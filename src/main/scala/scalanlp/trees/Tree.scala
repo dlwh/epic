@@ -17,11 +17,25 @@ case class Tree[+L](label: L, children: Seq[Tree[L]])(val span: Span) {
     children.last.span.end == this.span.end
   }
 
+  def leaves:Iterable[Tree[L]] = if(isLeaf) {
+    List(this).projection
+  } else  {
+    children.map(_.leaves).foldLeft[Stream[Tree[L]]](Stream.empty)(_ append _)
+  }
+
+  def allChildren = preorder;
+
+  def preorder: Iterable[Tree[L]] = {
+    children.map(_.preorder).foldLeft(List(this).projection)(_ append _)
+  }
+
+  def postorder: Iterable[Tree[L]] = {
+    children.map(_.postorder).foldLeft[Stream[Tree[L]]](Stream.empty)(_ append _) append List(this).projection
+  }
+
   import Tree._;
   override def toString = recursiveToString(this,0,new StringBuilder).toString;
   def render[W](words: Seq[W]) = recursiveRender(this,0,words, new StringBuilder).toString;
-
-
 }
 
 object Tree {
