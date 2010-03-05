@@ -2,7 +2,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.scalanlp</groupId>
   <artifactId>parser</artifactId>
-  <version>1.0-SNAPSHOT</version>
+  <version>0.1-SNAPSHOT</version>
   <inceptionYear>2009</inceptionYear>
   <build>
     <sourceDirectory>src/main/scala</sourceDirectory>
@@ -60,12 +60,12 @@
     <dependency>
       <groupId>org.scala-lang</groupId>
       <artifactId>scala-library</artifactId>
-      <version>2.7.3.RC2</version>
+      <version>2.8.0.Beta1</version>
     </dependency>
     <dependency>
       <groupId>org.scalanlp</groupId>
       <artifactId>scalanlp-core</artifactId>
-      <version>0.2-SNAPSHOT</version>
+      <version>0.2.1-SNAPSHOT</version>
     </dependency>
     <dependency>
       <groupId>junit</groupId>
@@ -86,6 +86,6 @@
     </plugins>
   </reporting>
   <properties>
-    <scala.version>2.7.3.RC2</scala.version>
+    <scala.version>2.8.0.Beta1</scala.version>
   </properties>
 </project>

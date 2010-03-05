@@ -1,6 +1,6 @@
 package scalanlp.trees;
 
-import util.Implicits._;
+//import util.Implicits._;
 import scala.collection.mutable.ArrayBuffer;
 
 case class Tree[+L](label: L, children: Seq[Tree[L]])(val span: Span) {
@@ -21,19 +21,19 @@ case class Tree[+L](label: L, children: Seq[Tree[L]])(val span: Span) {
   def leaves:Iterable[Tree[L]] = if(isLeaf) {
     List(this).projection
   } else  {
-    children.map(_.leaves).foldLeft[Stream[Tree[L]]](Stream.empty)(_ append _)
+    children.map(_.leaves).foldLeft[Stream[Tree[L]]](Stream.empty){_ append _}
   }
 
-  def map[M](f: L=>M):Tree[M] = Tree( f(label), children map ( _ map f))(span);
+  def map[M](f: L=>M):Tree[M] = Tree( f(label), children map { _ map f})(span);
 
   def allChildren = preorder;
 
-  def preorder: Iterable[Tree[L]] = {
-    children.map(_.preorder).foldLeft(List(this).projection)(_ append _)
+  def preorder: Iterator[Tree[L]] = {
+    children.map(_.preorder).foldLeft( Iterator(this)) { _ ++ _ }
   }
 
-  def postorder: Iterable[Tree[L]] = {
-    children.map(_.postorder).foldLeft[Stream[Tree[L]]](Stream.empty)(_ append _) append List(this).projection
+  def postorder: Iterator[Tree[L]] = {
+    children.map(_.postorder).foldRight(Iterator(this)){_ ++ _}
   }
 
   import Tree._;
@@ -42,7 +42,7 @@ case class Tree[+L](label: L, children: Seq[Tree[L]])(val span: Span) {
 }
 
 object Tree {
-  def fromString(input: String):(Tree[String],Seq[String]) = PennTreeReader.readTree(input).left.get;
+  def fromString(input: String):(Tree[String],Seq[String]) = new PennTreeReader().readTree(input).left.get;
 
   private def recursiveToString[L](tree: Tree[L], depth: Int, sb: StringBuilder):StringBuilder = {
     import tree._;
@@ -59,7 +59,7 @@ object Tree {
     import tree._;
       sb append "\n" append "  "*depth append "( " append tree.label
     if(isLeaf) {
-      sb append words(span).mkString(" "," ","");
+      sb append span.map(words).mkString(" "," ","");
     } else {
       //sb append "\n"
       for( c <- children ) {
@@ -98,6 +98,8 @@ object Trees {
   def binarize[L](tree: Tree[L], relabel: (L,L)=>L):BinarizedTree[L] = tree match {
     case Tree(l, Seq()) => NullaryTree(l)(tree.span)
     case Tree(l, Seq(oneChild)) => UnaryTree(l,binarize(oneChild,relabel))(tree.span);
+    case Tree(l, Seq(leftChild,rightChild)) => 
+      BinaryTree(l,binarize(leftChild,relabel),binarize(rightChild,relabel))(tree.span);
     case Tree(l, Seq(leftChild, otherChildren@ _*)) =>
       val newLeftChild = binarize(leftChild,relabel);
       val newRightLabel = relabel(l,leftChild.label);
@@ -127,4 +129,42 @@ object Trees {
   }
 
   def debinarize(tree: Tree[String]):Tree[String] = debinarize(tree, (x:String) => x.startsWith("@"));
+
+  object Transforms {
+    class EmptyNodeStripper extends (Tree[String]=>Option[Tree[String]]) {
+      def apply(tree: Tree[String]):Option[Tree[String]] = {
+        if(tree.label == "-NONE-") None
+        else if(tree.span.start == tree.span.end) None // screw stupid spans
+        else {
+          val newC = tree.children map this filter (None!=)
+          if(newC.length == 0 && !tree.isLeaf) None
+          else Some(Tree(tree.label,newC map (_.get))(tree.span))
+        }
+      }
+    }
+    class XOverXRemover[L] extends (Tree[L]=>Tree[L]) {
+      def apply(tree: Tree[L]):Tree[L] = {
+        if(tree.children.size == 1 && tree.label == tree.children(0).label) {
+          this(tree.children(0));
+        } else {
+          Tree(tree.label,tree.children.map(this))(tree.span);
+        }
+      }
+    }
+
+    class FunctionNodeStripper extends (Tree[String]=>Tree[String]) {
+      def apply(tree: Tree[String]): Tree[String] = {
+        tree.map(_.replaceAll("-.+","")) 
+      }
+    }
+
+    object StandardStringTransform extends (Tree[String]=>Tree[String]) {
+      private val ens = new EmptyNodeStripper;
+      private val xox = new XOverXRemover[String];
+      private val fns = new FunctionNodeStripper;
+      def apply(tree: Tree[String]): Tree[String] = {
+        xox(fns(ens(tree).get)) map (_.intern);
+      }
+    }
+  }
 }

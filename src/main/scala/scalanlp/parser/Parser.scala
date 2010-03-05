@@ -5,5 +5,5 @@ import scalanlp.classify.Classifier;
 import scalanlp.data._;
 
 trait Parser[L,W] extends Classifier[Tree[L],Seq[W]] {
-  def bestParse(s: Observation[Seq[W]]) = classify(s);
+  def bestParse(s: Seq[W]) = classify(s);
 }

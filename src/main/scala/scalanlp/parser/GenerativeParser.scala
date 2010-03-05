@@ -1,14 +1,24 @@
 package scalanlp.parser;
 
+import scala.collection.mutable.ArrayBuffer
+import scala.collection.mutable.BitSet
+import scala.collection.mutable.Map;
+
 import scalanlp.data._;
+import scalanlp.data.process._;
+import scalanlp.collection.mutable.SparseArray
 import scalanlp.counters._;
+import Counters._;
+import LogCounters.{LogPairedDoubleCounter,LogDoubleCounter,logNormalizeRows};
 import scalanlp.trees._;
 import java.util.Arrays;
+import scalanlp.util._;
+import scalala.Scalala.{log=>_,_};
+import scalala.tensor._;
 
 import scalanlp.util.Index;
 import Math._;
 
-import scala.collection.mutable.Map;
 
 import GenerativeParser._;
 
@@ -19,162 +29,201 @@ class GenerativeParser[L,W](root: L, lexicon: Lexicon[L,W],
   
   private class BackPtr;
   private case object Term extends BackPtr;
-  private case class Unary(lchild: L) extends BackPtr;
-  private case class Binary(lchild: L, rchild: L, split: Int) extends BackPtr;
+  private case class Unary(lchild: Int) extends BackPtr;
+  private case class Binary(lchild: Int, rchild: Int, split: Int) extends BackPtr;
 
-  def scores(o: Observation[Seq[W]]) = {
-    val s = o.features;
-    val score = new Array[Array[DoubleCounter[L]]](s.length+1, s.length + 1);
-    for(arr1 <- score;
-      i <- 0 until arr1.length) {
-      arr1(i) = DoubleCounter[L]();
-    }
-    val back = new Array[Array[Map[L,BackPtr]]](s.length+1,s.length+1);
+  // Score is a vector of scores whose indices are nonterms or preterms
+  private def updateUnaries(score: Vector,
+                            back: SparseArray[BackPtr]) {
+    var recheck:ArrayBuffer[Int] = new ArrayBuffer[Int]();
+    var lastRecheck = new ArrayBuffer[Int]();
+    val set = new BitSet(score.size);
+    recheck ++= score.activeElements.filter(!_._2.isInfinite).map(_._1);
+    val max_iter = 5;
 
-    for(arr1 <- back;
-      i <- 0 until arr1.length) {
-      arr1(i) = Map[L,BackPtr]();
+    var iter = 0;
+    while(iter < max_iter) {
+      iter += 1;
+
+      val elems = recheck.iterator;
+      val temp = recheck;
+      recheck = lastRecheck;
+      lastRecheck = temp;
+      set.clear();
+
+      for( b <- elems) {
+        val bScore = score(b);
+        for( (a,aScore) <- grammar.unaryRulesByIndexedChild(b).activeElements) {
+          val prob = aScore + bScore;
+          if(prob > score(a)) {
+            score(a) = prob;
+            back(a) = Unary(b);
+            if(!set(a)) {
+              set += a;
+              recheck += a;
+            }
+          }
+        }
+      }
+      lastRecheck.clear();
     }
+  }
+
+
+  def scores(s: Seq[W]) = {
+    val score = Array.fill(s.length+1, s.length + 1)(grammar.fillArray(Double.NegativeInfinity));
+    val back = Array.fill(s.length+1,s.length+1)(grammar.mkSparseArray[BackPtr]);
+
     for{i <- 0 until s.length} {
       for ( a <- lexicon.tags;
             wScore = lexicon.wordScore(a,s(i))
             if !wScore.isInfinite) {
-        score(i)(i+1)(a) = wScore;
-        back(i)(i+1)(a) = Term;
+        assert(a != null);
+        score(i)(i+1)(grammar.index(a)) = wScore;
+        back(i)(i+1)(grammar.index(a)) = Term;
       }
-      var added = true;
-      while(added) {
-        added = false;
 
-        for( (b,bScore) <- score(i)(i+1);
-            ((a,_),aScore) <- grammar.unaryRulesByChild(b)) {
-          val prob = aScore + bScore;
-          if(!score(i)(i+1).contains(a) || prob > score(i)(i+1)(a)) {
-            score(i)(i+1)(a) = prob;
-            back(i)(i+1)(a) = Unary(b);
-            added = true;
-          }
-        }
-      }
+      updateUnaries(score(i)(i+1),back(i)(i+1));
     }
-    for( span <- 2 to s.length;
-        begin <- 0 to (s.length - span);
-        end = begin + span;
+
+    for {
+      span <- 2 to s.length;
+      begin <- 0 to (s.length - span);
+      end = begin + span
+    } {
+      for {
         split <- (begin+1) to (end-1);
-        (b,bScore) <- score(begin)(split);
-        ((a,(_,c)),aScore) <- grammar.binaryRulesByLeftChild(b)
-        if score(split)(end) contains c) {
-      val prob = bScore + score(split)(end)(c) + aScore;
-      if(!score(begin)(end).contains(a) || prob > score(begin)(end)(a)) {
-        score(begin)(end)(a) = prob;
-        back(begin)(end)(a) = Binary(b,c,split);
-      }
-      var added = true;
-      while(added) {
-        added = false;
-        for( (b,bScore) <- score(begin)(end);
-          ((a,_),aScore) <- grammar.unaryRulesByChild(b)) {
-          val prob = aScore + bScore;
-          if(!score(begin)(end).contains(a) || prob > score(begin)(end)(a)) {
-            score(begin)(end)(a) = prob;
-            back(begin)(end)(a) = Unary(b);
-            added = true;
+        (b,bScore) <- score(begin)(split).activeElements;
+        if !bScore.isInfinite
+        (c,parentVector) <- grammar.binaryRulesByIndexedLeftChild(b)
+      } {
+        val cScore = score(split)(end)(c)
+        if (!cScore.isInfinite)
+          for {
+            (a,aScore) <- parentVector.activeElements
+          } {
+            val prob = bScore + cScore + aScore;
+            if(prob > score(begin)(end)(a)) {
+              score(begin)(end)(a) = prob;
+              back(begin)(end)(a) = Binary(b,c,split);
+            }
           }
-        } 
       }
+      updateUnaries(score(begin)(end),back(begin)(end));
     }
 
-/*
-    for( (arr,i) <- back zipWithIndex;
-         (ctr,j) <- arr zipWithIndex
-       )  {
-       println( (i,j) + score(i)(j).toString);
-       println( (i,j) + ctr.toString);
-     }
-     */
+    val bestParse = try {
+      buildTree(back,0,s.length,grammar.index(root));
+    } catch { case e =>
+      println( score(0)(s.length).toString);
+      println( back(0)(s.length).toString);
+      throw e;
+    }
 
-    val bestParse = buildTree(back,0,s.length,root);
     val c = DoubleCounter[Tree[L]]();
-    c(bestParse) = score(0)(s.length)(root);
+    c(bestParse) = score(0)(s.length)(grammar.index(root));
     c;
   }
 
-  private def buildTree(back: Array[Array[Map[L,BackPtr]]], start: Int, end: Int, root: L):BinarizedTree[L] = {
+  private def buildTree(back: Array[Array[SparseArray[BackPtr]]], start: Int, end: Int, root: Int):BinarizedTree[L] = {
     val b = back(start)(end)(root)
     b match {
       case Term =>
-        NullaryTree(root)(Span(start,end));
+        NullaryTree(grammar.index.get(root))(Span(start,end));
       case Unary(child) => 
         val c = buildTree(back,start,end,child);
-        UnaryTree(root,c)(Span(start,end));
+        UnaryTree(grammar.index.get(root),c)(Span(start,end));
       case Binary(lchild,rchild,split) => 
         val lc = buildTree(back,start,split,lchild);
         val rc = buildTree(back,split,end,rchild);
-        BinaryTree(root,lc,rc)(Span(start,end));
+        BinaryTree(grammar.index.get(root),lc,rc)(Span(start,end));
     }
   }
 }
 
+sealed abstract class Rule[+L] { def parent: L }
+final case class BinaryRule[+L](parent: L, left: L, right: L) extends Rule[L];
+final case class UnaryRule[+L](parent: L, child: L) extends Rule[L];
 
 object GenerativeParser {
+  class Grammar[L](private val productions: LogPairedDoubleCounter[L,Rule[L]]) extends VectorBroker[L] {
 
-  class Grammar[L](private val unaryRules: PairedDoubleCounter[L,L],
-                   private val binaryRules: PairedDoubleCounter[L,(L,L)]) {
-    {
-      val totals = DoubleCounter[L]();
-      for( (a,ctr) <- unaryRules) {
-        totals(a) += ctr.total;
-      }
-      for( (a,ctr) <- binaryRules) {
-        totals(a) += ctr.total;
-      }
+    private val leftChildBinaryRules = LogPairedDoubleCounter[L,BinaryRule[L]]();
+    private val childUnaryParents = LogPairedDoubleCounter[L,UnaryRule[L]]();
+    private val unaryRules = PairedDoubleCounter[L,UnaryRule[L]]();
+    private val binaryRules = PairedDoubleCounter[L,BinaryRule[L]]();
 
-      unaryRules.transform { (a,ctr) =>
-        val total = log(totals(a));
-        ctr.transform  { (b,count) =>
-          val c = log(count) - total;
-          assert(c <= 0,"" + ((a,b,c)) + count + total);
-          c
+    val index: Index[L] = {
+      val index = Index[L]();
+      for((a,ctr) <- productions.rows;
+          (prod,score) <- ctr) {
+        assert(score <= 0,(score,a,prod)+"");
+        prod match {
+          case u@UnaryRule(_,b) =>
+            childUnaryParents(b,u) = score;
+            unaryRules(a,u) = score;
+            index.index(b);
+          case br@BinaryRule(_,b,c) =>
+            leftChildBinaryRules(b,br) = score;
+            binaryRules(a,br) = score;
+            index.index(b);
+            index.index(c);
         }
-        ctr;
       }
-
-      binaryRules.transform { (a,ctr) =>
-        val total = log(totals(a));
-        ctr.transform  { (r,count) =>
-          val c = log(count) - total;
-          assert(c <= 0, "" + ((a,r,c)) + count + total + totals(a));
-          c
-        }
-        ctr;
-      }
+      productions.rows.map(_._1) foreach { index.index _ };
+      index
     }
 
-    private val leftChildBinaryRules = new PairedDoubleCounter[L,(L,(L,L))];
-    for((a,ctr) <- binaryRules;
-        (r@(b,_),score) <- ctr) {
-      leftChildBinaryRules.incrementCount(b,(a,r),score);
+    private val indexedUnaryRulesByChild:Array[Vector] = fillArray(mkVector(Double.NegativeInfinity));
+    for( ((a,UnaryRule(_,b)),score) <- unaryRules) {
+      indexedUnaryRulesByChild(index(b))(index(a)) = score;
     }
 
-    private val childUnaryParents = new PairedDoubleCounter[L,(L,L)];
-    for((a,ctr) <- unaryRules;
-        (b,score) <- ctr) {
-      childUnaryParents.incrementCount(b,(a,b),score);
+    // Mapping is Left Child -> Right Child -> Parent -> Score
+    private val indexedBinaryRulesByLeftChild:Array[SparseArray[Vector]] = (
+      fillArray(fillSparseArray(mkVector(Double.NegativeInfinity)))
+    );
+    for( ((a,BinaryRule(_,b,c)),score) <- binaryRules) {
+      indexedBinaryRulesByLeftChild(index(b))(index(c))(index(a)) = score;
     }
+
 
     /**
     * Returns pairs of the form ((parent,child),score);
     */
-    def unaryRulesByChild(c: L) = childUnaryParents(c).elements;
+    def unaryRulesByChild(c: L) = {
+      assert(c != null);
+      childUnaryParents(c).iterator;
+    }
+
+
+    /**
+    * Returns a vector of parent index -> score
+    */
+    def unaryRulesByIndexedChild(c: Int) = {
+      indexedUnaryRulesByChild(c);
+    }
+
+
     /**
     * Returns pairs of the form (child,score);
     */
-    def unaryRulesByParent(p: L) = unaryRules(p).elements;
+    def unaryRulesByParent(p: L) = {
+      assert(p != null);
+      unaryRules(p).iterator;
+    }
 
     /**
     * Returns pairs of the form ( (parent,(left,right)),score);
     */
     def binaryRulesByLeftChild(c: L) = leftChildBinaryRules(c).elements;
+
+    /**
+    * Returns a SparseArray[Vector] with RightIndex -> ParentIndex -> Score
+    */
+    def binaryRulesByIndexedLeftChild(b: Int) = indexedBinaryRulesByLeftChild(b);
+
+
     /**
     * Returns pairs of the form ( (lchild,rchild),
     */
@@ -182,12 +231,24 @@ object GenerativeParser {
   }
 
   class Lexicon[L,W](private val lexicon: PairedDoubleCounter[L,W], smoothing: Double) {
+    val wordCounts = DoubleCounter[W]();
+    lexicon.rows.foreach ( wordCounts += _._2 )
+
     def wordScore(l: L, w: W) = {
-      val result = log(lexicon(l)(w) + smoothing) - log(lexicon(l).total + lexicon(l).size * smoothing)
+      var cWord = wordCounts(w);
+      var cTagWord = lexicon(l)(w);
+      if(wordCounts(w) < 4) {
+        cWord += 1.0;
+        cTagWord += lexicon(l).size.toDouble / wordCounts.size
+      }
+      val pW = (1.0 + cWord) / (wordCounts.total + 1.0);
+      val pTgW = (cTagWord) / (cWord);
+      val pTag = lexicon(l).total / wordCounts.total
+      val result = log(pW * pTgW / pTag);
       result;
     }
 
-    def tags = lexicon.keys;
+    def tags = lexicon.rows.map(_._1);
   }
 
   def fromTrees[W](data: Collection[(Tree[String],Seq[W])]):GenerativeParser[String,W] = {
@@ -198,17 +259,16 @@ object GenerativeParser {
   def fromTrees[W](data: Iterator[(Tree[String],Seq[W])]):GenerativeParser[String,W] = {
     val root = "";
     val lexicon = new PairedDoubleCounter[String,W]();
-    val unaryRules = new PairedDoubleCounter[String,String]();
-    val binaryRules = new PairedDoubleCounter[String,(String,String)]();
+    val productions = new PairedDoubleCounter[String,Rule[String]]();
 
     for( (tree,words) <- data) {
       val btree = Trees.binarize(tree);
       val leaves = tree.leaves map (l => (l,words(l.span.start)));
       btree.allChildren foreach { 
         case t @ BinaryTree(a,bc,cc) => 
-          binaryRules.incrementCount( a, (bc.label,cc.label), 1.0); 
+          productions(a,BinaryRule(a,bc.label,cc.label)) += 1.0;
         case t@UnaryTree(a,bc) => 
-          unaryRules.incrementCount( a, bc.label, 1.0); 
+          productions(a,UnaryRule(a,bc.label)) += 1.0;
         case t => 
       }
       for( (l,w) <- leaves) {
@@ -217,41 +277,77 @@ object GenerativeParser {
       
     }
 
-    new GenerativeParser(root,new Lexicon(lexicon,0.1),new Grammar(unaryRules,binaryRules));
+    new GenerativeParser(root,new Lexicon(lexicon,0.1),new Grammar(logNormalizeRows(productions)));
   }
+}
+
+
+object GenerativeTester {
+  import java.io.File;
+ // import scalax.io.Implicits._;
+  def main(args: Array[String]) {
+    val treebank = Treebank.fromPennTreebankDir(new File(args(0)));
+    val xform = Trees.Transforms.StandardStringTransform;
+    val trees = for( (tree,words) <- treebank.trainTrees)
+      yield (xform(tree),words map (_.intern));
+    val parser = GenerativeParser.fromTrees(trees);
+    //println("Train:");
+    //eval(treebank.trainTrees,parser,xform);
+    println("Dev:");
+    eval(treebank.devTrees,parser,xform);
+    println("Test:");
+    eval(treebank.testTrees,parser,xform);
+  }
+
+  def eval(trees: Iterator[(Tree[String],Seq[String])],
+           parser: GenerativeParser[String,String],
+           xform: Tree[String]=>Tree[String]) {
+    val peval = new ParseEval(Set(""));
+    val goldGuess = {
+      for { 
+        (goldTree, words) <- trees;
+        () = println(words);
+        () = println(xform(goldTree) render words);
+        guessTree = Trees.debinarize(parser(words))
+      } yield {
+        println(guessTree render words);
+        println("===========");
+        val ret = (xform(goldTree),guessTree)
+        println("Local Accuracy:" + peval(Iterator.single(ret)));
+        ret;
+      }
+    }
+    val (prec,recall,exact) = peval(goldGuess);
+    val f1 = (2 * prec * recall)/(prec + recall);
+    println( "P: " + prec + " R:" + recall + " F1: " + f1 +  " Ex:" + exact);
+  }
+
 }
 
 object GenerativeInterpreter {
   import java.io.File;
-  import scalax.io.Implicits._;
   def main(args: Array[String]) {
-    val trees = {
-     for(file <- new File(args(0)).listFiles.elements;
-     //for(dir <- new File(args(0)).listFiles.elements;
-       //   if dir.isDirectory;
-     //     file <- dir.listFiles.elements;
-          (tree,words) <- PennTreeReader.readTrees(file.slurp).fold( x=>x, x => throw new Exception("error in " + file + " " + x.toString)) elements)
-        yield (tree.map(_.replaceAll("\\-.*","").intern),words.map(_.intern));
-    }
+    val treebank = Treebank.fromPennTreebankDir(new File(args(0)));
+    val xform = Trees.Transforms.StandardStringTransform;
+    val trees = for( (tree,words) <- treebank.trainTrees)
+      yield (xform(tree),words map (_.intern));
     val parser = GenerativeParser.fromTrees(trees);
     while(true) {
       print("Ready> ");
       val line = readLine();
       if(line.trim == "quit") System.exit(1);
-      val words =new scalanlp.data.process.PTBTokenizer tokenize(line.trim);
+      val words = PTBTokenizer.tokenize(line.trim);
       words match {
         case Left(words)=>
         println(words.mkString(","));
         try {
-          val parse = parser(Observation("console",words));
+          val parse = parser(words);
           println(Trees.debinarize(parse) render words);
         } catch {
           case e => e.printStackTrace();
         }
         case Right(bleh) => println(bleh);
       }
-      ()
     }
-    ()
   }
 }
