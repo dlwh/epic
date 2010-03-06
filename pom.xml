@@ -88,4 +88,6 @@
   <properties>
     <scala.version>2.8.0.Beta1</scala.version>
   </properties>
+    <name>Scalanlp Parser</name>
 </project>
+
