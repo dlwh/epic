@@ -34,7 +34,8 @@ class GenerativeParser[L,W](root: L, lexicon: Lexicon[L,W],
 
   // Score is a vector of scores whose indices are nonterms or preterms
   private def updateUnaries(score: Vector,
-                            back: SparseArray[BackPtr]) {
+                            back: SparseArray[BackPtr],
+                            active: IntBloomFilter) {
     var recheck:ArrayBuffer[Int] = new ArrayBuffer[Int]();
     var lastRecheck = new ArrayBuffer[Int]();
     val set = new BitSet(score.size);
@@ -58,6 +59,7 @@ class GenerativeParser[L,W](root: L, lexicon: Lexicon[L,W],
           if(prob > score(a)) {
             score(a) = prob;
             back(a) = Unary(b);
+            active += a;
             if(!set(a)) {
               set += a;
               recheck += a;
@@ -71,8 +73,9 @@ class GenerativeParser[L,W](root: L, lexicon: Lexicon[L,W],
 
 
   def scores(s: Seq[W]) = {
-    val score = Array.fill(s.length+1, s.length + 1)(grammar.fillArray(Double.NegativeInfinity));
+    val score = Array.fill(s.length+1, s.length + 1)(grammar.mkVector(Double.NegativeInfinity));
     val back = Array.fill(s.length+1,s.length+1)(grammar.mkSparseArray[BackPtr]);
+    val active = Array.fill(s.length+1,s.length+1)(new IntBloomFilter(grammar.index.size,3));
 
     for{i <- 0 until s.length} {
       for ( a <- lexicon.tags;
@@ -81,9 +84,10 @@ class GenerativeParser[L,W](root: L, lexicon: Lexicon[L,W],
         assert(a != null);
         score(i)(i+1)(grammar.index(a)) = wScore;
         back(i)(i+1)(grammar.index(a)) = Term;
+        active(i)(i+1) += grammar.index(a);
       }
 
-      updateUnaries(score(i)(i+1),back(i)(i+1));
+      updateUnaries(score(i)(i+1),back(i)(i+1),active(i)(i+1));
     }
 
     for {
@@ -96,6 +100,7 @@ class GenerativeParser[L,W](root: L, lexicon: Lexicon[L,W],
         (b,bScore) <- score(begin)(split).activeElements;
         if !bScore.isInfinite
         (c,parentVector) <- grammar.binaryRulesByIndexedLeftChild(b)
+        if active(split)(end)(c)
       } {
         val cScore = score(split)(end)(c)
         if (!cScore.isInfinite)
@@ -106,10 +111,11 @@ class GenerativeParser[L,W](root: L, lexicon: Lexicon[L,W],
             if(prob > score(begin)(end)(a)) {
               score(begin)(end)(a) = prob;
               back(begin)(end)(a) = Binary(b,c,split);
+              active(begin)(end) += a;
             }
           }
       }
-      updateUnaries(score(begin)(end),back(begin)(end));
+      updateUnaries(score(begin)(end),back(begin)(end),active(begin)(end));
     }
 
     val bestParse = try {
@@ -162,21 +168,28 @@ object GenerativeParser {
           case u@UnaryRule(_,b) =>
             childUnaryParents(b,u) = score;
             unaryRules(a,u) = score;
+            index.index(a);
             index.index(b);
           case br@BinaryRule(_,b,c) =>
             leftChildBinaryRules(b,br) = score;
             binaryRules(a,br) = score;
+            index.index(a)
             index.index(b);
             index.index(c);
         }
       }
-      productions.rows.map(_._1) foreach { index.index _ };
       index
     }
 
     private val indexedUnaryRulesByChild:Array[Vector] = fillArray(mkVector(Double.NegativeInfinity));
     for( ((a,UnaryRule(_,b)),score) <- unaryRules) {
-      indexedUnaryRulesByChild(index(b))(index(a)) = score;
+      try {
+        indexedUnaryRulesByChild(index(b))(index(a)) = score;
+      } catch {
+        case e =>
+        println(index(a),index(b),a,b);
+        throw e
+      }
     }
 
     // Mapping is Left Child -> Right Child -> Parent -> Score
@@ -308,12 +321,15 @@ object GenerativeTester {
         (goldTree, words) <- trees;
         () = println(words);
         () = println(xform(goldTree) render words);
+        startTime = System.currentTimeMillis;
         guessTree = Trees.debinarize(parser(words))
       } yield {
+        val endTime = System.currentTimeMillis;
         println(guessTree render words);
-        println("===========");
         val ret = (xform(goldTree),guessTree)
         println("Local Accuracy:" + peval(Iterator.single(ret)));
+        println( (endTime - startTime) / 1000.0 + " Seconds");
+        println("===========");
         ret;
       }
     }
