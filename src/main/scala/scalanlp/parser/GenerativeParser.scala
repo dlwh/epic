@@ -275,7 +275,7 @@ object GenerativeParser {
     val productions = new PairedDoubleCounter[String,Rule[String]]();
 
     for( (tree,words) <- data) {
-      val btree = Trees.binarize(tree);
+      val btree = Trees.xBarBinarize(tree);
       val leaves = tree.leaves map (l => (l,words(l.span.start)));
       btree.allChildren foreach { 
         case t @ BinaryTree(a,bc,cc) => 

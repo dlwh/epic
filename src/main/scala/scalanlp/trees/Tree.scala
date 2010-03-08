@@ -130,6 +130,12 @@ object Trees {
 
   def debinarize(tree: Tree[String]):Tree[String] = debinarize(tree, (x:String) => x.startsWith("@"));
 
+  private def xbarStringBinarizer(currentLabel: String, append:String) = {
+    if(currentLabel.startsWith("@")) currentLabel
+    else "@" + currentLabel
+  }
+  def xBarBinarize(tree: Tree[String]) = binarize[String](tree,xbarStringBinarizer);
+
   object Transforms {
     class EmptyNodeStripper extends (Tree[String]=>Option[Tree[String]]) {
       def apply(tree: Tree[String]):Option[Tree[String]] = {
