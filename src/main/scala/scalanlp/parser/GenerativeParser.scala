@@ -149,39 +149,25 @@ class GenerativeParser[L,W](root: L, lexicon: Lexicon[L,W],
 
 object GenerativeParser {
 
-  class Lexicon[L,W](private val lexicon: PairedDoubleCounter[L,W], smoothing: Double) {
-    val wordCounts = DoubleCounter[W]();
-    lexicon.rows.foreach ( wordCounts += _._2 )
+  
 
-    def wordScore(l: L, w: W) = {
-      var cWord = wordCounts(w);
-      var cTagWord = lexicon(l)(w);
-      if(wordCounts(w) < 4) {
-        cWord += 1.0;
-        cTagWord += lexicon(l).size.toDouble / wordCounts.size
-      }
-      val pW = (1.0 + cWord) / (wordCounts.total + 1.0);
-      val pTgW = (cTagWord) / (cWord);
-      val pTag = lexicon(l).total / wordCounts.total
-      val result = log(pW * pTgW / pTag);
-      result;
-    }
-
-    def tags = lexicon.rows.map(_._1);
-  }
-
-  def fromTrees[W](data: Collection[(Tree[String],Seq[W])]):GenerativeParser[String,W] = {
-    fromTrees(data.elements);
+  def fromTrees[W](data: Collection[(Tree[String],Seq[W])], binarize: Tree[String]=>BinarizedTree[String]):GenerativeParser[String,W] = {
+    fromTrees(data.iterator,binarize);
   }
     
     
-  def fromTrees[W](data: Iterator[(Tree[String],Seq[W])]):GenerativeParser[String,W] = {
+  def fromTrees[W](data: Iterator[(Tree[String],Seq[W])], binarize: Tree[String]=>BinarizedTree[String]):GenerativeParser[String,W] = {
     val root = "";
+    val (lexicon,productions) = extractCounts(data,binarize);
+    new GenerativeParser(root,new SimpleLexicon(lexicon),new GenerativeGrammar(logNormalizeRows(productions)));
+  }
+
+  def extractCounts[W](data: Iterator[(Tree[String],Seq[W])], binarize: Tree[String]=>BinarizedTree[String]) = {
     val lexicon = new PairedDoubleCounter[String,W]();
     val productions = new PairedDoubleCounter[String,Rule[String]]();
 
     for( (tree,words) <- data) {
-      val btree = Trees.xBarBinarize(tree);
+      val btree = binarize(tree);
       val leaves = tree.leaves map (l => (l,words(l.span.start)));
       btree.allChildren foreach { 
         case t @ BinaryTree(a,bc,cc) => 
@@ -195,8 +181,8 @@ object GenerativeParser {
       }
       
     }
+    (lexicon,productions)
 
-    new GenerativeParser(root,new Lexicon(lexicon,0.1),new GenerativeGrammar(logNormalizeRows(productions)));
   }
 }
 
@@ -209,7 +195,7 @@ object GenerativeTester {
     val xform = Trees.Transforms.StandardStringTransform;
     val trees = for( (tree,words) <- treebank.trainTrees)
       yield (xform(tree),words map (_.intern));
-    val parser = GenerativeParser.fromTrees(trees);
+    val parser = GenerativeParser.fromTrees(trees,Trees.xBarBinarize _ );
     //println("Train:");
     //eval(treebank.trainTrees,parser,xform);
     println("Dev:");
@@ -253,7 +239,7 @@ object GenerativeInterpreter {
     val xform = Trees.Transforms.StandardStringTransform;
     val trees = for( (tree,words) <- treebank.trainTrees)
       yield (xform(tree),words map (_.intern));
-    val parser = GenerativeParser.fromTrees(trees);
+    val parser = GenerativeParser.fromTrees(trees,Trees.xBarBinarize _);
     while(true) {
       print("Ready> ");
       val line = readLine();

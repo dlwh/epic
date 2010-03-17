@@ -33,7 +33,7 @@ class GenerativeGrammar[L](productions: LogPairedDoubleCounter[L,Rule[L]]) exten
     val index = Index[L]();
     for((a,ctr) <- productions.rows;
         (prod,score) <- ctr) {
-      assert(score <= 0,(score,a,prod)+"");
+      assert(score <= 0,(score,a,prod)+" " + ctr);
       prod match {
         case u@UnaryRule(_,b) =>
           childUnaryParents(b,u) = score;
