@@ -12,6 +12,7 @@ import scalanlp.trees.Treebank
 import scalanlp.trees.Trees
 import scalanlp.trees.UnaryTree
 import scalanlp.util.IntBloomFilter
+import scalanlp.collection.mutable.SparseArray
 import scalanlp.counters.Counters._;
 import Math.exp
 
@@ -104,65 +105,60 @@ object StateSplitting {
   }
 
   def expectedCounts[L,W](grammar: Grammar[L], lexicon: Lexicon[L,W], tree: BinarizedTree[Seq[L]], s: Seq[W]) = {
-    val ruleCounts = PairedDoubleCounter[L,Rule[L]]();
-    val wordCounts = PairedDoubleCounter[L,W]();
+    val binaryRuleCounts = grammar.fillSparseArray(grammar.fillSparseArray(grammar.mkVector(0.0)));
+    val unaryRuleCounts = grammar.fillSparseArray(grammar.mkVector(0.0));
+    val wordCounts = grammar.fillSparseArray(DoubleCounter[W]());
 
     val iScores = insideScores(grammar,lexicon,tree,s);
     val oScores = outsideScores(grammar,lexicon, tree,s,iScores);
+    val indexedTree:Tree[Seq[Int]] = tree.map{ _.map(grammar.index) };
+
     // normalizer
     val totalProb = logSum(iScores(0)(s.length)(tree.label map grammar.index));
     println("Total Prob" + totalProb);
     assert(!totalProb.isInfinite);
     println("Expected Counts");
 
-    tree.allChildren foreach {
-      case t: NullaryTree[L] =>
+    indexedTree.allChildren foreach {
+      case t: NullaryTree[Seq[Int]] =>
         for( l <- t.label) {
-          val iLabel = grammar.index(l);
-          val iS = iScores(t.span.start)(t.span.end)(iLabel);
-          val oS = oScores(t.span.start)(t.span.end)(iLabel);
+          val iS = iScores(t.span.start)(t.span.end)(l);
+          val oS = oScores(t.span.start)(t.span.end)(l);
           val ruleScore = (iS + oS - totalProb);
           assert(!ruleScore.isNaN);
           //assert(!ruleScore.isInfinite);
          // assert(exp(ruleScore) > 0, " " + ruleScore);
-          wordCounts(l,s(t.span.start)) += exp(ruleScore);
+          wordCounts(l)(s(t.span.start)) = exp(ruleScore);
         }
       case t@UnaryTree(_,child) =>
         for {
           p <- t.label.iterator;
-          pIndex = grammar.index(p);
-          opScore = oScores(t.span.start)(t.span.end)(pIndex);
+          opScore = oScores(t.span.start)(t.span.end)(p);
           c <- child.label.iterator
-          cIndex = grammar.index(c);
-          icScore = iScores(child.span.start)(child.span.end)(cIndex)
+          icScore = iScores(child.span.start)(child.span.end)(c)
         } {
-          val rule = UnaryRule(p,c);
-          val ruleScore = opScore + icScore + grammar.unaryRulesByIndexedChild(cIndex)(pIndex) - totalProb;
+          val ruleScore = opScore + icScore + grammar.unaryRulesByIndexedChild(c)(p) - totalProb;
           assert(!ruleScore.isNaN);
          // assert(!ruleScore.isInfinite);
          // assert(exp(ruleScore) > 0, " " + ruleScore);
-          ruleCounts(rule.parent,rule) += exp(ruleScore);
+          unaryRuleCounts(p)(c) += exp(ruleScore);
         }
       case t@ BinaryTree(_,lc,rc) =>
         for {
           p <- t.label iterator;
-          pIndex = grammar.index(p);
-          opScore = oScores(t.span.start)(t.span.end)(pIndex);
+          opScore = oScores(t.span.start)(t.span.end)(p);
           l <- lc.label.iterator
-          lIndex = grammar.index(l);
-          val lRules = grammar.binaryRulesByIndexedLeftChild(lIndex);
-          ilScore = iScores(lc.span.start)(lc.span.end)(lIndex);
+          val lRules = grammar.binaryRulesByIndexedLeftChild(l);
+          ilScore = iScores(lc.span.start)(lc.span.end)(l);
           r <- rc.label.iterator
         } {
-          val rIndex = grammar.index(r);
-          val irScore = iScores(rc.span.start)(rc.span.end)(rIndex)
-          val rule = BinaryRule(p,l,r);
-          val ruleScore = opScore + irScore + ilScore + lRules(rIndex)(pIndex) - totalProb;
+          val irScore = iScores(rc.span.start)(rc.span.end)(r)
+          val ruleScore = opScore + irScore + ilScore + lRules(r)(p) - totalProb;
           //assert(exp(ruleScore) > 0, " " + ruleScore);
-          ruleCounts(rule.parent,rule) += exp(ruleScore);
+          binaryRuleCounts(p)(l)(r) += exp(ruleScore);
         }
     }
-    (ruleCounts,wordCounts,totalProb);
+    (binaryRuleCounts,unaryRuleCounts,wordCounts,totalProb);
   }
 
   def splitCounts[L,L2,W](ruleCounts: RuleCounts[L],
@@ -209,29 +205,81 @@ object StateSplitting {
       val grammar = new GenerativeGrammar(LogCounters.logNormalizeRows(splitRules));
       val lexicon = new UnsmoothedLexicon(LogCounters.logNormalizeRows(splitWords));
       val results = for {
-        (t,s) <- trees.iterator
+        (t,s) <- trees
       } yield expectedCounts(grammar,lexicon,t,s);
 
-      val (finalCounts, finalWords, logProb) = results.reduceLeft { (counts1,counts2) =>
-        val (ruleCounts1,wCounts1,tProb1) = counts1;
-        val (ruleCounts2,wCounts2,tProb2) = counts2;
-        (ruleCounts1 + ruleCounts2 value, wCounts1 + wCounts2 value, tProb1 + tProb2 );
+      val binaryRuleCounts = grammar.fillSparseArray(grammar.fillSparseArray(grammar.mkVector(0.0)));
+      val unaryRuleCounts = grammar.fillSparseArray(grammar.mkVector(0.0));
+      val wordCounts = grammar.fillSparseArray(DoubleCounter[W]());
+      var logProb = 0.0;
+
+      for( (bCounts,uCounts,wCounts,tProb) <- results) {
+        for( (k1,c) <- bCounts;
+            (k2,vec) <- c) {
+          binaryRuleCounts(k1)(k2) += vec;
+        }
+        for( (k,vec) <- uCounts) {
+          unaryRuleCounts(k) += vec;
+        }
+        for( (k,vec) <- wCounts) {
+          wordCounts(k) += vec;
+        }
+        logProb += tProb;
       }
+
+      val finalRules = decodeRules(grammar,binaryRuleCounts,unaryRuleCounts);
+      val finalWords = decodeWords(grammar,wordCounts);
+
       for( (k,ctr) <- finalWords.rows) {
         println(k + " " + ctr.maxk(30));
       }
+
       val improvement = (lastLogProb-logProb)/lastLogProb;
       println("Iter: " + logProb + "(" + lastLogProb + "->" +improvement+")");
 
-      (finalCounts,finalWords,logProb,improvement);
+      (finalRules,finalWords,logProb,improvement);
     }
-    stateIterator.dropWhile(_._4 > convergence).map { case (sR,sW,logP,_) => (sR,sW,logP) }.next
+    stateIterator.drop(10).dropWhile(_._4 > convergence).map { case (sR,sW,logP,_) => (sR,sW,logP) }.next
+  }
+
+  private def decodeRules[L](g: Grammar[L],
+                             binaryRuleCounts: SparseArray[SparseArray[Vector]],
+                             unaryRuleCounts: SparseArray[Vector]) = {
+    val ctr = PairedDoubleCounter[L,Rule[L]]();
+
+    for( (pIndex,arr1) <- binaryRuleCounts.iterator;
+        p = g.index.get(pIndex);
+        (lIndex,arr2) <- arr1.iterator;
+        l = g.index.get(lIndex);
+        (rIndex,v) <- arr2.activeElements;
+        r = g.index.get(rIndex)
+    ) {
+      ctr(p,BinaryRule(p,l,r)) = v;
+    }
+
+    for( (pIndex,arr1) <- unaryRuleCounts.iterator;
+        p = g.index.get(pIndex);
+        (cIndex,v) <- arr1.activeElements;
+        c = g.index.get(cIndex)
+    ) {
+      ctr(p,UnaryRule(p,c)) = v;
+    }
+
+    ctr;
+  }
+
+  private def decodeWords[L,W](g: Grammar[L], wordCounts: SparseArray[DoubleCounter[W]]) = {
+    val ctr = PairedDoubleCounter[L,W]();
+    for( (i,c) <- wordCounts) {
+      ctr(g.index.get(i)) := c;
+    }
+    ctr;
   }
 
   type RuleCounts[L] = PairedDoubleCounter[L,Rule[L]];
   type TagWordCounts[L,W] = PairedDoubleCounter[L,W];
   type Treebank[L,W] = Seq[(BinarizedTree[L],Seq[W])];
-  type SplitTreebank[L,W] = Seq[(BinarizedTree[Seq[L]],Seq[W])];
+  type SplitTreebank[L,W] = Iterator[(BinarizedTree[Seq[L]],Seq[W])];
 
   def splitGrammar[L,W](ruleCounts: RuleCounts[L],
                       wordCounts: TagWordCounts[L,W],
@@ -240,21 +288,22 @@ object StateSplitting {
                       randomNoise: Double,  convergence: Double): (RuleCounts[L],TagWordCounts[L,W],Double)  = {
     val oneCycle = splitCycle(_:RuleCounts[L],_:TagWordCounts[L,W],_:SplitTreebank[L,W],splitter,randomNoise,convergence);
 
-    def splitTrees(trees: Treebank[L,W]):SplitTreebank[L,W] = for { (tree,sent) <- trees } yield (tree.map(splitter),sent)
-    val initialTrees: SplitTreebank[L,W]= splitTrees(unsplitTrees);
+    def splitTree(tree: BinarizedTree[L]):BinarizedTree[Seq[L]] =  tree.map(splitter);
+    def resplitTree(tree: BinarizedTree[Seq[L]]):BinarizedTree[Seq[L]] =  tree.map(_ flatMap splitter);
+    def splitHelper(pair: (BinarizedTree[L],Seq[W]), splitFun: BinarizedTree[L]=>BinarizedTree[Seq[L]]) = (
+      (splitFun(pair._1),pair._2)
+    );
 
-    def resplitTrees(trees: SplitTreebank[L,W]) =for { (tree,sent) <- trees } yield (tree.map(_ flatMap splitter),sent)
-
-    val (state,trees) = Iterator.iterate( (oneCycle(ruleCounts,wordCounts,initialTrees),initialTrees) ) { state =>
-      val ((ruleCounts,wordCounts,logProb),trees) = state;
-      println("LP: " + logProb);
-      val split = resplitTrees(trees)
-      val nextState = oneCycle(ruleCounts,wordCounts,split);
-      (nextState,split);
-    } drop (nSplits-1) next
+    val initState = (ruleCounts,wordCounts,Double.NegativeInfinity, splitTree _)
+    val (finalCounts,finalWords,logProb,_) = Iterator.iterate( initState ) { state =>
+      val (ruleCounts,wordCounts,logProb,splitFun) = state;
+      val myTrees = unsplitTrees.iterator map { splitHelper(_,splitFun) };
+      val (nextRules,nextWords,newLP) = oneCycle(ruleCounts,wordCounts,myTrees);
+      (nextRules,nextWords,newLP,splitFun andThen resplitTree);
+    } drop (nSplits) next
 
     //val (rules,wordCounts,logProb) = state;
-    state;
+    (finalCounts,finalWords,logProb);
   }
 
   def splitGrammar(ruleCounts: RuleCounts[String],
@@ -277,7 +326,7 @@ object StateSplittingTest {
     val xform = Trees.Transforms.StandardStringTransform;
     println("Loading Treebank");
     val trees = (for( (tree,words) <- treebank.trainTrees)
-      yield (Trees.xBarBinarize(xform(tree)),words map (_.intern))).take(2000) toSeq;
+      yield (Trees.xBarBinarize(xform(tree)),words map (_.intern))) toSeq;
     println("Extracting counts");
     val (initialLex,initialProductions) = (
       GenerativeParser.extractCounts(trees.iterator,Trees.xBarBinarize _)
