@@ -7,6 +7,7 @@ import scala.collection.mutable.Map;
 import scalanlp.data._;
 import scalanlp.data.process._;
 import scalanlp.collection.mutable.SparseArray
+import scalanlp.collection.mutable.TriangularArray
 import scalanlp.counters._;
 import Counters._;
 import LogCounters.{LogPairedDoubleCounter,LogDoubleCounter,logNormalizeRows};
@@ -73,9 +74,9 @@ class GenerativeParser[L,W](root: L, lexicon: Lexicon[L,W],
 
 
   def scores(s: Seq[W]) = {
-    val score = Array.fill(s.length+1, s.length + 1)(grammar.mkVector(Double.NegativeInfinity));
-    val back = Array.fill(s.length+1,s.length+1)(grammar.mkSparseArray[BackPtr]);
-    val active = Array.fill(s.length+1,s.length+1)(new IntBloomFilter(grammar.index.size,3));
+    val score = new TriangularArray(s.length+1, grammar.mkVector(Double.NegativeInfinity));
+    val back = new TriangularArray(s.length+1, grammar.mkSparseArray[BackPtr]);
+    val active = new TriangularArray(s.length+1, new IntBloomFilter(grammar.index.size,3));
 
     for{i <- 0 until s.length} {
       for ( a <- lexicon.tags;
@@ -131,7 +132,7 @@ class GenerativeParser[L,W](root: L, lexicon: Lexicon[L,W],
     c;
   }
 
-  private def buildTree(back: Array[Array[SparseArray[BackPtr]]], start: Int, end: Int, root: Int):BinarizedTree[L] = {
+  private def buildTree(back: TriangularArray[SparseArray[BackPtr]], start: Int, end: Int, root: Int):BinarizedTree[L] = {
     val b = back(start)(end)(root)
     b match {
       case Term =>

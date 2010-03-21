@@ -12,6 +12,7 @@ import scalanlp.trees.Treebank
 import scalanlp.trees.Trees
 import scalanlp.trees.UnaryTree
 import scalanlp.util.IntBloomFilter
+import scalanlp.collection.mutable.TriangularArray
 import scalanlp.collection.mutable.SparseArray
 import scalanlp.counters.Counters._;
 import Math.exp
@@ -19,7 +20,7 @@ import Math.exp
 object StateSplitting {
 
   def insideScores[L,W](grammar: Grammar[L], lexicon: Lexicon[L,W], tree: BinarizedTree[Seq[L]], s: Seq[W]) = {
-    val score = Array.fill(s.length+1, s.length + 1)(grammar.mkVector(Double.NegativeInfinity));
+    val score = new TriangularArray(s.length+1, grammar.mkVector(Double.NegativeInfinity));
     val indexedTree:Tree[Seq[Int]] = tree.map{ _.map(grammar.index) };
 
     indexedTree.postorder.foreach {
@@ -66,9 +67,9 @@ object StateSplitting {
     score;
   }
 
-  def outsideScores[L,W](grammar: Grammar[L], lexicon: Lexicon[L,W], tree: BinarizedTree[Seq[L]], s: Seq[W], insideScores: Array[Array[Vector]]) = {
+  def outsideScores[L,W](grammar: Grammar[L], lexicon: Lexicon[L,W], tree: BinarizedTree[Seq[L]], s: Seq[W], insideScores: TriangularArray[Vector]) = {
     val indexedTree:Tree[Seq[Int]] = tree.map{ _.map(grammar.index) };
-    val score = Array.fill(s.length+1, s.length + 1)(grammar.mkVector(Double.NegativeInfinity));
+    val score = new TriangularArray(s.length+1, grammar.mkVector(Double.NegativeInfinity));
     // Root gets score 0
     score(0)(s.length)(indexedTree.label) = 0.0;
 

@@ -11,6 +11,7 @@
       <plugin>
         <groupId>org.scala-tools</groupId>
         <artifactId>maven-scala-plugin</artifactId>
+        <version>2.13</version>
         <executions>
           <execution>
             <goals>
@@ -22,6 +23,7 @@
         <configuration>
           <scalaVersion>${scala.version}</scalaVersion>
           <displayCmd>true</displayCmd>
+          <recompilationMode>modified-only</recompilationMode>
         </configuration>
       </plugin>
       <plugin>
@@ -65,7 +67,7 @@
     <dependency>
       <groupId>org.scalanlp</groupId>
       <artifactId>scalanlp-core</artifactId>
-      <version>0.2.1-SNAPSHOT</version>
+      <version>0.2.2-SNAPSHOT</version>
     </dependency>
     <dependency>
       <groupId>junit</groupId>
