@@ -7,13 +7,6 @@ import scala.util.parsing.input._;
 
 import scala.io.Source;
 
-object PennTreeReader2 {
-  def readTree(text: Source):(Tree[String],Seq[String]) = {
-    
-      null
-  }
-}
-
 class PennTreeReader(badLabels: Set[String]) extends StdLexical with ImplicitConversions with Scanners {
   def this() = this(Set("-NONE-"));
   private val ws = whitespace;
