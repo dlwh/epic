@@ -2,17 +2,13 @@ package scalanlp.parser;
 
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.BitSet
-import scala.collection.mutable.Map;
 
 import scalanlp.data._;
 import scalanlp.data.process._;
-import scalanlp.collection.mutable.SparseArray
-import scalanlp.collection.mutable.TriangularArray
 import scalanlp.counters._;
 import Counters._;
 import LogCounters.{LogPairedDoubleCounter,LogDoubleCounter,logNormalizeRows};
 import scalanlp.trees._;
-import java.util.Arrays;
 import scalanlp.util._;
 import scalala.Scalala.{log=>_,_};
 import scalala.tensor._;
@@ -28,19 +24,12 @@ import GenerativeParser._;
 class GenerativeParser[L,W](root: L, lexicon: Lexicon[L,W],
                             grammar: Grammar[L]) extends Parser[L,W] {
   
-  private class BackPtr;
-  private case object Term extends BackPtr;
-  private case class Unary(lchild: Int) extends BackPtr;
-  private case class Binary(lchild: Int, rchild: Int, split: Int) extends BackPtr;
-
   // Score is a vector of scores whose indices are nonterms or preterms
-  private def updateUnaries(score: Vector,
-                            back: SparseArray[BackPtr],
-                            active: IntBloomFilter) {
+  private def updateUnaries(chart: ParseChart[L], begin:Int, end: Int) = {
     var recheck:ArrayBuffer[Int] = new ArrayBuffer[Int]();
     var lastRecheck = new ArrayBuffer[Int]();
-    val set = new BitSet(score.size);
-    recheck ++= score.activeElements.filter(!_._2.isInfinite).map(_._1);
+    val set = new BitSet();
+    recheck ++= chart.enteredLabelIndexes(begin, end);
     val max_iter = 5;
 
     var iter = 0;
@@ -54,13 +43,11 @@ class GenerativeParser[L,W](root: L, lexicon: Lexicon[L,W],
       set.clear();
 
       for( b <- elems) {
-        val bScore = score(b);
+        val bScore = chart.labelScore(begin,end,b);
         for( (a,aScore) <- grammar.unaryRulesByIndexedChild(b).activeElements) {
           val prob = aScore + bScore;
-          if(prob > score(a)) {
-            score(a) = prob;
-            back(a) = Unary(b);
-            active += a;
+          if(prob > chart.labelScore(begin,end,b)) {
+            chart.enterUnary(begin,end,a,b,prob);
             if(!set(a)) {
               set += a;
               recheck += a;
@@ -74,21 +61,18 @@ class GenerativeParser[L,W](root: L, lexicon: Lexicon[L,W],
 
 
   def scores(s: Seq[W]) = {
-    val score = new TriangularArray(s.length+1, grammar.mkVector(Double.NegativeInfinity));
-    val back = new TriangularArray(s.length+1, grammar.mkSparseArray[BackPtr]);
-    val active = new TriangularArray(s.length+1, new IntBloomFilter(grammar.index.size,3));
+
+    val chart = new ParseChart(grammar,s.length);
 
     for{i <- 0 until s.length} {
       for ( a <- lexicon.tags;
             wScore = lexicon.wordScore(a,s(i))
             if !wScore.isInfinite) {
         assert(a != null);
-        score(i)(i+1)(grammar.index(a)) = wScore;
-        back(i)(i+1)(grammar.index(a)) = Term;
-        active(i)(i+1) += grammar.index(a);
+        chart.enterTerm(i,i+1,a,wScore);
       }
 
-      updateUnaries(score(i)(i+1),back(i)(i+1),active(i)(i+1));
+      updateUnaries(chart,i,i+1);
     }
 
     for {
@@ -98,59 +82,32 @@ class GenerativeParser[L,W](root: L, lexicon: Lexicon[L,W],
     } {
       for {
         split <- (begin+1) to (end-1);
-        (b,bScore) <- score(begin)(split).activeElements;
+        (b,bScore) <- chart.enteredLabelScores(begin, split);
         if !bScore.isInfinite
         (c,parentVector) <- grammar.binaryRulesByIndexedLeftChild(b)
-        if active(split)(end)(c)
       } {
-        val cScore = score(split)(end)(c)
+        val cScore = chart.labelScore(split, end, c)
         if (!cScore.isInfinite)
           for {
             (a,aScore) <- parentVector.activeElements
           } {
             val prob = bScore + cScore + aScore;
-            if(prob > score(begin)(end)(a)) {
-              score(begin)(end)(a) = prob;
-              back(begin)(end)(a) = Binary(b,c,split);
-              active(begin)(end) += a;
+            if(prob > chart.labelScore(begin,end,a)) {
+              chart.enterBinary(begin,split,end,a,b,c,prob);
             }
           }
       }
-      updateUnaries(score(begin)(end),back(begin)(end),active(begin)(end));
+      updateUnaries(chart,begin,end);
     }
 
-    val bestParse = try {
-      buildTree(back,0,s.length,grammar.index(root));
-    } catch { case e =>
-      println( score(0)(s.length).toString);
-      println( back(0)(s.length).toString);
-      throw e;
-    }
-
+    val bestParse = chart.buildTree(0,s.length,grammar.index(root));
     val c = DoubleCounter[Tree[L]]();
-    c(bestParse) = score(0)(s.length)(grammar.index(root));
+    c(bestParse) = chart.labelScore(0, s.length, root);
     c;
-  }
-
-  private def buildTree(back: TriangularArray[SparseArray[BackPtr]], start: Int, end: Int, root: Int):BinarizedTree[L] = {
-    val b = back(start)(end)(root)
-    b match {
-      case Term =>
-        NullaryTree(grammar.index.get(root))(Span(start,end));
-      case Unary(child) => 
-        val c = buildTree(back,start,end,child);
-        UnaryTree(grammar.index.get(root),c)(Span(start,end));
-      case Binary(lchild,rchild,split) => 
-        val lc = buildTree(back,start,split,lchild);
-        val rc = buildTree(back,split,end,rchild);
-        BinaryTree(grammar.index.get(root),lc,rc)(Span(start,end));
-    }
   }
 }
 
 object GenerativeParser {
-
-  
 
   def fromTrees[W](data: Collection[(Tree[String],Seq[W])], binarize: Tree[String]=>BinarizedTree[String]):GenerativeParser[String,W] = {
     fromTrees(data.iterator,binarize);
