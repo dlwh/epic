@@ -25,6 +25,7 @@ case class Tree[+L](label: L, children: Seq[Tree[L]])(val span: Span) {
   }
 
   def map[M](f: L=>M):Tree[M] = Tree( f(label), children map { _ map f})(span);
+  def extend[B](f: Tree[L]=>B):Tree[B] = Tree(f(this), children map { _ extend f})(span);
 
   def allChildren = preorder;
 
@@ -35,6 +36,7 @@ case class Tree[+L](label: L, children: Seq[Tree[L]])(val span: Span) {
   def postorder: Iterator[Tree[L]] = {
     children.map(_.postorder).foldRight(Iterator(this)){_ ++ _}
   }
+
 
   import Tree._;
   override def toString = recursiveToString(this,0,new StringBuilder).toString;
@@ -74,6 +76,7 @@ object Tree {
 
 sealed trait BinarizedTree[+L] extends Tree[L] {
   override def map[M](f: L=>M): BinarizedTree[M] = null; 
+  def extend[B](f: BinarizedTree[L]=>B):BinarizedTree[B]
 }
 
 case class BinaryTree[+L](l: L,
@@ -82,16 +85,19 @@ case class BinaryTree[+L](l: L,
                         ) extends Tree[L](l,List(leftChild,rightChild))(span
                         ) with BinarizedTree[L] {
   override def map[M](f: L=>M):BinaryTree[M] = BinaryTree( f(label), leftChild map f, rightChild map f)(span);
+  override def extend[B](f: BinarizedTree[L]=>B) = BinaryTree( f(this), leftChild extend f, rightChild extend f)(span);
 }
 
 case class UnaryTree[+L](l: L, child: BinarizedTree[L])(span: Span
                         ) extends Tree[L](l,List(child))(span
                         ) with BinarizedTree[L] {
   override def map[M](f: L=>M): UnaryTree[M] = UnaryTree( f(label), child map f)(span);
+  override def extend[B](f: BinarizedTree[L]=>B) = UnaryTree( f(this), child extend f)(span);
 }
 
 case class NullaryTree[+L](l: L)(span: Span) extends Tree[L](l,Seq())(span) with BinarizedTree[L]{
   override def map[M](f: L=>M): NullaryTree[M] = NullaryTree( f(label))(span);
+  override def extend[B](f: BinarizedTree[L]=>B) = NullaryTree( f(this))(span);
 }
 
 object Trees {
