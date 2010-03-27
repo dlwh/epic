@@ -283,6 +283,38 @@ object StateSplitting {
     ctr;
   }
 
+
+  def splitGrammar[L,W](ruleCounts: RuleCounts[L],
+                        wordCounts: TagWordCounts[L,W],
+                        trees: Treebank[L,W],
+                        root: L,
+                        nSplits:Int =3,
+                        randomNoise: Double=0.1,
+                        convergence: Double = 1E-4): (RuleCounts[(L,Int)],TagWordCounts[(L,Int),W],Double) = {
+    def split(s: (L,Int) ) = {
+      val (l,state) = s;
+      if (l == root) Seq(s) else Seq( (l,state*2),(l,state*2+1));
+    }
+
+    val myTrees = trees.view.map { case (tree,sent) => (tree.map { (_,0) },sent) }
+
+    val myRuleCounts = LogPairedDoubleCounter[(L,Int),Rule[(L,Int)]]();
+    for ( (l,rule,w) <- ruleCounts.triples) rule match {
+      case UnaryRule(par,child) =>
+        myRuleCounts( (l,0), UnaryRule( (l,0), (child,0))) = w;
+      case BinaryRule(par,lc,rc) =>
+        myRuleCounts( (l,0), UnaryRule( (lc,0), (rc,0))) = w;
+    }
+
+    val myWordCounts = LogPairedDoubleCounter[(L,Int),W]();
+    for ( (l,word,w) <- wordCounts.triples) {
+      myWordCounts( (l,0), word) = w;
+    }
+
+    splitGrammar(myRuleCounts,myWordCounts,myTrees,split _, nSplits, randomNoise, convergence);
+  }
+
+
   def decodeWords[L,W](g: Grammar[L], wordCounts: SparseArray[LogDoubleCounter[W]]) = {
     val ctr = LogPairedDoubleCounter[L,W]();
     for( (i,c) <- wordCounts) {
@@ -321,15 +353,6 @@ object StateSplitting {
     (finalCounts,finalWords,logProb);
   }
 
-  def splitGrammar(ruleCounts: RuleCounts[String],
-                   wordCounts: TagWordCounts[String,String],
-                   trees: Treebank[String,String],
-                   nSplits:Int =3,
-                   randomNoise: Double=0.1,
-                   convergence: Double = 1E-4): (RuleCounts[String],TagWordCounts[String,String],Double) = {
-    def split(s: String) = if (s.isEmpty) Seq(s) else if(!s.contains("**")) Seq(s+"**0",s+"**1") else Seq(s+"0",s+"1")
-    splitGrammar(ruleCounts,wordCounts,trees,split _, nSplits, randomNoise, convergence);
-  }
 
 }
 
@@ -347,7 +370,8 @@ object StateSplittingTest {
       GenerativeParser.extractCounts(trees.iterator,Trees.xBarBinarize _)
     );
     println("Splitting Grammar");
-    val (finalLex,finalProd,logProb) = StateSplitting.splitGrammar(LogCounters.log(initialProductions),LogCounters.log(initialLex),trees);
+    import StateSplitting._;
+    val (finalLex,finalProd,logProb) = splitGrammar(LogCounters.log(initialProductions),LogCounters.log(initialLex),trees,"");
   }
 
 }
