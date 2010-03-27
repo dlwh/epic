@@ -1,7 +1,10 @@
 package scalanlp.trees;
 
-//import util.Implicits._;
+import java.io.DataInput
+import java.io.DataOutput
 import scala.collection.mutable.ArrayBuffer;
+import scalanlp.io.Serialization
+
 
 case class Tree[+L](label: L, children: Seq[Tree[L]])(val span: Span) {
   def isLeaf = children.size == 0;
@@ -70,6 +73,22 @@ object Tree {
     }
     sb append ")";
     sb
+  }
+
+  implicit def treeSerializationHandler[L:Serialization.Handler]: Serialization.Handler[Tree[L]] = new Serialization.Handler[Tree[L]] {
+    def write(t: Tree[L], data: DataOutput) = {
+      implicitly[Serialization.Handler[L]].write(t.label,data);
+      Serialization.Handlers.seqHandler(this).write(t.children,data);
+      data.writeInt(t.span.start);
+      data.writeInt(t.span.end);
+    }
+    def read(data: DataInput) = {
+      val label = implicitly[Serialization.Handler[L]].read(data);
+      val children = Serialization.Handlers.seqHandler(this).read(data);
+      val begin = data.readInt();
+      val end = data.readInt();
+      new Tree(label,children)(Span(begin,end));
+    }
   }
 
 }
