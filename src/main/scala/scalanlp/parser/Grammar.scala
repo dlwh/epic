@@ -15,8 +15,20 @@ trait Grammar[L] extends VectorBroker[L] {
   def unaryRulesByChild(c: L): Iterator[(UnaryRule[L],Double)];
   def unaryRulesByParent(p: L): Iterator[(UnaryRule[L],Double)];
   def binaryRulesByLeftChild(c: L): Iterator[(BinaryRule[L],Double)];
+  /**
+   * Returns a vector of parent index -> score
+   */
   def unaryRulesByIndexedChild(c: Int): Vector;
+
+  /**
+   * Returns a SparseArray[Vector] with RightIndex -> ParentIndex -> Score
+   */
   def binaryRulesByIndexedLeftChild(b: Int): SparseArray[Vector];
+
+  /**
+   * Returns a SparseArray[Vector] with LeftIndex -> ParentIndex -> Score
+   */
+  def binaryRulesByIndexedRightChild(c: Int): SparseArray[Vector];
 }
 
 /**
@@ -70,6 +82,13 @@ class GenerativeGrammar[L](productions: LogPairedDoubleCounter[L,Rule[L]]) exten
     indexedBinaryRulesByLeftChild(index(b))(index(c))(index(a)) = score;
   }
 
+  // Mapping is Left Child -> Right Child -> Parent -> Score
+  private val indexedBinaryRulesByRightChild:Array[SparseArray[Vector]] = (
+    fillArray(fillSparseArray(mkVector(Double.NegativeInfinity)))
+  );
+  for( ((a,BinaryRule(_,b,c)),score) <- binaryRules) {
+    indexedBinaryRulesByLeftChild(index(c))(index(b))(index(a)) = score;
+  }
 
   /**
    * Returns pairs of the form ((parent,child),score);
@@ -80,9 +99,6 @@ class GenerativeGrammar[L](productions: LogPairedDoubleCounter[L,Rule[L]]) exten
   }
 
 
-  /**
-   * Returns a vector of parent index -> score
-   */
   def unaryRulesByIndexedChild(c: Int) = {
     indexedUnaryRulesByChild(c);
   }
@@ -101,11 +117,9 @@ class GenerativeGrammar[L](productions: LogPairedDoubleCounter[L,Rule[L]]) exten
    */
   def binaryRulesByLeftChild(c: L) = leftChildBinaryRules(c).elements;
 
-  /**
-   * Returns a SparseArray[Vector] with RightIndex -> ParentIndex -> Score
-   */
   def binaryRulesByIndexedLeftChild(b: Int) = indexedBinaryRulesByLeftChild(b);
 
+  def binaryRulesByIndexedRightChild(c: Int): SparseArray[Vector] = indexedBinaryRulesByRightChild(c);
 
   /**
    * Returns pairs of the form ( (lchild,rchild),

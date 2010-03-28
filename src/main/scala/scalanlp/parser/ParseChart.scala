@@ -28,6 +28,7 @@ final class ParseChart[L](grammar: Grammar[L], length: Int) {
   def enterUnary(begin: Int, end: Int, parent: L, child: L, w: Double): Unit = {
     enterUnary(begin,end,grammar.index(parent),grammar.index(child),w);
   }
+
   def enterUnary(begin: Int, end: Int, parent: Int, child: Int, w: Double): Unit = {
     score(begin, end)(parent) = w;
     back(begin, end)(parent) = Unary(child);
