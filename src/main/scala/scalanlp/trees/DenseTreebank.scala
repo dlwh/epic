@@ -84,20 +84,22 @@ object DenseTreebank {
       val (sections,testSections,trainSections,devSections) = Serialization.read[Metadata](metaIn);
       metaIn.close();
 
-      def treesFromSection(sec: String): Iterator[(Tree[String],Seq[String])] = {
-        val section = zipFile.getEntry("sections/"+sec);
-        val sectionIn = zipFile.getInputStream(section);
-        val data = new DataInputStream(new BufferedInputStream(sectionIn));
-        val iterator = if(!Serialization.read[Boolean](data)) Iterator.empty;
-        else Iterator.continually {
-          val indexedTree = Serialization.read[Tree[Int]](data);
-          val indexedWords = Serialization.read[Seq[Int]](data);
-          val continue = Serialization.read[Boolean](data);
-          (indexedTree.map(symbolIndex.get _), indexedWords.map(wordIndex.get _),continue);
-        } takeWhile( _._3);
-        
-        for( (tree,words, _ ) <- iterator) yield (tree,words);
-      }
+      def treesFromSection(sec: String): Iterable[(Tree[String],Seq[String])] = new Iterable[(Tree[String],Seq[String])] {
+        def iterator = {
+          val section = zipFile.getEntry("sections/"+sec);
+          val sectionIn = zipFile.getInputStream(section);
+          val data = new DataInputStream(new BufferedInputStream(sectionIn));
+          val iterator = if(!Serialization.read[Boolean](data)) Iterator.empty;
+          else Iterator.continually {
+            val indexedTree = Serialization.read[Tree[Int]](data);
+            val indexedWords = Serialization.read[Seq[Int]](data);
+            val continue = Serialization.read[Boolean](data);
+            (indexedTree.map(symbolIndex.get _), indexedWords.map(wordIndex.get _),continue);
+          } takeWhile( _._3);
+
+          for( (tree,words, _ ) <- iterator) yield (tree,words);
+        }
+      };
     };
   }
 
