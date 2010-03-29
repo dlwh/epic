@@ -22,6 +22,7 @@ import scala.collection.mutable.BitSet
 
 import scalanlp.data._;
 import scalanlp.data.process._;
+import scalanlp.config.Configuration
 import scalanlp.counters._;
 import Counters._;
 import LogCounters.{LogPairedDoubleCounter,LogDoubleCounter,logNormalizeRows};
@@ -126,25 +127,24 @@ class GenerativeParser[L,W](root: L, lexicon: Lexicon[L,W],
 
 object GenerativeParser {
 
-  def fromTrees[W](data: Collection[(Tree[String],Seq[W])], binarize: Tree[String]=>BinarizedTree[String]):GenerativeParser[String,W] = {
-    fromTrees(data.iterator,binarize);
+  def fromTrees[W](data: Collection[(BinarizedTree[String],Seq[W])]):GenerativeParser[String,W] = {
+    fromTrees(data.iterator);
   }
     
     
-  def fromTrees[W](data: Iterator[(Tree[String],Seq[W])], binarize: Tree[String]=>BinarizedTree[String]):GenerativeParser[String,W] = {
+  def fromTrees[W](data: Iterator[(BinarizedTree[String],Seq[W])]):GenerativeParser[String,W] = {
     val root = "";
-    val (lexicon,productions) = extractCounts(data,binarize);
+    val (lexicon,productions) = extractCounts(data);
     new GenerativeParser(root,new SimpleLexicon(lexicon),new GenerativeGrammar(logNormalizeRows(productions)));
   }
 
-  def extractCounts[W](data: Iterator[(Tree[String],Seq[W])], binarize: Tree[String]=>BinarizedTree[String]) = {
+  def extractCounts[W](data: Iterator[(BinarizedTree[String],Seq[W])]) = {
     val lexicon = new PairedDoubleCounter[String,W]();
     val productions = new PairedDoubleCounter[String,Rule[String]]();
 
     for( (tree,words) <- data) {
-      val btree = binarize(tree);
       val leaves = tree.leaves map (l => (l,words(l.span.start)));
-      btree.allChildren foreach { 
+      tree.allChildren foreach { 
         case t @ BinaryTree(a,bc,cc) => 
           productions(a,BinaryRule(a,bc.label,cc.label)) += 1.0;
         case t@UnaryTree(a,bc) => 
@@ -157,54 +157,13 @@ object GenerativeParser {
       
     }
     (lexicon,productions)
-
   }
 }
 
-
-object GenerativeTester {
-  import java.io.File;
- // import scalax.io.Implicits._;
-  def main(args: Array[String]) {
-    val treebank = Treebank.fromPennTreebankDir(new File(args(0)));
-    val xform = Trees.Transforms.StandardStringTransform;
-    val trees = for( (tree,words) <- treebank.trainTrees)
-      yield (xform(tree),words map (_.intern));
-    val parser = GenerativeParser.fromTrees(trees,Trees.xBarBinarize _ );
-    //println("Train:");
-    //eval(treebank.trainTrees,parser,xform);
-    println("Dev:");
-    eval(treebank.devTrees,parser,xform);
-    println("Test:");
-    eval(treebank.testTrees,parser,xform);
-  }
-
-  def eval(trees: Iterator[(Tree[String],Seq[String])],
-           parser: GenerativeParser[String,String],
-           xform: Tree[String]=>Tree[String]) {
-    val peval = new ParseEval(Set(""));
-    val goldGuess = {
-      for { 
-        (goldTree, words) <- trees;
-        () = println(words);
-        () = println(xform(goldTree) render words);
-        startTime = System.currentTimeMillis;
-        guessTree = Trees.debinarize(parser(words))
-      } yield {
-        val endTime = System.currentTimeMillis;
-        println(guessTree render words);
-        val ret = (xform(goldTree),guessTree)
-        println("Local Accuracy:" + peval(Iterator.single(ret)));
-        println( (endTime - startTime) / 1000.0 + " Seconds");
-        println("===========");
-        ret;
-      }
-    }
-    val (prec,recall,exact) = peval(goldGuess);
-    val f1 = (2 * prec * recall)/(prec + recall);
-    println( "P: " + prec + " R:" + recall + " F1: " + f1 +  " Ex:" + exact);
-  }
-
+object GenerativeTester extends ParserTester {
+  def trainParser(trainTrees: Iterable[(BinarizedTree[String],Seq[String])],
+                  devTrees: Iterable[(BinarizedTree[String],Seq[String])],
+                  config: Configuration):Parser[String,String] = GenerativeParser.fromTrees(trainTrees);
 }
 
 object GenerativeInterpreter {
@@ -213,8 +172,8 @@ object GenerativeInterpreter {
     val treebank = Treebank.fromPennTreebankDir(new File(args(0)));
     val xform = Trees.Transforms.StandardStringTransform;
     val trees = for( (tree,words) <- treebank.trainTrees)
-      yield (xform(tree),words map (_.intern));
-    val parser = GenerativeParser.fromTrees(trees,Trees.xBarBinarize _);
+      yield (Trees.binarize(xform(tree)),words map (_.intern));
+    val parser = GenerativeParser.fromTrees(trees);
     while(true) {
       print("Ready> ");
       val line = readLine();

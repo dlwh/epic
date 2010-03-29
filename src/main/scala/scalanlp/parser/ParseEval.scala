@@ -16,6 +16,10 @@ package scalanlp.parser;
 */
 
 
+import java.io.File
+import java.io.FileInputStream
+import java.util.Properties
+import scalanlp.config.Configuration
 import scalanlp.trees._;
 
 
@@ -59,3 +63,67 @@ class ParseEval[L](ignoredLabels: Set[L]) {
         yield (child.label,child.span);
   }
 }
+
+object ParseEval {
+  def evaluate(trees: Iterator[(Tree[String],Seq[String])],
+           parser: Parser[String,String],
+           xform: Tree[String]=>Tree[String]=Trees.Transforms.StandardStringTransform) = {
+    val peval = new ParseEval(Set(""));
+    val goldGuess = {
+      for {
+        (goldTree, words) <- trees;
+        () = println(words);
+        () = println(xform(goldTree) render words);
+        startTime = System.currentTimeMillis;
+        guessTree = Trees.debinarize(parser(words))
+      } yield {
+        val endTime = System.currentTimeMillis;
+        println(guessTree render words);
+        val ret = (xform(goldTree),guessTree)
+        println("Local Accuracy:" + peval(Iterator.single(ret)));
+        println( (endTime - startTime) / 1000.0 + " Seconds");
+        println("===========");
+        ret;
+      }
+    }
+    val (prec,recall,exact) = peval(goldGuess);
+    (prec,recall,exact);
+  }
+}
+
+trait ParserTester {
+  def trainParser(trainTrees: Iterable[(BinarizedTree[String],Seq[String])],
+                  devTrees: Iterable[(BinarizedTree[String],Seq[String])],
+                  config: Configuration):Parser[String,String];
+
+  def main(args: Array[String]) {
+    val properties = new Properties();
+    properties.load(new FileInputStream(new File(args(0))));
+    val config = Configuration.fromProperties(properties);
+    val treebank = {
+      val path = config.readIn[File]("treebank.path");
+      if(path.isDirectory) Treebank.fromPennTreebankDir(path)
+      else DenseTreebank.fromZipFile(path);
+    }
+    val binarize = {
+      val kind = config.readIn[String]("tree.binarization","standard");
+      if(kind == "xbar") Trees.xBarBinarize _ ;
+      else Trees.binarize(_:Tree[String]);
+    }
+
+    val xform = Trees.Transforms.StandardStringTransform;
+    val trainTrees = for( (tree,words) <- treebank.trainTrees)
+      yield (binarize(xform(tree)),words map (_.intern));
+    val devTrees = for( (tree,words) <- treebank.devTrees)
+      yield (binarize(xform(tree)),words map (_.intern));
+    println("Training Parser...");
+    val parser = trainParser(trainTrees,devTrees,config);
+    println("Evaluating Parser...");
+    val (prec,recall,exact) = ParseEval.evaluate(treebank.testTrees.iterator,parser,xform);
+    val f1 = (2 * prec * recall)/(prec + recall);
+    println("Eval finished. Results:");
+    println( "P: " + prec + " R:" + recall + " F1: " + f1 +  " Ex:" + exact);
+  }
+
+}
+

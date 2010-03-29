@@ -20,11 +20,13 @@ import scalala.Scalala._;
 import scalala.tensor.Vector;
 import scalanlp.collection.mutable.SparseArray
 import scalanlp.collection.mutable.TriangularArray
+import scalanlp.config.Configuration
 import scalanlp.counters.Counters._;
 import scalanlp.counters.LogCounters;
 import scalanlp.counters.LogCounters.LogPairedDoubleCounter;
 import scalanlp.counters.LogCounters.LogDoubleCounter;
 import scalanlp.math.Numerics.logSum;
+import scalanlp.parser.ParserTester
 import scalanlp.parser._;
 import scalanlp.trees.BinarizedTree
 import scalanlp.trees.BinaryTree
@@ -299,7 +301,6 @@ object StateSplitting {
     ctr;
   }
 
-
   def splitGrammar[L,W](ruleCounts: RuleCounts[L],
                         wordCounts: TagWordCounts[L,W],
                         trees: Treebank[L,W],
@@ -331,6 +332,20 @@ object StateSplitting {
   }
 
 
+  def splitStringGrammar(ruleCounts: RuleCounts[String],
+                   wordCounts: TagWordCounts[String,String],
+                   trees: Treebank[String,String],
+                   nSplits:Int =3,
+                   randomNoise: Double=0.1,
+                   convergence: Double = 1E-4): (RuleCounts[String],TagWordCounts[String,String],Double) = {
+    def split(s: String ) = {
+      if (s == "") Seq(s) else if(s.contains("---")) Seq( s+"0",s+"1") else Seq(s+"---0",s+"---1");
+    }
+
+    splitGrammar(ruleCounts,wordCounts,trees,split _, nSplits, randomNoise, convergence);
+  }
+
+
   def decodeWords[L,W](g: Grammar[L], wordCounts: SparseArray[LogDoubleCounter[W]]) = {
     val ctr = LogPairedDoubleCounter[L,W]();
     for( (i,c) <- wordCounts) {
@@ -341,8 +356,8 @@ object StateSplitting {
 
   type RuleCounts[L] = LogPairedDoubleCounter[L,Rule[L]];
   type TagWordCounts[L,W] = LogPairedDoubleCounter[L,W];
-  type Treebank[L,W] = Seq[(BinarizedTree[L],Seq[W])];
-  type SplitTreebank[L,W] = Seq[(BinarizedTree[Seq[L]],Seq[W])];
+  type Treebank[L,W] = Iterable[(BinarizedTree[L],Seq[W])];
+  type SplitTreebank[L,W] = Iterable[(BinarizedTree[Seq[L]],Seq[W])];
 
   def splitGrammar[L,W](ruleCounts: RuleCounts[L],
                       wordCounts: TagWordCounts[L,W],
@@ -372,22 +387,21 @@ object StateSplitting {
 
 }
 
-object StateSplittingTest {
-  import java.io.File;
- // import scalax.io.Implicits._;
-  def main(args: Array[String]) {
-    val treebank = Treebank.fromPennTreebankDir(new File(args(0)));
-    val xform = Trees.Transforms.StandardStringTransform;
-    println("Loading Treebank");
-    val trees = (for( (tree,words) <- treebank.trainTrees take 2000)
-      yield (Trees.xBarBinarize(xform(tree)),words map (_.intern))) toSeq;
+
+object StateSplittingTest extends ParserTester {
+  def trainParser(trainTrees: Iterable[(BinarizedTree[String],Seq[String])],
+                  devTrees: Iterable[(BinarizedTree[String],Seq[String])],
+                  config: Configuration):Parser[String,String] = {
+
     println("Extracting counts");
     val (initialLex,initialProductions) = (
-      GenerativeParser.extractCounts(trees.iterator,Trees.xBarBinarize _)
+      GenerativeParser.extractCounts(trainTrees.iterator)
     );
     println("Splitting Grammar");
     import StateSplitting._;
-    val (finalLex,finalProd,logProb) = splitGrammar(LogCounters.log(initialProductions),LogCounters.log(initialLex),trees,"");
+    val (finalProd,finalLex,logProb) = splitStringGrammar(LogCounters.log(initialProductions),LogCounters.log(initialLex),trainTrees);
+    val grammar = new GenerativeGrammar(finalProd);
+    val lex = new SimpleLexicon(LogCounters.exp(finalLex));
+    new GenerativeParser("",lex,grammar);
   }
-
 }
