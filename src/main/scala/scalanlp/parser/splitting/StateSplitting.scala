@@ -399,9 +399,11 @@ object StateSplittingTest extends ParserTester {
     );
     println("Splitting Grammar");
     import StateSplitting._;
-    val (finalProd,finalLex,logProb) = splitStringGrammar(LogCounters.log(initialProductions),LogCounters.log(initialLex),trainTrees);
+    val (finalProd,finalLex,logProb) = splitGrammar(LogCounters.log(initialProductions),LogCounters.log(initialLex),trainTrees,"");
     val grammar = new GenerativeGrammar(finalProd);
     val lex = new SimpleLexicon(LogCounters.exp(finalLex));
-    new GenerativeParser("",lex,grammar);
+    new GenerativeParser[(String,Int),String](("",0),lex,grammar).map { (t:Tree[(String,Int)]) =>
+      t.map(_._1);
+    }
   }
 }
