@@ -5,11 +5,15 @@ import scalala.tensor.Vector;
 import scalanlp.counters.LogCounters
 import scalanlp.counters.LogCounters.LogDoubleCounter
 import scalanlp.math.Numerics.logSum;
+import scalanlp.trees.BinarizedTree
+import scalanlp.trees.BinarizedTree
+import scalanlp.trees.Tree
 import scalanlp.trees.Treebank
 import scalanlp.trees.Trees
 import scalanlp.parser._;
 import scalala.tensor.dense.DenseMatrix
 import scalanlp.collection.mutable.SparseArray
+import scalanlp.config.Configuration
 import scalanlp.counters.Counters._;
 import Math.exp
 
@@ -184,21 +188,23 @@ object BitVectorEM {
 }
 
 
-object BitVectorTest {
-  import java.io.File;
- // import scalax.io.Implicits._;
-  def main(args: Array[String]) {
-    val treebank = Treebank.fromPennTreebankDir(new File(args(0)));
-    val xform = Trees.Transforms.StandardStringTransform;
-    println("Loading Treebank");
-    val trees = (for( (tree,words) <- treebank.trainTrees take 2000)
-      yield (Trees.xBarBinarize(xform(tree)),words map (_.intern))) toSeq;
+
+object BitVectorTest extends ParserTester {
+  def trainParser(trainTrees: Iterable[(BinarizedTree[String],Seq[String])],
+                  devTrees: Iterable[(BinarizedTree[String],Seq[String])],
+                  config: Configuration):Parser[String,String] = {
+
     println("Extracting counts");
     val (initialLex,initialProductions) = (
-      GenerativeParser.extractCounts(trees.iterator,Trees.xBarBinarize _)
+      GenerativeParser.extractCounts(trainTrees.iterator)
     );
     println("Splitting Grammar");
-    val (finalLex,finalProd,logProb) = BitVectorEM.splitCycle(LogCounters.log(initialProductions),LogCounters.log(initialLex),trees,args(1).toInt);
+    import StateSplitting._;
+    val (finalProd,finalLex,logProb) = BitVectorEM.splitCycle(LogCounters.log(initialProductions),LogCounters.log(initialLex),trainTrees,8);
+    val grammar = new GenerativeGrammar(finalProd);
+    val lex = new SimpleLexicon(LogCounters.exp(finalLex));
+    new GenerativeParser[(String,Int),String](("",0),lex,grammar).map { (t:Tree[(String,Int)]) =>
+      t.map(_._1);
+    }
   }
-
 }
