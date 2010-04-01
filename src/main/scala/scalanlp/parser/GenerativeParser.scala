@@ -64,7 +64,7 @@ class GenerativeParser[L,W](root: L, lexicon: Lexicon[L,W],
         val bScore = chart.labelScore(begin,end,b);
         for( (a,aScore) <- grammar.unaryRulesByIndexedChild(b).activeElements) {
           val prob = aScore + bScore;
-          if(prob > chart.labelScore(begin,end,b)) {
+          if(prob > chart.labelScore(begin,end,a)) {
             chart.enterUnary(begin,end,a,b,prob);
             if(!set(a)) {
               set += a;
