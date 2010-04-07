@@ -24,9 +24,13 @@ import scalanlp.collection.mutable.SparseArray;
 import scalanlp.counters.LogCounters._;
 import scalanlp.util.Index;
 
-sealed abstract class Rule[+L] { def parent: L }
-final case class BinaryRule[+L](parent: L, left: L, right: L) extends Rule[L];
-final case class UnaryRule[+L](parent: L, child: L) extends Rule[L];
+sealed abstract class Rule[+L] { def parent: L; def children: Seq[L] }
+final case class BinaryRule[+L](parent: L, left: L, right: L) extends Rule[L] {
+  def children = Seq(left,right);
+}
+final case class UnaryRule[+L](parent: L, child: L) extends Rule[L] {
+  def children = Seq(child);
+}
 
 trait Grammar[L] extends VectorBroker[L] {
   def unaryRulesByChild(c: L): Iterator[(UnaryRule[L],Double)];
