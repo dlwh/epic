@@ -149,24 +149,7 @@ object BitVectorEM {
         (t,s) <- trees.iterator
       } yield expectedCounts(grammar,lexicon,t map split,s);
 
-      val binaryRuleCounts = grammar.fillSparseArray(grammar.fillSparseArray(grammar.mkVector(Double.NegativeInfinity)));
-      val unaryRuleCounts = grammar.fillSparseArray(grammar.mkVector(Double.NegativeInfinity));
-      val wordCounts = grammar.fillSparseArray(LogDoubleCounter[W]());
-      var logProb = 0.0;
-
-      for( (bCounts,uCounts,wCounts,tProb) <- results) {
-        for( (k1,c) <- bCounts;
-            (k2,vec) <- c) {
-          logAdd(binaryRuleCounts(k1)(k2),vec);
-        }
-        for( (k,vec) <- uCounts) {
-          logAdd(unaryRuleCounts(k),vec);
-        }
-        for( (k,vec) <- wCounts) {
-          logAdd(wordCounts(k),vec);
-        }
-        logProb += tProb;
-      }
+      val ExpectedCounts(binaryRuleCounts,unaryRuleCounts,wordCounts,logProb) = results.reduceLeft { _ += _ };
 
       val twiddledBinaryCounts = collapseBinaryRules(grammar,binaryRuleCounts,numBits);
       val twiddledUnaryCounts = collapseUnaryRules(grammar,unaryRuleCounts,numBits);
