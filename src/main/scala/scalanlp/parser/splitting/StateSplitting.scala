@@ -62,6 +62,11 @@ object StateSplitting {
           a <- t.label
         } {
           val ruleScore = rules(a) + spanScore(c);
+          if(ruleScore.isInfinite) {
+            println(tree render s);
+            println(t render s);
+            assert(!ruleScore.isInfinite,rules(a) + " " + spanScore(c));
+          }
           spanScore(a) = logSum(spanScore(a), ruleScore);
         }
       case t@BinaryTree(_,lchild,rchild) =>
@@ -70,9 +75,9 @@ object StateSplitting {
         val split = t.leftChild.span.end;
         assert(split == rchild.span.start);
         val end = t.span.end;
-         for {
+        for {
           a <- t.label
-       } {
+        } {
          val scores = for {
            b <- lchild.label
            rules = grammar.binaryRulesByIndexedLeftChild(b);
@@ -81,6 +86,7 @@ object StateSplitting {
            rules(c)(a) + score(begin)(split)(b) + score(split)(end)(c);
          };
          spanScore(a) = logSum(scores);
+         assert(!a.isInfinite);
        }
       case _ => error("bad tree!");
     }
@@ -107,6 +113,7 @@ object StateSplitting {
           rScore = insideScores(rchild.span.start)(rchild.span.end)(r)
         } {
           val rS = lRules(r)(p);
+          assert(!rS.isInfinite);
           score(lchild.span.start)(lchild.span.end)(l) = logSum(score(lchild.span.start)(lchild.span.end)(l),pScore + rScore + rS);
           score(rchild.span.start)(rchild.span.end)(r) = logSum(score(rchild.span.start)(rchild.span.end)(r),pScore + lScore + rS);
         }
@@ -118,12 +125,40 @@ object StateSplitting {
           c <- child.label
         } {
           val rScore = grammar.unaryRulesByIndexedChild(c)(p)
+          assert(!rScore.isInfinite)
           score(child.span.start)(child.span.end)(c) = logSum(score(child.span.start)(child.span.end)(c),pScore + rScore);
         }
 
     }
 
     score
+  }
+
+  final case class ExpectedCounts[W](
+    binaryRuleCounts: SparseArray[SparseArray[Vector]], // parent -> lchild -> rchild -> counts;
+    unaryRuleCounts: SparseArray[Vector], // parent -> child -> counts;
+    wordCounts: SparseArray[LogDoubleCounter[W]], // parent -> word -> counts;
+    var logProb: Double
+  ) {
+    def +=(c: ExpectedCounts[W]) = {
+      val ExpectedCounts(bCounts,uCounts,wCounts,tProb) = c;
+
+      for( (k1,c) <- bCounts;
+          (k2,vec) <- c) {
+        logAdd(binaryRuleCounts(k1)(k2),vec);
+      }
+
+      for( (k,vec) <- uCounts) {
+        logAdd(unaryRuleCounts(k),vec);
+      }
+
+      for( (k,vec) <- wCounts) {
+        logAdd(wordCounts(k),vec);
+      }
+
+      logProb += tProb;
+      this;
+    }
   }
 
   def expectedCounts[L,W](grammar: Grammar[L], lexicon: Lexicon[L,W], tree: BinarizedTree[Seq[L]], s: Seq[W]) = {
@@ -133,7 +168,7 @@ object StateSplitting {
 
     val iScores = insideScores(grammar,lexicon,tree,s);
     val oScores = outsideScores(grammar,lexicon, tree,s,iScores);
-    val indexedTree:Tree[Seq[Int]] = tree.map{ _.map(grammar.index) };
+    val indexedTree:Tree[Seq[Int]] = tree.map { _.map(grammar.index) };
 
     // normalizer
     val totalProb = logSum(iScores(0)(s.length)(tree.label map grammar.index));
@@ -178,7 +213,7 @@ object StateSplitting {
           binaryRuleCounts(p)(l)(r) = logSum(binaryRuleCounts(p)(l)(r), ruleScore);
         }
     }
-    (binaryRuleCounts,unaryRuleCounts,wordCounts,totalProb);
+    ExpectedCounts(binaryRuleCounts,unaryRuleCounts,wordCounts,totalProb);
   }
 
   def splitCounts[L,L2,W](ruleCounts: RuleCounts[L],
@@ -188,18 +223,18 @@ object StateSplitting {
     val splitRules = LogPairedDoubleCounter[L2,Rule[L2]]();
     for {
       ((_,baseR),count) <- ruleCounts;
-      r <- splitRule(baseR,splitter);
-      x = Math.log(1 + 2 * randomNoise * Math.random - randomNoise)
+      r <- splitRule(baseR,splitter)
     } {
+      val x = Math.log(1 + 2 * randomNoise * Math.random - randomNoise);
       splitRules(r.parent,r) = count + x;
     }
 
     val splitWords = LogPairedDoubleCounter[L2,W]();
     for {
       ((l,w),count) <- wordCounts
-      r <- splitter(l);
-      x = Math.log(1 + 2 * randomNoise * Math.random - randomNoise)
+      r <- splitter(l)
     } {
+      val x = Math.log(1 + 2 * randomNoise * Math.random - randomNoise)
       splitWords(r,w) = count + x;
     }
 
@@ -218,11 +253,10 @@ object StateSplitting {
     }
   }
 
-
-  private def splitRule[L,L2,W](r: Rule[L], splitter: L=>Seq[L2]):Seq[Rule[L2]] = r match {
-    case UnaryRule(p,c) => for { pp <- splitter(p) ; cc <- splitter(c)} yield UnaryRule(pp,cc);
+  private def splitRule[L,L2,W](r: Rule[L], splitter: L=>Seq[L2]):Iterator[Rule[L2]] = r match {
+    case UnaryRule(p,c) => for { pp <- splitter(p).iterator ; cc <- splitter(c).iterator} yield UnaryRule(pp,cc);
     case BinaryRule(p,l,r) => 
-      for { pp <- splitter(p) ; ll <- splitter(l); rr <- splitter(r)} yield BinaryRule(pp,ll,rr);
+      for { pp <- splitter(p).iterator ; ll <- splitter(l).iterator; rr <- splitter(r).iterator } yield BinaryRule(pp,ll,rr);
   }
 
   def splitCycle[L,W](ruleCounts: RuleCounts[L],
@@ -238,27 +272,10 @@ object StateSplitting {
       val grammar = new GenerativeGrammar(LogCounters.logNormalizeRows(splitRules));
       val lexicon = new UnsmoothedLexicon(LogCounters.logNormalizeRows(splitWords));
       val results = for {
-        (t,s) <- trees
+        (t,s) <- trees.iterator
       } yield expectedCounts(grammar,lexicon,t,s);
 
-      val binaryRuleCounts = grammar.fillSparseArray(grammar.fillSparseArray(grammar.mkVector(Double.NegativeInfinity)));
-      val unaryRuleCounts = grammar.fillSparseArray(grammar.mkVector(Double.NegativeInfinity));
-      val wordCounts = grammar.fillSparseArray(LogDoubleCounter[W]());
-      var logProb = 0.0;
-
-      for( (bCounts,uCounts,wCounts,tProb) <- results) {
-        for( (k1,c) <- bCounts;
-            (k2,vec) <- c) {
-          logAdd(binaryRuleCounts(k1)(k2),vec);
-        }
-        for( (k,vec) <- uCounts) {
-          logAdd(unaryRuleCounts(k),vec);
-        }
-        for( (k,vec) <- wCounts) {
-          logAdd(wordCounts(k),vec);
-        }
-        logProb += tProb;
-      }
+      val ExpectedCounts(binaryRuleCounts,unaryRuleCounts,wordCounts,logProb) = results.reduceLeft( _ += _ );
 
       val finalRules = decodeRules(grammar,binaryRuleCounts,unaryRuleCounts);
       val finalWords = decodeWords(grammar,wordCounts);
@@ -320,7 +337,7 @@ object StateSplitting {
       case UnaryRule(par,child) =>
         myRuleCounts( (l,0), UnaryRule( (l,0), (child,0))) = w;
       case BinaryRule(par,lc,rc) =>
-        myRuleCounts( (l,0), UnaryRule( (lc,0), (rc,0))) = w;
+        myRuleCounts( (l,0), BinaryRule( (l,0), (lc,0), (rc,0))) = w;
     }
 
     val myWordCounts = LogPairedDoubleCounter[(L,Int),W]();
