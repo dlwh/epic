@@ -36,11 +36,11 @@ trait ParserTester {
 
     val xform = Trees.Transforms.StandardStringTransform;
 
-    val trainTrees = for( (tree,words) <- treebank.trainTrees)
-      yield (binarize(xform(tree)),words map (_.intern));
+    val trainTrees = for( (tree,words) <- treebank.trainTrees.view)
+      yield (binarize(xform(tree)),words);
 
-    val devTrees = for( (tree,words) <- treebank.devTrees)
-      yield (binarize(xform(tree)),words map (_.intern));
+    val devTrees = for( (tree,words) <- treebank.devTrees.view)
+      yield (binarize(xform(tree)),words);
 
     println("Training Parser...");
     val parser = trainParser(trainTrees,devTrees,config);
