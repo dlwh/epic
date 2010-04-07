@@ -34,11 +34,6 @@ import scalala.tensor._;
 import scalanlp.util.Index;
 import Math._;
 
-
-import GenerativeParser._;
-
-@serializable
-@SerialVersionUID(1L)
 class GenerativeParser[L,W](root: L, lexicon: Lexicon[L,W],
                             grammar: Grammar[L]) extends Parser[L,W] {
   
