@@ -21,7 +21,7 @@ import scalanlp.parser.Lexicon
 import scalanlp.parser.ParseChart
 import scalanlp.parser.Parser
 import scala.collection.mutable.PriorityQueue
-import scalanlp.counters.Counters.DoubleCounter
+import scalala.tensor.counters.Counters.DoubleCounter
 import scalanlp.parser.Grammar
 import scalanlp.trees.Span;
 import scalanlp.trees.Tree
