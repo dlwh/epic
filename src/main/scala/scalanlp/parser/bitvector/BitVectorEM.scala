@@ -2,8 +2,8 @@ package scalanlp.parser.bitvector
 
 import scalala.Scalala._;
 import scalala.tensor.Vector;
-import scalanlp.counters.LogCounters
-import scalanlp.counters.LogCounters.LogDoubleCounter
+import scalala.tensor.counters.LogCounters
+import scalala.tensor.counters.LogCounters.LogDoubleCounter
 import scalanlp.math.Numerics.logSum;
 import scalanlp.trees.BinarizedTree
 import scalanlp.trees.BinarizedTree
@@ -14,7 +14,7 @@ import scalanlp.parser._;
 import scalala.tensor.dense.DenseMatrix
 import scalanlp.collection.mutable.SparseArray
 import scalanlp.config.Configuration
-import scalanlp.counters.Counters._;
+import scalala.tensor.counters.Counters._;
 import Math.exp
 
 import scalanlp.parser.splitting.StateSplitting
