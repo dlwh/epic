@@ -21,10 +21,10 @@ import scalala.tensor.Vector;
 import scalanlp.collection.mutable.SparseArray
 import scalanlp.collection.mutable.TriangularArray
 import scalanlp.config.Configuration
-import scalanlp.counters.Counters._;
-import scalanlp.counters.LogCounters;
-import scalanlp.counters.LogCounters.LogPairedDoubleCounter;
-import scalanlp.counters.LogCounters.LogDoubleCounter;
+import scalala.tensor.counters.Counters._;
+import scalala.tensor.counters.LogCounters;
+import scalala.tensor.counters.LogCounters.LogPairedDoubleCounter;
+import scalala.tensor.counters.LogCounters.LogDoubleCounter;
 import scalanlp.math.Numerics.logSum;
 import scalanlp.parser.ParserTester
 import scalanlp.parser._;

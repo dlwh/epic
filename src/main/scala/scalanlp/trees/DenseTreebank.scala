@@ -25,7 +25,8 @@ import java.io.FileOutputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
 import java.util.zip.ZipOutputStream
-import scalanlp.io.Serialization
+import scalanlp.serialization.JavaDataSerialization._;
+import scalanlp.serialization.JavaDataSerialization;
 import scalanlp.util.Index
 
 object DenseTreebank {
@@ -34,11 +35,7 @@ object DenseTreebank {
     val symbolIndex = Index[String]();
     val wordIndex = Index[String]();
 
-    import scalanlp.io.Serialization.Handlers._;
-    import scalanlp.io.Serialization.ScalanlpHandlers._;
-
-    val treeHandler = Tree.treeSerializationHandler[Int];
-    val wordsHandler = seqHandler[Int];
+    val treeHandler = Tree.treeSerializationReadWritable[Int];
 
     for(section <- treebank.sections) {
       zipWriter.putNextEntry(new ZipEntry("sections/"+section));
@@ -46,11 +43,11 @@ object DenseTreebank {
       for( (tree,words) <- treebank.treesFromSection(section)) {
         val indexedTree = tree.map(symbolIndex index _);
         val indexedWords = words.map(wordIndex index _);
-        Serialization.write(true,dos);
-        Serialization.write(indexedTree,dos);
-        Serialization.write(indexedWords,dos);
+        write(dos,true);
+        write(dos,indexedTree);
+        write(dos,indexedWords);
       }
-      Serialization.write(false,dos);
+      write(dos,false);
       dos.flush();
       zipWriter.closeEntry();
     }
@@ -60,10 +57,10 @@ object DenseTreebank {
     zipWriter.putNextEntry(new ZipEntry("metadata"));
     val dos = new DataOutputStream(zipWriter);
     import treebank._;
-    Serialization.write(symbolIndex:Index[String],dos);
-    Serialization.write(wordIndex:Index[String],dos);
+    write(dos,symbolIndex:Index[String]);
+    write(dos,wordIndex:Index[String]);
     val metadata :Metadata = (sections,testSections,trainSections,devSections);
-    Serialization.write(metadata,dos);
+    write(dos,metadata);
     dos.close();
     zipWriter.close();
   }
@@ -75,13 +72,10 @@ object DenseTreebank {
     val metadata = zipFile.getEntry("metadata");
     val metaIn = new DataInputStream(zipFile.getInputStream(metadata));
 
-    import scalanlp.io.Serialization.Handlers._;
-    import scalanlp.io.Serialization.ScalanlpHandlers._;
-
     new Treebank {
-      val symbolIndex = Serialization.read[Index[String]](metaIn);
-      val wordIndex = Serialization.read[Index[String]](metaIn);
-      val (sections,testSections,trainSections,devSections) = Serialization.read[Metadata](metaIn);
+      val symbolIndex = read[Index[String]](metaIn);
+      val wordIndex = read[Index[String]](metaIn);
+      val (sections,testSections,trainSections,devSections) = read[Metadata](metaIn);
       metaIn.close();
 
       def treesFromSection(sec: String): Iterable[(Tree[String],Seq[String])] = new Iterable[(Tree[String],Seq[String])] {
@@ -89,11 +83,11 @@ object DenseTreebank {
           val section = zipFile.getEntry("sections/"+sec);
           val sectionIn = zipFile.getInputStream(section);
           val data = new DataInputStream(new BufferedInputStream(sectionIn));
-          val iterator = if(!Serialization.read[Boolean](data)) Iterator.empty;
+          val iterator = if(!read[Boolean](data)) Iterator.empty;
           else Iterator.continually {
-            val indexedTree = Serialization.read[Tree[Int]](data);
-            val indexedWords = Serialization.read[Seq[Int]](data);
-            val continue = Serialization.read[Boolean](data);
+            val indexedTree = read[Tree[Int]](data);
+            val indexedWords = read[Seq[Int]](data);
+            val continue = read[Boolean](data);
             (indexedTree.map(symbolIndex.get _), indexedWords.map(wordIndex.get _),continue);
           } takeWhile( _._3);
 

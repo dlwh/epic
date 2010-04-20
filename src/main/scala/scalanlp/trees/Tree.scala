@@ -19,10 +19,9 @@ package scalanlp.trees;
 import java.io.DataInput
 import java.io.DataOutput
 import scala.collection.mutable.ArrayBuffer;
-import scalanlp.io.Serialization
+import scalanlp.serialization.JavaDataSerialization
 
-
-case class Tree[+L](label: L, children: Seq[Tree[L]])(val span: Span) {
+class Tree[+L](val label: L, val children: Seq[Tree[L]])(val span: Span) {
   def isLeaf = children.size == 0;
   /**
   * A tree is valid if this' span contains all children's spans 
@@ -30,7 +29,7 @@ case class Tree[+L](label: L, children: Seq[Tree[L]])(val span: Span) {
   */
   def isValid = isLeaf || {
     children.map(_.span).forall(this.span contains _) &&
-    children.elements.drop(1).zip(children.elements).forall { case (next,prev) =>
+    children.iterator.drop(1).zip(children.iterator).forall { case (next,prev) =>
       prev.span.end == next.span.start
     } &&
     children(0).span.start == this.span.start && 
@@ -38,7 +37,7 @@ case class Tree[+L](label: L, children: Seq[Tree[L]])(val span: Span) {
   }
 
   def leaves:Iterable[Tree[L]] = if(isLeaf) {
-    List(this).projection
+    List(this).view
   } else  {
     children.map(_.leaves).foldLeft[Stream[Tree[L]]](Stream.empty){_ append _}
   }
@@ -63,6 +62,8 @@ case class Tree[+L](label: L, children: Seq[Tree[L]])(val span: Span) {
 }
 
 object Tree {
+  def apply[L](label: L, children: Seq[Tree[L]])(span: Span) = new Tree(label,children)(span);
+  def unapply[L](t: Tree[L]): Option[(L,Seq[Tree[L]])] = Some((t.label,t.children));
   def fromString(input: String):(Tree[String],Seq[String]) = new PennTreeReader().readTree(input).left.get;
 
   private def recursiveToString[L](tree: Tree[L], depth: Int, sb: StringBuilder):StringBuilder = {
@@ -91,16 +92,18 @@ object Tree {
     sb
   }
 
-  implicit def treeSerializationHandler[L:Serialization.Handler]: Serialization.Handler[Tree[L]] = new Serialization.Handler[Tree[L]] {
-    def write(t: Tree[L], data: DataOutput) = {
-      implicitly[Serialization.Handler[L]].write(t.label,data);
-      Serialization.Handlers.seqHandler(this).write(t.children,data);
+  import JavaDataSerialization._;
+
+  implicit def treeSerializationReadWritable[L:ReadWritable]: ReadWritable[Tree[L]] = new ReadWritable[Tree[L]] {
+    def write(data: DataOutput, t: Tree[L]) = {
+      implicitly[ReadWritable[L]].write(data,t.label);
+      JavaDataSerialization.write(data,t.children);
       data.writeInt(t.span.start);
       data.writeInt(t.span.end);
     }
     def read(data: DataInput) = {
-      val label = implicitly[Serialization.Handler[L]].read(data);
-      val children = Serialization.Handlers.seqHandler(this).read(data);
+      val label = implicitly[JavaDataSerialization.ReadWritable[L]].read(data);
+      val children = JavaDataSerialization.seqReadWritable(this).read(data);
       val begin = data.readInt();
       val end = data.readInt();
       new Tree(label,children)(Span(begin,end));

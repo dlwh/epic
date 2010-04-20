@@ -23,7 +23,7 @@ import scala.collection.mutable.BitSet
 import scalanlp.data._;
 import scalanlp.data.process._;
 import scalanlp.config.Configuration
-import scalanlp.counters._;
+import scalala.tensor.counters._;
 import Counters._;
 import LogCounters.{LogPairedDoubleCounter,LogDoubleCounter,logNormalizeRows};
 import scalanlp.trees._;
@@ -122,7 +122,7 @@ class GenerativeParser[L,W](root: L, lexicon: Lexicon[L,W],
 
 object GenerativeParser {
 
-  def fromTrees[W](data: Collection[(BinarizedTree[String],Seq[W])]):GenerativeParser[String,W] = {
+  def fromTrees[W](data: Iterable[(BinarizedTree[String],Seq[W])]):GenerativeParser[String,W] = {
     fromTrees(data.iterator);
   }
     
@@ -133,9 +133,9 @@ object GenerativeParser {
     new GenerativeParser(root,new SimpleLexicon(lexicon),new GenerativeGrammar(logNormalizeRows(productions)));
   }
 
-  def extractCounts[W](data: Iterator[(BinarizedTree[String],Seq[W])]) = {
-    val lexicon = new PairedDoubleCounter[String,W]();
-    val productions = new PairedDoubleCounter[String,Rule[String]]();
+  def extractCounts[L,W](data: Iterator[(BinarizedTree[L],Seq[W])]) = {
+    val lexicon = new PairedDoubleCounter[L,W]();
+    val productions = new PairedDoubleCounter[L,Rule[L]]();
 
     for( (tree,words) <- data) {
       val leaves = tree.leaves map (l => (l,words(l.span.start)));

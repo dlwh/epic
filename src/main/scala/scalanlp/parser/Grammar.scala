@@ -21,7 +21,7 @@ import scalala.Scalala._;
 import scalala.tensor._;
 import scalanlp.data.VectorBroker
 import scalanlp.collection.mutable.SparseArray;
-import scalanlp.counters.LogCounters._;
+import scalala.tensor.counters.LogCounters._;
 import scalanlp.util.Index;
 
 sealed abstract class Rule[+L] { def parent: L; def children: Seq[L] }
@@ -136,7 +136,7 @@ class GenerativeGrammar[L](productions: LogPairedDoubleCounter[L,Rule[L]]) exten
   /**
    * Returns pairs of the form ( (parent,(left,right)),score);
    */
-  def binaryRulesByLeftChild(c: L) = leftChildBinaryRules(c).elements;
+  def binaryRulesByLeftChild(c: L) = leftChildBinaryRules(c).iterator;
 
   def binaryRulesByIndexedLeftChild(b: Int) = indexedBinaryRulesByLeftChild(b);
 
@@ -145,5 +145,5 @@ class GenerativeGrammar[L](productions: LogPairedDoubleCounter[L,Rule[L]]) exten
   /**
    * Returns pairs of the form ( (lchild,rchild),
    */
-  def binaryRulesByParent(p: L) = binaryRules(p).elements;
+  def binaryRulesByParent(p: L) = binaryRules(p).iterator;
 }

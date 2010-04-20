@@ -17,10 +17,10 @@ package scalanlp.parser
 
 
 
-import scalanlp.counters.Counters.DoubleCounter
-import scalanlp.counters.Counters.PairedDoubleCounter
+import scalala.tensor.counters.Counters.DoubleCounter
+import scalala.tensor.counters.Counters.PairedDoubleCounter
 import Math.log
-import scalanlp.counters.LogCounters.LogPairedDoubleCounter
+import scalala.tensor.counters.LogCounters.LogPairedDoubleCounter
 
 
 trait Lexicon[L,W] {

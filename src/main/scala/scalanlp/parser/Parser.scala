@@ -18,7 +18,7 @@ package scalanlp.parser;
 
 import scalanlp.trees._;
 import scalanlp.classify.Classifier;
-import scalanlp.counters.Counters.DoubleCounter
+import scalala.tensor.counters.Counters.DoubleCounter
 import scalanlp.data._;
 
 trait Parser[L,W] extends Classifier[Tree[L],Seq[W]] { outer =>
