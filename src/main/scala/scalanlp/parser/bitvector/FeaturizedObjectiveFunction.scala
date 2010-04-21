@@ -1,5 +1,7 @@
 package scalanlp.parser.bitvector
 
+import scalala.Scalala._;
+import scalala.tensor.counters.Counters
 import scalala.tensor.counters.Counters.DoubleCounter
 import scalala.tensor.counters.Counters.PairedDoubleCounter
 import scalala.tensor.counters.LogCounters
@@ -8,89 +10,158 @@ import scalala.tensor.counters.LogCounters.LogPairedDoubleCounter
 import scalala.tensor.dense.DenseMatrix
 import scalala.tensor.dense.DenseVector
 import scalanlp.optimize.DiffFunction
+import scalanlp.optimize.LBFGS
+import scalanlp.util.ConsoleLogging
 import scalanlp.util.Index
 import scalanlp.collection.mutable.Grid2
+import scalanlp.collection.mutable.SparseArray
 import scalanlp.data.VectorBroker
+import scalanlp.util.Log
 
-trait FeaturizedObjectiveFunction extends DiffFunction[Int,DenseVector]  {
+abstract class FeaturizedObjectiveFunction extends DiffFunction[Int,DenseVector]  {
   type Context;
   type Decision;
   type Feature;
 
-  protected def allDecisions: Iterator[Decision]
+  protected def decisionsForContext(c: Context): Iterator[Decision]
   protected def allContexts: Iterator[Context]
   protected def features(d: Decision, c: Context):Seq[Feature];
-  protected def expectedCounts(logThetas: LogPairedDoubleCounter[Context,Decision]):PairedDoubleCounter[Context,Decision];
+  protected def initialFeatureWeight(f: Feature):Double;
+  /** Should compute marginal likelihood and expected counts for the data */
+  protected def expectedCounts(logThetas: LogPairedDoubleCounter[Context,Decision]):(Double,PairedDoubleCounter[Context,Decision]);
 
-  val decisionIndex: Index[Decision] = Index(allDecisions);
   val contextIndex: Index[Context] = Index(allContexts);
-  val (featureIndex: Index[Feature], featureGrid: Grid2[Seq[Int]]) = {
-    val index = Index[Feature]();
-    val grid = new Grid2[Seq[Int]](decisionIndex.size,contextIndex.size,Seq.empty);
-    for(dI <- 0 until decisionIndex.size; cI <- 0 until contextIndex.size) {
-      val d = decisionIndex.get(dI);
-      val c = contextIndex.get(cI);
-      val f = features(d,c);
-      grid(dI,cI) = f map (index.index _ );
+  protected val contextBroker = VectorBroker.fromIndex(contextIndex);
+
+  val (decisionIndex,indexedDecisionsForContext:Seq[Seq[Int]]) = {
+    val decisionIndex = Index[Decision];
+    val indexedDecisionsForContext = contextBroker.mkArray[Seq[Int]];
+    for( (c,cI) <- contextIndex.pairs) {
+      indexedDecisionsForContext(cI) = decisionsForContext(c).map(decisionIndex.index _).toSeq;
     }
-    (index,grid);
+    (decisionIndex,indexedDecisionsForContext:Seq[Seq[Int]]);
+  }
+  protected val decisionBroker = VectorBroker.fromIndex(decisionIndex);
+
+  // feature grid is contextIndex -> decisionIndex -> Seq[feature index]
+  val (featureIndex: Index[Feature], featureGrid: Array[SparseArray[Seq[Int]]]) = {
+    val index = Index[Feature]();
+    val grid = contextBroker.fillArray(decisionBroker.fillSparseArray(Seq[Int]()));
+    for(cI <- 0 until contextIndex.size;
+        c = contextIndex.get(cI);
+        dI <- indexedDecisionsForContext(cI)) {
+      val d = decisionIndex.get(dI);
+      val f = features(d,c);
+      if(!f.isEmpty)
+        grid(cI)(dI) = f.iterator map {index.index _ } toSeq;
+    }
+    (index,grid:Array[SparseArray[Seq[Int]]]);
   }
 
+  val initWeights = Counters.aggregate(featureIndex.map{ f => (f,initialFeatureWeight(f))});
+  val initIndexedWeights = VectorBroker.fromIndex(featureIndex).encodeDense(initWeights);
+
   private def decodeMatrix(m: DenseVector): DoubleCounter[Feature] = VectorBroker.fromIndex(featureIndex).decode(m);
-  private def computeLogThetas(weights: DoubleCounter[Feature]) = {
+  private def computeLogThetas(weights: DenseVector) = {
     val thetas = LogPairedDoubleCounter[Context,Decision]
-    for(c <- contextIndex;
-        d <- decisionIndex) {
-      val score = (for( f <- features(d,c) iterator ) yield weights(f)).foldLeft(0.0){_+_};
-      thetas(c,d) = score;
+    for((dIs,cI) <- featureGrid.zipWithIndex;
+        c = contextIndex.get(cI);
+        cTheta = thetas(c);
+        dI <- dIs.keysIterator) {
+      val d = decisionIndex.get(dI);
+      val score = sumWeights(featureGrid(cI)(dI),weights);
+      cTheta(d) = score;
     }
     LogCounters.logNormalizeRows(thetas);
   }
 
-  override def calculate(weights: DenseVector) = {
-    val featureWeights = decodeMatrix(weights);
-    val logThetas = computeLogThetas(featureWeights);
-
-    val eCounts = expectedCounts(logThetas);
-
-    computeGradient(logThetas, eCounts);
+  private def sumWeights(indices: Seq[Int], weights: DenseVector) = {
+    var i = 0;
+    var sum = 0.0;
+    while(i < indices.length) {
+      val f = indices(i);
+      sum += weights(f);
+      i += 1;
+    }
+    sum;
   }
 
-  override def valueAt(weights: DenseVector) = calculate(weights)._1;
-  override def gradientAt(weights: DenseVector) = calculate(weights)._2;
+  override def calculate(weights: DenseVector) = {
+    val logThetas = computeLogThetas(weights);
+    val (marginalLogProb,eCounts) = expectedCounts(logThetas);
 
-  def computeGradient(logThetas: LogPairedDoubleCounter[Context,Decision], eCounts: PairedDoubleCounter[Context,Decision]) = {
+    val (expCompleteLogProb,grad) = computeGradient(logThetas, eCounts);
+    (-marginalLogProb,grad);
+  }
+
+  // computes expComplete log Likelihood and gradient
+  private def computeGradient(logThetas: LogPairedDoubleCounter[Context,Decision], eCounts: PairedDoubleCounter[Context,Decision]) = {
     val featureGrad = VectorBroker.fromIndex(featureIndex).mkDenseVector(0.0);
     var logProb = 0.0;
-    for((c,ctr) <- eCounts.rows;
-        cI = contextIndex(c);
-        (d,e) <- ctr) {
-      val dI = decisionIndex(d);
-      logProb += e * logThetas(c,d);
-      for( f <- featureGrid(cI,dI))
-        featureGrad(f) += e;
+    // gradient is \sum_{d,c} e(d,c) * (f(d,c) - \sum_{d'} logTheta(c,d') f(d',c))
+    // = \sum_{d,c} (e(d,c)  - e(*,c) logTheta(d,c)) f(d,c)
+    // = \sum_{d,c} margin(d,c) * f(d,c)
+    //
+    // e(*,c) = \sum_d e(d,c) == eCounts(c).total
+    for((c,ctr) <- eCounts.rows) {
+      val cI = contextIndex(c);
+      val cTheta = logThetas(c);
+      val logTotal = Math.log(ctr.total);
+      for((d,e) <- ctr) {
+        val lT = cTheta(d);
+        logProb += e * lT;
 
-      val logE = Math.log(e);
-      for(dd <- ctr.activeDomain) {
-        val ddI = decisionIndex(dd);
-        for( f <- featureGrid(cI,ddI)) {
-          featureGrad(f) -= Math.exp(logE + logThetas(c,dd));
-        }
+        val margin = e - Math.exp(logTotal + lT);
+        val dI = decisionIndex(d);
+
+        for( f <- featureGrid(cI)(dI))
+          featureGrad(f) += margin;
       }
     }
 
-    (logProb,featureGrad);
+    (-logProb,-featureGrad value);
   }
 
   class mStepObjective(eCounts: PairedDoubleCounter[Context,Decision]) extends DiffFunction[Int,DenseVector]   {
     override def calculate(weights: DenseVector) = {
-      val featureWeights = decodeMatrix(weights);
-      val logThetas = computeLogThetas(featureWeights);
+      val logThetas = computeLogThetas(weights);
       computeGradient(logThetas,eCounts);
     }
 
-    override def valueAt(weights: DenseVector) = calculate(weights)._1;
-    override def gradientAt(weights: DenseVector) = calculate(weights)._2;
+  }
+
+  def runEM(initialWeights: DoubleCounter[Feature] = initWeights): LogPairedDoubleCounter[Context,Decision] = {
+    val log = Log.globalLog;
+
+    var weights = initIndexedWeights;
+    var lastLL = Double.NegativeInfinity;
+
+    var converged = false;
+    val optimizer = new LBFGS[Int,DenseVector](20,3) with ConsoleLogging;
+    val broker = VectorBroker.fromIndex(featureIndex);
+    while(!converged) {
+      log(Log.INFO)("E step");
+      val logThetas = computeLogThetas(weights);
+      //log(Log.INFO)("Thetas: " + logThetas);
+      val (marginalLogProb,eCounts) = expectedCounts(logThetas);
+      val diff = (lastLL - marginalLogProb)/lastLL;
+      lastLL = marginalLogProb;
+      val converged = diff < 1E-4;
+      log(Log.INFO)("Marginal likelihood: " + marginalLogProb + " (Diff: " + diff + ")");
+      if(!converged) {
+        log(Log.INFO)("M step");
+        val obj = new mStepObjective(eCounts);
+        val newWeights = optimizer.minimize(obj, weights);
+        val nrm = norm(weights - newWeights,2) / weights.size;
+        weights = newWeights;
+        log(Log.INFO)("M Step finished: " + nrm);
+      }
+
+    }
+
+    val finalThetas = computeLogThetas(weights);
+    log(Log.INFO)("Final thetas" + finalThetas);
+    finalThetas;
   }
 
 

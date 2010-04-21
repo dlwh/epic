@@ -7,6 +7,7 @@ import scalala.tensor.counters.Counters.PairedDoubleCounter
 import scalala.tensor.counters.LogCounters.LogPairedDoubleCounter
 import scalala.tensor.counters.LogCounters.LogDoubleCounter
 import scalanlp.trees._
+import scalanlp.config.Configuration
 import scalanlp.parser.GenerativeGrammar
 import scalanlp.parser.UnsmoothedLexicon
 import scalanlp.parser._;
@@ -14,6 +15,7 @@ import scalala.tensor.counters.Counters._;
 
 import scalanlp.parser.splitting.StateSplitting
 import scalanlp.parser.splitting.StateSplitting._;
+import scalanlp.util.CachedHashCode;
 
 import BitUtils._;
 
@@ -22,20 +24,20 @@ class LogisticBitVector[L,W](treebank: StateSplitting.Treebank[L,W], root: L, nu
   type Context = (L,Substate);
   type Decision = MyDecision;
   type Feature = MyFeature;
-  val numStates = (1 << numBits);
+  lazy val numStates = (1 << numBits);
 
   sealed trait MyDecision;
-  case class BinaryRuleDecision(left: L, leftState: Int, right: L, rightState: Int) extends MyDecision;
-  case class UnaryRuleDecision(child: L, state: Int) extends MyDecision;
-  case class WordDecision(word: W) extends MyDecision;
+  case class BinaryRuleDecision(left: L, leftState: Int, right: L, rightState: Int) extends MyDecision with CachedHashCode;
+  case class UnaryRuleDecision(child: L, state: Int) extends MyDecision with CachedHashCode;
+  case class WordDecision(word: W) extends MyDecision with CachedHashCode;
 
   trait MyFeature;
-  case class RuleFeature(r: Rule[L]) extends MyFeature;
-  case class SingleBitFeature(r: Rule[L], bit: BitStatus) extends MyFeature;
-  case class BinaryBitFeature(r: Rule[L], bit1: BitStatus, bit2: BitStatus) extends MyFeature;
+  case class RuleFeature(r: Rule[L]) extends MyFeature with CachedHashCode;
+  case class SingleBitFeature(r: Rule[L], bit: BitStatus) extends MyFeature with CachedHashCode;
+  case class BinaryBitFeature(r: Rule[L], bit1: BitStatus, bit2: BitStatus) extends MyFeature with CachedHashCode;
 
-  case class LexicalFeature(parent: L, word: W) extends MyFeature;
-  case class LexicalBitFeature(parent: L, word: W, bit: BitStatus) extends MyFeature;
+  case class LexicalFeature(parent: L, word: W) extends MyFeature with CachedHashCode;
+  case class LexicalBitFeature(parent: L, word: W, bit: BitStatus) extends MyFeature with CachedHashCode;
 
   sealed trait LabelOfBit;
   case object Parent extends LabelOfBit;
@@ -44,11 +46,11 @@ class LogisticBitVector[L,W](treebank: StateSplitting.Treebank[L,W], root: L, nu
   case object UChild extends LabelOfBit;
 
   final case class BitStatus(label: LabelOfBit, bitIndex: Int, toggled: Int);
-  val (initLexicon:PairedDoubleCounter[L,W],initProductions:PairedDoubleCounter[L,Rule[L]]) = GenerativeParser.extractCounts(treebank.iterator);
+  lazy val (initLexicon:PairedDoubleCounter[L,W],initProductions:PairedDoubleCounter[L,Rule[L]]) = GenerativeParser.extractCounts(treebank.iterator);
 
-  def allDecisions: Iterator[Decision] = {
-    val lexDecisions = for( ((l,w),_) <- initLexicon.iterator) yield WordDecision(w);
-    val ruleDecisions: Iterator[Iterator[MyDecision]] = for( ((_,r),_) <- initProductions.iterator) yield r match {
+  def decisionsForContext(c: Context): Iterator[Decision] = {
+    val lexDecisions = for( (w,_) <- initLexicon(c._1).iterator) yield WordDecision(w);
+    val ruleDecisions:  Iterator[Iterator[MyDecision]] = for( (r,_) <- initProductions(c._1).iterator) yield r match {
       case BinaryRule(par,left,right) => for(lS <- 0 until numStates iterator; rS <- 0 until numStates iterator)
         yield BinaryRuleDecision(left,lS,right,rS);
       case UnaryRule(_,child) => for(s <- 0 until numStates iterator)
@@ -59,36 +61,38 @@ class LogisticBitVector[L,W](treebank: StateSplitting.Treebank[L,W], root: L, nu
   }
 
   def allContexts: Iterator[Context] = {
+    val allLabels = Set.empty ++ initProductions.rows.map{_._1} ++ initLexicon.rows.map{_._1};
+    println(numStates);
     for {
-      (l,_) <- initProductions.rows
+      l <- allLabels.iterator
       state <- 0 until numStates iterator
     } yield (l,state);
   }
 
   def features(d: Decision, c: Context):Seq[Feature] = d match {
     case WordDecision(w) =>
-     val bitStates = for( (bit,toggled) <- BitUtils.iterateBits(c._2,numBits) )
+     val bitStates: Iterator[Feature] = for( (bit,toggled) <- BitUtils.iterateBits(c._2,numBits) )
        yield LexicalBitFeature(c._1,w,BitStatus(Parent,bit,toggled));
-     (Iterator.single(LexicalFeature(c._1,w)) ++ bitStates).toSeq;
+     (Iterator.single[Feature](LexicalFeature(c._1,w)) ++ bitStates).toSeq;
     case UnaryRuleDecision(child,state) =>
       val rule = UnaryRule(c._1,child);
       val ruleFeature = RuleFeature(rule);
       val childBitStates = mkBitStati(UChild,state);
       val parentBitStates = mkBitStati(Parent,c._2);
-      val childFeatures = childBitStates map { SingleBitFeature(rule, _) }
-      val parentFeatures = parentBitStates map { SingleBitFeature(rule, _) };
+      val childFeatures:Seq[Feature] = childBitStates map { SingleBitFeature(rule, _) }
+      val parentFeatures:Seq[Feature] = parentBitStates map { SingleBitFeature(rule, _) };
       val binFeatures = for(parent <- parentBitStates iterator; child <- childBitStates iterator)
         yield BinaryBitFeature(rule, parent, child);
-      Seq(ruleFeature) ++ parentFeatures ++ childFeatures ++ binFeatures;
+      Seq[Feature](ruleFeature) ++ parentFeatures ++ childFeatures ++ binFeatures;
     case BinaryRuleDecision(left,lstate,right,rstate) =>
       val rule = BinaryRule(c._1,left,right);
       val ruleFeature = RuleFeature(rule);
       val lchildBitStates = mkBitStati(LChild,lstate);
       val rchildBitStates = mkBitStati(RChild,rstate);
       val parentBitStates = mkBitStati(Parent,c._2);
-      val lchildFeatures = lchildBitStates map { SingleBitFeature(rule, _) }
-      val rchildFeatures = rchildBitStates map { SingleBitFeature(rule, _) }
-      val parentFeatures = parentBitStates map { SingleBitFeature(rule, _) };
+      val parentFeatures:Seq[Feature] = parentBitStates map { SingleBitFeature(rule, _) };
+      val lchildFeatures:Seq[Feature] = lchildBitStates map { SingleBitFeature(rule, _) }
+      val rchildFeatures:Seq[Feature] = rchildBitStates map { SingleBitFeature(rule, _) }
       val lbinFeatures = for(parent <- parentBitStates iterator; child <- lchildBitStates iterator)
         yield BinaryBitFeature(rule, parent, child);
       val rbinFeatures = for(parent <- parentBitStates iterator; child <- rchildBitStates iterator)
@@ -127,10 +131,10 @@ class LogisticBitVector[L,W](treebank: StateSplitting.Treebank[L,W], root: L, nu
       eCtr(WordDecision(w)) = v;
     }
 
-    LogCounters.exp(eCounts);
+    (logProb,LogCounters.exp(eCounts));
   }
 
-  private def extractGrammarAndLexicon(logThetas: LogPairedDoubleCounter[Context,Decision]) = {
+  def extractGrammarAndLexicon(logThetas: LogPairedDoubleCounter[Context,Decision]) = {
     // NB: Context is (L,Int), and is our parent for the production rules.
     val lexicon = LogPairedDoubleCounter[Context,W]();
     val productions = LogPairedDoubleCounter[Context,Rule[(L,Int)]]();
@@ -158,7 +162,31 @@ class LogisticBitVector[L,W](treebank: StateSplitting.Treebank[L,W], root: L, nu
     }
   } toSeq;
 
+  def initialFeatureWeight(feature: Feature) = feature match {
+    case RuleFeature(r) => Math.log(initProductions(r.parent, r));
+    case SingleBitFeature(r, bit) => Math.log(Math.random * 0.2 + 0.9)
+    case BinaryBitFeature(r, bit1, bit2) => Math.log(Math.random * 0.2 + 0.9)
+    case LexicalFeature(parent, word) => Math.log(initLexicon(parent,word));
+    case LexicalBitFeature(parent, word, bit) => Math.log(Math.random * 0.2 + 0.9)
+  }
 
+}
 
+object LogisticBitVectorTest extends ParserTester {
+  def trainParser(trainTrees: Iterable[(BinarizedTree[String],Seq[String])],
+                  devTrees: Iterable[(BinarizedTree[String],Seq[String])],
+                  config: Configuration):Parser[String,String] = {
 
+    val obj = new LogisticBitVector(trainTrees,"",config.readIn("parser.bits",3));
+    val finalThetas = obj.runEM();
+
+    val (prods,words) = obj.extractGrammarAndLexicon(finalThetas);
+
+    val grammar = new GenerativeGrammar(prods);
+    val lex = new SimpleLexicon(LogCounters.exp(words));
+
+    new GenerativeParser[(String,Int),String](("",0),lex,grammar).map { (t:Tree[(String,Int)]) =>
+      t.map(_._1);
+    }
+  }
 }
