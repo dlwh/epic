@@ -204,7 +204,7 @@ object Trees {
 
     class FunctionNodeStripper extends (Tree[String]=>Tree[String]) {
       def apply(tree: Tree[String]): Tree[String] = {
-        tree.map(_.replaceAll("-.+","")) 
+        tree.map(_.replaceAll("[-=].+",""))
       }
     }
 
