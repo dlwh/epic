@@ -13,7 +13,7 @@ import scalanlp.trees.Trees
 trait ParserTester {
   def trainParser(trainTrees: Iterable[(BinarizedTree[String],Seq[String])],
                   devTrees: Iterable[(BinarizedTree[String],Seq[String])],
-                  config: Configuration):Parser[String,String];
+                  config: Configuration):Iterator[(String,Parser[String,String])];
 
   def main(args: Array[String]) {
     val properties = new Properties();
@@ -44,11 +44,18 @@ trait ParserTester {
       yield (binarize(xform(tree)),words);
 
     println("Training Parser...");
-    val parser = trainParser(trainTrees,devTrees,config);
+    val parsers = trainParser(trainTrees,devTrees,config);
 
+    for((name,parser) <- parsers) {
+      println("Parser " + name);
+      val testTrees = treebank.testTrees.iterator.filter(_._2.length <= maxLength);
 
+      evalParser(testTrees,parser,xform);
+    }
+  }
+
+  protected def evalParser(testTrees: Iterator[(Tree[String],Seq[String])], parser: Parser[String,String], xform: Tree[String]=>Tree[String]) = {
     println("Evaluating Parser...");
-    val testTrees = treebank.testTrees.iterator.filter(_._2.length <= maxLength);
     val (prec,recall,exact) = ParseEval.evaluate(testTrees,parser,xform);
     val f1 = (2 * prec * recall)/(prec + recall);
     println("Eval finished. Results:");

@@ -160,7 +160,7 @@ object GenerativeParser {
 object GenerativeTester extends ParserTester {
   def trainParser(trainTrees: Iterable[(BinarizedTree[String],Seq[String])],
                   devTrees: Iterable[(BinarizedTree[String],Seq[String])],
-                  config: Configuration):Parser[String,String] = GenerativeParser.fromTrees(trainTrees);
+                  config: Configuration) = Iterator.single(("",GenerativeParser.fromTrees(trainTrees)));
 }
 
 object GenerativeInterpreter {

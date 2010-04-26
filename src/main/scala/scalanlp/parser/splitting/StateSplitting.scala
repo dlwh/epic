@@ -408,19 +408,26 @@ object StateSplitting {
 object StateSplittingTest extends ParserTester {
   def trainParser(trainTrees: Iterable[(BinarizedTree[String],Seq[String])],
                   devTrees: Iterable[(BinarizedTree[String],Seq[String])],
-                  config: Configuration):Parser[String,String] = {
+                  config: Configuration) = {
 
     println("Extracting counts");
     val (initialLex,initialProductions) = (
       GenerativeParser.extractCounts(trainTrees.iterator)
     );
-    println("Splitting Grammar");
-    import StateSplitting._;
-    val (finalProd,finalLex,logProb) = splitGrammar(LogCounters.log(initialProductions),LogCounters.log(initialLex),trainTrees,"");
-    val grammar = new GenerativeGrammar(finalProd);
-    val lex = new SimpleLexicon(LogCounters.exp(finalLex));
-    new GenerativeParser[(String,Int),String](("",0),lex,grammar).map { (t:Tree[(String,Int)]) =>
-      t.map(_._1);
+    Iterator.tabulate(2) {
+      case 0 =>
+        val grammar = new GenerativeGrammar(LogCounters.logNormalizeRows(initialProductions));
+        ("raw",new GenerativeParser("",new SimpleLexicon(initialLex),grammar))
+      case 1 =>
+        println("Splitting Grammar");
+        import StateSplitting._;
+        val (finalProd,finalLex,logProb) = splitGrammar(LogCounters.log(initialProductions),LogCounters.log(initialLex),trainTrees,"");
+        val grammar = new GenerativeGrammar(finalProd);
+        val lex = new SimpleLexicon(LogCounters.exp(finalLex));
+        val parser = new GenerativeParser[(String,Int),String](("",0),lex,grammar).map { (t:Tree[(String,Int)]) =>
+          t.map(_._1);
+        }
+        ("split",parser);
     }
   }
 }

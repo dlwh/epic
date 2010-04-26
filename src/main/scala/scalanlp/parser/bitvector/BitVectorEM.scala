@@ -175,7 +175,7 @@ object BitVectorEM {
 object BitVectorTest extends ParserTester {
   def trainParser(trainTrees: Iterable[(BinarizedTree[String],Seq[String])],
                   devTrees: Iterable[(BinarizedTree[String],Seq[String])],
-                  config: Configuration):Parser[String,String] = {
+                  config: Configuration) = {
 
     println("Extracting counts");
     val (initialLex,initialProductions) = (
@@ -186,8 +186,8 @@ object BitVectorTest extends ParserTester {
     val (finalProd,finalLex,logProb) = BitVectorEM.splitCycle(LogCounters.log(initialProductions),LogCounters.log(initialLex),trainTrees,8);
     val grammar = new GenerativeGrammar(finalProd);
     val lex = new SimpleLexicon(LogCounters.exp(finalLex));
-    new GenerativeParser[(String,Int),String](("",0),lex,grammar).map { (t:Tree[(String,Int)]) =>
+    Iterator.single(("result",new GenerativeParser[(String,Int),String](("",0),lex,grammar).map { (t:Tree[(String,Int)]) =>
       t.map(_._1);
-    }
+    }));
   }
 }

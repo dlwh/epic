@@ -67,9 +67,9 @@ abstract class FeaturizedObjectiveFunction extends DiffFunction[Int,DenseVector]
     for((dIs,cI) <- featureGrid.zipWithIndex;
         c = contextIndex.get(cI);
         cTheta = thetas(c);
-        dI <- dIs.keysIterator) {
+        (dI,features) <- dIs) {
       val d = decisionIndex.get(dI);
-      val score = sumWeights(featureGrid(cI)(dI),weights);
+      val score = sumWeights(features,weights);
       cTheta(d) = score;
     }
     LogCounters.logNormalizeRows(thetas);
@@ -130,38 +130,32 @@ abstract class FeaturizedObjectiveFunction extends DiffFunction[Int,DenseVector]
 
   }
 
-  def runEM(initialWeights: DoubleCounter[Feature] = initWeights): LogPairedDoubleCounter[Context,Decision] = {
+  protected def postIteration(iterNumber: Int, weights: LogPairedDoubleCounter[Context,Decision]) { }
+
+  final case class State(encodedWeights: DenseVector, marginalLikelihood: Double) {
+    lazy val logThetas = computeLogThetas(encodedWeights);
+  }
+
+  def emIterations(initialWeights: DoubleCounter[Feature] = initWeights): Iterator[State] = {
     val log = Log.globalLog;
 
     var weights = initIndexedWeights;
     var lastLL = Double.NegativeInfinity;
 
-    var converged = false;
-    val optimizer = new LBFGS[Int,DenseVector](20,3) with ConsoleLogging;
+    val optimizer = new LBFGS[Int,DenseVector](30,5) with ConsoleLogging;
     val broker = VectorBroker.fromIndex(featureIndex);
-    while(!converged) {
+    val weightsIterator = Iterator.iterate(State(initIndexedWeights,Double.NegativeInfinity)) { state =>
       log(Log.INFO)("E step");
-      val logThetas = computeLogThetas(weights);
-      //log(Log.INFO)("Thetas: " + logThetas);
-      val (marginalLogProb,eCounts) = expectedCounts(logThetas);
-      val diff = (lastLL - marginalLogProb)/lastLL;
-      lastLL = marginalLogProb;
-      val converged = diff < 1E-4;
-      log(Log.INFO)("Marginal likelihood: " + marginalLogProb + " (Diff: " + diff + ")");
-      if(!converged) {
-        log(Log.INFO)("M step");
-        val obj = new mStepObjective(eCounts);
-        val newWeights = optimizer.minimize(obj, weights);
-        val nrm = norm(weights - newWeights,2) / weights.size;
-        weights = newWeights;
-        log(Log.INFO)("M Step finished: " + nrm);
-      }
-
+      val (marginalLogProb,eCounts) = expectedCounts(state.logThetas);
+      log(Log.INFO)("M step");
+      val obj = new mStepObjective(eCounts);
+      val newWeights = optimizer.minimize(obj, weights);
+      val nrm = norm(weights - newWeights,2) / weights.size;
+      log(Log.INFO)("M Step finished: " + nrm);
+      State(newWeights,marginalLogProb);
     }
 
-    val finalThetas = computeLogThetas(weights);
-    log(Log.INFO)("Final thetas" + finalThetas);
-    finalThetas;
+    weightsIterator
   }
 
 
