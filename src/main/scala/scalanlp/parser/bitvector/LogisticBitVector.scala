@@ -170,9 +170,11 @@ object LogisticBitVectorTest extends ParserTester {
                   devTrees: Iterable[(BinarizedTree[String],Seq[String])],
                   config: Configuration) = {
 
-    val numBits = config.readIn("parser.bits",3);
-    val obj = new LogisticBitVector(trainTrees,"",numBits, new SlavFeaturizer(numBits));
-    val iterationsPerEval = config.readIn("eval.iterations",10);
+    val numBits = config.readIn("numBits",3);
+    val featurizer = config.readIn[Featurizer[String,String]]("featurizer");
+    val obj = new LogisticBitVector(trainTrees,"",numBits, featurizer);
+    val iterationsPerEval = config.readIn("iterations.eval",10);
+    val maxIterations = config.readIn("iterations.max",100);
     val stateIterator = obj.emIterations();
 
     var lastLL = Double.NegativeInfinity;
@@ -182,24 +184,27 @@ object LogisticBitVectorTest extends ParserTester {
     var converged = false;
     val log = Log.globalLog;
     Iterators.fromProducer[(String,Parser[String,String])] {
-      var iter = 0;
-      var stateOpt:Option[obj.State] = None;
-      while(iter < iterationsPerEval && stateIterator.hasNext && !converged) {
-        iter += 1;
-        val state = stateIterator.next;
-        totalIters += 1;
-        log(Log.INFO)("Iteration " + totalIters + "finished.")
-        val diff = (lastLL - state.marginalLikelihood)/lastLL;
-        if(diff < 1E-4) {
-          numBelowThreshold += 1;
+      if(totalIters >= maxIterations) None
+      else {
+        var iter = 0;
+        var stateOpt:Option[obj.State] = None;
+        while(iter < iterationsPerEval && stateIterator.hasNext && !converged) {
+          iter += 1;
+          val state = stateIterator.next;
+          totalIters += 1;
+          log(Log.INFO)("Iteration " + totalIters + " finished.")
+          val diff = (lastLL - state.marginalLikelihood)/lastLL;
+          if(diff < 1E-4) {
+            numBelowThreshold += 1;
+          }
+          log(Log.INFO)("Marginal likelihood: " + state.marginalLikelihood + " (Diff: " + diff + ")");
+          lastLL = state.marginalLikelihood;
+          stateOpt = Some(state);
         }
-        log(Log.INFO)("Marginal likelihood: " + state.marginalLikelihood + " (Diff: " + diff + ")");
-        lastLL = state.marginalLikelihood;
-        stateOpt = Some(state);
-      }
-      for( state <- stateOpt) yield {
-        val parser = obj.extractParser(state.logThetas);
-        (totalIters + "", parser);
+        for( state <- stateOpt) yield {
+          val parser = obj.extractParser(state.logThetas);
+          (totalIters + "", parser);
+        }
       }
     }
 

@@ -181,7 +181,7 @@ object StateSplitting {
           val oS = oScores(t.span.start)(t.span.end)(l);
           val ruleScore = (iS + oS - totalProb);
           assert(!ruleScore.isNaN);
-          //assert(!ruleScore.isInfinite);
+          assert(!ruleScore.isInfinite);
          // assert(exp(ruleScore) > 0, " " + ruleScore);
           wordCounts(l)(s(t.span.start)) = logSum(wordCounts(l)(s(t.span.start)), ruleScore);
         }
@@ -194,7 +194,7 @@ object StateSplitting {
         } {
           val ruleScore = opScore + icScore + grammar.unaryRulesByIndexedChild(c)(p) - totalProb;
           assert(!ruleScore.isNaN);
-         // assert(!ruleScore.isInfinite);
+          assert(!ruleScore.isInfinite);
          // assert(exp(ruleScore) > 0, " " + ruleScore);
           unaryRuleCounts(p)(c) = logSum(unaryRuleCounts(p)(c), ruleScore);
         }
@@ -209,6 +209,8 @@ object StateSplitting {
         } {
           val irScore = iScores(rc.span.start)(rc.span.end)(r)
           val ruleScore = opScore + irScore + ilScore + lRules(r)(p) - totalProb;
+          assert(!ruleScore.isNaN);
+          assert(!ruleScore.isInfinite);
           //assert(exp(ruleScore) > 0, " " + ruleScore);
           binaryRuleCounts(p)(l)(r) = logSum(binaryRuleCounts(p)(l)(r), ruleScore);
         }

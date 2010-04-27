@@ -29,7 +29,6 @@ class NormalGenerativeFeaturizer[L,W] extends Featurizer[L,W] {
     case _ => None
   }
 }
-
 class UnaryBitFeaturizer[L,W](numBits:Int) extends Featurizer[L,W] {
   def features(d: LogisticBitVector.Decision[L,W], c: LogisticBitVector.Context[L]): Seq[LogisticBitVector.Feature[L,W]] = d match {
     case WordDecision(w) =>
@@ -47,12 +46,11 @@ class UnaryBitFeaturizer[L,W](numBits:Int) extends Featurizer[L,W] {
   def initFeatureWeight(logit: LogisticBitVector[L,W], f: LogisticBitVector.Feature[L,W]) = f match {
     case SingleBitFeature(_,_,_) => Some(Math.log(Math.random * 0.2 + 0.9))
     case _ => None
-  }
-}
+  } }
 
 class PairFeaturizer[L,W](featurizers: Seq[Featurizer[L,W]]) extends Featurizer[L,W] {
   def features(d: LogisticBitVector.Decision[L,W], c: LogisticBitVector.Context[L]): Seq[LogisticBitVector.Feature[L,W]] = {
-    val allFeatures = (for( feat <- featurizers; f <- features(d,c)) yield f).toIndexedSeq;
+    val allFeatures = (for( feat <- featurizers; f <- feat.features(d,c)) yield f).toIndexedSeq;
     val unionFeatures = for( i <- 0 until allFeatures.length; j <- (i+1) until allFeatures.length)
       yield UnionFeature(Seq(allFeatures(i),allFeatures(j)))
     allFeatures ++ unionFeatures;
@@ -66,6 +64,8 @@ class PairFeaturizer[L,W](featurizers: Seq[Featurizer[L,W]]) extends Featurizer[
     featurizers.iterator.map{_.initFeatureWeight(logit,f)}.find(_ != None).getOrElse(None);
   }
 }
+
+class StandardFeaturizer[L,W](numBits: Int) extends PairFeaturizer[L,W](Seq(new UnaryBitFeaturizer[L,W](numBits),new NormalGenerativeFeaturizer[L,W])) with Featurizer[L,W];
 
 case class SlavRuleFeature[L,W](r: Rule[(L,Int)]) extends Feature[L,W] with CachedHashCode;
 case class SlavLexicalFeature[L,W](parent: L, state: Int, word: W) extends Feature[L,W] with CachedHashCode;

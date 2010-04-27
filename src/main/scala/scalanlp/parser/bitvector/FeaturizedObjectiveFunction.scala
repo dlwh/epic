@@ -155,7 +155,7 @@ abstract class FeaturizedObjectiveFunction extends DiffFunction[Int,DenseVector]
       State(newWeights,marginalLogProb);
     }
 
-    weightsIterator
+    weightsIterator drop 1 // initial iteration is crap
   }
 
 
