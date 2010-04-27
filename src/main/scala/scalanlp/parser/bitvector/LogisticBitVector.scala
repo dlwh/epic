@@ -67,10 +67,10 @@ class LogisticBitVector[L,W](treebank: StateSplitting.Treebank[L,W],
   def decisionsForContext(c: Context): Iterator[Decision] = {
     val lexDecisions = for( (w,_) <- initLexicon(c._1).iterator) yield LogisticBitVector.WordDecision[L,W](w);
     val ruleDecisions:  Iterator[Iterator[Decision]] = for( (r,_) <- initProductions(c._1).iterator) yield r match {
-      case BinaryRule(par,left,right) => for(lS <- 0 until numStates iterator; rS <- 0 until numStates iterator)
-        yield LogisticBitVector.BinaryRuleDecision(left,lS,right,rS);
-      case UnaryRule(_,child) => for(s <- 0 until numStates iterator)
-        yield LogisticBitVector.UnaryRuleDecision(child,s);
+      case BinaryRule(par,left,right) => for(lS <- split(left).iterator; rS <- split(right).iterator)
+        yield LogisticBitVector.BinaryRuleDecision(lS._1,lS._2,rS._1,rS._2);
+      case UnaryRule(_,child) => for(s <- split(child).iterator)
+        yield LogisticBitVector.UnaryRuleDecision(s._1,s._2);
     }
 
     lexDecisions ++ ruleDecisions.flatten;
@@ -78,18 +78,23 @@ class LogisticBitVector[L,W](treebank: StateSplitting.Treebank[L,W],
 
   def allContexts: Iterator[Context] = {
     val allLabels = Set.empty ++ initProductions.rows.map{_._1} ++ initLexicon.rows.map{_._1};
-    println(numStates);
     for {
       l <- allLabels.iterator
-      state <- 0 until numStates iterator
-    } yield (l,state);
+      state <- split(l).iterator
+    } yield state;
   }
 
   def features(d: Decision, c: Context):Seq[Feature] = {
     featurizer.features(d, c);
   }
 
-  private def split(x: L) = if(x == root) Seq((x,0)) else (0 until (1 << numBits) ) map { i => (x,i) };
+  private def split(x: L) = {
+    if(x == root) Seq((x,0))
+    else {
+      val maxStates = BitUtils.roundToNextPowerOfTwo(initLexicon(x).size + initProductions(x).size);
+      (0 until (numStates min maxStates)) map { i => (x,i) };
+    }
+  }
 
   def expectedCounts(logThetas: LogPairedDoubleCounter[Context,Decision]) = {
     val (productions,wordProds) = extractGrammarAndLexicon(logThetas);
@@ -170,10 +175,10 @@ object LogisticBitVectorTest extends ParserTester {
                   devTrees: Iterable[(BinarizedTree[String],Seq[String])],
                   config: Configuration) = {
 
-    val numBits = config.readIn("numBits",3);
+    val numBits = config.readIn[Int]("numBits",3);
     val featurizer = config.readIn[Featurizer[String,String]]("featurizer");
     val obj = new LogisticBitVector(trainTrees,"",numBits, featurizer);
-    val iterationsPerEval = config.readIn("iterations.eval",10);
+    val iterationsPerEval = config.readIn("iterations.eval",25);
     val maxIterations = config.readIn("iterations.max",100);
     val stateIterator = obj.emIterations();
 

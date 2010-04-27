@@ -20,4 +20,11 @@ object BitUtils {
   }
 
   def bitMatches(field: Int, bit: Int, set: Int) = ((field & (1 << bit)) > 0) == (set != 0);
+
+  // from http://graphics.stanford.edu/~seander/bithacks.html#RoundUpPowerOf2Float
+  def roundToNextPowerOfTwo(v: Int) = if(v < 1) 1 else {
+    val f = v.asInstanceOf[Float]
+    val t = 1 << ((java.lang.Float.floatToIntBits(f) >> 23) - 0x7f)
+    t << (if(t < v) 1 else 0)
+  }
 }
