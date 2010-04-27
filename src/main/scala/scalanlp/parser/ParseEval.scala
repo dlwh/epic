@@ -72,8 +72,8 @@ object ParseEval {
     val goldGuess = {
       for {
         (goldTree, words) <- trees;
-        () = println(words);
         () = println(xform(goldTree) render words);
+        () = println(words);
         startTime = System.currentTimeMillis;
         guessTree = Trees.debinarize(parser(words))
       } yield {

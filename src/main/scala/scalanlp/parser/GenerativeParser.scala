@@ -40,7 +40,6 @@ class GenerativeParser[L,W](root: L, lexicon: Lexicon[L,W],
   // Score is a vector of scores whose indices are nonterms or preterms
   private def updateUnaries(chart: ParseChart[L], begin:Int, end: Int) = {
     var recheck:ArrayBuffer[Int] = new ArrayBuffer[Int]();
-    var lastRecheck = new ArrayBuffer[Int]();
     val set = new BitSet();
     recheck ++= chart.enteredLabelIndexes(begin, end);
     val max_iter = 5;
@@ -50,9 +49,7 @@ class GenerativeParser[L,W](root: L, lexicon: Lexicon[L,W],
       iter += 1;
 
       val elems = recheck.iterator;
-      val temp = recheck;
-      recheck = lastRecheck;
-      lastRecheck = temp;
+      recheck = new ArrayBuffer[Int]();
       set.clear();
 
       for( b <- elems) {
@@ -68,7 +65,6 @@ class GenerativeParser[L,W](root: L, lexicon: Lexicon[L,W],
           }
         }
       }
-      lastRecheck.clear();
     }
   }
 
@@ -113,10 +109,16 @@ class GenerativeParser[L,W](root: L, lexicon: Lexicon[L,W],
       updateUnaries(chart,begin,end);
     }
 
-    val bestParse = chart.buildTree(0,s.length,grammar.index(root));
-    val c = DoubleCounter[Tree[L]]();
-    c(bestParse) = chart.labelScore(0, s.length, root);
-    c;
+    try {
+      val bestParse = chart.buildTree(0,s.length,grammar.index(root));
+      val c = DoubleCounter[Tree[L]]();
+      c(bestParse) = chart.labelScore(0, s.length, root);
+      c;
+    } catch {
+      case e =>
+        chart.dumpChart();
+        throw e;
+    }
   }
 }
 

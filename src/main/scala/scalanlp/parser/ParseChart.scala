@@ -18,6 +18,7 @@ package scalanlp.parser
 
 
 import scalanlp.collection.mutable.TriangularArray
+import scalala.tensor.counters.Counters.DoubleCounter
 import scalanlp.trees.BinarizedTree
 import scalanlp.trees.BinaryTree
 import scalanlp.trees.NullaryTree
@@ -75,6 +76,14 @@ final class ParseChart[L](grammar: Grammar[L], length: Int) {
     if(!active(begin, end)(label)) Double.NegativeInfinity
     else score(begin, end)(label);
   }
+
+  def dumpChart() {
+    val myScore = new TriangularArray[DoubleCounter[L]](length+1,(i:Int,j:Int)=>grammar.decode(score(i,j)));
+    val myBack = new TriangularArray[Map[L,BackPtr]](length+1,(i:Int,j:Int)=>grammar.decode(back(i,j)));
+    println(myScore);
+    println(myBack);
+  }
+
 
   def buildTree(start: Int, end: Int, root: Int):BinarizedTree[L] = {
     val b = back(start, end)(root)
