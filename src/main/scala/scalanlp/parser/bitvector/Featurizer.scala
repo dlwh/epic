@@ -4,7 +4,6 @@ import scalanlp.parser._
 import LogisticBitVector._;
 import scalanlp.util.CachedHashCode
 
-
 trait Featurizer[L,W] {
   def features(d: LogisticBitVector.Decision[L,W], c: LogisticBitVector.Context[L]): Seq[LogisticBitVector.Feature[L,W]];
   def initFeatureWeight(logit: LogisticBitVector[L,W], f: LogisticBitVector.Feature[L,W]):Option[Double]
@@ -48,9 +47,27 @@ class UnaryBitFeaturizer[L,W](numBits:Int) extends Featurizer[L,W] {
     case _ => None
   } }
 
-class PairFeaturizer[L,W](featurizers: Seq[Featurizer[L,W]]) extends Featurizer[L,W] {
+class CrossProductFeaturizer[L,W](f1: Featurizer[L,W], f2: Featurizer[L,W]) extends Featurizer[L,W] {
   def features(d: LogisticBitVector.Decision[L,W], c: LogisticBitVector.Context[L]): Seq[LogisticBitVector.Feature[L,W]] = {
-    val allFeatures = (for( feat <- featurizers; f <- feat.features(d,c)) yield f).toIndexedSeq;
+    val feats1 = f1.features(d,c);
+    val feats2 = f2.features(d,c);
+    val unionFeatures = for(ff1 <- feats1; ff2 <- feats2)
+      yield UnionFeature(Seq(ff1,ff2));
+    feats1 ++ feats2 ++ unionFeatures;
+  }
+  def initFeatureWeight(logit: LogisticBitVector[L,W], f: LogisticBitVector.Feature[L,W]) = f match {
+    case UnionFeature(feats) => Some(feats.map{scoreFeature(logit,_)}.foldLeft(0.0){ _ + _.get })
+    case f => scoreFeature(logit,f);
+  }
+
+  private def scoreFeature(logit: LogisticBitVector[L,W], f: Feature[L,W]) = {
+    Iterator(f1,f2).map{_.initFeatureWeight(logit,f)}.find(_ != None).getOrElse(None);
+  }
+}
+
+class AllPairsFeaturizer[L,W](inner: Featurizer[L,W]) extends Featurizer[L,W] {
+  def features(d: LogisticBitVector.Decision[L,W], c: LogisticBitVector.Context[L]): Seq[LogisticBitVector.Feature[L,W]] = {
+    val allFeatures = (for( f <- inner.features(d,c)) yield f).toIndexedSeq;
     val unionFeatures = for( i <- 0 until allFeatures.length; j <- (i+1) until allFeatures.length)
       yield UnionFeature(Seq(allFeatures(i),allFeatures(j)))
     allFeatures ++ unionFeatures;
@@ -61,11 +78,13 @@ class PairFeaturizer[L,W](featurizers: Seq[Featurizer[L,W]]) extends Featurizer[
   }
 
   private def scoreFeature(logit: LogisticBitVector[L,W], f: Feature[L,W]) = {
-    featurizers.iterator.map{_.initFeatureWeight(logit,f)}.find(_ != None).getOrElse(None);
+    inner.initFeatureWeight(logit,f);
   }
 }
 
-class StandardFeaturizer[L,W](numBits: Int) extends PairFeaturizer[L,W](Seq(new UnaryBitFeaturizer[L,W](numBits),new NormalGenerativeFeaturizer[L,W])) with Featurizer[L,W];
+class StandardFeaturizer[L,W](numBits: Int) extends CrossProductFeaturizer[L,W](
+  new AllPairsFeaturizer(new UnaryBitFeaturizer[L,W](numBits)),
+  new NormalGenerativeFeaturizer[L,W]) with Featurizer[L,W];
 
 case class SlavRuleFeature[L,W](r: Rule[(L,Int)]) extends Feature[L,W] with CachedHashCode;
 case class SlavLexicalFeature[L,W](parent: L, state: Int, word: W) extends Feature[L,W] with CachedHashCode;
