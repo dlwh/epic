@@ -58,6 +58,17 @@ abstract class FeaturizedObjectiveFunction extends DiffFunction[Int,DenseVector]
     (index,grid:Array[SparseArray[Seq[Int]]]);
   }
 
+  /*
+  {
+    for((dIs,cI) <- featureGrid.zipWithIndex;
+        c = contextIndex.get(cI);
+        (dI,features) <- dIs) {
+      val d = decisionIndex.get(dI);
+      println( (c,d) -> features.map(featureIndex.get _ ));
+    }
+  }
+  */
+
   val initWeights = Counters.aggregate(featureIndex.map{ f => (f,initialFeatureWeight(f))});
   val initIndexedWeights = VectorBroker.fromIndex(featureIndex).encodeDense(initWeights);
 
@@ -98,8 +109,8 @@ abstract class FeaturizedObjectiveFunction extends DiffFunction[Int,DenseVector]
   private def computeGradient(logThetas: LogPairedDoubleCounter[Context,Decision], eCounts: PairedDoubleCounter[Context,Decision]) = {
     val featureGrad = VectorBroker.fromIndex(featureIndex).mkDenseVector(0.0);
     var logProb = 0.0;
-    // gradient is \sum_{d,c} e(d,c) * (f(d,c) - \sum_{d'} logTheta(c,d') f(d',c))
-    // = \sum_{d,c} (e(d,c)  - e(*,c) logTheta(d,c)) f(d,c)
+    // gradient is \sum_{d,c} e(d,c) * (f(d,c) - \sum_{d'} exp(logTheta(c,d')) f(d',c))
+    // = \sum_{d,c} (e(d,c)  - e(*,c) exp(logTheta(d,c))) f(d,c)
     // = \sum_{d,c} margin(d,c) * f(d,c)
     //
     // e(*,c) = \sum_d e(d,c) == eCounts(c).total
@@ -139,18 +150,14 @@ abstract class FeaturizedObjectiveFunction extends DiffFunction[Int,DenseVector]
   def emIterations(initialWeights: DoubleCounter[Feature] = initWeights): Iterator[State] = {
     val log = Log.globalLog;
 
-    var weights = initIndexedWeights;
-    var lastLL = Double.NegativeInfinity;
-
-    val optimizer = new LBFGS[Int,DenseVector](30,5) with ConsoleLogging;
-    val broker = VectorBroker.fromIndex(featureIndex);
+    val optimizer = new LBFGS[Int,DenseVector](90,5) with ConsoleLogging;
     val weightsIterator = Iterator.iterate(State(initIndexedWeights,Double.NegativeInfinity)) { state =>
       log(Log.INFO)("E step");
       val (marginalLogProb,eCounts) = expectedCounts(state.logThetas);
       log(Log.INFO)("M step");
       val obj = new mStepObjective(eCounts);
-      val newWeights = optimizer.minimize(obj, weights);
-      val nrm = norm(weights - newWeights,2) / weights.size;
+      val newWeights = optimizer.minimize(obj, state.encodedWeights);
+      val nrm = norm(state.encodedWeights - newWeights,2) / newWeights.size;
       log(Log.INFO)("M Step finished: " + nrm);
       State(newWeights,marginalLogProb);
     }
