@@ -45,7 +45,8 @@ class UnaryBitFeaturizer[L,W](numBits:Int) extends Featurizer[L,W] {
   def initFeatureWeight(logit: LogisticBitVector[L,W], f: LogisticBitVector.Feature[L,W]) = f match {
     case SingleBitFeature(_,_,_) => Some(Math.log(Math.random * 0.2 + 0.9))
     case _ => None
-  } }
+  }
+}
 
 class CrossProductFeaturizer[L,W](f1: Featurizer[L,W], f2: Featurizer[L,W]) extends Featurizer[L,W] {
   def features(d: LogisticBitVector.Decision[L,W], c: LogisticBitVector.Context[L]): Seq[LogisticBitVector.Feature[L,W]] = {
