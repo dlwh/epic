@@ -108,7 +108,7 @@ class GenerativeGrammar[L](productions: LogPairedDoubleCounter[L,Rule[L]]) exten
     fillArray(fillSparseArray(mkVector(Double.NegativeInfinity)))
   );
   for( ((a,BinaryRule(_,b,c)),score) <- binaryRules) {
-    indexedBinaryRulesByLeftChild(index(c))(index(b))(index(a)) = score;
+    indexedBinaryRulesByRightChild(index(c))(index(b))(index(a)) = score;
   }
 
   /**
