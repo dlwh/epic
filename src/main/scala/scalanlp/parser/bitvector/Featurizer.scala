@@ -1,5 +1,6 @@
 package scalanlp.parser.bitvector
 
+import scala.collection.mutable.ArrayBuffer
 import scalanlp.parser._
 import LogisticBitVector._;
 import scalanlp.util.CachedHashCode
@@ -12,7 +13,7 @@ trait Featurizer[L,W] {
 class NormalGenerativeFeaturizer[L,W] extends Featurizer[L,W] {
   def features(d: LogisticBitVector.Decision[L,W], c: LogisticBitVector.Context[L]): Seq[LogisticBitVector.Feature[L,W]] = d match {
     case WordDecision(w) =>
-      Seq(LexicalFeature(c._1,w))
+      ArrayBuffer(LexicalFeature(c._1,w))
     case UnaryRuleDecision(child,state) =>
       val rule = UnaryRule(c._1,child);
       val ruleFeature = RuleFeature[L,W](rule);
@@ -29,9 +30,20 @@ class NormalGenerativeFeaturizer[L,W] extends Featurizer[L,W] {
   }
 }
 class UnaryBitFeaturizer[L,W](numBits:Int) extends Featurizer[L,W] {
+  def mkBitStati(numBits: Int, lbl: LabelOfBit, state: Substate) = {
+    for( (bit,toggled) <- BitUtils.iterateBits(state,numBits)) yield {
+      stati(lbl.index)(bit)(toggled);
+    }
+  } toSeq;
+
+  private val stati = Array.tabulate(4,numBits,2) { (parentId, bit, toggled) =>
+    SingleBitFeature(LogisticBitVector.bitLabels(parentId),bit,toggled);
+  }
+
   def features(d: LogisticBitVector.Decision[L,W], c: LogisticBitVector.Context[L]): Seq[LogisticBitVector.Feature[L,W]] = d match {
     case WordDecision(w) =>
-      Seq(LexicalFeature(c._1,w))
+      val parentFeatures = mkBitStati(numBits, Parent,c._2);
+      parentFeatures toSeq
     case UnaryRuleDecision(child,state) =>
       val childFeatures = mkBitStati(numBits, UChild,state);
       val parentFeatures = mkBitStati(numBits, Parent,c._2);
@@ -53,11 +65,11 @@ class CrossProductFeaturizer[L,W](f1: Featurizer[L,W], f2: Featurizer[L,W]) exte
     val feats1 = f1.features(d,c);
     val feats2 = f2.features(d,c);
     val unionFeatures = for(ff1 <- feats1; ff2 <- feats2)
-      yield UnionFeature(Seq(ff1,ff2));
+      yield UnionFeature(ff1,ff2);
     feats1 ++ feats2 ++ unionFeatures;
   }
   def initFeatureWeight(logit: LogisticBitVector[L,W], f: LogisticBitVector.Feature[L,W]) = f match {
-    case UnionFeature(feats) => Some(feats.map{scoreFeature(logit,_)}.foldLeft(0.0){ _ + _.get })
+    case UnionFeature(f1,f2) => Some(scoreFeature(logit,f1).get + scoreFeature(logit,f2).get);
     case f => scoreFeature(logit,f);
   }
 
@@ -68,13 +80,13 @@ class CrossProductFeaturizer[L,W](f1: Featurizer[L,W], f2: Featurizer[L,W]) exte
 
 class AllPairsFeaturizer[L,W](inner: Featurizer[L,W]) extends Featurizer[L,W] {
   def features(d: LogisticBitVector.Decision[L,W], c: LogisticBitVector.Context[L]): Seq[LogisticBitVector.Feature[L,W]] = {
-    val allFeatures = (for( f <- inner.features(d,c)) yield f).toIndexedSeq;
-    val unionFeatures = for( i <- 0 until allFeatures.length; j <- (i+1) until allFeatures.length)
-      yield UnionFeature(Seq(allFeatures(i),allFeatures(j)))
+    val allFeatures = (for( f <- inner.features(d,c).view) yield f).toIndexedSeq;
+    val unionFeatures = for( i <- Iterator.range(0,allFeatures.length); j <- Iterator.range((i+1),allFeatures.length))
+      yield UnionFeature(allFeatures(i),allFeatures(j))
     allFeatures ++ unionFeatures;
   }
   def initFeatureWeight(logit: LogisticBitVector[L,W], f: LogisticBitVector.Feature[L,W]) = f match {
-    case UnionFeature(feats) => Some(feats.map{scoreFeature(logit,_)}.foldLeft(0.0){ _ + _.get })
+    case UnionFeature(f1,f2) => Some(scoreFeature(logit,f1).get + scoreFeature(logit,f2).get);
     case f => scoreFeature(logit,f);
   }
 

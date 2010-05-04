@@ -36,19 +36,16 @@ object LogisticBitVector {
   case class RuleFeature[L,W](r: Rule[L]) extends Feature[L,W] with CachedHashCode;
   case class LexicalFeature[L,W](parent: L, word: W) extends Feature[L,W] with CachedHashCode;
   case class SingleBitFeature[L,W](lbl: LabelOfBit, bitIndex: Int, toggled: Int) extends Feature[L,W] with CachedHashCode;
-  case class UnionFeature[L,W](feats: Seq[Feature[L,W]]) extends Feature[L,W] with CachedHashCode;
+  case class UnionFeature[L,W](f1: Feature[L,W], f2: Feature[L,W]) extends Feature[L,W] with CachedHashCode;
 
-  sealed trait LabelOfBit;
-  case object Parent extends LabelOfBit;
-  case object LChild extends LabelOfBit;
-  case object RChild extends LabelOfBit;
-  case object UChild extends LabelOfBit;
+  sealed class LabelOfBit(val index: Int);
+  case object Parent extends LabelOfBit(0);
+  case object LChild extends LabelOfBit(1);
+  case object RChild extends LabelOfBit(2);
+  case object UChild extends LabelOfBit(3);
 
-  def mkBitStati(numBits: Int, lbl: LabelOfBit, state: Substate) = {
-    for( (bit,toggled) <- BitUtils.iterateBits(state,numBits)) yield {
-      SingleBitFeature(lbl,bit,toggled);
-    }
-  } toSeq;
+  private[bitvector] val bitLabels = Seq(Parent,LChild,RChild,UChild);
+
 }
 
 import LogisticBitVector._
