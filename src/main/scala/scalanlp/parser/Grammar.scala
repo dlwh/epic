@@ -41,7 +41,7 @@ trait Grammar[L] extends VectorBroker[L] {
   /**
    * Returns a vector of parent index -> score
    */
-  def unaryRulesByIndexedChild(c: Int): Vector;
+  def unaryRulesByIndexedChild(c: Int): SparseVector;
 
   /**
    * Returns a SparseArray[Vector] with RightIndex -> ParentIndex -> Score
@@ -93,15 +93,9 @@ class GenerativeGrammar[L](productions: LogPairedDoubleCounter[L,Rule[L]]) exten
     index
   }
 
-  private val indexedUnaryRulesByChild:Array[Vector] = fillArray(mkVector(Double.NegativeInfinity));
+  private val indexedUnaryRulesByChild:Array[SparseVector] = fillArray(mkSparseVector(Double.NegativeInfinity));
   for( ((a,UnaryRule(_,b)),score) <- unaryRules) {
-    try {
       indexedUnaryRulesByChild(index(b))(index(a)) = score;
-    } catch {
-      case e =>
-        println(index(a),index(b),a,b);
-        throw e
-    }
   }
 
   // Mapping is Left Child -> Right Child -> Parent -> Score
@@ -111,19 +105,6 @@ class GenerativeGrammar[L](productions: LogPairedDoubleCounter[L,Rule[L]]) exten
   for( ((a,BinaryRule(_,b,c)),score) <- binaryRules) {
     indexedBinaryRulesByLeftChild(index(b))(index(c))(index(a)) = score;
   }
-
-  /*
-  for( cas <- indexedBinaryRulesByLeftChild;
-      _ = println("VVV" + cas.used * 1.0 / cas.size);
-       (c,as) <- cas) {
-     as.asInstanceOf[AdaptiveVector].innerVector match {
-      case v: SparseVector =>
-        println(v.used * 1.0 / v.size);
-      case _ => println("dense!");
-    }
-  }
-  */
-
 
   // Mapping is Left Child -> Right Child -> Parent -> Score
   private val indexedBinaryRulesByRightChild:SparseArray[SparseArray[SparseVector]] = (
@@ -153,7 +134,6 @@ class GenerativeGrammar[L](productions: LogPairedDoubleCounter[L,Rule[L]]) exten
   def unaryRulesByIndexedChild(c: Int) = {
     indexedUnaryRulesByChild(c);
   }
-
 
   /**
    * Returns pairs of the form (child,score);

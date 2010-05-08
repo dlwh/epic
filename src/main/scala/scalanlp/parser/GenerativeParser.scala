@@ -40,6 +40,57 @@ class GenerativeParser[L,W](root: L, lexicon: Lexicon[L,W],
   
   // Score is a vector of scores whose indices are nonterms or preterms
   private def updateUnaries(chart: ParseChart[L], begin:Int, end: Int) = {
+    var recheck = grammar.mkArray[Int];
+    var check = grammar.mkArray[Int];
+
+    var used = 0;
+    for(idx <- chart.enteredLabelIndexes(begin,end)) {
+      recheck(used) = idx;
+      used += 1;
+    }
+    var old_used = used;
+
+    val set = new BitSet();
+
+    val max_iter = 5;
+    var iter = 0;
+    while(iter < max_iter) {
+      val tmp = check;
+      check = recheck;
+      recheck = tmp;
+      used = 0;
+      set.clear();
+
+      var i = 0;
+      while(i < old_used) {
+        val b = check(i);
+        i += 1;
+        val bScore = chart.labelScore(begin,end,b);
+
+        var j = 0;
+        val parentVector = grammar.unaryRulesByIndexedChild(b);
+        while(j < parentVector.used) {
+          val a = parentVector.index(j);
+          val aScore = parentVector.data(j);
+          j += 1
+          val prob = aScore + bScore;
+          if(prob > chart.labelScore(begin,end,a)) {
+            chart.enterUnary(begin,end,a,b,prob);
+            if(!set(a)) {
+              set += a;
+              recheck(used) = a;
+              used += 1;
+            }
+          }
+        }
+      }
+
+      old_used = used;
+
+      iter += 1;
+    }
+
+    /*
     var recheck:ArrayBuffer[Int] = new ArrayBuffer[Int]();
     val set = new BitSet();
     recheck ++= chart.enteredLabelIndexes(begin, end);
@@ -67,6 +118,7 @@ class GenerativeParser[L,W](root: L, lexicon: Lexicon[L,W],
         }
       }
     }
+    */
   }
 
 
@@ -91,6 +143,7 @@ class GenerativeParser[L,W](root: L, lexicon: Lexicon[L,W],
     } {
       for {
         (b,binaryRules) <- grammar.allBinaryRules;
+        if chart.canStartHere(begin, end, b);
         (c,parentVector) <- binaryRules;
         split <- chart.feasibleSpan(begin, end, b, c)
       } {

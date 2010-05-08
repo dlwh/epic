@@ -32,8 +32,8 @@ final class ParseChart[L](grammar: Grammar[L], length: Int) {
   private case class Unary(lchild: Int) extends BackPtr;
   private case class Binary(lchild: Int, rchild: Int, split: Int) extends BackPtr;
 
-  private val score = TriangularArray.raw(length+1, grammar.mkVector(Double.NegativeInfinity));
-  private val back =  TriangularArray.raw(length+1, grammar.mkSparseArray[BackPtr]);
+  private val score = TriangularArray.raw(length+1, grammar.mkDenseVector(Double.NegativeInfinity));
+  private val back =  TriangularArray.raw(length+1, grammar.mkArray[BackPtr]);
   // right most place a left constituent with label l can start and end at position i
   private val narrowLeft = Array.fill(length+1)(grammar.fillArray[Int](-1));
   // left most place a left constituent with label l can start and end at position i
@@ -70,6 +70,11 @@ final class ParseChart[L](grammar: Grammar[L], length: Int) {
     wideLeft(end)(parent) = begin min wideLeft(end)(parent);
     wideRight(begin)(parent) = end max wideRight(begin)(parent);
     narrowRight(begin)(parent) = end min narrowRight(begin)(parent);
+  }
+
+  /** Can a constituent with this label start here and end before end*/
+  def canStartHere(begin: Int, end: Int, child: Int):Boolean = {
+    narrowRight(begin)(child) <= end;
   }
 
   def feasibleSpan(begin: Int, end: Int, leftState: Int, rightState: Int): Span = {
