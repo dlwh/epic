@@ -52,10 +52,6 @@ class GraphParser[L,W](root: L, lexicon: Lexicon[L,W], g: Grammar[L]) extends Pa
     // make the chart:
     val chart = new ParseChart(g,s.length);
     val agenda = new PriorityQueue[Item];
-    // elements that reach a particular span
-    // left extent -> right child -> right extent -> child score
-    val leftReach = Array.fill(s.length+1)(g.fillSparseArray(Array.fill(s.length+1)(Double.NegativeInfinity)));
-    val rightReach = Array.fill(s.length+1)(g.fillSparseArray(Array.fill(s.length+1)(Double.NegativeInfinity)));
 
     for( (w,i) <- s zipWithIndex;
         a <- lexicon.tags;
