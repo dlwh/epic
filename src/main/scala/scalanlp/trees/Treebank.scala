@@ -30,14 +30,14 @@ trait Treebank {
   def testSections: Seq[String];
   def testTrees = treesFromSections(testSections);
 
-  def treesFromSection(sec: String): Iterable[(Tree[String],Seq[String])];
+  def treesFromSection(sec: String): Seq[(Tree[String],Seq[String])];
   def treesFromSections(secs: Seq[String]) = {
     for(sec <- secs.view;
         tree <- treesFromSection(sec).view)
       yield tree;
   }
 
-  def trees: Iterable[(Tree[String],Seq[String])] = treesFromSections(sections);
+  def trees: Seq[(Tree[String],Seq[String])] = treesFromSections(sections);
           
 }
 

@@ -16,11 +16,9 @@ package scalanlp.parser;
 */
 
 
-import java.io.File
-import java.io.FileInputStream
-import java.util.Properties
-import scalanlp.config.Configuration
 import scalanlp.trees._;
+import scala.collection.mutable.ArrayBuffer
+import scalanlp.concurrent.ParallelOps._;
 
 
 /**
@@ -34,59 +32,73 @@ class ParseEval[L](ignoredLabels: Set[L]) {
   * Computes precision, recall, and exact match for the each
   * guess/gold pair of trees.
   */
-  def apply(guessgold: Iterator[(Tree[L],Tree[L])]) = {
-    var totalGuess = 0;
-    var totalGold = 0;
-    var totalRight = 0;
-    var exact = 0;
-    var numParses = 0;
-    for( (guess,gold) <- guessgold) {
-      val guessSet = labeledConstituents(guess);
-      val goldSet = labeledConstituents(gold);
-      val inter = (guessSet intersect goldSet)
-      numParses += 1;
-      if(goldSet.size == inter.size && guessSet.size == inter.size) {
-        exact += 1;
-      }
-      totalGuess += guessSet.size;
-      totalGold += goldSet.size;
-      totalRight += inter.size;
+  def apply(guessgold: Iterator[(Tree[L],Tree[L])]):(Double,Double,Double) = {
+    val allStats = for( (guess,gold) <- guessgold) yield { apply(guess,gold) }
+
+    val stats = allStats.reduceLeft(_ + _);
+
+    (stats.precision,stats.recall,stats.exact);
+  }
+
+  def apply(guess: Tree[L], gold: Tree[L]): Statistics = {
+    val guessSet = labeledConstituents(guess);
+    val goldSet = labeledConstituents(gold);
+    val inter = (guessSet intersect goldSet)
+    val exact = if(goldSet.size == inter.size && guessSet.size == inter.size) 1 else 0;
+    Statistics(guessSet.size, goldSet.size, inter.size, exact, 1);
+  }
+
+  case class Statistics(guess: Int=0, gold: Int=0, right: Int=0, numExact: Int=0, numParses: Int) {
+    def +(stats: Statistics) = {
+      Statistics(guess + stats.guess,
+                 gold + stats.gold,
+                 right + stats.right,
+                 numExact + stats.numExact,
+                 numParses + stats.numParses)
     }
 
-    (totalRight * 1.0 /totalGuess, totalRight * 1.0 /totalGold, exact*1.0/numParses)
-    
+    def precision = (right * 1.0 / guess);
+    def recall = (right * 1.0 / gold);
+    def exact = (numExact * 1.0 / numParses);
   }
 
   private def labeledConstituents(tree: Tree[L]) = Set() ++ {
-    for(child <- tree.preorder;
-        if !ignoredLabels.contains(child.label))
+    for(child <- tree.preorder
+        if !ignoredLabels.contains(child.label) && child.span.size > 1)
         yield (child.label,child.span);
   }
 }
 
 object ParseEval {
-  def evaluate(trees: Iterator[(Tree[String],Seq[String])],
+  def evaluate(trees: IndexedSeq[(Tree[String],Seq[String])],
            parser: Parser[String,String],
            xform: Tree[String]=>Tree[String]=Trees.Transforms.StandardStringTransform) = {
-    val peval = new ParseEval(Set(""));
-    val goldGuess = {
-      for {
-        (goldTree, words) <- trees;
-        () = println(xform(goldTree) render words);
-        () = println(words);
-        startTime = System.currentTimeMillis;
-        guessTree = Trees.debinarize(parser(words))
-      } yield {
-        val endTime = System.currentTimeMillis;
-        println(guessTree render words);
-        val ret = (xform(goldTree),guessTree)
-        println("Local Accuracy:" + peval(Iterator.single(ret)));
-        println( (endTime - startTime) / 1000.0 + " Seconds");
-        println("===========");
-        ret;
-      }
+    val peval = new ParseEval(Set("","''", "``", ".", ":", ","));
+    import peval.Statistics;
+   // println("here?");
+
+    def evalSentence(sent: (Tree[String],Seq[String])) = {
+      val (goldTree,words) = sent;
+      val startTime = System.currentTimeMillis;
+      val guessTree = Trees.debinarize(parser(words))
+      val stats = peval(guessTree,xform(goldTree));
+      val endTime = System.currentTimeMillis;
+      val buf = new StringBuilder();
+      buf ++= "======\n";
+      buf ++= words.mkString(",");
+      buf ++= "\nGold:\n";
+      buf ++= xform(goldTree).render(words);
+      buf ++= "\nGuess:\n";
+      buf ++= guessTree.render(words);
+      buf ++= ("\nLocal Accuracy:" + (stats.precision,stats.recall,stats.exact) + "\n") ;
+      buf ++= ((endTime - startTime) / 1000.0 + " Seconds")
+      buf ++= "\n======";
+      println(buf.toString);
+      stats;
     }
-    val (prec,recall,exact) = peval(goldGuess);
+    val stats = trees.par.withSequentialThreshold(100).mapReduce({ evalSentence(_:(Tree[String],Seq[String]))},{ (_:Statistics) + (_:Statistics)});
+  //  val stats = trees.view.map{ evalSentence(_)}.reduceLeft{ (_:Statistics) + (_:Statistics)};
+    val (prec,recall,exact) = (stats.precision,stats.recall,stats.exact);
     (prec,recall,exact);
   }
 }

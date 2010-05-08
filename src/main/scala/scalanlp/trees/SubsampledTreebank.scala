@@ -14,7 +14,7 @@ class SubsampledTreebank(base: Treebank, numTrain: Int, numDev:Int, numTest: Int
     case _ => error("unknown section: " + sec);
   }
 
-  private def downSample[K](trees: Iterable[K], num: Int) = {
+  private def downSample[K](trees: Seq[K], num: Int) = {
     if(num < 0) trees
     else {
       // TODO: maybe randomly sample

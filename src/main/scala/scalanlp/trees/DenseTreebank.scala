@@ -25,8 +25,9 @@ import java.io.FileOutputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
 import java.util.zip.ZipOutputStream
-import scalanlp.serialization.JavaDataSerialization._;
-import scalanlp.serialization.JavaDataSerialization;
+import scala.collection.mutable.ArrayBuffer
+import scalanlp.serialization.DataSerialization;
+import scalanlp.serialization.DataSerialization._;
 import scalanlp.util.Index
 
 object DenseTreebank {
@@ -78,21 +79,23 @@ object DenseTreebank {
       val (sections,testSections,trainSections,devSections) = read[Metadata](metaIn);
       metaIn.close();
 
-      def treesFromSection(sec: String): Iterable[(Tree[String],Seq[String])] = new Iterable[(Tree[String],Seq[String])] {
-        def iterator = {
+      def treesFromSection(sec: String): IndexedSeq[(Tree[String],Seq[String])] = {
+        val iterator = {
           val section = zipFile.getEntry("sections/"+sec);
           val sectionIn = zipFile.getInputStream(section);
           val data = new DataInputStream(new BufferedInputStream(sectionIn));
           val iterator = if(!read[Boolean](data)) Iterator.empty;
           else Iterator.continually {
             val indexedTree = read[Tree[Int]](data);
-            val indexedWords = read[Seq[Int]](data);
+            val indexedWords = read[IndexedSeq[Int]](data);
             val continue = read[Boolean](data);
             (indexedTree.map(symbolIndex.get _), indexedWords.map(wordIndex.get _),continue);
           } takeWhile( _._3);
 
           for( (tree,words, _ ) <- iterator) yield (tree,words);
         }
+
+        (new ArrayBuffer[(Tree[String],Seq[String])] ++= iterator);
       };
     };
   }
