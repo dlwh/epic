@@ -19,7 +19,8 @@ package scalanlp.trees;
 import java.io.DataInput
 import java.io.DataOutput
 import scala.collection.mutable.ArrayBuffer;
-import scalanlp.serialization.JavaDataSerialization
+import scalanlp.serialization.DataSerialization
+import scalanlp.serialization.DataSerialization._;
 
 class Tree[+L](val label: L, val children: Seq[Tree[L]])(val span: Span) {
   def isLeaf = children.size == 0;
@@ -92,18 +93,16 @@ object Tree {
     sb
   }
 
-  import JavaDataSerialization._;
-
   implicit def treeSerializationReadWritable[L:ReadWritable]: ReadWritable[Tree[L]] = new ReadWritable[Tree[L]] {
     def write(data: DataOutput, t: Tree[L]) = {
       implicitly[ReadWritable[L]].write(data,t.label);
-      JavaDataSerialization.write(data,t.children);
+      DataSerialization.write(data,t.children);
       data.writeInt(t.span.start);
       data.writeInt(t.span.end);
     }
     def read(data: DataInput) = {
-      val label = implicitly[JavaDataSerialization.ReadWritable[L]].read(data);
-      val children = JavaDataSerialization.seqReadWritable(this).read(data);
+      val label = implicitly[ReadWritable[L]].read(data);
+      val children = seqReadWritable(this).read(data);
       val begin = data.readInt();
       val end = data.readInt();
       new Tree(label,children)(Span(begin,end));
