@@ -74,8 +74,7 @@ class GenerativeParser[L,W](root: L, lexicon: Lexicon[L,W],
     val chart = new ParseChart(grammar,s.length);
 
     for{i <- 0 until s.length} {
-      for ( a <- lexicon.tags;
-            wScore = lexicon.wordScore(a,s(i))
+      for ( (a,wScore) <- lexicon.tagScores(s(i))
             if !wScore.isInfinite) {
         assert(a != null);
         chart.enterTerm(i,i+1,a,wScore);

@@ -20,11 +20,13 @@ package scalanlp.parser
 import scalala.tensor.counters.Counters.DoubleCounter
 import scalala.tensor.counters.Counters.PairedDoubleCounter
 import Math.log
+import scalala.tensor.counters.LogCounters.LogDoubleCounter
 import scalala.tensor.counters.LogCounters.LogPairedDoubleCounter
 
 
 trait Lexicon[L,W] {
   def wordScore(label: L, w: W): Double;
+  def tagScores(w: W): LogDoubleCounter[L] = scalala.tensor.counters.LogCounters.aggregate( tags.map { l => (l,wordScore(l,w))});
   def tags: Iterator[L];
 }
 
@@ -33,10 +35,10 @@ class UnsmoothedLexicon[L,W](lexicon: LogPairedDoubleCounter[L,W]) extends Lexic
   def tags = lexicon.rows.map(_._1);
 }
 
-
 class SimpleLexicon[L,W](private val lexicon: PairedDoubleCounter[L,W]) extends Lexicon[L,W] {
   private val wordCounts = DoubleCounter[W]();
   lexicon.rows.foreach ( wordCounts += _._2 )
+
 
   def wordScore(l: L, w: W) = {
     var cWord = wordCounts(w);
