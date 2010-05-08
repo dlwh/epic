@@ -68,6 +68,7 @@ object StateSplitting {
             assert(!ruleScore.isInfinite,rules(a) + " " + spanScore(c));
           }
           spanScore(a) = logSum(spanScore(a), ruleScore);
+          assert(!spanScore(a).isInfinite);
         }
       case t@BinaryTree(_,lchild,rchild) =>
         val spanScore = score(t.span.start)(t.span.end);
@@ -78,15 +79,17 @@ object StateSplitting {
         for {
           a <- t.label
         } {
-         val scores = for {
-           b <- lchild.label
-           rules = grammar.binaryRulesByIndexedLeftChild(b);
-           c <- rchild.label
-         } yield {
-           rules(c)(a) + score(begin)(split)(b) + score(split)(end)(c);
-         };
-         spanScore(a) = logSum(scores);
-         assert(!a.isInfinite);
+          val arr = new Array[Double](lchild.label.length * rchild.label.length);
+          var i = 0;
+          for { b <- lchild.label } {
+            val rules = grammar.binaryRulesByIndexedLeftChild(b);
+            for { c <- rchild.label } {
+              arr(i) = rules(c)(a) + score(begin)(split)(b) + score(split)(end)(c);
+              i += 1;
+            }
+          };
+          spanScore(a) = logSum(arr);
+          assert(!spanScore(a).isInfinite);
        }
       case _ => error("bad tree!");
     }
