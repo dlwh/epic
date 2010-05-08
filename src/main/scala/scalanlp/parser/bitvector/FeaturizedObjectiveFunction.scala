@@ -20,6 +20,7 @@ import scalanlp.util.Index
 import scalanlp.math.Numerics;
 import scalanlp.collection.mutable.Grid2
 import scalanlp.collection.mutable.SparseArray
+import scalanlp.concurrent.ThreadPoolRunner
 import scalanlp.data.VectorBroker
 import scalanlp.util.Log
 
@@ -42,25 +43,26 @@ abstract class FeaturizedObjectiveFunction extends DiffFunction[Int,DenseVector]
     val decisionIndex = Index[Decision];
     val indexedDecisionsForContext = contextBroker.mkArray[Seq[Int]];
     for( (c,cI) <- contextIndex.pairs) {
-      indexedDecisionsForContext(cI) = decisionsForContext(c).map(decisionIndex.index _).toSeq;
+      indexedDecisionsForContext(cI) = scala.util.Sorting.stableSort(decisionsForContext(c).map(decisionIndex.index _).toSeq);
     }
     (decisionIndex,indexedDecisionsForContext:Seq[Seq[Int]]);
   }
   protected val decisionBroker = VectorBroker.fromIndex(decisionIndex);
 
   // feature grid is contextIndex -> decisionIndex -> Seq[feature index]
-  val (featureIndex: Index[Feature], featureGrid: Array[SparseArray[Seq[Int]]]) = {
+  val (featureIndex: Index[Feature], featureGrid: Array[SparseArray[Array[Int]]]) = {
     val index = Index[Feature]();
-    val grid = contextBroker.fillArray(decisionBroker.fillSparseArray(Seq[Int]()));
+    val grid = contextBroker.fillArray(decisionBroker.fillSparseArray(Array[Int]()));
     for(cI <- 0 until contextIndex.size;
         c = contextIndex.get(cI);
         dI <- indexedDecisionsForContext(cI)) {
       val d = decisionIndex.get(dI);
       val f = features(d,c);
-      if(!f.isEmpty)
-        grid(cI)(dI) = f map {index.index _ };
+      if(!f.isEmpty) {
+        grid(cI)(dI) = scala.util.Sorting.stableSort(f.map{index.index _});
+      }
     }
-    (index,grid:Array[SparseArray[Seq[Int]]]);
+    (index,grid:Array[SparseArray[Array[Int]]]);
   }
 
   /*
@@ -127,7 +129,7 @@ abstract class FeaturizedObjectiveFunction extends DiffFunction[Int,DenseVector]
     thetas;
   }
 
-  private def sumWeights(indices: Seq[Int], weights: DenseVector) = {
+  private def sumWeights(indices: Array[Int], weights: DenseVector) = {
     var i = 0;
     var sum = 0.0;
     while(i < indices.length) {
@@ -150,26 +152,54 @@ abstract class FeaturizedObjectiveFunction extends DiffFunction[Int,DenseVector]
 
   // computes expComplete log Likelihood and gradient
   private def computeGradient(logThetas: Array[Vector], eCounts: Array[Vector], eTotals: Array[Double]) = {
-    val featureGrad = VectorBroker.fromIndex(featureIndex).mkDenseVector(0.0);
-    var logProb = 0.0;
     // gradient is \sum_{d,c} e(d,c) * (f(d,c) - \sum_{d'} exp(logTheta(c,d')) f(d',c))
     // = \sum_{d,c} (e(d,c)  - e(*,c) exp(logTheta(d,c))) f(d,c)
     // = \sum_{d,c} margin(d,c) * f(d,c)
     //
     // e(*,c) = \sum_d e(d,c) == eCounts(c).total
+    val featureGrad = VectorBroker.fromIndex(featureIndex).mkDenseVector(0.0);
+    var logProb = 0.0;
+
     for( (vec,c) <- eCounts.zipWithIndex) {
       val cTheta = logThetas(c);
       val logTotal = Math.log(eTotals(c));
-      for((d,e) <- vec.activeElements) {
-        val lT = cTheta(d);
-        logProb += e * lT;
+      val vec2 = vec match {
+        case v: AdaptiveVector => v.innerVector;
+        case v => v
+      }
+      vec2 match {
+        case vec: SparseVector =>
+          var i = 0;
+          while(i < vec.used) {
+            val d = vec.index(i);
+            val e = vec.data(i);
+            val lT = cTheta(d);
+            logProb += e * lT;
 
-        val margin = e - Math.exp(logTotal + lT);
+            val margin = e - Math.exp(logTotal + lT);
 
-        for( f <- featureGrid(c)(d))
-          featureGrad(f) += margin;
+            var j = 0;
+            val grid = featureGrid(c)(d);
+            while(j < grid.size) {
+              val f = grid(j);
+              featureGrad(f) += margin;
+              j += 1;
+            }
+            i += 1;
+          }
+        case _ =>
+          for((d,e) <- vec.activeElements) {
+            val lT = cTheta(d);
+            logProb += e * lT;
+
+            val margin = e - Math.exp(logTotal + lT);
+
+            for( f <- featureGrid(c)(d))
+              featureGrad(f) += margin;
+          }
       }
     }
+
 
     (-logProb,-featureGrad value);
   }
@@ -187,10 +217,10 @@ abstract class FeaturizedObjectiveFunction extends DiffFunction[Int,DenseVector]
     lazy val logThetas = decodeThetas(computeLogThetas(encodedWeights));
   }
 
-  def emIterations(initialWeights: DoubleCounter[Feature] = initWeights): Iterator[State] = {
+  def emIterations(initialWeights: DoubleCounter[Feature] = initWeights, maxMStepIterations: Int=90): Iterator[State] = {
     val log = Log.globalLog;
 
-    val optimizer = new LBFGS[Int,DenseVector](90,5) with ConsoleLogging;
+    val optimizer = new LBFGS[Int,DenseVector](maxMStepIterations,5) with ConsoleLogging;
     val weightsIterator = Iterator.iterate(State(initIndexedWeights,Double.NegativeInfinity)) { state =>
       log(Log.INFO)("E step");
       val (marginalLogProb,eCounts) = expectedCounts(state.logThetas);

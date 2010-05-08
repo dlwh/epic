@@ -88,7 +88,7 @@ class LogisticBitVector[L,W](treebank: StateSplitting.Treebank[L,W],
   private def split(x: L) = {
     if(x == root) Seq((x,0))
     else {
-      val maxStates = BitUtils.roundToNextPowerOfTwo(initLexicon(x).size + initProductions(x).size);
+      val maxStates = BitUtils.roundToNextPowerOfTwo(initLexicon(x).size + 100 * initProductions(x).size);
       (0 until (numStates min maxStates)) map { i => (x,i) };
     }
   }
@@ -177,7 +177,8 @@ object LogisticBitVectorTest extends ParserTester {
     val obj = new LogisticBitVector(trainTrees,"",numBits, featurizer);
     val iterationsPerEval = config.readIn("iterations.eval",25);
     val maxIterations = config.readIn("iterations.max",100);
-    val stateIterator = obj.emIterations();
+    val maxMStepIterations = config.readIn("iterations.mstep.max",80);
+    val stateIterator = obj.emIterations(maxMStepIterations = maxMStepIterations);
 
     var lastLL = Double.NegativeInfinity;
     var numBelowThreshold = 0;

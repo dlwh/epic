@@ -60,13 +60,18 @@ class UnaryBitFeaturizer[L,W](numBits:Int) extends Featurizer[L,W] {
   }
 }
 
-class CrossProductFeaturizer[L,W](f1: Featurizer[L,W], f2: Featurizer[L,W]) extends Featurizer[L,W] {
+class CrossProductFeaturizer[L,W](f1: Featurizer[L,W], f2: Featurizer[L,W],
+                                  suppressLeftFeatures: Boolean=false,
+                                  suppressRightFeatures: Boolean = false) extends Featurizer[L,W] {
   def features(d: LogisticBitVector.Decision[L,W], c: LogisticBitVector.Context[L]): Seq[LogisticBitVector.Feature[L,W]] = {
     val feats1 = f1.features(d,c);
     val feats2 = f2.features(d,c);
     val unionFeatures = for(ff1 <- feats1; ff2 <- feats2)
       yield UnionFeature(ff1,ff2);
-    feats1 ++ feats2 ++ unionFeatures;
+    var rv:Seq[LogisticBitVector.Feature[L,W]] = unionFeatures;
+    if(!suppressRightFeatures) rv = rv ++ feats2;
+    if(!suppressLeftFeatures) rv = rv ++ feats1;
+    rv;
   }
   def initFeatureWeight(logit: LogisticBitVector[L,W], f: LogisticBitVector.Feature[L,W]) = f match {
     case UnionFeature(f1,f2) => Some(scoreFeature(logit,f1).get + scoreFeature(logit,f2).get);
@@ -95,9 +100,9 @@ class AllPairsFeaturizer[L,W](inner: Featurizer[L,W]) extends Featurizer[L,W] {
   }
 }
 
-class StandardFeaturizer[L,W](numBits: Int) extends CrossProductFeaturizer[L,W](
+class StandardFeaturizer[L,W](numBits: Int,suppressLoneBit: Boolean, suppressLoneRule: Boolean) extends CrossProductFeaturizer[L,W](
   new AllPairsFeaturizer(new UnaryBitFeaturizer[L,W](numBits)),
-  new NormalGenerativeFeaturizer[L,W]) with Featurizer[L,W];
+  new NormalGenerativeFeaturizer[L,W],suppressLoneBit,suppressLoneRule) with Featurizer[L,W];
 
 case class SlavRuleFeature[L,W](r: Rule[(L,Int)]) extends Feature[L,W] with CachedHashCode;
 case class SlavLexicalFeature[L,W](parent: L, state: Int, word: W) extends Feature[L,W] with CachedHashCode;
