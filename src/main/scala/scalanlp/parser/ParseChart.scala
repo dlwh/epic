@@ -32,15 +32,20 @@ final class ParseChart[L](grammar: Grammar[L], length: Int) {
   private case class Unary(lchild: Int) extends BackPtr;
   private case class Binary(lchild: Int, rchild: Int, split: Int) extends BackPtr;
 
-  private val score = new TriangularArray(length+1, grammar.mkVector(Double.NegativeInfinity));
-  private val back = new TriangularArray(length+1, grammar.mkSparseArray[BackPtr]);
-  private val active = new TriangularArray(length+1, new IntBloomFilter(grammar.index.size,3));
+  private val score = TriangularArray.raw(length+1, grammar.mkVector(Double.NegativeInfinity));
+  private val back =  TriangularArray.raw(length+1, grammar.mkSparseArray[BackPtr]);
+  // right most place a left constituent with label l can start and end at position i
+  private val narrowLeft = Array.fill(length+1)(grammar.fillArray[Int](-1));
+  // left most place a left constituent with label l can start and end at position i
+  private val wideLeft = Array.fill(length+1)(grammar.fillArray[Int](length+1));
+  // left most place a right constituent with label l--which starts at position i--can end.
+  private val narrowRight = Array.fill(length+1)(grammar.fillArray[Int](length+1));
+  // right-most place a right constituent with label l--which starts at position i--can end.
+  private val wideRight = Array.fill(length+1)(grammar.fillArray[Int](-1));
 
   def enterTerm(begin: Int, end: Int, label: L, w: Double): Unit = enterTerm(begin,end,grammar.index(label),w);
   def enterTerm(begin: Int, end: Int, label: Int, w: Double): Unit = {
-    score(begin, end)(label) = w;
-    back(begin, end)(label) = Term;
-    active(begin, end) += label
+    enter(begin,end,label,Term,w);
   }
 
   def enterUnary(begin: Int, end: Int, parent: L, child: L, w: Double): Unit = {
@@ -48,45 +53,65 @@ final class ParseChart[L](grammar: Grammar[L], length: Int) {
   }
 
   def enterUnary(begin: Int, end: Int, parent: Int, child: Int, w: Double): Unit = {
-    score(begin, end)(parent) = w;
-    back(begin, end)(parent) = Unary(child);
-    active(begin, end) += parent;
+    enter(begin,end,parent,Unary(child),w);
   }
 
   def enterBinary(begin: Int, split: Int, end: Int, parent: L, lchild: L, rchild: L, w: Double): Unit = {
     enterBinary(begin,split,end,grammar.index(parent),grammar.index(lchild), grammar.index(rchild), w);
   }
   def enterBinary(begin: Int, split: Int, end: Int, parent: Int, lchild: Int, rchild: Int, w: Double): Unit = {
-    score(begin, end)(parent) = w;
-    back(begin, end)(parent) = Binary(lchild,rchild,split);
-    active(begin, end) += parent;
+    enter(begin,end,parent,Binary(lchild,rchild,split),w);
   }
 
+  private def enter(begin: Int, end: Int, parent: Int, ptr: BackPtr, w: Double) = {
+    score(TriangularArray.index(begin,end))(parent) = w;
+    back(TriangularArray.index(begin,end))(parent) = ptr;
+    narrowLeft(end)(parent) = begin max narrowLeft(end)(parent);
+    wideLeft(end)(parent) = begin min wideLeft(end)(parent);
+    wideRight(begin)(parent) = end max wideRight(begin)(parent);
+    narrowRight(begin)(parent) = end min narrowRight(begin)(parent);
+  }
+
+  def feasibleSpan(begin: Int, end: Int, leftState: Int, rightState: Int): Span = {
+    val narrowR = narrowRight(begin)(leftState);
+    val narrowL = narrowLeft(end)(rightState);
+
+    if (narrowR >= end || narrowL < narrowR) {
+      emptySpan
+    } else {
+      val trueMin = narrowR max wideLeft(end)(rightState);
+      val trueMax = wideRight(begin)(leftState) min narrowL;
+      if(trueMin > narrowL || trueMin > trueMax) emptySpan
+      else Span(trueMin,trueMax+1)
+    }
+  }
+
+  private val emptySpan = Span(length+1,length+1)
+
   def enteredLabelIndexes(begin: Int, end: Int) = {
-    score(begin, end).activeDomain.iterator
+    score(TriangularArray.index(begin, end)).activeDomain.iterator
   }
 
   def enteredLabelScores(begin: Int, end: Int) = {
-    score(begin, end).activeElements
+    score(TriangularArray.index(begin, end)).activeElements
   }
 
 
   def labelScore(begin: Int, end: Int, label: L): Double = labelScore(begin,end,grammar.index(label));
   def labelScore(begin: Int, end: Int, label: Int): Double = {
-    if(!active(begin, end)(label)) Double.NegativeInfinity
-    else score(begin, end)(label);
+    score(TriangularArray.index(begin, end))(label);
   }
 
   def dumpChart() {
-    val myScore = new TriangularArray[DoubleCounter[L]](length+1,(i:Int,j:Int)=>grammar.decode(score(i,j)));
-    val myBack = new TriangularArray[Map[L,BackPtr]](length+1,(i:Int,j:Int)=>grammar.decode(back(i,j)));
+    val myScore = new TriangularArray[DoubleCounter[L]](length+1,(i:Int,j:Int)=>grammar.decode(score(TriangularArray.index(i,j))));
+    val myBack = new TriangularArray[Map[L,BackPtr]](length+1,(i:Int,j:Int)=>grammar.decode(back(TriangularArray.index(i,j))));
     println(myScore);
     println(myBack);
   }
 
 
   def buildTree(start: Int, end: Int, root: Int):BinarizedTree[L] = {
-    val b = back(start, end)(root)
+    val b = back(TriangularArray.index(start, end))(root)
     b match {
       case Term =>
         NullaryTree(grammar.index.get(root))(Span(start,end));

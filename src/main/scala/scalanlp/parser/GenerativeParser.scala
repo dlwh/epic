@@ -26,6 +26,7 @@ import scalanlp.config.Configuration
 import scalala.tensor.counters._;
 import Counters._;
 import LogCounters.{LogPairedDoubleCounter,LogDoubleCounter,logNormalizeRows};
+import scalanlp.text.tokenize.PTBTokenizer
 import scalanlp.trees._;
 import scalanlp.util._;
 import scalala.Scalala.{log=>_,_};
@@ -89,6 +90,30 @@ class GenerativeParser[L,W](root: L, lexicon: Lexicon[L,W],
       end = begin + span
     } {
       for {
+        (b,binaryRules) <- grammar.allBinaryRules;
+        (c,parentVector) <- binaryRules;
+        split <- chart.feasibleSpan(begin, end, b, c)
+      } {
+        val bScore = chart.labelScore(begin, split,b);
+        if (!bScore.isInfinite) {
+          val cScore = chart.labelScore(split, end, c)
+          if (!cScore.isInfinite) {
+            var i = 0;
+            while(i < parentVector.used) {
+              val a = parentVector.index(i);
+              val aScore = parentVector.data(i);
+              i += 1;
+              val prob = bScore + cScore + aScore;
+              if(prob > chart.labelScore(begin,end,a)) {
+                chart.enterBinary(begin,split,end,a,b,c,prob);
+              }
+
+            }
+          }
+        }
+      }
+      /*
+      for {
         split <- (begin+1) to (end-1);
         (b,bScore) <- chart.enteredLabelScores(begin, split);
         if !bScore.isInfinite
@@ -105,6 +130,7 @@ class GenerativeParser[L,W](root: L, lexicon: Lexicon[L,W],
             }
           }
       }
+      */
       updateUnaries(chart,begin,end);
     }
 
@@ -174,17 +200,13 @@ object GenerativeInterpreter {
       print("Ready> ");
       val line = readLine();
       if(line.trim == "quit") System.exit(1);
-      val words = PTBTokenizer.tokenize(line.trim);
-      words match {
-        case Left(words)=>
-        println(words.mkString(","));
-        try {
-          val parse = parser(words);
-          println(Trees.debinarize(parse) render words);
-        } catch {
-          case e => e.printStackTrace();
-        }
-        case Right(bleh) => println(bleh);
+      val words = PTBTokenizer().apply(line.trim);
+      println(words.mkString(","));
+      try {
+        val parse = parser(words.toSeq);
+        println(Trees.debinarize(parse) render words.toSeq);
+      } catch {
+        case e => e.printStackTrace();
       }
     }
   }

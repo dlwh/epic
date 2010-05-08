@@ -20,7 +20,9 @@ package scalanlp.parser
 import scalala.Scalala._;
 import scalala.tensor._;
 import scalanlp.data.VectorBroker
+import scalala.tensor.sparse.SparseVector
 import scalanlp.collection.mutable.SparseArray;
+import scalala.tensor.adaptive.AdaptiveVector
 import scalala.tensor.counters.LogCounters._;
 import scalanlp.util.Index;
 
@@ -44,12 +46,19 @@ trait Grammar[L] extends VectorBroker[L] {
   /**
    * Returns a SparseArray[Vector] with RightIndex -> ParentIndex -> Score
    */
-  def binaryRulesByIndexedLeftChild(b: Int): SparseArray[Vector];
+  def binaryRulesByIndexedLeftChild(b: Int): SparseArray[SparseVector];
+
+  def allBinaryRules:SparseArray[SparseArray[SparseVector]];
+
+  /**
+   * Returns a SparseArray[Vector] with LeftIndex -> RightIndex -> Score
+   */
+  def binaryRulesByIndexedParent(a: Int): SparseArray[SparseVector];
 
   /**
    * Returns a SparseArray[Vector] with LeftIndex -> ParentIndex -> Score
    */
-  def binaryRulesByIndexedRightChild(c: Int): SparseArray[Vector];
+  def binaryRulesByIndexedRightChild(c: Int): SparseArray[SparseVector];
 }
 
 /**
@@ -96,19 +105,40 @@ class GenerativeGrammar[L](productions: LogPairedDoubleCounter[L,Rule[L]]) exten
   }
 
   // Mapping is Left Child -> Right Child -> Parent -> Score
-  private val indexedBinaryRulesByLeftChild:Array[SparseArray[Vector]] = (
-    fillArray(fillSparseArray(mkVector(Double.NegativeInfinity)))
+  private val indexedBinaryRulesByLeftChild:SparseArray[SparseArray[SparseVector]] = (
+    fillSparseArray(fillSparseArray(mkSparseVector(Double.NegativeInfinity)))
   );
   for( ((a,BinaryRule(_,b,c)),score) <- binaryRules) {
     indexedBinaryRulesByLeftChild(index(b))(index(c))(index(a)) = score;
   }
 
+  /*
+  for( cas <- indexedBinaryRulesByLeftChild;
+      _ = println("VVV" + cas.used * 1.0 / cas.size);
+       (c,as) <- cas) {
+     as.asInstanceOf[AdaptiveVector].innerVector match {
+      case v: SparseVector =>
+        println(v.used * 1.0 / v.size);
+      case _ => println("dense!");
+    }
+  }
+  */
+
+
   // Mapping is Left Child -> Right Child -> Parent -> Score
-  private val indexedBinaryRulesByRightChild:Array[SparseArray[Vector]] = (
-    fillArray(fillSparseArray(mkVector(Double.NegativeInfinity)))
+  private val indexedBinaryRulesByRightChild:SparseArray[SparseArray[SparseVector]] = (
+    fillSparseArray(fillSparseArray(mkSparseVector(Double.NegativeInfinity)))
   );
   for( ((a,BinaryRule(_,b,c)),score) <- binaryRules) {
     indexedBinaryRulesByRightChild(index(c))(index(b))(index(a)) = score;
+  }
+
+  // Mapping is Parent -> Left Child -> Right Child ->  Score
+  private val indexedBinaryRulesByParent:SparseArray[SparseArray[SparseVector]] = (
+    fillSparseArray(fillSparseArray(mkSparseVector(Double.NegativeInfinity)))
+  );
+  for( ((a,BinaryRule(_,b,c)),score) <- binaryRules) {
+    indexedBinaryRulesByParent(index(a))(index(b))(index(c)) = score;
   }
 
   /**
@@ -138,12 +168,17 @@ class GenerativeGrammar[L](productions: LogPairedDoubleCounter[L,Rule[L]]) exten
    */
   def binaryRulesByLeftChild(c: L) = leftChildBinaryRules(c).iterator;
 
+
+  def allBinaryRules = indexedBinaryRulesByLeftChild;
+
   def binaryRulesByIndexedLeftChild(b: Int) = indexedBinaryRulesByLeftChild(b);
 
-  def binaryRulesByIndexedRightChild(c: Int): SparseArray[Vector] = indexedBinaryRulesByRightChild(c);
+  def binaryRulesByIndexedRightChild(c: Int): SparseArray[SparseVector] = indexedBinaryRulesByRightChild(c);
 
   /**
-   * Returns pairs of the form ( (lchild,rchild),
+   * Returns pairs of the form (lchild,rchild),
    */
   def binaryRulesByParent(p: L) = binaryRules(p).iterator;
+  /** b, c **/
+  def binaryRulesByIndexedParent(a: Int): SparseArray[SparseVector] = indexedBinaryRulesByParent(a);
 }
