@@ -378,8 +378,8 @@ object StateSplitting {
 
   type RuleCounts[L] = LogPairedDoubleCounter[L,Rule[L]];
   type TagWordCounts[L,W] = LogPairedDoubleCounter[L,W];
-  type Treebank[L,W] = Iterable[(BinarizedTree[L],Seq[W])];
-  type SplitTreebank[L,W] = Iterable[(BinarizedTree[Seq[L]],Seq[W])];
+  type Treebank[L,W] = Seq[(BinarizedTree[L],Seq[W])];
+  type SplitTreebank[L,W] = Seq[(BinarizedTree[Seq[L]],Seq[W])];
 
   def splitGrammar[L,W](ruleCounts: RuleCounts[L],
                       wordCounts: TagWordCounts[L,W],
@@ -411,8 +411,8 @@ object StateSplitting {
 
 
 object StateSplittingTest extends ParserTester {
-  def trainParser(trainTrees: Iterable[(BinarizedTree[String],Seq[String])],
-                  devTrees: Iterable[(BinarizedTree[String],Seq[String])],
+  def trainParser(trainTrees: Seq[(BinarizedTree[String],Seq[String])],
+                  devTrees: Seq[(BinarizedTree[String],Seq[String])],
                   config: Configuration) = {
 
     println("Extracting counts");

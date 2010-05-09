@@ -13,6 +13,7 @@ import scalala.tensor.counters.LogCounters.LogDoubleCounter
 import scalala.tensor.counters.LogCounters.LogPairedDoubleCounter
 import scalala.tensor.dense.DenseMatrix
 import scalala.tensor.dense.DenseVector
+import scalanlp.concurrent.ParallelOps._;
 import scalanlp.optimize.DiffFunction
 import scalanlp.optimize.LBFGS
 import scalanlp.util.ConsoleLogging
@@ -150,6 +151,45 @@ abstract class FeaturizedObjectiveFunction extends DiffFunction[Int,DenseVector]
     (-marginalLogProb,grad);
   }
 
+
+  override def valueAt(weights: DenseVector) = {
+    val encodedThetas = computeLogThetas(weights);
+    val logThetas = decodeThetas(encodedThetas);
+    val (marginalLogProb,eCounts) = expectedCounts(logThetas);
+
+    -marginalLogProb;
+  }
+
+  private def computeValue(logThetas: Array[Vector], eCounts: Array[Vector], eTotals: Array[Double]) = {
+    var logProb = 0.0;
+
+    for( (vec,c) <- eCounts.zipWithIndex) {
+      val cTheta = logThetas(c);
+      val logTotal = Math.log(eTotals(c));
+      val vec2 = vec match {
+        case v: AdaptiveVector => v.innerVector;
+        case v => v
+      }
+      vec2 match {
+        case vec: SparseVector =>
+          var i = 0;
+          while(i < vec.used) {
+            val d = vec.index(i);
+            val e = vec.data(i);
+            val lT = cTheta(d);
+            logProb += e * lT;
+            i += 1;
+          }
+        case _ =>
+          for((d,e) <- vec.activeElements) {
+            val lT = cTheta(d);
+            logProb += e * lT;
+          }
+      }
+    }
+    -logProb
+  }
+
   // computes expComplete log Likelihood and gradient
   private def computeGradient(logThetas: Array[Vector], eCounts: Array[Vector], eTotals: Array[Double]) = {
     // gradient is \sum_{d,c} e(d,c) * (f(d,c) - \sum_{d'} exp(logTheta(c,d')) f(d',c))
@@ -157,10 +197,11 @@ abstract class FeaturizedObjectiveFunction extends DiffFunction[Int,DenseVector]
     // = \sum_{d,c} margin(d,c) * f(d,c)
     //
     // e(*,c) = \sum_d e(d,c) == eCounts(c).total
-    val featureGrad = VectorBroker.fromIndex(featureIndex).mkDenseVector(0.0);
-    var logProb = 0.0;
+    def featureGrad = VectorBroker.fromIndex(featureIndex).mkDenseVector(0.0);
 
-    for( (vec,c) <- eCounts.zipWithIndex) {
+    val (grad,prob) = eCounts.zipWithIndex.par(2000).fold( (featureGrad,0.0) ) { (gradObj,vecIndex) =>
+      val (vec,c) = vecIndex;
+      var (featureGrad,logProb) = gradObj;
       val cTheta = logThetas(c);
       val logTotal = Math.log(eTotals(c));
       val vec2 = vec match {
@@ -198,10 +239,14 @@ abstract class FeaturizedObjectiveFunction extends DiffFunction[Int,DenseVector]
               featureGrad(f) += margin;
           }
       }
+      (featureGrad,logProb)
+
+    } { (gradObj1,gradObj2) =>
+      gradObj1._1 += gradObj2._1
+      (gradObj1._1, gradObj1._2 + gradObj2._2)
     }
 
-
-    (-logProb,-featureGrad value);
+    (-prob,-grad value);
   }
 
   class mStepObjective(eCounts: PairedDoubleCounter[Context,Decision]) extends DiffFunction[Int,DenseVector]   {
@@ -211,24 +256,44 @@ abstract class FeaturizedObjectiveFunction extends DiffFunction[Int,DenseVector]
       computeGradient(logThetas,encodedCounts,encodedTotals);
     }
 
+    override def valueAt(weights: DenseVector) = {
+      val logThetas = computeLogThetas(weights);
+      computeValue(logThetas,encodedCounts,encodedTotals);
+    }
+
   }
 
   final case class State(encodedWeights: DenseVector, marginalLikelihood: Double) {
     lazy val logThetas = decodeThetas(computeLogThetas(encodedWeights));
   }
 
+  private def memoryString = {
+    val r = Runtime.getRuntime;
+    val free = r.freeMemory / (1024 * 1024);
+    val total = r.totalMemory / (1024 * 1024);
+    ((total - free) + "M used; " + free  + "M free; " + total  + "M total");
+  }
   def emIterations(initialWeights: DoubleCounter[Feature] = initWeights, maxMStepIterations: Int=90): Iterator[State] = {
     val log = Log.globalLog;
 
     val optimizer = new LBFGS[Int,DenseVector](maxMStepIterations,5) with ConsoleLogging;
     val weightsIterator = Iterator.iterate(State(initIndexedWeights,Double.NegativeInfinity)) { state =>
       log(Log.INFO)("E step");
+      log(Log.INFO)("pre E pre gc: " + memoryString);
+      System.gc();
+      log(Log.INFO)("pre E post gc: " + memoryString);
       val (marginalLogProb,eCounts) = expectedCounts(state.logThetas);
       log(Log.INFO)("M step");
+      log(Log.INFO)("pre M gc: " + memoryString);
+      System.gc();
+      log(Log.INFO)("M post gc: " + memoryString);
       val obj = new mStepObjective(eCounts);
       val newWeights = optimizer.minimize(obj, state.encodedWeights);
       val nrm = norm(state.encodedWeights - newWeights,2) / newWeights.size;
       log(Log.INFO)("M Step finished: " + nrm);
+      log(Log.INFO)("post M pre gc: " + memoryString);
+      System.gc();
+      log(Log.INFO)(" post M post gc: " + memoryString);
       State(newWeights,marginalLogProb);
     }
 

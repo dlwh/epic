@@ -70,9 +70,7 @@ class ParseEval[L](ignoredLabels: Set[L]) {
 }
 
 object ParseEval {
-  def evaluate(trees: IndexedSeq[(Tree[String],Seq[String])],
-           parser: Parser[String,String],
-           xform: Tree[String]=>Tree[String]=Trees.Transforms.StandardStringTransform) = {
+  def evaluate(trees: IndexedSeq[(Tree[String],Seq[String])], parser: Parser[String,String]) = {
     val peval = new ParseEval(Set("","''", "``", ".", ":", ","));
     import peval.Statistics;
    // println("here?");
@@ -81,13 +79,13 @@ object ParseEval {
       val (goldTree,words) = sent;
       val startTime = System.currentTimeMillis;
       val guessTree = Trees.debinarize(parser(words))
-      val stats = peval(guessTree,xform(goldTree));
+      val stats = peval(guessTree,goldTree);
       val endTime = System.currentTimeMillis;
       val buf = new StringBuilder();
       buf ++= "======\n";
       buf ++= words.mkString(",");
       buf ++= "\nGold:\n";
-      buf ++= xform(goldTree).render(words);
+      buf ++= goldTree.render(words);
       buf ++= "\nGuess:\n";
       buf ++= guessTree.render(words);
       buf ++= ("\nLocal Accuracy:" + (stats.precision,stats.recall,stats.exact) + "\n") ;

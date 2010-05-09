@@ -12,8 +12,8 @@ import scalanlp.trees.Treebank
 import scalanlp.trees.Trees
 
 trait ParserTester {
-  def trainParser(trainTrees: Iterable[(BinarizedTree[String],Seq[String])],
-                  devTrees: Iterable[(BinarizedTree[String],Seq[String])],
+  def trainParser(trainTrees: Seq[(BinarizedTree[String],Seq[String])],
+                  devTrees: Seq[(BinarizedTree[String],Seq[String])],
                   config: Configuration):Iterator[(String,Parser[String,String])];
 
   def main(args: Array[String]) {
@@ -36,27 +36,27 @@ trait ParserTester {
 
     val xform = Trees.Transforms.StandardStringTransform;
 
-    val trainTrees = for( (tree,words) <- treebank.trainTrees.view.filter(_._2.length < maxLength))
-      yield (binarize(xform(tree)),words);
+    val trainTrees = ArrayBuffer() ++= (for( (tree,words) <- treebank.trainTrees.view.filter(_._2.length <= maxLength))
+      yield (binarize(xform(tree)),words));
 
-    val devTrees = for( (tree,words) <- treebank.devTrees.view.filter(_._2.length < maxLength))
-      yield (binarize(xform(tree)),words);
+    val devTrees = ArrayBuffer() ++= (for( (tree,words) <- treebank.devTrees.view.filter(_._2.length <= maxLength))
+      yield (binarize(xform(tree)),words));
 
     println("Training Parser...");
     val parsers = trainParser(trainTrees,devTrees,config);
+    val testTrees = ArrayBuffer() ++= (for( (tree,words) <- treebank.testTrees.view.filter(_._2.length <= maxLength))
+      yield (xform(tree),words));
 
     for((name,parser) <- parsers) {
       println("Parser " + name);
-      val testTrees = treebank.testTrees.filter(_._2.length <= maxLength);
 
-      evalParser(testTrees,parser,xform);
+      evalParser(testTrees,parser);
     }
   }
 
-  protected def evalParser(testTrees: Seq[(Tree[String],Seq[String])], parser: Parser[String,String], xform: Tree[String]=>Tree[String]) = {
+  protected def evalParser(testTrees: IndexedSeq[(Tree[String],Seq[String])], parser: Parser[String,String]) = {
     println("Evaluating Parser...");
-    val arr = new ArrayBuffer() ++= testTrees;
-    val (prec,recall,exact) = ParseEval.evaluate(arr,parser,xform);
+    val (prec,recall,exact) = ParseEval.evaluate(testTrees,parser);
     val f1 = (2 * prec * recall)/(prec + recall);
     println("Eval finished. Results:");
     println( "P: " + prec + " R:" + recall + " F1: " + f1 +  " Ex:" + exact);

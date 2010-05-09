@@ -7,6 +7,8 @@ import scalala.tensor.counters.Counters.PairedDoubleCounter
 import scalala.tensor.counters.LogCounters.LogPairedDoubleCounter
 import scalala.tensor.counters.LogCounters.LogDoubleCounter
 import scalanlp.trees._
+import scalanlp.concurrent.ParallelOps._;
+import scalanlp.concurrent.ThreadLocal;
 import scalanlp.config.Configuration
 import scalanlp.parser.GenerativeGrammar
 import scalanlp.parser.UnsmoothedLexicon
@@ -95,15 +97,17 @@ class LogisticBitVector[L,W](treebank: StateSplitting.Treebank[L,W],
 
   def expectedCounts(logThetas: LogPairedDoubleCounter[Context,Decision]) = {
     val (productions,wordProds) = extractGrammarAndLexicon(logThetas);
-    val grammar = new GenerativeGrammar(productions);
+    val grammar = new ThreadLocal(new GenerativeGrammar(productions));
     val lexicon = new UnsmoothedLexicon(wordProds);
-    val results = for {
-      (t:BinarizedTree[L],s) <- treebank.iterator
-    } yield StateSplitting.expectedCounts(grammar,lexicon,t map split,s);
+   // val ecounts = treebank.iterator.map { case (t,s) => StateSplitting.expectedCounts(grammar(),lexicon,t map split,s); }
+     //     .reduceLeft(_ += _);
+    val ecounts = treebank.par(100).mapReduce(
+      { case (t,s) => StateSplitting.expectedCounts(grammar(),lexicon,t map split,s); },
+      {( _:ExpectedCounts[W]) += (_: ExpectedCounts[W])} ); 
 
-    val ExpectedCounts(binaryRuleCounts,unaryRuleCounts,wordCounts,logProb) = results.reduceLeft { _ += _ };
-    val ruleCounts = StateSplitting.decodeRules(grammar, binaryRuleCounts, unaryRuleCounts);
-    val lexCounts = StateSplitting.decodeWords(grammar, wordCounts);
+    val ExpectedCounts(binaryRuleCounts,unaryRuleCounts,wordCounts,logProb) = ecounts;
+    val ruleCounts = StateSplitting.decodeRules(grammar.get, binaryRuleCounts, unaryRuleCounts);
+    val lexCounts = StateSplitting.decodeWords(grammar.get, wordCounts);
 
     val eCounts = LogPairedDoubleCounter[Context,Decision]();
 
@@ -168,8 +172,8 @@ class LogisticBitVector[L,W](treebank: StateSplitting.Treebank[L,W],
 object LogisticBitVectorTest extends ParserTester {
 
 
-  def trainParser(trainTrees: Iterable[(BinarizedTree[String],Seq[String])],
-                  devTrees: Iterable[(BinarizedTree[String],Seq[String])],
+  def trainParser(trainTrees: Seq[(BinarizedTree[String],Seq[String])],
+                  devTrees: Seq[(BinarizedTree[String],Seq[String])],
                   config: Configuration) = {
 
     val numBits = config.readIn[Int]("numBits",3);
