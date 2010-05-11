@@ -5,7 +5,7 @@ import scalala.tensor.counters.Counters.PairedDoubleCounter
 import scalala.tensor.counters.LogCounters.LogDoubleCounter
 import scalala.tensor.counters.LogCounters.LogPairedDoubleCounter
 import scalala.tensor.counters.LogCounters
-import bitvector.LogisticBitVector.Feature
+import LogisticBitVector.Feature
 
 
 class BitVectorLexicon[L,W](featurizer: Featurizer[L,W],

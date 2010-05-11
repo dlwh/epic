@@ -1,6 +1,5 @@
 package scalanlp.parser.bitvector
 
-import scala.collection.mutable.HashMap
 import scalala.Scalala._;
 import scalala.tensor.counters.LogCounters
 import scalala.tensor.counters.Counters.PairedDoubleCounter
@@ -54,6 +53,8 @@ import LogisticBitVector._
 
 class LogisticBitVector[L,W](treebank: StateSplitting.Treebank[L,W],
                              root: L,
+                             val initLexicon: PairedDoubleCounter[L,W],
+                             val initProductions: PairedDoubleCounter[L,Rule[L]],
                              numBits: Int,
                              featurizer: Featurizer[L,W]) extends FeaturizedObjectiveFunction {
   type Context = LogisticBitVector.Context[L];
@@ -61,7 +62,6 @@ class LogisticBitVector[L,W](treebank: StateSplitting.Treebank[L,W],
   type Feature = LogisticBitVector.Feature[L,W];
   lazy val numStates = (1 << numBits);
 
-  lazy val (initLexicon:PairedDoubleCounter[L,W],initProductions:PairedDoubleCounter[L,Rule[L]]) = GenerativeParser.extractCounts(treebank.iterator);
 
   def decisionsForContext(c: Context): Iterator[Decision] = {
     val lexDecisions = for( (w,_) <- initLexicon(c._1).iterator) yield LogisticBitVector.WordDecision[L,W](w);
@@ -178,11 +178,13 @@ object LogisticBitVectorTest extends ParserTester {
 
     val numBits = config.readIn[Int]("numBits",3);
     val featurizer = config.readIn[Featurizer[String,String]]("featurizer");
-    val obj = new LogisticBitVector(trainTrees,"",numBits, featurizer);
+    val (initLexicon,initProductions) = GenerativeParser.extractCounts(trainTrees.iterator);
+    val obj = new LogisticBitVector(trainTrees,"",initLexicon,initProductions,numBits, featurizer);
     val iterationsPerEval = config.readIn("iterations.eval",25);
     val maxIterations = config.readIn("iterations.max",100);
     val maxMStepIterations = config.readIn("iterations.mstep.max",80);
     val stateIterator = obj.emIterations(maxMStepIterations = maxMStepIterations);
+
 
     var lastLL = Double.NegativeInfinity;
     var numBelowThreshold = 0;
