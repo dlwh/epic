@@ -64,7 +64,7 @@ class ParseEval[L](ignoredLabels: Set[L]) {
 
   private def labeledConstituents(tree: Tree[L]) = Set() ++ {
     for(child <- tree.preorder
-        if !ignoredLabels.contains(child.label) && child.span.size > 1)
+        if !ignoredLabels.contains(child.label) && !child.isLeaf)
         yield (child.label,child.span);
   }
 }
