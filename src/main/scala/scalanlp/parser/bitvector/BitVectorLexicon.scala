@@ -1,35 +1,50 @@
 package scalanlp.parser
 package bitvector
 
+import scalala.tensor.counters.Counters.DoubleCounter
 import scalala.tensor.counters.Counters.PairedDoubleCounter
 import scalala.tensor.counters.LogCounters.LogDoubleCounter
 import scalala.tensor.counters.LogCounters.LogPairedDoubleCounter
 import scalala.tensor.counters.LogCounters
+import scala.util.control.Breaks._;
 import LogisticBitVector.Feature
 
 
 class BitVectorLexicon[L,W](featurizer: Featurizer[L,W],
                             precomputedScores: LogPairedDoubleCounter[W,(L,Int)],
-                            tagFeatureWeights: PairedDoubleCounter[(L,Int),Feature[L,W]],
-                            logNormalizers: LogDoubleCounter[(L,Int)]) extends Lexicon[(L,Int),W] {
+                            featureWeights: DoubleCounter[Feature[L,W]],
+                            logNormalizers: LogDoubleCounter[(L,Int)],
+                            tagSet: Set[(L,Int)],
+                            openTagSet: Set[(L,Int)]
+                            ) extends Lexicon[(L,Int),W] {
   def wordScore(label: (L,Int), w: W): Double = {
-    if(precomputedScores(w).size > 0) precomputedScores(w)(label)
+    val score = if(precomputedScores(w).size > 0) precomputedScores(w)(label)
     else scoreUnknown(label,w);
+    println(label,w,score);
+    score;
   }
   
   override def tagScores(w: W): LogDoubleCounter[(L,Int)] = {
-    if(precomputedScores(w).size > 0) precomputedScores(w);
-    else LogCounters.aggregate(tags.map { l => (l,scoreUnknown(l,w))});
+    val scores = if(precomputedScores(w).size > 0) precomputedScores(w);
+    else LogCounters.aggregate(tags.map { l => (l,scoreUnknown(l,w))}.filterNot(_._2.isInfinite));
+
+    println(w,scores);
+    scores;
   }
 
-  private def scoreUnknown(label: (L,Int), w: W) = {
-    var score = 0.0;
-    val labelScores = tagFeatureWeights(label);
-    for(f <- featurizer.features(LogisticBitVector.WordDecision(w), label)) {
-      score += labelScores(f);
+  private def scoreUnknown(label: (L,Int), w: W):Double = {
+    if(!openTagSet.contains(label)) Double.NegativeInfinity
+    else {
+      var score = 0.0;
+      val feats = featurizer.features(LogisticBitVector.WordDecision(w), label);
+      for(f <- feats) {
+        val w = featureWeights(f);
+        score += featureWeights(f);
+      }
+      println(label,w,score-logNormalizers(label),logNormalizers(label),feats.map { case f => (f,featureWeights(f)) });
+      score - logNormalizers(label);
     }
-    score - logNormalizers(label);
   }
   
-  def tags: Iterator[(L,Int)] = tagFeatureWeights.rows.map(_._1);
+  def tags: Iterator[(L,Int)] = tagSet.iterator;
 }

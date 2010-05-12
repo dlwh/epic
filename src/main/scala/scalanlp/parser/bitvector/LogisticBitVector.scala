@@ -34,7 +34,7 @@ object LogisticBitVector {
 
   trait Feature[+L,+W] extends Product with CachedHashCode;
 
-  case class RuleFeature[L,W](r: Rule[L]) extends Feature[L,W] with CachedHashCode;
+  case class RuleFeature[L](r: Rule[L]) extends Feature[L,Nothing] with CachedHashCode;
   case class LexicalFeature[L,W](parent: L, word: W) extends Feature[L,W] with CachedHashCode;
   case class SingleBitFeature[L,W](lbl: LabelOfBit, bitIndex: Int, toggled: Int) extends Feature[L,W] with CachedHashCode;
   case class UnionFeature[L,W](f1: Feature[L,W], f2: Feature[L,W]) extends Feature[L,W] with CachedHashCode;
@@ -129,11 +129,20 @@ class LogisticBitVector[L,W](treebank: StateSplitting.Treebank[L,W],
     (logProb,LogCounters.exp(eCounts));
   }
 
-  def extractParser(logThetas: LogPairedDoubleCounter[Context,Decision]) = {
+  def extractParser(logThetas: LogPairedDoubleCounter[Context,Decision],
+                    features:DoubleCounter[Feature],
+                    logNormalizers: LogDoubleCounter[Context]) = {
     val (prods,words) = extractGrammarAndLexicon(logThetas);
     val grammar = new GenerativeGrammar(prods);
     // words is normalized, and so we need to rescale it so that SimpleLexicon doesn't suck horribly.
-    val lex = new SimpleLexicon(LogCounters.exp(words + Math.log(initLexicon.total)));
+   // val lex = new SimpleLexicon(LogCounters.exp(words + Math.log(initLexicon.total)));
+    val transposed = LogPairedDoubleCounter[W,Context];
+    transposed := words.transpose;
+    val tags = Set.empty ++ words.activeKeys.map(_._1);
+    // TODO: make less awful
+    println{tags.map(t => (t,words(t).size))};
+    val openTags = for( t <- tags if words(t).size > 50)  yield t;
+    val lex = new BitVectorLexicon[L,W](featurizer, transposed, features, logNormalizers,tags, openTags.toSet);
     val parser = new GenerativeParser[(L,Int),W]((root,0),lex,grammar).map { (t:Tree[(L,Int)]) =>
       t.map(_._1);
     }
@@ -145,18 +154,17 @@ class LogisticBitVector[L,W](treebank: StateSplitting.Treebank[L,W],
     val lexicon = LogPairedDoubleCounter[Context,W]();
     val productions = LogPairedDoubleCounter[Context,Rule[(L,Int)]]();
     for( (c,decCtr) <- logThetas.rows;
-         lexCtr = lexicon(c);
-         prodCtr = productions(c);
-         (d,v) <- decCtr) {
+         (d,v) <- decCtr
+         if v != Double.NegativeInfinity) {
       d match {
         case WordDecision(w) =>
-          lexCtr(w) = v;
+          lexicon(c)(w) = v;
         case UnaryRuleDecision(child,state) =>
           val r = UnaryRule(c,(child,state));
-          prodCtr(r) = v;
+          productions(c)(r) = v;
         case BinaryRuleDecision(lchild,lstate,rchild,rstate) =>
           val r = BinaryRule(c,(lchild,lstate),(rchild,rstate));
-          prodCtr(r) = v;
+          productions(c)(r) = v;
       }
     }
     (productions,lexicon);
@@ -164,7 +172,7 @@ class LogisticBitVector[L,W](treebank: StateSplitting.Treebank[L,W],
 
 
   def initialFeatureWeight(feature: Feature) ={
-    featurizer.initFeatureWeight(this,feature).get;
+    featurizer.initFeatureWeight(feature).get;
   }
 
 }
@@ -177,14 +185,16 @@ object LogisticBitVectorTest extends ParserTester {
                   config: Configuration) = {
 
     val numBits = config.readIn[Int]("numBits",3);
-    val featurizer = config.readIn[Featurizer[String,String]]("featurizer");
     val (initLexicon,initProductions) = GenerativeParser.extractCounts(trainTrees.iterator);
+    val factory = config.readIn[FeaturizerFactory[String,String]]("featurizerFactory");
+
+    val featurizer = factory.getFeaturizer(config, initLexicon, initProductions);
+
     val obj = new LogisticBitVector(trainTrees,"",initLexicon,initProductions,numBits, featurizer);
     val iterationsPerEval = config.readIn("iterations.eval",25);
     val maxIterations = config.readIn("iterations.max",100);
     val maxMStepIterations = config.readIn("iterations.mstep.max",80);
     val stateIterator = obj.emIterations(maxMStepIterations = maxMStepIterations);
-
 
     var lastLL = Double.NegativeInfinity;
     var numBelowThreshold = 0;
@@ -211,7 +221,7 @@ object LogisticBitVectorTest extends ParserTester {
           stateOpt = Some(state);
         }
         for( state <- stateOpt) yield {
-          val parser = obj.extractParser(state.logThetas);
+          val parser = obj.extractParser(state.logThetas,state.weights,state.weightLogNormalizers);
           (totalIters + "", parser);
         }
       }
