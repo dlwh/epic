@@ -66,17 +66,6 @@ abstract class FeaturizedObjectiveFunction extends DiffFunction[Int,DenseVector]
     (index,grid:Array[SparseArray[Array[Int]]]);
   }
 
-  /*
-  {
-    for((dIs,cI) <- featureGrid.zipWithIndex;
-        c = contextIndex.get(cI);
-        (dI,features) <- dIs) {
-      val d = decisionIndex.get(dI);
-      println( (c,d) -> features.map(featureIndex.get _ ));
-    }
-  }
-  */
-
   val initWeights = Counters.aggregate(featureIndex.map{ f => (f,initialFeatureWeight(f))});
   val initIndexedWeights = VectorBroker.fromIndex(featureIndex).encodeDense(initWeights);
 
