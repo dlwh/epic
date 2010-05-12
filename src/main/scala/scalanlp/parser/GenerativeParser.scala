@@ -90,35 +90,6 @@ class GenerativeParser[L,W](root: L, lexicon: Lexicon[L,W],
       iter += 1;
     }
 
-    /*
-    var recheck:ArrayBuffer[Int] = new ArrayBuffer[Int]();
-    val set = new BitSet();
-    recheck ++= chart.enteredLabelIndexes(begin, end);
-    val max_iter = 5;
-
-    var iter = 0;
-    while(iter < max_iter) {
-      iter += 1;
-
-      val elems = recheck.iterator;
-      recheck = new ArrayBuffer[Int]();
-      set.clear();
-
-      for( b <- elems) {
-        val bScore = chart.labelScore(begin,end,b);
-        for( (a,aScore) <- grammar.unaryRulesByIndexedChild(b).activeElements) {
-          val prob = aScore + bScore;
-          if(prob > chart.labelScore(begin,end,a)) {
-            chart.enterUnary(begin,end,a,b,prob);
-            if(!set(a)) {
-              set += a;
-              recheck += a;
-            }
-          }
-        }
-      }
-    }
-    */
   }
 
 
