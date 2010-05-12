@@ -21,12 +21,10 @@ class WordShapeFeaturizer[L](lexicon: PairedDoubleCounter[L,String]) extends Fea
 
       if(wordCounts(w) > 3) {
         features += LexicalFeature(c._1,w);
-        features += IndicatorWSFeature(c._1,'Uncommon);
+ //      features += IndicatorWSFeature(c._1,'Uncommon);
       } else if(wordCounts(w) > 1) {
-      //  features += IndicatorWSFeature(c._1,'Rare);
       } else {
-        //features += IndicatorWSFeature(c._1,'Rare);
-      //  features += IndicatorWSFeature(c._1,'Unknown);
+        //features += IndicatorWSFeature(c._1,'Unknown);
       }
 
       val wlen = w.length;
@@ -65,9 +63,9 @@ class WordShapeFeaturizer[L](lexicon: PairedDoubleCounter[L,String]) extends Fea
     case _ => Seq.empty;
   }
 
-  def initFeatureWeight(f: Feature[L,String]):Option[Double] = f match {
+  def priorForFeature(f: Feature[L,String]):Option[Double] = f match {
     case LexicalFeature(l,w) => Some(Math.log(lexicon(l,w)));
-    case f : WordShapeFeature[_] => Some(Math.log(Math.random/10));
+    case f : WordShapeFeature[_] => Some(-10.0);
     case _ => None;
   }
 }

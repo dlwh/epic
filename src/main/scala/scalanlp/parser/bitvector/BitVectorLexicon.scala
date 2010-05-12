@@ -37,11 +37,16 @@ class BitVectorLexicon[L,W](featurizer: Featurizer[L,W],
     else {
       var score = 0.0;
       val feats = featurizer.features(LogisticBitVector.WordDecision(w), label);
+      var featScores = collection.mutable.Map[Feature[L,W],Double]();
       for(f <- feats) {
-        val w = featureWeights(f);
-        score += featureWeights(f);
+        var w = featureWeights(f);
+        if(w == 0) {
+          w = featurizer.priorForFeature(f) getOrElse 0.0;
+        }
+        featScores(f) = w;
+        score += w;
       }
-      println(label,w,score-logNormalizers(label),logNormalizers(label),feats.map { case f => (f,featureWeights(f)) });
+      println(label,w,score-logNormalizers(label),logNormalizers(label),featScores);
       score - logNormalizers(label);
     }
   }

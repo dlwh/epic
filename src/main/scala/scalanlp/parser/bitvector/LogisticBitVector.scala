@@ -171,8 +171,8 @@ class LogisticBitVector[L,W](treebank: StateSplitting.Treebank[L,W],
   }
 
 
-  def initialFeatureWeight(feature: Feature) ={
-    featurizer.initFeatureWeight(feature).get;
+  def priorForFeature(feature: Feature) ={
+    featurizer.priorForFeature(feature).get;
   }
 
 }

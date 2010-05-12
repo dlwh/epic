@@ -24,16 +24,15 @@ class SlavFeaturizer[L,W](baseLexicon: PairedDoubleCounter[L,W],
       val ruleFeature = SlavRuleFeature[L,W](rule);
       Seq(ruleFeature)
   }
-  def initFeatureWeight(f: LogisticBitVector.Feature[L,W]) = {
-    val noise = 0.2 * Math.random + 0.9
+  def priorForFeature(f: LogisticBitVector.Feature[L,W]) = {
     f match {
       case SlavRuleFeature(BinaryRule((par,parstate),(lchild,lchildState),(rchild,rchildState))) =>
         val baseRule = BinaryRule(par,lchild,rchild);
-        Some(Math.log(baseProductions(par, baseRule) * noise));
+        Some(Math.log(baseProductions(par, baseRule)));
       case SlavRuleFeature(UnaryRule((par,parstate),(child,childState))) =>
         val baseRule = UnaryRule(par,child);
-        Some(Math.log(baseProductions(par, baseRule) * noise));
-      case SlavLexicalFeature(parent,_, word) => Some(Math.log(baseLexicon(parent,word) * noise));
+        Some(Math.log(baseProductions(par, baseRule)));
+      case SlavLexicalFeature(parent,_, word) => Some(Math.log(baseLexicon(parent,word)));
       case _ => None
     }
   }

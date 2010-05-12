@@ -25,7 +25,7 @@ import scalanlp.concurrent.ThreadPoolRunner
 import scalanlp.data.VectorBroker
 import scalanlp.util.Log
 
-abstract class FeaturizedObjectiveFunction extends DiffFunction[Int,DenseVector]  {
+abstract class FeaturizedObjectiveFunction(val regularizationConstant: Double=0.001) extends DiffFunction[Int,DenseVector]  {
   type Context;
   type Decision;
   type Feature;
@@ -33,7 +33,7 @@ abstract class FeaturizedObjectiveFunction extends DiffFunction[Int,DenseVector]
   protected def decisionsForContext(c: Context): Iterator[Decision]
   protected def allContexts: Iterator[Context]
   protected def features(d: Decision, c: Context):Seq[Feature];
-  protected def initialFeatureWeight(f: Feature):Double;
+  protected def priorForFeature(f: Feature):Double;
   /** Should compute marginal likelihood and expected counts for the data */
   protected def expectedCounts(logThetas: LogPairedDoubleCounter[Context,Decision]):(Double,PairedDoubleCounter[Context,Decision]);
 
@@ -66,9 +66,21 @@ abstract class FeaturizedObjectiveFunction extends DiffFunction[Int,DenseVector]
     (index,grid:Array[SparseArray[Array[Int]]]);
   }
 
-  val initWeights = Counters.aggregate(featureIndex.map{ f => (f,initialFeatureWeight(f))});
-  val initIndexedWeights = VectorBroker.fromIndex(featureIndex).encodeDense(initWeights);
+  val priorMean = Counters.aggregate(featureIndex.map{ f => (f,priorForFeature(f))});
+  val encodedPriorMean = VectorBroker.fromIndex(featureIndex).encodeDense(priorMean);
 
+  val encodedInitWeights = {
+    val weights = encodedPriorMean.copy;
+    var i = 0;
+    while(i < weights.size) {
+      weights(i) += Math.log(Math.random * 0.02 + 0.99);
+      i += 1;
+    }
+    weights;
+  }
+  val initWeights = decodeFeatures(encodedInitWeights);
+
+  private def encodeFeatures(m: DoubleCounter[Feature]) = VectorBroker.fromIndex(featureIndex).encodeDense(m);
   private def decodeFeatures(m: DenseVector): DoubleCounter[Feature] = VectorBroker.fromIndex(featureIndex).decode(m);
 
   private def encodeCounts(eCounts: PairedDoubleCounter[Context,Decision]): (Array[Vector],Array[Double]) = {
@@ -143,8 +155,6 @@ abstract class FeaturizedObjectiveFunction extends DiffFunction[Int,DenseVector]
 
   }
 
-
-
   private def sumWeights(indices: Array[Int], weights: DenseVector) = {
     var i = 0;
     var sum = 0.0;
@@ -162,7 +172,7 @@ abstract class FeaturizedObjectiveFunction extends DiffFunction[Int,DenseVector]
     val (marginalLogProb,eCounts) = expectedCounts(logThetas);
 
     val (encodedCounts,encodedTotals) = encodeCounts(eCounts);
-    val (expCompleteLogProb,grad) = computeGradient(encodedThetas, encodedCounts, encodedTotals);
+    val (expCompleteLogProb,grad) = computeGradient(weights, encodedThetas, encodedCounts, encodedTotals);
     (-marginalLogProb,grad);
   }
 
@@ -172,10 +182,10 @@ abstract class FeaturizedObjectiveFunction extends DiffFunction[Int,DenseVector]
     val logThetas = decodeThetas(encodedThetas);
     val (marginalLogProb,eCounts) = expectedCounts(logThetas);
 
-    -marginalLogProb;
+    -marginalLogProb + regularizationConstant/2 * Math.pow(norm(weights - encodedPriorMean,2),2);
   }
 
-  private def computeValue(logThetas: Array[Vector], eCounts: Array[Vector], eTotals: Array[Double]) = {
+  private def computeValue(featureWeights: Vector, logThetas: Array[Vector], eCounts: Array[Vector], eTotals: Array[Double]) = {
     var logProb = 0.0;
 
     for( (vec,c) <- eCounts.zipWithIndex) {
@@ -202,11 +212,11 @@ abstract class FeaturizedObjectiveFunction extends DiffFunction[Int,DenseVector]
           }
       }
     }
-    -logProb
+    -logProb + regularizationConstant/2 * Math.pow(norm(featureWeights - encodedPriorMean,2),2);
   }
 
   // computes expComplete log Likelihood and gradient
-  private def computeGradient(logThetas: Array[Vector], eCounts: Array[Vector], eTotals: Array[Double]) = {
+  private def computeGradient(featureWeights: Vector, logThetas: Array[Vector], eCounts: Array[Vector], eTotals: Array[Double]) = {
     // gradient is \sum_{d,c} e(d,c) * (f(d,c) - \sum_{d'} exp(logTheta(c,d')) f(d',c))
     // = \sum_{d,c} (e(d,c)  - e(*,c) exp(logTheta(d,c))) f(d,c)
     // = \sum_{d,c} margin(d,c) * f(d,c)
@@ -261,19 +271,22 @@ abstract class FeaturizedObjectiveFunction extends DiffFunction[Int,DenseVector]
       (gradObj1._1, gradObj1._2 + gradObj2._2)
     }
 
-    (-prob,-grad value);
+    val realProb = - prob + regularizationConstant * Math.pow(norm(featureWeights - encodedPriorMean,2),2);
+    val finalGrad = -grad + (featureWeights - encodedPriorMean) * regularizationConstant;
+
+    (realProb,finalGrad value);
   }
 
   class mStepObjective(eCounts: PairedDoubleCounter[Context,Decision]) extends DiffFunction[Int,DenseVector]   {
     val (encodedCounts,encodedTotals) = encodeCounts(eCounts);
     override def calculate(weights: DenseVector) = {
       val logThetas = computeLogThetas(weights);
-      computeGradient(logThetas,encodedCounts,encodedTotals);
+      computeGradient(weights,logThetas,encodedCounts,encodedTotals);
     }
 
     override def valueAt(weights: DenseVector) = {
       val logThetas = computeLogThetas(weights);
-      computeValue(logThetas,encodedCounts,encodedTotals);
+      computeValue(weights,logThetas,encodedCounts,encodedTotals);
     }
 
   }
@@ -295,7 +308,7 @@ abstract class FeaturizedObjectiveFunction extends DiffFunction[Int,DenseVector]
     val log = Log.globalLog;
 
     val optimizer = new LBFGS[Int,DenseVector](maxMStepIterations,5) with ConsoleLogging;
-    val weightsIterator = Iterator.iterate(State(initIndexedWeights,Double.NegativeInfinity)) { state =>
+    val weightsIterator = Iterator.iterate(State(encodeFeatures(initialWeights),Double.NegativeInfinity)) { state =>
       log(Log.INFO)("E step");
       log(Log.INFO)("pre E pre gc: " + memoryString);
       System.gc();

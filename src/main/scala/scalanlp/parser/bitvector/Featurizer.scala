@@ -9,7 +9,7 @@ import LogisticBitVector._;
 trait Featurizer[L,W] {
   def features(d: LogisticBitVector.Decision[L,W],
                c: LogisticBitVector.Context[L]): Seq[LogisticBitVector.Feature[L,W]];
-  def initFeatureWeight(f: LogisticBitVector.Feature[L,W]):Option[Double]
+  def priorForFeature(f: LogisticBitVector.Feature[L,W]):Option[Double]
 }
 
 class NormalGenerativeRuleFeaturizer[L,W](baseProductions: PairedDoubleCounter[L,Rule[L]]) extends Featurizer[L,W] {
@@ -28,7 +28,7 @@ class NormalGenerativeRuleFeaturizer[L,W](baseProductions: PairedDoubleCounter[L
       Seq(ruleFeature)
     case _ => Seq.empty;
   }
-  def initFeatureWeight(f: LogisticBitVector.Feature[L,W]) = f match {
+  def priorForFeature(f: LogisticBitVector.Feature[L,W]) = f match {
     case RuleFeature(r:Rule[L]) => Some(Math.log(baseProductions(r.parent, r)));
     case _ => None
   }
@@ -42,7 +42,7 @@ class StupidGenerativeLexicalFeaturizer[L,W](baseLexicon: PairedDoubleCounter[L,
     case _ => Seq.empty
   }
 
-  def initFeatureWeight(f: LogisticBitVector.Feature[L,W]) = f match {
+  def priorForFeature(f: LogisticBitVector.Feature[L,W]) = f match {
     case LexicalFeature(parent:L, word:W) => Some(Math.log(baseLexicon(parent,word)));
     case _ => None
   }
@@ -74,8 +74,8 @@ class UnaryBitFeaturizer[L,W](numBits:Int) extends Featurizer[L,W] {
       val parentFeatures = mkBitStati(numBits, Parent,c._2);
       parentFeatures ++ lchildFeatures ++ rchildFeatures toSeq
   }
-  def initFeatureWeight(f: LogisticBitVector.Feature[L,W]) = f match {
-    case SingleBitFeature(_,_,_) => Some(Math.log(Math.random * 0.2 + 0.9))
+  def priorForFeature(f: LogisticBitVector.Feature[L,W]) = f match {
+    case SingleBitFeature(_,_,_) => Some(0.0);
     case _ => None
   }
 }
@@ -95,13 +95,13 @@ class CrossProductFeaturizer[L,W](f1: Featurizer[L,W], f2: Featurizer[L,W],
     rv;
   }
 
-  def initFeatureWeight(f: LogisticBitVector.Feature[L,W]) = f match {
+  def priorForFeature(f: LogisticBitVector.Feature[L,W]) = f match {
     case UnionFeature(f1,f2) => Some(scoreFeature(f1).get + scoreFeature(f2).get);
     case f => scoreFeature(f);
   }
 
   private def scoreFeature(f: Feature[L,W]) = {
-    Iterator(f1,f2).map{_.initFeatureWeight(f)}.find(_ != None).getOrElse(None);
+    Iterator(f1,f2).map{_.priorForFeature(f)}.find(_ != None).getOrElse(None);
   }
 }
 
@@ -111,12 +111,12 @@ class SequenceFeaturizer[L,W](inner: Featurizer[L,W]*) extends Featurizer[L,W] {
     val allFeatures = for(feat <- inner; f <- feat.features(d,c)) yield f;
     allFeatures;
   }
-  def initFeatureWeight(f: LogisticBitVector.Feature[L,W]) = f match {
+  def priorForFeature(f: LogisticBitVector.Feature[L,W]) = f match {
     case f => scoreFeature(f);
   }
 
   private def scoreFeature(f: Feature[L,W]) = {
-    inner.iterator.map{_.initFeatureWeight(f)}.find(_ != None).getOrElse(None);
+    inner.iterator.map{_.priorForFeature(f)}.find(_ != None).getOrElse(None);
   }
 }
 
@@ -128,14 +128,14 @@ class AllPairsFeaturizer[L,W](inner: Featurizer[L,W]) extends Featurizer[L,W] {
       yield UnionFeature(allFeatures(i),allFeatures(j))
     allFeatures ++ unionFeatures;
   }
-  def initFeatureWeight(f: LogisticBitVector.Feature[L,W]) = f match {
+  def priorForFeature(f: LogisticBitVector.Feature[L,W]) = f match {
     case UnionFeature(f1,f2) => Some(scoreFeature(f1).get +
                                      scoreFeature(f2).get);
     case f => scoreFeature(f);
   }
 
   private def scoreFeature(f: Feature[L,W]) = {
-    inner.initFeatureWeight(f);
+    inner.priorForFeature(f);
   }
 }
 
