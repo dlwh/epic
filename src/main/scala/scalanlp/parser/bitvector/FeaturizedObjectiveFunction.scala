@@ -130,6 +130,32 @@ abstract class FeaturizedObjectiveFunction extends DiffFunction[Int,DenseVector]
     thetas;
   }
 
+ private def computeThetaLogNormalizers(weights: DenseVector) = {
+    val thetas = contextBroker.mkArray[Vector];
+    for((dIs,cI) <- featureGrid.zipWithIndex) {
+      thetas(cI) = decisionBroker.mkVector(Double.NegativeInfinity);
+      for((dI,features) <- dIs) {
+        val score = sumWeights(features,weights);
+        thetas(cI)(dI) = score;
+      }
+    }
+
+    thetas.map { arr => arr.asInstanceOf[AdaptiveVector].innerVector match {
+        case v: DenseVector =>
+          val max = v.data.filter(_ !=0).reduceLeft(_ max _);
+          val logSum = Numerics.logSum(v.data.iterator,max);
+          logSum;
+        case v: SparseVector =>
+          val max = v.data.take(v.used).reduceLeft(_ max _);
+          val logSum = Numerics.logSum(v.data.iterator.take(v.used),max);
+          logSum
+      }
+    }
+
+  }
+
+
+
   private def sumWeights(indices: Array[Int], weights: DenseVector) = {
     var i = 0;
     var sum = 0.0;
@@ -265,6 +291,8 @@ abstract class FeaturizedObjectiveFunction extends DiffFunction[Int,DenseVector]
 
   final case class State(encodedWeights: DenseVector, marginalLikelihood: Double) {
     lazy val logThetas = decodeThetas(computeLogThetas(encodedWeights));
+    lazy val weights = decodeFeatures(encodedWeights);
+    lazy val weightLogNormalizers = LogCounters.aggregate(contextBroker.decode(computeThetaLogNormalizers(encodedWeights)));
   }
 
   private def memoryString = {
@@ -273,6 +301,7 @@ abstract class FeaturizedObjectiveFunction extends DiffFunction[Int,DenseVector]
     val total = r.totalMemory / (1024 * 1024);
     ((total - free) + "M used; " + free  + "M free; " + total  + "M total");
   }
+
   def emIterations(initialWeights: DoubleCounter[Feature] = initWeights, maxMStepIterations: Int=90): Iterator[State] = {
     val log = Log.globalLog;
 
