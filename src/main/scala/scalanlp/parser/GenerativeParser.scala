@@ -209,7 +209,7 @@ object GenerativeParser {
 object GenerativeTester extends ParserTester {
   def trainParser(trainTrees: Seq[(BinarizedTree[String],Seq[String])],
                   devTrees: Seq[(BinarizedTree[String],Seq[String])],
-                  config: Configuration) = Iterator.single(("",GenerativeParser.fromTrees(trainTrees)));
+                  config: Configuration) = Iterator.single(("Gen",GenerativeParser.fromTrees(trainTrees)));
 }
 
 object GenerativeInterpreter {

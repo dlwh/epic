@@ -59,7 +59,7 @@ class Tree[+L](val label: L, val children: Seq[Tree[L]])(val span: Span) {
 
   import Tree._;
   override def toString = recursiveToString(this,0,new StringBuilder).toString;
-  def render[W](words: Seq[W]) = recursiveRender(this,0,words, new StringBuilder).toString;
+  def render[W](words: Seq[W], newline: Boolean = true) = recursiveRender(this,0,words, newline, new StringBuilder).toString;
 }
 
 object Tree {
@@ -78,15 +78,17 @@ object Tree {
   }
 
 
-  private def recursiveRender[L,W](tree: Tree[L], depth: Int, words: Seq[W], sb: StringBuilder): StringBuilder =  {
+  private def recursiveRender[L,W](tree: Tree[L], depth: Int, words: Seq[W], newline: Boolean, sb: StringBuilder): StringBuilder =  {
     import tree._;
-      sb append "\n" append "  "*depth append "( " append tree.label
+    if(newline) sb append "\n" append "  " * depth;
+    else sb.append(" ");
+    sb append "(" append tree.label
     if(isLeaf) {
       sb append span.map(words).mkString(" "," ","");
     } else {
       //sb append "\n"
       for( c <- children ) {
-        recursiveRender(c,depth+1,words,sb);
+        recursiveRender(c,depth+1,words,newline, sb);
       }
     }
     sb append ")";

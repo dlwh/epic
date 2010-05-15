@@ -17,6 +17,11 @@ package scalanlp.parser;
 
 
 import scalanlp.trees._;
+import java.io.BufferedOutputStream
+import java.io.File
+import java.io.FileOutputStream
+import java.io.PrintStream
+import scala.actors.Actor
 import scala.collection.mutable.ArrayBuffer
 import scalanlp.concurrent.ParallelOps._;
 
@@ -70,10 +75,34 @@ class ParseEval[L](ignoredLabels: Set[L]) {
 }
 
 object ParseEval {
-  def evaluate(trees: IndexedSeq[(Tree[String],Seq[String])], parser: Parser[String,String]) = {
+  def evaluate(trees: IndexedSeq[(Tree[String],Seq[String])], parser: Parser[String,String], evalDir: String) = {
     val peval = new ParseEval(Set("","''", "``", ".", ":", ","));
     import peval.Statistics;
-   // println("here?");
+
+    val parsedir = new File(evalDir);
+    parsedir.mkdirs() || error("Couldn't make directory: " + parsedir);
+    val goldOut = new PrintStream(new BufferedOutputStream(new FileOutputStream(new File(parsedir,"gold"))));
+    val guessOut = new PrintStream(new BufferedOutputStream(new FileOutputStream(new File(parsedir,"guess"))));
+
+    import Actor._;
+    val goldAppender = actor {
+      loop {
+        react {
+          case Some(msg) =>  goldOut.println(msg);
+          case None => goldOut.close(); Actor.exit();
+        }
+      }
+    }
+
+    val guessAppender = actor {
+      loop {
+        react {
+          case Some(msg) =>  guessOut.println(msg);
+          case None => guessOut.close(); Actor.exit();
+        }
+      }
+    }
+
 
     def evalSentence(sent: (Tree[String],Seq[String])) = {
       val (goldTree,words) = sent;
@@ -91,10 +120,16 @@ object ParseEval {
       buf ++= ("\nLocal Accuracy:" + (stats.precision,stats.recall,stats.exact) + "\n") ;
       buf ++= ((endTime - startTime) / 1000.0 + " Seconds")
       buf ++= "\n======";
+      guessAppender ! Some(guessTree.render(words,newline=false));
+      goldAppender !  Some(goldTree.render(words,newline=false));
       println(buf.toString);
       stats;
     }
     val stats = trees.par.withSequentialThreshold(100).mapReduce({ evalSentence(_:(Tree[String],Seq[String]))},{ (_:Statistics) + (_:Statistics)});
+    guessAppender ! None;
+    goldAppender ! None;
+
+
   //  val stats = trees.view.map{ evalSentence(_)}.reduceLeft{ (_:Statistics) + (_:Statistics)};
     val (prec,recall,exact) = (stats.precision,stats.recall,stats.exact);
     (prec,recall,exact);
