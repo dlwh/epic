@@ -43,7 +43,7 @@ class SimpleLexicon[L,W](private val lexicon: PairedDoubleCounter[L,W]) extends 
   def wordScore(l: L, w: W) = {
     var cWord = wordCounts(w);
     var cTagWord = lexicon(l)(w);
-    if(wordCounts(w) < 4) {
+    if(wordCounts(w) < 4 && lexicon(l).size > 50) {
       cWord += 1.0;
       cTagWord += lexicon(l).size.toDouble / wordCounts.size
     }

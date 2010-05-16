@@ -1,6 +1,7 @@
 package scalanlp.parser.bitvector
 
 import scalala.Scalala._;
+import scalala.tensor.dense.DenseVector;
 import scalala.tensor.counters.LogCounters
 import scalala.tensor.counters.Counters.PairedDoubleCounter
 import scalala.tensor.counters.LogCounters.LogPairedDoubleCounter
@@ -9,10 +10,12 @@ import scalanlp.trees._
 import scalanlp.concurrent.ParallelOps._;
 import scalanlp.concurrent.ThreadLocal;
 import scalanlp.config.Configuration
+import scalanlp.optimize.LBFGS
 import scalanlp.parser.GenerativeGrammar
 import scalanlp.parser.UnsmoothedLexicon
 import scalanlp.parser._;
 import scalala.tensor.counters.Counters._;
+import scalanlp.util.ConsoleLogging
 import scalanlp.util.Iterators
 import scalanlp.util.Log
 
@@ -143,7 +146,7 @@ class LogisticBitVector[L,W](treebank: StateSplitting.Treebank[L,W],
     println{tags.map(t => (t,words(t).size))};
     val openTags = for( t <- tags if words(t).size > 50)  yield t;
     val lex = new BitVectorLexicon[L,W](featurizer, transposed, features, logNormalizers,tags, openTags.toSet);
-    val parser = new GenerativeParser[(L,Int),W]((root,0),lex,grammar).map { (t:Tree[(L,Int)]) =>
+    val parser = new ChartParser[(L,Int),W]((root,0),lex,grammar).map { (t:Tree[(L,Int)]) =>
       t.map(_._1);
     }
     parser;
@@ -225,6 +228,36 @@ object LogisticBitVectorTest extends ParserTester {
           (totalIters + "", parser);
         }
       }
+    }
+
+  }
+}
+
+
+object LBFGSBitVectorTest extends ParserTester {
+
+  def trainParser(trainTrees: Seq[(BinarizedTree[String],Seq[String])],
+                  devTrees: Seq[(BinarizedTree[String],Seq[String])],
+                  config: Configuration) = {
+
+    val numBits = config.readIn[Int]("numBits",3);
+    val (initLexicon,initProductions) = GenerativeParser.extractCounts(trainTrees.iterator);
+    val factory = config.readIn[FeaturizerFactory[String,String]]("featurizerFactory");
+
+    val featurizer = factory.getFeaturizer(config, initLexicon, initProductions);
+
+    val obj = new LogisticBitVector(trainTrees,"",initLexicon,initProductions,numBits, featurizer);
+    val iterationsPerEval = config.readIn("iterations.eval",25);
+    val maxIterations = config.readIn("iterations.max",100);
+    val maxMStepIterations = config.readIn("iterations.mstep.max",80);
+    val opt = new LBFGS[Int,DenseVector](iterationsPerEval,5) with ConsoleLogging;
+
+    val log = Log.globalLog;
+    for( (state,iter) <- opt.iterations(obj,obj.encodedInitWeights).take(maxIterations).zipWithIndex;
+         if iter != 0 && iter % iterationsPerEval == 0) yield {
+       val parseState = new obj.State(state.x,-state.value);
+       val parser = obj.extractParser(parseState.logThetas,parseState.weights,parseState.weightLogNormalizers);
+       (iter + "", parser);
     }
 
   }

@@ -80,25 +80,16 @@ object ParseEval {
     import peval.Statistics;
 
     val parsedir = new File(evalDir);
-    parsedir.mkdirs() || error("Couldn't make directory: " + parsedir);
+    parsedir.exists() || parsedir.mkdirs() || error("Couldn't make directory: " + parsedir);
     val goldOut = new PrintStream(new BufferedOutputStream(new FileOutputStream(new File(parsedir,"gold"))));
     val guessOut = new PrintStream(new BufferedOutputStream(new FileOutputStream(new File(parsedir,"guess"))));
 
     import Actor._;
-    val goldAppender = actor {
+    val appender = actor {
       loop {
         react {
-          case Some(msg) =>  goldOut.println(msg);
-          case None => goldOut.close(); Actor.exit();
-        }
-      }
-    }
-
-    val guessAppender = actor {
-      loop {
-        react {
-          case Some(msg) =>  guessOut.println(msg);
-          case None => guessOut.close(); Actor.exit();
+          case Some((guess,gold)) =>  goldOut.println(gold); guessOut.println(guess);
+          case None => goldOut.close(); guessOut.close(); Actor.exit();
         }
       }
     }
@@ -120,14 +111,12 @@ object ParseEval {
       buf ++= ("\nLocal Accuracy:" + (stats.precision,stats.recall,stats.exact) + "\n") ;
       buf ++= ((endTime - startTime) / 1000.0 + " Seconds")
       buf ++= "\n======";
-      guessAppender ! Some(guessTree.render(words,newline=false));
-      goldAppender !  Some(goldTree.render(words,newline=false));
+      appender ! Some((guessTree.render(words,newline=false)), goldTree.render(words,newline=false));
       println(buf.toString);
       stats;
     }
     val stats = trees.par.withSequentialThreshold(100).mapReduce({ evalSentence(_:(Tree[String],Seq[String]))},{ (_:Statistics) + (_:Statistics)});
-    guessAppender ! None;
-    goldAppender ! None;
+    appender ! None;
 
 
   //  val stats = trees.view.map{ evalSentence(_)}.reduceLeft{ (_:Statistics) + (_:Statistics)};

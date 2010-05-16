@@ -15,8 +15,6 @@ package scalanlp.parser
  limitations under the License.
 */
 
-
-
 import scalanlp.collection.mutable.TriangularArray
 import scalala.tensor.counters.Counters.DoubleCounter
 import scalanlp.trees.BinarizedTree
@@ -26,14 +24,15 @@ import scalanlp.trees.UnaryTree
 import scalanlp.trees.Span
 import scalanlp.util.IntBloomFilter
 
-final class ParseChart[L](grammar: Grammar[L], length: Int) {
-  private class BackPtr;
-  private case object Term extends BackPtr;
-  private case class Unary(lchild: Int) extends BackPtr;
-  private case class Binary(lchild: Int, rchild: Int, split: Int) extends BackPtr;
+abstract class ParseChart[L](grammar: Grammar[L], val length: Int) {
+  protected trait Meta;
+
+  protected def getMeta(begin: Int, end: Int, label: Int):Meta = {
+    back(TriangularArray.index(begin,end))(label);
+  }
 
   private val score = TriangularArray.raw(length+1, grammar.mkDenseVector(Double.NegativeInfinity));
-  private val back =  TriangularArray.raw(length+1, grammar.mkArray[BackPtr]);
+  private val back =  TriangularArray.raw(length+1, grammar.mkArray[Meta]);
   // right most place a left constituent with label l can start and end at position i
   private val narrowLeft = Array.fill(length+1)(grammar.fillArray[Int](-1));
   // left most place a left constituent with label l can start and end at position i
@@ -43,27 +42,7 @@ final class ParseChart[L](grammar: Grammar[L], length: Int) {
   // right-most place a right constituent with label l--which starts at position i--can end.
   private val wideRight = Array.fill(length+1)(grammar.fillArray[Int](-1));
 
-  def enterTerm(begin: Int, end: Int, label: L, w: Double): Unit = enterTerm(begin,end,grammar.index(label),w);
-  def enterTerm(begin: Int, end: Int, label: Int, w: Double): Unit = {
-    enter(begin,end,label,Term,w);
-  }
-
-  def enterUnary(begin: Int, end: Int, parent: L, child: L, w: Double): Unit = {
-    enterUnary(begin,end,grammar.index(parent),grammar.index(child),w);
-  }
-
-  def enterUnary(begin: Int, end: Int, parent: Int, child: Int, w: Double): Unit = {
-    enter(begin,end,parent,Unary(child),w);
-  }
-
-  def enterBinary(begin: Int, split: Int, end: Int, parent: L, lchild: L, rchild: L, w: Double): Unit = {
-    enterBinary(begin,split,end,grammar.index(parent),grammar.index(lchild), grammar.index(rchild), w);
-  }
-  def enterBinary(begin: Int, split: Int, end: Int, parent: Int, lchild: Int, rchild: Int, w: Double): Unit = {
-    enter(begin,end,parent,Binary(lchild,rchild,split),w);
-  }
-
-  private def enter(begin: Int, end: Int, parent: Int, ptr: BackPtr, w: Double) = {
+  protected final def enter(begin: Int, end: Int, parent: Int, ptr: Meta, w: Double) = {
     score(TriangularArray.index(begin,end))(parent) = w;
     back(TriangularArray.index(begin,end))(parent) = ptr;
     narrowLeft(end)(parent) = begin max narrowLeft(end)(parent);
@@ -109,14 +88,42 @@ final class ParseChart[L](grammar: Grammar[L], length: Int) {
 
   def dumpChart() {
     val myScore = new TriangularArray[DoubleCounter[L]](length+1,(i:Int,j:Int)=>grammar.decode(score(TriangularArray.index(i,j))));
-    val myBack = new TriangularArray[Map[L,BackPtr]](length+1,(i:Int,j:Int)=>grammar.decode(back(TriangularArray.index(i,j))));
+    val myBack = new TriangularArray[Map[L,Meta]](length+1,(i:Int,j:Int)=>grammar.decode(back(TriangularArray.index(i,j))));
     println(myScore);
     println(myBack);
   }
 
+}
+
+final class InsideParseChart[L](grammar: Grammar[L], length: Int) extends ParseChart[L](grammar,length) {
+  private class BackPtr extends Meta;
+  private case object Term extends BackPtr;
+  private case class Unary(lchild: Int) extends BackPtr;
+  private case class Binary(lchild: Int, rchild: Int, split: Int) extends BackPtr;
+
+  def enterTerm(begin: Int, end: Int, label: L, w: Double): Unit = enterTerm(begin,end,grammar.index(label),w);
+  def enterTerm(begin: Int, end: Int, label: Int, w: Double): Unit = {
+    enter(begin,end,label,Term,w);
+  }
+
+  def enterUnary(begin: Int, end: Int, parent: L, child: L, w: Double): Unit = {
+    enterUnary(begin,end,grammar.index(parent),grammar.index(child),w);
+  }
+
+  def enterUnary(begin: Int, end: Int, parent: Int, child: Int, w: Double): Unit = {
+    enter(begin,end,parent,Unary(child),w);
+  }
+
+  def enterBinary(begin: Int, split: Int, end: Int, parent: L, lchild: L, rchild: L, w: Double): Unit = {
+    enterBinary(begin,split,end,grammar.index(parent),grammar.index(lchild), grammar.index(rchild), w);
+  }
+  def enterBinary(begin: Int, split: Int, end: Int, parent: Int, lchild: Int, rchild: Int, w: Double): Unit = {
+    enter(begin,end,parent,Binary(lchild,rchild,split),w);
+  }
+
 
   def buildTree(start: Int, end: Int, root: Int):BinarizedTree[L] = {
-    val b = back(TriangularArray.index(start, end))(root)
+    val b = getMeta(start, end, root)
     b match {
       case Term =>
         NullaryTree(grammar.index.get(root))(Span(start,end));
@@ -129,5 +136,19 @@ final class ParseChart[L](grammar: Grammar[L], length: Int) {
         BinaryTree(grammar.index.get(root),lc,rc)(Span(start,end));
     }
   }
+}
+
+final class OutsideParseChart[L](grammar: Grammar[L], length: Int) extends ParseChart[L](grammar,length) {
+
+  private object Dummy extends Meta;
+
+
+  def enter(begin: Int, end: Int, parent: L, w: Double): Unit = {
+    enter(begin,end,grammar.index(parent), w);
+  }
+  def enter(begin: Int, end: Int, label: Int, w: Double): Unit = {
+    enter(begin,end,label,Dummy,w);
+  }
+
 
 }
