@@ -36,10 +36,18 @@ class WordShapeFeaturizer[L](lexicon: PairedDoubleCounter[L,String]) extends Fea
       val hasLower = w.exists(_.isLower);
       val hasDash = w.contains('-');
       val l = c._1;
-      //TODO add INITC, KNOWNLC
       if(numCaps > 0) features += (IndicatorWSFeature(l,'HasCap));
       if(numCaps > 1) features += (IndicatorWSFeature(l,'HasManyCap));
-      if(w(0).isUpper || w(0).isTitleCase) features += (IndicatorWSFeature(l,'HasInitCap));
+      if(numCaps > 1 && !hasLower) features += (IndicatorWSFeature(l,'AllCaps));
+      if(w(0).isUpper || w(0).isTitleCase) {
+        //TODO add INITC
+        features += (IndicatorWSFeature(l,'HasInitCap));
+        if(wordCounts(w.toLowerCase) > 3 && wordCounts(w) <= 3) {
+          features += IndicatorWSFeature(l,'HasKnownLC);
+          if(lexicon(l,w.toLowerCase) > 0)
+            features += LexicalFeature(l,w.toLowerCase);
+        }
+      }
       if(!hasLower) features += (IndicatorWSFeature(l,'HasNoLower));
       if(hasDash) features += (IndicatorWSFeature(l,'HasDash));
       if(hasDigit) features += (IndicatorWSFeature(l,'HasDigit));
@@ -48,7 +56,7 @@ class WordShapeFeaturizer[L](lexicon: PairedDoubleCounter[L,String]) extends Fea
 
       if(w.length > 3 && w.endsWith("s") && !w.endsWith("ss") && !w.endsWith("us") && !w.endsWith("is"))
          features += (IndicatorWSFeature(l,'EndsWithS));
-      else if(w.length >= 5 && !hasDigit && numCaps == 0) {
+      else if(w.length >= 5 && !(hasDigit && numCaps > 0) && !hasDash)  {
         features += (SuffixFeature(l,w.substring(w.length-3)))
         features += (SuffixFeature(l,w.substring(w.length-2)))
       }
@@ -64,8 +72,10 @@ class WordShapeFeaturizer[L](lexicon: PairedDoubleCounter[L,String]) extends Fea
   }
 
   def priorForFeature(f: Feature[L,String]):Option[Double] = f match {
-    case LexicalFeature(l,w) => Some(Math.log(lexicon(l,w)));
-    case f : WordShapeFeature[_] => Some(-10.0);
+    case LexicalFeature(l,w) => 
+      if(lexicon(l,w) == 0) Some(Double.NegativeInfinity)
+      else Some(math.log(lexicon(l,w)) - math.log(lexicon(l).total));
+    case f : WordShapeFeature[_] => Some(-30.0);
     case _ => None;
   }
 }

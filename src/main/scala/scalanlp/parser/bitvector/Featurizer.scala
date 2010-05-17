@@ -2,6 +2,7 @@ package scalanlp.parser.bitvector
 
 import scala.collection.mutable.ArrayBuffer
 import scalala.tensor.counters.Counters.PairedDoubleCounter;
+import scalala.tensor.counters.LogCounters
 import scalanlp.parser._
 import scalanlp.util.CachedHashCode
 import LogisticBitVector._;
@@ -29,7 +30,24 @@ class NormalGenerativeRuleFeaturizer[L,W](baseProductions: PairedDoubleCounter[L
     case _ => Seq.empty;
   }
   def priorForFeature(f: LogisticBitVector.Feature[L,W]) = f match {
-    case RuleFeature(r:Rule[L]) => Some(Math.log(baseProductions(r.parent, r)));
+    case RuleFeature(r:Rule[L]) => 
+      if(baseProductions(r.parent,r) == 0) Some(Double.NegativeInfinity)
+      else Some(math.log(baseProductions(r.parent, r)) - math.log(baseProductions(r.parent).total) );
+    case _ => None
+  }
+}
+
+case class LRRuleFeature[L](dir: Symbol, par: L, child: L) extends Feature[L,Nothing];
+
+class LRRuleFeaturizer[L,W] extends Featurizer[L,W] {
+  def features(d: LogisticBitVector.Decision[L,W],
+               c: LogisticBitVector.Context[L]): Seq[LogisticBitVector.Feature[L,W]] = d match {
+    case BinaryRuleDecision(left,lstate,right,rstate) =>
+      Seq( LRRuleFeature('Left,c._1,left), LRRuleFeature('Right, c._1, right));
+    case _ => Seq.empty;
+  }
+  def priorForFeature(f: LogisticBitVector.Feature[L,W]) = f match {
+    case LRRuleFeature(dir: Symbol, par: L, child: L) => Some(0.0)
     case _ => None
   }
 }
@@ -43,7 +61,7 @@ class StupidGenerativeLexicalFeaturizer[L,W](baseLexicon: PairedDoubleCounter[L,
   }
 
   def priorForFeature(f: LogisticBitVector.Feature[L,W]) = f match {
-    case LexicalFeature(parent:L, word:W) => Some(Math.log(baseLexicon(parent,word)));
+    case LexicalFeature(parent:L, word:W) => Some(math.log(baseLexicon(parent,word)));
     case _ => None
   }
 }
