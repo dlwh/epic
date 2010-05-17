@@ -129,8 +129,7 @@ class AllPairsFeaturizer[L,W](inner: Featurizer[L,W]) extends Featurizer[L,W] {
     allFeatures ++ unionFeatures;
   }
   def priorForFeature(f: LogisticBitVector.Feature[L,W]) = f match {
-    case UnionFeature(f1,f2) => Some(scoreFeature(f1).get +
-                                     scoreFeature(f2).get);
+    case UnionFeature(f1,f2) => for(a <- scoreFeature(f1); b <- scoreFeature(f2)) yield a + b;
     case f => scoreFeature(f);
   }
 
