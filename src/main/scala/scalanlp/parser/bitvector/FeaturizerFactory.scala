@@ -44,3 +44,12 @@ class WordShapeFactory[L] extends FeaturizerFactory[L,String] {
   }
 }
 
+class AllPairsWordShapeFactory[L] extends FeaturizerFactory[L,String] {
+  def getFeaturizer(conf: Configuration,
+                    baseLexicon: PairedDoubleCounter[L,String],
+                    baseProductions: PairedDoubleCounter[L,Rule[L]]):Featurizer[L,String] = {
+    val rules = new NormalGenerativeRuleFeaturizer[L,String](baseProductions);
+    val lex = new AllPairsFeaturizer(new WordShapeFeaturizer[L](baseLexicon));
+    new SequenceFeaturizer(rules,lex);
+  }
+}
