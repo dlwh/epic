@@ -36,7 +36,7 @@ import scalanlp.trees.Treebank
 import scalanlp.trees.Trees
 import scalanlp.trees.UnaryTree
 
-import Math.exp
+import math.exp
 
 object StateSplitting {
 
@@ -230,7 +230,7 @@ object StateSplitting {
       ((_,baseR),count) <- ruleCounts;
       r <- splitRule(baseR,splitter)
     } {
-      val x = Math.log(1 + 2 * randomNoise * Math.random - randomNoise);
+      val x = math.log(1 + 2 * randomNoise * math.random - randomNoise);
       splitRules(r.parent,r) = count + x;
     }
 
@@ -239,7 +239,7 @@ object StateSplitting {
       ((l,w),count) <- wordCounts
       r <- splitter(l)
     } {
-      val x = Math.log(1 + 2 * randomNoise * Math.random - randomNoise)
+      val x = math.log(1 + 2 * randomNoise * math.random - randomNoise)
       splitWords(r,w) = count + x;
     }
 

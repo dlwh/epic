@@ -84,12 +84,12 @@ class HeadFinder[L](rules: Map[L,Seq[HeadRule[L]]]) {
       val childLabels = children.map(_.label);
 
       val answer = if(rule.dis) {
-        if(rule.dir == Left) childLabels.findIndexOf(rule.headSet contains _)
-        else childLabels.findLastIndexOf(rule.headSet contains _)
+        if(rule.dir == Left) childLabels.indexWhere(rule.headSet contains _)
+        else childLabels.lastIndexWhere(rule.headSet contains _)
       } else {
         val candidates = for (l <- rule.heads.iterator) yield {
-          if(rule.dir == Left) childLabels.findIndexOf(_ == l)
-          else childLabels.findLastIndexOf(_ == l)
+          if(rule.dir == Left) childLabels.indexOf(l)
+          else childLabels.lastIndexOf(l)
         };
         candidates.find( _ >= 0) getOrElse -1;
       }
