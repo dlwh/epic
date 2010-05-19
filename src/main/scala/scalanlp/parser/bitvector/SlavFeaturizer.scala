@@ -3,14 +3,15 @@ package bitvector
 
 import scalala.tensor.counters.Counters.PairedDoubleCounter;
 
-import LogisticBitVector._;import scalanlp.config.Configuration
+import LogisticBitVector._;
+import scalanlp.config.Configuration
 
 
 case class SlavRuleFeature[L,W](r: Rule[(L,Int)]) extends Feature[L,W];
 case class SlavLexicalFeature[L,W](parent: L, state: Int, word: W) extends Feature[L,W]
 
 class SlavFeaturizer[L,W](baseLexicon: PairedDoubleCounter[L,W],
-                          baseProductions: PairedDoubleCounter[L,Rule[L]], numBits: Int) extends Featurizer[L,W] {
+                          baseProductions: PairedDoubleCounter[L,Rule[L]]) extends Featurizer[L,W] {
   def features(d: LogisticBitVector.Decision[L,W],
                c: LogisticBitVector.Context[L]): Seq[LogisticBitVector.Feature[L,W]] = d match {
     case WordDecision(w) =>
@@ -24,15 +25,64 @@ class SlavFeaturizer[L,W](baseLexicon: PairedDoubleCounter[L,W],
       val ruleFeature = SlavRuleFeature[L,W](rule);
       Seq(ruleFeature)
   }
-  def priorForFeature(f: LogisticBitVector.Feature[L,W]) = {
+  def initialValueForFeature(f: LogisticBitVector.Feature[L,W]) = {
     f match {
       case SlavRuleFeature(BinaryRule((par,parstate),(lchild,lchildState),(rchild,rchildState))) =>
         val baseRule = BinaryRule(par,lchild,rchild);
-        Some(Math.log(baseProductions(par, baseRule)));
+        if( baseProductions(par, baseRule) == 0) Some(Double.NegativeInfinity)
+        else Some(math.log(baseProductions(par,baseRule)) - math.log(baseProductions(par).total));
       case SlavRuleFeature(UnaryRule((par,parstate),(child,childState))) =>
         val baseRule = UnaryRule(par,child);
-        Some(Math.log(baseProductions(par, baseRule)));
-      case SlavLexicalFeature(parent,_, word) => Some(Math.log(baseLexicon(parent,word)));
+        if( baseProductions(par, baseRule) == 0) Some(Double.NegativeInfinity)
+        else Some(math.log(baseProductions(par,baseRule)) - math.log(baseProductions(par).total));
+      case SlavLexicalFeature(parent,_, word) => Some(math.log(baseLexicon(parent,word)));
+        if( baseLexicon(parent, word) == 0) Some(Double.NegativeInfinity)
+        else Some(math.log(baseLexicon(parent,word)) - math.log(baseLexicon(parent).total));
+      case _ => None
+    }
+  }
+
+    def priorForFeature(f: LogisticBitVector.Feature[L,W]) = {
+    f match {
+      case SlavRuleFeature(BinaryRule((par,parstate),(lchild,lchildState),(rchild,rchildState))) =>
+        Some(0.0);
+      case SlavRuleFeature(UnaryRule((par,parstate),(child,childState))) =>
+        Some(0.0);
+      case SlavLexicalFeature(parent,_, word) => Some(math.log(baseLexicon(parent,word)));
+        Some(0.0);
+      case _ => None
+    }
+  }
+}
+
+case class SlavUnarySubstateFeature(parState: Int, childState: Int) extends Feature[Nothing,Nothing];
+case class SlavBinarySubstateFeature(parState: Int, lchildState: Int, rchildState: Int) extends Feature[Nothing,Nothing];
+case class SlavLexicalSubstateFeature(parState: Int) extends Feature[Nothing,Nothing];
+
+class SlavBitFeaturizer[L,W] extends Featurizer[L,W] {
+  def features(d: LogisticBitVector.Decision[L,W],
+               c: LogisticBitVector.Context[L]): Seq[LogisticBitVector.Feature[L,W]] = d match {
+    case WordDecision(w) =>
+      Seq(SlavLexicalSubstateFeature(c._2));
+    case UnaryRuleDecision(child,state) =>
+      Seq(SlavUnarySubstateFeature(c._2,state));
+    case BinaryRuleDecision(left,lstate,right,rstate) =>
+      Seq(SlavBinarySubstateFeature(c._2,lstate,rstate));
+  }
+  def priorForFeature(f: LogisticBitVector.Feature[L,W]) = {
+    f match {
+      case _ : SlavLexicalSubstateFeature => Some(0.0);
+      case _ : SlavBinarySubstateFeature => Some(0.0);
+      case _ : SlavUnarySubstateFeature => Some(0.0);
+      case _ => None
+    }
+  }
+
+  def initialValueForFeature(f: LogisticBitVector.Feature[L,W]) = {
+    f match {
+      case _ : SlavLexicalSubstateFeature => Some(0.0);
+      case _ : SlavBinarySubstateFeature => Some(0.0);
+      case _ : SlavUnarySubstateFeature => Some(0.0);
       case _ => None
     }
   }
@@ -42,7 +92,6 @@ class SlavFeatureFactory[L,W] extends FeaturizerFactory[L,W] {
   def getFeaturizer(conf: Configuration,
                     baseLexicon: PairedDoubleCounter[L,W],
                     baseProductions: PairedDoubleCounter[L,Rule[L]]):Featurizer[L,W] = {
-    val numBits = conf.readIn[Int]("numBits");
-    new SlavFeaturizer(baseLexicon,baseProductions,numBits);
+    new SlavFeaturizer(baseLexicon,baseProductions);
   }
 }

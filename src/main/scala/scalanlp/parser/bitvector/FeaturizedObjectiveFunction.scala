@@ -25,7 +25,7 @@ import scalanlp.concurrent.ThreadPoolRunner
 import scalanlp.data.VectorBroker
 import scalanlp.util.Log
 
-abstract class FeaturizedObjectiveFunction(val regularizationConstant: Double=0.001) extends DiffFunction[Int,DenseVector]  {
+abstract class FeaturizedObjectiveFunction(val regularizationConstant: Double= 0.01) extends DiffFunction[Int,DenseVector]  {
   type Context;
   type Decision;
   type Feature;
@@ -34,6 +34,7 @@ abstract class FeaturizedObjectiveFunction(val regularizationConstant: Double=0.
   protected def allContexts: Iterator[Context]
   protected def features(d: Decision, c: Context):Seq[Feature];
   protected def priorForFeature(f: Feature):Double;
+  protected def initialValueForFeature(f: Feature):Double;
   /** Should compute marginal likelihood and expected counts for the data */
   protected def expectedCounts(logThetas: LogPairedDoubleCounter[Context,Decision]):(Double,PairedDoubleCounter[Context,Decision]);
 
@@ -67,18 +68,10 @@ abstract class FeaturizedObjectiveFunction(val regularizationConstant: Double=0.
   }
 
   val priorMean = Counters.aggregate(featureIndex.map{ f => (f,priorForFeature(f))});
-  val encodedPriorMean = VectorBroker.fromIndex(featureIndex).encodeDense(priorMean);
+  val encodedPriorMean = encodeFeatures(priorMean);
 
-  val encodedInitWeights = {
-    val weights = encodedPriorMean.copy;
-    var i = 0;
-    while(i < weights.size) {
-      weights(i) += Math.log(Math.random * 0.02 + 0.99);
-      i += 1;
-    }
-    weights;
-  }
-  val initWeights = decodeFeatures(encodedInitWeights);
+  val defaultInitWeights = Counters.aggregate(featureIndex.map{ f => (f,initialValueForFeature(f) + math.log(.02 * math.random + 0.99))});
+  val encodedInitialWeights = encodeFeatures(defaultInitWeights);
 
   private def encodeFeatures(m: DoubleCounter[Feature]) = VectorBroker.fromIndex(featureIndex).encodeDense(m);
   private def decodeFeatures(m: DenseVector): DoubleCounter[Feature] = VectorBroker.fromIndex(featureIndex).decode(m);
@@ -182,7 +175,7 @@ abstract class FeaturizedObjectiveFunction(val regularizationConstant: Double=0.
     val logThetas = decodeThetas(encodedThetas);
     val (marginalLogProb,eCounts) = expectedCounts(logThetas);
 
-    -marginalLogProb + regularizationConstant/2 * Math.pow(norm(weights - encodedPriorMean,2),2);
+    -marginalLogProb + regularizationValue(weights);
   }
 
   private def computeValue(featureWeights: Vector, logThetas: Array[Vector], eCounts: Array[Vector], eTotals: Array[Double]) = {
@@ -190,7 +183,7 @@ abstract class FeaturizedObjectiveFunction(val regularizationConstant: Double=0.
 
     for( (vec,c) <- eCounts.zipWithIndex) {
       val cTheta = logThetas(c);
-      val logTotal = Math.log(eTotals(c));
+      val logTotal = math.log(eTotals(c));
       val vec2 = vec match {
         case v: AdaptiveVector => v.innerVector;
         case v => v
@@ -212,11 +205,11 @@ abstract class FeaturizedObjectiveFunction(val regularizationConstant: Double=0.
           }
       }
     }
-    -logProb + regularizationConstant/2 * Math.pow(norm(featureWeights - encodedPriorMean,2),2);
+    -logProb + regularizationValue(featureWeights);
   }
 
   // computes expComplete log Likelihood and gradient
-  private def computeGradient(featureWeights: Vector, logThetas: Array[Vector], eCounts: Array[Vector], eTotals: Array[Double]) = {
+  private def computeGradient(featureWeights: Vector, logThetas: Array[Vector], eCounts: Array[Vector], eTotals: Array[Double]): (Double,DenseVector) = {
     // gradient is \sum_{d,c} e(d,c) * (f(d,c) - \sum_{d'} exp(logTheta(c,d')) f(d',c))
     // = \sum_{d,c} (e(d,c)  - e(*,c) exp(logTheta(d,c))) f(d,c)
     // = \sum_{d,c} margin(d,c) * f(d,c)
@@ -228,7 +221,7 @@ abstract class FeaturizedObjectiveFunction(val regularizationConstant: Double=0.
       val (vec,c) = vecIndex;
       var (featureGrad,logProb) = gradObj;
       val cTheta = logThetas(c);
-      val logTotal = Math.log(eTotals(c));
+      val logTotal = math.log(eTotals(c));
       val vec2 = vec match {
         case v: AdaptiveVector => v.innerVector;
         case v => v
@@ -242,7 +235,7 @@ abstract class FeaturizedObjectiveFunction(val regularizationConstant: Double=0.
             val lT = cTheta(d);
             logProb += e * lT;
 
-            val margin = e - Math.exp(logTotal + lT);
+            val margin = e - math.exp(logTotal + lT);
 
             var j = 0;
             val grid = featureGrid(c)(d);
@@ -258,7 +251,7 @@ abstract class FeaturizedObjectiveFunction(val regularizationConstant: Double=0.
             val lT = cTheta(d);
             logProb += e * lT;
 
-            val margin = e - Math.exp(logTotal + lT);
+            val margin = e - math.exp(logTotal + lT);
 
             for( f <- featureGrid(c)(d))
               featureGrad(f) += margin;
@@ -271,10 +264,16 @@ abstract class FeaturizedObjectiveFunction(val regularizationConstant: Double=0.
       (gradObj1._1, gradObj1._2 + gradObj2._2)
     }
 
-    val realProb = - prob + regularizationConstant * Math.pow(norm(featureWeights - encodedPriorMean,2),2);
-    val finalGrad = -grad + (featureWeights - encodedPriorMean) * regularizationConstant;
+    val realProb = - prob + regularizationValue(featureWeights);
+    val finalGrad = -grad + regularizationGradient(featureWeights);
 
     (realProb,finalGrad value);
+  }
+
+  private def regularizationGradient(weights: Vector):Vector = (weights - encodedPriorMean) * regularizationConstant
+  private def regularizationValue(weights: Vector):Double = {
+    val diff = (weights - encodedPriorMean) value;
+    1.0 /2 * (diff dot diff) * regularizationConstant;
   }
 
   class mStepObjective(eCounts: PairedDoubleCounter[Context,Decision]) extends DiffFunction[Int,DenseVector]   {
@@ -304,7 +303,7 @@ abstract class FeaturizedObjectiveFunction(val regularizationConstant: Double=0.
     ((total - free) + "M used; " + free  + "M free; " + total  + "M total");
   }
 
-  def emIterations(initialWeights: DoubleCounter[Feature] = initWeights, maxMStepIterations: Int=90): Iterator[State] = {
+  def emIterations(initialWeights: DoubleCounter[Feature] = defaultInitWeights, maxMStepIterations: Int=90): Iterator[State] = {
     val log = Log.globalLog;
 
     val optimizer = new LBFGS[Int,DenseVector](maxMStepIterations,5) with ConsoleLogging;

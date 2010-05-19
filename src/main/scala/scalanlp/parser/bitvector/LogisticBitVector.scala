@@ -41,6 +41,7 @@ object LogisticBitVector {
   case class LexicalFeature[L,W](parent: L, word: W) extends Feature[L,W] with CachedHashCode;
   case class SingleBitFeature[L,W](lbl: LabelOfBit, bitIndex: Int, toggled: Int) extends Feature[L,W] with CachedHashCode;
   case class UnionFeature[L,W](f1: Feature[L,W], f2: Feature[L,W]) extends Feature[L,W] with CachedHashCode;
+  case class SeqFeature[L,W](fs: Seq[Feature[L,W]]) extends Feature[L,W] with CachedHashCode;
 
   sealed class LabelOfBit(val index: Int);
   case object Parent extends LabelOfBit(0);
@@ -178,6 +179,10 @@ class LogisticBitVector[L,W](treebank: StateSplitting.Treebank[L,W],
     featurizer.priorForFeature(feature).get;
   }
 
+  def initialValueForFeature(feature: Feature) ={
+    featurizer.initialValueForFeature(feature).get;
+  }
+
 }
 
 object LogisticBitVectorTest extends ParserTester {
@@ -253,7 +258,7 @@ object LBFGSBitVectorTest extends ParserTester {
     val opt = new LBFGS[Int,DenseVector](iterationsPerEval,5) with ConsoleLogging;
 
     val log = Log.globalLog;
-    for( (state,iter) <- opt.iterations(obj,obj.encodedInitWeights).take(maxIterations).zipWithIndex;
+    for( (state,iter) <- opt.iterations(obj,obj.encodedInitialWeights).take(maxIterations).zipWithIndex;
          if iter != 0 && iter % iterationsPerEval == 0) yield {
        val parseState = new obj.State(state.x,-state.value);
        val parser = obj.extractParser(parseState.logThetas,parseState.weights,parseState.weightLogNormalizers);

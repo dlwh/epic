@@ -71,11 +71,19 @@ class WordShapeFeaturizer[L](lexicon: PairedDoubleCounter[L,String]) extends Fea
     case _ => Seq.empty;
   }
 
-  def priorForFeature(f: Feature[L,String]):Option[Double] = f match {
+  def initialValueForFeature(f: Feature[L,String]):Option[Double] = f match {
     case LexicalFeature(l,w) => 
       if(lexicon(l,w) == 0) Some(Double.NegativeInfinity)
       else Some(math.log(lexicon(l,w)) - math.log(lexicon(l).total));
     case f : WordShapeFeature[_] => Some(-30.0);
+    case _ => None;
+  }
+
+  def priorForFeature(f: Feature[L,String]):Option[Double] = f match {
+    case LexicalFeature(l,w) =>
+      if(lexicon(l,w) == 0) Some(Double.NegativeInfinity)
+      else Some(math.log(lexicon(l,w)) - math.log(lexicon(l).total));
+    case f : WordShapeFeature[_] => Some(0.0);
     case _ => None;
   }
 }

@@ -19,6 +19,15 @@ class BitAugmentedFactory[L,W](normalFactory: FeaturizerFactory[L,W]) extends Fe
     val suppressLoneRule = conf.readIn[Boolean]("featurizer.suppressLoneRule");
     val suppressLoneBit = conf.readIn[Boolean]("featurizer.suppressLoneBit");
     return new CrossProductFeaturizer(new AllPairsFeaturizer(new UnaryBitFeaturizer(numBits)),
+class SlavAugmentedFactory[L,W](normalFactory: FeaturizerFactory[L,W]) extends FeaturizerFactory[L,W] {
+  def getFeaturizer(conf: Configuration,
+                    baseLexicon: PairedDoubleCounter[L,W],
+                    baseProductions: PairedDoubleCounter[L,Rule[L]]):Featurizer[L,W] = {
+    val numStates = conf.readIn[Int]("numStates");
+    val inner = normalFactory.getFeaturizer(conf,baseLexicon,baseProductions);
+    val suppressLoneRule = conf.readIn[Boolean]("featurizer.suppressLoneRule",true);
+    val suppressLoneBit = conf.readIn[Boolean]("featurizer.suppressLoneBit",true);
+    return new CrossProductFeaturizer(new SlavBitFeaturizer,
                                       inner,suppressLoneBit,suppressLoneRule);
   }
 
