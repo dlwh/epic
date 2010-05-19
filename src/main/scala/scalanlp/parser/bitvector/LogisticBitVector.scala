@@ -59,13 +59,11 @@ class LogisticBitVector[L,W](treebank: StateSplitting.Treebank[L,W],
                              root: L,
                              val initLexicon: PairedDoubleCounter[L,W],
                              val initProductions: PairedDoubleCounter[L,Rule[L]],
-                             numBits: Int,
+                             numStates: Int,
                              featurizer: Featurizer[L,W]) extends FeaturizedObjectiveFunction {
   type Context = LogisticBitVector.Context[L];
   type Decision = LogisticBitVector.Decision[L,W];
   type Feature = LogisticBitVector.Feature[L,W];
-  lazy val numStates = (1 << numBits);
-
 
   def decisionsForContext(c: Context): Iterator[Decision] = {
     val lexDecisions = for( (w,_) <- initLexicon(c._1).iterator) yield LogisticBitVector.WordDecision[L,W](w);
@@ -192,13 +190,13 @@ object LogisticBitVectorTest extends ParserTester {
                   devTrees: Seq[(BinarizedTree[String],Seq[String])],
                   config: Configuration) = {
 
-    val numBits = config.readIn[Int]("numBits",3);
+    val numStates = config.readIn[Int]("numStates",8);
     val (initLexicon,initProductions) = GenerativeParser.extractCounts(trainTrees.iterator);
     val factory = config.readIn[FeaturizerFactory[String,String]]("featurizerFactory");
 
     val featurizer = factory.getFeaturizer(config, initLexicon, initProductions);
 
-    val obj = new LogisticBitVector(trainTrees,"",initLexicon,initProductions,numBits, featurizer);
+    val obj = new LogisticBitVector(trainTrees,"",initLexicon,initProductions,numStates, featurizer);
     val iterationsPerEval = config.readIn("iterations.eval",25);
     val maxIterations = config.readIn("iterations.max",100);
     val maxMStepIterations = config.readIn("iterations.mstep.max",80);
@@ -245,13 +243,13 @@ object LBFGSBitVectorTest extends ParserTester {
                   devTrees: Seq[(BinarizedTree[String],Seq[String])],
                   config: Configuration) = {
 
-    val numBits = config.readIn[Int]("numBits",3);
+    val numStates = config.readIn[Int]("numBits",8);
     val (initLexicon,initProductions) = GenerativeParser.extractCounts(trainTrees.iterator);
     val factory = config.readIn[FeaturizerFactory[String,String]]("featurizerFactory");
 
     val featurizer = factory.getFeaturizer(config, initLexicon, initProductions);
 
-    val obj = new LogisticBitVector(trainTrees,"",initLexicon,initProductions,numBits, featurizer);
+    val obj = new LogisticBitVector(trainTrees,"",initLexicon,initProductions,numStates, featurizer);
     val iterationsPerEval = config.readIn("iterations.eval",25);
     val maxIterations = config.readIn("iterations.max",100);
     val maxMStepIterations = config.readIn("iterations.mstep.max",80);
@@ -261,6 +259,8 @@ object LBFGSBitVectorTest extends ParserTester {
     for( (state,iter) <- opt.iterations(obj,obj.encodedInitialWeights).take(maxIterations).zipWithIndex;
          if iter != 0 && iter % iterationsPerEval == 0) yield {
        val parseState = new obj.State(state.x,-state.value);
+       log(Log.INFO)("Iteration " + iter + " finished.");
+       log(Log.INFO)("Likelihood: " + parseState.marginalLikelihood);
        val parser = obj.extractParser(parseState.logThetas,parseState.weights,parseState.weightLogNormalizers);
        (iter + "", parser);
     }
