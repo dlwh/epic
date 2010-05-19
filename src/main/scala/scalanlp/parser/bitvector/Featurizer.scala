@@ -30,6 +30,7 @@ class NormalGenerativeRuleFeaturizer[L,W](baseProductions: PairedDoubleCounter[L
       Seq(ruleFeature)
     case _ => Seq.empty;
   }
+
   def priorForFeature(f: LogisticBitVector.Feature[L,W]) = f match {
     case RuleFeature(r:Rule[L]) => 
       if(baseProductions(r.parent,r) == 0) Some(Double.NegativeInfinity)
@@ -144,7 +145,7 @@ class CrossProductFeaturizer[L,W](f1: Featurizer[L,W], f2: Featurizer[L,W],
   }
 
   def initialValueForFeature(f: LogisticBitVector.Feature[L,W]) = f match {
-    case UnionFeature(f1,f2) => Some(scoreInitFeature(f1).get + scoreInitFeature(f2).get);
+    case UnionFeature(f1,f2) => Some(scoreInitFeature(f1).get * scoreInitFeature(f2).get);
     case f => scoreFeature(f);
   }
 
