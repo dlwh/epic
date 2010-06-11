@@ -183,7 +183,6 @@ abstract class FeaturizedObjectiveFunction(val regularizationConstant: Double= 0
 
     for( (vec,c) <- eCounts.zipWithIndex) {
       val cTheta = logThetas(c);
-      val logTotal = math.log(eTotals(c));
       val vec2 = vec match {
         case v: AdaptiveVector => v.innerVector;
         case v => v
