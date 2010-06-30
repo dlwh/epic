@@ -32,44 +32,43 @@ class PennTreeReader(badLabels: Set[String]) extends StdLexical with ImplicitCon
 
   private val tok = rep(other) ^^ { x => x.mkString("")};
 
-  private def seqTree(pos:Int):Parser[(List[Tree[String]],Seq[String])] = (
+  private def seqTree(pos:Int):Parser[(List[Tree[String]],IndexedSeq[String])] = (
     tree(pos) >> {
       case Some((tree,words)) => 
         seqTree(pos+words.length).? ^^ { 
           case Some( (restTrees,restWords) ) => 
-            (tree :: restTrees, words.toList ++ restWords.toList)
-          case None =>(tree :: Nil, words)
+            (tree :: restTrees, words.toIndexedSeq ++ restWords.toIndexedSeq)
+          case None =>(tree :: Nil, words.toIndexedSeq)
         }
       case None =>
         seqTree(pos).? ^^ { 
-          case None => (Nil,Nil)
+          case None => (List.empty,IndexedSeq.empty)
           case Some( x ) => x
         }
     }
   )
 
-  private def tree(pos:Int):Parser[Option[(Tree[String],Seq[String])]] = ( 
+  private def tree(pos:Int):Parser[Option[(Tree[String],IndexedSeq[String])]] = (
    ( (lparen ~> tok <~ ws) ~ tok <~ rparen ^^ {
       case (label ~ word) if badLabels(label) => None
-      case (label ~ word) => Some ((Tree(label,Seq())(Span(pos,pos+1)),Seq(word)) )
+      case (label ~ word) => Some ((Tree(label,IndexedSeq())(Span(pos,pos+1)),IndexedSeq(word)) )
     })
     |(lparen ~> opt(tok) ) ~ (seqTree(pos) <~ rparen) ^^ {
       case (Some("-NONE-") ~ _ ) => None
       case (mbLabel ~ children) =>
         val words = children._2;
-        Some((Tree(mbLabel.getOrElse(""),children._1)(Span(pos,pos + words.length)), words))
+        Some((Tree(mbLabel.getOrElse(""),children._1.toIndexedSeq)(Span(pos,pos + words.length)), words))
     }
   )
 
-  def readTrees(input: String): Either[List[(Tree[String],Seq[String])],ParseResult[List[(Tree[String],Seq[String])]]] = {
+  def readTrees(input: String): Either[List[(Tree[String],IndexedSeq[String])],ParseResult[List[(Tree[String],IndexedSeq[String])]]] = {
     phrase(rep1(tree(0)))(new CharSequenceReader(input)) match {
         case Success( result, _) => Left( result map (_.get) )
         case x => Right(x map (_ map (_.get)));
       }
   }
 
-
-  def readTree(input: String): Either[(Tree[String],Seq[String]),ParseResult[(Tree[String],Seq[String])]] = {
+  def readTree(input: String): Either[(Tree[String],IndexedSeq[String]),ParseResult[(Tree[String],IndexedSeq[String])]] = {
       phrase(tree(0))(new CharSequenceReader(input)) match {
         case Success( result, _) => Left( result.get )
         case x => Right(x map (_.get));
