@@ -15,7 +15,7 @@ class WordShapeFeaturizer[L](lexicon: PairedDoubleCounter[L,String]) extends Fea
   val wordCounts = Counters.aggregate(for( ((_,w),count) <- lexicon.activeElements) yield (w,count));
 
   def features(d: LogisticBitVector.Decision[L,String], c: LogisticBitVector.Context[L]) = d match {
-    case WordDecision(w) if wordCounts(w) > 5 => Seq(LexicalFeature(c._1,w));
+    case WordDecision(w) if wordCounts(w) > 5 => IndexedSeq(LexicalFeature(c._1,w));
     case WordDecision(w) =>
       val features = new ArrayBuffer[Feature[L,String]];
 
@@ -66,9 +66,9 @@ class WordShapeFeaturizer[L](lexicon: PairedDoubleCounter[L,String]) extends Fea
       } else if(w.length < 5) {
         features += (IndicatorWSFeature(l,'ShortWord));
       }
-      features:Seq[Feature[L,String]];
+      features:IndexedSeq[Feature[L,String]];
 
-    case _ => Seq.empty;
+    case _ => IndexedSeq.empty;
   }
 
   def initialValueForFeature(f: Feature[L,String]):Option[Double] = f match {

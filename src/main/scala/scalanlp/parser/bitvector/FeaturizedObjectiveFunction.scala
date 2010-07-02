@@ -24,6 +24,7 @@ import scalanlp.collection.mutable.SparseArray
 import scalanlp.concurrent.ThreadPoolRunner
 import scalanlp.data.VectorBroker
 import scalanlp.util.Log
+import scalanlp.util.Profiling
 
 abstract class FeaturizedObjectiveFunction(val regularizationConstant: Double= 0.01) extends DiffFunction[Int,DenseVector]  {
   type Context;
@@ -32,7 +33,7 @@ abstract class FeaturizedObjectiveFunction(val regularizationConstant: Double= 0
 
   protected def decisionsForContext(c: Context): Iterator[Decision]
   protected def allContexts: Iterator[Context]
-  protected def features(d: Decision, c: Context):Seq[Feature];
+  protected def features(d: Decision, c: Context):IndexedSeq[Feature];
   protected def priorForFeature(f: Feature):Double;
   protected def initialValueForFeature(f: Feature):Double;
   /** Should compute marginal likelihood and expected counts for the data */
@@ -44,8 +45,10 @@ abstract class FeaturizedObjectiveFunction(val regularizationConstant: Double= 0
   val (decisionIndex,indexedDecisionsForContext:Seq[Seq[Int]]) = {
     val decisionIndex = Index[Decision];
     val indexedDecisionsForContext = contextBroker.mkArray[Seq[Int]];
-    for( (c,cI) <- contextIndex.pairs) {
-      indexedDecisionsForContext(cI) = scala.util.Sorting.stableSort(decisionsForContext(c).map(decisionIndex.index _).toSeq);
+    Profiling.time("foo1") {
+      for( (c,cI) <- contextIndex.pairs) {
+        indexedDecisionsForContext(cI) = scala.util.Sorting.stableSort(decisionsForContext(c).map(decisionIndex.index _).toSeq);
+      }
     }
     (decisionIndex,indexedDecisionsForContext:Seq[Seq[Int]]);
   }
@@ -60,8 +63,10 @@ abstract class FeaturizedObjectiveFunction(val regularizationConstant: Double= 0
         dI <- indexedDecisionsForContext(cI)) {
       val d = decisionIndex.get(dI);
       val f = features(d,c);
-      if(!f.isEmpty) {
-        grid(cI)(dI) = scala.util.Sorting.stableSort(f.map{index.index _});
+      Profiling.time(c + " " + d + f.size) {
+        if(!f.isEmpty) {
+          grid(cI)(dI) = f.map(index.index).toArray.sorted;
+        }
       }
     }
     (index,grid:Array[SparseArray[Array[Int]]]);

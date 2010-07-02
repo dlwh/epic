@@ -85,7 +85,7 @@ class LogisticBitVector[L,W](treebank: StateSplitting.Treebank[L,W],
     } yield state;
   }
 
-  def features(d: Decision, c: Context):Seq[Feature] = {
+  def features(d: Decision, c: Context):IndexedSeq[Feature] = {
     featurizer.features(d, c);
   }
 
