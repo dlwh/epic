@@ -18,11 +18,11 @@ import scalanlp.optimize.DiffFunction
 import scalanlp.optimize.LBFGS
 import scalanlp.util.ConsoleLogging
 import scalanlp.util.Index
+import scalanlp.util.Encoder
 import scalanlp.math.Numerics;
 import scalanlp.collection.mutable.Grid2
 import scalanlp.collection.mutable.SparseArray
 import scalanlp.concurrent.ThreadPoolRunner
-import scalanlp.data.VectorBroker
 import scalanlp.util.Log
 import scalanlp.util.Profiling
 
@@ -40,7 +40,7 @@ abstract class FeaturizedObjectiveFunction(val regularizationConstant: Double= 0
   protected def expectedCounts(logThetas: LogPairedDoubleCounter[Context,Decision]):(Double,PairedDoubleCounter[Context,Decision]);
 
   val contextIndex: Index[Context] = Index(allContexts);
-  protected val contextBroker = VectorBroker.fromIndex(contextIndex);
+  protected val contextBroker = Encoder.fromIndex(contextIndex);
 
   val (decisionIndex,indexedDecisionsForContext:Seq[Seq[Int]]) = {
     val decisionIndex = Index[Decision];
@@ -52,7 +52,7 @@ abstract class FeaturizedObjectiveFunction(val regularizationConstant: Double= 0
     }
     (decisionIndex,indexedDecisionsForContext:Seq[Seq[Int]]);
   }
-  protected val decisionBroker = VectorBroker.fromIndex(decisionIndex);
+  protected val decisionBroker = Encoder.fromIndex(decisionIndex);
 
   // feature grid is contextIndex -> decisionIndex -> Seq[feature index]
   val (featureIndex: Index[Feature], featureGrid: Array[SparseArray[Array[Int]]]) = {
@@ -78,8 +78,8 @@ abstract class FeaturizedObjectiveFunction(val regularizationConstant: Double= 0
   val defaultInitWeights = Counters.aggregate(featureIndex.map{ f => (f,initialValueForFeature(f) + math.log(.02 * math.random + 0.99))});
   val encodedInitialWeights = encodeFeatures(defaultInitWeights);
 
-  private def encodeFeatures(m: DoubleCounter[Feature]) = VectorBroker.fromIndex(featureIndex).encodeDense(m);
-  private def decodeFeatures(m: DenseVector): DoubleCounter[Feature] = VectorBroker.fromIndex(featureIndex).decode(m);
+  private def encodeFeatures(m: DoubleCounter[Feature]) = Encoder.fromIndex(featureIndex).encodeDense(m);
+  private def decodeFeatures(m: DenseVector): DoubleCounter[Feature] = Encoder.fromIndex(featureIndex).decode(m);
 
   private def encodeCounts(eCounts: PairedDoubleCounter[Context,Decision]): (Array[Vector],Array[Double]) = {
     val encCounts = contextBroker.mkArray[Vector];
@@ -219,7 +219,7 @@ abstract class FeaturizedObjectiveFunction(val regularizationConstant: Double= 0
     // = \sum_{d,c} margin(d,c) * f(d,c)
     //
     // e(*,c) = \sum_d e(d,c) == eCounts(c).total
-    def featureGrad = VectorBroker.fromIndex(featureIndex).mkDenseVector(0.0);
+    def featureGrad = Encoder.fromIndex(featureIndex).mkDenseVector(0.0);
 
     val (grad,prob) = eCounts.zipWithIndex.par(2000).fold( (featureGrad,0.0) ) { (gradObj,vecIndex) =>
       val (vec,c) = vecIndex;

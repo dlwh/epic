@@ -19,7 +19,7 @@ package scalanlp.parser
 
 import scalala.Scalala._;
 import scalala.tensor._;
-import scalanlp.data.VectorBroker
+import scalanlp.util.Encoder;
 import scalala.tensor.sparse.SparseVector
 import scalanlp.collection.mutable.SparseArray;
 import scalala.tensor.adaptive.AdaptiveVector
@@ -34,7 +34,7 @@ final case class UnaryRule[+L](parent: L, child: L) extends Rule[L] {
   def children = Seq(child);
 }
 
-trait Grammar[L] extends VectorBroker[L] {
+trait Grammar[L] extends Encoder[L] {
   def unaryRulesByChild(c: L): Iterator[(UnaryRule[L],Double)];
   def unaryRulesByParent(p: L): Iterator[(UnaryRule[L],Double)];
   def binaryRulesByLeftChild(c: L): Iterator[(BinaryRule[L],Double)];

@@ -13,17 +13,17 @@ case class SlavLexicalFeature[L,W](parent: L, state: Int, word: W) extends Featu
 class SlavFeaturizer[L,W](baseLexicon: PairedDoubleCounter[L,W],
                           baseProductions: PairedDoubleCounter[L,Rule[L]]) extends Featurizer[L,W] {
   def features(d: LogisticBitVector.Decision[L,W],
-               c: LogisticBitVector.Context[L]): Seq[LogisticBitVector.Feature[L,W]] = d match {
+               c: LogisticBitVector.Context[L]): IndexedSeq[LogisticBitVector.Feature[L,W]] = d match {
     case WordDecision(w) =>
-      Seq(SlavLexicalFeature(c._1,c._2,w))
+      IndexedSeq(SlavLexicalFeature(c._1,c._2,w))
     case UnaryRuleDecision(child,state) =>
       val rule = UnaryRule(c,(child,state));
       val ruleFeature = SlavRuleFeature[L,W](rule);
-      Seq(ruleFeature)
+      IndexedSeq(ruleFeature)
     case BinaryRuleDecision(left,lstate,right,rstate) =>
       val rule = BinaryRule(c,(left,lstate),(right,rstate));
       val ruleFeature = SlavRuleFeature[L,W](rule);
-      Seq(ruleFeature)
+      IndexedSeq(ruleFeature)
   }
   def initialValueForFeature(f: LogisticBitVector.Feature[L,W]) = {
     f match {
@@ -61,13 +61,13 @@ case class SlavLexicalSubstateFeature(parState: Int) extends Feature[Nothing,Not
 
 class SlavBitFeaturizer[L,W] extends Featurizer[L,W] {
   def features(d: LogisticBitVector.Decision[L,W],
-               c: LogisticBitVector.Context[L]): Seq[LogisticBitVector.Feature[L,W]] = d match {
+               c: LogisticBitVector.Context[L]): IndexedSeq[LogisticBitVector.Feature[L,W]] = d match {
     case WordDecision(w) =>
-      Seq(SlavLexicalSubstateFeature(c._2));
+      IndexedSeq(SlavLexicalSubstateFeature(c._2));
     case UnaryRuleDecision(child,state) =>
-      Seq(SlavUnarySubstateFeature(c._2,state));
+      IndexedSeq(SlavUnarySubstateFeature(c._2,state));
     case BinaryRuleDecision(left,lstate,right,rstate) =>
-      Seq(SlavBinarySubstateFeature(c._2,lstate,rstate));
+      IndexedSeq(SlavBinarySubstateFeature(c._2,lstate,rstate));
   }
   def priorForFeature(f: LogisticBitVector.Feature[L,W]) = {
     f match {
