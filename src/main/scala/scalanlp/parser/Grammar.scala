@@ -35,6 +35,7 @@ final case class UnaryRule[+L](parent: L, child: L) extends Rule[L] {
 }
 
 trait Grammar[L] extends Encoder[L] {
+  override val index: Index[L];
   def unaryRulesByChild(c: L): Iterator[(UnaryRule[L],Double)];
   def unaryRulesByParent(p: L): Iterator[(UnaryRule[L],Double)];
   def binaryRulesByLeftChild(c: L): Iterator[(BinaryRule[L],Double)];

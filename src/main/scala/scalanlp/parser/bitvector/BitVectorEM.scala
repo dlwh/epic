@@ -45,7 +45,7 @@ object BitVectorEM {
     val rightBitCounts = g.fillArray(mkMap);
 
     for {
-      (parentI,c1) <- counts.iterator;
+      (parentI,c1) <- (counts.iterator: Iterator[(Int,SparseArray[Vector])]);
       (lchildI,c2) <- c1.iterator;
       lchild = g.index.get(lchildI);
       (lbit,leftPolarity) <- iterateBits(lchild._2, numBits);

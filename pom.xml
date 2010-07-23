@@ -82,12 +82,12 @@
     <dependency>
       <groupId>org.scalanlp</groupId>
       <artifactId>scalanlp-data_${scala.version}</artifactId>
-      <version>0.3.1-SNAPSHOT</version>
+      <version>0.3.2-SNAPSHOT</version>
     </dependency>
     <dependency>
       <groupId>org.scalanlp</groupId>
       <artifactId>scalanlp-learn_${scala.version}</artifactId>
-      <version>0.3.1-SNAPSHOT</version>
+      <version>0.3.2-SNAPSHOT</version>
     </dependency>
     <dependency>
       <groupId>junit</groupId>
@@ -104,7 +104,7 @@
     <dependency>
       <groupId>org.scalatest</groupId>
       <artifactId>scalatest</artifactId>
-      <version>1.2-for-scala-${scala.version}-SNAPSHOT</version>
+      <version>1.2</version>
       <scope>test</scope>
     </dependency>
   </dependencies>
@@ -120,7 +120,7 @@
     </plugins>
   </reporting>
   <properties>
-    <scala.version>2.8.0.RC6</scala.version>
+    <scala.version>2.8.0</scala.version>
   </properties>
     <name>Scalanlp Parser</name>
 </project>
