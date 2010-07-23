@@ -52,11 +52,9 @@ class SubstateIndex[T](objs: Index[T], substatesForObj: T=>Int) extends Index[(T
   def pairs = iterator.zipWithIndex
 
   private var lastOffset = 0;
-  private var lastIndex = 0;
 
   private def found(index : Int, offset : Int) : Int = {
     lastOffset = offset;
-    lastIndex = index;
     offset;
   }
 
@@ -66,10 +64,12 @@ class SubstateIndex[T](objs: Index[T], substatesForObj: T=>Int) extends Index[(T
    * negative and can be converted into an insertion point with -(rv+1).
    */
   private def findOffset(i : Int) : Int = {
+    val lastOffset = this.lastOffset;
+    val lastIndex = offsets(lastOffset)
 
     if (i == lastIndex) {
       // previous element; don't need to update lastOffset
-      return lastOffset;
+      lastOffset;
     } else {
       // regular binary search
       var begin = 0;
