@@ -60,7 +60,8 @@ class LogisticBitVector[L,W](treebank: StateSplitting.Treebank[L,W],
                              val initLexicon: PairedDoubleCounter[L,W],
                              val initProductions: PairedDoubleCounter[L,Rule[L]],
                              numStates: Int,
-                             featurizer: Featurizer[L,W]) extends FeaturizedObjectiveFunction {
+                             featurizer: Featurizer[L,W],
+                             initFeatureWeights: DoubleCounter[LogisticBitVector.Feature[L,W]] = DoubleCounter[LogisticBitVector.Feature[L,W]]()) extends FeaturizedObjectiveFunction {
   type Context = LogisticBitVector.Context[L];
   type Decision = LogisticBitVector.Decision[L,W];
   type Feature = LogisticBitVector.Feature[L,W];
@@ -101,8 +102,6 @@ class LogisticBitVector[L,W](treebank: StateSplitting.Treebank[L,W],
     val (productions,wordProds) = extractGrammarAndLexicon(logThetas);
     val grammar = new ThreadLocal(new GenerativeGrammar(productions));
     val lexicon = new UnsmoothedLexicon(wordProds);
-   // val ecounts = treebank.iterator.map { case (t,s) => StateSplitting.expectedCounts(grammar(),lexicon,t map split,s); }
-     //     .reduceLeft(_ += _);
     val ecounts = treebank.par(100).mapReduce(
       { case (t,s) => StateSplitting.expectedCounts(grammar(),lexicon,t map split,s); },
       {( _:ExpectedCounts[W]) += (_: ExpectedCounts[W])} ); 
@@ -177,8 +176,8 @@ class LogisticBitVector[L,W](treebank: StateSplitting.Treebank[L,W],
     featurizer.priorForFeature(feature).get;
   }
 
-  def initialValueForFeature(feature: Feature) ={
-    featurizer.initialValueForFeature(feature).get;
+  def initialValueForFeature(feature: Feature) = {
+    initFeatureWeights.get(feature).orElse(featurizer.initialValueForFeature(feature)).get;
   }
 
 }
