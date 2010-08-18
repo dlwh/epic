@@ -17,7 +17,7 @@ package scalanlp.parser.hypergraph
 
 
 
-import scalanlp.parser.InsideParseChart
+import scalanlp.parser.ParseChart
 import scalanlp.parser.Lexicon
 import scalanlp.parser.ParseChart
 import scalanlp.parser.Parser
@@ -51,7 +51,7 @@ class GraphParser[L,W](root: L, lexicon: Lexicon[L,W], g: Grammar[L]) extends Pa
 
   def scores(s: Seq[W]) = {
     // make the chart:
-    val chart = new InsideParseChart(g,s.length);
+    val chart = new ParseChart(g,s.length);
     val agenda = new PriorityQueue[Item];
 
     for( (w,i) <- s zipWithIndex;

@@ -22,17 +22,12 @@ import scalanlp.trees.BinaryTree
 import scalanlp.trees.NullaryTree
 import scalanlp.trees.UnaryTree
 import scalanlp.trees.Span
-import scalanlp.util.IntBloomFilter
 
-abstract class ParseChart[L](grammar: Grammar[L], val length: Int) {
-  protected trait Meta;
+import scalanlp.util.Implicits._;
 
-  protected def getMeta(begin: Int, end: Int, label: Int):Meta = {
-    back(TriangularArray.index(begin,end))(label);
-  }
+ class ParseChart[L](grammar: Grammar[L], val length: Int) {
 
   private val score = TriangularArray.raw(length+1, grammar.mkDenseVector(Double.NegativeInfinity));
-  private val back =  TriangularArray.raw(length+1, grammar.mkArray[Meta]);
   // right most place a left constituent with label l can start and end at position i
   private val narrowLeft = Array.fill(length+1)(grammar.fillArray[Int](-1));
   // left most place a left constituent with label l can start and end at position i
@@ -42,9 +37,8 @@ abstract class ParseChart[L](grammar: Grammar[L], val length: Int) {
   // right-most place a right constituent with label l--which starts at position i--can end.
   private val wideRight = Array.fill(length+1)(grammar.fillArray[Int](-1));
 
-  protected final def enter(begin: Int, end: Int, parent: Int, ptr: Meta, w: Double) = {
+  final def enter(begin: Int, end: Int, parent: Int, w: Double) = {
     score(TriangularArray.index(begin,end))(parent) = w;
-    back(TriangularArray.index(begin,end))(parent) = ptr;
     narrowLeft(end)(parent) = begin max narrowLeft(end)(parent);
     wideLeft(end)(parent) = begin min wideLeft(end)(parent);
     wideRight(begin)(parent) = end max wideRight(begin)(parent);
@@ -88,22 +82,12 @@ abstract class ParseChart[L](grammar: Grammar[L], val length: Int) {
 
   def dumpChart() {
     val myScore = new TriangularArray[DoubleCounter[L]](length+1,(i:Int,j:Int)=>grammar.decode(score(TriangularArray.index(i,j))));
-    val myBack = new TriangularArray[Map[L,Meta]](length+1,(i:Int,j:Int)=>grammar.decode(back(TriangularArray.index(i,j))));
     println(myScore);
-    println(myBack);
   }
-
-}
-
-final class InsideParseChart[L](grammar: Grammar[L], length: Int) extends ParseChart[L](grammar,length) {
-  private class BackPtr extends Meta;
-  private case object Term extends BackPtr;
-  private case class Unary(lchild: Int) extends BackPtr;
-  private case class Binary(lchild: Int, rchild: Int, split: Int) extends BackPtr;
 
   def enterTerm(begin: Int, end: Int, label: L, w: Double): Unit = enterTerm(begin,end,grammar.index(label),w);
   def enterTerm(begin: Int, end: Int, label: Int, w: Double): Unit = {
-    enter(begin,end,label,Term,w);
+    enter(begin,end,label,w);
   }
 
   def enterUnary(begin: Int, end: Int, parent: L, child: L, w: Double): Unit = {
@@ -111,44 +95,42 @@ final class InsideParseChart[L](grammar: Grammar[L], length: Int) extends ParseC
   }
 
   def enterUnary(begin: Int, end: Int, parent: Int, child: Int, w: Double): Unit = {
-    enter(begin,end,parent,Unary(child),w);
+    enter(begin,end,parent,w);
   }
 
   def enterBinary(begin: Int, split: Int, end: Int, parent: L, lchild: L, rchild: L, w: Double): Unit = {
     enterBinary(begin,split,end,grammar.index(parent),grammar.index(lchild), grammar.index(rchild), w);
   }
   def enterBinary(begin: Int, split: Int, end: Int, parent: Int, lchild: Int, rchild: Int, w: Double): Unit = {
-    enter(begin,end,parent,Binary(lchild,rchild,split),w);
+    enter(begin,end,parent,w);
   }
 
 
   def buildTree(start: Int, end: Int, root: Int):BinarizedTree[L] = {
-    val b = getMeta(start, end, root)
-    b match {
-      case Term =>
-        NullaryTree(grammar.index.get(root))(Span(start,end));
-      case Unary(child) =>
-        val c = buildTree(start,end,child);
-        UnaryTree(grammar.index.get(root),c)(Span(start,end));
-      case Binary(lchild,rchild,split) =>
-        val lc = buildTree(start,split,lchild);
-        val rc = buildTree(split,end,rchild);
-        BinaryTree(grammar.index.get(root),lc,rc)(Span(start,end));
+    val scoreToFind = labelScore(start,end,root);
+    for {
+      split <- (start + 1) until end;
+      (b,childScores) <- grammar.binaryRulesByIndexedParent(root);
+      (c,ruleScore) <- childScores
+    } {
+      val score = ruleScore + labelScore(start,split,b) + labelScore(split,end,c);
+      if(score closeTo scoreToFind) {
+        val left = buildTree(start,split,b);
+        val right = buildTree(split,end,c);
+        return BinaryTree(grammar.index.get(root),left,right)(Span(start,end));
+      }
     }
+    for {
+      (b,ruleScore) <- grammar.unaryRulesByIndexedParent(root)
+    } {
+      val score = ruleScore + labelScore(start,end,b);
+      if(score closeTo scoreToFind) {
+        val child = buildTree(start,end,b);
+        return UnaryTree(grammar.index.get(root),child)(Span(start,end));
+      }
+    }
+    if(start +1 == end) // lexical
+      NullaryTree(grammar.index.get(root))(Span(start,end));  
+    else error("Couldn't find a tree!");
   }
-}
-
-final class OutsideParseChart[L](grammar: Grammar[L], length: Int) extends ParseChart[L](grammar,length) {
-
-  private object Dummy extends Meta;
-
-
-  def enter(begin: Int, end: Int, parent: L, w: Double): Unit = {
-    enter(begin,end,grammar.index(parent), w);
-  }
-  def enter(begin: Int, end: Int, label: Int, w: Double): Unit = {
-    enter(begin,end,label,Dummy,w);
-  }
-
-
 }

@@ -7,7 +7,7 @@ import scalanlp.trees.Tree
 class ChartParser[L,W](val root: L, val lexicon: Lexicon[L,W], val grammar: Grammar[L]) extends Parser[L,W] {
 
   // Score is a vector of scores whose indices are nonterms or preterms
-  private def updateInsideUnaries(chart: InsideParseChart[L], begin:Int, end: Int) = {
+  private def updateInsideUnaries(chart: ParseChart[L], begin:Int, end: Int) = {
     var recheck = grammar.mkArray[Int];
     var check = grammar.mkArray[Int];
 
@@ -60,7 +60,7 @@ class ChartParser[L,W](val root: L, val lexicon: Lexicon[L,W], val grammar: Gram
 
   }
 
-  private def updateOutsideUnaries(outside: OutsideParseChart[L], begin: Int, end: Int) = {
+  private def updateOutsideUnaries(outside: ParseChart[L], begin: Int, end: Int) = {
         var recheck = grammar.mkArray[Int];
     var check = grammar.mkArray[Int];
 
@@ -112,9 +112,9 @@ class ChartParser[L,W](val root: L, val lexicon: Lexicon[L,W], val grammar: Gram
     }
   }
 
-  def buildOutsideChart(inside: InsideParseChart[L]) = {
+  def buildOutsideChart(inside: ParseChart[L]) = {
     val length = inside.length;
-    val outside = new OutsideParseChart[L](grammar,inside.length);
+    val outside = new ParseChart[L](grammar,inside.length);
     outside.enter(0,inside.length,grammar.index(root),0.0);
     for {
       begin <- 0 until length;
@@ -153,8 +153,8 @@ class ChartParser[L,W](val root: L, val lexicon: Lexicon[L,W], val grammar: Gram
   /** begin, end, label */
   type LabeledSpanFilter = (Int,Int,Int) => Boolean
 
-  def buildInsideChart(s: Seq[W], filter: LabeledSpanFilter = ( (_,_,_) => true) ): InsideParseChart[L] = {
-    val chart = new InsideParseChart(grammar,s.length);
+  def buildInsideChart(s: Seq[W], filter: LabeledSpanFilter = ( (_,_,_) => true) ): ParseChart[L] = {
+    val chart = new ParseChart(grammar,s.length);
 
     for{i <- 0 until s.length} {
       for ( (a,wScore) <- lexicon.tagScores(s(i))
