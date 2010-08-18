@@ -51,7 +51,7 @@ class GraphParser[L,W](root: L, lexicon: Lexicon[L,W], g: Grammar[L]) extends Pa
 
   def scores(s: Seq[W]) = {
     // make the chart:
-    val chart = new ParseChart(g,s.length);
+    val chart = ParseChart.viterbi(g,s.length);
     val agenda = new PriorityQueue[Item];
 
     for( (w,i) <- s zipWithIndex;

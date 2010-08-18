@@ -144,7 +144,7 @@ class LogisticBitVector[L,W](treebank: StateSplitting.Treebank[L,W],
     println{tags.map(t => (t,words(t).size))};
     val openTags = for( t <- tags if words(t).size > 50)  yield t;
     val lex = new BitVectorLexicon[L,W](featurizer, transposed, features, logNormalizers,tags, openTags.toSet);
-    val parser = new ChartParser[(L,Int),W]((root,0),lex,grammar).map { (t:Tree[(L,Int)]) =>
+    val parser = new CKYParser[(L,Int),W]((root,0),lex,grammar).map { (t:Tree[(L,Int)]) =>
       t.map(_._1);
     }
     parser;

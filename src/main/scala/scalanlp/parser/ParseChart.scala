@@ -25,9 +25,9 @@ import scalanlp.trees.Span
 
 import scalanlp.util.Implicits._;
 
- class ParseChart[L](grammar: Grammar[L], val length: Int) {
+ abstract class ParseChart[L](grammar: Grammar[L], val length: Int) {
 
-  private val score = TriangularArray.raw(length+1, grammar.mkDenseVector(Double.NegativeInfinity));
+  private val score = TriangularArray.raw(length+1, grammar.mkDenseVector(zero));
   // right most place a left constituent with label l can start and end at position i
   private val narrowLeft = Array.fill(length+1)(grammar.fillArray[Int](-1));
   // left most place a left constituent with label l can start and end at position i
@@ -37,8 +37,11 @@ import scalanlp.util.Implicits._;
   // right-most place a right constituent with label l--which starts at position i--can end.
   private val wideRight = Array.fill(length+1)(grammar.fillArray[Int](-1));
 
+  protected def sum(a:Double,b: Double):Double
+  protected def zero: Double;
+
   final def enter(begin: Int, end: Int, parent: Int, w: Double) = {
-    score(TriangularArray.index(begin,end))(parent) = w;
+    score(TriangularArray.index(begin,end))(parent) = sum(score(TriangularArray.index(begin,end))(parent), w);
     narrowLeft(end)(parent) = begin max narrowLeft(end)(parent);
     wideLeft(end)(parent) = begin min wideLeft(end)(parent);
     wideRight(begin)(parent) = end max wideRight(begin)(parent);
@@ -75,14 +78,10 @@ import scalanlp.util.Implicits._;
   }
 
 
+  def apply(begin: Int, end: Int, label: Int):Double = labelScore(begin,end,label);
   def labelScore(begin: Int, end: Int, label: L): Double = labelScore(begin,end,grammar.index(label));
   def labelScore(begin: Int, end: Int, label: Int): Double = {
     score(TriangularArray.index(begin, end))(label);
-  }
-
-  def dumpChart() {
-    val myScore = new TriangularArray[DoubleCounter[L]](length+1,(i:Int,j:Int)=>grammar.decode(score(TriangularArray.index(i,j))));
-    println(myScore);
   }
 
   def enterTerm(begin: Int, end: Int, label: L, w: Double): Unit = enterTerm(begin,end,grammar.index(label),w);
@@ -108,6 +107,7 @@ import scalanlp.util.Implicits._;
 
   def buildTree(start: Int, end: Int, root: Int):BinarizedTree[L] = {
     val scoreToFind = labelScore(start,end,root);
+    var closest = Double.NaN;
     for {
       split <- (start + 1) until end;
       (b,childScores) <- grammar.binaryRulesByIndexedParent(root);
@@ -118,6 +118,8 @@ import scalanlp.util.Implicits._;
         val left = buildTree(start,split,b);
         val right = buildTree(split,end,c);
         return BinaryTree(grammar.index.get(root),left,right)(Span(start,end));
+      } else if(closest.isNaN || (score - scoreToFind).abs < (scoreToFind - closest).abs) {
+        closest = score;
       }
     }
     for {
@@ -127,10 +129,44 @@ import scalanlp.util.Implicits._;
       if(score closeTo scoreToFind) {
         val child = buildTree(start,end,b);
         return UnaryTree(grammar.index.get(root),child)(Span(start,end));
+      } else if(closest.isNaN || (score - scoreToFind).abs < (scoreToFind - closest).abs) {
+        closest = score;
       }
     }
     if(start +1 == end) // lexical
-      NullaryTree(grammar.index.get(root))(Span(start,end));  
-    else error("Couldn't find a tree!");
+      NullaryTree(grammar.index.get(root))(Span(start,end));
+    else error("Couldn't find a tree!" + closest);
   }
+}
+
+
+object ParseChart {
+  def apply[L](g: Grammar[L], length: Int) = viterbi(g,length);
+
+  trait Viterbi {
+    final def zero = Double.NegativeInfinity;
+    final def sum(a: Double, b: Double) = {
+      math.max(a,b);
+    }
+  }
+  type ViterbiParseChart[L] = ParseChart[L] with Viterbi;
+  
+  trait LogProbability {
+    final def zero = Double.NegativeInfinity;
+    final def sum(a: Double, b: Double) = scalanlp.math.Numerics.logSum(a,b);
+  }
+  type LogProbabilityParseChart[L] = ParseChart[L] with LogProbability;
+
+  trait Factory[Chart[X]<:ParseChart[X]] {
+    def apply[L](g: Grammar[L], length: Int):Chart[L];
+  }
+
+  val viterbi = new Factory[ViterbiParseChart] {
+    def apply[L](g: Grammar[L], length: Int) = new ParseChart(g,length) with Viterbi;
+  }
+
+  val logProb = new Factory[LogProbabilityParseChart] {
+    def apply[L](g: Grammar[L], length: Int) = new ParseChart(g,length) with LogProbability;
+  }
+
 }
