@@ -335,7 +335,7 @@ object StateSplitting {
       if (l == root) Seq(s) else Seq( (l,state*2),(l,state*2+1));
     }
 
-    val myTrees = trees.view.map { case (tree,sent) => (tree.map { (_,0) },sent) }
+    val myTrees = trees.map { case (tree,sent) => (tree.map { (_,0) },sent) }
 
     val myRuleCounts = LogPairedDoubleCounter[(L,Int),Rule[(L,Int)]]();
     for ( (l,rule,w) <- ruleCounts.triples) rule match {
@@ -378,7 +378,7 @@ object StateSplitting {
 
   type RuleCounts[L] = LogPairedDoubleCounter[L,Rule[L]];
   type TagWordCounts[L,W] = LogPairedDoubleCounter[L,W];
-  type Treebank[L,W] = Seq[(BinarizedTree[L],Seq[W])];
+  type Treebank[L,W] = IndexedSeq[(BinarizedTree[L],Seq[W])];
   type SplitTreebank[L,W] = Seq[(BinarizedTree[Seq[L]],Seq[W])];
 
   def splitGrammar[L,W](ruleCounts: RuleCounts[L],
@@ -426,7 +426,7 @@ object StateSplittingTest extends ParserTester {
       case 1 =>
         println("Splitting Grammar");
         import StateSplitting._;
-        val (finalProd,finalLex,logProb) = splitGrammar(LogCounters.log(initialProductions),LogCounters.log(initialLex),trainTrees,"");
+        val (finalProd,finalLex,logProb) = splitGrammar(LogCounters.log(initialProductions),LogCounters.log(initialLex),trainTrees.toIndexedSeq,"");
         val grammar = new GenerativeGrammar(finalProd);
         val lex = new SimpleLexicon(LogCounters.exp(finalLex));
         val parser = new ChartParser(("",0),lex,grammar).map { (t:Tree[(String,Int)]) =>

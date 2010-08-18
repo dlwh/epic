@@ -195,7 +195,7 @@ object LogisticBitVectorTest extends ParserTester {
 
     val featurizer = factory.getFeaturizer(config, initLexicon, initProductions);
 
-    val obj = new LogisticBitVector(trainTrees,"",initLexicon,initProductions,numStates, featurizer);
+    val obj = new LogisticBitVector(trainTrees.toIndexedSeq,"",initLexicon,initProductions,numStates, featurizer);
     val iterationsPerEval = config.readIn("iterations.eval",25);
     val maxIterations = config.readIn("iterations.max",100);
     val maxMStepIterations = config.readIn("iterations.mstep.max",80);
@@ -248,7 +248,7 @@ object LBFGSBitVectorTest extends ParserTester {
 
     val featurizer = factory.getFeaturizer(config, initLexicon, initProductions);
 
-    val obj = new LogisticBitVector(trainTrees,"",initLexicon,initProductions,numStates, featurizer);
+    val obj = new LogisticBitVector(trainTrees.toIndexedSeq,"",initLexicon,initProductions,numStates, featurizer);
     val iterationsPerEval = config.readIn("iterations.eval",25);
     val maxIterations = config.readIn("iterations.max",100);
     val maxMStepIterations = config.readIn("iterations.mstep.max",80);
