@@ -46,9 +46,15 @@ object GenerativeParser {
     
   def fromTrees[W](data: Iterator[(BinarizedTree[String],Seq[W])]):ChartParser[String,W] = {
     val root = "";
-    val (lexicon,productions) = extractCounts(data);
-    new CKYParser(root,new SimpleLexicon(lexicon),new GenerativeGrammar(logNormalizeRows(productions)));
+    val (lexicon,grammar) = extractLexiconAndGrammar(data);
+    new CKYParser(root, lexicon, grammar);
   }
+
+  def extractLexiconAndGrammar[W](data: Iterator[(BinarizedTree[String],Seq[W])]):(Lexicon[String,W],GenerativeGrammar[String]) = {
+    val (lexicon,productions) = extractCounts(data);
+    (new SimpleLexicon(lexicon),new GenerativeGrammar(logNormalizeRows(productions)));
+  }
+
 
   def extractCounts[L,W](data: Iterator[(BinarizedTree[L],Seq[W])]) = {
     val lexicon = new PairedDoubleCounter[L,W]();

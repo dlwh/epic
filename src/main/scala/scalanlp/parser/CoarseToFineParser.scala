@@ -1,7 +1,8 @@
 package scalanlp.parser
 
 import scalala.tensor.counters.Counters.DoubleCounter
-import scalanlp.trees.Tree
+import scalanlp.config.Configuration
+import scalanlp.trees._
 
 import ChartParser._;
 
@@ -45,4 +46,22 @@ class CoarseToFineParser[C,F,W](coarseParser: ChartParser[C,W],
     fineParser.buildOutsideChart(inside, chartFactory,validSpan);
   }
   
+}
+
+object SimpleCoarseToFineTester extends ParserTester {
+  def trainParser(trainTrees: Seq[(BinarizedTree[String],Seq[String])],
+                  devTrees: Seq[(BinarizedTree[String],Seq[String])],
+                  config: Configuration) = {
+    def proj(label: String) =  if(label == "" ) label else "X";
+    val coarseTrees = for {
+      (tree,words) <- trainTrees
+    } yield (tree map proj, words);
+
+    val coarse = GenerativeParser.fromTrees(coarseTrees);
+
+    val (fineLexicon,fineGrammar) = GenerativeParser.extractLexiconAndGrammar(trainTrees.iterator);
+    val fine = new CoarseToFineParser(coarse, proj _, "", fineLexicon, fineGrammar);
+
+    Iterator.single(("CtF", fine));
+  }
 }
