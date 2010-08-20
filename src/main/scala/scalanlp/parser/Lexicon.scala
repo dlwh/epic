@@ -47,11 +47,15 @@ class SimpleLexicon[L,W](private val lexicon: PairedDoubleCounter[L,W]) extends 
       cWord += 1.0;
       cTagWord += lexicon(l).size.toDouble / wordCounts.size
     }
-    val pW = (1.0 + cWord) / (wordCounts.total + 1.0);
-    val pTgW = (cTagWord) / (cWord);
-    val pTag = lexicon(l).total / wordCounts.total
-    val result = log(pW * pTgW / pTag);
-    result;
+    if(cWord == 0) {
+      Double.NegativeInfinity
+    } else {
+      val pW = (1.0 + cWord) / (wordCounts.total + 1.0);
+      val pTgW = (cTagWord) / (cWord);
+      val pTag = lexicon(l).total / wordCounts.total
+      val result = log(pW * pTgW / pTag);
+      result;
+    }
   }
 
   def tags = lexicon.rows.map(_._1);
