@@ -112,7 +112,7 @@ class CKYParser[L,W](val root: L, val lexicon: Lexicon[L,W], val grammar: Gramma
     outside.enter(0,inside.length,grammar.index(root),0.0);
     for {
       begin <- 0 until length;
-      end <- length until begin
+      end <- length until begin by (-1)
     } {
       updateOutsideUnaries(outside,0,length, validSpan);
       for {
@@ -143,7 +143,7 @@ class CKYParser[L,W](val root: L, val lexicon: Lexicon[L,W], val grammar: Gramma
   }
 
   // Score is a vector of scores whose indices are nonterms or preterms
-  private def updateInsideUnaries(chart: ParseChart[L], begin:Int, end: Int, validSpan: SpanFilter) = {
+  private def updateInsideUnaries(chart: ParseChart[L], begin: Int, end: Int, validSpan: SpanFilter) = {
     var recheck = grammar.mkArray[Int];
     var check = grammar.mkArray[Int];
 
@@ -178,11 +178,7 @@ class CKYParser[L,W](val root: L, val lexicon: Lexicon[L,W], val grammar: Gramma
           val aScore = parentVector.data(j);
           j += 1
           val prob = aScore + bScore;
-          // TODO: figure out how to remove this > check to
-          // make it compatible with logProbs
-          // probably a close to is fine.
-          if(validSpan(begin,end,a) && prob > chart.labelScore(begin,end,a)) {
-            chart.enterUnary(begin,end,a,b,prob);
+          if(validSpan(begin,end,a) && chart.enterUnary(begin,end, a, b, prob)) {
             if(!set(a)) {
               set += a;
               recheck(used) = a;

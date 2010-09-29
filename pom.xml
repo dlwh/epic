@@ -31,9 +31,11 @@
         <configuration>
           <scalaVersion>${scala.version}</scalaVersion>
           <displayCmd>true</displayCmd>
+          <recompileMode>modified-only</recompileMode>
           <args>
             <arg>-deprecation</arg>
             <arg>-optimize</arg>
+            <arg>-make:transitive</arg>
           </args>
           <jvmArgs>
             <jvmArg>-Xmx1G</jvmArg>
@@ -83,6 +85,21 @@
       <groupId>org.scalanlp</groupId>
       <artifactId>scalanlp-data_${scala.version}</artifactId>
       <version>0.3.2-SNAPSHOT</version>
+    </dependency>
+    <dependency>
+      <groupId>org.scalanlp</groupId>
+      <artifactId>scalala_${scala.version}</artifactId>
+      <version>0.4.1-SNAPSHOT</version>
+    </dependency>
+    <dependency>
+      <groupId>org.scalanlp</groupId>
+      <artifactId>scalanlp-graphs_${scala.version}</artifactId>
+      <version>0.1-SNAPSHOT</version>
+    </dependency>
+    <dependency> <!-- sparse data structures with primitive types -->
+      <groupId>fastutil</groupId>
+      <artifactId>fastutil</artifactId>
+      <version>5.1.5</version>
     </dependency>
     <dependency>
       <groupId>org.scalanlp</groupId>

@@ -23,9 +23,11 @@ import scalanlp.trees.NullaryTree
 import scalanlp.trees.UnaryTree
 import scalanlp.trees.Span
 
-import scalanlp.util.Implicits._;
+import scalanlp.util.Implicits._
+import scalala.tensor.sparse.SparseVector
+import collection.mutable.BitSet;
 
- abstract class ParseChart[L](grammar: Grammar[L], val length: Int) {
+abstract class ParseChart[L](grammar: Grammar[L], val length: Int) {
 
   private val score = TriangularArray.raw(length+1, grammar.mkDenseVector(zero));
   // right most place a left constituent with label l can start and end at position i
@@ -37,15 +39,21 @@ import scalanlp.util.Implicits._;
   // right-most place a right constituent with label l--which starts at position i--can end.
   private val wideRight = Array.fill(length+1)(grammar.fillArray[Int](-1));
 
+  // requirements: sum(a,b) >= a, \forall b that might be used.
   protected def sum(a:Double,b: Double):Double
   protected def zero: Double;
 
   final def enter(begin: Int, end: Int, parent: Int, w: Double) = {
-    score(TriangularArray.index(begin,end))(parent) = sum(score(TriangularArray.index(begin,end))(parent), w);
-    narrowLeft(end)(parent) = begin max narrowLeft(end)(parent);
-    wideLeft(end)(parent) = begin min wideLeft(end)(parent);
-    wideRight(begin)(parent) = end max wideRight(begin)(parent);
-    narrowRight(begin)(parent) = end min narrowRight(begin)(parent);
+    val oldScore = score(TriangularArray.index(begin,end))(parent);
+    val newScore = sum(score(TriangularArray.index(begin,end))(parent), w);
+    if(newScore > oldScore) {
+      score(TriangularArray.index(begin,end))(parent) = newScore;
+      narrowLeft(end)(parent) = begin max narrowLeft(end)(parent);
+      wideLeft(end)(parent) = begin min wideLeft(end)(parent);
+      wideRight(begin)(parent) = end max wideRight(begin)(parent);
+      narrowRight(begin)(parent) = end min narrowRight(begin)(parent);
+    }
+    newScore > oldScore
   }
 
   /** Can a constituent with this label start here and end before end*/
@@ -89,11 +97,11 @@ import scalanlp.util.Implicits._;
     enter(begin,end,label,w);
   }
 
-  def enterUnary(begin: Int, end: Int, parent: L, child: L, w: Double): Unit = {
+  def enterUnary(begin: Int, end: Int, parent: L, child: L, w: Double):Boolean = {
     enterUnary(begin,end,grammar.index(parent),grammar.index(child),w);
   }
 
-  def enterUnary(begin: Int, end: Int, parent: Int, child: Int, w: Double): Unit = {
+  def enterUnary(begin: Int, end: Int, parent: Int, child: Int, w: Double) = {
     enter(begin,end,parent,w);
   }
 
@@ -135,7 +143,7 @@ import scalanlp.util.Implicits._;
     }
     if(start +1 == end) // lexical
       NullaryTree(grammar.index.get(root))(Span(start,end));
-    else error("Couldn't find a tree!" + closest);
+    else error("Couldn't find a tree!" + closest + " " + start + " " + end + " " + grammar.index.get(root));
   }
 }
 
@@ -150,23 +158,36 @@ object ParseChart {
     }
   }
   type ViterbiParseChart[L] = ParseChart[L] with Viterbi;
-  
+
   trait LogProbability {
     final def zero = Double.NegativeInfinity;
     final def sum(a: Double, b: Double) = scalanlp.math.Numerics.logSum(a,b);
   }
   type LogProbabilityParseChart[L] = ParseChart[L] with LogProbability;
 
+
   trait Factory[Chart[X]<:ParseChart[X]] {
     def apply[L](g: Grammar[L], length: Int):Chart[L];
+    def computeUnaryClosure[L](g: Grammar[L]):UnaryRuleClosure;
   }
 
-  val viterbi = new Factory[ViterbiParseChart] {
+
+  // concrete factories:
+  object viterbi extends Factory[ViterbiParseChart] {
     def apply[L](g: Grammar[L], length: Int) = new ParseChart(g,length) with Viterbi;
+    def computeUnaryClosure[L](grammar: Grammar[L]):UnaryRuleClosure = {
+      import scalanlp.math.Semiring.Viterbi._;
+      UnaryRuleClosure.computeClosure(grammar)
+    }
   }
 
-  val logProb = new Factory[LogProbabilityParseChart] {
+  object logProb extends Factory[LogProbabilityParseChart] {
     def apply[L](g: Grammar[L], length: Int) = new ParseChart(g,length) with LogProbability;
+    def computeUnaryClosure[L](grammar: Grammar[L]):UnaryRuleClosure = {
+      import scalanlp.math.Semiring.LogSpace._;
+      UnaryRuleClosure.computeClosure(grammar)
+    }
   }
+
 
 }

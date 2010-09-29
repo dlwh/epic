@@ -15,8 +15,6 @@ package scalanlp.parser
  limitations under the License.
 */
 
-
-
 import scalala.Scalala._;
 import scalala.tensor._;
 import scalanlp.util.Encoder;
