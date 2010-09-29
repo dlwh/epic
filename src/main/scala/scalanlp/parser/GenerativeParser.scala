@@ -39,15 +39,15 @@ import Math._;
 
 object GenerativeParser {
 
-  def fromTrees[W](data: Iterable[(BinarizedTree[String],Seq[W])]):ChartParser[String,W] = {
+  def fromTrees[W](data: Iterable[(BinarizedTree[String],Seq[W])]):ChartParser[ParseChart.ViterbiParseChart, String,W] = {
     fromTrees(data.iterator);
   }
     
     
-  def fromTrees[W](data: Iterator[(BinarizedTree[String],Seq[W])]):ChartParser[String,W] = {
+  def fromTrees[W](data: Iterator[(BinarizedTree[String],Seq[W])]):ChartParser[ParseChart.ViterbiParseChart, String,W] = {
     val root = "";
     val (lexicon,grammar) = extractLexiconAndGrammar(data);
-    new CKYParser(root, lexicon, grammar);
+    CKYParser(root, lexicon, grammar);
   }
 
   def extractLexiconAndGrammar[W](data: Iterator[(BinarizedTree[String],Seq[W])]):(Lexicon[String,W],GenerativeGrammar[String]) = {

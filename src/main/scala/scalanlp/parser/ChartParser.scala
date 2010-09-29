@@ -7,28 +7,23 @@ import scalanlp.trees.Tree
 import ChartParser._;
 import ParseChart.Factory;
 
-trait ChartParser[L,W] extends Parser[L,W] {
+trait ChartParser[Chart[X]<:ParseChart[X],L,W] extends Parser[L,W] {
   /**
    * Given a sentence s, fills a parse chart with inside scores.
    * validSpan can be used as a filter to insist that certain ones are valid.
    */
-  def buildInsideChart[Chart[X]<:ParseChart[X]](s: Seq[W], 
-                       chartFactory: Factory[Chart] = ParseChart.viterbi,
-                       validSpan: SpanFilter = defaultFilter):Chart[L];
+  def buildInsideChart(s: Seq[W], validSpan: SpanFilter = defaultFilter):Chart[L];
   /**
    * Given an inside chart, fills the passed-in outside parse chart with inside scores.
    */
-  def buildOutsideChart[Chart[X]<:ParseChart[X]](inside: ParseChart[L],
-                        chartFactory: Factory[Chart] = ParseChart.viterbi,
-                        validSpan: SpanFilter = defaultFilter):Chart[L];
+  def buildOutsideChart(inside: ParseChart[L], validSpan: SpanFilter = defaultFilter):Chart[L];
 
   def grammar: Grammar[L];
   def root: L;
 
-
   def scores(s: Seq[W]) = {
-    val chart = buildInsideChart[ParseChart.ViterbiParseChart](s,ParseChart.viterbi);
     try {
+      val chart = buildInsideChart(s);
       val bestParse = chart.buildTree(0,s.length,grammar.index(root));
       val c = DoubleCounter[Tree[L]]();
       c(bestParse) = chart.labelScore(0, s.length, root);
@@ -49,14 +44,21 @@ object ChartParser {
   type SpanFilter = (Int,Int,Int)=>Boolean;
   def defaultFilter(begin: Int, end: Int, label: Int) = true;
 
-  def apply[L,W](root: L, lexicon: Lexicon[L,W], grammar: Grammar[L]) = new CKYParser(root,lexicon,grammar);
+  def apply[Chart[X]<:ParseChart[X],L,W](root: L, lexicon: Lexicon[L,W],
+                                         grammar: Grammar[L],
+                                         chartFactory: Factory[Chart] = ParseChart.viterbi) = {
+    new CKYParser[Chart,L,W](root,lexicon,grammar,chartFactory);
+  }
 
 }
 
-class CKYParser[L,W](val root: L, val lexicon: Lexicon[L,W], val grammar: Grammar[L]) extends ChartParser[L,W] {
+class CKYParser[Chart[X]<:ParseChart[X], L,W](val root: L,
+                                              val lexicon: Lexicon[L,W],
+                                              val grammar: Grammar[L],
+                                              chartFactory: Factory[Chart] = ParseChart.viterbi)
+        extends ChartParser[Chart,L,W] {
 
-  def buildInsideChart[Chart[X]<:ParseChart[X]](s: Seq[W],
-                       chartFactory: Factory[Chart] = ParseChart.viterbi,
+  def buildInsideChart(s: Seq[W],
                        validSpan: SpanFilter = defaultFilter):Chart[L] = {
     val chart = chartFactory(grammar,s.length);
 
@@ -104,8 +106,7 @@ class CKYParser[L,W](val root: L, val lexicon: Lexicon[L,W], val grammar: Gramma
   }
 
 
-  def buildOutsideChart[Chart[X]<:ParseChart[X]](inside: ParseChart[L],
-                         chartFactory: Factory[Chart] = ParseChart.viterbi,
+  def buildOutsideChart(inside: ParseChart[L],
                          validSpan: SpanFilter = defaultFilter):Chart[L] = {
     val length = inside.length;
     val outside = chartFactory(grammar,length);
@@ -246,5 +247,11 @@ class CKYParser[L,W](val root: L, val lexicon: Lexicon[L,W], val grammar: Gramma
 
       iter += 1
     }
+  }
+}
+
+object CKYParser {
+  def apply[L,W](root: L, lexicon: Lexicon[L,W], grammar: Grammar[L]) = {
+    new CKYParser[ParseChart.ViterbiParseChart,L,W](root,lexicon,grammar,ParseChart.viterbi);
   }
 }

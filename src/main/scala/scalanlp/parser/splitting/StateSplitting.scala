@@ -419,17 +419,18 @@ object StateSplittingTest extends ParserTester {
     val (initialLex,initialProductions) = (
       GenerativeParser.extractCounts(trainTrees.iterator)
     );
+    
     Iterator.tabulate(2) {
       case 0 =>
         val grammar = new GenerativeGrammar(LogCounters.logNormalizeRows(initialProductions));
-        ("raw",new CKYParser("",new SimpleLexicon(initialLex),grammar))
+        ("raw",CKYParser("",new SimpleLexicon(initialLex),grammar))
       case 1 =>
         println("Splitting Grammar");
         import StateSplitting._;
         val (finalProd,finalLex,logProb) = splitGrammar(LogCounters.log(initialProductions),LogCounters.log(initialLex),trainTrees.toIndexedSeq,"");
         val grammar = new GenerativeGrammar(finalProd);
         val lex = new SimpleLexicon(LogCounters.exp(finalLex));
-        val parser = new CKYParser(("",0),lex,grammar).map { (t:Tree[(String,Int)]) =>
+        val parser = CKYParser(("",0),lex,grammar).map { (t:Tree[(String,Int)]) =>
           t.map(_._1);
         }
         ("split",parser);
