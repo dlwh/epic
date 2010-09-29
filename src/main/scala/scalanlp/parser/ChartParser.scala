@@ -43,6 +43,10 @@ object ChartParser {
    */
   type SpanFilter = (Int,Int,Int)=>Boolean;
   def defaultFilter(begin: Int, end: Int, label: Int) = true;
+  // optimization: use the single version of defaultFilter by default so that we can
+  // do a reference equality check and avoid the method call in the common case.
+  // Yes, this showed up in a profile.
+  val defaultFilterBoxed:SpanFilter = defaultFilter _;
 
   def apply[Chart[X]<:ParseChart[X],L,W](root: L, lexicon: Lexicon[L,W],
                                          grammar: Grammar[L],
@@ -58,15 +62,17 @@ class CKYParser[Chart[X]<:ParseChart[X], L,W](val root: L,
                                               chartFactory: Factory[Chart] = ParseChart.viterbi)
         extends ChartParser[Chart,L,W] {
 
+  private lazy val unaryClosure = chartFactory.computeUnaryClosure(grammar);
+
   def buildInsideChart(s: Seq[W],
-                       validSpan: SpanFilter = defaultFilter):Chart[L] = {
+                       validSpan: SpanFilter = defaultFilterBoxed):Chart[L] = {
     val chart = chartFactory(grammar,s.length);
 
     for{i <- 0 until s.length} {
       for ( (a,wScore) <- lexicon.tagScores(s(i))
             if !wScore.isInfinite && !wScore.isNaN) {
         assert(a != null);
-        chart.enterTerm(i,i+1,a,wScore);
+        chart.enter(i,i+1,grammar.index(a),wScore);
       }
 
       updateInsideUnaries(chart,i,i+1, validSpan);
@@ -92,9 +98,9 @@ class CKYParser[Chart[X]<:ParseChart[X], L,W](val root: L,
               val a = parentVector.index(i);
               val aScore = parentVector.data(i);
               i += 1;
-              if(validSpan(begin,end,a)) {
+              if((validSpan eq defaultFilterBoxed) || validSpan(begin,end,a)) {
                 val prob = bScore + cScore + aScore;
-                chart.enterBinary(begin,split,end,a,b,c,prob);
+                chart.enter(begin,end,a,prob);
               }
             }
           }
@@ -145,107 +151,39 @@ class CKYParser[Chart[X]<:ParseChart[X], L,W](val root: L,
 
   // Score is a vector of scores whose indices are nonterms or preterms
   private def updateInsideUnaries(chart: ParseChart[L], begin: Int, end: Int, validSpan: SpanFilter) = {
-    var recheck = grammar.mkArray[Int];
-    var check = grammar.mkArray[Int];
-
-    var used = 0;
-    for(idx <- chart.enteredLabelIndexes(begin,end)) {
-      recheck(used) = idx;
-      used += 1;
-    }
-    var old_used = used;
-
-    val set = new BitSet();
-
-    val max_iter = 5;
-    var iter = 0;
-    while(iter < max_iter) {
-      val tmp = check;
-      check = recheck;
-      recheck = tmp;
-      used = 0;
-      set.clear();
-
-      var i = 0;
-      while(i < old_used) {
-        val b = check(i);
-        i += 1;
-        val bScore = chart.labelScore(begin,end,b);
-
-        var j = 0;
-        val parentVector = grammar.unaryRulesByIndexedChild(b);
-        while(j < parentVector.used) {
-          val a = parentVector.index(j);
+    for(b <- chart.enteredLabelIndexes(begin,end)) {
+      val bScore = chart.labelScore(begin,end,b);
+      val parentVector = unaryClosure.closeFromChild(b);
+      var j = 0;
+      while(j < parentVector.used) {
+        val a = parentVector.index(j);
+        if(a != b) {
           val aScore = parentVector.data(j);
-          j += 1
           val prob = aScore + bScore;
-          if(validSpan(begin,end,a) && chart.enterUnary(begin,end, a, b, prob)) {
-            if(!set(a)) {
-              set += a;
-              recheck(used) = a;
-              used += 1;
-            }
-          }
+          if(validSpan(begin,end,a)) chart.enter(begin,end, a, prob)
         }
+        j += 1
       }
-
-      old_used = used;
-
-      iter += 1;
     }
 
   }
 
   private def updateOutsideUnaries(outside: ParseChart[L], begin: Int, end: Int, validSpan: SpanFilter) = {
-    var recheck = grammar.mkArray[Int];
-    var check = grammar.mkArray[Int];
-
-    var used = 0;
-    for(idx <- outside.enteredLabelIndexes(begin,end)) {
-      recheck(used) = idx;
-      used += 1;
-    }
-    var old_used = used;
-
-    val set = new BitSet();
-
-    val max_iter = 5;
-    var iter = 0;
-    while(iter < max_iter) {
-      val tmp = check;
-      check = recheck;
-      recheck = tmp;
-      used = 0;
-      set.clear();
-
-      var i = 0;
-      while(i < old_used) {
-        val a = check(i);
-        i += 1;
-        val aScore = outside.labelScore(begin,end,a);
-
-        var j = 0;
-        val childVector = grammar.unaryRulesByIndexedParent(a);
-        while(j < childVector.used) {
-          val b = childVector.index(j);
+    for(a <- outside.enteredLabelIndexes(begin,end)) {
+      val aScore = outside.labelScore(begin,end,a);
+      var j = 0;
+      val childVector = unaryClosure.closeFromParent(a);
+      while(j < childVector.used) {
+        val b = childVector.index(j);
+        if(a != b) {
           val bScore = childVector.data(j);
-          j += 1
           val prob = aScore + bScore;
-          // TODO: see above.
-          if(prob > outside.labelScore(begin,end,b) && validSpan(begin,end,b)) {
+          if(validSpan(begin,end,b)) {
             outside.enter(begin,end,b,prob);
-            if(!set(b)) {
-              set += b;
-              recheck(used) = b;
-              used += 1;
-            }
           }
         }
+        j += 1
       }
-
-      old_used = used;
-
-      iter += 1
     }
   }
 }
