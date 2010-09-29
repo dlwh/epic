@@ -30,14 +30,14 @@ trait Treebank {
   def testSections: Seq[String];
   def testTrees = treesFromSections(testSections);
 
-  def treesFromSection(sec: String): Seq[(Tree[String],Seq[String])];
+  def treesFromSection(sec: String): Iterator[(Tree[String],Seq[String])];
   def treesFromSections(secs: Seq[String]) = {
-    for(sec <- secs.view;
-        tree <- treesFromSection(sec).view)
+    for(sec <- secs.iterator;
+        tree <- treesFromSection(sec))
       yield tree;
   }
 
-  def trees: Seq[(Tree[String],Seq[String])] = treesFromSections(sections);
+  def trees: Iterator[(Tree[String],Seq[String])] = treesFromSections(sections);
           
 }
 
@@ -55,8 +55,8 @@ object Treebank {
     val testSections = List("22");
     def treesFromSection(sec: String) = {
       val pennReader = new PennTreeReader();
-      for(file <- new File(dir,sec).listFiles.view;
-        tree <- pennReader.readTrees(Source.fromFile(file).mkString("")).fold( x=>x, x => error("error in " + file + " " + x.toString)) view)
+      for(file <- new File(dir,sec).listFiles.iterator;
+        tree <- pennReader.readTrees(Source.fromFile(file).mkString("")).fold( x=>x, x => error("error in " + file + " " + x.toString)).iterator)
       yield tree;
     }
   }

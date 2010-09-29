@@ -79,7 +79,7 @@ object DenseTreebank {
       val (sections,testSections,trainSections,devSections) = read[Metadata](metaIn);
       metaIn.close();
 
-      def treesFromSection(sec: String): IndexedSeq[(Tree[String],Seq[String])] = {
+      def treesFromSection(sec: String): Iterator[(Tree[String],Seq[String])] = {
         val iterator = {
           val section = zipFile.getEntry("sections/"+sec);
           val sectionIn = zipFile.getInputStream(section);
@@ -95,7 +95,8 @@ object DenseTreebank {
           for( (tree,words, _ ) <- iterator) yield (tree,words);
         }
 
-        (new ArrayBuffer[(Tree[String],Seq[String])] ++= iterator);
+        iterator
+
       };
     };
   }
