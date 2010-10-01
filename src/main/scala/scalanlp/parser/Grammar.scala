@@ -53,7 +53,7 @@ trait Grammar[L] extends Encoder[L] {
    */
   def binaryRulesByIndexedLeftChild(b: Int): SparseArray[SparseVector];
 
-  /** Returns rules in lchild -> rchild -> parent form */
+  /** Returns rules in lchild -> rchild -> parent -> score form */
   def allBinaryRules:SparseArray[SparseArray[SparseVector]];
 
   /**

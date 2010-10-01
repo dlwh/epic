@@ -61,6 +61,9 @@ abstract class ParseChart[L](grammar: Grammar[L], val length: Int) {
     narrowRight(begin)(child) <= end;
   }
 
+  /**
+   * returns all the possible split points for a span over (begin,end) with left child and right child
+   */
   def feasibleSpan(begin: Int, end: Int, leftState: Int, rightState: Int): Span = {
     val narrowR = narrowRight(begin)(leftState);
     val narrowL = narrowLeft(end)(rightState);

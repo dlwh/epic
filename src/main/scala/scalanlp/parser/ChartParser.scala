@@ -20,6 +20,8 @@ trait ChartParser[Chart[X]<:ParseChart[X],L,W] extends Parser[L,W] {
 
   def grammar: Grammar[L];
   def root: L;
+  def lexicon:Lexicon[L,W];
+
 
   def scores(s: Seq[W]) = {
     try {
