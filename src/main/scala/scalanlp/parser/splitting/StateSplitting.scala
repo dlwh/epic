@@ -38,6 +38,8 @@ import scalanlp.trees.UnaryTree
 
 import math.exp
 
+import InsideOutside._;
+
 object StateSplitting {
 
   def insideScores[L,W](grammar: Grammar[L], lexicon: Lexicon[L,W], tree: BinarizedTree[Seq[L]], s: Seq[W]) = {
@@ -137,32 +139,6 @@ object StateSplitting {
     score
   }
 
-  final case class ExpectedCounts[W](
-    binaryRuleCounts: SparseArray[SparseArray[Vector]], // parent -> lchild -> rchild -> counts;
-    unaryRuleCounts: SparseArray[Vector], // parent -> child -> counts;
-    wordCounts: SparseArray[LogDoubleCounter[W]], // parent -> word -> counts;
-    var logProb: Double
-  ) {
-    def +=(c: ExpectedCounts[W]) = {
-      val ExpectedCounts(bCounts,uCounts,wCounts,tProb) = c;
-
-      for( (k1,c) <- bCounts;
-          (k2,vec) <- c) {
-        logAdd(binaryRuleCounts(k1)(k2),vec);
-      }
-
-      for( (k,vec) <- uCounts) {
-        logAdd(unaryRuleCounts(k),vec);
-      }
-
-      for( (k,vec) <- wCounts) {
-        logAdd(wordCounts(k),vec);
-      }
-
-      logProb += tProb;
-      this;
-    }
-  }
 
   def expectedCounts[L,W](grammar: Grammar[L], lexicon: Lexicon[L,W], tree: BinarizedTree[Seq[L]], s: Seq[W]) = {
     val binaryRuleCounts = grammar.fillSparseArray(grammar.fillSparseArray(grammar.mkVector(Double.NegativeInfinity)));
@@ -246,18 +222,6 @@ object StateSplitting {
     (splitRules,splitWords);
   }
 
-  def logAdd(v: Vector, v2: Vector) {
-    for( (i,w) <- v2.activeElements) {
-      v(i) = logSum(v(i),w);
-    }
-  }
-
-  def logAdd[W](v: LogDoubleCounter[W], v2: LogDoubleCounter[W]) {
-    for( (i,w) <- v2.iterator) {
-      v(i) = logSum(v(i),w);
-    }
-  }
-
   private def splitRule[L,L2,W](r: Rule[L], splitter: L=>Seq[L2]):Iterator[Rule[L2]] = r match {
     case UnaryRule(p,c) => for { pp <- splitter(p).iterator ; cc <- splitter(c).iterator} yield UnaryRule(pp,cc);
     case BinaryRule(p,l,r) => 
@@ -297,31 +261,7 @@ object StateSplitting {
     stateIterator.drop(10).dropWhile(_._4 > convergence).map { case (sR,sW,logP,_) => (sR,sW,logP) }.next
   }
 
-  def decodeRules[L](g: Grammar[L],
-                     binaryRuleCounts: SparseArray[SparseArray[Vector]],
-                     unaryRuleCounts: SparseArray[Vector]) = {
-    val ctr = LogPairedDoubleCounter[L,Rule[L]]();
 
-    for( (pIndex,arr1) <- binaryRuleCounts.iterator;
-        p = g.index.get(pIndex);
-        (lIndex,arr2) <- arr1.iterator;
-        l = g.index.get(lIndex);
-        (rIndex,v) <- arr2.activeElements;
-        r = g.index.get(rIndex)
-    ) {
-      ctr(p,BinaryRule(p,l,r)) = v;
-    }
-
-    for( (pIndex,arr1) <- unaryRuleCounts.iterator;
-        p = g.index.get(pIndex);
-        (cIndex,v) <- arr1.activeElements;
-        c = g.index.get(cIndex)
-    ) {
-      ctr(p,UnaryRule(p,c)) = v;
-    }
-
-    ctr;
-  }
 
   def splitGrammar[L,W](ruleCounts: RuleCounts[L],
                         wordCounts: TagWordCounts[L,W],
@@ -365,15 +305,6 @@ object StateSplitting {
     }
 
     splitGrammar(ruleCounts,wordCounts,trees,split _, nSplits, randomNoise, convergence);
-  }
-
-
-  def decodeWords[L,W](g: Grammar[L], wordCounts: SparseArray[LogDoubleCounter[W]]) = {
-    val ctr = LogPairedDoubleCounter[L,W]();
-    for( (i,c) <- wordCounts) {
-      ctr(g.index.get(i)) := c;
-    }
-    ctr;
   }
 
   type RuleCounts[L] = LogPairedDoubleCounter[L,Rule[L]];

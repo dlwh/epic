@@ -53,6 +53,7 @@ object LogisticBitVector {
 
 }
 
+import InsideOutside._;
 import LogisticBitVector._
 
 class LogisticBitVector[L,W](treebank: StateSplitting.Treebank[L,W],
@@ -107,8 +108,8 @@ class LogisticBitVector[L,W](treebank: StateSplitting.Treebank[L,W],
       {( _:ExpectedCounts[W]) += (_: ExpectedCounts[W])} ); 
 
     val ExpectedCounts(binaryRuleCounts,unaryRuleCounts,wordCounts,logProb) = ecounts;
-    val ruleCounts = StateSplitting.decodeRules(grammar.get, binaryRuleCounts, unaryRuleCounts);
-    val lexCounts = StateSplitting.decodeWords(grammar.get, wordCounts);
+    val ruleCounts = decodeRules(grammar.get, binaryRuleCounts, unaryRuleCounts);
+    val lexCounts = decodeWords(grammar.get, wordCounts);
 
     val eCounts = LogPairedDoubleCounter[Context,Decision]();
 

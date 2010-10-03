@@ -2,12 +2,13 @@ package scalanlp.parser
 
 import scalanlp.collection.mutable.SparseArray
 import scalala.tensor.counters.LogCounters.LogDoubleCounter
+import scalala.tensor.counters.LogCounters.LogPairedDoubleCounter
 import scalala.tensor.Vector;
-import scalala.tensor.sparse.SparseVector;
 import scalanlp.math.Numerics.logSum;
 
 import ParseChart._;
 import ChartParser._;
+import InsideOutside._;
 
 /**
  * 
@@ -23,7 +24,7 @@ class InsideOutside[L,W](parser: ChartParser[LogProbabilityParseChart,L,W]) {
   def root = parser.root;
 
 
-  def expectedCounts(words: Seq[W], validSpan:ChartParser.SpanFilter =ChartParser.defaultFilterBoxed):ExpectedCounts = {
+  def expectedCounts(words: Seq[W], validSpan:ChartParser.SpanFilter =ChartParser.defaultFilterBoxed):ExpectedCounts[W] = {
     val inside = parser.buildInsideChart(words);
     val outside = parser.buildOutsideChart(inside);
     val totalProb = inside.labelScore(0, words.length, root);
@@ -97,13 +98,21 @@ class InsideOutside[L,W](parser: ChartParser[LogProbabilityParseChart,L,W]) {
   }
 
 
-  final case class ExpectedCounts(
+
+
+  private val isTag = new collection.mutable.BitSet();
+  lexicon.tags.foreach {l => isTag += grammar.index(l)};
+}
+
+object InsideOutside {
+
+  final case class ExpectedCounts[W](
     binaryRuleCounts: SparseArray[SparseArray[Vector]], // parent -> lchild -> rchild -> counts;
     unaryRuleCounts: SparseArray[Vector], // parent -> child -> counts;
     wordCounts: SparseArray[LogDoubleCounter[W]], // parent -> word -> counts;
     var logProb: Double
   ) {
-    def +=(c: ExpectedCounts) = {
+    def +=(c: ExpectedCounts[W]) = {
       val ExpectedCounts(bCounts,uCounts,wCounts,tProb) = c;
 
       for( (k1,c) <- bCounts;
@@ -124,17 +133,48 @@ class InsideOutside[L,W](parser: ChartParser[LogProbabilityParseChart,L,W]) {
     }
   }
 
+    def decodeRules[L](g: Grammar[L],
+                     binaryRuleCounts: SparseArray[SparseArray[Vector]],
+                     unaryRuleCounts: SparseArray[Vector]) = {
+    val ctr = LogPairedDoubleCounter[L,Rule[L]]();
 
-  private val isTag = new collection.mutable.BitSet();
-  lexicon.tags.foreach {l => isTag += grammar.index(l)};
+    for( (pIndex,arr1) <- binaryRuleCounts.iterator;
+        p = g.index.get(pIndex);
+        (lIndex,arr2) <- arr1.iterator;
+        l = g.index.get(lIndex);
+        (rIndex,v) <- arr2.activeElements;
+        r = g.index.get(rIndex)
+    ) {
+      ctr(p,BinaryRule(p,l,r)) = v;
+    }
 
-  def logAdd(v: Vector, v2: Vector) {
+    for( (pIndex,arr1) <- unaryRuleCounts.iterator;
+        p = g.index.get(pIndex);
+        (cIndex,v) <- arr1.activeElements;
+        c = g.index.get(cIndex)
+    ) {
+      ctr(p,UnaryRule(p,c)) = v;
+    }
+
+    ctr;
+  }
+
+  def decodeWords[L,W](g: Grammar[L], wordCounts: SparseArray[LogDoubleCounter[W]]) = {
+    val ctr = LogPairedDoubleCounter[L,W]();
+    for( (i,c) <- wordCounts) {
+      ctr(g.index.get(i)) := c;
+    }
+    ctr;
+  }
+
+
+  private def logAdd(v: Vector, v2: Vector) {
     for( (i,w) <- v2.activeElements) {
       v(i) = logSum(v(i),w);
     }
   }
 
-  def logAdd[W](v: LogDoubleCounter[W], v2: LogDoubleCounter[W]) {
+  private def logAdd[W](v: LogDoubleCounter[W], v2: LogDoubleCounter[W]) {
     for( (i,w) <- v2.iterator) {
       v(i) = logSum(v(i),w);
     }
