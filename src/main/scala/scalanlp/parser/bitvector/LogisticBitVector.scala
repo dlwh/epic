@@ -109,7 +109,7 @@ class LogisticBitVector[L,W](treebank: StateSplitting.Treebank[L,W],
 
     val (ruleCounts,lexCounts) = ecounts.decode(grammar());
 
-    val eCounts = LogPairedDoubleCounter[Context,Decision]();
+    val eCounts = PairedDoubleCounter[Context,Decision]();
 
     for( (c,rules) <- ruleCounts.rows;
         eCtr = eCounts(c);
@@ -120,13 +120,13 @@ class LogisticBitVector[L,W](treebank: StateSplitting.Treebank[L,W],
         eCtr(UnaryRuleDecision(child,state))  = v;
     }
 
-    for( (c,words:LogDoubleCounter[W]) <- lexCounts.rows;
+    for( (c,words:DoubleCounter[W]) <- lexCounts.rows;
         eCtr = eCounts(c);
         (w:W,v) <- words )  {
       eCtr(WordDecision(w)) = v;
     }
 
-    (ecounts.logProb,LogCounters.exp(eCounts));
+    (ecounts.logProb,eCounts);
   }
 
   def extractParser(logThetas: LogPairedDoubleCounter[Context,Decision],

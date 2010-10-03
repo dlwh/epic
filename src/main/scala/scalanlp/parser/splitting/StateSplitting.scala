@@ -23,8 +23,6 @@ import scalanlp.collection.mutable.TriangularArray
 import scalanlp.config.Configuration
 import scalala.tensor.counters.Counters._;
 import scalala.tensor.counters.LogCounters;
-import scalala.tensor.counters.LogCounters.LogPairedDoubleCounter;
-import scalala.tensor.counters.LogCounters.LogDoubleCounter;
 import scalanlp.math.Numerics.logSum;
 import scalanlp.parser.ParserTester
 import scalanlp.parser._;
@@ -143,7 +141,7 @@ object StateSplitting {
   def expectedCounts[L,W](grammar: Grammar[L], lexicon: Lexicon[L,W], tree: BinarizedTree[Seq[L]], s: Seq[W]) = {
     val binaryRuleCounts = grammar.fillSparseArray(grammar.fillSparseArray(grammar.mkVector(Double.NegativeInfinity)));
     val unaryRuleCounts = grammar.fillSparseArray(grammar.mkVector(Double.NegativeInfinity));
-    val wordCounts = grammar.fillSparseArray(LogDoubleCounter[W]());
+    val wordCounts = grammar.fillSparseArray(DoubleCounter[W]());
 
     val iScores = insideScores(grammar,lexicon,tree,s);
     val oScores = outsideScores(grammar,lexicon, tree,s,iScores);
@@ -162,7 +160,7 @@ object StateSplitting {
           assert(!ruleScore.isNaN);
           assert(!ruleScore.isInfinite);
          // assert(exp(ruleScore) > 0, " " + ruleScore);
-          wordCounts(l)(s(t.span.start)) = logSum(wordCounts(l)(s(t.span.start)), ruleScore);
+          wordCounts(l)(s(t.span.start)) +=  exp(ruleScore);
         }
       case t@UnaryTree(_,child) =>
         for {
@@ -175,7 +173,7 @@ object StateSplitting {
           assert(!ruleScore.isNaN);
           assert(!ruleScore.isInfinite);
          // assert(exp(ruleScore) > 0, " " + ruleScore);
-          unaryRuleCounts(p)(c) = logSum(unaryRuleCounts(p)(c), ruleScore);
+          unaryRuleCounts(p)(c) += exp(ruleScore);
         }
       case t@ BinaryTree(_,lc,rc) =>
         for {
@@ -191,7 +189,7 @@ object StateSplitting {
           assert(!ruleScore.isNaN);
           assert(!ruleScore.isInfinite);
           //assert(exp(ruleScore) > 0, " " + ruleScore);
-          binaryRuleCounts(p)(l)(r) = logSum(binaryRuleCounts(p)(l)(r), ruleScore);
+          binaryRuleCounts(p)(l)(r) += exp(ruleScore);
         }
     }
     ExpectedCounts(binaryRuleCounts,unaryRuleCounts,wordCounts,totalProb);
@@ -199,24 +197,25 @@ object StateSplitting {
 
   def splitCounts[L,L2,W](ruleCounts: RuleCounts[L],
                            wordCounts: TagWordCounts[L,W],
-                           splitter: L=>Seq[L2], randomNoise: Double = 0.1) = {
+                           splitter: L=>Seq[L2],
+                           randomNoise: Double = 0.1):(RuleCounts[L2],TagWordCounts[L2,W]) = {
 
-    val splitRules = LogPairedDoubleCounter[L2,Rule[L2]]();
+    val splitRules = PairedDoubleCounter[L2,Rule[L2]]();
     for {
       ((_,baseR),count) <- ruleCounts;
       r <- splitRule(baseR,splitter)
     } {
-      val x = math.log(1 + 2 * randomNoise * math.random - randomNoise);
-      splitRules(r.parent,r) = count + x;
+      val x = (1 + 2 * randomNoise * math.random - randomNoise);
+      splitRules(r.parent,r) = count * x;
     }
 
-    val splitWords = LogPairedDoubleCounter[L2,W]();
+    val splitWords = PairedDoubleCounter[L2,W]();
     for {
       ((l,w),count) <- wordCounts
       r <- splitter(l)
     } {
-      val x = math.log(1 + 2 * randomNoise * math.random - randomNoise)
-      splitWords(r,w) = count + x;
+      val x = (1 + 2 * randomNoise * math.random - randomNoise);
+      splitWords(r,w) = count * x;
     }
 
     (splitRules,splitWords);
@@ -261,8 +260,6 @@ object StateSplitting {
     stateIterator.drop(10).dropWhile(_._4 > convergence).map { case (sR,sW,logP,_) => (sR,sW,logP) }.next
   }
 
-
-
   def splitGrammar[L,W](ruleCounts: RuleCounts[L],
                         wordCounts: TagWordCounts[L,W],
                         trees: Treebank[L,W],
@@ -277,7 +274,7 @@ object StateSplitting {
 
     val myTrees = trees.map { case (tree,sent) => (tree.map { (_,0) },sent) }
 
-    val myRuleCounts = LogPairedDoubleCounter[(L,Int),Rule[(L,Int)]]();
+    val myRuleCounts = PairedDoubleCounter[(L,Int),Rule[(L,Int)]]();
     for ( (l,rule,w) <- ruleCounts.triples) rule match {
       case UnaryRule(par,child) =>
         myRuleCounts( (l,0), UnaryRule( (l,0), (child,0))) = w;
@@ -285,7 +282,7 @@ object StateSplitting {
         myRuleCounts( (l,0), BinaryRule( (l,0), (lc,0), (rc,0))) = w;
     }
 
-    val myWordCounts = LogPairedDoubleCounter[(L,Int),W]();
+    val myWordCounts = PairedDoubleCounter[(L,Int),W]();
     for ( (l,word,w) <- wordCounts.triples) {
       myWordCounts( (l,0), word) = w;
     }
@@ -307,8 +304,8 @@ object StateSplitting {
     splitGrammar(ruleCounts,wordCounts,trees,split _, nSplits, randomNoise, convergence);
   }
 
-  type RuleCounts[L] = LogPairedDoubleCounter[L,Rule[L]];
-  type TagWordCounts[L,W] = LogPairedDoubleCounter[L,W];
+  type RuleCounts[L] = PairedDoubleCounter[L,Rule[L]];
+  type TagWordCounts[L,W] = PairedDoubleCounter[L,W];
   type Treebank[L,W] = IndexedSeq[(BinarizedTree[L],Seq[W])];
   type SplitTreebank[L,W] = Seq[(BinarizedTree[Seq[L]],Seq[W])];
 
@@ -348,7 +345,8 @@ object StateSplittingTest extends ParserTester {
 
     println("Extracting counts");
     val (initialLex,initialProductions) = (
-      GenerativeParser.extractCounts(trainTrees.iterator)
+      GenerativeParser.extractCounts(trainTrees.iterator
+        )
     );
     
     Iterator.tabulate(2) {
@@ -358,9 +356,9 @@ object StateSplittingTest extends ParserTester {
       case 1 =>
         println("Splitting Grammar");
         import StateSplitting._;
-        val (finalProd,finalLex,logProb) = splitGrammar(LogCounters.log(initialProductions),LogCounters.log(initialLex),trainTrees.toIndexedSeq,"");
-        val grammar = new GenerativeGrammar(finalProd);
-        val lex = new SimpleLexicon(LogCounters.exp(finalLex));
+        val (finalProd,finalLex,logProb) = splitGrammar(initialProductions,initialLex,trainTrees.toIndexedSeq,"");
+        val grammar = new GenerativeGrammar(LogCounters.logNormalizeRows(finalProd));
+        val lex = new SimpleLexicon(finalLex);
         val parser = CKYParser(("",0),lex,grammar).map { (t:Tree[(String,Int)]) =>
           t.map(_._1);
         }

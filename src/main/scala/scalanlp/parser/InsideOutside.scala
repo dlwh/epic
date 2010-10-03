@@ -1,15 +1,15 @@
 package scalanlp.parser
 
 import scalanlp.collection.mutable.SparseArray
-import scalala.tensor.counters.LogCounters.LogDoubleCounter
-import scalala.tensor.counters.LogCounters.LogPairedDoubleCounter
+import scalala.tensor.counters.Counters.DoubleCounter
+import scalala.tensor.counters.Counters.PairedDoubleCounter
 import scalala.tensor.Vector
-import scalala.tensor.counters.LogCounters;
-import scalanlp.math.Numerics.logSum;
 
 import ParseChart._;
 import ChartParser._;
 import InsideOutside._;
+
+import math.exp;
 
 /**
  * 
@@ -40,15 +40,16 @@ class InsideOutside[L,W](parser: ChartParser[LogProbabilityParseChart,L,W]) {
   private def computeWordCounts(words: scala.Seq[W],
                         inside: LogProbabilityParseChart[L],
                         outside: LogProbabilityParseChart[L],
-                        totalProb: Double): SparseArray[LogDoubleCounter[W]] = {
-    val wordCounts = grammar.fillSparseArray(LogDoubleCounter[W]());
+                        totalProb: Double): SparseArray[DoubleCounter[W]] = {
+    val wordCounts = grammar.fillSparseArray(DoubleCounter[W]());
     // handle lexical productions:
     for (i <- 0 until words.length) {
-      val w = words(i);
+      val
+      w = words(i);
       for (l <- inside.enteredLabelIndexes(i, i + 1) if isTag(l)) {
         val iScore = inside.labelScore(i, i + 1, l);
         val oScore = outside.labelScore(i, i + 1, l);
-        wordCounts(l)(w) = logSum( wordCounts(l)(w),(iScore + oScore) - totalProb);
+        wordCounts(l)(w) += exp(iScore + oScore - totalProb);
       }
     }
     wordCounts
@@ -81,7 +82,7 @@ class InsideOutside[L,W](parser: ChartParser[LogProbabilityParseChart,L,W]) {
             i += 1;
             if ((validSpan eq defaultFilterBoxed) || validSpan(begin, end, a)) {
               val prob = bScore + cScore + aScore + rScore - totalProb;
-              binaryRuleCounts(a)(b)(c) = logSum(binaryRuleCounts(a)(b)(c), prob);
+              binaryRuleCounts(a)(b)(c) += exp(prob);
             }
           }
         }
@@ -113,7 +114,7 @@ class InsideOutside[L,W](parser: ChartParser[LogProbabilityParseChart,L,W]) {
           i += 1;
           if ((validSpan eq defaultFilterBoxed) || validSpan(begin, end, a)) {
             val prob = bScore + aScore + rScore - totalProb;
-            unaryRuleCounts(a)(b) = logSum(unaryRuleCounts(a)(b), prob);
+            unaryRuleCounts(a)(b) += exp(prob);
           }
         }
       }
@@ -131,28 +132,28 @@ object InsideOutside {
   final case class ExpectedCounts[W](
     binaryRuleCounts: SparseArray[SparseArray[Vector]], // parent -> lchild -> rchild -> counts;
     unaryRuleCounts: SparseArray[Vector], // parent -> child -> counts;
-    wordCounts: SparseArray[LogDoubleCounter[W]], // parent -> word -> counts;
+    wordCounts: SparseArray[DoubleCounter[W]], // parent -> word -> counts;
     var logProb: Double
   ) {
 
     def this(g: Grammar[_]) = this(g.fillSparseArray(g.fillSparseArray(g.mkVector(Double.NegativeInfinity))),
                                    g.fillSparseArray(g.mkVector(Double.NegativeInfinity)),
-                                   g.fillSparseArray(LogDoubleCounter[W]()), 0.0);
+                                   g.fillSparseArray(DoubleCounter[W]()), 0.0);
 
     def +=(c: ExpectedCounts[W]) = {
       val ExpectedCounts(bCounts,uCounts,wCounts,tProb) = c;
 
       for( (k1,c) <- bCounts;
           (k2,vec) <- c) {
-        logAdd(binaryRuleCounts(k1)(k2),vec);
+        binaryRuleCounts(k1)(k2) += vec;
       }
 
       for( (k,vec) <- uCounts) {
-        logAdd(unaryRuleCounts(k),vec);
+        unaryRuleCounts(k) += vec;
       }
 
       for( (k,vec) <- wCounts) {
-        logAdd(wordCounts(k),vec);
+        wordCounts(k) += vec;
       }
 
       logProb += tProb;
@@ -165,7 +166,7 @@ object InsideOutside {
     def decodeRules[L](g: Grammar[L],
                      binaryRuleCounts: SparseArray[SparseArray[Vector]],
                      unaryRuleCounts: SparseArray[Vector]) = {
-    val ctr = LogPairedDoubleCounter[L,Rule[L]]();
+    val ctr = PairedDoubleCounter[L,Rule[L]]();
 
     for( (pIndex,arr1) <- binaryRuleCounts.iterator;
         p = g.index.get(pIndex);
@@ -188,8 +189,8 @@ object InsideOutside {
     ctr;
   }
 
-  def decodeWords[L,W](g: Grammar[L], wordCounts: SparseArray[LogDoubleCounter[W]]) = {
-    val ctr = LogPairedDoubleCounter[L,W]();
+  def decodeWords[L,W](g: Grammar[L], wordCounts: SparseArray[DoubleCounter[W]]) = {
+    val ctr = PairedDoubleCounter[L,W]();
     for( (i,c) <- wordCounts) {
       ctr(g.index.get(i)) := c;
     }
@@ -197,15 +198,5 @@ object InsideOutside {
   }
 
 
-  private def logAdd(v: Vector, v2: Vector) {
-    for( (i,w) <- v2.activeElements) {
-      v(i) = logSum(v(i),w);
-    }
-  }
 
-  private def logAdd[W](v: LogDoubleCounter[W], v2: LogDoubleCounter[W]) {
-    for( (i,w) <- v2.iterator) {
-      v(i) = logSum(v(i),w);
-    }
-  }
 }
