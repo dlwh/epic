@@ -25,8 +25,8 @@ class InsideOutside[L,W](parser: ChartParser[LogProbabilityParseChart,L,W]) {
   def root = parser.root;
 
   def expectedCounts(words: Seq[W], validSpan:ChartParser.SpanFilter =ChartParser.defaultFilterBoxed):ExpectedCounts[W] = {
-    val inside = parser.buildInsideChart(words);
-    val outside = parser.buildOutsideChart(inside);
+    val inside = parser.buildInsideChart(words, validSpan);
+    val outside = parser.buildOutsideChart(inside, validSpan);
     val totalProb = inside.labelScore(0, words.length, root);
 
 
@@ -48,7 +48,7 @@ class InsideOutside[L,W](parser: ChartParser[LogProbabilityParseChart,L,W]) {
       for (l <- inside.enteredLabelIndexes(i, i + 1) if isTag(l)) {
         val iScore = inside.labelScore(i, i + 1, l);
         val oScore = outside.labelScore(i, i + 1, l);
-        wordCounts(l)(w) = (iScore + oScore) - totalProb;
+        wordCounts(l)(w) = logSum( wordCounts(l)(w),(iScore + oScore) - totalProb);
       }
     }
     wordCounts
