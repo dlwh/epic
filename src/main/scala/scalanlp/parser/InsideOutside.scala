@@ -140,6 +140,8 @@ object InsideOutside {
                                    g.fillSparseArray(g.mkVector(Double.NegativeInfinity)),
                                    g.fillSparseArray(DoubleCounter[W]()), 0.0);
 
+    def decode[L](g: Grammar[L]) = (decodeRules(g,binaryRuleCounts,unaryRuleCounts),decodeWords(g,wordCounts));
+
     def +=(c: ExpectedCounts[W]) = {
       val ExpectedCounts(bCounts,uCounts,wCounts,tProb) = c;
 
@@ -160,7 +162,26 @@ object InsideOutside {
       this;
     }
 
-    def decode[L](g: Grammar[L]) = (decodeRules(g,binaryRuleCounts,unaryRuleCounts),decodeWords(g,wordCounts));
+    def -=(c: ExpectedCounts[W]) = {
+      val ExpectedCounts(bCounts,uCounts,wCounts,tProb) = c;
+
+      for( (k1,c) <- bCounts;
+          (k2,vec) <- c) {
+        binaryRuleCounts(k1)(k2) -= vec;
+      }
+
+      for( (k,vec) <- uCounts) {
+        unaryRuleCounts(k) -= vec;
+      }
+
+      for( (k,vec) <- wCounts) {
+        wordCounts(k) -= vec;
+      }
+
+      logProb -= tProb;
+      this;
+    }
+
   }
 
     def decodeRules[L](g: Grammar[L],
