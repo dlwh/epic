@@ -244,10 +244,10 @@ object StateSplitting {
         (t,s) <- trees.iterator
       } yield expectedCounts(grammar,lexicon,t,s);
 
-      val ExpectedCounts(binaryRuleCounts,unaryRuleCounts,wordCounts,logProb) = results.reduceLeft( _ += _ );
+      val accum = results.reduceLeft( _ += _ );
+      val logProb = accum.logProb;
 
-      val finalRules = decodeRules(grammar,binaryRuleCounts,unaryRuleCounts);
-      val finalWords = decodeWords(grammar,wordCounts);
+      val (finalRules,finalWords) = accum.decode(grammar);
 
       for( (k,ctr) <- finalWords.rows) {
         println(k + " " + ctr.maxk(30));

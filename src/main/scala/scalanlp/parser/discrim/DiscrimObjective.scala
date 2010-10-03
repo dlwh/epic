@@ -5,6 +5,7 @@ import scalala.tensor.dense.DenseVector
 import scalala.tensor.sparse.SparseVector
 import scalanlp.optimize.DiffFunction
 import scalanlp.trees._;
+import InsideOutside._;
 
 /**
  * 
@@ -24,7 +25,7 @@ class DiscrimObjective[L,W] extends DiffFunction[Int,DenseVector] {
     grammar;
   }
 
-  private def treeToFeatures(t: BinarizedTree[Int], words: Seq[W]):Iterator[SparseVector] = {
+  private def treeToExpectedCounts(t: BinarizedTree[Int], words: Seq[W]):Iterator[SparseVector] = {
     for(t2 <- t.allChildren)
       yield t2 match {
         case BinaryTree(a,Tree(b,_),Tree(c,_)) =>

@@ -107,9 +107,7 @@ class LogisticBitVector[L,W](treebank: StateSplitting.Treebank[L,W],
       { case (t,s) => StateSplitting.expectedCounts(grammar(),lexicon,t map split,s); },
       {( _:ExpectedCounts[W]) += (_: ExpectedCounts[W])} ); 
 
-    val ExpectedCounts(binaryRuleCounts,unaryRuleCounts,wordCounts,logProb) = ecounts;
-    val ruleCounts = decodeRules(grammar.get, binaryRuleCounts, unaryRuleCounts);
-    val lexCounts = decodeWords(grammar.get, wordCounts);
+    val (ruleCounts,lexCounts) = ecounts.decode(grammar());
 
     val eCounts = LogPairedDoubleCounter[Context,Decision]();
 
@@ -128,7 +126,7 @@ class LogisticBitVector[L,W](treebank: StateSplitting.Treebank[L,W],
       eCtr(WordDecision(w)) = v;
     }
 
-    (logProb,LogCounters.exp(eCounts));
+    (ecounts.logProb,LogCounters.exp(eCounts));
   }
 
   def extractParser(logThetas: LogPairedDoubleCounter[Context,Decision],
