@@ -56,6 +56,11 @@ trait Grammar[L] extends Encoder[L] {
   /** Returns rules in lchild -> rchild -> parent -> score form */
   def allBinaryRules:SparseArray[SparseArray[SparseVector]];
 
+  /** Returns the score of a binary rule */
+  def binaryRuleScore(a: Int, b:Int, c: Int): Double;
+  /** Returns the score of a unary rule */
+  def unaryRuleScore(a: Int, b: Int):Double
+
   /**
    * Returns a SparseArray[Vector] with LeftIndex -> RightIndex -> Score
    */
@@ -169,6 +174,9 @@ class GenerativeGrammar[L](productions: LogPairedDoubleCounter[L,Rule[L]]) exten
   def binaryRulesByIndexedLeftChild(b: Int) = indexedBinaryRulesByLeftChild(b);
 
   def binaryRulesByIndexedRightChild(c: Int): SparseArray[SparseVector] = indexedBinaryRulesByRightChild(c);
+
+  def binaryRuleScore(a: Int, b: Int, c: Int) = indexedBinaryRulesByParent(a)(b)(c);
+  def unaryRuleScore(a: Int, b: Int) = indexedUnaryRulesByParent(a)(b);
 
   /**
    * Returns pairs of the form (lchild,rchild),

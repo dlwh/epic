@@ -85,4 +85,6 @@ class FeaturizedGrammar[L,W](weights: DenseVector, features: FeatureIndexer[L,W]
 
   def binaryRulesByIndexedParent(a: Int): SparseArray[SparseVector] = indexedBinaryRulesByParent(a);
 
+  def binaryRuleScore(a: Int, b: Int, c: Int) = indexedBinaryRulesByParent(a)(b)(c);
+  def unaryRuleScore(a: Int, b: Int) = indexedUnaryRulesByParent(a)(b);
 }
