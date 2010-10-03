@@ -25,17 +25,28 @@ class DiscrimObjective[L,W] extends DiffFunction[Int,DenseVector] {
     grammar;
   }
 
-  private def treeToExpectedCounts(t: BinarizedTree[Int], words: Seq[W]):Iterator[SparseVector] = {
-    for(t2 <- t.allChildren)
-      yield t2 match {
+  // these expected counts are in normal space, not log space.
+  private def treeToExpectedCountsAndScore(g: Grammar[L],
+                                   lexicon: Lexicon[L,W],
+                                   t: BinarizedTree[Int],
+                                   words: Seq[W]):(ExpectedCounts[W],Double) = {
+    val expectedCounts = new ExpectedCounts[W](g)
+    var score = 0.0;
+    for(t2 <- t.allChildren) {
+      t2 match {
         case BinaryTree(a,Tree(b,_),Tree(c,_)) =>
-          indexedFeatures.featuresFor(a,b,c);
+          expectedCounts.binaryRuleCounts(a)(b)(c) += 1
+          score += g.binaryRuleScore(a,b,c);
         case UnaryTree(a,Tree(b,_)) =>
-          indexedFeatures.featuresFor(a,b);
+          expectedCounts.unaryRuleCounts(a)(b) += 1
+          score += g.unaryRuleScore(a,b);
         case n@NullaryTree(a) =>
           val w = words(n.span.start);
-          indexedFeatures.featuresFor(a,w);
+          expectedCounts.wordCounts(a)(w) += 1
+          score += lexicon.wordScore(g.index.get(a), w);
       }
+    }
+    (expectedCounts,score);
   }
 
 
