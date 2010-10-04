@@ -30,6 +30,12 @@ class SimpleFeaturizer[L,W] extends Featurizer[L,W] {
   def featuresFor(l: L, w: W) = aggregate(LexicalFeature(l,w) -> 1.0);
 }
 
+class SmartLexFeaturizer[L](lexicon: PairedDoubleCounter[L,String]) extends Featurizer[L,String] {
+  val wordshape = new WordShapeFeaturizer(lexicon);
+  def featuresFor(r: Rule[L]) = aggregate(RuleFeature(r) -> 1.0);
+  def featuresFor(l: L, w: String)  = wordshape.featuresFor(l,w);
+}
+
 trait FeatureIndexer[L,W] extends Encoder[Feature] {
   val index:Index[Feature];
   val labelIndex: Index[L];

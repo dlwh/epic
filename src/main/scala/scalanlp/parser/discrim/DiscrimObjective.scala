@@ -3,8 +3,10 @@ package discrim
 
 import scalala.tensor.dense.DenseVector
 import scalala.tensor.sparse.SparseVector
-import scalanlp.optimize.DiffFunction
-import scalanlp.trees._;
+import scalanlp.trees._
+import scalanlp.config.Configuration
+import scalanlp.optimize.{LBFGS, DiffFunction}
+import scalanlp.util.{ConsoleLogging, Log};
 import InsideOutside._;
 import ParseChart.LogProbabilityParseChart;
 import scalanlp.concurrent.ParallelOps._;
@@ -18,17 +20,23 @@ import scalala.tensor.counters.Counters._
  */
 class DiscrimObjective[L,W](feat: Featurizer[L,W],
                             root: L,
-                            trees: IndexedSeq[(BinarizedTree[L],Seq[W])]) extends DiffFunction[Int,DenseVector] {
-  def calculate(weights: DenseVector) = {
-
+                            trees: IndexedSeq[(BinarizedTree[L],Seq[W])],
+                            initLexicon: PairedDoubleCounter[L,W]) extends DiffFunction[Int,DenseVector] {
+  def extractParser(weights: DenseVector)= {
     val grammar = weightsToGrammar(weights);
     val lexicon = weightsToLexicon(weights);
-    val parser = new CKYParser[LogProbabilityParseChart,L,W](root,lexicon,grammar,ParseChart.logProb);
-    val ecounts = indexedTrees.par.fold(new ExpectedCounts[W](grammar)) { (counts, treewords) =>
+    val parser = new CKYParser[LogProbabilityParseChart, L, W](root, lexicon, grammar, ParseChart.logProb);
+    parser
+  }
+
+  def calculate(weights: DenseVector) = {
+
+    val parser = extractParser(weights)
+    val ecounts = indexedTrees.par.fold(new ExpectedCounts[W](parser.grammar)) { (counts, treewords) =>
       val tree = treewords._1;
       val words = treewords._2;
 
-      val treeCounts = treeToExpectedCounts(grammar,lexicon,tree,words);
+      val treeCounts = treeToExpectedCounts(parser.grammar,parser.lexicon,tree,words);
       val wordCounts = wordsToExpectedCounts(words, parser);
       counts += treeCounts -= wordCounts;
 
@@ -45,17 +53,7 @@ class DiscrimObjective[L,W](feat: Featurizer[L,W],
   val indexedTrees = for( (t,w) <- trees) yield (t.map(indexedFeatures.labelIndex),w);
 
   val openTags = Set.empty ++ {
-    val lexicon = new PairedDoubleCounter[L,W]();
-    val tags = collection.mutable.Set[L]();
-    for{
-      (tree,words) <- trees
-      leaves = tree.leaves map (l => (l,words(l.span.start)));
-      (l,w) <- leaves
-    }{
-      tags += l.label;
-      lexicon(l.label).incrementCount(w,1);
-    }
-    for( t <- tags if lexicon(t).size > 50)  yield t;
+    for( t <- initLexicon.rows.map(_._1) if initLexicon(t).size > 50)  yield t;
   }
 
   def weightsToLexicon(weights: DenseVector) = {
@@ -124,4 +122,34 @@ class DiscrimObjective[L,W](feat: Featurizer[L,W],
   }
 
 
+}
+
+
+object DiscriminativeTest extends ParserTester {
+
+  def trainParser(trainTrees: Seq[(BinarizedTree[String],Seq[String])],
+                  devTrees: Seq[(BinarizedTree[String],Seq[String])],
+                  config: Configuration) = {
+
+    val numStates = config.readIn[Int]("numBits",8);
+    val (initLexicon,initProductions) = GenerativeParser.extractCounts(trainTrees.iterator);
+
+    val featurizer =  new SmartLexFeaturizer(initLexicon);
+
+    val obj = new DiscrimObjective(featurizer, "", trainTrees.toIndexedSeq,initLexicon);
+    val iterationsPerEval = config.readIn("iterations.eval",25);
+    val maxIterations = config.readIn("iterations.max",100);
+    val maxMStepIterations = config.readIn("iterations.mstep.max",80);
+    val opt = new LBFGS[Int,DenseVector](iterationsPerEval,5) with ConsoleLogging;
+
+    val init = obj.indexedFeatures.mkDenseVector();
+
+    val log = Log.globalLog;
+    for( (state,iter) <- opt.iterations(obj,init).take(maxIterations).zipWithIndex;
+         if iter != 0 && iter % iterationsPerEval == 0) yield {
+       val parser = obj.extractParser(state.x);
+       (iter + "", parser);
+    }
+
+  }
 }
