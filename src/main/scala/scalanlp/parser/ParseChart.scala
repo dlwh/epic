@@ -29,7 +29,7 @@ import collection.mutable.BitSet;
 
 abstract class ParseChart[L](grammar: Grammar[L], val length: Int) {
 
-  private val score = TriangularArray.raw(length+1, grammar.mkDenseVector(zero));
+  private val score = TriangularArray.raw(length+1, grammar.mkSparseVector(zero));
   // right most place a left constituent with label l can start and end at position i
   private val narrowLeft = Array.fill(length+1)(grammar.fillArray[Int](-1));
   // left most place a left constituent with label l can start and end at position i
@@ -113,6 +113,11 @@ abstract class ParseChart[L](grammar: Grammar[L], val length: Int) {
   }
   final def enterBinary(begin: Int, split: Int, end: Int, parent: Int, lchild: Int, rchild: Int, w: Double): Unit = {
     enter(begin,end,parent,w);
+  }
+
+  override def toString = {
+    val data = new TriangularArray[DoubleCounter[L]](length+1, (i:Int,j:Int)=>grammar.decode(score(TriangularArray.index(i,j)))).toString;
+    "ParseChart[" + data + "]";
   }
 
 
