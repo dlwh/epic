@@ -15,7 +15,7 @@ import math.exp;
  * 
  * @author dlwh
  */
-class InsideOutside[L,W](parser: ChartParser[LogProbabilityParseChart,L,W]) {
+class InsideOutside[L,W](val parser: ChartParser[LogProbabilityParseChart,L,W]) {
   def this(root: L, g: Grammar[L], lexicon: Lexicon[L,W])  = {
     this(new CKYParser[ParseChart.LogProbabilityParseChart,L,W](root,lexicon,g,logProb));
   }
@@ -28,7 +28,6 @@ class InsideOutside[L,W](parser: ChartParser[LogProbabilityParseChart,L,W]) {
     val inside = parser.buildInsideChart(words, validSpan);
     val outside = parser.buildOutsideChart(inside, validSpan);
     val totalProb = inside.labelScore(0, words.length, root);
-
 
     val wordCounts = computeWordCounts(words, inside, outside, totalProb)
     val binaryRuleCounts = computeBinaryCounts(words, inside, outside, validSpan, totalProb)
@@ -44,8 +43,7 @@ class InsideOutside[L,W](parser: ChartParser[LogProbabilityParseChart,L,W]) {
     val wordCounts = grammar.fillSparseArray(DoubleCounter[W]());
     // handle lexical productions:
     for (i <- 0 until words.length) {
-      val
-      w = words(i);
+      val w = words(i);
       for (l <- inside.enteredLabelIndexes(i, i + 1) if isTag(l)) {
         val iScore = inside.labelScore(i, i + 1, l);
         val oScore = outside.labelScore(i, i + 1, l);
@@ -59,13 +57,13 @@ class InsideOutside[L,W](parser: ChartParser[LogProbabilityParseChart,L,W]) {
                                   inside: LogProbabilityParseChart[L],
                                   outside: LogProbabilityParseChart[L],
                                   validSpan: SpanFilter, totalProb: Double) = {
-    val binaryRuleCounts = grammar.fillSparseArray(grammar.fillSparseArray(grammar.mkVector(Double.NegativeInfinity)));
+    val binaryRuleCounts = grammar.fillSparseArray(grammar.fillSparseArray(grammar.mkVector(0.0)));
     // handle binary rules
     for{
       span <- 2 to words.length;
       begin <- 0 to (words.length - span);
       end = begin + span
-      (b, binaryRules) <- grammar.allBinaryRules;
+      (b, binaryRules) <- grammar.allBinaryRules
       if inside.canStartHere(begin, end, b);
       (c, parentVector) <- binaryRules;
       split <- inside.feasibleSpan(begin, end, b, c)
@@ -80,9 +78,10 @@ class InsideOutside[L,W](parser: ChartParser[LogProbabilityParseChart,L,W]) {
             val rScore = parentVector.data(i);
             val aScore = outside.labelScore(begin, end, a);
             i += 1;
-            if ((validSpan eq defaultFilterBoxed) || validSpan(begin, end, a)) {
+            if (!aScore.isInfinite) {
               val prob = bScore + cScore + aScore + rScore - totalProb;
               binaryRuleCounts(a)(b)(c) += exp(prob);
+              assert(binaryRuleCounts(a)(b)(c) >= exp(prob),binaryRuleCounts(a)(b)(c) + " " + exp(prob));
             }
           }
         }
@@ -96,7 +95,7 @@ class InsideOutside[L,W](parser: ChartParser[LogProbabilityParseChart,L,W]) {
                                  outside: LogProbabilityParseChart[L],
                                  validSpan: SpanFilter,
                                  totalProb: Double): SparseArray[Vector] = {
-    val unaryRuleCounts = grammar.fillSparseArray(grammar.mkVector(Double.NegativeInfinity));
+    val unaryRuleCounts = grammar.fillSparseArray(grammar.mkVector(0.0));
     for{
       span <- 1 to words.length;
       begin <- 0 to (words.length - span);
@@ -136,8 +135,8 @@ object InsideOutside {
     var logProb: Double
   ) {
 
-    def this(g: Grammar[_]) = this(g.fillSparseArray(g.fillSparseArray(g.mkVector(Double.NegativeInfinity))),
-                                   g.fillSparseArray(g.mkVector(Double.NegativeInfinity)),
+    def this(g: Grammar[_]) = this(g.fillSparseArray(g.fillSparseArray(g.mkVector(0.0))),
+                                   g.fillSparseArray(g.mkVector(0.0)),
                                    g.fillSparseArray(DoubleCounter[W]()), 0.0);
 
     def decode[L](g: Grammar[L]) = (decodeRules(g,binaryRuleCounts,unaryRuleCounts),decodeWords(g,wordCounts));
