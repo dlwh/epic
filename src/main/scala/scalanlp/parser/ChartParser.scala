@@ -64,7 +64,7 @@ class CKYParser[Chart[X]<:ParseChart[X], L,W](val root: L,
                                               chartFactory: Factory[Chart] = ParseChart.viterbi)
         extends ChartParser[Chart,L,W] {
 
-  private lazy val unaryClosure = chartFactory.computeUnaryClosure(grammar);
+  private lazy val unaryClosure: UnaryRuleClosure = chartFactory.computeUnaryClosure(grammar);
 
   def buildInsideChart(s: Seq[W],
                        validSpan: SpanFilter = defaultFilterBoxed):Chart[L] = {
@@ -115,7 +115,7 @@ class CKYParser[Chart[X]<:ParseChart[X], L,W](val root: L,
 
 
   def buildOutsideChart(inside: ParseChart[L],
-                         validSpan: SpanFilter = defaultFilter):Chart[L] = {
+                         validSpan: SpanFilter = defaultFilterBoxed):Chart[L] = {
     val length = inside.length;
     val outside = chartFactory(grammar,length);
     outside.enter(0,inside.length,grammar.index(root),0.0);
@@ -123,26 +123,24 @@ class CKYParser[Chart[X]<:ParseChart[X], L,W](val root: L,
       begin <- 0 until length;
       end <- length until begin by (-1)
     } {
-      updateOutsideUnaries(outside,0,length, validSpan);
+      updateOutsideUnaries(outside,begin,end, validSpan);
       for {
-        (b,binaryRules) <- grammar.allBinaryRules
-        (c,parents) <- binaryRules
-        (a,ruleScore) <- parents.activeElements
-        if !ruleScore.isInfinite && !outside.labelScore(begin, end, a).isInfinite
-        split <- (begin + 1) until (end-1)
-        // TODO: figure out how to use feasible spans for outside
-        //split <- inside.feasibleSpan(begin, end, b, c)
+        a <- outside.enteredLabelIndexes(begin,end);
+        (b,binaryRules) <- grammar.binaryRulesByIndexedParent(a);
+        if inside.canStartHere(begin,end,b)
+        (c,ruleScore) <- binaryRules.activeElements
+        split <- inside.feasibleSpan(begin, end, b, c)
       } {
         val aOutside = outside.labelScore(begin, end, a) + ruleScore;
         val bInside = inside.labelScore(begin,split,b);
         val cInside = inside.labelScore(split,end,c);
         if(!bInside.isInfinite && !cInside.isInfinite) {
           val bOutside = aOutside + cInside;
-          if(validSpan(begin,split,b))
+          if((validSpan eq defaultFilterBoxed) || validSpan(begin,split,b))
             outside.enter(begin,split,b,bOutside);
 
           val cOutside = aOutside + bInside;
-          if(validSpan(split,end,c))
+          if( (validSpan eq defaultFilterBoxed) || validSpan(split,end,c))
             outside.enter(split,end,c,cOutside);
         }
       }
@@ -151,7 +149,6 @@ class CKYParser[Chart[X]<:ParseChart[X], L,W](val root: L,
     outside;
   }
 
-  // Score is a vector of scores whose indices are nonterms or preterms
   private def updateInsideUnaries(chart: ParseChart[L], begin: Int, end: Int, validSpan: SpanFilter) = {
     for(b <- chart.enteredLabelIndexes(begin,end)) {
       val bScore = chart.labelScore(begin,end,b);
