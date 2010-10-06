@@ -6,19 +6,24 @@ import collection.mutable.ArrayBuffer
 import scalanlp.parser.Rule;
 
 
-sealed abstract class WordShapeFeature[+L](l: L) extends Feature;
+sealed abstract class WordShapeFeature[+L](l: L) extends Feature[L,Nothing];
 final case class IndicatorWSFeature[L](l: L, name: Symbol) extends WordShapeFeature(l);
 final case class SuffixFeature[L](l: L, str: String) extends WordShapeFeature(l);
 
 class WordShapeFeaturizer[L](lexicon: PairedDoubleCounter[L,String]) extends Featurizer[L,String] {
   val wordCounts = Counters.aggregate(for( ((_,w),count) <- lexicon.activeElements) yield (w,count));
 
-  def featuresFor(r: Rule[L]) = Counters.DoubleCounter[Feature]();
+  def initialValueForFeature(f: Feature[L,String]) = f match {
+    case LexicalFeature(l:L,w:String) => math.log(lexicon(l,w)/lexicon(l).total);
+    case _ => 0.0;
+  }
+
+  def featuresFor(r: Rule[L]) = Counters.DoubleCounter[Feature[L,String]]();
 
   def featuresFor(l: L, w: String) = {
     if(wordCounts(w) > 5) Counters.aggregate(LexicalFeature(l,w) -> 1.0);
     else {
-      val features = ArrayBuffer[Feature]();
+      val features = ArrayBuffer[Feature[L,String]]();
       features += LexicalFeature(l,w);
 
       val wlen = w.length;

@@ -129,6 +129,14 @@ class DiscrimObjective[L,W](feat: Featurizer[L,W],
     result;
   }
 
+  def initialWeightVector = {
+    val result = indexedFeatures.mkDenseVector(0.0);
+    for(f <- 0 until result.size) {
+      result(f) = indexedFeatures.initialValueFor(f);
+    }
+    result;
+  }
+
 
 }
 
@@ -139,7 +147,6 @@ object DiscriminativeTest extends ParserTester {
                   devTrees: Seq[(BinarizedTree[String],Seq[String])],
                   config: Configuration) = {
 
-    val numStates = config.readIn[Int]("numBits",8);
     val (initLexicon,initProductions) = GenerativeParser.extractCounts(trainTrees.iterator);
 
     val featurizer = new SimpleFeaturizer[String,String]();//new SmartLexFeaturizer(initLexicon);
@@ -150,8 +157,7 @@ object DiscriminativeTest extends ParserTester {
     val maxMStepIterations = config.readIn("iterations.mstep.max",80);
     val opt = new LBFGS[Int,DenseVector](iterationsPerEval,5) with ConsoleLogging;
 
-    val init = obj.indexedFeatures.mkDenseVector();
-    init -= 1; // unaries need negative weights.
+    val init = obj.initialWeightVector;
 
     val log = Log.globalLog;
     for( (state,iter) <- opt.iterations(obj,init).take(maxIterations).zipWithIndex;

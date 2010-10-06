@@ -10,34 +10,44 @@ import scalanlp.util.Encoder;
 import scalanlp.util.Index;
 
 
-trait Feature;
+trait Feature[+L,+W];
 
 /**
  * 
  * @author dlwh
  */
-trait Featurizer[-L,-W] {
-  def featuresFor(r: Rule[L]):DoubleCounter[Feature];
-  def featuresFor(l: L, w: W):DoubleCounter[Feature];
+trait Featurizer[L,W] {
+  def featuresFor(r: Rule[L]):DoubleCounter[Feature[L,W]];
+  def featuresFor(l: L, w: W):DoubleCounter[Feature[L,W]];
+
+  /** should return 0.0 if we don't care about this feature. */
+  def initialValueForFeature(f: Feature[L,W]):Double;
 }
 
 
-case class RuleFeature[L](r: Rule[L]) extends Feature;
-case class LexicalFeature[L,W](l: L, w: W) extends Feature;
+case class RuleFeature[L](r: Rule[L]) extends Feature[L,Nothing];
+case class LexicalFeature[L,W](l: L, w: W) extends Feature[L,W];
 
 class SimpleFeaturizer[L,W] extends Featurizer[L,W] {
   def featuresFor(r: Rule[L]) = aggregate(RuleFeature(r) -> 1.0);
   def featuresFor(l: L, w: W) = aggregate(LexicalFeature(l,w) -> 1.0);
+
+  def initialValueForFeature(f: Feature[L,W]) = 0.0;
 }
 
 class SmartLexFeaturizer[L](lexicon: PairedDoubleCounter[L,String]) extends Featurizer[L,String] {
   val wordshape = new WordShapeFeaturizer(lexicon);
   def featuresFor(r: Rule[L]) = aggregate(RuleFeature(r) -> 1.0);
   def featuresFor(l: L, w: String)  = wordshape.featuresFor(l,w);
+
+  def initialValueForFeature(f: Feature[L,String]) = f match {
+    case r: RuleFeature[L] => -1.0;
+    case _ => wordshape.initialValueForFeature(f);
+  }
 }
 
-trait FeatureIndexer[L,W] extends Encoder[Feature] {
-  val index:Index[Feature];
+trait FeatureIndexer[L,W] extends Encoder[Feature[L,W]] {
+  val index:Index[Feature[L,W]];
   val labelIndex: Index[L];
   val featurizer: Featurizer[L,W];
 
@@ -65,8 +75,12 @@ trait FeatureIndexer[L,W] extends Encoder[Feature] {
     else lexicalCache(a)(w);
   }
 
+  def initialValueFor(f: Feature[L,W]):Double = featurizer.initialValueForFeature(f);
+
+  def initialValueFor(f: Int):Double = initialValueFor(index.get(f));
+
   // strips out features we haven't seen before.
-  private def stripEncode(ctr: DoubleCounter[Feature]) = {
+  private def stripEncode(ctr: DoubleCounter[Feature[L,W]]) = {
     val res = mkSparseVector();
     for( (k,v) <- ctr) {
       val ind = index(k);
@@ -81,14 +95,14 @@ trait FeatureIndexer[L,W] extends Encoder[Feature] {
 object FeatureIndexer {
   def apply[L,W](f: Featurizer[L,W], trees: Iterable[(BinarizedTree[L],Seq[W])]) = {
     val labelIndex = Index[L]();
-    val featureIndex = Index[Feature]();
+    val featureIndex = Index[Feature[L,W]]();
 
     // a -> b c -> SparseVector of feature weights
-    val binaryRuleCache = new ArrayMap(new SparseArrayMap(new SparseArrayMap[DoubleCounter[Feature]](null)));
+    val binaryRuleCache = new ArrayMap(new SparseArrayMap(new SparseArrayMap[DoubleCounter[Feature[L,W]]](null)));
     // a -> b SparseVector
-    val unaryRuleCache = new ArrayMap(new SparseArrayMap[DoubleCounter[Feature]](null));
+    val unaryRuleCache = new ArrayMap(new SparseArrayMap[DoubleCounter[Feature[L,W]]](null));
     // a -> W map
-    val lexicalCache = new ArrayMap(collection.mutable.Map[W,DoubleCounter[Feature]]());
+    val lexicalCache = new ArrayMap(collection.mutable.Map[W,DoubleCounter[Feature[L,W]]]());
 
     for {
       (t,words) <- trees;
