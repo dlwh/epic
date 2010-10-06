@@ -13,6 +13,7 @@ import scalanlp.concurrent.ParallelOps._;
 import scalanlp.concurrent.ThreadLocal;
 import scalala.Scalala._;
 import scalala.tensor.counters.Counters._
+import scalanlp.util._;
 
 /**
  * 
@@ -31,22 +32,29 @@ class DiscrimObjective[L,W](feat: Featurizer[L,W],
 
   def calculate(weights: DenseVector) = {
 
-    val parser = extractParser(weights)
-    val ecounts = indexedTrees.par.fold(new ExpectedCounts[W](parser.grammar)) { (counts, treewords) =>
+    val parser = new ThreadLocal(extractParser(weights));
+    val ecounts = indexedTrees.par.fold(new ExpectedCounts[W](parser().grammar)) { (counts, treewords) =>
       val tree = treewords._1;
       val words = treewords._2;
 
-      val treeCounts = treeToExpectedCounts(parser.grammar,parser.lexicon,tree,words);
-      val wordCounts = wordsToExpectedCounts(words, parser);
-      counts += treeCounts -= wordCounts;
+      val treeCounts = treeToExpectedCounts(parser().grammar,parser().lexicon,tree,words);
+      val wordCounts = wordsToExpectedCounts(words, parser());
+      counts += treeCounts
+      counts -= wordCounts;
+
+      counts
 
     } { (ecounts1, ecounts2) =>
       ecounts1 += ecounts2
+
+      ecounts1
     }
 
-    val grad = -expectedCountsToFeatureVector(ecounts)
 
-    (ecounts.logProb, grad value);
+    val grad = -expectedCountsToFeatureVector(ecounts)
+    println((norm(grad,2), ecounts.logProb));
+
+    (-ecounts.logProb, grad value);
   }
 
   val indexedFeatures: FeatureIndexer[L,W] = FeatureIndexer(feat,trees);
@@ -134,7 +142,7 @@ object DiscriminativeTest extends ParserTester {
     val numStates = config.readIn[Int]("numBits",8);
     val (initLexicon,initProductions) = GenerativeParser.extractCounts(trainTrees.iterator);
 
-    val featurizer =  new SmartLexFeaturizer(initLexicon);
+    val featurizer = new SimpleFeaturizer[String,String]();//new SmartLexFeaturizer(initLexicon);
 
     val obj = new DiscrimObjective(featurizer, "", trainTrees.toIndexedSeq,initLexicon);
     val iterationsPerEval = config.readIn("iterations.eval",25);
@@ -143,6 +151,7 @@ object DiscriminativeTest extends ParserTester {
     val opt = new LBFGS[Int,DenseVector](iterationsPerEval,5) with ConsoleLogging;
 
     val init = obj.indexedFeatures.mkDenseVector();
+    init -= 1; // unaries need negative weights.
 
     val log = Log.globalLog;
     for( (state,iter) <- opt.iterations(obj,init).take(maxIterations).zipWithIndex;
