@@ -29,7 +29,7 @@ class InsideOutsideTest extends FunSuite with Checkers {
     assert(words("V","eats") === 1.0);
   }
 
-  test("More complex example") {
+  test("complex example") {
     val grammar = grammarForComplexExample;
     val lexicon = lexiconForComplexExample;
     val io = new InsideOutside("S",grammar,lexicon);
@@ -119,13 +119,67 @@ class InsideOutsideTest extends FunSuite with Checkers {
     'ADJP -> ('JJ,'NP) -> (1.0),
     'NP -> ('NN) -> (1.0),
     'NP -> ('JJ,'NN) -> (1.0),
-    'NP -> ('PRP) -> (1.0)
+    'NP -> ('PRP) -> (1.0),
+    'XXX -> 'PUNCT -> 1.0
    );
 
   def lexiconForComplexExample = lexicon(
     'JJ -> "good" -> (1.0),
     'NN -> "control" -> (1.0),
     'VBZ -> "has" -> (1.0),
-    'PRP -> "He" -> (1.0)
+    'PRP -> "He" -> (1.0),
+    'PUNCT -> "." -> (1.0)
   )
+
+  def grammarForMoreComplexExample = grammar(
+    'S -> ('ADJP) -> 1.0,
+    'S -> ('VP) -> 1.0,
+    'S -> ('NP) -> 1.0,
+    'S -> ('NP,'VP) -> 1.0,
+    'S -> ('S,'XS) -> 1.0,
+    'VP -> ('VBZ,'NP) -> 1.0,
+    'VP -> ('VBZ,'S) -> 1.0,
+    'VP -> ('NN) -> 1.0,
+    'VP -> ('VBZ,'ADJP) -> 1.0,
+    'ADJP -> ('JJ,'NP) -> 1.0,
+    'ADJP -> ('JJ) -> 1.0,
+    'NP -> ('NP,'VP) -> 1.0,
+    'NP -> ('NP,'NP) -> 1.0,
+    'NP -> ('NN) -> 1.0,
+    'NP -> ('NP,'XNP) -> 1.0,
+    'NP -> ('NP,'NN) -> 1.0,
+    'NP -> ('JJ) -> 1.0,
+    'NP -> ('NP,'ADJP) -> 1.0,
+    'NP -> ('JJ,'XNP) -> 1.0,
+    'NP -> ('JJ,'NN) -> 1.0,
+    'NP -> ('PRP) -> 1.0,
+    'NP -> ('ADJP,'NN) -> 1.0,
+    'XS -> ('NP,'XS) -> 1.0,
+    'XS -> ('VP,'XS) -> 1.0,
+    'XS -> ('S,'PUNCT) -> 1.0,
+    'XS -> ('VP,'PUNCT) -> 1.0,
+    'XS -> ('NP,'VP) -> 1.0,
+    'XS -> ('S,'XS) -> 1.0,
+    'ROOT -> ('S) -> 1.0,
+    'XXX -> 'YYY -> 1.0
+   );
+
+
+  test("More complex example") {
+    val grammar = grammarForMoreComplexExample;
+    val lexicon = lexiconForComplexExample;
+    val io = new InsideOutside("ROOT",grammar,lexicon);
+    val sent = "He has good control ." split " ";
+    val counts = io.expectedCounts(sent);
+    val (rules, words) = counts.decode(grammar);
+
+    assert(words("JJ","good") === 1.0);
+    assert(words("NN","control") === 1.0);
+    assert(words("VBZ","has") === 1.0);
+    assert(words("PRP","He") === 1.0);
+    assert(words("PUNCT",".") === 1.0);
+    assert(rules("ROOT",UnaryRule("ROOT","S")) === 1.0);
+    assert(rules("NP",UnaryRule("NP","PRP")) === 1.0);
+  }
 }
+

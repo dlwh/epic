@@ -40,7 +40,7 @@ abstract class ParseChart[L](grammar: Grammar[L], val length: Int) {
   private val wideRight = Array.fill(length+1)(grammar.fillArray[Int](-1));
 
   // requirements: sum(a,b) >= a, \forall b that might be used.
-  protected def sum(a:Double,b: Double):Double
+  def sum(a:Double,b: Double):Double
   protected def zero: Double;
 
   final def enter(begin: Int, end: Int, parent: Int, w: Double) = {

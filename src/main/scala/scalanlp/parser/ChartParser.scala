@@ -73,7 +73,6 @@ class CKYParser[Chart[X]<:ParseChart[X], L,W](val root: L,
     for{i <- 0 until s.length} {
       for ( (a,wScore) <- lexicon.tagScores(s(i))
             if !wScore.isInfinite && !wScore.isNaN) {
-        assert(a != null);
         chart.enter(i,i+1,grammar.index(a),wScore);
       }
 
@@ -120,16 +119,18 @@ class CKYParser[Chart[X]<:ParseChart[X], L,W](val root: L,
     val outside = chartFactory(grammar,length);
     outside.enter(0,inside.length,grammar.index(root),0.0);
     for {
-      begin <- 0 until length;
-      end <- length until begin by (-1)
+      span <- length until 0 by (-1)
+      begin <- 0 to (length-span)
     } {
+      val end = begin + span;
       updateOutsideUnaries(outside,begin,end, validSpan);
       for {
         a <- outside.enteredLabelIndexes(begin,end);
+        if !inside.labelScore(begin,end,a).isInfinite
         (b,binaryRules) <- grammar.binaryRulesByIndexedParent(a);
         if inside.canStartHere(begin,end,b)
         (c,ruleScore) <- binaryRules.activeElements
-        split <- inside.feasibleSpan(begin, end, b, c)
+        split <- (begin + 1) until end//inside.feasibleSpan(begin, end, b, c)
       } {
         val aOutside = outside.labelScore(begin, end, a) + ruleScore;
         val bInside = inside.labelScore(begin,split,b);
@@ -150,6 +151,7 @@ class CKYParser[Chart[X]<:ParseChart[X], L,W](val root: L,
   }
 
   private def updateInsideUnaries(chart: ParseChart[L], begin: Int, end: Int, validSpan: SpanFilter) = {
+    val newMass = grammar.mkVector(Double.NegativeInfinity);
     for(b <- chart.enteredLabelIndexes(begin,end)) {
       val bScore = chart.labelScore(begin,end,b);
       val parentVector = unaryClosure.closeFromChild(b);
@@ -159,15 +161,22 @@ class CKYParser[Chart[X]<:ParseChart[X], L,W](val root: L,
         if(a != b) {
           val aScore = parentVector.data(j);
           val prob = aScore + bScore;
-          if(validSpan(begin,end,a)) chart.enter(begin,end, a, prob)
+          if(validSpan(begin,end,a)) {
+            newMass(a) = chart.sum(newMass(a),prob);
+          }
         }
         j += 1
       }
     }
 
+    for((a,v) <- newMass.activeElements) {
+      chart.enter(begin,end,a, v);
+    }
+
   }
 
   private def updateOutsideUnaries(outside: ParseChart[L], begin: Int, end: Int, validSpan: SpanFilter) = {
+    val newMass = grammar.mkVector(Double.NegativeInfinity);
     for(a <- outside.enteredLabelIndexes(begin,end)) {
       val aScore = outside.labelScore(begin,end,a);
       var j = 0;
@@ -178,11 +187,15 @@ class CKYParser[Chart[X]<:ParseChart[X], L,W](val root: L,
           val bScore = childVector.data(j);
           val prob = aScore + bScore;
           if(validSpan(begin,end,b)) {
-            outside.enter(begin,end,b,prob);
+            newMass(b) = outside.sum(newMass(b),prob);
           }
         }
         j += 1
       }
+    }
+
+    for((a,v) <- newMass.activeElements) {
+      outside.enter(begin,end,a, v);
     }
   }
 }

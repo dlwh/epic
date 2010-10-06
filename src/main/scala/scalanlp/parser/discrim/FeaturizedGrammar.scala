@@ -6,9 +6,8 @@ import scalanlp.collection.mutable.SparseArray;
 import scalala.tensor.sparse._;
 import scalanlp.parser.Grammar
 
-
 /**
- * 
+ *
  * @author dlwh
  */
 class FeaturizedGrammar[L,W](weights: DenseVector, features: FeatureIndexer[L,W]) extends Grammar[L] {
@@ -79,11 +78,11 @@ class FeaturizedGrammar[L,W](weights: DenseVector, features: FeatureIndexer[L,W]
 
   def allBinaryRules = indexedBinaryRulesByLeftChild;
 
-  def binaryRulesByIndexedLeftChild(b: Int) = indexedBinaryRulesByLeftChild(b);
+  def binaryRulesByIndexedLeftChild(b: Int) = indexedBinaryRulesByLeftChild.getOrElse(b,indexedBinaryRulesByLeftChild.defaultValue);
 
   def binaryRulesByIndexedRightChild(c: Int): SparseArray[SparseVector] = indexedBinaryRulesByRightChild(c);
 
-  def binaryRulesByIndexedParent(a: Int): SparseArray[SparseVector] = indexedBinaryRulesByParent(a);
+  def binaryRulesByIndexedParent(a: Int): SparseArray[SparseVector] = indexedBinaryRulesByParent.getOrElse(a,indexedBinaryRulesByParent.defaultValue);
 
   def binaryRuleScore(a: Int, b: Int, c: Int) = indexedBinaryRulesByParent(a)(b)(c);
   def unaryRuleScore(a: Int, b: Int) = indexedUnaryRulesByParent(a)(b);
