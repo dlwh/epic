@@ -149,7 +149,8 @@ object DiscriminativeTest extends ParserTester {
 
     val (initLexicon,initProductions) = GenerativeParser.extractCounts(trainTrees.iterator);
 
-    val featurizer = new SimpleFeaturizer[String,String]();//new SmartLexFeaturizer(initLexicon);
+    val factory = config.readIn[FeaturizerFactory[String,String]]("featurizerFactory",new PlainFeaturizerFactory[String]);
+    val featurizer = factory.getFeaturizer(config, initLexicon, initProductions);
 
     val obj = new DiscrimObjective(featurizer, "", trainTrees.toIndexedSeq,initLexicon);
     val iterationsPerEval = config.readIn("iterations.eval",25);

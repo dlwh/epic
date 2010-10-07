@@ -24,26 +24,37 @@ trait Featurizer[L,W] {
   def initialValueForFeature(f: Feature[L,W]):Double;
 }
 
-
+/** A Rule feature is just an indicator on there being this rule */
 case class RuleFeature[L](r: Rule[L]) extends Feature[L,Nothing];
+/** A Lexical feature is just an indicator on there being this word */
 case class LexicalFeature[L,W](l: L, w: W) extends Feature[L,W];
 
 class SimpleFeaturizer[L,W] extends Featurizer[L,W] {
   def featuresFor(r: Rule[L]) = aggregate(RuleFeature(r) -> 1.0);
   def featuresFor(l: L, w: W) = aggregate(LexicalFeature(l,w) -> 1.0);
 
-  def initialValueForFeature(f: Feature[L,W]) = 0.0;
+  def initialValueForFeature(f: Feature[L,W]) = -1.0;
 }
 
-class SmartLexFeaturizer[L](lexicon: PairedDoubleCounter[L,String]) extends Featurizer[L,String] {
-  val wordshape = new WordShapeFeaturizer(lexicon);
-  def featuresFor(r: Rule[L]) = aggregate(RuleFeature(r) -> 1.0);
-  def featuresFor(l: L, w: String)  = wordshape.featuresFor(l,w);
+import scalala.Scalala._;
+/** Returns the sum of all features for two featurizers.  */
+class SumFeaturizer[L,W](f1: Featurizer[L,W], f2: Featurizer[L,W]) extends Featurizer[L,W] {
+  def featuresFor(r: Rule[L]) = f1.featuresFor(r) + f2.featuresFor(r) value;
+  def featuresFor(l: L, w: W)  = f1.featuresFor(l,w) + f2.featuresFor(l,w) value;
 
-  def initialValueForFeature(f: Feature[L,String]) = f match {
-    case r: RuleFeature[L] => -1.0;
-    case _ => wordshape.initialValueForFeature(f);
+  def initialValueForFeature(f: Feature[L,W]) = f1.initialValueForFeature(f) + f2.initialValueForFeature(f);
+}
+
+class RuleFeaturizer[L,W](prods: PairedDoubleCounter[L,Rule[L]]) extends Featurizer[L,W] {
+  def featuresFor(r: Rule[L]) = aggregate(RuleFeature(r) -> 1.0);
+  def featuresFor(l: L, w: W) = aggregate[Feature[L,W]]();
+
+
+  def initialValueForFeature(f: Feature[L,W]) = f match {
+    case RuleFeature(r) => math.log(prods(r.parent,r) / prods(r.parent).total);
+    case _ => 0.0;
   }
+
 }
 
 trait FeatureIndexer[L,W] extends Encoder[Feature[L,W]] {

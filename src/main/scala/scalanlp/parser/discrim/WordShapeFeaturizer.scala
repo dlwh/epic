@@ -10,6 +10,9 @@ sealed abstract class WordShapeFeature[+L](l: L) extends Feature[L,Nothing];
 final case class IndicatorWSFeature[L](l: L, name: Symbol) extends WordShapeFeature(l);
 final case class SuffixFeature[L](l: L, str: String) extends WordShapeFeature(l);
 
+/**
+ * This class generates features according to the word shapes.
+ */
 class WordShapeFeaturizer[L](lexicon: PairedDoubleCounter[L,String]) extends Featurizer[L,String] {
   val wordCounts = Counters.aggregate(for( ((_,w),count) <- lexicon.activeElements) yield (w,count));
 
