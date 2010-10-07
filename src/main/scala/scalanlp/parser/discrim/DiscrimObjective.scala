@@ -5,8 +5,8 @@ import scalala.tensor.dense.DenseVector
 import scalala.tensor.sparse.SparseVector
 import scalanlp.trees._
 import scalanlp.config.Configuration
-import scalanlp.optimize.{LBFGS, DiffFunction}
-import scalanlp.util.{ConsoleLogging, Log};
+import scalanlp.util.{ConsoleLogging, Log}
+import scalanlp.optimize.{CachedDiffFunction, LBFGS, DiffFunction};
 import InsideOutside._;
 import ParseChart.LogProbabilityParseChart;
 import scalanlp.concurrent.ParallelOps._;
@@ -170,7 +170,8 @@ object DiscriminativeTest extends ParserTester {
     val init = obj.initialWeightVector;
 
     val log = Log.globalLog;
-    for( (state,iter) <- opt.iterations(obj,init).take(maxIterations).zipWithIndex;
+    val cachedObj = new CachedDiffFunction(obj);
+    for( (state,iter) <- opt.iterations(cachedObj,init).take(maxIterations).zipWithIndex;
          if iter != 0 && iter % iterationsPerEval == 0) yield {
        val parser = obj.extractViterbiParser(state.x);
        (iter + "", parser);
