@@ -23,7 +23,16 @@ class DiscrimObjective[L,W](feat: Featurizer[L,W],
                             root: L,
                             trees: IndexedSeq[(BinarizedTree[L],Seq[W])],
                             initLexicon: PairedDoubleCounter[L,W]) extends DiffFunction[Int,DenseVector] {
-  def extractParser(weights: DenseVector)= {
+
+
+  def extractViterbiParser(weights: DenseVector) = {
+    val grammar = weightsToGrammar(weights);
+    val lexicon = weightsToLexicon(weights);
+    val parser = CKYParser(root, lexicon, grammar);
+    parser
+  }
+
+  def extractLogProbParser(weights: DenseVector)= {
     val grammar = weightsToGrammar(weights);
     val lexicon = weightsToLexicon(weights);
     val parser = new CKYParser[LogProbabilityParseChart, L, W](root, lexicon, grammar, ParseChart.logProb);
@@ -32,7 +41,7 @@ class DiscrimObjective[L,W](feat: Featurizer[L,W],
 
   def calculate(weights: DenseVector) = {
 
-    val parser = new ThreadLocal(extractParser(weights));
+    val parser = new ThreadLocal(extractLogProbParser(weights));
     val ecounts = indexedTrees.par.fold(new ExpectedCounts[W](parser().grammar)) { (counts, treewords) =>
       val tree = treewords._1;
       val words = treewords._2;
@@ -163,7 +172,7 @@ object DiscriminativeTest extends ParserTester {
     val log = Log.globalLog;
     for( (state,iter) <- opt.iterations(obj,init).take(maxIterations).zipWithIndex;
          if iter != 0 && iter % iterationsPerEval == 0) yield {
-       val parser = obj.extractParser(state.x);
+       val parser = obj.extractViterbiParser(state.x);
        (iter + "", parser);
     }
 
