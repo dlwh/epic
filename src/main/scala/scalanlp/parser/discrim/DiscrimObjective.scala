@@ -165,12 +165,14 @@ object DiscriminativeTest extends ParserTester {
     val iterationsPerEval = config.readIn("iterations.eval",25);
     val maxIterations = config.readIn("iterations.max",100);
     val maxMStepIterations = config.readIn("iterations.mstep.max",80);
+    val regularization = config.readIn("objective.regularization",0.001);
     val opt = new LBFGS[Int,DenseVector](iterationsPerEval,5) with ConsoleLogging;
 
     val init = obj.initialWeightVector;
 
     val log = Log.globalLog;
-    val cachedObj = new CachedDiffFunction(obj);
+    val reg = DiffFunction.withL2Regularization(obj, regularization);
+    val cachedObj = new CachedDiffFunction(reg);
     for( (state,iter) <- opt.iterations(cachedObj,init).take(maxIterations).zipWithIndex;
          if iter != 0 && iter % iterationsPerEval == 0) yield {
        val parser = obj.extractViterbiParser(state.x);
