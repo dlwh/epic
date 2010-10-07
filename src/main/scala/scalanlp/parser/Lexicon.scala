@@ -28,16 +28,20 @@ trait Lexicon[L,W] {
   def wordScore(label: L, w: W): Double;
   def tagScores(w: W): LogDoubleCounter[L] = scalala.tensor.counters.LogCounters.aggregate( tags.map { l => (l,wordScore(l,w))});
   def tags: Iterator[L];
+
+  def knownTagWords: Iterator[(L,W)]
 }
 
 class UnsmoothedLexicon[L,W](lexicon: LogPairedDoubleCounter[L,W]) extends Lexicon[L,W] {
   def wordScore(l: L, w: W) = lexicon(l,w);
   def tags = lexicon.rows.map(_._1);
+  def knownTagWords = lexicon.activeKeys;
 }
 
 class SimpleLexicon[L,W](private val lexicon: PairedDoubleCounter[L,W]) extends Lexicon[L,W] {
   private val wordCounts = DoubleCounter[W]();
   lexicon.rows.foreach ( wordCounts += _._2 )
+  def knownTagWords = lexicon.activeKeys;
 
 
   def wordScore(l: L, w: W) = {

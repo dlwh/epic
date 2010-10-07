@@ -38,7 +38,7 @@
             <arg>-make:transitive</arg>
           </args>
           <jvmArgs>
-            <jvmArg>-Xmx1G</jvmArg>
+            <jvmArg>-Xmx2G</jvmArg>
             <jvmArg>-Xms64m</jvmArg>
           </jvmArgs>
         </configuration>
@@ -83,7 +83,7 @@
     </dependency>
     <dependency>
       <groupId>org.scalanlp</groupId>
-      <artifactId>scalanlp-data_${scala.version}</artifactId>
+      <artifactId>scalanlp-data_2.8.1.RC1</artifactId>
       <version>0.3.2-SNAPSHOT</version>
     </dependency>
     <dependency>

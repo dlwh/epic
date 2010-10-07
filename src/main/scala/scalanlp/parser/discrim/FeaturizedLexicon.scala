@@ -15,6 +15,8 @@ class FeaturizedLexicon[L,W](val openTagSet: Set[L], val weights: DenseVector,
     tagScores(w)(label);
   }
 
+
+
   override def tagScores(w: W): LogDoubleCounter[L] = {
     if(wordScores.contains(w)) wordScores(w)
     else aggregate(openTagSet.iterator.map ( k => (k,scoreUnknown(k,w))));
@@ -38,5 +40,7 @@ class FeaturizedLexicon[L,W](val openTagSet: Set[L], val weights: DenseVector,
     wordScores(word,featureIndexer.labelIndex.get(tagIndex)) = feats dot weights;
     tagSet += featureIndexer.labelIndex.get(tagIndex);
   }
+
+  def knownTagWords = wordScores.activeKeys.map(_.swap);
 
 }

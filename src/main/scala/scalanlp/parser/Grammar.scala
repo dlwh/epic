@@ -56,6 +56,9 @@ trait Grammar[L] extends Encoder[L] {
   /** Returns rules in lchild -> rchild -> parent -> score form */
   def allBinaryRules:SparseArray[SparseArray[SparseVector]];
 
+  /** Returns rules in child -> parent -> score form */
+  def allUnaryRules:SparseArray[SparseVector];
+
   /** Returns the score of a binary rule */
   def binaryRuleScore(a: Int, b:Int, c: Int): Double;
   /** Returns the score of a unary rule */
@@ -74,6 +77,7 @@ trait Grammar[L] extends Encoder[L] {
 
 /**
  * Given a counter of productions that has been log-normalized by rows,
+ * creates a grammar. Simple simple.
  */
 class GenerativeGrammar[L](productions: LogPairedDoubleCounter[L,Rule[L]]) extends Grammar[L] {
 
@@ -104,12 +108,12 @@ class GenerativeGrammar[L](productions: LogPairedDoubleCounter[L,Rule[L]]) exten
     index
   }
 
-  private val indexedUnaryRulesByChild:Array[SparseVector] = fillArray(mkSparseVector(Double.NegativeInfinity));
+  private val indexedUnaryRulesByChild:SparseArray[SparseVector] = fillSparseArray(mkSparseVector(Double.NegativeInfinity));
   for( ((a,UnaryRule(_,b)),score) <- unaryRules) {
       indexedUnaryRulesByChild(index(b))(index(a)) = score;
   }
 
-  private val indexedUnaryRulesByParent:Array[SparseVector] = fillArray(mkSparseVector(Double.NegativeInfinity));
+  private val indexedUnaryRulesByParent:SparseArray[SparseVector] = fillSparseArray(mkSparseVector(Double.NegativeInfinity));
   for( ((a,UnaryRule(_,b)),score) <- unaryRules) {
       indexedUnaryRulesByParent(index(a))(index(b)) = score;
   }
@@ -170,6 +174,7 @@ class GenerativeGrammar[L](productions: LogPairedDoubleCounter[L,Rule[L]]) exten
   def binaryRulesByLeftChild(c: L) = leftChildBinaryRules(c).iterator;
 
   def allBinaryRules = indexedBinaryRulesByLeftChild;
+  def allUnaryRules = indexedUnaryRulesByChild;
 
   def binaryRulesByIndexedLeftChild(b: Int) = indexedBinaryRulesByLeftChild(b);
 

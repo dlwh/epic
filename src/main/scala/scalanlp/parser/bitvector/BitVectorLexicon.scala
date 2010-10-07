@@ -23,7 +23,10 @@ class BitVectorLexicon[L,W](featurizer: Featurizer[L,W],
     println(label,w,score);
     score;
   }
-  
+
+
+  def knownTagWords = precomputedScores.activeKeys.map(_.swap);
+
   override def tagScores(w: W): LogDoubleCounter[(L,Int)] = {
     val scores = if(precomputedScores(w).size > 0) precomputedScores(w);
     else LogCounters.aggregate(tags.map { l => (l,scoreUnknown(l,w))}.filterNot(_._2.isInfinite));

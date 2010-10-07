@@ -104,6 +104,66 @@ trait FeatureIndexer[L,W] extends Encoder[Feature[L,W]] {
 }
 
 object FeatureIndexer {
+
+  def apply[L,L2,W](f: Featurizer[L2,W], rawGrammar: Grammar[L], lex: Lexicon[L,W], split: L=>Seq[L2]) = {
+    val featureIndex = Index[Feature[L2,W]]();
+    val splitLabelIndex = Index[L2]();
+
+    // a -> b c -> SparseVector of feature weights
+    val binaryRuleCache = new ArrayMap(new SparseArrayMap(new SparseArrayMap[DoubleCounter[Feature[L2,W]]](null)));
+    // a -> b SparseVector
+    val unaryRuleCache = new ArrayMap(new SparseArrayMap[DoubleCounter[Feature[L2,W]]](null));
+    // a -> W map
+    val lexicalCache = new ArrayMap(collection.mutable.Map[W,DoubleCounter[Feature[L2,W]]]());
+
+    // binaries
+    for{
+      (b,binaryRules) <- rawGrammar.allBinaryRules;
+      (c,parents) <- binaryRules;
+      a <- parents.activeKeys;
+      bSplit <- split(rawGrammar.index.get(b));
+      val bI = splitLabelIndex.index(bSplit)
+      cSplit <- split(rawGrammar.index.get(c));
+      val cI = splitLabelIndex.index(cSplit)
+      aSplit <- split(rawGrammar.index.get(a))
+    } {
+      val aI = splitLabelIndex.index(aSplit)
+      val binaryRule = BinaryRule(aSplit,bSplit,cSplit);
+      val feats = f.featuresFor(binaryRule);
+      binaryRuleCache(aI)(bI)(cI) = feats;
+      feats.keysIterator.foreach {featureIndex.index _ };
+    }
+
+
+    // unaries
+    for{
+      (b,parents) <- rawGrammar.allUnaryRules;
+      a <- parents.activeKeys;
+      bSplit <- split(rawGrammar.index.get(b));
+      val bI = splitLabelIndex.index(bSplit)
+      aSplit <- split(rawGrammar.index.get(a))
+    } {
+      val aI = splitLabelIndex.index(aSplit)
+      val binaryRule = UnaryRule(aSplit,bSplit);
+      val feats = f.featuresFor(binaryRule);
+      unaryRuleCache(aI)(bI) = feats;
+      feats.keysIterator.foreach {featureIndex.index _ };
+    }
+
+    // lex
+    for{
+      (l,w) <- lex.knownTagWords
+      lSplit <- split(l)
+    } {
+      val lI = splitLabelIndex.index(lSplit)
+      val feats = f.featuresFor(lSplit,w);
+      lexicalCache(lI)(w) = feats;
+      feats.keysIterator.foreach {featureIndex.index _ };
+    }
+
+    cachedFeaturesToIndexedFeatures[L2,W](f,splitLabelIndex,featureIndex,binaryRuleCache,unaryRuleCache,lexicalCache)
+  }
+
   def apply[L,W](f: Featurizer[L,W], trees: Iterable[(BinarizedTree[L],Seq[W])]) = {
     val labelIndex = Index[L]();
     val featureIndex = Index[Feature[L,W]]();
@@ -149,42 +209,49 @@ object FeatureIndexer {
       }
 
     }
-    val lI = labelIndex;
-    val featureEncoder = Encoder.fromIndex(featureIndex);
-    val brc =  Array.tabulate(lI.size){ a =>
-      val bArray = new SparseArray(lI.size, new SparseArray[SparseVector](lI.size, null));
-      for((b,cArrayMap) <- binaryRuleCache(a)) {
-        for( (c,ctr) <- cArrayMap) {
-           bArray(b)(c) = featureEncoder.encodeSparse(ctr);
-        }
-      }
-      bArray;
-    };
 
-    val urc = Array.tabulate(lI.size){ a =>
-      val bArray =  new SparseArray[SparseVector](lI.size, null);
-      for( (b,ctr) <- unaryRuleCache(a))
-         bArray(b) = featureEncoder.encodeSparse(ctr);
-      bArray;
-    }
-
-    val lrc = Array.tabulate(lI.size){ (a) =>
-      lexicalCache(a).mapValues(featureEncoder.encodeSparse _).toMap;
-    }
-    new FeatureIndexer[L,W] {
-      val index = featureIndex;
-      val labelIndex = lI;
-      val featurizer = f;
-
-      // a -> b c -> SparseVector of feature weights
-      val binaryRuleCache: Array[SparseArray[SparseArray[SparseVector]]] = brc;
-      // a -> b SparseVector
-      val unaryRuleCache: Array[SparseArray[SparseVector]] = urc
-      // a -> W map
-      val lexicalCache: Array[Map[W,SparseVector]] = lrc;
-
-    }
+    cachedFeaturesToIndexedFeatures[L,W](f, labelIndex,featureIndex,binaryRuleCache,unaryRuleCache,lexicalCache)
   }
+
+  private def cachedFeaturesToIndexedFeatures[L,W](f: Featurizer[L,W], lI: Index[L], featureIndex: Index[Feature[L,W]],
+                                        binaryRuleCache: ArrayMap[SparseArrayMap[SparseArrayMap[DoubleCounter[Feature[L,W]]]]],
+                                        unaryRuleCache: ArrayMap[SparseArrayMap[DoubleCounter[Feature[L,W]]]],
+                                        lexicalCache: ArrayMap[collection.mutable.Map[W,DoubleCounter[Feature[L,W]]]]) = {
+      val featureEncoder = Encoder.fromIndex(featureIndex);
+      val brc =  Array.tabulate(lI.size){ a =>
+        val bArray = new SparseArray(lI.size, new SparseArray[SparseVector](lI.size, null));
+        for((b,cArrayMap) <- binaryRuleCache(a)) {
+          for( (c,ctr) <- cArrayMap) {
+            bArray(b)(c) = featureEncoder.encodeSparse(ctr);
+          }
+        }
+        bArray;
+      };
+
+      val urc = Array.tabulate(lI.size){ a =>
+        val bArray =  new SparseArray[SparseVector](lI.size, null);
+        for( (b,ctr) <- unaryRuleCache(a))
+          bArray(b) = featureEncoder.encodeSparse(ctr);
+        bArray;
+      }
+
+      val lrc = Array.tabulate(lI.size){ (a) =>
+        lexicalCache(a).mapValues(featureEncoder.encodeSparse _).toMap;
+      }
+      new FeatureIndexer[L,W] {
+        val index = featureIndex;
+        val labelIndex = lI;
+        val featurizer = f;
+
+        // a -> b c -> SparseVector of feature weights
+        val binaryRuleCache: Array[SparseArray[SparseArray[SparseVector]]] = brc;
+        // a -> b SparseVector
+        val unaryRuleCache: Array[SparseArray[SparseVector]] = urc
+        // a -> W map
+        val lexicalCache: Array[Map[W,SparseVector]] = lrc;
+
+      }
+    }
 
 }
 

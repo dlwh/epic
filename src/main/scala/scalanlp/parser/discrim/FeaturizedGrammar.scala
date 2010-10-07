@@ -13,8 +13,8 @@ import scalanlp.parser.Grammar
 class FeaturizedGrammar[L,W](weights: DenseVector, features: FeatureIndexer[L,W]) extends Grammar[L] {
   override val index = features.labelIndex;
 
-  private val indexedUnaryRulesByChild:Array[SparseVector] = fillArray(mkSparseVector(Double.NegativeInfinity));
-  private val indexedUnaryRulesByParent:Array[SparseVector] = fillArray(mkSparseVector(Double.NegativeInfinity));
+  private val indexedUnaryRulesByChild = fillSparseArray(mkSparseVector(Double.NegativeInfinity));
+  private val indexedUnaryRulesByParent = fillSparseArray(mkSparseVector(Double.NegativeInfinity));
   for( (bRules,a) <- features.unaryRuleCache.iterator.zipWithIndex; (b,f) <- bRules) {
     val score = f dot weights;
     indexedUnaryRulesByChild(b)(a) = score;
@@ -77,6 +77,7 @@ class FeaturizedGrammar[L,W](weights: DenseVector, features: FeatureIndexer[L,W]
   }
 
   def allBinaryRules = indexedBinaryRulesByLeftChild;
+  def allUnaryRules = indexedUnaryRulesByChild;
 
   def binaryRulesByIndexedLeftChild(b: Int) = indexedBinaryRulesByLeftChild.getOrElse(b,indexedBinaryRulesByLeftChild.defaultValue);
 

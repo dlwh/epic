@@ -334,9 +334,7 @@ object StateSplitting {
     (finalCounts,finalWords,logProb);
   }
 
-
 }
-
 
 object StateSplittingTest extends ParserTester {
   def trainParser(trainTrees: Seq[(BinarizedTree[String],Seq[String])],
