@@ -34,10 +34,10 @@ trait LatentFeaturizerFactory {
 }
 
 class BitVectorFeaturizerFactory extends LatentFeaturizerFactory {
-  def getFeaturizer[L,W](base: Featurizer[L,W], numStates: Int) = new BitVectorFeaturizer(base,numStates);
+  def getFeaturizer[L,W](base: Featurizer[L,W], numStates: Int) = new BitVectorFeaturizer(new CachingFeaturizer(base),numStates);
 }
 
 class SlavLatentFeaturizerFactory extends LatentFeaturizerFactory {
-  def getFeaturizer[L,W](base: Featurizer[L,W], numStates: Int) = new SlavFeaturizer(base,numStates);
+  def getFeaturizer[L,W](base: Featurizer[L,W], numStates: Int) = new SlavFeaturizer(new CachingFeaturizer(base),numStates);
 }
 

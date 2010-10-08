@@ -41,7 +41,6 @@ case class SequenceFeature[L,W](f: Seq[Feature[L,W]]) extends Feature[L,W] with 
 case class PairFeature[L,W](f: Feature[L,W], f2: Feature[L,W]) extends Feature[(L,Int),W] with CachedHashCode;
 
 
-
 class SimpleFeaturizer[L,W] extends Featurizer[L,W] {
   def featuresFor(r: Rule[L]) = aggregate(RuleFeature(r) -> 1.0);
   def featuresFor(l: L, w: W) = aggregate(LexicalFeature(l,w) -> 1.0);
@@ -52,7 +51,13 @@ class SimpleFeaturizer[L,W] extends Featurizer[L,W] {
 import scalala.Scalala._;
 /** Returns the sum of all features for two featurizers.  */
 class SumFeaturizer[L,W](f1: Featurizer[L,W], f2: Featurizer[L,W]) extends Featurizer[L,W] {
-  def featuresFor(r: Rule[L]) = f1.featuresFor(r) + f2.featuresFor(r) value;
+  def featuresFor(r: Rule[L]) = {
+    val r1 = f1.featuresFor(r)
+    val r2 = f2.featuresFor(r);
+    if(r1.isEmpty) r2
+    else if(r2.isEmpty) r1
+    else  r1 + r2 value;
+  }
   def featuresFor(l: L, w: W)  = f1.featuresFor(l,w) + f2.featuresFor(l,w) value;
 
   def initialValueForFeature(f: Feature[L,W]) = f1.initialValueForFeature(f) + f2.initialValueForFeature(f);
@@ -70,10 +75,36 @@ class RuleFeaturizer[L,W](prods: PairedDoubleCounter[L,Rule[L]]) extends Featuri
 
 }
 
+class CachingFeaturizer[L,W](f: Featurizer[L,W]) extends Featurizer[L,W] {
+  var lastRule: Rule[L] = null;
+  var lastPair: (L,W) = null;
+  var lastRCtr : DoubleCounter[Feature[L,W]] = _;
+  var lastLCtr : DoubleCounter[Feature[L,W]] = _;
+
+  def featuresFor(r: Rule[L]) = {
+    if(r != lastRule) {
+      lastRCtr = f.featuresFor(r);
+      lastRule = r;
+    }
+    lastRCtr
+  }
+  def featuresFor(l: L, w: W) = {
+    if((l,w) != lastPair) {
+      lastLCtr = f.featuresFor(l,w);
+      lastPair = (l,w);
+    }
+    lastLCtr
+  }
+
+  def initialValueForFeature(feat: Feature[L,W]) = f.initialValueForFeature(feat);
+
+}
+
 
 class SlavFeaturizer[L,W](base: Featurizer[L,W], numStates:Int) extends Featurizer[(L,Int),W] {
   def featuresFor(r: Rule[(L,Int)]) = r match {
     case BinaryRule(a,b,c) =>
+      println(r);
       val result = DoubleCounter[Feature[(L,Int),W]]();
       val baseFeatures = base.featuresFor(BinaryRule(a._1,b._1,c._1));
       val substates = ArrayBuffer(a._2, b._2, c._2);
@@ -82,6 +113,7 @@ class SlavFeaturizer[L,W](base: Featurizer[L,W], numStates:Int) extends Featuriz
       }
       result;
     case UnaryRule(a,b) =>
+      println(r);
       val result = DoubleCounter[Feature[(L,Int),W]]();
       val baseFeatures = base.featuresFor(UnaryRule(a._1,b._1));
       val substates = ArrayBuffer(a._2,b._2);
