@@ -202,9 +202,11 @@ class BitVectorFeaturizer[L,W](base: Featurizer[L,W], numStates: Int, arity: Int
   }
 
   def initialValueForFeature(f: Feature[(L,Int),W]) = f match {
-    case PairFeature(baseF, _:SequenceFeature[_,_]) =>
+    case PairFeature(baseF, SequenceFeature(Seq())) =>
       val baseScore = base.initialValueForFeature(baseF);
-      baseScore + math.log(0.9 + math.random * 0.2);
+      baseScore
+    case _ : PairFeature[_,_] =>
+      math.log(0.9 + math.random * 0.2);
     case _ => 0.0;
   }
 
