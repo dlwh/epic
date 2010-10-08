@@ -62,19 +62,12 @@ object StateSplitting {
           a <- t.label
         } {
           val ruleScore = rules(a) + spanScore(c);
-          if(ruleScore.isInfinite) {
-            println(tree render s);
-            println(t render s);
-            assert(!ruleScore.isInfinite,rules(a) + " " + spanScore(c));
-          }
           spanScore(a) = logSum(spanScore(a), ruleScore);
-          assert(!spanScore(a).isInfinite);
         }
       case t@BinaryTree(_,lchild,rchild) =>
         val spanScore = score(t.span.start,t.span.end);
         val begin = t.span.start;
         val split = t.leftChild.span.end;
-        assert(split == rchild.span.start);
         val end = t.span.end;
         for {
           a <- t.label
@@ -89,7 +82,6 @@ object StateSplitting {
             }
           };
           spanScore(a) = logSum(arr);
-          assert(!spanScore(a).isInfinite);
        }
       case _ => error("bad tree!");
     }
@@ -116,7 +108,6 @@ object StateSplitting {
           rScore = insideScores(rchild.span.start,rchild.span.end)(r)
         } {
           val rS = lRules(r)(p);
-          assert(!rS.isInfinite);
           score(lchild.span.start,lchild.span.end)(l) = logSum(score(lchild.span.start,lchild.span.end)(l),pScore + rScore + rS);
           score(rchild.span.start,rchild.span.end)(r) = logSum(score(rchild.span.start,rchild.span.end)(r),pScore + lScore + rS);
         }
@@ -128,7 +119,6 @@ object StateSplitting {
           c <- child.label
         } {
           val rScore = grammar.unaryRulesByIndexedChild(c)(p)
-          assert(!rScore.isInfinite)
           score(child.span.start,child.span.end)(c) = logSum(score(child.span.start,child.span.end)(c),pScore + rScore);
         }
 
@@ -139,8 +129,8 @@ object StateSplitting {
 
 
   def expectedCounts[L,W](grammar: Grammar[L], lexicon: Lexicon[L,W], tree: BinarizedTree[Seq[L]], s: Seq[W]) = {
-    val binaryRuleCounts = grammar.fillSparseArray(grammar.fillSparseArray(grammar.mkVector(Double.NegativeInfinity)));
-    val unaryRuleCounts = grammar.fillSparseArray(grammar.mkVector(Double.NegativeInfinity));
+    val binaryRuleCounts = grammar.fillSparseArray(grammar.fillSparseArray(grammar.mkVector(0.0)));
+    val unaryRuleCounts = grammar.fillSparseArray(grammar.mkVector(0.0));
     val wordCounts = grammar.fillSparseArray(DoubleCounter[W]());
 
     val iScores = insideScores(grammar,lexicon,tree,s);
@@ -158,7 +148,6 @@ object StateSplitting {
           val oS = oScores(t.span.start,t.span.end)(l);
           val ruleScore = (iS + oS - totalProb);
           assert(!ruleScore.isNaN);
-          assert(!ruleScore.isInfinite);
          // assert(exp(ruleScore) > 0, " " + ruleScore);
           wordCounts(l)(s(t.span.start)) +=  exp(ruleScore);
         }
@@ -171,7 +160,6 @@ object StateSplitting {
         } {
           val ruleScore = opScore + icScore + grammar.unaryRulesByIndexedChild(c)(p) - totalProb;
           assert(!ruleScore.isNaN);
-          assert(!ruleScore.isInfinite);
          // assert(exp(ruleScore) > 0, " " + ruleScore);
           unaryRuleCounts(p)(c) += exp(ruleScore);
         }
@@ -187,7 +175,6 @@ object StateSplitting {
           val irScore = iScores(rc.span.start,rc.span.end)(r)
           val ruleScore = opScore + irScore + ilScore + lRules(r)(p) - totalProb;
           assert(!ruleScore.isNaN);
-          assert(!ruleScore.isInfinite);
           //assert(exp(ruleScore) > 0, " " + ruleScore);
           binaryRuleCounts(p)(l)(r) += exp(ruleScore);
         }
