@@ -130,19 +130,21 @@ class CKYParser[Chart[X]<:ParseChart[X], L,W](val root: L,
         (b,binaryRules) <- grammar.binaryRulesByIndexedParent(a);
         if inside.canStartHere(begin,end,b)
         (c,ruleScore) <- binaryRules.activeElements
-        split <- (begin + 1) until end//inside.feasibleSpan(begin, end, b, c)
+        split <- inside.feasibleSpan(begin, end, b, c)
       } {
         val aOutside = outside.labelScore(begin, end, a) + ruleScore;
         val bInside = inside.labelScore(begin,split,b);
-        val cInside = inside.labelScore(split,end,c);
-        if(!bInside.isInfinite && !cInside.isInfinite) {
-          val bOutside = aOutside + cInside;
-          if((validSpan eq defaultFilterBoxed) || validSpan(begin,split,b))
-            outside.enter(begin,split,b,bOutside);
+        if(!java.lang.Double.isInfinite(bInside)) {
+          val cInside = inside.labelScore(split,end,c);
+          if(!java.lang.Double.isInfinite(cInside)) {
+            val bOutside = aOutside + cInside;
+            if((validSpan eq defaultFilterBoxed) || validSpan(begin,split,b))
+              outside.enter(begin,split,b,bOutside);
 
-          val cOutside = aOutside + bInside;
-          if( (validSpan eq defaultFilterBoxed) || validSpan(split,end,c))
-            outside.enter(split,end,c,cOutside);
+            val cOutside = aOutside + bInside;
+            if( (validSpan eq defaultFilterBoxed) || validSpan(split,end,c))
+              outside.enter(split,end,c,cOutside);
+          }
         }
       }
     }
