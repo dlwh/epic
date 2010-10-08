@@ -29,7 +29,10 @@ import collection.mutable.BitSet;
 
 abstract class ParseChart[L](grammar: Grammar[L], val length: Int) {
 
-  private val score = TriangularArray.raw(length+1, grammar.mkSparseVector(zero));
+  private val score = TriangularArray.raw(length+1, grammar.mkDenseVector(zero));
+  // which labels have been entered.
+  private val enteredLabels = TriangularArray.raw(length+1,new collection.mutable.BitSet());
+
   // right most place a left constituent with label l can start and end at position i
   private val narrowLeft = Array.fill(length+1)(grammar.fillArray[Int](-1));
   // left most place a left constituent with label l can start and end at position i
@@ -46,6 +49,8 @@ abstract class ParseChart[L](grammar: Grammar[L], val length: Int) {
   final def enter(begin: Int, end: Int, parent: Int, w: Double) = {
     val oldScore = score(TriangularArray.index(begin,end))(parent);
     val newScore = sum(score(TriangularArray.index(begin,end))(parent), w);
+    enteredLabels(TriangularArray.index(begin,end))(parent) = true;
+
     if(newScore > oldScore) {
       score(TriangularArray.index(begin,end))(parent) = newScore;
       narrowLeft(end)(parent) = begin max narrowLeft(end)(parent);
@@ -81,11 +86,12 @@ abstract class ParseChart[L](grammar: Grammar[L], val length: Int) {
   private val emptySpan = Span(length+1,length+1)
 
   def enteredLabelIndexes(begin: Int, end: Int) = {
-    score(TriangularArray.index(begin, end)).activeDomain.iterator
+    enteredLabels(TriangularArray.index(begin,end)).iterator;
   }
 
   def enteredLabelScores(begin: Int, end: Int) = {
-    score(TriangularArray.index(begin, end)).activeElements
+    val scoreArray = score(TriangularArray.index(begin,end));
+    enteredLabels(TriangularArray.index(begin,end)).iterator.map { i => (i,scoreArray(i))};
   }
 
 
