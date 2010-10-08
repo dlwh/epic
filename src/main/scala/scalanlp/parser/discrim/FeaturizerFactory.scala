@@ -28,3 +28,16 @@ class PlainFeaturizerFactory[L] extends FeaturizerFactory[L,String] {
     new SumFeaturizer(rules,lex);
   }
 }
+
+trait LatentFeaturizerFactory {
+  def getFeaturizer[L,W](base: Featurizer[L,W], numStates: Int):Featurizer[(L,Int),W];
+}
+
+class BitVectorFeaturizerFactory extends LatentFeaturizerFactory {
+  def getFeaturizer[L,W](base: Featurizer[L,W], numStates: Int) = new BitVectorFeaturizer(base,numStates);
+}
+
+class SlavLatentFeaturizerFactory extends LatentFeaturizerFactory {
+  def getFeaturizer[L,W](base: Featurizer[L,W], numStates: Int) = new SlavFeaturizer(base,numStates);
+}
+

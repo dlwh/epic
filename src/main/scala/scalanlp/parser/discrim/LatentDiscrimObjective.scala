@@ -145,7 +145,6 @@ class LatentDiscrimObjective[L,L2,W](feat: Featurizer[L2,W],
 }
 
 
-/*
 object LatentDiscriminativeTest extends ParserTester {
 
   def trainParser(trainTrees: Seq[(BinarizedTree[String],Seq[String])],
@@ -153,11 +152,20 @@ object LatentDiscriminativeTest extends ParserTester {
                   config: Configuration) = {
 
     val (initLexicon,initProductions) = GenerativeParser.extractCounts(trainTrees.iterator);
+    val numStates = config.readIn[Int]("discrim.numStates",2);
 
-    val factory = config.readIn[FeaturizerFactory[String,String]]("featurizerFactory",new PlainFeaturizerFactory[String]);
+    val factory = config.readIn[FeaturizerFactory[String,String]]("discrim.featurizerFactory",new PlainFeaturizerFactory[String]);
     val featurizer = factory.getFeaturizer(config, initLexicon, initProductions);
+    val latentFactory = config.readIn[LatentFeaturizerFactory]("discrim.latentFactory",new SlavLatentFeaturizerFactory());
+    val latentFeaturizer = latentFactory.getFeaturizer(featurizer, numStates);
 
-    val obj = new DiscrimObjective(featurizer, "", trainTrees.toIndexedSeq,initLexicon);
+    def split(x: String) = {
+      if(x.isEmpty) Seq((x,0))
+      else for(i <- 0 until numStates) yield (x,i);
+    }
+    val obj = new LatentDiscrimObjective(latentFeaturizer, "",
+                                         trainTrees.toIndexedSeq,
+                                         initProductions, initLexicon, split _);
     val iterationsPerEval = config.readIn("iterations.eval",25);
     val maxIterations = config.readIn("iterations.max",100);
     val maxMStepIterations = config.readIn("iterations.mstep.max",80);
@@ -171,10 +179,11 @@ object LatentDiscriminativeTest extends ParserTester {
     val cachedObj = new CachedDiffFunction(reg);
     for( (state,iter) <- opt.iterations(cachedObj,init).take(maxIterations).zipWithIndex;
          if iter != 0 && iter % iterationsPerEval == 0) yield {
-       val parser = obj.extractViterbiParser(state.x);
+       val parser = obj.extractViterbiParser(state.x).map { (t:Tree[(String,Int)]) =>
+         t.map(_._1);
+       };
        (iter + "", parser);
     }
 
   }
 }
-*/

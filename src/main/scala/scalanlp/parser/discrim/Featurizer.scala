@@ -1,13 +1,18 @@
-package scalanlp.parser.discrim
+package scalanlp.parser
+package discrim
 
 import scalala.tensor.counters.Counters._
 import scalanlp.collection.mutable.{SparseArrayMap, SparseArray, ArrayMap}
 
-import scalala.tensor.sparse.SparseVector;
-import scalanlp.parser._;
+import scalala.tensor.sparse.SparseVector
+import scalanlp.util.{CachedHashCode, Encoder, Index}
+import collection.mutable.{ArrayBuffer}
+
+import scalanlp.parser._
+import bitvector.BitUtils;
 import scalanlp.trees._;
-import scalanlp.util.Encoder;
-import scalanlp.util.Index;
+
+
 
 
 trait Feature[+L,+W];
@@ -25,9 +30,17 @@ trait Featurizer[L,W] {
 }
 
 /** A Rule feature is just an indicator on there being this rule */
-case class RuleFeature[L](r: Rule[L]) extends Feature[L,Nothing];
+case class RuleFeature[L](r: Rule[L]) extends Feature[L,Nothing] with CachedHashCode;
 /** A Lexical feature is just an indicator on there being this word */
-case class LexicalFeature[L,W](l: L, w: W) extends Feature[L,W];
+case class LexicalFeature[L,W](l: L, w: W) extends Feature[L,W] with CachedHashCode;
+case class SubstateFeature[L,W](f: Feature[L,W], states: Seq[Int]) extends Feature[(L,Int),W] with CachedHashCode;
+
+import bitvector.LogisticBitVector._;
+case class BitFeature(lbl: LabelOfBit, index: Int, toggled: Int) extends Feature[Nothing,Nothing] with CachedHashCode;
+case class SequenceFeature[L,W](f: Seq[Feature[L,W]]) extends Feature[L,W] with CachedHashCode;
+case class PairFeature[L,W](f: Feature[L,W], f2: Feature[L,W]) extends Feature[(L,Int),W] with CachedHashCode;
+
+
 
 class SimpleFeaturizer[L,W] extends Featurizer[L,W] {
   def featuresFor(r: Rule[L]) = aggregate(RuleFeature(r) -> 1.0);
@@ -56,6 +69,117 @@ class RuleFeaturizer[L,W](prods: PairedDoubleCounter[L,Rule[L]]) extends Featuri
   }
 
 }
+
+
+class SlavFeaturizer[L,W](base: Featurizer[L,W], numStates:Int) extends Featurizer[(L,Int),W] {
+  def featuresFor(r: Rule[(L,Int)]) = r match {
+    case BinaryRule(a,b,c) =>
+      val result = DoubleCounter[Feature[(L,Int),W]]();
+      val baseFeatures = base.featuresFor(BinaryRule(a._1,b._1,c._1));
+      val substates = ArrayBuffer(a._2, b._2, c._2);
+      for( (k,v) <- baseFeatures) {
+        result(SubstateFeature(k,substates)) = v;
+      }
+      result;
+    case UnaryRule(a,b) =>
+      val result = DoubleCounter[Feature[(L,Int),W]]();
+      val baseFeatures = base.featuresFor(UnaryRule(a._1,b._1));
+      val substates = ArrayBuffer(a._2,b._2);
+      for( (k,v) <- baseFeatures) {
+        result(SubstateFeature(k,substates)) = v;
+      }
+      result;
+  }
+
+  def featuresFor(l: (L,Int), w: W) = {
+    val baseFeatures = base.featuresFor(l._1, w);
+    val substates = ArrayBuffer(l._2);
+    val result = DoubleCounter[Feature[(L,Int),W]]();
+    for( (k,v) <- baseFeatures) {
+      result(SubstateFeature(k,substates)) = v;
+    }
+    result;
+  }
+  def initialValueForFeature(f: Feature[(L,Int),W]) = f match {
+    case SubstateFeature(baseF, _) =>
+      val baseScore = base.initialValueForFeature(baseF);
+      baseScore + math.log(0.9 + math.random * 0.2);
+    case _ => 0.0;
+  }
+}
+
+class BitVectorFeaturizer[L,W](base: Featurizer[L,W], numStates: Int, arity: Int = 2) extends Featurizer[(L,Int),W] {
+  val numBits = BitUtils.roundToNextPowerOfTwo(numStates);
+  private def mkBitStati(numBits: Int, lbl: LabelOfBit, state: Int) = {
+    for( (bit,toggled) <- BitUtils.iterateBits(state,numBits)) yield {
+      stati(lbl.index)(bit)(toggled);
+    }
+  }
+
+  private val stati = Array.tabulate(4,numBits,2) { (parentId, bit, toggled) =>
+    BitFeature(bitLabels(parentId),bit,toggled);
+  }
+
+  // all subsets <= size k
+  def chooseSubsets[X,Y](fs: Seq[Feature[X,Y]], myArity:Int = arity):Seq[Seq[Feature[X,Y]]] = {
+    if(fs.isEmpty || myArity == 0) Seq.empty
+    else {
+      val rec = chooseSubsets(fs.tail,myArity-1);
+      rec ++ rec.map(fs.head +: _);
+    }
+  }
+
+
+  def featuresFor(r: Rule[(L,Int)]) = r match {
+    case BinaryRule(a,b,c) =>
+      val result = DoubleCounter[Feature[(L,Int),W]]();
+      val baseFeatures = base.featuresFor(BinaryRule(a._1,b._1,c._1));
+      val subFeatures = {
+        val bitIterator = mkBitStati(numBits,Parent,a._2) ++ mkBitStati(numBits,LChild,b._2) ++ mkBitStati(numBits, RChild, c._2);
+        val subsets = chooseSubsets(bitIterator.toSeq);
+        subsets.map(SequenceFeature(_));
+      }
+      for( (k,v) <- baseFeatures; sub <- subFeatures) {
+        result(PairFeature(k,sub)) = v;
+      }
+      result;
+    case UnaryRule(a,b) =>
+      val result = DoubleCounter[Feature[(L,Int),W]]();
+      val baseFeatures = base.featuresFor(UnaryRule(a._1,b._1));
+      val subFeatures = {
+        val bitIterator = mkBitStati(numBits,Parent,a._2) ++ mkBitStati(numBits,UChild,b._2);
+        val subsets = chooseSubsets(bitIterator.toSeq);
+        subsets.map(SequenceFeature(_));
+      }
+      for( (k,v) <- baseFeatures; sub <- subFeatures) {
+        result(PairFeature(k,sub)) = v;
+      }
+      result;
+  }
+
+  def featuresFor(l: (L,Int), w: W) = {
+    val baseFeatures = base.featuresFor(l._1, w);
+    val result = DoubleCounter[Feature[(L,Int),W]]();
+    val subFeatures = {
+      val bitIterator = mkBitStati(numBits,Parent,l._2);
+      val subsets = chooseSubsets(bitIterator.toSeq);
+      subsets.map(SequenceFeature(_));
+    }
+    for( (k,v) <- baseFeatures; sub <- subFeatures) {
+      result(PairFeature(k,sub)) = v;
+    }
+    result;
+  }
+
+  def initialValueForFeature(f: Feature[(L,Int),W]) = f match {
+    case PairFeature(baseF, _:SequenceFeature[_,_]) =>
+      val baseScore = base.initialValueForFeature(baseF);
+      baseScore + math.log(0.9 + math.random * 0.2);
+    case _ => 0.0;
+  }
+
+}
+
 
 trait FeatureIndexer[L,W] extends Encoder[Feature[L,W]] {
   val index:Index[Feature[L,W]];
