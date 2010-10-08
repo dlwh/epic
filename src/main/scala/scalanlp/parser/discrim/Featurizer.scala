@@ -104,7 +104,6 @@ class CachingFeaturizer[L,W](f: Featurizer[L,W]) extends Featurizer[L,W] {
 class SlavFeaturizer[L,W](base: Featurizer[L,W], numStates:Int) extends Featurizer[(L,Int),W] {
   def featuresFor(r: Rule[(L,Int)]) = r match {
     case BinaryRule(a,b,c) =>
-      println(r);
       val result = DoubleCounter[Feature[(L,Int),W]]();
       val baseFeatures = base.featuresFor(BinaryRule(a._1,b._1,c._1));
       val substates = ArrayBuffer(a._2, b._2, c._2);
@@ -113,7 +112,6 @@ class SlavFeaturizer[L,W](base: Featurizer[L,W], numStates:Int) extends Featuriz
       }
       result;
     case UnaryRule(a,b) =>
-      println(r);
       val result = DoubleCounter[Feature[(L,Int),W]]();
       val baseFeatures = base.featuresFor(UnaryRule(a._1,b._1));
       val substates = ArrayBuffer(a._2,b._2);
@@ -154,7 +152,7 @@ class BitVectorFeaturizer[L,W](base: Featurizer[L,W], numStates: Int, arity: Int
 
   // all subsets <= size k
   def chooseSubsets[X,Y](fs: Seq[Feature[X,Y]], myArity:Int = arity):Seq[Seq[Feature[X,Y]]] = {
-    if(fs.isEmpty || myArity == 0) Seq.empty
+    if(fs.isEmpty || myArity == 0) Seq(Seq.empty)
     else {
       val rec = chooseSubsets(fs.tail,myArity-1);
       rec ++ rec.map(fs.head +: _);
