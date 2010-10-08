@@ -13,8 +13,6 @@ import bitvector.BitUtils;
 import scalanlp.trees._;
 
 
-
-
 trait Feature[+L,+W];
 
 /**
