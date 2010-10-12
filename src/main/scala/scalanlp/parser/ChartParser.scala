@@ -22,6 +22,8 @@ trait ChartParser[Chart[X]<:ParseChart[X],L,W] extends Parser[L,W] {
   def root: L;
   def lexicon:Lexicon[L,W];
 
+  def withCharts[Chart[X]<:ParseChart[X]](factory: ParseChart.Factory[Chart]):ChartParser[Chart,L,W];
+
 
   def scores(s: Seq[W]) = {
     try {
@@ -65,6 +67,10 @@ class CKYParser[Chart[X]<:ParseChart[X], L,W](val root: L,
         extends ChartParser[Chart,L,W] {
 
   private lazy val unaryClosure: UnaryRuleClosure = chartFactory.computeUnaryClosure(grammar);
+
+  def withCharts[Chart[X]<:ParseChart[X]](factory: ParseChart.Factory[Chart]):ChartParser[Chart,L,W] = {
+    new CKYParser[Chart,L,W](root,lexicon,grammar,factory);
+  }
 
   def buildInsideChart(s: Seq[W],
                        validSpan: SpanFilter = defaultFilterBoxed):Chart[L] = {

@@ -22,18 +22,21 @@ class CoarseToFineParser[Chart[X]<:ParseChart[X],C,F,W](coarseParser: ChartParse
 
   private val fineParser = new CKYParser[Chart,F,W](root,lexicon,grammar,chartFactory);
 
-  def buildInsideChart(s: Seq[W],
-                                                validSpan: SpanFilter = defaultFilter):Chart[F] = {
+  def buildInsideChart(s: Seq[W], validSpan: SpanFilter = defaultFilter):Chart[F] = {
     val coarseInside = coarseParser.buildInsideChart(s, validSpan)
     val coarseOutside = coarseParser.buildOutsideChart(coarseInside, validSpan);
 
     val sentProb = coarseInside(0,s.length,coarseRootIndex);
     println(sentProb);
+    assert(!sentProb.isInfinite, s);
 
     def spanFilter(begin: Int, end: Int, label: Int) = (
-      (coarseInside(begin,end,indexedProjections(label))
-              + coarseOutside(begin,end,indexedProjections(label)) - sentProb > threshold)
-      && defaultFilter(begin,end,label)
+      if(!validSpan(begin,end,label)) false
+      else {
+        val score =  (coarseInside(begin,end,indexedProjections(label))
+                + coarseOutside(begin,end,indexedProjections(label)) - sentProb);
+        score > threshold;
+      }
     );
 
     fineParser.buildInsideChart(s,spanFilter _);
@@ -45,6 +48,11 @@ class CoarseToFineParser[Chart[X]<:ParseChart[X],C,F,W](coarseParser: ChartParse
   def buildOutsideChart(inside: ParseChart[F],
                         validSpan: SpanFilter = defaultFilter):Chart[F] = {
     fineParser.buildOutsideChart(inside, validSpan);
+  }
+
+  def withCharts[Chart[X]<:ParseChart[X]](factory: ParseChart.Factory[Chart]) = {
+    val cc = coarseParser.withCharts(factory);
+    new CoarseToFineParser[Chart,C,F,W](cc,proj, root,lexicon,grammar,factory, threshold);
   }
   
 }
