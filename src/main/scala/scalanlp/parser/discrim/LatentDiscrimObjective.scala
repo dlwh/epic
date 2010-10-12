@@ -2,7 +2,6 @@ package scalanlp.parser
 package discrim
 
 import scalala.tensor.dense.DenseVector
-import scalala.tensor.sparse.SparseVector
 import scalanlp.trees._
 import scalanlp.config.Configuration
 import scalanlp.util.{ConsoleLogging, Log}
@@ -24,9 +23,10 @@ import scalanlp.util._;
 class LatentDiscrimObjective[L,L2,W](feat: Featurizer[L2,W],
                             unsplitRoot: L,
                             trees: IndexedSeq[(BinarizedTree[L],Seq[W])],
-                            initProductions: PairedDoubleCounter[L,Rule[L]],
-                            initLexicon: PairedDoubleCounter[L,W],
-                            splitLabel: L=>Seq[L2]) extends DiffFunction[Int,DenseVector] {
+                            coarseParser: ChartParser[LogProbabilityParseChart, L, W],
+                            openTags: Set[L],
+                            splitLabel: L=>Seq[L2],
+                            unsplit: (L2=>L)) extends DiffFunction[Int,DenseVector] {
 
   val root = {
     val splitRoot = splitLabel(unsplitRoot);
@@ -38,14 +38,20 @@ class LatentDiscrimObjective[L,L2,W](feat: Featurizer[L2,W],
   def extractViterbiParser(weights: DenseVector) = {
     val grammar = weightsToGrammar(weights);
     val lexicon = weightsToLexicon(weights);
-    val parser = CKYParser(root, lexicon, grammar);
+    val cc = coarseParser.withCharts[ParseChart.ViterbiParseChart](ParseChart.viterbi);
+    val parser = new CoarseToFineParser[ParseChart.ViterbiParseChart,L,L2,W](cc,
+      unsplit, root, lexicon, grammar, ParseChart.viterbi);
+    //val parser = CKYParser(root, lexicon, grammar);
     parser
   }
 
   def extractLogProbParser(weights: DenseVector)= {
     val grammar = weightsToGrammar(weights);
     val lexicon = weightsToLexicon(weights);
-    val parser = new CKYParser[LogProbabilityParseChart, L2, W](root, lexicon, grammar, ParseChart.logProb);
+    val cc = coarseParser.withCharts[LogProbabilityParseChart](ParseChart.logProb);
+ //   val parser = new CoarseToFineParser[LogProbabilityParseChart,L,L2,W](cc,
+   //   unsplit, root, lexicon, grammar, ParseChart.logProb);
+    val parser = new CKYParser[LogProbabilityParseChart,L2,W](root, lexicon, grammar, ParseChart.logProb);
     parser
   }
 
@@ -76,17 +82,17 @@ class LatentDiscrimObjective[L,L2,W](feat: Featurizer[L2,W],
   }
 
   val indexedFeatures: FeatureIndexer[L2,W] = {
-    val initGrammar = new GenerativeGrammar(LogCounters.logNormalizeRows(initProductions));
-    val initLex = new UnsmoothedLexicon(LogCounters.logNormalizeRows(initLexicon));
+    val initGrammar = coarseParser.grammar;
+    val initLex = coarseParser.lexicon;
     FeatureIndexer[L,L2,W](feat, initGrammar, initLex, splitLabel);
   }
 
-  val openTags = Set.empty ++ {
-    for( t <- initLexicon.rows.map(_._1) if initLexicon(t).size > 50; s <- splitLabel(t).iterator)  yield s;
+  val splitOpenTags = {
+    for(t <- openTags; s <- splitLabel(t))  yield s;
   }
 
   def weightsToLexicon(weights: DenseVector) = {
-    val grammar = new FeaturizedLexicon(openTags, weights, indexedFeatures);
+    val grammar = new FeaturizedLexicon(splitOpenTags, weights, indexedFeatures);
     grammar;
   }
 
@@ -154,18 +160,36 @@ object LatentDiscriminativeTest extends ParserTester {
     val (initLexicon,initProductions) = GenerativeParser.extractCounts(trainTrees.iterator);
     val numStates = config.readIn[Int]("discrim.numStates",2);
 
+    val xbarParser = {
+      val grammar = new GenerativeGrammar(LogCounters.logNormalizeRows(initProductions));
+      val lexicon = new SimpleLexicon(initLexicon);
+      new CKYParser[LogProbabilityParseChart,String,String]("",lexicon,grammar,ParseChart.logProb);
+    }
+
     val factory = config.readIn[FeaturizerFactory[String,String]]("discrim.featurizerFactory",new PlainFeaturizerFactory[String]);
     val featurizer = factory.getFeaturizer(config, initLexicon, initProductions);
     val latentFactory = config.readIn[LatentFeaturizerFactory]("discrim.latentFactory",new SlavLatentFeaturizerFactory());
     val latentFeaturizer = latentFactory.getFeaturizer(featurizer, numStates);
 
+
+    val openTags = Set.empty ++ {
+      for(t <- initLexicon.activeKeys.map(_._1) if initLexicon(t).size > 50) yield t;
+    }
+
     def split(x: String) = {
       if(x.isEmpty) Seq((x,0))
       else for(i <- 0 until numStates) yield (x,i);
     }
+    def project(x: (String,Int)) = x._1;
+
     val obj = new LatentDiscrimObjective(latentFeaturizer, "",
                                          trainTrees.toIndexedSeq,
-                                         initProductions, initLexicon, split _);
+                                         xbarParser,
+                                         openTags,
+                                         split _,
+                                         project _);
+
+
     val iterationsPerEval = config.readIn("iterations.eval",25);
     val maxIterations = config.readIn("iterations.max",100);
     val maxMStepIterations = config.readIn("iterations.mstep.max",80);

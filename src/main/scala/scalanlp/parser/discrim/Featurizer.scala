@@ -376,7 +376,7 @@ object FeatureIndexer {
         val bArray = new SparseArray(lI.size, new SparseArray[SparseVector](lI.size, null));
         for((b,cArrayMap) <- binaryRuleCache(a)) {
           for( (c,ctr) <- cArrayMap) {
-            bArray(b)(c) = featureEncoder.encodeSparse(ctr);
+            bArray.getOrElseUpdate(b)(c) = featureEncoder.encodeSparse(ctr);
           }
         }
         bArray;

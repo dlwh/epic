@@ -2,7 +2,6 @@ package scalanlp.parser
 package discrim
 
 import scalala.tensor.dense.DenseVector
-import scalala.tensor.sparse.SparseVector
 import scalanlp.trees._
 import scalanlp.config.Configuration
 import scalanlp.util.{ConsoleLogging, Log}
@@ -40,7 +39,6 @@ class DiscrimObjective[L,W](feat: Featurizer[L,W],
   }
 
   def calculate(weights: DenseVector) = {
-
     val parser = new ThreadLocal(extractLogProbParser(weights));
     val ecounts = indexedTrees.par.fold(new ExpectedCounts[W](parser().grammar)) { (counts, treewords) =>
       val tree = treewords._1;
@@ -98,14 +96,14 @@ class DiscrimObjective[L,W](feat: Featurizer[L,W],
     for(t2 <- t.allChildren) {
       t2 match {
         case BinaryTree(a,Tree(b,_),Tree(c,_)) =>
-          expectedCounts.binaryRuleCounts(a)(b)(c) += 1
+          expectedCounts.binaryRuleCounts.getOrElseUpdate(a).getOrElseUpdate(b)(c) += 1
           score += g.binaryRuleScore(a,b,c);
         case UnaryTree(a,Tree(b,_)) =>
-          expectedCounts.unaryRuleCounts(a)(b) += 1
+          expectedCounts.unaryRuleCounts.getOrElseUpdate(a)(b) += 1
           score += g.unaryRuleScore(a,b);
         case n@NullaryTree(a) =>
           val w = words(n.span.start);
-          expectedCounts.wordCounts(a)(w) += 1
+          expectedCounts.wordCounts.getOrElseUpdate(a)(w) += 1
           score += lexicon.wordScore(g.index.get(a), w);
       }
     }

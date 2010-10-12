@@ -24,11 +24,11 @@ import scalala.tensor.adaptive.AdaptiveVector
 import scalala.tensor.counters.LogCounters._;
 import scalanlp.util.Index;
 
-sealed abstract class Rule[+L] { def parent: L; def children: Seq[L] }
-final case class BinaryRule[+L](parent: L, left: L, right: L) extends Rule[L] {
+sealed abstract class Rule[@specialized(Int) +L] { def parent: L; def children: Seq[L] }
+final case class BinaryRule[@specialized(Int) +L](parent: L, left: L, right: L) extends Rule[L] {
   def children = Seq(left,right);
 }
-final case class UnaryRule[+L](parent: L, child: L) extends Rule[L] {
+final case class UnaryRule[@specialized(Int) +L](parent: L, child: L) extends Rule[L] {
   def children = Seq(child);
 }
 
@@ -110,12 +110,12 @@ class GenerativeGrammar[L](productions: LogPairedDoubleCounter[L,Rule[L]]) exten
 
   private val indexedUnaryRulesByChild:SparseArray[SparseVector] = fillSparseArray(mkSparseVector(Double.NegativeInfinity));
   for( ((a,UnaryRule(_,b)),score) <- unaryRules) {
-      indexedUnaryRulesByChild(index(b))(index(a)) = score;
+    indexedUnaryRulesByChild.getOrElseUpdate(index(b))(index(a)) = score;
   }
 
   private val indexedUnaryRulesByParent:SparseArray[SparseVector] = fillSparseArray(mkSparseVector(Double.NegativeInfinity));
   for( ((a,UnaryRule(_,b)),score) <- unaryRules) {
-      indexedUnaryRulesByParent(index(a))(index(b)) = score;
+    indexedUnaryRulesByParent.getOrElseUpdate(index(a))(index(b)) = score;
   }
 
 
@@ -124,7 +124,7 @@ class GenerativeGrammar[L](productions: LogPairedDoubleCounter[L,Rule[L]]) exten
     fillSparseArray(fillSparseArray(mkSparseVector(Double.NegativeInfinity)))
   );
   for( ((a,BinaryRule(_,b,c)),score) <- binaryRules) {
-    indexedBinaryRulesByLeftChild(index(b))(index(c))(index(a)) = score;
+    indexedBinaryRulesByLeftChild.getOrElseUpdate(index(b)).getOrElseUpdate(index(c))(index(a)) = score;
   }
 
   // Mapping is Left Child -> Right Child -> Parent -> Score
@@ -132,7 +132,7 @@ class GenerativeGrammar[L](productions: LogPairedDoubleCounter[L,Rule[L]]) exten
     fillSparseArray(fillSparseArray(mkSparseVector(Double.NegativeInfinity)))
   );
   for( ((a,BinaryRule(_,b,c)),score) <- binaryRules) {
-    indexedBinaryRulesByRightChild(index(c))(index(b))(index(a)) = score;
+    indexedBinaryRulesByRightChild.getOrElseUpdate(index(c)).getOrElseUpdate(index(b))(index(a)) = score;
   }
 
   // Mapping is Parent -> Left Child -> Right Child ->  Score
@@ -140,7 +140,7 @@ class GenerativeGrammar[L](productions: LogPairedDoubleCounter[L,Rule[L]]) exten
     fillSparseArray(fillSparseArray(mkSparseVector(Double.NegativeInfinity)))
   );
   for( ((a,BinaryRule(_,b,c)),score) <- binaryRules) {
-    indexedBinaryRulesByParent(index(a))(index(b))(index(c)) = score;
+    indexedBinaryRulesByParent.getOrElseUpdate(index(a)).getOrElseUpdate(index(b))(index(c)) = score;
   }
 
   /**

@@ -18,7 +18,6 @@ package scalanlp.parser.splitting
 
 import scalala.Scalala._;
 import scalala.tensor.Vector;
-import scalanlp.collection.mutable.SparseArray
 import scalanlp.collection.mutable.TriangularArray
 import scalanlp.config.Configuration
 import scalala.tensor.counters.Counters._;
@@ -139,7 +138,8 @@ object StateSplitting {
 
     // normalizer
     val totalProb = logSum(iScores(0,s.length)(tree.label map grammar.index));
-    assert(!totalProb.isInfinite);
+    if(totalProb.isInfinite)
+      assert(!totalProb.isInfinite, indexedTree.render(s) + "\n" + tree.render(s) + "\n" + iScores + "\n"+oScores);
 
     indexedTree.allChildren foreach {
       case t: NullaryTree[Seq[Int]] =>
@@ -149,7 +149,7 @@ object StateSplitting {
           val ruleScore = (iS + oS - totalProb);
           assert(!ruleScore.isNaN);
          // assert(exp(ruleScore) > 0, " " + ruleScore);
-          wordCounts(l)(s(t.span.start)) +=  exp(ruleScore);
+          wordCounts.getOrElseUpdate(l)(s(t.span.start)) +=  exp(ruleScore);
         }
       case t@UnaryTree(_,child) =>
         for {
@@ -161,7 +161,7 @@ object StateSplitting {
           val ruleScore = opScore + icScore + grammar.unaryRulesByIndexedChild(c)(p) - totalProb;
           assert(!ruleScore.isNaN);
          // assert(exp(ruleScore) > 0, " " + ruleScore);
-          unaryRuleCounts(p)(c) += exp(ruleScore);
+          unaryRuleCounts.getOrElseUpdate(p)(c) += exp(ruleScore);
         }
       case t@ BinaryTree(_,lc,rc) =>
         for {
@@ -176,7 +176,7 @@ object StateSplitting {
           val ruleScore = opScore + irScore + ilScore + lRules(r)(p) - totalProb;
           assert(!ruleScore.isNaN);
           //assert(exp(ruleScore) > 0, " " + ruleScore);
-          binaryRuleCounts(p)(l)(r) += exp(ruleScore);
+          binaryRuleCounts.getOrElseUpdate(p).getOrElseUpdate(l)(r) += exp(ruleScore);
         }
     }
     ExpectedCounts(binaryRuleCounts,unaryRuleCounts,wordCounts,totalProb);

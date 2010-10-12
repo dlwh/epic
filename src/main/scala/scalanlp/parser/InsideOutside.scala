@@ -47,7 +47,7 @@ class InsideOutside[L,W](val parser: ChartParser[LogProbabilityParseChart,L,W]) 
       for (l <- inside.enteredLabelIndexes(i, i + 1) if isTag(l)) {
         val iScore = inside.labelScore(i, i + 1, l);
         val oScore = outside.labelScore(i, i + 1, l);
-        wordCounts(l)(w) += exp(iScore + oScore - totalProb);
+        wordCounts.getOrElseUpdate(l)(w) += exp(iScore + oScore - totalProb);
       }
     }
     wordCounts
@@ -80,7 +80,7 @@ class InsideOutside[L,W](val parser: ChartParser[LogProbabilityParseChart,L,W]) 
             i += 1;
             if (!aScore.isInfinite) {
               val prob = bScore + cScore + aScore + rScore - totalProb;
-              binaryRuleCounts(a)(b)(c) += exp(prob);
+              binaryRuleCounts.getOrElseUpdate(a).getOrElseUpdate(b)(c) += exp(prob);
               assert(binaryRuleCounts(a)(b)(c) >= exp(prob),binaryRuleCounts(a)(b)(c) + " " + exp(prob));
             }
           }
@@ -113,7 +113,7 @@ class InsideOutside[L,W](val parser: ChartParser[LogProbabilityParseChart,L,W]) 
           i += 1;
           if ((validSpan eq defaultFilterBoxed) || validSpan(begin, end, a)) {
             val prob = bScore + aScore + rScore - totalProb;
-            unaryRuleCounts(a)(b) += exp(prob);
+            unaryRuleCounts.getOrElseUpdate(a)(b) += exp(prob);
           }
         }
       }
@@ -146,15 +146,15 @@ object InsideOutside {
 
       for( (k1,c) <- bCounts;
           (k2,vec) <- c) {
-        binaryRuleCounts(k1)(k2) += vec;
+        binaryRuleCounts.getOrElseUpdate(k1).getOrElseUpdate(k2) += vec;
       }
 
       for( (k,vec) <- uCounts) {
-        unaryRuleCounts(k) += vec;
+        unaryRuleCounts.getOrElseUpdate(k) += vec;
       }
 
       for( (k,vec) <- wCounts) {
-        wordCounts(k) += vec;
+        wordCounts.getOrElseUpdate(k) += vec;
       }
 
       logProb += tProb;
@@ -166,15 +166,15 @@ object InsideOutside {
 
       for( (k1,c) <- bCounts;
           (k2,vec) <- c) {
-        binaryRuleCounts(k1)(k2) -= vec;
+        binaryRuleCounts.getOrElseUpdate(k1).getOrElseUpdate(k2) -= vec;
       }
 
       for( (k,vec) <- uCounts) {
-        unaryRuleCounts(k) -= vec;
+        unaryRuleCounts.getOrElseUpdate(k) -= vec;
       }
 
       for( (k,vec) <- wCounts) {
-        wordCounts(k) -= vec;
+        wordCounts.getOrElseUpdate(k) -= vec;
       }
 
       logProb -= tProb;

@@ -17,8 +17,8 @@ class FeaturizedGrammar[L,W](weights: DenseVector, features: FeatureIndexer[L,W]
   private val indexedUnaryRulesByParent = fillSparseArray(mkSparseVector(Double.NegativeInfinity));
   for( (bRules,a) <- features.unaryRuleCache.iterator.zipWithIndex; (b,f) <- bRules) {
     val score = f dot weights;
-    indexedUnaryRulesByChild(b)(a) = score;
-    indexedUnaryRulesByParent(a)(b) = score;
+    indexedUnaryRulesByChild.getOrElseUpdate(b)(a) = score;
+    indexedUnaryRulesByParent.getOrElseUpdate(a)(b) = score;
   }
 
   // Mapping is Left Child -> Right Child -> Parent -> Score
@@ -35,9 +35,9 @@ class FeaturizedGrammar[L,W](weights: DenseVector, features: FeatureIndexer[L,W]
   }
   for( (bRules,a) <- features.binaryRuleCache.iterator.zipWithIndex; (b,cRules) <- bRules; (c,f) <- cRules) {
     val score = f dot weights;
-    indexedBinaryRulesByLeftChild(b)(c)(a) = score;
-    indexedBinaryRulesByRightChild(c)(b)(a) = score;
-    indexedBinaryRulesByParent(a)(b)(c) = score;
+    indexedBinaryRulesByLeftChild.getOrElseUpdate(b).getOrElseUpdate(c)(a) = score;
+    indexedBinaryRulesByRightChild.getOrElseUpdate(c).getOrElseUpdate(b)(a) = score;
+    indexedBinaryRulesByParent.getOrElseUpdate(a).getOrElseUpdate(b)(c) = score;
   }
 
    /**
