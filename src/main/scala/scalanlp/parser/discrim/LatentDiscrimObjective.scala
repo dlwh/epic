@@ -49,9 +49,9 @@ class LatentDiscrimObjective[L,L2,W](feat: Featurizer[L2,W],
     val grammar = weightsToGrammar(weights);
     val lexicon = weightsToLexicon(weights);
     val cc = coarseParser.withCharts[LogProbabilityParseChart](ParseChart.logProb);
- //   val parser = new CoarseToFineParser[LogProbabilityParseChart,L,L2,W](cc,
-   //   unsplit, root, lexicon, grammar, ParseChart.logProb);
-    val parser = new CKYParser[LogProbabilityParseChart,L2,W](root, lexicon, grammar, ParseChart.logProb);
+    val parser = new CoarseToFineParser[LogProbabilityParseChart,L,L2,W](cc,
+      unsplit, root, lexicon, grammar, ParseChart.logProb);
+   // val parser = new CKYParser[LogProbabilityParseChart,L2,W](root, lexicon, grammar, ParseChart.logProb);
     parser
   }
 
