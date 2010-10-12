@@ -12,7 +12,7 @@ class CoarseToFineParser[Chart[X]<:ParseChart[X],C,F,W](coarseParser: ChartParse
                                 val lexicon: Lexicon[F,W],
                                 val grammar: Grammar[F],
                                 chartFactory: ParseChart.Factory[Chart] = ParseChart.viterbi,
-                                threshold:Double = -100) extends ChartParser[Chart,F,W] {
+                                threshold:Double = -10) extends ChartParser[Chart,F,W] {
 
   private val indexedProjections = grammar.fillArray(-1);
   for( (l,idx) <- grammar.index.zipWithIndex) {
@@ -35,7 +35,9 @@ class CoarseToFineParser[Chart[X]<:ParseChart[X],C,F,W](coarseParser: ChartParse
       else {
         val score =  (coarseInside(begin,end,indexedProjections(label))
                 + coarseOutside(begin,end,indexedProjections(label)) - sentProb);
-        score > threshold;
+        val ret = score > threshold;
+      //  if(!ret) println("prune! " + s + (begin,end) + " " + grammar.index.get(label));
+        ret
       }
     );
 
