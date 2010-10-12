@@ -49,10 +49,10 @@ abstract class ParseChart[L](grammar: Grammar[L], val length: Int) {
   final def enter(begin: Int, end: Int, parent: Int, w: Double) = {
     val oldScore = score(TriangularArray.index(begin,end))(parent);
     val newScore = sum(score(TriangularArray.index(begin,end))(parent), w);
-    enteredLabels(TriangularArray.index(begin,end))(parent) = true;
+    score(TriangularArray.index(begin,end))(parent) = newScore;
 
-    if(newScore > oldScore) {
-      score(TriangularArray.index(begin,end))(parent) = newScore;
+    if(oldScore == zero) {
+      enteredLabels(TriangularArray.index(begin,end))(parent) = true;
       narrowLeft(end)(parent) = begin max narrowLeft(end)(parent);
       wideLeft(end)(parent) = begin min wideLeft(end)(parent);
       wideRight(begin)(parent) = end max wideRight(begin)(parent);
