@@ -24,7 +24,7 @@ import scalala.tensor.adaptive.AdaptiveVector
 import scalala.tensor.counters.LogCounters._;
 import scalanlp.util.Index;
 
-sealed abstract class Rule[@specialized(Int) +L] { def parent: L; def children: Seq[L] }
+sealed abstract trait Rule[@specialized(Int) +L] { def parent: L; def children: Seq[L] }
 final case class BinaryRule[@specialized(Int) +L](parent: L, left: L, right: L) extends Rule[L] {
   def children = Seq(left,right);
 }
