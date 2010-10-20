@@ -27,7 +27,7 @@ class CoarseToFineParser[Chart[X]<:ParseChart[X],C,F,W](coarseParser: ChartParse
     val coarseOutside = coarseParser.buildOutsideChart(coarseInside, validSpan);
 
     val sentProb = coarseInside(0,s.length,coarseRootIndex);
-    println(sentProb);
+    //println(sentProb);
     assert(!sentProb.isInfinite, s);
 
     def spanFilter(begin: Int, end: Int, label: Int) = (
