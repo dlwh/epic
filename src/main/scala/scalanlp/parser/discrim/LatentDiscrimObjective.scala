@@ -7,7 +7,8 @@ import scalanlp.config.Configuration
 import scalanlp.util.{ConsoleLogging, Log}
 import scalanlp.optimize.{CachedDiffFunction, LBFGS, DiffFunction}
 import splitting.StateSplitting
-import scalala.tensor.counters.LogCounters;
+import scalala.tensor.counters.LogCounters
+import scalanlp.parser.UnaryRuleClosure.UnaryClosureException;
 import InsideOutside._;
 import ParseChart.LogProbabilityParseChart;
 import scalanlp.concurrent.ParallelOps._;
@@ -55,30 +56,40 @@ class LatentDiscrimObjective[L,L2,W](feat: Featurizer[L2,W],
     parser
   }
 
+  var numFailures = 0;
+
   def calculate(weights: DenseVector) = {
 
-    val parser = new ThreadLocal(extractLogProbParser(weights));
-    val ecounts = trees.par.fold(new ExpectedCounts[W](parser().grammar)) { (counts, treewords) =>
-      val tree = treewords._1;
-      val words = treewords._2;
+    try {
+      val parser = new ThreadLocal(extractLogProbParser(weights));
+      val ecounts = trees.par.fold(new ExpectedCounts[W](parser().grammar)) { (counts, treewords) =>
+        val tree = treewords._1;
+        val words = treewords._2;
 
-      val treeCounts = treeToExpectedCounts(parser().grammar,parser().lexicon,tree,words);
-      val wordCounts = wordsToExpectedCounts(words, parser());
-      counts += treeCounts
-      counts -= wordCounts;
+        val treeCounts = treeToExpectedCounts(parser().grammar,parser().lexicon,tree,words);
+        val wordCounts = wordsToExpectedCounts(words, parser());
+        counts += treeCounts
+        counts -= wordCounts;
 
-      counts
+        counts
 
-    } { (ecounts1, ecounts2) =>
-      ecounts1 += ecounts2
+      } { (ecounts1, ecounts2) =>
+        ecounts1 += ecounts2
 
-      ecounts1
+        ecounts1
+      }
+
+      val grad = -expectedCountsToFeatureVector(ecounts)
+      println((norm(grad,2), ecounts.logProb));
+      (-ecounts.logProb, grad value);
+    }  catch {
+      case ex: UnaryClosureException =>
+        numFailures += 1;
+        if(numFailures > 10) throw ex;
+        ex.printStackTrace();
+        (Double.PositiveInfinity,indexedFeatures.mkDenseVector(0.0));
     }
 
-    val grad = -expectedCountsToFeatureVector(ecounts)
-    println((norm(grad,2), ecounts.logProb));
-
-    (-ecounts.logProb, grad value);
   }
 
   val indexedFeatures: FeatureIndexer[L2,W] = {
@@ -191,9 +202,8 @@ object LatentDiscriminativeTest extends ParserTester {
 
 
     val iterationsPerEval = config.readIn("iterations.eval",25);
-    val maxIterations = config.readIn("iterations.max",100);
-    val maxMStepIterations = config.readIn("iterations.mstep.max",80);
-    val regularization = config.readIn("objective.regularization",0.001);
+    val maxIterations = config.readIn("iterations.max",300);
+    val regularization = config.readIn("objective.regularization",0.01);
     val opt = new LBFGS[Int,DenseVector](iterationsPerEval,5) with ConsoleLogging;
 
     val init = obj.initialWeightVector;

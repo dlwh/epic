@@ -34,11 +34,14 @@ trait UnaryRuleClosure {
  * @author dlwh
  */
 object UnaryRuleClosure {
+
+  class UnaryClosureException(cause: Exception) extends Exception("Error computing closure",cause);
+
   def apply[L](g: Grammar[L])(implicit semiring: Semiring[Double]):UnaryRuleClosure = {
     computeClosure(g)(semiring);
   }
 
-  def computeClosure[L](g:Grammar[L])(implicit semiring: Semiring[Double]) = {
+  def computeClosure[L](g:Grammar[L])(implicit semiring: Semiring[Double]) = try {
     val unaryGraph = computeUnaryGraph(g);
     val childToParent = Distance.allPairDistances(unaryGraph);
     val parentToChild = Distance.allPairDistances(scalanlp.graphs.reverseWeighted(unaryGraph));
@@ -48,6 +51,10 @@ object UnaryRuleClosure {
       def closeFromChild(c: Int) = indexedC2P(c);
       def closeFromParent(p: Int) = indexedP2C(p);
     }
+  } catch {
+    case ex: ArithmeticException =>
+      throw new UnaryClosureException(ex);
+
   }
 
   private def indexMap[L](grammar: Grammar[L], map: Map[Int,Map[Int,Double]]):Array[SparseVector] = {
