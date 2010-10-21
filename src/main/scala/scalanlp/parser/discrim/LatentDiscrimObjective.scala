@@ -17,6 +17,8 @@ import scalala.Scalala._;
 import scalala.tensor.counters.Counters._
 import scalanlp.util._;
 
+import ChartParser.SpanFilter;
+
 /**
  * 
  * @author dlwh
@@ -35,6 +37,22 @@ class LatentDiscrimObjective[L,L2,W](feat: Featurizer[L2,W],
     splitRoot.head;
   }
 
+  val indexedFeatures: FeatureIndexer[L2,W] = {
+    val initGrammar = coarseParser.grammar;
+    val initLex = coarseParser.lexicon;
+    FeatureIndexer[L,L2,W](feat, initGrammar, initLex, splitLabel);
+  }
+
+  private val indexedProjections = Encoder.fromIndex(indexedFeatures.labelIndex).fillArray(-1);
+  for( (l,idx) <- indexedFeatures.labelIndex.zipWithIndex) {
+    indexedProjections(idx) = coarseParser.grammar.index(unsplit(l));
+  }
+
+
+  val treesWithCharts = trees.par.map { case (tree,words) =>
+    val filter = CoarseToFineParser.coarseSpanFilterFromParser(words,coarseParser, indexedProjections);
+    (tree,words,filter)
+  }
 
   def extractViterbiParser(weights: DenseVector) = {
     val grammar = weightsToGrammar(weights);
@@ -42,7 +60,7 @@ class LatentDiscrimObjective[L,L2,W](feat: Featurizer[L2,W],
     val cc = coarseParser.withCharts[ParseChart.ViterbiParseChart](ParseChart.viterbi);
     val parser = new CoarseToFineParser[ParseChart.ViterbiParseChart,L,L2,W](cc,
       unsplit, root, lexicon, grammar, ParseChart.viterbi);
-    //val parser = CKYParser(root, lexicon, grammar);
+   // val parser = CKYParser(root, lexicon, grammar);
     parser
   }
 
@@ -50,9 +68,9 @@ class LatentDiscrimObjective[L,L2,W](feat: Featurizer[L2,W],
     val grammar = weightsToGrammar(weights);
     val lexicon = weightsToLexicon(weights);
     val cc = coarseParser.withCharts[LogProbabilityParseChart](ParseChart.logProb);
-    val parser = new CoarseToFineParser[LogProbabilityParseChart,L,L2,W](cc,
-      unsplit, root, lexicon, grammar, ParseChart.logProb);
-   // val parser = new CKYParser[LogProbabilityParseChart,L2,W](root, lexicon, grammar, ParseChart.logProb);
+    //val parser = new CoarseToFineParser[LogProbabilityParseChart,L,L2,W](cc,
+    //  unsplit, root, lexicon, grammar, ParseChart.logProb);
+    val parser = new CKYParser[LogProbabilityParseChart,L2,W](root, lexicon, grammar, ParseChart.logProb);
     parser
   }
 
@@ -62,21 +80,14 @@ class LatentDiscrimObjective[L,L2,W](feat: Featurizer[L2,W],
 
     try {
       val parser = new ThreadLocal(extractLogProbParser(weights));
-      val ecounts = trees.par.fold(new ExpectedCounts[W](parser().grammar)) { (counts, treewords) =>
-        val tree = treewords._1;
-        val words = treewords._2;
+      val ecounts = treesWithCharts.par.fold(new ExpectedCounts[W](parser().grammar)) { (counts, treewordsfilter) =>
+        val (tree,words,spanFilter) = treewordsfilter;
 
         val treeCounts = treeToExpectedCounts(parser().grammar,parser().lexicon,tree,words);
-        val wordCounts = wordsToExpectedCounts(words, parser());
-        counts += treeCounts
-        counts -= wordCounts;
-
-        counts
-
+        val wordCounts = wordsToExpectedCounts(words, parser(), spanFilter);
+        counts += treeCounts -= wordCounts;
       } { (ecounts1, ecounts2) =>
         ecounts1 += ecounts2
-
-        ecounts1
       }
 
       val grad = -expectedCountsToFeatureVector(ecounts)
@@ -92,11 +103,6 @@ class LatentDiscrimObjective[L,L2,W](feat: Featurizer[L2,W],
 
   }
 
-  val indexedFeatures: FeatureIndexer[L2,W] = {
-    val initGrammar = coarseParser.grammar;
-    val initLex = coarseParser.lexicon;
-    FeatureIndexer[L,L2,W](feat, initGrammar, initLex, splitLabel);
-  }
 
   val splitOpenTags = {
     for(t <- openTags; s <- splitLabel(t))  yield s;
@@ -112,8 +118,8 @@ class LatentDiscrimObjective[L,L2,W](feat: Featurizer[L2,W],
     grammar;
   }
 
-  def wordsToExpectedCounts(words: Seq[W], parser: ChartParser[LogProbabilityParseChart,L2,W]) = {
-    val ecounts = new InsideOutside(parser).expectedCounts(words);
+  def wordsToExpectedCounts(words: Seq[W], parser: ChartParser[LogProbabilityParseChart,L2,W], spanFilter: SpanFilter = ChartParser.defaultFilterBoxed) = {
+    val ecounts = new InsideOutside(parser).expectedCounts(words, spanFilter);
     ecounts
   }
 
