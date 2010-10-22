@@ -148,7 +148,7 @@ class DiscrimObjective[L,W](feat: Featurizer[L,W],
 }
 
 
-object DiscriminativeTest extends ParserTester {
+object DiscriminativeTrainer extends ParserTrainer {
 
   def trainParser(trainTrees: Seq[(BinarizedTree[String],Seq[String])],
                   devTrees: Seq[(BinarizedTree[String],Seq[String])],

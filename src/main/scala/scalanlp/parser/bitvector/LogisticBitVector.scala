@@ -181,7 +181,7 @@ class LogisticBitVector[L,W](treebank: StateSplitting.Treebank[L,W],
 
 }
 
-object LogisticBitVectorTest extends ParserTester {
+object LogisticBitVectorTrainer extends ParserTrainer {
 
 
   def trainParser(trainTrees: Seq[(BinarizedTree[String],Seq[String])],
@@ -235,7 +235,7 @@ object LogisticBitVectorTest extends ParserTester {
 }
 
 
-object LBFGSBitVectorTest extends ParserTester {
+object LBFGSBitVectorTrainer extends ParserTrainer {
 
   def trainParser(trainTrees: Seq[(BinarizedTree[String],Seq[String])],
                   devTrees: Seq[(BinarizedTree[String],Seq[String])],

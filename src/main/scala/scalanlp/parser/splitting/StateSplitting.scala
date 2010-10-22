@@ -23,7 +23,7 @@ import scalanlp.config.Configuration
 import scalala.tensor.counters.Counters._;
 import scalala.tensor.counters.LogCounters;
 import scalanlp.math.Numerics.logSum;
-import scalanlp.parser.ParserTester
+import scalanlp.parser.ParserTrainer
 import scalanlp.parser._;
 import scalanlp.trees.BinarizedTree
 import scalanlp.trees.BinaryTree
@@ -323,7 +323,7 @@ object StateSplitting {
 
 }
 
-object StateSplittingTest extends ParserTester {
+object StateSplittingTrainer extends ParserTrainer {
   def trainParser(trainTrees: Seq[(BinarizedTree[String],Seq[String])],
                   devTrees: Seq[(BinarizedTree[String],Seq[String])],
                   config: Configuration) = {

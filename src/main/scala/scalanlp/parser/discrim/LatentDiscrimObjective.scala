@@ -168,7 +168,7 @@ class LatentDiscrimObjective[L,L2,W](feat: Featurizer[L2,W],
 }
 
 
-object LatentDiscriminativeTest extends ParserTester {
+object LatentDiscriminativeTrainer extends ParserTrainer {
 
   def trainParser(trainTrees: Seq[(BinarizedTree[String],Seq[String])],
                   devTrees: Seq[(BinarizedTree[String],Seq[String])],

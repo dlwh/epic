@@ -11,7 +11,7 @@ import scalanlp.trees.Tree
 import scalanlp.trees.Treebank
 import scalanlp.trees.Trees
 
-trait ParserTester {
+trait ParserTrainer {
   def trainParser(trainTrees: Seq[(BinarizedTree[String],Seq[String])],
                   devTrees: Seq[(BinarizedTree[String],Seq[String])],
                   config: Configuration):Iterator[(String,Parser[String,String])];

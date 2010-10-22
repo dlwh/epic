@@ -78,7 +78,7 @@ object GenerativeParser {
   }
 }
 
-object GenerativeTester extends ParserTester {
+object GenerativeTrainer extends ParserTrainer {
   def trainParser(trainTrees: Seq[(BinarizedTree[String],Seq[String])],
                   devTrees: Seq[(BinarizedTree[String],Seq[String])],
                   config: Configuration) = Iterator.single(("Gen",GenerativeParser.fromTrees(trainTrees)));
