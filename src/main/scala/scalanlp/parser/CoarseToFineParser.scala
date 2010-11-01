@@ -76,7 +76,7 @@ object CoarseToFineParser {
   }
 }
 
-object SimpleCoarseToFineTester extends ParserTester {
+object SimpleCoarseToFineTrainer extends ParserTrainer {
   def trainParser(trainTrees: Seq[(BinarizedTree[String],Seq[String])],
                   devTrees: Seq[(BinarizedTree[String],Seq[String])],
                   config: Configuration) = {
