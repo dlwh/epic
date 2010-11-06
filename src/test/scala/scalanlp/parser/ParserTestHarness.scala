@@ -9,7 +9,7 @@ import scalanlp.trees.{TstTreebank, Trees, Tree, BinarizedTree}
  */
 trait ParserTestHarness {
   def getTrainTrees(binarization:(Tree[String]=>BinarizedTree[String]) = (Trees.xBarBinarize _),
-                    maxLength:Int= 10) = {
+                    maxLength:Int= 15) = {
     val treebank = {
       TstTreebank.treebank;
     }
@@ -17,7 +17,7 @@ trait ParserTestHarness {
   }
 
   def getTestTrees(binarization:(Tree[String]=>BinarizedTree[String]) = (Trees.xBarBinarize _),
-                   maxLength:Int= 10) = {
+                   maxLength:Int= 15) = {
     val treebank = {
       TstTreebank.treebank;
     }
@@ -26,7 +26,7 @@ trait ParserTestHarness {
 
   def massageTrees(trees: Iterator[(Tree[String],Seq[String])],
                    binarize:(Tree[String]=>BinarizedTree[String]) = (Trees.xBarBinarize _),
-                   maxLength:Int=10) = {
+                   maxLength:Int=15) = {
     val xform = Trees.Transforms.StandardStringTransform;
     val trainTrees = ArrayBuffer() ++= (for( (tree,words) <- trees.filter(_._2.length <= maxLength))
     yield (binarize(xform(tree)),words));

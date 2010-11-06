@@ -7,7 +7,7 @@ import scalanlp.trees.Tree
 import ChartParser._;
 import ParseChart.Factory;
 
-trait ChartParser[Chart[X]<:ParseChart[X],L,W] extends Parser[L,W] {
+trait ChartParser[Chart[X]<:ParseChart[X],L,W] extends Parser[L,W] with ViterbiDecoder[L] {
   /**
    * Given a sentence s, fills a parse chart with inside scores.
    * validSpan can be used as a filter to insist that certain ones are valid.
@@ -28,7 +28,7 @@ trait ChartParser[Chart[X]<:ParseChart[X],L,W] extends Parser[L,W] {
   def scores(s: Seq[W]) = {
     try {
       val chart = buildInsideChart(s);
-      val bestParse = chart.buildTree(0,s.length,grammar.index(root));
+      val bestParse = extractBestParse(root, chart, buildOutsideChart(chart));
       val c = DoubleCounter[Tree[L]]();
       c(bestParse) = chart.labelScore(0, s.length, root);
       c;

@@ -27,7 +27,7 @@ import scalanlp.util.Implicits._
 import scalala.tensor.sparse.SparseVector
 import collection.mutable.BitSet;
 
-abstract class ParseChart[L](grammar: Grammar[L], val length: Int) {
+abstract class ParseChart[L](val grammar: Grammar[L], val length: Int) {
 
   private val score = TriangularArray.raw(length+1, grammar.mkDenseVector(zero));
   // which labels have been entered.
@@ -126,39 +126,6 @@ abstract class ParseChart[L](grammar: Grammar[L], val length: Int) {
     "ParseChart[" + data + "]";
   }
 
-
-  def buildTree(start: Int, end: Int, root: Int):BinarizedTree[L] = {
-    val scoreToFind = labelScore(start,end,root);
-    var closest = Double.NaN;
-    for {
-      split <- (start + 1) until end;
-      (b,childScores) <- grammar.binaryRulesByIndexedParent(root);
-      (c,ruleScore) <- childScores
-    } {
-      val score = ruleScore + labelScore(start,split,b) + labelScore(split,end,c);
-      if(score closeTo scoreToFind) {
-        val left = buildTree(start,split,b);
-        val right = buildTree(split,end,c);
-        return BinaryTree(grammar.index.get(root),left,right)(Span(start,end));
-      } else if(closest.isNaN || (score - scoreToFind).abs < (scoreToFind - closest).abs) {
-        closest = score;
-      }
-    }
-    for {
-      (b,ruleScore) <- grammar.unaryRulesByIndexedParent(root)
-    } {
-      val score = ruleScore + labelScore(start,end,b);
-      if(score closeTo scoreToFind) {
-        val child = buildTree(start,end,b);
-        return UnaryTree(grammar.index.get(root),child)(Span(start,end));
-      } else if(closest.isNaN || (score - scoreToFind).abs < (scoreToFind - closest).abs) {
-        closest = score;
-      }
-    }
-    if(start +1 == end) // lexical
-      NullaryTree(grammar.index.get(root))(Span(start,end));
-    else error("Couldn't find a tree!" + closest + " " + start + " " + end + " " + grammar.index.get(root));
-  }
 }
 
 

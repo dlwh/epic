@@ -12,7 +12,7 @@ import org.scalatest.prop._;
 @RunWith(classOf[JUnitRunner])
 class CoarseToFineTest extends ParserTestHarness with FunSuite {
 
-  test("test on simpleGrammar") {
+  test("coarse2fine parser shouldn't be lossy wrt generative parser") {
     val trainTrees = getTrainTrees();
     def proj(label: String) =  if(label == "" ) label else "X";
     val coarseTrees = for {
@@ -28,6 +28,7 @@ class CoarseToFineTest extends ParserTestHarness with FunSuite {
     val rctf = evalParser(getTestTrees(),fine)
     val rgen = evalParser(getTestTrees(),gen)
     assert(rctf === rgen);
+    //assert(rgen._4 > 0.6, rgen);
 
   }
 

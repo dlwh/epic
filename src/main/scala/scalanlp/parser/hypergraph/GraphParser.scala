@@ -17,14 +17,10 @@ package scalanlp.parser.hypergraph
 
 
 
-import scalanlp.parser.ParseChart
-import scalanlp.parser.Lexicon
-import scalanlp.parser.ParseChart
-import scalanlp.parser.Parser
 import scala.collection.mutable.PriorityQueue
 import scalala.tensor.counters.Counters.DoubleCounter
-import scalanlp.parser.Grammar
-import scalanlp.trees.Span;
+import scalanlp.trees.Span
+import scalanlp.parser._;
 import scalanlp.trees.Tree
 import scala.util.control.Breaks._;
 import scala.util.control.Breaks;
@@ -138,7 +134,8 @@ class GraphParser[L,W](root: L, lexicon: Lexicon[L,W], g: Grammar[L]) extends Pa
       }
     }
 
-    val bestParse = chart.buildTree(0, s.length, g.index(root));
+    // TODO: graph outside scores (?)
+    val bestParse = new ViterbiDecoder[L]{}.extractBestParse(root, chart, null);
     val c = DoubleCounter[Tree[L]]();
     c(bestParse) = chart.labelScore(0, s.length, root);
     c;
