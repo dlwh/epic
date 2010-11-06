@@ -16,17 +16,9 @@ package scalanlp.trees
 */
 
 
-import java.io.BufferedInputStream
-import java.io.BufferedOutputStream
-import java.io.DataInputStream
-import java.io.DataOutputStream
-import java.io.File
-import java.io.FileOutputStream
-import java.util.zip.ZipEntry
-import java.util.zip.ZipFile
-import java.util.zip.ZipOutputStream
-import scala.collection.mutable.ArrayBuffer
-import scalanlp.serialization.DataSerialization;
+import scalanlp.serialization.DataSerialization
+import java.util.zip.{ZipEntry, ZipFile, ZipOutputStream}
+import java.io._;
 import scalanlp.serialization.DataSerialization._;
 import scalanlp.util.Index
 
@@ -50,7 +42,8 @@ object DenseTreebank {
       }
       write(dos,false);
       dos.flush();
-      zipWriter.closeEntry();
+      zipWriter
+              .closeEntry();
     }
 
 

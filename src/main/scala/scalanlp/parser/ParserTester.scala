@@ -56,7 +56,7 @@ trait ParserTrainer {
 
   protected def evalParser(testTrees: IndexedSeq[(Tree[String],Seq[String])], parser: Parser[String,String], name: String) = {
     println("Evaluating Parser...");
-    val (prec,recall,exact) = ParseEval.evaluate(testTrees,parser,name);
+    val (prec,recall,exact) = ParseEval.evaluateAndLog(testTrees,parser,name);
     val f1 = (2 * prec * recall)/(prec + recall);
     println("Eval finished. Results:");
     println( "P: " + prec + " R:" + recall + " F1: " + f1 +  " Ex:" + exact);

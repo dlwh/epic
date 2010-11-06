@@ -75,9 +75,33 @@ class ParseEval[L](ignoredLabels: Set[L]) {
 }
 
 object ParseEval {
-  def evaluate(trees: IndexedSeq[(Tree[String],Seq[String])], parser: Parser[String,String], evalDir: String) = {
+
+  type PostParseFn = (Tree[String],Tree[String],Seq[String],ParseEval[String]#Statistics,Int)=>Unit;
+  val noPostParseFn = (_:Tree[String],_:Tree[String],_:Seq[String],_:ParseEval[String]#Statistics,_:Int)=>()
+
+  def evaluate(trees: IndexedSeq[(Tree[String],Seq[String])],
+               parser: Parser[String,String],
+               postEval: PostParseFn = noPostParseFn) = {
+
     val peval = new ParseEval(Set("","''", "``", ".", ":", ","));
     import peval.Statistics;
+
+    def evalSentence(sent: (Tree[String],Seq[String])) = {
+      val (goldTree,words) = sent;
+      val startTime = System.currentTimeMillis;
+      val guessTree = Trees.debinarize(parser(words))
+      val stats = peval(guessTree,goldTree);
+      val endTime = System.currentTimeMillis;
+      postEval(guessTree,goldTree,words,stats,(endTime-startTime).toInt);
+      stats;
+    }
+    val stats = trees.par.withSequentialThreshold(100).mapReduce({ evalSentence(_:(Tree[String],Seq[String]))},{ (_:Statistics) + (_:Statistics)});
+
+    val (prec,recall,exact) = (stats.precision,stats.recall,stats.exact);
+    (prec,recall,exact);
+  }
+
+  def evaluateAndLog(trees: IndexedSeq[(Tree[String],Seq[String])], parser: Parser[String,String], evalDir: String) = {
 
     val parsedir = new File(evalDir);
     parsedir.exists() || parsedir.mkdirs() || error("Couldn't make directory: " + parsedir);
@@ -94,13 +118,8 @@ object ParseEval {
       }
     }
 
-
-    def evalSentence(sent: (Tree[String],Seq[String])) = {
-      val (goldTree,words) = sent;
-      val startTime = System.currentTimeMillis;
-      val guessTree = Trees.debinarize(parser(words))
-      val stats = peval(guessTree,goldTree);
-      val endTime = System.currentTimeMillis;
+    def postEval(guessTree: Tree[String], goldTree: Tree[String], words: Seq[String],
+                 stats: ParseEval[String]#Statistics, time: Int) = {
       val buf = new StringBuilder();
       buf ++= "======\n";
       buf ++= words.mkString(",");
@@ -109,19 +128,15 @@ object ParseEval {
       buf ++= "\nGuess:\n";
       buf ++= guessTree.render(words);
       buf ++= ("\nLocal Accuracy:" + (stats.precision,stats.recall,stats.exact) + "\n") ;
-      buf ++= ((endTime - startTime) / 1000.0 + " Seconds")
+      buf ++= (time / 1000.0 + " Seconds")
       buf ++= "\n======";
-      appender ! Some((guessTree.render(words,newline=false)), goldTree.render(words,newline=false));
       println(buf.toString);
-      stats;
+      appender ! Some((guessTree.render(words,newline=false)), goldTree.render(words,newline=false));
     }
-    val stats = trees.par.withSequentialThreshold(100).mapReduce({ evalSentence(_:(Tree[String],Seq[String]))},{ (_:Statistics) + (_:Statistics)});
+
+    val r = evaluate(trees,parser,postEval _);
     appender ! None;
-
-
-  //  val stats = trees.view.map{ evalSentence(_)}.reduceLeft{ (_:Statistics) + (_:Statistics)};
-    val (prec,recall,exact) = (stats.precision,stats.recall,stats.exact);
-    (prec,recall,exact);
+    r
   }
 }
 
