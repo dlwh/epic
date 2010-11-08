@@ -1,4 +1,5 @@
 package scalanlp.parser
+package projections
 
 /**
  * A trait for projecting charts from coarse to fine.

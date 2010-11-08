@@ -2,6 +2,7 @@ package scalanlp.parser
 package discrim
 
 import scalala.tensor.dense.DenseVector
+import scalanlp.parser.projections._;
 import scalanlp.trees._
 import scalanlp.config.Configuration
 import scalanlp.util.{ConsoleLogging, Log}

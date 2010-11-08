@@ -1,4 +1,5 @@
 package scalanlp.parser
+package projections
 
 import org.junit.runner.RunWith;
 import org.scalatest._;
