@@ -47,6 +47,12 @@ trait Grammar[L] extends Encoder[L] {
    */
   def unaryRulesByIndexedParent(c: Int): SparseVector;
 
+  /**
+   * Returns true if the label has no productions with it on the LHS.
+   */
+  def isPreterminal(label: Int): Boolean = {
+    unaryRulesByIndexedParent(label).used == 0 && binaryRulesByIndexedParent(label).size == 0;
+  }
 
   /**
    * Returns a SparseArray[Vector] with RightIndex -> ParentIndex -> Score
@@ -91,18 +97,20 @@ class GenerativeGrammar[L](productions: LogPairedDoubleCounter[L,Rule[L]]) exten
     for((a,ctr) <- productions.rows;
         (prod,score) <- ctr) {
       assert(score <= 0,(score,a,prod)+" " + ctr);
-      prod match {
-        case u@UnaryRule(_,b) =>
-          childUnaryParents(b,u) = score;
-          unaryRules(a,u) = score;
-          index.index(a);
-          index.index(b);
-        case br@BinaryRule(_,b,c) =>
-          leftChildBinaryRules(b,br) = score;
-          binaryRules(a,br) = score;
-          index.index(a)
-          index.index(b);
-          index.index(c);
+      if(score != Double.NegativeInfinity) {
+        prod match {
+          case u@UnaryRule(_,b) =>
+            childUnaryParents(b,u) = score;
+            unaryRules(a,u) = score;
+            index.index(a);
+            index.index(b);
+          case br@BinaryRule(_,b,c) =>
+            leftChildBinaryRules(b,br) = score;
+            binaryRules(a,br) = score;
+            index.index(a)
+            index.index(b);
+            index.index(c);
+        }
       }
     }
     index

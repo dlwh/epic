@@ -86,7 +86,7 @@ object ParseEval {
     val peval = new ParseEval(Set("","''", "``", ".", ":", ","));
     import peval.Statistics;
 
-    def evalSentence(sent: (Tree[String],Seq[String])) = {
+    def evalSentence(sent: (Tree[String],Seq[String])) = try {
       val (goldTree,words) = sent;
       val startTime = System.currentTimeMillis;
       val guessTree = Trees.debinarize(parser(words))
@@ -94,6 +94,8 @@ object ParseEval {
       val endTime = System.currentTimeMillis;
       postEval(guessTree,goldTree,words,stats,(endTime-startTime).toInt);
       stats;
+    } catch {
+      case e:RuntimeException => throw new RuntimeException("Error parsing: " + sent._1.render(sent._2), e);
     }
     val stats = trees.par.withSequentialThreshold(100).mapReduce({ evalSentence(_:(Tree[String],Seq[String]))},{ (_:Statistics) + (_:Statistics)});
 

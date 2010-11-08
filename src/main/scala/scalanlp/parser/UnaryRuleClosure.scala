@@ -41,7 +41,7 @@ object UnaryRuleClosure {
     computeClosure(g)(semiring);
   }
 
-  def computeClosure[L](g:Grammar[L])(implicit semiring: Semiring[Double]) = try {
+  def computeClosure[L](g:Grammar[L])(implicit semiring: Semiring[Double]):UnaryRuleClosure = try {
     val unaryGraph = computeUnaryGraph(g);
     val childToParent = Distance.allPairDistances(unaryGraph);
     val parentToChild = Distance.allPairDistances(scalanlp.graphs.reverseWeighted(unaryGraph));
@@ -57,10 +57,10 @@ object UnaryRuleClosure {
 
   }
 
-  private def indexMap[L](grammar: Grammar[L], map: Map[Int,Map[Int,Double]]):Array[SparseVector] = {
+  private def indexMap[L](grammar: Grammar[L], map: Map[Int,Map[Int,Double]])(implicit semiring: Semiring[Double]):Array[SparseVector] = {
     Array.tabulate(grammar.index.size){i =>
       val sparse = grammar.mkSparseVector(Double.NegativeInfinity);
-      for( (k,v) <- map.getOrElse(i,Map.empty)) sparse(k) = v;
+      for( (k,v) <- map.getOrElse(i,Map.empty) if v != semiring.zero) sparse(k) = v;
       sparse
     };
   }

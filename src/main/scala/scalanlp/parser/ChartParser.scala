@@ -66,7 +66,7 @@ class CKYParser[Chart[X]<:ParseChart[X], L,W](val root: L,
                                               chartFactory: Factory[Chart] = ParseChart.viterbi)
         extends ChartParser[Chart,L,W] {
 
-  private lazy val unaryClosure: UnaryRuleClosure = chartFactory.computeUnaryClosure(grammar);
+  lazy val unaryClosure: UnaryRuleClosure = chartFactory.computeUnaryClosure(grammar);
 
   def withCharts[Chart[X]<:ParseChart[X]](factory: ParseChart.Factory[Chart]):ChartParser[Chart,L,W] = {
     new CKYParser[Chart,L,W](root,lexicon,grammar,factory);
