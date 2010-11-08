@@ -44,10 +44,8 @@ class LatentDiscrimObjective[L,L2,W](feat: Featurizer[L2,W],
     FeatureIndexer[L,L2,W](feat, initGrammar, initLex, splitLabel);
   }
 
-  private val indexedProjections = Encoder.fromIndex(indexedFeatures.labelIndex).fillArray(-1);
-  for( (l,idx) <- indexedFeatures.labelIndex.zipWithIndex) {
-    indexedProjections(idx) = coarseParser.grammar.index(unsplit(l));
-  }
+  private val indexedProjections = new ProjectionIndexer(coarseParser.grammar.index,
+    indexedFeatures.labelIndex, unsplit);
 
 
   val treesWithCharts = trees.par.map { case (tree,words) =>

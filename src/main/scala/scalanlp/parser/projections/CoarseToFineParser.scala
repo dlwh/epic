@@ -16,10 +16,8 @@ class CoarseToFineParser[Chart[X]<:ParseChart[X],C,F,W](coarseParser: ChartParse
                                 chartFactory: ParseChart.Factory[Chart] = ParseChart.viterbi,
                                 threshold:Double = -10) extends ChartParser[Chart,F,W] {
 
-  private val indexedProjections = grammar.fillArray(-1);
-  for( (l,idx) <- grammar.index.zipWithIndex) {
-    indexedProjections(idx) = coarseParser.grammar.index(proj(l));
-  }
+  val indexedProjections = new ProjectionIndexer(coarseParser.grammar.index, grammar.index, proj);
+
   private val coarseRootIndex = coarseParser.grammar.index(proj(root));
 
   private val fineParser = new CKYParser[Chart,F,W](root,lexicon,grammar,chartFactory);
