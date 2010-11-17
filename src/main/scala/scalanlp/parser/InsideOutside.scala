@@ -24,7 +24,7 @@ class InsideOutside[L,W](val parser: ChartParser[LogProbabilityParseChart,L,W]) 
   def lexicon = parser.lexicon;
   def root = parser.root;
 
-  def expectedCounts(words: Seq[W], validSpan:ChartParser.SpanFilter =ChartParser.defaultFilterBoxed):ExpectedCounts[W] = {
+  def expectedCounts(words: Seq[W], validSpan: SpanScorer =defaultScorer):ExpectedCounts[W] = {
     val inside = parser.buildInsideChart(words, validSpan);
     val outside = parser.buildOutsideChart(inside, validSpan);
     val totalProb = inside.labelScore(0, words.length, root);
@@ -56,7 +56,7 @@ class InsideOutside[L,W](val parser: ChartParser[LogProbabilityParseChart,L,W]) 
   private def computeBinaryCounts(words: scala.Seq[W],
                                   inside: LogProbabilityParseChart[L],
                                   outside: LogProbabilityParseChart[L],
-                                  validSpan: SpanFilter, totalProb: Double) = {
+                                  validSpan: SpanScorer, totalProb: Double) = {
     val binaryRuleCounts = grammar.fillSparseArray(grammar.fillSparseArray(grammar.mkVector(0.0)));
     // handle binary rules
     for{
@@ -79,7 +79,7 @@ class InsideOutside[L,W](val parser: ChartParser[LogProbabilityParseChart,L,W]) 
             val aScore = outside.labelScore(begin, end, a);
             i += 1;
             if (!aScore.isInfinite) {
-              val prob = bScore + cScore + aScore + rScore - totalProb;
+              val prob = bScore + cScore + aScore + rScore + validSpan.scoreBinaryRule(begin,split, end,a,b,c)  - totalProb;
               binaryRuleCounts.getOrElseUpdate(a).getOrElseUpdate(b)(c) += exp(prob);
               assert(binaryRuleCounts(a)(b)(c) >= exp(prob),binaryRuleCounts(a)(b)(c) + " " + exp(prob));
             }
@@ -93,7 +93,7 @@ class InsideOutside[L,W](val parser: ChartParser[LogProbabilityParseChart,L,W]) 
   private def computeUnaryCounts(words: scala.Seq[W],
                                  inside: LogProbabilityParseChart[L],
                                  outside: LogProbabilityParseChart[L],
-                                 validSpan: SpanFilter,
+                                 validSpan: SpanScorer,
                                  totalProb: Double): SparseArray[Vector] = {
     val unaryRuleCounts = grammar.fillSparseArray(grammar.mkVector(0.0));
     for{
@@ -110,11 +110,9 @@ class InsideOutside[L,W](val parser: ChartParser[LogProbabilityParseChart,L,W]) 
           val a = parentVector.index(i);
           val rScore = parentVector.data(i);
           val aScore = outside.labelScore(begin, end, a);
+          val prob = bScore + aScore + rScore + validSpan.scoreUnaryRule(begin,end,a,b) - totalProb;
+          unaryRuleCounts.getOrElseUpdate(a)(b) += exp(prob);
           i += 1;
-          if ((validSpan eq defaultFilterBoxed) || validSpan(begin, end, a)) {
-            val prob = bScore + aScore + rScore - totalProb;
-            unaryRuleCounts.getOrElseUpdate(a)(b) += exp(prob);
-          }
         }
       }
     }

@@ -18,8 +18,6 @@ import scalala.Scalala._;
 import scalala.tensor.counters.Counters._
 import scalanlp.util._;
 
-import ChartParser.SpanFilter;
-
 /**
  * 
  * @author dlwh
@@ -49,7 +47,7 @@ class LatentDiscrimObjective[L,L2,W](feat: Featurizer[L2,W],
 
 
   val treesWithCharts = trees.par.map { case (tree,words) =>
-    val filter = CoarseToFineParser.coarseSpanFilterFromParser(words,coarseParser, indexedProjections);
+    val filter = CoarseToFineParser.coarseSpanScorerFromParser(words,coarseParser, indexedProjections);
     (tree,words,filter)
   }
 
@@ -80,10 +78,10 @@ class LatentDiscrimObjective[L,L2,W](feat: Featurizer[L2,W],
     try {
       val parser = new ThreadLocal(extractLogProbParser(weights));
       val ecounts = treesWithCharts.par.fold(new ExpectedCounts[W](parser().grammar)) { (counts, treewordsfilter) =>
-        val (tree,words,spanFilter) = treewordsfilter;
+        val (tree,words,spanScorer) = treewordsfilter;
 
         val treeCounts = treeToExpectedCounts(parser().grammar,parser().lexicon,tree,words);
-        val wordCounts = wordsToExpectedCounts(words, parser(), spanFilter);
+        val wordCounts = wordsToExpectedCounts(words, parser(), spanScorer);
         counts += treeCounts -= wordCounts;
       } { (ecounts1, ecounts2) =>
         ecounts1 += ecounts2
@@ -117,8 +115,8 @@ class LatentDiscrimObjective[L,L2,W](feat: Featurizer[L2,W],
     grammar;
   }
 
-  def wordsToExpectedCounts(words: Seq[W], parser: ChartParser[LogProbabilityParseChart,L2,W], spanFilter: SpanFilter = ChartParser.defaultFilterBoxed) = {
-    val ecounts = new InsideOutside(parser).expectedCounts(words, spanFilter);
+  def wordsToExpectedCounts(words: Seq[W], parser: ChartParser[LogProbabilityParseChart,L2,W], spanScorer: SpanScorer = ChartParser.defaultScorer) = {
+    val ecounts = new InsideOutside(parser).expectedCounts(words, spanScorer);
     ecounts
   }
 

@@ -12,11 +12,11 @@ trait ChartParser[Chart[X]<:ParseChart[X],L,W] extends Parser[L,W] with ViterbiD
    * Given a sentence s, fills a parse chart with inside scores.
    * validSpan can be used as a filter to insist that certain ones are valid.
    */
-  def buildInsideChart(s: Seq[W], validSpan: SpanFilter = defaultFilter):Chart[L];
+  def buildInsideChart(s: Seq[W], validSpan: SpanScorer = defaultScorer):Chart[L];
   /**
    * Given an inside chart, fills the passed-in outside parse chart with inside scores.
    */
-  def buildOutsideChart(inside: ParseChart[L], validSpan: SpanFilter = defaultFilter):Chart[L];
+  def buildOutsideChart(inside: ParseChart[L], validSpan: SpanScorer = defaultScorer):Chart[L];
 
   def grammar: Grammar[L];
   def root: L;
@@ -40,17 +40,11 @@ trait ChartParser[Chart[X]<:ParseChart[X],L,W] extends Parser[L,W] with ViterbiD
 }
 
 object ChartParser {
-  /**
-   *  A spanfilter decides whether or not a label is acceptible for a
-   * given span. The parameters are begin, end, label, where label
-   * is the index of the label in the grammar the chart parser is using.
-   */
-  type SpanFilter = (Int,Int,Int)=>Boolean;
-  def defaultFilter(begin: Int, end: Int, label: Int) = true;
-  // optimization: use the single version of defaultFilter by default so that we can
-  // do a reference equality check and avoid the method call in the common case.
-  // Yes, this showed up in a profile.
-  val defaultFilterBoxed:SpanFilter = defaultFilter _;
+  val defaultScorer = new SpanScorer {
+    def scoreUnaryRule(begin: Int, end: Int, parent: Int, child: Int) = 0.0;
+
+    def scoreBinaryRule(begin: Int, split: Int, end: Int, parent: Int, leftChild: Int, rightChild: Int) = 0.0
+  }
 
   def apply[Chart[X]<:ParseChart[X],L,W](root: L, lexicon: Lexicon[L,W],
                                          grammar: Grammar[L],
@@ -73,7 +67,7 @@ class CKYParser[Chart[X]<:ParseChart[X], L,W](val root: L,
   }
 
   def buildInsideChart(s: Seq[W],
-                       validSpan: SpanFilter = defaultFilterBoxed):Chart[L] = {
+                       validSpan: SpanScorer = defaultScorer):Chart[L] = {
     val chart = chartFactory(grammar,s.length);
 
     for{i <- 0 until s.length} {
@@ -103,11 +97,14 @@ class CKYParser[Chart[X]<:ParseChart[X], L,W](val root: L,
             var i = 0;
             while(i < parentVector.used) {
               val a = parentVector.index(i);
-              val aScore = parentVector.data(i);
-              i += 1;
-              if((validSpan eq defaultFilterBoxed) || validSpan(begin,end,a)) {
-                val prob = bScore + cScore + aScore;
-                chart.enter(begin,end,a,prob);
+              val spanScore = validSpan.scoreBinaryRule(begin,split,end,a,b,c);
+              if(spanScore != Double.NegativeInfinity) {
+                val aScore = parentVector.data(i) + spanScore;
+                i += 1;
+                if(aScore != Double.NegativeInfinity) {
+                  val prob = bScore + cScore + aScore;
+                  chart.enter(begin,end,a,prob);
+                }
               }
             }
           }
@@ -120,7 +117,7 @@ class CKYParser[Chart[X]<:ParseChart[X], L,W](val root: L,
 
 
   def buildOutsideChart(inside: ParseChart[L],
-                         validSpan: SpanFilter = defaultFilterBoxed):Chart[L] = {
+                         validSpan: SpanScorer = defaultScorer):Chart[L] = {
     val length = inside.length;
     val outside = chartFactory(grammar,length);
     outside.enter(0,inside.length,grammar.index(root),0.0);
@@ -143,13 +140,18 @@ class CKYParser[Chart[X]<:ParseChart[X], L,W](val root: L,
         if(!java.lang.Double.isInfinite(bInside)) {
           val cInside = inside.labelScore(split,end,c);
           if(!java.lang.Double.isInfinite(cInside)) {
-            val bOutside = aOutside + cInside;
-            if((validSpan eq defaultFilterBoxed) || validSpan(begin,split,b))
-              outside.enter(begin,split,b,bOutside);
+            val spanScore = validSpan.scoreBinaryRule(begin,split,end,a,b,c);
+            if(spanScore != Double.NegativeInfinity) {
+              val bOutside = aOutside + cInside + spanScore;
+              if(bOutside != Double.NegativeInfinity) {
+                outside.enter(begin,split,b,bOutside);
+              }
 
-            val cOutside = aOutside + bInside;
-            if( (validSpan eq defaultFilterBoxed) || validSpan(split,end,c))
-              outside.enter(split,end,c,cOutside);
+              val cOutside = aOutside + bInside + spanScore;
+              if( cOutside != Double.NegativeInfinity) {
+                outside.enter(split,end,c,cOutside);
+              }
+            }
           }
         }
       }
@@ -158,7 +160,7 @@ class CKYParser[Chart[X]<:ParseChart[X], L,W](val root: L,
     outside;
   }
 
-  private def updateInsideUnaries(chart: ParseChart[L], begin: Int, end: Int, validSpan: SpanFilter) = {
+  private def updateInsideUnaries(chart: ParseChart[L], begin: Int, end: Int, validSpan: SpanScorer) = {
     val newMass = grammar.mkVector(Double.NegativeInfinity);
     for(b <- chart.enteredLabelIndexes(begin,end)) {
       val bScore = chart.labelScore(begin,end,b);
@@ -168,8 +170,9 @@ class CKYParser[Chart[X]<:ParseChart[X], L,W](val root: L,
         val a = parentVector.index(j);
         if(a != b) {
           val aScore = parentVector.data(j);
-          val prob = aScore + bScore;
-          if(validSpan(begin,end,a)) {
+          // TODO: this isn't a rule, but a chain. RAWR
+          val prob = aScore + bScore + validSpan.scoreUnaryRule(begin, end, a, b);
+          if(prob != Double.NegativeInfinity) {
             newMass(a) = chart.sum(newMass(a),prob);
           }
         }
@@ -183,7 +186,7 @@ class CKYParser[Chart[X]<:ParseChart[X], L,W](val root: L,
 
   }
 
-  private def updateOutsideUnaries(outside: ParseChart[L], begin: Int, end: Int, validSpan: SpanFilter) = {
+  private def updateOutsideUnaries(outside: ParseChart[L], begin: Int, end: Int, validSpan: SpanScorer) = {
     val newMass = grammar.mkVector(Double.NegativeInfinity);
     for(a <- outside.enteredLabelIndexes(begin,end)) {
       val aScore = outside.labelScore(begin,end,a);
@@ -193,8 +196,8 @@ class CKYParser[Chart[X]<:ParseChart[X], L,W](val root: L,
         val b = childVector.index(j);
         if(a != b) {
           val bScore = childVector.data(j);
-          val prob = aScore + bScore;
-          if(validSpan(begin,end,b)) {
+          val prob = aScore + bScore + validSpan.scoreUnaryRule(begin,end,a,b);
+          if(prob != Double.NegativeInfinity) {
             newMass(b) = outside.sum(newMass(b),prob);
           }
         }

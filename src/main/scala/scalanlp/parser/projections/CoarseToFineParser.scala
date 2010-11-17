@@ -22,19 +22,18 @@ class CoarseToFineParser[Chart[X]<:ParseChart[X],C,F,W](coarseParser: ChartParse
 
   private val fineParser = new CKYParser[Chart,F,W](root,lexicon,grammar,chartFactory);
 
-  def buildInsideChart(s: Seq[W], validSpan: SpanFilter = defaultFilter):Chart[F] = {
-    val chartFilterer = coarseSpanFilterFromParser(s, coarseParser, indexedProjections, threshold);
-    def spanFilter(begin:Int, end:Int, label: Int) = validSpan(begin,end,label) && chartFilterer(begin,end,label)
-
-    fineParser.buildInsideChart(s,spanFilter _);
+  def buildInsideChart(s: Seq[W], validSpan: SpanScorer = defaultScorer):Chart[F] = {
+    val chartScorer = coarseSpanScorerFromParser(s, coarseParser, indexedProjections, threshold);
+    val myScorer = SpanScorer.sum(chartScorer,validSpan);
+    fineParser.buildInsideChart(s, myScorer);
   }
 
 
-    /**
+  /**
    * Given an inside chart, fills the passed-in outside parse chart with inside scores.
    */
   def buildOutsideChart(inside: ParseChart[F],
-                        validSpan: SpanFilter = defaultFilter):Chart[F] = {
+                        validSpan: SpanScorer = defaultScorer):Chart[F] = {
     fineParser.buildOutsideChart(inside, validSpan);
   }
 
@@ -46,18 +45,28 @@ class CoarseToFineParser[Chart[X]<:ParseChart[X],C,F,W](coarseParser: ChartParse
 
 
 object CoarseToFineParser {
-  def coarseChartSpanFilter[C](proj: Int=>Int,
+  def coarseChartSpanScorer[C](proj: Int=>Int,
                                coarseInside: ParseChart[C],
                                coarseOutside:ParseChart[C],
                                sentProb:Double,
-                               threshold:Double = -10):SpanFilter = { (begin:Int,end:Int,label:Int) =>
-    val score =  (coarseInside(begin,end,proj(label))
-            + coarseOutside(begin,end,proj(label)) - sentProb);
-    val ret = score > threshold;
-    ret
+                               threshold:Double = -10):SpanScorer = new SpanScorer {
+
+    @inline
+    def score(begin: Int, end: Int, label: Int) = {
+      val score =  (coarseInside(begin,end,proj(label))
+              + coarseOutside(begin,end,proj(label)) - sentProb);
+      if (score > threshold) 0.0 else Double.NegativeInfinity;
+    }
+
+    def scoreUnaryRule(begin: Int, end: Int, parent: Int, child: Int) = score(begin,end,parent);
+
+
+    def scoreBinaryRule(begin: Int, split: Int, end: Int, parent: Int, leftChild: Int, rightChild: Int) = {
+      score(begin,end,parent);
+    }
   }
 
-  def coarseSpanFilterFromParser[W,L,Chart[X]<:ParseChart[X]](s: Seq[W],
+  def coarseSpanScorerFromParser[W,L,Chart[X]<:ParseChart[X]](s: Seq[W],
                                                               coarseParser: ChartParser[Chart,L,W],
                                                               proj: Int=>Int,
                                                               threshold: Double = -10) = {
@@ -68,10 +77,10 @@ object CoarseToFineParser {
     val sentProb = coarseInside(0,s.length,coarseRootIndex);
     assert(!sentProb.isInfinite, s);
 
-    val chartFilterer = CoarseToFineParser.coarseChartSpanFilter(proj,
+    val chartScorer = CoarseToFineParser.coarseChartSpanScorer(proj,
       coarseInside, coarseOutside, sentProb, threshold);
 
-    chartFilterer
+    chartScorer
   }
 }
 
