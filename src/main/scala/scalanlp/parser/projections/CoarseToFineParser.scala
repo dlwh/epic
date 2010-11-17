@@ -1,6 +1,7 @@
 package scalanlp.parser
 package projections
 
+
 import scalala.tensor.counters.Counters.DoubleCounter
 import scalanlp.config.Configuration
 import scalanlp.trees._

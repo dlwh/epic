@@ -7,6 +7,8 @@ package scalanlp.parser
  *
  * @author dlwh
  */
+@serializable
+@SerialVersionUID(1)
 trait SpanScorer {
   def scoreBinaryRule(begin: Int, split: Int, end: Int, parent: Int, leftChild: Int, rightChild: Int): Double
   def scoreUnaryRule(begin: Int, end: Int, parent: Int, child: Int): Double

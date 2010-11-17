@@ -15,15 +15,15 @@ import scalanlp.math.Numerics.logSum;
  * @author dlwh
  */
 trait ParseDecoder[L] {
-  def extractBestParse(root:L, inside: ParseChart[L], outside: =>ParseChart[L]):BinarizedTree[L];
+  def extractBestParse(root:L, grammar: Grammar[L], inside: ParseChart[L], outside: =>ParseChart[L]):BinarizedTree[L];
 }
 
 /**
  * Tries to extract a tree that maximizes log score.
  */
 trait ViterbiDecoder[L] extends ParseDecoder[L] {
-  override def extractBestParse(root: L, inside: ParseChart[L], outside: =>ParseChart[L]):BinarizedTree[L] = {
-    import inside.{grammar,labelScore};
+  override def extractBestParse(root: L, grammar: Grammar[L], inside: ParseChart[L], outside: =>ParseChart[L]):BinarizedTree[L] = {
+    import inside.labelScore
 
     def buildTree(start: Int, end: Int, root: Int):BinarizedTree[L] = {
       val scoreToFind = labelScore(start,end,root);
@@ -76,9 +76,9 @@ trait MaxRuleSumDecoder[L] extends ParseDecoder[L] {
                                  maxUnaryChild: Array[Array[Int]],
                                  maxSplit: Array[Array[Int]]); // split point, or -1 if a unary, or -2 if preterminal
 
-  override def extractBestParse(root: L, inside: ParseChart[L], xoutside: =>ParseChart[L]):BinarizedTree[L] = {
-    import inside.{grammar,labelScore};
-    val data = buildMaxCCharts(root, inside, xoutside);
+  override def extractBestParse(root: L, grammar: Grammar[L], inside: ParseChart[L], xoutside: =>ParseChart[L]):BinarizedTree[L] = {
+    import inside.{labelScore};
+    val data = buildMaxCCharts(root, grammar, inside, xoutside);
     import data._;
     def buildTree(begin: Int, end: Int, root: Int, allowUnary:Boolean =true):BinarizedTree[L] = {
       val lroot = grammar.index.get(root);
@@ -101,10 +101,8 @@ trait MaxRuleSumDecoder[L] extends ParseDecoder[L] {
     buildTree(0,inside.length, inside.grammar.index(root));
   }
 
-  private def buildMaxCCharts(root: L, inside: ParseChart[L], outside: ParseChart[L]) = {
+  private def buildMaxCCharts(root: L, grammar: Grammar[L], inside: ParseChart[L], outside: ParseChart[L]) = {
     val partition = inside.labelScore(0,inside.length,root);
-    import inside.grammar;
-
 
     val maxScore = TriangularArray.raw(inside.length,grammar.fillArray(Double.NegativeInfinity));
     val maxLeftChild = TriangularArray.raw(inside.length,grammar.fillArray(-1));
@@ -118,7 +116,7 @@ trait MaxRuleSumDecoder[L] extends ParseDecoder[L] {
         for(begin <- 0 until inside.length) {
           val end = begin + 1;
           val arrayIndex = TriangularArray.index(begin,end);
-          for( (a,aInside) <- inside.enteredLabelScores(begin,end) if inside.grammar.isPreterminal(a)) {
+          for( (a,aInside) <- inside.enteredLabelScores(begin,end) if grammar.isPreterminal(a)) {
             val aOutside = outside.labelScore(begin,end,a);
             val score = aOutside + aInside - partition;
             if(score != Double.NegativeInfinity) {
@@ -216,7 +214,7 @@ object MaxRuleTrainer extends ParserTrainer {
       def scores(o: Seq[String]) = try {
         val inside = base.buildInsideChart(o);
         lazy val outside = base.buildOutsideChart(inside);
-        val tree = extractBestParse(base.root, inside, outside);
+        val tree = extractBestParse(base.root, grammar, inside, outside);
         Counters.aggregate(tree -> 1.0);
       } catch {
         case e => throw new RuntimeException("Couldn't parse " + o, e);

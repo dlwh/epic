@@ -28,7 +28,7 @@ trait ChartParser[Chart[X]<:ParseChart[X],L,W] extends Parser[L,W] with ViterbiD
   def scores(s: Seq[W]) = {
     try {
       val chart = buildInsideChart(s);
-      val bestParse = extractBestParse(root, chart, buildOutsideChart(chart));
+      val bestParse = extractBestParse(root, grammar, chart, buildOutsideChart(chart));
       val c = DoubleCounter[Tree[L]]();
       c(bestParse) = chart.labelScore(0, s.length, root);
       c;

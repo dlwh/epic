@@ -25,9 +25,12 @@ import scalanlp.trees.Span
 
 import scalanlp.util.Implicits._
 import scalala.tensor.sparse.SparseVector
-import collection.mutable.BitSet;
+import collection.mutable.BitSet
+import scalanlp.util.Encoder;
 
-abstract class ParseChart[L](val grammar: Grammar[L], val length: Int) {
+@serializable
+@SerialVersionUID(1)
+abstract class ParseChart[L](val grammar: Encoder[L], val length: Int) {
 
   private val score = TriangularArray.raw(length+1, grammar.mkDenseVector(zero));
   // which labels have been entered.

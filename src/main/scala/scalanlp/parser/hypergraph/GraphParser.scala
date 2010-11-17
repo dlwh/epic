@@ -26,7 +26,7 @@ import scala.util.control.Breaks._;
 import scala.util.control.Breaks;
 
 
-class GraphParser[L,W](root: L, lexicon: Lexicon[L,W], g: Grammar[L]) extends Parser[L,W] {
+class GraphParser[L,W](root: L, lexicon: Lexicon[L,W], grammar: Grammar[L]) extends Parser[L,W] {
 
   sealed trait Item {
     def score: Double
@@ -47,14 +47,14 @@ class GraphParser[L,W](root: L, lexicon: Lexicon[L,W], g: Grammar[L]) extends Pa
 
   def scores(s: Seq[W]) = {
     // make the chart:
-    val chart = ParseChart.viterbi(g,s.length);
+    val chart = ParseChart.viterbi(grammar,s.length);
     val agenda = new PriorityQueue[Item];
 
     for( (w,i) <- s zipWithIndex;
         a <- lexicon.tags;
         wScore = lexicon.wordScore(a,s(i))
         if !wScore.isInfinite) {
-      agenda += LexicalItem(g.index(a),i,wScore);
+      agenda += LexicalItem(grammar.index(a),i,wScore);
     }
     breakable {
       while(!agenda.isEmpty) {
@@ -93,7 +93,7 @@ class GraphParser[L,W](root: L, lexicon: Lexicon[L,W], g: Grammar[L]) extends Pa
           }
           // otherwise, expand all related edges.
 
-          val leftChildRules = g.binaryRulesByIndexedLeftChild(child);
+          val leftChildRules = grammar.binaryRulesByIndexedLeftChild(child);
           for {
             (rchild,parentScores) <- leftChildRules
             end <- span.end until (s.length+1)
@@ -106,7 +106,7 @@ class GraphParser[L,W](root: L, lexicon: Lexicon[L,W], g: Grammar[L]) extends Pa
             agenda += BinaryItem(parent, child, rchild, Span(span.start,end),span.end,totalScore);
           }
 
-          val rightChildRules = g.binaryRulesByIndexedRightChild(child);
+          val rightChildRules = grammar.binaryRulesByIndexedRightChild(child);
           for {
             (lchild,parentScores) <- rightChildRules
             start <- 0 until span.start
@@ -119,7 +119,7 @@ class GraphParser[L,W](root: L, lexicon: Lexicon[L,W], g: Grammar[L]) extends Pa
             agenda += BinaryItem(parent, lchild, child, Span(start,span.end),span.start,totalScore);
           }
 
-          val unaryRules = g.unaryRulesByIndexedChild(child);
+          val unaryRules = grammar.unaryRulesByIndexedChild(child);
           for {
             (parent,ruleScore) <- unaryRules
             if chart.labelScore(span.start, span.end, parent).isNegInfinity
@@ -135,7 +135,7 @@ class GraphParser[L,W](root: L, lexicon: Lexicon[L,W], g: Grammar[L]) extends Pa
     }
 
     // TODO: graph outside scores (?)
-    val bestParse = new ViterbiDecoder[L]{}.extractBestParse(root, chart, null);
+    val bestParse = new ViterbiDecoder[L]{}.extractBestParse(root, grammar, chart, null);
     val c = DoubleCounter[Tree[L]]();
     c(bestParse) = chart.labelScore(0, s.length, root);
     c;
