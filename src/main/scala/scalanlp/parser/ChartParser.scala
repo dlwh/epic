@@ -44,6 +44,7 @@ object ChartParser {
     def scoreUnaryRule(begin: Int, end: Int, parent: Int, child: Int) = 0.0;
 
     def scoreBinaryRule(begin: Int, split: Int, end: Int, parent: Int, leftChild: Int, rightChild: Int) = 0.0
+    def scoreLexical(begin: Int, end: Int, parent: Int) = 0.0
   }
 
   def apply[Chart[X]<:ParseChart[X],L,W](root: L, lexicon: Lexicon[L,W],
@@ -54,6 +55,8 @@ object ChartParser {
 
 }
 
+@serializable
+@SerialVersionUID(1)
 class CKYParser[Chart[X]<:ParseChart[X], L,W](val root: L,
                                               val lexicon: Lexicon[L,W],
                                               val grammar: Grammar[L],
@@ -71,9 +74,18 @@ class CKYParser[Chart[X]<:ParseChart[X], L,W](val root: L,
     val chart = chartFactory(grammar,s.length);
 
     for{i <- 0 until s.length} {
+      var foundSomething = false;
       for ( (a,wScore) <- lexicon.tagScores(s(i))
-            if !wScore.isInfinite && !wScore.isNaN) {
-        chart.enter(i,i+1,grammar.index(a),wScore);
+            if !wScore.isInfinite && !wScore.isNaN;
+            ai = grammar.index(a);
+            (spanScore:Double) = validSpan.scoreLexical(i,i+1,ai)
+            if spanScore != Double.NegativeInfinity
+            ) {
+        chart.enter(i,i+1,ai,wScore + spanScore);
+        foundSomething = true;
+      }
+      if(!foundSomething) {
+        error("Couldn't score " + s(i) + " " + lexicon.tagScores(s(i)));
       }
 
       updateInsideUnaries(chart,i,i+1, validSpan);

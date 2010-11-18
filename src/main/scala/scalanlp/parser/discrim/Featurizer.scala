@@ -13,12 +13,16 @@ import bitvector.BitUtils;
 import scalanlp.trees._;
 
 
+@serializable
+@SerialVersionUID(1)
 trait Feature[+L,+W];
 
 /**
  * 
  * @author dlwh
  */
+@serializable
+@SerialVersionUID(1)
 trait Featurizer[L,W] {
   def featuresFor(r: Rule[L]):DoubleCounter[Feature[L,W]];
   def featuresFor(l: L, w: W):DoubleCounter[Feature[L,W]];
@@ -211,6 +215,8 @@ class BitVectorFeaturizer[L,W](base: Featurizer[L,W], numStates: Int, arity: Int
 }
 
 
+@serializable
+@SerialVersionUID(1)
 trait FeatureIndexer[L,W] extends Encoder[Feature[L,W]] {
   val index:Index[Feature[L,W]];
   val labelIndex: Index[L];

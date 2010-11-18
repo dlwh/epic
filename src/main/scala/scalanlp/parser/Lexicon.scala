@@ -24,6 +24,8 @@ import scalala.tensor.counters.LogCounters.LogDoubleCounter
 import scalala.tensor.counters.LogCounters.LogPairedDoubleCounter
 
 
+@serializable
+@SerialVersionUID(1)
 trait Lexicon[L,W] {
   def wordScore(label: L, w: W): Double;
   def tagScores(w: W): LogDoubleCounter[L] = scalala.tensor.counters.LogCounters.aggregate( tags.map { l => (l,wordScore(l,w))});

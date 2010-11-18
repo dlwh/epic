@@ -23,6 +23,7 @@ class FeaturizedLexicon[L,W](val openTagSet: Set[L], val weights: DenseVector,
   }
 
   private def scoreUnknown(label: L, w: W):Double = {
+    assert(!openTagSet.isEmpty);
     if(!openTagSet.contains(label)) Double.NegativeInfinity
     else {
       val feats = featureIndexer.featuresFor(featureIndexer.labelIndex(label),w);

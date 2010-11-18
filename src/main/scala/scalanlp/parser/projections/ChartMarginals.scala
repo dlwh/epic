@@ -58,6 +58,10 @@ class ChartMarginals[C,L,W](val parser: ChartParser[LogProbabilityParseChart,L,W
         compositeChart.labelScore(begin,end,parent);
       }
 
+      def scoreLexical(begin: Int, end: Int, tag: Int) = {
+        compositeChart.labelScore(begin,end,tag);
+      }
+
       def scoreBinaryRule(begin: Int, split: Int, end: Int, parent: Int, leftChild: Int, rightChild: Int) = {
         compositeChart.labelScore(begin,end,parent);
       }

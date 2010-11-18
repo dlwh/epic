@@ -44,7 +44,6 @@ class CoarseToFineParser[Chart[X]<:ParseChart[X],C,F,W](coarseParser: ChartParse
   }
 }
 
-
 object CoarseToFineParser {
   def coarseChartSpanScorer[C](proj: Int=>Int,
                                coarseInside: ParseChart[C],
@@ -64,6 +63,9 @@ object CoarseToFineParser {
 
     def scoreBinaryRule(begin: Int, split: Int, end: Int, parent: Int, leftChild: Int, rightChild: Int) = {
       score(begin,end,parent);
+    }
+    def scoreLexical(begin: Int, end: Int, tag: Int): Double = {
+      score(begin,end,tag);
     }
   }
 

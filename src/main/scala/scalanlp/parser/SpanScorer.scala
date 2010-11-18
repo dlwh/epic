@@ -12,6 +12,7 @@ package scalanlp.parser
 trait SpanScorer {
   def scoreBinaryRule(begin: Int, split: Int, end: Int, parent: Int, leftChild: Int, rightChild: Int): Double
   def scoreUnaryRule(begin: Int, end: Int, parent: Int, child: Int): Double
+  def scoreLexical(begin: Int, end: Int, tag: Int): Double;
 }
 
 object SpanScorer {
@@ -26,6 +27,29 @@ object SpanScorer {
       if(r1 == Double.NegativeInfinity) r1
       else r1 + s2.scoreUnaryRule(begin, end, parent, child);
     }
+
+    def scoreLexical(begin: Int, end: Int, tag: Int): Double = {
+      val r1 = s1.scoreLexical(begin, end, tag);
+      if(r1 == Double.NegativeInfinity) r1
+      else r1 + s2.scoreLexical(begin, end, tag)
+    }
+  }
+
+  def project(fineToCoarseMap: Int=>Int)(coarseScorer: SpanScorer): SpanScorer = new SpanScorer {
+    def scoreBinaryRule(begin: Int, split: Int, end: Int, parent: Int, leftChild: Int, rightChild: Int): Double = {
+      coarseScorer.scoreBinaryRule(begin, split, end, fineToCoarseMap(parent), fineToCoarseMap(leftChild), fineToCoarseMap(rightChild))
+    }
+    def scoreUnaryRule(begin: Int, end: Int, parent: Int, child: Int): Double = {
+      coarseScorer.scoreUnaryRule(begin, end, fineToCoarseMap(parent), fineToCoarseMap(child))
+    }
+
+    def scoreLexical(begin: Int, end: Int, tag: Int): Double = {
+      coarseScorer.scoreLexical(begin, end, fineToCoarseMap(tag))
+    }
+  }
+
+  trait Factory[W] {
+    def mkSpanScorer(s: Seq[W], oldScorer: SpanScorer = ChartParser.defaultScorer):SpanScorer
   }
 
 }

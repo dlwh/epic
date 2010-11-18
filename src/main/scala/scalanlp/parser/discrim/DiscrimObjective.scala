@@ -7,7 +7,11 @@ import scalanlp.config.Configuration
 import scalanlp.util.{ConsoleLogging, Log}
 import scalanlp.optimize._
 
-import InsideOutside._;
+import InsideOutside._
+import scalanlp.parser.UnaryRuleClosure.UnaryClosureException
+import scalala.tensor.counters.LogCounters
+import projections.{ProjectionIndexer, CoarseToFineParser}
+
 import ParseChart.LogProbabilityParseChart;
 import scalanlp.concurrent.ParallelOps._;
 import scalanlp.concurrent.ThreadLocal;
@@ -22,8 +26,9 @@ import scalanlp.util._;
 class DiscrimObjective[L,W](feat: Featurizer[L,W],
                             root: L,
                             trees: IndexedSeq[(BinarizedTree[L],Seq[W])],
-                            initLexicon: PairedDoubleCounter[L,W]) extends DiffFunction[Int,DenseVector] {
-
+                            initLexicon: PairedDoubleCounter[L,W],
+                            coarseParser: ChartParser[LogProbabilityParseChart, L, W])
+        extends DiffFunction[Int,DenseVector] {
 
   def extractViterbiParser(weights: DenseVector) = {
     val grammar = weightsToGrammar(weights);
@@ -39,34 +44,56 @@ class DiscrimObjective[L,W](feat: Featurizer[L,W],
     parser
   }
 
+  var numFailures = 0;
+
+
+
   def calculate(weights: DenseVector) = {
-    val parser = new ThreadLocal(extractLogProbParser(weights));
-    val ecounts = indexedTrees.par.fold(new ExpectedCounts[W](parser().grammar)) { (counts, treewords) =>
-      val tree = treewords._1;
-      val words = treewords._2;
+    try {
+      val parser = new ThreadLocal(extractLogProbParser(weights));
+      val ecounts = treesWithCharts.par.fold(new ExpectedCounts[W](parser().grammar)) { (counts, treewords) =>
+        val tree = treewords._1;
+        val words = treewords._2;
+        val scorer = treewords._3;
 
-      val treeCounts = treeToExpectedCounts(parser().grammar,parser().lexicon,tree,words);
-      val wordCounts = wordsToExpectedCounts(words, parser());
-      counts += treeCounts
-      counts -= wordCounts;
+        val treeCounts = treeToExpectedCounts(parser().grammar,parser().lexicon,tree,words);
+        val wordCounts = wordsToExpectedCounts(words, parser(), scorer);
+        counts += treeCounts
+        counts -= wordCounts;
 
-      counts
+        counts
 
-    } { (ecounts1, ecounts2) =>
-      ecounts1 += ecounts2
+      } { (ecounts1, ecounts2) =>
+        ecounts1 += ecounts2
 
-      ecounts1
+        ecounts1
+      }
+
+      val grad = -expectedCountsToFeatureVector(ecounts)
+      println((norm(grad,2), ecounts.logProb));
+
+      (-ecounts.logProb, grad value);
+
+    }  catch {
+      case ex: UnaryClosureException =>
+        numFailures += 1;
+        if(numFailures > 20) throw ex;
+        ex.printStackTrace();
+        (Double.PositiveInfinity,indexedFeatures.mkDenseVector(0.0));
     }
 
 
-    val grad = -expectedCountsToFeatureVector(ecounts)
-    println((norm(grad,2), ecounts.logProb));
-
-    (-ecounts.logProb, grad value);
   }
 
   val indexedFeatures: FeatureIndexer[L,W] = FeatureIndexer(feat,trees);
-  val indexedTrees = for( (t,w) <- trees) yield (t.map(indexedFeatures.labelIndex),w);
+
+  private val indexedProjections = new ProjectionIndexer(coarseParser.grammar.index,
+    indexedFeatures.labelIndex, identity[L] _)
+
+  val treesWithCharts = trees.par.map { case (tree,words) =>
+    val filter = CoarseToFineParser.coarseSpanScorerFromParser(words,coarseParser, indexedProjections);
+    (tree,words,filter)
+  }
 
   val openTags = Set.empty ++ {
     for( t <- initLexicon.rows.map(_._1) if initLexicon(t).size > 50)  yield t;
@@ -82,17 +109,18 @@ class DiscrimObjective[L,W](feat: Featurizer[L,W],
     grammar;
   }
 
-  def wordsToExpectedCounts(words: Seq[W], parser: ChartParser[LogProbabilityParseChart,L,W]) = {
-    val ecounts = new InsideOutside(parser).expectedCounts(words);
+  def wordsToExpectedCounts(words: Seq[W], parser: ChartParser[LogProbabilityParseChart,L,W], scorer: SpanScorer) = {
+    val ecounts = new InsideOutside(parser).expectedCounts(words, scorer);
     ecounts
   }
 
   // these expected counts are in normal space, not log space.
   private def treeToExpectedCounts(g: Grammar[L],
                                    lexicon: Lexicon[L,W],
-                                   t: BinarizedTree[Int],
+                                   lt: BinarizedTree[L],
                                    words: Seq[W]):ExpectedCounts[W] = {
     val expectedCounts = new ExpectedCounts[W](g)
+    val t = lt.map(indexedFeatures.labelIndex);
     var score = 0.0;
     for(t2 <- t.allChildren) {
       t2 match {
@@ -160,7 +188,13 @@ object DiscriminativeTrainer extends ParserTrainer {
     val factory = config.readIn[FeaturizerFactory[String,String]]("featurizerFactory",new PlainFeaturizerFactory[String]);
     val featurizer = factory.getFeaturizer(config, initLexicon, initProductions);
 
-    val obj = new DiscrimObjective(featurizer, "", trainTrees.toIndexedSeq,initLexicon);
+    val xbarParser = {
+      val grammar = new GenerativeGrammar(LogCounters.logNormalizeRows(initProductions));
+      val lexicon = new SimpleLexicon(initLexicon);
+      new CKYParser[LogProbabilityParseChart,String,String]("",lexicon,grammar,ParseChart.logProb);
+    }
+
+    val obj = new DiscrimObjective(featurizer, "", trainTrees.toIndexedSeq,initLexicon, xbarParser);
     val iterationsPerEval = config.readIn("iterations.eval",25);
     val maxIterations = config.readIn("iterations.max",100);
     val maxMStepIterations = config.readIn("iterations.mstep.max",80);
@@ -191,7 +225,14 @@ object DiscrimApproxTest extends ParserTrainer {
     val factory = config.readIn[FeaturizerFactory[String,String]]("featurizerFactory",new PlainFeaturizerFactory[String]);
     val featurizer = factory.getFeaturizer(config, initLexicon, initProductions);
 
-    val obj = new DiscrimObjective(featurizer, "", trainTrees.toIndexedSeq,initLexicon);
+
+    val xbarParser = {
+      val grammar = new GenerativeGrammar(LogCounters.logNormalizeRows(initProductions));
+      val lexicon = new SimpleLexicon(initLexicon);
+      new CKYParser[LogProbabilityParseChart,String,String]("",lexicon,grammar,ParseChart.logProb);
+    }
+
+    val obj = new DiscrimObjective(featurizer, "", trainTrees.toIndexedSeq,initLexicon, xbarParser);
     val iterationsPerEval = config.readIn("iterations.eval",25);
     val maxIterations = config.readIn("iterations.max",100);
     val maxMStepIterations = config.readIn("iterations.mstep.max",80);

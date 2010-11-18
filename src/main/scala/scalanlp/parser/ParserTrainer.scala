@@ -1,7 +1,5 @@
 package scalanlp.parser;
 
-import java.io.File
-import java.io.FileInputStream
 import java.util.Properties
 import scala.collection.mutable.ArrayBuffer
 import scalanlp.config.Configuration
@@ -10,6 +8,7 @@ import scalanlp.trees.DenseTreebank
 import scalanlp.trees.Tree
 import scalanlp.trees.Treebank
 import scalanlp.trees.Trees
+import java.io._
 
 trait ParserTrainer {
   def trainParser(trainTrees: Seq[(BinarizedTree[String],Seq[String])],
@@ -51,6 +50,12 @@ trait ParserTrainer {
       println("Parser " + name);
 
       evalParser(testTrees,parser,name);
+      val outDir = new File("parsers/");
+      outDir.mkdirs();
+      val out = new File(outDir,name + ".parser");
+      val stream = new ObjectOutputStream(new BufferedOutputStream(new FileOutputStream(out)));
+      stream.writeObject(parser);
+      stream.close();
     }
   }
 

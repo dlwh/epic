@@ -15,7 +15,8 @@ package scalanlp.parser
  limitations under the License.
 */
 
-import scalala.Scalala._;
+import scalala.Scalala._
+import java.io.DataOutput;
 import scalala.tensor._;
 import scalanlp.util.Encoder;
 import scalala.tensor.sparse.SparseVector
@@ -32,6 +33,8 @@ final case class UnaryRule[@specialized(Int) +L](parent: L, child: L) extends Ru
   def children = Seq(child);
 }
 
+@serializable
+@SerialVersionUID(1)
 trait Grammar[L] extends Encoder[L] {
   override val index: Index[L];
   def unaryRulesByChild(c: L): Iterator[(UnaryRule[L],Double)];
@@ -45,7 +48,7 @@ trait Grammar[L] extends Encoder[L] {
   /**
    * Returns a vector of child index -> score
    */
-  def unaryRulesByIndexedParent(c: Int): SparseVector;
+  def unaryRulesByIndexedParent(p: Int): SparseVector;
 
   /**
    * Returns true if the label has no productions with it on the LHS.
@@ -80,6 +83,31 @@ trait Grammar[L] extends Encoder[L] {
    */
   def binaryRulesByIndexedRightChild(c: Int): SparseArray[SparseVector];
 }
+
+/*
+object Grammar {
+  import scalanlp.serialization.DataSerialization._;
+  import scalanlp.serialization.DataSerialization
+  implicit def grammarIsWritable[L:Writable]: Writable[Grammar[L]] = new Writable[Grammar[L]] {
+    def write(out: DataOutput, g: Grammar[L]) = {
+      // Grammar consists of an index, unary rules, and binary rules.
+      DataSerialization.write(out, g.index);
+      // Unary format: (parent index,<sparse vec of unary rules>)*, -1
+      for(i <- 0 until g.index.size) {
+        val vec = g.unaryRulesByIndexedParent(i);
+        if(g.used != 0) {
+          DataSerialization.write(out, i);
+          DataSerialization.write(out, vec);
+        }
+      }
+      DataSerialization.write(-1);
+      // Binary format: (parent index,(lchild index, sparsevec of rchild,score)
+
+
+    }
+  }
+}
+*/
 
 /**
  * Given a counter of productions that has been log-normalized by rows,

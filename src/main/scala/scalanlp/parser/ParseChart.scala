@@ -150,6 +150,8 @@ object ParseChart {
   type LogProbabilityParseChart[L] = ParseChart[L] with LogProbability;
 
 
+  @serializable
+  @SerialVersionUID(1)
   trait Factory[Chart[X]<:ParseChart[X]] {
     def apply[L](g: Grammar[L], length: Int):Chart[L];
     def computeUnaryClosure[L](g: Grammar[L]):UnaryRuleClosure;
