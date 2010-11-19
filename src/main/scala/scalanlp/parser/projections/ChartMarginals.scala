@@ -8,7 +8,7 @@ import scalala.tensor.Vector
 import scalanlp.util.Index;
 
 import ParseChart._;
-import ChartParser._;
+import ChartBuilder._;
 import InsideOutside._;
 
 /**
@@ -16,9 +16,9 @@ import InsideOutside._;
  * TODO: probably give direct access to marginals
  * @author dlwh
  */
-class ChartMarginals[C,L,W](val parser: ChartParser[LogProbabilityParseChart,L,W], coarseIndex: Index[C], proj: L=>C) {
+class ChartMarginals[C,L,W](val parser: ChartBuilder[LogProbabilityParseChart,L,W], coarseIndex: Index[C], proj: L=>C) {
   def this(root: L, g: Grammar[L], lexicon: Lexicon[L,W], coarseIndex: Index[C], proj: L=>C)  = {
-    this(new CKYParser[ParseChart.LogProbabilityParseChart,L,W](root,lexicon,g,logProb), coarseIndex, proj);
+    this(new CKYChartBuilder[ParseChart.LogProbabilityParseChart,L,W](root,lexicon,g,logProb), coarseIndex, proj);
   }
 
   def grammar = parser.grammar;

@@ -25,7 +25,7 @@ import scalanlp.util._;
 class LatentDiscrimObjective[L,L2,W](feat: Featurizer[L2,W],
                             unsplitRoot: L,
                             trees: IndexedSeq[(BinarizedTree[L],Seq[W])],
-                            coarseParser: ChartParser[LogProbabilityParseChart, L, W],
+                            coarseParser: ChartBuilder[LogProbabilityParseChart, L, W],
                             openTags: Set[L],
                             splitLabel: L=>Seq[L2],
                             unsplit: (L2=>L)) extends DiffFunction[Int,DenseVector] {
@@ -47,7 +47,7 @@ class LatentDiscrimObjective[L,L2,W](feat: Featurizer[L2,W],
 
 
   val treesWithCharts = trees.par.map { case (tree,words) =>
-    val filter = CoarseToFineParser.coarseSpanScorerFromParser(words,coarseParser, indexedProjections);
+    val filter = CoarseToFineChartBuilder.coarseSpanScorerFromParser(words,coarseParser, indexedProjections);
     (tree,words,filter)
   }
 
@@ -55,9 +55,10 @@ class LatentDiscrimObjective[L,L2,W](feat: Featurizer[L2,W],
     val grammar = weightsToGrammar(weights);
     val lexicon = weightsToLexicon(weights);
     val cc = coarseParser.withCharts[ParseChart.ViterbiParseChart](ParseChart.viterbi);
-    val parser = new CoarseToFineParser[ParseChart.ViterbiParseChart,L,L2,W](cc,
+    val builder = new CoarseToFineChartBuilder[ParseChart.ViterbiParseChart,L,L2,W](cc,
       unsplit, root, lexicon, grammar, ParseChart.viterbi);
-   // val parser = CKYParser(root, lexicon, grammar);
+    val parser = new ChartParser(builder,new ViterbiDecoder(indexedProjections));
+   // val parser = CKYChartBuilder(root, lexicon, grammar);
     parser
   }
 
@@ -65,9 +66,9 @@ class LatentDiscrimObjective[L,L2,W](feat: Featurizer[L2,W],
     val grammar = weightsToGrammar(weights);
     val lexicon = weightsToLexicon(weights);
     val cc = coarseParser.withCharts[LogProbabilityParseChart](ParseChart.logProb);
-    //val parser = new CoarseToFineParser[LogProbabilityParseChart,L,L2,W](cc,
+    //val parser = new CoarseToFineChartBuilder[LogProbabilityParseChart,L,L2,W](cc,
     //  unsplit, root, lexicon, grammar, ParseChart.logProb);
-    val parser = new CKYParser[LogProbabilityParseChart,L2,W](root, lexicon, grammar, ParseChart.logProb);
+    val parser = new CKYChartBuilder[LogProbabilityParseChart,L2,W](root, lexicon, grammar, ParseChart.logProb);
     parser
   }
 
@@ -115,7 +116,7 @@ class LatentDiscrimObjective[L,L2,W](feat: Featurizer[L2,W],
     grammar;
   }
 
-  def wordsToExpectedCounts(words: Seq[W], parser: ChartParser[LogProbabilityParseChart,L2,W], spanScorer: SpanScorer = ChartParser.defaultScorer) = {
+  def wordsToExpectedCounts(words: Seq[W], parser: ChartBuilder[LogProbabilityParseChart,L2,W], spanScorer: SpanScorer = ChartBuilder.defaultScorer) = {
     val ecounts = new InsideOutside(parser).expectedCounts(words, spanScorer);
     ecounts
   }
@@ -177,7 +178,7 @@ object LatentDiscriminativeTrainer extends ParserTrainer {
     val xbarParser = {
       val grammar = new GenerativeGrammar(LogCounters.logNormalizeRows(initProductions));
       val lexicon = new SimpleLexicon(initLexicon);
-      new CKYParser[LogProbabilityParseChart,String,String]("",lexicon,grammar,ParseChart.logProb);
+      new CKYChartBuilder[LogProbabilityParseChart,String,String]("",lexicon,grammar,ParseChart.logProb);
     }
 
     val factory = config.readIn[FeaturizerFactory[String,String]]("discrim.featurizerFactory",new PlainFeaturizerFactory[String]);
@@ -216,10 +217,8 @@ object LatentDiscriminativeTrainer extends ParserTrainer {
     val cachedObj = new CachedDiffFunction(reg);
     for( (state,iter) <- opt.iterations(cachedObj,init).take(maxIterations).zipWithIndex;
          if iter != 0 && iter % iterationsPerEval == 0) yield {
-       val parser = obj.extractViterbiParser(state.x).map { (t:Tree[(String,Int)]) =>
-         t.map(_._1);
-       };
-       (iter + "", parser);
+      val parser = obj.extractViterbiParser(state.x)
+      ("LatentDiscrim-" + iter.toString,parser)
     }
 
   }

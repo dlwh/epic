@@ -43,9 +43,7 @@ class GraphParser[L,W](root: L, lexicon: Lexicon[L,W], grammar: Grammar[L]) exte
 
   implicit val ordering: Ordering[Item] = Ordering.Double.on(_.score);
 
-  val continues = new Breaks;
-
-  def scores(s: Seq[W]) = {
+  def bestParse(s: Seq[W]) = {
     // make the chart:
     val chart = ParseChart.viterbi(grammar,s.length);
     val agenda = new PriorityQueue[Item];
@@ -135,10 +133,8 @@ class GraphParser[L,W](root: L, lexicon: Lexicon[L,W], grammar: Grammar[L]) exte
     }
 
     // TODO: graph outside scores (?)
-    val bestParse = new ViterbiDecoder[L]{}.extractBestParse(root, grammar, chart, null);
-    val c = DoubleCounter[Tree[L]]();
-    c(bestParse) = chart.labelScore(0, s.length, root);
-    c;
+    val bestParse = SimpleViterbiDecoder[L](grammar).extractBestParse(root, grammar, chart, null);
+    bestParse
   }
 
 }

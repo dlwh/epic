@@ -21,16 +21,7 @@ import scalanlp.classify.Classifier;
 import scalala.tensor.counters.Counters.DoubleCounter
 import scalanlp.data._;
 
-trait Parser[L,W] extends Classifier[Tree[L],Seq[W]] { outer =>
-  def bestParse(s: Seq[W]) = classify(s);
-  def map[U](f: Tree[L]=>Tree[U]):Parser[U,W] = new Parser[U,W] {
-    override def scores(o: Seq[W]) = {
-      val ctr = DoubleCounter[Tree[U]]();
-      for( (t,w) <- outer.scores(o)) {
-        val y = f(t);
-        ctr(y) = ctr(y) max w;
-      }
-      ctr
-    }
-  }
+trait Parser[L,W] extends (Seq[W]=>Tree[L]) { outer =>
+  def apply(s: Seq[W]) = bestParse(s);
+  def bestParse(s: Seq[W]):Tree[L];
 }

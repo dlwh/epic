@@ -6,7 +6,7 @@ import scalala.tensor.counters.Counters.PairedDoubleCounter
 import scalala.tensor.Vector
 
 import ParseChart._;
-import ChartParser._;
+import ChartBuilder._;
 import InsideOutside._;
 
 import math.exp;
@@ -15,9 +15,9 @@ import math.exp;
  * 
  * @author dlwh
  */
-class InsideOutside[L,W](val parser: ChartParser[LogProbabilityParseChart,L,W]) {
+class InsideOutside[L,W](val parser: ChartBuilder[LogProbabilityParseChart,L,W]) {
   def this(root: L, g: Grammar[L], lexicon: Lexicon[L,W])  = {
-    this(new CKYParser[ParseChart.LogProbabilityParseChart,L,W](root,lexicon,g,logProb));
+    this(new CKYChartBuilder[ParseChart.LogProbabilityParseChart,L,W](root,lexicon,g,logProb));
   }
 
   def grammar = parser.grammar;

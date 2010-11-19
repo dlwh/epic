@@ -49,7 +49,15 @@ object SpanScorer {
   }
 
   trait Factory[W] {
-    def mkSpanScorer(s: Seq[W], oldScorer: SpanScorer = ChartParser.defaultScorer):SpanScorer
+    def mkSpanScorer(s: Seq[W], oldScorer: SpanScorer = ChartBuilder.defaultScorer):SpanScorer
+  }
+
+  def identity:SpanScorer = new SpanScorer {
+    def scoreLexical(begin: Int, end: Int, tag: Int) = 0.0
+
+    def scoreUnaryRule(begin: Int, end: Int, parent: Int, child: Int) = 0.0
+
+    def scoreBinaryRule(begin: Int, split: Int, end: Int, parent: Int, leftChild: Int, rightChild: Int) = 0.0
   }
 
 }

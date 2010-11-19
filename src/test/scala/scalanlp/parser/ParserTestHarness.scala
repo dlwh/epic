@@ -40,4 +40,14 @@ trait ParserTestHarness {
     val f1 = (2 * prec * recall)/(prec + recall);
     (prec,recall,exact,f1);
   }
+
+
+}
+
+object ParserTestHarness extends ParserTestHarness {
+  val (simpleLexicon,simpleGrammar) = GenerativeParser.extractLexiconAndGrammar(getTrainTrees().iterator);
+  val simpleParser = {
+    val chartBuilder = new CKYChartBuilder[ParseChart.ViterbiParseChart, String, String]("", simpleLexicon, simpleGrammar, ParseChart.viterbi)
+    ChartParser(chartBuilder);
+  }
 }

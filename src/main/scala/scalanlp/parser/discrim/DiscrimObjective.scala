@@ -10,7 +10,7 @@ import scalanlp.optimize._
 import InsideOutside._
 import scalanlp.parser.UnaryRuleClosure.UnaryClosureException
 import scalala.tensor.counters.LogCounters
-import projections.{ProjectionIndexer, CoarseToFineParser}
+import projections.{ProjectionIndexer, CoarseToFineChartBuilder}
 
 import ParseChart.LogProbabilityParseChart;
 import scalanlp.concurrent.ParallelOps._;
@@ -27,20 +27,21 @@ class DiscrimObjective[L,W](feat: Featurizer[L,W],
                             root: L,
                             trees: IndexedSeq[(BinarizedTree[L],Seq[W])],
                             initLexicon: PairedDoubleCounter[L,W],
-                            coarseParser: ChartParser[LogProbabilityParseChart, L, W])
+                            coarseParser: ChartBuilder[LogProbabilityParseChart, L, W])
         extends DiffFunction[Int,DenseVector] {
 
   def extractViterbiParser(weights: DenseVector) = {
     val grammar = weightsToGrammar(weights);
     val lexicon = weightsToLexicon(weights);
-    val parser = CKYParser(root, lexicon, grammar);
+    val builder = CKYChartBuilder(root, lexicon, grammar);
+    val parser = ChartParser(builder);
     parser
   }
 
   def extractLogProbParser(weights: DenseVector)= {
     val grammar = weightsToGrammar(weights);
     val lexicon = weightsToLexicon(weights);
-    val parser = new CKYParser[LogProbabilityParseChart, L, W](root, lexicon, grammar, ParseChart.logProb);
+    val parser = new CKYChartBuilder[LogProbabilityParseChart, L, W](root, lexicon, grammar, ParseChart.logProb);
     parser
   }
 
@@ -91,7 +92,7 @@ class DiscrimObjective[L,W](feat: Featurizer[L,W],
     indexedFeatures.labelIndex, identity[L] _)
 
   val treesWithCharts = trees.par.map { case (tree,words) =>
-    val filter = CoarseToFineParser.coarseSpanScorerFromParser(words,coarseParser, indexedProjections);
+    val filter = CoarseToFineChartBuilder.coarseSpanScorerFromParser(words,coarseParser, indexedProjections);
     (tree,words,filter)
   }
 
@@ -109,7 +110,7 @@ class DiscrimObjective[L,W](feat: Featurizer[L,W],
     grammar;
   }
 
-  def wordsToExpectedCounts(words: Seq[W], parser: ChartParser[LogProbabilityParseChart,L,W], scorer: SpanScorer) = {
+  def wordsToExpectedCounts(words: Seq[W], parser: ChartBuilder[LogProbabilityParseChart,L,W], scorer: SpanScorer) = {
     val ecounts = new InsideOutside(parser).expectedCounts(words, scorer);
     ecounts
   }
@@ -191,7 +192,7 @@ object DiscriminativeTrainer extends ParserTrainer {
     val xbarParser = {
       val grammar = new GenerativeGrammar(LogCounters.logNormalizeRows(initProductions));
       val lexicon = new SimpleLexicon(initLexicon);
-      new CKYParser[LogProbabilityParseChart,String,String]("",lexicon,grammar,ParseChart.logProb);
+      new CKYChartBuilder[LogProbabilityParseChart,String,String]("",lexicon,grammar,ParseChart.logProb);
     }
 
     val obj = new DiscrimObjective(featurizer, "", trainTrees.toIndexedSeq,initLexicon, xbarParser);
@@ -229,7 +230,7 @@ object DiscrimApproxTest extends ParserTrainer {
     val xbarParser = {
       val grammar = new GenerativeGrammar(LogCounters.logNormalizeRows(initProductions));
       val lexicon = new SimpleLexicon(initLexicon);
-      new CKYParser[LogProbabilityParseChart,String,String]("",lexicon,grammar,ParseChart.logProb);
+      new CKYChartBuilder[LogProbabilityParseChart,String,String]("",lexicon,grammar,ParseChart.logProb);
     }
 
     val obj = new DiscrimObjective(featurizer, "", trainTrees.toIndexedSeq,initLexicon, xbarParser);

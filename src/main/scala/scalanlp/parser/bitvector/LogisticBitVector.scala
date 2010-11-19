@@ -1,6 +1,6 @@
 package scalanlp.parser.bitvector
 
-import scalala.Scalala._;
+import scalala.Scalala._
 import scalala.tensor.dense.DenseVector;
 import scalala.tensor.counters.LogCounters
 import scalala.tensor.counters.Counters.PairedDoubleCounter
@@ -14,9 +14,11 @@ import scalanlp.optimize.LBFGS
 import scalanlp.parser.GenerativeGrammar
 import scalanlp.parser.UnsmoothedLexicon
 import scalanlp.parser._;
+import scalanlp.parser.projections._;
 import scalala.tensor.counters.Counters._;
 import scalanlp.util.ConsoleLogging
 import scalanlp.util.Iterators
+import scalanlp.util.Index
 import scalanlp.util.Log
 
 import scalanlp.parser.splitting.StateSplitting
@@ -99,6 +101,8 @@ class LogisticBitVector[L,W](treebank: StateSplitting.Treebank[L,W],
     }
   }
 
+  private def unsplit(x: (L,Int)) = x._1;
+
   def expectedCounts(logThetas: LogPairedDoubleCounter[Context,Decision]) = {
     val (productions,wordProds) = extractGrammarAndLexicon(logThetas);
     val grammar = new ThreadLocal(new GenerativeGrammar(productions));
@@ -129,6 +133,11 @@ class LogisticBitVector[L,W](treebank: StateSplitting.Treebank[L,W],
     (ecounts.logProb,eCounts);
   }
 
+  val coarseLabelIndex = {
+    val allLabels = Set.empty ++ initProductions.rows.map{_._1} ++ initLexicon.rows.map{_._1};
+    Index(allLabels);
+  }
+
   def extractParser(logThetas: LogPairedDoubleCounter[Context,Decision],
                     features:DoubleCounter[Feature],
                     logNormalizers: LogDoubleCounter[Context]) = {
@@ -143,9 +152,8 @@ class LogisticBitVector[L,W](treebank: StateSplitting.Treebank[L,W],
     println{tags.map(t => (t,words(t).size))};
     val openTags = for( t <- tags if words(t).size > 50)  yield t;
     val lex = new BitVectorLexicon[L,W](featurizer, transposed, features, logNormalizers,tags, openTags.toSet);
-    val parser = CKYParser[(L,Int),W]((root,0),lex,grammar).map { (t:Tree[(L,Int)]) =>
-      t.map(_._1);
-    }
+    val builder = CKYChartBuilder[(L,Int),W]((root,0),lex,grammar);
+    val parser = ProjectingParser(builder,coarseLabelIndex,unsplit _);
     parser;
   }
 

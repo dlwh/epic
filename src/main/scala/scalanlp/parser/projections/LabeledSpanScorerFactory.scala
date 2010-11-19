@@ -11,15 +11,17 @@ import scalanlp.trees.DenseTreebank
  * Creates labeled span scorers for a set of trees from some parser. Does not do any projection.
  * @author dlwh
  */
-class LabeledSpanScorerFactory[L,W](parser: ChartParser[ParseChart.LogProbabilityParseChart,L,W]) extends SpanScorer.Factory[W] {
+class LabeledSpanScorerFactory[L,W](parser: ChartBuilder[ParseChart.LogProbabilityParseChart,L,W]) extends SpanScorer.Factory[W] {
 
-  def mkSpanScorer(s: Seq[W], scorer: SpanScorer = ChartParser.defaultScorer) = {
+  def mkSpanScorer(s: Seq[W], scorer: SpanScorer = ChartBuilder.defaultScorer) = {
     val coarseRootIndex = parser.grammar.index(parser.root);
     val inside = parser.buildInsideChart(s, scorer)
     val outside = parser.buildOutsideChart(inside, scorer);
 
     val sentProb = inside(0,s.length,coarseRootIndex);
-    assert(!sentProb.isInfinite, s);
+    if(sentProb.isInfinite) {
+      error("Couldn't parse " + s + " " + sentProb)
+    }
 
     val chartScorer = buildSpanScorer(inside,outside,sentProb);
 
@@ -60,14 +62,21 @@ object ProjectTreebankToLabeledSpans {
 
   def loadParser(loc: File) = {
     val oin = new ObjectInputStream(new BufferedInputStream(new FileInputStream(loc)));
-    val parser = oin.readObject().asInstanceOf[ChartParser[ParseChart.LogProbabilityParseChart,String,String]]
+    val parser = oin.readObject().asInstanceOf[ChartBuilder[ParseChart.LogProbabilityParseChart,String,String]]
     oin.close();
     parser;
   }
 
   def mapTrees(factory: SpanScorer.Factory[String], trees: IndexedSeq[(Tree[String],Seq[String])]) = {
     // TODO: have ability to use other span scorers.
-    trees.toIndexedSeq.par.map { case (tree,words) => factory.mkSpanScorer(words) }
+    trees.toIndexedSeq.par.map { case (tree,words) =>
+      println(words);
+      try {
+        factory.mkSpanScorer(words)
+      } catch {
+        case e: Exception => e.printStackTrace(); SpanScorer.identity;
+      }
+    }
   }
 
   def writeObject(o: AnyRef, file: File) {

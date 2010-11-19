@@ -32,6 +32,7 @@ import scalanlp.trees.Tree
 import scalanlp.trees.Treebank
 import scalanlp.trees.Trees
 import scalanlp.trees.UnaryTree
+import scalanlp.parser.projections._;
 
 import math.exp
 
@@ -333,20 +334,20 @@ object StateSplittingTrainer extends ParserTrainer {
       GenerativeParser.extractCounts(trainTrees.iterator
         )
     );
-    
+
+    val coarseGrammar = new GenerativeGrammar(LogCounters.logNormalizeRows(initialProductions));
     Iterator.tabulate(2) {
       case 0 =>
-        val grammar = new GenerativeGrammar(LogCounters.logNormalizeRows(initialProductions));
-        ("raw",CKYParser("",new SimpleLexicon(initialLex),grammar))
+        ("raw",ChartParser(CKYChartBuilder("", new SimpleLexicon(initialLex), coarseGrammar) ))
       case 1 =>
         println("Splitting Grammar");
         import StateSplitting._;
         val (finalProd,finalLex,logProb) = splitGrammar(initialProductions,initialLex,trainTrees.toIndexedSeq,"");
         val grammar = new GenerativeGrammar(LogCounters.logNormalizeRows(finalProd));
         val lex = new SimpleLexicon(finalLex);
-        val parser = CKYParser(("",0),lex,grammar).map { (t:Tree[(String,Int)]) =>
-          t.map(_._1);
-        }
+        val builder = CKYChartBuilder(("",0),lex,grammar);
+        def proj(l: (String,Int)) = l._1;
+        val parser = ProjectingParser(builder,coarseGrammar.index,proj);
         ("split",parser);
     }
   }

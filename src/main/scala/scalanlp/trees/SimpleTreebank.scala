@@ -29,7 +29,7 @@ object SimpleTreebank {
     def writeToFile(file: File, trees: Iterator[(Tree[String],Seq[String])]) = {
       val outTrain = new PrintStream(new BufferedOutputStream(new FileOutputStream(file)));
       for( (tree,words) <- trees) {
-        outTrain.println(tree.render(words,false));
+        outTrain.println(Trees.Transforms.StandardStringTransform(tree).render(words,false));
       }
 
       outTrain.close();
