@@ -23,7 +23,7 @@ class CoarseToFineChartBuilder[Chart[X]<:ParseChart[X],C,F,W](coarseParser: Char
 
   private val fineParser = new CKYChartBuilder[Chart,F,W](root,lexicon,grammar,chartFactory);
 
-  def buildInsideChart(s: Seq[W], validSpan: SpanScorer = defaultScorer):Chart[F] = {
+  def buildInsideChart(s: Seq[W], validSpan: SpanScorer = SpanScorer.identity):Chart[F] = {
     val chartScorer = coarseSpanScorerFromParser(s, coarseParser, indexedProjections, threshold);
     val myScorer = SpanScorer.sum(chartScorer,validSpan);
     fineParser.buildInsideChart(s, myScorer);
@@ -34,7 +34,7 @@ class CoarseToFineChartBuilder[Chart[X]<:ParseChart[X],C,F,W](coarseParser: Char
    * Given an inside chart, fills the passed-in outside parse chart with inside scores.
    */
   def buildOutsideChart(inside: ParseChart[F],
-                        validSpan: SpanScorer = defaultScorer):Chart[F] = {
+                        validSpan: SpanScorer = SpanScorer.identity):Chart[F] = {
     fineParser.buildOutsideChart(inside, validSpan);
   }
 

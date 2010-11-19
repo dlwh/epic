@@ -1,6 +1,5 @@
 package scalanlp.parser
 
-import ChartBuilder._;
 import ParseChart.Factory;
 
 trait ChartBuilder[+Chart[X]<:ParseChart[X],L,W] {
@@ -8,11 +7,11 @@ trait ChartBuilder[+Chart[X]<:ParseChart[X],L,W] {
    * Given a sentence s, fills a parse chart with inside scores.
    * validSpan can be used as a filter to insist that certain ones are valid.
    */
-  def buildInsideChart(s: Seq[W], validSpan: SpanScorer = defaultScorer):Chart[L];
+  def buildInsideChart(s: Seq[W], validSpan: SpanScorer = SpanScorer.identity):Chart[L];
   /**
    * Given an inside chart, fills the passed-in outside parse chart with inside scores.
    */
-  def buildOutsideChart(inside: ParseChart[L], validSpan: SpanScorer = defaultScorer):Chart[L];
+  def buildOutsideChart(inside: ParseChart[L], validSpan: SpanScorer = SpanScorer.identity):Chart[L];
 
   def grammar: Grammar[L];
   def root: L;
@@ -22,13 +21,6 @@ trait ChartBuilder[+Chart[X]<:ParseChart[X],L,W] {
 }
 
 object ChartBuilder {
-  val defaultScorer = new SpanScorer {
-    def scoreUnaryRule(begin: Int, end: Int, parent: Int, child: Int) = 0.0;
-
-    def scoreBinaryRule(begin: Int, split: Int, end: Int, parent: Int, leftChild: Int, rightChild: Int) = 0.0
-    def scoreLexical(begin: Int, end: Int, parent: Int) = 0.0
-  }
-
   def apply[Chart[X]<:ParseChart[X],L,W](root: L, lexicon: Lexicon[L,W],
                                          grammar: Grammar[L],
                                          chartFactory: Factory[Chart] = ParseChart.viterbi) = {
@@ -52,7 +44,7 @@ class CKYChartBuilder[Chart[X]<:ParseChart[X], L,W](val root: L,
   }
 
   def buildInsideChart(s: Seq[W],
-                       validSpan: SpanScorer = defaultScorer):Chart[L] = {
+                       validSpan: SpanScorer = SpanScorer.identity):Chart[L] = {
     val chart = chartFactory(grammar,s.length);
 
     for{i <- 0 until s.length} {
@@ -110,7 +102,7 @@ class CKYChartBuilder[Chart[X]<:ParseChart[X], L,W](val root: L,
 
 
   def buildOutsideChart(inside: ParseChart[L],
-                         validSpan: SpanScorer = defaultScorer):Chart[L] = {
+                         validSpan: SpanScorer = SpanScorer.identity):Chart[L] = {
     val length = inside.length;
     val outside = chartFactory(grammar,length);
     outside.enter(0,inside.length,grammar.index(root),0.0);

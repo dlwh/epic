@@ -21,7 +21,7 @@ trait ChartDecoder[C,F] {
   def extractBestParse(root:F, grammar: Grammar[F],
                        inside: ParseChart[F],
                        outside: =>ParseChart[F],
-                       spanScorer: SpanScorer = ChartBuilder.defaultScorer):BinarizedTree[C];
+                       spanScorer: SpanScorer = SpanScorer.identity):BinarizedTree[C];
 
 }
 
@@ -34,7 +34,7 @@ class ViterbiDecoder[C,F](val indexedProjections: ProjectionIndexer[C,F]) extend
 
   override def extractBestParse(root: F, grammar: Grammar[F],
                                 inside: ParseChart[F], outside: =>ParseChart[F],
-                                spanScorer: SpanScorer = ChartBuilder.defaultScorer):BinarizedTree[C] = {
+                                spanScorer: SpanScorer = SpanScorer.identity):BinarizedTree[C] = {
     import inside.labelScore
 
     def buildTree(start: Int, end: Int, root: Int):BinarizedTree[C] = {
@@ -120,7 +120,7 @@ trait MaxRuleSumDecoder[C,F] extends ChartDecoder[C] {
 
   override def extractBestParse(root: F, grammar: Grammar[F],
                                 inside: ParseChart[F], outside: =>ParseChart[F],
-                                spanScorer: SpanScorer = ChartBuilder.defaultScorer):BinarizedTree[C] = {
+                                spanScorer: SpanScorer = SpanScorer.identity):BinarizedTree[C] = {
     import inside.{labelScore};
     val data = buildMaxCCharts(root, grammar, inside, xoutside, spanScorer);
     import data._;

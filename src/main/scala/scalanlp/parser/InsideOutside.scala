@@ -24,7 +24,7 @@ class InsideOutside[L,W](val parser: ChartBuilder[LogProbabilityParseChart,L,W])
   def lexicon = parser.lexicon;
   def root = parser.root;
 
-  def expectedCounts(words: Seq[W], validSpan: SpanScorer =defaultScorer):ExpectedCounts[W] = {
+  def expectedCounts(words: Seq[W], validSpan: SpanScorer =SpanScorer.identity):ExpectedCounts[W] = {
     val inside = parser.buildInsideChart(words, validSpan);
     val outside = parser.buildOutsideChart(inside, validSpan);
     val totalProb = inside.labelScore(0, words.length, root);

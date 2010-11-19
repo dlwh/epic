@@ -49,10 +49,14 @@ object SpanScorer {
   }
 
   trait Factory[W] {
-    def mkSpanScorer(s: Seq[W], oldScorer: SpanScorer = ChartBuilder.defaultScorer):SpanScorer
+    def mkSpanScorer(s: Seq[W], oldScorer: SpanScorer = identity):SpanScorer
   }
 
-  def identity:SpanScorer = new SpanScorer {
+  def identityFactory[W]:Factory[W] = new Factory[W] {
+    def mkSpanScorer(s: Seq[W], oldScorer: SpanScorer = identity) = oldScorer;
+  }
+
+  val identity = new SpanScorer {
     def scoreLexical(begin: Int, end: Int, tag: Int) = 0.0
 
     def scoreUnaryRule(begin: Int, end: Int, parent: Int, child: Int) = 0.0

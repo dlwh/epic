@@ -13,7 +13,7 @@ import scalanlp.trees.DenseTreebank
  */
 class LabeledSpanScorerFactory[L,W](parser: ChartBuilder[ParseChart.LogProbabilityParseChart,L,W]) extends SpanScorer.Factory[W] {
 
-  def mkSpanScorer(s: Seq[W], scorer: SpanScorer = ChartBuilder.defaultScorer) = {
+  def mkSpanScorer(s: Seq[W], scorer: SpanScorer = SpanScorer.identity) = {
     val coarseRootIndex = parser.grammar.index(parser.root);
     val inside = parser.buildInsideChart(s, scorer)
     val outside = parser.buildOutsideChart(inside, scorer);

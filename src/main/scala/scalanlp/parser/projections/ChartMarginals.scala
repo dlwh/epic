@@ -27,7 +27,7 @@ class ChartMarginals[C,L,W](val parser: ChartBuilder[LogProbabilityParseChart,L,
 
   private val indexer = new ProjectionIndexer[C,L](coarseIndex, grammar.index,  proj);
 
-  def projectParse(words: Seq[W], validSpan: SpanScorer =defaultScorer):SpanScorer = {
+  def projectParse(words: Seq[W], validSpan: SpanScorer =SpanScorer.identity):SpanScorer = {
     val inside = parser.buildInsideChart(words, validSpan);
     val outside = parser.buildOutsideChart(inside, validSpan);
     val totalProb = inside.labelScore(0, words.length, root);
