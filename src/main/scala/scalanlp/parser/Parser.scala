@@ -23,5 +23,5 @@ import scalanlp.data._;
 
 trait Parser[L,W] extends (Seq[W]=>Tree[L]) { outer =>
   def apply(s: Seq[W]) = bestParse(s);
-  def bestParse(s: Seq[W]):Tree[L];
+  def bestParse(s: Seq[W], spanScorer: SpanScorer = SpanScorer.identity):Tree[L];
 }

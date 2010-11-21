@@ -180,10 +180,11 @@ class DiscrimObjective[L,W](feat: Featurizer[L,W],
 
 object DiscriminativeTrainer extends ParserTrainer {
 
-  def trainParser(trainTrees: Seq[(BinarizedTree[String],Seq[String])],
-                  devTrees: Seq[(BinarizedTree[String],Seq[String])],
+  def trainParser(trainTreesX: Seq[(BinarizedTree[String],Seq[String],SpanScorer)],
+                  devTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer)],
                   config: Configuration) = {
 
+    val trainTrees = trainTreesX.map(c => (c._1,c._2));
     val (initLexicon,initProductions) = GenerativeParser.extractCounts(trainTrees.iterator);
 
     val factory = config.readIn[FeaturizerFactory[String,String]]("featurizerFactory",new PlainFeaturizerFactory[String]);
@@ -216,41 +217,3 @@ object DiscriminativeTrainer extends ParserTrainer {
   }
 }
 
-object DiscrimApproxTest extends ParserTrainer {
-  def trainParser(trainTrees: Seq[(BinarizedTree[String],Seq[String])],
-                  devTrees: Seq[(BinarizedTree[String],Seq[String])],
-                  config: Configuration) = {
-
-    val (initLexicon,initProductions) = GenerativeParser.extractCounts(trainTrees.iterator);
-
-    val factory = config.readIn[FeaturizerFactory[String,String]]("featurizerFactory",new PlainFeaturizerFactory[String]);
-    val featurizer = factory.getFeaturizer(config, initLexicon, initProductions);
-
-
-    val xbarParser = {
-      val grammar = new GenerativeGrammar(LogCounters.logNormalizeRows(initProductions));
-      val lexicon = new SimpleLexicon(initLexicon);
-      new CKYChartBuilder[LogProbabilityParseChart,String,String]("",lexicon,grammar,ParseChart.logProb);
-    }
-
-    val obj = new DiscrimObjective(featurizer, "", trainTrees.toIndexedSeq,initLexicon, xbarParser);
-    val iterationsPerEval = config.readIn("iterations.eval",25);
-    val maxIterations = config.readIn("iterations.max",100);
-    val maxMStepIterations = config.readIn("iterations.mstep.max",80);
-    val regularization = config.readIn("objective.regularization",0.001);
-    val opt = new LBFGS[Int,DenseVector](iterationsPerEval,5) with ConsoleLogging;
-
-    val init = obj.initialWeightVector;
-
-    val log = Log.globalLog;
-    val reg = DiffFunction.withL2Regularization(obj, regularization);
-    val checking = new GradientCheckingDiffFunction[Int,DenseVector](reg);
-    val cachedObj = new CachedDiffFunction(checking);
-    for( (state,iter) <- opt.iterations(cachedObj,init).take(maxIterations).zipWithIndex;
-         if iter != 0 && iter % iterationsPerEval == 0) yield {
-       val parser = obj.extractViterbiParser(state.x);
-       (iter + "", parser);
-    }
-
-  }
-}

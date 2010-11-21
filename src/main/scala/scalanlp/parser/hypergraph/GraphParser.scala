@@ -43,7 +43,8 @@ class GraphParser[L,W](root: L, lexicon: Lexicon[L,W], grammar: Grammar[L]) exte
 
   implicit val ordering: Ordering[Item] = Ordering.Double.on(_.score);
 
-  def bestParse(s: Seq[W]) = {
+  // TODO: integrate span scorer. shouldn't be hard
+  def bestParse(s: Seq[W], spanScorer: SpanScorer = SpanScorer.identity) = {
     // make the chart:
     val chart = ParseChart.viterbi(grammar,s.length);
     val agenda = new PriorityQueue[Item];

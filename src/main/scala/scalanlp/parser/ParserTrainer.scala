@@ -11,24 +11,29 @@ import scalanlp.trees.Trees
 import java.io._
 
 trait ParserTrainer {
-  def trainParser(trainTrees: Seq[(BinarizedTree[String],Seq[String])],
-                  devTrees: Seq[(BinarizedTree[String],Seq[String])],
+  def trainParser(trainTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer)],
+                  devTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer)],
                   config: Configuration):Iterator[(String,Parser[String,String])];
 
 
   def transformTrees(trees: Iterator[(Tree[String],Seq[String])],
+                     spans: Iterable[SpanScorer],
                      maxLength: Int,
                      binarize: (Tree[String]) => BinarizedTree[String],
-                     xform: Tree[String]=>Tree[String]): IndexedSeq[(BinarizedTree[String], Seq[String])] = {
+                     xform: Tree[String]=>Tree[String]): IndexedSeq[(BinarizedTree[String], Seq[String],SpanScorer)] = {
 
     val transformed =  for {
-      (tree, words) <- (trees) if words.length < maxLength
+      ((tree, words),span) <- (trees zip spans.iterator) if words.length <= maxLength
     } yield {
-      (binarize(xform(tree)), words)
+      (binarize(xform(tree)), words,span)
     };
 
     ArrayBuffer() ++= transformed;
   }
+
+  def loadTrainSpans(config: Configuration):Iterable[SpanScorer] = Stream.continually(SpanScorer.identity);
+  def loadTestSpans(config: Configuration):Iterable[SpanScorer] = Stream.continually(SpanScorer.identity);
+  def loadDevSpans(config: Configuration):Iterable[SpanScorer] = Stream.continually(SpanScorer.identity);
 
   def main(args: Array[String]) {
     val config = Configuration.fromPropertiesFiles(args.map{new File(_)});
@@ -50,13 +55,16 @@ trait ParserTrainer {
 
     val xform = Trees.Transforms.StandardStringTransform;
 
-    val trainTrees = transformTrees(treebank.trainTrees, maxLength, binarize, xform);
+    val trainSpans = loadTrainSpans(config);
+    val trainTrees = transformTrees(treebank.trainTrees, trainSpans, maxLength, binarize, xform);
 
-    val devTrees = transformTrees(treebank.devTrees, maxLength, binarize, xform)
+    val devSpans = loadDevSpans(config);
+    val devTrees = transformTrees(treebank.devTrees, devSpans, maxLength, binarize, xform)
 
     println("Training Parser...");
     val parsers = trainParser(trainTrees,devTrees,config);
-    val testTrees = transformTrees(treebank.testTrees, maxLength, binarize, xform)
+    val testSpans = loadTestSpans(config);
+    val testTrees = transformTrees(treebank.testTrees, testSpans, maxLength, binarize, xform)
 
     for((name,parser) <- parsers) {
       println("Parser " + name);
@@ -71,7 +79,7 @@ trait ParserTrainer {
     }
   }
 
-  protected def evalParser(testTrees: IndexedSeq[(Tree[String],Seq[String])], parser: Parser[String,String], name: String) = {
+  protected def evalParser(testTrees: IndexedSeq[(Tree[String],Seq[String],SpanScorer)], parser: Parser[String,String], name: String) = {
     println("Evaluating Parser...");
     val (prec,recall,exact) = ParseEval.evaluateAndLog(testTrees,parser,name);
     val f1 = (2 * prec * recall)/(prec + recall);

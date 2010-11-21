@@ -79,17 +79,17 @@ object ParseEval {
   type PostParseFn = (Tree[String],Tree[String],Seq[String],ParseEval[String]#Statistics,Int)=>Unit;
   val noPostParseFn = (_:Tree[String],_:Tree[String],_:Seq[String],_:ParseEval[String]#Statistics,_:Int)=>()
 
-  def evaluate(trees: IndexedSeq[(Tree[String],Seq[String])],
+  def evaluate(trees: IndexedSeq[(Tree[String],Seq[String],SpanScorer)],
                parser: Parser[String,String],
                postEval: PostParseFn = noPostParseFn) = {
 
     val peval = new ParseEval(Set("","''", "``", ".", ":", ","));
     import peval.Statistics;
 
-    def evalSentence(sent: (Tree[String],Seq[String])) = try {
-      val (goldTree,words) = sent;
+    def evalSentence(sent: (Tree[String],Seq[String],SpanScorer)) = try {
+      val (goldTree,words,scorer) = sent;
       val startTime = System.currentTimeMillis;
-      val guessTree = Trees.debinarize(parser(words))
+      val guessTree = Trees.debinarize(parser.bestParse(words,scorer))
       val stats = peval(guessTree,goldTree);
       val endTime = System.currentTimeMillis;
       postEval(guessTree,goldTree,words,stats,(endTime-startTime).toInt);
@@ -97,13 +97,13 @@ object ParseEval {
     } catch {
       case e:RuntimeException => throw new RuntimeException("Error parsing: " + sent._1.render(sent._2), e);
     }
-    val stats = trees.par.withSequentialThreshold(100).mapReduce({ evalSentence(_:(Tree[String],Seq[String]))},{ (_:Statistics) + (_:Statistics)});
+    val stats = trees.par.withSequentialThreshold(100).mapReduce({ evalSentence _ },{ (_:Statistics) + (_:Statistics)});
 
     val (prec,recall,exact) = (stats.precision,stats.recall,stats.exact);
     (prec,recall,exact);
   }
 
-  def evaluateAndLog(trees: IndexedSeq[(Tree[String],Seq[String])], parser: Parser[String,String], evalDir: String) = {
+  def evaluateAndLog(trees: IndexedSeq[(Tree[String],Seq[String],SpanScorer)], parser: Parser[String,String], evalDir: String) = {
 
     val parsedir = new File(evalDir);
     parsedir.exists() || parsedir.mkdirs() || error("Couldn't make directory: " + parsedir);
@@ -141,4 +141,3 @@ object ParseEval {
     r
   }
 }
-

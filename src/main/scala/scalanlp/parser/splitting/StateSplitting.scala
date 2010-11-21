@@ -325,9 +325,11 @@ object StateSplitting {
 }
 
 object StateSplittingTrainer extends ParserTrainer {
-  def trainParser(trainTrees: Seq[(BinarizedTree[String],Seq[String])],
-                  devTrees: Seq[(BinarizedTree[String],Seq[String])],
+  def trainParser(trainTreesX: Seq[(BinarizedTree[String],Seq[String],SpanScorer)],
+                  devTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer)],
                   config: Configuration) = {
+
+    val trainTrees = trainTreesX.map( c => (c._1,c._2));
 
     println("Extracting counts");
     val (initialLex,initialProductions) = (

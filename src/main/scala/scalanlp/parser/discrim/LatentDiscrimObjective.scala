@@ -2,7 +2,8 @@ package scalanlp.parser
 package discrim
 
 import scalala.tensor.dense.DenseVector
-import scalanlp.parser.projections._;
+import scalanlp.parser.projections._
+import java.io.File;
 import scalanlp.trees._
 import scalanlp.config.Configuration
 import scalanlp.util.{ConsoleLogging, Log}
@@ -22,9 +23,9 @@ import scalanlp.util._;
  * 
  * @author dlwh
  */
-class LatentDiscrimObjective[L,L2,W](feat: Featurizer[L2,W],
-                            unsplitRoot: L,
-                            trees: IndexedSeq[(BinarizedTree[L],Seq[W])],
+class LatentDiscrimObjective[L,L2,W](featurizer: Featurizer[L2,W],
+                            unsplitRoot: L, // self explanatory
+                            trees: IndexedSeq[(BinarizedTree[L],Seq[W],SpanScorer)],
                             coarseParser: ChartBuilder[LogProbabilityParseChart, L, W],
                             openTags: Set[L],
                             splitLabel: L=>Seq[L2],
@@ -39,16 +40,20 @@ class LatentDiscrimObjective[L,L2,W](feat: Featurizer[L2,W],
   val indexedFeatures: FeatureIndexer[L2,W] = {
     val initGrammar = coarseParser.grammar;
     val initLex = coarseParser.lexicon;
-    FeatureIndexer[L,L2,W](feat, initGrammar, initLex, splitLabel);
+    FeatureIndexer[L,L2,W](featurizer, initGrammar, initLex, splitLabel);
   }
 
   private val indexedProjections = new ProjectionIndexer(coarseParser.grammar.index,
     indexedFeatures.labelIndex, unsplit);
 
+  // This span scorer is for coarse grammar, need to project to fine scorer
+  protected def projectCoarseScorer(coarseScorer: SpanScorer):SpanScorer ={
+    new ProjectingSpanScorer(indexedProjections, coarseScorer);
+  }
 
-  val treesWithCharts = trees.par.map { case (tree,words) =>
-    val filter = CoarseToFineChartBuilder.coarseSpanScorerFromParser(words,coarseParser, indexedProjections);
-    (tree,words,filter)
+
+  val treesWithCharts = (trees).par.map { case (tree,words,scorer) =>
+    (tree,words,projectCoarseScorer(scorer));
   }
 
   def extractViterbiParser(weights: DenseVector) = {
@@ -58,16 +63,12 @@ class LatentDiscrimObjective[L,L2,W](feat: Featurizer[L2,W],
     val builder = new CoarseToFineChartBuilder[ParseChart.ViterbiParseChart,L,L2,W](cc,
       unsplit, root, lexicon, grammar, ParseChart.viterbi);
     val parser = new ChartParser(builder,new ViterbiDecoder(indexedProjections));
-   // val parser = CKYChartBuilder(root, lexicon, grammar);
     parser
   }
 
   def extractLogProbParser(weights: DenseVector)= {
     val grammar = weightsToGrammar(weights);
     val lexicon = weightsToLexicon(weights);
-    val cc = coarseParser.withCharts[LogProbabilityParseChart](ParseChart.logProb);
-    //val parser = new CoarseToFineChartBuilder[LogProbabilityParseChart,L,L2,W](cc,
-    //  unsplit, root, lexicon, grammar, ParseChart.logProb);
     val parser = new CKYChartBuilder[LogProbabilityParseChart,L2,W](root, lexicon, grammar, ParseChart.logProb);
     parser
   }
@@ -78,8 +79,8 @@ class LatentDiscrimObjective[L,L2,W](feat: Featurizer[L2,W],
 
     try {
       val parser = new ThreadLocal(extractLogProbParser(weights));
-      val ecounts = treesWithCharts.par.fold(new ExpectedCounts[W](parser().grammar)) { (counts, treewordsfilter) =>
-        val (tree,words,spanScorer) = treewordsfilter;
+      val ecounts = treesWithCharts.par.fold(new ExpectedCounts[W](parser().grammar)) { (counts, treeWordsScorer) =>
+        val (tree,words,spanScorer) = treeWordsScorer;
 
         val treeCounts = treeToExpectedCounts(parser().grammar,parser().lexicon,tree,words);
         val wordCounts = wordsToExpectedCounts(words, parser(), spanScorer);
@@ -101,7 +102,6 @@ class LatentDiscrimObjective[L,L2,W](feat: Featurizer[L2,W],
 
   }
 
-
   val splitOpenTags = {
     for(t <- openTags; s <- splitLabel(t))  yield s;
   }
@@ -116,7 +116,9 @@ class LatentDiscrimObjective[L,L2,W](feat: Featurizer[L2,W],
     grammar;
   }
 
-  def wordsToExpectedCounts(words: Seq[W], parser: ChartBuilder[LogProbabilityParseChart,L2,W], spanScorer: SpanScorer = SpanScorer.identity) = {
+  def wordsToExpectedCounts(words: Seq[W],
+                            parser: ChartBuilder[LogProbabilityParseChart,L2,W],
+                            spanScorer: SpanScorer = SpanScorer.identity) = {
     val ecounts = new InsideOutside(parser).expectedCounts(words, spanScorer);
     ecounts
   }
@@ -167,12 +169,18 @@ class LatentDiscrimObjective[L,L2,W](feat: Featurizer[L2,W],
 
 
 object LatentDiscriminativeTrainer extends ParserTrainer {
+  def split(x: String, numStates: Int) = {
+    if(x.isEmpty) Seq((x,0))
+    else for(i <- 0 until numStates) yield (x,i);
+  }
+  def unsplit(x: (String,Int)) = x._1;
 
-  def trainParser(trainTrees: Seq[(BinarizedTree[String],Seq[String])],
-                  devTrees: Seq[(BinarizedTree[String],Seq[String])],
+
+  def trainParser(trainTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer)],
+                  devTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer)],
                   config: Configuration) = {
 
-    val (initLexicon,initProductions) = GenerativeParser.extractCounts(trainTrees.iterator);
+    val (initLexicon,initProductions) = GenerativeParser.extractCounts(trainTrees.iterator.map(tuple => (tuple._1,tuple._2)));
     val numStates = config.readIn[Int]("discrim.numStates",2);
 
     val xbarParser = {
@@ -186,23 +194,16 @@ object LatentDiscriminativeTrainer extends ParserTrainer {
     val latentFactory = config.readIn[LatentFeaturizerFactory]("discrim.latentFactory",new SlavLatentFeaturizerFactory());
     val latentFeaturizer = latentFactory.getFeaturizer(featurizer, numStates);
 
-
     val openTags = Set.empty ++ {
       for(t <- initLexicon.activeKeys.map(_._1) if initLexicon(t).size > 50) yield t;
     }
-
-    def split(x: String) = {
-      if(x.isEmpty) Seq((x,0))
-      else for(i <- 0 until numStates) yield (x,i);
-    }
-    def project(x: (String,Int)) = x._1;
 
     val obj = new LatentDiscrimObjective(latentFeaturizer, "",
                                          trainTrees.toIndexedSeq,
                                          xbarParser,
                                          openTags,
-                                         split _,
-                                         project _);
+                                         split(_:String,numStates),
+                                         unsplit (_:(String,Int)));
 
 
     val iterationsPerEval = config.readIn("iterations.eval",25);

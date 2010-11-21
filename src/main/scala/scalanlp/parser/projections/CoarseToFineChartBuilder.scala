@@ -9,6 +9,8 @@ import scalanlp.trees._
 import ChartBuilder._;
 import CoarseToFineChartBuilder._;
 
+@serializable
+@SerialVersionUID(1)
 class CoarseToFineChartBuilder[Chart[X]<:ParseChart[X],C,F,W](coarseParser: ChartBuilder[Chart,C,W],
                                 proj: F=>C,
                                 val root: F,
@@ -87,22 +89,3 @@ object CoarseToFineChartBuilder {
   }
 }
 
-object SimpleCoarseToFineTrainer extends ParserTrainer {
-  def trainParser(trainTrees: Seq[(BinarizedTree[String],Seq[String])],
-                  devTrees: Seq[(BinarizedTree[String],Seq[String])],
-                  config: Configuration) = {
-    def proj(label: String) =  if(label == "" ) label else "X";
-    val coarseTrees = for {
-      (tree,words) <- trainTrees
-    } yield (tree map proj, words)
-
-    val coarse = GenerativeParser.fromTrees(coarseTrees);
-    val coarseBuilder = coarse.builder.asInstanceOf[ChartBuilder[scalanlp.parser.ParseChart.ViterbiParseChart,String,String]];
-
-    val (fineLexicon,fineGrammar) = GenerativeParser.extractLexiconAndGrammar(trainTrees.iterator);
-    val fine = new CoarseToFineChartBuilder[ParseChart.ViterbiParseChart,String,String,String](coarseBuilder, proj _, "", fineLexicon, fineGrammar, ParseChart.viterbi);
-    val parser = ChartParser(fine);
-
-    Iterator.single(("CtF", parser));
-  }
-}

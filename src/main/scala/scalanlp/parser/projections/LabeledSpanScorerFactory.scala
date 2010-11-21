@@ -91,17 +91,16 @@ object ProjectTreebankToLabeledSpans {
   def loadSpans(spanDir: File) = {
     if(!spanDir.exists || !spanDir.isDirectory) error(spanDir + " must exist and be a directory!")
 
-    val trainSpans = loadSpanFile(new File(spanDir,TRAIN_SPANS_NAME));
-    val devSpans = loadSpanFile(new File(spanDir,DEV_SPANS_NAME));
-    val testSpans = loadSpanFile(new File(spanDir,TEST_SPANS_NAME));
+    val trainSpans = loadSpansFile(new File(spanDir,TRAIN_SPANS_NAME));
+    val devSpans = loadSpansFile(new File(spanDir,DEV_SPANS_NAME));
+    val testSpans = loadSpansFile(new File(spanDir,TEST_SPANS_NAME));
 
     (trainSpans,devSpans,testSpans);
   }
 
   def loadSpansFile(spanFile: File) = {
     require(spanFile.exists, spanFile + " must exist!")
-    loadSpanObject(spanFile);
-    val oin = new ObjectInputStream(new BufferedInputStream(new FileInputStream(loc)));
+    val oin = new ObjectInputStream(new BufferedInputStream(new FileInputStream(spanFile)));
     val spans = oin.readObject().asInstanceOf[IndexedSeq[SpanScorer]]
     oin.close();
     spans;
