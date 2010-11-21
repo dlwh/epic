@@ -49,20 +49,23 @@ class LabeledSpanScorerFactory[L,W](parser: ChartBuilder[ParseChart.LogProbabili
 }
 
 object ProjectTreebankToLabeledSpans {
+  val TRAIN_SPANS_NAME = "train.spans.ser"
+  val DEV_SPANS_NAME = "dev.spans.ser"
+  val TEST_SPANS_NAME = "test.spans.ser"
   def main(args: Array[String]) {
     val parser = loadParser(new File(args(0)));
     val treebank = DenseTreebank.fromZipFile(new File(args(1)));
     val outDir = new File(args(2));
     outDir.mkdirs();
-    val factory = new LabeledSpanScorerFactory[String,String](parser);
-    writeObject(mapTrees(factory,treebank.trainTrees.toIndexedSeq),new File(outDir,"train.spans.ser"))
-    writeObject(mapTrees(factory,treebank.testTrees.toIndexedSeq),new File(outDir,"test.spans.ser"))
-    writeObject(mapTrees(factory,treebank.devTrees.toIndexedSeq),new File(outDir,"dev.spans.ser"))
+    val factory = new LabeledSpanScorerFactory[String,String](parser.builder.withCharts(ParseChart.logProb));
+    writeObject(mapTrees(factory,treebank.trainTrees.toIndexedSeq),new File(outDir,TRAIN_SPANS_NAME))
+    writeObject(mapTrees(factory,treebank.testTrees.toIndexedSeq),new File(outDir,TEST_SPANS_NAME))
+    writeObject(mapTrees(factory,treebank.devTrees.toIndexedSeq),new File(outDir,DEV_SPANS_NAME))
   }
 
   def loadParser(loc: File) = {
     val oin = new ObjectInputStream(new BufferedInputStream(new FileInputStream(loc)));
-    val parser = oin.readObject().asInstanceOf[ChartBuilder[ParseChart.LogProbabilityParseChart,String,String]]
+    val parser = oin.readObject().asInstanceOf[ChartParser[String,String,String]]
     oin.close();
     parser;
   }
@@ -83,5 +86,24 @@ object ProjectTreebankToLabeledSpans {
     val oout = new ObjectOutputStream(new BufferedOutputStream(new FileOutputStream(file)));
     oout.writeObject(o);
     oout.close();
+  }
+
+  def loadSpans(spanDir: File) = {
+    if(!spanDir.exists || !spanDir.isDirectory) error(spanDir + " must exist and be a directory!")
+
+    val trainSpans = loadSpanFile(new File(spanDir,TRAIN_SPANS_NAME));
+    val devSpans = loadSpanFile(new File(spanDir,DEV_SPANS_NAME));
+    val testSpans = loadSpanFile(new File(spanDir,TEST_SPANS_NAME));
+
+    (trainSpans,devSpans,testSpans);
+  }
+
+  def loadSpansFile(spanFile: File) = {
+    require(spanFile.exists, spanFile + " must exist!")
+    loadSpanObject(spanFile);
+    val oin = new ObjectInputStream(new BufferedInputStream(new FileInputStream(loc)));
+    val spans = oin.readObject().asInstanceOf[IndexedSeq[SpanScorer]]
+    oin.close();
+    spans;
   }
 }
