@@ -15,6 +15,21 @@ trait ParserTrainer {
                   devTrees: Seq[(BinarizedTree[String],Seq[String])],
                   config: Configuration):Iterator[(String,Parser[String,String])];
 
+
+  def transformTrees(trees: Iterator[(Tree[String],Seq[String])],
+                     maxLength: Int,
+                     binarize: (Tree[String]) => BinarizedTree[String],
+                     xform: Tree[String]=>Tree[String]): IndexedSeq[(BinarizedTree[String], Seq[String])] = {
+
+    val transformed =  for {
+      (tree, words) <- (trees) if words.length < maxLength
+    } yield {
+      (binarize(xform(tree)), words)
+    };
+
+    ArrayBuffer() ++= transformed;
+  }
+
   def main(args: Array[String]) {
     val config = Configuration.fromPropertiesFiles(args.map{new File(_)});
 
@@ -35,16 +50,13 @@ trait ParserTrainer {
 
     val xform = Trees.Transforms.StandardStringTransform;
 
-    val trainTrees = ArrayBuffer() ++= (for( (tree,words) <- treebank.trainTrees.filter(_._2.length <= maxLength))
-      yield (binarize(xform(tree)),words));
+    val trainTrees = transformTrees(treebank.trainTrees, maxLength, binarize, xform);
 
-    val devTrees = ArrayBuffer() ++= (for( (tree,words) <- treebank.devTrees.filter(_._2.length <= maxLength))
-      yield (binarize(xform(tree)),words));
+    val devTrees = transformTrees(treebank.devTrees, maxLength, binarize, xform)
 
     println("Training Parser...");
     val parsers = trainParser(trainTrees,devTrees,config);
-    val testTrees = ArrayBuffer() ++= (for( (tree,words) <- treebank.testTrees.filter(_._2.length <= maxLength))
-      yield (xform(tree),words));
+    val testTrees = transformTrees(treebank.testTrees, maxLength, binarize, xform)
 
     for((name,parser) <- parsers) {
       println("Parser " + name);
@@ -65,6 +77,7 @@ trait ParserTrainer {
     val f1 = (2 * prec * recall)/(prec + recall);
     println("Eval finished. Results:");
     println( "P: " + prec + " R:" + recall + " F1: " + f1 +  " Ex:" + exact);
+    f1
   }
 
 }

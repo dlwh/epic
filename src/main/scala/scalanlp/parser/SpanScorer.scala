@@ -48,10 +48,13 @@ object SpanScorer {
     }
   }
 
+  @serializable
   trait Factory[W] {
     def mkSpanScorer(s: Seq[W], oldScorer: SpanScorer = identity):SpanScorer
   }
 
+  @serializable
+  @SerialVersionUID(1)
   def identityFactory[W]:Factory[W] = new Factory[W] {
     def mkSpanScorer(s: Seq[W], oldScorer: SpanScorer = identity) = oldScorer;
   }

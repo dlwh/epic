@@ -16,7 +16,7 @@ class ProjectionIndexer[C,F](val coarseIndex: Index[C], val fineIndex:Index[F], 
 
   val coarseEncoder = Encoder.fromIndex(coarseIndex);
 
-  val refinements = indexedProjections.zipWithIndex.groupBy(_._1).mapValues(arr => arr.map(_._2));
+  val refinements = indexedProjections.zipWithIndex.groupBy(_._1).mapValues(arr => arr.map(_._2)).toMap;
 
   def refinementsOf(c: Int):Array[Int] = refinements(c);
 
