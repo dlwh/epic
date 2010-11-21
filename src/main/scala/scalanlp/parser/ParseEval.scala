@@ -90,7 +90,7 @@ object ParseEval {
       val (goldTree,words,scorer) = sent;
       val startTime = System.currentTimeMillis;
       val guessTree = Trees.debinarize(parser.bestParse(words,scorer))
-      val stats = peval(guessTree,goldTree);
+      val stats = peval(guessTree,Trees.debinarize(goldTree));
       val endTime = System.currentTimeMillis;
       postEval(guessTree,goldTree,words,stats,(endTime-startTime).toInt);
       stats;
