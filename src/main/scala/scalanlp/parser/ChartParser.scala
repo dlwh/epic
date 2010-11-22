@@ -9,7 +9,7 @@ import scalanlp.trees._;
 @serializable
 @SerialVersionUID(1)
 class ChartParser[F,C,W](val builder: ChartBuilder[ParseChart,F,W],
-                         decoder: ChartDecoder[C,F],
+                         val decoder: ChartDecoder[C,F],
                          val scorerFactory: SpanScorer.Factory[W] = SpanScorer.identityFactory[W]) extends Parser[C,W] {
 
   override def bestParse(w: Seq[W], scorer: SpanScorer = SpanScorer.identity) = try {
