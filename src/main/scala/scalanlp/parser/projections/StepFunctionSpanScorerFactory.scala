@@ -7,7 +7,7 @@ package projections
  *
  * @author dlwh
  */
-class StepFunctionSpanScorerFactory[L,W](innerFactory: SpanScorer.Factory[W], threshold: Double=1E-10) extends SpanScorer.Factory[W] {
+class StepFunctionSpanScorerFactory[L,W](innerFactory: SpanScorer.Factory[W], threshold: Double= -5) extends SpanScorer.Factory[W] {
   def mkSpanScorer(s: scala.Seq[W], oldScorer: SpanScorer = SpanScorer.identity):SpanScorer = {
     val inner = innerFactory.mkSpanScorer(s,oldScorer);
     new SpanScorer {

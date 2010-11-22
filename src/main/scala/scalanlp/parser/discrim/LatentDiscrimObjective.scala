@@ -225,12 +225,16 @@ object LatentDiscriminativeTrainer extends ParserTrainer {
       for(t <- initLexicon.activeKeys.map(_._1) if initLexicon(t).size > 50) yield t;
     }
 
+    val threshold = config.readIn("discrim.filterThreshold",-5.0)
+
+    val thresholdingTrainTrees = trainTrees.toIndexedSeq.par(1000).map { case (t,w,s) => (t,w,new ThresholdingScorer(s,threshold))};
+
     obj = new LatentDiscrimObjective(latentFeaturizer, "",
-                                         trainTrees.toIndexedSeq,
-                                         xbarParser,
-                                         openTags,
-                                         split(_:String,numStates),
-                                         unsplit (_:(String,Int)));
+      thresholdingTrainTrees,
+      xbarParser,
+      openTags,
+      split(_:String,numStates),
+      unsplit (_:(String,Int)));
 
 
     val iterationsPerEval = config.readIn("iterations.eval",25);
