@@ -1,7 +1,8 @@
 package scalanlp.parser
 package projections
 
-import scalanlp.trees._;
+import scalanlp.trees._
+import scalanlp.collection.mutable.TriangularArray;
 
 import java.io._
 import scalanlp.concurrent.ParallelOps._
@@ -28,24 +29,34 @@ class LabeledSpanScorerFactory[L,W](parser: ChartBuilder[ParseChart.LogProbabili
     chartScorer
   }
 
-  def buildSpanScorer(inside: ParseChart[L], outside: ParseChart[L], sentProb: Double):SpanScorer = new SpanScorer {
-    @inline
-    def score(begin: Int, end: Int, label: Int) = {
-      val score =  (inside(begin,end,label)
-              + outside(begin,end,label) - sentProb);
-      score
+  def buildSpanScorer(inside: ParseChart[L], outside: ParseChart[L], sentProb: Double):LabeledSpanScorer = {
+    val scores = TriangularArray.raw(inside.length+1,inside.grammar.fillArray(Double.NegativeInfinity));
+    for(begin <-  0 until inside.length; end <- begin+1 to (inside.length)) {
+      for(l <- inside.enteredLabelIndexes(begin,end))
+        scores(TriangularArray.index(begin,end))(l) = inside.labelScore(begin,end,l) + outside.labelScore(begin,end,l) - sentProb;
     }
-
-    def scoreUnaryRule(begin: Int, end: Int, parent: Int, child: Int) = score(begin,end,parent);
-
-    def scoreBinaryRule(begin: Int, split: Int, end: Int, parent: Int, leftChild: Int, rightChild: Int) = {
-      score(begin,end,parent);
-    }
-    def scoreLexical(begin: Int, end: Int, tag: Int): Double = {
-      score(begin,end,tag);
-    }
+    return new LabeledSpanScorer(scores);
   }
 
+}
+
+@serializable
+@SerialVersionUID(1)
+class LabeledSpanScorer(scores: Array[Array[Double]]) extends SpanScorer {
+  @inline
+  def score(begin: Int, end: Int, label: Int) = {
+    val score =  scores(TriangularArray.index(begin,end))(label)
+    score
+  }
+
+  def scoreUnaryRule(begin: Int, end: Int, parent: Int, child: Int) = score(begin,end,parent);
+
+  def scoreBinaryRule(begin: Int, split: Int, end: Int, parent: Int, leftChild: Int, rightChild: Int) = {
+    score(begin,end,parent);
+  }
+  def scoreLexical(begin: Int, end: Int, tag: Int): Double = {
+    score(begin,end,tag);
+  }
 }
 
 object ProjectTreebankToLabeledSpans {
