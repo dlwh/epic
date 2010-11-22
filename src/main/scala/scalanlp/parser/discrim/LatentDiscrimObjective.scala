@@ -43,11 +43,11 @@ class LatentDiscrimObjective[L,L2,W](featurizer: Featurizer[L2,W],
     FeatureIndexer[L,L2,W](featurizer, initGrammar, initLex, splitLabel);
   }
 
-  private val indexedProjections = new ProjectionIndexer(coarseParser.grammar.index,
+  val indexedProjections = new ProjectionIndexer(coarseParser.grammar.index,
     indexedFeatures.labelIndex, unsplit);
 
   // This span scorer is for coarse grammar, need to project to fine scorer
-  protected def projectCoarseScorer(coarseScorer: SpanScorer):SpanScorer ={
+  def projectCoarseScorer(coarseScorer: SpanScorer):SpanScorer ={
     new ProjectingSpanScorer(indexedProjections, coarseScorer);
   }
 
@@ -167,14 +167,41 @@ class LatentDiscrimObjective[L,L2,W](featurizer: Featurizer[L2,W],
 
 }
 
-
 object LatentDiscriminativeTrainer extends ParserTrainer {
   def split(x: String, numStates: Int) = {
     if(x.isEmpty) Seq((x,0))
     else for(i <- 0 until numStates) yield (x,i);
   }
+
   def unsplit(x: (String,Int)) = x._1;
 
+  override def loadTrainSpans(config: Configuration):Iterable[SpanScorer] = {
+    val spanDir = config.readIn[File]("spans.labeled",null);
+    if(spanDir eq null) super.loadTrainSpans(config);
+    else {
+      val spanFile = new File(spanDir,ProjectTreebankToLabeledSpans.TRAIN_SPANS_NAME)
+      ProjectTreebankToLabeledSpans.loadSpansFile(spanFile);
+    }
+  }
+  override def loadDevSpans(config: Configuration):Iterable[SpanScorer] = {
+    val spanDir = config.readIn[File]("spans.labeled",null);
+    if(spanDir eq null) super.loadTrainSpans(config);
+    else {
+      val spanFile = new File(spanDir,ProjectTreebankToLabeledSpans.DEV_SPANS_NAME)
+      ProjectTreebankToLabeledSpans.loadSpansFile(spanFile);
+    }
+  }
+
+  override def loadTestSpans(config: Configuration):Iterable[SpanScorer] = {
+    val spanDir = config.readIn[File]("spans.labeled",null);
+    if(spanDir eq null) super.loadTrainSpans(config);
+    else {
+      val spanFile = new File(spanDir,ProjectTreebankToLabeledSpans.TRAIN_SPANS_NAME)
+      ProjectTreebankToLabeledSpans.loadSpansFile(spanFile).map(obj.projectCoarseScorer _);
+    }
+  }
+
+  var obj: LatentDiscrimObjective[String,(String,Int),String] = null;
 
   def trainParser(trainTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer)],
                   devTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer)],
@@ -198,7 +225,7 @@ object LatentDiscriminativeTrainer extends ParserTrainer {
       for(t <- initLexicon.activeKeys.map(_._1) if initLexicon(t).size > 50) yield t;
     }
 
-    val obj = new LatentDiscrimObjective(latentFeaturizer, "",
+    obj = new LatentDiscrimObjective(latentFeaturizer, "",
                                          trainTrees.toIndexedSeq,
                                          xbarParser,
                                          openTags,
