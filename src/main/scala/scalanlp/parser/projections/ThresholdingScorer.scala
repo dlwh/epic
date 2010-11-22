@@ -14,10 +14,10 @@ class ThresholdingScorer(inner: SpanScorer, threshold: Double= -5.) extends Span
 
   def scoreLexical(begin: Int, end: Int, tag: Int) = I(inner.scoreLexical(begin,end,tag))
 
-  def scoreUnaryRule(begin: Int, end: Int, parent: Int, child: Int) = I(scoreUnaryRule(begin,end,parent,child));
+  def scoreUnaryRule(begin: Int, end: Int, parent: Int, child: Int) = I(inner.scoreUnaryRule(begin,end,parent,child));
 
   def scoreBinaryRule(begin: Int, split: Int, end: Int, parent: Int, leftChild: Int, rightChild: Int) = {
-    I(scoreBinaryRule(begin, split, end, parent, leftChild, rightChild))
+    I(inner.scoreBinaryRule(begin, split, end, parent, leftChild, rightChild))
   }
 
 }
