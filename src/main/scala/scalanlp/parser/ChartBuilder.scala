@@ -16,6 +16,7 @@ trait ChartBuilder[+Chart[X]<:ParseChart[X],L,W] {
   def grammar: Grammar[L];
   def root: L;
   def lexicon:Lexicon[L,W];
+  def unaryClosure: UnaryRuleClosure;
 
   def withCharts[Chart[X]<:ParseChart[X]](factory: ParseChart.Factory[Chart]):ChartBuilder[Chart,L,W];
 }
@@ -128,14 +129,10 @@ class CKYChartBuilder[Chart[X]<:ParseChart[X], L,W](val root: L,
             val spanScore = validSpan.scoreBinaryRule(begin,split,end,a,b,c);
             if(spanScore != Double.NegativeInfinity) {
               val bOutside = aOutside + cInside + spanScore;
-              if(bOutside != Double.NegativeInfinity) {
-                outside.enter(begin,split,b,bOutside);
-              }
+              outside.enter(begin,split,b,bOutside);
 
               val cOutside = aOutside + bInside + spanScore;
-              if( cOutside != Double.NegativeInfinity) {
-                outside.enter(split,end,c,cOutside);
-              }
+              outside.enter(split,end,c,cOutside);
             }
           }
         }
