@@ -127,3 +127,28 @@ object ProjectTreebankToLabeledSpans {
 
 }
 
+object ProjectTreebankToLabeledSpansProjective {
+  import ProjectTreebankToLabeledSpans._;
+
+  def main(args: Array[String]) {
+    val genParser = ProjectTreebankToLabeledSpans.loadParser(new File(args(0)));
+    val latentParser = loadParser(new File(args(0)));
+    val treebank = DenseTreebank.fromZipFile(new File(args(1)));
+    val outDir = new File(args(2));
+    outDir.mkdirs();
+    def unsplit(x: (String,Int)) = x._1
+    val projections = new ProjectionIndexer(genParser.builder.grammar.index,latentParser.builder.grammar.index,unsplit _)
+    val factory = new LabeledSpanScorerFactory[String,(String,Int),String](latentParser.builder.withCharts(ParseChart.logProb),projections);
+    writeObject(mapTrees(factory,treebank.trainTrees.toIndexedSeq),new File(outDir,TRAIN_SPANS_NAME))
+    writeObject(mapTrees(factory,treebank.testTrees.toIndexedSeq),new File(outDir,TEST_SPANS_NAME))
+    writeObject(mapTrees(factory,treebank.devTrees.toIndexedSeq),new File(outDir,DEV_SPANS_NAME))
+  }
+
+  def loadParser(loc: File) = {
+    val oin = new ObjectInputStream(new BufferedInputStream(new FileInputStream(loc)));
+    val parser = oin.readObject().asInstanceOf[ChartParser[(String,Int),String,String]]
+    oin.close();
+    parser;
+  }
+
+}
