@@ -2,17 +2,19 @@ package scalanlp.parser
 package projections
 
 import scalanlp.trees._
-import scalanlp.collection.mutable.TriangularArray;
+import scalanlp.collection.mutable.TriangularArray
+import scalanlp.math.Numerics;
 
 import java.io._
 import scalanlp.concurrent.ParallelOps._
 import scalanlp.trees.DenseTreebank
 
 /**
- * Creates labeled span scorers for a set of trees from some parser. Does not do any projection.
+ * Creates labeled span scorers for a set of trees from some parser.
  * @author dlwh
  */
-class LabeledSpanScorerFactory[L,W](parser: ChartBuilder[ParseChart.LogProbabilityParseChart,L,W]) extends SpanScorer.Factory[W] {
+class LabeledSpanScorerFactory[C,L,W](parser: ChartBuilder[ParseChart.LogProbabilityParseChart,L,W],
+                                    indexedProjections: ProjectionIndexer[C,L]) extends SpanScorer.Factory[W] {
 
   def mkSpanScorer(s: Seq[W], scorer: SpanScorer = SpanScorer.identity) = {
     val coarseRootIndex = parser.grammar.index(parser.root);
@@ -32,8 +34,13 @@ class LabeledSpanScorerFactory[L,W](parser: ChartBuilder[ParseChart.LogProbabili
   def buildSpanScorer(inside: ParseChart[L], outside: ParseChart[L], sentProb: Double):LabeledSpanScorer = {
     val scores = TriangularArray.raw(inside.length+1,inside.grammar.fillArray(Double.NegativeInfinity));
     for(begin <-  0 until inside.length; end <- begin+1 to (inside.length)) {
-      for(l <- inside.enteredLabelIndexes(begin,end))
-        scores(TriangularArray.index(begin,end))(l) = inside.labelScore(begin,end,l) + outside.labelScore(begin,end,l) - sentProb;
+      for(l <- inside.enteredLabelIndexes(begin,end)) {
+        val index = TriangularArray.index(begin, end)
+        val pL = indexedProjections.project(l)
+        val currentScore = scores(index)(pL);
+        val myScore = inside.labelScore(begin, end, l) + outside.labelScore(begin, end, l) - sentProb
+        scores(index)(pL) = Numerics.logSum(currentScore,myScore);
+      }
     }
     return new LabeledSpanScorer(scores);
   }
@@ -44,7 +51,7 @@ class LabeledSpanScorerFactory[L,W](parser: ChartBuilder[ParseChart.LogProbabili
 @SerialVersionUID(1)
 class LabeledSpanScorer(scores: Array[Array[Double]]) extends SpanScorer {
   @inline
-  def score(begin: Int, end: Int, label: Int) = {
+  private def score(begin: Int, end: Int, label: Int) = {
     val score =  scores(TriangularArray.index(begin,end))(label)
     score
   }
@@ -68,7 +75,8 @@ object ProjectTreebankToLabeledSpans {
     val treebank = DenseTreebank.fromZipFile(new File(args(1)));
     val outDir = new File(args(2));
     outDir.mkdirs();
-    val factory = new LabeledSpanScorerFactory[String,String](parser.builder.withCharts(ParseChart.logProb));
+    val projections = new ProjectionIndexer(parser.builder.grammar.index,parser.builder.grammar.index,identity[String])
+    val factory = new LabeledSpanScorerFactory[String,String,String](parser.builder.withCharts(ParseChart.logProb),projections);
     writeObject(mapTrees(factory,treebank.trainTrees.toIndexedSeq),new File(outDir,TRAIN_SPANS_NAME))
     writeObject(mapTrees(factory,treebank.testTrees.toIndexedSeq),new File(outDir,TEST_SPANS_NAME))
     writeObject(mapTrees(factory,treebank.devTrees.toIndexedSeq),new File(outDir,DEV_SPANS_NAME))
@@ -116,4 +124,6 @@ object ProjectTreebankToLabeledSpans {
     oin.close();
     spans;
   }
+
 }
+
