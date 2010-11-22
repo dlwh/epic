@@ -70,7 +70,7 @@ class AnchoredRuleScorerFactory[C,L,W](parser: ChartBuilder[ParseChart.LogProbab
           val pP = indexedProjections.project(parent);
 
           for(split <- (begin+1) until end) {
-            val parentArray = if(binaryScores(index)(split)(pP) eq null) {
+            val parentArray = if(binaryScores(index)(split-begin)(pP) eq null) {
               binaryScores(index)(split-begin)(pP) = projFill(projFill(Double.NegativeInfinity));
               binaryScores(index)(split-begin)(pP)
             } else {
