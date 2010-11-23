@@ -3,7 +3,9 @@ package projections
 
 import scalanlp.trees._
 import scalanlp.collection.mutable.TriangularArray
-import scalanlp.math.Numerics;
+import scalanlp.math.Numerics
+import scalanlp.util.Index
+import scalala.tensor.sparse.SparseVector;
 
 import java.io._
 import scalanlp.concurrent.ParallelOps._
@@ -32,28 +34,29 @@ class LabeledSpanScorerFactory[C,L,W](parser: ChartBuilder[ParseChart.LogProbabi
   }
 
   def buildSpanScorer(inside: ParseChart[L], outside: ParseChart[L], sentProb: Double):LabeledSpanScorer = {
-    val scores = TriangularArray.raw(inside.length+1,inside.grammar.fillArray(Double.NegativeInfinity));
+    val scores = TriangularArray.raw(inside.length+1,indexedProjections.coarseEncoder.mkSparseVector(Double.NegativeInfinity));
     for(begin <-  0 until inside.length; end <- begin+1 to (inside.length)) {
+      val index = TriangularArray.index(begin, end)
       for(l <- inside.enteredLabelIndexes(begin,end)) {
-        val index = TriangularArray.index(begin, end)
         val pL = indexedProjections.project(l)
         val currentScore = scores(index)(pL);
         val myScore = inside.labelScore(begin, end, l) + outside.labelScore(begin, end, l) - sentProb
         scores(index)(pL) = Numerics.logSum(currentScore,myScore);
       }
     }
-    return new LabeledSpanScorer(scores);
+    println(scores.foldLeft(0)(_ + _.used) * 1.0 / (scores.size * scores(0).size));
+    new LabeledSpanScorer(scores);
   }
 
 }
 
 @serializable
 @SerialVersionUID(1)
-class LabeledSpanScorer(scores: Array[Array[Double]]) extends SpanScorer {
+class LabeledSpanScorer(scores: Array[SparseVector]) extends SpanScorer {
   @inline
   private def score(begin: Int, end: Int, label: Int) = {
-    val score =  scores(TriangularArray.index(begin,end))(label)
-    score
+    if(scores(TriangularArray.index(begin,end)) eq null) Double.NegativeInfinity
+    else scores(TriangularArray.index(begin,end))(label)
   }
 
   def scoreUnaryRule(begin: Int, end: Int, parent: Int, child: Int) = score(begin,end,parent);
@@ -70,6 +73,7 @@ object ProjectTreebankToLabeledSpans {
   val TRAIN_SPANS_NAME = "train.spans.ser"
   val DEV_SPANS_NAME = "dev.spans.ser"
   val TEST_SPANS_NAME = "test.spans.ser"
+  val SPAN_INDEX_NAME = "spanindex.ser"
   def main(args: Array[String]) {
     val parser = loadParser(new File(args(0)));
     val treebank = DenseTreebank.fromZipFile(new File(args(1)));
@@ -77,6 +81,7 @@ object ProjectTreebankToLabeledSpans {
     outDir.mkdirs();
     val projections = new ProjectionIndexer(parser.builder.grammar.index,parser.builder.grammar.index,identity[String])
     val factory = new LabeledSpanScorerFactory[String,String,String](parser.builder.withCharts(ParseChart.logProb),projections);
+    writeObject(parser.builder.grammar.index,new File(outDir,SPAN_INDEX_NAME));
     writeObject(mapTrees(factory,treebank.trainTrees.toIndexedSeq),new File(outDir,TRAIN_SPANS_NAME))
     writeObject(mapTrees(factory,treebank.testTrees.toIndexedSeq),new File(outDir,TEST_SPANS_NAME))
     writeObject(mapTrees(factory,treebank.devTrees.toIndexedSeq),new File(outDir,DEV_SPANS_NAME))
@@ -123,6 +128,14 @@ object ProjectTreebankToLabeledSpans {
     val spans = oin.readObject().asInstanceOf[IndexedSeq[SpanScorer]]
     oin.close();
     spans;
+  }
+
+  def loadSpanIndex(spanFile: File) = {
+    require(spanFile.exists, spanFile + " must exist!")
+    val oin = new ObjectInputStream(new BufferedInputStream(new FileInputStream(spanFile)));
+    val index = oin.readObject().asInstanceOf[Index[String]];
+    oin.close();
+    index;
   }
 
 }

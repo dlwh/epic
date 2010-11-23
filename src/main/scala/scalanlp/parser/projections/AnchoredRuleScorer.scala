@@ -2,8 +2,9 @@ package scalanlp.parser
 package projections
 
 import scalanlp.trees._
-import scalanlp.collection.mutable.TriangularArray
-import scalanlp.math.Numerics;
+import scalanlp.math.Numerics
+import scalanlp.collection.mutable.{SparseArray, TriangularArray}
+import scalala.tensor.sparse.SparseVector;
 
 import java.io._
 import scalanlp.concurrent.ParallelOps._
@@ -36,18 +37,22 @@ class AnchoredRuleScorerFactory[C,L,W](parser: ChartBuilder[ParseChart.LogProbab
                       sentProb: Double,
                       scorer: SpanScorer=SpanScorer.identity):AnchoredRuleScorer = {
     val numProjectedLabels = indexedProjections.coarseIndex.size;
-    def projFill[T:ClassManifest](t: =>T) = Array.fill(numProjectedLabels)(t);
+    def projFill[T:ClassManifest](t: =>T) = new SparseArray(numProjectedLabels,t,0);
+    def projVector() = {
+      val vec = new SparseVector(numProjectedLabels,0);
+      vec.default = Double.NegativeInfinity;
+      vec
+    }
 
-    val lexicalScores = Array.fill(inside.length)(projFill(Double.NegativeInfinity))
-    val unaryScores = TriangularArray.raw(inside.length+1,projFill(projFill(Double.NegativeInfinity)));
+    val lexicalScores = Array.fill(inside.length)(projVector())
+    val unaryScores = TriangularArray.raw(inside.length+1,projFill(projVector()));
     // so hard!
-    val binaryScores = TriangularArray.raw[Array[Array[Array[Array[Double]]]]](inside.length+1,null);
+    val binaryScores = TriangularArray.raw[Array[SparseArray[SparseArray[SparseVector]]]](inside.length+1,null);
     for(begin <- 0 until inside.length; end <- (begin + 1) to inside.length) {
       val numSplits = end - begin;
       if(!inside.enteredLabelIndexes(begin,end).isEmpty) // is there anything to put here?
-        binaryScores(TriangularArray.index(begin,end)) = Array.fill(numSplits)(projFill[Array[Array[Double]]](null));
+        binaryScores(TriangularArray.index(begin,end)) = Array.fill(numSplits)(projFill[SparseArray[SparseVector]](null));
     }
-
 
     val grammar = parser.grammar;
     for(begin <- 0 until inside.length; end = begin + 1;
@@ -71,7 +76,7 @@ class AnchoredRuleScorerFactory[C,L,W](parser: ChartBuilder[ParseChart.LogProbab
 
           for(split <- (begin+1) until end) {
             val parentArray = if(binaryScores(index)(split-begin)(pP) eq null) {
-              binaryScores(index)(split-begin)(pP) = projFill(projFill(Double.NegativeInfinity));
+              binaryScores(index)(split-begin)(pP) = projFill(projVector);
               binaryScores(index)(split-begin)(pP)
             } else {
               binaryScores(index)(split-begin)(pP);
@@ -112,12 +117,12 @@ class AnchoredRuleScorerFactory[C,L,W](parser: ChartBuilder[ParseChart.LogProbab
 
 @serializable
 @SerialVersionUID(1)
-class AnchoredRuleScorer(lexicalScores: Array[Array[Double]], // begin -> label -> score
+class AnchoredRuleScorer(lexicalScores: Array[SparseVector], // begin -> label -> score
                          // (begin,end) -> parent -> child -> score
-                         unaryScores: Array[Array[Array[Double]]],
+                         unaryScores: Array[SparseArray[SparseVector]],
                          // (begin,end) -> (split-begin) -> parent -> lchild -> rchild -> score
                          // so many arrays.
-                         binaryScores: Array[Array[Array[Array[Array[Double]]]]]
+                         binaryScores: Array[Array[SparseArray[SparseArray[SparseVector]]]]
                         ) extends SpanScorer {
   def scoreUnaryRule(begin: Int, end: Int, parent: Int, child: Int) = {
     unaryScores(TriangularArray.index(begin,end))(parent)(child);

@@ -44,12 +44,12 @@ trait ParserTrainer {
       else DenseTreebank.fromZipFile(path);
     }
 
-
     val binarize = {
       val kind = config.readIn[String]("tree.binarization","standard");
       if(kind == "xbar") Trees.xBarBinarize _ ;
       else Trees.binarize(_:Tree[String]);
     }
+
 
     val maxLength = config.readIn[Int]("sentence.maxLength",40);
 
