@@ -140,6 +140,7 @@ object ProjectTreebankToAnchoredRules {
   val TRAIN_SPANS_NAME = "train.spans.ser"
   val DEV_SPANS_NAME = "dev.spans.ser"
   val TEST_SPANS_NAME = "test.spans.ser"
+  val SPAN_INDEX_NAME = "spanindex.ser"
   def main(args: Array[String]) {
     val parser = loadParser(new File(args(0)));
     val treebank = DenseTreebank.fromZipFile(new File(args(1)));
@@ -147,9 +148,10 @@ object ProjectTreebankToAnchoredRules {
     outDir.mkdirs();
     val projections = new ProjectionIndexer(parser.builder.grammar.index,parser.builder.grammar.index,identity[String])
     val factory = new AnchoredRuleScorerFactory[String,String,String](parser.builder.withCharts(ParseChart.logProb), projections);
-    writeObject(mapTrees(factory,treebank.trainTrees.toIndexedSeq),new File(outDir,TRAIN_SPANS_NAME))
-    writeObject(mapTrees(factory,treebank.testTrees.toIndexedSeq),new File(outDir,TEST_SPANS_NAME))
-    writeObject(mapTrees(factory,treebank.devTrees.toIndexedSeq),new File(outDir,DEV_SPANS_NAME))
+    writeObject(parser.builder.grammar.index,new File(outDir,SPAN_INDEX_NAME));
+    ProjectTreebankToLabeledSpans.writeIterable(mapTrees(factory,treebank.trainTrees.toIndexedSeq),new File(outDir,TRAIN_SPANS_NAME))
+    ProjectTreebankToLabeledSpans.writeIterable(mapTrees(factory,treebank.testTrees.toIndexedSeq),new File(outDir,TEST_SPANS_NAME))
+    ProjectTreebankToLabeledSpans.writeIterable(mapTrees(factory,treebank.devTrees.toIndexedSeq),new File(outDir,DEV_SPANS_NAME))
   }
 
   def loadParser(loc: File) = {
