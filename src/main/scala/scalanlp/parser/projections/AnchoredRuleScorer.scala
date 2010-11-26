@@ -15,7 +15,8 @@ import scalanlp.trees.DenseTreebank
  * @author dlwh
  */
 class AnchoredRuleScorerFactory[C,L,W](parser: ChartBuilder[ParseChart.LogProbabilityParseChart,L,W],
-                                     indexedProjections: ProjectionIndexer[C,L]) extends SpanScorer.Factory[W] {
+                                     indexedProjections: ProjectionIndexer[C,L],
+                                     pruningThreshold: Double = -7) extends SpanScorer.Factory[W] {
 
   def mkSpanScorer(s: Seq[W], scorer: SpanScorer = SpanScorer.identity) = {
     val coarseRootIndex = parser.grammar.index(parser.root);
@@ -45,7 +46,7 @@ class AnchoredRuleScorerFactory[C,L,W](parser: ChartBuilder[ParseChart.LogProbab
     }
 
     val lexicalScores = Array.fill(inside.length)(projVector())
-    val unaryScores = TriangularArray.raw(inside.length+1,projFill(projVector()));
+    val unaryScores = TriangularArray.raw(inside.length+1,null:SparseArray[SparseVector]);
     // so hard!
     val binaryScores = TriangularArray.raw[Array[SparseArray[SparseArray[SparseVector]]]](inside.length+1,null);
     for(begin <- 0 until inside.length; end <- (begin + 1) to inside.length) {
@@ -75,7 +76,7 @@ class AnchoredRuleScorerFactory[C,L,W](parser: ChartBuilder[ParseChart.LogProbab
           val pP = indexedProjections.project(parent);
 
           for(split <- (begin+1) until end) {
-            val parentArray = if(binaryScores(index)(split-begin)(pP) eq null) {
+            lazy val parentArray = if(binaryScores(index)(split-begin)(pP) eq null) {
               binaryScores(index)(split-begin)(pP) = projFill(projVector);
               binaryScores(index)(split-begin)(pP)
             } else {
@@ -86,21 +87,31 @@ class AnchoredRuleScorerFactory[C,L,W](parser: ChartBuilder[ParseChart.LogProbab
                 (c,ruleScore) <- cRules.activeElements) {
               val pB = indexedProjections.project(b);
               val pC = indexedProjections.project(c);
-              val accScore = parentArray(pB)(pC);
               val currentScore = (inside.labelScore(begin,split,b) + inside.labelScore(split,end,c)
                       + parentScore + ruleScore + scorer.scoreBinaryRule(begin,split,end,parent,b,c) - sentProb);
-              parentArray(pB)(pC) = Numerics.logSum(accScore,currentScore);
+              if(currentScore > pruningThreshold) {
+                val accScore = parentArray(pB)(pC);
+                parentArray(pB)(pC) = Numerics.logSum(accScore,currentScore);
+              }
             }
           }
           // do unaries
-          val parentArray = unaryScores(index)(pP);
+          lazy val parentArray = if(unaryScores(index)(pP) eq null) {
+            unaryScores(index)(pP) = projVector();
+            unaryScores(index)(pP)
+          } else {
+            unaryScores(index)(pP)
+          }
           // TODO: how to handle unaries appropriately
           for( (c,ruleScore) <- parser.unaryClosure.closeFromParent(parent)) {
             val score = ruleScore + inside.labelScore(begin,end,c) + parentScore +
                     scorer.scoreUnaryRule(begin,end,parent,c) - sentProb;
-            val pC = indexedProjections.project(c);
-            val accScore = parentArray(pC);
-            parentArray(pC) = Numerics.logSum(accScore,score);
+            if(score > pruningThreshold) {
+              val pC = indexedProjections.project(c);
+              assert(parentArray != null, unaryScores(index)(pP));
+              val accScore = parentArray(pC);
+              parentArray(pC) = Numerics.logSum(accScore,score);
+            }
           }
 
         }

@@ -17,7 +17,8 @@ import scalanlp.trees.DenseTreebank
  * @author dlwh
  */
 class LabeledSpanScorerFactory[C,L,W](parser: ChartBuilder[ParseChart.LogProbabilityParseChart,L,W],
-                                    indexedProjections: ProjectionIndexer[C,L]) extends SpanScorer.Factory[W] {
+                                    indexedProjections: ProjectionIndexer[C,L],
+                                    pruningThreshold: Double= -7) extends SpanScorer.Factory[W] {
 
   def mkSpanScorer(s: Seq[W], scorer: SpanScorer = SpanScorer.identity) = {
     val coarseRootIndex = parser.grammar.index(parser.root);
@@ -35,16 +36,27 @@ class LabeledSpanScorerFactory[C,L,W](parser: ChartBuilder[ParseChart.LogProbabi
   }
 
   def buildSpanScorer(inside: ParseChart[L], outside: ParseChart[L], sentProb: Double):LabeledSpanScorer = {
-    val scores = TriangularArray.raw(inside.length+1,indexedProjections.coarseEncoder.fillArray(Double.NegativeInfinity));
+    val scores = TriangularArray.raw(inside.length+1,null:SparseVector);
+    var density = 0;
+    var labelDensity = 0;
     for(begin <-  0 until inside.length; end <- begin+1 to (inside.length)) {
       val index = TriangularArray.index(begin, end)
       for(l <- inside.enteredLabelIndexes(begin,end)) {
         val pL = indexedProjections.project(l)
-        val currentScore = scores(index)(pL);
         val myScore = inside.labelScore(begin, end, l) + outside.labelScore(begin, end, l) - sentProb
-        scores(index)(pL) = Numerics.logSum(currentScore,myScore);
+        if(myScore >= pruningThreshold) {
+          if(scores(index) == null) {
+            scores(index) = indexedProjections.coarseEncoder.mkSparseVector(Double.NegativeInfinity);
+            density += 1;
+          }
+          val currentScore = scores(index)(pL);
+          if(currentScore == Double.NegativeInfinity) labelDensity += 1;
+          scores(index)(pL) = Numerics.logSum(currentScore,myScore);
+        }
       }
     }
+    println("Density: " + density * 1.0 / scores.length);
+    println("Label Density:" + labelDensity * 1.0 / scores.length / parser.grammar.index.size)
     new LabeledSpanScorer(scores);
   }
 
@@ -52,7 +64,7 @@ class LabeledSpanScorerFactory[C,L,W](parser: ChartBuilder[ParseChart.LogProbabi
 
 @serializable
 @SerialVersionUID(1)
-class LabeledSpanScorer(scores: Array[Array[Double]]) extends SpanScorer {
+class LabeledSpanScorer(scores: Array[SparseVector]) extends SpanScorer {
   @inline
   private def score(begin: Int, end: Int, label: Int) = {
     if(scores(TriangularArray.index(begin,end)) eq null) Double.NegativeInfinity
