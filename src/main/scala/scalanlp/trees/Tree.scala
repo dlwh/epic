@@ -210,17 +210,28 @@ object Trees {
           case "-RRB-" => "-RRB-"
           case "-LRB-" => "-LRB-"
           case "-LCB-" => "-LCB-"
-          case x => x.replaceAll("[-=].*","");
+          case x => x.replaceAll("[-|=].*","");
         }
       }
+    }
+
+    object StupidPRTMerger extends (Tree[String]=>Tree[String]) {
+      def apply(tree: Tree[String]) = {
+       tree.map {
+         case "PRT" => "ADVP"
+         case x => x
+       }
+      }
+
     }
 
     object StandardStringTransform extends (Tree[String]=>Tree[String]) {
       private val ens = new EmptyNodeStripper;
       private val xox = new XOverXRemover[String];
       private val fns = new FunctionNodeStripper;
+      private val stupid = StupidPRTMerger;
       def apply(tree: Tree[String]): Tree[String] = {
-        xox(fns(ens(tree).get)) map (_.intern);
+        xox(stupid(fns(ens(tree).get))) map (_.intern);
       }
     }
   }
