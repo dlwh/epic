@@ -139,8 +139,8 @@ object StateSplitting {
 
     // normalizer
     val totalProb = logSum(iScores(0,s.length)(tree.label map grammar.index));
-    if(totalProb.isInfinite)
-      assert(!totalProb.isInfinite, indexedTree.render(s) + "\n" + tree.render(s) + "\n" + iScores + "\n"+oScores);
+    if(totalProb.isInfinite || totalProb.isNaN)
+      error("NAn or infinite" + totalProb + " " + indexedTree.render(s) + "\n" + tree.render(s) + "\n" + iScores + "\n"+oScores);
 
     indexedTree.allChildren foreach {
       case t: NullaryTree[Seq[Int]] =>

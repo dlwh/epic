@@ -35,9 +35,16 @@ class SlavFeaturizer[L,W](baseLexicon: PairedDoubleCounter[L,W],
         val baseRule = UnaryRule(par,child);
         if( baseProductions(par, baseRule) == 0) Some(Double.NegativeInfinity)
         else Some(math.log(baseProductions(par,baseRule)) - math.log(baseProductions(par).total));
-      case SlavLexicalFeature(parent,_, word) => Some(math.log(baseLexicon(parent,word)));
-        if( baseLexicon(parent, word) == 0) Some(Double.NegativeInfinity)
-        else Some(math.log(baseLexicon(parent,word)) - math.log(baseLexicon(parent).total));
+      case SlavLexicalFeature(parent,_, word) =>
+        if( baseLexicon(parent, word) == 0) {
+          error("NegativeInfintiy for " + parent + word + baseLexicon(parent));
+          Some(Double.NegativeInfinity)
+        }
+        else {
+         val r =  Some(math.log(baseLexicon(parent,word)) - math.log(baseLexicon(parent).total));
+         assert(r != Double.NegativeInfinity);
+         r
+        }
       case _ => None
     }
   }

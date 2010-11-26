@@ -17,7 +17,10 @@ class WordShapeFeaturizer[L](lexicon: PairedDoubleCounter[L,String]) extends Fea
   val wordCounts = Counters.aggregate(for( ((_,w),count) <- lexicon.activeElements) yield (w,count));
 
   def initialValueForFeature(f: Feature[L,String]) = f match {
-    case LexicalFeature(l:L,w:String) => math.log(lexicon(l,w)/lexicon(l).total);
+    case LexicalFeature(l:L,w:String) =>
+      val r = math.log(lexicon(l,w)/lexicon(l).total);
+      if(r == Double.NegativeInfinity) -10
+      else r
     case _ => 0.0;
   }
 

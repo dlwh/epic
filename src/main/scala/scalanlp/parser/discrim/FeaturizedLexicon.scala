@@ -39,6 +39,8 @@ class FeaturizedLexicon[L,W](val openTagSet: Set[L], val weights: DenseVector,
   for( (wordMap, tagIndex) <- featureIndexer.lexicalCache.iterator.zipWithIndex;
        (word,feats) <- wordMap) {
     wordScores(word,featureIndexer.labelIndex.get(tagIndex)) = feats dot weights;
+    assert(wordScores(word,featureIndexer.labelIndex.get(tagIndex)) != Double.NegativeInfinity, (word,featureIndexer.labelIndex.get(tagIndex)).toString + "\n" +
+        featureIndexer.decode(feats) + " " + featureIndexer.decode(weights));
     tagSet += featureIndexer.labelIndex.get(tagIndex);
   }
 

@@ -100,7 +100,10 @@ class LatentDiscrimObjective[L,L2,W](featurizer: Featurizer[L2,W],
 
       println("Parsing took: " + finishTime / 1000.0)
       val grad = -expectedCountsToFeatureVector(ecounts) value;
+
       println((norm(grad,2), ecounts.logProb));
+      assert(grad.forall(!_._2.isInfinite), "wtf grad");
+      assert(weights.forall(!_._2.isInfinite),"wtf weights: " + indexedFeatures.decode(weights));
       (-ecounts.logProb,  grad);
     }  catch {
       case ex: UnaryClosureException =>
@@ -319,6 +322,22 @@ object StochasticLatentTrainer extends ParserTrainer {
 
   var obj: LatentDiscrimObjective[String,(String,Int),String] = null;
 
+  def quickEval(devTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer)], weights: DenseVector, iter: Int, iterPerValidate:Int) {
+    if(iter % iterPerValidate == 0) {
+      println("Validating...");
+      val parser = obj.extractLogProbParser(weights);
+      val validationLikelihood = devTrees.toIndexedSeq.par.fold(0.0) { (ll,sent) =>
+        val (t,w,s) = sent;
+        val myScore = parser.buildInsideChart(w,obj.projectCoarseScorer(s)).labelScore(0,w.length,obj.root);
+        ll + myScore;
+      }  {
+        _ + _
+      }
+
+      println("Validation ll: " + validationLikelihood)
+    }
+  }
+
   def trainParser(trainTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer)],
                   devTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer)],
                   config: Configuration) = {
@@ -361,14 +380,17 @@ object StochasticLatentTrainer extends ParserTrainer {
     val opt = new StochasticGradientDescent[Int,DenseVector](alpha,maxIterations,batchSize) with ConsoleLogging;
 
     val init = obj.initialWeightVector;
+    val iterPerValidate = config.readIn("iterations.validate",10);
 
     val log = Log.globalLog;
     val reg = DiffFunction.withL2Regularization(obj, regularization);
     for( (state,iter) <- opt.iterations(reg,init).take(maxIterations).zipWithIndex;
+         () = quickEval(devTrees,state.x, iter, iterPerValidate)
          if iter != 0 && iter % iterationsPerEval == 0) yield {
       val parser = obj.extractViterbiParser(state.x)
       ("LatentDiscrim-" + iter.toString,parser)
     }
+
 
   }
 }
