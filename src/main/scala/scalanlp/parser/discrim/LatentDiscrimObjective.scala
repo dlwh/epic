@@ -108,6 +108,7 @@ class LatentDiscrimObjective[L,L2,W](featurizer: Featurizer[L2,W],
     }  catch {
       case ex: UnaryClosureException =>
         numFailures += 1;
+        println(indexedFeatures.decode(weights));
         if(numFailures > 10) throw ex;
         ex.printStackTrace();
         (Double.PositiveInfinity,indexedFeatures.mkDenseVector(0.0));
