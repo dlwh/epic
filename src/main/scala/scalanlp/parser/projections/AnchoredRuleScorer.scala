@@ -90,17 +90,17 @@ class AnchoredRuleScorerFactory[C,L,W](parser: ChartBuilder[ParseChart.LogProbab
               val currentScore = (inside.labelScore(begin,split,b) + inside.labelScore(split,end,c)
                       + parentScore + ruleScore + scorer.scoreBinaryRule(begin,split,end,parent,b,c) - sentProb);
               if(currentScore > pruningThreshold) {
-                val accScore = parentArray(pB)(pC);
+                val accScore = parentArray.getOrElseUpdate(pB,projVector())(pC);
                 parentArray(pB)(pC) = Numerics.logSum(accScore,currentScore);
               }
             }
           }
           // do unaries
-          lazy val parentArray = if(unaryScores(index)(pP) eq null) {
-            unaryScores(index)(pP) = projVector();
-            unaryScores(index)(pP)
+          lazy val parentArray = if(unaryScores(index) eq null) {
+            unaryScores(index) = projFill(projVector());
+            unaryScores(index).getOrElseUpdate(pP,projVector());
           } else {
-            unaryScores(index)(pP)
+            unaryScores(index).getOrElseUpdate(pP,projVector())
           }
           // TODO: how to handle unaries appropriately
           for( (c,ruleScore) <- parser.unaryClosure.closeFromParent(parent)) {
@@ -179,7 +179,7 @@ object ProjectTreebankToAnchoredRules {
       try {
         factory.mkSpanScorer(words)
       } catch {
-        case e: Exception => e.printStackTrace(); SpanScorer.identity;
+        case e: Exception => e.printStackTrace(); throw e; //SpanScorer.identity;
       }
     }
   }
