@@ -21,8 +21,10 @@ class UnaryChainRemover[L] {
       case UnaryTree(l,c) =>
         val (chain,cn) = stripChain(c);
         counts(l -> cn.label, chain) += 1;
-        UnaryTree(l,cn)(t.span);
-      case t => t
+        UnaryTree(l,transform(cn))(t.span);
+      case BinaryTree(l,lchild,rchild) =>
+        BinaryTree(l,transform(lchild),transform(rchild))(t.span);
+      case t => t;
     }
 
 
@@ -45,7 +47,6 @@ class UnaryChainRemover[L] {
 object UnaryChainRemover {
   private def chainReplacer[L](counts: Counters.PairedIntCounter[(L,L),Seq[L]]) = {
     val maxes = counts.rows.map{ case (labels,map) => (labels -> map.argmax)}.toMap;
-    println(maxes);
 
     new ChainReplacer[L]  {
       def replacementFor(parent: L, child: L) = maxes.getOrElse(parent -> child, Seq.empty);
@@ -55,7 +56,7 @@ object UnaryChainRemover {
   trait ChainReplacer[L] {
     def replacementFor(parent: L, child: L):Seq[L];
 
-    def replaceUnaries(t: BinarizedTree[L]) = t match {
+    def replaceUnaries(t: Tree[L]) = t match {
       case UnaryTree(a,child) =>
         val c = child.label;
         val replacements = replacementFor(a,c);

@@ -16,7 +16,8 @@ package scalanlp.parser;
 */
 
 
-import scalanlp.trees._;
+import scalanlp.trees._
+import scalanlp.trees.UnaryChainRemover.ChainReplacer;
 import java.io.BufferedOutputStream
 import java.io.File
 import java.io.FileOutputStream
@@ -80,7 +81,7 @@ object ParseEval {
   val noPostParseFn = (_:Tree[String],_:Tree[String],_:Seq[String],_:ParseEval[String]#Statistics,_:Int)=>()
 
   def evaluate(trees: IndexedSeq[(Tree[String],Seq[String],SpanScorer)],
-               parser: Parser[String,String],
+               parser: Parser[String,String], chainReplacer: ChainReplacer[String],
                postEval: PostParseFn = noPostParseFn) = {
 
     val peval = new ParseEval(Set("","''", "``", ".", ":", ","));
@@ -89,10 +90,11 @@ object ParseEval {
     def evalSentence(sent: (Tree[String],Seq[String],SpanScorer)) = try {
       val (goldTree,words,scorer) = sent;
       val startTime = System.currentTimeMillis;
-      val guessTree = Trees.debinarize(parser.bestParse(words,scorer))
-      val stats = peval(guessTree,Trees.debinarize(goldTree));
+      val guessTree = Trees.debinarize(chainReplacer.replaceUnaries(parser.bestParse(words,scorer)));
+      val deBgold = Trees.debinarize(goldTree);
+      val stats = peval(guessTree,deBgold);
       val endTime = System.currentTimeMillis;
-      postEval(guessTree,goldTree,words,stats,(endTime-startTime).toInt);
+      postEval(guessTree,deBgold,words,stats,(endTime-startTime).toInt);
       stats;
     } catch {
       case e:RuntimeException => throw new RuntimeException("Error parsing: " + sent._1.render(sent._2), e);
@@ -103,7 +105,8 @@ object ParseEval {
     (prec,recall,exact);
   }
 
-  def evaluateAndLog(trees: IndexedSeq[(Tree[String],Seq[String],SpanScorer)], parser: Parser[String,String], evalDir: String) = {
+  def evaluateAndLog(trees: IndexedSeq[(Tree[String],Seq[String],SpanScorer)],
+                     parser: Parser[String,String], evalDir: String, chainReplacer: ChainReplacer[String]) = {
 
     val parsedir = new File(evalDir);
     parsedir.exists() || parsedir.mkdirs() || error("Couldn't make directory: " + parsedir);
@@ -136,7 +139,7 @@ object ParseEval {
       appender ! Some((guessTree.render(words,newline=false)), goldTree.render(words,newline=false));
     }
 
-    val r = evaluate(trees,parser,postEval _);
+    val r = evaluate(trees,parser,chainReplacer, postEval _);
     appender ! None;
     r
   }

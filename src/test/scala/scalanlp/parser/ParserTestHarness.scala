@@ -1,19 +1,20 @@
 package scalanlp.parser
 
 import collection.mutable.ArrayBuffer
-import scalanlp.trees.{TstTreebank, Trees, Tree, BinarizedTree}
+import scalanlp.trees._
 
 /**
  *
  * @author dlwh
  */
 trait ParserTestHarness {
-  def getTrainTrees(binarization:(Tree[String]=>BinarizedTree[String]) = (Trees.xBarBinarize _),
+  def getTrainTreesAndReplacer(binarization:(Tree[String]=>BinarizedTree[String]) = (Trees.xBarBinarize _),
                     maxLength:Int= 15) = {
     val treebank = {
       TstTreebank.treebank;
     }
-    massageTrees(treebank.trainTrees,binarization,maxLength);
+    val trees = massageTrees(treebank.trainTrees,binarization,maxLength);
+    (new UnaryChainRemover[String]).removeUnaryChains(trees.iterator);
   }
 
   def getTestTrees(binarization:(Tree[String]=>BinarizedTree[String]) = (Trees.xBarBinarize _),
@@ -36,7 +37,7 @@ trait ParserTestHarness {
 
 
   def evalParser(testTrees: IndexedSeq[(Tree[String],Seq[String])],parser: Parser[String,String]) = {
-    val (prec,recall,exact) = ParseEval.evaluate(testTrees.map { case (t,w) => (t,w,SpanScorer.identity)},parser);
+    val (prec,recall,exact) = ParseEval.evaluate(testTrees.map { case (t,w) => (t,w,SpanScorer.identity)},parser, ParserTestHarness.unaryReplacer);
     val f1 = (2 * prec * recall)/(prec + recall);
     (prec,recall,exact,f1);
   }
@@ -45,7 +46,10 @@ trait ParserTestHarness {
 }
 
 object ParserTestHarness extends ParserTestHarness {
-  val (simpleLexicon,simpleGrammar) = GenerativeParser.extractLexiconAndGrammar(getTrainTrees().iterator);
+  val ((simpleLexicon,simpleGrammar), unaryReplacer) = {
+    val (trees,replacer) = getTrainTreesAndReplacer();
+    (GenerativeParser.extractLexiconAndGrammar(trees.iterator),replacer);
+  }
   val simpleParser = {
     val chartBuilder = new CKYChartBuilder[ParseChart.ViterbiParseChart, String, String]("", simpleLexicon, simpleGrammar, ParseChart.viterbi)
     ChartParser(chartBuilder);

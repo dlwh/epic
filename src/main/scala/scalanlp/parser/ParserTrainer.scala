@@ -3,12 +3,9 @@ package scalanlp.parser;
 import java.util.Properties
 import scala.collection.mutable.ArrayBuffer
 import scalanlp.config.Configuration
-import scalanlp.trees.BinarizedTree
-import scalanlp.trees.DenseTreebank
-import scalanlp.trees.Tree
-import scalanlp.trees.Treebank
-import scalanlp.trees.Trees
 import java.io._
+import scalanlp.trees._
+import scalanlp.trees.UnaryChainRemover.ChainReplacer
 
 trait ParserTrainer {
   def trainParser(trainTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer)],
@@ -20,15 +17,21 @@ trait ParserTrainer {
                      spans: Iterable[SpanScorer],
                      maxLength: Int,
                      binarize: (Tree[String]) => BinarizedTree[String],
-                     xform: Tree[String]=>Tree[String]): IndexedSeq[(BinarizedTree[String], Seq[String],SpanScorer)] = {
+                     xform: Tree[String]=>Tree[String]): (IndexedSeq[(BinarizedTree[String], Seq[String],SpanScorer)],ChainReplacer[String]) = {
 
-    val transformed =  for {
+    val binarizedAndTransformed = (for {
       ((tree, words),span) <- (trees zip spans.iterator) if words.length <= maxLength
-    } yield {
-      (binarize(xform(tree)), words,span)
-    };
+    } yield ((binarize(xform(tree)),words),span)).toIndexedSeq
 
-    ArrayBuffer() ++= transformed;
+    val chainRemover = new UnaryChainRemover[String];
+
+    val (dechained,chainReplacer) = chainRemover.removeUnaryChains(binarizedAndTransformed.iterator.map(_._1));
+
+    val dechainedWithSpans = for {
+      ((t,w),(_,span)) <- (dechained zip binarizedAndTransformed)
+    } yield (t,w,span);
+
+    (dechainedWithSpans, chainReplacer)
   }
 
   def loadTrainSpans(config: Configuration):Iterable[SpanScorer] = Stream.continually(SpanScorer.identity);
@@ -56,20 +59,20 @@ trait ParserTrainer {
     val xform = Trees.Transforms.StandardStringTransform;
 
     val trainSpans = loadTrainSpans(config);
-    val trainTrees = transformTrees(treebank.trainTrees, trainSpans, maxLength, binarize, xform);
+    val (trainTrees,replacer) = transformTrees(treebank.trainTrees, trainSpans, maxLength, binarize, xform);
 
     val devSpans = loadDevSpans(config);
-    val devTrees = transformTrees(treebank.devTrees, devSpans, maxLength, binarize, xform)
+    val devTrees = transformTrees(treebank.devTrees, devSpans, maxLength, binarize, xform)._1
 
     println("Training Parser...");
     val parsers = trainParser(trainTrees,devTrees,config);
     val testSpans = loadTestSpans(config);
-    val testTrees = transformTrees(treebank.testTrees, testSpans, maxLength, binarize, xform)
+    val testTrees = transformTrees(treebank.testTrees, testSpans, maxLength, binarize, xform)._1
 
     for((name,parser) <- parsers) {
       println("Parser " + name);
 
-      evalParser(testTrees,parser,name);
+      evalParser(testTrees,parser,name,replacer);
       val outDir = new File("parsers/");
       outDir.mkdirs();
       val out = new File(outDir,name + ".parser");
@@ -79,9 +82,10 @@ trait ParserTrainer {
     }
   }
 
-  protected def evalParser(testTrees: IndexedSeq[(Tree[String],Seq[String],SpanScorer)], parser: Parser[String,String], name: String) = {
+  protected def evalParser(testTrees: IndexedSeq[(Tree[String],Seq[String],SpanScorer)],
+          parser: Parser[String,String], name: String, chainReplacer: ChainReplacer[String]) = {
     println("Evaluating Parser...");
-    val (prec,recall,exact) = ParseEval.evaluateAndLog(testTrees,parser,name);
+    val (prec,recall,exact) = ParseEval.evaluateAndLog(testTrees,parser,name,chainReplacer);
     val f1 = (2 * prec * recall)/(prec + recall);
     println("Eval finished. Results:");
     println( "P: " + prec + " R:" + recall + " F1: " + f1 +  " Ex:" + exact);
