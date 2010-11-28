@@ -122,7 +122,7 @@ class InsideOutside[L,W](val parser: ChartBuilder[LogProbabilityParseChart,L,W])
           if(!aScore.isInfinite) {
             val prob = exp(bScore + aScore + rScore + validSpan.scoreUnaryRule(begin,end,a,b) - totalProb);
             if(prob.isInfinite || prob.isNaN)
-              error("nan in " + words + " for unary " + inside.grammar.index.get(a) + "->" + inside.grammar.index.get(b) + ": " + prob + " a: " + aScore + " " + "b: " + bScore + " sp: " + validSpan.scoreUnaryRule(begin,end,a,b) );
+              error("nan in " + words + " for unary " + inside.grammar.index.get(a) + "->" + inside.grammar.index.get(b) + ": " + prob + " a: " + aScore + " " + "b: " + bScore + " sp: " + validSpan.scoreUnaryRule(begin,end,a,b)  + "tot: " + totalProb);
             unaryRuleCounts.getOrElseUpdate(a)(b) += prob;
           }
           i += 1;

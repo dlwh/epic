@@ -16,7 +16,6 @@ trait ChartBuilder[+Chart[X]<:ParseChart[X],L,W] {
   def grammar: Grammar[L];
   def root: L;
   def lexicon:Lexicon[L,W];
-  def unaryClosure: UnaryRuleClosure;
 
   def withCharts[Chart[X]<:ParseChart[X]](factory: ParseChart.Factory[Chart]):ChartBuilder[Chart,L,W];
 }
@@ -37,8 +36,6 @@ class CKYChartBuilder[Chart[X]<:ParseChart[X], L,W](val root: L,
                                               val grammar: Grammar[L],
                                               chartFactory: Factory[Chart] = ParseChart.viterbi)
         extends ChartBuilder[Chart,L,W] {
-
-  lazy val unaryClosure: UnaryRuleClosure = chartFactory.computeUnaryClosure(grammar);
 
   def withCharts[Chart[X]<:ParseChart[X]](factory: ParseChart.Factory[Chart]):ChartBuilder[Chart,L,W] = {
     new CKYChartBuilder[Chart,L,W](root,lexicon,grammar,factory);
@@ -147,7 +144,7 @@ class CKYChartBuilder[Chart[X]<:ParseChart[X], L,W](val root: L,
     val newMass = grammar.mkVector(Double.NegativeInfinity);
     for(b <- chart.enteredLabelIndexes(begin,end)) {
       val bScore = chart.labelScore(begin,end,b);
-      val parentVector = unaryClosure.closeFromChild(b);
+      val parentVector = grammar.unaryRulesByIndexedChild(b);
       var j = 0;
       while(j < parentVector.used) {
         val a = parentVector.index(j);
@@ -174,7 +171,7 @@ class CKYChartBuilder[Chart[X]<:ParseChart[X], L,W](val root: L,
     for(a <- outside.enteredLabelIndexes(begin,end)) {
       val aScore = outside.labelScore(begin,end,a);
       var j = 0;
-      val childVector = unaryClosure.closeFromParent(a);
+      val childVector = grammar.unaryRulesByIndexedParent(a);
       while(j < childVector.used) {
         val b = childVector.index(j);
         if(a != b) {

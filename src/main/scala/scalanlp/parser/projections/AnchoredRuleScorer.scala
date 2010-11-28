@@ -103,7 +103,7 @@ class AnchoredRuleScorerFactory[C,L,W](parser: ChartBuilder[ParseChart.LogProbab
             unaryScores(index).getOrElseUpdate(pP,projVector())
           }
           // TODO: how to handle unaries appropriately
-          for( (c,ruleScore) <- parser.unaryClosure.closeFromParent(parent)) {
+          for( (c,ruleScore) <- parser.grammar.unaryRulesByIndexedParent(parent)) {
             val score = ruleScore + inside.labelScore(begin,end,c) + parentScore +
                     scorer.scoreUnaryRule(begin,end,parent,c) - sentProb;
             if(score > pruningThreshold) {

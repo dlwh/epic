@@ -65,13 +65,13 @@ class SumFeaturizer[L,W](f1: Featurizer[L,W], f2: Featurizer[L,W]) extends Featu
   def initialValueForFeature(f: Feature[L,W]) = f1.initialValueForFeature(f) + f2.initialValueForFeature(f);
 }
 
-class RuleFeaturizer[L,W](prods: PairedDoubleCounter[L,Rule[L]]) extends Featurizer[L,W] {
+class RuleFeaturizer[L,W](prods: PairedDoubleCounter[L,Rule[L]], initToZero: Boolean = false) extends Featurizer[L,W] {
   def featuresFor(r: Rule[L]) = aggregate(RuleFeature(r) -> 1.0);
   def featuresFor(l: L, w: W) = aggregate[Feature[L,W]]();
 
 
   def initialValueForFeature(f: Feature[L,W]) = f match {
-    case RuleFeature(r) => math.log(prods(r.parent,r) / prods(r.parent).total);
+    case RuleFeature(r) => if(initToZero) 0.0 else math.log(prods(r.parent,r) / prods(r.parent).total) / 100;
     case _ => 0.0;
   }
 

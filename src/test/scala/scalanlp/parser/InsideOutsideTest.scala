@@ -173,13 +173,14 @@ class InsideOutsideTest extends FunSuite with Checkers {
     val counts = io.expectedCounts(sent);
     val (rules, words) = counts.decode(grammar);
 
-    assert(words("JJ","good") === 1.0);
-    assert(words("NN","control") === 1.0);
-    assert(words("VBZ","has") === 1.0);
-    assert(words("PRP","He") === 1.0);
-    assert(words("PUNCT",".") === 1.0);
-    assert(rules("ROOT",UnaryRule("ROOT","S")) === 1.0);
-    assert(rules("NP",UnaryRule("NP","PRP")) === 1.0);
+
+    assert((words("JJ","good") - 1.0).abs < 1E-6, words("JJ","good"));
+    assert((words("NN","control") - 1.0).abs < 1E-6, words("NN","control"));
+    assert((words("VBZ","has") - 1.0).abs < 1E-6, words("VBZ","has"));
+    assert((words("PRP","He") - 1.0).abs < 1E-6, words("PRP","He"));
+    assert((words("PUNCT",".") - 1.0).abs < 1E-6, words("PUNCT","."));
+    assert((rules("ROOT",UnaryRule("ROOT","S")) - 1.0).abs < 1E-6, rules("ROOT",UnaryRule("ROOT","S")));
+    assert((rules("NP",UnaryRule("NP","PRP")) - 1.0).abs < 1E-6, rules("NP",UnaryRule("NP","PRP")));
   }
 }
 

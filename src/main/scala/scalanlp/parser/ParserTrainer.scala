@@ -38,6 +38,8 @@ trait ParserTrainer {
   def loadTestSpans(config: Configuration):Iterable[SpanScorer] = Stream.continually(SpanScorer.identity);
   def loadDevSpans(config: Configuration):Iterable[SpanScorer] = Stream.continually(SpanScorer.identity);
 
+  var unaryReplacer : ChainReplacer[String] = _;
+
   def main(args: Array[String]) {
     val config = Configuration.fromPropertiesFiles(args.map{new File(_)});
 
@@ -60,6 +62,8 @@ trait ParserTrainer {
 
     val trainSpans = loadTrainSpans(config);
     val (trainTrees,replacer) = transformTrees(treebank.trainTrees, trainSpans, maxLength, binarize, xform);
+
+    unaryReplacer = replacer;
 
     val devSpans = loadDevSpans(config);
     val devTrees = transformTrees(treebank.devTrees, devSpans, maxLength, binarize, xform)._1

@@ -13,14 +13,14 @@ final case class SuffixFeature[L](l: L, str: String) extends WordShapeFeature(l)
 /**
  * This class generates features according to the word shapes.
  */
-class WordShapeFeaturizer[L](lexicon: PairedDoubleCounter[L,String]) extends Featurizer[L,String] {
+class WordShapeFeaturizer[L](lexicon: PairedDoubleCounter[L,String], initToZero: Boolean = false) extends Featurizer[L,String] {
   val wordCounts = Counters.aggregate(for( ((_,w),count) <- lexicon.activeElements) yield (w,count));
 
   def initialValueForFeature(f: Feature[L,String]) = f match {
-    case LexicalFeature(l:L,w:String) =>
+    case LexicalFeature(l:L,w:String) if !initToZero =>
       val r = math.log(lexicon(l,w)/lexicon(l).total);
       if(r == Double.NegativeInfinity) -10
-      else r
+      else r/100
     case _ => 0.0;
   }
 

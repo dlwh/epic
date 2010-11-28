@@ -86,13 +86,17 @@ class LatentDiscrimObjective[L,L2,W](featurizer: Featurizer[L2,W],
       val ecounts = trees.par.fold(new ExpectedCounts[W](parser().grammar)) { (counts, treeWordsScorer) =>
         val localIn = System.currentTimeMillis();
         val (tree,words,spanScorer) = treeWordsScorer;
+        try {
 
-        val treeCounts = treeToExpectedCounts(parser().grammar,parser().lexicon,tree,words);
-        val treeTime = System.currentTimeMillis() - localIn;
-        val wordCounts = wordsToExpectedCounts(words, parser(), spanScorer);
-        val wordTime = System.currentTimeMillis() - localIn;
-        println("Parse: " + words.length + " tree:" + treeTime + " parse: " + wordTime);
-        counts += treeCounts -= wordCounts;
+          val treeCounts = treeToExpectedCounts(parser().grammar,parser().lexicon,tree,words, spanScorer);
+          val treeTime = System.currentTimeMillis() - localIn;
+          val wordCounts = wordsToExpectedCounts(words, parser(), spanScorer);
+          val wordTime = System.currentTimeMillis() - localIn;
+          //println("Parse: " + words.length + " tree:" + treeTime + " parse: " + wordTime);
+          counts += treeCounts -= wordCounts;
+        } catch {
+          case e => println("Error in parsing: " + words + e); e.printStackTrace(); throw new RuntimeException("Error parsing " + words,e);
+        }
       } { (ecounts1, ecounts2) =>
         ecounts1 += ecounts2
       }
@@ -141,8 +145,9 @@ class LatentDiscrimObjective[L,L2,W](featurizer: Featurizer[L2,W],
   private def treeToExpectedCounts(g: Grammar[L2],
                                    lexicon: Lexicon[L2,W],
                                    t: BinarizedTree[L],
-                                   words: Seq[W]):ExpectedCounts[W] = {
-    StateSplitting.expectedCounts(g,lexicon,t.map(splitLabel),words);
+                                   words: Seq[W],
+                                   spanScorer: SpanScorer = SpanScorer.identity):ExpectedCounts[W] = {
+    StateSplitting.expectedCounts(g,lexicon,t.map(splitLabel),words,spanScorer);
   }
 
   def expectedCountsToFeatureVector(ecounts: ExpectedCounts[W]):DenseVector = {
@@ -239,7 +244,7 @@ object LatentDiscriminativeTrainer extends ParserTrainer {
       for(t <- initLexicon.activeKeys.map(_._1) if initLexicon(t).size > 50) yield t;
     }
 
-    val threshold = config.readIn("discrim.filterThreshold",-5.0)
+    val threshold = config.readIn("discrim.filterThreshold",-8.0)
 
     val thresholdingTrainTrees = trainTrees.toIndexedSeq.par(1000).map { case (t,w,s) => (t,w,new ThresholdingScorer(s,threshold))};
 
@@ -326,16 +331,10 @@ object StochasticLatentTrainer extends ParserTrainer {
   def quickEval(devTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer)], weights: DenseVector, iter: Int, iterPerValidate:Int) {
     if(iter % iterPerValidate == 0) {
       println("Validating...");
-      val parser = obj.extractLogProbParser(weights);
-      val validationLikelihood = devTrees.toIndexedSeq.par.fold(0.0) { (ll,sent) =>
-        val (t,w,s) = sent;
-        val myScore = parser.buildInsideChart(w,obj.projectCoarseScorer(s)).labelScore(0,w.length,obj.root);
-        ll + myScore;
-      }  {
-        _ + _
-      }
-
-      println("Validation ll: " + validationLikelihood)
+      val parser = obj.extractViterbiParser(weights);
+      val fixedTrees = devTrees.take(400).map { case (a,b,c) => (a,b,obj.projectCoarseScorer(c))}.toIndexedSeq;
+      val results = ParseEval.evaluate(fixedTrees, parser, unaryReplacer);
+      println("Validation : " + results)
     }
   }
 
@@ -361,7 +360,7 @@ object StochasticLatentTrainer extends ParserTrainer {
       for(t <- initLexicon.activeKeys.map(_._1) if initLexicon(t).size > 50) yield t;
     }
 
-    val threshold = config.readIn("discrim.filterThreshold",-5.0)
+    val threshold = config.readIn("discrim.filterThreshold",-8.0)
 
     val thresholdingTrainTrees = trainTrees.toIndexedSeq.par(1000).map { case (t,w,s) => (t,w,new ThresholdingScorer(s,threshold))};
 
@@ -387,9 +386,11 @@ object StochasticLatentTrainer extends ParserTrainer {
     val reg = DiffFunction.withL2Regularization(obj, regularization);
     for( (state,iter) <- opt.iterations(reg,init).take(maxIterations).zipWithIndex;
          () = quickEval(devTrees,state.x, iter, iterPerValidate)
-         if iter != 0 && iter % iterationsPerEval == 0) yield {
+         if iter != 0 && iter % iterationsPerEval == 0) yield try {
       val parser = obj.extractViterbiParser(state.x)
       ("LatentDiscrim-" + iter.toString,parser)
+    } catch {
+      case e => println(e);e.printStackTrace(); throw e;
     }
 
 

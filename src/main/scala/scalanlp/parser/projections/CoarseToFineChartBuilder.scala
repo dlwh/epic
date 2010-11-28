@@ -25,8 +25,6 @@ class CoarseToFineChartBuilder[Chart[X]<:ParseChart[X],C,F,W](coarseParser: Char
 
   private val fineParser = new CKYChartBuilder[Chart,F,W](root,lexicon,grammar,chartFactory);
 
-  def unaryClosure = fineParser.unaryClosure;
-
   def buildInsideChart(s: Seq[W], validSpan: SpanScorer = SpanScorer.identity):Chart[F] = {
     val chartScorer = coarseSpanScorerFromParser(s, coarseParser, indexedProjections, threshold);
     val myScorer = SpanScorer.sum(chartScorer,validSpan);
