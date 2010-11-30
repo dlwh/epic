@@ -393,7 +393,7 @@ object StochasticLatentTrainer extends ParserTrainer {
     val alpha = config.readIn("opt.stepsize",20.0);
     val useL1 = config.readIn("opt.useL1",false);
     System.out.println("UseL1: " + useL1);
-    val opt = if(useL1) {
+    val opt = if(!useL1) {
       new StochasticGradientDescent[Int,DenseVector](alpha,maxIterations,batchSize)
               with AdaptiveGradientDescent.L2Regularization[Int,DenseVector]
               with ConsoleLogging {
