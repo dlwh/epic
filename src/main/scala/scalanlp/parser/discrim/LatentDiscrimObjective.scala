@@ -3,7 +3,6 @@ package discrim
 
 import scalala.tensor.dense.DenseVector
 import scalanlp.parser.projections._
-import java.io.File
 import scalanlp.optimize._
 
 import scalanlp.trees._
@@ -11,8 +10,9 @@ import scalanlp.config.Configuration
 import scalanlp.util.{ConsoleLogging, Log}
 import splitting.StateSplitting
 import scalala.tensor.counters.LogCounters
-import scalanlp.parser.UnaryRuleClosure.UnaryClosureException;
-import InsideOutside._;
+import scalanlp.parser.UnaryRuleClosure.UnaryClosureException
+import InsideOutside._
+import java.io._;
 import ParseChart.LogProbabilityParseChart;
 import scalanlp.concurrent.ParallelOps._;
 import scalanlp.concurrent.ThreadLocal;
@@ -246,10 +246,7 @@ object LatentDiscriminativeTrainer extends ParserTrainer {
       new CKYChartBuilder[LogProbabilityParseChart,String,String]("",lexicon,grammar,ParseChart.logProb);
     }
 
-    val factory = config.readIn[FeaturizerFactory[String,String]]("discrim.featurizerFactory",new PlainFeaturizerFactory[String]);
-    val featurizer = factory.getFeaturizer(config, initLexicon, initProductions);
-    val latentFactory = config.readIn[LatentFeaturizerFactory]("discrim.latentFactory",new SlavLatentFeaturizerFactory());
-    val latentFeaturizer = latentFactory.getFeaturizer(featurizer, numStates);
+    val latentFeaturizer = StochasticLatentTrainer.getFeaturizer(config, initLexicon, initProductions, numStates)
 
     val openTags = Set.empty ++ {
       for(t <- initLexicon.activeKeys.map(_._1) if initLexicon(t).size > 50) yield t;
@@ -352,6 +349,31 @@ object StochasticLatentTrainer extends ParserTrainer {
     }
   }
 
+  def readObject[T](loc: File) = {
+    val oin = new ObjectInputStream(new BufferedInputStream(new FileInputStream(loc)));
+    val parser = oin.readObject().asInstanceOf[T]
+    oin.close();
+    parser;
+  }
+
+  def getFeaturizer(config: Configuration,
+                    initLexicon: PairedDoubleCounter[String, String],
+                    initProductions: PairedDoubleCounter[String, Rule[String]],
+                    numStates: Int): Featurizer[(String, Int), String] = {
+    val factory = config.readIn[FeaturizerFactory[String, String]]("discrim.featurizerFactory", new PlainFeaturizerFactory[String]);
+    val featurizer = factory.getFeaturizer(config, initLexicon, initProductions);
+    val latentFactory = config.readIn[LatentFeaturizerFactory]("discrim.latentFactory", new SlavLatentFeaturizerFactory());
+    val latentFeaturizer = latentFactory.getFeaturizer(featurizer, numStates);
+    val weightsPath = config.readIn[File]("discrim.oldweights",null);
+    if(weightsPath == null) {
+      latentFeaturizer
+    } else {
+      val weights = readObject[(DenseVector,DoubleCounter[Feature[(String,Int),String]])](weightsPath)._2;
+      val splitStates = config.readIn[Boolean]("discrim.splitOldWeights",false);
+      new CachedWeightsFeaturizer(latentFeaturizer, weights, if(splitStates) FeatureProjectors.split _ else identity _)
+    }
+  }
+
   def trainParser(trainTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer)],
                   devTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer)],
                   config: Configuration) = {
@@ -365,10 +387,7 @@ object StochasticLatentTrainer extends ParserTrainer {
       new CKYChartBuilder[LogProbabilityParseChart,String,String]("",lexicon,grammar,ParseChart.logProb);
     }
 
-    val factory = config.readIn[FeaturizerFactory[String,String]]("discrim.featurizerFactory",new PlainFeaturizerFactory[String]);
-    val featurizer = factory.getFeaturizer(config, initLexicon, initProductions);
-    val latentFactory = config.readIn[LatentFeaturizerFactory]("discrim.latentFactory",new SlavLatentFeaturizerFactory());
-    val latentFeaturizer = latentFactory.getFeaturizer(featurizer, numStates);
+    val latentFeaturizer: Featurizer[(String, Int), String] = getFeaturizer(config, initLexicon, initProductions, numStates)
 
     val openTags = Set.empty ++ {
       for(t <- initLexicon.activeKeys.map(_._1) if initLexicon(t).size > 50) yield t;
