@@ -240,7 +240,7 @@ object StateSplitting {
         }
     }
 
-    println("Problems: " + numProblems * 1.0 / numTotal);
+    //println("Problems: " + numProblems * 1.0 / numTotal);
     ExpectedCounts(binaryRuleCounts,unaryRuleCounts,wordCounts,totalProb);
   }
 
