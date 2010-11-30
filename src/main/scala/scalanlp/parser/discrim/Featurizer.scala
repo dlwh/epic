@@ -99,7 +99,23 @@ class CachingFeaturizer[L,W](f: Featurizer[L,W]) extends Featurizer[L,W] {
   }
 
   def initialValueForFeature(feat: Feature[L,W]) = f.initialValueForFeature(feat);
+}
 
+class CachedWeightsFeaturizer[L,W](f: Featurizer[L,W],
+                                   weights: DoubleCounter[Feature[L,W]],
+                                   proj: Feature[L,W]=>Feature[L,W] = identity[Feature[L,W]] _ ) extends Featurizer[L,W] {
+  def featuresFor(r: Rule[L]) =  f.featuresFor(r);
+
+  def featuresFor(l: L, w: W) = f.featuresFor(l,w);
+
+  def initialValueForFeature(feat: Feature[L,W]) = weights.get(feat).getOrElse(f.initialValueForFeature(feat))  + math.log(0.9 + math.random * 0.2);
+}
+
+object FeatureProjectors {
+  def split[L,W](f: Feature[(L,Int),W]) = f match {
+    case SubstateFeature(k,states) => SubstateFeature(k,states.map(_/2));
+    case _ => f;
+  }
 }
 
 
