@@ -78,6 +78,7 @@ class LatentDiscrimObjective[L,L2,W](featurizer: Featurizer[L2,W],
   var numFailures = 0;
 
   def calculate(weights: DenseVector, sample: IndexedSeq[Int]) = {
+    assert(weights.forall(!_._2.isNaN),"wtf weights: " + indexedFeatures.decode(weights));
 
     try {
       val parser = new ThreadLocal(extractLogProbParser(weights));
@@ -107,7 +108,6 @@ class LatentDiscrimObjective[L,L2,W](featurizer: Featurizer[L2,W],
 
       println((norm(grad,2), ecounts.logProb));
       assert(grad.forall(!_._2.isInfinite), "wtf grad");
-      assert(weights.forall(!_._2.isInfinite),"wtf weights: " + indexedFeatures.decode(weights));
       (-ecounts.logProb,  grad);
     }  catch {
       case ex: UnaryClosureException =>
@@ -223,6 +223,7 @@ object LatentDiscriminativeTrainer extends ParserTrainer {
   var obj: LatentDiscrimObjective[String,(String,Int),String] = null;
 
   def quickEval(devTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer)], weights: DenseVector, iter: Int, iterPerValidate:Int) {
+    ProjectTreebankToLabeledSpans.writeObject((weights,obj.indexedFeatures.decode(weights)),new java.io.File("weights.ser"));
     if(iter % iterPerValidate == 0) {
       println("Validating...");
       val parser = obj.extractViterbiParser(weights);
@@ -342,6 +343,7 @@ object StochasticLatentTrainer extends ParserTrainer {
 
   def quickEval(devTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer)], weights: DenseVector, iter: Int, iterPerValidate:Int) {
     if(iter % iterPerValidate == 0) {
+      ProjectTreebankToLabeledSpans.writeObject((weights,obj.indexedFeatures.decode(weights)),new java.io.File("weights.ser"));
       println("Validating...");
       val parser = obj.extractViterbiParser(weights);
       val fixedTrees = devTrees.take(400).map { case (a,b,c) => (a,b,obj.projectCoarseScorer(c))}.toIndexedSeq;
