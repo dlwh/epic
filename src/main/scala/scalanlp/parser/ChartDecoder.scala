@@ -37,7 +37,7 @@ class ViterbiDecoder[C,F](val indexedProjections: ProjectionIndexer[C,F]) extend
                                 spanScorer: SpanScorer = SpanScorer.identity):BinarizedTree[C] = {
     import inside.labelScore
 
-    def buildTree(start: Int, end: Int, root: Int):BinarizedTree[C] = {
+    def buildTree(start: Int, end: Int, root: Int, usedUnaries: Set[Int] = Set.empty):BinarizedTree[C] = {
       if(start +1 == end && grammar.isPreterminal(root)) {
         return NullaryTree(indexedProjections.coarseSymbol(root))(Span(start,end));
       }
@@ -63,23 +63,23 @@ class ViterbiDecoder[C,F](val indexedProjections: ProjectionIndexer[C,F]) extend
           maxSplit = split;
         }
       }
-      for {
-        (b,ruleScore) <- grammar.unaryRulesByIndexedParent(root)
-      } {
-        val score = ruleScore + labelScore(start,end,b) + spanScorer.scoreUnaryRule(start,end,root,b);
-        if(score > maxScore) {
-          maxScore = score;
-          maxLeft = b;
-          maxRight = -1;
-          maxSplit = -1;
+        for {
+          (b,ruleScore) <- grammar.unaryRulesByIndexedParent(root) if !usedUnaries(b)
+        } {
+          val score = ruleScore + labelScore(start,end,b) + spanScorer.scoreUnaryRule(start,end,root,b);
+          if(score > maxScore) {
+            maxScore = score;
+            maxLeft = b;
+            maxRight = -1;
+            maxSplit = -1;
+          }
         }
-      }
 
       if(maxScore == Double.NegativeInfinity) {
         println("entered things: " + inside.enteredLabelScores(start,end).map { case (i,v) => (grammar.index.get(i),v)}.toList)
         error("Couldn't find a tree!" + start + " " + end + " " + grammar.index.get(root));
       } else if(maxRight == -1) {
-        val child = buildTree(start,end,maxLeft);
+        val child = buildTree(start,end,maxLeft, usedUnaries + root);
         UnaryTree(indexedProjections.coarseSymbol(root),child)(Span(start,end));
       } else {
         val lchild = buildTree(start,maxSplit,maxLeft);

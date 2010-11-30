@@ -222,6 +222,16 @@ object LatentDiscriminativeTrainer extends ParserTrainer {
 
   var obj: LatentDiscrimObjective[String,(String,Int),String] = null;
 
+  def quickEval(devTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer)], weights: DenseVector, iter: Int, iterPerValidate:Int) {
+    if(iter % iterPerValidate == 0) {
+      println("Validating...");
+      val parser = obj.extractViterbiParser(weights);
+      val fixedTrees = devTrees.take(400).map { case (a,b,c) => (a,b,obj.projectCoarseScorer(c))}.toIndexedSeq;
+      val results = ParseEval.evaluate(fixedTrees, parser, unaryReplacer);
+      println("Validation : " + results)
+    }
+  }
+
   def trainParser(trainTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer)],
                   devTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer)],
                   config: Configuration) = {
@@ -259,6 +269,7 @@ object LatentDiscriminativeTrainer extends ParserTrainer {
     val iterationsPerEval = config.readIn("iterations.eval",25);
     val maxIterations = config.readIn("iterations.max",300);
     val regularization = config.readIn("objective.regularization",0.01);
+    val iterPerValidate = config.readIn("iterations.validate",10);
     val opt = new LBFGS[Int,DenseVector](iterationsPerEval,5) with ConsoleLogging;
 
     val init = obj.initialWeightVector;
@@ -267,6 +278,7 @@ object LatentDiscriminativeTrainer extends ParserTrainer {
     val reg = DiffFunction.withL2Regularization(obj, regularization);
     val cachedObj = new CachedDiffFunction(reg);
     for( (state,iter) <- opt.iterations(cachedObj,init).take(maxIterations).zipWithIndex;
+         () = quickEval(devTrees,state.x, iter, iterPerValidate)
          if iter != 0 && iter % iterationsPerEval == 0) yield {
       val parser = obj.extractViterbiParser(state.x)
       ("LatentDiscrim-" + iter.toString,parser)
@@ -374,17 +386,30 @@ object StochasticLatentTrainer extends ParserTrainer {
 
     val iterationsPerEval = config.readIn("iterations.eval",25);
     val maxIterations = config.readIn("iterations.max",300);
-    val regularization = config.readIn("objective.regularization",0.01);
     val batchSize = config.readIn("opt.batchsize",1000);
-    val alpha = config.readIn("opt.stepsize",0.05);
-    val opt = new StochasticGradientDescent[Int,DenseVector](alpha,maxIterations,batchSize) with ConsoleLogging;
+    val regularization = config.readIn("objective.regularization",0.01) * batchSize / trainTrees.length;
+    val alpha = config.readIn("opt.stepsize",20.0);
+    val useL1 = config.readIn("opt.useL1",false);
+    System.out.println("UseL1: " + useL1);
+    val opt = if(useL1) {
+      new StochasticGradientDescent[Int,DenseVector](alpha,maxIterations,batchSize)
+              with AdaptiveGradientDescent.L2Regularization[Int,DenseVector]
+              with ConsoleLogging {
+        override val lambda = regularization;
+      }
+    } else {
+      new StochasticGradientDescent[Int,DenseVector](alpha,maxIterations,batchSize)
+              with AdaptiveGradientDescent.L1Regularization[Int,DenseVector]
+              with ConsoleLogging {
+        override val lambda = regularization;
+      }
+    }
 
     val init = obj.initialWeightVector;
     val iterPerValidate = config.readIn("iterations.validate",10);
 
     val log = Log.globalLog;
-    val reg = DiffFunction.withL2Regularization(obj, regularization);
-    for( (state,iter) <- opt.iterations(reg,init).take(maxIterations).zipWithIndex;
+    for( (state,iter) <- opt.iterations(obj,init).take(maxIterations).zipWithIndex;
          () = quickEval(devTrees,state.x, iter, iterPerValidate)
          if iter != 0 && iter % iterationsPerEval == 0) yield try {
       val parser = obj.extractViterbiParser(state.x)
