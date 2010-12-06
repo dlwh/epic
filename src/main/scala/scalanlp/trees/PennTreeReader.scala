@@ -24,7 +24,7 @@ import scala.util.parsing.input._;
 
 import scala.io.Source;
 
-class PennTreeReader(badLabels: Set[String]) extends StdLexical with ImplicitConversions with Scanners {
+class PennTreeReader(badLabels: String=>Boolean) extends StdLexical with ImplicitConversions with Scanners {
   def this() = this(Set("-NONE-"));
   private val ws = whitespace;
   private val other = acceptIf( c => !c.isWhitespace && c != '(' && c != ')')( "'" + _ + "'not expected");
@@ -76,4 +76,10 @@ class PennTreeReader(badLabels: Set[String]) extends StdLexical with ImplicitCon
       }
   }
 
+}
+
+object PennTreeReader {
+  def forGerman = new PennTreeReader({ s =>
+     s.startsWith("*T");
+  })
 }

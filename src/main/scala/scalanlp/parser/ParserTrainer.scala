@@ -58,7 +58,10 @@ trait ParserTrainer {
 
     val maxLength = config.readIn[Int]("sentence.maxLength",40);
 
-    val xform = Trees.Transforms.StandardStringTransform;
+    val xform = config.readIn[String]("treebank.processing","standard").toLowerCase match {
+      case "german" => Trees.Transforms.GermanTreebankTransform;
+      case _ => Trees.Transforms.StandardStringTransform;
+    }
 
     val trainSpans = loadTrainSpans(config);
     val (trainTrees,replacer) = transformTrees(treebank.trainTrees, trainSpans, maxLength, binarize, xform);

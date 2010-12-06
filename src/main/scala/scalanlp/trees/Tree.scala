@@ -234,5 +234,21 @@ object Trees {
         xox(stupid(fns(ens(tree).get))) map (_.intern);
       }
     }
+
+    object GermanTreebankTransform extends (Tree[String]=>Tree[String]) {
+      private val ens = new EmptyNodeStripper;
+      private val xox = new XOverXRemover[String];
+      private val tr = GermanTraceRemover;
+      def apply(tree: Tree[String]): Tree[String] = {
+        xox(tr(ens(tree).get)) map (_.intern);
+      }
+    }
+
+    object GermanTraceRemover extends (Tree[String]=>Tree[String]) {
+      def apply(tree: Tree[String]):Tree[String] = {
+        tree.map(_.replaceAll("\\-\\*T.\\*",""))
+      }
+    }
+
   }
 }

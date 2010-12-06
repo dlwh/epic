@@ -60,4 +60,19 @@ object Treebank {
       yield tree;
     }
   }
+
+  def fromGermanTreebank(dir: File):Treebank = new Treebank {
+    def sections = List("negra_1.mrg","negra_2.mrg","negra_3.mrg");
+    def trainSections = sections.slice(0,1);
+    def devSections = sections.slice(1,2);
+    def testSections = sections.slice(2,3);
+
+    def treesFromSection(sec: String) = {
+      val file = new File(dir,sec);
+      val pennReader = PennTreeReader.forGerman;
+      import scala.io.Codec.ISO8859;
+      for(tree <- pennReader.readTrees(Source.fromFile(file)(ISO8859).mkString("")).fold( x=>x, x => error("error in " + file + " " + x.toString)).iterator)
+        yield tree;
+    }
+  }
 }

@@ -63,8 +63,8 @@ class ParseEval[L](ignoredLabels: Set[L]) {
                  numParses + stats.numParses)
     }
 
-    def precision = (right * 1.0 / guess);
-    def recall = (right * 1.0 / gold);
+    def precision = if(guess == 0) 1.0 else (right * 1.0 / guess);
+    def recall = if(guess == 0) 1.0 else (right * 1.0 / gold);
     def exact = (numExact * 1.0 / numParses);
   }
 
@@ -97,7 +97,8 @@ object ParseEval {
       postEval(guessTree,deBgold,words,stats,(endTime-startTime).toInt);
       stats;
     } catch {
-      case e:RuntimeException => throw new RuntimeException("Error parsing: " + sent._1.render(sent._2), e);
+      case e:RuntimeException => e.printStackTrace();
+      Statistics(0, peval.labeledConstituents(sent._1).size, 0, 0, 1);
     }
     val stats = trees.par.withSequentialThreshold(100).mapReduce({ evalSentence _ },{ (_:Statistics) + (_:Statistics)});
 
