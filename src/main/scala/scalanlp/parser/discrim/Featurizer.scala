@@ -65,13 +65,14 @@ class SumFeaturizer[L,W](f1: Featurizer[L,W], f2: Featurizer[L,W]) extends Featu
   def initialValueForFeature(f: Feature[L,W]) = f1.initialValueForFeature(f) + f2.initialValueForFeature(f);
 }
 
-class RuleFeaturizer[L,W](prods: PairedDoubleCounter[L,Rule[L]], initToZero: Boolean = false) extends Featurizer[L,W] {
+class RuleFeaturizer[L,W](prods: PairedDoubleCounter[L,Rule[L]], initToZero: Boolean = true) extends Featurizer[L,W] {
+  println(initToZero);
   def featuresFor(r: Rule[L]) = aggregate(RuleFeature(r) -> 1.0);
   def featuresFor(l: L, w: W) = aggregate[Feature[L,W]]();
 
 
   def initialValueForFeature(f: Feature[L,W]) = f match {
-    case RuleFeature(r) => if(initToZero) 0.0 else math.log(prods(r.parent,r) / prods(r.parent).total) / 100;
+    case RuleFeature(r) => if(initToZero) 0.0 else math.log(prods(r.parent,r) / prods(r.parent).total);
     case _ => 0.0;
   }
 
@@ -108,7 +109,7 @@ class CachedWeightsFeaturizer[L,W](f: Featurizer[L,W],
 
   def featuresFor(l: L, w: W) = f.featuresFor(l,w);
 
-  def initialValueForFeature(feat: Feature[L,W]) = weights.get(feat).getOrElse(f.initialValueForFeature(feat))  + math.log(0.9 + math.random * 0.2);
+  def initialValueForFeature(feat: Feature[L,W]) = weights.get(proj(feat)).getOrElse(f.initialValueForFeature(feat))  + math.log(0.9 + math.random * 0.2);
 }
 
 object FeatureProjectors {

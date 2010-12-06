@@ -22,8 +22,8 @@ class PlainFeaturizerFactory[L] extends FeaturizerFactory[L,String] {
   def getFeaturizer(conf: Configuration,
                     baseLexicon: PairedDoubleCounter[L,String],
                     baseProductions: PairedDoubleCounter[L,Rule[L]]):Featurizer[L,String] = {
-    val lex = new WordShapeFeaturizer(baseLexicon);
-    val rules = new RuleFeaturizer[L,String](baseProductions);
+    val lex = new WordShapeFeaturizer(baseLexicon,conf.readIn[Boolean]("initToZero",true));
+    val rules = new RuleFeaturizer[L,String](baseProductions, conf.readIn[Boolean]("initToZero",true));
 
     new SumFeaturizer(rules,lex);
   }
