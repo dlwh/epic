@@ -340,7 +340,7 @@ object StochasticLatentTrainer extends ParserTrainer {
 
   def quickEval(devTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer)], weights: DenseVector, iter: Int, iterPerValidate:Int) {
     if(iter % iterPerValidate == 0) {
-      ProjectTreebankToLabeledSpans.writeObject((weights,obj.indexedFeatures.decode(weights)),new java.io.File("weights.ser"));
+      ProjectTreebankToLabeledSpans.writeObject((weights,obj.indexedFeatures.decode(weights)),new java.io.File("weights-" +iter +".ser"));
       println("Validating...");
       val parser = obj.extractViterbiParser(weights);
       val fixedTrees = devTrees.take(400).map { case (a,b,c) => (a,b,obj.projectCoarseScorer(c))}.toIndexedSeq;
@@ -368,6 +368,7 @@ object StochasticLatentTrainer extends ParserTrainer {
     if(weightsPath == null) {
       latentFeaturizer
     } else {
+      println("Using awesome weights...");
       val weights = readObject[(DenseVector,DoubleCounter[Feature[(String,Int),String]])](weightsPath)._2;
       val splitStates = config.readIn[Boolean]("discrim.splitOldWeights",false);
       new CachedWeightsFeaturizer(latentFeaturizer, weights, if(splitStates) FeatureProjectors.split _ else identity _)
