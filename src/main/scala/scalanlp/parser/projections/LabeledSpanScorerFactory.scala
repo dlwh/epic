@@ -157,18 +157,42 @@ object ProjectTreebankToLabeledSpans {
 object ProjectTreebankToLabeledSpansProjective {
   import ProjectTreebankToLabeledSpans._;
 
+
+  def mapTrees(factory: SpanScorer.Factory[String], trees: IndexedSeq[((Tree[String],Seq[String]),SpanScorer)]) = {
+    // TODO: have ability to use other span scorers.
+    trees.toIndexedSeq.par.map { case ((tree,words),oldScorer) =>
+      println(words);
+      try {
+        val scorer = factory.mkSpanScorer(words,oldScorer)
+        scorer;
+      } catch {
+        case e: Exception => e.printStackTrace(); error("rawr");
+      }
+    }
+  }
+
   def main(args: Array[String]) {
     val genParser = ProjectTreebankToLabeledSpans.loadParser(new File(args(0)));
-    val latentParser = loadParser(new File(args(0)));
-    val treebank = DenseTreebank.fromZipFile(new File(args(1)));
-    val outDir = new File(args(2));
-    outDir.mkdirs();
+    val latentParser = loadParser(new File(args(1)));
+    val treebank = DenseTreebank.fromZipFile(new File(args(2)));
+    val outDir = new File(args(3));
+    val inSpanDir = new File(args(4));
     def unsplit(x: (String,Int)) = x._1
     val projections = new ProjectionIndexer(genParser.builder.grammar.index,latentParser.builder.grammar.index,unsplit _)
+
+    def projectScorer(coarseScorer: SpanScorer) = new ProjectingSpanScorer(projections, coarseScorer);
+
+    val trainSpans = loadSpansFile(new File(inSpanDir,TRAIN_SPANS_NAME)).map(projectScorer _);
+    val testSpans = loadSpansFile(new File(inSpanDir,TEST_SPANS_NAME)).map(projectScorer _);
+    val devSpans = loadSpansFile(new File(inSpanDir,DEV_SPANS_NAME)).map(projectScorer _);
+
+    outDir.mkdirs();
     val factory = new LabeledSpanScorerFactory[String,(String,Int),String](latentParser.builder.withCharts(ParseChart.logProb),projections);
-    writeObject(mapTrees(factory,treebank.trainTrees.toIndexedSeq),new File(outDir,TRAIN_SPANS_NAME))
-    writeObject(mapTrees(factory,treebank.testTrees.toIndexedSeq),new File(outDir,TEST_SPANS_NAME))
-    writeObject(mapTrees(factory,treebank.devTrees.toIndexedSeq),new File(outDir,DEV_SPANS_NAME))
+
+    writeObject(genParser.builder.grammar.index,new File(outDir,SPAN_INDEX_NAME));
+    writeIterable(mapTrees(factory,treebank.trainTrees.toIndexedSeq zip trainSpans),new File(outDir,TRAIN_SPANS_NAME))
+    writeIterable(mapTrees(factory,treebank.testTrees.toIndexedSeq zip testSpans),new File(outDir,TEST_SPANS_NAME))
+    writeIterable(mapTrees(factory,treebank.devTrees.toIndexedSeq zip devSpans),new File(outDir,DEV_SPANS_NAME))
   }
 
   def loadParser(loc: File) = {
