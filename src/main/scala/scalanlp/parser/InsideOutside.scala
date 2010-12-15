@@ -35,6 +35,13 @@ class InsideOutside[L,W](val parser: ChartBuilder[LogProbabilityParseChart,L,W])
     }
   val outside = parser.buildOutsideChart(inside, validSpan);
 
+    expectedCounts(words,inside,outside,totalProb, validSpan)
+  }
+
+  def expectedCounts(words: Seq[W],
+                     inside: LogProbabilityParseChart[L],
+                     outside: LogProbabilityParseChart[L],
+                     totalProb: Double, validSpan: SpanScorer) = {
     val wordCounts = computeWordCounts(words, inside, outside, validSpan, totalProb)
     val binaryRuleCounts = computeBinaryCounts(words, inside, outside, validSpan, totalProb)
     val unaryRuleCounts = computeUnaryCounts(words, inside, outside, validSpan, totalProb)
@@ -43,10 +50,10 @@ class InsideOutside[L,W](val parser: ChartBuilder[LogProbabilityParseChart,L,W])
   }
 
   private def computeWordCounts(words: scala.Seq[W],
-                        inside: LogProbabilityParseChart[L],
-                        outside: LogProbabilityParseChart[L],
-                        validSpan: SpanScorer,
-                        totalProb: Double): SparseArray[DoubleCounter[W]] = {
+                                inside: LogProbabilityParseChart[L],
+                                outside: LogProbabilityParseChart[L],
+                                validSpan: SpanScorer,
+                                totalProb: Double): SparseArray[DoubleCounter[W]] = {
     val wordCounts = grammar.fillSparseArray(DoubleCounter[W]());
     // handle lexical productions:
     for (i <- 0 until words.length) {
