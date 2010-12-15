@@ -18,7 +18,7 @@ import scalanlp.trees.DenseTreebank
  */
 class LabeledSpanScorerFactory[C,L,W](parser: ChartBuilder[ParseChart.LogProbabilityParseChart,L,W],
                                     indexedProjections: ProjectionIndexer[C,L],
-                                    pruningThreshold: Double= -10) extends SpanScorer.Factory[W] {
+                                    pruningThreshold: Double= -5) extends SpanScorer.Factory[W] {
 
   def mkSpanScorer(s: Seq[W], scorer: SpanScorer = SpanScorer.identity) = {
     val coarseRootIndex = parser.grammar.index(parser.root);
@@ -35,28 +35,76 @@ class LabeledSpanScorerFactory[C,L,W](parser: ChartBuilder[ParseChart.LogProbabi
     chartScorer
   }
 
-  def buildSpanScorer(inside: ParseChart[L], outside: ParseChart[L], sentProb: Double):LabeledSpanScorer = {
-    val scores = TriangularArray.raw(inside.length+1,null:SparseVector);
-    var density = 0;
-    var labelDensity = 0;
-    for(begin <-  0 until inside.length; end <- begin+1 to (inside.length)) {
-      val index = TriangularArray.index(begin, end)
-      for(l <- inside.enteredLabelIndexes(begin,end)) {
-        val pL = indexedProjections.project(l)
-        val myScore = inside.labelScore(begin, end, l) + outside.labelScore(begin, end, l) - sentProb
-        if(myScore >= pruningThreshold) {
-          if(scores(index) == null) {
-            scores(index) = indexedProjections.coarseEncoder.mkSparseVector(Double.NegativeInfinity);
-            density += 1;
-          }
-          val currentScore = scores(index)(pL);
-          if(currentScore == Double.NegativeInfinity) labelDensity += 1;
-          scores(index)(pL) = Numerics.logSum(currentScore,myScore);
+  def mkSpanScorerWithTree(tree: BinarizedTree[C], s: Seq[W], scorer: SpanScorer= SpanScorer.identity) = {
+    val coarseRootIndex = parser.grammar.index(parser.root);
+    val inside = parser.buildInsideChart(s, scorer)
+    val outside = parser.buildOutsideChart(inside, scorer);
+    val lexicon = parser.lexicon;
+
+    val sentProb = inside(0,s.length,coarseRootIndex);
+    if(sentProb.isInfinite) {
+      error("Couldn't parse " + s + " " + sentProb)
+    }
+
+    try {
+      val chartScorer = buildSpanScorer(inside,outside,sentProb, tree);
+      chartScorer
+    } catch {
+      case e:BlarghException =>
+        println(lexicon.tagScores(s(e.w)),e.l);
+       assert(false)
+    }
+
+  }
+
+  case class BlarghException(l :L , w: Int) extends Exception;
+
+  def goldLabels(length: Int, tree: BinarizedTree[C]) = {
+    val result = TriangularArray.raw(length,collection.mutable.BitSet());
+    if(tree != null) {
+      for( t <- tree.allChildren) {
+        try {
+          result(TriangularArray.index(t.span.start,t.span.end)).+=(indexedProjections.coarseIndex(t.label));
+        } catch {
+          case e => println("wtf: " + t.label,e);
         }
       }
     }
-    println("Density: " + density * 1.0 / scores.length);
-    println("Label Density:" + labelDensity * 1.0 / scores.length / parser.grammar.index.size)
+    result;
+  }
+
+  def buildSpanScorer(inside: ParseChart[L], outside: ParseChart[L], sentProb: Double, tree: BinarizedTree[C] = null):LabeledSpanScorer = {
+    val markedSpans = goldLabels(inside.length, tree)
+
+    val scores = TriangularArray.raw(inside.length+1,null:SparseVector);
+    for(begin <-  0 until inside.length; end <- begin+1 to (inside.length)) {
+      val index = TriangularArray.index(begin, end)
+      val scoresForLocation = indexedProjections.coarseEncoder.mkSparseVector(Double.NegativeInfinity);
+      for(l <- inside.enteredLabelIndexes(begin,end)) {
+        val pL = indexedProjections.project(l)
+        val myScore = inside.labelScore(begin, end, l) + outside.labelScore(begin, end, l) - sentProb
+        val currentScore = scoresForLocation(pL);
+        scoresForLocation(pL) = Numerics.logSum(currentScore,myScore);
+      }
+
+      for( (c,v) <- scoresForLocation.activeElements) {
+        if(v > pruningThreshold || markedSpans(index)(c)) {
+          if(scores(index) eq null) {
+            scores(index) = indexedProjections.coarseEncoder.mkSparseVector(Double.NegativeInfinity);
+          }
+          scores(index)(c) = v;
+        }
+      }
+
+      for(c <- markedSpans(index)) {
+        if(scores(index) == null || scores(index)(c) == Double.NegativeInfinity) {
+          println("grrr....");
+          println(parser.grammar.index.get(c) + " " + begin + " " + end + tree + " " + inside.labelScore(begin,end,c) + " " + outside.labelScore(begin,end,c) + " " + sentProb)
+        }
+      }
+    }
+    //println("Density: " + density * 1.0 / scores.length);
+    //println("Label Density:" + labelDensity * 1.0 / scores.length / parser.grammar.index.size)
     new LabeledSpanScorer(scores);
   }
 
@@ -94,9 +142,9 @@ object ProjectTreebankToLabeledSpans {
     val projections = new ProjectionIndexer(parser.builder.grammar.index,parser.builder.grammar.index,identity[String])
     val factory = new LabeledSpanScorerFactory[String,String,String](parser.builder.withCharts(ParseChart.logProb),projections);
     writeObject(parser.builder.grammar.index,new File(outDir,SPAN_INDEX_NAME));
-    writeIterable(mapTrees(factory,treebank.trainTrees.toIndexedSeq),new File(outDir,TRAIN_SPANS_NAME))
-    writeIterable(mapTrees(factory,treebank.testTrees.toIndexedSeq),new File(outDir,TEST_SPANS_NAME))
-    writeIterable(mapTrees(factory,treebank.devTrees.toIndexedSeq),new File(outDir,DEV_SPANS_NAME))
+    writeIterable(mapTrees(factory,transformTrees(treebank.trainTrees),true),new File(outDir,TRAIN_SPANS_NAME))
+    writeIterable(mapTrees(factory,transformTrees(treebank.testTrees),false),new File(outDir,TEST_SPANS_NAME))
+    writeIterable(mapTrees(factory,transformTrees(treebank.devTrees),false),new File(outDir,DEV_SPANS_NAME))
   }
 
   def loadParser(loc: File) = {
@@ -106,15 +154,29 @@ object ProjectTreebankToLabeledSpans {
     parser;
   }
 
-  def mapTrees(factory: SpanScorer.Factory[String], trees: IndexedSeq[(Tree[String],Seq[String])]) = {
+  def transformTrees(trees: Iterator[(Tree[String],Seq[String])]): IndexedSeq[(BinarizedTree[String], Seq[String])] = {
+    val xform = Trees.Transforms.StandardStringTransform;
+    val binarize = Trees.xBarBinarize _;
+    val binarizedAndTransformed = (for {
+      (tree, words) <- trees
+    } yield (binarize(xform(tree)),words)).toIndexedSeq
+
+    val chainRemover = new UnaryChainRemover[String];
+
+    val (dechained,chainReplacer) = chainRemover.removeUnaryChains(binarizedAndTransformed.iterator);
+
+    dechained.toIndexedSeq
+  }
+
+  def mapTrees(factory: LabeledSpanScorerFactory[String,String,String], trees: IndexedSeq[(BinarizedTree[String],Seq[String])], useTree: Boolean) = {
     // TODO: have ability to use other span scorers.
     trees.toIndexedSeq.par.map { case (tree,words) =>
       println(words);
       try {
-        val scorer = factory.mkSpanScorer(words)
+        val scorer = if(useTree) factory.mkSpanScorerWithTree(tree,words) else factory.mkSpanScorer(words);
         scorer;
       } catch {
-        case e: Exception => e.printStackTrace(); error("rawr");
+        case e: Exception => e.printStackTrace(); SpanScorer.identity;
       }
     }
   }
@@ -154,52 +216,3 @@ object ProjectTreebankToLabeledSpans {
 
 }
 
-object ProjectTreebankToLabeledSpansProjective {
-  import ProjectTreebankToLabeledSpans._;
-
-
-  def mapTrees(factory: SpanScorer.Factory[String], trees: IndexedSeq[((Tree[String],Seq[String]),SpanScorer)]) = {
-    // TODO: have ability to use other span scorers.
-    trees.toIndexedSeq.par.map { case ((tree,words),oldScorer) =>
-      println(words);
-      try {
-        val scorer = factory.mkSpanScorer(words,oldScorer)
-        scorer;
-      } catch {
-        case e: Exception => e.printStackTrace(); error("rawr");
-      }
-    }
-  }
-
-  def main(args: Array[String]) {
-    val genParser = ProjectTreebankToLabeledSpans.loadParser(new File(args(0)));
-    val latentParser = loadParser(new File(args(1)));
-    val treebank = DenseTreebank.fromZipFile(new File(args(2)));
-    val outDir = new File(args(3));
-    val inSpanDir = new File(args(4));
-    def unsplit(x: (String,Int)) = x._1
-    val projections = new ProjectionIndexer(genParser.builder.grammar.index,latentParser.builder.grammar.index,unsplit _)
-
-    def projectScorer(coarseScorer: SpanScorer) = new ProjectingSpanScorer(projections, coarseScorer);
-
-    val trainSpans = loadSpansFile(new File(inSpanDir,TRAIN_SPANS_NAME)).map(projectScorer _);
-    val testSpans = loadSpansFile(new File(inSpanDir,TEST_SPANS_NAME)).map(projectScorer _);
-    val devSpans = loadSpansFile(new File(inSpanDir,DEV_SPANS_NAME)).map(projectScorer _);
-
-    outDir.mkdirs();
-    val factory = new LabeledSpanScorerFactory[String,(String,Int),String](latentParser.builder.withCharts(ParseChart.logProb),projections);
-
-    writeObject(genParser.builder.grammar.index,new File(outDir,SPAN_INDEX_NAME));
-    writeIterable(mapTrees(factory,treebank.trainTrees.toIndexedSeq zip trainSpans),new File(outDir,TRAIN_SPANS_NAME))
-    writeIterable(mapTrees(factory,treebank.testTrees.toIndexedSeq zip testSpans),new File(outDir,TEST_SPANS_NAME))
-    writeIterable(mapTrees(factory,treebank.devTrees.toIndexedSeq zip devSpans),new File(outDir,DEV_SPANS_NAME))
-  }
-
-  def loadParser(loc: File) = {
-    val oin = new ObjectInputStream(new BufferedInputStream(new FileInputStream(loc)));
-    val parser = oin.readObject().asInstanceOf[ChartParser[(String,Int),String,String]]
-    oin.close();
-    parser;
-  }
-
-}
