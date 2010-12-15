@@ -61,9 +61,7 @@ class LatentDiscrimObjective[L,L2,W](featurizer: Featurizer[L2,W],
   def extractViterbiParser(weights: DenseVector) = {
     val grammar = weightsToGrammar(weights);
     val lexicon = weightsToLexicon(weights);
-    val cc = coarseParser.withCharts[ParseChart.ViterbiParseChart](ParseChart.viterbi);
-    val builder = new CoarseToFineChartBuilder[ParseChart.ViterbiParseChart,L,L2,W](cc,
-      unsplit, root, lexicon, grammar, ParseChart.viterbi);
+    val builder = CKYChartBuilder(root, lexicon, grammar);
     val parser = new ChartParser(builder,new ViterbiDecoder(indexedProjections));
     parser
   }
