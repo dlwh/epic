@@ -25,6 +25,7 @@ trait Treebank {
   def trainTrees = treesFromSections(trainSections);
 
   def devSections: Seq[String];
+
   def devTrees = treesFromSections(devSections);
 
   def testSections: Seq[String];
@@ -50,9 +51,9 @@ object Treebank {
   */
   def fromPennTreebankDir(dir: File) = new Treebank {
     def sections = dir.listFiles.filter(_.isDirectory).map(_.getName);
-    val trainSections = List.range(2,10).map("0" + _) ++ List.range(10,22).map(""+_)
-    val devSections = List("24");
-    val testSections = List("22");
+    val trainSections = Seq.range(2,10).map("0" + _) ++ Seq.range(10,22).map(""+_)
+    val devSections = List("22");
+    val testSections = List("23");
     def treesFromSection(sec: String) = {
       val pennReader = new PennTreeReader();
       for(file <- new File(dir,sec).listFiles.iterator;
