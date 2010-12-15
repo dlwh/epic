@@ -45,9 +45,9 @@ object StepFunctionifySpanScorers {
 
     outDir.mkdirs();
 
-    writeIterable(trainSpans.map(new StepFunctionSpanScorer(_,-7.0)),new File(outDir,TRAIN_SPANS_NAME))
-    writeIterable(testSpans.map(new StepFunctionSpanScorer(_,-7.0)),new File(outDir,TEST_SPANS_NAME))
-    writeIterable(devSpans.map(new StepFunctionSpanScorer(_,-7.0)),new File(outDir,DEV_SPANS_NAME))
+    writeIterable(trainSpans.map(new StepFunctionSpanScorer(_,Double.NegativeInfinity)),new File(outDir,TRAIN_SPANS_NAME))
+    writeIterable(testSpans.map(new StepFunctionSpanScorer(_,Double.NegativeInfinity)),new File(outDir,TEST_SPANS_NAME))
+    writeIterable(devSpans.map(new StepFunctionSpanScorer(_,Double.NegativeInfinity)),new File(outDir,DEV_SPANS_NAME))
   }
 
 }
