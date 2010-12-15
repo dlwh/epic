@@ -64,19 +64,19 @@ class GraphParser[L,W](root: L, lexicon: Lexicon[L,W], grammar: Grammar[L]) exte
           case LexicalItem(parent, i, w) =>
             val span = top.span;
             if(chart.labelScore(span.start, span.end, parent).isInfinite) {
-              chart.enterTerm(span.start, span.end, parent, w);
+              chart.enter(span.start, span.end, parent, w);
             } else {
               alreadyAdded = true; // already expanded a better node here
             }
           case UnaryItem(parent, child, span, w) =>
             if(chart.labelScore(span.start, span.end, parent).isInfinite) {
-              chart.enterUnary(span.start, span.end, parent, child, w)
+              chart.enter(span.start, span.end, parent, w)
             } else {
               alreadyAdded = true; // already expanded a better node here
             }
           case BinaryItem(parent, lchild, rchild, span, split, w) =>
             if(chart.labelScore(span.start, span.end, parent).isInfinite) {
-              chart.enterBinary(span.start, split, span.end, parent, lchild, rchild, w);
+              chart.enter(span.start, span.end, parent, w);
             } else {
               alreadyAdded = true; // already expanded a better node here
             }
