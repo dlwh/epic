@@ -106,9 +106,8 @@ object SimpleViterbiDecoder {
 
 /**
  * Tries to extract a tree that maximizes rule sum in the coarse grammar
-trait MaxRuleSumDecoder[C,F] extends ChartDecoder[C] {
+trait MaxRuleSumDecoder[C,F] extends ChartDecoder[C,F] {
 
-  protected def unaryClosure: UnaryRuleClosure;
   protected def indexedProjections: ProjectionIndexer[C,F]
   protected def coarseGrammar: Grammar[C] // just for what rules are possible.
 
@@ -121,8 +120,7 @@ trait MaxRuleSumDecoder[C,F] extends ChartDecoder[C] {
   override def extractBestParse(root: F, grammar: Grammar[F],
                                 inside: ParseChart[F], outside: =>ParseChart[F],
                                 spanScorer: SpanScorer = SpanScorer.identity):BinarizedTree[C] = {
-    import inside.{labelScore};
-    val data = buildMaxCCharts(root, grammar, inside, xoutside, spanScorer);
+    val data = buildMaxCCharts(root, grammar, inside, outside, spanScorer);
     import data._;
     def buildTree(begin: Int, end: Int, root: Int, allowUnary:Boolean =true):BinarizedTree[L] = {
       val lroot = grammar.index.get(root);
@@ -216,7 +214,7 @@ trait MaxRuleSumDecoder[C,F] extends ChartDecoder[C] {
         // TODO: allow more than 1 unary
         for{
           (pB,coarseRules) <- coarseGrammar.allUnaryRules
-          if maxScore(TriangularArray.index(begin,split))(pB) != Double.NegativeInfinity
+          if maxScore(TriangularArray.index(begin,end))(pB) != Double.NegativeInfinity
           pA <- coarseRules.activeKeys
         } {
          var score = Double.NegativeInfinity;
@@ -255,11 +253,10 @@ object MaxRuleTrainer extends ParserTrainer {
                   devTrees: Seq[(BinarizedTree[String],Seq[String])],
                   config: Configuration) = {
     import scalanlp.math.Semiring.Viterbi.doubleIsViterbi;
-    val base = GenerativeParser.fromTrees(trainTrees).withCharts(ParseChart.logProb);
+    val base = GenerativeParser.fromTrees(trainTrees).builder.withCharts(ParseChart.logProb);
     import base.grammar;
 
     val parser = new Parser[String,String] with MaxRuleSumDecoder[String] {
-      val unaryClosure = UnaryRuleClosure(base.grammar);
       def scores(o: Seq[String]) = try {
         val inside = base.buildInsideChart(o);
         lazy val outside = base.buildOutsideChart(inside);
@@ -271,5 +268,6 @@ object MaxRuleTrainer extends ParserTrainer {
     }
     Iterator.single(("MaxRule",parser));
   }
-} */
+}
+ */
 
