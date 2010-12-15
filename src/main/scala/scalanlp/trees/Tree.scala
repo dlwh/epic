@@ -210,7 +210,9 @@ object Trees {
           case "-RRB-" => "-RRB-"
           case "-LRB-" => "-LRB-"
           case "-LCB-" => "-LCB-"
-          case x => x.replaceAll("[-|=].*","");
+          case x =>
+            if(x.startsWith("--")) x.replaceAll("---.*","--")
+            else x.replaceAll("[-|=].*","");
         }
       }
     }
@@ -238,9 +240,10 @@ object Trees {
     object GermanTreebankTransform extends (Tree[String]=>Tree[String]) {
       private val ens = new EmptyNodeStripper;
       private val xox = new XOverXRemover[String];
+      private val fns = new FunctionNodeStripper;
       private val tr = GermanTraceRemover;
       def apply(tree: Tree[String]): Tree[String] = {
-        xox(tr(ens(tree).get)) map (_.intern);
+        xox(tr(fns(ens(tree).get))) map (_.intern);
       }
     }
 
