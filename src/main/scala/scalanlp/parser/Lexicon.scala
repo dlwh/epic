@@ -49,7 +49,8 @@ class SimpleLexicon[L,W](private val lexicon: PairedDoubleCounter[L,W]) extends 
   def wordScore(l: L, w: W) = {
     var cWord = wordCounts(w);
     var cTagWord = lexicon(l)(w);
-    if(wordCounts(w) < 4 && lexicon(l).size > 50) {
+    assert(cWord >= cTagWord);
+    if(wordCounts(w) < 10 && lexicon(l).size > 50) {
       cWord += 1.0;
       cTagWord += lexicon(l).size.toDouble / wordCounts.size
     }
@@ -59,7 +60,8 @@ class SimpleLexicon[L,W](private val lexicon: PairedDoubleCounter[L,W]) extends 
       val pW = (1.0 + cWord) / (wordCounts.total + 1.0);
       val pTgW = (cTagWord) / (cWord);
       val pTag = lexicon(l).total / wordCounts.total
-      val result = log(pW * pTgW / pTag);
+      val result = log(pW) + log(pTgW) - log(pTag);
+      assert(cTagWord == 0 || result > Double.NegativeInfinity)
       result;
     }
   }
