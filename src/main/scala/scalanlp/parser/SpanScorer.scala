@@ -35,6 +35,21 @@ object SpanScorer {
     }
   }
 
+  def divide(s: SpanScorer, div: Double) = new SpanScorer {
+    def scoreBinaryRule(begin: Int, split: Int, end: Int, parent: Int, leftChild: Int, rightChild: Int): Double = {
+      s.scoreBinaryRule(begin, split, end, parent, leftChild, rightChild) / div;
+    }
+
+    def scoreUnaryRule(begin: Int, end: Int, parent: Int, child: Int): Double = {
+      s.scoreUnaryRule(begin, end, parent, child) / div;
+    }
+
+    def scoreLexical(begin: Int, end: Int, tag: Int): Double = {
+      s.scoreLexical(begin, end, tag) / div;
+    }
+
+  }
+
   def project(fineToCoarseMap: Int=>Int)(coarseScorer: SpanScorer): SpanScorer = new SpanScorer {
     def scoreBinaryRule(begin: Int, split: Int, end: Int, parent: Int, leftChild: Int, rightChild: Int): Double = {
       coarseScorer.scoreBinaryRule(begin, split, end, fineToCoarseMap(parent), fineToCoarseMap(leftChild), fineToCoarseMap(rightChild))
