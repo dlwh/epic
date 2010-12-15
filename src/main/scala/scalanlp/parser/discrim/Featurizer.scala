@@ -65,14 +65,14 @@ class SumFeaturizer[L,W](f1: Featurizer[L,W], f2: Featurizer[L,W]) extends Featu
   def initialValueForFeature(f: Feature[L,W]) = f1.initialValueForFeature(f) + f2.initialValueForFeature(f);
 }
 
-class RuleFeaturizer[L,W](prods: PairedDoubleCounter[L,Rule[L]], initToZero: Boolean = true) extends Featurizer[L,W] {
+class RuleFeaturizer[L,W](prods: PairedDoubleCounter[L,Rule[L]], initToZero: Boolean = true, scale: Double = 1.0) extends Featurizer[L,W] {
   println(initToZero);
   def featuresFor(r: Rule[L]) = aggregate(RuleFeature(r) -> 1.0);
   def featuresFor(l: L, w: W) = aggregate[Feature[L,W]]();
 
 
   def initialValueForFeature(f: Feature[L,W]) = f match {
-    case RuleFeature(r) => if(initToZero) 0.0 else math.log(prods(r.parent,r) / prods(r.parent).total);
+    case RuleFeature(r) => if(initToZero) 0.0 else math.log(prods(r.parent,r) / prods(r.parent).total) / scale;
     case _ => 0.0;
   }
 
@@ -104,12 +104,19 @@ class CachingFeaturizer[L,W](f: Featurizer[L,W]) extends Featurizer[L,W] {
 
 class CachedWeightsFeaturizer[L,W](f: Featurizer[L,W],
                                    weights: DoubleCounter[Feature[L,W]],
-                                   proj: Feature[L,W]=>Feature[L,W] = identity[Feature[L,W]] _ ) extends Featurizer[L,W] {
+                                   proj: Feature[L,W]=>Feature[L,W] = identity[Feature[L,W]] _,
+                                   randomize:Boolean = true) extends Featurizer[L,W] {
   def featuresFor(r: Rule[L]) =  f.featuresFor(r);
 
   def featuresFor(l: L, w: W) = f.featuresFor(l,w);
 
-  def initialValueForFeature(feat: Feature[L,W]) = weights.get(proj(feat)).getOrElse(f.initialValueForFeature(feat))  + math.log(0.9 + math.random * 0.2);
+  def initialValueForFeature(feat: Feature[L,W]) = {
+    weights.get(proj(feat)) match {
+      case Some(v) =>
+        v + {if(randomize) math.log(0.999 + math.random * 0.002) else 0.0};
+      case None =>  f.initialValueForFeature(feat)
+    }
+  }
 }
 
 object FeatureProjectors {
@@ -118,7 +125,6 @@ object FeatureProjectors {
     case _ => f;
   }
 }
-
 
 class SlavFeaturizer[L,W](base: Featurizer[L,W], numStates:Int) extends Featurizer[(L,Int),W] {
   def featuresFor(r: Rule[(L,Int)]) = r match {
@@ -152,7 +158,51 @@ class SlavFeaturizer[L,W](base: Featurizer[L,W], numStates:Int) extends Featuriz
   def initialValueForFeature(f: Feature[(L,Int),W]) = f match {
     case SubstateFeature(baseF, _) =>
       val baseScore = base.initialValueForFeature(baseF);
-      baseScore + math.log(0.9 + math.random * 0.2);
+      baseScore + math.log(0.99 + math.random * 0.02);
+    case _ => 0.0;
+  }
+}
+
+
+
+class SlavPlusFeaturizer[L,W](base: Featurizer[L,W], numStates:Int) extends Featurizer[(L,Int),W] {
+  case class ProjFeature(f: Feature[L,W]) extends Feature[(L,Int),W];
+
+  def featuresFor(r: Rule[(L,Int)]) = r match {
+    case BinaryRule(a,b,c) =>
+      val result = DoubleCounter[Feature[(L,Int),W]]();
+      val baseFeatures = base.featuresFor(BinaryRule(a._1,b._1,c._1));
+      val substates = ArrayBuffer(a._2, b._2, c._2);
+      for( (k,v) <- baseFeatures) {
+        result(SubstateFeature(k,substates)) = v;
+        result(ProjFeature(k)) = v;
+      }
+      result;
+    case UnaryRule(a,b) =>
+      val result = DoubleCounter[Feature[(L,Int),W]]();
+      val baseFeatures = base.featuresFor(UnaryRule(a._1,b._1));
+      val substates = ArrayBuffer(a._2,b._2);
+      for( (k,v) <- baseFeatures) {
+        result(SubstateFeature(k,substates)) = v;
+        result(ProjFeature(k)) = v;
+      }
+      result;
+  }
+
+  def featuresFor(l: (L,Int), w: W) = {
+    val baseFeatures = base.featuresFor(l._1, w);
+    val substates = ArrayBuffer(l._2);
+    val result = DoubleCounter[Feature[(L,Int),W]]();
+    for( (k,v) <- baseFeatures) {
+      result(SubstateFeature(k,substates)) = v;
+      result(ProjFeature(k)) = v;
+    }
+    result;
+  }
+  def initialValueForFeature(f: Feature[(L,Int),W]) = f match {
+    case SubstateFeature(baseF, _) =>
+      val baseScore = base.initialValueForFeature(baseF);
+      baseScore + math.log(0.99 + math.random * 0.02);
     case _ => 0.0;
   }
 }

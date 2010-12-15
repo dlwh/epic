@@ -22,8 +22,10 @@ class PlainFeaturizerFactory[L] extends FeaturizerFactory[L,String] {
   def getFeaturizer(conf: Configuration,
                     baseLexicon: PairedDoubleCounter[L,String],
                     baseProductions: PairedDoubleCounter[L,Rule[L]]):Featurizer[L,String] = {
-    val lex = new WordShapeFeaturizer(baseLexicon,conf.readIn[Boolean]("initToZero",true));
-    val rules = new RuleFeaturizer[L,String](baseProductions, conf.readIn[Boolean]("initToZero",true));
+    val scale = conf.readIn[Double]("init.scale",conf.readIn[Double]("ep.models",1));
+    println(scale);
+    val lex = new WordShapeFeaturizer(baseLexicon,conf.readIn[Boolean]("initToZero",true),scale);
+    val rules = new RuleFeaturizer[L,String](baseProductions, conf.readIn[Boolean]("initToZero",true),scale);
 
     new SumFeaturizer(rules,lex);
   }
@@ -41,3 +43,6 @@ class SlavLatentFeaturizerFactory extends LatentFeaturizerFactory {
   def getFeaturizer[L,W](base: Featurizer[L,W], numStates: Int) = new SlavFeaturizer(new CachingFeaturizer(base),numStates);
 }
 
+class SlavPlusLatentFeaturizerFactory extends LatentFeaturizerFactory {
+  def getFeaturizer[L,W](base: Featurizer[L,W], numStates: Int) = new SlavPlusFeaturizer(new CachingFeaturizer(base),numStates);
+}
