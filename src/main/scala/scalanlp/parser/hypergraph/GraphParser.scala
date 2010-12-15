@@ -134,7 +134,7 @@ class GraphParser[L,W](root: L, lexicon: Lexicon[L,W], grammar: Grammar[L]) exte
     }
 
     // TODO: graph outside scores (?)
-    val bestParse = SimpleViterbiDecoder[L](grammar).extractBestParse(root, grammar, chart, null);
+    val bestParse = SimpleViterbiDecoder[L](grammar).extractBestParse(root, grammar, chart, null, null);
     bestParse
   }
 

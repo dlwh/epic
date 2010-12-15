@@ -121,7 +121,7 @@ class CKYChartBuilder[Chart[X]<:ParseChart[X], L,W](val root: L,
         (c,ruleScore) <- binaryRules.activeElements
         split <- inside.feasibleSpan(begin, end, b, c)
       } {
-        val score = outsidePostUnaries.labelScore(begin,end) + ruleScore
+        val score = outsidePostUnaries.labelScore(begin,end,a) + ruleScore
         val bInside = inside.labelScore(begin,split,b);
         if(!java.lang.Double.isInfinite(bInside)) {
           val cInside = inside.labelScore(split,end,c);

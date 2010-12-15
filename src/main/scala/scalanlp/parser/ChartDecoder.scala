@@ -20,7 +20,7 @@ import scalanlp.math.Numerics.logSum;
 trait ChartDecoder[C,F] {
   def extractBestParse(root:F, grammar: Grammar[F],
                        inside: ParseChart[F],
-                       outside: =>ParseChart[F],
+                       outside: =>ParseChart[F],outsideChartPostUnaries: =>ParseChart[F],
                        spanScorer: SpanScorer = SpanScorer.identity):BinarizedTree[C];
 
 }
@@ -33,7 +33,8 @@ trait ChartDecoder[C,F] {
 class ViterbiDecoder[C,F](val indexedProjections: ProjectionIndexer[C,F]) extends ChartDecoder[C,F] {
 
   override def extractBestParse(root: F, grammar: Grammar[F],
-                                inside: ParseChart[F], outside: =>ParseChart[F], outsideChartPostUnaries: =>ParseChart[F],
+                                inside: ParseChart[F],
+                                outside: =>ParseChart[F], outsideChartPostUnaries: =>ParseChart[F],
                                 spanScorer: SpanScorer = SpanScorer.identity):BinarizedTree[C] = {
     import inside.labelScore
 

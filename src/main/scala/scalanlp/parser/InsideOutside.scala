@@ -33,17 +33,18 @@ class InsideOutside[L,W](val parser: ChartBuilder[LogProbabilityParseChart,L,W])
       if(xxProb.isNaN || xxProb.isInfinite) error("Couldn't parse either! " + words)
       else error("Couldn't parse with span filter. Too much pruning?" + words);
     }
-    val outside = parser.buildOutsideChart(inside, validSpan)._1;
+    val (outside,outsidePostUnaries) = parser.buildOutsideChart(inside, validSpan);
 
-    expectedCounts(words,inside,outside,totalProb, validSpan)
+    expectedCounts(words,inside,outside, outsidePostUnaries, totalProb, validSpan)
   }
 
   def expectedCounts(words: Seq[W],
                      inside: LogProbabilityParseChart[L],
                      outside: LogProbabilityParseChart[L],
+                     outsidePostUnaries: LogProbabilityParseChart[L],
                      totalProb: Double, validSpan: SpanScorer) = {
-    val wordCounts = computeWordCounts(words, inside, outside, validSpan, totalProb)
-    val binaryRuleCounts = computeBinaryCounts(words, inside, outside, validSpan, totalProb)
+    val wordCounts = computeWordCounts(words, inside, outsidePostUnaries, validSpan, totalProb)
+    val binaryRuleCounts = computeBinaryCounts(words, inside, outsidePostUnaries, validSpan, totalProb)
     val unaryRuleCounts = computeUnaryCounts(words, inside, outside, validSpan, totalProb)
 
     ExpectedCounts(binaryRuleCounts, unaryRuleCounts, wordCounts, totalProb);

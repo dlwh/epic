@@ -36,7 +36,7 @@ class CoarseToFineChartBuilder[Chart[X]<:ParseChart[X],C,F,W](coarseParser: Char
    * Given an inside chart, fills the passed-in outside parse chart with inside scores.
    */
   def buildOutsideChart(inside: ParseChart[F],
-                        validSpan: SpanScorer = SpanScorer.identity):Chart[F] = {
+                        validSpan: SpanScorer = SpanScorer.identity):(Chart[F],Chart[F]) = {
     fineParser.buildOutsideChart(inside, validSpan);
   }
 
@@ -77,7 +77,7 @@ object CoarseToFineChartBuilder {
                                                               threshold: Double = -10) = {
     val coarseRootIndex = coarseParser.grammar.index(coarseParser.root);
     val coarseInside = coarseParser.buildInsideChart(s)
-    val coarseOutside = coarseParser.buildOutsideChart(coarseInside);
+    val coarseOutside = coarseParser.buildOutsideChart(coarseInside)._2;
 
     val sentProb = coarseInside(0,s.length,coarseRootIndex);
     assert(!sentProb.isInfinite, s);

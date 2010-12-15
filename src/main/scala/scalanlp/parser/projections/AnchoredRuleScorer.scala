@@ -21,14 +21,14 @@ class AnchoredRuleScorerFactory[C,L,W](parser: ChartBuilder[ParseChart.LogProbab
   def mkSpanScorer(s: Seq[W], scorer: SpanScorer = SpanScorer.identity) = {
     val coarseRootIndex = parser.grammar.index(parser.root);
     val inside = parser.buildInsideChart(s, scorer)
-    val outside = parser.buildOutsideChart(inside, scorer);
+    val (outside,outsidePost) = parser.buildOutsideChart(inside, scorer);
 
     val sentProb = inside(0,s.length,coarseRootIndex);
     if(sentProb.isInfinite) {
       error("Couldn't parse " + s + " " + sentProb)
     }
 
-    val chartScorer = buildSpanScorer(inside,outside,sentProb);
+    val chartScorer = buildSpanScorer(inside,outside,outsidePost,sentProb);
 
     chartScorer
   }
@@ -45,6 +45,7 @@ class AnchoredRuleScorerFactory[C,L,W](parser: ChartBuilder[ParseChart.LogProbab
 
   def buildSpanScorer(inside: ParseChart[L],
                       outside: ParseChart[L],
+                      outsidePost: ParseChart[L],
                       sentProb: Double,
                       scorer: SpanScorer=SpanScorer.identity,
                       tree: BinarizedTree[C] = null):AnchoredRuleScorer = {
@@ -73,7 +74,7 @@ class AnchoredRuleScorerFactory[C,L,W](parser: ChartBuilder[ParseChart.LogProbab
     for(begin <- 0 until inside.length; end = begin + 1;
         l <- inside.enteredLabelIndexes(begin,end) if parser.grammar.isPreterminal(l)) {
       val accScore = lexicalScores(begin)(indexedProjections.project(l));
-      val currentScore = inside.labelScore(begin,end,l) + outside.labelScore(begin,end,l) - sentProb;
+      val currentScore = inside.labelScore(begin,end,l) + outsidePost.labelScore(begin,end,l) - sentProb;
       val pL = indexedProjections.project(l)
       if(currentScore > pruningThreshold || gold(TriangularArray.index(begin,end))(pL))
           lexicalScores(begin)(pL) = 0
@@ -86,7 +87,8 @@ class AnchoredRuleScorerFactory[C,L,W](parser: ChartBuilder[ParseChart.LogProbab
 
         // do binaries
         for( parent <- inside.enteredLabelIndexes(begin,end)) {
-          val parentScore = outside.labelScore(begin,end,parent);
+          val parentPostScore = outsidePost.labelScore(begin,end,parent);
+          val parentPreScore = outside.labelScore(begin,end,parent);
           val pP = indexedProjections.project(parent);
 
           var logTotal = Double.NegativeInfinity;
@@ -110,7 +112,7 @@ class AnchoredRuleScorerFactory[C,L,W](parser: ChartBuilder[ParseChart.LogProbab
                 val ruleScore = cRules.data(i)
                 val pC = indexedProjections.project(c);
                 val currentScore = (bScore + inside.labelScore(split,end,c)
-                        + parentScore + ruleScore + scorer.scoreBinaryRule(begin,split,end,parent,b,c) - sentProb);
+                        + parentPostScore + ruleScore + scorer.scoreBinaryRule(begin,split,end,parent,b,c) - sentProb);
                 if(currentScore > pruningThreshold || (gold(index)(pP) && gold(TriangularArray.index(begin,split))(pB) && gold(TriangularArray.index(split,end))(pC))) {
                   val accScore = parentArray.getOrElseUpdate(pB,projVector())(pC);
                   if(gold(index)(pP)
@@ -138,7 +140,7 @@ class AnchoredRuleScorerFactory[C,L,W](parser: ChartBuilder[ParseChart.LogProbab
             unaryScores(index).getOrElseUpdate(pP,projVector())
           }
           for( (c,ruleScore) <- parser.grammar.unaryRulesByIndexedParent(parent)) {
-            val score = ruleScore + inside.labelScore(begin,end,c) + parentScore +
+            val score = ruleScore + inside.labelScore(begin,end,c) + parentPreScore +
                     scorer.scoreUnaryRule(begin,end,parent,c) - sentProb;
             val pC = indexedProjections.project(c);
             if(pP != pC && (score > pruningThreshold || (gold(index)(pP) && gold(index)(pC)))) {

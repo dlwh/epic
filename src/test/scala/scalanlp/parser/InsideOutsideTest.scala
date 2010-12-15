@@ -87,28 +87,28 @@ class InsideOutsideTest extends FunSuite with Checkers {
     val io = new InsideOutside("S",grammar,lexicon);
     val sent = "He has good control" split " ";
     val inside = io.parser.buildInsideChart(sent);
-    val outside = io.parser.buildOutsideChart(inside);
+    val (outsidePre,outsidePost) = io.parser.buildOutsideChart(inside);
 
-    assert((outside.labelScore(0,4, "S") === 0.0));
-    assert(outside.enteredLabelScores(0,4).toSeq.length === 1);
+    assert((outsidePost.labelScore(0,4, "S") === 0.0));
+    assert(outsidePost.enteredLabelScores(0,4).toSeq.length === 1);
 
-    assert(outside.enteredLabelScores(0,3).toSeq.length === 0);
-    assert((outside.labelScore(1,4, "VP") - math.log(1.0/3.0)).abs < 1E-4);
-    assert(outside.enteredLabelScores(1,4).toSeq.length === 1);
+    assert(outsidePost.enteredLabelScores(0,3).toSeq.length === 0);
+    assert((outsidePost.labelScore(1,4, "VP") - math.log(1.0/3.0)).abs < 1E-4);
+    assert(outsidePost.enteredLabelScores(1,4).toSeq.length === 1);
 
-    assert(outside.enteredLabelScores(0,2).toSeq.length === 0);
-    assert(outside.enteredLabelScores(1,3).toSeq.length === 0);
-    assert((outside.labelScore(2,4, "NP") - math.log(1.0/6.0)).abs < 1E-6);
-    assert((outside.labelScore(2,4, "ADJP") - math.log(1.0/6.0)).abs < 1E-6);
+    assert(outsidePost.enteredLabelScores(0,2).toSeq.length === 0);
+    assert(outsidePost.enteredLabelScores(1,3).toSeq.length === 0);
+    assert((outsidePost.labelScore(2,4, "NP") - math.log(1.0/6.0)).abs < 1E-6);
+    assert((outsidePost.labelScore(2,4, "ADJP") - math.log(1.0/6.0)).abs < 1E-6);
 
-    assert((outside.labelScore(0,1,"PRP") - math.log(1.0/9.0)).abs < 1E-5, outside.labelScore(0,1,"PRP") + " " + math.log(1.0/9.0));
-    assert((outside.labelScore(0,1,"NP") - math.log(1.0/3.0)).abs < 1E-5);
-    assert((outside.labelScore(1,2,"VBZ") - math.log(1.0/9.0)).abs < 1E-5);
-    assert(outside.enteredLabelScores(1,2).toSeq.length === 1);
-    assert((outside.labelScore(2,3,"JJ") - math.log(1.0/9.0)).abs < 1E-5);
-    assert(outside.enteredLabelScores(2,3).toSeq.length === 1);
-    assert((outside.labelScore(3,4, "NP") - math.log(1.0/6.0)).abs < 1E-5);
-    assert((outside.labelScore(3,4,"NN") - math.log(1.0/9.0)).abs < 1E-5, outside.labelScore(3,4,"NN"));
+    assert((outsidePost.labelScore(0,1,"PRP") - math.log(1.0/9.0)).abs < 1E-5, outsidePost.labelScore(0,1,"PRP") + " " + math.log(1.0/9.0));
+    assert((outsidePost.labelScore(0,1,"NP") - math.log(1.0/3.0)).abs < 1E-5);
+    assert((outsidePost.labelScore(1,2,"VBZ") - math.log(1.0/9.0)).abs < 1E-5);
+    assert(outsidePost.enteredLabelScores(1,2).toSeq.length === 1);
+    assert((outsidePost.labelScore(2,3,"JJ") - math.log(1.0/9.0)).abs < 1E-5);
+    assert(outsidePost.enteredLabelScores(2,3).toSeq.length === 1);
+    assert((outsidePost.labelScore(3,4, "NP") - math.log(1.0/6.0)).abs < 1E-5);
+    assert((outsidePost.labelScore(3,4,"NN") - math.log(1.0/9.0)).abs < 1E-5, outsidePost.labelScore(3,4,"NN"));
   }
 
   import DSLGrammar._;

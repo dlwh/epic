@@ -15,7 +15,6 @@ import InsideOutside._;
  * Project Charts from a Fine grammar to marginals in a finer grammar, returning a SpanFilter.
  * TODO: probably give direct access to marginals
  * @author dlwh
- */
 class ChartMarginals[C,L,W](val parser: ChartBuilder[LogProbabilityParseChart,L,W], coarseIndex: Index[C], proj: L=>C) {
   def this(root: L, g: Grammar[L], lexicon: Lexicon[L,W], coarseIndex: Index[C], proj: L=>C)  = {
     this(new CKYChartBuilder[ParseChart.LogProbabilityParseChart,L,W](root,lexicon,g,logProb), coarseIndex, proj);
@@ -68,4 +67,5 @@ class ChartMarginals[C,L,W](val parser: ChartBuilder[LogProbabilityParseChart,L,
     }
   }
 }
+ */
 
