@@ -10,8 +10,9 @@ trait ChartBuilder[+Chart[X]<:ParseChart[X],L,W] {
   def buildInsideChart(s: Seq[W], validSpan: SpanScorer = SpanScorer.identity):Chart[L];
   /**
    * Given an inside chart, fills the passed-in outside parse chart with inside scores.
+   * Computes two charts. The first does not include unaries at a span. The second one does.
    */
-  def buildOutsideChart(inside: ParseChart[L], validSpan: SpanScorer = SpanScorer.identity):Chart[L];
+  def buildOutsideChart(inside: ParseChart[L], validSpan: SpanScorer = SpanScorer.identity):(Chart[L],Chart[L]);
 
   def grammar: Grammar[L];
   def root: L;
@@ -101,35 +102,36 @@ class CKYChartBuilder[Chart[X]<:ParseChart[X], L,W](val root: L,
 
 
   def buildOutsideChart(inside: ParseChart[L],
-                         validSpan: SpanScorer = SpanScorer.identity):Chart[L] = {
+                         validSpan: SpanScorer = SpanScorer.identity):(Chart[L],Chart[L]) = {
     val length = inside.length;
     val outside = chartFactory(grammar,length);
+    val outsidePostUnaries = chartFactory(grammar,length);
     outside.enter(0,inside.length,grammar.index(root),0.0);
     for {
       span <- length until 0 by (-1)
       begin <- 0 to (length-span)
     } {
       val end = begin + span;
-      updateOutsideUnaries(outside,begin,end, validSpan);
+      updateOutsideUnaries(outside,outsidePostUnaries,begin,end, validSpan);
       for {
-        a <- outside.enteredLabelIndexes(begin,end);
+        a <- outsidePostUnaries.enteredLabelIndexes(begin,end);
         if !inside.labelScore(begin,end,a).isInfinite
         (b,binaryRules) <- grammar.binaryRulesByIndexedParent(a);
         if inside.canStartHere(begin,end,b)
         (c,ruleScore) <- binaryRules.activeElements
         split <- inside.feasibleSpan(begin, end, b, c)
       } {
-        val aOutside = outside.labelScore(begin, end, a) + ruleScore;
+        val score = outsidePostUnaries.labelScore(begin,end) + ruleScore
         val bInside = inside.labelScore(begin,split,b);
         if(!java.lang.Double.isInfinite(bInside)) {
           val cInside = inside.labelScore(split,end,c);
           if(!java.lang.Double.isInfinite(cInside)) {
             val spanScore = validSpan.scoreBinaryRule(begin,split,end,a,b,c);
             if(spanScore != Double.NegativeInfinity) {
-              val bOutside = aOutside + cInside + spanScore;
+              val bOutside = score + cInside + spanScore;
               outside.enter(begin,split,b,bOutside);
 
-              val cOutside = aOutside + bInside + spanScore;
+              val cOutside = score + bInside + spanScore;
               outside.enter(split,end,c,cOutside);
             }
           }
@@ -137,7 +139,7 @@ class CKYChartBuilder[Chart[X]<:ParseChart[X], L,W](val root: L,
       }
     }
 
-    outside;
+    (outside,outsidePostUnaries);
   }
 
   private def updateInsideUnaries(chart: ParseChart[L], begin: Int, end: Int, validSpan: SpanScorer) = {
@@ -150,7 +152,6 @@ class CKYChartBuilder[Chart[X]<:ParseChart[X], L,W](val root: L,
         val a = parentVector.index(j);
         if(a != b) {
           val aScore = parentVector.data(j);
-          // TODO: this isn't a rule, but a chain. RAWR
           val prob = aScore + bScore + validSpan.scoreUnaryRule(begin, end, a, b);
           if(prob != Double.NegativeInfinity) {
             newMass(a) = chart.sum(newMass(a),prob);
@@ -166,10 +167,11 @@ class CKYChartBuilder[Chart[X]<:ParseChart[X], L,W](val root: L,
 
   }
 
-  private def updateOutsideUnaries(outside: ParseChart[L], begin: Int, end: Int, validSpan: SpanScorer) = {
+  private def updateOutsideUnaries(outside: ParseChart[L], outsidePostUnaries: ParseChart[L], begin: Int, end: Int, validSpan: SpanScorer) = {
     val newMass = grammar.mkVector(Double.NegativeInfinity);
     for(a <- outside.enteredLabelIndexes(begin,end)) {
       val aScore = outside.labelScore(begin,end,a);
+      newMass(a) = outside.sum(newMass(a),aScore);
       var j = 0;
       val childVector = grammar.unaryRulesByIndexedParent(a);
       while(j < childVector.used) {
@@ -185,9 +187,10 @@ class CKYChartBuilder[Chart[X]<:ParseChart[X], L,W](val root: L,
       }
     }
 
-    for((a,v) <- newMass.activeElements) {
-      outside.enter(begin,end,a, v);
+    for((k,v) <- newMass.activeElements) {
+      outsidePostUnaries.enter(begin,end,k,v)
     }
+
   }
 }
 

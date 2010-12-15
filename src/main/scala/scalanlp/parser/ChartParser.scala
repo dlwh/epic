@@ -15,8 +15,8 @@ class ChartParser[F,C,W](val builder: ChartBuilder[ParseChart,F,W],
   override def bestParse(w: Seq[W], scorer: SpanScorer = SpanScorer.identity) = try {
     val metaScorer = scorerFactory.mkSpanScorer(w, scorer);
     val chart = builder.buildInsideChart(w, validSpan = metaScorer);
-    lazy val outsideChart = builder.buildOutsideChart(chart, validSpan =metaScorer)
-    val bestParse = decoder.extractBestParse(builder.root, builder.grammar, chart, outsideChart,metaScorer);
+    lazy val (outsideChart,outsideChartPostU) = builder.buildOutsideChart(chart, validSpan =metaScorer)
+    val bestParse = decoder.extractBestParse(builder.root, builder.grammar, chart, outsideChart, outsideChartPostU, metaScorer);
     bestParse
   } catch {
     case e => throw e;

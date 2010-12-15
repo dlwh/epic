@@ -33,7 +33,7 @@ class InsideOutside[L,W](val parser: ChartBuilder[LogProbabilityParseChart,L,W])
       if(xxProb.isNaN || xxProb.isInfinite) error("Couldn't parse either! " + words)
       else error("Couldn't parse with span filter. Too much pruning?" + words);
     }
-  val outside = parser.buildOutsideChart(inside, validSpan);
+    val outside = parser.buildOutsideChart(inside, validSpan)._1;
 
     expectedCounts(words,inside,outside,totalProb, validSpan)
   }
