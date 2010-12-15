@@ -1,6 +1,5 @@
 package scalanlp.trees
 
-import collection.generic.CanBuildFrom
 import collection.mutable.ArrayBuffer
 
 import UnaryChainRemover._
@@ -17,19 +16,23 @@ class UnaryChainRemover[L] {
     val buf = new ArrayBuffer[(BinarizedTree[L],Seq[W])];
     val counts = Counters.PairedIntCounter[(L,L),Seq[L]];
 
-    def transform(t: BinarizedTree[L]):BinarizedTree[L] = t match {
+    def transform(t: BinarizedTree[L],parentWasUnary:Boolean):BinarizedTree[L] = t match {
       case UnaryTree(l,c) =>
         val (chain,cn) = stripChain(c);
         counts(l -> cn.label, chain) += 1;
-        UnaryTree(l,transform(cn))(t.span);
+        UnaryTree(l,transform(cn,true))(t.span);
       case BinaryTree(l,lchild,rchild) =>
-        BinaryTree(l,transform(lchild),transform(rchild))(t.span);
+        if(parentWasUnary) BinaryTree(l,transform(lchild,false),transform(rchild,false))(t.span);
+        else UnaryTree(l,BinaryTree(l,transform(lchild,false),transform(rchild,false))(t.span))(t.span);
+      case NullaryTree(l) =>
+        if(parentWasUnary) NullaryTree(l)(t.span);
+        else UnaryTree(l,NullaryTree(l)(t.span))(t.span);
       case t => t;
     }
 
 
     for( (t,w) <- trees) {
-      val tn = transform(t)
+      val tn = transform(t,true);
       buf += (tn -> w);
     }
 
@@ -49,19 +52,26 @@ object UnaryChainRemover {
     val maxes = counts.rows.map{ case (labels,map) => (labels -> map.argmax)}.toMap;
 
     new ChainReplacer[L]  {
-      def replacementFor(parent: L, child: L) = maxes.getOrElse(parent -> child, Seq.empty);
+      def replacementFor(parent: L, child: L) = {
+        if(parent == child) Seq.empty
+        else maxes.getOrElse(parent -> child, Seq.empty);
+      }
     }
 
   }
   trait ChainReplacer[L] {
     def replacementFor(parent: L, child: L):Seq[L];
 
-    def replaceUnaries(t: Tree[L]) = t match {
+    def replaceUnaries(t: Tree[L]):Tree[L] = t match {
+      case UnaryTree(a,child) if a == child.label =>
+        replaceUnaries(child)
       case UnaryTree(a,child) =>
         val c = child.label;
         val replacements = replacementFor(a,c);
-        val withChain = replacements.foldRight(child)( (lbl,child) => UnaryTree(lbl,child)(child.span));
+        val withChain = replacements.foldRight(replaceUnaries(child).asInstanceOf[BinarizedTree[L]])( (lbl,child) => UnaryTree(lbl,child)(child.span));
         UnaryTree(a,withChain)(t.span);
+      case t@BinaryTree(a,lchild,rchild) =>
+        BinaryTree(a,replaceUnaries(lchild).asInstanceOf[BinarizedTree[L]],replaceUnaries(rchild).asInstanceOf[BinarizedTree[L]])(t.span)
       case t => t;
     }
   }

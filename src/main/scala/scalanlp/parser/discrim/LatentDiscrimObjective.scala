@@ -235,16 +235,16 @@ object LatentDiscriminativeTrainer extends ParserTrainer {
                   devTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer)],
                   config: Configuration) = {
 
-    val (initLexicon,initProductions) = GenerativeParser.extractCounts(trainTrees.iterator.map(tuple => (tuple._1,tuple._2)));
+    val (initLexicon,initBinaries,initUnaries) = GenerativeParser.extractCounts(trainTrees.iterator.map(tuple => (tuple._1,tuple._2)));
     val numStates = config.readIn[Int]("discrim.numStates",2);
 
     val xbarParser = {
-      val grammar = new GenerativeGrammar(LogCounters.logNormalizeRows(initProductions));
+      val grammar = new GenerativeGrammar(LogCounters.logNormalizeRows(initBinaries),LogCounters.logNormalizeRows(initUnaries));
       val lexicon = new SimpleLexicon(initLexicon);
       new CKYChartBuilder[LogProbabilityParseChart,String,String]("",lexicon,grammar,ParseChart.logProb);
     }
 
-    val latentFeaturizer = StochasticLatentTrainer.getFeaturizer(config, initLexicon, initProductions, numStates)
+    val latentFeaturizer = StochasticLatentTrainer.getFeaturizer(config, initLexicon, initBinaries, initUnaries, numStates)
 
     val openTags = Set.empty ++ {
       for(t <- initLexicon.activeKeys.map(_._1) if initLexicon(t).size > 50) yield t;
@@ -356,10 +356,11 @@ object StochasticLatentTrainer extends ParserTrainer {
 
   def getFeaturizer(config: Configuration,
                     initLexicon: PairedDoubleCounter[String, String],
-                    initProductions: PairedDoubleCounter[String, Rule[String]],
+                    initBinaries: PairedDoubleCounter[String, BinaryRule[String]],
+                    initUnaries: PairedDoubleCounter[String, UnaryRule[String]],
                     numStates: Int): Featurizer[(String, Int), String] = {
     val factory = config.readIn[FeaturizerFactory[String, String]]("discrim.featurizerFactory", new PlainFeaturizerFactory[String]);
-    val featurizer = factory.getFeaturizer(config, initLexicon, initProductions);
+    val featurizer = factory.getFeaturizer(config, initLexicon, initBinaries, initUnaries);
     val latentFactory = config.readIn[LatentFeaturizerFactory]("discrim.latentFactory", new SlavLatentFeaturizerFactory());
     val latentFeaturizer = latentFactory.getFeaturizer(featurizer, numStates);
     val weightsPath = config.readIn[File]("discrim.oldweights",null);
@@ -377,16 +378,16 @@ object StochasticLatentTrainer extends ParserTrainer {
                   devTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer)],
                   config: Configuration) = {
 
-    val (initLexicon,initProductions) = GenerativeParser.extractCounts(trainTrees.iterator.map(tuple => (tuple._1,tuple._2)));
+    val (initLexicon,initBinaries,initUnaries) = GenerativeParser.extractCounts(trainTrees.iterator.map(tuple => (tuple._1,tuple._2)));
     val numStates = config.readIn[Int]("discrim.numStates",2);
 
     val xbarParser = loadParser(config) getOrElse {
-      val grammar = new GenerativeGrammar(LogCounters.logNormalizeRows(initProductions));
+      val grammar = new GenerativeGrammar(LogCounters.logNormalizeRows(initBinaries),LogCounters.logNormalizeRows(initUnaries));
       val lexicon = new SimpleLexicon(initLexicon);
       new CKYChartBuilder[LogProbabilityParseChart,String,String]("",lexicon,grammar,ParseChart.logProb);
     }
 
-    val latentFeaturizer: Featurizer[(String, Int), String] = getFeaturizer(config, initLexicon, initProductions, numStates)
+    val latentFeaturizer: Featurizer[(String, Int), String] = getFeaturizer(config, initLexicon, initBinaries, initUnaries, numStates)
 
     val openTags = Set.empty ++ {
       for(t <- initLexicon.activeKeys.map(_._1) if initLexicon(t).size > 50) yield t;

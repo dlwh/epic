@@ -14,7 +14,8 @@ trait Featurizer[L,W] {
   def initialValueForFeature(f: LogisticBitVector.Feature[L,W]):Option[Double]
 }
 
-class NormalGenerativeRuleFeaturizer[L,W](baseProductions: PairedDoubleCounter[L,Rule[L]]) extends Featurizer[L,W] {
+class NormalGenerativeRuleFeaturizer[L,W](baseBinaries: PairedDoubleCounter[L,BinaryRule[L]],
+                                          baseUnaries: PairedDoubleCounter[L,UnaryRule[L]]) extends Featurizer[L,W] {
   def features(d: LogisticBitVector.Decision[L,W],
                c: LogisticBitVector.Context[L]): IndexedSeq[LogisticBitVector.Feature[L,W]] = d match {
     /*case WordDecision(w) =>
@@ -32,16 +33,22 @@ class NormalGenerativeRuleFeaturizer[L,W](baseProductions: PairedDoubleCounter[L
   }
 
   def priorForFeature(f: LogisticBitVector.Feature[L,W]) = f match {
-    case RuleFeature(r:Rule[L]) => 
-      if(baseProductions(r.parent,r) == 0) Some(Double.NegativeInfinity)
-      else Some(math.log(baseProductions(r.parent, r)) - math.log(baseProductions(r.parent).total) );
+    case RuleFeature(r:UnaryRule[L]) =>
+      if(baseUnaries(r.parent,r) == 0) Some(Double.NegativeInfinity)
+      else Some(math.log(baseUnaries(r.parent, r)) - math.log(baseUnaries(r.parent).total) );
+    case RuleFeature(r:BinaryRule[L]) =>
+      if(baseBinaries(r.parent,r) == 0) Some(Double.NegativeInfinity)
+      else Some(math.log(baseBinaries(r.parent, r)) - math.log(baseBinaries(r.parent).total) );
     case _ => None
   }
 
   def initialValueForFeature(f: LogisticBitVector.Feature[L,W]) = f match {
-    case RuleFeature(r:Rule[L]) =>
-      if(baseProductions(r.parent,r) == 0) Some(Double.NegativeInfinity)
-      else Some(math.log(baseProductions(r.parent, r)) - math.log(baseProductions(r.parent).total) );
+    case RuleFeature(r:UnaryRule[L]) =>
+      if(baseUnaries(r.parent,r) == 0) Some(Double.NegativeInfinity)
+      else Some(math.log(baseUnaries(r.parent, r)) - math.log(baseUnaries(r.parent).total) );
+    case RuleFeature(r:BinaryRule[L]) =>
+      if(baseBinaries(r.parent,r) == 0) Some(Double.NegativeInfinity)
+      else Some(math.log(baseBinaries(r.parent, r)) - math.log(baseBinaries(r.parent).total) );
     case _ => None
   }
 }

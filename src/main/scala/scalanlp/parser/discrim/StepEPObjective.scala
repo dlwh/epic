@@ -97,9 +97,9 @@ class StepEPObjective[L,L2,W](featurizers: Seq[Featurizer[L2,W]],
           val charts = epBuilder.buildAllCharts(words,spanScorer,tree);
 
           val p = parsers.last;
-          val ParsedSentenceData(inside,outside,outsidePost,z,f0) = charts.last;
+          val ParsedSentenceData(inside,outside,z,f0) = charts.last;
           val treeCounts = treeToExpectedCounts(p.grammar,p.lexicon,tree,words, f0)
-          val wordCounts = wordsToExpectedCounts(p,words,inside,outside, outsidePost, z, f0);
+          val wordCounts = wordsToExpectedCounts(p,words,inside,outside, z, f0);
           counts += treeCounts -= wordCounts;
         } catch {
           case e => println("Error in parsing: " + words + e); e.printStackTrace(); throw new RuntimeException("Error parsing " + words,e);
@@ -145,10 +145,9 @@ class StepEPObjective[L,L2,W](featurizers: Seq[Featurizer[L2,W]],
   def wordsToExpectedCounts(parser: LogProbBuilder, words: Seq[W],
                             inside: LogProbabilityParseChart[L2],
                             outside: LogProbabilityParseChart[L2],
-                            outsidePostUnaries: LogProbabilityParseChart[L2],
                             totalProb: Double,
                             spanScorer: SpanScorer) = {
-    val ecounts = new InsideOutside(parser).expectedCounts(words, inside, outside, outsidePostUnaries, totalProb, spanScorer);
+    val ecounts = new InsideOutside(parser).expectedCounts(words, inside, outside, totalProb, spanScorer);
     ecounts
   }
 
@@ -282,41 +281,15 @@ object StepEPTrainer extends ParserTrainer {
     parser;
   }
 
-  def getFeaturizer(config: Configuration,
-                    initLexicon: PairedDoubleCounter[String, String],
-                    initProductions: PairedDoubleCounter[String, Rule[String]],
-                    numStates: Int, numModels: Int): IndexedSeq[Featurizer[(String, Int), String]] = {
-    val factory = config.readIn[FeaturizerFactory[String, String]]("discrim.featurizerFactory", new PlainFeaturizerFactory[String]);
-    val featurizer = factory.getFeaturizer(config, initLexicon, initProductions);
-    val latentFactory = config.readIn[LatentFeaturizerFactory]("discrim.latentFactory", new SlavLatentFeaturizerFactory());
-    val latentFeaturizer = latentFactory.getFeaturizer(featurizer, numStates);
-    val weightsPath = config.readIn[File]("discrim.oldweights",null);
-    if(weightsPath == null) {
-      Array.fill(numModels)(latentFeaturizer)
-    } else {
-      println("Using awesome weights...");
-      val weightSeq = readObject[Array[(DenseVector,DoubleCounter[Feature[(String,Int),String]])]](weightsPath).map(_._2);
-      val splitStates = config.readIn[Boolean]("discrim.splitOldWeights",false);
-      def identity(x: Feature[(String,Int),String]) = x;
-      val proj: Feature[(String,Int),String]=>Feature[(String,Int),String] = if(splitStates) FeatureProjectors.split[String,String] _ else identity _
-
-      Array.tabulate(numModels){ m =>
-        if(m < weightSeq.length)
-          new CachedWeightsFeaturizer(latentFeaturizer, weightSeq(m), proj)
-        else latentFeaturizer;
-      }
-    }
-  }
-
   def trainParser(trainTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer)],
                   devTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer)],
                   config: Configuration) = {
 
-    val (initLexicon,initProductions) = GenerativeParser.extractCounts(trainTrees.iterator.map(tuple => (tuple._1,tuple._2)));
+    val (initLexicon,initBinaries,initUnaries) = GenerativeParser.extractCounts(trainTrees.iterator.map(tuple => (tuple._1,tuple._2)));
     val numStates = config.readIn[Int]("discrim.numStates",2);
 
     val xbarParser = loadParser(config) getOrElse {
-      val grammar = new GenerativeGrammar(LogCounters.logNormalizeRows(initProductions));
+      val grammar = new GenerativeGrammar(LogCounters.logNormalizeRows(initBinaries),LogCounters.logNormalizeRows(initUnaries));
       val lexicon = new SimpleLexicon(initLexicon);
       new CKYChartBuilder[LogProbabilityParseChart,String,String]("",lexicon,grammar,ParseChart.logProb);
     }
@@ -324,7 +297,7 @@ object StepEPTrainer extends ParserTrainer {
     val maxEPIterations = config.readIn[Int]("ep.iterations",1);
     val epModels = config.readIn[Int]("ep.models",2);
 
-    val latentFeaturizer = getFeaturizer(config, initLexicon, initProductions, numStates, epModels)
+    val latentFeaturizer = EPTrainer.getFeaturizer(config, initLexicon, initBinaries, initUnaries, numStates, epModels)
 
     val openTags = Set.empty ++ {
       for(t <- initLexicon.activeKeys.map(_._1) if initLexicon(t).size > 50) yield t;

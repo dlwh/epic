@@ -35,6 +35,8 @@ abstract class ParseChart[L](val grammar: Encoder[L], val length: Int) {
   private val score = TriangularArray.raw(length+1, grammar.mkDenseVector(zero));
   // which labels have been entered.
   private val enteredLabels = TriangularArray.raw(length+1,new collection.mutable.BitSet());
+  private val scorePostUnary = TriangularArray.raw(length+1, grammar.mkDenseVector(zero));
+  private val enteredLabelsPostUnary = TriangularArray.raw(length+1,new collection.mutable.BitSet());
 
   // right most place a left constituent with label l can start and end at position i
   private val narrowLeft = Array.fill(length+1)(grammar.fillArray[Int](-1));
@@ -51,11 +53,26 @@ abstract class ParseChart[L](val grammar: Encoder[L], val length: Int) {
 
   final def enter(begin: Int, end: Int, parent: Int, w: Double) = {
     val oldScore = score(TriangularArray.index(begin,end))(parent);
-    val newScore = sum(score(TriangularArray.index(begin,end))(parent), w);
+    val newScore = sum(oldScore, w);
     score(TriangularArray.index(begin,end))(parent) = newScore;
 
     if(oldScore == zero) {
       enteredLabels(TriangularArray.index(begin,end))(parent) = true;
+      narrowLeft(end)(parent) = begin max narrowLeft(end)(parent);
+      wideLeft(end)(parent) = begin min wideLeft(end)(parent);
+      wideRight(begin)(parent) = end max wideRight(begin)(parent);
+      narrowRight(begin)(parent) = end min narrowRight(begin)(parent);
+    }
+    newScore > oldScore
+  }
+
+  final def enterUnary(begin: Int, end: Int, parent: Int, w: Double) = {
+    val oldScore = scorePostUnary(TriangularArray.index(begin,end))(parent);
+    val newScore = sum(oldScore, w);
+    scorePostUnary(TriangularArray.index(begin,end))(parent) = newScore;
+
+    if(oldScore == zero) {
+      enteredLabelsPostUnary(TriangularArray.index(begin,end))(parent) = true;
       narrowLeft(end)(parent) = begin max narrowLeft(end)(parent);
       wideLeft(end)(parent) = begin min wideLeft(end)(parent);
       wideRight(begin)(parent) = end max wideRight(begin)(parent);
@@ -88,41 +105,36 @@ abstract class ParseChart[L](val grammar: Encoder[L], val length: Int) {
 
   private val emptySpan = Span(length+1,length+1)
 
-  def enteredLabelIndexes(begin: Int, end: Int) = {
+  def enteredLabelIndexesNoUnary(begin: Int, end: Int) = {
     enteredLabels(TriangularArray.index(begin,end)).iterator;
   }
 
-  def enteredLabelScores(begin: Int, end: Int) = {
+  def enteredLabelScoresNoUnary(begin: Int, end: Int) = {
     val scoreArray = score(TriangularArray.index(begin,end));
     enteredLabels(TriangularArray.index(begin,end)).iterator.map { i => (i,scoreArray(i))};
   }
 
+  def enteredLabelIndexes(begin: Int, end: Int) = {
+    enteredLabelsPostUnary(TriangularArray.index(begin,end)).iterator;
+  }
+
+  def enteredLabelScores(begin: Int, end: Int) = {
+    val scoreArray = scorePostUnary(TriangularArray.index(begin,end));
+    enteredLabelsPostUnary(TriangularArray.index(begin,end)).iterator.map { i => (i,scoreArray(i))};
+  }
+
 
   def apply(begin: Int, end: Int, label: Int):Double = labelScore(begin,end,label);
-  def labelScore(begin: Int, end: Int, label: L): Double = labelScore(begin,end,grammar.index(label));
-  def labelScore(begin: Int, end: Int, label: Int): Double = {
+  def labelScoreNoUnary(begin: Int, end: Int, label: L): Double = labelScoreNoUnary(begin,end,grammar.index(label));
+  def labelScoreNoUnary(begin: Int, end: Int, label: Int): Double = {
     score(TriangularArray.index(begin, end))(label);
   }
 
-  def enterTerm(begin: Int, end: Int, label: L, w: Double): Unit = enterTerm(begin,end,grammar.index(label),w);
-  def enterTerm(begin: Int, end: Int, label: Int, w: Double): Unit = {
-    enter(begin,end,label,w);
+  def labelScore(begin: Int, end: Int, label: L): Double = labelScore(begin,end,grammar.index(label));
+  def labelScore(begin: Int, end: Int, label: Int): Double = {
+    scorePostUnary(TriangularArray.index(begin, end))(label);
   }
 
-  def enterUnary(begin: Int, end: Int, parent: L, child: L, w: Double):Boolean = {
-    enterUnary(begin,end,grammar.index(parent),grammar.index(child),w);
-  }
-
-  def enterUnary(begin: Int, end: Int, parent: Int, child: Int, w: Double) = {
-    enter(begin,end,parent,w);
-  }
-
-  def enterBinary(begin: Int, split: Int, end: Int, parent: L, lchild: L, rchild: L, w: Double): Unit = {
-    enterBinary(begin,split,end,grammar.index(parent),grammar.index(lchild), grammar.index(rchild), w);
-  }
-  final def enterBinary(begin: Int, split: Int, end: Int, parent: Int, lchild: Int, rchild: Int, w: Double): Unit = {
-    enter(begin,end,parent,w);
-  }
 
   override def toString = {
     val data = new TriangularArray[DoubleCounter[L]](length+1, (i:Int,j:Int)=>grammar.decode(score(TriangularArray.index(i,j)))).toString;

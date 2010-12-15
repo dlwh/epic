@@ -25,7 +25,7 @@ import scalala.tensor.adaptive.AdaptiveVector
 import scalala.tensor.counters.LogCounters._;
 import scalanlp.util.Index;
 
-sealed abstract trait Rule[@specialized(Int) +L] { def parent: L; def children: Seq[L] }
+sealed trait Rule[@specialized(Int) +L] { def parent: L; def children: Seq[L] }
 final case class BinaryRule[@specialized(Int) +L](parent: L, left: L, right: L) extends Rule[L] {
   def children = Seq(left,right);
 }
@@ -54,7 +54,7 @@ trait Grammar[L] extends Encoder[L] {
    * Returns true if the label has no productions with it on the LHS.
    */
   def isPreterminal(label: Int): Boolean = {
-    unaryRulesByIndexedParent(label).used == 0 && binaryRulesByIndexedParent(label).size == 0;
+    binaryRulesByIndexedParent(label).size == 0;
   }
 
   /**
@@ -113,7 +113,8 @@ object Grammar {
  * Given a counter of productions that has been log-normalized by rows,
  * creates a grammar. Simple simple.
  */
-class GenerativeGrammar[L](productions: LogPairedDoubleCounter[L,Rule[L]]) extends Grammar[L] {
+class GenerativeGrammar[L](binaryProductions: LogPairedDoubleCounter[L,BinaryRule[L]],
+                           unaryProductions: LogPairedDoubleCounter[L,UnaryRule[L]]) extends Grammar[L] {
 
   private val leftChildBinaryRules = LogPairedDoubleCounter[L,BinaryRule[L]]();
   private val childUnaryParents = LogPairedDoubleCounter[L,UnaryRule[L]]();
@@ -122,23 +123,23 @@ class GenerativeGrammar[L](productions: LogPairedDoubleCounter[L,Rule[L]]) exten
 
   val index: Index[L] = {
     val index = Index[L]();
-    for((a,ctr) <- productions.rows;
-        (prod,score) <- ctr) {
-      assert(score <= 0,(score,a,prod)+" " + ctr);
+    for((a,ctr) <- binaryProductions.rows;
+        (br,score) <- ctr) {
       if(score != Double.NegativeInfinity) {
-        prod match {
-          case u@UnaryRule(_,b) =>
-            childUnaryParents(b,u) = score;
-            unaryRules(a,u) = score;
-            index.index(a);
-            index.index(b);
-          case br@BinaryRule(_,b,c) =>
-            leftChildBinaryRules(b,br) = score;
-            binaryRules(a,br) = score;
-            index.index(a)
-            index.index(b);
-            index.index(c);
-        }
+        leftChildBinaryRules(br.left,br) = score;
+        binaryRules(a,br) = score;
+        index.index(a)
+        index.index(br.left);
+        index.index(br.right);
+      }
+    }
+    for((a,ctr) <- unaryProductions.rows;
+        (u,score) <- ctr) {
+      if(score != Double.NegativeInfinity) {
+        childUnaryParents(u.child,u) = score;
+        unaryRules(a,u) = score;
+        index.index(a);
+        index.index(u.child);
       }
     }
     index

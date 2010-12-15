@@ -21,8 +21,8 @@ class LabeledSpanScorerTest extends ParserTestHarness with FunSuite {
       val gent = gen(w);
       val scorer = f.mkSpanScorer(w);
       val ginside2 = gen.builder.buildInsideChart(w,scorer);
-      lazy val goutside2 = gen.builder.buildOutsideChart(ginside2,scorer)._1
-      val tree = SimpleViterbiDecoder(ParserTestHarness.simpleGrammar).extractBestParse("",gen.builder.grammar, ginside2,goutside2,null)
+      lazy val goutside2 = gen.builder.buildOutsideChart(ginside2,scorer)
+      val tree = SimpleViterbiDecoder(ParserTestHarness.simpleGrammar).extractBestParse("",gen.builder.grammar, ginside2,goutside2)
     } catch {
       case e: Exception =>
       throw new RuntimeException("Trouble with " + t.render(w),e);

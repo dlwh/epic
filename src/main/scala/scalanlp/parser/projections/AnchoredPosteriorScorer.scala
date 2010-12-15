@@ -21,14 +21,14 @@ class AnchoredPosteriorScorerFactory[C,L,W](parser: ChartBuilder[ParseChart.LogP
   def mkSpanScorer(s: Seq[W], scorer: SpanScorer = SpanScorer.identity) = {
     val coarseRootIndex = parser.grammar.index(parser.root);
     val inside = parser.buildInsideChart(s, scorer)
-    val (outside,outsidePost) = parser.buildOutsideChart(inside, scorer);
+    val outside = parser.buildOutsideChart(inside, scorer);
 
     val sentProb = inside(0,s.length,coarseRootIndex);
     if(sentProb.isInfinite) {
       error("Couldn't parse " + s + " " + sentProb)
     }
 
-    val chartScorer = buildSpanScorer(inside,outside,outsidePost,sentProb);
+    val chartScorer = buildSpanScorer(inside,outside,sentProb);
 
     chartScorer
   }
@@ -45,7 +45,6 @@ class AnchoredPosteriorScorerFactory[C,L,W](parser: ChartBuilder[ParseChart.LogP
 
   def buildSpanScorer(inside: ParseChart[L],
                       outside: ParseChart[L],
-                      outsidePost: ParseChart[L],
                       sentProb: Double,
                       scorer: SpanScorer=SpanScorer.identity,
                       tree: BinarizedTree[C] = null):AnchoredPosteriorScorer = {
@@ -86,7 +85,7 @@ class AnchoredPosteriorScorerFactory[C,L,W](parser: ChartBuilder[ParseChart.LogP
 
         // do binaries
         for( parent <- inside.enteredLabelIndexes(begin,end)) {
-          val parentPreScore = outside.labelScore(begin,end,parent);
+          val parentPreScore = outside.labelScoreNoUnary(begin,end,parent);
           val parentPostScore = outside.labelScore(begin,end,parent);
           val pP = indexedProjections.project(parent);
 
@@ -135,7 +134,7 @@ class AnchoredPosteriorScorerFactory[C,L,W](parser: ChartBuilder[ParseChart.LogP
             unaryScores(index).getOrElseUpdate(pP,projVector())
           }
           for( (c,ruleScore) <- parser.grammar.unaryRulesByIndexedParent(parent)) {
-            val score = ruleScore + inside.labelScore(begin,end,c) + parentPreScore +
+            val score = ruleScore + inside.labelScoreNoUnary(begin,end,c) + parentPreScore +
                     scorer.scoreUnaryRule(begin,end,parent,c) - sentProb - 1; //TODO: hack
             assert(score <= 0.0,score + " " + ruleScore + " " + inside.labelScore(begin,end,c) + " " + parentPreScore + " " + scorer.scoreUnaryRule(begin,end,parent,c) + " " + sentProb);
             val pC = indexedProjections.project(c);

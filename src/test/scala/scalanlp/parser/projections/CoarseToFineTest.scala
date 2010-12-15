@@ -35,4 +35,23 @@ class CoarseToFineTest extends ParserTestHarness with FunSuite {
 
   }
 
+  test("coarse2fine parser shouldn't be lossy wrt itself" ) {
+    val (trainTrees,replacer)= getTrainTreesAndReplacer();
+    def proj(label: String) =  label
+
+    val coarse = GenerativeParser.fromTrees(trainTrees);
+    val coarseBuilder = coarse.builder.asInstanceOf[ChartBuilder[scalanlp.parser.ParseChart.ViterbiParseChart,String,String]];
+
+    val (fineLexicon,fineGrammar) = GenerativeParser.extractLexiconAndGrammar(trainTrees.iterator);
+    val fine = new CoarseToFineChartBuilder[ParseChart.ViterbiParseChart,String,String,String](coarseBuilder, proj _, "", fineLexicon, fineGrammar, ParseChart.viterbi);
+    val parser = ChartParser(fine);
+    val gen = ParserTestHarness.simpleParser
+
+    val rctf = evalParser(getTestTrees(),parser)
+    val rgen = evalParser(getTestTrees(),gen)
+    assert(rctf === rgen);
+    //assert(rgen._4 > 0.6, rgen);
+
+  }
+
 }

@@ -16,10 +16,13 @@ import scalanlp.trees.BinarizedTree
 @SerialVersionUID(1)
 trait EPApproximator[C,F,W] {
   // TODO: add a type for the kind of span scorer this is.
-  def project(inside: ParseChart[F], outside: ParseChart[F], outsidePost: ParseChart[F], partition: Double, goldTree: BinarizedTree[C]):SpanScorer
+  def project(inside: ParseChart[F], outside: ParseChart[F], partition: Double, goldTree: BinarizedTree[C]):SpanScorer
   def divideAndNormalize(num: SpanScorer, denom: SpanScorer, words: Seq[W]):SpanScorer
 }
 
+
+@serializable
+@SerialVersionUID(1)
 class AnchoredRuleApproximator[C,F,W](fineParser: ChartBuilder[LogProbabilityParseChart,F,W],
                                       coarseParser: ChartBuilder[LogProbabilityParseChart,C,W],
                                       projections: ProjectionIndexer[C,F], pruningThreshold: Double = Double.NegativeInfinity) extends EPApproximator[C,F,W] {
@@ -30,8 +33,8 @@ class AnchoredRuleApproximator[C,F,W](fineParser: ChartBuilder[LogProbabilityPar
   val zeroParser = new CKYChartBuilder[LogProbabilityParseChart,C,W](coarseParser.root, zeroLexicon,zeroGrammar,ParseChart.logProb);
   val zeroFactory = new AnchoredRuleScorerFactory[C,C,W](coarseParser,new ProjectionIndexer(coarseParser.grammar.index,coarseParser.grammar.index,identity[C]_),pruningThreshold)
 
-  def project(inside: ParseChart[F], outside: ParseChart[F], outsidePost: ParseChart[F], partition: Double, tree: BinarizedTree[C]):SpanScorer = {
-    factory.buildSpanScorer(inside,outside,  outsidePost, partition, SpanScorer.identity, tree);
+  def project(inside: ParseChart[F], outside: ParseChart[F], partition: Double, tree: BinarizedTree[C]):SpanScorer = {
+    factory.buildSpanScorer(inside,outside,  partition, SpanScorer.identity, tree);
   }
 
   def divideAndNormalize(num: SpanScorer, denom: SpanScorer, words: Seq[W]):SpanScorer ={

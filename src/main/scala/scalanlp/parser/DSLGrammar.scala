@@ -9,12 +9,18 @@ import scalala.tensor.counters.LogCounters;
  */
 object DSLGrammar {
   def grammar(rewrites: DSLGrammarPart*) = {
-    val result = PairedDoubleCounter[String,Rule[String]];
+    val binaryProductions = PairedDoubleCounter[String,BinaryRule[String]];
+    val unaryProductions = PairedDoubleCounter[String,UnaryRule[String]];
     for ( DSLGrammarPart(r,w) <- rewrites) {
-      result(r.parent,r) += w;
+      r match {
+        case br@BinaryRule(a,b,c) =>
+          binaryProductions(a,br) = w;
+        case ur@UnaryRule(a,b) =>
+          unaryProductions(a,ur) = w;
+      }
     }
 
-    new GenerativeGrammar(LogCounters.logNormalizeRows(result));
+    new GenerativeGrammar(LogCounters.logNormalizeRows(binaryProductions),LogCounters.logNormalizeRows(unaryProductions));
   }
 
   def lexicon(words: ((Symbol,String),Double)*) = {
@@ -26,17 +32,30 @@ object DSLGrammar {
   }
 
   def simpleGrammar =  grammar(
-    'S -> ('N,'V) -> 1.0,
-    'V -> ('V, 'N) -> 1.0,
-    'N -> ('N,'P) -> 1.0,
-    'P -> ('PP, 'N) -> 1.0
+    'S -> 'Sb -> 1.0,
+    'Sb -> ('NPu,'VPu) -> 1.0,
+
+    'VPu -> 'VPb -> 1.0,
+    'VPb -> ('Vu, 'NPu) -> 1.0,
+
+    'NPu -> 'NPb -> 1.0,
+    'NPu -> 'N -> 1.0,
+
+    'NPb -> ('Nu,'PPu) -> 1.0,
+
+    'PPu -> 'PPb -> 1.0,
+    'PPb -> ('Pu, 'Nu) -> 1.0,
+
+    'Nu -> 'N -> 1.0,
+    'Pu -> 'P -> 1.0,
+    'Vu -> 'V -> 1.0
   );
 
   def simpleLexicon =  lexicon(
     'N -> "She" -> 1.0,
     'V -> "eats" -> 1.0,
     'N -> "pizza" -> 1.0,
-    'PP -> "without" -> 1.0,
+    'P -> "without" -> 1.0,
     'N -> "anchovies" -> 1.0
   );
 

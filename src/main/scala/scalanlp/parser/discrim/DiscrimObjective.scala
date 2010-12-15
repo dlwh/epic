@@ -185,13 +185,13 @@ object DiscriminativeTrainer extends ParserTrainer {
                   config: Configuration) = {
 
     val trainTrees = trainTreesX.map(c => (c._1,c._2));
-    val (initLexicon,initProductions) = GenerativeParser.extractCounts(trainTrees.iterator);
+    val (initLexicon,initBinaries,initUnaries) = GenerativeParser.extractCounts(trainTrees.iterator);
 
     val factory = config.readIn[FeaturizerFactory[String,String]]("featurizerFactory",new PlainFeaturizerFactory[String]);
-    val featurizer = factory.getFeaturizer(config, initLexicon, initProductions);
+    val featurizer = factory.getFeaturizer(config, initLexicon, initBinaries, initUnaries);
 
     val xbarParser = {
-      val grammar = new GenerativeGrammar(LogCounters.logNormalizeRows(initProductions));
+      val grammar = new GenerativeGrammar(LogCounters.logNormalizeRows(initBinaries), LogCounters.logNormalizeRows(initUnaries));
       val lexicon = new SimpleLexicon(initLexicon);
       new CKYChartBuilder[LogProbabilityParseChart,String,String]("",lexicon,grammar,ParseChart.logProb);
     }

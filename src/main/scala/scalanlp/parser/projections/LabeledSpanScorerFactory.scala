@@ -23,7 +23,7 @@ class LabeledSpanScorerFactory[C,L,W](parser: ChartBuilder[ParseChart.LogProbabi
   def mkSpanScorer(s: Seq[W], scorer: SpanScorer = SpanScorer.identity) = {
     val coarseRootIndex = parser.grammar.index(parser.root);
     val inside = parser.buildInsideChart(s, scorer)
-    val outside = parser.buildOutsideChart(inside, scorer)._2;
+    val outside = parser.buildOutsideChart(inside, scorer);
 
     val sentProb = inside(0,s.length,coarseRootIndex);
     if(sentProb.isInfinite) {
@@ -38,7 +38,7 @@ class LabeledSpanScorerFactory[C,L,W](parser: ChartBuilder[ParseChart.LogProbabi
   def mkSpanScorerWithTree(tree: BinarizedTree[C], s: Seq[W], scorer: SpanScorer= SpanScorer.identity) = {
     val coarseRootIndex = parser.grammar.index(parser.root);
     val inside = parser.buildInsideChart(s, scorer)
-    val outside = parser.buildOutsideChart(inside, scorer)._2;
+    val outside = parser.buildOutsideChart(inside, scorer);
     val lexicon = parser.lexicon;
 
     val sentProb = inside(0,s.length,coarseRootIndex);
@@ -82,7 +82,7 @@ class LabeledSpanScorerFactory[C,L,W](parser: ChartBuilder[ParseChart.LogProbabi
       val scoresForLocation = indexedProjections.coarseEncoder.mkSparseVector(Double.NegativeInfinity);
       for(l <- inside.enteredLabelIndexes(begin,end)) {
         val pL = indexedProjections.project(l)
-        val myScore = inside.labelScore(begin, end, l) + outside.labelScore(begin, end, l) - sentProb
+        val myScore = inside.labelScore(begin, end, l) + outside.labelScoreNoUnary(begin, end, l) - sentProb
         val currentScore = scoresForLocation(pL);
         scoresForLocation(pL) = Numerics.logSum(currentScore,myScore);
       }

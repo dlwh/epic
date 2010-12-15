@@ -23,15 +23,12 @@ class AnchoredRuleScorerTest  extends ParserTestHarness with FunSuite {
       val gent = gen(w);
       val scorer = f.mkSpanScorer(w);
       val ginside = zero.buildInsideChart(w,scorer);
-      println(w + " " + ginside.labelScore(0,w.length,gen.builder.root));
-      val (goutside,goutsideP) = zero.buildOutsideChart(ginside,scorer)
-      val scorer2 = fnext.buildSpanScorer(ginside,goutside,goutsideP,ginside.labelScore(0,w.length,""),scorer)
+      val goutside = zero.buildOutsideChart(ginside,scorer)
+      val scorer2 = fnext.buildSpanScorer(ginside,goutside,ginside.labelScore(0,w.length,""),scorer)
       val ginside2 = zero.buildInsideChart(w,scorer2);
-      println(w + " " + ginside2.labelScore(0,w.length,gen.builder.root));
-      lazy val goutside2 = zero.buildOutsideChart(ginside2,scorer2)._1;
-      val tree = SimpleViterbiDecoder(ParserTestHarness.simpleGrammar).extractBestParse("",zero.grammar, ginside,goutside, null, scorer)
-      val tree2 = SimpleViterbiDecoder(ParserTestHarness.simpleGrammar).extractBestParse("",zero.grammar, ginside2,goutside2, null, scorer)
-      println(tree render w,t render w,tree2 render w);
+      lazy val goutside2 = zero.buildOutsideChart(ginside2,scorer2);
+      val tree = SimpleViterbiDecoder(ParserTestHarness.simpleGrammar).extractBestParse("",zero.grammar, ginside,goutside, scorer)
+      val tree2 = SimpleViterbiDecoder(ParserTestHarness.simpleGrammar).extractBestParse("",zero.grammar, ginside2,goutside2, scorer)
       assert(tree2 == tree);
     } catch {
       case e: Exception =>

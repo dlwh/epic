@@ -24,7 +24,7 @@ class ProductParser[L,L2,W](val parsers: Seq[CKYChartBuilder[LogProbabilityParse
 
     val zeroInside = zeroParser.buildInsideChart(words,sumScorer);
     val zeroOutside = zeroParser.buildOutsideChart(zeroInside,sumScorer);
-    val tree = SimpleViterbiDecoder(zeroGrammar).extractBestParse(coarseParser.root,zeroGrammar, zeroInside,zeroOutside._1, zeroOutside._2, sumScorer);
+    val tree = SimpleViterbiDecoder(zeroGrammar).extractBestParse(coarseParser.root,zeroGrammar, zeroInside,zeroOutside, sumScorer);
 
     tree;
   }
