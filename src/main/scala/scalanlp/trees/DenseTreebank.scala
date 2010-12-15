@@ -95,7 +95,7 @@ object DenseTreebank {
   }
 
   def main(args: Array[String]) = {
-    val penn = Treebank.fromGermanTreebank(new File(args(0)));//Treebank.fromPennTreebankDir(new File(args(0)));
+    val penn = Treebank.fromPennTreebankDir(new File(args(0)));
     DenseTreebank.compressTreebank(penn, new File(args(1)));
     val dense = DenseTreebank.fromZipFile(new File(args(1)));
     dense.treesFromSection(dense.sections.last) foreach println
