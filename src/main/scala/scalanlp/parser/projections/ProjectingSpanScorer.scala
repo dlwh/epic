@@ -7,16 +7,20 @@ package projections
  */
 class ProjectingSpanScorer[C,F](indexedProjections: ProjectionIndexer[C,F], scorer: SpanScorer) extends SpanScorer {
   def scoreLexical(begin: Int, end: Int, tag: Int) = {
-    scorer.scoreLexical(begin,end, indexedProjections.project(tag));
+    val pTag = indexedProjections.project(tag)
+    scorer.scoreLexical(begin,end, pTag) - math.log(indexedProjections.refinementsOf(pTag).length);
   }
 
   def scoreUnaryRule(begin: Int, end: Int, parent: Int, child: Int) = {
-    scorer.scoreUnaryRule(begin,end,indexedProjections.project(parent), indexedProjections.project(child))
+    val pParent = indexedProjections.project(parent)
+    val pChild = indexedProjections.project(child)
+    scorer.scoreUnaryRule(begin,end,pParent, pChild) - math.log(indexedProjections.refinementsOf(pParent).length);
   }
 
   def scoreBinaryRule(begin: Int, split: Int, end: Int, parent: Int, leftChild: Int, rightChild: Int) = {
-    scorer.scoreBinaryRule(begin,split, end,indexedProjections.project(parent),
+    val pParent = indexedProjections.project(parent)
+    scorer.scoreBinaryRule(begin,split, end,pParent,
       indexedProjections.project(leftChild),
-      indexedProjections.project(rightChild))
+      indexedProjections.project(rightChild))- math.log(indexedProjections.refinementsOf(pParent).length);
   }
 }

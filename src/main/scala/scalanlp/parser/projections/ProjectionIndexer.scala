@@ -1,6 +1,7 @@
 package scalanlp.parser.projections
 
 import scalanlp.util.{Encoder, Index}
+import collection.mutable.ArrayBuffer
 
 /**
  * For computing projections from a fine grammar to a coarse grammar
@@ -16,7 +17,13 @@ class ProjectionIndexer[C,F](val coarseIndex: Index[C], val fineIndex:Index[F], 
 
   val coarseEncoder = Encoder.fromIndex(coarseIndex);
 
-  val refinements = indexedProjections.zipWithIndex.groupBy(_._1).mapValues(arr => arr.map(_._2)).toMap;
+  val refinements = {
+    val result = Encoder.fromIndex(coarseIndex).fillArray(new ArrayBuffer[Int]);
+    for( (coarse,fine) <- indexedProjections zipWithIndex) {
+      result(coarse) += fine
+    }
+    result.map(_.toArray);
+  }
 
   def refinementsOf(c: Int):Array[Int] = refinements(c);
 
