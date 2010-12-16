@@ -24,7 +24,8 @@ class EPParser[L,L2,W](val parsers: Seq[CKYChartBuilder[LogProbabilityParseChart
 
 
   def buildAllCharts(words: Seq[W], initScorer: SpanScorer=SpanScorer.identity, tree: BinarizedTree[L]=null):Array[ParsedSentenceData] = {
-    var currentF0:SpanScorer = coarseFact.mkSpanScorer(words,initScorer);
+    //var currentF0:SpanScorer = coarseFact.mkSpanScorer(words,initScorer);
+    var currentF0 = initScorer;
     val corrections = Array.fill(parsers.length)( SpanScorer.divide(currentF0,parsers.length));
 
     val partitions = Array.fill(parsers.length)(0.0);
@@ -37,6 +38,7 @@ class EPParser[L,L2,W](val parsers: Seq[CKYChartBuilder[LogProbabilityParseChart
     for(i <- 0 until maxEPIterations if changed) {
       val lastF0 = currentF0;
       for(m <- 0 until parsers.length) {
+        println(i + " " + m + words);
         val rescaledScorer = approximators(m).divideAndNormalize(currentF0, corrections(m), words);
         val projectedScorer = projectCoarseScorer(rescaledScorer, m);
 
@@ -49,14 +51,10 @@ class EPParser[L,L2,W](val parsers: Seq[CKYChartBuilder[LogProbabilityParseChart
         val newPartition = insideCharts(m).labelScore(0,words.length,parsers.last.root);
         partitions(m) = newPartition;
         // project down the approximation
-        currentF0 = approximators(m).project(insideCharts(m),outsideCharts(m),outsidePostCharts(m), newPartition, tree);
-        corrections(m) = approximators(m).updateCorrection(corrections(m),currentF0,rescaledScorer,words.length,damping);
-        //ensureScorer(currentF0,rescaledScorer,corrections(m),words.length);
-        //val norm: Double = computeNormalizer(words, currentF0)
-        //println("norm: " +  norm + words);
+        currentF0 = approximators(m).project(insideCharts(m),outsideCharts(m),outsidePostCharts(m), newPartition, projectedScorer, tree);
+        corrections(m) = ScalingSpanScorer(currentF0,rescaledScorer,0.0,-1);
       }
-      //if(parsers.length == 1 || maxEPIterations == 1) {
-      if(maxEPIterations == 1) {
+      if(parsers.length == 1 || maxEPIterations == 1) {
         changed = false;
       } else {
         val maxChange = computeMaxChange(currentF0,lastF0,words.length);
