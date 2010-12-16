@@ -29,6 +29,7 @@ class StepEPObjective[L,L2,W](featurizers: Seq[Featurizer[L2,W]],
                           trees: IndexedSeq[(BinarizedTree[L],Seq[W],SpanScorer)],
                           coarseParser: ChartBuilder[LogProbabilityParseChart, L, W],
                           openTags: Set[L],
+                          closedWords: Set[W],
                           numModels: Int,
                           splitLabel: L=>Seq[L2],
                           unsplit: (L2=>L),
@@ -133,7 +134,7 @@ class StepEPObjective[L,L2,W](featurizers: Seq[Featurizer[L2,W]],
   }
 
   def weightsToLexicon(weights: DenseVector, modelIndex: Int) = {
-    val grammar = new FeaturizedLexicon(splitOpenTags, weights, indexedFeatures(modelIndex));
+    val grammar = new FeaturizedLexicon(splitOpenTags, closedWords, weights, indexedFeatures(modelIndex));
     grammar;
   }
 
@@ -330,10 +331,17 @@ object StepEPTrainer extends ParserTrainer {
       for(t <- initLexicon.activeKeys.map(_._1) if initLexicon(t).size > 50) yield t;
     }
 
+    val closedWords = Set.empty ++ {
+      val wordCounts = DoubleCounter[String]();
+      initLexicon.rows.foreach ( wordCounts += _._2 )
+      wordCounts.iterator.filter(_._2 > 10).map(_._1);
+    }
+
     obj = new StepEPObjective(latentFeaturizer, "",
       trainTrees.toIndexedSeq,
       xbarParser,
       openTags,
+      closedWords,
       epModels,
       split(_:String,numStates),
       unsplit (_:(String,Int)),

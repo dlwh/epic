@@ -9,7 +9,7 @@ import scalala.tensor.counters.LogCounters._;
  * @author dlwh
  *
  */
-class FeaturizedLexicon[L,W](val openTagSet: Set[L], val weights: DenseVector,
+class FeaturizedLexicon[L,W](val openTagSet: Set[L], val closedWords: Set[W], val weights: DenseVector,
                              val featureIndexer: FeatureIndexer[L,W]) extends Lexicon[L,W] {
   def wordScore(label: L, w: W): Double = {
     tagScores(w)(label);
@@ -18,8 +18,14 @@ class FeaturizedLexicon[L,W](val openTagSet: Set[L], val weights: DenseVector,
 
 
   override def tagScores(w: W): LogDoubleCounter[L] = {
-    if(wordScores.contains(w)) wordScores(w)
-    else aggregate(openTagSet.iterator.map ( k => (k,scoreUnknown(k,w))));
+    if(closedWords(w) && wordScores.contains(w)) wordScores(w)
+    else {
+      val res = aggregate(openTagSet.iterator.map ( k => (k,scoreUnknown(k,w))));
+      for( (k,v) <- wordScores(w)) {
+        res(k) = v;
+      }
+      res
+    }
   }
 
   private def scoreUnknown(label: L, w: W):Double = {

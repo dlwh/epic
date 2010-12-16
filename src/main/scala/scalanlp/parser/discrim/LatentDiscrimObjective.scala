@@ -29,6 +29,7 @@ class LatentDiscrimObjective[L,L2,W](featurizer: Featurizer[L2,W],
                             trees: IndexedSeq[(BinarizedTree[L],Seq[W],SpanScorer)],
                             coarseParser: ChartBuilder[LogProbabilityParseChart, L, W],
                             openTags: Set[L],
+                            closedWords: Set[W],
                             splitLabel: L=>Seq[L2],
                             unsplit: (L2=>L)) extends BatchDiffFunction[Int,DenseVector] {
 
@@ -123,7 +124,7 @@ class LatentDiscrimObjective[L,L2,W](featurizer: Featurizer[L2,W],
   }
 
   def weightsToLexicon(weights: DenseVector) = {
-    val grammar = new FeaturizedLexicon(splitOpenTags, weights, indexedFeatures);
+    val grammar = new FeaturizedLexicon(splitOpenTags, closedWords, weights, indexedFeatures);
     grammar;
   }
 
@@ -250,6 +251,12 @@ object LatentDiscriminativeTrainer extends ParserTrainer {
       for(t <- initLexicon.activeKeys.map(_._1) if initLexicon(t).size > 50) yield t;
     }
 
+    val closedWords = Set.empty ++ {
+      val wordCounts = DoubleCounter[String]();
+      initLexicon.rows.foreach ( wordCounts += _._2 )
+      wordCounts.iterator.filter(_._2 < 10).map(_._1);
+    }
+
     val threshold = config.readIn("discrim.filterThreshold",-8.0)
 
     val thresholdingTrainTrees = trainTrees.toIndexedSeq.par(1000).map { case (t,w,s) => (t,w,new ThresholdingScorer(s,threshold))};
@@ -258,6 +265,7 @@ object LatentDiscriminativeTrainer extends ParserTrainer {
       thresholdingTrainTrees,
       xbarParser,
       openTags,
+      closedWords,
       split(_:String,numStates),
       unsplit (_:(String,Int)));
 
@@ -392,6 +400,12 @@ object StochasticLatentTrainer extends ParserTrainer {
       for(t <- initLexicon.activeKeys.map(_._1) if initLexicon(t).size > 50) yield t;
     }
 
+    val closedWords = Set.empty ++ {
+      val wordCounts = DoubleCounter[String]();
+      initLexicon.rows.foreach ( wordCounts += _._2 )
+      wordCounts.iterator.filter(_._2 > 10).map(_._1);
+    }
+
     val threshold = config.readIn("discrim.filterThreshold",-8.0)
 
     val thresholdingTrainTrees = trainTrees.toIndexedSeq.par(1000).map { case (t,w,s) => (t,w,new ThresholdingScorer(s,threshold))};
@@ -400,6 +414,7 @@ object StochasticLatentTrainer extends ParserTrainer {
       thresholdingTrainTrees,
       xbarParser,
       openTags,
+      closedWords,
       split(_:String,numStates),
       unsplit (_:(String,Int)));
 

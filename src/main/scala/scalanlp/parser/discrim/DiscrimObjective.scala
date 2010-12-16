@@ -100,8 +100,15 @@ class DiscrimObjective[L,W](feat: Featurizer[L,W],
     for( t <- initLexicon.rows.map(_._1) if initLexicon(t).size > 50)  yield t;
   }
 
+
+  val closedWords = Set.empty ++ {
+    val wordCounts = DoubleCounter[W]();
+    initLexicon.rows.foreach ( wordCounts += _._2 )
+    wordCounts.iterator.filter(_._2 > 10).map(_._1);
+  }
+
   def weightsToLexicon(weights: DenseVector) = {
-    val grammar = new FeaturizedLexicon(openTags, weights, indexedFeatures);
+    val grammar = new FeaturizedLexicon(openTags, closedWords, weights, indexedFeatures);
     grammar;
   }
 
