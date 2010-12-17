@@ -20,7 +20,7 @@ import scalanlp.math.Numerics.logSum;
 trait ChartDecoder[C,F] {
   def extractBestParse(root:F, grammar: Grammar[F],
                        inside: ParseChart[F],
-                       outside: =>ParseChart[F],outsideChartPostUnaries: =>ParseChart[F],
+                       outside: =>ParseChart[F],
                        spanScorer: SpanScorer = SpanScorer.identity):BinarizedTree[C];
 
 }
@@ -34,29 +34,47 @@ class ViterbiDecoder[C,F](val indexedProjections: ProjectionIndexer[C,F]) extend
 
   override def extractBestParse(root: F, grammar: Grammar[F],
                                 inside: ParseChart[F],
-                                outside: =>ParseChart[F], outsideChartPostUnaries: =>ParseChart[F],
+                                outside: =>ParseChart[F],
                                 spanScorer: SpanScorer = SpanScorer.identity):BinarizedTree[C] = {
-    import inside.labelScore
 
-    def buildTree(start: Int, end: Int, root: Int, usedUnaries: Set[Int] = Set.empty):BinarizedTree[C] = {
-      if(start +1 == end && grammar.isPreterminal(root)) {
-        return NullaryTree(indexedProjections.coarseSymbol(root))(Span(start,end));
+    def buildTreeUnary(start: Int, end:Int, root: Int):BinarizedTree[C] = {
+      var maxScore = Double.NegativeInfinity;
+      var maxChild = -1;
+      for {
+        (b,ruleScore) <- grammar.unaryRulesByIndexedParent(root)
+      } {
+        val score = ruleScore + inside.bot(start,end,b) + spanScorer.scoreUnaryRule(start,end,root,b);
+        if(score > maxScore) {
+          maxScore = score;
+          maxChild = b;
+        }
       }
 
+      if(maxScore == Double.NegativeInfinity) {
+        println("entered things: " + inside.bot.enteredLabelScores(start,end).map { case (i,v) => (grammar.index.get(i),v)}.toList)
+        error("Couldn't find a tree!" + start + " " + end + " " + grammar.index.get(root));
+      }
+      val child = buildTree(start,end,maxChild);
+      UnaryTree(indexedProjections.coarseSymbol(root),child)(Span(start,end));
+    }
+
+    def buildTree(start: Int, end: Int, root: Int):BinarizedTree[C] = {
       var maxScore = Double.NegativeInfinity;
       var maxLeft = -1;
       var maxRight = -1;
       var maxSplit = -1;
+      if(start +1 == end) {
+        return NullaryTree(indexedProjections.coarseSymbol(root))(Span(start,end));
+      }
 
       for {
         (b,rchild) <- grammar.allBinaryRules;
-        if inside.canStartHere(start,end,b);
         (c,parentScores) <- rchild
-        split <- inside.feasibleSpan(start, end, b, c)
+        split <- inside.top.feasibleSpan(start, end, b, c)
       } {
         val ruleScore = parentScores(root);
-        val score = ruleScore + labelScore(start,split,b) +
-                labelScore(split,end,c) + spanScorer.scoreBinaryRule(start,split,end,root,b,c);
+        val score = ruleScore + inside.top.labelScore(start,split,b) +
+                inside.top.labelScore(split,end,c) + spanScorer.scoreBinaryRule(start,split,end,root,b,c);
         if(score > maxScore) {
           maxScore = score;
           maxLeft = b;
@@ -64,34 +82,20 @@ class ViterbiDecoder[C,F](val indexedProjections: ProjectionIndexer[C,F]) extend
           maxSplit = split;
         }
       }
-        for {
-          (b,ruleScore) <- grammar.unaryRulesByIndexedParent(root) if !usedUnaries(b)
-        } {
-          val score = ruleScore + labelScore(start,end,b) + spanScorer.scoreUnaryRule(start,end,root,b);
-          if(score > maxScore) {
-            maxScore = score;
-            maxLeft = b;
-            maxRight = -1;
-            maxSplit = -1;
-          }
-        }
 
       if(maxScore == Double.NegativeInfinity) {
-        println("entered things: " + inside.enteredLabelScores(start,end).map { case (i,v) => (grammar.index.get(i),v)}.toList)
+        println("entered things: " + inside.bot.enteredLabelScores(start,end).map { case (i,v) => (grammar.index.get(i),v)}.toList)
         error("Couldn't find a tree!" + start + " " + end + " " + grammar.index.get(root));
-      } else if(maxRight == -1) {
-        val child = buildTree(start,end,maxLeft, usedUnaries + root);
-        UnaryTree(indexedProjections.coarseSymbol(root),child)(Span(start,end));
       } else {
-        val lchild = buildTree(start,maxSplit,maxLeft);
-        val rchild = buildTree(maxSplit,end,maxRight);
+        val lchild = buildTreeUnary(start,maxSplit,maxLeft);
+        val rchild = buildTreeUnary(maxSplit,end,maxRight);
         BinaryTree(indexedProjections.coarseSymbol(root),lchild,rchild)(Span(start,end));
       }
 
 
     }
 
-    buildTree(0,inside.length, grammar.index(root));
+    buildTreeUnary(0,inside.length, grammar.index(root));
   }
 }
 

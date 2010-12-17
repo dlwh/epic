@@ -16,10 +16,13 @@ import scalanlp.trees.BinarizedTree
 @SerialVersionUID(1)
 trait EPApproximator[C,F,W] {
   // TODO: add a type for the kind of span scorer this is.
-  def project(inside: ParseChart[F], outside: ParseChart[F], outsidePost: ParseChart[F], partition: Double, spanScorer: SpanScorer,  goldTree: BinarizedTree[C]):SpanScorer
+  def project(inside: ParseChart[F], outside: ParseChart[F], partition: Double, spanScorer: SpanScorer, goldTree: BinarizedTree[C]):SpanScorer
   def divideAndNormalize(num: SpanScorer, denom: SpanScorer, words: Seq[W]):SpanScorer
 }
 
+
+@serializable
+@SerialVersionUID(1)
 class AnchoredRuleApproximator[C,F,W](fineParser: ChartBuilder[LogProbabilityParseChart,F,W],
                                       coarseParser: ChartBuilder[LogProbabilityParseChart,C,W],
                                       projections: ProjectionIndexer[C,F], pruningThreshold: Double = Double.NegativeInfinity) extends EPApproximator[C,F,W] {
@@ -28,10 +31,11 @@ class AnchoredRuleApproximator[C,F,W](fineParser: ChartBuilder[LogProbabilityPar
   val zeroGrammar = new ZeroGrammar(coarseParser.grammar);
   val zeroLexicon = new ZeroLexicon(coarseParser.lexicon);
   val zeroParser = new CKYChartBuilder[LogProbabilityParseChart,C,W](coarseParser.root, zeroLexicon,zeroGrammar,ParseChart.logProb);
-  val zeroFactory = new NonNormalizingAnchoredRuleScorerFactory[C,C,W](coarseParser,new ProjectionIndexer(coarseParser.grammar.index,coarseParser.grammar.index,identity[C]_),pruningThreshold)
+  //val zeroFactory = new NonNormalizingAnchoredRuleScorerFactory[C,C,W](coarseParser,new ProjectionIndexer(coarseParser.grammar.index,coarseParser.grammar.index,identity[C]_),pruningThreshold)
+  val zeroFactory = { error("TODO"); new AnchoredRuleScorerFactory[C,C,W](coarseParser,new ProjectionIndexer(coarseParser.grammar.index,coarseParser.grammar.index,identity[C]_),pruningThreshold) }
 
-  def project(inside: ParseChart[F], outside: ParseChart[F], outsidePost: ParseChart[F], partition: Double, spanScorer: SpanScorer, tree: BinarizedTree[C]):SpanScorer = {
-    factory.buildSpanScorer(inside,outside,  outsidePost, partition, spanScorer, tree);
+  def project(inside: ParseChart[F], outside: ParseChart[F], partition: Double, spanScorer: SpanScorer, tree: BinarizedTree[C]):SpanScorer = {
+    factory.buildSpanScorer(inside,outside,  partition, spanScorer, tree);
   }
 
   def divideAndNormalize(num: SpanScorer, denom: SpanScorer, words: Seq[W]):SpanScorer ={

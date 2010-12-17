@@ -26,6 +26,7 @@ import scala.util.control.Breaks._;
 import scala.util.control.Breaks;
 
 
+/* TODO: repair
 class GraphParser[L,W](root: L, lexicon: Lexicon[L,W], grammar: Grammar[L]) extends Parser[L,W] {
 
   sealed trait Item {
@@ -63,20 +64,20 @@ class GraphParser[L,W](root: L, lexicon: Lexicon[L,W], grammar: Grammar[L]) exte
         top match {
           case LexicalItem(parent, i, w) =>
             val span = top.span;
-            if(chart.labelScore(span.start, span.end, parent).isInfinite) {
-              chart.enter(span.start, span.end, parent, w);
+            if(chart.bot.labelScore(span.start, span.end, parent).isInfinite) {
+              chart.bot.enter(span.start, span.end, parent, w);
             } else {
               alreadyAdded = true; // already expanded a better node here
             }
           case UnaryItem(parent, child, span, w) =>
-            if(chart.labelScore(span.start, span.end, parent).isInfinite) {
-              chart.enter(span.start, span.end, parent, w)
+            if(chart.top.labelScore(span.start, span.end, parent).isInfinite) {
+              chart.top.enter(span.start, span.end, parent, w)
             } else {
               alreadyAdded = true; // already expanded a better node here
             }
           case BinaryItem(parent, lchild, rchild, span, split, w) =>
-            if(chart.labelScore(span.start, span.end, parent).isInfinite) {
-              chart.enter(span.start, span.end, parent, w);
+            if(chart.bot.labelScore(span.start, span.end, parent).isInfinite) {
+              chart.bot.enter(span.start, span.end, parent, w);
             } else {
               alreadyAdded = true; // already expanded a better node here
             }
@@ -139,3 +140,4 @@ class GraphParser[L,W](root: L, lexicon: Lexicon[L,W], grammar: Grammar[L]) exte
   }
 
 }
+*/

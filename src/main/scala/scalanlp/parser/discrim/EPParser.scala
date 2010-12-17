@@ -18,7 +18,6 @@ class EPParser[L,L2,W](val parsers: Seq[CKYChartBuilder[LogProbabilityParseChart
                        val maxEPIterations: Int= 1,
                        val damping: Double = 1.0) extends Parser[L,W] {
   case class ParsedSentenceData(inside: LogProbabilityParseChart[L2], outside: LogProbabilityParseChart[L2],
-                                outsidePost: LogProbabilityParseChart[L2],
                                 partition: Double, f0: SpanScorer)
 
 
@@ -31,27 +30,30 @@ class EPParser[L,L2,W](val parsers: Seq[CKYChartBuilder[LogProbabilityParseChart
     val partitions = Array.fill(parsers.length)(0.0);
     val insideCharts = Array.fill[LogProbabilityParseChart[L2]](parsers.length)(null);
     val outsideCharts = Array.fill[LogProbabilityParseChart[L2]](parsers.length)(null);
-    val outsidePostCharts = Array.fill[LogProbabilityParseChart[L2]](parsers.length)(null);
     val scorers = Array.fill(parsers.length)(SpanScorer.identity);
     var changed = true;
 
+    var lastF0 = currentF0;
     for(i <- 0 until maxEPIterations if changed) {
-      val lastF0 = currentF0;
+      val lastLastF0 = lastF0;
+      lastF0 = currentF0;
       for(m <- 0 until parsers.length) {
         println(i + " " + m + words);
         val rescaledScorer = approximators(m).divideAndNormalize(currentF0, corrections(m), words);
-        val projectedScorer = projectCoarseScorer(rescaledScorer, m);
+        val projectedScorer = projectCoarseScorer(rescaledScorer, m); // TODO subtract out log numStates
+        if(parsers.length == 1) {
+          //sanify(rescaledScorer, words.length);
+        }
 
         insideCharts(m) = parsers(m).buildInsideChart(words,projectedScorer);
-        val (outside,outsidePost) = parsers(m).buildOutsideChart(insideCharts(m),projectedScorer);
+        val outside = parsers(m).buildOutsideChart(insideCharts(m),projectedScorer);
         outsideCharts(m) = outside
-        outsidePostCharts(m) = outsidePost;
         scorers(m) = projectedScorer;
 
-        val newPartition = insideCharts(m).labelScore(0,words.length,parsers.last.root);
+        val newPartition = insideCharts(m).top.labelScore(0,words.length,parsers.last.root);
         partitions(m) = newPartition;
         // project down the approximation
-        currentF0 = approximators(m).project(insideCharts(m),outsideCharts(m),outsidePostCharts(m), newPartition, projectedScorer, tree);
+        currentF0 = approximators(m).project(insideCharts(m),outsideCharts(m), newPartition, projectedScorer, tree);
         corrections(m) = ScalingSpanScorer(currentF0,rescaledScorer,0.0,-1);
       }
       if(parsers.length == 1 || maxEPIterations == 1) {
@@ -59,18 +61,57 @@ class EPParser[L,L2,W](val parsers: Seq[CKYChartBuilder[LogProbabilityParseChart
       } else {
         val maxChange = computeMaxChange(currentF0,lastF0,words.length);
         assert(!maxChange.isNaN)
-        changed = maxChange > 1E-4;
+        changed = maxChange.abs > 1E-4;
         if(!changed) {
           print(i + " ")
         } else if(i == maxEPIterations - 1) {
 
           print("F ")
         }
+        println("<" + i +">" + maxChange);
       }
     }
     Array.tabulate(parsers.length)(m => ParsedSentenceData(insideCharts(m),
-      outsideCharts(m),outsidePostCharts(m), partitions(m),scorers(m)));
+      outsideCharts(m), partitions(m),scorers(m)));
   }
+
+  def ensureScorer(scorer: SpanScorer, qi: SpanScorer, ti:SpanScorer, length: Int) = {
+    val other = SpanScorer.sum(qi,ti);
+    for {
+      span <- 1 to length iterator;
+      i <- 0 to (length - span) iterator;
+      j = i + span;
+      k <- (i+1) until j iterator;
+      p <- 0 until projections(0).coarseIndex.size iterator;
+      (b,bv) <- coarseParser.grammar.binaryRulesByIndexedParent(p) iterator;
+      c <- bv.activeKeys
+    } {
+      val s1 = scorer.scoreBinaryRule(i, k, j, p, b, c)
+      val s2 = other.scoreBinaryRule(i, k, j, p, b, c)
+      if(s1 != s2) {
+        assert( (s1 - s2).abs < 1E-4,s1 + " " + s2);
+      }
+    }
+
+  }
+
+  /*
+  def ensureScorer(scorer: SpanScorer, qi: SpanScorer, ti:SpanScorer, length: Int) = {
+    val other = SpanScorer.sum(qi,ti);
+    for {
+      span <- 1 to length iterator;
+      i <- 0 to (length - span) iterator;
+      j = i + span;
+      k <- (i+1) until j iterator;
+      p <- 0 until projections(0).coarseIndex.size iterator;
+      (b,bv) <- coarseParser.grammar.binaryRulesByIndexedParent(p) iterator;
+      c <- bv.activeKeys
+    } {
+      println(scorer.scoreBinaryRule(i,k,j,p,b,c),other.scoreBinaryRule(i,k,j,p,b,c));
+    }
+
+  }
+  */
 
   def computeMaxChange(scorer1: SpanScorer, scorer2: SpanScorer, length: Int):Double = {
     val changes = for {
@@ -83,13 +124,17 @@ class EPParser[L,L2,W](val parsers: Seq[CKYChartBuilder[LogProbabilityParseChart
       c <- bv.activeKeys
     } yield {
       // TODO: compute change that is consistent with all span scorers :-/
-      val a = (scorer1.scoreBinaryRule(i,k,j,p,b,c) - scorer2.scoreBinaryRule(i,k,j,p,b,c));
+      val s1 = scorer1.scoreBinaryRule(i, k, j, p, b, c)
+      val s2 = scorer2.scoreBinaryRule(i, k, j, p, b, c)
+      val a = (s1 - s2);
       if(a.isNaN) 0.0 // from negative infinities...el
       else if(a.isInfinite) 1.0
-      else  a.abs/math.max(1E-4,scorer1.scoreBinaryRule(i,k,j,p,b,c).abs)
+      else  {
+        a.abs
+      }
     }
 
-    changes.find(_ > 1E-4).getOrElse(0.0);
+    changes.max;
   }
 
   def projectCoarseScorer(coarseScorer: SpanScorer, model: Int):SpanScorer ={
@@ -108,6 +153,6 @@ class EPParser[L,L2,W](val parsers: Seq[CKYChartBuilder[LogProbabilityParseChart
   def bestParse(s: scala.Seq[W], spanScorer: SpanScorer) = {
     val parserData = buildAllCharts(s,spanScorer).last
     val lastParser = parsers.last;
-    decoder.extractBestParse(lastParser.root,lastParser.grammar,parserData.inside,parserData.outside,parserData.outsidePost,parserData.f0);
+    decoder.extractBestParse(lastParser.root,lastParser.grammar,parserData.inside,parserData.outside,parserData.f0);
   }
 }

@@ -61,7 +61,8 @@ import LogisticBitVector._
 class LogisticBitVector[L,W](treebank: StateSplitting.Treebank[L,W],
                              root: L,
                              val initLexicon: PairedDoubleCounter[L,W],
-                             val initProductions: PairedDoubleCounter[L,Rule[L]],
+                             val initBinaries:PairedDoubleCounter[L,BinaryRule[L]],
+                             val initUnaries: PairedDoubleCounter[L,UnaryRule[L]],
                              numStates: Int,
                              featurizer: Featurizer[L,W],
                              initFeatureWeights: DoubleCounter[LogisticBitVector.Feature[L,W]] = DoubleCounter[LogisticBitVector.Feature[L,W]]()) extends FeaturizedObjectiveFunction {
@@ -71,9 +72,12 @@ class LogisticBitVector[L,W](treebank: StateSplitting.Treebank[L,W],
 
   def decisionsForContext(c: Context): Iterator[Decision] = {
     val lexDecisions = for( (w,_) <- initLexicon(c._1).iterator) yield LogisticBitVector.WordDecision[L,W](w);
-    val ruleDecisions:  Iterator[Iterator[Decision]] = for( (r,_) <- initProductions(c._1).iterator) yield r match {
+    val ruleDecisions:  Iterator[Iterator[Decision]] = for( (r,_) <- initBinaries(c._1).iterator) yield r match {
       case BinaryRule(par,left,right) => for(lS <- split(left).iterator; rS <- split(right).iterator)
         yield LogisticBitVector.BinaryRuleDecision(lS._1,lS._2,rS._1,rS._2);
+    }
+
+    val unaryDecisions:  Iterator[Iterator[Decision]] = for( (r,_) <- initUnaries(c._1).iterator) yield r match {
       case UnaryRule(_,child) => for(s <- split(child).iterator)
         yield LogisticBitVector.UnaryRuleDecision(s._1,s._2);
     }
@@ -82,7 +86,7 @@ class LogisticBitVector[L,W](treebank: StateSplitting.Treebank[L,W],
   }
 
   def allContexts: Iterator[Context] = {
-    val allLabels = Set.empty ++ initProductions.rows.map{_._1} ++ initLexicon.rows.map{_._1};
+    val allLabels = Set.empty ++ initBinaries.rows.map{_._1} ++ initLexicon.rows.map{_._1} ++ initUnaries.rows.map(_._1);
     for {
       l <- allLabels.iterator
       state <- split(l).iterator
@@ -96,7 +100,7 @@ class LogisticBitVector[L,W](treebank: StateSplitting.Treebank[L,W],
   private def split(x: L) = {
     if(x == root) Seq((x,0))
     else {
-      val maxStates = BitUtils.roundToNextPowerOfTwo(initLexicon(x).size + 100 * initProductions(x).size);
+      val maxStates = BitUtils.roundToNextPowerOfTwo(initLexicon(x).size + 100 * initBinaries.size);
       (0 until (numStates min maxStates)) map { i => (x,i) };
     }
   }
@@ -104,14 +108,14 @@ class LogisticBitVector[L,W](treebank: StateSplitting.Treebank[L,W],
   private def unsplit(x: (L,Int)) = x._1;
 
   def expectedCounts(logThetas: LogPairedDoubleCounter[Context,Decision]) = {
-    val (productions,wordProds) = extractGrammarAndLexicon(logThetas);
-    val grammar = new ThreadLocal(new GenerativeGrammar(productions));
+    val (unaries,binaries,wordProds) = extractGrammarAndLexicon(logThetas);
+    val grammar = new GenerativeGrammar(LogCounters.logNormalizeRows(binaries),LogCounters.logNormalizeRows(unaries));
     val lexicon = new UnsmoothedLexicon(wordProds);
     val ecounts = treebank.par(100).mapReduce(
-      { case (t,s) => StateSplitting.expectedCounts(grammar(),lexicon,t map split,s); },
+      { case (t,s) => StateSplitting.expectedCounts(grammar,lexicon,t map split,s); },
       {( _:ExpectedCounts[W]) += (_: ExpectedCounts[W])} ); 
 
-    val (ruleCounts,lexCounts) = ecounts.decode(grammar());
+    val (ruleCounts,unaryCounts,lexCounts) = ecounts.decode(grammar);
 
     val eCounts = PairedDoubleCounter[Context,Decision]();
 
@@ -120,6 +124,11 @@ class LogisticBitVector[L,W](treebank: StateSplitting.Treebank[L,W],
         (rule,v) <- rules ) rule match {
       case BinaryRule(_, (lchild,lstate), (rchild,rstate)) =>
         eCtr(BinaryRuleDecision(lchild,lstate,rchild,rstate)) = v;
+    }
+
+    for( (c,rules) <- unaryCounts.rows;
+           eCtr = eCounts(c);
+           (rule,v) <- rules ) rule match {
       case UnaryRule(_, (child,state)) =>
         eCtr(UnaryRuleDecision(child,state))  = v;
     }
@@ -134,17 +143,15 @@ class LogisticBitVector[L,W](treebank: StateSplitting.Treebank[L,W],
   }
 
   val coarseLabelIndex = {
-    val allLabels = Set.empty ++ initProductions.rows.map{_._1} ++ initLexicon.rows.map{_._1};
+    val allLabels = Set.empty ++ initBinaries.rows.map{_._1} ++ initBinaries.rows.map{_._1} ++  initLexicon.rows.map{_._1};
     Index(allLabels);
   }
 
   def extractParser(logThetas: LogPairedDoubleCounter[Context,Decision],
                     features:DoubleCounter[Feature],
                     logNormalizers: LogDoubleCounter[Context]) = {
-    val (prods,words) = extractGrammarAndLexicon(logThetas);
-    val grammar = new GenerativeGrammar(prods);
-    // words is normalized, and so we need to rescale it so that SimpleLexicon doesn't suck horribly.
-   // val lex = new SimpleLexicon(LogCounters.exp(words + Math.log(initLexicon.total)));
+    val (unaryRules,binaryRules,words) = extractGrammarAndLexicon(logThetas);
+    val grammar = new GenerativeGrammar(LogCounters.logNormalize(binaryRules),LogCounters.logNormalize(unaryRules));
     val transposed = LogPairedDoubleCounter[W,Context];
     transposed := words.transpose;
     val tags = Set.empty ++ words.activeKeys.map(_._1);
@@ -160,7 +167,8 @@ class LogisticBitVector[L,W](treebank: StateSplitting.Treebank[L,W],
   def extractGrammarAndLexicon(logThetas: LogPairedDoubleCounter[Context,Decision]) = {
     // NB: Context is (L,Int), and is our parent for the production rules.
     val lexicon = LogPairedDoubleCounter[Context,W]();
-    val productions = LogPairedDoubleCounter[Context,Rule[(L,Int)]]();
+    val binaryRules = LogPairedDoubleCounter[Context,BinaryRule[(L,Int)]]();
+    val unaryRules = LogPairedDoubleCounter[Context,UnaryRule[(L,Int)]]();
     for( (c,decCtr) <- logThetas.rows;
          (d,v) <- decCtr
          if v != Double.NegativeInfinity) {
@@ -169,13 +177,13 @@ class LogisticBitVector[L,W](treebank: StateSplitting.Treebank[L,W],
           lexicon(c)(w) = v;
         case UnaryRuleDecision(child,state) =>
           val r = UnaryRule(c,(child,state));
-          productions(c)(r) = v;
+          unaryRules(c)(r) = v;
         case BinaryRuleDecision(lchild,lstate,rchild,rstate) =>
           val r = BinaryRule(c,(lchild,lstate),(rchild,rstate));
-          productions(c)(r) = v;
+          binaryRules(c)(r) = v;
       }
     }
-    (productions,lexicon);
+    (unaryRules,binaryRules,lexicon);
   }
 
 
@@ -198,12 +206,12 @@ object LogisticBitVectorTrainer extends ParserTrainer {
 
     val trainTrees = trainTreesX.view.map(c => (c._1,c._2));
     val numStates = config.readIn[Int]("numStates",8);
-    val (initLexicon,initProductions) = GenerativeParser.extractCounts(trainTrees.iterator);
+    val (initLexicon,initBinaries, initUnaries) = GenerativeParser.extractCounts(trainTrees.iterator);
     val factory = config.readIn[FeaturizerFactory[String,String]]("featurizerFactory");
 
-    val featurizer = factory.getFeaturizer(config, initLexicon, initProductions);
+    val featurizer = factory.getFeaturizer(config, initLexicon, initBinaries, initUnaries);
 
-    val obj = new LogisticBitVector(trainTrees.toIndexedSeq,"",initLexicon,initProductions,numStates, featurizer);
+    val obj = new LogisticBitVector(trainTrees.toIndexedSeq,"",initLexicon,initBinaries, initUnaries,numStates, featurizer);
     val iterationsPerEval = config.readIn("iterations.eval",25);
     val maxIterations = config.readIn("iterations.max",100);
     val maxMStepIterations = config.readIn("iterations.mstep.max",80);
@@ -252,12 +260,12 @@ object LBFGSBitVectorTrainer extends ParserTrainer {
 
     val trainTrees = trainTreesX.view.map(c => (c._1,c._2));
     val numStates = config.readIn[Int]("numBits",8);
-    val (initLexicon,initProductions) = GenerativeParser.extractCounts(trainTrees.iterator);
+    val (initLexicon,initBinaries, initUnaries) = GenerativeParser.extractCounts(trainTrees.iterator);
     val factory = config.readIn[FeaturizerFactory[String,String]]("featurizerFactory");
 
-    val featurizer = factory.getFeaturizer(config, initLexicon, initProductions);
+    val featurizer = factory.getFeaturizer(config, initLexicon, initBinaries, initUnaries);
 
-    val obj = new LogisticBitVector(trainTrees.toIndexedSeq,"",initLexicon,initProductions,numStates, featurizer);
+    val obj = new LogisticBitVector(trainTrees.toIndexedSeq,"",initLexicon,initBinaries, initUnaries,numStates, featurizer);
     val iterationsPerEval = config.readIn("iterations.eval",25);
     val maxIterations = config.readIn("iterations.max",100);
     val maxMStepIterations = config.readIn("iterations.mstep.max",80);

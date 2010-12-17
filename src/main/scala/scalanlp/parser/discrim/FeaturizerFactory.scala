@@ -1,8 +1,9 @@
-package scalanlp.parser.discrim
+package scalanlp.parser
+package discrim
 
 import scalanlp.config.Configuration
-import scalanlp.parser.Rule
-import scalala.tensor.counters.Counters._;
+import scalala.tensor.counters.Counters._
+
 
 /**
  * 
@@ -12,7 +13,8 @@ trait FeaturizerFactory[L,W] {
   /** Returns a featurizer based on a configuration and a lexicon/production */
   def getFeaturizer(conf: Configuration,
                     baseLexicon: PairedDoubleCounter[L,W],
-                    baseProductions: PairedDoubleCounter[L,Rule[L]]):Featurizer[L,W];
+                    baseProductions: PairedDoubleCounter[L,BinaryRule[L]],
+                    baseUnaries: PairedDoubleCounter[L,UnaryRule[L]]):Featurizer[L,W];
 }
 
 /**
@@ -21,11 +23,10 @@ trait FeaturizerFactory[L,W] {
 class PlainFeaturizerFactory[L] extends FeaturizerFactory[L,String] {
   def getFeaturizer(conf: Configuration,
                     baseLexicon: PairedDoubleCounter[L,String],
-                    baseProductions: PairedDoubleCounter[L,Rule[L]]):Featurizer[L,String] = {
-    val scale = conf.readIn[Double]("init.scale",conf.readIn[Double]("ep.models",1));
-    println(scale);
-    val lex = new WordShapeFeaturizer(baseLexicon,conf.readIn[Boolean]("initToZero",true),scale);
-    val rules = new RuleFeaturizer[L,String](baseProductions, conf.readIn[Boolean]("initToZero",true),scale);
+                    baseBinaries: PairedDoubleCounter[L,BinaryRule[L]],
+                    baseUnaries: PairedDoubleCounter[L,UnaryRule[L]]):Featurizer[L,String] = {
+    val lex = new WordShapeFeaturizer(baseLexicon,conf.readIn[Boolean]("initToZero",true),1.0);
+    val rules = new RuleFeaturizer[L,String](baseBinaries,baseUnaries, conf.readIn[Boolean]("initToZero",true),1.0);
 
     new SumFeaturizer(rules,lex);
   }
@@ -45,4 +46,8 @@ class SlavLatentFeaturizerFactory extends LatentFeaturizerFactory {
 
 class SlavPlusLatentFeaturizerFactory extends LatentFeaturizerFactory {
   def getFeaturizer[L,W](base: Featurizer[L,W], numStates: Int) = new SlavPlusFeaturizer(new CachingFeaturizer(base),numStates);
+}
+
+class SlavSplitLatentFeaturizerFactory extends LatentFeaturizerFactory {
+  def getFeaturizer[L,W](base: Featurizer[L,W], numStates: Int) = new SlavSplitFeaturizer(new CachingFeaturizer(base),numStates);
 }

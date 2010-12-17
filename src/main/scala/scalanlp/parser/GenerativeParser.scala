@@ -52,22 +52,23 @@ object GenerativeParser {
   }
 
   def extractLexiconAndGrammar[W](data: Iterator[(BinarizedTree[String],Seq[W])]):(Lexicon[String,W],GenerativeGrammar[String]) = {
-    val (lexicon,productions) = extractCounts(data);
-    (new SimpleLexicon(lexicon),new GenerativeGrammar(logNormalizeRows(productions)));
+    val (lexicon,binaryProductions,unaryProductions) = extractCounts(data);
+    (new SimpleLexicon(lexicon),new GenerativeGrammar(logNormalizeRows(binaryProductions),logNormalizeRows(unaryProductions)));
   }
 
 
   def extractCounts[L,W](data: Iterator[(BinarizedTree[L],Seq[W])]) = {
     val lexicon = new PairedDoubleCounter[L,W]();
-    val productions = new PairedDoubleCounter[L,Rule[L]]();
+    val binaryProductions = new PairedDoubleCounter[L,BinaryRule[L]]();
+    val unaryProductions = new PairedDoubleCounter[L,UnaryRule[L]]();
 
     for( (tree,words) <- data) {
       val leaves = tree.leaves map (l => (l,words(l.span.start)));
       tree.allChildren foreach { 
         case t @ BinaryTree(a,bc,cc) => 
-          productions(a,BinaryRule(a,bc.label,cc.label)) += 1.0;
+          binaryProductions(a,BinaryRule(a,bc.label,cc.label)) += 1.0;
         case t@UnaryTree(a,bc) => 
-          productions(a,UnaryRule(a,bc.label)) += 1.0;
+          unaryProductions(a,UnaryRule(a,bc.label)) += 1.0;
         case t => 
       }
       for( (l,w) <- leaves) {
@@ -75,7 +76,7 @@ object GenerativeParser {
       }
       
     }
-    (lexicon,productions)
+    (lexicon,binaryProductions,unaryProductions)
   }
 }
 

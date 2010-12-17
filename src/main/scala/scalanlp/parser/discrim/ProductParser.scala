@@ -24,7 +24,7 @@ class ProductParser[L,L2,W](val parsers: Seq[CKYChartBuilder[LogProbabilityParse
 
     val zeroInside = zeroParser.buildInsideChart(words,sumScorer);
     val zeroOutside = zeroParser.buildOutsideChart(zeroInside,sumScorer);
-    val tree = SimpleViterbiDecoder(zeroGrammar).extractBestParse(coarseParser.root,zeroGrammar, zeroInside,zeroOutside._1, zeroOutside._2, sumScorer);
+    val tree = SimpleViterbiDecoder(zeroGrammar).extractBestParse(coarseParser.root,zeroGrammar, zeroInside,zeroOutside, sumScorer);
 
     tree;
   }
@@ -34,7 +34,9 @@ class ProductParser[L,L2,W](val parsers: Seq[CKYChartBuilder[LogProbabilityParse
   }
 
   val anchoredProjectors = parsers zip projections map { case (parser,projection) =>
-    new AnchoredPosteriorScorerFactory(parser,projection,Double.NegativeInfinity);
+    error("TODO")
+    //new AnchoredPosteriorScorerFactory(parser,projection,Double.NegativeInfinity);
+    new AnchoredRuleScorerFactory(parser,projection,Double.NegativeInfinity);
   }
 
 

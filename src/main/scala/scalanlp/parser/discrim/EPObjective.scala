@@ -97,9 +97,9 @@ class EPObjective[L,L2,W](featurizers: Seq[Featurizer[L2,W]],
         try {
           val charts = epBuilder.buildAllCharts(words,spanScorer,tree);
 
-          val expectedCounts = for( (p,ParsedSentenceData(inside,outside,outsidePostUnaries,z,f0)) <- parsers zip charts) yield {
+          val expectedCounts = for( (p,ParsedSentenceData(inside,outside,z,f0)) <- parsers zip charts) yield {
             val treeCounts = treeToExpectedCounts(p.grammar,p.lexicon,tree,words, f0)
-            val wordCounts = wordsToExpectedCounts(p,words,inside,outside,outsidePostUnaries, z, f0);
+            val wordCounts = wordsToExpectedCounts(p,words,inside,outside, z, f0);
             treeCounts -= wordCounts;
           }
 
@@ -151,10 +151,9 @@ class EPObjective[L,L2,W](featurizers: Seq[Featurizer[L2,W]],
   def wordsToExpectedCounts(parser: LogProbBuilder, words: Seq[W],
                             inside: LogProbabilityParseChart[L2],
                             outside: LogProbabilityParseChart[L2],
-                            outsidePostUnaries: LogProbabilityParseChart[L2],
                             totalProb: Double,
                             spanScorer: SpanScorer) = {
-    val ecounts = new InsideOutside(parser).expectedCounts(words, inside, outside, outsidePostUnaries, totalProb, spanScorer);
+    val ecounts = new InsideOutside(parser).expectedCounts(words, inside, outside, totalProb, spanScorer);
     ecounts
   }
 
@@ -309,10 +308,11 @@ object EPTrainer extends ParserTrainer {
 
   def getFeaturizer(config: Configuration,
                     initLexicon: PairedDoubleCounter[String, String],
-                    initProductions: PairedDoubleCounter[String, Rule[String]],
+                    initBinaries: PairedDoubleCounter[String, BinaryRule[String]],
+                    initUnaries: PairedDoubleCounter[String, UnaryRule[String]],
                     numStates: Int, numModels: Int): IndexedSeq[Featurizer[(String, Int), String]] = {
     val factory = config.readIn[FeaturizerFactory[String, String]]("discrim.featurizerFactory", new PlainFeaturizerFactory[String]);
-    val featurizer = factory.getFeaturizer(config, initLexicon, initProductions);
+    val featurizer = factory.getFeaturizer(config, initLexicon, initBinaries, initUnaries);
     val latentFactory = config.readIn[LatentFeaturizerFactory]("discrim.latentFactory", new SlavLatentFeaturizerFactory());
     val latentFeaturizer = latentFactory.getFeaturizer(featurizer, numStates);
     val weightsPath = config.readIn[File]("discrim.oldweights",null);
@@ -337,11 +337,11 @@ object EPTrainer extends ParserTrainer {
                   devTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer)],
                   config: Configuration) = {
 
-    val (initLexicon,initProductions) = GenerativeParser.extractCounts(trainTrees.iterator.map(tuple => (tuple._1,tuple._2)));
+    val (initLexicon,initBinaries,initUnaries) = GenerativeParser.extractCounts(trainTrees.iterator.map(tuple => (tuple._1,tuple._2)));
     val numStates = config.readIn[Int]("discrim.numStates",2);
 
     val xbarParser = loadParser(config) getOrElse {
-      val grammar = new GenerativeGrammar(LogCounters.logNormalizeRows(initProductions));
+      val grammar = new GenerativeGrammar(LogCounters.logNormalizeRows(initBinaries),LogCounters.logNormalizeRows(initUnaries));
       val lexicon = new SimpleLexicon(initLexicon);
       new CKYChartBuilder[LogProbabilityParseChart,String,String]("",lexicon,grammar,ParseChart.logProb);
     }
@@ -349,7 +349,7 @@ object EPTrainer extends ParserTrainer {
     val maxEPIterations = config.readIn[Int]("ep.iterations",1);
     val epModels = config.readIn[Int]("ep.models",2);
 
-    val latentFeaturizer = getFeaturizer(config, initLexicon, initProductions, numStates, epModels)
+    val latentFeaturizer = getFeaturizer(config, initLexicon, initBinaries, initUnaries, numStates, epModels)
 
     val openTags = Set.empty ++ {
       for(t <- initLexicon.activeKeys.map(_._1) if initLexicon(t).size > 50) yield t;

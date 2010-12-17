@@ -11,7 +11,8 @@ case class SlavRuleFeature[L,W](r: Rule[(L,Int)]) extends Feature[L,W];
 case class SlavLexicalFeature[L,W](parent: L, state: Int, word: W) extends Feature[L,W]
 
 class SlavFeaturizer[L,W](baseLexicon: PairedDoubleCounter[L,W],
-                          baseProductions: PairedDoubleCounter[L,Rule[L]]) extends Featurizer[L,W] {
+                          baseBinaries: PairedDoubleCounter[L,BinaryRule[L]],
+                          baseUnaries: PairedDoubleCounter[L,UnaryRule[L]]) extends Featurizer[L,W] {
   def features(d: LogisticBitVector.Decision[L,W],
                c: LogisticBitVector.Context[L]): IndexedSeq[LogisticBitVector.Feature[L,W]] = d match {
     case WordDecision(w) =>
@@ -29,12 +30,12 @@ class SlavFeaturizer[L,W](baseLexicon: PairedDoubleCounter[L,W],
     f match {
       case SlavRuleFeature(BinaryRule((par,parstate),(lchild,lchildState),(rchild,rchildState))) =>
         val baseRule = BinaryRule(par,lchild,rchild);
-        if( baseProductions(par, baseRule) == 0) Some(Double.NegativeInfinity)
-        else Some(math.log(baseProductions(par,baseRule)) - math.log(baseProductions(par).total));
+        if( baseBinaries(par, baseRule) == 0) Some(Double.NegativeInfinity)
+        else Some(math.log(baseBinaries(par,baseRule)) - math.log(baseBinaries(par).total));
       case SlavRuleFeature(UnaryRule((par,parstate),(child,childState))) =>
         val baseRule = UnaryRule(par,child);
-        if( baseProductions(par, baseRule) == 0) Some(Double.NegativeInfinity)
-        else Some(math.log(baseProductions(par,baseRule)) - math.log(baseProductions(par).total));
+        if( baseUnaries(par, baseRule) == 0) Some(Double.NegativeInfinity)
+        else Some(math.log(baseUnaries(par,baseRule)) - math.log(baseUnaries(par).total));
       case SlavLexicalFeature(parent,_, word) =>
         if( baseLexicon(parent, word) == 0) {
           error("NegativeInfintiy for " + parent + word + baseLexicon(parent));
@@ -55,7 +56,7 @@ class SlavFeaturizer[L,W](baseLexicon: PairedDoubleCounter[L,W],
         Some(0.0);
       case SlavRuleFeature(UnaryRule((par,parstate),(child,childState))) =>
         Some(0.0);
-      case SlavLexicalFeature(parent,_, word) => Some(math.log(baseLexicon(parent,word)));
+      case SlavLexicalFeature(parent,_, word) =>
         Some(0.0);
       case _ => None
     }
@@ -98,7 +99,8 @@ class SlavBitFeaturizer[L,W] extends Featurizer[L,W] {
 class SlavFeatureFactory[L,W] extends FeaturizerFactory[L,W] {
   def getFeaturizer(conf: Configuration,
                     baseLexicon: PairedDoubleCounter[L,W],
-                    baseProductions: PairedDoubleCounter[L,Rule[L]]):Featurizer[L,W] = {
-    new SlavFeaturizer(baseLexicon,baseProductions);
+                    baseBinaries: PairedDoubleCounter[L,BinaryRule[L]],
+                    baseUnaries: PairedDoubleCounter[L,UnaryRule[L]]):Featurizer[L,W] = {
+    new SlavFeaturizer(baseLexicon,baseBinaries,baseUnaries);
   }
 }

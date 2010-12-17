@@ -65,14 +65,19 @@ class SumFeaturizer[L,W](f1: Featurizer[L,W], f2: Featurizer[L,W]) extends Featu
   def initialValueForFeature(f: Feature[L,W]) = f1.initialValueForFeature(f) + f2.initialValueForFeature(f);
 }
 
-class RuleFeaturizer[L,W](prods: PairedDoubleCounter[L,Rule[L]], initToZero: Boolean = true, scale: Double = 1.0) extends Featurizer[L,W] {
+class RuleFeaturizer[L,W](binaries: PairedDoubleCounter[L,BinaryRule[L]],
+                          unaries: PairedDoubleCounter[L,UnaryRule[L]],
+                          initToZero: Boolean = true, scale: Double = 1.0) extends Featurizer[L,W] {
   println(initToZero);
   def featuresFor(r: Rule[L]) = aggregate(RuleFeature(r) -> 1.0);
   def featuresFor(l: L, w: W) = aggregate[Feature[L,W]]();
 
 
   def initialValueForFeature(f: Feature[L,W]) = f match {
-    case RuleFeature(r) => if(initToZero) 0.0 else math.log(prods(r.parent,r) / prods(r.parent).total) / scale;
+    case RuleFeature(r:BinaryRule[L]) => if(initToZero) 0.0 else
+      math.log(binaries(r.parent,r) / binaries(r.parent).total) / scale;
+    case RuleFeature(r:UnaryRule[L]) => if(initToZero) 0.0 else
+      math.log(unaries(r.parent,r) / unaries(r.parent).total) / scale;
     case _ => 0.0;
   }
 
@@ -152,6 +157,50 @@ class SlavFeaturizer[L,W](base: Featurizer[L,W], numStates:Int) extends Featuriz
     val result = DoubleCounter[Feature[(L,Int),W]]();
     for( (k,v) <- baseFeatures) {
       result(SubstateFeature(k,substates)) = v;
+    }
+    result;
+  }
+  def initialValueForFeature(f: Feature[(L,Int),W]) = f match {
+    case SubstateFeature(baseF, _) =>
+      val baseScore = base.initialValueForFeature(baseF);
+      baseScore + math.log(0.99 + math.random * 0.02);
+    case _ => 0.0;
+  }
+}
+
+class SlavSplitFeaturizer[L,W](base: Featurizer[L,W], numStates:Int) extends Featurizer[(L,Int),W] {
+  val root: Int = math.sqrt(numStates).toInt;
+  def featuresFor(r: Rule[(L,Int)]) = r match {
+    case BinaryRule(a,b,c) =>
+      val result = DoubleCounter[Feature[(L,Int),W]]();
+      val baseFeatures = base.featuresFor(BinaryRule(a._1,b._1,c._1));
+      val substates1 = ArrayBuffer(a._2 - (a._2%root), b._2 - (b._2%root), c._2 - (c._2%root));
+      val substates2 = ArrayBuffer((a._2%root),  (b._2%root),  (c._2%root));
+      for( (k,v) <- baseFeatures) {
+        result(SubstateFeature(k,substates1)) = v;
+        result(SubstateFeature(k,substates2)) = v;
+      }
+      result;
+    case UnaryRule(a,b) =>
+      val result = DoubleCounter[Feature[(L,Int),W]]();
+      val baseFeatures = base.featuresFor(UnaryRule(a._1,b._1));
+      val substates1 = ArrayBuffer(a._2 - (a._2%root), b._2 - (b._2%root));
+      val substates2 = ArrayBuffer((a._2%root),  (b._2%root));
+      for( (k,v) <- baseFeatures) {
+        result(SubstateFeature(k,substates1)) = v;
+        result(SubstateFeature(k,substates2)) = v;
+      }
+      result;
+  }
+
+  def featuresFor(l: (L,Int), w: W) = {
+    val baseFeatures = base.featuresFor(l._1, w);
+    val substates1 = ArrayBuffer(l._2 - (l._2 %root));
+    val substates2 = ArrayBuffer((l._2%root));
+    val result = DoubleCounter[Feature[(L,Int),W]]();
+    for( (k,v) <- baseFeatures) {
+      result(SubstateFeature(k,substates1)) = v;
+      result(SubstateFeature(k,substates2)) = v;
     }
     result;
   }
