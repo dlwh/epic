@@ -28,11 +28,7 @@ class AnchoredRuleApproximator[C,F,W](fineParser: ChartBuilder[LogProbabilityPar
                                       projections: ProjectionIndexer[C,F], pruningThreshold: Double = Double.NegativeInfinity) extends EPApproximator[C,F,W] {
   val factory = new AnchoredRuleScorerFactory[C,F,W](fineParser,projections,pruningThreshold);
 
-  val zeroGrammar = new ZeroGrammar(coarseParser.grammar);
-  val zeroLexicon = new ZeroLexicon(coarseParser.lexicon);
-  val zeroParser = new CKYChartBuilder[LogProbabilityParseChart,C,W](coarseParser.root, zeroLexicon,zeroGrammar,ParseChart.logProb);
-  //val zeroFactory = new NonNormalizingAnchoredRuleScorerFactory[C,C,W](coarseParser,new ProjectionIndexer(coarseParser.grammar.index,coarseParser.grammar.index,identity[C]_),pruningThreshold)
-  val zeroFactory = { error("TODO"); new AnchoredRuleScorerFactory[C,C,W](coarseParser,new ProjectionIndexer(coarseParser.grammar.index,coarseParser.grammar.index,identity[C]_),pruningThreshold) }
+  val zeroFactory = new CachingSpanScorerFactory(coarseParser);
 
   def project(inside: ParseChart[F], outside: ParseChart[F], partition: Double, spanScorer: SpanScorer, tree: BinarizedTree[C]):SpanScorer = {
     factory.buildSpanScorer(inside,outside,  partition, spanScorer, tree);
