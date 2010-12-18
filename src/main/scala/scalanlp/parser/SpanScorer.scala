@@ -82,4 +82,6 @@ object SpanScorer {
     def scoreBinaryRule(begin: Int, split: Int, end: Int, parent: Int, leftChild: Int, rightChild: Int) = 0.0
   }
 
+
+
 }
