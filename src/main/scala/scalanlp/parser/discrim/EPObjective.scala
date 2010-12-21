@@ -6,6 +6,7 @@ import scalanlp.parser.projections._
 import scalanlp.optimize._
 
 import scalanlp.trees._
+import scalanlp.util._
 import scalanlp.config.Configuration
 import scalanlp.util.{ConsoleLogging, Log}
 import splitting.StateSplitting
@@ -25,26 +26,25 @@ import scalanlp.util._;
  * @author dlwh
  */
 class EPObjective[L,L2,W](featurizers: Seq[Featurizer[L2,W]],
-                          unsplitRoot: L, // self explanatory
                           trees: IndexedSeq[(BinarizedTree[L],Seq[W],SpanScorer)],
+                          indexedProjections: ProjectionIndexer[L,L2],
                           coarseParser: ChartBuilder[LogProbabilityParseChart, L, W],
-                          openTags: Set[L],
+                          openTags: Set[L2],
                           closedWords: Set[W],
                           numModels: Int,
-                          splitLabel: L=>Seq[L2],
-                          unsplit: (L2=>L),
-                          maxEPIterations: Int = 1) extends BatchDiffFunction[Int,DenseVector] {
+                          maxEPIterations: Int = 1) 
+                        extends AbstractDiscriminativeObjective[L,L2,W](trees,indexedProjections,openTags,closedWords) {
 
   val root = {
-    val splitRoot = splitLabel(unsplitRoot);
-    require(splitRoot.length == 1, "Split of root must be length 1");
-    splitRoot.head;
+    val splits = indexedProjections.refinementsOf(coarseParser.root)
+    require(splits.length == 1)
+    splits(0)
   }
 
   val indexedFeatures: Seq[FeatureIndexer[L2,W]] = featurizers.map { featurizer =>
     val initGrammar = coarseParser.grammar;
     val initLex = coarseParser.lexicon;
-    FeatureIndexer[L,L2,W](featurizer, initGrammar, initLex, splitLabel);
+    FeatureIndexer[L,L2,W](featurizer, initGrammar, initLex, indexedProjections);
   }
 
   private val offsets = Array.fill(numModels+1)(0);
@@ -58,101 +58,62 @@ class EPObjective[L,L2,W](featurizers: Seq[Featurizer[L2,W]],
   }
   def totalModelSize = offsets.last;
 
-  val indexedProjections = indexedFeatures.map { index =>
-    new ProjectionIndexer(coarseParser.grammar.index, index.labelIndex, unsplit)
-  };
-
-  val fullRange = (0 until trees.length);
-
-  // TODO: fix
-  def extractViterbiParser(weights: DenseVector) = {
-    val parsers = Array.tabulate(numModels)(extractLogProbParser(weights,_));
-    val epBuilder = new EPParser(parsers,coarseParser, indexedProjections,maxEPIterations);
+  def extractParser(weights: DenseVector) = {
+    val parsers = Array.tabulate(numModels)(extractLogProbBuilder(weights,_));
+    val epBuilder = new EPParser[L,L2,W](parsers,coarseParser, Array.fill(numModels)(indexedProjections),maxEPIterations);
     epBuilder;
   }
 
-  type LogProbBuilder = CKYChartBuilder[LogProbabilityParseChart,L2,W]
+  protected type Builder = EPParser[L,L2,W]
+  protected type Counts = Seq[ExpectedCounts[W]]
 
-  def extractLogProbParser(weights: DenseVector, model: Int)= {
-    val grammar = weightsToGrammar(weights, model);
-    val lexicon = weightsToLexicon(weights, model);
+  def builder(weights: DenseVector) = extractParser(weights);
+
+  protected def emptyCounts(b: Builder) = b.parsers.map { p => new ExpectedCounts[W](p.grammar)}
+  protected def expectedCounts(epBuilder: Builder, t: BinarizedTree[L], w: Seq[W], scorer:SpanScorer) = {
+    val charts = epBuilder.buildAllCharts(w,scorer,t);
+
+    import epBuilder._;
+
+    val expectedCounts = for( (p,ParsedSentenceData(inside,outside,z,f0)) <- epBuilder.parsers zip charts) yield {
+      val treeCounts = treeToExpectedCounts(p.grammar,p.lexicon,t,w, f0)
+      val wordCounts = wordsToExpectedCounts(p,w,inside,outside, z, f0);
+      treeCounts -= wordCounts;
+    }
+
+    expectedCounts
+  }
+
+  def sumCounts(c1: Counts, c2: Counts) = {
+    Array.tabulate(numModels)(m => c1(m) += c2(m));
+  }
+
+  def countsToObjective(c: Counts) = {
+    val weightVectors = for { (e,f) <- c zip indexedFeatures} yield expectedCountsToFeatureVector(f,e);
+    val grad = -tileWeightVectors( weightVectors.toArray) value;
+
+    val logProb = c.map(_.logProb);
+
+    println((norm(grad,2), logProb.mkString("(",",",")")));
+    assert(grad.forall(!_._2.isInfinite), "wtf grad");
+    (-logProb.last,  grad);
+  }
+
+
+  private type LogProbBuilder = CKYChartBuilder[LogProbabilityParseChart,L2,W]
+  private def extractLogProbBuilder(weights: DenseVector, model: Int)= {
+    val grammar = weightsToGrammar(indexedFeatures(model), projectWeights(weights,model));
+    val lexicon = weightsToLexicon(indexedFeatures(model), projectWeights(weights,model));
     val parser = new LogProbBuilder(root, lexicon, grammar, ParseChart.logProb);
     parser
   }
 
-  var numFailures = 0;
-  def calculate(weights: DenseVector, sample: IndexedSeq[Int]) = {
-    assert(weights.forall(!_._2.isNaN),"wtf weights!");
 
-    try {
-      val parsers = Array.tabulate(numModels)(extractLogProbParser(weights,_));
-      val epBuilder = new EPParser(parsers,coarseParser, indexedProjections,maxEPIterations);
-      import epBuilder._;
-      val myTrees = sample.map(trees);
-      val startTime = System.currentTimeMillis();
-      def initialExpectedCounts = parsers.map( p => new ExpectedCounts[W](p.grammar))
-      val ecounts = myTrees.par(8).fold(initialExpectedCounts) { (counts, treeWordsScorer) =>
-        val localIn = System.currentTimeMillis();
-        val (tree,words,spanScorer) = treeWordsScorer;
-        try {
-          val charts = epBuilder.buildAllCharts(words,spanScorer,tree);
-
-          val expectedCounts = for( (p,ParsedSentenceData(inside,outside,z,f0)) <- parsers zip charts) yield {
-            val treeCounts = treeToExpectedCounts(p.grammar,p.lexicon,tree,words, f0)
-            val wordCounts = wordsToExpectedCounts(p,words,inside,outside, z, f0);
-            treeCounts -= wordCounts;
-          }
-
-          Array.tabulate(numModels)(m => counts(m) += expectedCounts(m));
-        } catch {
-          case e => println("Error in parsing: " + words + e); e.printStackTrace(); throw new RuntimeException("Error parsing " + words,e);
-        }
-      } { (ecounts1, ecounts2) =>
-        Array.tabulate(numModels)(m => ecounts1(m) += ecounts2(m))
-      }
-      val finishTime = System.currentTimeMillis() - startTime;
-
-      println("Parsing took: " + finishTime / 1000.0)
-      val weightVectors = for { (e,f) <- ecounts zip indexedFeatures} yield expectedCountsToFeatureVector(e,f);
-      val grad = -tileWeightVectors( weightVectors) value;
-
-      val logProb = ecounts.map(_.logProb);
-
-      println((norm(grad,2), logProb.mkString("(",",",")")));
-      assert(grad.forall(!_._2.isInfinite), "wtf grad");
-      (-logProb.last,  grad);
-    }  catch {
-      case ex: UnaryClosureException =>
-        numFailures += 1;
-        if(numFailures > 10) throw ex;
-        ex.printStackTrace();
-        (Double.PositiveInfinity,null);
-    }
-
-  }
-
-  val splitOpenTags = {
-    for(t <- openTags; s <- splitLabel(t))  yield s;
-  }
-
-  def weightsToLexicon(weights: DenseVector, modelIndex: Int) = {
-    val grammar = new FeaturizedLexicon(splitOpenTags, closedWords,
-      projectWeights(weights,modelIndex),
-      indexedFeatures(modelIndex));
-    grammar;
-  }
-
-  def weightsToGrammar(weights: DenseVector, modelIndex: Int):Grammar[L2] = {
-    val myWeights = projectWeights(weights,modelIndex);
-    val grammar =  new FeaturizedGrammar(myWeights,indexedFeatures(modelIndex))
-    grammar;
-  }
-
-  def wordsToExpectedCounts(parser: LogProbBuilder, words: Seq[W],
-                            inside: LogProbabilityParseChart[L2],
-                            outside: LogProbabilityParseChart[L2],
-                            totalProb: Double,
-                            spanScorer: SpanScorer) = {
+  private def wordsToExpectedCounts(parser: LogProbBuilder, words: Seq[W],
+                                    inside: LogProbabilityParseChart[L2],
+                                    outside: LogProbabilityParseChart[L2],
+                                    totalProb: Double,
+                                    spanScorer: SpanScorer) = {
     val ecounts = new InsideOutside(parser).expectedCounts(words, inside, outside, totalProb, spanScorer);
     ecounts
   }
@@ -163,32 +124,7 @@ class EPObjective[L,L2,W](featurizers: Seq[Featurizer[L2,W]],
                                    t: BinarizedTree[L],
                                    words: Seq[W],
                                    spanScorer: SpanScorer = SpanScorer.identity):ExpectedCounts[W] = {
-    StateSplitting.expectedCounts(g,lexicon,t.map(splitLabel),words,spanScorer);
-  }
-
-  def expectedCountsToFeatureVector(ecounts: ExpectedCounts[W], indexedFeatures: FeatureIndexer[L2,W]):DenseVector = {
-    val result = indexedFeatures.mkDenseVector(0.0);
-
-    // binaries
-    for( (a,bvec) <- ecounts.binaryRuleCounts;
-         (b,cvec) <- bvec;
-         (c,v) <- cvec.activeElements) {
-      result += (indexedFeatures.featuresFor(a,b,c) * v);
-    }
-
-    // unaries
-    for( (a,bvec) <- ecounts.unaryRuleCounts;
-         (b,v) <- bvec.activeElements) {
-      result += (indexedFeatures.featuresFor(a,b) * v);
-    }
-
-    // lex
-    for( (a,ctr) <- ecounts.wordCounts;
-         (w,v) <- ctr) {
-      result += (indexedFeatures.featuresFor(a,w) * v);
-    }
-
-    result;
+    StateSplitting.expectedCounts(g,lexicon,t.map(indexedProjections.refinementsOf _),words,spanScorer);
   }
 
   def projectWeights(weights: DenseVector, modelIndex: Int) = {
@@ -204,7 +140,6 @@ class EPObjective[L,L2,W](featurizers: Seq[Featurizer[L2,W]],
   }
 
   def tileWeightVectors(modelWeights: Array[DenseVector]) = {
-    // TODO: not require same number of features per model
     val weights = new DenseVector(totalModelSize);
     var i = 0;
     for(w <- modelWeights) {
@@ -242,41 +177,6 @@ object EPTrainer extends ParserTrainer {
 
   def unsplit(x: (String,Int)) = x._1;
 
-  override def loadTrainSpans(config: Configuration):Iterable[SpanScorer] = {
-    val spanDir = config.readIn[File]("spans.labeled",null);
-    if(spanDir eq null) super.loadTrainSpans(config);
-    else {
-      val spanFile = new File(spanDir,ProjectTreebankToLabeledSpans.TRAIN_SPANS_NAME)
-      ProjectTreebankToLabeledSpans.loadSpansFile(spanFile);
-    }
-  }
-  override def loadDevSpans(config: Configuration):Iterable[SpanScorer] = {
-    val spanDir = config.readIn[File]("spans.labeled",null);
-    if(spanDir eq null) super.loadDevSpans(config);
-    else {
-      val spanFile = new File(spanDir,ProjectTreebankToLabeledSpans.DEV_SPANS_NAME)
-      ProjectTreebankToLabeledSpans.loadSpansFile(spanFile);
-    }
-  }
-
-  override def loadTestSpans(config: Configuration):Iterable[SpanScorer] = {
-    val spanDir = config.readIn[File]("spans.labeled",null);
-    if(spanDir eq null) super.loadTestSpans(config);
-    else {
-      val spanFile = new File(spanDir,ProjectTreebankToLabeledSpans.TEST_SPANS_NAME)
-      ProjectTreebankToLabeledSpans.loadSpansFile(spanFile)
-    }
-  }
-
-  def loadCoarseIndex(config: Configuration, index: Index[String]):Index[String] = {
-    val spanDir = config.readIn[File]("spans.labeled",null);
-    if(spanDir eq null) index
-    else {
-      val spanFile = new File(spanDir,ProjectTreebankToLabeledSpans.SPAN_INDEX_NAME)
-      ProjectTreebankToLabeledSpans.loadSpanIndex(spanFile)
-    }
-  }
-
   def loadParser(config: Configuration) = {
     val spanDir = config.readIn[File]("parser.base",null);
     if(spanDir eq null) None
@@ -292,18 +192,11 @@ object EPTrainer extends ParserTrainer {
       val modelWeights = obj.partitionWeights(weights).zip(obj.indexedFeatures).map { case (w,ind) => (w,ind.decode(w))};
       ProjectTreebankToLabeledSpans.writeObject(modelWeights,new java.io.File("weights-" +iter +".ser"));
       println("Validating...");
-      val parser = obj.extractViterbiParser(weights);
+      val parser = obj.extractParser(weights);
       val fixedTrees = devTrees.take(400).toIndexedSeq;
       val results = ParseEval.evaluate(fixedTrees, parser, unaryReplacer);
       println("Validation : " + results)
     }
-  }
-
-  def readObject[T](loc: File) = {
-    val oin = new ObjectInputStream(new BufferedInputStream(new FileInputStream(loc)));
-    val parser = oin.readObject().asInstanceOf[T]
-    oin.close();
-    parser;
   }
 
   def getFeaturizer(config: Configuration,
@@ -351,8 +244,17 @@ object EPTrainer extends ParserTrainer {
 
     val latentFeaturizer = getFeaturizer(config, initLexicon, initBinaries, initUnaries, numStates, epModels)
 
+    val fineLabelIndex = {
+      val index = Index[(String,Int)];
+      for( l <- xbarParser.grammar.index; l2 <- split(l,numStates)) {
+        index.index(l2)
+      }
+      index;
+    }
+    val indexedProjections = new ProjectionIndexer(xbarParser.grammar.index, fineLabelIndex, unsplit);
+
     val openTags = Set.empty ++ {
-      for(t <- initLexicon.activeKeys.map(_._1) if initLexicon(t).size > 50) yield t;
+      for(t <- initLexicon.activeKeys.map(_._1) if initLexicon(t).size > 50; t2 <- split(t, numStates) iterator ) yield t2;
     }
 
     val closedWords = Set.empty ++ {
@@ -361,14 +263,13 @@ object EPTrainer extends ParserTrainer {
       wordCounts.iterator.filter(_._2 > 10).map(_._1);
     }
 
-    obj = new EPObjective(latentFeaturizer, "",
+    obj = new EPObjective(latentFeaturizer, 
       trainTrees.toIndexedSeq,
+      indexedProjections,
       xbarParser,
       openTags,
       closedWords,
       epModels,
-      split(_:String,numStates),
-      unsplit (_:(String,Int)),
       maxEPIterations);
 
 
@@ -399,7 +300,7 @@ object EPTrainer extends ParserTrainer {
     for( (state,iter) <- opt.iterations(obj,init).take(maxIterations).zipWithIndex;
          () = quickEval(devTrees,state.x, iter, iterPerValidate)
          if iter != 0 && iter % iterationsPerEval == 0) yield try {
-      val parser = obj.extractViterbiParser(state.x)
+      val parser = obj.extractParser(state.x)
       ("LatentDiscrim-" + iter.toString,parser)
     } catch {
       case e => println(e);e.printStackTrace(); throw e;

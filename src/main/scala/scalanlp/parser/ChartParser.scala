@@ -8,12 +8,13 @@ import scalanlp.trees._;
  */
 @serializable
 @SerialVersionUID(1)
-class ChartParser[F,C,W](val builder: ChartBuilder[ParseChart,F,W],
+class ChartParser[C,F,W](val builder: ChartBuilder[ParseChart,F,W],
                          val decoder: ChartDecoder[C,F],
+                         val scorerProjector: SpanScorer=>SpanScorer = identity _,
                          val scorerFactory: SpanScorer.Factory[W] = SpanScorer.identityFactory[W]) extends Parser[C,W] {
 
   override def bestParse(w: Seq[W], scorer: SpanScorer = SpanScorer.identity) = try {
-    val metaScorer = scorerFactory.mkSpanScorer(w, scorer);
+    val metaScorer = scorerFactory.mkSpanScorer(w, scorerProjector(scorer));
     val chart = builder.buildInsideChart(w, validSpan = metaScorer);
     lazy val outsideChart = builder.buildOutsideChart(chart, validSpan =metaScorer)
     val bestParse = decoder.extractBestParse(builder.root, builder.grammar, chart, outsideChart, metaScorer);
@@ -21,6 +22,7 @@ class ChartParser[F,C,W](val builder: ChartBuilder[ParseChart,F,W],
   } catch {
     case e => throw e;
   }
+
 }
 
 object ChartParser {

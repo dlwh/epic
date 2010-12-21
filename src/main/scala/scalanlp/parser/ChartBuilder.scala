@@ -17,6 +17,8 @@ trait ChartBuilder[+Chart[X]<:ParseChart[X],L,W] {
   def root: L;
   def lexicon:Lexicon[L,W];
 
+  def index = grammar.index;
+
   def withCharts[Chart[X]<:ParseChart[X]](factory: ParseChart.Factory[Chart]):ChartBuilder[Chart,L,W];
 }
 

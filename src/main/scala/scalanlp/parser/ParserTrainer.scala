@@ -1,11 +1,51 @@
 package scalanlp.parser;
 
 import java.util.Properties
+import projections.ProjectTreebankToLabeledSpans
 import scala.collection.mutable.ArrayBuffer
-import scalanlp.config.Configuration
+import scalanlp.config._
 import java.io._
 import scalanlp.trees._
+import scalanlp.util._
 import scalanlp.trees.UnaryChainRemover.ChainReplacer
+
+case class TreebankParams(path: File, maxLength:Int = 40, binarization:String = "xbar", processing: String = "standard") {
+  def binarize = {
+    if(binarization == "xbar") Trees.xBarBinarize _ ;
+    else Trees.binarize(_:Tree[String]);
+  }
+
+  val treebank = {
+    if(path.isDirectory) Treebank.fromPennTreebankDir(path)
+    else DenseTreebank.fromZipFile(path);
+  }
+
+  val xform = processing match {
+    case "german" => Trees.Transforms.GermanTreebankTransform;
+    case _ => Trees.Transforms.StandardStringTransform;
+  }
+
+}
+
+case class Spans(directory: File = null) {
+  def loadSpans(path: Option[File]):Iterable[SpanScorer] = path match {
+    case Some(path) => ProjectTreebankToLabeledSpans.loadSpansFile(path);
+    case None =>       Stream.continually(SpanScorer.identity)
+  }
+
+  val trainSpansFile = Option(directory).map{dir => new File(dir, ProjectTreebankToLabeledSpans.TRAIN_SPANS_NAME)}
+  val trainSpans = loadSpans(trainSpansFile);
+
+  val devSpansFile = Option(directory).map{dir => new File(dir, ProjectTreebankToLabeledSpans.DEV_SPANS_NAME)}
+  val devSpans = loadSpans(devSpansFile);
+
+  val testSpansFile = Option(directory).map{dir => new File(dir, ProjectTreebankToLabeledSpans.TEST_SPANS_NAME)}
+  val testSpans = loadSpans(testSpansFile);
+}
+
+case class ParserTrainerParams(treebank: TreebankParams, spans: Spans) {
+
+}
 
 trait ParserTrainer {
   def trainParser(trainTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer)],
@@ -39,47 +79,24 @@ trait ParserTrainer {
     (dechainedWithSpans, chainReplacer)
   }
 
-  def loadTrainSpans(config: Configuration):Iterable[SpanScorer] = Stream.continually(SpanScorer.identity);
-  def loadTestSpans(config: Configuration):Iterable[SpanScorer] = Stream.continually(SpanScorer.identity);
-  def loadDevSpans(config: Configuration):Iterable[SpanScorer] = Stream.continually(SpanScorer.identity);
-
   var unaryReplacer : ChainReplacer[String] = _;
 
   def main(args: Array[String]) {
     val config = Configuration.fromPropertiesFiles(args.map{new File(_)});
-
-    val treebank = {
-      val path = config.readIn[File]("treebank.path");
-      if(path.isDirectory) Treebank.fromPennTreebankDir(path)
-      else DenseTreebank.fromZipFile(path);
-    }
-
-    val binarize = {
-      val kind = config.readIn[String]("tree.binarization","standard");
-      if(kind == "xbar") Trees.xBarBinarize _ ;
-      else Trees.binarize(_:Tree[String]);
-    }
+    val params = config.readIn[ParserTrainerParams]("treebank");
+    import params.treebank._;
+    import params.spans._;
 
 
-    val maxLength = config.readIn[Int]("sentence.maxLength",40);
-
-    val xform = config.readIn[String]("treebank.processing","standard").toLowerCase match {
-      case "german" => Trees.Transforms.GermanTreebankTransform;
-      case _ => Trees.Transforms.StandardStringTransform;
-    }
-
-    val trainSpans = loadTrainSpans(config);
     val trainTreesWithUnaries = transformTrees(treebank.trainTrees, trainSpans, maxLength, binarize, xform);
     val (trainTrees,replacer) = removeUnaryChains(trainTreesWithUnaries);
-
     unaryReplacer = replacer;
 
-    val devSpans = loadDevSpans(config);
     val devTrees = transformTrees(treebank.devTrees, devSpans, maxLength, binarize, xform)
 
     println("Training Parser...");
     val parsers = trainParser(trainTrees,devTrees,config);
-    val testSpans = loadTestSpans(config);
+
     val testTrees = transformTrees(treebank.testTrees, testSpans, maxLength, binarize, xform)
 
     for((name,parser) <- parsers) {
@@ -88,10 +105,8 @@ trait ParserTrainer {
       evalParser(testTrees,parser,name,replacer);
       val outDir = new File("parsers/");
       outDir.mkdirs();
-      val out = new File(outDir,name + ".parser");
-      val stream = new ObjectOutputStream(new BufferedOutputStream(new FileOutputStream(out)));
-      stream.writeObject(parser);
-      stream.close();
+      val out = new File(outDir,name +".parser")
+      writeObject(out,parser);
     }
   }
 

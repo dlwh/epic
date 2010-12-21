@@ -102,7 +102,7 @@ class ViterbiDecoder[C,F](val indexedProjections: ProjectionIndexer[C,F]) extend
 @serializable
 @SerialVersionUID(1)
 class SimpleViterbiDecoder[L](grammar: Grammar[L]) extends
-    ViterbiDecoder[L,L](new ProjectionIndexer(grammar.index,grammar.index,identity[L]));
+    ViterbiDecoder[L,L](ProjectionIndexer.simple(grammar.index));
 
 
 object SimpleViterbiDecoder {

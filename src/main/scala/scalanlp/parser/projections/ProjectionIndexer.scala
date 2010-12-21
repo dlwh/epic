@@ -25,7 +25,8 @@ class ProjectionIndexer[C,F](val coarseIndex: Index[C], val fineIndex:Index[F], 
     result.map(_.toArray);
   }
 
-  def refinementsOf(c: Int):Array[Int] = refinements(c);
+  def refinementsOf(c: Int):IndexedSeq[Int] = refinements(c);
+  def refinementsOf(c: C):IndexedSeq[F] = refinements(coarseIndex(c)).map(fineIndex.get _);
 
   /**
    * Computes the projection of the indexed fine label f to an indexed coarse label.
@@ -40,4 +41,8 @@ class ProjectionIndexer[C,F](val coarseIndex: Index[C], val fineIndex:Index[F], 
    * Same as project(f)
    */
   def apply(f: Int) = project(f)
+}
+
+object ProjectionIndexer {
+  def simple[L](index: Index[L]) = new ProjectionIndexer(index,index, identity[L] _);
 }

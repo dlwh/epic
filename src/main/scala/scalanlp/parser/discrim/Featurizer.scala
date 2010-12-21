@@ -8,7 +8,7 @@ import scalala.tensor.sparse.SparseVector
 import scalanlp.util.{CachedHashCode, Encoder, Index}
 import collection.mutable.{ArrayBuffer}
 
-import scalanlp.parser._
+import projections._;
 import bitvector.BitUtils;
 import scalanlp.trees._;
 
@@ -381,9 +381,8 @@ trait FeatureIndexer[L,W] extends Encoder[Feature[L,W]] {
 
 object FeatureIndexer {
 
-  def apply[L,L2,W](f: Featurizer[L2,W], rawGrammar: Grammar[L], lex: Lexicon[L,W], split: L=>Seq[L2]) = {
+  def apply[L,L2,W](f: Featurizer[L2,W], rawGrammar: Grammar[L], lex: Lexicon[L,W], indexedProjections: ProjectionIndexer[L,L2]) = {
     val featureIndex = Index[Feature[L2,W]]();
-    val splitLabelIndex = Index[L2]();
 
     // a -> b c -> SparseVector of feature weights
     val binaryRuleCache = new ArrayMap(new SparseArrayMap(new SparseArrayMap[DoubleCounter[Feature[L2,W]]](null)));
@@ -397,16 +396,15 @@ object FeatureIndexer {
       (b,binaryRules) <- rawGrammar.allBinaryRules;
       (c,parents) <- binaryRules;
       a <- parents.activeKeys;
-      bSplit <- split(rawGrammar.index.get(b));
-      val bI = splitLabelIndex.index(bSplit)
-      cSplit <- split(rawGrammar.index.get(c));
-      val cI = splitLabelIndex.index(cSplit)
-      aSplit <- split(rawGrammar.index.get(a))
+      aSplit <- indexedProjections.refinementsOf(a)
+      bSplit <- indexedProjections.refinementsOf(b)
+      cSplit <- indexedProjections.refinementsOf(c)
     } {
-      val aI = splitLabelIndex.index(aSplit)
-      val binaryRule = BinaryRule(aSplit,bSplit,cSplit);
+      val binaryRule = BinaryRule(indexedProjections.fineIndex.get(aSplit),
+        indexedProjections.fineIndex.get(bSplit),
+        indexedProjections.fineIndex.get(cSplit));
       val feats = f.featuresFor(binaryRule);
-      binaryRuleCache(aI)(bI)(cI) = feats;
+      binaryRuleCache(aSplit)(bSplit)(cSplit) = feats;
       feats.keysIterator.foreach {featureIndex.index _ };
     }
 
@@ -415,29 +413,27 @@ object FeatureIndexer {
     for{
       (b,parents) <- rawGrammar.allUnaryRules;
       a <- parents.activeKeys;
-      bSplit <- split(rawGrammar.index.get(b));
-      val bI = splitLabelIndex.index(bSplit)
-      aSplit <- split(rawGrammar.index.get(a))
+      aSplit <- indexedProjections.refinementsOf(a)
+      bSplit <- indexedProjections.refinementsOf(b)
     } {
-      val aI = splitLabelIndex.index(aSplit)
-      val binaryRule = UnaryRule(aSplit,bSplit);
+      val binaryRule = UnaryRule(indexedProjections.fineIndex.get(aSplit),
+        indexedProjections.fineIndex.get(bSplit));
       val feats = f.featuresFor(binaryRule);
-      unaryRuleCache(aI)(bI) = feats;
+      unaryRuleCache(aSplit)(bSplit) = feats;
       feats.keysIterator.foreach {featureIndex.index _ };
     }
 
     // lex
     for{
       (l,w) <- lex.knownTagWords
-      lSplit <- split(l)
+      lSplit <- indexedProjections.refinementsOf(l)
     } {
-      val lI = splitLabelIndex.index(lSplit)
       val feats = f.featuresFor(lSplit,w);
-      lexicalCache(lI)(w) = feats;
+      lexicalCache(indexedProjections.fineIndex(lSplit))(w) = feats;
       feats.keysIterator.foreach {featureIndex.index _ };
     }
 
-    cachedFeaturesToIndexedFeatures[L2,W](f,splitLabelIndex,featureIndex,binaryRuleCache,unaryRuleCache,lexicalCache)
+    cachedFeaturesToIndexedFeatures[L2,W](f,indexedProjections.fineIndex,featureIndex,binaryRuleCache,unaryRuleCache,lexicalCache)
   }
 
   def apply[L,W](f: Featurizer[L,W], trees: Iterable[(BinarizedTree[L],Seq[W])]) = {

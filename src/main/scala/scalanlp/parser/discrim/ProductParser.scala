@@ -34,9 +34,7 @@ class ProductParser[L,L2,W](val parsers: Seq[CKYChartBuilder[LogProbabilityParse
   }
 
   val anchoredProjectors = parsers zip projections map { case (parser,projection) =>
-    error("TODO")
-    //new AnchoredPosteriorScorerFactory(parser,projection,Double.NegativeInfinity);
-    new AnchoredRuleScorerFactory(parser,projection,Double.NegativeInfinity);
+    new AnchoredRulePosteriorScorerFactory(parser,projection,Double.NegativeInfinity);
   }
 
 
