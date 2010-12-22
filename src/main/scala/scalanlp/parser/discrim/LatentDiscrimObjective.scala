@@ -101,11 +101,9 @@ class LatentDiscrimObjective[L,L2,W](featurizer: Featurizer[L2,W],
     }
     result;
   }
-
-
 }
 
-object StochasticLatentTrainer extends ParserTrainer {
+trait LatentTrainer extends ParserTrainer {
   def split(x: String, numStates: Int) = {
     if(x.isEmpty) Seq((x,0))
     else for(i <- 0 until numStates) yield (x,i);
@@ -121,45 +119,33 @@ object StochasticLatentTrainer extends ParserTrainer {
     }
   }
 
-  var obj: LatentDiscrimObjective[String,(String,Int),String] = null;
-
-  def quickEval(indexedProjections: ProjectionIndexer[String,(String,Int)], devTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer)], weights: DenseVector, iter: Int, iterPerValidate:Int) {
-    if(iter % iterPerValidate == 0) {
-      ProjectTreebankToLabeledSpans.writeObject((weights,obj.indexedFeatures.decode(weights)),new java.io.File("weights-" +iter +".ser"));
-      println("Validating...");
-      val parser = obj.extractParser(weights);
-      val fixedTrees = devTrees.take(400).map { case (a,b,c) => (a,b,obj.projectCoarseScorer(indexedProjections,c))}.toIndexedSeq;
-      val results = ParseEval.evaluate(fixedTrees, parser, unaryReplacer);
-      println("Validation : " + results)
-    }
-  }
-
-  def readObject[T](loc: File) = {
-    val oin = new ObjectInputStream(new BufferedInputStream(new FileInputStream(loc)));
-    val parser = oin.readObject().asInstanceOf[T]
-    oin.close();
-    parser;
-  }
+  type MyFeaturizer;
+  type MyObjective <: AbstractDiscriminativeObjective[String,(String,Int),String];
 
   def getFeaturizer(config: Configuration,
                     initLexicon: PairedDoubleCounter[String, String],
                     initBinaries: PairedDoubleCounter[String, BinaryRule[String]],
                     initUnaries: PairedDoubleCounter[String, UnaryRule[String]],
-                    numStates: Int): Featurizer[(String, Int), String] = {
-    val factory = config.readIn[FeaturizerFactory[String, String]]("discrim.featurizerFactory", new PlainFeaturizerFactory[String]);
-    val featurizer = factory.getFeaturizer(config, initLexicon, initBinaries, initUnaries);
-    val latentFactory = config.readIn[LatentFeaturizerFactory]("discrim.latentFactory", new SlavLatentFeaturizerFactory());
-    val latentFeaturizer = latentFactory.getFeaturizer(featurizer, numStates);
-    val weightsPath = config.readIn[File]("discrim.oldweights",null);
-    if(weightsPath == null) {
-      latentFeaturizer
-    } else {
-      println("Using awesome weights...");
-      val weights = readObject[(DenseVector,DoubleCounter[Feature[(String,Int),String]])](weightsPath)._2;
-      val splitStates = config.readIn[Boolean]("discrim.splitOldWeights",false);
-      new CachedWeightsFeaturizer(latentFeaturizer, weights, if(splitStates) FeatureProjectors.split _ else identity _)
-    }
+                    numStates: Int): MyFeaturizer;
+
+  def quickEval(obj: AbstractDiscriminativeObjective[String,(String,Int),String],
+                indexedProjections: ProjectionIndexer[String,(String,Int)],
+                devTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer)], weights: DenseVector) {
+    println("Validating...");
+    val parser = obj.extractParser(weights);
+    val fixedTrees = devTrees.take(400).toIndexedSeq;
+    val results = ParseEval.evaluate(fixedTrees, parser, unaryReplacer);
+    println("Validation : " + results)
   }
+
+
+  def mkObjective(conf: Configuration,
+                  latentFeaturizer: MyFeaturizer,
+                  trainTrees: Seq[(BinarizedTree[String], scala.Seq[String], SpanScorer)],
+                  indexedProjections: ProjectionIndexer[String, (String, Int)],
+                  xbarParser: ChartBuilder[ParseChart.LogProbabilityParseChart, String, String],
+                  openTags: Set[(String, Int)],
+                  closedWords: Set[String]): MyObjective;
 
   def trainParser(trainTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer)],
                   devTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer)],
@@ -183,7 +169,7 @@ object StochasticLatentTrainer extends ParserTrainer {
     }
     val indexedProjections = new ProjectionIndexer(xbarParser.grammar.index, fineLabelIndex, unsplit);
 
-    val latentFeaturizer: Featurizer[(String, Int), String] = getFeaturizer(config, initLexicon, initBinaries, initUnaries, numStates)
+    val latentFeaturizer: MyFeaturizer = getFeaturizer(config, initLexicon, initBinaries, initUnaries, numStates)
 
     val openTags = Set.empty ++ {
       for(t <- initLexicon.activeKeys.map(_._1) if initLexicon(t).size > 50; t2 <- split(t, numStates) iterator ) yield t2;
@@ -195,12 +181,7 @@ object StochasticLatentTrainer extends ParserTrainer {
       wordCounts.iterator.filter(_._2 > 10).map(_._1);
     }
 
-    obj = new LatentDiscrimObjective(latentFeaturizer, 
-      trainTrees.toIndexedSeq,
-      indexedProjections,
-      xbarParser,
-      openTags,
-      closedWords)
+    val obj = mkObjective(config, latentFeaturizer, trainTrees, indexedProjections, xbarParser, openTags, closedWords)
 
     val iterationsPerEval = config.readIn("iterations.eval",25);
     val maxIterations = config.readIn("iterations.max",300);
@@ -208,7 +189,7 @@ object StochasticLatentTrainer extends ParserTrainer {
     val regularization = config.readIn("objective.regularization",0.01) * batchSize / trainTrees.length;
     val alpha = config.readIn("opt.stepsize",20.0);
     val useL1 = config.readIn("opt.useL1",false);
-    System.out.println("UseL1: " + useL1);
+
     val opt = if(!useL1) {
       new StochasticGradientDescent[Int,DenseVector](alpha,maxIterations,batchSize)
               with AdaptiveGradientDescent.L2Regularization[Int,DenseVector]
@@ -227,15 +208,70 @@ object StochasticLatentTrainer extends ParserTrainer {
     val iterPerValidate = config.readIn("iterations.validate",10);
 
     val log = Log.globalLog;
-    for( (state,iter) <- opt.iterations(obj,init).take(maxIterations).zipWithIndex;
-         () = quickEval(indexedProjections,devTrees.toIndexedSeq,state.x, iter, iterPerValidate)
+    def evalAndCache(pair: (opt.State,Int) ) {
+      val (state,iter) = pair;
+      val weights = state.x;
+      if(iter % iterPerValidate == 0) {
+        cacheWeights(config,obj,weights, iter);
+        quickEval(obj,indexedProjections, devTrees, weights);
+      }
+    }
+
+    for( (state,iter) <- opt.iterations(obj,init).take(maxIterations).zipWithIndex.tee(evalAndCache _);
          if iter != 0 && iter % iterationsPerEval == 0) yield try {
       val parser = obj.extractParser(state.x)
       ("LatentDiscrim-" + iter.toString,parser)
     } catch {
       case e => println(e);e.printStackTrace(); throw e;
     }
-
-
   }
+
+
+  def cacheWeights(config: Configuration, obj: MyObjective, weights: DenseVector, iter: Int);
+}
+
+object StochasticLatentTrainer extends LatentTrainer {
+
+  type MyFeaturizer = Featurizer[(String,Int),String];
+  type MyObjective = LatentDiscrimObjective[String,(String,Int),String];
+
+  def getFeaturizer(config: Configuration,
+                    initLexicon: PairedDoubleCounter[String, String],
+                    initBinaries: PairedDoubleCounter[String, BinaryRule[String]],
+                    initUnaries: PairedDoubleCounter[String, UnaryRule[String]],
+                    numStates: Int): Featurizer[(String, Int), String] = {
+    val factory = config.readIn[FeaturizerFactory[String, String]]("discrim.featurizerFactory", new PlainFeaturizerFactory[String]);
+    val featurizer = factory.getFeaturizer(config, initLexicon, initBinaries, initUnaries);
+    val latentFactory = config.readIn[LatentFeaturizerFactory]("discrim.latentFactory", new SlavLatentFeaturizerFactory());
+    val latentFeaturizer = latentFactory.getFeaturizer(featurizer, numStates);
+    val weightsPath = config.readIn[File]("discrim.oldweights",null);
+    if(weightsPath == null) {
+      latentFeaturizer
+    } else {
+      val weights = readObject[(DenseVector,DoubleCounter[Feature[(String,Int),String]])](weightsPath)._2;
+      val splitStates = config.readIn[Boolean]("discrim.splitOldWeights",false);
+      new CachedWeightsFeaturizer(latentFeaturizer, weights, if(splitStates) FeatureProjectors.split _ else identity _)
+    }
+  }
+
+  def mkObjective(config: Configuration,
+                  latentFeaturizer: Featurizer[(String, Int), String],
+                  trainTrees: Seq[(BinarizedTree[String], scala.Seq[String], SpanScorer)],
+                  indexedProjections: ProjectionIndexer[String, (String, Int)],
+                  xbarParser: ChartBuilder[ParseChart.LogProbabilityParseChart, String, String],
+                  openTags: Set[(String, Int)],
+                  closedWords: Set[String]) = {
+    new LatentDiscrimObjective(latentFeaturizer,
+      trainTrees.toIndexedSeq,
+      indexedProjections,
+      xbarParser,
+      openTags,
+      closedWords)
+  }
+
+
+  def cacheWeights(config: Configuration, obj: MyObjective, weights: DenseVector, iter: Int) = {
+    writeObject( new File("weights-"+iter +".ser"), weights -> obj.indexedFeatures.decode(weights));
+  }
+
 }

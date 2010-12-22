@@ -30,6 +30,7 @@ abstract class AbstractDiscriminativeObjective[L,L2,W](
   closedWords: Set[W]) extends BatchDiffFunction[Int,DenseVector] with Logged {
 
   def extractParser(weights: DenseVector):Parser[L,W];
+  def initialWeightVector:DenseVector
 
   protected type Builder
   protected type Counts
@@ -39,7 +40,6 @@ abstract class AbstractDiscriminativeObjective[L,L2,W](
   protected def sumCounts(c1: Counts, c2: Counts):Counts
   /** Should return -logProb and the objective function */
   protected def countsToObjective(c: Counts):(Double,DenseVector)
-  protected def initialWeightVector:DenseVector
 
   private var numFailures = 0;
 
@@ -55,7 +55,7 @@ abstract class AbstractDiscriminativeObjective[L,L2,W](
         try {
           sumCounts(counts,expectedCounts(parser,tree,words,spanScorer));
         } catch {
-          case e => println("Error in parsing: " + words + e); e.printStackTrace(); throw new RuntimeException("Error parsing " + words,e);
+          case e => println("Error in parsing: " + words + e); throw new RuntimeException("Error parsing " + words,e);
         }
       } { sumCounts(_,_)}
       val finishTime = System.currentTimeMillis() - startTime;
@@ -113,7 +113,7 @@ abstract class AbstractDiscriminativeObjective[L,L2,W](
   }
 
 
-  def projectCoarseScorer(indexedProjections: ProjectionIndexer[L,L2], 
+  protected def projectCoarseScorer(indexedProjections: ProjectionIndexer[L,L2],
                                     coarseScorer: SpanScorer):SpanScorer ={
     new ProjectingSpanScorer(indexedProjections, coarseScorer);
   }
