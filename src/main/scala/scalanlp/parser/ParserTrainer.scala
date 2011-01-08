@@ -84,6 +84,7 @@ trait ParserTrainer {
   def main(args: Array[String]) {
     val config = Configuration.fromPropertiesFiles(args.map{new File(_)});
     val params = config.readIn[ParserTrainerParams]("treebank");
+    println(params);
     import params.treebank._;
     import params.spans._;
 
