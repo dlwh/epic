@@ -114,7 +114,7 @@ class EPObjective[L,L2,W](featurizers: Seq[Featurizer[L2,W]],
                                     outside: LogProbabilityParseChart[L2],
                                     totalProb: Double,
                                     spanScorer: SpanScorer) = {
-    val ecounts = new InsideOutside(parser).expectedCounts(words, inside, outside, totalProb, spanScorer);
+    val ecounts = new InsideOutside(parser).expectedCounts(words, inside, outside, totalProb, projectCoarseScorer(indexedProjections, spanScorer));
     ecounts
   }
 
@@ -124,7 +124,7 @@ class EPObjective[L,L2,W](featurizers: Seq[Featurizer[L2,W]],
                                    t: BinarizedTree[L],
                                    words: Seq[W],
                                    spanScorer: SpanScorer = SpanScorer.identity):ExpectedCounts[W] = {
-    StateSplitting.expectedCounts(g,lexicon,t.map(indexedProjections.refinementsOf _),words,spanScorer);
+    StateSplitting.expectedCounts(g,lexicon,t.map(indexedProjections.refinementsOf _),words,projectCoarseScorer(indexedProjections, spanScorer));
   }
 
   def projectWeights(weights: DenseVector, modelIndex: Int) = {

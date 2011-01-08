@@ -81,7 +81,7 @@ class LatentDiscrimObjective[L,L2,W](featurizer: Featurizer[L2,W],
   protected def wordsToExpectedCounts(words: Seq[W],
                             parser: ChartBuilder[LogProbabilityParseChart,L2,W],
                             spanScorer: SpanScorer = SpanScorer.identity) = {
-    val ecounts = new InsideOutside(parser).expectedCounts(words, spanScorer);
+    val ecounts = new InsideOutside(parser).expectedCounts(words, projectCoarseScorer(indexedProjections, spanScorer));
     ecounts
   }
 
@@ -91,7 +91,8 @@ class LatentDiscrimObjective[L,L2,W](featurizer: Featurizer[L2,W],
                                     t: BinarizedTree[L],
                                     words: Seq[W],
                                    spanScorer: SpanScorer = SpanScorer.identity):ExpectedCounts[W] = {
-    StateSplitting.expectedCounts(g,lexicon,t.map(indexedProjections.refinementsOf _),words,spanScorer);
+    StateSplitting.expectedCounts(g,lexicon,t.map(indexedProjections.refinementsOf _),words,
+      projectCoarseScorer(indexedProjections, spanScorer));
   }
 
   def initialWeightVector = {
