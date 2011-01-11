@@ -12,7 +12,7 @@ import scalala.tensor.counters.Counters.DoubleCounter
  */
 object ProjectingParser {
   def apply[C,F,W](builder: ChartBuilder[ParseChart,F,W], coarseIndex: Index[C], proj: F=>C) = {
-    val indexedProjections = new ProjectionIndexer(coarseIndex,builder.grammar.index,proj);
+    val indexedProjections = ProjectionIndexer(coarseIndex,builder.grammar.index,proj);
     val decoder = new ViterbiDecoder(indexedProjections);
     new ChartParser(builder, decoder);
   }

@@ -15,7 +15,7 @@ class AnchoredRuleScorerTest  extends ParserTestHarness with FunSuite {
 
   test("We can parse using span scorer") {
     val gen = ParserTestHarness.simpleParser;
-    val projections = new ProjectionIndexer(gen.builder.grammar.index,gen.builder.grammar.index,identity[String])
+    val projections = ProjectionIndexer(gen.builder.grammar.index,gen.builder.grammar.index,identity[String])
     val f = new AnchoredRuleScorerFactory(gen.builder.withCharts(ParseChart.logProb), projections, Double.NegativeInfinity);
     val zero = new CKYChartBuilder[ParseChart.LogProbabilityParseChart,String,String](gen.builder.root,new ZeroLexicon(gen.builder.lexicon), new ZeroGrammar(gen.builder.grammar),ParseChart.logProb);
     val fnext = new AnchoredRuleScorerFactory(zero, projections, Double.NegativeInfinity);

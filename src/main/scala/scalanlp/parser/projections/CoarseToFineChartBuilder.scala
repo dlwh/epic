@@ -19,7 +19,7 @@ class CoarseToFineChartBuilder[Chart[X]<:ParseChart[X],C,F,W](coarseParser: Char
                                 chartFactory: ParseChart.Factory[Chart] = ParseChart.viterbi,
                                 threshold:Double = -10) extends ChartBuilder[Chart,F,W] {
 
-  val indexedProjections = new ProjectionIndexer(coarseParser.grammar.index, grammar.index, proj);
+  val indexedProjections = ProjectionIndexer(coarseParser.grammar.index, grammar.index, proj);
 
   private val coarseRootIndex = coarseParser.grammar.index(proj(root));
 

@@ -9,12 +9,8 @@ import collection.mutable.ArrayBuffer
  */
 @serializable
 @SerialVersionUID(1)
-class ProjectionIndexer[C,F](val coarseIndex: Index[C], val fineIndex:Index[F], proj: F=>C) extends (Int=>Int) {
-  private val indexedProjections = Encoder.fromIndex(fineIndex).fillArray(-1);
-  for( (l,idx) <- fineIndex.zipWithIndex) {
-    indexedProjections(idx) = coarseIndex(proj(l));
-  }
-
+class ProjectionIndexer[C,F] private (val coarseIndex: Index[C],
+                                      val fineIndex:Index[F], indexedProjections: Array[Int]) extends (Int=>Int) {
   val coarseEncoder = Encoder.fromIndex(coarseIndex);
 
   val refinements = {
@@ -44,5 +40,13 @@ class ProjectionIndexer[C,F](val coarseIndex: Index[C], val fineIndex:Index[F], 
 }
 
 object ProjectionIndexer {
-  def simple[L](index: Index[L]) = new ProjectionIndexer(index,index, identity[L] _);
+  def simple[L](index: Index[L]) = ProjectionIndexer(index,index, identity[L] _);
+
+  def apply[C,F](coarseIndex: Index[C], fineIndex: Index[F], proj: F=>C) = {
+    val indexedProjections = Encoder.fromIndex(fineIndex).fillArray(-1);
+    for( (l,idx) <- fineIndex.zipWithIndex) {
+      indexedProjections(idx) = coarseIndex(proj(l));
+    }
+    new ProjectionIndexer(coarseIndex,fineIndex,indexedProjections);
+  }
 }

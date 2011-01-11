@@ -168,7 +168,7 @@ trait LatentTrainer extends ParserTrainer {
       }
       index;
     }
-    val indexedProjections = new ProjectionIndexer(xbarParser.grammar.index, fineLabelIndex, unsplit);
+    val indexedProjections = ProjectionIndexer(xbarParser.grammar.index, fineLabelIndex, unsplit);
 
     val latentFeaturizer: MyFeaturizer = getFeaturizer(config, initLexicon, initBinaries, initUnaries, numStates)
 

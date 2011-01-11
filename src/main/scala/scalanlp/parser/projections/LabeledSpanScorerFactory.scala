@@ -139,7 +139,7 @@ object ProjectTreebankToLabeledSpans {
     val treebank = DenseTreebank.fromZipFile(new File(args(1)));
     val outDir = new File(args(2));
     outDir.mkdirs();
-    val projections = new ProjectionIndexer(parser.builder.grammar.index,parser.builder.grammar.index,identity[String])
+    val projections = ProjectionIndexer(parser.builder.grammar.index,parser.builder.grammar.index,identity[String])
     val factory = new LabeledSpanScorerFactory[String,String,String](parser.builder.withCharts(ParseChart.logProb),projections);
     writeObject(parser.builder.grammar.index,new File(outDir,SPAN_INDEX_NAME));
     writeIterable(mapTrees(factory,transformTrees(treebank.trainTrees),true),new File(outDir,TRAIN_SPANS_NAME))

@@ -134,7 +134,7 @@ class EPParser[L,L2,W](val parsers: Seq[CKYChartBuilder[LogProbabilityParseChart
       }
     }
 
-    changes.max;
+    changes.foldLeft(0.0)(math.max _ );
   }
 
   def projectCoarseScorer(coarseScorer: SpanScorer, model: Int):SpanScorer ={
@@ -147,7 +147,7 @@ class EPParser[L,L2,W](val parsers: Seq[CKYChartBuilder[LogProbabilityParseChart
   val decoder = new ViterbiDecoder(projections.last);
   val f0Decoder = new SimpleViterbiDecoder(coarseParser.grammar);
   val f0Builder = new CKYChartBuilder[LogProbabilityParseChart,L,W](coarseParser.root,new ZeroLexicon(coarseParser.lexicon), new ZeroGrammar(coarseParser.grammar), ParseChart.logProb);
-  val coarseFact = new AnchoredRuleScorerFactory[L,L,W](coarseParser, new ProjectionIndexer(coarseParser.grammar.index,coarseParser.grammar.index,identity[L]), Double.NegativeInfinity);
+  val coarseFact = new AnchoredRuleScorerFactory[L,L,W](coarseParser, ProjectionIndexer(coarseParser.grammar.index,coarseParser.grammar.index,identity[L]), Double.NegativeInfinity);
 
 
   def bestParse(s: scala.Seq[W], spanScorer: SpanScorer) = {

@@ -42,7 +42,7 @@ class ProductParser[L,L2,W](val parsers: Seq[CKYChartBuilder[LogProbabilityParse
   val zeroGrammar = new ZeroGrammar(coarseParser.grammar);
   val zeroLexicon = new ZeroLexicon(coarseParser.lexicon);
   val zeroParser = new CKYChartBuilder[LogProbabilityParseChart,L,W](coarseParser.root, zeroLexicon,zeroGrammar,ParseChart.logProb);
-  val coarseIndexer = new ProjectionIndexer(coarseParser.grammar.index, coarseParser.grammar.index, identity[L] _)
+  val coarseIndexer = ProjectionIndexer(coarseParser.grammar.index, coarseParser.grammar.index, identity[L] _)
 }
 
 /**
