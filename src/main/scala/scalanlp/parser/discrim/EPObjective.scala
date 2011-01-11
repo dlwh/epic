@@ -190,9 +190,9 @@ object EPTrainer extends LatentTrainer {
     } else {
       println("Using awesome weights...");
       val weightSeq = readObject[Array[(DenseVector,DoubleCounter[Feature[(String,Int),String]])]](weightsPath).map(_._2);
-      val splitStates = config.readIn[Boolean]("discrim.splitOldWeights",false);
+      val splitFactor = config.readIn[Int]("discrim.splitFactor",1);
       def identity(x: Feature[(String,Int),String]) = x;
-      val proj: Feature[(String,Int),String]=>Feature[(String,Int),String] = if(splitStates) FeatureProjectors.split[String,String] _ else identity _
+      val proj: Feature[(String,Int),String]=>Feature[(String,Int),String] = FeatureProjectors.split[String,String](_,splitFactor)
 
       Array.tabulate(numModels){ m =>
         if(m < weightSeq.length)
