@@ -125,8 +125,8 @@ class CachedWeightsFeaturizer[L,W](f: Featurizer[L,W],
 }
 
 object FeatureProjectors {
-  def split[L,W](f: Feature[(L,Int),W]) = f match {
-    case SubstateFeature(k,states) => SubstateFeature(k,states.map(_/2));
+  def split[L,W](f: Feature[(L,Int),W], splitFactor: Int) = f match {
+    case SubstateFeature(k,states) => SubstateFeature(k,states.map(_/splitFactor));
     case _ => f;
   }
 }

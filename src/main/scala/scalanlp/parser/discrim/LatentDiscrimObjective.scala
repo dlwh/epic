@@ -250,8 +250,8 @@ object StochasticLatentTrainer extends LatentTrainer {
       latentFeaturizer
     } else {
       val weights = readObject[(DenseVector,DoubleCounter[Feature[(String,Int),String]])](weightsPath)._2;
-      val splitStates = config.readIn[Boolean]("discrim.splitOldWeights",false);
-      new CachedWeightsFeaturizer(latentFeaturizer, weights, if(splitStates) FeatureProjectors.split _ else identity _)
+      val splitFactor = config.readIn[Int]("discrim.splitFactor",1);
+      new CachedWeightsFeaturizer(latentFeaturizer, weights, FeatureProjectors.split(_,splitFactor));
     }
   }
 
