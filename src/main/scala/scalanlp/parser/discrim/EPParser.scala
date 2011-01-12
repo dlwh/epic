@@ -51,6 +51,7 @@ class EPParser[L,L2,W](val parsers: Seq[CKYChartBuilder[LogProbabilityParseChart
         scorers(m) = projectedScorer;
 
         val newPartition = insideCharts(m).top.labelScore(0,words.length,parsers.last.root);
+        assert(!newPartition.isInfinite);
         partitions(m) = newPartition;
         // project down the approximation
         currentF0 = approximators(m).project(insideCharts(m),outsideCharts(m), newPartition, projectedScorer, tree);

@@ -113,12 +113,6 @@ abstract class AbstractDiscriminativeObjective[L,L2,W](
   }
 
 
-  protected def projectCoarseScorer(indexedProjections: ProjectionIndexer[L,L2],
-                                    coarseScorer: SpanScorer):SpanScorer ={
-    new ProjectingSpanScorer(indexedProjections, coarseScorer);
-  }
-
-
 }
 
 

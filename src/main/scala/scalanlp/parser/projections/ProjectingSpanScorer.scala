@@ -24,3 +24,7 @@ class ProjectingSpanScorer[C,F](indexedProjections: ProjectionIndexer[C,F], scor
       indexedProjections.project(rightChild))- math.log(indexedProjections.refinementsOf(pParent).length);
   }
 }
+
+object ProjectingSpanScorer {
+  def factory[C,F](indexedProjections:ProjectionIndexer[C,F])= {(scorer: SpanScorer) => new ProjectingSpanScorer(indexedProjections,scorer)}
+}

@@ -27,12 +27,6 @@ class InsideOutside[L,W](val parser: ChartBuilder[LogProbabilityParseChart,L,W])
   def expectedCounts(words: Seq[W], validSpan: SpanScorer =SpanScorer.identity):ExpectedCounts[W] = {
     val inside = parser.buildInsideChart(words, validSpan);
     val totalProb = inside.top.labelScore(0, words.length, root);
-    if(totalProb.isInfinite || totalProb.isNaN) {
-      val xxChart = parser.buildInsideChart(words);
-      val xxProb = xxChart.top.labelScore(0, words.length, root);
-      if(xxProb.isNaN || xxProb.isInfinite) error("Couldn't parse either! " + words)
-      else error("Couldn't parse with span filter. Too much pruning?" + words);
-    }
     val outside = parser.buildOutsideChart(inside, validSpan);
 
     expectedCounts(words,inside,outside, totalProb, validSpan)

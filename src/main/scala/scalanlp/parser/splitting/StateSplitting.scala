@@ -41,7 +41,7 @@ import InsideOutside._;
 object StateSplitting {
 
   def insideScores[L,W](grammar: Grammar[L], lexicon: Lexicon[L,W], tree: BinarizedTree[Seq[L]], s: Seq[W], scorer: SpanScorer = SpanScorer.identity) = {
-    val score = new TriangularArray(s.length+1, grammar.mkVector(Double.NegativeInfinity));
+    val chart = ParseChart.logProb(grammar, s.length);
     val indexedTree:Tree[Seq[Int]] = tree.map{ _.map(grammar.index) };
 
     indexedTree.postorder.foreach {
@@ -53,7 +53,7 @@ object StateSplitting {
         for( a <- t.label.iterator;
             wScore = lexicon.wordScore(grammar.index.get(a),word) + scorer.scoreLexical(t.span.start,t.span.start+1,a);
             if !wScore.isInfinite) {
-          score(t.span.start,t.span.start+1)(a) = wScore;
+          chart.bot.enter(t.span.start,t.span.end,a,wScore);
           foundOne = true;
         }
         if(!foundOne) {
@@ -63,29 +63,29 @@ object StateSplitting {
           error("Trouble with lexical " + t.render(s) + " " + msg.mkString(", "))
         }
       case t : UnaryTree[Seq[Int]] =>
-        val spanScore = score(t.span.start,t.span.end);
         var foundOne = false;
         for ( a <- t.label) {
           val rules = grammar.unaryRulesByIndexedParent(a);
           for(c <- t.child.label) {
-            val ruleScore = rules(c) + spanScore(c) + scorer.scoreUnaryRule(t.span.start, t.span.end, a, c);
+            val ruleScore = (rules(c)
+              + chart.bot(t.span.start,t.span.end,c)
+              + scorer.scoreUnaryRule(t.span.start, t.span.end, a, c));
             if(!ruleScore.isInfinite) {
               foundOne = true;
             }
-            spanScore(a) = logSum(spanScore(a), ruleScore);
+            chart.top.enter(t.span.start, t.span.end, a,ruleScore);
           }
         }
 
         if(!foundOne) {
           val msg = t.label.map { a => t.child.label.map { c =>
             grammar.index.get(a) + "->" + grammar.index.get(c) + " " +
-             grammar.unaryRulesByIndexedParent(a)(c) + " " +  spanScore(c) + " " + scorer.scoreUnaryRule(t.span.start, t.span.end, a, c);
+             grammar.unaryRulesByIndexedParent(a)(c) + " " +  chart.bot(t.span.start,t.span.end,c) + " " + scorer.scoreUnaryRule(t.span.start, t.span.end, a, c);
           }}
           error("Trouble with unary " + t.render(s) + " " + msg.mkString(", "))
         }
       case t@BinaryTree(_,lchild,rchild) =>
         var foundOne = false;
-        val spanScore = score(t.span.start,t.span.end);
         val begin = t.span.start;
         val split = t.leftChild.span.end;
         val end = t.span.end;
@@ -97,18 +97,18 @@ object StateSplitting {
           for { b <- lchild.label } {
             val rules = grammar.binaryRulesByIndexedLeftChild(b);
             for { c <- rchild.label } {
-              arr(i) = rules(c)(a) + score(begin,split)(b) + score(split,end)(c) + scorer.scoreBinaryRule(begin,split,end,a,b,c);
+              arr(i) = rules(c)(a) + chart.top(begin,split,b) + chart.top(split,end,c) + scorer.scoreBinaryRule(begin,split,end,a,b,c);
               i += 1;
             }
           };
-          spanScore(a) = logSum(arr);
-          if(!spanScore(a).isInfinite && !spanScore(a).isNaN) foundOne = true;
+          chart.bot.enter(begin,end,a,logSum(arr));
+          if(!chart.bot(begin,end,a).isInfinite) foundOne = true;
        }
 
         if(!foundOne) {
           val msg = t.label.map { a => t.leftChild.label.map { b => t.rightChild.label.map { c =>
             grammar.index.get(a) + "->" + grammar.index.get(b) + " " + grammar.index.get(c) + " br: " +
-                 grammar.binaryRulesByIndexedLeftChild(b)(c)(a) +  " lc:"+ score(begin,split)(b) +  " rc: " + score(split,end)(c) +
+                 grammar.binaryRulesByIndexedLeftChild(b)(c)(a) +  " lc:"+ chart.top(begin,split,b) +  " rc: " + chart.top(split,end,c) +
                 " scorer: " + scorer.scoreBinaryRule(begin,split,end,a,b,c);
           }}}
           error("Trouble with binary " + t.render(s) + " " + msg.mkString(", "))
@@ -116,45 +116,45 @@ object StateSplitting {
       case _ => error("bad tree!");
     }
 
-    score;
+    chart;
   }
 
-  def outsideScores[L,W](grammar: Grammar[L], lexicon: Lexicon[L,W], tree: BinarizedTree[Seq[L]], s: Seq[W], insideScores: TriangularArray[Vector], scorer: SpanScorer= SpanScorer.identity) = {
+  def outsideScores[L,W](grammar: Grammar[L], lexicon: Lexicon[L,W], tree: BinarizedTree[Seq[L]], s: Seq[W], insideScores: ParseChart.LogProbabilityParseChart[L], scorer: SpanScorer= SpanScorer.identity) = {
     val indexedTree:Tree[Seq[Int]] = tree.map{ _.map(grammar.index) };
-    val score = new TriangularArray(s.length+1, grammar.mkVector(Double.NegativeInfinity));
+    val chart = ParseChart.logProb(grammar, s.length);
     // Root gets score 0
-    score(0,s.length)(indexedTree.label) = 0.0;
+    for(l <- indexedTree.label) chart.top.enter(0,s.length,l,0.0);
 
     // Set the outside score of each child
     indexedTree.preorder.foreach {
       case t @ BinaryTree(_,lchild,rchild) =>
         for {
           p <- t.label.iterator
-          pScore = score(t.span.start,t.span.end)(p);
+          pScore = chart.bot(t.span.start,t.span.end,p);
           l <- lchild.label.iterator
-          lScore = insideScores(lchild.span.start,lchild.span.end)(l);
+          lScore = insideScores.top(lchild.span.start,lchild.span.end,l);
           lRules = grammar.binaryRulesByIndexedLeftChild(l);
           r <- rchild.label.iterator
-          rScore = insideScores(rchild.span.start,rchild.span.end)(r)
+          rScore = insideScores.top(rchild.span.start,rchild.span.end,r)
         } {
           val rS = lRules(r)(p) + scorer.scoreBinaryRule(t.span.start,lchild.span.end,t.span.end,p,l,r);
-          score(lchild.span.start,lchild.span.end)(l) = logSum(score(lchild.span.start,lchild.span.end)(l),pScore + rScore + rS);
-          score(rchild.span.start,rchild.span.end)(r) = logSum(score(rchild.span.start,rchild.span.end)(r),pScore + lScore + rS);
+          chart.top.enter(lchild.span.start,lchild.span.end,l, pScore + rScore + rS);
+          chart.top.enter(rchild.span.start,rchild.span.end,r, pScore + lScore + rS);
         }
       case tree: NullaryTree[Seq[Int]] => () // do nothing
       case t @ UnaryTree(_,child) =>
         for {
           p <- t.label
-          pScore = score(child.span.start,child.span.end)(p);
+          pScore = chart.bot(child.span.start,child.span.end,p);
           c <- child.label
         } {
           val rScore = grammar.unaryRulesByIndexedChild(c)(p)+ scorer.scoreUnaryRule(t.span.start,t.span.end,p,c);
-          score(child.span.start,child.span.end)(c) = logSum(score(child.span.start,child.span.end)(c),pScore + rScore);
+          chart.bot.enter(child.span.start,child.span.end,c,pScore + rScore);
         }
 
     }
 
-    score
+    chart
   }
 
 
@@ -163,8 +163,6 @@ object StateSplitting {
     val unaryRuleCounts = grammar.fillSparseArray(grammar.mkVector(0.0));
     val wordCounts = grammar.fillSparseArray(DoubleCounter[W]());
 
-    var numTotal = 0;
-    var numProblems = 0;
     val safeScorer = scorer;
     /*new SpanScorer {
       @inline private def I(score: Double) = if(score > Double.NegativeInfinity) score else -100.0;
@@ -183,15 +181,15 @@ object StateSplitting {
     val indexedTree:Tree[Seq[Int]] = tree.map { _.map(grammar.index) };
 
     // normalizer
-    val totalProb = logSum(iScores(0,s.length)(tree.label map grammar.index));
+    val totalProb = logSum(tree.label.map(grammar.index).map(iScores.top(0,s.length,_)));
     if(totalProb.isInfinite || totalProb.isNaN)
       error("NAn or infinite" + totalProb + " " + tree.render(s));
 
     indexedTree.allChildren foreach {
       case t: NullaryTree[Seq[Int]] =>
         for( l <- t.label) {
-          val iS = iScores(t.span.start,t.span.end)(l);
-          val oS = oScores(t.span.start,t.span.end)(l)
+          val iS = iScores.bot(t.span.start,t.span.end,l);
+          val oS = oScores.bot(t.span.start,t.span.end,l)
           val ruleScore = (iS + oS - totalProb);
           assert(!ruleScore.isNaN);
          // assert(exp(ruleScore) > 0, " " + ruleScore);
@@ -201,9 +199,9 @@ object StateSplitting {
       case t@UnaryTree(_,child) =>
         for {
           p <- t.label.iterator;
-          opScore = oScores(t.span.start,t.span.end)(p);
+          opScore = oScores.top(t.span.start,t.span.end,p);
           c <- child.label.iterator
-          icScore = iScores(child.span.start,child.span.end)(c)
+          icScore = iScores.bot(child.span.start,child.span.end,c)
         } {
           val ruleScore = opScore + icScore + grammar.unaryRulesByIndexedChild(c)(p) - totalProb;
           val span = safeScorer.scoreUnaryRule(t.span.start,t.span.end,p,c);
@@ -215,13 +213,13 @@ object StateSplitting {
       case t@ BinaryTree(_,lc,rc) =>
         for {
           p <- t.label iterator;
-          opScore = oScores(t.span.start,t.span.end)(p);
+          opScore = oScores.bot(t.span.start,t.span.end,p);
           l <- lc.label.iterator
           val lRules = grammar.binaryRulesByIndexedLeftChild(l);
-          ilScore = iScores(lc.span.start,lc.span.end)(l);
+          ilScore = iScores.top(lc.span.start,lc.span.end,l);
           r <- rc.label.iterator
         } {
-          val irScore = iScores(rc.span.start,rc.span.end)(r)
+          val irScore = iScores.top(rc.span.start,rc.span.end,r)
           val ruleScore = opScore + irScore + ilScore + lRules(r)(p) - totalProb;
           val span = safeScorer.scoreBinaryRule(t.span.start,rc.span.start,rc.span.end,p,l,r);
           assert(!ruleScore.isNaN);

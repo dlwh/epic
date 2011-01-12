@@ -49,7 +49,7 @@ class LatentDiscrimObjective[L,L2,W](featurizer: Featurizer[L2,W],
     val grammar = weightsToGrammar(indexedFeatures, weights);
     val lexicon = weightsToLexicon(indexedFeatures, weights);
     val builder = CKYChartBuilder[L2,W](root, lexicon, grammar);
-    val parser = new ChartParser[L,L2,W](builder,new ViterbiDecoder(indexedProjections), new ProjectingSpanScorer(indexedProjections,_));
+    val parser = new ChartParser[L,L2,W](builder,new ViterbiDecoder(indexedProjections), ProjectingSpanScorer.factory(indexedProjections));
     parser
   }
 
@@ -67,6 +67,7 @@ class LatentDiscrimObjective[L,L2,W](featurizer: Featurizer[L2,W],
   protected def expectedCounts(b: Builder, t: BinarizedTree[L], w: Seq[W], scorer:SpanScorer) = {
     val treeCounts = treeToExpectedCounts(b.grammar,b.lexicon,t,w, scorer);
     val wordCounts = wordsToExpectedCounts(w, b, scorer);
+    if(treeCounts.logProb > wordCounts.logProb) error(t.render(w) + " " + treeCounts + " " + wordCounts);
     treeCounts -= wordCounts;
   }
 
@@ -160,6 +161,7 @@ trait LatentTrainer extends ParserTrainer {
       val lexicon = new SimpleLexicon(initLexicon);
       new CKYChartBuilder[LogProbabilityParseChart,String,String]("",lexicon,grammar,ParseChart.logProb);
     }
+
 
     val fineLabelIndex = {
       val index = Index[(String,Int)];
