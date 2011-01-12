@@ -49,7 +49,7 @@ class LatentDiscrimObjective[L,L2,W](featurizer: Featurizer[L2,W],
     val grammar = weightsToGrammar(indexedFeatures, weights);
     val lexicon = weightsToLexicon(indexedFeatures, weights);
     val builder = CKYChartBuilder[L2,W](root, lexicon, grammar);
-    val parser = new ChartParser[L,L2,W](builder,new ViterbiDecoder(indexedProjections), projectCoarseScorer(indexedProjections,_));
+    val parser = new ChartParser[L,L2,W](builder,new ViterbiDecoder(indexedProjections), new ProjectingSpanScorer(indexedProjections,_));
     parser
   }
 
@@ -81,7 +81,7 @@ class LatentDiscrimObjective[L,L2,W](featurizer: Featurizer[L2,W],
   protected def wordsToExpectedCounts(words: Seq[W],
                             parser: ChartBuilder[LogProbabilityParseChart,L2,W],
                             spanScorer: SpanScorer = SpanScorer.identity) = {
-    val ecounts = new InsideOutside(parser).expectedCounts(words, projectCoarseScorer(indexedProjections, spanScorer));
+    val ecounts = new InsideOutside(parser).expectedCounts(words, new ProjectingSpanScorer(indexedProjections, spanScorer));
     ecounts
   }
 
@@ -92,7 +92,7 @@ class LatentDiscrimObjective[L,L2,W](featurizer: Featurizer[L2,W],
                                     words: Seq[W],
                                    spanScorer: SpanScorer = SpanScorer.identity):ExpectedCounts[W] = {
     StateSplitting.expectedCounts(g,lexicon,t.map(indexedProjections.refinementsOf _),words,
-      projectCoarseScorer(indexedProjections, spanScorer));
+      new ProjectingSpanScorer(indexedProjections, spanScorer));
   }
 
   def initialWeightVector = {

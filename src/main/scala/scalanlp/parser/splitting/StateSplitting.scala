@@ -165,7 +165,8 @@ object StateSplitting {
 
     var numTotal = 0;
     var numProblems = 0;
-    val safeScorer = new SpanScorer {
+    val safeScorer = scorer;
+    /*new SpanScorer {
       @inline private def I(score: Double) = if(score > Double.NegativeInfinity) score else -100.0;
 
       def scoreLexical(begin: Int, end: Int, tag: Int) = I(scorer.scoreLexical(begin,end,tag))
@@ -175,7 +176,7 @@ object StateSplitting {
       def scoreBinaryRule(begin: Int, split: Int, end: Int, parent: Int, leftChild: Int, rightChild: Int) = {
         I(scorer.scoreBinaryRule(begin, split, end, parent, leftChild, rightChild))
       }
-    }
+    } */
 
     val iScores = insideScores(grammar,lexicon,tree,s, safeScorer);
     val oScores = outsideScores(grammar,lexicon, tree,s,iScores, safeScorer);

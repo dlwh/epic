@@ -62,7 +62,7 @@ class LabeledSpanScorerFactory[C,L,W](parser: ChartBuilder[ParseChart.LogProbabi
   def goldLabels(length: Int, tree: BinarizedTree[C]) = {
     val result = TriangularArray.raw(length,collection.mutable.BitSet());
     if(tree != null) {
-      for( t <- tree.allChildren) {
+      for( t <- tree.allChildren if !t.isInstanceOf[UnaryTree[L]]) {
         try {
           result(TriangularArray.index(t.span.start,t.span.end)).+=(indexedProjections.coarseIndex(t.label));
         } catch {
@@ -99,7 +99,8 @@ class LabeledSpanScorerFactory[C,L,W](parser: ChartBuilder[ParseChart.LogProbabi
       for(c <- markedSpans(index)) {
         if(scores(index) == null || scores(index)(c) == Double.NegativeInfinity) {
           println("grrr....");
-          println(parser.grammar.index.get(c) + " " + begin + " " + end + tree + " " + inside.top.labelScore(begin,end,c) + " " + outside.top.labelScore(begin,end,c) + " " + sentProb)
+          println(parser.grammar.index.get(c) + " " + begin + " " + end + tree + " " + inside.bot.labelScore(begin,end,c) + " " + outside.bot.labelScore(begin,end,c) + " " + sentProb)
+          //if(begin + 1 != end) error("crashy");
         }
       }
     }
