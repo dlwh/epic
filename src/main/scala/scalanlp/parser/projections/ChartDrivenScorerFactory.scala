@@ -11,9 +11,9 @@ import collection.mutable.BitSet
  */
 abstract class ChartDrivenScorerFactory[C,L,W](parser: ChartBuilder[ParseChart.LogProbabilityParseChart,L,W],
                                      indexedProjections: ProjectionIndexer[C,L],
-                                     pruningThreshold: Double = -7) extends SpanScorer.Factory[W] {
+                                     pruningThreshold: Double = -7) extends SpanScorer.Factory[C,L,W] {
 
-  def mkSpanScorer(s: Seq[W], scorer: SpanScorer = SpanScorer.identity) = {
+  def mkSpanScorer(s: Seq[W], scorer: SpanScorer[L] = SpanScorer.identity) = {
     val coarseRootIndex = parser.grammar.index(parser.root);
     val inside = parser.buildInsideChart(s, scorer)
     val outside = parser.buildOutsideChart(inside, scorer);
@@ -30,17 +30,17 @@ abstract class ChartDrivenScorerFactory[C,L,W](parser: ChartBuilder[ParseChart.L
 
   val proj = new AnchoredRuleProjector[C,L,W](parser, indexedProjections);
 
-  type MyScorer <:SpanScorer
+  type MyScorer <:SpanScorer[C]
 
 
   def buildSpanScorer(inside: ParseChart[L],
                       outside: ParseChart[L],
                       sentProb: Double,
-                      scorer: SpanScorer=SpanScorer.identity,
+                      scorer: SpanScorer[L]=SpanScorer.identity[L],
                       tree: BinarizedTree[C] = null):MyScorer = {
     import AnchoredRuleProjector._;
 
-    val pruner = {
+    val pruner: SpanScorer[L] = {
       if(tree == null) thresholdPruning(pruningThreshold)
       else goldTreeForcing(tree.map(indexedProjections.coarseIndex), thresholdPruning(pruningThreshold));
     }

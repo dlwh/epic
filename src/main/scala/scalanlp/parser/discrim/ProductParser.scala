@@ -11,7 +11,7 @@ import java.io.{FileInputStream, BufferedInputStream, ObjectInputStream, File}
 
 class ProductParser[L,L2,W](val parsers: Seq[CKYChartBuilder[LogProbabilityParseChart,L2,W]], coarseParser: ChartBuilder[LogProbabilityParseChart,L,W],
                        val projections: Seq[ProjectionIndexer[L,L2]]) extends Parser[L,W] {
-  def bestParse(words: scala.Seq[W], spanScorer: SpanScorer) = {
+  def bestParse(words: scala.Seq[W], spanScorer: SpanScorer[L]) = {
     val projected = projections.map(projectCoarseScorer(spanScorer,_));
     val posteriorScorers = for {
       (p,scorer) <- anchoredProjectors zip projected
@@ -19,7 +19,7 @@ class ProductParser[L,L2,W](val parsers: Seq[CKYChartBuilder[LogProbabilityParse
       p.mkSpanScorer(words,scorer);
     }
 
-    val sumScorer = posteriorScorers.foldLeft(spanScorer)(SpanScorer.sum(_:SpanScorer,_:SpanScorer));
+    val sumScorer = posteriorScorers.foldLeft(spanScorer)(SpanScorer.sum(_:SpanScorer[L],_:SpanScorer[L]));
 
 
     val zeroInside = zeroParser.buildInsideChart(words,sumScorer);
@@ -29,7 +29,7 @@ class ProductParser[L,L2,W](val parsers: Seq[CKYChartBuilder[LogProbabilityParse
     tree;
   }
 
-  def projectCoarseScorer(coarseScorer: SpanScorer, projections: ProjectionIndexer[L,L2]):SpanScorer ={
+  def projectCoarseScorer(coarseScorer: SpanScorer[L], projections: ProjectionIndexer[L,L2]):SpanScorer[L2] ={
     new ProjectingSpanScorer(projections, coarseScorer);
   }
 
@@ -50,8 +50,8 @@ class ProductParser[L,L2,W](val parsers: Seq[CKYChartBuilder[LogProbabilityParse
  * @author dlwh
  */
 object ProductParserRunner extends ParserTrainer {
-  def trainParser(trainTrees: Seq[(BinarizedTree[String], Seq[String], SpanScorer)],
-                  devTrees: Seq[(BinarizedTree[String], Seq[String], SpanScorer)], config: Configuration) = {
+  def trainParser(trainTrees: Seq[(BinarizedTree[String], Seq[String], SpanScorer[String])],
+                  devTrees: Seq[(BinarizedTree[String], Seq[String], SpanScorer[String])], config: Configuration) = {
     val parsers = new ArrayBuffer[EPParser[String,(String,Int),String]];
     var found = true;
     var i = 0;

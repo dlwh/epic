@@ -7,11 +7,11 @@ trait ChartBuilder[+Chart[X]<:ParseChart[X],L,W] {
    * Given a sentence s, fills a parse chart with inside scores.
    * validSpan can be used as a filter to insist that certain ones are valid.
    */
-  def buildInsideChart(s: Seq[W], validSpan: SpanScorer = SpanScorer.identity):Chart[L];
+  def buildInsideChart(s: Seq[W], validSpan: SpanScorer[L] = SpanScorer.identity):Chart[L];
   /**
    * Given an inside chart, fills the passed-in outside parse chart with inside scores.
    */
-  def buildOutsideChart(inside: ParseChart[L], validSpan: SpanScorer = SpanScorer.identity):Chart[L];
+  def buildOutsideChart(inside: ParseChart[L], validSpan: SpanScorer[L] = SpanScorer.identity):Chart[L];
 
   def grammar: Grammar[L];
   def root: L;
@@ -44,7 +44,7 @@ class CKYChartBuilder[Chart[X]<:ParseChart[X], L,W](val root: L,
   }
 
   def buildInsideChart(s: Seq[W],
-                       validSpan: SpanScorer = SpanScorer.identity):Chart[L] = {
+                       validSpan: SpanScorer[L] = SpanScorer.identity):Chart[L] = {
     val chart = chartFactory(grammar,s.length);
 
     for{i <- 0 until s.length} {
@@ -105,7 +105,7 @@ class CKYChartBuilder[Chart[X]<:ParseChart[X], L,W](val root: L,
 
 
   def buildOutsideChart(inside: ParseChart[L],
-                         validSpan: SpanScorer = SpanScorer.identity):Chart[L] = {
+                         validSpan: SpanScorer[L] = SpanScorer.identity):Chart[L] = {
     val length = inside.length;
     val outside = chartFactory(grammar,length);
     outside.top.enter(0,inside.length,grammar.index(root),0.0);
@@ -144,7 +144,7 @@ class CKYChartBuilder[Chart[X]<:ParseChart[X], L,W](val root: L,
     outside
   }
 
-  private def updateInsideUnaries(chart: ParseChart[L], begin: Int, end: Int, validSpan: SpanScorer) = {
+  private def updateInsideUnaries(chart: ParseChart[L], begin: Int, end: Int, validSpan: SpanScorer[L]) = {
     for(b <- chart.bot.enteredLabelIndexes(begin,end)) {
       val bScore = chart.bot.labelScore(begin,end,b);
       val parentVector = grammar.unaryRulesByIndexedChild(b);
@@ -162,7 +162,7 @@ class CKYChartBuilder[Chart[X]<:ParseChart[X], L,W](val root: L,
 
   }
 
-  private def updateOutsideUnaries(outside: ParseChart[L], begin: Int, end: Int, validSpan: SpanScorer) = {
+  private def updateOutsideUnaries(outside: ParseChart[L], begin: Int, end: Int, validSpan: SpanScorer[L]) = {
     for(a <- outside.top.enteredLabelIndexes(begin,end)) {
       val aScore = outside.top.labelScore(begin,end,a);
 

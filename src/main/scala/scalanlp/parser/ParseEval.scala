@@ -80,14 +80,14 @@ object ParseEval {
   type PostParseFn = (Tree[String],Tree[String],Seq[String],ParseEval[String]#Statistics,Int)=>Unit;
   val noPostParseFn = (_:Tree[String],_:Tree[String],_:Seq[String],_:ParseEval[String]#Statistics,_:Int)=>()
 
-  def evaluate(trees: IndexedSeq[(Tree[String],Seq[String],SpanScorer)],
+  def evaluate(trees: IndexedSeq[(Tree[String],Seq[String],SpanScorer[String])],
                parser: Parser[String,String], chainReplacer: ChainReplacer[String],
                postEval: PostParseFn = noPostParseFn) = {
 
     val peval = new ParseEval(Set("","''", "``", ".", ":", ","));
     import peval.Statistics;
 
-    def evalSentence(sent: (Tree[String],Seq[String],SpanScorer)) = try {
+    def evalSentence(sent: (Tree[String],Seq[String],SpanScorer[String])) = try {
       val (goldTree,words,scorer) = sent;
       val startTime = System.currentTimeMillis;
       val guessTree = Trees.debinarize(chainReplacer.replaceUnaries(parser.bestParse(words,scorer)));
@@ -106,7 +106,7 @@ object ParseEval {
     (prec,recall,exact);
   }
 
-  def evaluateAndLog(trees: IndexedSeq[(Tree[String],Seq[String],SpanScorer)],
+  def evaluateAndLog(trees: IndexedSeq[(Tree[String],Seq[String],SpanScorer[String])],
                      parser: Parser[String,String], evalDir: String, chainReplacer: ChainReplacer[String]) = {
 
     val parsedir = new File(evalDir);

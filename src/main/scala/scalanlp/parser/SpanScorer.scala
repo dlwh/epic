@@ -1,22 +1,21 @@
 package scalanlp.parser
 
 /**
- * SpanWeighters are used in ChartParsers to reweight labeled spans and rules.
+ * SpanScorers are used in ChartParsers to reweight rules in a particular context.
  * Typically, they're indexed for a *particular* grammar for speed.
- *
  *
  * @author dlwh
  */
 @serializable
 @SerialVersionUID(1)
-trait SpanScorer {
+trait SpanScorer[T] {
   def scoreBinaryRule(begin: Int, split: Int, end: Int, parent: Int, leftChild: Int, rightChild: Int): Double
   def scoreUnaryRule(begin: Int, end: Int, parent: Int, child: Int): Double
   def scoreLexical(begin: Int, end: Int, tag: Int): Double;
 }
 
 object SpanScorer {
-  def sum(s1: SpanScorer, s2: SpanScorer):SpanScorer = new SpanScorer {
+  def sum[T](s1: SpanScorer[T], s2: SpanScorer[T]):SpanScorer[T] = new SpanScorer[T] {
     def scoreBinaryRule(begin: Int, split: Int, end: Int, parent: Int, leftChild: Int, rightChild: Int): Double = {
       val r1 = s1.scoreBinaryRule(begin, split, end, parent, leftChild, rightChild);
       if(r1 == Double.NegativeInfinity) r1
@@ -35,7 +34,7 @@ object SpanScorer {
     }
   }
 
-  def divide(s: SpanScorer, div: Double) = new SpanScorer {
+  def divide[T](s: SpanScorer[T], div: Double):SpanScorer[T] = new SpanScorer[T] {
     def scoreBinaryRule(begin: Int, split: Int, end: Int, parent: Int, leftChild: Int, rightChild: Int): Double = {
       s.scoreBinaryRule(begin, split, end, parent, leftChild, rightChild) / div;
     }
@@ -50,31 +49,18 @@ object SpanScorer {
 
   }
 
-  def project(fineToCoarseMap: Int=>Int)(coarseScorer: SpanScorer): SpanScorer = new SpanScorer {
-    def scoreBinaryRule(begin: Int, split: Int, end: Int, parent: Int, leftChild: Int, rightChild: Int): Double = {
-      coarseScorer.scoreBinaryRule(begin, split, end, fineToCoarseMap(parent), fineToCoarseMap(leftChild), fineToCoarseMap(rightChild))
-    }
-    def scoreUnaryRule(begin: Int, end: Int, parent: Int, child: Int): Double = {
-      coarseScorer.scoreUnaryRule(begin, end, fineToCoarseMap(parent), fineToCoarseMap(child))
-    }
-
-    def scoreLexical(begin: Int, end: Int, tag: Int): Double = {
-      coarseScorer.scoreLexical(begin, end, fineToCoarseMap(tag))
-    }
-  }
-
   @serializable
-  trait Factory[W] {
-    def mkSpanScorer(s: Seq[W], oldScorer: SpanScorer = identity):SpanScorer
+  trait Factory[C,F,-W] {
+    def mkSpanScorer(s: Seq[W], oldScorer: SpanScorer[F] = identity):SpanScorer[C]
   }
 
   @serializable
   @SerialVersionUID(1)
-  def identityFactory[W]:Factory[W] = new Factory[W] {
-    def mkSpanScorer(s: Seq[W], oldScorer: SpanScorer = identity) = oldScorer;
+  def identityFactory[C,F,W]:Factory[C,F,W] = new Factory[C,F,W] {
+    def mkSpanScorer(s: Seq[W], oldScorer: SpanScorer[F] = identity) = identity[C];
   }
 
-  val identity = new SpanScorer {
+  def identity[T]:SpanScorer[T] = new SpanScorer[T] {
     def scoreLexical(begin: Int, end: Int, tag: Int) = 0.0
 
     def scoreUnaryRule(begin: Int, end: Int, parent: Int, child: Int) = 0.0

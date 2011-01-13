@@ -26,7 +26,7 @@ import scalanlp.util._;
  * @author dlwh
  */
 class EPObjective[L,L2,W](featurizers: Seq[Featurizer[L2,W]],
-                          trees: IndexedSeq[(BinarizedTree[L],Seq[W],SpanScorer)],
+                          trees: IndexedSeq[(BinarizedTree[L],Seq[W],SpanScorer[L])],
                           indexedProjections: ProjectionIndexer[L,L2],
                           coarseParser: ChartBuilder[LogProbabilityParseChart, L, W],
                           openTags: Set[L2],
@@ -70,7 +70,7 @@ class EPObjective[L,L2,W](featurizers: Seq[Featurizer[L2,W]],
   def builder(weights: DenseVector) = extractParser(weights);
 
   protected def emptyCounts(b: Builder) = b.parsers.map { p => new ExpectedCounts[W](p.grammar)}
-  protected def expectedCounts(epBuilder: Builder, t: BinarizedTree[L], w: Seq[W], scorer:SpanScorer) = {
+  protected def expectedCounts(epBuilder: Builder, t: BinarizedTree[L], w: Seq[W], scorer:SpanScorer[L]) = {
     val charts = epBuilder.buildAllCharts(w,scorer,t);
 
     import epBuilder._;
@@ -113,7 +113,7 @@ class EPObjective[L,L2,W](featurizers: Seq[Featurizer[L2,W]],
                                     inside: LogProbabilityParseChart[L2],
                                     outside: LogProbabilityParseChart[L2],
                                     totalProb: Double,
-                                    spanScorer: SpanScorer) = {
+                                    spanScorer: SpanScorer[L2]) = {
     val ecounts = new InsideOutside(parser).expectedCounts(words, inside, outside, totalProb, spanScorer);
     ecounts
   }
@@ -123,7 +123,7 @@ class EPObjective[L,L2,W](featurizers: Seq[Featurizer[L2,W]],
                                    lexicon: Lexicon[L2,W],
                                    t: BinarizedTree[L],
                                    words: Seq[W],
-                                   spanScorer: SpanScorer = SpanScorer.identity):ExpectedCounts[W] = {
+                                   spanScorer: SpanScorer[L2]):ExpectedCounts[W] = {
     StateSplitting.expectedCounts(g,lexicon,t.map(indexedProjections.refinementsOf _),words,spanScorer);
   }
 
@@ -204,7 +204,7 @@ object EPTrainer extends LatentTrainer {
 
   def mkObjective(config: Configuration,
                   latentFeaturizer: MyFeaturizer,
-                  trainTrees: Seq[(BinarizedTree[String], scala.Seq[String], SpanScorer)],
+                  trainTrees: Seq[(BinarizedTree[String], scala.Seq[String], SpanScorer[String])],
                   indexedProjections: ProjectionIndexer[String, (String, Int)],
                   xbarParser: ChartBuilder[ParseChart.LogProbabilityParseChart, String, String],
                   openTags: Set[(String, Int)],

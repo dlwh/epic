@@ -18,9 +18,9 @@ import scalanlp.trees.DenseTreebank
  */
 class LabeledSpanScorerFactory[C,L,W](parser: ChartBuilder[ParseChart.LogProbabilityParseChart,L,W],
                                     indexedProjections: ProjectionIndexer[C,L],
-                                    pruningThreshold: Double= -5) extends SpanScorer.Factory[W] {
+                                    pruningThreshold: Double= -5) extends SpanScorer.Factory[C,L,W] {
 
-  def mkSpanScorer(s: Seq[W], scorer: SpanScorer = SpanScorer.identity) = {
+  def mkSpanScorer(s: Seq[W], scorer: SpanScorer[L] = SpanScorer.identity) = {
     val coarseRootIndex = parser.grammar.index(parser.root);
     val inside = parser.buildInsideChart(s, scorer)
     val outside = parser.buildOutsideChart(inside, scorer);
@@ -35,7 +35,7 @@ class LabeledSpanScorerFactory[C,L,W](parser: ChartBuilder[ParseChart.LogProbabi
     chartScorer
   }
 
-  def mkSpanScorerWithTree(tree: BinarizedTree[C], s: Seq[W], scorer: SpanScorer= SpanScorer.identity) = {
+  def mkSpanScorerWithTree(tree: BinarizedTree[C], s: Seq[W], scorer: SpanScorer[L] = SpanScorer.identity) = {
     val coarseRootIndex = parser.grammar.index(parser.root);
     val inside = parser.buildInsideChart(s, scorer)
     val outside = parser.buildOutsideChart(inside, scorer);
@@ -73,7 +73,7 @@ class LabeledSpanScorerFactory[C,L,W](parser: ChartBuilder[ParseChart.LogProbabi
     result;
   }
 
-  def buildSpanScorer(inside: ParseChart[L], outside: ParseChart[L], sentProb: Double, tree: BinarizedTree[C] = null):LabeledSpanScorer = {
+  def buildSpanScorer(inside: ParseChart[L], outside: ParseChart[L], sentProb: Double, tree: BinarizedTree[C] = null):LabeledSpanScorer[C] = {
     val markedSpans = goldLabels(inside.length, tree)
 
     val scores = TriangularArray.raw(inside.length+1,null:SparseVector);
@@ -106,14 +106,14 @@ class LabeledSpanScorerFactory[C,L,W](parser: ChartBuilder[ParseChart.LogProbabi
     }
     //println("Density: " + density * 1.0 / scores.length);
     //println("Label Density:" + labelDensity * 1.0 / scores.length / parser.grammar.index.size)
-    new LabeledSpanScorer(scores);
+    new LabeledSpanScorer[C](scores);
   }
 
 }
 
 @serializable
 @SerialVersionUID(1)
-class LabeledSpanScorer(scores: Array[SparseVector]) extends SpanScorer {
+class LabeledSpanScorer[L](scores: Array[SparseVector]) extends SpanScorer[L] {
   @inline
   private def score(begin: Int, end: Int, label: Int) = {
     if(scores(TriangularArray.index(begin,end)) eq null) Double.NegativeInfinity
@@ -202,9 +202,9 @@ object ProjectTreebankToLabeledSpans {
     (trainSpans,devSpans,testSpans);
   }
 
-  def loadSpansFile(spanFile: File):Iterable[SpanScorer] = {
+  def loadSpansFile(spanFile: File):Iterable[SpanScorer[String]] = {
     require(spanFile.exists, spanFile + " must exist!")
-    new FileIterable[SpanScorer](spanFile);
+    new FileIterable[SpanScorer[String]](spanFile);
   }
 
   def loadSpanIndex(spanFile: File) = {
@@ -216,4 +216,3 @@ object ProjectTreebankToLabeledSpans {
   }
 
 }
-

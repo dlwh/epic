@@ -40,7 +40,7 @@ import InsideOutside._;
 
 object StateSplitting {
 
-  def insideScores[L,W](grammar: Grammar[L], lexicon: Lexicon[L,W], tree: BinarizedTree[Seq[L]], s: Seq[W], scorer: SpanScorer = SpanScorer.identity) = {
+  def insideScores[L,W](grammar: Grammar[L], lexicon: Lexicon[L,W], tree: BinarizedTree[Seq[L]], s: Seq[W], scorer: SpanScorer[L] = SpanScorer.identity) = {
     val chart = ParseChart.logProb(grammar, s.length);
     val indexedTree:Tree[Seq[Int]] = tree.map{ _.map(grammar.index) };
 
@@ -119,7 +119,7 @@ object StateSplitting {
     chart;
   }
 
-  def outsideScores[L,W](grammar: Grammar[L], lexicon: Lexicon[L,W], tree: BinarizedTree[Seq[L]], s: Seq[W], insideScores: ParseChart.LogProbabilityParseChart[L], scorer: SpanScorer= SpanScorer.identity) = {
+  def outsideScores[L,W](grammar: Grammar[L], lexicon: Lexicon[L,W], tree: BinarizedTree[Seq[L]], s: Seq[W], insideScores: ParseChart.LogProbabilityParseChart[L], scorer: SpanScorer[L]= SpanScorer.identity) = {
     val indexedTree:Tree[Seq[Int]] = tree.map{ _.map(grammar.index) };
     val chart = ParseChart.logProb(grammar, s.length);
     // Root gets score 0
@@ -158,7 +158,7 @@ object StateSplitting {
   }
 
 
-  def expectedCounts[L,W](grammar: Grammar[L], lexicon: Lexicon[L,W], tree: BinarizedTree[Seq[L]], s: Seq[W], scorer: SpanScorer = SpanScorer.identity) = {
+  def expectedCounts[L,W](grammar: Grammar[L], lexicon: Lexicon[L,W], tree: BinarizedTree[Seq[L]], s: Seq[W], scorer: SpanScorer[L] = SpanScorer.identity[L]) = {
     val binaryRuleCounts = grammar.fillSparseArray(grammar.fillSparseArray(grammar.mkVector(0.0)));
     val unaryRuleCounts = grammar.fillSparseArray(grammar.mkVector(0.0));
     val wordCounts = grammar.fillSparseArray(DoubleCounter[W]());
@@ -390,8 +390,8 @@ object StateSplitting {
 }
 
 object StateSplittingTrainer extends ParserTrainer {
-  def trainParser(trainTreesX: Seq[(BinarizedTree[String],Seq[String],SpanScorer)],
-                  devTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer)],
+  def trainParser(trainTreesX: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])],
+                  devTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])],
                   config: Configuration) = {
 
     val trainTrees = trainTreesX.map( c => (c._1,c._2));

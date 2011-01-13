@@ -25,7 +25,7 @@ import java.io._;
  * @author dlwh
  */
 class DiscrimObjective[L,W](feat: Featurizer[L,W],
-                            trees: IndexedSeq[(BinarizedTree[L],Seq[W],SpanScorer)],
+                            trees: IndexedSeq[(BinarizedTree[L],Seq[W],SpanScorer[L])],
                             coarseParser: ChartBuilder[LogProbabilityParseChart, L, W],
                             openTags: Set[L],
                             closedWords: Set[W])
@@ -36,7 +36,7 @@ class DiscrimObjective[L,W](feat: Featurizer[L,W],
                                               lexicon: Lexicon[L,W],
                                               lt: BinarizedTree[L],
                                               words: Seq[W],
-                                              spanScorer: SpanScorer):ExpectedCounts[W] = {
+                                              spanScorer: SpanScorer[L]):ExpectedCounts[W] = {
     val expectedCounts = new ExpectedCounts[W](g)
     val t = lt.map(indexedFeatures.labelIndex);
     var score = 0.0;
@@ -73,8 +73,8 @@ object DiscriminativeTrainer extends ParserTrainer {
 
 
 
-  def trainParser(trainTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer)],
-                  devTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer)],
+  def trainParser(trainTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])],
+                  devTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])],
                   config: Configuration) = {
 
     val (initLexicon,initBinaries,initUnaries) = GenerativeParser.extractCounts(trainTrees.iterator.map(tuple => (tuple._1,tuple._2)));

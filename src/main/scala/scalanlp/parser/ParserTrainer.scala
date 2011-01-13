@@ -28,7 +28,7 @@ case class TreebankParams(path: File, maxLength:Int = 40, binarization:String = 
 }
 
 case class Spans(directory: File = null) {
-  def loadSpans(path: Option[File]):Iterable[SpanScorer] = path match {
+  def loadSpans(path: Option[File]):Iterable[SpanScorer[String]] = path match {
     case Some(path) => ProjectTreebankToLabeledSpans.loadSpansFile(path);
     case None =>       Stream.continually(SpanScorer.identity)
   }
@@ -48,16 +48,16 @@ case class ParserTrainerParams(treebank: TreebankParams, spans: Spans) {
 }
 
 trait ParserTrainer {
-  def trainParser(trainTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer)],
-                  devTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer)],
+  def trainParser(trainTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])],
+                  devTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])],
                   config: Configuration):Iterator[(String,Parser[String,String])];
 
 
   def transformTrees(trees: Iterator[(Tree[String],Seq[String])],
-                     spans: Iterable[SpanScorer],
+                     spans: Iterable[SpanScorer[String]],
                      maxLength: Int,
                      binarize: (Tree[String]) => BinarizedTree[String],
-                     xform: Tree[String]=>Tree[String]): IndexedSeq[(BinarizedTree[String], Seq[String],SpanScorer)] = {
+                     xform: Tree[String]=>Tree[String]): IndexedSeq[(BinarizedTree[String], Seq[String],SpanScorer[String])] = {
 
     val binarizedAndTransformed = for {
       ((tree, words),span) <- (trees zip spans.iterator) if words.length <= maxLength
@@ -67,7 +67,7 @@ trait ParserTrainer {
 
   }
 
-  def removeUnaryChains(trees: IndexedSeq[(BinarizedTree[String],Seq[String],SpanScorer)]) = {
+  def removeUnaryChains(trees: IndexedSeq[(BinarizedTree[String],Seq[String],SpanScorer[String])]) = {
     val chainRemover = new UnaryChainRemover[String];
 
     val (dechained,chainReplacer) = chainRemover.removeUnaryChains(trees.iterator.map { case (t,w,s) => (t,w) });
@@ -111,7 +111,7 @@ trait ParserTrainer {
     }
   }
 
-  protected def evalParser(testTrees: IndexedSeq[(Tree[String],Seq[String],SpanScorer)],
+  protected def evalParser(testTrees: IndexedSeq[(Tree[String],Seq[String],SpanScorer[String])],
           parser: Parser[String,String], name: String, chainReplacer: ChainReplacer[String]) = {
     println("Evaluating Parser...");
     val (prec,recall,exact) = ParseEval.evaluateAndLog(testTrees,parser,name,chainReplacer);

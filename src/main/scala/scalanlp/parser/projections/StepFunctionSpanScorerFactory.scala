@@ -11,8 +11,8 @@ import java.io._;
  *
  * @author dlwh
  */
-class StepFunctionSpanScorerFactory[L,W](innerFactory: SpanScorer.Factory[W], threshold: Double= -7) extends SpanScorer.Factory[W] {
-  def mkSpanScorer(s: scala.Seq[W], oldScorer: SpanScorer = SpanScorer.identity):SpanScorer = {
+class StepFunctionSpanScorerFactory[L,W](innerFactory: SpanScorer.Factory[L,L,W], threshold: Double= -7) extends SpanScorer.Factory[L,L,W] {
+  def mkSpanScorer(s: scala.Seq[W], oldScorer: SpanScorer[L] = SpanScorer.identity):SpanScorer[L] = {
     val inner = innerFactory.mkSpanScorer(s,oldScorer);
     new StepFunctionSpanScorer(inner, threshold);
   }
@@ -20,7 +20,7 @@ class StepFunctionSpanScorerFactory[L,W](innerFactory: SpanScorer.Factory[W], th
 
 @serializable
 @SerialVersionUID(1)
-final class StepFunctionSpanScorer(inner: SpanScorer, threshold: Double = -7) extends SpanScorer {
+final class StepFunctionSpanScorer[L](inner: SpanScorer[L], threshold: Double = -7) extends SpanScorer[L] {
   @inline def I(score: Double) = if(score > threshold) 0.0 else Double.NegativeInfinity;
 
   def scoreLexical(begin: Int, end: Int, tag: Int) = I(inner.scoreLexical(begin,end,tag))

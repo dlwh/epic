@@ -16,8 +16,8 @@ import scalanlp.trees.BinarizedTree
 @SerialVersionUID(1)
 trait EPApproximator[C,F,W] {
   // TODO: add a type for the kind of span scorer this is.
-  def project(inside: ParseChart[F], outside: ParseChart[F], partition: Double, spanScorer: SpanScorer, goldTree: BinarizedTree[C]):SpanScorer
-  def divideAndNormalize(num: SpanScorer, denom: SpanScorer, words: Seq[W]):SpanScorer
+  def project(inside: ParseChart[F], outside: ParseChart[F], partition: Double, spanScorer: SpanScorer[F], goldTree: BinarizedTree[C]):SpanScorer[C]
+  def divideAndNormalize(num: SpanScorer[C], denom: SpanScorer[C], words: Seq[W]):SpanScorer[C]
 }
 
 
@@ -28,40 +28,14 @@ class AnchoredRuleApproximator[C,F,W](fineParser: ChartBuilder[LogProbabilityPar
                                       projections: ProjectionIndexer[C,F], pruningThreshold: Double = Double.NegativeInfinity) extends EPApproximator[C,F,W] {
   val factory = new AnchoredRuleScorerFactory[C,F,W](fineParser,projections,pruningThreshold);
 
-  val zeroFactory = new CachingSpanScorerFactory(coarseParser);
+  val zeroFactory = new CachingSpanScorerFactory[C,W](coarseParser);
 
-  def project(inside: ParseChart[F], outside: ParseChart[F], partition: Double, spanScorer: SpanScorer, tree: BinarizedTree[C]):SpanScorer = {
+  def project(inside: ParseChart[F], outside: ParseChart[F], partition: Double, spanScorer: SpanScorer[F], tree: BinarizedTree[C]):SpanScorer[C] = {
     factory.buildSpanScorer(inside,outside,  partition, spanScorer, tree);
   }
 
-  def divideAndNormalize(num: SpanScorer, denom: SpanScorer, words: Seq[W]):SpanScorer ={
+  def divideAndNormalize(num: SpanScorer[C], denom: SpanScorer[C], words: Seq[W]):SpanScorer[C] ={
     val div = ScalingSpanScorer(num,denom,0.0,-1);
     zeroFactory.mkSpanScorer(words,div);
-  }
-
-  def updateCorrection(oldCorrection: SpanScorer, newF0: SpanScorer, rescaled: SpanScorer, len: Int, damping: Double):SpanScorer ={
-    if(damping == 1.0)
-      ScalingSpanScorer(newF0,rescaled,0.0,-1);
-    else {
-      val damped = new SpanScorer {
-        def scoreLexical(begin: Int, end: Int, tag: Int) = {
-          oldCorrection.scoreLexical(begin,end,tag) * (1-damping) + damping * newF0.scoreLexical(begin,end,tag) -
-                  damping * rescaled.scoreLexical(begin,end,tag)
-        }
-
-        def scoreUnaryRule(begin: Int, end: Int, parent: Int, child: Int) = {
-          oldCorrection.scoreUnaryRule(begin,end,parent,child) * (1-damping) + damping * newF0.scoreUnaryRule(begin,end,parent,child) -
-                  damping * rescaled.scoreUnaryRule(begin,end,parent,child)
-        }
-
-        def scoreBinaryRule(begin: Int, split: Int, end: Int, parent: Int, leftChild: Int, rightChild: Int) = {
-          oldCorrection.scoreBinaryRule(begin,split,end,parent,leftChild,rightChild) * (1-damping) + damping * newF0.scoreBinaryRule(begin,split,end,parent,leftChild,rightChild) -
-                  damping * rescaled.scoreBinaryRule(begin,split,end,parent,leftChild,rightChild)
-        }
-      }
-
-      damped;
-
-    }
   }
 }

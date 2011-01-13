@@ -81,8 +81,8 @@ object GenerativeParser {
 }
 
 object GenerativeTrainer extends ParserTrainer {
-  def trainParser(trainTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer)],
-                  devTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer)],
+  def trainParser(trainTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])],
+                  devTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])],
                   config: Configuration) = {
     Iterator.single(("Gen",GenerativeParser.fromTrees(trainTrees.view.map(c => (c._1,c._2)))));
   }

@@ -200,8 +200,8 @@ class LogisticBitVector[L,W](treebank: StateSplitting.Treebank[L,W],
 object LogisticBitVectorTrainer extends ParserTrainer {
 
 
-  def trainParser(trainTreesX: Seq[(BinarizedTree[String],Seq[String],SpanScorer)],
-                  devTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer)],
+  def trainParser(trainTreesX: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])],
+                  devTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])],
                   config: Configuration) = {
 
     val trainTrees = trainTreesX.view.map(c => (c._1,c._2));
@@ -254,8 +254,8 @@ object LogisticBitVectorTrainer extends ParserTrainer {
 
 object LBFGSBitVectorTrainer extends ParserTrainer {
 
-  def trainParser(trainTreesX: Seq[(BinarizedTree[String],Seq[String],SpanScorer)],
-                  devTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer)],
+  def trainParser(trainTreesX: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])],
+                  devTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])],
                   config: Configuration) = {
 
     val trainTrees = trainTreesX.view.map(c => (c._1,c._2));

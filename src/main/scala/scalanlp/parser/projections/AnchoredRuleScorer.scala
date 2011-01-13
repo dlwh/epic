@@ -20,7 +20,7 @@ class AnchoredRuleScorerFactory[C,L,W](parser: ChartBuilder[ParseChart.LogProbab
                                      pruningThreshold: Double = -7)
         extends ChartDrivenScorerFactory[C,L,W](parser,indexedProjections,pruningThreshold) {
 
-  type MyScorer = AnchoredRuleScorer;
+  type MyScorer = AnchoredRuleScorer[C];
   protected def createSpanScorer(ruleData: AnchoredRuleProjector.AnchoredData, sentProb: Double) = {
     val AnchoredRuleProjector.AnchoredData(lexicalScores,unaryScores,logTotalsUnaries,binaryScores,logTotals) = ruleData;
     new AnchoredRuleScorer(lexicalScores, unaryScores, binaryScores, logTotals, logTotalsUnaries);
@@ -39,7 +39,7 @@ class AnchoredRulePosteriorScorerFactory[C,L,W](parser: ChartBuilder[ParseChart.
                                      pruningThreshold: Double = -7)
         extends ChartDrivenScorerFactory[C,L,W](parser,indexedProjections,pruningThreshold) {
 
-  type MyScorer = AnchoredRuleScorer;
+  type MyScorer = AnchoredRuleScorer[C];
   protected def createSpanScorer(ruleData: AnchoredRuleProjector.AnchoredData, sentProb: Double) = {
     val zeroSparseVector = new SparseVector(indexedProjections.coarseIndex.size, 0);
     zeroSparseVector.default = 0.0;
@@ -53,7 +53,7 @@ class AnchoredRulePosteriorScorerFactory[C,L,W](parser: ChartBuilder[ParseChart.
 
 @serializable
 @SerialVersionUID(2)
-class AnchoredRuleScorer(lexicalScores: Array[SparseVector], // begin -> label -> score
+class AnchoredRuleScorer[L](lexicalScores: Array[SparseVector], // begin -> label -> score
                          // (begin,end) -> parent -> child -> score
                          unaryScores: Array[Array[SparseVector]],
                          // (begin,end) -> (split-begin) -> parent -> lchild -> rchild -> score
@@ -61,7 +61,7 @@ class AnchoredRuleScorer(lexicalScores: Array[SparseVector], // begin -> label -
                          binaryScores: Array[Array[Array[Array[SparseVector]]]],
                          logTotalBinaries: Array[SparseVector], // sum of scores for binary scores.
                          logTotalUnaries: Array[SparseVector] // sum of scores for unary scores.
-                        ) extends SpanScorer {
+                        ) extends SpanScorer[L] {
 
   def scoreUnaryRule(begin: Int, end: Int, parent: Int, child: Int) = {
     val forSpan = unaryScores(TriangularArray.index(begin, end))

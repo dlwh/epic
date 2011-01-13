@@ -10,7 +10,7 @@ import scalanlp.math.Numerics
  * @author dlwh
  */
 object ScalingSpanScorer {
-  def apply(num: SpanScorer, denom: SpanScorer, constant:Double, root: Int):SpanScorer = new SpanScorer {
+  def apply[C](num: SpanScorer[C], denom: SpanScorer[C], constant:Double, root: Int):SpanScorer[C] = new SpanScorer[C] {
     def scoreLexical(begin: Int, end: Int, tag: Int) = {
       val ns = num.scoreLexical(begin, end, tag)
       if(ns == Double.NegativeInfinity) ns

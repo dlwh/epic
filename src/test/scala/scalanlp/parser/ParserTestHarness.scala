@@ -37,7 +37,7 @@ trait ParserTestHarness {
 
 
   def evalParser(testTrees: IndexedSeq[(Tree[String],Seq[String])],parser: Parser[String,String]) = {
-    val (prec,recall,exact) = ParseEval.evaluate(testTrees.map { case (t,w) => (t,w,SpanScorer.identity)},parser, ParserTestHarness.unaryReplacer);
+    val (prec,recall,exact) = ParseEval.evaluate(testTrees.map { case (t,w) => (t,w,SpanScorer.identity[String])},parser, ParserTestHarness.unaryReplacer);
     val f1 = (2 * prec * recall)/(prec + recall);
     (prec,recall,exact,f1);
   }

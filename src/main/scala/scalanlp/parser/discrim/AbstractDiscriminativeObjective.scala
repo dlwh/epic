@@ -24,7 +24,7 @@ import Log._;
 
 
 abstract class AbstractDiscriminativeObjective[L,L2,W](
-  trees: IndexedSeq[(BinarizedTree[L],Seq[W],SpanScorer)],
+  trees: IndexedSeq[(BinarizedTree[L],Seq[W],SpanScorer[L])],
   val indexedProjections: ProjectionIndexer[L,L2],
   openTags: Set[L2],
   closedWords: Set[W]) extends BatchDiffFunction[Int,DenseVector] with Logged {
@@ -36,7 +36,7 @@ abstract class AbstractDiscriminativeObjective[L,L2,W](
   protected type Counts
   protected def builder(weights: DenseVector):Builder
   protected def emptyCounts(b: Builder): Counts
-  protected def expectedCounts(b: Builder, t: BinarizedTree[L], w: Seq[W], scorer: SpanScorer):Counts
+  protected def expectedCounts(b: Builder, t: BinarizedTree[L], w: Seq[W], scorer: SpanScorer[L]):Counts
   protected def sumCounts(c1: Counts, c2: Counts):Counts
   /** Should return -logProb and the objective function */
   protected def countsToObjective(c: Counts):(Double,DenseVector)

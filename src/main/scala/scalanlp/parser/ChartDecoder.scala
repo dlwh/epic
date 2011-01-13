@@ -21,7 +21,7 @@ trait ChartDecoder[C,F] {
   def extractBestParse(root:F, grammar: Grammar[F],
                        inside: ParseChart[F],
                        outside: =>ParseChart[F],
-                       spanScorer: SpanScorer = SpanScorer.identity):BinarizedTree[C];
+                       spanScorer: SpanScorer[F] = SpanScorer.identity):BinarizedTree[C];
 
 }
 
@@ -35,7 +35,7 @@ class ViterbiDecoder[C,F](val indexedProjections: ProjectionIndexer[C,F]) extend
   override def extractBestParse(root: F, grammar: Grammar[F],
                                 inside: ParseChart[F],
                                 outside: =>ParseChart[F],
-                                spanScorer: SpanScorer = SpanScorer.identity):BinarizedTree[C] = {
+                                spanScorer: SpanScorer[F] = SpanScorer.identity):BinarizedTree[C] = {
 
     def buildTreeUnary(start: Int, end:Int, root: Int):BinarizedTree[C] = {
       var maxScore = Double.NegativeInfinity;

@@ -8,12 +8,12 @@ import scalanlp.collection.mutable.TriangularArray
  *
  * @author dlwh
  */
-class CachingSpanScorerFactory[L,W](chartBuilder: ChartBuilder[ParseChart,L,W]) extends SpanScorer.Factory[W] {
+class CachingSpanScorerFactory[L,W](chartBuilder: ChartBuilder[ParseChart,L,W]) extends SpanScorer.Factory[L,L,W] {
   val zero = new CKYChartBuilder[ParseChart.LogProbabilityParseChart, L,W](chartBuilder.root,
     new ZeroLexicon(chartBuilder.lexicon), new ZeroGrammar(chartBuilder.grammar),ParseChart.logProb);
 
 
-  def mkSpanScorer(s: Seq[W], oldScorer: SpanScorer = SpanScorer.identity):SpanScorer = {
+  def mkSpanScorer(s: Seq[W], oldScorer: SpanScorer[L] = SpanScorer.identity):SpanScorer[L] = {
     val zeroSparseVector = new SparseVector(chartBuilder.grammar.index.size,0)
     zeroSparseVector.default = 0.0;
     val logTotals = TriangularArray.raw(s.length+1,zeroSparseVector);
@@ -21,7 +21,7 @@ class CachingSpanScorerFactory[L,W](chartBuilder: ChartBuilder[ParseChart,L,W]) 
     new AnchoredRuleScorer(lexicalScores, unaryScores, binaryScores, logTotals, logTotals);
   }
 
-  private def extractScores(s: Seq[W], scorer: SpanScorer) = {
+  private def extractScores(s: Seq[W], scorer: SpanScorer[L]) = {
     val inside = zero.buildInsideChart(s,scorer);
 
     // preliminaries: we're not going to fill in everything: some things will be null.

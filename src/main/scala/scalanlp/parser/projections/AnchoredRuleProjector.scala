@@ -30,8 +30,8 @@ class AnchoredRuleProjector[C,L,W](parser: ChartBuilder[ParseChart.LogProbabilit
   def projectRulePosteriors(inside: ParseChart[L],
                             outside: ParseChart[L],
                             sentProb: Double,
-                            scorer: SpanScorer=SpanScorer.identity,
-                            pruneLabel: SpanScorer=AnchoredRuleProjector.noPruning):AnchoredRuleProjector.AnchoredData = {
+                            scorer: SpanScorer[L]=SpanScorer.identity,
+                            pruneLabel: SpanScorer[L]=AnchoredRuleProjector.noPruning[L]):AnchoredRuleProjector.AnchoredData = {
 
 
     // preliminaries: we're not going to fill in everything: some things will be null.
@@ -190,9 +190,9 @@ object AnchoredRuleProjector {
                           /** (triangularIndex)(parent) => sum of all binary rules at parent. */
                           logBinaryTotals: Array[SparseVector]);
 
-  val noPruning: SpanScorer = thresholdPruning(Double.NegativeInfinity);
+  def noPruning[L]: SpanScorer[L] = thresholdPruning(Double.NegativeInfinity);
 
-  def thresholdPruning(thresh: Double):SpanScorer = new SpanScorer {
+  def thresholdPruning[L](thresh: Double):SpanScorer[L] = new SpanScorer[L] {
     def scoreLexical(begin: Int, end: Int, tag: Int) = thresh;
 
     def scoreUnaryRule(begin: Int, end: Int, parent: Int, child: Int) = thresh;
@@ -200,14 +200,14 @@ object AnchoredRuleProjector {
     def scoreBinaryRule(begin: Int, split: Int, end: Int, parent: Int, leftChild: Int, rightChild: Int) = thresh;
   }
 
-  def goldTreeForcing[L](tree: BinarizedTree[Int], pruner: SpanScorer = thresholdPruning(-7)):SpanScorer ={
+  def goldTreeForcing[L](tree: BinarizedTree[Int], pruner: SpanScorer[L] = thresholdPruning(-7)):SpanScorer[L] ={
     val gold = TriangularArray.raw(tree.span.end+1,collection.mutable.BitSet());
     if(tree != null) {
       for( t <- tree.allChildren) {
         gold(TriangularArray.index(t.span.start,t.span.end)).+=(t.label);
       }
     }
-    new SpanScorer {
+    new SpanScorer[L] {
       def scoreLexical(begin: Int, end: Int, tag: Int) = {
         if(gold(TriangularArray.index(begin,end))(tag) )Double.NegativeInfinity
         else pruner.scoreLexical(begin,end,tag);

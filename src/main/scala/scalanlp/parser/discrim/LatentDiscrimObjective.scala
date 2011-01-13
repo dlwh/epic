@@ -25,7 +25,7 @@ import scalanlp.util._;
  * @author dlwh
  */
 class LatentDiscrimObjective[L,L2,W](featurizer: Featurizer[L2,W],
-                            trees: IndexedSeq[(BinarizedTree[L],Seq[W],SpanScorer)],
+                            trees: IndexedSeq[(BinarizedTree[L],Seq[W],SpanScorer[L])],
                             indexedProjections: ProjectionIndexer[L,L2],
                             coarseParser: ChartBuilder[LogProbabilityParseChart, L, W],
                             openTags: Set[L2],
@@ -64,10 +64,10 @@ class LatentDiscrimObjective[L,L2,W](featurizer: Featurizer[L2,W],
   }
   
   protected def emptyCounts(b: Builder) = new ExpectedCounts[W](b.grammar)
-  protected def expectedCounts(b: Builder, t: BinarizedTree[L], w: Seq[W], scorer:SpanScorer) = {
+  protected def expectedCounts(b: Builder, t: BinarizedTree[L], w: Seq[W], scorer:SpanScorer[L]) = {
     val treeCounts = treeToExpectedCounts(b.grammar,b.lexicon,t,w, scorer);
     val wordCounts = wordsToExpectedCounts(w, b, scorer);
-    if(treeCounts.logProb > wordCounts.logProb) error(t.render(w) + " " + treeCounts + " " + wordCounts);
+    if(treeCounts.logProb - wordCounts.logProb > 1E-4) error(t.render(w) + " " + treeCounts + " " + wordCounts);
     treeCounts -= wordCounts;
   }
 
@@ -81,7 +81,7 @@ class LatentDiscrimObjective[L,L2,W](featurizer: Featurizer[L2,W],
 
   protected def wordsToExpectedCounts(words: Seq[W],
                             parser: ChartBuilder[LogProbabilityParseChart,L2,W],
-                            spanScorer: SpanScorer = SpanScorer.identity) = {
+                            spanScorer: SpanScorer[L] = SpanScorer.identity) = {
     val ecounts = new InsideOutside(parser).expectedCounts(words, new ProjectingSpanScorer(indexedProjections, spanScorer));
     ecounts
   }
@@ -91,7 +91,7 @@ class LatentDiscrimObjective[L,L2,W](featurizer: Featurizer[L2,W],
                                     lexicon: Lexicon[L2,W],
                                     t: BinarizedTree[L],
                                     words: Seq[W],
-                                   spanScorer: SpanScorer = SpanScorer.identity):ExpectedCounts[W] = {
+                                   spanScorer: SpanScorer[L] = SpanScorer.identity):ExpectedCounts[W] = {
     StateSplitting.expectedCounts(g,lexicon,t.map(indexedProjections.refinementsOf _),words,
       new ProjectingSpanScorer(indexedProjections, spanScorer));
   }
@@ -132,7 +132,7 @@ trait LatentTrainer extends ParserTrainer {
 
   def quickEval(obj: AbstractDiscriminativeObjective[String,(String,Int),String],
                 indexedProjections: ProjectionIndexer[String,(String,Int)],
-                devTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer)], weights: DenseVector) {
+                devTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])], weights: DenseVector) {
     println("Validating...");
     val parser = obj.extractParser(weights);
     val fixedTrees = devTrees.take(400).toIndexedSeq;
@@ -143,14 +143,14 @@ trait LatentTrainer extends ParserTrainer {
 
   def mkObjective(conf: Configuration,
                   latentFeaturizer: MyFeaturizer,
-                  trainTrees: Seq[(BinarizedTree[String], scala.Seq[String], SpanScorer)],
+                  trainTrees: Seq[(BinarizedTree[String], scala.Seq[String], SpanScorer[String])],
                   indexedProjections: ProjectionIndexer[String, (String, Int)],
                   xbarParser: ChartBuilder[ParseChart.LogProbabilityParseChart, String, String],
                   openTags: Set[(String, Int)],
                   closedWords: Set[String]): MyObjective;
 
-  def trainParser(trainTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer)],
-                  devTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer)],
+  def trainParser(trainTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])],
+                  devTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])],
                   config: Configuration) = {
 
     val (initLexicon,initBinaries,initUnaries) = GenerativeParser.extractCounts(trainTrees.iterator.map(tuple => (tuple._1,tuple._2)));
@@ -259,7 +259,7 @@ object StochasticLatentTrainer extends LatentTrainer {
 
   def mkObjective(config: Configuration,
                   latentFeaturizer: Featurizer[(String, Int), String],
-                  trainTrees: Seq[(BinarizedTree[String], scala.Seq[String], SpanScorer)],
+                  trainTrees: Seq[(BinarizedTree[String], scala.Seq[String], SpanScorer[String])],
                   indexedProjections: ProjectionIndexer[String, (String, Int)],
                   xbarParser: ChartBuilder[ParseChart.LogProbabilityParseChart, String, String],
                   openTags: Set[(String, Int)],

@@ -9,7 +9,7 @@ package projections
  */
 @serializable
 @SerialVersionUID(1)
-class ThresholdingScorer(inner: SpanScorer, threshold: Double= -5.) extends SpanScorer {
+class ThresholdingScorer[L](inner: SpanScorer[L], threshold: Double= -5.) extends SpanScorer[L] {
   @inline private def I(score: Double) = if(score > threshold) score else Double.NegativeInfinity;
 
   def scoreLexical(begin: Int, end: Int, tag: Int) = I(inner.scoreLexical(begin,end,tag))
