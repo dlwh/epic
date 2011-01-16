@@ -50,6 +50,7 @@ case class ParserTrainerParams(treebank: TreebankParams, spans: Spans) {
 trait ParserTrainer {
   def trainParser(trainTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])],
                   devTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])],
+                  unaryReplacer : ChainReplacer[String],
                   config: Configuration):Iterator[(String,Parser[String,String])];
 
 
@@ -79,8 +80,6 @@ trait ParserTrainer {
     (dechainedWithSpans, chainReplacer)
   }
 
-  var unaryReplacer : ChainReplacer[String] = _;
-
   def main(args: Array[String]) {
     val config = Configuration.fromPropertiesFiles(args.map{new File(_)});
     val params = config.readIn[ParserTrainerParams]("treebank");
@@ -91,12 +90,11 @@ trait ParserTrainer {
 
     val trainTreesWithUnaries = transformTrees(treebank.trainTrees, trainSpans, maxLength, binarize, xform);
     val (trainTrees,replacer) = removeUnaryChains(trainTreesWithUnaries);
-    unaryReplacer = replacer;
 
     val devTrees = transformTrees(treebank.devTrees, devSpans, maxLength, binarize, xform)
 
     println("Training Parser...");
-    val parsers = trainParser(trainTrees,devTrees,config);
+    val parsers = trainParser(trainTrees,devTrees,replacer,config);
 
     val testTrees = transformTrees(treebank.testTrees, testSpans, maxLength, binarize, xform)
 

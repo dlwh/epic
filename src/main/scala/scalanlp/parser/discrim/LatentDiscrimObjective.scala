@@ -7,15 +7,15 @@ import scalanlp.optimize._
 
 import scalanlp.trees._
 import scalanlp.config.Configuration
-import scalanlp.util.{ConsoleLogging, Log}
 import splitting.StateSplitting
 import scalala.tensor.counters.LogCounters
-import scalanlp.parser.UnaryRuleClosure.UnaryClosureException
 import InsideOutside._
-import java.io._;
+import java.io._
+import scalanlp.trees.UnaryChainRemover.ChainReplacer
+;
 import ParseChart.LogProbabilityParseChart;
-import scalanlp.concurrent.ParallelOps._;
-import scalanlp.concurrent.ThreadLocal;
+
+
 import scalala.Scalala._;
 import scalala.tensor.counters.Counters._
 import scalanlp.util._;
@@ -132,6 +132,7 @@ trait LatentTrainer extends ParserTrainer {
 
   def quickEval(obj: AbstractDiscriminativeObjective[String,(String,Int),String],
                 indexedProjections: ProjectionIndexer[String,(String,Int)],
+                unaryReplacer : ChainReplacer[String],
                 devTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])], weights: DenseVector) {
     println("Validating...");
     val parser = obj.extractParser(weights);
@@ -151,6 +152,7 @@ trait LatentTrainer extends ParserTrainer {
 
   def trainParser(trainTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])],
                   devTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])],
+                  unaryReplacer : ChainReplacer[String],
                   config: Configuration) = {
 
     val (initLexicon,initBinaries,initUnaries) = GenerativeParser.extractCounts(trainTrees.iterator.map(tuple => (tuple._1,tuple._2)));
@@ -216,7 +218,7 @@ trait LatentTrainer extends ParserTrainer {
       val weights = state.x;
       if(iter % iterPerValidate == 0) {
         cacheWeights(config,obj,weights, iter);
-        quickEval(obj,indexedProjections, devTrees, weights);
+        quickEval(obj,indexedProjections, unaryReplacer, devTrees, weights);
       }
     }
 

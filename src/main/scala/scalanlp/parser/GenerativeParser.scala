@@ -17,23 +17,17 @@ package scalanlp.parser;
 
 
 
-import scala.collection.mutable.ArrayBuffer
-import scala.collection.mutable.BitSet
+import scalanlp.trees.UnaryChainRemover.ChainReplacer;
 
-import scalanlp.data._;
-import scalanlp.data.process._;
 import scalanlp.config.Configuration
 import scalala.tensor.counters._;
 import Counters._;
-import LogCounters.{LogPairedDoubleCounter,LogDoubleCounter,logNormalizeRows};
+import LogCounters.logNormalizeRows;
 import scalanlp.text.tokenize.PTBTokenizer
 import scalanlp.trees._;
-import scalanlp.util._;
-import scalala.Scalala.{log=>_,_};
-import scalala.tensor._;
 
-import scalanlp.util.Index;
-import Math._;
+import scalala.Scalala.{log=>_};
+
 
 
 
@@ -83,6 +77,7 @@ object GenerativeParser {
 object GenerativeTrainer extends ParserTrainer {
   def trainParser(trainTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])],
                   devTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])],
+                  unaryReplacer : ChainReplacer[String],
                   config: Configuration) = {
     Iterator.single(("Gen",GenerativeParser.fromTrees(trainTrees.view.map(c => (c._1,c._2)))));
   }

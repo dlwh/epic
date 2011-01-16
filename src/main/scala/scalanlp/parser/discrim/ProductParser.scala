@@ -1,7 +1,9 @@
 package scalanlp.parser
 package discrim
 
-import projections._;
+import projections._
+import scalanlp.trees.UnaryChainRemover.ChainReplacer
+;
 import ParseChart._;
 
 import scalanlp.trees._
@@ -51,7 +53,9 @@ class ProductParser[L,L2,W](val parsers: Seq[CKYChartBuilder[LogProbabilityParse
  */
 object ProductParserRunner extends ParserTrainer {
   def trainParser(trainTrees: Seq[(BinarizedTree[String], Seq[String], SpanScorer[String])],
-                  devTrees: Seq[(BinarizedTree[String], Seq[String], SpanScorer[String])], config: Configuration) = {
+                  devTrees: Seq[(BinarizedTree[String], Seq[String], SpanScorer[String])],
+                  unaryReplacer : ChainReplacer[String],
+                  config: Configuration) = {
     val parsers = new ArrayBuffer[EPParser[String,(String,Int),String]];
     var found = true;
     var i = 0;
@@ -66,8 +70,6 @@ object ProductParserRunner extends ParserTrainer {
       i += 1;
     }
     val coarseParser = loadParser(config);
-
-    println(parsers);
 
     val productParser = new ProductParser(parsers.flatMap(_.parsers), coarseParser.get, parsers.flatMap(_.projections));
     Iterator.single( "Product" -> productParser);

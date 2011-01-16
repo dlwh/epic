@@ -16,21 +16,19 @@ package scalanlp.parser.splitting
 */
 
 
-import scalala.Scalala._;
-import scalala.tensor.Vector;
-import scalanlp.collection.mutable.TriangularArray
+
+
 import scalanlp.config.Configuration
-import scalala.tensor.counters.Counters._;
+import scalala.tensor.counters.Counters._
+import scalanlp.trees.UnaryChainRemover.ChainReplacer
+;
 import scalala.tensor.counters.LogCounters;
 import scalanlp.math.Numerics.logSum;
-import scalanlp.parser.ParserTrainer
 import scalanlp.parser._;
 import scalanlp.trees.BinarizedTree
 import scalanlp.trees.BinaryTree
 import scalanlp.trees.NullaryTree
 import scalanlp.trees.Tree
-import scalanlp.trees.Treebank
-import scalanlp.trees.Trees
 import scalanlp.trees.UnaryTree
 import scalanlp.parser.projections._;
 
@@ -396,6 +394,7 @@ object StateSplitting {
 object StateSplittingTrainer extends ParserTrainer {
   def trainParser(trainTreesX: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])],
                   devTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])],
+                  unaryReplacer : ChainReplacer[String],
                   config: Configuration) = {
 
     val trainTrees = trainTreesX.map( c => (c._1,c._2));

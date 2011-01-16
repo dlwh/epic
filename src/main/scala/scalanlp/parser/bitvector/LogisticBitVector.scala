@@ -1,7 +1,9 @@
 package scalanlp.parser.bitvector
 
 import scalala.Scalala._
-import scalala.tensor.dense.DenseVector;
+import scalala.tensor.dense.DenseVector
+import scalanlp.trees.UnaryChainRemover.ChainReplacer
+;
 import scalala.tensor.counters.LogCounters
 import scalala.tensor.counters.Counters.PairedDoubleCounter
 import scalala.tensor.counters.LogCounters.LogPairedDoubleCounter
@@ -202,6 +204,7 @@ object LogisticBitVectorTrainer extends ParserTrainer {
 
   def trainParser(trainTreesX: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])],
                   devTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])],
+                  unaryReplacer : ChainReplacer[String],
                   config: Configuration) = {
 
     val trainTrees = trainTreesX.view.map(c => (c._1,c._2));
@@ -256,6 +259,7 @@ object LBFGSBitVectorTrainer extends ParserTrainer {
 
   def trainParser(trainTreesX: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])],
                   devTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])],
+                  unaryReplacer : ChainReplacer[String],
                   config: Configuration) = {
 
     val trainTrees = trainTreesX.view.map(c => (c._1,c._2));

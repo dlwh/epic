@@ -4,17 +4,15 @@ package discrim
 import scalala.tensor.dense.DenseVector
 import scalanlp.trees._
 import scalanlp.config.Configuration
-import scalanlp.util.{ConsoleLogging, Log}
 import scalanlp.optimize._
 
 import InsideOutside._
-import scalanlp.parser.UnaryRuleClosure.UnaryClosureException
 import scalala.tensor.counters.LogCounters
-import projections._;
+import projections._
+import scalanlp.trees.UnaryChainRemover.ChainReplacer;
 
 import ParseChart.LogProbabilityParseChart;
-import scalanlp.concurrent.ParallelOps._;
-import scalanlp.concurrent.ThreadLocal;
+
 import scalala.Scalala._;
 import scalala.tensor.counters.Counters._
 import scalanlp.util._;
@@ -75,7 +73,8 @@ object DiscriminativeTrainer extends ParserTrainer {
 
   def trainParser(trainTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])],
                   devTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])],
-                  config: Configuration) = {
+                  unaryReplacer : ChainReplacer[String],
+                  config: Configuration): Iterator[(String, ChartParser[String, String, String])] = {
 
     val (initLexicon,initBinaries,initUnaries) = GenerativeParser.extractCounts(trainTrees.iterator.map(tuple => (tuple._1,tuple._2)));
 
