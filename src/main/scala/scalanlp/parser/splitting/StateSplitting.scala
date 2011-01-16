@@ -145,7 +145,7 @@ object StateSplitting {
       case t @ UnaryTree(_,child) =>
         for {
           p <- t.label
-          pScore = chart.bot(child.span.start,child.span.end,p);
+          pScore = chart.top(child.span.start,child.span.end,p);
           c <- child.label
         } {
           val rScore = grammar.unaryRulesByIndexedChild(c)(p)+ scorer.scoreUnaryRule(t.span.start,t.span.end,p,c);
@@ -226,6 +226,7 @@ object StateSplitting {
           //assert(exp(ruleScore) > 0, " " + ruleScore);
           assert(!exp(ruleScore + span).isInfinite, ruleScore + " " + span + " " + (ruleScore + span) + " " + totalProb);
           binaryRuleCounts.getOrElseUpdate(p).getOrElseUpdate(l)(r) += exp(ruleScore + span);
+          assert(binaryRuleCounts(p)(l)(r) >=exp(ruleScore + span));
         }
     }
 
@@ -287,13 +288,16 @@ object StateSplitting {
 
     val stateIterator = Iterator.iterate( (splitBiRules,splitUnRules,splitWords,Double.MaxValue,convergence.abs*100)) { case state =>
       val (splitRules,splitUnRules, splitWords,lastLogProb,_) = state;
+      assert(splitRules.total != 0)
+      assert(splitUnRules.total != 0)
+      assert(splitWords.total != 0)
       val grammar = new GenerativeGrammar(LogCounters.logNormalizeRows(splitRules), LogCounters.logNormalizeRows(splitUnRules));
       val lexicon = new UnsmoothedLexicon(LogCounters.logNormalizeRows(splitWords));
       val results = for {
         (t,s) <- trees.iterator
       } yield expectedCounts(grammar,lexicon,t,s);
 
-      val accum = results.reduceLeft( _ += _ );
+      val accum = results.reduceLeft{ _ += _ }
       val logProb = accum.logProb;
 
       val (finalRules,finalUnaries,finalWords) = accum.decode(grammar);
@@ -403,10 +407,7 @@ object StateSplittingTrainer extends ParserTrainer {
 
     val coarseGrammar = new GenerativeGrammar(LogCounters.logNormalizeRows(initialProductions),
                                               LogCounters.logNormalizeRows(initUnR));
-    Iterator.tabulate(2) {
-      case 0 =>
-        ("raw",ChartParser(CKYChartBuilder("", new SimpleLexicon(initialLex), coarseGrammar) ))
-      case 1 =>
+    Iterator.single {
         println("Splitting Grammar");
         import StateSplitting._;
         val (finalProd,finalUn,finalLex,logProb) = splitGrammar(initialProductions,initUnR,initialLex,trainTrees.toIndexedSeq,"");
