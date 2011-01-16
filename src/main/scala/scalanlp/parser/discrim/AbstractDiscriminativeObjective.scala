@@ -38,7 +38,7 @@ abstract class AbstractDiscriminativeObjective[L,L2,W](
   protected def emptyCounts(b: Builder): Counts
   protected def expectedCounts(b: Builder, t: BinarizedTree[L], w: Seq[W], scorer: SpanScorer[L]):Counts
   protected def sumCounts(c1: Counts, c2: Counts):Counts
-  /** Should return -logProb and the objective function */
+  /** Should return -logProb and the derivative */
   protected def countsToObjective(c: Counts):(Double,DenseVector)
 
   private var numFailures = 0;

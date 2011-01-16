@@ -10,6 +10,8 @@ import scalanlp.trees.{BinarizedTree, Tree}
  * Used for computed the expected number of anchored rules that occur at each span/split.
  * @author dlwh
  */
+@serializable
+@SerialVersionUID(1L)
 class AnchoredRuleProjector[C,L,W](parser: ChartBuilder[ParseChart.LogProbabilityParseChart,L,W],
                                    indexedProjections: ProjectionIndexer[C,L],
                                    pruningThreshold: Double = -5) {

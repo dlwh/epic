@@ -269,7 +269,7 @@ object StochasticLatentTrainer extends LatentTrainer {
       indexedProjections,
       xbarParser,
       openTags,
-      closedWords)
+      closedWords) with ConsoleLogging;
   }
 
 
