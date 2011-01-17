@@ -61,31 +61,35 @@ class DiscrimObjective[L,W](feat: Featurizer[L,W],
 
 object DiscriminativeTrainer extends ParserTrainer {
 
-  def loadParser(config: Configuration) = {
-    val spanDir = config.readIn[File]("parser.base",null);
-    if(spanDir eq null) None
-    else {
-      Some(ProjectTreebankToLabeledSpans.loadParser(spanDir).builder.withCharts(ParseChart.logProb))
-    }
-  }
+  protected implicit val paramManifest = manifest[Params];
+  case class Params(parser: ParserParams.BaseParser,
+                    opt: OptParams,
+                    featurizerFactory: FeaturizerFactory[String,String] = new PlainFeaturizerFactory[String],
+                    iterationsPerEval: Int = 50,
+                    maxIterations: Int = 201,
+                    iterPerValidate: Int = 10,
+                    oldWeights: File = null,
+                    splitFactor:Int = 1);
 
 
 
-  def trainParser(trainTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])],
-                  devTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])],
-                  unaryReplacer : ChainReplacer[String],
-                  config: Configuration): Iterator[(String, ChartParser[String, String, String])] = {
+  override def trainParser(trainTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])],
+                           devTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])],
+                           unaryReplacer : ChainReplacer[String],
+                           params: Params): Iterator[(String, ChartParser[String, String, String])] = {
 
     val (initLexicon,initBinaries,initUnaries) = GenerativeParser.extractCounts(trainTrees.iterator.map(tuple => (tuple._1,tuple._2)));
 
-    val xbarParser = loadParser(config) getOrElse {
+    val xbarParser = params.parser.optParser getOrElse {
       val grammar = new GenerativeGrammar(LogCounters.logNormalizeRows(initBinaries),LogCounters.logNormalizeRows(initUnaries));
       val lexicon = new SimpleLexicon(initLexicon);
       new CKYChartBuilder[LogProbabilityParseChart,String,String]("",lexicon,grammar,ParseChart.logProb);
     }
 
-    val factory = config.readIn[FeaturizerFactory[String,String]]("featurizerFactory",new PlainFeaturizerFactory[String]);
-    val featurizer = factory.getFeaturizer(config, initLexicon, initBinaries, initUnaries);
+    import params._;
+
+    val factory = params.featurizerFactory;
+    val featurizer = factory.getFeaturizer(initLexicon, initBinaries, initUnaries);
 
     val openTags = Set.empty ++ {
       for(t <- initLexicon.activeKeys.map(_._1) if initLexicon(t).size > 50) yield t;
@@ -98,10 +102,7 @@ object DiscriminativeTrainer extends ParserTrainer {
     }
 
     val obj = new DiscrimObjective(featurizer, trainTrees.toIndexedSeq, xbarParser, openTags, closedWords);
-    val iterationsPerEval = config.readIn("iterations.eval",25);
-    val maxIterations = config.readIn("iterations.max",100);
-    val maxMStepIterations = config.readIn("iterations.mstep.max",80);
-    val regularization = config.readIn("objective.regularization",0.001);
+    val regularization = params.opt.regularization;
     val opt = new LBFGS[Int,DenseVector](iterationsPerEval,5) with ConsoleLogging;
 
     val init = obj.initialWeightVector;

@@ -199,25 +199,31 @@ class LogisticBitVector[L,W](treebank: StateSplitting.Treebank[L,W],
 
 }
 
+case class LogisticParams(featurizerFactory: FeaturizerFactory[String,String],
+                          numStates: Int= 8,
+                          iterationsPerEval: Int = 25,
+                          maxIterations: Int = 100,
+                          maxMStepIterations: Int = 80);
+
 object LogisticBitVectorTrainer extends ParserTrainer {
+
+  type Params = LogisticParams;
+  protected val paramManifest = manifest[LogisticParams];
 
 
   def trainParser(trainTreesX: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])],
                   devTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])],
                   unaryReplacer : ChainReplacer[String],
-                  config: Configuration) = {
+                  params: Params) = {
 
     val trainTrees = trainTreesX.view.map(c => (c._1,c._2));
-    val numStates = config.readIn[Int]("numStates",8);
+    import params._;
     val (initLexicon,initBinaries, initUnaries) = GenerativeParser.extractCounts(trainTrees.iterator);
-    val factory = config.readIn[FeaturizerFactory[String,String]]("featurizerFactory");
+    val factory = featurizerFactory;
 
-    val featurizer = factory.getFeaturizer(config, initLexicon, initBinaries, initUnaries);
+    val featurizer = factory.getFeaturizer(initLexicon, initBinaries, initUnaries);
 
     val obj = new LogisticBitVector(trainTrees.toIndexedSeq,"",initLexicon,initBinaries, initUnaries,numStates, featurizer);
-    val iterationsPerEval = config.readIn("iterations.eval",25);
-    val maxIterations = config.readIn("iterations.max",100);
-    val maxMStepIterations = config.readIn("iterations.mstep.max",80);
     val stateIterator = obj.emIterations(maxMStepIterations = maxMStepIterations);
 
     var lastLL = Double.NegativeInfinity;
@@ -256,23 +262,22 @@ object LogisticBitVectorTrainer extends ParserTrainer {
 
 
 object LBFGSBitVectorTrainer extends ParserTrainer {
+  type Params = LogisticParams;
+  protected val paramManifest = manifest[LogisticParams];
 
   def trainParser(trainTreesX: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])],
                   devTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])],
                   unaryReplacer : ChainReplacer[String],
-                  config: Configuration) = {
+                  params: Params) = {
 
     val trainTrees = trainTreesX.view.map(c => (c._1,c._2));
-    val numStates = config.readIn[Int]("numBits",8);
     val (initLexicon,initBinaries, initUnaries) = GenerativeParser.extractCounts(trainTrees.iterator);
-    val factory = config.readIn[FeaturizerFactory[String,String]]("featurizerFactory");
 
-    val featurizer = factory.getFeaturizer(config, initLexicon, initBinaries, initUnaries);
+    import params._;
+
+    val featurizer = featurizerFactory.getFeaturizer(initLexicon, initBinaries, initUnaries);
 
     val obj = new LogisticBitVector(trainTrees.toIndexedSeq,"",initLexicon,initBinaries, initUnaries,numStates, featurizer);
-    val iterationsPerEval = config.readIn("iterations.eval",25);
-    val maxIterations = config.readIn("iterations.max",100);
-    val maxMStepIterations = config.readIn("iterations.mstep.max",80);
     val opt = new LBFGS[Int,DenseVector](iterationsPerEval,5) with ConsoleLogging;
 
     val log = Log.globalLog;

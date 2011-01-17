@@ -97,8 +97,7 @@ class SlavBitFeaturizer[L,W] extends Featurizer[L,W] {
 }
 
 class SlavFeatureFactory[L,W] extends FeaturizerFactory[L,W] {
-  def getFeaturizer(conf: Configuration,
-                    baseLexicon: PairedDoubleCounter[L,W],
+  def getFeaturizer(baseLexicon: PairedDoubleCounter[L,W],
                     baseBinaries: PairedDoubleCounter[L,BinaryRule[L]],
                     baseUnaries: PairedDoubleCounter[L,UnaryRule[L]]):Featurizer[L,W] = {
     new SlavFeaturizer(baseLexicon,baseBinaries,baseUnaries);

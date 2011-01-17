@@ -17,7 +17,9 @@ package scalanlp.parser;
 
 
 
-import scalanlp.trees.UnaryChainRemover.ChainReplacer;
+import scalanlp.trees.UnaryChainRemover.ChainReplacer
+import scalanlp.parser.ParserParams.NoParams
+;
 
 import scalanlp.config.Configuration
 import scalala.tensor.counters._;
@@ -74,11 +76,11 @@ object GenerativeParser {
   }
 }
 
-object GenerativeTrainer extends ParserTrainer {
+object GenerativeTrainer extends ParserTrainer with NoParams {
   def trainParser(trainTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])],
                   devTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])],
                   unaryReplacer : ChainReplacer[String],
-                  config: Configuration) = {
+                  config: Params) = {
     Iterator.single(("Gen",GenerativeParser.fromTrees(trainTrees.view.map(c => (c._1,c._2)))));
   }
 }

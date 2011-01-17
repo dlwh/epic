@@ -3,20 +3,14 @@ package discrim
 
 import scalala.tensor.dense.DenseVector
 import scalanlp.parser.projections._
-import scalanlp.optimize._
-
 import scalanlp.trees._
-import scalanlp.util._
 import scalanlp.config.Configuration
-import scalanlp.util.{ConsoleLogging, Log}
 import splitting.StateSplitting
-import scalala.tensor.counters.LogCounters
-import scalanlp.parser.UnaryRuleClosure.UnaryClosureException
 import InsideOutside._
 import java.io._;
 import ParseChart.LogProbabilityParseChart;
-import scalanlp.concurrent.ParallelOps._;
-import scalanlp.concurrent.ThreadLocal;
+
+
 import scalala.Scalala._;
 import scalala.tensor.counters.Counters._
 import scalanlp.util._;
@@ -174,23 +168,28 @@ object EPTrainer extends LatentTrainer {
   type MyFeaturizer = IndexedSeq[Featurizer[(String,Int),String]];
   type MyObjective = EPObjective[String,(String,Int),String];
 
-  def getFeaturizer(config: Configuration,
+  case class EPParams(models: Int = 2, iterations: Int= 1);
+
+  case class SpecificParams(ep: EPParams);
+  protected implicit val specificManifest = manifest[SpecificParams];
+
+  def getFeaturizer(params: Params,
                     initLexicon: PairedDoubleCounter[String, String],
                     initBinaries: PairedDoubleCounter[String, BinaryRule[String]],
                     initUnaries: PairedDoubleCounter[String, UnaryRule[String]],
                     numStates: Int): IndexedSeq[Featurizer[(String, Int), String]] = {
-    val numModels = config.readIn[Int]("ep.models,", 2)
-    val factory = config.readIn[FeaturizerFactory[String, String]]("discrim.featurizerFactory", new PlainFeaturizerFactory[String]);
-    val featurizer = factory.getFeaturizer(config, initLexicon, initBinaries, initUnaries);
-    val latentFactory = config.readIn[LatentFeaturizerFactory]("discrim.latentFactory", new SlavLatentFeaturizerFactory());
+    val numModels = params.specific.ep.models;
+    val factory = params.featurizerFactory;
+    val featurizer = factory.getFeaturizer(initLexicon, initBinaries, initUnaries);
+    val latentFactory = params.latentFactory;
     val latentFeaturizer = latentFactory.getFeaturizer(featurizer, numStates);
-    val weightsPath = config.readIn[File]("discrim.oldweights",null);
+    val weightsPath = params.oldWeights;
     if(weightsPath == null) {
       Array.fill(numModels)(latentFeaturizer)
     } else {
       println("Using awesome weights...");
       val weightSeq = readObject[Array[(DenseVector,DoubleCounter[Feature[(String,Int),String]])]](weightsPath).map(_._2);
-      val splitFactor = config.readIn[Int]("discrim.splitFactor",1);
+      val splitFactor = params.splitFactor;
       def identity(x: Feature[(String,Int),String]) = x;
       val proj: Feature[(String,Int),String]=>Feature[(String,Int),String] = FeatureProjectors.split[String,String](_,splitFactor)
 
@@ -202,15 +201,15 @@ object EPTrainer extends LatentTrainer {
     }
   }
 
-  def mkObjective(config: Configuration,
+  def mkObjective(params: Params,
                   latentFeaturizer: MyFeaturizer,
                   trainTrees: Seq[(BinarizedTree[String], scala.Seq[String], SpanScorer[String])],
                   indexedProjections: ProjectionIndexer[String, (String, Int)],
                   xbarParser: ChartBuilder[ParseChart.LogProbabilityParseChart, String, String],
                   openTags: Set[(String, Int)],
                   closedWords: Set[String]) = {
-    val maxEPIterations = config.readIn[Int]("ep.iterations",1);
-    val epModels = config.readIn[Int]("ep.models",2);
+    val maxEPIterations = params.specific.ep.iterations;
+    val epModels = params.specific.ep.models;
 
     new EPObjective(latentFeaturizer,
       trainTrees.toIndexedSeq,
@@ -222,7 +221,7 @@ object EPTrainer extends LatentTrainer {
       maxEPIterations);
   }
 
-  def cacheWeights(config: Configuration, obj: MyObjective, weights: DenseVector, iter: Int) = {
+  def cacheWeights(params: Params, obj: MyObjective, weights: DenseVector, iter: Int) = {
     val partWeights = obj.partitionWeights(weights);
     writeObject( new File("weights-"+iter +".ser"), (obj.indexedFeatures zip partWeights).map { case (f, w) => w -> f.decode(w) });
   }

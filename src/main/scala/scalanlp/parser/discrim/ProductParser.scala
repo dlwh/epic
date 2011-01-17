@@ -7,7 +7,6 @@ import scalanlp.trees.UnaryChainRemover.ChainReplacer
 import ParseChart._;
 
 import scalanlp.trees._
-import scalanlp.config.Configuration
 import collection.mutable.ArrayBuffer
 import java.io.{FileInputStream, BufferedInputStream, ObjectInputStream, File}
 
@@ -52,16 +51,21 @@ class ProductParser[L,L2,W](val parsers: Seq[CKYChartBuilder[LogProbabilityParse
  * @author dlwh
  */
 object ProductParserRunner extends ParserTrainer {
+
+  case class Params(parser: ParserParams.BaseParser, model0: File = null, model1: File = null, model2: File = null, model3: File = null);
+  protected val paramManifest = manifest[Params];
+
   def trainParser(trainTrees: Seq[(BinarizedTree[String], Seq[String], SpanScorer[String])],
                   devTrees: Seq[(BinarizedTree[String], Seq[String], SpanScorer[String])],
                   unaryReplacer : ChainReplacer[String],
-                  config: Configuration) = {
+                  params: Params) = {
     val parsers = new ArrayBuffer[EPParser[String,(String,Int),String]];
     var found = true;
     var i = 0;
-    while(found) {
+    val paths = params.productIterator;
+    while(found && paths.hasNext) {
       found = false;
-      val path = config.readIn[java.io.File]("parser.model" + i,null)
+      val path = paths.dropWhile(!_.isInstanceOf[File]).next.asInstanceOf[File];
       println(path);
       if(path ne null) {
         parsers += readObject(path);
@@ -69,7 +73,7 @@ object ProductParserRunner extends ParserTrainer {
       }
       i += 1;
     }
-    val coarseParser = loadParser(config);
+    val coarseParser = params.parser.optParser;
 
     val productParser = new ProductParser(parsers.flatMap(_.parsers), coarseParser.get, parsers.flatMap(_.projections));
     Iterator.single( "Product" -> productParser);
@@ -83,11 +87,4 @@ object ProductParserRunner extends ParserTrainer {
     parser;
   }
 
-  def loadParser(config: Configuration) = {
-    val spanDir = config.readIn[File]("parser.base",null);
-    if(spanDir eq null) None
-    else {
-      Some(ProjectTreebankToLabeledSpans.loadParser(spanDir).builder.withCharts(ParseChart.logProb))
-    }
-  }
 }

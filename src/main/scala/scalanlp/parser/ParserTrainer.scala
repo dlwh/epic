@@ -1,8 +1,6 @@
 package scalanlp.parser;
 
-import java.util.Properties
 import projections.ProjectTreebankToLabeledSpans
-import scala.collection.mutable.ArrayBuffer
 import scalanlp.config._
 import java.io._
 import scalanlp.trees._
@@ -43,15 +41,31 @@ case class Spans(directory: File = null) {
   val testSpans = loadSpans(testSpansFile);
 }
 
-case class ParserTrainerParams(treebank: TreebankParams, spans: Spans) {
+case class ParserTrainerParams(treebank: TreebankParams, spans: Spans);
+
+object ParserParams {
+  trait NoParams { self: ParserTrainer =>
+    case class Params();
+    protected val paramManifest = manifest[Params];
+  }
+
+  case class BaseParser(base: File = null) {
+    def optParser = Option(base).map { f =>
+      ProjectTreebankToLabeledSpans.loadParser(f).builder.withCharts(ParseChart.logProb)
+    }
+  }
 
 }
 
 trait ParserTrainer {
+
+  type Params;
+  protected implicit val paramManifest: Manifest[Params];
+
   def trainParser(trainTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])],
                   devTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])],
                   unaryReplacer : ChainReplacer[String],
-                  config: Configuration):Iterator[(String,Parser[String,String])];
+                  params: Params):Iterator[(String,Parser[String,String])];
 
 
   def transformTrees(trees: Iterator[(Tree[String],Seq[String])],
@@ -82,7 +96,8 @@ trait ParserTrainer {
 
   def main(args: Array[String]) {
     val config = Configuration.fromPropertiesFiles(args.map{new File(_)});
-    val params = config.readIn[ParserTrainerParams]("treebank");
+    val params = config.readIn[ParserTrainerParams]("parser");
+    val specificParams = config.readIn[Params]("trainer");
     println(params);
     import params.treebank._;
     import params.spans._;
@@ -94,7 +109,7 @@ trait ParserTrainer {
     val devTrees = transformTrees(treebank.devTrees, devSpans, maxLength, binarize, xform)
 
     println("Training Parser...");
-    val parsers = trainParser(trainTrees,devTrees,replacer,config);
+    val parsers = trainParser(trainTrees,devTrees,replacer,specificParams);
 
     val testTrees = transformTrees(treebank.testTrees, testSpans, maxLength, binarize, xform)
 

@@ -11,8 +11,7 @@ import scalala.tensor.counters.Counters._
  */
 trait FeaturizerFactory[L,W] {
   /** Returns a featurizer based on a configuration and a lexicon/production */
-  def getFeaturizer(conf: Configuration,
-                    baseLexicon: PairedDoubleCounter[L,W],
+  def getFeaturizer(baseLexicon: PairedDoubleCounter[L,W],
                     baseProductions: PairedDoubleCounter[L,BinaryRule[L]],
                     baseUnaries: PairedDoubleCounter[L,UnaryRule[L]]):Featurizer[L,W];
 }
@@ -20,13 +19,12 @@ trait FeaturizerFactory[L,W] {
 /**
  * Uses just rule features and wordshapes
  */
-class PlainFeaturizerFactory[L] extends FeaturizerFactory[L,String] {
-  def getFeaturizer(conf: Configuration,
-                    baseLexicon: PairedDoubleCounter[L,String],
+class PlainFeaturizerFactory[L](initToZero: Boolean = true) extends FeaturizerFactory[L,String] {
+  def getFeaturizer(baseLexicon: PairedDoubleCounter[L,String],
                     baseBinaries: PairedDoubleCounter[L,BinaryRule[L]],
                     baseUnaries: PairedDoubleCounter[L,UnaryRule[L]]):Featurizer[L,String] = {
-    val lex = new WordShapeFeaturizer(baseLexicon,conf.readIn[Boolean]("initToZero",true),1.0);
-    val rules = new RuleFeaturizer[L,String](baseBinaries,baseUnaries, conf.readIn[Boolean]("initToZero",true),1.0);
+    val lex = new WordShapeFeaturizer(baseLexicon,initToZero,1.0);
+    val rules = new RuleFeaturizer[L,String](baseBinaries,baseUnaries,initToZero,1.0);
 
     new SumFeaturizer(rules,lex);
   }
