@@ -171,7 +171,7 @@ object EPTrainer extends LatentTrainer {
   case class EPParams(models: Int = 2, iterations: Int= 1);
 
   case class SpecificParams(ep: EPParams);
-  protected implicit val specificManifest = manifest[SpecificParams];
+  protected def specificManifest = manifest[SpecificParams];
 
   def getFeaturizer(params: Params,
                     initLexicon: PairedDoubleCounter[String, String],

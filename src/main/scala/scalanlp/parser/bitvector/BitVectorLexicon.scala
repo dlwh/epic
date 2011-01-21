@@ -2,11 +2,10 @@ package scalanlp.parser
 package bitvector
 
 import scalala.tensor.counters.Counters.DoubleCounter
-import scalala.tensor.counters.Counters.PairedDoubleCounter
 import scalala.tensor.counters.LogCounters.LogDoubleCounter
 import scalala.tensor.counters.LogCounters.LogPairedDoubleCounter
 import scalala.tensor.counters.LogCounters
-import scala.util.control.Breaks._;
+
 import LogisticBitVector.Feature
 
 

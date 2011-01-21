@@ -1,7 +1,7 @@
 package scalanlp.parser
 package projections
 
-import scalanlp.trees._;
+
 
 import java.io._;
 

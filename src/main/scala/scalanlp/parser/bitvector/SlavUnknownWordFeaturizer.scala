@@ -1,6 +1,5 @@
 package scalanlp.parser.bitvector
 
-import scala.collection.mutable.ArrayBuffer
 import scalala.tensor.counters.Counters
 import scalala.tensor.counters.Counters.PairedDoubleCounter
 import scalanlp.parser.bitvector.LogisticBitVector.Feature

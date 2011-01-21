@@ -2,9 +2,6 @@ package scalanlp.parser
 package projections
 
 import scalanlp.trees.BinarizedTree
-import scalanlp.collection.mutable.TriangularArray
-import collection.mutable.BitSet
-
 /**
  * 
  * @author dlwh

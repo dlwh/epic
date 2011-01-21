@@ -2,8 +2,7 @@ package scalanlp.parser
 package discrim
 
 import scalanlp.trees._
-import scalanlp.collection.mutable.TriangularArray
-import scalanlp.math.Numerics;
+
 import projections._;
 import ParseChart._;
 

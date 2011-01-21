@@ -19,7 +19,6 @@ import scalanlp.collection.mutable.TriangularArray
 import scalala.tensor.counters.Counters.DoubleCounter
 import scalanlp.trees.Span
 
-import scalanlp.util.Implicits._
 import scalanlp.util.Encoder;
 
 @serializable

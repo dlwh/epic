@@ -29,7 +29,7 @@ class DiscrimObjective[L,W](feat: Featurizer[L,W],
                             closedWords: Set[W])
         extends LatentDiscrimObjective[L,L,W](feat,trees,ProjectionIndexer.simple(coarseParser.index),coarseParser, openTags,closedWords) {
 
-  // these expected counts are in normal space, not log space.
+  /*
   override protected def treeToExpectedCounts(g: Grammar[L],
                                               lexicon: Lexicon[L,W],
                                               lt: BinarizedTree[L],
@@ -55,13 +55,14 @@ class DiscrimObjective[L,W](feat: Featurizer[L,W],
     expectedCounts.logProb = score;
     expectedCounts;
   }
+  */
 
 }
 
 
 object DiscriminativeTrainer extends ParserTrainer {
 
-  protected implicit val paramManifest = manifest[Params];
+  protected val paramManifest = manifest[Params];
   case class Params(parser: ParserParams.BaseParser,
                     opt: OptParams,
                     featurizerFactory: FeaturizerFactory[String,String] = new PlainFeaturizerFactory[String],
@@ -101,16 +102,20 @@ object DiscriminativeTrainer extends ParserTrainer {
       wordCounts.iterator.filter(_._2 > 10).map(_._1);
     }
 
-    val obj = new DiscrimObjective(featurizer, trainTrees.toIndexedSeq, xbarParser, openTags, closedWords);
-    val regularization = params.opt.regularization;
-    val opt = new LBFGS[Int,DenseVector](iterationsPerEval,5) with ConsoleLogging;
+    val obj = new DiscrimObjective(featurizer, trainTrees.toIndexedSeq, xbarParser, openTags, closedWords) with ConsoleLogging;
+    val optimizer = new StochasticGradientDescent[Int,DenseVector](opt.alpha,maxIterations, opt.batchSize)
+              with AdaptiveGradientDescent.L2Regularization[Int,DenseVector]
+              with ConsoleLogging {
+        override val lambda = params.opt.adjustedRegularization(trainTrees.length);
+      }
 
+    // new LBFGS[Int,DenseVector](iterationsPerEval,5) with ConsoleLogging;
     val init = obj.initialWeightVector;
 
     val log = Log.globalLog;
-    val reg = DiffFunction.withL2Regularization(obj, regularization);
-    val cachedObj = new CachedDiffFunction(reg);
-    for( (state,iter) <- opt.iterations(cachedObj,init).take(maxIterations).zipWithIndex;
+    val wrap = new GradientCheckingDiffFunction(obj,Array(1E-4));
+    for( (state,iter) <- optimizer.iterations(obj,init).take(maxIterations).zipWithIndex;
+         _ = wrap.calculate(state.x);
          if iter != 0 && iter % iterationsPerEval == 0) yield {
        val parser = obj.extractParser(state.x);
        (iter + "", parser);

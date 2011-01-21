@@ -1,15 +1,9 @@
 package scalanlp.parser
 package projections
 
-import scalanlp.trees._
-import scalanlp.math.Numerics
-import scalanlp.collection.mutable.{TriangularArray}
+import scalanlp.collection.mutable.TriangularArray
 import scalala.tensor.sparse.SparseVector;
-import scalala.tensor.Vector;
 
-import java.io._
-import scalanlp.concurrent.ParallelOps._
-import scalanlp.trees.DenseTreebank
 
 /**
  * Creates labeled span scorers for a set of trees from some parser. Projects from L to C.

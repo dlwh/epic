@@ -7,10 +7,8 @@ import scalala.tensor.Vector;
 import scalala.tensor.adaptive.AdaptiveVector;
 import scalala.tensor.sparse.SparseVector;
 
-import scalala.tensor.counters.Counters
 import scalala.tensor.counters.Counters.DoubleCounter
 import scalala.tensor.counters.Counters.PairedDoubleCounter
-import scalala.tensor.counters.LogCounters
 import scalala.tensor.counters.LogCounters.LogPairedDoubleCounter
 import scalala.tensor.dense.DenseVector
 import scalanlp.concurrent.ParallelOps._;

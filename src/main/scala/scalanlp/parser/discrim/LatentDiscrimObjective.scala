@@ -45,10 +45,7 @@ class LatentDiscrimObjective[L,L2,W](featurizer: Featurizer[L2,W],
   }
 
   def extractParser(weights: DenseVector) = {
-    val grammar = weightsToGrammar(indexedFeatures, weights);
-    val lexicon = weightsToLexicon(indexedFeatures, weights);
-    val builder = CKYChartBuilder[L2,W](root, lexicon, grammar);
-    val parser = new ChartParser[L,L2,W](builder,new ViterbiDecoder(indexedProjections), ProjectingSpanScorer.factory(indexedProjections));
+    val parser = new ChartParser[L,L2,W](builder(weights),new ViterbiDecoder(indexedProjections), ProjectingSpanScorer.factory(indexedProjections));
     parser
   }
 
@@ -66,8 +63,16 @@ class LatentDiscrimObjective[L,L2,W](featurizer: Featurizer[L2,W],
   protected def expectedCounts(b: Builder, t: BinarizedTree[L], w: Seq[W], scorer:SpanScorer[L]) = {
     val treeCounts = treeToExpectedCounts(b.grammar,b.lexicon,t,w, scorer);
     val wordCounts = wordsToExpectedCounts(w, b, scorer);
+    /*
+    println(w);
+    println(t render w)
+    println("tree:" + treeCounts.logProb + " " + treeCounts.decode(b.grammar));
+    println("words:" + wordCounts.logProb + " " + wordCounts.decode(b.grammar));
     if(treeCounts.logProb - wordCounts.logProb > 1E-4) error(t.render(w) + " " + treeCounts + " " + wordCounts);
-    treeCounts -= wordCounts;
+    */
+    treeCounts -= wordCounts
+//    println("Acc: " + treeCounts.logProb + " " +  treeCounts.decode(b.grammar) )
+//    treeCounts;
   }
 
   def sumCounts(c1: Counts, c2: Counts) = { c1 += c2}
@@ -79,18 +84,18 @@ class LatentDiscrimObjective[L,L2,W](featurizer: Featurizer[L2,W],
   }
 
   protected def wordsToExpectedCounts(words: Seq[W],
-                            parser: ChartBuilder[LogProbabilityParseChart,L2,W],
-                            spanScorer: SpanScorer[L] = SpanScorer.identity) = {
+                                      parser: ChartBuilder[LogProbabilityParseChart,L2,W],
+                                      spanScorer: SpanScorer[L] = SpanScorer.identity) = {
     val ecounts = new InsideOutside(parser).expectedCounts(words, new ProjectingSpanScorer(indexedProjections, spanScorer));
     ecounts
   }
 
   // these expected counts are in normal space, not log space.
   protected def treeToExpectedCounts(g: Grammar[L2],
-                                    lexicon: Lexicon[L2,W],
-                                    t: BinarizedTree[L],
-                                    words: Seq[W],
-                                   spanScorer: SpanScorer[L] = SpanScorer.identity):ExpectedCounts[W] = {
+                                     lexicon: Lexicon[L2,W],
+                                     t: BinarizedTree[L],
+                                     words: Seq[W],
+                                     spanScorer: SpanScorer[L] = SpanScorer.identity):ExpectedCounts[W] = {
     StateSplitting.expectedCounts(g,lexicon,t.map(indexedProjections.refinementsOf _),words,
       new ProjectingSpanScorer(indexedProjections, spanScorer));
   }
@@ -111,6 +116,18 @@ case class OptParams(batchSize:Int = 512,
   def adjustedRegularization(numInstances: Int) = regularization * 0.01 * batchSize / numInstances;
 }
 
+case class LatentParams[P](parser: ParserParams.BaseParser,
+                           opt: OptParams,
+                           specific: P,
+                           featurizerFactory: FeaturizerFactory[String,String] = new PlainFeaturizerFactory[String],
+                           latentFactory: LatentFeaturizerFactory = new SlavLatentFeaturizerFactory(),
+                           numStates: Int= 8,
+                           iterationsPerEval: Int = 50,
+                           maxIterations: Int = 201,
+                           iterPerValidate: Int = 10,
+                           oldWeights: File = null,
+                           splitFactor:Int = 1);
+
 trait LatentTrainer extends ParserTrainer {
   def split(x: String, numStates: Int) = {
     if(x.isEmpty) Seq((x,0))
@@ -122,22 +139,12 @@ trait LatentTrainer extends ParserTrainer {
   type MyFeaturizer;
   type MyObjective <: AbstractDiscriminativeObjective[String,(String,Int),String];
 
-  case class Params(parser: ParserParams.BaseParser,
-                    opt: OptParams,
-                    specific: SpecificParams,
-                    featurizerFactory: FeaturizerFactory[String,String] = new PlainFeaturizerFactory[String],
-                    latentFactory: LatentFeaturizerFactory = new SlavLatentFeaturizerFactory(),
-                    numStates: Int= 8,
-                    iterationsPerEval: Int = 50,
-                    maxIterations: Int = 201,
-                    iterPerValidate: Int = 10,
-                    oldWeights: File = null,
-                    splitFactor:Int = 1);
-
-  protected val paramManifest = manifest[Params];
 
   type SpecificParams;
-  protected implicit val specificManifest : Manifest[SpecificParams];
+  protected implicit def specificManifest : Manifest[SpecificParams];
+
+  type Params = LatentParams[SpecificParams];
+  protected lazy val paramManifest = { println(manifest[Params]); manifest[Params]}
 
   def getFeaturizer(params: Params,
                     initLexicon: PairedDoubleCounter[String, String],
@@ -172,6 +179,7 @@ trait LatentTrainer extends ParserTrainer {
 
     val (initLexicon,initBinaries,initUnaries) = GenerativeParser.extractCounts(trainTrees.iterator.map(tuple => (tuple._1,tuple._2)));
     import params._;
+    println("NumStates: " + params);
 
     val xbarParser = parser.optParser getOrElse {
       val grammar = new GenerativeGrammar(LogCounters.logNormalizeRows(initBinaries),LogCounters.logNormalizeRows(initUnaries));
@@ -217,7 +225,7 @@ trait LatentTrainer extends ParserTrainer {
       }
     }
 
-    val init = obj.initialWeightVector;
+    val init = obj.initialWeightVector.copy;
 
     val log = Log.globalLog;
     def evalAndCache(pair: (optimizer.State,Int) ) {
@@ -248,7 +256,7 @@ object StochasticLatentTrainer extends LatentTrainer {
   type MyObjective = LatentDiscrimObjective[String,(String,Int),String];
 
   class SpecificParams();
-  protected implicit val specificManifest = manifest[SpecificParams];
+  protected def specificManifest = manifest[SpecificParams];
 
   def getFeaturizer(params: Params,
                     initLexicon: PairedDoubleCounter[String, String],
@@ -277,12 +285,13 @@ object StochasticLatentTrainer extends LatentTrainer {
                   xbarParser: ChartBuilder[ParseChart.LogProbabilityParseChart, String, String],
                   openTags: Set[(String, Int)],
                   closedWords: Set[String]) = {
-    new LatentDiscrimObjective(latentFeaturizer,
+    val r = new LatentDiscrimObjective(latentFeaturizer,
       trainTrees.toIndexedSeq,
       indexedProjections,
       xbarParser,
       openTags,
       closedWords) with ConsoleLogging;
+    r
   }
 
 
@@ -291,3 +300,4 @@ object StochasticLatentTrainer extends LatentTrainer {
   }
 
 }
+

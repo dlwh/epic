@@ -1,6 +1,6 @@
 package scalanlp.parser
 
-import scala.collection.mutable.ArrayBuffer;
+
 import scalanlp.trees._;
 
 /**

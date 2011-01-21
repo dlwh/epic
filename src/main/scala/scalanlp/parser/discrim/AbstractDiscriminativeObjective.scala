@@ -7,18 +7,13 @@ import scalanlp.parser.projections._
 import scalanlp.optimize._
 
 import scalanlp.trees._
-import scalanlp.config.Configuration
-import scalanlp.util.{ConsoleLogging, Log}
-import splitting.StateSplitting
-import scalala.tensor.counters.LogCounters
 import scalanlp.parser.UnaryRuleClosure.UnaryClosureException
 import InsideOutside._
-import java.io._;
-import ParseChart.LogProbabilityParseChart;
+
+
 import scalanlp.concurrent.ParallelOps._;
-import scalanlp.concurrent.ThreadLocal;
+
 import scalala.Scalala._;
-import scalala.tensor.counters.Counters._
 import scalanlp.util._;
 import Log._;
 
@@ -44,20 +39,21 @@ abstract class AbstractDiscriminativeObjective[L,L2,W](
   private var numFailures = 0;
 
   def calculate(weights: DenseVector, sample: IndexedSeq[Int]) = {
+    println(norm(weights,2));
 
     try {
       val parser = builder(weights);
       val trees = sample.map(this.trees);
       val startTime = System.currentTimeMillis();
-      val ecounts = trees.par.fold(emptyCounts(parser)) { (counts, treeWordsScorer) =>
+      val ecounts = trees.par.mapReduce({ treeWordsScorer =>
         val localIn = System.currentTimeMillis();
         val (tree,words,spanScorer) = treeWordsScorer;
         try {
-          sumCounts(counts,expectedCounts(parser,tree,words,spanScorer));
+          expectedCounts(parser,tree,words,spanScorer)
         } catch {
           case e => println("Error in parsing: " + words + e); throw new RuntimeException("Error parsing " + words,e);
         }
-      } { sumCounts(_,_)}
+      },{ sumCounts(_:Counts,_:Counts)})
       val finishTime = System.currentTimeMillis() - startTime;
 
       log(INFO)("Parsing took: " + finishTime / 1000.0)

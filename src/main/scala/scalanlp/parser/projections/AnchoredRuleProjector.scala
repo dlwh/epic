@@ -4,7 +4,7 @@ package projections
 import scalala.tensor.sparse.SparseVector
 import scalanlp.collection.mutable.TriangularArray
 import scalanlp.math.Numerics
-import scalanlp.trees.{BinarizedTree, Tree}
+import scalanlp.trees.BinarizedTree
 
 /**
  * Used for computed the expected number of anchored rules that occur at each span/split.

@@ -1,11 +1,6 @@
 package scalanlp.parser
 
-import scalanlp.trees._
-import scalanlp.trees.UnaryChainRemover.ChainReplacer;
 
-import java.io._
-import scalanlp.concurrent.ParallelOps._
-import scalanlp.trees.DenseTreebank
 
 /**
  * Creates labeled span scorers for a set of trees from some parser.

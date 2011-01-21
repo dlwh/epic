@@ -1,10 +1,6 @@
 package scalanlp.parser
 package projections
 
-import scalanlp.collection.mutable.TriangularArray
-import scalala.tensor.sparse.SparseVector
-import scalanlp.math.Numerics
-
 /**
  * 
  * @author dlwh

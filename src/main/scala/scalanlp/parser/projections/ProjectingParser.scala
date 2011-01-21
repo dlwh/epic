@@ -1,10 +1,7 @@
 package scalanlp.parser
 package projections
 
-import scalanlp.trees._
 import scalanlp.util.Index;
-import scalala.tensor.counters.Counters.DoubleCounter
-
 /**
  * A parser that takes a fine grammar and produces a chart, then projects that chart
  * somehow into a coarse tree. Currently, it's Viterbi.

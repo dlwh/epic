@@ -4,14 +4,12 @@ import scalala.Scalala._;
 import scalala.tensor.Vector;
 import scalala.tensor.adaptive.AdaptiveVector;
 import scalala.tensor.sparse.SparseVector;
-import scalala.tensor.dense.DenseVector;
+
 import scalala.tensor.counters.Counters
 import scalala.tensor.counters.Counters.DoubleCounter
 import scalala.tensor.counters.Counters.PairedDoubleCounter
 import scalala.tensor.counters.LogCounters
-import scalala.tensor.counters.LogCounters.LogDoubleCounter
 import scalala.tensor.counters.LogCounters.LogPairedDoubleCounter
-import scalala.tensor.dense.DenseMatrix
 import scalala.tensor.dense.DenseVector
 import scalanlp.concurrent.ParallelOps._;
 import scalanlp.optimize.DiffFunction
@@ -20,9 +18,7 @@ import scalanlp.util.ConsoleLogging
 import scalanlp.util.Index
 import scalanlp.util.Encoder
 import scalanlp.math.Numerics;
-import scalanlp.collection.mutable.Grid2
 import scalanlp.collection.mutable.SparseArray
-import scalanlp.concurrent.ThreadPoolRunner
 import scalanlp.util.Log
 import scalanlp.util.Profiling
 

@@ -21,7 +21,7 @@ class ProjectingSpanScorer[C,F](indexedProjections: ProjectionIndexer[C,F], scor
     val pParent = indexedProjections.project(parent)
     scorer.scoreBinaryRule(begin,split, end,pParent,
       indexedProjections.project(leftChild),
-      indexedProjections.project(rightChild))- math.log(indexedProjections.refinementsOf(pParent).length);
+      indexedProjections.project(rightChild)) - math.log(indexedProjections.refinementsOf(pParent).length);
   }
 }
 

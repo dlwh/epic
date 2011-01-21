@@ -1,15 +1,11 @@
 package scalanlp.parser
 package projections
 
-import scalanlp.collection.mutable.SparseArray
-import scalala.tensor.counters.Counters.DoubleCounter
-import scalala.tensor.counters.Counters.PairedDoubleCounter
-import scalala.tensor.Vector
-import scalanlp.util.Index;
 
-import ParseChart._;
-import ChartBuilder._;
-import InsideOutside._;
+
+
+
+
 
 /**
  * Project Charts from a Fine grammar to marginals in a finer grammar, returning a SpanFilter.

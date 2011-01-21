@@ -15,13 +15,11 @@ package scalanlp.parser
  limitations under the License.
 */
 
-import scalala.Scalala._
-import java.io.DataOutput;
-import scalala.tensor._;
+
+
 import scalanlp.util.Encoder;
 import scalala.tensor.sparse.SparseVector
 import scalanlp.collection.mutable.SparseArray;
-import scalala.tensor.adaptive.AdaptiveVector
 import scalala.tensor.counters.LogCounters._;
 import scalanlp.util.Index;
 

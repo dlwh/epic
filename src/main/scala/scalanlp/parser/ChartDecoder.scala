@@ -2,13 +2,9 @@ package scalanlp.parser
 
 import projections.ProjectionIndexer
 import scalanlp.trees._
-import scalanlp.config.Configuration
-import scalanlp.graphs.{DotRenderer, Distance}
 
-import scalala.tensor.counters.Counters;
-import scalanlp.util.Implicits._
-import scalanlp.collection.mutable.TriangularArray;
-import scalanlp.math.Numerics.logSum;
+
+
 
 /**
  * A ChartDecoder can turn an inside chart (and optionally an outside chart) from some

@@ -2,9 +2,7 @@ package scalanlp.parser.bitvector
 
 import scala.collection.mutable.ArrayBuffer
 import scalala.tensor.counters.Counters.PairedDoubleCounter;
-import scalala.tensor.counters.LogCounters
 import scalanlp.parser._
-import scalanlp.util.CachedHashCode
 import LogisticBitVector._;
 
 trait Featurizer[L,W] {

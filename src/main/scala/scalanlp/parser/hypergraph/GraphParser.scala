@@ -17,13 +17,9 @@ package scalanlp.parser.hypergraph
 
 
 
-import scala.collection.mutable.PriorityQueue
-import scalala.tensor.counters.Counters.DoubleCounter
-import scalanlp.trees.Span
-import scalanlp.parser._;
-import scalanlp.trees.Tree
-import scala.util.control.Breaks._;
-import scala.util.control.Breaks;
+
+
+
 
 
 /* TODO: repair

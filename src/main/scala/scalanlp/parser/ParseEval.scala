@@ -23,7 +23,6 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.PrintStream
 import scala.actors.Actor
-import scala.collection.mutable.ArrayBuffer
 import scalanlp.concurrent.ParallelOps._;
 
 

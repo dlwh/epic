@@ -44,8 +44,9 @@ case class Spans(directory: File = null) {
 case class ParserTrainerParams(treebank: TreebankParams, spans: Spans);
 
 object ParserParams {
+  case class Params();
   trait NoParams { self: ParserTrainer =>
-    case class Params();
+    type Params = ParserParams.Params;
     protected val paramManifest = manifest[Params];
   }
 
@@ -99,6 +100,7 @@ trait ParserTrainer {
     val params = config.readIn[ParserTrainerParams]("parser");
     val specificParams = config.readIn[Params]("trainer");
     println(params);
+    println(specificParams);
     import params.treebank._;
     import params.spans._;
 

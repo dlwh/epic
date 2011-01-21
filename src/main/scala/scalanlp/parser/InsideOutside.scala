@@ -6,7 +6,7 @@ import scalala.tensor.counters.Counters.PairedDoubleCounter
 import scalala.tensor.Vector
 
 import ParseChart._;
-import ChartBuilder._;
+
 import InsideOutside._;
 
 import math.exp;
@@ -53,7 +53,7 @@ class InsideOutside[L,W](val parser: ChartBuilder[LogProbabilityParseChart,L,W])
     for (i <- 0 until words.length) {
       val w = words(i);
       for (l <- inside.bot.enteredLabelIndexes(i, i + 1) if isTag(l)) {
-        val iScore = inside.bot.labelScore(i, i + 1, l);
+        val iScore = inside.bot.labelScore(i, i + 1, l) + validSpan.scoreLexical(i,i+1,l);
         val oScore = outside.bot.labelScore(i, i + 1, l);
         wordCounts.getOrElseUpdate(l)(w) += exp(iScore + oScore - totalProb);
       }
@@ -83,12 +83,13 @@ class InsideOutside[L,W](val parser: ChartBuilder[LogProbabilityParseChart,L,W])
           var i = 0;
           while (i < parentVector.used) {
             val a = parentVector.index(i);
-            val rScore = parentVector.data(i);
+            val rScore = parentVector.data(i) + validSpan.scoreBinaryRule(begin,split, end,a,b,c);
             val aScore = outside.bot.labelScore(begin, end, a);
             i += 1;
             if (!aScore.isInfinite) {
-              val prob = exp(bScore + cScore + aScore + rScore + validSpan.scoreBinaryRule(begin,split, end,a,b,c)  - totalProb);
-              if(prob.isInfinite || prob.isNaN) error(prob + " in " + words + " a: " + aScore + " b" + bScore  + " c" + cScore  + " r" + rScore  + " sp" + validSpan.scoreBinaryRule(begin,split,end,a,b,c) + " t" + totalProb);
+              val prob = exp(bScore + cScore + aScore + rScore - totalProb);
+              if(prob.isInfinite || prob.isNaN)
+                error(prob + " in " + words + " a: " + aScore + " b" + bScore  + " c" + cScore  + " r" + rScore  + " sp" + validSpan.scoreBinaryRule(begin,split,end,a,b,c) + " t" + totalProb);
               binaryRuleCounts.getOrElseUpdate(a).getOrElseUpdate(b)(c) += prob;
               assert(binaryRuleCounts(a)(b)(c) >= prob,binaryRuleCounts(a)(b)(c) + " " + prob);
             }
@@ -117,10 +118,10 @@ class InsideOutside[L,W](val parser: ChartBuilder[LogProbabilityParseChart,L,W])
         var i = 0;
         while (i < parentVector.used) {
           val a = parentVector.index(i);
-          val rScore = parentVector.data(i);
+          val rScore = parentVector.data(i) + validSpan.scoreUnaryRule(begin,end,a,b);
           val aScore = outside.top.labelScore(begin, end, a);
           if(!aScore.isInfinite) {
-            val prob = exp(bScore + aScore + rScore + validSpan.scoreUnaryRule(begin,end,a,b) - totalProb);
+            val prob = exp(bScore + aScore + rScore - totalProb);
             if(prob.isInfinite || prob.isNaN)
               error("nan in " + words + " for unary " + inside.grammar.index.get(a) + "->" + inside.grammar.index.get(b) + ": " + prob + " a: " + aScore + " " + "b: " + bScore + " sp: " + validSpan.scoreUnaryRule(begin,end,a,b)  + "tot: " + totalProb);
             unaryRuleCounts.getOrElseUpdate(a)(b) += prob;

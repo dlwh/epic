@@ -17,9 +17,8 @@ package scalanlp.parser;
 
 
 import scalanlp.trees._;
-import scalanlp.classify.Classifier;
-import scalala.tensor.counters.Counters.DoubleCounter
-import scalanlp.data._;
+
+
 
 trait Parser[L,W] extends (Seq[W]=>Tree[L]) { outer =>
   def apply(s: Seq[W]) = bestParse(s);

@@ -6,7 +6,7 @@ import scalanlp.collection.mutable.{SparseArrayMap, SparseArray, ArrayMap}
 
 import scalala.tensor.sparse.SparseVector
 import scalanlp.util.{CachedHashCode, Encoder, Index}
-import collection.mutable.{ArrayBuffer}
+import collection.mutable.ArrayBuffer
 
 import projections._;
 import bitvector.BitUtils;
@@ -74,10 +74,13 @@ class RuleFeaturizer[L,W](binaries: PairedDoubleCounter[L,BinaryRule[L]],
 
 
   def initialValueForFeature(f: Feature[L,W]) = f match {
-    case RuleFeature(r:BinaryRule[L]) => if(initToZero) 0.0 else
-      math.log(binaries(r.parent,r) / binaries(r.parent).total) / scale;
+    case RuleFeature(r:BinaryRule[L]) => if(initToZero) 0.0  else{
+      val s = math.log(binaries(r.parent,r) / binaries(r.parent).total) / scale //+ math.log(r.hashCode.abs * 1.0 /  Int.MaxValue)
+      assert(!s.isNaN, r + " " + binaries(r.parent))
+      s
+    }
     case RuleFeature(r:UnaryRule[L]) => if(initToZero) 0.0 else
-      math.log(unaries(r.parent,r) / unaries(r.parent).total) / scale;
+      math.log(unaries(r.parent,r) / unaries(r.parent).total) / scale //+ math.log(r.hashCode.abs * 1.0 /  Int.MaxValue)
     case _ => 0.0;
   }
 
@@ -161,9 +164,13 @@ class SlavFeaturizer[L,W](base: Featurizer[L,W], numStates:Int) extends Featuriz
     result;
   }
   def initialValueForFeature(f: Feature[(L,Int),W]) = f match {
-    case SubstateFeature(baseF, _) =>
-      val baseScore = base.initialValueForFeature(baseF);
-      baseScore + math.log(0.99 + math.random * 0.02);
+    case SubstateFeature(baseF, x) =>
+      val baseScore = base.initialValueForFeature(baseF) //+ math.log(x.foldLeft(1.)(_ + 3 * _));
+      assert(!baseScore.isNaN,baseF);
+      //baseScore + math.log(1.0 - 1E-10 + math.random * 2 * 1E-10)
+      val r = baseScore + math.log(1.0 - .1 + math.random * 2 * .1)
+      assert(!r.isNaN,"post random: " + baseF);
+      r
     case _ => 0.0;
   }
 }
@@ -251,7 +258,8 @@ class SlavPlusFeaturizer[L,W](base: Featurizer[L,W], numStates:Int) extends Feat
   def initialValueForFeature(f: Feature[(L,Int),W]) = f match {
     case SubstateFeature(baseF, _) =>
       val baseScore = base.initialValueForFeature(baseF);
-      baseScore + math.log(0.99 + math.random * 0.02);
+//      baseScore + math.log(0.99 + math.random * 0.02);
+      baseScore + math.log(1.0 - 1E-10 + math.random * 2 * 1E-10)
     case _ => 0.0;
   }
 }
@@ -347,18 +355,21 @@ trait FeatureIndexer[L,W] extends Encoder[Feature[L,W]] {
 
 
   def featuresFor(a: Int, b: Int, c: Int) = {
-    if(binaryRuleCache(a)(b)(c) == null)
+    if(binaryRuleCache(a)(b)(c) == null) {
       stripEncode(featurizer.featuresFor(BinaryRule(labelIndex.get(a),labelIndex.get(b), labelIndex.get(c))));
-    else binaryRuleCache(a)(b)(c);
+    } else binaryRuleCache(a)(b)(c);
   }
 
   def featuresFor(a: Int, b: Int) = {
-    if(unaryRuleCache(a)(b) == null) stripEncode(featurizer.featuresFor(UnaryRule(labelIndex.get(a),labelIndex.get(b))));
-    else unaryRuleCache(a)(b);
+    if(unaryRuleCache(a)(b) == null) {
+      stripEncode(featurizer.featuresFor(UnaryRule(labelIndex.get(a),labelIndex.get(b))))
+    } else unaryRuleCache(a)(b);
   }
 
   def featuresFor(a: Int, w: W) = {
-    if(!lexicalCache(a).contains(w)) stripEncode(featurizer.featuresFor(labelIndex.get(a),w));
+    if(!lexicalCache(a).contains(w)) {
+      stripEncode(featurizer.featuresFor(labelIndex.get(a),w));
+    }
     else lexicalCache(a)(w);
   }
 
@@ -436,55 +447,6 @@ object FeatureIndexer {
     cachedFeaturesToIndexedFeatures[L2,W](f,indexedProjections.fineIndex,featureIndex,binaryRuleCache,unaryRuleCache,lexicalCache)
   }
 
-  def apply[L,W](f: Featurizer[L,W], trees: Iterable[(BinarizedTree[L],Seq[W])]) = {
-    val labelIndex = Index[L]();
-    val featureIndex = Index[Feature[L,W]]();
-
-    // a -> b c -> SparseVector of feature weights
-    val binaryRuleCache = new ArrayMap(new SparseArrayMap(new SparseArrayMap[DoubleCounter[Feature[L,W]]](null)));
-    // a -> b SparseVector
-    val unaryRuleCache = new ArrayMap(new SparseArrayMap[DoubleCounter[Feature[L,W]]](null));
-    // a -> W map
-    val lexicalCache = new ArrayMap(collection.mutable.Map[W,DoubleCounter[Feature[L,W]]]());
-
-    for {
-      (t,words) <- trees;
-      t2 <- t.allChildren
-    } {
-      t2 match {
-        case BinaryTree(a,Tree(b,_),Tree(c,_)) =>
-          val ia = labelIndex.index(a);
-          val ib = labelIndex.index(b);
-          val ic = labelIndex.index(c);
-          if(binaryRuleCache(ia)(ib)(ic) eq null) {
-            val feats = f.featuresFor(new BinaryRule(a,b,c));
-            binaryRuleCache(ia)(ib)(ic) = feats;
-            feats.keysIterator.foreach {featureIndex.index _ };
-          }
-        case UnaryTree(a,Tree(b,_)) =>
-          val ia = labelIndex.index(a);
-          val ib = labelIndex.index(b);
-          if(unaryRuleCache(ia)(ib) eq null) {
-            val feats = f.featuresFor(new UnaryRule(a,b));
-            unaryRuleCache(ia)(ib) = feats;
-            feats.keysIterator.foreach {featureIndex.index _ };
-          }
-        case n@NullaryTree(a) =>
-          val w = words(n.span.start);
-          val ia = labelIndex.index(a);
-          if(!lexicalCache(ia).contains(w)) {
-            val feats = f.featuresFor(a,w);
-            lexicalCache(ia)(w) = feats;
-            feats.keysIterator.foreach {featureIndex.index _ };
-          }
-
-      }
-
-    }
-
-    cachedFeaturesToIndexedFeatures[L,W](f, labelIndex,featureIndex,binaryRuleCache,unaryRuleCache,lexicalCache)
-  }
-
   private def cachedFeaturesToIndexedFeatures[L,W](f: Featurizer[L,W], lI: Index[L], featureIndex: Index[Feature[L,W]],
                                         binaryRuleCache: ArrayMap[SparseArrayMap[SparseArrayMap[DoubleCounter[Feature[L,W]]]]],
                                         unaryRuleCache: ArrayMap[SparseArrayMap[DoubleCounter[Feature[L,W]]]],
@@ -510,6 +472,7 @@ object FeatureIndexer {
       val lrc = Array.tabulate(lI.size){ (a) =>
         lexicalCache(a).mapValues(featureEncoder.encodeSparse _).toMap;
       }
+
       new FeatureIndexer[L,W] {
         val index = featureIndex;
         val labelIndex = lI;

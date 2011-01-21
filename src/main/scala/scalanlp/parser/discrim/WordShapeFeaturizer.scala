@@ -4,7 +4,7 @@ import scalala.tensor.counters.Counters
 import scalala.tensor.counters.Counters.PairedDoubleCounter
 import collection.mutable.ArrayBuffer
 import scalanlp.parser.Rule
-import java.nio.CharBuffer;
+
 
 
 sealed abstract class WordShapeFeature[+L](l: L) extends Feature[L,Nothing];
@@ -32,7 +32,7 @@ class WordShapeFeaturizer[L](lexicon: PairedDoubleCounter[L,String], initToZero:
     if(wordCounts(w) > 5) Counters.aggregate(LexicalFeature(l,w) -> 1.0);
     else {
       val features = ArrayBuffer[Feature[L,String]]();
-      if(math.random < 0.5 || wordCounts(w) > 3) // really rare words should randomly be removed the treebank.
+      if(wordCounts(w) > 3)
         features += LexicalFeature(l,w);
 
       features += makeShapeFeature(l, w);
