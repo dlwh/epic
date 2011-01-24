@@ -19,7 +19,7 @@ trait FeaturizerFactory[L,W] {
 /**
  * Uses just rule features and wordshapes
  */
-class PlainFeaturizerFactory[L](initToZero: Boolean = false) extends FeaturizerFactory[L,String] {
+class PlainFeaturizerFactory[L](initToZero: Boolean = true) extends FeaturizerFactory[L,String] {
   def getFeaturizer(baseLexicon: PairedDoubleCounter[L,String],
                     baseBinaries: PairedDoubleCounter[L,BinaryRule[L]],
                     baseUnaries: PairedDoubleCounter[L,UnaryRule[L]]):Featurizer[L,String] = {

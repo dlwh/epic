@@ -76,11 +76,12 @@ class RuleFeaturizer[L,W](binaries: PairedDoubleCounter[L,BinaryRule[L]],
   def initialValueForFeature(f: Feature[L,W]) = f match {
     case RuleFeature(r:BinaryRule[L]) => if(initToZero) 0.0  else{
       val s = math.log(binaries(r.parent,r) / binaries(r.parent).total) / scale //+ math.log(r.hashCode.abs * 1.0 /  Int.MaxValue)
-      assert(!s.isNaN, r + " " + binaries(r.parent))
-      s
+      if(s.isNaN || s.isInfinite) 0.0 else s
     }
-    case RuleFeature(r:UnaryRule[L]) => if(initToZero) 0.0 else
-      math.log(unaries(r.parent,r) / unaries(r.parent).total) / scale //+ math.log(r.hashCode.abs * 1.0 /  Int.MaxValue)
+    case RuleFeature(r:UnaryRule[L]) => if(initToZero) 0.0 else {
+      val s = math.log(unaries(r.parent,r) / unaries(r.parent).total) / scale //+ math.log(r.hashCode.abs * 1.0 /  Int.MaxValue)
+      if(s.isNaN || s.isInfinite)  0.0 else s
+    }
     case _ => 0.0;
   }
 

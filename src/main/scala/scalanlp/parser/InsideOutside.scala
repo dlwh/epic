@@ -118,9 +118,9 @@ class InsideOutside[L,W](val parser: ChartBuilder[LogProbabilityParseChart,L,W])
         var i = 0;
         while (i < parentVector.used) {
           val a = parentVector.index(i);
-          val rScore = parentVector.data(i) + validSpan.scoreUnaryRule(begin,end,a,b);
           val aScore = outside.top.labelScore(begin, end, a);
           if(!aScore.isInfinite) {
+            val rScore = parentVector.data(i) + validSpan.scoreUnaryRule(begin,end,a,b);
             val prob = exp(bScore + aScore + rScore - totalProb);
             if(prob.isInfinite || prob.isNaN)
               error("nan in " + words + " for unary " + inside.grammar.index.get(a) + "->" + inside.grammar.index.get(b) + ": " + prob + " a: " + aScore + " " + "b: " + bScore + " sp: " + validSpan.scoreUnaryRule(begin,end,a,b)  + "tot: " + totalProb);

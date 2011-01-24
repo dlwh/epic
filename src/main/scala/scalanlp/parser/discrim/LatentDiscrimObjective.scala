@@ -123,7 +123,7 @@ case class LatentParams[P](parser: ParserParams.BaseParser,
                            latentFactory: LatentFeaturizerFactory = new SlavLatentFeaturizerFactory(),
                            numStates: Int= 8,
                            iterationsPerEval: Int = 50,
-                           maxIterations: Int = 201,
+                           maxIterations: Int = 202,
                            iterPerValidate: Int = 10,
                            oldWeights: File = null,
                            splitFactor:Int = 1);
