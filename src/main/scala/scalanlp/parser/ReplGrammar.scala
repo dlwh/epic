@@ -12,7 +12,7 @@ class ReplGrammar(treebankPath: String, isDenseTreebank:Boolean=true, binarizati
   else Treebank.fromPennTreebankDir(new java.io.File(treebankPath));
 
   val binarize = {
-    if(binarizationKind == "xbar") Trees.xBarBinarize _ ;
+    if(binarizationKind == "xbar") Trees.xBarBinarize(_:Tree[String],false);
     else Trees.binarize(_:Tree[String]);
   }
 

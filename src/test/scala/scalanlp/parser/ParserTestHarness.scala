@@ -8,8 +8,8 @@ import scalanlp.trees._
  * @author dlwh
  */
 trait ParserTestHarness {
-  def getTrainTreesAndReplacer(binarization:(Tree[String]=>BinarizedTree[String]) = (Trees.xBarBinarize _),
-                    maxLength:Int= 15) = {
+  def getTrainTreesAndReplacer(binarization:(Tree[String]=>BinarizedTree[String]) = (Trees.xBarBinarize(_:Tree[String],false)),
+                               maxLength:Int= 15) = {
     val treebank = {
       TstTreebank.treebank;
     }
@@ -17,7 +17,7 @@ trait ParserTestHarness {
     (new UnaryChainRemover[String]).removeUnaryChains(trees.iterator);
   }
 
-  def getTestTrees(binarization:(Tree[String]=>BinarizedTree[String]) = (Trees.xBarBinarize _),
+  def getTestTrees(binarization:(Tree[String]=>BinarizedTree[String]) = (Trees.xBarBinarize(_:Tree[String],false)),
                    maxLength:Int= 15) = {
     val treebank = {
       TstTreebank.treebank;
@@ -26,7 +26,7 @@ trait ParserTestHarness {
   }
 
   def massageTrees(trees: Iterator[(Tree[String],Seq[String])],
-                   binarize:(Tree[String]=>BinarizedTree[String]) = (Trees.xBarBinarize _),
+                   binarize:(Tree[String]=>BinarizedTree[String]) = (Trees.xBarBinarize(_:Tree[String],false)),
                    maxLength:Int=15) = {
     val xform = Trees.Transforms.StandardStringTransform;
     val trainTrees = ArrayBuffer() ++= (for( (tree,words) <- trees.filter(_._2.length <= maxLength))

@@ -38,7 +38,7 @@ class Tree[+L](val label: L, val children: IndexedSeq[Tree[L]])(val span: Span) 
   }
 
   def leaves:Iterable[Tree[L]] = if(isLeaf) {
-    List(this).view
+    IndexedSeq(this).view
   } else  {
     children.map(_.leaves).foldLeft[Stream[Tree[L]]](Stream.empty){_ append _}
   }
@@ -64,7 +64,7 @@ class Tree[+L](val label: L, val children: IndexedSeq[Tree[L]])(val span: Span) 
 
 object Tree {
   def apply[L](label: L, children: IndexedSeq[Tree[L]])(span: Span) = new Tree(label,children)(span);
-  def unapply[L](t: Tree[L]): Option[(L,Seq[Tree[L]])] = Some((t.label,t.children));
+  def unapply[L](t: Tree[L]): Option[(L,IndexedSeq[Tree[L]])] = Some((t.label,t.children));
   def fromString(input: String):(Tree[String],Seq[String]) = new PennTreeReader().readTree(input).left.get;
 
   private def recursiveToString[L](tree: Tree[L], depth: Int, sb: StringBuilder):StringBuilder = {
@@ -140,17 +140,23 @@ case class NullaryTree[+L](l: L)(span: Span) extends Tree[L](l,IndexedSeq.empty)
 }
 
 object Trees {
-  def binarize[L](tree: Tree[L], relabel: (L,L)=>L):BinarizedTree[L] = tree match {
+  def binarize[L](tree: Tree[L], relabel: (L,L)=>L, left:Boolean=false):BinarizedTree[L] = tree match {
     case Tree(l, Seq()) => NullaryTree(l)(tree.span)
     case Tree(l, Seq(oneChild)) => UnaryTree(l,binarize(oneChild,relabel))(tree.span);
     case Tree(l, Seq(leftChild,rightChild)) => 
       BinaryTree(l,binarize(leftChild,relabel),binarize(rightChild,relabel))(tree.span);
-    case Tree(l, Seq(leftChild, otherChildren@ _*)) =>
+    case Tree(l, Seq(leftChild, otherChildren@ _*)) if left =>
       val newLeftChild = binarize(leftChild,relabel);
       val newRightLabel = relabel(l,leftChild.label);
       val newRightChildSpan = Span(newLeftChild.span.end,tree.span.end);
       val newRightChild = binarize(Tree(newRightLabel,otherChildren.toIndexedSeq)(newRightChildSpan), relabel);
-      BinaryTree(l, newLeftChild, newRightChild)(tree.span) 
+      BinaryTree(l, newLeftChild, newRightChild)(tree.span)
+    case Tree(l, children) => // right binarization
+      val newRightChild = binarize(children.last,relabel);
+      val newLeftLabel = relabel(l,newRightChild.label);
+      val newLeftChildSpan = Span(tree.span.start,newRightChild.span.start)
+      val newLeftChild = binarize(Tree(newLeftLabel,children.take(children.length-1))(newLeftChildSpan), relabel);
+      BinaryTree(l, newLeftChild, newRightChild)(tree.span)
   }
 
   private def stringBinarizer(currentLabel: String, append: String) = { 
@@ -179,7 +185,7 @@ object Trees {
     if(currentLabel.startsWith("@")) currentLabel
     else "@" + currentLabel
   }
-  def xBarBinarize(tree: Tree[String]) = binarize[String](tree,xbarStringBinarizer);
+  def xBarBinarize(tree: Tree[String], left: Boolean = false) = binarize[String](tree,xbarStringBinarizer, left);
 
   object Transforms {
     class EmptyNodeStripper extends (Tree[String]=>Option[Tree[String]]) {

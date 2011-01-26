@@ -206,7 +206,7 @@ trait LatentTrainer extends ParserTrainer {
     val closedWords = Set.empty ++ {
       val wordCounts = DoubleCounter[String]();
       initLexicon.rows.foreach ( wordCounts += _._2 )
-      wordCounts.iterator.filter(_._2 > 10).map(_._1);
+      wordCounts.iterator.filter(_._2 > 5).map(_._1);
     }
 
     val obj = mkObjective(params, latentFeaturizer, trainTrees, indexedProjections, xbarParser, openTags, closedWords)

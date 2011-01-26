@@ -19,12 +19,12 @@ class WordShapeFeaturizer[L](lexicon: PairedDoubleCounter[L,String]) extends Fea
     case WordDecision(w) =>
       val features = new ArrayBuffer[Feature[L,String]];
 
+      features += LexicalFeature(c._1,w);
       if(wordCounts(w) > 3) {
-        features += LexicalFeature(c._1,w);
- //      features += IndicatorWSFeature(c._1,'Uncommon);
+       features += IndicatorWSFeature(c._1,'Uncommon);
       } else if(wordCounts(w) > 1) {
       } else {
-        //features += IndicatorWSFeature(c._1,'Unknown);
+        features += IndicatorWSFeature(c._1,'Unknown);
       }
 
       val wlen = w.length;

@@ -9,7 +9,8 @@ import scalanlp.trees.UnaryChainRemover.ChainReplacer
 
 case class TreebankParams(path: File, maxLength:Int = 40, binarization:String = "xbar", processing: String = "standard") {
   def binarize = {
-    if(binarization == "xbar") Trees.xBarBinarize _ ;
+    if(binarization == "xbar") Trees.xBarBinarize(_:Tree[String],left=false);
+    else if(binarization == "leftXbar") Trees.xBarBinarize(_:Tree[String],left=true);
     else Trees.binarize(_:Tree[String]);
   }
 
@@ -59,6 +60,7 @@ object ParserParams {
 }
 
 trait ParserTrainer {
+  import ParserTrainer._;
 
   type Params;
   protected implicit val paramManifest: Manifest[Params];
@@ -69,31 +71,7 @@ trait ParserTrainer {
                   params: Params):Iterator[(String,Parser[String,String])];
 
 
-  def transformTrees(trees: Iterator[(Tree[String],Seq[String])],
-                     spans: Iterable[SpanScorer[String]],
-                     maxLength: Int,
-                     binarize: (Tree[String]) => BinarizedTree[String],
-                     xform: Tree[String]=>Tree[String]): IndexedSeq[(BinarizedTree[String], Seq[String],SpanScorer[String])] = {
 
-    val binarizedAndTransformed = for {
-      ((tree, words),span) <- (trees zip spans.iterator) if words.length <= maxLength
-    } yield (binarize(xform(tree)),words,span)
-
-      binarizedAndTransformed.toIndexedSeq
-
-  }
-
-  def removeUnaryChains(trees: IndexedSeq[(BinarizedTree[String],Seq[String],SpanScorer[String])]) = {
-    val chainRemover = new UnaryChainRemover[String];
-
-    val (dechained,chainReplacer) = chainRemover.removeUnaryChains(trees.iterator.map { case (t,w,s) => (t,w) });
-
-    val dechainedWithSpans = for {
-      ((t,w),(_,_,span)) <- (dechained zip trees)
-    } yield (t,w,span);
-
-    (dechainedWithSpans, chainReplacer)
-  }
 
   def main(args: Array[String]) {
     val config = Configuration.fromPropertiesFiles(args.map{new File(_)});
@@ -138,3 +116,30 @@ trait ParserTrainer {
 
 }
 
+object ParserTrainer {
+  def transformTrees(trees: Iterator[(Tree[String],Seq[String])],
+                     spans: Iterable[SpanScorer[String]],
+                     maxLength: Int,
+                     binarize: (Tree[String]) => BinarizedTree[String],
+                     xform: Tree[String]=>Tree[String]): IndexedSeq[(BinarizedTree[String], Seq[String],SpanScorer[String])] = {
+
+    val binarizedAndTransformed = for {
+      ((tree, words),span) <- (trees zip spans.iterator) if words.length <= maxLength
+    } yield (binarize(xform(tree)),words,span)
+
+      binarizedAndTransformed.toIndexedSeq
+
+  }
+
+  def removeUnaryChains(trees: IndexedSeq[(BinarizedTree[String],Seq[String],SpanScorer[String])]) = {
+    val chainRemover = new UnaryChainRemover[String];
+
+    val (dechained,chainReplacer) = chainRemover.removeUnaryChains(trees.iterator.map { case (t,w,s) => (t,w) });
+
+    val dechainedWithSpans = for {
+      ((t,w),(_,_,span)) <- (dechained zip trees)
+    } yield (t,w,span);
+
+    (dechainedWithSpans, chainReplacer)
+  }
+}

@@ -157,7 +157,7 @@ object ProjectTreebankToLabeledSpans {
 
   def transformTrees(trees: Iterator[(Tree[String],Seq[String])]): IndexedSeq[(BinarizedTree[String], Seq[String])] = {
     val xform = Trees.Transforms.StandardStringTransform;
-    val binarize = Trees.xBarBinarize _;
+    val binarize = Trees.xBarBinarize(_:Tree[String],false);
     val binarizedAndTransformed = (for {
       (tree, words) <- trees
     } yield (binarize(xform(tree)),words)).toIndexedSeq

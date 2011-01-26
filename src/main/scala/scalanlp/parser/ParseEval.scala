@@ -17,13 +17,15 @@ package scalanlp.parser;
 
 
 import scalanlp.trees._
-import scalanlp.trees.UnaryChainRemover.ChainReplacer;
+import scalanlp.trees.UnaryChainRemover.ChainReplacer
+import scalanlp.config.Configuration;
 import java.io.BufferedOutputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.io.PrintStream
 import scala.actors.Actor
 import scalanlp.concurrent.ParallelOps._;
+import scalanlp.util._;
 
 
 /**
@@ -33,16 +35,17 @@ import scalanlp.concurrent.ParallelOps._;
 * @author dlwh
 */
 class ParseEval[L](ignoredLabels: Set[L]) {
+  import ParseEval.Statistics;
   /**
   * Computes precision, recall, and exact match for the each
   * guess/gold pair of trees.
   */
-  def apply(guessgold: Iterator[(Tree[L],Tree[L])]):(Double,Double,Double) = {
+  def apply(guessgold: Iterator[(Tree[L],Tree[L])]):Statistics = {
     val allStats = for( (guess,gold) <- guessgold) yield { apply(guess,gold) }
 
     val stats = allStats.reduceLeft(_ + _);
 
-    (stats.precision,stats.recall,stats.exact);
+    stats
   }
 
   def apply(guess: Tree[L], gold: Tree[L]): Statistics = {
@@ -50,22 +53,12 @@ class ParseEval[L](ignoredLabels: Set[L]) {
     val goldSet = labeledConstituents(gold);
     val inter = (guessSet intersect goldSet)
     val exact = if(goldSet.size == inter.size && guessSet.size == inter.size) 1 else 0;
-    Statistics(guessSet.size, goldSet.size, inter.size, exact, 1);
+    val guessLeaves = guess.leaves;
+    val goldLeaves = gold.leaves;
+    val numRight = goldLeaves.zip(guessLeaves).foldLeft(0) { (acc,gg) => if(gg._1.label == gg._2.label) acc + 1 else acc};
+    Statistics(guessSet.size, goldSet.size, inter.size, exact, numRight, guess.span.end, 1);
   }
 
-  case class Statistics(guess: Int=0, gold: Int=0, right: Int=0, numExact: Int=0, numParses: Int) {
-    def +(stats: Statistics) = {
-      Statistics(guess + stats.guess,
-                 gold + stats.gold,
-                 right + stats.right,
-                 numExact + stats.numExact,
-                 numParses + stats.numParses)
-    }
-
-    def precision = if(guess == 0) 1.0 else (right * 1.0 / guess);
-    def recall = if(guess == 0) 1.0 else (right * 1.0 / gold);
-    def exact = (numExact * 1.0 / numParses);
-  }
 
   private def labeledConstituents(tree: Tree[L]) = Set() ++ {
     for(child <- tree.preorder
@@ -76,15 +69,34 @@ class ParseEval[L](ignoredLabels: Set[L]) {
 
 object ParseEval {
 
-  type PostParseFn = (Tree[String],Tree[String],Seq[String],ParseEval[String]#Statistics,Int)=>Unit;
-  val noPostParseFn = (_:Tree[String],_:Tree[String],_:Seq[String],_:ParseEval[String]#Statistics,_:Int)=>()
+  case class Statistics(guess: Int, gold: Int, right: Int, numExact: Int,
+                        tagsRight: Int, numWords: Int,
+                        numParses: Int) {
+    def +(stats: Statistics) = {
+      Statistics(guess + stats.guess,
+        gold + stats.gold,
+        right + stats.right,
+        numExact + stats.numExact,
+        tagsRight + stats.tagsRight,
+        numWords + stats.numWords,
+        numParses + stats.numParses)
+    }
+
+    def precision = if(guess == 0) 1.0 else (right * 1.0 / guess);
+    def recall = if(guess == 0) 1.0 else (right * 1.0 / gold);
+    def exact = (numExact * 1.0 / numParses);
+    def tagAccuracy = tagsRight * 1.0 / numWords;
+    def f1 = (2 * precision * recall)/(precision + recall);
+  }
+
+  type PostParseFn = (Tree[String],Tree[String],Seq[String],Statistics,Int)=>Unit;
+  val noPostParseFn = (_:Tree[String],_:Tree[String],_:Seq[String],_:Statistics,_:Int)=>()
 
   def evaluate(trees: IndexedSeq[(Tree[String],Seq[String],SpanScorer[String])],
                parser: Parser[String,String], chainReplacer: ChainReplacer[String],
                postEval: PostParseFn = noPostParseFn) = {
 
     val peval = new ParseEval(Set("","''", "``", ".", ":", ","));
-    import peval.Statistics;
 
     def evalSentence(sent: (Tree[String],Seq[String],SpanScorer[String])) = try {
       val (goldTree,words,scorer) = sent;
@@ -97,7 +109,7 @@ object ParseEval {
       stats;
     } catch {
       case e:RuntimeException => e.printStackTrace();
-      Statistics(0, peval.labeledConstituents(sent._1).size, 0, 0, 1);
+      Statistics(0, peval.labeledConstituents(sent._1).size, 0, 0, 0, sent._2.length, 1);
     }
     val stats = trees.par.withSequentialThreshold(100).mapReduce({ evalSentence _ },{ (_:Statistics) + (_:Statistics)});
 
@@ -124,7 +136,7 @@ object ParseEval {
     }
 
     def postEval(guessTree: Tree[String], goldTree: Tree[String], words: Seq[String],
-                 stats: ParseEval[String]#Statistics, time: Int) = {
+                 stats: Statistics, time: Int) = {
       val buf = new StringBuilder();
       buf ++= "======\n";
       buf ++= words.mkString(",");
@@ -132,7 +144,7 @@ object ParseEval {
       buf ++= goldTree.render(words);
       buf ++= "\nGuess:\n";
       buf ++= guessTree.render(words);
-      buf ++= ("\nLocal Accuracy:" + (stats.precision,stats.recall,stats.exact) + "\n") ;
+      buf ++= ("\nLocal Accuracy:" + (stats.precision,stats.recall,stats.f1,stats.exact,stats.tagAccuracy) + "\n") ;
       buf ++= (time / 1000.0 + " Seconds")
       buf ++= "\n======";
       println(buf.toString);
@@ -142,5 +154,36 @@ object ParseEval {
     val r = evaluate(trees,parser,chainReplacer, postEval _);
     appender ! None;
     r
+  }
+}
+
+object ParserTester {
+  import ParserTrainer._;
+  def main(args: Array[String]) {
+    val config = Configuration.fromPropertiesFiles(args.map(new File(_)));
+    val params = config.readIn[ParserTrainerParams]("treebank");
+    val parserFile = config.readIn[File]("parser.test");
+
+    import params.treebank._;
+    import params.spans._;
+
+    val trainTreesWithUnaries = transformTrees(treebank.trainTrees, trainSpans, maxLength, binarize, xform);
+    val (trainTrees,replacer) = removeUnaryChains(trainTreesWithUnaries);
+
+    val parser = readObject[Parser[String,String]](parserFile);
+
+    val testTrees = transformTrees(treebank.testTrees, testSpans, maxLength, binarize, xform)
+
+    evalParser(testTrees,parser,"test",replacer);
+  }
+
+  protected def evalParser(testTrees: IndexedSeq[(Tree[String],Seq[String],SpanScorer[String])],
+          parser: Parser[String,String], name: String, chainReplacer: ChainReplacer[String]) = {
+    println("Evaluating Parser...");
+    val (prec,recall,exact) = ParseEval.evaluateAndLog(testTrees,parser,name,chainReplacer);
+    val f1 = (2 * prec * recall)/(prec + recall);
+    println("Eval finished. Results:");
+    println( "P: " + prec + " R:" + recall + " F1: " + f1 +  " Ex:" + exact);
+    f1
   }
 }
