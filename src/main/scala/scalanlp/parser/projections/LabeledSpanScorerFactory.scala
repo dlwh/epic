@@ -18,7 +18,7 @@ import scalanlp.trees.DenseTreebank
  */
 class LabeledSpanScorerFactory[C,L,W](parser: ChartBuilder[ParseChart.LogProbabilityParseChart,L,W],
                                     indexedProjections: ProjectionIndexer[C,L],
-                                    pruningThreshold: Double= -10) extends SpanScorer.Factory[C,L,W] {
+                                    pruningThreshold: Double= -5) extends SpanScorer.Factory[C,L,W] {
 
   def mkSpanScorer(s: Seq[W], scorer: SpanScorer[L] = SpanScorer.identity) = {
     val coarseRootIndex = parser.grammar.index(parser.root);

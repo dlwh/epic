@@ -113,8 +113,7 @@ object ParseEval {
     }
     val stats = trees.par.withSequentialThreshold(100).mapReduce({ evalSentence _ },{ (_:Statistics) + (_:Statistics)});
 
-    val (prec,recall,exact) = (stats.precision,stats.recall,stats.exact);
-    (prec,recall,exact);
+    stats
   }
 
   def evaluateAndLog(trees: IndexedSeq[(Tree[String],Seq[String],SpanScorer[String])],
@@ -180,10 +179,10 @@ object ParserTester {
   protected def evalParser(testTrees: IndexedSeq[(Tree[String],Seq[String],SpanScorer[String])],
           parser: Parser[String,String], name: String, chainReplacer: ChainReplacer[String]) = {
     println("Evaluating Parser...");
-    val (prec,recall,exact) = ParseEval.evaluateAndLog(testTrees,parser,name,chainReplacer);
-    val f1 = (2 * prec * recall)/(prec + recall);
+    val stats = ParseEval.evaluateAndLog(testTrees,parser,name,chainReplacer);
+    import stats._;
     println("Eval finished. Results:");
-    println( "P: " + prec + " R:" + recall + " F1: " + f1 +  " Ex:" + exact);
+    println( "P: " + precision + " R:" + recall + " F1: " + f1 +  " Ex:" + exact + " Tagging: " + stats.tagAccuracy);
     f1
   }
 }

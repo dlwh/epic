@@ -33,12 +33,13 @@ abstract class ParseChart[L](val grammar: Encoder[L], val length: Int) {
     def labelScore(begin: Int, end: Int, label: L):Double = labelScore(begin,end,grammar.index(label));
 
     def enter(begin: Int, end: Int, parent: Int, w: Double) = {
-      val oldScore = score(TriangularArray.index(begin,end))(parent);
+      val index = TriangularArray.index(begin, end)
+      val oldScore = score(index)(parent);
       val newScore = sum(oldScore, w);
-      score(TriangularArray.index(begin,end))(parent) = newScore;
+      score(index)(parent) = newScore;
 
       if(oldScore == zero) {
-        enteredLabels(TriangularArray.index(begin,end))(parent) = true;
+        enteredLabels(index)(parent) = true;
         narrowLeft(end)(parent) = begin max narrowLeft(end)(parent);
         wideLeft(end)(parent) = begin min wideLeft(end)(parent);
         wideRight(begin)(parent) = end max wideRight(begin)(parent);
