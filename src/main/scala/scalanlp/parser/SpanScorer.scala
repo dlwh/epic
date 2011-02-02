@@ -60,6 +60,13 @@ object SpanScorer {
     def mkSpanScorer(s: Seq[W], oldScorer: SpanScorer[F] = identity) = identity[C];
   }
 
+
+  @serializable
+  @SerialVersionUID(1)
+  def forwardingFactory[C,W]:Factory[C,C,W] = new Factory[C,C,W] {
+    def mkSpanScorer(s: Seq[W], oldScorer: SpanScorer[C] = identity) = oldScorer;
+  }
+
   def identity[T]:SpanScorer[T] = new SpanScorer[T] {
     def scoreLexical(begin: Int, end: Int, tag: Int) = 0.0
 

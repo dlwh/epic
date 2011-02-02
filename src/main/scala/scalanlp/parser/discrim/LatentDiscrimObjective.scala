@@ -45,7 +45,7 @@ class LatentDiscrimObjective[L,L2,W](featurizer: Featurizer[L2,W],
   }
 
   def extractParser(weights: DenseVector) = {
-    val parser = new ChartParser[L,L2,W](builder(weights),new ViterbiDecoder(indexedProjections), ProjectingSpanScorer.factory(indexedProjections));
+    val parser = new ChartParser[L,L2,W](builder(weights),new ViterbiDecoder(indexedProjections),indexedProjections);
     parser
   }
 
