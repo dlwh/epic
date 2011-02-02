@@ -48,8 +48,9 @@ object GenerativeParser {
   }
 
   def extractLexiconAndGrammar[W](data: Iterator[(BinarizedTree[String],Seq[W])]):(Lexicon[String,W],GenerativeGrammar[String]) = {
-    val (lexicon,binaryProductions,unaryProductions) = extractCounts(data);
-    (new SimpleLexicon(lexicon),new GenerativeGrammar(logNormalizeRows(binaryProductions),logNormalizeRows(unaryProductions)));
+    val (wordCounts,binaryProductions,unaryProductions) = extractCounts(data);
+    val lexicon = new SimpleLexicon(wordCounts);
+    (lexicon,new GenerativeGrammar(logNormalizeRows(binaryProductions),logNormalizeRows(unaryProductions)));
   }
 
 
@@ -81,7 +82,21 @@ object GenerativeTrainer extends ParserTrainer with NoParams {
                   devTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])],
                   unaryReplacer : ChainReplacer[String],
                   config: Params) = {
-    Iterator.single(("Gen",GenerativeParser.fromTrees(trainTrees.view.map(c => (c._1,c._2)))));
+    val parser = GenerativeParser.fromTrees(trainTrees.view.map(c => (c._1,c._2)));
+    Iterator.single(("Gen",parser));
+  }
+}
+
+object SigTrainer extends ParserTrainer with NoParams {
+  def trainParser(trainTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])],
+                  devTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])],
+                  unaryReplacer : ChainReplacer[String],
+                  config: Params) = {
+    val (words,binary,unary) = GenerativeParser.extractCounts(trainTrees.iterator.map{ case (a,b,c) => (a,b)});
+    val grammar = new GenerativeGrammar(logNormalizeRows(binary),logNormalizeRows(unary));
+    val lexicon = new SignatureLexicon(words, EnglishWordClassGenerator, 3);
+    val parser = ChartParser(CKYChartBuilder("",lexicon,grammar));
+    Iterator.single(("Gen",parser));
   }
 }
 
