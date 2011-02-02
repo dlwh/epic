@@ -67,36 +67,42 @@ class CKYChartBuilder[Chart[X]<:ParseChart[X], L,W](val root: L,
       updateInsideUnaries(chart,i,i+1, validSpan);
     }
 
+    // a -> bc over [begin,split,end)
     for {
       span <- 2 to s.length;
       begin <- 0 to (s.length - span);
       end = begin + span
     } {
-      for {
-        (b,binaryRules) <- grammar.allBinaryRules;
-        //if chart.top.canStartHere(begin, end, b);
-        (c,parentVector) <- binaryRules;
-        split <- chart.top.feasibleSpan(begin, end, b, c)
-      } {
-        val bScore = chart.top.labelScore(begin, split,b);
-        if (!bScore.isInfinite) {
-          val cScore = chart.top.labelScore(split, end, c)
-          if (!cScore.isInfinite) {
-            var i = 0;
-            while(i < parentVector.used) {
-              val a = parentVector.index(i);
-              val spanScore = validSpan.scoreBinaryRule(begin,split,end,a,b,c);
-              if(spanScore != Double.NegativeInfinity) {
-                val aScore = parentVector.data(i) + spanScore;
-                if(aScore != Double.NegativeInfinity) {
-                  val prob = bScore + cScore + aScore;
-                  chart.bot.enter(begin,end,a,prob);
+      for ( (b,binaryRules) <- grammar.allBinaryRules) {
+        var ruleIndex = 0;
+        val numRulesWithB = binaryRules.activeLength;
+        while(ruleIndex < numRulesWithB) {
+          val c = binaryRules.indexAt(ruleIndex);
+          val parentVector = binaryRules.valueAt(ruleIndex);
+          ruleIndex += 1;
+          for(split <- chart.top.feasibleSpan(begin, end, b, c)) {
+            val bScore = chart.top.labelScore(begin, split,b);
+            if (bScore != Double.NegativeInfinity) {
+              val cScore = chart.top.labelScore(split, end, c)
+              if (cScore != Double.NegativeInfinity) {
+                var i = 0;
+                while(i < parentVector.used) {
+                  val a = parentVector.index(i);
+                  val aScore = parentVector.data(i);
+                  i += 1;
+                  val spanScore = validSpan.scoreBinaryRule(begin,split,end,a,b,c);
+                  val totalA = aScore + spanScore;
+                  if(totalA != Double.NegativeInfinity) {
+                    val prob = bScore + cScore + totalA;
+                    chart.bot.enter(begin,end,a,prob);
+                  }
                 }
               }
-              i += 1;
             }
+
           }
         }
+
       }
       updateInsideUnaries(chart,begin,end, validSpan);
     }
