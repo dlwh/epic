@@ -107,7 +107,7 @@ class EPParser[L,L2,W](val parsers: Seq[CKYChartBuilder[LogProbabilityParseChart
   val approximators = (parsers zip projections).map{ case (parser,proj) =>
     new AnchoredRuleApproximator[L,L2,W](parser, coarseParser,proj, Double.NegativeInfinity);
   }
-  val decoder = new ViterbiDecoder(projections.last);
+  val decoder = new ViterbiDecoder[L,L2,W](projections.last);
   val f0Decoder = new SimpleViterbiDecoder(coarseParser.grammar);
   val f0Builder = new CKYChartBuilder[LogProbabilityParseChart,L,W](coarseParser.root,new ZeroLexicon(coarseParser.lexicon), new ZeroGrammar(coarseParser.grammar), ParseChart.logProb);
   val coarseFact = new AnchoredRuleScorerFactory[L,L,W](coarseParser, ProjectionIndexer(coarseParser.grammar.index,coarseParser.grammar.index,identity[L]), Double.NegativeInfinity);
@@ -116,6 +116,6 @@ class EPParser[L,L2,W](val parsers: Seq[CKYChartBuilder[LogProbabilityParseChart
   def bestParse(s: scala.Seq[W], spanScorer: SpanScorer[L]) = {
     val parserData = buildAllCharts(s,spanScorer).last
     val lastParser = parsers.last;
-    decoder.extractBestParse(lastParser.root,lastParser.grammar,parserData.inside,parserData.outside,parserData.f0);
+    decoder.extractBestParse(lastParser.root,lastParser.grammar,parserData.inside,parserData.outside,s,parserData.f0);
   }
 }

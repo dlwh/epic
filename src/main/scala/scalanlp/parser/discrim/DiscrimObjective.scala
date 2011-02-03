@@ -113,9 +113,7 @@ object DiscriminativeTrainer extends ParserTrainer {
     val init = obj.initialWeightVector;
 
     val log = Log.globalLog;
-    val wrap = new GradientCheckingDiffFunction(obj,Array(1E-4));
     for( (state,iter) <- optimizer.iterations(obj,init).take(maxIterations).zipWithIndex;
-         _ = wrap.calculate(state.x);
          if iter != 0 && iter % iterationsPerEval == 0) yield {
        val parser = obj.extractParser(state.x);
        (iter + "", parser);

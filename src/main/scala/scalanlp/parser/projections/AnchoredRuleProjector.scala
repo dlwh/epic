@@ -13,8 +13,7 @@ import scalanlp.trees.BinarizedTree
 @serializable
 @SerialVersionUID(1L)
 class AnchoredRuleProjector[C,L,W](parser: ChartBuilder[ParseChart.LogProbabilityParseChart,L,W],
-                                   indexedProjections: ProjectionIndexer[C,L],
-                                   pruningThreshold: Double = -5) {
+                                   indexedProjections: ProjectionIndexer[C,L]) {
 
 
 
@@ -103,23 +102,30 @@ class AnchoredRuleProjector[C,L,W](parser: ChartBuilder[ParseChart.LogProbabilit
             }
 
             // P(sAt->sBu uCt | sAt) \propto \sum_{latent} O(A-x,s,t) r(A-x ->B-y C-z) I(B-y,s,u) I(C-z, s, u)
-            for(b <- inside.top.enteredLabelIndexes(begin,split)) {
-              val cRules = grammar.binaryRulesByIndexedParent(parent)(b);
-              val pB = indexedProjections.project(b);
-              var i = 0
-              val bScore = inside.top.labelScore(begin, split, b)
-              while(i < cRules.used) {
-                val c = cRules.index(i);
-                val ruleScore = cRules.data(i)
-                val pC = indexedProjections.project(c);
-                val currentScore = (bScore + inside.top.labelScore(split,end,c)
-                        + parentScore + ruleScore + scorer.scoreBinaryRule(begin,split,end,parent,b,c) - sentProb);
-                if(currentScore > pruneLabel.scoreBinaryRule(begin,split,end,pP,pB,pC)) {
-                  val accScore = getOrElseUpdate(parentArray,pB,projVector())(pC);
-                  parentArray(pB)(pC) = Numerics.logSum(accScore,currentScore);
-                  logTotal = Numerics.logSum(logTotal,currentScore);
+            var ruleIndex = 0;
+            val rules = grammar.binaryRulesByIndexedParent(parent)
+            val numRules = rules.activeLength;
+            while(ruleIndex < numRules) {
+              val b = rules.indexAt(ruleIndex);
+              val cRules = rules.valueAt(ruleIndex);
+              ruleIndex += 1;
+              val bScore = inside.top.labelScore(begin,split,b);
+              if(bScore != Double.NegativeInfinity) {
+                val pB = indexedProjections.project(b);
+                var i = 0
+                while(i < cRules.used) {
+                  val c = cRules.index(i);
+                  val ruleScore = cRules.data(i)
+                  val pC = indexedProjections.project(c);
+                  val currentScore = (bScore + inside.top.labelScore(split,end,c)
+                          + parentScore + ruleScore + scorer.scoreBinaryRule(begin,split,end,parent,b,c) - sentProb);
+                  if(currentScore > pruneLabel.scoreBinaryRule(begin,split,end,pP,pB,pC)) {
+                    val accScore = getOrElseUpdate(parentArray,pB,projVector())(pC);
+                    parentArray(pB)(pC) = Numerics.logSum(accScore,currentScore);
+                    logTotal = Numerics.logSum(logTotal,currentScore);
+                  }
+                  i+=1;
                 }
-                i+=1;
               }
             }
 
@@ -147,7 +153,12 @@ class AnchoredRuleProjector[C,L,W](parser: ChartBuilder[ParseChart.LogProbabilit
             getOrElseUpdate(unaryScores(index), pP,projVector())
           }
 
-          for( (c,ruleScore) <- parser.grammar.unaryRulesByIndexedParent(parent)) {
+          var ruleIndex = 0;
+          val rules = parser.grammar.unaryRulesByIndexedParent(parent);
+          while(ruleIndex < rules.used) {
+            val c = rules.index(ruleIndex);
+            val ruleScore = rules.data(ruleIndex);
+            ruleIndex += 1;
             val score = ruleScore + inside.bot.labelScore(begin,end,c) + parentScore +
                     scorer.scoreUnaryRule(begin,end,parent,c) - sentProb;
             val pC = indexedProjections.project(c);
