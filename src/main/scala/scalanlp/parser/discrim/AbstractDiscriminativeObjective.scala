@@ -83,8 +83,8 @@ abstract class AbstractDiscriminativeObjective[L,L2,W](
   }
 
 
-  protected def expectedCountsToFeatureVector(indexedFeatures: FeatureIndexer[L2,W], ecounts: ExpectedCounts[W]):DenseVector = {
-    val result = indexedFeatures.mkDenseVector(0.0);
+  def expectedCountsToFeatureVector(indexedFeatures: FeatureIndexer[L2,W], ecounts: ExpectedCounts[W]):DenseVector = {
+   val result = indexedFeatures.mkDenseVector(0.0);
 
     // binaries
     for( (a,bvec) <- ecounts.binaryRuleCounts;

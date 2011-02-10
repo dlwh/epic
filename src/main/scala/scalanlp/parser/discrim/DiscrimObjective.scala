@@ -29,33 +29,6 @@ class DiscrimObjective[L,W](feat: Featurizer[L,W],
                             closedWords: Set[W])
         extends LatentDiscrimObjective[L,L,W](feat,trees,ProjectionIndexer.simple(coarseParser.index),coarseParser, openTags,closedWords) {
 
-  /*
-  override protected def treeToExpectedCounts(g: Grammar[L],
-                                              lexicon: Lexicon[L,W],
-                                              lt: BinarizedTree[L],
-                                              words: Seq[W],
-                                              spanScorer: SpanScorer[L]):ExpectedCounts[W] = {
-    val expectedCounts = new ExpectedCounts[W](g)
-    val t = lt.map(indexedFeatures.labelIndex);
-    var score = 0.0;
-    for(t2 <- t.allChildren) {
-      t2 match {
-        case BinaryTree(a,Tree(b,_),Tree(c,_)) =>
-          expectedCounts.binaryRuleCounts.getOrElseUpdate(a).getOrElseUpdate(b)(c) += 1
-          score += g.binaryRuleScore(a,b,c);
-        case UnaryTree(a,Tree(b,_)) =>
-          expectedCounts.unaryRuleCounts.getOrElseUpdate(a)(b) += 1
-          score += g.unaryRuleScore(a,b);
-        case n@NullaryTree(a) =>
-          val w = words(n.span.start);
-          expectedCounts.wordCounts.getOrElseUpdate(a)(w) += 1
-          score += lexicon.wordScore(g.index.get(a), w);
-      }
-    }
-    expectedCounts.logProb = score;
-    expectedCounts;
-  }
-  */
 
 }
 

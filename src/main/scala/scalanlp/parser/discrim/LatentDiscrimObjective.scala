@@ -43,9 +43,17 @@ class LatentDiscrimObjective[L,L2,W](featurizer: Featurizer[L2,W],
     val initLex = coarseParser.lexicon;
     FeatureIndexer[L,L2,W](featurizer, initGrammar, initLex, indexedProjections);
   }
+  println("Num features: " + indexedFeatures.index.size);
 
   def extractParser(weights: DenseVector) = {
     val parser = new ChartParser[L,L2,W](builder(weights),new ViterbiDecoder(indexedProjections),indexedProjections);
+    parser
+  }
+
+
+  def extractMaxParser(weights: DenseVector) = {
+    val parser = new ChartParser[L,L2,W](builder(weights).withCharts(ParseChart.viterbi),
+      new ViterbiDecoder(indexedProjections),indexedProjections);
     parser
   }
 
@@ -91,11 +99,11 @@ class LatentDiscrimObjective[L,L2,W](featurizer: Featurizer[L2,W],
   }
 
   // these expected counts are in normal space, not log space.
-  protected def treeToExpectedCounts(g: Grammar[L2],
-                                     lexicon: Lexicon[L2,W],
-                                     t: BinarizedTree[L],
-                                     words: Seq[W],
-                                     spanScorer: SpanScorer[L] = SpanScorer.identity):ExpectedCounts[W] = {
+  def treeToExpectedCounts(g: Grammar[L2],
+                           lexicon: Lexicon[L2,W],
+                           t: BinarizedTree[L],
+                           words: Seq[W],
+                           spanScorer: SpanScorer[L] = SpanScorer.identity):ExpectedCounts[W] = {
     StateSplitting.expectedCounts(g,lexicon,t.map(indexedProjections.refinementsOf _),words,
       new ProjectingSpanScorer(indexedProjections, spanScorer));
   }
@@ -179,9 +187,9 @@ trait LatentTrainer extends ParserTrainer {
 
     val (initLexicon,initBinaries,initUnaries) = GenerativeParser.extractCounts(trainTrees.iterator.map(tuple => (tuple._1,tuple._2)));
     import params._;
-    println("NumStates: " + params);
+    println("NumStates: " + params.numStates);
 
-    val xbarParser = parser.optParser getOrElse {
+    val xbarParser = parser.optParser.getOrElse {
       val grammar = new GenerativeGrammar(LogCounters.logNormalizeRows(initBinaries),LogCounters.logNormalizeRows(initUnaries));
       val lexicon = new SimpleLexicon(initLexicon);
       new CKYChartBuilder[LogProbabilityParseChart,String,String]("",lexicon,grammar,ParseChart.logProb);
