@@ -1,9 +1,14 @@
 package scalanlp.parser
 
+
+import java.util.Arrays;
 import projections.{AnchoredRulePosteriorScorerFactory, ProjectionIndexer}
 import scalanlp.trees._
 import scalanlp.parser.ParserParams.NoParams
 import scalanlp.trees.UnaryChainRemover.ChainReplacer
+import scalanlp.collection.mutable.TriangularArray
+import scalanlp.util._;
+import scalanlp.math.Numerics._;
 
 
 /**
@@ -106,9 +111,9 @@ object SimpleViterbiDecoder {
 }
 
 /**
- * Tries to extract a tree that maximizes rule sum in the coarse grammar
+ * Tries to extract a tree that maximizes rule product in the coarse grammar
  **/
-class MaxRuleSumDecoder[C,F, W](coarseGrammar: Grammar[C], coarseLexicon: Lexicon[C,W],
+class MaxRuleProductDecoder[C,F, W](coarseGrammar: Grammar[C], coarseLexicon: Lexicon[C,W],
                              indexedProjections: ProjectionIndexer[C,F],
                              fineBuilder: ChartBuilder[ParseChart.LogProbabilityParseChart, F, W]) extends ChartDecoder[C,F, W] {
   val p = new AnchoredRulePosteriorScorerFactory(fineBuilder,indexedProjections,-5)
@@ -128,9 +133,8 @@ class MaxRuleSumDecoder[C,F, W](coarseGrammar: Grammar[C], coarseLexicon: Lexico
   }
 }
 
-import scalala.tensor.counters.LogCounters._;
-
 object MaxRuleTrainer extends ParserTrainer with NoParams {
+  import scalala.tensor.counters.LogCounters._;
   def trainParser(trainTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])],
                   devTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])],
                   unaryReplacer : ChainReplacer[String],
@@ -140,8 +144,105 @@ object MaxRuleTrainer extends ParserTrainer with NoParams {
     val lexicon = new SignatureLexicon(words, EnglishWordClassGenerator, 3);
     val projections = ProjectionIndexer.simple(grammar.index);
     val builder = CKYChartBuilder("",lexicon,grammar).withCharts(ParseChart.logProb);
-    val decoder = new MaxRuleSumDecoder(grammar,lexicon,projections,builder)
+    val decoder = new MaxRuleProductDecoder(grammar,lexicon,projections,builder)
     val parser = new ChartParser(builder,decoder,projections);
     Iterator.single(("Gen",parser));
+  }
+}
+
+class MaxConstituentDecoder[C,F,W](indexedProjections: ProjectionIndexer[C,F]) extends ChartDecoder[C,F,W] {
+  override def extractBestParse(root: F, grammar: Grammar[F],
+                                 inside: ParseChart[F], loutside: =>ParseChart[F], words: Seq[W],
+                                 scorer : SpanScorer[F] = SpanScorer.identity):BinarizedTree[C] = {
+    val outside = loutside;
+    val maxSplit = new TriangularArray[Int](inside.length+1,0);
+    val maxBotLabel = new TriangularArray[Int](inside.length+1,-1);
+    val maxBotScore = new TriangularArray[Double](inside.length+1,Double.NegativeInfinity);
+    val maxTopLabel = new TriangularArray[Int](inside.length+1,-1);
+    val maxTopScore = new TriangularArray[Double](inside.length+1,Double.NegativeInfinity);
+
+    val scores = indexedProjections.coarseEncoder.fillArray(Double.NegativeInfinity);
+    for(i <- 0 until inside.length) {
+      Arrays.fill(scores,Double.NegativeInfinity);
+      for(l <- inside.bot.enteredLabelIndexes(i,i+1)) {
+        val myScore = inside.bot.labelScore(i, i + 1, l) + outside.bot.labelScore(i, i+1, l);
+        scores(indexedProjections.project(l)) = logSum(scores(indexedProjections.project(l)), myScore);
+      }
+      maxBotScore(i,i+1) = scores.max;
+      maxBotLabel(i,i+1) = scores.argmax;
+
+      Arrays.fill(scores,Double.NegativeInfinity);
+      for(l <- inside.top.enteredLabelIndexes(i,i+1)) {
+        val myScore = inside.top.labelScore(i, i + 1, l) + outside.top.labelScore(i, i+1, l);
+        scores(indexedProjections.project(l)) = logSum(scores(indexedProjections.project(l)), myScore);
+      }
+      maxTopScore(i,i+1) = logSum(scores.max,maxBotScore(i,i+1));
+      maxTopLabel(i,i+1) = scores.argmax;
+    }
+
+    for {
+      span <- 2 to inside.length;
+      begin <- 0 to (inside.length - span);
+      end = begin + span
+    } {
+      Arrays.fill(scores,Double.NegativeInfinity);
+      for(l <- inside.bot.enteredLabelIndexes(begin,end)) {
+        val myScore = inside.bot.labelScore(begin, end, l) + outside.bot.labelScore(begin, end, l);
+        scores(indexedProjections.project(l)) = logSum(scores(indexedProjections.project(l)), myScore);
+      }
+      maxBotScore(begin,end) = scores.max;
+      maxBotLabel(begin,end) = scores.argmax;
+
+      Arrays.fill(scores,Double.NegativeInfinity);
+      for(l <- inside.top.enteredLabelIndexes(begin,end)) {
+        val myScore = inside.top.labelScore(begin, end, l) + outside.top.labelScore(begin, end, l);
+        scores(indexedProjections.project(l)) = logSum(scores(indexedProjections.project(l)), myScore);
+      }
+      maxTopScore(begin,end) = logSum(scores.max,maxBotScore(begin,end));
+      maxTopLabel(begin,end) = scores.argmax;
+
+      val (split,splitScore) = (for(split <- begin +1 until end) yield {
+        val score = logSum(maxTopScore(begin,split),maxTopScore(split,end));
+        (split,score)
+      })reduceLeft ( (a,b) => if(a._2 > b._2) a else b);
+
+      maxSplit(begin,end) = split;
+      maxTopScore(begin,end) = logSum(maxTopScore(begin,end),splitScore);
+      //maxBotScore(begin,end) = logSum(maxBotScore(begin,end),splitScore);
+    }
+
+    def extract(begin: Int, end: Int):BinarizedTree[C] = {
+      val lower = if(begin + 1== end) {
+        NullaryTree(indexedProjections.coarseIndex.get(maxBotLabel(begin,end)))(Span(begin,end));
+      } else {
+        val split = maxSplit(begin,end);
+        val left = extract(begin,split);
+        val right = extract(split,end);
+        BinaryTree(indexedProjections.coarseIndex.get(maxBotLabel(begin,end)),left,right)(Span(begin,end));
+      }
+
+      UnaryTree(indexedProjections.coarseIndex.get(maxTopLabel(begin,end)),lower)(Span(begin,end));
+    }
+
+    extract(0,inside.length);
+
+
+  }
+}
+
+object MaxConstituentTrainer extends ParserTrainer with NoParams {
+  import scalala.tensor.counters.LogCounters._;
+  def trainParser(trainTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])],
+                  devTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])],
+                  unaryReplacer : ChainReplacer[String],
+                  config: Params) = {
+    val (words,binary,unary) = GenerativeParser.extractCounts(trainTrees.iterator.map{ case (a,b,c) => (a,b)});
+    val grammar = new GenerativeGrammar(logNormalizeRows(binary),logNormalizeRows(unary));
+    val lexicon = new SignatureLexicon(words, EnglishWordClassGenerator, 3);
+    val projections = ProjectionIndexer.simple(grammar.index);
+    val builder = CKYChartBuilder("",lexicon,grammar).withCharts(ParseChart.logProb);
+    val decoder = new MaxConstituentDecoder[String,String,String](projections)
+    val parser = new ChartParser(builder,decoder,projections);
+    Iterator.single(("Consti",parser));
   }
 }
