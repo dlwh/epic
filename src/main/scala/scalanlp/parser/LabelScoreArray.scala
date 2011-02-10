@@ -11,8 +11,8 @@ import scalala.tensor.dense.DenseVector
 @serializable
 @SerialVersionUID(1)
 class LabelScoreArray(length: Int, grammarSize: Int, fill: Double) {
-  protected val score = TriangularArray.raw(length+1, LabelScoreArray.mkGrammarVector(grammarSize, fill));
-  protected val enteredLabels = TriangularArray.raw(length+1,new collection.mutable.BitSet());
+  protected final val score = TriangularArray.raw(length+1, LabelScoreArray.mkGrammarVector(grammarSize, fill));
+  protected final val enteredLabels = TriangularArray.raw(length+1,new collection.mutable.BitSet());
 
   final def apply(begin: Int, end: Int, label: Int) = labelScore(begin,end,label);
   final def labelScore(begin: Int, end: Int, label: Int) = score(TriangularArray.index(begin,end))(label);

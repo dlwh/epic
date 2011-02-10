@@ -39,11 +39,11 @@ abstract class ParseChart[L](val grammar: Encoder[L], val length: Int) {
       score(index)(parent) = newScore;
 
       if(oldScore == zero) {
-        enteredLabels(index)(parent) = true;
-        narrowLeft(end)(parent) = begin max narrowLeft(end)(parent);
-        wideLeft(end)(parent) = begin min wideLeft(end)(parent);
-        wideRight(begin)(parent) = end max wideRight(begin)(parent);
-        narrowRight(begin)(parent) = end min narrowRight(begin)(parent);
+        enteredLabels(index) += parent;
+        narrowLeft(end)(parent) = math.max(begin, narrowLeft(end)(parent));
+        wideLeft(end)(parent) = math.min(begin, wideLeft(end)(parent));
+        wideRight(begin)(parent) = math.max(end,wideRight(begin)(parent));
+        narrowRight(begin)(parent) = math.min(end,narrowRight(begin)(parent));
       }
       newScore > oldScore
     }
@@ -117,14 +117,14 @@ object ParseChart {
   @serializable
   @SerialVersionUID(1)
   trait Factory[Chart[X]<:ParseChart[X]] {
-    def apply[L](g: Grammar[L], length: Int):Chart[L];
+    def apply[L](g: Encoder[L], length: Int):Chart[L];
     def computeUnaryClosure[L](g: Grammar[L]):UnaryRuleClosure;
   }
 
 
   // concrete factories:
   object viterbi extends Factory[ViterbiParseChart] {
-    def apply[L](g: Grammar[L], length: Int) = new ParseChart(g,length) with Viterbi;
+    def apply[L](g: Encoder[L], length: Int) = new ParseChart(g,length) with Viterbi;
     def computeUnaryClosure[L](grammar: Grammar[L]):UnaryRuleClosure = {
       import scalanlp.math.Semiring.Viterbi._;
       UnaryRuleClosure.computeClosure(grammar)
@@ -132,7 +132,7 @@ object ParseChart {
   }
 
   object logProb extends Factory[LogProbabilityParseChart] {
-    def apply[L](g: Grammar[L], length: Int) = new ParseChart(g,length) with LogProbability;
+    def apply[L](g: Encoder[L], length: Int) = new ParseChart(g,length) with LogProbability;
     def computeUnaryClosure[L](grammar: Grammar[L]):UnaryRuleClosure = {
       import scalanlp.math.Semiring.LogSpace._;
       UnaryRuleClosure.computeClosure(grammar)
