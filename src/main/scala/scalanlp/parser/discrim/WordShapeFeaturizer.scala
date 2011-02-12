@@ -1,9 +1,9 @@
-package scalanlp.parser.discrim
+package scalanlp.parser
+package discrim
 
 import scalala.tensor.counters.Counters
 import scalala.tensor.counters.Counters.PairedDoubleCounter
 import collection.mutable.ArrayBuffer
-import scalanlp.parser.Rule
 
 
 
@@ -11,12 +11,15 @@ sealed abstract class WordShapeFeature[+L](l: L) extends Feature[L,Nothing];
 final case class IndicatorWSFeature[L](l: L, name: Symbol) extends WordShapeFeature(l);
 final case class SuffixFeature[L](l: L, str: String) extends WordShapeFeature(l);
 final case class ShapeFeature[+L](l: L, str: String) extends WordShapeFeature(l);
+final case class SignatureFeature[+L](l: L, str: String) extends WordShapeFeature(l);
 
 /**
  * This class generates features according to the word shapes.
  */
 class WordShapeFeaturizer[L](lexicon: PairedDoubleCounter[L,String], initToZero: Boolean = true, scale: Double = 1.0) extends Featurizer[L,String] {
   val wordCounts = Counters.aggregate(for( ((_,w),count) <- lexicon.activeElements) yield (w,count));
+
+  val signatureGenerator = EnglishWordClassGenerator;
 
   def initialValueForFeature(f: Feature[L,String]) = f match {
     case LexicalFeature(l:L,w:String) if !initToZero =>
@@ -32,10 +35,9 @@ class WordShapeFeaturizer[L](lexicon: PairedDoubleCounter[L,String], initToZero:
     if(wordCounts(w) > 5) Counters.aggregate(LexicalFeature(l,w) -> 1.0);
     else {
       val features = ArrayBuffer[Feature[L,String]]();
-      if(wordCounts(w) > 3)
-        features += LexicalFeature(l,w);
-
+      features += LexicalFeature(l,w);
       features += makeShapeFeature(l, w);
+      features += SignatureFeature(l,signatureGenerator.signatureFor(w));
 
       val wlen = w.length;
       val numCaps = (w:Seq[Char]).count{_.isUpper};
