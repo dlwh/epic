@@ -109,12 +109,7 @@ class LatentDiscrimObjective[L,L2,W](featurizer: Featurizer[L2,W],
   }
 }
 
-case class OptParams(batchSize:Int = 512,
-                     regularization :Double = 0.01,
-                     alpha: Double = 0.5,
-                     useL1: Boolean = false) {
-  def adjustedRegularization(numInstances: Int) = regularization * 0.01 * batchSize / numInstances;
-}
+import FirstOrderMinimizer.OptParams;
 
 case class LatentParams[P](parser: ParserParams.BaseParser,
                            opt: OptParams,
@@ -211,19 +206,7 @@ trait LatentTrainer extends ParserTrainer {
 
     val obj = mkObjective(params, latentFeaturizer, trainTrees, indexedProjections, xbarParser, openTags, closedWords)
 
-    val optimizer = if(!opt.useL1) {
-      new StochasticGradientDescent[Int,DenseVector](opt.alpha,maxIterations, opt.batchSize)
-              with AdaptiveGradientDescent.L2Regularization[Int,DenseVector]
-              with ConsoleLogging {
-        override val lambda = params.opt.adjustedRegularization(trainTrees.length);
-      }
-    } else {
-      new StochasticGradientDescent[Int,DenseVector](opt.alpha,maxIterations,opt.batchSize)
-              with AdaptiveGradientDescent.L1Regularization[Int,DenseVector]
-              with ConsoleLogging {
-        override val lambda = params.opt.adjustedRegularization(trainTrees.length);
-      }
-    }
+    val optimizer = opt.minimizer(obj,trainTrees.length);
 
     val init = obj.initialWeightVector.copy;
 
