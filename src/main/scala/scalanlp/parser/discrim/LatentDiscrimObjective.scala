@@ -45,7 +45,7 @@ class LatentDiscrimObjective[L,L2,W](featurizer: Featurizer[L2,W],
   }
 
   def extractParser(weights: DenseVector) = {
-    val parser = new ChartParser[L,L2,W](builder(weights),new ViterbiDecoder(indexedProjections),indexedProjections);
+    val parser = new ChartParser[L,L2,W](builder(weights),new MaxConstituentDecoder(indexedProjections),indexedProjections);
     parser
   }
 
@@ -58,7 +58,7 @@ class LatentDiscrimObjective[L,L2,W](featurizer: Featurizer[L2,W],
     val parser = new CKYChartBuilder[LogProbabilityParseChart,L2,W](root, lexicon, grammar, ParseChart.logProb);
     parser
   }
-  
+
   protected def emptyCounts(b: Builder) = new ExpectedCounts[W](b.grammar)
   protected def expectedCounts(b: Builder, t: BinarizedTree[L], w: Seq[W], scorer:SpanScorer[L]) = {
     val treeCounts = treeToExpectedCounts(b.grammar,b.lexicon,t,w, scorer);
@@ -211,14 +211,18 @@ trait LatentTrainer extends ParserTrainer {
     val init = obj.initialWeightVector.copy;
 
     val log = Log.globalLog;
+    import scalanlp.optimize.RandomizedGradientCheckingFunction;
+    val rand = new RandomizedGradientCheckingFunction(obj);
     def evalAndCache(pair: (optimizer.State,Int) ) {
       val (state,iter) = pair;
+      //rand.calculate(state.x);
       val weights = state.x;
       if(iter % iterPerValidate == 0) {
         cacheWeights(params, obj,weights, iter);
         quickEval(obj,indexedProjections, unaryReplacer, devTrees, weights);
       }
     }
+
 
     for( (state,iter) <- optimizer.iterations(obj,init).take(maxIterations).zipWithIndex.tee(evalAndCache _);
          if iter != 0 && iter % iterationsPerEval == 0) yield try {
@@ -274,6 +278,7 @@ object StochasticLatentTrainer extends LatentTrainer {
       xbarParser,
       openTags,
       closedWords) with ConsoleLogging;
+
     r
   }
 

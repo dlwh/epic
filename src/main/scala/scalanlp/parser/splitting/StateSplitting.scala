@@ -48,7 +48,7 @@ object StateSplitting {
         val word = s(t.span.start);
         var foundOne = false;
         for( a <- t.label.iterator;
-            wScore = lexicon.wordScore(grammar.index.get(a),word) + scorer.scoreLexical(t.span.start,t.span.start+1,a);
+            wScore = lexicon.wordScore(grammar.index.get(a),word) + scorer.scoreLexical(t.span.start,t.span.end,a);
             if !wScore.isInfinite) {
           chart.bot.enter(t.span.start,t.span.end,a,wScore);
           foundOne = true;

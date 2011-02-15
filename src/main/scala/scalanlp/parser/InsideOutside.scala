@@ -53,7 +53,7 @@ class InsideOutside[L,W](val parser: ChartBuilder[LogProbabilityParseChart,L,W])
     for (i <- 0 until words.length) {
       val w = words(i);
       for (l <- inside.bot.enteredLabelIndexes(i, i + 1) if isTag(l)) {
-        val iScore = inside.bot.labelScore(i, i + 1, l) + validSpan.scoreLexical(i,i+1,l);
+        val iScore = inside.bot.labelScore(i, i + 1, l);
         val oScore = outside.bot.labelScore(i, i + 1, l);
         wordCounts.getOrElseUpdate(l)(w) += exp(iScore + oScore - totalProb);
       }

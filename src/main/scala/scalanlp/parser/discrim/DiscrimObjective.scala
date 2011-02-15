@@ -29,7 +29,6 @@ class DiscrimObjective[L,W](feat: Featurizer[L,W],
                             closedWords: Set[W])
         extends LatentDiscrimObjective[L,L,W](feat,trees,ProjectionIndexer.simple(coarseParser.index),coarseParser, openTags,closedWords) {
 
-  /*
   override protected def treeToExpectedCounts(g: Grammar[L],
                                               lexicon: Lexicon[L,W],
                                               lt: BinarizedTree[L],
@@ -55,7 +54,6 @@ class DiscrimObjective[L,W](feat: Featurizer[L,W],
     expectedCounts.logProb = score;
     expectedCounts;
   }
-  */
 
 }
 
@@ -112,9 +110,11 @@ object DiscriminativeTrainer extends ParserTrainer {
 
     // new LBFGS[Int,DenseVector](iterationsPerEval,5) with ConsoleLogging;
     val init = obj.initialWeightVector;
+    val rand = new RandomizedGradientCheckingFunction(obj, 0.1);
 
     val log = Log.globalLog;
     for( (state,iter) <- optimizer.iterations(obj,init).take(maxIterations).zipWithIndex;
+         //_ = rand.calculate(init);
          if iter != 0 && iter % iterationsPerEval == 0) yield {
        val parser = obj.extractParser(state.x);
        (iter + "", parser);
