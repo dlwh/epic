@@ -211,8 +211,8 @@ trait LatentTrainer extends ParserTrainer {
     val init = obj.initialWeightVector.copy;
 
     val log = Log.globalLog;
-    import scalanlp.optimize.RandomizedGradientCheckingFunction;
-    val rand = new RandomizedGradientCheckingFunction(obj);
+    //import scalanlp.optimize.RandomizedGradientCheckingFunction;
+    //val rand = new RandomizedGradientCheckingFunction(obj);
     def evalAndCache(pair: (optimizer.State,Int) ) {
       val (state,iter) = pair;
       //rand.calculate(state.x);
