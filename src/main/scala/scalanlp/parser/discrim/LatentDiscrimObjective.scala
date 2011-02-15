@@ -224,7 +224,9 @@ trait LatentTrainer extends ParserTrainer {
     }
 
 
-    for( (state,iter) <- optimizer.iterations(obj,init).take(maxIterations).zipWithIndex.tee(evalAndCache _);
+    val cachedObj = new CachedBatchDiffFunction[Int,DenseVector](obj);
+
+    for( (state,iter) <- optimizer.iterations(cachedObj,init).take(maxIterations).zipWithIndex.tee(evalAndCache _);
          if iter != 0 && iter % iterationsPerEval == 0) yield try {
       val parser = obj.extractParser(state.x)
       ("LatentDiscrim-" + iter.toString,parser)
