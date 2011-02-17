@@ -1,19 +1,16 @@
 package scalanlp.parser
 package discrim
 
-import scalanlp.trees.BinarizedTree
 import scalanlp.trees.UnaryChainRemover.ChainReplacer
 
+import scalanlp.collection.mutable.TriangularArray
 import scalanlp.util._
 import scalanlp.trees._
 import scalanlp.parser.InsideOutside.ExpectedCounts
-;
 import scalala.tensor.counters.LogCounters
 import scalala.tensor.counters.Counters.DoubleCounter;
 import scalanlp.parser.ParseChart.LogProbabilityParseChart
 import projections.ProjectionIndexer
-;
-;
 
 /**
  * 
@@ -52,29 +49,56 @@ object StructuredTrainer extends ParserTrainer {
 
     val obj = new DiscrimObjective(featurizer, trainTrees.toIndexedSeq, xbarParser, openTags, closedWords);
 
-    val initWeights = obj.initialWeightVector;
+    val weights = obj.initialWeightVector;
 
-    val parser = obj.extractMaxParser(initWeights);
+    val peval = new ParseEval(Set("","''", "``", ".", ":", ","));
+    var parser = obj.extractMaxParser(weights);
     for((goldTree,words,coarseFilter) <- trainTrees) {
-      val guessTree = parser.bestParse(words,coarseFilter)
+      val lossScorer = lossAugmentedScorer(xbarParser.grammar.index,goldTree);
+      val guessTree = parser.bestParse(words,SpanScorer.sum(coarseFilter,lossScorer));
       val goldCounts = treeToExpectedCounts(parser,goldTree,words,coarseFilter);
       val guessCounts = treeToExpectedCounts(parser,guessTree,words,coarseFilter);
 
       val goldFeatures = expectedCountsToFeatureVector(obj.indexedFeatures, goldCounts);
       val guessFeatures = expectedCountsToFeatureVector(obj.indexedFeatures, guessCounts);
+      val stats = peval(guessTree, goldTree);
+      val loss : Double = stats.gold - stats.right;
 
+      //println("Gold:" + goldTree.render(words));
+      //println("Guess:" + guessTree.render(words));
+      //println("Lossless:" + nonlossGuess.render(words));
+      //println("Loss:" + loss + " rel: " +  stats.recall);
+      weights += goldFeatures;
+      weights -= guessFeatures;
 
-      for( (featureIndex, count) <- goldFeatures.activeElements) {
-        // puts features elsewhere
-      }
-
-
+      parser = obj.extractMaxParser(weights);
 
     }
 
     Iterator.single(("Structured",parser));
+  }
 
+  def lossAugmentedScorer[L](index: Index[L], goldTree: Tree[L]): SpanScorer[L] = {
+    val gold = new TriangularArray(goldTree.span.end+1,collection.mutable.BitSet());
+    for( t <- goldTree.allChildren) {
+      gold(t.span.start,t.span.end) += index(t.label);
+    }
 
+    val scorer = new SpanScorer[L] {
+      def scoreLexical(begin: Int, end: Int, tag: Int) = 0.0
+
+      def scoreUnaryRule(begin: Int, end: Int, parent: Int, child: Int) = {
+        if(gold(begin,end)(parent)) 0.0
+        else 1.0;
+      }
+
+      def scoreBinaryRule(begin: Int, split: Int, end: Int, parent: Int, leftChild: Int, rightChild: Int) =  {
+        if(gold(begin,end)(parent)) 0.0
+        else 1.0;
+      }
+    }
+
+    scorer
   }
 
   def treeToExpectedCounts[L,W](parser: ChartParser[L,L,W],
@@ -129,6 +153,5 @@ object StructuredTrainer extends ParserTrainer {
 
     result;
   }
-
 
 }
