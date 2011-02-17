@@ -87,6 +87,11 @@ object ParseEval {
     def exact = (numExact * 1.0 / numParses);
     def tagAccuracy = tagsRight * 1.0 / numWords;
     def f1 = (2 * precision * recall)/(precision + recall);
+
+    override def toString() = {
+      "Statistics(precision=" + precision +
+        ", recall=" + recall + ", f1=" + f1 + ", exact=" + exact + ", tagAccuracy=" + tagAccuracy +")";
+    }
   }
 
   type PostParseFn = (Tree[String],Tree[String],Seq[String],Statistics,Int)=>Unit;
