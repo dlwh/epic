@@ -46,7 +46,7 @@ class LatentDiscrimObjective[L,L2,W](featurizer: Featurizer[L2,W],
   println("Num features: " + indexedFeatures.index.size);
 
   def extractParser(weights: DenseVector) = {
-    val parser = new ChartParser[L,L2,W](builder(weights),new ViterbiDecoder(indexedProjections),indexedProjections);
+    val parser = new ChartParser[L,L2,W](builder(weights),new MaxConstituentDecoder(indexedProjections),indexedProjections);
     parser
   }
 
@@ -66,7 +66,7 @@ class LatentDiscrimObjective[L,L2,W](featurizer: Featurizer[L2,W],
     val parser = new CKYChartBuilder[LogProbabilityParseChart,L2,W](root, lexicon, grammar, ParseChart.logProb);
     parser
   }
-  
+
   protected def emptyCounts(b: Builder) = new ExpectedCounts[W](b.grammar)
   protected def expectedCounts(b: Builder, t: BinarizedTree[L], w: Seq[W], scorer:SpanScorer[L]) = {
     val treeCounts = treeToExpectedCounts(b.grammar,b.lexicon,t,w, scorer);
@@ -117,12 +117,7 @@ class LatentDiscrimObjective[L,L2,W](featurizer: Featurizer[L2,W],
   }
 }
 
-case class OptParams(batchSize:Int = 512,
-                     regularization :Double = 0.01,
-                     alpha: Double = 0.5,
-                     useL1: Boolean = false) {
-  def adjustedRegularization(numInstances: Int) = regularization * 0.01 * batchSize / numInstances;
-}
+import FirstOrderMinimizer.OptParams;
 
 case class LatentParams[P](parser: ParserParams.BaseParser,
                            opt: OptParams,
@@ -219,25 +214,16 @@ trait LatentTrainer extends ParserTrainer {
 
     val obj = mkObjective(params, latentFeaturizer, trainTrees, indexedProjections, xbarParser, openTags, closedWords)
 
-    val optimizer = if(!opt.useL1) {
-      new StochasticGradientDescent[Int,DenseVector](opt.alpha,maxIterations, opt.batchSize)
-              with AdaptiveGradientDescent.L2Regularization[Int,DenseVector]
-              with ConsoleLogging {
-        override val lambda = params.opt.adjustedRegularization(trainTrees.length);
-      }
-    } else {
-      new StochasticGradientDescent[Int,DenseVector](opt.alpha,maxIterations,opt.batchSize)
-              with AdaptiveGradientDescent.L1Regularization[Int,DenseVector]
-              with ConsoleLogging {
-        override val lambda = params.opt.adjustedRegularization(trainTrees.length);
-      }
-    }
+    val optimizer = opt.minimizer(obj,trainTrees.length);
 
     val init = obj.initialWeightVector.copy;
 
     val log = Log.globalLog;
+    //import scalanlp.optimize.RandomizedGradientCheckingFunction;
+    //val rand = new RandomizedGradientCheckingFunction(obj);
     def evalAndCache(pair: (optimizer.State,Int) ) {
       val (state,iter) = pair;
+      //rand.calculate(state.x);
       val weights = state.x;
       if(iter % iterPerValidate == 0) {
         cacheWeights(params, obj,weights, iter);
@@ -245,7 +231,10 @@ trait LatentTrainer extends ParserTrainer {
       }
     }
 
-    for( (state,iter) <- optimizer.iterations(obj,init).take(maxIterations).zipWithIndex.tee(evalAndCache _);
+
+    val cachedObj = new CachedBatchDiffFunction[Int,DenseVector](obj);
+
+    for( (state,iter) <- optimizer.iterations(cachedObj,init).take(maxIterations).zipWithIndex.tee(evalAndCache _);
          if iter != 0 && iter % iterationsPerEval == 0) yield try {
       val parser = obj.extractParser(state.x)
       ("LatentDiscrim-" + iter.toString,parser)
@@ -299,6 +288,7 @@ object StochasticLatentTrainer extends LatentTrainer {
       xbarParser,
       openTags,
       closedWords) with ConsoleLogging;
+
     r
   }
 

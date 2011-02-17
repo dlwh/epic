@@ -29,10 +29,36 @@ class DiscrimObjective[L,W](feat: Featurizer[L,W],
                             closedWords: Set[W])
         extends LatentDiscrimObjective[L,L,W](feat,trees,ProjectionIndexer.simple(coarseParser.index),coarseParser, openTags,closedWords) {
 
+  override def treeToExpectedCounts(g: Grammar[L],
+                                              lexicon: Lexicon[L,W],
+                                              lt: BinarizedTree[L],
+                                              words: Seq[W],
+                                              spanScorer: SpanScorer[L]):ExpectedCounts[W] = {
+    val expectedCounts = new ExpectedCounts[W](g)
+    val t = lt.map(indexedFeatures.labelIndex);
+    var score = 0.0;
+    for(t2 <- t.allChildren) {
+      t2 match {
+        case BinaryTree(a,Tree(b,_),Tree(c,_)) =>
+          expectedCounts.binaryRuleCounts.getOrElseUpdate(a).getOrElseUpdate(b)(c) += 1
+          score += g.binaryRuleScore(a,b,c);
+        case UnaryTree(a,Tree(b,_)) =>
+          expectedCounts.unaryRuleCounts.getOrElseUpdate(a)(b) += 1
+          score += g.unaryRuleScore(a,b);
+        case n@NullaryTree(a) =>
+          val w = words(n.span.start);
+          expectedCounts.wordCounts.getOrElseUpdate(a)(w) += 1
+          score += lexicon.wordScore(g.index.get(a), w);
+      }
+    }
+    expectedCounts.logProb = score;
+    expectedCounts;
+  }
 
 }
 
 
+import scalanlp.optimize.FirstOrderMinimizer._;
 object DiscriminativeTrainer extends ParserTrainer {
 
   protected val paramManifest = manifest[Params];
@@ -84,9 +110,11 @@ object DiscriminativeTrainer extends ParserTrainer {
 
     // new LBFGS[Int,DenseVector](iterationsPerEval,5) with ConsoleLogging;
     val init = obj.initialWeightVector;
+    val rand = new RandomizedGradientCheckingFunction(obj, 0.1);
 
     val log = Log.globalLog;
     for( (state,iter) <- optimizer.iterations(obj,init).take(maxIterations).zipWithIndex;
+         //_ = rand.calculate(init);
          if iter != 0 && iter % iterationsPerEval == 0) yield {
        val parser = obj.extractParser(state.x);
        (iter + "", parser);
