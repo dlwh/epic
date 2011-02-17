@@ -21,9 +21,8 @@ import projections.ProjectionIndexer
  */
 object StructuredTrainer extends ParserTrainer {
 
-  protected val paramManifest = manifest[LatentParams[IgnoreMe]]
-  type Params = LatentParams[IgnoreMe];
-  case class IgnoreMe();
+  protected val paramManifest = manifest[DiscriminativeTrainer.Params]
+  type Params = DiscriminativeTrainer.Params;
 
   def trainParser(trainTrees: Seq[(BinarizedTree[String], Seq[String], SpanScorer[String])],
                   devTrees: Seq[(BinarizedTree[String], Seq[String], SpanScorer[String])],
