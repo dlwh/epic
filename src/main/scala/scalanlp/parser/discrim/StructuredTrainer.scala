@@ -56,7 +56,6 @@ object StructuredTrainer extends ParserTrainer {
     for((goldTree,words,coarseFilter) <- trainTrees) {
       val lossScorer = lossAugmentedScorer(xbarParser.grammar.index,goldTree);
       val guessTree = parser.bestParse(words,SpanScorer.sum(coarseFilter,lossScorer));
-      val nonlossGuess = parser.bestParse(words,coarseFilter);
       val goldCounts = treeToExpectedCounts(parser,goldTree,words,coarseFilter);
       val guessCounts = treeToExpectedCounts(parser,guessTree,words,coarseFilter);
 
@@ -65,10 +64,10 @@ object StructuredTrainer extends ParserTrainer {
       val stats = peval(guessTree, goldTree);
       val loss : Double = stats.gold - stats.right;
 
-      println("Gold:" + goldTree.render(words));
-      println("Guess:" + guessTree.render(words));
-      println("Lossless:" + nonlossGuess.render(words));
-      println("Loss:" + loss + " rel: " +  stats.recall);
+      //println("Gold:" + goldTree.render(words));
+      //println("Guess:" + guessTree.render(words));
+      //println("Lossless:" + nonlossGuess.render(words));
+      //println("Loss:" + loss + " rel: " +  stats.recall);
       weights += goldFeatures;
       weights -= guessFeatures;
 
