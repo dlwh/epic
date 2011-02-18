@@ -10,7 +10,7 @@ import org.scalatest.prop._;
  * @author dlwh
  */
 @RunWith(classOf[JUnitRunner])
-class InsideOutsideTest extends FunSuite with Checkers {
+class InsideOutsideTest extends FunSuite {
   test("Simple test from iobasics") {
     val grammar = DSLGrammar.simpleGrammar;
     val lexicon = DSLGrammar.simpleLexicon;
