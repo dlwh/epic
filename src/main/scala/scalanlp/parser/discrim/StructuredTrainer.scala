@@ -3,6 +3,11 @@ package discrim
 
 import scalanlp.trees.UnaryChainRemover.ChainReplacer
 
+import scalanlp.optimize.FirstOrderMinimizer.OptParams;
+import java.io.File;
+
+import scalala.tensor.Vector;
+import scalanlp.concurrent.ParallelOps._;
 import scalanlp.collection.mutable.TriangularArray
 import scalanlp.util._
 import scalanlp.trees._
@@ -12,14 +17,25 @@ import scalala.tensor.counters.Counters.DoubleCounter;
 import scalanlp.parser.ParseChart.LogProbabilityParseChart
 import projections.ProjectionIndexer
 
+import structpred._;
+import edu.berkeley.nlp.util.CounterInterface;
+import scala.collection.JavaConversions._;
+
 /**
- * 
+ *
  * @author dlwh
  */
 object StructuredTrainer extends ParserTrainer {
 
-  protected val paramManifest = manifest[DiscriminativeTrainer.Params]
-  type Params = DiscriminativeTrainer.Params;
+  protected val paramManifest = manifest[Params];
+  case class Params(parser: ParserParams.BaseParser,
+                    opt: OptParams,
+                    featurizerFactory: FeaturizerFactory[String,String] = new PlainFeaturizerFactory[String],
+                    iterationsPerEval: Int = 50,
+                    maxIterations: Int = 201,
+                    iterPerValidate: Int = 10,
+                    C: Double = 1E-4,
+                    epsilon: Double = 1E-2);
 
   def trainParser(trainTrees: Seq[(BinarizedTree[String], Seq[String], SpanScorer[String])],
                   devTrees: Seq[(BinarizedTree[String], Seq[String], SpanScorer[String])],
@@ -48,37 +64,82 @@ object StructuredTrainer extends ParserTrainer {
     }
 
     val obj = new DiscrimObjective(featurizer, trainTrees.toIndexedSeq, xbarParser, openTags, closedWords);
-
     val weights = obj.initialWeightVector;
+    val model = new ParserLinearModel[ParseChart.LogProbabilityParseChart](xbarParser,obj);
 
+    val learner = new OneSlackSVM[(BinarizedTree[String], Seq[String], SpanScorer[String])](params.C,params.epsilon,10)
+    val finalWeights = learner.train(model.denseVectorToCounter(weights),model, trainTrees, params.maxIterations);
+    val parser = obj.extractMaxParser(model.weightsToDenseVector(finalWeights));
+
+    Iterator(("Base",obj.extractParser(weights)),("Structured",parser));
+  }
+
+  import java.{util=>ju}
+
+
+  class ParserLinearModel[Chart[X]<:ParseChart[X]](xbarParser: ChartBuilder[Chart,String,String],
+                          obj: DiscrimObjective[String,String]) extends LossAugmentedLinearModel[(BinarizedTree[String],Seq[String],SpanScorer[String])] {
+    type Datum = (BinarizedTree[String],Seq[String],SpanScorer[String])
     val peval = new ParseEval(Set("","''", "``", ".", ":", ","));
-    var parser = obj.extractMaxParser(weights);
-    for((goldTree,words,coarseFilter) <- trainTrees) {
-      val lossScorer = lossAugmentedScorer(xbarParser.grammar.index,goldTree);
-      val guessTree = parser.bestParse(words,SpanScorer.sum(coarseFilter,lossScorer));
-      val goldCounts = treeToExpectedCounts(parser,goldTree,words,coarseFilter);
-      val guessCounts = treeToExpectedCounts(parser,guessTree,words,coarseFilter);
 
-      val goldFeatures = expectedCountsToFeatureVector(obj.indexedFeatures, goldCounts);
-      val guessFeatures = expectedCountsToFeatureVector(obj.indexedFeatures, guessCounts);
-      val stats = peval(guessTree, goldTree);
-      val loss : Double = stats.gold - stats.right;
+    override def getLossAugmentedUpdateBundle(datum: Datum, lossWeight: Double): UpdateBundle = {
+      getLossAugmentedUpdateBundleBatch(ju.Collections.singletonList(datum), 1, lossWeight).get(0);
+    }
 
-      //println("Gold:" + goldTree.render(words));
-      //println("Guess:" + guessTree.render(words));
-      //println("Lossless:" + nonlossGuess.render(words));
-      //println("Loss:" + loss + " rel: " +  stats.recall);
-      weights += goldFeatures;
-      weights -= guessFeatures;
+    override def getLossAugmentedUpdateBundleBatch(datum: ju.List[Datum], numThreads: Int,
+                                           lossWeight: Double): ju.List[UpdateBundle] = {
+      val parser = obj.extractMaxParser(weightsToDenseVector(weights));
+      datum.toIndexedSeq.par.map { case (goldTree,words,coarseFilter) =>
+        val lossScorer = lossAugmentedScorer(lossWeight,xbarParser.grammar.index,goldTree);
+        val guessTree = parser.bestParse(words,SpanScorer.sum(coarseFilter,lossScorer));
+        val goldCounts = treeToExpectedCounts(parser,goldTree,words,coarseFilter);
+        val guessCounts = treeToExpectedCounts(parser,guessTree,words,coarseFilter);
 
-      parser = obj.extractMaxParser(weights);
+        val goldFeatures = expectedCountsToFeatureVector(obj.indexedFeatures, goldCounts);
+        val guessFeatures = expectedCountsToFeatureVector(obj.indexedFeatures, guessCounts);
+        val stats = peval(guessTree, goldTree);
+        val loss : Double = stats.gold - stats.right;
+
+        val bundle = new UpdateBundle;
+        bundle.gold = denseVectorToCounter(goldFeatures);
+        bundle.guess = denseVectorToCounter(guessFeatures);
+        bundle.loss = loss;
+
+        bundle
+      }
+    }
+
+
+    def getUpdateBundle(datum: Datum): UpdateBundle = getLossAugmentedUpdateBundle(datum, 0.0);
+    override def getUpdateBundleBatch(datum: ju.List[Datum], numThreads: Int): ju.List[UpdateBundle] = {
+      getLossAugmentedUpdateBundleBatch(datum,numThreads,0.0);
 
     }
 
-    Iterator.single(("Structured",parser));
+    @scala.reflect.BeanProperty
+    var weights: CounterInterface[java.lang.Integer] = _;
+
+    def weightsToDenseVector(weights: CounterInterface[java.lang.Integer]) = {
+      val vector = obj.indexedFeatures.mkDenseVector(0.0);
+      for(entry <- weights.entries) {
+        vector(entry.getKey.intValue) = entry.getValue.doubleValue;
+      }
+      vector
+    }
+
+    def denseVectorToCounter(vec: Vector) = {
+      val res = new edu.berkeley.nlp.util.Counter[java.lang.Integer]();
+      for( (i,v) <- vec.activeElements) {
+        res.setCount(i,v);
+      }
+      res
+    }
+
+
+
   }
 
-  def lossAugmentedScorer[L](index: Index[L], goldTree: Tree[L]): SpanScorer[L] = {
+  def lossAugmentedScorer[L](lossWeight: Double, index: Index[L], goldTree: Tree[L]): SpanScorer[L] = {
     val gold = new TriangularArray(goldTree.span.end+1,collection.mutable.BitSet());
     for( t <- goldTree.allChildren) {
       gold(t.span.start,t.span.end) += index(t.label);
@@ -89,12 +150,12 @@ object StructuredTrainer extends ParserTrainer {
 
       def scoreUnaryRule(begin: Int, end: Int, parent: Int, child: Int) = {
         if(gold(begin,end)(parent)) 0.0
-        else 1.0;
+        else lossWeight;
       }
 
       def scoreBinaryRule(begin: Int, split: Int, end: Int, parent: Int, leftChild: Int, rightChild: Int) =  {
         if(gold(begin,end)(parent)) 0.0
-        else 1.0;
+        else lossWeight;
       }
     }
 

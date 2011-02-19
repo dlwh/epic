@@ -96,10 +96,14 @@
       <artifactId>scalanlp-graphs_${scala.version}</artifactId>
       <version>0.1-SNAPSHOT</version>
     </dependency>
-    <dependency> <!-- sparse data structures with primitive types -->
-      <groupId>fastutil</groupId>
-      <artifactId>fastutil</artifactId>
-      <version>5.1.5</version>
+    <dependency> <!-- Taylor's stuff -->
+      <groupId>edu.berkeley.nlp</groupId>
+      <artifactId>structure-pred</artifactId>
+      <version>1.0-SNAPSHOT</version>
+      <!--
+      <scope>system</scope>
+      <systemPath>lib/structure-pred-1.0-SNAPSHOT.jar</systemPath>
+      -->
     </dependency>
     <dependency>
       <groupId>org.scalanlp</groupId>
