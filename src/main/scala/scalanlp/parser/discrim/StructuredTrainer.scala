@@ -67,7 +67,7 @@ object StructuredTrainer extends ParserTrainer {
     val weights = obj.initialWeightVector;
     val model = new ParserLinearModel[ParseChart.LogProbabilityParseChart](xbarParser,obj);
 
-    val learner = new NSlackSVM[(BinarizedTree[String], Seq[String], SpanScorer[String])](params.C,params.epsilon,10)
+    val learner = new FastNSlackSVM[(BinarizedTree[String], Seq[String], SpanScorer[String])](params.C,params.epsilon,10)
     val finalWeights = learner.train(model.denseVectorToCounter(weights),model, trainTrees, params.maxIterations);
     val parser = obj.extractMaxParser(model.weightsToDenseVector(finalWeights));
 
