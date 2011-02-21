@@ -67,7 +67,7 @@ object StructuredTrainer extends ParserTrainer {
     val weights = obj.initialWeightVector;
     val model = new ParserLinearModel[ParseChart.LogProbabilityParseChart](xbarParser,obj);
 
-    val learner = new FastNSlackSVM[(BinarizedTree[String], Seq[String], SpanScorer[String])](params.C,params.epsilon,10)
+    val learner = new NSlackSVM[(BinarizedTree[String], Seq[String], SpanScorer[String])](params.C,params.epsilon,10)
     val finalWeights = learner.train(model.denseVectorToCounter(weights),model, trainTrees, params.maxIterations);
     val parser = obj.extractMaxParser(model.weightsToDenseVector(finalWeights));
 
@@ -82,6 +82,9 @@ object StructuredTrainer extends ParserTrainer {
     type Datum = (BinarizedTree[String],Seq[String],SpanScorer[String])
     val peval = new ParseEval(Set("","''", "``", ".", ":", ","));
 
+    override def startIteration(t: Int) = {
+    }
+    
     override def getLossAugmentedUpdateBundle(datum: Datum, lossWeight: Double): UpdateBundle = {
       getLossAugmentedUpdateBundleBatch(ju.Collections.singletonList(datum), 1, lossWeight).get(0);
     }
