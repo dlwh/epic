@@ -78,11 +78,14 @@ object StructuredTrainer extends ParserTrainer {
 
 
   class ParserLinearModel[Chart[X]<:ParseChart[X]](xbarParser: ChartBuilder[Chart,String,String],
+		  				  devTrees: Seq[(BinarizedTree[String], Seq[String], SpanScorer[String])],
+		  				  unaryReplacer: ChainReplacer[String],
                           obj: DiscrimObjective[String,String]) extends LossAugmentedLinearModel[(BinarizedTree[String],Seq[String],SpanScorer[String])] {
     type Datum = (BinarizedTree[String],Seq[String],SpanScorer[String])
     val peval = new ParseEval(Set("","''", "``", ".", ":", ","));
 
     override def startIteration(t: Int) = {
+      val parser = obj.extractMaxParser(weightsToDenseVector(weights));
     }
     
     override def getLossAugmentedUpdateBundle(datum: Datum, lossWeight: Double): UpdateBundle = {
