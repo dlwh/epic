@@ -4,7 +4,7 @@ package discrim
 import scalanlp.trees.UnaryChainRemover.ChainReplacer
 
 import scalanlp.optimize.FirstOrderMinimizer.OptParams;
-import java.io.File;
+
 
 import scalala.tensor.Vector;
 import scalanlp.concurrent.ParallelOps._;
@@ -19,7 +19,9 @@ import projections.ProjectionIndexer
 
 import structpred._;
 import edu.berkeley.nlp.util.CounterInterface;
-import scala.collection.JavaConversions._;
+import scala.collection.JavaConversions._
+import java.io.{File, FileWriter}
+;
 
 /**
  *
@@ -65,7 +67,7 @@ object StructuredTrainer extends ParserTrainer {
 
     val obj = new DiscrimObjective(featurizer, trainTrees.toIndexedSeq, xbarParser, openTags, closedWords);
     val weights = obj.initialWeightVector;
-    val model = new ParserLinearModel[ParseChart.LogProbabilityParseChart](xbarParser,obj);
+    val model = new ParserLinearModel[ParseChart.LogProbabilityParseChart](xbarParser,devTrees.toIndexedSeq, unaryReplacer, obj);
 
     val learner = new NSlackSVM[(BinarizedTree[String], Seq[String], SpanScorer[String])](params.C,params.epsilon,10)
     val finalWeights = learner.train(model.denseVectorToCounter(weights),model, trainTrees, params.maxIterations);
@@ -78,14 +80,18 @@ object StructuredTrainer extends ParserTrainer {
 
 
   class ParserLinearModel[Chart[X]<:ParseChart[X]](xbarParser: ChartBuilder[Chart,String,String],
-		  				  devTrees: Seq[(BinarizedTree[String], Seq[String], SpanScorer[String])],
-		  				  unaryReplacer: ChainReplacer[String],
-                          obj: DiscrimObjective[String,String]) extends LossAugmentedLinearModel[(BinarizedTree[String],Seq[String],SpanScorer[String])] {
+                                                   devTrees: IndexedSeq[(BinarizedTree[String], Seq[String], SpanScorer[String])],
+                                                   unaryReplacer: ChainReplacer[String],
+                                                   obj: DiscrimObjective[String,String]) extends LossAugmentedLinearModel[(BinarizedTree[String],Seq[String],SpanScorer[String])] {
     type Datum = (BinarizedTree[String],Seq[String],SpanScorer[String])
     val peval = new ParseEval(Set("","''", "``", ".", ":", ","));
 
-    override def startIteration(t: Int) = {
+    override def startIteration(t: Int) {
       val parser = obj.extractMaxParser(weightsToDenseVector(weights));
+      val result = ParseEval.evaluateAndLog(devTrees,parser, "Dev-" +t,unaryReplacer);
+      val out = new FileWriter(new File("LEARNING_CURVE"), true);
+      out.append( t + "\t" + result.precision + "\t" + result.recall + "\t" + result.f1 + "\n");
+      out.close();
     }
     
     override def getLossAugmentedUpdateBundle(datum: Datum, lossWeight: Double): UpdateBundle = {
