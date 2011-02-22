@@ -1,4 +1,4 @@
 #!/bin/bash
 DESCR=$1
 shift
-/Users/tberg/thirdparty/qsub-zen-mult $PSI 7000 1 "jobs/parse/psi.conf" "java -server -ea -Xmx7g -cp ../../MIRA-parser.jar scalanlp.parser.discrim.StructuredTrainer psi.conf" "$DESCR" ""
+/Users/tberg/thirdparty/qsub-mult $PSI 7000 1 "jobs/parse/psi.conf" "java -server -ea -Xmx7g -cp ../../eps1-parser.jar scalanlp.parser.discrim.StructuredTrainer psi.conf" "$DESCR" ""

@@ -69,8 +69,8 @@ object StructuredTrainer extends ParserTrainer {
     val weights = obj.initialWeightVector;
     val model = new ParserLinearModel[ParseChart.LogProbabilityParseChart](xbarParser,devTrees.toIndexedSeq, unaryReplacer, obj);
 
-//    val learner = new NSlackSVM[(BinarizedTree[String], Seq[String], SpanScorer[String])](params.C,params.epsilon,10)
-    val learner = new MIRA[(BinarizedTree[String], Seq[String], SpanScorer[String])](true,false,params.C)
+    val learner = new NSlackSVM[(BinarizedTree[String], Seq[String], SpanScorer[String])](params.C,params.epsilon,10)
+//    val learner = new MIRA[(BinarizedTree[String], Seq[String], SpanScorer[String])](true,false,params.C)
     val finalWeights = learner.train(model.denseVectorToCounter(weights),model, trainTrees, params.maxIterations);
     val parser = obj.extractMaxParser(model.weightsToDenseVector(finalWeights));
 
@@ -123,7 +123,7 @@ object StructuredTrainer extends ParserTrainer {
     }
 
 
-    def getUpdateBundle(datum: Datum): UpdateBundle = getLossAugmentedUpdateBundle(datum, 0.0);
+    override def getUpdateBundle(datum: Datum): UpdateBundle = getLossAugmentedUpdateBundle(datum, 0.0);
     override def getUpdateBundleBatch(datum: ju.List[Datum], numThreads: Int): ju.List[UpdateBundle] = {
       getLossAugmentedUpdateBundleBatch(datum,numThreads,0.0);
 
