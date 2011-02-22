@@ -1,4 +1,4 @@
 #!/bin/bash
 DESCR=$1
 shift
-/Users/tberg/thirdparty/run-command-mult $PSI "jobs/parse/psi.conf" "run-command /usr/local/lang/jdk1.6.0-64bit/bin/java -server -ea -Xrunhprof:cpu=samples,depth=12 -Xmx8g -cp ../../parser-0.1-SNAPSHOT-jar-with-dependencies.jar scalanlp.parser.discrim.StructuredTrainer icsi.conf" "$DESCR" ""
+/Users/tberg/thirdparty/qsub-zen-mult $PSI 7000 1 "jobs/parse/psi.conf" "java -server -ea -Xmx7g -cp ../../MIRA-parser.jar scalanlp.parser.discrim.StructuredTrainer psi.conf" "$DESCR" ""
