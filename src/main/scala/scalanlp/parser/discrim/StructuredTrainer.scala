@@ -84,7 +84,6 @@ object StructuredTrainer extends ParserTrainer {
                                                    unaryReplacer: ChainReplacer[String],
                                                    obj: DiscrimObjective[String,String]) extends LossAugmentedLinearModel[(BinarizedTree[String],Seq[String],SpanScorer[String])] {
     type Datum = (BinarizedTree[String],Seq[String],SpanScorer[String])
-    val peval = new ParseEval(Set("","''", "``", ".", ":", ","));
 
     override def startIteration(t: Int) {
       val parser = obj.extractMaxParser(weightsToDenseVector(weights));
@@ -103,14 +102,15 @@ object StructuredTrainer extends ParserTrainer {
       val parser = obj.extractMaxParser(weightsToDenseVector(weights));
       datum.toIndexedSeq.par.map { case (goldTree,words,coarseFilter) =>
         val lossScorer = lossAugmentedScorer(lossWeight,xbarParser.grammar.index,goldTree);
-        val guessTree = parser.bestParse(words,SpanScorer.sum(coarseFilter,lossScorer));
-        val goldCounts = treeToExpectedCounts(parser,goldTree,words,coarseFilter);
-        val guessCounts = treeToExpectedCounts(parser,guessTree,words,coarseFilter);
+        val scorer = SpanScorer.sum(coarseFilter, lossScorer)
+        val guessTree = parser.bestParse(words,scorer);
+        val (goldCounts,_) = treeToExpectedCounts(parser,goldTree,words,scorer);
+        val (guessCounts,loss) = treeToExpectedCounts(parser,guessTree,words,scorer);
 
         val goldFeatures = expectedCountsToFeatureVector(obj.indexedFeatures, goldCounts);
         val guessFeatures = expectedCountsToFeatureVector(obj.indexedFeatures, guessCounts);
-        val stats = peval(guessTree, goldTree);
-        val loss : Double = stats.gold - stats.right;
+
+        val modelScore = goldCounts.logProb - guessCounts.logProb;
 
         val bundle = new UpdateBundle;
         bundle.gold = denseVectorToCounter(goldFeatures);
@@ -177,28 +177,32 @@ object StructuredTrainer extends ParserTrainer {
   def treeToExpectedCounts[L,W](parser: ChartParser[L,L,W],
                                 lt: BinarizedTree[L],
                                 words: Seq[W],
-                                spanScorer: SpanScorer[L]):ExpectedCounts[W] = {
+                                spanScorer: SpanScorer[L]):(ExpectedCounts[W],Double) = {
     val g = parser.builder.grammar;
     val lexicon = parser.builder.lexicon;
     val expectedCounts = new ExpectedCounts[W](g)
     val t = lt.map(g.index);
     var score = 0.0;
+    var loss = 0.0;
     for(t2 <- t.allChildren) {
       t2 match {
-        case BinaryTree(a,Tree(b,_),Tree(c,_)) =>
+        case BinaryTree(a,bt@ Tree(b,_),Tree(c,_)) =>
           expectedCounts.binaryRuleCounts.getOrElseUpdate(a).getOrElseUpdate(b)(c) += 1
           score += g.binaryRuleScore(a,b,c);
+          loss += spanScorer.scoreBinaryRule(t2.span.start,bt.span.end, t2.span.end, a,b,c);
         case UnaryTree(a,Tree(b,_)) =>
           expectedCounts.unaryRuleCounts.getOrElseUpdate(a)(b) += 1
           score += g.unaryRuleScore(a,b);
+          loss += spanScorer.scoreUnaryRule(t2.span.start,t2.span.end,a,b);
         case n@NullaryTree(a) =>
           val w = words(n.span.start);
           expectedCounts.wordCounts.getOrElseUpdate(a)(w) += 1
           score += lexicon.wordScore(g.index.get(a), w);
+          loss += spanScorer.scoreLexical(t2.span.start,t2.span.end,a);
       }
     }
     expectedCounts.logProb = score;
-    expectedCounts;
+    (expectedCounts,loss);
   }
 
   def expectedCountsToFeatureVector[L,W](indexedFeatures: FeatureIndexer[L,W], ecounts: ExpectedCounts[W]) = {
