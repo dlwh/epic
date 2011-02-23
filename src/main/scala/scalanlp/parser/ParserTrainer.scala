@@ -7,7 +7,8 @@ import scalanlp.trees._
 import scalanlp.util._
 import scalanlp.trees.UnaryChainRemover.ChainReplacer
 
-case class TreebankParams(path: File, maxLength:Int = 40, binarization:String = "xbar", processing: String = "standard") {
+case class TreebankParams(path: File, maxLength:Int = 40, binarization:String = "xbar", processing: String = "standard",
+                          verticalMarkovization:Int=0, horizontalMarkovization:Int=1000) {
   def binarize = {
     if(binarization == "xbar") Trees.xBarBinarize(_:Tree[String],left=false);
     else if(binarization == "leftXbar") Trees.xBarBinarize(_:Tree[String],left=true);
@@ -83,15 +84,15 @@ trait ParserTrainer {
     import params.spans._;
 
 
-    val trainTreesWithUnaries = transformTrees(treebank.trainTrees, trainSpans, maxLength, binarize, xform);
+    val trainTreesWithUnaries = transformTrees(treebank.trainTrees, trainSpans, maxLength, binarize, xform, verticalMarkovization, horizontalMarkovization);
     val (trainTrees,replacer) = removeUnaryChains(trainTreesWithUnaries);
 
-    val devTrees = transformTrees(treebank.devTrees, devSpans, maxLength, binarize, xform)
+    val devTrees = transformTrees(treebank.devTrees, devSpans, maxLength, binarize, xform, verticalMarkovization, horizontalMarkovization);
 
     println("Training Parser...");
     val parsers = trainParser(trainTrees,devTrees,replacer,specificParams);
 
-    val testTrees = transformTrees(treebank.testTrees, testSpans, maxLength, binarize, xform)
+    val testTrees = transformTrees(treebank.testTrees, testSpans, maxLength, binarize, xform, verticalMarkovization, horizontalMarkovization)
 
     for((name,parser) <- parsers) {
       println("Parser " + name);
@@ -121,11 +122,24 @@ object ParserTrainer {
                      spans: Iterable[SpanScorer[String]],
                      maxLength: Int,
                      binarize: (Tree[String]) => BinarizedTree[String],
-                     xform: Tree[String]=>Tree[String]): IndexedSeq[(BinarizedTree[String], Seq[String],SpanScorer[String])] = {
+                     xform: Tree[String]=>Tree[String],
+                     verticalDepth:Int,
+                     horizontalDepth: Int): IndexedSeq[(BinarizedTree[String], Seq[String],SpanScorer[String])] = {
 
     val binarizedAndTransformed = for {
       ((tree, words),span) <- (trees zip spans.iterator) if words.length <= maxLength
-    } yield (binarize(xform(tree)),words,span)
+    } yield {
+//      println("pre: " + tree.render(words));
+      val transformed = xform(tree);
+//      println("trans: " + transformed.render(words));
+      val vertAnnotated = Trees.annotateParents(transformed,depth = verticalDepth);
+//      println("vert: " + vertAnnotated.render(words));
+      val bin = binarize(vertAnnotated);
+//      println("bin: " + bin.render(words));
+      val horiz = Trees.markovizeBinarization(bin,horizontalDepth);
+//      println("horiz: " + horiz.render(words));
+      (horiz,words,span)
+    }
 
       binarizedAndTransformed.toIndexedSeq
 

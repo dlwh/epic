@@ -31,12 +31,12 @@ object GoldTagExperiment {
     import params.treebank._;
     import params.spans._;
 
-    val trainTreesWithUnaries = transformTrees(treebank.trainTrees, trainSpans, maxLength, binarize, xform);
+    val trainTreesWithUnaries = transformTrees(treebank.trainTrees, trainSpans, maxLength, binarize, xform, 0, 0);
     val (trainTrees,replacer) = removeUnaryChains(trainTreesWithUnaries);
 
     val parser = readObject[ChartParser[String,_,String]](parserFile);
 
-    val testTrees = transformTrees(treebank.testTrees, testSpans, maxLength, binarize, xform)
+    val testTrees = transformTrees(treebank.testTrees, testSpans, maxLength, binarize, xform, 0, 0 )
 
     val goldenTrees = for ( (tree,words,span) <- testTrees) yield {
       (tree,words,SpanScorer.sum(new GoldTagScorer(getTags(parser.projections.coarseIndex, tree), -90),span))

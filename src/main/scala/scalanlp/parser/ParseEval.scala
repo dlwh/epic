@@ -106,8 +106,8 @@ object ParseEval {
     def evalSentence(sent: (Tree[String],Seq[String],SpanScorer[String])) = try {
       val (goldTree,words,scorer) = sent;
       val startTime = System.currentTimeMillis;
-      val guessTree = Trees.debinarize(chainReplacer.replaceUnaries(parser.bestParse(words,scorer)));
-      val deBgold = Trees.debinarize(goldTree);
+      val guessTree = Trees.debinarize(chainReplacer.replaceUnaries(Trees.deannotate(parser.bestParse(words,scorer))));
+      val deBgold = Trees.debinarize(Trees.deannotate(goldTree));
       val stats = peval(guessTree,deBgold);
       val endTime = System.currentTimeMillis;
       postEval(guessTree,deBgold,words,stats,(endTime-startTime).toInt);
@@ -171,12 +171,12 @@ object ParserTester {
     import params.treebank._;
     import params.spans._;
 
-    val trainTreesWithUnaries = transformTrees(treebank.trainTrees, trainSpans, maxLength, binarize, xform);
+    val trainTreesWithUnaries = transformTrees(treebank.trainTrees, trainSpans, maxLength, binarize, xform, verticalMarkovization, horizontalMarkovization);
     val (trainTrees,replacer) = removeUnaryChains(trainTreesWithUnaries);
 
     val parser = readObject[Parser[String,String]](parserFile);
 
-    val testTrees = transformTrees(treebank.testTrees, testSpans, maxLength, binarize, xform)
+    val testTrees = transformTrees(treebank.testTrees, testSpans, maxLength, binarize, xform, verticalMarkovization, horizontalMarkovization)
 
     evalParser(testTrees,parser,"test",replacer);
   }

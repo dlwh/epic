@@ -159,9 +159,31 @@ object Trees {
       BinaryTree(l, newLeftChild, newRightChild)(tree.span)
   }
 
-  private def stringBinarizer(currentLabel: String, append: String) = { 
-      val head = if(currentLabel(0) != '@') '@' + currentLabel + "->" else currentLabel
-      head + "_" + append
+  def deannotate(tree: Tree[String]):Tree[String] = tree.map(l => l.takeWhile(_ != '^'));
+
+  def markovizeBinarization(tree: BinarizedTree[String], order: Int):BinarizedTree[String] = {
+    tree.map{ l =>
+      val headIndex = l.indexOf('>')
+      if(headIndex < 0) l
+      else {
+        val head = l.slice(0,headIndex+1);
+        // find the n'th from the back.
+        var i = l.length-1;
+        var n = 0;
+        while(i >= 0 && n < order) {
+          if(l.charAt(i) == '_') n+=1;
+          i-=1;
+        }
+        if(i <= headIndex) l
+        else head + l.substring(i+1);
+      }
+    }
+  }
+
+  private def stringBinarizer(currentLabel: String, append: String) = {
+    val head = if(currentLabel(0) != '@') '@' + currentLabel + "->" else currentLabel
+    val r = head + "_" + append
+    r
   }
   def binarize(tree: Tree[String]):BinarizedTree[String] = binarize[String](tree, stringBinarizer _ );
 
@@ -181,11 +203,22 @@ object Trees {
 
   def debinarize(tree: Tree[String]):Tree[String] = debinarize(tree, (x:String) => x.startsWith("@"));
 
+
   private def xbarStringBinarizer(currentLabel: String, append:String) = {
     if(currentLabel.startsWith("@")) currentLabel
     else "@" + currentLabel
   }
   def xBarBinarize(tree: Tree[String], left: Boolean = false) = binarize[String](tree,xbarStringBinarizer, left);
+
+   def annotateParents[L](tree: Tree[L], join: (L,L)=>L, depth: Int, history: List[L] = List.empty):Tree[L] = {
+    if(depth == 0) tree
+    else {
+      val newLabel = (tree.label :: history).view.take(depth+1).reduceLeft(join);
+      new Tree(newLabel,tree.children.map(c => annotateParents[L](c,join,depth,tree.label :: history.take(depth))))(tree.span);
+    }
+  }
+
+  def annotateParents(tree: Tree[String], depth: Int):Tree[String] = annotateParents(tree,{(x:String,b:String)=>x + '^' + b},depth);
 
   object Transforms {
     class EmptyNodeStripper extends (Tree[String]=>Option[Tree[String]]) {
