@@ -203,6 +203,12 @@ object Trees {
 
   def debinarize(tree: Tree[String]):Tree[String] = debinarize(tree, (x:String) => x.startsWith("@"));
 
+  def binarizeProjection(s: String) = {
+    val start = if(s.startsWith("@")) 1 else 0;
+    var end = s.indexOf("-");
+    if(end < 0) end = s.length;
+    s.slice(start,end);
+  }
 
   private def xbarStringBinarizer(currentLabel: String, append:String) = {
     if(currentLabel.startsWith("@")) currentLabel
@@ -210,7 +216,7 @@ object Trees {
   }
   def xBarBinarize(tree: Tree[String], left: Boolean = false) = binarize[String](tree,xbarStringBinarizer, left);
 
-   def annotateParents[L](tree: Tree[L], join: (L,L)=>L, depth: Int, history: List[L] = List.empty):Tree[L] = {
+  def annotateParents[L](tree: Tree[L], join: (L,L)=>L, depth: Int, history: List[L] = List.empty):Tree[L] = {
     if(depth == 0) tree
     else {
       val newLabel = (tree.label :: history).view.take(depth+1).reduceLeft(join);
