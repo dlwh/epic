@@ -204,10 +204,11 @@ object Trees {
   def debinarize(tree: Tree[String]):Tree[String] = debinarize(tree, (x:String) => x.startsWith("@"));
 
   def binarizeProjection(s: String) = {
-    val start = if(s.startsWith("@")) 1 else 0;
-    var end = s.indexOf("-");
+    var end = s.indexOf(">")-1
+    val endThingy = s.indexOf("^");
     if(end < 0) end = s.length;
-    s.slice(start,end);
+    if(endThingy < end && endThingy >= 0) end = endThingy;
+    s.slice(0,end);
   }
 
   private def xbarStringBinarizer(currentLabel: String, append:String) = {

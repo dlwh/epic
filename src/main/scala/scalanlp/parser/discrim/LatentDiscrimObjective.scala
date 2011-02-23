@@ -34,7 +34,7 @@ class LatentDiscrimObjective[L,L2,W](featurizer: Featurizer[L2,W],
 
   val root = {
     val splits = indexedProjections.refinementsOf(coarseParser.root)
-    require(splits.length == 1)
+    require(splits.length == 1, splits)
     splits(0)
   }
 

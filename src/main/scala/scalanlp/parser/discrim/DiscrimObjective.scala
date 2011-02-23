@@ -24,17 +24,16 @@ import java.io._;
  */
 class DiscrimObjective[L,W](feat: Featurizer[L,W],
                             trees: IndexedSeq[(BinarizedTree[L],Seq[W],SpanScorer[L])],
-                            projections: ProjectionIndexer[L,L],
                             coarseParser: ChartBuilder[LogProbabilityParseChart, L, W],
                             openTags: Set[L],
                             closedWords: Set[W])
-        extends LatentDiscrimObjective[L,L,W](feat,trees,projections,coarseParser, openTags,closedWords) {
+        extends LatentDiscrimObjective[L,L,W](feat,trees,ProjectionIndexer.simple(coarseParser.grammar.index),coarseParser, openTags,closedWords) {
 
   override def treeToExpectedCounts(g: Grammar[L],
-                                              lexicon: Lexicon[L,W],
-                                              lt: BinarizedTree[L],
-                                              words: Seq[W],
-                                              spanScorer: SpanScorer[L]):ExpectedCounts[W] = {
+                                    lexicon: Lexicon[L,W],
+                                    lt: BinarizedTree[L],
+                                    words: Seq[W],
+                                    spanScorer: SpanScorer[L]):ExpectedCounts[W] = {
     val expectedCounts = new ExpectedCounts[W](g)
     val t = lt.map(indexedFeatures.labelIndex);
     var score = 0.0;
@@ -102,8 +101,7 @@ object DiscriminativeTrainer extends ParserTrainer {
       wordCounts.iterator.filter(_._2 > 10).map(_._1);
     }
 
-    val projections = ProjectionIndexer.simple(xbarParser.grammar.index);
-    val obj = new DiscrimObjective(featurizer, trainTrees.toIndexedSeq, projections, xbarParser, openTags, closedWords) with ConsoleLogging;
+    val obj = new DiscrimObjective(featurizer, trainTrees.toIndexedSeq, xbarParser, openTags, closedWords) with ConsoleLogging;
     val optimizer = new StochasticGradientDescent[Int,DenseVector](opt.alpha,maxIterations, opt.batchSize)
               with AdaptiveGradientDescent.L2Regularization[Int,DenseVector]
               with ConsoleLogging {

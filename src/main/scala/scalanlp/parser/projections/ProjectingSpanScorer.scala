@@ -5,12 +5,13 @@ package projections
  * 
  * @author dlwh
  */
-class ProjectingSpanScorer[C,F](indexedProjections: ProjectionIndexer[C,F], scorer: SpanScorer[C]) extends SpanScorer[F] {
+class ProjectingSpanScorer[C,F](indexedProjections: ProjectionIndexer[C,F], scorer: SpanScorer[C], downWeight: Boolean=true) extends SpanScorer[F] {
 
   private val projectionAdjustments = new Array[Double](indexedProjections.coarseIndex.size);
-  for(c <- 0 until indexedProjections.coarseIndex.size) {
-    projectionAdjustments(c) = math.log(indexedProjections.refinementsOf(c).length);
-  }
+  if(downWeight)
+    for(c <- 0 until indexedProjections.coarseIndex.size) {
+      projectionAdjustments(c) = math.log(indexedProjections.refinementsOf(c).length);
+    }
 
   def scoreLexical(begin: Int, end: Int, tag: Int) = {
     val pTag = indexedProjections.project(tag)

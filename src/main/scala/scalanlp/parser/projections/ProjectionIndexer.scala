@@ -45,7 +45,9 @@ object ProjectionIndexer {
   def apply[C,F](coarseIndex: Index[C], fineIndex: Index[F], proj: F=>C) = {
     val indexedProjections = Encoder.fromIndex(fineIndex).fillArray(-1);
     for( (l,idx) <- fineIndex.zipWithIndex) {
-      indexedProjections(idx) = coarseIndex(proj(l));
+      val projectedIdx = coarseIndex(proj(l));
+      if(projectedIdx < 0) throw new RuntimeException("error while indexing" + l + " to " + proj(l) + fineIndex(l));
+      indexedProjections(idx) = projectedIdx;
     }
     new ProjectionIndexer(coarseIndex,fineIndex,indexedProjections);
   }
