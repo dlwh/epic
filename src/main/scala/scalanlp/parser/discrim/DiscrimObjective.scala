@@ -102,7 +102,8 @@ object DiscriminativeTrainer extends ParserTrainer {
       wordCounts.iterator.filter(_._2 > 10).map(_._1);
     }
 
-    val obj = new DiscrimObjective(featurizer, trainTrees.toIndexedSeq, xbarParser, openTags, closedWords) with ConsoleLogging;
+    val projections = ProjectionIndexer.simple(xbarParser.grammar.index);
+    val obj = new DiscrimObjective(featurizer, trainTrees.toIndexedSeq, projections, xbarParser, openTags, closedWords) with ConsoleLogging;
     val optimizer = new StochasticGradientDescent[Int,DenseVector](opt.alpha,maxIterations, opt.batchSize)
               with AdaptiveGradientDescent.L2Regularization[Int,DenseVector]
               with ConsoleLogging {

@@ -68,9 +68,9 @@ object StructuredTrainer extends ParserTrainer {
       wordCounts.iterator.filter(_._2 > 5).map(_._1);
     }
 
-    val projections = new ProjectionIndexer()
+    val projections = ProjectionIndexer(xbarParser.index, baseParserIndex, Trees.binarizeProjection _);
 
-    val obj = new DiscrimObjective(featurizer, trainTrees.toIndexedSeq, xbarParser, openTags, closedWords);
+    val obj = new DiscrimObjective(featurizer, trainTrees.toIndexedSeq, projections, xbarParser, openTags, closedWords);
     val weights = obj.initialWeightVector;
     val model = new ParserLinearModel[ParseChart.LogProbabilityParseChart](xbarParser,devTrees.toIndexedSeq, unaryReplacer, obj);
 
