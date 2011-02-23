@@ -70,7 +70,7 @@ object StructuredTrainer extends ParserTrainer {
     val weights = obj.initialWeightVector;
     val model = new ParserLinearModel[ParseChart.LogProbabilityParseChart](xbarParser,devTrees.toIndexedSeq, unaryReplacer, obj);
 
-    val learner = if (mira) new MIRA[(BinaryTree[String],Seq[String],SpanScorer[String])](true,false,params.C) 
+    val learner = if (params.mira) new MIRA[(BinarizedTree[String],Seq[String],SpanScorer[String])](true,false,params.C)
                   else new NSlackSVM[(BinarizedTree[String], Seq[String], SpanScorer[String])](params.C,params.epsilon,10)
     val finalWeights = learner.train(model.denseVectorToCounter(weights),model, trainTrees, params.maxIterations);
     val parser = obj.extractMaxParser(model.weightsToDenseVector(finalWeights));
@@ -106,8 +106,9 @@ object StructuredTrainer extends ParserTrainer {
         val lossScorer = lossAugmentedScorer(lossWeight,xbarParser.grammar.index,goldTree);
         val scorer = SpanScorer.sum(coarseFilter, lossScorer)
         val guessTree = parser.bestParse(words,scorer);
-        val (goldCounts,_) = treeToExpectedCounts(parser,goldTree,words,scorer);
-        val (guessCounts,loss) = treeToExpectedCounts(parser,guessTree,words,scorer);
+        val unweightedLossScorer = lossAugmentedScorer(1.0,xbarParser.grammar.index,goldTree);
+        val (goldCounts,_) = treeToExpectedCounts(parser,goldTree,words,unweightedLossScorer);
+        val (guessCounts,loss) = treeToExpectedCounts(parser,guessTree,words,unweightedLossScorer);
 
         val goldFeatures = expectedCountsToFeatureVector(obj.indexedFeatures, goldCounts);
         val guessFeatures = expectedCountsToFeatureVector(obj.indexedFeatures, guessCounts);
