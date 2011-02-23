@@ -102,7 +102,7 @@ object StructuredTrainer extends ParserTrainer {
     override def getLossAugmentedUpdateBundleBatch(datum: ju.List[Datum], numThreads: Int,
                                            lossWeight: Double): ju.List[UpdateBundle] = {
       val parser = obj.extractMaxParser(weightsToDenseVector(weights));
-      datum.toIndexedSeq.par(8).map { case (goldTree,words,coarseFilter) =>
+      datum.toIndexedSeq.par(1).map { case (goldTree,words,coarseFilter) =>
         val lossScorer = lossAugmentedScorer(lossWeight,xbarParser.grammar.index,goldTree);
         val scorer = SpanScorer.sum(coarseFilter, lossScorer)
         val guessTree = parser.bestParse(words,scorer);
