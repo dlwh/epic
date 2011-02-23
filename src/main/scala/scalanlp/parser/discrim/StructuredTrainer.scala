@@ -37,7 +37,8 @@ object StructuredTrainer extends ParserTrainer {
                     maxIterations: Int = 201,
                     iterPerValidate: Int = 10,
                     C: Double = 1E-4,
-                    epsilon: Double = 1E-2);
+                    epsilon: Double = 1E-2,
+                    mira: Boolean = false);
 
   def trainParser(trainTrees: Seq[(BinarizedTree[String], Seq[String], SpanScorer[String])],
                   devTrees: Seq[(BinarizedTree[String], Seq[String], SpanScorer[String])],
@@ -69,7 +70,8 @@ object StructuredTrainer extends ParserTrainer {
     val weights = obj.initialWeightVector;
     val model = new ParserLinearModel[ParseChart.LogProbabilityParseChart](xbarParser,devTrees.toIndexedSeq, unaryReplacer, obj);
 
-    val learner = new NSlackSVM[(BinarizedTree[String], Seq[String], SpanScorer[String])](params.C,params.epsilon,10)
+    val learner = if (mira) new MIRA[(BinaryTree[String],Seq[String],SpanScorer[String])](true,false,params.C) 
+                  else new NSlackSVM[(BinarizedTree[String], Seq[String], SpanScorer[String])](params.C,params.epsilon,10)
     val finalWeights = learner.train(model.denseVectorToCounter(weights),model, trainTrees, params.maxIterations);
     val parser = obj.extractMaxParser(model.weightsToDenseVector(finalWeights));
 
