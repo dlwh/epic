@@ -124,7 +124,7 @@ object StructuredTrainer extends ParserTrainer {
     }
 
 
-    def getUpdateBundle(datum: Datum): UpdateBundle = getLossAugmentedUpdateBundle(datum, 0.0);
+    override def getUpdateBundle(datum: Datum): UpdateBundle = getLossAugmentedUpdateBundle(datum, 0.0);
     override def getUpdateBundleBatch(datum: ju.List[Datum], numThreads: Int): ju.List[UpdateBundle] = {
       getLossAugmentedUpdateBundleBatch(datum,numThreads,0.0);
 
