@@ -29,7 +29,7 @@ import java.io.{File, FileWriter}
  */
 object StructuredTrainer extends ParserTrainer {
 
-  protected val paramManifest = manifest[Params]; //classOf[Params] Params.class
+  protected val paramManifest = manifest[Params];
   case class Params(parser: ParserParams.BaseParser,
                     opt: OptParams,
                     featurizerFactory: FeaturizerFactory[String,String] = new PlainFeaturizerFactory[String],
@@ -45,15 +45,13 @@ object StructuredTrainer extends ParserTrainer {
                   unaryReplacer: ChainReplacer[String], params: Params) = {
     val (initLexicon,initBinaries,initUnaries) = GenerativeParser.extractCounts(trainTrees.iterator.map(tuple => (tuple._1,tuple._2)));
 
-    val xbarParser = {
+    val xbarParser = params.parser.optParser.getOrElse {
       val grammar = new GenerativeGrammar(LogCounters.logNormalizeRows(initBinaries),LogCounters.logNormalizeRows(initUnaries));
       val lexicon = new SimpleLexicon(initLexicon);
       new CKYChartBuilder[LogProbabilityParseChart,String,String]("",lexicon,grammar,ParseChart.logProb);
-    }
 
-    val baseParserIndex = params.parser.optParser.map(_.grammar.index) getOrElse {
-      xbarParser.index;
     }
+    val indexedProjections = ProjectionIndexer.simple(xbarParser.grammar.index);
 
     val factory = params.featurizerFactory;
     val featurizer = factory.getFeaturizer(initLexicon, initBinaries, initUnaries);
@@ -68,9 +66,7 @@ object StructuredTrainer extends ParserTrainer {
       wordCounts.iterator.filter(_._2 > 5).map(_._1);
     }
 
-    val projections = ProjectionIndexer(xbarParser.index, baseParserIndex, Trees.binarizeProjection _);
-
-    val obj = new DiscrimObjective(featurizer, trainTrees.toIndexedSeq, projections, xbarParser, openTags, closedWords);
+    val obj = new DiscrimObjective(featurizer, trainTrees.toIndexedSeq, xbarParser, openTags, closedWords);
     val weights = obj.initialWeightVector;
     val model = new ParserLinearModel[ParseChart.LogProbabilityParseChart](xbarParser,devTrees.toIndexedSeq, unaryReplacer, obj);
 
@@ -106,13 +102,12 @@ object StructuredTrainer extends ParserTrainer {
     override def getLossAugmentedUpdateBundleBatch(datum: ju.List[Datum], numThreads: Int,
                                            lossWeight: Double): ju.List[UpdateBundle] = {
       val parser = obj.extractMaxParser(weightsToDenseVector(weights));
-      datum.toIndexedSeq.par.map { case (goldTree,words,coarseFilter) =>
+      datum.toIndexedSeq.par(8).map { case (goldTree,words,coarseFilter) =>
         val lossScorer = lossAugmentedScorer(lossWeight,xbarParser.grammar.index,goldTree);
         val scorer = SpanScorer.sum(coarseFilter, lossScorer)
         val guessTree = parser.bestParse(words,scorer);
-        val unweightedLossScorer = lossAugmentedScorer(1.0,xbarParser.grammar.index,goldTree);
-        val (goldCounts,_) = treeToExpectedCounts(parser,goldTree,words,unweightedLossScorer);
-        val (guessCounts,loss) = treeToExpectedCounts(parser,guessTree,words,unweightedLossScorer);
+        val (goldCounts,_) = treeToExpectedCounts(parser,goldTree,words,scorer);
+        val (guessCounts,loss) = treeToExpectedCounts(parser,guessTree,words,scorer);
 
         val goldFeatures = expectedCountsToFeatureVector(obj.indexedFeatures, goldCounts);
         val guessFeatures = expectedCountsToFeatureVector(obj.indexedFeatures, guessCounts);
