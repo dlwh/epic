@@ -29,7 +29,7 @@ import java.io.{File, FileWriter}
  */
 object StructuredTrainer extends ParserTrainer {
 
-  protected val paramManifest = manifest[Params];
+  protected val paramManifest = manifest[Params]; //classOf[Params] Params.class
   case class Params(parser: ParserParams.BaseParser,
                     opt: OptParams,
                     featurizerFactory: FeaturizerFactory[String,String] = new PlainFeaturizerFactory[String],
@@ -45,13 +45,15 @@ object StructuredTrainer extends ParserTrainer {
                   unaryReplacer: ChainReplacer[String], params: Params) = {
     val (initLexicon,initBinaries,initUnaries) = GenerativeParser.extractCounts(trainTrees.iterator.map(tuple => (tuple._1,tuple._2)));
 
-    val xbarParser = params.parser.optParser.getOrElse {
+    val xbarParser = {
       val grammar = new GenerativeGrammar(LogCounters.logNormalizeRows(initBinaries),LogCounters.logNormalizeRows(initUnaries));
       val lexicon = new SimpleLexicon(initLexicon);
       new CKYChartBuilder[LogProbabilityParseChart,String,String]("",lexicon,grammar,ParseChart.logProb);
-
     }
-    val indexedProjections = ProjectionIndexer.simple(xbarParser.grammar.index);
+
+    val baseParserIndex = params.parser.optParser.map(_.grammar.index) getOrElse {
+      xbarParser.index;
+    }
 
     val factory = params.featurizerFactory;
     val featurizer = factory.getFeaturizer(initLexicon, initBinaries, initUnaries);
@@ -65,6 +67,8 @@ object StructuredTrainer extends ParserTrainer {
       initLexicon.rows.foreach ( wordCounts += _._2 )
       wordCounts.iterator.filter(_._2 > 5).map(_._1);
     }
+
+    val projections = new ProjectionIndexer()
 
     val obj = new DiscrimObjective(featurizer, trainTrees.toIndexedSeq, xbarParser, openTags, closedWords);
     val weights = obj.initialWeightVector;

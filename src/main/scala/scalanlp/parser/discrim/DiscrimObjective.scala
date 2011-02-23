@@ -24,10 +24,11 @@ import java.io._;
  */
 class DiscrimObjective[L,W](feat: Featurizer[L,W],
                             trees: IndexedSeq[(BinarizedTree[L],Seq[W],SpanScorer[L])],
+                            projections: ProjectionIndexer[L,L],
                             coarseParser: ChartBuilder[LogProbabilityParseChart, L, W],
                             openTags: Set[L],
                             closedWords: Set[W])
-        extends LatentDiscrimObjective[L,L,W](feat,trees,ProjectionIndexer.simple(coarseParser.index),coarseParser, openTags,closedWords) {
+        extends LatentDiscrimObjective[L,L,W](feat,trees,projections,coarseParser, openTags,closedWords) {
 
   override def treeToExpectedCounts(g: Grammar[L],
                                               lexicon: Lexicon[L,W],
