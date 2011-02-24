@@ -33,7 +33,7 @@ object StructuredTrainer extends ParserTrainer {
                     opt: OptParams,
                     featurizerFactory: FeaturizerFactory[String,String] = new PlainFeaturizerFactory[String],
                     iterationsPerEval: Int = 50,
-                    maxIterations: Int = 201,
+                    maxIterations: Int = 30,
                     iterPerValidate: Int = 10,
                     C: Double = 1E-4,
                     epsilon: Double = 1E-2,

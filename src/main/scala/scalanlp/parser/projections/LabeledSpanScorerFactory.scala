@@ -16,7 +16,7 @@ import scalanlp.trees.DenseTreebank
  * Creates labeled span scorers for a set of trees from some parser.
  * @author dlwh
  */
-class LabeledSpanScorerFactory[C,L,W](parser: ChartBuilder[ParseChart.LogProbabilityParseChart,L,W],
+class LabeledSpanScorerFactory[C,L,W](parser: ChartBuilder[ParseChart,L,W],
                                     indexedProjections: ProjectionIndexer[C,L],
                                     pruningThreshold: Double= -5) extends SpanScorer.Factory[C,L,W] {
 
@@ -141,7 +141,7 @@ object ProjectTreebankToLabeledSpans {
     val outDir = new File(args(2));
     outDir.mkdirs();
     val projections = ProjectionIndexer(parser.builder.grammar.index,parser.builder.grammar.index,identity[String])
-    val factory = new LabeledSpanScorerFactory[String,String,String](parser.builder.withCharts(ParseChart.logProb),projections);
+    val factory = new LabeledSpanScorerFactory[String,String,String](parser.builder.withCharts(ParseChart.viterbi),projections);
     writeObject(parser.builder.grammar.index,new File(outDir,SPAN_INDEX_NAME));
     writeIterable(mapTrees(factory,transformTrees(treebank.trainTrees),true),new File(outDir,TRAIN_SPANS_NAME))
     writeIterable(mapTrees(factory,transformTrees(treebank.testTrees),false),new File(outDir,TEST_SPANS_NAME))
