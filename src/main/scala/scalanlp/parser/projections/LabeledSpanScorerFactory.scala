@@ -10,7 +10,7 @@ import scalanlp.io.FileIterable;
 
 import java.io._
 import scalanlp.concurrent.ParallelOps._
-import scalanlp.trees.DenseTreebank
+import scalanlp.trees.{Trees,DenseTreebank}
 
 /**
  * Creates labeled span scorers for a set of trees from some parser.
@@ -148,6 +148,11 @@ object ProjectTreebankToLabeledSpans {
     writeIterable(mapTrees(factory,transformTrees(treebank.devTrees),false),new File(outDir,DEV_SPANS_NAME))
   }
 
+  def transformTrees(trees: Iterator[(Tree[String],Seq[String])]): IndexedSeq[(BinarizedTree[String], scala.Seq[String])] = {
+    ParserTrainer.transformTrees(trees,Stream.continually(SpanScorer.identity), 40,
+      Trees.binarize(_:Tree[String]), Trees.Transforms.StandardStringTransform, 2, 2).map{ case (a,b,c) => (a,b)}
+  };
+
   def loadParser(loc: File) = {
     val oin = new ObjectInputStream(new BufferedInputStream(new FileInputStream(loc)));
     val parser = oin.readObject().asInstanceOf[ChartParser[String,String,String]]
@@ -155,19 +160,6 @@ object ProjectTreebankToLabeledSpans {
     parser;
   }
 
-  def transformTrees(trees: Iterator[(Tree[String],Seq[String])]): IndexedSeq[(BinarizedTree[String], Seq[String])] = {
-    val xform = Trees.Transforms.StandardStringTransform;
-    val binarize = Trees.xBarBinarize(_:Tree[String],false);
-    val binarizedAndTransformed = (for {
-      (tree, words) <- trees
-    } yield (binarize(xform(tree)),words)).toIndexedSeq
-
-    val chainRemover = new UnaryChainRemover[String];
-
-    val (dechained,chainReplacer) = chainRemover.removeUnaryChains(binarizedAndTransformed.iterator);
-
-    dechained.toIndexedSeq
-  }
 
   def mapTrees(factory: LabeledSpanScorerFactory[String,String,String], trees: IndexedSeq[(BinarizedTree[String],Seq[String])], useTree: Boolean) = {
     // TODO: have ability to use other span scorers.

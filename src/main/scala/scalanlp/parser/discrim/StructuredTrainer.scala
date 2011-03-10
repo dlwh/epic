@@ -127,13 +127,17 @@ object StructuredTrainer extends ParserTrainer {
     override def getLossAugmentedUpdateBundleBatch(data: ju.List[Datum], numThreads: Int,
                                            lossWeight: Double): ju.List[UpdateBundle] = {
       val parser = getParser(weights);
+      val logSumBuilder = parser.builder.withCharts(ParseChart.logProb);
       data.toIndexedSeq.par(16).map { case (goldTree,words,coarseFilter) =>
         val lossScorer = lossAugmentedScorer(lossWeight,projections,goldTree);
         val scorer = SpanScorer.sum(coarseFilter, lossScorer)
+
+//        val logSumCounts = obj.wordsToExpectedCounts(words,logSumBuilder,coarseFilter);
+
         val guessTree = parser.bestParse(words,scorer);
-        val unweightedLossScorer = new ProjectingSpanScorer(projections, lossAugmentedScorer(1.0,projections,goldTree), false);
-        val (goldCounts,_) = treeToExpectedCounts(parser,goldTree,words,unweightedLossScorer);
-        val (guessCounts,loss) = treeToExpectedCounts(parser,guessTree,words,unweightedLossScorer);
+        val (goldCounts,_) = treeToExpectedCounts(parser,goldTree,words,SpanScorer.identity);
+//        val (guessCounts,loss) = treeToExpectedCounts(parser,guessTree,words,unweightedLossScorer);
+        val guessCounts = obj.wordsToExpectedCounts(words,logSumBuilder,coarseFilter);
 
         val goldFeatures = expectedCountsToFeatureVector(obj.indexedFeatures, goldCounts);
         val guessFeatures = expectedCountsToFeatureVector(obj.indexedFeatures, guessCounts);
@@ -141,7 +145,7 @@ object StructuredTrainer extends ParserTrainer {
         val bundle = new UpdateBundle;
         bundle.gold = denseVectorToCounter(goldFeatures);
         bundle.guess = denseVectorToCounter(guessFeatures);
-        bundle.loss = loss;
+        bundle.loss = 0.0 //loss;
 
         bundle
       }

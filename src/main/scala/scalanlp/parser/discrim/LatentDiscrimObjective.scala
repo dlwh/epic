@@ -91,7 +91,7 @@ class LatentDiscrimObjective[L,L2,W](featurizer: Featurizer[L2,W],
     (obj,grad);
   }
 
-  protected def wordsToExpectedCounts(words: Seq[W],
+  def wordsToExpectedCounts(words: Seq[W],
                                       parser: ChartBuilder[LogProbabilityParseChart,L2,W],
                                       spanScorer: SpanScorer[L] = SpanScorer.identity) = {
     val ecounts = new InsideOutside(parser).expectedCounts(words, new ProjectingSpanScorer(indexedProjections, spanScorer));

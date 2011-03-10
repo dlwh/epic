@@ -111,6 +111,7 @@ object Grammar {
  * Given a counter of productions that has been log-normalized by rows,
  * creates a grammar. Simple simple.
  */
+@SerialVersionUID(925230863821585211L)
 class GenerativeGrammar[L](binaryProductions: LogPairedDoubleCounter[L,BinaryRule[L]],
                            unaryProductions: LogPairedDoubleCounter[L,UnaryRule[L]]) extends Grammar[L] {
 
