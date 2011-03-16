@@ -33,6 +33,7 @@ trait Featurizer[L,W] {
 
 /** A Rule feature is just an indicator on there being this rule */
 case class RuleFeature[L](r: Rule[L]) extends Feature[L,Nothing] with CachedHashCode;
+case class WeightedFeature(kind: Symbol) extends Feature[Nothing,Nothing] with CachedHashCode;
 /** A Lexical feature is just an indicator on there being this word */
 case class LexicalFeature[L,W](l: L, w: W) extends Feature[L,W] with CachedHashCode;
 case class SubstateFeature[L,W](f: Feature[L,W], states: Seq[Int]) extends Feature[(L,Int),W] with CachedHashCode;
@@ -68,9 +69,38 @@ class SumFeaturizer[L,W](f1: Featurizer[L,W], f2: Featurizer[L,W]) extends Featu
 class RuleFeaturizer[L,W](binaries: PairedDoubleCounter[L,BinaryRule[L]],
                           unaries: PairedDoubleCounter[L,UnaryRule[L]],
                           initToZero: Boolean = true, scale: Double = 1.0) extends Featurizer[L,W] {
-  println(initToZero);
   def featuresFor(r: Rule[L]) = aggregate(RuleFeature(r) -> 1.0);
   def featuresFor(l: L, w: W) = aggregate[Feature[L,W]]();
+
+  def initialValueForFeature(f: Feature[L,W]) = f match {
+    case RuleFeature(r:BinaryRule[L]) => if(initToZero) 0.0  else{
+      val s = math.log(binaries(r.parent,r) / binaries(r.parent).total) / scale //+ math.log(r.hashCode.abs * 1.0 /  Int.MaxValue)
+      if(s.isNaN || s.isInfinite) 0.0 else s
+    }
+    case RuleFeature(r:UnaryRule[L]) => if(initToZero) 0.0 else {
+      val s = math.log(unaries(r.parent,r) / unaries(r.parent).total) / scale //+ math.log(r.hashCode.abs * 1.0 /  Int.MaxValue)
+      if(s.isNaN || s.isInfinite)  0.0 else s
+    }
+    case _ => 0.0;
+  }
+
+}
+
+
+class WeightedRuleFeaturizer[L,W](binaries: PairedDoubleCounter[L,BinaryRule[L]],
+                                  unaries: PairedDoubleCounter[L,UnaryRule[L]],
+                                  lexicon: PairedDoubleCounter[L,W],
+                                  initToZero: Boolean = true, scale: Double = 1.0) extends Featurizer[L,W] {
+  def featuresFor(r: Rule[L]) = r match {
+    case u: UnaryRule[L] => aggregate(WeightedFeature('LogProb)->math.log(unaries(u.parent,u)/unaries(u.parent).total));
+    case u: BinaryRule[L] => aggregate(WeightedFeature('LogProb)->math.log(binaries(u.parent,u)/binaries(u.parent).total));
+  }
+
+  val smoothedLexicon: SimpleLexicon[L, W] = new SimpleLexicon(lexicon);
+
+  def featuresFor(l: L, w: W) = {
+    aggregate(WeightedFeature('LogProb)->smoothedLexicon.wordScore(l,w));
+  }
 
 
   def initialValueForFeature(f: Feature[L,W]) = f match {
