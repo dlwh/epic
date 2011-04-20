@@ -149,8 +149,9 @@ object ProjectTreebankToLabeledSpans {
   }
 
   def transformTrees(trees: Iterator[(Tree[String],Seq[String])]): IndexedSeq[(BinarizedTree[String], scala.Seq[String])] = {
-    ParserTrainer.transformTrees(trees,Stream.continually(SpanScorer.identity), 40,
-      Trees.binarize(_:Tree[String]), Trees.Transforms.StandardStringTransform, 2, 2).map{ case (a,b,c) => (a,b)}
+    ParserTrainer.transformTrees(trees,Stream.continually(SpanScorer.identity), 30000,
+        Trees.xBarBinarize(_:Tree[String]), Trees.Transforms.StandardStringTransform, 0, 0).map{ case (a,b,c) => (a,b)}
+  //    Trees.binarize(_:Tree[String]), Trees.Transforms.StandardStringTransform, 2, 2).map{ case (a,b,c) => (a,b)}
   };
 
   def loadParser(loc: File) = {

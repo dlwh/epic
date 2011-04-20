@@ -55,7 +55,7 @@ object StructuredTrainer extends ParserTrainer {
     }
 
 
-    val projections = params.parser.optParser.map(p =>  ProjectionIndexer(p.index, xbarParser.index, Trees.binarizeProjection _)) getOrElse {
+    val projections = params.parser.optParser.map(p => ProjectionIndexer.simple(p.index)) getOrElse {
       ProjectionIndexer.simple(xbarParser.index);
     }
     val indexedProjections = ProjectionIndexer.simple(xbarParser.grammar.index);
@@ -67,15 +67,20 @@ object StructuredTrainer extends ParserTrainer {
       for(t <- initLexicon.activeKeys.map(_._1) if initLexicon(t).size > 50) yield t;
     }
 
+    println("Basexxx: " + xbarParser.lexicon.tagScores("messages"));
+    println(openTags);
+
     val closedWords = Set.empty ++ {
       val wordCounts = DoubleCounter[String]();
       initLexicon.rows.foreach ( wordCounts += _._2 )
-      wordCounts.iterator.filter(_._2 > 5).map(_._1);
+      wordCounts.iterator.filter(_._2 > 10).map(_._1);
     }
 
 
     val obj = new DiscrimObjective(featurizer, trainTrees.toIndexedSeq, xbarParser, openTags, closedWords);
     val weights = obj.initialWeightVector;
+    val pp = obj.extractMaxParser(weights);
+    println("Basexxx: " + pp.builder.lexicon.tagScores("messages"));
     val model = new ParserLinearModel[ParseChart.LogProbabilityParseChart](projections,devTrees.toIndexedSeq, unaryReplacer, obj);
 
     NSlackSVM.SvmOpts.smoMiniBatch = params.smoMiniBatch;
