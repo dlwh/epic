@@ -10,7 +10,7 @@ import scalanlp.trees._
 import collection.mutable.ArrayBuffer
 import java.io.{FileInputStream, BufferedInputStream, ObjectInputStream, File}
 
-class ProductParser[L,L2,W](val parsers: Seq[CKYChartBuilder[LogProbabilityParseChart,L2,W]], coarseParser: ChartBuilder[LogProbabilityParseChart,L,W],
+class ProductParser[L,L2,W](val parsers: Seq[ChartBuilder[LogProbabilityParseChart,L2,W]], coarseParser: ChartBuilder[LogProbabilityParseChart,L,W],
                        val projections: Seq[ProjectionIndexer[L,L2]]) extends Parser[L,W] {
   def bestParse(words: scala.Seq[W], spanScorer: SpanScorer[L]) = {
     val projected = projections.map(projectCoarseScorer(spanScorer,_));
@@ -37,8 +37,6 @@ class ProductParser[L,L2,W](val parsers: Seq[CKYChartBuilder[LogProbabilityParse
   val anchoredProjectors = parsers zip projections map { case (parser,projection) =>
     new AnchoredRulePosteriorScorerFactory(parser,projection,Double.NegativeInfinity);
   }
-
-
 
   val zeroGrammar = new ZeroGrammar(coarseParser.grammar);
   val zeroLexicon = new ZeroLexicon(coarseParser.lexicon);
