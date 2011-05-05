@@ -59,46 +59,43 @@ class EPObjective[L,L2,W](featurizers: Seq[Featurizer[L2,W]],
   }
 
   protected type Builder = EPParser[L,L2,W]
-  protected type Counts = Seq[ExpectedCounts[W]]
+  protected type Counts = (Double,Seq[ExpectedCounts[W]])
 
   def builder(weights: DenseVector) = extractParser(weights);
 
-  protected def emptyCounts(b: Builder) = b.parsers.map { p => new ExpectedCounts[W](p.grammar)}
+  protected def emptyCounts(b: Builder) = (0.0,b.parsers.map { p => new ExpectedCounts[W](p.grammar)})
   protected def expectedCounts(epBuilder: Builder, t: BinarizedTree[L], w: Seq[W], scorer:SpanScorer[L]) = {
-    val charts = epBuilder.buildAllCharts(w,scorer,t);
+    val (partition,charts) = epBuilder.buildAllCharts(w,scorer,t);
 
     import epBuilder._;
 
-    val expectedCounts = for( (p,ParsedSentenceData(inside,outside,z,f0)) <- epBuilder.parsers zip charts) yield {
+    val expectedCounts = for( (p: ChartBuilder[ParseChart.LogProbabilityParseChart, L2, W],ParsedSentenceData(inside,outside,z,f0)) <- epBuilder.parsers zip charts) yield {
       val treeCounts = treeToExpectedCounts(p.grammar,p.lexicon,t,w, f0)
       val wordCounts = wordsToExpectedCounts(p,w,inside,outside, z, f0);
       treeCounts -= wordCounts;
     }
 
-    expectedCounts
+    (partition,expectedCounts)
   }
 
   def sumCounts(c1: Counts, c2: Counts) = {
-    Array.tabulate(numModels)(m => c1(m) += c2(m));
+    val countsPart = Array.tabulate(numModels)(m => c1._2.apply(m) += c2._2.apply(m))
+    (c1._1 + c2._1, countsPart);
   }
 
   def countsToObjective(c: Counts) = {
-    val weightVectors = for { (e,f) <- c zip indexedFeatures} yield expectedCountsToFeatureVector(f,e);
+    val weightVectors = for { (e,f) <- c._2 zip indexedFeatures} yield expectedCountsToFeatureVector(f,e);
     val grad = -tileWeightVectors( weightVectors.toArray) value;
-
-    val logProb = c.map(_.logProb);
-
-    println((norm(grad,2), logProb.mkString("(",",",")")));
     assert(grad.forall(!_._2.isInfinite), "wtf grad");
-    (-logProb.last,  grad);
+    (-c._1,  grad);
   }
 
 
-  private type LogProbBuilder = CKYChartBuilder[LogProbabilityParseChart,L2,W]
+  private type LogProbBuilder = ChartBuilder[LogProbabilityParseChart,L2,W]
   private def extractLogProbBuilder(weights: DenseVector, model: Int)= {
     val grammar = weightsToGrammar(indexedFeatures(model), projectWeights(weights,model));
     val lexicon = weightsToLexicon(indexedFeatures(model), projectWeights(weights,model));
-    val parser = new LogProbBuilder(root, lexicon, grammar, ParseChart.logProb);
+    val parser = new CKYChartBuilder[LogProbabilityParseChart,L2,W](root, lexicon, grammar, ParseChart.logProb);
     parser
   }
 

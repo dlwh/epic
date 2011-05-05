@@ -86,3 +86,24 @@ object ProductParserRunner extends ParserTrainer {
   }
 
 }
+
+object ProductParserTrainer extends ParserTrainer {
+  def trainParser(trainTrees: Seq[(BinarizedTree[String], Seq[String], SpanScorer[String])],
+                  devTrees: Seq[(BinarizedTree[String], Seq[String], SpanScorer[String])],
+                  unaryReplacer: ChainReplacer[String], params: Params) = {
+    val splits = IndexedSeq.tabulate(params.numParsers) { slice =>
+      IndexedSeq.tabulate(trainTrees.length / params.numParsers) { i => trainTrees(slice * trainTrees.length / params.numParsers + i)}
+    }
+
+    val gens = splits.map { split =>
+      GenerativeParser.fromTrees(trainTrees.map { case (a,b,c) => (a,b)})
+    }
+    val builders = gens.map { _.builder.withCharts(ParseChart.logProb)};
+    val parsers = gens.take(1) :+ new ProductParser(builders, builders(0), Array.fill(gens.length){ProjectionIndexer.simple(builders.first.index)})
+    val names = for( i <- 0 until parsers.length) yield "Parser-" + i
+    names zip parsers iterator
+  }
+
+  protected val paramManifest = implicitly[Manifest[Params]];
+  case class Params(numParsers: Int = 2)
+}

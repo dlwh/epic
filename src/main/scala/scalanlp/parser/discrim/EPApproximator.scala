@@ -15,7 +15,7 @@ import scalanlp.trees.BinarizedTree
 trait EPApproximator[C,F,W] {
   // TODO: add a type for the kind of span scorer this is.
   def project(inside: ParseChart[F], outside: ParseChart[F], partition: Double, spanScorer: SpanScorer[F], goldTree: BinarizedTree[C]):SpanScorer[C]
-  def divideAndNormalize(num: SpanScorer[C], denom: SpanScorer[C], words: Seq[W]):SpanScorer[C]
+  def divide(num: SpanScorer[C], denom: SpanScorer[C], words: Seq[W]):SpanScorer[C]
 }
 
 
@@ -32,7 +32,7 @@ class AnchoredRuleApproximator[C,F,W](fineParser: ChartBuilder[LogProbabilityPar
     factory.buildSpanScorer(inside,outside,  partition, spanScorer, tree);
   }
 
-  def divideAndNormalize(num: SpanScorer[C], denom: SpanScorer[C], words: Seq[W]):SpanScorer[C] ={
+  def divide(num: SpanScorer[C], denom: SpanScorer[C], words: Seq[W]):SpanScorer[C] ={
     val div = ScalingSpanScorer(num,denom,0.0,-1);
     zeroFactory.mkSpanScorer(words,div);
   }

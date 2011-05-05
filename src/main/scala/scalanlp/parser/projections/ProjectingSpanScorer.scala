@@ -5,7 +5,7 @@ package projections
  * 
  * @author dlwh
  */
-class ProjectingSpanScorer[C,F](indexedProjections: ProjectionIndexer[C,F], scorer: SpanScorer[C], downWeight: Boolean=true) extends SpanScorer[F] {
+class ProjectingSpanScorer[C,F](indexedProjections: ProjectionIndexer[C,F], val scorer: SpanScorer[C], downWeight: Boolean=true) extends SpanScorer[F] {
 
   private val projectionAdjustments = new Array[Double](indexedProjections.coarseIndex.size);
   if(downWeight)
