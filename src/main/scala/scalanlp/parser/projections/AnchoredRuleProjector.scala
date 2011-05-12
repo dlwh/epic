@@ -117,7 +117,8 @@ class AnchoredRuleProjector[C,L,W](parser: ChartBuilder[ParseChart.LogProbabilit
                   val c = cRules.index(i);
                   val ruleScore = cRules.data(i)
                   val pC = indexedProjections.project(c);
-                  val currentScore = (bScore + inside.top.labelScore(split,end,c)
+                  val cScore = inside.top.labelScore(split, end, c)
+                  val currentScore = (bScore + cScore
                           + parentScore + ruleScore + scorer.scoreBinaryRule(begin,split,end,parent,b,c) - sentProb);
                   if(currentScore > pruneLabel.scoreBinaryRule(begin,split,end,pP,pB,pC)) {
                     val accScore = getOrElseUpdate(parentArray,pB,projVector())(pC);
@@ -136,7 +137,7 @@ class AnchoredRuleProjector[C,L,W](parser: ChartBuilder[ParseChart.LogProbabilit
             if(logTotals(index) eq null) {
               logTotals(index) = projVector;
             }
-            logTotals(index)(pP) = logTotal;
+            logTotals(index)(pP) = Numerics.logSum(logTotals(index)(pP),logTotal);
           }
         }
 
@@ -173,7 +174,7 @@ class AnchoredRuleProjector[C,L,W](parser: ChartBuilder[ParseChart.LogProbabilit
             if(logTotalsUnaries(index) eq null) {
               logTotalsUnaries(index) = projVector;
             }
-            logTotalsUnaries(index)(pP) = logTotal;
+            logTotalsUnaries(index)(pP) = Numerics.logSum(logTotalsUnaries(index)(pP),logTotal);
           }
 
         }

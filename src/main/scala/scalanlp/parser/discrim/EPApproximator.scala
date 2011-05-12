@@ -29,7 +29,7 @@ class AnchoredRuleApproximator[C,F,W](fineParser: ChartBuilder[LogProbabilityPar
   val zeroFactory = new CachingSpanScorerFactory[C,W](coarseParser);
 
   def project(inside: ParseChart[F], outside: ParseChart[F], partition: Double, spanScorer: SpanScorer[F], tree: BinarizedTree[C]):SpanScorer[C] = {
-    factory.buildSpanScorer(inside,outside,  partition, spanScorer, tree);
+    factory.buildSpanScorer(inside, outside,  partition, spanScorer, tree);
   }
 
   def divide(num: SpanScorer[C], denom: SpanScorer[C], words: Seq[W]):SpanScorer[C] ={

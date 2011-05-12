@@ -30,7 +30,7 @@ class AnchoredRuleScorerTest  extends ParserTestHarness with FunSuite {
       lazy val goutside2 = zero.buildOutsideChart(ginside2,scorer2);
       val tree = SimpleViterbiDecoder(ParserTestHarness.simpleGrammar).extractBestParse("",zero.grammar, ginside,goutside,w, scorer)
       val tree2 = SimpleViterbiDecoder(ParserTestHarness.simpleGrammar).extractBestParse("",zero.grammar, ginside2,goutside2,w, scorer)
-      assert(tree2 == tree);
+      assert(tree2 === tree);
     } catch {
       case e: Exception =>
       throw new RuntimeException("Trouble with " + t.render(w),e);

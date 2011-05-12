@@ -40,7 +40,6 @@ class EPParser[L,L2,W](val parsers: Seq[ChartBuilder[LogProbabilityParseChart,L2
       val lastLastF0 = lastF0;
       lastF0 = currentF0;
       for(m <- 0 until parsers.length) {
-        println(i + " " + m + words);
         val rescaledScorer = approximators(m).divide(currentF0, corrections(m), words);
         val projectedScorer = projectCoarseScorer(rescaledScorer, m);
 
@@ -53,7 +52,7 @@ class EPParser[L,L2,W](val parsers: Seq[ChartBuilder[LogProbabilityParseChart,L2
         partitions(m) = newPartition;
         // project down the approximation
         currentF0 = approximators(m).project(insideCharts(m),outsideCharts(m), newPartition, projectedScorer, tree);
-        corrections(m) = ScalingSpanScorer(currentF0,rescaledScorer,0.0,-1);
+        corrections(m) = ScalingSpanScorer(currentF0,rescaledScorer,newPartition,f0Builder.grammar.index(f0Builder.root));
       }
       if(parsers.length == 1 || maxEPIterations == 1) {
         changed = false;
@@ -62,19 +61,21 @@ class EPParser[L,L2,W](val parsers: Seq[ChartBuilder[LogProbabilityParseChart,L2
         assert(!maxChange.isNaN)
         changed = maxChange.abs > 1E-4;
         if(!changed) {
-          print(i + " ")
+          print("Iteration " + i + ": " + words +  " converged: ")
         } else if(i == maxEPIterations - 1) {
 
-          print("F ")
+          print(words + " did not converge!: ");
         }
         println("<" + i +">" + maxChange);
       }
     }
 
+
     val allFi = corrections.reduceLeft(SpanScorer.sum _)
 
-    val partition = (f0Builder.buildInsideChart(words, allFi).top.labelScore(0,words.length,f0Builder.root)
-            + partitions.reduceLeft(_ + _));
+    val partition = (f0Builder.buildInsideChart(words, allFi).top.labelScore(0,words.length,f0Builder.root))
+//    println(partitions.mkString + " vs " + partition + " vs " + (f0Builder.buildInsideChart(words, currentF0).top.labelScore(0,words.length,f0Builder.root)));
+            //+ partitions.reduceLeft(_ + _));
     val data = Array.tabulate(parsers.length)(m => ParsedSentenceData(insideCharts(m),
       outsideCharts(m), partitions(m),scorers(m)));
     (partition,data)
@@ -135,7 +136,7 @@ object EPParserTrainer extends ParserTrainer {
       GenerativeParser.fromTrees(trainTrees.map { case (a,b,c) => (a,b)})
     }
     val builders = gens.map { _.builder.withCharts(ParseChart.logProb)};
-    val parsers = gens.take(1) :+ new EPParser(builders, builders(0), Array.fill(gens.length){ProjectionIndexer.simple(builders.first.index)})
+    val parsers = gens.take(1) :+ new EPParser(builders, builders(0), Array.fill(gens.length){ProjectionIndexer.simple(builders.head.index)})
     val names = for( i <- 0 until parsers.length) yield "Parser-" + i
     names zip parsers iterator
   }

@@ -219,11 +219,10 @@ trait LatentTrainer extends ParserTrainer {
     val init = obj.initialWeightVector.copy;
 
     val log = Log.globalLog;
-    //import scalanlp.optimize.RandomizedGradientCheckingFunction;
-    //val rand = new RandomizedGradientCheckingFunction(obj);
+    import scalanlp.optimize.RandomizedGradientCheckingFunction;
+    val rand = new RandomizedGradientCheckingFunction(obj);
     def evalAndCache(pair: (optimizer.State,Int) ) {
       val (state,iter) = pair;
-      //rand.calculate(state.x);
       val weights = state.x;
       if(iter % iterPerValidate == 0) {
         cacheWeights(params, obj,weights, iter);
@@ -235,6 +234,7 @@ trait LatentTrainer extends ParserTrainer {
     val cachedObj = new CachedBatchDiffFunction[Int,DenseVector](obj);
 
     for( (state,iter) <- optimizer.iterations(cachedObj,init).take(maxIterations).zipWithIndex.tee(evalAndCache _);
+//         _ = rand.calculate(state.x);
          if iter != 0 && iter % iterationsPerEval == 0) yield try {
       val parser = obj.extractParser(state.x)
       ("LatentDiscrim-" + iter.toString,parser)

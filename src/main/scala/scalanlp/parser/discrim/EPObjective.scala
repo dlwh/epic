@@ -69,13 +69,16 @@ class EPObjective[L,L2,W](featurizers: Seq[Featurizer[L2,W]],
 
     import epBuilder._;
 
-    val expectedCounts = for( (p: ChartBuilder[ParseChart.LogProbabilityParseChart, L2, W],ParsedSentenceData(inside,outside,z,f0)) <- epBuilder.parsers zip charts) yield {
-      val treeCounts = treeToExpectedCounts(p.grammar,p.lexicon,t,w, f0)
+    var treeScore = 0.0;
+
+    val expectedCounts = for( (p,ParsedSentenceData(inside,outside,z,f0)) <- epBuilder.parsers zip charts) yield {
+      val treeCounts = treeToExpectedCounts(p.grammar,p.lexicon,t,w, new ProjectingSpanScorer(indexedProjections, scorer))
       val wordCounts = wordsToExpectedCounts(p,w,inside,outside, z, f0);
+      treeScore += treeCounts.logProb;
       treeCounts -= wordCounts;
     }
 
-    (partition,expectedCounts)
+    (treeScore - partition,expectedCounts)
   }
 
   def sumCounts(c1: Counts, c2: Counts) = {
@@ -207,6 +210,7 @@ object EPTrainer extends LatentTrainer {
                   closedWords: Set[String]) = {
     val maxEPIterations = params.specific.ep.iterations;
     val epModels = params.specific.ep.models;
+    println(trainTrees.length)
 
     new EPObjective(latentFeaturizer,
       trainTrees.toIndexedSeq,
