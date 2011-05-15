@@ -35,7 +35,7 @@ class ProductParser[L,L2,W](val parsers: Seq[ChartBuilder[LogProbabilityParseCha
   }
 
   val anchoredProjectors = parsers zip projections map { case (parser,projection) =>
-    new AnchoredRulePosteriorScorerFactory(parser,projection,Double.NegativeInfinity);
+    new AnchoredRuleScorerFactory(parser,projection,Double.NegativeInfinity);
   }
 
   val zeroGrammar = new ZeroGrammar(coarseParser.grammar);
@@ -57,23 +57,26 @@ object ProductParserRunner extends ParserTrainer {
                   devTrees: Seq[(BinarizedTree[String], Seq[String], SpanScorer[String])],
                   unaryReplacer : ChainReplacer[String],
                   params: Params) = {
-    val parsers = new ArrayBuffer[EPParser[String,(String,Int),String]];
+    val parsers = new ArrayBuffer[ChartParser[String,(String,Int),String]];
     var found = true;
     var i = 0;
-    val paths = params.productIterator;
+    val paths = params.productIterator.buffered;
     while(found && paths.hasNext) {
       found = false;
-      val path = paths.dropWhile(!_.isInstanceOf[File]).next.asInstanceOf[File];
-      println(path);
-      if(path ne null) {
-        parsers += readObject(path);
-        found = true;
+      while(paths.hasNext && !paths.head.isInstanceOf[File]) paths.next;
+      if(paths.hasNext) {
+        val path = paths.next.asInstanceOf[File];
+        println(path);
+        if(path ne null) {
+          parsers += readObject(path);
+          found = true;
+        }
+        i += 1;
       }
-      i += 1;
     }
     val coarseParser = params.parser.optParser;
 
-    val productParser = new ProductParser(parsers.flatMap(_.parsers), coarseParser.get, parsers.flatMap(_.projections));
+    val productParser = new ProductParser(parsers.map(_.builder.withCharts(ParseChart.logProb)), coarseParser.get, parsers.map(_.projections));
     Iterator.single( "Product" -> productParser);
   }
 

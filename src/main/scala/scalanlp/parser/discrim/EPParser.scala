@@ -6,6 +6,8 @@ import scalanlp.trees._
 import projections._;
 import ParseChart._
 import scalanlp.trees.UnaryChainRemover.ChainReplacer
+import java.io.{File, BufferedInputStream, FileInputStream, ObjectInputStream}
+import collection.mutable.ArrayBuffer
 ;
 
 /**
@@ -74,8 +76,6 @@ class EPParser[L,L2,W](val parsers: Seq[ChartBuilder[LogProbabilityParseChart,L2
     val allFi = corrections.reduceLeft(SpanScorer.sum _)
 
     val partition = (f0Builder.buildInsideChart(words, allFi).top.labelScore(0,words.length,f0Builder.root))
-//    println(partitions.mkString + " vs " + partition + " vs " + (f0Builder.buildInsideChart(words, currentF0).top.labelScore(0,words.length,f0Builder.root)));
-            //+ partitions.reduceLeft(_ + _));
     val data = Array.tabulate(parsers.length)(m => ParsedSentenceData(insideCharts(m),
       outsideCharts(m), partitions(m),scorers(m)));
     (partition,data)
@@ -110,17 +110,70 @@ class EPParser[L,L2,W](val parsers: Seq[ChartBuilder[LogProbabilityParseChart,L2
   }
 
   val approximators = (parsers zip projections).map{ case (parser,proj) =>
-    new AnchoredRuleApproximator[L,L2,W](parser, coarseParser,proj, Double.NegativeInfinity);
+//    new AnchoredRuleApproximator[L,L2,W](parser, coarseParser,proj, Double.NegativeInfinity);
+    new AnchoredRulePosteriorApproximator[L,L2,W](parser, coarseParser,proj, Double.NegativeInfinity);
   }
   val decoder = new ViterbiDecoder[L,L2,W](projections.last);
-  val f0Decoder = new SimpleViterbiDecoder(coarseParser.grammar);
+  val f0Decoder = new SimpleViterbiDecoder[L,W](coarseParser.grammar);
   val f0Builder = new CKYChartBuilder[LogProbabilityParseChart,L,W](coarseParser.root,new ZeroLexicon(coarseParser.lexicon), new ZeroGrammar(coarseParser.grammar), ParseChart.logProb);
 
   def bestParse(s: scala.Seq[W], spanScorer: SpanScorer[L]) = {
     val parserData = buildAllCharts(s,spanScorer)._2.last
     val lastParser = parsers.last;
     decoder.extractBestParse(lastParser.root,lastParser.grammar,parserData.inside,parserData.outside,s,parserData.f0);
+//    val fac = new AnchoredRulePosteriorScorerFactory(lastParser,projections.last,Double.NegativeInfinity);
+//    val scorer: fac.MyScorer = fac.buildSpanScorer(parserData.inside,parserData.outside,parserData.partition,parserData.f0);
+//    val zeroInside: ParseChart.LogProbabilityParseChart[L] = f0Builder.buildInsideChart(s,scorer);
+//    val zeroOutside: ParseChart.LogProbabilityParseChart[L] = f0Builder.buildOutsideChart(zeroInside,scorer);
+//    val tree: BinarizedTree[L] = f0Decoder.extractBestParse(coarseParser.root,f0Builder.grammar, zeroInside,zeroOutside, s, scorer);
+//    tree
   }
+}
+
+/**
+ *
+ * @author dlwh
+ */
+object EPParserRunner extends ParserTrainer {
+
+  case class Params(parser: ParserParams.BaseParser, model0: File = null, model1: File = null, model2: File = null, model3: File = null);
+  protected val paramManifest = manifest[Params];
+
+  def trainParser(trainTrees: Seq[(BinarizedTree[String], Seq[String], SpanScorer[String])],
+                  devTrees: Seq[(BinarizedTree[String], Seq[String], SpanScorer[String])],
+                  unaryReplacer : ChainReplacer[String],
+                  params: Params) = {
+    val parsers = new ArrayBuffer[ChartParser[String,(String,Int),String]];
+    var found = true;
+    var i = 0;
+    val paths = params.productIterator.buffered;
+    while(found && paths.hasNext) {
+      found = false;
+      while(paths.hasNext && !paths.head.isInstanceOf[File]) paths.next;
+      if(paths.hasNext) {
+        val path = paths.next.asInstanceOf[File];
+        println(path);
+        if(path ne null) {
+          parsers += readObject(path);
+          found = true;
+        }
+        i += 1;
+      }
+    }
+    val coarseParser = params.parser.optParser;
+
+    val productParser = new EPParser(parsers.map(_.builder.withCharts(ParseChart.logProb)), coarseParser.get, parsers.map(_.projections), maxEPIterations = 5);
+    Iterator.single( "EPIC" -> productParser);
+  }
+
+
+  def readObject[T](loc: File) = {
+    val oin = new ObjectInputStream(new BufferedInputStream(new FileInputStream(loc)));
+    val parser = oin.readObject().asInstanceOf[T]
+    oin.close();
+    parser;
+  }
+
 }
 
 object EPParserTrainer extends ParserTrainer {

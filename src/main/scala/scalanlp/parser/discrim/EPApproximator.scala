@@ -37,3 +37,23 @@ class AnchoredRuleApproximator[C,F,W](fineParser: ChartBuilder[LogProbabilityPar
     zeroFactory.mkSpanScorer(words,div);
   }
 }
+
+// TODO: is this EP?
+@serializable
+@SerialVersionUID(1)
+class AnchoredRulePosteriorApproximator[C,F,W](fineParser: ChartBuilder[LogProbabilityParseChart,F,W],
+                                               coarseParser: ChartBuilder[LogProbabilityParseChart,C,W],
+                                               projections: ProjectionIndexer[C,F], pruningThreshold: Double = Double.NegativeInfinity) extends EPApproximator[C,F,W] {
+  val factory = new AnchoredRulePosteriorScorerFactory[C,F,W](fineParser,projections,pruningThreshold);
+
+  val zeroFactory = new CachingSpanScorerFactory[C,W](coarseParser);
+
+  def project(inside: ParseChart[F], outside: ParseChart[F], partition: Double, spanScorer: SpanScorer[F], tree: BinarizedTree[C]):SpanScorer[C] = {
+    factory.buildSpanScorer(inside, outside,  partition, spanScorer, tree);
+  }
+
+  def divide(num: SpanScorer[C], denom: SpanScorer[C], words: Seq[W]):SpanScorer[C] ={
+    val div = ScalingSpanScorer(num,denom,0.0,-1);
+    zeroFactory.mkSpanScorer(words,div);
+  }
+}
