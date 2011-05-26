@@ -20,14 +20,14 @@ class EPParser[L,L2,W](val parsers: Seq[ChartBuilder[LogProbabilityParseChart,L2
                        val projections: Seq[ProjectionIndexer[L,L2]],
                        val maxEPIterations: Int= 1,
                        val damping: Double = 1.0) extends Parser[L,W] {
+
+  case class EPResult(marginals: Seq[ParsedSentenceData], partition: Double, f0: SpanScorer[L])
   case class ParsedSentenceData(inside: LogProbabilityParseChart[L2], outside: LogProbabilityParseChart[L2],
-                                partition: Double, f0: SpanScorer[L2])
-
-
+                                partition: Double, correction: SpanScorer[L2])
 
   def buildAllCharts(words: Seq[W],
                      initScorer: SpanScorer[L]=SpanScorer.identity[L],
-                     tree: BinarizedTree[L]=null):(Double,Array[ParsedSentenceData]) = {
+                     tree: BinarizedTree[L]=null):EPResult = {
     var currentF0 = initScorer;
     val corrections = Array.fill(parsers.length)( SpanScorer.divide(currentF0,parsers.length));
 
@@ -78,7 +78,7 @@ class EPParser[L,L2,W](val parsers: Seq[ChartBuilder[LogProbabilityParseChart,L2
     val partition = (f0Builder.buildInsideChart(words, allFi).top.labelScore(0,words.length,f0Builder.root))
     val data = Array.tabulate(parsers.length)(m => ParsedSentenceData(insideCharts(m),
       outsideCharts(m), partitions(m),scorers(m)));
-    (partition,data)
+    EPResult(data,partition,currentF0)
   }
 
   def computeMaxChange(scorer1: SpanScorer[L], scorer2: SpanScorer[L], length: Int):Double = {
@@ -114,19 +114,21 @@ class EPParser[L,L2,W](val parsers: Seq[ChartBuilder[LogProbabilityParseChart,L2
     new AnchoredRulePosteriorApproximator[L,L2,W](parser, coarseParser,proj, Double.NegativeInfinity);
   }
   val decoder = new ViterbiDecoder[L,L2,W](projections.last);
-  val f0Decoder = new SimpleViterbiDecoder[L,W](coarseParser.grammar);
+  val f0Decoder = new MaxConstituentDecoder[L,L,W](ProjectionIndexer.simple(coarseParser.grammar.index));
   val f0Builder = new CKYChartBuilder[LogProbabilityParseChart,L,W](coarseParser.root,new ZeroLexicon(coarseParser.lexicon), new ZeroGrammar(coarseParser.grammar), ParseChart.logProb);
 
   def bestParse(s: scala.Seq[W], spanScorer: SpanScorer[L]) = {
-    val parserData = buildAllCharts(s,spanScorer)._2.last
-    val lastParser = parsers.last;
-    decoder.extractBestParse(lastParser.root,lastParser.grammar,parserData.inside,parserData.outside,s,parserData.f0);
+    val EPResult(parserDatas,partition,f0) = buildAllCharts(s,spanScorer);
+//    val parserData = parserDatas.last;
+//    val lastParser = parsers.last;
+//    decoder.extractBestParse(lastParser.root,lastParser.grammar,parserData.inside,parserData.outside,s,parserData.correction);
+
 //    val fac = new AnchoredRulePosteriorScorerFactory(lastParser,projections.last,Double.NegativeInfinity);
-//    val scorer: fac.MyScorer = fac.buildSpanScorer(parserData.inside,parserData.outside,parserData.partition,parserData.f0);
-//    val zeroInside: ParseChart.LogProbabilityParseChart[L] = f0Builder.buildInsideChart(s,scorer);
-//    val zeroOutside: ParseChart.LogProbabilityParseChart[L] = f0Builder.buildOutsideChart(zeroInside,scorer);
-//    val tree: BinarizedTree[L] = f0Decoder.extractBestParse(coarseParser.root,f0Builder.grammar, zeroInside,zeroOutside, s, scorer);
-//    tree
+//    val scorer: fac.MyScorer = fac.buildSpanScorer(parserData.inside,parserData.outside,parserData.partition,parserData.correction);
+    val zeroInside: ParseChart.LogProbabilityParseChart[L] = f0Builder.buildInsideChart(s,f0);
+    val zeroOutside: ParseChart.LogProbabilityParseChart[L] = f0Builder.buildOutsideChart(zeroInside,f0);
+    val tree: BinarizedTree[L] = f0Decoder.extractBestParse(coarseParser.root,f0Builder.grammar, zeroInside,zeroOutside, s, f0);
+    tree
   }
 }
 
