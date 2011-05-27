@@ -25,6 +25,18 @@ class EPParser[L,L2,W](val parsers: Seq[ChartBuilder[LogProbabilityParseChart,L2
   case class ParsedSentenceData(inside: LogProbabilityParseChart[L2], outside: LogProbabilityParseChart[L2],
                                 partition: Double, correction: SpanScorer[L2])
 
+  def fineParsers(decoder: ChartDecoder[L,L2,W]):Seq[Parser[L,W]] = {
+    for( ((parser,projection),i) <- parsers zip projections zipWithIndex) yield {
+      new Parser[L,W] {
+        def bestParse(s: Seq[W], spanScorer: SpanScorer[L]) = {
+          val EPResult(parserDatas,partition,f0) = buildAllCharts(s,spanScorer);
+          val parserData = parserDatas(i)
+          decoder.extractBestParse(parser.root,parser.grammar,parserData.inside,parserData.outside,s,parserData.correction);
+        }
+      }
+    }
+  }
+
   def buildAllCharts(words: Seq[W],
                      initScorer: SpanScorer[L]=SpanScorer.identity[L],
                      tree: BinarizedTree[L]=null):EPResult = {
@@ -97,9 +109,8 @@ class EPParser[L,L2,W](val parsers: Seq[ChartBuilder[LogProbabilityParseChart,L2
       val a = (s1 - s2);
       if(a.isNaN) 0.0 // from negative infinities...el
       else if(a.isInfinite) 1.0
-      else  {
-        a.abs
-      }
+      else if(s1.abs < 1E-4) a.abs
+      else a.abs / (s1.abs + s2.abs)
     }
 
     changes.foldLeft(0.0)(math.max _ );
@@ -111,7 +122,7 @@ class EPParser[L,L2,W](val parsers: Seq[ChartBuilder[LogProbabilityParseChart,L2
 
   val approximators = (parsers zip projections).map{ case (parser,proj) =>
 //    new AnchoredRuleApproximator[L,L2,W](parser, coarseParser,proj, Double.NegativeInfinity);
-    new AnchoredRulePosteriorApproximator[L,L2,W](parser, coarseParser,proj, Double.NegativeInfinity);
+    new AnchoredRuleApproximator[L,L2,W](parser, coarseParser,proj, Double.NegativeInfinity);
   }
   val decoder = new ViterbiDecoder[L,L2,W](projections.last);
   val f0Decoder = new MaxConstituentDecoder[L,L,W](ProjectionIndexer.simple(coarseParser.grammar.index));
@@ -127,7 +138,10 @@ class EPParser[L,L2,W](val parsers: Seq[ChartBuilder[LogProbabilityParseChart,L2
 //    val scorer: fac.MyScorer = fac.buildSpanScorer(parserData.inside,parserData.outside,parserData.partition,parserData.correction);
     val zeroInside: ParseChart.LogProbabilityParseChart[L] = f0Builder.buildInsideChart(s,f0);
     val zeroOutside: ParseChart.LogProbabilityParseChart[L] = f0Builder.buildOutsideChart(zeroInside,f0);
-    val tree: BinarizedTree[L] = f0Decoder.extractBestParse(coarseParser.root,f0Builder.grammar, zeroInside,zeroOutside, s, f0);
+    val fac = new AnchoredRulePosteriorScorerFactory(f0Builder,ProjectionIndexer.simple(coarseParser.grammar.index),Double.NegativeInfinity);
+    val scorer: fac.MyScorer = fac.buildSpanScorer(zeroInside,zeroOutside,0.0,f0);
+//    val tree: BinarizedTree[L] = f0Decoder.extractBestParse(coarseParser.root,f0Builder.grammar, zeroInside,zeroOutside, s, scorer);
+    val tree = SimpleViterbiDecoder(coarseParser.grammar).extractBestParse(coarseParser.root, f0Builder.grammar , zeroInside,zeroOutside, s, scorer);
     tree
   }
 }

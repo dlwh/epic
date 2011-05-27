@@ -2,7 +2,12 @@ package scalanlp.parser
 package projections
 
 import scalanlp.collection.mutable.TriangularArray
-import scalala.tensor.sparse.SparseVector;
+import scalala.tensor.sparse.SparseVector
+import scalanlp.trees.{Trees, BinarizedTree, Tree, DenseTreebank}
+import scalanlp.io.FileIterable
+import java.io._
+import scalanlp.util.Index
+import scalanlp.concurrent.ParallelOps._;
 
 
 /**
@@ -10,7 +15,7 @@ import scalala.tensor.sparse.SparseVector;
  * @author dlwh
  */
 class AnchoredRuleScorerFactory[C,L,W](parser: ChartBuilder[ParseChart.LogProbabilityParseChart,L,W],
-                                     indexedProjections: ProjectionIndexer[C,L],
+                                     val indexedProjections: ProjectionIndexer[C,L],
                                      pruningThreshold: Double = -7)
         extends ChartDrivenScorerFactory[C,L,W](parser,indexedProjections,pruningThreshold) {
 
@@ -92,3 +97,85 @@ class AnchoredRuleScorer[L](lexicalScores: Array[SparseVector], // begin -> labe
   }
 }
 
+object ProjectTreebankToVarGrammar {
+  val TRAIN_SPANS_NAME = "train.spans.ser"
+  val DEV_SPANS_NAME = "dev.spans.ser"
+  val TEST_SPANS_NAME = "test.spans.ser"
+  val SPAN_INDEX_NAME = "spanindex.ser"
+  def main(args: Array[String]) {
+    val parser = loadParser(new File(args(0)));
+    val coarseParser = ProjectTreebankToLabeledSpans.loadParser(new File(args(1)));
+    val treebank = DenseTreebank.fromZipFile(new File(args(2)));
+    val (inTrain,inDev,inTest) = ProjectTreebankToLabeledSpans.loadSpans(new File(args(3)));
+    val outDir = new File(args(4));
+    outDir.mkdirs();
+    val projections = ProjectionIndexer[String,(String,Int)](coarseParser.builder.grammar.index,parser.builder.grammar.index,_._1);
+    val factory = new AnchoredRuleScorerFactory[String,(String,Int),String](parser.builder.withCharts(ParseChart.logProb),projections, -100);
+    writeObject(parser.builder.grammar.index,new File(outDir,SPAN_INDEX_NAME));
+    writeIterable(mapTrees(factory,transformTrees(treebank.trainTrees, inTrain),true),new File(outDir,TRAIN_SPANS_NAME))
+    writeIterable(mapTrees(factory,transformTrees(treebank.testTrees, inDev),false),new File(outDir,TEST_SPANS_NAME))
+    writeIterable(mapTrees(factory,transformTrees(treebank.devTrees, inTest),false),new File(outDir,DEV_SPANS_NAME))
+  }
+
+  def transformTrees(trees: Iterator[(Tree[String],Seq[String])], spanScorers: Iterable[SpanScorer[String]]): IndexedSeq[(BinarizedTree[String], scala.Seq[String], SpanScorer[String])] = {
+    ParserTrainer.transformTrees(trees,spanScorers, 30000,
+        Trees.xBarBinarize(_:Tree[String]), Trees.Transforms.StandardStringTransform, 0, 0)
+  //    Trees.binarize(_:Tree[String]), Trees.Transforms.StandardStringTransform, 2, 2).map{ case (a,b,c) => (a,b)}
+  };
+
+  def loadParser(loc: File) = {
+    val oin = new ObjectInputStream(new BufferedInputStream(new FileInputStream(loc)));
+    val parser = oin.readObject().asInstanceOf[ChartParser[String,(String,Int),String]]
+    oin.close();
+    parser;
+  }
+
+
+  def mapTrees(factory: AnchoredRuleScorerFactory[String,(String,Int),String], trees: IndexedSeq[(BinarizedTree[String],Seq[String], SpanScorer[String])], useTree: Boolean) = {
+    // TODO: have ability to use other span scorers.
+    trees.toIndexedSeq.par.map { case (tree,words, scorer) =>
+      println(words);
+      try {
+        val proj: ProjectingSpanScorer[String, (String, Int)] = new ProjectingSpanScorer(factory.indexedProjections,scorer,true);
+        val res = factory.mkSpanScorer(words,proj)
+        res;
+      } catch {
+        case e: Exception => e.printStackTrace(); SpanScorer.identity;
+      }
+    }
+  }
+
+  def writeObject(o: AnyRef, file: File) {
+    val oout = new ObjectOutputStream(new BufferedOutputStream(new FileOutputStream(file)));
+    oout.writeObject(o);
+    oout.close();
+  }
+
+  def writeIterable[T](o: Iterable[T], file: File) {
+    FileIterable.write(o,file);
+  }
+
+  def loadSpans(spanDir: File) = {
+    if(!spanDir.exists || !spanDir.isDirectory) error(spanDir + " must exist and be a directory!")
+
+    val trainSpans = loadSpansFile(new File(spanDir,TRAIN_SPANS_NAME));
+    val devSpans = loadSpansFile(new File(spanDir,DEV_SPANS_NAME));
+    val testSpans = loadSpansFile(new File(spanDir,TEST_SPANS_NAME));
+
+    (trainSpans,devSpans,testSpans);
+  }
+
+  def loadSpansFile(spanFile: File):Iterable[SpanScorer[String]] = {
+    require(spanFile.exists, spanFile + " must exist!")
+    new FileIterable[SpanScorer[String]](spanFile);
+  }
+
+  def loadSpanIndex(spanFile: File) = {
+    require(spanFile.exists, spanFile + " must exist!")
+    val oin = new ObjectInputStream(new BufferedInputStream(new FileInputStream(spanFile)));
+    val index = oin.readObject().asInstanceOf[Index[String]];
+    oin.close();
+    index;
+  }
+
+}
