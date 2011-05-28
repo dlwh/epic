@@ -20,11 +20,11 @@ class ReplGrammar(treebankPath: String, isDenseTreebank:Boolean=true, binarizati
 
   val xform = Trees.Transforms.StandardStringTransform;
 
-  lazy val trainTrees = IndexedSeq.empty ++ (for( (tree,words) <- treebank.trainTrees.filter(_._2.length <= maxLength))
-    yield (binarize(xform(tree)),words)).toSeq;
+  lazy val trainTrees = IndexedSeq.empty ++ (for( (tree,words) <- treebank.train.trees.filter(_._2.length <= maxLength))
+    yield TreeInstance(words.toString(),binarize(xform(tree)),words)).toSeq;
 
-  lazy val devTrees = IndexedSeq.empty ++ (for( (tree,words) <- treebank.devTrees.filter(_._2.length <= maxLength))
-    yield (binarize(xform(tree)),words)).toSeq;
+  lazy val devTrees = IndexedSeq.empty ++ (for( (tree,words) <- treebank.dev.trees.filter(_._2.length <= maxLength))
+    yield TreeInstance(words.toString(),binarize(xform(tree)),words)).toSeq;
 
-  lazy val (lexicon,grammar) = GenerativeParser.extractLexiconAndGrammar(trainTrees.iterator);
+  lazy val (lexicon,grammar) = GenerativeParser.extractLexiconAndGrammar(trainTrees);
 }

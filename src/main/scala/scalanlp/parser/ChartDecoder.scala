@@ -135,11 +135,11 @@ class MaxRuleProductDecoder[C,F, W](coarseGrammar: Grammar[C], coarseLexicon: Le
 
 object MaxRuleTrainer extends ParserTrainer with NoParams {
   import scalala.tensor.counters.LogCounters._;
-  def trainParser(trainTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])],
-                  devTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])],
+  def trainParser(trainTrees: IndexedSeq[TreeInstance[String,String]],
+                  devTrees:   IndexedSeq[TreeInstance[String,String]],
                   unaryReplacer : ChainReplacer[String],
                   config: Params) = {
-    val (words,binary,unary) = GenerativeParser.extractCounts(trainTrees.iterator.map{ case (a,b,c) => (a,b)});
+    val (words,binary,unary) = GenerativeParser.extractCounts(trainTrees);
     val grammar = new GenerativeGrammar(logNormalizeRows(binary),logNormalizeRows(unary));
     val lexicon = new SignatureLexicon(words, EnglishWordClassGenerator, 3);
     val projections = ProjectionIndexer.simple(grammar.index);
@@ -232,11 +232,11 @@ class MaxConstituentDecoder[C,F,W](indexedProjections: ProjectionIndexer[C,F]) e
 
 object MaxConstituentTrainer extends ParserTrainer with NoParams {
   import scalala.tensor.counters.LogCounters._;
-  def trainParser(trainTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])],
-                  devTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])],
+  def trainParser(trainTrees: IndexedSeq[TreeInstance[String,String]],
+                  devTrees:   IndexedSeq[TreeInstance[String,String]],
                   unaryReplacer : ChainReplacer[String],
                   config: Params) = {
-    val (words,binary,unary) = GenerativeParser.extractCounts(trainTrees.iterator.map{ case (a,b,c) => (a,b)});
+    val (words,binary,unary) = GenerativeParser.extractCounts(trainTrees);
     val grammar = new GenerativeGrammar(logNormalizeRows(binary),logNormalizeRows(unary));
     val lexicon = new SignatureLexicon(words, EnglishWordClassGenerator, 3);
     val projections = ProjectionIndexer.simple(grammar.index);

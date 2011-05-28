@@ -53,7 +53,7 @@ object DenseTreebank {
     import treebank._;
     write(dos,symbolIndex:Index[String]);
     write(dos,wordIndex:Index[String]);
-    val metadata :Metadata = (sections,testSections,trainSections,devSections);
+    val metadata :Metadata = (sections,test.sections,train.sections,dev.sections);
     write(dos,metadata);
     dos.close();
     zipWriter.close();
@@ -71,6 +71,10 @@ object DenseTreebank {
       val wordIndex = read[Index[String]](metaIn);
       val (sections,testSections,trainSections,devSections) = read[Metadata](metaIn);
       metaIn.close();
+
+      val test = Portion("test",testSections);
+      val dev = Portion("dev",devSections);
+      val train = Portion("train",trainSections);
 
       def treesFromSection(sec: String): Iterator[(Tree[String],Seq[String])] = {
         val iterator = {

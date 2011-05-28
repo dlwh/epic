@@ -291,7 +291,7 @@ object StateSplitting {
       assert(splitWords.total != 0)
       val grammar = new GenerativeGrammar(LogCounters.logNormalizeRows(splitRules), LogCounters.logNormalizeRows(splitUnRules));
       val lexicon = new UnsmoothedLexicon(LogCounters.logNormalizeRows(splitWords));
-      val accum = trees.par.mapReduce ( {case (t,s) =>  expectedCounts(grammar,lexicon,t,s)}, (_:ExpectedCounts[W]) += (_:ExpectedCounts[W]) )
+      val accum = trees.par.mapReduce ( {case TreeInstance(_,t,s,_) =>  expectedCounts[L,W](grammar,lexicon,t,s)}, (_:ExpectedCounts[W]) += (_:ExpectedCounts[W]) )
       val logProb = accum.logProb;
 
       val (finalRules,finalUnaries,finalWords) = accum.decode(grammar);
@@ -319,7 +319,7 @@ object StateSplitting {
       if (l == root) Seq(s) else Seq( (l,state*2),(l,state*2+1));
     }
 
-    val myTrees = trees.map { case (tree,sent) => (tree.map { (_,0) },sent) }
+    val myTrees = trees.map { case TreeInstance(id,tree,sent, _) => TreeInstance(id,tree.map { (_,0) },sent) }
     val SplittingData(binaries,unaries,wordCounts) = data;
 
     val myRuleCounts = PairedDoubleCounter[(L,Int),BinaryRule[(L,Int)]]();
@@ -336,7 +336,7 @@ object StateSplitting {
     val myWordCounts = PairedDoubleCounter[(L,Int),W]();
     for ( (l,word,w) <- wordCounts.triples) {
       myWordCounts( (l,0), word) = w;
-    }
+    };
 
     val splittingData = SplittingData(myRuleCounts, myUnaries, myWordCounts)
     splitGrammar(splittingData,myTrees,split _, nSplits, randomNoise, convergence);
@@ -358,8 +358,8 @@ object StateSplitting {
   case class SplittingData[L,W](binaryRules: PairedDoubleCounter[L,BinaryRule[L]],
                                 unaryRules: PairedDoubleCounter[L,UnaryRule[L]],
                                 tagCounts: PairedDoubleCounter[L,W]);
-  type Treebank[L,W] = IndexedSeq[(BinarizedTree[L],Seq[W])];
-  type SplitTreebank[L,W] = IndexedSeq[(BinarizedTree[Seq[L]],Seq[W])];
+  type Treebank[L,W] = IndexedSeq[TreeInstance[L,W]];
+  type SplitTreebank[L,W] = IndexedSeq[TreeInstance[Seq[L],W]];
 
   def splitGrammar[L,W](initData: SplittingData[L,W],
                       unsplitTrees: Treebank[L,W],
@@ -369,8 +369,8 @@ object StateSplitting {
 
     def splitTree(tree: BinarizedTree[L]):BinarizedTree[Seq[L]] =  tree.map(splitter);
     def resplitTree(tree: BinarizedTree[Seq[L]]):BinarizedTree[Seq[L]] =  tree.map(_ flatMap splitter);
-    def splitHelper(pair: (BinarizedTree[L],Seq[W]), splitFun: BinarizedTree[L]=>BinarizedTree[Seq[L]]) = (
-      (splitFun(pair._1),pair._2)
+    def splitHelper(pair: TreeInstance[L,W], splitFun: BinarizedTree[L]=>BinarizedTree[Seq[L]]) = (
+      TreeInstance(pair.id,splitFun(pair.tree),pair.words)
     );
 
     val initState = (initData,Double.NegativeInfinity, splitTree _)
@@ -388,24 +388,20 @@ object StateSplitting {
 }
 
 object StateSplittingTrainer extends ParserTrainer with NoParams {
-  def trainParser(trainTreesX: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])],
-                  devTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])],
+  def trainParser(trainTrees: IndexedSeq[TreeInstance[String,String]],
+                  devTrees: IndexedSeq[TreeInstance[String,String]],
                   unaryReplacer : ChainReplacer[String],
                   params: Params) = {
 
-    val trainTrees = trainTreesX.map( c => (c._1,c._2));
-
     println("Extracting counts");
-    val (initialLex,initialProductions,initUnR) = (
-      GenerativeParser.extractCounts(trainTrees.iterator )
-      );
+    val (initialLex,initialProductions,initUnR) = GenerativeParser.extractCounts(trainTrees)
 
     val coarseGrammar = new GenerativeGrammar(LogCounters.logNormalizeRows(initialProductions),
       LogCounters.logNormalizeRows(initUnR));
     println("Splitting Grammar");
     import StateSplitting._;
     val data = SplittingData(initialProductions, initUnR, initialLex)
-    for( (SplittingData(finalProd,finalUn,finalLex),logProb) <-  splitGrammar(data,trainTrees.toIndexedSeq,"")) yield {
+    for( (SplittingData(finalProd,finalUn,finalLex),logProb) <-  splitGrammar(data,trainTrees,"")) yield {
       val grammar = new GenerativeGrammar(LogCounters.logNormalizeRows(finalProd),LogCounters.logNormalizeRows(finalUn));
       val lex = new SimpleLexicon(finalLex);
       val builder = CKYChartBuilder(("",0),lex,grammar);

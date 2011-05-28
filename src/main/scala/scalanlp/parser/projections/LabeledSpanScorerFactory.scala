@@ -137,22 +137,16 @@ object ProjectTreebankToLabeledSpans {
   val SPAN_INDEX_NAME = "spanindex.ser"
   def main(args: Array[String]) {
     val parser = loadParser(new File(args(0)));
-    val treebank = DenseTreebank.fromZipFile(new File(args(1)));
+    val treebank = ProcessedTreebank(TreebankParams(new File(args(1))),SpanParams());
     val outDir = new File(args(2));
     outDir.mkdirs();
     val projections = ProjectionIndexer(parser.builder.grammar.index,parser.builder.grammar.index,identity[String])
     val factory = new LabeledSpanScorerFactory[String,String,String](parser.builder.withCharts(ParseChart.viterbi),projections);
     writeObject(parser.builder.grammar.index,new File(outDir,SPAN_INDEX_NAME));
-    writeIterable(mapTrees(factory,transformTrees(treebank.trainTrees),true),new File(outDir,TRAIN_SPANS_NAME))
-    writeIterable(mapTrees(factory,transformTrees(treebank.testTrees),false),new File(outDir,TEST_SPANS_NAME))
-    writeIterable(mapTrees(factory,transformTrees(treebank.devTrees),false),new File(outDir,DEV_SPANS_NAME))
+    writeIterable(mapTrees(factory,treebank.trainTrees,true),new File(outDir,TRAIN_SPANS_NAME))
+    writeIterable(mapTrees(factory,treebank.testTrees,false),new File(outDir,TEST_SPANS_NAME))
+    writeIterable(mapTrees(factory,treebank.devTrees,false),new File(outDir,DEV_SPANS_NAME))
   }
-
-  def transformTrees(trees: Iterator[(Tree[String],Seq[String])]): IndexedSeq[(BinarizedTree[String], scala.Seq[String])] = {
-    ParserTrainer.transformTrees(trees,Stream.continually(SpanScorer.identity), 30000,
-        Trees.xBarBinarize(_:Tree[String]), Trees.Transforms.StandardStringTransform, 0, 0).map{ case (a,b,c) => (a,b)}
-  //    Trees.binarize(_:Tree[String]), Trees.Transforms.StandardStringTransform, 2, 2).map{ case (a,b,c) => (a,b)}
-  };
 
   def loadParser(loc: File) = {
     val oin = new ObjectInputStream(new BufferedInputStream(new FileInputStream(loc)));
@@ -162,9 +156,9 @@ object ProjectTreebankToLabeledSpans {
   }
 
 
-  def mapTrees(factory: LabeledSpanScorerFactory[String,String,String], trees: IndexedSeq[(BinarizedTree[String],Seq[String])], useTree: Boolean) = {
+  def mapTrees(factory: LabeledSpanScorerFactory[String,String,String], trees: IndexedSeq[TreeInstance[String,String]], useTree: Boolean) = {
     // TODO: have ability to use other span scorers.
-    trees.toIndexedSeq.par.map { case (tree,words) =>
+    trees.toIndexedSeq.par.map { case TreeInstance(_,tree,words,_) =>
       println(words);
       try {
         val scorer = if(useTree) factory.mkSpanScorerWithTree(tree,words) else factory.mkSpanScorer(words);

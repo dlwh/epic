@@ -20,7 +20,7 @@ import scalanlp.util._;
  * @author dlwh
  */
 class EPObjective[L,L2,W](featurizers: Seq[Featurizer[L2,W]],
-                          trees: IndexedSeq[(BinarizedTree[L],Seq[W],SpanScorer[L])],
+                          trees: IndexedSeq[TreeInstance[L,W]],
                           indexedProjections: ProjectionIndexer[L,L2],
                           coarseParser: ChartBuilder[LogProbabilityParseChart, L, W],
                           openTags: Set[L2],
@@ -203,7 +203,7 @@ object EPTrainer extends LatentTrainer {
 
   def mkObjective(params: Params,
                   latentFeaturizer: MyFeaturizer,
-                  trainTrees: Seq[(BinarizedTree[String], scala.Seq[String], SpanScorer[String])],
+                  trainTrees: IndexedSeq[TreeInstance[String,String]],
                   indexedProjections: ProjectionIndexer[String, (String, Int)],
                   xbarParser: ChartBuilder[ParseChart.LogProbabilityParseChart, String, String],
                   openTags: Set[(String, Int)],
@@ -213,7 +213,7 @@ object EPTrainer extends LatentTrainer {
     println(trainTrees.length)
 
     new EPObjective(latentFeaturizer,
-      trainTrees.toIndexedSeq,
+      trainTrees,
       indexedProjections,
       xbarParser,
       openTags,

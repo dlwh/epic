@@ -43,10 +43,10 @@ object StructuredTrainer extends ParserTrainer {
                     minDecodeToSmoTimeRatio:Double = 0.0,
                     miniBatchSize: Int = 1);
 
-  def trainParser(trainTrees: Seq[(BinarizedTree[String], Seq[String], SpanScorer[String])],
-                  devTrees: Seq[(BinarizedTree[String], Seq[String], SpanScorer[String])],
+  def trainParser(trainTrees: IndexedSeq[TreeInstance[String,String]],
+                  devTrees: IndexedSeq[TreeInstance[String,String]],
                   unaryReplacer: ChainReplacer[String], params: Params) = {
-    val (initLexicon,initBinaries,initUnaries) = GenerativeParser.extractCounts(trainTrees.iterator.map(tuple => (tuple._1,tuple._2)));
+    val (initLexicon,initBinaries,initUnaries) = GenerativeParser.extractCounts(trainTrees);
 
     val xbarParser = {
       val grammar = new GenerativeGrammar(LogCounters.logNormalizeRows(initBinaries),LogCounters.logNormalizeRows(initUnaries));
@@ -77,10 +77,9 @@ object StructuredTrainer extends ParserTrainer {
     }
 
 
-    val obj = new DiscrimObjective(featurizer, trainTrees.toIndexedSeq, xbarParser, openTags, closedWords);
+    val obj = new DiscrimObjective(featurizer, trainTrees, xbarParser, openTags, closedWords);
     val weights = obj.initialWeightVector;
     val pp = obj.extractMaxParser(weights);
-    println("Basexxx: " + pp.builder.lexicon.tagScores("messages"));
     val model = new ParserLinearModel[ParseChart.LogProbabilityParseChart](projections,devTrees.toIndexedSeq, unaryReplacer, obj);
 
     NSlackSVM.SvmOpts.smoMiniBatch = params.smoMiniBatch;
@@ -88,11 +87,8 @@ object StructuredTrainer extends ParserTrainer {
     NSlackSVM.SvmOpts.minDecodeToSmoTimeRatio = params.minDecodeToSmoTimeRatio;
     NSlackSVM.SvmOpts.miniBatchSize = params.miniBatchSize;
 
-    println(trainTrees.length + " XXX");
-
-
-    val learner = if (params.mira) new MIRA[(BinarizedTree[String],Seq[String],SpanScorer[String])](true,false,params.C) 
-                  else new NSlackSVM[(BinarizedTree[String], Seq[String], SpanScorer[String])](params.C,params.epsilon,10, new NSlackSVM.SvmOpts)
+    val learner = if (params.mira) new MIRA[TreeInstance[String,String]](true,false,params.C)
+                  else new NSlackSVM[TreeInstance[String,String]](params.C,params.epsilon,10, new NSlackSVM.SvmOpts)
     val finalWeights = learner.train(model.denseVectorToCounter(weights),model, trainTrees, params.maxIterations);
     val parser = model.getParser(finalWeights);
 
@@ -103,10 +99,10 @@ object StructuredTrainer extends ParserTrainer {
 
 
   class ParserLinearModel[Chart[X]<:ParseChart[X]](projections: ProjectionIndexer[String,String],
-                                                   devTrees: IndexedSeq[(BinarizedTree[String], Seq[String], SpanScorer[String])],
+                                                   devTrees: IndexedSeq[TreeInstance[String,String]],
                                                    unaryReplacer: ChainReplacer[String],
-                                                   obj: DiscrimObjective[String,String]) extends LossAugmentedLinearModel[(BinarizedTree[String],Seq[String],SpanScorer[String])] {
-    type Datum = (BinarizedTree[String],Seq[String],SpanScorer[String])
+                                                   obj: DiscrimObjective[String,String]) extends LossAugmentedLinearModel[TreeInstance[String,String]] {
+    type Datum = TreeInstance[String,String];
 
     def getParser(weights: CounterInterface[java.lang.Integer]) = {
       val parser = obj.extractMaxParser(weightsToDenseVector(weights));
@@ -133,14 +129,14 @@ object StructuredTrainer extends ParserTrainer {
                                            lossWeight: Double): ju.List[UpdateBundle] = {
       val parser = getParser(weights);
       val logSumBuilder = parser.builder.withCharts(ParseChart.logProb);
-      data.toIndexedSeq.par(16).map { case (goldTree,words,coarseFilter) =>
+      data.toIndexedSeq.par(16).map { case ti@TreeInstance(_,goldTree,words,coarseFilter) =>
         val lossScorer = lossAugmentedScorer(lossWeight,projections,goldTree);
         val scorer = SpanScorer.sum(coarseFilter, lossScorer)
 
 //        val logSumCounts = obj.wordsToExpectedCounts(words,logSumBuilder,coarseFilter);
 
         val guessTree = parser.bestParse(words,scorer);
-        val (goldCounts,_) = treeToExpectedCounts(parser,goldTree,words,SpanScorer.identity);
+        val (goldCounts,_) = treeToExpectedCounts(parser,ti);
 //        val (guessCounts,loss) = treeToExpectedCounts(parser,guessTree,words,unweightedLossScorer);
         val guessCounts = obj.wordsToExpectedCounts(words,logSumBuilder,coarseFilter);
 
@@ -210,9 +206,8 @@ object StructuredTrainer extends ParserTrainer {
   }
 
   def treeToExpectedCounts[L,W](parser: ChartParser[L,L,W],
-                                lt: BinarizedTree[L],
-                                words: Seq[W],
-                                spanScorer: SpanScorer[L]):(ExpectedCounts[W],Double) = {
+                                treeInstance: TreeInstance[L,W]):(ExpectedCounts[W],Double) = {
+    val TreeInstance(_,lt,words,spanScorer) = treeInstance;
     val g = parser.builder.grammar;
     val lexicon = parser.builder.lexicon;
     val expectedCounts = new ExpectedCounts[W](g)

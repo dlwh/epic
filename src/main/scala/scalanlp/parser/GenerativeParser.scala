@@ -35,31 +35,27 @@ import scalala.Scalala.{log=>_};
 
 object GenerativeParser {
 
-  def fromTrees[W](data: Iterable[(BinarizedTree[String],Seq[W])]):ChartParser[String,String,W] = {
-    fromTrees(data.iterator);
-  }
-    
-    
-  def fromTrees[W](data: Iterator[(BinarizedTree[String],Seq[W])]):ChartParser[String,String,W] = {
+  def fromTrees[W](data: Traversable[TreeInstance[String,W]]):ChartParser[String,String,W] = {
     val root = "";
     val (lexicon,grammar) = extractLexiconAndGrammar(data);
     val builder = CKYChartBuilder(root, lexicon, grammar);
     ChartParser(builder);
   }
 
-  def extractLexiconAndGrammar[W](data: Iterator[(BinarizedTree[String],Seq[W])]):(Lexicon[String,W],GenerativeGrammar[String]) = {
+  def extractLexiconAndGrammar[W](data: TraversableOnce[TreeInstance[String,W]]):(Lexicon[String,W],GenerativeGrammar[String]) = {
     val (wordCounts,binaryProductions,unaryProductions) = extractCounts(data);
     val lexicon = new SimpleLexicon(wordCounts);
     (lexicon,new GenerativeGrammar(logNormalizeRows(binaryProductions),logNormalizeRows(unaryProductions)));
   }
 
 
-  def extractCounts[L,W](data: Iterator[(BinarizedTree[L],Seq[W])]) = {
+  def extractCounts[L,W](data: TraversableOnce[TreeInstance[L,W]]) = {
     val lexicon = new PairedDoubleCounter[L,W]();
     val binaryProductions = new PairedDoubleCounter[L,BinaryRule[L]]();
     val unaryProductions = new PairedDoubleCounter[L,UnaryRule[L]]();
 
-    for( (tree,words) <- data) {
+    for( ti <- data) {
+      val TreeInstance(_,tree,words,_) = ti;
       val leaves = tree.leaves map (l => (l,words(l.span.start)));
       tree.allChildren foreach { 
         case t @ BinaryTree(a,bc,cc) => 
@@ -78,48 +74,24 @@ object GenerativeParser {
 }
 
 object GenerativeTrainer extends ParserTrainer with NoParams {
-  def trainParser(trainTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])],
-                  devTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])],
+  def trainParser(trainTrees: IndexedSeq[TreeInstance[String,String]],
+                  devTrees: IndexedSeq[TreeInstance[String,String]],
                   unaryReplacer : ChainReplacer[String],
                   config: Params) = {
-    val parser = GenerativeParser.fromTrees(trainTrees.view.map(c => (c._1,c._2)));
+    val parser = GenerativeParser.fromTrees(trainTrees);
     Iterator.single(("Gen",parser));
   }
 }
 
 object SigTrainer extends ParserTrainer with NoParams {
-  def trainParser(trainTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])],
-                  devTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])],
+  def trainParser(trainTrees: IndexedSeq[TreeInstance[String,String]],
+                  devTrees: IndexedSeq[TreeInstance[String,String]],
                   unaryReplacer : ChainReplacer[String],
                   config: Params) = {
-    val (words,binary,unary) = GenerativeParser.extractCounts(trainTrees.iterator.map{ case (a,b,c) => (a,b)});
+    val (words,binary,unary) = GenerativeParser.extractCounts(trainTrees);
     val grammar = new GenerativeGrammar(logNormalizeRows(binary),logNormalizeRows(unary));
     val lexicon = new SignatureLexicon(words, EnglishWordClassGenerator, 5);
     val parser = ChartParser(CKYChartBuilder("",lexicon,grammar));
     Iterator.single(("Gen",parser));
-  }
-}
-
-object GenerativeInterpreter {
-  import java.io.File;
-  def main(args: Array[String]) {
-    val treebank = Treebank.fromPennTreebankDir(new File(args(0)));
-    val xform = Trees.Transforms.StandardStringTransform;
-    val trees = for( (tree,words) <- treebank.trainTrees)
-      yield (Trees.binarize(xform(tree)),words map (_.intern));
-    val parser = GenerativeParser.fromTrees(trees);
-    while(true) {
-      print("Ready> ");
-      val line = readLine();
-      if(line.trim == "quit") System.exit(1);
-      val words = PTBTokenizer().apply(line.trim);
-      println(words.mkString(","));
-      try {
-        val parse = parser(words.toSeq);
-        println(Trees.debinarize(parse) render words.toSeq);
-      } catch {
-        case e => e.printStackTrace();
-      }
-    }
   }
 }

@@ -105,23 +105,16 @@ object ProjectTreebankToVarGrammar {
   def main(args: Array[String]) {
     val parser = loadParser(new File(args(0)));
     val coarseParser = ProjectTreebankToLabeledSpans.loadParser(new File(args(1)));
-    val treebank = DenseTreebank.fromZipFile(new File(args(2)));
-    val (inTrain,inDev,inTest) = ProjectTreebankToLabeledSpans.loadSpans(new File(args(3)));
+    val treebank = ProcessedTreebank(TreebankParams(new File(args(1))),SpanParams(new File(args(3))));
     val outDir = new File(args(4));
     outDir.mkdirs();
     val projections = ProjectionIndexer[String,(String,Int)](coarseParser.builder.grammar.index,parser.builder.grammar.index,_._1);
     val factory = new AnchoredRuleScorerFactory[String,(String,Int),String](parser.builder.withCharts(ParseChart.logProb),projections, -100);
     writeObject(parser.builder.grammar.index,new File(outDir,SPAN_INDEX_NAME));
-    writeIterable(mapTrees(factory,transformTrees(treebank.trainTrees, inTrain),true),new File(outDir,TRAIN_SPANS_NAME))
-    writeIterable(mapTrees(factory,transformTrees(treebank.testTrees, inDev),false),new File(outDir,TEST_SPANS_NAME))
-    writeIterable(mapTrees(factory,transformTrees(treebank.devTrees, inTest),false),new File(outDir,DEV_SPANS_NAME))
+    writeIterable(mapTrees(factory,treebank.trainTrees,true),new File(outDir,TRAIN_SPANS_NAME))
+    writeIterable(mapTrees(factory,treebank.testTrees,false),new File(outDir,TEST_SPANS_NAME))
+    writeIterable(mapTrees(factory,treebank.devTrees,false),new File(outDir,DEV_SPANS_NAME))
   }
-
-  def transformTrees(trees: Iterator[(Tree[String],Seq[String])], spanScorers: Iterable[SpanScorer[String]]): IndexedSeq[(BinarizedTree[String], scala.Seq[String], SpanScorer[String])] = {
-    ParserTrainer.transformTrees(trees,spanScorers, 30000,
-        Trees.xBarBinarize(_:Tree[String]), Trees.Transforms.StandardStringTransform, 0, 0)
-  //    Trees.binarize(_:Tree[String]), Trees.Transforms.StandardStringTransform, 2, 2).map{ case (a,b,c) => (a,b)}
-  };
 
   def loadParser(loc: File) = {
     val oin = new ObjectInputStream(new BufferedInputStream(new FileInputStream(loc)));
@@ -131,9 +124,9 @@ object ProjectTreebankToVarGrammar {
   }
 
 
-  def mapTrees(factory: AnchoredRuleScorerFactory[String,(String,Int),String], trees: IndexedSeq[(BinarizedTree[String],Seq[String], SpanScorer[String])], useTree: Boolean) = {
+  def mapTrees(factory: AnchoredRuleScorerFactory[String,(String,Int),String], trees: IndexedSeq[TreeInstance[String,String]], useTree: Boolean) = {
     // TODO: have ability to use other span scorers.
-    trees.toIndexedSeq.par.map { case (tree,words, scorer) =>
+    trees.toIndexedSeq.par.map { case TreeInstance(_,tree,words, scorer) =>
       println(words);
       try {
         val proj: ProjectingSpanScorer[String, (String, Int)] = new ProjectingSpanScorer(factory.indexedProjections,scorer,true);

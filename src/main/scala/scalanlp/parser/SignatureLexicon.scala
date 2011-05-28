@@ -89,7 +89,7 @@ object EnglishWordClassGenerator extends SignatureGenerator[String] {
   def signatureFor(word: String) = {
     val sb = new StringBuilder;
     val wlen = word.length();
-    val numCaps = (word:Seq[Char]).count(_.isUpperCase);
+    val numCaps = (word:Seq[Char]).count(_.isUpper);
     val hasDigit = word.exists(_.isDigit);
     val hasDash = word.contains('-');
     val hasLower = numCaps < wlen;

@@ -22,27 +22,20 @@ class GoldTagScorer[L](tags: Seq[Int], wrongTag: Double=Double.NegativeInfinity)
 }
 
 object GoldTagExperiment {
-  import ParserTrainer._;
   def main(args: Array[String]) {
     val config = Configuration.fromPropertiesFiles(args.map(new File(_)));
-    val params = config.readIn[ParserTrainerParams]("treebank");
+    val params = config.readIn[ProcessedTreebank]("treebank");
     val parserFile = config.readIn[File]("parser.test");
+    import params._;
 
-    import params.treebank._;
-    import params.spans._;
-
-    val trainTreesWithUnaries = transformTrees(treebank.trainTrees, trainSpans, maxLength, binarize, xform, 0, 0);
-    val (trainTrees,replacer) = removeUnaryChains(trainTreesWithUnaries);
 
     val parser = readObject[ChartParser[String,_,String]](parserFile);
 
-    val testTrees = transformTrees(treebank.testTrees, testSpans, maxLength, binarize, xform, 0, 0 )
-
-    val goldenTrees = for ( (tree,words,span) <- testTrees) yield {
-      (tree,words,SpanScorer.sum(new GoldTagScorer(getTags(parser.projections.coarseIndex, tree), -90),span))
+    val goldenTrees = for ( TreeInstance(id,tree,words,span) <- testTrees) yield {
+      TreeInstance("gold-"+id,tree,words,SpanScorer.sum(new GoldTagScorer(getTags(parser.projections.coarseIndex, tree), -90),span))
     };
 
-    evalParser(goldenTrees,parser,"test",replacer);
+    evalParser(goldenTrees,parser,"gold-test",replacer);
   }
 
   def getTags[L](index: Index[L], tree: Tree[L]) = {
@@ -50,7 +43,7 @@ object GoldTagExperiment {
     tags
   }
 
-  protected def evalParser(testTrees: IndexedSeq[(Tree[String],Seq[String],SpanScorer[String])],
+  protected def evalParser(testTrees: IndexedSeq[TreeInstance[String,String]],
           parser: Parser[String,String], name: String, chainReplacer: ChainReplacer[String]) = {
     println("Evaluating Parser...");
     val stats = ParseEval.evaluateAndLog(testTrees,parser,name,chainReplacer);

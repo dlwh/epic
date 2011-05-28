@@ -4,13 +4,15 @@ import java.io.File
 
 class SubsampledTreebank(base: Treebank, numTrain: Int, numDev:Int, numTest: Int) extends Treebank {
   def sections = Seq("train","test","dev");
-  def trainSections: Seq[String] = Seq("train");
-  def testSections = Seq("test");
-  def devSections = Seq("dev");
+
+  val test = new Portion("test",Seq("test"));
+  val dev = new Portion("dev",Seq("dev"));
+  val train = new Portion("train",Seq("train"));
+
   def treesFromSection(sec: String) = sec match {
-    case "train" => downSample(base.trainTrees,numTrain);
-    case "test" => downSample(base.testTrees,numTest);
-    case "dev" => downSample(base.devTrees,numDev);
+    case "train" => downSample(base.train.trees,numTrain);
+    case "test" => downSample(base.test.trees,numTest);
+    case "dev" => downSample(base.dev.trees,numDev);
     case _ => error("unknown section: " + sec);
   }
 

@@ -16,20 +16,20 @@ package scalanlp.trees;
 */
 
 
-import java.io.File;
+import java.io.File
 
-trait Treebank {
+trait Treebank { outer =>
+
+  case class Portion(name: String, sections: Seq[String]) {
+    def trees = treesFromSections(sections);
+  }
+
+  val train: Portion
+  val test: Portion
+  val dev: Portion
+  val all:Portion = Portion("all",sections)
+
   def sections: Seq[String];
-
-  def trainSections: Seq[String];
-  def trainTrees = treesFromSections(trainSections);
-
-  def devSections: Seq[String];
-
-  def devTrees = treesFromSections(devSections);
-
-  def testSections: Seq[String];
-  def testTrees = treesFromSections(testSections);
 
   def treesFromSection(sec: String): Iterator[(Tree[String],Seq[String])];
   def treesFromSections(secs: Seq[String]) = {
@@ -42,8 +42,8 @@ trait Treebank {
           
 }
 
-
 object Treebank {
+
   import scala.io.Source;
   /**
   * Reads a treebank from the "mrg/wsj" section
@@ -51,9 +51,12 @@ object Treebank {
   */
   def fromPennTreebankDir(dir: File) = new Treebank {
     def sections = dir.listFiles.filter(_.isDirectory).map(_.getName);
-    val trainSections = Seq.range(2,10).map("0" + _) ++ Seq.range(10,22).map(""+_)
-    val devSections = List("22");
-    val testSections = List("23");
+    val train = Portion("train", Seq.range(2,10).map("0" + _) ++ Seq.range(10,22).map(""+_));
+
+    val test = Portion("test",Seq("23"));
+
+    val dev = Portion("dev",Seq("22"));
+
     def treesFromSection(sec: String) = {
       val pennReader = new PennTreeReader();
       for(file <- new File(dir,sec).listFiles.iterator;
@@ -62,18 +65,9 @@ object Treebank {
     }
   }
 
-  def fromGermanTreebank(dir: File):Treebank = new Treebank {
-    def sections = List("negra_1.mrg","negra_2.mrg","negra_3.mrg");
-    def trainSections = sections.slice(0,1);
-    def devSections = sections.slice(1,2);
-    def testSections = sections.slice(2,3);
-
-    def treesFromSection(sec: String) = {
-      val file = new File(dir,sec);
-      val pennReader = PennTreeReader.forGerman;
-      import scala.io.Codec.ISO8859;
-      for(tree <- pennReader.readTrees(Source.fromFile(file)(ISO8859).mkString("")).fold( x=>x, x => error("error in " + file + " " + x.toString)).iterator)
-        yield tree;
-    }
+  def fromGermanTreebank(dir: File):Treebank = {
+    import scala.io.Codec.ISO8859
+    implicit val cod = ISO8859;
+    new SimpleTreebank(new File(dir + "/negra_1.mrg"),new File(dir + "/negra_2.mrg"),new File(dir + "/negra_3.mrg"))
   }
 }

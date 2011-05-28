@@ -23,7 +23,7 @@ import java.io._;
  * @author dlwh
  */
 class DiscrimObjective[L,W](feat: Featurizer[L,W],
-                            trees: IndexedSeq[(BinarizedTree[L],Seq[W],SpanScorer[L])],
+                            trees: IndexedSeq[TreeInstance[L,W]],
                             coarseParser: ChartBuilder[LogProbabilityParseChart, L, W],
                             openTags: Set[L],
                             closedWords: Set[W])
@@ -73,12 +73,12 @@ object DiscriminativeTrainer extends ParserTrainer {
 
 
 
-  override def trainParser(trainTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])],
-                           devTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])],
-                           unaryReplacer : ChainReplacer[String],
-                           params: Params): Iterator[(String, ChartParser[String, String, String])] = {
+  def trainParser(trainTrees: IndexedSeq[TreeInstance[String,String]],
+                  devTrees: IndexedSeq[TreeInstance[String,String]],
+                  unaryReplacer : ChainReplacer[String],
+                  params: Params): Iterator[(String, ChartParser[String, String, String])] = {
 
-    val (initLexicon,initBinaries,initUnaries) = GenerativeParser.extractCounts(trainTrees.iterator.map(tuple => (tuple._1,tuple._2)));
+    val (initLexicon,initBinaries,initUnaries) = GenerativeParser.extractCounts(trainTrees);
 
     val xbarParser = params.parser.optParser getOrElse {
       val grammar = new GenerativeGrammar(LogCounters.logNormalizeRows(initBinaries),LogCounters.logNormalizeRows(initUnaries));
@@ -121,4 +121,3 @@ object DiscriminativeTrainer extends ParserTrainer {
 
   }
 }
-

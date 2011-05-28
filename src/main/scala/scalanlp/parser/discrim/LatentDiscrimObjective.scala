@@ -24,7 +24,7 @@ import scalanlp.util._;
  * @author dlwh
  */
 class LatentDiscrimObjective[L,L2,W](featurizer: Featurizer[L2,W],
-                            trees: IndexedSeq[(BinarizedTree[L],Seq[W],SpanScorer[L])],
+                            trees: IndexedSeq[TreeInstance[L,W]],
                             indexedProjections: ProjectionIndexer[L,L2],
                             coarseParser: ChartBuilder[LogProbabilityParseChart, L, W],
                             openTags: Set[L2],
@@ -158,7 +158,7 @@ trait LatentTrainer extends ParserTrainer {
   def quickEval(obj: AbstractDiscriminativeObjective[String,(String,Int),String],
                 indexedProjections: ProjectionIndexer[String,(String,Int)],
                 unaryReplacer : ChainReplacer[String],
-                devTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])], weights: DenseVector) {
+                devTrees: Seq[TreeInstance[String,String]], weights: DenseVector) {
     println("Validating...");
     val parser = obj.extractParser(weights);
     val fixedTrees = devTrees.take(400).toIndexedSeq;
@@ -169,18 +169,18 @@ trait LatentTrainer extends ParserTrainer {
 
   def mkObjective(params: Params,
                   latentFeaturizer: MyFeaturizer,
-                  trainTrees: Seq[(BinarizedTree[String], scala.Seq[String], SpanScorer[String])],
+                  trainTrees: IndexedSeq[TreeInstance[String,String]],
                   indexedProjections: ProjectionIndexer[String, (String, Int)],
                   xbarParser: ChartBuilder[ParseChart.LogProbabilityParseChart, String, String],
                   openTags: Set[(String, Int)],
                   closedWords: Set[String]): MyObjective;
 
-  def trainParser(trainTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])],
-                  devTrees: Seq[(BinarizedTree[String],Seq[String],SpanScorer[String])],
+  def trainParser(trainTrees: IndexedSeq[TreeInstance[String,String]],
+                  devTrees: IndexedSeq[TreeInstance[String,String]],
                   unaryReplacer : ChainReplacer[String],
                   params: Params) = {
 
-    val (initLexicon,initBinaries,initUnaries) = GenerativeParser.extractCounts(trainTrees.iterator.map(tuple => (tuple._1,tuple._2)));
+    val (initLexicon,initBinaries,initUnaries) = GenerativeParser.extractCounts(trainTrees);
     import params._;
     println("NumStates: " + params.numStates);
 
@@ -275,15 +275,15 @@ object StochasticLatentTrainer extends LatentTrainer {
     }
   }
 
-  def mkObjective(params: Params,
+  override def mkObjective(params: Params,
                   latentFeaturizer: Featurizer[(String, Int), String],
-                  trainTrees: Seq[(BinarizedTree[String], scala.Seq[String], SpanScorer[String])],
+                  trainTrees: IndexedSeq[TreeInstance[String,String]],
                   indexedProjections: ProjectionIndexer[String, (String, Int)],
                   xbarParser: ChartBuilder[ParseChart.LogProbabilityParseChart, String, String],
                   openTags: Set[(String, Int)],
                   closedWords: Set[String]) = {
     val r = new LatentDiscrimObjective(latentFeaturizer,
-      trainTrees.toIndexedSeq,
+      trainTrees,
       indexedProjections,
       xbarParser,
       openTags,

@@ -97,14 +97,14 @@ object ParseEval {
   type PostParseFn = (Tree[String],Tree[String],Seq[String],Statistics,Int)=>Unit;
   val noPostParseFn = (_:Tree[String],_:Tree[String],_:Seq[String],_:Statistics,_:Int)=>()
 
-  def evaluate(trees: IndexedSeq[(Tree[String],Seq[String],SpanScorer[String])],
+  def evaluate(trees: IndexedSeq[TreeInstance[String,String]],
                parser: Parser[String,String], chainReplacer: ChainReplacer[String],
                postEval: PostParseFn = noPostParseFn) = {
 
     val peval = new ParseEval(Set("","''", "``", ".", ":", ","));
 
-    def evalSentence(sent: (Tree[String],Seq[String],SpanScorer[String])) = try {
-      val (goldTree,words,scorer) = sent;
+    def evalSentence(sent: TreeInstance[String,String]) = try {
+      val TreeInstance(id,goldTree,words,scorer) = sent;
       val startTime = System.currentTimeMillis;
       val guessTree = Trees.debinarize(chainReplacer.replaceUnaries(Trees.deannotate(parser.bestParse(words,scorer))));
       val deBgold = Trees.debinarize(Trees.deannotate(goldTree));
@@ -114,14 +114,14 @@ object ParseEval {
       stats;
     } catch {
       case e:RuntimeException => e.printStackTrace();
-      Statistics(0, peval.labeledConstituents(sent._1).size, 0, 0, 0, sent._2.length, 1);
+      Statistics(0, peval.labeledConstituents(sent.tree).size, 0, 0, 0, sent.words.length, 1);
     }
     val stats = trees.par.withSequentialThreshold(100).mapReduce({ evalSentence _ },{ (_:Statistics) + (_:Statistics)});
 
     stats
   }
 
-  def evaluateAndLog(trees: IndexedSeq[(Tree[String],Seq[String],SpanScorer[String])],
+  def evaluateAndLog(trees: IndexedSeq[TreeInstance[String,String]],
                      parser: Parser[String,String], evalDir: String, chainReplacer: ChainReplacer[String]) = {
 
     val parsedir = new File(evalDir);
@@ -161,6 +161,7 @@ object ParseEval {
   }
 }
 
+/*
 object ParserTester {
   import ParserTrainer._;
   def main(args: Array[String]) {
@@ -181,7 +182,7 @@ object ParserTester {
     evalParser(testTrees,parser,"test",replacer);
   }
 
-  protected def evalParser(testTrees: IndexedSeq[(Tree[String],Seq[String],SpanScorer[String])],
+  protected def evalParser(testTrees:
           parser: Parser[String,String], name: String, chainReplacer: ChainReplacer[String]) = {
     println("Evaluating Parser...");
     val stats = ParseEval.evaluateAndLog(testTrees,parser,name,chainReplacer);
@@ -191,3 +192,4 @@ object ParserTester {
     f1
   }
 }
+*/

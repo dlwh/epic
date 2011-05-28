@@ -9,8 +9,17 @@ import scalanlp.util.{CachedHashCode, Encoder, Index}
 import collection.mutable.ArrayBuffer
 
 import projections._;
-import bitvector.BitUtils;
 import scalanlp.trees._;
+
+object BitStuff {
+  sealed class LabelOfBit(val index: Int);
+  case object Parent extends LabelOfBit(0);
+  case object LChild extends LabelOfBit(1);
+  case object RChild extends LabelOfBit(2);
+  case object UChild extends LabelOfBit(3);
+  val bitLabels = Seq(Parent,LChild,RChild,UChild);
+}
+import BitStuff._;
 
 
 @serializable
@@ -38,7 +47,6 @@ case class WeightedFeature(kind: Symbol) extends Feature[Nothing,Nothing] with C
 case class LexicalFeature[L,W](l: L, w: W) extends Feature[L,W] with CachedHashCode;
 case class SubstateFeature[L,W](f: Feature[L,W], states: Seq[Int]) extends Feature[(L,Int),W] with CachedHashCode;
 
-import bitvector.LogisticBitVector._;
 case class BitFeature(lbl: LabelOfBit, index: Int, toggled: Int) extends Feature[Nothing,Nothing] with CachedHashCode;
 case class SequenceFeature[L,W](f: Seq[Feature[L,W]]) extends Feature[L,W] with CachedHashCode;
 case class PairFeature[L,W](f: Feature[L,W], f2: Feature[L,W]) extends Feature[(L,Int),W] with CachedHashCode;

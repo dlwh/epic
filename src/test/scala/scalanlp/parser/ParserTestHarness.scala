@@ -13,8 +13,8 @@ trait ParserTestHarness {
     val treebank = {
       TstTreebank.treebank;
     }
-    val trees = massageTrees(treebank.trainTrees,binarization,maxLength);
-    (new UnaryChainRemover[String]).removeUnaryChains(trees.iterator);
+    val trees = massageTrees(treebank.train.trees,binarization,maxLength);
+    removeUnaryChains(trees);
   }
 
   def getTestTrees(binarization:(Tree[String]=>BinarizedTree[String]) = (Trees.xBarBinarize(_:Tree[String],false)),
@@ -22,7 +22,19 @@ trait ParserTestHarness {
     val treebank = {
       TstTreebank.treebank;
     }
-    massageTrees(treebank.testTrees,binarization,maxLength);
+    massageTrees(treebank.test.trees,binarization,maxLength);
+  }
+
+  def removeUnaryChains(trees: IndexedSeq[TreeInstance[String,String]]) = {
+    val chainRemover = new UnaryChainRemover[String];
+
+    val (dechained,chainReplacer) = chainRemover.removeUnaryChains(trees.iterator.map { ti => (ti.tree,ti.words)})
+
+    val dechainedWithSpans = for {
+      ((t,w),TreeInstance(id,_,_,span)) <- (dechained zip trees)
+    } yield TreeInstance(id,t,w,span);
+
+    (dechainedWithSpans, chainReplacer)
   }
 
   def massageTrees(trees: Iterator[(Tree[String],Seq[String])],
@@ -30,14 +42,14 @@ trait ParserTestHarness {
                    maxLength:Int=15) = {
     val xform = Trees.Transforms.StandardStringTransform;
     val trainTrees = ArrayBuffer() ++= (for( (tree,words) <- trees.filter(_._2.length <= maxLength))
-    yield (binarize(xform(tree)),words));
+    yield TreeInstance("",binarize(xform(tree)),words));
 
     trainTrees
   }
 
 
-  def evalParser(testTrees: IndexedSeq[(Tree[String],Seq[String])],parser: Parser[String,String]) = {
-    ParseEval.evaluate(testTrees.map { case (t,w) => (t,w,SpanScorer.identity[String])},parser, ParserTestHarness.unaryReplacer);
+  def evalParser(testTrees: IndexedSeq[TreeInstance[String,String]],parser: Parser[String,String]) = {
+    ParseEval.evaluate(testTrees,parser, ParserTestHarness.unaryReplacer);
   }
 
 

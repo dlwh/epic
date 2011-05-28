@@ -19,7 +19,7 @@ import Log._;
 
 
 abstract class AbstractDiscriminativeObjective[L,L2,W](
-  trees: IndexedSeq[(BinarizedTree[L],Seq[W],SpanScorer[L])],
+  trees: IndexedSeq[TreeInstance[L,W]],
   val indexedProjections: ProjectionIndexer[L,L2],
   openTags: Set[L2],
   closedWords: Set[W]) extends BatchDiffFunction[Int,DenseVector] with Logged {
@@ -47,7 +47,7 @@ abstract class AbstractDiscriminativeObjective[L,L2,W](
       val startTime = System.currentTimeMillis();
       val ecounts = trees.par.mapReduce({ treeWordsScorer =>
         val localIn = System.currentTimeMillis();
-        val (tree,words,spanScorer) = treeWordsScorer;
+        val TreeInstance(_,tree,words,spanScorer) = treeWordsScorer;
         try {
           expectedCounts(parser,tree,words,spanScorer)
         } catch {
