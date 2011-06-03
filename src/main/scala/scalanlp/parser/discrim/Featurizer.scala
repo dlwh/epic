@@ -303,7 +303,7 @@ class SlavPlusFeaturizer[L,W](base: Featurizer[L,W], numStates:Int) extends Feat
   }
 }
 
-class BitVectorFeaturizer[L,W](base: Featurizer[L,W], numStates: Int, arity: Int = 2) extends Featurizer[(L,Int),W] {
+class BitVectorFeaturizer[L,W](base: Featurizer[L,W], numStates: Int, arity: Int = 1) extends Featurizer[(L,Int),W] {
   val numBits = BitUtils.roundToNextPowerOfTwo(numStates);
   private def mkBitStati(numBits: Int, lbl: LabelOfBit, state: Int) = {
     for( (bit,toggled) <- BitUtils.iterateBits(state,numBits)) yield {

@@ -60,7 +60,7 @@ class LabeledSpanScorerFactory[C,L,W](parser: ChartBuilder[ParseChart,L,W],
   case class BlarghException(l :L , w: Int) extends Exception;
 
   def goldLabels(length: Int, tree: BinarizedTree[C]) = {
-    val result = TriangularArray.raw(length,collection.mutable.BitSet());
+    val result = TriangularArray.raw(length+1,collection.mutable.BitSet());
     if(tree != null) {
       for( t <- tree.allChildren if !t.isInstanceOf[UnaryTree[L]]) {
         try {

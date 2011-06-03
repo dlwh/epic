@@ -193,3 +193,29 @@ object ParserTester {
   }
 }
 */
+
+trait ParserTester {
+  def main(args: Array[String]) {
+    val config = Configuration.fromPropertiesFiles(args.map{new File(_)});
+    val params = config.readIn[ProcessedTreebank]("parser");
+    import params._;
+    val parserFile = config.readIn[File]("parser.test");
+    println("Evaluating Parser...");
+    println(params);
+    val parser = readObject[Parser[String,String]](parserFile);
+
+
+    println("Evaluating Parser...");
+    val stats = evalParser(testTrees,parser,"Test",replacer);
+    import stats._;
+    println("Eval finished. Results:");
+    println( "P: " + precision + " R:" + recall + " F1: " + f1 +  " Ex:" + exact + " Tag Accuracy: " + tagAccuracy);
+  }
+
+  def evalParser(testTrees: IndexedSeq[TreeInstance[String,String]],
+          parser: Parser[String,String], name: String, chainReplacer: ChainReplacer[String]):ParseEval.Statistics = {
+    val stats = ParseEval.evaluateAndLog(testTrees,parser,name,chainReplacer);
+    stats
+  }
+
+}

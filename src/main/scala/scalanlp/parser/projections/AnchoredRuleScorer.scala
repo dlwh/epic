@@ -6,8 +6,10 @@ import scalala.tensor.sparse.SparseVector
 import scalanlp.trees.{Trees, BinarizedTree, Tree, DenseTreebank}
 import scalanlp.io.FileIterable
 import java.io._
-import scalanlp.util.Index
-import scalanlp.concurrent.ParallelOps._;
+import scalanlp.concurrent.ParallelOps._
+import actors.Actor
+import scalanlp.util.{HeapDump, Index}
+;
 
 
 /**
@@ -103,13 +105,27 @@ object ProjectTreebankToVarGrammar {
   val TEST_SPANS_NAME = "test.spans.ser"
   val SPAN_INDEX_NAME = "spanindex.ser"
   def main(args: Array[String]) {
+    Actor.actor {
+      def memoryString = {
+        val r = Runtime.getRuntime;
+        val free = r.freeMemory / (1024 * 1024);
+        val total = r.totalMemory / (1024 * 1024);
+        ((total - free) + "M used; " + free  + "M free; " + total  + "M total");
+      }
+      Actor.loop {
+        Thread.sleep(60 * 1000);
+//        HeapDump.dumpHeap("heap.dump");
+        println(memoryString);
+      }
+
+    }
     val parser = loadParser(new File(args(0)));
     val coarseParser = ProjectTreebankToLabeledSpans.loadParser(new File(args(1)));
-    val treebank = ProcessedTreebank(TreebankParams(new File(args(1))),SpanParams(new File(args(3))));
+    val treebank = ProcessedTreebank(TreebankParams(new File(args(2)),maxLength=10000),SpanParams(new File(args(3))));
     val outDir = new File(args(4));
     outDir.mkdirs();
     val projections = ProjectionIndexer[String,(String,Int)](coarseParser.builder.grammar.index,parser.builder.grammar.index,_._1);
-    val factory = new AnchoredRuleScorerFactory[String,(String,Int),String](parser.builder.withCharts(ParseChart.logProb),projections, -100);
+    val factory = new AnchoredRuleScorerFactory[String,(String,Int),String](parser.builder.withCharts(ParseChart.logProb),projections, -5);
     writeObject(parser.builder.grammar.index,new File(outDir,SPAN_INDEX_NAME));
     writeIterable(mapTrees(factory,treebank.trainTrees,true),new File(outDir,TRAIN_SPANS_NAME))
     writeIterable(mapTrees(factory,treebank.testTrees,false),new File(outDir,TEST_SPANS_NAME))
@@ -130,8 +146,8 @@ object ProjectTreebankToVarGrammar {
       println(words);
       try {
         val proj: ProjectingSpanScorer[String, (String, Int)] = new ProjectingSpanScorer(factory.indexedProjections,scorer,true);
-        val res = factory.mkSpanScorer(words,proj)
-        res;
+        val newScorer = factory.mkSpanScorer(words,proj)
+        CompressedScorer.fromScorer(newScorer,words.length,factory.indexedProjections.coarseIndex.size);
       } catch {
         case e: Exception => e.printStackTrace(); SpanScorer.identity;
       }

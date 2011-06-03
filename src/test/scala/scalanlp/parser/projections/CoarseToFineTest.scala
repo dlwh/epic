@@ -17,7 +17,7 @@ class CoarseToFineTest extends ParserTestHarness with FunSuite {
     val (trainTrees,replacer)= getTrainTreesAndReplacer();
     def proj(label: String) =  if(label == "" ) label else "X";
     val coarseTrees = for {
-      TreeInstance(id,tree,words,_) <- trainTrees
+      TreeInstance(id,tree,words, _ ) <- trainTrees
     } yield TreeInstance(id, tree map proj, words);
 
     val coarse = GenerativeParser.fromTrees(coarseTrees);
