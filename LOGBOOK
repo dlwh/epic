@@ -1,0 +1,77 @@
+5/13/2011:
+
+EP Versus Product:
+
+Len 15, 2 2-state grammars:
+1 Parser, viterbi: 85.1 (XXX check)
+1 Parser, max rule: 85.7 (XXX hceck)
+2 Parsers f0 viterbi: 86.0
+2 Parsers, EP, max variational on last parser: 86.1 (XXX check)
+2 Parsers, EP, max rule on last parser: 86.2
+2 Parsers, Product, max variational: 86.3
+2 Parserse, EP, max label on f0: 86.4
+2 parsers, EP, max label, trained starting from good initialization: 86.5
+2 Parsers, Product, max rule: 86.7
+
+
+
+1/14/11:
+
+4 state Stochastic discrim: 69 F1
+
+seems low?
+
+1/18/11:
+
+Slav 3 splits, len 15: ~89F1
+len 40: 87F1 (WTF)
+
+
+
+1/23/11:
+Len States F1
+40   1    59.88  
+40   2    67.22
+40   4    71.97
+
+
+
+15   1    75.44
+15   2    89.76
+15   4    82.5
+
+1/25/11
+40   2    72.18
+
+Generative New RIGHT binarization: 64.75
+Same with left.
+
+
+1/28/11:
+Lexicons:
+Type: IncB:  F1:   Tag Accuracy:
+Old   10     60.5     93.2
+Unk1  10     60.5     93.2
+Unk2  10     60.2     92.5
+Unk3  10     59.9     92.1
+Unk1   5     60.5     93.3
+Unk1   2     60.6     93.3
+Unk1   2     60.7     93.4
+
+
+2/2/11:
+current GenerativeTrainer
+real    2m49.098s
+user    8m7.350s
+sys     0m14.754s
+
+current SigTrainer:
+real    2m53.907s
+user    8m22.004s
+sys     0m15.053s
+
+post while loop:
+real    2m8.360s
+user    5m58.861s
+sys     0m11.705s
+
