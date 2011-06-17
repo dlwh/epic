@@ -91,7 +91,7 @@ object SigTrainer extends ParserTrainer with NoParams {
     val (words,binary,unary) = GenerativeParser.extractCounts(trainTrees);
     val grammar = new GenerativeGrammar(logNormalizeRows(binary),logNormalizeRows(unary));
     val lexicon = new SignatureLexicon(words, EnglishWordClassGenerator, 5);
-    val parser = ChartParser(CKYChartBuilder("",lexicon,grammar));
+    val parser = ChartParser(CKYChartBuilder("",lexicon,grammar).withCharts(ParseChart.logProb));
     Iterator.single(("Gen",parser));
   }
 }
