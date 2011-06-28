@@ -2,13 +2,13 @@ package scalanlp.parser
 package projections
 
 import scalanlp.collection.mutable.TriangularArray
-import scalala.tensor.sparse.SparseVector
 import scalanlp.trees.{Trees, BinarizedTree, Tree, DenseTreebank}
 import scalanlp.io.FileIterable
 import java.io._
-import scalanlp.concurrent.ParallelOps._
 import actors.Actor
 import scalanlp.util.{HeapDump, Index}
+import scalanlp.tensor.sparse.OldSparseVector
+import collection.parallel.immutable.ParSeq
 ;
 
 
@@ -42,8 +42,7 @@ class AnchoredRulePosteriorScorerFactory[C,L,W](parser: ChartBuilder[ParseChart.
 
   type MyScorer = AnchoredRuleScorer[C];
   protected def createSpanScorer(ruleData: AnchoredRuleProjector.AnchoredData, sentProb: Double) = {
-    val zeroSparseVector = new SparseVector(indexedProjections.coarseIndex.size, 0);
-    zeroSparseVector.default = 0.0;
+    val zeroSparseVector = new OldSparseVector(indexedProjections.coarseIndex.size, 0., 0);
     val logTotals = TriangularArray.raw(ruleData.lexicalScores.length+1,zeroSparseVector);
     val AnchoredRuleProjector.AnchoredData(lexicalScores,unaryScores, _, binaryScores, _) = ruleData;
     new AnchoredRuleScorer(lexicalScores, unaryScores, binaryScores, logTotals, logTotals);
@@ -54,14 +53,14 @@ class AnchoredRulePosteriorScorerFactory[C,L,W](parser: ChartBuilder[ParseChart.
 
 @serializable
 @SerialVersionUID(2)
-class AnchoredRuleScorer[L](lexicalScores: Array[SparseVector], // begin -> label -> score
+class AnchoredRuleScorer[L](lexicalScores: Array[OldSparseVector], // begin -> label -> score
                          // (begin,end) -> parent -> child -> score
-                         unaryScores: Array[Array[SparseVector]],
+                         unaryScores: Array[Array[OldSparseVector]],
                          // (begin,end) -> (split-begin) -> parent -> lchild -> rchild -> score
                          // so many arrays.
-                         binaryScores: Array[Array[Array[Array[SparseVector]]]],
-                         logTotalBinaries: Array[SparseVector], // sum of scores for binary scores.
-                         logTotalUnaries: Array[SparseVector] // sum of scores for unary scores.
+                         binaryScores: Array[Array[Array[Array[OldSparseVector]]]],
+                         logTotalBinaries: Array[OldSparseVector], // sum of scores for binary scores.
+                         logTotalUnaries: Array[OldSparseVector] // sum of scores for unary scores.
                         ) extends SpanScorer[L] {
 
   def scoreUnaryRule(begin: Int, end: Int, parent: Int, child: Int) = {
@@ -140,18 +139,19 @@ object ProjectTreebankToVarGrammar {
   }
 
 
-  def mapTrees(factory: AnchoredRuleScorerFactory[String,(String,Int),String], trees: IndexedSeq[TreeInstance[String,String]], useTree: Boolean) = {
+  def mapTrees(factory: AnchoredRuleScorerFactory[String,(String,Int),String], trees: IndexedSeq[TreeInstance[String,String]], useTree: Boolean): Iterable[SpanScorer[String]] = {
     // TODO: have ability to use other span scorers.
-    trees.toIndexedSeq.par.map { case TreeInstance(_,tree,words, scorer) =>
+    trees.toIndexedSeq.par.map { (ti:TreeInstance[String,String]) =>
+      val TreeInstance(_,tree,words,scorer) = ti
       println(words);
       try {
         val proj: ProjectingSpanScorer[String, (String, Int)] = new ProjectingSpanScorer(factory.indexedProjections,scorer,true);
         val newScorer = factory.mkSpanScorer(words,proj)
-        CompressedScorer.fromScorer(newScorer,words.length,factory.indexedProjections.coarseIndex.size);
+        newScorer
       } catch {
-        case e: Exception => e.printStackTrace(); SpanScorer.identity;
+        case e: Exception => e.printStackTrace(); SpanScorer.identity[String];
       }
-    }
+    }.seq
   }
 
   def writeObject(o: AnyRef, file: File) {

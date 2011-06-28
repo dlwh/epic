@@ -1,11 +1,9 @@
 package scalanlp.parser
 package discrim
 
-import scalala.tensor.counters.Counters
-import scalala.tensor.counters.Counters.PairedDoubleCounter
 import collection.mutable.ArrayBuffer
-
-
+import scalala.tensor.{Counter2, Counter}
+import scalala.library.Library._
 
 sealed abstract class WordShapeFeature[+L](l: L) extends Feature[L,Nothing];
 final case class IndicatorWSFeature[L](l: L, name: Symbol) extends WordShapeFeature(l);
@@ -16,23 +14,25 @@ final case class SignatureFeature[+L](l: L, str: String) extends WordShapeFeatur
 /**
  * This class generates features according to the word shapes.
  */
-class WordShapeFeaturizer[L](lexicon: PairedDoubleCounter[L,String], initToZero: Boolean = true, scale: Double = 1.0) extends Featurizer[L,String] {
-  val wordCounts = Counters.aggregate(for( ((_,w),count) <- lexicon.activeElements) yield (w,count));
+class WordShapeFeaturizer[L](lexicon: Counter2[L,String,Double], initToZero: Boolean = true, scale: Double = 1.0) extends Featurizer[L,String] {
+  val wordCounts = sum(lexicon,Axis.Horizontal)
+  val labelTotals = sum(lexicon,Axis.Vertical)
 
   val signatureGenerator = EnglishWordClassGenerator;
 
+
   def initialValueForFeature(f: Feature[L,String]) = f match {
-    case LexicalFeature(l:L,w:String) if !initToZero =>
-      val r = math.log(lexicon(l,w)/lexicon(l).total) /scale;
+    case LexicalFeature(l,w:String) if !initToZero =>
+      val r = math.log(lexicon(l,w)/labelTotals(l)) /scale;
       if(r == Double.NegativeInfinity) -30
       else r
     case _ => 0.0;
   }
 
-  def featuresFor(r: Rule[L]) = Counters.DoubleCounter[Feature[L,String]]();
+  def featuresFor(r: Rule[L]) = Counter[Feature[L,String],Double]();
 
   def featuresFor(l: L, w: String) = {
-    if(wordCounts(w) > 5) Counters.aggregate(LexicalFeature(l,w) -> 1.0);
+    if(wordCounts(w) > 5) Counter(LexicalFeature(l,w) -> 1.0);
     else {
       val features = ArrayBuffer[Feature[L,String]]();
       features += LexicalFeature(l,w);
@@ -70,7 +70,7 @@ class WordShapeFeaturizer[L](lexicon: PairedDoubleCounter[L,String], initToZero:
       if(hasDash && (hasLetter || hasDigit))  {
         val split = w.split("-");
         val lastInSplit = split.last;
-        if(lexicon(l)(lastInSplit) > 0) {
+        if(lexicon(l,lastInSplit) > 0) {
           features += IndicatorWSFeature(l,'PostHyphenOccursWithLabel)
         } else if(wordCounts(lastInSplit) > 0) {
           features += IndicatorWSFeature(l,'PostHyphenDoesNotOccurWithLabel)
@@ -91,7 +91,7 @@ class WordShapeFeaturizer[L](lexicon: PairedDoubleCounter[L,String], initToZero:
       } else if(w.length < 5) {
         features += (IndicatorWSFeature(l,'ShortWord));
       }
-      Counters.aggregate(features.iterator.map(f => (f,1.0)));
+      Counter(features.iterator.map(f => (f,1.0)));
     }
 
   }

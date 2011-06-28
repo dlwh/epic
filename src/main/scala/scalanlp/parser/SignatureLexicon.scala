@@ -1,18 +1,20 @@
 package scalanlp.parser
 
-import scalala.tensor.counters.Counters._;
+import scalala.tensor.{Counter, Counter2}
+import scalala.library.Library.{sum,Axis};
 
 /**
  * 
  * @author dlwh
  */
 @SerialVersionUID(1L)
-class SignatureLexicon[L,W](initCounts: PairedDoubleCounter[L,W], sigGen: SignatureGenerator[W],
+class SignatureLexicon[L,W](initCounts: Counter2[L,W,Double], sigGen: SignatureGenerator[W],
                             threshold: Double = 2) extends Lexicon[L,W] {
-  val (wordCounts,lexicon, sigCounts) = SignatureLexicon.makeSignatureCounts(sigGen, initCounts, threshold);
-  def knownTagWords = initCounts.activeDomain.iterator;
+  val (wordCounts, lexicon, sigCounts) = SignatureLexicon.makeSignatureCounts(sigGen, initCounts, threshold);
+  def knownTagWords = initCounts.nonzero.keys.iterator
+  val lexiconTotals = sum(lexicon,Axis.Vertical);
 
-  def tags = lexicon.rows.map(_._1);
+  def tags = lexicon.domain._1.iterator
 
   def wordScore(l: L, w: W) = {
     val sig = if(wordCounts(w) < threshold) {
@@ -22,7 +24,7 @@ class SignatureLexicon[L,W](initCounts: PairedDoubleCounter[L,W], sigGen: Signat
     }
 
     var cWord = sigCounts(sig);
-    var cTagWord = lexicon(l)(sig);
+    var cTagWord = lexicon(l,sig);
     assert(cWord >= cTagWord);
     /*
     if(wordCounts(sig) < 5 && lexicon(l).size > 50) {
@@ -42,21 +44,21 @@ class SignatureLexicon[L,W](initCounts: PairedDoubleCounter[L,W], sigGen: Signat
     }
     */
     import math.log
-    log(cTagWord) - log(lexicon(l).total);
+    log(cTagWord) - log(lexiconTotals(l)); // XXXX
 
   }
 }
 
 object SignatureLexicon {
   private def makeSignatureCounts[L,W](sigGen: SignatureGenerator[W],
-                                       counts: PairedDoubleCounter[L,W], threshold: Double) = {
-    val wordCounts = DoubleCounter[W]();
-    for( ((l,w),count) <- counts) {
+                                       counts: Counter2[L,W, Double], threshold: Double) = {
+    val wordCounts = Counter[W,Double]();
+    for( ((l,w),count) <- counts.nonzero.pairs) {
       wordCounts(w) += count;
     }
-    val lexicon = PairedDoubleCounter[L,W]();
-    val sigCounts = DoubleCounter[W]();
-    for( ((l,w),count) <- counts) {
+    val lexicon = Counter2[L,W,Double]();
+    val sigCounts = Counter[W,Double]();
+    for( ((l,w),count) <- counts.nonzero.pairs) {
       val sig = if(wordCounts(w) < threshold) sigGen.signatureFor(w) else w
 
       sigCounts(sig) += count
@@ -81,7 +83,7 @@ object SignatureGenerator {
   }
 }
 
-class UnknownSigLexicon[L](initCounts: PairedDoubleCounter[L,String],
+class UnknownSigLexicon[L](initCounts: Counter2[L,String,Double],
                            threshold: Double = 2) extends SignatureLexicon(initCounts,SignatureGenerator.unknown(">>UNKNOWN<<"),threshold);
 
 @SerialVersionUID(1L)

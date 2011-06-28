@@ -17,7 +17,7 @@ package scalanlp.parser
 */
 
 import scalanlp.math.Semiring;
-import scalala.tensor.sparse._;
+import scalanlp.tensor.sparse._;
 import scalanlp.graphs._;
 
 /**
@@ -27,8 +27,8 @@ import scalanlp.graphs._;
 @serializable
 @SerialVersionUID(1)
 trait UnaryRuleClosure {
-  def closeFromChild(child: Int):SparseVector;
-  def closeFromParent(parent: Int):SparseVector;
+  def closeFromChild(child: Int):OldSparseVector;
+  def closeFromParent(parent: Int):OldSparseVector;
 }
 
 /**
@@ -59,9 +59,9 @@ object UnaryRuleClosure {
 
   }
 
-  private def indexMap[L](grammar: Grammar[L], map: Map[Int,Map[Int,Double]])(implicit semiring: Semiring[Double]):Array[SparseVector] = {
+  private def indexMap[L](grammar: Grammar[L], map: Map[Int,Map[Int,Double]])(implicit semiring: Semiring[Double]):Array[OldSparseVector] = {
     Array.tabulate(grammar.index.size){i =>
-      val sparse = grammar.mkSparseVector(Double.NegativeInfinity);
+      val sparse = grammar.mkOldSparseVector(Double.NegativeInfinity);
       for( (k,v) <- map.getOrElse(i,Map.empty) if v != semiring.zero) sparse(k) = v;
       sparse
     };
@@ -87,7 +87,7 @@ object UnaryRuleClosure {
 
       def successors(n1: Int) = g.unaryRulesByIndexedChild(n1).keysIterator;
       def edgesFrom(n1: Int) = {
-        for( (n2,w) <- g.unaryRulesByIndexedChild(n1).activeElements)
+        for( (n2,w) <- g.unaryRulesByIndexedChild(n1).activeIterator)
           yield (n1,n2,w);
       }
 

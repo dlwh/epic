@@ -7,19 +7,19 @@ import scalanlp.optimize.FirstOrderMinimizer.OptParams;
 
 
 import scalala.tensor.Vector;
-import scalanlp.concurrent.ParallelOps._;
 import scalanlp.collection.mutable.TriangularArray
 import scalanlp.util._
 import scalanlp.trees._
 import scalanlp.parser.InsideOutside.ExpectedCounts
-import scalala.tensor.counters.LogCounters
-import scalala.tensor.counters.Counters.DoubleCounter;
 import scalanlp.parser.ParseChart.LogProbabilityParseChart
 import structpred._;
 import edu.berkeley.nlp.util.CounterInterface;
 import scala.collection.JavaConversions._
 import java.io.{File, FileWriter}
 import projections.{ProjectingSpanScorer, ProjectionIndexer}
+import scalala.library.Library
+import Library.sum
+import scalala.tensor.::
 
 
 /**
@@ -49,7 +49,7 @@ object StructuredTrainer extends ParserTrainer {
     val (initLexicon,initBinaries,initUnaries) = GenerativeParser.extractCounts(trainTrees);
 
     val xbarParser = {
-      val grammar = new GenerativeGrammar(LogCounters.logNormalizeRows(initBinaries),LogCounters.logNormalizeRows(initUnaries));
+      val grammar = new GenerativeGrammar(Library.logAndNormalizeRows(initBinaries),Library.logAndNormalizeRows(initUnaries));
       val lexicon = new SimpleLexicon(initLexicon);
       new CKYChartBuilder[LogProbabilityParseChart,String,String]("",lexicon,grammar,ParseChart.logProb);
     }
@@ -64,16 +64,15 @@ object StructuredTrainer extends ParserTrainer {
     val featurizer = factory.getFeaturizer(initLexicon, initBinaries, initUnaries);
 
     val openTags = Set.empty ++ {
-      for(t <- initLexicon.activeKeys.map(_._1) if initLexicon(t).size > 50) yield t;
+      for(t <- initLexicon.domain._1 if initLexicon(t, ::).size > 50) yield t;
     }
 
     println("Basexxx: " + xbarParser.lexicon.tagScores("messages"));
     println(openTags);
 
     val closedWords = Set.empty ++ {
-      val wordCounts = DoubleCounter[String]();
-      initLexicon.rows.foreach ( wordCounts += _._2 )
-      wordCounts.iterator.filter(_._2 > 10).map(_._1);
+      val wordCounts = sum(initLexicon)
+      wordCounts.nonzero.pairs.iterator.filter(_._2 > 10).map(_._1);
     }
 
 
@@ -129,7 +128,8 @@ object StructuredTrainer extends ParserTrainer {
                                            lossWeight: Double): ju.List[UpdateBundle] = {
       val parser = getParser(weights);
       val logSumBuilder = parser.builder.withCharts(ParseChart.logProb);
-      data.toIndexedSeq.par(16).map { case ti@TreeInstance(_,goldTree,words,coarseFilter) =>
+      data.toIndexedSeq.par.map { (ti:TreeInstance[String,String]) =>
+        val TreeInstance(_,goldTree,words,coarseFilter) = ti;
         val lossScorer = lossAugmentedScorer(lossWeight,projections,goldTree);
         val scorer = SpanScorer.sum(coarseFilter, lossScorer)
 
@@ -149,7 +149,7 @@ object StructuredTrainer extends ParserTrainer {
         bundle.loss = 0.0 //loss;
 
         bundle
-      }
+      }.seq
     }
 
 
@@ -170,9 +170,9 @@ object StructuredTrainer extends ParserTrainer {
       vector
     }
 
-    def denseVectorToCounter(vec: Vector) = {
+    def denseVectorToCounter(vec: Vector[Double]) = {
       val res = new edu.berkeley.nlp.util.Counter[java.lang.Integer]();
-      for( (i,v) <- vec.activeElements) {
+      for( (i,v) <- vec.nonzero.pairs.iterator) {
         res.setCount(i,v);
       }
       res
@@ -236,25 +236,24 @@ object StructuredTrainer extends ParserTrainer {
   }
 
   def expectedCountsToFeatureVector[L,W](indexedFeatures: FeatureIndexer[L,W], ecounts: ExpectedCounts[W]) = {
-    import scalala.Scalala._;
-    val result = indexedFeatures.mkSparseHashVector(0.0);
+    val result = indexedFeatures.mkSparseVector();
 
     // binaries
     for( (a,bvec) <- ecounts.binaryRuleCounts;
          (b,cvec) <- bvec;
-         (c,v) <- cvec.activeElements) {
+         (c,v) <- cvec.nonzero.pairs) {
       result += (indexedFeatures.featuresFor(a,b,c) * v);
     }
 
     // unaries
     for( (a,bvec) <- ecounts.unaryRuleCounts;
-         (b,v) <- bvec.activeElements) {
+         (b,v) <- bvec.nonzero.pairs) {
       result += (indexedFeatures.featuresFor(a,b) * v);
     }
 
     // lex
     for( (a,ctr) <- ecounts.wordCounts;
-         (w,v) <- ctr) {
+         (w,v) <- ctr.nonzero.pairs) {
       result += (indexedFeatures.featuresFor(a,w) * v);
     }
 

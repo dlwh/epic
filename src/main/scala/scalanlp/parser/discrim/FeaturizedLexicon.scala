@@ -1,15 +1,15 @@
 package scalanlp.parser
 package discrim
 
-import scalala.tensor.dense._;
-import scalala.tensor.counters.LogCounters._;
+import scalala.tensor.dense._
+import scalala.tensor.{Counter2,Counter,::}
 
 /**
  * 
  * @author dlwh
  *
  */
-class FeaturizedLexicon[L,W](val openTagSet: Set[L], val closedWords: Set[W], val weights: DenseVector,
+class FeaturizedLexicon[L,W](val openTagSet: Set[L], val closedWords: Set[W], val weights: DenseVector[Double],
                              val featureIndexer: FeatureIndexer[L,W]) extends Lexicon[L,W] {
   def wordScore(label: L, w: W): Double = {
     tagScores(w)(label);
@@ -17,11 +17,11 @@ class FeaturizedLexicon[L,W](val openTagSet: Set[L], val closedWords: Set[W], va
 
 
 
-  override def tagScores(w: W): LogDoubleCounter[L] = {
-    if(closedWords(w) && wordScores.contains(w)) wordScores(w)
+  override def tagScores(w: W): Counter[L,Double] = {
+    if(closedWords(w) && wordScores.contains(w)) wordScores(w, ::)
     else {
-      val res = aggregate(openTagSet.iterator.map ( k => (k,scoreUnknown(k,w))));
-      for( (k,v) <- wordScores(w)) {
+      val res = Counter(openTagSet.iterator.map ( k => (k,scoreUnknown(k,w))));
+      for( (k,v) <- wordScores(w, ::).nonzero.pairs) {
         res(k) = v;
       }
       res
@@ -40,13 +40,13 @@ class FeaturizedLexicon[L,W](val openTagSet: Set[L], val closedWords: Set[W], va
 
   def tags: Iterator[L] = tagSet.iterator;
 
-  private val wordScores = LogPairedDoubleCounter[W,L]();
+  private val wordScores = Counter2[W,L,Double]();
   private val tagSet = collection.mutable.Set[L]();
   for( (wordMap, tagIndex) <- featureIndexer.lexicalCache.iterator.zipWithIndex;
        (word,feats) <- wordMap) {
     val score = feats dot weights;
     if(score.isNaN) {
-      error("Score for " + word + "is NaN!" + feats.activeKeys.map { k => (featureIndexer.index.get(k),weights(k))}.toIndexedSeq);
+      error("Score for " + word + "is NaN!" + feats.nonzero.keys.map { k => (featureIndexer.index.get(k),weights(k))}.toIndexedSeq);
     }
     wordScores(word,featureIndexer.labelIndex.get(tagIndex)) = score;
     assert(wordScores(word,featureIndexer.labelIndex.get(tagIndex)) != Double.NegativeInfinity, (word,featureIndexer.labelIndex.get(tagIndex)).toString + "\n" +
@@ -54,6 +54,6 @@ class FeaturizedLexicon[L,W](val openTagSet: Set[L], val closedWords: Set[W], va
     tagSet += featureIndexer.labelIndex.get(tagIndex);
   }
 
-  def knownTagWords = wordScores.activeKeys.map(_.swap);
+  def knownTagWords = wordScores.nonzero.keys.iterator.map(_.swap);
 
 }

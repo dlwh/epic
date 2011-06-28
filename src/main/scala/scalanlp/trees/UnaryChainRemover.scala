@@ -3,7 +3,8 @@ package scalanlp.trees
 import collection.mutable.ArrayBuffer
 
 import UnaryChainRemover._
-import scalala.tensor.counters.Counters;
+import scalala.tensor.mutable.Counter2
+import scalala.tensor.::
 
 /**
  * Removes unaries chains A -> B -> ... -> C, replacing them with A -> C and remembering the most likely
@@ -14,7 +15,7 @@ import scalala.tensor.counters.Counters;
 class UnaryChainRemover[L] {
   def removeUnaryChains[W](trees: Iterator[(BinarizedTree[L],Seq[W])]):(IndexedSeq[(BinarizedTree[L],Seq[W])],ChainReplacer[L]) = {
     val buf = new ArrayBuffer[(BinarizedTree[L],Seq[W])];
-    val counts = Counters.PairedIntCounter[(L,L),Seq[L]];
+    val counts = Counter2[(L,L),Seq[L],Int];
 
     def transform(t: BinarizedTree[L],parentWasUnary:Boolean):BinarizedTree[L] = t match {
       case UnaryTree(l,c) =>
@@ -48,8 +49,8 @@ class UnaryChainRemover[L] {
 }
 
 object UnaryChainRemover {
-  private def chainReplacer[L](counts: Counters.PairedIntCounter[(L,L),Seq[L]]) = {
-    val maxes = counts.rows.map{ case (labels,map) => (labels -> map.argmax)}.toMap;
+  private def chainReplacer[L](counts: Counter2[(L,L),Seq[L],Int]) = {
+    val maxes = counts.domain._1.map{ labels => (labels -> counts(labels,::).argmax)}.toMap;
 
     new ChainReplacer[L]  {
       def replacementFor(parent: L, child: L) = {

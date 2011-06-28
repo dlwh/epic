@@ -28,7 +28,7 @@ class LabelScoreArray(length: Int, grammarSize: Int, fill: Double) {
 
 object LabelScoreArray {
   private def mkGrammarVector(grammarSize: Int, fill: Double) = {
-    val r = new DenseVector(grammarSize);
+    val r = DenseVector.zeros[Double](grammarSize);
     Arrays.fill(r.data,fill);
     r
   }

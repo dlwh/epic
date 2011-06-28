@@ -29,7 +29,7 @@ class ChartParser[C,F,W](val builder: ChartBuilder[ParseChart,F,W],
 object ChartParser {
   def apply[L,W](builder: ChartBuilder[ParseChart,L,W]) = {
 
-    new ChartParser[L,L,W](builder, new MaxConstituentDecoder(ProjectionIndexer.simple(builder.grammar.index)), ProjectionIndexer.simple(builder.index));
+    new ChartParser[L,L,W](builder, new MaxConstituentDecoder(ProjectionIndexer.simple(builder.grammar.index)), ProjectionIndexer.simple(builder.grammar.index));
   }
 
 }

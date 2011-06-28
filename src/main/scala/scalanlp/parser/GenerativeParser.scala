@@ -19,18 +19,11 @@ package scalanlp.parser;
 
 import scalanlp.trees.UnaryChainRemover.ChainReplacer
 import scalanlp.parser.ParserParams.NoParams
-;
 
-import scalanlp.config.Configuration
-import scalala.tensor.counters._;
-import Counters._;
-import LogCounters.logNormalizeRows;
-import scalanlp.text.tokenize.PTBTokenizer
 import scalanlp.trees._;
 
-import scalala.Scalala.{log=>_};
-
-
+import scalala.tensor.Counter2
+import scalala.library.Library
 
 
 object GenerativeParser {
@@ -45,14 +38,14 @@ object GenerativeParser {
   def extractLexiconAndGrammar[W](data: TraversableOnce[TreeInstance[String,W]]):(Lexicon[String,W],GenerativeGrammar[String]) = {
     val (wordCounts,binaryProductions,unaryProductions) = extractCounts(data);
     val lexicon = new SimpleLexicon(wordCounts);
-    (lexicon,new GenerativeGrammar(logNormalizeRows(binaryProductions),logNormalizeRows(unaryProductions)));
+    (lexicon,new GenerativeGrammar(Library.logAndNormalizeRows(binaryProductions),Library.logAndNormalizeRows(unaryProductions)));
   }
 
 
   def extractCounts[L,W](data: TraversableOnce[TreeInstance[L,W]]) = {
-    val lexicon = new PairedDoubleCounter[L,W]();
-    val binaryProductions = new PairedDoubleCounter[L,BinaryRule[L]]();
-    val unaryProductions = new PairedDoubleCounter[L,UnaryRule[L]]();
+    val lexicon = Counter2[L,W,Double]();
+    val binaryProductions = Counter2[L,BinaryRule[L],Double]();
+    val unaryProductions = Counter2[L,UnaryRule[L],Double]();
 
     for( ti <- data) {
       val TreeInstance(_,tree,words,_) = ti;
@@ -65,7 +58,7 @@ object GenerativeParser {
         case t => 
       }
       for( (l,w) <- leaves) {
-        lexicon(l.label).incrementCount(w,1);
+        lexicon(l.label,w) += 1
       }
       
     }
@@ -89,7 +82,7 @@ object SigTrainer extends ParserTrainer with NoParams {
                   unaryReplacer : ChainReplacer[String],
                   config: Params) = {
     val (words,binary,unary) = GenerativeParser.extractCounts(trainTrees);
-    val grammar = new GenerativeGrammar(logNormalizeRows(binary),logNormalizeRows(unary));
+    val grammar = new GenerativeGrammar(Library.logAndNormalizeRows(binary),Library.logAndNormalizeRows(unary));
     val lexicon = new SignatureLexicon(words, EnglishWordClassGenerator, 5);
     val parser = ChartParser(CKYChartBuilder("",lexicon,grammar).withCharts(ParseChart.logProb));
     Iterator.single(("Gen",parser));

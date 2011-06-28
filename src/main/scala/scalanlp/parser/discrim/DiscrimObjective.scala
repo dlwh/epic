@@ -3,20 +3,19 @@ package discrim
 
 import scalala.tensor.dense.DenseVector
 import scalanlp.trees._
-import scalanlp.config.Configuration
 import scalanlp.optimize._
 
 import InsideOutside._
-import scalala.tensor.counters.LogCounters
 import projections._
 import scalanlp.trees.UnaryChainRemover.ChainReplacer;
 
 import ParseChart.LogProbabilityParseChart;
 
-import scalala.Scalala._;
-import scalala.tensor.counters.Counters._
 import scalanlp.util._;
-import java.io._;
+import java.io._
+import scalala.library.Library
+import Library.sum
+import scalala.tensor.{Counter,::}
 
 /**
  * 
@@ -81,7 +80,7 @@ object DiscriminativeTrainer extends ParserTrainer {
     val (initLexicon,initBinaries,initUnaries) = GenerativeParser.extractCounts(trainTrees);
 
     val xbarParser = params.parser.optParser getOrElse {
-      val grammar = new GenerativeGrammar(LogCounters.logNormalizeRows(initBinaries),LogCounters.logNormalizeRows(initUnaries));
+      val grammar = new GenerativeGrammar(Library.logAndNormalizeRows(initBinaries),Library.logAndNormalizeRows(initUnaries));
       val lexicon = new SimpleLexicon(initLexicon);
       new CKYChartBuilder[LogProbabilityParseChart,String,String]("",lexicon,grammar,ParseChart.logProb);
     }
@@ -92,23 +91,22 @@ object DiscriminativeTrainer extends ParserTrainer {
     val featurizer = factory.getFeaturizer(initLexicon, initBinaries, initUnaries);
 
     val openTags = Set.empty ++ {
-      for(t <- initLexicon.activeKeys.map(_._1) if initLexicon(t).size > 50) yield t;
+      for(t <- initLexicon.nonzero.keys.iterator.map(_._1) if initLexicon(t, ::).size > 50) yield t;
     }
 
     val closedWords = Set.empty ++ {
-      val wordCounts = DoubleCounter[String]();
-      initLexicon.rows.foreach ( wordCounts += _._2 )
-      wordCounts.iterator.filter(_._2 > 10).map(_._1);
+      val wordCounts = sum(initLexicon)
+      wordCounts.nonzero.pairs.iterator.filter(_._2 > 10).map(_._1);
     }
 
     val obj = new DiscrimObjective(featurizer, trainTrees.toIndexedSeq, xbarParser, openTags, closedWords) with ConsoleLogging;
-    val optimizer = new StochasticGradientDescent[Int,DenseVector](opt.alpha,maxIterations, opt.batchSize)
-              with AdaptiveGradientDescent.L2Regularization[Int,DenseVector]
+    val optimizer = new StochasticGradientDescent[DenseVector[Double]](opt.alpha,maxIterations, opt.batchSize)
+              with AdaptiveGradientDescent.L2Regularization[DenseVector[Double]]
               with ConsoleLogging {
         override val lambda = params.opt.adjustedRegularization(trainTrees.length);
       }
 
-    // new LBFGS[Int,DenseVector](iterationsPerEval,5) with ConsoleLogging;
+    // new LBFGS[Int,DenseVector[Double]](iterationsPerEval,5) with ConsoleLogging;
     val init = obj.initialWeightVector;
     val rand = new RandomizedGradientCheckingFunction(obj, 0.1);
 

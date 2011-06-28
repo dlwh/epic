@@ -16,10 +16,11 @@ package scalanlp.parser
 */
 
 import scalanlp.collection.mutable.TriangularArray
-import scalala.tensor.counters.Counters.DoubleCounter
 import scalanlp.trees.Span
 
-import scalanlp.util.Encoder;
+import scalanlp.util.Encoder
+import scalala.tensor.Counter
+;
 
 @serializable
 @SerialVersionUID(2)
@@ -89,7 +90,7 @@ abstract class ParseChart[L](val grammar: Encoder[L], val length: Int) {
   private val emptySpan = Span(length+1,length+1)
 
   override def toString = {
-    val data = new TriangularArray[DoubleCounter[L]](length+1, (i:Int,j:Int)=>grammar.decode(top.scoreArray(TriangularArray.index(i,j)))).toString;
+    val data = new TriangularArray[Counter[L, Double]](length+1, (i:Int,j:Int)=>grammar.decode(top.scoreArray(TriangularArray.index(i,j)))).toString;
     "ParseChart[" + data + "]";
   }
 
@@ -109,7 +110,7 @@ object ParseChart {
 
   trait LogProbability {
     final def zero = Double.NegativeInfinity;
-    final def sum(a: Double, b: Double) = scalanlp.math.Numerics.logSum(a,b);
+    final def sum(a: Double, b: Double) = scalala.library.Numerics.logSum(a,b);
   }
   type LogProbabilityParseChart[L] = ParseChart[L] with LogProbability;
 

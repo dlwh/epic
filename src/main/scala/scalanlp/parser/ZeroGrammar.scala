@@ -1,7 +1,7 @@
 package scalanlp.parser
 
-import scalanlp.collection.mutable.SparseArray
-import scalala.tensor.sparse.SparseVector
+import scalanlp.collection.mutable.SparseArrayMap
+import scalanlp.tensor.sparse.OldSparseVector
 
 /**
  * 
@@ -11,10 +11,10 @@ class ZeroGrammar[L](g: Grammar[L]) extends Grammar[L] {
 
   val index = g.index;
 
-  private val indexedUnaryRulesByChild:SparseArray[SparseVector] = fillSparseArray(mkSparseVector(Double.NegativeInfinity));
-  private val indexedUnaryRulesByParent:SparseArray[SparseVector] = fillSparseArray(mkSparseVector(Double.NegativeInfinity));
+  private val indexedUnaryRulesByChild = fillSparseArrayMap(mkOldSparseVector(Double.NegativeInfinity));
+  private val indexedUnaryRulesByParent = fillSparseArrayMap(mkOldSparseVector(Double.NegativeInfinity));
   for( (c,parentVector) <- g.allUnaryRules) {
-    for( (p,v) <- parentVector.activeElements) {
+    for( (p,v) <- parentVector.activeIterator) {
       indexedUnaryRulesByChild.getOrElseUpdate(c)(p) = 0.0;
       indexedUnaryRulesByParent.getOrElseUpdate(p)(c) = 0.0;
     }
@@ -22,19 +22,19 @@ class ZeroGrammar[L](g: Grammar[L]) extends Grammar[L] {
 
 
   // Mapping is Left Child -> Right Child -> Parent -> Score
-  private val indexedBinaryRulesByLeftChild:SparseArray[SparseArray[SparseVector]] = (
-    fillSparseArray(fillSparseArray(mkSparseVector(Double.NegativeInfinity)))
+  private val indexedBinaryRulesByLeftChild = (
+    fillSparseArrayMap(fillSparseArrayMap(mkOldSparseVector(Double.NegativeInfinity)))
   );
   // Mapping is Left Child -> Right Child -> Parent -> Score
-  private val indexedBinaryRulesByRightChild:SparseArray[SparseArray[SparseVector]] = (
-      fillSparseArray(fillSparseArray(mkSparseVector(Double.NegativeInfinity)))
+  private val indexedBinaryRulesByRightChild = (
+      fillSparseArrayMap(fillSparseArrayMap(mkOldSparseVector(Double.NegativeInfinity)))
   );
   // Mapping is Parent -> Left Child -> Right Child ->  Score
-  private val indexedBinaryRulesByParent:SparseArray[SparseArray[SparseVector]] = (
-    fillSparseArray(fillSparseArray(mkSparseVector(Double.NegativeInfinity)))
+  private val indexedBinaryRulesByParent = (
+    fillSparseArrayMap(fillSparseArrayMap(mkOldSparseVector(Double.NegativeInfinity)))
   );
   for( (b,rules) <- g.allBinaryRules; (c,parentVector) <- rules) {
-    for( (p,v) <- parentVector.activeElements) {
+    for( (p,v) <- parentVector.activeIterator) {
       indexedBinaryRulesByLeftChild.getOrElseUpdate(b).getOrElseUpdate(c)(p) = 0.0;
       indexedBinaryRulesByRightChild.getOrElseUpdate(c).getOrElseUpdate(b)(p) = 0.0;
       indexedBinaryRulesByParent.getOrElseUpdate(p).getOrElseUpdate(b)(c) = 0.0;
@@ -82,11 +82,11 @@ class ZeroGrammar[L](g: Grammar[L]) extends Grammar[L] {
 
   def binaryRulesByIndexedLeftChild(b: Int) = indexedBinaryRulesByLeftChild(b);
 
-  def binaryRulesByIndexedRightChild(c: Int): SparseArray[SparseVector] = indexedBinaryRulesByRightChild(c);
+  def binaryRulesByIndexedRightChild(c: Int): SparseArrayMap[OldSparseVector] = indexedBinaryRulesByRightChild(c);
 
   def binaryRuleScore(a: Int, b: Int, c: Int) = indexedBinaryRulesByParent(a)(b)(c);
   def unaryRuleScore(a: Int, b: Int) = indexedUnaryRulesByParent(a)(b);
 
   /** b, c **/
-  def binaryRulesByIndexedParent(a: Int): SparseArray[SparseVector] = indexedBinaryRulesByParent(a);
+  def binaryRulesByIndexedParent(a: Int): SparseArrayMap[OldSparseVector] = indexedBinaryRulesByParent(a);
 }

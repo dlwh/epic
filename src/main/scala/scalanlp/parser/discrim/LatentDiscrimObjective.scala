@@ -8,16 +8,15 @@ import scalanlp.optimize._
 import scalanlp.trees._
 import scalanlp.config.Configuration
 import splitting.StateSplitting
-import scalala.tensor.counters.LogCounters
 import InsideOutside._
 import java.io._
 import scalanlp.trees.UnaryChainRemover.ChainReplacer
 import ParseChart.LogProbabilityParseChart
 
-
-import scalala.Scalala._;
-import scalala.tensor.counters.Counters._
-import scalanlp.util._;
+import scalanlp.util._
+import scalala.tensor.{Counter, Counter2, ::}
+import scalala.library.Library
+import scalala.library.Library._
 
 /**
  * 
@@ -45,13 +44,13 @@ class LatentDiscrimObjective[L,L2,W](featurizer: Featurizer[L2,W],
   }
   println("Num features: " + indexedFeatures.index.size);
 
-  def extractParser(weights: DenseVector) = {
+  def extractParser(weights: DenseVector[Double]) = {
     val parser = new ChartParser[L,L2,W](builder(weights),new MaxConstituentDecoder(indexedProjections),indexedProjections);
     parser
   }
 
 
-  def extractMaxParser(weights: DenseVector) = {
+  def extractMaxParser(weights: DenseVector[Double]) = {
     val parser = new ChartParser[L,L2,W](builder(weights).withCharts(ParseChart.viterbi),
       new ViterbiDecoder(indexedProjections),indexedProjections);
     parser
@@ -60,7 +59,7 @@ class LatentDiscrimObjective[L,L2,W](featurizer: Featurizer[L2,W],
   protected type Builder = CKYChartBuilder[LogProbabilityParseChart,L2,W];
   protected type Counts = ExpectedCounts[W];
 
-  protected def builder(weights: DenseVector)= {
+  protected def builder(weights: DenseVector[Double])= {
     val grammar = weightsToGrammar(indexedFeatures, weights);
     val lexicon = weightsToLexicon(indexedFeatures, weights);
     val parser = new CKYChartBuilder[LogProbabilityParseChart,L2,W](root, lexicon, grammar, ParseChart.logProb);
@@ -86,7 +85,7 @@ class LatentDiscrimObjective[L,L2,W](featurizer: Featurizer[L2,W],
   def sumCounts(c1: Counts, c2: Counts) = { c1 += c2}
 
   def countsToObjective(c: Counts) = {
-    val grad = -expectedCountsToFeatureVector(indexedFeatures, c) value;
+    val grad = -expectedCountsToFeatureVector(indexedFeatures, c);
     val obj = -c.logProb
     (obj,grad);
   }
@@ -150,15 +149,15 @@ trait LatentTrainer extends ParserTrainer {
   protected lazy val paramManifest = { println(manifest[Params]); manifest[Params]}
 
   def getFeaturizer(params: Params,
-                    initLexicon: PairedDoubleCounter[String, String],
-                    initBinaries: PairedDoubleCounter[String, BinaryRule[String]],
-                    initUnaries: PairedDoubleCounter[String, UnaryRule[String]],
+                    initLexicon: Counter2[String, String, Double],
+                    initBinaries: Counter2[String, BinaryRule[String], Double],
+                    initUnaries: Counter2[String, UnaryRule[String], Double],
                     numStates: Int): MyFeaturizer;
 
   def quickEval(obj: AbstractDiscriminativeObjective[String,(String,Int),String],
                 indexedProjections: ProjectionIndexer[String,(String,Int)],
                 unaryReplacer : ChainReplacer[String],
-                devTrees: Seq[TreeInstance[String,String]], weights: DenseVector) {
+                devTrees: Seq[TreeInstance[String,String]], weights: DenseVector[Double]) {
     println("Validating...");
     val parser = obj.extractParser(weights);
     val fixedTrees = devTrees.take(400).toIndexedSeq;
@@ -185,7 +184,7 @@ trait LatentTrainer extends ParserTrainer {
     println("NumStates: " + params.numStates);
 
     val xbarParser = parser.optParser.getOrElse {
-      val grammar = new GenerativeGrammar(LogCounters.logNormalizeRows(initBinaries),LogCounters.logNormalizeRows(initUnaries));
+      val grammar = new GenerativeGrammar(Library.logAndNormalizeRows(initBinaries),Library.logAndNormalizeRows(initUnaries));
       val lexicon = new SimpleLexicon(initLexicon);
       new CKYChartBuilder[LogProbabilityParseChart,String,String]("",lexicon,grammar,ParseChart.logProb);
     }
@@ -203,20 +202,19 @@ trait LatentTrainer extends ParserTrainer {
     val latentFeaturizer: MyFeaturizer = getFeaturizer(params, initLexicon, initBinaries, initUnaries, numStates)
 
     val openTags = Set.empty ++ {
-      for(t <- initLexicon.activeKeys.map(_._1) if initLexicon(t).size > 50; t2 <- split(t, numStates) iterator ) yield t2;
+      for(t <- initLexicon.nonzero.keys.map(_._1) if initLexicon(t,::).size > 50; t2 <- split(t, numStates).iterator ) yield t2;
     }
 
     val closedWords = Set.empty ++ {
-      val wordCounts = DoubleCounter[String]();
-      initLexicon.rows.foreach ( wordCounts += _._2 )
-      wordCounts.iterator.filter(_._2 > 5).map(_._1);
+      val wordCounts = sum(initLexicon)
+      wordCounts.nonzero.pairs.iterator.filter(_._2 > 5).map(_._1);
     }
 
     val obj = mkObjective(params, latentFeaturizer, trainTrees, indexedProjections, xbarParser, openTags, closedWords)
 
     val optimizer = opt.minimizer(obj,trainTrees.length);
 
-    val init = obj.initialWeightVector.copy;
+    val init = obj.initialWeightVector + 0.0;
 
     val log = Log.globalLog;
     import scalanlp.optimize.RandomizedGradientCheckingFunction;
@@ -231,7 +229,7 @@ trait LatentTrainer extends ParserTrainer {
     }
 
 
-    val cachedObj = new CachedBatchDiffFunction[Int,DenseVector](obj);
+    val cachedObj = new CachedBatchDiffFunction[DenseVector[Double]](obj);
 
     for( (state,iter) <- optimizer.iterations(cachedObj,init).take(maxIterations).zipWithIndex.tee(evalAndCache _);
 //         _ = rand.calculate(state.x);
@@ -244,7 +242,7 @@ trait LatentTrainer extends ParserTrainer {
   }
 
 
-  def cacheWeights(params: Params, obj: MyObjective, weights: DenseVector, iter: Int);
+  def cacheWeights(params: Params, obj: MyObjective, weights: DenseVector[Double], iter: Int);
 }
 
 object StochasticLatentTrainer extends LatentTrainer {
@@ -256,9 +254,9 @@ object StochasticLatentTrainer extends LatentTrainer {
   protected def specificManifest = manifest[SpecificParams];
 
   def getFeaturizer(params: Params,
-                    initLexicon: PairedDoubleCounter[String, String],
-                    initBinaries: PairedDoubleCounter[String, BinaryRule[String]],
-                    initUnaries: PairedDoubleCounter[String, UnaryRule[String]],
+                    initLexicon: Counter2[String, String, Double],
+                    initBinaries: Counter2[String, BinaryRule[String], Double],
+                    initUnaries: Counter2[String, UnaryRule[String], Double],
                     numStates: Int): Featurizer[(String, Int), String] = {
     val factory = params.featurizerFactory;
     val featurizer = factory.getFeaturizer(initLexicon, initBinaries, initUnaries);
@@ -269,7 +267,7 @@ object StochasticLatentTrainer extends LatentTrainer {
     if(weightsPath == null) {
       latentFeaturizer
     } else {
-      val weights = readObject[(DenseVector,DoubleCounter[Feature[(String,Int),String]])](weightsPath)._2;
+      val weights = readObject[(DenseVector[Double],Counter[Feature[(String,Int),String],Double])](weightsPath)._2;
       val splitFactor = params.splitFactor;
       new CachedWeightsFeaturizer(latentFeaturizer, weights, FeatureProjectors.split(_,splitFactor));
     }
@@ -293,7 +291,7 @@ object StochasticLatentTrainer extends LatentTrainer {
   }
 
 
-  def cacheWeights(params: Params, obj: MyObjective, weights: DenseVector, iter: Int) = {
+  def cacheWeights(params: Params, obj: MyObjective, weights: DenseVector[Double], iter: Int) = {
     writeObject( new File("weights-"+iter +".ser"), weights -> obj.indexedFeatures.decode(weights));
   }
 

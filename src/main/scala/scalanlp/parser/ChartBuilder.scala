@@ -5,7 +5,7 @@ import ParseChart.Factory;
 trait ChartBuilder[+Chart[X]<:ParseChart[X],L,W] {
   /**
    * Given a sentence s, fills a parse chart with inside scores.
-   * validSpan can be used as a filter to insist that certain ones are valid.
+   * validSpan can be activeSize as a filter to insist that certain ones are valid.
    */
   def buildInsideChart(s: Seq[W], validSpan: SpanScorer[L] = SpanScorer.identity):Chart[L];
   /**
@@ -50,8 +50,7 @@ class CKYChartBuilder[Chart[X]<:ParseChart[X], L,W](val root: L,
     for{i <- 0 until s.length} {
       var foundSomething = false;
       for {
-        (a,wScore) <- lexicon.tagScores(s(i))
-        if !wScore.isInfinite && !wScore.isNaN;
+        (a,wScore) <- lexicon.tagScores(s(i)).nonzero.pairs.iterator if !wScore.isInfinite && !wScore.isNaN;
         ai = grammar.index(a);
         (spanScore:Double) = validSpan.scoreLexical(i,i+1,ai)
         if spanScore != Double.NegativeInfinity
@@ -60,7 +59,7 @@ class CKYChartBuilder[Chart[X]<:ParseChart[X], L,W](val root: L,
         foundSomething = true;
       }
       if(!foundSomething) {
-        val spanScores = lexicon.tagScores(s(i)).iterator.map { case (k,v) => (k,validSpan.scoreLexical(i,i+1,grammar.index(k)))} toIndexedSeq;
+        val spanScores = lexicon.tagScores(s(i)).nonzero.pairs.iterator.map { case (k,v) => (k,validSpan.scoreLexical(i,i+1,grammar.index(k)))} toIndexedSeq;
         error("Couldn't score " + s(i) + " " + lexicon.tagScores(s(i)) + "spans: " + spanScores);
       }
 
@@ -75,7 +74,7 @@ class CKYChartBuilder[Chart[X]<:ParseChart[X], L,W](val root: L,
     } {
       for ( (b,binaryRules) <- grammar.allBinaryRules) {
         var ruleIndex = 0;
-        val numRulesWithB = binaryRules.activeLength;
+        val numRulesWithB = binaryRules.activeSize;
         while(ruleIndex < numRulesWithB) {
           val c = binaryRules.indexAt(ruleIndex);
           val parentVector = binaryRules.valueAt(ruleIndex);
@@ -86,9 +85,9 @@ class CKYChartBuilder[Chart[X]<:ParseChart[X], L,W](val root: L,
               val cScore = chart.top.labelScore(split, end, c)
               if (cScore != Double.NegativeInfinity) {
                 var i = 0;
-                while(i < parentVector.used) {
-                  val a = parentVector.index(i);
-                  val aScore = parentVector.data(i);
+                while(i < parentVector.activeSize) {
+                  val a = parentVector.indexAt(i);
+                  val aScore = parentVector.valueAt(i);
                   i += 1;
                   val spanScore = validSpan.scoreBinaryRule(begin,split,end,a,b,c);
                   val totalA = aScore + spanScore;
@@ -128,9 +127,9 @@ class CKYChartBuilder[Chart[X]<:ParseChart[X], L,W](val root: L,
           (b,binaryRules) <- grammar.binaryRulesByIndexedParent(a)
         } {
           var i = 0;
-          while(i < binaryRules.used) {
-            val c = binaryRules.index(i);
-            val ruleScore = binaryRules.data(i);
+          while(i < binaryRules.activeSize) {
+            val c = binaryRules.indexAt(i);
+            val ruleScore = binaryRules.valueAt(i);
             i += 1;
             for(split <- inside.top.feasibleSpan(begin, end, b, c) ) {
 
@@ -166,9 +165,9 @@ class CKYChartBuilder[Chart[X]<:ParseChart[X], L,W](val root: L,
       val bScore = chart.bot.labelScore(begin,end,b);
       val parentVector = grammar.unaryRulesByIndexedChild(b);
       var j = 0;
-      while(j < parentVector.used) {
-        val a = parentVector.index(j);
-        val aScore = parentVector.data(j);
+      while(j < parentVector.activeSize) {
+        val a = parentVector.indexAt(j);
+        val aScore = parentVector.valueAt(j);
         val prob = aScore + bScore + validSpan.scoreUnaryRule(begin, end, a, b);
         if(prob != Double.NegativeInfinity) {
           chart.top.enter(begin,end,a, prob);
@@ -185,9 +184,9 @@ class CKYChartBuilder[Chart[X]<:ParseChart[X], L,W](val root: L,
 
       var j = 0;
       val childVector = grammar.unaryRulesByIndexedParent(a);
-      while(j < childVector.used) {
-        val b = childVector.index(j);
-        val bScore = childVector.data(j);
+      while(j < childVector.activeSize) {
+        val b = childVector.indexAt(j);
+        val bScore = childVector.valueAt(j);
         val prob = aScore + bScore + validSpan.scoreUnaryRule(begin,end,a,b);
         if(prob != Double.NegativeInfinity) {
           outside.bot.enter(begin,end,b, prob);

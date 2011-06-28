@@ -8,7 +8,8 @@ import scalanlp.parser.ParserParams.NoParams
 import scalanlp.trees.UnaryChainRemover.ChainReplacer
 import scalanlp.collection.mutable.TriangularArray
 import scalanlp.util._;
-import scalanlp.math.Numerics._;
+import scalala.library.Numerics._
+import scalala.library.Library
 
 
 /**
@@ -42,7 +43,7 @@ class ViterbiDecoder[C,F, W](val indexedProjections: ProjectionIndexer[C,F]) ext
       var maxScore = Double.NegativeInfinity;
       var maxChild = -1;
       for {
-        (b,ruleScore) <- grammar.unaryRulesByIndexedParent(root)
+        (b,ruleScore) <- grammar.unaryRulesByIndexedParent(root).activeIterator
       } {
         val score = ruleScore + inside.bot(start,end,b) + spanScorer.scoreUnaryRule(start,end,root,b);
         if(score > maxScore) {
@@ -134,13 +135,12 @@ class MaxRuleProductDecoder[C,F, W](coarseGrammar: Grammar[C], coarseLexicon: Le
 }
 
 object MaxRuleTrainer extends ParserTrainer with NoParams {
-  import scalala.tensor.counters.LogCounters._;
   def trainParser(trainTrees: IndexedSeq[TreeInstance[String,String]],
                   devTrees:   IndexedSeq[TreeInstance[String,String]],
                   unaryReplacer : ChainReplacer[String],
                   config: Params) = {
     val (words,binary,unary) = GenerativeParser.extractCounts(trainTrees);
-    val grammar = new GenerativeGrammar(logNormalizeRows(binary),logNormalizeRows(unary));
+    val grammar = new GenerativeGrammar(Library.logAndNormalizeRows(binary),Library.logAndNormalizeRows(unary));
     val lexicon = new SignatureLexicon(words, EnglishWordClassGenerator, 3);
     val projections = ProjectionIndexer.simple(grammar.index);
     val builder = CKYChartBuilder("",lexicon,grammar).withCharts(ParseChart.logProb);
@@ -231,13 +231,12 @@ class MaxConstituentDecoder[C,F,W](indexedProjections: ProjectionIndexer[C,F]) e
 }
 
 object MaxConstituentTrainer extends ParserTrainer with NoParams {
-  import scalala.tensor.counters.LogCounters._;
   def trainParser(trainTrees: IndexedSeq[TreeInstance[String,String]],
                   devTrees:   IndexedSeq[TreeInstance[String,String]],
                   unaryReplacer : ChainReplacer[String],
                   config: Params) = {
     val (words,binary,unary) = GenerativeParser.extractCounts(trainTrees);
-    val grammar = new GenerativeGrammar(logNormalizeRows(binary),logNormalizeRows(unary));
+    val grammar = new GenerativeGrammar(Library.logAndNormalizeRows(binary),Library.logAndNormalizeRows(unary));
     val lexicon = new SignatureLexicon(words, EnglishWordClassGenerator, 3);
     val projections = ProjectionIndexer.simple(grammar.index);
     val builder = CKYChartBuilder("",lexicon,grammar).withCharts(ParseChart.logProb);

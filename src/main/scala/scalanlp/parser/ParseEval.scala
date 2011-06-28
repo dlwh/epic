@@ -24,7 +24,6 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.PrintStream
 import scala.actors.Actor
-import scalanlp.concurrent.ParallelOps._;
 import scalanlp.util._;
 
 
@@ -116,7 +115,7 @@ object ParseEval {
       case e:RuntimeException => e.printStackTrace();
       Statistics(0, peval.labeledConstituents(sent.tree).size, 0, 0, 0, sent.words.length, 1);
     }
-    val stats = trees.par.withSequentialThreshold(100).mapReduce({ evalSentence _ },{ (_:Statistics) + (_:Statistics)});
+    val stats = trees.par.view.map { evalSentence _ }.reduce { (_:Statistics) + (_:Statistics)};
 
     stats
   }

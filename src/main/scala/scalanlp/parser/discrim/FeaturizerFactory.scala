@@ -2,7 +2,7 @@ package scalanlp.parser
 package discrim
 
 import scalanlp.config.Configuration
-import scalala.tensor.counters.Counters._
+import scalala.tensor.Counter2
 
 
 /**
@@ -11,18 +11,18 @@ import scalala.tensor.counters.Counters._
  */
 trait FeaturizerFactory[L,W] {
   /** Returns a featurizer based on a configuration and a lexicon/production */
-  def getFeaturizer(baseLexicon: PairedDoubleCounter[L,W],
-                    baseProductions: PairedDoubleCounter[L,BinaryRule[L]],
-                    baseUnaries: PairedDoubleCounter[L,UnaryRule[L]]):Featurizer[L,W];
+  def getFeaturizer(baseLexicon: Counter2[L,W,Double],
+                    baseProductions: Counter2[L,BinaryRule[L],Double],
+                    baseUnaries: Counter2[L,UnaryRule[L],Double]):Featurizer[L,W];
 }
 
 /**
  * Uses just rule features and wordshapes
  */
 class PlainFeaturizerFactory[L](initToZero: Boolean = true) extends FeaturizerFactory[L,String] {
-  def getFeaturizer(baseLexicon: PairedDoubleCounter[L,String],
-                    baseBinaries: PairedDoubleCounter[L,BinaryRule[L]],
-                    baseUnaries: PairedDoubleCounter[L,UnaryRule[L]]):Featurizer[L,String] = {
+  def getFeaturizer(baseLexicon: Counter2[L,String,Double],
+                    baseBinaries: Counter2[L,BinaryRule[L],Double],
+                    baseUnaries: Counter2[L,UnaryRule[L],Double]):Featurizer[L,String] = {
     val lex = new WordShapeFeaturizer(baseLexicon,initToZero,1.0);
     val rules = new RuleFeaturizer[L,String](baseBinaries,baseUnaries,initToZero,1.0);
 
@@ -34,9 +34,9 @@ class PlainFeaturizerFactory[L](initToZero: Boolean = true) extends FeaturizerFa
  * Uses just rule features and wordshapes
  */
 class WeightedFeaturizerFactory[L](initToZero: Boolean = true) extends FeaturizerFactory[L,String] {
-  def getFeaturizer(baseLexicon: PairedDoubleCounter[L,String],
-                    baseBinaries: PairedDoubleCounter[L,BinaryRule[L]],
-                    baseUnaries: PairedDoubleCounter[L,UnaryRule[L]]):Featurizer[L,String] = {
+  def getFeaturizer(baseLexicon: Counter2[L,String,Double],
+                    baseBinaries: Counter2[L,BinaryRule[L],Double],
+                    baseUnaries: Counter2[L,UnaryRule[L],Double]):Featurizer[L,String] = {
     val lex = new WordShapeFeaturizer(baseLexicon,initToZero,1.0);
     val rules = new RuleFeaturizer[L,String](baseBinaries,baseUnaries,initToZero,1.0);
     val rules2 = new WeightedRuleFeaturizer[L,String](baseBinaries,baseUnaries,baseLexicon,initToZero,1.0);
@@ -50,7 +50,7 @@ trait LatentFeaturizerFactory {
 }
 
 class BitVectorFeaturizerFactory extends LatentFeaturizerFactory {
-  def getFeaturizer[L,W](base: Featurizer[L,W], numStates: Int) = new BitVectorFeaturizer(new CachingFeaturizer(base),numStates);
+  def getFeaturizer[L,W](base: Featurizer[L,W], numStates: Int) = new BitVectorFeaturizer(base,numStates);
 }
 
 class SlavLatentFeaturizerFactory extends LatentFeaturizerFactory {
@@ -58,9 +58,9 @@ class SlavLatentFeaturizerFactory extends LatentFeaturizerFactory {
 }
 
 class SlavPlusLatentFeaturizerFactory extends LatentFeaturizerFactory {
-  def getFeaturizer[L,W](base: Featurizer[L,W], numStates: Int) = new SlavPlusFeaturizer(new CachingFeaturizer(base),numStates);
+  def getFeaturizer[L,W](base: Featurizer[L,W], numStates: Int) = new SlavPlusFeaturizer(base,numStates);
 }
 
 class SlavSplitLatentFeaturizerFactory extends LatentFeaturizerFactory {
-  def getFeaturizer[L,W](base: Featurizer[L,W], numStates: Int) = new SlavSplitFeaturizer(new CachingFeaturizer(base),numStates);
+  def getFeaturizer[L,W](base: Featurizer[L,W], numStates: Int) = new SlavSplitFeaturizer(base,numStates);
 }

@@ -1,7 +1,7 @@
 package scalanlp.parser
 
-import scalala.tensor.counters.Counters._;
-import scalala.tensor.counters.LogCounters;
+import scalala.library.Library
+import scalala.tensor.Counter2
 
 /**
  * 
@@ -9,8 +9,8 @@ import scalala.tensor.counters.LogCounters;
  */
 object DSLGrammar {
   def grammar(rewrites: DSLGrammarPart*) = {
-    val binaryProductions = PairedDoubleCounter[String,BinaryRule[String]];
-    val unaryProductions = PairedDoubleCounter[String,UnaryRule[String]];
+    val binaryProductions = Counter2[String,BinaryRule[String], Double];
+    val unaryProductions = Counter2[String,UnaryRule[String], Double];
     for ( DSLGrammarPart(r,w) <- rewrites) {
       r match {
         case br@BinaryRule(a,b,c) =>
@@ -20,15 +20,15 @@ object DSLGrammar {
       }
     }
 
-    new GenerativeGrammar(LogCounters.logNormalizeRows(binaryProductions),LogCounters.logNormalizeRows(unaryProductions));
+    new GenerativeGrammar(Library.logAndNormalizeRows(binaryProductions),Library.logAndNormalizeRows(unaryProductions));
   }
 
   def lexicon(words: ((Symbol,String),Double)*) = {
-    val result = PairedDoubleCounter[String,String];
+    val result = Counter2[String,String,Double];
     for( ((sym,str),w) <- words) {
       result(sym.name,str) = w;
     }
-    new UnsmoothedLexicon(LogCounters.logNormalizeRows(result));
+    new UnsmoothedLexicon(Library.logAndNormalizeRows(result));
   }
 
   def simpleGrammar =  grammar(

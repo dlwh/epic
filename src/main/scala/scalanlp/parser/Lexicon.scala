@@ -17,54 +17,54 @@ package scalanlp.parser
 
 
 
-import scalala.tensor.counters.Counters.DoubleCounter
-import scalala.tensor.counters.Counters.PairedDoubleCounter
 import math.log
-import scalala.tensor.counters.LogCounters.LogDoubleCounter
-import scalala.tensor.counters.LogCounters.LogPairedDoubleCounter
-
+import scalala.tensor.{Counter2, Counter}
+import scalala.tensor.::
+import scalala.library.Library._;
 
 @serializable
 @SerialVersionUID(1)
 trait Lexicon[L,W] {
   def wordScore(label: L, w: W): Double;
-  def tagScores(w: W): LogDoubleCounter[L] = scalala.tensor.counters.LogCounters.aggregate( tags.map { l => (l,wordScore(l,w))});
+  def tagScores(w: W): Counter[L,Double] = Counter( tags.map { l => (l,wordScore(l,w))});
   def tags: Iterator[L];
 
   def knownTagWords: Iterator[(L,W)]
 }
 
-class UnsmoothedLexicon[L,W](lexicon: LogPairedDoubleCounter[L,W]) extends Lexicon[L,W] {
+// counter should be in log space
+class UnsmoothedLexicon[L,W](lexicon: Counter2[L,W,Double]) extends Lexicon[L,W] {
   def wordScore(l: L, w: W) = lexicon(l,w);
-  def tags = lexicon.rows.map(_._1);
-  def knownTagWords = lexicon.activeKeys;
+  def tags = lexicon.domain._1.iterator
+  def knownTagWords = lexicon.nonzero.keys.iterator;
 }
 
-class SimpleLexicon[L,W](private val lexicon: PairedDoubleCounter[L,W]) extends Lexicon[L,W] {
-  private val wordCounts = DoubleCounter[W]();
-  lexicon.rows.foreach ( wordCounts += _._2 )
-  def knownTagWords = lexicon.activeKeys;
-
+// counter should be in normal space
+class SimpleLexicon[L,W](private val lexicon: Counter2[L,W,Double]) extends Lexicon[L,W] {
+  private val wordCounts = sum(lexicon)
+  private val labelCounts = sum(lexicon,Axis.Vertical)
+  private val totalCount = wordCounts.sum
+  def knownTagWords = lexicon.nonzero.keys.iterator;
 
   def wordScore(l: L, w: W) = {
     var cWord = wordCounts(w);
-    var cTagWord = lexicon(l)(w);
+    var cTagWord = lexicon(l,w);
     assert(cWord >= cTagWord);
-    if(wordCounts(w) < 10 && lexicon(l).size > 50) {
+    if(wordCounts(w) < 10 && lexicon(l,::).size > 50) {
       cWord += 1.0;
-      cTagWord += lexicon(l).size.toDouble / wordCounts.size
+      cTagWord += lexicon(l,::).size.toDouble / wordCounts.size
     }
     if(cWord == 0) {
       Double.NegativeInfinity
     } else {
-      val pW = (1.0 + cWord) / (wordCounts.total + 1.0);
+      val pW = (1.0 + cWord) / (totalCount + 1.0)
       val pTgW = (cTagWord) / (cWord);
-      val pTag = lexicon(l).total / wordCounts.total
+      val pTag = labelCounts(l) / totalCount
       val result = log(pW) + log(pTgW) - log(pTag);
       assert(cTagWord == 0 || result > Double.NegativeInfinity)
       result;
     }
   }
 
-  def tags = lexicon.rows.map(_._1);
+  def tags = lexicon.domain._1.iterator;
 }

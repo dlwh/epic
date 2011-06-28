@@ -3,14 +3,14 @@ package projections
 
 import scalanlp.trees._
 import scalanlp.collection.mutable.TriangularArray
-import scalanlp.math.Numerics
+import scalala.library.Numerics._
 import scalanlp.util.Index
-import scalala.tensor.sparse.SparseVector
 import scalanlp.io.FileIterable;
 
 import java.io._
-import scalanlp.concurrent.ParallelOps._
 import scalanlp.trees.{Trees,DenseTreebank}
+import scalanlp.tensor.sparse.OldSparseVector
+import scalala.library.Numerics
 
 /**
  * Creates labeled span scorers for a set of trees from some parser.
@@ -76,10 +76,10 @@ class LabeledSpanScorerFactory[C,L,W](parser: ChartBuilder[ParseChart,L,W],
   def buildSpanScorer(inside: ParseChart[L], outside: ParseChart[L], sentProb: Double, tree: BinarizedTree[C] = null):LabeledSpanScorer[C] = {
     val markedSpans = goldLabels(inside.length, tree)
 
-    val scores = TriangularArray.raw(inside.length+1,null:SparseVector);
+    val scores = TriangularArray.raw(inside.length+1,null:OldSparseVector);
     for(begin <-  0 until inside.length; end <- begin+1 to (inside.length)) {
       val index = TriangularArray.index(begin, end)
-      val scoresForLocation = indexedProjections.coarseEncoder.mkSparseVector(Double.NegativeInfinity);
+      val scoresForLocation = indexedProjections.coarseEncoder.mkOldSparseVector(Double.NegativeInfinity);
       for(l <- inside.bot.enteredLabelIndexes(begin,end)) {
         val pL = indexedProjections.project(l)
         val myScore = inside.bot.labelScore(begin, end, l) + outside.bot.labelScore(begin, end, l) - sentProb
@@ -87,10 +87,10 @@ class LabeledSpanScorerFactory[C,L,W](parser: ChartBuilder[ParseChart,L,W],
         scoresForLocation(pL) = Numerics.logSum(currentScore,myScore);
       }
 
-      for( (c,v) <- scoresForLocation.activeElements) {
+      for( (c,v) <- scoresForLocation.nonzero.pairs) {
         if(v > pruningThreshold || markedSpans(index)(c)) {
           if(scores(index) eq null) {
-            scores(index) = indexedProjections.coarseEncoder.mkSparseVector(Double.NegativeInfinity);
+            scores(index) = indexedProjections.coarseEncoder.mkOldSparseVector(Double.NegativeInfinity);
           }
           scores(index)(c) = v;
         }
@@ -113,7 +113,7 @@ class LabeledSpanScorerFactory[C,L,W](parser: ChartBuilder[ParseChart,L,W],
 
 @serializable
 @SerialVersionUID(1)
-class LabeledSpanScorer[L](scores: Array[SparseVector]) extends SpanScorer[L] {
+class LabeledSpanScorer[L](scores: Array[OldSparseVector]) extends SpanScorer[L] {
   @inline
   private def score(begin: Int, end: Int, label: Int) = {
     if(scores(TriangularArray.index(begin,end)) eq null) Double.NegativeInfinity
@@ -158,15 +158,16 @@ object ProjectTreebankToLabeledSpans {
 
   def mapTrees(factory: LabeledSpanScorerFactory[String,String,String], trees: IndexedSeq[TreeInstance[String,String]], useTree: Boolean) = {
     // TODO: have ability to use other span scorers.
-    trees.toIndexedSeq.par.map { case TreeInstance(_,tree,words,_) =>
-      println(words);
+    trees.toIndexedSeq.par.map { (ti:TreeInstance[String,String]) =>
+      val TreeInstance(id,tree,words,_) = ti
+      println(id,words);
       try {
         val scorer = if(useTree) factory.mkSpanScorerWithTree(tree,words) else factory.mkSpanScorer(words);
         scorer;
       } catch {
         case e: Exception => e.printStackTrace(); SpanScorer.identity;
       }
-    }
+    }.seq
   }
 
   def writeObject(o: AnyRef, file: File) {

@@ -1,15 +1,13 @@
 package scalanlp.parser
 
-import scalanlp.collection.mutable.SparseArray
-import scalala.tensor.counters.Counters.DoubleCounter
-import scalala.tensor.counters.Counters.PairedDoubleCounter
-import scalala.tensor.Vector
-
+import scalanlp.collection.mutable.SparseArrayMap
 import ParseChart._;
 
 import InsideOutside._;
 
-import math.exp;
+import math.exp
+import scalala.tensor.::
+import scalala.tensor.mutable.{Counter, Counter2, Vector}
 
 /**
  * 
@@ -47,8 +45,8 @@ class InsideOutside[L,W](val parser: ChartBuilder[LogProbabilityParseChart,L,W])
                                 inside: LogProbabilityParseChart[L],
                                 outside: LogProbabilityParseChart[L],
                                 validSpan: SpanScorer[L],
-                                totalProb: Double): SparseArray[DoubleCounter[W]] = {
-    val wordCounts = grammar.fillSparseArray(DoubleCounter[W]());
+                                totalProb: Double): SparseArrayMap[Counter[W, Double]] = {
+    val wordCounts = grammar.fillSparseArrayMap(Counter[W, Double]());
     // handle lexical productions:
     for (i <- 0 until words.length) {
       val w = words(i);
@@ -65,7 +63,7 @@ class InsideOutside[L,W](val parser: ChartBuilder[LogProbabilityParseChart,L,W])
                                   inside: LogProbabilityParseChart[L],
                                   outside: LogProbabilityParseChart[L],
                                   validSpan: SpanScorer[L], totalProb: Double) = {
-    val binaryRuleCounts = grammar.fillSparseArray(grammar.fillSparseArray(grammar.mkVector(0.0)));
+    val binaryRuleCounts = grammar.fillSparseArrayMap(grammar.fillSparseArrayMap(grammar.mkVector()));
     // handle binary rules
     for{
       span <- 2 to words.length;
@@ -81,9 +79,9 @@ class InsideOutside[L,W](val parser: ChartBuilder[LogProbabilityParseChart,L,W])
         val cScore = inside.top.labelScore(split, end, c)
         if (!cScore.isInfinite) {
           var i = 0;
-          while (i < parentVector.used) {
-            val a = parentVector.index(i);
-            val rScore = parentVector.data(i) + validSpan.scoreBinaryRule(begin,split, end,a,b,c);
+          while (i < parentVector.activeSize) {
+            val a = parentVector.indexAt(i);
+            val rScore = parentVector.valueAt(i) + validSpan.scoreBinaryRule(begin,split, end,a,b,c);
             val aScore = outside.bot.labelScore(begin, end, a);
             i += 1;
             if (!aScore.isInfinite) {
@@ -104,8 +102,8 @@ class InsideOutside[L,W](val parser: ChartBuilder[LogProbabilityParseChart,L,W])
                                  inside: LogProbabilityParseChart[L],
                                  outside: LogProbabilityParseChart[L],
                                  validSpan: SpanScorer[L],
-                                 totalProb: Double): SparseArray[Vector] = {
-    val unaryRuleCounts = grammar.fillSparseArray(grammar.mkVector(0.0));
+                                 totalProb: Double): SparseArrayMap[Vector[Double]] = {
+    val unaryRuleCounts = grammar.fillSparseArrayMap(grammar.mkVector());
     for{
       span <- 1 to words.length;
       begin <- 0 to (words.length - span);
@@ -116,11 +114,11 @@ class InsideOutside[L,W](val parser: ChartBuilder[LogProbabilityParseChart,L,W])
       if (!bScore.isInfinite) {
         val parentVector = grammar.unaryRulesByIndexedChild(b);
         var i = 0;
-        while (i < parentVector.used) {
-          val a = parentVector.index(i);
+        while (i < parentVector.activeSize) {
+          val a = parentVector.indexAt(i);
           val aScore = outside.top.labelScore(begin, end, a);
           if(!aScore.isInfinite) {
-            val rScore = parentVector.data(i) + validSpan.scoreUnaryRule(begin,end,a,b);
+            val rScore = parentVector.valueAt(i) + validSpan.scoreUnaryRule(begin,end,a,b);
             val prob = exp(bScore + aScore + rScore - totalProb);
             if(prob.isInfinite || prob.isNaN)
               error("nan in " + words + " for unary " + inside.grammar.index.get(a) + "->" + inside.grammar.index.get(b) + ": " + prob + " a: " + aScore + " " + "b: " + bScore + " sp: " + validSpan.scoreUnaryRule(begin,end,a,b)  + "tot: " + totalProb);
@@ -141,15 +139,15 @@ class InsideOutside[L,W](val parser: ChartBuilder[LogProbabilityParseChart,L,W])
 object InsideOutside {
 
   final case class ExpectedCounts[W](
-    binaryRuleCounts: SparseArray[SparseArray[Vector]], // parent -> lchild -> rchild -> counts;
-    unaryRuleCounts: SparseArray[Vector], // parent -> child -> counts;
-    wordCounts: SparseArray[DoubleCounter[W]], // parent -> word -> counts;
+    binaryRuleCounts: SparseArrayMap[SparseArrayMap[Vector[Double]]], // parent -> lchild -> rchild -> counts;
+    unaryRuleCounts: SparseArrayMap[Vector[Double]], // parent -> child -> counts;
+    wordCounts: SparseArrayMap[Counter[W,Double]], // parent -> word -> counts;
     var logProb: Double
   ) {
 
-    def this(g: Grammar[_]) = this(g.fillSparseArray(g.fillSparseArray(g.mkVector(0.0))),
-                                   g.fillSparseArray(g.mkVector(0.0)),
-                                   g.fillSparseArray(DoubleCounter[W]()), 0.0);
+    def this(g: Grammar[_]) = this(g.fillSparseArrayMap(g.fillSparseArrayMap(g.mkVector())),
+                                   g.fillSparseArrayMap(g.mkVector()),
+                                   g.fillSparseArrayMap(Counter[W,Double]()), 0.0);
 
     def decode[L](g: Grammar[L]) = (decodeRules(g,binaryRuleCounts), decodeUnaries(g,unaryRuleCounts),decodeWords(g,wordCounts));
 
@@ -196,14 +194,14 @@ object InsideOutside {
   }
 
   def decodeRules[L](g: Grammar[L],
-                     binaryRuleCounts: SparseArray[SparseArray[Vector]]) = {
-    val ctr = PairedDoubleCounter[L,BinaryRule[L]]();
+                     binaryRuleCounts: SparseArrayMap[SparseArrayMap[Vector[Double]]]) = {
+    val ctr = Counter2[L,BinaryRule[L],Double]();
 
     for( (pIndex,arr1) <- binaryRuleCounts.iterator;
          p = g.index.get(pIndex);
          (lIndex,arr2) <- arr1.iterator;
          l = g.index.get(lIndex);
-         (rIndex,v) <- arr2.activeElements;
+         (rIndex,v) <- arr2.nonzero.pairs.iterator;
          r = g.index.get(rIndex)
     ) {
       ctr(p,BinaryRule(p,l,r)) = v;
@@ -213,11 +211,11 @@ object InsideOutside {
   }
 
   def decodeUnaries[L](g: Grammar[L],
-            unaryRuleCounts: SparseArray[Vector]) = {
-    val ctr = PairedDoubleCounter[L,UnaryRule[L]]();
+            unaryRuleCounts: SparseArrayMap[Vector[Double]]) = {
+    val ctr = Counter2[L,UnaryRule[L],Double]();
     for( (pIndex,arr1) <- unaryRuleCounts.iterator;
         p = g.index.get(pIndex);
-        (cIndex,v) <- arr1.activeElements;
+        (cIndex,v) <- arr1.nonzero.pairs.iterator;
         c = g.index.get(cIndex)
     ) {
       ctr(p,UnaryRule(p,c)) = v;
@@ -226,10 +224,10 @@ object InsideOutside {
     ctr;
   }
 
-  def decodeWords[L,W](g: Grammar[L], wordCounts: SparseArray[DoubleCounter[W]]) = {
-    val ctr = PairedDoubleCounter[L,W]();
+  def decodeWords[L,W](g: Grammar[L], wordCounts: SparseArrayMap[Counter[W,Double]]) = {
+    val ctr = Counter2[L,W,Double]();
     for( (i,c) <- wordCounts) {
-      ctr(g.index.get(i)) := c;
+      ctr(g.index.get(i), ::) := c;
     }
     ctr;
   }
