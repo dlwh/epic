@@ -58,7 +58,7 @@ object StateSplitting {
             lexicon.tagScores(word).toString + " " +
             grammar.index.get(a) + " " + lexicon.wordScore(grammar.index.get(a),word) + " " + scorer.scoreLexical(t.span.start,t.span.start+1,a);
           }
-          error("Trouble with lexical " + t.render(s) + " " + msg.mkString(", "))
+          sys.error("Trouble with lexical " + t.render(s) + " " + msg.mkString(", "))
         }
       case t : UnaryTree[Seq[Int]] =>
         var foundOne = false;
@@ -80,7 +80,7 @@ object StateSplitting {
             grammar.index.get(a) + "->" + grammar.index.get(c) + " " +
              grammar.unaryRulesByIndexedParent(a)(c) + " " +  chart.bot(t.span.start,t.span.end,c) + " " + scorer.scoreUnaryRule(t.span.start, t.span.end, a, c);
           }}
-          error("Trouble with unary " + t.render(s) + " " + msg.mkString(", "))
+          sys.error("Trouble with unary " + t.render(s) + " " + msg.mkString(", "))
         }
       case t@BinaryTree(_,lchild,rchild) =>
         var foundOne = false;
@@ -109,9 +109,9 @@ object StateSplitting {
                  grammar.binaryRulesByIndexedLeftChild(b)(c)(a) +  " lc:"+ chart.top(begin,split,b) +  " rc: " + chart.top(split,end,c) +
                 " scorer: " + scorer.scoreBinaryRule(begin,split,end,a,b,c);
           }}}
-          error("Trouble with binary " + t.render(s) + " " + msg.mkString(", "))
+          sys.error("Trouble with binary " + t.render(s) + " " + msg.mkString(", "))
         }
-      case _ => error("bad tree!");
+      case _ => sys.error("bad tree!");
     }
 
     chart;
@@ -181,7 +181,7 @@ object StateSplitting {
     // normalizer
     val totalProb = logSum(tree.label.map(grammar.index).map(iScores.top(0,s.length,_)));
     if(totalProb.isInfinite || totalProb.isNaN)
-      error("NAn or infinite" + totalProb + " " + tree.render(s));
+      sys.error("NAn or infinite" + totalProb + " " + tree.render(s));
 
     indexedTree.allChildren foreach {
       case t: NullaryTree[Seq[Int]] =>

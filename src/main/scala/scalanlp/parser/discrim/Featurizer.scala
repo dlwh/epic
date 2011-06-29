@@ -24,17 +24,15 @@ object BitStuff {
 import BitStuff._;
 
 
-@serializable
 @SerialVersionUID(1)
-trait Feature[+L,+W];
+trait Feature[+L,+W] extends Serializable;
 
 /**
  * 
  * @author dlwh
  */
-@serializable
 @SerialVersionUID(1)
-trait Featurizer[L,W] {
+trait Featurizer[L,W] extends Serializable {
   def featuresFor(r: Rule[L]):Counter[Feature[L,W], Double];
   def featuresFor(l: L, w: W):Counter[Feature[L,W], Double];
 

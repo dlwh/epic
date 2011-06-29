@@ -60,7 +60,7 @@ class CKYChartBuilder[Chart[X]<:ParseChart[X], L,W](val root: L,
       }
       if(!foundSomething) {
         val spanScores = lexicon.tagScores(s(i)).nonzero.pairs.iterator.map { case (k,v) => (k,validSpan.scoreLexical(i,i+1,grammar.index(k)))} toIndexedSeq;
-        error("Couldn't score " + s(i) + " " + lexicon.tagScores(s(i)) + "spans: " + spanScores);
+        sys.error("Couldn't score " + s(i) + " " + lexicon.tagScores(s(i)) + "spans: " + spanScores);
       }
 
       updateInsideUnaries(chart,i,i+1, validSpan);

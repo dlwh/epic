@@ -34,15 +34,15 @@ trait Lexicon[L,W] {
 
 // counter should be in log space
 class UnsmoothedLexicon[L,W](lexicon: Counter2[L,W,Double]) extends Lexicon[L,W] {
-  def wordScore(l: L, w: W) = lexicon(l,w);
+  def wordScore(l: L, w: W) = if(lexicon.contains(l,w)) lexicon(l,w)  else Double.NegativeInfinity
   def tags = lexicon.domain._1.iterator
   def knownTagWords = lexicon.nonzero.keys.iterator;
 }
 
 // counter should be in normal space
 class SimpleLexicon[L,W](private val lexicon: Counter2[L,W,Double]) extends Lexicon[L,W] {
-  private val wordCounts = sum(lexicon)
-  private val labelCounts = sum(lexicon,Axis.Vertical)
+  private val wordCounts:Counter[W,Double] = sum(lexicon)
+  private val labelCounts:Counter[L,Double] = sum(lexicon,Axis.Vertical)
   private val totalCount = wordCounts.sum
   def knownTagWords = lexicon.nonzero.keys.iterator;
 

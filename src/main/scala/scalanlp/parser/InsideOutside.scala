@@ -87,7 +87,7 @@ class InsideOutside[L,W](val parser: ChartBuilder[LogProbabilityParseChart,L,W])
             if (!aScore.isInfinite) {
               val prob = exp(bScore + cScore + aScore + rScore - totalProb);
               if(prob.isInfinite || prob.isNaN)
-                error(prob + " in " + words + " a: " + aScore + " b" + bScore  + " c" + cScore  + " r" + rScore  + " sp" + validSpan.scoreBinaryRule(begin,split,end,a,b,c) + " t" + totalProb);
+                sys.error(prob + " in " + words + " a: " + aScore + " b" + bScore  + " c" + cScore  + " r" + rScore  + " sp" + validSpan.scoreBinaryRule(begin,split,end,a,b,c) + " t" + totalProb);
               binaryRuleCounts.getOrElseUpdate(a).getOrElseUpdate(b)(c) += prob;
               assert(binaryRuleCounts(a)(b)(c) >= prob,binaryRuleCounts(a)(b)(c) + " " + prob);
             }
@@ -121,7 +121,7 @@ class InsideOutside[L,W](val parser: ChartBuilder[LogProbabilityParseChart,L,W])
             val rScore = parentVector.valueAt(i) + validSpan.scoreUnaryRule(begin,end,a,b);
             val prob = exp(bScore + aScore + rScore - totalProb);
             if(prob.isInfinite || prob.isNaN)
-              error("nan in " + words + " for unary " + inside.grammar.index.get(a) + "->" + inside.grammar.index.get(b) + ": " + prob + " a: " + aScore + " " + "b: " + bScore + " sp: " + validSpan.scoreUnaryRule(begin,end,a,b)  + "tot: " + totalProb);
+              sys.error("nan in " + words + " for unary " + inside.grammar.index.get(a) + "->" + inside.grammar.index.get(b) + ": " + prob + " a: " + aScore + " " + "b: " + bScore + " sp: " + validSpan.scoreUnaryRule(begin,end,a,b)  + "tot: " + totalProb);
             unaryRuleCounts.getOrElseUpdate(a)(b) += prob;
           }
           i += 1;
@@ -190,6 +190,7 @@ object InsideOutside {
       logProb -= tProb;
       this;
     }
+
 
   }
 

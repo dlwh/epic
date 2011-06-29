@@ -27,7 +27,7 @@ class LabeledSpanScorerFactory[C,L,W](parser: ChartBuilder[ParseChart,L,W],
 
     val sentProb = inside.top(0,s.length,coarseRootIndex);
     if(sentProb.isInfinite) {
-      error("Couldn't parse " + s + " " + sentProb)
+      sys.error("Couldn't parse " + s + " " + sentProb)
     }
 
     val chartScorer = buildSpanScorer(inside,outside,sentProb);
@@ -43,7 +43,7 @@ class LabeledSpanScorerFactory[C,L,W](parser: ChartBuilder[ParseChart,L,W],
 
     val sentProb = inside.top.labelScore(0,s.length,coarseRootIndex);
     if(sentProb.isInfinite) {
-      error("Couldn't parse " + s + " " + sentProb)
+      sys.error("Couldn't parse " + s + " " + sentProb)
     }
 
     try {
@@ -100,7 +100,7 @@ class LabeledSpanScorerFactory[C,L,W](parser: ChartBuilder[ParseChart,L,W],
         if(scores(index) == null || scores(index)(c) == Double.NegativeInfinity) {
           println("grrr....");
           println(parser.grammar.index.get(c) + " " + begin + " " + end + tree + " " + inside.bot.labelScore(begin,end,c) + " " + outside.bot.labelScore(begin,end,c) + " " + sentProb)
-          //if(begin + 1 != end) error("crashy");
+          //if(begin + 1 != end) sys.error("crashy");
         }
       }
     }
@@ -181,7 +181,7 @@ object ProjectTreebankToLabeledSpans {
   }
 
   def loadSpans(spanDir: File) = {
-    if(!spanDir.exists || !spanDir.isDirectory) error(spanDir + " must exist and be a directory!")
+    if(!spanDir.exists || !spanDir.isDirectory) sys.error(spanDir + " must exist and be a directory!")
 
     val trainSpans = loadSpansFile(new File(spanDir,TRAIN_SPANS_NAME));
     val devSpans = loadSpansFile(new File(spanDir,DEV_SPANS_NAME));

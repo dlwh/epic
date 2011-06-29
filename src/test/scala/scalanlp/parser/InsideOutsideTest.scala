@@ -4,6 +4,7 @@ import org.junit.runner.RunWith;
 import org.scalatest._;
 import org.scalatest.junit._;
 import org.scalatest.prop._;
+import scalala.tensor.::
 
 /**
  * 
@@ -11,6 +12,11 @@ import org.scalatest.prop._;
  */
 @RunWith(classOf[JUnitRunner])
 class InsideOutsideTest extends FunSuite {
+
+  implicit def near(x: Double) = new {
+    def near(y: Double) = if( (x-y).abs < 1E-4 * math.max(x+y,1E-4)/2) None else Some(x + " not near " + y)
+  }
+
   test("Simple test from iobasics") {
     val grammar = DSLGrammar.simpleGrammar;
     val lexicon = DSLGrammar.simpleLexicon;
@@ -18,15 +24,15 @@ class InsideOutsideTest extends FunSuite {
     val sent = "She eats pizza without anchovies" split " ";
     val counts = io.expectedCounts(sent);
     val (rules,unaries,words) = counts.decode(grammar);
-    assert(rules("Sb",BinaryRule("Sb","NPu","VPu")) === 1.0);
-    assert(rules("NPb",BinaryRule("NPb","Nu","PPu")) === 1.0);
-    assert(rules("PPb",BinaryRule("PPb","Pu","Nu")) === 1.0);
-    assert(rules("VPb",BinaryRule("VPb","Vu","NPu")) === 1.0);
-    assert(words("P","without") === 1.0);
-    assert(words("N","pizza") === 1.0);
-    assert(words("N","She") === 1.0);
-    assert(words("N","anchovies") === 1.0);
-    assert(words("V","eats") === 1.0);
+    assert(rules("Sb",BinaryRule("Sb","NPu","VPu")) near 1.0);
+    assert(rules("NPb",BinaryRule("NPb","Nu","PPu")) near 1.0);
+    assert(rules("PPb",BinaryRule("PPb","Pu","Nu")) near 1.0);
+    assert(rules("VPb",BinaryRule("VPb","Vu","NPu")) near 1.0);
+    assert(words("P","without") near 1.0, words("P",::));
+    assert(words("N","pizza") near 1.0);
+    assert(words("N","She") near 1.0);
+    assert(words("N","anchovies") near 1.0);
+    assert(words("V","eats") near 1.0);
   }
 
   test("complex example") {
@@ -37,17 +43,17 @@ class InsideOutsideTest extends FunSuite {
     val counts = io.expectedCounts(sent);
     val res@(rules,unaries, words) = counts.decode(grammar);
 
-    assert(rules("Sb",BinaryRule("Sb","NPu","VPu")) === 1.0);
-    assert(rules("VPb",BinaryRule("VPb","VBZu","NPu")) === 0.4999999999999997);
-    assert(rules("VPb",BinaryRule("VPb","VBZu","ADJPu"))===0.4999999999999997);
-    assert(rules("NPb",BinaryRule("NPb","JJu","NNu"))===0.49999999999999994);
-    assert(unaries("NPu",UnaryRule("NPu","NN"))===0.49999999999999994);
-    assert(unaries("NPu",UnaryRule("NPu","PRP"))===1.0);
-    assert(rules("ADJPb",BinaryRule("ADJPb","JJu","NPu")) === 0.49999999999999994);
-    assert(words("JJ","good") === 1.0);
-    assert(words("NN","control") === 1.0);
-    assert(words("VBZ","has") === 1.0);
-    assert(words("PRP","He") === 1.0);
+    assert(rules("Sb",BinaryRule("Sb","NPu","VPu")) near  1.0);
+    assert(rules("VPb",BinaryRule("VPb","VBZu","NPu")) near  0.4999999999999997);
+    assert(rules("VPb",BinaryRule("VPb","VBZu","ADJPu"))near 0.4999999999999997);
+    assert(rules("NPb",BinaryRule("NPb","JJu","NNu"))near 0.49999999999999994);
+    assert(unaries("NPu",UnaryRule("NPu","NN"))near 0.49999999999999994);
+    assert(unaries("NPu",UnaryRule("NPu","PRP"))near 1.0);
+    assert(rules("ADJPb",BinaryRule("ADJPb","JJu","NPu")) near  0.49999999999999994);
+    assert(words("JJ","good") near  1.0);
+    assert(words("NN","control") near  1.0);
+    assert(words("VBZ","has") near  1.0);
+    assert(words("PRP","He") near  1.0);
   }
 
   test("complex example inside") {
