@@ -20,6 +20,7 @@ import scalanlp.trees.Span
 
 import scalanlp.util.Encoder
 import scalala.tensor.Counter
+import scalala.tensor.dense.DenseVectorCol
 ;
 
 @serializable
@@ -85,12 +86,12 @@ abstract class ParseChart[L](val grammar: Encoder[L], val length: Int) {
 
   // requirements: sum(a,b) >= a, \forall b that might be used.
   def sum(a:Double,b: Double):Double
-  protected def zero: Double;
+  protected final def zero = Double.NegativeInfinity
 
   private val emptySpan = Span(length+1,length+1)
 
   override def toString = {
-    val data = new TriangularArray[Counter[L, Double]](length+1, (i:Int,j:Int)=>grammar.decode(top.scoreArray(TriangularArray.index(i,j)))).toString;
+    val data = new TriangularArray[Counter[L, Double]](length+1, (i:Int,j:Int)=>grammar.decode(new DenseVectorCol(top.scoreArray(TriangularArray.index(i,j))))).toString;
     "ParseChart[" + data + "]";
   }
 
@@ -101,7 +102,6 @@ object ParseChart {
   def apply[L](g: Grammar[L], length: Int) = viterbi(g,length);
 
   trait Viterbi {
-    final def zero = Double.NegativeInfinity;
     final def sum(a: Double, b: Double) = {
       math.max(a,b);
     }
@@ -109,15 +109,13 @@ object ParseChart {
   type ViterbiParseChart[L] = ParseChart[L] with Viterbi;
 
   trait LogProbability {
-    final def zero = Double.NegativeInfinity;
     final def sum(a: Double, b: Double) = scalala.library.Numerics.logSum(a,b);
   }
   type LogProbabilityParseChart[L] = ParseChart[L] with LogProbability;
 
 
-  @serializable
   @SerialVersionUID(1)
-  trait Factory[Chart[X]<:ParseChart[X]] {
+  trait Factory[Chart[X]<:ParseChart[X]] extends Serializable {
     def apply[L](g: Encoder[L], length: Int):Chart[L];
     def computeUnaryClosure[L](g: Grammar[L]):UnaryRuleClosure;
   }

@@ -54,7 +54,7 @@ class ViterbiDecoder[C,F, W](val indexedProjections: ProjectionIndexer[C,F]) ext
 
       if(maxScore == Double.NegativeInfinity) {
         println("entered things: " + inside.bot.enteredLabelScores(start,end).map { case (i,v) => (grammar.index.get(i),v)}.toList)
-        error("Couldn't find a tree!" + start + " " + end + " " + grammar.index.get(root));
+        sys.error("Couldn't find a tree!" + start + " " + end + " " + grammar.index.get(root));
       }
       val child = buildTree(start,end,maxChild);
       UnaryTree(indexedProjections.coarseSymbol(root),child)(Span(start,end));
@@ -87,7 +87,7 @@ class ViterbiDecoder[C,F, W](val indexedProjections: ProjectionIndexer[C,F]) ext
 
       if(maxScore == Double.NegativeInfinity) {
         println("entered things: " + inside.bot.enteredLabelScores(start,end).map { case (i,v) => (grammar.index.get(i),v)}.toList)
-        error("Couldn't find a tree!" + start + " " + end + " " + grammar.index.get(root));
+        sys.error("Couldn't find a tree!" + start + " " + end + " " + grammar.index.get(root));
       } else {
         val lchild = buildTreeUnary(start,maxSplit,maxLeft);
         val rchild = buildTreeUnary(maxSplit,end,maxRight);
