@@ -212,7 +212,7 @@ trait LatentTrainer extends ParserTrainer {
 
     val obj = mkObjective(params, latentFeaturizer, trainTrees, indexedProjections, xbarParser, openTags, closedWords)
 
-    val optimizer = opt.minimizer(obj,trainTrees.length);
+    val optimizer = opt.minimizer(obj);
 
     val init = obj.initialWeightVector + 0.0;
 

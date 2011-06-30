@@ -100,11 +100,7 @@ object DiscriminativeTrainer extends ParserTrainer {
     }
 
     val obj = new DiscrimObjective(featurizer, trainTrees.toIndexedSeq, xbarParser, openTags, closedWords) with ConsoleLogging;
-    val optimizer = new StochasticGradientDescent[DenseVector[Double]](opt.alpha,maxIterations, opt.batchSize)
-              with AdaptiveGradientDescent.L2Regularization[DenseVector[Double]]
-              with ConsoleLogging {
-        override val lambda = params.opt.adjustedRegularization(trainTrees.length);
-      }
+    val optimizer = params.opt.minimizer(new CachedBatchDiffFunction(obj))
 
     // new LBFGS[Int,DenseVector[Double]](iterationsPerEval,5) with ConsoleLogging;
     val init = obj.initialWeightVector;
