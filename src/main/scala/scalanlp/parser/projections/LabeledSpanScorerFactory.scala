@@ -137,7 +137,8 @@ object ProjectTreebankToLabeledSpans {
   val SPAN_INDEX_NAME = "spanindex.ser"
   def main(args: Array[String]) {
     val parser = loadParser(new File(args(0)));
-    val treebank = ProcessedTreebank(TreebankParams(new File(args(1))),SpanParams());
+    val treebank = ProcessedTreebank(TreebankParams(new File(args(1)),maxLength=10000),SpanParams());
+
     val outDir = new File(args(2));
     outDir.mkdirs();
     val projections = ProjectionIndexer(parser.builder.grammar.index,parser.builder.grammar.index,identity[String])
