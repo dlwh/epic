@@ -435,7 +435,7 @@ object FeatureIndexer {
         indexedProjections.fineIndex.get(bSplit),
         indexedProjections.fineIndex.get(cSplit));
       val feats = f.featuresFor(binaryRule);
-      binaryRuleCache(aSplit)(bSplit)(cSplit) = feats;
+      binaryRuleCache(aSplit).getOrElseUpdate(bSplit)(cSplit) = feats;
       feats.keysIterator.foreach {featureIndex.index _ };
     }
 
