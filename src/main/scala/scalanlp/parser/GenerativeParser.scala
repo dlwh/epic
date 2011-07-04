@@ -35,10 +35,10 @@ object GenerativeParser {
     ChartParser(builder);
   }
 
-  def extractLexiconAndGrammar[W](data: TraversableOnce[TreeInstance[String,W]]):(Lexicon[String,W],GenerativeGrammar[String]) = {
+  def extractLexiconAndGrammar[W](data: TraversableOnce[TreeInstance[String,W]]) = {
     val (wordCounts,binaryProductions,unaryProductions) = extractCounts(data);
     val lexicon = new SimpleLexicon(wordCounts);
-    (lexicon,new GenerativeGrammar(Library.logAndNormalizeRows(binaryProductions),Library.logAndNormalizeRows(unaryProductions)));
+    (lexicon,Grammar(Library.logAndNormalizeRows(binaryProductions),Library.logAndNormalizeRows(unaryProductions)));
   }
 
 
@@ -82,7 +82,7 @@ object SigTrainer extends ParserTrainer with NoParams {
                   unaryReplacer : ChainReplacer[String],
                   config: Params) = {
     val (words,binary,unary) = GenerativeParser.extractCounts(trainTrees);
-    val grammar = new GenerativeGrammar(Library.logAndNormalizeRows(binary),Library.logAndNormalizeRows(unary));
+    val grammar = Grammar(Library.logAndNormalizeRows(binary),Library.logAndNormalizeRows(unary));
     val lexicon = new SignatureLexicon(words, EnglishWordClassGenerator, 5);
     val parser = ChartParser(CKYChartBuilder("",lexicon,grammar).withCharts(ParseChart.logProb));
     Iterator.single(("Gen",parser));

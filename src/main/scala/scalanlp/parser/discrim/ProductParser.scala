@@ -38,7 +38,7 @@ class ProductParser[L,L2,W](val parsers: Seq[ChartBuilder[LogProbabilityParseCha
     new AnchoredRuleScorerFactory(parser,projection,Double.NegativeInfinity);
   }
 
-  val zeroGrammar = new ZeroGrammar(coarseParser.grammar);
+  val zeroGrammar = Grammar.zero(coarseParser.grammar);
   val zeroLexicon = new ZeroLexicon(coarseParser.lexicon);
   val zeroParser = new CKYChartBuilder[LogProbabilityParseChart,L,W](coarseParser.root, zeroLexicon,zeroGrammar,ParseChart.logProb);
   val coarseIndexer = ProjectionIndexer(coarseParser.grammar.index, coarseParser.grammar.index, identity[L] _)

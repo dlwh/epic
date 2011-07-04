@@ -122,7 +122,7 @@ class MaxRuleProductDecoder[C,F, W](coarseGrammar: Grammar[C], coarseLexicon: Le
   override def extractBestParse(root: F, grammar: Grammar[F],
                                 inside: ParseChart[F], outside: =>ParseChart[F], words:Seq[W],
                                 spanScorer: SpanScorer[F] = SpanScorer.identity):BinarizedTree[C] = {
-    val zeroGrammar = new ZeroGrammar(coarseGrammar);
+    val zeroGrammar = Grammar.zero(coarseGrammar);
     val zeroLexicon = new ZeroLexicon(coarseLexicon);
     val coarseRoot = indexedProjections.project(root)
     val zeroParser = new CKYChartBuilder[ParseChart.LogProbabilityParseChart,C,W](coarseRoot, zeroLexicon, zeroGrammar,ParseChart.logProb);
@@ -140,7 +140,7 @@ object MaxRuleTrainer extends ParserTrainer with NoParams {
                   unaryReplacer : ChainReplacer[String],
                   config: Params) = {
     val (words,binary,unary) = GenerativeParser.extractCounts(trainTrees);
-    val grammar = new GenerativeGrammar(Library.logAndNormalizeRows(binary),Library.logAndNormalizeRows(unary));
+    val grammar = Grammar(Library.logAndNormalizeRows(binary),Library.logAndNormalizeRows(unary));
     val lexicon = new SignatureLexicon(words, EnglishWordClassGenerator, 3);
     val projections = ProjectionIndexer.simple(grammar.index);
     val builder = CKYChartBuilder("",lexicon,grammar).withCharts(ParseChart.logProb);
@@ -236,7 +236,7 @@ object MaxConstituentTrainer extends ParserTrainer with NoParams {
                   unaryReplacer : ChainReplacer[String],
                   config: Params) = {
     val (words,binary,unary) = GenerativeParser.extractCounts(trainTrees);
-    val grammar = new GenerativeGrammar(Library.logAndNormalizeRows(binary),Library.logAndNormalizeRows(unary));
+    val grammar = Grammar(Library.logAndNormalizeRows(binary),Library.logAndNormalizeRows(unary));
     val lexicon = new SignatureLexicon(words, EnglishWordClassGenerator, 3);
     val projections = ProjectionIndexer.simple(grammar.index);
     val builder = CKYChartBuilder("",lexicon,grammar).withCharts(ParseChart.logProb);

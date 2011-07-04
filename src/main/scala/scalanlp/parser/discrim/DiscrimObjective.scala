@@ -80,7 +80,7 @@ object DiscriminativeTrainer extends ParserTrainer {
     val (initLexicon,initBinaries,initUnaries) = GenerativeParser.extractCounts(trainTrees);
 
     val xbarParser = params.parser.optParser getOrElse {
-      val grammar = new GenerativeGrammar(Library.logAndNormalizeRows(initBinaries),Library.logAndNormalizeRows(initUnaries));
+      val grammar = Grammar(Library.logAndNormalizeRows(initBinaries),Library.logAndNormalizeRows(initUnaries));
       val lexicon = new SimpleLexicon(initLexicon);
       new CKYChartBuilder[LogProbabilityParseChart,String,String]("",lexicon,grammar,ParseChart.logProb);
     }

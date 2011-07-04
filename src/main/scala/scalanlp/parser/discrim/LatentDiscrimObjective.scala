@@ -184,7 +184,7 @@ trait LatentTrainer extends ParserTrainer {
     println("NumStates: " + params.numStates);
 
     val xbarParser = parser.optParser.getOrElse {
-      val grammar = new GenerativeGrammar(Library.logAndNormalizeRows(initBinaries),Library.logAndNormalizeRows(initUnaries));
+      val grammar = Grammar(Library.logAndNormalizeRows(initBinaries),Library.logAndNormalizeRows(initUnaries));
       val lexicon = new SimpleLexicon(initLexicon);
       new CKYChartBuilder[LogProbabilityParseChart,String,String]("",lexicon,grammar,ParseChart.logProb);
     }

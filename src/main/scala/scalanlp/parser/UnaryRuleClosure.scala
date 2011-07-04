@@ -24,9 +24,8 @@ import scalanlp.graphs._;
  *
  * @author dlwh
  */
-@serializable
 @SerialVersionUID(1)
-trait UnaryRuleClosure {
+trait UnaryRuleClosure extends Serializable {
   def closeFromChild(child: Int):OldSparseVector;
   def closeFromParent(parent: Int):OldSparseVector;
 }

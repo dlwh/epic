@@ -289,7 +289,7 @@ object StateSplitting {
       assert(splitRules.sum != 0)
       assert(splitUnRules.sum != 0)
       assert(splitWords.sum != 0)
-      val grammar = new GenerativeGrammar(Library.logAndNormalizeRows(splitRules), Library.logAndNormalizeRows(splitUnRules));
+      val grammar = Grammar(Library.logAndNormalizeRows(splitRules), Library.logAndNormalizeRows(splitUnRules));
       val lexicon = new UnsmoothedLexicon(Library.logAndNormalizeRows(splitWords));
       val accum = trees.par.view.map {case TreeInstance(_,t,s,_) =>  expectedCounts[L,W](grammar,lexicon,t,s)}.reduce((_:ExpectedCounts[W]) += (_:ExpectedCounts[W]) )
       val logProb = accum.logProb;
@@ -392,13 +392,13 @@ object StateSplittingTrainer extends ParserTrainer with NoParams {
     println("Extracting counts");
     val (initialLex,initialProductions,initUnR) = GenerativeParser.extractCounts(trainTrees)
 
-    val coarseGrammar = new GenerativeGrammar(Library.logAndNormalizeRows(initialProductions),
+    val coarseGrammar = Grammar(Library.logAndNormalizeRows(initialProductions),
       Library.logAndNormalizeRows(initUnR));
     println("Splitting Grammar");
     import StateSplitting._;
     val data = SplittingData(initialProductions, initUnR, initialLex)
     for( (SplittingData(finalProd,finalUn,finalLex),logProb) <-  splitGrammar(data,trainTrees,"")) yield {
-      val grammar = new GenerativeGrammar(Library.logAndNormalizeRows(finalProd),Library.logAndNormalizeRows(finalUn));
+      val grammar = Grammar(Library.logAndNormalizeRows(finalProd),Library.logAndNormalizeRows(finalUn));
       val lex = new SimpleLexicon(finalLex);
       val builder = CKYChartBuilder(("",0),lex,grammar);
       def proj(l: (String,Int)) = l._1;

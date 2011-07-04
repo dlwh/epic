@@ -46,7 +46,7 @@ class FeaturizedLexicon[L,W](val openTagSet: Set[L], val closedWords: Set[W], va
        (word,feats) <- wordMap) {
     val score = feats dot weights;
     if(score.isNaN) {
-      error("Score for " + word + "is NaN!" + feats.nonzero.keys.map { k => (featureIndexer.index.get(k),weights(k))}.toIndexedSeq);
+      sys.error("Score for " + word + "is NaN!" + feats.nonzero.keys.map { k => (featureIndexer.index.get(k),weights(k))}.toIndexedSeq);
     }
     wordScores(word,featureIndexer.labelIndex.get(tagIndex)) = score;
     assert(wordScores(word,featureIndexer.labelIndex.get(tagIndex)) != Double.NegativeInfinity, (word,featureIndexer.labelIndex.get(tagIndex)).toString + "\n" +

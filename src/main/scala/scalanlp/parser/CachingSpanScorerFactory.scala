@@ -10,7 +10,7 @@ import scalanlp.tensor.sparse.OldSparseVector
  */
 class CachingSpanScorerFactory[L,W](chartBuilder: ChartBuilder[ParseChart,L,W]) extends SpanScorer.Factory[L,L,W] {
   val zero = new CKYChartBuilder[ParseChart.LogProbabilityParseChart, L,W](chartBuilder.root,
-    new ZeroLexicon(chartBuilder.lexicon), new ZeroGrammar(chartBuilder.grammar),ParseChart.logProb);
+    new ZeroLexicon(chartBuilder.lexicon), Grammar.zero(chartBuilder.grammar),ParseChart.logProb);
 
 
   def mkSpanScorer(s: Seq[W], oldScorer: SpanScorer[L] = SpanScorer.identity):SpanScorer[L] = {

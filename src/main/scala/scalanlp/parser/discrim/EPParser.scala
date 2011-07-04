@@ -14,12 +14,11 @@ import collection.mutable.ArrayBuffer
  *
  * @author dlwh
  */
-@serializable
 @SerialVersionUID(1)
 class EPParser[L,L2,W](val parsers: Seq[ChartBuilder[LogProbabilityParseChart,L2,W]], coarseParser: ChartBuilder[LogProbabilityParseChart,L,W],
                        val projections: Seq[ProjectionIndexer[L,L2]],
                        val maxEPIterations: Int= 1,
-                       val damping: Double = 1.0) extends Parser[L,W] {
+                       val damping: Double = 1.0) extends Parser[L,W] with Serializable {
 
   case class EPResult(marginals: Seq[ParsedSentenceData], partition: Double, f0: SpanScorer[L])
   case class ParsedSentenceData(inside: LogProbabilityParseChart[L2], outside: LogProbabilityParseChart[L2],
@@ -126,7 +125,7 @@ class EPParser[L,L2,W](val parsers: Seq[ChartBuilder[LogProbabilityParseChart,L2
   }
   val decoder = new ViterbiDecoder[L,L2,W](projections.last);
   val f0Decoder = new MaxConstituentDecoder[L,L,W](ProjectionIndexer.simple(coarseParser.grammar.index));
-  val f0Builder = new CKYChartBuilder[LogProbabilityParseChart,L,W](coarseParser.root,new ZeroLexicon(coarseParser.lexicon), new ZeroGrammar(coarseParser.grammar), ParseChart.logProb);
+  val f0Builder = new CKYChartBuilder[LogProbabilityParseChart,L,W](coarseParser.root,new ZeroLexicon(coarseParser.lexicon), Grammar.zero(coarseParser.grammar), ParseChart.logProb);
 
   def bestParse(s: scala.Seq[W], spanScorer: SpanScorer[L]) = {
     val EPResult(parserDatas,partition,f0) = buildAllCharts(s,spanScorer);

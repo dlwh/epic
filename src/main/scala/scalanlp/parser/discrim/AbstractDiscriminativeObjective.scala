@@ -78,7 +78,7 @@ abstract class AbstractDiscriminativeObjective[L,L2,W](
   }
 
   protected def weightsToGrammar(indexedFeatures: FeatureIndexer[L2,W], weights: DenseVector[Double]):Grammar[L2] = {
-    val grammar =  new FeaturizedGrammar(weights,indexedFeatures)
+    val grammar =  FeaturizedGrammar(weights,indexedFeatures)
     grammar;
   }
 

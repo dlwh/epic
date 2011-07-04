@@ -20,7 +20,7 @@ object DSLGrammar {
       }
     }
 
-    new GenerativeGrammar(Library.logAndNormalizeRows(binaryProductions),Library.logAndNormalizeRows(unaryProductions));
+    Grammar(Library.logAndNormalizeRows(binaryProductions),Library.logAndNormalizeRows(unaryProductions));
   }
 
   def lexicon(words: ((Symbol,String),Double)*) = {

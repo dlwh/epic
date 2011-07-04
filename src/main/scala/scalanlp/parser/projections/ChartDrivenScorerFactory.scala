@@ -17,7 +17,7 @@ abstract class ChartDrivenScorerFactory[C,L,W](parser: ChartBuilder[ParseChart.L
 
     val sentProb = inside.top.labelScore(0,s.length,coarseRootIndex);
     if(sentProb.isInfinite) {
-      error("Couldn't parse " + s + " " + sentProb)
+      sys.error("Couldn't parse " + s + " " + sentProb)
     }
 
     val chartScorer = buildSpanScorer(inside,outside,sentProb,scorer);

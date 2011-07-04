@@ -111,9 +111,8 @@ class LabeledSpanScorerFactory[C,L,W](parser: ChartBuilder[ParseChart,L,W],
 
 }
 
-@serializable
 @SerialVersionUID(1)
-class LabeledSpanScorer[L](scores: Array[OldSparseVector]) extends SpanScorer[L] {
+class LabeledSpanScorer[L](scores: Array[OldSparseVector]) extends SpanScorer[L] with Serializable {
   @inline
   private def score(begin: Int, end: Int, label: Int) = {
     if(scores(TriangularArray.index(begin,end)) eq null) Double.NegativeInfinity

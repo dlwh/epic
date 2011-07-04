@@ -124,7 +124,7 @@ object ParseEval {
                      parser: Parser[String,String], evalDir: String, chainReplacer: ChainReplacer[String]) = {
 
     val parsedir = new File(evalDir);
-    parsedir.exists() || parsedir.mkdirs() || error("Couldn't make directory: " + parsedir);
+    parsedir.exists() || parsedir.mkdirs() || sys.error("Couldn't make directory: " + parsedir);
     val goldOut = new PrintStream(new BufferedOutputStream(new FileOutputStream(new File(parsedir,"gold"))));
     val guessOut = new PrintStream(new BufferedOutputStream(new FileOutputStream(new File(parsedir,"guess"))));
 
