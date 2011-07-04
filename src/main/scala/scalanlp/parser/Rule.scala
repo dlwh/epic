@@ -1,5 +1,8 @@
 package scalanlp.parser
 
+import scalanlp.serialization.{SerializationFormat, DataSerialization}
+import java.io.DataOutput
+
 /*
  Copyright 2010 David Hall
 
@@ -18,44 +21,79 @@ package scalanlp.parser
 
 
 
-import scalanlp.util.Encoder;
-import scalanlp.collection.mutable.SparseArrayMap;
-import scalanlp.util.Index
-import scalanlp.tensor.sparse.OldSparseVector
-import scalala.tensor.{Counter2,::}
-
 sealed trait Rule[@specialized(Int) +L] { def parent: L; def children: Seq[L] }
 
+final case class BinaryRule[@specialized(Int) +L](parent: L, left: L, right: L) extends Rule[L] {
+  def children = Seq(left,right);
+}
+final case class UnaryRule[@specialized(Int) +L](parent: L, child: L) extends Rule[L] {
+  def children = Seq(child);
+}
 
 
+object Rule {
+  implicit def ruleReadWritable[L:DataSerialization.ReadWritable] = new DataSerialization.ReadWritable[Rule[L]] {
+    def write(sink: DataOutput, r: Rule[L]) = r match {
+      case r@UnaryRule(_,_) =>
+        sink.writeBoolean(false)
+        DataSerialization.write(sink, r.parent)
+        DataSerialization.write(sink, r.child)
+      case r@BinaryRule(_,_,_) =>
+        sink.writeBoolean(true)
+        DataSerialization.write(sink, r.parent)
+        DataSerialization.write(sink, r.left)
+        DataSerialization.write(sink, r.right)
+    }
 
-
-/*
-object Grammar {
-  import scalanlp.serialization.DataSerialization._;
-  import scalanlp.serialization.DataSerialization
-  implicit def grammarIsWritable[L:Writable]: Writable[Grammar[L]] = new Writable[Grammar[L]] {
-    def write(out: DataOutput, g: Grammar[L]) = {
-      // Grammar consists of an index, unary rules, and binary rules.
-      DataSerialization.write(out, g.index);
-      // Unary format: (parent index,<sparse vec of unary rules>)*, -1
-      for(i <- 0 until g.index.size) {
-        val vec = g.unaryRulesByIndexedParent(i);
-        if(g.used != 0) {
-          DataSerialization.write(out, i);
-          DataSerialization.write(out, vec);
-        }
+    def read(source: DataSerialization.Input) = {
+      if(source.readBoolean()) {
+        val p = DataSerialization.read[L](source)
+        val c = DataSerialization.read[L](source)
+        UnaryRule(p,c)
+      } else {
+        val p = DataSerialization.read[L](source)
+        val l = DataSerialization.read[L](source)
+        val r = DataSerialization.read[L](source)
+        BinaryRule(p,l,r)
       }
-      DataSerialization.write(-1);
-      // Binary format: (parent index,(lchild index, sparsevec of rchild,score)
-
-
     }
   }
 }
-*/
 
-/**
- * Given a counter of productions that has been log-normalized by rows,
- * creates a grammar. Simple simple.
- */
+object UnaryRule {
+  implicit def ruleReadWritable[L:DataSerialization.ReadWritable] = new DataSerialization.ReadWritable[UnaryRule[L]] {
+    def write(sink: DataOutput, r: UnaryRule[L]) = {
+      sink.writeBoolean(false)
+      DataSerialization.write(sink, r.parent)
+      DataSerialization.write(sink, r.child)
+    }
+
+    def read(source: DataSerialization.Input) = {
+      val isUnary = !source.readBoolean()
+      assert(isUnary)
+      val p = DataSerialization.read[L](source)
+      val c = DataSerialization.read[L](source)
+      UnaryRule(p,c)
+    }
+  }
+}
+
+object BinaryRule {
+  implicit def ruleReadWritable[L:DataSerialization.ReadWritable] = new DataSerialization.ReadWritable[BinaryRule[L]] {
+    def write(sink: DataOutput, r: BinaryRule[L]) = {
+      sink.writeBoolean(true)
+      DataSerialization.write(sink, r.parent)
+      DataSerialization.write(sink, r.left)
+      DataSerialization.write(sink, r.right)
+    }
+
+    def read(source: DataSerialization.Input) = {
+      val isBinary = source.readBoolean()
+      assert(isBinary)
+      val p = DataSerialization.read[L](source)
+      val c = DataSerialization.read[L](source)
+      val r = DataSerialization.read[L](source)
+      BinaryRule(p,c,r)
+    }
+  }
+}
