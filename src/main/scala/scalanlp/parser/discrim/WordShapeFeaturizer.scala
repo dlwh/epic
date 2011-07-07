@@ -8,6 +8,7 @@ import scalala.library.Library._
 sealed abstract class WordShapeFeature[+L](l: L) extends Feature[L,Nothing];
 final case class IndicatorWSFeature[L](l: L, name: Symbol) extends WordShapeFeature(l);
 final case class SuffixFeature[L](l: L, str: String) extends WordShapeFeature(l);
+final case class PrefixFeature[L](l: L, str: String) extends WordShapeFeature(l);
 final case class ShapeFeature[+L](l: L, str: String) extends WordShapeFeature(l);
 final case class SignatureFeature[+L](l: L, str: String) extends WordShapeFeature(l);
 
@@ -84,6 +85,10 @@ class WordShapeFeaturizer[L](lexicon: Counter2[L,String,Double], initToZero: Boo
       else if(w.length >= 5 && !(hasDigit && numCaps > 0) && !hasDash)  {
         features += (SuffixFeature(l,w.substring(w.length-3)))
         features += (SuffixFeature(l,w.substring(w.length-2)))
+        features += (SuffixFeature(l,w.substring(w.length-1)))
+        features += PrefixFeature(l,w.substring(0,1))
+        features += PrefixFeature(l,w.substring(0,2))
+        features += PrefixFeature(l,w.substring(0,3))
       }
 
       if(w.length > 10) {

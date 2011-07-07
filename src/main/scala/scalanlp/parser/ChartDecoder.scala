@@ -70,11 +70,10 @@ class ViterbiDecoder[C,F, W](val indexedProjections: ProjectionIndexer[C,F]) ext
       }
 
       for {
-        (b,rchild) <- grammar.allBinaryRules;
-        (c,parentScores) <- rchild
+        (b,rchild) <- grammar.binaryRulesByIndexedParent(root);
+        (c,ruleScore) <- rchild.nonzero.pairs
         split <- inside.top.feasibleSpan(start, end, b, c)
       } {
-        val ruleScore = parentScores(root);
         val score = ruleScore + inside.top.labelScore(start,split,b) +
                 inside.top.labelScore(split,end,c) + spanScorer.scoreBinaryRule(start,split,end,root,b,c);
         if(score > maxScore) {

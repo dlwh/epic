@@ -46,6 +46,7 @@ case class WeightedFeature(kind: Symbol) extends Feature[Nothing,Nothing] with C
 /** A Lexical feature is just an indicator on there being this word */
 case class LexicalFeature[L,W](l: L, w: W) extends Feature[L,W] with CachedHashCode;
 case class SubstateFeature[L,W](f: Feature[L,W], states: Seq[Int]) extends Feature[(L,Int),W] with CachedHashCode;
+case class UnannotatedRuleFeature[L](r: Rule[L]) extends Feature[L,Nothing] with CachedHashCode
 
 case class BitFeature(lbl: LabelOfBit, index: Int, toggled: Int) extends Feature[Nothing,Nothing] with CachedHashCode;
 case class SequenceFeature[L,W](f: Seq[Feature[L,W]]) extends Feature[L,W] with CachedHashCode;
@@ -71,6 +72,23 @@ class SumFeaturizer[L,W](f1: Featurizer[L,W], f2: Featurizer[L,W]) extends Featu
   def featuresFor(l: L, w: W)  = f1.featuresFor(l,w) + f2.featuresFor(l,w);
 
   def initialValueForFeature(f: Feature[L,W]) = f1.initialValueForFeature(f) + f2.initialValueForFeature(f);
+}
+
+class UnannotatingFeaturizer[W] extends Featurizer[String,W] {
+  def featuresFor(r: Rule[String]) = r match {
+    case BinaryRule(a,b,c) =>
+      Counter(UnannotatedRuleFeature(BinaryRule(unannotate(a),unannotate(b),unannotate(c))) -> 1.0)
+    case UnaryRule(a,b) =>
+      Counter(UnannotatedRuleFeature(UnaryRule(unannotate(a),unannotate(b))) -> 1.0)
+  }
+
+  def featuresFor(l: String, w: W) = Counter[Feature[String,W],Double]()
+
+  def initialValueForFeature(f: Feature[String, W]) = 0.0
+
+  def unannotate(a: String) = {
+    a.takeWhile(_ != '^')
+  }
 }
 
 class RuleFeaturizer[L,W](binaries: Counter2[L,BinaryRule[L], Double],
@@ -359,9 +377,8 @@ class BitVectorFeaturizer[L,W](base: Featurizer[L,W], numStates: Int, arity: Int
 }
 
 
-@serializable
 @SerialVersionUID(1)
-trait FeatureIndexer[L,W] extends Encoder[Feature[L,W]] {
+trait FeatureIndexer[L,W] extends Encoder[Feature[L,W]] with Serializable {
   val index:Index[Feature[L,W]];
   val labelIndex: Index[L];
   val featurizer: Featurizer[L,W];
@@ -424,9 +441,9 @@ object FeatureIndexer {
 
     // binaries
     for{
-      (b,binaryRules) <- rawGrammar.allBinaryRules;
-      (c,parents) <- binaryRules;
-      a <- parents.activeKeys;
+      (a,binaryRules) <- rawGrammar.allBinaryRulesByParent;
+      (b,rightChildren) <- binaryRules;
+      c <- rightChildren.activeKeys
       aSplit <- indexedProjections.refinementsOf(a)
       bSplit <- indexedProjections.refinementsOf(b)
       cSplit <- indexedProjections.refinementsOf(c)

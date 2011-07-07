@@ -91,11 +91,11 @@ object StateSplitting {
           a <- t.label
         } {
           val arr = new Array[Double](lchild.label.length * rchild.label.length);
+          val rules = grammar.binaryRulesByIndexedParent(a);
           var i = 0;
           for { b <- lchild.label } {
-            val rules = grammar.binaryRulesByIndexedLeftChild(b);
             for { c <- rchild.label } {
-              arr(i) = rules(c)(a) + chart.top(begin,split,b) + chart.top(split,end,c) + scorer.scoreBinaryRule(begin,split,end,a,b,c);
+              arr(i) = rules(b)(c) + chart.top(begin,split,b) + chart.top(split,end,c) + scorer.scoreBinaryRule(begin,split,end,a,b,c);
               i += 1;
             }
           };
@@ -106,7 +106,7 @@ object StateSplitting {
         if(!foundOne) {
           val msg = t.label.map { a => t.leftChild.label.map { b => t.rightChild.label.map { c =>
             grammar.index.get(a) + "->" + grammar.index.get(b) + " " + grammar.index.get(c) + " br: " +
-                 grammar.binaryRulesByIndexedLeftChild(b)(c)(a) +  " lc:"+ chart.top(begin,split,b) +  " rc: " + chart.top(split,end,c) +
+                 grammar.binaryRulesByIndexedParent(a)(b)(c) +  " lc:"+ chart.top(begin,split,b) +  " rc: " + chart.top(split,end,c) +
                 " scorer: " + scorer.scoreBinaryRule(begin,split,end,a,b,c);
           }}}
           sys.error("Trouble with binary " + t.render(s) + " " + msg.mkString(", "))
@@ -128,14 +128,14 @@ object StateSplitting {
       case t @ BinaryTree(_,lchild,rchild) =>
         for {
           p <- t.label.iterator
+          pRules = grammar.binaryRulesByIndexedParent(p);
           pScore = chart.bot(t.span.start,t.span.end,p);
           l <- lchild.label.iterator
           lScore = insideScores.top(lchild.span.start,lchild.span.end,l);
-          lRules = grammar.binaryRulesByIndexedLeftChild(l);
           r <- rchild.label.iterator
           rScore = insideScores.top(rchild.span.start,rchild.span.end,r)
         } {
-          val rS = lRules(r)(p) + scorer.scoreBinaryRule(t.span.start,lchild.span.end,t.span.end,p,l,r);
+          val rS = pRules(l)(r) + scorer.scoreBinaryRule(t.span.start,lchild.span.end,t.span.end,p,l,r);
           chart.top.enter(lchild.span.start,lchild.span.end,l, pScore + rScore + rS);
           chart.top.enter(rchild.span.start,rchild.span.end,r, pScore + lScore + rS);
         }
@@ -211,14 +211,14 @@ object StateSplitting {
       case t@ BinaryTree(_,lc,rc) =>
         for {
           p <- t.label iterator;
+          pRules = grammar.binaryRulesByIndexedLeftChild(p);
           opScore = oScores.bot(t.span.start,t.span.end,p);
           l <- lc.label.iterator
-          val lRules = grammar.binaryRulesByIndexedLeftChild(l);
           ilScore = iScores.top(lc.span.start,lc.span.end,l);
           r <- rc.label.iterator
         } {
           val irScore = iScores.top(rc.span.start,rc.span.end,r)
-          val ruleScore = opScore + irScore + ilScore + lRules(r)(p) - totalProb;
+          val ruleScore = opScore + irScore + ilScore + pRules(l)(r) - totalProb;
           val span = safeScorer.scoreBinaryRule(t.span.start,rc.span.start,rc.span.end,p,l,r);
           assert(!ruleScore.isNaN);
           //assert(exp(ruleScore) > 0, " " + ruleScore);

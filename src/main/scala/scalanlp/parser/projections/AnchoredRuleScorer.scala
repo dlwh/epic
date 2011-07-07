@@ -165,7 +165,7 @@ object ProjectTreebankToVarGrammar {
   }
 
   def loadSpans(spanDir: File) = {
-    if(!spanDir.exists || !spanDir.isDirectory) error(spanDir + " must exist and be a directory!")
+    if(!spanDir.exists || !spanDir.isDirectory) sys.error(spanDir + " must exist and be a directory!")
 
     val trainSpans = loadSpansFile(new File(spanDir,TRAIN_SPANS_NAME));
     val devSpans = loadSpansFile(new File(spanDir,DEV_SPANS_NAME));

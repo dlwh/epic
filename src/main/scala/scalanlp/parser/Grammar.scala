@@ -23,12 +23,16 @@ import scalala.tensor.{Counter2,::}
 import scalanlp.serialization.{DataSerialization}
 import java.io.{DataInput, DataOutput}
 import scalanlp.serialization.DataSerialization.ReadWritable
+import scalala.library.Library._
 
 @SerialVersionUID(2)
 sealed trait Grammar[L] extends Encoder[L] with Serializable {
   override val index: Index[L];
   val unaryRules: Counter2[L,UnaryRule[L], Double]
   val binaryRules: Counter2[L,BinaryRule[L], Double]
+  lazy val maxNumBinaryRulesForParent: Int = {
+    for(a <- binaryRules.domain._1) yield binaryRules(a,::).size
+  } max
   def unaryRulesByChild(c: L): Iterator[(UnaryRule[L],Double)];
   def unaryRulesByParent(p: L): Iterator[(UnaryRule[L],Double)];
   def binaryRulesByLeftChild(c: L): Iterator[(BinaryRule[L],Double)];
@@ -57,6 +61,9 @@ sealed trait Grammar[L] extends Encoder[L] with Serializable {
 
   /** Returns rules in lchild -> rchild -> parent -> score form */
   def allBinaryRules:SparseArrayMap[SparseArrayMap[OldSparseVector]];
+
+  /** Returns rules in parent -> lchild -> rchild -> score form*/
+  def allBinaryRulesByParent:SparseArrayMap[SparseArrayMap[OldSparseVector]];
 
   /** Returns rules in child -> parent -> score form */
   def allUnaryRules:SparseArrayMap[OldSparseVector];
@@ -188,6 +195,7 @@ object Grammar {
       def binaryRulesByLeftChild(c: L) = leftChildBinaryRules(c, ::).nonzero.pairs.iterator;
 
       def allBinaryRules = indexedBinaryRulesByLeftChild;
+      def allBinaryRulesByParent = indexedBinaryRulesByParent;
       def allUnaryRules = indexedUnaryRulesByChild;
 
       def binaryRulesByIndexedLeftChild(b: Int) = indexedBinaryRulesByLeftChild(b);
