@@ -134,31 +134,37 @@ class CKYChartBuilder[Chart[X]<:ParseChart[X], L,W](val root: L,
         for { // a ->  bc  [begin,split,end)
           a <- outside.bot.enteredLabelIndexes(begin,end)
           if !inside.bot.labelScore(begin,end,a).isInfinite
-          (b,binaryRules) <- grammar.binaryRulesByIndexedParent(a)
         } {
-          var i = 0
-          while(i < binaryRules.activeSize) {
-            val c = binaryRules.indexAt(i)
-            val ruleScore = binaryRules.valueAt(i)
-            i += 1
-            for(split <- inside.top.feasibleSpan(begin, end, b, c) ) {
+          val bRules = grammar.binaryRulesByIndexedParent(a)
+          var bi = 0;
+          while(bi < bRules.activeSize) {
+            val b = bRules.indexAt(bi)
+            val binaryRules = bRules.valueAt(bi)
+            bi += 1
+            var i = 0
+            while(i < binaryRules.activeSize) {
+              val c = binaryRules.indexAt(i)
+              val ruleScore = binaryRules.valueAt(i)
+              i += 1
+              for(split <- inside.top.feasibleSpan(begin, end, b, c) ) {
 
-              val score = outside.bot.labelScore(begin,end,a) + ruleScore
-              val bInside = inside.top.labelScore(begin,split,b)
+                val score = outside.bot.labelScore(begin,end,a) + ruleScore
+                val bInside = inside.top.labelScore(begin,split,b)
 
-              if(!java.lang.Double.isInfinite(bInside)) {
+                if(!java.lang.Double.isInfinite(bInside)) {
 
-                val cInside = inside.top.labelScore(split,end,c)
-                if(!java.lang.Double.isInfinite(cInside)) {
+                  val cInside = inside.top.labelScore(split,end,c)
+                  if(!java.lang.Double.isInfinite(cInside)) {
 
-                  val spanScore = validSpan.scoreBinaryRule(begin,split,end,a,b,c)
-                  if(spanScore != Double.NegativeInfinity) {
+                    val spanScore = validSpan.scoreBinaryRule(begin,split,end,a,b,c)
+                    if(spanScore != Double.NegativeInfinity) {
 
-                    val bOutside = score + cInside + spanScore
-                    outside.top.enter(begin,split,b,bOutside)
+                      val bOutside = score + cInside + spanScore
+                      outside.top.enter(begin,split,b,bOutside)
 
-                    val cOutside = score + bInside + spanScore
-                    outside.top.enter(split,end,c,cOutside)
+                      val cOutside = score + bInside + spanScore
+                      outside.top.enter(split,end,c,cOutside)
+                    }
                   }
                 }
               }
