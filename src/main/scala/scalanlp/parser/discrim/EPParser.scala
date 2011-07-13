@@ -16,7 +16,7 @@ import collection.mutable.ArrayBuffer
  */
 @SerialVersionUID(1)
 class EPParser[L,L2,W](val parsers: Seq[ChartBuilder[LogProbabilityParseChart,L2,W]], coarseParser: ChartBuilder[LogProbabilityParseChart,L,W],
-                       val projections: Seq[ProjectionIndexer[L,L2]],
+                       val projections: Seq[GrammarProjections[L,L2]],
                        val maxEPIterations: Int= 1,
                        val damping: Double = 1.0) extends Parser[L,W] with Serializable {
 
@@ -65,7 +65,7 @@ class EPParser[L,L2,W](val parsers: Seq[ChartBuilder[LogProbabilityParseChart,L2
         partitions(m) = newPartition;
         // project down the approximation
         currentF0 = approximators(m).project(insideCharts(m),outsideCharts(m), newPartition, projectedScorer, tree);
-        corrections(m) = ScalingSpanScorer(currentF0,rescaledScorer,newPartition,f0Builder.grammar.index(f0Builder.root));
+        corrections(m) = ScalingSpanScorer(currentF0,rescaledScorer,newPartition,f0Builder.grammar.labelIndex(f0Builder.root));
       }
       if(parsers.length == 1 || maxEPIterations == 1) {
         changed = false;
@@ -74,10 +74,10 @@ class EPParser[L,L2,W](val parsers: Seq[ChartBuilder[LogProbabilityParseChart,L2
         assert(!maxChange.isNaN)
         changed = maxChange.abs > 1E-4;
         if(!changed) {
-          print("Iteration " + i + ": " + words +  " converged: ")
+          println("Iteration " + i + ": " + words +  " converged: ")
         } else if(i == maxEPIterations - 1) {
 
-          print(words + " did not converge!: ");
+          println(words + " did not converge!: ");
         }
         println("<" + i +">" + maxChange);
       }
@@ -94,20 +94,20 @@ class EPParser[L,L2,W](val parsers: Seq[ChartBuilder[LogProbabilityParseChart,L2
 
   def computeMaxChange(scorer1: SpanScorer[L], scorer2: SpanScorer[L], length: Int):Double = {
     val changes = for {
-      span <- 1 to length iterator;
-      i <- 0 to (length - span) iterator;
+      span <- (1 to length).iterator;
+      i <- (0 to (length - span)).iterator;
       j = i + span;
-      k <- (i+1) until j iterator;
-      p <- 0 until projections(0).coarseIndex.size iterator;
-      (b,bv) <- coarseParser.grammar.binaryRulesByIndexedParent(p) iterator;
-      c <- bv.activeKeys
+      k <- ((i + 1) until j).iterator;
+      p <- (0 until projections(0).labels.coarseIndex.size).iterator;
+      r <- coarseParser.grammar.indexedBinaryRulesWithParent(p)
     } yield {
       // TODO: compute change that is consistent with all span scorers :-/
-      val s1 = scorer1.scoreBinaryRule(i, k, j, p, b, c)
-      val s2 = scorer2.scoreBinaryRule(i, k, j, p, b, c)
+      val s1 = scorer1.scoreBinaryRule(i, k, j, r)
+      val s2 = scorer2.scoreBinaryRule(i, k, j, r)
       val a = (s1 - s2);
       if(a.isNaN) 0.0 // from negative infinities...el
-      else if(a.isInfinite) 1.0
+      else if(a < 0 && a.isInfinite) 1001.0
+      else if(a.isInfinite) 10000.
       else if(s1.abs < 1E-4) a.abs
       else a.abs / (s1.abs + s2.abs)
     }
@@ -123,25 +123,15 @@ class EPParser[L,L2,W](val parsers: Seq[ChartBuilder[LogProbabilityParseChart,L2
 //    new AnchoredRuleApproximator[L,L2,W](parser, coarseParser,proj, Double.NegativeInfinity);
     new AnchoredRuleApproximator[L,L2,W](parser, coarseParser,proj, Double.NegativeInfinity);
   }
-  val decoder = new ViterbiDecoder[L,L2,W](projections.last);
-  val f0Decoder = new MaxConstituentDecoder[L,L,W](ProjectionIndexer.simple(coarseParser.grammar.index));
+  val decoder = new MaxConstituentDecoder[L,L2,W](projections.last);
+  val f0Decoder = new MaxConstituentDecoder[L,L,W](GrammarProjections.identity(coarseParser.grammar));
   val f0Builder = new CKYChartBuilder[LogProbabilityParseChart,L,W](coarseParser.root,new ZeroLexicon(coarseParser.lexicon), Grammar.zero(coarseParser.grammar), ParseChart.logProb);
 
   def bestParse(s: scala.Seq[W], spanScorer: SpanScorer[L]) = {
     val EPResult(parserDatas,partition,f0) = buildAllCharts(s,spanScorer);
-//    val parserData = parserDatas.last;
-//    val lastParser = parsers.last;
-//    decoder.extractBestParse(lastParser.root,lastParser.grammar,parserData.inside,parserData.outside,s,parserData.correction);
-
-//    val fac = new AnchoredRulePosteriorScorerFactory(lastParser,projections.last,Double.NegativeInfinity);
-//    val scorer: fac.MyScorer = fac.buildSpanScorer(parserData.inside,parserData.outside,parserData.partition,parserData.correction);
-    val zeroInside: ParseChart.LogProbabilityParseChart[L] = f0Builder.buildInsideChart(s,f0);
-    val zeroOutside: ParseChart.LogProbabilityParseChart[L] = f0Builder.buildOutsideChart(zeroInside,f0);
-    val fac = new AnchoredRulePosteriorScorerFactory(f0Builder,ProjectionIndexer.simple(coarseParser.grammar.index),Double.NegativeInfinity);
-    val scorer: fac.MyScorer = fac.buildSpanScorer(zeroInside,zeroOutside,0.0,f0);
-//    val tree: BinarizedTree[L] = f0Decoder.extractBestParse(coarseParser.root,f0Builder.grammar, zeroInside,zeroOutside, s, scorer);
-    val tree = SimpleViterbiDecoder(coarseParser.grammar).extractBestParse(coarseParser.root, f0Builder.grammar , zeroInside,zeroOutside, s, scorer);
-    tree
+    val parserData = parserDatas.last;
+    val lastParser = parsers.last;
+    decoder.extractBestParse(lastParser.root,lastParser.grammar,parserData.inside,parserData.outside,s,parserData.correction);
   }
 }
 
@@ -151,7 +141,11 @@ class EPParser[L,L2,W](val parsers: Seq[ChartBuilder[LogProbabilityParseChart,L2
  */
 object EPParserRunner extends ParserTrainer {
 
-  case class Params(parser: ParserParams.BaseParser, model0: File = null, model1: File = null, model2: File = null, model3: File = null);
+  case class Params(parser: ParserParams.BaseParser,
+                    model0: File = null,
+                    model1: File = null,
+                    model2: File = null,
+                    model3: File = null);
   protected val paramManifest = manifest[Params];
 
   def trainParser(trainTrees: IndexedSeq[TreeInstance[String,String]],

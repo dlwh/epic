@@ -24,7 +24,7 @@ import scalala.library.Library._
  */
 class LatentDiscrimObjective[L,L2,W](featurizer: Featurizer[L2,W],
                             trees: IndexedSeq[TreeInstance[L,W]],
-                            indexedProjections: ProjectionIndexer[L,L2],
+                            indexedProjections: GrammarProjections[L,L2],
                             coarseParser: ChartBuilder[LogProbabilityParseChart, L, W],
                             openTags: Set[L2],
                             closedWords: Set[W]
@@ -32,7 +32,7 @@ class LatentDiscrimObjective[L,L2,W](featurizer: Featurizer[L2,W],
 
 
   val root = {
-    val splits = indexedProjections.refinementsOf(coarseParser.root)
+    val splits = indexedProjections.labels.refinementsOf(coarseParser.root)
     require(splits.length == 1, splits)
     splits(0)
   }
@@ -52,7 +52,7 @@ class LatentDiscrimObjective[L,L2,W](featurizer: Featurizer[L2,W],
 
   def extractMaxParser(weights: DenseVector[Double]) = {
     val parser = new ChartParser[L,L2,W](builder(weights).withCharts(ParseChart.viterbi),
-      new ViterbiDecoder(indexedProjections),indexedProjections);
+      new ViterbiDecoder(indexedProjections.labels),indexedProjections);
     parser
   }
 
@@ -103,7 +103,7 @@ class LatentDiscrimObjective[L,L2,W](featurizer: Featurizer[L2,W],
                            t: BinarizedTree[L],
                            words: Seq[W],
                            spanScorer: SpanScorer[L] = SpanScorer.identity):ExpectedCounts[W] = {
-    StateSplitting.expectedCounts(g,lexicon,t.map(indexedProjections.refinementsOf _),words,
+    StateSplitting.expectedCounts(g,lexicon,t.map(indexedProjections.labels.refinementsOf _),words,
       new ProjectingSpanScorer(indexedProjections, spanScorer));
   }
 
@@ -155,7 +155,6 @@ trait LatentTrainer extends ParserTrainer {
                     numStates: Int): MyFeaturizer;
 
   def quickEval(obj: AbstractDiscriminativeObjective[String,(String,Int),String],
-                indexedProjections: ProjectionIndexer[String,(String,Int)],
                 unaryReplacer : ChainReplacer[String],
                 devTrees: Seq[TreeInstance[String,String]], weights: DenseVector[Double]) {
     println("Validating...");
@@ -169,7 +168,7 @@ trait LatentTrainer extends ParserTrainer {
   def mkObjective(params: Params,
                   latentFeaturizer: MyFeaturizer,
                   trainTrees: IndexedSeq[TreeInstance[String,String]],
-                  indexedProjections: ProjectionIndexer[String, (String, Int)],
+                  indexedProjections: GrammarProjections[String,(String,Int)],
                   xbarParser: ChartBuilder[ParseChart.LogProbabilityParseChart, String, String],
                   openTags: Set[(String, Int)],
                   closedWords: Set[String]): MyObjective;
@@ -190,14 +189,7 @@ trait LatentTrainer extends ParserTrainer {
     }
 
 
-    val fineLabelIndex = {
-      val index = Index[(String,Int)];
-      for( l <- xbarParser.grammar.index; l2 <- split(l,numStates)) {
-        index.index(l2)
-      }
-      index;
-    }
-    val indexedProjections = ProjectionIndexer(xbarParser.grammar.index, fineLabelIndex, unsplit);
+    val indexedProjections = GrammarProjections(xbarParser.grammar, split(_:String,numStates), unsplit);
 
     val latentFeaturizer: MyFeaturizer = getFeaturizer(params, initLexicon, initBinaries, initUnaries, numStates)
 
@@ -224,7 +216,7 @@ trait LatentTrainer extends ParserTrainer {
       val weights = state.x;
       if(iter % iterPerValidate == 0) {
         cacheWeights(params, obj,weights, iter);
-        quickEval(obj,indexedProjections, unaryReplacer, devTrees, weights);
+        quickEval(obj, unaryReplacer, devTrees, weights);
       }
     }
 
@@ -276,11 +268,11 @@ object StochasticLatentTrainer extends LatentTrainer {
   override def mkObjective(params: Params,
                   latentFeaturizer: Featurizer[(String, Int), String],
                   trainTrees: IndexedSeq[TreeInstance[String,String]],
-                  indexedProjections: ProjectionIndexer[String, (String, Int)],
+                  indexedProjections: GrammarProjections[String,(String,Int)],
                   xbarParser: ChartBuilder[ParseChart.LogProbabilityParseChart, String, String],
                   openTags: Set[(String, Int)],
                   closedWords: Set[String]) = {
-    val r = new LatentDiscrimObjective(latentFeaturizer,
+    val r = new LatentDiscrimObjective[String,(String,Int),String](latentFeaturizer,
       trainTrees,
       indexedProjections,
       xbarParser,

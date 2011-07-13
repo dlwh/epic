@@ -7,7 +7,6 @@ import scalanlp.parser.projections._
 import scalanlp.optimize._
 
 import scalanlp.trees._
-import scalanlp.parser.UnaryRuleClosure.UnaryClosureException
 import InsideOutside._
 
 import scalanlp.util._;
@@ -18,7 +17,7 @@ import scalala.library.Library._;
 
 abstract class AbstractDiscriminativeObjective[L,L2,W](
   trees: IndexedSeq[TreeInstance[L,W]],
-  val indexedProjections: ProjectionIndexer[L,L2],
+  val indexedProjections: GrammarProjections[L,L2],
   openTags: Set[L2],
   closedWords: Set[W]) extends BatchDiffFunction[DenseVector[Double]] with Logged {
 
@@ -37,35 +36,27 @@ abstract class AbstractDiscriminativeObjective[L,L2,W](
   private var numFailures = 0;
 
   def calculate(weights: DenseVector[Double], sample: IndexedSeq[Int]) = {
-    println(weights.norm(2))
+    val parser = builder(weights);
+    val trees = sample.map(this.trees);
+    val startTime = System.currentTimeMillis();
+    val ecounts = trees.par.view.map{ treeWordsScorer =>
+      val localIn = System.currentTimeMillis();
+      val TreeInstance(_,tree,words,spanScorer) = treeWordsScorer;
+      try {
+        expectedCounts(parser,tree,words,spanScorer)
+      } catch {
+        case e => println("Error in parsing: " + words + e);
+        e.printStackTrace()
+        throw e;
+      }
+    } reduce {
+      sumCounts(_:Counts,_:Counts)
+    };
+    val finishTime = System.currentTimeMillis() - startTime;
 
-    try {
-      val parser = builder(weights);
-      val trees = sample.map(this.trees);
-      val startTime = System.currentTimeMillis();
-      val ecounts = trees.par.view.map{ treeWordsScorer =>
-        val localIn = System.currentTimeMillis();
-        val TreeInstance(_,tree,words,spanScorer) = treeWordsScorer;
-        try {
-          expectedCounts(parser,tree,words,spanScorer)
-        } catch {
-          case e => println("Error in parsing: " + words + e); throw new RuntimeException("Error parsing " + words,e);
-        }
-      } reduce {
-        sumCounts(_:Counts,_:Counts)
-      };
-      val finishTime = System.currentTimeMillis() - startTime;
-
-      log(INFO)("Parsing took: " + finishTime / 1000.0)
-      val (obj,grad) = countsToObjective(ecounts);
-      (obj,grad)
-    }  catch {
-      case ex: UnaryClosureException =>
-        numFailures += 1;
-        if(numFailures > 10) throw ex;
-        ex.printStackTrace();
-        (Double.PositiveInfinity,DenseVector.zeros[Double](weights.size));
-    }
+    log(INFO)("Parsing took: " + finishTime / 1000.0)
+    val (obj,grad) = countsToObjective(ecounts);
+    (obj,grad)
 
   }
 
@@ -83,25 +74,15 @@ abstract class AbstractDiscriminativeObjective[L,L2,W](
   }
 
 
-  def expectedCountsToFeatureVector(indexedFeatures: FeatureIndexer[L2,W], ecounts: ExpectedCounts[W]):DenseVector[Double] = {
-   val result = indexedFeatures.mkDenseVector(0.0);
+  def expectedCountsToFeatureVector[L,W](indexedFeatures: FeatureIndexer[L,W], ecounts: ExpectedCounts[W]) = {
+    val result = indexedFeatures.mkDenseVector();
 
     // binaries
-    for( (a,bvec) <- ecounts.binaryRuleCounts;
-         (b,cvec) <- bvec;
-         (c,v) <- cvec.nonzero.pairs.iterator) {
-      result += (indexedFeatures.featuresFor(a,b,c) * v);
-    }
-
-    // unaries
-    for( (a,bvec) <- ecounts.unaryRuleCounts;
-         (b,v) <- bvec.nonzero.pairs.iterator) {
-      result += (indexedFeatures.featuresFor(a,b) * v);
-    }
+    for((r,v) <- ecounts.ruleCounts.pairsIteratorNonZero)
+      result += (indexedFeatures.featuresFor(r) * v);
 
     // lex
-    for( (a,ctr) <- ecounts.wordCounts;
-         (w,v) <- ctr.pairs) {
+    for( (a,ctr) <- ecounts.wordCounts; (w,v) <- ctr.nonzero.pairs) {
       result += (indexedFeatures.featuresFor(a,w) * v);
     }
 

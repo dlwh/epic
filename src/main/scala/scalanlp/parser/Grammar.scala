@@ -16,7 +16,7 @@ package scalanlp.parser
 */
 
 import scalanlp.util.Encoder;
-import scalanlp.collection.mutable.SparseArrayMap;
+
 import scalanlp.util.Index
 import scalanlp.tensor.sparse.OldSparseVector
 import scalala.tensor.{Counter2,::}
@@ -24,204 +24,152 @@ import scalanlp.serialization.{DataSerialization}
 import java.io.{DataInput, DataOutput}
 import scalanlp.serialization.DataSerialization.ReadWritable
 import scalala.library.Library._
+import collection.mutable.ArrayBuffer
+import scalala.collection.sparse.SparseArray
+import scalanlp.collection.mutable.{OpenAddressHashArray, SparseArrayMap}
 
 @SerialVersionUID(2)
-sealed trait Grammar[L] extends Encoder[L] with Serializable {
-  override val index: Index[L];
-  val unaryRules: Counter2[L,UnaryRule[L], Double]
-  val binaryRules: Counter2[L,BinaryRule[L], Double]
+sealed trait Grammar[L] extends Encoder[Rule[L]] with Serializable {
+  override val index: Index[Rule[L]]
+  val labelIndex: Index[L];
+  def labelEncoder  = Encoder.fromIndex(labelIndex)
+  val unaryRules: Counter2[L, UnaryRule[L], Double]
+  val binaryRules: Counter2[L, BinaryRule[L], Double]
+  // don't mutate me!
+  val indexedRules: Array[Rule[Int]];
+  // don't mutate me!
+  val ruleScoreArray: Array[Double];
+
+  def ruleIndex(a: Int, b: Int, c: Int):Int
+  def ruleIndex(a: Int, b: Int):Int
+
+  def binaryRulesWithParent(l: L) = binaryRules(l,::).pairsIteratorNonZero
+  // Rule Index
+  def indexedBinaryRulesWithParent(l: Int):Array[Int]
+  // Rule Index
+  def indexedUnaryRulesWithChild(l: Int):Array[Int]
+  // Rule Index
+  def indexedUnaryRulesWithParent(l: Int):Array[Int]
+
+  final def ruleScore(r: Int):Double = ruleScoreArray(r)
+  def ruleScore(a: Int, b: Int, c: Int):Double = ruleScoreArray(ruleIndex(a,b,c))
+  def ruleScore(a: Int, b: Int):Double = ruleScoreArray(ruleIndex(a,b))
+
+  def parent(r: Int) = indexedRules(r).parent
+  def leftChild(r: Int) = indexedRules(r).asInstanceOf[BinaryRule[Int]].left
+  def rightChild(r: Int) = indexedRules(r).asInstanceOf[BinaryRule[Int]].right
+  def child(r: Int) = indexedRules(r).asInstanceOf[UnaryRule[Int]].child
+
+
   lazy val maxNumBinaryRulesForParent: Int = {
     for(a <- binaryRules.domain._1) yield binaryRules(a,::).size
-  } max
-  def unaryRulesByChild(c: L): Iterator[(UnaryRule[L],Double)];
-  def unaryRulesByParent(p: L): Iterator[(UnaryRule[L],Double)];
-  def binaryRulesByLeftChild(c: L): Iterator[(BinaryRule[L],Double)];
-  def binaryRulesByParent(p: L): Iterator[(BinaryRule[L],Double)]
-  /**
-   * Returns a vector of parent index -> score
-   */
-  def unaryRulesByIndexedChild(c: Int): OldSparseVector;
-
-  /**
-   * Returns a vector of child index -> score
-   */
-  def unaryRulesByIndexedParent(p: Int): OldSparseVector;
+  }.max
 
   /**
    * Returns true if the label has no productions with it on the LHS.
    */
   def isPreterminal(label: Int): Boolean = {
-    binaryRulesByIndexedParent(label).size == 0;
+    indexedBinaryRulesWithParent(label).size == 0;
   }
 
-  /**
-   * Returns a SparseArrayMap[Vector] with RightIndex -> ParentIndex -> Score
-   */
-  def binaryRulesByIndexedLeftChild(b: Int): SparseArrayMap[OldSparseVector];
-
-  /** Returns rules in lchild -> rchild -> parent -> score form */
-  def allBinaryRules:SparseArrayMap[SparseArrayMap[OldSparseVector]];
-
-  /** Returns rules in parent -> lchild -> rchild -> score form*/
-  def allBinaryRulesByParent:SparseArrayMap[SparseArrayMap[OldSparseVector]];
-
-  /** Returns rules in child -> parent -> score form */
-  def allUnaryRules:SparseArrayMap[OldSparseVector];
-
-  /** Returns the score of a binary rule */
-  def binaryRuleScore(a: Int, b:Int, c: Int): Double;
-  /** Returns the score of a unary rule */
-  def unaryRuleScore(a: Int, b: Int):Double
-
-  /**
-   * Returns a SparseArrayMap[Vector] with LeftIndex -> RightIndex -> Score
-   */
-  def binaryRulesByIndexedParent(a: Int): SparseArrayMap[OldSparseVector];
-
-  /**
-   * Returns a SparseArrayMap[Vector] with LeftIndex -> ParentIndex -> Score
-   */
-  def binaryRulesByIndexedRightChild(c: Int): SparseArrayMap[OldSparseVector];
+  final def ruleScore(r: Rule[L]) = ruleScoreArray(index(r))
 }
 
 object Grammar {
   def apply[L](binaryProductions: Counter2[L,BinaryRule[L],Double],
                unaryProductions: Counter2[L,UnaryRule[L],Double]):Grammar[L] = {
-    val index: Index[L] = {
+    val (index: Index[L],ruleIndex: Index[Rule[L]]) = {
       val index = Index[L]();
+      val ruleIndex = Index[Rule[L]]()
       for(((a,br),score) <- binaryProductions.nonzero.pairs) {
         if(score != Double.NegativeInfinity) {
           index.index(a)
           index.index(br.left);
           index.index(br.right);
+          ruleIndex.index(br)
         }
       }
       for(((a,u),score) <- unaryProductions.nonzero.pairs) {
         if(score != Double.NegativeInfinity) {
           index.index(a);
           index.index(u.child);
+          ruleIndex.index(u)
         }
       }
-      index
+      index -> ruleIndex
     }
-    apply(index,binaryProductions,unaryProductions)
+    apply(index,ruleIndex,binaryProductions,unaryProductions)
   }
 
-  def apply[L](index: Index[L],
+  def apply[L](labelIndex: Index[L],
+               ruleIndex: Index[Rule[L]],
                binaryProductions: Counter2[L,BinaryRule[L],Double],
                unaryProductions: Counter2[L,UnaryRule[L],Double]):Grammar[L] = {
-    val ind = index
+    val li = labelIndex
+    val ri = ruleIndex
     new Grammar[L] {
-      val index = ind
-      private val leftChildBinaryRules = Counter2[L,BinaryRule[L], Double]();
-      private val childUnaryParents = Counter2[L,UnaryRule[L], Double]();
-      val unaryRules = Counter2[L,UnaryRule[L], Double]();
-      val binaryRules = Counter2[L,BinaryRule[L], Double]();
+      val index = ri
+      val labelIndex = li
+      val unaryRules = unaryProductions
+      val binaryRules = binaryProductions
+      val indexedRules = for ( r <- index.toArray) yield r match {
+        case BinaryRule(a,b,c) => BinaryRule(labelIndex(a),labelIndex(b),labelIndex(c)):Rule[Int]
+        case UnaryRule(a,b) => UnaryRule(labelIndex(a),labelIndex(b)):Rule[Int]
+      }
+      val ruleScoreArray = for(r <- index.toArray) yield r match {
+        case r@BinaryRule(a,_,_) => binaryProductions(a,r)
+        case r@UnaryRule(a,_) => unaryProductions(a,r)
+      }
 
-      for(((a,br),score) <- binaryProductions.nonzero.pairs) {
-        if(score != Double.NegativeInfinity) {
-          leftChildBinaryRules(br.left,br) = score;
-          binaryRules(a,br) = score;
+      val binaryRuleTable = new OpenAddressHashArray[Int](labelIndex.size * labelIndex.size * labelIndex.size)
+      val unaryRuleTable = new OpenAddressHashArray[Int](labelIndex.size * labelIndex.size)
+
+      private val (binaryRulesByParent,unaryRulesByParent,binaryRulesByLeftChild,binaryRulesByRightChild,unaryRulesByChild) = {
+        val binaryRulesByParent = Array.fill(labelIndex.size)(new ArrayBuffer[Int]())
+        val unaryRulesByParent = Array.fill(labelIndex.size)(new ArrayBuffer[Int]())
+        val binaryRulesByLeftChild = Array.fill(labelIndex.size)(new ArrayBuffer[Int]())
+        val binaryRulesByRightChild = Array.fill(labelIndex.size)(new ArrayBuffer[Int]())
+        val unaryRulesByChild = Array.fill(labelIndex.size)(new ArrayBuffer[Int]())
+        for ( (r,i) <- indexedRules.zipWithIndex) r match {
+          case BinaryRule(p,l,rc) =>
+            binaryRulesByParent(p) += i
+            binaryRulesByLeftChild(l) += i
+            binaryRulesByRightChild(rc) += i
+            binaryRuleTable(rc + labelIndex.size * (l + labelIndex.size * p)) = i
+          case UnaryRule(p,c) =>
+            unaryRulesByParent(p) += i
+            unaryRulesByChild(c) += i
+            unaryRuleTable(c + labelIndex.size * (p)) = i
         }
-      }
-      for(((a,u),score) <- unaryProductions.nonzero.pairs) {
-        if(score != Double.NegativeInfinity) {
-          childUnaryParents(u.child,u) = score;
-          unaryRules(a,u) = score;
-        }
-      }
 
-      private val indexedUnaryRulesByChild:SparseArrayMap[OldSparseVector] = fillSparseArrayMap(mkOldSparseVector(Double.NegativeInfinity));
-      for( ((a,UnaryRule(_,b)),score) <- unaryRules.nonzero.pairs) {
-        indexedUnaryRulesByChild.getOrElseUpdate(index(b))(index(a)) = score;
-      }
 
-      private val indexedUnaryRulesByParent:SparseArrayMap[OldSparseVector] = fillSparseArrayMap(mkOldSparseVector(Double.NegativeInfinity));
-      for( ((a,UnaryRule(_,b)),score) <- unaryRules.nonzero.pairs) {
-        indexedUnaryRulesByParent.getOrElseUpdate(index(a))(index(b)) = score;
+        (binaryRulesByParent.map(_.toArray),
+          unaryRulesByParent.map(_.toArray),
+          binaryRulesByLeftChild.map(_.toArray),
+          binaryRulesByRightChild.map(_.toArray),
+          unaryRulesByChild.map(_.toArray))
       }
 
 
-      // Mapping is Left Child -> Right Child -> Parent -> Score
-      private val indexedBinaryRulesByLeftChild:SparseArrayMap[SparseArrayMap[OldSparseVector]] = (
-        fillSparseArrayMap(fillSparseArrayMap(mkOldSparseVector(Double.NegativeInfinity)))
-        );
-      for( ((a,BinaryRule(_,b,c)),score) <- binaryRules.nonzero.pairs) {
-        indexedBinaryRulesByLeftChild.getOrElseUpdate(index(b)).getOrElseUpdate(index(c))(index(a)) = score;
-      }
-
-      // Mapping is Left Child -> Right Child -> Parent -> Score
-      private val indexedBinaryRulesByRightChild:SparseArrayMap[SparseArrayMap[OldSparseVector]] = (
-        fillSparseArrayMap(fillSparseArrayMap(mkOldSparseVector(Double.NegativeInfinity)))
-        );
-      for( ((a,BinaryRule(_,b,c)),score) <- binaryRules.nonzero.pairs) {
-        indexedBinaryRulesByRightChild.getOrElseUpdate(index(c)).getOrElseUpdate(index(b))(index(a)) = score;
-      }
-
-      // Mapping is Parent -> Left Child -> Right Child ->  Score
-      private val indexedBinaryRulesByParent:SparseArrayMap[SparseArrayMap[OldSparseVector]] = (
-        fillSparseArrayMap(fillSparseArrayMap(mkOldSparseVector(Double.NegativeInfinity)))
-        );
-      for( ((a,BinaryRule(_,b,c)),score) <- binaryRules.nonzero.pairs) {
-        indexedBinaryRulesByParent.getOrElseUpdate(index(a)).getOrElseUpdate(index(b))(index(c)) = score;
-      }
-
-      /**
-       * Returns pairs of the form ((parent,child),score);
-       */
-      def unaryRulesByChild(c: L) = {
-        childUnaryParents(c, ::).nonzero.pairs.iterator
-      }
+      def ruleIndex(a: Int, b: Int, c: Int) = binaryRuleTable(c + labelIndex.size * (b + labelIndex.size * a))
+      def ruleIndex(a: Int, b: Int) = unaryRuleTable(b + labelIndex.size * a)
 
 
-      def unaryRulesByIndexedChild(c: Int) = {
-        indexedUnaryRulesByChild(c);
-      }
-
-      def unaryRulesByIndexedParent(p: Int) = {
-        indexedUnaryRulesByParent(p);
-      }
-
-      /**
-       * Returns pairs of the form (child,score);
-       */
-      def unaryRulesByParent(p: L) = {
-        unaryRules(p, ::).nonzero.pairs.iterator;
-      }
-
-      /**
-       * Returns pairs of the form ( (parent,(left,right)),score);
-       */
-      def binaryRulesByLeftChild(c: L) = leftChildBinaryRules(c, ::).nonzero.pairs.iterator;
-
-      def allBinaryRules = indexedBinaryRulesByLeftChild;
-      def allBinaryRulesByParent = indexedBinaryRulesByParent;
-      def allUnaryRules = indexedUnaryRulesByChild;
-
-      def binaryRulesByIndexedLeftChild(b: Int) = indexedBinaryRulesByLeftChild(b);
-
-      def binaryRulesByIndexedRightChild(c: Int): SparseArrayMap[OldSparseVector] = indexedBinaryRulesByRightChild(c);
-
-      def binaryRuleScore(a: Int, b: Int, c: Int) = indexedBinaryRulesByParent(a)(b)(c);
-      def unaryRuleScore(a: Int, b: Int) = indexedUnaryRulesByParent(a)(b);
-
-      /**
-       * Returns pairs of the form (lchild,rchild),
-       */
-      def binaryRulesByParent(p: L) = binaryRules(p, ::).nonzero.pairs.iterator;
-      /** b, c **/
-      def binaryRulesByIndexedParent(a: Int): SparseArrayMap[OldSparseVector] = indexedBinaryRulesByParent(a);
+      def indexedBinaryRulesWithParent(l: Int) = binaryRulesByParent(l)
+      def indexedUnaryRulesWithParent(l: Int) = unaryRulesByParent(l)
+      def indexedUnaryRulesWithChild(l: Int) = unaryRulesByChild(l)
     }
 
   }
 
   def zero[L](grammar: Grammar[L]) = {
-    apply(grammar.index,grammar.binaryRules :* 0.0,grammar.unaryRules :* 0.0)
+    apply(grammar.labelIndex,grammar.index,grammar.binaryRules :* 0.0,grammar.unaryRules :* 0.0)
   }
 
   implicit def grammarIsReadWritable[L:DataSerialization.ReadWritable]: ReadWritable[Grammar[L]]  = {
     new DataSerialization.ReadWritable[Grammar[L]] {
       def write(sink: DataOutput, g: Grammar[L]) {
+        DataSerialization.write(sink, g.labelIndex)
         DataSerialization.write(sink, g.index)
         DataSerialization.write(sink, g.unaryRules)
         DataSerialization.write(sink, g.binaryRules)
@@ -229,9 +177,10 @@ object Grammar {
 
       def read(source: DataInput) = {
         val i = DataSerialization.read[Index[L]](source)
+        val ri = DataSerialization.read[Index[Rule[L]]](source)
         val u = DataSerialization.read[Counter2[L,UnaryRule[L],Double]](source)
         val b = DataSerialization.read[Counter2[L,BinaryRule[L],Double]](source)
-        Grammar(i,b,u)
+        Grammar(i,ri,b,u)
       }
     }
   }

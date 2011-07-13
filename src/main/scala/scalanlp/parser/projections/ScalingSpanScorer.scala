@@ -7,33 +7,33 @@ package projections
  */
 object ScalingSpanScorer {
   def apply[C](num: SpanScorer[C], denom: SpanScorer[C], constant:Double, root: Int):SpanScorer[C] = new SpanScorer[C] {
-    def scoreLexical(begin: Int, end: Int, tag: Int) = {
-      val ns = num.scoreLexical(begin, end, tag)
+    def scoreSpan(begin: Int, end: Int, tag: Int) = {
+      val ns = num.scoreSpan(begin, end, tag)
       if(ns == Double.NegativeInfinity) ns
       else {
-        val ds = denom.scoreLexical(begin, end, tag)
+        val ds = denom.scoreSpan(begin, end, tag)
         if(ns == Double.NegativeInfinity || ds == Double.NegativeInfinity) Double.NegativeInfinity;
         else ns - ds + {if(tag == root) constant else 0.0 }
       }
     }
 
-    def scoreUnaryRule(begin: Int, end: Int, parent: Int, child: Int) = {
-      val ns = num.scoreUnaryRule(begin, end, parent, child)
+    def scoreUnaryRule(begin: Int, end: Int, rule: Int) = {
+      val ns = num.scoreUnaryRule(begin, end, rule)
       if(ns == Double.NegativeInfinity) ns
       else {
-        val ds = denom.scoreUnaryRule(begin, end, parent, child)
+        val ds = denom.scoreUnaryRule(begin, end, rule)
         if(ns == Double.NegativeInfinity || ds == Double.NegativeInfinity) Double.NegativeInfinity;
-        else ns - ds+ {if(parent == root) constant else 0.0 }
+        else ns - ds
       }
     }
 
-    def scoreBinaryRule(begin: Int, split: Int, end: Int, parent: Int, leftChild: Int, rightChild: Int) = {
-      val ns = num.scoreBinaryRule(begin, split, end, parent, leftChild, rightChild)
+    def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = {
+      val ns = num.scoreBinaryRule(begin, split, end, rule)
       if(ns == Double.NegativeInfinity) ns
       else {
-        val ds = denom.scoreBinaryRule(begin, split, end, parent, leftChild, rightChild)
+        val ds = denom.scoreBinaryRule(begin, split, end, rule)
         if(ns == Double.NegativeInfinity || ds == Double.NegativeInfinity) Double.NegativeInfinity;
-        else ns - ds + {if(parent == root) constant else 0.0 }
+        else ns - ds
       }
     }
   }

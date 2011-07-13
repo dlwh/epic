@@ -5,7 +5,6 @@ package projections
 
 import CoarseToFineChartBuilder._;
 
-@serializable
 @SerialVersionUID(1)
 class CoarseToFineChartBuilder[Chart[X]<:ParseChart[X],C,F,W](coarseParser: ChartBuilder[Chart,C,W],
                                 proj: F=>C,
@@ -13,11 +12,11 @@ class CoarseToFineChartBuilder[Chart[X]<:ParseChart[X],C,F,W](coarseParser: Char
                                 val lexicon: Lexicon[F,W],
                                 val grammar: Grammar[F],
                                 chartFactory: ParseChart.Factory[Chart] = ParseChart.viterbi,
-                                threshold:Double = -10) extends ChartBuilder[Chart,F,W] {
+                                threshold:Double = -10) extends ChartBuilder[Chart,F,W] with Serializable {
 
-  val indexedProjections = ProjectionIndexer(coarseParser.grammar.index, grammar.index, proj);
+  val indexedProjections = ProjectionIndexer(coarseParser.grammar.labelIndex, grammar.labelIndex, proj);
 
-  private val coarseRootIndex = coarseParser.grammar.index(proj(root));
+  private val coarseRootIndex = coarseParser.grammar.labelIndex(proj(root));
 
   private val fineParser = new CKYChartBuilder[Chart,F,W](root,lexicon,grammar,chartFactory);
 
@@ -56,13 +55,14 @@ object CoarseToFineChartBuilder {
       if (score > threshold) 0.0 else Double.NegativeInfinity;
     }
 
-    def scoreUnaryRule(begin: Int, end: Int, parent: Int, child: Int) = 0.0;
+    def scoreUnaryRule(begin: Int, end: Int, rule: Int) = 0.0;
 
 
-    def scoreBinaryRule(begin: Int, split: Int, end: Int, parent: Int, leftChild: Int, rightChild: Int) = {
-      score(begin,end,parent);
+    def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = {
+      0.0
     }
-    def scoreLexical(begin: Int, end: Int, tag: Int): Double = {
+
+    def scoreSpan(begin: Int, end: Int, tag: Int): Double = {
       score(begin,end,tag);
     }
   }
@@ -71,7 +71,7 @@ object CoarseToFineChartBuilder {
                                                               coarseParser: ChartBuilder[Chart,C,W],
                                                               proj: Int=>Int,
                                                               threshold: Double = -10):SpanScorer[F] = {
-    val coarseRootIndex = coarseParser.grammar.index(coarseParser.root);
+    val coarseRootIndex = coarseParser.grammar.labelIndex(coarseParser.root);
     val coarseInside = coarseParser.buildInsideChart(s)
     val coarseOutside = coarseParser.buildOutsideChart(coarseInside);
 

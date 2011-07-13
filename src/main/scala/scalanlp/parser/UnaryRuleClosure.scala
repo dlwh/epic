@@ -23,7 +23,6 @@ import scalanlp.graphs._;
 /**
  *
  * @author dlwh
- */
 @SerialVersionUID(1)
 trait UnaryRuleClosure extends Serializable {
   def closeFromChild(child: Int):OldSparseVector;
@@ -59,7 +58,7 @@ object UnaryRuleClosure {
   }
 
   private def indexMap[L](grammar: Grammar[L], map: Map[Int,Map[Int,Double]])(implicit semiring: Semiring[Double]):Array[OldSparseVector] = {
-    Array.tabulate(grammar.index.size){i =>
+    Array.tabulate(grammar.labelIndex.size){i =>
       val sparse = grammar.mkOldSparseVector(Double.NegativeInfinity);
       for( (k,v) <- map.getOrElse(i,Map.empty) if v != semiring.zero) sparse(k) = v;
       sparse
@@ -76,12 +75,12 @@ object UnaryRuleClosure {
       def weight(e: Edge) = e._3;
 
       def getEdge(n1: Int, n2: Int) = {
-        val w = g.unaryRulesByIndexedChild(n1)(n2)
+        val w = g.indexedUnary(n1)(n2)
         if(w == Double.NegativeInfinity) None
         else Some((n1,n2,w));
       }
 
-      def nodes = 0 until g.index.size;
+      def nodes = 0 until g.labelIndex.size;
       def edges = for(n1 <- nodes iterator; e <- edgesFrom(n1)) yield e;
 
       def successors(n1: Int) = g.unaryRulesByIndexedChild(n1).keysIterator;
@@ -91,10 +90,11 @@ object UnaryRuleClosure {
       }
 
       override def toString = {
-        edges.map{ case (n1,n2,w) => (g.index.get(n1), g.index.get(n2), w)}.mkString("Unaries[",",\n","]");
+        edges.map{ case (n1,n2,w) => (g.labelIndex.get(n1), g.labelIndex.get(n2), w)}.mkString("Unaries[",",\n","]");
       }
 
     }
   }
 
-}
+} */
+

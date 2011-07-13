@@ -7,10 +7,9 @@ import collection.mutable.ArrayBuffer
  * For computing projections from a fine grammar to a coarse grammar
  * @author dlwh
  */
-@serializable
 @SerialVersionUID(1)
 class ProjectionIndexer[C,F] private (val coarseIndex: Index[C],
-                                      val fineIndex:Index[F], indexedProjections: Array[Int]) extends (Int=>Int) {
+                                      val fineIndex:Index[F], indexedProjections: Array[Int]) extends (Int=>Int) with Serializable {
   val coarseEncoder = Encoder.fromIndex(coarseIndex);
 
   val refinements = {

@@ -23,7 +23,7 @@ class InsideOutsideTest extends FunSuite {
     val io = new InsideOutside("S",grammar,lexicon);
     val sent = "She eats pizza without anchovies" split " ";
     val counts = io.expectedCounts(sent);
-    val (rules,unaries,words) = counts.decode(grammar);
+    val ((rules,unaries),words) = counts.decode(grammar);
     assert(rules("Sb",BinaryRule("Sb","NPu","VPu")) near 1.0);
     assert(rules("NPb",BinaryRule("NPb","Nu","PPu")) near 1.0);
     assert(rules("PPb",BinaryRule("PPb","Pu","Nu")) near 1.0);
@@ -41,7 +41,7 @@ class InsideOutsideTest extends FunSuite {
     val io = new InsideOutside("S",grammar,lexicon);
     val sent = "He has good control" split " ";
     val counts = io.expectedCounts(sent);
-    val res@(rules,unaries, words) = counts.decode(grammar);
+    val res@((rules,unaries), words) = counts.decode(grammar);
 
     assert(rules("Sb",BinaryRule("Sb","NPu","VPu")) near  1.0);
     assert(rules("VPb",BinaryRule("VPb","VBZu","NPu")) near  0.4999999999999997);

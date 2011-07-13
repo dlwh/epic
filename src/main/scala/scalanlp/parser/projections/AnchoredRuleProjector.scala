@@ -10,10 +10,9 @@ import scalanlp.tensor.sparse.OldSparseVector
  * Used for computed the expected number of anchored rules that occur at each span/split.
  * @author dlwh
  */
-@serializable
 @SerialVersionUID(1L)
 class AnchoredRuleProjector[C,L,W](parser: ChartBuilder[ParseChart.LogProbabilityParseChart,L,W],
-                                   indexedProjections: ProjectionIndexer[C,L]) {
+                                   indexedProjections: GrammarProjections[C,L]) extends Serializable {
 
 
 
@@ -37,10 +36,15 @@ class AnchoredRuleProjector[C,L,W](parser: ChartBuilder[ParseChart.LogProbabilit
 
     // preliminaries: we're not going to fill in everything: some things will be null.
     // all of this is how to deal with it.
-    val numProjectedLabels = indexedProjections.coarseIndex.size;
+    val numProjectedLabels = indexedProjections.labels.coarseIndex.size;
+    val numProjectedRules = indexedProjections.rules.coarseIndex.size;
     def projFill[T>:Null<:AnyRef:ClassManifest]() = Array.fill[T](numProjectedLabels)(null);
     def projVector() = {
       new OldSparseVector(numProjectedLabels,Double.NegativeInfinity, 0);
+    }
+
+    def projRuleVector() = {
+      new OldSparseVector(numProjectedRules,Double.NegativeInfinity, 0);
     }
 
     def getOrElseUpdate[T<:AnyRef](arr: Array[T], i: Int, t : =>T) = {
@@ -51,30 +55,30 @@ class AnchoredRuleProjector[C,L,W](parser: ChartBuilder[ParseChart.LogProbabilit
     }
 
     // The data, and initialization. most things init'd to null
-    val lexicalScores = Array.fill(inside.length)(projVector())
-    val unaryScores = TriangularArray.raw(inside.length+1,null:Array[OldSparseVector]);
+    val lexicalScores = TriangularArray.raw(inside.length+1,null:OldSparseVector)
+    val unaryScores = TriangularArray.raw(inside.length+1,null:OldSparseVector);
 
     val logTotals = TriangularArray.raw(inside.length+1,null:OldSparseVector);
     val logTotalsUnaries = TriangularArray.raw(inside.length+1,null:OldSparseVector);
 
-    val binaryScores = TriangularArray.raw[Array[Array[Array[OldSparseVector]]]](inside.length+1,null);
+    val binaryScores = TriangularArray.raw[Array[OldSparseVector]](inside.length+1,null);
     for(begin <- 0 until inside.length; end <- (begin + 1) to inside.length) {
       val numSplits = end - begin;
       if(!inside.bot.enteredLabelIndexes(begin,end).isEmpty) // is there anything to put here?
-        binaryScores(TriangularArray.index(begin,end)) = Array.fill(numSplits)(projFill[Array[OldSparseVector]]);
+        binaryScores(TriangularArray.index(begin,end)) = Array.fill(numSplits)(null:OldSparseVector)
     }
 
 
     import parser.grammar;
 
-    // fill in lexicals
-    for(begin <- 0 until inside.length; end = begin + 1;
+    // fill in spans
+    for(begin <- 0 until inside.length; end <- (begin + 1) to (inside.length);
         l <- inside.bot.enteredLabelIndexes(begin,end)) {
-      val accScore = lexicalScores(begin)(indexedProjections.project(l));
       val currentScore = inside.bot.labelScore(begin,end,l) + outside.bot.labelScore(begin,end,l) - sentProb;
-      val pL = indexedProjections.project(l)
-      if(currentScore > pruneLabel.scoreLexical(begin,end,pL))
-        lexicalScores(begin)(pL) = 0
+      val pL = indexedProjections.labels.project(l)
+      if(currentScore > pruneLabel.scoreSpan(begin,end,pL)) {
+        getOrElseUpdate(lexicalScores,TriangularArray.index(begin,end),projVector())(pL) = 0
+      }
     }
 
 
@@ -87,48 +91,42 @@ class AnchoredRuleProjector[C,L,W](parser: ChartBuilder[ParseChart.LogProbabilit
         // do binaries
         for( parent <- inside.bot.enteredLabelIndexes(begin,end)) {
           val parentScore = outside.bot.labelScore(begin,end,parent);
-          val pP = indexedProjections.project(parent);
+          val pP = indexedProjections.labels.project(parent);
 
           var logTotal = Double.NegativeInfinity;
 
           for(split <- (begin+1) until end) {
-            lazy val parentArray = if(binaryScores(index)(split-begin)(pP) eq null) {
-              binaryScores(index)(split-begin)(pP) = projFill[OldSparseVector]();
-              binaryScores(index)(split-begin)(pP)
+            lazy val parentArray = if(binaryScores(index)(split-begin) eq null) {
+              binaryScores(index)(split-begin) = projRuleVector()
+              binaryScores(index)(split-begin)
             } else {
-              binaryScores(index)(split-begin)(pP);
+              binaryScores(index)(split-begin)
             }
 
             // P(sAt->sBu uCt | sAt) \propto \sum_{latent} O(A-x,s,t) r(A-x ->B-y C-z) I(B-y,s,u) I(C-z, s, u)
-            var ruleIndex = 0;
-            val rules = grammar.binaryRulesByIndexedParent(parent)
-            val numRules = rules.activeSize;
-            while(ruleIndex < numRules) {
-              val b = rules.indexAt(ruleIndex);
-              val cRules = rules.valueAt(ruleIndex);
-              ruleIndex += 1;
+            val rules = grammar.indexedBinaryRulesWithParent(parent)
+            for(r <- rules) {
+              val b = grammar.leftChild(r)
+              val c = grammar.rightChild(r)
+              val pR = indexedProjections.rules.project(r)
+
+              val ruleScore = grammar.ruleScore(r)
+
               val bScore = inside.top.labelScore(begin,split,b);
-              if(bScore != Double.NegativeInfinity) {
-                val pB = indexedProjections.project(b);
-                var i = 0
-                while(i < cRules.activeSize) {
-                  val c = cRules.indexAt(i);
-                  val ruleScore = cRules.valueAt(i)
-                  val pC = indexedProjections.project(c);
-                  val cScore = inside.top.labelScore(split, end, c)
-                  val currentScore = (bScore + cScore
-                          + parentScore + ruleScore + scorer.scoreBinaryRule(begin,split,end,parent,b,c) - sentProb);
-                  if(currentScore > pruneLabel.scoreBinaryRule(begin,split,end,pP,pB,pC)) {
-                    val accScore = getOrElseUpdate(parentArray,pB,projVector())(pC);
-                    parentArray(pB)(pC) = Numerics.logSum(accScore,currentScore);
-                    logTotal = Numerics.logSum(logTotal,currentScore);
-                  }
-                  i+=1;
-                }
+              val cScore = inside.top.labelScore(split, end, c)
+
+              val currentScore = (bScore + cScore
+                + parentScore
+                + ruleScore
+                + scorer.scoreBinaryRule(begin,split,end,r)  + scorer.scoreSpan(begin,end,parent)
+                - sentProb);
+              if(currentScore > pruneLabel.scoreBinaryRule(begin,split,end,indexedProjections.rules.project(r))) {
+                val accScore = parentArray(pR)
+                parentArray(pR) = Numerics.logSum(accScore,currentScore);
+                logTotal = Numerics.logSum(logTotal,currentScore);
               }
+
             }
-
-
           }
 
           if(logTotal != Double.NegativeInfinity) {
@@ -142,28 +140,25 @@ class AnchoredRuleProjector[C,L,W](parser: ChartBuilder[ParseChart.LogProbabilit
         // do unaries. Similar to above
         for( parent <- inside.top.enteredLabelIndexes(begin,end)) {
           val parentScore = outside.top.labelScore(begin,end,parent);
-          val pP = indexedProjections.project(parent);
+          val pP = indexedProjections.labels.project(parent);
 
           var logTotal = Double.NegativeInfinity;
           lazy val parentArray = if(unaryScores(index) eq null) {
-            unaryScores(index) = projFill[OldSparseVector];
-            getOrElseUpdate(unaryScores(index), pP, projVector());
+            unaryScores(index) = projRuleVector()
+            unaryScores(index)
           } else {
-            getOrElseUpdate(unaryScores(index), pP,projVector())
+            unaryScores(index)
           }
 
-          var ruleIndex = 0;
-          val rules = parser.grammar.unaryRulesByIndexedParent(parent);
-          while(ruleIndex < rules.activeSize) {
-            val c = rules.indexAt(ruleIndex);
-            val ruleScore = rules.valueAt(ruleIndex);
-            ruleIndex += 1;
+          for(r <- parser.grammar.indexedUnaryRulesWithParent(parent)) {
+            val c = parser.grammar.child(r)
+            val pR = indexedProjections.rules.project(r)
+            val ruleScore = parser.grammar.ruleScore(r)
             val score = ruleScore + inside.bot.labelScore(begin,end,c) + parentScore +
-                    scorer.scoreUnaryRule(begin,end,parent,c) - sentProb;
-            val pC = indexedProjections.project(c);
-            if(score > pruneLabel.scoreUnaryRule(begin,end,pP,pC)) {
-              val accScore = parentArray(pC);
-              parentArray(pC) = Numerics.logSum(accScore,score);
+                    scorer.scoreUnaryRule(begin,end,r) - sentProb;
+            if(score > pruneLabel.scoreUnaryRule(begin,end,indexedProjections.rules.project(r))) {
+              val accScore = parentArray(pR);
+              parentArray(pR) = Numerics.logSum(accScore,score);
               logTotal= Numerics.logSum(logTotal,score);
             }
           }
@@ -191,27 +186,28 @@ object AnchoredRuleProjector {
   /**
    * POJO for anchored rule counts. entries may be null.
    */
-  case class AnchoredData(/** lexicalScore(pos)(label) = score of tag at position pos */
-                          lexicalScores: Array[OldSparseVector],
-                          /** unaryScores(triangularIndex)(parent)(child) => score of unary from parent to child */
-                          unaryScores: Array[Array[OldSparseVector]],
+  case class AnchoredData(/** spanScore(trianuglarIndex)(label) = score of tag at position pos */
+                          spanScores: Array[OldSparseVector],
+                          /** unaryScores(triangularIndex)(rule) => score of unary from parent to child */
+                          unaryScores: Array[OldSparseVector],
                           /** (triangularIndex)(parent) => same, but for unaries*/
                           logUnaryTotals: Array[OldSparseVector],
-                          /** binaryScores(triangularIndex)(split)(parent)(lchild)(rchild) => score of unary from parent to child */
-                          binaryScores: Array[Array[Array[Array[OldSparseVector]]]],
+                          /** binaryScores(triangularIndex)(split)(rule) => score of unary from parent to child */
+                          binaryScores: Array[Array[OldSparseVector]],
                           /** (triangularIndex)(parent) => sum of all binary rules at parent. */
                           logBinaryTotals: Array[OldSparseVector]);
 
   def noPruning[L]: SpanScorer[L] = thresholdPruning(Double.NegativeInfinity);
 
   def thresholdPruning[L](thresh: Double):SpanScorer[L] = new SpanScorer[L] {
-    def scoreLexical(begin: Int, end: Int, tag: Int) = thresh;
+    def scoreSpan(begin: Int, end: Int, tag: Int) = thresh;
 
-    def scoreUnaryRule(begin: Int, end: Int, parent: Int, child: Int) = thresh;
+    def scoreUnaryRule(begin: Int, end: Int, rule: Int) = thresh;
 
-    def scoreBinaryRule(begin: Int, split: Int, end: Int, parent: Int, leftChild: Int, rightChild: Int) = thresh;
+    def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = thresh;
   }
 
+  /*
   def goldTreeForcing[L](tree: BinarizedTree[Int], pruner: SpanScorer[L] = thresholdPruning(-7)):SpanScorer[L] ={
     val gold = TriangularArray.raw(tree.span.end+1,collection.mutable.BitSet());
     if(tree != null) {
@@ -220,18 +216,18 @@ object AnchoredRuleProjector {
       }
     }
     new SpanScorer[L] {
-      def scoreLexical(begin: Int, end: Int, tag: Int) = {
+      def scoreSpan(begin: Int, end: Int, tag: Int) = {
         if(gold(TriangularArray.index(begin,end))(tag) )Double.NegativeInfinity
-        else pruner.scoreLexical(begin,end,tag);
+        else pruner.scoreSpan(begin,end,tag);
       }
 
-      def scoreUnaryRule(begin: Int, end: Int, parent: Int, child: Int) = {
+      def scoreUnaryRule(begin: Int, end: Int, rule: Int) = {
         if(gold(TriangularArray.index(begin,end))(parent)  && gold(TriangularArray.index(begin,end))(child))
           Double.NegativeInfinity
         else pruner.scoreUnaryRule(begin,end,parent,child)
       }
 
-      def scoreBinaryRule(begin: Int, split: Int, end: Int, parent: Int, leftChild: Int, rightChild: Int) = {
+      def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = {
         if(gold(TriangularArray.index(begin,end))(parent)
                 && gold(TriangularArray.index(begin,split))(leftChild)
                 && gold(TriangularArray.index(split,end))(rightChild)) Double.NegativeInfinity
@@ -239,4 +235,5 @@ object AnchoredRuleProjector {
       }
     }
   }
+  */
 }

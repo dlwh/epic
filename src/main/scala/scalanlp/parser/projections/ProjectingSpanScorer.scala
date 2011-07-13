@@ -5,36 +5,44 @@ package projections
  * 
  * @author dlwh
  */
-class ProjectingSpanScorer[C,F](indexedProjections: ProjectionIndexer[C,F], val scorer: SpanScorer[C], downWeight: Boolean=true) extends SpanScorer[F] {
+class ProjectingSpanScorer[C,F](proj: GrammarProjections[C,F],
+                                val scorer: SpanScorer[C],
+                                downWeight: Boolean=true) extends SpanScorer[F] {
 
-  private val projectionAdjustments = new Array[Double](indexedProjections.coarseIndex.size);
+  private def labelProjections = proj.labels
+  private def ruleProjections = proj.rules
+
+  private val labelAdjustments = new Array[Double](labelProjections.coarseIndex.size);
   if(downWeight)
-    for(c <- 0 until indexedProjections.coarseIndex.size) {
-      projectionAdjustments(c) = math.log(indexedProjections.refinementsOf(c).length);
+    for(c <- 0 until labelProjections.coarseIndex.size) {
+      labelAdjustments(c) = math.log(labelProjections.refinementsOf(c).length);
     }
 
-  def scoreLexical(begin: Int, end: Int, tag: Int) = {
-    val pTag = indexedProjections.project(tag)
-    scorer.scoreLexical(begin,end, pTag) - projectionAdjustments(pTag);
+  private val ruleAdjustments = new Array[Double](ruleProjections.coarseIndex.size);
+  if(downWeight)
+    for(c <- 0 until ruleProjections.coarseIndex.size) {
+      ruleAdjustments(c) = math.log(ruleProjections.refinementsOf(c).length);
+    }
+
+  def scoreSpan(begin: Int, end: Int, tag: Int) = {
+    val pTag = labelProjections.project(tag)
+    scorer.scoreSpan(begin,end, pTag) - labelAdjustments(pTag);
   }
 
-  def scoreUnaryRule(begin: Int, end: Int, parent: Int, child: Int) = {
-    val pParent = indexedProjections.project(parent)
-    val pChild = indexedProjections.project(child)
-    scorer.scoreUnaryRule(begin,end,pParent, pChild) - projectionAdjustments(pParent);
+  def scoreUnaryRule(begin: Int, end: Int, rule: Int) = {
+    val pRule = ruleProjections.project(rule)
+    scorer.scoreUnaryRule(begin,end,pRule) - ruleAdjustments(pRule);
   }
 
-  def scoreBinaryRule(begin: Int, split: Int, end: Int, parent: Int, leftChild: Int, rightChild: Int) = {
-    val pParent = indexedProjections.project(parent)
-    scorer.scoreBinaryRule(begin,split, end,pParent,
-      indexedProjections.project(leftChild),
-      indexedProjections.project(rightChild)) - projectionAdjustments(pParent);
+  def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = {
+    val pRule = ruleProjections.project(rule)
+    scorer.scoreBinaryRule(begin,split, end,pRule) - ruleAdjustments(pRule);
   }
 }
 
 object ProjectingSpanScorer {
-  def factory[C,F](indexedProjections:ProjectionIndexer[C,F])= new SpanScorer.Factory[F,C,Any] {
+  def factory[C,F](proj: GrammarProjections[C,F])= new SpanScorer.Factory[F,C,Any] {
     def apply(scorer: SpanScorer[C]) = mkSpanScorer(Seq.empty,scorer)
-    def mkSpanScorer(words: Seq[Any], scorer: SpanScorer[C]) = new ProjectingSpanScorer(indexedProjections,scorer);
+    def mkSpanScorer(words: Seq[Any], scorer: SpanScorer[C]) = new ProjectingSpanScorer(proj, scorer);
   }
 }

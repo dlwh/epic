@@ -13,7 +13,7 @@ class SubsampledTreebank(base: Treebank, numTrain: Int, numDev:Int, numTest: Int
     case "train" => downSample(base.train.trees,numTrain);
     case "test" => downSample(base.test.trees,numTest);
     case "dev" => downSample(base.dev.trees,numDev);
-    case _ => error("unknown section: " + sec);
+    case _ => sys.error("unknown section: " + sec);
   }
 
   private def downSample[K](trees: Iterator[K], num: Int) = {

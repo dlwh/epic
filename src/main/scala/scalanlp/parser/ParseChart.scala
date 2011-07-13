@@ -23,9 +23,8 @@ import scalala.tensor.Counter
 import scalala.tensor.dense.DenseVectorCol
 import scalanlp.parser.ParseChart.FeasibleSpan
 
-@serializable
 @SerialVersionUID(2)
-abstract class ParseChart[L](val grammar: Encoder[L], val length: Int) {
+abstract class ParseChart[L](val grammar: Encoder[L], val length: Int) extends Serializable {
   final val top = new ChartScores()
   final val bot = new ChartScores()
 
@@ -151,25 +150,25 @@ object ParseChart {
   @SerialVersionUID(1)
   trait Factory[Chart[X]<:ParseChart[X]] extends Serializable {
     def apply[L](g: Encoder[L], length: Int):Chart[L]
-    def computeUnaryClosure[L](g: Grammar[L]):UnaryRuleClosure
+//    def computeUnaryClosure[L](g: Grammar[L]):UnaryRuleClosure
   }
 
 
   // concrete factories:
   object viterbi extends Factory[ViterbiParseChart] {
     def apply[L](g: Encoder[L], length: Int) = new ParseChart(g,length) with Viterbi
-    def computeUnaryClosure[L](grammar: Grammar[L]):UnaryRuleClosure = {
-      import scalanlp.math.Semiring.Viterbi._
-      UnaryRuleClosure.computeClosure(grammar)
-    }
+//    def computeUnaryClosure[L](grammar: Grammar[L]):UnaryRuleClosure = {
+//      import scalanlp.math.Semiring.Viterbi._
+//      UnaryRuleClosure.computeClosure(grammar)
+//    }
   }
 
   object logProb extends Factory[LogProbabilityParseChart] {
     def apply[L](g: Encoder[L], length: Int) = new ParseChart(g,length) with LogProbability
-    def computeUnaryClosure[L](grammar: Grammar[L]):UnaryRuleClosure = {
-      import scalanlp.math.Semiring.LogSpace._
-      UnaryRuleClosure.computeClosure(grammar)
-    }
+//    def computeUnaryClosure[L](grammar: Grammar[L]):UnaryRuleClosure = {
+//      import scalanlp.math.Semiring.LogSpace._
+//      UnaryRuleClosure.computeClosure(grammar)
+//    }
   }
 
   final case class FeasibleSpan(begin:Int,end:Int) extends Traversable[Int] {

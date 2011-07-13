@@ -11,7 +11,7 @@ import collection.mutable.ArrayBuffer
 import java.io.{FileInputStream, BufferedInputStream, ObjectInputStream, File}
 
 class ProductParser[L,L2,W](val parsers: Seq[ChartBuilder[LogProbabilityParseChart,L2,W]], coarseParser: ChartBuilder[LogProbabilityParseChart,L,W],
-                       val projections: Seq[ProjectionIndexer[L,L2]]) extends Parser[L,W] {
+                       val projections: Seq[GrammarProjections[L,L2]]) extends Parser[L,W] {
   def bestParse(words: scala.Seq[W], spanScorer: SpanScorer[L]) = {
     val projected = projections.map(projectCoarseScorer(spanScorer,_));
     val posteriorScorers = for {
@@ -30,7 +30,7 @@ class ProductParser[L,L2,W](val parsers: Seq[ChartBuilder[LogProbabilityParseCha
     tree;
   }
 
-  def projectCoarseScorer(coarseScorer: SpanScorer[L], projections: ProjectionIndexer[L,L2]):SpanScorer[L2] ={
+  def projectCoarseScorer(coarseScorer: SpanScorer[L], projections: GrammarProjections[L,L2]):SpanScorer[L2] ={
     new ProjectingSpanScorer(projections, coarseScorer);
   }
 
@@ -41,7 +41,7 @@ class ProductParser[L,L2,W](val parsers: Seq[ChartBuilder[LogProbabilityParseCha
   val zeroGrammar = Grammar.zero(coarseParser.grammar);
   val zeroLexicon = new ZeroLexicon(coarseParser.lexicon);
   val zeroParser = new CKYChartBuilder[LogProbabilityParseChart,L,W](coarseParser.root, zeroLexicon,zeroGrammar,ParseChart.logProb);
-  val coarseIndexer = ProjectionIndexer(coarseParser.grammar.index, coarseParser.grammar.index, identity[L] _)
+  val coarseIndexer = ProjectionIndexer(coarseParser.grammar.labelIndex, coarseParser.grammar.labelIndex, identity[L] _)
 }
 
 /**

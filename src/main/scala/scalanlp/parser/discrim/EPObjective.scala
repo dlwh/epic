@@ -18,7 +18,7 @@ import scalala.tensor.{Counter, Counter2}
  */
 class EPObjective[L,L2,W](featurizers: Seq[Featurizer[L2,W]],
                           trees: IndexedSeq[TreeInstance[L,W]],
-                          indexedProjections: ProjectionIndexer[L,L2],
+                          indexedProjections: GrammarProjections[L,L2],
                           coarseParser: ChartBuilder[LogProbabilityParseChart, L, W],
                           openTags: Set[L2],
                           closedWords: Set[W],
@@ -27,7 +27,7 @@ class EPObjective[L,L2,W](featurizers: Seq[Featurizer[L2,W]],
                         extends AbstractDiscriminativeObjective[L,L2,W](trees,indexedProjections,openTags,closedWords) {
 
   val root = {
-    val splits = indexedProjections.refinementsOf(coarseParser.root)
+    val splits = indexedProjections.labels.refinementsOf(coarseParser.root)
     require(splits.length == 1)
     splits(0)
   }
@@ -115,7 +115,7 @@ class EPObjective[L,L2,W](featurizers: Seq[Featurizer[L2,W]],
                                    t: BinarizedTree[L],
                                    words: Seq[W],
                                    spanScorer: SpanScorer[L2]):ExpectedCounts[W] = {
-    StateSplitting.expectedCounts(g,lexicon,t.map(indexedProjections.refinementsOf _),words,spanScorer)
+    StateSplitting.expectedCounts(g,lexicon,t.map(indexedProjections.labels.refinementsOf _),words,spanScorer)
   }
 
   def projectWeights(weights: DenseVector[Double], modelIndex: Int) = {
@@ -201,7 +201,7 @@ object EPTrainer extends LatentTrainer {
   def mkObjective(params: Params,
                   latentFeaturizer: MyFeaturizer,
                   trainTrees: IndexedSeq[TreeInstance[String,String]],
-                  indexedProjections: ProjectionIndexer[String, (String, Int)],
+                  indexedProjections: GrammarProjections[String, (String, Int)],
                   xbarParser: ChartBuilder[ParseChart.LogProbabilityParseChart, String, String],
                   openTags: Set[(String, Int)],
                   closedWords: Set[String]) = {

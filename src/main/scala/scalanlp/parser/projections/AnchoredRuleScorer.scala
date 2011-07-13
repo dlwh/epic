@@ -17,14 +17,34 @@ import collection.parallel.immutable.ParSeq
  * @author dlwh
  */
 class AnchoredRuleScorerFactory[C,L,W](parser: ChartBuilder[ParseChart.LogProbabilityParseChart,L,W],
-                                     val indexedProjections: ProjectionIndexer[C,L],
+                                     val indexedProjections: GrammarProjections[C,L],
                                      pruningThreshold: Double = -7)
         extends ChartDrivenScorerFactory[C,L,W](parser,indexedProjections,pruningThreshold) {
 
   type MyScorer = AnchoredRuleScorer[C];
+  private def normalize(ruleScores: OldSparseVector, totals: OldSparseVector):OldSparseVector = {
+    if(ruleScores eq null) null
+    else {
+      val r = new OldSparseVector(ruleScores.length,ruleScores.default,ruleScores.activeSize)
+      for( (rule,score) <- ruleScores.activeIterator) {
+        val parent = indexedProjections.labels.coarseIndex(indexedProjections.rules.coarseIndex.get(rule).parent)
+        r(rule) = (score - totals(parent))
+      }
+      r
+    }
+  }
+
   protected def createSpanScorer(ruleData: AnchoredRuleProjector.AnchoredData, sentProb: Double) = {
     val AnchoredRuleProjector.AnchoredData(lexicalScores,unaryScores,logTotalsUnaries,binaryScores,logTotals) = ruleData;
-    new AnchoredRuleScorer(lexicalScores, unaryScores, binaryScores, logTotals, logTotalsUnaries);
+    val normUnaries:Array[OldSparseVector] = for((ruleScores,totals) <- unaryScores zip logTotalsUnaries) yield {
+      normalize(ruleScores, totals)
+    }
+
+    val normBinaries:Array[Array[OldSparseVector]] = for ((splits,totals) <- binaryScores zip logTotals) yield {
+      if(splits eq null) null
+      else for(ruleScores <- splits) yield normalize(ruleScores,totals)
+    }
+    new AnchoredRuleScorer(lexicalScores, normUnaries, normBinaries);
   }
 
 }
@@ -36,65 +56,45 @@ class AnchoredRuleScorerFactory[C,L,W](parser: ChartBuilder[ParseChart.LogProbab
  * @author dlwh
  */
 class AnchoredRulePosteriorScorerFactory[C,L,W](parser: ChartBuilder[ParseChart.LogProbabilityParseChart,L,W],
-                                     indexedProjections: ProjectionIndexer[C,L],
+                                     indexedProjections: GrammarProjections[C,L],
                                      pruningThreshold: Double = -7)
         extends ChartDrivenScorerFactory[C,L,W](parser,indexedProjections,pruningThreshold) {
 
   type MyScorer = AnchoredRuleScorer[C];
   protected def createSpanScorer(ruleData: AnchoredRuleProjector.AnchoredData, sentProb: Double) = {
-    val zeroSparseVector = new OldSparseVector(indexedProjections.coarseIndex.size, 0., 0);
-    val logTotals = TriangularArray.raw(ruleData.lexicalScores.length+1,zeroSparseVector);
     val AnchoredRuleProjector.AnchoredData(lexicalScores,unaryScores, _, binaryScores, _) = ruleData;
-    new AnchoredRuleScorer(lexicalScores, unaryScores, binaryScores, logTotals, logTotals);
+    new AnchoredRuleScorer(lexicalScores, unaryScores, binaryScores);
   }
 
 }
 
 
-@serializable
-@SerialVersionUID(2)
-class AnchoredRuleScorer[L](lexicalScores: Array[OldSparseVector], // begin -> label -> score
-                         // (begin,end) -> parent -> child -> score
-                         unaryScores: Array[Array[OldSparseVector]],
-                         // (begin,end) -> (split-begin) -> parent -> lchild -> rchild -> score
-                         // so many arrays.
-                         binaryScores: Array[Array[Array[Array[OldSparseVector]]]],
-                         logTotalBinaries: Array[OldSparseVector], // sum of scores for binary scores.
-                         logTotalUnaries: Array[OldSparseVector] // sum of scores for unary scores.
-                        ) extends SpanScorer[L] {
+@SerialVersionUID(3)
+class AnchoredRuleScorer[L](spanScores: Array[OldSparseVector], // triangular index -> label -> score
+                         // (begin,end) -> rule -> score
+                         unaryScores: Array[OldSparseVector],
+                         // (begin,end) -> (split-begin) -> rule -> score
+                         binaryScores: Array[Array[OldSparseVector]]) extends SpanScorer[L] with Serializable {
 
-  def scoreUnaryRule(begin: Int, end: Int, parent: Int, child: Int) = {
+  def scoreUnaryRule(begin: Int, end: Int, rule: Int) = {
     val forSpan = unaryScores(TriangularArray.index(begin, end))
     if(forSpan eq null) Double.NegativeInfinity
-    else if(forSpan(parent) eq null) Double.NegativeInfinity
-    else if(logTotalUnaries(TriangularArray.index(begin,end)) eq null)  Double.NegativeInfinity
-    else {
-      val r= forSpan(parent)(child) - logTotalUnaries(TriangularArray.index(begin,end))(parent);
-      if(logTotalUnaries(TriangularArray.index(begin,end))(parent) == Double.NegativeInfinity) Double.NegativeInfinity
-      else r
-    }
+    else forSpan(rule)
   }
 
-  def scoreBinaryRule(begin: Int, split: Int, end: Int, parent: Int, leftChild: Int, rightChild: Int) = {
+  def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = {
     val forSpan = binaryScores(TriangularArray.index(begin, end))
     if(forSpan eq null) Double.NegativeInfinity
     else {
       val forSplit = forSpan(split - begin)
       if(forSplit eq null) Double.NegativeInfinity
-      else {
-        val forParent = forSplit(parent)
-        if(forParent == null || forParent(leftChild) == null) Double.NegativeInfinity
-        else {
-          val r = forParent(leftChild)(rightChild) - logTotalBinaries(TriangularArray.index(begin,end))(parent);
-          if(logTotalBinaries(TriangularArray.index(begin,end))(parent) == Double.NegativeInfinity) Double.NegativeInfinity
-          else r
-
-        }
-      }
+      else forSplit(rule)
     }
   }
-  def scoreLexical(begin: Int, end: Int, tag: Int): Double = {
-    lexicalScores(begin)(tag);
+  def scoreSpan(begin: Int, end: Int, tag: Int): Double = {
+    val scores = spanScores(TriangularArray.index(begin, end))
+    if(scores ne null) scores(tag)
+    else Double.NegativeInfinity
   }
 }
 
@@ -123,9 +123,9 @@ object ProjectTreebankToVarGrammar {
     val treebank = ProcessedTreebank(TreebankParams(new File(args(2)),maxLength=10000),SpanParams(new File(args(3))));
     val outDir = new File(args(4));
     outDir.mkdirs();
-    val projections = ProjectionIndexer[String,(String,Int)](coarseParser.builder.grammar.index,parser.builder.grammar.index,_._1);
+    val projections = GrammarProjections(coarseParser.builder.grammar,parser.builder.grammar, {(x: (String,Int))=>x._1})
     val factory = new AnchoredRuleScorerFactory[String,(String,Int),String](parser.builder.withCharts(ParseChart.logProb),projections, -5);
-    writeObject(parser.builder.grammar.index,new File(outDir,SPAN_INDEX_NAME));
+    writeObject(parser.builder.grammar.labelIndex,new File(outDir,SPAN_INDEX_NAME));
     writeIterable(mapTrees(factory,treebank.trainTrees,true),new File(outDir,TRAIN_SPANS_NAME))
     writeIterable(mapTrees(factory,treebank.testTrees,false),new File(outDir,TEST_SPANS_NAME))
     writeIterable(mapTrees(factory,treebank.devTrees,false),new File(outDir,DEV_SPANS_NAME))

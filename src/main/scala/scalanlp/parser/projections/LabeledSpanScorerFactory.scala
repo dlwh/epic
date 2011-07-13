@@ -21,7 +21,7 @@ class LabeledSpanScorerFactory[C,L,W](parser: ChartBuilder[ParseChart,L,W],
                                     pruningThreshold: Double= -5) extends SpanScorer.Factory[C,L,W] {
 
   def mkSpanScorer(s: Seq[W], scorer: SpanScorer[L] = SpanScorer.identity) = {
-    val coarseRootIndex = parser.grammar.index(parser.root);
+    val coarseRootIndex = parser.grammar.labelIndex(parser.root);
     val inside = parser.buildInsideChart(s, scorer)
     val outside = parser.buildOutsideChart(inside, scorer);
 
@@ -36,7 +36,7 @@ class LabeledSpanScorerFactory[C,L,W](parser: ChartBuilder[ParseChart,L,W],
   }
 
   def mkSpanScorerWithTree(tree: BinarizedTree[C], s: Seq[W], scorer: SpanScorer[L] = SpanScorer.identity) = {
-    val coarseRootIndex = parser.grammar.index(parser.root);
+    val coarseRootIndex = parser.grammar.labelIndex(parser.root);
     val inside = parser.buildInsideChart(s, scorer)
     val outside = parser.buildOutsideChart(inside, scorer);
     val lexicon = parser.lexicon;
@@ -99,7 +99,7 @@ class LabeledSpanScorerFactory[C,L,W](parser: ChartBuilder[ParseChart,L,W],
       for(c <- markedSpans(index)) {
         if(scores(index) == null || scores(index)(c) == Double.NegativeInfinity) {
           println("grrr....");
-          println(parser.grammar.index.get(c) + " " + begin + " " + end + tree + " " + inside.bot.labelScore(begin,end,c) + " " + outside.bot.labelScore(begin,end,c) + " " + sentProb)
+          println(parser.grammar.labelIndex.get(c) + " " + begin + " " + end + tree + " " + inside.bot.labelScore(begin,end,c) + " " + outside.bot.labelScore(begin,end,c) + " " + sentProb)
           //if(begin + 1 != end) sys.error("crashy");
         }
       }
@@ -113,19 +113,13 @@ class LabeledSpanScorerFactory[C,L,W](parser: ChartBuilder[ParseChart,L,W],
 
 @SerialVersionUID(1)
 class LabeledSpanScorer[L](scores: Array[OldSparseVector]) extends SpanScorer[L] with Serializable {
-  @inline
-  private def score(begin: Int, end: Int, label: Int) = {
+  def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = 0.0
+
+  def scoreUnaryRule(begin: Int, end: Int, rule: Int) = 0.0
+
+  def scoreSpan(begin: Int, end: Int, label: Int): Double = {
     if(scores(TriangularArray.index(begin,end)) eq null) Double.NegativeInfinity
     else scores(TriangularArray.index(begin,end))(label)
-  }
-
-  def scoreUnaryRule(begin: Int, end: Int, parent: Int, child: Int) = 0.0;
-
-  def scoreBinaryRule(begin: Int, split: Int, end: Int, parent: Int, leftChild: Int, rightChild: Int) = {
-    score(begin,end,parent);
-  }
-  def scoreLexical(begin: Int, end: Int, tag: Int): Double = {
-    score(begin,end,tag);
   }
 }
 
@@ -140,9 +134,9 @@ object ProjectTreebankToLabeledSpans {
 
     val outDir = new File(args(2));
     outDir.mkdirs();
-    val projections = ProjectionIndexer(parser.builder.grammar.index,parser.builder.grammar.index,identity[String])
+    val projections = ProjectionIndexer(parser.builder.grammar.labelIndex,parser.builder.grammar.labelIndex,identity[String])
     val factory = new LabeledSpanScorerFactory[String,String,String](parser.builder.withCharts(ParseChart.viterbi),projections);
-    writeObject(parser.builder.grammar.index,new File(outDir,SPAN_INDEX_NAME));
+    writeObject(parser.builder.grammar.labelIndex,new File(outDir,SPAN_INDEX_NAME));
     writeIterable(mapTrees(factory,treebank.trainTrees,true),new File(outDir,TRAIN_SPANS_NAME))
     writeIterable(mapTrees(factory,treebank.testTrees,false),new File(outDir,TEST_SPANS_NAME))
     writeIterable(mapTrees(factory,treebank.devTrees,false),new File(outDir,DEV_SPANS_NAME))

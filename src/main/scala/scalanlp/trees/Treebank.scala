@@ -60,7 +60,7 @@ object Treebank {
     def treesFromSection(sec: String) = {
       val pennReader = new PennTreeReader();
       for(file <- new File(dir,sec).listFiles.iterator;
-        tree <- pennReader.readTrees(Source.fromFile(file).mkString("")).fold( x=>x, x => error("error in " + file + " " + x.toString)).iterator)
+        tree <- pennReader.readTrees(Source.fromFile(file).mkString("")).fold( x=>x, x => sys.error("error in " + file + " " + x.toString)).iterator)
       yield tree;
     }
   }

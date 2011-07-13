@@ -7,17 +7,16 @@ package projections
  *
  * @author dlwh
  */
-@serializable
 @SerialVersionUID(1)
-class ThresholdingScorer[L](inner: SpanScorer[L], threshold: Double= -5.) extends SpanScorer[L] {
+class ThresholdingScorer[L](inner: SpanScorer[L], threshold: Double= -5.) extends SpanScorer[L] with Serializable {
   @inline private def I(score: Double) = if(score > threshold) score else Double.NegativeInfinity;
 
-  def scoreLexical(begin: Int, end: Int, tag: Int) = I(inner.scoreLexical(begin,end,tag))
+  def scoreSpan(begin: Int, end: Int, tag: Int) = I(inner.scoreSpan(begin,end,tag))
 
-  def scoreUnaryRule(begin: Int, end: Int, parent: Int, child: Int) = I(inner.scoreUnaryRule(begin,end,parent,child));
+  def scoreUnaryRule(begin: Int, end: Int, rule: Int) = I(inner.scoreUnaryRule(begin,end,rule));
 
-  def scoreBinaryRule(begin: Int, split: Int, end: Int, parent: Int, leftChild: Int, rightChild: Int) = {
-    I(inner.scoreBinaryRule(begin, split, end, parent, leftChild, rightChild))
+  def scoreBinaryRule(begin: Int, split: Int, end: Int, r: Int) = {
+    I(inner.scoreBinaryRule(begin, split, end, r))
   }
 
 }

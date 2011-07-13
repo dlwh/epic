@@ -69,16 +69,14 @@ object SignatureLexicon {
   }
 }
 
-@serializable
-trait SignatureGenerator[W] {
+trait SignatureGenerator[W] extends Serializable {
   def signatureFor(w: W):W
 }
 
 object SignatureGenerator {
   def unknown[W](unknown: W): SignatureGenerator[W] = new ConstantSigGenerator(unknown);
-  @serializable
   @SerialVersionUID(1)
-  class ConstantSigGenerator[W](unknown: W) extends SignatureGenerator[W] {
+  class ConstantSigGenerator[W](unknown: W) extends SignatureGenerator[W] with Serializable {
     def signatureFor(w: W) = unknown;
   }
 }

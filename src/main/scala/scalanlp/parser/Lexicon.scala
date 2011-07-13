@@ -22,9 +22,8 @@ import scalala.tensor.{Counter2, Counter}
 import scalala.tensor.::
 import scalala.library.Library._;
 
-@serializable
 @SerialVersionUID(1)
-trait Lexicon[L,W] {
+trait Lexicon[L,W] extends Serializable {
   def wordScore(label: L, w: W): Double;
   def tagScores(w: W): Counter[L,Double] = Counter( tags.map { l => (l,wordScore(l,w))});
   def tags: Iterator[L];

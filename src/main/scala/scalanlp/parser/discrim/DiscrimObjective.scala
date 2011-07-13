@@ -26,32 +26,39 @@ class DiscrimObjective[L,W](feat: Featurizer[L,W],
                             coarseParser: ChartBuilder[LogProbabilityParseChart, L, W],
                             openTags: Set[L],
                             closedWords: Set[W])
-        extends LatentDiscrimObjective[L,L,W](feat,trees,ProjectionIndexer.simple(coarseParser.grammar.index),coarseParser, openTags,closedWords) {
+        extends LatentDiscrimObjective[L,L,W](feat,trees,GrammarProjections.identity(coarseParser.grammar),coarseParser, openTags,closedWords) {
 
-  override def treeToExpectedCounts(g: Grammar[L],
-                                    lexicon: Lexicon[L,W],
-                                    lt: BinarizedTree[L],
-                                    words: Seq[W],
-                                    spanScorer: SpanScorer[L]):ExpectedCounts[W] = {
+  def treeToExpectedCounts[L,W](parser: ChartParser[L,L,W],
+                                treeInstance: TreeInstance[L,W]):(ExpectedCounts[W],Double) = {
+    val TreeInstance(_,t,words,spanScorer) = treeInstance;
+    val g = parser.builder.grammar;
+    val lexicon = parser.builder.lexicon;
     val expectedCounts = new ExpectedCounts[W](g)
-    val t = lt.map(indexedFeatures.labelIndex);
     var score = 0.0;
+    var loss = 0.0;
     for(t2 <- t.allChildren) {
       t2 match {
-        case BinaryTree(a,Tree(b,_),Tree(c,_)) =>
-          expectedCounts.binaryRuleCounts.getOrElseUpdate(a).getOrElseUpdate(b)(c) += 1
-          score += g.binaryRuleScore(a,b,c);
+        case BinaryTree(a,bt@ Tree(b,_),Tree(c,_)) =>
+          val r = g.index(BinaryRule(a,b,c))
+          expectedCounts.ruleCounts(r) += 1
+          score += g.ruleScore(r);
+          loss += spanScorer.scoreBinaryRule(t2.span.start,bt.span.end, t2.span.end, r)
         case UnaryTree(a,Tree(b,_)) =>
-          expectedCounts.unaryRuleCounts.getOrElseUpdate(a)(b) += 1
-          score += g.unaryRuleScore(a,b);
+          val r = g.index(UnaryRule(a,b))
+          expectedCounts.ruleCounts(r) += 1
+          score += g.ruleScore(r);
+          loss += spanScorer.scoreUnaryRule(t2.span.start,t2.span.end,r)
         case n@NullaryTree(a) =>
+          val aI = g.labelIndex(a)
           val w = words(n.span.start);
-          expectedCounts.wordCounts.getOrElseUpdate(a)(w) += 1
-          score += lexicon.wordScore(g.index.get(a), w);
+          expectedCounts.wordCounts.getOrElseUpdate(aI)(w) += 1
+          score += lexicon.wordScore(g.labelIndex.get(aI), w);
+          loss += spanScorer.scoreSpan(t2.span.start,t2.span.end,aI);
+
       }
     }
     expectedCounts.logProb = score;
-    expectedCounts;
+    (expectedCounts,loss);
   }
 
 }

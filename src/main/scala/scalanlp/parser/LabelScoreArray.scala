@@ -8,9 +8,8 @@ import scalala.tensor.dense.{DenseVectorCol, DenseVector}
  * 
  * @author dlwh
  */
-@serializable
 @SerialVersionUID(1)
-class LabelScoreArray(length: Int, grammarSize: Int, fill: Double) {
+class LabelScoreArray(length: Int, grammarSize: Int, fill: Double) extends Serializable {
   final val score = TriangularArray.raw(length+1, LabelScoreArray.mkGrammarVector(grammarSize, fill));
   final val enteredLabels = TriangularArray.raw(length+1,new collection.mutable.BitSet());
 

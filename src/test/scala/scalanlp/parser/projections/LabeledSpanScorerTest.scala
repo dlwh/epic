@@ -15,7 +15,7 @@ class LabeledSpanScorerTest extends ParserTestHarness with FunSuite {
 
   test("We can parse using span scorer") {
     val gen = ParserTestHarness.simpleParser;
-    val projections = ProjectionIndexer(gen.builder.grammar.index,gen.builder.grammar.index,identity[String])
+    val projections = ProjectionIndexer(gen.builder.grammar.labelIndex,gen.builder.grammar.labelIndex,identity[String])
     val f = new LabeledSpanScorerFactory(gen.builder.withCharts(ParseChart.logProb), projections);
     for( TreeInstance(_,t,w,_) <- getTestTrees()) try {
       val gent = gen(w);

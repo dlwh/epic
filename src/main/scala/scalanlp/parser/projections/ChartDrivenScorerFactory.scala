@@ -7,11 +7,11 @@ import scalanlp.trees.BinarizedTree
  * @author dlwh
  */
 abstract class ChartDrivenScorerFactory[C,L,W](parser: ChartBuilder[ParseChart.LogProbabilityParseChart,L,W],
-                                     indexedProjections: ProjectionIndexer[C,L],
+                                     indexedProjections: GrammarProjections[C,L],
                                      pruningThreshold: Double = -7) extends SpanScorer.Factory[C,L,W] {
 
   def mkSpanScorer(s: Seq[W], scorer: SpanScorer[L] = SpanScorer.identity) = {
-    val coarseRootIndex = parser.grammar.index(parser.root);
+    val coarseRootIndex = parser.grammar.labelIndex(parser.root);
     val inside = parser.buildInsideChart(s, scorer)
     val outside = parser.buildOutsideChart(inside, scorer);
 
@@ -38,8 +38,9 @@ abstract class ChartDrivenScorerFactory[C,L,W](parser: ChartBuilder[ParseChart.L
     import AnchoredRuleProjector._;
 
     val pruner: SpanScorer[L] = {
-      if(tree == null) thresholdPruning(pruningThreshold)
-      else goldTreeForcing(tree.map(indexedProjections.coarseIndex), thresholdPruning(pruningThreshold));
+      thresholdPruning(pruningThreshold)
+//      if(tree == null) thresholdPruning(pruningThreshold)
+//      else goldTreeForcing(tree.map(indexedProjections.coarseIndex), thresholdPruning(pruningThreshold));
     }
     val ruleData = proj.projectRulePosteriors(inside,outside,sentProb,scorer,pruner);
 

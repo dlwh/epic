@@ -8,9 +8,9 @@ import scalanlp.util.Index;
  * @author dlwh
  */
 object ProjectingParser {
-  def apply[C,F,W](builder: ChartBuilder[ParseChart,F,W], coarseIndex: Index[C], proj: F=>C) = {
-    val indexedProjections = ProjectionIndexer(coarseIndex,builder.grammar.index,proj);
-    val decoder = new ViterbiDecoder[C,F,W](indexedProjections);
+  def apply[C,F,W](builder: ChartBuilder[ParseChart,F,W], coarseGrammar: Grammar[C], proj: F=>C) = {
+    val indexedProjections = GrammarProjections(coarseGrammar,builder.grammar,proj)
+    val decoder = new ViterbiDecoder[C,F,W](indexedProjections.labels);
     new ChartParser(builder, decoder, indexedProjections);
   }
 }

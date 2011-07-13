@@ -1,18 +1,17 @@
 package scalanlp.parser
 
-import projections.{ProjectingSpanScorer, ProjectionIndexer}
+import projections.{GrammarProjections, ProjectingSpanScorer, ProjectionIndexer}
 import scalanlp.trees.BinarizedTree
 
 /**
  * 
  * @author dlwh
  */
-@serializable
 @SerialVersionUID(1)
 class ChartParser[C,F,W](val builder: ChartBuilder[ParseChart,F,W],
                          val decoder: ChartDecoder[C,F,W],
-                         val projections: ProjectionIndexer[C,F],
-                         downWeightProjections:Boolean =true) extends Parser[C,W] {
+                         val projections: GrammarProjections[C,F],
+                         downWeightProjections:Boolean =true) extends Parser[C,W] with Serializable {
 
   override def bestParse(w: Seq[W], scorer: SpanScorer[C] = SpanScorer.identity):BinarizedTree[C] = try {
     val metaScorer = new ProjectingSpanScorer(projections,scorer,downWeightProjections);
@@ -29,7 +28,8 @@ class ChartParser[C,F,W](val builder: ChartBuilder[ParseChart,F,W],
 object ChartParser {
   def apply[L,W](builder: ChartBuilder[ParseChart,L,W]) = {
 
-    new ChartParser[L,L,W](builder, new MaxConstituentDecoder(ProjectionIndexer.simple(builder.grammar.index)), ProjectionIndexer.simple(builder.grammar.index));
+    new ChartParser[L,L,W](builder,
+      new MaxConstituentDecoder(GrammarProjections.identity(builder.grammar)), GrammarProjections.identity(builder.grammar))
   }
 
 }

@@ -12,13 +12,12 @@ import scalanlp.util._;
  * @author dlwh
  */
 @SerialVersionUID(1)
-@serializable
-class GoldTagScorer[L](tags: Seq[Int], wrongTag: Double=Double.NegativeInfinity) extends SpanScorer[L] {
-  def scoreLexical(begin: Int, end: Int, tag: Int) = if(tags(begin) == tag) 0.0 else wrongTag;
+class GoldTagScorer[L](tags: Seq[Int], wrongTag: Double=Double.NegativeInfinity) extends SpanScorer[L] with Serializable {
+  def scoreSpan(begin: Int, end: Int, tag: Int) = if(end > begin + 1 || tags(begin) == tag) 0.0 else wrongTag;
 
-  def scoreUnaryRule(begin: Int, end: Int, parent: Int, child: Int) = 0.0;
+  def scoreUnaryRule(begin: Int, end: Int, r: Int) = 0.0;
 
-  def scoreBinaryRule(begin: Int, split: Int, end: Int, parent: Int, leftChild: Int, rightChild: Int) = 0.0
+  def scoreBinaryRule(begin: Int, split: Int, end: Int, r: Int) = 0.0
 }
 
 object GoldTagExperiment {
@@ -32,7 +31,7 @@ object GoldTagExperiment {
     val parser = readObject[ChartParser[String,_,String]](parserFile);
 
     val goldenTrees = for ( TreeInstance(id,tree,words,span) <- testTrees) yield {
-      TreeInstance("gold-"+id,tree,words,SpanScorer.sum(new GoldTagScorer(getTags(parser.projections.coarseIndex, tree), -90),span))
+      TreeInstance("gold-"+id,tree,words,SpanScorer.sum(new GoldTagScorer(getTags(parser.projections.labels.coarseIndex, tree), -90),span))
     };
 
     evalParser(goldenTrees,parser,"gold-test",replacer);

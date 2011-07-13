@@ -16,10 +16,10 @@ import structpred._;
 import edu.berkeley.nlp.util.CounterInterface;
 import scala.collection.JavaConversions._
 import java.io.{File, FileWriter}
-import projections.{ProjectingSpanScorer, ProjectionIndexer}
 import scalala.library.Library
 import Library.sum
 import scalala.tensor.::
+import projections.{GrammarProjections, ProjectingSpanScorer, ProjectionIndexer}
 
 
 /**
@@ -55,10 +55,10 @@ object StructuredTrainer extends ParserTrainer {
     }
 
 
-    val projections = params.parser.optParser.map(p => ProjectionIndexer.simple(p.index)) getOrElse {
-      ProjectionIndexer.simple(xbarParser.index);
+    val projections = params.parser.optParser.map(p => GrammarProjections.identity(p.grammar)) getOrElse {
+      GrammarProjections.identity(xbarParser.grammar);
     }
-    val indexedProjections = ProjectionIndexer.simple(xbarParser.grammar.index);
+    val indexedProjections = GrammarProjections.identity(xbarParser.grammar)
 
     val factory = params.featurizerFactory;
     val featurizer = factory.getFeaturizer(initLexicon, initBinaries, initUnaries);
@@ -97,7 +97,7 @@ object StructuredTrainer extends ParserTrainer {
   import java.{util=>ju}
 
 
-  class ParserLinearModel[Chart[X]<:ParseChart[X]](projections: ProjectionIndexer[String,String],
+  class ParserLinearModel[Chart[X]<:ParseChart[X]](projections: GrammarProjections[String,String],
                                                    devTrees: IndexedSeq[TreeInstance[String,String]],
                                                    unaryReplacer: ChainReplacer[String],
                                                    obj: DiscrimObjective[String,String]) extends LossAugmentedLinearModel[TreeInstance[String,String]] {
@@ -130,7 +130,7 @@ object StructuredTrainer extends ParserTrainer {
       val logSumBuilder = parser.builder.withCharts(ParseChart.logProb);
       data.toIndexedSeq.par.map { (ti:TreeInstance[String,String]) =>
         val TreeInstance(_,goldTree,words,coarseFilter) = ti;
-        val lossScorer = lossAugmentedScorer(lossWeight,projections,goldTree);
+        val lossScorer = lossAugmentedScorer(lossWeight,projections.labels,goldTree);
         val scorer = SpanScorer.sum(coarseFilter, lossScorer)
 
 //        val logSumCounts = obj.wordsToExpectedCounts(words,logSumBuilder,coarseFilter);
@@ -189,17 +189,9 @@ object StructuredTrainer extends ParserTrainer {
     }
 
     val scorer = new SpanScorer[L] {
-      def scoreLexical(begin: Int, end: Int, tag: Int) = 0.0
-
-      def scoreUnaryRule(begin: Int, end: Int, parent: Int, child: Int) = {
-        if(gold(begin,end)(parent)) 0.0
-        else lossWeight;
-      }
-
-      def scoreBinaryRule(begin: Int, split: Int, end: Int, parent: Int, leftChild: Int, rightChild: Int) =  {
-        if(gold(begin,end)(parent)) 0.0
-        else lossWeight;
-      }
+      def scoreSpan(begin: Int, end: Int, tag: Int) = if(begin + 1 == end || gold(begin,end)(tag)) 0.0 else lossWeight
+      def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = 0.0
+      def scoreUnaryRule(begin: Int, end: Int, rule: Int) = 0.0
     }
 
     scorer
@@ -207,28 +199,31 @@ object StructuredTrainer extends ParserTrainer {
 
   def treeToExpectedCounts[L,W](parser: ChartParser[L,L,W],
                                 treeInstance: TreeInstance[L,W]):(ExpectedCounts[W],Double) = {
-    val TreeInstance(_,lt,words,spanScorer) = treeInstance;
+    val TreeInstance(_,t,words,spanScorer) = treeInstance;
     val g = parser.builder.grammar;
     val lexicon = parser.builder.lexicon;
     val expectedCounts = new ExpectedCounts[W](g)
-    val t = lt.map(g.index);
     var score = 0.0;
     var loss = 0.0;
     for(t2 <- t.allChildren) {
       t2 match {
         case BinaryTree(a,bt@ Tree(b,_),Tree(c,_)) =>
-          expectedCounts.binaryRuleCounts.getOrElseUpdate(a).getOrElseUpdate(b)(c) += 1
-          score += g.binaryRuleScore(a,b,c);
-          loss += spanScorer.scoreBinaryRule(t2.span.start,bt.span.end, t2.span.end, a,b,c);
+          val r = g.index(BinaryRule(a,b,c))
+          expectedCounts.ruleCounts(r) += 1
+          score += g.ruleScore(r);
+          loss += spanScorer.scoreBinaryRule(t2.span.start,bt.span.end, t2.span.end, r) + spanScorer.scoreSpan(t2.span.start,t2.span.end,r)
         case UnaryTree(a,Tree(b,_)) =>
-          expectedCounts.unaryRuleCounts.getOrElseUpdate(a)(b) += 1
-          score += g.unaryRuleScore(a,b);
-          loss += spanScorer.scoreUnaryRule(t2.span.start,t2.span.end,a,b);
+          val r = g.index(UnaryRule(a,b))
+          expectedCounts.ruleCounts(r) += 1
+          score += g.ruleScore(r);
+          loss += spanScorer.scoreUnaryRule(t2.span.start,t2.span.end,r);
         case n@NullaryTree(a) =>
+          val aI = g.labelIndex(a)
           val w = words(n.span.start);
-          expectedCounts.wordCounts.getOrElseUpdate(a)(w) += 1
-          score += lexicon.wordScore(g.index.get(a), w);
-          loss += spanScorer.scoreLexical(t2.span.start,t2.span.end,a);
+          expectedCounts.wordCounts.getOrElseUpdate(aI)(w) += 1
+          score += lexicon.wordScore(g.labelIndex.get(aI), w);
+          loss += spanScorer.scoreSpan(t2.span.start,t2.span.end,aI);
+
       }
     }
     expectedCounts.logProb = score;
@@ -239,21 +234,11 @@ object StructuredTrainer extends ParserTrainer {
     val result = indexedFeatures.mkSparseVector();
 
     // binaries
-    for( (a,bvec) <- ecounts.binaryRuleCounts;
-         (b,cvec) <- bvec;
-         (c,v) <- cvec.nonzero.pairs) {
-      result += (indexedFeatures.featuresFor(a,b,c) * v);
-    }
-
-    // unaries
-    for( (a,bvec) <- ecounts.unaryRuleCounts;
-         (b,v) <- bvec.nonzero.pairs) {
-      result += (indexedFeatures.featuresFor(a,b) * v);
-    }
+    for((r,v) <- ecounts.ruleCounts.pairsIteratorNonZero)
+      result += (indexedFeatures.featuresFor(r) * v);
 
     // lex
-    for( (a,ctr) <- ecounts.wordCounts;
-         (w,v) <- ctr.nonzero.pairs) {
+    for( (a,ctr) <- ecounts.wordCounts; (w,v) <- ctr.nonzero.pairs) {
       result += (indexedFeatures.featuresFor(a,w) * v);
     }
 
