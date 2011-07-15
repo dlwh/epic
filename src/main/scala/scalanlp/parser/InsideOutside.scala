@@ -69,7 +69,10 @@ class InsideOutside[L,W](val parser: ChartBuilder[LogProbabilityParseChart,L,W])
       span <- 2 to words.length
       begin <- 0 to (words.length - span)
       end = begin + span
-      (BinaryRule(a,b,c),r) <- grammar.indexedRules.iterator.zipWithIndex
+      a <- inside.bot.enteredLabelIndexes(begin,end)
+      r <- grammar.indexedBinaryRulesWithParent(a)
+      b = grammar.leftChild(r)
+      c = grammar.rightChild(r)
       split <- inside.top.feasibleSpan(begin, end, b, c)
     } {
       val bScore = inside.top.labelScore(begin, split, b)
@@ -94,8 +97,10 @@ class InsideOutside[L,W](val parser: ChartBuilder[LogProbabilityParseChart,L,W])
       span <- 1 to words.length
       begin <- 0 to (words.length - span)
       end = begin + span
-      (UnaryRule(a,b),r) <- grammar.indexedRules.iterator.zipWithIndex
+      a <- inside.top.enteredLabelIndexes(begin,end)
+      r <- grammar.indexedUnaryRulesWithParent(a)
     } {
+      val b = grammar.child(r)
       val bScore = inside.bot.labelScore(begin, end, b)
       val aScore = outside.top.labelScore(begin, end, a)
       val rScore = grammar.ruleScore(r) + validSpan.scoreUnaryRule(begin,end,r);

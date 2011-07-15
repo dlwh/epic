@@ -12,7 +12,9 @@ import InsideOutside._
 import scalanlp.util._;
 import Log._;
 
-import scalala.library.Library._;
+import scalala.library.Library._
+import scalala.tensor.sparse.SparseVector
+;
 
 
 abstract class AbstractDiscriminativeObjective[L,L2,W](
@@ -41,14 +43,16 @@ abstract class AbstractDiscriminativeObjective[L,L2,W](
     val startTime = System.currentTimeMillis();
     val ecounts = trees.par.view.map{ treeWordsScorer =>
       val localIn = System.currentTimeMillis();
-      val TreeInstance(_,tree,words,spanScorer) = treeWordsScorer;
-      try {
+      val TreeInstance(id,tree,words,spanScorer) = treeWordsScorer;
+      val res = try {
         expectedCounts(parser,tree,words,spanScorer)
       } catch {
         case e => println("Error in parsing: " + words + e);
         e.printStackTrace()
         throw e;
       }
+      println(id,words,sample.length)
+      res
     } reduce {
       sumCounts(_:Counts,_:Counts)
     };
@@ -77,13 +81,23 @@ abstract class AbstractDiscriminativeObjective[L,L2,W](
   def expectedCountsToFeatureVector[L,W](indexedFeatures: FeatureIndexer[L,W], ecounts: ExpectedCounts[W]) = {
     val result = indexedFeatures.mkDenseVector();
 
-    // binaries
+    def sumVectorIntoResults(vec: SparseVector[Double], v: Double) {
+      var i = 0
+      while (i < vec.nonzeroSize) {
+        result(vec.data.indexAt(i)) += vec.data.valueAt(i) * v
+        i += 1
+      }
+    }
+
+    // rules
     for((r,v) <- ecounts.ruleCounts.pairsIteratorNonZero)
-      result += (indexedFeatures.featuresFor(r) * v);
+      sumVectorIntoResults(indexedFeatures.featuresFor(r),v)
 
     // lex
+
     for( (a,ctr) <- ecounts.wordCounts; (w,v) <- ctr.nonzero.pairs) {
-      result += (indexedFeatures.featuresFor(a,w) * v);
+      val vec = indexedFeatures.featuresFor(a,w)
+      sumVectorIntoResults(vec, v)
     }
 
     result;
