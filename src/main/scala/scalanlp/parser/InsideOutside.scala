@@ -78,7 +78,7 @@ class InsideOutside[L,W](val parser: ChartBuilder[LogProbabilityParseChart,L,W])
       val bScore = inside.top.labelScore(begin, split, b)
       val cScore = inside.top.labelScore(split, end, c)
       val aScore = outside.bot.labelScore(begin, end, a)
-      val rScore = grammar.ruleScore(r) + validSpan.scoreBinaryRule(begin,split,end,r) + validSpan.scoreSpan(begin,split,a)
+      val rScore = grammar.ruleScore(r) + validSpan.scoreBinaryRule(begin,split,end,r) + validSpan.scoreSpan(begin,end,a)
       val prob = exp(bScore + cScore + aScore + rScore - totalProb)
       if(prob != 0.0)
         ruleCounts(r) += prob

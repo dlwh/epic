@@ -115,6 +115,7 @@ object DiscriminativeTrainer extends ParserTrainer {
 
     val log = Log.globalLog;
     for( (state,iter) <- optimizer.iterations(obj,init).take(maxIterations).zipWithIndex;
+        _ = rand.calculate(state.x);
          if iter != 0 && iter % iterationsPerEval == 0) yield {
        val parser = obj.extractParser(state.x);
        (iter + "", parser);

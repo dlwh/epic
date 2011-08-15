@@ -22,7 +22,7 @@ trait EPApproximator[C,F,W] extends Serializable {
 class AnchoredRuleApproximator[C,F,W](fineParser: ChartBuilder[LogProbabilityParseChart,F,W],
                                       coarseParser: ChartBuilder[LogProbabilityParseChart,C,W],
                                       projections: GrammarProjections[C,F], pruningThreshold: Double = Double.NegativeInfinity) extends EPApproximator[C,F,W] with Serializable {
-  val factory = new AnchoredRuleScorerFactory[C,F,W](fineParser,projections,pruningThreshold);
+  val factory = new AnchoredRuleScorerFactory[C,F,W](coarseParser.grammar, fineParser,projections,pruningThreshold);
 
   val zeroFactory = new CachingSpanScorerFactory[C,W](coarseParser);
 

@@ -6,9 +6,10 @@ import scalanlp.trees.BinarizedTree
  * 
  * @author dlwh
  */
-abstract class ChartDrivenScorerFactory[C,L,W](parser: ChartBuilder[ParseChart.LogProbabilityParseChart,L,W],
-                                     indexedProjections: GrammarProjections[C,L],
-                                     pruningThreshold: Double = -7) extends SpanScorer.Factory[C,L,W] {
+abstract class ChartDrivenScorerFactory[C,L,W](coarseGrammar: Grammar[C],
+                                               parser: ChartBuilder[ParseChart.LogProbabilityParseChart,L,W],
+                                               indexedProjections: GrammarProjections[C,L],
+                                               pruningThreshold: Double = -7) extends SpanScorer.Factory[C,L,W] {
 
   def mkSpanScorer(s: Seq[W], scorer: SpanScorer[L] = SpanScorer.identity) = {
     val coarseRootIndex = parser.grammar.labelIndex(parser.root);
@@ -25,6 +26,21 @@ abstract class ChartDrivenScorerFactory[C,L,W](parser: ChartBuilder[ParseChart.L
     chartScorer;
   }
 
+  def mkSpanScorerWithTree(s: Seq[W], scorer: SpanScorer[L] = SpanScorer.identity, tree: BinarizedTree[C]=null) = {
+    val coarseRootIndex = parser.grammar.labelIndex(parser.root);
+    val inside = parser.buildInsideChart(s, scorer)
+    val outside = parser.buildOutsideChart(inside, scorer);
+
+    val sentProb = inside.top.labelScore(0,s.length,coarseRootIndex);
+    if(sentProb.isInfinite) {
+      sys.error("Couldn't parse " + s + " " + sentProb)
+    }
+
+    val chartScorer = buildSpanScorer(inside,outside,sentProb,scorer,tree);
+
+    chartScorer;
+  }
+
   val proj = new AnchoredRuleProjector[C,L,W](parser, indexedProjections);
 
   type MyScorer <:SpanScorer[C]
@@ -37,10 +53,12 @@ abstract class ChartDrivenScorerFactory[C,L,W](parser: ChartBuilder[ParseChart.L
                       tree: BinarizedTree[C] = null):MyScorer = {
     import AnchoredRuleProjector._;
 
-    val pruner: SpanScorer[L] = {
-      thresholdPruning(pruningThreshold)
-//      if(tree == null) thresholdPruning(pruningThreshold)
-//      else goldTreeForcing(tree.map(indexedProjections.coarseIndex), thresholdPruning(pruningThreshold));
+    val pruner: SpanScorer[C] = {
+      if(tree == null) thresholdPruning(pruningThreshold)
+      else {
+        val gold = goldTreeForcing(coarseGrammar, tree.map(indexedProjections.labels.coarseIndex))
+        SpanScorer.sum(gold,thresholdPruning(pruningThreshold))
+      };
     }
     val ruleData = proj.projectRulePosteriors(inside,outside,sentProb,scorer,pruner);
 

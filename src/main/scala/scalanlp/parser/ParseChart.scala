@@ -22,6 +22,7 @@ import scalanlp.util.Encoder
 import scalala.tensor.Counter
 import scalala.tensor.dense.DenseVectorCol
 import scalanlp.parser.ParseChart.FeasibleSpan
+import math._
 
 @SerialVersionUID(2)
 abstract class ParseChart[L](val grammar: Encoder[L], val length: Int) extends Serializable {
@@ -141,7 +142,14 @@ object ParseChart {
   type ViterbiParseChart[L] = ParseChart[L] with Viterbi
 
   trait LogProbability {
-    final def sum(a: Double, b: Double) = scalala.library.Numerics.logSum(a,b)
+    final def sum(a: Double, b: Double) = {
+      // log1p isn't optimized, and I don't really care about accuracy that much
+      // scalala.library.Numerics.logSum(a,b)
+      if (a.isNegInfinity) b
+      else if (b.isNegInfinity) a
+      else if (a < b) b + log(1+exp(a - b))
+      else a + log(1+exp(b - a))
+    }
     final def sum(arr: Array[Double], length: Int) = scalala.library.Numerics.logSum(arr,length)
   }
   type LogProbabilityParseChart[L] = ParseChart[L] with LogProbability

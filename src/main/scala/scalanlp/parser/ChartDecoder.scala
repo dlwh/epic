@@ -118,7 +118,7 @@ object SimpleViterbiDecoder {
 class MaxRuleProductDecoder[C,F, W](coarseGrammar: Grammar[C], coarseLexicon: Lexicon[C,W],
                              indexedProjections: GrammarProjections[C,F],
                              fineBuilder: ChartBuilder[ParseChart.LogProbabilityParseChart, F, W]) extends ChartDecoder[C,F, W] {
-  val p = new AnchoredRulePosteriorScorerFactory(fineBuilder,indexedProjections,-5)
+  val p = new AnchoredRulePosteriorScorerFactory(coarseGrammar, fineBuilder,indexedProjections,-5)
 
   override def extractBestParse(root: F, grammar: Grammar[F],
                                 inside: ParseChart[F], outside: =>ParseChart[F], words:Seq[W],

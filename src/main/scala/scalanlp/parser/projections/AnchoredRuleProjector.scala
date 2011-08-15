@@ -5,6 +5,7 @@ import scalanlp.collection.mutable.TriangularArray
 import scalala.library.Numerics
 import scalanlp.trees.BinarizedTree
 import scalanlp.tensor.sparse.OldSparseVector
+import sun.misc.Unsafe
 
 /**
  * Used for computed the expected number of anchored rules that occur at each span/split.
@@ -13,8 +14,6 @@ import scalanlp.tensor.sparse.OldSparseVector
 @SerialVersionUID(1L)
 class AnchoredRuleProjector[C,L,W](parser: ChartBuilder[ParseChart.LogProbabilityParseChart,L,W],
                                    indexedProjections: GrammarProjections[C,L]) extends Serializable {
-
-
 
 
 
@@ -31,7 +30,7 @@ class AnchoredRuleProjector[C,L,W](parser: ChartBuilder[ParseChart.LogProbabilit
                             outside: ParseChart[L],
                             sentProb: Double,
                             scorer: SpanScorer[L]=SpanScorer.identity,
-                            pruneLabel: SpanScorer[L]=AnchoredRuleProjector.noPruning[L]):AnchoredRuleProjector.AnchoredData = {
+                            pruneLabel: SpanScorer[C]=AnchoredRuleProjector.noPruning[C]):AnchoredRuleProjector.AnchoredData = {
 
 
     // preliminaries: we're not going to fill in everything: some things will be null.
@@ -90,44 +89,45 @@ class AnchoredRuleProjector[C,L,W](parser: ChartBuilder[ParseChart.LogProbabilit
 
         // do binaries
         for( parent <- inside.bot.enteredLabelIndexes(begin,end)) {
-          val parentScore = outside.bot.labelScore(begin,end,parent);
+          val parentScore = outside.bot.labelScore(begin,end,parent)+ scorer.scoreSpan(begin,end,parent);
           val pP = indexedProjections.labels.project(parent);
 
           var logTotal = Double.NegativeInfinity;
 
-          for(split <- (begin+1) until end) {
-            lazy val parentArray = if(binaryScores(index)(split-begin) eq null) {
-              binaryScores(index)(split-begin) = projRuleVector()
-              binaryScores(index)(split-begin)
-            } else {
-              binaryScores(index)(split-begin)
-            }
-
-            // P(sAt->sBu uCt | sAt) \propto \sum_{latent} O(A-x,s,t) r(A-x ->B-y C-z) I(B-y,s,u) I(C-z, s, u)
-            val rules = grammar.indexedBinaryRulesWithParent(parent)
-            for(r <- rules) {
-              val b = grammar.leftChild(r)
-              val c = grammar.rightChild(r)
-              val pR = indexedProjections.rules.project(r)
-
-              val ruleScore = grammar.ruleScore(r)
-
-              val bScore = inside.top.labelScore(begin,split,b);
-              val cScore = inside.top.labelScore(split, end, c)
-
-              val currentScore = (bScore + cScore
-                + parentScore
-                + ruleScore
-                + scorer.scoreBinaryRule(begin,split,end,r)  + scorer.scoreSpan(begin,end,parent)
-                - sentProb);
-              if(currentScore > pruneLabel.scoreBinaryRule(begin,split,end,indexedProjections.rules.project(r))) {
-                val accScore = parentArray(pR)
-                parentArray(pR) = Numerics.logSum(accScore,currentScore);
-                logTotal = Numerics.logSum(logTotal,currentScore);
+          if(parentScore > Double.NegativeInfinity || pruneLabel.scoreSpan(begin,end,pP) > Double.NegativeInfinity)
+            for(split <- (begin+1) until end) {
+              lazy val parentArray = if(binaryScores(index)(split-begin) eq null) {
+                binaryScores(index)(split-begin) = projRuleVector()
+                binaryScores(index)(split-begin)
+              } else {
+                binaryScores(index)(split-begin)
               }
 
+              // P(sAt->sBu uCt | sAt) \propto \sum_{latent} O(A-x,s,t) r(A-x ->B-y C-z) I(B-y,s,u) I(C-z, s, u)
+              val rules = grammar.indexedBinaryRulesWithParent(parent)
+              for(r <- rules) {
+                val b = grammar.leftChild(r)
+                val c = grammar.rightChild(r)
+                val pR = indexedProjections.rules.project(r)
+
+                val ruleScore = grammar.ruleScore(r)
+
+                val bScore = inside.top.labelScore(begin,split,b);
+                val cScore = inside.top.labelScore(split, end, c)
+
+                val currentScore = (bScore + cScore
+                  + parentScore
+                  + ruleScore
+                  + scorer.scoreBinaryRule(begin,split,end,r)
+                  - sentProb);
+                if(currentScore > pruneLabel.scoreBinaryRule(begin,split,end,indexedProjections.rules.project(r))) {
+                  val accScore = parentArray(pR)
+                  parentArray(pR) = Numerics.logSum(accScore,currentScore);
+                  logTotal = Numerics.logSum(logTotal,currentScore);
+                }
+
+              }
             }
-          }
 
           if(logTotal != Double.NegativeInfinity) {
             if(logTotals(index) eq null) {
@@ -207,8 +207,8 @@ object AnchoredRuleProjector {
     def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = thresh;
   }
 
-  /*
-  def goldTreeForcing[L](tree: BinarizedTree[Int], pruner: SpanScorer[L] = thresholdPruning(-7)):SpanScorer[L] ={
+  def goldTreeForcing[L](grammar: Grammar[L],
+                         tree: BinarizedTree[Int]):SpanScorer[L] ={
     val gold = TriangularArray.raw(tree.span.end+1,collection.mutable.BitSet());
     if(tree != null) {
       for( t <- tree.allChildren) {
@@ -218,22 +218,23 @@ object AnchoredRuleProjector {
     new SpanScorer[L] {
       def scoreSpan(begin: Int, end: Int, tag: Int) = {
         if(gold(TriangularArray.index(begin,end))(tag) )Double.NegativeInfinity
-        else pruner.scoreSpan(begin,end,tag);
+        else 0.0
       }
 
       def scoreUnaryRule(begin: Int, end: Int, rule: Int) = {
+        val UnaryRule(parent,child) = grammar.indexedRules(rule)
         if(gold(TriangularArray.index(begin,end))(parent)  && gold(TriangularArray.index(begin,end))(child))
           Double.NegativeInfinity
-        else pruner.scoreUnaryRule(begin,end,parent,child)
+        else 0.0
       }
 
       def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = {
+        val BinaryRule(parent,leftChild,rightChild) = grammar.indexedRules(rule)
         if(gold(TriangularArray.index(begin,end))(parent)
                 && gold(TriangularArray.index(begin,split))(leftChild)
                 && gold(TriangularArray.index(split,end))(rightChild)) Double.NegativeInfinity
-        else pruner.scoreBinaryRule(begin,split,end,parent,leftChild,rightChild)
+        else 0.0
       }
     }
   }
-  */
 }

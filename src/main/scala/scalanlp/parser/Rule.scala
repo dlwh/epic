@@ -21,7 +21,7 @@ import java.io.DataOutput
 
 
 
-sealed trait Rule[@specialized(Int) +L] { def parent: L; def children: Seq[L] }
+sealed trait Rule[@specialized(Int) +L] { def parent: L; def children: Seq[L]; def symbols = parent +: children }
 
 final case class BinaryRule[@specialized(Int) +L](parent: L, left: L, right: L) extends Rule[L] {
   def children = Seq(left,right);

@@ -35,7 +35,7 @@ class ProductParser[L,L2,W](val parsers: Seq[ChartBuilder[LogProbabilityParseCha
   }
 
   val anchoredProjectors = parsers zip projections map { case (parser,projection) =>
-    new AnchoredRuleScorerFactory(parser,projection,Double.NegativeInfinity);
+    new AnchoredRuleScorerFactory(coarseParser.grammar, parser,projection,Double.NegativeInfinity);
   }
 
   val zeroGrammar = Grammar.zero(coarseParser.grammar);

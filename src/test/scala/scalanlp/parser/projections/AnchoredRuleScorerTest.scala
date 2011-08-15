@@ -16,9 +16,9 @@ class AnchoredRuleScorerTest  extends ParserTestHarness with FunSuite {
   test("We can parse using span scorer") {
     val gen = ParserTestHarness.simpleParser;
     val projections = GrammarProjections.identity(gen.builder.grammar)
-    val f = new AnchoredRuleScorerFactory(gen.builder.withCharts(ParseChart.logProb), projections, Double.NegativeInfinity);
+    val f = new AnchoredRuleScorerFactory(gen.builder.grammar, gen.builder.withCharts(ParseChart.logProb), projections, Double.NegativeInfinity);
     val zero = new CKYChartBuilder[ParseChart.LogProbabilityParseChart,String,String](gen.builder.root,new ZeroLexicon(gen.builder.lexicon), Grammar.zero(gen.builder.grammar),ParseChart.logProb);
-    val fnext = new AnchoredRuleScorerFactory(zero, projections, Double.NegativeInfinity);
+    val fnext = new AnchoredRuleScorerFactory(zero.grammar, zero, projections, Double.NegativeInfinity);
     for( TreeInstance(_,t,w,_) <- getTestTrees()) try {
       val gent = gen(w);
       val scorer = f.mkSpanScorer(w);
@@ -43,7 +43,7 @@ class AnchoredRuleScorerTest  extends ParserTestHarness with FunSuite {
   test("Parsing kind of works using it") {
     val gen = ParserTestHarness.simpleParser;
     val projections = GrammarProjections.identity(gen.builder.grammar)
-    val f = new AnchoredRuleScorerFactory(gen.builder.withCharts(ParseChart.logProb), projections, Double.NegativeInfinity);
+    val f = new AnchoredRuleScorerFactory(gen.builder.grammar, gen.builder.withCharts(ParseChart.logProb), projections, Double.NegativeInfinity);
     val zero = new CKYChartBuilder[ParseChart.LogProbabilityParseChart,String,String](gen.builder.root,new ZeroLexicon(gen.builder.lexicon), Grammar.zero(gen.builder.grammar),ParseChart.logProb);
 
     val parser = new Parser[String,String] {

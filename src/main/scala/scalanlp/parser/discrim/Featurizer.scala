@@ -45,7 +45,7 @@ case class RuleFeature[L](r: Rule[L]) extends Feature[L,Nothing] with CachedHash
 case class WeightedFeature(kind: Symbol) extends Feature[Nothing,Nothing] with CachedHashCode
 /** A Lexical feature is just an indicator on there being this word */
 case class LexicalFeature[L,W](l: L, w: W) extends Feature[L,W] with CachedHashCode
-case class SubstateFeature[L,W](f: Feature[L,W], states: Seq[Int]) extends Feature[(L,Int),W] with CachedHashCode
+case class SubstateFeature[L,W,T](f: Feature[L,W], states: Seq[T]) extends Feature[(L,T),W] with CachedHashCode
 case class UnannotatedRuleFeature[L](r: Rule[L]) extends Feature[L,Nothing] with CachedHashCode
 
 case class BitFeature(lbl: LabelOfBit, index: Int, toggled: Int) extends Feature[Nothing,Nothing] with CachedHashCode
@@ -420,7 +420,7 @@ trait FeatureIndexer[L,W] extends Encoder[Feature[L,W]] with Serializable {
 
 object FeatureIndexer {
 
-  def apply[L,L2,W](f: Featurizer[L2,W], rawGrammar: Grammar[L], lex: Lexicon[L,W], indexedProjections: GrammarProjections[L,L2]) = {
+  def apply[L,L2,W](f: Featurizer[L2,W], lex: Lexicon[L,W], indexedProjections: GrammarProjections[L,L2]) = {
     val featureIndex = Index[Feature[L2,W]]()
     val ruleIndex = indexedProjections.rules.fineIndex
 
@@ -429,41 +429,16 @@ object FeatureIndexer {
     // a -> W map
     val lexicalCache = new ArrayMap(collection.mutable.Map[W,Counter[Feature[L2,W], Double]]())
 
-    // binaries
-    for{
-      rule <- rawGrammar.indexedRules
-    } rule match {
-      case BinaryRule(a,b,c) =>
-        for {
-          aSplit <- indexedProjections.labels.refinementsOf(a)
-          bSplit <- indexedProjections.labels.refinementsOf(b)
-          cSplit <- indexedProjections.labels.refinementsOf(c)
-        } {
-          val binaryRule = BinaryRule(indexedProjections.labels.fineIndex.get(aSplit),
-            indexedProjections.labels.fineIndex.get(bSplit),
-            indexedProjections.labels.fineIndex.get(cSplit))
-          val feats = f.featuresFor(binaryRule)
-          val ri = ruleIndex(binaryRule)
-          ruleCache(ri) = feats
-          feats.keysIterator.foreach {featureIndex.index _ }
-        }
-      case UnaryRule(a,b) =>
-        for {
-          aSplit <- indexedProjections.labels.refinementsOf(a)
-          bSplit <- indexedProjections.labels.refinementsOf(b)
-        } {
-          val unaryRule = UnaryRule(indexedProjections.labels.fineIndex.get(aSplit),
-            indexedProjections.labels.fineIndex.get(bSplit))
-          val feats = f.featuresFor(unaryRule)
-          val ri = ruleIndex(unaryRule)
-          ruleCache(ri) = feats
-          feats.keysIterator.foreach {featureIndex.index _ }
-        }
-
+    // rules
+    for (rule <- indexedProjections.rules.fineIndex) {
+      val feats = f.featuresFor(rule)
+      val ri = ruleIndex(rule)
+      ruleCache(ri) = feats
+      feats.keysIterator.foreach {featureIndex.index _ }
     }
 
     // lex
-    for{
+    for {
       (l,w) <- lex.knownTagWords
       lSplit <- indexedProjections.labels.refinementsOf(l)
     } {

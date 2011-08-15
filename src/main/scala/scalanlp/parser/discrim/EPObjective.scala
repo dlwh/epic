@@ -35,7 +35,7 @@ class EPObjective[L,L2,W](featurizers: Seq[Featurizer[L2,W]],
   val indexedFeatures: Seq[FeatureIndexer[L2,W]] = featurizers.map { featurizer =>
     val initGrammar = coarseParser.grammar
     val initLex = coarseParser.lexicon
-    FeatureIndexer[L,L2,W](featurizer, initGrammar, initLex, indexedProjections)
+    FeatureIndexer[L,L2,W](featurizer, initLex, indexedProjections)
   }
 
   private val offsets = Array.fill(numModels+1)(0);

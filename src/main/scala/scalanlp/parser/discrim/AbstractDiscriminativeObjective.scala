@@ -51,7 +51,6 @@ abstract class AbstractDiscriminativeObjective[L,L2,W](
         e.printStackTrace()
         throw e;
       }
-      println(id,words,sample.length)
       res
     } reduce {
       sumCounts(_:Counts,_:Counts)

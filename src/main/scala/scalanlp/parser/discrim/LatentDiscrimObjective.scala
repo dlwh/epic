@@ -38,9 +38,8 @@ class LatentDiscrimObjective[L,L2,W](featurizer: Featurizer[L2,W],
   }
 
   val indexedFeatures: FeatureIndexer[L2,W] = {
-    val initGrammar = coarseParser.grammar;
     val initLex = coarseParser.lexicon;
-    FeatureIndexer[L,L2,W](featurizer, initGrammar, initLex, indexedProjections);
+    FeatureIndexer[L,L2,W](featurizer, initLex, indexedProjections);
   }
   println("Num features: " + indexedFeatures.index.size);
 
@@ -78,8 +77,6 @@ class LatentDiscrimObjective[L,L2,W](featurizer: Featurizer[L2,W],
     if(treeCounts.logProb - wordCounts.logProb > 1E-4) error(t.render(w) + " " + treeCounts + " " + wordCounts);
     */
     treeCounts -= wordCounts
-//    println("Acc: " + treeCounts.logProb + " " +  treeCounts.decode(b.grammar) )
-//    treeCounts;
   }
 
   def sumCounts(c1: Counts, c2: Counts) = { c1 += c2}
@@ -146,7 +143,7 @@ trait LatentTrainer extends ParserTrainer {
   protected implicit def specificManifest : Manifest[SpecificParams];
 
   type Params = LatentParams[SpecificParams];
-  protected lazy val paramManifest = { println(manifest[Params]); manifest[Params]}
+  protected lazy val paramManifest = { manifest[Params]}
 
   def getFeaturizer(params: Params,
                     initLexicon: Counter2[String, String, Double],
@@ -210,7 +207,7 @@ trait LatentTrainer extends ParserTrainer {
 
     val log = Log.globalLog;
     import scalanlp.optimize.RandomizedGradientCheckingFunction;
-    val rand = new RandomizedGradientCheckingFunction(obj);
+    val rand = new RandomizedGradientCheckingFunction(obj,1E-4);
     def evalAndCache(pair: (optimizer.State,Int) ) {
       val (state,iter) = pair;
       val weights = state.x;
@@ -224,7 +221,6 @@ trait LatentTrainer extends ParserTrainer {
     val cachedObj = new CachedBatchDiffFunction[DenseVector[Double]](obj);
 
     for( (state,iter) <- optimizer.iterations(cachedObj,init).take(maxIterations).zipWithIndex.tee(evalAndCache _);
-//         _ = rand.calculate(state.x);
          if iter != 0 && iter % iterationsPerEval == 0) yield try {
       val parser = obj.extractParser(state.x)
       ("LatentDiscrim-" + iter.toString,parser)

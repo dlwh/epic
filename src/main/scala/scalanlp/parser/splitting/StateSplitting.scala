@@ -57,7 +57,7 @@ object StateSplitting {
           val msg = lexicon.tagScores(word).toString + " " + t.label.map { a =>
             grammar.labelIndex.get(a) + " " + scorer.scoreSpan(t.span.start,t.span.end,a);
           }
-          sys.error("Trouble with lexical " + t.render(s) + " " + msg.mkString(", "))
+          sys.error("Trouble with lexical " + t.render(s) + " " + msg.mkString)
         }
       case t : UnaryTree[Seq[Int]] =>
         var foundOne = false;
@@ -213,7 +213,7 @@ object StateSplitting {
         }
       case t@ BinaryTree(_,lc,rc) =>
         for {
-          p <- t.label iterator;
+          p <- t.label.iterator;
           opScore = oScores.bot(t.span.start,t.span.end,p);
           l <- lc.label.iterator
           ilScore = iScores.top(lc.span.start,lc.span.end,l);
@@ -221,7 +221,7 @@ object StateSplitting {
         } {
           val irScore = iScores.top(rc.span.start,rc.span.end,r)
           val ruleScore = opScore + irScore + ilScore + grammar.ruleScore(p,l,r) - totalProb;
-          val span = safeScorer.scoreBinaryRule(t.span.start,rc.span.start,rc.span.end,grammar.ruleIndex(p,l,r));
+          val span = safeScorer.scoreBinaryRule(t.span.start,rc.span.start,rc.span.end,grammar.ruleIndex(p,l,r)) + safeScorer.scoreSpan(t.span.start,t.span.end,p)
           assert(!ruleScore.isNaN);
           //assert(exp(ruleScore) > 0, " " + ruleScore);
           assert(!exp(ruleScore + span).isInfinite, ruleScore + " " + span + " " + (ruleScore + span) + " " + totalProb);

@@ -70,7 +70,7 @@ class EPParser[L,L2,W](val parsers: Seq[ChartBuilder[LogProbabilityParseChart,L2
       if(parsers.length == 1 || maxEPIterations == 1) {
         changed = false;
       } else {
-        val maxChange = computeMaxChange(currentF0,lastF0,words.length);
+        val maxChange = computeMaxChange(currentF0,lastF0,initScorer,words.length);
         assert(!maxChange.isNaN)
         changed = maxChange.abs > 1E-4;
         if(!changed) {
@@ -92,13 +92,13 @@ class EPParser[L,L2,W](val parsers: Seq[ChartBuilder[LogProbabilityParseChart,L2
     EPResult(data,partition,currentF0)
   }
 
-  def computeMaxChange(scorer1: SpanScorer[L], scorer2: SpanScorer[L], length: Int):Double = {
+  def computeMaxChange(scorer1: SpanScorer[L], scorer2: SpanScorer[L], validSpan: SpanScorer[L], length: Int):Double = {
     val changes = for {
       span <- (1 to length).iterator;
       i <- (0 to (length - span)).iterator;
       j = i + span;
+      p <- (0 until projections(0).labels.coarseIndex.size).iterator if !validSpan.scoreSpan(i,j,p).isNegInfinity
       k <- ((i + 1) until j).iterator;
-      p <- (0 until projections(0).labels.coarseIndex.size).iterator;
       r <- coarseParser.grammar.indexedBinaryRulesWithParent(p)
     } yield {
       // TODO: compute change that is consistent with all span scorers :-/
