@@ -15,7 +15,8 @@ import scalala.tensor.{Counter, Counter2}
 import scalala.tensor.::
 
 /**
- * 
+ * Runs something not unlike Petrov's 2008 EMNLP paper.
+ *
  * @author dlwh
  */
 object MultiscaleTrainer extends ParserTrainer {

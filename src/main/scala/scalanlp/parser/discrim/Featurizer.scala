@@ -171,6 +171,10 @@ object FeatureProjectors {
   }
 }
 
+
+/**
+ * Takes another featurizer and wraps it in a SubstateFeature(baseFeature,<vector of parameters>)
+ */
 class SlavFeaturizer[L,W](base: Featurizer[L,W], numStates:Int) extends Featurizer[(L,Int),W] {
   def featuresFor(r: Rule[(L,Int)]) = r match {
     case BinaryRule(a,b,c) =>

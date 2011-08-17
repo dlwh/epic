@@ -5,10 +5,11 @@ import scalala.tensor.mutable.Counter
 import collection.mutable.ArrayBuffer
 
 /**
- * 
+ *
+ * A Featurizer that returns features at each scale in the feature cascade
+ *
  * @author dlwh
  */
-
 class MultiscaleFeaturizer[L,W](base: Featurizer[L,W]) extends Featurizer[(L,Seq[Int]),W] {
   def featuresFor(r: Rule[(L,Seq[Int])]) = r match {
     case BinaryRule(a,b,c) =>
@@ -16,7 +17,7 @@ class MultiscaleFeaturizer[L,W](base: Featurizer[L,W]) extends Featurizer[(L,Seq
       val baseFeatures = base.featuresFor(BinaryRule(a._1,b._1,c._1))
       for( (k,v) <- baseFeatures.nonzero.pairs) {
         var i = 0;
-        while(i < a._2.length) {
+        while(i <= a._2.length) {
           val substates = ArrayBuffer(a._2.drop(i),b._2.drop(i),c._2.drop(i))
           result(SubstateFeature(k,substates)) = v
           i += 1
@@ -28,7 +29,7 @@ class MultiscaleFeaturizer[L,W](base: Featurizer[L,W]) extends Featurizer[(L,Seq
       val baseFeatures = base.featuresFor(UnaryRule(a._1,b._1))
       for( (k,v) <- baseFeatures.nonzero.pairs) {
         var i = 0;
-        while(i < a._2.length) {
+        while(i <= a._2.length) {
           val substates = ArrayBuffer(a._2.drop(i),b._2.drop(i))
           result(SubstateFeature(k,substates)) = v
           i += 1
@@ -42,7 +43,12 @@ class MultiscaleFeaturizer[L,W](base: Featurizer[L,W]) extends Featurizer[(L,Seq
     val substates = ArrayBuffer(l._2)
     val result = Counter[Feature[(L,Seq[Int]),W],Double]()
     for( (k,v) <- baseFeatures.nonzero.pairs) {
-      result(SubstateFeature(k,substates)) = v
+      var i = 0;
+      while(i <= l._2.length) {
+        val substates = ArrayBuffer(l._2.drop(i))
+        result(SubstateFeature(k,substates)) = v
+        i += 1
+      }
     }
     result
   }

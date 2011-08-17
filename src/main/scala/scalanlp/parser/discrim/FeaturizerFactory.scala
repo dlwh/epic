@@ -31,7 +31,7 @@ class PlainFeaturizerFactory[L](initToZero: Boolean = true) extends FeaturizerFa
 }
 
 /**
- * Uses just rule features and wordshapes
+ * Uses just rule features, wordshapes, and the log probability of the rules
  */
 class WeightedFeaturizerFactory[L](initToZero: Boolean = true) extends FeaturizerFactory[L,String] {
   def getFeaturizer(baseLexicon: Counter2[L,String,Double],
