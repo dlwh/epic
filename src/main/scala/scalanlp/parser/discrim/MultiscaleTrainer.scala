@@ -62,7 +62,9 @@ object MultiscaleTrainer extends ParserTrainer {
       latentFeaturizer
     } else {
       val weights = readObject[(DenseVector[Double],Counter[Feature[(String,Seq[Int]),String],Double])](weightsPath)._2;
-      new CachedWeightsFeaturizer(latentFeaturizer, weights);
+      println(weights.size,weights.valuesIterator.count(_ == 0.0),weights.valuesIterator.count(_.abs < 1E-4))
+
+      new CachedWeightsFeaturizer(latentFeaturizer, weights, randomize= false, randomizeZeros = true);
     }
   }
 
@@ -99,7 +101,7 @@ object MultiscaleTrainer extends ParserTrainer {
 
   def splitRules(rules: Counter[Rule[(String,Seq[Int])],Double], splitAllRules: Boolean = false) = {
     val splitter = new ConditionalRuleSplitter(fracToSplit = if(splitAllRules) 1.0 else 0.5, minRuleValue = if(splitAllRules) -1 else 1E-4)
-    def split(sym: (String,Seq[Int])) = if(sym._1 == "") Seq(sym) else Seq((sym._1,0 +: sym._2), (sym._1,1 +: sym._2))
+    def split(sym: (String,Seq[Int])) = if(sym._1 == "") Seq(sym._1 -> Seq(0)) else Seq((sym._1,0 +: sym._2), (sym._1,1 +: sym._2))
     def proj(sym: (String,Seq[Int])) = sym._1
     splitter.chooseRulesToSplit(rules, split, proj)
   }
@@ -163,7 +165,7 @@ object MultiscaleTrainer extends ParserTrainer {
     for( (state,iter) <- optimizer.iterations(cachedObj,init).take(maxIterations).zipWithIndex.tee(evalAndCache _);
          if iter != 0 && iter % iterationsPerEval == 0) yield try {
       val parser = obj.extractParser(state.x)
-      ("LatentDiscrim-" + iter.toString,parser)
+      ("MultiScale-" + iter.toString,parser)
     } catch {
       case e => println(e);e.printStackTrace(); throw e;
     }
@@ -171,6 +173,7 @@ object MultiscaleTrainer extends ParserTrainer {
 
 
   def cacheWeights(params: Params, obj: MyObjective, weights: DenseVector[Double], iter: Int) = {
+    println("Zeros:" + weights.size,weights.valuesIterator.count(_ == 0), weights.valuesIterator.count(_.abs < 1E-4))
     writeObject( new File("weights-"+iter +".ser"), weights -> obj.indexedFeatures.decode(weights))
   }
 
