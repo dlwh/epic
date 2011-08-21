@@ -150,7 +150,7 @@ class WeightedRuleFeaturizer[L,W](binaries: Counter2[L,BinaryRule[L],Double],
 class CachedWeightsFeaturizer[L,W](f: Featurizer[L,W],
                                    weights: Counter[Feature[L,W], Double],
                                    proj: Feature[L,W]=>Feature[L,W] = identity[Feature[L,W]] _,
-                                   randomize:Boolean = true) extends Featurizer[L,W] {
+                                   randomize:Boolean = true, randomizeZeros: Boolean = false) extends Featurizer[L,W] {
   def featuresFor(r: Rule[L]) =  f.featuresFor(r)
 
   def featuresFor(l: L, w: W) = f.featuresFor(l,w)
@@ -158,7 +158,7 @@ class CachedWeightsFeaturizer[L,W](f: Featurizer[L,W],
   def initialValueForFeature(feat: Feature[L,W]) = {
     weights.get(proj(feat)) match {
       case Some(v) =>
-        v + {if(randomize) math.log(0.999 + math.random * 0.002) else 0.0}
+        v + {if(randomize || (v == 0.0 && randomizeZeros)) math.log(0.95 + math.random * 0.1) else 0.0}
       case None =>  f.initialValueForFeature(feat)
     }
   }
