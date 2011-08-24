@@ -22,7 +22,15 @@ import java.io._;
 import scalanlp.serialization.DataSerialization._;
 import scalanlp.util.Index
 
+/**
+ * DenseTreebank provides a way of serializing treebanks
+ *
+ * @author dlwh
+ */
 object DenseTreebank {
+  /**
+   * Produces a densetreebank in path from a current Treebank.
+   */
   def compressTreebank(treebank: Treebank, path: File) = {
     val zipWriter = new ZipOutputStream(new BufferedOutputStream(new FileOutputStream(path)));
     val symbolIndex = Index[String]();
@@ -42,8 +50,7 @@ object DenseTreebank {
       }
       write(dos,false);
       dos.flush();
-      zipWriter
-              .closeEntry();
+      zipWriter.closeEntry();
     }
 
 
@@ -61,6 +68,9 @@ object DenseTreebank {
 
   private type Metadata = (Seq[String],Seq[String],Seq[String],Seq[String]);
 
+  /**
+   * Read in a zip file to a treebank.
+   */
   def fromZipFile(path: File): Treebank = {
     val zipFile = new ZipFile(path);
     val metadata = zipFile.getEntry("metadata");
@@ -99,7 +109,7 @@ object DenseTreebank {
   }
 
   def main(args: Array[String]) = {
-    val penn = Treebank.fromPennTreebankDir(new File(args(0)));
+    val penn = Treebank.fromChineseTreebankDir(new File(args(0)));
     DenseTreebank.compressTreebank(penn, new File(args(1)));
     val dense = DenseTreebank.fromZipFile(new File(args(1)));
     dense.treesFromSection(dense.sections.last) foreach println

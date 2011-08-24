@@ -16,6 +16,9 @@ package scalanlp.trees
 */
 
 
+/**
+ * Implements HeadFinding as in the Collins parser.
+ */
 object HeadFinder {
 
   sealed trait Dir;
@@ -74,6 +77,12 @@ object HeadFinder {
 
 import HeadFinder._;
 
+/**
+ * Can annotate a tree with the head word. Usually
+ * you should just use HeadFinder.collinsHeadFinder
+ *
+ * @author dlwh
+ */
 class HeadFinder[L](rules: Map[L,Seq[HeadRule[L]]]) {
 
   def findHeadChild(t: Tree[L]) = {

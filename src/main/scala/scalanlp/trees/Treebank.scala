@@ -17,27 +17,59 @@ package scalanlp.trees;
 
 
 import java.io.File
+import io.Codec
 
+/**
+ * A Treebank contains a train set, a test set, and a dev set, which are "Portions". Portions
+ * are made up of sections, which have the trees.
+ *
+ * @author dlwh
+ */
 trait Treebank { outer =>
 
+  /**
+   * Class for a split of a training set.
+   */
   case class Portion(name: String, sections: Seq[String]) {
     def trees = treesFromSections(sections);
   }
 
+  /**
+   * Training set
+   */
   val train: Portion
+  /**
+   * Test set
+   */
   val test: Portion
+  /**
+   * Dev set
+   */
   val dev: Portion
+  /**
+   * All sentences
+   */
   val all:Portion = Portion("all",sections)
 
+  /**
+   * Every section in the treebank
+   */
   def sections: Seq[String];
 
+  /**
+   * Read the trees from a section
+   */
   def treesFromSection(sec: String): Iterator[(Tree[String],Seq[String])];
+
   def treesFromSections(secs: Seq[String]) = {
     for(sec <- secs.iterator;
         tree <- treesFromSection(sec))
       yield tree;
   }
 
+  /**
+   * All trees
+   */
   def trees: Iterator[(Tree[String],Seq[String])] = treesFromSections(sections);
           
 }
@@ -49,7 +81,7 @@ object Treebank {
   * Reads a treebank from the "mrg/wsj" section
   * of the parsed Treebank.
   */
-  def fromPennTreebankDir(dir: File) = new Treebank {
+  def fromPennTreebankDir(dir: File):Treebank = new Treebank {
     def sections = dir.listFiles.filter(_.isDirectory).map(_.getName);
     val train = Portion("train", Seq.range(2,10).map("0" + _) ++ Seq.range(10,22).map(""+_));
 
@@ -69,5 +101,22 @@ object Treebank {
     import scala.io.Codec.ISO8859
     implicit val cod = ISO8859;
     new SimpleTreebank(new File(dir + "/negra_1.mrg"),new File(dir + "/negra_2.mrg"),new File(dir + "/negra_3.mrg"))
+  }
+
+  def fromChineseTreebankDir(dir: File):Treebank = new Treebank {
+    def sections = dir.listFiles.map(_.getName);
+    private def id_to_name(id: Int) = "chtb_" + {if(id < 100)  "0" + id else id} +".mrg"
+
+    val train = Portion("train",{(1 to 270) ++ (400 to 1151)} map(id_to_name))
+    val test = Portion("test", 271 to 300 map id_to_name)
+    val dev = Portion("dev",301 to 325 map id_to_name)
+
+    def treesFromSection(sec: String) = {
+      val file = new File(dir,sec)
+      val pennReader = new PennTreeReader();
+      val iter = pennReader.readTrees(Source.fromFile(file)(Codec("GB18030")).mkString(""));
+      for(tree <- iter.fold( x=>x, x => sys.error("error in " + file + " " + x.toString)).iterator)
+        yield tree
+    }
   }
 }
