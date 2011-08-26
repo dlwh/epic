@@ -113,8 +113,9 @@ object Treebank {
 
     def treesFromSection(sec: String) = {
       val file = new File(dir,sec)
+      println(file)
       val pennReader = new PennTreeReader();
-      val iter = pennReader.readTrees(Source.fromFile(file)(Codec("GB18030")).mkString(""));
+      val iter = pennReader.readTrees(Source.fromFile(file)(Codec("UTF-8")).mkString(""));
       for(tree <- iter.fold( x=>x, x => sys.error("error in " + file + " " + x.toString)).iterator)
         yield tree
     }
