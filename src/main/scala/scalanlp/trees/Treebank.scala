@@ -1,4 +1,6 @@
-package scalanlp.trees;
+package scalanlp.trees
+
+import java.io.{FileReader, File, FileInputStream, InputStreamReader}
 /*
  Copyright 2010 David Hall
 
@@ -90,10 +92,10 @@ object Treebank {
     val dev = Portion("dev",Seq("22"));
 
     def treesFromSection(sec: String) = {
-      val pennReader = new PennTreeReader();
       for(file <- new File(dir,sec).listFiles.iterator;
-        tree <- pennReader.readTrees(Source.fromFile(file).mkString("")).fold( x=>x, x => sys.error("error in " + file + " " + x.toString)).iterator)
-      yield tree;
+        pennReader = new PennTreeReader(new FileReader(file));
+        tree <- pennReader)
+      yield tree
     }
   }
 
@@ -114,9 +116,8 @@ object Treebank {
     def treesFromSection(sec: String) = {
       val file = new File(dir,sec)
       println(file)
-      val pennReader = new PennTreeReader();
-      val iter = pennReader.readTrees(Source.fromFile(file)(Codec("UTF-8")).mkString(""));
-      for(tree <- iter.fold( x=>x, x => sys.error("error in " + file + " " + x.toString)).iterator)
+      val pennReader = new PennTreeReader(new InputStreamReader(new FileInputStream(file),"UTF-8"));
+      for(tree <- pennReader)
         yield tree
     }
   }

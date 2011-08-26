@@ -16,11 +16,11 @@ package scalanlp.trees;
 */
 
 
-import java.io.DataInput
-import java.io.DataOutput
 import scala.collection.mutable.ArrayBuffer;
 import scalanlp.serialization.DataSerialization
-import scalanlp.serialization.DataSerialization._;
+import scalanlp.serialization.DataSerialization._
+import java.io.{StringReader, DataInput, DataOutput}
+;
 
 class Tree[+L](val label: L, val children: IndexedSeq[Tree[L]])(val span: Span) {
   def isLeaf = children.size == 0;
@@ -42,6 +42,23 @@ class Tree[+L](val label: L, val children: IndexedSeq[Tree[L]])(val span: Span) 
   } else  {
     children.map(_.leaves).foldLeft[Stream[Tree[L]]](Stream.empty){_ append _}
   }
+
+  /**
+   * Useful for stripping the words out of a tree
+   * Returns (tree without leaves, leaves)
+   */
+  def cutLeaves: (Tree[L],IndexedSeq[L]) = {
+    def recCutLeaves(tree: Tree[L]): (Option[Tree[L]],IndexedSeq[L]) = {
+      if(tree.isLeaf) (None,IndexedSeq(tree.label))
+      else {
+        val fromChildren = tree.children.map(recCutLeaves _)
+        Some(Tree(tree.label,fromChildren.flatMap(_._1))(span)) -> fromChildren.flatMap(_._2)
+      }
+    }
+    val (treeOpt,leaves) = recCutLeaves(this)
+    treeOpt.get -> leaves
+  }
+
 
   def map[M](f: L=>M):Tree[M] = Tree( f(label), children map { _ map f})(span);
   def extend[B](f: Tree[L]=>B):Tree[B] = Tree(f(this), children map { _ extend f})(span);
@@ -65,7 +82,7 @@ class Tree[+L](val label: L, val children: IndexedSeq[Tree[L]])(val span: Span) 
 object Tree {
   def apply[L](label: L, children: IndexedSeq[Tree[L]])(span: Span) = new Tree(label,children)(span);
   def unapply[L](t: Tree[L]): Option[(L,IndexedSeq[Tree[L]])] = Some((t.label,t.children));
-  def fromString(input: String):(Tree[String],Seq[String]) = new PennTreeReader().readTree(input).left.get;
+  def fromString(input: String):(Tree[String],Seq[String]) = new PennTreeReader(new StringReader(input)).next
 
   private def recursiveToString[L](tree: Tree[L], depth: Int, sb: StringBuilder):StringBuilder = {
     import tree._;

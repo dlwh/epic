@@ -20,9 +20,8 @@ class SimpleTreebank(trainUrls: Map[String,URL],
   def treesFromSection(sec: String) = {
     val url = (trainUrls orElse devUrls orElse testUrls)(sec) ;
     val stream = url.openStream();
-    val pennReader = new PennTreeReader();
-    val trees = pennReader.readTrees(Source.fromInputStream(stream)(enc).mkString(""));
-    trees.fold( x=>x, x => sys.error("error in " + url + " " + x.toString)).iterator
+    val pennReader = new PennTreeReader(new InputStreamReader(stream));
+    pennReader
   }
 
   val train = Portion("train", trainUrls.keys.toSeq)
