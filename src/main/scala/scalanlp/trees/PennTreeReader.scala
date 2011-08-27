@@ -189,22 +189,19 @@ object PennTreeReader {
    *
    * @param lowercase
    */
-  def parseEasy(treeString : String, lowercase : Boolean = false) =
-    {
-      try {
-        parseHard(treeString, lowercase);
-      } catch {
-
-        case e : RuntimeException => null;
-      }
+  def parseEasy(treeString : String, lowercase : Boolean = false) = {
+    try {
+      parseHard(treeString, lowercase);
+    } catch {
+      case e : RuntimeException => null;
     }
+  }
 
-  def parseHard(treeString : String, lowercase : Boolean = false) =
-    {
-      val sr = new StringReader(treeString);
-      val reader = new PennTreeReader(sr, lowercase = lowercase);
-      reader.next();
-    }
+  def parseHard(treeString : String, lowercase : Boolean = false) = {
+    val sr = new StringReader(treeString);
+    val reader = new PennTreeReader(sr, lowercase = lowercase);
+    reader.next();
+  }
 }
 
 
