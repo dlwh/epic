@@ -28,7 +28,10 @@ import scala.collection.mutable.ArrayBuffer
  * @author adpauls
  * @author dlwh
  */
-class PennTreeReader(val reader : Reader, val lowercase : Boolean = false, val ROOT_LABEL : String = "") extends Iterator[(Tree[String],IndexedSeq[String])] {
+class PennTreeReader(val reader : Reader,
+                     val lowercase : Boolean = false,
+                     val ROOT_LABEL : String = "",
+                     dropLabels:Set[String]=Set("-NONE-")) extends Iterator[(Tree[String],IndexedSeq[String])] {
 
   val in = new PushbackReader(reader, 4)
 
@@ -105,9 +108,11 @@ class PennTreeReader(val reader : Reader, val lowercase : Boolean = false, val R
           currPos += 1
         } else {
           val (tree,w) = readTree(false, currPos)
-          currPos = tree.span.e
-          words ++= w
-          children.add(tree);
+          if(!dropLabels(tree.label)) {
+            currPos = tree.span.e
+            words ++= w
+            children.add(tree);
+          }
         }
       } else if (peek() == 65535) {
         throw new RuntimeException("Unmatched parentheses in tree input.");
