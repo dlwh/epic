@@ -73,13 +73,6 @@ class EPParser[L,L2,W](val parsers: Seq[ChartBuilder[LogProbabilityParseChart,L2
         val maxChange = computeMaxChange(currentF0,lastF0,initScorer,words.length);
         assert(!maxChange.isNaN)
         changed = maxChange.abs > 1E-4;
-        if(!changed) {
-          println("Iteration " + i + ": " + words +  " converged: ")
-        } else if(i == maxEPIterations - 1) {
-
-          println(words + " did not converge!: ");
-        }
-        println("<" + i +">" + maxChange);
       }
     }
 
@@ -112,7 +105,7 @@ class EPParser[L,L2,W](val parsers: Seq[ChartBuilder[LogProbabilityParseChart,L2
       else a.abs / (s1.abs + s2.abs)
     }
 
-    changes.foldLeft(0.0)(math.max _ );
+    changes.find( _.abs > 1E-4).getOrElse(0.0)
   }
 
   def projectCoarseScorer(coarseScorer: SpanScorer[L], model: Int) ={

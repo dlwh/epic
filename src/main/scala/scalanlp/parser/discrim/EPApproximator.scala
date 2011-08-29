@@ -12,7 +12,6 @@ import scalanlp.trees.BinarizedTree
  */
 @SerialVersionUID(1)
 trait EPApproximator[C,F,W] extends Serializable {
-  // TODO: add a type for the kind of span scorer this is.
   def project(inside: ParseChart[F], outside: ParseChart[F], partition: Double, spanScorer: SpanScorer[F], goldTree: BinarizedTree[C]):SpanScorer[C]
   def divide(num: SpanScorer[C], denom: SpanScorer[C], words: Seq[W]):SpanScorer[C]
 }

@@ -69,7 +69,8 @@ class EPObjective[L,L2,W](featurizers: Seq[Featurizer[L2,W]],
     var treeScore = 0.0
 
     val expectedCounts = for( (p,ParsedSentenceData(inside,outside,z,f0)) <- epBuilder.parsers zip charts) yield {
-      val treeCounts = treeToExpectedCounts(p.grammar,p.lexicon,t,w, new ProjectingSpanScorer(indexedProjections, scorer))
+//      val treeCounts = treeToExpectedCounts(p.grammar,p.lexicon,t,w, new ProjectingSpanScorer(indexedProjections, scorer))
+      val treeCounts = treeToExpectedCounts(p.grammar,p.lexicon,t,w, f0)
       val wordCounts = wordsToExpectedCounts(p,w,inside,outside, z, f0)
       treeScore += treeCounts.logProb
       treeCounts -= wordCounts
