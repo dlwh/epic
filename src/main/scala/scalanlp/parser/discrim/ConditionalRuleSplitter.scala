@@ -25,8 +25,12 @@ class ConditionalRuleSplitter(fracToSplit: Double = 0.5, minRuleValue: Double = 
     val coarsened = syms.groupBy(proj)
     // unaries that go between scales
     val shiftUnaries = for( UnaryRule(a,b) <- rules.keysIterator; aa <- coarsened(proj(a)); bb <- coarsened(proj(b))) yield UnaryRule(aa,bb)
+    println("All: " + allRules.size)
+    println("AllU: " + allRules.filter(_.isInstanceOf[UnaryRule[L]]).size)
+    println("Shift: " + shiftUnaries.size)
+    println("raw:" + rules.keysIterator.filter(_.isInstanceOf[UnaryRule[L]]).size)
 
-    (coarsened,allRules ++ shiftUnaries.toSet)
+    (coarsened,(allRules ++ shiftUnaries).toSet.toIndexedSeq)
   }
 
 }
