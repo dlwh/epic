@@ -29,19 +29,19 @@ class AnchoredRuleScorerFactory[C,L,W](coarseGrammar: Grammar[C],
       val r = new OldSparseVector(ruleScores.length,ruleScores.default,ruleScores.activeSize)
       for( (rule,score) <- ruleScores.activeIterator) {
         val parent = indexedProjections.labels.coarseIndex(indexedProjections.rules.coarseIndex.get(rule).parent)
-        r(rule) = (score - totals(parent))
+        r(rule) = math.log(score) - math.log(totals(parent))
       }
       r
     }
   }
 
   protected def createSpanScorer(ruleData: AnchoredRuleProjector.AnchoredData, sentProb: Double) = {
-    val AnchoredRuleProjector.AnchoredData(lexicalScores,unaryScores,logTotalsUnaries,binaryScores,logTotals) = ruleData;
-    val normUnaries:Array[OldSparseVector] = for((ruleScores,totals) <- unaryScores zip logTotalsUnaries) yield {
+    val AnchoredRuleProjector.AnchoredData(lexicalScores,unaryScores,totalsUnaries,binaryScores,totalsBinaries) = ruleData;
+    val normUnaries:Array[OldSparseVector] = for((ruleScores,totals) <- unaryScores zip totalsUnaries) yield {
       normalize(ruleScores, totals)
     }
 
-    val normBinaries:Array[Array[OldSparseVector]] = for ((splits,totals) <- binaryScores zip logTotals) yield {
+    val normBinaries:Array[Array[OldSparseVector]] = for ((splits,totals) <- binaryScores zip totalsBinaries) yield {
       if(splits eq null) null
       else for(ruleScores <- splits) yield normalize(ruleScores,totals)
     }
@@ -65,7 +65,7 @@ class AnchoredRulePosteriorScorerFactory[C,L,W](coarseGrammar: Grammar[C],
   type MyScorer = AnchoredRuleScorer[C];
   protected def createSpanScorer(ruleData: AnchoredRuleProjector.AnchoredData, sentProb: Double) = {
     val AnchoredRuleProjector.AnchoredData(lexicalScores,unaryScores, _, binaryScores, _) = ruleData;
-    new AnchoredRuleScorer(lexicalScores, unaryScores, binaryScores);
+    new AnchoredRuleScorer(lexicalScores, unaryScores.map(_.values.map(math.log)), binaryScores.map(_.map(_.values.map(math.log))));
   }
 
 }

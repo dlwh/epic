@@ -41,7 +41,7 @@ abstract class ChartDrivenScorerFactory[C,L,W](coarseGrammar: Grammar[C],
     chartScorer;
   }
 
-  val proj = new AnchoredRuleProjector[C,L,W](parser, indexedProjections);
+  val proj = new AnchoredRuleProjector[C,L,W](coarseGrammar, parser, indexedProjections);
 
   type MyScorer <:SpanScorer[C]
 
