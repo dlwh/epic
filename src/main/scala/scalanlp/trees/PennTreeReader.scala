@@ -23,7 +23,7 @@ import java.io.StringReader
 import scala.collection.mutable.ArrayBuffer
 
 /**
- * PennTreeReader due to Adam Pauls. This reader puts the words in the tree.
+ * PennTreeReader due to Adam Pauls.
  *
  * @author adpauls
  * @author dlwh
