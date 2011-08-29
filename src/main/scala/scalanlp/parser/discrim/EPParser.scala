@@ -65,7 +65,7 @@ class EPParser[L,L2,W](val parsers: Seq[ChartBuilder[LogProbabilityParseChart,L2
         partitions(m) = newPartition;
         // project down the approximation
         currentF0 = approximators(m).project(insideCharts(m),outsideCharts(m), newPartition, projectedScorer, tree);
-        corrections(m) = ScalingSpanScorer(currentF0,rescaledScorer,newPartition,f0Builder.grammar.labelIndex(f0Builder.root));
+        corrections(m) = ScalingSpanScorer(currentF0,rescaledScorer,0.0,-1)
       }
       if(parsers.length == 1 || maxEPIterations == 1) {
         changed = false;
@@ -77,9 +77,8 @@ class EPParser[L,L2,W](val parsers: Seq[ChartBuilder[LogProbabilityParseChart,L2
     }
 
 
-    val allFi = corrections.reduceLeft(SpanScorer.sum _)
-
-    val partition = (f0Builder.buildInsideChart(words, allFi).top.labelScore(0,words.length,f0Builder.root))
+    val f0Partition = (f0Builder.buildInsideChart(words, currentF0).top.labelScore(0,words.length,f0Builder.root))
+    val partition = partitions.sum + f0Partition
     val data = Array.tabulate(parsers.length)(m => ParsedSentenceData(insideCharts(m),
       outsideCharts(m), partitions(m),scorers(m)));
     EPResult(data,partition,currentF0)
