@@ -77,10 +77,10 @@ class CKYChartBuilder[Chart[X]<:ParseChart[X], L,W](val root: L,
     } {
       for ( a <- 0 until grammar.labelIndex.size) {
         val passScore = validSpan.scoreSpan(begin,end,a)
-        val rules = grammar.indexedBinaryRulesWithParent(a)
         var offset = 0 // into scoreArray
-        var ruleIndex = 0 // into rules
-        if(!passScore.isInfinite)
+        if(!passScore.isInfinite) {
+          var ruleIndex = 0 // into rules
+          val rules = grammar.indexedBinaryRulesWithParent(a)
           while(ruleIndex < rules.length) {
             val r = rules(ruleIndex)
             val b = grammar.leftChild(r)
@@ -99,6 +99,7 @@ class CKYChartBuilder[Chart[X]<:ParseChart[X], L,W](val root: L,
               }
             }
           }
+        }
         // done updating vector, do an enter:
         if(offset > 0)
           chart.bot.enter(begin,end,a,scoreArray,offset)
