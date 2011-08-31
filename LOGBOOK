@@ -1,3 +1,21 @@
+8/31/2011:
+
+Len 40:
+1 Parser, 2 states: 81.07
+2 Parsers, EP, 2 states: 82.02 (might not have converged)
+2 Parsers, ADF, 2 states, 82.82
+1 Parser, 4 states: 83.94 (might not have converged)
+1 Parser, 4 states, split featurization == independent bits: 84.39
+
+Len 15:
+
+1 Parser, 2 states: 85.72
+2 Parsers, EP, 2 states: 87.02
+2 Parsers, ADF, 2 states: 87.59
+1 Parser 4 states, split featurization: 87.77 
+1 Parser, 4 states: 88.11
+
+
 5/13/2011:
 
 EP Versus Product:
