@@ -28,7 +28,7 @@ import BitStuff._
 trait Feature[+L,+W] extends Serializable
 
 /**
- * 
+ * A Featurizer turns decisions in a grammar into a set of features, possibly weighted
  * @author dlwh
  */
 @SerialVersionUID(1)
@@ -42,17 +42,25 @@ trait Featurizer[L,W] extends Serializable {
 
 /** A Rule feature is just an indicator on there being this rule */
 case class RuleFeature[L](r: Rule[L]) extends Feature[L,Nothing] with CachedHashCode
+/** A simple indicator feature */
 case class WeightedFeature(kind: Symbol) extends Feature[Nothing,Nothing] with CachedHashCode
 /** A Lexical feature is just an indicator on there being this word */
 case class LexicalFeature[L,W](l: L, w: W) extends Feature[L,W] with CachedHashCode
+/** wraps a feature with substate information */
 case class SubstateFeature[L,W,T](f: Feature[L,W], states: Seq[T]) extends Feature[(L,T),W] with CachedHashCode
 case class UnannotatedRuleFeature[L](r: Rule[L]) extends Feature[L,Nothing] with CachedHashCode
 
+/** Useful for the all-bits featurizer: does it have this bit on this rule? */
 case class BitFeature(lbl: LabelOfBit, index: Int, toggled: Int) extends Feature[Nothing,Nothing] with CachedHashCode
+/** conjoins some features */
 case class SequenceFeature[L,W](f: Seq[Feature[L,W]]) extends Feature[L,W] with CachedHashCode
+/** conjoins just two features*/
 case class PairFeature[L,W](f: Feature[L,W], f2: Feature[L,W]) extends Feature[(L,Int),W] with CachedHashCode
 
 
+/**
+ * Just returns features on the input rules
+ */
 class SimpleFeaturizer[L,W] extends Featurizer[L,W] {
   def featuresFor(r: Rule[L]) = Counter(RuleFeature(r) -> 1.0)
   def featuresFor(l: L, w: W) = Counter(LexicalFeature(l,w) -> 1.0)
@@ -74,6 +82,9 @@ class SumFeaturizer[L,W](f1: Featurizer[L,W], f2: Featurizer[L,W]) extends Featu
   def initialValueForFeature(f: Feature[L,W]) = f1.initialValueForFeature(f) + f2.initialValueForFeature(f)
 }
 
+/**
+ * Strips annotations from a symbol before doing normal featurization
+ */
 class UnannotatingFeaturizer[W] extends Featurizer[String,W] {
   def featuresFor(r: Rule[String]) = r match {
     case BinaryRule(a,b,c) =>
@@ -91,6 +102,9 @@ class UnannotatingFeaturizer[W] extends Featurizer[String,W] {
   }
 }
 
+/**
+ * Just returns indicators on rule features, no lexical features
+ */
 class RuleFeaturizer[L,W](binaries: Counter2[L,BinaryRule[L], Double],
                           unaries: Counter2[L,UnaryRule[L],Double],
                           initToZero: Boolean = true, scale: Double = 1.0) extends Featurizer[L,W] {
@@ -114,6 +128,9 @@ class RuleFeaturizer[L,W](binaries: Counter2[L,BinaryRule[L], Double],
 }
 
 
+/**
+ * Adds in a feature LogProb with weight equal to the generative log prob of a rule/symbol
+ */
 class WeightedRuleFeaturizer[L,W](binaries: Counter2[L,BinaryRule[L],Double],
                                   unaries: Counter2[L,UnaryRule[L],Double],
                                   lexicon: Counter2[L,W,Double],
@@ -147,6 +164,9 @@ class WeightedRuleFeaturizer[L,W](binaries: Counter2[L,BinaryRule[L],Double],
 
 }
 
+/**
+ * Forwards feature calls, but looks up known weights for initial values
+ */
 class CachedWeightsFeaturizer[L,W](f: Featurizer[L,W],
                                    weights: Counter[Feature[L,W], Double],
                                    proj: Feature[L,W]=>Feature[L,W] = identity[Feature[L,W]] _,

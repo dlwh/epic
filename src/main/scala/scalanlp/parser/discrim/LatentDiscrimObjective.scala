@@ -19,7 +19,8 @@ import scalala.library.Library
 import scalala.library.Library._
 
 /**
- * 
+ * This guy does most of the work for the latent parser
+ * Objective Function computes suff stats given tree and given words under log-loss (usually)
  * @author dlwh
  */
 class LatentDiscrimObjective[L,L2,W](featurizer: Featurizer[L2,W],
@@ -31,24 +32,35 @@ class LatentDiscrimObjective[L,L2,W](featurizer: Featurizer[L2,W],
                             ) extends AbstractDiscriminativeObjective[L,L2,W](trees,indexedProjections,openTags,closedWords) {
 
 
+  /** The split root symbol */
   val root = {
     val splits = indexedProjections.labels.refinementsOf(coarseParser.root)
     require(splits.length == 1, splits)
     splits(0)
   }
 
+  /**
+   * For each production, its features
+   */
   val indexedFeatures: FeatureIndexer[L2,W] = {
     val initLex = coarseParser.lexicon;
     FeatureIndexer[L,L2,W](featurizer, initLex, indexedProjections);
   }
   println("Num features: " + indexedFeatures.index.size);
 
+  /**
+   * Returns a parser for a set of weights.
+   * Weights are linearized
+   */
   def extractParser(weights: DenseVector[Double]) = {
     val parser = new ChartParser[L,L2,W](builder(weights),new MaxConstituentDecoder(indexedProjections),indexedProjections);
     parser
   }
 
 
+  /**
+   * A parser in the max-semiring
+   */
   def extractMaxParser(weights: DenseVector[Double]) = {
     val parser = new ChartParser[L,L2,W](builder(weights).withCharts(ParseChart.viterbi),
       new ViterbiDecoder(indexedProjections.labels),indexedProjections);
