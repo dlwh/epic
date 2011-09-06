@@ -56,6 +56,7 @@ case class BitFeature(lbl: LabelOfBit, index: Int, toggled: Int) extends Feature
 case class SequenceFeature[L,W](f: Seq[Feature[L,W]]) extends Feature[L,W] with CachedHashCode
 /** conjoins just two features*/
 case class PairFeature[L,W](f: Feature[L,W], f2: Feature[L,W]) extends Feature[(L,Int),W] with CachedHashCode
+case class TaggedFeature[L,W](f: Feature[L,W], symbol: Symbol) extends Feature[L,W] with CachedHashCode
 
 
 /**
@@ -281,7 +282,51 @@ class SlavSplitFeaturizer[L,W](base: Featurizer[L,W], numStates:Int) extends Fea
   }
 }
 
+class HighLowFeaturizer[L,W](base: Featurizer[L,W], numStates: Int) extends Featurizer[(L,Int),W] {
+  val root: Int = math.sqrt(numStates).toInt
 
+  def featuresFor(r: Rule[(L, Int)]):Counter[Feature[(L, Int),W],Double] = r match {
+   case BinaryRule(a,b,c) =>
+      val result = Counter[Feature[(L,Int),W],Double]()
+      val baseFeatures = base.featuresFor(BinaryRule(a._1,b._1,c._1))
+      val substates1 = ArrayBuffer(a._2 / root, b._2 / root, c._2 / root)
+      val substates2 = ArrayBuffer((a._2%root),  (b._2%root),  (c._2%root))
+      for( (k,v) <- baseFeatures.nonzero.pairs) {
+        result(TaggedFeature(SubstateFeature(k,substates1), 'High)) = v
+        result(TaggedFeature(SubstateFeature(k,substates2), 'Low)) = v
+      }
+      result
+    case UnaryRule(a,b) =>
+      val result = Counter[Feature[(L,Int),W], Double]()
+      val baseFeatures = base.featuresFor(UnaryRule(a._1,b._1))
+      val substates1 = ArrayBuffer(a._2 / root, b._2 / root)
+      val substates2 = ArrayBuffer((a._2%root),  (b._2%root))
+      for( (k,v) <- baseFeatures.nonzero.pairs) {
+        result(TaggedFeature(SubstateFeature(k,substates1), 'High)) = v
+        result(TaggedFeature(SubstateFeature(k,substates2), 'Low)) = v
+      }
+      result
+  }
+
+  def featuresFor(l: (L, Int), w: W) = {
+    val baseFeatures = base.featuresFor(l._1, w)
+    val substates1 = ArrayBuffer(l._2 / root)
+    val substates2 = ArrayBuffer((l._2%root))
+    val result = Counter[Feature[(L,Int),W], Double]()
+    for( (k,v) <- baseFeatures.nonzero.pairs) {
+      result(TaggedFeature(SubstateFeature(k,substates1),'High)) = v
+      result(TaggedFeature(SubstateFeature(k,substates2),'Low)) = v
+    }
+    result
+  }
+
+  def initialValueForFeature(f: Feature[(L,Int),W]) = f match {
+    case TaggedFeature(SubstateFeature(baseF, _), sym) =>
+      val baseScore = base.initialValueForFeature(baseF)
+      baseScore + math.log(0.99 + math.random * 0.02)
+    case _ => 0.0
+  }
+}
 
 class SlavPlusFeaturizer[L,W](base: Featurizer[L,W], numStates:Int) extends Featurizer[(L,Int),W] {
   case class ProjFeature(f: Feature[L,W]) extends Feature[(L,Int),W]
