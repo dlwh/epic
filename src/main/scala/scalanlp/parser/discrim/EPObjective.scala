@@ -193,7 +193,7 @@ object EPTrainer extends LatentTrainer {
 
       Array.tabulate(numModels){ m =>
         if(m < weightSeq.length)
-          new CachedWeightsFeaturizer(latentFeaturizer, weightSeq(m), proj)
+          new CachedWeightsFeaturizer(latentFeaturizer, weightSeq(m), proj, randomize=false)
         else latentFeaturizer
       }
     }
@@ -222,8 +222,13 @@ object EPTrainer extends LatentTrainer {
 
   def cacheWeights(params: Params, obj: MyObjective, weights: DenseVector[Double], iter: Int) = {
     val partWeights = obj.partitionWeights(weights)
-    writeObject( new File("weights-"+iter +".ser"), (obj.indexedFeatures zip partWeights).map { case (f, w) => w -> f.decode(w) })
+    writeObject( new File("weights-"+iter +".ser"), (obj.indexedFeatures zip partWeights).map { case (f, w) => w -> f.decode(w) }.toArray)
   }
 
 }
 
+object ZipWeights extends App {
+  val files = args.map(new File(_))
+  val objs: Array[(DenseVector[Double], Counter[Feature[(String, Int), String], Double])] = files.map(readObject[(DenseVector[Double],Counter[Feature[(String,Int),String],Double])](_)).toArray
+  writeObject(new File("weights.ser"), objs)
+}
