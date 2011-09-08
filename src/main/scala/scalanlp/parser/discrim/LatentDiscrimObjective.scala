@@ -14,6 +14,7 @@ import scalanlp.trees.UnaryChainRemover.ChainReplacer
 import ParseChart.LogProbabilityParseChart
 
 import scalanlp.util._
+import logging._
 import scalala.tensor.{Counter, Counter2, ::}
 import scalala.library.Library
 import scalala.library.Library._
@@ -217,7 +218,6 @@ trait LatentTrainer extends ParserTrainer {
 
     val init = obj.initialWeightVector + 0.0;
 
-    val log = Log.globalLog;
     import scalanlp.optimize.RandomizedGradientCheckingFunction;
     val rand = new RandomizedGradientCheckingFunction(obj,1E-4);
     def evalAndCache(pair: (optimizer.State,Int) ) {
@@ -285,7 +285,7 @@ object StochasticLatentTrainer extends LatentTrainer {
       indexedProjections,
       xbarParser,
       openTags,
-      closedWords) with ConsoleLogging;
+      closedWords) with ConfiguredLogging;
 
     r
   }

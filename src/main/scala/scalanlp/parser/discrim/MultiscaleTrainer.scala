@@ -13,6 +13,7 @@ import scalala.library.Library._
 import scalanlp.optimize.CachedBatchDiffFunction
 import scalala.tensor.{Counter, Counter2}
 import scalala.tensor.::
+import logging._
 
 /**
  * Runs something not unlike Petrov's 2008 EMNLP paper.
@@ -42,7 +43,7 @@ object MultiscaleTrainer extends ParserTrainer {
       indexedProjections,
       xbarParser,
       openTags,
-      closedWords) with ConsoleLogging;
+      closedWords) with ConfiguredLogging;
 
     r
   }

@@ -9,12 +9,11 @@ import scalanlp.optimize._
 import scalanlp.trees._
 import InsideOutside._
 
-import scalanlp.util._;
-import Log._;
+import scalanlp.util._
+import logging._
 
 import scalala.library.Library._
 import scalala.tensor.sparse.SparseVector
-;
 
 
 abstract class AbstractDiscriminativeObjective[L,L2,W](
@@ -57,7 +56,7 @@ abstract class AbstractDiscriminativeObjective[L,L2,W](
     };
     val finishTime = System.currentTimeMillis() - startTime;
 
-    log(INFO)("Parsing took: " + finishTime / 1000.0)
+    log.info("Parsing took: " + finishTime / 1000.0)
     val (obj,grad) = countsToObjective(ecounts);
     (obj,grad)
 

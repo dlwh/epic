@@ -12,7 +12,9 @@ import scalanlp.trees.UnaryChainRemover.ChainReplacer;
 import ParseChart.LogProbabilityParseChart;
 
 import scalanlp.util._;
+import logging._
 import java.io._
+import logging.ConfiguredLogging
 import scalala.library.Library
 import Library.sum
 import scalala.tensor.{Counter,::}
@@ -106,14 +108,13 @@ object DiscriminativeTrainer extends ParserTrainer {
       wordCounts.nonzero.pairs.iterator.filter(_._2 > 10).map(_._1);
     }
 
-    val obj = new DiscrimObjective(featurizer, trainTrees.toIndexedSeq, xbarParser, openTags, closedWords) with ConsoleLogging;
+    val obj = new DiscrimObjective(featurizer, trainTrees.toIndexedSeq, xbarParser, openTags, closedWords) with ConfiguredLogging;
     val optimizer = params.opt.minimizer(new CachedBatchDiffFunction(obj))
 
     // new LBFGS[Int,DenseVector[Double]](iterationsPerEval,5) with ConsoleLogging;
     val init = obj.initialWeightVector;
     val rand = new RandomizedGradientCheckingFunction(obj, 0.1);
 
-    val log = Log.globalLog;
     for( (state,iter) <- optimizer.iterations(obj,init).take(maxIterations).zipWithIndex;
         _ = rand.calculate(state.x);
          if iter != 0 && iter % iterationsPerEval == 0) yield {
