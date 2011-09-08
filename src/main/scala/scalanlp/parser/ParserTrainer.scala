@@ -40,7 +40,8 @@ trait ParserTrainer {
   }
 
   def main(args: Array[String]) {
-    val config = Configuration.fromPropertiesFiles(args.map{new File(_)});
+    val (baseConfig,files) = scalanlp.config.CommandLineParser.parseArguments(args)
+    val config = baseConfig backoff Configuration.fromPropertiesFiles(files.map(new File(_)))
     val params = config.readIn[ProcessedTreebank]("parser");
     val specificParams = config.readIn[Params]("trainer");
     println("Training Parser...");
