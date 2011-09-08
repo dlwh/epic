@@ -1,4 +1,10 @@
+9/7/2011:
+
+ADF: 3 parsers, len 40: 83.2
+EP: 2 parsers, relaunch from earlier 2 parser run: 83.4 (init from ADF), 83.0 (init from EP)
+
 9/6/2011:
+
 
 Two Len 40, sub-state parsers, 80.5 and 80.8 F1
 
@@ -6,6 +12,8 @@ Product, product of Variational Decoding: 77.6
 Product, product of max rule decoder: 81.26
 ADF, Last one decoder max constituent: 78.6
 EP, last one decoder max constituent: 80.45
+*ADF, initialized from above: 83.5
+*ADF, initialized with 1 of the above for f1: 82.9
 
 
 9/4/2011:
@@ -49,7 +57,7 @@ Len 40:
 2 Parsers, EP, 2 states: 82.0 (might not have converged)
 2 Parsers, ADF, 2 states, 82.5
 1 Parser, 4 states: 83.9 (might not have converged)
-1 Parser, 4 states, split featurization == independent bits: 84.4, 84.1
+1 Parser, 4 states, split featurization == independent bits: 84.4, 84.1, ****85.1, may not have converged
 
 Len 15:
 
