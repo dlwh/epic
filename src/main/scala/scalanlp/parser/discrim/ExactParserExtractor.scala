@@ -50,7 +50,7 @@ object ExactParserExtractor {
           g = grammars(i)
           score = g.ruleScore(BinaryRule(aa,bb,cc))
           _ = println(br,i,score)
-        } yield scores
+        } yield score
 
         brules(a,br) = scores.sum
       case ur@UnaryRule(a,b) =>
