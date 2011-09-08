@@ -211,9 +211,14 @@ object EPParserParamRunner extends ParserTrainer {
     val product = new ProductParser(parsers, coarseParser.get, projections)
     val raw = for ( ((par,pro),i) <- parsers zip epParser.projections zipWithIndex)
                   yield ("Raw-" + i) -> new ChartParser[String,(String,Int),String](par, new MaxConstituentDecoder(pro), pro)
+
     val teed = epParser.fineParsers(new MaxConstituentDecoder(projections(0)))
     val namedTeed = for ( (p,i) <- teed.zipWithIndex) yield ("Teed-" + i) -> p
-    Iterator("F0" -> epParser.f0parser) ++ raw.iterator ++ eps ++ Iterator("Product" -> product) ++ namedTeed
+
+    val exact = ExactParserExtractor.extractParser(parsers, coarseParser.get, projections)
+
+
+    Iterator("Exact" -> exact, "F0" -> epParser.f0parser) ++ raw.iterator ++ eps ++ Iterator("Product" -> product) ++ namedTeed
   }
 
 
