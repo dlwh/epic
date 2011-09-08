@@ -9,10 +9,9 @@ import scalanlp.trees._
 import collection.mutable.ArrayBuffer
 import java.io.{FileInputStream, BufferedInputStream, ObjectInputStream, File}
 
-@serializable
 @SerialVersionUID(1L)
 class ProductParser[L,L2,W](val parsers: Seq[ChartBuilder[LogProbabilityParseChart,L2,W]], coarseParser: ChartBuilder[LogProbabilityParseChart,L,W],
-                       val projections: Seq[GrammarProjections[L,L2]]) extends Parser[L,W] {
+                       val projections: Seq[GrammarProjections[L,L2]]) extends Parser[L,W] with Serializable {
   def bestParse(words: scala.Seq[W], spanScorer: SpanScorer[L]) = {
     val projected = projections.map(projectCoarseScorer(spanScorer,_))
     val posteriorScorers = for {
