@@ -19,8 +19,27 @@ package scalanlp.parser;
 import scalanlp.trees._;
 
 
-
-trait Parser[L,W] extends (Seq[W]=>Tree[L]) { outer =>
+/**
+ * A Parser produces a syntactic representation of a sentence, called a [[scalanlp.trees.Tree], which
+ * has internal nodes that demarcate syntactic functions
+ *
+ * @author dlwh
+ */
+trait Parser[L,W] extends (Seq[W]=>Tree[L]) {
+  /**
+   * Returns the best parse (calls bestParse) for the sentence
+   *
+   * @param s the sentence
+   */
   def apply(s: Seq[W]) = bestParse(s);
+
+  /**
+   * Returns the best parse for the sentence. Optionally takes a [[scalanlp.parser.SpanScorer]], which
+   * can be used to provide additional information about the weight of particular spans or
+   * rules in a sentence.
+   *
+   * @param s sentence
+   * @param spanScorer the span scorer
+   */
   def bestParse(s: Seq[W], spanScorer: SpanScorer[L] = SpanScorer.identity):Tree[L];
 }

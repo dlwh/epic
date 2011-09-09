@@ -9,6 +9,13 @@ import scalanlp.trees._
 import collection.mutable.ArrayBuffer
 import java.io.{FileInputStream, BufferedInputStream, ObjectInputStream, File}
 
+/**
+ * The Product Parser implements Petrov's Product Parser from his NAACL 2010 paper.
+ * Basically, parse with a bunch of latent variable grammars, pointwise multiply their
+ * rule marginals, and take the tree that maximizes the sum of those products.
+ *
+ * @author dlwh
+ */
 @SerialVersionUID(1L)
 class ProductParser[L,L2,W](val parsers: Seq[ChartBuilder[LogProbabilityParseChart,L2,W]], coarseParser: ChartBuilder[LogProbabilityParseChart,L,W],
                        val projections: Seq[GrammarProjections[L,L2]]) extends Parser[L,W] with Serializable {
