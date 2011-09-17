@@ -4,7 +4,8 @@ import projections.{GrammarProjections, ProjectingSpanScorer, ProjectionIndexer}
 import scalanlp.trees.BinarizedTree
 
 /**
- * 
+ * A ChartParser produces trees with labels C from a ChartBuilder with labels F, a decoder from C to F, and
+ * projections from C to F
  * @author dlwh
  */
 @SerialVersionUID(1)

@@ -4,7 +4,8 @@ import scalala.library.Library
 import scalala.tensor.Counter2
 
 /**
- * 
+ * A DSL Grammar allows us to define simple weighted PCFG's quickly.
+ * Useful for testing. See definition of simpleGrammar for an example
  * @author dlwh
  */
 object DSLGrammar {

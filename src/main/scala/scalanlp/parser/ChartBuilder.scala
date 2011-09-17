@@ -2,6 +2,9 @@ package scalanlp.parser
 
 import ParseChart.Factory
 
+/**
+ * Trait for things that parse. So far, we only have CKYChartBuilder
+ */
 trait ChartBuilder[+Chart[X]<:ParseChart[X],L,W] {
   /**
    * Given a sentence s, fills a parse chart with inside scores.
@@ -19,6 +22,9 @@ trait ChartBuilder[+Chart[X]<:ParseChart[X],L,W] {
 
   def index = grammar.labelIndex
 
+  /**
+   * Change the kind of parse chart that gets built
+   */
   def withCharts[Chart[X]<:ParseChart[X]](factory: ParseChart.Factory[Chart]):ChartBuilder[Chart,L,W]
 }
 
@@ -31,6 +37,9 @@ object ChartBuilder {
 
 }
 
+/**
+ * Implements the CKY algorithm for parsing a weighted pcfg.
+ */
 @SerialVersionUID(1)
 class CKYChartBuilder[Chart[X]<:ParseChart[X], L,W](val root: L,
                                               val lexicon: Lexicon[L,W],

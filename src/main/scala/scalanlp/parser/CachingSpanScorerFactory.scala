@@ -6,7 +6,7 @@ import scalanlp.tensor.sparse.OldSparseVector
 import scalala.library.Numerics
 
 /**
- *
+ * CachingSpanScorerFactory essentially just rencodes a SpanScorer into a possibly more efficient representation.
  * @author dlwh
  */
 class CachingSpanScorerFactory[L,W](chartBuilder: ChartBuilder[ParseChart,L,W]) extends SpanScorer.Factory[L,L,W] {
