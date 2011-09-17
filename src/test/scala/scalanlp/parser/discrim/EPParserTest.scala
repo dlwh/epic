@@ -5,7 +5,6 @@ import org.junit.runner.RunWith;
 import org.scalatest._;
 import org.scalatest.junit._
 import projections.{GrammarProjections, ProjectionIndexer}
-;
 
 
 /**

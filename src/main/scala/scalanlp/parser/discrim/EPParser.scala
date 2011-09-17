@@ -216,9 +216,10 @@ object EPParserParamRunner extends ParserTrainer {
     val namedTeed = for ( (p,i) <- teed.zipWithIndex) yield ("Teed-" + i) -> p
 
     val exact = ExactParserExtractor.extractParser(parsers, coarseParser.get, projections)
+    val exact0 = ExactParserExtractor.extractParser(parsers.take(1), coarseParser.get, projections.take(1))
 
 
-    Iterator("Exact" -> exact, "F0" -> epParser.f0parser) ++ raw.iterator ++ eps ++ Iterator("Product" -> product) ++ namedTeed
+    Iterator("Exact" -> exact, "Exact0" -> exact0, "F0" -> epParser.f0parser) ++ raw.iterator ++ eps ++ Iterator("Product" -> product) ++ namedTeed
   }
 
 

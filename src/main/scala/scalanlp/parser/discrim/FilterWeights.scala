@@ -15,6 +15,7 @@ import projections.GrammarProjections._
 import scalala.library.Library._
 import scalanlp.optimize.CachedBatchDiffFunction
 import scalala.tensor.::
+import collection.mutable.ArrayBuffer
 
 /**
  * 
@@ -45,10 +46,11 @@ object FilterWeights extends ParserTrainer {
 
     val result = Counter[Feature[(String,Int),String],Double]()
     val result2 = Counter[Feature[(String,Int),String], Double]()
-    for( s@SubstateFeature(f,states) <-  weights.keysIterator) {
-      if(states(0) < 2)
-        result(s) = weights(s)
-      else result2(SubstateFeature(f,states.map(_ >> 1))) = weights(s)
+    for( feat <-  weights.keysIterator) feat match {
+      case TaggedFeature(s@SubstateFeature(f,states), 'High) =>
+        result(SubstateFeature(f,ArrayBuffer(states:_*))) = weights(feat)
+      case TaggedFeature(s@SubstateFeature(f,states), 'Low) =>
+       result2(SubstateFeature(f,ArrayBuffer(states:_*))) = weights(feat)
     }
 
       val (initLexicon,initBinaries,initUnaries) = GenerativeParser.extractCounts(trainTrees)
@@ -66,8 +68,6 @@ object FilterWeights extends ParserTrainer {
     val featurizer = featurizerFactory.getFeaturizer(initLexicon, initBinaries, initUnaries)
     val latentFactory = new SlavLatentFeaturizerFactory
     val baseFeaturizer = latentFactory.getFeaturizer(featurizer, numStates)
-    val latentFeaturizer = new CachedWeightsFeaturizer(baseFeaturizer, result, randomize= false, randomizeZeros = false)
-    val highlatentFeaturizer = new CachedWeightsFeaturizer(baseFeaturizer, result2, randomize= false, randomizeZeros = false)
 
     val openTags = Set.empty ++ {
       for(t <- initLexicon.nonzero.keys.map(_._1) if initLexicon(t,::).size > 50; t2 <- split(t, numStates).iterator ) yield t2
@@ -78,12 +78,13 @@ object FilterWeights extends ParserTrainer {
       wordCounts.nonzero.pairs.iterator.filter(_._2 > 5).map(_._1)
     }
 
-    val obj = new LatentDiscrimObjective(latentFeaturizer, trainTrees, indexedProjections, xbarParser, openTags, closedWords)
-
-    val init = obj.initialWeightVector + 0.0
+    val obj = new LatentDiscrimObjective(baseFeaturizer, trainTrees, indexedProjections, xbarParser, openTags, closedWords)
+    println(obj.indexedFeatures.index)
+    val init = obj.indexedFeatures.encodeDense(result)
+    println(norm(init,2))
     val parser = obj.extractParser(init)
-    val obj2 = new LatentDiscrimObjective(highlatentFeaturizer, trainTrees, indexedProjections, xbarParser, openTags, closedWords)
-    val init2 = obj2.initialWeightVector + 0.0
+    val init2 = obj.indexedFeatures.encodeDense(result2)
+    println(norm(init2,3))
     val parser2 = obj.extractParser(init2)
 
     val ep = new EPParser(Seq(parser,parser2).map(_.builder.withCharts(ParseChart.logProb)), xbarParser, Seq(indexedProjections, indexedProjections), 4)

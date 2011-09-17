@@ -323,7 +323,8 @@ class HighLowFeaturizer[L,W](base: Featurizer[L,W], numStates: Int) extends Feat
   def initialValueForFeature(f: Feature[(L,Int),W]) = f match {
     case TaggedFeature(SubstateFeature(baseF, _), sym) =>
       val baseScore = base.initialValueForFeature(baseF)
-      baseScore + math.log(0.99 + math.random * 0.02)
+      val r = baseScore + math.log(1.0 - .1 + math.random * 2 * .1)
+      r
     case _ => 0.0
   }
 }

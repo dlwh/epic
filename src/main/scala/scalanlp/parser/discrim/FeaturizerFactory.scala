@@ -64,3 +64,7 @@ class SlavPlusLatentFeaturizerFactory extends LatentFeaturizerFactory {
 class SlavSplitLatentFeaturizerFactory extends LatentFeaturizerFactory {
   def getFeaturizer[L,W](base: Featurizer[L,W], numStates: Int) = new SlavSplitFeaturizer(base,numStates);
 }
+
+class HighLowFactory extends LatentFeaturizerFactory {
+  def getFeaturizer[L,W](base: Featurizer[L,W], numStates: Int) = new HighLowFeaturizer(base,numStates);
+}

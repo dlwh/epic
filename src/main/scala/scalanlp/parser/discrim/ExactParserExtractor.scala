@@ -7,6 +7,9 @@ import scalanlp.parser._
 import scalala.tensor.{Counter, Counter2}
 import scalala.tensor.Counter
 import scalala.tensor.::
+import java.io.File
+import scalanlp.trees.UnaryChainRemover.ChainReplacer
+import scalanlp.util._
 
 /**
  * 
@@ -49,7 +52,6 @@ object ExactParserExtractor {
           cc = c._2 apply i
           g = grammars(i)
           score = g.ruleScore(BinaryRule(aa,bb,cc))
-          _ = println(br,i,score)
         } yield score
 
         brules(a,br) = scores.sum
@@ -67,12 +69,12 @@ object ExactParserExtractor {
     val grammar = Grammar(myProjections.labels.fineIndex, myProjections.rules.fineIndex, brules, urules)
 
     val lexicons = parsers.map(_.lexicon)
-    val closedWords = lexicons.head.asInstanceOf[FeaturizedLexicon[L2,W]].closedWords
 
     val wordScores = Counter2[W,MyLabel,Double]()
     val _knownTagWords = collection.mutable.Set[(MyLabel,W)]()
-    val knownTags = collection.mutable.Set[MyLabel]()
-    for( (l,w) <- coarseParser.lexicon.knownTagWords; ref <- myProjections.labels.refinementsOf(l)) {
+    val knownTags = coarseParser.lexicon.knownTagWords.map(_._1).flatMap(myProjections.labels.refinementsOf _).toSet
+    val knownWords = coarseParser.lexicon.knownTagWords.map(_._2).toSet
+    for( w <- knownWords; l <- coarseParser.lexicon.tagScores(w).keys; ref <- myProjections.labels.refinementsOf(l)) {
       val scores = for {
         i <- 0 until grammars.length;
         ll = ref._2 apply i
@@ -80,8 +82,10 @@ object ExactParserExtractor {
 
       wordScores(w,ref) = scores.sum
       _knownTagWords += (ref->w)
-      knownTags += ref
     }
+
+    for(w <- knownWords) assert(wordScores(w,::).size != 0, w + " " + coarseParser.lexicon.tagScores(w))
+
 
     def scoreUnknown(label: (L,Seq[L2]), w: W):Double = {
       var score = 0.0
@@ -97,12 +101,9 @@ object ExactParserExtractor {
     val lexicon = new Lexicon[MyLabel,W] {
 
       override def tagScores(w: W): Counter[MyLabel,Double] = {
-        if(closedWords(w) && wordScores.contains(w)) wordScores(w, ::)
+        if(wordScores.contains(w)) wordScores(w, ::)
         else {
           val res = Counter(knownTags.iterator.map ( k => (k,scoreUnknown(k,w))));
-          for( (k,v) <- wordScores(w, ::).nonzero.pairs) {
-            res(k) = v;
-          }
           res
         }
       }
@@ -115,15 +116,51 @@ object ExactParserExtractor {
 
       def knownTagWords = _knownTagWords.iterator
 
-
-
     }
-
 
     val root = myProjections.labels.refinementsOf(coarseParser.root)(0)
     val builder = new CKYChartBuilder[ParseChart.LogProbabilityParseChart,MyLabel,W](root, lexicon, grammar, ParseChart.logProb)
     new ChartParser(builder, new MaxConstituentDecoder[L,MyLabel,W](myProjections), myProjections)
 
+  }
+
+
+}
+
+object ExactRunner extends ParserTrainer {
+
+  case class Params(parser: ParserParams.BaseParser,
+                    model0: File = null,
+                    model1: File = null,
+                    model2: File = null,
+                    model3: File = null)
+  protected val paramManifest = manifest[Params]
+
+  def trainParser(trainTrees: IndexedSeq[TreeInstance[String,String]],
+                  devTrees: IndexedSeq[TreeInstance[String,String]],
+                  unaryReplacer : ChainReplacer[String],
+                  params: Params) = {
+    val parsers = new ArrayBuffer[ChartParser[String,(String,Int),String]]
+    var found = true
+    var i = 0
+    val paths = params.productIterator.buffered
+    while(found && paths.hasNext) {
+      found = false
+      while(paths.hasNext && !paths.head.isInstanceOf[File]) paths.next
+      if(paths.hasNext) {
+        val path = paths.next.asInstanceOf[File]
+        println(path)
+        if(path ne null) {
+          parsers += readObject(path)
+          found = true
+        }
+        i += 1
+      }
+    }
+    val coarseParser = params.parser.optParser
+
+    val productParser = ExactParserExtractor.extractParser(parsers.map(_.builder.withCharts(ParseChart.logProb)), coarseParser.get, parsers.map(_.projections))
+    Iterator.single( "Exact" -> productParser)
   }
 
 
