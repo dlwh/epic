@@ -10,6 +10,7 @@ import scalala.tensor.::
 import java.io.File
 import scalanlp.trees.UnaryChainRemover.ChainReplacer
 import scalanlp.util._
+import collection.IndexedSeq
 
 /**
  * 
@@ -28,14 +29,14 @@ object ExactParserExtractor {
 
     def project(l: MyLabel) = l._1
     def refine(l: L):Seq[MyLabel] = {
-      val options = ArrayBuffer[ArrayBuffer[L2]]()
-      options += ArrayBuffer()
-      for(p <- projections) {
-        for(l2 <- p.labels.refinementsOf(l); o <- options) {
-          o += l2
+      val options = IndexedSeq[IndexedSeq[L2]](Vector.empty)
+      val r = projections.foldLeft(options){ (options,p) =>
+        for(l2 <- p.labels.refinementsOf(l); o <- options) yield {
+          val r: IndexedSeq[L2] = o :+ l2
+          r
         }
       }
-      options.map(l ->  _)
+      r.map(l ->  _)
     }
 
     val myProjections = GrammarProjections(coarseParser.grammar, refine _,  project _)
@@ -70,24 +71,14 @@ object ExactParserExtractor {
 
     val lexicons = parsers.map(_.lexicon)
 
-    val wordScores = Counter2[W,MyLabel,Double]()
     val _knownTagWords = collection.mutable.Set[(MyLabel,W)]()
     val knownTags = coarseParser.lexicon.knownTagWords.map(_._1).flatMap(myProjections.labels.refinementsOf _).toSet
     val knownWords = coarseParser.lexicon.knownTagWords.map(_._2).toSet
-    for( w <- knownWords; l <- coarseParser.lexicon.tagScores(w).keys; ref <- myProjections.labels.refinementsOf(l)) {
-      val scores = for {
-        i <- 0 until grammars.length;
-        ll = ref._2 apply i
-      } yield lexicons(i).wordScore(ll, w)
-
-      wordScores(w,ref) = scores.sum
+    for( w <- knownWords; ll1 <- lexicons(0).tagScores(w).keysIterator; ref <- myProjections.labels.refinementsOf(projections(0).labels.project(ll1))) {
       _knownTagWords += (ref->w)
     }
 
-    for(w <- knownWords) assert(wordScores(w,::).size != 0, w + " " + coarseParser.lexicon.tagScores(w))
-
-
-    def scoreUnknown(label: (L,Seq[L2]), w: W):Double = {
+    def scoreWord(label: (L,Seq[L2]), w: W):Double = {
       var score = 0.0
       for( (lex,l) <- lexicons zip label._2) {
         val s = lex.wordScore(l,w)
@@ -100,22 +91,26 @@ object ExactParserExtractor {
 
     val lexicon = new Lexicon[MyLabel,W] {
 
-      override def tagScores(w: W): Counter[MyLabel,Double] = {
-        if(wordScores.contains(w)) wordScores(w, ::)
-        else {
-          val res = Counter(knownTags.iterator.map ( k => (k,scoreUnknown(k,w))));
-          res
-        }
+      def wordScore(label: MyLabel, w: W):Double = {
+        scoreWord(label,w)
       }
 
-      def wordScore(label: MyLabel, w: W):Double = {
-          tagScores(w)(label)
+
+      override def tagScores(w: W) = {
+        val scores = lexicons.map(_.tagScores(w));
+        val res = Counter[MyLabel,Double]()
+        for( ll1 <- scores(0).keysIterator; ref <- myProjections.labels.refinementsOf(projections(0).labels.project(ll1))) {
+          val allScores = for (
+            (sc,label) <- scores zip ref._2
+          ) yield sc(label)
+          res(ref) = allScores.sum
+        }
+        res
       }
 
       def tags = knownTags.iterator
 
       def knownTagWords = _knownTagWords.iterator
-
     }
 
     val root = myProjections.labels.refinementsOf(coarseParser.root)(0)
