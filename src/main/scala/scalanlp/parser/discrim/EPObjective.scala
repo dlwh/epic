@@ -13,7 +13,7 @@ import scalanlp.util._
 import scalala.tensor.{Counter, Counter2}
 
 /**
- * 
+ * EPObective trains a discriminative EP-type parser
  * @author dlwh
  */
 class EPObjective[L,L2,W](featurizers: Seq[Featurizer[L2,W]],

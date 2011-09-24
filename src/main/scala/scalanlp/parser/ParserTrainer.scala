@@ -8,6 +8,9 @@ import scalanlp.util._
 import scalanlp.trees.UnaryChainRemover.ChainReplacer
 
 
+/**
+ * Mostly a utility class for parsertrainers.
+ */
 object ParserParams {
   case class Params();
   trait NoParams { self: ParserTrainer =>
@@ -23,14 +26,29 @@ object ParserParams {
 
 }
 
+/**
+ * ParserTrainer is a base-trait for the parser training pipeline. Handles
+ * reading in the treebank and params and such
+ */
 trait ParserTrainer {
+  /**
+   * The type of the parameters to read in via scalanlp.config
+   */
   type Params;
+  /**
+   * Required manifest for the params
+   */
   protected implicit val paramManifest: Manifest[Params];
 
+  /**
+   * The main point of entry for implementors. Should return a sequence
+   * of parsers
+   */
   def trainParser(trainTrees: IndexedSeq[TreeInstance[String,String]],
                   devTrees: IndexedSeq[TreeInstance[String,String]],
                   unaryReplacer : ChainReplacer[String],
                   params: Params):Iterator[(String,Parser[String,String])];
+
 
   def trainParser(treebank: ProcessedTreebank, params: Params):Iterator[(String,Parser[String,String])] = {
     import treebank._;
@@ -39,6 +57,9 @@ trait ParserTrainer {
     parsers
   }
 
+  /**
+   * Trains a sequence of parsers and evaluates them.
+   */
   def main(args: Array[String]) {
     val (baseConfig,files) = scalanlp.config.CommandLineParser.parseArguments(args)
     val config = baseConfig backoff Configuration.fromPropertiesFiles(files.map(new File(_)))
