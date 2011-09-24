@@ -282,6 +282,49 @@ class SlavSplitFeaturizer[L,W](base: Featurizer[L,W], numStates:Int) extends Fea
   }
 }
 
+case class IndexFeature[L2,W](f: Feature[L2,W], index:Int) extends Feature[(Nothing,Seq[L2]),W]
+
+class ProductFeaturizer[L,L2,W](base: IndexedSeq[Featurizer[L2,W]]) extends Featurizer[(L,Seq[L2]),W] {
+  def featuresFor(r: Rule[(L, Seq[L2])]) = r match {
+    case BinaryRule(a,b,c) =>
+      val ctr = Counter[Feature[(L,Seq[L2]),W],Double]()
+      for( i <- 0 until base.length) {
+        val baseFeatures = base(i).featuresFor(BinaryRule(a._2 apply (i),b._2 apply (i),c._2 apply (i)))
+        for( (f,v) <- baseFeatures.pairsIterator) {
+          ctr(IndexFeature(f,i)) = v
+        }
+
+      }
+      ctr
+    case UnaryRule(a,b) =>
+      val ctr = Counter[Feature[(L,Seq[L2]),W],Double]()
+      for( i <- 0 until base.length) {
+        val baseFeatures = base(i).featuresFor(UnaryRule(a._2 apply (i),b._2 apply (i)))
+        for( (f,v) <- baseFeatures.pairsIterator) {
+          ctr(IndexFeature(f,i)) = v
+        }
+
+      }
+      ctr
+  }
+
+  def featuresFor(l: (L, Seq[L2]), w: W) = {
+    val ctr = Counter[Feature[(L,Seq[L2]),W],Double]()
+      for( i <- 0 until base.length) {
+        val baseFeatures = base(i).featuresFor(l._2 apply i,w)
+        for( (f,v) <- baseFeatures.pairsIterator) {
+          ctr(IndexFeature(f,i)) = v
+        }
+
+      }
+      ctr
+  }
+
+  def initialValueForFeature(f: Feature[(L, Seq[L2]), W]) = f match  {
+    case IndexFeature(feat,i) => base(i).initialValueForFeature(feat)
+  }
+}
+
 class HighLowFeaturizer[L,W](base: Featurizer[L,W], numStates: Int) extends Featurizer[(L,Int),W] {
   val root: Int = math.sqrt(numStates).toInt
 

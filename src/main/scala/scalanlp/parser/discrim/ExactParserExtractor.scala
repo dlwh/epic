@@ -1,16 +1,21 @@
-package scalanlp.parser.discrim
+package scalanlp.parser
+package discrim
 
 import scalanlp.parser.ParseChart._
 import scalanlp.parser.projections.GrammarProjections
 import collection.mutable.ArrayBuffer
 import scalanlp.parser._
+import projections.GrammarProjections._
 import scalala.tensor.{Counter, Counter2}
-import scalala.tensor.Counter
 import scalala.tensor.::
 import java.io.File
 import scalanlp.trees.UnaryChainRemover.ChainReplacer
 import scalanlp.util._
-import collection.IndexedSeq
+import logging.ConfiguredLogging
+import scalala.library.Library
+import Library.{sum,norm}
+import scalanlp.optimize.CachedBatchDiffFunction
+import scalala.tensor.dense.DenseVector
 
 /**
  * 
@@ -122,6 +127,118 @@ object ExactParserExtractor {
 
 }
 
+object ExactTrainer extends ParserTrainer {
+  type Params = LatentParams[SpecificParams]
+  case class SpecificParams(numParsers: Int = 2)
+
+  protected lazy val paramManifest = implicitly[Manifest[Params]]
+  type MyLabel = (String,Seq[L2])
+  type L2 = (String,Int)
+
+  def split(l: String, numStates: Int, numParsers: Int): IndexedSeq[MyLabel] = if(l == "") IndexedSeq((l,IndexedSeq.fill(numParsers)(l -> 0))) else {
+    val options = IndexedSeq[IndexedSeq[L2]](Vector.empty)
+    val r = (0 until numParsers).foldLeft(options){ (options,p) =>
+      for(l2 <- 0 until numStates; o <- options) yield {
+        val r: IndexedSeq[L2] = o :+ (l->l2)
+        r
+      }
+    }
+    r.map(l ->  _)
+  }
+
+  def unsplit(l: MyLabel) = l._1
+
+  def getFeaturizer(params: Params,
+                    initLexicon: Counter2[String, String, Double],
+                    initBinaries: Counter2[String, BinaryRule[String], Double],
+                    initUnaries: Counter2[String, UnaryRule[String], Double],
+                    numStates: Int) = {
+    val factory = params.featurizerFactory;
+    val featurizer = factory.getFeaturizer(initLexicon, initBinaries, initUnaries);
+    val latentFactory = params.latentFactory;
+    val latentFeaturizer = latentFactory.getFeaturizer(featurizer, numStates);
+    new ProductFeaturizer[String,L2,String](IndexedSeq.fill(params.specific.numParsers)(latentFeaturizer))
+  }
+
+  def trainParser(trainTrees: IndexedSeq[TreeInstance[String, String]],
+                  devTrees: IndexedSeq[TreeInstance[String, String]],
+                  unaryReplacer: ChainReplacer[String], params: Params) = {
+
+    val (initLexicon,initBinaries,initUnaries) = GenerativeParser.extractCounts(trainTrees);
+    import params._;
+    val numParsers = params.specific.numParsers;
+    println("NumStates: " + params.numStates);
+    println("NumParsers: " + params.specific.numParsers);
+
+    val xbarParser = parser.optParser.getOrElse {
+      val grammar = Grammar(Library.logAndNormalizeRows(initBinaries),Library.logAndNormalizeRows(initUnaries));
+      val lexicon = new SimpleLexicon(initLexicon);
+      new CKYChartBuilder[LogProbabilityParseChart,String,String]("",lexicon,grammar,ParseChart.logProb);
+    }
+
+
+    val indexedProjections = GrammarProjections(xbarParser.grammar, split(_:String,numStates, numParsers), unsplit);
+
+    val latentFeaturizer = getFeaturizer(params, initLexicon, initBinaries, initUnaries, numStates)
+
+    val openTags = Set.empty ++ {
+      for(t <- initLexicon.nonzero.keys.map(_._1) if initLexicon(t,::).size > 50; t2 <- split(t, numStates, numParsers).iterator ) yield t2;
+    }
+
+    val closedWords = Set.empty ++ {
+      val wordCounts = sum(initLexicon)
+      wordCounts.nonzero.pairs.iterator.filter(_._2 > 5).map(_._1);
+    }
+
+    val obj = new LatentDiscrimObjective[String,MyLabel,String](latentFeaturizer,
+      trainTrees,
+      indexedProjections,
+      xbarParser,
+      openTags,
+      closedWords) with ConfiguredLogging;
+
+    val optimizer = opt.minimizer(obj);
+
+    val init = obj.initialWeightVector + 0.0;
+
+    import scalanlp.optimize.RandomizedGradientCheckingFunction;
+    val rand = new RandomizedGradientCheckingFunction(obj,1E-4);
+    def evalAndCache(pair: (optimizer.State,Int) ) {
+      val (state,iter) = pair;
+      val weights = state.x;
+      if(iter % iterPerValidate == 0) {
+        cacheWeights(params, obj,weights, iter);
+        quickEval(obj, unaryReplacer, devTrees, weights);
+      }
+    }
+
+
+    val cachedObj = new CachedBatchDiffFunction[DenseVector[Double]](obj);
+
+    for( (state,iter) <- optimizer.iterations(cachedObj,init).take(maxIterations).zipWithIndex.tee(evalAndCache _);
+         if iter != 0 && iter % iterationsPerEval == 0) yield try {
+      val parser = obj.extractParser(state.x)
+      ("LatentDiscrim-" + iter.toString,parser)
+    } catch {
+      case e => println(e);e.printStackTrace(); throw e;
+    }
+  }
+
+  def cacheWeights(params: Params, obj: LatentDiscrimObjective[String,MyLabel,String], weights: DenseVector[Double], iter: Int) = {
+    writeObject( new File("weights-"+iter +".ser"), weights -> obj.indexedFeatures.decode(weights));
+  }
+
+    def quickEval(obj: AbstractDiscriminativeObjective[String,MyLabel,String],
+                unaryReplacer : ChainReplacer[String],
+                devTrees: Seq[TreeInstance[String,String]], weights: DenseVector[Double]) {
+    println("Validating...");
+    val parser = obj.extractParser(weights);
+    val fixedTrees = devTrees.take(400).toIndexedSeq;
+    val results = ParseEval.evaluate(fixedTrees, parser, unaryReplacer);
+    println("Validation : " + results)
+  }
+}
+
 object ExactRunner extends ParserTrainer {
 
   case class Params(parser: ParserParams.BaseParser,
@@ -159,4 +276,84 @@ object ExactRunner extends ParserTrainer {
   }
 
 
+}
+
+object SplitExact extends ParserTrainer {
+
+  case class Params(parser: ParserParams.BaseParser,
+                    featurizerFactory: FeaturizerFactory[String,String] = new PlainFeaturizerFactory[String],
+                    weightsPath: File, numStates: Int)
+
+  protected val paramManifest = implicitly[Manifest[Params]]
+
+
+  def split(x: String, numStates: Int) = {
+    if(x.isEmpty) Seq((x,0))
+    else for(i <- 0 until numStates) yield (x,i)
+  }
+
+  def unsplit(x: (String,Int)) = x._1
+
+
+  def trainParser(trainTrees: IndexedSeq[TreeInstance[String, String]],
+                  devTrees: IndexedSeq[TreeInstance[String, String]],
+                  unaryReplacer: ChainReplacer[String], params: Params) = {
+
+    import params._
+
+    val features = scalanlp.util.readObject[(Any,Counter[Feature[(String,Seq[(String,Int)]),String],Double])](weightsPath)._2
+    val featuresByIndex = Counter2[Int,Feature[(String,Int),String],Double]()
+    for( (IndexFeature(f,i),v) <- features.pairsIterator) {
+      featuresByIndex(i,f.asInstanceOf[Feature[(String,Int),String]]) = v
+    }
+
+    val (initLexicon,initBinaries,initUnaries) = GenerativeParser.extractCounts(trainTrees)
+
+    val xbarParser: ChartBuilder[ParseChart.LogProbabilityParseChart, String, String] = params.parser.optParser.getOrElse {
+      val grammar = Grammar(Library.logAndNormalizeRows(initBinaries),Library.logAndNormalizeRows(initUnaries))
+      val lexicon = new SimpleLexicon(initLexicon)
+      new CKYChartBuilder[LogProbabilityParseChart,String,String]("",lexicon,grammar,ParseChart.logProb)
+    }
+
+
+    val indexedProjections = GrammarProjections(xbarParser.grammar, split(_:String,numStates), unsplit)
+
+    val featurizer = featurizerFactory.getFeaturizer(initLexicon, initBinaries, initUnaries)
+    val latentFactory = new SlavLatentFeaturizerFactory
+    val baseFeaturizer = latentFactory.getFeaturizer(featurizer, numStates)
+
+    val openTags = Set.empty ++ {
+      for(t <- initLexicon.nonzero.keys.map(_._1) if initLexicon(t,::).size > 50; t2 <- split(t, numStates).iterator ) yield t2
+    }
+
+    val closedWords = Set.empty ++ {
+      val wordCounts = sum(initLexicon)
+      wordCounts.nonzero.pairs.iterator.filter(_._2 > 5).map(_._1)
+    }
+
+
+    val obj = new LatentDiscrimObjective(baseFeaturizer, trainTrees, indexedProjections, xbarParser, openTags, closedWords)
+    val parsers = {for( i <- featuresByIndex.domain._1.iterator) yield {
+      val init = obj.indexedFeatures.encodeDense(featuresByIndex(i,::))
+      println(i)
+      println("Norm: " + norm(init,2))
+      println("Norm counter: " + norm(featuresByIndex(i,::),2))
+      println("Number zeros: " + init.toArray.count(_ == 0.0))
+      println("Number zeros counter: " + featuresByIndex(i,::).valuesIterator.count(_ == 0.0))
+      val parser = obj.extractParser(init)
+      ("Split-" + i) -> parser
+
+    }}.toIndexedSeq
+
+    val projections = IndexedSeq.fill(parsers.length)(indexedProjections)
+    val ep = new EPParser(parsers.map(_._2.builder.withCharts(ParseChart.logProb)), xbarParser, projections, 4)
+    val adf = new EPParser(parsers.map(_._2.builder.withCharts(ParseChart.logProb)), xbarParser, projections, 1)
+    val product = new ProductParser(parsers.map(_._2.builder.withCharts(ParseChart.logProb)), xbarParser, projections)
+    val ep8 = new EPParser(parsers.map(_._2.builder.withCharts(ParseChart.logProb)), xbarParser, projections, 8)
+    val exact = ExactParserExtractor.extractParser(parsers.map(_._2.builder.withCharts(ParseChart.logProb)), xbarParser, projections)
+
+    parsers.iterator ++ Iterator("EP"-> ep, "ADF" -> adf, "Product" -> product, "EP-8" -> ep8, "Exact" -> exact)
+
+
+  }
 }
