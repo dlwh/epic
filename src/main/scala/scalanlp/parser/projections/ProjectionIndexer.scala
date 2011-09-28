@@ -36,6 +36,13 @@ class ProjectionIndexer[C,F] private (val coarseIndex: Index[C],
    * Same as project(f)
    */
   def apply(f: Int) = project(f)
+
+  /**
+   *  From a PI[C,F] and a PI[F,F2], makes a PI[C,F2]
+   */
+  def compose[F2](finerProjections: ProjectionIndexer[F,F2]) = {
+    ProjectionIndexer(coarseIndex, finerProjections.fineIndex, {finerProjections.project(_ : F2)} andThen {project(_ : F)})
+  }
 }
 
 object ProjectionIndexer {

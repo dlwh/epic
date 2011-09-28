@@ -303,8 +303,8 @@ object SplitExact extends ParserTrainer {
 
     val features = scalanlp.util.readObject[(Any,Counter[Feature[(String,Seq[(String,Int)]),String],Double])](weightsPath)._2
     val featuresByIndex = Counter2[Int,Feature[(String,Int),String],Double]()
-    for( (IndexFeature(f,i),v) <- features.pairsIterator) {
-      featuresByIndex(i,f.asInstanceOf[Feature[(String,Int),String]]) = v
+    for( (IndexFeature(SubstateFeature(f,states),i),v) <- features.pairsIterator) {
+      featuresByIndex(i,SubstateFeature(f,ArrayBuffer(states:_*))) = v
     }
 
     val (initLexicon,initBinaries,initUnaries) = GenerativeParser.extractCounts(trainTrees)
