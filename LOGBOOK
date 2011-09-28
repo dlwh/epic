@@ -1,6 +1,16 @@
+
+
 9/22/2011:
 
-Exact: 2 parsers, length 40: 83.6
+Exact training, 2 parsers, 2 states:
+decoding:
+Exact: length 40: 83.6
+ADF: 82.57
+EP: 83.55
+The first parser: 69.5
+The second parser: 48.67
+Product: 72.40
+
 
 9/7/2011:
 
