@@ -25,6 +25,13 @@ class AnchoredRuleApproximator[C,F,W](fineParser: ChartBuilder[LogProbabilityPar
 
   val zeroFactory = new CachingSpanScorerFactory[C,W](coarseParser);
 
+  def project(words: Seq[W], spanScorer: SpanScorer[F], tree: BinarizedTree[C] = null):SpanScorer[C] = {
+    val inside = fineParser.buildInsideChart(words,spanScorer)
+    val outside = fineParser.buildOutsideChart(inside,spanScorer)
+    val partition = inside.top.labelScore(0,words.length,fineParser.root)
+    project(inside,outside,partition,spanScorer,tree)
+  }
+
   def project(inside: ParseChart[F], outside: ParseChart[F], partition: Double, spanScorer: SpanScorer[F], tree: BinarizedTree[C]):SpanScorer[C] = {
     factory.buildSpanScorer(inside, outside,  partition, spanScorer, tree);
   }

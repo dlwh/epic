@@ -61,7 +61,7 @@ object ParserTestHarness extends ParserTestHarness {
     (GenerativeParser.extractLexiconAndGrammar(trees.iterator),replacer);
   }
   val simpleParser = {
-    val chartBuilder = new CKYChartBuilder[ParseChart.ViterbiParseChart, String, String]("", simpleLexicon, simpleGrammar, ParseChart.viterbi)
+    val chartBuilder = new CKYChartBuilder[ParseChart.LogProbabilityParseChart, String, String]("", simpleLexicon, simpleGrammar, ParseChart.logProb)
     ChartParser(chartBuilder);
   }
 }

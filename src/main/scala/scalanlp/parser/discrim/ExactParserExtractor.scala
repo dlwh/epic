@@ -129,35 +129,41 @@ object ExactParserExtractor {
 
 object ExactTrainer extends ParserTrainer {
   type Params = LatentParams[SpecificParams]
-  case class SpecificParams(numParsers: Int = 2)
+  case class SpecificParams(numParsers: Int = 2, numSatelliteStates: Int=2)
 
   protected lazy val paramManifest = implicitly[Manifest[Params]]
-  type MyLabel = (String,Seq[L2])
+  type MyLabel = ((String,Int),Seq[L2])
   type L2 = (String,Int)
 
-  def split(l: String, numStates: Int, numParsers: Int): IndexedSeq[MyLabel] = if(l == "") IndexedSeq((l,IndexedSeq.fill(numParsers)(l -> 0))) else {
-    val options = IndexedSeq[IndexedSeq[L2]](Vector.empty)
-    val r = (0 until numParsers).foldLeft(options){ (options,p) =>
-      for(l2 <- 0 until numStates; o <- options) yield {
-        val r: IndexedSeq[L2] = o :+ (l->l2)
-        r
+  def split(l: String, numStates: Int, numSatellites: IndexedSeq[Int]): IndexedSeq[MyLabel] = {
+    if(l == "") {
+      IndexedSeq((l -> 0,IndexedSeq.fill(numSatellites.length)(l -> 0)))
+    } else {
+      val options = IndexedSeq[IndexedSeq[L2]](Vector.empty)
+      val r = numSatellites.foldLeft(options){ (options,myStates) =>
+        for(l2 <- 0 until myStates; o <- options) yield {
+          val r: IndexedSeq[L2] = o :+ (l->l2)
+          r
+        }
       }
+      for(i <- 0 until numStates; o <- options) yield (l -> i) -> o
     }
-    r.map(l ->  _)
   }
 
-  def unsplit(l: MyLabel) = l._1
+  def unsplit(l: MyLabel) = l._1._1
 
   def getFeaturizer(params: Params,
                     initLexicon: Counter2[String, String, Double],
                     initBinaries: Counter2[String, BinaryRule[String], Double],
                     initUnaries: Counter2[String, UnaryRule[String], Double],
-                    numStates: Int) = {
+                    numCoreStates: Int,
+                    satellites: IndexedSeq[Int]) = {
     val factory = params.featurizerFactory;
     val featurizer = factory.getFeaturizer(initLexicon, initBinaries, initUnaries);
     val latentFactory = params.latentFactory;
-    val latentFeaturizer = latentFactory.getFeaturizer(featurizer, numStates);
-    new ProductFeaturizer[String,L2,String](IndexedSeq.fill(params.specific.numParsers)(latentFeaturizer))
+    val latentFeaturizer = latentFactory.getFeaturizer(featurizer, numCoreStates);
+    val satelliteFeats = satellites.map(latentFactory.getFeaturizer(featurizer,_))
+    new SatelliteFeaturizer[(String,Int),L2,String](latentFeaturizer,satelliteFeats)
   }
 
   def trainParser(trainTrees: IndexedSeq[TreeInstance[String, String]],
@@ -167,8 +173,10 @@ object ExactTrainer extends ParserTrainer {
     val (initLexicon,initBinaries,initUnaries) = GenerativeParser.extractCounts(trainTrees);
     import params._;
     val numParsers = params.specific.numParsers;
+    val numSatellites = params.specific.numSatelliteStates;
     println("NumStates: " + params.numStates);
     println("NumParsers: " + params.specific.numParsers);
+    println("NumSatellites: " + params.specific.numSatelliteStates);
 
     val xbarParser = parser.optParser.getOrElse {
       val grammar = Grammar(Library.logAndNormalizeRows(initBinaries),Library.logAndNormalizeRows(initUnaries));
@@ -177,12 +185,13 @@ object ExactTrainer extends ParserTrainer {
     }
 
 
-    val indexedProjections = GrammarProjections(xbarParser.grammar, split(_:String,numStates, numParsers), unsplit);
+    val satellites = Array.fill(numParsers)(numSatellites)
+    val indexedProjections = GrammarProjections(xbarParser.grammar, split(_:String,numStates, satellites), unsplit);
 
-    val latentFeaturizer = getFeaturizer(params, initLexicon, initBinaries, initUnaries, numStates)
+    val latentFeaturizer = getFeaturizer(params, initLexicon, initBinaries, initUnaries, numStates, satellites)
 
     val openTags = Set.empty ++ {
-      for(t <- initLexicon.nonzero.keys.map(_._1) if initLexicon(t,::).size > 50; t2 <- split(t, numStates, numParsers).iterator ) yield t2;
+      for(t <- initLexicon.nonzero.keys.map(_._1) if initLexicon(t,::).size > 50; t2 <- split(t, numStates, satellites).iterator ) yield t2;
     }
 
     val closedWords = Set.empty ++ {
@@ -301,10 +310,11 @@ object SplitExact extends ParserTrainer {
 
     import params._
 
-    val features = scalanlp.util.readObject[(Any,Counter[Feature[(String,Seq[(String,Int)]),String],Double])](weightsPath)._2
+    type MyLabel = ((String,Int),Seq[(String,Int)])
+    val features = scalanlp.util.readObject[(Any,Counter[Feature[MyLabel,String],Double])](weightsPath)._2
     val featuresByIndex = Counter2[Int,Feature[(String,Int),String],Double]()
-    for( (IndexFeature(SubstateFeature(f,states),i),v) <- features.pairsIterator) {
-      featuresByIndex(i,SubstateFeature(f,ArrayBuffer(states:_*))) = v
+    for( (SatelliteFeature(SubstateFeature(baseV,states2),SubstateFeature(f,states),i),v) <- features.pairsIterator) {
+      featuresByIndex(i,SubstateFeature(f,ArrayBuffer(states:_*))) += v
     }
 
     val (initLexicon,initBinaries,initUnaries) = GenerativeParser.extractCounts(trainTrees)
@@ -333,7 +343,11 @@ object SplitExact extends ParserTrainer {
 
 
     val obj = new LatentDiscrimObjective(baseFeaturizer, trainTrees, indexedProjections, xbarParser, openTags, closedWords)
+    println("Current:")
+    println(obj.indexedFeatures.index)
     val parsers = {for( i <- featuresByIndex.domain._1.iterator) yield {
+      println("Model " + i)
+      println(featuresByIndex(i,::))
       val init = obj.indexedFeatures.encodeDense(featuresByIndex(i,::))
       println(i)
       println("Norm: " + norm(init,2))
@@ -345,11 +359,12 @@ object SplitExact extends ParserTrainer {
 
     }}.toIndexedSeq
 
+    val coarseParser = ChartParser(xbarParser)
     val projections = IndexedSeq.fill(parsers.length)(indexedProjections)
-    val ep = new EPParser(parsers.map(_._2.builder.withCharts(ParseChart.logProb)), xbarParser, projections, 4)
-    val adf = new EPParser(parsers.map(_._2.builder.withCharts(ParseChart.logProb)), xbarParser, projections, 1)
+    val ep = new EPParser(parsers.map(_._2.builder.withCharts(ParseChart.logProb)), coarseParser, projections, 4)
+    val adf = new EPParser(parsers.map(_._2.builder.withCharts(ParseChart.logProb)), coarseParser, projections, 1)
     val product = new ProductParser(parsers.map(_._2.builder.withCharts(ParseChart.logProb)), xbarParser, projections)
-    val ep8 = new EPParser(parsers.map(_._2.builder.withCharts(ParseChart.logProb)), xbarParser, projections, 8)
+    val ep8 = new EPParser(parsers.map(_._2.builder.withCharts(ParseChart.logProb)), coarseParser, projections, 8)
     val exact = ExactParserExtractor.extractParser(parsers.map(_._2.builder.withCharts(ParseChart.logProb)), xbarParser, projections)
 
     parsers.iterator ++ Iterator("EP"-> ep, "ADF" -> adf, "Product" -> product, "EP-8" -> ep8, "Exact" -> exact)
