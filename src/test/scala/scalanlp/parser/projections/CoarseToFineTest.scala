@@ -21,10 +21,10 @@ class CoarseToFineTest extends ParserTestHarness with FunSuite {
     } yield TreeInstance(id, tree map proj, words);
 
     val coarse = GenerativeParser.fromTrees(coarseTrees);
-    val coarseBuilder = coarse.builder.withCharts(ParseChart.logProb)
+    val coarseBuilder = coarse.builder.asInstanceOf[ChartBuilder[scalanlp.parser.ParseChart.ViterbiParseChart,String,String]];
 
     val (fineLexicon,fineGrammar) = GenerativeParser.extractLexiconAndGrammar(trainTrees.iterator);
-    val fine = new CoarseToFineChartBuilder[ParseChart.LogProbabilityParseChart,String,String,String](coarseBuilder, proj _, "", fineLexicon, fineGrammar, ParseChart.logProb);
+    val fine = new CoarseToFineChartBuilder[ParseChart.ViterbiParseChart,String,String,String](coarseBuilder, proj _, "", fineLexicon, fineGrammar, ParseChart.viterbi);
     val parser = ChartParser(fine);
     val gen = ParserTestHarness.simpleParser
 
@@ -40,10 +40,10 @@ class CoarseToFineTest extends ParserTestHarness with FunSuite {
     def proj(label: String) =  label
 
     val coarse = GenerativeParser.fromTrees(trainTrees);
-    val coarseBuilder = coarse.builder.withCharts(ParseChart.logProb)
+    val coarseBuilder = coarse.builder.asInstanceOf[ChartBuilder[scalanlp.parser.ParseChart.ViterbiParseChart,String,String]];
 
     val (fineLexicon,fineGrammar) = GenerativeParser.extractLexiconAndGrammar(trainTrees.iterator);
-    val fine = new CoarseToFineChartBuilder[ParseChart.LogProbabilityParseChart,String,String,String](coarseBuilder, proj _, "", fineLexicon, fineGrammar, ParseChart.logProb);
+    val fine = new CoarseToFineChartBuilder[ParseChart.ViterbiParseChart,String,String,String](coarseBuilder, proj _, "", fineLexicon, fineGrammar, ParseChart.viterbi);
     val parser = ChartParser(fine);
     val gen = ParserTestHarness.simpleParser
 

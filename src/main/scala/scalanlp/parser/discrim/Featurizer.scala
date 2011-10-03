@@ -282,28 +282,26 @@ class SlavSplitFeaturizer[L,W](base: Featurizer[L,W], numStates:Int) extends Fea
   }
 }
 
-case class SatelliteFeature[L,L2,W](f: Feature[L,W], fSat: Feature[L2,W], index:Int) extends Feature[(L,Seq[L2]),W]
+case class IndexFeature[L2,W](f: Feature[L2,W], index:Int) extends Feature[(Nothing,Seq[L2]),W]
 
-class SatelliteFeaturizer[L,L2,W](base: Featurizer[L,W], satellites: IndexedSeq[Featurizer[L2,W]]) extends Featurizer[(L,Seq[L2]),W] {
+class ProductFeaturizer[L,L2,W](base: IndexedSeq[Featurizer[L2,W]]) extends Featurizer[(L,Seq[L2]),W] {
   def featuresFor(r: Rule[(L, Seq[L2])]) = r match {
     case BinaryRule(a,b,c) =>
       val ctr = Counter[Feature[(L,Seq[L2]),W],Double]()
-      val baseFeatures = base.featuresFor(BinaryRule(a._1,b._1,c._1))
-      for( (f,fv) <- baseFeatures.pairsIterator; i <- 0 until satellites.length) {
-        val satFeatures = satellites(i).featuresFor(BinaryRule(a._2 apply (i),b._2 apply (i),c._2 apply (i)))
-        for( (fSat,v) <- satFeatures.pairsIterator) {
-          ctr(SatelliteFeature(f, fSat,i)) = v * fv
+      for( i <- 0 until base.length) {
+        val baseFeatures = base(i).featuresFor(BinaryRule(a._2 apply (i),b._2 apply (i),c._2 apply (i)))
+        for( (f,v) <- baseFeatures.pairsIterator) {
+          ctr(IndexFeature(f,i)) = v
         }
 
       }
       ctr
     case UnaryRule(a,b) =>
       val ctr = Counter[Feature[(L,Seq[L2]),W],Double]()
-      val baseFeatures = base.featuresFor(UnaryRule(a._1,b._1))
-      for( (f,fv) <- baseFeatures.pairsIterator; i <- 0 until satellites.length) {
-        val baseFeatures = satellites(i).featuresFor(UnaryRule(a._2 apply (i),b._2 apply (i)))
-        for( (fSat,v) <- baseFeatures.pairsIterator) {
-          ctr(SatelliteFeature(f,fSat,i)) = v * fv
+      for( i <- 0 until base.length) {
+        val baseFeatures = base(i).featuresFor(UnaryRule(a._2 apply (i),b._2 apply (i)))
+        for( (f,v) <- baseFeatures.pairsIterator) {
+          ctr(IndexFeature(f,i)) = v
         }
 
       }
@@ -312,19 +310,18 @@ class SatelliteFeaturizer[L,L2,W](base: Featurizer[L,W], satellites: IndexedSeq[
 
   def featuresFor(l: (L, Seq[L2]), w: W) = {
     val ctr = Counter[Feature[(L,Seq[L2]),W],Double]()
-    val baseFeatures = base.featuresFor(l._1,w);
-    for( (f,fv) <- baseFeatures.pairsIterator; i <- 0 until satellites.length) {
-      val baseFeatures = satellites(i).featuresFor(l._2 apply i,w)
-      for( (fSat,v) <- baseFeatures.pairsIterator) {
-        ctr(SatelliteFeature(f,fSat,i)) = v * fv
-      }
+      for( i <- 0 until base.length) {
+        val baseFeatures = base(i).featuresFor(l._2 apply i,w)
+        for( (f,v) <- baseFeatures.pairsIterator) {
+          ctr(IndexFeature(f,i)) = v
+        }
 
-    }
-    ctr
+      }
+      ctr
   }
 
   def initialValueForFeature(f: Feature[(L, Seq[L2]), W]) = f match  {
-    case SatelliteFeature(f1,feat,i) => base.initialValueForFeature(f1) * satellites(i).initialValueForFeature(feat)
+    case IndexFeature(feat,i) => base(i).initialValueForFeature(feat)
   }
 }
 
@@ -541,7 +538,7 @@ object FeatureIndexer {
     val ruleIndex = indexedProjections.rules.fineIndex
 
     // a -> b c -> SparseVector[Double] of feature weights
-    val ruleCache = new OpenAddressHashArray[Counter[Feature[L2,W],Double]](Int.MaxValue / 2)
+    val ruleCache = new OpenAddressHashArray[Counter[Feature[L2,W],Double]](1000000)
     // a -> W map
     val lexicalCache = new ArrayMap(collection.mutable.Map[W,Counter[Feature[L2,W], Double]]())
 

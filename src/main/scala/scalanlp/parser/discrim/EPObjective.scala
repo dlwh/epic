@@ -32,7 +32,6 @@ class EPObjective[L,L2,W](featurizers: Seq[Featurizer[L2,W]],
     splits(0)
   }
 
-
   val indexedFeatures: Seq[FeatureIndexer[L2,W]] = featurizers.map { featurizer =>
     val initGrammar = coarseParser.grammar
     val initLex = coarseParser.lexicon
@@ -52,11 +51,11 @@ class EPObjective[L,L2,W](featurizers: Seq[Featurizer[L2,W]],
 
   def extractParser(weights: DenseVector[Double]) = {
     val parsers = Array.tabulate(numModels)(extractLogProbBuilder(weights,_))
-    val epBuilder = new EPParser[L,L,L2,W](parsers,ChartParser(coarseParser), Array.fill(numModels)(indexedProjections),maxEPIterations)
+    val epBuilder = new EPParser[L,L2,W](parsers,coarseParser, Array.fill(numModels)(indexedProjections),maxEPIterations)
     epBuilder
   }
 
-  protected type Builder = EPParser[L,L,L2,W]
+  protected type Builder = EPParser[L,L2,W]
   protected type Counts = (Double,Seq[ExpectedCounts[W]])
 
   def builder(weights: DenseVector[Double]) = extractParser(weights)

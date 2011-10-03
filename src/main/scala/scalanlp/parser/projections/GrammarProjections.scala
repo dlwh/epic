@@ -8,7 +8,6 @@ import scalanlp.util.Index
  * @author dlwh
  */
 
-@SerialVersionUID(1)
 case class GrammarProjections[C,F](labels: ProjectionIndexer[C,F], rules: ProjectionIndexer[Rule[C],Rule[F]]) {
   def compose[F2](other: GrammarProjections[F,F2]) = new GrammarProjections(labels compose other.labels, rules compose other.rules)
 
