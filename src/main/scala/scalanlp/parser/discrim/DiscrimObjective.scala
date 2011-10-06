@@ -20,7 +20,7 @@ import Library.sum
 import scalala.tensor.{Counter,::}
 
 /**
- * 
+ * The objective function for log-linear parsers with no substates
  * @author dlwh
  */
 class DiscrimObjective[L,W](feat: Featurizer[L,W],

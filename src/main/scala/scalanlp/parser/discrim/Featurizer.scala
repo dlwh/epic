@@ -238,52 +238,12 @@ class SlavFeaturizer[L,W](base: Featurizer[L,W], numStates:Int) extends Featuriz
   }
 }
 
-class SlavSplitFeaturizer[L,W](base: Featurizer[L,W], numStates:Int) extends Featurizer[(L,Int),W] {
-  val root: Int = math.sqrt(numStates).toInt
-  def featuresFor(r: Rule[(L,Int)]) = r match {
-    case BinaryRule(a,b,c) =>
-      val result = Counter[Feature[(L,Int),W],Double]()
-      val baseFeatures = base.featuresFor(BinaryRule(a._1,b._1,c._1))
-      val substates1 = ArrayBuffer(a._2 - (a._2%root), b._2 - (b._2%root), c._2 - (c._2%root))
-      val substates2 = ArrayBuffer((a._2%root),  (b._2%root),  (c._2%root))
-      for( (k,v) <- baseFeatures.nonzero.pairs) {
-        result(SubstateFeature(k,substates1)) = v
-        result(SubstateFeature(k,substates2)) = v
-      }
-      result
-    case UnaryRule(a,b) =>
-      val result = Counter[Feature[(L,Int),W], Double]()
-      val baseFeatures = base.featuresFor(UnaryRule(a._1,b._1))
-      val substates1 = ArrayBuffer(a._2 - (a._2%root), b._2 - (b._2%root))
-      val substates2 = ArrayBuffer((a._2%root),  (b._2%root))
-      for( (k,v) <- baseFeatures.nonzero.pairs) {
-        result(SubstateFeature(k,substates1)) = v
-        result(SubstateFeature(k,substates2)) = v
-      }
-      result
-  }
-
-  def featuresFor(l: (L,Int), w: W) = {
-    val baseFeatures = base.featuresFor(l._1, w)
-    val substates1 = ArrayBuffer(l._2 - (l._2 %root))
-    val substates2 = ArrayBuffer((l._2%root))
-    val result = Counter[Feature[(L,Int),W], Double]()
-    for( (k,v) <- baseFeatures.nonzero.pairs) {
-      result(SubstateFeature(k,substates1)) = v
-      result(SubstateFeature(k,substates2)) = v
-    }
-    result
-  }
-  def initialValueForFeature(f: Feature[(L,Int),W]) = f match {
-    case SubstateFeature(baseF, _) =>
-      val baseScore = base.initialValueForFeature(baseF)
-      baseScore + math.log(0.99 + math.random * 0.02)
-    case _ => 0.0
-  }
-}
-
 case class IndexFeature[L2,W](f: Feature[L2,W], index:Int) extends Feature[(Nothing,Seq[L2]),W]
 
+/**
+ * Featurizer for training products of L2 grammars that project to L's.
+ * Elements of the product are independent, given the L.
+ */
 class ProductFeaturizer[L,L2,W](base: IndexedSeq[Featurizer[L2,W]]) extends Featurizer[(L,Seq[L2]),W] {
   def featuresFor(r: Rule[(L, Seq[L2])]) = r match {
     case BinaryRule(a,b,c) =>
@@ -325,53 +285,9 @@ class ProductFeaturizer[L,L2,W](base: IndexedSeq[Featurizer[L2,W]]) extends Feat
   }
 }
 
-class HighLowFeaturizer[L,W](base: Featurizer[L,W], numStates: Int) extends Featurizer[(L,Int),W] {
-  val root: Int = math.sqrt(numStates).toInt
-
-  def featuresFor(r: Rule[(L, Int)]):Counter[Feature[(L, Int),W],Double] = r match {
-   case BinaryRule(a,b,c) =>
-      val result = Counter[Feature[(L,Int),W],Double]()
-      val baseFeatures = base.featuresFor(BinaryRule(a._1,b._1,c._1))
-      val substates1 = ArrayBuffer(a._2 / root, b._2 / root, c._2 / root)
-      val substates2 = ArrayBuffer((a._2%root),  (b._2%root),  (c._2%root))
-      for( (k,v) <- baseFeatures.nonzero.pairs) {
-        result(TaggedFeature(SubstateFeature(k,substates1), 'High)) = v
-        result(TaggedFeature(SubstateFeature(k,substates2), 'Low)) = v
-      }
-      result
-    case UnaryRule(a,b) =>
-      val result = Counter[Feature[(L,Int),W], Double]()
-      val baseFeatures = base.featuresFor(UnaryRule(a._1,b._1))
-      val substates1 = ArrayBuffer(a._2 / root, b._2 / root)
-      val substates2 = ArrayBuffer((a._2%root),  (b._2%root))
-      for( (k,v) <- baseFeatures.nonzero.pairs) {
-        result(TaggedFeature(SubstateFeature(k,substates1), 'High)) = v
-        result(TaggedFeature(SubstateFeature(k,substates2), 'Low)) = v
-      }
-      result
-  }
-
-  def featuresFor(l: (L, Int), w: W) = {
-    val baseFeatures = base.featuresFor(l._1, w)
-    val substates1 = ArrayBuffer(l._2 / root)
-    val substates2 = ArrayBuffer((l._2%root))
-    val result = Counter[Feature[(L,Int),W], Double]()
-    for( (k,v) <- baseFeatures.nonzero.pairs) {
-      result(TaggedFeature(SubstateFeature(k,substates1),'High)) = v
-      result(TaggedFeature(SubstateFeature(k,substates2),'Low)) = v
-    }
-    result
-  }
-
-  def initialValueForFeature(f: Feature[(L,Int),W]) = f match {
-    case TaggedFeature(SubstateFeature(baseF, _), sym) =>
-      val baseScore = base.initialValueForFeature(baseF)
-      val r = baseScore + math.log(1.0 - .1 + math.random * 2 * .1)
-      r
-    case _ => 0.0
-  }
-}
-
+/**
+ * Slav Featurizer that includes features for the base state
+ */
 class SlavPlusFeaturizer[L,W](base: Featurizer[L,W], numStates:Int) extends Featurizer[(L,Int),W] {
   case class ProjFeature(f: Feature[L,W]) extends Feature[(L,Int),W]
 
@@ -415,6 +331,10 @@ class SlavPlusFeaturizer[L,W](base: Featurizer[L,W], numStates:Int) extends Feat
   }
 }
 
+/**
+ * Treats the Substate as a bit vector and produces up to arity subset features
+ * based on that bitvector
+ */
 class BitVectorFeaturizer[L,W](base: Featurizer[L,W], numStates: Int, arity: Int = 1) extends Featurizer[(L,Int),W] {
   val numBits = BitUtils.roundToNextPowerOfTwo(numStates)
   private def mkBitStati(numBits: Int, lbl: LabelOfBit, state: Int) = {
@@ -490,6 +410,12 @@ class BitVectorFeaturizer[L,W](base: Featurizer[L,W], numStates: Int, arity: Int
 }
 
 
+/**
+ * FeatureIndexers give you an indexed encoding of the features for each rule and label
+ * using indexed rule and indexed labels.
+ *
+ * @author dlwh
+ */
 @SerialVersionUID(1)
 trait FeatureIndexer[L,W] extends Encoder[Feature[L,W]] with Serializable {
   val index:Index[Feature[L,W]]
@@ -533,12 +459,15 @@ trait FeatureIndexer[L,W] extends Encoder[Feature[L,W]] with Serializable {
 
 object FeatureIndexer {
 
+  /**
+   * Creates a FeatureIndexer by featurizing all rules/words and indexing them
+   */
   def apply[L,L2,W](f: Featurizer[L2,W], lex: Lexicon[L,W], indexedProjections: GrammarProjections[L,L2]) = {
     val featureIndex = Index[Feature[L2,W]]()
     val ruleIndex = indexedProjections.rules.fineIndex
 
     // a -> b c -> SparseVector[Double] of feature weights
-    val ruleCache = new OpenAddressHashArray[Counter[Feature[L2,W],Double]](1000000)
+    val ruleCache = new OpenAddressHashArray[Counter[Feature[L2,W],Double]](Int.MaxValue/3)
     // a -> W map
     val lexicalCache = new ArrayMap(collection.mutable.Map[W,Counter[Feature[L2,W], Double]]())
 
