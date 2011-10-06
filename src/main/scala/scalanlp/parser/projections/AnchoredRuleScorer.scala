@@ -123,7 +123,7 @@ object ProjectTreebankToVarGrammar {
 
     }
     val parser = loadParser(new File(args(0)));
-    val coarseParser = ProjectTreebankToLabeledSpans.loadParser(new File(args(1)));
+    val coarseParser = ProjectTreebankToLabeledSpans.loadParser[String](new File(args(1)));
     val treebank = ProcessedTreebank(TreebankParams(new File(args(2)),maxLength=10000),SpanParams(new File(args(3))));
     val outDir = new File(args(4));
     outDir.mkdirs();

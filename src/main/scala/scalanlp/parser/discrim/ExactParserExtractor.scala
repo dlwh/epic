@@ -225,7 +225,12 @@ object ExactTrainer extends ParserTrainer {
   }
 
   def cacheWeights(params: Params, obj: LatentDiscrimObjective[String,MyLabel,String], weights: DenseVector[Double], iter: Int) = {
-    writeObject( new File("weights-"+iter +".ser"), weights -> obj.indexedFeatures.decode(weights));
+        val name = if(iter % 20 == 0) {
+      new File("weights-a.ser")
+    } else {
+      new File("weights-b.ser")
+    }
+    writeObject( name, weights -> obj.indexedFeatures.decode(weights));
   }
 
     def quickEval(obj: AbstractDiscriminativeObjective[String,MyLabel,String],

@@ -20,7 +20,7 @@ object ParserParams {
 
   case class BaseParser(base: File = null) {
     def optParser = Option(base).map { f =>
-      ProjectTreebankToLabeledSpans.loadParser(f).builder.withCharts(ParseChart.logProb)
+     readObject[ChartParser[String,String,String]](f).builder.withCharts(ParseChart.logProb)
     }
   }
 

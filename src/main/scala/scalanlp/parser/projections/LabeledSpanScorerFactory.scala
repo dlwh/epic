@@ -129,28 +129,28 @@ object ProjectTreebankToLabeledSpans {
   val TEST_SPANS_NAME = "test.spans.ser"
   val SPAN_INDEX_NAME = "spanindex.ser"
   def main(args: Array[String]) {
-    val parser = loadParser(new File(args(0)));
+    val parser = loadParser[Any](new File(args(0)));
     val treebank = ProcessedTreebank(TreebankParams(new File(args(1)),maxLength=10000),SpanParams());
 
     val outDir = new File(args(2));
     outDir.mkdirs();
-    val projections = ProjectionIndexer(parser.builder.grammar.labelIndex,parser.builder.grammar.labelIndex,identity[String])
-    val factory = new LabeledSpanScorerFactory[String,String,String](parser.builder.withCharts(ParseChart.viterbi),projections);
+    val projections = parser.projections
+    val factory = new LabeledSpanScorerFactory[String,Any,String](parser.builder.withCharts(ParseChart.viterbi),projections.labels);
     writeObject(parser.builder.grammar.labelIndex,new File(outDir,SPAN_INDEX_NAME));
     writeIterable(mapTrees(factory,treebank.trainTrees,true),new File(outDir,TRAIN_SPANS_NAME))
     writeIterable(mapTrees(factory,treebank.testTrees,false),new File(outDir,TEST_SPANS_NAME))
     writeIterable(mapTrees(factory,treebank.devTrees,false),new File(outDir,DEV_SPANS_NAME))
   }
 
-  def loadParser(loc: File) = {
+  def loadParser[T](loc: File) = {
     val oin = new ObjectInputStream(new BufferedInputStream(new FileInputStream(loc)));
-    val parser = oin.readObject().asInstanceOf[ChartParser[String,String,String]]
+    val parser = oin.readObject().asInstanceOf[ChartParser[String,T,String]]
     oin.close();
     parser;
   }
 
 
-  def mapTrees(factory: LabeledSpanScorerFactory[String,String,String], trees: IndexedSeq[TreeInstance[String,String]], useTree: Boolean) = {
+  def mapTrees(factory: LabeledSpanScorerFactory[String,Any,String], trees: IndexedSeq[TreeInstance[String,String]], useTree: Boolean) = {
     // TODO: have ability to use other span scorers.
     trees.toIndexedSeq.par.map { (ti:TreeInstance[String,String]) =>
       val TreeInstance(id,tree,words,_) = ti

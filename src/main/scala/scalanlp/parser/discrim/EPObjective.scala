@@ -222,7 +222,12 @@ object EPTrainer extends LatentTrainer {
 
   def cacheWeights(params: Params, obj: MyObjective, weights: DenseVector[Double], iter: Int) = {
     val partWeights = obj.partitionWeights(weights)
-    writeObject( new File("weights-"+iter +".ser"), (obj.indexedFeatures zip partWeights).map { case (f, w) => w -> f.decode(w) }.toArray)
+      val name = if(iter % 20 == 0) {
+      new File("weights-a.ser")
+    } else {
+      new File("weights-b.ser")
+    }
+    writeObject( name, (obj.indexedFeatures zip partWeights).map { case (f, w) => w -> f.decode(w) }.toArray)
   }
 
 }
