@@ -11,6 +11,7 @@ import java.io._
 import scalanlp.trees.{Trees,DenseTreebank}
 import scalanlp.tensor.sparse.OldSparseVector
 import scalala.library.Numerics
+import scalanlp.config.Configuration
 
 /**
  * Creates labeled span scorers for a set of trees from some parser.
@@ -123,16 +124,23 @@ class LabeledSpanScorer[L](scores: Array[OldSparseVector]) extends SpanScorer[L]
   }
 }
 
+case class ProjectionParams(treebank: TreebankParams, spans: SpanParams, parser: File, out: File = new File("spans")) {
+  def processedTreebank = ProcessedTreebank(treebank,spans)
+}
+
 object ProjectTreebankToLabeledSpans {
   val TRAIN_SPANS_NAME = "train.spans.ser"
   val DEV_SPANS_NAME = "dev.spans.ser"
   val TEST_SPANS_NAME = "test.spans.ser"
   val SPAN_INDEX_NAME = "spanindex.ser"
   def main(args: Array[String]) {
-    val parser = loadParser[Any](new File(args(0)));
-    val treebank = ProcessedTreebank(TreebankParams(new File(args(1)),maxLength=10000),SpanParams());
+    val (baseConfig,files) = scalanlp.config.CommandLineParser.parseArguments(args)
+    val config = baseConfig backoff Configuration.fromPropertiesFiles(files.map(new File(_)))
+    val params = config.readIn[ProjectionParams]("")
+    val treebank = params.processedTreebank
+    val parser = loadParser[Any](params.parser)
 
-    val outDir = new File(args(2));
+    val outDir = params.out
     outDir.mkdirs();
     val projections = parser.projections
     val factory = new LabeledSpanScorerFactory[String,Any,String](parser.builder.withCharts(ParseChart.viterbi),projections.labels);
@@ -148,7 +156,6 @@ object ProjectTreebankToLabeledSpans {
     oin.close();
     parser;
   }
-
 
   def mapTrees(factory: LabeledSpanScorerFactory[String,Any,String], trees: IndexedSeq[TreeInstance[String,String]], useTree: Boolean) = {
     // TODO: have ability to use other span scorers.
