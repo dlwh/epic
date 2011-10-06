@@ -384,7 +384,7 @@ object StateSplitting {
 
 }
 
-object StateSplittingTrainer extends ParserTrainer with NoParams {
+object StateSplittingPipeline extends ParserPipeline with NoParams {
   def trainParser(trainTrees: IndexedSeq[TreeInstance[String,String]],
                   devTrees: IndexedSeq[TreeInstance[String,String]],
                   unaryReplacer : ChainReplacer[String],

@@ -161,7 +161,7 @@ class EPObjective[L,L2,W](featurizers: Seq[Featurizer[L2,W]],
 
 }
 
-object EPTrainer extends LatentTrainer {
+object EPPipeline extends LatentPipeline {
 
   type MyFeaturizer = IndexedSeq[Featurizer[(String,Int),String]]
   type MyObjective = EPObjective[String,(String,Int),String]

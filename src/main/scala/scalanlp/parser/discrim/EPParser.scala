@@ -142,7 +142,7 @@ class EPParser[L,L2,W](val parsers: Seq[ChartBuilder[LogProbabilityParseChart,L2
  *
  * @author dlwh
  */
-object EPParserRunner extends ParserTrainer {
+object EPParserRunner extends ParserPipeline {
 
   case class Params(parser: ParserParams.BaseParser,
                     model0: File = null,
@@ -186,7 +186,7 @@ object EPParserRunner extends ParserTrainer {
  *
  * @author dlwh
  */
-object EPParserParamRunner extends ParserTrainer {
+object EPParserParamRunner extends ParserPipeline {
 
   case class Params(parser: ParserParams.BaseParser,
                     epParser: File)

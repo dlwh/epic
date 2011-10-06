@@ -127,7 +127,7 @@ object ExactParserExtractor {
 
 }
 
-object ExactTrainer extends ParserTrainer {
+object ExactPipeline extends ParserPipeline {
   type Params = LatentParams[SpecificParams]
   case class SpecificParams(numParsers: Int = 2)
 
@@ -244,7 +244,7 @@ object ExactTrainer extends ParserTrainer {
   }
 }
 
-object ExactRunner extends ParserTrainer {
+object ExactRunner extends ParserPipeline {
 
   case class Params(parser: ParserParams.BaseParser,
                     model0: File = null,
@@ -283,7 +283,7 @@ object ExactRunner extends ParserTrainer {
 
 }
 
-object SplitExact extends ParserTrainer {
+object SplitExact extends ParserPipeline {
 
   case class Params(parser: ParserParams.BaseParser,
                     featurizerFactory: FeaturizerFactory[String,String] = new PlainFeaturizerFactory[String],

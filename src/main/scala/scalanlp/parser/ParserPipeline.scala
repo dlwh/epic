@@ -13,7 +13,7 @@ import scalanlp.trees.UnaryChainRemover.ChainReplacer
  */
 object ParserParams {
   case class Params();
-  trait NoParams { self: ParserTrainer =>
+  trait NoParams { self: ParserPipeline =>
     type Params = ParserParams.Params;
     protected val paramManifest = manifest[Params];
   }
@@ -30,7 +30,7 @@ object ParserParams {
  * ParserTrainer is a base-trait for the parser training pipeline. Handles
  * reading in the treebank and params and such
  */
-trait ParserTrainer {
+trait ParserPipeline {
   /**
    * The type of the parameters to read in via scalanlp.config
    */

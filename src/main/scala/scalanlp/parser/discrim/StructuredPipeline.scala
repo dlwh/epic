@@ -26,7 +26,7 @@ import projections.{GrammarProjections, ProjectingSpanScorer, ProjectionIndexer}
  *
  * @author dlwh
  */
-object StructuredTrainer extends ParserTrainer {
+object StructuredPipeline extends ParserPipeline {
 
   protected val paramManifest = manifest[Params];
   case class Params(parser: ParserParams.BaseParser,

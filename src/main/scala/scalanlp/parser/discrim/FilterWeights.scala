@@ -26,7 +26,7 @@ import collection.mutable.ArrayBuffer
 case class FilterWeightsParams(parser: ParserParams.BaseParser,
                                featurizerFactory: FeaturizerFactory[String,String] = new PlainFeaturizerFactory[String],
                                weightsPath: File)
-object FilterWeights extends ParserTrainer {
+object FilterWeights extends ParserPipeline {
   protected val paramManifest = implicitly[Manifest[FilterWeightsParams]]
   type Params = FilterWeightsParams
 

@@ -67,7 +67,7 @@ class DiscrimObjective[L,W](feat: Featurizer[L,W],
 
 
 import scalanlp.optimize.FirstOrderMinimizer._;
-object DiscriminativeTrainer extends ParserTrainer {
+object DiscriminativePipeline extends ParserPipeline {
 
   protected val paramManifest = manifest[Params];
   case class Params(parser: ParserParams.BaseParser,

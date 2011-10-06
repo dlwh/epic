@@ -135,7 +135,7 @@ class MaxRuleProductDecoder[C,F, W](coarseGrammar: Grammar[C], coarseLexicon: Le
   }
 }
 
-object MaxRuleTrainer extends ParserTrainer with NoParams {
+object MaxRulePipeline extends ParserPipeline with NoParams {
   def trainParser(trainTrees: IndexedSeq[TreeInstance[String,String]],
                   devTrees:   IndexedSeq[TreeInstance[String,String]],
                   unaryReplacer : ChainReplacer[String],
@@ -232,7 +232,7 @@ class MaxConstituentDecoder[C,F,W](projections: GrammarProjections[C,F]) extends
   }
 }
 
-object MaxConstituentTrainer extends ParserTrainer with NoParams {
+object MaxConstituentPipeline extends ParserPipeline with NoParams {
   def trainParser(trainTrees: IndexedSeq[TreeInstance[String,String]],
                   devTrees:   IndexedSeq[TreeInstance[String,String]],
                   unaryReplacer : ChainReplacer[String],

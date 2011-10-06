@@ -66,7 +66,7 @@ object GenerativeParser {
   }
 }
 
-object GenerativeTrainer extends ParserTrainer with NoParams {
+object GenerativePipeline extends ParserPipeline with NoParams {
   def trainParser(trainTrees: IndexedSeq[TreeInstance[String,String]],
                   devTrees: IndexedSeq[TreeInstance[String,String]],
                   unaryReplacer : ChainReplacer[String],
@@ -76,7 +76,7 @@ object GenerativeTrainer extends ParserTrainer with NoParams {
   }
 }
 
-object SigTrainer extends ParserTrainer with NoParams {
+object SigPipeline extends ParserPipeline with NoParams {
   def trainParser(trainTrees: IndexedSeq[TreeInstance[String,String]],
                   devTrees: IndexedSeq[TreeInstance[String,String]],
                   unaryReplacer : ChainReplacer[String],

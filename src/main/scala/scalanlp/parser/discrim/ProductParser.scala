@@ -55,7 +55,7 @@ class ProductParser[L,L2,W](val parsers: Seq[ChartBuilder[LogProbabilityParseCha
  * 
  * @author dlwh
  */
-object ProductParserRunner extends ParserTrainer {
+object ProductParserRunner extends ParserPipeline {
 
   case class Params(parser: ParserParams.BaseParser, model0: File = null, model1: File = null, model2: File = null, model3: File = null)
   protected val paramManifest = manifest[Params]

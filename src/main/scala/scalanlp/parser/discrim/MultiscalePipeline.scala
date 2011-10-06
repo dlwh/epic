@@ -20,7 +20,7 @@ import logging._
  *
  * @author dlwh
  */
-object MultiscaleTrainer extends ParserTrainer {
+object MultiscalePipeline extends ParserPipeline {
 
   type MyFeaturizer = Featurizer[(String,Seq[Int]),String]
   type MyObjective = LatentDiscrimObjective[String,(String,Seq[Int]),String]
@@ -31,8 +31,8 @@ object MultiscaleTrainer extends ParserTrainer {
   type Params = LatentParams[SpecificParams];
   protected lazy val paramManifest = { manifest[Params]}
 
-  def mkObjective(params: MultiscaleTrainer.Params,
-                  latentFeaturizer: MultiscaleTrainer.MyFeaturizer,
+  def mkObjective(params: MultiscalePipeline.Params,
+                  latentFeaturizer: MultiscalePipeline.MyFeaturizer,
                   trainTrees: IndexedSeq[TreeInstance[String, String]],
                   indexedProjections: GrammarProjections[String, (String, Seq[Int])],
                   xbarParser: ChartBuilder[ParseChart.LogProbabilityParseChart, String, String],
@@ -49,7 +49,7 @@ object MultiscaleTrainer extends ParserTrainer {
   }
 
 
-  def getFeaturizer(params: MultiscaleTrainer.Params,
+  def getFeaturizer(params: MultiscalePipeline.Params,
                     initLexicon: Counter2[String, String, Double],
                     initBinaries: Counter2[String, BinaryRule[String], Double],
                     initUnaries: Counter2[String, UnaryRule[String], Double],

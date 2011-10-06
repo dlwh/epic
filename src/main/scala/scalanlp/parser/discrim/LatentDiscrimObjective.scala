@@ -140,7 +140,7 @@ case class LatentParams[P](parser: ParserParams.BaseParser,
                            oldWeights: File = null,
                            splitFactor:Int = 1);
 
-trait LatentTrainer extends ParserTrainer {
+trait LatentPipeline extends ParserPipeline {
   def split(x: String, numStates: Int) = {
     if(x.isEmpty) Seq((x,0))
     else for(i <- 0 until numStates) yield (x,i);
@@ -245,7 +245,7 @@ trait LatentTrainer extends ParserTrainer {
   def cacheWeights(params: Params, obj: MyObjective, weights: DenseVector[Double], iter: Int);
 }
 
-object StochasticLatentTrainer extends LatentTrainer {
+object StochasticLatentPipeline extends LatentPipeline {
 
   type MyFeaturizer = Featurizer[(String,Int),String];
   type MyObjective = LatentDiscrimObjective[String,(String,Int),String];
