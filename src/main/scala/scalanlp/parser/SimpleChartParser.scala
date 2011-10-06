@@ -3,8 +3,31 @@ package scalanlp.parser
 import projections.{GrammarProjections, ProjectingSpanScorer, ProjectionIndexer}
 import scalanlp.trees.BinarizedTree
 
+class ChartPair[PC[X]<:ParseChart[X],L](val inside: PC[L], _outside: =>PC[L], val scorer: SpanScorer[L] = SpanScorer.identity) {
+  lazy val outside = _outside
+}
+
+@SerialVersionUID(1)
+trait ChartParser[C,F,W] extends Parser[C,W] with Serializable {
+  def charts(w: Seq[W], scorer: SpanScorer[C]= SpanScorer.identity):ChartPair[ParseChart,F]
+
+  def decoder: ChartDecoder[C,F,W]
+
+  def projections: GrammarProjections[C,F]
+  protected def root: F
+  protected def grammar: Grammar[F]
+
+  override def bestParse(w: Seq[W], scorer: SpanScorer[C] = SpanScorer.identity):BinarizedTree[C] = try {
+    val chart = charts(w,scorer)
+    val bestParse = decoder.extractBestParse(root, grammar, chart.inside, chart.outside, w, chart.scorer);
+    bestParse
+  } catch {
+    case e => throw e;
+  }
+}
+
 /**
- * A ChartParser produces trees with labels C from a ChartBuilder with labels F, a decoder from C to F, and
+ * A SimpleChartParser produces trees with labels C from a ChartBuilder with labels F, a decoder from C to F, and
  * projections from C to F
  * @author dlwh
  */
@@ -12,17 +35,19 @@ import scalanlp.trees.BinarizedTree
 class SimpleChartParser[C,F,W](val builder: ChartBuilder[ParseChart,F,W],
                          val decoder: ChartDecoder[C,F,W],
                          val projections: GrammarProjections[C,F],
-                         downWeightProjections:Boolean =true) extends Parser[C,W] with Serializable {
+                         downWeightProjections:Boolean =true) extends ChartParser[C,F,W] with Serializable {
 
-  override def bestParse(w: Seq[W], scorer: SpanScorer[C] = SpanScorer.identity):BinarizedTree[C] = try {
-    val metaScorer = new ProjectingSpanScorer(projections,scorer,downWeightProjections);
-    val chart = builder.buildInsideChart(w, validSpan = metaScorer);
-    lazy val outsideChart = builder.buildOutsideChart(chart, validSpan =metaScorer)
-    val bestParse = decoder.extractBestParse(builder.root, builder.grammar, chart, outsideChart, w, metaScorer);
-    bestParse
-  } catch {
-    case e => throw e;
+  def charts(w: Seq[W], scorer: SpanScorer[C]) = {
+    val meta = new ProjectingSpanScorer[C,F](projections,scorer,downWeightProjections)
+    val inside = builder.buildInsideChart(w,meta)
+    lazy val outside = builder.buildOutsideChart(inside,meta)
+    new ChartPair[ParseChart,F](inside,outside,meta)
   }
+
+  protected def root = builder.root
+  protected def grammar = builder.grammar
+
+
 
 }
 
