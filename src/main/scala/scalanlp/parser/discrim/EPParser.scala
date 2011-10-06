@@ -16,25 +16,45 @@ import scalanlp.util._
  */
 @SerialVersionUID(1)
 class EPParser[L,L2,W](val parsers: Seq[ChartBuilder[LogProbabilityParseChart,L2,W]], coarseParser: ChartBuilder[LogProbabilityParseChart,L,W],
-                       val projections: Seq[GrammarProjections[L,L2]],
+                       val projectionsSeq: Seq[GrammarProjections[L,L2]],
                        val maxEPIterations: Int= 1,
-                       val damping: Double = 1.0) extends Parser[L,W] with Serializable {
+                       val damping: Double = 1.0) extends ChartParser[L,L2,W] with Serializable { outer =>
 
   case class EPResult(marginals: Seq[ParsedSentenceData], partition: Double, f0: SpanScorer[L])
   case class ParsedSentenceData(inside: LogProbabilityParseChart[L2], outside: LogProbabilityParseChart[L2],
                                 partition: Double, correction: SpanScorer[L2])
 
-  def fineParsers(decoder: ChartDecoder[L,L2,W]):Seq[Parser[L,W]] = {
-    for( ((parser,projection),i) <- parsers zip projections zipWithIndex) yield {
-      new Parser[L,W] with Serializable {
-        def bestParse(s: Seq[W], spanScorer: SpanScorer[L]) = {
+  def fineParsers:Seq[ChartParser[L,L2,W]] = {
+    for( ((parser,projection),i) <- parsers zip projectionsSeq zipWithIndex) yield {
+      new ChartParser[L,L2,W] with Serializable {
+
+        def charts(s: scala.Seq[W], spanScorer: SpanScorer[L]) = {
           val EPResult(parserDatas,partition,f0) = buildAllCharts(s,spanScorer)
           val parserData = parserDatas(i)
-          decoder.extractBestParse(parser.root,parser.grammar,parserData.inside,parserData.outside,s,parserData.correction)
+          new ChartPair[ParseChart,L2](parserData.inside, parserData.outside, parserData.correction)
         }
+
+        def decoder = outer.decoder
+
+        def projections = projection
+
+        protected def root = parser.root
+
+        protected def grammar = parser.grammar
       }
     }
   }
+
+  def charts(s: scala.Seq[W], spanScorer: SpanScorer[L]) = {
+    val EPResult(parserDatas,partition,f0) = buildAllCharts(s,spanScorer)
+    val parserData = parserDatas.last
+    new ChartPair[ParseChart,L2](parserData.inside, parserData.outside, parserData.correction)
+  }
+
+  protected def root = parsers.last.root
+  def projections = projectionsSeq.last
+
+  protected def grammar = parsers.last.grammar
 
   def buildAllCharts(words: Seq[W],
                      initScorer: SpanScorer[L]=SpanScorer.identity[L],
@@ -89,7 +109,7 @@ class EPParser[L,L2,W](val parsers: Seq[ChartBuilder[LogProbabilityParseChart,L2
       span <- (1 to length).iterator
       i <- (0 to (length - span)).iterator
       j = i + span
-      p <- (0 until projections(0).labels.coarseIndex.size).iterator if !validSpan.scoreSpan(i,j,p).isNegInfinity
+      p <- (0 until projectionsSeq(0).labels.coarseIndex.size).iterator if !validSpan.scoreSpan(i,j,p).isNegInfinity
       k <- ((i + 1) until j).iterator
       r <- coarseParser.grammar.indexedBinaryRulesWithParent(p)
     } yield {
@@ -108,32 +128,37 @@ class EPParser[L,L2,W](val parsers: Seq[ChartBuilder[LogProbabilityParseChart,L2
   }
 
   def projectCoarseScorer(coarseScorer: SpanScorer[L], model: Int) ={
-    new ProjectingSpanScorer(projections(model), coarseScorer)
+    new ProjectingSpanScorer(projectionsSeq(model), coarseScorer)
   }
 
-  val approximators = (parsers zip projections).map{ case (parser,proj) =>
+  val approximators = (parsers zip projectionsSeq).map{ case (parser,proj) =>
 //    new AnchoredRuleApproximator[L,L2,W](parser, coarseParser,proj, Double.NegativeInfinity)
     new AnchoredRuleApproximator[L,L2,W](parser, coarseParser,proj, Double.NegativeInfinity)
   }
-  val decoder = new MaxConstituentDecoder[L,L2,W](projections.last)
+  val decoder = new MaxConstituentDecoder[L,L2,W](projectionsSeq.last)
   val f0Decoder = new MaxConstituentDecoder[L,L,W](GrammarProjections.identity(coarseParser.grammar))
   val f0Builder = new CKYChartBuilder[LogProbabilityParseChart,L,W](coarseParser.root,new ZeroLexicon(coarseParser.lexicon), Grammar.zero(coarseParser.grammar), ParseChart.logProb)
 
-  def bestParse(s: scala.Seq[W], spanScorer: SpanScorer[L]) = {
-    val EPResult(parserDatas,partition,f0) = buildAllCharts(s,spanScorer)
-    val parserData = parserDatas.last
-    val lastParser = parsers.last
-    decoder.extractBestParse(lastParser.root,lastParser.grammar,parserData.inside,parserData.outside,s,parserData.correction)
-  }
 
-  def f0parser:Parser[L,W] = {
-    new Parser[L,W] with Serializable {
-      def bestParse(s: Seq[W], spanScorer: SpanScorer[L]) = {
-        val EPResult(parserDatas,partition,f0) = buildAllCharts(s,spanScorer)
-        val f0Inside = f0Builder.buildInsideChart(s,SpanScorer.sum(spanScorer,f0))
+
+  def f0parser:ChartParser[L,L,W] = {
+    new ChartParser[L,L,W] with Serializable {
+
+      def charts(w: Seq[W], spanScorer: SpanScorer[L]) = {
+        val EPResult(parserDatas,partition,f0) = buildAllCharts(w,spanScorer)
+        val f0Inside = f0Builder.buildInsideChart(w,SpanScorer.sum(spanScorer,f0))
         val f0Outside = f0Builder.buildOutsideChart(f0Inside,SpanScorer.sum(spanScorer,f0))
-        f0Decoder.extractBestParse(f0Builder.root,f0Builder.grammar,f0Inside,f0Outside,s,SpanScorer.sum(spanScorer,f0))
+        new ChartPair[ParseChart,L](f0Inside,f0Outside,SpanScorer.sum(spanScorer,f0))
       }
+
+      def decoder = f0Decoder
+
+      def projections = GrammarProjections.identity(coarseParser.grammar)
+
+      protected def root = f0Builder.root
+
+      protected def grammar = f0Builder.grammar
+
     }
   }
 }
@@ -200,7 +225,7 @@ object EPParserParamRunner extends ParserPipeline {
 
     val epParser = readObject[EPParser[String,(String,Int),String]](params.epParser)
     val parsers = epParser.parsers
-    val projections = epParser.projections
+    val projections = epParser.projectionsSeq
 
     val coarseParser = params.parser.optParser
 
@@ -209,17 +234,17 @@ object EPParserParamRunner extends ParserPipeline {
       ("EP-" + i) -> productParser
     }
     val product = new ProductParser(parsers, coarseParser.get, projections)
-    val raw = for ( ((par,pro),i) <- parsers zip epParser.projections zipWithIndex)
+    val raw = for ( ((par,pro),i) <- parsers zip epParser.projectionsSeq zipWithIndex)
                   yield ("Raw-" + i) -> new SimpleChartParser[String,(String,Int),String](par, new MaxConstituentDecoder(pro), pro)
 
-    val teed = epParser.fineParsers(new MaxConstituentDecoder(projections(0)))
+    val teed = epParser.fineParsers
     val namedTeed = for ( (p,i) <- teed.zipWithIndex) yield ("Teed-" + i) -> p
 
     val exact = ExactParserExtractor.extractParser(parsers, coarseParser.get, projections)
     val exact0 = ExactParserExtractor.extractParser(parsers.take(1), coarseParser.get, projections.take(1))
 
 
-    Iterator("Exact" -> exact, "Exact0" -> exact0, "F0" -> epParser.f0parser) ++ raw.iterator ++ eps ++ Iterator("Product" -> product) ++ namedTeed
+    Iterator[(String,Parser[String,String])]("Exact" -> exact, "Exact0" -> exact0, "F0" -> epParser.f0parser) ++ raw.iterator ++ eps ++ Iterator("Product" -> product) ++ namedTeed
   }
 
 

@@ -3,7 +3,7 @@ package scalanlp.parser
 import projections.{GrammarProjections, ProjectingSpanScorer, ProjectionIndexer}
 import scalanlp.trees.BinarizedTree
 
-class ChartPair[PC[X]<:ParseChart[X],L](val inside: PC[L], _outside: =>PC[L], val scorer: SpanScorer[L] = SpanScorer.identity) {
+class ChartPair[+PC[X]<:ParseChart[X],L](val inside: PC[L], _outside: =>PC[L], val scorer: SpanScorer[L] = SpanScorer.identity) {
   lazy val outside = _outside
 }
 
