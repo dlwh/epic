@@ -11,6 +11,6 @@ object ProjectingParser {
   def apply[C,F,W](builder: ChartBuilder[ParseChart,F,W], coarseGrammar: Grammar[C], proj: F=>C) = {
     val indexedProjections = GrammarProjections(coarseGrammar,builder.grammar,proj)
     val decoder = new ViterbiDecoder[C,F,W](indexedProjections.labels);
-    new ChartParser(builder, decoder, indexedProjections);
+    new SimpleChartParser(builder, decoder, indexedProjections);
   }
 }

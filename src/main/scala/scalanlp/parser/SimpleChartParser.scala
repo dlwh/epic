@@ -9,7 +9,7 @@ import scalanlp.trees.BinarizedTree
  * @author dlwh
  */
 @SerialVersionUID(1)
-class ChartParser[C,F,W](val builder: ChartBuilder[ParseChart,F,W],
+class SimpleChartParser[C,F,W](val builder: ChartBuilder[ParseChart,F,W],
                          val decoder: ChartDecoder[C,F,W],
                          val projections: GrammarProjections[C,F],
                          downWeightProjections:Boolean =true) extends Parser[C,W] with Serializable {
@@ -26,10 +26,9 @@ class ChartParser[C,F,W](val builder: ChartBuilder[ParseChart,F,W],
 
 }
 
-object ChartParser {
+object SimpleChartParser {
   def apply[L,W](builder: ChartBuilder[ParseChart,L,W]) = {
-
-    new ChartParser[L,L,W](builder,
+    new SimpleChartParser[L,L,W](builder,
       new MaxConstituentDecoder(GrammarProjections.identity(builder.grammar)), GrammarProjections.identity(builder.grammar))
   }
 

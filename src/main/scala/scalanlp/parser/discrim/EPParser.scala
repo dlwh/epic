@@ -155,7 +155,7 @@ object EPParserRunner extends ParserPipeline {
                   devTrees: IndexedSeq[TreeInstance[String,String]],
                   unaryReplacer : ChainReplacer[String],
                   params: Params) = {
-    val parsers = new ArrayBuffer[ChartParser[String,(String,Int),String]]
+    val parsers = new ArrayBuffer[SimpleChartParser[String,(String,Int),String]]
     var found = true
     var i = 0
     val paths = params.productIterator.buffered
@@ -210,7 +210,7 @@ object EPParserParamRunner extends ParserPipeline {
     }
     val product = new ProductParser(parsers, coarseParser.get, projections)
     val raw = for ( ((par,pro),i) <- parsers zip epParser.projections zipWithIndex)
-                  yield ("Raw-" + i) -> new ChartParser[String,(String,Int),String](par, new MaxConstituentDecoder(pro), pro)
+                  yield ("Raw-" + i) -> new SimpleChartParser[String,(String,Int),String](par, new MaxConstituentDecoder(pro), pro)
 
     val teed = epParser.fineParsers(new MaxConstituentDecoder(projections(0)))
     val namedTeed = for ( (p,i) <- teed.zipWithIndex) yield ("Teed-" + i) -> p

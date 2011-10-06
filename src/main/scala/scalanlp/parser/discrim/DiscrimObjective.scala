@@ -30,7 +30,7 @@ class DiscrimObjective[L,W](feat: Featurizer[L,W],
                             closedWords: Set[W])
         extends LatentDiscrimObjective[L,L,W](feat,trees,GrammarProjections.identity(coarseParser.grammar),coarseParser, openTags,closedWords) {
 
-  def treeToExpectedCounts[L,W](parser: ChartParser[L,L,W],
+  def treeToExpectedCounts[L,W](parser: SimpleChartParser[L,L,W],
                                 treeInstance: TreeInstance[L,W]):(ExpectedCounts[W],Double) = {
     val TreeInstance(_,t,words,spanScorer) = treeInstance;
     val g = parser.builder.grammar;
@@ -84,7 +84,7 @@ object DiscriminativePipeline extends ParserPipeline {
   def trainParser(trainTrees: IndexedSeq[TreeInstance[String,String]],
                   devTrees: IndexedSeq[TreeInstance[String,String]],
                   unaryReplacer : ChainReplacer[String],
-                  params: Params): Iterator[(String, ChartParser[String, String, String])] = {
+                  params: Params): Iterator[(String, SimpleChartParser[String, String, String])] = {
 
     val (initLexicon,initBinaries,initUnaries) = GenerativeParser.extractCounts(trainTrees);
 

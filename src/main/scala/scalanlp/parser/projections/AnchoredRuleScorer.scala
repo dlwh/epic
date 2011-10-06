@@ -138,7 +138,7 @@ object ProjectTreebankToVarGrammar {
 
   def loadParser(loc: File) = {
     val oin = new ObjectInputStream(new BufferedInputStream(new FileInputStream(loc)));
-    val parser = oin.readObject().asInstanceOf[ChartParser[String,(String,Int),String]]
+    val parser = oin.readObject().asInstanceOf[SimpleChartParser[String,(String,Int),String]]
     oin.close();
     parser;
   }

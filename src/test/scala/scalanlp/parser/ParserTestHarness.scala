@@ -62,6 +62,6 @@ object ParserTestHarness extends ParserTestHarness {
   }
   val simpleParser = {
     val chartBuilder = new CKYChartBuilder[ParseChart.ViterbiParseChart, String, String]("", simpleLexicon, simpleGrammar, ParseChart.viterbi)
-    ChartParser(chartBuilder);
+    SimpleChartParser(chartBuilder);
   }
 }

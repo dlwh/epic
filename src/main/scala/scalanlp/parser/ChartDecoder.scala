@@ -146,7 +146,7 @@ object MaxRulePipeline extends ParserPipeline with NoParams {
     val projections = GrammarProjections.identity(grammar)
     val builder = CKYChartBuilder("",lexicon,grammar).withCharts(ParseChart.logProb)
     val decoder = new MaxRuleProductDecoder(grammar,lexicon,projections,builder)
-    val parser = new ChartParser(builder,decoder,projections)
+    val parser = new SimpleChartParser(builder,decoder,projections)
     Iterator.single(("Gen",parser))
   }
 }
@@ -243,7 +243,7 @@ object MaxConstituentPipeline extends ParserPipeline with NoParams {
     val projections = GrammarProjections.identity(grammar)
     val builder = CKYChartBuilder("",lexicon,grammar).withCharts(ParseChart.logProb)
     val decoder = new MaxConstituentDecoder[String,String,String](projections)
-    val parser = new ChartParser(builder,decoder,projections)
+    val parser = new SimpleChartParser(builder,decoder,projections)
     Iterator.single(("Consti",parser))
   }
 }

@@ -28,11 +28,11 @@ import scalala.library.Library
 
 object GenerativeParser {
 
-  def fromTrees[W](data: Traversable[TreeInstance[String,W]]):ChartParser[String,String,W] = {
+  def fromTrees[W](data: Traversable[TreeInstance[String,W]]):SimpleChartParser[String,String,W] = {
     val root = "";
     val (lexicon,grammar) = extractLexiconAndGrammar(data);
     val builder = CKYChartBuilder(root, lexicon, grammar);
-    ChartParser(builder);
+    SimpleChartParser(builder);
   }
 
   def extractLexiconAndGrammar[W](data: TraversableOnce[TreeInstance[String,W]]) = {
@@ -84,7 +84,7 @@ object SigPipeline extends ParserPipeline with NoParams {
     val (words,binary,unary) = GenerativeParser.extractCounts(trainTrees);
     val grammar = Grammar(Library.logAndNormalizeRows(binary),Library.logAndNormalizeRows(unary));
     val lexicon = new SignatureLexicon(words, EnglishWordClassGenerator, 5);
-    val parser = ChartParser(CKYChartBuilder("",lexicon,grammar).withCharts(ParseChart.logProb));
+    val parser = SimpleChartParser(CKYChartBuilder("",lexicon,grammar).withCharts(ParseChart.logProb));
     Iterator.single(("Gen",parser));
   }
 }

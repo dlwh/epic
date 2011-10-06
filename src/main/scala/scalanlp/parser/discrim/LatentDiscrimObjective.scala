@@ -54,7 +54,7 @@ class LatentDiscrimObjective[L,L2,W](featurizer: Featurizer[L2,W],
    * Weights are linearized
    */
   def extractParser(weights: DenseVector[Double]) = {
-    val parser = new ChartParser[L,L2,W](builder(weights),new MaxConstituentDecoder(indexedProjections),indexedProjections);
+    val parser = new SimpleChartParser[L,L2,W](builder(weights),new MaxConstituentDecoder(indexedProjections),indexedProjections);
     parser
   }
 
@@ -63,7 +63,7 @@ class LatentDiscrimObjective[L,L2,W](featurizer: Featurizer[L2,W],
    * A parser in the max-semiring
    */
   def extractMaxParser(weights: DenseVector[Double]) = {
-    val parser = new ChartParser[L,L2,W](builder(weights).withCharts(ParseChart.viterbi),
+    val parser = new SimpleChartParser[L,L2,W](builder(weights).withCharts(ParseChart.viterbi),
       new ViterbiDecoder(indexedProjections.labels),indexedProjections);
     parser
   }

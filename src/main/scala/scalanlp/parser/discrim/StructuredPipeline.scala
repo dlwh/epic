@@ -105,7 +105,7 @@ object StructuredPipeline extends ParserPipeline {
 
     def getParser(weights: CounterInterface[java.lang.Integer]) = {
       val parser = obj.extractMaxParser(weightsToDenseVector(weights));
-      val realParser = new ChartParser(parser.builder, new SimpleViterbiDecoder[String,String](parser.builder.grammar), projections, false);
+      val realParser = new SimpleChartParser(parser.builder, new SimpleViterbiDecoder[String,String](parser.builder.grammar), projections, false);
       realParser
     }
 
@@ -197,7 +197,7 @@ object StructuredPipeline extends ParserPipeline {
     scorer
   }
 
-  def treeToExpectedCounts[L,W](parser: ChartParser[L,L,W],
+  def treeToExpectedCounts[L,W](parser: SimpleChartParser[L,L,W],
                                 treeInstance: TreeInstance[L,W]):(ExpectedCounts[W],Double) = {
     val TreeInstance(_,t,words,spanScorer) = treeInstance;
     val g = parser.builder.grammar;

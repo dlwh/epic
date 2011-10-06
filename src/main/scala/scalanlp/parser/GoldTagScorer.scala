@@ -28,7 +28,7 @@ object GoldTagExperiment {
     import params._;
 
 
-    val parser = readObject[ChartParser[String,_,String]](parserFile);
+    val parser = readObject[SimpleChartParser[String,_,String]](parserFile);
 
     val goldenTrees = for ( TreeInstance(id,tree,words,span) <- testTrees) yield {
       TreeInstance("gold-"+id,tree,words,SpanScorer.sum(new GoldTagScorer(getTags(parser.projections.labels.coarseIndex, tree), -90),span))

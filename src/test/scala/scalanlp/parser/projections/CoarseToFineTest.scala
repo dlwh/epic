@@ -25,7 +25,7 @@ class CoarseToFineTest extends ParserTestHarness with FunSuite {
 
     val (fineLexicon,fineGrammar) = GenerativeParser.extractLexiconAndGrammar(trainTrees.iterator);
     val fine = new CoarseToFineChartBuilder[ParseChart.ViterbiParseChart,String,String,String](coarseBuilder, proj _, "", fineLexicon, fineGrammar, ParseChart.viterbi);
-    val parser = ChartParser(fine);
+    val parser = SimpleChartParser(fine);
     val gen = ParserTestHarness.simpleParser
 
     val rctf = evalParser(getTestTrees(),parser)
@@ -44,7 +44,7 @@ class CoarseToFineTest extends ParserTestHarness with FunSuite {
 
     val (fineLexicon,fineGrammar) = GenerativeParser.extractLexiconAndGrammar(trainTrees.iterator);
     val fine = new CoarseToFineChartBuilder[ParseChart.ViterbiParseChart,String,String,String](coarseBuilder, proj _, "", fineLexicon, fineGrammar, ParseChart.viterbi);
-    val parser = ChartParser(fine);
+    val parser = SimpleChartParser(fine);
     val gen = ParserTestHarness.simpleParser
 
     val rctf = evalParser(getTestTrees(),parser)

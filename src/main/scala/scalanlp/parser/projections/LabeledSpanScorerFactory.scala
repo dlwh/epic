@@ -152,7 +152,7 @@ object ProjectTreebankToLabeledSpans {
 
   def loadParser[T](loc: File) = {
     val oin = new ObjectInputStream(new BufferedInputStream(new FileInputStream(loc)));
-    val parser = oin.readObject().asInstanceOf[ChartParser[String,T,String]]
+    val parser = oin.readObject().asInstanceOf[SimpleChartParser[String,T,String]]
     oin.close();
     parser;
   }

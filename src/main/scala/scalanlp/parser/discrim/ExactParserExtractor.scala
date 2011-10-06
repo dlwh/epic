@@ -28,7 +28,7 @@ object ExactParserExtractor {
 
   def extractParser[L,L2,W](parsers: Seq[ChartBuilder[LogProbabilityParseChart,L2,W]],
                             coarseParser: ChartBuilder[LogProbabilityParseChart,L,W],
-                            projections: Seq[GrammarProjections[L,L2]]):ChartParser[L,(L,Seq[L2]),W] = {
+                            projections: Seq[GrammarProjections[L,L2]]):SimpleChartParser[L,(L,Seq[L2]),W] = {
 
     type MyLabel = Label[L,L2]
 
@@ -120,7 +120,7 @@ object ExactParserExtractor {
 
     val root = myProjections.labels.refinementsOf(coarseParser.root)(0)
     val builder = new CKYChartBuilder[ParseChart.LogProbabilityParseChart,MyLabel,W](root, lexicon, grammar, ParseChart.logProb)
-    new ChartParser(builder, new MaxConstituentDecoder[L,MyLabel,W](myProjections), myProjections)
+    new SimpleChartParser(builder, new MaxConstituentDecoder[L,MyLabel,W](myProjections), myProjections)
 
   }
 
@@ -257,7 +257,7 @@ object ExactRunner extends ParserPipeline {
                   devTrees: IndexedSeq[TreeInstance[String,String]],
                   unaryReplacer : ChainReplacer[String],
                   params: Params) = {
-    val parsers = new ArrayBuffer[ChartParser[String,(String,Int),String]]
+    val parsers = new ArrayBuffer[SimpleChartParser[String,(String,Int),String]]
     var found = true
     var i = 0
     val paths = params.productIterator.buffered

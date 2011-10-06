@@ -85,7 +85,7 @@ object MultiscalePipeline extends ParserPipeline {
       result
 
     } else {
-      val oldParser = readObject[ChartParser[String,(String,Seq[Int]),String]](params.specific.lastParser)
+      val oldParser = readObject[SimpleChartParser[String,(String,Seq[Int]),String]](params.specific.lastParser)
       val result = Counter[Rule[(String,Seq[Int])],Double]()
       for( p@(_,rule) <- oldParser.builder.grammar.binaryRules.keysIterator) {
         result(rule) = oldParser.builder.grammar.binaryRules(p)

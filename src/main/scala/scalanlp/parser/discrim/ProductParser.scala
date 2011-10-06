@@ -64,7 +64,7 @@ object ProductParserRunner extends ParserPipeline {
                   devTrees: IndexedSeq[TreeInstance[String,String]],
                   unaryReplacer : ChainReplacer[String],
                   params: Params) = {
-    val parsers = new ArrayBuffer[ChartParser[String,(String,Int),String]]
+    val parsers = new ArrayBuffer[SimpleChartParser[String,(String,Int),String]]
     var found = true
     var i = 0
     val paths = params.productIterator.buffered
