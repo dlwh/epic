@@ -71,7 +71,7 @@ object SpanScorer {
    */
   @SerialVersionUID(1)
   trait Factory[C,F,-W] extends Serializable {
-    def mkSpanScorer(s: Seq[W], oldScorer: SpanScorer[F] = identity):SpanScorer[C]
+    def mkSpanScorer(s: Seq[W], oldScorer: SpanScorer[C] = identity):SpanScorer[C]
   }
 
   /**
@@ -79,7 +79,7 @@ object SpanScorer {
    */
   @SerialVersionUID(1)
   def identityFactory[C,F,W]:Factory[C,F,W] = new Factory[C,F,W] {
-    def mkSpanScorer(s: Seq[W], oldScorer: SpanScorer[F] = identity) = identity[C];
+    def mkSpanScorer(s: Seq[W], oldScorer: SpanScorer[C] = identity) = identity[C];
   }
 
 

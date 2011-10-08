@@ -38,7 +38,7 @@ class EPParser[L,L2,W](val parsers: Seq[ChartBuilder[LogProbabilityParseChart,L2
 
         def projections = projection
 
-        protected def root = parser.root
+        def root = parser.root
 
         protected def grammar = parser.grammar
       }
@@ -51,7 +51,7 @@ class EPParser[L,L2,W](val parsers: Seq[ChartBuilder[LogProbabilityParseChart,L2
     new ChartPair[ParseChart,L2](parserData.inside, parserData.outside, parserData.correction)
   }
 
-  protected def root = parsers.last.root
+  def root = parsers.last.root
   def projections = projectionsSeq.last
 
   protected def grammar = parsers.last.grammar
@@ -155,7 +155,7 @@ class EPParser[L,L2,W](val parsers: Seq[ChartBuilder[LogProbabilityParseChart,L2
 
       def projections = GrammarProjections.identity(coarseParser.grammar)
 
-      protected def root = f0Builder.root
+      def root = f0Builder.root
 
       protected def grammar = f0Builder.grammar
 

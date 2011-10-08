@@ -118,7 +118,7 @@ object SimpleViterbiDecoder {
 class MaxRuleProductDecoder[C,F, W](coarseGrammar: Grammar[C], coarseLexicon: Lexicon[C,W],
                              indexedProjections: GrammarProjections[C,F],
                              fineBuilder: ChartBuilder[ParseChart.LogProbabilityParseChart, F, W]) extends ChartDecoder[C,F, W] {
-  val p = new AnchoredRulePosteriorScorerFactory(coarseGrammar, fineBuilder,indexedProjections,-5)
+  val p = new AnchoredRulePosteriorScorerFactory(coarseGrammar, new SimpleChartParser(fineBuilder, new ViterbiDecoder[C,F,W](indexedProjections.labels), indexedProjections),-5)
 
   override def extractBestParse(root: F, grammar: Grammar[F],
                                 inside: ParseChart[F], outside: =>ParseChart[F], words:Seq[W],
@@ -127,7 +127,7 @@ class MaxRuleProductDecoder[C,F, W](coarseGrammar: Grammar[C], coarseLexicon: Le
     val zeroLexicon = new ZeroLexicon(coarseLexicon)
     val coarseRoot = indexedProjections.labels.project(root)
     val zeroParser = new CKYChartBuilder[ParseChart.LogProbabilityParseChart,C,W](coarseRoot, zeroLexicon, zeroGrammar,ParseChart.logProb)
-    val scorer = p.buildSpanScorer(inside, outside, inside.top.labelScore(0,inside.length,root),spanScorer)
+    val scorer = p.buildSpanScorer(new ChartPair[ParseChart,F](inside, outside, spanScorer),inside.top.labelScore(0,inside.length,root))
     val zeroInside = zeroParser.buildInsideChart(words,scorer)
     val zeroOutside = zeroParser.buildOutsideChart(zeroInside,scorer)
     val tree = SimpleViterbiDecoder(zeroGrammar).extractBestParse(coarseRoot,zeroGrammar, zeroInside,zeroOutside, words, scorer)

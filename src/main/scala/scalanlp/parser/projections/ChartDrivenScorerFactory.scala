@@ -7,51 +7,47 @@ import scalanlp.trees.BinarizedTree
  * @author dlwh
  */
 abstract class ChartDrivenScorerFactory[C,L,W](coarseGrammar: Grammar[C],
-                                               parser: ChartBuilder[ParseChart.LogProbabilityParseChart,L,W],
-                                               indexedProjections: GrammarProjections[C,L],
+                                               parser: SimpleChartParser[C,L,W],
                                                pruningThreshold: Double = -7) extends SpanScorer.Factory[C,L,W] {
 
-  def mkSpanScorer(s: Seq[W], scorer: SpanScorer[L] = SpanScorer.identity) = {
-    val coarseRootIndex = parser.grammar.labelIndex(parser.root);
-    val inside = parser.buildInsideChart(s, scorer)
-    val outside = parser.buildOutsideChart(inside, scorer);
+  def indexedProjections = parser.projections
 
-    val sentProb = inside.top.labelScore(0,s.length,coarseRootIndex);
+  def mkSpanScorer(s: Seq[W], scorer: SpanScorer[C] = SpanScorer.identity) = {
+    val charts = parser.charts(s,scorer)
+
+    val sentProb = charts.inside.top.labelScore(0,s.length,parser.root)
     if(sentProb.isInfinite) {
       sys.error("Couldn't parse " + s + " " + sentProb)
     }
 
-    val chartScorer = buildSpanScorer(inside,outside,sentProb,scorer);
+    val chartScorer = buildSpanScorer(charts,sentProb);
 
     chartScorer;
   }
 
-  def mkSpanScorerWithTree(s: Seq[W], scorer: SpanScorer[L] = SpanScorer.identity, tree: BinarizedTree[C]=null) = {
-    val coarseRootIndex = parser.grammar.labelIndex(parser.root);
-    val inside = parser.buildInsideChart(s, scorer)
-    val outside = parser.buildOutsideChart(inside, scorer);
+  def mkSpanScorerWithTree(s: Seq[W], scorer: SpanScorer[C] = SpanScorer.identity, tree: BinarizedTree[C]=null) = {
+ val charts = parser.charts(s,scorer)
 
-    val sentProb = inside.top.labelScore(0,s.length,coarseRootIndex);
+    val sentProb = charts.inside.top.labelScore(0,s.length,parser.root)
     if(sentProb.isInfinite) {
       sys.error("Couldn't parse " + s + " " + sentProb)
     }
 
-    val chartScorer = buildSpanScorer(inside,outside,sentProb,scorer,tree);
+    val chartScorer = buildSpanScorer(charts,sentProb,tree);
 
     chartScorer;
   }
 
-  val proj = new AnchoredRuleProjector[C,L,W](coarseGrammar, parser, indexedProjections);
+  val proj = new AnchoredRuleProjector[C,L,W](coarseGrammar, parser.builder.withCharts(ParseChart.logProb), indexedProjections);
 
   type MyScorer <:SpanScorer[C]
 
 
-  def buildSpanScorer(inside: ParseChart[L],
-                      outside: ParseChart[L],
+  def buildSpanScorer(charts: ChartPair[ParseChart,L],
                       sentProb: Double,
-                      scorer: SpanScorer[L]=SpanScorer.identity[L],
                       tree: BinarizedTree[C] = null):MyScorer = {
     import AnchoredRuleProjector._;
+    import charts._
 
     val pruner: SpanScorer[C] = {
       if(tree == null) thresholdPruning(pruningThreshold)

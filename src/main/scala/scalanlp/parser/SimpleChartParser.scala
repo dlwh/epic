@@ -14,7 +14,7 @@ trait ChartParser[C,F,W] extends Parser[C,W] with Serializable {
   def decoder: ChartDecoder[C,F,W]
 
   def projections: GrammarProjections[C,F]
-  protected def root: F
+  def root: F
   protected def grammar: Grammar[F]
 
   override def bestParse(w: Seq[W], scorer: SpanScorer[C] = SpanScorer.identity):BinarizedTree[C] = try {
@@ -44,7 +44,7 @@ class SimpleChartParser[C,F,W](val builder: ChartBuilder[ParseChart,F,W],
     new ChartPair[ParseChart,F](inside,outside,meta)
   }
 
-  protected def root = builder.root
+  def root = builder.root
   protected def grammar = builder.grammar
 
 

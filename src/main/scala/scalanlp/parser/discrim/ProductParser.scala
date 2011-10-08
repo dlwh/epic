@@ -20,11 +20,10 @@ import java.io.{FileInputStream, BufferedInputStream, ObjectInputStream, File}
 class ProductParser[L,L2,W](val parsers: Seq[ChartBuilder[LogProbabilityParseChart,L2,W]], coarseParser: ChartBuilder[LogProbabilityParseChart,L,W],
                        val projections: Seq[GrammarProjections[L,L2]]) extends Parser[L,W] with Serializable {
   def bestParse(words: scala.Seq[W], spanScorer: SpanScorer[L]) = {
-    val projected = projections.map(projectCoarseScorer(spanScorer,_))
     val posteriorScorers = for {
-      (p,scorer) <- anchoredProjectors zip projected
+      p <- anchoredProjectors
     } yield {
-      p.mkSpanScorer(words,scorer)
+      p.mkSpanScorer(words,spanScorer)
     }
 
     val sumScorer = posteriorScorers.foldLeft(spanScorer)(SpanScorer.sum(_:SpanScorer[L],_:SpanScorer[L]))
@@ -42,7 +41,7 @@ class ProductParser[L,L2,W](val parsers: Seq[ChartBuilder[LogProbabilityParseCha
   }
 
   val anchoredProjectors = parsers zip projections map { case (parser,projection) =>
-    new AnchoredRulePosteriorScorerFactory(coarseParser.grammar, parser,projection,Double.NegativeInfinity)
+    new AnchoredRulePosteriorScorerFactory(coarseParser.grammar, new SimpleChartParser(parser,new ViterbiDecoder[L,L2,W](projection.labels),projection),Double.NegativeInfinity)
   }
 
   val zeroGrammar = Grammar.zero(coarseParser.grammar)

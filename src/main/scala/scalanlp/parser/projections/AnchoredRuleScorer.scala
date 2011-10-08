@@ -17,10 +17,9 @@ import collection.parallel.immutable.ParSeq
  * @author dlwh
  */
 class AnchoredRuleScorerFactory[C,L,W](coarseGrammar: Grammar[C],
-                                       parser: ChartBuilder[ParseChart.LogProbabilityParseChart,L,W],
-                                       val indexedProjections: GrammarProjections[C,L],
+                                       parser: SimpleChartParser[C,L,W],
                                        pruningThreshold: Double = -7)
-        extends ChartDrivenScorerFactory[C,L,W](coarseGrammar,parser,indexedProjections,pruningThreshold) {
+        extends ChartDrivenScorerFactory[C,L,W](coarseGrammar,parser,pruningThreshold) {
 
   type MyScorer = AnchoredRuleScorer[C];
   private def normalize(ruleScores: OldSparseVector, totals: OldSparseVector):OldSparseVector = {
@@ -57,10 +56,9 @@ class AnchoredRuleScorerFactory[C,L,W](coarseGrammar: Grammar[C],
  * @author dlwh
  */
 class AnchoredRulePosteriorScorerFactory[C,L,W](coarseGrammar: Grammar[C],
-                                                parser: ChartBuilder[ParseChart.LogProbabilityParseChart,L,W],
-                                                indexedProjections: GrammarProjections[C,L],
+                                                parser: SimpleChartParser[C,L,W],
                                                 pruningThreshold: Double = -7)
-        extends ChartDrivenScorerFactory[C,L,W](coarseGrammar, parser,indexedProjections,pruningThreshold) {
+        extends ChartDrivenScorerFactory[C,L,W](coarseGrammar, parser,pruningThreshold) {
 
   type MyScorer = AnchoredRuleScorer[C];
   protected def createSpanScorer(ruleData: AnchoredRuleProjector.AnchoredData, sentProb: Double) = {
@@ -127,8 +125,7 @@ object ProjectTreebankToVarGrammar {
     val treebank = ProcessedTreebank(TreebankParams(new File(args(2)),maxLength=10000),SpanParams(new File(args(3))));
     val outDir = new File(args(4));
     outDir.mkdirs();
-    val projections = GrammarProjections(coarseParser.builder.grammar,parser.builder.grammar, {(x: (String,Int))=>x._1})
-    val factory = new AnchoredRuleScorerFactory[String,(String,Int),String](coarseParser.builder.grammar, parser.builder.withCharts(ParseChart.logProb),projections, -10);
+    val factory = new AnchoredRuleScorerFactory[String,(String,Int),String](coarseParser.builder.grammar, parser, -10);
     writeObject(parser.builder.grammar.labelIndex,new File(outDir,SPAN_INDEX_NAME));
     writeIterable(mapTrees(factory,treebank.trainTrees,true),new File(outDir,TRAIN_SPANS_NAME))
     writeIterable(mapTrees(factory,treebank.testTrees,false),new File(outDir,TEST_SPANS_NAME))
@@ -150,8 +147,7 @@ object ProjectTreebankToVarGrammar {
       val TreeInstance(_,tree,words,scorer) = ti
       println(words);
       try {
-        val proj: ProjectingSpanScorer[String, (String, Int)] = new ProjectingSpanScorer(factory.indexedProjections,scorer,true);
-        val newScorer = factory.mkSpanScorerWithTree(words,proj, if(useTree) tree else null)
+        val newScorer = factory.mkSpanScorerWithTree(words,scorer, if(useTree) tree else null)
         newScorer
       } catch {
         case e: Exception => e.printStackTrace(); SpanScorer.identity[String];

@@ -39,10 +39,3 @@ class ProjectingSpanScorer[C,F](proj: GrammarProjections[C,F],
     scorer.scoreBinaryRule(begin,split, end,pRule) - ruleAdjustments(pRule);
   }
 }
-
-object ProjectingSpanScorer {
-  def factory[C,F](proj: GrammarProjections[C,F])= new SpanScorer.Factory[F,C,Any] {
-    def apply(scorer: SpanScorer[C]) = mkSpanScorer(Seq.empty,scorer)
-    def mkSpanScorer(words: Seq[Any], scorer: SpanScorer[C]) = new ProjectingSpanScorer(proj, scorer);
-  }
-}

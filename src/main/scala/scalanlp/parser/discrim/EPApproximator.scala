@@ -21,12 +21,12 @@ trait EPApproximator[C,F,W] extends Serializable {
 class AnchoredRuleApproximator[C,F,W](fineParser: ChartBuilder[LogProbabilityParseChart,F,W],
                                       coarseParser: ChartBuilder[LogProbabilityParseChart,C,W],
                                       projections: GrammarProjections[C,F], pruningThreshold: Double = Double.NegativeInfinity) extends EPApproximator[C,F,W] with Serializable {
-  val factory = new AnchoredRuleScorerFactory[C,F,W](coarseParser.grammar, fineParser,projections,pruningThreshold);
+  val factory = new AnchoredRuleScorerFactory[C,F,W](coarseParser.grammar, new SimpleChartParser(fineParser,new ViterbiDecoder[C,F,W](projections.labels),projections),pruningThreshold);
 
   val zeroFactory = new CachingSpanScorerFactory[C,W](coarseParser);
 
   def project(inside: ParseChart[F], outside: ParseChart[F], partition: Double, spanScorer: SpanScorer[F], tree: BinarizedTree[C]):SpanScorer[C] = {
-    factory.buildSpanScorer(inside, outside,  partition, spanScorer, tree);
+    factory.buildSpanScorer(new ChartPair[ParseChart,F](inside, outside,spanScorer),  partition, tree);
   }
 
   def divide(num: SpanScorer[C], denom: SpanScorer[C], words: Seq[W]):SpanScorer[C] ={
