@@ -22,6 +22,9 @@ import scalala.tensor.{Counter2, Counter}
 import scalala.tensor.::
 import scalala.library.Library._;
 
+/**
+ * Scores (label,word) pairs in a sentence
+ */
 @SerialVersionUID(1)
 trait Lexicon[L,W] extends Serializable {
   def wordScore(label: L, w: W): Double;

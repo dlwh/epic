@@ -33,8 +33,11 @@ import math.exp
 import InsideOutside._
 import scalala.tensor.{Counter,Counter2}
 import scalala.library.Library
-;
 
+/**
+ * State Splitting implements the InsideOutside/Tree Message Passing algorithm for Matsuzaki et all 2005
+ * Given a gold bracketing and a set of candidate labels, it computes expected counts for those candidate labels
+ */
 object StateSplitting {
 
   def insideScores[L,W](grammar: Grammar[L], lexicon: Lexicon[L,W], tree: BinarizedTree[Seq[L]], s: Seq[W], scorer: SpanScorer[L] = SpanScorer.identity) = {
@@ -161,7 +164,7 @@ object StateSplitting {
 
 
   def expectedCounts[L,W](grammar: Grammar[L], lexicon: Lexicon[L,W], tree: BinarizedTree[Seq[L]], s: Seq[W], scorer: SpanScorer[L] = SpanScorer.identity[L]) = {
-    val ruleCounts = grammar.mkOldSparseVector()
+    val ruleCounts = grammar.mkDenseVector()
     val wordCounts = grammar.fillSparseArrayMap(Counter[W,Double]());
 
     val safeScorer = scorer;
@@ -235,7 +238,7 @@ object StateSplitting {
 
   def splitCounts[L,L2,W](data: SplittingData[L,W],
                           splitter: L=>Seq[L2],
-                          randomNoise: Double = 0.1):SplittingData[L2,W] = {
+                          randomNoise: Double = 0.01):SplittingData[L2,W] = {
 
     val SplittingData(binaries,unaries,wordCounts) = data;
 

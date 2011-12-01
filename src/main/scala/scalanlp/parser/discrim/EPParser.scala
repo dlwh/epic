@@ -11,7 +11,8 @@ import collection.mutable.ArrayBuffer
 import scalanlp.util._
 
 /**
- *
+ * The EP Parser parses a product of grammars by projecting each down to an easy to parse grammar,
+ * and using each grammar in sequence to evaluate
  * @author dlwh
  */
 @SerialVersionUID(1)
@@ -133,7 +134,7 @@ class EPParser[L,L2,W](val parsers: Seq[ChartBuilder[LogProbabilityParseChart,L2
 
   val approximators = (parsers zip projectionsSeq).map{ case (parser,proj) =>
 //    new AnchoredRuleApproximator[L,L2,W](parser, coarseParser,proj, Double.NegativeInfinity)
-    new AnchoredRuleApproximator[L,L2,W](parser, coarseParser,proj, Double.NegativeInfinity)
+    new AnchoredRuleApproximator[L,L2,W](parser, coarseParser,proj, -20)
   }
   val decoder = new MaxConstituentDecoder[L,L2,W](projectionsSeq.last)
   val f0Decoder = new MaxConstituentDecoder[L,L,W](GrammarProjections.identity(coarseParser.grammar))
@@ -206,6 +207,28 @@ object EPParserRunner extends ParserPipeline {
 
 }
 
+object MaxRuleRunner extends ParserPipeline {
+
+  case class Params(parser: ParserParams.BaseParser,
+                    model: File )
+  protected val paramManifest = manifest[Params]
+
+  def trainParser(trainTrees: IndexedSeq[TreeInstance[String,String]],
+                  devTrees: IndexedSeq[TreeInstance[String,String]],
+                  unaryReplacer : ChainReplacer[String],
+                  params: Params) = {
+    val parser: SimpleChartParser[String,(String,Int),String] = readObject(params.model)
+    val coarseParser = params.parser.optParser.get
+    val dec = new MaxRuleProductDecoder(coarseParser.grammar,coarseParser.lexicon, parser.projections, parser.builder.withCharts(ParseChart.logProb))
+    val maxrule = new SimpleChartParser(parser.builder, dec, parser.projections)
+    val viterbi = new SimpleChartParser(parser.builder, new ViterbiDecoder[String,(String,Int),String](parser.projections.labels), parser.projections)
+
+    Iterator( "MaxRule" -> maxrule, "Default" -> parser, "Viterbi" -> viterbi)
+  }
+
+
+}
+
 
 /**
  *
@@ -214,7 +237,7 @@ object EPParserRunner extends ParserPipeline {
 object EPParserParamRunner extends ParserPipeline {
 
   case class Params(parser: ParserParams.BaseParser,
-                    epParser: File)
+                    epParser: File, useExact: Boolean = true)
   protected val paramManifest = manifest[Params]
 
   def trainParser(trainTrees: IndexedSeq[TreeInstance[String,String]],
@@ -240,11 +263,13 @@ object EPParserParamRunner extends ParserPipeline {
     val teed = epParser.fineParsers
     val namedTeed = for ( (p,i) <- teed.zipWithIndex) yield ("Teed-" + i) -> p
 
-    val exact = ExactParserExtractor.extractParser(parsers, coarseParser.get, projections)
-    val exact0 = ExactParserExtractor.extractParser(parsers.take(1), coarseParser.get, projections.take(1))
+    val exactStuff = if(params.useExact) {
+      val exact = ExactParserExtractor.extractParser(parsers, coarseParser.get, projections)
+      Iterator(("Exact" -> exact))
+    } else Iterator.empty
 
 
-    Iterator[(String,Parser[String,String])]("Exact" -> exact, "Exact0" -> exact0, "F0" -> epParser.f0parser) ++ raw.iterator ++ eps ++ Iterator("Product" -> product) ++ namedTeed
+    Iterator[(String,Parser[String,String])]("F0" -> epParser.f0parser) ++ raw.iterator ++ eps ++ Iterator("Product" -> product) ++ namedTeed ++ exactStuff
   }
 
 
