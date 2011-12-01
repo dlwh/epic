@@ -10,7 +10,7 @@ import scalala.tensor.::
 import scalala.tensor.mutable.{Counter, Counter2, Vector}
 
 /**
- * 
+ * InsideOutside computes expected counts for rules and lexical emissions for a chart builder
  * @author dlwh
  */
 class InsideOutside[L,W](val parser: ChartBuilder[LogProbabilityParseChart,L,W]) {
@@ -70,18 +70,31 @@ class InsideOutside[L,W](val parser: ChartBuilder[LogProbabilityParseChart,L,W])
       begin <- 0 to (words.length - span)
       end = begin + span
       a <- inside.bot.enteredLabelIndexes(begin,end)
-      r <- grammar.indexedBinaryRulesWithParent(a)
-      b = grammar.leftChild(r)
-      c = grammar.rightChild(r)
-      split <- inside.top.feasibleSpan(begin, end, b, c)
     } {
-      val bScore = inside.top.labelScore(begin, split, b)
-      val cScore = inside.top.labelScore(split, end, c)
-      val aScore = outside.bot.labelScore(begin, end, a)
-      val rScore = grammar.ruleScore(r) + validSpan.scoreBinaryRule(begin,split,end,r) + validSpan.scoreSpan(begin,end,a)
-      val prob = exp(bScore + cScore + aScore + rScore - totalProb)
-      if(prob != 0.0)
-        ruleCounts(r) += prob
+      var i = 0;
+      val rules = grammar.indexedBinaryRulesWithParent(a)
+      val spanScore = validSpan.scoreSpan(begin,end,a)
+      while(i < rules.length) {
+        val r = rules(i)
+        val b = grammar.leftChild(r)
+        val c = grammar.rightChild(r)
+        val ruleScore = grammar.ruleScore(r)
+        i += 1
+        val feasibleSpan = inside.top.feasibleSpanX(begin, end, b, c)
+        var split = (feasibleSpan >> 32).toInt
+        val endSplit = feasibleSpan.toInt // lower 32 bits
+        while(split < endSplit) {
+          val bScore = inside.top.labelScore(begin, split, b)
+          val cScore = inside.top.labelScore(split, end, c)
+          val aScore = outside.bot.labelScore(begin, end, a)
+          val rScore = ruleScore + validSpan.scoreBinaryRule(begin,split,end,r) + spanScore
+          val prob = exp(bScore + cScore + aScore + rScore - totalProb)
+          if(prob != 0.0)
+            ruleCounts(r) += prob
+
+          split += 1
+        }
+      }
     }
     ruleCounts
   }
@@ -118,13 +131,13 @@ class InsideOutside[L,W](val parser: ChartBuilder[LogProbabilityParseChart,L,W])
 object InsideOutside {
 
   final case class ExpectedCounts[W](
-    ruleCounts: Vector[Double],
-    wordCounts: SparseArrayMap[Counter[W,Double]], // parent -> word -> counts
-    var logProb: Double
-  ) {
+                                      ruleCounts: Vector[Double],
+                                      wordCounts: SparseArrayMap[Counter[W,Double]], // parent -> word -> counts
+                                      var logProb: Double
+                                      ) {
 
-    def this(g: Grammar[_]) = this(g.mkOldSparseVector(),
-                                   g.labelEncoder.fillSparseArrayMap(Counter[W,Double]()), 0.0)
+    def this(g: Grammar[_]) = this(g.mkDenseVector(),
+      g.labelEncoder.fillSparseArrayMap(Counter[W,Double]()), 0.0)
 
     def decode[L](g: Grammar[L]) = (decodeRules(g,ruleCounts), decodeWords(g,wordCounts))
 

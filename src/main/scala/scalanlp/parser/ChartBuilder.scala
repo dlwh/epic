@@ -78,6 +78,8 @@ class CKYChartBuilder[Chart[X]<:ParseChart[X], L,W](val root: L,
     // 100 = max span length
     val scoreArray = new Array[Double](grammar.maxNumBinaryRulesForParent * maxSpanLength * s.length)
 
+    val top = chart.top
+
     // a -> bc over [begin,split,end)
     for {
       span <- 2 to (maxSpanLength)
@@ -96,7 +98,10 @@ class CKYChartBuilder[Chart[X]<:ParseChart[X], L,W](val root: L,
             val c = grammar.rightChild(r)
             val ruleScore = grammar.ruleScore(r)
             ruleIndex += 1
-            for(split <- chart.top.feasibleSpan(begin, end, b, c)) {
+            val feasibleSpan = top.feasibleSpanX(begin, end, b, c)
+            var split = (feasibleSpan >> 32).toInt
+            val endSplit = feasibleSpan.toInt // lower 32 bits
+            while(split < endSplit) {
               val bScore = chart.top.labelScore(begin, split,b)
               val cScore = chart.top.labelScore(split, end, c)
               val spanScore = validSpan.scoreBinaryRule(begin,split,end,r) + passScore
@@ -106,6 +111,7 @@ class CKYChartBuilder[Chart[X]<:ParseChart[X], L,W](val root: L,
                 scoreArray(offset) = prob
                 offset += 1
               }
+              split += 1
             }
           }
         }
@@ -125,6 +131,8 @@ class CKYChartBuilder[Chart[X]<:ParseChart[X], L,W](val root: L,
     val length = inside.length
     val outside = chartFactory(grammar.labelEncoder,length)
     outside.top.enter(0,inside.length,grammar.labelIndex(root),0.0)
+    val itop = inside.top
+    val ibot = inside.top
     for {
       span <- length until 0 by (-1)
       begin <- 0 to (length-span)
@@ -132,31 +140,36 @@ class CKYChartBuilder[Chart[X]<:ParseChart[X], L,W](val root: L,
       val end = begin + span
       updateOutsideUnaries(outside,begin,end, validSpan)
       if(span > 1)
-        for { // a ->  bc  [begin,split,end)
-          a <- outside.bot.enteredLabelIndexes(begin,end)
-          passScore = validSpan.scoreSpan(begin,end,a)
-          if !(passScore + inside.bot.labelScore(begin,end,a)).isInfinite
-        } {
-          val rules = grammar.indexedBinaryRulesWithParent(a)
-          var br = 0;
-          while(br < rules.length) {
-            val r = rules(br)
-            val b = grammar.leftChild(r)
-            val c = grammar.rightChild(r)
-            val ruleScore = grammar.ruleScore(r)
-            br += 1
-            for(split <- inside.top.feasibleSpan(begin, end, b, c) ) {
-              val score = outside.bot.labelScore(begin,end,a) + ruleScore
-              val bInside = inside.top.labelScore(begin,split,b)
-              val cInside = inside.top.labelScore(split,end,c)
-              val spanScore = validSpan.scoreBinaryRule(begin,split,end,r) + passScore
-              val bOutside = score + cInside + spanScore
-              if(!java.lang.Double.isInfinite(bOutside))
-                outside.top.enter(begin,split,b,bOutside)
+        // a ->  bc  [begin,split,end)
+        for ( a <- outside.bot.enteredLabelIndexes(begin,end) ) {
+          val aScore = outside.bot.labelScore(begin,end,a) + validSpan.scoreSpan(begin,end,a)
+          if (!aScore.isInfinite) {
+            val rules = grammar.indexedBinaryRulesWithParent(a)
+            var br = 0;
+            while(br < rules.length) {
+              val r = rules(br)
+              val b = grammar.leftChild(r)
+              val c = grammar.rightChild(r)
+              val ruleScore = grammar.ruleScore(r)
+              br += 1
+              val feasibleSpan = itop.feasibleSpanX(begin, end, b, c)
+              var split = (feasibleSpan >> 32).toInt
+              val endSplit = feasibleSpan.toInt // lower 32 bits
+              while(split < endSplit) {
+                val score = aScore + ruleScore
+                val bInside = itop.labelScore(begin,split,b)
+                val cInside = itop.labelScore(split,end,c)
+                val spanScore = validSpan.scoreBinaryRule(begin,split,end,r)
+                val bOutside = score + cInside + spanScore
+                if(!java.lang.Double.isInfinite(bOutside))
+                  outside.top.enter(begin,split,b,bOutside)
 
-              val cOutside = score + bInside + spanScore
-              if(!java.lang.Double.isInfinite(cOutside))
-                outside.top.enter(split,end,c,cOutside)
+                val cOutside = score + bInside + spanScore
+                if(!java.lang.Double.isInfinite(cOutside))
+                  outside.top.enter(split,end,c,cOutside)
+
+                split += 1
+              }
             }
           }
         }

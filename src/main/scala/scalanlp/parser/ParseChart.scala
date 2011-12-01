@@ -92,6 +92,23 @@ abstract class ParseChart[L](val grammar: Encoder[L], val length: Int) extends S
       }
     }
 
+    def feasibleSpanX(begin: Int, end: Int, leftState:Int, rightState: Int):Long = {
+      val narrowR = narrowRight(begin)(leftState)
+      val narrowL = narrowLeft(end)(rightState)
+
+      if (narrowR >= end || narrowL < narrowR) {
+        0L
+      } else {
+        val trueX = wideLeft(end)(rightState)
+        val trueMin = if(narrowR > trueX) narrowR else trueX
+        val wr = wideRight(begin)(leftState)
+        val trueMax = if(wr < narrowL) wr else narrowL
+        if(trueMin > narrowL || trueMin > trueMax)  0L
+        else ((trueMin:Long) << 32) | ((trueMax + 1):Long)
+      }
+    }
+
+
 
     // right most place a left constituent with label l can start and end at position i
     private val narrowLeft = Array.fill(length+1)(grammar.fillArray[Int](-1))
