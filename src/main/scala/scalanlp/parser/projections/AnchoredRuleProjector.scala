@@ -87,6 +87,8 @@ class AnchoredRuleProjector[C,L,W](coarseGrammar: Grammar[C],
       for(begin <- 0 until (inside.length - diff + 1)) {
         val end = begin + diff;
         val index = TriangularArray.index(begin,end);
+        var pruned = 0
+        var totalP = 0
 
         // do binaries
         for( parent <- inside.bot.enteredLabelIndexes(begin,end)) {
@@ -95,7 +97,7 @@ class AnchoredRuleProjector[C,L,W](coarseGrammar: Grammar[C],
 
           var total = 0.0
 
-          if(parentScore > Double.NegativeInfinity) {
+          if(parentScore + inside.bot.labelScore(begin,end,parent) - sentProb > pruneLabel.scoreSpan(begin,end,parent)) {
             val rules = grammar.indexedBinaryRulesWithParent(parent)
             var ruleIndex = 0
             while(ruleIndex < rules.length) {
@@ -141,6 +143,9 @@ class AnchoredRuleProjector[C,L,W](coarseGrammar: Grammar[C],
             totals(index)(pP) += total
           }
         }
+        if(totalP != 0.0)
+          println(pruned * 1.0 / totalP)
+
 
         // do unaries. Similar to above
         for( parent <- inside.top.enteredLabelIndexes(begin,end)) {
@@ -207,9 +212,9 @@ object AnchoredRuleProjector {
   def thresholdPruning[L](thresh: Double):SpanScorer[L] = new SpanScorer[L] {
     def scoreSpan(begin: Int, end: Int, tag: Int) = thresh;
 
-    def scoreUnaryRule(begin: Int, end: Int, rule: Int) = thresh;
+    def scoreUnaryRule(begin: Int, end: Int, rule: Int) = Double.NegativeInfinity
 
-    def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = thresh;
+    def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = Double.NegativeInfinity
   }
 
   def goldTreeForcing[L](grammar: Grammar[L],

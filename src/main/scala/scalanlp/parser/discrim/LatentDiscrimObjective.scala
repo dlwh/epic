@@ -193,6 +193,7 @@ trait LatentPipeline extends ParserPipeline {
     println("NumStates: " + params.numStates);
 
     val xbarParser = parser.optParser.getOrElse {
+      println("building a parser from scratch...")
       val grammar = Grammar(Library.logAndNormalizeRows(initBinaries),Library.logAndNormalizeRows(initUnaries));
       val lexicon = new SimpleLexicon(initLexicon);
       new CKYChartBuilder[LogProbabilityParseChart,String,String]("",lexicon,grammar,ParseChart.logProb);

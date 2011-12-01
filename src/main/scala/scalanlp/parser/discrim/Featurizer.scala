@@ -10,7 +10,6 @@ import scalala.tensor.{Counter2, Counter}
 import scalala.library.Library._
 import scalala.tensor.sparse.SparseVector
 import scalanlp.collection.mutable.{OpenAddressHashArray, SparseArrayMap, ArrayMap}
-import scalanlp.tensor.sparse.OldSparseVector
 
 /** For representing features over bits */
 object BitStuff {

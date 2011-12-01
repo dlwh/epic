@@ -10,6 +10,7 @@ import java.io._
 import ParseChart.LogProbabilityParseChart
 
 import scalanlp.util._
+import logging.ConsoleLogging
 import scalala.tensor.{Counter, Counter2}
 
 /**
@@ -217,7 +218,7 @@ object EPPipeline extends LatentPipeline {
       openTags,
       closedWords,
       epModels,
-      maxEPIterations)
+      maxEPIterations) with ConsoleLogging
   }
 
   def cacheWeights(params: Params, obj: MyObjective, weights: DenseVector[Double], iter: Int) = {

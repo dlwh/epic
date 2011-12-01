@@ -2,10 +2,7 @@ package scalanlp.parser;
 package discrim;
 
 import scalala.tensor.dense._
-import scalanlp.collection.mutable.SparseArrayMap;
-import scalala.tensor.sparse._;
 import scalanlp.parser.Grammar
-import scalanlp.tensor.sparse.OldSparseVector
 import scalala.tensor.mutable.Counter2
 
 object FeaturizedGrammar {

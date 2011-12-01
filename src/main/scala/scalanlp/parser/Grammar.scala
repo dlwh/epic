@@ -18,15 +18,13 @@ package scalanlp.parser
 import scalanlp.util.Encoder;
 
 import scalanlp.util.Index
-import scalanlp.tensor.sparse.OldSparseVector
 import scalala.tensor.{Counter2,::}
 import scalanlp.serialization.{DataSerialization}
 import java.io.{DataInput, DataOutput}
 import scalanlp.serialization.DataSerialization.ReadWritable
 import scalala.library.Library._
 import collection.mutable.ArrayBuffer
-import scalala.collection.sparse.SparseArray
-import scalanlp.collection.mutable.{OpenAddressHashArray, SparseArrayMap}
+import scalanlp.collection.mutable.{OpenAddressHashArray}
 
 @SerialVersionUID(2)
 sealed trait Grammar[L] extends Encoder[Rule[L]] with Serializable {

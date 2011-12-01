@@ -16,9 +16,9 @@ class AnchoredRuleScorerTest  extends ParserTestHarness with FunSuite {
   test("We can parse using span scorer") {
     val gen = ParserTestHarness.simpleParser;
     val projections = GrammarProjections.identity(gen.builder.grammar)
-    val f = new AnchoredRuleScorerFactory(gen.builder.grammar, gen.builder.withCharts(ParseChart.logProb), projections, Double.NegativeInfinity);
+    val f = new AnchoredRuleScorerFactory(gen.builder.grammar, gen, Double.NegativeInfinity);
     val zero = new CKYChartBuilder[ParseChart.LogProbabilityParseChart,String,String](gen.builder.root,new ZeroLexicon(gen.builder.lexicon), Grammar.zero(gen.builder.grammar),ParseChart.logProb);
-    val fnext = new AnchoredRuleScorerFactory(zero.grammar, zero, projections, Double.NegativeInfinity);
+    val fnext = new AnchoredRuleScorerFactory(zero.grammar, SimpleChartParser(zero), Double.NegativeInfinity);
     for( TreeInstance(_,t,w,_) <- getTestTrees()) try {
       val gent = gen(w);
       val scorer = f.mkSpanScorer(w);
@@ -27,7 +27,7 @@ class AnchoredRuleScorerTest  extends ParserTestHarness with FunSuite {
       val ginside = zero.buildInsideChart(w,scorer);
       assert(!ginside.top.labelScore(0,w.length,"").isInfinite)
       val goutside = zero.buildOutsideChart(ginside,scorer)
-      val scorer2 = fnext.buildSpanScorer(ginside,goutside,ginside.top.labelScore(0,w.length,""),scorer)
+      val scorer2 = fnext.buildSpanScorer(new ChartPair[ParseChart,String](ginside,goutside,scorer),ginside.top.labelScore(0,w.length,""))
       val ginside2 = zero.buildInsideChart(w,scorer2);
       lazy val goutside2 = zero.buildOutsideChart(ginside2,scorer2);
       val tree = SimpleViterbiDecoder(ParserTestHarness.simpleGrammar).extractBestParse("",zero.grammar, ginside,goutside,w, scorer)
@@ -43,7 +43,7 @@ class AnchoredRuleScorerTest  extends ParserTestHarness with FunSuite {
   test("Parsing kind of works using it") {
     val gen = ParserTestHarness.simpleParser;
     val projections = GrammarProjections.identity(gen.builder.grammar)
-    val f = new AnchoredRuleScorerFactory(gen.builder.grammar, gen.builder.withCharts(ParseChart.logProb), projections, Double.NegativeInfinity);
+    val f = new AnchoredRuleScorerFactory(gen.builder.grammar, gen, Double.NegativeInfinity);
     val zero = new CKYChartBuilder[ParseChart.LogProbabilityParseChart,String,String](gen.builder.root,new ZeroLexicon(gen.builder.lexicon), Grammar.zero(gen.builder.grammar),ParseChart.logProb);
 
     val parser = new Parser[String,String] {

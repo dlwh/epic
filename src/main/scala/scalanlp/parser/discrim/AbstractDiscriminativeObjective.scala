@@ -37,11 +37,11 @@ abstract class AbstractDiscriminativeObjective[L,L2,W](
   private var numFailures = 0;
 
   def calculate(weights: DenseVector[Double], sample: IndexedSeq[Int]) = {
+    val inTime = System.currentTimeMillis()
     val parser = builder(weights);
     val trees = sample.map(this.trees);
     val startTime = System.currentTimeMillis();
     val ecounts = trees.par.view.map{ treeWordsScorer =>
-      val localIn = System.currentTimeMillis();
       val TreeInstance(id,tree,words,spanScorer) = treeWordsScorer;
       val res = try {
         expectedCounts(parser,tree,words,spanScorer)
@@ -58,6 +58,8 @@ abstract class AbstractDiscriminativeObjective[L,L2,W](
 
     log.info("Parsing took: " + finishTime / 1000.0)
     val (obj,grad) = countsToObjective(ecounts);
+    val outTime = System.currentTimeMillis()
+    log.info("Everything took: " + (outTime - inTime) / 1000.0)
     (obj,grad)
 
   }

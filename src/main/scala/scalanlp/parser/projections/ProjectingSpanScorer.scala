@@ -26,7 +26,9 @@ class ProjectingSpanScorer[C,F](proj: GrammarProjections[C,F],
 
   def scoreSpan(begin: Int, end: Int, tag: Int) = {
     val pTag = labelProjections.project(tag)
-    scorer.scoreSpan(begin,end, pTag) - labelAdjustments(pTag);
+    val raw = scorer.scoreSpan(begin,end, pTag)
+    if(raw != Double.NegativeInfinity) raw - labelAdjustments(pTag);
+    else raw
   }
 
   def scoreUnaryRule(begin: Int, end: Int, rule: Int) = {
