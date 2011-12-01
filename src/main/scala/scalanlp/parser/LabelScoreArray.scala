@@ -5,7 +5,8 @@ import java.util.Arrays
 import scalala.tensor.dense.{DenseVectorCol, DenseVector}
 
 /**
- * 
+ * A LabelScoreArray is just a triangular array whose entries are arrays. Admits efficient
+ * iteration over "on" elements in an (i,j) index.
  * @author dlwh
  */
 @SerialVersionUID(1)
