@@ -8,6 +8,7 @@ import InsideOutside._
 import math.exp
 import scalala.tensor.::
 import scalala.tensor.mutable.{Counter, Counter2, Vector}
+import scalala.tensor.dense.DenseVector
 
 /**
  * InsideOutside computes expected counts for rules and lexical emissions for a chart builder
@@ -131,7 +132,7 @@ class InsideOutside[L,W](val parser: ChartBuilder[LogProbabilityParseChart,L,W])
 object InsideOutside {
 
   final case class ExpectedCounts[W](
-                                      ruleCounts: Vector[Double],
+                                      ruleCounts: DenseVector[Double],
                                       wordCounts: SparseArrayMap[Counter[W,Double]], // parent -> word -> counts
                                       var logProb: Double
                                       ) {

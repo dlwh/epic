@@ -32,7 +32,8 @@ import math.exp
 
 import InsideOutside._
 import scalala.tensor.{Counter,Counter2}
-import scalala.library.Library
+import scalala.library.{Numerics, Library}
+import java.util.Arrays
 
 /**
  * State Splitting implements the InsideOutside/Tree Message Passing algorithm for Matsuzaki et all 2005
@@ -40,126 +41,138 @@ import scalala.library.Library
  */
 object StateSplitting {
 
+  case class Beliefs(candidates: Seq[Int], inside: Array[Double], outside: Array[Double])
+  object Beliefs {
+    def apply(candidates: Seq[Int]):Beliefs = {
+      val r = this(candidates,new Array[Double](candidates.length),new Array[Double](candidates.length))
+      Arrays.fill(r.inside,Double.NegativeInfinity)
+      Arrays.fill(r.outside,Double.NegativeInfinity)
+      r
+    }
+  }
+
   def insideScores[L,W](grammar: Grammar[L], lexicon: Lexicon[L,W], tree: BinarizedTree[Seq[L]], s: Seq[W], scorer: SpanScorer[L] = SpanScorer.identity) = {
-    val chart = ParseChart.logProb(grammar.labelEncoder, s.length);
-    val indexedTree:Tree[Seq[Int]] = tree.map{ _.map(grammar.labelIndex) };
+    val indexedTree:Tree[Beliefs] = tree.map{  candidates => Beliefs(candidates.map(grammar.labelIndex))}
 
     indexedTree.postorder.foreach {
-      case t : NullaryTree[Seq[Int]] =>
+      case t@NullaryTree(Beliefs(labels,scores,_)) =>
         // fill in POS tags:
         assert(t.span.length == 1);
         val word = s(t.span.start);
         var foundOne = false;
-        for( a <- t.label.iterator;
+        for( i <- 0 until scores.length;
+            a = labels(i);
             wScore = lexicon.wordScore(grammar.labelIndex.get(a),word) + scorer.scoreSpan(t.span.start,t.span.end,a);
             if !wScore.isInfinite) {
-          chart.bot.enter(t.span.start,t.span.end,a,wScore);
+          scores(i) = wScore
           foundOne = true;
         }
         if(!foundOne) {
-          val msg = lexicon.tagScores(word).toString + " " + t.label.map { a =>
-            grammar.labelIndex.get(a) + " " + scorer.scoreSpan(t.span.start,t.span.end,a);
-          }
-          sys.error("Trouble with lexical " + t.render(s) + " " + msg.mkString)
+          sys.error("Trouble with lexical " + t.render(s))
         }
-      case t : UnaryTree[Seq[Int]] =>
+      case t@UnaryTree(Beliefs(aLabels,aScores,_),Tree(Beliefs(cLabels,cScores,_),_)) =>
         var foundOne = false;
-        for ( a <- t.label) {
-          for(c <- t.child.label) {
+        val arr = new Array[Double](cLabels.length)
+        for(ai <- 0 until aLabels.length) {
+          var i = 0
+          for(ci <- 0 until cLabels.length) {
+            val a = aLabels(ai)
+            val c = cLabels(ci)
             val ruleScore = (grammar.ruleScore(a,c)
-              + chart.bot(t.span.start,t.span.end,c)
+              + cScores(ci)
               + scorer.scoreUnaryRule(t.span.start, t.span.end, grammar.ruleIndex(a, c)));
             if(!ruleScore.isInfinite) {
               foundOne = true;
             }
-            chart.top.enter(t.span.start, t.span.end, a,ruleScore);
+            arr(i) = ruleScore
+            i += 1
           }
+          aScores(ai) = Numerics.logSum(arr,arr.length)
         }
 
         if(!foundOne) {
-          val msg = t.label.map { a => t.child.label.map { c =>
-            grammar.labelIndex.get(a) + "->" + grammar.labelIndex.get(c) + " " +
-             grammar.ruleScore(a,c) + " " +  chart.bot(t.span.start,t.span.end,c) + " " + scorer.scoreUnaryRule(t.span.start, t.span.end, grammar.ruleIndex(a,c));
-          }}
-          sys.error("Trouble with unary " + t.render(s) + " " + msg.mkString(", "))
+          sys.error("Trouble with unary " + t.render(s))
         }
-      case t@BinaryTree(_,lchild,rchild) =>
+      case t@BinaryTree(Beliefs(aLabels,aScores,_),Tree(Beliefs(bLabels,bScores,_),_),Tree(Beliefs(cLabels,cScores,_),_)) =>
         var foundOne = false;
-        val begin = t.span.start;
-        val split = t.leftChild.span.end;
-        val end = t.span.end;
+        val begin = t.span.start
+        val split = t.leftChild.span.end
+        val end = t.span.end
         for {
-          a <- t.label
+          ai <- 0 until aLabels.length
         } {
-          val arr = new Array[Double](lchild.label.length * rchild.label.length);
+          val a = aLabels(ai)
+          val arr = new Array[Double](bLabels.length * cLabels.length);
           var i = 0;
-          for { b <- lchild.label } {
-            for { c <- rchild.label } {
+          for { bi <- 0 until bLabels.length } {
+            val b = bLabels(bi)
+            for { ci <- 0 until cLabels.length } {
+              val c = cLabels(ci)
               arr(i) = ( grammar.ruleScore(a,b,c)
-                + chart.top(begin,split,b)
-                + chart.top(split,end,c)
+                + bScores(bi)
+                + cScores(ci)
                 + scorer.scoreBinaryRule(begin,split,end,grammar.ruleIndex(a,b,c)) + scorer.scoreSpan(begin,end,a)
                 )
               i += 1;
             }
           };
-          chart.bot.enter(begin,end,a,logSum(arr));
-          if(!chart.bot(begin,end,a).isInfinite) foundOne = true;
+          aScores(ai) = logSum(arr)
+          if(!aScores(ai).isInfinite) foundOne = true;
        }
 
         if(!foundOne) {
-          val msg = t.label.map { a => t.leftChild.label.map { b => t.rightChild.label.map { c =>
-            grammar.labelIndex.get(a) + "->" + grammar.labelIndex.get(b) + " " + grammar.labelIndex.get(c) + " br: " +
-                 grammar.ruleScore(a,b,c) +  " lc:"+ chart.top(begin,split,b) +  " rc: " + chart.top(split,end,c) +
-                " scorer: " + scorer.scoreBinaryRule(begin,split,end,grammar.ruleIndex(a,b,c));
-          }}}
-          sys.error("Trouble with binary " + t.render(s) + " " + msg.mkString(", "))
+          sys.error("Trouble with binary " + t.render(s))
         }
       case _ => sys.error("bad tree!");
     }
 
-    chart;
+    indexedTree;
   }
 
-  def outsideScores[L,W](grammar: Grammar[L], lexicon: Lexicon[L,W], tree: BinarizedTree[Seq[L]], s: Seq[W], insideScores: ParseChart.LogProbabilityParseChart[L], scorer: SpanScorer[L]= SpanScorer.identity) = {
-    val indexedTree:Tree[Seq[Int]] = tree.map{ _.map(grammar.labelIndex) };
-    val chart = ParseChart.logProb(grammar.labelEncoder, s.length);
+  def outsideScores[L,W](grammar: Grammar[L], lexicon: Lexicon[L,W], s: Seq[W], tree: Tree[Beliefs], scorer: SpanScorer[L]= SpanScorer.identity) {
     // Root gets score 0
-    for(l <- indexedTree.label) chart.top.enter(0,s.length,l,0.0);
+    Arrays.fill(tree.label.outside,0.0)
 
     // Set the outside score of each child
-    indexedTree.preorder.foreach {
+    tree.preorder.foreach {
       case t @ BinaryTree(_,lchild,rchild) =>
         for {
-          p <- t.label.iterator
-          pScore = chart.bot(t.span.start,t.span.end,p);
-          l <- lchild.label.iterator
-          lScore = insideScores.top(lchild.span.start,lchild.span.end,l);
-          r <- rchild.label.iterator
-          rScore = insideScores.top(rchild.span.start,rchild.span.end,r)
+          (p,pScore) <- t.label.candidates zip t.label.outside
+          li <- 0 until lchild.label.candidates.length
+          l = lchild.label.candidates(li)
+          lScore = lchild.label.inside(li)
+          ri <- 0 until rchild.label.candidates.length
+          r = rchild.label.candidates(ri)
+          rScore = rchild.label.inside(ri)
         } {
           val spanScore = (
             scorer.scoreBinaryRule(t.span.start, lchild.span.end, t.span.end, grammar.ruleIndex(p, l, r))
             + scorer.scoreSpan(t.span.start, t.span.end, p)
           )
           val rS = grammar.ruleScore(p,l,r) + spanScore
-          chart.top.enter(lchild.span.start,lchild.span.end,l, pScore + rScore + rS);
-          chart.top.enter(rchild.span.start,rchild.span.end,r, pScore + lScore + rS);
+          lchild.label.outside(li) = logSum(lchild.label.outside(li),pScore + rScore + rS)
+          rchild.label.outside(ri) = logSum(rchild.label.outside(ri),pScore + lScore + rS)
         }
       case tree: NullaryTree[Seq[Int]] => () // do nothing
       case t @ UnaryTree(_,child) =>
+        val arr = new Array[Double](t.label.candidates.size)
         for {
-          p <- t.label
-          pScore = chart.top(child.span.start,child.span.end,p);
-          c <- child.label
+          (c,ci) <- child.label.candidates.zipWithIndex
         } {
-          val rScore = grammar.ruleScore(p,c) + scorer.scoreUnaryRule(t.span.start,t.span.end,grammar.ruleIndex(p,c));
-          chart.bot.enter(child.span.start,child.span.end,c,pScore + rScore);
+          var i = 0
+          for {
+            (p,pScore) <- t.label.candidates zip t.label.outside
+          } {
+            val rScore = grammar.ruleScore(p,c) + scorer.scoreUnaryRule(t.span.start,t.span.end,grammar.ruleIndex(p,c));
+            arr(i) = pScore + rScore
+            i += 1
+          }
+          child.label.outside(ci) = Numerics.logSum(arr,arr.length)
         }
+
 
     }
 
-    chart
   }
 
 
@@ -180,51 +193,49 @@ object StateSplitting {
       }
     } */
 
-    val iScores = insideScores(grammar,lexicon,tree,s, safeScorer);
-    val oScores = outsideScores(grammar,lexicon, tree,s,iScores, safeScorer);
-    val indexedTree:Tree[Seq[Int]] = tree.map { _.map(grammar.labelIndex) };
+    val stree = insideScores(grammar,lexicon,tree,s, safeScorer);
+    outsideScores(grammar,lexicon, s,stree, safeScorer);
 
     // normalizer
-    val totalProb = logSum(tree.label.map(grammar.labelIndex).map(iScores.top(0,s.length,_)));
+    val totalProb = logSum(stree.label.inside,stree.label.inside.length)
     if(totalProb.isInfinite || totalProb.isNaN)
       sys.error("NAn or infinite" + totalProb + " " + tree.render(s));
 
-    indexedTree.allChildren foreach {
-      case t: NullaryTree[Seq[Int]] =>
-        for( l <- t.label) {
-          val iS = iScores.bot(t.span.start,t.span.end,l);
-          val oS = oScores.bot(t.span.start,t.span.end,l)
+    stree.allChildren foreach {
+      case t@NullaryTree(Beliefs(labels,iScores,oScores)) =>
+        for( i <- 0 until  labels.length) {
+          val l = labels(i)
+          val iS = iScores(i)
+          val oS = oScores(i)
           val ruleScore = (iS + oS - totalProb);
           assert(!ruleScore.isNaN);
          // assert(exp(ruleScore) > 0, " " + ruleScore);
           assert(!exp(ruleScore).isInfinite);
           wordCounts.getOrElseUpdate(l)(s(t.span.start)) +=  exp(ruleScore);
         }
-      case t@UnaryTree(_,child) =>
+      case t@UnaryTree(Beliefs(aLabels,_,aScores),Tree(Beliefs(cLabels,cScores,_),_)) =>
         for {
-          p <- t.label.iterator;
-          opScore = oScores.top(t.span.start,t.span.end,p);
-          c <- child.label.iterator
-          icScore = iScores.bot(child.span.start,child.span.end,c)
+          (p,opScore) <- aLabels zip aScores
+          (c,icScore) <- cLabels zip cScores
         } {
           val ruleScore = opScore + icScore + grammar.ruleScore(p,c) - totalProb;
           val span = safeScorer.scoreUnaryRule(t.span.start,t.span.end,grammar.ruleIndex(p,c));
           assert(!ruleScore.isNaN);
          // assert(exp(ruleScore) > 0, " " + ruleScore);
-          assert(!exp(ruleScore + span).isInfinite);
+          assert(!exp(ruleScore + span).isInfinite,ruleScore + " " + span);
           ruleCounts(grammar.ruleIndex(p,c)) += exp(ruleScore + span);
         }
-      case t@ BinaryTree(_,lc,rc) =>
+      case t@BinaryTree(Beliefs(aLabels,_,aScores),Tree(Beliefs(bLabels,bScores,_),_),Tree(Beliefs(cLabels,cScores,_),_)) =>
+        val begin = t.span.start
+        val split = t.rightChild.span.start
+        val end = t.span.end
         for {
-          p <- t.label.iterator;
-          opScore = oScores.bot(t.span.start,t.span.end,p);
-          l <- lc.label.iterator
-          ilScore = iScores.top(lc.span.start,lc.span.end,l);
-          r <- rc.label.iterator
+          (p,opScore) <- aLabels zip aScores
+          (l,ilScore) <- bLabels zip bScores
+          (r,irScore) <- cLabels zip cScores
         } {
-          val irScore = iScores.top(rc.span.start,rc.span.end,r)
           val ruleScore = opScore + irScore + ilScore + grammar.ruleScore(p,l,r) - totalProb;
-          val span = safeScorer.scoreBinaryRule(t.span.start,rc.span.start,rc.span.end,grammar.ruleIndex(p,l,r)) + safeScorer.scoreSpan(t.span.start,t.span.end,p)
+          val span = safeScorer.scoreBinaryRule(begin,split,end,grammar.ruleIndex(p,l,r)) + safeScorer.scoreSpan(begin,end,p)
           assert(!ruleScore.isNaN);
           //assert(exp(ruleScore) > 0, " " + ruleScore);
           assert(!exp(ruleScore + span).isInfinite, ruleScore + " " + span + " " + (ruleScore + span) + " " + totalProb);
