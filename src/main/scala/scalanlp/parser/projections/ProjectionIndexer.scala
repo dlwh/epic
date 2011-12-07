@@ -57,4 +57,28 @@ object ProjectionIndexer {
     }
     new ProjectionIndexer(coarseIndex,fineIndex,indexedProjections);
   }
+
+  def fromSplitter[C,F](coarseIndex: Index[C], fineIndex: Index[F], split: C=>Seq[F]) = {
+    val indexedProjections = Encoder.fromIndex(fineIndex).fillArray(-1);
+    for( (c,cf) <- coarseIndex.zipWithIndex; f <- split(c)) {
+      try {
+        indexedProjections(fineIndex(f)) = cf
+      } catch {
+        case e => println("Grrr... " + f + "\n" + fineIndex); throw e;
+      }
+    }
+    new ProjectionIndexer(coarseIndex,fineIndex,indexedProjections)
+
+  }
+
+  def fromSplitter[C,F](coarseIndex: Index[C], split: C=>Seq[F]) = {
+    val fineIndex = Index[F]()
+    val indexedProjections = new ArrayBuffer[Int]()
+    for( (c,cf) <- coarseIndex.zipWithIndex; f <- split(c)) {
+      val i = fineIndex.index(f)
+      indexedProjections += cf
+    }
+    new ProjectionIndexer(coarseIndex,fineIndex,indexedProjections.toArray)
+
+  }
 }
