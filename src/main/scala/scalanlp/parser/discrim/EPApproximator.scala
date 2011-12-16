@@ -12,7 +12,7 @@ import scalanlp.trees.BinarizedTree
  */
 @SerialVersionUID(1)
 trait EPApproximator[C,F,W] extends Serializable {
-  def project(inside: ParseChart[F], outside: ParseChart[F], partition: Double, spanScorer: SpanScorer[F], goldTree: BinarizedTree[C]):SpanScorer[C]
+  def project(inside: ParseChart[F], outside: ParseChart[F], partition: Double, spanScorer: SpanScorer[F], goldTree: BinarizedTree[C] = null):SpanScorer[C]
   def divide(num: SpanScorer[C], denom: SpanScorer[C], words: Seq[W]):SpanScorer[C]
 }
 
@@ -21,12 +21,17 @@ trait EPApproximator[C,F,W] extends Serializable {
 class AnchoredRuleApproximator[C,F,W](fineParser: ChartBuilder[LogProbabilityParseChart,F,W],
                                       coarseParser: ChartBuilder[LogProbabilityParseChart,C,W],
                                       projections: GrammarProjections[C,F], pruningThreshold: Double = Double.NegativeInfinity) extends EPApproximator[C,F,W] with Serializable {
-  val factory = new AnchoredRuleScorerFactory[C,F,W](coarseParser.grammar, new SimpleChartParser(fineParser,new ViterbiDecoder[C,F,W](projections.labels),projections),pruningThreshold);
+  val factory = new AnchoredRuleScorerFactory[C,F,W](coarseParser.grammar, new SimpleChartParser(fineParser,new ViterbiDecoder[C,F,W](projections.labels),projections));
 
   val zeroFactory = new CachingSpanScorerFactory[C,W](coarseParser);
 
-  def project(inside: ParseChart[F], outside: ParseChart[F], partition: Double, spanScorer: SpanScorer[F], tree: BinarizedTree[C]):SpanScorer[C] = {
-    factory.buildSpanScorer(new ChartPair[ParseChart,F](inside, outside,spanScorer),  partition, tree);
+  def project(inside: ParseChart[F], outside: ParseChart[F], partition: Double, spanScorer: SpanScorer[F], tree: BinarizedTree[C] = null):SpanScorer[C] = {
+    val pruner = if(tree != null) {
+      SpanScorer.sum[C](AnchoredRuleProjector.goldTreeForcing(tree.map(coarseParser.index)), SpanScorer.constant(pruningThreshold))
+    } else {
+      SpanScorer.constant[C](pruningThreshold)
+    }
+    factory.buildSpanScorer(new ChartPair[ParseChart,F](inside, outside,spanScorer),  partition, pruner)
   }
 
   def divide(num: SpanScorer[C], denom: SpanScorer[C], words: Seq[W]):SpanScorer[C] ={

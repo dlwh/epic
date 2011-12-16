@@ -13,8 +13,8 @@ class CachingSpanScorerFactory[L,W](chartBuilder: ChartBuilder[ParseChart,L,W]) 
   val zero = new CKYChartBuilder[ParseChart.LogProbabilityParseChart, L,W](chartBuilder.root,
     new ZeroLexicon(chartBuilder.lexicon), Grammar.zero(chartBuilder.grammar),ParseChart.logProb)
 
-  def mkSpanScorer(s: Seq[W], oldScorer: SpanScorer[L] = SpanScorer.identity):SpanScorer[L] = {
-    val AnchoredRuleProjector.AnchoredData(lexicalScores,unaryScores,_,binaryScores,_) = extractScores(s, oldScorer)
+  def mkSpanScorer(s: Seq[W], oldScorer: SpanScorer[L] = SpanScorer.identity, thresholdScorer: SpanScorer[L] = SpanScorer.constant(Double.NegativeInfinity)):SpanScorer[L] = {
+    val AnchoredRuleProjector.AnchoredData(lexicalScores,unaryScores,_,binaryScores,_) = extractScores(s, oldScorer, thresholdScorer)
     new AnchoredRuleScorer(lexicalScores, unaryScores, binaryScores)
   }
 

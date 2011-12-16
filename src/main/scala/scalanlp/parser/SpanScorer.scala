@@ -71,7 +71,7 @@ object SpanScorer {
    */
   @SerialVersionUID(1)
   trait Factory[C,F,-W] extends Serializable {
-    def mkSpanScorer(s: Seq[W], oldScorer: SpanScorer[C] = identity):SpanScorer[C]
+    def mkSpanScorer(s: Seq[W], oldScorer: SpanScorer[C] = identity, thresholdInclusion: SpanScorer[C] = SpanScorer.constant[C](Double.NegativeInfinity)):SpanScorer[C]
   }
 
   /**
@@ -79,7 +79,7 @@ object SpanScorer {
    */
   @SerialVersionUID(1)
   def identityFactory[C,F,W]:Factory[C,F,W] = new Factory[C,F,W] {
-    def mkSpanScorer(s: Seq[W], oldScorer: SpanScorer[C] = identity) = identity[C];
+    def mkSpanScorer(s: Seq[W], oldScorer: SpanScorer[C], pruner: SpanScorer[C]) = identity[C];
   }
 
 
@@ -88,7 +88,7 @@ object SpanScorer {
    */
   @SerialVersionUID(1)
   def forwardingFactory[C,W]:Factory[C,C,W] = new Factory[C,C,W] {
-    def mkSpanScorer(s: Seq[W], oldScorer: SpanScorer[C] = identity) = oldScorer;
+    def mkSpanScorer(s: Seq[W], oldScorer: SpanScorer[C], pruner: SpanScorer[C]) = oldScorer;
   }
 
   /**
@@ -100,6 +100,17 @@ object SpanScorer {
     def scoreUnaryRule(begin: Int, end: Int, rule: Int) = 0.0
 
     def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = 0.0
+  }
+
+  /**
+   * Constant scorer returns the same thing for all applications
+   */
+  def constant[L](labelThreshold: Double, ruleThreshold: Double = Double.NegativeInfinity):SpanScorer[L] = new SpanScorer[L] {
+    def scoreSpan(begin: Int, end: Int, tag: Int) = labelThreshold
+
+    def scoreUnaryRule(begin: Int, end: Int, rule: Int) = ruleThreshold
+
+    def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = ruleThreshold
   }
 
 

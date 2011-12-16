@@ -9,10 +9,12 @@ import java.io._;
  * Takes another SpanScorer.Factory, and thresholds its outputs so that any thing > threshold is 0.0, and
  * anything else is Double.NegativeInfinity
  *
+ * Ignores thresholdScorer
+ *
  * @author dlwh
  */
 class StepFunctionSpanScorerFactory[L,W](innerFactory: SpanScorer.Factory[L,L,W], threshold: Double= -7) extends SpanScorer.Factory[L,L,W] {
-  def mkSpanScorer(s: scala.Seq[W], oldScorer: SpanScorer[L] = SpanScorer.identity):SpanScorer[L] = {
+  def mkSpanScorer(s: scala.Seq[W], oldScorer: SpanScorer[L] = SpanScorer.identity, thresholdScorer: SpanScorer[L] = SpanScorer.constant(Double.NegativeInfinity)):SpanScorer[L] = {
     val inner = innerFactory.mkSpanScorer(s,oldScorer);
     new StepFunctionSpanScorer(inner, threshold);
   }

@@ -217,8 +217,7 @@ object AnchoredRuleProjector {
     def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = Double.NegativeInfinity
   }
 
-  def goldTreeForcing[L](grammar: Grammar[L],
-                         tree: BinarizedTree[Int]):SpanScorer[L] ={
+  def goldTreeForcing[L](tree: BinarizedTree[Int]):SpanScorer[L] ={
     val gold = TriangularArray.raw(tree.span.end+1,collection.mutable.BitSet());
     if(tree != null) {
       for( t <- tree.allChildren) {
@@ -231,20 +230,9 @@ object AnchoredRuleProjector {
         else 0.0
       }
 
-      def scoreUnaryRule(begin: Int, end: Int, rule: Int) = {
-        val UnaryRule(parent,child) = grammar.indexedRules(rule)
-        if(gold(TriangularArray.index(begin,end))(parent)  && gold(TriangularArray.index(begin,end))(child))
-          Double.NegativeInfinity
-        else 0.0
-      }
+      def scoreUnaryRule(begin: Int, end: Int, rule: Int) = 0.0
 
-      def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = {
-        val BinaryRule(parent,leftChild,rightChild) = grammar.indexedRules(rule)
-        if(gold(TriangularArray.index(begin,end))(parent)
-                && gold(TriangularArray.index(begin,split))(leftChild)
-                && gold(TriangularArray.index(split,end))(rightChild)) Double.NegativeInfinity
-        else 0.0
-      }
+      def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = 0.0
     }
   }
 }
