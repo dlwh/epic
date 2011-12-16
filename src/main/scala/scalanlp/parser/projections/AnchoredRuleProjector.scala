@@ -221,12 +221,31 @@ object AnchoredRuleProjector {
     val gold = TriangularArray.raw(tree.span.end+1,collection.mutable.BitSet());
     if(tree != null) {
       for( t <- tree.allChildren) {
-        gold(TriangularArray.index(t.span.start,t.span.end)).+=(t.label);
+        gold(TriangularArray.index(t.span.start,t.span.end)) +=(t.label);
       }
     }
     new SpanScorer[L] {
       def scoreSpan(begin: Int, end: Int, tag: Int) = {
-        if(gold(TriangularArray.index(begin,end))(tag) )Double.NegativeInfinity
+        if(gold(TriangularArray.index(begin,end))(tag)) Double.NegativeInfinity
+        else 0.0
+      }
+
+      def scoreUnaryRule(begin: Int, end: Int, rule: Int) = 0.0
+
+      def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = 0.0
+    }
+  }
+
+ def candidateTreeForcing[L](tree: BinarizedTree[Seq[Int]]):SpanScorer[L] ={
+    val gold = TriangularArray.raw(tree.span.end+1,collection.mutable.BitSet());
+    if(tree != null) {
+      for( t <- tree.allChildren) {
+        gold(TriangularArray.index(t.span.start,t.span.end)) ++= t.label
+      }
+    }
+    new SpanScorer[L] {
+      def scoreSpan(begin: Int, end: Int, tag: Int) = {
+        if(gold(TriangularArray.index(begin,end))(tag)) Double.NegativeInfinity
         else 0.0
       }
 

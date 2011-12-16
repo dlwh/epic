@@ -33,20 +33,6 @@ class LabeledSpanScorerFactory[C,L,W](parser: ChartParser[C,L,W]) extends SpanSc
     chartScorer
   }
 
-  def goldLabels(length: Int, tree: BinarizedTree[C]) = {
-    val result = TriangularArray.raw(length+1,collection.mutable.BitSet())
-    if(tree != null) {
-      for( t <- tree.allChildren if !t.isInstanceOf[UnaryTree[L]]) {
-        try {
-          result(TriangularArray.index(t.span.start,t.span.end)).+=(indexedProjections.coarseIndex(t.label))
-        } catch {
-          case e => println("wtf: " + t.label,e)
-        }
-      }
-    }
-    result
-  }
-
   def buildSpanScorer(charts: ChartPair[ParseChart,L], sentProb: Double,
                       coarseScorer: SpanScorer[C] = SpanScorer.identity,
                       thresholdScorer: SpanScorer[C] = SpanScorer.constant(Double.NegativeInfinity)):LabeledSpanScorer[C] = {
@@ -92,7 +78,9 @@ class LabeledSpanScorer[L](scores: Array[OldSparseVector]) extends SpanScorer[L]
   }
 }
 
-case class ProjectionParams(treebank: TreebankParams, spans: SpanParams, parser: File, out: File = new File("spans"), maxParseLength: Int = 40, project: Boolean = true) {
+case class ProjectionParams(treebank: TreebankParams,
+                            spans: SpanParams,
+                            parser: File, out: File = new File("spans"), maxParseLength: Int = 40, project: Boolean = true) {
   def processedTreebank = ProcessedTreebank(treebank,spans)
 }
 
@@ -112,11 +100,24 @@ object ProjectTreebankToLabeledSpans {
     val outDir = params.out
     outDir.mkdirs()
 
-    val factory = new LabeledSpanScorerFactory[String,Any,String](parser)
-    writeObject(parser.builder.grammar.labelIndex,new File(outDir,SPAN_INDEX_NAME))
-    writeIterable(mapTrees(factory,treebank.trainTrees,true, params.maxParseLength),new File(outDir,TRAIN_SPANS_NAME))
-    writeIterable(mapTrees(factory,treebank.testTrees,false, 10000),new File(outDir,TEST_SPANS_NAME))
-    writeIterable(mapTrees(factory,treebank.devTrees,false, 10000),new File(outDir,DEV_SPANS_NAME))
+    val proj = new GrammarProjections(ProjectionIndexer.simple(parser.projections.labels.coarseIndex), ProjectionIndexer.simple(parser.projections.rules.coarseIndex))
+    val trueProj = parser.projections
+    if(params.project) {
+      val factory = new LabeledSpanScorerFactory[String,Any,String](parser)
+      writeObject(parser.projections.labels.coarseIndex,new File(outDir,SPAN_INDEX_NAME))
+      writeIterable(mapTrees(factory,treebank.trainTrees, proj, true, params.maxParseLength),new File(outDir,TRAIN_SPANS_NAME))
+      writeIterable(mapTrees(factory,treebank.testTrees, proj, false, 10000),new File(outDir,TEST_SPANS_NAME))
+      writeIterable(mapTrees(factory,treebank.devTrees, proj, false, 10000),new File(outDir,DEV_SPANS_NAME))
+    } else {
+      val fineProj = new GrammarProjections(ProjectionIndexer.simple(parser.projections.labels.fineIndex), ProjectionIndexer.simple(parser.projections.rules.fineIndex))
+      val nonprojectingParser = new SimpleChartParser(parser.builder,new SimpleViterbiDecoder[Any,String](parser.builder.grammar), fineProj)
+      val factory = new LabeledSpanScorerFactory[Any,Any,String](nonprojectingParser)
+      writeObject(parser.projections.labels.fineIndex,new File(outDir,SPAN_INDEX_NAME))
+      writeIterable(mapTrees(factory,treebank.trainTrees, trueProj, true, params.maxParseLength),new File(outDir,TRAIN_SPANS_NAME))
+      writeIterable(mapTrees(factory,treebank.testTrees, trueProj, false, 10000),new File(outDir,TEST_SPANS_NAME))
+      writeIterable(mapTrees(factory,treebank.devTrees, trueProj, false, 10000),new File(outDir,DEV_SPANS_NAME))
+
+    }
   }
 
   def loadParser[T](loc: File) = {
@@ -126,19 +127,21 @@ object ProjectTreebankToLabeledSpans {
     parser
   }
 
-  def mapTrees(factory: LabeledSpanScorerFactory[String,Any,String], trees: IndexedSeq[TreeInstance[String,String]], useTree: Boolean, maxL: Int) = {
+  def mapTrees[L](factory: LabeledSpanScorerFactory[L,Any,String], trees: IndexedSeq[TreeInstance[String,String]],
+                  proj: GrammarProjections[String,L], useTree: Boolean, maxL: Int) = {
     // TODO: have ability to use other span scorers.
     trees.toIndexedSeq.par.map { (ti:TreeInstance[String,String]) =>
       val TreeInstance(id,tree,words,preScorer) = ti
       println(id,words)
       try {
         val pruningThreshold = -7.0
-        val pruner:SpanScorer[String] = if(useTree) {
-          SpanScorer.sum(AnchoredRuleProjector.goldTreeForcing(tree.map(factory.indexedProjections.coarseIndex)), SpanScorer.constant(pruningThreshold))
+        val pruner:SpanScorer[L] = if(useTree) {
+          val mappedTree = tree.map(l => proj.labels.refinementsOf(l).map(proj.labels.fineIndex))
+          SpanScorer.sum(AnchoredRuleProjector.candidateTreeForcing(mappedTree), SpanScorer.constant(pruningThreshold))
         } else {
-          SpanScorer.constant[String](pruningThreshold)
+          SpanScorer.constant[L](pruningThreshold)
         }
-        val scorer =factory.mkSpanScorer(words,preScorer, pruner)
+        val scorer =factory.mkSpanScorer(words,new ProjectingSpanScorer(proj, preScorer), pruner)
         scorer
       } catch {
         case e: Exception => e.printStackTrace(); SpanScorer.identity
