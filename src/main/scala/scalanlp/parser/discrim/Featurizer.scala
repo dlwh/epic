@@ -176,9 +176,9 @@ class CachedWeightsFeaturizer[L,W](f: Featurizer[L,W],
   def featuresFor(l: L, w: W) = f.featuresFor(l,w)
 
   def initialValueForFeature(feat: Feature[L,W]) = {
-    weights.get(proj(feat)) match {
+    weights.get(feat) orElse weights.get(proj(feat)) match {
       case Some(v) =>
-        v + {if(randomize || (v == 0.0 && randomizeZeros)) math.log(0.95 + math.random * 0.1) else 0.0}
+        v + {if(randomize || (v == 0.0 && randomizeZeros)) math.log(0.99 + math.random * 0.02) else 0.0}
       case None =>  f.initialValueForFeature(feat)
     }
   }

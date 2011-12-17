@@ -37,6 +37,7 @@ abstract class AbstractDiscriminativeObjective[L,L2,W](
   private var numFailures = 0;
 
   def calculate(weights: DenseVector[Double], sample: IndexedSeq[Int]) = {
+    println("Zeros:" + weights.size,weights.valuesIterator.count(_ == 0), weights.valuesIterator.count(_.abs < 1E-4))
     val inTime = System.currentTimeMillis()
     val parser = builder(weights);
     val trees = sample.map(this.trees);

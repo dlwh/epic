@@ -348,39 +348,31 @@ object StateSplitting {
   }
 
   // returns the labels whose refinements should be merged
-  def determineLabelsToUnsplit[L,W](data: SplittingData[L,W],
-                      splitData: SplittingData[L,W],
+  def determineLabelsToUnsplit[L,W](oneStepProjections: ProjectionIndexer[L,L],
+                      builder: ChartBuilder[ParseChart,L,W],
                       trees: SplitTreebank[L,W],
-                      splitter: L=>Seq[L],
                       percentMerging: Double = 0.5) = {
-    val SplittingData(splitRules,splitUnRules, splitWords) = splitData;
-    val SplittingData(coarseRules,coarseUnRules, coarseWords) = data
-    val grammar = Grammar(Library.logAndNormalizeRows(splitRules), Library.logAndNormalizeRows(splitUnRules));
-    val lexicon = new UnsmoothedLexicon(Library.logAndNormalizeRows(splitWords));
-    val coarseGrammar = Grammar(coarseRules,coarseUnRules)
-    val proj = ProjectionIndexer.fromSplitter(coarseGrammar.labelIndex, grammar.labelIndex, splitter)
-
-    val calibratedTrees = trees.par.map { case TreeInstance(_,t,s,_) => calibrateTree(grammar,lexicon,t,s)}
-    val symbolCounts = calibratedTrees.map(expectedSymbolCounts(grammar,_)).reduceLeft{ _ += _ }
+    val calibratedTrees = trees.par.map { case TreeInstance(_,t,s,_) => calibrateTree(builder.grammar,builder.lexicon,t,s)}
+    val symbolCounts = calibratedTrees.map(expectedSymbolCounts(builder.grammar,_)).reduceLeft{ _ += _ } + 1E-2
     val symbolTrials = {
       DenseVector.tabulate(symbolCounts.length){f =>
-        val sibs = proj.refinements(proj.project(f))
+        val sibs = oneStepProjections.refinements(oneStepProjections.project(f))
         sibs.map(symbolCounts).sum
       }
     }
-    assert(!symbolTrials.valuesIterator.exists(_ == 0.0))
+//    assert(!symbolTrials.valuesIterator.exists(_ == 0.0), builder.grammar.labelEncoder.decode(symbolTrials))
     val symbolProbs = (symbolCounts :/ symbolTrials).map(math.log)
     assert(!symbolProbs.valuesIterator.exists(_.isNaN))
     assert(!symbolProbs.valuesIterator.exists(_.isInfinite), symbolProbs.pairsIterator.toIndexedSeq.mkString("\n"))
-    println(Encoder.fromIndex(proj.fineIndex).decode(symbolProbs))
-    val mergeCosts = calibratedTrees.map(computeMergeCosts(proj,symbolProbs,_)).reduce(_ += _)
-    println(proj.coarseEncoder.decode(mergeCosts))
-    val topK = (0 until proj.coarseIndex.size).sortBy(i => -mergeCosts(i)).take(percentMerging * proj.coarseIndex.size toInt)
+    println(Encoder.fromIndex(oneStepProjections.fineIndex).decode(symbolProbs))
+    val mergeCosts = calibratedTrees.map(computeMergeCosts(oneStepProjections,symbolProbs,_)).reduce(_ += _)
+    println(oneStepProjections.coarseEncoder.decode(mergeCosts))
+    val topK = (0 until oneStepProjections.coarseIndex.size).sortBy(i => -mergeCosts(i)).take(percentMerging * oneStepProjections.coarseIndex.size toInt)
     println("Will merge:")
     for(i <- topK) {
-      println(i + ": " + splitter(proj.coarseIndex.get(i)))
+      println(i + ": " + oneStepProjections.refinementsOf(oneStepProjections.coarseIndex.get(i)))
     }
-    topK.map(proj.coarseIndex.get).toSet
+    topK.map(oneStepProjections.coarseIndex.get).toSet
   }
 
   private def mergeRules[L,W](splitData: SplittingData[L,W], project: L=>L) = {
@@ -518,7 +510,12 @@ object StateSplitting {
       val splitData = splitCounts(data,splitProjections.refinementsOf(_:L),randomNoise);
       val (newData,newLP) = oneCycle(splitData,myTrees);
 
-      val labelsToUnsplit = this.determineLabelsToUnsplit(data,newData,myTrees,conditionalSplit)
+      val grammar = Grammar(Library.logAndNormalizeRows(newData.binaryRules),
+        Library.logAndNormalizeRows(newData.unaryRules));
+      val lex = new SimpleLexicon(newData.tagCounts);
+      // TODO, ugh
+      val builder = CKYChartBuilder(null.asInstanceOf[L],lex,grammar);
+      val labelsToUnsplit = this.determineLabelsToUnsplit(splitProjections,builder, myTrees)
       val labelsToNotSplit = labelsToUnsplit.flatMap(splitter).toSet
 
       (newData,labelsToNotSplit,newLP,fullProjections)
