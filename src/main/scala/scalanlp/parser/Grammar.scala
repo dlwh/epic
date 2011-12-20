@@ -59,9 +59,7 @@ sealed trait Grammar[L] extends Encoder[Rule[L]] with Serializable {
   def child(r: Int) = indexedRules(r).asInstanceOf[UnaryRule[Int]].child
 
 
-  lazy val maxNumBinaryRulesForParent: Int = {
-    for(a <- binaryRules.domain._1) yield binaryRules(a,::).size
-  }.max
+  def maxNumBinaryRulesForParent: Int
 
   /**
    * Returns true if the label has no productions with it on the LHS.
@@ -156,6 +154,10 @@ object Grammar {
       def indexedBinaryRulesWithParent(l: Int) = binaryRulesByParent(l)
       def indexedUnaryRulesWithParent(l: Int) = unaryRulesByParent(l)
       def indexedUnaryRulesWithChild(l: Int) = unaryRulesByChild(l)
+
+      val maxNumBinaryRulesForParent = {
+        for(a <- binaryRules.domain._1) yield binaryRules(a,::).size
+      }.max
     }
 
   }

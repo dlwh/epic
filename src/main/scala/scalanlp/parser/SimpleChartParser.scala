@@ -3,9 +3,7 @@ package scalanlp.parser
 import projections.{GrammarProjections, ProjectingSpanScorer, ProjectionIndexer}
 import scalanlp.trees.BinarizedTree
 
-class ChartPair[+PC[X]<:ParseChart[X],L](val inside: PC[L], _outside: =>PC[L], val scorer: SpanScorer[L] = SpanScorer.identity) {
-  lazy val outside = _outside
-}
+case class ChartPair[+PC[X]<:ParseChart[X],L](inside: PC[L], outside: PC[L], scorer: SpanScorer[L] = SpanScorer.identity)
 
 @SerialVersionUID(1)
 trait ChartParser[C,F,W] extends Parser[C,W] with Serializable {
@@ -40,7 +38,7 @@ class SimpleChartParser[C,F,W](val builder: ChartBuilder[ParseChart,F,W],
   def charts(w: Seq[W], scorer: SpanScorer[C]) = {
     val meta = new ProjectingSpanScorer[C,F](projections,scorer,downWeightProjections)
     val inside = builder.buildInsideChart(w,meta)
-    lazy val outside = builder.buildOutsideChart(inside,meta)
+    val outside = builder.buildOutsideChart(inside,meta)
     new ChartPair[ParseChart,F](inside,outside,meta)
   }
 
