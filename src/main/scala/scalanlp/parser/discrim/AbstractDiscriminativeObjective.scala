@@ -20,16 +20,20 @@ abstract class AbstractDiscriminativeObjective[L,L2,W](
   trees: IndexedSeq[TreeInstance[L,W]],
   val indexedProjections: GrammarProjections[L,L2],
   openTags: Set[L2],
-  closedWords: Set[W]) extends BatchDiffFunction[DenseVector[Double]] with Logged {
+  closedWords: Set[W],
+  specificSpans: Seq[SpanScorer[L2]] = Stream.continually(SpanScorer.identity[L2])
+  ) extends BatchDiffFunction[DenseVector[Double]] with Logged {
 
   def extractParser(weights: DenseVector[Double]):Parser[L,W];
   def initialWeightVector:DenseVector[Double]
+
+  val zippedTrees = trees zip specificSpans
 
   protected type Builder
   protected type Counts
   protected def builder(weights: DenseVector[Double]):Builder
   protected def emptyCounts(b: Builder): Counts
-  protected def expectedCounts(b: Builder, t: BinarizedTree[L], w: Seq[W], scorer: SpanScorer[L]):Counts
+  protected def expectedCounts(b: Builder, t: BinarizedTree[L], w: Seq[W], scorer: SpanScorer[L], specificScorer: SpanScorer[L2]):Counts
   protected def sumCounts(c1: Counts, c2: Counts):Counts
   /** Should return -logProb and the derivative */
   protected def countsToObjective(c: Counts):(Double,DenseVector[Double])
@@ -40,12 +44,12 @@ abstract class AbstractDiscriminativeObjective[L,L2,W](
     println("Zeros:" + weights.size,weights.valuesIterator.count(_ == 0), weights.valuesIterator.count(_.abs < 1E-4))
     val inTime = System.currentTimeMillis()
     val parser = builder(weights);
-    val trees = sample.map(this.trees);
+    val trees = sample.map(zippedTrees)
     val startTime = System.currentTimeMillis();
     val ecounts = trees.par.view.map{ treeWordsScorer =>
-      val TreeInstance(id,tree,words,spanScorer) = treeWordsScorer;
+      val (TreeInstance(id,tree,words,spanScorer),specificScorer) = treeWordsScorer;
       val res = try {
-        expectedCounts(parser,tree,words,spanScorer)
+        expectedCounts(parser,tree,words,spanScorer,specificScorer)
       } catch {
         case e => println("Error in parsing: " + words + e);
         e.printStackTrace()

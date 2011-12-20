@@ -79,7 +79,7 @@ class LabeledSpanScorer[L](scores: Array[OldSparseVector]) extends SpanScorer[L]
 }
 
 case class ProjectionParams(treebank: TreebankParams,
-                            spans: SpanParams,
+                            spans: SpanParams[String],
                             parser: File, out: File = new File("spans"), maxParseLength: Int = 40, project: Boolean = true) {
   def processedTreebank = ProcessedTreebank(treebank,spans)
 }
@@ -169,7 +169,7 @@ object ProjectTreebankToLabeledSpans {
     (trainSpans,devSpans,testSpans)
   }
 
-  def loadSpansFile(spanFile: File):Iterable[SpanScorer[String]] = {
+  def loadSpansFile[String](spanFile: File):Iterable[SpanScorer[String]] = {
     require(spanFile.exists, spanFile + " must exist!")
     new FileIterable[SpanScorer[String]](spanFile)
   }

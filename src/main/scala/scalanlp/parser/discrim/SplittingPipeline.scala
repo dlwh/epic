@@ -3,7 +3,7 @@ package scalanlp.parser.discrim
 import scalanlp.util._
 import scalanlp.parser._
 import java.io._
-import projections.{ProjectionIndexer, GrammarProjections}
+import projections.{ProjectingSpanScorer, ProjectionIndexer, GrammarProjections}
 import scalala.tensor.dense.DenseVector
 import scalanlp.trees.UnaryChainRemover.ChainReplacer
 import scalala.library.Library
@@ -21,10 +21,12 @@ import logging._
  */
 object SplittingPipeline extends ParserPipeline {
 
-  type MyFeaturizer = Featurizer[(String,Seq[Int]),String]
-  type MyObjective = LatentDiscrimObjective[String,(String,Seq[Int]),String]
+  type Sym = (String,Seq[Int])
+  type MyFeaturizer = Featurizer[Sym,String]
+  type MyObjective = LatentDiscrimObjective[String,Sym,String]
 
-  case class SpecificParams(lastParser: File = null, fracToSplit:Double = 0.5)
+  case class SpecificParams(lastParser: File = null, fracToSplit:Double = 0.5, refinedSpans: SpanParams[Sym]) {
+  }
   implicit def specificManifest = manifest[SpecificParams]
 
   type Params = LatentParams[SpecificParams];
@@ -36,19 +38,29 @@ object SplittingPipeline extends ParserPipeline {
                   indexedProjections: GrammarProjections[String, (String, Seq[Int])],
                   xbarParser: ChartBuilder[ParseChart.LogProbabilityParseChart, String, String],
                   openTags: Set[(String, Seq[Int])],
-                  closedWords: Set[String]) = {
+                  closedWords: Set[String],
+                  oneStepProjections: ProjectionIndexer[Sym,Sym]) = {
+    class ProjectScorer(scorer: SpanScorer[Sym]) extends SpanScorer[Sym] {
+      def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = 0.0
+
+      def scoreUnaryRule(begin: Int, end: Int, rule: Int) = 0.0
+
+      def scoreSpan(begin: Int, end: Int, tag: Int) = {
+        scorer.scoreSpan(begin,end,oneStepProjections.project(tag))
+      }
+    }
+    val spans = params.specific.refinedSpans.trainSpans.map(new ProjectScorer(_))
     val r = new LatentDiscrimObjective(latentFeaturizer,
       trainTrees,
       indexedProjections,
       xbarParser,
       openTags,
-      closedWords) with ConfiguredLogging;
+      closedWords, spans) with ConfiguredLogging;
 
     r
   }
 
 
-  type Sym = (String,Seq[Int])
   def getFeaturizer(params: SplittingPipeline.Params,
                     initLexicon: Counter2[String, String, Double],
                     initBinaries: Counter2[String, BinaryRule[String], Double],
@@ -104,22 +116,20 @@ object SplittingPipeline extends ParserPipeline {
       new CKYChartBuilder[LogProbabilityParseChart,String,String]("",lexicon,grammar,ParseChart.logProb);
     }
 
-    val oneStepProjections = if(specific.lastParser == null) {
-      initialSplit(xbarParser.grammar.labelIndex)
+    val (oneStepProjections,siblingProjections) = if(specific.lastParser == null) {
+      val r = initialSplit(xbarParser.grammar.labelIndex)
+      r -> r
     } else {
       val oldParser = readObject[SimpleChartParser[String,Sym,String]](params.specific.lastParser)
       val lastProjectionsFile = new File(params.specific.lastParser.getParentFile.getParentFile,"projections.ser")
-      val lastOneStep = readObject[ProjectionIndexer[Sym,Sym]](lastProjectionsFile)
-      splitLabels(lastOneStep, oldParser, trainTrees, params.specific.fracToSplit)
+      val lastSiblings = readObject[ProjectionIndexer[Sym,Sym]](lastProjectionsFile)
+      splitLabels(lastSiblings, oldParser, trainTrees, params.specific.fracToSplit)
     }
-    writeObject(new File("projections.ser"), oneStepProjections)
+    writeObject(new File("projections.ser"), siblingProjections)
 
     def unsplit(s: (String,Any)) = s._1
     val labelProjections = ProjectionIndexer(xbarParser.grammar.labelIndex, oneStepProjections.fineIndex, unsplit)
     def split(s: String) = labelProjections.refinementsOf(s)
-    for(s <- oneStepProjections.coarseIndex) println(s -> oneStepProjections.refinementsOf(s))
-    println("<<<<<")
-    for(s <- labelProjections.coarseIndex) println(s -> labelProjections.refinementsOf(s))
 
     val indexedProjections = {
       val raw = GrammarProjections(xbarParser.grammar, split _, unsplit _ )
@@ -137,7 +147,7 @@ object SplittingPipeline extends ParserPipeline {
       wordCounts.nonzero.pairs.iterator.filter(_._2 > 5).map(_._1);
     }
 
-    val obj = mkObjective(params, latentFeaturizer, trainTrees, indexedProjections, xbarParser, openTags, closedWords)
+    val obj = mkObjective(params, latentFeaturizer, trainTrees, indexedProjections, xbarParser, openTags, closedWords, oneStepProjections)
 
     val optimizer = opt.minimizer(obj);
 

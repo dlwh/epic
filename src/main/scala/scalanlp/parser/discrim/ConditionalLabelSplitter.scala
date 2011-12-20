@@ -6,10 +6,9 @@ import splitting.StateSplitting
 import scalanlp.util.Index
 
 /**
- * 
+ * Returns a new set of one-step splits as a ProjectionIndexer, as well as sibling splits
  * @author dlwh
  */
-
 class ConditionalLabelSplitter[L](oneStepProjections: ProjectionIndexer[L,L],
                                   split: L=>Seq[L],
                                   fracToSplit: Double = 0.5) {
@@ -21,7 +20,9 @@ class ConditionalLabelSplitter[L](oneStepProjections: ProjectionIndexer[L,L],
     })
     val newFineLabels = Index(newCoarseLabels.flatMap(split))
 
-    ProjectionIndexer.fromSplitter(newCoarseLabels, newFineLabels, split)
+    val oneStep = ProjectionIndexer.fromSplitter(oneStepProjections.fineIndex, newFineLabels, {(l:L) => if(labelsToUnsplit(l)) Seq(l) else split(l)} )
+    val sibProj = ProjectionIndexer.fromSplitter(newCoarseLabels, newFineLabels, split)
+    (oneStep,sibProj)
   }
 
 }

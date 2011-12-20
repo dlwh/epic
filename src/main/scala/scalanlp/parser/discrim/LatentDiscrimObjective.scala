@@ -29,8 +29,9 @@ class LatentDiscrimObjective[L,L2,W](featurizer: Featurizer[L2,W],
                             indexedProjections: GrammarProjections[L,L2],
                             coarseParser: ChartBuilder[LogProbabilityParseChart, L, W],
                             openTags: Set[L2],
-                            closedWords: Set[W]
-                            ) extends AbstractDiscriminativeObjective[L,L2,W](trees,indexedProjections,openTags,closedWords) {
+                            closedWords: Set[W],
+                            specificSpans: Seq[SpanScorer[L2]] = Stream.continually(SpanScorer.identity[L2])
+                            ) extends AbstractDiscriminativeObjective[L,L2,W](trees,indexedProjections,openTags,closedWords, specificSpans) {
 
 
   /** The split root symbol */
@@ -79,9 +80,10 @@ class LatentDiscrimObjective[L,L2,W](featurizer: Featurizer[L2,W],
   }
 
   protected def emptyCounts(b: Builder) = new ExpectedCounts[W](b.grammar)
-  protected def expectedCounts(b: Builder, t: BinarizedTree[L], w: Seq[W], scorer:SpanScorer[L]) = {
-    val treeCounts = treeToExpectedCounts(b.grammar,b.lexicon,t,w, scorer);
-    val wordCounts = wordsToExpectedCounts(w, b, scorer);
+  protected def expectedCounts(b: Builder, t: BinarizedTree[L], w: Seq[W], scorer:SpanScorer[L], specific: SpanScorer[L2]) = {
+    val summed = SpanScorer.sum(new ProjectingSpanScorer(indexedProjections, scorer),specific)
+    val treeCounts = treeToExpectedCounts(b.grammar,b.lexicon,t,w, summed)
+    val wordCounts = wordsToExpectedCounts(w, b, summed)
     /*
     println(w);
     println(t render w)
@@ -101,9 +103,9 @@ class LatentDiscrimObjective[L,L2,W](featurizer: Featurizer[L2,W],
   }
 
   def wordsToExpectedCounts(words: Seq[W],
-                                      parser: ChartBuilder[LogProbabilityParseChart,L2,W],
-                                      spanScorer: SpanScorer[L] = SpanScorer.identity) = {
-    val ecounts = new InsideOutside(parser).expectedCounts(words, new ProjectingSpanScorer(indexedProjections, spanScorer));
+                            parser: ChartBuilder[LogProbabilityParseChart,L2,W],
+                            spanScorer: SpanScorer[L2] = SpanScorer.identity) = {
+    val ecounts = new InsideOutside(parser).expectedCounts(words,spanScorer);
     ecounts
   }
 
@@ -112,9 +114,9 @@ class LatentDiscrimObjective[L,L2,W](featurizer: Featurizer[L2,W],
                            lexicon: Lexicon[L2,W],
                            t: BinarizedTree[L],
                            words: Seq[W],
-                           spanScorer: SpanScorer[L] = SpanScorer.identity):ExpectedCounts[W] = {
+                           spanScorer: SpanScorer[L2] = SpanScorer.identity):ExpectedCounts[W] = {
     StateSplitting.expectedCounts(g,lexicon,t.map(indexedProjections.labels.refinementsOf _),words,
-      new ProjectingSpanScorer(indexedProjections, spanScorer));
+      spanScorer)
   }
 
   def initialWeightVector = {

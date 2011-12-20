@@ -10,7 +10,7 @@ import scalanlp.data.Example
  *
  * @author dlwh
  */
-case class ProcessedTreebank(treebank: TreebankParams, spans: SpanParams) {
+case class ProcessedTreebank(treebank: TreebankParams, spans: SpanParams[String]) {
   import spans._;
 
   lazy val trainTreesWithUnaries = transformTrees(treebank.treebank.train, trainSpans);
@@ -77,9 +77,9 @@ case class TreebankParams(path: File,
 
 }
 
-case class SpanParams(directory: File = null) {
-  def loadSpans(path: Option[File]):Iterable[SpanScorer[String]] = path match {
-    case Some(path) => ProjectTreebankToLabeledSpans.loadSpansFile(path);
+case class SpanParams[String](directory: File = null) {
+  def loadSpans(path: Option[File]):Seq[SpanScorer[String]] = path match {
+    case Some(path) => ProjectTreebankToLabeledSpans.loadSpansFile(path).toSeq;
     case None =>       Stream.continually(SpanScorer.identity)
   }
 

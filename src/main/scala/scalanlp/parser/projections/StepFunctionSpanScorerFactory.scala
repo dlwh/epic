@@ -41,9 +41,9 @@ object StepFunctionifySpanScorers {
     val outDir = new File(args(0));
     val inSpanDir = new File(args(1));
 
-    val trainSpans = loadSpansFile(new File(inSpanDir,TRAIN_SPANS_NAME))
-    val testSpans = loadSpansFile(new File(inSpanDir,TEST_SPANS_NAME))
-    val devSpans = loadSpansFile(new File(inSpanDir,DEV_SPANS_NAME))
+    val trainSpans = loadSpansFile[String](new File(inSpanDir,TRAIN_SPANS_NAME))
+    val testSpans = loadSpansFile[String](new File(inSpanDir,TEST_SPANS_NAME))
+    val devSpans = loadSpansFile[String](new File(inSpanDir,DEV_SPANS_NAME))
 
     outDir.mkdirs();
 

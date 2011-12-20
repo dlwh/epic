@@ -62,7 +62,7 @@ class EPObjective[L,L2,W](featurizers: Seq[Featurizer[L2,W]],
   def builder(weights: DenseVector[Double]) = extractParser(weights)
 
   protected def emptyCounts(b: Builder) = (0.0,b.parsers.map { p => new ExpectedCounts[W](p.grammar)})
-  protected def expectedCounts(epBuilder: Builder, t: BinarizedTree[L], w: Seq[W], scorer:SpanScorer[L]) = {
+  protected def expectedCounts(epBuilder: Builder, t: BinarizedTree[L], w: Seq[W], scorer:SpanScorer[L], specific: SpanScorer[L2]) = {
     val epBuilder.EPResult(charts,partition,_) = epBuilder.buildAllCharts(w,scorer,t)
 
     import epBuilder._
