@@ -138,7 +138,7 @@ class CKYChartBuilder[Chart[X]<:ParseChart[X], L,W](val root: L,
       begin <- 0 to (length-span)
     } {
       val end = begin + span
-      updateOutsideUnaries(outside,begin,end, validSpan)
+      updateOutsideUnaries(outside,inside, begin,end, validSpan)
       if(span > 1)
         // a ->  bc  [begin,split,end)
         for ( a <- outside.bot.enteredLabelIndexes(begin,end) ) {
@@ -161,12 +161,11 @@ class CKYChartBuilder[Chart[X]<:ParseChart[X], L,W](val root: L,
                 val cInside = itop.labelScore(split,end,c)
                 val spanScore = validSpan.scoreBinaryRule(begin,split,end,r)
                 val bOutside = score + cInside + spanScore
-                if(!java.lang.Double.isInfinite(bOutside))
-                  outside.top.enter(begin,split,b,bOutside)
-
                 val cOutside = score + bInside + spanScore
-                if(!java.lang.Double.isInfinite(cOutside))
+                if(!java.lang.Double.isInfinite(bOutside) && !java.lang.Double.isInfinite(cOutside)) {
+                  outside.top.enter(begin,split,b,bOutside)
                   outside.top.enter(split,end,c,cOutside)
+                }
 
                 split += 1
               }
@@ -195,7 +194,7 @@ class CKYChartBuilder[Chart[X]<:ParseChart[X], L,W](val root: L,
 
   }
 
-  private def updateOutsideUnaries(outside: ParseChart[L], begin: Int, end: Int, validSpan: SpanScorer[L]) = {
+  private def updateOutsideUnaries(outside: ParseChart[L], inside: ParseChart[L], begin: Int, end: Int, validSpan: SpanScorer[L]) = {
     for(a <- outside.top.enteredLabelIndexes(begin,end)) {
       val aScore = outside.top.labelScore(begin,end,a)
 
@@ -205,7 +204,7 @@ class CKYChartBuilder[Chart[X]<:ParseChart[X], L,W](val root: L,
         val b = grammar.child(rules(j))
         val bScore = grammar.ruleScore(rules(j))
         val prob = aScore + bScore + validSpan.scoreUnaryRule(begin,end,rules(j))
-        if(prob != Double.NegativeInfinity) {
+        if(prob != Double.NegativeInfinity && inside.bot.labelScore(begin,end,b) != Double.NegativeInfinity) {
           outside.bot.enter(begin,end,b, prob)
         }
         j += 1
