@@ -108,6 +108,21 @@ abstract class ParseChart[L](val grammar: Encoder[L], val length: Int) extends S
       }
     }
 
+    def rightChildExtent(begin: Int, rightState: Int):Long = {
+      val nr = narrowRight(begin)(rightState)
+      val wr = wideRight(begin)(rightState)
+      if (nr > length || wr < 0) 0L
+      else ((nr:Long) << 32)|((wr+1):Long)
+    }
+
+
+    def leftChildExtent(end: Int, leftState: Int):Long = {
+      val nl = narrowLeft(end)(leftState)
+      val wl = wideLeft(end)(leftState)
+      if (wl > length || nl < 0) 0L
+      else ((wl:Long) << 32)|( (nl+1):Long)
+    }
+
 
 
     // right most place a left constituent with label l can start and end at position i
@@ -130,7 +145,12 @@ abstract class ParseChart[L](val grammar: Encoder[L], val length: Int) extends S
   private val emptySpan = Span(length+1,length+1)
 
   override def toString = {
-    val data = new TriangularArray[Counter[L, Double]](length+1, (i:Int,j:Int)=>grammar.decode(new DenseVectorCol(top.scoreArray(TriangularArray.index(i,j))))).toString
+    def decodeCell(i: Int, j: Int) = {
+      val arr = top.scoreArray(TriangularArray.index(i,j))
+      val decoded = Seq() ++ (arr.zipWithIndex.collect { case (v,i) if !v.isInfinite => grammar.index.get(i) -> v})
+      decoded.mkString(", ")
+    }
+    val data = new TriangularArray[String](length+1, decodeCell _ )
     "ParseChart[" + data + "]"
   }
 
