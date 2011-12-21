@@ -23,7 +23,7 @@ class ConstraintScorer[L](scores: Array[BitSet]) extends SpanScorer[L] {
 
   def scoreSpan(begin: Int, end: Int, tag: Int) = {
     val set = scores(TriangularArray.index(begin,end))
-    if(set == null || !set(tag)) Double.NegativeInfinity
+    if(set == null || !set.contains(tag)) Double.NegativeInfinity
     else 0.0
   }
 }
