@@ -45,6 +45,10 @@ sealed trait Grammar[L] extends Encoder[Rule[L]] with Serializable {
   // Rule Index
   def indexedBinaryRulesWithParent(l: Int):Array[Int]
   // Rule Index
+  def indexedBinaryRulesWithLeftChild(b: Int):Array[Int]
+  // Rule Index
+  def indexedBinaryRulesWithRightChild(c: Int):Array[Int]
+  // Rule Index
   def indexedUnaryRulesWithChild(l: Int):Array[Int]
   // Rule Index
   def indexedUnaryRulesWithParent(l: Int):Array[Int]
@@ -154,6 +158,8 @@ object Grammar {
       def indexedBinaryRulesWithParent(l: Int) = binaryRulesByParent(l)
       def indexedUnaryRulesWithParent(l: Int) = unaryRulesByParent(l)
       def indexedUnaryRulesWithChild(l: Int) = unaryRulesByChild(l)
+      def indexedBinaryRulesWithLeftChild(b: Int) = binaryRulesByLeftChild(b)
+      def indexedBinaryRulesWithRightChild(c: Int) = binaryRulesByRightChild(c)
 
       val maxNumBinaryRulesForParent = {
         for(a <- binaryRules.domain._1) yield binaryRules(a,::).size
