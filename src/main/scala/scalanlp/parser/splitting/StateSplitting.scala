@@ -133,7 +133,6 @@ object StateSplitting {
           };
           aScores(ai) = logSum(arr,i)
           if(!aScores(ai).isInfinite) foundOne = true;
-          else println("wtf!!!!")
           ai += 1
        }
 

@@ -67,9 +67,12 @@ class ConstraintScorerFactory[C,L,W](parser: ChartParser[C,L,W], threshold: Doub
         active += pL
       }
 
+      val gold = active.filter(goldTags.isGoldTag(begin,end,_))
+      val maxGoldTag = if(gold.isEmpty) -1 else gold.maxBy(scoresForLocation)
+
       for( c <- active) {
         val v = scoresForLocation(c)
-        if(v > threshold || goldTags.isGoldTag(begin,end,c)) {
+        if(v > threshold || maxGoldTag == c) {
           if(scores(index) eq null) {
             scores(index) = new collection.mutable.BitSet()
           }
@@ -133,7 +136,6 @@ object ProjectTreebankToConstraints {
       val TreeInstance(id,tree,words,preScorer) = ti
       println(id,words)
       try {
-        val pruningThreshold = -7
         val pruner:GoldTagPolicy[L] = if(useTree) {
           val mappedTree = tree.map(l => proj.labels.refinementsOf(l).map(proj.labels.fineIndex))
           GoldTagPolicy.candidateTreeForcing(mappedTree)

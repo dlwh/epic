@@ -95,7 +95,7 @@ class AnchoredRuleProjector[C,L,W](coarseGrammar: Grammar[C],
 
           var total = 0.0
 
-          if(parentScore + inside.bot.labelScore(begin,end,parent) - sentProb > threshold || goldTagPolicy.isGoldTag(begin,end,parent)) {
+          if(parentScore + inside.bot.labelScore(begin,end,parent) - sentProb > Double.NegativeInfinity || goldTagPolicy.isGoldTag(begin,end,parent)) {
             val rules = grammar.indexedBinaryRulesWithParent(parent)
             var ruleIndex = 0
             while(ruleIndex < rules.length) {
@@ -153,6 +153,7 @@ class AnchoredRuleProjector[C,L,W](coarseGrammar: Grammar[C],
             unaryScores(index)
           } else {
             unaryScores(index)
+
           }
 
           for(r <- parser.grammar.indexedUnaryRulesWithParent(parent)) {

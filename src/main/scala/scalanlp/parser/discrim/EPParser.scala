@@ -134,7 +134,7 @@ class EPParser[L,L2,W](val parsers: Seq[ChartBuilder[LogProbabilityParseChart,L2
 
   val approximators = (parsers zip projectionsSeq).map{ case (parser,proj) =>
 //    new AnchoredRuleApproximator[L,L2,W](parser, coarseParser,proj, Double.NegativeInfinity)
-    new AnchoredRuleApproximator[L,L2,W](parser, coarseParser,proj, -7)
+    new AnchoredRuleApproximator[L,L2,W](parser, coarseParser,proj, -10)
   }
   val decoder = new MaxConstituentDecoder[L,L2,W](projectionsSeq.last)
   val f0Decoder = new MaxConstituentDecoder[L,L,W](GrammarProjections.identity(coarseParser.grammar))
