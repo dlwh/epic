@@ -177,6 +177,7 @@ object Trees {
   }
 
   def deannotate(tree: Tree[String]):Tree[String] = tree.map(l => l.takeWhile(_ != '^'));
+  def deannotate(tree: BinarizedTree[String]):BinarizedTree[String] = tree.map(l => l.takeWhile(_ != '^'));
 
   def markovizeBinarization(tree: BinarizedTree[String], order: Int):BinarizedTree[String] = {
     tree.map{ l =>
