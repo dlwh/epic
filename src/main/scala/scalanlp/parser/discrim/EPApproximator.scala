@@ -21,15 +21,15 @@ trait EPApproximator[C,F,W] extends Serializable {
 class AnchoredRuleApproximator[C,F,W](fineParser: ChartBuilder[LogProbabilityParseChart,F,W],
                                       coarseParser: ChartBuilder[LogProbabilityParseChart,C,W],
                                       projections: GrammarProjections[C,F], pruningThreshold: Double = Double.NegativeInfinity) extends EPApproximator[C,F,W] with Serializable {
-  val factory = new AnchoredRuleScorerFactory[C,F,W](coarseParser.grammar, new SimpleChartParser(fineParser,new ViterbiDecoder[C,F,W](projections.labels),projections));
+  val factory = new AnchoredRuleScorerFactory[C,F,W](coarseParser.grammar, new SimpleChartParser(fineParser,new ViterbiDecoder[C,F,W](projections.labels),projections), pruningThreshold);
 
-  val zeroFactory = new CachingSpanScorerFactory[C,W](coarseParser);
+  val zeroFactory = new CachingSpanScorerFactory[C,W](coarseParser, pruningThreshold);
 
   def project(inside: ParseChart[F], outside: ParseChart[F], partition: Double, spanScorer: SpanScorer[F], tree: BinarizedTree[C] = null):SpanScorer[C] = {
     val pruner = if(tree != null) {
-      SpanScorer.sum[C](AnchoredRuleProjector.goldTreeForcing(tree.map(coarseParser.index)), SpanScorer.constant(pruningThreshold))
+      GoldTagPolicy.goldTreeForcing[C](tree.map(coarseParser.index))
     } else {
-      SpanScorer.constant[C](pruningThreshold)
+      GoldTagPolicy.noGoldTags[C]
     }
     factory.buildSpanScorer(new ChartPair[ParseChart,F](inside, outside,spanScorer),  partition, pruner)
   }

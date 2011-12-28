@@ -9,12 +9,12 @@ import scalala.library.Numerics
  * CachingSpanScorerFactory essentially just rencodes a SpanScorer into a possibly more efficient representation.
  * @author dlwh
  */
-class CachingSpanScorerFactory[L,W](chartBuilder: ChartBuilder[ParseChart,L,W]) extends SpanScorer.Factory[L,L,W] {
+class CachingSpanScorerFactory[L,W](chartBuilder: ChartBuilder[ParseChart,L,W], threshold: Double) extends SpanScorer.Factory[L,L,W] {
   val zero = new CKYChartBuilder[ParseChart.LogProbabilityParseChart, L,W](chartBuilder.root,
     new ZeroLexicon(chartBuilder.lexicon), Grammar.zero(chartBuilder.grammar),ParseChart.logProb)
 
-  def mkSpanScorer(s: Seq[W], oldScorer: SpanScorer[L] = SpanScorer.identity, thresholdScorer: SpanScorer[L] = SpanScorer.constant(Double.NegativeInfinity)):SpanScorer[L] = {
-    val AnchoredRuleProjector.AnchoredData(lexicalScores,unaryScores,_,binaryScores,_) = extractScores(s, oldScorer, thresholdScorer)
+  def mkSpanScorer(s: Seq[W], oldScorer: SpanScorer[L] = SpanScorer.identity, goldTagPolicy: GoldTagPolicy[L]):SpanScorer[L] = {
+    val AnchoredRuleProjector.AnchoredData(lexicalScores,unaryScores,_,binaryScores,_) = extractScores(s, oldScorer, goldTagPolicy)
     new AnchoredRuleScorer(lexicalScores, unaryScores, binaryScores)
   }
 
@@ -25,9 +25,9 @@ class CachingSpanScorerFactory[L,W](chartBuilder: ChartBuilder[ParseChart,L,W]) 
    * @param outside outside chart
    * @param sentProb log probability of the root. probably a log partition
    * @param scorer: scorer used to produce this tree.
-   * @param pruneLabel should return a threshold to determine if we need to prune. (prune if posterior <= threshold) See companion object for good choices.
+   * @param goldTags
    */
-  def extractScores(s: Seq[W], scorer: SpanScorer[L], pruneLabel: SpanScorer[L]=AnchoredRuleProjector.noPruning[L]):AnchoredRuleProjector.AnchoredData = {
+  def extractScores(s: Seq[W], scorer: SpanScorer[L], goldTags: GoldTagPolicy[L]):AnchoredRuleProjector.AnchoredData = {
     val inside = zero.buildInsideChart(s,scorer)
     // preliminaries: we're not going to fill in everything: some things will be null.
     // all of this is how to deal with it.
@@ -69,7 +69,7 @@ class CachingSpanScorerFactory[L,W](chartBuilder: ChartBuilder[ParseChart,L,W]) 
     for(begin <- 0 until inside.length; end <- (begin + 1) to (inside.length);
         l <- inside.bot.enteredLabelIndexes(begin,end)) {
       val currentScore = scorer.scoreSpan(begin,end,l)
-      if(currentScore > pruneLabel.scoreSpan(begin,end,l)) {
+      if(currentScore > threshold || goldTags.isGoldTag(begin, end, l)) {
         getOrElseUpdate(lexicalScores,TriangularArray.index(begin,end),projVector())(l) = currentScore
       }
     }
@@ -95,7 +95,7 @@ class CachingSpanScorerFactory[L,W](chartBuilder: ChartBuilder[ParseChart,L,W]) 
             val rules = grammar.indexedBinaryRulesWithParent(parent)
             for(r <- rules) {
               val currentScore = scorer.scoreBinaryRule(begin,split,end,r)
-              if(currentScore > pruneLabel.scoreBinaryRule(begin,split,end,r))
+              if(currentScore > Double.NegativeInfinity)
                 parentArray(r) = currentScore
             }
           }
@@ -113,7 +113,7 @@ class CachingSpanScorerFactory[L,W](chartBuilder: ChartBuilder[ParseChart,L,W]) 
 
           for(r <- grammar.indexedUnaryRulesWithParent(parent)) {
             val score =  scorer.scoreUnaryRule(begin,end,r)
-            if(score > pruneLabel.scoreUnaryRule(begin,end,r)) {
+            if(score > Double.NegativeInfinity) {
               val accScore = parentArray(r);
               parentArray(r) = Numerics.logSum(accScore,score);
             }

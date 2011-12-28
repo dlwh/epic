@@ -14,7 +14,7 @@ import java.io._;
  * @author dlwh
  */
 class StepFunctionSpanScorerFactory[L,W](innerFactory: SpanScorer.Factory[L,L,W], threshold: Double= -7) extends SpanScorer.Factory[L,L,W] {
-  def mkSpanScorer(s: scala.Seq[W], oldScorer: SpanScorer[L] = SpanScorer.identity, thresholdScorer: SpanScorer[L] = SpanScorer.constant(Double.NegativeInfinity)):SpanScorer[L] = {
+  def mkSpanScorer(s: scala.Seq[W], oldScorer: SpanScorer[L], thresholdScorer: GoldTagPolicy[L]):SpanScorer[L] = {
     val inner = innerFactory.mkSpanScorer(s,oldScorer);
     new StepFunctionSpanScorer(inner, threshold);
   }

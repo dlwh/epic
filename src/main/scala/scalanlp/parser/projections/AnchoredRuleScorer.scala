@@ -11,8 +11,8 @@ import scalanlp.tensor.sparse.OldSparseVector
  * @author dlwh
  */
 class AnchoredRuleScorerFactory[C,L,W](val coarseGrammar: Grammar[C],
-                                       parser: SimpleChartParser[C,L,W])
-        extends ChartDrivenScorerFactory[C,L,W](coarseGrammar,parser) {
+                                       parser: SimpleChartParser[C,L,W], threshold: Double)
+        extends ChartDrivenScorerFactory[C,L,W](coarseGrammar,parser, threshold) {
 
   type MyScorer = AnchoredRuleScorer[C];
   private def normalize(ruleScores: OldSparseVector, totals: OldSparseVector):OldSparseVector = {
@@ -49,8 +49,8 @@ class AnchoredRuleScorerFactory[C,L,W](val coarseGrammar: Grammar[C],
  * @author dlwh
  */
 class AnchoredRulePosteriorScorerFactory[C,L,W](coarseGrammar: Grammar[C],
-                                                parser: SimpleChartParser[C,L,W])
-        extends ChartDrivenScorerFactory[C,L,W](coarseGrammar, parser) {
+                                                parser: SimpleChartParser[C,L,W], threshold: Double = Double.NegativeInfinity)
+        extends ChartDrivenScorerFactory[C,L,W](coarseGrammar, parser, threshold) {
 
   type MyScorer = AnchoredRuleScorer[C];
   protected def createSpanScorer(ruleData: AnchoredRuleProjector.AnchoredData, sentProb: Double) = {

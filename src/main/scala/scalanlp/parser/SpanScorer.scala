@@ -1,5 +1,8 @@
 package scalanlp.parser
 
+import scalanlp.trees.BinarizedTree
+import scalanlp.collection.mutable.TriangularArray
+
 /**
  * SpanScorers are used in [[scalanlp.parser.ChartParser]]s to reweight rules in a particular context.
  * Typically, they're indexed for a *particular* set of rules and labels for speed.
@@ -71,7 +74,8 @@ object SpanScorer {
    */
   @SerialVersionUID(1)
   trait Factory[C,F,-W] extends Serializable {
-    def mkSpanScorer(s: Seq[W], oldScorer: SpanScorer[C] = identity, thresholdInclusion: SpanScorer[C] = SpanScorer.constant[C](Double.NegativeInfinity)):SpanScorer[C]
+    def mkSpanScorer(s: Seq[W], oldScorer: SpanScorer[C] = identity,
+                     goldLabel: GoldTagPolicy[C] = GoldTagPolicy.noGoldTags[C]):SpanScorer[C]
   }
 
   /**
@@ -79,7 +83,7 @@ object SpanScorer {
    */
   @SerialVersionUID(1)
   def identityFactory[C,F,W]:Factory[C,F,W] = new Factory[C,F,W] {
-    def mkSpanScorer(s: Seq[W], oldScorer: SpanScorer[C], pruner: SpanScorer[C]) = identity[C];
+    def mkSpanScorer(s: Seq[W], oldScorer: SpanScorer[C], goldTag: GoldTagPolicy[C]) = identity[C];
   }
 
 
@@ -88,7 +92,7 @@ object SpanScorer {
    */
   @SerialVersionUID(1)
   def forwardingFactory[C,W]:Factory[C,C,W] = new Factory[C,C,W] {
-    def mkSpanScorer(s: Seq[W], oldScorer: SpanScorer[C], pruner: SpanScorer[C]) = oldScorer;
+    def mkSpanScorer(s: Seq[W], oldScorer: SpanScorer[C], goldTag: GoldTagPolicy[C]) = oldScorer;
   }
 
   /**
@@ -114,5 +118,44 @@ object SpanScorer {
   }
 
 
+}
 
+trait GoldTagPolicy[L] {
+  def isGoldTag(start: Int, end: Int, tag: Int):Boolean
+}
+
+object GoldTagPolicy {
+  def noGoldTags[L]:GoldTagPolicy[L] = new GoldTagPolicy[L] {
+    def isGoldTag(start: Int, end: Int, tag: Int) = false
+  }
+
+  def candidateTreeForcing[L](tree: BinarizedTree[Seq[Int]]):GoldTagPolicy[L] ={
+    val gold = TriangularArray.raw(tree.span.end+1,collection.mutable.BitSet());
+    if(tree != null) {
+      for( t <- tree.allChildren) {
+        gold(TriangularArray.index(t.span.start,t.span.end)) ++= t.label
+      }
+    }
+    new GoldTagPolicy[L] {
+      def isGoldTag(start: Int, end: Int, tag: Int) = {
+        val set = gold(TriangularArray.index(start,end))
+        set != null && set.contains(tag)
+      }
+    }
+  }
+
+
+  def goldTreeForcing[L](tree: BinarizedTree[Int]):GoldTagPolicy[L] ={
+    val gold = TriangularArray.raw(tree.span.end+1,-1)
+    if(tree != null) {
+      for( t <- tree.allChildren) {
+        gold(TriangularArray.index(t.span.start,t.span.end)) = t.label
+      }
+    }
+    new GoldTagPolicy[L] {
+      def isGoldTag(start: Int, end: Int, tag: Int) = {
+        gold(TriangularArray.index(start,end)) == tag
+      }
+    }
+  }
 }

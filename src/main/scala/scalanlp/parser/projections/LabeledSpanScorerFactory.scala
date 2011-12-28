@@ -17,10 +17,10 @@ import scalanlp.config.Configuration
  * Creates labeled span scorers for a set of trees from some parser.
  * @author dlwh
  */
-class LabeledSpanScorerFactory[C,L,W](parser: ChartParser[C,L,W]) extends SpanScorer.Factory[C,L,W] {
+class LabeledSpanScorerFactory[C,L,W](parser: ChartParser[C,L,W], threshold: Double) extends SpanScorer.Factory[C,L,W] {
   def indexedProjections = parser.projections.labels
 
-  def mkSpanScorer(s: Seq[W], scorer: SpanScorer[C] = SpanScorer.identity, thresholdScorer: SpanScorer[C] = SpanScorer.constant(Double.NegativeInfinity)) = {
+  def mkSpanScorer(s: Seq[W], scorer: SpanScorer[C] = SpanScorer.identity, goldTag: GoldTagPolicy[C] = GoldTagPolicy.noGoldTags) = {
     val charts = parser.charts(s,scorer)
 
     val sentProb = charts.inside.top.labelScore(0,s.length,parser.root)
@@ -28,14 +28,14 @@ class LabeledSpanScorerFactory[C,L,W](parser: ChartParser[C,L,W]) extends SpanSc
       sys.error("Couldn't parse " + s + " " + sentProb)
     }
 
-    val chartScorer = buildSpanScorer(charts,sentProb, scorer, thresholdScorer)
+    val chartScorer = buildSpanScorer(charts,sentProb, scorer, goldTag)
 
     chartScorer
   }
 
   def buildSpanScorer(charts: ChartPair[ParseChart,L], sentProb: Double,
                       coarseScorer: SpanScorer[C] = SpanScorer.identity,
-                      thresholdScorer: SpanScorer[C] = SpanScorer.constant(Double.NegativeInfinity)):LabeledSpanScorer[C] = {
+                      goldTag: GoldTagPolicy[C] = GoldTagPolicy.noGoldTags):LabeledSpanScorer[C] = {
     import charts._
 
     val scores = TriangularArray.raw(inside.length+1,null:OldSparseVector)
@@ -50,7 +50,7 @@ class LabeledSpanScorerFactory[C,L,W](parser: ChartParser[C,L,W]) extends SpanSc
       }
 
       for( (c,v) <- scoresForLocation.nonzero.pairs) {
-        if(v > thresholdScorer.scoreSpan(begin,end,c)) {
+        if(v > threshold || goldTag.isGoldTag(begin,end,c)) {
           if(scores(index) eq null) {
             scores(index) = indexedProjections.coarseEncoder.mkOldSparseVector(Double.NegativeInfinity)
           }
@@ -101,7 +101,7 @@ object ProjectTreebankToLabeledSpans {
     val proj = new GrammarProjections(ProjectionIndexer.simple(parser.projections.labels.coarseIndex), ProjectionIndexer.simple(parser.projections.rules.coarseIndex))
     val trueProj = parser.projections
     if(params.project) {
-      val factory = new LabeledSpanScorerFactory[String,Any,String](parser)
+      val factory = new LabeledSpanScorerFactory[String,Any,String](parser, -7)
       writeObject(parser.projections.labels.coarseIndex,new File(outDir,SPAN_INDEX_NAME))
       SpanBroker.serializeSpans(mapTrees(factory,treebank.trainTrees, proj, true, params.maxParseLength),new File(outDir,TRAIN_SPANS_NAME))
       SpanBroker.serializeSpans(mapTrees(factory,treebank.testTrees, proj, false, 10000),new File(outDir,TEST_SPANS_NAME))
@@ -109,7 +109,7 @@ object ProjectTreebankToLabeledSpans {
     } else {
       val fineProj = new GrammarProjections(ProjectionIndexer.simple(parser.projections.labels.fineIndex), ProjectionIndexer.simple(parser.projections.rules.fineIndex))
       val nonprojectingParser = new SimpleChartParser(parser.builder,new SimpleViterbiDecoder[Any,String](parser.builder.grammar), fineProj)
-      val factory = new LabeledSpanScorerFactory[Any,Any,String](nonprojectingParser)
+      val factory = new LabeledSpanScorerFactory[Any,Any,String](nonprojectingParser, -7)
       writeObject(parser.projections.labels.fineIndex,new File(outDir,SPAN_INDEX_NAME))
       serializeSpans(mapTrees(factory,treebank.trainTrees, trueProj, true, params.maxParseLength),new File(outDir,TRAIN_SPANS_NAME))
       serializeSpans(mapTrees(factory,treebank.testTrees, trueProj, false, 10000),new File(outDir,TEST_SPANS_NAME))
@@ -133,11 +133,11 @@ object ProjectTreebankToLabeledSpans {
       println(id,words)
       try {
         val pruningThreshold = -7.0
-        val pruner:SpanScorer[L] = if(useTree) {
+        val pruner:GoldTagPolicy[L] = if(useTree) {
           val mappedTree = tree.map(l => proj.labels.refinementsOf(l).map(proj.labels.fineIndex))
-          SpanScorer.sum(AnchoredRuleProjector.candidateTreeForcing(mappedTree), SpanScorer.constant(pruningThreshold))
+          GoldTagPolicy.candidateTreeForcing(mappedTree)
         } else {
-          SpanScorer.constant[L](pruningThreshold)
+          GoldTagPolicy.noGoldTags
         }
         val scorer =factory.mkSpanScorer(words,new ProjectingSpanScorer(proj, preScorer), pruner)
         id -> scorer

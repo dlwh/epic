@@ -14,7 +14,7 @@ import sun.misc.Unsafe
 @SerialVersionUID(2L)
 class AnchoredRuleProjector[C,L,W](coarseGrammar: Grammar[C],
                                    parser: ChartBuilder[ParseChart.LogProbabilityParseChart,L,W],
-                                   indexedProjections: GrammarProjections[C,L]) extends Serializable {
+                                   indexedProjections: GrammarProjections[C,L], threshold: Double) extends Serializable {
 
 
 
@@ -31,7 +31,7 @@ class AnchoredRuleProjector[C,L,W](coarseGrammar: Grammar[C],
                             outside: ParseChart[L],
                             sentProb: Double,
                             scorer: SpanScorer[L]=SpanScorer.identity,
-                            pruneLabel: SpanScorer[C]=AnchoredRuleProjector.noPruning[C]):AnchoredRuleProjector.AnchoredData = {
+                            goldTagPolicy: GoldTagPolicy[C] = GoldTagPolicy.noGoldTags[C]):AnchoredRuleProjector.AnchoredData = {
 
 
     // preliminaries: we're not going to fill in everything: some things will be null.
@@ -76,7 +76,7 @@ class AnchoredRuleProjector[C,L,W](coarseGrammar: Grammar[C],
         l <- inside.bot.enteredLabelIndexes(begin,end)) {
       val currentScore = inside.bot.labelScore(begin,end,l) + outside.bot.labelScore(begin,end,l) - sentProb;
       val pL = indexedProjections.labels.project(l)
-      if(currentScore > pruneLabel.scoreSpan(begin,end,pL)) {
+      if(currentScore > threshold || goldTagPolicy.isGoldTag(begin,end,pL)) {
         getOrElseUpdate(lexicalScores,TriangularArray.index(begin,end),projVector())(pL) = 0
       }
     }
@@ -87,8 +87,6 @@ class AnchoredRuleProjector[C,L,W](coarseGrammar: Grammar[C],
       for(begin <- 0 until (inside.length - diff + 1)) {
         val end = begin + diff;
         val index = TriangularArray.index(begin,end);
-        var pruned = 0
-        var totalP = 0
 
         // do binaries
         for( parent <- inside.bot.enteredLabelIndexes(begin,end)) {
@@ -97,7 +95,7 @@ class AnchoredRuleProjector[C,L,W](coarseGrammar: Grammar[C],
 
           var total = 0.0
 
-          if(parentScore + inside.bot.labelScore(begin,end,parent) - sentProb > pruneLabel.scoreSpan(begin,end,parent)) {
+          if(parentScore + inside.bot.labelScore(begin,end,parent) - sentProb > threshold || goldTagPolicy.isGoldTag(begin,end,parent)) {
             val rules = grammar.indexedBinaryRulesWithParent(parent)
             var ruleIndex = 0
             while(ruleIndex < rules.length) {
@@ -119,7 +117,7 @@ class AnchoredRuleProjector[C,L,W](coarseGrammar: Grammar[C],
                     + ruleScore
                     + scorer.scoreBinaryRule(begin,split,end,r)
                     - sentProb);
-                  if(currentScore > pruneLabel.scoreBinaryRule(begin,split,end,pR)) {
+                  if(currentScore > Double.NegativeInfinity) {
                     val parentArray = if(binaryScores(index)(split-begin) eq null) {
                       binaryScores(index)(split-begin) = projRuleVector()
                       binaryScores(index)(split-begin)
@@ -143,9 +141,6 @@ class AnchoredRuleProjector[C,L,W](coarseGrammar: Grammar[C],
             totals(index)(pP) += total
           }
         }
-        if(totalP != 0.0)
-          println(pruned * 1.0 / totalP)
-
 
         // do unaries. Similar to above
         for( parent <- inside.top.enteredLabelIndexes(begin,end)) {
@@ -166,7 +161,7 @@ class AnchoredRuleProjector[C,L,W](coarseGrammar: Grammar[C],
             val ruleScore = parser.grammar.ruleScore(r)
             val score = ruleScore + inside.bot.labelScore(begin,end,c) + parentScore +
                     scorer.scoreUnaryRule(begin,end,r) - sentProb;
-            if(score > pruneLabel.scoreUnaryRule(begin,end,indexedProjections.rules.project(r))) {
+            if(score > Double.NegativeInfinity) {
               val count = math.exp(score)
               parentArray(pR) += count
               total += count
@@ -207,51 +202,6 @@ object AnchoredRuleProjector {
                           /** (triangularIndex)(parent) => sum of all binary rules at parent. */
                           binaryTotals: Array[OldSparseVector]);
 
-  def noPruning[L]: SpanScorer[L] = thresholdPruning(Double.NegativeInfinity);
-
-  def thresholdPruning[L](thresh: Double):SpanScorer[L] = new SpanScorer[L] {
-    def scoreSpan(begin: Int, end: Int, tag: Int) = thresh;
-
-    def scoreUnaryRule(begin: Int, end: Int, rule: Int) = Double.NegativeInfinity
-
-    def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = Double.NegativeInfinity
-  }
-
-  def goldTreeForcing[L](tree: BinarizedTree[Int]):SpanScorer[L] ={
-    val gold = TriangularArray.raw(tree.span.end+1,collection.mutable.BitSet());
-    if(tree != null) {
-      for( t <- tree.allChildren) {
-        gold(TriangularArray.index(t.span.start,t.span.end)) +=(t.label);
-      }
-    }
-    new SpanScorer[L] {
-      def scoreSpan(begin: Int, end: Int, tag: Int) = {
-        if(gold(TriangularArray.index(begin,end))(tag)) Double.NegativeInfinity
-        else 0.0
-      }
-
-      def scoreUnaryRule(begin: Int, end: Int, rule: Int) = 0.0
-
-      def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = 0.0
-    }
-  }
-
- def candidateTreeForcing[L](tree: BinarizedTree[Seq[Int]]):SpanScorer[L] ={
-    val gold = TriangularArray.raw(tree.span.end+1,collection.mutable.BitSet());
-    if(tree != null) {
-      for( t <- tree.allChildren) {
-        gold(TriangularArray.index(t.span.start,t.span.end)) ++= t.label
-      }
-    }
-    new SpanScorer[L] {
-      def scoreSpan(begin: Int, end: Int, tag: Int) = {
-        if(gold(TriangularArray.index(begin,end))(tag)) Double.NegativeInfinity
-        else 0.0
-      }
-
-      def scoreUnaryRule(begin: Int, end: Int, rule: Int) = 0.0
-
-      def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = 0.0
-    }
-  }
 }
+
+
