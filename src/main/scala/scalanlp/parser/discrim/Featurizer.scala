@@ -10,6 +10,7 @@ import scalala.tensor.{Counter2, Counter}
 import scalala.library.Library._
 import scalala.tensor.sparse.SparseVector
 import scalanlp.collection.mutable.{OpenAddressHashArray, SparseArrayMap, ArrayMap}
+import scalala.tensor.dense.DenseVector
 
 /** For representing features over bits */
 object BitStuff {
@@ -437,6 +438,23 @@ trait FeatureIndexer[L,W] extends Encoder[Feature[L,W]] with Serializable {
       stripEncode(featurizer.featuresFor(labelIndex.get(a),w))
     }
     else lexicalCache(a)(w)
+  }
+
+  def dotProjectOfFeatures(a: Int, w: W, weights: DenseVector[Double]) = {
+    if(lexicalCache(a).contains(w)) lexicalCache(a)(w) dot weights
+    else {
+      var score = 0.0
+      val feats = featurizer.featuresFor(labelIndex.get(a),w)
+      for( (k,v) <- feats.nonzero.pairs) {
+        val ind = index(k)
+        if(ind != -1) {
+          score += v * weights(ind)
+        }
+      }
+      score
+    }
+
+
   }
 
   def initialValueFor(f: Feature[L,W]):Double = featurizer.initialValueForFeature(f)

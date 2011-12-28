@@ -15,8 +15,6 @@ class FeaturizedLexicon[L,W](val openTagSet: Set[L], val closedWords: Set[W], va
     tagScores(w)(label);
   }
 
-
-
   override def tagScores(w: W): Counter[L,Double] = {
     if(closedWords(w) && wordScores.contains(w)) wordScores(w, ::)
     else {

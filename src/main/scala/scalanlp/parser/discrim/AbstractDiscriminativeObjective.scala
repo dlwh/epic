@@ -53,7 +53,8 @@ abstract class AbstractDiscriminativeObjective[L,L2,W](
       } catch {
         case e => println("Error in parsing: " + words + e);
         e.printStackTrace()
-        throw e;
+        emptyCounts(parser)
+//        throw e;
       }
       res
     } reduce {
