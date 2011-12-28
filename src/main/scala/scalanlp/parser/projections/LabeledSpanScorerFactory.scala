@@ -85,10 +85,8 @@ case class ProjectionParams(treebank: TreebankParams,
 }
 
 object ProjectTreebankToLabeledSpans {
-  val TRAIN_SPANS_NAME = "train.spans.ser"
-  val DEV_SPANS_NAME = "dev.spans.ser"
-  val TEST_SPANS_NAME = "test.spans.ser"
-  val SPAN_INDEX_NAME = "spanindex.ser"
+  import SpanBroker._
+
   def main(args: Array[String]) {
     val (baseConfig,files) = scalanlp.config.CommandLineParser.parseArguments(args)
     val config = baseConfig backoff Configuration.fromPropertiesFiles(files.map(new File(_)))
@@ -105,17 +103,17 @@ object ProjectTreebankToLabeledSpans {
     if(params.project) {
       val factory = new LabeledSpanScorerFactory[String,Any,String](parser)
       writeObject(parser.projections.labels.coarseIndex,new File(outDir,SPAN_INDEX_NAME))
-      writeIterable(mapTrees(factory,treebank.trainTrees, proj, true, params.maxParseLength),new File(outDir,TRAIN_SPANS_NAME))
-      writeIterable(mapTrees(factory,treebank.testTrees, proj, false, 10000),new File(outDir,TEST_SPANS_NAME))
-      writeIterable(mapTrees(factory,treebank.devTrees, proj, false, 10000),new File(outDir,DEV_SPANS_NAME))
+      SpanBroker.serializeSpans(mapTrees(factory,treebank.trainTrees, proj, true, params.maxParseLength),new File(outDir,TRAIN_SPANS_NAME))
+      SpanBroker.serializeSpans(mapTrees(factory,treebank.testTrees, proj, false, 10000),new File(outDir,TEST_SPANS_NAME))
+      SpanBroker.serializeSpans(mapTrees(factory,treebank.devTrees, proj, false, 10000),new File(outDir,DEV_SPANS_NAME))
     } else {
       val fineProj = new GrammarProjections(ProjectionIndexer.simple(parser.projections.labels.fineIndex), ProjectionIndexer.simple(parser.projections.rules.fineIndex))
       val nonprojectingParser = new SimpleChartParser(parser.builder,new SimpleViterbiDecoder[Any,String](parser.builder.grammar), fineProj)
       val factory = new LabeledSpanScorerFactory[Any,Any,String](nonprojectingParser)
       writeObject(parser.projections.labels.fineIndex,new File(outDir,SPAN_INDEX_NAME))
-      writeIterable(mapTrees(factory,treebank.trainTrees, trueProj, true, params.maxParseLength),new File(outDir,TRAIN_SPANS_NAME))
-      writeIterable(mapTrees(factory,treebank.testTrees, trueProj, false, 10000),new File(outDir,TEST_SPANS_NAME))
-      writeIterable(mapTrees(factory,treebank.devTrees, trueProj, false, 10000),new File(outDir,DEV_SPANS_NAME))
+      serializeSpans(mapTrees(factory,treebank.trainTrees, trueProj, true, params.maxParseLength),new File(outDir,TRAIN_SPANS_NAME))
+      serializeSpans(mapTrees(factory,treebank.testTrees, trueProj, false, 10000),new File(outDir,TEST_SPANS_NAME))
+      serializeSpans(mapTrees(factory,treebank.devTrees, trueProj, false, 10000),new File(outDir,DEV_SPANS_NAME))
 
     }
   }
@@ -142,9 +140,9 @@ object ProjectTreebankToLabeledSpans {
           SpanScorer.constant[L](pruningThreshold)
         }
         val scorer =factory.mkSpanScorer(words,new ProjectingSpanScorer(proj, preScorer), pruner)
-        scorer
+        id -> scorer
       } catch {
-        case e: Exception => e.printStackTrace(); SpanScorer.identity
+        case e: Exception => e.printStackTrace(); id -> SpanScorer.identity[L]
       }
     }.seq
   }
@@ -155,31 +153,6 @@ object ProjectTreebankToLabeledSpans {
     oout.close()
   }
 
-  def writeIterable[T](o: Iterable[T], file: File) {
-    FileIterable.write(o,file)
-  }
 
-  def loadSpans(spanDir: File) = {
-    if(!spanDir.exists || !spanDir.isDirectory) sys.error(spanDir + " must exist and be a directory!")
-
-    val trainSpans = loadSpansFile(new File(spanDir,TRAIN_SPANS_NAME))
-    val devSpans = loadSpansFile(new File(spanDir,DEV_SPANS_NAME))
-    val testSpans = loadSpansFile(new File(spanDir,TEST_SPANS_NAME))
-
-    (trainSpans,devSpans,testSpans)
-  }
-
-  def loadSpansFile[String](spanFile: File):Iterable[SpanScorer[String]] = {
-    require(spanFile.exists, spanFile + " must exist!")
-    new FileIterable[SpanScorer[String]](spanFile)
-  }
-
-  def loadSpanIndex(spanFile: File) = {
-    require(spanFile.exists, spanFile + " must exist!")
-    val oin = new ObjectInputStream(new BufferedInputStream(new FileInputStream(spanFile)))
-    val index = oin.readObject().asInstanceOf[Index[String]]
-    oin.close()
-    index
-  }
 
 }

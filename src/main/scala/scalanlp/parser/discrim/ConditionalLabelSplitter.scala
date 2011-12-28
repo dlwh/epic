@@ -19,8 +19,9 @@ class ConditionalLabelSplitter[L](oneStepProjections: ProjectionIndexer[L,L],
       else l
     })
     val newFineLabels = Index(newCoarseLabels.flatMap(split))
+    println(labelsToUnsplit)
 
-    val oneStep = ProjectionIndexer.fromSplitter(oneStepProjections.fineIndex, newFineLabels, {(l:L) => if(labelsToUnsplit(l)) Seq(l) else split(l)} )
+    val oneStep = ProjectionIndexer.fromSplitter(oneStepProjections.fineIndex, newFineLabels, {(l:L) => if(labelsToUnsplit(oneStepProjections.project(l))) Seq(l) else split(l)} )
     val sibProj = ProjectionIndexer.fromSplitter(newCoarseLabels, newFineLabels, split)
     (oneStep,sibProj)
   }

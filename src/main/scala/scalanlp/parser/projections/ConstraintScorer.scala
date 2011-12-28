@@ -16,7 +16,7 @@ import scalanlp.util.Index
  * @author dlwh
  */
 
-class ConstraintScorer[L](scores: Array[BitSet]) extends SpanScorer[L] {
+class ConstraintScorer[L](val scores: Array[BitSet]) extends SpanScorer[L] {
   def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = 0.0
 
   def scoreUnaryRule(begin: Int, end: Int, rule: Int) = 0.0
@@ -86,10 +86,9 @@ class ConstraintScorerFactory[C,L,W](parser: ChartParser[C,L,W]) extends SpanSco
 }
 
 object ProjectTreebankToConstraints {
-  val TRAIN_SPANS_NAME = "train.spans.ser"
-  val DEV_SPANS_NAME = "dev.spans.ser"
-  val TEST_SPANS_NAME = "test.spans.ser"
-  val SPAN_INDEX_NAME = "spanindex.ser"
+
+  import SpanBroker._
+
   def main(args: Array[String]) {
     val (baseConfig,files) = scalanlp.config.CommandLineParser.parseArguments(args)
     val config = baseConfig backoff Configuration.fromPropertiesFiles(files.map(new File(_)))
@@ -105,19 +104,18 @@ object ProjectTreebankToConstraints {
     val trueProj = parser.projections
     if(params.project) {
       val factory = new ConstraintScorerFactory[String,Any,String](parser)
-      writeObject(parser.projections.labels.coarseIndex,new File(outDir,SPAN_INDEX_NAME))
-      writeIterable(mapTrees(factory,treebank.trainTrees, proj, true, params.maxParseLength),new File(outDir,TRAIN_SPANS_NAME))
-      writeIterable(mapTrees(factory,treebank.testTrees, proj, false, 10000),new File(outDir,TEST_SPANS_NAME))
-      writeIterable(mapTrees(factory,treebank.devTrees, proj, false, 10000),new File(outDir,DEV_SPANS_NAME))
+      scalanlp.util.writeObject(new File(outDir,SPAN_INDEX_NAME),parser.projections.labels.coarseIndex)
+      serializeSpans(mapTrees(factory,treebank.trainTrees, proj, true, params.maxParseLength),new File(outDir,TRAIN_SPANS_NAME))
+      serializeSpans(mapTrees(factory,treebank.testTrees, proj, false, 10000),new File(outDir,TEST_SPANS_NAME))
+      serializeSpans(mapTrees(factory,treebank.devTrees, proj, false, 10000),new File(outDir,DEV_SPANS_NAME))
     } else {
       val fineProj = new GrammarProjections(ProjectionIndexer.simple(parser.projections.labels.fineIndex), ProjectionIndexer.simple(parser.projections.rules.fineIndex))
       val nonprojectingParser = new SimpleChartParser(parser.builder,new SimpleViterbiDecoder[Any,String](parser.builder.grammar), fineProj)
       val factory = new ConstraintScorerFactory[Any,Any,String](nonprojectingParser)
-      writeObject(parser.projections.labels.fineIndex,new File(outDir,SPAN_INDEX_NAME))
-      writeIterable(mapTrees(factory,treebank.trainTrees, trueProj, true, params.maxParseLength),new File(outDir,TRAIN_SPANS_NAME))
-      writeIterable(mapTrees(factory,treebank.testTrees, trueProj, false, 10000),new File(outDir,TEST_SPANS_NAME))
-      writeIterable(mapTrees(factory,treebank.devTrees, trueProj, false, 10000),new File(outDir,DEV_SPANS_NAME))
-
+      scalanlp.util.writeObject(new File(outDir, SPAN_INDEX_NAME), parser.projections.labels.fineIndex)
+      serializeSpans(mapTrees(factory,treebank.trainTrees, trueProj, true, params.maxParseLength),new File(outDir,TRAIN_SPANS_NAME))
+      serializeSpans(mapTrees(factory,treebank.testTrees, trueProj, false, 10000),new File(outDir,TEST_SPANS_NAME))
+      serializeSpans(mapTrees(factory,treebank.devTrees, trueProj, false, 10000),new File(outDir,DEV_SPANS_NAME))
     }
   }
 
@@ -135,52 +133,20 @@ object ProjectTreebankToConstraints {
       val TreeInstance(id,tree,words,preScorer) = ti
       println(id,words)
       try {
-        val pruningThreshold = -7.0
+        val pruningThreshold = -7
         val pruner:SpanScorer[L] = if(useTree) {
           val mappedTree = tree.map(l => proj.labels.refinementsOf(l).map(proj.labels.fineIndex))
           SpanScorer.sum(AnchoredRuleProjector.candidateTreeForcing(mappedTree), SpanScorer.constant(pruningThreshold))
         } else {
           SpanScorer.constant[L](pruningThreshold)
         }
-        val scorer =factory.mkSpanScorer(words,new ProjectingSpanScorer(proj, preScorer), pruner)
-        scorer
+        val scorer = factory.mkSpanScorer(words,new ProjectingSpanScorer(proj, preScorer), pruner)
+        id -> scorer
       } catch {
-        case e: Exception => e.printStackTrace(); SpanScorer.identity
+        case e: Exception => e.printStackTrace(); id -> SpanScorer.identity[L]
       }
     }.seq
   }
 
-  def writeObject(o: AnyRef, file: File) {
-    val oout = new ObjectOutputStream(new BufferedOutputStream(new FileOutputStream(file)))
-    oout.writeObject(o)
-    oout.close()
-  }
-
-  def writeIterable[T](o: Iterable[T], file: File) {
-    FileIterable.write(o,file)
-  }
-
-  def loadSpans(spanDir: File) = {
-    if(!spanDir.exists || !spanDir.isDirectory) sys.error(spanDir + " must exist and be a directory!")
-
-    val trainSpans = loadSpansFile(new File(spanDir,TRAIN_SPANS_NAME))
-    val devSpans = loadSpansFile(new File(spanDir,DEV_SPANS_NAME))
-    val testSpans = loadSpansFile(new File(spanDir,TEST_SPANS_NAME))
-
-    (trainSpans,devSpans,testSpans)
-  }
-
-  def loadSpansFile[String](spanFile: File):Iterable[SpanScorer[String]] = {
-    require(spanFile.exists, spanFile + " must exist!")
-    new FileIterable[SpanScorer[String]](spanFile)
-  }
-
-  def loadSpanIndex(spanFile: File) = {
-    require(spanFile.exists, spanFile + " must exist!")
-    val oin = new ObjectInputStream(new BufferedInputStream(new FileInputStream(spanFile)))
-    val index = oin.readObject().asInstanceOf[Index[String]]
-    oin.close()
-    index
-  }
 
 }

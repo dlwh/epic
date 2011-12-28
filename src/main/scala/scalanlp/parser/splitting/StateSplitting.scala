@@ -77,7 +77,10 @@ object StateSplitting {
           foundOne = true;
         }
         if(!foundOne) {
-          sys.error("Trouble with lexical " + t.render(s))
+          val available: IndexedSeq[(L, Double)] =  (0 until grammar.labelIndex.size).map { i =>
+            grammar.labelIndex.get(i) -> scorer.scoreSpan(t.span.start,t.span.end,i)
+          }.toIndexedSeq
+          sys.error("Trouble with lexical " + s(t.span.start) + " " + t.label.candidates.map(grammar.labelIndex.get _) + "\n" + available.mkString("Available:",",",""))
         }
       case t@UnaryTree(Beliefs(aLabels,aScores,_),Tree(Beliefs(cLabels,cScores,_),_)) =>
         var foundOne = false;
@@ -364,9 +367,7 @@ object StateSplitting {
     val symbolProbs = (symbolCounts :/ symbolTrials).map(math.log)
     assert(!symbolProbs.valuesIterator.exists(_.isNaN))
     assert(!symbolProbs.valuesIterator.exists(_.isInfinite), symbolProbs.pairsIterator.toIndexedSeq.mkString("\n"))
-    println(Encoder.fromIndex(oneStepProjections.fineIndex).decode(symbolProbs))
     val mergeCosts = calibratedTrees.map(computeMergeCosts(oneStepProjections,symbolProbs,_)).reduce(_ += _)
-    println(oneStepProjections.coarseEncoder.decode(mergeCosts))
     val topK = (0 until oneStepProjections.coarseIndex.size).sortBy(i => -mergeCosts(i)).take(percentMerging * oneStepProjections.coarseIndex.size toInt)
     println("Will merge:")
     for(i <- topK) {

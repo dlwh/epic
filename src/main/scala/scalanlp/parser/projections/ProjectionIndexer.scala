@@ -43,6 +43,11 @@ class ProjectionIndexer[C,F] private (val coarseIndex: Index[C],
   def compose[F2](finerProjections: ProjectionIndexer[F,F2]) = {
     ProjectionIndexer(coarseIndex, finerProjections.fineIndex, {finerProjections.project(_ : F2)} andThen {project(_ : F)})
   }
+
+  override def toString() = {
+    coarseIndex.map(x => x -> refinementsOf(x)).mkString("ProjectionIndexer(",", ", ")")
+
+  }
 }
 
 object ProjectionIndexer {

@@ -3,7 +3,7 @@ package scalanlp.parser.discrim
 import scalanlp.util._
 import scalanlp.parser._
 import java.io._
-import projections.{ProjectingSpanScorer, ProjectionIndexer, GrammarProjections}
+import projections.{ConstraintScorer, ProjectingSpanScorer, ProjectionIndexer, GrammarProjections}
 import scalala.tensor.dense.DenseVector
 import scalanlp.trees.UnaryChainRemover.ChainReplacer
 import scalala.library.Library
@@ -13,6 +13,7 @@ import scalanlp.optimize.CachedBatchDiffFunction
 import scalala.tensor.{Counter, Counter2}
 import scalala.tensor.::
 import logging._
+import scalanlp.collection.mutable.TriangularArray
 
 /**
  * Runs a parser that can conditionally split labels
@@ -49,7 +50,8 @@ object SplittingPipeline extends ParserPipeline {
         scorer.scoreSpan(begin,end,oneStepProjections.project(tag))
       }
     }
-    val spans = params.specific.refinedSpans.trainSpans.map(new ProjectScorer(_))
+    val broker = params.specific.refinedSpans.trainSpans
+    val spans = trainTrees.map(instance => new ProjectScorer(broker.spanForId(instance.id)))
     val r = new LatentDiscrimObjective(latentFeaturizer,
       trainTrees,
       indexedProjections,
@@ -123,9 +125,19 @@ object SplittingPipeline extends ParserPipeline {
       val oldParser = readObject[SimpleChartParser[String,Sym,String]](params.specific.lastParser)
       val lastProjectionsFile = new File(params.specific.lastParser.getParentFile.getParentFile,"projections.ser")
       val lastSiblings = readObject[ProjectionIndexer[Sym,Sym]](lastProjectionsFile)
-      splitLabels(lastSiblings, oldParser, trainTrees, params.specific.fracToSplit)
+      val r = splitLabels(lastSiblings, oldParser, trainTrees, params.specific.fracToSplit)
+      println("Old parser projections:")
+      println(oldParser.projections.labels.fineIndex)
+      r
     }
     writeObject(new File("projections.ser"), siblingProjections)
+    println("Siblings:")
+    println(siblingProjections.coarseIndex)
+    println("One step:")
+    println(oneStepProjections.coarseIndex)
+    println(oneStepProjections.fineIndex)
+    println("Span Index:")
+    println(params.specific.refinedSpans.index)
 
     def unsplit(s: (String,Any)) = s._1
     val labelProjections = ProjectionIndexer(xbarParser.grammar.labelIndex, oneStepProjections.fineIndex, unsplit)

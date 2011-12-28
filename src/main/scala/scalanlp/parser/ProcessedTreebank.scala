@@ -1,9 +1,10 @@
 package scalanlp.parser
 
-import projections._;
+import projections._
 import scalanlp.trees._;
 import java.io.File
 import scalanlp.data.Example
+import scalanlp.util.Index
 
 /**
  * Represents a treebank with attendant spans, binarization, etc. Used in all the parser trainers.
@@ -22,17 +23,19 @@ case class ProcessedTreebank(treebank: TreebankParams, spans: SpanParams[String]
 
 
   def transformTrees(portion: treebank.treebank.Portion,
-                     spans: Iterable[SpanScorer[String]]): IndexedSeq[TreeInstance[String,String]] = {
+                     broker: SpanBroker[String]): IndexedSeq[TreeInstance[String,String]] = {
     import treebank._;
 
     val binarizedAndTransformed = for (
-      (((tree, words),span),index) <- (portion.trees zip spans.iterator).zipWithIndex if words.length <= maxLength
+      ((tree, words),index) <- portion.trees.zipWithIndex if words.length <= maxLength
     ) yield {
       val transformed = xform(tree);
       val vertAnnotated = Trees.annotateParents(transformed,depth = verticalMarkovization);
       val bin = binarize(vertAnnotated);
       val horiz = Trees.markovizeBinarization(bin,horizontalMarkovization);
-      TreeInstance(portion.name +"-" + index,horiz,words,span)
+      val name = portion.name +"-" + index
+      val span = broker.spanForId(name)
+      TreeInstance(name,horiz,words,span)
     }
 
     binarizedAndTransformed.toIndexedSeq
@@ -77,20 +80,23 @@ case class TreebankParams(path: File,
 
 }
 
-case class SpanParams[String](directory: File = null) {
-  def loadSpans(path: Option[File]):Seq[SpanScorer[String]] = path match {
-    case Some(path) => ProjectTreebankToLabeledSpans.loadSpansFile(path).toSeq;
-    case None =>       Stream.continually(SpanScorer.identity)
+case class SpanParams[T](directory: File = null) {
+  def loadSpans(path: Option[File]):SpanBroker[T] = path match {
+    case Some(path) =>  SpanBroker.load(path)
+    case None => SpanBroker.zeroBroker[T]
   }
+  import SpanBroker._
 
-  val trainSpansFile = Option(directory).map{dir => new File(dir, ProjectTreebankToLabeledSpans.TRAIN_SPANS_NAME)}
+  val trainSpansFile = Option(directory).map{dir => new File(dir, TRAIN_SPANS_NAME)}
   lazy val trainSpans = loadSpans(trainSpansFile);
 
-  val devSpansFile = Option(directory).map{dir => new File(dir, ProjectTreebankToLabeledSpans.DEV_SPANS_NAME)}
+  val devSpansFile = Option(directory).map{dir => new File(dir, DEV_SPANS_NAME)}
   lazy val devSpans = loadSpans(devSpansFile);
 
-  val testSpansFile = Option(directory).map{dir => new File(dir, ProjectTreebankToLabeledSpans.TEST_SPANS_NAME)}
+  val testSpansFile = Option(directory).map{dir => new File(dir,TEST_SPANS_NAME)}
   lazy val testSpans = loadSpans(testSpansFile);
+
+  def index = Option(directory).map { dir => SpanBroker.loadSpanIndex(new File(directory,SPAN_INDEX_NAME))}
 }
 
 case class TreeInstance[L,+W](id: String,

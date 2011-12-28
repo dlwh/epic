@@ -2,14 +2,8 @@ package scalanlp.parser
 package projections
 
 import scalanlp.collection.mutable.TriangularArray
-import scalanlp.trees.{Trees, BinarizedTree, Tree, DenseTreebank}
-import scalanlp.io.FileIterable
 import java.io._
-import actors.Actor
-import scalanlp.util.{HeapDump, Index}
 import scalanlp.tensor.sparse.OldSparseVector
-import collection.parallel.immutable.ParSeq
-;
 
 
 /**
@@ -98,98 +92,3 @@ class AnchoredRuleScorer[L](spanScores: Array[OldSparseVector], // triangular in
   }
 }
 
-object ProjectTreebankToVarGrammar {
-  val TRAIN_SPANS_NAME = "train.spans.ser"
-  val DEV_SPANS_NAME = "dev.spans.ser"
-  val TEST_SPANS_NAME = "test.spans.ser"
-  val SPAN_INDEX_NAME = "spanindex.ser"
-  def main(args: Array[String]) {
-    Actor.actor {
-      def memoryString = {
-        val r = Runtime.getRuntime;
-        val free = r.freeMemory / (1024 * 1024);
-        val total = r.totalMemory / (1024 * 1024);
-        ((total - free) + "M used; " + free  + "M free; " + total  + "M total");
-      }
-      Actor.loop {
-        Thread.sleep(60 * 1000);
-//        HeapDump.dumpHeap("heap.dump");
-        println(memoryString);
-      }
-
-    }
-    val parser = loadParser(new File(args(0)));
-    val coarseParser = ProjectTreebankToLabeledSpans.loadParser[String](new File(args(1)));
-    val treebank = ProcessedTreebank(TreebankParams(new File(args(2)),maxLength=10000),SpanParams(new File(args(3))));
-    val outDir = new File(args(4));
-    outDir.mkdirs();
-    val factory = new AnchoredRuleScorerFactory[String,(String,Int),String](coarseParser.builder.grammar, parser);
-    writeObject(parser.builder.grammar.labelIndex,new File(outDir,SPAN_INDEX_NAME));
-    writeIterable(mapTrees(factory,treebank.trainTrees,true),new File(outDir,TRAIN_SPANS_NAME))
-    writeIterable(mapTrees(factory,treebank.testTrees,false),new File(outDir,TEST_SPANS_NAME))
-    writeIterable(mapTrees(factory,treebank.devTrees,false),new File(outDir,DEV_SPANS_NAME))
-    System.exit(0)
-  }
-
-  def loadParser(loc: File) = {
-    val oin = new ObjectInputStream(new BufferedInputStream(new FileInputStream(loc)));
-    val parser = oin.readObject().asInstanceOf[SimpleChartParser[String,(String,Int),String]]
-    oin.close();
-    parser;
-  }
-
-
-  def mapTrees(factory: AnchoredRuleScorerFactory[String,(String,Int),String], trees: IndexedSeq[TreeInstance[String,String]], useTree: Boolean): Iterable[SpanScorer[String]] = {
-    // TODO: have ability to use other span scorers.
-    trees.toIndexedSeq.par.map { (ti:TreeInstance[String,String]) =>
-      val TreeInstance(_,tree,words,scorer) = ti
-      println(words);
-      val pruningThreshold = -7;
-      try {
-        val pruner: SpanScorer[String] = if(useTree) {
-          SpanScorer.sum[String](AnchoredRuleProjector.goldTreeForcing(tree.map(factory.coarseGrammar.labelIndex)), SpanScorer.constant(pruningThreshold))
-        } else {
-          SpanScorer.constant[String](pruningThreshold)
-        }
-        val newScorer = factory.mkSpanScorer(words,scorer, pruner)
-        newScorer
-      } catch {
-        case e: Exception => e.printStackTrace(); SpanScorer.identity[String];
-      }
-    }.seq
-  }
-
-  def writeObject(o: AnyRef, file: File) {
-    val oout = new ObjectOutputStream(new BufferedOutputStream(new FileOutputStream(file)));
-    oout.writeObject(o);
-    oout.close();
-  }
-
-  def writeIterable[T](o: Iterable[T], file: File) {
-    FileIterable.write(o,file);
-  }
-
-  def loadSpans(spanDir: File) = {
-    if(!spanDir.exists || !spanDir.isDirectory) sys.error(spanDir + " must exist and be a directory!")
-
-    val trainSpans = loadSpansFile(new File(spanDir,TRAIN_SPANS_NAME));
-    val devSpans = loadSpansFile(new File(spanDir,DEV_SPANS_NAME));
-    val testSpans = loadSpansFile(new File(spanDir,TEST_SPANS_NAME));
-
-    (trainSpans,devSpans,testSpans);
-  }
-
-  def loadSpansFile(spanFile: File):Iterable[SpanScorer[String]] = {
-    require(spanFile.exists, spanFile + " must exist!")
-    new FileIterable[SpanScorer[String]](spanFile);
-  }
-
-  def loadSpanIndex(spanFile: File) = {
-    require(spanFile.exists, spanFile + " must exist!")
-    val oin = new ObjectInputStream(new BufferedInputStream(new FileInputStream(spanFile)));
-    val index = oin.readObject().asInstanceOf[Index[String]];
-    oin.close();
-    index;
-  }
-
-}

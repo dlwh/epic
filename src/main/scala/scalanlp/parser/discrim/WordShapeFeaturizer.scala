@@ -116,7 +116,7 @@ class WordShapeFeaturizer[L](lexicon: Counter2[L,String,Double], initToZero: Boo
       }
       i +=1;
     }
-    new ShapeFeature(l,result.toString.intern);
+    new ShapeFeature(l,result.toString);
   }
 
 }

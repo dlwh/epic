@@ -34,22 +34,3 @@ final class StepFunctionSpanScorer[L](inner: SpanScorer[L], threshold: Double = 
   }
 }
 
-object StepFunctionifySpanScorers {
-  import ProjectTreebankToLabeledSpans._;
-
-  def main(args: Array[String]) {
-    val outDir = new File(args(0));
-    val inSpanDir = new File(args(1));
-
-    val trainSpans = loadSpansFile[String](new File(inSpanDir,TRAIN_SPANS_NAME))
-    val testSpans = loadSpansFile[String](new File(inSpanDir,TEST_SPANS_NAME))
-    val devSpans = loadSpansFile[String](new File(inSpanDir,DEV_SPANS_NAME))
-
-    outDir.mkdirs();
-
-    writeIterable(trainSpans.map(new StepFunctionSpanScorer(_,Double.NegativeInfinity)),new File(outDir,TRAIN_SPANS_NAME))
-    writeIterable(testSpans.map(new StepFunctionSpanScorer(_,Double.NegativeInfinity)),new File(outDir,TEST_SPANS_NAME))
-    writeIterable(devSpans.map(new StepFunctionSpanScorer(_,Double.NegativeInfinity)),new File(outDir,DEV_SPANS_NAME))
-  }
-
-}

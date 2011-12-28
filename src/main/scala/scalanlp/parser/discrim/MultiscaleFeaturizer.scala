@@ -54,10 +54,10 @@ class MultiscaleFeaturizer[L,W](base: Featurizer[L,W]) extends Featurizer[(L,Seq
 
   def initialValueForFeature(f: Feature[(L,Seq[Int]),W]) = f match {
     case SubstateFeature(baseF, x) =>
-        println(baseF)
-        val baseScore = if(x(0).length ==0) 0.0 else base.initialValueForFeature(baseF)
-        assert(!baseScore.isNaN,baseF)
-        baseScore + math.log(1.0 - .1 + math.random * 2 * .1)
+      // TODO: try this out?
+      val baseScore = if(x(0).length ==0)  base.initialValueForFeature(baseF) else 0.0
+      assert(!baseScore.isNaN,baseF)
+      baseScore + math.log(1.0 - .1 + math.random * 2 * .1)
     case f => println(f);0.0
   }
 }
