@@ -135,22 +135,6 @@ class MaxRuleProductDecoder[C,F, W](coarseGrammar: Grammar[C], coarseLexicon: Le
   }
 }
 
-object MaxRulePipeline extends ParserPipeline with NoParams {
-  def trainParser(trainTrees: IndexedSeq[TreeInstance[String,String]],
-                  devTrees:   IndexedSeq[TreeInstance[String,String]],
-                  unaryReplacer : ChainReplacer[String],
-                  config: Params) = {
-    val (words,binary,unary) = GenerativeParser.extractCounts(trainTrees)
-    val grammar = Grammar(Library.logAndNormalizeRows(binary),Library.logAndNormalizeRows(unary))
-    val lexicon = new SignatureLexicon(words, EnglishWordClassGenerator, 3)
-    val projections = GrammarProjections.identity(grammar)
-    val builder = CKYChartBuilder("",lexicon,grammar).withCharts(ParseChart.logProb)
-    val decoder = new MaxRuleProductDecoder(grammar,lexicon,projections,builder)
-    val parser = new SimpleChartParser(builder,decoder,projections)
-    Iterator.single(("Gen",parser))
-  }
-}
-
 class MaxConstituentDecoder[C,F,W](projections: GrammarProjections[C,F]) extends ChartDecoder[C,F,W] {
   val indexedProjections = projections.labels
   override def extractBestParse(root: F, grammar: Grammar[F],
@@ -229,21 +213,5 @@ class MaxConstituentDecoder[C,F,W](projections: GrammarProjections[C,F]) extends
     extract(0,inside.length)
 
 
-  }
-}
-
-object MaxConstituentPipeline extends ParserPipeline with NoParams {
-  def trainParser(trainTrees: IndexedSeq[TreeInstance[String,String]],
-                  devTrees:   IndexedSeq[TreeInstance[String,String]],
-                  unaryReplacer : ChainReplacer[String],
-                  config: Params) = {
-    val (words,binary,unary) = GenerativeParser.extractCounts(trainTrees)
-    val grammar = Grammar(Library.logAndNormalizeRows(binary),Library.logAndNormalizeRows(unary))
-    val lexicon = new SignatureLexicon(words, EnglishWordClassGenerator, 3)
-    val projections = GrammarProjections.identity(grammar)
-    val builder = CKYChartBuilder("",lexicon,grammar).withCharts(ParseChart.logProb)
-    val decoder = new MaxConstituentDecoder[String,String,String](projections)
-    val parser = new SimpleChartParser(builder,decoder,projections)
-    Iterator.single(("Consti",parser))
   }
 }

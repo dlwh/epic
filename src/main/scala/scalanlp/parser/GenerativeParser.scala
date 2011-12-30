@@ -68,18 +68,7 @@ object GenerativeParser {
 
 object GenerativePipeline extends ParserPipeline with NoParams {
   def trainParser(trainTrees: IndexedSeq[TreeInstance[String,String]],
-                  devTrees: IndexedSeq[TreeInstance[String,String]],
-                  unaryReplacer : ChainReplacer[String],
-                  config: Params) = {
-    val parser = GenerativeParser.fromTrees(trainTrees);
-    Iterator.single(("Gen",parser));
-  }
-}
-
-object SigPipeline extends ParserPipeline with NoParams {
-  def trainParser(trainTrees: IndexedSeq[TreeInstance[String,String]],
-                  devTrees: IndexedSeq[TreeInstance[String,String]],
-                  unaryReplacer : ChainReplacer[String],
+                  validate: Parser[String,String]=>ParseEval.Statistics,
                   config: Params) = {
     val (words,binary,unary) = GenerativeParser.extractCounts(trainTrees);
     val grammar = Grammar(Library.logAndNormalizeRows(binary),Library.logAndNormalizeRows(unary));

@@ -105,8 +105,7 @@ object SplittingPipeline extends ParserPipeline {
   }
 
   def trainParser(trainTrees: IndexedSeq[TreeInstance[String,String]],
-                  devTrees: IndexedSeq[TreeInstance[String,String]],
-                  unaryReplacer : ChainReplacer[String],
+                  validate: Parser[String,String]=>ParseEval.Statistics,
                   params: Params) = {
 
     val (initLexicon,initBinaries,initUnaries) = GenerativeParser.extractCounts(trainTrees);
@@ -172,7 +171,9 @@ object SplittingPipeline extends ParserPipeline {
       val weights = state.x;
       if(iter % iterPerValidate == 0) {
         cacheWeights(params, obj,weights, iter);
-        quickEval(obj, unaryReplacer, devTrees, weights);
+        println("Validating...");
+        val parser = obj.extractParser(weights);
+        println(validate(parser))
       }
     }
 
@@ -195,13 +196,4 @@ object SplittingPipeline extends ParserPipeline {
     writeObject( new File(name), weights -> obj.indexedFeatures.decode(weights))
   }
 
-  def quickEval(obj: AbstractDiscriminativeObjective[String,(String,Seq[Int]),String],
-                unaryReplacer : ChainReplacer[String],
-                devTrees: Seq[TreeInstance[String,String]], weights: DenseVector[Double]) {
-    println("Validating...");
-    val parser = obj.extractParser(weights);
-    val fixedTrees = devTrees.take(400).toIndexedSeq;
-    val results = ParseEval.evaluate(fixedTrees, parser, unaryReplacer);
-    println("Validation : " + results)
-  }
 }

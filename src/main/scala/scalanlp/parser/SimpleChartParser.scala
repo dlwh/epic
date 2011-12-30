@@ -33,7 +33,7 @@ trait ChartParser[C,F,W] extends Parser[C,W] with Serializable {
 class SimpleChartParser[C,F,W](val builder: ChartBuilder[ParseChart,F,W],
                          val decoder: ChartDecoder[C,F,W],
                          val projections: GrammarProjections[C,F],
-                         downWeightProjections:Boolean =true) extends ChartParser[C,F,W] with Serializable {
+                         downWeightProjections:Boolean =false) extends ChartParser[C,F,W] with Serializable {
 
   def charts(w: Seq[W], scorer: SpanScorer[C]) = {
     val meta = new ProjectingSpanScorer[C,F](projections,scorer,downWeightProjections)

@@ -45,15 +45,17 @@ trait ParserPipeline {
    * of parsers
    */
   def trainParser(trainTrees: IndexedSeq[TreeInstance[String,String]],
-                  devTrees: IndexedSeq[TreeInstance[String,String]],
-                  unaryReplacer : ChainReplacer[String],
+                  validate: Parser[String,String]=>ParseEval.Statistics,
                   params: Params):Iterator[(String,Parser[String,String])];
 
 
   def trainParser(treebank: ProcessedTreebank, params: Params):Iterator[(String,Parser[String,String])] = {
     import treebank._;
 
-    val parsers = trainParser(trainTrees,devTrees,replacer,params);
+
+    val validateTrees = devTrees.take(400)
+    def validate(parser: Parser[String,String]) = ParseEval.evaluate(validateTrees, parser, replacer);
+    val parsers = trainParser(trainTrees,validate,params);
     parsers
   }
 

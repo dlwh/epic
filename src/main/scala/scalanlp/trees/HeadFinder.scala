@@ -70,7 +70,7 @@ object HeadFinder {
                 shr(Left, false, "NP"),
                 shr(Right, false, "CD"),
                 shr(Right, true, "JJ", "JJS", "RB", "QP"))
-  );
+  ) withDefault(k => Seq(shr(Left,true,k)))
 
   val collinsHeadFinder = new HeadFinder(collinsHeadRules);
 }
@@ -85,12 +85,12 @@ import HeadFinder._;
  */
 class HeadFinder[L](rules: Map[L,Seq[HeadRule[L]]]) {
 
-  def findHeadChild(t: Tree[L]) = {
-    val myRules = rules(t.label);
+  def findHeadChild[F](t: Tree[F], proj: F=>L) = {
+    val myRules = rules(proj(t.label));
 
     val answers = for(rule <- myRules.iterator) yield {
       val children = t.children;
-      val childLabels = children.map(_.label);
+      val childLabels = children.map(c => proj(c.label));
 
       val answer = if(rule.dis) {
         if(rule.dir == Left) childLabels.indexWhere(rule.headSet contains _)
@@ -112,11 +112,19 @@ class HeadFinder[L](rules: Map[L,Seq[HeadRule[L]]]) {
   def findHeadWordIndex(t: Tree[L]):Int = {
     if(t.isLeaf) t.span.start;
     else {
-      findHeadWordIndex(t.children(findHeadChild(t)));
+      findHeadWordIndex(t.children(findHeadChild(t,identity[L])));
+    }
+  }
+
+  def findHeadTag[F](t: Tree[F], proj: F=>L):F = {
+    if(t.isLeaf) t.label
+    else {
+      findHeadTag(t.children(findHeadChild(t,proj)), proj);
     }
   }
 
   def findHeadWord[W](t: Tree[L], words: Seq[W]) = words(findHeadWordIndex(t));
 
   def annotateHeadWords[W](t: Tree[L], words: Seq[W]): Tree[(L,W)] = t.extend{tree => (tree.label,findHeadWord(tree,words)) }
+
 }

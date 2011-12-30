@@ -60,8 +60,7 @@ object ProductParserRunner extends ParserPipeline {
   protected val paramManifest = manifest[Params]
 
   def trainParser(trainTrees: IndexedSeq[TreeInstance[String,String]],
-                  devTrees: IndexedSeq[TreeInstance[String,String]],
-                  unaryReplacer : ChainReplacer[String],
+                  validate: Parser[String,String]=>ParseEval.Statistics,
                   params: Params) = {
     val parsers = new ArrayBuffer[SimpleChartParser[String,(String,Int),String]]
     var found = true

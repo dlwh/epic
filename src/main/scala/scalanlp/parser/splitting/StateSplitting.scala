@@ -530,8 +530,7 @@ object StateSplitting {
 
 object StateSplittingPipeline extends ParserPipeline with NoParams {
   def trainParser(trainTrees: IndexedSeq[TreeInstance[String,String]],
-                  devTrees: IndexedSeq[TreeInstance[String,String]],
-                  unaryReplacer : ChainReplacer[String],
+                  validate: Parser[String,String]=>ParseEval.Statistics,
                   params: Params) = {
 
     println("Extracting counts");

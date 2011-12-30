@@ -166,17 +166,6 @@ trait LatentPipeline extends ParserPipeline {
                     initUnaries: Counter2[String, UnaryRule[String], Double],
                     numStates: Int): MyFeaturizer;
 
-  def quickEval(obj: AbstractDiscriminativeObjective[String,(String,Int),String],
-                unaryReplacer : ChainReplacer[String],
-                devTrees: Seq[TreeInstance[String,String]], weights: DenseVector[Double]) {
-    println("Validating...");
-    val parser = obj.extractParser(weights);
-    val fixedTrees = devTrees.take(400).toIndexedSeq;
-    val results = ParseEval.evaluate(fixedTrees, parser, unaryReplacer);
-    println("Validation : " + results)
-  }
-
-
   def mkObjective(params: Params,
                   latentFeaturizer: MyFeaturizer,
                   trainTrees: IndexedSeq[TreeInstance[String,String]],
@@ -186,8 +175,7 @@ trait LatentPipeline extends ParserPipeline {
                   closedWords: Set[String]): MyObjective;
 
   def trainParser(trainTrees: IndexedSeq[TreeInstance[String,String]],
-                  devTrees: IndexedSeq[TreeInstance[String,String]],
-                  unaryReplacer : ChainReplacer[String],
+                  validate: Parser[String,String]=>ParseEval.Statistics,
                   params: Params) = {
 
     val (initLexicon,initBinaries,initUnaries) = GenerativeParser.extractCounts(trainTrees);
@@ -228,7 +216,9 @@ trait LatentPipeline extends ParserPipeline {
       val weights = state.x;
       if(iter % iterPerValidate == 0) {
         cacheWeights(params, obj,weights, iter);
-        quickEval(obj, unaryReplacer, devTrees, weights);
+        println("Validating...");
+        val parser = obj.extractParser(weights);
+        println(validate(parser))
       }
     }
 

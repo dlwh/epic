@@ -133,6 +133,7 @@ object Tree {
 sealed trait BinarizedTree[+L] extends Tree[L] {
   override def map[M](f: L=>M): BinarizedTree[M] = null; 
   def extend[B](f: BinarizedTree[L]=>B):BinarizedTree[B]
+  def relabelRoot[B>:L](f: L=>B):BinarizedTree[B]
 }
 
 case class BinaryTree[+L](l: L,
@@ -142,6 +143,8 @@ case class BinaryTree[+L](l: L,
                         ) with BinarizedTree[L] {
   override def map[M](f: L=>M):BinaryTree[M] = BinaryTree( f(label), leftChild map f, rightChild map f)(span);
   override def extend[B](f: BinarizedTree[L]=>B) = BinaryTree( f(this), leftChild extend f, rightChild extend f)(span);
+  def relabelRoot[B>:L](f: L=>B):BinarizedTree[B] = BinaryTree(f(label), leftChild,rightChild)(span)
+
 }
 
 case class UnaryTree[+L](l: L, child: BinarizedTree[L])(span: Span
@@ -149,11 +152,13 @@ case class UnaryTree[+L](l: L, child: BinarizedTree[L])(span: Span
                         ) with BinarizedTree[L] {
   override def map[M](f: L=>M): UnaryTree[M] = UnaryTree( f(label), child map f)(span);
   override def extend[B](f: BinarizedTree[L]=>B) = UnaryTree( f(this), child extend f)(span);
+  def relabelRoot[B>:L](f: L=>B):BinarizedTree[B] = UnaryTree(f(label), child)(span)
 }
 
 case class NullaryTree[+L](l: L)(span: Span) extends Tree[L](l,IndexedSeq.empty)(span) with BinarizedTree[L]{
   override def map[M](f: L=>M): NullaryTree[M] = NullaryTree( f(label))(span);
   override def extend[B](f: BinarizedTree[L]=>B) = NullaryTree( f(this))(span);
+  def relabelRoot[B>:L](f: L=>B):BinarizedTree[B] = NullaryTree(f(label))(span)
 }
 
 object Trees {
@@ -176,8 +181,9 @@ object Trees {
       BinaryTree(l, newLeftChild, newRightChild)(tree.span)
   }
 
-  def deannotate(tree: Tree[String]):Tree[String] = tree.map(l => l.takeWhile(_ != '^'));
-  def deannotate(tree: BinarizedTree[String]):BinarizedTree[String] = tree.map(l => l.takeWhile(_ != '^'));
+  def deannotate(tree: Tree[String]):Tree[String] = tree.map(deannotateLabel _)
+  def deannotate(tree: BinarizedTree[String]):BinarizedTree[String] = tree.map(deannotateLabel _)
+  def deannotateLabel(l: String) = l.takeWhile(c => c != '^' && c != '>')
 
   def markovizeBinarization(tree: BinarizedTree[String], order: Int):BinarizedTree[String] = {
     tree.map{ l =>
@@ -198,8 +204,37 @@ object Trees {
     }
   }
 
+  /**
+   * Adds horizontal markovization to an already binarized tree with no markovization
+   */
+  def addHorizontalMarkovization[T](tree: BinarizedTree[T],
+                                    order: Int,
+                                    join: (T,Seq[Either[T,T]])=>T,
+                                    isIntermediate: T=>Boolean):BinarizedTree[T] = {
+    def rec(tree: BinarizedTree[T],history: List[Either[T,T]] = List.empty):BinarizedTree[T] = {
+      val newLabel = if(isIntermediate(tree.label)) join(tree.label,history.take(order)) else tree.label
+      tree match {
+        case BinaryTree(_, t1, t2) =>
+          val newHistory = if(isIntermediate(tree.label)) history.take(order) else List.empty
+          BinaryTree(newLabel, rec(t1,Right(t2.label) :: newHistory), rec(t2,Left(t1.label)::newHistory))(tree.span)
+        case UnaryTree(label, child) =>
+          UnaryTree(newLabel,rec(child,if(child.label == label) history else List.empty))(tree.span)
+        case NullaryTree(_) =>
+          NullaryTree(newLabel)(tree.span)
+      }
+
+    }
+
+    rec(tree)
+  }
+
+  def addHorizontalMarkovization(tree: BinarizedTree[String], order: Int):BinarizedTree[String] = {
+    def join(t: String, chain: Seq[Either[String,String]]) = chain.map{ case Left(l) => "\\" + l case Right(r) => "/" + r}.mkString(t +">","_","")
+    addHorizontalMarkovization(tree,order,join,(_:String).startsWith("@"))
+  }
+
   private def stringBinarizer(currentLabel: String, append: String) = {
-    val head = if(currentLabel(0) != '@') '@' + currentLabel + "->" else currentLabel
+    val head = if(currentLabel(0) != '@') '@' + currentLabel + ">" else currentLabel
     val r = head + "_" + append
     r
   }
@@ -238,12 +273,39 @@ object Trees {
   def annotateParents[L](tree: Tree[L], join: (L,L)=>L, depth: Int, history: List[L] = List.empty):Tree[L] = {
     if(depth == 0) tree
     else {
-      val newLabel = (tree.label :: history).view.take(depth+1).reduceLeft(join);
-      new Tree(newLabel,tree.children.map(c => annotateParents[L](c,join,depth,tree.label :: history.take(depth))))(tree.span);
+      val newLabel = (tree.label :: history).iterator.take(depth).reduceLeft(join);
+      new Tree(newLabel,tree.children.map(c => annotateParents[L](c,join,depth,tree.label :: history.take(depth-1 max 0))))(tree.span);
     }
   }
 
   def annotateParents(tree: Tree[String], depth: Int):Tree[String] = annotateParents(tree,{(x:String,b:String)=>x + '^' + b},depth);
+
+  def annotateParentsBinarized[L](tree: BinarizedTree[L], join: (L,L)=>L, keepParent: L=>Boolean, depth: Int):BinarizedTree[L] = {
+    def rec(tree: BinarizedTree[L], history: List[L] = List.empty):BinarizedTree[L] = {
+      tree match {
+        //invariant: history is the (depth) non-intermediate symbols, where we remove unary-identity transitions
+        case BinaryTree(label, t1, t2) =>
+          val newLabel = if(keepParent(label)) history.take(depth-1).foldLeft(label)(join) else history.drop(1).foldLeft(label)(join)
+          val newHistory = if(keepParent(label)) (label :: history) take depth else history
+          val lchild = rec(t1,newHistory)
+          val rchild = rec(t2,newHistory)
+          BinaryTree(newLabel, lchild, rchild)(tree.span)
+        case UnaryTree(label, child) =>
+          val newLabel = if(keepParent(label)) history.take(depth-1).foldLeft(label)(join) else history.drop(1).foldLeft(label)(join)
+          val newHistory = if(keepParent(label) && label != child.label) (label :: history) take depth else history
+          UnaryTree(newLabel,rec(child,newHistory))(tree.span)
+        case NullaryTree(label) =>
+          val newLabel = if(history.head == label) history.reduceLeft(join) else history.take(depth-1).foldLeft(label)(join)
+          NullaryTree(newLabel)(tree.span)
+      }
+    }
+    rec(tree)
+
+  }
+
+  def annotateParentsBinarized(tree: BinarizedTree[String], depth: Int):BinarizedTree[String] = {
+    annotateParentsBinarized(tree,{(x:String,b:String)=>x + '^' + b},!(_:String).startsWith("@"),depth)
+  };
 
   object Transforms {
     class EmptyNodeStripper extends (Tree[String]=>Option[Tree[String]]) {
@@ -281,23 +343,13 @@ object Trees {
       }
     }
 
-    object StupidPRTMerger extends (Tree[String]=>Tree[String]) {
-      def apply(tree: Tree[String]) = {
-       tree.map {
-         case "PRT" => "ADVP"
-         case x => x
-       }
-      }
-
-    }
 
     object StandardStringTransform extends (Tree[String]=>Tree[String]) {
       private val ens = new EmptyNodeStripper;
       private val xox = new XOverXRemover[String];
       private val fns = new FunctionNodeStripper;
-      private val stupid = StupidPRTMerger;
       def apply(tree: Tree[String]): Tree[String] = {
-        xox(stupid(fns(ens(tree).get))) map (_.intern);
+        xox(fns(ens(tree).get)) map (_.intern);
       }
     }
 

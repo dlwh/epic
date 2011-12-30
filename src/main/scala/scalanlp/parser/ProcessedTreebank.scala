@@ -58,7 +58,7 @@ case class TreebankParams(path: File,
                           maxLength:Int = 40,
                           binarization:String = "xbar",
                           processing: String = "standard",
-                          verticalMarkovization:Int=0,
+                          verticalMarkovization:Int=1,
                           horizontalMarkovization:Int=1000) {
   def binarize = {
     if(binarization == "xbar") Trees.xBarBinarize(_:Tree[String],left=false);

@@ -178,8 +178,7 @@ object EPParserRunner extends ParserPipeline {
   protected val paramManifest = manifest[Params]
 
   def trainParser(trainTrees: IndexedSeq[TreeInstance[String,String]],
-                  devTrees: IndexedSeq[TreeInstance[String,String]],
-                  unaryReplacer : ChainReplacer[String],
+                  validate: Parser[String,String]=>ParseEval.Statistics,
                   params: Params) = {
     val parsers = new ArrayBuffer[SimpleChartParser[String,(String,Int),String]]
     var found = true
@@ -207,28 +206,6 @@ object EPParserRunner extends ParserPipeline {
 
 }
 
-object MaxRuleRunner extends ParserPipeline {
-
-  case class Params(parser: ParserParams.BaseParser,
-                    model: File )
-  protected val paramManifest = manifest[Params]
-
-  def trainParser(trainTrees: IndexedSeq[TreeInstance[String,String]],
-                  devTrees: IndexedSeq[TreeInstance[String,String]],
-                  unaryReplacer : ChainReplacer[String],
-                  params: Params) = {
-    val parser: SimpleChartParser[String,(String,Int),String] = readObject(params.model)
-    val coarseParser = params.parser.optParser.get
-    val dec = new MaxRuleProductDecoder(coarseParser.grammar,coarseParser.lexicon, parser.projections, parser.builder.withCharts(ParseChart.logProb))
-    val maxrule = new SimpleChartParser(parser.builder, dec, parser.projections)
-    val viterbi = new SimpleChartParser(parser.builder, new ViterbiDecoder[String,(String,Int),String](parser.projections.labels), parser.projections)
-
-    Iterator( "MaxRule" -> maxrule, "Default" -> parser, "Viterbi" -> viterbi)
-  }
-
-
-}
-
 
 /**
  *
@@ -241,8 +218,7 @@ object EPParserParamRunner extends ParserPipeline {
   protected val paramManifest = manifest[Params]
 
   def trainParser(trainTrees: IndexedSeq[TreeInstance[String,String]],
-                  devTrees: IndexedSeq[TreeInstance[String,String]],
-                  unaryReplacer : ChainReplacer[String],
+                  validate: Parser[String,String]=>ParseEval.Statistics,
                   params: Params) = {
 
 

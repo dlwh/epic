@@ -44,8 +44,8 @@ object StructuredPipeline extends ParserPipeline {
                     miniBatchSize: Int = 1);
 
   def trainParser(trainTrees: IndexedSeq[TreeInstance[String,String]],
-                  devTrees: IndexedSeq[TreeInstance[String,String]],
-                  unaryReplacer: ChainReplacer[String], params: Params) = {
+                  validate: Parser[String,String]=>ParseEval.Statistics,
+                  params: Params) = {
     val (initLexicon,initBinaries,initUnaries) = GenerativeParser.extractCounts(trainTrees);
 
     val xbarParser = {
@@ -67,9 +67,6 @@ object StructuredPipeline extends ParserPipeline {
       for(t <- initLexicon.domain._1 if initLexicon(t, ::).size > 50) yield t;
     }
 
-    println("Basexxx: " + xbarParser.lexicon.tagScores("messages"));
-    println(openTags);
-
     val closedWords = Set.empty ++ {
       val wordCounts = sum(initLexicon)
       wordCounts.nonzero.pairs.iterator.filter(_._2 > 10).map(_._1);
@@ -79,7 +76,7 @@ object StructuredPipeline extends ParserPipeline {
     val obj = new DiscrimObjective(featurizer, trainTrees, xbarParser, openTags, closedWords);
     val weights = obj.initialWeightVector;
     val pp = obj.extractMaxParser(weights);
-    val model = new ParserLinearModel[ParseChart.LogProbabilityParseChart](projections,devTrees.toIndexedSeq, unaryReplacer, obj);
+    val model = new ParserLinearModel[ParseChart.LogProbabilityParseChart](projections, obj);
 
     NSlackSVM.SvmOpts.smoMiniBatch = params.smoMiniBatch;
     NSlackSVM.SvmOpts.innerSmoIters = params.innerSmoIters;
@@ -98,9 +95,10 @@ object StructuredPipeline extends ParserPipeline {
 
 
   class ParserLinearModel[Chart[X]<:ParseChart[X]](projections: GrammarProjections[String,String],
-                                                   devTrees: IndexedSeq[TreeInstance[String,String]],
-                                                   unaryReplacer: ChainReplacer[String],
                                                    obj: DiscrimObjective[String,String]) extends LossAugmentedLinearModel[TreeInstance[String,String]] {
+
+    def startIteration(p1: Int) {}
+
     type Datum = TreeInstance[String,String];
 
     def getParser(weights: CounterInterface[java.lang.Integer]) = {
@@ -111,15 +109,6 @@ object StructuredPipeline extends ParserPipeline {
 
     val timeIn : Long = System.currentTimeMillis();
 
-    override def startIteration(t: Int) {
-      val parser = getParser(weights);
-      val result = ParseEval.evaluateAndLog(devTrees,parser, "Dev-" +t,unaryReplacer);
-      val out = new FileWriter(new File("LEARNING_CURVE"), true);
-      val totalTime = (System.currentTimeMillis() - timeIn)/1000.0;
-      out.append( t + "\t" + result.precision + "\t" + result.recall + "\t" + result.f1 + "\t" + totalTime + "\n");
-      out.close();
-    }
-    
     override def getLossAugmentedUpdateBundle(datum: Datum, lossWeight: Double): UpdateBundle = {
       getLossAugmentedUpdateBundleBatch(ju.Collections.singletonList(datum), 1, lossWeight).get(0);
     }
