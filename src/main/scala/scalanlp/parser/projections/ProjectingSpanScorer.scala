@@ -7,7 +7,7 @@ package projections
  */
 class ProjectingSpanScorer[C,F](proj: GrammarProjections[C,F],
                                 val scorer: SpanScorer[C],
-                                downWeight: Boolean=true) extends SpanScorer[F] {
+                                downWeight: Boolean=false) extends SpanScorer[F] {
 
   private def labelProjections = proj.labels
   private def ruleProjections = proj.rules
