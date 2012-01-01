@@ -18,9 +18,9 @@ object ParserParams {
     protected val paramManifest = manifest[Params];
   }
 
-  case class BaseParser(base: File = null) {
+  case class BaseParser[Fine](base: File = null) {
     def optParser = Option(base).map { f =>
-     readObject[SimpleChartParser[String,String,String]](f).builder.withCharts(ParseChart.logProb)
+     readObject[SimpleChartParser[String,Fine,String]](f).builder.withCharts(ParseChart.logProb)
     }
   }
 

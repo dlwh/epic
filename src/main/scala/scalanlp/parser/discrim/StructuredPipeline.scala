@@ -29,7 +29,7 @@ import projections.{GrammarProjections, ProjectingSpanScorer, ProjectionIndexer}
 object StructuredPipeline extends ParserPipeline {
 
   protected val paramManifest = manifest[Params];
-  case class Params(parser: ParserParams.BaseParser,
+  case class Params(parser: ParserParams.BaseParser[String],
                     opt: OptParams,
                     featurizerFactory: FeaturizerFactory[String,String] = new PlainFeaturizerFactory[String],
                     iterationsPerEval: Int = 50,

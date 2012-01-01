@@ -130,7 +130,7 @@ class LatentDiscrimObjective[L,L2,W](featurizer: Featurizer[L2,W],
 
 import FirstOrderMinimizer.OptParams;
 
-case class LatentParams[P](parser: ParserParams.BaseParser,
+case class LatentParams[P](parser: ParserParams.BaseParser[String],
                            opt: OptParams,
                            specific: P,
                            featurizerFactory: FeaturizerFactory[String,String] = new PlainFeaturizerFactory[String],

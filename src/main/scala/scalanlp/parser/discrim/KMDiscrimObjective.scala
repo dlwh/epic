@@ -18,61 +18,62 @@ import logging.ConfiguredLogging
 import scalala.library.Library
 import Library.sum
 import scalala.tensor.{Counter,::}
+import projections.GrammarProjections
+import collection.immutable.Set
+import splitting.StateSplitting
 
 /**
- * The objective function for log-linear parsers with no substates
+ * The objective function for K&M annotated log-linear parsers with no substates
  * @author dlwh
  */
-class DiscrimObjective[L,W](feat: Featurizer[L,W],
+class KMDiscrimObjective[L,L2,W](feat: Featurizer[L2,W],
+                            ann: (BinarizedTree[L],Seq[W])=>BinarizedTree[L2],
                             trees: IndexedSeq[TreeInstance[L,W]],
+                            proj: GrammarProjections[L,L2],
                             coarseParser: ChartBuilder[LogProbabilityParseChart, L, W],
-                            openTags: Set[L],
+                            openTags: Set[L2],
                             closedWords: Set[W])
-        extends LatentDiscrimObjective[L,L,W](feat,trees,GrammarProjections.identity(coarseParser.grammar),coarseParser, openTags,closedWords) {
+        extends LatentDiscrimObjective[L,L2,W](feat,trees,proj,coarseParser, openTags,closedWords) {
 
-  def treeToExpectedCounts[L,W](parser: SimpleChartParser[L,L,W],
-                                treeInstance: TreeInstance[L,W]):(ExpectedCounts[W],Double) = {
-    val TreeInstance(_,t,words,spanScorer) = treeInstance;
-    val g = parser.builder.grammar;
-    val lexicon = parser.builder.lexicon;
+  override def treeToExpectedCounts(g: Grammar[L2],
+                           lexicon: Lexicon[L2,W],
+                           t: BinarizedTree[L],
+                           words: Seq[W],
+                           spanScorer: SpanScorer[L2] = SpanScorer.identity):ExpectedCounts[W] = {
     val expectedCounts = new ExpectedCounts[W](g)
     var score = 0.0;
-    var loss = 0.0;
-    for(t2 <- t.allChildren) {
+    val annotated = ann(t,words)
+    for(t2 <- annotated.allChildren) {
       t2 match {
         case BinaryTree(a,bt@ Tree(b,_),Tree(c,_)) =>
           val r = g.index(BinaryRule(a,b,c))
           expectedCounts.ruleCounts(r) += 1
           score += g.ruleScore(r);
-          loss += spanScorer.scoreBinaryRule(t2.span.start,bt.span.end, t2.span.end, r)
         case UnaryTree(a,Tree(b,_)) =>
           val r = g.index(UnaryRule(a,b))
           expectedCounts.ruleCounts(r) += 1
           score += g.ruleScore(r);
-          loss += spanScorer.scoreUnaryRule(t2.span.start,t2.span.end,r)
         case n@NullaryTree(a) =>
           val aI = g.labelIndex(a)
           val w = words(n.span.start);
           expectedCounts.wordCounts.getOrElseUpdate(aI)(w) += 1
           score += lexicon.wordScore(g.labelIndex.get(aI), w);
-          loss += spanScorer.scoreSpan(t2.span.start,t2.span.end,aI);
-
       }
     }
     expectedCounts.logProb = score;
-    (expectedCounts,loss);
+    expectedCounts
   }
 
 }
 
 
 import scalanlp.optimize.FirstOrderMinimizer._;
-object DiscriminativePipeline extends ParserPipeline {
+object KMDiscriminativePipeline extends ParserPipeline {
 
   protected val paramManifest = manifest[Params];
   case class Params(parser: ParserParams.BaseParser[String],
                     opt: OptParams,
-                    featurizerFactory: FeaturizerFactory[String,String] = new PlainFeaturizerFactory[String],
+                    featurizerFactory: FeaturizerFactory[AnnotatedLabel,String] = new PlainFeaturizerFactory[AnnotatedLabel],
                     iterationsPerEval: Int = 50,
                     maxIterations: Int = 201,
                     iterPerValidate: Int = 10,
@@ -83,7 +84,7 @@ object DiscriminativePipeline extends ParserPipeline {
 
   def trainParser(trainTrees: IndexedSeq[TreeInstance[String,String]],
                   validate: Parser[String,String]=>ParseEval.Statistics,
-                  params: Params): Iterator[(String, SimpleChartParser[String, String, String])] = {
+                  params: Params): Iterator[(String, SimpleChartParser[String, AnnotatedLabel, String])] = {
 
     val (initLexicon,initBinaries,initUnaries) = GenerativeParser.extractCounts(trainTrees);
 
@@ -96,18 +97,33 @@ object DiscriminativePipeline extends ParserPipeline {
     import params._;
 
     val factory = params.featurizerFactory;
-    val featurizer = factory.getFeaturizer(initLexicon, initBinaries, initUnaries);
 
-    val openTags = Set.empty ++ {
-      for(t <- initLexicon.nonzero.keys.iterator.map(_._1) if initLexicon(t, ::).size > 50) yield t;
+
+    val pipeline = new KMPipeline()
+
+    val transformed = trainTrees.par.map { ti =>
+      val t = pipeline(ti.tree,ti.words)
+      TreeInstance(ti.id,t,ti.words)
+    }.seq
+    val (words,binary,unary) = GenerativeParser.extractCounts(transformed);
+    val grammar = Grammar(Library.logAndNormalizeRows(binary),Library.logAndNormalizeRows(unary));
+    println(grammar.labelIndex)
+    val lexicon = new SignatureLexicon(words, EnglishWordClassGenerator, 5);
+    val proj = GrammarProjections(xbarParser.grammar,grammar,{(_:AnnotatedLabel).label})
+
+    val featurizer = factory.getFeaturizer(words, binary, unary);
+
+
+    val openTags: Set[AnnotatedLabel] = Set.empty ++ {
+      for(t <- words.nonzero.keys.iterator.map(_._1) if words(t, ::).size > 50) yield t;
     }
 
-    val closedWords = Set.empty ++ {
-      val wordCounts = sum(initLexicon)
+    val closedWords:Set[String] = Set.empty ++ {
+      val wordCounts = sum(words)
       wordCounts.nonzero.pairs.iterator.filter(_._2 > 10).map(_._1);
     }
 
-    val obj = new DiscrimObjective(featurizer, trainTrees.toIndexedSeq, xbarParser, openTags, closedWords) with ConfiguredLogging;
+    val obj = new KMDiscrimObjective[String,AnnotatedLabel,String](featurizer, pipeline, trainTrees.toIndexedSeq, proj, xbarParser, openTags, closedWords) with ConfiguredLogging;
     val optimizer = params.opt.minimizer(new CachedBatchDiffFunction(obj))
 
     // new LBFGS[Int,DenseVector[Double]](iterationsPerEval,5) with ConsoleLogging;
@@ -115,10 +131,9 @@ object DiscriminativePipeline extends ParserPipeline {
     val rand = new RandomizedGradientCheckingFunction(obj, 0.1);
 
     for( (state,iter) <- optimizer.iterations(obj,init).take(maxIterations).zipWithIndex;
-        _ = rand.calculate(state.x);
          if iter != 0 && iter % iterationsPerEval == 0) yield {
        val parser = obj.extractParser(state.x);
-       (iter + "", parser);
+       ("KM-disc"+iter, parser);
     }
 
   }

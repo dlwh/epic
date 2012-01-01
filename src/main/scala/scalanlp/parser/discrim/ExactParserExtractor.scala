@@ -238,7 +238,7 @@ object ExactPipeline extends ParserPipeline {
 
 object ExactRunner extends ParserPipeline {
 
-  case class Params(parser: ParserParams.BaseParser,
+  case class Params(parser: ParserParams.BaseParser[String],
                     model0: File = null,
                     model1: File = null,
                     model2: File = null,
@@ -276,7 +276,7 @@ object ExactRunner extends ParserPipeline {
 
 object SplitExact extends ParserPipeline {
 
-  case class Params(parser: ParserParams.BaseParser,
+  case class Params(parser: ParserParams.BaseParser[String],
                     featurizerFactory: FeaturizerFactory[String,String] = new PlainFeaturizerFactory[String],
                     weightsPath: File, numStates: Int)
 

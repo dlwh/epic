@@ -170,7 +170,7 @@ class EPParser[L,L2,W](val parsers: Seq[ChartBuilder[LogProbabilityParseChart,L2
  */
 object EPParserRunner extends ParserPipeline {
 
-  case class Params(parser: ParserParams.BaseParser,
+  case class Params(parser: ParserParams.BaseParser[String],
                     model0: File = null,
                     model1: File = null,
                     model2: File = null,
@@ -213,7 +213,7 @@ object EPParserRunner extends ParserPipeline {
  */
 object EPParserParamRunner extends ParserPipeline {
 
-  case class Params(parser: ParserParams.BaseParser,
+  case class Params(parser: ParserParams.BaseParser[String],
                     epParser: File, useExact: Boolean = true)
   protected val paramManifest = manifest[Params]
 

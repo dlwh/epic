@@ -244,7 +244,7 @@ class KMPipeline(horizontal: Int = 2, vertical: Int = 2) extends ((BinarizedTree
 
 object KleinAndManningPipeline extends ParserPipeline {
   protected val paramManifest = manifest[Params]
-  case class Params(parser: ParserParams.BaseParser,
+  case class Params(parser: ParserParams.BaseParser[String],
                     horizontal: Int = 2,
                     vertical: Int = 2)
 
