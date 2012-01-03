@@ -73,7 +73,7 @@ object KMDiscriminativePipeline extends ParserPipeline {
   protected val paramManifest = manifest[Params];
   case class Params(parser: ParserParams.BaseParser[String],
                     opt: OptParams,
-                    featurizerFactory: FeaturizerFactory[AnnotatedLabel,String] = new PlainFeaturizerFactory[AnnotatedLabel],
+                    featurizerFactory: FeaturizerFactory[AnnotatedLabel,String] = new PlainFeaturizerFactory[AnnotatedLabel](),
                     iterationsPerEval: Int = 50,
                     maxIterations: Int = 201,
                     iterPerValidate: Int = 10,
