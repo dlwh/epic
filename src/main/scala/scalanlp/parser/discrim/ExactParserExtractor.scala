@@ -342,10 +342,11 @@ object SplitExact extends ParserPipeline {
     }}.toIndexedSeq
 
     val projections = IndexedSeq.fill(parsers.length)(indexedProjections)
-    val ep = new EPParser(parsers.map(_._2.builder.withCharts(ParseChart.logProb)), xbarParser, projections, 4)
-    val adf = new EPParser(parsers.map(_._2.builder.withCharts(ParseChart.logProb)), xbarParser, projections, 1)
+    val models = parsers.map(_._2).map(EPModel.fromChartParser(_)).map(_.builder)
+    val ep = new EPParser(models, xbarParser, 4)
+    val adf = new EPParser(models, xbarParser, 1)
     val product = new ProductParser(parsers.map(_._2.builder.withCharts(ParseChart.logProb)), xbarParser, projections)
-    val ep8 = new EPParser(parsers.map(_._2.builder.withCharts(ParseChart.logProb)), xbarParser, projections, 8)
+    val ep8 = new EPParser(models, xbarParser, 8)
     val exact = ExactParserExtractor.extractParser(parsers.map(_._2.builder.withCharts(ParseChart.logProb)), xbarParser, projections)
 
     parsers.iterator ++ Iterator("EP"-> ep, "ADF" -> adf, "Product" -> product, "EP-8" -> ep8, "Exact" -> exact)

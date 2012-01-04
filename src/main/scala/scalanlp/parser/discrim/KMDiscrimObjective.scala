@@ -108,7 +108,6 @@ object KMDiscriminativePipeline extends ParserPipeline {
     val (words,binary,unary) = GenerativeParser.extractCounts(transformed);
     val grammar = Grammar(Library.logAndNormalizeRows(binary),Library.logAndNormalizeRows(unary));
     println(grammar.labelIndex)
-    val lexicon = new SignatureLexicon(words, EnglishWordClassGenerator, 5);
     val proj = GrammarProjections(xbarParser.grammar,grammar,{(_:AnnotatedLabel).label})
 
     val featurizer = factory.getFeaturizer(words, binary, unary);
@@ -126,11 +125,34 @@ object KMDiscriminativePipeline extends ParserPipeline {
     val obj = new KMDiscrimObjective[String,AnnotatedLabel,String](featurizer, pipeline, trainTrees.toIndexedSeq, proj, xbarParser, openTags, closedWords) with ConfiguredLogging;
     val optimizer = params.opt.minimizer(new CachedBatchDiffFunction(obj))
 
+
+    def cacheWeights(weights: DenseVector[Double], iter: Int) {
+      val name = if(iter % (2*iterPerValidate) == 0) {
+        "weights-a"
+      } else {
+        "weights-b"
+      }
+
+      writeObject( new File(name+".ser"), weights -> obj.indexedFeatures.decode(weights))
+    }
+
+    def evalAndCache(pair: (optimizer.State,Int) ) {
+      val (state,iter) = pair;
+      val weights = state.x;
+      if(iter % iterPerValidate == 0) {
+        cacheWeights(weights, iter)
+        println("Validating...");
+        val parser = obj.extractParser(weights);
+        println(validate(parser))
+      }
+    }
+
+
     // new LBFGS[Int,DenseVector[Double]](iterationsPerEval,5) with ConsoleLogging;
     val init = obj.initialWeightVector;
     val rand = new RandomizedGradientCheckingFunction(obj, 0.1);
 
-    for( (state,iter) <- optimizer.iterations(obj,init).take(maxIterations).zipWithIndex;
+    for( (state,iter) <- optimizer.iterations(obj,init).take(maxIterations).zipWithIndex.tee(evalAndCache _);
          if iter != 0 && iter % iterationsPerEval == 0) yield {
        val parser = obj.extractParser(state.x);
        ("KM-disc"+iter, parser);

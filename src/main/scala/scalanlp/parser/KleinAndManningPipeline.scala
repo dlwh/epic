@@ -16,9 +16,14 @@ case class AnnotatedLabel(label: String,
   def annotate(sym: Symbol) = copy(features = features + sym)
   def isIntermediate = label.nonEmpty && label.charAt(0) == '@'
   def baseLabel = label.dropWhile(_ == '@')
+
+  override lazy val hashCode = {
+    scala.runtime.ScalaRunTime._hashCode(this)
+  }
 }
 
-class KMPipeline(horizontal: Int = 2, vertical: Int = 2) extends ((BinarizedTree[String],Seq[String])=>BinarizedTree[AnnotatedLabel]) {
+@SerialVersionUID(1)
+class KMPipeline(horizontal: Int = 2, vertical: Int = 2) extends ((BinarizedTree[String],Seq[String])=>BinarizedTree[AnnotatedLabel]) with Serializable {
 
   def apply(tree: BinarizedTree[String], words: Seq[String]) =  {
     val treeOut = (

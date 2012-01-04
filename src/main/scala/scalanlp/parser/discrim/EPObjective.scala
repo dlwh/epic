@@ -52,27 +52,33 @@ class EPObjective[L,L2,W](featurizers: Seq[Featurizer[L2,W]],
 
   def extractParser(weights: DenseVector[Double]) = {
     val parsers = Array.tabulate(numModels)(extractLogProbBuilder(weights,_))
-    val epBuilder = new EPParser[L,L2,W](parsers,coarseParser, Array.fill(numModels)(indexedProjections),maxEPIterations)
+    // TODO fix:
+    val models = parsers.map(EPModel.fromBuilderAndProjections(_,indexedProjections)).map(_.builder)
+    val epBuilder = new EPParser[L,W](models,coarseParser, maxEPIterations)
     epBuilder
   }
 
-  protected type Builder = EPParser[L,L2,W]
+  protected type Builder = EPParser[L,W]
   protected type Counts = (Double,Seq[ExpectedCounts[W]])
 
   def builder(weights: DenseVector[Double]) = extractParser(weights)
 
-  protected def emptyCounts(b: Builder) = (0.0,b.parsers.map { p => new ExpectedCounts[W](p.grammar)})
+  protected def emptyCounts(b: Builder) = (0.0,b.parsers.map { p => new ExpectedCounts[W](p.chartBuilder.grammar)})
   protected def expectedCounts(epBuilder: Builder, t: BinarizedTree[L], w: Seq[W], scorer:SpanScorer[L], specific: SpanScorer[L2]) = {
-    val epBuilder.EPResult(charts,partition,_) = epBuilder.buildAllCharts(w,scorer,t)
+    val epBuilder.EPResult(marginals,partition,_) = epBuilder.buildAllCharts(w,scorer,t)
 
     import epBuilder._
 
     var treeScore = 0.0
 
-    val expectedCounts = for( (p,ParsedSentenceData(inside,outside,z,f0)) <- epBuilder.parsers zip charts) yield {
-      val treeCounts = treeToExpectedCounts(p.grammar,p.lexicon,t,w, new ProjectingSpanScorer(indexedProjections, scorer))
+    val expectedCounts = for( (marg,model) <- marginals zip epBuilder.parsers) yield {
+      val coerceBuilder: ChartBuilder[LogProbabilityParseChart,L2,W] = marg.model.chartBuilder.asInstanceOf[ChartBuilder[LogProbabilityParseChart, L2, W]]
+      val treeCounts = treeToExpectedCounts(coerceBuilder.grammar,
+        coerceBuilder.lexicon, t, w, new ProjectingSpanScorer(indexedProjections, scorer))
 //      val treeCounts = treeToExpectedCounts(p.grammar,p.lexicon,t,w, f0)
-      val wordCounts = wordsToExpectedCounts(p,w,inside,outside, z, f0)
+      val inside = marg.inside.asInstanceOf[LogProbabilityParseChart[L2]]
+      val outside = marg.outside.asInstanceOf[LogProbabilityParseChart[L2]]
+      val wordCounts = wordsToExpectedCounts(coerceBuilder,w,inside,outside, marg.partition, marg.scorer.asInstanceOf[SpanScorer[L2]])
       treeScore += treeCounts.logProb
       treeCounts -= wordCounts
     }
