@@ -61,7 +61,6 @@ class Tree[+L](val label: L, val children: IndexedSeq[Tree[L]])(val span: Span) 
 
 
   def map[M](f: L=>M):Tree[M] = Tree( f(label), children map { _ map f})(span);
-  def extend[B](f: Tree[L]=>B):Tree[B] = Tree(f(this), children map { _ extend f})(span);
 
   def allChildren = preorder;
 

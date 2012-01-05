@@ -125,6 +125,6 @@ class HeadFinder[L](rules: Map[L,Seq[HeadRule[L]]]) {
 
   def findHeadWord[W](t: Tree[L], words: Seq[W]) = words(findHeadWordIndex(t));
 
-  def annotateHeadWords[W](t: Tree[L], words: Seq[W]): Tree[(L,W)] = t.extend{tree => (tree.label,findHeadWord(tree,words)) }
+//  def annotateHeadWords[W](t: Tree[L], words: Seq[W]): Tree[(L,W)] = t.extend{tree => (tree.label,findHeadWord(tree,words)) }
 
 }
