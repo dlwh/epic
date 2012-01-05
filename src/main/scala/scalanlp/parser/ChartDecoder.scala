@@ -2,7 +2,7 @@ package scalanlp.parser
 
 
 import java.util.Arrays
-import projections.{GrammarProjections, AnchoredRulePosteriorScorerFactory, ProjectionIndexer}
+import projections.{AnchoredRuleScorerFactory, GrammarProjections, AnchoredRulePosteriorScorerFactory, ProjectionIndexer}
 import scalanlp.trees._
 import scalanlp.parser.ParserParams.NoParams
 import scalanlp.trees.UnaryChainRemover.ChainReplacer
@@ -99,7 +99,8 @@ class ViterbiDecoder[C,F, W](val indexedProjections: ProjectionIndexer[C,F]) ext
 
     }
 
-    buildTreeUnary(0,inside.length, grammar.labelIndex(root))
+    val t = buildTreeUnary(0,inside.length, grammar.labelIndex(root))
+    t
   }
 }
 
@@ -119,6 +120,29 @@ class MaxRuleProductDecoder[C,F, W](coarseGrammar: Grammar[C], coarseLexicon: Le
                              indexedProjections: GrammarProjections[C,F],
                              fineBuilder: ChartBuilder[ParseChart.LogProbabilityParseChart, F, W]) extends ChartDecoder[C,F, W] {
   val p = new AnchoredRulePosteriorScorerFactory(coarseGrammar, new SimpleChartParser(fineBuilder, new ViterbiDecoder[C,F,W](indexedProjections.labels), indexedProjections))
+
+  override def extractBestParse(root: F, grammar: Grammar[F],
+                                inside: ParseChart[F], outside: =>ParseChart[F], words:Seq[W],
+                                spanScorer: SpanScorer[F] = SpanScorer.identity):BinarizedTree[C] = {
+    val zeroGrammar = Grammar.zero(coarseGrammar)
+    val zeroLexicon = new ZeroLexicon(coarseLexicon)
+    val coarseRoot = indexedProjections.labels.project(root)
+    val zeroParser = new CKYChartBuilder[ParseChart.LogProbabilityParseChart,C,W](coarseRoot, zeroLexicon, zeroGrammar,ParseChart.logProb)
+    val scorer = p.buildSpanScorer(new ChartPair[ParseChart,F](inside, outside, spanScorer),inside.top.labelScore(0,inside.length,root))
+    val zeroInside = zeroParser.buildInsideChart(words,scorer)
+    val zeroOutside = zeroParser.buildOutsideChart(zeroInside,scorer)
+    val tree = SimpleViterbiDecoder(zeroGrammar).extractBestParse(coarseRoot,zeroGrammar, zeroInside,zeroOutside, words, scorer)
+    tree
+  }
+}
+
+/**
+ * Tries to extract a tree that maximizes... XXX
+ **/
+class MaxVariationalDecoder[C,F, W](coarseGrammar: Grammar[C], coarseLexicon: Lexicon[C,W],
+                             indexedProjections: GrammarProjections[C,F],
+                             fineBuilder: ChartBuilder[ParseChart.LogProbabilityParseChart, F, W]) extends ChartDecoder[C,F, W] {
+  val p = new AnchoredRuleScorerFactory(coarseGrammar, new SimpleChartParser(fineBuilder, new ViterbiDecoder[C,F,W](indexedProjections.labels), indexedProjections),Double.NegativeInfinity)
 
   override def extractBestParse(root: F, grammar: Grammar[F],
                                 inside: ParseChart[F], outside: =>ParseChart[F], words:Seq[W],
