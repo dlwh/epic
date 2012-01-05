@@ -476,6 +476,35 @@ trait FeatureIndexer[L,W] extends Encoder[Feature[L,W]] with Serializable {
 
 object FeatureIndexer {
 
+  def apply[L2,W](f: Featurizer[L2,W], lex: Lexicon[L2,W], grammar: Grammar[L2]) = {
+    val featureIndex = Index[Feature[L2,W]]()
+    val ruleIndex = grammar.index;
+
+    // a -> b c -> SparseVector[Double] of feature weights
+    val ruleCache = new OpenAddressHashArray[Counter[Feature[L2,W],Double]](Int.MaxValue/3)
+    // a -> W map
+    val lexicalCache = new ArrayMap(collection.mutable.Map[W,Counter[Feature[L2,W], Double]]())
+
+    // rules
+    for (rule <- ruleIndex) {
+      val feats = f.featuresFor(rule)
+      val ri = ruleIndex(rule)
+      ruleCache(ri) = feats
+      feats.keysIterator.foreach {featureIndex.index _ }
+    }
+
+    // lex
+    for {
+      (l,w) <- lex.knownTagWords
+    } {
+      val feats = f.featuresFor(l,w)
+      lexicalCache(grammar.labelIndex(l))(w) = feats
+      feats.keysIterator.foreach {featureIndex.index _ }
+    }
+
+    cachedFeaturesToIndexedFeatures[L2,W](f,grammar.labelIndex,ruleIndex,featureIndex,ruleCache,lexicalCache)
+  }
+
   /**
    * Creates a FeatureIndexer by featurizing all rules/words and indexing them
    */

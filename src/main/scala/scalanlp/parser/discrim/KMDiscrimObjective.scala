@@ -26,24 +26,21 @@ import splitting.StateSplitting
  * The objective function for K&M annotated log-linear parsers with no substates
  * @author dlwh
  */
-class KMDiscrimObjective[L,L2,W](feat: Featurizer[L2,W],
-                            ann: (BinarizedTree[L],Seq[W])=>BinarizedTree[L2],
+class KMDiscrimObjective[L,W](feat: Featurizer[L,W],
                             trees: IndexedSeq[TreeInstance[L,W]],
-                            proj: GrammarProjections[L,L2],
                             coarseParser: ChartBuilder[LogProbabilityParseChart, L, W],
-                            openTags: Set[L2],
+                            openTags: Set[L],
                             closedWords: Set[W])
-        extends LatentDiscrimObjective[L,L2,W](feat,trees,proj,coarseParser, openTags,closedWords) {
+        extends LatentDiscrimObjective[L,L,W](feat,trees,GrammarProjections.identity(coarseParser.grammar),coarseParser, openTags,closedWords) {
 
-  override def treeToExpectedCounts(g: Grammar[L2],
-                           lexicon: Lexicon[L2,W],
+  override def treeToExpectedCounts(g: Grammar[L],
+                           lexicon: Lexicon[L,W],
                            t: BinarizedTree[L],
                            words: Seq[W],
-                           spanScorer: SpanScorer[L2] = SpanScorer.identity):ExpectedCounts[W] = {
+                           spanScorer: SpanScorer[L] = SpanScorer.identity):ExpectedCounts[W] = {
     val expectedCounts = new ExpectedCounts[W](g)
     var score = 0.0;
-    val annotated = ann(t,words)
-    for(t2 <- annotated.allChildren) {
+    for(t2 <- t.allChildren) {
       t2 match {
         case BinaryTree(a,bt@ Tree(b,_),Tree(c,_)) =>
           val r = g.index(BinaryRule(a,b,c))
@@ -107,10 +104,17 @@ object KMDiscriminativePipeline extends ParserPipeline {
     }.seq
     val (words,binary,unary) = GenerativeParser.extractCounts(transformed);
     val grammar = Grammar(Library.logAndNormalizeRows(binary),Library.logAndNormalizeRows(unary));
+    val lexicon = new SignatureLexicon(words, EnglishWordClassGenerator, 5);
+    val builder = CKYChartBuilder(AnnotatedLabel(""),lexicon,grammar).withCharts(ParseChart.logProb)
     println(grammar.labelIndex)
     val proj = GrammarProjections(xbarParser.grammar,grammar,{(_:AnnotatedLabel).label})
 
     val featurizer = factory.getFeaturizer(words, binary, unary);
+
+    val newTrees = (trainTrees zip transformed).toArray.par.map { case (ti,newTree) =>
+      val scorer = new ProjectingSpanScorer(proj,ti.spanScorer)
+      TreeInstance(ti.id,newTree.tree,newTree.words,scorer)
+    }.seq
 
 
     val openTags: Set[AnnotatedLabel] = Set.empty ++ {
@@ -122,7 +126,7 @@ object KMDiscriminativePipeline extends ParserPipeline {
       wordCounts.nonzero.pairs.iterator.filter(_._2 > 10).map(_._1);
     }
 
-    val obj = new KMDiscrimObjective[String,AnnotatedLabel,String](featurizer, pipeline, trainTrees.toIndexedSeq, proj, xbarParser, openTags, closedWords) with ConfiguredLogging;
+    val obj = new KMDiscrimObjective[AnnotatedLabel,String](featurizer, newTrees,  builder, openTags, closedWords) with ConfiguredLogging;
     val optimizer = params.opt.minimizer(new CachedBatchDiffFunction(obj))
 
 
@@ -143,7 +147,9 @@ object KMDiscriminativePipeline extends ParserPipeline {
         cacheWeights(weights, iter)
         println("Validating...");
         val parser = obj.extractParser(weights);
-        println(validate(parser))
+        val decoder = new MaxConstituentDecoder[String,AnnotatedLabel,String](proj)
+        val newParser = new SimpleChartParser[String,AnnotatedLabel,String](parser.builder,decoder, proj)
+        println(validate(newParser))
       }
     }
 
@@ -155,7 +161,9 @@ object KMDiscriminativePipeline extends ParserPipeline {
     for( (state,iter) <- optimizer.iterations(obj,init).take(maxIterations).zipWithIndex.tee(evalAndCache _);
          if iter != 0 && iter % iterationsPerEval == 0) yield {
        val parser = obj.extractParser(state.x);
-       ("KM-disc"+iter, parser);
+       val decoder = new MaxConstituentDecoder[String,AnnotatedLabel,String](proj)
+        val newParser = new SimpleChartParser[String,AnnotatedLabel,String](parser.builder,decoder, proj)
+       ("KM-disc"+iter, newParser);
     }
 
   }
