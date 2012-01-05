@@ -279,7 +279,11 @@ object KleinAndManningPipeline extends ParserPipeline {
     val proj = GrammarProjections(xbarParser.grammar,grammar,{(_:AnnotatedLabel).label})
     val decoder = new MaxConstituentDecoder[String,AnnotatedLabel,String](proj)
     val parser = new SimpleChartParser[String,AnnotatedLabel,String](builder,decoder,proj)
-    Iterator("Markovized" -> parser)
+    val maxV = new MaxVariationalDecoder[String,AnnotatedLabel,String](xbarParser.grammar,xbarParser.lexicon,proj,builder)
+    val maxVParser = new SimpleChartParser[String,AnnotatedLabel,String](builder,maxV,proj)
+    val vit = new ViterbiDecoder[String,AnnotatedLabel,String](proj.labels)
+    val viterbiParser = new SimpleChartParser[String,AnnotatedLabel,String](builder,vit,proj)
+    Iterator("maxV" -> maxVParser, "Viterbi" -> viterbiParser, "Markovized" -> parser)
   }
 
 }
