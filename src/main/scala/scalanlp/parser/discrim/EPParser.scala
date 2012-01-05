@@ -54,7 +54,8 @@ object EPModel {
 @SerialVersionUID(2)
 class EPParser[L,W](val parsers: Seq[EPModel[L,W]#Builder], coarseParser: ChartBuilder[LogProbabilityParseChart,L,W],
                     val maxEPIterations: Int= 1,
-                    val damping: Double = 1.0) extends Parser[L,W] with Serializable { outer =>
+                    val damping: Double = 1.0,
+                    takeCounterMeasures: Boolean = true) extends Parser[L,W] with Serializable { outer =>
 
 
   def bestParse(s: Seq[W], spanScorer: SpanScorer[L]) = {
@@ -72,7 +73,7 @@ class EPParser[L,W](val parsers: Seq[EPModel[L,W]#Builder], coarseParser: ChartB
   class ModelData(val model: EPModel[L,W]#Builder) {
     import model.L2
     protected[EPParser] val approximator = {
-      new AnchoredRuleApproximator[L,L2,W](model.chartBuilder, coarseParser,model.projections, -10)
+      new AnchoredRuleApproximator[L,L2,W](model.chartBuilder, coarseParser,model.projections, Double.NegativeInfinity)
     }
     def decoder = new MaxConstituentDecoder[L,L2,W](model.projections)
     var inside: LogProbabilityParseChart[L2] = _
@@ -94,12 +95,13 @@ class EPParser[L,W](val parsers: Seq[EPModel[L,W]#Builder], coarseParser: ChartB
     var currentF0 = initScorer
     val marginals = parsers.map(new ModelData(_))
     marginals.foreach { _.correction = SpanScorer.divide(currentF0,parsers.length) }
+
     var changed = true
 
     var lastF0 = currentF0
     for(i <- 0 until maxEPIterations if changed) {
       lastF0 = currentF0
-      for(marg <- marginals) {
+      for( (marg,m) <- marginals.zipWithIndex) {
         import marg._
         val p = model
         val proj:GrammarProjections[L,p.L2] = model.projections
@@ -112,7 +114,7 @@ class EPParser[L,W](val parsers: Seq[EPModel[L,W]#Builder], coarseParser: ChartB
 
         val newPartition = inside.top.labelScore(0,words.length,model.chartBuilder.root)
         if(newPartition.isInfinite) {
-          sys.error("Couldn't parse" + words + " on iteration " + i)
+          sys.error("Couldn't parse" + words + " on iteration " + i + " with model " + m)
         }
         marg.partition = newPartition
         // project down the approximation
