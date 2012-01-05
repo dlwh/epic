@@ -40,11 +40,11 @@ class AnchoredRuleProjector[C,L,W](coarseGrammar: Grammar[C],
     val numProjectedRules = indexedProjections.rules.coarseIndex.size;
     def projFill[T>:Null<:AnyRef:ClassManifest]() = Array.fill[T](numProjectedLabels)(null);
     def projVector() = {
-      new OldSparseVector(numProjectedLabels,0.0, 0);
+      new OldSparseVector(numProjectedLabels,Double.NegativeInfinity, 0);
     }
 
     def projRuleVector() = {
-      new OldSparseVector(numProjectedRules,0.0, 0);
+      new OldSparseVector(numProjectedRules,Double.NegativeInfinity, 0);
     }
 
     def getOrElseUpdate[T<:AnyRef](arr: Array[T], i: Int, t : =>T) = {
@@ -93,7 +93,7 @@ class AnchoredRuleProjector[C,L,W](coarseGrammar: Grammar[C],
           val parentScore = outside.bot.labelScore(begin,end,parent)+ scorer.scoreSpan(begin,end,parent);
           val pP = indexedProjections.labels.project(parent);
 
-          var total = 0.0
+          var total = Double.NegativeInfinity
 
           if(parentScore + inside.bot.labelScore(begin,end,parent) - sentProb > Double.NegativeInfinity || goldTagPolicy.isGoldTag(begin,end,parent)) {
             val rules = grammar.indexedBinaryRulesWithParent(parent)
@@ -124,9 +124,10 @@ class AnchoredRuleProjector[C,L,W](coarseGrammar: Grammar[C],
                     } else {
                       binaryScores(index)(split-begin)
                     }
-                    val count = math.exp(currentScore)
-                    parentArray(pR) += count
-                    total += count
+//                    val count = math.exp(currentScore)
+//                    parentArray(pR) += count
+                    parentArray(pR) = Numerics.logSum(parentArray(pR),currentScore)
+                    total = Numerics.logSum(total,currentScore)
                   }
                 }
 
@@ -134,20 +135,20 @@ class AnchoredRuleProjector[C,L,W](coarseGrammar: Grammar[C],
             }
           }
 
-          if(total != 0.0) {
+          if(total != Double.NegativeInfinity) {
             if(totals(index) eq null) {
               totals(index) = projVector;
             }
-            totals(index)(pP) += total
+            totals(index)(pP) = Numerics.logSum(totals(index)(pP),total)
           }
         }
 
         // do unaries. Similar to above
-        for( parent <- inside.top.enteredLabelIndexes(begin,end)) {
+        for( parent <- outside.top.enteredLabelIndexes(begin,end)) {
           val parentScore = outside.top.labelScore(begin,end,parent);
           val pP = indexedProjections.labels.project(parent);
 
-          var total = 0.0
+          var total = Double.NegativeInfinity
           lazy val parentArray = if(unaryScores(index) eq null) {
             unaryScores(index) = projRuleVector()
             unaryScores(index)
@@ -162,18 +163,22 @@ class AnchoredRuleProjector[C,L,W](coarseGrammar: Grammar[C],
             val ruleScore = parser.grammar.ruleScore(r)
             val score = ruleScore + inside.bot.labelScore(begin,end,c) + parentScore +
                     scorer.scoreUnaryRule(begin,end,r) - sentProb;
+            val pC = indexedProjections.labels.project(c)
             if(score > Double.NegativeInfinity) {
-              val count = math.exp(score)
-              parentArray(pR) += count
-              total += count
+//              val count = math.exp(score)
+//              parentArray(pR) += count
+              parentArray(pR) = Numerics.logSum(parentArray(pR),score)
+              total = Numerics.logSum(total,score)
+//              total += count
             }
           }
 
-          if(total != 0.0) {
+          if(total != Double.NegativeInfinity) {
             if(totalsUnaries(index) eq null) {
               totalsUnaries(index) = projVector;
             }
-            totalsUnaries(index)(pP) += total
+            totalsUnaries(index)(pP) = Numerics.logSum(totalsUnaries(index)(pP),total)
+//            totalsUnaries(index)(pP) += total
           }
 
         }
