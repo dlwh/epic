@@ -2,7 +2,6 @@ package scalanlp.parser
 package discrim
 
 import scalanlp.trees._
-import projections.GrammarProjections
 import scalanlp.parser.InsideOutside.ExpectedCounts
 import scalanlp.parser.ParseChart._
 import scalanlp.util.logging.ConfiguredLogging
@@ -19,6 +18,7 @@ import scalanlp.optimize.{CachedBatchDiffFunction, BatchDiffFunction}
 import java.io.File
 import scalanlp.util._
 import scalala.tensor.{Counter, Counter2, ::}
+import projections.{ProjectingSpanScorer, GrammarProjections}
 
 class EPModelObjective[L,W](models: Seq[DiscEPModel[L,W]],
                             trees: IndexedSeq[TreeInstance[L,W]],
@@ -81,7 +81,7 @@ class EPModelObjective[L,W](models: Seq[DiscEPModel[L,W]],
       val tcounts = model.treeExpectedCounts(marg.model.asInstanceOf[model.Builder],
         tree,
         words,
-        marg.scorer.asInstanceOf[SpanScorer[model.L2]])
+        new ProjectingSpanScorer(model.projections, scorer))
       val wordCounts = new InsideOutside(marg.model.chartBuilder).expectedCounts(words, marg.inside, marg.outside, marg.partition, marg.scorer)
       treeScore += tcounts.logProb
       tcounts -= wordCounts
@@ -99,18 +99,22 @@ class EPModelObjective[L,W](models: Seq[DiscEPModel[L,W]],
   }
 
   private def countsToObjective(c: Counts) = {
-    val weightVectors = for { (e,f) <- c._2 zip models} yield expectedCountsToFeatureVector(f.indexedFeatures,e)
+    val weightVectors = for { (e,f) <- c._2 zip models if !f.locked} yield {
+      expectedCountsToFeatureVector(f.indexedFeatures,e)
+    }
     val grad = -tileWeightVectors( weightVectors.toIndexedSeq)
     assert(grad.data.forall(!_.isInfinite), "wtf grad")
     (-c._1,  grad)
   }
 
+  val initialWeightVectors = models.map(_.initialWeightVector).toIndexedSeq
+
   def initialWeightVector = {
-    tileWeightVectors(models.map(_.initialWeightVector).toIndexedSeq)
+    val variable = (0 until numModels) collect { case m if !models(m).locked => initialWeightVectors(m)}
+    tileWeightVectors(variable)
   }
 
-
-  def partitionWeights(weights: DenseVector[Double]): Array[DenseVectorCol[Double]] = {
+  def partitionWeights(weights: DenseVector[Double]): Array[DenseVector[Double]] = {
     Array.tabulate(numModels)(m => projectWeights(weights, m))
   }
 
@@ -129,13 +133,15 @@ class EPModelObjective[L,W](models: Seq[DiscEPModel[L,W]],
     weights
   }
 
-
   private def projectWeights(weights: DenseVector[Double], modelIndex: Int) = {
-    val result = models(modelIndex).indexedFeatures.mkDenseVector(0.0)
-    for(i <- 0 until result.size) {
-      result(i) = weights(i + offsets(modelIndex))
+    if(models(modelIndex).locked) initialWeightVectors(modelIndex)
+    else {
+      val result = models(modelIndex).indexedFeatures.mkDenseVector(0.0)
+      for(i <- 0 until result.size) {
+        result(i) = weights(i + offsets(modelIndex))
+      }
+      result
     }
-    result
   }
 
   private def expectedCountsToFeatureVector[L,W](indexedFeatures: FeatureIndexer[L,W], ecounts: ExpectedCounts[W]) = {
@@ -154,7 +160,6 @@ class EPModelObjective[L,W](models: Seq[DiscEPModel[L,W]],
       sumVectorIntoResults(indexedFeatures.featuresFor(r),v)
 
     // lex
-
     for( (a,ctr) <- ecounts.wordCounts; (w,v) <- ctr.nonzero.pairs) {
       val vec = indexedFeatures.featuresFor(a,w)
       sumVectorIntoResults(vec, v)
@@ -164,12 +169,13 @@ class EPModelObjective[L,W](models: Seq[DiscEPModel[L,W]],
   }
 
   // more bookkeeping. offsets into giant tiled weight vector for submodels
+  // don't include weights for locked features
   private val offsets = Array.fill(numModels+1)(0);
   {
     var acc = 0
     for(m <- 0 to numModels) {
       offsets(m) = acc
-      if(m < numModels)
+      if(m < numModels && !models(m).locked)
         acc += models(m).indexedFeatures.index.size
     }
   }
@@ -179,6 +185,8 @@ trait DiscEPModel[L,W] extends EPModel[L,W] {
   def initialWeightVector: DenseVector[Double] = {
     indexedFeatures.tabulateDenseVector(indexedFeatures.initialValueFor _)
   }
+
+  def locked: Boolean
   def indexedFeatures: FeatureIndexer[L2,W]
   def builder(weights: DenseVector[Double]):Builder
   def treeExpectedCounts(builder: Builder,
@@ -188,13 +196,11 @@ trait DiscEPModel[L,W] extends EPModel[L,W] {
 }
 
 abstract class AbstractDiscEPModel[L,L3,W](proj: GrammarProjections[L,L3],
-                                   featurizer: Featurizer[L3, W],
-                                   initLexicon: Lexicon[L, W],
                                    root: L3,
                                    openTags: Set[L3], closedWords: Set[W]) extends DiscEPModel[L,W] {
   type L2 = L3
   def projections = proj
-  val indexedFeatures = FeatureIndexer(featurizer,initLexicon,proj)
+  def indexedFeatures:FeatureIndexer[L2,W]
 
   def builder(weights: DenseVector[Double]):Builder = {
     val grammar = weightsToGrammar(weights);
@@ -219,10 +225,9 @@ abstract class AbstractDiscEPModel[L,L3,W](proj: GrammarProjections[L,L3],
 
 class KMDiscEPModel[W](proj: GrammarProjections[String,AnnotatedLabel],
                        ann: (BinarizedTree[String],Seq[W])=>BinarizedTree[AnnotatedLabel],
-                       featurizer: Featurizer[AnnotatedLabel,W],
-                       lexicon: Lexicon[String, W],
+                       val indexedFeatures: FeatureIndexer[AnnotatedLabel,W],
                        openTags: Set[AnnotatedLabel],
-                       closedWords: Set[W]) extends AbstractDiscEPModel(proj,featurizer,lexicon,AnnotatedLabel(""),openTags,closedWords) {
+                       closedWords: Set[W], val locked: Boolean = false) extends AbstractDiscEPModel(proj,AnnotatedLabel(""),openTags,closedWords) {
   def treeExpectedCounts(builder: Builder, tree: BinarizedTree[String],
                          words: Seq[W], scorer: SpanScorer[AnnotatedLabel]) =  {
     val g = builder.chartBuilder.grammar
@@ -258,7 +263,11 @@ class LatentDiscEPModel[L,L2,W](proj: GrammarProjections[L,L2],
                            lexicon: Lexicon[L, W],
                            root: L2,
                            openTags: Set[L2],
-                           closedWords: Set[W]) extends AbstractDiscEPModel(proj,featurizer,lexicon,root,openTags,closedWords) {
+                           closedWords: Set[W],
+                           val locked: Boolean = false) extends AbstractDiscEPModel(proj,root,openTags,closedWords) {
+
+
+  def indexedFeatures = FeatureIndexer(featurizer,lexicon,proj)
 
   def treeExpectedCounts(builder: Builder, tree: BinarizedTree[L], w: Seq[W], scorer: SpanScorer[L2]) = {
     StateSplitting.expectedCounts(builder.chartBuilder.grammar,
@@ -279,7 +288,8 @@ trait EPModelFactory[L,W] {
 case class LatentDiscEPModelFactory[L,W](numStates: Int,
                                          featurizerFactory: FeaturizerFactory[L,W] = new PlainFeaturizerFactory[L](),
                                          latentFactory: LatentFeaturizerFactory = new SlavLatentFeaturizerFactory,
-                                         oldWeights: File = null) extends EPModelFactory[L,W] {
+                                         oldWeights: File = null,
+                                         locked: Boolean = false) extends EPModelFactory[L,W] {
   def make(coarseParser: ChartBuilder[LogProbabilityParseChart,L,W],
            trainTrees: IndexedSeq[TreeInstance[String,String]],
            initLexicon: Counter2[L,W,Double],
@@ -297,7 +307,7 @@ case class LatentDiscEPModelFactory[L,W](numStates: Int,
 
     val finalFeat: Featurizer[(L, Int), W] = if(oldWeights != null) {
       val weights = readObject[(Any,Counter[Feature[(L,Int),W],Double])](oldWeights)._2
-      new CachedWeightsFeaturizer(latentF,weights,randomize=false,randomizeZeros=true)
+      new CachedWeightsFeaturizer(latentF,weights,randomize=false,randomizeZeros=false)
     } else {
       latentF
     }
@@ -324,7 +334,8 @@ case class LatentDiscEPModelFactory[L,W](numStates: Int,
 
 case class KMDiscEPModelFactory(pipeline: KMPipeline,
                                 featurizerFactory: FeaturizerFactory[AnnotatedLabel,String] = new PlainFeaturizerFactory[AnnotatedLabel],
-                                oldWeights: File = null) extends EPModelFactory[String,String] {
+                                oldWeights: File = null,
+                                locked: Boolean = false) extends EPModelFactory[String,String] {
    def make(coarseParser: ChartBuilder[LogProbabilityParseChart,String,String],
             trainTrees: IndexedSeq[TreeInstance[String,String]],
             initLexicon: Counter2[String,String,Double],
@@ -336,19 +347,18 @@ case class KMDiscEPModelFactory(pipeline: KMPipeline,
      }.seq
      val (words,binary,unary) = GenerativeParser.extractCounts(transformed);
      val grammar = Grammar(Library.logAndNormalizeRows(binary),Library.logAndNormalizeRows(unary));
-     println(grammar.labelIndex)
      val lexicon = new SignatureLexicon(words, EnglishWordClassGenerator, 5);
      val proj = GrammarProjections(coarseParser.grammar,grammar,{(_:AnnotatedLabel).label})
-
 
     val featurizer = featurizerFactory.getFeaturizer(words, binary, unary);
 
     val finalFeat = if(oldWeights != null) {
       val weights = readObject[(Any,Counter[Feature[AnnotatedLabel,String],Double])](oldWeights)._2
-      new CachedWeightsFeaturizer(featurizer,weights,randomize=false,randomizeZeros=true)
+      new CachedWeightsFeaturizer(featurizer,weights,randomize=false,randomizeZeros=false)
     } else {
       featurizer
     }
+    val indexed = FeatureIndexer(finalFeat,lexicon,grammar)
 
     val openTags: Set[AnnotatedLabel] = Set.empty ++ {
       for(t <- words.nonzero.keys.iterator.map(_._1) if words(t, ::).size > 50) yield t;
@@ -359,7 +369,7 @@ case class KMDiscEPModelFactory(pipeline: KMPipeline,
       wordCounts.nonzero.pairs.iterator.filter(_._2 > 10).map(_._1);
     }
 
-     new KMDiscEPModel[String](proj,pipeline,finalFeat,coarseParser.lexicon,openTags,closedWords)
+     new KMDiscEPModel[String](proj,pipeline,indexed,openTags,closedWords)
    }
 }
 
@@ -396,7 +406,7 @@ object EPModelPipeline extends ParserPipeline {
     val optimizer = params.opt.minimizer(cachedObj)
 
     // new LBFGS[Int,DenseVector[Double]](iterationsPerEval,5) with ConsoleLogging;
-    val init = obj.initialWeightVector;
+    val init = obj.initialWeightVector + 0.0;
 
     def cacheWeights(weights: DenseVector[Double], iter: Int) {
       val partWeights = obj.partitionWeights(weights)
@@ -424,12 +434,19 @@ object EPModelPipeline extends ParserPipeline {
 
 
 
-    for( (state,iter) <- optimizer.iterations(cachedObj,init).take(maxIterations).zipWithIndex.tee(evalAndCache _);
-         if iter != 0 && iter % iterationsPerEval == 0) yield try {
-      val parser = obj.extractParser(state.x)
-      ("EP-" + iter.toString,parser)
-    } catch {
-      case e => println(e);e.printStackTrace(); throw e;
+    val it = {
+      for( (state,iter) <- optimizer.iterations(cachedObj,init).take(maxIterations).zipWithIndex.tee(evalAndCache _);
+           if iter != 0 && iter % iterationsPerEval == 0) yield try {
+        val parser = obj.extractParser(state.x)
+        ("EP-" + iter.toString,parser)
+      } catch {
+        case e => println(e);e.printStackTrace(); throw e;
+      }
     }
+
+    val pinit = obj.extractParser(init)
+
+    Iterator("Init" -> pinit, "f0" -> pinit.f0parser) ++ it
   }
 }
+
