@@ -157,7 +157,25 @@ object ExactPipeline extends ParserPipeline {
     val featurizer = factory.getFeaturizer(initLexicon, initBinaries, initUnaries);
     val latentFactory = params.latentFactory;
     val latentFeaturizer = latentFactory.getFeaturizer(featurizer, numStates);
-    new ProductFeaturizer[String,L2,String](IndexedSeq.fill(params.specific.numParsers)(latentFeaturizer))
+    val weightsPath = params.oldWeights
+
+    if(weightsPath == null) {
+      new ProductFeaturizer[String,L2,String](IndexedSeq.fill(params.specific.numParsers)(latentFeaturizer))
+    } else {
+      println("Using awesome weights...")
+      val weightSeq = readObject[Array[(DenseVector[Double],Counter[Feature[(String,Int),String],Double])]](weightsPath).map(_._2)
+      val splitFactor = params.splitFactor
+      def identity(x: Feature[(String,Int),String]) = x
+      val proj: Feature[(String,Int),String]=>Feature[(String,Int),String] = FeatureProjectors.split[String,String](_,splitFactor)
+
+      val feats = Array.tabulate(params.specific.numParsers){ m =>
+        if(m < weightSeq.length)
+          new CachedWeightsFeaturizer(latentFeaturizer, weightSeq(m), proj, randomize=false)
+        else latentFeaturizer
+      }
+      new ProductFeaturizer[String,L2,String](feats)
+    }
+
   }
 
   def trainParser(trainTrees: IndexedSeq[TreeInstance[String, String]],

@@ -56,9 +56,7 @@ class AnchoredRulePosteriorScorerFactory[C,L,W](coarseGrammar: Grammar[C],
   type MyScorer = AnchoredRuleScorer[C];
   protected def createSpanScorer(ruleData: AnchoredRuleProjector.AnchoredData, sentProb: Double) = {
     val AnchoredRuleProjector.AnchoredData(lexicalScores,unaryScores, _, binaryScores, _) = ruleData;
-    val logUnaryScores = unaryScores.map(vec => if(vec eq null) null else vec.values.map(math.log))
-    val logBinaryScores = binaryScores.map(arr => if(arr eq null) null else arr.map(vec => if(vec eq null) null else vec.values.map(math.log)))
-    new AnchoredRuleScorer(lexicalScores, logUnaryScores, logBinaryScores);
+    new AnchoredRuleScorer(lexicalScores, unaryScores, binaryScores);
   }
 
 }
