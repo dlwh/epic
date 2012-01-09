@@ -149,13 +149,7 @@ class AnchoredRuleProjector[C,L,W](coarseGrammar: Grammar[C],
           val pP = indexedProjections.labels.project(parent);
 
           var total = Double.NegativeInfinity
-          lazy val parentArray = if(unaryScores(index) eq null) {
-            unaryScores(index) = projRuleVector()
-            unaryScores(index)
-          } else {
-            unaryScores(index)
-
-          }
+          var parentArray: OldSparseVector = null
 
           for(r <- parser.grammar.indexedUnaryRulesWithParent(parent)) {
             val c = parser.grammar.child(r)
@@ -165,6 +159,13 @@ class AnchoredRuleProjector[C,L,W](coarseGrammar: Grammar[C],
                     scorer.scoreUnaryRule(begin,end,r) - sentProb;
             val pC = indexedProjections.labels.project(c)
             if(score > Double.NegativeInfinity) {
+              if(parentArray eq null)
+               parentArray = if(unaryScores(index) eq null) {
+                 unaryScores(index) = projRuleVector()
+                 unaryScores(index)
+               } else {
+                 unaryScores(index)
+               }
 //              val count = math.exp(score)
 //              parentArray(pR) += count
               parentArray(pR) = Numerics.logSum(parentArray(pR),score)
