@@ -36,7 +36,12 @@ abstract class ParseChart[L](val grammar: Encoder[L], val length: Int) extends S
 
     def enter(begin: Int, end: Int, parent: Int, w: Double) = {
       val index = TriangularArray.index(begin, end)
-      val oldScore = score(index)(parent)
+      var arr = score(index)
+      if(arr eq null) {
+        score(index) = LabelScoreArray.mkGrammarVector(grammar.index.size,zero)
+        arr = score(index)
+      }
+      val oldScore = arr(parent)
       val newScore = sum(oldScore, w)
       score(index)(parent) = newScore
 
@@ -56,9 +61,14 @@ abstract class ParseChart[L](val grammar: Encoder[L], val length: Int) extends S
      */
     def enter(begin: Int, end: Int, parent: Int, w: Array[Double], length: Int) = {
       val index = TriangularArray.index(begin, end)
-      val oldScore = score(index)(parent)
+      var arr = score(index)
+      if(arr eq null) {
+        score(index) = LabelScoreArray.mkGrammarVector(grammar.index.size,zero)
+        arr = score(index)
+      }
+      val oldScore = arr(parent)
       val newScore = sum(w,length)
-      score(index)(parent) = newScore
+      arr(parent) = newScore
 
       if(newScore > oldScore) {
         enteredLabels(index) += parent
