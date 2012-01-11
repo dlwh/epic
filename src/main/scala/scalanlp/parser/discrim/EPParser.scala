@@ -73,7 +73,7 @@ class EPParser[L,W](val parsers: Seq[EPModel[L,W]#Builder], coarseParser: ChartB
   class ModelData(val model: EPModel[L,W]#Builder) {
     import model.L2
     protected[EPParser] val approximator = {
-      new AnchoredRuleApproximator[L,L2,W](model.chartBuilder, coarseParser,model.projections, Double.NegativeInfinity)
+      new AnchoredRuleApproximator[L,L2,W](model.chartBuilder, coarseParser,model.projections, -7)
     }
     def decoder = new MaxConstituentDecoder[L,L2,W](model.projections)
     var inside: LogProbabilityParseChart[L2] = _
