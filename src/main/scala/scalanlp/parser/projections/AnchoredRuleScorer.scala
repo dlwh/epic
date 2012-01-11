@@ -18,11 +18,11 @@ class AnchoredRuleScorerFactory[C,L,W](val coarseGrammar: Grammar[C],
   private def normalize(ruleScores: OldSparseVector, totals: OldSparseVector):OldSparseVector = {
     if(ruleScores eq null) null
     else {
-      val r = new OldSparseVector(ruleScores.length,ruleScores.default,ruleScores.activeSize)
+      val r = new OldSparseVector(ruleScores.length,Double.NegativeInfinity,ruleScores.activeSize)
       for( (rule,score) <- ruleScores.activeIterator) {
         val parent = indexedProjections.labels.coarseIndex(indexedProjections.rules.coarseIndex.get(rule).parent)
-//        r(rule) = math.log(score) - math.log(totals(parent))
-        r(rule) = score - totals(parent)
+        r(rule) = math.log(score) - math.log(totals(parent))
+//        r(rule) = score - totals(parent)
       }
       r
     }
@@ -52,11 +52,31 @@ class AnchoredRuleScorerFactory[C,L,W](val coarseGrammar: Grammar[C],
 class AnchoredRulePosteriorScorerFactory[C,L,W](coarseGrammar: Grammar[C],
                                                 parser: SimpleChartParser[C,L,W], threshold: Double = Double.NegativeInfinity)
         extends ChartDrivenScorerFactory[C,L,W](coarseGrammar, parser, threshold) {
+  private def normalize(ruleScores: OldSparseVector):OldSparseVector = {
+    if(ruleScores eq null) null
+    else {
+      val r = new OldSparseVector(ruleScores.length,Double.NegativeInfinity,ruleScores.activeSize)
+      for( (rule,score) <- ruleScores.activeIterator) {
+        val parent = indexedProjections.labels.coarseIndex(indexedProjections.rules.coarseIndex.get(rule).parent)
+        r(rule) = math.log(score)
+//        r(rule) = score - totals(parent)
+      }
+      r
+    }
+  }
 
   type MyScorer = AnchoredRuleScorer[C];
   protected def createSpanScorer(ruleData: AnchoredRuleProjector.AnchoredData, sentProb: Double) = {
     val AnchoredRuleProjector.AnchoredData(lexicalScores,unaryScores, _, binaryScores, _) = ruleData;
-    new AnchoredRuleScorer(lexicalScores, unaryScores, binaryScores);
+    val normUnaries:Array[OldSparseVector] = for(ruleScores <- unaryScores) yield {
+      normalize(ruleScores)
+    }
+
+    val normBinaries:Array[Array[OldSparseVector]] = for (splits <- binaryScores) yield {
+      if(splits eq null) null
+      else for(ruleScores <- splits) yield normalize(ruleScores)
+    }
+    new AnchoredRuleScorer(lexicalScores, normUnaries, normBinaries);
   }
 
 }
