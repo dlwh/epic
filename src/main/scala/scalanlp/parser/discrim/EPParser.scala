@@ -9,6 +9,8 @@ import scalanlp.trees.UnaryChainRemover.ChainReplacer
 import java.io.{File, BufferedInputStream, FileInputStream, ObjectInputStream}
 import collection.mutable.ArrayBuffer
 import scalanlp.util._
+import java.lang.String
+import collection.Iterator
 
 
 /**
@@ -73,7 +75,7 @@ class EPParser[L,W](val parsers: Seq[EPModel[L,W]#Builder], coarseParser: ChartB
   class ModelData(val model: EPModel[L,W]#Builder) {
     import model.L2
     protected[EPParser] val approximator = {
-      new AnchoredRuleApproximator[L,L2,W](model.chartBuilder, coarseParser,model.projections, -7)
+      new AnchoredRuleApproximator[L,L2,W](model.chartBuilder, coarseParser,model.projections, -10)
     }
     def decoder = new MaxConstituentDecoder[L,L2,W](model.projections)
     var inside: LogProbabilityParseChart[L2] = _
@@ -189,7 +191,7 @@ class EPParser[L,W](val parsers: Seq[EPModel[L,W]#Builder], coarseParser: ChartB
  */
 object EPParserRunner extends ParserPipeline {
 
-  case class Params(parser: ParserParams.BaseParser[String],
+  case class Params(parser: ParserParams.BaseParser[String], useExact: Boolean = true,
                     model0: File = null,
                     model1: File = null,
                     model2: File = null,
@@ -218,9 +220,16 @@ object EPParserRunner extends ParserPipeline {
     }
     val coarseParser = params.parser.optParser
     val models = parsers.map(EPModel.fromChartParser(_)).map(_.builder)
+    val product: ProductParser[String, (String, Int), String] = new ProductParser(parsers.map(_.builder.asInstanceOf[ChartBuilder[LogProbabilityParseChart,(String,Int),String]]), coarseParser.get, parsers.map(_.projections))
 
-    val productParser = new EPParser(models, coarseParser.get, maxEPIterations = 5)
-    Iterator.single( "EPIC" -> productParser)
+    val productParser: EPParser[String, String] = new EPParser(models, coarseParser.get, maxEPIterations = 4)
+    val adf: EPParser[String, String] = new EPParser(models, coarseParser.get, maxEPIterations = 1)
+
+    val exactStuff = if(params.useExact) {
+      val exact = ExactParserExtractor.extractParser(parsers.map(_.builder.asInstanceOf[ChartBuilder[LogProbabilityParseChart,(String,Int),String]]), coarseParser.get, models.map(_.projections))
+      Iterator(("Exact" -> exact))
+    } else Iterator.empty
+    Iterator( "ADF" -> adf, "EP" -> (productParser:Parser[String,String]), "Product" -> (product:Parser[String,String]), "F0" -> productParser.f0parser) ++ exactStuff
   }
 
 
@@ -230,6 +239,7 @@ object EPParserRunner extends ParserPipeline {
 /**
  *
  * @author dlwh
+ */
 object EPParserParamRunner extends ParserPipeline {
 
   case class Params(parser: ParserParams.BaseParser[String],
@@ -241,31 +251,29 @@ object EPParserParamRunner extends ParserPipeline {
                   params: Params) = {
 
 
-    val epParser = readObject[EPParser[String,(String,Int),String]](params.epParser)
+    val epParser = readObject[EPParser[String,String]](params.epParser)
     val parsers = epParser.parsers
 
     val coarseParser = params.parser.optParser
 
-    val eps = Iterator.tabulate(5) { i =>
-      val productParser = new EPParser(parsers, coarseParser.get, maxEPIterations = i+1)
-      ("EP-" + i) -> productParser
+    val product = new ProductParser(parsers.map(_.chartBuilder), coarseParser.get, parsers.map(_.projections))
+    val raw = for ( (m,i) <- parsers.zipWithIndex) yield {
+      val proj = m.projections.asInstanceOf[GrammarProjections[String,(String,Int)]]
+      ("Raw-" + i) -> new SimpleChartParser[String,(String,Int),String](m.chartBuilder.asInstanceOf[ChartBuilder[ParseChart,(String,Int),String]], new MaxConstituentDecoder(proj), proj)
     }
-    val product = new ProductParser(parsers, coarseParser.get)
-    val raw = for ( ((par,pro),i) <- parsers)
-                  yield ("Raw-" + i) -> new SimpleChartParser[String,(String,Int),String](par, new MaxConstituentDecoder(pro), pro)
 
-    val teed = epParser.fineParsers
-    val namedTeed = for ( (p,i) <- teed.zipWithIndex) yield ("Teed-" + i) -> p
+    val adf = new EPParser(epParser.parsers,coarseParser.get,1)
+    val ep = new EPParser(epParser.parsers,coarseParser.get,4)
 
     val exactStuff = if(params.useExact) {
-      val exact = ExactParserExtractor.extractParser(parsers, coarseParser.get)
+      val exact = ExactParserExtractor.extractParser(parsers.map(_.chartBuilder), coarseParser.get, parsers.map(_.projections))
       Iterator(("Exact" -> exact))
     } else Iterator.empty
 
 
-    Iterator[(String,Parser[String,String])]("F0" -> epParser.f0parser) ++ raw.iterator ++ eps ++ Iterator("Product" -> product) ++ namedTeed ++ exactStuff
+    Iterator[(String,Parser[String,String])]("F0" -> ep.f0parser) ++ raw.iterator ++ Iterator("EP" -> ep, "ADF" -> adf, "Product" -> product) ++ exactStuff
   }
 
 
-} */
+}
 

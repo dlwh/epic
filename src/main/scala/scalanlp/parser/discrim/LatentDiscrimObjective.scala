@@ -91,7 +91,13 @@ class LatentDiscrimObjective[L,L2,W](featurizer: Featurizer[L2,W],
     println("words:" + wordCounts.logProb + " " + wordCounts.decode(b.grammar));
     if(treeCounts.logProb - wordCounts.logProb > 1E-4) error(t.render(w) + " " + treeCounts + " " + wordCounts);
     */
-    treeCounts -= wordCounts
+    val r = treeCounts -= wordCounts
+    if(r.logProb.isNaN || r.logProb.isInfinite) {
+      println("Warning: NaN's in ecounts for" + w)
+      emptyCounts(b)
+    } else {
+      r
+    }
   }
 
   def sumCounts(c1: Counts, c2: Counts) = { c1 += c2}

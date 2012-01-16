@@ -70,6 +70,7 @@ object KMDiscriminativePipeline extends ParserPipeline {
   protected val paramManifest = manifest[Params];
   case class Params(parser: ParserParams.BaseParser[String],
                     opt: OptParams,
+                    pipeline: KMPipeline,
                     featurizerFactory: FeaturizerFactory[AnnotatedLabel,String] = new PlainFeaturizerFactory[AnnotatedLabel](),
                     iterationsPerEval: Int = 50,
                     maxIterations: Int = 201,
@@ -94,9 +95,6 @@ object KMDiscriminativePipeline extends ParserPipeline {
     import params._;
 
     val factory = params.featurizerFactory;
-
-
-    val pipeline = new KMPipeline()
 
     val transformed = trainTrees.par.map { ti =>
       val t = pipeline(ti.tree,ti.words)

@@ -367,7 +367,7 @@ object SplitExact extends ParserPipeline {
     val ep8 = new EPParser(models, xbarParser, 8)
     val exact = ExactParserExtractor.extractParser(parsers.map(_._2.builder.withCharts(ParseChart.logProb)), xbarParser, projections)
 
-    parsers.iterator ++ Iterator("EP"-> ep, "ADF" -> adf, "Product" -> product, "EP-8" -> ep8, "Exact" -> exact)
+    parsers.iterator ++ Iterator("EP"-> ep, "ADF" -> adf, "Product" -> product, "f0" -> ep.f0parser, "Exact" -> exact)
 
 
   }
