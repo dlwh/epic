@@ -193,6 +193,7 @@ object ParserTester {
 }
 */
 
+/*
 trait ParserTester {
   def main(args: Array[String]) {
     val config = Configuration.fromPropertiesFiles(args.map{new File(_)});
@@ -218,3 +219,4 @@ trait ParserTester {
   }
 
 }
+*/
