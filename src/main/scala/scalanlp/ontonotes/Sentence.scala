@@ -3,6 +3,15 @@ package scalanlp.ontonotes
 import scalanlp.data.Example
 import scalanlp.trees.{Span, Tree}
 import java.io.{PushbackReader, Reader, InputStream}
+import collection.mutable.ArrayBuffer
+
+case class Document(id: String, sentences: Seq[Sentence])
+
+object Document {
+  def fromXML(node: xml.Node) = {
+    Document(node \ "@id" text, node \ "sentence" map {Sentence.fromXML _})
+  }
+}
 
 /**
  *
@@ -10,24 +19,83 @@ import java.io.{PushbackReader, Reader, InputStream}
  */
 
 case class Sentence(id: String,
-                   rawSentence: String,
-                   tokens: Seq[Token],
-                   tree: Tree[String],
-                   meta: Map[String,Seq[String]] = Map.empty) {
-  def words = tokens.map(_.word)
+                   words: Seq[String],
+                   tree: Tree[OntoLabel]) extends Example[Tree[OntoLabel],Seq[String]] {
+  def features = words
+  def label = tree
 }
 
-case class Token(pos: Int, word: String,
-                 sense: Option[String] = None,
-                 entity: Option[Entity] = None,
-                 mention: Option[Mention] = None,
-                 frame: Option[Frame] = None)
 
-case class Mention(id: Int, span: Span, mentionType: MentionType = MentionType.Ident)
-case class Entity(entityType: NERType, span: Span)
+object Sentence {
+  def fromXML(node: xml.Node) = {
+    val tree = node \ "T"
 
-case class Frame(sense: String, args: Seq[Argument])
+    def rec(tree: xml.Node, offset: Int = 0):(Tree[OntoLabel],IndexedSeq[String]) = {
+      val tag = (tree \ "@tag").text
+      val coref = (tree \ "coref").headOption.map(processCoref _)
+      val prop = (tree \ "proposition").headOption.map(processProp _)
+      val sense = (tree \ "sense").headOption.map(processSense _)
+      val entity = (tree \ "name").headOption.map(processName _)
+      val word = (tree \ "@word").headOption.map(_.text)
+
+      var moff = offset
+      val words = ArrayBuffer[String]()
+      for(w <- word) words += w
+      val children = for( (c: xml.Node) <- (tree \ "T").toIndexedSeq) yield {
+        val r = rec(c,moff)
+        moff += r._2.length
+        words ++= r._2
+        r._1
+      }
+
+      Tree(OntoLabel(tag,sense,entity.getOrElse(NERType.NotEntity), coref, prop), children)(Span(offset,moff)) -> words
+    }
+
+    val (t2,words) = rec(tree.head)
+    Sentence(node \ "@id" text, words, t2)
+  }
+
+  private def processCoref(node: xml.Node):Mention = {
+    Mention( (node \ "@chainid").text.toInt, MentionType.fromString(node \ "@link" text))
+  }
+
+  private def processProp(node: xml.Node) = {
+    val lemma = (node \ "@lemma").text
+    val sense = (node \ "@sense").text.toInt
+
+    val args = for(argN <- node \ "analogue") yield {
+      val arg = (argN \ "@type").text
+      val fillers = for(f <- argN \\ "link") yield {
+        val Array(index,height) = f.text.split(":").map(_.toInt)
+        index -> height
+      }
+      Argument(arg,fillers)
+    }
+
+    Frame(lemma,sense,args)
+  }
+
+  private def processSense(node: xml.Node):Sense = {
+    Sense(node \ "@lemma" text, (node \ "@sense").text.toInt, (node \ "@pos").text)
+  }
+
+  private def processName(node: xml.Node) = {
+    NERType.fromString(node \ "@type" text)
+  }
+}
+
+
+case class OntoLabel(tag: String,
+                     sense: Option[Sense] = None,
+                     entity: NERType = NERType.NotEntity,
+                     mention: Option[Mention] = None,
+                     frame: Option[Frame] = None)
+
+case class Mention(id: Int, mentionType: MentionType = MentionType.Ident)
+
+case class Frame(lemma: String, sense: Int, args: Seq[Argument])
 case class Argument(arg: String, fillers: Seq[(Int,Int)]) // leaf:height pairs
+case class Sense(lemma: String, sense: Int, pos: String)
 
 sealed trait MentionType
 object MentionType {
