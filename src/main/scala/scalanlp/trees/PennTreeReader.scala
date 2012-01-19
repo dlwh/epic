@@ -33,14 +33,14 @@ class PennTreeReader(val reader : Reader,
                      val ROOT_LABEL : String = "",
                      dropLabels:Set[String]=Set("-NONE-")) extends Iterator[(Tree[String],IndexedSeq[String])] {
 
-  val in = new PushbackReader(reader, 4)
+  private val in = new PushbackReader(reader, 4)
 
-  var nextTree = readRootTree()
+  private var nextTree = readRootTree()
 
-  def hasNext() = (nextTree != null);
+  def hasNext = (nextTree != null);
 
   def next() = {
-    if (!hasNext()) throw new NoSuchElementException();
+    if (!hasNext) throw new NoSuchElementException();
     val tree = nextTree;
 
     nextTree = readRootTree();
