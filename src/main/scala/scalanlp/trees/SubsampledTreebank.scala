@@ -2,6 +2,11 @@ package scalanlp.trees
 
 import java.io.File
 
+/**
+ * A Treebank that uses a few number of training and test sentences.
+ *
+ * @author dlwh
+ */
 class SubsampledTreebank(base: Treebank[String], numTrain: Int, numDev:Int, numTest: Int) extends Treebank[String] {
   def sections = Seq("train","test","dev");
 
@@ -25,6 +30,11 @@ class SubsampledTreebank(base: Treebank[String], numTrain: Int, numDev:Int, numT
   }
 }
 
+/**
+ * Main class to subsample a treebank; useful for development
+ *
+ * @author dlwh
+ */
 object ReduceTreebank {
   def main(args: Array[String]) = {
     val penn = Treebank.fromPennTreebankDir(new File(args(0)));

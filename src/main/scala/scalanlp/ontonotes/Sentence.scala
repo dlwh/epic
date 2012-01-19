@@ -5,19 +5,26 @@ import scalanlp.trees.{Span, Tree}
 import java.io.{PushbackReader, Reader, InputStream}
 import collection.mutable.ArrayBuffer
 
+/**
+ * Represents an ontonotes document (a single file)
+ */
 case class Document(id: String, sentences: Seq[Sentence])
 
 object Document {
+  /**
+   * Reads a single document reprseented as the XML file format
+   * <document id="..."> <sentence> ... </sentence> </document>
+   */
   def fromXML(node: xml.Node) = {
     Document(node \ "@id" text, node \ "sentence" map {Sentence.fromXML _})
   }
 }
 
 /**
+ * represents an annotation ontonotes sentence. Doesn't include raw sentence, for now.
  *
  * @author dlwh
  */
-
 case class Sentence(id: String,
                    words: Seq[String],
                    tree: Tree[OntoLabel]) extends Example[Tree[OntoLabel],Seq[String]] {
@@ -27,6 +34,31 @@ case class Sentence(id: String,
 
 
 object Sentence {
+  /**
+   * Reads an Ontonotes dlwh-XML file:
+   *
+   * example
+   * {{{
+   *   <sentence coref_section="0" id="4@bc/cnn/00/cnn_0000@all@cnn@bc@en@on">
+    <tree>(TOP (FRAG (NP-VOC (NNP Paula)) (NP-VOC (NNP Paula)) (. /.)))</tree>
+    <T tag="TOP">
+      <T tag="FRAG">
+        <T tag="NP-VOC">
+          <coref chain="IDENT" chainid="367" link="IDENT" />
+          <name string="Paula" tokens="0 1" type="PERSON" words="0 1" />
+          <T tag="NNP" word="Paula" />
+        </T>
+        <T tag="NP-VOC">
+          <coref chain="IDENT" chainid="367" link="IDENT" />
+          <name string="Paula" tokens="1 2" type="PERSON" words="1 2" />
+          <T tag="NNP" word="Paula" />
+        </T>
+        <T tag="." word="/." />
+      </T>
+    </T>
+  </sentence>
+   }}}
+   */
   def fromXML(node: xml.Node) = {
     val tree = node \ "T"
 
@@ -85,18 +117,35 @@ object Sentence {
 }
 
 
+/**
+ * A label in an Ontonotes annotated tree.
+ * Includes tag, word sense, NER tag, coref mention and propbank frame
+ */
 case class OntoLabel(tag: String,
                      sense: Option[Sense] = None,
                      entity: NERType = NERType.NotEntity,
                      mention: Option[Mention] = None,
                      frame: Option[Frame] = None)
 
+/**
+ * A coref mention
+ */
 case class Mention(id: Int, mentionType: MentionType = MentionType.Ident)
 
+/**
+ * A Propbank mention
+ */
 case class Frame(lemma: String, sense: Int, args: Seq[Argument])
 case class Argument(arg: String, fillers: Seq[(Int,Int)]) // leaf:height pairs
+
+/**
+ * A wordnet sense
+ */
 case class Sense(lemma: String, sense: Int, pos: String)
 
+/**
+ * The kinds of mentions used by Ontonotes
+ */
 sealed trait MentionType
 object MentionType {
   def fromString(str: String): MentionType = str.toLowerCase match {
@@ -109,6 +158,9 @@ object MentionType {
   case object ApposAttrib extends MentionType
 }
 
+/**
+ * The NER types used in Ontonotes
+ */
 sealed trait NERType
 object NERType {
   def fromString(str: String): NERType = str.toLowerCase match {
