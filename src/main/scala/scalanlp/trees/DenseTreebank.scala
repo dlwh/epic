@@ -31,7 +31,7 @@ object DenseTreebank {
   /**
    * Produces a densetreebank in path from a current Treebank.
    */
-  def compressTreebank(treebank: Treebank, path: File) = {
+  def compressTreebank(treebank: Treebank[String], path: File) = {
     val zipWriter = new ZipOutputStream(new BufferedOutputStream(new FileOutputStream(path)));
     val symbolIndex = Index[String]();
     val wordIndex = Index[String]();
@@ -71,12 +71,12 @@ object DenseTreebank {
   /**
    * Read in a zip file to a treebank.
    */
-  def fromZipFile(path: File): Treebank = {
+  def fromZipFile(path: File): Treebank[String] = {
     val zipFile = new ZipFile(path);
     val metadata = zipFile.getEntry("metadata");
     val metaIn = new DataInputStream(zipFile.getInputStream(metadata));
 
-    new Treebank {
+    new Treebank[String] {
       val symbolIndex = read[Index[String]](metaIn);
       val wordIndex = read[Index[String]](metaIn);
       val (sections,testSections,trainSections,devSections) = read[Metadata](metaIn);

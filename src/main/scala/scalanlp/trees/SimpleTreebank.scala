@@ -10,7 +10,7 @@ import io.{Codec, Source}
  */
 class SimpleTreebank(trainUrls: Map[String,URL],
                      devUrls: Map[String,URL],
-                     testUrls: Map[String,URL])(implicit enc: Codec) extends Treebank {
+                     testUrls: Map[String,URL])(implicit enc: Codec) extends Treebank[String] {
   def this(train:File, dev: File, test: File) = {
     this(Map(train.getName -> train.toURI.toURL),
       Map(dev.getName -> dev.toURI.toURL),
@@ -32,7 +32,7 @@ class SimpleTreebank(trainUrls: Map[String,URL],
 }
 
 object SimpleTreebank {
-  def writeSimpleTreebank(trees: Treebank, dir: File) = {
+  def writeSimpleTreebank(trees: Treebank[String], dir: File) = {
     dir.mkdirs();
     def writeToFile(file: File, trees: Iterator[(Tree[String],Seq[String])]) = {
       val outTrain = new PrintStream(new BufferedOutputStream(new FileOutputStream(file)));

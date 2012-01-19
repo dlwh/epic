@@ -27,7 +27,7 @@ import io.Codec
  *
  * @author dlwh
  */
-trait Treebank { outer =>
+trait Treebank[L] { outer =>
 
   /**
    * Class for a split of a training set.
@@ -61,7 +61,7 @@ trait Treebank { outer =>
   /**
    * Read the trees from a section
    */
-  def treesFromSection(sec: String): Iterator[(Tree[String],Seq[String])];
+  def treesFromSection(sec: String): Iterator[(Tree[L],Seq[String])];
 
   def treesFromSections(secs: Seq[String]) = {
     for(sec <- secs.iterator;
@@ -72,8 +72,7 @@ trait Treebank { outer =>
   /**
    * All trees
    */
-  def trees: Iterator[(Tree[String],Seq[String])] = treesFromSections(sections);
-          
+  def trees: Iterator[(Tree[L],Seq[String])] = treesFromSections(sections);
 }
 
 object Treebank {
@@ -83,7 +82,7 @@ object Treebank {
   * Reads a treebank from the "mrg/wsj" section
   * of the parsed Treebank.
   */
-  def fromPennTreebankDir(dir: File):Treebank = new Treebank {
+  def fromPennTreebankDir(dir: File):Treebank[String] = new Treebank[String] {
     def sections = dir.listFiles.filter(_.isDirectory).map(_.getName);
     val train = Portion("train", Seq.range(2,10).map("0" + _) ++ Seq.range(10,22).map(""+_));
 
@@ -99,13 +98,13 @@ object Treebank {
     }
   }
 
-  def fromGermanTreebank(dir: File):Treebank = {
+  def fromGermanTreebank(dir: File):Treebank[String] = {
     import scala.io.Codec.ISO8859
     implicit val cod = ISO8859;
     new SimpleTreebank(new File(dir + "/negra_1.mrg"),new File(dir + "/negra_2.mrg"),new File(dir + "/negra_3.mrg"))
   }
 
-  def fromChineseTreebankDir(dir: File):Treebank = new Treebank {
+  def fromChineseTreebankDir(dir: File):Treebank[String] = new Treebank[String] {
     def sections = dir.listFiles.map(_.getName);
     private def id_to_name(id: Int) = "chtb_" + {if(id < 100)  "0" + id else id} +".mrg"
 

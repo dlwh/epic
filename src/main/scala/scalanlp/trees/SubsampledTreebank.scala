@@ -2,7 +2,7 @@ package scalanlp.trees
 
 import java.io.File
 
-class SubsampledTreebank(base: Treebank, numTrain: Int, numDev:Int, numTest: Int) extends Treebank {
+class SubsampledTreebank(base: Treebank[String], numTrain: Int, numDev:Int, numTest: Int) extends Treebank[String] {
   def sections = Seq("train","test","dev");
 
   val test = new Portion("test",Seq("test"));
