@@ -107,6 +107,7 @@ object Grammar {
                unaryProductions: Counter2[L,UnaryRule[L],Double]):Grammar[L] = {
     val li = labelIndex
     val ri = ruleIndex
+
     new Grammar[L] {
       val index = ri
       val labelIndex = li

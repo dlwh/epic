@@ -108,14 +108,12 @@ object DiscriminativePipeline extends ParserPipeline {
     }
 
     val obj = new DiscrimObjective(featurizer, trainTrees.toIndexedSeq, xbarParser, openTags, closedWords) with ConfiguredLogging;
-    val optimizer = params.opt.minimizer(new CachedBatchDiffFunction(obj))
 
     // new LBFGS[Int,DenseVector[Double]](iterationsPerEval,5) with ConsoleLogging;
     val init = obj.initialWeightVector;
     val rand = new RandomizedGradientCheckingFunction(obj, 0.1);
 
-    for( (state,iter) <- optimizer.iterations(obj,init).take(maxIterations).zipWithIndex;
-        _ = rand.calculate(state.x);
+    for( (state,iter) <- params.opt.iterations(new CachedBatchDiffFunction(obj),init).take(maxIterations).zipWithIndex;
          if iter != 0 && iter % iterationsPerEval == 0) yield {
        val parser = obj.extractParser(state.x);
        (iter + "", parser);

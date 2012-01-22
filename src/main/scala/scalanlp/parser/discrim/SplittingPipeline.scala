@@ -9,11 +9,11 @@ import scalanlp.trees.UnaryChainRemover.ChainReplacer
 import scalala.library.Library
 import scalanlp.parser.ParseChart._
 import scalala.library.Library._
-import scalanlp.optimize.CachedBatchDiffFunction
 import scalala.tensor.{Counter, Counter2}
 import scalala.tensor.::
 import logging._
 import scalanlp.collection.mutable.TriangularArray
+import scalanlp.optimize.{BatchDiffFunction, FirstOrderMinimizer, CachedBatchDiffFunction}
 
 /**
  * Runs a parser that can conditionally split labels
@@ -160,13 +160,11 @@ object SplittingPipeline extends ParserPipeline {
 
     val obj = mkObjective(params, latentFeaturizer, trainTrees, indexedProjections, xbarParser, openTags, closedWords, oneStepProjections)
 
-    val optimizer = opt.minimizer(obj);
-
     val init = obj.initialWeightVector + 0.0;
 
     import scalanlp.optimize.RandomizedGradientCheckingFunction;
-    val rand = new RandomizedGradientCheckingFunction(obj,1E-4);
-    def evalAndCache(pair: (optimizer.State,Int) ) {
+    type OptState = FirstOrderMinimizer[DenseVector[Double],BatchDiffFunction[DenseVector[Double]]]#State
+    def evalAndCache(pair: (OptState,Int) ) {
       val (state,iter) = pair;
       val weights = state.x;
       if(iter % iterPerValidate == 0) {
@@ -180,7 +178,7 @@ object SplittingPipeline extends ParserPipeline {
 
     val cachedObj = new CachedBatchDiffFunction[DenseVector[Double]](obj);
 
-    for( (state,iter) <- optimizer.iterations(cachedObj,init).take(maxIterations).zipWithIndex.tee(evalAndCache _);
+    for( (state,iter) <- params.opt.iterations(cachedObj,init).take(maxIterations).zipWithIndex.tee(evalAndCache _);
          if iter != 0 && iter % iterationsPerEval == 0) yield try {
       val parser = obj.extractParser(state.x)
       ("MultiScale-" + iter.toString,parser)

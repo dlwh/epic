@@ -99,9 +99,9 @@ object KMLatentPipeline extends ParserPipeline {
 
 
     val obj = new LatentDiscrimObjective[AnnotatedLabel,(AnnotatedLabel,Int),String](latentFeaturizer, newTrees, proj2, builder, openTags, closedWords) with ConfiguredLogging;
-    val optimizer = params.opt.minimizer(new CachedBatchDiffFunction(obj))
 
-    def evalAndCache(pair: (optimizer.State,Int) ) {
+    type OptState = FirstOrderMinimizer[DenseVector[Double],BatchDiffFunction[DenseVector[Double]]]#State
+    def evalAndCache(pair: (OptState,Int) ) {
       val (state,iter) = pair;
       val weights = state.x;
       if(iter % iterPerValidate == 0) {
@@ -117,7 +117,7 @@ object KMLatentPipeline extends ParserPipeline {
 
     val init = obj.initialWeightVector;
 
-    for( (state,iter) <- optimizer.iterations(obj,init).take(maxIterations).zipWithIndex.tee(evalAndCache);
+    for( (state,iter) <- params.opt.iterations(obj,init).take(maxIterations).zipWithIndex.tee(evalAndCache);
          if iter != 0 && iter % iterationsPerEval == 0) yield {
       val parser = obj.extractParser(state.x);
       val newProj: GrammarProjections[String, (AnnotatedLabel,Int)] = proj compose proj2

@@ -14,11 +14,11 @@ import scalala.library.Library._
 import scalala.library.Library
 import scalanlp.parser.ParseEval.Statistics
 import scalanlp.optimize.FirstOrderMinimizer.OptParams
-import scalanlp.optimize.{CachedBatchDiffFunction, BatchDiffFunction}
 import java.io.File
 import scalanlp.util._
 import scalala.tensor.{Counter, Counter2, ::}
 import projections.{ProjectingSpanScorer, GrammarProjections}
+import scalanlp.optimize.{FirstOrderMinimizer, CachedBatchDiffFunction, BatchDiffFunction}
 
 class EPModelObjective[L,W](models: Seq[DiscEPModel[L,W]],
                             trees: IndexedSeq[TreeInstance[L,W]],
@@ -403,8 +403,6 @@ object EPModelPipeline extends ParserPipeline {
 
     val obj = new EPModelObjective(models,trainTrees,xbarParser,params.ep.iterations)
     val cachedObj = new CachedBatchDiffFunction[DenseVector[Double]](obj);
-    val optimizer = params.opt.minimizer(cachedObj)
-
     // new LBFGS[Int,DenseVector[Double]](iterationsPerEval,5) with ConsoleLogging;
     val init = obj.initialWeightVector + 0.0;
 
@@ -421,7 +419,8 @@ object EPModelPipeline extends ParserPipeline {
       }
     }
 
-    def evalAndCache(pair: (optimizer.State,Int) ) {
+    type OptState = FirstOrderMinimizer[DenseVector[Double],BatchDiffFunction[DenseVector[Double]]]#State
+    def evalAndCache(pair: (OptState,Int) ) {
       val (state,iter) = pair;
       val weights = state.x;
       if(iter % iterPerValidate == 0) {
@@ -435,7 +434,7 @@ object EPModelPipeline extends ParserPipeline {
 
 
     val it = {
-      for( (state,iter) <- optimizer.iterations(cachedObj,init).take(maxIterations).zipWithIndex.tee(evalAndCache _);
+      for( (state,iter) <- params.opt.iterations(cachedObj,init).take(maxIterations).zipWithIndex.tee(evalAndCache _);
            if iter != 0 && iter % iterationsPerEval == 0) yield try {
         val parser = obj.extractParser(state.x)
         ("EP-" + iter.toString,parser)

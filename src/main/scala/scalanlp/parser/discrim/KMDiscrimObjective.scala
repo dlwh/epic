@@ -125,8 +125,6 @@ object KMDiscriminativePipeline extends ParserPipeline {
     }
 
     val obj = new KMDiscrimObjective[AnnotatedLabel,String](featurizer, newTrees,  builder, openTags, closedWords) with ConfiguredLogging;
-    val optimizer = params.opt.minimizer(new CachedBatchDiffFunction(obj))
-
 
     def cacheWeights(weights: DenseVector[Double], iter: Int) {
       val name = if(iter % (2*iterPerValidate) == 0) {
@@ -138,7 +136,8 @@ object KMDiscriminativePipeline extends ParserPipeline {
       writeObject( new File(name+".ser"), weights -> obj.indexedFeatures.decode(weights))
     }
 
-    def evalAndCache(pair: (optimizer.State,Int) ) {
+    type OptState = FirstOrderMinimizer[DenseVector[Double],BatchDiffFunction[DenseVector[Double]]]#State
+    def evalAndCache(pair: (OptState,Int) ) {
       val (state,iter) = pair;
       val weights = state.x;
       if(iter % iterPerValidate == 0) {
@@ -156,7 +155,7 @@ object KMDiscriminativePipeline extends ParserPipeline {
     val init = obj.initialWeightVector;
     val rand = new RandomizedGradientCheckingFunction(obj, 0.1);
 
-    for( (state,iter) <- optimizer.iterations(obj,init).take(maxIterations).zipWithIndex.tee(evalAndCache _);
+    for( (state,iter) <- params.opt.iterations(obj,init).take(maxIterations).zipWithIndex.tee(evalAndCache _);
          if iter != 0 && iter % iterationsPerEval == 0) yield {
        val parser = obj.extractParser(state.x);
        val decoder = new MaxConstituentDecoder[String,AnnotatedLabel,String](proj)
