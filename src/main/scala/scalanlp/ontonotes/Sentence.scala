@@ -30,6 +30,66 @@ case class Sentence(id: String,
                    tree: Tree[OntoLabel]) extends Example[Tree[OntoLabel],Seq[String]] {
   def features = words
   def label = tree
+
+  def stripTraces() = {
+    // walk the tree twice. first time patching everything except srl, which
+    // has to be fixed later because of the indexed strategy
+    val idMap = collection.mutable.Map[(Int,Int),(Int,Int)]()
+    def isTrace(t: Tree[OntoLabel]) = t.label.tag.startsWith("-NONE-")
+    def rec1(t: Tree[OntoLabel], offset:Int = 0):Option[(Tree[OntoLabel],Seq[String],Int)] = {
+      var moff = offset
+      val newWords = new ArrayBuffer[String]()
+      val oldHeight = t.leftHeight
+      if(isTrace(t)) {
+        None
+      } else {
+        if(t.isLeaf) {
+          newWords += words(t.span.start)
+          moff += 1
+        }
+
+        var newHeight = -1
+        val newChildren = for( c <- t.children) yield {
+          rec1(c,moff) match {
+            case None => None
+            case Some((t,w,h)) =>
+              if(newHeight < 0) newHeight = h + 1
+              newWords ++= w
+              moff += w.length
+              Some(t)
+          }
+        }
+
+
+        val finalChildren = newChildren.flatMap(_.iterator)
+        if(t.children.length != 0 && finalChildren.length == 0) {
+          None
+        } else {
+          if(newHeight < 0) newHeight = 0
+          val newTree = Tree(t.label,finalChildren)(Span(offset,moff))
+          idMap(t.span.start -> oldHeight) = (offset -> newHeight)
+          Some((newTree,newWords,newHeight))
+        }
+      }
+    }
+
+    val Some((newTree,w2,_)) = rec1(tree)
+    // second pass: update Semantic role stuff
+    val t3 = newTree.map { l =>
+      l.frame match {
+        case None => l
+        case Some(frame) =>
+          val newArgs = frame.args.map{a =>
+            a.copy(fillers = a.fillers.collect(idMap))
+          }
+          val newFrame = frame.copy(args = newArgs.filter(_.fillers.nonEmpty))
+          l.copy(frame = Some(newFrame))
+      }
+    }
+
+    Sentence(id,w2,t3)
+
+  }
 }
 
 
@@ -72,7 +132,10 @@ object Sentence {
 
       var moff = offset
       val words = ArrayBuffer[String]()
-      for(w <- word) words += w
+      for(w <- word) {
+        moff += 1
+        words += w
+      }
       val children = for( (c: xml.Node) <- (tree \ "T").toIndexedSeq) yield {
         val r = rec(c,moff)
         moff += r._2.length
@@ -108,7 +171,7 @@ object Sentence {
   }
 
   private def processSense(node: xml.Node):Sense = {
-    Sense(node \ "@lemma" text, (node \ "@sense").text.toInt, (node \ "@pos").text)
+    Sense(node \ "@lemma" text, (node \ "@sense").text, (node \ "@pos").text)
   }
 
   private def processName(node: xml.Node) = {
@@ -141,7 +204,7 @@ case class Argument(arg: String, fillers: Seq[(Int,Int)]) // leaf:height pairs
 /**
  * A wordnet sense
  */
-case class Sense(lemma: String, sense: Int, pos: String)
+case class Sense(lemma: String, sense: String, pos: String)
 
 /**
  * The kinds of mentions used by Ontonotes
