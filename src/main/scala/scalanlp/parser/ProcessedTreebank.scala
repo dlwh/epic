@@ -54,6 +54,7 @@ case class ProcessedTreebank(treebank: TreebankParams, spans: SpanParams[String]
   }
 
 }
+
 case class TreebankParams(path: File,
                           maxLength:Int = 40,
                           binarization:String = "xbar",
@@ -66,7 +67,7 @@ case class TreebankParams(path: File,
     else Trees.binarize(_:Tree[String]);
   }
 
-  val treebank = {
+  lazy val treebank = {
     if(path.isDirectory) Treebank.fromPennTreebankDir(path)
     else DenseTreebank.fromZipFile(path);
   }
