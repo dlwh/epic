@@ -29,7 +29,7 @@ import scalala.library.Library
 object GenerativeParser {
 
   def fromTrees[W](data: Traversable[TreeInstance[String,W]]):SimpleChartParser[String,String,W] = {
-    val root = "";
+    val root = data.head.tree.label
     val (lexicon,grammar) = extractLexiconAndGrammar(data);
     val builder = CKYChartBuilder(root, lexicon, grammar);
     SimpleChartParser(builder);
