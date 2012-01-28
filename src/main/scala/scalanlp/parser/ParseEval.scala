@@ -51,6 +51,7 @@ class ParseEval[L](ignoredLabels: Set[L]) {
     val guessSet = labeledConstituents(guess);
     val goldSet = labeledConstituents(gold);
     val inter = (guessSet intersect goldSet)
+    println(guessSet,goldSet,inter)
     val exact = if(goldSet.size == inter.size && guessSet.size == inter.size) 1 else 0;
     val guessLeaves = guess.leaves;
     val goldLeaves = gold.leaves;
@@ -96,32 +97,35 @@ object ParseEval {
   type PostParseFn = (Tree[String],Tree[String],Seq[String],Statistics,Int)=>Unit;
   val noPostParseFn = (_:Tree[String],_:Tree[String],_:Seq[String],_:Statistics,_:Int)=>()
 
-  def evaluate(trees: IndexedSeq[TreeInstance[String,String]],
-               parser: Parser[String,String], chainReplacer: ChainReplacer[String],
-               postEval: PostParseFn = noPostParseFn) = {
+  def evaluate[L](trees: IndexedSeq[TreeInstance[L,String]],
+                  parser: Parser[L,String], chainReplacer: ChainReplacer[L],
+                  postEval: PostParseFn = noPostParseFn,
+                  asString: L=>String = identity[String] _) = {
 
     val peval = new ParseEval(Set("","''", "``", ".", ":", ","));
+    // TODO: make less horrible
 
-    def evalSentence(sent: TreeInstance[String,String]) = try {
+    def evalSentence(sent: TreeInstance[L,String]) = try {
       val TreeInstance(id,goldTree,words,scorer) = sent;
       val startTime = System.currentTimeMillis;
-      val guessTree = Trees.debinarize(chainReplacer.replaceUnaries(Trees.deannotate(parser.bestParse(words,scorer))));
-      val deBgold = Trees.debinarize(Trees.deannotate(goldTree));
+      val tree: Tree[String] = chainReplacer.replaceUnaries(parser.bestParse(words,scorer)).map(asString)
+      val guessTree = Trees.debinarize(Trees.deannotate(tree))
+      val deBgold = Trees.debinarize(Trees.deannotate(goldTree.map(asString)));
       val stats = peval(guessTree,deBgold);
       val endTime = System.currentTimeMillis;
       postEval(guessTree,deBgold,words,stats,(endTime-startTime).toInt);
       stats;
     } catch {
       case e:RuntimeException => e.printStackTrace();
-      Statistics(0, peval.labeledConstituents(sent.tree).size, 0, 0, 0, sent.words.length, 1);
+      Statistics(0, peval.labeledConstituents(sent.tree.map(asString)).size, 0, 0, 0, sent.words.length, 1);
     }
     val stats = trees.par.view.map { evalSentence _ }.reduce { (_:Statistics) + (_:Statistics)};
 
     stats
   }
 
-  def evaluateAndLog(trees: IndexedSeq[TreeInstance[String,String]],
-                     parser: Parser[String,String], evalDir: String, chainReplacer: ChainReplacer[String]) = {
+  def evaluateAndLog[L](trees: IndexedSeq[TreeInstance[L,String]],
+                     parser: Parser[L,String], evalDir: String, chainReplacer: ChainReplacer[L], asString: L=>String = (_:L).toString) = {
 
     val parsedir = new File(evalDir);
     parsedir.exists() || parsedir.mkdirs() || sys.error("Couldn't make directory: " + parsedir);
@@ -154,7 +158,7 @@ object ParseEval {
       appender ! Some((guessTree.render(words,newline=false)), goldTree.render(words,newline=false));
     }
 
-    val r = evaluate(trees,parser,chainReplacer, postEval _);
+    val r = evaluate(trees,parser,chainReplacer, postEval _, asString);
     appender ! None;
     r
   }

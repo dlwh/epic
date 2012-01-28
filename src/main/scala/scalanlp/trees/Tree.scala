@@ -20,6 +20,7 @@ import scala.collection.mutable.ArrayBuffer;
 import scalanlp.serialization.DataSerialization
 import scalanlp.serialization.DataSerialization._
 import java.io.{StringReader, DataInput, DataOutput}
+import scalanlp.util.Lens
 ;
 
 class Tree[+L](val label: L, val children: IndexedSeq[Tree[L]])(val span: Span) {
@@ -71,6 +72,8 @@ class Tree[+L](val label: L, val children: IndexedSeq[Tree[L]])(val span: Span) 
   def postorder: Iterator[Tree[L]] = {
     children.map(_.postorder).foldRight(Iterator(this)){_ ++ _}
   }
+
+  def leftHeight:Int = if(isLeaf) 0 else 1 + children(0).leftHeight
 
 
   import Tree._;
@@ -307,9 +310,10 @@ object Trees {
   };
 
   object Transforms {
-    class EmptyNodeStripper extends (Tree[String]=>Option[Tree[String]]) {
-      def apply(tree: Tree[String]):Option[Tree[String]] = {
-        if(tree.label == "-NONE-") None
+
+    class EmptyNodeStripper[T](implicit lens: Lens[T,String]) extends (Tree[T]=>Option[Tree[T]]) {
+      def apply(tree: Tree[T]):Option[Tree[T]] = {
+        if(lens.get(tree.label) == "-NONE-") None
         else if(tree.span.start == tree.span.end) None // screw stupid spans
         else {
           val newC = tree.children map this filter (None!=)
@@ -318,6 +322,7 @@ object Trees {
         }
       }
     }
+
     class XOverXRemover[L] extends (Tree[L]=>Tree[L]) {
       def apply(tree: Tree[L]):Tree[L] = {
         if(tree.children.size == 1 && tree.label == tree.children(0).label) {
@@ -328,27 +333,36 @@ object Trees {
       }
     }
 
-    class FunctionNodeStripper extends (Tree[String]=>Tree[String]) {
-      def apply(tree: Tree[String]): Tree[String] = {
-        tree.map{
-          case "-RCB-" => "-RCB-"
-          case "-RRB-" => "-RRB-"
-          case "-LRB-" => "-LRB-"
-          case "-LCB-" => "-LCB-"
+    class FunctionNodeStripper[T](implicit lens: Lens[T,String]) extends (Tree[T]=>Tree[T]) {
+      def apply(tree: Tree[T]): Tree[T] = {
+        tree.map{ label =>
+          lens.get(label) match {
+          case "-RCB-" | "-RRB-" | "-LRB-" | "-LCB-" => label
           case x =>
-            if(x.startsWith("--")) x.replaceAll("---.*","--")
-            else x.replaceAll("[-|=].*","");
+            if(x.startsWith("--")) lens.set(label,x.replaceAll("---.*","--"))
+            else lens.set(label,x.replaceAll("[-|=].*",""))
+          }
         }
       }
     }
 
 
     object StandardStringTransform extends (Tree[String]=>Tree[String]) {
-      private val ens = new EmptyNodeStripper;
+      private val ens = new EmptyNodeStripper[String];
       private val xox = new XOverXRemover[String];
-      private val fns = new FunctionNodeStripper;
+      private val fns = new FunctionNodeStripper[String];
       def apply(tree: Tree[String]): Tree[String] = {
         xox(fns(ens(tree).get)) map (_.intern);
+      }
+    }
+
+    class LensedStandardTransform[T](implicit lens: Lens[T,String]) extends (Tree[T]=>Tree[T]) {
+      private val ens = new EmptyNodeStripper[T]
+      private val xox = new XOverXRemover[T]
+      private val fns = new FunctionNodeStripper[T]
+
+      def apply(tree: Tree[T]) = {
+        xox(fns(ens(tree).get)) map ( l => lens.set(l,lens.get(l).intern));
       }
     }
 

@@ -54,7 +54,7 @@ object ParserTester {
 
   def evalParser(testTrees: IndexedSeq[TreeInstance[String,String]],
           parser: Parser[String,String], name: String, chainReplacer: ChainReplacer[String]):ParseEval.Statistics = {
-    val stats = ParseEval.evaluateAndLog(testTrees,parser,name,chainReplacer);
+    val stats = ParseEval.evaluateAndLog[String](testTrees,parser,name,chainReplacer);
     stats
   }
 

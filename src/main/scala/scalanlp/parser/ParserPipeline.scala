@@ -54,7 +54,7 @@ trait ParserPipeline {
 
 
     val validateTrees = devTrees.take(400)
-    def validate(parser: Parser[String,String]) = ParseEval.evaluate(validateTrees, parser, replacer);
+    def validate(parser: Parser[String,String]) = ParseEval.evaluate[String](validateTrees, parser, replacer);
     val parsers = trainParser(trainTrees,validate,params);
     parsers
   }
@@ -92,7 +92,7 @@ trait ParserPipeline {
 
   def evalParser(testTrees: IndexedSeq[TreeInstance[String,String]],
           parser: Parser[String,String], name: String, chainReplacer: ChainReplacer[String]):ParseEval.Statistics = {
-    val stats = ParseEval.evaluateAndLog(testTrees,parser,name,chainReplacer);
+    val stats = ParseEval.evaluateAndLog[String](testTrees,parser,name,chainReplacer);
     stats
   }
 
