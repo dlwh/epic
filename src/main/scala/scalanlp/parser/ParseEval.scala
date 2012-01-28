@@ -51,7 +51,6 @@ class ParseEval[L](ignoredLabels: Set[L]) {
     val guessSet = labeledConstituents(guess);
     val goldSet = labeledConstituents(gold);
     val inter = (guessSet intersect goldSet)
-    println(guessSet,goldSet,inter)
     val exact = if(goldSet.size == inter.size && guessSet.size == inter.size) 1 else 0;
     val guessLeaves = guess.leaves;
     val goldLeaves = gold.leaves;
