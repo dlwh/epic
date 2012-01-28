@@ -101,7 +101,7 @@ object ParseEval {
                   postEval: PostParseFn = noPostParseFn,
                   asString: L=>String = identity[String] _) = {
 
-    val peval = new ParseEval(Set("","''", "``", ".", ":", ","));
+    val peval = new ParseEval(Set("","''", "``", ".", ":", ",", "TOP"));
     // TODO: make less horrible
 
     def evalSentence(sent: TreeInstance[L,String]) = try {
