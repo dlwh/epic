@@ -8,35 +8,35 @@ import java.lang.String
  * 
  * @author dlwh
  */
-class Corpus(path: File, split: Corpus.Split) extends Treebank[OntoLabel] {
+class Corpus(path: File, split: Corpus.Split) extends Treebank[OntoLabel] { outer =>
   val train = Portion("train",split.trainSections)
   val test = Portion("test",split.testSections)
   val dev = Portion("dev",split.devSections)
 
   def sections = split.allSections
 
-  def documentsFromSection(sec: String) = {
-    val files = new File(path,sec).listFiles(new FilenameFilter {
-      def accept(p1: File, p2: String) = p2.endsWith(".xml")
-    })
-
-    files.map(scala.xml.XML.loadFile(_)).map(Document.fromXML _)
+  def documentFromSection(sec: String) = {
+    val p = new File(new File(path,sec.take(2)),path.getName + "_" + sec + ".xml")
+    Document.fromXML(scala.xml.XML.loadFile(p))
   }
 
   def treesFromSection(sec: String) = {
-    for(d <- documentsFromSection(sec).iterator; t <- d.sentences.iterator) yield {
-      (t.tree,t.words)
+    val d = documentFromSection(sec)
+    for(t <- d.sentences.iterator; t2 = t.stripTraces()) yield {
+      (t2.tree,t2.words)
     }
   }
+
+
 }
 
 object Corpus {
   // TODO: make a principled decision for dev
-  case class Split(train: Int, dev: Int, test: Int, start: Int = 0) {
-    def trainSections = (start to train).map("%02d" format _)
-    def devSections = ((train + 1) to dev).map("%02d" format _)
-    def testSections = ((dev + 1) to test).map("%02d" format _)
-    def allSections = (start to test).map("%02d" format _)
+  case class Split(train: Int, dev: Int, test: Int, start: Int = 1) {
+    def trainSections = (start to train).map("%04d" format _)
+    def devSections = ((train + 1) to dev).map("%04d" format _)
+    def testSections = ((dev + 1) to test).map("%04d" format _)
+    def allSections = (start to test).map("%04d" format _)
   }
 
   val splits = Map(
@@ -46,7 +46,7 @@ object Corpus {
     "NBC" -> Split(26,29,39),
     "PRI" -> Split(83,89,112),
     "VOA" -> Split(185,198,264),
-    "WSJ" -> Split(21,22,23,start=2)
+    "WSJ" -> Split(2199,2299,2399,start=201)
   )
 
   def fromXMLDirectory(path: File) = {
