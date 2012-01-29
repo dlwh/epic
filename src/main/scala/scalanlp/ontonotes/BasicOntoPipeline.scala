@@ -53,7 +53,7 @@ trait BasicOntoPipeline {
       println("Parser " + name);
 
       println("Evaluating Parser...");
-      val stats= ParseEval.evaluateAndLog(testTrees, parser:Parser[OntoLabel, String], "Onto", params.replacer, {(_:OntoLabel).tag})
+      val stats= ParseEval.evaluateAndLog(testTrees, parser:Parser[OntoLabel, String], name, params.replacer, {(_:OntoLabel).tag})
       import stats._;
       println("Eval finished. Results:");
       println( "P: " + precision + " R:" + recall + " F1: " + f1 +  " Ex:" + exact + " Tag Accuracy: " + tagAccuracy);

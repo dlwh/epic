@@ -37,7 +37,6 @@ case class KMPipeline(horizontal: Int = 2,
 
   override def toString() = scala.runtime.ScalaRunTime._toString(this)
 
-
   private implicit def enrichFn[U,T](f: U=>T) = new {
     def >>?(b: Boolean, f2: T=> T) = {
       if(b) f andThen f2
@@ -45,20 +44,23 @@ case class KMPipeline(horizontal: Int = 2,
     }
   }
 
-  val pipeline = { (tree: BinarizedTree[String],words: Seq[String]) => (
-    {(_:BinarizedTree[String]).map(AnnotatedLabel(_))}
-    andThen {annVert _}
-    andThen {annHorz _}
-    >>? (splitAux, {_splitAux(_,words)})
-    >>? (splitVP,{_splitVP(_)})
-    >>? (splitIN,{_splitIN(_)})
-    >>? (splitPossNP,{_splitPossNP(_)})
-    >>? (annotateBaseNP, {_annotateBaseNP(_)})
-    >>? (annotateRightRecNP, {_annotateRightRecNP(_)})
-    >>? (markNonIdentityUnaries, {_markNonIdentityUnaries(_)})
-    >>? (markExternalUnaries, {_markExternalUnaries(_)})
-    >>? (markDominatesV,{markDominates(_,"V",l => l.startsWith("V") || l.startsWith("MD"))})
-  )(tree)}
+  val pipeline = { (tree: BinarizedTree[String],words: Seq[String]) => {
+    val root = tree.label
+    (
+      {(_:BinarizedTree[String]).map(AnnotatedLabel(_))}
+        andThen {annVert _}
+        andThen {annHorz _}
+        >>? (splitAux, {_splitAux(_,words)})
+        >>? (splitVP,{_splitVP(_)})
+        >>? (splitIN,{_splitIN(_,root)})
+        >>? (splitPossNP,{_splitPossNP(_)})
+        >>? (annotateBaseNP, {_annotateBaseNP(_,root)})
+        >>? (annotateRightRecNP, {_annotateRightRecNP(_)})
+        >>? (markNonIdentityUnaries, {_markNonIdentityUnaries(_,root)})
+        >>? (markExternalUnaries, {_markExternalUnaries(_,root)})
+        >>? (markDominatesV,{markDominates(_,"V",l => l.startsWith("V") || l.startsWith("MD"))})
+    )(tree) }
+  }
 
   def apply(tree: BinarizedTree[String], words: Seq[String]) =  {
     val treeOut = pipeline(tree,words)
@@ -107,7 +109,7 @@ case class KMPipeline(horizontal: Int = 2,
   }
 
   val activeVerbs = Set("VBZ","VBD","VBP","MD")
-  private def _splitVP(tree: BinarizedTree[AnnotatedLabel]) = tree.extend{ (t: BinarizedTree[AnnotatedLabel]) =>
+  private def _splitVP(tree: BinarizedTree[AnnotatedLabel]) = tree.extend { (t: BinarizedTree[AnnotatedLabel]) =>
     if(t.label.baseLabel != "VP") t.label
     else {
       val headTag = HeadFinder.collinsHeadFinder.findHeadTag(t,{(_:AnnotatedLabel).baseLabel})
@@ -121,13 +123,13 @@ case class KMPipeline(horizontal: Int = 2,
   }
 
 
-  private def _splitIN(tree: BinarizedTree[AnnotatedLabel],
+  private def _splitIN(tree: BinarizedTree[AnnotatedLabel], root: String,
               parent: Option[String] = None,
               grandParent: Option[String] = None):BinarizedTree[AnnotatedLabel] = {
     val blbl = tree.label.baseLabel
     tree match {
       case tree@NullaryTree(lbl) if blbl == "IN" =>
-        if(grandParent.isEmpty || grandParent.exists(_ == "") || parent.exists(_ == "")) {
+        if(grandParent.isEmpty || grandParent.exists(_ == root) || parent.exists(_ == root)) {
           tree
         } else if (grandParent.exists(_(0) == 'N') && (parent.exists(s => s(0) == 'P' || s(0) == 'A'))) {
           tree.copy(lbl.annotate('IN_N))(tree.span)
@@ -145,15 +147,15 @@ case class KMPipeline(horizontal: Int = 2,
       case UnaryTree(lbl,c) =>
         if(blbl != "IN") {
           if(parent.exists(_ != blbl))
-            UnaryTree(lbl,_splitIN(c,Some(blbl),parent))(tree.span)
+            UnaryTree(lbl,_splitIN(c,root,Some(blbl),parent))(tree.span)
           else
-            UnaryTree(lbl,_splitIN(c,parent,grandParent))(tree.span)
+            UnaryTree(lbl,_splitIN(c,root,parent,grandParent))(tree.span)
         } else {
-          val nc = _splitIN(c,parent,grandParent)
+          val nc = _splitIN(c,root,parent,grandParent)
           UnaryTree(nc.label,nc)(tree.span)
         }
       case BinaryTree(lbl,l,r) =>
-        BinaryTree(lbl,_splitIN(l,Some(blbl),parent),_splitIN(r,Some(blbl),parent))(tree.span)
+        BinaryTree(lbl,_splitIN(l,root,Some(blbl),parent),_splitIN(r,root,Some(blbl),parent))(tree.span)
       case _ => tree
     }
 
@@ -173,7 +175,7 @@ case class KMPipeline(horizontal: Int = 2,
   }
 
 
-  def _annotateBaseNP(tree: BinarizedTree[AnnotatedLabel]) = {
+  def _annotateBaseNP(tree: BinarizedTree[AnnotatedLabel], root: String) = {
     // boolean is whether or not it's a "base"
     def rec(tree: BinarizedTree[AnnotatedLabel]):(BinarizedTree[AnnotatedLabel],Boolean) = tree match {
       case t:NullaryTree[AnnotatedLabel] => t -> true
@@ -183,7 +185,7 @@ case class KMPipeline(horizontal: Int = 2,
         val (newchild,ok) = rec(child)
         if(ok && lbl1.baseLabel == "NP") {
           UnaryTree(lbl1.annotate('BaseNP),newchild)(t.span) -> true
-        } else if(lbl1.label == "") {
+        } else if(lbl1.label == root) {
           UnaryTree(lbl1,newchild)(t.span) -> false
         } else {
         UnaryTree(lbl1,newchild)(t.span) -> false
@@ -240,25 +242,25 @@ case class KMPipeline(horizontal: Int = 2,
   }
 
 
-  def _markNonIdentityUnaries(tree: BinarizedTree[AnnotatedLabel]):BinarizedTree[AnnotatedLabel] = tree match {
-    case BinaryTree(label,lc,rc) => BinaryTree(label,_markNonIdentityUnaries(lc),_markNonIdentityUnaries(rc))(tree.span)
+  def _markNonIdentityUnaries(tree: BinarizedTree[AnnotatedLabel], root: String):BinarizedTree[AnnotatedLabel] = tree match {
+    case BinaryTree(label,lc,rc) => BinaryTree(label,_markNonIdentityUnaries(lc,root),_markNonIdentityUnaries(rc,root))(tree.span)
     case NullaryTree(label) => tree
-    case UnaryTree(label,c) if label.label != "" && label.label != c.label.label => UnaryTree(label.annotate('RealUnary),_markNonIdentityUnaries(c))(tree.span)
-    case UnaryTree(label,c) => UnaryTree(label,_markNonIdentityUnaries(c))(tree.span)
+    case UnaryTree(label,c) if label.label != root && label.label != c.label.label => UnaryTree(label.annotate('RealUnary),_markNonIdentityUnaries(c,root))(tree.span)
+    case UnaryTree(label,c) => UnaryTree(label,_markNonIdentityUnaries(c,root))(tree.span)
   }
 
-  def _markExternalUnaries(tree: BinarizedTree[AnnotatedLabel], shouldAnnotate: String=>Boolean = Set("RB","DT")):BinarizedTree[AnnotatedLabel] = tree match {
-    case BinaryTree(label,lc,rc) => BinaryTree(label,_markExternalUnaries(lc),_markExternalUnaries(rc))(tree.span)
+  def _markExternalUnaries(tree: BinarizedTree[AnnotatedLabel], root: String, shouldAnnotate: String=>Boolean = Set("RB","DT")):BinarizedTree[AnnotatedLabel] = tree match {
+    case BinaryTree(label,lc,rc) => BinaryTree(label,_markExternalUnaries(lc,root,shouldAnnotate),_markExternalUnaries(rc,root,shouldAnnotate))(tree.span)
     case NullaryTree(label) => tree
-    case UnaryTree(label,c) if label.label != "" && label.label != c.label.label && shouldAnnotate(c.label.label) =>
-      UnaryTree(label,_markExternalUnaries(c).relabelRoot(_.annotate('ExternalUnary)))(tree.span)
-    case UnaryTree(label,c) => UnaryTree(label,_markExternalUnaries(c))(tree.span)
+    case UnaryTree(label,c) if label.label != root && label.label != c.label.label && shouldAnnotate(c.label.label) =>
+      UnaryTree(label,_markExternalUnaries(c,root,shouldAnnotate).relabelRoot(_.annotate('ExternalUnary)))(tree.span)
+    case UnaryTree(label,c) => UnaryTree(label,_markExternalUnaries(c,root,shouldAnnotate))(tree.span)
   }
 
   def markDominates(tree: BinarizedTree[AnnotatedLabel], label: String, pred: String=>Boolean) = {
     def dominates(x: BinarizedTree[AnnotatedLabel]) = x.leaves.exists { t => pred(t.label.label) }
     tree.extend { (t:BinarizedTree[AnnotatedLabel]) =>
-      if(t.label.label == "") t.label
+      if(t eq tree) t.label
       else if(dominates(t)) t.label.annotate(Symbol("Dom"+label))
       else t.label
     }
