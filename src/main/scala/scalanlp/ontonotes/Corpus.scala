@@ -15,14 +15,14 @@ class Corpus(path: File, split: Corpus.Split) extends Treebank[OntoLabel] { oute
 
   def sections = split.allSections
 
-  def documentFromSection(sec: String) = {
+  def documentFromSection(sec: String):Option[Document] = {
     val p = new File(new File(path,sec.take(2)),path.getName + "_" + sec + ".xml")
-    Document.fromXML(scala.xml.XML.loadFile(p))
+    if(p.exists) Some(Document.fromXML(scala.xml.XML.loadFile(p)))
+    else None
   }
 
   def treesFromSection(sec: String) = {
-    val d = documentFromSection(sec)
-    for(t <- d.sentences.iterator; t2 = t.stripTraces()) yield {
+    for(d <- documentFromSection(sec).iterator; t <- d.sentences.iterator; t2 = t.stripTraces()) yield {
       (t2.tree,t2.words)
     }
   }
