@@ -9,18 +9,6 @@ import scalala.library.Library
 import scalanlp.parser.ParseChart._
 import collection.IndexedSeq
 
-case class AnnotatedLabel(label: String,
-                          parents: Seq[String] = Seq.empty,
-                          siblings: Seq[Either[String,String]] = Seq.empty,
-                          features: Set[Symbol] = Set.empty) {
-  def annotate(sym: Symbol) = copy(features = features + sym)
-  def isIntermediate = label.nonEmpty && label.charAt(0) == '@'
-  def baseLabel = label.dropWhile(_ == '@')
-
-  override lazy val hashCode = {
-    scala.runtime.ScalaRunTime._hashCode(this)
-  }
-}
 
 @SerialVersionUID(1)
 case class KMPipeline(horizontal: Int = 2,
@@ -36,6 +24,8 @@ case class KMPipeline(horizontal: Int = 2,
                  markDominatesV: Boolean = true) extends ((BinarizedTree[String],Seq[String])=>BinarizedTree[AnnotatedLabel]) {
 
   override def toString() = scala.runtime.ScalaRunTime._toString(this)
+
+  import KMPipeline._
 
   private implicit def enrichFn[U,T](f: U=>T) = new {
     def >>?(b: Boolean, f2: T=> T) = {
@@ -95,13 +85,13 @@ case class KMPipeline(horizontal: Int = 2,
       t match {
         case UnaryTree(label,NullaryTree(lbl2)) if label.baseLabel == lbl2.baseLabel =>
           val w = words(t.span.start)
-          if (beVerbs.contains(w.toLowerCase)) label.annotate('AuxBe).annotate('Aux)
-          else if (hasVerbs.contains(w.toLowerCase)) label.annotate('AuxHave).annotate('Aux)
+          if (beVerbs.contains(w.toLowerCase)) label.annotate(AuxBe).annotate(Aux)
+          else if (hasVerbs.contains(w.toLowerCase)) label.annotate(AuxHave).annotate(Aux)
           else label
         case NullaryTree(label) =>
           val w = words(t.span.start)
-          if (beVerbs.contains(w.toLowerCase)) label.annotate('AuxBe).annotate('Aux)
-          else if (hasVerbs.contains(w.toLowerCase)) label.annotate('AuxHave).annotate('Aux)
+          if (beVerbs.contains(w.toLowerCase)) label.annotate(AuxBe).annotate(Aux)
+          else if (hasVerbs.contains(w.toLowerCase)) label.annotate(AuxHave).annotate(Aux)
           else label
         case _ => t.label
       }
@@ -115,9 +105,9 @@ case class KMPipeline(horizontal: Int = 2,
       val headTag = HeadFinder.collinsHeadFinder.findHeadTag(t,{(_:AnnotatedLabel).baseLabel})
       val base = headTag.baseLabel
       if (activeVerbs(base)) {
-        t.label.annotate('VPisVBF)
+        t.label.annotate(VPisVBF)
       } else {
-        t.label.annotate(Symbol("VPis"+base))
+        t.label.annotate(VPisX(base))
       }
     }
   }
@@ -132,14 +122,14 @@ case class KMPipeline(horizontal: Int = 2,
         if(grandParent.isEmpty || grandParent.exists(_ == root) || parent.exists(_ == root)) {
           tree
         } else if (grandParent.exists(_(0) == 'N') && (parent.exists(s => s(0) == 'P' || s(0) == 'A'))) {
-          tree.copy(lbl.annotate('IN_N))(tree.span)
+          tree.copy(lbl.annotate(IN_N))(tree.span)
         } else if (parent.exists(_(0) == 'Q') && (grandParent.exists(s => s(0) == 'N' || s.startsWith("ADJP")))) {
-          tree.copy(lbl.annotate('IN_Q))(tree.span)
+          tree.copy(lbl.annotate(IN_Q))(tree.span)
         } else if(grandParent.exists(_ == "S")) {
           if(parent.exists(_ == "SBAR")) {
-            tree.copy(lbl.annotate('IN_SCC))(tree.span)
+            tree.copy(lbl.annotate(IN_SCC))(tree.span)
           } else {
-            tree.copy(lbl.annotate('IN_SC))(tree.span)
+            tree.copy(lbl.annotate(IN_SC))(tree.span)
           }
         } else {
           tree
@@ -167,7 +157,7 @@ case class KMPipeline(horizontal: Int = 2,
       val headTag = HeadFinder.collinsHeadFinder.findHeadTag(t,{(_:AnnotatedLabel).baseLabel})
       val base = headTag.baseLabel
       if (base == "POS") {
-        t.label.annotate('NP_Possessive)
+        t.label.annotate(NP_Possessive)
       } else {
         t.label
       }
@@ -184,7 +174,7 @@ case class KMPipeline(horizontal: Int = 2,
       case t@UnaryTree(lbl1, child) =>
         val (newchild,ok) = rec(child)
         if(ok && lbl1.baseLabel == "NP") {
-          UnaryTree(lbl1.annotate('BaseNP),newchild)(t.span) -> true
+          UnaryTree(lbl1.annotate(BaseNP),newchild)(t.span) -> true
         } else if(lbl1.label == root) {
           UnaryTree(lbl1,newchild)(t.span) -> false
         } else {
@@ -194,7 +184,7 @@ case class KMPipeline(horizontal: Int = 2,
         val (newlc,lok) = rec(lc)
         val (newrc,rok) = rec(rc)
         if(lok && rok && lbl.baseLabel == "NP") {
-          BinaryTree(lbl.annotate('BaseNP),newlc,newrc)(t.span) -> true
+          BinaryTree(lbl.annotate(BaseNP),newlc,newrc)(t.span) -> true
         } else {
           BinaryTree(lbl,newlc,newrc)(t.span) -> false
         }
@@ -212,7 +202,7 @@ case class KMPipeline(horizontal: Int = 2,
       case t@UnaryTree(lbl1, child) =>
         val (newchild,ok) = rec(child)
         if(ok && lbl1.baseLabel == "NP") {
-          UnaryTree(lbl1.annotate('RRNP),newchild)(t.span) -> true
+          UnaryTree(lbl1.annotate(RRNP),newchild)(t.span) -> true
         } else {
           UnaryTree(lbl1,newchild)(t.span) -> (ok||lbl1.label == "NP")
         }
@@ -221,7 +211,7 @@ case class KMPipeline(horizontal: Int = 2,
         if(rok && lbl.baseLabel == "NP") {
           val (newlc,_) = rec(lc)
           val lclc = annotateDownwards(newlc)
-          BinaryTree(lbl.annotate('RRNP),lclc,newrc)(t.span) -> true
+          BinaryTree(lbl.annotate(RRNP),lclc,newrc)(t.span) -> true
         } else {
           val (newlc,_) = rec(lc)
           BinaryTree(lbl,newlc,newrc)(t.span) -> (rok || (lbl.label == "NP"))
@@ -232,9 +222,9 @@ case class KMPipeline(horizontal: Int = 2,
     def annotateDownwards(tree: BinarizedTree[AnnotatedLabel]):BinarizedTree[AnnotatedLabel] = tree match {
       case t:NullaryTree[AnnotatedLabel] => t
       case UnaryTree(lbl,child) if lbl.baseLabel == "NP" =>
-        UnaryTree(lbl.annotate('RRNP), annotateDownwards(child))(tree.span)
+        UnaryTree(lbl.annotate(RRNP), annotateDownwards(child))(tree.span)
       case BinaryTree(lbl,lc,rc) if lbl.baseLabel == "NP" =>
-        BinaryTree(lbl.annotate('RRNP), annotateDownwards(lc), annotateDownwards(rc))(tree.span)
+        BinaryTree(lbl.annotate(RRNP), annotateDownwards(lc), annotateDownwards(rc))(tree.span)
       case _ => tree
     }
     rec(tree)._1
@@ -245,7 +235,7 @@ case class KMPipeline(horizontal: Int = 2,
   def _markNonIdentityUnaries(tree: BinarizedTree[AnnotatedLabel], root: String):BinarizedTree[AnnotatedLabel] = tree match {
     case BinaryTree(label,lc,rc) => BinaryTree(label,_markNonIdentityUnaries(lc,root),_markNonIdentityUnaries(rc,root))(tree.span)
     case NullaryTree(label) => tree
-    case UnaryTree(label,c) if label.label != root && label.label != c.label.label => UnaryTree(label.annotate('RealUnary),_markNonIdentityUnaries(c,root))(tree.span)
+    case UnaryTree(label,c) if label.label != root && label.label != c.label.label => UnaryTree(label.annotate(RealUnary),_markNonIdentityUnaries(c,root))(tree.span)
     case UnaryTree(label,c) => UnaryTree(label,_markNonIdentityUnaries(c,root))(tree.span)
   }
 
@@ -253,7 +243,7 @@ case class KMPipeline(horizontal: Int = 2,
     case BinaryTree(label,lc,rc) => BinaryTree(label,_markExternalUnaries(lc,root,shouldAnnotate),_markExternalUnaries(rc,root,shouldAnnotate))(tree.span)
     case NullaryTree(label) => tree
     case UnaryTree(label,c) if label.label != root && label.label != c.label.label && shouldAnnotate(c.label.label) =>
-      UnaryTree(label,_markExternalUnaries(c,root,shouldAnnotate).relabelRoot(_.annotate('ExternalUnary)))(tree.span)
+      UnaryTree(label,_markExternalUnaries(c,root,shouldAnnotate).relabelRoot(_.annotate(ExternalUnary)))(tree.span)
     case UnaryTree(label,c) => UnaryTree(label,_markExternalUnaries(c,root,shouldAnnotate))(tree.span)
   }
 
@@ -261,10 +251,36 @@ case class KMPipeline(horizontal: Int = 2,
     def dominates(x: BinarizedTree[AnnotatedLabel]) = x.leaves.exists { t => pred(t.label.label) }
     tree.extend { (t:BinarizedTree[AnnotatedLabel]) =>
       if(t eq tree) t.label
-      else if(dominates(t)) t.label.annotate(Symbol("Dom"+label))
+      else if(dominates(t)) t.label.annotate(Dom(label))
       else t.label
     }
   }
+}
+
+object KMPipeline {
+  // Annotations
+  trait Aux extends Annotation
+  case object AuxBe extends Aux
+  case object Aux extends Aux
+  case object AuxHave extends Aux
+
+  case object VPisVBF extends Annotation
+  case class VPisX(x: String) extends Annotation
+
+  sealed trait INKind extends Annotation
+  case object IN_N extends INKind
+  case object IN_Q extends INKind
+  case object IN_SCC extends INKind
+  case object IN_SC extends INKind
+
+  case object NP_Possessive extends Annotation
+  case object BaseNP extends Annotation
+  case object RRNP extends Annotation
+
+  case object RealUnary extends Annotation
+  case object ExternalUnary extends Annotation
+
+  case class Dom(str: String) extends Annotation
 }
 
 /**

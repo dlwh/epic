@@ -5,6 +5,7 @@ import scalanlp.parser.{Rule, AnnotatedLabel, UnaryRule, BinaryRule}
 import scalala.tensor.Counter
 import scalala.library.Library._
 import collection.immutable.Set
+import scalanlp.parser.Annotation
 
 /**
  * 
@@ -16,7 +17,7 @@ class AnnotatedLabelFeaturizer(binaries: Counter2[AnnotatedLabel,BinaryRule[Anno
                           wordFeaturizer: Featurizer[AnnotatedLabel,String],
                           initToZero: Boolean = false, scale: Double = 1.0) extends Featurizer[AnnotatedLabel,String] {
 
-  val allSymbols: Set[Symbol] = {
+  val allSymbols: Set[Annotation] = {
     Set.empty ++ {
       for(lbl <- (binaries.keysIterator.map(_._1) ++ unaries.keysIterator.map(_._1));
           sym <- lbl.features) yield sym
@@ -97,7 +98,7 @@ class VarMarkovFeaturizer(binaries: Counter2[AnnotatedLabel,BinaryRule[Annotated
                           wordFeaturizer: Featurizer[AnnotatedLabel,String],
                           initToZero: Boolean = false, scale: Double = 1.0) extends Featurizer[AnnotatedLabel,String] {
 
-  val allSymbols: Set[Symbol] = {
+  val allSymbols: Set[Annotation] = {
     Set.empty ++ {
       for(lbl <- (binaries.keysIterator.map(_._1) ++ unaries.keysIterator.map(_._1));
           sym <- lbl.features) yield sym
