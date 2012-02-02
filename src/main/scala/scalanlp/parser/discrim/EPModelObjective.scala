@@ -223,13 +223,15 @@ abstract class AbstractDiscEPModel[L,L3,W](proj: GrammarProjections[L,L3],
 
 }
 
-class KMDiscEPModel[W](proj: GrammarProjections[String,AnnotatedLabel],
-                       ann: (BinarizedTree[String],Seq[W])=>BinarizedTree[AnnotatedLabel],
-                       val indexedFeatures: FeatureIndexer[AnnotatedLabel,W],
-                       openTags: Set[AnnotatedLabel],
-                       closedWords: Set[W], val locked: Boolean = false) extends AbstractDiscEPModel(proj,AnnotatedLabel(""),openTags,closedWords) {
-  def treeExpectedCounts(builder: Builder, tree: BinarizedTree[String],
-                         words: Seq[W], scorer: SpanScorer[AnnotatedLabel]) =  {
+class KMDiscEPModel[L,L3,W](proj: GrammarProjections[L,L3],
+                       ann: (BinarizedTree[L],Seq[W])=>BinarizedTree[L3],
+                       val indexedFeatures: FeatureIndexer[L3,W],
+                       openTags: Set[L3],
+                       closedWords: Set[W],
+                       root: L3,
+                       val locked: Boolean = false) extends AbstractDiscEPModel[L,L3,W](proj,root,openTags,closedWords) {
+  def treeExpectedCounts(builder: Builder, tree: BinarizedTree[L],
+                         words: Seq[W], scorer: SpanScorer[L3]) =  {
     val g = builder.chartBuilder.grammar
     val lexicon = builder.chartBuilder.lexicon
     val annotated = ann(tree,words)
@@ -279,7 +281,7 @@ class LatentDiscEPModel[L,L2,W](proj: GrammarProjections[L,L2],
 
 trait EPModelFactory[L,W] {
   def make(coarseParser: ChartBuilder[LogProbabilityParseChart,L,W],
-           trainTrees: IndexedSeq[TreeInstance[String,String]],
+           trainTrees: IndexedSeq[TreeInstance[L,W]],
            initLexicon: Counter2[L,W,Double],
            initBinaries: Counter2[L,BinaryRule[L],Double],
            initUnaries: Counter2[L,UnaryRule[L],Double]):DiscEPModel[L,W]
@@ -291,7 +293,7 @@ case class LatentDiscEPModelFactory[L,W](numStates: Int,
                                          oldWeights: File = null,
                                          locked: Boolean = false) extends EPModelFactory[L,W] {
   def make(coarseParser: ChartBuilder[LogProbabilityParseChart,L,W],
-           trainTrees: IndexedSeq[TreeInstance[String,String]],
+           trainTrees: IndexedSeq[TreeInstance[L,W]],
            initLexicon: Counter2[L,W,Double],
            initBinaries: Counter2[L,BinaryRule[L],Double],
            initUnaries: Counter2[L,UnaryRule[L],Double]):DiscEPModel[L,W] = {
@@ -369,7 +371,7 @@ case class KMDiscEPModelFactory(pipeline: KMPipeline,
       wordCounts.nonzero.pairs.iterator.filter(_._2 > 10).map(_._1);
     }
 
-     new KMDiscEPModel[String](proj,pipeline,indexed,openTags,closedWords)
+     new KMDiscEPModel[String,AnnotatedLabel,String](proj,pipeline,indexed,openTags,closedWords,transformed.head.tree.label,locked)
    }
 }
 

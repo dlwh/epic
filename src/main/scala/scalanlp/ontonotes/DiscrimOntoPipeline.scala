@@ -5,7 +5,7 @@ import scalanlp.parser.Grammar._
 import scalala.library.Library
 import scalanlp.parser._
 
-import discrim.{KMDiscrimObjective, DiscrimObjective, FeaturizerFactory, PlainFeaturizerFactory}
+import discrim._
 import projections.{ProjectingSpanScorer, GrammarProjections}
 import scalanlp.optimize.FirstOrderMinimizer._
 import scalanlp.parser.ParserParams
@@ -21,15 +21,16 @@ import scalanlp.parser.ParseChart._
 import scalanlp.parser.ParseChart
 import scalala.library.Library._
 import scalanlp.util.logging.ConfiguredLogging
-import scalanlp.optimize.RandomizedGradientCheckingFunction
-import scalanlp.optimize.CachedBatchDiffFunction
+import scalanlp.trees._
+import scalala.tensor.dense.DenseVector
+import scalanlp.util._
+import scalanlp.optimize.{BatchDiffFunction, FirstOrderMinimizer, RandomizedGradientCheckingFunction, CachedBatchDiffFunction}
 
 object DiscrimOntoPipeline extends BasicOntoPipeline {
 
   protected val paramManifest = manifest[Params];
   case class Params(parser: ParserParams.BaseParser[OntoLabel],
                     opt: OptParams,
-                    featurizerFactory: FeaturizerFactory[AnnotatedLabel,String] = new PlainFeaturizerFactory[AnnotatedLabel],
                     iterationsPerEval: Int = 50,
                     maxIterations: Int = 201,
                     iterPerValidate: Int = 10,
@@ -37,10 +38,13 @@ object DiscrimOntoPipeline extends BasicOntoPipeline {
                     oldWeights: File = null)
 
 
+  def trainParser(trainTrees: IndexedSeq[TreeInstance[OntoLabel, String]], validate: (Parser[OntoLabel, String]) => Statistics, params: Params) = {
+    val strippedTrees = for (ti <- trainTrees) yield {
+      new TreeInstance(ti.id, ti.tree.map(stripAnnotations _), ti.words)
+    }
+    val (initLexicon,initBinaries,initUnaries) = GenerativeParser.extractCounts(strippedTrees);
 
-  def trainParser(trainTrees2: IndexedSeq[TreeInstance[OntoLabel, String]], validate: (Parser[OntoLabel, String]) => Statistics, params: Params) = {
-    val trainTrees = for( ti <- trainTrees2) yield ti.copy(ti.id, ti.tree.map(stripAnnotations _))
-    val (initLexicon,initBinaries,initUnaries) = GenerativeParser.extractCounts(trainTrees);
+    import params._
 
     val xbarParser = params.parser.optParser getOrElse {
       val grammar = Grammar(Library.logAndNormalizeRows(initBinaries),Library.logAndNormalizeRows(initUnaries));
@@ -48,47 +52,51 @@ object DiscrimOntoPipeline extends BasicOntoPipeline {
       new CKYChartBuilder[LogProbabilityParseChart,OntoLabel,String](OntoLabel("TOP"),lexicon,grammar,ParseChart.logProb);
     }
 
-    import params._;
-    val transformed = trainTrees.par.map { ti =>
-      val t = pipeline(ti.tree.map(_.tag),ti.words)
-      TreeInstance(ti.id,t,ti.words)
-    }.seq
-    val (words,binary,unary) = GenerativeParser.extractCounts(transformed);
-    val grammar = Grammar(Library.logAndNormalizeRows(binary),Library.logAndNormalizeRows(unary));
-    val lexicon = new SignatureLexicon(words, EnglishWordClassGenerator, 5);
-    val builder = CKYChartBuilder(AnnotatedLabel("TOP"),lexicon,grammar).withCharts(ParseChart.logProb)
-    val proj = GrammarProjections(xbarParser.grammar,grammar,{(a:AnnotatedLabel) => OntoLabel(a.label)})
+    val modelFactories = IndexedSeq( new KMOntoDiscEPModelFactory(new KMPipeline()), new NEREPModelFactory[String]())
+    println(modelFactories)
+    val models = modelFactories.map(_.make(xbarParser,trainTrees,initLexicon,initBinaries,initUnaries))
 
-    val factory = params.featurizerFactory;
-    val featurizer = factory.getFeaturizer(words, binary, unary);
+    val obj = new EPModelObjective(models,trainTrees,xbarParser,4)
+    val cachedObj = new CachedBatchDiffFunction[DenseVector[Double]](obj);
+    val init = obj.initialWeightVector + 0.0;
 
-    val openTags = Set.empty ++ {
-      for(t <- words.nonzero.keys.iterator.map(_._1) if words(t, ::).size > 50) yield t;
+    def cacheWeights(weights: DenseVector[Double], iter: Int) {
+      val partWeights = obj.partitionWeights(weights)
+      val name = if(iter % (2*iterPerValidate) == 0) {
+        "weights-a"
+      } else {
+        "weights-b"
+      }
+
+      for( (w,i) <- partWeights.zipWithIndex) {
+        writeObject( new File(name+"-"+i+".ser"), w -> models(i).indexedFeatures.decode(w))
+      }
+    }
+
+    type OptState = FirstOrderMinimizer[DenseVector[Double],BatchDiffFunction[DenseVector[Double]]]#State
+    def evalAndCache(pair: (OptState,Int) ) {
+      val (state,iter) = pair;
+      val weights = state.x;
+      if(iter % iterPerValidate == 0) {
+        cacheWeights(weights, iter)
+        println("Validating...");
+        val parser = obj.extractParser(weights);
+        println(validate(parser))
+      }
     }
 
 
-    val newTrees = (trainTrees zip transformed).toArray.par.map { case (ti,newTree) =>
-      val scorer = new ProjectingSpanScorer(proj,ti.spanScorer)
-      TreeInstance(ti.id,newTree.tree,newTree.words,scorer)
-    }.seq
 
-    val closedWords = Set.empty ++ {
-      val wordCounts = sum(initLexicon)
-      wordCounts.nonzero.pairs.iterator.filter(_._2 > 10).map(_._1);
+    val it = {
+      for( (state,iter) <- params.opt.iterations(cachedObj,init).take(maxIterations).zipWithIndex.tee(evalAndCache _);
+           if iter != 0 && iter % iterationsPerEval == 0) yield try {
+        val parser = obj.extractParser(state.x)
+        ("EP-" + iter.toString,parser)
+      } catch {
+        case e => println(e);e.printStackTrace(); throw e;
+      }
     }
 
-    val obj = new KMDiscrimObjective[AnnotatedLabel,String](featurizer, newTrees,  builder, openTags, closedWords) with ConfiguredLogging;
-
-    val init = obj.initialWeightVector;
-    val rand = new RandomizedGradientCheckingFunction(obj, 0.1);
-
-    for( (state,iter) <- params.opt.iterations(new CachedBatchDiffFunction(obj),init).take(maxIterations).zipWithIndex;
-         if iter != 0 && iter % iterationsPerEval == 0) yield {
-      val parser = obj.extractParser(state.x);
-      val decoder = new MaxConstituentDecoder[OntoLabel,AnnotatedLabel,String](proj)
-      val newParser = new SimpleChartParser[OntoLabel,AnnotatedLabel,String](parser.builder,decoder, proj)
-       ("Onto-"+iter, newParser);
-    }
-
+    it
   }
 }
