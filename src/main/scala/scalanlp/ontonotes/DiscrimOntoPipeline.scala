@@ -52,7 +52,7 @@ object DiscrimOntoPipeline extends BasicOntoPipeline {
       new CKYChartBuilder[LogProbabilityParseChart,OntoLabel,String](OntoLabel("TOP"),lexicon,grammar,ParseChart.logProb);
     }
 
-    val modelFactories = IndexedSeq( new KMOntoDiscEPModelFactory(new KMPipeline()), new NEREPModelFactory[String]())
+    val modelFactories = IndexedSeq( new KMOntoDiscEPModelFactory(new KMPipeline()), new NEREPModelFactory[String](smoothRules = false))
     println(modelFactories)
     val models = modelFactories.map(_.make(xbarParser,trainTrees,initLexicon,initBinaries,initUnaries))
 

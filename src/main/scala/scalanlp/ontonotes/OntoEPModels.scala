@@ -33,8 +33,8 @@ class StrippingOntoEPModel(inner: EPModelFactory[OntoLabel,String]) extends EPMo
 }
 
 case class KMOntoDiscEPModelFactory(pipeline: KMPipeline,
-                                    featurizerFactory: FeaturizerFactory[AnnotatedLabel,String] = new PlainFeaturizerFactory[AnnotatedLabel],
-                                    addRawRules: Boolean = true,
+                                    featurizerFactory: FeaturizerFactory[AnnotatedLabel,String] = new AnnotatedLabelFeatureFactory(),
+                                    smoothRules: Boolean = true,
                                     oldWeights: File = null,
                                     locked: Boolean = false) extends EPModelFactory[OntoLabel,String] {
    def make(coarseParser: ChartBuilder[LogProbabilityParseChart,OntoLabel,String],
@@ -47,7 +47,7 @@ case class KMOntoDiscEPModelFactory(pipeline: KMPipeline,
        TreeInstance(ti.id,t,ti.words)
      }.seq
      val (words,binary,unary) = GenerativeParser.extractCounts(transformed);
-     if(addRawRules) {
+     if(smoothRules) {
        for( (l,w) <- initLexicon.keysIterator) {
          words(AnnotatedLabel(l.tag),w) += 1.0
        }
@@ -80,7 +80,7 @@ case class KMOntoDiscEPModelFactory(pipeline: KMPipeline,
 
     val closedWords:Set[String] = Set.empty ++ {
       val wordCounts = sum(words)
-      wordCounts.nonzero.pairs.iterator.filter(_._2 > 10).map(_._1);
+      wordCounts.nonzero.pairs.iterator.filter(pair => pair._2 > 10 || !pair._1.exists(c => c.isDigit || c.isLetter)).map(_._1);
     }
 
      import KMOntoDiscEPModelFactory._
@@ -93,7 +93,7 @@ object KMOntoDiscEPModelFactory {
 
 }
 
-case class NEREPModelFactory[W](featurizerFactory: FeaturizerFactory[AnnotatedLabel,W] = new PlainFeaturizerFactory[AnnotatedLabel]()) extends EPModelFactory[OntoLabel,W] {
+case class NEREPModelFactory[W](featurizerFactory: FeaturizerFactory[AnnotatedLabel,W] = new AnnotatedLabelFeatureFactory(), smoothRules: Boolean = true) extends EPModelFactory[OntoLabel,W] {
   import NEREPModelFactory._
   def make(coarseParser: ChartBuilder[ParseChart.LogProbabilityParseChart,OntoLabel,W],
            trainTrees: IndexedSeq[TreeInstance[OntoLabel,W]],
@@ -103,7 +103,40 @@ case class NEREPModelFactory[W](featurizerFactory: FeaturizerFactory[AnnotatedLa
     val nerTrees: IndexedSeq[TreeInstance[AnnotatedLabel, W]] = for( ti <- trainTrees) yield {
       TreeInstance(ti.id,nerify(ti.tree),ti.words)
     }
+
     val (words,binary,unary) = GenerativeParser.extractCounts(nerTrees);
+
+    if(smoothRules) {
+      val wordsX = words.keysIterator.toIndexedSeq
+      for( (l,w) <- wordsX) {
+        words(l.baseAnnotatedLabel,w) += 1
+      }
+
+      val rulesX = binary.keysIterator.toIndexedSeq
+      for( (l,r) <- rulesX) {
+        if(r.symbols.exists(a => a.features.contains(StartingNER) || a.features.contains(ContinuingNER)))
+          binary(l.baseAnnotatedLabel, r.map(_.baseAnnotatedLabel)) += 1.0
+
+        if(r.children.exists(_.baseLabel == "NP")) {
+          for(mapped <- applyAllNER(r)) {
+            binary(mapped.parent, mapped) += 1.0
+          }
+        }
+      }
+
+      val unaryX = unary.keysIterator.toIndexedSeq
+      for( (l,r) <- unaryX) {
+        if(r.symbols.exists(a => a.features.contains(StartingNER) || a.features.contains(ContinuingNER)))
+          unary(l.baseAnnotatedLabel, r.map(_.baseAnnotatedLabel)) += 1.0
+
+        if(r.children.exists(_.baseLabel == "NP")) {
+          for(mapped <- applyAllNER(r)) {
+            unary(mapped.parent, mapped) += 1.0
+          }
+        }
+      }
+    }
+
     val grammar = Grammar(Library.logAndNormalizeRows(binary),Library.logAndNormalizeRows(unary));
     val lexicon = new SimpleLexicon(words);
     val proj = GrammarProjections(coarseParser.grammar,grammar,{(l:AnnotatedLabel) => OntoLabel(l.label)})
@@ -119,7 +152,7 @@ case class NEREPModelFactory[W](featurizerFactory: FeaturizerFactory[AnnotatedLa
 
     val closedWords = Set.empty ++ {
       val wordCounts = sum(initLexicon)
-      wordCounts.nonzero.pairs.iterator.filter(_._2 > 5).map(_._1);
+      wordCounts.nonzero.pairs.iterator.filter(pair => pair._2 > 10 || !pair._1.asInstanceOf[String].exists(c => c.isDigit || c.isLetter)).map(_._1);
     }
 
     new KMDiscEPModel[OntoLabel,AnnotatedLabel,W](proj,
@@ -132,20 +165,36 @@ case class NEREPModelFactory[W](featurizerFactory: FeaturizerFactory[AnnotatedLa
 
   }
 
+  val allContinue = NERType.values.map(ContinueNER(_))
+  val allStart = NERType.values.map(StartNER(_))
+  val allSyms =  allContinue ++ allStart ++ Set(ContinuingNER, StartingNER)
+  // make it so all NPs have all possible StartNER annotations
+  private def applyAllNER(r: UnaryRule[AnnotatedLabel]) = {
+    val baseRule = r.mapChildren(a => a.copy(features=a.features -- allSyms))
+    val start = for(x <- allStart) yield baseRule.mapChildren(a => if(a.baseLabel != "NP") a else a.copy(features = a.features ++ Set(x,StartingNER)))
+    start
+  }
+
+  private def applyAllNER(r: BinaryRule[AnnotatedLabel]) = {
+    val baseRule = r.mapChildren(a => a.copy(features=a.features -- allSyms))
+    val start = for(x <- allStart) yield baseRule.mapChildren(a => if(a.baseLabel != "NP") a else a.copy(features = a.features ++ Set(x,StartingNER)))
+    start
+  }
+
 
 
 }
 
 object NEREPModelFactory {
   // annotations:
-  case class ContinueNER(x: NERType) extends Annotation
+  case class ContinueNER(x: NERType.Value) extends Annotation
   case object ContinuingNER extends Annotation
 
-  case class StartNER(x: NERType) extends Annotation
+  case class StartNER(x: NERType.Value) extends Annotation
   case object StartingNER extends Annotation
 
   private def sillyclosure(t: BinarizedTree[OntoLabel], w: Any) = nerify(t)
-  def nerify(tree: BinarizedTree[OntoLabel], incomingNER: NERType = NERType.NotEntity):BinarizedTree[AnnotatedLabel] = {
+  def nerify(tree: BinarizedTree[OntoLabel], incomingNER: NERType.Value = NERType.NotEntity):BinarizedTree[AnnotatedLabel] = {
     val (features:Set[Annotation],next) = tree.label.entity match {
       case NERType.NotEntity =>
         if(incomingNER == NERType.NotEntity) Set.empty[Annotation] -> NERType.NotEntity

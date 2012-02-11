@@ -19,6 +19,8 @@ case class AnnotatedLabel(label: String,
   def isIntermediate = label.nonEmpty && label.charAt(0) == '@'
   def baseLabel = label.dropWhile(_ == '@')
 
+  def baseAnnotatedLabel = AnnotatedLabel(label)
+
   override lazy val hashCode = {
     scala.runtime.ScalaRunTime._hashCode(this)
   }
