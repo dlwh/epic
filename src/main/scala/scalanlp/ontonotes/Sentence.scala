@@ -186,7 +186,7 @@ object Sentence {
  */
 case class OntoLabel(tag: String,
                      sense: Option[Sense] = None,
-                     entity: NERType = NERType.NotEntity,
+                     entity: NERType.Value = NERType.NotEntity,
                      mention: Option[Mention] = None,
                      frame: Option[Frame] = None)
 
@@ -224,9 +224,8 @@ object MentionType {
 /**
  * The NER types used in Ontonotes
  */
-sealed trait NERType
-object NERType {
-  def fromString(str: String): NERType = str.toLowerCase match {
+object NERType extends Enumeration {
+  def fromString(str: String): NERType.Value = str.toLowerCase match {
     case "cardinal" => Cardinal
     case "date" => Date
     case "event" => Event
@@ -248,23 +247,23 @@ object NERType {
     case "notentity" | "none" => NotEntity
   }
 
-  case object Cardinal extends NERType
-  case object Date extends NERType
-  case object Event extends NERType
-  case object Fac extends NERType
-  case object GPE extends NERType
-  case object Language extends NERType
-  case object Law extends NERType
-  case object Loc extends NERType
-  case object Money extends NERType
-  case object NORP extends NERType
-  case object Ordinal extends NERType
-  case object Org extends NERType
-  case object Percent extends NERType
-  case object Person extends NERType
-  case object Product extends NERType
-  case object Quantity extends NERType
-  case object Time extends NERType
-  case object WorkOfArt extends NERType
-  case object NotEntity extends NERType
+  val Cardinal = Value
+  val Date = Value
+  val Event = Value
+  val Fac = Value
+  val GPE = Value
+  val Language = Value
+  val Law = Value
+  val Loc = Value
+  val Money = Value
+  val NORP = Value
+  val Ordinal = Value
+  val Org = Value
+  val Percent = Value
+  val Person = Value
+  val Product = Value
+  val Quantity = Value
+  val Time = Value
+  val WorkOfArt = Value
+  val NotEntity = Value
 }
