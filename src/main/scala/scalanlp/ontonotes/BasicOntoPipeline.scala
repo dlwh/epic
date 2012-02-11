@@ -42,8 +42,6 @@ trait BasicOntoPipeline {
     val devTrees = for( ti <- params.devTrees) yield ti.copy(ti.id, ti.tree.map(stripAnnotations _))
     val testTrees = params.testTrees.map(ti => ti.copy(tree=ti.tree.map(stripAnnotations _)))
 
-
-
     val validateTrees = devTrees.take(400)
     def validate(parser: Parser[OntoLabel,String]) = {
       ParseEval.evaluate[OntoLabel](validateTrees, parser, params.replacer, asString = {(_:OntoLabel).tag})
@@ -85,8 +83,11 @@ object GenerativeOntoPipeline extends BasicOntoPipeline {
  *
  * @author dlwh
  */
-case class ProcessedOntobank(treebank: TreebankParams) {
+case class ProcessedOntobank(treebank: TreebankParams, annotationsTrain: String = "", annotationsEval: String = "") {
   import treebank.maxLength
+
+  val trainingAnnotations = annotationsTrain.split(",")
+  val testAnnotations = annotationsTrain.split(",")
 
   val corpus = Corpus.fromXMLDirectory(treebank.path)
   lazy val trainTreesWithUnaries = transformTrees(corpus.train)
@@ -118,6 +119,7 @@ case class ProcessedOntobank(treebank: TreebankParams) {
   }
 
   def stripAnnotations(t: OntoLabel) = OntoLabel(t.tag)
+
 
 
   // TODO: this needs a lens
