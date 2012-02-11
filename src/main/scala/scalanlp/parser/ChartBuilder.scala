@@ -60,7 +60,7 @@ class CKYChartBuilder[Chart[X]<:ParseChart[X], L,W](val root: L,
       for {
         (a,wScore) <- lexicon.tagScores(s(i)).nonzero.pairs.iterator if !wScore.isInfinite && !wScore.isNaN
         ai = grammar.labelIndex(a)
-        (spanScore:Double) = 0.0 //validSpan.scoreSpan(i,i+1,ai)
+        (spanScore:Double) = validSpan.scoreSpan(i,i+1,ai)
         if spanScore != Double.NegativeInfinity
       } {
         chart.bot.enter(i,i+1,ai,wScore + spanScore)

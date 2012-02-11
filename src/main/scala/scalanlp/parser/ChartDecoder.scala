@@ -223,6 +223,8 @@ class MaxConstituentDecoder[C,F,W](projections: GrammarProjections[C,F]) extends
 
     def extract(begin: Int, end: Int):BinarizedTree[C] = {
       val lower = if(begin + 1== end) {
+        if(maxBotScore(begin,end) == Double.NegativeInfinity)
+          throw new RuntimeException("Couldn't make a good score for " + (begin,end))
         NullaryTree(indexedProjections.coarseIndex.get(maxBotLabel(begin,end)))(Span(begin,end))
       } else {
         val split = maxSplit(begin,end)
