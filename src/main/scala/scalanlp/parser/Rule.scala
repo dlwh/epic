@@ -26,15 +26,18 @@ sealed trait Rule[@specialized(Int) +L] {
   def children: Seq[L];
   def symbols = parent +: children
   def map[A](f: L=>A):Rule[A]
+  def mapChildren[A>:L](f: L=>A):Rule[A]
 }
 
 final case class BinaryRule[@specialized(Int) +L](parent: L, left: L, right: L) extends Rule[L] {
   def children = Seq(left,right);
   def map[A](f: L=>A) = BinaryRule(f(parent),f(left),f(right))
+  def mapChildren[A>:L](f: L=>A) = BinaryRule(parent,f(left),f(right))
 }
 final case class UnaryRule[@specialized(Int) +L](parent: L, child: L) extends Rule[L] {
   def children = Seq(child);
   def map[A](f: L=>A) = UnaryRule(f(parent),f(child))
+  def mapChildren[A>:L](f: L=>A) = UnaryRule(parent,f(child))
 }
 
 
