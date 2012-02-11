@@ -18,13 +18,33 @@ package scalanlp.trees
 
 /**
  * Implements HeadFinding as in the Collins parser.
+ *
+ * Based on Aria's code.
+ *
+ * @author dlwh
  */
 object HeadFinder {
 
+  /**
+   * Search direction for the match.
+   */
   sealed trait Dir;
   case object Left extends Dir;
   case object Right extends Dir;
 
+
+  /**
+   * Based on Aria's comments:
+   *
+   * Basically, you're looking for the head label by searching in Dir
+   * for each parent -> rule expansion.
+   *
+   * Dir is whether or not to look left to right or right to left
+   * Dis determines whether you are looking for the first match
+   * of any of the categories, or if you're looking for any match
+   * of the first category, then the second, etc. etc.
+   *
+   */
   case class HeadRule[L](dir: Dir, dis: Boolean, heads: Seq[L]) {
     val headSet = Set.empty ++ heads;
   }
