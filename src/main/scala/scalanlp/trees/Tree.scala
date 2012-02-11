@@ -346,13 +346,28 @@ object Trees {
       }
     }
 
+    class StupidLabelRemover[T](labels: Set[String] = Set("EDITED"))(implicit lens: Lens[T,String]) extends (Tree[T]=>Tree[T]) {
+      def apply(t: Tree[T]):Tree[T] = {
+        def rec(t: Tree[T]):Seq[Tree[T]] = {
+          val newChildren = t.children.flatMap(rec)
+          if(labels.contains(lens.get(t.label))) {
+            newChildren
+          } else {
+            Seq(new Tree(t.label,children=newChildren)(t.span))
+          }
+        }
+        rec(t).head
+      }
+    }
+
 
     object StandardStringTransform extends (Tree[String]=>Tree[String]) {
       private val ens = new EmptyNodeStripper[String];
       private val xox = new XOverXRemover[String];
       private val fns = new FunctionNodeStripper[String];
+      private val stupid = new StupidLabelRemover[String]
       def apply(tree: Tree[String]): Tree[String] = {
-        xox(fns(ens(tree).get)) map (_.intern);
+        xox(stupid(fns(ens(tree).get))) map (_.intern);
       }
     }
 
@@ -360,9 +375,10 @@ object Trees {
       private val ens = new EmptyNodeStripper[T]
       private val xox = new XOverXRemover[T]
       private val fns = new FunctionNodeStripper[T]
+      private val stupid = new StupidLabelRemover[T]
 
       def apply(tree: Tree[T]) = {
-        xox(fns(ens(tree).get)) map ( l => lens.set(l,lens.get(l).intern));
+        xox(stupid(fns(ens(tree).get))) map ( l => lens.set(l,lens.get(l).intern));
       }
     }
 
