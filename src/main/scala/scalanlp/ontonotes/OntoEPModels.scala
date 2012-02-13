@@ -171,13 +171,13 @@ case class NEREPModelFactory[W](featurizerFactory: FeaturizerFactory[AnnotatedLa
   // make it so all NPs have all possible StartNER annotations
   private def applyAllNER(r: UnaryRule[AnnotatedLabel]) = {
     val baseRule = r.mapChildren(a => a.copy(features=a.features -- allSyms))
-    val start = for(x <- allStart) yield baseRule.mapChildren(a => if(a.baseLabel != "NP") a else a.copy(features = a.features ++ Set(x,StartingNER)))
+    val start = for(x <- allStart) yield baseRule.mapChildren(a => if(a.baseLabel != "NP" || a.isIntermediate) a else a.copy(features = a.features ++ Set(x,StartingNER)))
     start
   }
 
   private def applyAllNER(r: BinaryRule[AnnotatedLabel]) = {
     val baseRule = r.mapChildren(a => a.copy(features=a.features -- allSyms))
-    val start = for(x <- allStart) yield baseRule.mapChildren(a => if(a.baseLabel != "NP") a else a.copy(features = a.features ++ Set(x,StartingNER)))
+    val start = for(x <- allStart) yield baseRule.mapChildren(a => if(a.baseLabel != "NP" || a.isIntermediate) a else a.copy(features = a.features ++ Set(x,StartingNER)))
     start
   }
 
