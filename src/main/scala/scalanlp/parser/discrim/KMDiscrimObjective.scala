@@ -22,48 +22,6 @@ import projections.GrammarProjections
 import collection.immutable.Set
 import splitting.StateSplitting
 
-/**
- * The objective function for K&M annotated log-linear parsers with no substates
- * @author dlwh
- */
-class KMDiscrimObjective[L,W](feat: Featurizer[L,W],
-                            trees: IndexedSeq[TreeInstance[L,W]],
-                            coarseParser: ChartBuilder[LogProbabilityParseChart, L, W],
-                            openTags: Set[L],
-                            closedWords: Set[W])
-        extends LatentDiscrimObjective[L,L,W](feat,trees,GrammarProjections.identity(coarseParser.grammar),coarseParser, openTags,closedWords) {
-
-  override def treeToExpectedCounts(g: Grammar[L],
-                           lexicon: Lexicon[L,W],
-                           t: BinarizedTree[L],
-                           words: Seq[W],
-                           spanScorer: SpanScorer[L] = SpanScorer.identity):ExpectedCounts[W] = {
-    val expectedCounts = new ExpectedCounts[W](g)
-    var score = 0.0;
-    for(t2 <- t.allChildren) {
-      t2 match {
-        case BinaryTree(a,bt@ Tree(b,_),Tree(c,_)) =>
-          val r = g.index(BinaryRule(a,b,c))
-          expectedCounts.ruleCounts(r) += 1
-          score += g.ruleScore(r);
-        case UnaryTree(a,Tree(b,_)) =>
-          val r = g.index(UnaryRule(a,b))
-          expectedCounts.ruleCounts(r) += 1
-          score += g.ruleScore(r);
-        case n@NullaryTree(a) =>
-          val aI = g.labelIndex(a)
-          val w = words(n.span.start);
-          expectedCounts.wordCounts.getOrElseUpdate(aI)(w) += 1
-          score += lexicon.wordScore(g.labelIndex.get(aI), w);
-      }
-    }
-    expectedCounts.logProb = score;
-    expectedCounts
-  }
-
-}
-
-
 import scalanlp.optimize.FirstOrderMinimizer._;
 object KMDiscriminativePipeline extends ParserPipeline {
 
@@ -124,7 +82,7 @@ object KMDiscriminativePipeline extends ParserPipeline {
       wordCounts.nonzero.pairs.iterator.filter(_._2 > 10).map(_._1);
     }
 
-    val obj = new KMDiscrimObjective[AnnotatedLabel,String](featurizer, newTrees,  builder, openTags, closedWords) with ConfiguredLogging;
+    val obj = new DiscrimObjective[AnnotatedLabel,String](featurizer, newTrees,  builder, openTags, closedWords) with ConfiguredLogging;
 
     def cacheWeights(weights: DenseVector[Double], iter: Int) {
       val name = if(iter % (2*iterPerValidate) == 0) {

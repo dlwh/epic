@@ -33,7 +33,7 @@ abstract class AbstractDiscriminativeObjective[L,L2,W](
   protected type Counts
   protected def builder(weights: DenseVector[Double]):Builder
   protected def emptyCounts(b: Builder): Counts
-  protected def expectedCounts(b: Builder, t: BinarizedTree[L], w: Seq[W], scorer: SpanScorer[L], specificScorer: SpanScorer[L2]):Counts
+  protected def expectedCounts(b: Builder, t: TreeInstance[L,W], specificScorer: SpanScorer[L2]):Counts
   protected def sumCounts(c1: Counts, c2: Counts):Counts
   /** Should return -logProb and the derivative */
   protected def countsToObjective(c: Counts):(Double,DenseVector[Double])
@@ -46,10 +46,10 @@ abstract class AbstractDiscriminativeObjective[L,L2,W](
     val parser = builder(weights);
     val trees = sample.map(zippedTrees)
     val startTime = System.currentTimeMillis();
-    val ecounts = trees.par.view.map{ treeWordsScorer =>
-      val (TreeInstance(id,tree,words,spanScorer),specificScorer) = treeWordsScorer;
+    val ecounts = trees.par.view.map{ tiAndScorer =>
+      val (ti@TreeInstance(id,tree,words,spanScorer),specificScorer) = tiAndScorer;
       val res = try {
-        expectedCounts(parser,tree,words,spanScorer,specificScorer)
+        expectedCounts(parser,ti,specificScorer)
       } catch {
         case e => println("Error in parsing: " + words + e);
         e.printStackTrace()

@@ -2,7 +2,7 @@ package scalanlp.parser.splitting
 /*
  Copyright 2010 David Hall
 
- Licensed under the Apache License, Version 2.0 (the "License");
+ Licensed under the Apache License, Version 2.0 (the "License")
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
 
@@ -18,15 +18,15 @@ package scalanlp.parser.splitting
 
 import scalanlp.config.Configuration
 import scalanlp.trees.UnaryChainRemover.ChainReplacer
-import scalanlp.parser.ParserParams.NoParams;
-import scalala.library.Numerics.logSum;
-import scalanlp.parser._;
+import scalanlp.parser.ParserParams.NoParams
+import scalala.library.Numerics.logSum
+import scalanlp.parser._
 import scalanlp.trees.BinarizedTree
 import scalanlp.trees.BinaryTree
 import scalanlp.trees.NullaryTree
 import scalanlp.trees.Tree
 import scalanlp.trees.UnaryTree
-import scalanlp.parser.projections._;
+import scalanlp.parser.projections._
 
 import math.exp
 
@@ -65,16 +65,16 @@ object StateSplitting {
     indexedTree.postorder.foreach {
       case t@NullaryTree(Beliefs(labels,scores,_)) =>
         // fill in POS tags:
-        assert(t.span.length == 1);
-        val word = s(t.span.start);
-        var foundOne = false;
+        assert(t.span.length == 1)
+        val word = s(t.span.start)
+        var foundOne = false
         for( i <- 0 until scores.length;
             a = labels(i);
-            wScore = lexicon.wordScore(grammar.labelIndex.get(a),word) + scorer.scoreSpan(t.span.start,t.span.end,a);
+            wScore = lexicon.wordScore(grammar.labelIndex.get(a),word) + scorer.scoreSpan(t.span.start,t.span.end,a)
             if !wScore.isInfinite) {
           scores(i) = wScore
           assert(!wScore.isInfinite)
-          foundOne = true;
+          foundOne = true
         }
         if(!foundOne) {
           val available: IndexedSeq[(L, Double)] =  (0 until grammar.labelIndex.size).map { i =>
@@ -83,7 +83,7 @@ object StateSplitting {
           sys.error("Trouble with lexical " + s(t.span.start) + " " + t.label.candidates.map(grammar.labelIndex.get _) + "\n" + available.mkString("Available:",",",""))
         }
       case t@UnaryTree(Beliefs(aLabels,aScores,_),Tree(Beliefs(cLabels,cScores,_),_)) =>
-        var foundOne = false;
+        var foundOne = false
         var ai = 0
         while(ai < aLabels.length) {
           var i = 0
@@ -92,9 +92,9 @@ object StateSplitting {
             val c = cLabels(i)
             val ruleScore = (grammar.ruleScore(a,c)
               + cScores(i)
-              + scorer.scoreUnaryRule(t.span.start, t.span.end, grammar.ruleIndex(a, c)));
+              + scorer.scoreUnaryRule(t.span.start, t.span.end, grammar.ruleIndex(a, c)))
             if(!ruleScore.isInfinite) {
-              foundOne = true;
+              foundOne = true
             }
             arr(i) = ruleScore
             i += 1
@@ -107,14 +107,14 @@ object StateSplitting {
           sys.error("Trouble with unary " + t.render(s))
         }
       case t@BinaryTree(Beliefs(aLabels,aScores,_),Tree(Beliefs(bLabels,bScores,_),_),Tree(Beliefs(cLabels,cScores,_),_)) =>
-        var foundOne = false;
+        var foundOne = false
         val begin = t.span.start
         val split = t.leftChild.span.end
         val end = t.span.end
         var ai = 0
         while(ai < aScores.length) {
           val a = aLabels(ai)
-          var i = 0;
+          var i = 0
           var bi = 0
           while(bi < bLabels.length) {
             val b = bLabels(bi)
@@ -126,23 +126,23 @@ object StateSplitting {
                 + cScores(ci)
                 + scorer.scoreBinaryRule(begin,split,end,grammar.ruleIndex(a,b,c)) + scorer.scoreSpan(begin,end,a)
                 )
-              i += 1;
+              i += 1
               ci += 1
             }
             bi += 1
-          };
+          }
           aScores(ai) = logSum(arr,i)
-          if(!aScores(ai).isInfinite) foundOne = true;
+          if(!aScores(ai).isInfinite) foundOne = true
           ai += 1
        }
 
         if(!foundOne) {
           sys.error("Trouble with binary " + t.render(s))
         }
-      case _ => sys.error("bad tree!");
+      case _ => sys.error("bad tree!")
     }
 
-    indexedTree;
+    indexedTree
   }
 
   def outsideScores[L,W](grammar: Grammar[L], lexicon: Lexicon[L,W], s: Seq[W], tree: BinarizedTree[Beliefs], scorer: SpanScorer[L]= SpanScorer.identity) {
@@ -179,7 +179,7 @@ object StateSplitting {
           for {
             (p,pScore) <- t.label.candidates zip t.label.outside
           } {
-            val rScore = grammar.ruleScore(p,c) + scorer.scoreUnaryRule(t.span.start,t.span.end,grammar.ruleIndex(p,c));
+            val rScore = grammar.ruleScore(p,c) + scorer.scoreUnaryRule(t.span.start,t.span.end,grammar.ruleIndex(p,c))
             arr(i) = pScore + rScore
             i += 1
           }
@@ -193,8 +193,8 @@ object StateSplitting {
 
 
   def calibrateTree[W, L](grammar: Grammar[L], lexicon: Lexicon[L, W], tree: BinarizedTree[Seq[L]], s: scala.Seq[W], scorer: SpanScorer[L] = SpanScorer.identity[L]) = {
-    val stree = insideScores(grammar, lexicon, tree, s, scorer);
-    outsideScores(grammar, lexicon, s, stree, scorer);
+    val stree = insideScores(grammar, lexicon, tree, s, scorer)
+    outsideScores(grammar, lexicon, s, stree, scorer)
     stree
   }
 
@@ -202,7 +202,7 @@ object StateSplitting {
     val counts = grammar.labelEncoder.mkDenseVector()
     tree.allChildren.foreach { node =>
       val c = Library.logNormalize(DenseVector.tabulate(node.label.candidates.length)(i => node.label.inside(i) + node.label.outside(i)))
-      var i = 0;
+      var i = 0
       while(i < node.label.candidates.length) {
         counts(node.label.candidates(i)) += math.exp(c(i))
         i += 1
@@ -211,7 +211,13 @@ object StateSplitting {
     counts
   }
 
-  def expectedCounts[L,W](grammar: Grammar[L], lexicon: Lexicon[L,W], tree: BinarizedTree[Seq[L]], s: Seq[W], scorer: SpanScorer[L] = SpanScorer.identity[L], acc: ExpectedCounts[W] = null) = {
+  def expectedCounts[L,W](grammar: Grammar[L],
+                          lexicon: Lexicon[L,W],
+                          tree: BinarizedTree[Seq[L]],
+                          s: Seq[W],
+                          scorer: SpanScorer[L] = SpanScorer.identity[L],
+                          acc: ExpectedCounts[W] = null,
+                          spanVisitor: AnchoredSpanVisitor = AnchoredSpanVisitor.noOp) = {
     val counts = if(acc eq null) new ExpectedCounts[W](grammar) else acc
     val ruleCounts = counts.ruleCounts
     val wordCounts = counts.wordCounts
@@ -221,7 +227,7 @@ object StateSplitting {
     // normalizer
     val totalProb = logSum(stree.label.inside,stree.label.inside.length)
     if(totalProb.isInfinite || totalProb.isNaN)
-      sys.error("NAn or infinite" + totalProb + " " + tree.render(s));
+      sys.error("NAn or infinite" + totalProb + " " + tree.render(s))
 
     stree.allChildren foreach {
       case t@NullaryTree(Beliefs(labels,iScores,oScores)) =>
@@ -229,11 +235,13 @@ object StateSplitting {
           val l = labels(i)
           val iS = iScores(i)
           val oS = oScores(i)
-          val ruleScore = (iS + oS - totalProb);
-          assert(!ruleScore.isNaN);
-         // assert(exp(ruleScore) > 0, " " + ruleScore);
-          assert(!exp(ruleScore).isInfinite);
-          wordCounts.getOrElseUpdate(l)(s(t.span.start)) +=  exp(ruleScore);
+          val ruleScore = exp(iS + oS - totalProb)
+          assert(!ruleScore.isNaN)
+         // assert(exp(ruleScore) > 0, " " + ruleScore)
+          assert(!ruleScore.isInfinite)
+          wordCounts.getOrElseUpdate(l)(s(t.span.start)) += ruleScore
+          if(spanVisitor ne AnchoredSpanVisitor.noOp)
+            spanVisitor.visitSpan(t.span.start,t.span.end,l,ruleScore)
         }
       case t@UnaryTree(Beliefs(aLabels,_,aScores),Tree(Beliefs(cLabels,cScores,_),_)) =>
         var pi = 0
@@ -246,79 +254,92 @@ object StateSplitting {
             val c = cLabels(ci)
             val icScore = cScores(ci)
             ci += 1
-            val ruleScore = opScore + icScore + grammar.ruleScore(p,c) - totalProb;
-            val span = scorer.scoreUnaryRule(t.span.start,t.span.end,grammar.ruleIndex(p,c));
-            assert(!ruleScore.isNaN);
-           // assert(exp(ruleScore) > 0, " " + ruleScore);
-            assert(!exp(ruleScore + span).isInfinite,ruleScore + " " + span);
-            ruleCounts(grammar.ruleIndex(p,c)) += exp(ruleScore + span);
+            val ruleIndex = grammar.ruleIndex(p, c)
+            val ruleScore = opScore + icScore + grammar.ruleScore(ruleIndex) - totalProb
+            val span = scorer.scoreUnaryRule(t.span.start,t.span.end,ruleIndex)
+            assert(!ruleScore.isNaN)
+           // assert(exp(ruleScore) > 0, " " + ruleScore)
+            val count = exp(ruleScore + span)
+            assert(!count.isInfinite,ruleScore + " " + span)
+            ruleCounts(ruleIndex) += count
+            if(spanVisitor ne AnchoredSpanVisitor.noOp)
+              spanVisitor.visitUnaryRule(t.span.start,t.span.end,ruleIndex,count)
           }
         }
       case t@BinaryTree(Beliefs(aLabels,_,aScores),Tree(Beliefs(bLabels,bScores,_),_),Tree(Beliefs(cLabels,cScores,_),_)) =>
         val begin = t.span.start
         val split = t.rightChild.span.start
         val end = t.span.end
-        for {
-          (p,opScore) <- aLabels zip aScores
-          (l,ilScore) <- bLabels zip bScores
-          (r,irScore) <- cLabels zip cScores
-        } {
-          val ruleScore = opScore + irScore + ilScore + grammar.ruleScore(p,l,r) - totalProb;
-          val span = scorer.scoreBinaryRule(begin,split,end,grammar.ruleIndex(p,l,r)) + scorer.scoreSpan(begin,end,p)
-          assert(!ruleScore.isNaN);
-          //assert(exp(ruleScore) > 0, " " + ruleScore);
-          assert(!exp(ruleScore + span).isInfinite, ruleScore + " " + span + " " + (ruleScore + span) + " " + totalProb);
-          ruleCounts(grammar.ruleIndex(p,l,r)) += exp(ruleScore + span);
+        for ( (p,opScore) <- aLabels zip aScores) {
+          var spanCount = 0.0
+          for { (l,ilScore) <- bLabels zip bScores
+                (r,irScore) <- cLabels zip cScores
+          } {
+            val ruleIndex = grammar.ruleIndex(p, l, r)
+            val ruleScore = opScore + irScore + ilScore + grammar.ruleScore(ruleIndex) - totalProb
+            val span = scorer.scoreBinaryRule(begin,split,end,ruleIndex) + scorer.scoreSpan(begin,end,p)
+            assert(!ruleScore.isNaN)
+            //assert(exp(ruleScore) > 0, " " + ruleScore)
+            val score = exp(ruleScore + span)
+            assert(!score.isInfinite, ruleScore + " " + span + " " + (ruleScore + span) + " " + totalProb)
+            ruleCounts(ruleIndex) += score
+            if(spanVisitor ne AnchoredSpanVisitor.noOp) {
+              spanVisitor.visitBinaryRule(begin,split,end,ruleIndex,score)
+              spanCount += score
+            }
+          }
+          if(spanVisitor ne AnchoredSpanVisitor.noOp)
+            spanVisitor.visitSpan(begin,end,p,spanCount)
         }
     }
 
-    //println("Problems: " + numProblems * 1.0 / numTotal);
-    ExpectedCounts(ruleCounts,wordCounts,counts.logProb + totalProb);
+    //println("Problems: " + numProblems * 1.0 / numTotal)
+    ExpectedCounts(ruleCounts,wordCounts,counts.logProb + totalProb)
   }
 
   def splitCounts[L,L2,W](data: SplittingData[L,W],
                           splitter: L=>Seq[L2],
                           randomNoise: Double = 0.01):SplittingData[L2,W] = {
 
-    val SplittingData(binaries,unaries,wordCounts) = data;
+    val SplittingData(binaries,unaries,wordCounts) = data
 
-    val splitRules = Counter2[L2,BinaryRule[L2],Double]();
+    val splitRules = Counter2[L2,BinaryRule[L2],Double]()
     for {
-      ((_,baseR),count) <- binaries.nonzero.pairs;
+      ((_,baseR),count) <- binaries.nonzero.pairs
       r <- splitRule(baseR,splitter)
     } {
-      val x = (1 + 2 * randomNoise * math.random - randomNoise);
-      splitRules(r.parent,r) = count * x;
+      val x = (1 + 2 * randomNoise * math.random - randomNoise)
+      splitRules(r.parent,r) = count * x
     }
 
-    val splitUnaries = Counter2[L2,UnaryRule[L2],Double]();
+    val splitUnaries = Counter2[L2,UnaryRule[L2],Double]()
     for {
-      ((_,baseR),count) <- unaries.nonzero.pairs;
+      ((_,baseR),count) <- unaries.nonzero.pairs
       r <- splitRule(baseR,splitter)
     } {
-      val x = (1 + 2 * randomNoise * math.random - randomNoise);
-      splitUnaries(r.parent,r) = count * x;
+      val x = (1 + 2 * randomNoise * math.random - randomNoise)
+      splitUnaries(r.parent,r) = count * x
     }
 
-    val splitWords = Counter2[L2,W,Double]();
+    val splitWords = Counter2[L2,W,Double]()
     for {
       ((l,w),count) <- wordCounts.nonzero.pairs
       r <- splitter(l)
     } {
-      val x = (1 + 2 * randomNoise * math.random - randomNoise);
-      splitWords(r,w) = count * x;
+      val x = (1 + 2 * randomNoise * math.random - randomNoise)
+      splitWords(r,w) = count * x
     }
 
-    SplittingData(splitRules,splitUnaries,splitWords);
+    SplittingData(splitRules,splitUnaries,splitWords)
   }
 
   private def splitRule[L,L2,W](r: UnaryRule[L], splitter: L=>Seq[L2]):Iterator[UnaryRule[L2]] = r match {
-    case UnaryRule(p,c) => for { pp <- splitter(p).iterator ; cc <- splitter(c).iterator} yield UnaryRule(pp,cc);
+    case UnaryRule(p,c) => for { pp <- splitter(p).iterator ; cc <- splitter(c).iterator} yield UnaryRule(pp,cc)
   }
 
   private def splitRule[L,L2,W](r: BinaryRule[L], splitter: L=>Seq[L2]):Iterator[BinaryRule[L2]] = r match {
     case BinaryRule(p,l,r) =>
-      for { pp <- splitter(p).iterator ; ll <- splitter(l).iterator; rr <- splitter(r).iterator } yield BinaryRule(pp,ll,rr);
+      for { pp <- splitter(p).iterator ; ll <- splitter(l).iterator; rr <- splitter(r).iterator } yield BinaryRule(pp,ll,rr)
   }
 
 
@@ -330,21 +351,21 @@ object StateSplitting {
                       (SplittingData[L,W],Double) = {
 
     val stateIterator = Iterator.iterate( (splitData,Double.MaxValue,convergence.abs*100,0)) { case state =>
-      val (SplittingData(splitRules,splitUnRules, splitWords),lastLogProb,_,it) = state;
+      val (SplittingData(splitRules,splitUnRules, splitWords),lastLogProb,_,it) = state
       assert(splitRules.sum != 0)
       assert(splitUnRules.sum != 0)
       assert(splitWords.sum != 0)
-      val grammar = Grammar(Library.logAndNormalizeRows(splitRules), Library.logAndNormalizeRows(splitUnRules));
-      val lexicon = new UnsmoothedLexicon(Library.logAndNormalizeRows(splitWords));
+      val grammar = Grammar(Library.logAndNormalizeRows(splitRules), Library.logAndNormalizeRows(splitUnRules))
+      val lexicon = new UnsmoothedLexicon(Library.logAndNormalizeRows(splitWords))
       val accum = trees.par.aggregate[ExpectedCounts[W]](null)( (acc,treeInstance) => expectedCounts[L,W](grammar,lexicon,treeInstance.tree,treeInstance.words,acc=acc), _ += _)
-      val logProb = accum.logProb;
+      val logProb = accum.logProb
 
-      val ((finalRules,finalUnaries),finalWords) = accum.decode(grammar);
+      val ((finalRules,finalUnaries),finalWords) = accum.decode(grammar)
 
-      val improvement = (lastLogProb-logProb)/lastLogProb;
-      println("Iter: " + logProb + "(" + lastLogProb + "->" +improvement+")");
+      val improvement = (lastLogProb-logProb)/lastLogProb
+      println("Iter: " + logProb + "(" + lastLogProb + "->" +improvement+")")
 
-      (SplittingData(finalRules,finalUnaries,finalWords),logProb,improvement,it+1);
+      (SplittingData(finalRules,finalUnaries,finalWords),logProb,improvement,it+1)
     }
     stateIterator.drop(10).dropWhile(x => x._3 > convergence && (x._4 < maxIter || maxIter < 0)).map { case (data,logP,_,_) => (data,logP) }.next()
   }
@@ -376,7 +397,7 @@ object StateSplitting {
   }
 
   private def mergeRules[L,W](splitData: SplittingData[L,W], project: L=>L) = {
-    val SplittingData(splitRules,splitUnRules, splitWords) = splitData;
+    val SplittingData(splitRules,splitUnRules, splitWords) = splitData
 
     val newBinaryRules = Counter2[L,BinaryRule[L],Double]()
     val newUnaryRules = Counter2[L,UnaryRule[L],Double]()
@@ -444,58 +465,58 @@ object StateSplitting {
                         randomNoise: Double=0.1,
                         convergence: Double = 1E-4): Iterator[(SplittingData[(L,Seq[Int]),W],Double)] = {
     def split(s: (L,Seq[Int]) ) = {
-      val (l,state) = s;
-      if (l == root) Seq(s) else Seq( (l,state :+ 0),(l,state :+ 1));
+      val (l,state) = s
+      if (l == root) Seq(s) else Seq( (l,state :+ 0),(l,state :+ 1))
     }
 
     def proj(s: (L,Seq[Int]))= s._1
 
     val myTrees = trees.map { case TreeInstance(id,tree,sent, _) => TreeInstance(id,tree.map { (_,Seq.empty[Int]) },sent) }
-    val SplittingData(binaries,unaries,wordCounts) = data;
+    val SplittingData(binaries,unaries,wordCounts) = data
 
     // turn every label l into (l,0)
-    val myRuleCounts = Counter2[(L,Seq[Int]),BinaryRule[(L,Seq[Int])],Double]();
+    val myRuleCounts = Counter2[(L,Seq[Int]),BinaryRule[(L,Seq[Int])],Double]()
     for ( (l,rule,w) <- binaries.triples) rule match {
       case BinaryRule(par,lc,rc) =>
-        myRuleCounts( (l,Seq.empty), BinaryRule( (l,Seq.empty), (lc,Seq.empty), (rc,Seq.empty))) = w;
+        myRuleCounts( (l,Seq.empty), BinaryRule( (l,Seq.empty), (lc,Seq.empty), (rc,Seq.empty))) = w
     }
-    val myUnaries = Counter2[(L,Seq[Int]),UnaryRule[(L,Seq[Int])],Double]();
+    val myUnaries = Counter2[(L,Seq[Int]),UnaryRule[(L,Seq[Int])],Double]()
     for ( (l,rule,w) <- unaries.triples) rule match {
       case UnaryRule(par,child) =>
-      myUnaries( (l,Seq.empty), UnaryRule( (l,Seq.empty), (child,Seq.empty))) = w;
+      myUnaries( (l,Seq.empty), UnaryRule( (l,Seq.empty), (child,Seq.empty))) = w
     }
 
-    val myWordCounts = Counter2[(L,Seq[Int]),W,Double]();
+    val myWordCounts = Counter2[(L,Seq[Int]),W,Double]()
     for ( ((l,word),w) <- wordCounts.nonzero.pairs) {
-      myWordCounts( (l,Seq.empty), word) = w;
-    };
+      myWordCounts( (l,Seq.empty), word) = w
+    }
 
     val splittingData = SplittingData(myRuleCounts, myUnaries, myWordCounts)
-    splitGrammar(splittingData,myTrees,split _, nSplits, randomNoise, convergence);
+    splitGrammar(splittingData,myTrees,split _, nSplits, randomNoise, convergence)
   }
 
   case class SplittingData[L,W](binaryRules: Counter2[L,BinaryRule[L],Double],
                                 unaryRules: Counter2[L,UnaryRule[L],Double],
-                                tagCounts: Counter2[L,W,Double]);
-  type Treebank[L,W] = IndexedSeq[TreeInstance[L,W]];
-  type SplitTreebank[L,W] = IndexedSeq[TreeInstance[Seq[L],W]];
+                                tagCounts: Counter2[L,W,Double])
+  type Treebank[L,W] = IndexedSeq[TreeInstance[L,W]]
+  type SplitTreebank[L,W] = IndexedSeq[TreeInstance[Seq[L],W]]
 
   def splitGrammar[L,W](initData: SplittingData[L,W],
                       unsplitTrees: Treebank[L,W],
                       splitter: L=>Seq[L], nSplits: Int,
                       randomNoise: Double,  convergence: Double): Iterator[(SplittingData[L,W],Double)]  = {
-    val oneCycle = splitCycle(_:SplittingData[L,W],_:SplitTreebank[L,W],splitter,randomNoise,convergence);
+    val oneCycle = splitCycle(_:SplittingData[L,W],_:SplitTreebank[L,W],splitter,randomNoise,convergence)
 
     def splitHelper(pair: TreeInstance[L,W], splitFun: BinarizedTree[L]=>BinarizedTree[Seq[L]]) = (
       TreeInstance(pair.id,splitFun(pair.tree),pair.words)
-    );
+    )
 
-    val coarseGrammar = Grammar(initData.binaryRules, initData.unaryRules);
+    val coarseGrammar = Grammar(initData.binaryRules, initData.unaryRules)
     val initProjections = ProjectionIndexer.simple(coarseGrammar.labelIndex)
 
     val initState = (initData,Set.empty[L],Double.NegativeInfinity, initProjections)
     val iterations = Iterator.iterate( initState ) { state =>
-      val (data,thingsToNotSplit,logProb,oldProjections) = state;
+      val (data,thingsToNotSplit,logProb,oldProjections) = state
       def conditionalSplit(refined: L) = {
         if(thingsToNotSplit(refined)) Seq(refined)
         else splitter(refined)
@@ -504,17 +525,17 @@ object StateSplitting {
       val splitProjections = ProjectionIndexer.fromSplitter(oldProjections.fineIndex, conditionalSplit)
 
       // no split -> new split
-      val fullProjections = oldProjections compose splitProjections;
+      val fullProjections = oldProjections compose splitProjections
       def split(sym: L) = fullProjections.refinementsOf(sym)
-      val myTrees = unsplitTrees.map { splitHelper(_, _.map(split)) }.toIndexedSeq;
-      val splitData = splitCounts(data,splitProjections.refinementsOf(_:L),randomNoise);
-      val (newData,newLP) = oneCycle(splitData,myTrees);
+      val myTrees = unsplitTrees.map { splitHelper(_, _.map(split)) }.toIndexedSeq
+      val splitData = splitCounts(data,splitProjections.refinementsOf(_:L),randomNoise)
+      val (newData,newLP) = oneCycle(splitData,myTrees)
 
       val grammar = Grammar(Library.logAndNormalizeRows(newData.binaryRules),
-        Library.logAndNormalizeRows(newData.unaryRules));
-      val lex = new SimpleLexicon(newData.tagCounts);
+        Library.logAndNormalizeRows(newData.unaryRules))
+      val lex = new SimpleLexicon(newData.tagCounts)
       // TODO, ugh
-      val builder = CKYChartBuilder(null.asInstanceOf[L],lex,grammar);
+      val builder = CKYChartBuilder(null.asInstanceOf[L],lex,grammar)
       val labelsToUnsplit = this.determineLabelsToUnsplit(splitProjections,builder, myTrees)
       val labelsToNotSplit = labelsToUnsplit.flatMap(splitter).toSet
 
@@ -533,28 +554,28 @@ object StateSplittingPipeline extends ParserPipeline with NoParams {
                   validate: Parser[String,String]=>ParseEval.Statistics,
                   params: Params) = {
 
-    println("Extracting counts");
+    println("Extracting counts")
     val (initialLex,initialProductions,initUnR) = GenerativeParser.extractCounts(trainTrees)
 
     val coarseGrammar = Grammar(Library.logAndNormalizeRows(initialProductions),
-      Library.logAndNormalizeRows(initUnR));
-    println("Splitting Grammar");
-    import StateSplitting._;
+      Library.logAndNormalizeRows(initUnR))
+    println("Splitting Grammar")
+    import StateSplitting._
     val data = SplittingData(initialProductions, initUnR, initialLex)
     var iter = 0
     for( (SplittingData(finalProd,finalUn,finalLex),logProb) <-  splitGrammar(data,trainTrees,"")) yield {
-      val grammar = Grammar(Library.logAndNormalizeRows(finalProd),Library.logAndNormalizeRows(finalUn));
-      val lex = new SimpleLexicon(finalLex);
-      val builder = CKYChartBuilder(("",Seq.empty),lex,grammar);
-      def proj(l: (String,Seq[Int])) = l._1;
-      val parser = ProjectingParser(builder,coarseGrammar,proj);
+      val grammar = Grammar(Library.logAndNormalizeRows(finalProd),Library.logAndNormalizeRows(finalUn))
+      val lex = new SimpleLexicon(finalLex)
+      val builder = CKYChartBuilder(("",Seq.empty),lex,grammar)
+      def proj(l: (String,Seq[Int])) = l._1
+      val parser = ProjectingParser(builder,coarseGrammar,proj)
       iter += 1
       val name = if(iter == 1) {
         "base"
       } else {
         "split-" + iter
       }
-      (name,parser);
+      (name,parser)
     }
   }
 }

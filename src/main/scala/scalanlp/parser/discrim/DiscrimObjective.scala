@@ -30,37 +30,45 @@ class DiscrimObjective[L,W](feat: Featurizer[L,W],
                             closedWords: Set[W])
         extends LatentDiscrimObjective[L,L,W](feat,trees,GrammarProjections.identity(coarseParser.grammar),coarseParser, openTags,closedWords) {
 
-  def treeToExpectedCounts[L,W](parser: SimpleChartParser[L,L,W],
-                                treeInstance: TreeInstance[L,W]):(ExpectedCounts[W],Double) = {
-    val TreeInstance(_,t,words,spanScorer) = treeInstance;
-    val g = parser.builder.grammar;
-    val lexicon = parser.builder.lexicon;
+    override def treeToExpectedCounts(g: Grammar[L],
+                           lexicon: Lexicon[L,W],
+                           broker: BaseWeightedSpanBroker[L,L,W],
+                           ti: TreeInstance[L,W],
+                           spanScorer: SpanScorer[L] = SpanScorer.identity) = {
     val expectedCounts = new ExpectedCounts[W](g)
+    val composite = SpanScorer.sum(ti.spanScorer,broker.spanForId(ti.id))
+    val weights = DenseVector.zeros[Double](broker.numWeights)
+    val visitor = broker.ecountsVisitor(ti.id,weights.data)
     var score = 0.0;
-    var loss = 0.0;
-    for(t2 <- t.allChildren) {
+    for(t2 <- ti.tree.allChildren) {
       t2 match {
         case BinaryTree(a,bt@ Tree(b,_),Tree(c,_)) =>
           val r = g.index(BinaryRule(a,b,c))
           expectedCounts.ruleCounts(r) += 1
-          score += g.ruleScore(r);
-          loss += spanScorer.scoreBinaryRule(t2.span.start,bt.span.end, t2.span.end, r)
+          score += ( g.ruleScore(r)
+            + composite.scoreSpan(t2.span.start,t2.span.end,g.labelIndex(a))
+            + composite.scoreBinaryRule(t2.span.start,bt.span.end,t2.span.end,r)
+            )
+
+          visitor.visitSpan(t2.span.start,t2.span.end,g.labelIndex(a), 1)
+          visitor.visitBinaryRule(t2.span.start,bt.span.end,t2.span.end,r,1)
         case UnaryTree(a,Tree(b,_)) =>
           val r = g.index(UnaryRule(a,b))
           expectedCounts.ruleCounts(r) += 1
-          score += g.ruleScore(r);
-          loss += spanScorer.scoreUnaryRule(t2.span.start,t2.span.end,r)
+          visitor.visitUnaryRule(t2.span.start,t2.span.end,r,1)
+          score += ( g.ruleScore(r)
+            + composite.scoreUnaryRule(t2.span.start,t2.span.end,r)
+            )
         case n@NullaryTree(a) =>
           val aI = g.labelIndex(a)
-          val w = words(n.span.start);
+          val w = ti.words(n.span.start);
           expectedCounts.wordCounts.getOrElseUpdate(aI)(w) += 1
-          score += lexicon.wordScore(g.labelIndex.get(aI), w);
-          loss += spanScorer.scoreSpan(t2.span.start,t2.span.end,aI);
-
+          visitor.visitSpan(t2.span.start,t2.span.end,aI, 1)
+          score += lexicon.wordScore(g.labelIndex.get(aI), w) + ti.spanScorer.scoreSpan(t2.span.start,t2.span.end,aI)
       }
     }
     expectedCounts.logProb = score;
-    (expectedCounts,loss);
+    expectedCounts -> weights
   }
 
 }
@@ -121,3 +129,4 @@ object DiscriminativePipeline extends ParserPipeline {
 
   }
 }
+

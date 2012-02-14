@@ -57,7 +57,7 @@ abstract class ParseChart[L](val grammar: Encoder[L], val length: Int) extends S
 
     /**
      * Bulk enter: sum w in the current semiring (with length as the size) and add it in.
-     * Avoids duplicating work. Always overwrites old score
+     * Avoids duplicating work.
      */
     def enter(begin: Int, end: Int, parent: Int, w: Array[Double], length: Int) = {
       val index = TriangularArray.index(begin, end)
@@ -68,7 +68,7 @@ abstract class ParseChart[L](val grammar: Encoder[L], val length: Int) extends S
       }
       val oldScore = arr(parent)
       val newScore = sum(w,length)
-      arr(parent) = newScore
+      arr(parent) = sum(oldScore,newScore)
 
       if(newScore > oldScore) {
         enteredLabels(index) += parent

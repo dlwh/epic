@@ -82,7 +82,7 @@ class EPModelObjective[L,W](models: Seq[DiscEPModel[L,W]],
         tree,
         words,
         new ProjectingSpanScorer(model.projections, scorer))
-      val wordCounts = new InsideOutside(marg.model.chartBuilder).expectedCounts(words, marg.inside, marg.outside, marg.partition, marg.scorer)
+      val wordCounts = new InsideOutside(marg.model.chartBuilder).expectedCounts(words, marg.inside, marg.outside, marg.partition, marg.scorer, AnchoredSpanVisitor.noOp)
       treeScore += tcounts.logProb
       tcounts -= wordCounts
     }
