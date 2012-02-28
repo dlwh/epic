@@ -81,7 +81,7 @@ case class KMPipeline(horizontal: Int = 2,
   val hasVerbs = Set("has","have","had")
 
   private def _splitAux(tree: BinarizedTree[AnnotatedLabel], words: Seq[String]): BinarizedTree[AnnotatedLabel] = {
-    tree.extend { (t:BinarizedTree[AnnotatedLabel]) =>
+    tree.extend { t =>
       t match {
         case UnaryTree(label,NullaryTree(lbl2)) if label.baseLabel == lbl2.baseLabel =>
           val w = words(t.span.start)
@@ -99,7 +99,7 @@ case class KMPipeline(horizontal: Int = 2,
   }
 
   val activeVerbs = Set("VBZ","VBD","VBP","MD")
-  private def _splitVP(tree: BinarizedTree[AnnotatedLabel]) = tree.extend { (t: BinarizedTree[AnnotatedLabel]) =>
+  private def _splitVP(tree: BinarizedTree[AnnotatedLabel]) = tree.extend { t =>
     if(t.label.baseLabel != "VP") t.label
     else {
       val headTag = HeadFinder.collinsHeadFinder.findHeadTag(t,{(_:AnnotatedLabel).baseLabel})
@@ -151,7 +151,7 @@ case class KMPipeline(horizontal: Int = 2,
 
   }
 
-  def _splitPossNP(tree: BinarizedTree[AnnotatedLabel]) = tree.extend{ (t: BinarizedTree[AnnotatedLabel]) =>
+  def _splitPossNP(tree: BinarizedTree[AnnotatedLabel]) = tree.extend{ t =>
     if(t.label.baseLabel != "NP") t.label
     else {
       val headTag = HeadFinder.collinsHeadFinder.findHeadTag(t,{(_:AnnotatedLabel).baseLabel})
@@ -248,8 +248,8 @@ case class KMPipeline(horizontal: Int = 2,
   }
 
   def markDominates(tree: BinarizedTree[AnnotatedLabel], label: String, pred: String=>Boolean) = {
-    def dominates(x: BinarizedTree[AnnotatedLabel]) = x.leaves.exists { t => pred(t.label.label) }
-    tree.extend { (t:BinarizedTree[AnnotatedLabel]) =>
+    def dominates(x: Tree[AnnotatedLabel]) = x.leaves.exists { t => pred(t.label.label) }
+    tree.extend { t =>
       if(t eq tree) t.label
       else if(dominates(t)) t.label.annotate(Dom(label))
       else t.label

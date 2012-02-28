@@ -35,14 +35,33 @@ import scalala.tensor.{Counter,Counter2}
 import scalala.library.{Numerics, Library}
 import java.util.Arrays
 import scalala.tensor.dense.DenseVector
-import collection.mutable.BitSet
 import scalanlp.util.{Index, Encoder}
+import collection.mutable.{ArrayBuffer, BitSet}
 
 /**
  * State Splitting implements the InsideOutside/Tree Message Passing algorithm for Matsuzaki et all 2005
  * Given a gold bracketing and a set of candidate labels, it computes expected counts for those candidate labels
  */
-object StateSplitting {
+class StateSplitting[L,W](grammar: Grammar[L], lexicon: Lexicon[L,W]) {
+  def this(b: ChartBuilder[ParseChart,L,W]) = this(b.grammar,b.lexicon)
+
+
+  // enters the score for this label. Multiscale will do something subtly different
+  protected def updateBeliefsInside(beliefs: Beliefs, index: Int, score: Double){
+    beliefs.inside(index) = score
+  }
+
+  protected def updateHierarchyInside(beliefs: Beliefs) {
+  }
+
+  // enters the score for this label. Multiscale will do something subtly different
+  // should logsum
+  protected def updateBeliefsOutside(beliefs: Beliefs, index: Int, score: Double) {
+    beliefs.outside(index) = Numerics.logSum(beliefs.outside(index),score)
+  }
+
+  protected def updateHierarchyOutside(beliefs: Beliefs) {
+  }
 
   case class Beliefs(candidates: Seq[Int], inside: Array[Double], outside: Array[Double]) {
     def format[L](idx: Index[L]) = {
@@ -58,7 +77,7 @@ object StateSplitting {
     }
   }
 
-  def insideScores[L,W](grammar: Grammar[L], lexicon: Lexicon[L,W], tree: BinarizedTree[Seq[L]], s: Seq[W], scorer: SpanScorer[L] = SpanScorer.identity) = {
+  def insideScores(tree: BinarizedTree[Seq[L]], s: Seq[W], scorer: SpanScorer[L] = SpanScorer.identity) = {
     val indexedTree:BinarizedTree[Beliefs] = tree.map{  candidates => Beliefs(candidates.map(grammar.labelIndex))}
     val arr = new Array[Double](64 * 64)
 
@@ -72,9 +91,9 @@ object StateSplitting {
             a = labels(i);
             wScore = lexicon.wordScore(grammar.labelIndex.get(a),word) + scorer.scoreSpan(t.span.start,t.span.end,a)
             if !wScore.isInfinite) {
-          scores(i) = wScore
           assert(!wScore.isInfinite)
           foundOne = true
+          updateBeliefsInside(t.label,i,wScore)
         }
         if(!foundOne) {
           val available: IndexedSeq[(L, Double)] =  (0 until grammar.labelIndex.size).map { i =>
@@ -82,6 +101,7 @@ object StateSplitting {
           }.toIndexedSeq
           sys.error("Trouble with lexical " + s(t.span.start) + " " + t.label.candidates.map(grammar.labelIndex.get _) + "\n" + available.mkString("Available:",",",""))
         }
+        updateHierarchyInside(t.label)
       case t@UnaryTree(Beliefs(aLabels,aScores,_),Tree(Beliefs(cLabels,cScores,_),_)) =>
         var foundOne = false
         var ai = 0
@@ -90,22 +110,24 @@ object StateSplitting {
           while(i < cLabels.length) {
             val a = aLabels(ai)
             val c = cLabels(i)
-            val ruleScore = (grammar.ruleScore(a,c)
-              + cScores(i)
-              + scorer.scoreUnaryRule(t.span.start, t.span.end, grammar.ruleIndex(a, c)))
-            if(!ruleScore.isInfinite) {
-              foundOne = true
+            val ruleIndex = grammar.ruleIndex(a,c)
+            if(ruleIndex >= 0) {
+              val ruleScore = (grammar.ruleScore(ruleIndex)
+                + cScores(i)
+                + scorer.scoreUnaryRule(t.span.start, t.span.end, ruleIndex))
+              arr(i) = ruleScore
+              foundOne |= !ruleScore.isInfinite
             }
-            arr(i) = ruleScore
             i += 1
           }
-          aScores(ai) = Numerics.logSum(arr,i)
+          updateBeliefsInside(t.label,ai,Numerics.logSum(arr,i))
           ai += 1
         }
 
         if(!foundOne) {
           sys.error("Trouble with unary " + t.render(s))
         }
+        updateHierarchyInside(t.label)
       case t@BinaryTree(Beliefs(aLabels,aScores,_),Tree(Beliefs(bLabels,bScores,_),_),Tree(Beliefs(cLabels,cScores,_),_)) =>
         var foundOne = false
         val begin = t.span.start
@@ -131,7 +153,7 @@ object StateSplitting {
             }
             bi += 1
           }
-          aScores(ai) = logSum(arr,i)
+          updateBeliefsInside(t.label,ai,Numerics.logSum(arr,i))
           if(!aScores(ai).isInfinite) foundOne = true
           ai += 1
        }
@@ -139,39 +161,51 @@ object StateSplitting {
         if(!foundOne) {
           sys.error("Trouble with binary " + t.render(s))
         }
+        updateHierarchyInside(t.label)
       case _ => sys.error("bad tree!")
     }
 
     indexedTree
   }
 
-  def outsideScores[L,W](grammar: Grammar[L], lexicon: Lexicon[L,W], s: Seq[W], tree: BinarizedTree[Beliefs], scorer: SpanScorer[L]= SpanScorer.identity) {
+  def outsideScores(s: Seq[W], tree: BinarizedTree[Beliefs], scorer: SpanScorer[L]= SpanScorer.identity) {
     // Root gets score 0
     Arrays.fill(tree.label.outside,0.0)
+    // caches
+    val leftScores = new Array[Double](64 * 64) // leftScores can be easily updated the outside
+    // right scores are little more obnoxious, and so we don't do them
 
     // Set the outside score of each child
     tree.preorder.foreach {
       case t @ BinaryTree(_,lchild,rchild) =>
-        for {
-          (p,pScore) <- t.label.candidates zip t.label.outside
-          li <- 0 until lchild.label.candidates.length
-          l = lchild.label.candidates(li)
-          lScore = lchild.label.inside(li)
-          ri <- 0 until rchild.label.candidates.length
-          r = rchild.label.candidates(ri)
-          rScore = rchild.label.inside(ri)
-        } {
-          val spanScore = (
-            scorer.scoreBinaryRule(t.span.start, lchild.span.end, t.span.end, grammar.ruleIndex(p, l, r))
-            + scorer.scoreSpan(t.span.start, t.span.end, p)
-          )
-          val rS = grammar.ruleScore(p,l,r) + spanScore
-          lchild.label.outside(li) = logSum(lchild.label.outside(li),pScore + rScore + rS)
-          rchild.label.outside(ri) = logSum(rchild.label.outside(ri),pScore + lScore + rS)
+        for ( li <- 0 until lchild.label.candidates.length) {
+          var offset = 0 // into leftScores
+          val l = lchild.label.candidates(li)
+          val lScore = lchild.label.inside(li)
+          for {
+            ri <- 0 until rchild.label.candidates.length
+            r = rchild.label.candidates(ri)
+            rScore = rchild.label.inside(ri)
+            (p,pScore) <- t.label.candidates zip t.label.outside
+          } {
+            val ruleIndex = grammar.ruleIndex(p,l,r)
+            if(ruleIndex >= 0) {
+              val spanScore = (
+                scorer.scoreBinaryRule(t.span.start, lchild.span.end, t.span.end, ruleIndex)
+                  + scorer.scoreSpan(t.span.start, t.span.end, p)
+                )
+              val rS = grammar.ruleScore(ruleIndex) + spanScore
+              leftScores(offset) = pScore + rScore + rS
+              offset += 1
+              rchild.label.outside(ri) = logSum(rchild.label.outside(ri),pScore + lScore + rS)
+            }
+          }
+
+          updateBeliefsOutside(t.label,li,logSum(leftScores,offset))
         }
+        updateHierarchyOutside(t.label)
       case tree: NullaryTree[Seq[Int]] => () // do nothing
       case t @ UnaryTree(_,child) =>
-        val arr = new Array[Double](t.label.candidates.size)
         for {
           (c,ci) <- child.label.candidates.zipWithIndex
         } {
@@ -179,12 +213,16 @@ object StateSplitting {
           for {
             (p,pScore) <- t.label.candidates zip t.label.outside
           } {
-            val rScore = grammar.ruleScore(p,c) + scorer.scoreUnaryRule(t.span.start,t.span.end,grammar.ruleIndex(p,c))
-            arr(i) = pScore + rScore
-            i += 1
+            val ruleIndex = grammar.ruleIndex(p,c)
+            if(ruleIndex >= 0) {
+              val rScore = grammar.ruleScore(ruleIndex) + scorer.scoreUnaryRule(t.span.start,t.span.end,ruleIndex)
+              leftScores(i) = pScore + rScore
+              i += 1
+            }
           }
-          child.label.outside(ci) = Numerics.logSum(arr,arr.length)
+          updateBeliefsOutside(child.label,ci,Numerics.logSum(leftScores,i))
         }
+        updateHierarchyOutside(t.label)
 
 
     }
@@ -192,13 +230,13 @@ object StateSplitting {
   }
 
 
-  def calibrateTree[W, L](grammar: Grammar[L], lexicon: Lexicon[L, W], tree: BinarizedTree[Seq[L]], s: scala.Seq[W], scorer: SpanScorer[L] = SpanScorer.identity[L]) = {
-    val stree = insideScores(grammar, lexicon, tree, s, scorer)
-    outsideScores(grammar, lexicon, s, stree, scorer)
+  def calibrateTree(tree: BinarizedTree[Seq[L]], s: scala.Seq[W], scorer: SpanScorer[L] = SpanScorer.identity[L]) = {
+    val stree = insideScores(tree, s, scorer)
+    outsideScores(s, stree, scorer)
     stree
   }
 
-  def expectedSymbolCounts[L](grammar: Grammar[L], tree: BinarizedTree[Beliefs]) = {
+  def expectedSymbolCounts(tree: BinarizedTree[Beliefs]) = {
     val counts = grammar.labelEncoder.mkDenseVector()
     tree.allChildren.foreach { node =>
       val c = Library.logNormalize(DenseVector.tabulate(node.label.candidates.length)(i => node.label.inside(i) + node.label.outside(i)))
@@ -211,18 +249,16 @@ object StateSplitting {
     counts
   }
 
-  def expectedCounts[L,W](grammar: Grammar[L],
-                          lexicon: Lexicon[L,W],
-                          tree: BinarizedTree[Seq[L]],
-                          s: Seq[W],
-                          scorer: SpanScorer[L] = SpanScorer.identity[L],
-                          acc: ExpectedCounts[W] = null,
-                          spanVisitor: AnchoredSpanVisitor = AnchoredSpanVisitor.noOp) = {
+  def expectedCounts(tree: BinarizedTree[Seq[L]],
+                     s: Seq[W],
+                     scorer: SpanScorer[L] = SpanScorer.identity[L],
+                     acc: ExpectedCounts[W] = null,
+                     spanVisitor: AnchoredSpanVisitor = AnchoredSpanVisitor.noOp) = {
     val counts = if(acc eq null) new ExpectedCounts[W](grammar) else acc
     val ruleCounts = counts.ruleCounts
     val wordCounts = counts.wordCounts
 
-    val stree = calibrateTree(grammar, lexicon, tree, s, scorer)
+    val stree = calibrateTree(tree, s, scorer)
 
     // normalizer
     val totalProb = logSum(stree.label.inside,stree.label.inside.length)
@@ -297,6 +333,9 @@ object StateSplitting {
     ExpectedCounts(ruleCounts,wordCounts,counts.logProb + totalProb)
   }
 
+}
+
+object StateSplitting {
   def splitCounts[L,L2,W](data: SplittingData[L,W],
                           splitter: L=>Seq[L2],
                           randomNoise: Double = 0.01):SplittingData[L2,W] = {
@@ -357,7 +396,9 @@ object StateSplitting {
       assert(splitWords.sum != 0)
       val grammar = Grammar(Library.logAndNormalizeRows(splitRules), Library.logAndNormalizeRows(splitUnRules))
       val lexicon = new UnsmoothedLexicon(Library.logAndNormalizeRows(splitWords))
-      val accum = trees.par.aggregate[ExpectedCounts[W]](null)( (acc,treeInstance) => expectedCounts[L,W](grammar,lexicon,treeInstance.tree,treeInstance.words,acc=acc), _ += _)
+      val ss = new StateSplitting(grammar,lexicon)
+      import ss._
+      val accum = trees.par.aggregate[ExpectedCounts[W]](null)( (acc,treeInstance) => expectedCounts(treeInstance.tree,treeInstance.words,acc=acc), _ += _)
       val logProb = accum.logProb
 
       val ((finalRules,finalUnaries),finalWords) = accum.decode(grammar)
@@ -375,8 +416,10 @@ object StateSplitting {
                       builder: ChartBuilder[ParseChart,L,W],
                       trees: SplitTreebank[L,W],
                       percentMerging: Double = 0.5) = {
-    val calibratedTrees = trees.par.map { case TreeInstance(_,t,s,_) => calibrateTree(builder.grammar,builder.lexicon,t,s)}
-    val symbolCounts = calibratedTrees.map(expectedSymbolCounts(builder.grammar,_)).reduceLeft{ _ += _ } + 1E-2
+    val ss = new StateSplitting(builder.grammar,builder.lexicon)
+    import ss._
+    val calibratedTrees = trees.par.map { case TreeInstance(_,t,s,_) => calibrateTree(t,s)}
+    val symbolCounts = calibratedTrees.map(expectedSymbolCounts(_)).reduceLeft{ _ += _ } + 1E-2
     val symbolTrials = {
       DenseVector.tabulate(symbolCounts.length){f =>
         val sibs = oneStepProjections.refinements(oneStepProjections.project(f))
@@ -418,7 +461,7 @@ object StateSplitting {
 
   }
 
-  private def computeMergeCosts[L,L2](proj: ProjectionIndexer[L,L2], symbolLogProbs: Int => Double, trees: BinarizedTree[Beliefs]) = {
+  private def computeMergeCosts[L,L2](proj: ProjectionIndexer[L,L2], symbolLogProbs: Int => Double, trees: BinarizedTree[StateSplitting[L2,_]#Beliefs]) = {
     val costs = proj.coarseEncoder.mkDenseVector()
     // inside merged
     val insideBins = Array.fill(costs.length)(Double.NegativeInfinity)
@@ -546,8 +589,10 @@ object StateSplitting {
 
   }
 
-
 }
+
+
+
 
 object StateSplittingPipeline extends ParserPipeline with NoParams {
   def trainParser(trainTrees: IndexedSeq[TreeInstance[String,String]],
@@ -576,6 +621,82 @@ object StateSplittingPipeline extends ParserPipeline with NoParams {
         "split-" + iter
       }
       (name,parser)
+    }
+  }
+}
+
+class MultiscaleStateSplitting[L,W](g: Grammar[L], l: Lexicon[L,W], hierarchy: MultiscaleHierarchy[L]) extends StateSplitting[L,W](g,l) {
+
+  override protected def updateBeliefsInside(beliefs: Beliefs, index: Int, score: Double) {
+    val ref = hierarchy.finalRefinements(beliefs.candidates(index))
+    var ri = 0
+    var i = 0
+    while(i < beliefs.candidates.length && ri < ref.length)  {
+      if(ref(ri) == beliefs.candidates(i)) {
+        beliefs.inside(i) = score
+        ri += 1
+      }
+      i += 1
+    }
+    assert(ri == ref.length)
+  }
+
+  // quadratic. might need to fix
+  // basically, for every non-finest label, set its score to the logsum of its finest refinements
+  override protected def updateHierarchyInside(beliefs: Beliefs) {
+    var index = 0
+    val buf = new Array[Double](beliefs.candidates.size)
+    while(index < beliefs.candidates.size) {
+      val ref = hierarchy.finalRefinements(beliefs.candidates(index))
+      if(ref.nonEmpty) { // not the finest layer?
+        var ri = 0
+        var i = 0
+        while(i < beliefs.candidates.length && ri < ref.length)  {
+          if(ref(ri) == beliefs.candidates(i)) {
+            buf(ri) = beliefs.inside(i)
+            ri += 1
+          }
+          i += 1
+        }
+        beliefs.inside(index) = Numerics.logSum(buf,ri)
+      }
+      index += 1
+    }
+
+  }
+
+  override protected def updateBeliefsOutside(beliefs: Beliefs, index: Int, score: Double) {
+    val ref = hierarchy.finalRefinements(beliefs.candidates(index))
+    var ri = 0
+    var i = 0
+    while(i < beliefs.candidates.length && ri < ref.length)  {
+      if(ref(ri) == beliefs.candidates(i)) {
+        beliefs.outside(i) = score
+        ri += 1
+      }
+      i += 1
+    }
+    assert(ri == ref.length)
+  }
+
+  override protected def updateHierarchyOutside(beliefs: Beliefs) {
+    var index = 0
+    val buf = new Array[Double](beliefs.candidates.size)
+    while(index < beliefs.candidates.size) {
+      val ref = hierarchy.finalRefinements(beliefs.candidates(index))
+      if(ref.nonEmpty) { // not the finest layer?
+        var ri = 0
+        var i = 0
+        while(i < beliefs.candidates.length && ri < ref.length)  {
+          if(ref(ri) == beliefs.candidates(i)) {
+            buf(ri) = beliefs.outside(i)
+            ri += 1
+          }
+          i += 1
+        }
+        beliefs.outside(index) = Numerics.logSum(buf,ri)
+      }
+      index += 1
     }
   }
 }

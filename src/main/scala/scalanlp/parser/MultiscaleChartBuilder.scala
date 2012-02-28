@@ -1,7 +1,8 @@
 package scalanlp.parser
 
-import scalanlp.util.Index
 import scalanlp.parser.ParseChart.Factory
+import scalanlp.util.{Encoder, Index}
+import collection.mutable.ArrayBuffer
 
 
 case class MultiscaleHierarchy[L](index: Index[L],
@@ -9,8 +10,35 @@ case class MultiscaleHierarchy[L](index: Index[L],
                                   oneStepRefinements: Array[Array[Int]],
                                   postorderTraversal: Array[Int]) {
   val maxOneStep = oneStepRefinements.iterator.map(_.length).max
+  def isFinestLevel(l: Int) = oneStepRefinements(l).length == 0
+  def isFinestLevel(l: L): Boolean = isFinestLevel(index(l))
 }
 
+object MultiscaleHierarchy {
+  def make[L](index: Index[L], oneStepProj: (L=>Option[L])) = {
+    val projections = Encoder.fromIndex(index).tabulateArray(oneStepProj)
+    val oneStepRefinements = Encoder.fromIndex(index).fillArray(new ArrayBuffer[Int])
+    for( (Some(coarser),finer) <- projections.zipWithIndex) {
+      oneStepRefinements(index(coarser)) += finer
+    }
+
+    val finalRefinements = Encoder.fromIndex(index).fillArray(null:Array[Int])
+    val postorder = new ArrayBuffer[Int]
+    def rec(lbl: Int) {
+      if (finalRefinements(lbl) eq null) {
+        if(oneStepRefinements(lbl).nonEmpty) {
+          oneStepRefinements(lbl) foreach rec
+          finalRefinements(lbl) = oneStepRefinements(lbl) map finalRefinements reduceLeft(_ ++ _)
+        } else {
+          finalRefinements(lbl) = Array(lbl)
+        }
+        postorder += lbl
+      }
+    }
+    (0 until index.size) foreach rec
+    MultiscaleHierarchy(index, finalRefinements, oneStepRefinements.map(_.toArray), postorder.toArray)
+  }
+}
 
 /**
  * 

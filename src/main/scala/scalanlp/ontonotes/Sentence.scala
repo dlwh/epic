@@ -31,7 +31,7 @@ case class Sentence(id: String,
   def features = words
   def label = tree
 
-  def stripTraces() = {
+  def stripTraces = {
     // walk the tree twice. first time patching everything except srl, which
     // has to be fixed later because of the indexed strategy
     val idMap = collection.mutable.Map[(Int,Int),(Int,Int)]()

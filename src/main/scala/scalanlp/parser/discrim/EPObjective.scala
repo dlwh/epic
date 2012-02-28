@@ -124,7 +124,7 @@ class EPObjective[L,L2,W](featurizers: Seq[Featurizer[L2,W]],
                                    t: BinarizedTree[L],
                                    words: Seq[W],
                                    spanScorer: SpanScorer[L2]):ExpectedCounts[W] = {
-    StateSplitting.expectedCounts(g,lexicon,t.map(indexedProjections.labels.refinementsOf _),words,spanScorer)
+    new StateSplitting(g,lexicon).expectedCounts(t.map(indexedProjections.labels.refinementsOf _),words,spanScorer)
   }
 
   def projectWeights(weights: DenseVector[Double], modelIndex: Int) = {

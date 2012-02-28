@@ -21,7 +21,6 @@ import scalanlp.serialization.DataSerialization
 import scalanlp.serialization.DataSerialization._
 import java.io.{StringReader, DataInput, DataOutput}
 import scalanlp.util.Lens
-;
 
 class Tree[+L](val label: L, val children: IndexedSeq[Tree[L]])(val span: Span) {
   def isLeaf = children.size == 0;
@@ -62,6 +61,7 @@ class Tree[+L](val label: L, val children: IndexedSeq[Tree[L]])(val span: Span) 
 
 
   def map[M](f: L=>M):Tree[M] = Tree( f(label), children map { _ map f})(span);
+  def extend[B](f: Tree[L]=>B):Tree[B] = Tree(f(this),children map { _ extend f})(span)
 
   def allChildren = preorder;
 
@@ -133,8 +133,9 @@ object Tree {
 }
 
 sealed trait BinarizedTree[+L] extends Tree[L] {
-  override def map[M](f: L=>M): BinarizedTree[M] = null; 
-  def extend[B](f: BinarizedTree[L]=>B):BinarizedTree[B]
+  override def map[M](f: L=>M): BinarizedTree[M] = null;
+  // have to override to trick scala to refine the type
+  override def extend[B](f: Tree[L]=>B):BinarizedTree[B] = {sys.error("...")}
   def relabelRoot[B>:L](f: L=>B):BinarizedTree[B]
 }
 
@@ -144,7 +145,7 @@ case class BinaryTree[+L](l: L,
                         ) extends Tree[L](l,IndexedSeq(leftChild,rightChild))(span
                         ) with BinarizedTree[L] {
   override def map[M](f: L=>M):BinaryTree[M] = BinaryTree( f(label), leftChild map f, rightChild map f)(span);
-  override def extend[B](f: BinarizedTree[L]=>B) = BinaryTree( f(this), leftChild extend f, rightChild extend f)(span);
+  override def extend[B](f: Tree[L]=>B) = BinaryTree( f(this), leftChild extend f, rightChild extend f)(span);
   def relabelRoot[B>:L](f: L=>B):BinarizedTree[B] = BinaryTree(f(label), leftChild,rightChild)(span)
 
 }
@@ -153,13 +154,13 @@ case class UnaryTree[+L](l: L, child: BinarizedTree[L])(span: Span
                         ) extends Tree[L](l,IndexedSeq(child))(span
                         ) with BinarizedTree[L] {
   override def map[M](f: L=>M): UnaryTree[M] = UnaryTree( f(label), child map f)(span);
-  override def extend[B](f: BinarizedTree[L]=>B) = UnaryTree( f(this), child extend f)(span);
+  override def extend[B](f: Tree[L]=>B) = UnaryTree( f(this), child extend f)(span);
   def relabelRoot[B>:L](f: L=>B):BinarizedTree[B] = UnaryTree(f(label), child)(span)
 }
 
 case class NullaryTree[+L](l: L)(span: Span) extends Tree[L](l,IndexedSeq.empty)(span) with BinarizedTree[L]{
   override def map[M](f: L=>M): NullaryTree[M] = NullaryTree( f(label))(span);
-  override def extend[B](f: BinarizedTree[L]=>B) = NullaryTree( f(this))(span);
+  override def extend[B](f: Tree[L]=>B) = NullaryTree( f(this))(span);
   def relabelRoot[B>:L](f: L=>B):BinarizedTree[B] = NullaryTree(f(label))(span)
 }
 

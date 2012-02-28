@@ -84,7 +84,7 @@ class LatentDiscrimObjective[L,L2,W](featurizer: Featurizer[L2,W],
     val lexicon = weightsToLexicon(indexedFeatures, grammarWeights)
     val parser = new CKYChartBuilder[LogProbabilityParseChart,L2,W](root, lexicon, grammar, ParseChart.logProb)
 
-    val otherWeights = weights.asCol(indexedFeatures.index.size until (indexedFeatures.index.size + numSpanWeights)) + 0.0
+    val otherWeights = if(numSpanWeights == 0) DenseVector.zeros[Double](0) else weights.asCol(indexedFeatures.index.size until (indexedFeatures.index.size + numSpanWeights)) + 0.0
     val actualBroker = weightedBroker.broker(grammar.labelIndex, grammar.index, otherWeights)
     Builder(parser,actualBroker)
   }
@@ -114,7 +114,7 @@ class LatentDiscrimObjective[L,L2,W](featurizer: Featurizer[L2,W],
 
   def countsToObjective(c: Counts) = {
     val counts = expectedCountsToFeatureVector(indexedFeatures, c._1)
-    val grad = DenseVector.vertcat(counts,c._2)
+    val grad = if(c._2.size == 0) counts else DenseVector.vertcat(counts,c._2)
     val obj = -c._1.logProb
     (obj,-grad)
   }
@@ -138,7 +138,7 @@ class LatentDiscrimObjective[L,L2,W](featurizer: Featurizer[L2,W],
     val composite = SpanScorer.sum(spanScorer,broker.spanForId(ti.id))
     val spanCounts = DenseVector.zeros[Double](numSpanWeights)
     val visitor = broker.ecountsVisitor(ti.id,spanCounts.data)
-    val ecounts = StateSplitting.expectedCounts(g,lexicon,ti.tree.map(indexedProjections.labels.refinementsOf _),ti.words,
+    val ecounts = new StateSplitting(g,lexicon).expectedCounts(ti.tree.map(indexedProjections.labels.refinementsOf _),ti.words,
       composite,spanVisitor=visitor)
 
     ecounts -> spanCounts

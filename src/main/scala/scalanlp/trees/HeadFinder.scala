@@ -129,10 +129,10 @@ class HeadFinder[L](rules: Map[L,Seq[HeadRule[L]]]) {
     answers.find(_ >= 0) getOrElse 0;
   }
 
-  def findHeadWordIndex(t: Tree[L]):Int = {
+  def findHeadWordIndex[F](t: Tree[F], proj: F=>L):Int = {
     if(t.isLeaf) t.span.start;
     else {
-      findHeadWordIndex(t.children(findHeadChild(t,identity[L])));
+      findHeadWordIndex(t.children(findHeadChild(t,proj)),proj);
     }
   }
 
@@ -143,8 +143,9 @@ class HeadFinder[L](rules: Map[L,Seq[HeadRule[L]]]) {
     }
   }
 
-  def findHeadWord[W](t: Tree[L], words: Seq[W]) = words(findHeadWordIndex(t));
+  def findHeadWord[W](t: Tree[L], words: Seq[W]) = words(findHeadWordIndex[L](t,identity _));
+  def findHeadWord[F,W](t: Tree[F], words: Seq[W], proj: F=>L) = words(findHeadWordIndex(t,proj));
 
-//  def annotateHeadWords[W](t: Tree[L], words: Seq[W]): Tree[(L,W)] = t.extend{tree => (tree.label,findHeadWord(tree,words)) }
+  def annotateHeadWords[W](t: Tree[L], words: Seq[W]): Tree[(L,W)] = t.extend{tree => (tree.label,findHeadWord(tree,words)) }
 
 }

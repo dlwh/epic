@@ -272,8 +272,8 @@ class LatentDiscEPModel[L,L2,W](proj: GrammarProjections[L,L2],
   def indexedFeatures = FeatureIndexer(featurizer,lexicon,proj)
 
   def treeExpectedCounts(builder: Builder, tree: BinarizedTree[L], w: Seq[W], scorer: SpanScorer[L2]) = {
-    StateSplitting.expectedCounts(builder.chartBuilder.grammar,
-      builder.chartBuilder.lexicon,tree.map(proj.labels.refinementsOf _),w,
+    new StateSplitting(builder.chartBuilder.grammar,
+      builder.chartBuilder.lexicon).expectedCounts(tree.map(proj.labels.refinementsOf _),w,
       scorer)
   }
 
