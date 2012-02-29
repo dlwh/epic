@@ -62,7 +62,7 @@ class DiscrimObjective[L,W](feat: Featurizer[L,W],
         case n@NullaryTree(a) =>
           val aI = g.labelIndex(a)
           val w = ti.words(n.span.start);
-          expectedCounts.wordCounts.getOrElseUpdate(aI)(w) += 1
+          expectedCounts.wordCounts(aI)(w) += 1
           visitor.visitSpan(t2.span.start,t2.span.end,aI, 1)
           score += lexicon.wordScore(g.labelIndex.get(aI), w) + ti.spanScorer.scoreSpan(t2.span.start,t2.span.end,aI)
       }

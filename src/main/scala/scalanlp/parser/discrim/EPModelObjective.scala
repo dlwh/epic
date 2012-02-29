@@ -160,7 +160,7 @@ class EPModelObjective[L,W](models: Seq[DiscEPModel[L,W]],
       sumVectorIntoResults(indexedFeatures.featuresFor(r),v)
 
     // lex
-    for( (a,ctr) <- ecounts.wordCounts; (w,v) <- ctr.nonzero.pairs) {
+    for( (ctr, a) <- ecounts.wordCounts.zipWithIndex; (w,v) <- ctr.nonzero.pairs) {
       val vec = indexedFeatures.featuresFor(a,w)
       sumVectorIntoResults(vec, v)
     }
@@ -251,7 +251,7 @@ class KMDiscEPModel[L,L3,W](proj: GrammarProjections[L,L3],
         case n@NullaryTree(a) =>
           val aI = g.labelIndex(a)
           val w = words(n.span.start);
-          expectedCounts.wordCounts.getOrElseUpdate(aI)(w) += 1
+          expectedCounts.wordCounts(aI)(w) += 1
           score += lexicon.wordScore(g.labelIndex.get(aI), w);
       }
     }

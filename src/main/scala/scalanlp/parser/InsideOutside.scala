@@ -1,6 +1,5 @@
 package scalanlp.parser
 
-import scalanlp.collection.mutable.SparseArrayMap
 import ParseChart._
 
 import InsideOutside._
@@ -49,8 +48,8 @@ class InsideOutside[L,W](val parser: ChartBuilder[LogProbabilityParseChart,L,W])
                                 outside: LogProbabilityParseChart[L],
                                 validSpan: SpanScorer[L],
                                 totalProb: Double,
-                                spanVisitor: AnchoredSpanVisitor): SparseArrayMap[Counter[W, Double]] = {
-    val wordCounts = grammar.labelEncoder.fillSparseArrayMap(Counter[W, Double]())
+                                spanVisitor: AnchoredSpanVisitor): Array[Counter[W, Double]] = {
+    val wordCounts = grammar.labelEncoder.fillArray(Counter[W, Double]())
     // handle lexical productions:
     for (i <- 0 until words.length) {
       val w = words(i)
@@ -59,7 +58,7 @@ class InsideOutside[L,W](val parser: ChartBuilder[LogProbabilityParseChart,L,W])
         val oScore = outside.bot.labelScore(i, i + 1, l)
         val count = exp(iScore + oScore - totalProb)
         if(spanVisitor ne AnchoredSpanVisitor.noOp) spanVisitor.visitSpan(i,i+1,l,count)
-        wordCounts.getOrElseUpdate(l)(w) += count
+        wordCounts(l)(w) += count
       }
     }
     wordCounts
@@ -146,11 +145,14 @@ class InsideOutside[L,W](val parser: ChartBuilder[LogProbabilityParseChart,L,W])
 object InsideOutside {
 
   final case class ExpectedCounts[W](ruleCounts: DenseVector[Double],
-                                     wordCounts: SparseArrayMap[Counter[W,Double]], // parent -> word -> counts
+                                     wordCounts: Array[Counter[W,Double]], // parent -> word -> counts
                                      var logProb: Double) {
 
     def this(g: Grammar[_]) = this(g.mkDenseVector(),
-      g.labelEncoder.fillSparseArrayMap(Counter[W,Double]()), 0.0)
+      g.labelEncoder.fillArray(Counter[W,Double]()), 0.0)
+
+    def this(numRules: Int, numLabels: Int) = this(DenseVector.zeros[Double](numRules),
+      Array.fill(numLabels)(Counter[W,Double]()), 0.0)
 
     def decode[L](g: Grammar[L]) = (decodeRules(g,ruleCounts), decodeWords(g,wordCounts))
 
@@ -159,8 +161,8 @@ object InsideOutside {
 
       this.ruleCounts += c.ruleCounts
 
-      for( (k,vec) <- wCounts) {
-        wordCounts.getOrElseUpdate(k) += vec
+      for( (vec, k) <- wCounts.iterator.zipWithIndex) {
+        wordCounts(k) += vec
       }
 
       logProb += tProb
@@ -172,8 +174,8 @@ object InsideOutside {
 
       this.ruleCounts -= c.ruleCounts
 
-      for( (k,vec) <- wCounts) {
-        wordCounts.getOrElseUpdate(k) -= vec
+      for( (vec,k) <- wCounts.iterator.zipWithIndex) {
+        wordCounts(k) -= vec
       }
 
       logProb -= tProb
@@ -200,9 +202,9 @@ object InsideOutside {
     (binaries,unaries)
   }
 
-  def decodeWords[L,W](g: Grammar[L], wordCounts: SparseArrayMap[Counter[W,Double]]) = {
+  def decodeWords[L,W](g: Grammar[L], wordCounts: Array[Counter[W,Double]]) = {
     val ctr = Counter2[L,W,Double]()
-    for( (i,c) <- wordCounts) {
+    for( (c,i) <- wordCounts.zipWithIndex) {
       ctr(g.labelIndex.get(i), ::) := c
     }
     ctr

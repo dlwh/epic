@@ -101,7 +101,7 @@ abstract class AbstractDiscriminativeObjective[L,L2,W](
 
     // lex
 
-    for( (a,ctr) <- ecounts.wordCounts; (w,v) <- ctr.nonzero.pairs) {
+    for( (ctr,a) <- ecounts.wordCounts.iterator.zipWithIndex; (w,v) <- ctr.nonzero.pairs) {
       val vec = indexedFeatures.featuresFor(a,w)
       sumVectorIntoResults(vec, v)
     }

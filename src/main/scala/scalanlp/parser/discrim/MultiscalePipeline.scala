@@ -304,7 +304,7 @@ class MultiscaleObjective[L,L2,W](featurizer: Featurizer[L2,W],
     val spanCounts = DenseVector.zeros[Double](numSpanWeights)
     val visitor = broker.ecountsVisitor(ti.id,spanCounts.data)
     val ecounts = new MultiscaleStateSplitting(g,lexicon,hierarchy).expectedCounts(ti.tree.map(indexedProjections.labels.refinementsOf _),ti.words,
-      composite,spanVisitor=visitor)
+      composite)
 
     ecounts -> spanCounts
 
