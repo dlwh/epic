@@ -23,16 +23,16 @@ class AnchoredRuleScorerTest  extends ParserTestHarness with FunSuite {
       val gent = gen(w);
       val scorer = f.mkSpanScorer(w);
       val xx = zero.buildInsideChart(w)
-      assert(!xx.top.labelScore(0,w.length,"").isInfinite)
+      assert(!xx.top.labelScore(0,w.length,"").isInfinite, "early")
       val ginside = zero.buildInsideChart(w,scorer);
-      assert(!ginside.top.labelScore(0,w.length,"").isInfinite)
+      assert(!ginside.top.labelScore(0,w.length,"").isInfinite, "mid")
       val goutside = zero.buildOutsideChart(ginside,scorer)
-      val scorer2 = fnext.buildSpanScorer(new ChartPair[ParseChart,String](ginside,goutside,scorer),ginside.top.labelScore(0,w.length,""))
+      val scorer2 = fnext.buildSpanScorer(new ChartPair[ParseChart,String](ginside,goutside,ginside.top.labelScore(0,w.length,""),scorer))
       val ginside2 = zero.buildInsideChart(w,scorer2);
       lazy val goutside2 = zero.buildOutsideChart(ginside2,scorer2);
       val tree = SimpleViterbiDecoder(ParserTestHarness.simpleGrammar).extractBestParse("",zero.grammar, ginside,goutside,w, scorer)
       val tree2 = SimpleViterbiDecoder(ParserTestHarness.simpleGrammar).extractBestParse("",zero.grammar, ginside2,goutside2,w, scorer)
-      assert(tree2 === tree);
+      assert(tree2 === tree, "late");
     } catch {
       case e: Exception =>
       throw new RuntimeException("Trouble with " + t.render(w),e);

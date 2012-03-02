@@ -136,13 +136,13 @@ abstract class ParseChart[L](val grammar: Encoder[L], val length: Int) extends S
 
 
     // right most place a left constituent with label l can start and end at position i
-    private val narrowLeft = Array.fill(length+1)(grammar.fillArray[Int](-1))
+    val narrowLeft = Array.fill(length+1)(grammar.fillArray[Int](-1))
     // left most place a left constituent with label l can start and end at position i
-    private val wideLeft = Array.fill(length+1)(grammar.fillArray[Int](length+1))
+    val wideLeft = Array.fill(length+1)(grammar.fillArray[Int](length+1))
     // left most place a right constituent with label l--which starts at position i--can end.
-    private val narrowRight = Array.fill(length+1)(grammar.fillArray[Int](length+1))
+    val narrowRight = Array.fill(length+1)(grammar.fillArray[Int](length+1))
     // right-most place a right constituent with label l--which starts at position i--can end.
-    private val wideRight = Array.fill(length+1)(grammar.fillArray[Int](-1))
+    val wideRight = Array.fill(length+1)(grammar.fillArray[Int](-1))
   }
 
 

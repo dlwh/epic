@@ -31,7 +31,7 @@ class AnchoredRuleApproximator[C,F,W](fineParser: ChartBuilder[LogProbabilityPar
     } else {
       GoldTagPolicy.noGoldTags[C]
     }
-    factory.buildSpanScorer(new ChartPair[ParseChart,F](inside, outside,spanScorer),  partition, pruner)
+    factory.buildSpanScorer(new ChartPair[ParseChart,F](inside, outside, partition, spanScorer), pruner)
   }
 
   def divide(num: SpanScorer[C], denom: SpanScorer[C], words: Seq[W]):SpanScorer[C] ={

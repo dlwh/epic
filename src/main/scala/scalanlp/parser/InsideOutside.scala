@@ -37,10 +37,9 @@ class InsideOutside[L,W](val parser: ChartBuilder[LogProbabilityParseChart,L,W])
                      totalProb: Double, validSpan: SpanScorer[L],
                      spanVisitor: AnchoredSpanVisitor) = {
     val wordCounts = computeWordCounts(words, inside, outside, validSpan, totalProb, spanVisitor)
-    val ruleCounts = computeBinaryCounts(words, inside, outside, validSpan, totalProb, spanVisitor)
-    val unaryRuleCounts = computeUnaryCounts(words, inside, outside, validSpan, totalProb, spanVisitor)
+    val ruleCounts = computeRuleCounts(words, inside, outside, validSpan, totalProb, spanVisitor)
 
-    ExpectedCounts(ruleCounts + unaryRuleCounts, wordCounts, totalProb)
+    ExpectedCounts(ruleCounts, wordCounts, totalProb)
   }
 
   private def computeWordCounts(words: scala.Seq[W],
@@ -64,59 +63,75 @@ class InsideOutside[L,W](val parser: ChartBuilder[LogProbabilityParseChart,L,W])
     wordCounts
   }
 
-  private def computeBinaryCounts(words: scala.Seq[W],
+  private def computeRuleCounts(words: scala.Seq[W],
                                   inside: LogProbabilityParseChart[L],
                                   outside: LogProbabilityParseChart[L],
                                   validSpan: SpanScorer[L],
                                   totalProb: Double,
                                   spanVisitor: AnchoredSpanVisitor = AnchoredSpanVisitor.noOp) = {
     val ruleCounts = grammar.mkDenseVector()
+    val data = ruleCounts.data
     // handle binary rules
     for{
       span <- 2 to words.length
       begin <- 0 to (words.length - span)
-      end = begin + span
-      a <- inside.bot.enteredLabelIndexes(begin,end)
     } {
-      var i = 0;
-      val rules = grammar.indexedBinaryRulesWithParent(a)
-      val spanScore = validSpan.scoreSpan(begin,end,a)
-      while(i < rules.length) {
-        val r = rules(i)
-        val b = grammar.leftChild(r)
-        val c = grammar.rightChild(r)
-        val ruleScore = grammar.ruleScore(r)
-        i += 1
-        val feasibleSpan = inside.top.feasibleSpanX(begin, end, b, c)
-        var split = (feasibleSpan >> 32).toInt
-        val endSplit = feasibleSpan.toInt // lower 32 bits
-        var selfScore = 0.0
-        while(split < endSplit) {
-          val bScore = inside.top.labelScore(begin, split, b)
-          val cScore = inside.top.labelScore(split, end, c)
-          val aScore = outside.bot.labelScore(begin, end, a)
-          val rScore = ruleScore + validSpan.scoreBinaryRule(begin,split,end,r) + spanScore
-          val prob = exp(bScore + cScore + aScore + rScore - totalProb)
-          if(spanVisitor ne AnchoredSpanVisitor.noOp) spanVisitor.visitBinaryRule(begin,split,end,r,prob)
-          if(prob != 0.0) {
-            selfScore += prob
+      val end = begin + span
+
+      val narrowRight = inside.top.narrowRight(begin)
+      val narrowLeft = inside.top.narrowLeft(end)
+      val wideRight = inside.top.wideRight(begin)
+      val wideLeft = inside.top.wideLeft(end)
+
+      for(a <- inside.bot.enteredLabelIndexes(begin,end)) {
+        var i = 0;
+        val rules = grammar.indexedBinaryRulesWithParent(a)
+        val spanScore = validSpan.scoreSpan(begin,end,a)
+        while(i < rules.length) {
+          val r = rules(i)
+          val b = grammar.leftChild(r)
+          val c = grammar.rightChild(r)
+          val ruleScore = grammar.ruleScore(r)
+          i += 1
+
+          // this is too slow, so i'm having to inline it.
+          //              val feasibleSpan = itop.feasibleSpanX(begin, end, b, c)
+          val narrowR = narrowRight(b)
+          val narrowL = narrowLeft(c)
+
+          val feasibleSpan = if (narrowR >= end || narrowL < narrowR) {
+            0L
+          } else {
+            val trueX = wideLeft(c)
+            val trueMin = if(narrowR > trueX) narrowR else trueX
+            val wr = wideRight(b)
+            val trueMax = if(wr < narrowL) wr else narrowL
+            if(trueMin > narrowL || trueMin > trueMax)  0L
+            else ((trueMin:Long) << 32) | ((trueMax + 1):Long)
           }
-          split += 1
+
+          var split = (feasibleSpan >> 32).toInt
+          val endSplit = feasibleSpan.toInt // lower 32 bits
+          var selfScore = 0.0
+          while(split < endSplit) {
+            val bScore = inside.top.labelScore(begin, split, b)
+            val cScore = inside.top.labelScore(split, end, c)
+            val aScore = outside.bot.labelScore(begin, end, a)
+            val rScore = ruleScore + validSpan.scoreBinaryRule(begin,split,end,r) + spanScore
+            val prob = exp(bScore + cScore + aScore + rScore - totalProb)
+            if(spanVisitor ne AnchoredSpanVisitor.noOp) spanVisitor.visitBinaryRule(begin,split,end,r,prob)
+            if(prob != 0.0) {
+              selfScore += prob
+            }
+            split += 1
+          }
+          data(r) += selfScore
+          if(spanVisitor ne AnchoredSpanVisitor.noOp) spanVisitor.visitSpan(begin,end,a,selfScore)
         }
-        ruleCounts(r) += selfScore
-        if(spanVisitor ne AnchoredSpanVisitor.noOp) spanVisitor.visitSpan(begin,end,a,selfScore)
       }
     }
-    ruleCounts
-  }
 
-  private def computeUnaryCounts(words: scala.Seq[W],
-                                 inside: LogProbabilityParseChart[L],
-                                 outside: LogProbabilityParseChart[L],
-                                 validSpan: SpanScorer[L],
-                                 totalProb: Double,
-                                 spanVisitor: AnchoredSpanVisitor = AnchoredSpanVisitor.noOp) = {
-    val ruleCounts = grammar.mkDenseVector()
+    // Unaries
     // TODO: only iterate over observed counts
     for{
       span <- 1 to words.length
@@ -131,7 +146,7 @@ class InsideOutside[L,W](val parser: ChartBuilder[LogProbabilityParseChart,L,W])
       val rScore = grammar.ruleScore(r) + validSpan.scoreUnaryRule(begin,end,r);
       val prob = exp(bScore + aScore + rScore - totalProb);
       if(prob != 0.0) {
-        ruleCounts(r) += prob
+        data(r) += prob
         if(spanVisitor ne AnchoredSpanVisitor.noOp) spanVisitor.visitUnaryRule(begin,end,r,prob)
       }
     }

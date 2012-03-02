@@ -101,6 +101,7 @@ class EPParser[L,W](val parsers: Seq[EPModel[L,W]#Builder], coarseParser: ChartB
     var changed = true
 
     var lastF0 = currentF0
+    var lastIter = 0
     for(i <- 0 until maxEPIterations if changed) {
       lastF0 = currentF0
       for( (marg,m) <- marginals.zipWithIndex) {
@@ -130,7 +131,9 @@ class EPParser[L,W](val parsers: Seq[EPModel[L,W]#Builder], coarseParser: ChartB
         assert(!maxChange.isNaN)
         changed = maxChange.abs > 1E-4
       }
+      lastIter = i
     }
+    print(lastIter)
 
     val f0Partition = (f0Builder.buildInsideChart(words, currentF0).top.labelScore(0,words.length,f0Builder.root))
     val partition = marginals.map(_.partition).sum + f0Partition
@@ -170,7 +173,8 @@ class EPParser[L,W](val parsers: Seq[EPModel[L,W]#Builder], coarseParser: ChartB
         val EPResult(parserDatas,partition,f0) = buildAllCharts(w,spanScorer)
         val f0Inside = f0Builder.buildInsideChart(w,SpanScorer.sum(spanScorer,f0))
         val f0Outside = f0Builder.buildOutsideChart(f0Inside,SpanScorer.sum(spanScorer,f0))
-        new ChartPair[ParseChart,L](f0Inside,f0Outside,SpanScorer.sum(spanScorer,f0))
+        val f0Partition = f0Inside.top.labelScore(0,f0Inside.length,f0Builder.root)
+        new ChartPair[ParseChart,L](f0Inside,f0Outside,f0Partition,SpanScorer.sum(spanScorer,f0))
       }
 
       def decoder = f0Decoder

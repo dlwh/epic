@@ -1,10 +1,9 @@
 package scalanlp.parser
 package projections
 
-import scalanlp.collection.mutable.TriangularArray
 import java.io._
+import scalanlp.collection.mutable.{OpenAddressHashArray, TriangularArray}
 import scalanlp.tensor.sparse.OldSparseVector
-
 
 /**
  * Creates labeled span scorers for a set of trees from some parser. Projects from L to C.
@@ -18,10 +17,11 @@ class AnchoredRuleScorerFactory[C,L,W](val coarseGrammar: Grammar[C],
   private def normalize(ruleScores: OldSparseVector, totals: OldSparseVector):OldSparseVector = {
     if(ruleScores eq null) null
     else {
-      val r = new OldSparseVector(ruleScores.length,Double.NegativeInfinity,ruleScores.activeSize)
-      for( (rule,score) <- ruleScores.activeIterator) {
+      val r = new OldSparseVector(ruleScores.length,Double.NegativeInfinity, ruleScores.activeSize * 3 / 2)
+      for( (rule,score) <- ruleScores.pairsIterator) {
         val parent = indexedProjections.labels.coarseIndex(indexedProjections.rules.coarseIndex.get(rule).parent)
-        r(rule) = math.log(score) - math.log(totals(parent))
+        if(score > 0)
+          r(rule) = math.log(score) - math.log(totals(parent))
 //        r(rule) = score - totals(parent)
       }
       r
@@ -55,8 +55,8 @@ class AnchoredRulePosteriorScorerFactory[C,L,W](coarseGrammar: Grammar[C],
   private def normalize(ruleScores: OldSparseVector):OldSparseVector = {
     if(ruleScores eq null) null
     else {
-      val r = new OldSparseVector(ruleScores.length,Double.NegativeInfinity,ruleScores.activeSize)
-      for( (rule,score) <- ruleScores.activeIterator) {
+      val r = new OldSparseVector(ruleScores.length, Double.NegativeInfinity, ruleScores.activeSize)
+      for( (rule,score) <- ruleScores.pairsIterator) {
         val parent = indexedProjections.labels.coarseIndex(indexedProjections.rules.coarseIndex.get(rule).parent)
         r(rule) = math.log(score)
 //        r(rule) = score - totals(parent)

@@ -19,8 +19,7 @@ class LatentParserModel[L,L2,W](featurizer: Featurizer[L2,W],
                                 proj: GrammarProjections[L,L2],
                                 knownTagWords: Iterable[(L2,W)],
                                 openTags: Set[L2],
-                                closedWords: Set[W]) extends Model[TreeInstance[L,W]] {
-  type ExpectedCounts = ParserExpectedCounts[W]
+                                closedWords: Set[W]) extends AbstractParserModel[L,L2,W] {
   type Inference = LatentParserInference[L,L2, W]
 
   val indexedFeatures: FeatureIndexer[L2, W]  = FeatureIndexer(featurizer, knownTagWords, proj)
@@ -72,36 +71,20 @@ class LatentParserModel[L,L2,W](featurizer: Featurizer[L2,W],
 }
 
 case class LatentParserInference[L,L2,W](builder: ChartBuilder[LogProbabilityParseChart,L2,W],
-                                    proj: GrammarProjections[L,L2]) extends Inference[TreeInstance[L,W],ParserExpectedCounts[W]] {
-  def expectedCounts(d: TreeInstance[L, W]) = {
-    val projected = new ProjectingSpanScorer(proj,d.spanScorer)
-    ParserExpectedCounts(wordsToExpectedCounts(d,projected) -= treeToExpectedCounts(d, projected))
-  }
-  def wordsToExpectedCounts(ti: TreeInstance[L,W],
-                            spanScorer: SpanScorer[L2] = SpanScorer.identity) = {
-    val ecounts = new InsideOutside(builder).expectedCounts(ti.words,spanScorer)
-    ecounts
-  }
+                                         projections: GrammarProjections[L,L2]) extends ParserInference[L,L2,W] {
 
-  // these expected counts are in normal space, not log space.
-  def treeToExpectedCounts(ti: TreeInstance[L,W],
-                           spanScorer: SpanScorer[L2] = SpanScorer.identity) = {
+  // E[T-z|T,params]
+  def goldCounts(ti: TreeInstance[L,W], spanScorer: SpanScorer[L]) = {
+    val projected = new ProjectingSpanScorer(projections,spanScorer)
     val ecounts = new StateSplitting(
       builder.grammar,
-      builder.lexicon).expectedCounts(ti.tree.map(proj.labels.refinementsOf _),ti.words,spanScorer)
+      builder.lexicon).expectedCounts(ti.tree.map(projections.labels.refinementsOf _),ti.words,projected)
 
-    ecounts
-  }
-}
-
-case class ParserExpectedCounts[W](trueCounts: TrueCounts[W]) extends ExpectedCounts[ParserExpectedCounts[W]] {
-  def +=(other: ParserExpectedCounts[W]) = {
-    trueCounts += other.trueCounts
-    this
+    new ParserExpectedCounts(ecounts)
   }
 
-  def loss = trueCounts.logProb
 }
+
 
 object LatentPipeline extends ParserPipeline {
   case class Params(parser: ParserParams.BaseParser[String],

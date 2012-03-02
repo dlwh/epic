@@ -1,26 +1,24 @@
 package scalanlp.parser.epic
 
-import scalala.tensor.dense.DenseVector
 import scalanlp.optimize.BatchDiffFunction
 import scalanlp.util.Index
 import collection.GenTraversable
 import scalala.tensor.sparse.SparseVector
-
-trait Inference[Datum,ExpectedCounts] extends Serializable {
-  def expectedCounts(datum: Datum):ExpectedCounts
-}
+import scalala.tensor.dense.{DenseVectorCol, DenseVector}
 
 
-trait Model[Datum] {
+trait Model[Datum] { self =>
   type ExpectedCounts <: scalanlp.parser.epic.ExpectedCounts[ExpectedCounts]
-  type Inference <: scalanlp.parser.epic.Inference[Datum,ExpectedCounts]
+  type Inference <: scalanlp.parser.epic.Inference[Datum] {
+    type ExpectedCounts = self.ExpectedCounts
+  }
 
   def numFeatures: Int
 
   def inferenceFromWeights(weights: DenseVector[Double]):Inference
 
   def emptyCounts: ExpectedCounts
-  def expectedCountsToObjective(ecounts: ExpectedCounts):(Double,DenseVector[Double])
+  def expectedCountsToObjective(ecounts: ExpectedCounts):(Double,DenseVectorCol[Double])
 }
 /**
  * 
@@ -56,8 +54,8 @@ class ModelObjective[Datum](val model: Model[Datum],
   }
 }
 
-
 trait ExpectedCounts[Self<:ExpectedCounts[Self]] { this:Self =>
   def +=(other: Self):Self
+  def -=(other: Self):Self
   def loss: Double
 }

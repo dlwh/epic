@@ -86,6 +86,10 @@ class CKYChartBuilder[Chart[X]<:ParseChart[X], L,W](val root: L,
       begin <- 0 to (s.length - span)
       end = begin + span
     } {
+      val narrowRight = top.narrowRight(begin)
+      val narrowLeft = top.narrowLeft(end)
+      val wideRight = top.wideRight(begin)
+      val wideLeft = top.wideLeft(end)
       for ( a <- 0 until grammar.labelIndex.size) {
         val passScore = validSpan.scoreSpan(begin,end,a)
         var offset = 0 // into scoreArray
@@ -98,7 +102,22 @@ class CKYChartBuilder[Chart[X]<:ParseChart[X], L,W](val root: L,
             val c = grammar.rightChild(r)
             val ruleScore = grammar.ruleScore(r)
             ruleIndex += 1
+            /* unfortunately this line is a bottleneck, so i'm inlining it. ugh.
             val feasibleSpan = top.feasibleSpanX(begin, end, b, c)
+            */
+            val narrowR = narrowRight(b)
+            val narrowL = narrowLeft(c)
+
+            val feasibleSpan = if (narrowR >= end || narrowL < narrowR) {
+              0L
+            } else {
+              val trueX = wideLeft(c)
+              val trueMin = if(narrowR > trueX) narrowR else trueX
+              val wr = wideRight(b)
+              val trueMax = if(wr < narrowL) wr else narrowL
+              if(trueMin > narrowL || trueMin > trueMax)  0L
+              else ((trueMin:Long) << 32) | ((trueMax + 1):Long)
+            }
             var split = (feasibleSpan >> 32).toInt
             val endSplit = feasibleSpan.toInt // lower 32 bits
             while(split < endSplit) {
@@ -138,6 +157,10 @@ class CKYChartBuilder[Chart[X]<:ParseChart[X], L,W](val root: L,
       begin <- 0 to (length-span)
     } {
       val end = begin + span
+      val narrowRight = itop.narrowRight(begin)
+      val narrowLeft = itop.narrowLeft(end)
+      val wideRight = itop.wideRight(begin)
+      val wideLeft = itop.wideLeft(end)
       updateOutsideUnaries(outside,inside, begin,end, validSpan)
       if(span > 1)
         // a ->  bc  [begin,split,end)
@@ -152,7 +175,21 @@ class CKYChartBuilder[Chart[X]<:ParseChart[X], L,W](val root: L,
               val c = grammar.rightChild(r)
               val ruleScore = grammar.ruleScore(r)
               br += 1
-              val feasibleSpan = itop.feasibleSpanX(begin, end, b, c)
+              // this is too slow, so i'm having to inline it.
+//              val feasibleSpan = itop.feasibleSpanX(begin, end, b, c)
+              val narrowR = narrowRight(b)
+              val narrowL = narrowLeft(c)
+
+              val feasibleSpan = if (narrowR >= end || narrowL < narrowR) {
+                0L
+              } else {
+                val trueX = wideLeft(c)
+                val trueMin = if(narrowR > trueX) narrowR else trueX
+                val wr = wideRight(b)
+                val trueMax = if(wr < narrowL) wr else narrowL
+                if(trueMin > narrowL || trueMin > trueMax)  0L
+                else ((trueMin:Long) << 32) | ((trueMax + 1):Long)
+              }
               var split = (feasibleSpan >> 32).toInt
               val endSplit = feasibleSpan.toInt // lower 32 bits
               while(split < endSplit) {

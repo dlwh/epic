@@ -1,9 +1,9 @@
 package scalanlp.parser
 
 import projections.{AnchoredRuleProjector, AnchoredRuleScorer}
-import scalanlp.collection.mutable.TriangularArray
-import scalanlp.tensor.sparse.OldSparseVector
 import scalala.library.Numerics
+import scalanlp.collection.mutable.{OpenAddressHashArray, TriangularArray}
+import scalanlp.tensor.sparse.OldSparseVector
 
 /**
  * CachingSpanScorerFactory essentially just rencodes a SpanScorer into a possibly more efficient representation.

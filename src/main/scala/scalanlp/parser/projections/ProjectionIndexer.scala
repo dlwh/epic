@@ -8,7 +8,7 @@ import collection.mutable.ArrayBuffer
  * @author dlwh
  */
 @SerialVersionUID(1)
-class ProjectionIndexer[C,F] private (val coarseIndex: Index[C],
+final class ProjectionIndexer[C,F] private (val coarseIndex: Index[C],
                                       val fineIndex:Index[F], indexedProjections: Array[Int]) extends (Int=>Int) with Serializable {
   val coarseEncoder = Encoder.fromIndex(coarseIndex);
 

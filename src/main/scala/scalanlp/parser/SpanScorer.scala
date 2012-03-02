@@ -24,6 +24,7 @@ trait SpanScorer[T] extends Serializable {
    * "bottom" label. Typically it is used to filter out impossible rules (using Double.NegativeInfinity)
    */
   def scoreSpan(begin: Int, end: Int, tag: Int): Double;
+
 }
 
 object SpanScorer {

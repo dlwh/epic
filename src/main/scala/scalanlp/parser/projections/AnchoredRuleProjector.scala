@@ -1,11 +1,11 @@
 package scalanlp.parser
 package projections
 
-import scalanlp.collection.mutable.TriangularArray
 import scalala.library.Numerics
 import scalanlp.trees.BinarizedTree
-import scalanlp.tensor.sparse.OldSparseVector
 import sun.misc.Unsafe
+import scalanlp.collection.mutable.{OpenAddressHashArray, TriangularArray}
+import scalanlp.tensor.sparse.OldSparseVector
 
 /**
  * Used for computed the expected number of anchored rules that occur at each span/split.
@@ -17,7 +17,6 @@ class AnchoredRuleProjector[C,L,W](coarseGrammar: Grammar[C],
                                    indexedProjections: GrammarProjections[C,L], threshold: Double) extends Serializable {
 
 
-
   /**
    * Projects an inside and outside chart to anchored rule posteriors.
    *
@@ -27,11 +26,10 @@ class AnchoredRuleProjector[C,L,W](coarseGrammar: Grammar[C],
    * @param scorer: scorer used to produce this tree.
    * @param pruneLabel should return a threshold to determine if we need to prune. (prune if posterior <= threshold) See companion object for good choices.
    */
-  def projectRulePosteriors(inside: ParseChart[L],
-                            outside: ParseChart[L],
-                            sentProb: Double,
-                            scorer: SpanScorer[L]=SpanScorer.identity,
+  def projectRulePosteriors(charts: ChartPair[ParseChart, L],
                             goldTagPolicy: GoldTagPolicy[C] = GoldTagPolicy.noGoldTags[C]):AnchoredRuleProjector.AnchoredData = {
+
+    val ChartPair(inside,outside,sentProb,scorer) = charts
 
 
     // preliminaries: we're not going to fill in everything: some things will be null.
@@ -40,11 +38,11 @@ class AnchoredRuleProjector[C,L,W](coarseGrammar: Grammar[C],
     val numProjectedRules = indexedProjections.rules.coarseIndex.size;
     def projFill[T>:Null<:AnyRef:ClassManifest]() = Array.fill[T](numProjectedLabels)(null);
     def projVector() = {
-      new OldSparseVector(numProjectedLabels,0.0, 0);
+      new OldSparseVector(numProjectedLabels, 0.0);
     }
 
     def projRuleVector() = {
-      new OldSparseVector(numProjectedRules, 0.0, 0);
+      new OldSparseVector(numProjectedRules, 0.0);
     }
 
     def getOrElseUpdate[T<:AnyRef](arr: Array[T], i: Int, t : =>T) = {
@@ -87,6 +85,10 @@ class AnchoredRuleProjector[C,L,W](coarseGrammar: Grammar[C],
       for(begin <- 0 until (inside.length - diff + 1)) {
         val end = begin + diff;
         val index = TriangularArray.index(begin,end);
+        val narrowRight = inside.top.narrowRight(begin)
+        val narrowLeft = inside.top.narrowLeft(end)
+        val wideRight = inside.top.wideRight(begin)
+        val wideLeft = inside.top.wideLeft(end)
 
         // do binaries
         for( parent <- inside.bot.enteredLabelIndexes(begin,end)) {
@@ -106,7 +108,24 @@ class AnchoredRuleProjector[C,L,W](coarseGrammar: Grammar[C],
               val pR = indexedProjections.rules.project(r)
               ruleIndex += 1
 
-              for(split <- inside.top.feasibleSpan(begin, end, b, c)) {
+              // this is too slow, so i'm having to inline it.
+//              val feasibleSpan = itop.feasibleSpanX(begin, end, b, c)
+              val narrowR = narrowRight(b)
+              val narrowL = narrowLeft(c)
+
+              val feasibleSpan = if (narrowR >= end || narrowL < narrowR) {
+                0L
+              } else {
+                val trueX = wideLeft(c)
+                val trueMin = if(narrowR > trueX) narrowR else trueX
+                val wr = wideRight(b)
+                val trueMax = if(wr < narrowL) wr else narrowL
+                if(trueMin > narrowL || trueMin > trueMax)  0L
+                else ((trueMin:Long) << 32) | ((trueMax + 1):Long)
+              }
+              var split = (feasibleSpan >> 32).toInt
+              val endSplit = feasibleSpan.toInt // lower 32 bits
+              while(split < endSplit) {
                 // P(sAt->sBu uCt | sAt) \propto \sum_{latent} O(A-x,s,t) r(A-x ->B-y C-z) I(B-y,s,u) I(C-z, s, u)
                 val bScore = inside.top.labelScore(begin,split,b)
                 val cScore = inside.top.labelScore(split, end, c)
@@ -125,13 +144,17 @@ class AnchoredRuleProjector[C,L,W](coarseGrammar: Grammar[C],
                       binaryScores(index)(split-begin)
                     }
                     val count = math.exp(currentScore)
-                    parentArray(pR) += count
-                    total += count
+                    if(count > 0.0) {
+                      parentArray(pR) += count
+                      total += count
+                    }
+                    assert(count >= 0,pP)
 //                    parentArray(pR) = Numerics.logSum(parentArray(pR),currentScore)
 //                    total = Numerics.logSum(total,currentScore)
                   }
                 }
 
+                split += 1
               }
             }
           }
@@ -141,6 +164,7 @@ class AnchoredRuleProjector[C,L,W](coarseGrammar: Grammar[C],
               totals(index) = projVector;
             }
             totals(index)(pP) += total
+            assert(total >= 0,pP)
           }
         }
 

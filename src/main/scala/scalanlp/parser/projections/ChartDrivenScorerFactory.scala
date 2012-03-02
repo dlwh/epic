@@ -20,7 +20,7 @@ abstract class ChartDrivenScorerFactory[C,L,W](coarseGrammar: Grammar[C],
       sys.error("Couldn't parse " + s + " " + sentProb)
     }
 
-    val chartScorer = buildSpanScorer(charts,sentProb);
+    val chartScorer = buildSpanScorer(charts, goldTag);
 
     chartScorer;
   }
@@ -30,13 +30,11 @@ abstract class ChartDrivenScorerFactory[C,L,W](coarseGrammar: Grammar[C],
   type MyScorer <:SpanScorer[C]
 
   def buildSpanScorer(charts: ChartPair[ParseChart,L],
-                      sentProb: Double,
                       goldTagPolicy: GoldTagPolicy[C] = GoldTagPolicy.noGoldTags[C]):MyScorer = {
-    import charts._
 
-    val ruleData = proj.projectRulePosteriors(inside,outside,sentProb,scorer,goldTagPolicy);
+    val ruleData = proj.projectRulePosteriors(charts,goldTagPolicy);
 
-    createSpanScorer(ruleData, sentProb);
+    createSpanScorer(ruleData, charts.partition);
   }
 
   protected def createSpanScorer(ruleData: AnchoredRuleProjector.AnchoredData, sentProb: Double):MyScorer;
