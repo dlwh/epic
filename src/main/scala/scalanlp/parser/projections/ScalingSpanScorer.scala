@@ -29,10 +29,10 @@ object ScalingSpanScorer {
 
     def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = {
       val ns = num.scoreBinaryRule(begin, split, end, rule)
-      if(ns == Double.NegativeInfinity) ns
+      if (ns == Double.NegativeInfinity) ns
       else {
         val ds = denom.scoreBinaryRule(begin, split, end, rule)
-        if(ns == Double.NegativeInfinity || ds == Double.NegativeInfinity) Double.NegativeInfinity;
+        if (ds == Double.NegativeInfinity) Double.NegativeInfinity;
         else ns - ds
       }
     }

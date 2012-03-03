@@ -88,11 +88,11 @@ case class EPInference[Datum, Augment](inferences: IndexedSeq[ProjectableInferen
     EPExpectedCounts(counts.foldLeft(0.0){_ + _.loss}, counts)
   }
 
-  def guessCounts(datum: Datum, augment: Augment) = {
+  def getMarginals(datum: Datum, augment: Augment) = {
     val marginals = ArrayBuffer.fill(inferences.length)(null.asInstanceOf[ProjectableInference[Datum, Augment]#Marginal])
     def project(q: Augment, i: Int) = {
       val inf = inferences(i)
-      val (marg,contributionToLikelihood) = inf.marginal(datum,augment)
+      val (marg,contributionToLikelihood) = inf.marginal(datum,q)
       val newAugment = inf.project(datum,marg,q)
       marginals(i) = marg
       newAugment -> contributionToLikelihood
@@ -110,13 +110,17 @@ case class EPInference[Datum, Augment](inferences: IndexedSeq[ProjectableInferen
         converged = (s.logPartition - state.logPartition).abs/math.max(s.logPartition,state.logPartition) < 1E-4
       }
       iter += 1
-      print(iter +" ")
       state = s
     }
+    print(iter +" ")
 
-    val partition = state.logPartition
+    (state.logPartition, state.q, marginals, state.f_~)
+  }
 
-    val finalCounts = for( ((inf,f_~),i) <- (inferences zip state.f_~).zipWithIndex) yield {
+  def guessCounts(datum: Datum, augment: Augment) = {
+    val (partition, finalAugment, marginals, f_~) = getMarginals(datum,augment)
+
+    val finalCounts = for( ((inf,f_~),i) <- (inferences zip f_~).zipWithIndex) yield {
       val marg = marginals(i)
       val augment = f_~
       inf.guessCountsFromMarginals(datum, marg.asInstanceOf[inf.Marginal], augment)
@@ -184,14 +188,16 @@ object EPPipeline extends ParserPipeline {
       val weights = state.x
       if(iter % iterPerValidate == 0) {
         println("Validating...")
-        val parser = model.extractParser(state.x.asCol.apply(0 until model.numFeatures))
+        val inf = epModel.inferenceFromWeights(state.x)
+        val parser = EPParserExtractor.extractEPParser(inf,SimpleChartParser(projector.zero))
         println(validate(parser))
       }
     }
 
     for( (state,iter) <- params.opt.iterations(cachedObj,init).take(maxIterations).zipWithIndex.tee(evalAndCache _)
          if iter != 0 && iter % iterationsPerEval == 0) yield try {
-      val parser = model.extractParser(state.x.asCol.apply(0 until model.numFeatures))
+      val inf = epModel.inferenceFromWeights(state.x)
+      val parser = EPParserExtractor.extractEPParser(inf,SimpleChartParser(projector.zero))
       ("LatentDiscrim-" + iter.toString,parser)
     } catch {
       case e => println(e);e.printStackTrace(); throw e

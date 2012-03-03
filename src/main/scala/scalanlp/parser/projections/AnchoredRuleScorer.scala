@@ -18,8 +18,8 @@ class AnchoredRuleScorerFactory[C,L,W](val coarseGrammar: Grammar[C],
     if(ruleScores eq null) null
     else {
       val r = new OldSparseVector(ruleScores.length,Double.NegativeInfinity, ruleScores.activeSize * 3 / 2)
-      for( (rule,score) <- ruleScores.pairsIterator) {
-        val parent = indexedProjections.labels.coarseIndex(indexedProjections.rules.coarseIndex.get(rule).parent)
+      for( (rule,score) <- ruleScores.activeIterator) {
+        val parent = coarseGrammar.parent(rule)
         if(score > 0)
           r(rule) = math.log(score) - math.log(totals(parent))
 //        r(rule) = score - totals(parent)

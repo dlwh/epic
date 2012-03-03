@@ -50,7 +50,7 @@ case class ParserComponentInference[L,L2,W](inference: ParserInference[L,L2,W],
   }
 }
 
-case class SpanScorerFactor[L,W](f0Builder: CKYChartBuilder[LogProbabilityParseChart,L,W],
+case class SpanScorerFactor[L,W](f0Builder: ChartBuilder[LogProbabilityParseChart,L,W],
                                  words: Seq[W],
                                  scorer: SpanScorer[L]) extends Factor[SpanScorerFactor[L, W]] {
   def *(f: SpanScorerFactor[L, W]) = copy(scorer=SpanScorer.sum(scorer,f.scorer))
@@ -137,4 +137,17 @@ class AnchoredRuleApproximator[C,F,W](val coarseParser: ChartBuilder[LogProbabil
     factory.buildSpanScorer(marginal, pruner)
   }
 
+}
+
+object EPParserExtractor {
+  def extractEPParser[L,W](model: EPInference[TreeInstance[L,W],SpanScorerFactor[L,W]], zeroParser: SimpleChartParser[L,L,W]):Parser[L,W] = {
+    new Parser[L,W] {
+      def bestParse(s: Seq[W], spanScorer: SpanScorer[L]) = {
+        val inst = new TreeInstance("",null,s,spanScorer)
+        val augment = model.getMarginals(inst,new SpanScorerFactor(zeroParser.builder.withCharts(ParseChart.logProb),s,spanScorer))._2
+        zeroParser.bestParse(s,augment.scorer)
+      }
+    }
+
+  }
 }
