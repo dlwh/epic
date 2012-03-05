@@ -123,9 +123,7 @@ object ProjectTreebankToConstraints {
   }
 
   def loadParser[T](loc: File) = {
-    val oin = new ObjectInputStream(new BufferedInputStream(new FileInputStream(loc)))
-    val parser = oin.readObject().asInstanceOf[SimpleChartParser[String,T,String]]
-    oin.close()
+    val parser = scalanlp.util.readObject[SimpleChartParser[String,T,String]](loc)
     parser
   }
 

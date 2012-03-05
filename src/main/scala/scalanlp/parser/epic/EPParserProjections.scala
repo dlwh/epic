@@ -141,7 +141,7 @@ class AnchoredRuleApproximator[C,F,W](val coarseParser: ChartBuilder[LogProbabil
 
 object EPParserExtractor {
   def extractEPParser[L,W](model: EPInference[TreeInstance[L,W],SpanScorerFactor[L,W]], zeroParser: SimpleChartParser[L,L,W]):Parser[L,W] = {
-    new Parser[L,W] {
+    new Parser[L,W] with Serializable {
       def bestParse(s: Seq[W], spanScorer: SpanScorer[L]) = {
         val inst = new TreeInstance("",null,s,spanScorer)
         val augment = model.getMarginals(inst,new SpanScorerFactor(zeroParser.builder.withCharts(ParseChart.logProb),s,spanScorer))._2
