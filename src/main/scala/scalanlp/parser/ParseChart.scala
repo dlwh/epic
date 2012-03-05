@@ -25,20 +25,37 @@ import scalanlp.parser.ParseChart.FeasibleSpan
 import math._
 
 @SerialVersionUID(2)
-abstract class ParseChart[L](val grammar: Encoder[L], val length: Int) extends Serializable {
+abstract class ParseChart[L](val grammar: Encoder[L], val length: Int, lexicalize: Boolean = false) extends Serializable {
+  val grammarSize = grammar.index.size
+  val chartSize = if(lexicalize) grammarSize * length else grammarSize
+
   final val top = new ChartScores()
   final val bot = new ChartScores()
 
-  final class ChartScores private[ParseChart]() extends LabelScoreArray(length,grammar.index.size,zero) {
+  final class ChartScores private[ParseChart]() extends LabelScoreArray(length,chartSize,zero) {
 
     private[ParseChart] def scoreArray = score
     def labelScore(begin: Int, end: Int, label: L):Double = labelScore(begin,end,grammar.index(label))
 
-    def enter(begin: Int, end: Int, parent: Int, w: Double) = {
+    // lexicalization stuff
+    def labelScore(begin: Int, end: Int, label: Int, headWord: Int):Double = {
+      labelScore(begin,end,encodeLabelPair(label,headWord))
+    }
+    def encodeLabelPair(label: Int, headWord: Int) = headWord * grammarSize + label
+    def decodeLabelPart(labelhead: Int) = labelhead % grammarSize
+    def decodeHeadPart(labelhead: Int) = labelhead / grammarSize
+    def enter(begin:Int, end: Int, parent: Int, headWord: Int, w: Double):Boolean = {
+      enter(begin, end, encodeLabelPair(parent, headWord), w)
+    }
+    def enter(begin:Int, end: Int, parent: Int, headWord: Int, w: Array[Double], length: Int):Boolean = {
+      enter(begin, end, encodeLabelPair(parent, headWord), w, length)
+    }
+
+    def enter(begin: Int, end: Int, parent: Int, w: Double):Boolean = {
       val index = TriangularArray.index(begin, end)
       var arr = score(index)
       if(arr eq null) {
-        score(index) = LabelScoreArray.mkGrammarVector(grammar.index.size,zero)
+        score(index) = LabelScoreArray.mkGrammarVector(chartSize,zero)
         arr = score(index)
       }
       val oldScore = arr(parent)
@@ -46,11 +63,24 @@ abstract class ParseChart[L](val grammar: Encoder[L], val length: Int) extends S
       score(index)(parent) = newScore
 
       if(oldScore == zero) {
-        enteredLabels(index) += parent
-        narrowLeft(end)(parent) = math.max(begin, narrowLeft(end)(parent))
-        wideLeft(end)(parent) = math.min(begin, wideLeft(end)(parent))
-        wideRight(begin)(parent) = math.max(end,wideRight(begin)(parent))
-        narrowRight(begin)(parent) = math.min(end,narrowRight(begin)(parent))
+        updateExtents(index, parent, end, begin)
+      }
+      newScore > oldScore
+    }
+
+    def enter(begin: Int, end: Int, parent: Int, w: Array[Double], length: Int):Boolean = {
+      val index = TriangularArray.index(begin, end)
+      var arr = score(index)
+      if(arr eq null) {
+        score(index) = LabelScoreArray.mkGrammarVector(chartSize,zero)
+        arr = score(index)
+      }
+      val oldScore = arr(parent)
+      val newScore = sum(w,length)
+      arr(parent) = sum(oldScore,newScore)
+
+      if(newScore > oldScore) {
+        updateExtents(index, parent, end, begin)
       }
       newScore > oldScore
     }
@@ -59,25 +89,12 @@ abstract class ParseChart[L](val grammar: Encoder[L], val length: Int) extends S
      * Bulk enter: sum w in the current semiring (with length as the size) and add it in.
      * Avoids duplicating work.
      */
-    def enter(begin: Int, end: Int, parent: Int, w: Array[Double], length: Int) = {
-      val index = TriangularArray.index(begin, end)
-      var arr = score(index)
-      if(arr eq null) {
-        score(index) = LabelScoreArray.mkGrammarVector(grammar.index.size,zero)
-        arr = score(index)
-      }
-      val oldScore = arr(parent)
-      val newScore = sum(w,length)
-      arr(parent) = sum(oldScore,newScore)
-
-      if(newScore > oldScore) {
-        enteredLabels(index) += parent
-        narrowLeft(end)(parent) = math.max(begin, narrowLeft(end)(parent))
-        wideLeft(end)(parent) = math.min(begin, wideLeft(end)(parent))
-        wideRight(begin)(parent) = math.max(end,wideRight(begin)(parent))
-        narrowRight(begin)(parent) = math.min(end,narrowRight(begin)(parent))
-      }
-      newScore > oldScore
+    private def updateExtents(index: Int, parent: Int, end: Int, begin: Int) {
+      enteredLabels(index) += parent
+      narrowLeft(end)(parent) = math.max(begin, narrowLeft(end)(parent))
+      wideLeft(end)(parent) = math.min(begin, wideLeft(end)(parent))
+      wideRight(begin)(parent) = math.max(end, wideRight(begin)(parent))
+      narrowRight(begin)(parent) = math.min(end, narrowRight(begin)(parent))
     }
 
     /** Can a constituent with this label start here and end before end
@@ -134,15 +151,14 @@ abstract class ParseChart[L](val grammar: Encoder[L], val length: Int) extends S
     }
 
 
-
     // right most place a left constituent with label l can start and end at position i
-    val narrowLeft = Array.fill(length+1)(grammar.fillArray[Int](-1))
+    val narrowLeft = Array.fill(length+1)(Array.fill(chartSize)(-1))
     // left most place a left constituent with label l can start and end at position i
-    val wideLeft = Array.fill(length+1)(grammar.fillArray[Int](length+1))
+    val wideLeft = Array.fill(length+1)(Array.fill(chartSize)(length+1))
     // left most place a right constituent with label l--which starts at position i--can end.
-    val narrowRight = Array.fill(length+1)(grammar.fillArray[Int](length+1))
+    val narrowRight = Array.fill(length+1)(Array.fill(chartSize)(length+1))
     // right-most place a right constituent with label l--which starts at position i--can end.
-    val wideRight = Array.fill(length+1)(grammar.fillArray[Int](-1))
+    val wideRight = Array.fill(length+1)(Array.fill(chartSize)(-1))
   }
 
 
@@ -157,8 +173,11 @@ abstract class ParseChart[L](val grammar: Encoder[L], val length: Int) extends S
   override def toString = {
     def decodeCell(i: Int, j: Int) = {
       val arr = top.scoreArray(TriangularArray.index(i,j))
-      val decoded = Seq() ++ (arr.zipWithIndex.collect { case (v,i) if !v.isInfinite => grammar.index.get(i) -> v})
-      decoded.mkString(", ")
+      if(arr != null){
+        (arr.zipWithIndex.collect { case (v,i) if !v.isInfinite => grammar.index.get(i) -> v}).mkString(", ")
+      } else {
+        ""
+      }
     }
     val data = new TriangularArray[String](length+1, decodeCell _ )
     "ParseChart[" + data + "]"
@@ -203,15 +222,15 @@ object ParseChart {
 
 
   @SerialVersionUID(1)
-  trait Factory[Chart[X]<:ParseChart[X]] extends Serializable {
-    def apply[L](g: Encoder[L], length: Int):Chart[L]
+  trait Factory[+Chart[X]<:ParseChart[X]] extends Serializable {
+    def apply[L](g: Encoder[L], length: Int, lexicalize: Boolean = false):Chart[L]
 //    def computeUnaryClosure[L](g: Grammar[L]):UnaryRuleClosure
   }
 
 
   // concrete factories:
   object viterbi extends Factory[ViterbiParseChart] {
-    def apply[L](g: Encoder[L], length: Int) = new ParseChart(g,length) with Viterbi
+    def apply[L](g: Encoder[L], length: Int, lexicalize: Boolean) = new ParseChart(g,length,lexicalize) with Viterbi
 //    def computeUnaryClosure[L](grammar: Grammar[L]):UnaryRuleClosure = {
 //      import scalanlp.math.Semiring.Viterbi._
 //      UnaryRuleClosure.computeClosure(grammar)
@@ -219,7 +238,7 @@ object ParseChart {
   }
 
   object logProb extends Factory[LogProbabilityParseChart] {
-    def apply[L](g: Encoder[L], length: Int) = new ParseChart(g,length) with LogProbability
+    def apply[L](g: Encoder[L], length: Int, lexicalize: Boolean) = new ParseChart(g,length, lexicalize) with LogProbability
 //    def computeUnaryClosure[L](grammar: Grammar[L]):UnaryRuleClosure = {
 //      import scalanlp.math.Semiring.LogSpace._
 //      UnaryRuleClosure.computeClosure(grammar)
