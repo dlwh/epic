@@ -1,25 +1,43 @@
 package scalanlp.parser.lex
 
 import scalanlp.parser.ParseChart.Factory
-import scalanlp.parser.{SpanScorer, ParseChart}
 import scalala.library.Numerics
+import scalanlp.parser.{SpanScorer, ParseChart}
+
+
+case class LexChartPair[+PC[X]<:ParseChart[X],L, W](spec: LexGrammar[L,W]#Specialization,
+                                                    inside: PC[L],
+                                                    outside: PC[L],
+                                                    partition: Double,
+                                                    scorer: SpanScorer[L] = SpanScorer.identity)
 
 /**
  * Trait for things that parse. So far, we only have CKYChartBuilder
  */
-trait LexChartBuilder[+Chart[X]<:ParseChart[X], L, W] {
+trait LexChartBuilder[+Chart[X]<:ParseChart[X], L, W] extends Serializable {
   /**
    * Given a sentence s, fills a parse chart with inside scores.
-   * validSpan can be activeSize as a filter to insist that certain ones are valid.
    */
   def buildInsideChart(s: Seq[W], validSpan: SpanScorer[L] = SpanScorer.identity):Chart[L]
-  /**
-   * Given an inside chart, fills the passed-in outside parse chart with inside scores.
-   */
-  def buildOutsideChart(inside: ParseChart[L], words: Seq[W], validSpan: SpanScorer[L] = SpanScorer.identity):Chart[L]
+
+  def buildCharts(s: Seq[W], validSpan: SpanScorer[L]):LexChartPair[Chart, L, W]
+
+  def rootScore(inside: ParseChart[L]) = {
+    val indexedRoot = grammar.labelIndex(root)
+    val rootScores = new Array[Double](inside.length)
+    var offset = 0
+    for(i <- 0 until inside.length) {
+      val score = inside.top.labelScore(0, inside.length, indexedRoot, i)
+      if(score != Double.NegativeInfinity) {
+        rootScores(offset) = score
+        offset += 1
+      }
+    }
+    inside.sum(rootScores,offset)
+  }
 
   def root: L
-  def grammar: LexGrammar[L, W]
+  val grammar: LexGrammar[L, W]
 
   def index = grammar.labelIndex
 
@@ -36,20 +54,35 @@ trait LexChartBuilder[+Chart[X]<:ParseChart[X], L, W] {
  * @author dlwh
  */
 
-class LexCKYChartBuilder[+Chart[X]<:ParseChart[X], L, W](val root: L,
-                                                       val grammar: LexGrammar[L, W],
-                                                       val chartFactory: Factory[Chart]) extends LexChartBuilder[Chart, L, W] {
+class LexCKYChartBuilder[Chart[X]<:ParseChart[X], L, W](val root: L,
+                                                        val grammar: LexGrammar[L, W],
+                                                        val chartFactory: Factory[Chart]) extends LexChartBuilder[Chart, L, W] {
   def withCharts[Chart[X] <: ParseChart[X]](factory: Factory[Chart]):LexChartBuilder[Chart, L, W] = {
     new LexCKYChartBuilder[Chart, L, W](root, grammar, factory)
   }
 
-  def buildInsideChart(words: Seq[W], validSpan: SpanScorer[L]) = {
+
+  def buildInsideChart(s: Seq[W], validSpan: SpanScorer[L]) = {
+    val spec = grammar.specialize(s)
+    buildInsideChart(spec,validSpan)
+  }
+
+  def buildCharts(s: Seq[W], validSpan: SpanScorer[L]) = {
+    val spec = grammar.specialize(s)
+    val inside =  buildInsideChart(spec,validSpan)
+    val root = rootScore(inside)
+    val outside =  buildOutsideChart(inside, spec, validSpan)
+    LexChartPair[Chart,L,W](spec, inside, outside, root, validSpan)
+  }
+
+  def buildInsideChart(spec: grammar.Specialization, validSpan: SpanScorer[L]):Chart[L] = {
+    import spec.words
     val chart = chartFactory(grammar.labelEncoder, words.length, true)
 
     for{i <- 0 until words.length} {
       var foundSomething = false
       for {
-        (a, wScore) <- grammar.tagScores(words, i).activeIterator if !wScore.isInfinite && !wScore.isNaN
+        (a, wScore) <- spec.tagScores(i).activeIterator if !wScore.isInfinite && !wScore.isNaN
       } {
         val spanScore:Double = validSpan.scoreSpan(i, i+1, a)
         if (spanScore != Double.NegativeInfinity) {
@@ -61,7 +94,7 @@ class LexCKYChartBuilder[+Chart[X]<:ParseChart[X], L, W](val root: L,
         sys.error("Couldn't score " + words(i))
       }
 
-      updateInsideUnaries(chart, words, i, i+1, validSpan)
+      updateInsideUnaries(chart, spec,  i, i+1, validSpan)
     }
 
     val maxSpanLength = words.length min 100
@@ -80,7 +113,7 @@ class LexCKYChartBuilder[+Chart[X]<:ParseChart[X], L, W](val root: L,
       val narrowLeft = top.narrowLeft(end)
       val wideRight = top.wideRight(begin)
       val wideLeft = top.wideLeft(end)
-      for ( h <- begin until end; a <- grammar.labelsForHead(words(h)) ) {
+      for ( h <- begin until end; a <- spec.labelsForHead(h) ) {
         val passScore = validSpan.scoreSpan(begin, end, a)
         var offset = 0 // into scoreArray
         if(!passScore.isInfinite) {
@@ -95,65 +128,77 @@ class LexCKYChartBuilder[+Chart[X]<:ParseChart[X], L, W](val root: L,
             val feasibleSpan = top.feasibleSpanX(begin, end, b, c)
             */
             // Left child is head: extend right
-            for(right <- (h + 1) until end) {
-              val narrowR = narrowRight(chart.top.encodeLabelPair(b, h))
-              val narrowL = narrowLeft(chart.top.encodeLabelPair(c, right))
-              val ruleScore = grammar.scoreRightComplement(r, words, h, right)
+            if(grammar.isLeftRule(r)) {
+              var right = h+1;
+              while(right < end)  {
+                val narrowR = narrowRight(chart.top.encodeLabelPair(b, h))
+                val narrowL = narrowLeft(chart.top.encodeLabelPair(c, right))
 
-              val feasibleSpan = if (narrowR >= end || narrowL < narrowR) {
-                0L
-              } else {
-                val trueX = wideLeft(chart.top.encodeLabelPair(c, right))
-                val trueMin = if(narrowR > trueX) narrowR else trueX
-                val wr = wideRight(chart.top.encodeLabelPair(b, h))
-                val trueMax = if(wr < narrowL) wr else narrowL
-                if(trueMin > narrowL || trueMin > trueMax)  0L
-                else ((trueMin:Long) << 32) | ((trueMax + 1):Long)
-              }
-              var split = (feasibleSpan >> 32).toInt
-              val endSplit = feasibleSpan.toInt // lower 32 bits
-              while(split < endSplit) {
-                val bScore = chart.top.labelScore(begin, split, b, h)
-                val cScore = chart.top.labelScore(split, end, c, right)
-                val spanScore = validSpan.scoreBinaryRule(begin, split, end, r) + passScore
-                val totalA = ruleScore + spanScore
-                val prob = bScore + cScore + totalA
-                if(!java.lang.Double.isInfinite(prob)) {
-                  scoreArray(offset) = prob
-                  offset += 1
+                val feasibleSpan = if (narrowR >= end || narrowL < narrowR) {
+                  0L
+                } else {
+                  val trueX = wideLeft(chart.top.encodeLabelPair(c, right))
+                  val trueMin = if(narrowR > trueX) narrowR else trueX
+                  val wr = wideRight(chart.top.encodeLabelPair(b, h))
+                  val trueMax = if(wr < narrowL) wr else narrowL
+                  if(trueMin > narrowL || trueMin > trueMax)  0L
+                  else ((trueMin:Long) << 32) | ((trueMax + 1):Long)
                 }
-                split += 1
+                var split = (feasibleSpan >> 32).toInt
+                val endSplit = feasibleSpan.toInt // lower 32 bits
+                if(split < endSplit) {
+                  val ruleScore = spec.scoreRightComplement(r, h, right)
+                  while(split < endSplit) {
+                    val bScore = chart.top.labelScore(begin, split, b, h)
+                    val cScore = chart.top.labelScore(split, end, c, right)
+                    val spanScore = validSpan.scoreBinaryRule(begin, split, end, r) + passScore
+                    val totalA = ruleScore + spanScore
+                    val prob = bScore + cScore + totalA
+                    if(!java.lang.Double.isInfinite(prob)) {
+                      scoreArray(offset) = prob
+                      offset += 1
+                    }
+                    split += 1
+                  }
+                }
+                right += 1
               }
             }
 
-            for(left <- begin until h) {
-              val narrowR = narrowRight(chart.top.encodeLabelPair(b, left))
-              val narrowL = narrowLeft(chart.top.encodeLabelPair(c, h))
-              val ruleScore = grammar.scoreLeftComplement(r, words, h, left)
+            if(grammar.isRightRule(r)) {
+              var left = begin
+              while(left < h) {
+                val narrowR = narrowRight(chart.top.encodeLabelPair(b, left))
+                val narrowL = narrowLeft(chart.top.encodeLabelPair(c, h))
 
-              val feasibleSpan = if (narrowR >= end || narrowL < narrowR) {
-                0L
-              } else {
-                val trueX = wideLeft(chart.top.encodeLabelPair(c, h))
-                val trueMin = if(narrowR > trueX) narrowR else trueX
-                val wr = wideRight(chart.top.encodeLabelPair(b, left))
-                val trueMax = if(wr < narrowL) wr else narrowL
-                if(trueMin > narrowL || trueMin > trueMax)  0L
-                else ((trueMin:Long) << 32) | ((trueMax + 1):Long)
-              }
-              var split = (feasibleSpan >> 32).toInt
-              val endSplit = feasibleSpan.toInt // lower 32 bits
-              while(split < endSplit) {
-                val bScore = chart.top.labelScore(begin, split, b, left)
-                val cScore = chart.top.labelScore(split, end, c, h)
-                val spanScore = validSpan.scoreBinaryRule(begin, split, end, r) + passScore
-                val totalA = ruleScore + spanScore
-                val prob = bScore + cScore + totalA
-                if(!java.lang.Double.isInfinite(prob)) {
-                  scoreArray(offset) = prob
-                  offset += 1
+                val feasibleSpan = if (narrowR >= end || narrowL < narrowR) {
+                  0L
+                } else {
+                  val trueX = wideLeft(chart.top.encodeLabelPair(c, h))
+                  val trueMin = if(narrowR > trueX) narrowR else trueX
+                  val wr = wideRight(chart.top.encodeLabelPair(b, left))
+                  val trueMax = if(wr < narrowL) wr else narrowL
+                  if(trueMin > narrowL || trueMin > trueMax)  0L
+                  else ((trueMin:Long) << 32) | ((trueMax + 1):Long)
                 }
-                split += 1
+                var split = (feasibleSpan >> 32).toInt
+                val endSplit = feasibleSpan.toInt // lower 32 bits
+                if(split < endSplit) {
+                  val ruleScore = spec.scoreLeftComplement(r, h, left)
+                  while(split < endSplit) {
+                    val bScore = chart.top.labelScore(begin, split, b, left)
+                    val cScore = chart.top.labelScore(split, end, c, h)
+                    val spanScore = validSpan.scoreBinaryRule(begin, split, end, r) + passScore
+                    val totalA = ruleScore + spanScore
+                    val prob = bScore + cScore + totalA
+                    if(!java.lang.Double.isInfinite(prob)) {
+                      scoreArray(offset) = prob
+                      offset += 1
+                    }
+                    split += 1
+                  }
+                }
+                left += 1
               }
             }
           }
@@ -164,13 +209,13 @@ class LexCKYChartBuilder[+Chart[X]<:ParseChart[X], L, W](val root: L,
         }
 
       }
-      updateInsideUnaries(chart, words, begin, end, validSpan)
+      updateInsideUnaries(chart, spec, begin, end, validSpan)
     }
     chart
   }
 
-  def buildOutsideChart(inside: ParseChart[L], words: Seq[W],
-                        validSpan: SpanScorer[L] = SpanScorer.identity):Chart[L] = {
+  private def buildOutsideChart(inside: Chart[L], spec: grammar.Specialization,
+                                validSpan: SpanScorer[L] = SpanScorer.identity):Chart[L] = {
     val length = inside.length
     val outside = chartFactory(grammar.labelEncoder, length, lexicalize = true)
     for(h <- 0 until inside.length)
@@ -187,7 +232,7 @@ class LexCKYChartBuilder[+Chart[X]<:ParseChart[X], L, W](val root: L,
       val narrowLeft = itop.narrowLeft(end)
       val wideRight = itop.wideRight(begin)
       val wideLeft = itop.wideLeft(end)
-      updateOutsideUnaries(outside, inside, words, begin, end, validSpan)
+      updateOutsideUnaries(outside, inside, spec, begin, end, validSpan)
       if(span > 1)
         // a[h] ->  b[h] c[x]  [begin, split, end) | -> b[x] c[h]
         for (ah <- outside.bot.enteredLabelIndexes(begin, end) ) {
@@ -202,72 +247,85 @@ class LexCKYChartBuilder[+Chart[X]<:ParseChart[X], L, W](val root: L,
               val b = grammar.leftChild(r)
               val c = grammar.rightChild(r)
               br += 1
-              for(right <- (h + 1) until end) {
-                val narrowR = narrowRight(itop.encodeLabelPair(b, h))
-                val narrowL = narrowLeft(itop.encodeLabelPair(c, right))
-                val ruleScore = grammar.scoreRightComplement(r, words, h, right)
 
-                // this is too slow, so i'm having to inline it.
-                //              val feasibleSpan = itop.feasibleSpanX(begin, end, b, c)
-                val feasibleSpan = if (narrowR >= end || narrowL < narrowR) {
-                  0L
-                } else {
-                  val trueX = wideLeft(itop.encodeLabelPair(c, right))
-                  val trueMin = if(narrowR > trueX) narrowR else trueX
-                  val wr = wideRight(itop.encodeLabelPair(b, h))
-                  val trueMax = if(wr < narrowL) wr else narrowL
-                  if(trueMin > narrowL || trueMin > trueMax)  0L
-                  else ((trueMin:Long) << 32) | ((trueMax + 1):Long)
-                }
+              if(grammar.isLeftRule(r)) {
+                var right = h+1;
+                while(right < end)  {
+                  val narrowR = narrowRight(itop.encodeLabelPair(b, h))
+                  val narrowL = narrowLeft(itop.encodeLabelPair(c, right))
 
-                var split = (feasibleSpan >> 32).toInt
-                val endSplit = feasibleSpan.toInt // lower 32 bits
-                while(split < endSplit) {
-                  val score = aScore + ruleScore
-                  val bInside = itop.labelScore(begin, split, b, h)
-                  val cInside = itop.labelScore(split, end, c, right)
-                  val spanScore = validSpan.scoreBinaryRule(begin, split, end, r)
-                  val bOutside = score + cInside + spanScore
-                  val cOutside = score + bInside + spanScore
-                  if(!java.lang.Double.isInfinite(bOutside) && !java.lang.Double.isInfinite(cOutside)) {
-                    outside.top.enter(begin, split, b, h, bOutside)
-                    outside.top.enter(split, end, c, right, cOutside)
+                  // this is too slow, so i'm having to inline it.
+                  //              val feasibleSpan = itop.feasibleSpanX(begin, end, b, c)
+                  val feasibleSpan = if (narrowR >= end || narrowL < narrowR) {
+                    0L
+                  } else {
+                    val trueX = wideLeft(itop.encodeLabelPair(c, right))
+                    val trueMin = if(narrowR > trueX) narrowR else trueX
+                    val wr = wideRight(itop.encodeLabelPair(b, h))
+                    val trueMax = if(wr < narrowL) wr else narrowL
+                    if(trueMin > narrowL || trueMin > trueMax)  0L
+                    else ((trueMin:Long) << 32) | ((trueMax + 1):Long)
                   }
 
-                  split += 1
-                }
-              } // end extend right/left child is head
+                  var split = (feasibleSpan >> 32).toInt
+                  val endSplit = feasibleSpan.toInt // lower 32 bits
+                  if(split < endSplit) {
+                    val ruleScore = spec.scoreRightComplement(r, h, right)
+                    while(split < endSplit) {
+                      val score = aScore + ruleScore
+                      val bInside = itop.labelScore(begin, split, b, h)
+                      val cInside = itop.labelScore(split, end, c, right)
+                      val spanScore = validSpan.scoreBinaryRule(begin, split, end, r)
+                      val bOutside = score + cInside + spanScore
+                      val cOutside = score + bInside + spanScore
+                      if(!java.lang.Double.isInfinite(bOutside) && !java.lang.Double.isInfinite(cOutside)) {
+                        outside.top.enter(begin, split, b, h, bOutside)
+                        outside.top.enter(split, end, c, right, cOutside)
+                      }
 
-              for(left <- begin until h) {
-                val narrowR = narrowRight(itop.encodeLabelPair(b, left))
-                val narrowL = narrowLeft(itop.encodeLabelPair(c, h))
-                val ruleScore = grammar.scoreLeftComplement(r, words, h, left)
-
-                val feasibleSpan = if (narrowR >= end || narrowL < narrowR) {
-                  0L
-                } else {
-                val trueX = wideLeft(itop.encodeLabelPair(c, h))
-                  val trueMin = if(narrowR > trueX) narrowR else trueX
-                  val wr = wideRight(itop.encodeLabelPair(b, left))
-                  val trueMax = if(wr < narrowL) wr else narrowL
-                  if(trueMin > narrowL || trueMin > trueMax)  0L
-                  else ((trueMin:Long) << 32) | ((trueMax + 1):Long)
-                }
-                var split = (feasibleSpan >> 32).toInt
-                val endSplit = feasibleSpan.toInt // lower 32 bits
-                while(split < endSplit) {
-                  val score = aScore + ruleScore
-                  val bInside = itop.labelScore(begin, split, b, left)
-                  val cInside = itop.labelScore(split, end, c, h)
-                  val spanScore = validSpan.scoreBinaryRule(begin, split, end, r)
-                  val bOutside = score + cInside + spanScore
-                  val cOutside = score + bInside + spanScore
-                  if(!java.lang.Double.isInfinite(bOutside) && !java.lang.Double.isInfinite(cOutside)) {
-                    outside.top.enter(begin, split, b, left, bOutside)
-                    outside.top.enter(split, end, c, h, cOutside)
+                      split += 1
+                    }
                   }
+                  right += 1
+                } // end extend right/left child is head
+              }
 
-                  split += 1
+              if(grammar.isRightRule(r)) {
+                var left = begin
+                while(left < h) {
+                  val narrowR = narrowRight(itop.encodeLabelPair(b, left))
+                  val narrowL = narrowLeft(itop.encodeLabelPair(c, h))
+
+                  val feasibleSpan = if (narrowR >= end || narrowL < narrowR) {
+                    0L
+                  } else {
+                    val trueX = wideLeft(itop.encodeLabelPair(c, h))
+                    val trueMin = if(narrowR > trueX) narrowR else trueX
+                    val wr = wideRight(itop.encodeLabelPair(b, left))
+                    val trueMax = if(wr < narrowL) wr else narrowL
+                    if(trueMin > narrowL || trueMin > trueMax)  0L
+                    else ((trueMin:Long) << 32) | ((trueMax + 1):Long)
+                  }
+                  var split = (feasibleSpan >> 32).toInt
+                  val endSplit = feasibleSpan.toInt // lower 32 bits
+                  if (split < endSplit) {
+                  val ruleScore = spec.scoreLeftComplement(r, h, left)
+                    while(split < endSplit) {
+                      val score = aScore + ruleScore
+                      val bInside = itop.labelScore(begin, split, b, left)
+                      val cInside = itop.labelScore(split, end, c, h)
+                      val spanScore = validSpan.scoreBinaryRule(begin, split, end, r)
+                      val bOutside = score + cInside + spanScore
+                      val cOutside = score + bInside + spanScore
+                      if(!java.lang.Double.isInfinite(bOutside) && !java.lang.Double.isInfinite(cOutside)) {
+                        outside.top.enter(begin, split, b, left, bOutside)
+                        outside.top.enter(split, end, c, h, cOutside)
+                      }
+
+                      split += 1
+                    }
+                  }
+                  left += 1
                 }
               }
 
@@ -279,7 +337,7 @@ class LexCKYChartBuilder[+Chart[X]<:ParseChart[X], L, W](val root: L,
   }
 
 
-  private def updateInsideUnaries(chart: ParseChart[L], words: Seq[W], begin: Int, end: Int, validSpan: SpanScorer[L]) = {
+  private def updateInsideUnaries(chart: Chart[L], spec: grammar.Specialization, begin: Int, end: Int, validSpan: SpanScorer[L]) = {
     for(bh <- chart.bot.enteredLabelIndexes(begin, end)) {
       val b = chart.bot.decodeLabelPart(bh)
       val h = chart.bot.decodeHeadPart(bh)
@@ -288,7 +346,7 @@ class LexCKYChartBuilder[+Chart[X]<:ParseChart[X], L, W](val root: L,
       var j = 0
       while(j < rules.length) {
         val a = grammar.indexedRules(rules(j)).parent
-        val aScore: Double = grammar.scoreUnary(rules(j), words, h)
+        val aScore: Double = spec.scoreUnary(rules(j), h)
         val prob: Double = aScore + bScore + validSpan.scoreUnaryRule(begin, end, rules(j))
         if(prob != Double.NegativeInfinity) {
           chart.top.enter(begin, end, a, h, prob)
@@ -299,7 +357,7 @@ class LexCKYChartBuilder[+Chart[X]<:ParseChart[X], L, W](val root: L,
 
   }
 
-  private def updateOutsideUnaries(outside: ParseChart[L], inside: ParseChart[L], words: Seq[W], begin: Int, end: Int, validSpan: SpanScorer[L]) = {
+  private def updateOutsideUnaries(outside: Chart[L], inside: ParseChart[L], spec: grammar.Specialization, begin: Int, end: Int, validSpan: SpanScorer[L]) = {
     for(ah <- outside.top.enteredLabelIndexes(begin, end)) {
       val a = outside.top.decodeLabelPart(ah)
       val h = outside.top.decodeHeadPart(ah)
@@ -309,7 +367,7 @@ class LexCKYChartBuilder[+Chart[X]<:ParseChart[X], L, W](val root: L,
       val rules = grammar.indexedUnaryRulesWithParent(a)
       while(j < rules.length) {
         val b = grammar.child(rules(j))
-        val bScore = grammar.scoreUnary(rules(j), words, h)
+        val bScore = spec.scoreUnary(rules(j), h)
         val prob = aScore + bScore + validSpan.scoreUnaryRule(begin, end, rules(j))
         if(prob != Double.NegativeInfinity) {
           outside.bot.enter(begin, end, b, h, prob)

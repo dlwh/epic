@@ -55,6 +55,8 @@ class ConstraintScorerFactory[C,L,W](parser: ChartParser[C,L,W], threshold: Doub
 
     val scores = TriangularArray.raw(inside.length+1,null:collection.mutable.BitSet)
     val scoresForLocation = indexedProjections.coarseEncoder.fillArray(Double.NegativeInfinity)
+    var density = 0
+    var labelDensity = 0
     for(begin <-  0 until inside.length; end <- begin+1 to (inside.length)) {
       val active = new collection.mutable.BitSet()
       Arrays.fill(scoresForLocation,Double.NegativeInfinity)
@@ -75,14 +77,16 @@ class ConstraintScorerFactory[C,L,W](parser: ChartParser[C,L,W], threshold: Doub
         if(v > threshold || maxGoldTag == c) {
           if(scores(index) eq null) {
             scores(index) = new collection.mutable.BitSet()
+            density += 1
           }
           scores(index) += c
+          labelDensity += 1
         }
       }
 
     }
-    //println("Density: " + density * 1.0 / scores.length)
-    //println("Label Density:" + labelDensity * 1.0 / scores.length / parser.grammar.index.size)
+    println("Density: " + density * 1.0 / scores.length)
+    println("Label Density:" + labelDensity * 1.0 / scores.length / parser.projections.labels.coarseIndex.size)
     new ConstraintScorer[C](scores.map { e => if(e eq null) null else BitSet.empty ++ e})
   }
 

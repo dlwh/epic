@@ -26,4 +26,6 @@ case class LexicalFeature[L,W](l: L, w: W) extends Feature with CachedHashCode
 /** wraps a feature with substate information */
 case class SubstateFeature[T](f: Feature, states: Seq[T]) extends Feature with CachedHashCode
 
+case class IndicatorFeature(a: Any) extends Feature with CachedHashCode
+
 

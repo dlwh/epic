@@ -48,11 +48,11 @@ object LexParseProjector {
 class LexChartParser[L,W](baseGrammar: Grammar[L],
                           builder: LexChartBuilder[ParseChart,L,W]) extends ChartParser[L,L,W] {
   def charts(w: Seq[W], scorer: SpanScorer[L]) = {
-    val inside = builder.buildInsideChart(w, scorer)
-    val outside = builder.buildOutsideChart(inside, w, scorer)
+    val pair = builder.buildCharts(w,scorer)
+    import pair._
     val pi = LexParseProjector.projectChart(inside,builder.chartFactory)
     val po = LexParseProjector.projectChart(outside,builder.chartFactory)
-    ChartPair(pi,po,pi.top.labelScore(0,inside.length,builder.root), scorer)
+    ChartPair(pi,po,pi.top.labelScore(0,inside.length,builder.root), pair.scorer)
   }
 
   val decoder = new MaxConstituentDecoder[L,L,W](GrammarProjections.identity(baseGrammar))
@@ -64,3 +64,4 @@ class LexChartParser[L,W](baseGrammar: Grammar[L],
 
   protected def grammar = baseGrammar
 }
+

@@ -1,6 +1,7 @@
 package scalanlp.parser
 
 import ParseChart.Factory
+import scalala.library.Numerics
 
 /**
  * Trait for things that parse. So far, we only have CKYChartBuilder
@@ -21,6 +22,12 @@ trait ChartBuilder[+Chart[X]<:ParseChart[X],L,W] {
   def lexicon:Lexicon[L,W]
 
   def index = grammar.labelIndex
+
+  def rootScore(inside: ParseChart[L]) = {
+    val indexedRoot = grammar.labelIndex(root)
+    val score = inside.top.labelScore(0, inside.length, indexedRoot)
+    score
+  }
 
   /**
    * Change the kind of parse chart that gets built

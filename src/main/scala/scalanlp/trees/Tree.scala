@@ -75,7 +75,6 @@ class Tree[+L](val label: L, val children: IndexedSeq[Tree[L]])(val span: Span) 
 
   def leftHeight:Int = if(isLeaf) 0 else 1 + children(0).leftHeight
 
-
   import Tree._;
   override def toString = recursiveToString(this,0,new StringBuilder).toString;
   def render[W](words: Seq[W], newline: Boolean = true) = recursiveRender(this,0,words, newline, new StringBuilder).toString;
@@ -182,6 +181,24 @@ object Trees {
       val newLeftChildSpan = Span(tree.span.start,newRightChild.span.start)
       val newLeftChild = binarize(Tree(newLeftLabel,children.take(children.length-1))(newLeftChildSpan), relabel);
       BinaryTree(l, newLeftChild, newRightChild)(tree.span)
+  }
+
+  def headBinarize(tree: Tree[String], headFinder: HeadFinder[String]):BinarizedTree[String] = tree match {
+    case Tree(l, Seq()) => NullaryTree(l)(tree.span)
+    case Tree(l, Seq(oneChild)) => UnaryTree(l,headBinarize(oneChild,headFinder))(tree.span);
+    case Tree(l, Seq(leftChild,rightChild)) =>
+      BinaryTree(l,headBinarize(leftChild,headFinder),headBinarize(rightChild,headFinder))(tree.span);
+    case Tree(l, children) =>
+      val headChildIndex = headFinder.findHeadChild(tree, identity[String])
+      val binarizedLabel = "@" + l
+      val headBinarized = children.map(headBinarize(_, headFinder))
+      val headChild = headBinarized(headChildIndex)
+      // fold in right arguments
+      val right = headBinarized.drop(headChildIndex+1).foldLeft(headChild)((tree,newArg) => BinaryTree(binarizedLabel,tree,newArg)(Span(tree.span.start,newArg.span.end)))
+      // now fold in left args
+      val fullyBinarized = headBinarized.take(headChildIndex).foldRight(right)((newArg,tree) => BinaryTree(binarizedLabel,newArg,tree)(Span(newArg.span.start,tree.span.end)))
+      val finalTree = fullyBinarized.relabelRoot(_ => l)
+      finalTree
   }
 
   def deannotate(tree: Tree[String]):Tree[String] = tree.map(deannotateLabel _)

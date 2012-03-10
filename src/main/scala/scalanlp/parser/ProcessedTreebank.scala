@@ -57,13 +57,14 @@ case class ProcessedTreebank(treebank: TreebankParams, spans: SpanParams[String]
 
 case class TreebankParams(path: File,
                           maxLength:Int = 40,
-                          binarization:String = "xbar",
+                          binarization:String = "head",
                           processing: String = "standard",
                           verticalMarkovization:Int=1,
                           horizontalMarkovization:Int=1000) {
   def binarize = {
     if(binarization == "xbar") Trees.xBarBinarize(_:Tree[String],left=false);
     else if(binarization == "leftXbar") Trees.xBarBinarize(_:Tree[String],left=true);
+    else if(binarization == "head" || binarization == "collins")  Trees.headBinarize(_:Tree[String],HeadFinder.collinsHeadFinder)
     else Trees.binarize(_:Tree[String]);
   }
 

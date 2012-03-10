@@ -48,49 +48,61 @@ object HeadFinder {
   case class HeadRule[L](dir: Dir, dis: Boolean, heads: Seq[L]) {
     val headSet = Set.empty ++ heads;
   }
-  private def shr(dir: Dir, dis: Boolean, heads: String*) = HeadRule(dir,dis,heads);
+  private def shr[L](dir: Dir, dis: Boolean, heads: L*) = HeadRule(dir,dis,heads);
 
-  val collinsHeadRules = Map(
-    "ADJP" -> Seq(shr(Left, false,
-                           "NNS", "QP", "NN","$", "ADVP", "JJ", "VBN", "VBG", "ADJP", "JJR",
-                           "NP", "JJS", "DT","FW", "RBR", "RBS", "SBAR", "RB")),
-    "ADVP" -> Seq(shr(Right, false,
-                           "RB", "RBR", "RBS","FW", "ADVP", "TO", "CD",
-                           "JJR", "JJ", "IN", "NP", "JJS", "NN")),
-    "CONJP" -> Seq(shr(Right, false, "CC", "RB", "IN")),
-    "FRAG" -> Seq(shr(Right, false)),
-    "INTJ" -> Seq(shr(Left, false)),
-    "LST" -> Seq(shr(Right, false, "LS", ":")),
-    "NAC" -> Seq(shr(Left, false,
-                          "NN", "NNS", "NNP", "NNPS", "NAC", "EX", "$", "CD", "QP",
-                          "PRP", "VBG", "JJ", "JJS", "JJR", "ADJP", "FW")),
-    "NX" -> Seq(shr(Left, false)),
-    "PP" -> Seq(shr(Right, false, "IN", "TO", "VBG", "VBN", "RP", "FW")),
-    "PRN" -> Seq(shr(Left, false)),
-    "PRT" -> Seq(shr(Right, false, "RP")),
-    "QP" -> Seq(shr(Left, false,
-                         "$", "IN", "NNS", "NN", "JJ", "RB", "DT", "CD", "NCD", "QP", "JJR", "JJS")),
-    "RRC" -> Seq(shr(Right, false, "VP", "NP", "ADVP", "ADJP", "PP")),
-    "S" -> Seq(shr(Left, false, "TO", "IN", "VP", "S", "SBAR", "ADJP", "UCP", "NP")),
-    "SBAR" -> Seq(shr(Left, false,
-                           "WHNP", "WHPP", "WHADVP", "WHADJP", "IN", "DT", "S", "SQ", "SBAR", "FRAG")),
-    "SBARQ" -> Seq(shr(Left, false, "SQ", "S", "SINV", "SBARQ", "FRAG")),
-    "SINV" -> Seq(shr(Left, false, "VBZ", "VBD", "VBP", "VB", "MD", "VP", "S", "SINV", "ADJP", "NP")),
-    "SQ" -> Seq(shr(Left, false, "VBZ", "VBD", "VBP","VB", "MD", "VP", "SQ")),
-    "UCP" -> Seq(shr(Right, false)),
-    "VP" -> Seq(shr(Left, false,
-                         "TO", "VBD", "VBN", "MD", "VBZ", "VB", "VBG", "VBP", "AUX",
-                         "AUXG", "VP", "ADJP", "NN", "NNS", "NP")),
-    "WHADJP" -> Seq(shr(Right, false, "CC", "WRB", "JJ", "ADJP")),
-    "WHADVP" -> Seq(shr(Right, false, "CC", "WRB")),
-    "WHNP" -> Seq(shr(Left, false, "WDT", "WP", "WP$","WHADJP", "WHPP", "WHNP")),
-    "WHPP" -> Seq(shr(Right, false, "IN", "TO", "FW")),
-    "X" -> Seq(shr(Right, false)),
-    "NP" -> Seq(shr(Right, true, "NN", "NNP", "NNPS", "NNS", "NX", "POS", "JJR"),
-                shr(Left, false, "NP"),
-                shr(Right, false, "CD"),
-                shr(Right, true, "JJ", "JJS", "RB", "QP"))
-  ) withDefault(k => Seq(shr(Left,true,k)))
+  val collinsHeadRules ={
+    val basic = Map[String,Seq[HeadRule[String]]](
+      "" -> Seq(shr(Left,false,"S","SINV")),
+      "ROOT" -> Seq(shr(Left,false,"S","SINV")),
+      "ADJP" -> Seq(shr(Left, false,
+        "NNS", "QP", "NN","$", "ADVP", "JJ", "VBN", "VBG", "ADJP", "JJR",
+        "NP", "JJS", "DT","FW", "RBR", "RBS", "SBAR", "RB")),
+      "ADVP" -> Seq(shr(Right, false,
+        "RB", "RBR", "RBS","FW", "ADVP", "TO", "CD",
+        "JJR", "JJ", "IN", "NP", "JJS", "NN")),
+      "CONJP" -> Seq(shr(Right, false, "CC", "RB", "IN")),
+      "FRAG" -> Seq(shr(Right, false)),
+      "INTJ" -> Seq(shr(Left, false)),
+      "LST" -> Seq(shr(Right, false, "LS", ":")),
+      "NAC" -> Seq(shr(Left, false,
+        "NN", "NNS", "NNP", "NNPS", "NAC", "EX", "$", "CD", "QP",
+        "PRP", "VBG", "JJ", "JJS", "JJR", "ADJP", "FW")),
+      "NX" -> Seq(shr(Left, false)),
+      "PP" -> Seq(shr(Right, false, "IN", "TO", "VBG", "VBN", "RP", "FW")),
+      "PRN" -> Seq(shr(Left, false)),
+      "PRT" -> Seq(shr(Right, false, "RP")),
+      "QP" -> Seq(shr(Left, false,
+        "$", "IN", "NNS", "NN", "JJ", "RB", "DT", "CD", "NCD", "QP", "JJR", "JJS")),
+      "RRC" -> Seq(shr(Right, false, "VP", "NP", "ADVP", "ADJP", "PP")),
+      "S" -> Seq(shr(Left, false, "TO", "IN", "VP", "S", "SBAR", "ADJP", "UCP", "NP")),
+      "SBAR" -> Seq(shr(Left, false,
+        "WHNP", "WHPP", "WHADVP", "WHADJP", "IN", "DT", "S", "SQ", "SBAR", "FRAG")),
+      "SBARQ" -> Seq(shr(Left, false, "SQ", "S", "SINV", "SBARQ", "FRAG")),
+      "SINV" -> Seq(shr(Left, false, "VBZ", "VBD", "VBP", "VB", "MD", "VP", "S", "SINV", "ADJP", "NP")),
+      "SQ" -> Seq(shr(Left, false, "VBZ", "VBD", "VBP","VB", "MD", "VP", "SQ")),
+      "UCP" -> Seq(shr(Right, false)),
+      "VP" -> Seq(shr(Left, false,
+        "TO", "VBD", "VBN", "MD", "VBZ", "VB", "VBG", "VBP", "AUX",
+        "AUXG", "VP", "ADJP", "NN", "NNS", "NP")),
+      "WHADJP" -> Seq(shr(Right, false, "CC", "WRB", "JJ", "ADJP")),
+      "WHADVP" -> Seq(shr(Right, false, "CC", "WRB")),
+      "WHNP" -> Seq(shr(Left, false, "WDT", "WP", "WP$","WHADJP", "WHPP", "WHNP")),
+      "WHPP" -> Seq(shr(Right, false, "IN", "TO", "FW")),
+      "X" -> Seq(shr(Right, false)),
+      "NP" -> Seq(shr(Right, true, "NN", "NNP", "NNPS", "NNS", "NX", "POS", "JJR"),
+        shr(Left, false, "NP"),
+        shr(Right, false, "CD"),
+        shr(Right, true, "JJ", "JJS", "RB", "QP"))
+    )
+    //add in binarized symbols, and look for the binarized symbol first
+    (basic ++ basic.map{ case (k,v) => ("@" + k,v) }) map {  case (lbl,rules) =>
+      // add defaults for binarized rules
+      if(!lbl.startsWith("@"))
+        lbl -> (shr(Left,false, '@' + lbl) +: rules)
+      else
+        lbl -> (shr(Left,false, lbl) +: rules)
+    }
+  }
 
   val collinsHeadFinder = new HeadFinder(collinsHeadRules);
 }
@@ -103,10 +115,10 @@ import HeadFinder._;
  *
  * @author dlwh
  */
-class HeadFinder[L](rules: Map[L,Seq[HeadRule[L]]]) {
+class HeadFinder[L](rules: Map[L,Seq[HeadRule[L]]]) extends Serializable {
 
   def findHeadChild[F](t: Tree[F], proj: F=>L) = {
-    val myRules = rules(proj(t.label));
+    val myRules:Seq[HeadRule[L]] = rules.getOrElse(proj(t.label),Seq(shr(Left,false)));
 
     val answers = for(rule <- myRules.iterator) yield {
       val children = t.children;
@@ -146,6 +158,12 @@ class HeadFinder[L](rules: Map[L,Seq[HeadRule[L]]]) {
   def findHeadWord[W](t: Tree[L], words: Seq[W]) = words(findHeadWordIndex[L](t,identity _));
   def findHeadWord[F,W](t: Tree[F], words: Seq[W], proj: F=>L) = words(findHeadWordIndex(t,proj));
 
-  def annotateHeadWords[W](t: Tree[L], words: Seq[W]): Tree[(L,W)] = t.extend{tree => (tree.label,findHeadWord(tree,words)) }
+  def annotateHeadWords[W](t: Tree[L], words: Seq[W]): Tree[(L,W)] = t match {
+    case Tree(l,children) if children.length == 0 => Tree(l -> words(t.span.start),IndexedSeq.empty)(t.span)
+    case Tree(l,children) if children.length == 0 =>
+      val headChild = findHeadChild(t,identity[L])
+      val rec = children.map(annotateHeadWords(_,words))
+      Tree( l -> rec(headChild).label._2, rec)(t.span)
+  }
 
 }

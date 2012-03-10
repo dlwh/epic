@@ -211,8 +211,8 @@ object ParseChart {
     final def sum(a: Double, b: Double) = {
       // log1p isn't optimized, and I don't really care about accuracy that much
       // scalala.library.Numerics.logSum(a,b)
-      if (a.isNegInfinity) b
-      else if (b.isNegInfinity) a
+      if (a == Double.NegativeInfinity) b
+      else if (b == Double.NegativeInfinity) a
       else if (a < b) b + log(1+exp(a - b))
       else a + log(1+exp(b - a))
     }

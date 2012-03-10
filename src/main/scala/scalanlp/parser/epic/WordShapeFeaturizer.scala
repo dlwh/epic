@@ -35,7 +35,7 @@ class WordShapeFeaturizer[L](lexicon: Counter2[L,String,Double], initToZero: Boo
   def featuresFor(l: L, w: String) = {
     if(wordCounts(w) > 5) Counter(LexicalFeature(l,w) -> 1.0);
     else {
-      val features = ArrayBuffer[ Feature]();
+      val features = ArrayBuffer[Feature]();
       features += LexicalFeature(l,w);
       features += makeShapeFeature(l, w);
       features += SignatureFeature(l,signatureGenerator.signatureFor(w));
