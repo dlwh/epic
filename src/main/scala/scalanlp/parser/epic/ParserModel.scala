@@ -66,7 +66,7 @@ trait ParserModelFactory[L,W] extends ModelFactory[TreeInstance[L,W]] {
   type MyModel <: ParserModel[L,W]
 
   // Various useful helpful methods
-  protected def extractBasicCounts(trees: IndexedSeq[TreeInstance[L,W]]): (Counter2[L, W, Double], Counter2[L, BinaryRule[L], Double], Counter2[L, UnaryRule[L], Double]) = {
+  protected def extractBasicCounts[L,W](trees: IndexedSeq[TreeInstance[L,W]]): (Counter2[L, W, Double], Counter2[L, BinaryRule[L], Double], Counter2[L, UnaryRule[L], Double]) = {
     GenerativeParser.extractCounts(trees)
   }
 
@@ -80,7 +80,7 @@ trait ParserModelFactory[L,W] extends ModelFactory[TreeInstance[L,W]] {
     for ((t, w) <- baseLexicon.knownTagWords.toIterable; t2 <- indexedProjections.labels.refinementsOf(t)) yield (t2, w)
   }.toSet
 
-  protected def determineClosedWords(initLexicon: Counter2[L, W, Double]): Set[W] = {
+  protected def determineClosedWords[L,W](initLexicon: Counter2[L, W, Double]): Set[W] = {
     Set.empty ++ {
       val wordCounts = Library.sum(initLexicon)
       wordCounts.nonzero.pairs.iterator.filter(_._2 > 5).map(_._1)
