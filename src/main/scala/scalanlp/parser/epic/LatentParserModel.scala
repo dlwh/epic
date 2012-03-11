@@ -7,19 +7,15 @@ import splitting.StateSplitting
 import ParseChart.LogProbabilityParseChart
 import scalala.tensor.dense.DenseVector
 import scalala.tensor.sparse.SparseVector
-import scalanlp.optimize.FirstOrderMinimizer.OptParams
-import scalanlp.parser.ParseEval.Statistics
 import scalala.library.Library
-import scalala.tensor.::
-import scalala.library.Library._
-import scalanlp.optimize.{RandomizedGradientCheckingFunction, BatchDiffFunction, FirstOrderMinimizer, CachedBatchDiffFunction}
 
-class LatentParserModel[L,L2,W](featurizer: Featurizer[L2,W],
-                                root:L2,
-                                proj: GrammarProjections[L,L2],
-                                knownTagWords: Iterable[(L2,W)],
-                                openTags: Set[L2],
-                                closedWords: Set[W]) extends AbstractParserModel[L,L2,W] {
+class LatentParserModel[L,L3,W](featurizer: Featurizer[L3,W],
+                                root: L3,
+                                proj: GrammarProjections[L,L3],
+                                knownTagWords: Iterable[(L3,W)],
+                                openTags: Set[L3],
+                                closedWords: Set[W]) extends ParserModel[L,W] {
+  type L2 = L3
   type Inference = LatentParserInference[L,L2, W]
 
   val indexedFeatures: FeatureIndexer[L2, W]  = FeatureIndexer(featurizer, knownTagWords, proj)
@@ -85,74 +81,37 @@ case class LatentParserInference[L,L2,W](builder: ChartBuilder[LogProbabilityPar
 
 }
 
+case class LatentParserModelFactory(parser: ParserParams.BaseParser[String],
+                                    numStates: Int) extends ParserModelFactory[String, String] {
+  type MyModel = LatentParserModel[String,(String,Int),String]
 
-object LatentPipeline extends ParserPipeline {
-  case class Params(parser: ParserParams.BaseParser[String],
-                    opt: OptParams,
-                    numStates: Int= 2,
-                    iterationsPerEval: Int = 50,
-                    maxIterations: Int = 202,
-                    iterPerValidate: Int = 10);
-  protected val paramManifest = manifest[Params]
-
-
-  def split(x: String, numStates: Int) = {
-    if(x.isEmpty) Seq((x,0))
+  def split(x: String, root: String, numStates: Int) = {
+    if(x == root) Seq((x,0))
     else for(i <- 0 until numStates) yield (x,i)
   }
 
   def unsplit(x: (String,Int)) = x._1
 
-  def trainParser(trainTrees: IndexedSeq[TreeInstance[String, String]], validate: (Parser[String, String]) => Statistics, params: Params) = {
-    import params._
-    val (initLexicon,initBinaries,initUnaries) = GenerativeParser.extractCounts(trainTrees)
 
-    val xbarParser = parser.optParser.getOrElse {
-      println("building a parser from scratch...")
-      val grammar = Grammar(Library.logAndNormalizeRows(initBinaries),Library.logAndNormalizeRows(initUnaries))
-      val lexicon = new SimpleLexicon(initLexicon)
-      new CKYChartBuilder[LogProbabilityParseChart,String,String]("",lexicon,grammar,ParseChart.logProb)
+  def make(trainTrees: IndexedSeq[TreeInstance[String, String]]) = {
+    val (initLexicon,initBinaries,initUnaries) = this.extractBasicCounts(trainTrees)
+
+    val xbarParser = parser.optParser getOrElse {
+      val grammar = Grammar(Library.logAndNormalizeRows(initBinaries),Library.logAndNormalizeRows(initUnaries));
+      val lexicon = new SimpleLexicon(initLexicon);
+      new CKYChartBuilder[LogProbabilityParseChart,String,String]("",lexicon,grammar,ParseChart.logProb);
     }
+
     val feat = new SumFeaturizer(new SimpleFeaturizer[String,String], new WordShapeFeaturizer[String](initLexicon))
     val latentFeat = new SubstateFeaturizer(feat)
-    val indexedProjections = GrammarProjections(xbarParser.grammar, split(_:String,numStates), unsplit)
+    val indexedProjections = GrammarProjections(xbarParser.grammar, split(_:String,xbarParser.root, numStates), unsplit)
 
-    val openTags = Set.empty ++ {
-      for(t <- initLexicon.nonzero.keys.map(_._1) if initLexicon(t,::).size > 50; t2 <- split(t, numStates).iterator ) yield t2
-    }
+    val openTags = determineOpenTags(initLexicon, indexedProjections)
+    val knownTagWords = determineKnownTags(xbarParser.lexicon, indexedProjections)
+    val closedWords = determineClosedWords(initLexicon)
 
-    val knownTagWords = {
-      for( (t,w) <- xbarParser.lexicon.knownTagWords.toIterable; t2 <- split(t,numStates)) yield (t2,w)
-    }
-
-    val closedWords = Set.empty ++ {
-      val wordCounts = sum(initLexicon)
-      wordCounts.nonzero.pairs.iterator.filter(_._2 > 5).map(_._1)
-    }
-
-    val model = new LatentParserModel[String,(String,Int),String](latentFeat, ("",0), indexedProjections, knownTagWords, openTags, closedWords)
-
-    val obj = new ModelObjective(model,trainTrees)
-    val cachedObj = new CachedBatchDiffFunction(obj)
-    val init = obj.initialWeightVector
-
-    type OptState = FirstOrderMinimizer[DenseVector[Double],BatchDiffFunction[DenseVector[Double]]]#State
-    def evalAndCache(pair: (OptState,Int) ) {
-      val (state,iter) = pair
-      val weights = state.x
-      if(iter % iterPerValidate == 0) {
-        println("Validating...")
-        val parser = model.extractParser(weights)
-        println(validate(parser))
-      }
-    }
-
-    for( (state,iter) <- params.opt.iterations(cachedObj,init).take(maxIterations).zipWithIndex.tee(evalAndCache _)
-         if iter != 0 && iter % iterationsPerEval == 0) yield try {
-      val parser = model.extractParser(state.x)
-      ("LatentDiscrim-" + iter.toString,parser)
-    } catch {
-      case e => println(e);e.printStackTrace(); throw e
-    }
+    new LatentParserModel[String,(String,Int),String](latentFeat, ("",0), indexedProjections, knownTagWords, openTags, closedWords)
   }
+
 }
+

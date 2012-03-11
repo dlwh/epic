@@ -4,16 +4,17 @@ import scalala.tensor.dense.DenseVector
 import scalanlp.parser.InsideOutside.{ExpectedCounts=>TrueCounts}
 import scalanlp.parser._
 import projections.{ProjectingSpanScorer, GrammarProjections}
-
+import scalala.tensor.{Counter2,::}
+import scalala.library.Library
 
 /**
- * 
+ * Base trait for Parser-type models
  * @author dlwh
  */
-
-trait AbstractParserModel[L,L2,W] extends Model[TreeInstance[L,W]] {
+trait ParserModel[L,W] extends Model[TreeInstance[L,W]] {
+  type L2 // refined label type
   type ExpectedCounts = ParserExpectedCounts[W]
-  type Inference <: ParserInference[L,L2, W]
+//  type Inference <: ParserInference[L, L2, W]
 
   def extractParser(weights: DenseVector[Double]):Parser[L,W]
 
@@ -57,4 +58,32 @@ case class ParserExpectedCounts[W](trueCounts: TrueCounts[W]) extends ExpectedCo
   }
 
   def loss = trueCounts.logProb
+}
+
+trait ParserModelFactory[L,W] extends ModelFactory[TreeInstance[L,W]] {
+  type MyModel <: ParserModel[L,W]
+
+  // Various useful helpful methods
+  protected def extractBasicCounts(trees: IndexedSeq[TreeInstance[L,W]]): (Counter2[L, W, Double], Counter2[L, BinaryRule[L], Double], Counter2[L, UnaryRule[L], Double]) = {
+    GenerativeParser.extractCounts(trees)
+  }
+
+  protected def determineOpenTags[L,L2,W](initLexicon: Counter2[L, W, Double], indexedProjections: GrammarProjections[L, L2]): Set[L2] = {
+    Set.empty ++ {
+      for (t <- initLexicon.nonzero.keys.map(_._1) if initLexicon(t, ::).size > 50; t2 <- indexedProjections.labels.refinementsOf(t)) yield t2
+    }
+  }
+
+  protected def determineKnownTags[L,L2,W](baseLexicon: Lexicon[L, W], indexedProjections: GrammarProjections[L, L2]): Set[(L2,W)] = {
+    for ((t, w) <- baseLexicon.knownTagWords.toIterable; t2 <- indexedProjections.labels.refinementsOf(t)) yield (t2, w)
+  }.toSet
+
+  protected def determineClosedWords(initLexicon: Counter2[L, W, Double]): Set[W] = {
+    Set.empty ++ {
+      val wordCounts = Library.sum(initLexicon)
+      wordCounts.nonzero.pairs.iterator.filter(_._2 > 5).map(_._1)
+    }
+  }
+
+
 }

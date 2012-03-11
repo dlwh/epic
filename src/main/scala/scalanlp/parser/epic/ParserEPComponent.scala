@@ -8,14 +8,16 @@ import scalanlp.parser.ParseChart._
 import scalanlp.trees.BinarizedTree
 
 /**
- * 
+ * Attaches projection to a ParserModel, producing a new ParserModel
  * @author dlwh
  */
-
-class ParserEPComponent[L,L2,W](val base: AbstractParserModel[L, L2, W],
-                                val projector: EPProjector[L,L2, W]) extends Model[TreeInstance[L,W]] {
+class ParserEPComponent[L,L3,W](val base: ParserModel[L, W] { type L2 = L3 },
+                                val projector: EPProjector[L, L3, W]) extends ParserModel[L, W] {
+  type L2 = L3
   type ExpectedCounts = base.ExpectedCounts
   type Inference = ParserComponentInference[L,L2,W]
+
+  def extractParser(weights: DenseVector[Double]) = base.extractParser(weights)
 
   def numFeatures = base.numFeatures
 

@@ -19,7 +19,7 @@ import scalanlp.optimize.{BatchDiffFunction, FirstOrderMinimizer, CachedBatchDif
  * @author dlwh
  */
 
-class EPModel[Datum, Augment](models: Model[Datum] { type Inference <: ProjectableInference[Datum,Augment]}*)(implicit aIsFactor: Augment<:<Factor[Augment]) extends Model[Datum] {
+class EPModel[Datum, Augment](maxEPIter: Int, models: Model[Datum] { type Inference <: ProjectableInference[Datum,Augment]}*)(implicit aIsFactor: Augment<:<Factor[Augment]) extends Model[Datum] {
   type ExpectedCounts = EPExpectedCounts
   type Inference = EPInference[Datum, Augment]
 
@@ -43,7 +43,7 @@ class EPModel[Datum, Augment](models: Model[Datum] { type Inference <: Projectab
     val builders = ArrayBuffer.tabulate(models.length) { i =>
       models(i).inferenceFromWeights(allWeights(i))
     }
-    new EPInference(builders)
+    new EPInference(builders, maxEPIter)
   }
 
   private def partitionWeights(weights: DenseVector[Double]): Array[DenseVector[Double]] = {
@@ -77,7 +77,8 @@ case class EPExpectedCounts(var loss: Double, counts: IndexedSeq[ExpectedCounts[
   }
 }
 
-case class EPInference[Datum, Augment](inferences: IndexedSeq[ProjectableInference[Datum, Augment]])(implicit aIsFactor: Augment<:<Factor[Augment]) extends AugmentableInference[Datum, Augment] {
+case class EPInference[Datum, Augment](inferences: IndexedSeq[ProjectableInference[Datum, Augment]],
+                                        maxEPIter: Int)(implicit aIsFactor: Augment<:<Factor[Augment]) extends AugmentableInference[Datum, Augment] {
   type ExpectedCounts = EPExpectedCounts
 
   def baseAugment(v: Datum) = inferences(0).baseAugment(v)
@@ -99,7 +100,6 @@ case class EPInference[Datum, Augment](inferences: IndexedSeq[ProjectableInferen
     }
     val ep = new ExpectationPropagation(project _)
 
-    val maxEPIter = 4
     var state : ep.State = null
     val iterates = ep.inference(augment, 0 until inferences.length, inferences.map(_.baseAugment(datum)))
     var iter = 0
@@ -131,12 +131,14 @@ case class EPInference[Datum, Augment](inferences: IndexedSeq[ProjectableInferen
 }
 
 object EPPipeline extends ParserPipeline {
+  case class EPParams(iterations: Int= 5, pruningThreshold: Double = -15)
   case class Params(parser: ParserParams.BaseParser[String],
                     opt: OptParams,
                     numStates: Int= 2,
                     iterationsPerEval: Int = 50,
-                    maxIterations: Int = 202,
-                    iterPerValidate: Int = 10);
+                    maxIterations: Int = 1001,
+                    iterPerValidate: Int = 10,
+                    ep: EPParams);
   protected val paramManifest = manifest[Params]
 
 
@@ -175,8 +177,8 @@ object EPPipeline extends ParserPipeline {
     }
 
     val model = new LatentParserModel[String,(String,Int),String](latentFeat, ("",0), indexedProjections, knownTagWords, openTags, closedWords)
-    val projector = new AnchoredRuleApproximator(xbarParser,indexedProjections,-20)
-    val epModel = new EPModel(new ParserEPComponent(model, projector),new ParserEPComponent(model, projector))
+    val projector = new AnchoredRuleApproximator(xbarParser,indexedProjections,ep.pruningThreshold)
+    val epModel = new EPModel(ep.iterations, new ParserEPComponent(model, projector),new ParserEPComponent(model, projector))
 
     val obj = new ModelObjective(epModel,trainTrees)
     val cachedObj = new CachedBatchDiffFunction(obj)
