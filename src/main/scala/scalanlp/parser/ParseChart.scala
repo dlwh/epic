@@ -23,6 +23,7 @@ import scalala.tensor.Counter
 import scalala.tensor.dense.DenseVectorCol
 import scalanlp.parser.ParseChart.FeasibleSpan
 import math._
+import java.util.Arrays
 
 @SerialVersionUID(2)
 abstract class ParseChart[L](val grammar: Encoder[L], val length: Int, lexicalize: Boolean = false) extends Serializable {
@@ -152,13 +153,23 @@ abstract class ParseChart[L](val grammar: Encoder[L], val length: Int, lexicaliz
 
 
     // right most place a left constituent with label l can start and end at position i
-    val narrowLeft = Array.fill(length+1)(Array.fill(chartSize)(-1))
+    val narrowLeft = fastFill(length+1,chartSize,-1)
     // left most place a left constituent with label l can start and end at position i
-    val wideLeft = Array.fill(length+1)(Array.fill(chartSize)(length+1))
+    val wideLeft = fastFill(length+1,chartSize,length+1)
     // left most place a right constituent with label l--which starts at position i--can end.
-    val narrowRight = Array.fill(length+1)(Array.fill(chartSize)(length+1))
+    val narrowRight = fastFill(length+1,chartSize,length+1)
     // right-most place a right constituent with label l--which starts at position i--can end.
-    val wideRight = Array.fill(length+1)(Array.fill(chartSize)(-1))
+    val wideRight = fastFill(length+1,chartSize,-1)
+  }
+
+  def fastFill(len1: Int, len2: Int, value: Int) = {
+    val arr = Array.ofDim[Int](len1,len2)
+    var i = 0
+    while(i < len1) {
+      Arrays.fill(arr(i),value)
+      i += 1
+    }
+    arr
   }
 
 
