@@ -19,7 +19,7 @@ import scalanlp.optimize.{BatchDiffFunction, FirstOrderMinimizer, CachedBatchDif
  * @author dlwh
  */
 
-class EPModel[Datum, Augment](models: Model[Datum] { type Inference <: ProjectableInference[Datum,Augment]}*)(implicit aIsFactor: Augment<:<Factor[Augment]) extends Model[Datum] {
+class EPModel[Datum, Augment](maxEPIter: Int, models: Model[Datum] { type Inference <: ProjectableInference[Datum,Augment]}*)(implicit aIsFactor: Augment<:<Factor[Augment]) extends Model[Datum] {
   type ExpectedCounts = EPExpectedCounts
   type Inference = EPInference[Datum, Augment]
 
@@ -43,7 +43,7 @@ class EPModel[Datum, Augment](models: Model[Datum] { type Inference <: Projectab
     val builders = ArrayBuffer.tabulate(models.length) { i =>
       models(i).inferenceFromWeights(allWeights(i))
     }
-    new EPInference(builders)
+    new EPInference(builders, maxEPIter)
   }
 
   private def partitionWeights(weights: DenseVector[Double]): Array[DenseVector[Double]] = {
@@ -77,7 +77,8 @@ case class EPExpectedCounts(var loss: Double, counts: IndexedSeq[ExpectedCounts[
   }
 }
 
-case class EPInference[Datum, Augment](inferences: IndexedSeq[ProjectableInference[Datum, Augment]])(implicit aIsFactor: Augment<:<Factor[Augment]) extends AugmentableInference[Datum, Augment] {
+case class EPInference[Datum, Augment](inferences: IndexedSeq[ProjectableInference[Datum, Augment]],
+                                        maxEPIter: Int)(implicit aIsFactor: Augment<:<Factor[Augment]) extends AugmentableInference[Datum, Augment] {
   type ExpectedCounts = EPExpectedCounts
 
   def baseAugment(v: Datum) = inferences(0).baseAugment(v)
@@ -99,7 +100,6 @@ case class EPInference[Datum, Augment](inferences: IndexedSeq[ProjectableInferen
     }
     val ep = new ExpectationPropagation(project _)
 
-    val maxEPIter = 4
     var state : ep.State = null
     val iterates = ep.inference(augment, 0 until inferences.length, inferences.map(_.baseAugment(datum)))
     var iter = 0
@@ -130,13 +130,51 @@ case class EPInference[Datum, Augment](inferences: IndexedSeq[ProjectableInferen
   }
 }
 
+case class EPParams(iterations: Int= 5, pruningThreshold: Double = -15)
+
+case class EPParserModelFactory(ep: EPParams,
+                                parser: ParserParams.BaseParser[String],
+                                model1: ParserModelFactory[String, String] = null,
+                                model2: ParserModelFactory[String, String] = null,
+                                model3: ParserModelFactory[String, String] = null,
+                                model4: ParserModelFactory[String, String] = null,
+                                model5: ParserModelFactory[String, String] = null
+                                 ) extends ModelFactory[TreeInstance[String, String]] {
+  type MyModel = EPModel[TreeInstance[String,String], SpanScorerFactor[String,String]] with EPParserExtractor[String,String]
+
+  def make(train: IndexedSeq[TreeInstance[String, String]]) = {
+    val (initLexicon,initBinaries,initUnaries) = GenerativeParser.extractCounts(train)
+
+    val xbarParser = parser.optParser getOrElse {
+      val grammar = Grammar(Library.logAndNormalizeRows(initBinaries),Library.logAndNormalizeRows(initUnaries));
+      val lexicon = new SimpleLexicon(initLexicon);
+      new CKYChartBuilder[LogProbabilityParseChart,String,String]("",lexicon,grammar,ParseChart.logProb);
+    }
+
+    type ModelType = Model[TreeInstance[String,String]] { type Inference <: ProjectableInference[TreeInstance[String,String],SpanScorerFactor[String, String]]}
+    val models = Seq(model1,model2,model3,model4,model5).filterNot(_ eq null) map { model =>
+      val m1 = model.make(train)
+      val projector = new AnchoredRuleApproximator(xbarParser,m1.projections,ep.pruningThreshold)
+      val wrappedM1 = new ParserEPComponent[String,m1.L2,String](m1, projector)
+      wrappedM1:ModelType
+    }
+
+    new EPModel(ep.iterations, models:_*) with EPParserExtractor[String, String] {
+      val zeroParser = SimpleChartParser(new CKYChartBuilder(xbarParser.root,
+        new ZeroLexicon(xbarParser.lexicon),
+        Grammar.zero(xbarParser.grammar),ParseChart.logProb))
+    }
+  }
+}
+
 object EPPipeline extends ParserPipeline {
-  case class Params(parser: ParserParams.BaseParser[String],
+  case class Params(modelFactory: EPParserModelFactory,
                     opt: OptParams,
                     numStates: Int= 2,
                     iterationsPerEval: Int = 50,
-                    maxIterations: Int = 202,
-                    iterPerValidate: Int = 10);
+                    maxIterations: Int = 1001,
+                    iterPerValidate: Int = 10,
+                    ep: EPParams);
   protected val paramManifest = manifest[Params]
 
 
@@ -149,34 +187,8 @@ object EPPipeline extends ParserPipeline {
 
   def trainParser(trainTrees: IndexedSeq[TreeInstance[String, String]], validate: (Parser[String, String]) => Statistics, params: Params) = {
     import params._
-    val (initLexicon,initBinaries,initUnaries) = GenerativeParser.extractCounts(trainTrees)
 
-    val xbarParser = parser.optParser.getOrElse {
-      println("building a parser from scratch...")
-      val grammar = Grammar(Library.logAndNormalizeRows(initBinaries),Library.logAndNormalizeRows(initUnaries))
-      val lexicon = new SimpleLexicon(initLexicon)
-      new CKYChartBuilder[LogProbabilityParseChart,String,String]("",lexicon,grammar,ParseChart.logProb)
-    }
-    val feat = new SumFeaturizer(new SimpleFeaturizer[String,String], new WordShapeFeaturizer[String](initLexicon))
-    val latentFeat = new SubstateFeaturizer(feat)
-    val indexedProjections = GrammarProjections(xbarParser.grammar, split(_:String,numStates), unsplit)
-
-    val openTags = Set.empty ++ {
-      for(t <- initLexicon.nonzero.keys.map(_._1) if initLexicon(t,::).size > 50; t2 <- split(t, numStates).iterator ) yield t2
-    }
-
-    val knownTagWords = {
-      for( (t,w) <- xbarParser.lexicon.knownTagWords.toIterable; t2 <- split(t,numStates)) yield (t2,w)
-    }
-
-    val closedWords = Set.empty ++ {
-      val wordCounts = sum(initLexicon)
-      wordCounts.nonzero.pairs.iterator.filter(_._2 > 5).map(_._1)
-    }
-
-    val model = new LatentParserModel[String,(String,Int),String](latentFeat, ("",0), indexedProjections, knownTagWords, openTags, closedWords)
-    val projector = new AnchoredRuleApproximator(xbarParser,indexedProjections,-20)
-    val epModel = new EPModel(new ParserEPComponent(model, projector),new ParserEPComponent(model, projector))
+    val epModel = modelFactory.make(trainTrees)
 
     val obj = new ModelObjective(epModel,trainTrees)
     val cachedObj = new CachedBatchDiffFunction(obj)
@@ -188,16 +200,14 @@ object EPPipeline extends ParserPipeline {
       val weights = state.x
       if(iter % iterPerValidate == 0) {
         println("Validating...")
-        val inf = epModel.inferenceFromWeights(state.x)
-        val parser = EPParserExtractor.extractEPParser(inf,SimpleChartParser(projector.zero))
+        val parser = epModel.extractParser(state.x)
         println(validate(parser))
       }
     }
 
     for( (state,iter) <- params.opt.iterations(cachedObj,init).take(maxIterations).zipWithIndex.tee(evalAndCache _)
          if iter != 0 && iter % iterationsPerEval == 0) yield try {
-      val inf = epModel.inferenceFromWeights(state.x)
-      val parser = EPParserExtractor.extractEPParser(inf,SimpleChartParser(projector.zero))
+      val parser = epModel.extractParser(state.x)
       ("LatentDiscrim-" + iter.toString,parser)
     } catch {
       case e => println(e);e.printStackTrace(); throw e

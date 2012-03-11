@@ -8,14 +8,16 @@ import scalanlp.parser.ParseChart._
 import scalanlp.trees.BinarizedTree
 
 /**
- * 
+ * Attaches projection to a ParserModel, producing a new ParserModel
  * @author dlwh
  */
-
-class ParserEPComponent[L,L2,W](val base: AbstractParserModel[L, L2, W],
-                                val projector: EPProjector[L,L2, W]) extends Model[TreeInstance[L,W]] {
+class ParserEPComponent[L,L3,W](val base: ParserModel[L, W] { type L2 = L3; type Inference <: ParserInference[L,L3,W] },
+                                val projector: EPProjector[L, L3, W]) extends Model[TreeInstance[L,W]] {
+  type L2 = L3
   type ExpectedCounts = base.ExpectedCounts
   type Inference = ParserComponentInference[L,L2,W]
+
+  def extractParser(weights: DenseVector[Double]) = base.extractParser(weights)
 
   def numFeatures = base.numFeatures
 
@@ -139,12 +141,15 @@ class AnchoredRuleApproximator[C,F,W](val coarseParser: ChartBuilder[LogProbabil
 
 }
 
-object EPParserExtractor {
-  def extractEPParser[L,W](model: EPInference[TreeInstance[L,W],SpanScorerFactor[L,W]], zeroParser: SimpleChartParser[L,L,W]):Parser[L,W] = {
+trait EPParserExtractor[L,W] extends EPModel[TreeInstance[L,W],SpanScorerFactor[L,W]] {
+  def zeroParser: SimpleChartParser[L,L,W]
+
+  def extractParser(weights: DenseVector[Double]) = {
+    val inference = this.inferenceFromWeights(weights)
     new Parser[L,W] with Serializable {
       def bestParse(s: Seq[W], spanScorer: SpanScorer[L]) = {
         val inst = new TreeInstance("",null,s,spanScorer)
-        val augment = model.getMarginals(inst,new SpanScorerFactor(zeroParser.builder.withCharts(ParseChart.logProb),s,spanScorer))._2
+        val augment = inference.getMarginals(inst,new SpanScorerFactor(zeroParser.builder.withCharts(ParseChart.logProb),s,spanScorer))._2
         zeroParser.bestParse(s,augment.scorer)
       }
     }
