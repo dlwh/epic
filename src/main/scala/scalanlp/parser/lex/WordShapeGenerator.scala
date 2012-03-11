@@ -12,8 +12,8 @@ import scalanlp.text.tokenize.EnglishWordClassGenerator
 class WordShapeGenerator(wordCounts: Counter[String, Double], minCountUnknown: Int = 5) extends Serializable {
   val signatureGenerator = EnglishWordClassGenerator;
 
-  def featuresFor(w: String):Counter[Feature,Double] = {
-    if(wordCounts(w) > minCountUnknown) Counter(IndicatorFeature(w) -> 1.0)
+  def featuresFor(w: String):ArrayBuffer[Feature] = {
+    if(wordCounts(w) > minCountUnknown) ArrayBuffer(IndicatorFeature(w))
     else {
       val features = ArrayBuffer[Feature]()
       features += IndicatorFeature(w);
@@ -45,23 +45,23 @@ class WordShapeGenerator(wordCounts: Counter[String, Double], minCountUnknown: I
       if(!hasLetter) features += (IndicatorFeature('HasNoLetter));
       if(hasNotLetter) features += (IndicatorFeature('HasNotLetter));
 
-      if(w.length > 3 && w.endsWith("s") && !w.endsWith("ss") && !w.endsWith("us") && !w.endsWith("is"))
+      if(wlen > 3 && w.endsWith("s") && !w.endsWith("ss") && !w.endsWith("us") && !w.endsWith("is"))
          features += (IndicatorFeature('EndsWithS));
-      else if(w.length >= 5 && !(hasDigit && numCaps > 0) && !hasDash)  {
-        features += (IndicatorFeature(w.substring(w.length-3)))
-        features += (IndicatorFeature(w.substring(w.length-2)))
-        features += (IndicatorFeature(w.substring(w.length-1)))
+      else if(wlen >= 5 && !(hasDigit && numCaps > 0) && !hasDash)  {
+        features += (IndicatorFeature(w.substring(wlen-3)))
+        features += (IndicatorFeature(w.substring(wlen-2)))
+        features += (IndicatorFeature(w.substring(wlen-1)))
         features += IndicatorFeature(w.substring(0,1))
         features += IndicatorFeature(w.substring(0,2))
         features += IndicatorFeature(w.substring(0,3))
       }
 
-      if(w.length > 10) {
+      if(wlen > 10) {
         features += (IndicatorFeature('LongWord));
-      } else if(w.length < 5) {
+      } else if(wlen < 5) {
         features += (IndicatorFeature('ShortWord));
       }
-      Counter(features.iterator.map(f => (f,1.0)));
+      features
     }
 
   }
