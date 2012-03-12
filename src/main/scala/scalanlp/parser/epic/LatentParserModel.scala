@@ -1,6 +1,7 @@
 package scalanlp.parser.epic
 
 import scalanlp.parser._
+import features.WordShapeFeaturizer
 import scalanlp.parser.InsideOutside.{ExpectedCounts=>TrueCounts}
 import projections.{ProjectingSpanScorer, GrammarProjections}
 import splitting.StateSplitting
@@ -104,7 +105,8 @@ case class LatentParserModelFactory(parser: ParserParams.BaseParser[String],
       new CKYChartBuilder[LogProbabilityParseChart,String,String]("",lexicon,grammar,ParseChart.logProb);
     }
 
-    val feat = new SumFeaturizer(new SimpleFeaturizer[String,String], new WordShapeFeaturizer[String](initLexicon))
+    val gen = new WordShapeFeaturizer(Library.sum(initLexicon))
+    val feat = new SumFeaturizer[String,String](new SimpleFeaturizer[String,String], new LexFeaturizer(gen))
     val latentFeat = new SubstateFeaturizer(feat)
     val indexedProjections = GrammarProjections(xbarParser.grammar, split(_:String,xbarParser.root, numStates), unsplit)
 

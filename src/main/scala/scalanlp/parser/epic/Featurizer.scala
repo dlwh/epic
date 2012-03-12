@@ -3,6 +3,7 @@ package scalanlp.parser.epic
 import scalala.tensor.Counter
 import collection.mutable.ArrayBuffer
 import scalanlp.parser.{UnaryRule, BinaryRule, Rule}
+import scalanlp.parser.features._
 
 /**
  * A Featurizer turns decisions in a grammar into a set of features, possibly weighted
@@ -42,6 +43,21 @@ class SumFeaturizer[L,W](f1: Featurizer[L,W], f2: Featurizer[L,W]) extends Featu
   def featuresFor(l: L, w: W)  = f1.featuresFor(l,w) + f2.featuresFor(l,w)
 
   def initialValueForFeature(f:  Feature) = f1.initialValueForFeature(f) + f2.initialValueForFeature(f)
+}
+
+class LexFeaturizer[L,W](wGen: W=>IndexedSeq[Feature],
+                         lGen: L=>Seq[Feature] = {(x:L)=>Seq(IndicatorFeature(x))}) extends Featurizer[L,W] {
+  def featuresFor(r: Rule[L]) = Counter[Feature, Double]()
+
+  def featuresFor(l: L, w: W) = {
+    val ctr = Counter[Feature, Double]()
+    for ( wf <- wGen(w); lf <- lGen(l)) {
+      ctr(PairFeature(lf,wf)) = 1.0
+    }
+    ctr
+  }
+
+  def initialValueForFeature(f: Feature) = 0.0
 }
 
 /**

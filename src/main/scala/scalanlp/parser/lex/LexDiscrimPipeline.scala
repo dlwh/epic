@@ -12,6 +12,7 @@ import scalala.tensor.dense.DenseVector
 import collection.immutable.BitSet
 import scalanlp.trees._
 import epic._
+import features._
 import projections.GrammarProjections
 import scalanlp.util._
 import scalala.tensor.sparse.{SparseVectorCol, SparseVector}
@@ -605,7 +606,7 @@ object LexDiscrimPipeline extends ParserPipeline {
     }
     val summedCounts = Library.sum(initLexicon)
     val shapeGen = new SimpleWordShapeGen(summedCounts)
-    val tagShapeGen = new WordShapeGenerator(summedCounts)
+    val tagShapeGen = new WordShapeFeaturizer(summedCounts)
     val feat = new StandardFeaturizer[String, String](shapeGen, { (w:String) => tagShapeGen.featuresFor(w)})
 
 //    def featGen(w: String) = {

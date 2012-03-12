@@ -1,6 +1,7 @@
 package scalanlp.parser.epic
 
 import scalanlp.parser._
+import features.{IndicatorFeature, WordShapeFeaturizer}
 import scalanlp.parser.InsideOutside.{ExpectedCounts=>TrueCounts}
 import projections.GrammarProjections
 import ParseChart.LogProbabilityParseChart
@@ -102,8 +103,6 @@ case class DiscParserInference[L,L2,W](ann: (BinarizedTree[L],Seq[W])=>Binarized
     new ParserExpectedCounts(expectedCounts)
   }
 
-
-
 }
 
 case class KMModelFactory(parser: ParserParams.BaseParser[String],
@@ -118,22 +117,24 @@ case class KMModelFactory(parser: ParserParams.BaseParser[String],
     }.seq.toIndexedSeq
 
     val (initLexicon,initBinaries,initUnaries) = this.extractBasicCounts(transformed)
+    val (xbarLexicon,xbarBinaries,xbarUnaries) = this.extractBasicCounts(trainTrees)
 
     val xbarParser = parser.optParser getOrElse {
-      val (initLexicon,initBinaries,initUnaries) = this.extractBasicCounts(trainTrees)
-      val grammar = Grammar(Library.logAndNormalizeRows(initBinaries),Library.logAndNormalizeRows(initUnaries));
-      val lexicon = new SimpleLexicon(initLexicon);
+      val grammar = Grammar(Library.logAndNormalizeRows(xbarBinaries),Library.logAndNormalizeRows(xbarUnaries));
+      val lexicon = new SimpleLexicon(xbarLexicon);
       new CKYChartBuilder[LogProbabilityParseChart,String,String]("",lexicon,grammar,ParseChart.logProb);
     }
     val grammar = Grammar(Library.logAndNormalizeRows(initBinaries),Library.logAndNormalizeRows(initUnaries));
-    val lexicon = new SignatureLexicon(initLexicon, EnglishWordClassGenerator, 5);
     val indexedProjections = GrammarProjections(xbarParser.grammar,grammar,{(_:AnnotatedLabel).label})
 
-    val feat = new SumFeaturizer[AnnotatedLabel,String](new SimpleFeaturizer, new WordShapeFeaturizer(initLexicon))
+    val gen = new WordShapeFeaturizer(Library.sum(initLexicon))
+    def labelFlattener(l: AnnotatedLabel) = {
+      Seq(l, l.label, l.copy(features=Set.empty)).map(IndicatorFeature)
+    }
+    val feat = new SumFeaturizer[AnnotatedLabel,String](new SimpleFeaturizer, new LexFeaturizer(gen, labelFlattener _))
 
-    val identityProjections = GrammarProjections.identity(grammar)
-    val openTags = determineOpenTags(initLexicon, identityProjections)
-    val knownTagWords = determineKnownTags(lexicon, identityProjections)
+    val openTags = determineOpenTags(xbarLexicon, indexedProjections)
+    val knownTagWords = determineKnownTags(xbarParser.lexicon, indexedProjections)
     val closedWords = determineClosedWords(initLexicon)
 
     new KMModel[String,AnnotatedLabel,String](feat, transformed.head.label.label, pipeline, indexedProjections, knownTagWords, openTags, closedWords)
