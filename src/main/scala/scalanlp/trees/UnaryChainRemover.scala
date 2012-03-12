@@ -5,6 +5,7 @@ import collection.mutable.ArrayBuffer
 import UnaryChainRemover._
 import scalala.tensor.mutable.Counter2
 import scalala.tensor.::
+import scalanlp.parser.TreeInstance
 
 /**
  * Removes unaries chains A -> B -> ... -> C, replacing them with A -> C and remembering the most likely
@@ -13,8 +14,8 @@ import scalala.tensor.::
  * @author dlwh
  */
 class UnaryChainRemover[L](trans: L=>L = identity[L]_) {
-  def removeUnaryChains[W](trees: Iterator[(BinarizedTree[L],Seq[W])]):(IndexedSeq[(BinarizedTree[L],Seq[W])],ChainReplacer[L]) = {
-    val buf = new ArrayBuffer[(BinarizedTree[L],Seq[W])];
+  def removeUnaryChains[W](trees: TraversableOnce[TreeInstance[L,W]]):(IndexedSeq[TreeInstance[L,W]],ChainReplacer[L]) = {
+    val buf = new ArrayBuffer[TreeInstance[L,W]];
     val counts = Counter2[(L,L),Seq[L],Int];
 
     def transform(t: BinarizedTree[L],parentWasUnary:Boolean):BinarizedTree[L] = t match {
@@ -32,9 +33,9 @@ class UnaryChainRemover[L](trans: L=>L = identity[L]_) {
     }
 
 
-    for( (t,w) <- trees) {
-      val tn = transform(t,true);
-      buf += (tn -> w);
+    for( ti <- trees) {
+      val tn = transform(ti.tree,true);
+      buf += ti.copy(tree=tn)
     }
 
     (buf,chainReplacer(counts, trans));
@@ -45,6 +46,24 @@ class UnaryChainRemover[L](trans: L=>L = identity[L]_) {
       val (chain,tn) = stripChain(c);
       (trans(l) :: chain, tn);
     case _ => (List.empty,t);
+  }
+
+  def justRemoveChains(tree: BinarizedTree[L]) = {
+
+    def transform(t: BinarizedTree[L],parentWasUnary:Boolean):BinarizedTree[L] = t match {
+      case UnaryTree(l,c) =>
+        val (chain,cn) = stripChain(c);
+        UnaryTree(l,transform(cn,true))(t.span);
+      case BinaryTree(l,lchild,rchild) =>
+        if(parentWasUnary) BinaryTree(l,transform(lchild,false),transform(rchild,false))(t.span);
+        else UnaryTree(l,BinaryTree(l,transform(lchild,false),transform(rchild,false))(t.span))(t.span);
+      case NullaryTree(l) =>
+        if(parentWasUnary) NullaryTree(l)(t.span);
+        else UnaryTree(l,NullaryTree(l)(t.span))(t.span);
+      case t => t;
+    }
+
+    transform(tree,true)
   }
 }
 

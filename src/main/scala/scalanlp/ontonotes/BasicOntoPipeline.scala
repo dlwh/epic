@@ -126,13 +126,9 @@ case class ProcessedOntobank(treebank: TreebankParams, annotationsTrain: String 
   def removeUnaryChains(trees: IndexedSeq[TreeInstance[OntoLabel,String]]) = {
     val chainRemover = new UnaryChainRemover[OntoLabel](stripAnnotations _);
 
-    val (dechained,chainReplacer) = chainRemover.removeUnaryChains(trees.iterator.map { ti => (ti.tree,ti.words)})
+    val (dechained,chainReplacer) = chainRemover.removeUnaryChains(trees)
 
-    val dechainedWithSpans = for {
-      ((t,w),TreeInstance(id,_,_,span)) <- (dechained zip trees)
-    } yield TreeInstance(id,t,w,span);
-
-    (dechainedWithSpans, chainReplacer)
+    (dechained, chainReplacer)
   }
 
 }

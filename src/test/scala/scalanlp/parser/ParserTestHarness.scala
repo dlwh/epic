@@ -28,13 +28,9 @@ trait ParserTestHarness {
   def removeUnaryChains(trees: IndexedSeq[TreeInstance[String,String]]) = {
     val chainRemover = new UnaryChainRemover[String];
 
-    val (dechained,chainReplacer) = chainRemover.removeUnaryChains(trees.iterator.map { ti => (ti.tree,ti.words)})
+    val (dechained,chainReplacer) = chainRemover.removeUnaryChains(trees)
 
-    val dechainedWithSpans = for {
-      ((t,w),TreeInstance(id,_,_,span)) <- (dechained zip trees)
-    } yield TreeInstance(id,t,w,span);
-
-    (dechainedWithSpans, chainReplacer)
+    (dechained, chainReplacer)
   }
 
   def massageTrees(trees: Iterator[(Tree[String],Seq[String])],
