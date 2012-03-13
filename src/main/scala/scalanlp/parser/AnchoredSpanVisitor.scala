@@ -44,7 +44,9 @@ object AnchoredSpanVisitor {
         case UnaryTree(a,Tree(b,_)) =>
           val r = ruleIndex(UnaryRule(a,b))
           v.visitUnaryRule(t2.span.start, t2.span.end, r, 1.0)
-          score += spanScorer.scoreUnaryRule(t2.span.start, t2.span.end, r)
+          val sScore = spanScorer.scoreUnaryRule(t2.span.start, t2.span.end, r)
+          if(!sScore.isInfinite) score += sScore
+          else println(":(")
         case n@NullaryTree(a) =>
           val aI = labelIndex(a)
           v.visitSpan(t2.span.start, t2.span.end, aI, 1.0)
