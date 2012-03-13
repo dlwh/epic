@@ -44,7 +44,7 @@ class LabeledSpanScorerFactory[C,L,W](parser: ChartParser[C,L,W], threshold: Dou
       val scoresForLocation = indexedProjections.coarseEncoder.mkOldSparseVector(Double.NegativeInfinity)
       for(l <- inside.bot.enteredLabelIndexes(begin,end)) {
         val pL = indexedProjections.project(l)
-        val myScore = inside.bot.labelScore(begin, end, l) + outside.bot.labelScore(begin, end, l) + scorer.scoreSpan(begin,end,l) - sentProb
+        val myScore = inside.bot.labelScore(begin, end, l) + outside.bot.labelScore(begin, end, l) - sentProb
         val currentScore = scoresForLocation(pL)
         scoresForLocation(pL) = Numerics.logSum(currentScore,myScore)
       }

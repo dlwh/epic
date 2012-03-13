@@ -16,10 +16,15 @@ import scalanlp.util.Index
  * @author dlwh
  */
 
-class ConstraintScorer[L](val scores: Array[BitSet]) extends SpanScorer[L] {
+class ConstraintScorer[L](val scores: Array[BitSet], topScores: Array[BitSet]) extends SpanScorer[L] {
   def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = 0.0
 
-  def scoreUnaryRule(begin: Int, end: Int, rule: Int) = 0.0
+  def scoreUnaryRule(begin: Int, end: Int, rule: Int) = {
+    val set = topScores(TriangularArray.index(begin,end))
+    if(set == null || !set.contains(rule)) Double.NegativeInfinity
+    else 0.0
+//    0.0
+  }
 
   def scoreSpan(begin: Int, end: Int, tag: Int) = {
     val set = scores(TriangularArray.index(begin,end))
@@ -32,7 +37,7 @@ class ConstraintScorer[L](val scores: Array[BitSet]) extends SpanScorer[L] {
  * Creates labeled span scorers for a set of trees from some parser.
  * @author dlwh
  */
-class ConstraintScorerFactory[C,L,W](parser: ChartParser[C,L,W], threshold: Double) extends SpanScorer.Factory[C,L,W] {
+class ConstraintScorerFactory[C,L,W](parser: SimpleChartParser[C,L,W], threshold: Double) extends SpanScorer.Factory[C,L,W] {
   def indexedProjections = parser.projections.labels
 
   def mkSpanScorer(s: Seq[W], scorer: SpanScorer[C] = SpanScorer.identity, goldTags: GoldTagPolicy[C] = GoldTagPolicy.noGoldTags[C]) = {
@@ -48,46 +53,49 @@ class ConstraintScorerFactory[C,L,W](parser: ChartParser[C,L,W], threshold: Doub
     chartScorer
   }
 
+  def scoresForCharts(scoresForLocation: Array[Double], begin: Int, end: Int, ichart: ParseChart[L]#ChartScores, ochart: ParseChart[L]#ChartScores, sentProb: Double, goldTags: GoldTagPolicy[C], scores: Array[collection.mutable.BitSet]) {
+    val active = new collection.mutable.BitSet()
+    Arrays.fill(scoresForLocation, Double.NegativeInfinity)
+    val index = TriangularArray.index(begin, end)
+    for (l <- ichart.enteredLabelIndexes(begin, end)) {
+      val pL = indexedProjections.project(l)
+      val myScore = ichart.labelScore(begin, end, l) + ochart.labelScore(begin, end, l) - sentProb
+      val currentScore = scoresForLocation(pL)
+      scoresForLocation(pL) = Numerics.logSum(currentScore, myScore)
+      active += pL
+    }
+
+    val gold = active.filter(goldTags.isGoldTag(begin, end, _))
+
+    for (c <- active) {
+      val v = scoresForLocation(c)
+      if (v > threshold || goldTags.isGoldTag(begin, end, c)) {
+        if (scores(index) eq null) {
+          scores(index) = new collection.mutable.BitSet()
+        }
+        scores(index) += c
+      }
+    }
+  }
+
   def buildSpanScorer(charts: ChartPair[ParseChart,L], sentProb: Double,
                       coarseScorer: SpanScorer[C] = SpanScorer.identity,
                       goldTags: GoldTagPolicy[C] = GoldTagPolicy.noGoldTags[C]):ConstraintScorer[C] = {
     import charts._
 
     val scores = TriangularArray.raw(inside.length+1,null:collection.mutable.BitSet)
+    val topScores = TriangularArray.raw(inside.length+1,null:collection.mutable.BitSet)
     val scoresForLocation = indexedProjections.coarseEncoder.fillArray(Double.NegativeInfinity)
-    var density = 0
-    var labelDensity = 0
+
     for(begin <-  0 until inside.length; end <- begin+1 to (inside.length)) {
-      val active = new collection.mutable.BitSet()
-      Arrays.fill(scoresForLocation,Double.NegativeInfinity)
-      val index = TriangularArray.index(begin, end)
-      for(l <- inside.bot.enteredLabelIndexes(begin,end)) {
-        val pL = indexedProjections.project(l)
-        val myScore = inside.bot.labelScore(begin, end, l) + outside.bot.labelScore(begin, end, l) + scorer.scoreSpan(begin,end,l) - sentProb
-        val currentScore = scoresForLocation(pL)
-        scoresForLocation(pL) = Numerics.logSum(currentScore,myScore)
-        active += pL
-      }
-
-      val gold = active.filter(goldTags.isGoldTag(begin,end,_))
-      val maxGoldTag = if(gold.isEmpty) -1 else gold.maxBy(scoresForLocation)
-
-      for( c <- active) {
-        val v = scoresForLocation(c)
-        if(v > threshold || maxGoldTag == c) {
-          if(scores(index) eq null) {
-            scores(index) = new collection.mutable.BitSet()
-            density += 1
-          }
-          scores(index) += c
-          labelDensity += 1
-        }
-      }
+      scoresForCharts(scoresForLocation, begin, end, inside.bot, outside.bot, sentProb, goldTags, scores)
+      scoresForCharts(scoresForLocation, begin, end, inside.top, outside.top, sentProb, goldTags, topScores)
 
     }
-    println("Density: " + density * 1.0 / scores.length)
-    println("Label Density:" + labelDensity * 1.0 / scores.length / parser.projections.labels.coarseIndex.size)
-    new ConstraintScorer[C](scores.map { e => if(e eq null) null else BitSet.empty ++ e})
+//    println("Density: " + density * 1.0 / scores.length)
+//    println("Label Density:" + labelDensity * 1.0 / scores.length / parser.projections.labels.coarseIndex.size)
+    new ConstraintScorer[C](scores.map { e => if(e eq null) null else BitSet.empty ++ e},
+      topScores.map { e => if(e eq null) null else BitSet.empty ++ e.flatMap(parser.builder.grammar.indexedUnaryRulesWithParent(_))})
   }
 
 }
