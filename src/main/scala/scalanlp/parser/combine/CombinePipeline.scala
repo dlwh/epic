@@ -8,8 +8,6 @@ import scalanlp.trees._
 import scalanlp.parser._
 import collection.immutable.IndexedSeq
 import collection.{Iterable, BufferedIterator, Iterator}
-import epic.ModelObjective
-import scalanlp.optimize.CachedBatchDiffFunction
 import scalanlp.optimize.FirstOrderMinimizer.OptParams
 import scalanlp.util._
 import scalanlp.trees.UnaryChainRemover.ChainReplacer
@@ -20,6 +18,7 @@ case class CombineParams(treebank: TreebankParams,
                   systems:String = "all",
                   testSection: String = "23",
                   devSection: String = "22",
+                  iterationsPerEval: Int = 50,
                   actualTest: Boolean = false,
                   opt: OptParams
                    )
@@ -37,6 +36,7 @@ trait CombinePipeline {
     val (baseConfig,files) = scalanlp.config.CommandLineParser.parseArguments(args)
     val config = baseConfig backoff Configuration.fromPropertiesFiles(files.map(new File(_)))
     val params = config.readIn[CombineParams]("");
+    println(params)
     import params._
     val trainSections = {
       if(params.trainSections == "all" && !params.actualTest) Set("00","01","24")

@@ -161,6 +161,7 @@ class MaxVariationalDecoder[C,F, W](coarseGrammar: Grammar[C], coarseLexicon: Le
   }
 }
 
+@SerialVersionUID(-185839943177203964L)
 class MaxConstituentDecoder[C,F,W](projections: GrammarProjections[C,F]) extends ChartDecoder[C,F,W] {
   val indexedProjections = projections.labels
   override def extractBestParse(root: F, grammar: Grammar[F],

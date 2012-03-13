@@ -5,6 +5,7 @@ import scalanlp.util.Index
 import collection.GenTraversable
 import scalala.tensor.sparse.SparseVector
 import scalala.tensor.dense.{DenseVectorCol, DenseVector}
+import actors.threadpool.AtomicInteger
 
 
 trait Model[Datum] { self =>
@@ -40,9 +41,12 @@ class ModelObjective[Datum](val model: Model[Datum],
 
   def calculate(x: DenseVector[Double], batch: IndexedSeq[Int]) = {
     val model = inferenceFromWeights(x)
+    var success = new AtomicInteger(0)
     val finalCounts = select(batch).aggregate(emptyCounts)({ (countsSoFar,datum) =>
       try {
-        model.expectedCounts(datum) += countsSoFar
+        val counts = model.expectedCounts(datum) += countsSoFar
+        success.incrementAndGet()
+        counts
       } catch {
         case e =>
           new Exception("While processing " + datum, e).printStackTrace()
@@ -50,7 +54,8 @@ class ModelObjective[Datum](val model: Model[Datum],
       }
     },{ (a,b) => b += a})
 
-    expectedCountsToObjective(finalCounts)
+    val (loss,grad) = expectedCountsToObjective(finalCounts)
+    (loss/success.intValue(),  grad / success.doubleValue())
   }
 }
 

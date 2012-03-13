@@ -135,7 +135,7 @@ object LabeledSpanExtractor {
           totals(index) = projVector;
         }
         totals(index)(l) += 1
-        getOrElseUpdate(lexicalScores,index,projVector())(l) = 0
+        getOrElseUpdate(lexicalScores,index,projVector())(l) += 1
       case UnaryTree(a,bc@Tree(b,_)) =>
         val rule = UnaryRule(a,b)
         val pR = ruleIndex(rule)
