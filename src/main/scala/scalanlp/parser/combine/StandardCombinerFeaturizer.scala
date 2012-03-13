@@ -17,6 +17,7 @@ import scalanlp.parser.{SpanScorer, ParseChart, CKYChartBuilder, Grammar}
  */
 class StandardCombinerFeaturizer(grammar: Grammar[String],
                                  tb: TreeBundle[String, String],
+                                 useRuleFeatures: Boolean,
                                  featureIndex: Index[Feature],
                                  systemIndex: Index[String],
                                  systemFeatures: Array[Int],
@@ -33,8 +34,9 @@ class StandardCombinerFeaturizer(grammar: Grammar[String],
 
   // (begin,end)->split->rule->features
   val binaryCache = new TriangularArray(tb.words.length+1,null:Array[OpenAddressHashArray[OldSparseVector]])
+  val dummySV = new OldSparseVector(featureIndex.size,0,0)
 
-  def featuresForBinary(begin: Int, split: Int, end: Int, rule: Int):OldSparseVector = {
+  def featuresForBinary(begin: Int, split: Int, end: Int, rule: Int):OldSparseVector = if(!useRuleFeatures) dummySV else  {
     var forSpan = binaryCache(begin,end)
     if(forSpan eq null) {
       binaryCache(begin,end) = new Array[OpenAddressHashArray[OldSparseVector]](end-begin)
@@ -80,7 +82,7 @@ class StandardCombinerFeaturizer(grammar: Grammar[String],
     sv
   }
 
-  def featuresForUnary(begin: Int, end: Int, rule: Int) = {
+  def featuresForUnary(begin: Int, end: Int, rule: Int) =  if(!useRuleFeatures) dummySV else {
     val sv = new OldSparseVector(featureIndex.size)
     for( (data, system) <- outputRules.zipWithIndex if data ne null) {
       import data._
@@ -126,7 +128,8 @@ class StandardCombinerFeaturizer(grammar: Grammar[String],
 
 
 class StandardCombinerFeaturizerFactory(systems: Set[String],
-                                        grammar: Grammar[String]) extends CombinerFeaturizerFactory[String, String] {
+                                        grammar: Grammar[String],
+                                        useRuleFeatures: Boolean) extends CombinerFeaturizerFactory[String, String] {
   val systemIndex = Index[String]()
   systemIndex.index("ALL")
   systems foreach {systemIndex.index _}
@@ -150,7 +153,7 @@ class StandardCombinerFeaturizerFactory(systems: Set[String],
   def featurizerFor(tb: TreeBundle[String, String]):CombinerFeaturizer[String,String] = {
     // make a coarse filter:
 
-    new StandardCombinerFeaturizer(grammar, tb, featureIndex, systemIndex, systemFeatures, ruleFeatureIndex, labelFeatureIndex)
+    new StandardCombinerFeaturizer(grammar, tb, useRuleFeatures:Boolean, featureIndex, systemIndex, systemFeatures, ruleFeatureIndex, labelFeatureIndex)
   }
 
 

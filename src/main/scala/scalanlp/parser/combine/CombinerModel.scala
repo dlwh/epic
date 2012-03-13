@@ -15,6 +15,9 @@ import scalala.library.Library
 import scalanlp.tensor.sparse.OldSparseVector
 import scalanlp.collection.mutable.TriangularArray
 import projections.{ConstraintScorerFactory, LabeledSpanScorerFactory}
+import java.util.concurrent.ConcurrentHashMap
+import collection.JavaConversions
+import java.io.{PrintStream, BufferedOutputStream, FileOutputStream}
 
 /**
  * 
@@ -86,6 +89,12 @@ case class CombinerECounts(var loss: Double, counts: DenseVector[Double]) extend
 
 }
 
+
+object CombinerCache {
+  // I feel dirty, but meh.
+  val mapCache = new JavaConversions.JConcurrentMapWrapper(new ConcurrentHashMap[Seq[Any],SpanScorer[_]])
+}
+
 class CombinerParserInference[L,W](builder: CKYChartBuilder[ParseChart.LogProbabilityParseChart, L, W],
                                    factory: CombinerFeaturizerFactory[L,W],
                                    weights: DenseVector[Double],
@@ -100,33 +109,36 @@ class CombinerParserInference[L,W](builder: CKYChartBuilder[ParseChart.LogProbab
 
   val scorerFactory = new ConstraintScorerFactory[L,L, W](SimpleChartParser(builder),-14)
 
-  def makeFilter(tb: TreeBundle[L, W]):SpanScorer[L] = {
-    val data = LabeledSpanExtractor.extractSpans(builder.grammar.labelIndex, tb.outputs.values)
-    val init = new SpanScorer[L] {
-      def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = {
-        0.0
-      }
+  def makeFilter(tb: TreeBundle[L, W]):SpanScorer[L] =  {
+    CombinerCache.mapCache.get(tb.words) match {
+      case Some(scorer) => scorer.asInstanceOf[SpanScorer[L]]
+      case None =>
+        val data = LabeledSpanExtractor.extractSpans(builder.grammar.labelIndex, tb.outputs.values)
+        val init = new SpanScorer[L] {
+          def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = {
+            0.0
+          }
 
-      def scoreUnaryRule(begin: Int, end: Int, rule: Int) = {
-        0.0
-      }
+          def scoreUnaryRule(begin: Int, end: Int, rule: Int) = {
+            0.0
+          }
 
-      def scoreSpan(begin: Int, end: Int, tag: Int) = {
-        val arr = data(TriangularArray.index(begin,end))
-        if( (arr eq null) || arr(tag) <= 0) 0.0
-        else arr(tag) * 3
-      }
+          def scoreSpan(begin: Int, end: Int, tag: Int) = {
+            val arr = data(TriangularArray.index(begin,end))
+            if( (arr eq null) || arr(tag) <= 0) 0.0
+            else arr(tag) * 3
+          }
+        }
+
+        val goldTreePolicy = if(forceGoldTree && tb.goldTree != null) {
+          GoldTagPolicy.goldTreeForcing[L](tb.goldTree.map(builder.grammar.labelIndex))
+        } else {
+          GoldTagPolicy.noGoldTags[L]
+        }
+        val scorer = scorerFactory.mkSpanScorer(tb.words, init, goldTreePolicy)
+        CombinerCache.mapCache.putIfAbsent(tb.words, scorer)
+        scorer
     }
-
-    val goldTreePolicy = if(forceGoldTree && tb.goldTree != null) {
-      GoldTagPolicy.goldTreeForcing[L](tb.goldTree.map(builder.grammar.labelIndex))
-    } else {
-      GoldTagPolicy.noGoldTags[L]
-    }
-    scorerFactory.mkSpanScorer(tb.words, init, goldTreePolicy)
-//    val inside = builder.buildInsideChart(tb.words, init)
-//    val outside = builder.buildOutsideChart(outside, init)
-//    val scorer = new
   }
 
   def goldCounts(value: TreeBundle[L, W], augment: CombinerSpanScorer[L, W]) = {
@@ -230,7 +242,7 @@ object DiscrimCombinePipeline extends CombinePipeline {
 //    println("Extracting features... will take some time...")
 
     val allSystems = trainTrees.iterator.flatMap(_.outputs.keysIterator).toSet
-    val featurizerFactory = new StandardCombinerFeaturizerFactory(allSystems, basicParser.grammar)
+    val featurizerFactory = new StandardCombinerFeaturizerFactory(allSystems, basicParser.grammar, params.useRuleFeatures)
 
     /*
     val processed = new AtomicInteger(0)
@@ -273,6 +285,12 @@ object DiscrimCombinePipeline extends CombinePipeline {
     val init = obj.initialWeightVector
     for( (state,iter) <- params.opt.iterations(cachedObj,init).take(params.opt.maxIterations).zipWithIndex
          if iter != 0 && iter % params.iterationsPerEval == 0) yield try {
+      val features:Counter[Feature,Double] = Encoder.fromIndex(featurizerFactory.featureIndex).decode(state.x)
+      val out = new PrintStream(new BufferedOutputStream(new FileOutputStream("combine-" + iter +".feats.txt")))
+      for( (f,v) <- features.pairsIterator.toSeq.sortBy(-_._2.abs)) {
+        out.println(f + "\t" + v)
+      }
+      out.close()
       val parser = model.extractParser(state.x, testTrees)
       ("Combine-" + iter.toString,parser)
     } catch {

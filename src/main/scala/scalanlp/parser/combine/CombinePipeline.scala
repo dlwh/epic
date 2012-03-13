@@ -20,6 +20,7 @@ case class CombineParams(treebank: TreebankParams,
                   devSection: String = "22",
                   iterationsPerEval: Int = 50,
                   actualTest: Boolean = false,
+                  useRuleFeatures: Boolean = true,
                   opt: OptParams
                    )
 
