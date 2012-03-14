@@ -2,7 +2,6 @@ package scalanlp.parser.combine
 
 import scalanlp.parser.features._
 import scalala.tensor.mutable.Counter
-import scalanlp.parser.lex.LabeledFeature
 import scalanlp.util.Index
 import collection.immutable.Set
 import scalala.tensor.sparse.SparseVector
@@ -126,6 +125,7 @@ class StandardCombinerFeaturizer(grammar: Grammar[String],
 
 }
 
+case class LabelFeature[L](l: L) extends Feature
 
 class StandardCombinerFeaturizerFactory(systems: Set[String],
                                         grammar: Grammar[String],
@@ -146,7 +146,7 @@ class StandardCombinerFeaturizerFactory(systems: Set[String],
   val labelFeatureIndex = Array.tabulate(systemIndex.size,grammar.labelIndex.size) { (i,j) =>
     val system = featureIndex.get(systemFeatures(i))
     val rule = grammar.labelIndex.get(j)
-    val f = PairFeature(system,new LabeledFeature(rule, null))
+    val f = PairFeature(system,LabelFeature(rule))
     featureIndex.index(f)
   }
 

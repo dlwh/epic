@@ -9,6 +9,8 @@ import ParseChart.LogProbabilityParseChart
 import scalala.tensor.dense.DenseVector
 import scalala.tensor.sparse.SparseVector
 import scalala.library.Library
+import java.io.{FileReader, BufferedReader, File}
+import io.Source
 
 class LatentParserModel[L,L3,W](featurizer: Featurizer[L3,W],
                                 root: L3,
@@ -85,16 +87,15 @@ case class LatentParserInference[L,L2,W](builder: ChartBuilder[LogProbabilityPar
 }
 
 case class LatentParserModelFactory(parser: ParserParams.BaseParser[String],
+                                    substates: File = null,
                                     numStates: Int) extends ParserModelFactory[String, String] {
   type MyModel = LatentParserModel[String,(String,Int),String]
 
-  def split(x: String, root: String, numStates: Int) = {
-    if(x == root) Seq((x,0))
-    else for(i <- 0 until numStates) yield (x,i)
+  def split(x: String, counts: Map[String,Int], numStates: Int) = {
+    for(i <- 0 until counts.getOrElse(x,numStates)) yield (x,i)
   }
 
   def unsplit(x: (String,Int)) = x._1
-
 
   def make(trainTrees: IndexedSeq[TreeInstance[String, String]]) = {
     val (initLexicon,initBinaries,initUnaries) = this.extractBasicCounts(trainTrees)
@@ -105,10 +106,21 @@ case class LatentParserModelFactory(parser: ParserParams.BaseParser[String],
       new CKYChartBuilder[LogProbabilityParseChart,String,String]("",lexicon,grammar,ParseChart.logProb);
     }
 
+    val substateMap = if(substates != null && substates.exists) {
+      val in = Source.fromFile(substates).getLines()
+      val pairs = for( line <- in) yield {
+        val split = line.split("\\s+")
+        split(0) -> split(1).toInt
+      }
+      pairs.toMap + (xbarParser.root -> 1)
+    } else {
+      Map(xbarParser.root -> 1)
+    }
+
     val gen = new WordShapeFeaturizer(Library.sum(initLexicon))
     val feat = new SumFeaturizer[String,String](new SimpleFeaturizer[String,String], new LexFeaturizer(gen))
     val latentFeat = new SubstateFeaturizer(feat)
-    val indexedProjections = GrammarProjections(xbarParser.grammar, split(_:String,xbarParser.root, numStates), unsplit)
+    val indexedProjections = GrammarProjections(xbarParser.grammar, split(_:String,substateMap, numStates), unsplit)
 
     val openTags = determineOpenTags(initLexicon, indexedProjections)
     val knownTagWords = determineKnownTags(xbarParser.lexicon, indexedProjections)

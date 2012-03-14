@@ -41,6 +41,7 @@ class ModelObjective[Datum](val model: Model[Datum],
 
   def calculate(x: DenseVector[Double], batch: IndexedSeq[Int]) = {
     val model = inferenceFromWeights(x)
+    val timeIn = System.currentTimeMillis()
     var success = new AtomicInteger(0)
     val finalCounts = select(batch).aggregate(emptyCounts)({ (countsSoFar,datum) =>
       try {
@@ -53,8 +54,12 @@ class ModelObjective[Datum](val model: Model[Datum],
           countsSoFar
       }
     },{ (a,b) => b += a})
+    val timeOut = System.currentTimeMillis()
+    println("Parsing took: " + (timeOut - timeIn) * 1.0/1000 + "s" )
 
     val (loss,grad) = expectedCountsToObjective(finalCounts)
+    val timeOut2 = System.currentTimeMillis()
+    println("Finishing took: " + (timeOut2 - timeOut) * 1.0/1000 + "s" )
     (loss/success.intValue(),  grad / success.doubleValue())
   }
 }
