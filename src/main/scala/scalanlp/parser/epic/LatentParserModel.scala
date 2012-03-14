@@ -128,6 +128,7 @@ case class LatentParserModelFactory(parser: ParserParams.BaseParser[String],
 
     new LatentParserModel[String,(String,Int),String](latentFeat, ("",0), indexedProjections, knownTagWords, openTags, closedWords)
   }
-
 }
+
+
 

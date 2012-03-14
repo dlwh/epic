@@ -81,7 +81,7 @@ class StandardCombinerFeaturizer(grammar: Grammar[String],
     sv
   }
 
-  def featuresForUnary(begin: Int, end: Int, rule: Int) =  if(!useRuleFeatures) dummySV else {
+  def featuresForUnary(begin: Int, end: Int, rule: Int) =  /*if(!useRuleFeatures) dummySV else*/ {
     val sv = new OldSparseVector(featureIndex.size)
     for( (data, system) <- outputRules.zipWithIndex if data ne null) {
       import data._

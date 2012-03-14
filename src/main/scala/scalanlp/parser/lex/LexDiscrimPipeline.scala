@@ -515,7 +515,6 @@ class LexModel[L, W](indexed: FeatureIndexer[L,W],
 }
 
 case class LexInference[L, W](builder: LexCKYChartBuilder[ParseChart.LogProbabilityParseChart, L, W],
-                              wordIndex: Index[W],
                               headFinder: HeadFinder[L]) extends MarginalInference[TreeInstance[L, W], SpanScorer[L]] {
   type ExpectedCounts = LexInsideOutside.ExpectedCounts[W]
   type Marginal = LexChartPair[ParseChart.LogProbabilityParseChart, L, W]
@@ -529,7 +528,7 @@ case class LexInference[L, W](builder: LexCKYChartBuilder[ParseChart.LogProbabil
 
   def guessCountsFromMarginals(v: TreeInstance[L, W], marg: Marginal, aug: SpanScorer[L]) = {
     val root_score = marg.partition
-    val ec = new LexInsideOutside(builder, wordIndex).expectedCounts(marg.spec, marg.inside,
+    val ec = new LexInsideOutside(builder).expectedCounts(marg.spec, marg.inside,
       marg.outside, root_score, marg.scorer)
     ec
   }
@@ -538,7 +537,7 @@ case class LexInference[L, W](builder: LexCKYChartBuilder[ParseChart.LogProbabil
   def goldCounts(ti: TreeInstance[L, W], augment: SpanScorer[L]) = {
     val g = builder.grammar
     val spec = g.specialize(ti.words)
-    val counts = new ExpectedCounts(builder.grammar.index.size, builder.grammar.labelIndex.size, wordIndex.size)
+    val counts = new ExpectedCounts(builder.grammar.index.size, builder.grammar.labelIndex.size)
     val words = ti.words
     var score = 0.0
     def rec(t: BinarizedTree[L]):Int= t match {
@@ -551,7 +550,7 @@ case class LexInference[L, W](builder: LexCKYChartBuilder[ParseChart.LogProbabil
         n.span.start
       case UnaryTree(a, b) =>
         val h = rec(b)
-        val headW = wordIndex(ti.words(h))
+        val headW = ti.words(h)
         val r = g.index(UnaryRule(a, b.label))
         counts.unaryCounts(r)(headW) += 1
         score += ( spec.scoreUnary(r, h)
@@ -564,7 +563,7 @@ case class LexInference[L, W](builder: LexCKYChartBuilder[ParseChart.LogProbabil
         val (head, dep) = if(headIsLeft) childHeads(0) -> childHeads(1) else childHeads(1) -> childHeads(0)
         val cache = counts.bCounts
         val r = g.index(BinaryRule(a, b, c))
-        cache(r)(wordIndex(ti.words(head)), wordIndex(ti.words(dep))) += 1
+        cache(r)(ti.words(head), ti.words(dep)) += 1
         if(headIsLeft) {
           score += ( spec.scoreRightComplement(r, head, dep)
 //            + ti.spanScorer.scoreSpan(t.span.start, t.span.end, g.labelIndex(a))
