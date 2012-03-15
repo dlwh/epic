@@ -50,15 +50,13 @@ object LexParseProjector {
 }
 
 class LexChartParser[L,W](baseGrammar: Grammar[L],
-                          builder: LexChartBuilder[ParseChart,L,W]) extends Parser[L,W] {
+                          builder: LexChartBuilder[ParseChart,L,W]) extends Parser[L,W] with Serializable {
   def charts(w: Seq[W], scorer: SpanScorer[L]) = {
     val pair = builder.buildCharts(w,scorer)
     import pair._
     val pi = LexParseProjector.projectChart(pair.inside, pair.outside, pair.partition, builder.chartFactory)
     pi
   }
-
-
 
   def bestParse(s: Seq[W], spanScorer: SpanScorer[L]) = {
     val marginals = charts(s, spanScorer)
