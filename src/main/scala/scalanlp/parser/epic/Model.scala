@@ -60,7 +60,7 @@ class ModelObjective[Datum](val model: Model[Datum],
     val (loss,grad) = expectedCountsToObjective(finalCounts)
     val timeOut2 = System.currentTimeMillis()
     println("Finishing took: " + (timeOut2 - timeOut) * 1.0/1000 + "s" )
-    (loss/success.intValue(),  grad / success.doubleValue())
+    (loss/success.intValue() * fullRange.size,  grad * (fullRange.size * 1.0 / success.intValue))
   }
 }
 
