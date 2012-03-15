@@ -61,8 +61,15 @@ case class DistFeature(dist: Int) extends Feature {
 case class IntRuleFeature(x: Int) extends Feature {
   override def hashCode = x
 }
+case class ProjRuleFeature(x: Int) extends Feature {
+  override def hashCode = x + 2003
+}
+case class LabelFeature(x: Int) extends Feature {
+  override def hashCode = x + 4007
+}
 
 case class StandardFeaturizer[L, W](wordIndex: Index[W],
+//                                    ruleFeatGen: Rule[L]=>IndexedSeq[AnyRef],
                                     featGen: (W) => IndexedSeq[AnyRef],
                                     tagFeatGen: (W=>IndexedSeq[AnyRef])) extends LexFeaturizer[L, W] {
 
@@ -451,16 +458,7 @@ class LexModel[L, W](indexed: FeatureIndexer[L,W],
 
   def extractParser(weights: DenseVector[Double]) = {
     val inf = inferenceFromWeights(weights)
-    val decoder = new MaxConstituentDecoder[L, L,W](GrammarProjections.identity(coarse.grammar))
-    new Parser[L, W] with Serializable {
-      def bestParse(s: Seq[W], spanScorer: SpanScorer[L]) = {
-        val marg = inf.marginal(new TreeInstance("", null, s, spanScorer), spanScorer)._1
-        val pi = LexParseProjector.projectChart(marg.inside, inf.builder.chartFactory)
-        val po = LexParseProjector.projectChart(marg.outside, inf.builder.chartFactory)
-        val bestParse = decoder.extractBestParse(coarse.root, coarse.grammar, pi, po, s, marg.scorer);
-        bestParse
-      }
-    }
+    new LexChartParser(coarse.grammar, inf.builder)
   }
 
   def numFeatures = indexed.index.size

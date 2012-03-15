@@ -27,7 +27,7 @@ import collection.mutable.ArrayBuffer
 import scalanlp.collection.mutable.{OpenAddressHashArray}
 
 @SerialVersionUID(2)
-sealed trait Grammar[L] extends Encoder[Rule[L]] with Serializable {
+trait Grammar[L] extends Encoder[Rule[L]] with Serializable {
   override val index: Index[Rule[L]]
   val labelIndex: Index[L];
   def labelEncoder  = Encoder.fromIndex(labelIndex)
