@@ -156,7 +156,7 @@ class CombinerParserInference[L,W](builder: CKYChartBuilder[ParseChart.LogProbab
     val inside = builder.buildInsideChart(v.words,aug)
     val outside = builder.buildOutsideChart(inside,aug)
     val root_score = inside.top.labelScore(0,v.words.length,builder.root)
-    println("Done parsing... " + v.id)
+//    println("Done parsing... " + v.id)
     new ChartPair[ParseChart.LogProbabilityParseChart,L](inside,outside,root_score,aug) -> root_score
   }
 
