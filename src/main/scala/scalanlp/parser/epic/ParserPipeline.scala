@@ -5,6 +5,7 @@ import scalanlp.parser.{Parser, TreeInstance}
 import scalanlp.parser.ParseEval.Statistics
 import scalala.tensor.dense.DenseVector
 import scalanlp.optimize.{BatchDiffFunction, FirstOrderMinimizer, CachedBatchDiffFunction}
+import java.io.File
 
 /**
  * Trains a single parser from a single model.
@@ -34,6 +35,7 @@ object ParserPipeline extends scalanlp.parser.ParserPipeline {
         println("Validating...")
         val parser = model.extractParser(weights)
         println(validate(parser))
+        model.saveWeights(new File("weights.ser.gz"), weights)
       }
     }
 

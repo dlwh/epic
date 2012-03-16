@@ -45,6 +45,27 @@ class SumFeaturizer[L,W](f1: Featurizer[L,W], f2: Featurizer[L,W]) extends Featu
   def initialValueForFeature(f:  Feature) = f1.initialValueForFeature(f) + f2.initialValueForFeature(f)
 }
 
+class RuleFeaturizer[L,W](lGen: L=>Seq[Feature] = {(x:L)=>Seq(IndicatorFeature(x))}) extends Featurizer[L,W] {
+  def featuresFor(l: L, w: W) = Counter[Feature,Double]()
+  def featuresFor(r: Rule[L]) = r match {
+    case BinaryRule(a,b,c) =>
+      val ctr = Counter[Feature,Double]()
+      for(aa <- lGen(a); bb <- lGen(b); cc <- lGen(c)) {
+        ctr(RuleFeature(BinaryRule(aa,bb,cc))) = 1
+      }
+      ctr
+    case UnaryRule(a,b) =>
+      val ctr = Counter[Feature,Double]()
+      for(aa <- lGen(a); bb <- lGen(b)) {
+        ctr(RuleFeature(UnaryRule(aa,bb))) = 1
+      }
+      ctr
+
+  }
+
+  def initialValueForFeature(f: Feature) = 0.0
+}
+
 class LexFeaturizer[L,W](wGen: W=>IndexedSeq[Feature],
                          lGen: L=>Seq[Feature] = {(x:L)=>Seq(IndicatorFeature(x))}) extends Featurizer[L,W] {
   def featuresFor(r: Rule[L]) = Counter[Feature, Double]()

@@ -9,6 +9,7 @@ import scalala.tensor.dense.DenseVector
 import scalala.tensor.sparse.SparseVector
 import scalala.library.Library
 import scalanlp.trees._
+import java.io.File
 
 class KMModel[L,L3,W](featurizer: Featurizer[L3,W],
                       root: L3,
@@ -65,6 +66,12 @@ class KMModel[L,L3,W](featurizer: Featurizer[L3,W],
     }
 
     result;
+  }
+
+
+  def saveWeights(f: File, weights: DenseVector[Double]) {
+    val decoded = indexedFeatures.decode(weights)
+    scalanlp.util.writeObject(f, decoded)
   }
 }
 
@@ -129,9 +136,11 @@ case class KMModelFactory(parser: ParserParams.BaseParser[String],
 
     val gen = new WordShapeFeaturizer(Library.sum(initLexicon))
     def labelFlattener(l: AnnotatedLabel) = {
-      Seq(l, l.label, l.copy(features=Set.empty)).map(IndicatorFeature)
+      val basic = Seq(l, l.label, l.copy(features=Set.empty))
+      val justAnnotations = for(l2 <- l.features) yield AnnotatedLabel(l.label).annotate(l2)
+      basic ++ justAnnotations map(IndicatorFeature)
     }
-    val feat = new SumFeaturizer[AnnotatedLabel,String](new SimpleFeaturizer, new LexFeaturizer(gen, labelFlattener _))
+    val feat = new SumFeaturizer[AnnotatedLabel,String](new RuleFeaturizer(labelFlattener _), new LexFeaturizer(gen, labelFlattener _))
 
     val openTags = determineOpenTags(xbarLexicon, indexedProjections)
     val knownTagWords = determineKnownTags(xbarParser.lexicon, indexedProjections)

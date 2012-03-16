@@ -152,6 +152,7 @@ trait EPParserExtractor[L,W] extends EPModel[TreeInstance[L,W],SpanScorerFactor[
 object EPParserExtractor {
   def extractParser[L,W](ex: EPParserExtractor[L,W], weights: DenseVector[Double]):Parser[L,W] = {
     val inference = ex.inferenceFromWeights(weights)
+    val zeroParser = ex.zeroParser
     new Parser[L,W] with Serializable {
       def bestParse(s: Seq[W], spanScorer: SpanScorer[L]) = {
         val inst = new TreeInstance("",null,s,spanScorer)

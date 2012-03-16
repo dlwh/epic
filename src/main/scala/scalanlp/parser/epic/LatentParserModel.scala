@@ -1,7 +1,7 @@
 package scalanlp.parser.epic
 
 import scalanlp.parser._
-import features.WordShapeFeaturizer
+import features.{IndicatorFeature, WordShapeFeaturizer}
 import scalanlp.parser.InsideOutside.{ExpectedCounts=>TrueCounts}
 import projections.{ProjectingSpanScorer, GrammarProjections}
 import splitting.StateSplitting
@@ -33,6 +33,11 @@ class LatentParserModel[L,L3,W](featurizer: Featurizer[L3,W],
     val parser = new CKYChartBuilder[LogProbabilityParseChart,L2,W](root, lexicon, grammar, ParseChart.logProb)
 
     new LatentParserInference(parser, projections)
+  }
+
+  def saveWeights(f: File, weights: DenseVector[Double]) {
+    val decoded = indexedFeatures.decode(weights)
+    scalanlp.util.writeObject(f, decoded)
   }
 
   def extractParser(weights: DenseVector[Double]):ChartParser[L,L2,W] = {
@@ -118,15 +123,18 @@ case class LatentParserModelFactory(parser: ParserParams.BaseParser[String],
     }
 
     val gen = new WordShapeFeaturizer(Library.sum(initLexicon))
-    val feat = new SumFeaturizer[String,String](new SimpleFeaturizer[String,String], new LexFeaturizer(gen))
-    val latentFeat = new SubstateFeaturizer(feat)
+    def labelFlattener(l: (String,Int)) = {
+      val basic = Seq(l, l._1)
+      basic map(IndicatorFeature)
+    }
+    val feat = new SumFeaturizer[(String,Int),String](new RuleFeaturizer(labelFlattener _), new LexFeaturizer(gen, labelFlattener _))
     val indexedProjections = GrammarProjections(xbarParser.grammar, split(_:String,substateMap, numStates), unsplit)
 
     val openTags = determineOpenTags(initLexicon, indexedProjections)
     val knownTagWords = determineKnownTags(xbarParser.lexicon, indexedProjections)
     val closedWords = determineClosedWords(initLexicon)
 
-    new LatentParserModel[String,(String,Int),String](latentFeat, ("",0), indexedProjections, knownTagWords, openTags, closedWords)
+    new LatentParserModel[String,(String,Int),String](feat, ("",0), indexedProjections, knownTagWords, openTags, closedWords)
   }
 }
 

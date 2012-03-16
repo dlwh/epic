@@ -208,7 +208,7 @@ object EPPipeline extends ParserPipeline {
     for( (state,iter) <- params.opt.iterations(cachedObj,init).take(maxIterations).zipWithIndex.tee(evalAndCache _)
          if iter != 0 && iter % iterationsPerEval == 0) yield try {
       val parser = epModel.extractParser(state.x)
-      ("LatentDiscrim-" + iter.toString,parser)
+      ("EP-" + iter.toString,parser)
     } catch {
       case e => println(e);e.printStackTrace(); throw e
     }

@@ -6,6 +6,7 @@ import scalanlp.parser._
 import projections.{ProjectingSpanScorer, GrammarProjections}
 import scalala.tensor.{Counter2,::}
 import scalala.library.Library
+import java.io.File
 
 /**
  * Base trait for Parser-type models
@@ -19,6 +20,8 @@ trait ParserModel[L,W] extends Model[TreeInstance[L,W]] {
   def projections: GrammarProjections[L, L2]
 
   def extractParser(weights: DenseVector[Double]):Parser[L,W]
+
+  def saveWeights(f: File, weights: DenseVector[Double])
 
 }
 
