@@ -159,7 +159,7 @@ case class EPParserModelFactory(ep: EPParams,
       wrappedM1:ModelType
     }
 
-    new EPModel(ep.iterations, models:_*) with EPParserExtractor[String, String] {
+    new EPModel(ep.iterations, models:_*) with EPParserExtractor[String, String] with Serializable {
       val zeroParser = SimpleChartParser(new CKYChartBuilder(xbarParser.root,
         new ZeroLexicon(xbarParser.lexicon),
         Grammar.zero(xbarParser.grammar),ParseChart.logProb))
