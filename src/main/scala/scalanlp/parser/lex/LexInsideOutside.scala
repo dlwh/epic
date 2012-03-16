@@ -7,12 +7,14 @@ import math.exp
 import scalala.tensor.mutable.{Counter, Counter2, Vector}
 
 import LexInsideOutside._
+import scalanlp.tensor.sparse.OldSparseVector
+import scalala.tensor.dense.{DenseVectorCol, DenseVector}
 
 /**
  * InsideOutside computes expected counts for rules and lexical emissions for a chart builder
  * @author dlwh
  */
-class LexInsideOutside[L,W](val parser: LexChartBuilder[LogProbabilityParseChart,L,W]) {
+class LexInsideOutside[L,W](featurizer: LexFeaturizer[L,W], val parser: LexChartBuilder[LogProbabilityParseChart,L,W]) {
   def grammar = parser.grammar
   def root = parser.root
   val indexedRoot = grammar.labelIndex(root)
@@ -28,41 +30,42 @@ class LexInsideOutside[L,W](val parser: LexChartBuilder[LogProbabilityParseChart
                      inside: LogProbabilityParseChart[L],
                      outside: LogProbabilityParseChart[L],
                      totalProb: Double, validSpan: SpanScorer[L]) = {
-    val wordCounts = computeWordCounts(spec, inside, outside, validSpan, totalProb)
-    val (lc,uc) = computeRuleCounts(spec, inside, outside, validSpan, totalProb)
+    val vector = DenseVector.zeros[Double](featurizer.featureIndex.size)
+    computeWordCounts(spec, inside, outside, validSpan, totalProb, vector)
+    computeRuleCounts(spec, inside, outside, validSpan, totalProb, vector)
 
-    ExpectedCounts(lc, uc, wordCounts, totalProb)
+    ExpectedCounts[W](vector, totalProb)
   }
 
   private def computeWordCounts(spec: LexGrammar[L,W]#Specialization,
                                 inside: LogProbabilityParseChart[L],
                                 outside: LogProbabilityParseChart[L],
                                 validSpan: SpanScorer[L],
-                                totalProb: Double): Array[Counter[W, Double]] = {
-    val wordCounts = grammar.labelEncoder.fillArray(Counter[W, Double]())
-    // handle lexical productions:
+                                totalProb: Double,
+                                vector: DenseVector[Double]) {
+    val fspec = featurizer.specialize(spec.words)
     for (i <- 0 until spec.words.length) {
-      val w = spec.words(i)
       for (lh <- inside.bot.enteredLabelIndexes(i, i + 1)) {
         val l = inside.bot.decodeLabelPart(lh)
         if (isTag(l)) {
           val iScore = inside.bot.labelScore(i, i + 1, lh)
           val oScore = outside.bot.labelScore(i, i + 1, lh)
           val count = exp(iScore + oScore - totalProb)
-          wordCounts(l)(w) += count
+          if(count > 0)
+            addMultiple(vector, fspec.featuresForTag(l,i), count)
         }
       }
     }
-    wordCounts
   }
+
 
   private def computeRuleCounts(spec: LexGrammar[L,W]#Specialization,
                                 inside: LogProbabilityParseChart[L],
                                 outside: LogProbabilityParseChart[L],
                                 validSpan: SpanScorer[L],
-                                totalProb: Double) = {
-    val lCounts = Array.fill(grammar.index.size)(Counter2[W,W,Double]())
-    val uCounts = Array.fill(grammar.index.size)(Counter[W,Double]())
+                                totalProb: Double,
+                                vector: DenseVector[Double]) = {
+    val fspec = featurizer.specialize(spec.words)
     // handle binary rules
     for{
       span <- 2 to inside.length
@@ -122,9 +125,7 @@ class LexInsideOutside[L,W](val parser: LexChartBuilder[LogProbabilityParseChart
                   }
                   split += 1
                 }
-                val wH = spec.words(h)
-                val wR = spec.words(right)
-                lCounts(r)(wH,wR) += selfScore
+                addMultiple(vector, fspec.featuresForRight(r,h,right), selfScore)
               }
             }
 
@@ -159,9 +160,8 @@ class LexInsideOutside[L,W](val parser: LexChartBuilder[LogProbabilityParseChart
                   }
                   split += 1
                 }
-                val wH = spec.words(h)
-                val wR = spec.words(left)
-                lCounts(r)(wH,wR) += selfScore
+                if(selfScore >= 0)
+                  addMultiple(vector, fspec.featuresForLeft(r,h,left), selfScore)
               }
             }
         }
@@ -170,7 +170,6 @@ class LexInsideOutside[L,W](val parser: LexChartBuilder[LogProbabilityParseChart
     }
 
     // Unaries
-    // TODO: only iterate over observed counts
     for{
       span <- 1 to spec.words.length
       begin <- 0 to (spec.words.length - span)
@@ -185,12 +184,10 @@ class LexInsideOutside[L,W](val parser: LexChartBuilder[LogProbabilityParseChart
         val aScore = outside.top.labelScore(begin, end, a, h)
         val rScore = spec.scoreUnary(r, h) + validSpan.scoreUnaryRule(begin,end,r);
         val prob = exp(bScore + aScore + rScore - totalProb);
-        if(prob != 0.0) {
-          uCounts(r)(spec.words(h)) += prob
-        }
+        if(prob >= 0)
+          addMultiple(vector, fspec.featuresForUnary(r,h), prob)
       }
     }
-    (lCounts,uCounts)
   }
 
   private val isTag = grammar.indexedTags
@@ -198,51 +195,23 @@ class LexInsideOutside[L,W](val parser: LexChartBuilder[LogProbabilityParseChart
 
 object LexInsideOutside {
 
-  final case class ExpectedCounts[W](bCounts: Array[Counter2[W,W,Double]],
-                                     unaryCounts: Array[Counter[W,Double]],
-                                     wordCounts: Array[Counter[W,Double]], // parent -> word -> counts
+  final case class ExpectedCounts[W](features: DenseVectorCol[Double],
                                      var logProb: Double) extends scalanlp.parser.epic.ExpectedCounts[ExpectedCounts[W]] {
 
     def loss = logProb
 
-    def this(numRules: Int, numLabels: Int) = this(Array.fill(numRules)(Counter2[W,W,Double]()),
-      Array.fill(numRules)(Counter[W,Double]()),
-      Array.fill(numLabels)(Counter[W,Double]()), 0.0)
+    def this(numFeatures: Int) = this(DenseVector.zeros(numFeatures), 0.0)
 
 //    def decode[L](g: Grammar[L]) = (decodeRules(g,ruleCounts), decodeWords(g,wordCounts))
 
     def +=(c: ExpectedCounts[W]) = {
-
-      for( (a,b) <- bCounts zip c.bCounts) {
-        a += b
-      }
-
-      for( (a,b) <- unaryCounts zip c.unaryCounts) {
-        a += b
-      }
-
-      for( (vec, k) <- c.wordCounts.iterator.zipWithIndex) {
-        wordCounts(k) += vec
-      }
-
+      features += c.features
       logProb += c.logProb
       this
     }
 
     def -=(c: ExpectedCounts[W]) = {
-
-      for( (a,b) <- bCounts zip c.bCounts) {
-        a -= b
-      }
-
-      for( (a,b) <- unaryCounts zip c.unaryCounts) {
-        a -= b
-      }
-
-      for( (vec,k) <- c.wordCounts.iterator.zipWithIndex) {
-        wordCounts(k) -= vec
-      }
-
+      features -= c.features
       logProb -= c.logProb
       this
     }
@@ -250,31 +219,15 @@ object LexInsideOutside {
 
   }
 
-//  def decodeRules[L](g: Grammar[L],
-//                     ruleCounts: Vector[Double]) = {
-//    val binaries = Counter2[L,BinaryRule[L],Double]()
-//    val unaries = Counter2[L,UnaryRule[L],Double]()
-//
-//    for ( (r,score) <- ruleCounts.pairsIteratorNonZero) {
-//      val rule = g.index.get(r)
-//      rule match {
-//        case rule@BinaryRule(p,_,_) =>
-//          binaries(p,rule) = score
-//        case rule@UnaryRule(p,c) =>
-//          unaries(p,rule) = score
-//      }
-//    }
-//    (binaries,unaries)
-//  }
 
-//  def decodeWords[L,W](g: Grammar[L], wordCounts: Array[Counter[W,Double]]) = {
-//    val ctr = Counter2[L,W,Double]()
-//    for( (c,i) <- wordCounts.zipWithIndex) {
-//      ctr(g.labelIndex.get(i), ::) := c
-//    }
-//    ctr
-//  }
-
+  private def addMultiple(vec: DenseVector[Double], feats: Array[Int], d: Double) = {
+    var i = 0
+    while(i < feats.length) {
+      vec(feats(i)) += d
+      i += 1
+    }
+    vec
+  }
 
 
 }

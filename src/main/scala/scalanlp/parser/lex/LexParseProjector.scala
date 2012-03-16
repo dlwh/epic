@@ -35,7 +35,7 @@ object LexParseProjector {
       Arrays.fill(offsets,0)
       for (ah <- inside.bot.enteredLabelIndexes(beg,end)) {
         val labelPart = inside.bot.decodeLabelPart(ah)
-        scoreBuf(labelPart)(offsets(labelPart)) = inside.bot.labelScore(beg,end,ah) + outside.top.labelScore(beg, end, ah) - rootScore
+        scoreBuf(labelPart)(offsets(labelPart)) = inside.bot.labelScore(beg,end,ah) + outside.bot.labelScore(beg, end, ah) - rootScore
         offsets(labelPart) += 1
       }
       for( a <- 0 until scoreBuf.length) {
