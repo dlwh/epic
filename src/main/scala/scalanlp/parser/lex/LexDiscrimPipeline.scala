@@ -65,29 +65,24 @@ case class StandardFeaturizer[L, W>:Null, P](wordIndex: Index[W],
   val featureIndex = Index[Feature]() // actual features
 
   // binned distances
-//  val distBins = Array(0,1,2,3)
-//  val minimums = Array(0,2,4,10)
-    val distBins = Array(0)
-    val minimums = Array(0)
+  val distBins = Array(0,1)
+  val minimums = Array(0,1)
+//    val distBins = Array(0)
+//    val minimums = Array(0)
   val numDistBins = distBins.length
 
-  private def binDistance(dist2:Int) = 0
-  /*
-  {
-    val dist = dist2.abs
-    if(dist >= 10) 3
-    else if (dist > 3) 2
-    else if(dist > 1) 1
+  private def binDistance(dist2:Int) = {
+    val dist = dist2.abs - 1
+    if(dist > 1) 1
     else 0
   }
-  */
 
-  def getHeadRuleFeatures(r: Int, w: Int, ww: W, distBin: Int): Array[Feature] = {
+  def getHeadRuleFeatures(r: Int, w: Int, ww: W, rawDistance: Int): Array[Feature] = {
     if(ruleIndex.get(r).children.size == 2) {
       val rawFeatures = for (rf <- ruleFeatures(r); wf <- indexedFeaturesForWord(w, ww)) yield HeadFeature(featureIndex.get(rf), wordPartIndex.get(rf))
-      val distedFeatures = for (f <- rawFeatures) yield DistFeature(distBins(distBin), f)
+      val distedFeatures = for (f <- rawFeatures) yield DistFeature(binDistance(rawDistance), f)
       (rawFeatures ++ distedFeatures)
-    } else if(distBin == 0) {
+    } else if(rawDistance == 0) {
       val rawFeatures = for( rf <- ruleFeatures(r); wf <- indexedFeaturesForWord(w, ww)) yield (HeadFeature(featureIndex.get(rf),wordPartIndex.get(rf)):Feature)
       rawFeatures
     } else {
@@ -95,19 +90,19 @@ case class StandardFeaturizer[L, W>:Null, P](wordIndex: Index[W],
     }
   }
 
-  def getDepRuleFeatures(r: Int, w: Int, ww: W, distBin: Int): Array[Feature] = {
+  def getDepRuleFeatures(r: Int, w: Int, ww: W, rawDistance: Int): Array[Feature] = {
     if(ruleIndex.get(r).children.size == 2) {
       val rawFeatures = for (rf <- ruleFeatures(r); wf <- indexedFeaturesForWord(w, ww)) yield DepFeature(featureIndex.get(rf), wordPartIndex.get(rf))
-      val distedFeatures = for (f <- rawFeatures) yield DistFeature(distBins(distBin), f)
+      val distedFeatures = for (f <- rawFeatures) yield DistFeature(binDistance(rawDistance), f)
       (rawFeatures ++ distedFeatures)
     } else {
       null
     }
   }
 
-  def getBilexFeatures(head: Int, hww: W, dep: Int, dww: W, sym: Symbol, d: Int): Array[Feature] = {
+  def getBilexFeatures(head: Int, hww: W, dep: Int, dww: W, sym: Symbol, rawDistance: Int): Array[Feature] = {
     val rawFeatures = for (rf <- indexedFeaturesForWord(head, hww); wf <- indexedFeaturesForWord(dep, dww)) yield BilexicalFeature(wordPartIndex.get(rf), wordPartIndex.get(wf), sym)
-    val distedFeatures = for (f <- rawFeatures) yield DistFeature(distBins(d), f)
+    val distedFeatures = for (f <- rawFeatures) yield DistFeature(binDistance(rawDistance), f)
     (rawFeatures ++ distedFeatures)
   }
 
@@ -121,12 +116,9 @@ case class StandardFeaturizer[L, W>:Null, P](wordIndex: Index[W],
   val tagCache = Encoder.fromIndex(wordIndex).tabulateArray(w => tagFeatGen(w).map(wordPartIndex.index(_)).toArray)
   // Rule -> Array[Feature Index]
   val ruleFeatures = Encoder.fromIndex(ruleIndex).tabulateArray(r => ruleFeatGen(r).map(featureIndex.index(_)).toArray);
-  // binned distance -> head word -> dependency word -> array of int features
-//  val headDepFeaturesLeft = Array.fill(distBins.size)(new OpenAddressHashArray[Array[Int]](wordIndex.size * wordIndex.size, null:Array[Int], cooccurringWords.size * 3))
-//  val headDepFeaturesRight = Array.fill(distBins.size)(new OpenAddressHashArray[Array[Int]](wordIndex.size * wordIndex.size, null:Array[Int], cooccurringWords.size * 3))
-  // index all bilexical features
 
-  {
+  // precompute features
+  { // bilexical features
     val allFeatures = cooccurringWords.par.aggregate(null:collection.mutable.Set[Feature])({ (set,wordPair) =>
       val (head,dep) = wordPair
       val headIndex = wordIndex(head)
@@ -140,18 +132,23 @@ case class StandardFeaturizer[L, W>:Null, P](wordIndex: Index[W],
     allFeatures foreach (featureIndex.index(_))
   }
 
-  // binned distance -> head word -> rule -> array of int features
-  val headRuleFeatures = Array.tabulate(numDistBins,wordIndex.size,ruleIndex.size){ (d,w,r) =>
-    val feats = getHeadRuleFeatures(r, w, null, minimums(d))
-    if(feats eq null) null
-    else feats.map(featureIndex.index(_))
-  }
-  // dist 0 also holds unary features
-  // binned distance -> dep word -> rule -> array of int features
-  val depRuleFeatures = Array.tabulate(numDistBins,wordIndex.size,ruleIndex.size){ (d,w,r) =>
-    val feats = getDepRuleFeatures(r, w, null, minimums(d))
-    if(feats eq null) null
-    else feats.map(featureIndex.index(_))
+  { // (head,rule) features and (dep,rule) features
+    // binned distance -> head word -> rule -> array of int features
+    val allFeatures = wordIndex.par.aggregate(null:collection.mutable.Set[Feature])({ (set,word) =>
+      val set2 = if(set eq null) collection.mutable.Set[Feature]() else set
+      val wi = wordIndex(word)
+      for(d <- 0 until distBins.length; r <- 0 until ruleIndex.size) {
+        val features = getHeadRuleFeatures(r, wi, word, minimums(d))
+        if(features ne null)
+          set2 ++= features
+
+        val depFeatures = getDepRuleFeatures(r, wi, word, minimums(d))
+        if(depFeatures ne null)
+          set2 ++= depFeatures
+      }
+      set2
+    }, {(a,b) => a ++= b})
+    allFeatures foreach (featureIndex.index(_))
   }
 
   // word -> Hash array of (Tag -> Array[Feature]). If the Tag isn't there, it's not allowed
@@ -165,38 +162,12 @@ case class StandardFeaturizer[L, W>:Null, P](wordIndex: Index[W],
     oah
   }
 
-  def indexedFeaturesForUnary(r: Int, w: Int, ww: W) = {
-    if(w >= 0) headRuleFeatures(0)(w)(r)
-    else {
-      stripEncode(featureIndex, getHeadRuleFeatures(r,w,ww,0))
-    }
-  }
-
-
-  def indexedFeaturesForRuleDep(r: Int, w: Int, ww: W, dist: Int) = {
-    if(w >= 0) depRuleFeatures(binDistance(dist))(w)(r)
-    else {
-      stripEncode(featureIndex, getDepRuleFeatures(r, w, ww, binDistance(dist)))
-    }
-  }
-
-
-
   def indexedFeaturesForWord(w: Int, ww: W) = {
     if(w >= 0) wordCache(w)
     else {
       featGen(ww).map(wordPartIndex).filter(_ >= 0).toArray
     }
   }
-
-
-  def indexedFeaturesForRuleHead(r: Int, w: Int, ww: W, dist: Int) = {
-    if(w >= 0) headRuleFeatures(binDistance(dist))(w)(r)
-    else {
-      stripEncode(featureIndex, getHeadRuleFeatures(r, w, ww, binDistance(dist)))
-    }
-  }
-
 
   private def stripEncode[F](index: Index[F], arr: Array[F]) = {
     val res = ArrayBuilder.make[Int]
@@ -215,27 +186,17 @@ case class StandardFeaturizer[L, W>:Null, P](wordIndex: Index[W],
   final class Spec(words: Seq[W]) extends Specialization {
     val indexed = words.map(wordIndex).toArray
     val bilexCache = new Array[Array[Int]](words.length * words.length)
-    /*
-    val cache = Array.tabulate(words.length){ wi =>
-      val w = words(wi)
-      val i = wordIndex(w)
-      if(i >= 0) wordCache(i)
-      else featGen(w).map(intern)
-    }
-    val tagcache = Array.tabulate(words.length) { wi =>
-      val w = words(wi)
-      val i = wordIndex(w)
-      if(i >= 0) tagCache(i)
-      else tagFeatGen(w).map(intern)
-    }
-    */
+    // headIndex -> (ruleIndex x dist) -> Array[Int]
+    val headCache = new Array[OpenAddressHashArray[Array[Int]]](words.length)
+    // depIndex -> (ruleIndex x dist) -> Array[Int]
+    val depCache = new Array[OpenAddressHashArray[Array[Int]]](words.length)
 
     private def mkOnesVector(array: Array[Int]) = {
       array
     }
 
     def featuresForUnary(rule: Int, head: Int) = {
-      val array = (ruleFeatures(rule) ++ indexedFeaturesForUnary(rule,indexed(head),words(head)))
+      val array = ruleFeatures(rule) ++ indexedFeaturesForUnary(rule,head)
       mkOnesVector(array)
     }
 
@@ -271,10 +232,8 @@ case class StandardFeaturizer[L, W>:Null, P](wordIndex: Index[W],
 
     private def indexedFeaturesForBinaryRule(r: Int, head: Int, dep: Int, dist: Int) = {
       val rule = ruleFeatures(r)
-      val ww = words(head)
-      val dww = words(dep)
-      val ruleHead = indexedFeaturesForRuleHead(r,indexed(head),ww, dist)
-      val ruleDep = indexedFeaturesForRuleDep(r,indexed(dep),dww, dist)
+      val ruleHead = indexedFeaturesForRuleHead(r,head, dist)
+      val ruleDep = indexedFeaturesForRuleDep(r,dep, dist)
       val bilex = indexedFeaturesForBilex(head,dep)
       val arr = new Array[Int](rule.length + ruleHead.length + ruleDep.length + bilex.length)
       var destPos = 0
@@ -298,13 +257,47 @@ case class StandardFeaturizer[L, W>:Null, P](wordIndex: Index[W],
       var cache = bilexCache(index)
       if(cache == null) {
         val dist = hw-dw
-        val binned = binDistance(dist)
-        val feats = getBilexFeatures(indexed(hw), words(hw), indexed(dw), words(dw), if(dist < 0) 'Left else 'Right, binned)
+        val feats = getBilexFeatures(indexed(hw), words(hw), indexed(dw), words(dw), if(dist < 0) 'Left else 'Right, dist)
         cache = stripEncode(featureIndex,feats)
         bilexCache(index) = cache
       }
       cache
     }
+
+
+
+    private def indexedFeaturesForRuleHead(r: Int, w: Int, dist: Int) = {
+      var rcache = headCache(w)
+      if(rcache eq null) {
+        rcache = new OpenAddressHashArray[Array[Int]](ruleIndex.size * numDistBins)
+        headCache(w) = rcache
+      }
+      val index = binDistance(dist) * ruleIndex.size + r
+      var cache = rcache(index)
+      if(cache == null)  {
+        cache = stripEncode(featureIndex, getHeadRuleFeatures(r, indexed(w), words(w), dist))
+        rcache(index) = cache
+      }
+      cache
+    }
+
+    private def indexedFeaturesForRuleDep(r: Int, w: Int, dist: Int) = {
+      var rcache = depCache(w)
+      if(rcache eq null) {
+        rcache = new OpenAddressHashArray[Array[Int]](ruleIndex.size * numDistBins)
+        depCache(w) = rcache
+      }
+      val index = binDistance(dist) * ruleIndex.size + r
+      var cache = rcache(index)
+      if(cache == null)  {
+        cache = stripEncode(featureIndex, getDepRuleFeatures(r, indexed(w), words(w), dist))
+        rcache(index) = cache
+      }
+      cache
+    }
+
+
+    def indexedFeaturesForUnary(r: Int, w: Int) = indexedFeaturesForRuleHead(r,w,0)
   }
 }
 
