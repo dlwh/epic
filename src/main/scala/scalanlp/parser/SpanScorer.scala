@@ -146,16 +146,18 @@ object GoldTagPolicy {
   }
 
 
-  def goldTreeForcing[L](tree: BinarizedTree[Int]):GoldTagPolicy[L] ={
-    val gold = TriangularArray.raw(tree.span.end+1,-1)
-    if(tree != null) {
-      for( t <- tree.allChildren) {
-        gold(TriangularArray.index(t.span.start,t.span.end)) = t.label
+  def goldTreeForcing[L](trees: BinarizedTree[Int]*):GoldTagPolicy[L] ={
+    val gold = TriangularArray.raw(trees.head.span.end+1,collection.mutable.BitSet());
+    for(tree <- trees) {
+      if(tree != null) {
+        for( t <- tree.allChildren) {
+          gold(TriangularArray.index(t.span.start,t.span.end)) += t.label
+        }
       }
     }
     new GoldTagPolicy[L] {
       def isGoldTag(start: Int, end: Int, tag: Int) = {
-        gold(TriangularArray.index(start,end)) == tag
+        gold(TriangularArray.index(start,end)) contains tag
       }
     }
   }
