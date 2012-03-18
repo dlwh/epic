@@ -46,6 +46,7 @@ trait CombinePipeline {
     }
 
     val acceptableSystems = if(systems == "all") Set.empty[String] else Set(systems.split(","):_*)
+    println(acceptableSystems)
 
     val treebank = params.treebank.treebank
 
@@ -54,7 +55,7 @@ trait CombinePipeline {
     val inputTrees: IndexedSeq[TreeBundle[String, String]] = {
       for {
         (section:String) <- trainSections.toIndexedSeq
-        tb <- readCandidatesFromSection(section, acceptableSystems, kbestDir, treebank, process)
+        tb <- readCandidatesFromSection(section, acceptableSystems, kbestDir, treebank, process).par
         goldTree = process(tb.goldTree)
       } yield tb.copy[String,String](goldTree=goldTree)
     }
@@ -62,7 +63,7 @@ trait CombinePipeline {
     val testTrees: IndexedSeq[TreeBundle[String, String]] = {
       val section = if(actualTest) params.testSection else params.devSection
       for {
-        tb <- readCandidatesFromSection(section, acceptableSystems, kbestDir, treebank, process)
+        tb <- readCandidatesFromSection(section, acceptableSystems, kbestDir, treebank, process).par
         goldTree = process(tb.goldTree)
       } yield tb.copy[String,String](goldTree=goldTree)
     }.toIndexedSeq
@@ -129,7 +130,7 @@ trait CombinePipeline {
     val filesToRead = for {
       f <- kbestDir.listFiles()
       if f.getName.startsWith("wsj" + section)
-      if (parsers.isEmpty || parsers.exists(f.getName contains _))
+      if (parsers.isEmpty || parsers.contains(f.getName.split("[.]")(1)))
     } yield f
 
     val iterators = for(f <- filesToRead) yield {
@@ -146,7 +147,8 @@ trait CombinePipeline {
 
     val filteredTrees = for {
       (t,w) <- trees
-      if w == iterators.view.map(_._2.head).collectFirst { case Some( (t2,w2)) => w2}.get
+//      _ = println(w)
+//      if w == iterators.view.map(_._2.head).collectFirst { case Some( (t2,w2)) => w2}.get
     } yield (t,w)
 
 
@@ -154,11 +156,19 @@ trait CombinePipeline {
       val guessTrees = for {
         (pname,iter) <- iterators
         (guessTree,w2) <- iter.next
-      } yield (pname -> guessTree)
+      } yield (pname,guessTree,w2)
       assert(words.length == t.span.end)
-      guessTrees.foreach{ case (sys,t) => assert(words.length == t.span.end, sys -> words -> t)}
+      if(guessTrees.exists{ case (sys,t,w2) => words.length != t.span.end || words != w2}) {
+        println("Something is wrong!")
+        println(t,words)
+        println(guessTrees.toIndexedSeq)
+        println(guessTrees.map{ case (sys,t,w2) => sys -> t.span.end}.toIndexedSeq)
+        println(guessTrees.map{ case (sys,t,w2) => sys -> w2}.toIndexedSeq)
+        println(words.length,t.span.end)
+        throw new RuntimeException()
+      }
       val rerooted = process(Tree("ROOT",t.children)(t.span))
-      TreeBundle(section+ "-" +i, rerooted, guessTrees.toMap.mapValues(process), words)
+      TreeBundle(section+ "-" +i, rerooted, guessTrees.map(x => (x._1 -> x._2)).toMap.mapValues(process), words)
     }
 
     treeIterator.toIndexedSeq
