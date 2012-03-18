@@ -107,35 +107,15 @@ class CombinerParserInference[L,W](builder: CKYChartBuilder[ParseChart.LogProbab
     new CombinerSpanScorer(filter, factory.featurizerFor(v), weights)
   }
 
-  val scorerFactory = new ConstraintScorerFactory[L,L, W](SimpleChartParser(builder),-14)
+  val scorerFactory = new ConstraintScorerFactory[L,L, W](SimpleChartParser(builder),-5)
 
   def makeFilter(tb: TreeBundle[L, W]):SpanScorer[L] =  {
     CombinerCache.mapCache.get(tb.words) match {
       case Some(scorer) => scorer.asInstanceOf[SpanScorer[L]]
       case None =>
-        val data = LabeledSpanExtractor.extractSpans(builder.grammar.labelIndex, tb.outputs.values)
-        val init = new SpanScorer[L] {
-          def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = {
-            0.0
-          }
-
-          def scoreUnaryRule(begin: Int, end: Int, rule: Int) = {
-            0.0
-          }
-
-          def scoreSpan(begin: Int, end: Int, tag: Int) = {
-            val arr = data(TriangularArray.index(begin,end))
-            if( (arr eq null) || arr(tag) <= 0) 0.0
-            else arr(tag) * 3
-          }
-        }
-
-        val goldTreePolicy = if(forceGoldTree && tb.goldTree != null) {
-          GoldTagPolicy.goldTreeForcing[L](tb.goldTree.map(builder.grammar.labelIndex))
-        } else {
-          GoldTagPolicy.noGoldTags[L]
-        }
-        val scorer = scorerFactory.mkSpanScorer(tb.words, init, goldTreePolicy)
+        val goldTreePolicy =
+          GoldTagPolicy.goldTreeForcing[L](tb.treeInstances(withGold=forceGoldTree && tb.goldTree != null).map(ti => ti.tree.map(builder.grammar.labelIndex)).toSeq:_*)
+        val scorer = scorerFactory.mkSpanScorer(tb.words, SpanScorer.identity, goldTreePolicy)
         CombinerCache.mapCache.putIfAbsent(tb.words, scorer)
         scorer
     }
@@ -150,11 +130,13 @@ class CombinerParserInference[L,W](builder: CKYChartBuilder[ParseChart.LogProbab
       augment)
     CombinerECounts(score, visitor.featureCounts)
   }
+  
+  val zeroBuilder = new CKYChartBuilder(builder.root, new ZeroLexicon(builder.lexicon), Grammar.zero(builder.grammar), ParseChart.logProb)
 
 
   def marginal(v: TreeBundle[L, W], aug: CombinerSpanScorer[L, W]) = {
-    val inside = builder.buildInsideChart(v.words,aug)
-    val outside = builder.buildOutsideChart(inside,aug)
+    val inside = zeroBuilder.buildInsideChart(v.words,aug)
+    val outside = zeroBuilder.buildOutsideChart(inside,aug)
     val root_score = inside.top.labelScore(0,v.words.length,builder.root)
 //    println("Done parsing... " + v.id)
     new ChartPair[ParseChart.LogProbabilityParseChart,L](inside,outside,root_score,aug) -> root_score
@@ -164,7 +146,7 @@ class CombinerParserInference[L,W](builder: CKYChartBuilder[ParseChart.LogProbab
   def guessCountsFromMarginals(v: TreeBundle[L, W], marg: CombinerParserInference[L, W]#Marginal, aug: CombinerSpanScorer[L, W]) = {
     val root_score = marg.inside.top.labelScore(0,v.words.length,builder.root)
     val visitor = new CombinerFeaturizerECVisitor(aug.feat, DenseVector.zeros[Double](weights.size))
-    new InsideOutside(builder).expectedCounts(v.words, marg.inside, marg.outside, root_score, marg.scorer, visitor)
+    new InsideOutside(zeroBuilder).expectedCounts(v.words, marg.inside, marg.outside, root_score, marg.scorer, visitor)
     CombinerECounts(root_score, visitor.featureCounts)
   }
 
@@ -232,10 +214,12 @@ object DiscrimCombinePipeline extends CombinePipeline {
                   params: DiscrimCombinePipeline.Params) = {
     val basicParser = {
       val allTrees = testTrees.flatMap(_.treeInstances(withGold=false)).toArray ++ trainTrees.flatMap(_.treeInstances(withGold=true))
-      val (lexicon,grammar) = GenerativeParser.extractLexiconAndGrammar(allTrees)
+      val (words,binary,unary) = GenerativeParser.extractCounts(allTrees)
+      val grammar = Grammar(Library.logAndNormalizeRows(binary),Library.logAndNormalizeRows(unary));
+      val lexicon = new UnsmoothedLexicon(Library.logAndNormalizeRows(words))
+      val zeroParser = new CKYChartBuilder("ROOT", lexicon, grammar, ParseChart.logProb)
       // erase rule counts
-      //      val zeroParser = new CKYChartBuilder("ROOT", lexicon, grammar, ParseChart.viterbi)
-      val zeroParser = new CKYChartBuilder("ROOT", new ZeroLexicon(lexicon), Grammar.zero(grammar), ParseChart.logProb)
+//      val zeroParser = new CKYChartBuilder("ROOT", new ZeroLexicon(lexicon), Grammar.zero(grammar), ParseChart.logProb)
       zeroParser
     }
 
