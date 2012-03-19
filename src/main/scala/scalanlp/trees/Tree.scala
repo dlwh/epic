@@ -189,7 +189,7 @@ object Trees {
     case Tree(l, Seq(leftChild,rightChild)) =>
       BinaryTree(l,headBinarize(leftChild,headFinder),headBinarize(rightChild,headFinder))(tree.span);
     case Tree(l, children) =>
-      val headChildIndex = headFinder.findHeadChild(tree, identity[String])
+      val headChildIndex = headFinder.findHeadChild(tree, identity[String] _)
       val binarizedLabel = "@" + l
       val headBinarized = children.map(headBinarize(_, headFinder))
       val headChild = headBinarized(headChildIndex)

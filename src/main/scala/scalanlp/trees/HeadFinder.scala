@@ -54,6 +54,7 @@ object HeadFinder {
     val basic = Map[String,Seq[HeadRule[String]]](
       "" -> Seq(shr(Left,false,"S","SINV")),
       "ROOT" -> Seq(shr(Left,false,"S","SINV")),
+      "TOP" -> Seq(shr(Left,false,"S","SINV")),
       "ADJP" -> Seq(shr(Left, false,
         "NNS", "QP", "NN","$", "ADVP", "JJ", "VBN", "VBG", "ADJP", "JJR",
         "NP", "JJS", "DT","FW", "RBR", "RBS", "SBAR", "RB")),
@@ -107,7 +108,10 @@ object HeadFinder {
   val collinsHeadFinder = new HeadFinder(collinsHeadRules);
 }
 
-import HeadFinder._;
+import HeadFinder._
+import scalanlp.parser.Rule
+import scalanlp.parser.UnaryRule
+import scalanlp.parser.BinaryRule
 
 /**
  * Can annotate a tree with the head word. Usually
@@ -117,13 +121,17 @@ import HeadFinder._;
  */
 class HeadFinder[L](rules: Map[L,Seq[HeadRule[L]]]) extends Serializable {
 
-  def findHeadChild[F](t: Tree[F], proj: F=>L) = {
-    val myRules:Seq[HeadRule[L]] = rules.getOrElse(proj(t.label),Seq(shr(Left,false)));
+  def findHeadChild[F](r: Rule[F], proj: F=>L):Int = r match {
+    case UnaryRule(_,_) => 0
+    case BinaryRule(a,b,c) => 
+      findHeadChild(proj(a),proj(b),proj(c))
+  }
+
+  def findHeadChild(l: L, children: L*) = {
+    val myRules:Seq[HeadRule[L]] = rules.getOrElse(l,Seq(shr(Left,false)));
+    val childLabels:IndexedSeq[L] = children.toIndexedSeq
 
     val answers = for(rule <- myRules.iterator) yield {
-      val children = t.children;
-      val childLabels = children.map(c => proj(c.label));
-
       val answer = if(rule.dis) {
         if(rule.dir == Left) childLabels.indexWhere(rule.headSet contains _)
         else childLabels.lastIndexWhere(rule.headSet contains _)
@@ -139,6 +147,10 @@ class HeadFinder[L](rules: Map[L,Seq[HeadRule[L]]]) extends Serializable {
     }
 
     answers.find(_ >= 0) getOrElse 0;
+  }
+
+  def findHeadChild[F](t: Tree[F], proj: F=>L):Int = {
+    findHeadChild(proj(t.label),t.children.map(c => proj(c.label)):_*)
   }
 
   def findHeadWordIndex[F](t: Tree[F], proj: F=>L):Int = {
@@ -161,7 +173,7 @@ class HeadFinder[L](rules: Map[L,Seq[HeadRule[L]]]) extends Serializable {
   def annotateHeadWords[W](t: Tree[L], words: Seq[W]): Tree[(L,W)] = t match {
     case Tree(l,children) if children.length == 0 => Tree(l -> words(t.span.start),IndexedSeq.empty)(t.span)
     case Tree(l,children) if children.length == 0 =>
-      val headChild = findHeadChild(t,identity[L])
+      val headChild = findHeadChild(t,identity[L] _)
       val rec = children.map(annotateHeadWords(_,words))
       Tree( l -> rec(headChild).label._2, rec)(t.span)
   }
