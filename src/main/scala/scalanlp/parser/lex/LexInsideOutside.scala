@@ -14,7 +14,8 @@ import scalala.tensor.dense.{DenseVectorCol, DenseVector}
  * InsideOutside computes expected counts for rules and lexical emissions for a chart builder
  * @author dlwh
  */
-class LexInsideOutside[L,W](featurizer: LexFeaturizer[L,W], val parser: LexChartBuilder[LogProbabilityParseChart,L,W]) {
+class LexInsideOutside[L,W](featurizer: IndexedFeaturizer[L,W],
+                            val parser: LexChartBuilder[LogProbabilityParseChart,L,W]) {
   def grammar = parser.grammar
   def root = parser.root
   val indexedRoot = grammar.labelIndex(root)
@@ -125,7 +126,7 @@ class LexInsideOutside[L,W](featurizer: LexFeaturizer[L,W], val parser: LexChart
                   }
                   split += 1
                 }
-                addMultiple(vector, fspec.featuresForRight(r,h,right), selfScore)
+                addMultiple(vector, fspec.featuresForBinary(r,h,right), selfScore)
               }
             }
 
@@ -161,7 +162,7 @@ class LexInsideOutside[L,W](featurizer: LexFeaturizer[L,W], val parser: LexChart
                   split += 1
                 }
                 if(selfScore >= 0)
-                  addMultiple(vector, fspec.featuresForLeft(r,h,left), selfScore)
+                  addMultiple(vector, fspec.featuresForBinary(r,h,left), selfScore)
               }
             }
         }

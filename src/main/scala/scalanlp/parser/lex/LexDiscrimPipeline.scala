@@ -22,20 +22,174 @@ import scalanlp.tensor.sparse.OldSparseVector
 import collection.mutable.{ArrayBuilder, ArrayBuffer}
 import java.util.Arrays
 
-trait LexFeaturizer[L, W] {
+trait LexFeaturizer[L, W] extends Serializable {
   def specialize(words: Seq[W]):Specialization
 
-  val featureIndex: Index[Feature]
-
+  /**
+   * Specialization assumes that features are of several kinds, so that we can efficiently cache them.
+   */
   trait Specialization {
-    def featuresForUnary(rule: Int, head: Int): Array[Int]
 
-    def featuresForLeft(rule: Int, head: Int, leftHead: Int): Array[Int]
+    // Features for this rule with this head (and corresponding head child, as appropriate). For unaries.
+    def featuresForHead(rule: Int, head: Int): Array[Feature]
+    // Features for this rule with this dependent (and corresponding head child, as appropriate)
+    def featuresForDep(rule: Int, dep: Int): Array[Feature]
+    // Features for the unlabeled attachment of these two words
+    def featuresForBilex(head: Int, dep: Int):Array[Feature]
+    // all features for this attachment not captured by the above.
+    def featuresForAttach(r: Int, head: Int, dep: Int):Array[Feature]
 
-    def featuresForRight(rule: Int, head: Int, rightHead: Int): Array[Int]
 
-    def featuresForTag(tag: Int, head: Int): Array[Int]
+    def featuresForTag(tag: Int, head: Int): Array[Feature]
   }
+}
+
+case class HashFeature(hashBucket: Int) extends Feature
+
+/**
+ * Indexes and caches features for more efficient access.
+ * Two kinds of features: features we observed in a gold tree (true Features), and features
+ * we haven't. The latter are binned by hashcode into the higher-end of the feature index
+ * @param f base featureizer
+ * @param trueFeatureIndex index of featuers we saw in gold.
+ * @param dummyFeatures how many buckets in the hash part of the feature vector
+ * @tparam L Label
+ * @tparam W Word
+ */
+class IndexedFeaturizer[L,W](f: LexFeaturizer[L,W],
+                             labelIndex: Index[L],
+                             ruleIndex: Index[Rule[L]],
+                             val trueFeatureIndex: Index[Feature],
+                             dummyFeatures: Int) extends Serializable {
+  def specialize(words: Seq[W]):Specialization = new Specialization(words)
+
+  val featureIndex:Index[Feature] = {
+    val r: MutableIndex[Feature] = Index[Feature]()
+    (trueFeatureIndex) foreach (r.index(_))
+    (0 until dummyFeatures) map {HashFeature(_)} foreach {r.index _}
+    r
+  }
+
+
+  case class Specialization(words: Seq[W]) {
+    private val fspec = f.specialize(words)
+    def featuresForUnary(rule: Int, head: Int): Array[Int] = indexedFeaturesForRuleHead(rule, head)
+    def featuresForTag(tag: Int, head: Int): Array[Int] = {
+      var rcache = wordCache(head)
+      if(rcache eq null) {
+        rcache = new OpenAddressHashArray[Array[Int]](labelIndex.size)
+        wordCache(head) = rcache
+      }
+      val index = tag
+      var cache = rcache(index)
+      if(cache == null) {
+        cache = stripEncode(featureIndex, fspec.featuresForTag(tag, head))
+        rcache(index) = cache
+      }
+      cache
+    }
+    def featuresForBinary(rule: Int, head: Int, dep: Int): Array[Int] = {
+      var rcache = binaryCache(head)
+      if(rcache eq null) {
+        rcache = new OpenAddressHashArray[Array[Int]](ruleIndex.size * words.size)
+        headCache(head) = rcache
+      }
+      val index = rule * words.size + dep
+      var cache = rcache(index)
+      if(cache == null)  {
+        val ruleHead = indexedFeaturesForRuleHead(rule,head)
+        val ruleDep = indexedFeaturesForRuleDep(rule,dep)
+        val bilex = indexedFeaturesForBilex(head,dep)
+        val brule = stripEncode(featureIndex, fspec.featuresForAttach(rule, head, dep))
+
+        cache = new Array[Int](brule.length + ruleHead.length + ruleDep.length + bilex.length)
+        var destPos = 0
+        System.arraycopy(brule,0,cache,destPos,brule.length)
+        destPos += brule.length
+        System.arraycopy(ruleHead,0,cache,destPos,ruleHead.length)
+        destPos += ruleHead.length
+        System.arraycopy(ruleDep,0,cache,destPos,ruleDep.length)
+        destPos += ruleDep.length
+        System.arraycopy(bilex,0,cache,destPos,bilex.length)
+        rcache(index) = cache
+      }
+      cache
+    }
+
+    // caches:
+    // words
+    val bilexCache = new Array[Array[Int]](words.length * words.length)
+    // headIndex -> (ruleIndex) -> Array[Int]
+    val headCache = new Array[OpenAddressHashArray[Array[Int]]](words.length)
+    // depIndex -> (ruleIndex) -> Array[Int]
+    val depCache = new Array[OpenAddressHashArray[Array[Int]]](words.length)
+    // headIndex -> (depIndex x ruleIndex) -> Array[Int]
+    // holds all features for attachment, uses other caches for faster computation
+    val binaryCache = new Array[OpenAddressHashArray[Array[Int]]](words.length)
+    // for tags. word -> tag -> Array[Int]
+    val wordCache = new Array[OpenAddressHashArray[Array[Int]]](words.length)
+
+    private def indexedFeaturesForRuleHead(r: Int, w: Int) = {
+      var rcache = headCache(w)
+      if(rcache eq null) {
+        rcache = new OpenAddressHashArray[Array[Int]](ruleIndex.size)
+        headCache(w) = rcache
+      }
+      val index = r
+      var cache = rcache(index)
+      if(cache == null)  {
+        cache = stripEncode(featureIndex, fspec.featuresForHead(r, w))
+        rcache(index) = cache
+      }
+      cache
+    }
+
+    private def indexedFeaturesForRuleDep(r: Int, w: Int) = {
+      var rcache = depCache(w)
+      if(rcache eq null) {
+        rcache = new OpenAddressHashArray[Array[Int]](ruleIndex.size)
+        depCache(w) = rcache
+      }
+      val index = r
+      var cache = rcache(index)
+      if(cache == null)  {
+        cache = stripEncode(featureIndex, fspec.featuresForDep(r, w))
+        rcache(index) = cache
+      }
+      cache
+    }
+
+    private def indexWordPair(hw: Int, dw: Int) = {
+      hw * words.size + dw
+    }
+
+    private def indexedFeaturesForBilex(hw: Int, dw: Int):Array[Int] = {
+      val index = indexWordPair(hw,dw)
+      var cache = bilexCache(index)
+      if(cache == null) {
+        val feats = fspec.featuresForBilex(hw, dw)
+        cache = stripEncode(featureIndex,feats)
+        bilexCache(index) = cache
+      }
+      cache
+    }
+  }
+
+  private def stripEncode[F](index: Index[F], arr: Array[F], dest: Array[Int] = null, destStart: Int = 0) = {
+    val res = if(dest eq null) new Array[Int](arr.length) else dest
+    var i = destStart
+    while( i < arr.length) {
+      val fi = index(arr(i))
+      if(fi >= 0) {
+        res(destStart + i)  = fi
+      } else {
+        res(destStart + i) = (trueFeatureIndex.size + math.abs(arr(i).hashCode) % dummyFeatures)
+      }
+      i += 1
+    }
+    res
+  }
+
 }
 
 case class HeadFeature[P](r: Feature, head: P) extends Feature
@@ -48,62 +202,29 @@ case class DistFeature(dist: Int, f: Feature) extends Feature
 case class PartFeature[P](feature: Feature, part: P) extends Feature
 
 case class StandardFeaturizer[L, W>:Null, P](wordIndex: Index[W],
-                                    cooccurringWords: Set[(W,W)],
-                                    ruleIndex: Index[Rule[L]],
-                                    labelIndex: Index[L],
-                                    validTags: W=>Array[L],
-                                    ruleFeatGen: Rule[L]=>IndexedSeq[Feature],
-                                    featGen: (W) => IndexedSeq[P],
-                                    tagFeatGen: (W=>IndexedSeq[P])) extends LexFeaturizer[L, W] {
+                                             labelIndex: Index[L],
+                                             ruleIndex: Index[Rule[L]],
+                                             ruleFeatGen: Rule[L]=>IndexedSeq[Feature],
+                                             featGen: (W) => IndexedSeq[P],
+                                             tagFeatGen: (W=>IndexedSeq[P])) extends LexFeaturizer[L, W] {
 
   def specialize(words: Seq[W]) = new Spec(words)
 
 
-  /* precompute features. Such a mess. */
   // word parts are things like suffixes, etc.
   val wordPartIndex = Index[P]()
-  val featureIndex = Index[Feature]() // actual features
 
   // binned distances
-  val distBins = Array(0,1)
-  val minimums = Array(0,1)
-//    val distBins = Array(0)
-//    val minimums = Array(0)
+  val distBins = Array(0,1,5,10)
+  val minimums = Array(1,2,5,10)
   val numDistBins = distBins.length
 
   private def binDistance(dist2:Int) = {
     val dist = dist2.abs - 1
-    if(dist > 1) 1
+    if (dist >= 10) 3
+    else if (dist >= 5) 2
+    else if (dist >= 2) 1
     else 0
-  }
-
-  def getHeadRuleFeatures(r: Int, w: Int, ww: W, rawDistance: Int): Array[Feature] = {
-    if(ruleIndex.get(r).children.size == 2) {
-      val rawFeatures = for (rf <- ruleFeatures(r); wf <- indexedFeaturesForWord(w, ww)) yield HeadFeature(featureIndex.get(rf), wordPartIndex.get(rf))
-      val distedFeatures = for (f <- rawFeatures) yield DistFeature(binDistance(rawDistance), f)
-      (rawFeatures ++ distedFeatures)
-    } else if(rawDistance == 0) {
-      val rawFeatures = for( rf <- ruleFeatures(r); wf <- indexedFeaturesForWord(w, ww)) yield (HeadFeature(featureIndex.get(rf),wordPartIndex.get(rf)):Feature)
-      rawFeatures
-    } else {
-      null
-    }
-  }
-
-  def getDepRuleFeatures(r: Int, w: Int, ww: W, rawDistance: Int): Array[Feature] = {
-    if(ruleIndex.get(r).children.size == 2) {
-      val rawFeatures = for (rf <- ruleFeatures(r); wf <- indexedFeaturesForWord(w, ww)) yield DepFeature(featureIndex.get(rf), wordPartIndex.get(rf))
-      val distedFeatures = for (f <- rawFeatures) yield DistFeature(binDistance(rawDistance), f)
-      (rawFeatures ++ distedFeatures)
-    } else {
-      null
-    }
-  }
-
-  def getBilexFeatures(head: Int, hww: W, dep: Int, dww: W, sym: Symbol, rawDistance: Int): Array[Feature] = {
-    val rawFeatures = for (rf <- indexedFeaturesForWord(head, hww); wf <- indexedFeaturesForWord(dep, dww)) yield BilexicalFeature(wordPartIndex.get(rf), wordPartIndex.get(wf), sym)
-    val distedFeatures = for (f <- rawFeatures) yield DistFeature(binDistance(rawDistance), f)
-    (rawFeatures ++ distedFeatures)
   }
 
   //////////////
@@ -114,258 +235,118 @@ case class StandardFeaturizer[L, W>:Null, P](wordIndex: Index[W],
   val wordCache: Array[Array[Int]] = Encoder.fromIndex(wordIndex).tabulateArray(w => featGen(w).map(wordPartIndex.index(_)).toArray)
   // these are features used by the tagger
   val tagCache = Encoder.fromIndex(wordIndex).tabulateArray(w => tagFeatGen(w).map(wordPartIndex.index(_)).toArray)
-  // Rule -> Array[Feature Index]
-  val ruleFeatures = Encoder.fromIndex(ruleIndex).tabulateArray(r => ruleFeatGen(r).map(featureIndex.index(_)).toArray);
+  // used by rule
+  val ruleCache = Encoder.fromIndex(ruleIndex).tabulateArray(r => ruleFeatGen(r).toArray)
 
-  // precompute features
-  { // bilexical features
-    val allFeatures = cooccurringWords.par.aggregate(null:collection.mutable.Set[Feature])({ (set,wordPair) =>
-      val (head,dep) = wordPair
-      val headIndex = wordIndex(head)
-      val depIndex = wordIndex(dep)
-      val set2 = if(set eq null) collection.mutable.Set[Feature]() else set
-      for(d <- 0 until distBins.length) {
-        set2 ++= getBilexFeatures(headIndex, head, depIndex, dep, 'Left, minimums(d))
-      }
-      set2
-    }, {(a,b) => a ++= b})
-    allFeatures foreach (featureIndex.index(_))
-  }
-
-  { // (head,rule) features and (dep,rule) features
-    // binned distance -> head word -> rule -> array of int features
-    val allFeatures = wordIndex.par.aggregate(null:collection.mutable.Set[Feature])({ (set,word) =>
-      val set2 = if(set eq null) collection.mutable.Set[Feature]() else set
-      val wi = wordIndex(word)
-      for(d <- 0 until distBins.length; r <- 0 until ruleIndex.size) {
-        val features = getHeadRuleFeatures(r, wi, word, minimums(d))
-        if(features ne null)
-          set2 ++= features
-
-        val depFeatures = getDepRuleFeatures(r, wi, word, minimums(d))
-        if(depFeatures ne null)
-          set2 ++= depFeatures
-      }
-      set2
-    }, {(a,b) => a ++= b})
-    allFeatures foreach (featureIndex.index(_))
-  }
-
-  // word -> Hash array of (Tag -> Array[Feature]). If the Tag isn't there, it's not allowed
-  val tagFeatures: Array[OpenAddressHashArray[Array[Int]]] = Array.tabulate(wordIndex.size){ (w) =>
-    val validTags = this.validTags(wordIndex.get(w))
-    val oah = new OpenAddressHashArray(labelIndex.size, null: Array[Int], validTags.length * 2)
-    for(t <- validTags) {
-      val itag = labelIndex(t)
-      oah(itag) = for( rf <- tagCache(w)) yield featureIndex.index(TagFeature(t,wordPartIndex.get(w)))
-    }
-    oah
-  }
-
-  def indexedFeaturesForWord(w: Int, ww: W) = {
+  def indexedFeaturesForWord(w: Int, ww: W): Array[Int] = {
     if(w >= 0) wordCache(w)
     else {
-      featGen(ww).map(wordPartIndex).filter(_ >= 0).toArray
+      featGen(ww).view.map(wordPartIndex).filter(_ >= 0).toArray
     }
   }
 
-  private def stripEncode[F](index: Index[F], arr: Array[F]) = {
-    val res = ArrayBuilder.make[Int]
-    res.sizeHint(arr)
-    var i = 0
-    while(i < arr.length) {
-      val fi = index(arr(i))
-      if(fi >= 0) {
-        res += fi
-      }
-      i += 1
+  def indexedTagFeaturesForWord(w: Int, ww: W): Array[Int] = {
+    if(w >= 0) tagCache(w)
+    else {
+      tagFeatGen(ww).view.map(wordPartIndex).filter(_ >= 0).toArray
     }
-    res.result()
   }
 
   final class Spec(words: Seq[W]) extends Specialization {
     val indexed = words.map(wordIndex).toArray
-    val bilexCache = new Array[Array[Int]](words.length * words.length)
-    // headIndex -> (ruleIndex x dist) -> Array[Int]
-    val headCache = new Array[OpenAddressHashArray[Array[Int]]](words.length)
-    // depIndex -> (ruleIndex x dist) -> Array[Int]
-    val depCache = new Array[OpenAddressHashArray[Array[Int]]](words.length)
 
-    private def mkOnesVector(array: Array[Int]) = {
-      array
+    def featuresForHead(rule: Int, head: Int) = {
+      val rc = ruleCache(rule)
+      val ifw = indexedFeaturesForWord(indexed(head), words(head))
+      def join(f: Feature, part: Int) = HeadFeature(f, wordPartIndex.get(part))
+      crossProduct(rc, ifw, join _)
     }
 
-    def featuresForUnary(rule: Int, head: Int) = {
-      val array = ruleFeatures(rule) ++ indexedFeaturesForUnary(rule,head)
-      mkOnesVector(array)
+
+    def featuresForDep(rule: Int, dep: Int) = {
+      val rc = ruleCache(rule)
+      val ifw = indexedFeaturesForWord(indexed(dep), words(dep))
+      def join(f: Feature, part: Int) = DepFeature(f, wordPartIndex.get(part))
+      crossProduct(rc, ifw, join _)
     }
 
-    def featuresForLeft(rule: Int, head: Int, leftHead: Int) = {
-      val array = indexedFeaturesForBinaryRule(rule,head,leftHead,head-leftHead)
-      mkOnesVector(array)
-    }
 
-    def featuresForRight(rule: Int, head: Int, rightHead: Int) = {
-      val array = indexedFeaturesForBinaryRule(rule,head,rightHead,head-rightHead)
-      mkOnesVector(array)
-    }
+    def featuresForBilex(head: Int, dep: Int) = {
+      val ifw1 = indexedFeaturesForWord(indexed(head), words(head))
+      val ifw2 = indexedFeaturesForWord(indexed(dep), words(dep))
+      val dir = if(head < dep) 'Right else 'Left
+      val binned = binDistance(head - dep)
 
-    def featuresForTag(tag: Int, head: Int) = {
-      val w = indexed(head)
-      if(w >= 0) {
-        mkOnesVector(tagFeatures(w)(tag))
-      } else {
-        val arr = ArrayBuilder.make[Int]
-        val feats = tagFeatGen(words(head))
-        arr.sizeHint(feats)
-        for(p <- feats) {
-          val pi = wordPartIndex(p)
-          if(pi >= 0) {
-            arr += pi
-          }
+      val arr = new Array[Feature](ifw1.length * ifw2.length * 2)
+      var t = 0
+      var i = 0
+      while (i < ifw1.length) {
+        var j = 0
+        val b = ifw1(i)
+        while (j < ifw2.length) {
+          val f = ifw2(j)
+          arr(t) = BilexicalFeature(wordPartIndex.get(b), wordPartIndex.get(f), dir)
+          arr(t + 1) = DistFeature(binned, arr(t))
+          t += 2
+          j += 1
         }
-        val r = arr.result()
-        mkOnesVector(r)
+        i += 1
       }
-    }
 
-
-    private def indexedFeaturesForBinaryRule(r: Int, head: Int, dep: Int, dist: Int) = {
-      val rule = ruleFeatures(r)
-      val ruleHead = indexedFeaturesForRuleHead(r,head, dist)
-      val ruleDep = indexedFeaturesForRuleDep(r,dep, dist)
-      val bilex = indexedFeaturesForBilex(head,dep)
-      val arr = new Array[Int](rule.length + ruleHead.length + ruleDep.length + bilex.length)
-      var destPos = 0
-      System.arraycopy(rule,0,arr,destPos,rule.length)
-      destPos += rule.length
-      System.arraycopy(ruleHead,0,arr,destPos,ruleHead.length)
-      destPos += ruleHead.length
-      System.arraycopy(ruleDep,0,arr,destPos,ruleDep.length)
-      destPos += ruleDep.length
-      System.arraycopy(bilex,0,arr,destPos,bilex.length)
       arr
     }
 
-    private def indexWordPair(hw: Int, dw: Int) = {
-      hw * words.size + dw
+
+    def featuresForAttach(r: Int, head: Int, dep: Int) = {
+      for(rf <- ruleCache(r)) yield DistFeature(binDistance(head-dep),rf):Feature
     }
 
 
-    private def indexedFeaturesForBilex(hw: Int, dw: Int):Array[Int] = {
-      val index = indexWordPair(hw,dw)
-      var cache = bilexCache(index)
-      if(cache == null) {
-        val dist = hw-dw
-        val feats = getBilexFeatures(indexed(hw), words(hw), indexed(dw), words(dw), if(dist < 0) 'Left else 'Right, dist)
-        cache = stripEncode(featureIndex,feats)
-        bilexCache(index) = cache
-      }
-      cache
+    def featuresForTag(tag: Int, head: Int) = {
+      for(f <- indexedTagFeaturesForWord(indexed(head), words(head))) yield TagFeature(labelIndex.get(tag), wordPartIndex.get(f)):Feature
     }
 
-
-
-    private def indexedFeaturesForRuleHead(r: Int, w: Int, dist: Int) = {
-      var rcache = headCache(w)
-      if(rcache eq null) {
-        rcache = new OpenAddressHashArray[Array[Int]](ruleIndex.size * numDistBins)
-        headCache(w) = rcache
-      }
-      val index = binDistance(dist) * ruleIndex.size + r
-      var cache = rcache(index)
-      if(cache == null)  {
-        cache = stripEncode(featureIndex, getHeadRuleFeatures(r, indexed(w), words(w), dist))
-        rcache(index) = cache
-      }
-      cache
-    }
-
-    private def indexedFeaturesForRuleDep(r: Int, w: Int, dist: Int) = {
-      var rcache = depCache(w)
-      if(rcache eq null) {
-        rcache = new OpenAddressHashArray[Array[Int]](ruleIndex.size * numDistBins)
-        depCache(w) = rcache
-      }
-      val index = binDistance(dist) * ruleIndex.size + r
-      var cache = rcache(index)
-      if(cache == null)  {
-        cache = stripEncode(featureIndex, getDepRuleFeatures(r, indexed(w), words(w), dist))
-        rcache(index) = cache
-      }
-      cache
-    }
-
-
-    def indexedFeaturesForUnary(r: Int, w: Int) = indexedFeaturesForRuleHead(r,w,0)
-  }
-}
-
-trait FeatureIndexer[L, W] extends Encoder[Feature] with Serializable {
-  val index: Index[Feature]
-  val baseGrammar: Grammar[L]
-  val headFinder: HeadFinder[L]
-  val tags: IndexedSeq[L]
-  val wordIndex: Index[W]
-  val featurizer: LexFeaturizer[L, W]
-  def validTags(w: W):Array[L]
-
-  val leftRules: Array[Boolean]
-  val rightRules: Array[Boolean]
-}
-
-object FeatureIndexer {
-  def extract[L, W](featurizer: LexFeaturizer[L, W], headFinder: HeadFinder[L],
-                    builder: ChartBuilder[ParseChart, L, W],
-                    wordIndex: Index[W],
-                    validTags: W=>Array[L],
-                    trees: Traversable[TreeInstance[L, W]]): FeatureIndexer[L, W] = {
-    val bg = builder.grammar
-
-    val lRules = new Array[Boolean](bg.index.size)
-    val rRules = new Array[Boolean](bg.index.size)
-
-    for(ti <- trees;  t <- ti.tree.allChildren if t.children.size > 1) t match {
-      case t:BinaryTree[L] =>
-        val headChild = headFinder.findHeadChild(t,identity[L])
-        val r = builder.grammar.index(BinaryRule(t.label, t.leftChild.label, t.rightChild.label))
-        if(headChild == 0) {
-          lRules(r) = true
-        } else {
-          rRules(r) = true
+    private def crossProduct(rc: Array[Feature], ifw: Array[Int], join: (Feature, Int) => Feature): Array[Feature] = {
+      val arr = new Array[Feature](rc.length * ifw.length)
+      var t = 0
+      var i = 0
+      while (i < rc.length) {
+        var j = 0
+        val b = rc(i)
+        while (j < ifw.length) {
+          val f = ifw(j)
+          arr(t) = join(b, f)
+          t += 1
+          j += 1
         }
-      case _ =>
+        i += 1
+      }
+
+      arr
     }
-
-    val wi = wordIndex
-    val vt = validTags
-
-    val f = featurizer
-    val hf = headFinder
-    new FeatureIndexer[L, W] {
-      val featurizer = f
-      val index = featurizer.featureIndex
-      val baseGrammar = builder.grammar
-      val headFinder = hf
-      val tags = builder.lexicon.tags.toIndexedSeq
-      val wordIndex = wi
-
-
-      def validTags(w: W) = vt(w)
-
-      val leftRules = lRules
-      val rightRules = rRules
-
-    }
-
   }
 }
 
-object FeaturizedLexGrammar {
-  def apply[L, W](fi: FeatureIndexer[L, W],
-                  weights: DenseVector[Double]): LexGrammar[L, W] = {
-    val bg = fi.baseGrammar
-    val wi = fi.wordIndex
+case class LexGrammarBundle[L,W](baseGrammar: Grammar[L],
+                                 tags: IndexedSeq[L],
+                                 headFinder: HeadFinder[L],
+                                 wordIndex: Index[W],
+                                 validTags: W=>Array[L]) { bundle =>
+  val bg = baseGrammar
+  val leftRules = new Array[Boolean](bg.index.size)
+  val rightRules = new Array[Boolean](bg.index.size)
+
+  for( (rule@BinaryRule(a,b,c),r) <- bg.index.iterator.zipWithIndex) {
+    val headChild = headFinder.findHeadChild(rule,identity[L](_))
+    if(headChild == 0) {
+      leftRules(r) = true
+    } else {
+      rightRules(r) = true
+    }
+  }
+
+  def makeGrammar(fi: IndexedFeaturizer[L, W], weights: DenseVector[Double]): LexGrammar[L, W] = {
+    val wi = wordIndex
     new LexGrammar[L, W] {
       final val index = bg.index
       def labelIndex = bg.labelIndex
@@ -385,28 +366,27 @@ object FeaturizedLexGrammar {
 
       def indexedUnaryRulesWithParent(l: Int) = bg.indexedUnaryRulesWithParent(l)
 
-      val tags = fi.tags
-      val indexedTags = BitSet() ++ fi.tags.map(bg.labelIndex)
+      val tags = bundle.tags
+      val indexedTags = BitSet() ++ tags.map(bg.labelIndex)
 
-      def isLeftRule(r: Int) = fi.leftRules(r)
+      def isLeftRule(r: Int) = leftRules(r)
 
-      def isRightRule(r: Int) = fi.rightRules(r)
-
+      def isRightRule(r: Int) = rightRules(r)
 
       def specialize(sent: Seq[W]) = new Specialization(sent)
 
       final class Specialization(val words: Seq[W]) extends super.Specialization {
         val indexed = words.map(wordIndex)
-        val f = fi.featurizer.specialize(words)
-        val indexedValidTags = words.map(fi.validTags).map(_.map(labelIndex))
+        val f = fi.specialize(words)
+        val indexedValidTags = words.map(validTags).map(_.map(labelIndex))
 
 
 
-//        override def finalize() {
-//          println("bcache desnity: " + bCache.activeSize * 1.0 / bCache.size)
-//          println("uCache density: " + uCache.activeSize * 1.0 / bCache.size)
-//
-//        }
+        //        override def finalize() {
+        //          println("bcache desnity: " + bCache.activeSize * 1.0 / bCache.size)
+        //          println("uCache density: " + uCache.activeSize * 1.0 / bCache.size)
+        //
+        //        }
 
         private def dot(features: Array[Int]) = {
           var i = 0
@@ -436,8 +416,8 @@ object FeaturizedLexGrammar {
           if (!score.isNaN)
             score
           else {
-            val score = dot(f.featuresForLeft(rule, head, leftHead))
-             bCache(cacheIndex) = score
+            val score = dot(f.featuresForBinary(rule, head, leftHead))
+            bCache(cacheIndex) = score
             score
           }
         }
@@ -449,7 +429,7 @@ object FeaturizedLexGrammar {
           if (!score.isNaN)
             score
           else {
-            val score = dot(f.featuresForRight(rule, head, rightHead))
+            val score = dot(f.featuresForBinary(rule, head, rightHead))
             bCache(cacheIndex) = score
             score
           }
@@ -476,117 +456,162 @@ object FeaturizedLexGrammar {
 }
 
 
-class LexModel[L, W](indexed: FeatureIndexer[L,W],
+
+object IndexedFeaturizer {
+  def extract[L, W](featurizer: LexFeaturizer[L, W],
+                    headFinder: HeadFinder[L],
+                    ruleIndex: Index[Rule[L]],
+                    labelIndex: Index[L],
+                    trees: Traversable[TreeInstance[L, W]]): IndexedFeaturizer[L, W] = {
+
+    val goldFeatures = trees.par.aggregate(null: collection.mutable.Set[Feature])( {(feats, ti) =>
+      val set = if(feats eq null) collection.mutable.Set[Feature]() else feats
+      val spec = featurizer.specialize(ti.words)
+      // returns head
+      def rec(t: BinarizedTree[L]):Int= t match {
+        case n@NullaryTree(a) =>
+          val aI = labelIndex(a)
+          set ++= spec.featuresForTag(aI,n.span.start)
+          n.span.start
+        case UnaryTree(a, b) =>
+          val h = rec(b)
+          val r = ruleIndex(UnaryRule(a, b.label))
+          set ++= spec.featuresForHead(r,h)
+          h
+        case t@BinaryTree(a, bt@Tree(b, _), Tree(c, _)) =>
+          val childHeads = IndexedSeq(rec(t.leftChild), rec(t.rightChild))
+          val headIsLeft = headFinder.findHeadChild(t, identity[L] _) == 0
+          val (head, dep) = if(headIsLeft) childHeads(0) -> childHeads(1) else childHeads(1) -> childHeads(0)
+          val r = ruleIndex(BinaryRule(a, b, c))
+          set ++= spec.featuresForHead(r,head)
+          set ++= spec.featuresForDep(r,dep)
+          set ++= spec.featuresForBilex(head, dep)
+          set ++= spec.featuresForAttach(r, head, dep)
+          head
+      }
+      rec(ti.tree)
+      set
+    }, {(a,b) => a ++= b})
+
+    val goldFeatureIndex = Index[Feature](goldFeatures)
+
+    new IndexedFeaturizer(featurizer, labelIndex, ruleIndex, goldFeatureIndex, goldFeatureIndex.size)
+  }
+}
+
+
+
+class LexModel[L, W](bundle: LexGrammarBundle[L,W],
+                     indexed: IndexedFeaturizer[L,W],
                      coarse: ChartBuilder[ParseChart, L, W]) extends Model[TreeInstance[L, W]] with Serializable {
 
-  def extractParser(weights: DenseVector[Double]) = {
-    val inf = inferenceFromWeights(weights)
-    new LexChartParser(coarse.grammar, inf.builder)
-  }
-
-  def numFeatures = indexed.index.size
-  import indexed._
-
-  def inferenceFromWeights(weights: DenseVector[Double]) = {
-    val gram: LexGrammar[L, W] = FeaturizedLexGrammar(indexed, weights)
-    val builder = new LexCKYChartBuilder(coarse.root, gram, ParseChart.logProb)
-    new LexInference(builder, indexed.featurizer, headFinder)
-  }
-
-  type Inference = LexInference[L, W]
-  type ExpectedCounts = LexInsideOutside.ExpectedCounts[W]
-
-  def emptyCounts = new ExpectedCounts(numFeatures)
-
-  def expectedCountsToObjective(ecounts: ExpectedCounts) = {
-    (ecounts.loss, ecounts.features)
-  }
-
-}
-
-case class LexInference[L, W](builder: LexCKYChartBuilder[ParseChart.LogProbabilityParseChart, L, W],
-                              featurizer: LexFeaturizer[L,W],
-                              headFinder: HeadFinder[L]) extends MarginalInference[TreeInstance[L, W], SpanScorer[L]] {
-  type ExpectedCounts = LexInsideOutside.ExpectedCounts[W]
-  type Marginal = LexChartPair[ParseChart.LogProbabilityParseChart, L, W]
-
-
-  def marginal(v: TreeInstance[L, W], aug: SpanScorer[L]) = {
-    val r = builder.buildCharts(v.words, aug)
-    r -> r.partition
-  }
-
-
-  def guessCountsFromMarginals(v: TreeInstance[L, W], marg: Marginal, aug: SpanScorer[L]) = {
-    val root_score = marg.partition
-    val ec = new LexInsideOutside(featurizer, builder).expectedCounts(marg.spec, marg.inside,
-      marg.outside, root_score, marg.scorer)
-    ec
-  }
-
-
-  def goldCounts(ti: TreeInstance[L, W], augment: SpanScorer[L]) = {
-    val g = builder.grammar
-    val spec = g.specialize(ti.words)
-    val fspec = featurizer.specialize(ti.words)
-    val counts = new ExpectedCounts(featurizer.featureIndex.size)
-    val words = ti.words
-    var score = 0.0
-    // rec returns head index
-    def rec(t: BinarizedTree[L]):Int= t match {
-      case n@NullaryTree(a) =>
-        val aI = g.labelIndex(a)
-        addMultiple(counts.features, fspec.featuresForTag(aI,n.span.start), 1.0)
-        score += spec.tagScores(n.span.start)(aI) + ti.spanScorer.scoreSpan(t.span.start, t.span.end, aI)
-        assert(!score.isInfinite)
-        n.span.start
-      case UnaryTree(a, b) =>
-        val h = rec(b)
-        val r = g.index(UnaryRule(a, b.label))
-        addMultiple(counts.features, fspec.featuresForUnary(r,h), 1.0)
-        score += ( spec.scoreUnary(r, h)
-//          + augment.scoreUnaryRule(t.span.start, t.span.end, r)
-          )
-        h
-      case t@BinaryTree(a, bt@Tree(b, _), Tree(c, _)) =>
-        val childHeads = IndexedSeq(rec(t.leftChild), rec(t.rightChild))
-        val headIsLeft = headFinder.findHeadChild(t, identity[L]) == 0
-        val (head, dep) = if(headIsLeft) childHeads(0) -> childHeads(1) else childHeads(1) -> childHeads(0)
-        val r = g.index(BinaryRule(a, b, c))
-        if(headIsLeft) {
-          score += ( spec.scoreRightComplement(r, head, dep)
-//            + ti.spanScorer.scoreSpan(t.span.start, t.span.end, g.labelIndex(a))
-//            + ti.spanScorer.scoreBinaryRule(t.span.start, bt.span.end, t.span.end, r)
-            )
-          addMultiple(counts.features, fspec.featuresForRight(r,head,dep), 1.0)
-        } else {
-          score += ( spec.scoreLeftComplement(r, head, dep)
-//            + ti.spanScorer.scoreSpan(t.span.start, t.span.end, g.labelIndex(a))
-//            + ti.spanScorer.scoreBinaryRule(t.span.start, bt.span.end, t.span.end, r)
-            )
-          addMultiple(counts.features, fspec.featuresForLeft(r,head,dep), 1.0)
-        }
-        if(headIsLeft) childHeads(0) else childHeads(1)
+    def extractParser(weights: DenseVector[Double]) = {
+      val inf = inferenceFromWeights(weights)
+      new LexChartParser(coarse.grammar, inf.builder)
     }
-    rec(ti.tree)
-    assert(!score.isInfinite)
-    counts.logProb = score
-    counts
-  }
 
-  def baseAugment(v: TreeInstance[L, W]) = v.spanScorer
+    def numFeatures = indexed.featureIndex.size
+    import bundle._
 
-
-  private def addMultiple(vec: DenseVector[Double], feats: Array[Int], d: Double) = {
-    var i = 0
-    while(i < feats.length) {
-      vec(feats(i)) += d
-      i += 1
+    def inferenceFromWeights(weights: DenseVector[Double]) = {
+      val gram: LexGrammar[L, W] = bundle.makeGrammar(indexed, weights)
+      val builder = new LexCKYChartBuilder(coarse.root, gram, ParseChart.logProb)
+      new LexInference(builder, indexed, headFinder)
     }
-    vec
+
+    type Inference = LexInference[L, W]
+    type ExpectedCounts = LexInsideOutside.ExpectedCounts[W]
+
+    def emptyCounts = new ExpectedCounts(numFeatures)
+
+    def expectedCountsToObjective(ecounts: ExpectedCounts) = {
+      (ecounts.loss, ecounts.features)
+    }
+
   }
 
-}
+  case class LexInference[L, W](builder: LexCKYChartBuilder[ParseChart.LogProbabilityParseChart, L, W],
+                                featurizer: IndexedFeaturizer[L,W],
+                                headFinder: HeadFinder[L]) extends MarginalInference[TreeInstance[L, W], SpanScorer[L]] {
+    type ExpectedCounts = LexInsideOutside.ExpectedCounts[W]
+    type Marginal = LexChartPair[ParseChart.LogProbabilityParseChart, L, W]
+
+
+    def marginal(v: TreeInstance[L, W], aug: SpanScorer[L]) = {
+      val r = builder.buildCharts(v.words, aug)
+      r -> r.partition
+    }
+
+
+    def guessCountsFromMarginals(v: TreeInstance[L, W], marg: Marginal, aug: SpanScorer[L]) = {
+      val root_score = marg.partition
+      val ec = new LexInsideOutside(featurizer, builder).expectedCounts(marg.spec, marg.inside,
+        marg.outside, root_score, marg.scorer)
+      ec
+    }
+
+
+    def goldCounts(ti: TreeInstance[L, W], augment: SpanScorer[L]) = {
+      val g = builder.grammar
+      val spec = g.specialize(ti.words)
+      val fspec = featurizer.specialize(ti.words)
+      val counts = new ExpectedCounts(featurizer.featureIndex.size)
+      val words = ti.words
+      var score = 0.0
+      // rec returns head index
+      def rec(t: BinarizedTree[L]):Int= t match {
+        case n@NullaryTree(a) =>
+          val aI = g.labelIndex(a)
+          addMultiple(counts.features, fspec.featuresForTag(aI,n.span.start), 1.0)
+          score += spec.tagScores(n.span.start)(aI) + ti.spanScorer.scoreSpan(t.span.start, t.span.end, aI)
+          assert(!score.isInfinite)
+          n.span.start
+        case UnaryTree(a, b) =>
+          val h = rec(b)
+          val r = g.index(UnaryRule(a, b.label))
+          addMultiple(counts.features, fspec.featuresForUnary(r,h), 1.0)
+          score += ( spec.scoreUnary(r, h)
+            //          + augment.scoreUnaryRule(t.span.start, t.span.end, r)
+            )
+          h
+        case t@BinaryTree(a, bt@Tree(b, _), Tree(c, _)) =>
+          val childHeads = IndexedSeq(rec(t.leftChild), rec(t.rightChild))
+          val headIsLeft = headFinder.findHeadChild(t, identity[L] _ ) == 0
+          val (head, dep) = if(headIsLeft) childHeads(0) -> childHeads(1) else childHeads(1) -> childHeads(0)
+          val r = g.index(BinaryRule(a, b, c))
+          if(headIsLeft) {
+            score += ( spec.scoreRightComplement(r, head, dep)
+              //            + ti.spanScorer.scoreSpan(t.span.start, t.span.end, g.labelIndex(a))
+              //            + ti.spanScorer.scoreBinaryRule(t.span.start, bt.span.end, t.span.end, r)
+              )
+          } else {
+            score += ( spec.scoreLeftComplement(r, head, dep)
+              //            + ti.spanScorer.scoreSpan(t.span.start, t.span.end, g.labelIndex(a))
+              //            + ti.spanScorer.scoreBinaryRule(t.span.start, bt.span.end, t.span.end, r)
+              )
+          }
+          addMultiple(counts.features, fspec.featuresForBinary(r,head,dep), 1.0)
+          if(headIsLeft) childHeads(0) else childHeads(1)
+      }
+      rec(ti.tree)
+      assert(!score.isInfinite)
+      counts.logProb = score
+      counts
+    }
+
+    def baseAugment(v: TreeInstance[L, W]) = v.spanScorer
+
+
+    private def addMultiple(vec: DenseVector[Double], feats: Array[Int], d: Double) = {
+      var i = 0
+      while(i < feats.length) {
+        vec(feats(i)) += d
+        i += 1
+      }
+      vec
+    }
+
+  }
 
 case class SubstringFeature(w: String) extends Feature
 
@@ -606,10 +631,10 @@ class SimpleWordShapeGen(tagWordCounts: Counter2[String,String,Double], counts: 
       if(counts(w) > 0) {
         buf += ("T-"+tagWordCounts(::, w).argmax)
       }
-//      if(w.length > 5) {
-//        buf += w.substring(w.length-3)
-//        buf += w.substring(w.length-2)
-//      }
+      //      if(w.length > 5) {
+      //        buf += w.substring(w.length-3)
+      //        buf += w.substring(w.length-2)
+      //      }
       buf
     }
 
@@ -675,37 +700,41 @@ object LexDiscrimPipeline extends ParserPipeline {
 
 
     //    def featGen(w: String) = {
-//      if(summedCounts(w) < 30)  Counter( (IndicatorFeature(EnglishWordClassGenerator.signatureFor(w)):Feature) -> 1.0)
-//      else Counter( (IndicatorFeature(w):Feature) -> 1.0)
-//    }
-
-    println("Wordindex size: " + wordIndex.size)
+    //      if(summedCounts(w) < 30)  Counter( (IndicatorFeature(EnglishWordClassGenerator.signatureFor(w)):Feature) -> 1.0)
+    //      else Counter( (IndicatorFeature(w):Feature) -> 1.0)
+    //    }
 
     val headFinder = HeadFinder.collinsHeadFinder
     val indexed = if(cachedIndex.exists()) {
-      scalanlp.util.readObject[FeatureIndexer[String,String]](cachedIndex)
+      scalanlp.util.readObject[IndexedFeaturizer[String,String]](cachedIndex)
     } else {
-      val cooccurringWords = trainTrees.par.aggregate(Set.empty[(String,String)])({ (agg,ti) =>
-        agg ++ (for(w1 <- ti.words; w2 <- ti.words) yield (w1,w2))
-      }, (_ ++ _))
-      println("cooc word size: " + cooccurringWords.size)
-      val feat = new StandardFeaturizer(wordIndex, cooccurringWords,
-                                        xbarParser.grammar.index,
-                                        xbarParser.grammar.labelIndex,
-                                        validTag,
-                                        ruleGen,
-                                        shapeGen,
-                                        { (w:String) => tagShapeGen.featuresFor(w)})
-      val f = FeatureIndexer.extract(feat, headFinder, xbarParser, wordIndex, validTag, trainTrees)
+      val feat = new StandardFeaturizer(wordIndex,
+      xbarParser.grammar.labelIndex,
+      xbarParser.grammar.index,
+      ruleGen,
+      shapeGen,
+      { (w:String) => tagShapeGen.featuresFor(w)})
+      val f = IndexedFeaturizer.extract(feat,
+        headFinder,
+        xbarParser.grammar.index,
+        xbarParser.grammar.labelIndex,
+        trainTrees)
       scalanlp.util.writeObject(cachedIndex,f)
       f
     }
 
-    val model = new LexModel(indexed, xbarParser)
+    val bundle = new LexGrammarBundle(xbarParser.grammar,
+      initLexicon.keys.map(_._1).toSet.toIndexedSeq,
+      headFinder,
+      wordIndex,
+      validTag _
+    )
+
+    val model = new LexModel(bundle, indexed, xbarParser)
 
     val obj = new ModelObjective(model, trainTrees)
     val cachedObj = new CachedBatchDiffFunction(obj)
-//    val checking = new RandomizedGradientCheckingFunction(cachedObj)
+    //    val checking = new RandomizedGradientCheckingFunction(cachedObj)
     val init = obj.initialWeightVector
 
     type OptState = FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State
