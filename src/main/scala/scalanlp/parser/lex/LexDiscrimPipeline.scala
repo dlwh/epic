@@ -503,115 +503,120 @@ object IndexedFeaturizer {
 
 class LexModel[L, W](bundle: LexGrammarBundle[L,W],
                      indexed: IndexedFeaturizer[L,W],
-                     coarse: ChartBuilder[ParseChart, L, W]) extends Model[TreeInstance[L, W]] with Serializable {
+                     coarse: ChartBuilder[ParseChart, L, W],
+                     initFeatureValue: Feature=>Option[Double]) extends Model[TreeInstance[L, W]] with Serializable {
 
-    def extractParser(weights: DenseVector[Double]) = {
-      val inf = inferenceFromWeights(weights)
-      new LexChartParser(coarse.grammar, inf.builder)
-    }
-
-    def numFeatures = indexed.featureIndex.size
-    import bundle._
-
-    def inferenceFromWeights(weights: DenseVector[Double]) = {
-      val gram: LexGrammar[L, W] = bundle.makeGrammar(indexed, weights)
-      val builder = new LexCKYChartBuilder(coarse.root, gram, ParseChart.logProb)
-      new LexInference(builder, indexed, headFinder)
-    }
-
-    type Inference = LexInference[L, W]
-    type ExpectedCounts = LexInsideOutside.ExpectedCounts[W]
-
-    def emptyCounts = new ExpectedCounts(numFeatures)
-
-    def expectedCountsToObjective(ecounts: ExpectedCounts) = {
-      (ecounts.loss, ecounts.features)
-    }
-
+  def extractParser(weights: DenseVector[Double]) = {
+    val inf = inferenceFromWeights(weights)
+    new LexChartParser(coarse.grammar, inf.builder)
   }
 
-  case class LexInference[L, W](builder: LexCKYChartBuilder[ParseChart.LogProbabilityParseChart, L, W],
-                                featurizer: IndexedFeaturizer[L,W],
-                                headFinder: HeadFinder[L]) extends MarginalInference[TreeInstance[L, W], SpanScorer[L]] {
-    type ExpectedCounts = LexInsideOutside.ExpectedCounts[W]
-    type Marginal = LexChartPair[ParseChart.LogProbabilityParseChart, L, W]
+  val featureIndex = indexed.featureIndex
 
 
-    def marginal(v: TreeInstance[L, W], aug: SpanScorer[L]) = {
-      val r = builder.buildCharts(v.words, aug)
-      r -> r.partition
-    }
+  import bundle._
+
+  def initialValueForFeature(f: Feature) = initFeatureValue(f).getOrElse(0)
+
+  def inferenceFromWeights(weights: DenseVector[Double]) = {
+    val gram: LexGrammar[L, W] = bundle.makeGrammar(indexed, weights)
+    val builder = new LexCKYChartBuilder(coarse.root, gram, ParseChart.logProb)
+    new LexInference(builder, indexed, headFinder)
+  }
+
+  type Inference = LexInference[L, W]
+  type ExpectedCounts = LexInsideOutside.ExpectedCounts[W]
+
+  def emptyCounts = new ExpectedCounts(numFeatures)
+
+  def expectedCountsToObjective(ecounts: ExpectedCounts) = {
+    (ecounts.loss, ecounts.features)
+  }
+
+}
+
+case class LexInference[L, W](builder: LexCKYChartBuilder[ParseChart.LogProbabilityParseChart, L, W],
+                              featurizer: IndexedFeaturizer[L,W],
+                              headFinder: HeadFinder[L]) extends MarginalInference[TreeInstance[L, W], SpanScorer[L]] {
+  type ExpectedCounts = LexInsideOutside.ExpectedCounts[W]
+  type Marginal = LexChartPair[ParseChart.LogProbabilityParseChart, L, W]
 
 
-    def guessCountsFromMarginals(v: TreeInstance[L, W], marg: Marginal, aug: SpanScorer[L]) = {
-      val root_score = marg.partition
-      val ec = new LexInsideOutside(featurizer, builder).expectedCounts(marg.spec, marg.inside,
-        marg.outside, root_score, marg.scorer)
-      ec
-    }
+  def marginal(v: TreeInstance[L, W], aug: SpanScorer[L]) = {
+    val r = builder.buildCharts(v.words, aug)
+    r -> r.partition
+  }
 
 
-    def goldCounts(ti: TreeInstance[L, W], augment: SpanScorer[L]) = {
-      val g = builder.grammar
-      val spec = g.specialize(ti.words)
-      val fspec = featurizer.specialize(ti.words)
-      val counts = new ExpectedCounts(featurizer.featureIndex.size)
-      val words = ti.words
-      var score = 0.0
-      // rec returns head index
-      def rec(t: BinarizedTree[L]):Int= t match {
-        case n@NullaryTree(a) =>
-          val aI = g.labelIndex(a)
-          addMultiple(counts.features, fspec.featuresForTag(aI,n.span.start), 1.0)
-          score += spec.tagScores(n.span.start)(aI) + ti.spanScorer.scoreSpan(t.span.start, t.span.end, aI)
-          assert(!score.isInfinite)
-          n.span.start
-        case UnaryTree(a, b) =>
-          val h = rec(b)
-          val r = g.index(UnaryRule(a, b.label))
-          addMultiple(counts.features, fspec.featuresForUnary(r,h), 1.0)
-          score += ( spec.scoreUnary(r, h)
-            //          + augment.scoreUnaryRule(t.span.start, t.span.end, r)
+  def guessCountsFromMarginals(v: TreeInstance[L, W], marg: Marginal, aug: SpanScorer[L]) = {
+    val root_score = marg.partition
+    val ec = new LexInsideOutside(featurizer, builder).expectedCounts(marg.spec, marg.inside,
+      marg.outside, root_score, marg.scorer)
+    ec
+  }
+
+
+  def goldCounts(ti: TreeInstance[L, W], augment: SpanScorer[L]) = {
+    val g = builder.grammar
+    val spec = g.specialize(ti.words)
+    val fspec = featurizer.specialize(ti.words)
+    val counts = new ExpectedCounts(featurizer.featureIndex.size)
+    val words = ti.words
+    var score = 0.0
+    // rec returns head index
+    def rec(t: BinarizedTree[L]):Int= t match {
+      case n@NullaryTree(a) =>
+        val aI = g.labelIndex(a)
+        addMultiple(counts.features, fspec.featuresForTag(aI,n.span.start), 1.0)
+        score += spec.tagScores(n.span.start)(aI) + ti.spanScorer.scoreSpan(t.span.start, t.span.end, aI)
+        assert(!score.isInfinite)
+        n.span.start
+      case UnaryTree(a, b) =>
+        val h = rec(b)
+        val r = g.index(UnaryRule(a, b.label))
+        addMultiple(counts.features, fspec.featuresForUnary(r,h), 1.0)
+        score += ( spec.scoreUnary(r, h)
+          //          + augment.scoreUnaryRule(t.span.start, t.span.end, r)
+          )
+        h
+      case t@BinaryTree(a, bt@Tree(b, _), Tree(c, _)) =>
+        val childHeads = IndexedSeq(rec(t.leftChild), rec(t.rightChild))
+        val headIsLeft = headFinder.findHeadChild(t, identity[L] _ ) == 0
+        val (head, dep) = if(headIsLeft) childHeads(0) -> childHeads(1) else childHeads(1) -> childHeads(0)
+        val r = g.index(BinaryRule(a, b, c))
+        if(headIsLeft) {
+          score += ( spec.scoreRightComplement(r, head, dep)
+            //            + ti.spanScorer.scoreSpan(t.span.start, t.span.end, g.labelIndex(a))
+            //            + ti.spanScorer.scoreBinaryRule(t.span.start, bt.span.end, t.span.end, r)
             )
-          h
-        case t@BinaryTree(a, bt@Tree(b, _), Tree(c, _)) =>
-          val childHeads = IndexedSeq(rec(t.leftChild), rec(t.rightChild))
-          val headIsLeft = headFinder.findHeadChild(t, identity[L] _ ) == 0
-          val (head, dep) = if(headIsLeft) childHeads(0) -> childHeads(1) else childHeads(1) -> childHeads(0)
-          val r = g.index(BinaryRule(a, b, c))
-          if(headIsLeft) {
-            score += ( spec.scoreRightComplement(r, head, dep)
-              //            + ti.spanScorer.scoreSpan(t.span.start, t.span.end, g.labelIndex(a))
-              //            + ti.spanScorer.scoreBinaryRule(t.span.start, bt.span.end, t.span.end, r)
-              )
-          } else {
-            score += ( spec.scoreLeftComplement(r, head, dep)
-              //            + ti.spanScorer.scoreSpan(t.span.start, t.span.end, g.labelIndex(a))
-              //            + ti.spanScorer.scoreBinaryRule(t.span.start, bt.span.end, t.span.end, r)
-              )
-          }
-          addMultiple(counts.features, fspec.featuresForBinary(r,head,dep), 1.0)
-          if(headIsLeft) childHeads(0) else childHeads(1)
-      }
-      rec(ti.tree)
-      assert(!score.isInfinite)
-      counts.logProb = score
-      counts
+        } else {
+          score += ( spec.scoreLeftComplement(r, head, dep)
+            //            + ti.spanScorer.scoreSpan(t.span.start, t.span.end, g.labelIndex(a))
+            //            + ti.spanScorer.scoreBinaryRule(t.span.start, bt.span.end, t.span.end, r)
+            )
+        }
+        addMultiple(counts.features, fspec.featuresForBinary(r,head,dep), 1.0)
+        if(headIsLeft) childHeads(0) else childHeads(1)
     }
-
-    def baseAugment(v: TreeInstance[L, W]) = v.spanScorer
-
-
-    private def addMultiple(vec: DenseVector[Double], feats: Array[Int], d: Double) = {
-      var i = 0
-      while(i < feats.length) {
-        vec(feats(i)) += d
-        i += 1
-      }
-      vec
-    }
-
+    rec(ti.tree)
+    assert(!score.isInfinite)
+    counts.logProb = score
+    counts
   }
+
+  def baseAugment(v: TreeInstance[L, W]) = v.spanScorer
+
+
+  private def addMultiple(vec: DenseVector[Double], feats: Array[Int], d: Double) = {
+    var i = 0
+    while(i < feats.length) {
+      vec(feats(i)) += d
+      i += 1
+    }
+    vec
+  }
+
+}
 
 case class SubstringFeature(w: String) extends Feature
 
@@ -730,7 +735,14 @@ object LexDiscrimPipeline extends ParserPipeline {
       validTag _
     )
 
-    val model = new LexModel(bundle, indexed, xbarParser)
+
+    val featureCounter = if(oldWeights ne null) {
+      readObject[Counter[Feature,Double]](oldWeights)
+    } else {
+      Counter[Feature,Double]()
+    }
+
+    val model = new LexModel(bundle, indexed, xbarParser, {featureCounter.get(_)})
 
     val obj = new ModelObjective(model, trainTrees)
     val cachedObj = new CachedBatchDiffFunction(obj)

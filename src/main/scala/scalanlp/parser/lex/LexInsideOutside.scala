@@ -126,7 +126,8 @@ class LexInsideOutside[L,W](featurizer: IndexedFeaturizer[L,W],
                   }
                   split += 1
                 }
-                addMultiple(vector, fspec.featuresForBinary(r,h,right), selfScore)
+                if(selfScore > 0.0)
+                  addMultiple(vector, fspec.featuresForBinary(r,h,right), selfScore)
               }
             }
 
@@ -161,7 +162,7 @@ class LexInsideOutside[L,W](featurizer: IndexedFeaturizer[L,W],
                   }
                   split += 1
                 }
-                if(selfScore >= 0)
+                if(selfScore > 0)
                   addMultiple(vector, fspec.featuresForBinary(r,h,left), selfScore)
               }
             }
@@ -185,7 +186,7 @@ class LexInsideOutside[L,W](featurizer: IndexedFeaturizer[L,W],
         val aScore = outside.top.labelScore(begin, end, a, h)
         val rScore = spec.scoreUnary(r, h) + validSpan.scoreUnaryRule(begin,end,r);
         val prob = exp(bScore + aScore + rScore - totalProb);
-        if(prob >= 0)
+        if(prob > 0)
           addMultiple(vector, fspec.featuresForUnary(r,h), prob)
       }
     }
@@ -223,8 +224,9 @@ object LexInsideOutside {
 
   private def addMultiple(vec: DenseVector[Double], feats: Array[Int], d: Double) = {
     var i = 0
+    val data = vec.data
     while(i < feats.length) {
-      vec(feats(i)) += d
+      data(feats(i)) += d
       i += 1
     }
     vec

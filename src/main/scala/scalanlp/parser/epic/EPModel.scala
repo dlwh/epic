@@ -1,6 +1,5 @@
 package scalanlp.parser.epic
 
-import scalala.tensor.::
 import collection.mutable.ArrayBuffer
 import scalanlp.inference.{Factor, ExpectationPropagation}
 import scalala.tensor.dense.DenseVector
@@ -10,22 +9,45 @@ import scalanlp.parser.Grammar._
 import scalala.library.Library
 import scalanlp.parser.ParseChart._
 import scalanlp.parser._
+import features.Feature
 import projections.GrammarProjections
 import scalala.library.Library._
 import scalanlp.optimize.{BatchDiffFunction, FirstOrderMinimizer, CachedBatchDiffFunction}
+import scalanlp.util.Index
+import java.io.File
+import scalala.tensor.{Counter, ::}
+
+case class ComponentFeature(index: Int, feature: Feature) extends Feature
+import scalanlp.util._
+
+object EPModel {
+  type CompatibleModel[Datum, Augment] = Model[Datum] { type Inference <: ProjectableInference[Datum,Augment]}
+}
+
 
 /**
  * 
  * @author dlwh
  */
-
-class EPModel[Datum, Augment](maxEPIter: Int, models: Model[Datum] { type Inference <: ProjectableInference[Datum,Augment]}*)(implicit aIsFactor: Augment<:<Factor[Augment]) extends Model[Datum] {
+class EPModel[Datum, Augment](maxEPIter: Int, initFeatureValue: Feature=>Option[Double],
+                              models: EPModel.CompatibleModel[Datum,Augment]*)(implicit aIsFactor: Augment<:<Factor[Augment]) extends Model[Datum] {
   type ExpectedCounts = EPExpectedCounts
   type Inference = EPInference[Datum, Augment]
 
-  val numFeatures = models.map(_.numFeatures).sum
+  val featureIndex:Index[Feature] = {
+    val index = Index[Feature]()
+    for( (m,i) <- models.zipWithIndex; f <- m.featureIndex) index.index(ComponentFeature(i,f))
+    index
+  }
 
-  import scalanlp.util._
+  override def shouldRandomizeWeights = models.exists(_.shouldRandomizeWeights)
+  override def initialValueForFeature(f: Feature) = initFeatureValue(f) getOrElse {
+    f match {
+      case ComponentFeature(m,ff) => models(m).initialValueForFeature(ff)
+      case _ => 0.0
+    }
+  }
+
   private val offsets = models.map(_.numFeatures).unfold(0)(_ + _)
 
   def emptyCounts = {
@@ -56,6 +78,13 @@ class EPModel[Datum, Augment](maxEPIter: Int, models: Model[Datum] { type Infere
       result(i) = weights(i + offsets(modelIndex))
     }
     result
+  }
+
+  override def cacheFeatureWeights(weights: DenseVector[Double], prefix: String) {
+    super.cacheFeatureWeights(weights, prefix)
+    for( ((w,m),i) <- (partitionWeights(weights) zip models).zipWithIndex) {
+      m.cacheFeatureWeights(w,prefix+"-model-"+i)
+    }
   }
 }
 
@@ -134,12 +163,13 @@ case class EPParams(iterations: Int= 5, pruningThreshold: Double = -15)
 
 case class EPParserModelFactory(ep: EPParams,
                                 parser: ParserParams.BaseParser[String],
+                                // I realy need ot figure out how to get this into my config language...
                                 model1: ParserModelFactory[String, String] = null,
                                 model2: ParserModelFactory[String, String] = null,
                                 model3: ParserModelFactory[String, String] = null,
                                 model4: ParserModelFactory[String, String] = null,
-                                model5: ParserModelFactory[String, String] = null
-                                 ) extends ModelFactory[TreeInstance[String, String]] {
+                                model5: ParserModelFactory[String, String] = null,
+                                oldWeights: File = null) extends ModelFactory[TreeInstance[String, String]] {
   type MyModel = EPModel[TreeInstance[String,String], SpanScorerFactor[String,String]] with EPParserExtractor[String,String]
 
   def make(train: IndexedSeq[TreeInstance[String, String]]) = {
@@ -159,7 +189,13 @@ case class EPParserModelFactory(ep: EPParams,
       wrappedM1:ModelType
     }
 
-    new EPModel(ep.iterations, models:_*) with EPParserExtractor[String, String] with Serializable {
+    val featureCounter = if(oldWeights ne null) {
+      readObject[Counter[Feature,Double]](oldWeights)
+    } else {
+      Counter[Feature,Double]()
+    }
+
+    new EPModel(ep.iterations, {featureCounter.get(_)}, models:_*) with EPParserExtractor[String, String] with Serializable {
       val zeroParser = SimpleChartParser(new CKYChartBuilder(xbarParser.root,
         new ZeroLexicon(xbarParser.lexicon),
         Grammar.zero(xbarParser.grammar),ParseChart.logProb))

@@ -1,11 +1,13 @@
 package scalanlp.parser.epic
 
 import scalanlp.optimize.BatchDiffFunction
-import scalanlp.util.Index
 import collection.GenTraversable
 import scalala.tensor.sparse.SparseVector
 import scalala.tensor.dense.{DenseVectorCol, DenseVector}
 import actors.threadpool.AtomicInteger
+import scalanlp.parser.features.Feature
+import scalanlp.util.{Encoder, Index}
+import java.io.File
 
 
 trait Model[Datum] { self =>
@@ -14,7 +16,17 @@ trait Model[Datum] { self =>
     type ExpectedCounts = self.ExpectedCounts
   }
 
-  def numFeatures: Int
+  def featureIndex: Index[Feature]
+  def numFeatures = featureIndex.size
+
+  // just saves feature weights to disk as a serialized counter. The file is prefix.ser.gz
+  def cacheFeatureWeights(weights: DenseVector[Double], prefix: String = "weights") {
+    val ctr = Encoder.fromIndex(featureIndex).decode(weights)
+    scalanlp.util.writeObject(new File(prefix+".ser.gz"),  ctr)
+  }
+
+  def shouldRandomizeWeights: Boolean = true
+  def initialValueForFeature(f: Feature):Double// = 0
 
   def inferenceFromWeights(weights: DenseVector[Double]):Inference
 
@@ -36,16 +48,27 @@ class ModelObjective[Datum](val model: Model[Datum],
   // Selects a set of data to use
   protected def select(batch: IndexedSeq[Int]):GenTraversable[Datum] = batchSelector(batch)
 
-  def initialWeightVector: DenseVector[Double] = DenseVector.rand(numFeatures)
+  def initialWeightVector: DenseVector[Double] = {
+   val v = Encoder.fromIndex(featureIndex).tabulateDenseVector(f => model.initialValueForFeature(f))
+    if(model.shouldRandomizeWeights) {
+      v += DenseVector.rand(numFeatures) * 1E-5
+    }
+    v
+  }
 
+  var iter = 0
 
   def calculate(x: DenseVector[Double], batch: IndexedSeq[Int]) = {
-    val model = inferenceFromWeights(x)
+    if(iter % 10 == 0) {
+      model.cacheFeatureWeights(x, "weights")
+    }
+    iter += 1
+    val inference = inferenceFromWeights(x)
     val timeIn = System.currentTimeMillis()
-    var success = new AtomicInteger(0)
+    val success = new AtomicInteger(0)
     val finalCounts = select(batch).aggregate(emptyCounts)({ (countsSoFar,datum) =>
       try {
-        val counts = model.expectedCounts(datum) += countsSoFar
+        val counts = inference.expectedCounts(datum) += countsSoFar
         success.incrementAndGet()
         counts
       } catch {

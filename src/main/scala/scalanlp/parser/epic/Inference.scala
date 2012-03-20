@@ -16,6 +16,7 @@ trait GoldGuessInference[Datum] extends Inference[Datum] {
   def goldCounts(value: Datum):ExpectedCounts
 
   def expectedCounts(datum: Datum):ExpectedCounts = {
+//    guessCounts(datum)
     guessCounts(datum) -= goldCounts(datum)
   }
 }

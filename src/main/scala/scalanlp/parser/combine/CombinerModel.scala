@@ -6,7 +6,6 @@ import scalanlp.parser.features.Feature
 import scalala.tensor.dense.DenseVector
 import scalanlp.util.{Encoder, Index, TODO}
 import epic.{ModelObjective, MarginalInference, Model}
-import scalanlp.optimize.CachedBatchDiffFunction
 import collection.immutable.{Map, IndexedSeq}
 import scalanlp.trees.BinarizedTree
 import actors.threadpool.AtomicInteger
@@ -18,6 +17,7 @@ import projections.{ConstraintScorerFactory, LabeledSpanScorerFactory}
 import java.util.concurrent.ConcurrentHashMap
 import collection.JavaConversions
 import java.io.{PrintStream, BufferedOutputStream, FileOutputStream}
+import scalanlp.optimize.{RandomizedGradientCheckingFunction, CachedBatchDiffFunction}
 
 /**
  * 
@@ -25,12 +25,12 @@ import java.io.{PrintStream, BufferedOutputStream, FileOutputStream}
  */
 
 class CombinerModel[L,W](val builder: CKYChartBuilder[ParseChart.LogProbabilityParseChart, L, W],
-                         val factory: CombinerFeaturizerFactory[L,W]) extends Model[TreeBundle[L,W]] {
+                         val factory: CombinerFeaturizerFactory[L,W],
+                         initFeatValue: Feature=>Option[Double]) extends Model[TreeBundle[L,W]] {
   type ExpectedCounts = CombinerECounts
   type Inference = CombinerParserInference[L,W]
 
   val featureIndex = factory.featureIndex
-  def numFeatures = featureIndex.size
 
   def emptyCounts = CombinerECounts(0.0, DenseVector.zeros(numFeatures))
 
@@ -45,6 +45,8 @@ class CombinerModel[L,W](val builder: CKYChartBuilder[ParseChart.LogProbabilityP
   def extractParser(weights: DenseVector[Double], testTBs: IndexedSeq[TreeBundle[L,W]]) = {
     CombinerModel.extractParser(this, weights, testTBs)
   }
+
+  def initialValueForFeature(f: Feature) = initFeatValue(f).getOrElse(0.0)
 }
 
 object CombinerModel {
@@ -60,15 +62,23 @@ object CombinerModel {
       inf.baseAugment(tb)
     }
 
+    val zeroBuilder = inf.zeroBuilder
+
     val parser = new Parser[L,W] with Serializable {
       def bestParse(s: Seq[W], spanScorer: SpanScorer[L]) = {
         val scorer = SpanScorer.sum[L](sentToScorer(s),spanScorer)
-        val inside = builder.buildInsideChart(s, scorer)
-        val outside = builder.buildOutsideChart(inside, scorer)
-        decoder.extractBestParse(builder.root, builder.grammar, inside, outside, s, scorer)
+        val inside = zeroBuilder.buildInsideChart(s, scorer)
+        val outside = zeroBuilder.buildOutsideChart(inside, scorer)
+        val best = decoder.extractBestParse(zeroBuilder.root, zeroBuilder.grammar, inside, outside, s, scorer)
+        val exScore = inf.goldCounts(new TreeBundle("?",best,sentToDataMap(s),s)).loss
+        val canScore = inf.goldCounts(new TreeBundle("?",sentToDataMap(s).values.head,sentToDataMap(s),s)).loss
+        println(exScore + " " + canScore + " " + (best == sentToDataMap(s).values.head))
+        best
       }
-//      val decoder = new SimpleViterbiDecoder[String,String](basicParser.grammar)
-      val decoder = MaxConstituentDecoder.simple[L,W](builder.grammar)
+//      val decoder = new SimpleViterbiDecoder[L,W](zeroBuilder.grammar)
+//      val decoder = MaxConstituentDecoder.simple[L,W](builder.grammar)
+      val decoder = MaxRuleProductDecoder.simple(zeroBuilder)
+
     }
     parser
   }
@@ -107,9 +117,9 @@ class CombinerParserInference[L,W](builder: CKYChartBuilder[ParseChart.LogProbab
     new CombinerSpanScorer(filter, factory.featurizerFor(v), weights)
   }
 
-  val scorerFactory = new ConstraintScorerFactory[L,L, W](SimpleChartParser(builder),-5)
+  private val scorerFactory = new ConstraintScorerFactory[L,L, W](SimpleChartParser(builder),-5)
 
-  def makeFilter(tb: TreeBundle[L, W]):SpanScorer[L] =  {
+  private def makeFilter(tb: TreeBundle[L, W]):SpanScorer[L] =  {
     CombinerCache.mapCache.get(tb.words) match {
       case Some(scorer) => scorer.asInstanceOf[SpanScorer[L]]
       case None =>
@@ -132,7 +142,6 @@ class CombinerParserInference[L,W](builder: CKYChartBuilder[ParseChart.LogProbab
   }
   
   val zeroBuilder = new CKYChartBuilder(builder.root, new ZeroLexicon(builder.lexicon), Grammar.zero(builder.grammar), ParseChart.logProb)
-
 
   def marginal(v: TreeBundle[L, W], aug: CombinerSpanScorer[L, W]) = {
     val inside = zeroBuilder.buildInsideChart(v.words,aug)
@@ -217,56 +226,27 @@ object DiscrimCombinePipeline extends CombinePipeline {
       val (words,binary,unary) = GenerativeParser.extractCounts(allTrees)
       val grammar = Grammar(Library.logAndNormalizeRows(binary),Library.logAndNormalizeRows(unary));
       val lexicon = new UnsmoothedLexicon(Library.logAndNormalizeRows(words))
-      val zeroParser = new CKYChartBuilder("ROOT", lexicon, grammar, ParseChart.logProb)
+      val parser = new CKYChartBuilder("ROOT", lexicon, grammar, ParseChart.logProb)
       // erase rule counts
 //      val zeroParser = new CKYChartBuilder("ROOT", new ZeroLexicon(lexicon), Grammar.zero(grammar), ParseChart.logProb)
-      zeroParser
+      parser
     }
 
-//    println("Extracting features... will take some time...")
-
     val allSystems = trainTrees.iterator.flatMap(_.outputs.keysIterator).toSet
-    val featurizerFactory = new StandardCombinerFeaturizerFactory(allSystems, basicParser.grammar, params.useRuleFeatures)
+    val featurizerFactory = new StandardCombinerFeaturizerFactory(allSystems, basicParser.grammar, params.useRuleFeatures, params.useLabelFeatures)
 
-    /*
-    val processed = new AtomicInteger(0)
-    val featureIndex = {
-      val allFeatures = trainTrees.par.aggregate(Set.empty[Feature])({ (features, tb) =>
-        val myFeats = collection.mutable.Set[Feature]()
-        val featurizer = featurizerFactory.featurizerFor(tb)
-        val extractiveSpanScorer = new SpanScorer[String] {
-          def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = {
-            myFeats ++= featurizer.featuresForBinary(begin, split, end, rule).keys
-            0.0
-          }
+    val featureCounter = if(params.oldWeights ne null) {
+      scalanlp.util.readObject[Counter[Feature,Double]](params.oldWeights)
+    } else {
+      Counter[Feature,Double]()
+    }
 
-          def scoreUnaryRule(begin: Int, end: Int, rule: Int) = {
-            myFeats ++= featurizer.featuresForUnary(begin, end, rule).keys
-            0.0
-          }
-
-          def scoreSpan(begin: Int, end: Int, tag: Int) = {
-            myFeats ++= featurizer.featuresForSpan(begin, end, tag).keys
-            0.0
-          }
-        }
-
-        basicParser.buildInsideChart(tb.words, extractiveSpanScorer)
-        val total = processed.incrementAndGet()
-        println(total)
-        if(total % 100 == 0) {
-          println(total+ "/"+trainTrees.length)
-        }
-        features ++ myFeats
-      }, (_ ++ _))
-
-      Index[Feature](allFeatures)
-    }*/
-
-    val model = new CombinerModel(basicParser, featurizerFactory)
+    val model = new CombinerModel(basicParser, featurizerFactory, {featureCounter.get(_)})
     val obj = new ModelObjective(model, trainTrees)
     val cachedObj = new CachedBatchDiffFunction(obj)
+    val checking = new RandomizedGradientCheckingFunction(cachedObj,1.0)
     val init = obj.initialWeightVector
+//    Iterator("Combine-x" -> model.extractParser(init * 0.0 + 20.0, testTrees))
     for( (state,iter) <- params.opt.iterations(cachedObj,init).take(params.opt.maxIterations).zipWithIndex
          if iter != 0 && iter % params.iterationsPerEval == 0) yield try {
       val features:Counter[Feature,Double] = Encoder.fromIndex(featurizerFactory.featureIndex).decode(state.x)

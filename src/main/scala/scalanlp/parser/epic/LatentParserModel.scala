@@ -1,7 +1,7 @@
 package scalanlp.parser.epic
 
 import scalanlp.parser._
-import features.{IndicatorFeature, WordShapeFeaturizer}
+import features.{Feature, IndicatorFeature, WordShapeFeaturizer}
 import scalanlp.parser.InsideOutside.{ExpectedCounts=>TrueCounts}
 import projections.{ProjectingSpanScorer, GrammarProjections}
 import splitting.StateSplitting
@@ -11,21 +11,28 @@ import scalala.tensor.sparse.SparseVector
 import scalala.library.Library
 import java.io.{FileReader, BufferedReader, File}
 import io.Source
+import scalala.tensor.Counter
 
 class LatentParserModel[L,L3,W](featurizer: Featurizer[L3,W],
                                 root: L3,
                                 val projections: GrammarProjections[L,L3],
                                 knownTagWords: Iterable[(L3,W)],
                                 openTags: Set[L3],
-                                closedWords: Set[W]) extends ParserModel[L,W] {
+                                closedWords: Set[W],
+                                initialFeatureVal: (Feature=>Option[Double]) = { _ => None}) extends ParserModel[L,W] {
   type L2 = L3
   type Inference = LatentParserInference[L,L2, W]
 
   val indexedFeatures: FeatureIndexer[L2, W]  = FeatureIndexer(featurizer, knownTagWords, projections)
+  def featureIndex = indexedFeatures.index
+  override def shouldRandomizeWeights = true
+
+
+  override def initialValueForFeature(f: Feature) = initialFeatureVal(f) getOrElse 0.0
 
   def emptyCounts = ParserExpectedCounts[W](new TrueCounts(projections.rules.fineIndex.size,projections.labels.fineIndex.size))
 
-  def numFeatures = indexedFeatures.index.size
+
 
   def inferenceFromWeights(weights: DenseVector[Double]) = {
     val grammar = FeaturizedGrammar(weights,indexedFeatures)
@@ -93,7 +100,8 @@ case class LatentParserInference[L,L2,W](builder: ChartBuilder[LogProbabilityPar
 
 case class LatentParserModelFactory(parser: ParserParams.BaseParser[String],
                                     substates: File = null,
-                                    numStates: Int) extends ParserModelFactory[String, String] {
+                                    numStates: Int = 2,
+                                    oldWeights: File = null) extends ParserModelFactory[String, String] {
   type MyModel = LatentParserModel[String,(String,Int),String]
 
   def split(x: String, counts: Map[String,Int], numStates: Int) = {
@@ -134,7 +142,13 @@ case class LatentParserModelFactory(parser: ParserParams.BaseParser[String],
     val knownTagWords = determineKnownTags(xbarParser.lexicon, indexedProjections)
     val closedWords = determineClosedWords(initLexicon)
 
-    new LatentParserModel[String,(String,Int),String](feat, ("",0), indexedProjections, knownTagWords, openTags, closedWords)
+    val featureCounter = if(oldWeights ne null) {
+      scalanlp.util.readObject[Counter[Feature,Double]](oldWeights)
+    } else {
+      Counter[Feature,Double]()
+    }
+
+    new LatentParserModel[String,(String,Int),String](feat, ("",0), indexedProjections, knownTagWords, openTags, closedWords, {featureCounter.get(_)})
   }
 }
 

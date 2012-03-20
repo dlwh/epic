@@ -1,7 +1,7 @@
 package scalanlp.parser.epic
 
 import scalanlp.parser._
-import features.{IndicatorFeature, WordShapeFeaturizer}
+import features.{Feature, IndicatorFeature, WordShapeFeaturizer}
 import scalanlp.parser.InsideOutside.{ExpectedCounts=>TrueCounts}
 import projections.GrammarProjections
 import ParseChart.LogProbabilityParseChart
@@ -10,6 +10,7 @@ import scalala.tensor.sparse.SparseVector
 import scalala.library.Library
 import scalanlp.trees._
 import java.io.File
+import scalala.tensor.Counter
 
 class KMModel[L,L3,W](featurizer: Featurizer[L3,W],
                       root: L3,
@@ -17,16 +18,19 @@ class KMModel[L,L3,W](featurizer: Featurizer[L3,W],
                       val projections: GrammarProjections[L,L3],
                       knownTagWords: Iterable[(L3,W)],
                       openTags: Set[L3],
-                      closedWords: Set[W]) extends ParserModel[L,W] {
+                      closedWords: Set[W],
+                      initialFeatureVal: (Feature=>Option[Double]) = { _ => None}) extends ParserModel[L,W] {
   type L2 = L3
   type Inference = DiscParserInference[L,L2, W]
 
   val indexedFeatures: FeatureIndexer[L2, W]  = FeatureIndexer(featurizer, knownTagWords, projections)
+  def featureIndex = indexedFeatures.index
+
+
+  override def initialValueForFeature(f: Feature) = initialFeatureVal(f) getOrElse 0.0
+  override def shouldRandomizeWeights = false
 
   def emptyCounts = ParserExpectedCounts[W](new TrueCounts(projections.rules.fineIndex.size,projections.labels.fineIndex.size))
-
-  def numFeatures = indexedFeatures.index.size
-
   def inferenceFromWeights(weights: DenseVector[Double]) = {
     val grammar = FeaturizedGrammar(weights,indexedFeatures)
     val lexicon = new FeaturizedLexicon(openTags, closedWords, weights, indexedFeatures)
@@ -114,7 +118,7 @@ case class DiscParserInference[L,L2,W](ann: (BinarizedTree[L],Seq[W])=>Binarized
 
 case class KMModelFactory(parser: ParserParams.BaseParser[String],
                           pipeline: KMPipeline,
-                          numStates: Int) extends ParserModelFactory[String, String] {
+                          oldWeights: File = null) extends ParserModelFactory[String, String] {
   type MyModel = KMModel[String,AnnotatedLabel,String]
 
   def make(trainTrees: IndexedSeq[TreeInstance[String, String]]):MyModel = {
@@ -146,7 +150,12 @@ case class KMModelFactory(parser: ParserParams.BaseParser[String],
     val knownTagWords = determineKnownTags(xbarParser.lexicon, indexedProjections)
     val closedWords = determineClosedWords(initLexicon)
 
-    new KMModel[String,AnnotatedLabel,String](feat, transformed.head.label.label, pipeline, indexedProjections, knownTagWords, openTags, closedWords)
+    val featureCounter = if(oldWeights ne null) {
+      scalanlp.util.readObject[Counter[Feature,Double]](oldWeights)
+    } else {
+      Counter[Feature,Double]()
+    }
+    new KMModel[String,AnnotatedLabel,String](feat, transformed.head.label.label, pipeline, indexedProjections, knownTagWords, openTags, closedWords, {featureCounter.get(_)})
   }
 
 }

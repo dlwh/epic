@@ -21,7 +21,10 @@ case class CombineParams(treebank: TreebankParams,
                   iterationsPerEval: Int = 50,
                   actualTest: Boolean = false,
                   useRuleFeatures: Boolean = true,
-                  opt: OptParams
+                  useLabelFeatures: Boolean = true,
+                  opt: OptParams,
+                  oldWeights: File = null,
+                  maxLength: Int = 1000000
                    )
 
 /**
@@ -55,7 +58,7 @@ trait CombinePipeline {
     val inputTrees: IndexedSeq[TreeBundle[String, String]] = {
       for {
         (section:String) <- trainSections.toIndexedSeq
-        tb <- readCandidatesFromSection(section, acceptableSystems, kbestDir, treebank, process).par
+        tb <- readCandidatesFromSection(section, acceptableSystems, kbestDir, treebank, process, maxLength).par
         goldTree = process(tb.goldTree)
       } yield tb.copy[String,String](goldTree=goldTree)
     }
@@ -63,7 +66,7 @@ trait CombinePipeline {
     val testTrees: IndexedSeq[TreeBundle[String, String]] = {
       val section = if(actualTest) params.testSection else params.devSection
       for {
-        tb <- readCandidatesFromSection(section, acceptableSystems, kbestDir, treebank, process).par
+        tb <- readCandidatesFromSection(section, acceptableSystems, kbestDir, treebank, process, maxLength).par
         goldTree = process(tb.goldTree)
       } yield tb.copy[String,String](goldTree=goldTree)
     }.toIndexedSeq
@@ -126,11 +129,12 @@ trait CombinePipeline {
                                         parsers: Set[String],
                                         kbestDir: File,
                                         tb: Treebank[String],
-                                        process: Tree[String]=>BinarizedTree[String]):Iterable[TreeBundle[String,String]] = {
+                                        process: Tree[String]=>BinarizedTree[String],
+                                        maxLength: Int):Iterable[TreeBundle[String,String]] = {
     val filesToRead = for {
       f <- kbestDir.listFiles()
       if f.getName.startsWith("wsj" + section)
-      if (parsers.isEmpty || parsers.contains(f.getName.split("[.]")(1)))
+      if (parsers.isEmpty || parsers.contains(f.getName.substring(6,f.getName.lastIndexOf('.'))))
     } yield f
 
     val iterators = for(f <- filesToRead) yield {
@@ -157,6 +161,7 @@ trait CombinePipeline {
         (pname,iter) <- iterators
         (guessTree,w2) <- iter.next
       } yield (pname,guessTree,w2)
+
       assert(words.length == t.span.end)
       if(guessTrees.exists{ case (sys,t,w2) => words.length != t.span.end || words != w2}) {
         println("Something is wrong!")
@@ -171,7 +176,7 @@ trait CombinePipeline {
       TreeBundle(section+ "-" +i, rerooted, guessTrees.map(x => (x._1 -> x._2)).toMap.mapValues(process), words)
     }
 
-    treeIterator.toIndexedSeq
+    treeIterator.toIndexedSeq.filter(_.words.length < maxLength)
   }
 
   def newTreeIterator(file: File) = {

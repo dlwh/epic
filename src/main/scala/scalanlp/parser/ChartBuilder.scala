@@ -200,12 +200,12 @@ class CKYChartBuilder[Chart[X]<:ParseChart[X], L,W](val root: L,
               var split = (feasibleSpan >> 32).toInt
               val endSplit = feasibleSpan.toInt // lower 32 bits
               while(split < endSplit) {
-                val score = aScore + ruleScore
+                val spanScore = validSpan.scoreBinaryRule(begin,split,end,r)
+                val score = aScore + ruleScore + spanScore
                 val bInside = itop.labelScore(begin,split,b)
                 val cInside = itop.labelScore(split,end,c)
-                val spanScore = validSpan.scoreBinaryRule(begin,split,end,r)
-                val bOutside = score + cInside + spanScore
-                val cOutside = score + bInside + spanScore
+                val bOutside = score + cInside
+                val cOutside = score + bInside
                 if(!java.lang.Double.isInfinite(bOutside) && !java.lang.Double.isInfinite(cOutside)) {
                   outside.top.enter(begin,split,b,bOutside)
                   outside.top.enter(split,end,c,cOutside)

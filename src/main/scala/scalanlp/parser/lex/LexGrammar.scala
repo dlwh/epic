@@ -39,7 +39,7 @@ trait LexGrammar[L,W] extends Serializable {
 
   // Left Rule if the left child is the head
   def isLeftRule(r: Int):Boolean
-  // Right rule if the left child is the head
+  // Right rule if the right child is the head
   def isRightRule(r: Int):Boolean
 
   // don't mutate me!

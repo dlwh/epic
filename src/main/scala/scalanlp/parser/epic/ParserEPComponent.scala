@@ -3,6 +3,7 @@ package scalanlp.parser.epic
 import scalanlp.inference.Factor
 import scalala.tensor.dense.DenseVector
 import scalanlp.parser._
+import features.Feature
 import projections.{AnchoredRuleScorerFactory, GrammarProjections, ScalingSpanScorer}
 import scalanlp.parser.ParseChart._
 import scalanlp.trees.BinarizedTree
@@ -19,7 +20,11 @@ class ParserEPComponent[L,L3,W](val base: ParserModel[L, W] { type L2 = L3; type
 
   def extractParser(weights: DenseVector[Double]) = base.extractParser(weights)
 
-  def numFeatures = base.numFeatures
+  def featureIndex = base.featureIndex
+  def cacheFeatureWeights(weights: DenseVector[Double]) {base.cacheFeatureWeights(weights)}
+  override def numFeatures = base.numFeatures
+  override def shouldRandomizeWeights = base.shouldRandomizeWeights
+  override def initialValueForFeature(f: Feature) = base.initialValueForFeature(f)
 
   def inferenceFromWeights(weights: DenseVector[Double]) = {
     ParserComponentInference(base.inferenceFromWeights(weights),projector)

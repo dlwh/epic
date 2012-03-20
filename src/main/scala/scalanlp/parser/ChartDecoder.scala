@@ -137,6 +137,16 @@ class MaxRuleProductDecoder[C,F, W](coarseGrammar: Grammar[C], coarseLexicon: Le
   }
 }
 
+object MaxRuleProductDecoder {
+  def apply[C,F,W](base: ChartBuilder[ParseChart.LogProbabilityParseChart, C, W], fine: ChartBuilder[ParseChart.LogProbabilityParseChart, F, W],  proj: GrammarProjections[C,F]) = {
+    new MaxRuleProductDecoder(base.grammar, base.lexicon, proj, fine)
+  }
+
+  def simple[C,W](base: ChartBuilder[ParseChart.LogProbabilityParseChart, C, W]) = {
+    new MaxRuleProductDecoder(base.grammar, base.lexicon, GrammarProjections.identity(base.grammar), base)
+  }
+}
+
 /**
  * Tries to extract a tree that maximizes... XXX
  **/

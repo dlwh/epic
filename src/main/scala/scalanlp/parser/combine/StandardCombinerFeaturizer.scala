@@ -17,13 +17,15 @@ import scalanlp.parser.{SpanScorer, ParseChart, CKYChartBuilder, Grammar}
 class StandardCombinerFeaturizer(grammar: Grammar[String],
                                  tb: TreeBundle[String, String],
                                  useRuleFeatures: Boolean,
+                                 useLabelFeatures: Boolean,
                                  featureIndex: Index[Feature],
                                  systemIndex: Index[String],
                                  systemFeatures: Array[Int],
                                 // SystemIndex -> Rule Index -> FeatureIndex
                                  ruleIndex: Array[Array[Int]],
                                  // SystemIndex -> Label Index -> FeatureIndex
-                                 labelIndex: Array[Array[Int]]) extends CombinerFeaturizer[String,String] {
+                                 labelIndex: Array[Array[Int]],
+                                 topLabelIndex: Array[Array[Int]]) extends CombinerFeaturizer[String,String] {
 
   val outputRules = Array.tabulate(systemIndex.size){ i =>
     val system = systemIndex.get(i)
@@ -35,7 +37,7 @@ class StandardCombinerFeaturizer(grammar: Grammar[String],
   val binaryCache = new TriangularArray(tb.words.length+1,null:Array[OpenAddressHashArray[OldSparseVector]])
   val dummySV = new OldSparseVector(featureIndex.size,0,0)
 
-  def featuresForBinary(begin: Int, split: Int, end: Int, rule: Int):OldSparseVector = if(!useRuleFeatures) dummySV else  {
+  def featuresForBinary(begin: Int, split: Int, end: Int, rule: Int):OldSparseVector = {
     var forSpan = binaryCache(begin,end)
     if(forSpan eq null) {
       binaryCache(begin,end) = new Array[OpenAddressHashArray[OldSparseVector]](end-begin)
@@ -68,9 +70,20 @@ class StandardCombinerFeaturizer(grammar: Grammar[String],
             val ruleFeature = ruleIndex(system)(rule)
             val genRuleFeature = ruleIndex(0)(rule)
             val systemFeature = systemFeatures(system)
-            sv(ruleFeature) = ruleValue
-            sv(genRuleFeature) += ruleValue
+            val genFeature = systemFeatures(0)
+
+            if(useRuleFeatures) {
+              sv(ruleFeature) = ruleValue
+              sv(genRuleFeature) += ruleValue
+              sv(systemFeature) = ruleValue
+            }
+            if(useLabelFeatures) {
+              val tag = grammar.parent(rule)
+              sv(labelIndex(system)(tag)) += ruleValue
+              sv(labelIndex(0)(tag)) += ruleValue
+            }
             sv(systemFeature) = ruleValue
+            sv(genFeature) += ruleValue
           }
 
         }
@@ -81,7 +94,7 @@ class StandardCombinerFeaturizer(grammar: Grammar[String],
     sv
   }
 
-  def featuresForUnary(begin: Int, end: Int, rule: Int) =  /*if(!useRuleFeatures) dummySV else*/ {
+  def featuresForUnary(begin: Int, end: Int, rule: Int) =  {
     val sv = new OldSparseVector(featureIndex.size)
     for( (data, system) <- outputRules.zipWithIndex if data ne null) {
       import data._
@@ -91,18 +104,27 @@ class StandardCombinerFeaturizer(grammar: Grammar[String],
         else forSpan(rule)
       }
       if(ruleValue != 0) {
-        val ruleFeature = ruleIndex(system)(rule)
-        val genRuleFeature = ruleIndex(0)(rule)
         val systemFeature = systemFeatures(system)
-        sv(ruleFeature) = ruleValue
-        sv(genRuleFeature) += ruleValue
+        val genFeature = systemFeatures(0)
+        if(useRuleFeatures) {
+          val ruleFeature = ruleIndex(system)(rule)
+          val genRuleFeature = ruleIndex(0)(rule)
+          sv(ruleFeature) = ruleValue
+          sv(genRuleFeature) += ruleValue
+        }
+        if(useLabelFeatures) {
+          val tag = grammar.parent(rule)
+          sv(topLabelIndex(system)(tag)) += ruleValue
+          sv(topLabelIndex(0)(tag)) += ruleValue
+        }
         sv(systemFeature) = ruleValue
+        sv(genFeature) += ruleValue
       }
     }
     sv
   }
 
-  def featuresForSpan(begin: Int, end: Int, tag: Int) = {
+  def featuresForSpan(begin: Int, end: Int, tag: Int) = dummySV /*{
     val sv = new OldSparseVector(featureIndex.size)
     for( (data, system) <- outputRules.zipWithIndex if data ne null) {
       import data._
@@ -115,13 +137,17 @@ class StandardCombinerFeaturizer(grammar: Grammar[String],
         val ruleFeature = labelIndex(system)(tag)
         val genRuleFeature = labelIndex(0)(tag)
         val systemFeature = systemFeatures(system)
-        sv(ruleFeature) = ruleValue
-        sv(genRuleFeature) += ruleValue
+        val genFeature = systemFeatures(0)
+        if(useLabelFeatures) {
+          sv(ruleFeature) = ruleValue
+          sv(genRuleFeature) += ruleValue
+        }
         sv(systemFeature) = ruleValue
+        sv(genFeature) += ruleValue
       }
     }
     sv
-  }
+  }*/
 
 }
 
@@ -129,7 +155,8 @@ case class LabelFeature[L](l: L) extends Feature
 
 class StandardCombinerFeaturizerFactory(systems: Set[String],
                                         grammar: Grammar[String],
-                                        useRuleFeatures: Boolean) extends CombinerFeaturizerFactory[String, String] {
+                                        useRuleFeatures: Boolean,
+                                        useLabelFeatures: Boolean) extends CombinerFeaturizerFactory[String, String] {
   val systemIndex = Index[String]()
   systemIndex.index("ALL")
   systems foreach {systemIndex.index _}
@@ -139,21 +166,48 @@ class StandardCombinerFeaturizerFactory(systems: Set[String],
   val ruleFeatureIndex = Array.tabulate(systemIndex.size,grammar.index.size) { (i,j) =>
     val system = featureIndex.get(systemFeatures(i))
     val rule = grammar.index.get(j)
-    val f = PairFeature(system,RuleFeature(rule))
-    featureIndex.index(f)
+    if(useRuleFeatures) {
+      val f = PairFeature(system,RuleFeature(rule))
+      featureIndex.index(f)
+    } else {
+      -1
+    }
   }
 
   val labelFeatureIndex = Array.tabulate(systemIndex.size,grammar.labelIndex.size) { (i,j) =>
     val system = featureIndex.get(systemFeatures(i))
     val rule = grammar.labelIndex.get(j)
     val f = PairFeature(system,LabelFeature(rule))
-    featureIndex.index(f)
+    if(useLabelFeatures) {
+      featureIndex.index(f)
+    } else {
+      -1
+    }
+  }
+
+  val topLabelIndex = Array.tabulate(systemIndex.size,grammar.labelIndex.size) { (i,j) =>
+    val system = featureIndex.get(systemFeatures(i))
+    val rule = grammar.labelIndex.get(j)
+    if(useLabelFeatures)  {
+      val f = PairFeature(system,LabelFeature("BOT-" +rule))
+      featureIndex.index(f)
+    } else {
+      -1
+    }
   }
 
   def featurizerFor(tb: TreeBundle[String, String]):CombinerFeaturizer[String,String] = {
     // make a coarse filter:
 
-    new StandardCombinerFeaturizer(grammar, tb, useRuleFeatures:Boolean, featureIndex, systemIndex, systemFeatures, ruleFeatureIndex, labelFeatureIndex)
+    new StandardCombinerFeaturizer(grammar,
+      tb,
+      useRuleFeatures:Boolean,
+      useLabelFeatures,
+      featureIndex,
+      systemIndex,
+      systemFeatures,
+      ruleFeatureIndex,
+      labelFeatureIndex, topLabelIndex)
   }
 
 

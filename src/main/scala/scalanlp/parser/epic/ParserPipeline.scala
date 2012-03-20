@@ -4,8 +4,8 @@ import scalanlp.optimize.FirstOrderMinimizer.OptParams
 import scalanlp.parser.{Parser, TreeInstance}
 import scalanlp.parser.ParseEval.Statistics
 import scalala.tensor.dense.DenseVector
-import scalanlp.optimize.{BatchDiffFunction, FirstOrderMinimizer, CachedBatchDiffFunction}
 import java.io.File
+import scalanlp.optimize.{RandomizedGradientCheckingFunction, BatchDiffFunction, FirstOrderMinimizer, CachedBatchDiffFunction}
 
 /**
  * Trains a single parser from a single model.
@@ -25,6 +25,7 @@ object ParserPipeline extends scalanlp.parser.ParserPipeline {
 
     val obj = new ModelObjective(model,trainTrees)
     val cachedObj = new CachedBatchDiffFunction(obj)
+    val checking = new RandomizedGradientCheckingFunction(obj)
     val init = obj.initialWeightVector
 
     type OptState = FirstOrderMinimizer[DenseVector[Double],BatchDiffFunction[DenseVector[Double]]]#State
