@@ -140,9 +140,8 @@ case class KMModelFactory(parser: ParserParams.BaseParser[String],
 
     val gen = new WordShapeFeaturizer(Library.sum(initLexicon))
     def labelFlattener(l: AnnotatedLabel) = {
-      val basic = Seq(l, l.label, l.copy(features=Set.empty))
-      val justAnnotations = for(l2 <- l.features) yield AnnotatedLabel(l.label).annotate(l2)
-      basic ++ justAnnotations map(IndicatorFeature)
+      val basic = Seq(l, l.copy(features=Set.empty))
+      basic map {IndicatorFeature(_)}
     }
     val feat = new SumFeaturizer[AnnotatedLabel,String](new RuleFeaturizer(labelFlattener _), new LexFeaturizer(gen, labelFlattener _))
 
