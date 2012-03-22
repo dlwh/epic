@@ -94,8 +94,6 @@ case class LatentParserInference[L,L2,W](builder: ChartBuilder[LogProbabilityPar
     new ParserExpectedCounts(ecounts)
   }
 
-
-
 }
 
 case class LatentParserModelFactory(parser: ParserParams.BaseParser[String],
@@ -132,11 +130,12 @@ case class LatentParserModelFactory(parser: ParserParams.BaseParser[String],
 
     val gen = new WordShapeFeaturizer(Library.sum(initLexicon))
     def labelFlattener(l: (String,Int)) = {
-      val basic = Seq(l, l._1)
+      val basic = Seq(l)
       basic map(IndicatorFeature)
     }
     val feat = new SumFeaturizer[(String,Int),String](new RuleFeaturizer(labelFlattener _), new LexFeaturizer(gen, labelFlattener _))
     val indexedProjections = GrammarProjections(xbarParser.grammar, split(_:String,substateMap, numStates), unsplit)
+    println(indexedProjections.labels)
 
     val openTags = determineOpenTags(initLexicon, indexedProjections)
     val knownTagWords = determineKnownTags(xbarParser.lexicon, indexedProjections)
