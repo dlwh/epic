@@ -37,7 +37,7 @@ class StandardCombinerFeaturizer(grammar: Grammar[String],
 
   val outputRules = Array.tabulate(systemIndex.size){ i =>
     val system = systemIndex.get(i)
-    val data = for(tree <- tb.outputs.get(system)) yield LabeledSpanExtractor.extractAnchoredRules(grammar.labelIndex, grammar.index, Seq(tree))
+    val data = for(tree <- tb.outputs.get(system)) yield LabeledSpanExtractor.extractAnchoredRules(grammar.labelIndex, grammar.index, tree)
     data.getOrElse(null)
   }
 

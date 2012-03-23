@@ -31,7 +31,7 @@ object SimpleCombinePipeline extends CombinePipeline {
 
     def sentToScorer(s: Seq[String]) = {
       val outputs = sentToDataMap(s)
-      val data = LabeledSpanExtractor.extractAnchoredRules(basicParser.grammar.labelIndex, basicParser.grammar.index, outputs.values)
+      val data = LabeledSpanExtractor.extractAnchoredRules(basicParser.grammar.labelIndex, basicParser.grammar.index, outputs.values.flatten)
       new AnchoredRuleScorer[String](data.spanScores, data.unaryScores, data.binaryScores)
     }
 
@@ -107,53 +107,56 @@ object LabeledSpanExtractor {
 
     val binaryScores = TriangularArray.raw[Array[OldSparseVector]](length+1,null);
 
-    for(t <- trees; child <- t.allChildren) child match {
-      case NullaryTree(a) =>
-        val ind = TriangularArray.index(child.span.start,child.span.end)
-        val pL = labelIndex(a)
-        getOrElseUpdate(lexicalScores,ind,projVector())(pL) += 1
-      case BinaryTree(a,bc@Tree(b,_),Tree(c, _)) =>
-        val rule = BinaryRule(a,b,c)
-        val pR = ruleIndex(rule)
+    val constant = 1.0/trees.size
+    for(t <- trees; child <- t.allChildren) {
+      child match {
+        case NullaryTree(a) =>
+          val ind = TriangularArray.index(child.span.start, child.span.end)
+          val pL = labelIndex(a)
+          getOrElseUpdate(lexicalScores, ind, projVector())(pL) += 1
+        case BinaryTree(a, bc@Tree(b, _), Tree(c, _)) =>
+          val rule = BinaryRule(a, b, c)
+          val pR = ruleIndex(rule)
 
-        val l = labelIndex(a)
-        val index = TriangularArray.index(child.span.start,child.span.end)
-        val innerIndex = bc.span.end - bc.span.start
-        val parentArray =  if(binaryScores(index) eq null) {
-          val numSplits = child.span.end - child.span.start
-          binaryScores(index) = Array.fill(numSplits)(null:OldSparseVector)
-          binaryScores(index)(innerIndex) = projRuleVector()
-          binaryScores(index)(innerIndex)
-        } else if(binaryScores(index)(innerIndex) eq null) {
-          binaryScores(index)(innerIndex) = projRuleVector()
-          binaryScores(index)(innerIndex)
-        } else {
-          binaryScores(index)(innerIndex)
-        }
-        parentArray(pR) += 1
-        if(totals(index) eq null) {
-          totals(index) = projVector;
-        }
-        totals(index)(l) += 1
-        getOrElseUpdate(lexicalScores,index,projVector())(l) += 1
-      case UnaryTree(a,bc@Tree(b,_)) =>
-        val rule = UnaryRule(a,b)
-        val pR = ruleIndex(rule)
+          val l = labelIndex(a)
+          val index = TriangularArray.index(child.span.start, child.span.end)
+          val innerIndex = bc.span.end - bc.span.start
+          val parentArray = if (binaryScores(index) eq null) {
+            val numSplits = child.span.end - child.span.start
+            binaryScores(index) = Array.fill(numSplits)(null: OldSparseVector)
+            binaryScores(index)(innerIndex) = projRuleVector()
+            binaryScores(index)(innerIndex)
+          } else if (binaryScores(index)(innerIndex) eq null) {
+            binaryScores(index)(innerIndex) = projRuleVector()
+            binaryScores(index)(innerIndex)
+          } else {
+            binaryScores(index)(innerIndex)
+          }
+          parentArray(pR) += constant
+          if (totals(index) eq null) {
+            totals(index) = projVector;
+          }
+          totals(index)(l) += constant
+          getOrElseUpdate(lexicalScores, index, projVector())(l) += constant
+        case UnaryTree(a, bc@Tree(b, _)) =>
+          val rule = UnaryRule(a, b)
+          val pR = ruleIndex(rule)
 
-        val l = labelIndex(a)
-        val index = TriangularArray.index(child.span.start,child.span.end)
-        val parentArray = if(unaryScores(index) eq null) {
-          unaryScores(index) = projRuleVector()
-          unaryScores(index)
-        } else {
-          unaryScores(index)
-        }
-        parentArray(pR) += 1.0
-        if(totalsUnaries(index) eq null) {
-          totalsUnaries(index) = projVector;
-        }
-        totalsUnaries(index)(l) += 1.0
+          val l = labelIndex(a)
+          val index = TriangularArray.index(child.span.start, child.span.end)
+          val parentArray = if (unaryScores(index) eq null) {
+            unaryScores(index) = projRuleVector()
+            unaryScores(index)
+          } else {
+            unaryScores(index)
+          }
+          parentArray(pR) += constant
+          if (totalsUnaries(index) eq null) {
+            totalsUnaries(index) = projVector;
+          }
+          totalsUnaries(index)(l) += constant
 
+      }
     }
     new AnchoredData(lexicalScores, unaryScores, totalsUnaries, binaryScores, totals);
   }

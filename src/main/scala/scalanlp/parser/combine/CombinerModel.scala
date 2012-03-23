@@ -51,7 +51,7 @@ class CombinerModel[L,W](val builder: CKYChartBuilder[ParseChart.LogProbabilityP
 
 object CombinerModel {
   def extractParser[L,W](model: CombinerModel[L,W], weights: DenseVector[Double], testTBs: IndexedSeq[TreeBundle[L,W]]) ={
-    val sentToDataMap: Map[Seq[W], Map[String, BinarizedTree[L]]] = testTBs.iterator.map(tb => tb.words -> (Map.empty ++ tb.outputs)).toMap
+    val sentToDataMap: Map[Seq[W], Map[String, IndexedSeq[BinarizedTree[L]]]] = testTBs.iterator.map(tb => tb.words -> (Map.empty ++ tb.outputs)).toMap
     val builder = model.builder
     val factory = model.factory
     val inf =  new CombinerParserInference(builder, factory, weights, false)
@@ -69,11 +69,13 @@ object CombinerModel {
         val scorer = SpanScorer.sum[L](sentToScorer(s),spanScorer)
         val inside = zeroBuilder.buildInsideChart(s, scorer)
         val outside = zeroBuilder.buildOutsideChart(inside, scorer)
-        val best = decoder.extractBestParse(zeroBuilder.root, zeroBuilder.grammar, inside, outside, s, scorer)
-        val exScore = inf.goldCounts(new TreeBundle("?",best,sentToDataMap(s),s)).loss
-        val canScore = inf.goldCounts(new TreeBundle("?",sentToDataMap(s).values.head,sentToDataMap(s),s)).loss
-        println(exScore + " " + canScore + " " + (best == sentToDataMap(s).values.head))
-        best
+        try {
+          val best = decoder.extractBestParse(zeroBuilder.root, zeroBuilder.grammar, inside, outside, s, scorer)
+          best
+        } catch {
+          case e =>
+            sentToDataMap(s).flatMap(_._2).head
+        }
       }
 //      val decoder = new SimpleViterbiDecoder[L,W](zeroBuilder.grammar)
 //      val decoder = MaxConstituentDecoder.simple[L,W](builder.grammar)

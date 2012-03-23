@@ -7,25 +7,27 @@ import java.io.{BufferedReader, FileReader, File}
 import scalanlp.trees._
 import scalanlp.parser._
 import collection.immutable.IndexedSeq
-import collection.{Iterable, BufferedIterator, Iterator}
 import scalanlp.optimize.FirstOrderMinimizer.OptParams
 import scalanlp.util._
 import scalanlp.trees.UnaryChainRemover.ChainReplacer
+import collection.mutable.ArrayBuffer
+import collection._
 
 case class CombineParams(treebank: TreebankParams,
-                  kbestDir: File,
-                  trainSections:String = "all",
-                  systems:String = "all",
-                  testSection: String = "23",
-                  devSection: String = "22",
-                  iterationsPerEval: Int = 50,
-                  actualTest: Boolean = false,
-                  useRuleFeatures: Boolean = true,
-                  useLabelFeatures: Boolean = true,
-                  opt: OptParams,
-                  oldWeights: File = null,
-                  maxLength: Int = 1000000
-                   )
+                         dir: File,
+                         kbestDir: File = null,
+                         trainSections:String = "all",
+                         systems:String = "all",
+                         testSection: String = "23",
+                         devSection: String = "22",
+                         iterationsPerEval: Int = 50,
+                         actualTest: Boolean = false,
+                         useRuleFeatures: Boolean = true,
+                         useLabelFeatures: Boolean = true,
+                         opt: OptParams,
+                         oldWeights: File = null,
+                         maxLength: Int = 1000000
+                          )
 
 /**
  * 
@@ -58,17 +60,15 @@ trait CombinePipeline {
     val inputTrees: IndexedSeq[TreeBundle[String, String]] = {
       for {
         (section:String) <- trainSections.toIndexedSeq
-        tb <- readCandidatesFromSection(section, acceptableSystems, kbestDir, treebank, process, maxLength).par
-        goldTree = process(tb.goldTree)
-      } yield tb.copy[String,String](goldTree=goldTree)
+        tb <- readCandidatesFromSection(section, acceptableSystems, dir, kbestDir, treebank, process, maxLength)
+      } yield tb
     }
 
     val testTrees: IndexedSeq[TreeBundle[String, String]] = {
       val section = if(actualTest) params.testSection else params.devSection
       for {
-        tb <- readCandidatesFromSection(section, acceptableSystems, kbestDir, treebank, process, maxLength).par
-        goldTree = process(tb.goldTree)
-      } yield tb.copy[String,String](goldTree=goldTree)
+        tb <- readCandidatesFromSection(section, acceptableSystems, dir, kbestDir, treebank, process, maxLength)
+      } yield tb
     }.toIndexedSeq
 
     // Remove unary chains and remember the replacer.
@@ -127,22 +127,28 @@ trait CombinePipeline {
 
   private def readCandidatesFromSection(section: String,
                                         parsers: Set[String],
+                                        dir: File,
                                         kbestDir: File,
                                         tb: Treebank[String],
                                         process: Tree[String]=>BinarizedTree[String],
                                         maxLength: Int):Iterable[TreeBundle[String,String]] = {
     val filesToRead = for {
-      f <- kbestDir.listFiles()
+      f <- dir.listFiles() ++ {if(kbestDir ne null) kbestDir.listFiles() else Iterable.empty}
       if f.getName.startsWith("wsj" + section)
-      if (parsers.isEmpty || parsers.contains(f.getName.substring(6,f.getName.lastIndexOf('.'))))
+      systemName = f.getName.split("[._]")(1)
+      if (parsers.isEmpty || parsers.contains(systemName))
     } yield f
 
-    val iterators = for(f <- filesToRead) yield {
-      val parserName = f.getName.substring(6,f.getName.lastIndexOf('.'))
-      val iter: BufferedIterator[Option[(Tree[String], Seq[String])]] = if(parserName.contains("stanford")) {
-        newStanfordIterator(f).buffered
+    val iterators: Array[(String, Iterator[IndexedSeq[(Tree[String], Seq[String])]])] = for(f <- filesToRead) yield {
+      val parserName = f.getName.split("[.]")(1)
+      val iter: Iterator[IndexedSeq[(Tree[String], Seq[String])]] = if(parserName.contains("stanford")) {
+        newStanfordIterator(f).buffered.map(_.toIndexedSeq)
+      } else if(f.getParentFile == kbestDir && parserName.contains("charniak")) {
+        newCharniakKBestIterator(f).buffered
+      } else if(f.getParentFile == kbestDir) {
+        newKBestIterator(f).buffered
       } else {
-        newTreeIterator(f).buffered
+        newTreeIterator(f).buffered.map(_.toIndexedSeq)
       }
       parserName -> iter
     }
@@ -159,24 +165,62 @@ trait CombinePipeline {
     val treeIterator = for( ((t,words),i) <- filteredTrees.zipWithIndex) yield {
       val guessTrees = for {
         (pname,iter) <- iterators
-        (guessTree,w2) <- iter.next
-      } yield (pname,guessTree,w2)
+        kbestList = iter.next()
+        if kbestList.nonEmpty
+        trees = kbestList.map(_._1)
+        w = kbestList.head._2
+        if w == words
+      } yield (pname,trees)
 
-      assert(words.length == t.span.end)
-      if(guessTrees.exists{ case (sys,t,w2) => words.length != t.span.end || words != w2}) {
-        println("Something is wrong!")
-        println(t,words)
-        println(guessTrees.toIndexedSeq)
-        println(guessTrees.map{ case (sys,t,w2) => sys -> t.span.end}.toIndexedSeq)
-        println(guessTrees.map{ case (sys,t,w2) => sys -> w2}.toIndexedSeq)
-        println(words.length,t.span.end)
-        throw new RuntimeException()
-      }
-      val rerooted = process(Tree("ROOT",t.children)(t.span))
-      TreeBundle(section+ "-" +i, rerooted, guessTrees.map(x => (x._1 -> x._2)).toMap.mapValues(process), words)
+      def fullProcess(t: Tree[String]) = process(Tree("ROOT",t.children)(t.span))
+      val rerooted = fullProcess(t)
+      TreeBundle(section+ "-" +i, rerooted, guessTrees.map(x => (x._1 -> x._2)).toMap.mapValues(_.map(fullProcess)), words)
     }
 
     treeIterator.toIndexedSeq.filter(_.words.length < maxLength)
+  }
+
+  def newKBestIterator(file: File): Iterator[IndexedSeq[(Tree[String], Seq[String])]] = {
+    val lines = Source.fromFile(file).getLines()
+    scalanlp.util.Iterators.fromProducer {
+      if(!lines.hasNext) None
+      else {
+        val myLines = new ArrayBuffer[String]
+        var ok = true
+        while(lines.hasNext && ok) {
+          val line = lines.next()
+          if(line.trim != "") {
+            ok = true
+            myLines += line
+          } else {
+            ok = false
+          }
+        }
+//        println(myLines)
+        Some(myLines.map(Tree.fromString(_)).toIndexedSeq)
+      }
+    }
+  }
+
+  def newCharniakKBestIterator(file: File): Iterator[IndexedSeq[(Tree[String], Seq[String])]] = {
+    val lines = Source.fromFile(file).getLines()
+    lines.next() // drop the first header
+    scalanlp.util.Iterators.fromProducer {
+      if(!lines.hasNext) None
+      else {
+        val myLines = new ArrayBuffer[String]
+        var ok = true
+        while(lines.hasNext && ok) {
+          val line = lines.next()
+          if(line.substring(3,6) == "wsj") {
+            ok = false
+          } else if (line.startsWith("(")) {
+            myLines += line
+          }
+        }
+        Some(myLines.map(Tree.fromString(_)).toIndexedSeq)
+      }
+    }
   }
 
   def newTreeIterator(file: File) = {
@@ -188,9 +232,7 @@ trait CombinePipeline {
         Some(Tree.fromString(line))
       }
     }
-
   }
-
 
   def newStanfordIterator(file: File) = {
     val reader = new PennTreeReader(new BufferedReader(new FileReader(file)))
@@ -209,18 +251,18 @@ trait CombinePipeline {
 
 }
 
-case class TreeBundle[L,W](id: String, goldTree: BinarizedTree[L], outputs: Map[String,BinarizedTree[L]], words: Seq[W]) extends Example[Tree[L], Seq[W]] {
+case class TreeBundle[L,W](id: String, goldTree: BinarizedTree[L], outputs: Map[String,IndexedSeq[BinarizedTree[L]]], words: Seq[W]) extends Example[Tree[L], Seq[W]] {
   def features = words
 
   def label = goldTree
 
   def goldInstance = TreeInstance(id, goldTree, words)
-  def treeInstances(withGold: Boolean=false) = {
-    val allTrees = if(withGold) outputs.iterator ++ Iterator("Gold" -> goldTree) else outputs.iterator
-    for( (sys,t) <- allTrees) yield TreeInstance(id+"-"+sys, t, words)
+  def treeInstances(withGold: Boolean=false): Iterator[TreeInstance[L,W]] = {
+    val allTrees = if(withGold) outputs.iterator ++ Iterator("Gold" -> IndexedSeq(goldTree)) else outputs.iterator
+    for( (sys,trees) <- allTrees; t <- trees) yield TreeInstance(id+"-"+sys, t, words)
   }
 
   def mapTrees(f: BinarizedTree[L]=>BinarizedTree[L], mapGold: Boolean = false) = {
-    TreeBundle(id, if(mapGold) f(goldTree) else goldTree, outputs.mapValues(f), words)
+    TreeBundle(id, if(mapGold) f(goldTree) else goldTree, outputs.mapValues(_.map(f)), words)
   }
 }
