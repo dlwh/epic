@@ -23,7 +23,6 @@ class ParserEPComponent[L,L3,W](val base: ParserModel[L, W] { type L2 = L3; type
   def featureIndex = base.featureIndex
   def cacheFeatureWeights(weights: DenseVector[Double]) {base.cacheFeatureWeights(weights)}
   override def numFeatures = base.numFeatures
-  override def shouldRandomizeWeights = base.shouldRandomizeWeights
   override def initialValueForFeature(f: Feature) = base.initialValueForFeature(f)
 
   def inferenceFromWeights(weights: DenseVector[Double]) = {

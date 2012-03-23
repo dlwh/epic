@@ -26,9 +26,7 @@ class KMModel[L,L3,W](featurizer: Featurizer[L3,W],
   val indexedFeatures: FeatureIndexer[L2, W]  = FeatureIndexer(featurizer, knownTagWords, projections)
   def featureIndex = indexedFeatures.index
 
-
   override def initialValueForFeature(f: Feature) = initialFeatureVal(f) getOrElse 0.0
-  override def shouldRandomizeWeights = false
 
   def emptyCounts = ParserExpectedCounts[W](new TrueCounts(projections.rules.fineIndex.size,projections.labels.fineIndex.size))
   def inferenceFromWeights(weights: DenseVector[Double]) = {

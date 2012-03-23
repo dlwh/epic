@@ -747,7 +747,7 @@ object LexDiscrimPipeline extends ParserPipeline {
     val obj = new ModelObjective(model, trainTrees)
     val cachedObj = new CachedBatchDiffFunction(obj)
     //    val checking = new RandomizedGradientCheckingFunction(cachedObj)
-    val init = obj.initialWeightVector
+    val init = obj.initialWeightVector(false)
 
     type OptState = FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State
     def evalAndCache(pair: (OptState, Int) ) {

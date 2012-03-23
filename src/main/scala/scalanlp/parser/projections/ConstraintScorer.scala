@@ -3,13 +3,10 @@ package projections
 
 import collection.immutable.BitSet
 import scalanlp.collection.mutable.TriangularArray
-import scalanlp.tensor.sparse.OldSparseVector
 import scalala.library.Numerics
 import java.util.Arrays
 import scalanlp.config.Configuration
 import java.io._
-import scalanlp.io.FileIterable
-import scalanlp.util.Index
 
 /**
  * 

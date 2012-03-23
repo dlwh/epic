@@ -15,7 +15,8 @@ object ParserPipeline extends scalanlp.parser.ParserPipeline {
                     opt: OptParams,
                     iterationsPerEval: Int = 50,
                     maxIterations: Int = 1002,
-                    iterPerValidate: Int = 10);
+                    iterPerValidate: Int = 10,
+                    randomize: Boolean = false);
   protected val paramManifest = manifest[Params]
 
   def trainParser(trainTrees: IndexedSeq[TreeInstance[String, String]], validate: (Parser[String, String]) => Statistics, params: Params) = {
@@ -25,8 +26,8 @@ object ParserPipeline extends scalanlp.parser.ParserPipeline {
 
     val obj = new ModelObjective(model,trainTrees)
     val cachedObj = new CachedBatchDiffFunction(obj)
-    val checking = new RandomizedGradientCheckingFunction(obj)
-    val init = obj.initialWeightVector
+    val checking = new RandomizedGradientCheckingFunction(cachedObj)
+    val init = obj.initialWeightVector(randomize)
 
     type OptState = FirstOrderMinimizer[DenseVector[Double],BatchDiffFunction[DenseVector[Double]]]#State
     def evalAndCache(pair: (OptState,Int) ) {

@@ -193,6 +193,7 @@ trait DiscEPModel[L,W] extends EPModel[L,W] {
                      tree: BinarizedTree[L],
                      w: Seq[W],
                      scorer: SpanScorer[L2]):(ExpectedCounts[W])
+
 }
 
 abstract class AbstractDiscEPModel[L,L3,W](proj: GrammarProjections[L,L3],

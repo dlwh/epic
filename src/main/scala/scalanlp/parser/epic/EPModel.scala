@@ -40,7 +40,6 @@ class EPModel[Datum, Augment](maxEPIter: Int, initFeatureValue: Feature=>Option[
     index
   }
 
-  override def shouldRandomizeWeights = models.exists(_.shouldRandomizeWeights)
   override def initialValueForFeature(f: Feature) = initFeatureValue(f) getOrElse {
     f match {
       case ComponentFeature(m,ff) => models(m).initialValueForFeature(ff)
@@ -210,6 +209,7 @@ object EPPipeline extends ParserPipeline {
                     iterationsPerEval: Int = 50,
                     maxIterations: Int = 1001,
                     iterPerValidate: Int = 10,
+                    randomize: Boolean = true,
                     ep: EPParams);
   protected val paramManifest = manifest[Params]
 
@@ -228,7 +228,7 @@ object EPPipeline extends ParserPipeline {
 
     val obj = new ModelObjective(epModel,trainTrees)
     val cachedObj = new CachedBatchDiffFunction(obj)
-    val init = obj.initialWeightVector
+    val init = obj.initialWeightVector(randomize)
 
     type OptState = FirstOrderMinimizer[DenseVector[Double],BatchDiffFunction[DenseVector[Double]]]#State
     def evalAndCache(pair: (OptState,Int) ) {

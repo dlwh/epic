@@ -25,7 +25,6 @@ trait Model[Datum] { self =>
     scalanlp.util.writeObject(new File(prefix+".ser.gz"),  ctr)
   }
 
-  def shouldRandomizeWeights: Boolean = true
   def initialValueForFeature(f: Feature):Double// = 0
 
   def inferenceFromWeights(weights: DenseVector[Double]):Inference
@@ -48,9 +47,9 @@ class ModelObjective[Datum](val model: Model[Datum],
   // Selects a set of data to use
   protected def select(batch: IndexedSeq[Int]):GenTraversable[Datum] = batchSelector(batch)
 
-  def initialWeightVector: DenseVector[Double] = {
+  def initialWeightVector(randomize: Boolean): DenseVector[Double] = {
    val v = Encoder.fromIndex(featureIndex).tabulateDenseVector(f => model.initialValueForFeature(f))
-    if(model.shouldRandomizeWeights) {
+    if(randomize) {
       v += DenseVector.rand(numFeatures) * 1E-5
     }
     v

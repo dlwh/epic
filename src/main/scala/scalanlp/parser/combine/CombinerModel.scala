@@ -247,7 +247,7 @@ object DiscrimCombinePipeline extends CombinePipeline {
     val obj = new ModelObjective(model, trainTrees)
     val cachedObj = new CachedBatchDiffFunction(obj)
     val checking = new RandomizedGradientCheckingFunction(cachedObj,1.0)
-    val init = obj.initialWeightVector
+    val init = obj.initialWeightVector(false)
 //    Iterator("Combine-x" -> model.extractParser(init * 0.0 + 20.0, testTrees))
     for( (state,iter) <- params.opt.iterations(cachedObj,init).take(params.opt.maxIterations).zipWithIndex
          if iter != 0 && iter % params.iterationsPerEval == 0) yield try {

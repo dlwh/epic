@@ -1,7 +1,7 @@
 package scalanlp.parser.epic
 
 import scalanlp.parser._
-import features.{Feature, IndicatorFeature, WordShapeFeaturizer}
+import features.{RuleFeature, Feature, IndicatorFeature, WordShapeFeaturizer}
 import scalanlp.parser.InsideOutside.{ExpectedCounts=>TrueCounts}
 import projections.{ProjectingSpanScorer, GrammarProjections}
 import splitting.StateSplitting
@@ -25,14 +25,12 @@ class LatentParserModel[L,L3,W](featurizer: Featurizer[L3,W],
 
   val indexedFeatures: FeatureIndexer[L2, W]  = FeatureIndexer(featurizer, knownTagWords, projections)
   def featureIndex = indexedFeatures.index
-  override def shouldRandomizeWeights = true
 
-
-  override def initialValueForFeature(f: Feature) = initialFeatureVal(f) getOrElse 0.0
+  override def initialValueForFeature(f: Feature) = {
+    initialFeatureVal(f) getOrElse (math.random * 1E-3)
+  }
 
   def emptyCounts = ParserExpectedCounts[W](new TrueCounts(projections.rules.fineIndex.size,projections.labels.fineIndex.size))
-
-
 
   def inferenceFromWeights(weights: DenseVector[Double]) = {
     val grammar = FeaturizedGrammar(weights,indexedFeatures)
@@ -99,7 +97,8 @@ case class LatentParserInference[L,L2,W](builder: ChartBuilder[LogProbabilityPar
 case class LatentParserModelFactory(parser: ParserParams.BaseParser[String],
                                     substates: File = null,
                                     numStates: Int = 2,
-                                    oldWeights: File = null) extends ParserModelFactory[String, String] {
+                                    oldWeights: File = null,
+                                    splitFactor: Int = 1) extends ParserModelFactory[String, String] {
   type MyModel = LatentParserModel[String,(String,Int),String]
 
   def split(x: String, counts: Map[String,Int], numStates: Int) = {
@@ -142,7 +141,8 @@ case class LatentParserModelFactory(parser: ParserParams.BaseParser[String],
     val closedWords = determineClosedWords(initLexicon)
 
     val featureCounter = if(oldWeights ne null) {
-      scalanlp.util.readObject[Counter[Feature,Double]](oldWeights)
+      val baseCounter = scalanlp.util.readObject[Counter[Feature,Double]](oldWeights)
+      baseCounter
     } else {
       Counter[Feature,Double]()
     }
