@@ -124,9 +124,6 @@ class LexCKYChartBuilder[Chart[X]<:ParseChart[X], L, W](val root: L,
             val b = grammar.leftChild(r)
             val c = grammar.rightChild(r)
             ruleIndex += 1
-            /* unfortunately this line is a bottleneck, so i'm inlining it. ugh.
-            val feasibleSpan = top.feasibleSpanX(begin, end, b, c)
-            */
             // Left child is head: extend right
             if(grammar.isLeftRule(r)) {
               var right = h+1;

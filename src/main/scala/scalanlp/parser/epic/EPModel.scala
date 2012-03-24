@@ -160,15 +160,21 @@ case class EPInference[Datum, Augment](inferences: IndexedSeq[ProjectableInferen
 
 case class EPParams(iterations: Int= 5, pruningThreshold: Double = -15)
 
+object EPParserModelFactory {
+  type CompatibleFactory = ModelFactory[TreeInstance[String,String]] {
+    type MyModel <: EPModel.CompatibleModel[TreeInstance[String,String], SpanScorerFactor[String, String]]
+  }
+}
+
 case class EPParserModelFactory(ep: EPParams,
                                 parser: ParserParams.BaseParser[String],
                                 // I realy need ot figure out how to get this into my config language...
-                                model1: ParserModelFactory[String, String] = null,
-                                model2: ParserModelFactory[String, String] = null,
-                                model3: ParserModelFactory[String, String] = null,
-                                model4: ParserModelFactory[String, String] = null,
-                                model5: ParserModelFactory[String, String] = null,
-                                oldWeights: File = null) extends ModelFactory[TreeInstance[String, String]] {
+                                model1: EPParserModelFactory.CompatibleFactory = null,
+                                model2: EPParserModelFactory.CompatibleFactory = null,
+                                model3: EPParserModelFactory.CompatibleFactory = null,
+                                model4: EPParserModelFactory.CompatibleFactory = null,
+                                model5: EPParserModelFactory.CompatibleFactory = null,
+                                oldWeights: File = null) extends ParserExtractableModelFactory[String,String] {
   type MyModel = EPModel[TreeInstance[String,String], SpanScorerFactor[String,String]] with EPParserExtractor[String,String]
 
   def make(train: IndexedSeq[TreeInstance[String, String]]) = {
@@ -180,11 +186,9 @@ case class EPParserModelFactory(ep: EPParams,
       new CKYChartBuilder[LogProbabilityParseChart,String,String]("",lexicon,grammar,ParseChart.logProb);
     }
 
-    type ModelType = Model[TreeInstance[String,String]] { type Inference <: ProjectableInference[TreeInstance[String,String],SpanScorerFactor[String, String]]}
+    type ModelType = EPModel.CompatibleModel[TreeInstance[String,String],SpanScorerFactor[String, String]]
     val models = Seq(model1,model2,model3,model4,model5).filterNot(_ eq null) map { model =>
-      val m1 = model.make(train)
-      val wrappedM1 = new ParserEPComponent[String,m1.L2,String](m1, new AnchoredRuleApproximator(xbarParser, ep.pruningThreshold))
-      wrappedM1:ModelType
+      model.make(train):ModelType
     }
 
     val featureCounter = if(oldWeights ne null) {
@@ -201,51 +205,3 @@ case class EPParserModelFactory(ep: EPParams,
   }
 }
 
-object EPPipeline extends ParserPipeline {
-  case class Params(modelFactory: EPParserModelFactory,
-                    opt: OptParams,
-                    numStates: Int= 2,
-                    iterationsPerEval: Int = 50,
-                    maxIterations: Int = 1001,
-                    iterPerValidate: Int = 10,
-                    randomize: Boolean = true,
-                    ep: EPParams);
-  protected val paramManifest = manifest[Params]
-
-
-  def split(x: String, numStates: Int) = {
-    if(x.isEmpty) Seq((x,0))
-    else for(i <- 0 until numStates) yield (x,i)
-  }
-
-  def unsplit(x: (String,Int)) = x._1
-
-  def trainParser(trainTrees: IndexedSeq[TreeInstance[String, String]], validate: (Parser[String, String]) => Statistics, params: Params) = {
-    import params._
-
-    val epModel = modelFactory.make(trainTrees)
-
-    val obj = new ModelObjective(epModel,trainTrees)
-    val cachedObj = new CachedBatchDiffFunction(obj)
-    val init = obj.initialWeightVector(randomize)
-
-    type OptState = FirstOrderMinimizer[DenseVector[Double],BatchDiffFunction[DenseVector[Double]]]#State
-    def evalAndCache(pair: (OptState,Int) ) {
-      val (state,iter) = pair
-      val weights = state.x
-      if(iter % iterPerValidate == 0) {
-        println("Validating...")
-        val parser = epModel.extractParser(state.x)
-        println(validate(parser))
-      }
-    }
-
-    for( (state,iter) <- params.opt.iterations(cachedObj,init).take(maxIterations).zipWithIndex.tee(evalAndCache _)
-         if iter != 0 && iter % iterationsPerEval == 0) yield try {
-      val parser = epModel.extractParser(state.x)
-      ("EP-" + iter.toString,parser)
-    } catch {
-      case e => println(e);e.printStackTrace(); throw e
-    }
-  }
-}

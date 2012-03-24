@@ -7,54 +7,6 @@ import features.Feature
 import projections.{AnchoredRuleScorerFactory, GrammarProjections, ScalingSpanScorer}
 import scalanlp.parser.ParseChart._
 
-/**
- * Attaches projection to a ParserModel, producing a new ParserModel
- * @author dlwh
- */
-class ParserEPComponent[L,L3,W](val base: ParserModel[L, W] { type L2 = L3; type Inference <: ParserInference[L,L3,W] },
-                                val projector: EPProjector[L, L3, W]) extends Model[TreeInstance[L,W]] {
-  type L2 = L3
-  type ExpectedCounts = base.ExpectedCounts
-  type Inference = ParserComponentInference[L,L2,W]
-
-  def extractParser(weights: DenseVector[Double]) = base.extractParser(weights)
-
-  def featureIndex = base.featureIndex
-  def cacheFeatureWeights(weights: DenseVector[Double]) {base.cacheFeatureWeights(weights)}
-  override def numFeatures = base.numFeatures
-  override def initialValueForFeature(f: Feature) = base.initialValueForFeature(f)
-
-  def inferenceFromWeights(weights: DenseVector[Double]) = {
-    ParserComponentInference(base.inferenceFromWeights(weights),projector)
-  }
-
-  def emptyCounts = base.emptyCounts
-
-  def expectedCountsToObjective(ecounts: ExpectedCounts) = {
-    base.expectedCountsToObjective(ecounts)
-  }
-}
-
-case class ParserComponentInference[L,L2,W](inference: ParserInference[L,L2,W],
-                                            proj: EPProjector[L,L2, W]) extends ProjectableInference[TreeInstance[L,W],SpanScorerFactor[L,W]] {
-  type ExpectedCounts = inference.ExpectedCounts
-  type Marginal = inference.Marginal
-
-  def baseAugment(v: TreeInstance[L, W]) = SpanScorerFactor(proj.zero, v.words, inference.baseAugment(v))
-
-  def goldCounts(value: TreeInstance[L, W], augment: SpanScorerFactor[L, W]) = inference.goldCounts(value,augment.scorer)
-
-  def project(v: TreeInstance[L, W], m: Marginal, oldAugment: SpanScorerFactor[L, W]) = {
-    SpanScorerFactor(proj.zero, v.words, proj.project(inference, inference.projections, v, m, oldAugment.scorer))
-  }
-
-  def marginal(v: TreeInstance[L, W], aug: SpanScorerFactor[L, W]) = inference.marginal(v,aug.scorer)
-
-  def guessCountsFromMarginals(v: TreeInstance[L, W], marg: Marginal, aug: SpanScorerFactor[L, W]) = {
-    inference.guessCountsFromMarginals(v, marg, aug.scorer)
-  }
-}
-
 case class SpanScorerFactor[L,W](f0Builder: ChartBuilder[LogProbabilityParseChart,L,W],
                                  words: Seq[W],
                                  scorer: SpanScorer[L]) extends Factor[SpanScorerFactor[L, W]] {

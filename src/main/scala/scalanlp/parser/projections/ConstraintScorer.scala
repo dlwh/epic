@@ -2,11 +2,11 @@ package scalanlp.parser
 package projections
 
 import collection.immutable.BitSet
-import scalanlp.collection.mutable.TriangularArray
 import scalala.library.Numerics
 import java.util.Arrays
 import scalanlp.config.Configuration
 import java.io._
+import scalanlp.collection.mutable.{OpenAddressHashArray, TriangularArray}
 
 /**
  * 
@@ -36,6 +36,17 @@ class ConstraintScorer[L](val scores: Array[BitSet], topScores: Array[BitSet]) e
  */
 class ConstraintScorerFactory[C,L,W](parser: SimpleChartParser[C,L,W], threshold: Double) extends SpanScorer.Factory[C,L,W] {
   def indexedProjections = parser.projections.labels
+  private val coarseUnaryIndex = new OpenAddressHashArray(indexedProjections.coarseIndex.size * indexedProjections.coarseIndex.size, -1)
+  for(r@UnaryRule(a,b) <- parser.projections.rules.coarseIndex) {
+    val ai = indexedProjections.coarseIndex(a)
+    val bi = indexedProjections.coarseIndex(b)
+    val ri = parser.projections.rules.coarseIndex(r)
+    coarseUnaryIndex(bi + indexedProjections.coarseIndex.size * ai) = ri
+  }
+
+  private def ruleIndex(ai: Int, bi: Int) = {
+    coarseUnaryIndex(bi + indexedProjections.coarseIndex.size * ai)
+  }
 
   def mkSpanScorer(s: Seq[W], scorer: SpanScorer[C] = SpanScorer.identity, goldTags: GoldTagPolicy[C] = GoldTagPolicy.noGoldTags[C]) = {
     val charts = parser.charts(s,scorer)
@@ -62,8 +73,6 @@ class ConstraintScorerFactory[C,L,W](parser: SimpleChartParser[C,L,W], threshold
       active += pL
     }
 
-    val gold = active.filter(goldTags.isGoldTag(begin, end, _))
-
     for (c <- active) {
       val v = scoresForLocation(c)
       if (v > threshold || goldTags.isGoldTag(begin, end, c)) {
@@ -89,10 +98,19 @@ class ConstraintScorerFactory[C,L,W](parser: SimpleChartParser[C,L,W], threshold
       scoresForCharts(scoresForLocation, begin, end, inside.top, outside.top, sentProb, goldTags, topScores)
 
     }
+    
+    val unaryRulesAllowed = for( (t,b) <- topScores zip scores) yield {
+      if( (t eq null) || (b eq null)) null
+      else {
+        val bitset = BitSet.empty ++ {for { a <- t; c <- b; r = ruleIndex(a,c) if r != -1} yield r}
+        if(bitset.nonEmpty)
+          bitset
+        else null
+      }
+    }
 //    println("Density: " + density * 1.0 / scores.length)
 //    println("Label Density:" + labelDensity * 1.0 / scores.length / parser.projections.labels.coarseIndex.size)
-    new ConstraintScorer[C](scores.map { e => if(e eq null) null else BitSet.empty ++ e},
-      topScores.map { e => if(e eq null) null else BitSet.empty ++ e.flatMap(parser.builder.grammar.indexedUnaryRulesWithParent(_))})
+    new ConstraintScorer[C](scores.map { e => if(e eq null) null else BitSet.empty ++ e}, unaryRulesAllowed)
   }
 
 }

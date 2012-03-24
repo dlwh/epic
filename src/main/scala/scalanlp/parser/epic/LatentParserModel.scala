@@ -16,6 +16,7 @@ import scalala.tensor.Counter
 class LatentParserModel[L,L3,W](featurizer: Featurizer[L3,W],
                                 root: L3,
                                 val projections: GrammarProjections[L,L3],
+                                coarseBuilder: ChartBuilder[LogProbabilityParseChart, L, W],
                                 knownTagWords: Iterable[(L3,W)],
                                 openTags: Set[L3],
                                 closedWords: Set[W],
@@ -37,7 +38,7 @@ class LatentParserModel[L,L3,W](featurizer: Featurizer[L3,W],
     val lexicon = new FeaturizedLexicon(openTags, closedWords, weights, indexedFeatures)
     val parser = new CKYChartBuilder[LogProbabilityParseChart,L2,W](root, lexicon, grammar, ParseChart.logProb)
 
-    new LatentParserInference(parser, projections)
+    new LatentParserInference(coarseBuilder, parser, projections)
   }
 
   def extractParser(weights: DenseVector[Double]):ChartParser[L,L2,W] = {
@@ -74,12 +75,13 @@ class LatentParserModel[L,L3,W](featurizer: Featurizer[L3,W],
   }
 }
 
-case class LatentParserInference[L,L2,W](builder: ChartBuilder[LogProbabilityParseChart,L2,W],
+case class LatentParserInference[L,L2,W](coarseBuilder: ChartBuilder[LogProbabilityParseChart, L, W],
+                                         builder: ChartBuilder[LogProbabilityParseChart,L2,W],
                                          projections: GrammarProjections[L,L2]) extends ParserInference[L,L2,W] {
 
   // E[T-z|T,params]
-  def goldCounts(ti: TreeInstance[L,W], spanScorer: SpanScorer[L]) = {
-    val projected = new ProjectingSpanScorer(projections,spanScorer)
+  def goldCounts(ti: TreeInstance[L,W], spanScorer: SpanScorerFactor[L, W]) = {
+    val projected = new ProjectingSpanScorer(projections,spanScorer.scorer)
     val ecounts = new StateSplitting(
       builder.grammar,
       builder.lexicon).expectedCounts(ti.tree.map(projections.labels.refinementsOf _),ti.words,projected)
@@ -142,7 +144,7 @@ case class LatentParserModelFactory(parser: ParserParams.BaseParser[String],
       Counter[Feature,Double]()
     }
 
-    new LatentParserModel[String,(String,Int),String](feat, ("",0), indexedProjections, knownTagWords, openTags, closedWords, {featureCounter.get(_)})
+    new LatentParserModel[String,(String,Int),String](feat, ("",0), indexedProjections, xbarParser, knownTagWords, openTags, closedWords, {featureCounter.get(_)})
   }
 }
 

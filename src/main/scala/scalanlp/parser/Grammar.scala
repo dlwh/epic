@@ -122,8 +122,8 @@ object Grammar {
         case r@UnaryRule(a,_) => unaryProductions(a,r)
       }
 
-      val binaryRuleTable = labelEncoder.fillArray(new OpenAddressHashArray[Int](labelIndex.size * labelIndex.size,4))
-      val unaryRuleTable = new OpenAddressHashArray[Int](labelIndex.size * labelIndex.size)
+      val binaryRuleTable = labelEncoder.fillArray(new OpenAddressHashArray[Int](labelIndex.size * labelIndex.size,-1,4))
+      val unaryRuleTable = new OpenAddressHashArray[Int](labelIndex.size * labelIndex.size,-1, unaryRules.size * 2)
 
       private val (binaryRulesByParent,unaryRulesByParent,binaryRulesByLeftChild,binaryRulesByRightChild,unaryRulesByChild) = {
         val binaryRulesByParent = Array.fill(labelIndex.size)(new ArrayBuffer[Int]())
@@ -151,10 +151,8 @@ object Grammar {
           unaryRulesByChild.map(_.toArray))
       }
 
-
       def ruleIndex(a: Int, b: Int, c: Int) = binaryRuleTable(a)(c + labelIndex.size * b)
       def ruleIndex(a: Int, b: Int) = unaryRuleTable(b + labelIndex.size * a)
-
 
       def indexedBinaryRulesWithParent(l: Int) = binaryRulesByParent(l)
       def indexedUnaryRulesWithParent(l: Int) = unaryRulesByParent(l)

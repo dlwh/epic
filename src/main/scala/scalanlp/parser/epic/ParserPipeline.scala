@@ -11,7 +11,7 @@ import scalanlp.optimize.{RandomizedGradientCheckingFunction, BatchDiffFunction,
  * Trains a single parser from a single model.
  */
 object ParserPipeline extends scalanlp.parser.ParserPipeline {
-  case class Params(modelFactory: ParserModelFactory[String,String],
+  case class Params(modelFactory: ParserExtractableModelFactory[String,String],
                     opt: OptParams,
                     iterationsPerEval: Int = 50,
                     maxIterations: Int = 1002,

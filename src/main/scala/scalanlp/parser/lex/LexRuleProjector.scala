@@ -10,17 +10,19 @@ import projections.{AnchoredRuleScorer, AnchoredRuleProjector, GrammarProjection
  * @author dlwh
  */
 @SerialVersionUID(2L)
-class LexRuleProjector[C,L,W](parser: LexChartBuilder[ParseChart.LogProbabilityParseChart,L,W],
+class LexRuleProjector[C,L,W](val coarseGrammar: Grammar[C],
+                              parser: LexChartBuilder[ParseChart.LogProbabilityParseChart,L,W],
                               indexedProjections: GrammarProjections[C,L], threshold: Double) extends Serializable {
 
-  private def normalize(ruleScores: OldSparseVector):OldSparseVector = {
+  private def normalize(ruleScores: OldSparseVector, totals: OldSparseVector):OldSparseVector = {
     if(ruleScores eq null) null
     else {
-      val r = new OldSparseVector(ruleScores.length, Double.NegativeInfinity, ruleScores.activeSize)
-      for( (rule,score) <- ruleScores.pairsIterator) {
-        val parent = indexedProjections.labels.coarseIndex(indexedProjections.rules.coarseIndex.get(rule).parent)
-        r(rule) = math.log(score)
-        //        r(rule) = score - totals(parent)
+      val r = new OldSparseVector(ruleScores.length,Double.NegativeInfinity, ruleScores.activeSize * 3 / 2)
+      for( (rule,score) <- ruleScores.activeIterator) {
+        val parent = coarseGrammar.parent(rule)
+        if(score > 0)
+          r(rule) = math.log(score) - math.log(totals(parent))
+//        r(rule) = score - totals(parent)
       }
       r
     }
@@ -30,15 +32,16 @@ class LexRuleProjector[C,L,W](parser: LexChartBuilder[ParseChart.LogProbabilityP
     createSpanScorer(projectRulePosteriors(charts))
   }
 
-  def createSpanScorer(ruleData: AnchoredRuleProjector.AnchoredData): AnchoredRuleScorer[C] = {
-    val AnchoredRuleProjector.AnchoredData(lexicalScores,unaryScores, _, binaryScores, _) = ruleData;
-    val normUnaries:Array[OldSparseVector] = for(ruleScores <- unaryScores) yield {
-      normalize(ruleScores)
+
+  def createSpanScorer(ruleData: AnchoredRuleProjector.AnchoredData):AnchoredRuleScorer[C] = {
+    val AnchoredRuleProjector.AnchoredData(lexicalScores,unaryScores,totalsUnaries,binaryScores,totalsBinaries) = ruleData;
+    val normUnaries:Array[OldSparseVector] = for((ruleScores,totals) <- unaryScores zip totalsUnaries) yield {
+      normalize(ruleScores, totals)
     }
 
-    val normBinaries:Array[Array[OldSparseVector]] = for (splits <- binaryScores) yield {
+    val normBinaries:Array[Array[OldSparseVector]] = for ((splits,totals) <- binaryScores zip totalsBinaries) yield {
       if(splits eq null) null
-      else for(ruleScores <- splits) yield normalize(ruleScores)
+      else for(ruleScores <- splits) yield normalize(ruleScores,totals)
     }
     new AnchoredRuleScorer(lexicalScores, normUnaries, normBinaries);
   }
@@ -125,7 +128,7 @@ class LexRuleProjector[C,L,W](parser: LexChartBuilder[ParseChart.LogProbabilityP
 
           var total = 0.0
 
-          if(parentScore + inside.bot.labelScore(begin,end,ph) - sentProb > threshold || goldTagPolicy.isGoldTag(begin,end,pP)) {
+          if(parentScore + inside.bot.labelScore(begin,end,ph) - sentProb > Double.NegativeInfinity || goldTagPolicy.isGoldTag(begin,end,pP)) {
             val rules = grammar.indexedBinaryRulesWithParent(parent)
             var ruleIndex = 0
             while(ruleIndex < rules.length) {
@@ -158,8 +161,8 @@ class LexRuleProjector[C,L,W](parser: LexChartBuilder[ParseChart.LogProbabilityP
                     val ruleScore = spec.scoreRightComplement(r, h, right)
                     while(split < endSplit) {
                       // P(sAt->sBu uCt | sAt) \propto \sum_{latent} O(A-x,s,t) r(A-x ->B-y C-z) I(B-y,s,u) I(C-z, s, u)
-                      val bScore = inside.top.labelScore(begin,split,inside.top.encodeLabelPair(b, h))
-                      val cScore = inside.top.labelScore(split, end, inside.top.encodeLabelPair(c, right))
+                      val bScore = inside.top.labelScore(begin, split, b, h)
+                      val cScore = inside.top.labelScore(split, end, c, right)
 
                       if(bScore != Double.NegativeInfinity && cScore != Double.NegativeInfinity) {
                         val currentScore = (bScore + cScore
@@ -215,14 +218,14 @@ class LexRuleProjector[C,L,W](parser: LexChartBuilder[ParseChart.LogProbabilityP
                     val ruleScore = spec.scoreLeftComplement(r, h, left)
                     while(split < endSplit) {
                       // P(sAt->sBu uCt | sAt) \propto \sum_{latent} O(A-x,s,t) r(A-x ->B-y C-z) I(B-y,s,u) I(C-z, s, u)
-                      val bScore = inside.top.labelScore(begin,split,inside.top.encodeLabelPair(b, left))
-                      val cScore = inside.top.labelScore(split, end, inside.top.encodeLabelPair(c, h))
+                      val bScore = inside.top.labelScore(begin,split, b, left)
+                      val cScore = inside.top.labelScore(split, end, c, h)
 
                       if(bScore != Double.NegativeInfinity && cScore != Double.NegativeInfinity) {
                         val currentScore = (bScore + cScore
                           + parentScore
                           + ruleScore
-                          + scorer.scoreBinaryRule(begin,split,end,r)
+                          + scorer.scoreBinaryRule(begin, split, end, r)
                           - sentProb);
                         if(currentScore > Double.NegativeInfinity) {
                           val parentArray = if(binaryScores(index)(split-begin) eq null) {
@@ -262,7 +265,7 @@ class LexRuleProjector[C,L,W](parser: LexChartBuilder[ParseChart.LogProbabilityP
 
         // do unaries. Similar to above
         for( ph <- outside.top.enteredLabelIndexes(begin,end)) {
-          val parentScore = outside.top.labelScore(begin,end,ph);
+          val parentScore = outside.top.labelScore(begin,end,ph)
           val parent = inside.bot.decodeLabelPart(ph)
           val h = inside.bot.decodeHeadPart(ph)
           val pP = indexedProjections.labels.project(parent);

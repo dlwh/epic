@@ -661,31 +661,15 @@ class SimpleWordShapeGen(tagWordCounts: Counter2[String,String,Double], counts: 
   }
 }
 
+class LexParserModelFactory(parser: ParserParams.BaseParser[String],
+                            cachedIndex: File = new File("features.ser.gz"),
+                            oldWeights: File = null) extends ParserExtractableModelFactory[String,String] {
+  type MyModel = LexModel[String,String]
 
-/**
- *
- * @author dlwh
- */
-object LexDiscrimPipeline extends ParserPipeline {
-
-  protected val paramManifest = manifest[Params];
-
-  case class Params(parser: ParserParams.BaseParser[String],
-                    opt: OptParams,
-                    cachedIndex: File = new File("features.ser.gz"),
-                    iterationsPerEval: Int = 50,
-                    maxIterations: Int = 201,
-                    iterPerValidate: Int = 10,
-                    oldWeights: File = null);
-
-  def trainParser(trainTrees: IndexedSeq[TreeInstance[String, String]],
-                  validate: (Parser[String, String]) => Statistics,
-                  params: Params) = {
-    import params._
-
+  def make(trainTrees: IndexedSeq[TreeInstance[String, String]]) = {
     val (initLexicon, initBinaries, initUnaries) = GenerativeParser.extractCounts(trainTrees)
 
-    val xbarParser = params.parser.optParser getOrElse {
+    val xbarParser = parser.optParser getOrElse {
       val grammar = Grammar(Library.logAndNormalizeRows(initBinaries), Library.logAndNormalizeRows(initUnaries));
       val lexicon = new SimpleLexicon(initLexicon);
       new CKYChartBuilder[LogProbabilityParseChart, String, String]("", lexicon, grammar, ParseChart.logProb);
@@ -739,31 +723,9 @@ object LexDiscrimPipeline extends ParserPipeline {
       Counter[Feature,Double]()
     }
 
-    val model = new LexModel(bundle, indexed, xbarParser, {featureCounter.get(_)})
+    val model = new LexModel[String,String](bundle, indexed, xbarParser, {featureCounter.get(_)})
 
-    val obj = new ModelObjective(model, trainTrees)
-    val cachedObj = new CachedBatchDiffFunction(obj)
-    //    val checking = new RandomizedGradientCheckingFunction(cachedObj)
-    val init = obj.initialWeightVector(false)
-
-    type OptState = FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State
-    def evalAndCache(pair: (OptState, Int) ) {
-      val (state, iter) = pair
-      val weights = state.x
-      if(iter % iterPerValidate == 0) {
-        println("Validating...")
-        val parser = model.extractParser(weights)
-        println(validate(parser))
-      }
-    }
-
-    for( (state, iter) <- params.opt.iterations(cachedObj, init).take(maxIterations).zipWithIndex.tee(evalAndCache _)
-         if iter != 0 && iter % iterationsPerEval == 0) yield try {
-      val parser = model.extractParser(state.x)
-      ("LexDiscrim-" + iter.toString, parser)
-    } catch {
-      case e => println(e);e.printStackTrace(); throw e
-    }
+    model
 
 
   }

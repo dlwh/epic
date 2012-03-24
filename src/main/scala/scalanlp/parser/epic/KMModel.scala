@@ -16,6 +16,7 @@ class KMModel[L,L3,W](featurizer: Featurizer[L3,W],
                       root: L3,
                       ann: (BinarizedTree[L],Seq[W])=>BinarizedTree[L3],
                       val projections: GrammarProjections[L,L3],
+                      coarseBuilder: ChartBuilder[ParseChart.LogProbabilityParseChart, L, W],
                       knownTagWords: Iterable[(L3,W)],
                       openTags: Set[L3],
                       closedWords: Set[W],
@@ -34,7 +35,7 @@ class KMModel[L,L3,W](featurizer: Featurizer[L3,W],
     val lexicon = new FeaturizedLexicon(openTags, closedWords, weights, indexedFeatures)
     val parser = new CKYChartBuilder[LogProbabilityParseChart,L2,W](root, lexicon, grammar, ParseChart.logProb)
 
-    new DiscParserInference(ann, parser, projections)
+    new DiscParserInference(ann, coarseBuilder, parser, projections)
   }
 
   def extractParser(weights: DenseVector[Double]):ChartParser[L,L2,W] = {
@@ -73,11 +74,12 @@ class KMModel[L,L3,W](featurizer: Featurizer[L3,W],
 }
 
 case class DiscParserInference[L,L2,W](ann: (BinarizedTree[L],Seq[W])=>BinarizedTree[L2],
+                                       coarseBuilder: ChartBuilder[LogProbabilityParseChart,L,W],
                                        builder: ChartBuilder[LogProbabilityParseChart,L2,W],
                                        projections: GrammarProjections[L,L2]) extends ParserInference[L,L2,W] {
 
   // E[T-z|T,params]
-  def goldCounts(ti: TreeInstance[L,W], spanScorer: SpanScorer[L]) = {
+  def goldCounts(ti: TreeInstance[L,W], spanScorer: SpanScorerFactor[L, W]) = {
     val tree = ti.tree
     val words = ti.words
     val g = builder.grammar
@@ -147,7 +149,7 @@ case class KMModelFactory(parser: ParserParams.BaseParser[String],
     } else {
       Counter[Feature,Double]()
     }
-    new KMModel[String,AnnotatedLabel,String](feat, transformed.head.label.label, pipeline, indexedProjections, knownTagWords, openTags, closedWords, {featureCounter.get(_)})
+    new KMModel[String,AnnotatedLabel,String](feat, transformed.head.label.label, pipeline, indexedProjections, xbarParser, knownTagWords, openTags, closedWords, {featureCounter.get(_)})
   }
 
 }
