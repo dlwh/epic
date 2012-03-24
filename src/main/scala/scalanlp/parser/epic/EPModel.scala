@@ -183,8 +183,7 @@ case class EPParserModelFactory(ep: EPParams,
     type ModelType = Model[TreeInstance[String,String]] { type Inference <: ProjectableInference[TreeInstance[String,String],SpanScorerFactor[String, String]]}
     val models = Seq(model1,model2,model3,model4,model5).filterNot(_ eq null) map { model =>
       val m1 = model.make(train)
-      val projector = new AnchoredRuleApproximator(xbarParser,m1.projections,ep.pruningThreshold)
-      val wrappedM1 = new ParserEPComponent[String,m1.L2,String](m1, projector)
+      val wrappedM1 = new ParserEPComponent[String,m1.L2,String](m1, new AnchoredRuleApproximator(xbarParser, ep.pruningThreshold))
       wrappedM1:ModelType
     }
 

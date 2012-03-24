@@ -70,11 +70,6 @@ class KMModel[L,L3,W](featurizer: Featurizer[L3,W],
     result;
   }
 
-
-  def saveWeights(f: File, weights: DenseVector[Double]) {
-    val decoded = indexedFeatures.decode(weights)
-    scalanlp.util.writeObject(f, decoded)
-  }
 }
 
 case class DiscParserInference[L,L2,W](ann: (BinarizedTree[L],Seq[W])=>BinarizedTree[L2],

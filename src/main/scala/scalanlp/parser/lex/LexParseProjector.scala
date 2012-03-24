@@ -2,7 +2,7 @@ package scalanlp.parser.lex
 
 import java.util.Arrays
 import scalanlp.parser._
-import projections.{ProjectionIndexer, GrammarProjections}
+import projections.{ProjectingSpanScorer, ProjectionIndexer, GrammarProjections}
 import scalanlp.collection.mutable.TriangularArray
 import scalala.library.Numerics._
 import scalanlp.trees._
@@ -46,6 +46,31 @@ object LexParseProjector {
       }
     }
     newChart
+  }
+}
+
+class LexMaxVChartParser[L,L2,W](coarseGrammar: Grammar[L], coarseLexicon: Lexicon[L,W],
+                                 indexedProjections: GrammarProjections[L,L2],
+                                 builder: LexChartBuilder[ParseChart.LogProbabilityParseChart,L2,W]) extends Parser[L,W] with Serializable {
+  def charts(w: Seq[W], scorer: SpanScorer[L2]) = {
+    builder.buildCharts(w,scorer)
+  }
+
+  val projector = new LexRuleProjector(builder, indexedProjections, -12)
+
+  def bestParse(s: Seq[W], spanScorer: SpanScorer[L]) = {
+    val projecting = new ProjectingSpanScorer(indexedProjections, spanScorer)
+    val marginals = charts(s, projecting)
+
+    val zeroGrammar = Grammar.zero(coarseGrammar)
+    val zeroLexicon = new ZeroLexicon(coarseLexicon)
+    val coarseRoot = indexedProjections.labels.project(builder.root)
+    val zeroParser = new CKYChartBuilder[ParseChart.LogProbabilityParseChart,L,W](coarseRoot, zeroLexicon, zeroGrammar,ParseChart.logProb)
+    val scorer = projector.createSpanScorer(marginals)
+    val zeroInside = zeroParser.buildInsideChart(s,scorer)
+    val zeroOutside = zeroParser.buildOutsideChart(zeroInside,scorer)
+    val tree = MaxConstituentDecoder.simple(zeroGrammar).extractBestParse(coarseRoot,zeroGrammar, zeroInside,zeroOutside, s, scorer)
+    tree
   }
 }
 

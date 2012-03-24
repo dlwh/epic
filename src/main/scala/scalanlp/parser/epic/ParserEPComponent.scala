@@ -6,7 +6,6 @@ import scalanlp.parser._
 import features.Feature
 import projections.{AnchoredRuleScorerFactory, GrammarProjections, ScalingSpanScorer}
 import scalanlp.parser.ParseChart._
-import scalanlp.trees.BinarizedTree
 
 /**
  * Attaches projection to a ParserModel, producing a new ParserModel
@@ -46,7 +45,7 @@ case class ParserComponentInference[L,L2,W](inference: ParserInference[L,L2,W],
   def goldCounts(value: TreeInstance[L, W], augment: SpanScorerFactor[L, W]) = inference.goldCounts(value,augment.scorer)
 
   def project(v: TreeInstance[L, W], m: Marginal, oldAugment: SpanScorerFactor[L, W]) = {
-    SpanScorerFactor(proj.zero, v.words, proj.project(inference, v, m, oldAugment.scorer))
+    SpanScorerFactor(proj.zero, v.words, proj.project(inference, inference.projections, v, m, oldAugment.scorer))
   }
 
   def marginal(v: TreeInstance[L, W], aug: SpanScorerFactor[L, W]) = inference.marginal(v,aug.scorer)
@@ -118,6 +117,7 @@ trait EPProjector[L,L2,W] {
 
 
   def project(inf: ParserInference[L,L2,W],
+              projections: GrammarProjections[L,L2],
               instance: TreeInstance[L, W],
               marginal: ChartPair[ParseChart.LogProbabilityParseChart,L2],
               oldScorer: SpanScorer[L]):SpanScorer[L]
@@ -125,16 +125,16 @@ trait EPProjector[L,L2,W] {
 
 @SerialVersionUID(1)
 class AnchoredRuleApproximator[C,F,W](val coarseParser: ChartBuilder[LogProbabilityParseChart,C,W],
-                                      projections: GrammarProjections[C,F],
                                       pruningThreshold: Double = Double.NegativeInfinity) extends EPProjector[C,F,W] with Serializable {
 
   val zeroFactory = new CachingSpanScorerFactory[C,W](coarseParser, pruningThreshold);
 
   def project(inf: ParserInference[C,F,W],
+              projections: GrammarProjections[C,F],
               instance: TreeInstance[C, W],
               marginal: ChartPair[ParseChart.LogProbabilityParseChart,F],
               oldScorer: SpanScorer[C]):SpanScorer[C] = {
-    val factory = new AnchoredRuleScorerFactory[C,F,W](coarseParser.grammar, SimpleChartParser(inf.builder,inf.projections), pruningThreshold);
+    val factory = new AnchoredRuleScorerFactory[C,F,W](coarseParser.grammar, SimpleChartParser(inf.builder,projections), pruningThreshold);
     val pruner = if(instance.tree != null) {
       GoldTagPolicy.goldTreeForcing[C](instance.tree.map(coarseParser.index))
     } else {
@@ -145,7 +145,7 @@ class AnchoredRuleApproximator[C,F,W](val coarseParser: ChartBuilder[LogProbabil
 
 }
 
-trait EPParserExtractor[L,W] extends EPModel[TreeInstance[L,W],SpanScorerFactor[L,W]] {
+trait EPParserExtractor[L,W] extends EPModel[TreeInstance[L,W],SpanScorerFactor[L,W]] with ParserExtractable[L,W] {
   def zeroParser: SimpleChartParser[L,L,W]
 
   def extractParser(weights: DenseVector[Double]) = {

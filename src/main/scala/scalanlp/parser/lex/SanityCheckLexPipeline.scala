@@ -3,6 +3,7 @@ package scalanlp.parser.lex
 import scalanlp.parser.ParserParams.NoParams
 import scalala.library.Library
 import scalanlp.parser._
+import projections.GrammarProjections
 import scalanlp.util.Index
 import collection.immutable.BitSet
 
@@ -74,7 +75,7 @@ object SanityCheckLexPipeline extends ParserPipeline with NoParams {
 
       def indexedUnaryRulesWithParent(l: Int) = grammar.indexedUnaryRulesWithParent(l)
     }
-    val parser = new LexChartParser(grammar, new LexCKYChartBuilder("",lexgram, ParseChart.logProb))
+    val parser = new LexMaxVChartParser(grammar, lexicon, GrammarProjections.identity(grammar), new LexCKYChartBuilder("",lexgram, ParseChart.logProb))
     Iterator.single(("Gen", parser));
   }
 

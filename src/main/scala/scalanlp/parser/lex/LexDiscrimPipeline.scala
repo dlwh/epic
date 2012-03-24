@@ -504,11 +504,11 @@ object IndexedFeaturizer {
 class LexModel[L, W](bundle: LexGrammarBundle[L,W],
                      indexed: IndexedFeaturizer[L,W],
                      coarse: ChartBuilder[ParseChart, L, W],
-                     initFeatureValue: Feature=>Option[Double]) extends Model[TreeInstance[L, W]] with Serializable {
+                     initFeatureValue: Feature=>Option[Double]) extends Model[TreeInstance[L, W]] with Serializable with ParserExtractable[L,W] {
 
   def extractParser(weights: DenseVector[Double]) = {
     val inf = inferenceFromWeights(weights)
-    new LexChartParser(coarse.grammar, inf.builder)
+    new LexMaxVChartParser(coarse.grammar, coarse.lexicon, GrammarProjections.identity(coarse.grammar), inf.builder)
   }
 
   val featureIndex = indexed.featureIndex
@@ -541,12 +541,10 @@ case class LexInference[L, W](builder: LexCKYChartBuilder[ParseChart.LogProbabil
   type ExpectedCounts = LexInsideOutside.ExpectedCounts[W]
   type Marginal = LexChartPair[ParseChart.LogProbabilityParseChart, L, W]
 
-
   def marginal(v: TreeInstance[L, W], aug: SpanScorer[L]) = {
     val r = builder.buildCharts(v.words, aug)
     r -> r.partition
   }
-
 
   def guessCountsFromMarginals(v: TreeInstance[L, W], marg: Marginal, aug: SpanScorer[L]) = {
     val root_score = marg.partition
@@ -554,7 +552,6 @@ case class LexInference[L, W](builder: LexCKYChartBuilder[ParseChart.LogProbabil
       marg.outside, root_score, marg.scorer)
     ec
   }
-
 
   def goldCounts(ti: TreeInstance[L, W], augment: SpanScorer[L]) = {
     val g = builder.grammar

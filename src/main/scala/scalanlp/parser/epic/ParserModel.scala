@@ -1,28 +1,19 @@
 package scalanlp.parser.epic
 
-import scalala.tensor.dense.DenseVector
 import scalanlp.parser.InsideOutside.{ExpectedCounts=>TrueCounts}
 import scalanlp.parser._
 import projections.{ProjectingSpanScorer, GrammarProjections}
 import scalala.tensor.{Counter2,::}
 import scalala.library.Library
-import java.io.File
 
 /**
  * Base trait for Parser-type models
  * @author dlwh
  */
-trait ParserModel[L,W] extends Model[TreeInstance[L,W]] {
+trait ParserModel[L,W] extends Model[TreeInstance[L,W]] with ParserExtractable[L,W] {
   type L2 // refined label type
   type ExpectedCounts = ParserExpectedCounts[W]
   type Inference <: ParserInference[L, L2, W]
-
-  def projections: GrammarProjections[L, L2]
-
-  def extractParser(weights: DenseVector[Double]):Parser[L,W]
-
-  def saveWeights(f: File, weights: DenseVector[Double])
-
 }
 
 trait ParserInference[L,L2,W] extends MarginalInference[TreeInstance[L,W],SpanScorer[L]] {

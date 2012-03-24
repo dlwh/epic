@@ -40,11 +40,6 @@ class LatentParserModel[L,L3,W](featurizer: Featurizer[L3,W],
     new LatentParserInference(parser, projections)
   }
 
-  def saveWeights(f: File, weights: DenseVector[Double]) {
-    val decoded = indexedFeatures.decode(weights)
-    scalanlp.util.writeObject(f, decoded)
-  }
-
   def extractParser(weights: DenseVector[Double]):ChartParser[L,L2,W] = {
     new SimpleChartParser(inferenceFromWeights(weights).builder,new MaxConstituentDecoder[L,L2,W](projections),projections)
   }

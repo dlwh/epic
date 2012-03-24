@@ -37,7 +37,6 @@ object ParserPipeline extends scalanlp.parser.ParserPipeline {
         println("Validating...")
         val parser = model.extractParser(weights)
         println(validate(parser))
-        model.saveWeights(new File("weights.ser.gz"), weights)
       }
     }
 
