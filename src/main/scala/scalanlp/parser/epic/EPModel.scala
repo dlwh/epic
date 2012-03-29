@@ -24,7 +24,6 @@ object EPModel {
   type CompatibleModel[Datum, Augment] = Model[Datum] { type Inference <: ProjectableInference[Datum,Augment]}
 }
 
-
 /**
  * 
  * @author dlwh
@@ -174,6 +173,9 @@ case class EPParserModelFactory(ep: EPParams,
                                 model3: EPParserModelFactory.CompatibleFactory = null,
                                 model4: EPParserModelFactory.CompatibleFactory = null,
                                 model5: EPParserModelFactory.CompatibleFactory = null,
+                                model6: EPParserModelFactory.CompatibleFactory = null,
+                                model7: EPParserModelFactory.CompatibleFactory = null,
+                                model8: EPParserModelFactory.CompatibleFactory = null,
                                 oldWeights: File = null) extends ParserExtractableModelFactory[String,String] {
   type MyModel = EPModel[TreeInstance[String,String], SpanScorerFactor[String,String]] with EPParserExtractor[String,String]
 
@@ -187,7 +189,7 @@ case class EPParserModelFactory(ep: EPParams,
     }
 
     type ModelType = EPModel.CompatibleModel[TreeInstance[String,String],SpanScorerFactor[String, String]]
-    val models = Seq(model1,model2,model3,model4,model5).filterNot(_ eq null) map { model =>
+    val models = Seq(model1,model2,model3,model4,model5,model6,model7,model8).filterNot(_ eq null) map { model =>
       model.make(train):ModelType
     }
 

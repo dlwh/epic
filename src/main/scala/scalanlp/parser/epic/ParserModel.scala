@@ -41,7 +41,7 @@ trait ParserInference[L,L2,W] extends ProjectableInference[TreeInstance[L,W],Spa
 
   def baseAugment(v: TreeInstance[L,W]) = new SpanScorerFactor(projector.zero, v.words, v.spanScorer)
 
-  protected def projector: EPProjector[L,L2,W] = new AnchoredRuleApproximator(coarseBuilder, -14)
+  protected def projector: EPProjector[L,L2,W] = new AnchoredRuleApproximator(coarseBuilder, Double.NegativeInfinity)
 
   def project(v: TreeInstance[L, W], m: Marginal, oldAugment: SpanScorerFactor[L, W]) = {
     val p = projector

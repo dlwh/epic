@@ -1,3 +1,11 @@
+Runs:
+
+/work4/dlwh/jobs/EP.4-2012-03-22--15-37-45/ Latent-2x4 87.55
+/work4/dlwh/jobs/EP.3-2012-03-22--15-35-22 Latent-2x3 (86.97)
+/work4/dlwh/jobs/EP-2012-03-21--22-57-06 KM+Latent-2  (86.86)
+
+
+
 64  1x4 <=84.96
 128 2x4 85.36
 
@@ -190,4 +198,6 @@ post while loop:
 real    2m8.360s
 user    5m58.861s
 sys     0m11.705s
+
+
 

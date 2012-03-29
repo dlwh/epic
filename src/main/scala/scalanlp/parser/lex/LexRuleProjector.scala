@@ -98,16 +98,21 @@ class LexRuleProjector[C,L,W](val coarseGrammar: Grammar[C],
     import parser.grammar
 
     // fill in spans
-    for(begin <- 0 until inside.length; end <- (begin + 1) to (inside.length);
-        lh <- inside.bot.enteredLabelIndexes(begin,end)) {
-      val currentScore = inside.bot.labelScore(begin,end,lh) + outside.bot.labelScore(begin,end,lh) - sentProb;
-      val l = inside.bot.decodeLabelPart(lh)
-      val pL = indexedProjections.labels.project(l)
-      if(currentScore > threshold || goldTagPolicy.isGoldTag(begin,end,pL)) {
-        getOrElseUpdate(lexicalScores,TriangularArray.index(begin,end),projVector())(pL) = 0
+    for(begin <- 0 until inside.length; end <- (begin + 1) to (inside.length)) {
+      var foundOne = false
+      for(lh <- inside.bot.enteredLabelIndexes(begin,end)) {
+        val currentScore = inside.bot.labelScore(begin,end,lh) + outside.bot.labelScore(begin,end,lh) - sentProb;
+        val l = inside.bot.decodeLabelPart(lh)
+        val pL = indexedProjections.labels.project(l)
+        if(currentScore > threshold || goldTagPolicy.isGoldTag(begin,end,pL)) {
+          getOrElseUpdate(lexicalScores,TriangularArray.index(begin,end),projVector())(pL) = 0
+          foundOne = true
+        }
       }
-    }
 
+
+      if(!foundOne && begin + 1== end) sys.error("Couldn't find a label for " + begin)
+    }
 
     // the main loop, similar to cky
     for(diff <- 1 to inside.length) {

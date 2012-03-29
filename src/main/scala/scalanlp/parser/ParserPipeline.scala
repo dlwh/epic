@@ -79,7 +79,8 @@ trait ParserPipeline {
       println("Parser " + name);
 
       println("Evaluating Parser...");
-      val stats = evalParser(testTrees,parser,name,replacer);
+      val stats = evalParser(devTrees,parser,name+"-dev",replacer);
+      evalParser(testTrees,parser,name+"-test",replacer);
       import stats._;
       println("Eval finished. Results:");
       println( "P: " + precision + " R:" + recall + " F1: " + f1 +  " Ex:" + exact + " Tag Accuracy: " + tagAccuracy);

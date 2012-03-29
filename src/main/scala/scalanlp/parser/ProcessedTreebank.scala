@@ -14,20 +14,20 @@ import scalanlp.util.Index
 case class ProcessedTreebank(treebank: TreebankParams, spans: SpanParams[String]) {
   import spans._;
 
-  lazy val trainTreesWithUnaries = transformTrees(treebank.treebank.train, trainSpans);
+  lazy val trainTreesWithUnaries = transformTrees(treebank.treebank.train, trainSpans, treebank.maxLength);
   lazy val (trainTrees,replacer) = removeUnaryChains(trainTreesWithUnaries);
 
-  lazy val devTrees = transformTrees(treebank.treebank.dev, devSpans);
+  lazy val devTrees = transformTrees(treebank.treebank.dev, devSpans, 60);
 
-  lazy val testTrees = transformTrees(treebank.treebank.test, testSpans);
+  lazy val testTrees = transformTrees(treebank.treebank.test, testSpans, 1000000);
 
 
   def transformTrees(portion: treebank.treebank.Portion,
-                     broker: SpanBroker[String]): IndexedSeq[TreeInstance[String,String]] = {
+                     broker: SpanBroker[String], maxL: Int): IndexedSeq[TreeInstance[String,String]] = {
     import treebank._;
 
     val binarizedAndTransformed = for (
-      ((tree, words),index) <- portion.trees.zipWithIndex if words.length <= maxLength
+      ((tree, words),index) <- portion.trees.zipWithIndex if words.length <= maxL
     ) yield {
       val transformed = xform(tree);
       val vertAnnotated = Trees.annotateParents(transformed,depth = verticalMarkovization);

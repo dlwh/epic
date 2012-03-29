@@ -29,11 +29,8 @@ class StandardCombinerFeaturizer(grammar: Grammar[String],
                                  topLabelIndex: Array[Array[Int]]) extends CombinerFeaturizer[String,String] {
 
   // yuck
-  val ALL = 0 // 1 if all systems ahve it
-  val SOME = 1 // some system has it (max over values if they're not all 1)
-  val COUNT = 2 // sum of all systems scores for this system
-  val REJECT = 3 // 1 if some system doesn't have it, but some other system does
-  val MOST = 4 // 1 if count feature >= .5
+  val SOME = 0 // some system has it (max over values if they're not all 1)
+  val COUNT = 1 // sum of all systems scores for this pos
 
   val outputRules = Array.tabulate(systemIndex.size){ i =>
     val system = systemIndex.get(i)
@@ -60,12 +57,6 @@ class StandardCombinerFeaturizer(grammar: Grammar[String],
 
     var sv = forSplit(rule)
     if(sv eq null) {
-      // features everyone has agreed to touch
-      val allFeatures = new collection.mutable.BitSet()
-      val rejectedAllFeatures = new collection.mutable.BitSet()
-      // features someone has said no to, but someone else yes
-      val rejectFeatures = new collection.mutable.BitSet()
-      val someFeatures = new collection.mutable.BitSet()
       sv = new OldSparseVector(featureIndex.size)
       val tag = grammar.parent(rule)
       var system = 0
@@ -82,13 +73,12 @@ class StandardCombinerFeaturizer(grammar: Grammar[String],
               else forSplit(rule)
             }
           }
-          updateFeatureCounts(sv, system, rule, tag, ruleValue, allFeatures, someFeatures, rejectedAllFeatures, rejectFeatures)
+          updateFeatureCounts(sv, system, rule, tag, ruleValue)
 
         }
         system += 1
       }
 
-      handleCompositeFeatures(sv, allFeatures, rejectedAllFeatures, rejectFeatures, someFeatures, tag, rule)
       forSplit(rule) = sv
     }
     sv
@@ -97,11 +87,6 @@ class StandardCombinerFeaturizer(grammar: Grammar[String],
 
   def featuresForUnary(begin: Int, end: Int, rule: Int) =  {
     val sv = new OldSparseVector(featureIndex.size)
-    val allFeatures = new collection.mutable.BitSet()
-    val rejectedAllFeatures = new collection.mutable.BitSet()
-    // features someone has said no to, but someone else yes
-    val rejectFeatures = new collection.mutable.BitSet()
-    val someFeatures = new collection.mutable.BitSet()
     val tag = grammar.parent(rule)
     for( (data, system) <- outputRules.zipWithIndex if data ne null) {
       import data._
@@ -110,38 +95,26 @@ class StandardCombinerFeaturizer(grammar: Grammar[String],
         if(forSpan eq null) 0.0
         else forSpan(rule)
       }
-      updateFeatureCounts(sv, system, rule, tag, ruleValue, allFeatures, someFeatures, rejectedAllFeatures, rejectFeatures)
-      updateLabelFeatureCounts(topLabelIndex, allFeatures, tag, someFeatures, sv, system, ruleValue, rejectedAllFeatures, rejectFeatures)
+      updateFeatureCounts(sv, system, rule, tag, ruleValue)
+      updateLabelFeatureCounts(topLabelIndex, tag, sv, system, ruleValue)
     }
 
-    handleCompositeFeatures(sv, allFeatures, rejectedAllFeatures, rejectFeatures, someFeatures, tag, rule)
     sv
   }
 
-
-  def updateLabelFeatureCounts(labelIndex: Array[Array[Int]], allFeatures: BitSet, tag: Int, someFeatures: BitSet, sv: OldSparseVector, system: Int, ruleValue: Double, rejectedAllFeatures: BitSet, rejectFeatures: BitSet) {
+  private def updateLabelFeatureCounts(labelIndex: Array[Array[Int]], tag: Int, sv: OldSparseVector, system: Int, ruleValue: Double) {
     if (useLabelFeatures) {
-      if(ruleValue >= 0) {
-
-      allFeatures += labelIndex(ALL)(tag)
-      someFeatures += labelIndex(REJECT)(tag)
-
-      sv(labelIndex(system)(tag)) += ruleValue
-      sv(labelIndex(COUNT)(tag)) += ruleValue / tb.outputs.size
-      sv(labelIndex(SOME)(tag)) = math.max(ruleValue, sv(labelIndex(SOME)(tag)))
-      } else {
-        rejectedAllFeatures += labelIndex(ALL)(tag)
-        rejectFeatures += labelIndex(REJECT)(tag)
+      if(ruleValue >= .5) {
+        sv(labelIndex(system)(tag)) = 1.0
+        sv(labelIndex(COUNT)(tag)) += ruleValue / tb.outputs.size
+        sv(labelIndex(SOME)(tag)) = 1.0
       }
     }
   }
 
-  private def updateFeatureCounts(sv: OldSparseVector, system: Int, rule: Int, tag: Int, ruleValue: Double, allFeatures: BitSet, someFeatures: BitSet, rejectedAllFeatures: BitSet, rejectFeatures: BitSet) {
+  private def updateFeatureCounts(sv: OldSparseVector, system: Int, rule: Int, tag: Int, ruleValue: Double) {
     if (ruleValue != 0) {
       if (useRuleFeatures) {
-        allFeatures += ruleIndex(ALL)(rule)
-        someFeatures += ruleIndex(REJECT)(rule)
-
         sv(ruleIndex(system)(rule)) = ruleValue
         sv(ruleIndex(COUNT)(rule)) += ruleValue / tb.outputs.size
         sv(ruleIndex(SOME)(rule)) = math.max(ruleValue, sv(ruleIndex(SOME)(rule)))
@@ -150,49 +123,10 @@ class StandardCombinerFeaturizer(grammar: Grammar[String],
       sv(systemFeatures(system)) = ruleValue
       sv(systemFeatures(COUNT)) += ruleValue / tb.outputs.size
       sv(systemFeatures(SOME)) = math.max(ruleValue, sv(systemFeatures(SOME)))
-      someFeatures += systemFeatures(REJECT)
-    } else {
-      if (useRuleFeatures) {
-        rejectedAllFeatures += ruleIndex(ALL)(rule)
-        rejectFeatures += ruleIndex(REJECT)(rule)
-      }
-      rejectedAllFeatures += systemFeatures(ALL)
-      rejectFeatures += systemFeatures(REJECT)
-    }
-  }
-
-
-  private def handleCompositeFeatures(sv: OldSparseVector, allFeatures: BitSet, rejectedAllFeatures: BitSet, rejectFeatures: BitSet, someFeatures: BitSet, tag: Int, rule: Int) {
-    // process all features and reject features
-    // these are features that every ststem has seen
-    for (f <- allFeatures -- rejectedAllFeatures) {
-      sv(f) = 1
-    }
-    // these are features that some system has seen, and some system has said isn't ok.
-    for (f <- rejectFeatures & someFeatures) {
-      sv(f) = 1
-    }
-
-    // handle most features, by looking for count features with score >= .48
-    val MOST_THRESHOLD = 0.48
-    if (sv(systemFeatures(COUNT)) >= MOST_THRESHOLD) {
-      sv(systemFeatures(MOST)) = 1
-    }
-    if (useLabelFeatures && sv(labelIndex(COUNT)(tag)) >= MOST_THRESHOLD) {
-      sv(labelIndex(MOST)(tag)) = 1
-    }
-    if (rule >= 0 && useRuleFeatures && sv(ruleIndex(COUNT)(rule)) >= MOST_THRESHOLD) {
-      sv(ruleIndex(MOST)(rule)) = 1
     }
   }
 
   def featuresForSpan(begin: Int, end: Int, tag: Int) = {
-    // features everyone has agreed to touch
-    val allFeatures = new collection.mutable.BitSet()
-    val rejectedAllFeatures = new collection.mutable.BitSet()
-    // features someone has said no to, but someone else yes
-    val rejectFeatures = new collection.mutable.BitSet()
-    val someFeatures = new collection.mutable.BitSet()
     val sv = new OldSparseVector(featureIndex.size)
     for( (data, system) <- outputRules.zipWithIndex if data ne null) {
       import data._
@@ -202,10 +136,9 @@ class StandardCombinerFeaturizer(grammar: Grammar[String],
         else 0.0
       }
       if(ruleValue != 0) {
-        updateLabelFeatureCounts(labelIndex, allFeatures, tag, someFeatures, sv, system, ruleValue, rejectedAllFeatures, rejectFeatures)
+        updateLabelFeatureCounts(labelIndex, tag, sv, system, ruleValue)
       }
     }
-    handleCompositeFeatures(sv, allFeatures, rejectedAllFeatures, rejectFeatures, someFeatures, tag, -1)
     sv
   }
 
@@ -218,11 +151,8 @@ class StandardCombinerFeaturizerFactory(systems: Set[String],
                                         useRuleFeatures: Boolean,
                                         useLabelFeatures: Boolean) extends CombinerFeaturizerFactory[String, String] {
   val systemIndex = Index[String]()
-  systemIndex.index("ALL")
   systemIndex.index("SOME")
   systemIndex.index("COUNT")
-  systemIndex.index("REJECT")
-  systemIndex.index("MOST")
   systems foreach {systemIndex.index _}
 
   val featureIndex = Index[Feature]()
@@ -239,10 +169,10 @@ class StandardCombinerFeaturizerFactory(systems: Set[String],
   }
 
   val labelFeatureIndex = Array.tabulate(systemIndex.size,grammar.labelIndex.size) { (i,j) =>
-    val system = featureIndex.get(systemFeatures(i))
-    val rule = grammar.labelIndex.get(j)
-    val f = PairFeature(system,LabelFeature(rule))
     if(useLabelFeatures) {
+      val system = featureIndex.get(systemFeatures(i))
+      val rule = grammar.labelIndex.get(j)
+      val f = PairFeature(system,LabelFeature(rule))
       featureIndex.index(f)
     } else {
       -1

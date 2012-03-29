@@ -91,7 +91,12 @@ class LexCKYChartBuilder[Chart[X]<:ParseChart[X], L, W](val root: L,
         }
       }
       if(!foundSomething) {
-        sys.error("Couldn't score " + words(i))
+        println("Warning: couldn't score "+ words(i))
+        for {
+          (a, wScore) <- spec.tagScores(i).activeIterator if !wScore.isInfinite && !wScore.isNaN
+        } {
+          chart.bot.enter(i, i+1, a, i, wScore - 10)
+        }
       }
 
       updateInsideUnaries(chart, spec,  i, i+1, validSpan)

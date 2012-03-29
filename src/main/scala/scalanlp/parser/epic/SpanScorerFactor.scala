@@ -3,7 +3,6 @@ package scalanlp.parser.epic
 import scalanlp.inference.Factor
 import scalala.tensor.dense.DenseVector
 import scalanlp.parser._
-import features.Feature
 import projections.{AnchoredRuleScorerFactory, GrammarProjections, ScalingSpanScorer}
 import scalanlp.parser.ParseChart._
 
