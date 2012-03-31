@@ -177,7 +177,7 @@ case class EPParserModelFactory(ep: EPParams,
                                 model7: EPParserModelFactory.CompatibleFactory = null,
                                 model8: EPParserModelFactory.CompatibleFactory = null,
                                 oldWeights: File = null) extends ParserExtractableModelFactory[String,String] {
-  type MyModel = EPModel[TreeInstance[String,String], SpanScorerFactor[String,String]] with EPParserExtractor[String,String]
+  type MyModel = EPModel[TreeInstance[String,String], SpanScorerFactor[String,String]] with EPParser.Extractor[String,String]
 
   def make(train: IndexedSeq[TreeInstance[String, String]]) = {
     val (initLexicon,initBinaries,initUnaries) = GenerativeParser.extractCounts(train)
@@ -199,7 +199,7 @@ case class EPParserModelFactory(ep: EPParams,
       Counter[Feature,Double]()
     }
 
-    new EPModel(ep.iterations, {featureCounter.get(_)}, models:_*) with EPParserExtractor[String, String] with Serializable {
+    new EPModel(ep.iterations, {featureCounter.get(_)}, models:_*) with EPParser.Extractor[String, String] with Serializable {
       val zeroParser = SimpleChartParser(new CKYChartBuilder(xbarParser.root,
         new ZeroLexicon(xbarParser.lexicon),
         Grammar.zero(xbarParser.grammar),ParseChart.logProb))

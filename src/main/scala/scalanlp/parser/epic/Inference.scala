@@ -47,6 +47,5 @@ trait MarginalInference[Datum,Augment] extends AugmentableInference[Datum,Augmen
 
 trait ProjectableInference[Datum,Augment] extends MarginalInference[Datum,Augment] {
   def project(v: Datum, m: Marginal, oldAugment: Augment):Augment
-
 }
 

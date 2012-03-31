@@ -96,26 +96,3 @@ class AnchoredRuleApproximator[C,F,W](val coarseParser: ChartBuilder[LogProbabil
 
 }
 
-trait EPParserExtractor[L,W] extends EPModel[TreeInstance[L,W],SpanScorerFactor[L,W]] with ParserExtractable[L,W] {
-  def zeroParser: SimpleChartParser[L,L,W]
-
-  def extractParser(weights: DenseVector[Double]) = {
-    EPParserExtractor.extractParser(this,weights)
-  }
-}
-
-object EPParserExtractor {
-  def extractParser[L,W](ex: EPParserExtractor[L,W], weights: DenseVector[Double]):Parser[L,W] = {
-    val inference = ex.inferenceFromWeights(weights)
-    val zeroParser = ex.zeroParser
-    new Parser[L,W] with Serializable {
-      def bestParse(s: Seq[W], spanScorer: SpanScorer[L]) = {
-        val inst = new TreeInstance("",null,s,spanScorer)
-        val augment = inference.getMarginals(inst,new SpanScorerFactor(zeroParser.builder.withCharts(ParseChart.logProb),s,spanScorer))._2
-        zeroParser.bestParse(s,augment.scorer)
-      }
-    }
-
-  }
-
-}
