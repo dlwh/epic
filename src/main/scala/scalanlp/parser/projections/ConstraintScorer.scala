@@ -7,6 +7,7 @@ import java.util.Arrays
 import scalanlp.config.Configuration
 import java.io._
 import scalanlp.collection.mutable.{OpenAddressHashArray, TriangularArray}
+import scalanlp.trees.AnnotatedLabel
 
 /**
  * 
@@ -133,7 +134,7 @@ object ProjectTreebankToConstraints {
     val proj = new GrammarProjections(ProjectionIndexer.simple(parser.projections.labels.coarseIndex), ProjectionIndexer.simple(parser.projections.rules.coarseIndex))
     val trueProj = parser.projections
     if(params.project) {
-      val factory = new ConstraintScorerFactory[String,Any,String](parser, -7)
+      val factory = new ConstraintScorerFactory[AnnotatedLabel,Any,String](parser, -7)
       scalanlp.util.writeObject(new File(outDir,SPAN_INDEX_NAME),parser.projections.labels.coarseIndex)
       serializeSpans(mapTrees(factory,treebank.trainTrees, proj, true, params.maxParseLength),new File(outDir,TRAIN_SPANS_NAME))
       serializeSpans(mapTrees(factory,treebank.testTrees, proj, false, 10000),new File(outDir,TEST_SPANS_NAME))
@@ -150,19 +151,19 @@ object ProjectTreebankToConstraints {
   }
 
   def loadParser[T](loc: File) = {
-    val parser = scalanlp.util.readObject[SimpleChartParser[String,T,String]](loc)
+    val parser = scalanlp.util.readObject[SimpleChartParser[AnnotatedLabel,T,String]](loc)
     parser
   }
 
-  def mapTrees[L](factory: ConstraintScorerFactory[L,Any,String], trees: IndexedSeq[TreeInstance[String,String]],
-                  proj: GrammarProjections[String,L], useTree: Boolean, maxL: Int) = {
+  def mapTrees[L](factory: ConstraintScorerFactory[L,Any,String], trees: IndexedSeq[TreeInstance[AnnotatedLabel,String]],
+                  proj: GrammarProjections[AnnotatedLabel,L], useTree: Boolean, maxL: Int) = {
     // TODO: have ability to use other span scorers.
-    trees.toIndexedSeq.par.map { (ti:TreeInstance[String,String]) =>
+    trees.toIndexedSeq.par.map { (ti:TreeInstance[AnnotatedLabel,String]) =>
       val TreeInstance(id,tree,words,preScorer) = ti
       println(id,words)
       try {
         val pruner:GoldTagPolicy[L] = if(useTree) {
-          val mappedTree = tree.map(l => proj.labels.refinementsOf(l).map(proj.labels.fineIndex))
+          val mappedTree = tree.map(l => proj.labels.refinementsOf(l.baseAnnotatedLabel).map(proj.labels.fineIndex))
           GoldTagPolicy.candidateTreeForcing(mappedTree)
         } else {
           GoldTagPolicy.noGoldTags

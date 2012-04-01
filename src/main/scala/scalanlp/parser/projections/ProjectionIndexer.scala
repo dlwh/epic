@@ -10,27 +10,31 @@ import collection.mutable.ArrayBuffer
 @SerialVersionUID(1)
 final class ProjectionIndexer[C,F] private (val coarseIndex: Index[C],
                                       val fineIndex:Index[F], indexedProjections: Array[Int]) extends (Int=>Int) with Serializable {
-  val coarseEncoder = Encoder.fromIndex(coarseIndex);
+  val coarseEncoder = Encoder.fromIndex(coarseIndex)
 
   val refinements = {
-    val result = Encoder.fromIndex(coarseIndex).fillArray(new ArrayBuffer[Int]);
+    val result = Encoder.fromIndex(coarseIndex).fillArray(new ArrayBuffer[Int])
     for( (coarse,fine) <- indexedProjections zipWithIndex) {
       result(coarse) += fine
     }
-    result.map(_.toArray);
+    result.map(_.toArray)
   }
 
-  def refinementsOf(c: Int):IndexedSeq[Int] = refinements(c);
-  def refinementsOf(c: C):IndexedSeq[F] = refinements(coarseIndex(c)).map(fineIndex.get _);
+  def refinementsOf(c: Int):IndexedSeq[Int] = refinements(c)
+  def refinementsOf(c: C):IndexedSeq[F] = {
+    val ci = coarseIndex(c)
+    if(ci < 0) throw new RuntimeException("Not a coarse symbol: " + c)
+    refinements(ci).map(fineIndex.get _)
+  }
 
   /**
    * Computes the projection of the indexed fine label f to an indexed coarse label.
    */
-  def project(f: Int):Int = indexedProjections(f);
+  def project(f: Int):Int = indexedProjections(f)
 
-  def project(f: F):C = coarseIndex.get(project(fineIndex(f)));
+  def project(f: F):C = coarseIndex.get(project(fineIndex(f)))
 
-  def coarseSymbol(f: Int) = coarseIndex.get(project(f));
+  def coarseSymbol(f: Int) = coarseIndex.get(project(f))
 
   /**
    * Same as project(f)
@@ -51,25 +55,25 @@ final class ProjectionIndexer[C,F] private (val coarseIndex: Index[C],
 }
 
 object ProjectionIndexer {
-  def simple[L](index: Index[L]) = ProjectionIndexer(index,index, identity[L] _);
+  def simple[L](index: Index[L]) = ProjectionIndexer(index,index, identity[L] _)
 
   def apply[C,F](coarseIndex: Index[C], fineIndex: Index[F], proj: F=>C) = {
-    val indexedProjections = Encoder.fromIndex(fineIndex).fillArray(-1);
+    val indexedProjections = Encoder.fromIndex(fineIndex).fillArray(-1)
     for( (l,idx) <- fineIndex.zipWithIndex) {
-      val projectedIdx = coarseIndex(proj(l));
-      if(projectedIdx < 0) throw new RuntimeException("error while indexing" + l + " to " + proj(l) + fineIndex(l));
-      indexedProjections(idx) = projectedIdx;
+      val projectedIdx = coarseIndex(proj(l))
+      if(projectedIdx < 0) throw new RuntimeException("error while indexing" + l + " to " + proj(l) + fineIndex(l))
+      indexedProjections(idx) = projectedIdx
     }
-    new ProjectionIndexer(coarseIndex,fineIndex,indexedProjections);
+    new ProjectionIndexer(coarseIndex,fineIndex,indexedProjections)
   }
 
   def fromSplitter[C,F](coarseIndex: Index[C], fineIndex: Index[F], split: C=>Seq[F]) = {
-    val indexedProjections = Encoder.fromIndex(fineIndex).fillArray(-1);
+    val indexedProjections = Encoder.fromIndex(fineIndex).fillArray(-1)
     for( (c,cf) <- coarseIndex.zipWithIndex; f <- split(c)) {
       try {
         indexedProjections(fineIndex(f)) = cf
       } catch {
-        case e => println("Grrr... " + f + "\n" + fineIndex); throw e;
+        case e => println("Grrr... " + f + "\n" + fineIndex); throw e
       }
     }
     new ProjectionIndexer(coarseIndex,fineIndex,indexedProjections)

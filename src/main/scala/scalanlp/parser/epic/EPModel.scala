@@ -16,12 +16,13 @@ import scalanlp.optimize.{BatchDiffFunction, FirstOrderMinimizer, CachedBatchDif
 import scalanlp.util.Index
 import java.io.File
 import scalala.tensor.{Counter, ::}
+import scalanlp.trees.AnnotatedLabel
 
 case class ComponentFeature(index: Int, feature: Feature) extends Feature
 import scalanlp.util._
 
 object EPModel {
-  type CompatibleModel[Datum, Augment] = Model[Datum] { type Inference <: ProjectableInference[Datum,Augment]}
+  type CompatibleModel[Datum, Augment] = Model[Datum] { type Inference <: ProjectableInference[Datum, Augment]}
 }
 
 /**
@@ -29,19 +30,19 @@ object EPModel {
  * @author dlwh
  */
 class EPModel[Datum, Augment](maxEPIter: Int, initFeatureValue: Feature=>Option[Double],
-                              models: EPModel.CompatibleModel[Datum,Augment]*)(implicit aIsFactor: Augment<:<Factor[Augment]) extends Model[Datum] {
+                              models: EPModel.CompatibleModel[Datum, Augment]*)(implicit aIsFactor: Augment<:<Factor[Augment]) extends Model[Datum] {
   type ExpectedCounts = EPExpectedCounts
   type Inference = EPInference[Datum, Augment]
 
   val featureIndex:Index[Feature] = {
     val index = Index[Feature]()
-    for( (m,i) <- models.zipWithIndex; f <- m.featureIndex) index.index(ComponentFeature(i,f))
+    for( (m, i) <- models.zipWithIndex; f <- m.featureIndex) index.index(ComponentFeature(i, f))
     index
   }
 
   override def initialValueForFeature(f: Feature) = initFeatureValue(f) getOrElse {
     f match {
-      case ComponentFeature(m,ff) => models(m).initialValueForFeature(ff)
+      case ComponentFeature(m, ff) => models(m).initialValueForFeature(ff)
       case _ => 0.0
     }
   }
@@ -49,12 +50,12 @@ class EPModel[Datum, Augment](maxEPIter: Int, initFeatureValue: Feature=>Option[
   private val offsets = models.map(_.numFeatures).unfold(0)(_ + _)
 
   def emptyCounts = {
-    val counts = for( (m: Model[Datum] { type Inference <: ProjectableInference[Datum,Augment]}) <- models.toIndexedSeq) yield m.emptyCounts
-    EPExpectedCounts(0.0,counts)
+    val counts = for( (m: Model[Datum] { type Inference <: ProjectableInference[Datum, Augment]}) <- models.toIndexedSeq) yield m.emptyCounts
+    EPExpectedCounts(0.0, counts)
   }
 
   def expectedCountsToObjective(ecounts: EPModel[Datum, Augment]#ExpectedCounts) = {
-    val vectors = for( (m,e) <- models zip ecounts.counts) yield m.expectedCountsToObjective(e.asInstanceOf[m.ExpectedCounts])._2
+    val vectors = for( (m, e) <- models zip ecounts.counts) yield m.expectedCountsToObjective(e.asInstanceOf[m.ExpectedCounts])._2
     ecounts.loss -> DenseVector.vertcat(vectors:_*)
   }
 
@@ -80,15 +81,15 @@ class EPModel[Datum, Augment](maxEPIter: Int, initFeatureValue: Feature=>Option[
 
   override def cacheFeatureWeights(weights: DenseVector[Double], prefix: String) {
     super.cacheFeatureWeights(weights, prefix)
-    for( ((w,m),i) <- (partitionWeights(weights) zip models).zipWithIndex) {
-      m.cacheFeatureWeights(w,prefix+"-model-"+i)
+    for( ((w, m), i) <- (partitionWeights(weights) zip models).zipWithIndex) {
+      m.cacheFeatureWeights(w, prefix+"-model-"+i)
     }
   }
 }
 
 case class EPExpectedCounts(var loss: Double, counts: IndexedSeq[ExpectedCounts[_]]) extends ExpectedCounts[EPExpectedCounts] {
   def +=(other: EPExpectedCounts) = {
-    for( (t,u) <- counts zip other.counts) {
+    for( (t, u) <- counts zip other.counts) {
       t.asInstanceOf[{ def +=(e: ExpectedCounts[_]):ExpectedCounts[_]}] += u
     }
     this.loss += other.loss
@@ -96,7 +97,7 @@ case class EPExpectedCounts(var loss: Double, counts: IndexedSeq[ExpectedCounts[
   }
 
   def -=(other: EPExpectedCounts) = {
-    for( (t,u) <- counts zip other.counts) {
+    for( (t, u) <- counts zip other.counts) {
       t.asInstanceOf[{ def -=(e: ExpectedCounts[_]):ExpectedCounts[_]}] -= u
     }
     this.loss -= other.loss
@@ -112,7 +113,7 @@ case class EPInference[Datum, Augment](inferences: IndexedSeq[ProjectableInferen
 
   // assume we don't need gold  to do EP, at least for now
   def goldCounts(value: Datum, augment: Augment) = {
-    val counts = inferences.map(_.goldCounts(value,augment))
+    val counts = inferences.map(_.goldCounts(value, augment))
     EPExpectedCounts(counts.foldLeft(0.0){_ + _.loss}, counts)
   }
 
@@ -120,8 +121,8 @@ case class EPInference[Datum, Augment](inferences: IndexedSeq[ProjectableInferen
     val marginals = ArrayBuffer.fill(inferences.length)(null.asInstanceOf[ProjectableInference[Datum, Augment]#Marginal])
     def project(q: Augment, i: Int) = {
       val inf = inferences(i)
-      val (marg,contributionToLikelihood) = inf.marginal(datum,q)
-      val newAugment = inf.project(datum,marg,q)
+      val (marg, contributionToLikelihood) = inf.marginal(datum, q)
+      val newAugment = inf.project(datum, marg, q)
       marginals(i) = marg
       newAugment -> contributionToLikelihood
     }
@@ -134,7 +135,7 @@ case class EPInference[Datum, Augment](inferences: IndexedSeq[ProjectableInferen
     while(!converged && iter < maxEPIter && iterates.hasNext) {
       val s = iterates.next()
       if(state != null) {
-        converged = (s.logPartition - state.logPartition).abs/math.max(s.logPartition,state.logPartition) < 1E-4
+        converged = (s.logPartition - state.logPartition).abs/math.max(s.logPartition, state.logPartition) < 1E-4
       }
       iter += 1
       state = s
@@ -145,9 +146,9 @@ case class EPInference[Datum, Augment](inferences: IndexedSeq[ProjectableInferen
   }
 
   def guessCounts(datum: Datum, augment: Augment) = {
-    val (partition, finalAugment, marginals, f_~) = getMarginals(datum,augment)
+    val (partition, finalAugment, marginals, f_~) = getMarginals(datum, augment)
 
-    val finalCounts = for( ((inf,f_~),i) <- (inferences zip f_~).zipWithIndex) yield {
+    val finalCounts = for( ((inf, f_~), i) <- (inferences zip f_~).zipWithIndex) yield {
       val marg = marginals(i)
       val augment = f_~
       inf.guessCountsFromMarginals(datum, marg.asInstanceOf[inf.Marginal], augment)
@@ -160,13 +161,13 @@ case class EPInference[Datum, Augment](inferences: IndexedSeq[ProjectableInferen
 case class EPParams(iterations: Int= 5, pruningThreshold: Double = -15)
 
 object EPParserModelFactory {
-  type CompatibleFactory = ModelFactory[TreeInstance[String,String]] {
-    type MyModel <: EPModel.CompatibleModel[TreeInstance[String,String], SpanScorerFactor[String, String]]
+  type CompatibleFactory = ModelFactory[TreeInstance[AnnotatedLabel, String]] {
+    type MyModel <: EPModel.CompatibleModel[TreeInstance[AnnotatedLabel, String], SpanScorerFactor[AnnotatedLabel, String]]
   }
 }
 
 case class EPParserModelFactory(ep: EPParams,
-                                parser: ParserParams.BaseParser[String],
+                                baseParser: ParserParams.BaseParser,
                                 // I realy need ot figure out how to get this into my config language...
                                 model1: EPParserModelFactory.CompatibleFactory = null,
                                 model2: EPParserModelFactory.CompatibleFactory = null,
@@ -176,33 +177,30 @@ case class EPParserModelFactory(ep: EPParams,
                                 model6: EPParserModelFactory.CompatibleFactory = null,
                                 model7: EPParserModelFactory.CompatibleFactory = null,
                                 model8: EPParserModelFactory.CompatibleFactory = null,
-                                oldWeights: File = null) extends ParserExtractableModelFactory[String,String] {
-  type MyModel = EPModel[TreeInstance[String,String], SpanScorerFactor[String,String]] with EPParser.Extractor[String,String]
+                                oldWeights: File = null) extends ParserExtractableModelFactory[AnnotatedLabel, String] {
+  type MyModel = (
+    EPModel[TreeInstance[AnnotatedLabel, String], SpanScorerFactor[AnnotatedLabel, String]]
+    with EPParser.Extractor[AnnotatedLabel, String]
+  )
 
-  def make(train: IndexedSeq[TreeInstance[String, String]]) = {
-    val (initLexicon,initBinaries,initUnaries) = GenerativeParser.extractCounts(train)
+  def make(train: IndexedSeq[TreeInstance[AnnotatedLabel, String]]) = {
+    val xbarParser = baseParser.xbarParser(train)
 
-    val xbarParser = parser.optParser getOrElse {
-      val grammar = Grammar(Library.logAndNormalizeRows(initBinaries),Library.logAndNormalizeRows(initUnaries));
-      val lexicon = new SimpleLexicon(initLexicon);
-      new CKYChartBuilder[LogProbabilityParseChart,String,String]("",lexicon,grammar,ParseChart.logProb);
-    }
-
-    type ModelType = EPModel.CompatibleModel[TreeInstance[String,String],SpanScorerFactor[String, String]]
-    val models = Seq(model1,model2,model3,model4,model5,model6,model7,model8).filterNot(_ eq null) map { model =>
+    type ModelType = EPModel.CompatibleModel[TreeInstance[AnnotatedLabel, String], SpanScorerFactor[AnnotatedLabel, String]]
+    val models = Seq(model1, model2, model3, model4, model5, model6, model7, model8).filterNot(_ eq null) map { model =>
       model.make(train):ModelType
     }
 
     val featureCounter = if(oldWeights ne null) {
-      readObject[Counter[Feature,Double]](oldWeights)
+      readObject[Counter[Feature, Double]](oldWeights)
     } else {
-      Counter[Feature,Double]()
+      Counter[Feature, Double]()
     }
 
-    new EPModel(ep.iterations, {featureCounter.get(_)}, models:_*) with EPParser.Extractor[String, String] with Serializable {
+    new EPModel(ep.iterations, {featureCounter.get(_)}, models:_*) with EPParser.Extractor[AnnotatedLabel, String] with Serializable {
       val zeroParser = SimpleChartParser(new CKYChartBuilder(xbarParser.root,
         new ZeroLexicon(xbarParser.lexicon),
-        Grammar.zero(xbarParser.grammar),ParseChart.logProb))
+        Grammar.zero(xbarParser.grammar), ParseChart.logProb))
     }
   }
 }

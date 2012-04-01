@@ -1,7 +1,7 @@
 package scalanlp.parser.epic
 
 import scalanlp.parser._
-import features.{RuleFeature, Feature, IndicatorFeature, WordShapeFeaturizer}
+import features.{Feature, IndicatorFeature, WordShapeFeaturizer}
 import scalanlp.parser.InsideOutside.{ExpectedCounts=>TrueCounts}
 import projections.{ProjectingSpanScorer, GrammarProjections}
 import splitting.StateSplitting
@@ -9,12 +9,14 @@ import ParseChart.LogProbabilityParseChart
 import scalala.tensor.dense.DenseVector
 import scalala.tensor.sparse.SparseVector
 import scalala.library.Library
-import java.io.{FileReader, BufferedReader, File}
+import java.io.File
 import io.Source
 import scalala.tensor.Counter
+import scalanlp.trees.{BinarizedTree, AnnotatedLabel}
 
 class LatentParserModel[L,L3,W](featurizer: Featurizer[L3,W],
                                 root: L3,
+                                reannotate: (BinarizedTree[L],Seq[W])=>BinarizedTree[L],
                                 val projections: GrammarProjections[L,L3],
                                 coarseBuilder: ChartBuilder[LogProbabilityParseChart, L, W],
                                 knownTagWords: Iterable[(L3,W)],
@@ -38,7 +40,7 @@ class LatentParserModel[L,L3,W](featurizer: Featurizer[L3,W],
     val lexicon = new FeaturizedLexicon(openTags, closedWords, weights, indexedFeatures)
     val parser = new CKYChartBuilder[LogProbabilityParseChart,L2,W](root, lexicon, grammar, ParseChart.logProb)
 
-    new LatentParserInference(coarseBuilder, parser, projections)
+    new LatentParserInference(reannotate, coarseBuilder, parser, projections)
   }
 
   def extractParser(weights: DenseVector[Double]):ChartParser[L,L2,W] = {
@@ -75,67 +77,64 @@ class LatentParserModel[L,L3,W](featurizer: Featurizer[L3,W],
   }
 }
 
-case class LatentParserInference[L,L2,W](coarseBuilder: ChartBuilder[LogProbabilityParseChart, L, W],
+case class LatentParserInference[L,L2,W](reannotate: (BinarizedTree[L],Seq[W])=>BinarizedTree[L],
+                                         coarseBuilder: ChartBuilder[LogProbabilityParseChart, L, W],
                                          builder: ChartBuilder[LogProbabilityParseChart,L2,W],
                                          projections: GrammarProjections[L,L2]) extends ParserInference[L,L2,W] {
 
   // E[T-z|T,params]
   def goldCounts(ti: TreeInstance[L,W], spanScorer: SpanScorerFactor[L, W]) = {
+    val reannotated = reannotate(ti.tree, ti.words)
     val projected = new ProjectingSpanScorer(projections,spanScorer.scorer)
     val ecounts = new StateSplitting(
       builder.grammar,
-      builder.lexicon).expectedCounts(ti.tree.map(projections.labels.refinementsOf _),ti.words,projected)
+      builder.lexicon).expectedCounts(reannotated.map(projections.labels.refinementsOf _),ti.words,projected)
 
     new ParserExpectedCounts(ecounts)
   }
 
 }
 
-case class LatentParserModelFactory(parser: ParserParams.BaseParser[String],
+case class LatentParserModelFactory(baseParser: ParserParams.BaseParser,
                                     substates: File = null,
                                     numStates: Int = 2,
                                     oldWeights: File = null,
-                                    splitFactor: Int = 1) extends ParserModelFactory[String, String] {
-  type MyModel = LatentParserModel[String,(String,Int),String]
+                                    splitFactor: Int = 1) extends ParserModelFactory[AnnotatedLabel, String] {
+  type MyModel = LatentParserModel[AnnotatedLabel,(AnnotatedLabel,Int),String]
 
-  def split(x: String, counts: Map[String,Int], numStates: Int) = {
+  def split(x: AnnotatedLabel, counts: Map[AnnotatedLabel,Int], numStates: Int) = {
     for(i <- 0 until counts.getOrElse(x,numStates)) yield (x,i)
   }
 
-  def unsplit(x: (String,Int)) = x._1
+  def unsplit(x: (AnnotatedLabel,Int)) = x._1
 
-  def make(trainTrees: IndexedSeq[TreeInstance[String, String]]) = {
-    val (initLexicon,initBinaries,initUnaries) = this.extractBasicCounts(trainTrees)
+  def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]]) = {
+    val (xbarLexicon,xbarBinaries,xbarUnaries) = this.extractBasicCounts(trainTrees.map(_.mapLabels(_.baseAnnotatedLabel)))
 
-    val xbarParser = parser.optParser getOrElse {
-      val grammar = Grammar(Library.logAndNormalizeRows(initBinaries),Library.logAndNormalizeRows(initUnaries));
-      val lexicon = new SimpleLexicon(initLexicon);
-      new CKYChartBuilder[LogProbabilityParseChart,String,String]("",lexicon,grammar,ParseChart.logProb);
-    }
+    val xbarParser = baseParser.xbarParser(trainTrees)
 
     val substateMap = if(substates != null && substates.exists) {
       val in = Source.fromFile(substates).getLines()
       val pairs = for( line <- in) yield {
         val split = line.split("\\s+")
-        split(0) -> split(1).toInt
+        AnnotatedLabel(split(0)) -> split(1).toInt
       }
       pairs.toMap + (xbarParser.root -> 1)
     } else {
       Map(xbarParser.root -> 1)
     }
 
-    val gen = new WordShapeFeaturizer(Library.sum(initLexicon))
-    def labelFlattener(l: (String,Int)) = {
+    val gen = new WordShapeFeaturizer(Library.sum(xbarLexicon))
+    def labelFlattener(l: (AnnotatedLabel,Int)) = {
       val basic = Seq(l)
       basic map(IndicatorFeature)
     }
-    val feat = new SumFeaturizer[(String,Int),String](new RuleFeaturizer(labelFlattener _), new LexFeaturizer(gen, labelFlattener _))
-    val indexedProjections = GrammarProjections(xbarParser.grammar, split(_:String,substateMap, numStates), unsplit)
-    println(indexedProjections.labels)
+    val feat = new SumFeaturizer[(AnnotatedLabel,Int),String](new RuleFeaturizer(labelFlattener _), new LexFeaturizer(gen, labelFlattener _))
+    val indexedProjections = GrammarProjections(xbarParser.grammar, split(_:AnnotatedLabel,substateMap, numStates), unsplit)
 
-    val openTags = determineOpenTags(initLexicon, indexedProjections)
+    val openTags = determineOpenTags(xbarLexicon, indexedProjections)
     val knownTagWords = determineKnownTags(xbarParser.lexicon, indexedProjections)
-    val closedWords = determineClosedWords(initLexicon)
+    val closedWords = determineClosedWords(xbarLexicon)
 
     val featureCounter = if(oldWeights ne null) {
       val baseCounter = scalanlp.util.readObject[Counter[Feature,Double]](oldWeights)
@@ -144,7 +143,16 @@ case class LatentParserModelFactory(parser: ParserParams.BaseParser[String],
       Counter[Feature,Double]()
     }
 
-    new LatentParserModel[String,(String,Int),String](feat, ("",0), indexedProjections, xbarParser, knownTagWords, openTags, closedWords, {featureCounter.get(_)})
+    def reannotate(tree: BinarizedTree[AnnotatedLabel], words: Seq[String]) = tree.map(_.baseAnnotatedLabel)
+    new LatentParserModel[AnnotatedLabel,(AnnotatedLabel,Int),String](feat,
+                                                                      AnnotatedLabel.TOP -> 0,
+                                                                      reannotate,
+                                                                      indexedProjections,
+                                                                      xbarParser,
+                                                                      knownTagWords,
+                                                                      openTags,
+                                                                      closedWords,
+                                                                      {featureCounter.get(_)})
   }
 }
 

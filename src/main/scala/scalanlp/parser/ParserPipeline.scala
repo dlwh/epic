@@ -1,11 +1,10 @@
 package scalanlp.parser;
 
-import projections.ProjectTreebankToLabeledSpans
 import scalanlp.config._
 import java.io._
 import scalanlp.trees._
 import scalanlp.util._
-import scalanlp.trees.UnaryChainRemover.ChainReplacer
+import scalala.library.Library
 
 
 /**
@@ -18,9 +17,16 @@ object ParserParams {
     protected val paramManifest = manifest[Params];
   }
 
-  case class BaseParser[Fine](base: File = null) {
-    def optParser = Option(base).map { f =>
-     readObject[SimpleChartParser[String,Fine,String]](f).builder.withCharts(ParseChart.logProb)
+  case class BaseParser(path: File = null) {
+    def xbarParser(trees: IndexedSeq[TreeInstance[AnnotatedLabel,String]]) = Option(path) match {
+      case Some(f) =>
+        readObject[SimpleChartParser[AnnotatedLabel,AnnotatedLabel,String]](f).builder.withCharts(ParseChart.logProb)
+      case None =>
+        val (xbarLexicon,xbarBinaries,xbarUnaries) = GenerativeParser.extractCounts(trees.map(_.mapLabels(_.baseAnnotatedLabel)))
+
+        val grammar = Grammar(Library.logAndNormalizeRows(xbarBinaries),Library.logAndNormalizeRows(xbarUnaries));
+        val lexicon = new SimpleLexicon(xbarLexicon);
+        new CKYChartBuilder(AnnotatedLabel.TOP,lexicon,grammar,ParseChart.logProb);
     }
   }
 
@@ -44,17 +50,19 @@ trait ParserPipeline {
    * The main point of entry for implementors. Should return a sequence
    * of parsers
    */
-  def trainParser(trainTrees: IndexedSeq[TreeInstance[String,String]],
-                  validate: Parser[String,String]=>ParseEval.Statistics,
-                  params: Params):Iterator[(String,Parser[String,String])];
+  def trainParser(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel,String]],
+                  validate: Parser[AnnotatedLabel,String]=>ParseEval.Statistics,
+                  params: Params):Iterator[(String,Parser[AnnotatedLabel,String])];
 
 
-  def trainParser(treebank: ProcessedTreebank, params: Params):Iterator[(String,Parser[String,String])] = {
+  def trainParser(treebank: ProcessedTreebank, params: Params):Iterator[(String,Parser[AnnotatedLabel,String])] = {
     import treebank._;
 
 
     val validateTrees = devTrees.take(400)
-    def validate(parser: Parser[String,String]) = ParseEval.evaluate[String](validateTrees, parser, replacer);
+    def validate(parser: Parser[AnnotatedLabel,String]) = {
+      ParseEval.evaluate[AnnotatedLabel](validateTrees, parser, AnnotatedLabelChainReplacer, asString={(l:AnnotatedLabel)=>l.label})
+    };
     val parsers = trainParser(trainTrees,validate,params);
     parsers
   }
@@ -79,8 +87,8 @@ trait ParserPipeline {
       println("Parser " + name);
 
       println("Evaluating Parser...");
-      val stats = evalParser(devTrees,parser,name+"-dev",replacer);
-      evalParser(testTrees,parser,name+"-test",replacer);
+      val stats = evalParser(devTrees,parser,name+"-dev");
+      evalParser(testTrees,parser,name+"-test");
       import stats._;
       println("Eval finished. Results:");
       println( "P: " + precision + " R:" + recall + " F1: " + f1 +  " Ex:" + exact + " Tag Accuracy: " + tagAccuracy);
@@ -91,10 +99,10 @@ trait ParserPipeline {
     }
   }
 
-  def evalParser(testTrees: IndexedSeq[TreeInstance[String,String]],
-          parser: Parser[String,String], name: String, chainReplacer: ChainReplacer[String]):ParseEval.Statistics = {
-    val stats = ParseEval.evaluateAndLog[String](testTrees,parser,name,chainReplacer);
-    stats
+  def evalParser(testTrees: IndexedSeq[TreeInstance[AnnotatedLabel,String]],
+                 parser: Parser[AnnotatedLabel,String],
+                 name: String):ParseEval.Statistics = {
+    ParseEval.evaluateAndLog(testTrees, parser, name, AnnotatedLabelChainReplacer, { (_: AnnotatedLabel).label })
   }
 
 }

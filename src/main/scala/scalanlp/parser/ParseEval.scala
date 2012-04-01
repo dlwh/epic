@@ -17,14 +17,11 @@ package scalanlp.parser;
 
 
 import scalanlp.trees._
-import scalanlp.trees.UnaryChainRemover.ChainReplacer
-import scalanlp.config.Configuration;
 import java.io.BufferedOutputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.io.PrintStream
 import scala.actors.Actor
-import scalanlp.util._;
 
 
 /**
@@ -97,9 +94,10 @@ object ParseEval {
   val noPostParseFn = (_:Tree[String],_:Tree[String],_:Seq[String],_:Statistics,_:Int)=>()
 
   def evaluate[L](trees: IndexedSeq[TreeInstance[L,String]],
-                  parser: Parser[L,String], chainReplacer: ChainReplacer[L],
+                  parser: Parser[L,String],
+                  chainReplacer: UnaryChainReplacer[L],
                   postEval: PostParseFn = noPostParseFn,
-                  asString: L=>String = identity[String] _) = {
+                  asString: L=>String) = {
 
     val peval = new ParseEval(Set("","''", "``", ".", ":", ",", "TOP"));
     // TODO: make less horrible
@@ -124,7 +122,10 @@ object ParseEval {
   }
 
   def evaluateAndLog[L](trees: IndexedSeq[TreeInstance[L,String]],
-                     parser: Parser[L,String], evalDir: String, chainReplacer: ChainReplacer[L], asString: L=>String = (_:L).toString) = {
+                     parser: Parser[L,String],
+                     evalDir: String,
+                     chainReplacer: UnaryChainReplacer[L],
+                     asString: L=>String = (_:L).toString) = {
 
     val parsedir = new File(evalDir);
     parsedir.exists() || parsedir.mkdirs() || sys.error("Couldn't make directory: " + parsedir);
@@ -157,69 +158,8 @@ object ParseEval {
       appender ! Some((guessTree.render(words,newline=false)), goldTree.render(words,newline=false));
     }
 
-    val r = evaluate(trees,parser,chainReplacer, postEval _, asString);
+    val r = evaluate(trees, parser, chainReplacer, postEval _, asString);
     appender ! None;
     r
   }
 }
-
-/*
-object ParserTester {
-  import ParserTrainer._;
-  def main(args: Array[String]) {
-    val config = Configuration.fromPropertiesFiles(args.map(new File(_)));
-    val params = config.readIn[ParserTrainerParams]("treebank");
-    val parserFile = config.readIn[File]("parser.test");
-
-    import params.treebank._;
-    import params.spans._;
-
-    val trainTreesWithUnaries = transformTrees(treebank.trainTrees, trainSpans, maxLength, binarize, xform, verticalMarkovization, horizontalMarkovization);
-    val (trainTrees,replacer) = removeUnaryChains(trainTreesWithUnaries);
-
-    val parser = readObject[Parser[String,String]](parserFile);
-
-    val testTrees = transformTrees(treebank.testTrees, testSpans, maxLength, binarize, xform, verticalMarkovization, horizontalMarkovization)
-
-    evalParser(testTrees,parser,"test",replacer);
-  }
-
-  protected def evalParser(testTrees:
-          parser: Parser[String,String], name: String, chainReplacer: ChainReplacer[String]) = {
-    println("Evaluating Parser...");
-    val stats = ParseEval.evaluateAndLog(testTrees,parser,name,chainReplacer);
-    import stats._;
-    println("Eval finished. Results:");
-    println( "P: " + precision + " R:" + recall + " F1: " + f1 +  " Ex:" + exact + " Tagging: " + stats.tagAccuracy);
-    f1
-  }
-}
-*/
-
-/*
-trait ParserTester {
-  def main(args: Array[String]) {
-    val config = Configuration.fromPropertiesFiles(args.map{new File(_)});
-    val params = config.readIn[ProcessedTreebank]("parser");
-    import params._;
-    val parserFile = config.readIn[File]("parser.test");
-    println("Evaluating Parser...");
-    println(params);
-    val parser = readObject[Parser[String,String]](parserFile);
-
-
-    println("Evaluating Parser...");
-    val stats = evalParser(testTrees,parser,"Test",replacer);
-    import stats._;
-    println("Eval finished. Results:");
-    println( "P: " + precision + " R:" + recall + " F1: " + f1 +  " Ex:" + exact + " Tag Accuracy: " + tagAccuracy);
-  }
-
-  def evalParser(testTrees: IndexedSeq[TreeInstance[String,String]],
-          parser: Parser[String,String], name: String, chainReplacer: ChainReplacer[String]):ParseEval.Statistics = {
-    val stats = ParseEval.evaluateAndLog(testTrees,parser,name,chainReplacer);
-    stats
-  }
-
-}
-*/

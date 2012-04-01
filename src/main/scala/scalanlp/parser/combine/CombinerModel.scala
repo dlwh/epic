@@ -7,7 +7,6 @@ import scalala.tensor.dense.DenseVector
 import scalanlp.util.{Encoder, Index, TODO}
 import epic.{ModelObjective, MarginalInference, Model}
 import collection.immutable.{Map, IndexedSeq}
-import scalanlp.trees.BinarizedTree
 import actors.threadpool.AtomicInteger
 import scalala.tensor.sparse.SparseVector
 import scalala.library.Library
@@ -18,6 +17,7 @@ import java.util.concurrent.ConcurrentHashMap
 import collection.JavaConversions
 import java.io.{PrintStream, BufferedOutputStream, FileOutputStream}
 import scalanlp.optimize.{RandomizedGradientCheckingFunction, CachedBatchDiffFunction}
+import scalanlp.trees.{AnnotatedLabel, BinarizedTree}
 
 /**
  * 
@@ -220,22 +220,21 @@ class CombinerFeaturizerECVisitor[L,W](f: CombinerFeaturizer[L,W], val featureCo
 }
 
 object DiscrimCombinePipeline extends CombinePipeline {
-  def trainParser(trainTrees: IndexedSeq[TreeBundle[String, String]],
-                  testTrees: IndexedSeq[TreeBundle[String, String]],
+  def trainParser(trainTrees: IndexedSeq[TreeBundle[AnnotatedLabel, String]],
+                  testTrees: IndexedSeq[TreeBundle[AnnotatedLabel, String]],
                   params: DiscrimCombinePipeline.Params) = {
     val basicParser = {
       val allTrees = testTrees.flatMap(_.treeInstances(withGold=false)).toArray ++ trainTrees.flatMap(_.treeInstances(withGold=true))
-      val (words,binary,unary) = GenerativeParser.extractCounts(allTrees)
+      val stripped = allTrees.map(_.mapLabels(_.baseAnnotatedLabel))
+      val (words,binary,unary) = GenerativeParser.extractCounts(stripped)
       val grammar = Grammar(Library.logAndNormalizeRows(binary),Library.logAndNormalizeRows(unary));
       val lexicon = new UnsmoothedLexicon(Library.logAndNormalizeRows(words))
-      val parser = new CKYChartBuilder("ROOT", lexicon, grammar, ParseChart.logProb)
-      // erase rule counts
-//      val zeroParser = new CKYChartBuilder("ROOT", new ZeroLexicon(lexicon), Grammar.zero(grammar), ParseChart.logProb)
+      val parser = new CKYChartBuilder(AnnotatedLabel.TOP, lexicon, grammar, ParseChart.logProb)
       parser
     }
 
     val allSystems = trainTrees.iterator.flatMap(_.outputs.keysIterator).toSet
-    val featurizerFactory = new StandardCombinerFeaturizerFactory(allSystems, basicParser.grammar, params.useRuleFeatures, params.useLabelFeatures)
+    val featurizerFactory = new StandardCombinerFeaturizerFactory[AnnotatedLabel, String](allSystems, basicParser.grammar, params.useRuleFeatures, params.useLabelFeatures)
 
     val featureCounter = if(params.oldWeights ne null) {
       scalanlp.util.readObject[Counter[Feature,Double]](params.oldWeights)

@@ -11,11 +11,11 @@ import scalanlp.util.Index
  *
  * @author dlwh
  */
-case class ProcessedTreebank(treebank: TreebankParams, spans: SpanParams[String]) {
+case class ProcessedTreebank(treebank: TreebankParams, spans: SpanParams[AnnotatedLabel]) {
   import spans._;
 
   lazy val trainTreesWithUnaries = transformTrees(treebank.treebank.train, trainSpans, treebank.maxLength);
-  lazy val (trainTrees,replacer) = removeUnaryChains(trainTreesWithUnaries);
+  lazy val trainTrees = trainTreesWithUnaries.map(ti => ti.copy(tree=UnaryChainRemover.removeUnaryChains(ti.tree)))
 
   lazy val devTrees = transformTrees(treebank.treebank.dev, devSpans, 60);
 
@@ -23,57 +23,41 @@ case class ProcessedTreebank(treebank: TreebankParams, spans: SpanParams[String]
 
 
   def transformTrees(portion: treebank.treebank.Portion,
-                     broker: SpanBroker[String], maxL: Int): IndexedSeq[TreeInstance[String,String]] = {
+                     broker: SpanBroker[AnnotatedLabel], maxL: Int): IndexedSeq[TreeInstance[AnnotatedLabel,String]] = {
     import treebank._;
 
     val binarizedAndTransformed = for (
       ((tree, words),index) <- portion.trees.zipWithIndex if words.length <= maxL
     ) yield {
-      val transformed = xform(tree);
-      val vertAnnotated = Trees.annotateParents(transformed,depth = verticalMarkovization);
-      val bin = binarize(vertAnnotated);
-      val horiz = Trees.markovizeBinarization(bin,horizontalMarkovization);
+      val transformed = process(tree)
       val name = portion.name +"-" + index
       val span = broker.spanForId(name)
-      TreeInstance(name,horiz,words,span)
+      TreeInstance(name,transformed,words,span)
     }
 
     binarizedAndTransformed.toIndexedSeq
-  }
-
-  def removeUnaryChains(trees: IndexedSeq[TreeInstance[String,String]]) = {
-    val chainRemover = new UnaryChainRemover[String];
-
-    val (dechained,chainReplacer) = chainRemover.removeUnaryChains(trees)
-
-    (dechained, chainReplacer)
   }
 
 }
 
 case class TreebankParams(path: File,
                           maxLength:Int = 40,
-                          binarization:String = "head",
-                          processing: String = "standard",
-                          verticalMarkovization:Int=1,
-                          horizontalMarkovization:Int=1000) {
-  def binarize = {
-    if(binarization == "xbar") Trees.xBarBinarize(_:Tree[String],left=false);
-    else if(binarization == "leftXbar") Trees.xBarBinarize(_:Tree[String],left=true);
-    else if(binarization == "head" || binarization == "collins")  Trees.headBinarize(_:Tree[String],HeadFinder.collinsHeadFinder)
-    else Trees.binarize(_:Tree[String]);
+                          binarization:String = "head") {
+  def headRules = {
+    binarization match {
+      case "xbar" | "right" => HeadFinder.right[String]
+      case "leftXbar" | "left" => HeadFinder.left[String]
+      case "head" => HeadFinder.collins
+      case _ => HeadFinder.collins
+    }
   }
+
+  val process = new StandardTreeProcessor(headRules)
 
   lazy val treebank = {
     if(path.isDirectory) Treebank.fromPennTreebankDir(path)
     else DenseTreebank.fromZipFile(path);
   }
-
-  val xform = processing match {
-    case "german" => Trees.Transforms.GermanTreebankTransform;
-    case _ => Trees.Transforms.StandardStringTransform;
-  }
-
 
 
 }
@@ -101,6 +85,8 @@ case class TreeInstance[L,+W](id: String,
                              tree: BinarizedTree[L],
                              words: Seq[W],
                              spanScorer: SpanScorer[L] = SpanScorer.identity[L]) extends Example[Tree[L],(Seq[W],SpanScorer[L])] {
+  def mapLabels(f: L=>L) = copy(tree=tree.map(f))
+
   def label = tree;
   def features = words -> spanScorer;
 }

@@ -15,15 +15,14 @@ import projections.{AnchoredRuleScorer, LabeledSpanScorer}
  */
 
 object SimpleCombinePipeline extends CombinePipeline {
-  def trainParser(trainTrees: IndexedSeq[TreeBundle[String, String]], goldTrees: IndexedSeq[TreeBundle[String, String]], params: Params) = {
+  def trainParser(trainTrees: IndexedSeq[TreeBundle[AnnotatedLabel, String]],
+                  goldTrees: IndexedSeq[TreeBundle[AnnotatedLabel, String]], params: Params) = {
     // get a basic grammar over the input tree space. we won't use it for
     // for anything other than just what rules are allowed.
     val basicParser = {
       val allTrees = goldTrees.flatMap(_.treeInstances(withGold=false)).toArray ++ trainTrees.flatMap(_.treeInstances(withGold=true))
       val (lexicon,grammar) = GenerativeParser.extractLexiconAndGrammar(allTrees)
-      // erase rule counts
-//      val zeroParser = new CKYChartBuilder("ROOT", lexicon, grammar, ParseChart.viterbi)
-      val zeroParser = new CKYChartBuilder("ROOT", new ZeroLexicon(lexicon), Grammar.zero(grammar), ParseChart.viterbi)
+      val zeroParser = new CKYChartBuilder(AnnotatedLabel.TOP, new ZeroLexicon(lexicon), Grammar.zero(grammar), ParseChart.viterbi)
       zeroParser
     }
 
@@ -32,18 +31,18 @@ object SimpleCombinePipeline extends CombinePipeline {
     def sentToScorer(s: Seq[String]) = {
       val outputs = sentToDataMap(s)
       val data = LabeledSpanExtractor.extractAnchoredRules(basicParser.grammar.labelIndex, basicParser.grammar.index, outputs.values.flatten)
-      new AnchoredRuleScorer[String](data.spanScores, data.unaryScores, data.binaryScores)
+      new AnchoredRuleScorer[AnnotatedLabel](data.spanScores, data.unaryScores, data.binaryScores)
     }
 
-    val parser = new Parser[String,String] with Serializable {
-      def bestParse(s: Seq[String], spanScorer: SpanScorer[String]) = {
+    val parser = new Parser[AnnotatedLabel,String] with Serializable {
+      def bestParse(s: Seq[String], spanScorer: SpanScorer[AnnotatedLabel]) = {
         val scorer = SpanScorer.sum(sentToScorer(s),spanScorer)
         val inside = basicParser.buildInsideChart(s, scorer)
         val outside = basicParser.buildOutsideChart(inside, scorer)
         decoder.extractBestParse(basicParser.root, basicParser.grammar, inside, outside, s, scorer)
       }
 //      val decoder = new SimpleViterbiDecoder[String,String](basicParser.grammar)
-      val decoder = MaxConstituentDecoder.simple[String,String](basicParser.grammar)
+      val decoder = MaxConstituentDecoder.simple[AnnotatedLabel,String](basicParser.grammar)
     }
     Iterator(("MaxRecall" -> parser ))
   }

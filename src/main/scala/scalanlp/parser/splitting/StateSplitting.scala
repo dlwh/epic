@@ -17,15 +17,9 @@ package scalanlp.parser.splitting
 
 
 import scalanlp.config.Configuration
-import scalanlp.trees.UnaryChainRemover.ChainReplacer
 import scalanlp.parser.ParserParams.NoParams
 import scalala.library.Numerics.logSum
 import scalanlp.parser._
-import scalanlp.trees.BinarizedTree
-import scalanlp.trees.BinaryTree
-import scalanlp.trees.NullaryTree
-import scalanlp.trees.Tree
-import scalanlp.trees.UnaryTree
 import scalanlp.parser.projections._
 
 import math.exp
@@ -37,6 +31,7 @@ import java.util.Arrays
 import scalala.tensor.dense.DenseVector
 import scalanlp.util.{Index, Encoder}
 import collection.mutable.{ArrayBuffer, BitSet}
+import scalanlp.trees._
 
 /**
  * State Splitting implements the InsideOutside/Tree Message Passing algorithm for Matsuzaki et all 2005
@@ -64,7 +59,8 @@ class StateSplitting[L,W](grammar: Grammar[L], lexicon: Lexicon[L,W]) {
   }
 
   case class Beliefs(candidates: Seq[Int], inside: Array[Double], outside: Array[Double]) {
-    def format[L](idx: Index[L]) = {
+    override def toString() = {
+      val idx = grammar.labelIndex
       "Beliefs(" + candidates.map(idx.get _) +"," + inside.mkString("{",","," }") +"," + outside.mkString("{",", ","}")+")"
     }
   }
@@ -552,16 +548,14 @@ object StateSplitting {
 
 }
 
-
-
-
 object StateSplittingPipeline extends ParserPipeline with NoParams {
-  def trainParser(trainTrees: IndexedSeq[TreeInstance[String,String]],
-                  validate: Parser[String,String]=>ParseEval.Statistics,
+  def trainParser(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel,String]],
+                  validate: Parser[AnnotatedLabel,String]=>ParseEval.Statistics,
                   params: Params) = {
 
     println("Extracting counts")
-    val (initialLex,initialProductions,initUnR) = GenerativeParser.extractCounts(trainTrees)
+    val trees = trainTrees.map(_.mapLabels(_.baseAnnotatedLabel))
+    val (initialLex,initialProductions,initUnR) = GenerativeParser.extractCounts(trees)
 
     val coarseGrammar = Grammar(Library.logAndNormalizeRows(initialProductions),
       Library.logAndNormalizeRows(initUnR))
@@ -569,11 +563,11 @@ object StateSplittingPipeline extends ParserPipeline with NoParams {
     import StateSplitting._
     val data = SplittingData(initialProductions, initUnR, initialLex)
     var iter = 0
-    for( (SplittingData(finalProd,finalUn,finalLex),logProb) <-  splitGrammar(data,trainTrees,"")) yield {
+    for( (SplittingData(finalProd,finalUn,finalLex),logProb) <-  splitGrammar(data,trainTrees,AnnotatedLabel.TOP)) yield {
       val grammar = Grammar(Library.logAndNormalizeRows(finalProd),Library.logAndNormalizeRows(finalUn))
       val lex = new SimpleLexicon(finalLex)
-      val builder = CKYChartBuilder(("",Seq.empty),lex,grammar)
-      def proj(l: (String,Seq[Int])) = l._1
+      val builder = CKYChartBuilder((AnnotatedLabel.TOP,Seq.empty),lex,grammar)
+      def proj(l: (AnnotatedLabel,Seq[Int])) = l._1
       val parser = ProjectingParser(builder,coarseGrammar,proj)
       iter += 1
       val name = if(iter == 1) {
@@ -586,78 +580,3 @@ object StateSplittingPipeline extends ParserPipeline with NoParams {
   }
 }
 
-class MultiscaleStateSplitting[L,W](g: Grammar[L], l: Lexicon[L,W], hierarchy: MultiscaleHierarchy[L]) extends StateSplitting[L,W](g,l) {
-
-  override protected def updateBeliefsInside(beliefs: Beliefs, index: Int, score: Double) {
-    val ref = hierarchy.finalRefinements(beliefs.candidates(index))
-    var ri = 0
-    var i = 0
-    while(i < beliefs.candidates.length && ri < ref.length)  {
-      if(ref(ri) == beliefs.candidates(i)) {
-        beliefs.inside(i) = score
-        ri += 1
-      }
-      i += 1
-    }
-    assert(ri == ref.length)
-  }
-
-  // quadratic. might need to fix
-  // basically, for every non-finest label, set its score to the logsum of its finest refinements
-  override protected def updateHierarchyInside(beliefs: Beliefs) {
-    var index = 0
-    val buf = new Array[Double](beliefs.candidates.size)
-    while(index < beliefs.candidates.size) {
-      val ref = hierarchy.finalRefinements(beliefs.candidates(index))
-      if(ref.nonEmpty) { // not the finest layer?
-        var ri = 0
-        var i = 0
-        while(i < beliefs.candidates.length && ri < ref.length)  {
-          if(ref(ri) == beliefs.candidates(i)) {
-            buf(ri) = beliefs.inside(i)
-            ri += 1
-          }
-          i += 1
-        }
-        beliefs.inside(index) = Numerics.logSum(buf,ri)
-      }
-      index += 1
-    }
-
-  }
-
-  override protected def updateBeliefsOutside(beliefs: Beliefs, index: Int, score: Double) {
-    val ref = hierarchy.finalRefinements(beliefs.candidates(index))
-    var ri = 0
-    var i = 0
-    while(i < beliefs.candidates.length && ri < ref.length)  {
-      if(ref(ri) == beliefs.candidates(i)) {
-        beliefs.outside(i) = score
-        ri += 1
-      }
-      i += 1
-    }
-    assert(ri == ref.length)
-  }
-
-  override protected def updateHierarchyOutside(beliefs: Beliefs) {
-    var index = 0
-    val buf = new Array[Double](beliefs.candidates.size)
-    while(index < beliefs.candidates.size) {
-      val ref = hierarchy.finalRefinements(beliefs.candidates(index))
-      if(ref.nonEmpty) { // not the finest layer?
-        var ri = 0
-        var i = 0
-        while(i < beliefs.candidates.length && ri < ref.length)  {
-          if(ref(ri) == beliefs.candidates(i)) {
-            buf(ri) = beliefs.outside(i)
-            ri += 1
-          }
-          i += 1
-        }
-        beliefs.outside(index) = Numerics.logSum(buf,ri)
-      }
-      index += 1
-    }
-  }
-}

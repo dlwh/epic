@@ -4,12 +4,9 @@ package scalanlp.parser
 import java.util.Arrays
 import projections.{AnchoredRuleScorerFactory, GrammarProjections, AnchoredRulePosteriorScorerFactory, ProjectionIndexer}
 import scalanlp.trees._
-import scalanlp.parser.ParserParams.NoParams
-import scalanlp.trees.UnaryChainRemover.ChainReplacer
 import scalanlp.collection.mutable.TriangularArray
 import scalanlp.util._
 import scalala.library.Numerics._
-import scalala.library.Library
 
 
 /**
@@ -30,7 +27,7 @@ trait ChartDecoder[C,F,W] extends Serializable{
  * Tries to extract a tree that maximizes log score.
  */
 @SerialVersionUID(1)
-class ViterbiDecoder[C,F, W](val indexedProjections: ProjectionIndexer[C,F]) extends ChartDecoder[C,F,W] with Serializable {
+class ViterbiDecoder[C, F, W](val indexedProjections: ProjectionIndexer[C,F]) extends ChartDecoder[C,F,W] with Serializable {
 
   override def extractBestParse(root: F, grammar: Grammar[F],
                                 inside: ParseChart[F],

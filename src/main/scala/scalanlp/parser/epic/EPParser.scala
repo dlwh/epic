@@ -2,12 +2,13 @@ package scalanlp.parser
 package epic
 
 import scalala.tensor.dense.DenseVector
+import scalanlp.trees.BinarizedTree
 
 /**
+ * Parser that runs EP using the EPInference object and extracts a parse
  *
  * @author dlwh
  */
-
 class EPParser[L,W](zeroParser: SimpleChartParser[L,L,W],
                     inference: EPInference[TreeInstance[L,W], SpanScorerFactor[L,W]]) extends Parser[L,W] with Serializable {
   def bestParse(s: Seq[W], spanScorer: SpanScorer[L]) = {
@@ -30,7 +31,8 @@ object EPParser {
   def fromChartParsers[L,W](coarseParser: SimpleChartParser[L, L, W], parsers: (SimpleChartParser[L,_,W])*) = {
     val infs = parsers.map{ p => 
       val pp = p.asInstanceOf[SimpleChartParser[L, AnyRef,  W]]
-      new LatentParserInference(coarseParser.builder.withCharts(ParseChart.logProb),
+      new LatentParserInference({(a:BinarizedTree[L],b:Seq[W])=>a},
+        coarseParser.builder.withCharts(ParseChart.logProb),
         pp.builder.withCharts(ParseChart.logProb),
         pp.projections)
     }

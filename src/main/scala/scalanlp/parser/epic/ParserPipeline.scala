@@ -4,14 +4,11 @@ import scalanlp.optimize.FirstOrderMinimizer.OptParams
 import scalanlp.parser.{Parser, TreeInstance}
 import scalanlp.parser.ParseEval.Statistics
 import scalala.tensor.dense.DenseVector
-import java.io.File
 import scalanlp.optimize.{RandomizedGradientCheckingFunction, BatchDiffFunction, FirstOrderMinimizer, CachedBatchDiffFunction}
+import scalanlp.trees.AnnotatedLabel
 
-/**
- * Trains a single parser from a single model.
- */
 object ParserPipeline extends scalanlp.parser.ParserPipeline {
-  case class Params(modelFactory: ParserExtractableModelFactory[String,String],
+  case class Params(modelFactory: ParserExtractableModelFactory[AnnotatedLabel,String],
                     opt: OptParams,
                     iterationsPerEval: Int = 50,
                     maxIterations: Int = 1002,
@@ -19,7 +16,8 @@ object ParserPipeline extends scalanlp.parser.ParserPipeline {
                     randomize: Boolean = false);
   protected val paramManifest = manifest[Params]
 
-  def trainParser(trainTrees: IndexedSeq[TreeInstance[String, String]], validate: (Parser[String, String]) => Statistics, params: Params) = {
+  def trainParser(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]],
+                  validate: (Parser[AnnotatedLabel, String]) => Statistics, params: Params) = {
     import params._
 
     val model = modelFactory.make(trainTrees)

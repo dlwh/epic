@@ -16,14 +16,12 @@ package scalanlp.parser;
 */
 
 
-
-import scalanlp.trees.UnaryChainRemover.ChainReplacer
-import scalanlp.parser.ParserParams.NoParams
-
+import projections.GrammarProjections
 import scalanlp.trees._;
 
 import scalala.tensor.Counter2
 import scalala.library.Library
+import scalanlp.parser.ParserParams.{BaseParser, NoParams}
 
 
 object GenerativeParser {
@@ -35,7 +33,7 @@ object GenerativeParser {
     SimpleChartParser(builder);
   }
 
-  def extractLexiconAndGrammar[W](data: TraversableOnce[TreeInstance[String,W]]) = {
+  def extractLexiconAndGrammar[L, W](data: TraversableOnce[TreeInstance[L,W]]) = {
     val (wordCounts,binaryProductions,unaryProductions) = extractCounts(data);
     val lexicon = new SimpleLexicon(wordCounts);
     (lexicon,Grammar(Library.logAndNormalizeRows(binaryProductions),Library.logAndNormalizeRows(unaryProductions)));
@@ -66,14 +64,34 @@ object GenerativeParser {
   }
 }
 
-object GenerativePipeline extends ParserPipeline with NoParams {
-  def trainParser(trainTrees: IndexedSeq[TreeInstance[String,String]],
-                  validate: Parser[String,String]=>ParseEval.Statistics,
+object GenerativePipeline extends ParserPipeline {
+  case class Params(baseParser: BaseParser)
+  protected val paramManifest = manifest[Params]
+
+  def trainParser(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel,String]],
+                  validate: Parser[AnnotatedLabel,String]=>ParseEval.Statistics,
                   config: Params) = {
-    val (words,binary,unary) = GenerativeParser.extractCounts(trainTrees);
+    val xbar = config.baseParser.xbarParser(trainTrees)
+    val trees = trainTrees.map(_.mapLabels(_.clearFeatures))
+    val (words,binary,unary) = GenerativeParser.extractCounts(trees);
     val grammar = Grammar(Library.logAndNormalizeRows(binary),Library.logAndNormalizeRows(unary));
     val lexicon = new SignatureLexicon(words, EnglishWordClassGenerator, 5);
-    val parser = SimpleChartParser(CKYChartBuilder("",lexicon,grammar).withCharts(ParseChart.logProb));
+    val projections = GrammarProjections(xbar.grammar, grammar, {(_:AnnotatedLabel).baseAnnotatedLabel})
+    val builder = CKYChartBuilder(AnnotatedLabel.TOP, lexicon, grammar).withCharts(ParseChart.logProb)
+    val parser = SimpleChartParser(builder, projections);
     Iterator.single(("Gen",parser));
+  }
+}
+
+
+object XBarPipeline extends ParserPipeline {
+  case class Params(baseParser: BaseParser)
+  protected val paramManifest = manifest[Params]
+
+  def trainParser(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel,String]],
+                  validate: Parser[AnnotatedLabel,String]=>ParseEval.Statistics,
+                  config: Params) = {
+    val xbar = config.baseParser.xbarParser(trainTrees)
+    Iterator.single(("xbar",SimpleChartParser(xbar)));
   }
 }

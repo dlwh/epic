@@ -8,56 +8,42 @@ import scalanlp.trees._
  * @author dlwh
  */
 trait ParserTestHarness {
-  def getTrainTreesAndReplacer(binarization:(Tree[String]=>BinarizedTree[String]) = (Trees.xBarBinarize(_:Tree[String],false)),
-                               maxLength:Int= 15) = {
-    val treebank = {
-      TstTreebank.treebank;
-    }
-    val trees = massageTrees(treebank.train.trees,binarization,maxLength);
-    removeUnaryChains(trees);
+  def getTrainTrees(maxLength:Int= 15) = {
+    massageTrees(TstTreebank.treebank.train.trees,  maxLength).map(ti => ti.copy(tree=UnaryChainRemover.removeUnaryChains(ti.tree)))
   }
 
-  def getTestTrees(binarization:(Tree[String]=>BinarizedTree[String]) = (Trees.xBarBinarize(_:Tree[String],false)),
-                   maxLength:Int= 15) = {
-    val treebank = {
-      TstTreebank.treebank;
-    }
-    massageTrees(treebank.test.trees,binarization,maxLength);
+  def getTestTrees(maxLength:Int= 15) = {
+    massageTrees(TstTreebank.treebank.test.trees, maxLength);
   }
 
-  def removeUnaryChains(trees: IndexedSeq[TreeInstance[String,String]]) = {
-    val chainRemover = new UnaryChainRemover[String];
-
-    val (dechained,chainReplacer) = chainRemover.removeUnaryChains(trees)
-
-    (dechained, chainReplacer)
-  }
-
-  def massageTrees(trees: Iterator[(Tree[String],Seq[String])],
-                   binarize:(Tree[String]=>BinarizedTree[String]) = (Trees.xBarBinarize(_:Tree[String],false)),
-                   maxLength:Int=15) = {
-    val xform = Trees.Transforms.StandardStringTransform;
-    val trainTrees = ArrayBuffer() ++= (for( (tree,words) <- trees.filter(_._2.length <= maxLength))
-    yield TreeInstance("",binarize(xform(tree)),words));
+  def massageTrees(trees: Iterator[(Tree[String], Seq[String])], maxLength:Int=15) = {
+    val trainTrees = ArrayBuffer() ++= (for( (tree, words) <- trees.filter(_._2.length <= maxLength))
+    yield TreeInstance("", transform(tree), words));
 
     trainTrees
   }
 
 
-  def evalParser(testTrees: IndexedSeq[TreeInstance[String,String]],parser: Parser[String,String]) = {
-    ParseEval.evaluate(testTrees,parser, ParserTestHarness.unaryReplacer);
+  def evalParser(testTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]], parser: Parser[AnnotatedLabel, String]) = {
+    ParseEval.evaluate(testTrees, parser, AnnotatedLabelChainReplacer, asString = {(_:AnnotatedLabel).baseLabel})
   }
 
-
+  val transform = new StandardTreeProcessor(HeadFinder.left)
 }
 
 object ParserTestHarness extends ParserTestHarness {
-  val ((simpleLexicon,simpleGrammar), unaryReplacer) = {
-    val (trees,replacer) = getTrainTreesAndReplacer();
-    (GenerativeParser.extractLexiconAndGrammar(trees.iterator),replacer);
+  val (simpleLexicon, simpleGrammar) = {
+    try {
+    val trees = getTrainTrees();
+    GenerativeParser.extractLexiconAndGrammar(trees.iterator.map(_.mapLabels(_.baseAnnotatedLabel)))
+    } catch {
+      case e => e.printStackTrace(); throw e
+    }
   }
-  val simpleParser: SimpleChartParser[String,String,String] = {
-    val chartBuilder = new CKYChartBuilder[ParseChart.ViterbiParseChart, String, String]("", simpleLexicon, simpleGrammar, ParseChart.viterbi)
+  val simpleParser: SimpleChartParser[AnnotatedLabel, AnnotatedLabel, String] = {
+    val chartBuilder = new CKYChartBuilder[ParseChart.ViterbiParseChart,
+      AnnotatedLabel,
+      String](AnnotatedLabel.TOP, simpleLexicon, simpleGrammar, ParseChart.viterbi)
     SimpleChartParser(chartBuilder);
   }
 }

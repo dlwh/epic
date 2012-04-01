@@ -11,6 +11,7 @@ import scalala.library.Library
 import scalanlp.trees._
 import java.io.File
 import scalala.tensor.Counter
+import scalala.tensor.mutable.Counter2
 
 class KMModel[L,L3,W](featurizer: Featurizer[L3,W],
                       root: L3,
@@ -111,27 +112,22 @@ case class DiscParserInference[L,L2,W](ann: (BinarizedTree[L],Seq[W])=>Binarized
 
 }
 
-case class KMModelFactory(parser: ParserParams.BaseParser[String],
+case class KMModelFactory(baseParser: ParserParams.BaseParser,
                           pipeline: KMPipeline,
-                          oldWeights: File = null) extends ParserModelFactory[String, String] {
-  type MyModel = KMModel[String,AnnotatedLabel,String]
+                          oldWeights: File = null) extends ParserModelFactory[AnnotatedLabel, String] {
+  type MyModel = KMModel[AnnotatedLabel,AnnotatedLabel,String]
 
-  def make(trainTrees: IndexedSeq[TreeInstance[String, String]]):MyModel = {
-    val transformed: IndexedSeq[TreeInstance[AnnotatedLabel, String]] = trainTrees.par.map { ti =>
+  def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]]):MyModel = {
+    val transformed = trainTrees.par.map { ti =>
       val t = pipeline(ti.tree,ti.words)
       TreeInstance(ti.id,t,ti.words)
     }.seq.toIndexedSeq
 
     val (initLexicon,initBinaries,initUnaries) = this.extractBasicCounts(transformed)
-    val (xbarLexicon,xbarBinaries,xbarUnaries) = this.extractBasicCounts(trainTrees)
 
-    val xbarParser = parser.optParser getOrElse {
-      val grammar = Grammar(Library.logAndNormalizeRows(xbarBinaries),Library.logAndNormalizeRows(xbarUnaries));
-      val lexicon = new SimpleLexicon(xbarLexicon);
-      new CKYChartBuilder[LogProbabilityParseChart,String,String]("",lexicon,grammar,ParseChart.logProb);
-    }
+    val xbarParser = baseParser.xbarParser(trainTrees)
     val grammar = Grammar(Library.logAndNormalizeRows(initBinaries),Library.logAndNormalizeRows(initUnaries));
-    val indexedProjections = GrammarProjections(xbarParser.grammar,grammar,{(_:AnnotatedLabel).label})
+    val indexedProjections = GrammarProjections(xbarParser.grammar,grammar,{(_:AnnotatedLabel).baseAnnotatedLabel})
 
     val gen = new WordShapeFeaturizer(Library.sum(initLexicon))
     def labelFlattener(l: AnnotatedLabel) = {
@@ -139,6 +135,10 @@ case class KMModelFactory(parser: ParserParams.BaseParser[String],
       basic map {IndicatorFeature(_)}
     }
     val feat = new SumFeaturizer[AnnotatedLabel,String](new RuleFeaturizer(labelFlattener _), new LexFeaturizer(gen, labelFlattener _))
+    val xbarLexicon = Counter2[AnnotatedLabel, String, Double]()
+    for( (t,w,v) <- initLexicon.triplesIterator) {
+      xbarLexicon(t.baseAnnotatedLabel, w) += v
+    }
 
     val openTags = determineOpenTags(xbarLexicon, indexedProjections)
     val knownTagWords = determineKnownTags(xbarParser.lexicon, indexedProjections)
@@ -149,7 +149,7 @@ case class KMModelFactory(parser: ParserParams.BaseParser[String],
     } else {
       Counter[Feature,Double]()
     }
-    new KMModel[String,AnnotatedLabel,String](feat, transformed.head.label.label, pipeline, indexedProjections, xbarParser, knownTagWords, openTags, closedWords, {featureCounter.get(_)})
+    new KMModel[AnnotatedLabel,AnnotatedLabel,String](feat, transformed.head.label.label, pipeline, indexedProjections, xbarParser, knownTagWords, openTags, closedWords, {featureCounter.get(_)})
   }
 
 }

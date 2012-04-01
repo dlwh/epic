@@ -10,23 +10,24 @@ import scalanlp.tensor.sparse.OldSparseVector
 import scalanlp.collection.mutable.{OpenAddressHashArray, TriangularArray}
 import scalanlp.parser.{SpanScorer, ParseChart, CKYChartBuilder, Grammar}
 import collection.mutable.BitSet
+import scalanlp.trees.AnnotatedLabel
 
 /**
  * Not thread-safe... maybe
  * @author dlwh
  */
-class StandardCombinerFeaturizer(grammar: Grammar[String],
-                                 tb: TreeBundle[String, String],
-                                 useRuleFeatures: Boolean,
-                                 useLabelFeatures: Boolean,
-                                 featureIndex: Index[Feature],
-                                 systemIndex: Index[String],
-                                 systemFeatures: Array[Int],
-                                // SystemIndex -> Rule Index -> FeatureIndex
-                                 ruleIndex: Array[Array[Int]],
-                                 // SystemIndex -> Label Index -> FeatureIndex
-                                 labelIndex: Array[Array[Int]],
-                                 topLabelIndex: Array[Array[Int]]) extends CombinerFeaturizer[String,String] {
+class StandardCombinerFeaturizer[L,W](grammar: Grammar[L],
+                                      tb: TreeBundle[L, W],
+                                      useRuleFeatures: Boolean,
+                                      useLabelFeatures: Boolean,
+                                      featureIndex: Index[Feature],
+                                      systemIndex: Index[String],
+                                      systemFeatures: Array[Int],
+                                      // SystemIndex -> Rule Index -> FeatureIndex
+                                      ruleIndex: Array[Array[Int]],
+                                      // SystemIndex -> Label Index -> FeatureIndex
+                                      labelIndex: Array[Array[Int]],
+                                      topLabelIndex: Array[Array[Int]]) extends CombinerFeaturizer[L,W] {
 
   // yuck
   val SOME = 0 // some system has it (max over values if they're not all 1)
@@ -146,10 +147,10 @@ class StandardCombinerFeaturizer(grammar: Grammar[String],
 
 case class LabelFeature[L](l: L) extends Feature
 
-class StandardCombinerFeaturizerFactory(systems: Set[String],
-                                        grammar: Grammar[String],
-                                        useRuleFeatures: Boolean,
-                                        useLabelFeatures: Boolean) extends CombinerFeaturizerFactory[String, String] {
+class StandardCombinerFeaturizerFactory[L,W](systems: Set[String],
+                                             grammar: Grammar[L],
+                                             useRuleFeatures: Boolean,
+                                             useLabelFeatures: Boolean) extends CombinerFeaturizerFactory[L, W] {
   val systemIndex = Index[String]()
   systemIndex.index("SOME")
   systemIndex.index("COUNT")
@@ -190,7 +191,7 @@ class StandardCombinerFeaturizerFactory(systems: Set[String],
     }
   }
 
-  def featurizerFor(tb: TreeBundle[String, String]):CombinerFeaturizer[String,String] = {
+  def featurizerFor(tb: TreeBundle[L, W]):CombinerFeaturizer[L,W] = {
     // make a coarse filter:
 
     new StandardCombinerFeaturizer(grammar,

@@ -9,7 +9,6 @@ import scalanlp.parser._
 import collection.immutable.IndexedSeq
 import scalanlp.optimize.FirstOrderMinimizer.OptParams
 import scalanlp.util._
-import scalanlp.trees.UnaryChainRemover.ChainReplacer
 import collection.mutable.ArrayBuffer
 import collection._
 
@@ -56,16 +55,16 @@ trait CombinePipeline {
 
     val treebank = params.treebank.treebank
 
-    val process = Trees.Transforms.StandardStringTransform andThen {Trees.headBinarize(_, HeadFinder.collinsHeadFinder)} andThen {(_:BinarizedTree[String]).map(_.intern)}
+    val process = new StandardTreeProcessor()
 
-    val inputTrees: IndexedSeq[TreeBundle[String, String]] = {
+    val inputTrees: IndexedSeq[TreeBundle[AnnotatedLabel, String]] = {
       for {
         (section:String) <- trainSections.toIndexedSeq
         tb <- readCandidatesFromSection(section, acceptableSystems, dir, kbestDir, k, treebank, process, maxLength)
       } yield tb
     }
 
-    val testTrees: IndexedSeq[TreeBundle[String, String]] = {
+    val testTrees: IndexedSeq[TreeBundle[AnnotatedLabel, String]] = {
       val section = if(actualTest) params.testSection else params.devSection
       for {
         tb <- readCandidatesFromSection(section, acceptableSystems, dir, kbestDir, k, treebank, process, maxLength)
@@ -74,19 +73,17 @@ trait CombinePipeline {
 
     // Remove unary chains and remember the replacer.
     // we can use system output on test sentences, just not gold output!
-    val chainRemover = new UnaryChainRemover[String](identity)
-    val chainReplacer = chainRemover.removeUnaryChains(testTrees.flatMap(_.treeInstances(withGold = false)))._2
-    val fixedTrain = inputTrees.map(_.mapTrees({chainRemover.justRemoveChains _}, mapGold=true))
-    val fixedTest = testTrees.map(_.mapTrees({chainRemover.justRemoveChains _}, mapGold=false)  )
+    val fixedTrain = inputTrees.map(_.mapTrees({UnaryChainRemover.removeUnaryChains _}, mapGold=true))
+    val fixedTest = testTrees.map(_.mapTrees({UnaryChainRemover.removeUnaryChains _}, mapGold=false)  )
 
-    // train the parse, remove the gold trees, just in case.
-    val parsers = trainParser(fixedTrain, fixedTest.map(_.copy[String,String](goldTree=null)), params);
+    // train the parse, removing the gold trees, just in case.
+    val parsers = trainParser(fixedTrain, fixedTest.map(_.copy(goldTree=null)), params);
 
     for((name,parser) <- parsers) {
       println("Parser " + name);
 
       println("Evaluating Parser...");
-      val stats = evalParser(fixedTest.map(_.goldInstance),parser,name,chainReplacer);
+      val stats = evalParser(fixedTest.map(_.goldInstance),parser,name);
       import stats._;
       println("Eval finished. Results:");
       println( "P: " + precision + " R:" + recall + " F1: " + f1 +  " Ex:" + exact + " Tag Accuracy: " + tagAccuracy);
@@ -104,10 +101,10 @@ trait CombinePipeline {
    * The main point of entry for implementors. Should return a sequence
    * of parsers
    */
-  def trainParser(trainTrees: IndexedSeq[TreeBundle[String,String]],
-                  goldTrees: IndexedSeq[TreeBundle[String,String]],
+  def trainParser(trainTrees: IndexedSeq[TreeBundle[AnnotatedLabel,String]],
+                  goldTrees: IndexedSeq[TreeBundle[AnnotatedLabel,String]],
 //                  validate: Parser[String,String]=>ParseEval.Statistics,
-                  params: Params):Iterator[(String,Parser[String,String])];
+                  params: Params):Iterator[(String,Parser[AnnotatedLabel,String])];
 
 
 
@@ -126,14 +123,14 @@ trait CombinePipeline {
   // helper methods
 
 
-  private def readCandidatesFromSection(section: String,
-                                        parsers: Set[String],
-                                        dir: File,
-                                        kbestDir: File,
-                                        k: Int,
-                                        tb: Treebank[String],
-                                        process: Tree[String]=>BinarizedTree[String],
-                                        maxLength: Int):Iterable[TreeBundle[String,String]] = {
+  private def readCandidatesFromSection[L](section: String,
+                                           parsers: Set[String],
+                                           dir: File,
+                                           kbestDir: File,
+                                           k: Int,
+                                           tb: Treebank[String],
+                                           process: Tree[String]=>BinarizedTree[L],
+                                           maxLength: Int):Iterable[TreeBundle[L,String]] = {
     val filesToRead = for {
       f <- dir.listFiles() ++ {if(kbestDir ne null) kbestDir.listFiles() else Iterable.empty}
       if f.getName.startsWith("wsj" + section)
@@ -264,9 +261,9 @@ trait CombinePipeline {
   }
 
 
-  def evalParser(testTrees: IndexedSeq[TreeInstance[String,String]],
-                 parser: Parser[String,String], name: String, chainReplacer: ChainReplacer[String]):ParseEval.Statistics = {
-    val stats = ParseEval.evaluateAndLog[String](testTrees,parser,name,chainReplacer);
+  def evalParser(testTrees: IndexedSeq[TreeInstance[AnnotatedLabel,String]],
+                 parser: Parser[AnnotatedLabel,String], name: String):ParseEval.Statistics = {
+    val stats = ParseEval.evaluateAndLog[AnnotatedLabel](testTrees,parser,name,AnnotatedLabelChainReplacer);
     stats
   }
 

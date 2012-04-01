@@ -1,6 +1,7 @@
 package scalanlp.trees;
+
 /*
- Copyright 2010 David Hall
+ Copyright 2012 David Hall
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -164,65 +165,44 @@ case class NullaryTree[+L](l: L)(span: Span) extends Tree[L](l,IndexedSeq.empty)
 }
 
 object Trees {
-  def binarize[L](tree: Tree[L], relabel: (L,L)=>L, left:Boolean=false):BinarizedTree[L] = tree match {
+
+  def binarize[L](tree: Tree[L],
+                  makeIntermediate: L=>L,
+                  headFinder: HeadFinder[L]):BinarizedTree[L] = tree match {
     case Tree(l, Seq()) => NullaryTree(l)(tree.span)
-    case Tree(l, Seq(oneChild)) => UnaryTree(l,binarize(oneChild,relabel))(tree.span);
-    case Tree(l, Seq(leftChild,rightChild)) => 
-      BinaryTree(l,binarize(leftChild,relabel),binarize(rightChild,relabel))(tree.span);
-    case Tree(l, Seq(leftChild, otherChildren@ _*)) if left =>
-      val newLeftChild = binarize(leftChild,relabel);
-      val newRightLabel = relabel(l,leftChild.label);
-      val newRightChildSpan = Span(newLeftChild.span.end,tree.span.end);
-      val newRightChild = binarize(Tree(newRightLabel,otherChildren.toIndexedSeq)(newRightChildSpan), relabel);
-      BinaryTree(l, newLeftChild, newRightChild)(tree.span)
-    case Tree(l, children) => // right binarization
-      val newRightChild = binarize(children.last,relabel);
-      val newLeftLabel = relabel(l,newRightChild.label);
-      val newLeftChildSpan = Span(tree.span.start,newRightChild.span.start)
-      val newLeftChild = binarize(Tree(newLeftLabel,children.take(children.length-1))(newLeftChildSpan), relabel);
-      BinaryTree(l, newLeftChild, newRightChild)(tree.span)
+    case Tree(l, Seq(oneChild)) => UnaryTree(l,binarize(oneChild, makeIntermediate, headFinder))(tree.span);
+    case Tree(l, Seq(leftChild,rightChild)) =>
+      BinaryTree(l,binarize(leftChild, makeIntermediate, headFinder),binarize(rightChild, makeIntermediate, headFinder))(tree.span);
+    case Tree(l, children) =>
+      val headChildIndex = headFinder.findHeadChild(tree)
+      val binarized = children.map(binarize(_, makeIntermediate, headFinder))
+      val headChild = binarized(headChildIndex)
+      val intermediate = makeIntermediate(l)
+      // fold in right arguments
+      // newArg is hthe next right child
+      val right = binarized.drop(headChildIndex+1).foldLeft(headChild){ (tree,newArg) =>
+        BinaryTree(intermediate,tree,newArg)(Span(tree.span.start,newArg.span.end))
+      }
+      // now fold in left args
+      val fullyBinarized = binarized.take(headChildIndex).foldRight(right){(newArg,tree) =>
+        BinaryTree(intermediate,newArg,tree)(Span(newArg.span.start,tree.span.end))
+      }
+      fullyBinarized.relabelRoot(_ => l)
   }
 
-  def headBinarize(tree: Tree[String], headFinder: HeadFinder[String]):BinarizedTree[String] = tree match {
-    case Tree(l, Seq()) => NullaryTree(l)(tree.span)
-    case Tree(l, Seq(oneChild)) => UnaryTree(l,headBinarize(oneChild,headFinder))(tree.span);
-    case Tree(l, Seq(leftChild,rightChild)) =>
-      BinaryTree(l,headBinarize(leftChild,headFinder),headBinarize(rightChild,headFinder))(tree.span);
-    case Tree(l, children) =>
-      val headChildIndex = headFinder.findHeadChild(tree, identity[String] _)
-      val binarizedLabel = "@" + l
-      val headBinarized = children.map(headBinarize(_, headFinder))
-      val headChild = headBinarized(headChildIndex)
-      // fold in right arguments
-      val right = headBinarized.drop(headChildIndex+1).foldLeft(headChild)((tree,newArg) => BinaryTree(binarizedLabel,tree,newArg)(Span(tree.span.start,newArg.span.end)))
-      // now fold in left args
-      val fullyBinarized = headBinarized.take(headChildIndex).foldRight(right)((newArg,tree) => BinaryTree(binarizedLabel,newArg,tree)(Span(newArg.span.start,tree.span.end)))
-      val finalTree = fullyBinarized.relabelRoot(_ => l)
-      finalTree
+  def binarize(tree: Tree[String], headFinder: HeadFinder[String] = HeadFinder.collins):BinarizedTree[String] = {
+    def stringBinarizer(currentLabel: String) = {
+      if(currentLabel.startsWith("@")) currentLabel
+      else "@" + currentLabel
+    }
+
+    binarize[String](tree, stringBinarizer _, headFinder)
   }
+
 
   def deannotate(tree: Tree[String]):Tree[String] = tree.map(deannotateLabel _)
   def deannotate(tree: BinarizedTree[String]):BinarizedTree[String] = tree.map(deannotateLabel _)
   def deannotateLabel(l: String) = l.takeWhile(c => c != '^' && c != '>')
-
-  def markovizeBinarization(tree: BinarizedTree[String], order: Int):BinarizedTree[String] = {
-    tree.map{ l =>
-      val headIndex = l.indexOf('>')
-      if(headIndex < 0) l
-      else {
-        val head = l.slice(0,headIndex+1);
-        // find the n'th from the back.
-        var i = l.length-1;
-        var n = 0;
-        while(i >= 0 && n < order) {
-          if(l.charAt(i) == '_') n+=1;
-          i-=1;
-        }
-        if(i <= headIndex) l
-        else head + l.substring(i+1);
-      }
-    }
-  }
 
   /**
    * Adds horizontal markovization to an already binarized tree with no markovization
@@ -253,12 +233,6 @@ object Trees {
     addHorizontalMarkovization(tree,order,join,(_:String).startsWith("@"))
   }
 
-  private def stringBinarizer(currentLabel: String, append: String) = {
-    val head = if(currentLabel(0) != '@') '@' + currentLabel + ">" else currentLabel
-    val r = head + "_" + append
-    r
-  }
-  def binarize(tree: Tree[String]):BinarizedTree[String] = binarize[String](tree, stringBinarizer _ );
 
   def debinarize[L](tree: Tree[L], isBinarized: L=>Boolean):Tree[L] = {
     val l = tree.label;
@@ -276,20 +250,6 @@ object Trees {
 
   def debinarize(tree: Tree[String]):Tree[String] = debinarize(tree, (x:String) => x.startsWith("@"));
 
-  def binarizeProjection(s: String) = {
-    var end = s.indexOf(">")-1
-    val endThingy = s.indexOf("^");
-    if(end < 0) end = s.length;
-    if(endThingy < end && endThingy >= 0) end = endThingy;
-    s.slice(0,end);
-  }
-
-  private def xbarStringBinarizer(currentLabel: String, append:String) = {
-    if(currentLabel.startsWith("@")) currentLabel
-    else "@" + currentLabel
-  }
-  def xBarBinarize(tree: Tree[String], left: Boolean = false) = binarize[String](tree,xbarStringBinarizer, left);
-
   def annotateParents[L](tree: Tree[L], join: (L,L)=>L, depth: Int, history: List[L] = List.empty):Tree[L] = {
     if(depth == 0) tree
     else {
@@ -300,19 +260,29 @@ object Trees {
 
   def annotateParents(tree: Tree[String], depth: Int):Tree[String] = annotateParents(tree,{(x:String,b:String)=>x + '^' + b},depth);
 
-  def annotateParentsBinarized[L](tree: BinarizedTree[L], join: (L,L)=>L, keepParent: L=>Boolean, depth: Int):BinarizedTree[L] = {
+  /**
+   * Adds parent-markovization to an already binarized tree. Also handles the unary layering we do by ignoring
+   * identity unary transitions in the history
+   * @param tree the tree
+   * @param join join: join two elements of the history into a single label. (child,parent)=>newChild
+   * @param isIntermediate is this an intermediate symbol? Determines whether or not we should include the immediate parent of this label in the history
+   * @param depth how much history to keep
+   * @tparam L type of the tree
+   * @return
+   */
+  def annotateParentsBinarized[L](tree: BinarizedTree[L], join: (L,L)=>L, isIntermediate: L=>Boolean, depth: Int):BinarizedTree[L] = {
     def rec(tree: BinarizedTree[L], history: List[L] = List.empty):BinarizedTree[L] = {
       tree match {
         //invariant: history is the (depth) non-intermediate symbols, where we remove unary-identity transitions
         case BinaryTree(label, t1, t2) =>
-          val newLabel = if(keepParent(label)) history.take(depth-1).foldLeft(label)(join) else history.drop(1).foldLeft(label)(join)
-          val newHistory = if(keepParent(label)) (label :: history) take depth else history
+          val newLabel = if(!isIntermediate(label)) history.take(depth-1).foldLeft(label)(join) else history.drop(1).foldLeft(label)(join)
+          val newHistory = if(!isIntermediate(label)) (label :: history) take depth else history
           val lchild = rec(t1,newHistory)
           val rchild = rec(t2,newHistory)
           BinaryTree(newLabel, lchild, rchild)(tree.span)
         case UnaryTree(label, child) =>
-          val newLabel = if(keepParent(label)) history.take(depth-1).foldLeft(label)(join) else history.drop(1).foldLeft(label)(join)
-          val newHistory = if(keepParent(label) && label != child.label) (label :: history) take depth else history
+          val newLabel = if(!isIntermediate(label)) history.take(depth-1).foldLeft(label)(join) else history.drop(1).foldLeft(label)(join)
+          val newHistory = if(!isIntermediate(label) && label != child.label) (label :: history) take depth else history
           UnaryTree(newLabel,rec(child,newHistory))(tree.span)
         case NullaryTree(label) =>
           val newLabel = if(history.head == label) history.reduceLeft(join) else history.take(depth-1).foldLeft(label)(join)
@@ -324,7 +294,7 @@ object Trees {
   }
 
   def annotateParentsBinarized(tree: BinarizedTree[String], depth: Int):BinarizedTree[String] = {
-    annotateParentsBinarized(tree,{(x:String,b:String)=>x + '^' + b},!(_:String).startsWith("@"),depth)
+    annotateParentsBinarized(tree,{(x:String,b:String)=>x + '^' + b},(_:String).startsWith("@"),depth)
   };
 
   object Transforms {
@@ -364,28 +334,12 @@ object Trees {
       }
     }
 
-    class StupidLabelRemover[T](labels: Set[String] = Set("EDITED"))(implicit lens: Lens[T,String]) extends (Tree[T]=>Tree[T]) {
-      def apply(t: Tree[T]):Tree[T] = {
-        def rec(t: Tree[T]):Seq[Tree[T]] = {
-          val newChildren = t.children.flatMap(rec)
-          if(labels.contains(lens.get(t.label))) {
-            newChildren
-          } else {
-            Seq(new Tree(t.label,children=newChildren)(t.span))
-          }
-        }
-        rec(t).head
-      }
-    }
-
-
     object StandardStringTransform extends (Tree[String]=>Tree[String]) {
       private val ens = new EmptyNodeStripper[String];
       private val xox = new XOverXRemover[String];
-      private val fns = new FunctionNodeStripper[String];
-      private val stupid = new StupidLabelRemover[String]
+//      private val fns = new FunctionNodeStripper[String];
       def apply(tree: Tree[String]): Tree[String] = {
-        xox(stupid(fns(ens(tree).get))) map (_.intern);
+        xox(ens(tree).get) map (_.intern);
       }
     }
 
@@ -393,13 +347,13 @@ object Trees {
       private val ens = new EmptyNodeStripper[T]
       private val xox = new XOverXRemover[T]
       private val fns = new FunctionNodeStripper[T]
-      private val stupid = new StupidLabelRemover[T]
 
       def apply(tree: Tree[T]) = {
-        xox(stupid(fns(ens(tree).get))) map ( l => lens.set(l,lens.get(l).intern));
+        xox(fns(ens(tree).get)) map ( l => lens.set(l,lens.get(l).intern));
       }
     }
 
+    /*
     object GermanTreebankTransform extends (Tree[String]=>Tree[String]) {
       private val ens = new EmptyNodeStripper;
       private val xox = new XOverXRemover[String];
@@ -415,6 +369,10 @@ object Trees {
         tree.map(_.replaceAll("\\-\\*T.\\*",""))
       }
     }
+    */
 
   }
+
+
+
 }

@@ -12,8 +12,13 @@ class ReplGrammar(treebankPath: String, isDenseTreebank:Boolean=true, binarizati
   else Treebank.fromPennTreebankDir(new java.io.File(treebankPath));
 
   val binarize = {
-    if(binarizationKind == "xbar") Trees.xBarBinarize(_:Tree[String],false);
-    else Trees.binarize(_:Tree[String]);
+    val headRules = binarizationKind match {
+      case "xbar" | "right" => HeadFinder.right[String]
+      case "leftXbar" | "left" => HeadFinder.left[String]
+      case "head" => HeadFinder.collins
+      case _ => HeadFinder.collins
+    }
+    Trees.binarize((_:Tree[String]), headRules)
   }
 
   val maxLength = 15;

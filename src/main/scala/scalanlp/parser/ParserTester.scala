@@ -3,7 +3,7 @@ package scalanlp.parser
 import scalanlp.config.Configuration
 import java.io.File
 import scalanlp.util._
-import scalanlp.trees.UnaryChainRemover.ChainReplacer
+import scalanlp.trees.{AnnotatedLabel, AnnotatedLabelChainReplacer}
 
 /**
  * ParserTester just tests a grammar
@@ -27,7 +27,7 @@ object ParserTester {
     println(params);
     println(specificParams);
 
-    val parser = readObject[Parser[String,String]](specificParams.parser)
+    val parser = readObject[Parser[AnnotatedLabel,String]](specificParams.parser)
 
     import params._;
 
@@ -37,7 +37,7 @@ object ParserTester {
 
     {
       println("Evaluating Parser on dev...");
-      val stats = evalParser(devTrees,parser,name+ "-dev",replacer);
+      val stats = evalParser(devTrees,parser,name+ "-dev")
       import stats._;
       println("Eval finished. Results:");
       println( "P: " + precision + " R:" + recall + " F1: " + f1 +  " Ex:" + exact + " Tag Accuracy: " + tagAccuracy);
@@ -45,17 +45,16 @@ object ParserTester {
 
     {
       println("Evaluating Parser on test...");
-      val stats = evalParser(testTrees,parser,name+ "-test",replacer);
+      val stats = evalParser(testTrees,parser,name+ "-test")
       import stats._;
       println("Eval finished. Results:");
       println( "P: " + precision + " R:" + recall + " F1: " + f1 +  " Ex:" + exact + " Tag Accuracy: " + tagAccuracy);
     }
   }
 
-  def evalParser(testTrees: IndexedSeq[TreeInstance[String,String]],
-          parser: Parser[String,String], name: String, chainReplacer: ChainReplacer[String]):ParseEval.Statistics = {
-    val stats = ParseEval.evaluateAndLog[String](testTrees,parser,name,chainReplacer);
-    stats
+  def evalParser(testTrees: IndexedSeq[TreeInstance[AnnotatedLabel,String]],
+          parser: Parser[AnnotatedLabel,String], name: String):ParseEval.Statistics = {
+    ParseEval.evaluateAndLog(testTrees, parser, name, AnnotatedLabelChainReplacer)
   }
 
 }

@@ -6,6 +6,7 @@ import scalanlp.parser._
 import projections.GrammarProjections
 import scalanlp.util.Index
 import collection.immutable.BitSet
+import scalanlp.trees.AnnotatedLabel
 
 
 /**
@@ -13,14 +14,15 @@ import collection.immutable.BitSet
  * @author dlwh
  */
 object SanityCheckLexPipeline extends ParserPipeline with NoParams {
-  def trainParser(trainTrees: IndexedSeq[TreeInstance[String, String]],
-                  validate: Parser[String, String]=>ParseEval.Statistics,
+  def trainParser(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]],
+                  validate: Parser[AnnotatedLabel, String]=>ParseEval.Statistics,
                   config: Params) = {
-    val (words, binary, unary) = GenerativeParser.extractCounts(trainTrees);
+    val trees = trainTrees.map(_.mapLabels(_.baseAnnotatedLabel))
+    val (words, binary, unary) = GenerativeParser.extractCounts(trees);
     val grammar = Grammar(Library.logAndNormalizeRows(binary), Library.logAndNormalizeRows(unary));
     val lexicon = new SignatureLexicon(words, EnglishWordClassGenerator, 5);
     val _wordIndex = Index(words.keysIterator.map(_._2))
-    val lexgram = new LexGrammar[String, String] {
+    val lexgram = new LexGrammar[AnnotatedLabel, String] {
       def index = grammar.index
 
       def labelIndex = grammar.labelIndex
@@ -75,7 +77,8 @@ object SanityCheckLexPipeline extends ParserPipeline with NoParams {
 
       def indexedUnaryRulesWithParent(l: Int) = grammar.indexedUnaryRulesWithParent(l)
     }
-    val parser = new LexMaxVChartParser(grammar, lexicon, GrammarProjections.identity(grammar), new LexCKYChartBuilder("",lexgram, ParseChart.logProb))
+    val parser = new LexMaxVChartParser(grammar, lexicon, GrammarProjections.identity(grammar),
+      new LexCKYChartBuilder(AnnotatedLabel.TOP, lexgram, ParseChart.logProb))
     Iterator.single(("Gen", parser));
   }
 

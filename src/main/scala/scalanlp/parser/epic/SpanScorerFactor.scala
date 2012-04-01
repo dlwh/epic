@@ -46,8 +46,10 @@ case class SpanScorerFactor[L,W](f0Builder: ChartBuilder[LogProbabilityParseChar
               else if(a < 0 && a.isInfinite) 1001.0
               else if(a.isInfinite) 10000.
               else if(s1.abs < 1E-4) a.abs
-              else a.abs / (s1.abs + s2.abs)
-              if(diff > difference) return false
+              else a.abs / (s1.abs + s2.abs) * 2
+              if(diff > difference) {
+                return false
+              }
             }
             k += 1
           }
@@ -86,12 +88,7 @@ class AnchoredRuleApproximator[C,F,W](val coarseParser: ChartBuilder[LogProbabil
               marginal: ChartPair[ParseChart.LogProbabilityParseChart,F],
               oldScorer: SpanScorer[C]):SpanScorer[C] = {
     val factory = new AnchoredRuleScorerFactory[C,F,W](coarseParser.grammar, SimpleChartParser(inf.builder,projections), pruningThreshold);
-    val pruner = if(instance.tree != null) {
-      GoldTagPolicy.goldTreeForcing[C](instance.tree.map(coarseParser.index))
-    } else {
-      GoldTagPolicy.noGoldTags[C]
-    }
-    factory.buildSpanScorer(marginal, pruner)
+    factory.buildSpanScorer(marginal)
   }
 
 }

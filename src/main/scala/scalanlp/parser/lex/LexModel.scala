@@ -353,7 +353,7 @@ case class LexGrammarBundle[L,W](baseGrammar: Grammar[L],
   val rightRules = new Array[Boolean](bg.index.size)
 
   for( (rule@BinaryRule(a,b,c),r) <- bg.index.iterator.zipWithIndex) {
-    val headChild = headFinder.findHeadChild(rule,identity[L](_))
+    val headChild = headFinder.findHeadChild(rule)
     if(headChild == 0) {
       leftRules(r) = true
     } else {
@@ -471,8 +471,6 @@ case class LexGrammarBundle[L,W](baseGrammar: Grammar[L],
   }
 }
 
-
-
 object IndexedFeaturizer {
   def extract[L, W](featurizer: LexFeaturizer[L, W],
                     headFinder: HeadFinder[L],
@@ -503,7 +501,7 @@ object IndexedFeaturizer {
           h
         case t@BinaryTree(a, bt@Tree(b, _), Tree(c, _)) =>
           val childHeads = IndexedSeq(rec(t.leftChild), rec(t.rightChild))
-          val headIsLeft = headFinder.findHeadChild(t, identity[L] _) == 0
+          val headIsLeft = headFinder.findHeadChild(t) == 0
           val (head, dep) = if(headIsLeft) childHeads(0) -> childHeads(1) else childHeads(1) -> childHeads(0)
           val r = ruleIndex(BinaryRule(a, b, c))
           add(set,spec.featuresForHead(r,head))
@@ -535,6 +533,7 @@ object IndexedFeaturizer {
 
 
 class LexModel[L, W](bundle: LexGrammarBundle[L,W],
+                     reannotate: (BinarizedTree[L],Seq[W])=>BinarizedTree[L],
                      indexed: IndexedFeaturizer[L,W],
                      coarse: ChartBuilder[ParseChart, L, W],
                      initFeatureValue: Feature=>Option[Double]) extends Model[TreeInstance[L, W]] with Serializable with ParserExtractable[L,W] {
@@ -554,7 +553,7 @@ class LexModel[L, W](bundle: LexGrammarBundle[L,W],
   def inferenceFromWeights(weights: DenseVector[Double]) = {
     val gram: LexGrammar[L, W] = bundle.makeGrammar(indexed, weights)
     val builder = new LexCKYChartBuilder(coarse.root, gram, ParseChart.logProb)
-    new LexInference(coarse, builder, indexed, headFinder)
+    new LexInference(reannotate, coarse, builder, indexed, headFinder)
   }
 
   type Inference = LexInference[L, W]
@@ -568,7 +567,8 @@ class LexModel[L, W](bundle: LexGrammarBundle[L,W],
 
 }
 
-case class LexInference[L, W](coarseParser: ChartBuilder[ParseChart, L, W],
+case class LexInference[L, W](reannotate: (BinarizedTree[L],Seq[W])=>BinarizedTree[L],
+                              coarseParser: ChartBuilder[ParseChart, L, W],
                               builder: LexCKYChartBuilder[ParseChart.LogProbabilityParseChart, L, W],
                               featurizer: IndexedFeaturizer[L,W],
                               headFinder: HeadFinder[L]) extends ProjectableInference[TreeInstance[L, W], SpanScorerFactor[L, W]] {
@@ -612,7 +612,7 @@ case class LexInference[L, W](coarseParser: ChartBuilder[ParseChart, L, W],
         h
       case t@BinaryTree(a, bt@Tree(b, _), Tree(c, _)) =>
         val childHeads = IndexedSeq(rec(t.leftChild), rec(t.rightChild))
-        val headIsLeft = headFinder.findHeadChild(t, identity[L] _ ) == 0
+        val headIsLeft = headFinder.findHeadChild(t) == 0
         val (head, dep) = if(headIsLeft) childHeads(0) -> childHeads(1) else childHeads(1) -> childHeads(0)
         val r = g.index(BinaryRule(a, b, c))
         if(headIsLeft) {
@@ -629,7 +629,7 @@ case class LexInference[L, W](coarseParser: ChartBuilder[ParseChart, L, W],
         addMultiple(counts.features, fspec.featuresForBinary(r,head,dep), 1.0)
         if(headIsLeft) childHeads(0) else childHeads(1)
     }
-    rec(ti.tree)
+    rec(reannotate(ti.tree,ti.words))
     assert(!score.isInfinite)
     counts.logProb = score
     counts
@@ -662,7 +662,8 @@ case class LexInference[L, W](coarseParser: ChartBuilder[ParseChart, L, W],
 
 case class SubstringFeature(w: String) extends Feature
 
-class SimpleWordShapeGen(tagWordCounts: Counter2[String,String,Double], counts: Counter[String,Double], noShapeThreshold: Int = 100, minCountThreshold: Int = 5) extends (String=>IndexedSeq[String]) with Serializable {
+class SimpleWordShapeGen[L](tagWordCounts: Counter2[L,String,Double],
+                            counts: Counter[String,Double], noShapeThreshold: Int = 100, minCountThreshold: Int = 5) extends (String=>IndexedSeq[String]) with Serializable {
   def apply(w: String) = {
     if(counts(w) > noShapeThreshold) {
       ArrayBuffer(w, ("T-"+tagWordCounts(::, w).argmax))
@@ -706,58 +707,48 @@ class SimpleWordShapeGen(tagWordCounts: Counter2[String,String,Double], counts: 
   }
 }
 
-case class LexParserModelFactory(parser: ParserParams.BaseParser[String],
+case class LexParserModelFactory(baseParser: ParserParams.BaseParser,
                                  oldWeights: File = null,
                                  dummyFeats: Double = 0.5,
-                                 minFeatCutoff: Int = 1) extends ParserExtractableModelFactory[String,String] {
-  type MyModel = LexModel[String,String]
+                                 minFeatCutoff: Int = 1) extends ParserExtractableModelFactory[AnnotatedLabel,String] {
+  type MyModel = LexModel[AnnotatedLabel,String]
 
-  def make(trainTrees: IndexedSeq[TreeInstance[String, String]]) = {
-    val (initLexicon, initBinaries, initUnaries) = GenerativeParser.extractCounts(trainTrees)
+  def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]]) = {
+    val trees = trainTrees.map(_.mapLabels(_.baseAnnotatedLabel))
+    val (initLexicon, initBinaries, initUnaries) = GenerativeParser.extractCounts(trees)
 
-    val xbarParser = parser.optParser getOrElse {
-      val grammar = Grammar(Library.logAndNormalizeRows(initBinaries), Library.logAndNormalizeRows(initUnaries));
-      val lexicon = new SimpleLexicon(initLexicon);
-      new CKYChartBuilder[LogProbabilityParseChart, String, String]("", lexicon, grammar, ParseChart.logProb);
-    }
+    val xbarParser = baseParser.xbarParser(trees)
     val wordIndex = Index(trainTrees.iterator.flatMap(_.words))
     val summedCounts = Library.sum(initLexicon)
     val shapeGen = new SimpleWordShapeGen(initLexicon, summedCounts)
     val tagShapeGen = new WordShapeFeaturizer(summedCounts)
 
 
-    def ruleGen(r: Rule[String]) = IndexedSeq(RuleFeature(r))
+    def ruleGen(r: Rule[AnnotatedLabel]) = IndexedSeq(RuleFeature(r))
     def validTag(w: String) = xbarParser.lexicon.tagScores(w).keysIterator.toArray
 
-
-
-    //    def featGen(w: String) = {
-    //      if(summedCounts(w) < 30)  Counter( (IndicatorFeature(EnglishWordClassGenerator.signatureFor(w)):Feature) -> 1.0)
-    //      else Counter( (IndicatorFeature(w):Feature) -> 1.0)
-    //    }
-
-    val headFinder = HeadFinder.collinsHeadFinder
+    val headFinder = HeadFinder.collins
     val feat = new StandardFeaturizer(wordIndex,
     xbarParser.grammar.labelIndex,
     xbarParser.grammar.index,
     ruleGen,
     shapeGen,
     { (w:String) => tagShapeGen.featuresFor(w)})
-    val indexed =  IndexedFeaturizer.extract(feat,
+
+    val indexed =  IndexedFeaturizer.extract[AnnotatedLabel,String](feat,
       headFinder,
       xbarParser.grammar.index,
       xbarParser.grammar.labelIndex,
       dummyFeats,
       minFeatCutoff,
-      trainTrees)
+      trees)
 
-    val bundle = new LexGrammarBundle(xbarParser.grammar,
+    val bundle = new LexGrammarBundle[AnnotatedLabel, String](xbarParser.grammar,
       initLexicon.keys.map(_._1).toSet.toIndexedSeq,
       headFinder,
       wordIndex,
       validTag _
     )
-
 
     val featureCounter = if(oldWeights ne null) {
       readObject[Counter[Feature,Double]](oldWeights)
@@ -765,7 +756,8 @@ case class LexParserModelFactory(parser: ParserParams.BaseParser[String],
       Counter[Feature,Double]()
     }
 
-    val model = new LexModel[String,String](bundle, indexed, xbarParser, {featureCounter.get(_)})
+    def reannotate(tree: BinarizedTree[AnnotatedLabel], words: Seq[String]) = tree.map(_.baseAnnotatedLabel)
+    val model = new LexModel[AnnotatedLabel,String](bundle, reannotate, indexed, xbarParser, {featureCounter.get(_)})
 
     model
 

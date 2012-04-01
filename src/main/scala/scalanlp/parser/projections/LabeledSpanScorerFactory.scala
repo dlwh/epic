@@ -79,80 +79,8 @@ class LabeledSpanScorer[L](scores: Array[OldSparseVector]) extends SpanScorer[L]
 }
 
 case class ProjectionParams(treebank: TreebankParams,
-                            spans: SpanParams[String],
+                            spans: SpanParams[AnnotatedLabel],
                             parser: File, out: File = new File("spans"), maxParseLength: Int = 40, project: Boolean = true) {
   def processedTreebank = ProcessedTreebank(treebank,spans)
 }
 
-object ProjectTreebankToLabeledSpans {
-  import SpanBroker._
-
-  def main(args: Array[String]) {
-    val (baseConfig,files) = scalanlp.config.CommandLineParser.parseArguments(args)
-    val config = baseConfig backoff Configuration.fromPropertiesFiles(files.map(new File(_)))
-    val params = config.readIn[ProjectionParams]("")
-    val treebank = params.processedTreebank.copy(treebank = params.processedTreebank.treebank.copy(maxLength = 100000))
-    println(params)
-    val parser = loadParser[Any](params.parser)
-
-    val outDir = params.out
-    outDir.mkdirs()
-
-    val proj = new GrammarProjections(ProjectionIndexer.simple(parser.projections.labels.coarseIndex), ProjectionIndexer.simple(parser.projections.rules.coarseIndex))
-    val trueProj = parser.projections
-    if(params.project) {
-      val factory = new LabeledSpanScorerFactory[String,Any,String](parser, -7)
-      writeObject(parser.projections.labels.coarseIndex,new File(outDir,SPAN_INDEX_NAME))
-      SpanBroker.serializeSpans(mapTrees(factory,treebank.trainTrees, proj, true, params.maxParseLength),new File(outDir,TRAIN_SPANS_NAME))
-      SpanBroker.serializeSpans(mapTrees(factory,treebank.testTrees, proj, false, 10000),new File(outDir,TEST_SPANS_NAME))
-      SpanBroker.serializeSpans(mapTrees(factory,treebank.devTrees, proj, false, 10000),new File(outDir,DEV_SPANS_NAME))
-    } else {
-      val fineProj = new GrammarProjections(ProjectionIndexer.simple(parser.projections.labels.fineIndex), ProjectionIndexer.simple(parser.projections.rules.fineIndex))
-      val nonprojectingParser = new SimpleChartParser(parser.builder,new SimpleViterbiDecoder[Any,String](parser.builder.grammar), fineProj)
-      val factory = new LabeledSpanScorerFactory[Any,Any,String](nonprojectingParser, -7)
-      writeObject(parser.projections.labels.fineIndex,new File(outDir,SPAN_INDEX_NAME))
-      serializeSpans(mapTrees(factory,treebank.trainTrees, trueProj, true, params.maxParseLength),new File(outDir,TRAIN_SPANS_NAME))
-      serializeSpans(mapTrees(factory,treebank.testTrees, trueProj, false, 10000),new File(outDir,TEST_SPANS_NAME))
-      serializeSpans(mapTrees(factory,treebank.devTrees, trueProj, false, 10000),new File(outDir,DEV_SPANS_NAME))
-
-    }
-  }
-
-  def loadParser[T](loc: File) = {
-    val oin = new ObjectInputStream(new BufferedInputStream(new FileInputStream(loc)))
-    val parser = oin.readObject().asInstanceOf[SimpleChartParser[String,T,String]]
-    oin.close()
-    parser
-  }
-
-  def mapTrees[L](factory: LabeledSpanScorerFactory[L,Any,String], trees: IndexedSeq[TreeInstance[String,String]],
-                  proj: GrammarProjections[String,L], useTree: Boolean, maxL: Int) = {
-    // TODO: have ability to use other span scorers.
-    trees.toIndexedSeq.par.map { (ti:TreeInstance[String,String]) =>
-      val TreeInstance(id,tree,words,preScorer) = ti
-      println(id,words)
-      try {
-        val pruningThreshold = -7.0
-        val pruner:GoldTagPolicy[L] = if(useTree) {
-          val mappedTree = tree.map(l => proj.labels.refinementsOf(l).map(proj.labels.fineIndex))
-          GoldTagPolicy.candidateTreeForcing(mappedTree)
-        } else {
-          GoldTagPolicy.noGoldTags
-        }
-        val scorer =factory.mkSpanScorer(words,new ProjectingSpanScorer(proj, preScorer), pruner)
-        id -> scorer
-      } catch {
-        case e: Exception => e.printStackTrace(); id -> SpanScorer.identity[L]
-      }
-    }.seq
-  }
-
-  def writeObject(o: AnyRef, file: File) {
-    val oout = new ObjectOutputStream(new BufferedOutputStream(new FileOutputStream(file)))
-    oout.writeObject(o)
-    oout.close()
-  }
-
-
-
-}
