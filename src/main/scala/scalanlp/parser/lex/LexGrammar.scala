@@ -2,7 +2,7 @@ package scalanlp.parser.lex
 
 import scalanlp.tensor.sparse.OldSparseVector
 import scalanlp.util.{Encoder, Index}
-import scalanlp.parser.{UnaryRule, BinaryRule, Rule}
+import scalanlp.trees.{UnaryRule, BinaryRule, Rule}
 import collection.immutable.BitSet
 
 /**

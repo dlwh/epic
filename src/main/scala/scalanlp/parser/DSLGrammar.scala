@@ -2,6 +2,7 @@ package scalanlp.parser
 
 import scalala.library.Library
 import scalala.tensor.Counter2
+import scalanlp.trees.{Rule, BinaryRule, UnaryRule}
 
 /**
  * A DSL Grammar allows us to define simple weighted PCFG's quickly.

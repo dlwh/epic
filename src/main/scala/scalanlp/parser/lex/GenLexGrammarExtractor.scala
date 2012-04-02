@@ -3,7 +3,7 @@ package scalanlp.parser.lex
 import scalala.library.Library
 import scalala.tensor.Counter2
 import scalanlp.parser._
-import scalanlp.trees.{UnaryTree, BinaryTree}
+import scalanlp.trees.{BinaryRule, UnaryRule, UnaryTree, BinaryTree}
 
 /**
  * 

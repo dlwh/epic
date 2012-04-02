@@ -25,6 +25,7 @@ import scalanlp.serialization.DataSerialization.ReadWritable
 import scalala.library.Library._
 import collection.mutable.ArrayBuffer
 import scalanlp.collection.mutable.{OpenAddressHashArray}
+import scalanlp.trees.{UnaryRule, Rule, BinaryRule}
 
 @SerialVersionUID(2)
 trait Grammar[L] extends Encoder[Rule[L]] with Serializable {
@@ -41,7 +42,6 @@ trait Grammar[L] extends Encoder[Rule[L]] with Serializable {
   def ruleIndex(a: Int, b: Int, c: Int):Int
   def ruleIndex(a: Int, b: Int):Int
 
-  def binaryRulesWithParent(l: L) = binaryRules(l,::).pairsIteratorNonZero
   // Rule Index
   def indexedBinaryRulesWithParent(l: Int):Array[Int]
   // Rule Index
@@ -65,12 +65,6 @@ trait Grammar[L] extends Encoder[Rule[L]] with Serializable {
 
   def maxNumBinaryRulesForParent: Int
 
-  /**
-   * Returns true if the label has no productions with it on the LHS.
-   */
-  def isPreterminal(label: Int): Boolean = {
-    indexedBinaryRulesWithParent(label).size == 0;
-  }
 
   final def ruleScore(r: Rule[L]) = ruleScoreArray(index(r))
 }

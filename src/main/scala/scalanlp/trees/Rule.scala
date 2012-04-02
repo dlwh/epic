@@ -1,6 +1,6 @@
-package scalanlp.parser
+package scalanlp.trees
 
-import scalanlp.serialization.{SerializationFormat, DataSerialization}
+import scalanlp.serialization.DataSerialization
 import java.io.DataOutput
 
 /*
@@ -20,35 +20,43 @@ import java.io.DataOutput
 */
 
 
-
 sealed trait Rule[@specialized(Int) +L] {
   def parent: L;
+
   def children: Seq[L];
+
   def symbols = parent +: children
-  def map[A](f: L=>A):Rule[A]
-  def mapChildren[A>:L](f: L=>A):Rule[A]
+
+  def map[A](f: L => A): Rule[A]
+
+  def mapChildren[A >: L](f: L => A): Rule[A]
 }
 
 final case class BinaryRule[@specialized(Int) +L](parent: L, left: L, right: L) extends Rule[L] {
-  def children = Seq(left,right);
-  def map[A](f: L=>A) = BinaryRule(f(parent),f(left),f(right))
-  def mapChildren[A>:L](f: L=>A) = BinaryRule(parent,f(left),f(right))
+  def children = Seq(left, right);
+
+  def map[A](f: L => A) = BinaryRule(f(parent), f(left), f(right))
+
+  def mapChildren[A >: L](f: L => A) = BinaryRule(parent, f(left), f(right))
 }
+
 final case class UnaryRule[@specialized(Int) +L](parent: L, child: L) extends Rule[L] {
   def children = Seq(child);
-  def map[A](f: L=>A) = UnaryRule(f(parent),f(child))
-  def mapChildren[A>:L](f: L=>A) = UnaryRule(parent,f(child))
+
+  def map[A](f: L => A) = UnaryRule(f(parent), f(child))
+
+  def mapChildren[A >: L](f: L => A) = UnaryRule(parent, f(child))
 }
 
 
 object Rule {
-  implicit def ruleReadWritable[L:DataSerialization.ReadWritable] = new DataSerialization.ReadWritable[Rule[L]] {
+  implicit def ruleReadWritable[L: DataSerialization.ReadWritable] = new DataSerialization.ReadWritable[Rule[L]] {
     def write(sink: DataOutput, r: Rule[L]) = r match {
-      case r@UnaryRule(_,_) =>
+      case r@UnaryRule(_, _) =>
         sink.writeBoolean(false)
         DataSerialization.write(sink, r.parent)
         DataSerialization.write(sink, r.child)
-      case r@BinaryRule(_,_,_) =>
+      case r@BinaryRule(_, _, _) =>
         sink.writeBoolean(true)
         DataSerialization.write(sink, r.parent)
         DataSerialization.write(sink, r.left)
@@ -56,22 +64,22 @@ object Rule {
     }
 
     def read(source: DataSerialization.Input) = {
-      if(source.readBoolean()) {
+      if (source.readBoolean()) {
         val p = DataSerialization.read[L](source)
         val c = DataSerialization.read[L](source)
-        UnaryRule(p,c)
+        UnaryRule(p, c)
       } else {
         val p = DataSerialization.read[L](source)
         val l = DataSerialization.read[L](source)
         val r = DataSerialization.read[L](source)
-        BinaryRule(p,l,r)
+        BinaryRule(p, l, r)
       }
     }
   }
 }
 
 object UnaryRule {
-  implicit def ruleReadWritable[L:DataSerialization.ReadWritable] = new DataSerialization.ReadWritable[UnaryRule[L]] {
+  implicit def ruleReadWritable[L: DataSerialization.ReadWritable] = new DataSerialization.ReadWritable[UnaryRule[L]] {
     def write(sink: DataOutput, r: UnaryRule[L]) = {
       sink.writeBoolean(false)
       DataSerialization.write(sink, r.parent)
@@ -83,13 +91,13 @@ object UnaryRule {
       assert(isUnary)
       val p = DataSerialization.read[L](source)
       val c = DataSerialization.read[L](source)
-      UnaryRule(p,c)
+      UnaryRule(p, c)
     }
   }
 }
 
 object BinaryRule {
-  implicit def ruleReadWritable[L:DataSerialization.ReadWritable] = new DataSerialization.ReadWritable[BinaryRule[L]] {
+  implicit def ruleReadWritable[L: DataSerialization.ReadWritable] = new DataSerialization.ReadWritable[BinaryRule[L]] {
     def write(sink: DataOutput, r: BinaryRule[L]) = {
       sink.writeBoolean(true)
       DataSerialization.write(sink, r.parent)
@@ -103,7 +111,7 @@ object BinaryRule {
       val p = DataSerialization.read[L](source)
       val c = DataSerialization.read[L](source)
       val r = DataSerialization.read[L](source)
-      BinaryRule(p,c,r)
+      BinaryRule(p, c, r)
     }
   }
 }

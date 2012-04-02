@@ -8,6 +8,7 @@ import math.exp
 import scalala.tensor.::
 import scalala.tensor.mutable.{Counter, Counter2, Vector}
 import scalala.tensor.dense.DenseVector
+import scalanlp.trees.{BinaryRule, UnaryRule}
 
 /**
  * InsideOutside computes expected counts for rules and lexical emissions for a chart builder

@@ -2,6 +2,7 @@ package scalanlp.parser.epic
 
 import scalala.tensor.dense._
 import scalala.tensor.mutable.Counter2
+import scalanlp.trees.{BinaryRule, UnaryRule}
 import scalanlp.parser.{UnaryRule, BinaryRule, Grammar}
 
 object FeaturizedGrammar {

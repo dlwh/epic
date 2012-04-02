@@ -2,6 +2,7 @@ package scalanlp.parser.epic
 
 import scalala.tensor.Counter
 import collection.mutable.ArrayBuffer
+import scalanlp.trees.{UnaryRule, BinaryRule, Rule}
 import scalanlp.parser.{UnaryRule, BinaryRule, Rule}
 import scalanlp.parser.features._
 

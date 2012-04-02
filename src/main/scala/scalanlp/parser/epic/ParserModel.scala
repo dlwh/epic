@@ -5,7 +5,7 @@ import scalanlp.parser._
 import projections.{ProjectingSpanScorer, GrammarProjections}
 import scalala.tensor.{Counter2,::}
 import scalala.library.Library
-import scalanlp.trees.BinarizedTree
+import scalanlp.trees.{BinaryRule, UnaryRule, BinarizedTree}
 
 /**
  * Base trait for "normal" Parser-type models

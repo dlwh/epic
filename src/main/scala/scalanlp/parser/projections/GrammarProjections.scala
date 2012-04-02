@@ -2,6 +2,7 @@ package scalanlp.parser
 package projections
 
 import scalanlp.util.Index
+import scalanlp.trees.Rule
 
 /**
  * 

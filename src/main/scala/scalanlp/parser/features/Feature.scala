@@ -1,5 +1,6 @@
 package scalanlp.parser.features
 
+import scalanlp.trees.Rule
 import scalanlp.parser.Rule
 import scalanlp.util.CachedHashCode
 import scalala.tensor.Counter

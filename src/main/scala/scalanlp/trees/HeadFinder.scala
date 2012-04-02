@@ -19,6 +19,7 @@ package scalanlp.trees
 import scalanlp.trees.HeadRules.{Dir, Left, Right}
 import scalanlp.util.Lens
 import scalanlp.parser.Rule
+import scalanlp.trees.{UnaryRule, Rule, BinaryRule}
 import scalanlp.parser.UnaryRule
 import scalanlp.parser.BinaryRule
 
