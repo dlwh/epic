@@ -59,5 +59,5 @@ object SpanBroker {
   val TRAIN_SPANS_NAME = "train.spans.ser"
   val DEV_SPANS_NAME = "dev.spans.ser"
   val TEST_SPANS_NAME = "test.spans.ser"
-  val SPAN_INDEX_NAME = "spanindex.ser"
+  val XBAR_GRAMMAR_NAME = "spanindex.ser"
 }

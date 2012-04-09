@@ -1,62 +1,42 @@
 package scalanlp.parser
 
-import projections.{GrammarProjections, ProjectingSpanScorer, ProjectionIndexer}
 import scalanlp.trees.BinarizedTree
 
-case class ChartPair[+PC[X]<:ParseChart[X],L](inside: PC[L],
-                                              outside: PC[L],
-                                              partition: Double,
-                                              scorer: SpanScorer[L] = SpanScorer.identity)
-
 @SerialVersionUID(1)
-trait ChartParser[C,F,W] extends Parser[C,W] with Serializable {
-  def charts(w: Seq[W], scorer: SpanScorer[C]= SpanScorer.identity):ChartPair[ParseChart,F]
+trait ChartParser[L, W] extends Parser[L, W] with Serializable {
+  def charts(w: Seq[W]):ChartMarginal[ParseChart, L, W]
 
-  def decoder: ChartDecoder[C,F,W]
+  def decoder: ChartDecoder[L, W]
 
-  def projections: GrammarProjections[C,F]
-  def root: F
-  protected def grammar: Grammar[F]
+  def root: L
+  protected def grammar: Grammar[L]
 
-  override def bestParse(w: Seq[W], scorer: SpanScorer[C] = SpanScorer.identity):BinarizedTree[C] = try {
-    val chart = charts(w,scorer)
-    val bestParse = decoder.extractBestParse(root, grammar, chart.inside, chart.outside, w, chart.scorer);
-    bestParse
+  override def bestParse(w: Seq[W]):BinarizedTree[L] = try {
+    val chart = charts(w)
+    decoder.extractBestParse(chart)
   } catch {
     case e => throw e;
   }
 }
 
 /**
- * A SimpleChartParser produces trees with labels C from a ChartBuilder with labels F, a decoder from C to F, and
- * projections from C to F
+ * A SimpleChartParser produces trees with labels C from a ChartBuilder with labels L, a decoder from C to L, and
+ * projections from C to L
  * @author dlwh
  */
 @SerialVersionUID(1)
-class SimpleChartParser[C,F,W](val builder: ChartBuilder[ParseChart,F,W],
-                         val decoder: ChartDecoder[C,F,W],
-                         val projections: GrammarProjections[C,F]) extends ChartParser[C,F,W] with Serializable {
+class SimpleChartParser[L, W](val builder: ChartBuilder[ParseChart, L, W],
+                              val decoder: ChartDecoder[L, W]) extends ChartParser[L, W] with Serializable {
 
-  def charts(w: Seq[W], scorer: SpanScorer[C]) = {
-    val meta = new ProjectingSpanScorer[C,F](projections,scorer)
-    val inside = builder.buildInsideChart(w,meta)
-    val outside = builder.buildOutsideChart(inside,meta)
-    val partition = inside.top.labelScore(0, inside.length, builder.root)
-    new ChartPair[ParseChart,F](inside, outside, partition, meta)
-  }
+  def charts(w: Seq[W]) = builder.charts(w)
 
   def root = builder.root
-  protected def grammar = builder.grammar
-
+  protected def grammar = builder.grammar.grammar
 }
 
 object SimpleChartParser {
-  def apply[L,W](builder: ChartBuilder[ParseChart,L,W]) = {
-    new SimpleChartParser[L,L,W](builder,
-      new MaxConstituentDecoder(GrammarProjections.identity(builder.grammar)), GrammarProjections.identity(builder.grammar))
+  def apply[L, W](builder: ChartBuilder[ParseChart, L, W]) = {
+    new SimpleChartParser[L, W](builder, new MaxConstituentDecoder)
   }
 
-  def apply[L,L2,W](builder: ChartBuilder[ParseChart,L2,W], proj: GrammarProjections[L,L2]) = {
-    new SimpleChartParser[L,L2,W](builder, new MaxConstituentDecoder(proj), proj)
-  }
 }

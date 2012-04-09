@@ -30,6 +30,4 @@ class ReplGrammar(treebankPath: String, isDenseTreebank:Boolean=true, binarizati
 
   lazy val devTrees = IndexedSeq.empty ++ (for( (tree,words) <- treebank.dev.trees.filter(_._2.length <= maxLength))
     yield TreeInstance(words.toString(),binarize(xform(tree)),words)).toSeq;
-
-  lazy val (lexicon,grammar) = GenerativeParser.extractLexiconAndGrammar(trainTrees);
 }

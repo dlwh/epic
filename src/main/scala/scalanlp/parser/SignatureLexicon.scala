@@ -16,6 +16,9 @@ class SignatureLexicon[L,W](initCounts: Counter2[L,W,Double], sigGen: SignatureG
 
   def tags = lexicon.domain._1.iterator
 
+
+  def wordScore(words: Seq[W], label: L, pos: Int):Double = wordScore(label, words(pos))
+
   def wordScore(l: L, w: W) = {
     val sig = if(wordCounts(w) < threshold) {
       sigGen.signatureFor(w);

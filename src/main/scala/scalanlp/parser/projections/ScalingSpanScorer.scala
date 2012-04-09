@@ -1,13 +1,16 @@
 package scalanlp.parser
 package projections
 
+import scalanlp.util.TypeTags._
+import scalanlp.trees.Rule
+
 /**
  * 
  * @author dlwh
  */
 object ScalingSpanScorer {
   def apply[C](num: SpanScorer[C], denom: SpanScorer[C], constant:Double, root: Int):SpanScorer[C] = new SpanScorer[C] {
-    def scoreSpan(begin: Int, end: Int, tag: Int) = {
+    def scoreSpan(begin: Int, end: Int, tag: ID[C]) = {
       val ns = num.scoreSpan(begin, end, tag)
       if(ns == Double.NegativeInfinity) ns
       else {
@@ -17,7 +20,7 @@ object ScalingSpanScorer {
       }
     }
 
-    def scoreUnaryRule(begin: Int, end: Int, rule: Int) = {
+    def scoreUnaryRule(begin: Int, end: Int, rule: ID[Rule[C]]) = {
       val ns = num.scoreUnaryRule(begin, end, rule)
       if(ns == Double.NegativeInfinity) ns
       else {
@@ -27,7 +30,7 @@ object ScalingSpanScorer {
       }
     }
 
-    def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = {
+    def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: ID[Rule[C]]) = {
       val ns = num.scoreBinaryRule(begin, split, end, rule)
       if (ns == Double.NegativeInfinity) ns
       else {

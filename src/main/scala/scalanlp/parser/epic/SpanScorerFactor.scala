@@ -1,44 +1,48 @@
 package scalanlp.parser.epic
 
 import scalanlp.inference.Factor
-import scalala.tensor.dense.DenseVector
 import scalanlp.parser._
-import projections.{AnchoredRuleScorerFactory, GrammarProjections, ScalingSpanScorer}
+import projections.{AnchoredPCFGProjector, ScalingSpanScorer}
 import scalanlp.parser.ParseChart._
+import scalanlp.util.TypeTags
+import TypeTags._
 
-case class SpanScorerFactor[L,W](f0Builder: ChartBuilder[LogProbabilityParseChart,L,W],
-                                 words: Seq[W],
-                                 scorer: SpanScorer[L]) extends Factor[SpanScorerFactor[L, W]] {
-  def *(f: SpanScorerFactor[L, W]) = copy(scorer=SpanScorer.sum(scorer,f.scorer))
+case class SpanScorerFactor[L, W](grammar: Grammar[L],
+                                  words: Seq[W],
+                                  scorer: SpanScorer[L]) extends Factor[SpanScorerFactor[L, W]] {
+  def *(f: SpanScorerFactor[L, W]) = copy(scorer=SpanScorer.sum(scorer, f.scorer))
 
   def /(f: SpanScorerFactor[L, W]) = copy(scorer=ScalingSpanScorer(scorer, f.scorer, 0.0, -1))
 
   def *(f: Double) =  this
 
-  // TODO: decide if we need this.
-  // It's not strictly necessary, I think, but...
+  private val builder = new CKYChartBuilder(WeightedGrammar.oneOff[L,W](grammar, scorer), ParseChart.logProb)
+
   def logPartition = {
-    (f0Builder.buildInsideChart(words, scorer).top.labelScore(0,words.length,f0Builder.root))
+    (builder.charts(words).partition)
   }
 
-  def isConvergedTo(other: SpanScorerFactor[L,W], difference: Double = 1E-4):Boolean = {
+  def isConvergedTo(other: SpanScorerFactor[L, W], difference: Double = 1E-4):Boolean = {
     val length = words.length
     val scorer1 = scorer
     val scorer2 = other.scorer
 
+
+    /**
+     * TODO: include at least spans in this computation
+     */
     for { span <- (1 to length) } {
       var i = 0;
       while(i < length-span) {
         val j = i + span
-        for(p <- (0 until f0Builder.grammar.labelIndex.size).iterator if !scorer.scoreSpan(i,j,p).isNegInfinity) {
+        for(p <- (0 until grammar.labelIndex.size).iterator if !scorer.scoreSpan(i, j, tag(p)).isNegInfinity) {
           var k = i + 1
           while(k < j) {
-            val rules = f0Builder.grammar.indexedBinaryRulesWithParent(p)
+            val rules = grammar.indexedBinaryRulesWithParent(TypeTags.tag[L](p))
             var br = 0;
             while(br < rules.length) {
               val r = rules(br)
               br += 1
-              // TODO: compute change that is consistent with all span scorers :-/
               val s1 = scorer1.scoreBinaryRule(i, k, j, r)
               val s2 = scorer2.scoreBinaryRule(i, k, j, r)
               val a = (s1 - s2)
@@ -62,33 +66,20 @@ case class SpanScorerFactor[L,W](f0Builder: ChartBuilder[LogProbabilityParseChar
   }
 }
 
-trait EPProjector[L,L2,W] {
-  def coarseParser: ChartBuilder[LogProbabilityParseChart, L, W]
-
-  lazy val zero = new CKYChartBuilder[ParseChart.LogProbabilityParseChart, L,W](coarseParser.root,
-    new ZeroLexicon(coarseParser.lexicon), Grammar.zero(coarseParser.grammar),ParseChart.logProb)
-
-
-  def project(inf: ParserInference[L,L2,W],
-              projections: GrammarProjections[L,L2],
+trait EPProjector[L, W] {
+  def project(inf: ParserInference[L, W],
               instance: TreeInstance[L, W],
-              marginal: ChartPair[ParseChart.LogProbabilityParseChart,L2],
-              oldScorer: SpanScorer[L]):SpanScorer[L]
+              marginal: ChartMarginal[ParseChart.LogProbabilityParseChart, L, W]):WeightedGrammar[L, W]
 }
 
 @SerialVersionUID(1)
-class AnchoredRuleApproximator[C,F,W](val coarseParser: ChartBuilder[LogProbabilityParseChart,C,W],
-                                      pruningThreshold: Double = Double.NegativeInfinity) extends EPProjector[C,F,W] with Serializable {
+class AnchoredRuleApproximator[L, W](pruningThreshold: Double = Double.NegativeInfinity) extends EPProjector[L, W] with Serializable {
 
-  val zeroFactory = new CachingSpanScorerFactory[C,W](coarseParser, pruningThreshold);
-
-  def project(inf: ParserInference[C,F,W],
-              projections: GrammarProjections[C,F],
-              instance: TreeInstance[C, W],
-              marginal: ChartPair[ParseChart.LogProbabilityParseChart,F],
-              oldScorer: SpanScorer[C]):SpanScorer[C] = {
-    val factory = new AnchoredRuleScorerFactory[C,F,W](coarseParser.grammar, SimpleChartParser(inf.builder,projections), pruningThreshold);
-    factory.buildSpanScorer(marginal)
+  def project(inf: ParserInference[L, W],
+              instance: TreeInstance[L, W],
+              marginal: ChartMarginal[ParseChart.LogProbabilityParseChart, L, W]):WeightedGrammar[L, W] = {
+    val factory = new AnchoredPCFGProjector[L, W](marginal.grammar.grammar)
+    WeightedGrammar.oneOff(inf.grammar.grammar, factory.buildSpanScorer(marginal))
   }
 
 }

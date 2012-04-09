@@ -2,7 +2,7 @@ package scalanlp.parser
 package projections
 
 import scalanlp.util.Index
-import scalanlp.trees.Rule
+import scalanlp.trees._
 
 /**
  * 
@@ -10,17 +10,17 @@ import scalanlp.trees.Rule
  */
 
 @SerialVersionUID(1L)
-case class GrammarProjections[C,F](labels: ProjectionIndexer[C,F], rules: ProjectionIndexer[Rule[C],Rule[F]]) {
-  def compose[F2](other: GrammarProjections[F,F2]) = new GrammarProjections(labels compose other.labels, rules compose other.rules)
+case class GrammarRefinements[C,F](labels: ProjectionIndexer[C,F], rules: ProjectionIndexer[Rule[C],Rule[F]]) {
+  def compose[F2](other: GrammarRefinements[F,F2]) = new GrammarRefinements(labels compose other.labels, rules compose other.rules)
 
 }
 
-object GrammarProjections {
-  def identity[L](grammar: Grammar[L]): GrammarProjections[L, L] = {
+object GrammarRefinements {
+  def identity[L](grammar: Grammar[L]): GrammarRefinements[L, L] = {
     apply(grammar, grammar, Predef.identity[L] _)
   }
 
-  def apply[C,F](coarse: Grammar[C], fine: Grammar[F], proj: F=>C): GrammarProjections[C, F] = {
+  def apply[C,F](coarse: Grammar[C], fine: Grammar[F], proj: F=>C): GrammarRefinements[C, F] = {
     def projRule(r: Rule[F]) = r match {
       case BinaryRule(a,b,c) => BinaryRule(proj(a),proj(b),proj(c))
       case UnaryRule(a,b) => UnaryRule(proj(a),proj(b))
@@ -28,7 +28,7 @@ object GrammarProjections {
     val rules = ProjectionIndexer(coarse.index,fine.index, projRule)
     val labels = ProjectionIndexer(coarse.labelIndex,fine.labelIndex, proj)
 
-    new GrammarProjections(labels,rules)
+    new GrammarRefinements(labels,rules)
   }
 
   def apply[C,F](coarse: Grammar[C], split: C=>Seq[F], proj: F=>C) = {
@@ -58,6 +58,6 @@ object GrammarProjections {
 
     val rules = ProjectionIndexer(coarse.index,ruleIndex, projRule)
     val labels = ProjectionIndexer(coarse.labelIndex,fineIndex, proj)
-    new GrammarProjections(labels,rules)
+    new GrammarRefinements(labels,rules)
   }
 }

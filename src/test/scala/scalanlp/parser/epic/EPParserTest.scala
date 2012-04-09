@@ -4,13 +4,12 @@ package epic
 import org.junit.runner.RunWith;
 import org.scalatest._;
 import org.scalatest.junit._
-import projections.{GrammarProjections, ProjectionIndexer}
+import projections.{GrammarRefinements, ProjectionIndexer}
 
 
 /**
  *
  * @author dlwh
- */
 @RunWith(classOf[JUnitRunner])
 class EPParserTest extends ParserTestHarness with FunSuite {
 
@@ -35,4 +34,5 @@ class EPParserTest extends ParserTestHarness with FunSuite {
   }
 
 }
+ */
 

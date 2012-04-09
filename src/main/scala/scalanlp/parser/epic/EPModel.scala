@@ -10,7 +10,6 @@ import scalala.library.Library
 import scalanlp.parser.ParseChart._
 import scalanlp.parser._
 import features.Feature
-import projections.GrammarProjections
 import scalala.library.Library._
 import scalanlp.optimize.{BatchDiffFunction, FirstOrderMinimizer, CachedBatchDiffFunction}
 import scalanlp.util.Index
@@ -184,7 +183,7 @@ case class EPParserModelFactory(ep: EPParams,
   )
 
   def make(train: IndexedSeq[TreeInstance[AnnotatedLabel, String]]) = {
-    val xbarParser = baseParser.xbarParser(train)
+    val xbarGrammar = baseParser.xbarGrammar(train)
 
     type ModelType = EPModel.CompatibleModel[TreeInstance[AnnotatedLabel, String], SpanScorerFactor[AnnotatedLabel, String]]
     val models = Seq(model1, model2, model3, model4, model5, model6, model7, model8).filterNot(_ eq null) map { model =>
@@ -198,9 +197,7 @@ case class EPParserModelFactory(ep: EPParams,
     }
 
     new EPModel(ep.iterations, {featureCounter.get(_)}, models:_*) with EPParser.Extractor[AnnotatedLabel, String] with Serializable {
-      val zeroParser = SimpleChartParser(new CKYChartBuilder(xbarParser.root,
-        new ZeroLexicon(xbarParser.lexicon),
-        Grammar.zero(xbarParser.grammar), ParseChart.logProb))
+      def grammar = xbarGrammar
     }
   }
 }

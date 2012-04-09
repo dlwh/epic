@@ -18,11 +18,6 @@ package scalanlp.trees
 
 import scalanlp.trees.HeadRules.{Dir, Left, Right}
 import scalanlp.util.Lens
-import scalanlp.parser.Rule
-import scalanlp.trees.{UnaryRule, Rule, BinaryRule}
-import scalanlp.parser.UnaryRule
-import scalanlp.parser.BinaryRule
-
 
 /**
  * Implements HeadFinding as in the Collins parser.
@@ -88,10 +83,24 @@ class HeadFinder[L](defaultDirection: Dir = Left,
 
   def annotateHeadWords[W](t: Tree[L], words: Seq[W]): Tree[(L, W)] = t match {
     case Tree(l, children) if children.length == 0 => Tree(l -> words(t.span.start), IndexedSeq.empty)(t.span)
-    case Tree(l, children) if children.length == 0 =>
+    case Tree(l, children) =>
       val headChild = findHeadChild(t)
       val rec = children.map(annotateHeadWords(_, words))
       Tree(l -> rec(headChild).label._2, rec)(t.span)
+  }
+  
+  
+  def annotateHeadIndices[W](t: BinarizedTree[L]): BinarizedTree[(L, Int)] = t match {
+    case NullaryTree(l) =>  NullaryTree(l -> t.span.start)(t.span)
+    case UnaryTree(a, b) => 
+      val rec = annotateHeadIndices(b)
+      UnaryTree(a -> rec.label._2, rec)(t.span)
+    case BinaryTree(a, b, c) =>
+      val headChild = findHeadChild(t)
+      val recB = annotateHeadIndices(b)
+      val recC = annotateHeadIndices(c)
+      val head = if(headChild == 0) recB.label._2 else recC.label._2
+      BinaryTree(a -> head, recB, recC)(t.span)
   }
 
 

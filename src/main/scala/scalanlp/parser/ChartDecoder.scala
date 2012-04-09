@@ -2,11 +2,12 @@ package scalanlp.parser
 
 
 import java.util.Arrays
-import projections.{AnchoredRuleScorerFactory, GrammarProjections, AnchoredRulePosteriorScorerFactory, ProjectionIndexer}
+import projections.{AnchoredPCFGProjector, AnchoredRuleMarginalProjector}
 import scalanlp.trees._
 import scalanlp.collection.mutable.TriangularArray
 import scalanlp.util._
 import scalala.library.Numerics._
+import TypeTags._
 
 
 /**
@@ -15,189 +16,176 @@ import scalala.library.Numerics._
  *
  * @author dlwh
  */
-trait ChartDecoder[C,F,W] extends Serializable{
-  def extractBestParse(root:F, grammar: Grammar[F],
-                       inside: ParseChart[F],
-                       outside: =>ParseChart[F], words: Seq[W],
-                       spanScorer: SpanScorer[F] = SpanScorer.identity):BinarizedTree[C]
-
+trait ChartDecoder[L, W] extends Serializable{
+  def extractBestParse(marginal: ChartMarginal[ParseChart, L, W]):BinarizedTree[L]
 }
 
 /**
  * Tries to extract a tree that maximizes log score.
  */
-@SerialVersionUID(1)
-class ViterbiDecoder[C, F, W](val indexedProjections: ProjectionIndexer[C,F]) extends ChartDecoder[C,F,W] with Serializable {
+@SerialVersionUID(2)
+class ViterbiDecoder[L, W] extends ChartDecoder[L, W] with Serializable {
 
-  override def extractBestParse(root: F, grammar: Grammar[F],
-                                inside: ParseChart[F],
-                                outside: =>ParseChart[F], words: Seq[W],
-                                spanScorer: SpanScorer[F] = SpanScorer.identity):BinarizedTree[C] = {
+  override def extractBestParse(marginal: ChartMarginal[ParseChart, L, W]):BinarizedTree[L] = {
+    import marginal._
+    val labelIndex = grammar.labelIndex
+    val rootIndex = tag[L](grammar.labelIndex(grammar.root))
 
-    def buildTreeUnary(start: Int, end:Int, root: Int):BinarizedTree[C] = {
+    def buildTreeUnary(begin: Int, end:Int, root: ID[L], rootRef: ID[Ref[L]]):BinarizedTree[L] = {
       var maxScore = Double.NegativeInfinity
-      var maxChild = -1
+      var maxChild = tag[L](-1)
+      var maxChildRef = tag[Ref[L]](-1)
       for {
-        r <- grammar.indexedUnaryRulesWithParent(root)
+        r <- grammar.grammar.indexedUnaryRulesWithParent(root)
+        refR <- spec.validRuleRefinementsGivenParent(begin, end, r, rootRef)
       } {
-        val ruleScore = grammar.ruleScore(r)
-        val b = grammar.child(r)
-        val score = ruleScore + inside.bot(start,end,b) + spanScorer.scoreUnaryRule(start,end,r)
+        val ruleScore = spec.scoreUnaryRule(begin, end, r, refR)
+        val b = grammar.grammar.child(r)
+        val refB = spec.childRefinement(r, refR)
+        val score = ruleScore + inside.bot(begin, end, b, refB)
         if(score > maxScore) {
           maxScore = score
           maxChild = b
+          maxChildRef = refB
         }
       }
 
       if(maxScore == Double.NegativeInfinity) {
-        println("entered things: " + inside.bot.enteredLabelScores(start,end).map { case (i,v) => (grammar.labelIndex.get(i),v)}.toList)
-        sys.error("Couldn't find a tree!" + start + " " + end + " " + grammar.labelIndex.get(root))
+        println("entered things: " + inside.bot.enteredLabelScores(begin, end).map { case (i, v) => (grammar.labelIndex.get(i), v)}.toList)
+        sys.error("Couldn't find a tree!" + begin + " " + end + " " + grammar.labelIndex.get(root))
       }
-      val child = buildTree(start,end,maxChild)
-      UnaryTree(indexedProjections.coarseSymbol(root),child)(Span(start,end))
+      val child = buildTree(begin, end, maxChild, maxChildRef)
+      UnaryTree(labelIndex.get(root), child)(Span(begin, end))
     }
 
-    def buildTree(start: Int, end: Int, root: Int):BinarizedTree[C] = {
+    def buildTree(begin: Int, end: Int, root: ID[L], rootRef: ID[Ref[L]]):BinarizedTree[L] = {
       var maxScore = Double.NegativeInfinity
-      var maxLeft = -1
-      var maxRight = -1
+      var maxLeft = tag[L](-1)
+      var maxRight = tag[L](-1)
+      var maxLeftRef = tag[Ref[L]](-1)
+      var maxRightRef = tag[Ref[L]](-1)
       var maxSplit = -1
-      if(start +1 == end) {
-        return NullaryTree(indexedProjections.coarseSymbol(root))(Span(start,end))
+      if(begin +1 == end) {
+        return NullaryTree(labelIndex.get(root))(Span(begin, end))
       }
 
+      val spanScore = spec.scoreSpan(begin, end, root, rootRef)
       for {
-        r <- grammar.indexedBinaryRulesWithParent(root).iterator
-        b = grammar.leftChild(r)
-        c = grammar.rightChild(r)
-        split <- inside.top.feasibleSpan(start, end, b, c)
+        r <- grammar.grammar.indexedBinaryRulesWithParent(root)
+        b = grammar.grammar.leftChild(r)
+        c = grammar.grammar.rightChild(r)
+        refR <- spec.validRuleRefinementsGivenParent(begin, end, r, rootRef)
+        refB = spec.leftChildRefinement(r, refR)
+        refC = spec.rightChildRefinement(r, refR)
+        split <- inside.top.feasibleSpan(begin, end, b, refB, c, refC)
       } {
-        val ruleScore = grammar.ruleScore(r)
-        val score = ruleScore + inside.top.labelScore(start,split,b) +
-          inside.top.labelScore(split,end,c) +
-          spanScorer.scoreBinaryRule(start,split,end,r) + spanScorer.scoreSpan(start,end,root)
+        val ruleScore = spec.scoreBinaryRule(begin, split, end, r, refR)
+        val score = (
+          ruleScore
+            + inside.top.labelScore(begin, split, b, refB)
+            + inside.top.labelScore(split, end, c, refC)
+            + spanScore
+          )
         if(score > maxScore) {
           maxScore = score
           maxLeft = b
+          maxLeftRef = refB
           maxRight = c
+          maxRightRef = refC
           maxSplit = split
         }
       }
 
       if(maxScore == Double.NegativeInfinity) {
-        println("entered things: " + inside.bot.enteredLabelScores(start,end).map { case (i,v) => (grammar.labelIndex.get(i),v)}.toList)
-        sys.error("Couldn't find a tree!" + start + " " + end + " " + grammar.labelIndex.get(root))
+        println("entered things: " + inside.bot.enteredLabelScores(begin, end).map { case (i, v) => (grammar.labelIndex.get(i), v)}.toList)
+        sys.error("Couldn't find a tree!" + begin + " " + end + " " + grammar.labelIndex.get(root))
       } else {
-        val lchild = buildTreeUnary(start,maxSplit,maxLeft)
-        val rchild = buildTreeUnary(maxSplit,end,maxRight)
-        BinaryTree(indexedProjections.coarseSymbol(root),lchild,rchild)(Span(start,end))
+        val lchild = buildTreeUnary(begin, maxSplit, maxLeft, maxLeftRef)
+        val rchild = buildTreeUnary(maxSplit, end, maxRight, maxRightRef)
+        BinaryTree(labelIndex.get(root), lchild, rchild)(Span(begin, end))
       }
 
 
     }
 
-    val t = buildTreeUnary(0,inside.length, grammar.labelIndex(root))
+    val maxRootRef = spec.validLabelRefinements(0, inside.length, rootIndex).maxBy(ref => inside.top(0, inside.length, rootIndex, ref))
+    val t = buildTreeUnary(0, inside.length, rootIndex, maxRootRef)
     t
   }
-}
-
-@SerialVersionUID(1)
-class SimpleViterbiDecoder[L,W](grammar: Grammar[L]) extends
-    ViterbiDecoder[L,L,W](ProjectionIndexer.simple(grammar.labelIndex)) with Serializable
-
-
-object SimpleViterbiDecoder {
-  def apply[L,W](g: Grammar[L]):SimpleViterbiDecoder[L,W] = new SimpleViterbiDecoder[L,W](g)
 }
 
 /**
  * Tries to extract a tree that maximizes rule product in the coarse grammar
  **/
-class MaxRuleProductDecoder[C,F, W](coarseGrammar: Grammar[C], coarseLexicon: Lexicon[C,W],
-                             indexedProjections: GrammarProjections[C,F],
-                             fineBuilder: ChartBuilder[ParseChart.LogProbabilityParseChart, F, W]) extends ChartDecoder[C,F, W] {
-  val p = new AnchoredRulePosteriorScorerFactory(coarseGrammar, new SimpleChartParser(fineBuilder, new ViterbiDecoder[C,F,W](indexedProjections.labels), indexedProjections))
+case class MaxRuleProductDecoder[L, W](grammar: Grammar[L]) extends ChartDecoder[L, W] {
+  val p = new AnchoredRuleMarginalProjector[L,W]()
 
-  override def extractBestParse(root: F, grammar: Grammar[F],
-                                inside: ParseChart[F], outside: =>ParseChart[F], words:Seq[W],
-                                spanScorer: SpanScorer[F] = SpanScorer.identity):BinarizedTree[C] = {
-    val zeroGrammar = Grammar.zero(coarseGrammar)
-    val zeroLexicon = new ZeroLexicon(coarseLexicon)
-    val coarseRoot = indexedProjections.labels.project(root)
-    val zeroParser = new CKYChartBuilder[ParseChart.LogProbabilityParseChart,C,W](coarseRoot, zeroLexicon, zeroGrammar,ParseChart.logProb)
-    val partition = inside.top.labelScore(0,inside.length,root)
-    val scorer = p.buildSpanScorer(new ChartPair[ParseChart,F](inside, outside, partition, spanScorer))
-    val zeroInside = zeroParser.buildInsideChart(words,scorer)
-    val zeroOutside = zeroParser.buildOutsideChart(zeroInside,scorer)
-    val tree = SimpleViterbiDecoder(zeroGrammar).extractBestParse(coarseRoot,zeroGrammar, zeroInside,zeroOutside, words, scorer)
+  def extractBestParse(marginal: ChartMarginal[ParseChart, L, W]) = {
+    val scorer = p.buildSpanScorer(marginal)
+    val oneoff: WeightedGrammar[L, W] = WeightedGrammar.oneOff(grammar, scorer)
+    val newMarg = new CKYChartBuilder(oneoff, ParseChart.logProb).charts(marginal.spec.words)
+    val tree = new ViterbiDecoder[L,W].extractBestParse(newMarg)
     tree
-  }
-}
-
-object MaxRuleProductDecoder {
-  def apply[C,F,W](base: ChartBuilder[ParseChart.LogProbabilityParseChart, C, W], fine: ChartBuilder[ParseChart.LogProbabilityParseChart, F, W],  proj: GrammarProjections[C,F]) = {
-    new MaxRuleProductDecoder(base.grammar, base.lexicon, proj, fine)
-  }
-
-  def simple[C,W](base: ChartBuilder[ParseChart.LogProbabilityParseChart, C, W]) = {
-    new MaxRuleProductDecoder(base.grammar, base.lexicon, GrammarProjections.identity(base.grammar), base)
   }
 }
 
 /**
  * Tries to extract a tree that maximizes... XXX
  **/
-class MaxVariationalDecoder[C,F, W](coarseGrammar: Grammar[C], coarseLexicon: Lexicon[C,W],
-                             indexedProjections: GrammarProjections[C,F],
-                             fineBuilder: ChartBuilder[ParseChart.LogProbabilityParseChart, F, W]) extends ChartDecoder[C,F, W] {
-  val p = new AnchoredRuleScorerFactory(coarseGrammar, new SimpleChartParser(fineBuilder, new ViterbiDecoder[C,F,W](indexedProjections.labels), indexedProjections),Double.NegativeInfinity)
+class MaxVariationalDecoder[L, W](grammar: Grammar[L]) extends ChartDecoder[L, W] {
+  val p = new AnchoredPCFGProjector[L,W](grammar)
 
-  override def extractBestParse(root: F, grammar: Grammar[F],
-                                inside: ParseChart[F], outside: =>ParseChart[F], words:Seq[W],
-                                spanScorer: SpanScorer[F] = SpanScorer.identity):BinarizedTree[C] = {
-    val zeroGrammar = Grammar.zero(coarseGrammar)
-    val zeroLexicon = new ZeroLexicon(coarseLexicon)
-    val coarseRoot = indexedProjections.labels.project(root)
-    val zeroParser = new CKYChartBuilder[ParseChart.LogProbabilityParseChart,C,W](coarseRoot, zeroLexicon, zeroGrammar,ParseChart.logProb)
-    val partition = inside.top.labelScore(0,inside.length,root)
-    val scorer = p.buildSpanScorer(new ChartPair[ParseChart,F](inside, outside, partition, spanScorer))
-    val zeroInside = zeroParser.buildInsideChart(words,scorer)
-    val zeroOutside = zeroParser.buildOutsideChart(zeroInside,scorer)
-    val tree = SimpleViterbiDecoder(zeroGrammar).extractBestParse(coarseRoot,zeroGrammar, zeroInside,zeroOutside, words, scorer)
+  def extractBestParse(marginal: ChartMarginal[ParseChart, L, W]) = {
+    val scorer = p.buildSpanScorer(marginal)
+    val oneoff: WeightedGrammar[L, W] = WeightedGrammar.oneOff(grammar, scorer)
+    val newMarg = new CKYChartBuilder(oneoff, ParseChart.logProb).charts(marginal.spec.words)
+    val tree = new ViterbiDecoder[L,W].extractBestParse(newMarg)
     tree
   }
 }
 
-@SerialVersionUID(-185839943177203964L)
-class MaxConstituentDecoder[C,F,W](projections: GrammarProjections[C,F]) extends ChartDecoder[C,F,W] {
-  val indexedProjections = projections.labels
-  override def extractBestParse(root: F, grammar: Grammar[F],
-                                 inside: ParseChart[F], loutside: =>ParseChart[F], words: Seq[W],
-                                 scorer : SpanScorer[F] = SpanScorer.identity):BinarizedTree[C] = {
-    val outside = loutside
-    val maxSplit = new TriangularArray[Int](inside.length+1,0)
-    val maxBotLabel = new TriangularArray[Int](inside.length+1,-1)
-    val maxBotScore = new TriangularArray[Double](inside.length+1,Double.NegativeInfinity)
-    val maxTopLabel = new TriangularArray[Int](inside.length+1,-1)
-    val maxTopScore = new TriangularArray[Double](inside.length+1,Double.NegativeInfinity)
+@SerialVersionUID(2L)
+class MaxConstituentDecoder[L, W] extends ChartDecoder[L, W] {
 
-    val scores = indexedProjections.coarseEncoder.fillArray(Double.NegativeInfinity)
+  def extractBestParse(marginal: ChartMarginal[ParseChart, L, W]) = {
+    import marginal._
+
+    val labelIndex = marginal.grammar.labelIndex
+
+    val maxSplit = new TriangularArray[Int](inside.length+1, 0)
+    val maxBotLabel = new TriangularArray[Int](inside.length+1, -1)
+    val maxBotScore = new TriangularArray[Double](inside.length+1, Double.NegativeInfinity)
+    val maxTopLabel = new TriangularArray[Int](inside.length+1, -1)
+    val maxTopScore = new TriangularArray[Double](inside.length+1, Double.NegativeInfinity)
+
+
+    val scores = spec.grammar.labelEncoder.fillArray(Double.NegativeInfinity)
+    val buffer = Array.fill(1000)(Double.NegativeInfinity)
+
+    def marginalizeRefinements(begin: Int, end: Int, l: ID[L], ichart: inside.ChartScores, ochart: outside.ChartScores): Double = {
+      var bufOff = 0
+      for (lRef <- ichart.enteredLabelRefinements(begin, end, l)) {
+        val myScore = ichart.labelScore(begin, end, l, lRef) + ochart.labelScore(begin, end, l, lRef) - partition
+        buffer(bufOff) = myScore
+        bufOff += 1
+      }
+      inside.sum(buffer, bufOff)
+    }
+
     for(i <- 0 until inside.length) {
-      Arrays.fill(scores,Double.NegativeInfinity)
-      for(l <- inside.bot.enteredLabelIndexes(i,i+1)) {
-        val myScore = inside.bot.labelScore(i, i + 1, l) + outside.bot.labelScore(i, i+1, l)
-        scores(indexedProjections.project(l)) = logSum(scores(indexedProjections.project(l)), myScore)
+      Arrays.fill(scores, Double.NegativeInfinity)
+      for(l <- inside.bot.enteredLabelIndexes(i, i + 1)) {
+        scores(l) = marginalizeRefinements(i, i + 1, l, inside.bot, outside.bot)
       }
-      maxBotScore(i,i+1) = scores.max
-      maxBotLabel(i,i+1) = scores.argmax
+      maxBotScore(i, i + 1) = scores.max
+      maxBotLabel(i, i + 1) = scores.argmax
 
-      Arrays.fill(scores,Double.NegativeInfinity)
-      for(l <- inside.top.enteredLabelIndexes(i,i+1)) {
-        val myScore = inside.top.labelScore(i, i + 1, l) + outside.top.labelScore(i, i+1, l)
-        scores(indexedProjections.project(l)) = logSum(scores(indexedProjections.project(l)), myScore)
+      Arrays.fill(scores, Double.NegativeInfinity)
+      for(l <- inside.top.enteredLabelIndexes(i, i + 1)) {
+        scores(l) = marginalizeRefinements(i, i + 1, l, inside.top, outside.top)
       }
-      maxTopScore(i,i+1) = logSum(scores.max,maxBotScore(i,i+1))
-      maxTopLabel(i,i+1) = scores.argmax
+      maxTopScore(i, i + 1) = logSum(scores.max, maxBotScore(i, i + 1))
+      maxTopLabel(i, i + 1) = scores.argmax
     }
 
     for {
@@ -205,53 +193,45 @@ class MaxConstituentDecoder[C,F,W](projections: GrammarProjections[C,F]) extends
       begin <- 0 to (inside.length - span)
       end = begin + span
     } {
-      Arrays.fill(scores,Double.NegativeInfinity)
-      for(l <- inside.bot.enteredLabelIndexes(begin,end)) {
-        val myScore = inside.bot.labelScore(begin, end, l) + outside.bot.labelScore(begin, end, l)
-        scores(indexedProjections.project(l)) = logSum(scores(indexedProjections.project(l)), myScore)
+      Arrays.fill(scores, Double.NegativeInfinity)
+      for(l <- inside.bot.enteredLabelIndexes(begin, end)) {
+        scores(l) = marginalizeRefinements(begin, end, l, inside.bot, outside.bot)
       }
-      maxBotScore(begin,end) = scores.max
-      maxBotLabel(begin,end) = scores.argmax
+      maxBotScore(begin, end) = scores.max
+      maxBotLabel(begin, end) = scores.argmax
 
-      Arrays.fill(scores,Double.NegativeInfinity)
-      for(l <- inside.top.enteredLabelIndexes(begin,end)) {
-        val myScore = inside.top.labelScore(begin, end, l) + outside.top.labelScore(begin, end, l)
-        scores(indexedProjections.project(l)) = logSum(scores(indexedProjections.project(l)), myScore)
+      Arrays.fill(scores, Double.NegativeInfinity)
+      for(l <- inside.top.enteredLabelIndexes(begin, end)) {
+        scores(l) = marginalizeRefinements(begin, end, l, inside.top, outside.top)
       }
-      maxTopScore(begin,end) = logSum(scores.max,maxBotScore(begin,end))
-      maxTopLabel(begin,end) = scores.argmax
+      maxTopScore(begin, end) = logSum(scores.max, maxBotScore(begin, end))
+      maxTopLabel(begin, end) = scores.argmax
 
-      val (split,splitScore) = (for(split <- begin +1 until end) yield {
-        val score = logSum(maxTopScore(begin,split),maxTopScore(split,end))
-        (split,score)
-      })reduceLeft ( (a,b) => if(a._2 > b._2) a else b)
+      val (split, splitScore) = (for(split <- begin +1 until end) yield {
+        val score = logSum(maxTopScore(begin, split), maxTopScore(split, end))
+        (split, score)
+      }).maxBy(_._2)
 
-      maxSplit(begin,end) = split
-      maxTopScore(begin,end) = logSum(maxTopScore(begin,end),splitScore)
-      //maxBotScore(begin,end) = logSum(maxBotScore(begin,end),splitScore)
+      maxSplit(begin, end) = split
+      maxTopScore(begin, end) = logSum(maxTopScore(begin, end), splitScore)
+      //maxBotScore(begin, end) = logSum(maxBotScore(begin, end), splitScore)
     }
 
-    def extract(begin: Int, end: Int):BinarizedTree[C] = {
+    def extract(begin: Int, end: Int):BinarizedTree[L] = {
       val lower = if(begin + 1== end) {
-        if(maxBotScore(begin,end) == Double.NegativeInfinity)
-          throw new RuntimeException("Couldn't make a good score for " + (begin,end) + ". InsideIndices: " + inside.bot.enteredLabelIndexes(begin,end).toIndexedSeq + " outside: " + outside.bot.enteredLabelIndexes(begin,end).toIndexedSeq)
-        NullaryTree(indexedProjections.coarseIndex.get(maxBotLabel(begin,end)))(Span(begin,end))
+        if(maxBotScore(begin, end) == Double.NegativeInfinity)
+          throw new RuntimeException("Couldn't make a good score for " + (begin, end) + ". InsideIndices: " + inside.bot.enteredLabelIndexes(begin, end).toIndexedSeq + " outside: " + outside.bot.enteredLabelIndexes(begin, end).toIndexedSeq)
+        NullaryTree(labelIndex.get(maxBotLabel(begin, end)))(Span(begin, end))
       } else {
-        val split = maxSplit(begin,end)
-        val left = extract(begin,split)
-        val right = extract(split,end)
-        BinaryTree(indexedProjections.coarseIndex.get(maxBotLabel(begin,end)),left,right)(Span(begin,end))
+        val split = maxSplit(begin, end)
+        val left = extract(begin, split)
+        val right = extract(split, end)
+        BinaryTree(labelIndex.get(maxBotLabel(begin, end)), left, right)(Span(begin, end))
       }
 
-      UnaryTree(indexedProjections.coarseIndex.get(maxTopLabel(begin,end)),lower)(Span(begin,end))
+      UnaryTree(labelIndex.get(maxTopLabel(begin, end)), lower)(Span(begin, end))
     }
 
-    extract(0,inside.length)
-
-
+    extract(0, inside.length)
   }
-}
-
-object MaxConstituentDecoder {
-  def simple[L,W](g: Grammar[L]) =  new MaxConstituentDecoder[L,L,W](GrammarProjections.identity(g))
 }

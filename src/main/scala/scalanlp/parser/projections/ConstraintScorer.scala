@@ -7,7 +7,9 @@ import java.util.Arrays
 import scalanlp.config.Configuration
 import java.io._
 import scalanlp.collection.mutable.{OpenAddressHashArray, TriangularArray}
-import scalanlp.trees.AnnotatedLabel
+import scalanlp.trees._
+import scalanlp.util.TypeTags._
+import scalanlp.util.Index
 
 /**
  * 
@@ -15,17 +17,17 @@ import scalanlp.trees.AnnotatedLabel
  */
 
 class ConstraintScorer[L](val scores: Array[BitSet], topScores: Array[BitSet]) extends SpanScorer[L] {
-  def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = 0.0
+  def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: ID[Rule[L]]) = 0.0
 
-  def scoreUnaryRule(begin: Int, end: Int, rule: Int) = {
-    val set = topScores(TriangularArray.index(begin,end))
+  def scoreUnaryRule(begin: Int, end: Int, rule: ID[Rule[L]]) = {
+    val set = topScores(TriangularArray.index(begin, end))
     if(set == null || !set.contains(rule)) Double.NegativeInfinity
     else 0.0
 //    0.0
   }
 
-  def scoreSpan(begin: Int, end: Int, tag: Int) = {
-    val set = scores(TriangularArray.index(begin,end))
+  def scoreSpan(begin: Int, end: Int, tag: ID[L]) = {
+    val set = scores(TriangularArray.index(begin, end))
     if(set == null || !set.contains(tag)) Double.NegativeInfinity
     else 0.0
   }
@@ -35,85 +37,71 @@ class ConstraintScorer[L](val scores: Array[BitSet], topScores: Array[BitSet]) e
  * Creates labeled span scorers for a set of trees from some parser.
  * @author dlwh
  */
-class ConstraintScorerFactory[C,L,W](parser: SimpleChartParser[C,L,W], threshold: Double) extends SpanScorer.Factory[C,L,W] {
-  def indexedProjections = parser.projections.labels
-  private val coarseUnaryIndex = new OpenAddressHashArray(indexedProjections.coarseIndex.size * indexedProjections.coarseIndex.size, -1)
-  for(r@UnaryRule(a,b) <- parser.projections.rules.coarseIndex) {
-    val ai = indexedProjections.coarseIndex(a)
-    val bi = indexedProjections.coarseIndex(b)
-    val ri = parser.projections.rules.coarseIndex(r)
-    coarseUnaryIndex(bi + indexedProjections.coarseIndex.size * ai) = ri
-  }
+class ConstraintScorerFactory[L, W](parser: ChartBuilder[ParseChart, L, W], threshold: Double) extends SpanScorer.Factory[L, W] {
 
-  private def ruleIndex(ai: Int, bi: Int) = {
-    coarseUnaryIndex(bi + indexedProjections.coarseIndex.size * ai)
-  }
-
-  def mkSpanScorer(s: Seq[W], scorer: SpanScorer[C] = SpanScorer.identity, goldTags: GoldTagPolicy[C] = GoldTagPolicy.noGoldTags[C]) = {
-    val charts = parser.charts(s,scorer)
-
-    val sentProb = charts.inside.top.labelScore(0,s.length,parser.root)
-    if(sentProb.isInfinite) {
-      sys.error("Couldn't parse " + s + " " + sentProb)
-    }
-
-    val chartScorer = buildSpanScorer(charts,sentProb, scorer, goldTags)
-
+  def mkSpanScorer(s: Seq[W], goldTags: GoldTagPolicy[L] = GoldTagPolicy.noGoldTags[L]) = {
+    val charts = parser.charts(s)
+    val chartScorer = buildSpanScorer(charts, goldTags)
     chartScorer
   }
 
-  def scoresForCharts(scoresForLocation: Array[Double], begin: Int, end: Int, ichart: ParseChart[L]#ChartScores, ochart: ParseChart[L]#ChartScores, sentProb: Double, goldTags: GoldTagPolicy[C], scores: Array[collection.mutable.BitSet]) {
-    val active = new collection.mutable.BitSet()
-    Arrays.fill(scoresForLocation, Double.NegativeInfinity)
-    val index = TriangularArray.index(begin, end)
-    for (l <- ichart.enteredLabelIndexes(begin, end)) {
-      val pL = indexedProjections.project(l)
-      val myScore = ichart.labelScore(begin, end, l) + ochart.labelScore(begin, end, l) - sentProb
-      val currentScore = scoresForLocation(pL)
-      scoresForLocation(pL) = Numerics.logSum(currentScore, myScore)
-      active += pL
-    }
+  private def scoresForCharts(marg: ChartMarginal[ParseChart, L, W], gold: GoldTagPolicy[L]) = {
+    val length = marg.length
+    val scores = TriangularArray.raw(length+1, null: Array[Double])
+    val topScores = TriangularArray.raw(length+1, null: Array[Double])
+    val visitor = new AnchoredSpanVisitor[L] {
+      def visitBinaryRule(begin: Int, split: Int, end: Int, rule: ID[Rule[L]], ref: ID[RuleRef[L]], score: Double) {}
 
-    for (c <- active) {
-      val v = scoresForLocation(c)
-      if (v > threshold || goldTags.isGoldTag(begin, end, c)) {
-        if (scores(index) eq null) {
-          scores(index) = new collection.mutable.BitSet()
+      def visitUnaryRule(begin: Int, end: Int, rule: ID[Rule[L]], ref: ID[RuleRef[L]], score: Double) {
+        val index = TriangularArray.index(begin, end)
+        if(score != 0.0) {
+          if(topScores(index) eq null) {
+            topScores(index) = new Array[Double](parser.grammar.index.size)
+          }
+          topScores(index)(rule) += score
         }
-        scores(index) += c
+      }
+      
+
+      def visitSpan(begin: Int, end: Int, tag: ID[L], ref: ID[Ref[L]], score: Double) {
+        val index = TriangularArray.index(begin, end)
+        if(score != 0.0) {
+          if(scores(index) eq null) {
+            scores(index) = new Array[Double](parser.grammar.labelIndex.size)
+          }
+          scores(index)(tag) += score
+        }
       }
     }
+
+    // TODO: gold tags!
+    val labelThresholds = scores.map { case arr =>
+      if(arr eq null) null
+      else BitSet(0 until arr.length filter {s => math.log(arr(s)) > threshold}:_*)
+    }
+
+    val unaryThresholds = topScores.map { arr =>
+      if(arr eq null) null
+      else BitSet(0 until arr.length filter {s => math.log(arr(s)) > threshold}:_*)
+    }
+
+    (labelThresholds, unaryThresholds)
   }
 
-  def buildSpanScorer(charts: ChartPair[ParseChart,L], sentProb: Double,
-                      coarseScorer: SpanScorer[C] = SpanScorer.identity,
-                      goldTags: GoldTagPolicy[C] = GoldTagPolicy.noGoldTags[C]):ConstraintScorer[C] = {
+  def buildSpanScorer(charts: ChartMarginal[ParseChart, L, W],
+                      goldTags: GoldTagPolicy[L] = GoldTagPolicy.noGoldTags[L]):ConstraintScorer[L] = {
     import charts._
 
-    val scores = TriangularArray.raw(inside.length+1,null:collection.mutable.BitSet)
-    val topScores = TriangularArray.raw(inside.length+1,null:collection.mutable.BitSet)
-    val scoresForLocation = indexedProjections.coarseEncoder.fillArray(Double.NegativeInfinity)
+    val (label,unary) = scoresForCharts(charts, goldTags)
 
-    for(begin <-  0 until inside.length; end <- begin+1 to (inside.length)) {
-      scoresForCharts(scoresForLocation, begin, end, inside.bot, outside.bot, sentProb, goldTags, scores)
-      scoresForCharts(scoresForLocation, begin, end, inside.top, outside.top, sentProb, goldTags, topScores)
-
-    }
-    
-    val unaryRulesAllowed = for( (t,b) <- topScores zip scores) yield {
-      if( (t eq null) || (b eq null)) null
-      else {
-        val bitset = BitSet.empty ++ {for { a <- t; c <- b; r = ruleIndex(a,c) if r != -1} yield r}
-        if(bitset.nonEmpty)
-          bitset
-        else null
-      }
-    }
-//    println("Density: " + density * 1.0 / scores.length)
-//    println("Label Density:" + labelDensity * 1.0 / scores.length / parser.projections.labels.coarseIndex.size)
-    new ConstraintScorer[C](scores.map { e => if(e eq null) null else BitSet.empty ++ e}, unaryRulesAllowed)
+    new ConstraintScorer[L](label, unary)
   }
 
+}
+
+
+case class ProjectionParams(treebank: ProcessedTreebank,
+                            parser: File, out: File = new File("spans"), maxParseLength: Int = 40, project: Boolean = true) {
 }
 
 object ProjectTreebankToConstraints {
@@ -121,54 +109,44 @@ object ProjectTreebankToConstraints {
   import SpanBroker._
 
   def main(args: Array[String]) {
-    val (baseConfig,files) = scalanlp.config.CommandLineParser.parseArguments(args)
+    val (baseConfig, files) = scalanlp.config.CommandLineParser.parseArguments(args)
     val config = baseConfig backoff Configuration.fromPropertiesFiles(files.map(new File(_)))
     val params = config.readIn[ProjectionParams]("")
-    val treebank = params.processedTreebank.copy(treebank = params.processedTreebank.treebank.copy(maxLength = 100000))
+    val treebank = params.treebank.copy(maxLength = 1000000)
     println(params)
     val parser = loadParser[Any](params.parser)
 
     val outDir = params.out
     outDir.mkdirs()
 
-    val proj = new GrammarProjections(ProjectionIndexer.simple(parser.projections.labels.coarseIndex), ProjectionIndexer.simple(parser.projections.rules.coarseIndex))
-    val trueProj = parser.projections
-    if(params.project) {
-      val factory = new ConstraintScorerFactory[AnnotatedLabel,Any,String](parser, -7)
-      scalanlp.util.writeObject(new File(outDir,SPAN_INDEX_NAME),parser.projections.labels.coarseIndex)
-      serializeSpans(mapTrees(factory,treebank.trainTrees, proj, true, params.maxParseLength),new File(outDir,TRAIN_SPANS_NAME))
-      serializeSpans(mapTrees(factory,treebank.testTrees, proj, false, 10000),new File(outDir,TEST_SPANS_NAME))
-      serializeSpans(mapTrees(factory,treebank.devTrees, proj, false, 10000),new File(outDir,DEV_SPANS_NAME))
-    } else {
-      val fineProj = new GrammarProjections(ProjectionIndexer.simple(parser.projections.labels.fineIndex), ProjectionIndexer.simple(parser.projections.rules.fineIndex))
-      val nonprojectingParser = new SimpleChartParser(parser.builder,new SimpleViterbiDecoder[Any,String](parser.builder.grammar), fineProj)
-      val factory = new ConstraintScorerFactory[Any,Any,String](nonprojectingParser, -7)
-      scalanlp.util.writeObject(new File(outDir, SPAN_INDEX_NAME), parser.projections.labels.fineIndex)
-      serializeSpans(mapTrees(factory,treebank.trainTrees, trueProj, true, params.maxParseLength),new File(outDir,TRAIN_SPANS_NAME))
-      serializeSpans(mapTrees(factory,treebank.testTrees, trueProj, false, 10000),new File(outDir,TEST_SPANS_NAME))
-      serializeSpans(mapTrees(factory,treebank.devTrees, trueProj, false, 10000),new File(outDir,DEV_SPANS_NAME))
-    }
+    val factory = new ConstraintScorerFactory[AnnotatedLabel, String](parser.builder, -7)
+    scalanlp.util.writeObject(new File(outDir, XBAR_GRAMMAR_NAME), parser.builder.grammar.grammar)
+    serializeSpans(mapTrees(factory, treebank.trainTrees, parser.builder.grammar.labelIndex, true, params.maxParseLength), new File(outDir, TRAIN_SPANS_NAME))
+    serializeSpans(mapTrees(factory, treebank.testTrees, parser.builder.grammar.labelIndex, false, 10000), new File(outDir, TEST_SPANS_NAME))
+    serializeSpans(mapTrees(factory, treebank.devTrees, parser.builder.grammar.labelIndex, false, 10000), new File(outDir, DEV_SPANS_NAME))
   }
 
   def loadParser[T](loc: File) = {
-    val parser = scalanlp.util.readObject[SimpleChartParser[AnnotatedLabel,T,String]](loc)
+    val parser = scalanlp.util.readObject[SimpleChartParser[AnnotatedLabel, String]](loc)
     parser
   }
 
-  def mapTrees[L](factory: ConstraintScorerFactory[L,Any,String], trees: IndexedSeq[TreeInstance[AnnotatedLabel,String]],
-                  proj: GrammarProjections[AnnotatedLabel,L], useTree: Boolean, maxL: Int) = {
+  def mapTrees[L](factory: ConstraintScorerFactory[L, String], 
+                  trees: IndexedSeq[TreeInstance[L, String]],
+                  index: Index[L],
+                  useTree: Boolean, maxL: Int) = {
     // TODO: have ability to use other span scorers.
-    trees.toIndexedSeq.par.map { (ti:TreeInstance[AnnotatedLabel,String]) =>
-      val TreeInstance(id,tree,words,preScorer) = ti
-      println(id,words)
+    trees.toIndexedSeq.par.map { (ti:TreeInstance[L, String]) =>
+      val TreeInstance(id, tree, words) = ti
+      println(id, words)
       try {
         val pruner:GoldTagPolicy[L] = if(useTree) {
-          val mappedTree = tree.map(l => proj.labels.refinementsOf(l.baseAnnotatedLabel).map(proj.labels.fineIndex))
-          GoldTagPolicy.candidateTreeForcing(mappedTree)
+          val mappedTree = tree.map(l => index(l))
+          GoldTagPolicy.goldTreeForcing(mappedTree)
         } else {
           GoldTagPolicy.noGoldTags
         }
-        val scorer = factory.mkSpanScorer(words,new ProjectingSpanScorer(proj, preScorer), pruner)
+        val scorer = factory.mkSpanScorer(words, pruner)
         id -> scorer
       } catch {
         case e: Exception => e.printStackTrace(); id -> SpanScorer.identity[L]

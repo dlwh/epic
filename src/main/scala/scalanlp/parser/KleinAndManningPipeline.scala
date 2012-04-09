@@ -1,12 +1,9 @@
 package scalanlp.parser
 
-import projections.{ProjectingSpanScorer, GrammarProjections}
 import scalanlp.trees._
 
 import scalanlp.parser.ParseEval.Statistics
 import scalanlp.trees.Trees
-import scalala.library.Library
-import scalanlp.parser.ParseChart._
 import collection.IndexedSeq
 
 
@@ -291,7 +288,7 @@ object KleinAndManningPipeline extends ParserPipeline {
                   validate: (Parser[AnnotatedLabel, String]) => Statistics,
                   params: Params) = {
 
-    val xbarParser = params.baseParser.xbarParser(trainTrees)
+    val xbarParser = params.baseParser.xbarGrammar(trainTrees)
 
     val pipeline = params.pipeline
 
@@ -300,18 +297,10 @@ object KleinAndManningPipeline extends ParserPipeline {
       TreeInstance(ti.id, t,ti.words)
     }.seq
     val (words, binary, unary) = GenerativeParser.extractCounts(transformed);
-    val grammar = Grammar(Library.logAndNormalizeRows(binary), Library.logAndNormalizeRows(unary));
-    println(grammar.labelIndex)
-    val lexicon = new SignatureLexicon(words, EnglishWordClassGenerator, 5);
-    val builder = CKYChartBuilder(AnnotatedLabel(""), lexicon, grammar).withCharts(ParseChart.logProb)
-    val proj = GrammarProjections(xbarParser.grammar, grammar, {(_:AnnotatedLabel).baseAnnotatedLabel})
-    val decoder = new MaxConstituentDecoder[AnnotatedLabel, AnnotatedLabel, String](proj)
-    val parser = new SimpleChartParser[AnnotatedLabel, AnnotatedLabel, String](builder, decoder, proj)
-    val maxV = new MaxVariationalDecoder[AnnotatedLabel, AnnotatedLabel, String](xbarParser.grammar, xbarParser.lexicon, proj, builder)
-    val maxVParser = new SimpleChartParser[AnnotatedLabel, AnnotatedLabel, String](builder, maxV, proj)
-    val vit = new ViterbiDecoder[AnnotatedLabel, AnnotatedLabel, String](proj.labels)
-    val viterbiParser = new SimpleChartParser[AnnotatedLabel, AnnotatedLabel, String](builder, vit, proj)
-    Iterator("maxV" -> maxVParser, "Viterbi" -> viterbiParser, "Markovized" -> parser)
+    val grammar = WeightedGrammar.generative(AnnotatedLabel.TOP, binary, unary, words)
+    val builder = CKYChartBuilder(grammar, ParseChart.logProb)
+    val parser = SimpleChartParser[AnnotatedLabel, String](builder)
+    Iterator("Markovized" -> parser)
   }
 
 }

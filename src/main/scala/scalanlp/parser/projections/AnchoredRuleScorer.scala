@@ -2,24 +2,24 @@ package scalanlp.parser
 package projections
 
 import java.io._
-import scalanlp.collection.mutable.{OpenAddressHashArray, TriangularArray}
+import scalanlp.collection.mutable.TriangularArray
 import scalanlp.tensor.sparse.OldSparseVector
+import scalanlp.util.TypeTags.{tag,ID}
+import scalanlp.trees.Rule
 
 /**
  * Creates labeled span scorers for a set of trees from some parser. Projects from L to C.
  * @author dlwh
  */
-class AnchoredRuleScorerFactory[C,L,W](val coarseGrammar: Grammar[C],
-                                       parser: SimpleChartParser[C,L,W], threshold: Double)
-        extends ChartDrivenScorerFactory[C,L,W](coarseGrammar,parser, threshold) {
+case class AnchoredPCFGProjector[L, W](grammar: Grammar[L], threshold: Double = Double.NegativeInfinity) extends ChartProjector[L, W] {
 
-  type MyScorer = AnchoredRuleScorer[C];
+  type MyScorer = AnchoredRuleScorer[L];
   private def normalize(ruleScores: OldSparseVector, totals: OldSparseVector):OldSparseVector = {
     if(ruleScores eq null) null
     else {
-      val r = new OldSparseVector(ruleScores.length,Double.NegativeInfinity, ruleScores.activeSize * 3 / 2)
-      for( (rule,score) <- ruleScores.activeIterator) {
-        val parent = coarseGrammar.parent(rule)
+      val r = new OldSparseVector(ruleScores.length, Double.NegativeInfinity, ruleScores.activeSize * 3 / 2)
+      for( (rule, score) <- ruleScores.activeIterator) {
+        val parent = grammar.parent(tag[Rule[L]](rule))
         if(score > 0)
           r(rule) = math.log(score) - math.log(totals(parent))
 //        r(rule) = score - totals(parent)
@@ -29,14 +29,14 @@ class AnchoredRuleScorerFactory[C,L,W](val coarseGrammar: Grammar[C],
   }
 
   protected def createSpanScorer(ruleData: AnchoredRuleProjector.AnchoredData, sentProb: Double) = {
-    val AnchoredRuleProjector.AnchoredData(lexicalScores,unaryScores,totalsUnaries,binaryScores,totalsBinaries) = ruleData;
-    val normUnaries:Array[OldSparseVector] = for((ruleScores,totals) <- unaryScores zip totalsUnaries) yield {
+    val AnchoredRuleProjector.AnchoredData(lexicalScores, unaryScores, totalsUnaries, binaryScores, totalsBinaries) = ruleData;
+    val normUnaries:Array[OldSparseVector] = for((ruleScores, totals) <- unaryScores zip totalsUnaries) yield {
       normalize(ruleScores, totals)
     }
 
-    val normBinaries:Array[Array[OldSparseVector]] = for ((splits,totals) <- binaryScores zip totalsBinaries) yield {
+    val normBinaries:Array[Array[OldSparseVector]] = for ((splits, totals) <- binaryScores zip totalsBinaries) yield {
       if(splits eq null) null
-      else for(ruleScores <- splits) yield normalize(ruleScores,totals)
+      else for(ruleScores <- splits) yield normalize(ruleScores, totals)
     }
     new AnchoredRuleScorer(lexicalScores, normUnaries, normBinaries);
   }
@@ -49,25 +49,21 @@ class AnchoredRuleScorerFactory[C,L,W](val coarseGrammar: Grammar[C],
  * Creates labeled span scorers for a set of trees from some parser. Projects from L to C.
  * @author dlwh
  */
-class AnchoredRulePosteriorScorerFactory[C,L,W](coarseGrammar: Grammar[C],
-                                                parser: SimpleChartParser[C,L,W], threshold: Double = Double.NegativeInfinity)
-        extends ChartDrivenScorerFactory[C,L,W](coarseGrammar, parser, threshold) {
+case class AnchoredRuleMarginalProjector[L, W](threshold: Double = Double.NegativeInfinity) extends ChartProjector[L, W] {
   private def normalize(ruleScores: OldSparseVector):OldSparseVector = {
     if(ruleScores eq null) null
     else {
       val r = new OldSparseVector(ruleScores.length, Double.NegativeInfinity, ruleScores.activeSize)
-      for( (rule,score) <- ruleScores.pairsIterator) {
-        val parent = indexedProjections.labels.coarseIndex(indexedProjections.rules.coarseIndex.get(rule).parent)
+      for( (rule, score) <- ruleScores.pairsIterator) {
         r(rule) = math.log(score)
-//        r(rule) = score - totals(parent)
       }
       r
     }
   }
 
-  type MyScorer = AnchoredRuleScorer[C];
+  type MyScorer = AnchoredRuleScorer[L];
   protected def createSpanScorer(ruleData: AnchoredRuleProjector.AnchoredData, sentProb: Double) = {
-    val AnchoredRuleProjector.AnchoredData(lexicalScores,unaryScores, _, binaryScores, _) = ruleData;
+    val AnchoredRuleProjector.AnchoredData(lexicalScores, unaryScores, _, binaryScores, _) = ruleData;
     val normUnaries:Array[OldSparseVector] = for(ruleScores <- unaryScores) yield {
       normalize(ruleScores)
     }
@@ -84,18 +80,18 @@ class AnchoredRulePosteriorScorerFactory[C,L,W](coarseGrammar: Grammar[C],
 
 @SerialVersionUID(3)
 class AnchoredRuleScorer[L](spanScores: Array[OldSparseVector], // triangular index -> label -> score
-                         // (begin,end) -> rule -> score
-                         unaryScores: Array[OldSparseVector],
-                         // (begin,end) -> (split-begin) -> rule -> score
-                         binaryScores: Array[Array[OldSparseVector]]) extends SpanScorer[L] with Serializable {
+                            // (begin, end) -> rule -> score
+                            unaryScores: Array[OldSparseVector],
+                            // (begin, end) -> (split-begin) -> rule -> score
+                            binaryScores: Array[Array[OldSparseVector]]) extends SpanScorer[L] with Serializable {
 
-  def scoreUnaryRule(begin: Int, end: Int, rule: Int) = {
+  def scoreUnaryRule(begin: Int, end: Int, rule: ID[Rule[L]]) = {
     val forSpan = unaryScores(TriangularArray.index(begin, end))
     if(forSpan eq null) Double.NegativeInfinity
     else forSpan(rule)
   }
 
-  def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = {
+  def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: ID[Rule[L]]) = {
     val forSpan = binaryScores(TriangularArray.index(begin, end))
     if(forSpan eq null) Double.NegativeInfinity
     else {
@@ -104,7 +100,7 @@ class AnchoredRuleScorer[L](spanScores: Array[OldSparseVector], // triangular in
       else forSplit(rule)
     }
   }
-  def scoreSpan(begin: Int, end: Int, tag: Int): Double = {
+  def scoreSpan(begin: Int, end: Int, tag: ID[L]): Double = {
     val scores = spanScores(TriangularArray.index(begin, end))
     if(scores ne null) scores(tag)
     else Double.NegativeInfinity

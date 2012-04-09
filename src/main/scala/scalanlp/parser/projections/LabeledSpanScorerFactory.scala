@@ -3,20 +3,16 @@ package projections
 
 import scalanlp.trees._
 import scalanlp.collection.mutable.TriangularArray
-import scalala.library.Numerics._
-import scalanlp.util.Index
-import scalanlp.io.FileIterable
 
 import java.io._
-import scalanlp.trees.{Trees,DenseTreebank}
 import scalanlp.tensor.sparse.OldSparseVector
 import scalala.library.Numerics
-import scalanlp.config.Configuration
 
 /**
  * Creates labeled span scorers for a set of trees from some parser.
+ *
+ * TODO: make this correct by using score - log(1-exp(score)) as the score returned (as in notes)
  * @author dlwh
- */
 class LabeledSpanScorerFactory[C,L,W](parser: ChartParser[C,L,W], threshold: Double) extends SpanScorer.Factory[C,L,W] {
   def indexedProjections = parser.projections.labels
 
@@ -33,7 +29,7 @@ class LabeledSpanScorerFactory[C,L,W](parser: ChartParser[C,L,W], threshold: Dou
     chartScorer
   }
 
-  def buildSpanScorer(charts: ChartPair[ParseChart,L], sentProb: Double,
+  def buildSpanScorer(charts: ChartMarginal[ParseChart,L], sentProb: Double,
                       coarseScorer: SpanScorer[C] = SpanScorer.identity,
                       goldTag: GoldTagPolicy[C] = GoldTagPolicy.noGoldTags):LabeledSpanScorer[C] = {
     import charts._
@@ -78,9 +74,5 @@ class LabeledSpanScorer[L](scores: Array[OldSparseVector]) extends SpanScorer[L]
   }
 }
 
-case class ProjectionParams(treebank: TreebankParams,
-                            spans: SpanParams[AnnotatedLabel],
-                            parser: File, out: File = new File("spans"), maxParseLength: Int = 40, project: Boolean = true) {
-  def processedTreebank = ProcessedTreebank(treebank,spans)
-}
 
+*/

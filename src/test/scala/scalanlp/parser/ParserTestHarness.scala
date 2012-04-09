@@ -13,12 +13,12 @@ trait ParserTestHarness {
   }
 
   def getTestTrees(maxLength:Int= 15) = {
-    massageTrees(TstTreebank.treebank.test.trees, maxLength);
+    massageTrees(TstTreebank.treebank.test.trees, maxLength)
   }
 
   def massageTrees(trees: Iterator[(Tree[String], Seq[String])], maxLength:Int=15) = {
     val trainTrees = ArrayBuffer() ++= (for( (tree, words) <- trees.filter(_._2.length <= maxLength))
-    yield TreeInstance("", transform(tree), words));
+    yield TreeInstance("", transform(tree), words))
 
     trainTrees
   }
@@ -34,16 +34,16 @@ trait ParserTestHarness {
 object ParserTestHarness extends ParserTestHarness {
   val (simpleLexicon, simpleGrammar) = {
     try {
-    val trees = getTrainTrees();
-    GenerativeParser.extractLexiconAndGrammar(trees.iterator.map(_.mapLabels(_.baseAnnotatedLabel)))
+    val trees = getTrainTrees()
+    GenerativeParser.extractLexiconAndGrammar(trees.map(_.mapLabels(_.baseAnnotatedLabel)))
     } catch {
       case e => e.printStackTrace(); throw e
     }
   }
-  val simpleParser: SimpleChartParser[AnnotatedLabel, AnnotatedLabel, String] = {
-    val chartBuilder = new CKYChartBuilder[ParseChart.ViterbiParseChart,
-      AnnotatedLabel,
-      String](AnnotatedLabel.TOP, simpleLexicon, simpleGrammar, ParseChart.viterbi)
-    SimpleChartParser(chartBuilder);
+  val simpleParser: SimpleChartParser[AnnotatedLabel, String] = {
+    val trees = getTrainTrees()
+    val grammar = GenerativeParser.extractGrammar[AnnotatedLabel, String](trees.head.label.label, trees.map(_.mapLabels(_.baseAnnotatedLabel)))
+    val chartBuilder = new CKYChartBuilder(grammar, ParseChart.logProb)
+    SimpleChartParser(chartBuilder)
   }
 }

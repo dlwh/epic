@@ -39,7 +39,6 @@ trait Parser[L,W] extends (Seq[W]=>Tree[L]) {
    * rules in a sentence.
    *
    * @param s sentence
-   * @param spanScorer the span scorer
    */
-  def bestParse(s: Seq[W], spanScorer: SpanScorer[L] = SpanScorer.identity):Tree[L];
+  def bestParse(s: Seq[W]):Tree[L];
 }

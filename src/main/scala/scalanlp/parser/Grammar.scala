@@ -1,142 +1,102 @@
 package scalanlp.parser
-/*
- Copyright 2010 David Hall
 
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
-
- http://www.apache.org/licenses/LICENSE-2.0
-
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
-*/
-
-import scalanlp.util.Encoder;
-
-import scalanlp.util.Index
-import scalala.tensor.{Counter2,::}
-import scalanlp.serialization.{DataSerialization}
-import java.io.{DataInput, DataOutput}
-import scalanlp.serialization.DataSerialization.ReadWritable
-import scalala.library.Library._
+import scalanlp.collection.mutable.OpenAddressHashArray
 import collection.mutable.ArrayBuffer
-import scalanlp.collection.mutable.{OpenAddressHashArray}
 import scalanlp.trees.{UnaryRule, Rule, BinaryRule}
+import scalanlp.util.{TypeTags, Index, Encoder}
+import TypeTags.{ID,tag,tagArray}
+import scalala.tensor.Counter2
 
-@SerialVersionUID(2)
+
+/**
+ * A minimalist grammar that encodes just enough information to get reachability.
+ *
+ * That is, it has enough information to decide what parse trees for a given sentence are admissible
+ * given a tagged sentence.
+ *
+ *
+ * @author dlwh
+ */
 trait Grammar[L] extends Encoder[Rule[L]] with Serializable {
   override val index: Index[Rule[L]]
   val labelIndex: Index[L];
   def labelEncoder  = Encoder.fromIndex(labelIndex)
-  val unaryRules: Counter2[L, UnaryRule[L], Double]
-  val binaryRules: Counter2[L, BinaryRule[L], Double]
-  // don't mutate me!
-  val indexedRules: Array[Rule[Int]];
-  // don't mutate me!
-  val ruleScoreArray: Array[Double];
+  protected val indexedRules: Array[Rule[Int]];
 
-  def ruleIndex(a: Int, b: Int, c: Int):Int
-  def ruleIndex(a: Int, b: Int):Int
+  def root: L
 
-  // Rule Index
-  def indexedBinaryRulesWithParent(l: Int):Array[Int]
-  // Rule Index
-  def indexedBinaryRulesWithLeftChild(b: Int):Array[Int]
-  // Rule Index
-  def indexedBinaryRulesWithRightChild(c: Int):Array[Int]
-  // Rule Index
-  def indexedUnaryRulesWithChild(l: Int):Array[Int]
-  // Rule Index
-  def indexedUnaryRulesWithParent(l: Int):Array[Int]
+  // Accessors for properties of indexed rules
+  def parent(r: ID[Rule[L]]):ID[L] = tag[L](indexedRules(r).parent)
+  def leftChild(r: ID[Rule[L]]): ID[L] = TypeTags.tag[L](indexedRules(r).asInstanceOf[BinaryRule[Int]].left)
+  def rightChild(r: ID[Rule[L]]): ID[L] = tag[L](indexedRules(r).asInstanceOf[BinaryRule[Int]].right)
+  def child(r: ID[Rule[L]]): ID[L] = tag[L](indexedRules(r).asInstanceOf[UnaryRule[Int]].child)
 
-  final def ruleScore(r: Int):Double = ruleScoreArray(r)
-  def ruleScore(a: Int, b: Int, c: Int):Double = ruleScoreArray(ruleIndex(a,b,c))
-  def ruleScore(a: Int, b: Int):Double = ruleScoreArray(ruleIndex(a,b))
+  // query by parent or child
+  def indexedBinaryRulesWithParent(l: ID[L]):Array[ID[Rule[L]]]
+  def indexedBinaryRulesWithLeftChild(b: ID[L]):Array[ID[Rule[L]]]
+  def indexedBinaryRulesWithRightChild(c: ID[L]):Array[ID[Rule[L]]]
+  def indexedUnaryRulesWithChild(l: ID[L]):Array[ID[Rule[L]]]
+  def indexedUnaryRulesWithParent(l: ID[L]):Array[ID[Rule[L]]]
 
-  def parent(r: Int) = indexedRules(r).parent
-  def leftChild(r: Int) = indexedRules(r).asInstanceOf[BinaryRule[Int]].left
-  def rightChild(r: Int) = indexedRules(r).asInstanceOf[BinaryRule[Int]].right
-  def child(r: Int) = indexedRules(r).asInstanceOf[UnaryRule[Int]].child
-
-
-  def maxNumBinaryRulesForParent: Int
-
-
-  final def ruleScore(r: Rule[L]) = ruleScoreArray(index(r))
+  val tags: Set[L]
+  val indexedTags: Array[ID[L]]
 }
 
 object Grammar {
-  def apply[L](binaryProductions: Counter2[L,BinaryRule[L],Double],
-               unaryProductions: Counter2[L,UnaryRule[L],Double]):Grammar[L] = {
-    val (index: Index[L],ruleIndex: Index[Rule[L]]) = {
-      val index = Index[L]();
-      val ruleIndex = Index[Rule[L]]()
-      for(((a,br),score) <- binaryProductions.nonzero.pairs) {
-        if(score != Double.NegativeInfinity) {
-          index.index(a)
-          index.index(br.left);
-          index.index(br.right);
-          ruleIndex.index(br)
-        }
-      }
-      for(((a,u),score) <- unaryProductions.nonzero.pairs) {
-        if(score != Double.NegativeInfinity) {
-          index.index(a);
-          index.index(u.child);
-          ruleIndex.index(u)
-        }
-      }
-      index -> ruleIndex
+  def apply[L](root: L, productions: TraversableOnce[Rule[L]], tags: TraversableOnce[L]): Grammar[L] = {
+    val index = Index[L]();
+    val ruleIndex = Index[Rule[L]]()
+    for(r <- productions) {
+      index.index(r.parent);
+      r.children.foreach(index.index(_))
+      ruleIndex.index(r)
     }
-    apply(index,ruleIndex,binaryProductions,unaryProductions)
+    apply(root: L, index, ruleIndex, tags)
+  }
+  
+  def apply[L](root: L, binaries: Counter2[L, _<:Rule[L], _], unaries: Counter2[L, _ <: Rule[L], _], tags: Counter2[L, _, Double]): Grammar[L] = {
+    apply(root, binaries.keysIterator.map(_._2) ++ unaries.keysIterator.map(_._2), tags.keysIterator.map(_._1))
   }
 
-  def apply[L](labelIndex: Index[L],
-               ruleIndex: Index[Rule[L]],
-               binaryProductions: Counter2[L,BinaryRule[L],Double],
-               unaryProductions: Counter2[L,UnaryRule[L],Double]):Grammar[L] = {
+  def apply[L, W](root: L,
+                  labelIndex: Index[L],
+                  ruleIndex: Index[Rule[L]],
+                  tags: TraversableOnce[L]):Grammar[L] = {
     val li = labelIndex
     val ri = ruleIndex
+    val r = root
+    val t = tags.toSet
 
     new Grammar[L] {
       val index = ri
       val labelIndex = li
-      val unaryRules = unaryProductions
-      val binaryRules = binaryProductions
+      def root = r
+
       val indexedRules = for ( r <- index.toArray) yield r match {
-        case BinaryRule(a,b,c) => BinaryRule(labelIndex(a),labelIndex(b),labelIndex(c)):Rule[Int]
-        case UnaryRule(a,b) => UnaryRule(labelIndex(a),labelIndex(b)):Rule[Int]
-      }
-      val ruleScoreArray = for(r <- index.toArray) yield r match {
-        case r@BinaryRule(a,_,_) => binaryProductions(a,r)
-        case r@UnaryRule(a,_) => unaryProductions(a,r)
+        case BinaryRule(a, b, c) => BinaryRule(labelIndex(a), labelIndex(b), labelIndex(c)):Rule[Int]
+        case UnaryRule(a, b) => UnaryRule(labelIndex(a), labelIndex(b)):Rule[Int]
       }
 
-      val binaryRuleTable = labelEncoder.fillArray(new OpenAddressHashArray[Int](labelIndex.size * labelIndex.size,-1,4))
-      val unaryRuleTable = new OpenAddressHashArray[Int](labelIndex.size * labelIndex.size,-1, unaryRules.size * 2)
+      val binaryRuleTable = labelEncoder.fillArray(new OpenAddressHashArray[Int](labelIndex.size * labelIndex.size, -1, 4))
+      val unaryRuleTable = new OpenAddressHashArray[Int](labelIndex.size * labelIndex.size, -1)
 
-      private val (binaryRulesByParent,unaryRulesByParent,binaryRulesByLeftChild,binaryRulesByRightChild,unaryRulesByChild) = {
+      private val (binaryRulesByParent, unaryRulesByParent, binaryRulesByLeftChild, binaryRulesByRightChild, unaryRulesByChild) = {
         val binaryRulesByParent = Array.fill(labelIndex.size)(new ArrayBuffer[Int]())
         val unaryRulesByParent = Array.fill(labelIndex.size)(new ArrayBuffer[Int]())
         val binaryRulesByLeftChild = Array.fill(labelIndex.size)(new ArrayBuffer[Int]())
         val binaryRulesByRightChild = Array.fill(labelIndex.size)(new ArrayBuffer[Int]())
         val unaryRulesByChild = Array.fill(labelIndex.size)(new ArrayBuffer[Int]())
-        for ( (r,i) <- indexedRules.zipWithIndex) r match {
-          case BinaryRule(p,l,rc) =>
+        for ( (r, i) <- indexedRules.zipWithIndex) r match {
+          case BinaryRule(p, l, rc) =>
             binaryRulesByParent(p) += i
             binaryRulesByLeftChild(l) += i
             binaryRulesByRightChild(rc) += i
             binaryRuleTable(p)(rc + labelIndex.size * l) = i
-          case UnaryRule(p,c) =>
+          case UnaryRule(p, c) =>
             unaryRulesByParent(p) += i
             unaryRulesByChild(c) += i
             unaryRuleTable(c + labelIndex.size * (p)) = i
         }
-
 
         (binaryRulesByParent.map(_.toArray),
           unaryRulesByParent.map(_.toArray),
@@ -145,43 +105,22 @@ object Grammar {
           unaryRulesByChild.map(_.toArray))
       }
 
-      def ruleIndex(a: Int, b: Int, c: Int) = binaryRuleTable(a)(c + labelIndex.size * b)
-      def ruleIndex(a: Int, b: Int) = unaryRuleTable(b + labelIndex.size * a)
+      val tags = t
 
-      def indexedBinaryRulesWithParent(l: Int) = binaryRulesByParent(l)
-      def indexedUnaryRulesWithParent(l: Int) = unaryRulesByParent(l)
-      def indexedUnaryRulesWithChild(l: Int) = unaryRulesByChild(l)
-      def indexedBinaryRulesWithLeftChild(b: Int) = binaryRulesByLeftChild(b)
-      def indexedBinaryRulesWithRightChild(c: Int) = binaryRulesByRightChild(c)
+      val indexedTags = tagArray[L](tags.map(labelIndex).toArray)
 
-      val maxNumBinaryRulesForParent = {
-        for(a <- binaryRules.domain._1) yield binaryRules(a,::).size
-      }.max
+      def ruleIndex(a: Int, b: Int, c: Int) = tag[Rule[L]](binaryRuleTable(a)(c + labelIndex.size * b))
+      def ruleIndex(a: Int, b: Int) = tag[Rule[L]](unaryRuleTable(b + labelIndex.size * a))
+
+      def indexedBinaryRulesWithParent(l: ID[L]) = tagArray[Rule[L]](binaryRulesByParent(l))
+      def indexedUnaryRulesWithParent(l: ID[L]) = tagArray[Rule[L]](unaryRulesByParent(l))
+      def indexedUnaryRulesWithChild(l: ID[L]) = tagArray[Rule[L]](unaryRulesByChild(l))
+      def indexedBinaryRulesWithLeftChild(b: ID[L]) = tagArray[Rule[L]](binaryRulesByLeftChild(b))
+      def indexedBinaryRulesWithRightChild(c: ID[L]) = tagArray[Rule[L]](binaryRulesByRightChild(c))
+
     }
 
   }
-
-  def zero[L](grammar: Grammar[L]) = {
-    apply(grammar.labelIndex,grammar.index,grammar.binaryRules :* 0.0,grammar.unaryRules :* 0.0)
-  }
-
-  implicit def grammarIsReadWritable[L:DataSerialization.ReadWritable]: ReadWritable[Grammar[L]]  = {
-    new DataSerialization.ReadWritable[Grammar[L]] {
-      def write(sink: DataOutput, g: Grammar[L]) {
-        DataSerialization.write(sink, g.labelIndex)
-        DataSerialization.write(sink, g.index)
-        DataSerialization.write(sink, g.unaryRules)
-        DataSerialization.write(sink, g.binaryRules)
-      }
-
-      def read(source: DataInput) = {
-        val i = DataSerialization.read[Index[L]](source)
-        val ri = DataSerialization.read[Index[Rule[L]]](source)
-        val u = DataSerialization.read[Counter2[L,UnaryRule[L],Double]](source)
-        val b = DataSerialization.read[Counter2[L,BinaryRule[L],Double]](source)
-        Grammar(i,ri,b,u)
-      }
-    }
-  }
-
 }
+
+
