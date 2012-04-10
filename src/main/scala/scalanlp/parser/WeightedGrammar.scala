@@ -33,9 +33,6 @@ trait WeightedGrammar[L, W] extends Serializable {
    */
   trait Specialization {
 
-    def root = WeightedGrammar.this.root
-    def grammar = WeightedGrammar.this
-
     def words: Seq[W]
 
 
@@ -279,17 +276,17 @@ object WeightedGrammar {
 
         // TODO: make this not terminally slow!
         def ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int) = {
-          val a = grammar.grammar.parent(r)
-          val b = grammar.grammar.child(r)
+          val a = grammar.parent(r)
+          val b = grammar.child(r)
           val a2 = refinements.labels.globalize(a, refA)
           val b2 = refinements.labels.globalize(b, refB)
           (refinements.rules.fineIndex(UnaryRule(refinements.labels.fineIndex.get(a2),refinements.labels.fineIndex.get(b2))))
         }
 
         def ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int, refC: Int) = {
-          val a = grammar.grammar.parent(r)
-          val b = grammar.grammar.leftChild(r)
-          val c = grammar.grammar.rightChild(r)
+          val a = grammar.parent(r)
+          val b = grammar.leftChild(r)
+          val c = grammar.rightChild(r)
           val a2 = refinements.labels.globalize(a, refA)
           val b2 = refinements.labels.globalize(b, refB)
           val c2 = refinements.labels.globalize(c, refC)

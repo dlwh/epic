@@ -19,7 +19,7 @@ class CKYChartBuilder[+Chart[X]<:ParseChart[X], L, W](val grammar: WeightedGramm
     val outside = buildOutsideChart(inside, spec)
     val partition = rootScore(spec, inside)
 
-    new ChartMarginal[Chart, L, W](spec, inside, outside, partition)
+    new ChartMarginal[Chart, L, W](grammar.grammar, spec, inside, outside, partition)
   }
 
 

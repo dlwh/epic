@@ -9,7 +9,7 @@ import scalanlp.util.TypeTags._
  */
 trait Marginal[L, W] {
   def spec: WeightedGrammar[L, W]#Specialization
-  def grammar = spec.grammar
+  def grammar:Grammar[L]
   def partition: Double
   def words:Seq[W] = spec.words
 

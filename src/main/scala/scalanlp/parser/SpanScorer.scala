@@ -52,24 +52,6 @@ object SpanScorer {
   }
 
   /**
-   * Divides a SpanScorer by some scalar
-   */
-  def divide[L](s: SpanScorer[L], div: Double):SpanScorer[L] = new SpanScorer[L] {
-    def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int): Double = {
-      s.scoreBinaryRule(begin, split, end, rule) / div;
-    }
-
-    def scoreUnaryRule(begin: Int, end: Int, rule: Int): Double = {
-      s.scoreUnaryRule(begin, end, rule) / div;
-    }
-
-    def scoreSpan(begin: Int, end: Int, tag: Int): Double = {
-      s.scoreSpan(begin, end, tag) / div;
-    }
-
-  }
-
-  /**
    * A SpanScorer.Factory can build a SpanScorer from a sentence. Can be
    * used to compute features specific to a sentence, or to preparse the
    * sentence and return a scorer based on that.

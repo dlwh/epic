@@ -36,11 +36,11 @@ class ViterbiDecoder[L, W] extends ChartDecoder[L, W] with Serializable {
       var maxChild = -1
       var maxChildRef = -1
       for {
-        r <- grammar.grammar.indexedUnaryRulesWithParent(root)
+        r <- grammar.indexedUnaryRulesWithParent(root)
         refR <- spec.validRuleRefinementsGivenParent(begin, end, r, rootRef)
       } {
         val ruleScore = spec.scoreUnaryRule(begin, end, r, refR)
-        val b = grammar.grammar.child(r)
+        val b = grammar.child(r)
         val refB = spec.childRefinement(r, refR)
         val score = ruleScore + inside.bot(begin, end, b, refB)
         if(score > maxScore) {
@@ -71,9 +71,9 @@ class ViterbiDecoder[L, W] extends ChartDecoder[L, W] with Serializable {
 
       val spanScore = spec.scoreSpan(begin, end, root, rootRef)
       for {
-        r <- grammar.grammar.indexedBinaryRulesWithParent(root)
-        b = grammar.grammar.leftChild(r)
-        c = grammar.grammar.rightChild(r)
+        r <- grammar.indexedBinaryRulesWithParent(root)
+        b = grammar.leftChild(r)
+        c = grammar.rightChild(r)
         refR <- spec.validRuleRefinementsGivenParent(begin, end, r, rootRef)
         refB = spec.leftChildRefinement(r, refR)
         refC = spec.rightChildRefinement(r, refR)
@@ -159,7 +159,7 @@ class MaxConstituentDecoder[L, W] extends ChartDecoder[L, W] {
     val maxTopScore = new TriangularArray[Double](inside.length+1, Double.NegativeInfinity)
 
 
-    val scores = spec.grammar.labelEncoder.fillArray(Double.NegativeInfinity)
+    val scores = marginal.grammar.labelEncoder.fillArray(Double.NegativeInfinity)
     val buffer = Array.fill(1000)(Double.NegativeInfinity)
 
     def marginalizeRefinements(begin: Int, end: Int, l: Int, ichart: inside.ChartScores, ochart: outside.ChartScores): Double = {

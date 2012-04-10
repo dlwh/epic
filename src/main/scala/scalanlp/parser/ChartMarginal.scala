@@ -11,12 +11,13 @@ package scalanlp.parser
  * @tparam L the label type
  * @tparam W the word type
  */
-case class ChartMarginal[+Chart[X]<:ParseChart[X], L, W](spec: WeightedGrammar[L, W]#Specialization,
+case class ChartMarginal[+Chart[X]<:ParseChart[X], L, W](grammar: Grammar[L],
+                                                         spec: WeightedGrammar[L, W]#Specialization,
                                                          inside: Chart[L],
                                                          outside: Chart[L],
                                                          partition: Double) extends Marginal[L, W] {
   def length = inside.length
-  
+
   /**
    * Forest traversal that visits spans in a "bottom up" order.
    * @param spanVisitor
@@ -52,15 +53,15 @@ case class ChartMarginal[+Chart[X]<:ParseChart[X], L, W](spec: WeightedGrammar[L
 
       for (a <- inside.bot.enteredLabelIndexes(begin, end); refA <- inside.bot.enteredLabelRefinements(begin, end, a)) {
         var i = 0;
-        val rules = grammar.grammar.indexedBinaryRulesWithParent(a)
+        val rules = grammar.indexedBinaryRulesWithParent(a)
         val spanScore = spec.scoreSpan(begin, end, a, refA)
         val aScore = outside.bot.labelScore(begin, end, a, refA) + spanScore
         var count = 0.0
         if (!aScore.isInfinite)
           while(i < rules.length) {
             val r = rules(i)
-            val b = grammar.grammar.leftChild(r)
-            val c = grammar.grammar.rightChild(r)
+            val b = grammar.leftChild(r)
+            val c = grammar.rightChild(r)
             i += 1
             // this is too slow, so i'm having to inline it.
             //              val feasibleSpan = itop.feasibleSpanX(begin, end, b, c)
@@ -109,8 +110,8 @@ case class ChartMarginal[+Chart[X]<:ParseChart[X], L, W](spec: WeightedGrammar[L
       a <- inside.top.enteredLabelIndexes(begin, end)
       refA <- inside.top.enteredLabelRefinements(begin, end, a)
     } {
-      for (r <- grammar.grammar.indexedUnaryRulesWithParent(a); refR <- spec.validRuleRefinementsGivenParent(begin, end, r, refA)) {
-        val b = grammar.grammar.child(r)
+      for (r <- grammar.indexedUnaryRulesWithParent(a); refR <- spec.validRuleRefinementsGivenParent(begin, end, r, refA)) {
+        val b = grammar.child(r)
         val refB = spec.childRefinement(r, refR)
         val bScore = inside.bot.labelScore(begin, end, b, refB)
         val aScore = outside.top.labelScore(begin, end, a, refA)

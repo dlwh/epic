@@ -9,7 +9,8 @@ import scalanlp.trees._
  * @author dlwh
  */
 
-case class TreeMarginal[L, W](spec: WeightedGrammar[L, W]#Specialization,
+case class TreeMarginal[L, W](grammar: Grammar[L],
+                              spec: WeightedGrammar[L, W]#Specialization,
                               tree: BinarizedTree[(L,Int)]) extends Marginal[L, W] {
 
   val partition = {
@@ -59,6 +60,6 @@ object TreeMarginal {
   def apply[L, W](grammar: WeightedGrammar[L, W],
                   words: Seq[W],
                   tree: BinarizedTree[(L,Int)]):TreeMarginal[L, W] = {
-    TreeMarginal(grammar.specialize(words), tree)
+    TreeMarginal(grammar.grammar, grammar.specialize(words), tree)
   }
 }

@@ -70,7 +70,7 @@ class AnchoredRuleProjector(threshold: Double) extends Serializable {
           if(totals(index) eq null) {
             totals(index) = projVector()
           }
-          totals(index)(charts.grammar.grammar.parent(rule)) += count
+          totals(index)(charts.grammar.parent(rule)) += count
 
           val parentArray = if(binaryScores(index)(split-begin) eq null) {
             binaryScores(index)(split-begin) = projRuleVector()
@@ -94,7 +94,7 @@ class AnchoredRuleProjector(threshold: Double) extends Serializable {
         if(totalsUnaries(index) eq null) {
           totalsUnaries(index) = projVector()
         }
-        totalsUnaries(index)(charts.grammar.grammar.parent(rule)) += count
+        totalsUnaries(index)(charts.grammar.parent(rule)) += count
       }
 
     }

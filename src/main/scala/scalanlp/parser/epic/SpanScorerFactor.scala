@@ -78,7 +78,7 @@ class AnchoredRuleApproximator[L, W](pruningThreshold: Double = Double.NegativeI
   def project(inf: ParserInference[L, W],
               instance: TreeInstance[L, W],
               marginal: ChartMarginal[ParseChart.LogProbabilityParseChart, L, W]):WeightedGrammar[L, W] = {
-    val factory = new AnchoredPCFGProjector[L, W](marginal.grammar.grammar)
+    val factory = new AnchoredPCFGProjector[L, W](marginal.grammar)
     WeightedGrammar.oneOff(inf.grammar.grammar, factory.buildSpanScorer(marginal))
   }
 
