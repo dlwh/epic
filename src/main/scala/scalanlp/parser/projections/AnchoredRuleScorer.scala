@@ -85,13 +85,13 @@ class AnchoredRuleScorer[L](spanScores: Array[OldSparseVector], // triangular in
                             // (begin, end) -> (split-begin) -> rule -> score
                             binaryScores: Array[Array[OldSparseVector]]) extends SpanScorer[L] with Serializable {
 
-  def scoreUnaryRule(begin: Int, end: Int, rule: ID[Rule[L]]) = {
+  def scoreUnaryRule(begin: Int, end: Int, rule: Int) = {
     val forSpan = unaryScores(TriangularArray.index(begin, end))
     if(forSpan eq null) Double.NegativeInfinity
     else forSpan(rule)
   }
 
-  def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: ID[Rule[L]]) = {
+  def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = {
     val forSpan = binaryScores(TriangularArray.index(begin, end))
     if(forSpan eq null) Double.NegativeInfinity
     else {
@@ -100,7 +100,7 @@ class AnchoredRuleScorer[L](spanScores: Array[OldSparseVector], // triangular in
       else forSplit(rule)
     }
   }
-  def scoreSpan(begin: Int, end: Int, tag: ID[L]): Double = {
+  def scoreSpan(begin: Int, end: Int, tag: Int): Double = {
     val scores = spanScores(TriangularArray.index(begin, end))
     if(scores ne null) scores(tag)
     else Double.NegativeInfinity

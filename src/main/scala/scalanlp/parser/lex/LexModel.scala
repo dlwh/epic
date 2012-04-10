@@ -81,11 +81,11 @@ class IndexedFeaturizer[L, W](f: LexFeaturizer[L, W],
     
     def length = words.length
 
-    def featuresForUnaryRule(begin: Int, end: Int, rule: ID[Rule[L]], ref: ID[RuleRef[L]]) = {
+    def featuresForUnaryRule(begin: Int, end: Int, rule: Int, ref: Int) = {
       indexedFeaturesForRuleHead(rule, ref)
     }
 
-    def featuresForSpan(begin: Int, end: Int, tag: ID[L], ref: ID[Ref[L]]) = null
+    def featuresForSpan(begin: Int, end: Int, tag: Int, ref: Int) = null
 
     private val fspec = f.specialize(words)
     def featuresForTag(tag: Int, head: Int): Array[Int] = {
@@ -103,7 +103,7 @@ class IndexedFeaturizer[L, W](f: LexFeaturizer[L, W],
     }
 
 
-    def featuresForBinaryRule(begin: Int, split: Int, end: Int, rule: ID[Rule[L]], ref: ID[RuleRef[L]]) =  {
+    def featuresForBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int) =  {
       val head = (ref:Int) / words.length
       val dep = (ref:Int) % words.length
 
@@ -419,7 +419,7 @@ case class LexGrammarBundle[L, W](baseGrammar: Grammar[L],
         */
 
 
-        def scoreSpan(begin: Int, end: Int, label: ID[L], ref: ID[Ref[L]]) = {
+        def scoreSpan(begin: Int, end: Int, label: Int, ref: Int) = {
           if(ref < begin || ref >= end) Double.NegativeInfinity
           else dot(f.featuresForSpan(begin, end, label, ref))
         }
@@ -427,7 +427,7 @@ case class LexGrammarBundle[L, W](baseGrammar: Grammar[L],
         val bCache = new OpenAddressHashArray[Double](words.size * words.size * index.size, Double.NaN, words.size * index.size)
         val uCache = new OpenAddressHashArray[Double](words.size * index.size, Double.NaN, words.size * index.size)
 
-        def scoreUnaryRule(begin: Int, end: Int, rule: ID[Rule[L]], head: ID[RuleRef[L]]) = {
+        def scoreUnaryRule(begin: Int, end: Int, rule: Int, head: Int) = {
           val cacheIndex = head + words.size * rule
           val score = uCache(cacheIndex)
 
@@ -441,7 +441,7 @@ case class LexGrammarBundle[L, W](baseGrammar: Grammar[L],
         }
 
 
-        def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: ID[Rule[L]], ref: ID[RuleRef[L]]) = {
+        def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int) = {
           val head = (ref:Int) / words.length
           val dep = (ref:Int) % words.length
           val cacheIndex = head + words.size * (dep + words.size * rule)
@@ -458,59 +458,59 @@ case class LexGrammarBundle[L, W](baseGrammar: Grammar[L],
         }
 
 
-        def validLabelRefinements(begin: Int, end: Int, label: ID[L]) = tagArray(Array.range(begin,end))
+        def validLabelRefinements(begin: Int, end: Int, label: Int) = Array.range(begin,end)
 
         def numValidRefinements(label: Int) = words.length
 
-        def validRuleRefinementsGivenParent(begin: Int, end: Int, rule: ID[Rule[L]], parentRef: ID[Ref[L]]) = {
+        def validRuleRefinementsGivenParent(begin: Int, end: Int, rule: Int, parentRef: Int) = {
           if(!binaries(rule)) {
-            tagArray(Array(parentRef:Int))
+            Array(parentRef:Int)
           } else if(isLeftRule(rule)) {
-            tagArray(Array.range(parentRef, end))
+            Array.range(parentRef, end)
           } else {
-            tagArray(Array.range(begin, parentRef))
+            Array.range(begin, parentRef)
           }
         }
 
-        def validUnaryRuleRefinementsGivenChild(begin: Int, end: Int, rule: ID[Rule[L]], childRef: ID[Ref[L]]) = {
-          tagArray(Array(childRef:Int))
+        def validUnaryRuleRefinementsGivenChild(begin: Int, end: Int, rule: Int, childRef: Int) = {
+          Array(childRef)
         }
 
         def validTagsFor(pos: Int) = {
-          tagArray(indexedValidTags(pos))
+          indexedValidTags(pos)
         }
 
-        def leftChildRefinement(rule: ID[Rule[L]], ruleRef: ID[RuleRef[L]]) = {
-          if(isLeftRule(rule)) tag(ruleRef / words.length)
-          else tag(ruleRef % words.length)
+        def leftChildRefinement(rule: Int, ruleRef: Int) = {
+          if(isLeftRule(rule)) ruleRef / words.length
+          else ruleRef % words.length
         }
 
-        def rightChildRefinement(rule: ID[Rule[L]], ruleRef: ID[RuleRef[L]]) = {
-          if(isRightRule(rule)) tag(ruleRef / words.length)
-          else tag(ruleRef % words.length)
+        def rightChildRefinement(rule: Int, ruleRef: Int) = {
+          if(isRightRule(rule)) ruleRef / words.length
+          else ruleRef % words.length
         }
 
-        def parentRefinement(rule: ID[Rule[L]], ruleRef: ID[RuleRef[L]]) = {
-          if(binaries(rule)) tag(ruleRef / words.length)
-          else tag(ruleRef)
+        def parentRefinement(rule: Int, ruleRef: Int) = {
+          if(binaries(rule)) ruleRef / words.length
+          else ruleRef
         }
 
-        def childRefinement(rule: ID[Rule[L]], ruleRef: ID[RuleRef[L]]) = {
-          tag(ruleRef)
+        def childRefinement(rule: Int, ruleRef: Int) = {
+          ruleRef
         }
 
-        def ruleRefinementFromRefinements(r: ID[Rule[L]], refA: ID[Ref[L]], refB: ID[Ref[L]]) = {
+        def ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int) = {
           require(refA == (refB:Int))
-          tag(refA)
+          refA
         }
 
-        def ruleRefinementFromRefinements(r: ID[Rule[L]], refA: ID[Ref[L]], refB: ID[Ref[L]], refC: ID[Ref[L]]) = {
+        def ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int, refC: Int) = {
           if(isLeftRule(r)) {
             require(refA == (refB:Int))
-            tag(refA * words.length + refC)
+            refA * words.length + refC
           } else {
             require(refA == (refC:Int))
-            tag(refA * words.length + refB)
+            refA * words.length + refB
           }
         }
       }
@@ -620,7 +620,7 @@ case class LexInference[L, W](reannotate: (BinarizedTree[L], Seq[W])=>BinarizedT
 
   def goldCounts(ti: TreeInstance[L, W], augment: WeightedGrammar[L, W]) = {
     val reannotated = reannotate(ti.tree, ti.words)
-    val headed = headFinder.annotateHeadIndices(reannotated).asInstanceOf[BinarizedTree[(L,ID[Ref[L]])]]
+    val headed = headFinder.annotateHeadIndices(reannotated).asInstanceOf[BinarizedTree[(L,Int)]]
     TreeMarginal(augment, ti.words, headed).expectedCounts(featurizer)
   }
 }

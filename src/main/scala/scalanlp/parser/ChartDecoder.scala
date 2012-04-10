@@ -29,12 +29,12 @@ class ViterbiDecoder[L, W] extends ChartDecoder[L, W] with Serializable {
   override def extractBestParse(marginal: ChartMarginal[ParseChart, L, W]):BinarizedTree[L] = {
     import marginal._
     val labelIndex = grammar.labelIndex
-    val rootIndex = tag[L](grammar.labelIndex(grammar.root))
+    val rootIndex = (grammar.labelIndex(grammar.root))
 
-    def buildTreeUnary(begin: Int, end:Int, root: ID[L], rootRef: ID[Ref[L]]):BinarizedTree[L] = {
+    def buildTreeUnary(begin: Int, end:Int, root: Int, rootRef: Int):BinarizedTree[L] = {
       var maxScore = Double.NegativeInfinity
-      var maxChild = tag[L](-1)
-      var maxChildRef = tag[Ref[L]](-1)
+      var maxChild = -1
+      var maxChildRef = -1
       for {
         r <- grammar.grammar.indexedUnaryRulesWithParent(root)
         refR <- spec.validRuleRefinementsGivenParent(begin, end, r, rootRef)
@@ -58,12 +58,12 @@ class ViterbiDecoder[L, W] extends ChartDecoder[L, W] with Serializable {
       UnaryTree(labelIndex.get(root), child)(Span(begin, end))
     }
 
-    def buildTree(begin: Int, end: Int, root: ID[L], rootRef: ID[Ref[L]]):BinarizedTree[L] = {
+    def buildTree(begin: Int, end: Int, root: Int, rootRef: Int):BinarizedTree[L] = {
       var maxScore = Double.NegativeInfinity
-      var maxLeft = tag[L](-1)
-      var maxRight = tag[L](-1)
-      var maxLeftRef = tag[Ref[L]](-1)
-      var maxRightRef = tag[Ref[L]](-1)
+      var maxLeft = -1
+      var maxRight = -1
+      var maxLeftRef = -1
+      var maxRightRef = -1
       var maxSplit = -1
       if(begin +1 == end) {
         return NullaryTree(labelIndex.get(root))(Span(begin, end))
@@ -162,7 +162,7 @@ class MaxConstituentDecoder[L, W] extends ChartDecoder[L, W] {
     val scores = spec.grammar.labelEncoder.fillArray(Double.NegativeInfinity)
     val buffer = Array.fill(1000)(Double.NegativeInfinity)
 
-    def marginalizeRefinements(begin: Int, end: Int, l: ID[L], ichart: inside.ChartScores, ochart: outside.ChartScores): Double = {
+    def marginalizeRefinements(begin: Int, end: Int, l: Int, ichart: inside.ChartScores, ochart: outside.ChartScores): Double = {
       var bufOff = 0
       for (lRef <- ichart.enteredLabelRefinements(begin, end, l)) {
         val myScore = ichart.labelScore(begin, end, l, lRef) + ochart.labelScore(begin, end, l, lRef) - partition

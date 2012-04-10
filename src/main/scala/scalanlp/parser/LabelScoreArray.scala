@@ -2,8 +2,6 @@ package scalanlp.parser
 
 import scalanlp.collection.mutable.TriangularArray
 import java.util.Arrays
-import scalanlp.util.TypeTags._
-import scalanlp.util.TypeTags
 
 /**
  * A LabelScoreArray is just a triangular array whose entries are arrays. Admits efficient
@@ -17,20 +15,20 @@ class LabelScoreArray[L](length: Int, grammarSize: Int, fill: Double) extends Se
   final val enteredLabels = TriangularArray.raw(length+1, new collection.mutable.BitSet())
   final val enteredRefinements = TriangularArray.raw(length+1, Array.fill(grammarSize)(new collection.mutable.BitSet()))
 
-  final def apply(begin: Int, end: Int, label: ID[L], ref: ID[Ref[L]]) = labelScore(begin, end, label, ref)
-  @inline final def labelScore(begin: Int, end: Int, label: ID[L], ref: ID[Ref[L]]):Double = {
+  final def apply(begin: Int, end: Int, label: Int, ref: Int) = labelScore(begin, end, label, ref)
+  @inline final def labelScore(begin: Int, end: Int, label: Int, ref: Int):Double = {
     val ind = TriangularArray.index(begin, end)
     if (score(ind) eq null) Double.NegativeInfinity
     else if (score(ind)(label) eq null) Double.NegativeInfinity
     else score(ind)(label)(ref)
   }
 
-  final def enteredLabelIndexes(begin: Int, end: Int): Iterator[ID[L]] = {
-    enteredLabels(TriangularArray.index(begin, end)).iterator.asInstanceOf[Iterator[ID[L]]]
+  final def enteredLabelIndexes(begin: Int, end: Int): Iterator[Int] = {
+    enteredLabels(TriangularArray.index(begin, end)).iterator
   }
 
-  final def enteredLabelRefinements(begin: Int, end: Int, label: ID[L]) = {
-    enteredLabels(TriangularArray.index(begin, end)).iterator.asInstanceOf[Iterator[ID[Ref[L]]]]
+  final def enteredLabelRefinements(begin: Int, end: Int, label: Int) = {
+    enteredLabels(TriangularArray.index(begin, end)).iterator
   }
 
   def enteredLabelScores(begin: Int, end: Int) = {

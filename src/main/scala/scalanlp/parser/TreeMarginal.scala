@@ -10,11 +10,11 @@ import scalanlp.trees._
  */
 
 case class TreeMarginal[L, W](spec: WeightedGrammar[L, W]#Specialization,
-                              tree: BinarizedTree[(L,ID[Ref[L]])]) extends Marginal[L, W] {
+                              tree: BinarizedTree[(L,Int)]) extends Marginal[L, W] {
 
   val partition = {
     var score = 0.0
-    def rec(t: BinarizedTree[(L,ID[Ref[L]]) ]) = t match {
+    def rec(t: BinarizedTree[(L,Int) ]) = t match {
       case n@NullaryTree( (a, ref) ) =>
         val aI = tag[L](grammar.labelIndex(a))
         score += spec.scoreSpan(t.span.start, t.span.end, aI, ref)
@@ -58,7 +58,7 @@ case class TreeMarginal[L, W](spec: WeightedGrammar[L, W]#Specialization,
 object TreeMarginal {
   def apply[L, W](grammar: WeightedGrammar[L, W],
                   words: Seq[W],
-                  tree: BinarizedTree[(L,ID[Ref[L]])]):TreeMarginal[L, W] = {
+                  tree: BinarizedTree[(L,Int)]):TreeMarginal[L, W] = {
     TreeMarginal(grammar.specialize(words), tree)
   }
 }

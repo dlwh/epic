@@ -3,14 +3,13 @@ package projections
 
 import scalanlp.util.{Encoder, Index}
 import collection.mutable.ArrayBuffer
-import scalanlp.util.TypeTags._
 
 /**
  * For computing projections from a fine grammar to a coarse grammar.
  * 
  * There are two indexes maintained for the fine symbols: a globally unique
  * id, and a local per-symbol id (in the range 0...numRefinements(coarseSym).
- * The global id is an ID[F], while the local one is an ID[ Ref[C] ].
+ * The global id is an Int, while the local one is an ID[ Ref[C] ].
  * 
  * Yuck.
  * 
@@ -19,7 +18,7 @@ import scalanlp.util.TypeTags._
 @SerialVersionUID(1)
 final class ProjectionIndexer[C, F] private (val coarseIndex: Index[C],
                                                  val fineIndex:Index[F],
-                                                 indexedProjections: Array[ID[C]]) extends (ID[F]=>Int) with Serializable {
+                                                 indexedProjections: Array[Int]) extends (Int=>Int) with Serializable {
   val coarseEncoder = Encoder.fromIndex(coarseIndex)
 
   val globalRefinements = {
@@ -27,25 +26,24 @@ final class ProjectionIndexer[C, F] private (val coarseIndex: Index[C],
     for( (coarse, fine) <- (indexedProjections.asInstanceOf[Array[Int]]).zipWithIndex) {
       result(coarse) += fine
     }
-    result.map(arr => tagArray[F](arr.toArray))
+    result.map(arr => (arr.toArray))
   }
 
-  val localizationArray = new Array[ID[Ref[C]]](indexedProjections.length)
+  val localizationArray = new Array[Int](indexedProjections.length)
   val perSymbolRefinements = globalRefinements.map { arr =>
     for( (global,local) <- (arr.asInstanceOf[Array[Int]]).zipWithIndex) {
-      localizationArray(global) = tag[Ref[C]](local)
+      localizationArray(global) = local
     }
-    tagArray[Ref[C]](Array.range(0, arr.length))
+    Array.range(0, arr.length)
   }
-  // ID[F] -> ID[Ref[L]] 
 
-  def localize(f: ID[F]):ID[Ref[C]] =  localizationArray(f)
-  def globalize(c: ID[C], f: ID[Ref[C]]):ID[F] =  globalRefinements(c)(f)
+  def localize(f: Int):Int =  localizationArray(f)
+  def globalize(c: Int, f: Int):Int =  globalRefinements(c)(f)
 
-  def localize(f: F):ID[Ref[C]] =  localizationArray(fineIndex(f))
+  def localize(f: F):Int =  localizationArray(fineIndex(f))
 
-  def refinementsOf(c: ID[C]):Array[ID[F]] = globalRefinements(c)
-  def localRefinements(c: ID[C]):Array[ID[Ref[C]]] = perSymbolRefinements(c)
+  def refinementsOf(c: Int):Array[Int] = globalRefinements(c)
+  def localRefinements(c: Int):Array[Int] = perSymbolRefinements(c)
 
   def refinementsOf(c: C):IndexedSeq[F] = {
     val ci = coarseIndex(c)
@@ -56,16 +54,16 @@ final class ProjectionIndexer[C, F] private (val coarseIndex: Index[C],
   /**
    * Computes the projection of the indexed fine label f to an indexed coarse label.
    */
-  def project(f: ID[F]):ID[C] = indexedProjections(f)
+  def project(f: Int):Int = indexedProjections(f)
 
-  def project(f: F):C = coarseIndex.get(project(tag(fineIndex(f))))
+  def project(f: F):C = coarseIndex.get(project(fineIndex(f)))
 
-  def coarseSymbol(f: ID[F]) = coarseIndex.get(project(f))
+  def coarseSymbol(f: Int) = coarseIndex.get(project(f))
 
   /**
    * Same as project(f)
    */
-  def apply(f: ID[F]) = project(f)
+  def apply(f: Int) = project(f)
 
   /**
    *  From a PI[C, F] and a PI[F, F2], makes a PI[C, F2]
@@ -90,7 +88,7 @@ object ProjectionIndexer {
       if(projectedIdx < 0) throw new RuntimeException("error while indexing" + l + " to " + proj(l) + fineIndex(l))
       indexedProjections(idx) = projectedIdx
     }
-    new ProjectionIndexer(coarseIndex, fineIndex, tagArray(indexedProjections))
+    new ProjectionIndexer(coarseIndex, fineIndex, indexedProjections)
   }
 
   def fromSplitter[C, F](coarseIndex: Index[C], fineIndex: Index[F], split: C=>Seq[F]) = {
@@ -102,7 +100,7 @@ object ProjectionIndexer {
         case e => println("Grrr... " + f + "\n" + fineIndex); throw e
       }
     }
-    new ProjectionIndexer(coarseIndex, fineIndex, tagArray(indexedProjections))
+    new ProjectionIndexer(coarseIndex, fineIndex, indexedProjections)
 
   }
 
@@ -113,7 +111,7 @@ object ProjectionIndexer {
       val i = fineIndex.index(f)
       indexedProjections += cf
     }
-    new ProjectionIndexer(coarseIndex, fineIndex, tagArray(indexedProjections.toArray))
+    new ProjectionIndexer(coarseIndex, fineIndex, indexedProjections.toArray)
 
   }
 }

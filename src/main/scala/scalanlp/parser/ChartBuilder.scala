@@ -10,7 +10,7 @@ import scalanlp.parser.ParseChart.logProb
 trait ChartBuilder[+Chart[X]<:ParseChart[X], L, W] {
 
   def root: L = grammar.root
-  def rootIndex: ID[L] = tag[L](grammar.labelIndex(root))
+  def rootIndex: Int = tag[L](grammar.labelIndex(root))
   def grammar: WeightedGrammar[L, W]
 
   def charts(words: Seq[W]):ChartMarginal[Chart, L, W]

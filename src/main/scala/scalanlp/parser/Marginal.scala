@@ -39,15 +39,15 @@ object Marginal {
   private def mkVisitor[L, W, Feat](counts: ExpectedCounts[Feat],
                                     spec: SpanFeaturizer[L, W, Feat]#Specialization):AnchoredSpanVisitor[L] = {
     new AnchoredSpanVisitor[L] {
-      def visitBinaryRule(begin: Int, split: Int, end: Int, rule: ID[Rule[L]], ref: ID[RuleRef[L]], score: Double) {
+      def visitBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int, score: Double) {
         addScale(counts, spec.featuresForBinaryRule(begin, split, end, rule, ref), score)
       }
 
-      def visitUnaryRule(begin: Int, end: Int, rule: ID[Rule[L]], ref: ID[RuleRef[L]], score: Double) {
+      def visitUnaryRule(begin: Int, end: Int, rule: Int, ref: Int, score: Double) {
         addScale(counts, spec.featuresForUnaryRule(begin, end, rule, ref), score)
       }
 
-      def visitSpan(begin: Int, end: Int, tag: ID[L], ref: ID[Ref[L]], score: Double) {
+      def visitSpan(begin: Int, end: Int, tag: Int, ref: Int, score: Double) {
         addScale(counts, spec.featuresForSpan(begin, end, tag, ref), score)
       }
     }

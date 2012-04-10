@@ -10,7 +10,7 @@ import scalanlp.trees.Rule
  */
 object ScalingSpanScorer {
   def apply[C](num: SpanScorer[C], denom: SpanScorer[C], constant:Double, root: Int):SpanScorer[C] = new SpanScorer[C] {
-    def scoreSpan(begin: Int, end: Int, tag: ID[C]) = {
+    def scoreSpan(begin: Int, end: Int, tag: Int) = {
       val ns = num.scoreSpan(begin, end, tag)
       if(ns == Double.NegativeInfinity) ns
       else {
@@ -20,7 +20,7 @@ object ScalingSpanScorer {
       }
     }
 
-    def scoreUnaryRule(begin: Int, end: Int, rule: ID[Rule[C]]) = {
+    def scoreUnaryRule(begin: Int, end: Int, rule: Int) = {
       val ns = num.scoreUnaryRule(begin, end, rule)
       if(ns == Double.NegativeInfinity) ns
       else {
@@ -30,7 +30,7 @@ object ScalingSpanScorer {
       }
     }
 
-    def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: ID[Rule[C]]) = {
+    def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = {
       val ns = num.scoreBinaryRule(begin, split, end, rule)
       if (ns == Double.NegativeInfinity) ns
       else {

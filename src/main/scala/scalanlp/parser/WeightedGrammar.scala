@@ -1,9 +1,7 @@
 package scalanlp.parser
 
 import projections.GrammarRefinements
-import scalanlp.util.{Encoder, TypeTags}
 import scalanlp.trees._
-import TypeTags._
 import scalala.tensor.Counter2
 import scalala.library.Library
 
@@ -45,20 +43,20 @@ trait WeightedGrammar[L, W] {
 
 
     /**
-     * Scores the indexed label rule with refinenemnt ref, when it occurs at (begin, end). Can be used for tags, or for a
-     * "bottom" label. Mainly used for tags.
+     * Scores the indexed label rule with refinenemnt ref, when it occurs at (begin, end). Can be used for s, or for a
+     * "bottom" label. Mainly used for s.
      */
-    def scoreSpan(begin: Int, end: Int, label: ID[L], ref: ID[Ref[L]]):Double
+    def scoreSpan(begin: Int, end: Int, label: Int, ref: Int):Double
 
     /**
      * Scores the indexed [[scalanlp.trees.BinaryRule]] rule when it occurs at (begin, split, end)
      */
-    def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: ID[Rule[L]], ref: ID[RuleRef[L]]):Double
+    def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int):Double
 
     /**
      * Scores the indexed [[scalanlp.trees.UnaryRule]] rule when it occurs at (begin, end)
      */
-    def scoreUnaryRule(begin: Int, end: Int, rule: ID[Rule[L]], ref: ID[RuleRef[L]]):Double
+    def scoreUnaryRule(begin: Int, end: Int, rule: Int, ref: Int):Double
 
     // stuff related to reachability
     /**
@@ -67,7 +65,7 @@ trait WeightedGrammar[L, W] {
      * method may return a subset.
      * @return array of valid refinements. Don't modify!
      */
-    def validLabelRefinements(begin: Int, end: Int, label: ID[L]):Array[ID[Ref[L]]]
+    def validLabelRefinements(begin: Int, end: Int, label: Int):Array[Int]
 
     def numValidRefinements(label: Int):Int
 
@@ -78,25 +76,25 @@ trait WeightedGrammar[L, W] {
      * @param end
      * @return
      */
-    def validRuleRefinementsGivenParent(begin: Int, end: Int, rule: ID[Rule[L]], parentRef: ID[Ref[L]]):Array[ID[RuleRef[L]]]
+    def validRuleRefinementsGivenParent(begin: Int, end: Int, rule: Int, parentRef: Int):Array[Int]
 
-    def validUnaryRuleRefinementsGivenChild(begin: Int, end: Int, rule: ID[Rule[L]], childRef: ID[Ref[L]]):Array[ID[RuleRef[L]]]
+    def validUnaryRuleRefinementsGivenChild(begin: Int, end: Int, rule: Int, childRef: Int):Array[Int]
 
     /**
-     * Returns the (unrefined) valid tags for a given position
+     * Returns the (unrefined) valid s for a given position
      * @param pos
      * @return
      */
-    def validTagsFor(pos: Int):Array[ID[L]]
+    def validTagsFor(pos: Int):Array[Int]
 
-    def leftChildRefinement(rule: ID[Rule[L]], ruleRef: ID[RuleRef[L]]):ID[Ref[L]]
-    def rightChildRefinement(rule: ID[Rule[L]], ruleRef: ID[RuleRef[L]]):ID[Ref[L]]
-    def parentRefinement(rule: ID[Rule[L]], ruleRef: ID[RuleRef[L]]):ID[Ref[L]]
-    def childRefinement(rule: ID[Rule[L]], ruleRef: ID[RuleRef[L]]):ID[Ref[L]]
+    def leftChildRefinement(rule: Int, ruleRef: Int):Int
+    def rightChildRefinement(rule: Int, ruleRef: Int):Int
+    def parentRefinement(rule: Int, ruleRef: Int):Int
+    def childRefinement(rule: Int, ruleRef: Int):Int
 
 
-    def ruleRefinementFromRefinements(r: ID[Rule[L]], refA: ID[Ref[L]], refB: ID[Ref[L]]):ID[RuleRef[L]]
-    def ruleRefinementFromRefinements(r: ID[Rule[L]], refA: ID[Ref[L]], refB: ID[Ref[L]], refC: ID[Ref[L]]):ID[RuleRef[L]]
+    def ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int):Int
+    def ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int, refC: Int):Int
   }
 }
 
@@ -109,50 +107,50 @@ object WeightedGrammar {
       def specialize(w: Seq[W]) = new Specialization {
         def words = w
 
-        def scoreSpan(begin: Int, end: Int, label: ID[L], ref: ID[Ref[L]]) = {
+        def scoreSpan(begin: Int, end: Int, label: Int, ref: Int) = {
           scorer.scoreSpan(begin, end, label)
         }
 
-        def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: ID[Rule[L]], ref: ID[RuleRef[L]]) = {
+        def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int) = {
           scorer.scoreBinaryRule(begin, split, end, rule)
         }
 
-        def scoreUnaryRule(begin: Int, end: Int, rule: ID[Rule[L]], ref: ID[RuleRef[L]]) = {
+        def scoreUnaryRule(begin: Int, end: Int, rule: Int, ref: Int) = {
           scorer.scoreUnaryRule(begin, end, rule)
         }
 
-        val vldl = tagArray[Ref[L]](Array(0))
-        val vldr = tagArray[RuleRef[L]](Array(0))
-        def validLabelRefinements(begin: Int, end: Int, label: ID[L]) = (vldl)
+        val valid = Array(0)
+        val vldl = valid
+        def validLabelRefinements(begin: Int, end: Int, label: Int) = (vldl)
 
         def numValidRefinements(label: Int) = 1
 
-        def validRuleRefinementsGivenParent(begin: Int, end: Int, rule: ID[Rule[L]], parentRef: ID[Ref[L]]) = {
-          vldr
+        def validRuleRefinementsGivenParent(begin: Int, end: Int, rule: Int, parentRef: Int) = {
+          valid
         }
 
-        def validUnaryRuleRefinementsGivenChild(begin: Int, end: Int, rule: ID[Rule[L]], childRef: ID[Ref[L]]) = {
-          vldr
+        def validUnaryRuleRefinementsGivenChild(begin: Int, end: Int, rule: Int, childRef: Int) = {
+          valid
         }
 
         def validTagsFor(pos: Int) = {
           g.indexedTags
         }
 
-        def leftChildRefinement(rule: ID[Rule[L]], ruleRef: ID[RuleRef[L]]) = tag(0)
+        def leftChildRefinement(rule: Int, ruleRef: Int) = (0)
 
-        def rightChildRefinement(rule: ID[Rule[L]], ruleRef: ID[RuleRef[L]]) = tag(0)
+        def rightChildRefinement(rule: Int, ruleRef: Int) = (0)
 
-        def parentRefinement(rule: ID[Rule[L]], ruleRef: ID[RuleRef[L]]) = tag(0)
+        def parentRefinement(rule: Int, ruleRef: Int) = (0)
 
-        def childRefinement(rule: ID[Rule[L]], ruleRef: ID[RuleRef[L]]) = tag(0)
+        def childRefinement(rule: Int, ruleRef: Int) = (0)
 
-        def ruleRefinementFromRefinements(r: ID[Rule[L]], refA: ID[Ref[L]], refB: ID[Ref[L]], refC: ID[Ref[L]]) = {
-          tag(0)
+        def ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int, refC: Int) = {
+          (0)
         }
 
-        def ruleRefinementFromRefinements(r: ID[Rule[L]], refA: ID[Ref[L]], refB: ID[Ref[L]]) = {
-          tag(0)
+        def ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int) = {
+          (0)
         }
 
 
@@ -203,8 +201,7 @@ object WeightedGrammar {
       refinements.labels.fineIndex,
       refinements.rules.fineIndex, tags = grammar.tags.flatMap(refinements.labels.refinementsOf _))
 
-    val ruleScoreArray: Array[Array[Double]] = Array.tabulate(grammar.index.size){ (rr: Int) =>
-      val r: ID[Rule[L]]= tag[Rule[L]](rr);
+    val ruleScoreArray: Array[Array[Double]] = Array.tabulate(grammar.index.size){ (r: Int) =>
       val refs = refinements.rules.refinementsOf(r)
       val arr = new Array[Double](refs.length)
       for (i <- 0 until refs.length) {
@@ -214,7 +211,7 @@ object WeightedGrammar {
     }
 
     val spanScoreArray: Array[Array[Double]] = Array.tabulate(grammar.labelIndex.size){ (rr: Int) =>
-      val r: ID[L]= tag(rr);
+      val r: Int= (rr);
       val refs = refinements.labels.refinementsOf(r)
       val arr = new Array[Double](refs.length)
       for (i <- 0 until refs.length) {
@@ -229,7 +226,7 @@ object WeightedGrammar {
       def specialize(w: Seq[W]) = new Specialization {
         def words = w
 
-        def scoreSpan(begin: Int, end: Int, label: ID[L], ref: ID[Ref[L]]) = {
+        def scoreSpan(begin: Int, end: Int, label: Int, ref: Int) = {
           val baseScore = if(begin + 1 == end) {
             val fullId = refinements.labels.globalize(label, ref)
             lexicon.wordScore(words, refinements.labels.fineIndex.get(fullId), begin)
@@ -239,73 +236,73 @@ object WeightedGrammar {
           baseScore + spanScoreArray(label)(ref)
         }
 
-        def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: ID[Rule[L]], ref: ID[RuleRef[L]]) = {
+        def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int) = {
           ruleScoreArray(rule)(ref)
         }
 
-        def scoreUnaryRule(begin: Int, end: Int, rule: ID[Rule[L]], ref: ID[RuleRef[L]]) = {
+        def scoreUnaryRule(begin: Int, end: Int, rule: Int, ref: Int) = {
           ruleScoreArray(rule)(ref)
         }
 
-        def validLabelRefinements(begin: Int, end: Int, label: ID[L]) = {
+        def validLabelRefinements(begin: Int, end: Int, label: Int) = {
           refinements.labels.localRefinements(label)
         }
 
-        def validRuleRefinementsGivenParent(begin: Int, end: Int, rule: ID[Rule[L]], parentRef: ID[Ref[L]]) = {
+        def validRuleRefinementsGivenParent(begin: Int, end: Int, rule: Int, parentRef: Int) = {
           refinements.rules.localRefinements(rule)
         }
 
-        def validUnaryRuleRefinementsGivenChild(begin: Int, end: Int, rule: ID[Rule[L]], childRef: ID[Ref[L]]) = {
+        def validUnaryRuleRefinementsGivenChild(begin: Int, end: Int, rule: Int, childRef: Int) = {
           refinements.rules.localRefinements(rule)
         }
 
         def validTagsFor(pos: Int) = {
-          tagArray(lexicon.tagScores(words(pos)).keysIterator.map(refinements.labels.fineIndex).toArray)
+          (lexicon.tagScores(words(pos)).keysIterator.map(refinements.labels.fineIndex).toArray)
         }
 
-        def leftChildRefinement(rule: ID[Rule[L]], ruleRef: ID[RuleRef[L]]) = {
+        def leftChildRefinement(rule: Int, ruleRef: Int) = {
           val refinedRuleId = refinements.rules.globalize(rule, ruleRef)
           refinements.labels.localize(refinedGrammar.leftChild(refinedRuleId))
         }
 
-        def rightChildRefinement(rule: ID[Rule[L]], ruleRef: ID[RuleRef[L]]) = {
+        def rightChildRefinement(rule: Int, ruleRef: Int) = {
           val refinedRuleId = refinements.rules.globalize(rule, ruleRef)
           refinements.labels.localize(refinedGrammar.rightChild(refinedRuleId))
         }
 
-        def parentRefinement(rule: ID[Rule[L]], ruleRef: ID[RuleRef[L]]) = {
+        def parentRefinement(rule: Int, ruleRef: Int) = {
           val refinedRuleId = refinements.rules.globalize(rule, ruleRef)
           refinements.labels.localize(refinedGrammar.parent(refinedRuleId))
         }
 
-        def childRefinement(rule: ID[Rule[L]], ruleRef: ID[RuleRef[L]]) = {
+        def childRefinement(rule: Int, ruleRef: Int) = {
           val refinedRuleId = refinements.rules.globalize(rule, ruleRef)
           refinements.labels.localize(refinedGrammar.child(refinedRuleId))
         }
 
         // TODO: make this not terminally slow!
-        def ruleRefinementFromRefinements(r: ID[Rule[L]], refA: ID[Ref[L]], refB: ID[Ref[L]]) = {
+        def ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int) = {
           val a = grammar.grammar.parent(r)
           val b = grammar.grammar.child(r)
           val a2 = refinements.labels.globalize(a, refA)
           val b2 = refinements.labels.globalize(b, refB)
-          tag(refinements.rules.fineIndex(UnaryRule(refinements.labels.fineIndex.get(a2),refinements.labels.fineIndex.get(b2))))
+          (refinements.rules.fineIndex(UnaryRule(refinements.labels.fineIndex.get(a2),refinements.labels.fineIndex.get(b2))))
         }
 
-        def ruleRefinementFromRefinements(r: ID[Rule[L]], refA: ID[Ref[L]], refB: ID[Ref[L]], refC: ID[Ref[L]]) = {
+        def ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int, refC: Int) = {
           val a = grammar.grammar.parent(r)
           val b = grammar.grammar.leftChild(r)
           val c = grammar.grammar.rightChild(r)
           val a2 = refinements.labels.globalize(a, refA)
           val b2 = refinements.labels.globalize(b, refB)
           val c2 = refinements.labels.globalize(c, refC)
-          tag(refinements.rules.fineIndex(BinaryRule(refinements.labels.fineIndex.get(a2),
+          (refinements.rules.fineIndex(BinaryRule(refinements.labels.fineIndex.get(a2),
             refinements.labels.fineIndex.get(b2),
             refinements.labels.fineIndex.get(c2)
           ))  )
         }
 
-        def numValidRefinements(label: Int) = refinements.labels.refinementsOf(tag[L](label)).length
+        def numValidRefinements(label: Int) = refinements.labels.refinementsOf(label).length
       }
     }
 

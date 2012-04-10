@@ -35,7 +35,7 @@ abstract class ParseChart[L](val index: Index[L],
   final class ChartScores private[ParseChart]() extends LabelScoreArray[L](length, grammarSize, zero) {
     private[ParseChart] def scoreArray = score
 
-    def enter(begin: Int, end: Int, parent: ID[L], ref: ID[Ref[L]], w: Double):Boolean = {
+    def enter(begin: Int, end: Int, parent: Int, ref: Int, w: Double):Boolean = {
       val index = TriangularArray.index(begin, end)
       var arr = score(index)
       if(arr eq null) {
@@ -53,7 +53,7 @@ abstract class ParseChart[L](val index: Index[L],
       newScore > oldScore
     }
 
-    def enterSum(begin: Int, end: Int, parent: ID[L], ref: ID[Ref[L]], w: Array[Double], length: Int):Boolean = {
+    def enterSum(begin: Int, end: Int, parent: Int, ref: Int, w: Array[Double], length: Int):Boolean = {
       enter(begin, end, parent, ref, sum(w,length))
     }
 
@@ -73,7 +73,7 @@ abstract class ParseChart[L](val index: Index[L],
       narrowRight(begin)(parent)(ref) = math.min(end, narrowRight(begin)(parent)(ref))
     }
 
-    def feasibleSpanX(begin: Int, end: Int, leftState: ID[L], leftRef: ID[Ref[L]], rightState: ID[L], rightRef: ID[Ref[L]]):Long = {
+    def feasibleSpanX(begin: Int, end: Int, leftState: Int, leftRef: Int, rightState: Int, rightRef: Int):Long = {
       val narrowR = narrowRight(begin)(leftState)(leftRef)
       val narrowL = narrowLeft(end)(rightState)(rightRef)
 
@@ -89,14 +89,14 @@ abstract class ParseChart[L](val index: Index[L],
       }
     }
 
-    def feasibleSpan(begin: Int, end: Int, leftState: ID[L], leftRef: ID[Ref[L]], rightState: ID[L], rightRef: ID[Ref[L]]):Range = {
+    def feasibleSpan(begin: Int, end: Int, leftState: Int, leftRef: Int, rightState: Int, rightRef: Int):Range = {
       val span = feasibleSpanX(begin, end, leftState, leftRef, rightState, rightRef)
       val split = (span >> 32).toInt
       val endSplit = span.toInt // lower 32 bits
       Range(split,endSplit)
     }
 
-    def rightChildExtent(begin: Int, rightState: ID[L], ref: ID[Ref[L]]):Long = {
+    def rightChildExtent(begin: Int, rightState: Int, ref: Int):Long = {
       val nr = narrowRight(begin)(rightState)(ref)
       val wr = wideRight(begin)(rightState)(ref)
       if (nr > length || wr < 0) 0L
@@ -104,7 +104,7 @@ abstract class ParseChart[L](val index: Index[L],
     }
 
 
-    def leftChildExtent(end: Int, leftState: ID[L], ref: ID[Ref[L]]):Long = {
+    def leftChildExtent(end: Int, leftState: Int, ref: Int):Long = {
       val nl = narrowLeft(end)(leftState)(ref)
       val wl = wideLeft(end)(leftState)(ref)
       if (wl > length || nl < 0) 0L

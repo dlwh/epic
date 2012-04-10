@@ -78,17 +78,17 @@ trait FeatureIndexer[L, L2, W] extends SpanFeaturizer[L, W, Feature] with Encode
   }
 
   case class Spec private[FeatureIndexer] (words: Seq[W]) extends super.Specialization {
-    def featuresForBinaryRule(begin: Int, split: Int, end: Int, rule: ID[Rule[L]], ref: ID[RuleRef[L]]) = {
+    def featuresForBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int) = {
       val globalRule = proj.rules.globalize(rule, ref)
       featuresFor(globalRule).data.indexArray
     }
 
-    def featuresForUnaryRule(begin: Int, end: Int, rule: ID[Rule[L]], ref: ID[RuleRef[L]]) = {
+    def featuresForUnaryRule(begin: Int, end: Int, rule: Int, ref: Int) = {
       val globalRule = proj.rules.globalize(rule, ref)
       featuresFor(globalRule).data.indexArray
     }
 
-    def featuresForSpan(begin: Int, end: Int, tag: ID[L], ref: ID[Ref[L]]) = {
+    def featuresForSpan(begin: Int, end: Int, tag: Int, ref: Int) = {
       if(begin+1 == end) {
         val globalTag = proj.labels.globalize(tag, ref)
         featuresFor(globalTag, words(begin)).data.indexArray

@@ -15,7 +15,7 @@ import LatentTreeMarginal._
  */
 
 case class LatentTreeMarginal[L, W](spec: WeightedGrammar[L, W]#Specialization,
-                                    tree: BinarizedTree[(L, Seq[ID[Ref[L]]])]) extends Marginal[L, W] {
+                                    tree: BinarizedTree[(L, Seq[Int])]) extends Marginal[L, W] {
 
   private val stree = insideScores()
   outsideScores(stree)
@@ -85,7 +85,7 @@ case class LatentTreeMarginal[L, W](spec: WeightedGrammar[L, W]#Specialization,
 
 
   private def insideScores() = {
-    val indexedTree:BinarizedTree[Beliefs[L]] = tree.map{ case (l, refs) => Beliefs(tag(grammar.labelIndex(l)), refs) }
+    val indexedTree:BinarizedTree[Beliefs[L]] = tree.map{ case (l, refs) => Beliefs(grammar.labelIndex(l), refs) }
     val arr = new Array[Double](64 * 64)
 
     indexedTree.postorder.foreach {
@@ -240,7 +240,7 @@ object LatentTreeMarginal {
 
   def apply[L, W](grammar: WeightedGrammar[L, W],
                   words: Seq[W],
-                  tree: BinarizedTree[(L,Seq[ID[Ref[L]]])]):LatentTreeMarginal[L, W] = {
+                  tree: BinarizedTree[(L,Seq[Int])]):LatentTreeMarginal[L, W] = {
     LatentTreeMarginal(grammar.specialize(words), tree)
   }
 
@@ -249,12 +249,12 @@ object LatentTreeMarginal {
                       words: Seq[W],
                       tree: BinarizedTree[L]):LatentTreeMarginal[L, W] = {
     LatentTreeMarginal(grammar.specialize(words),
-      tree.map { l => (l, ref.localRefinements(tag(grammar.labelIndex(l))).toIndexedSeq)})
+      tree.map { l => (l, ref.localRefinements(grammar.labelIndex(l)).toIndexedSeq)})
   }
 
 
-  class Beliefs[L](val label: ID[L],
-                           val candidates: Seq[ID[Ref[L]]],
+  class Beliefs[L](val label: Int,
+                           val candidates: Seq[Int],
                            val inside: Array[Double],
                            val outside: Array[Double]) {
     override def toString() = {
@@ -267,8 +267,8 @@ object LatentTreeMarginal {
     def unapply[L](b: Beliefs[L]) = Some((b.label, b.candidates, b.inside, b.outside))
 
 
-    def apply[L](label: ID[L], candidates: Seq[ID[Ref[L]]]):Beliefs[L] = {
-      val r = new Beliefs(label, candidates, new Array[Double](candidates.length), new Array[Double](candidates.length))
+    def apply[L](label: Int, candidates: Seq[Int]):Beliefs[L] = {
+      val r = new Beliefs[L](label, candidates, new Array[Double](candidates.length), new Array[Double](candidates.length))
       Arrays.fill(r.inside, Double.NegativeInfinity)
       Arrays.fill(r.outside, Double.NegativeInfinity)
       r

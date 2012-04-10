@@ -22,15 +22,15 @@ class ProductionFeaturizer[L, W](grammar: Grammar[L],
   def specialize(w: Seq[W]) = new Specialization {
     val words = w
 
-    def featuresForBinaryRule(begin: Int, split: Int, end: Int, rule: ID[Rule[L]], ref: ID[RuleRef[L]]) = {
+    def featuresForBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int) = {
       Array(rule:Int)
     }
 
-    def featuresForUnaryRule(begin: Int, end: Int, rule: ID[Rule[L]], ref: ID[RuleRef[L]]) = {
+    def featuresForUnaryRule(begin: Int, end: Int, rule: Int, ref: Int) = {
       Array(rule:Int)
     }
 
-    def featuresForSpan(begin: Int, end: Int, tag: ID[L], ref: ID[Ref[L]]) = {
+    def featuresForSpan(begin: Int, end: Int, tag: Int, ref: Int) = {
       Array(index(LexicalProduction(grammar.labelIndex.get(tag), words(begin))))
     }
   }

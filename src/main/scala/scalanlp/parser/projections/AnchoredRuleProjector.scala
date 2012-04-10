@@ -61,12 +61,12 @@ class AnchoredRuleProjector(threshold: Double) extends Serializable {
     }
     
     val visitor = new AnchoredSpanVisitor[L] {
-      def visitSpan(begin: Int, end: Int, tag: ID[L], ref: ID[Ref[L]], score: Double) {
+      def visitSpan(begin: Int, end: Int, tag: Int, ref: Int, score: Double) {
         // fill in spans with 0 if they're active
         getOrElseUpdate(lexicalScores, TriangularArray.index(begin, end), projVector())(tag) = 0
       }
 
-      def visitBinaryRule(begin: Int, split: Int, end: Int, rule: ID[Rule[L]], ref: ID[RuleRef[L]], count: Double) {
+      def visitBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int, count: Double) {
         val index = TriangularArray.index(begin, end)
         if(count > 0.0) {
           totals(index)(charts.grammar.grammar.parent(rule)) += count
@@ -81,7 +81,7 @@ class AnchoredRuleProjector(threshold: Double) extends Serializable {
         }
       }
 
-      def visitUnaryRule(begin: Int, end: Int, rule: ID[Rule[L]], ref: ID[RuleRef[L]], count: Double) {
+      def visitUnaryRule(begin: Int, end: Int, rule: Int, ref: Int, count: Double) {
         val index = TriangularArray.index(begin, end)
         val parentArray = if(unaryScores(index) eq null) {
           unaryScores(index) = projRuleVector()

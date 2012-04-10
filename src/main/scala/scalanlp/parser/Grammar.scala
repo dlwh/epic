@@ -26,20 +26,20 @@ trait Grammar[L] extends Encoder[Rule[L]] with Serializable {
   def root: L
 
   // Accessors for properties of indexed rules
-  def parent(r: ID[Rule[L]]):ID[L] = tag[L](indexedRules(r).parent)
-  def leftChild(r: ID[Rule[L]]): ID[L] = TypeTags.tag[L](indexedRules(r).asInstanceOf[BinaryRule[Int]].left)
-  def rightChild(r: ID[Rule[L]]): ID[L] = tag[L](indexedRules(r).asInstanceOf[BinaryRule[Int]].right)
-  def child(r: ID[Rule[L]]): ID[L] = tag[L](indexedRules(r).asInstanceOf[UnaryRule[Int]].child)
+  def parent(r: Int):Int = tag[L](indexedRules(r).parent)
+  def leftChild(r: Int): Int = TypeTags.tag[L](indexedRules(r).asInstanceOf[BinaryRule[Int]].left)
+  def rightChild(r: Int): Int = tag[L](indexedRules(r).asInstanceOf[BinaryRule[Int]].right)
+  def child(r: Int): Int = tag[L](indexedRules(r).asInstanceOf[UnaryRule[Int]].child)
 
   // query by parent or child
-  def indexedBinaryRulesWithParent(l: ID[L]):Array[ID[Rule[L]]]
-  def indexedBinaryRulesWithLeftChild(b: ID[L]):Array[ID[Rule[L]]]
-  def indexedBinaryRulesWithRightChild(c: ID[L]):Array[ID[Rule[L]]]
-  def indexedUnaryRulesWithChild(l: ID[L]):Array[ID[Rule[L]]]
-  def indexedUnaryRulesWithParent(l: ID[L]):Array[ID[Rule[L]]]
+  def indexedBinaryRulesWithParent(l: Int):Array[Int]
+  def indexedBinaryRulesWithLeftChild(b: Int):Array[Int]
+  def indexedBinaryRulesWithRightChild(c: Int):Array[Int]
+  def indexedUnaryRulesWithChild(l: Int):Array[Int]
+  def indexedUnaryRulesWithParent(l: Int):Array[Int]
 
   val tags: Set[L]
-  val indexedTags: Array[ID[L]]
+  val indexedTags: Array[Int]
 }
 
 object Grammar {
@@ -107,16 +107,16 @@ object Grammar {
 
       val tags = t
 
-      val indexedTags = tagArray[L](tags.map(labelIndex).toArray)
+      val indexedTags = (tags.map(labelIndex).toArray)
 
-      def ruleIndex(a: Int, b: Int, c: Int) = tag[Rule[L]](binaryRuleTable(a)(c + labelIndex.size * b))
-      def ruleIndex(a: Int, b: Int) = tag[Rule[L]](unaryRuleTable(b + labelIndex.size * a))
+      def ruleIndex(a: Int, b: Int, c: Int) = binaryRuleTable(a)(c + labelIndex.size * b)
+      def ruleIndex(a: Int, b: Int) = unaryRuleTable(b + labelIndex.size * a)
 
-      def indexedBinaryRulesWithParent(l: ID[L]) = tagArray[Rule[L]](binaryRulesByParent(l))
-      def indexedUnaryRulesWithParent(l: ID[L]) = tagArray[Rule[L]](unaryRulesByParent(l))
-      def indexedUnaryRulesWithChild(l: ID[L]) = tagArray[Rule[L]](unaryRulesByChild(l))
-      def indexedBinaryRulesWithLeftChild(b: ID[L]) = tagArray[Rule[L]](binaryRulesByLeftChild(b))
-      def indexedBinaryRulesWithRightChild(c: ID[L]) = tagArray[Rule[L]](binaryRulesByRightChild(c))
+      def indexedBinaryRulesWithParent(l: Int) = binaryRulesByParent(l)
+      def indexedUnaryRulesWithParent(l: Int) = unaryRulesByParent(l)
+      def indexedUnaryRulesWithChild(l: Int) = unaryRulesByChild(l)
+      def indexedBinaryRulesWithLeftChild(b: Int) = binaryRulesByLeftChild(b)
+      def indexedBinaryRulesWithRightChild(c: Int) = binaryRulesByRightChild(c)
 
     }
 

@@ -18,9 +18,9 @@ trait SpanFeaturizer[L, W, Feat] {
   trait Specialization {
     def words: Seq[W]
 
-    def featuresForBinaryRule(begin: Int, split: Int, end: Int, rule: ID[Rule[L]], ref: ID[RuleRef[L]]):Array[Int]
-    def featuresForUnaryRule(begin: Int, end: Int, rule: ID[Rule[L]], ref: ID[RuleRef[L]]):Array[Int]
-    def featuresForSpan(begin: Int, end: Int, tag: ID[L], ref: ID[Ref[L]]):Array[Int]
+    def featuresForBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int):Array[Int]
+    def featuresForUnaryRule(begin: Int, end: Int, rule: Int, ref: Int):Array[Int]
+    def featuresForSpan(begin: Int, end: Int, tag: Int, ref: Int):Array[Int]
   }
 
 }
@@ -52,15 +52,15 @@ object SpanFeaturizer {
       def specialize(w: Seq[W]) = new Specialization {
         val words = w
 
-        def featuresForBinaryRule(begin: Int, split: Int, end: Int, rule: ID[Rule[L]], ref: ID[RuleRef[L]]) = {
+        def featuresForBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int) = {
           Array(refinedRuleIndices(rule)(ref))
         }
 
-        def featuresForUnaryRule(begin: Int, end: Int, rule: ID[Rule[L]], ref: ID[RuleRef[L]]) = {
+        def featuresForUnaryRule(begin: Int, end: Int, rule: Int, ref: Int) = {
           Array(refinedRuleIndices(rule)(ref))
         }
 
-        def featuresForSpan(begin: Int, end: Int, tag: ID[L], ref: ID[Ref[L]]) = {
+        def featuresForSpan(begin: Int, end: Int, tag: Int, ref: Int) = {
           if(begin+1 != end) Array.empty[Int]
           else {
             val refinedTag = proj.labels.globalize(tag, ref)

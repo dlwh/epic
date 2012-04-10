@@ -15,16 +15,16 @@ trait SpanScorer[L] extends Serializable {
   /**
    * Scores the indexed [[scalanlp.trees.BinaryRule]] rule when it occurs at (begin,split,end)
    */
-  def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: ID[Rule[L]]): Double
+  def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int): Double
   /**
    * Scores the indexed [[scalanlp.trees.UnaryRule]] rule when it occurs at (begin,end)
    */
-  def scoreUnaryRule(begin: Int, end: Int, rule: ID[Rule[L]]): Double
+  def scoreUnaryRule(begin: Int, end: Int, rule: Int): Double
   /**
    * Scores the indexed label rule when it occurs at (begin,end). Can be used for tags, or for a
    * "bottom" label. Typically it is used to filter out impossible rules (using Double.NegativeInfinity)
    */
-  def scoreSpan(begin: Int, end: Int, tag: ID[L]): Double;
+  def scoreSpan(begin: Int, end: Int, tag: Int): Double;
 
 }
 
@@ -33,18 +33,18 @@ object SpanScorer {
    * Returns the sum of two span scores, by adding them together.
    */
   def sum[L](s1: SpanScorer[L], s2: SpanScorer[L]):SpanScorer[L] = new SpanScorer[L] {
-    def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: ID[Rule[L]]): Double = {
+    def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int): Double = {
       val r1 = s1.scoreBinaryRule(begin, split, end, rule);
       if(r1 == Double.NegativeInfinity) r1
       else r1 + s2.scoreBinaryRule(begin, split, end, rule);
     }
-    def scoreUnaryRule(begin: Int, end: Int, rule: ID[Rule[L]]): Double = {
+    def scoreUnaryRule(begin: Int, end: Int, rule: Int): Double = {
       val r1 = s1.scoreUnaryRule(begin, end, rule);
       if(r1 == Double.NegativeInfinity) r1
       else r1 + s2.scoreUnaryRule(begin, end, rule);
     }
 
-    def scoreSpan(begin: Int, end: Int, tag: ID[L]): Double = {
+    def scoreSpan(begin: Int, end: Int, tag: Int): Double = {
       val r1 = s1.scoreSpan(begin, end, tag);
       if(r1 == Double.NegativeInfinity) r1
       else r1 + s2.scoreSpan(begin, end, tag)
@@ -55,15 +55,15 @@ object SpanScorer {
    * Divides a SpanScorer by some scalar
    */
   def divide[L](s: SpanScorer[L], div: Double):SpanScorer[L] = new SpanScorer[L] {
-    def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: ID[Rule[L]]): Double = {
+    def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int): Double = {
       s.scoreBinaryRule(begin, split, end, rule) / div;
     }
 
-    def scoreUnaryRule(begin: Int, end: Int, rule: ID[Rule[L]]): Double = {
+    def scoreUnaryRule(begin: Int, end: Int, rule: Int): Double = {
       s.scoreUnaryRule(begin, end, rule) / div;
     }
 
-    def scoreSpan(begin: Int, end: Int, tag: ID[L]): Double = {
+    def scoreSpan(begin: Int, end: Int, tag: Int): Double = {
       s.scoreSpan(begin, end, tag) / div;
     }
 
@@ -92,22 +92,22 @@ object SpanScorer {
    * The identity scorer returns 0 always.
    */
   def identity[L]:SpanScorer[L] = new SpanScorer[L] {
-    def scoreSpan(begin: Int, end: Int, tag: ID[L]) = 0.0
+    def scoreSpan(begin: Int, end: Int, tag: Int) = 0.0
 
-    def scoreUnaryRule(begin: Int, end: Int, rule: ID[Rule[L]]) = 0.0
+    def scoreUnaryRule(begin: Int, end: Int, rule: Int) = 0.0
 
-    def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: ID[Rule[L]]) = 0.0
+    def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = 0.0
   }
 
   /**
    * Constant scorer returns the same thing for all applications
    */
   def constant[L](labelThreshold: Double, ruleThreshold: Double = Double.NegativeInfinity):SpanScorer[L] = new SpanScorer[L] {
-    def scoreSpan(begin: Int, end: Int, tag: ID[L]) = labelThreshold
+    def scoreSpan(begin: Int, end: Int, tag: Int) = labelThreshold
 
-    def scoreUnaryRule(begin: Int, end: Int, rule: ID[Rule[L]]) = ruleThreshold
+    def scoreUnaryRule(begin: Int, end: Int, rule: Int) = ruleThreshold
 
-    def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: ID[Rule[L]]) = ruleThreshold
+    def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = ruleThreshold
   }
 
 

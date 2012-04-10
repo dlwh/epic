@@ -14,11 +14,11 @@ import scalanlp.trees.Rule
 class ThresholdingScorer[L](inner: SpanScorer[L], threshold: Double= -5.) extends SpanScorer[L] with Serializable {
   @inline private def I(score: Double) = if(score > threshold) score else Double.NegativeInfinity;
 
-  def scoreSpan(begin: Int, end: Int, tag: ID[L]) = I(inner.scoreSpan(begin,end,tag))
+  def scoreSpan(begin: Int, end: Int, tag: Int) = I(inner.scoreSpan(begin,end,tag))
 
-  def scoreUnaryRule(begin: Int, end: Int, rule: ID[Rule[L]]) = I(inner.scoreUnaryRule(begin,end,rule));
+  def scoreUnaryRule(begin: Int, end: Int, rule: Int) = I(inner.scoreUnaryRule(begin,end,rule));
 
-  def scoreBinaryRule(begin: Int, split: Int, end: Int, r: ID[Rule[L]]) = {
+  def scoreBinaryRule(begin: Int, split: Int, end: Int, r: Int) = {
     I(inner.scoreBinaryRule(begin, split, end, r))
   }
 

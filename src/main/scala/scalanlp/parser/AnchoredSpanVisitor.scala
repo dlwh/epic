@@ -10,17 +10,17 @@ import scalanlp.util.TypeTags.ID
  * @author dlwh
  */
 trait AnchoredSpanVisitor[L] {
-  def visitBinaryRule(begin: Int, split: Int, end: Int, rule: ID[Rule[L]], ref: ID[RuleRef[L]], score: Double)
-  def visitUnaryRule(begin: Int, end: Int, rule: ID[Rule[L]], ref: ID[RuleRef[L]], score: Double)
-  def visitSpan(begin: Int, end: Int, tag: ID[L], ref: ID[Ref[L]], score: Double)
+  def visitBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int, score: Double)
+  def visitUnaryRule(begin: Int, end: Int, rule: Int, ref: Int, score: Double)
+  def visitSpan(begin: Int, end: Int, tag: Int, ref: Int, score: Double)
 }
 
 object AnchoredSpanVisitor {
   def noOp[L]:AnchoredSpanVisitor[L] = new AnchoredSpanVisitor[L] {
-    def visitBinaryRule(begin: Int, split: Int, end: Int, rule: ID[Rule[L]], ref: ID[RuleRef[L]], score: Double) = {}
+    def visitBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int, score: Double) = {}
 
-    def visitUnaryRule(begin: Int, end: Int, rule: ID[Rule[L]], ref: ID[RuleRef[L]], score: Double) {}
+    def visitUnaryRule(begin: Int, end: Int, rule: Int, ref: Int, score: Double) {}
 
-    def visitSpan(begin: Int, end: Int, tag: ID[L], ref: ID[Ref[L]], score: Double) {}
+    def visitSpan(begin: Int, end: Int, tag: Int, ref: Int, score: Double) {}
   }
 }

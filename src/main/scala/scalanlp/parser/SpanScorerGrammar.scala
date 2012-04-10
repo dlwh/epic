@@ -17,19 +17,19 @@ class SpanScorerGrammar[L, W](val grammar: Grammar[L], factory: SpanScorer.Facto
   private class Spec(spec: WeightedGrammar[L,W]#Specialization) extends super.Specialization {
     def words = spec.words
 
-    def scoreSpan(begin: Int, end: Int, label: ID[L], ref: ID[Ref[L]]) = {
+    def scoreSpan(begin: Int, end: Int, label: Int, ref: Int) = {
       spec.scoreSpan(begin, end, label, ref)
     }
 
-    def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: ID[Rule[L]], ref: ID[RuleRef[L]]) = {
+    def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int) = {
       spec.scoreBinaryRule(begin, split,  end, rule, ref)
     }
 
-    def scoreUnaryRule(begin: Int, end: Int, rule: ID[Rule[L]], ref: ID[RuleRef[L]]) = {
+    def scoreUnaryRule(begin: Int, end: Int, rule: Int, ref: Int) = {
       spec.scoreUnaryRule(begin, end, rule, ref)
     }
 
-    def validLabelRefinements(begin: Int, end: Int, label: ID[L]) = {
+    def validLabelRefinements(begin: Int, end: Int, label: Int) = {
       spec.validLabelRefinements(begin, end, label)
     }
 
@@ -37,11 +37,11 @@ class SpanScorerGrammar[L, W](val grammar: Grammar[L], factory: SpanScorer.Facto
       spec.numValidRefinements(label)
     }
 
-    def validRuleRefinementsGivenParent(begin: Int, end: Int, rule: ID[Rule[L]], parentRef: ID[Ref[L]]) = {
+    def validRuleRefinementsGivenParent(begin: Int, end: Int, rule: Int, parentRef: Int) = {
       spec.validRuleRefinementsGivenParent(begin, end, rule, parentRef)
     }
 
-    def validUnaryRuleRefinementsGivenChild(begin: Int, end: Int, rule: ID[Rule[L]], childRef: ID[Ref[L]]) = {
+    def validUnaryRuleRefinementsGivenChild(begin: Int, end: Int, rule: Int, childRef: Int) = {
       spec.validUnaryRuleRefinementsGivenChild(begin, end, rule, childRef)
     }
 
@@ -49,27 +49,27 @@ class SpanScorerGrammar[L, W](val grammar: Grammar[L], factory: SpanScorer.Facto
       spec.validTagsFor(pos)
     }
 
-    def leftChildRefinement(rule: ID[Rule[L]], ruleRef: ID[RuleRef[L]]) = {
+    def leftChildRefinement(rule: Int, ruleRef: Int) = {
       spec.leftChildRefinement(rule, ruleRef)
     }
 
-    def rightChildRefinement(rule: ID[Rule[L]], ruleRef: ID[RuleRef[L]]) = {
+    def rightChildRefinement(rule: Int, ruleRef: Int) = {
       spec.rightChildRefinement(rule, ruleRef)
     }
 
-    def parentRefinement(rule: ID[Rule[L]], ruleRef: ID[RuleRef[L]]) = {
+    def parentRefinement(rule: Int, ruleRef: Int) = {
       spec.parentRefinement(rule, ruleRef)
     }
 
-    def childRefinement(rule: ID[Rule[L]], ruleRef: ID[RuleRef[L]]) = {
+    def childRefinement(rule: Int, ruleRef: Int) = {
       spec.childRefinement(rule, ruleRef)
     }
 
-    def ruleRefinementFromRefinements(r: ID[Rule[L]], refA: ID[Ref[L]], refB: ID[Ref[L]], refC: ID[Ref[L]]) = {
+    def ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int, refC: Int) = {
       spec.ruleRefinementFromRefinements(r, refA, refB, refC)
     }
 
-    def ruleRefinementFromRefinements(r: ID[Rule[L]], refA: ID[Ref[L]], refB: ID[Ref[L]]) = {
+    def ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int) = {
       spec.ruleRefinementFromRefinements(r, refA, refB)
     }
   }

@@ -17,16 +17,16 @@ import scalanlp.util.Index
  */
 
 class ConstraintScorer[L](val scores: Array[BitSet], topScores: Array[BitSet]) extends SpanScorer[L] {
-  def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: ID[Rule[L]]) = 0.0
+  def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = 0.0
 
-  def scoreUnaryRule(begin: Int, end: Int, rule: ID[Rule[L]]) = {
+  def scoreUnaryRule(begin: Int, end: Int, rule: Int) = {
     val set = topScores(TriangularArray.index(begin, end))
     if(set == null || !set.contains(rule)) Double.NegativeInfinity
     else 0.0
 //    0.0
   }
 
-  def scoreSpan(begin: Int, end: Int, tag: ID[L]) = {
+  def scoreSpan(begin: Int, end: Int, tag: Int) = {
     val set = scores(TriangularArray.index(begin, end))
     if(set == null || !set.contains(tag)) Double.NegativeInfinity
     else 0.0
@@ -50,9 +50,9 @@ class ConstraintScorerFactory[L, W](parser: ChartBuilder[ParseChart, L, W], thre
     val scores = TriangularArray.raw(length+1, null: Array[Double])
     val topScores = TriangularArray.raw(length+1, null: Array[Double])
     val visitor = new AnchoredSpanVisitor[L] {
-      def visitBinaryRule(begin: Int, split: Int, end: Int, rule: ID[Rule[L]], ref: ID[RuleRef[L]], score: Double) {}
+      def visitBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int, score: Double) {}
 
-      def visitUnaryRule(begin: Int, end: Int, rule: ID[Rule[L]], ref: ID[RuleRef[L]], score: Double) {
+      def visitUnaryRule(begin: Int, end: Int, rule: Int, ref: Int, score: Double) {
         val index = TriangularArray.index(begin, end)
         if(score != 0.0) {
           if(topScores(index) eq null) {
@@ -63,7 +63,7 @@ class ConstraintScorerFactory[L, W](parser: ChartBuilder[ParseChart, L, W], thre
       }
       
 
-      def visitSpan(begin: Int, end: Int, tag: ID[L], ref: ID[Ref[L]], score: Double) {
+      def visitSpan(begin: Int, end: Int, tag: Int, ref: Int, score: Double) {
         val index = TriangularArray.index(begin, end)
         if(score != 0.0) {
           if(scores(index) eq null) {
