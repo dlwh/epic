@@ -8,13 +8,13 @@ import scalanlp.util.TypeTags
  * A grammar that creates a span scorer as the Specialization and parses with it.
  * @author dlwh
  */
-class SpanScorerGrammar[L, W](val grammar: Grammar[L], factory: SpanScorer.Factory[L, W]) extends WeightedGrammar[L, W] {
+class SpanScorerGrammar[L, W](val grammar: Grammar[L], factory: SpanScorer.Factory[L, W]) extends DerivationScorer.Factory[L, W] {
   def specialize(words: Seq[W]):Specialization = {
     val scorer = factory.mkSpanScorer(words)
-    new Spec(WeightedGrammar.oneOff(grammar, scorer).specialize(words))
+    new Spec(DerivationScorerFactory.oneOff(grammar, scorer).specialize(words))
   }
   
-  private class Spec(spec: WeightedGrammar[L,W]#Specialization) extends super.Specialization {
+  private class Spec(spec: DerivationScorer[L,W]) extends super.Specialization {
     def words = spec.words
 
     def scoreSpan(begin: Int, end: Int, label: Int, ref: Int) = {

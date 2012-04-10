@@ -12,7 +12,7 @@ package scalanlp.parser
  * @tparam W the word type
  */
 case class ChartMarginal[+Chart[X]<:ParseChart[X], L, W](grammar: Grammar[L],
-                                                         spec: WeightedGrammar[L, W]#Specialization,
+                                                         spec: DerivationScorer[L, W],
                                                          inside: Chart[L],
                                                          outside: Chart[L],
                                                          partition: Double) extends Marginal[L, W] {
@@ -123,7 +123,7 @@ case class ChartMarginal[+Chart[X]<:ParseChart[X], L, W](grammar: Grammar[L],
 }
 
 object ChartMarginal {
-  def fromSentence[L, W](grammar: WeightedGrammar[L, W], sent: Seq[W]) = {
+  def fromSentence[L, W](grammar: DerivationScorer.Factory[L, W], sent: Seq[W]) = {
     val builder = ChartBuilder(grammar)
     builder.charts(sent)
   }

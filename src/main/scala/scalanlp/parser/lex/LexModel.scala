@@ -376,9 +376,9 @@ case class LexGrammarBundle[L, W](baseGrammar: Grammar[L],
     }
   }
 
-  def makeGrammar(fi: IndexedFeaturizer[L, W], weights: DenseVector[Double]): WeightedGrammar[L, W] = {
+  def makeGrammar(fi: IndexedFeaturizer[L, W], weights: DenseVector[Double]): DerivationScorer.Factory[L, W] = {
     val wi = wordIndex
-    new WeightedGrammar[L, W] {
+    new DerivationScorer.Factory[L, W] {
       val grammar = baseGrammar
 
       val tags = bundle.tags
@@ -388,13 +388,13 @@ case class LexGrammarBundle[L, W](baseGrammar: Grammar[L],
 
       def isRightRule(r: Int) = rightRules(r)
 
-      def specialize(sent: Seq[W]) = new Specialization(sent)
+      def specialize(sent: Seq[W]) = new Spec(sent)
 
       // refinement scheme:
       // binaryRule is (head * words.length + dep)
       // unaryRule is (head)
       // parent/leftchild/rightchild is (head)
-      final class Specialization(val words: Seq[W]) extends super.Specialization {
+      final class Spec(val words: Seq[W]) extends super.Specialization {
         val indexed = words.map(wordIndex)
         val f = fi.specialize(words)
         val indexedValidTags: Seq[Array[Int]] = words.map(validTags).map(_.map(labelIndex))
@@ -599,7 +599,7 @@ class LexModel[L, W](bundle: LexGrammarBundle[L, W],
   def initialValueForFeature(f: Feature) = initFeatureValue(f).getOrElse(0)
 
   def inferenceFromWeights(weights: DenseVector[Double]) = {
-    val gram: WeightedGrammar[L, W] = bundle.makeGrammar(indexed, weights)
+    val gram: DerivationScorer.Factory[L, W] = bundle.makeGrammar(indexed, weights)
     new LexInference(reannotate, gram, indexed, headFinder)
   }
 
@@ -615,11 +615,11 @@ class LexModel[L, W](bundle: LexGrammarBundle[L, W],
 }
 
 case class LexInference[L, W](reannotate: (BinarizedTree[L], Seq[W])=>BinarizedTree[L],
-                              grammar: WeightedGrammar[L, W],
+                              grammar: DerivationScorer.Factory[L, W],
                               featurizer: IndexedFeaturizer[L, W],
                               headFinder: HeadFinder[L]) extends ParserInference[L, W] {
 
-  def goldCounts(ti: TreeInstance[L, W], augment: WeightedGrammar[L, W]) = {
+  def goldCounts(ti: TreeInstance[L, W], augment: DerivationScorer.Factory[L, W]) = {
     val reannotated = reannotate(ti.tree, ti.words)
     val headed = headFinder.annotateHeadIndices(reannotated).asInstanceOf[BinarizedTree[(L,Int)]]
     TreeMarginal(augment, ti.words, headed).expectedCounts(featurizer)

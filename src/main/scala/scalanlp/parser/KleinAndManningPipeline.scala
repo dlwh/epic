@@ -297,7 +297,7 @@ object KleinAndManningPipeline extends ParserPipeline {
       TreeInstance(ti.id, t,ti.words)
     }.seq
     val (words, binary, unary) = GenerativeParser.extractCounts(transformed);
-    val grammar = WeightedGrammar.generative(AnnotatedLabel.TOP, binary, unary, words)
+    val grammar = DerivationScorerFactory.generative(AnnotatedLabel.TOP, binary, unary, words)
     val parser = SimpleChartParser[AnnotatedLabel, String](grammar)
     Iterator("Markovized" -> parser)
   }

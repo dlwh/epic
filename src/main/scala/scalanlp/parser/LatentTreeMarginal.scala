@@ -15,7 +15,7 @@ import LatentTreeMarginal._
  */
 
 case class LatentTreeMarginal[L, W](grammar: Grammar[L],
-                                    spec: WeightedGrammar[L, W]#Specialization,
+                                    spec: DerivationScorer[L, W],
                                     tree: BinarizedTree[(L, Seq[Int])]) extends Marginal[L, W] {
 
   private val stree = insideScores()
@@ -239,13 +239,13 @@ case class LatentTreeMarginal[L, W](grammar: Grammar[L],
 
 object LatentTreeMarginal {
 
-  def apply[L, W](grammar: WeightedGrammar[L, W],
+  def apply[L, W](grammar: DerivationScorer.Factory[L, W],
                   words: Seq[W],
                   tree: BinarizedTree[(L,Seq[Int])]):LatentTreeMarginal[L, W] = {
     LatentTreeMarginal(grammar.grammar, grammar.specialize(words), tree)
   }
 
-  def apply[L, L2, W](grammar: WeightedGrammar[L, W],
+  def apply[L, L2, W](grammar: DerivationScorer.Factory[L, W],
                       ref: ProjectionIndexer[L, L2],
                       words: Seq[W],
                       tree: BinarizedTree[L]):LatentTreeMarginal[L, W] = {

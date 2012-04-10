@@ -14,7 +14,7 @@ case class SpanScorerFactor[L, W](grammar: Grammar[L],
   def *(f: Double) =  this
 
   lazy val logPartition = {
-    val marg = ChartMarginal.fromSentence(WeightedGrammar.oneOff[L,W](grammar, scorer), words)
+    val marg = ChartMarginal.fromSentence(DerivationScorerFactory.oneOff[L,W](grammar, scorer), words)
     marg.partition
   }
 
@@ -65,7 +65,7 @@ case class SpanScorerFactor[L, W](grammar: Grammar[L],
 trait EPProjector[L, W] {
   def project(inf: ParserInference[L, W],
               instance: TreeInstance[L, W],
-              marginal: ChartMarginal[ParseChart.LogProbabilityParseChart, L, W]):WeightedGrammar[L, W]
+              marginal: ChartMarginal[ParseChart.LogProbabilityParseChart, L, W]):DerivationScorer.Factory[L, W]
 }
 
 @SerialVersionUID(1)
@@ -73,9 +73,9 @@ class AnchoredRuleApproximator[L, W](pruningThreshold: Double = Double.NegativeI
 
   def project(inf: ParserInference[L, W],
               instance: TreeInstance[L, W],
-              marginal: ChartMarginal[ParseChart.LogProbabilityParseChart, L, W]):WeightedGrammar[L, W] = {
+              marginal: ChartMarginal[ParseChart.LogProbabilityParseChart, L, W]):DerivationScorer.Factory[L, W] = {
     val factory = new AnchoredPCFGProjector[L, W](marginal.grammar)
-    WeightedGrammar.oneOff(inf.grammar.grammar, factory.buildSpanScorer(marginal))
+    DerivationScorerFactory.oneOff(inf.grammar.grammar, factory.buildSpanScorer(marginal))
   }
 
 }

@@ -4,7 +4,7 @@ import scalala.tensor.dense._
 import scalala.tensor.mutable.Counter2
 import scalanlp.trees.{BinaryRule, UnaryRule}
 import scalanlp.parser.projections.GrammarRefinements
-import scalanlp.parser.{Lexicon, WeightedGrammar, Grammar}
+import scalanlp.parser.{Lexicon, DerivationScorerFactory, Grammar}
 
 object FeaturizedGrammar {
   def apply[L, L2, W](xbar: Grammar[L],
@@ -19,6 +19,6 @@ object FeaturizedGrammar {
       ruleCache(r) = feats dot weights;
     }
 
-    WeightedGrammar.refined(xbar, refinements, ruleCache, spanCache, lexicon)
+    DerivationScorerFactory.refined(xbar, refinements, ruleCache, spanCache, lexicon)
   }
 }

@@ -50,11 +50,11 @@ class KMModel[L, L3, W](featurizer: Featurizer[L3, W],
 
 case class DiscParserInference[L, L2, W](featurizer: SpanFeaturizer[L, W, Feature],
                                          ann: (BinarizedTree[L], Seq[W])=>BinarizedTree[L2],
-                                         grammar: WeightedGrammar[L, W],
+                                         grammar: DerivationScorer.Factory[L, W],
                                          projections: GrammarRefinements[L, L2]) extends ParserInference[L, W] {
 
   // E[T-z|T, params]
-  def goldCounts(ti: TreeInstance[L, W], grammar: WeightedGrammar[L, W]) = {
+  def goldCounts(ti: TreeInstance[L, W], grammar: DerivationScorer.Factory[L, W]) = {
     val tree = ti.tree
     val words = ti.words
     val annotated = ann(tree, words)

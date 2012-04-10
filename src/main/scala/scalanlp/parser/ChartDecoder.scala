@@ -122,7 +122,7 @@ case class MaxRuleProductDecoder[L, W](grammar: Grammar[L]) extends ChartDecoder
 
   def extractBestParse(marginal: ChartMarginal[ParseChart, L, W]) = {
     val scorer = p.buildSpanScorer(marginal)
-    val oneoff: WeightedGrammar[L, W] = WeightedGrammar.oneOff(grammar, scorer)
+    val oneoff: DerivationScorer.Factory[L, W] = DerivationScorerFactory.oneOff(grammar, scorer)
     val newMarg = ChartMarginal.fromSentence(oneoff, marginal.spec.words)
     val tree = new ViterbiDecoder[L,W].extractBestParse(newMarg)
     tree
@@ -137,7 +137,7 @@ class MaxVariationalDecoder[L, W](grammar: Grammar[L]) extends ChartDecoder[L, W
 
   def extractBestParse(marginal: ChartMarginal[ParseChart, L, W]) = {
     val scorer = p.buildSpanScorer(marginal)
-    val oneoff: WeightedGrammar[L, W] = WeightedGrammar.oneOff(grammar, scorer)
+    val oneoff: DerivationScorer.Factory[L, W] = DerivationScorerFactory.oneOff(grammar, scorer)
     val newMarg = ChartMarginal.fromSentence(oneoff, marginal.spec.words)
     val tree = new ViterbiDecoder[L,W].extractBestParse(newMarg)
     tree

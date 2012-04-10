@@ -11,7 +11,7 @@ trait ChartBuilder[+Chart[X]<:ParseChart[X], L, W] {
 
   def root: L = grammar.root
   def rootIndex: Int = tag[L](grammar.labelIndex(root))
-  def grammar: WeightedGrammar[L, W]
+  def grammar: DerivationScorer.Factory[L, W]
 
   def charts(words: Seq[W]):ChartMarginal[Chart, L, W]
 
@@ -19,11 +19,11 @@ trait ChartBuilder[+Chart[X]<:ParseChart[X], L, W] {
 }
 
 object ChartBuilder {
-  def apply[L, W](grammar: WeightedGrammar[L, W]):ChartBuilder[ParseChart.LogProbabilityParseChart, L, W] = {
+  def apply[L, W](grammar: DerivationScorer.Factory[L, W]):ChartBuilder[ParseChart.LogProbabilityParseChart, L, W] = {
     apply(grammar, ParseChart.logProb)
   }
 
-  def apply[Chart[X]<:ParseChart[X], L, W](grammar: WeightedGrammar[L, W],
+  def apply[Chart[X]<:ParseChart[X], L, W](grammar: DerivationScorer.Factory[L, W],
                                            factory: ParseChart.Factory[Chart]):ChartBuilder[Chart, L, W] = {
     new CKYChartBuilder(grammar, factory)
   }

@@ -10,7 +10,7 @@ import scalanlp.util.TypeTags
  * @tparam L label type
  * @tparam W word type
  */
-class CKYChartBuilder[+Chart[X]<:ParseChart[X], L, W](val grammar: WeightedGrammar[L, W],
+class CKYChartBuilder[+Chart[X]<:ParseChart[X], L, W](val grammar: DerivationScorer.Factory[L, W],
                                                       val chartFactory: Factory[Chart]) extends ChartBuilder[Chart, L, W] {
 
   def charts(words: Seq[W]) = {
@@ -261,7 +261,7 @@ class CKYChartBuilder[+Chart[X]<:ParseChart[X], L, W](val grammar: WeightedGramm
 }
 
 object CKYChartBuilder {
-  def apply[L, W, Chart[X]<:ParseChart[X]](grammar: WeightedGrammar[L,W], chartFactory: ParseChart.Factory[Chart]) = {
+  def apply[L, W, Chart[X]<:ParseChart[X]](grammar: DerivationScorer.Factory[L,W], chartFactory: ParseChart.Factory[Chart]) = {
     new CKYChartBuilder(grammar, chartFactory)
   }
 }

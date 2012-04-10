@@ -14,7 +14,7 @@ class EPParser[L, W](grammar: Grammar[L],
   def bestParse(s: Seq[W]) = {
     val inst = new TreeInstance[L, W]("", null, s)
     val augment = inference.getMarginals(inst, new SpanScorerFactor(grammar, s, SpanScorer.identity))._2
-    val wgrammar = WeightedGrammar.oneOff[L, W](grammar, augment.scorer)
+    val wgrammar = DerivationScorerFactory.oneOff[L, W](grammar, augment.scorer)
     SimpleChartParser(wgrammar).bestParse(s)
   }
 
