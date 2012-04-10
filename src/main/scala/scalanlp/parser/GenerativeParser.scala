@@ -35,8 +35,7 @@ object GenerativeParser {
 
   def fromTrees[L, W](data: Traversable[TreeInstance[L, W]]):SimpleChartParser[L, W] = {
     val grammar = extractGrammar(data.head.tree.label, data)
-    val builder = CKYChartBuilder(grammar, ParseChart.logProb)
-    SimpleChartParser(builder)
+    SimpleChartParser(grammar)
   }
 
   def extractGrammar[L, W](root: L, data: TraversableOnce[TreeInstance[L, W]]): WeightedGrammar[L, W] = {
@@ -79,8 +78,7 @@ object GenerativePipeline extends ParserPipeline {
     val trees = trainTrees.map(_.mapLabels(_.clearFeatures))
     val (words, binary, unary) = GenerativeParser.extractCounts(trees)
     val grammar = WeightedGrammar.generative(xbar, binary, unary, words)
-    val builder = CKYChartBuilder(grammar, ParseChart.logProb)
-    val parser = SimpleChartParser(builder)
+    val parser = SimpleChartParser(grammar)
     Iterator.single(("Gen", parser))
   }
 }

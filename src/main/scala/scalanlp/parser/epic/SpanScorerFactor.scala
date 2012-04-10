@@ -3,9 +3,6 @@ package scalanlp.parser.epic
 import scalanlp.inference.Factor
 import scalanlp.parser._
 import projections.{AnchoredPCFGProjector, ScalingSpanScorer}
-import scalanlp.parser.ParseChart._
-import scalanlp.util.TypeTags
-import TypeTags._
 
 case class SpanScorerFactor[L, W](grammar: Grammar[L],
                                   words: Seq[W],
@@ -16,10 +13,9 @@ case class SpanScorerFactor[L, W](grammar: Grammar[L],
 
   def *(f: Double) =  this
 
-  private val builder = new CKYChartBuilder(WeightedGrammar.oneOff[L,W](grammar, scorer), ParseChart.logProb)
-
-  def logPartition = {
-    (builder.charts(words).partition)
+  lazy val logPartition = {
+    val marg = ChartMarginal.fromSentence(WeightedGrammar.oneOff[L,W](grammar, scorer), words)
+    marg.partition
   }
 
   def isConvergedTo(other: SpanScorerFactor[L, W], difference: Double = 1E-4):Boolean = {
@@ -35,10 +31,10 @@ case class SpanScorerFactor[L, W](grammar: Grammar[L],
       var i = 0;
       while(i < length-span) {
         val j = i + span
-        for(p <- (0 until grammar.labelIndex.size).iterator if !scorer.scoreSpan(i, j, tag(p)).isNegInfinity) {
+        for(p <- (0 until grammar.labelIndex.size).iterator if !scorer.scoreSpan(i, j, p).isNegInfinity) {
           var k = i + 1
           while(k < j) {
-            val rules = grammar.indexedBinaryRulesWithParent(TypeTags.tag[L](p))
+            val rules = grammar.indexedBinaryRulesWithParent(p)
             var br = 0;
             while(br < rules.length) {
               val r = rules(br)

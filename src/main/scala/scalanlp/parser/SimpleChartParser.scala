@@ -35,8 +35,10 @@ class SimpleChartParser[L, W](val builder: ChartBuilder[ParseChart, L, W],
 }
 
 object SimpleChartParser {
-  def apply[L, W](builder: ChartBuilder[ParseChart, L, W]) = {
-    new SimpleChartParser[L, W](builder, new MaxConstituentDecoder)
+  def apply[L, W](grammar: WeightedGrammar[L, W]) = {
+    new SimpleChartParser[L, W](ChartBuilder(grammar), new MaxConstituentDecoder)
   }
+
+
 
 }

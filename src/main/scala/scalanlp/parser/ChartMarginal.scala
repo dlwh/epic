@@ -126,7 +126,7 @@ case class ChartMarginal[+Chart[X]<:ParseChart[X], L, W](grammar: Grammar[L],
 
 object ChartMarginal {
   def fromSentence[L, W](grammar: WeightedGrammar[L, W], sent: Seq[W]) = {
-    val builder = new CKYChartBuilder(grammar, ParseChart.logProb)
+    val builder = ChartBuilder(grammar)
     builder.charts(sent)
   }
 }

@@ -15,7 +15,7 @@ class EPParser[L, W](grammar: Grammar[L],
     val inst = new TreeInstance[L, W]("", null, s)
     val augment = inference.getMarginals(inst, new SpanScorerFactor(grammar, s, SpanScorer.identity))._2
     val wgrammar = WeightedGrammar.oneOff[L, W](grammar, augment.scorer)
-    SimpleChartParser(CKYChartBuilder(wgrammar, ParseChart.logProb)).bestParse(s)
+    SimpleChartParser(wgrammar).bestParse(s)
   }
 
 }

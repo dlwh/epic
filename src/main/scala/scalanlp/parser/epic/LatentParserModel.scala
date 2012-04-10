@@ -40,8 +40,7 @@ class LatentParserModel[L, L3, W](featurizer: Featurizer[L3, W],
   }
 
   def extractParser(weights: DenseVector[Double]):ChartParser[L, W] = {
-    val builder = new CKYChartBuilder(inferenceFromWeights(weights).grammar, ParseChart.logProb)
-    SimpleChartParser(builder)
+    SimpleChartParser(inferenceFromWeights(weights).grammar)
   }
 
   def expectedCountsToObjective(ecounts: ExpectedCounts) = {

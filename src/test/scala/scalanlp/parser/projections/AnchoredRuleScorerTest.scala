@@ -21,11 +21,11 @@ class AnchoredRuleScorerTest  extends ParserTestHarness with FunSuite {
 
     val factory = new ProjectingScorerFactory(gen.builder.withCharts(ParseChart.logProb), f)
     val grammar = new SpanScorerGrammar(gen.builder.grammar.grammar, factory)
-    val chartParser = SimpleChartParser(new CKYChartBuilder(grammar, ParseChart.logProb))
+    val chartParser = SimpleChartParser(grammar)
 
     val factoryNext = new ProjectingScorerFactory(chartParser.builder.withCharts(ParseChart.logProb), f)
     val grammarNext = new SpanScorerGrammar(gen.builder.grammar.grammar, factoryNext)
-    val chartNext = SimpleChartParser(new CKYChartBuilder(grammarNext, ParseChart.logProb))
+    val chartNext = SimpleChartParser(grammarNext)
 
     for( TreeInstance(_, t, w) <- getTestTrees()) try {
       val tree1 = chartParser(w)
@@ -44,7 +44,7 @@ class AnchoredRuleScorerTest  extends ParserTestHarness with FunSuite {
     val factory = new ProjectingScorerFactory(gen.builder.withCharts(ParseChart.logProb), f)
     val grammar = new SpanScorerGrammar(gen.builder.grammar.grammar, factory)
 
-    val chartParser = SimpleChartParser(new CKYChartBuilder(grammar, ParseChart.logProb))
+    val chartParser = SimpleChartParser(grammar)
 
     val res = evalParser(getTestTrees(), chartParser)
     assert(res.f1 > 0.5, res.f1)

@@ -43,7 +43,6 @@ object ParserTestHarness extends ParserTestHarness {
   val simpleParser: SimpleChartParser[AnnotatedLabel, String] = {
     val trees = getTrainTrees()
     val grammar = GenerativeParser.extractGrammar[AnnotatedLabel, String](trees.head.label.label, trees.map(_.mapLabels(_.baseAnnotatedLabel)))
-    val chartBuilder = new CKYChartBuilder(grammar, ParseChart.logProb)
-    SimpleChartParser(chartBuilder)
+    SimpleChartParser(grammar)
   }
 }

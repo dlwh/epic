@@ -298,8 +298,7 @@ object KleinAndManningPipeline extends ParserPipeline {
     }.seq
     val (words, binary, unary) = GenerativeParser.extractCounts(transformed);
     val grammar = WeightedGrammar.generative(AnnotatedLabel.TOP, binary, unary, words)
-    val builder = CKYChartBuilder(grammar, ParseChart.logProb)
-    val parser = SimpleChartParser[AnnotatedLabel, String](builder)
+    val parser = SimpleChartParser[AnnotatedLabel, String](grammar)
     Iterator("Markovized" -> parser)
   }
 

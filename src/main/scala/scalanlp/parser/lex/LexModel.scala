@@ -589,7 +589,7 @@ class LexModel[L, W](bundle: LexGrammarBundle[L, W],
 
   def extractParser(weights: DenseVector[Double]) = {
     val inf = inferenceFromWeights(weights)
-    SimpleChartParser(new CKYChartBuilder(inf.grammar, ParseChart.logProb))
+    SimpleChartParser(inf.grammar)
   }
 
   val featureIndex = indexed.index
