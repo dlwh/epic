@@ -16,6 +16,7 @@ import LatentTreeMarginal._
 
 case class LatentTreeMarginal[L, W](grammar: Grammar[L],
                                     spec: DerivationScorer[L, W],
+                                    words: Seq[W],
                                     tree: BinarizedTree[(L, Seq[Int])]) extends Marginal[L, W] {
 
   private val stree = insideScores()
@@ -242,14 +243,14 @@ object LatentTreeMarginal {
   def apply[L, W](grammar: DerivationScorer.Factory[L, W],
                   words: Seq[W],
                   tree: BinarizedTree[(L,Seq[Int])]):LatentTreeMarginal[L, W] = {
-    LatentTreeMarginal(grammar.grammar, grammar.specialize(words), tree)
+    LatentTreeMarginal(grammar.grammar, grammar.specialize(words), words, tree)
   }
 
   def apply[L, L2, W](grammar: DerivationScorer.Factory[L, W],
                       ref: ProjectionIndexer[L, L2],
                       words: Seq[W],
                       tree: BinarizedTree[L]):LatentTreeMarginal[L, W] = {
-    LatentTreeMarginal(grammar.grammar, grammar.specialize(words),
+    LatentTreeMarginal(grammar.grammar, grammar.specialize(words), words,
       tree.map { l => (l, ref.localRefinements(grammar.labelIndex(l)).toIndexedSeq)})
   }
 
@@ -266,7 +267,6 @@ object LatentTreeMarginal {
 
   object Beliefs {
     def unapply[L](b: Beliefs[L]) = Some((b.label, b.candidates, b.inside, b.outside))
-
 
     def apply[L](label: Int, candidates: Seq[Int]):Beliefs[L] = {
       val r = new Beliefs[L](label, candidates, new Array[Double](candidates.length), new Array[Double](candidates.length))

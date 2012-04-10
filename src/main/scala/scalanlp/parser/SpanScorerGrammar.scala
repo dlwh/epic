@@ -11,12 +11,10 @@ import scalanlp.util.TypeTags
 class SpanScorerGrammar[L, W](val grammar: Grammar[L], factory: SpanScorer.Factory[L, W]) extends DerivationScorer.Factory[L, W] {
   def specialize(words: Seq[W]):Specialization = {
     val scorer = factory.mkSpanScorer(words)
-    new Spec(DerivationScorerFactory.oneOff(grammar, scorer).specialize(words))
+    new Spec(DerivationScorerFactory.oneOff(grammar, scorer).specialize(words), words)
   }
   
-  private class Spec(spec: DerivationScorer[L,W]) extends super.Specialization {
-    def words = spec.words
-
+  private class Spec(spec: DerivationScorer[L,W], val words: Seq[W]) extends super.Specialization {
     def scoreSpan(begin: Int, end: Int, label: Int, ref: Int) = {
       spec.scoreSpan(begin, end, label, ref)
     }

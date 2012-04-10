@@ -15,11 +15,11 @@ class CKYChartBuilder[+Chart[X]<:ParseChart[X], L, W](val grammar: DerivationSco
 
   def charts(words: Seq[W]) = {
     val spec = grammar.specialize(words)
-    val inside = buildInsideChart(spec)
+    val inside = buildInsideChart(spec, words)
     val outside = buildOutsideChart(inside, spec)
     val partition = rootScore(spec, inside)
 
-    new ChartMarginal[Chart, L, W](grammar.grammar, spec, inside, outside, partition)
+    new ChartMarginal[Chart, L, W](grammar.grammar, spec, words, inside, outside, partition)
   }
 
 
@@ -38,8 +38,7 @@ class CKYChartBuilder[+Chart[X]<:ParseChart[X], L, W](val grammar: DerivationSco
     inside.sum(rootScores, offset)
   }
 
-  private def buildInsideChart(spec: grammar.Specialization): Chart[L] = {
-    import spec.words
+  private def buildInsideChart(spec: DerivationScorer[L, W], words: Seq[W]): Chart[L] = {
     val chart = chartFactory(grammar.labelIndex, Array.tabulate(grammar.labelIndex.size)(spec.numValidRefinements), words.length)
 
     for{i <- 0 until words.length} {

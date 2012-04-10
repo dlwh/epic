@@ -1,7 +1,8 @@
 package scalanlp.parser
 /**
- * A Specialization is basically a refined grammar that has been tuned to a particular sentence (if applicable).
+ * A DerivationScorer is a refined grammar that has been tuned to a particular sentence (if applicable).
  * It knows how to to two things: assign scores to rules and spans, and determine reachability of various refinements.
+ *
  *
  * It might be nice to consider a refined grammar that doesn't need sentence-specific tuning, but
  * that interferes with integrating lexicalization into the framework.
@@ -9,10 +10,6 @@ package scalanlp.parser
  * @author dlwh
  */
 trait DerivationScorer[L, W] {
-
-
-  def words: Seq[W]
-
 
   /**
    * Scores the indexed label rule with refinenemnt ref, when it occurs at (begin, end). Can be used for s, or for a

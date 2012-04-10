@@ -13,6 +13,7 @@ package scalanlp.parser
  */
 case class ChartMarginal[+Chart[X]<:ParseChart[X], L, W](grammar: Grammar[L],
                                                          spec: DerivationScorer[L, W],
+                                                         words: Seq[W],
                                                          inside: Chart[L],
                                                          outside: Chart[L],
                                                          partition: Double) extends Marginal[L, W] {
@@ -102,8 +103,8 @@ case class ChartMarginal[+Chart[X]<:ParseChart[X], L, W](grammar: Grammar[L],
 
     // Unaries
     for {
-      span <- 1 to spec.words.length
-      begin <- 0 to (spec.words.length - span)
+      span <- 1 to words.length
+      begin <- 0 to (words.length - span)
       end = begin + span
       a <- inside.top.enteredLabelIndexes(begin, end)
       refA <- inside.top.enteredLabelRefinements(begin, end, a)

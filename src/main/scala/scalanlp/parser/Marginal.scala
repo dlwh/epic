@@ -11,7 +11,7 @@ trait Marginal[L, W] {
   def spec: DerivationScorer[L, W]
   def grammar:Grammar[L]
   def partition: Double
-  def words:Seq[W] = spec.words
+  def words:Seq[W]
   def length = words.length
 
   def expectedCounts[Feat](featurizer: DerivationFeaturizer[L, W, Feat]) = {
