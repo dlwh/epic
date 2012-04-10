@@ -2,7 +2,6 @@ package scalanlp.parser
 
 import scalanlp.collection.mutable.TriangularArray
 import scalanlp.trees.{Rule, BinarizedTree}
-import scalanlp.util.TypeTags._
 
 /**
  * SpanScorers are used in [[scalanlp.parser.ChartParser]]s to reweight rules in a particular context.
@@ -62,15 +61,6 @@ object SpanScorer {
   }
 
   /**
-   * Always returns the identity
-   */
-  @SerialVersionUID(1)
-  def identityFactory[L,W]:Factory[L,W] = new Factory[L,W] {
-    def mkSpanScorer(s: Seq[W], goldTag: GoldTagPolicy[L]) = identity[L];
-  }
-
-
-  /**
    * The identity scorer returns 0 always.
    */
   def identity[L]:SpanScorer[L] = new SpanScorer[L] {
@@ -80,19 +70,6 @@ object SpanScorer {
 
     def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = 0.0
   }
-
-  /**
-   * Constant scorer returns the same thing for all applications
-   */
-  def constant[L](labelThreshold: Double, ruleThreshold: Double = Double.NegativeInfinity):SpanScorer[L] = new SpanScorer[L] {
-    def scoreSpan(begin: Int, end: Int, tag: Int) = labelThreshold
-
-    def scoreUnaryRule(begin: Int, end: Int, rule: Int) = ruleThreshold
-
-    def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = ruleThreshold
-  }
-
-
 }
 
 trait GoldTagPolicy[L] {
