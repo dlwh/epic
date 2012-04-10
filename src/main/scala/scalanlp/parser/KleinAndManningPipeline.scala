@@ -31,7 +31,7 @@ case class KMPipeline(horizontal: Int = 2,
     }
   }
 
-  val pipeline = { (tree: BinarizedTree[AnnotatedLabel], words: Seq[String]) =>
+  private val pipeline = { (tree: BinarizedTree[AnnotatedLabel], words: Seq[String]) =>
     val root = tree.label.label
     ( {(_:BinarizedTree[AnnotatedLabel]).map(_.clearFeatures)}
       andThen {annVert _}
