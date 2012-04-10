@@ -18,7 +18,7 @@ import TypeTags._
  * @author dlwh
  */
 @SerialVersionUID(1)
-trait FeatureIndexer[L, L2, W] extends SpanFeaturizer[L, W, Feature] with Encoder[Feature] with Serializable {
+trait FeatureIndexer[L, L2, W] extends DerivationFeaturizer[L, W, Feature] with Encoder[Feature] with Serializable {
   val index:Index[Feature]
   val featurizer: Featurizer[L2, W]
   val grammar: Grammar[L]

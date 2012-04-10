@@ -14,7 +14,7 @@ trait Marginal[L, W] {
   def words:Seq[W] = spec.words
   def length = words.length
 
-  def expectedCounts[Feat](featurizer: SpanFeaturizer[L, W, Feat]) = {
+  def expectedCounts[Feat](featurizer: DerivationFeaturizer[L, W, Feat]) = {
     val spec = featurizer.specialize(words)
     val counts = new ExpectedCounts[Feat](featurizer.index)
     val visitor = Marginal.mkVisitor(counts, spec)
@@ -38,7 +38,7 @@ trait Marginal[L, W] {
 
 object Marginal {
   private def mkVisitor[L, W, Feat](counts: ExpectedCounts[Feat],
-                                    spec: SpanFeaturizer[L, W, Feat]#Specialization):DerivationVisitor[L] = {
+                                    spec: DerivationFeaturizer[L, W, Feat]#Specialization):DerivationVisitor[L] = {
     new DerivationVisitor[L] {
       def visitBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int, score: Double) {
         addScale(counts, spec.featuresForBinaryRule(begin, split, end, rule, ref), score)

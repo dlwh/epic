@@ -66,7 +66,7 @@ class IndexedFeaturizer[L, W](f: LexFeaturizer[L, W],
                              ruleIndex: Index[Rule[L]],
                              val trueFeatureIndex: Index[Feature],
                              lowCountFeatures: Set[Feature],
-                             dummyFeatures: Int) extends SpanFeaturizer[L, W, Feature] {
+                             dummyFeatures: Int) extends DerivationFeaturizer[L, W, Feature] {
   def specialize(words: Seq[W]):Specialization = new Spec(words)
 
   val (index:Index[Feature], lowCountFeature) = {

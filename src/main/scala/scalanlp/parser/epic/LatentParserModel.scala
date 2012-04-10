@@ -49,7 +49,7 @@ class LatentParserModel[L, L3, W](featurizer: Featurizer[L3, W],
 
 }
 
-case class LatentParserInference[L, L2, W](featurizer: SpanFeaturizer[L, W, Feature],
+case class LatentParserInference[L, L2, W](featurizer: DerivationFeaturizer[L, W, Feature],
                                            reannotate: (BinarizedTree[L], Seq[W])=>BinarizedTree[L],
                                            grammar: DerivationScorer.Factory[L, W],
                                            projections: GrammarRefinements[L, L2]) extends ParserInference[L, W] {

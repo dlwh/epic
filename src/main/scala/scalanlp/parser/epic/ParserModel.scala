@@ -22,7 +22,7 @@ trait ParserInference[L, W] extends ProjectableInference[TreeInstance[L, W], Der
   type Marginal = ChartMarginal[ParseChart.LogProbabilityParseChart, L, W]
 
   def grammar: DerivationScorer.Factory[L, W]
-  def featurizer: SpanFeaturizer[L, W, Feature]
+  def featurizer: DerivationFeaturizer[L, W, Feature]
 
   def marginal(v: TreeInstance[L, W], aug: DerivationScorer.Factory[L, W]) = {
     val builder = CKYChartBuilder(grammar, ParseChart.logProb)

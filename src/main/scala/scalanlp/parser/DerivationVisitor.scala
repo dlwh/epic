@@ -1,8 +1,5 @@
 package scalanlp.parser
 
-import scalanlp.trees._
-import scalanlp.util.TypeTags.ID
-
 /**
  * A class that asks about all anchored spans.
  * It's the "foreach" version of a spanscorer, that takes in

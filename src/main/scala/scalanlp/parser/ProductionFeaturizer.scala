@@ -1,17 +1,15 @@
 package scalanlp.parser
 
-import scalanlp.util.{TypeTags, Index}
-import scalanlp.trees.{Rule, Production, LexicalProduction}
-import TypeTags._
+import scalanlp.util.Index
+import scalanlp.trees.{Production, LexicalProduction}
 
 
 /**
- *
+ * A simple Featurizer that just counts derivations
  * @author dlwh
  */
-
 class ProductionFeaturizer[L, W](grammar: Grammar[L],
-                                 lexicalProductions: Iterable[LexicalProduction[L, W]]) extends SpanFeaturizer[L, W, Production[L,W]] {
+                                 lexicalProductions: Iterable[LexicalProduction[L, W]]) extends DerivationFeaturizer[L, W, Production[L,W]] {
   val index = {
     val index = Index[Production[L, W]]()
     grammar.index foreach {index.index(_)}

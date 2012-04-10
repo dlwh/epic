@@ -10,7 +10,7 @@ import scalanlp.util.{TypeTags, Index}
  * @author dlwh
  */
 
-trait SpanFeaturizer[L, W, Feat] {
+trait DerivationFeaturizer[L, W, Feat] {
   def index: Index[Feat]
   
   def specialize(words: Seq[W]):Specialization
@@ -25,15 +25,15 @@ trait SpanFeaturizer[L, W, Feat] {
 
 }
 
-object SpanFeaturizer {
+object DerivationFeaturizer {
   
-  def forGrammar[L, W](grammar: Grammar[L], lexicon: Lexicon[L, W]):SpanFeaturizer[L, W, Production[L, W]] = {
+  def forGrammar[L, W](grammar: Grammar[L], lexicon: Lexicon[L, W]):DerivationFeaturizer[L, W, Production[L, W]] = {
     forRefinedGrammar(grammar, lexicon, GrammarRefinements.identity(grammar))
   }
   
   def forRefinedGrammar[L, L2, W](coarse: Grammar[L],
                                   lexicon: Lexicon[L, W],
-                                  proj: GrammarRefinements[L, L2]):SpanFeaturizer[L, W, Production[L2, W]] = {
+                                  proj: GrammarRefinements[L, L2]):DerivationFeaturizer[L, W, Production[L2, W]] = {
 
     val refinedTagWords = for {
       (l, w) <- lexicon.knownTagWords
@@ -46,7 +46,7 @@ object SpanFeaturizer {
       proj.rules.refinementsOf(tag[Rule[L]](r)).map(fr => ind(proj.rules.fineIndex.get(fr)))
     }
 
-    new SpanFeaturizer[L, W, Production[L2, W]] {
+    new DerivationFeaturizer[L, W, Production[L2, W]] {
       def index = ind
 
       def specialize(w: Seq[W]) = new Specialization {

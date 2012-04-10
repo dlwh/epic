@@ -48,7 +48,7 @@ class KMModel[L, L3, W](featurizer: Featurizer[L3, W],
 
 }
 
-case class DiscParserInference[L, L2, W](featurizer: SpanFeaturizer[L, W, Feature],
+case class DiscParserInference[L, L2, W](featurizer: DerivationFeaturizer[L, W, Feature],
                                          ann: (BinarizedTree[L], Seq[W])=>BinarizedTree[L2],
                                          grammar: DerivationScorer.Factory[L, W],
                                          projections: GrammarRefinements[L, L2]) extends ParserInference[L, W] {
