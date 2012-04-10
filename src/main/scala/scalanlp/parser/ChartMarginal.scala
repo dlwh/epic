@@ -22,7 +22,7 @@ case class ChartMarginal[+Chart[X]<:ParseChart[X], L, W](grammar: Grammar[L],
    * Forest traversal that visits spans in a "bottom up" order.
    * @param spanVisitor
    */
-  def visitPostorder(spanVisitor: AnchoredSpanVisitor[L]) {
+  def visitPostorder(spanVisitor: DerivationVisitor[L]) {
     val itop = inside.top
 
     // handle lexical

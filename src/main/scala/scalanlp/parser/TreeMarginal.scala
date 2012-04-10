@@ -35,7 +35,7 @@ case class TreeMarginal[L, W](grammar: Grammar[L],
     score
   }
 
-  def visitPostorder(visitor: AnchoredSpanVisitor[L]) {
+  def visitPostorder(visitor: DerivationVisitor[L]) {
     tree.postorder foreach {
       case n@NullaryTree( (a, ref) ) =>
         val aI = tag[L](grammar.labelIndex(a))

@@ -49,7 +49,7 @@ class ConstraintScorerFactory[L, W](parser: ChartBuilder[ParseChart, L, W], thre
     val length = marg.length
     val scores = TriangularArray.raw(length+1, null: Array[Double])
     val topScores = TriangularArray.raw(length+1, null: Array[Double])
-    val visitor = new AnchoredSpanVisitor[L] {
+    val visitor = new DerivationVisitor[L] {
       def visitBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int, score: Double) {}
 
       def visitUnaryRule(begin: Int, end: Int, rule: Int, ref: Int, score: Double) {

@@ -27,18 +27,18 @@ trait Marginal[L, W] {
    * @param spanVisitor
    */
 
-  def visit(spanVisitor: AnchoredSpanVisitor[L]) { visitPostorder(spanVisitor) }
+  def visit(spanVisitor: DerivationVisitor[L]) { visitPostorder(spanVisitor) }
   /**
    * Forest traversal that visits spans in a "bottom up" order.
    * @param spanVisitor
    */
-  def visitPostorder(spanVisitor: AnchoredSpanVisitor[L])
+  def visitPostorder(spanVisitor: DerivationVisitor[L])
 }
 
 object Marginal {
   private def mkVisitor[L, W, Feat](counts: ExpectedCounts[Feat],
-                                    spec: SpanFeaturizer[L, W, Feat]#Specialization):AnchoredSpanVisitor[L] = {
-    new AnchoredSpanVisitor[L] {
+                                    spec: SpanFeaturizer[L, W, Feat]#Specialization):DerivationVisitor[L] = {
+    new DerivationVisitor[L] {
       def visitBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int, score: Double) {
         addScale(counts, spec.featuresForBinaryRule(begin, split, end, rule, ref), score)
       }

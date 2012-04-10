@@ -23,7 +23,7 @@ case class LatentTreeMarginal[L, W](grammar: Grammar[L],
 
   val partition = Numerics.logSum(stree.label.inside, stree.label.inside.length)
 
-  def visitPostorder(spanVisitor: AnchoredSpanVisitor[L]) = {
+  def visitPostorder(spanVisitor: DerivationVisitor[L]) = {
     // normalizer
     if (partition.isInfinite || partition.isNaN)
       sys.error("NAn or infinite" + partition + " " + tree.render(words))
