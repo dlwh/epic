@@ -24,6 +24,7 @@ import scalanlp.trees._
 import scalanlp.util._
 import scalanlp.util.TypeTags._
 import collection.Seq
+import scalanlp.text.tokenize.EnglishWordClassGenerator
 
 trait LexFeaturizer[L, W] extends Serializable {
   def specialize(words: Seq[W]):Specialization
@@ -634,7 +635,7 @@ class SimpleWordShapeGen[L](tagWordCounts: Counter2[L, String, Double],
       ArrayBuffer(w, ("T-"+tagWordCounts(::, w).argmax))
     } else {
       val buf = ArrayBuffer[String](//IndicatorFeature(w),
-        EnglishWordClassGenerator.signatureFor(w),
+        EnglishWordClassGenerator(w),
         makeShapeFeature(w)
       )
       if(counts(w) > minCountThreshold) {

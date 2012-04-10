@@ -10,13 +10,11 @@ import scalala.library.Library
  * is tasked with assigning weights to derivations.
  *
  * Rather than inheriting [[scalanlp.parser.Grammar]], this trait
- * has a composition of them.
- *
- * (Remember that ID[T] is Int with Tag[T] and is "just" an Int with some more compile-time safety.)
+ * has one.
  *
  * @author dlwh
  */
-trait WeightedGrammar[L, W] {
+trait WeightedGrammar[L, W] extends Serializable {
   def grammar: Grammar[L]
 
   def root = grammar.root
@@ -34,7 +32,6 @@ trait WeightedGrammar[L, W] {
    * that interferes with integrating lexicalization into the framework.
    */
   trait Specialization {
-
 
     def root = WeightedGrammar.this.root
     def grammar = WeightedGrammar.this
