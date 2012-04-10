@@ -1,4 +1,7 @@
 import AssemblyKeys._ // put this at the top of the file
+import de.johoop.jacoco4sbt._
+import JacocoPlugin._
+
 name := "parser"
 
 version := "1.0"
@@ -44,3 +47,4 @@ javaOptions += "-Xmx2g"
 seq(assemblySettings: _*)
 
 
+seq(jacoco.settings : _*)
