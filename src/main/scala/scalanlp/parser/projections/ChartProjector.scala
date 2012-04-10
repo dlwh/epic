@@ -13,7 +13,7 @@ trait ChartProjector[L, W] {
 
   private def proj = new AnchoredRuleProjector(threshold)
 
-  def buildSpanScorer(charts: Marginal[ParseChart, L, W],
+  def buildSpanScorer(charts: Marginal[L, W],
                       goldTagPolicy: GoldTagPolicy[L] = GoldTagPolicy.noGoldTags[L]):MyScorer = {
 
     val ruleData = proj.projectRulePosteriors(charts, goldTagPolicy)

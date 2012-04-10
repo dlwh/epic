@@ -21,7 +21,7 @@ class AnchoredRuleProjector(threshold: Double) extends Serializable {
    * @param scorer: scorer used to produce this tree.
    * @param pruneLabel should return a threshold to determine if we need to prune. (prune if posterior <= threshold) See companion object for good choices.
    */
-  def projectRulePosteriors[L,W](charts: ChartMarginal[ParseChart, L, W],
+  def projectRulePosteriors[L,W](charts: Marginal[L, W],
                                  goldTagPolicy: GoldTagPolicy[L] = GoldTagPolicy.noGoldTags[L]):AnchoredRuleProjector.AnchoredData = {
 
     val length = charts.length
@@ -47,18 +47,13 @@ class AnchoredRuleProjector(threshold: Double) extends Serializable {
     // The data, and initialization. most things init'd to null
     val lexicalScores = TriangularArray.raw(length+1, null:OldSparseVector)
     val unaryScores = TriangularArray.raw(length+1, null:OldSparseVector);
+    val binaryScores = TriangularArray.raw[Array[OldSparseVector]](length+1, null);
 
     val totals = TriangularArray.raw(length+1, null:OldSparseVector);
     val totalsUnaries = TriangularArray.raw(length+1, null:OldSparseVector);
 
-    val binaryScores = TriangularArray.raw[Array[OldSparseVector]](length+1, null);
-    for(begin <- 0 until length; end <- (begin + 1) to length) {
-      val numSplits = end - begin;
-      if(!charts.inside.bot.enteredLabelIndexes(begin, end).isEmpty) // is there anything to put here?
-        binaryScores(TriangularArray.index(begin, end)) = Array.fill(numSplits)(null:OldSparseVector)
-    }
-    
-    val visitor = new AnchoredSpanVisitor[L] {
+
+    val visitor = new DerivationVisitor[L] {
       def visitSpan(begin: Int, end: Int, tag: Int, ref: Int, score: Double) {
         // fill in spans with 0 if they're active
         getOrElseUpdate(lexicalScores, TriangularArray.index(begin, end), projVector())(tag) = 0
@@ -71,6 +66,11 @@ class AnchoredRuleProjector(threshold: Double) extends Serializable {
             totals(index) = projVector()
           }
           totals(index)(charts.grammar.parent(rule)) += count
+
+          if(binaryScores(index) eq null) {
+            val numSplits = end - begin;
+            binaryScores(TriangularArray.index(begin, end)) = Array.fill(numSplits)(null:OldSparseVector)
+          }
 
           val parentArray = if(binaryScores(index)(split-begin) eq null) {
             binaryScores(index)(split-begin) = projRuleVector()

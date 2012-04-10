@@ -12,6 +12,7 @@ trait Marginal[L, W] {
   def grammar:Grammar[L]
   def partition: Double
   def words:Seq[W] = spec.words
+  def length = words.length
 
   def expectedCounts[Feat](featurizer: SpanFeaturizer[L, W, Feat]) = {
     val spec = featurizer.specialize(words)
