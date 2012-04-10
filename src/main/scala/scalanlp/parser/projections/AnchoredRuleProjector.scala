@@ -4,8 +4,6 @@ package projections
 import scalanlp.collection.mutable.TriangularArray
 import scalanlp.tensor.sparse.OldSparseVector
 import scalanlp.util.TypeTags
-import TypeTags.ID
-import scalanlp.trees.Rule
 
 /**
  * Used for computed the expected number of anchored rules that occur at each span/split.
@@ -69,6 +67,9 @@ class AnchoredRuleProjector(threshold: Double) extends Serializable {
       def visitBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int, count: Double) {
         val index = TriangularArray.index(begin, end)
         if(count > 0.0) {
+          if(totals(index) eq null) {
+            totals(index) = projVector()
+          }
           totals(index)(charts.grammar.grammar.parent(rule)) += count
 
           val parentArray = if(binaryScores(index)(split-begin) eq null) {
@@ -90,6 +91,9 @@ class AnchoredRuleProjector(threshold: Double) extends Serializable {
           unaryScores(index)
         }
         parentArray(rule) += count
+        if(totalsUnaries(index) eq null) {
+          totalsUnaries(index) = projVector()
+        }
         totalsUnaries(index)(charts.grammar.grammar.parent(rule)) += count
       }
 

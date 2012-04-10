@@ -93,8 +93,6 @@ class InsideOutsideTest extends FunSuite {
     assert((inside.top.labelScore(0,4, "S", 0) - math.log(1.0/9.0)).abs < 1E-4)
     assert(inside.top.enteredLabelScores(0,4).toSeq.length === 1)
 
-
-
     assert((outside.top.labelScore(0,4, "S", 0) === 0.0))
     assert(outside.top.enteredLabelScores(0,4).toSeq.length === 1)
 

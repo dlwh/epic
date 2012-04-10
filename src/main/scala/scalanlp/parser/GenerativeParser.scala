@@ -15,12 +15,10 @@ package scalanlp.parser
  limitations under the License.
 */
 
-
 import scalanlp.trees._
 
 import scalala.tensor.Counter2
 import scalanlp.parser.ParserParams.{BaseParser, NoParams}
-
 
 object GenerativeParser {
   def extractLexiconAndGrammar[L, W](data: Traversable[TreeInstance[AnnotatedLabel, String]]) = {

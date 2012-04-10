@@ -167,7 +167,7 @@ object WeightedGrammar {
       lexicon.tags
     )
 
-    generative(root, binaryProductions, unaryProductions, lexicon)
+    generative(grammar, binaryProductions, unaryProductions, lexicon)
   }
 
   def generative[L, W](grammar: Grammar[L],

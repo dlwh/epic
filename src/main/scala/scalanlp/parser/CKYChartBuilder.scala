@@ -46,17 +46,12 @@ class CKYChartBuilder[+Chart[X]<:ParseChart[X], L, W](val grammar: WeightedGramm
       var foundSomething = false
       for {
         a <- spec.validTagsFor(i)
+        ref <- spec.validLabelRefinements(i, i+ 1, a)
       } {
-        var refi = 0
-        val refs = spec.validLabelRefinements(i, i+ 1, a)
-        while(refi < refs.length) {
-          val ref = refs(refi)
-          refi += 1
-          val score:Double = spec.scoreSpan(i, i+1, a, ref)
-          if (score != Double.NegativeInfinity) {
-            chart.bot.enter(i, i+1, a, ref, score)
-            foundSomething = true
-          }
+        val score:Double = spec.scoreSpan(i, i+1, a, ref)
+        if (score != Double.NegativeInfinity) {
+          chart.bot.enter(i, i+1, a, ref, score)
+          foundSomething = true
         }
       }
 
@@ -80,7 +75,7 @@ class CKYChartBuilder[+Chart[X]<:ParseChart[X], L, W](val grammar: WeightedGramm
       val wideRight = top.wideRight(begin)
       val wideLeft = top.wideLeft(end)
       for ( ai <- 0 until grammar.labelIndex.size; refA <- spec.validLabelRefinements(begin, end, TypeTags.tag(ai))) {
-        val a = TypeTags.tag[L](ai)
+        val a = ai
         val passScore = spec.scoreSpan(begin, end, a, refA)
         var offset = 0 // into scoreArray
         if(!passScore.isInfinite) {
@@ -220,7 +215,7 @@ class CKYChartBuilder[+Chart[X]<:ParseChart[X], L, W](val grammar: WeightedGramm
 
   private def updateInsideUnaries(chart: ParseChart[L], spec: grammar.Specialization, begin: Int, end: Int) = {
     for(bi <- chart.bot.enteredLabelIndexes(begin, end); refB <- chart.bot.enteredLabelRefinements(begin, end, bi)) {
-      val b = TypeTags.tag[L](bi)
+      val b = bi
       val bScore = chart.bot.labelScore(begin, end, b, refB)
       val rules = grammar.grammar.indexedUnaryRulesWithChild(b)
       var j = 0
@@ -243,7 +238,7 @@ class CKYChartBuilder[+Chart[X]<:ParseChart[X], L, W](val grammar: WeightedGramm
 
   private def updateOutsideUnaries(chart: ParseChart[L], inside: ParseChart[L], spec: grammar.Specialization, begin: Int, end: Int) = {
     for(ai <- chart.top.enteredLabelIndexes(begin, end); refA <- chart.top.enteredLabelRefinements(begin, end, ai)) {
-      val a = TypeTags.tag[L](ai)
+      val a = ai
       val bScore = chart.top.labelScore(begin, end, a, refA)
       val rules = grammar.grammar.indexedUnaryRulesWithParent(a)
       var j = 0

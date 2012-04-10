@@ -43,6 +43,9 @@ abstract class ParseChart[L](val index: Index[L],
         score(index)(parent) = LabelScoreArray.mkGrammarVector(refinementsFor(parent), zero)
         arr = score(index)
       }
+      if(arr(parent) eq null) {
+        arr(parent) = LabelScoreArray.mkGrammarVector(refinementsFor(parent), zero)
+      }
       val oldScore = arr(parent)(ref)
       val newScore = sum(oldScore, w)
       score(index)(parent)(ref) = newScore
@@ -58,7 +61,7 @@ abstract class ParseChart[L](val index: Index[L],
     }
 
     def labelScore(begin: Int, end: Int, parent: L, ref: Int):Double = {
-      labelScore(begin, end, tag[L](index(parent)), tag[Ref[L]](ref))
+      labelScore(begin, end, index(parent), ref)
     }
 
     /**

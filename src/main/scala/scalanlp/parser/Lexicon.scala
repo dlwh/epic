@@ -74,7 +74,7 @@ class SimpleLexicon[L, W](private val lexicon: Counter2[L, W, Double]) extends L
       val pTag = labelCounts(l) / totalCount
       val result = log(pW) + log(pTgW) - log(pTag);
       assert(cTagWord == 0 || result > Double.NegativeInfinity)
-      result;
+      result
     }
   }
 

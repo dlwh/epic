@@ -31,7 +31,8 @@ class ProductionFeaturizer[L, W](grammar: Grammar[L],
     }
 
     def featuresForSpan(begin: Int, end: Int, tag: Int, ref: Int) = {
-      Array(index(LexicalProduction(grammar.labelIndex.get(tag), words(begin))))
+      if(begin + 1 != end)  Array.empty
+      else Array(index(LexicalProduction(grammar.labelIndex.get(tag), words(begin))))
     }
   }
 }

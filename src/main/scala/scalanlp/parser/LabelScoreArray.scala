@@ -28,7 +28,7 @@ class LabelScoreArray[L](length: Int, grammarSize: Int, fill: Double) extends Se
   }
 
   final def enteredLabelRefinements(begin: Int, end: Int, label: Int) = {
-    enteredLabels(TriangularArray.index(begin, end)).iterator
+    enteredRefinements(TriangularArray.index(begin, end))(label).iterator
   }
 
   def enteredLabelScores(begin: Int, end: Int) = {

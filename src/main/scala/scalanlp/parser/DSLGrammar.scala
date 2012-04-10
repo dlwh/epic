@@ -23,8 +23,10 @@ object DSLGrammar {
         lexicon(a, word) = w
     }
 
+    val normLex = new UnsmoothedLexicon(Library.logAndNormalizeRows(lexicon))
+
     val grammar = Grammar("S",binaryProductions.keysIterator.map(_._2) ++ unaryProductions.keysIterator.map(_._2), lexicon.keysIterator.map(_._1))
-    WeightedGrammar.generative(grammar, binaryProductions, unaryProductions, lexicon)
+    WeightedGrammar.generative(grammar, binaryProductions, unaryProductions, normLex)
   }
 
   def simpleGrammar =  grammar(
