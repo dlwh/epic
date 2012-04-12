@@ -10,11 +10,12 @@ import scalanlp.trees.BinarizedTree
  * @author dlwh
  */
 class EPParser[L, W](grammar: Grammar[L],
+                     lexicon: Lexicon[L,  W],
                      inference: EPInference[TreeInstance[L, W], SpanScorerFactor[L, W]]) extends Parser[L, W] with Serializable {
   def bestParse(s: Seq[W]) = {
     val inst = new TreeInstance[L, W]("", null, s)
-    val augment = inference.getMarginals(inst, new SpanScorerFactor(grammar, s, SpanScorer.identity))._2
-    val wgrammar = DerivationScorerFactory.oneOff[L, W](grammar, augment.scorer)
+    val augment = inference.getMarginals(inst, new SpanScorerFactor(grammar, lexicon, s, SpanScorer.identity))._2
+    val wgrammar = DerivationScorerFactory.oneOff[L, W](grammar, lexicon, augment.scorer)
     SimpleChartParser(wgrammar).bestParse(s)
   }
 
@@ -23,9 +24,10 @@ class EPParser[L, W](grammar: Grammar[L],
 object EPParser {
   trait Extractor[L, W] extends EPModel[TreeInstance[L, W], SpanScorerFactor[L, W]] with ParserExtractable[L, W] {
     def grammar: Grammar[L]
+    def lexicon: Lexicon[L, W]
 
     def extractParser(weights: DenseVector[Double]) = {
-      new EPParser(grammar, inferenceFromWeights(weights))
+      new EPParser(grammar, lexicon, inferenceFromWeights(weights))
     }
   }
 

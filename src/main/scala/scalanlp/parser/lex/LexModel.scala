@@ -357,10 +357,9 @@ case class StandardFeaturizer[L, W>:Null, P](wordIndex: Index[W],
 }
 
 case class LexGrammarBundle[L, W](baseGrammar: Grammar[L],
-                                 tags: IndexedSeq[L],
+                                  baseLexicon: Lexicon[L, W],
                                  headFinder: HeadFinder[L],
-                                 wordIndex: Index[W],
-                                 validTags: W=>Array[L]) { bundle =>
+                                 wordIndex: Index[W]) { bundle =>
   val bg = baseGrammar
   val leftRules = new Array[Boolean](bg.index.size)
   val rightRules = new Array[Boolean](bg.index.size)
@@ -380,9 +379,7 @@ case class LexGrammarBundle[L, W](baseGrammar: Grammar[L],
     val wi = wordIndex
     new DerivationScorer.Factory[L, W] {
       val grammar = baseGrammar
-
-      val tags = bundle.tags
-      val indexedTags = BitSet() ++ tags.map(bg.labelIndex)
+      val lexicon = baseLexicon
 
       def isLeftRule(r: Int) = leftRules(r)
 
@@ -397,7 +394,7 @@ case class LexGrammarBundle[L, W](baseGrammar: Grammar[L],
       final class Spec(val words: Seq[W]) extends super.Specialization {
         val indexed = words.map(wordIndex)
         val f = fi.specialize(words)
-        val indexedValidTags: Seq[Array[Int]] = words.map(validTags).map(_.map(labelIndex))
+        val indexedValidTags: Seq[Array[Int]] = words.map(lexicon.tagsForWord(_)).map(_.map(labelIndex).toArray)
 
         private def dot(features: Array[Int]) = {
           var i = 0
@@ -585,6 +582,7 @@ class LexModel[L, W](bundle: LexGrammarBundle[L, W],
                      reannotate: (BinarizedTree[L], Seq[W])=>BinarizedTree[L],
                      indexed: IndexedFeaturizer[L, W],
                      coarse: Grammar[L],
+                     coarseLex: Lexicon[L, W],
                      initFeatureValue: Feature=>Option[Double]) extends Model[TreeInstance[L, W]] with Serializable with ParserExtractable[L, W] {
 
   def extractParser(weights: DenseVector[Double]) = {
@@ -683,7 +681,7 @@ case class LexParserModelFactory(baseParser: ParserParams.BaseParser,
     val trees = trainTrees.map(_.mapLabels(_.baseAnnotatedLabel))
     val (initLexicon, initBinaries, initUnaries) = GenerativeParser.extractCounts(trees)
 
-    val xbarParser = baseParser.xbarGrammar(trees)
+    val (xbarGrammar, xbarLexicon) = baseParser.xbarGrammar(trees)
     val wordIndex = Index(trainTrees.iterator.flatMap(_.words))
     val summedCounts = Library.sum(initLexicon)
     val shapeGen = new SimpleWordShapeGen(initLexicon, summedCounts)
@@ -693,29 +691,28 @@ case class LexParserModelFactory(baseParser: ParserParams.BaseParser,
 
 
     def ruleGen(r: Rule[AnnotatedLabel]) = IndexedSeq(RuleFeature(r))
-    def validTag(w: String) = lexicon.tagScores(w).keysIterator.toArray
+    def validTag(w: String) = lexicon.tagsForWord(w).toArray
 
     val headFinder = HeadFinder.collins
     val feat = new StandardFeaturizer(wordIndex,
-    xbarParser.labelIndex,
-    xbarParser.index,
+    xbarGrammar.labelIndex,
+    xbarGrammar.index,
     ruleGen,
     shapeGen,
     { (w:String) => tagShapeGen.featuresFor(w)})
 
     val indexed =  IndexedFeaturizer.extract[AnnotatedLabel, String](feat,
       headFinder,
-      xbarParser.index,
-      xbarParser.labelIndex,
+      xbarGrammar.index,
+      xbarGrammar.labelIndex,
       dummyFeats,
       minFeatCutoff,
       trees)
 
-    val bundle = new LexGrammarBundle[AnnotatedLabel, String](xbarParser,
-      initLexicon.keys.map(_._1).toSet.toIndexedSeq,
+    val bundle = new LexGrammarBundle[AnnotatedLabel, String](xbarGrammar,
+      xbarLexicon,
       headFinder,
-      wordIndex,
-      validTag _
+      wordIndex
     )
 
     val featureCounter = if(oldWeights ne null) {
@@ -725,7 +722,7 @@ case class LexParserModelFactory(baseParser: ParserParams.BaseParser,
     }
 
     def reannotate(tree: BinarizedTree[AnnotatedLabel], words: Seq[String]) = tree.map(_.baseAnnotatedLabel)
-    val model = new LexModel[AnnotatedLabel, String](bundle, reannotate, indexed, xbarParser, {featureCounter.get(_)})
+    val model = new LexModel[AnnotatedLabel, String](bundle, reannotate, indexed, xbarGrammar, xbarLexicon, {featureCounter.get(_)})
 
     model
 

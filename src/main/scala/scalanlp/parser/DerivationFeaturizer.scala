@@ -36,7 +36,7 @@ object DerivationFeaturizer {
                                   proj: GrammarRefinements[L, L2]):DerivationFeaturizer[L, W, Production[L2, W]] = {
 
     val refinedTagWords = for {
-      (l, w) <- lexicon.knownTagWords
+      LexicalProduction(l, w) <- lexicon.knownLexicalProductions
       l2 <- proj.labels.refinementsOf(l)
     } yield LexicalProduction(l2, w)
 

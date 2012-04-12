@@ -5,6 +5,7 @@ import scalanlp.parser._
 import projections.{AnchoredPCFGProjector, ScalingSpanScorer}
 
 case class SpanScorerFactor[L, W](grammar: Grammar[L],
+                                  lexicon: Lexicon[L, W],
                                   words: Seq[W],
                                   scorer: SpanScorer[L]) extends Factor[SpanScorerFactor[L, W]] {
   def *(f: SpanScorerFactor[L, W]) = copy(scorer=SpanScorer.sum(scorer, f.scorer))
@@ -14,7 +15,7 @@ case class SpanScorerFactor[L, W](grammar: Grammar[L],
   def *(f: Double) =  this
 
   lazy val logPartition = {
-    val marg = ChartMarginal.fromSentence(DerivationScorerFactory.oneOff[L,W](grammar, scorer), words)
+    val marg = ChartMarginal.fromSentence(DerivationScorerFactory.oneOff[L,W](grammar, lexicon, scorer), words)
     marg.partition
   }
 
@@ -75,7 +76,7 @@ class AnchoredRuleApproximator[L, W](pruningThreshold: Double = Double.NegativeI
               instance: TreeInstance[L, W],
               marginal: ChartMarginal[ParseChart.LogProbabilityParseChart, L, W]):DerivationScorer.Factory[L, W] = {
     val factory = new AnchoredPCFGProjector[L, W](marginal.grammar)
-    DerivationScorerFactory.oneOff(inf.grammar.grammar, factory.buildSpanScorer(marginal))
+    DerivationScorerFactory.oneOff(inf.grammar.grammar, inf.grammar.lexicon, factory.buildSpanScorer(marginal))
   }
 
 }

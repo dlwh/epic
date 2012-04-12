@@ -49,37 +49,20 @@ trait DerivationScorer[L, W] {
 
   def validUnaryRuleRefinementsGivenChild(begin: Int, end: Int, rule: Int, childRef: Int):Array[Int]
 
-  /**
-   * Returns the (unrefined) valid s for a given position
-   * @param pos
-   * @return
-   */
-  def validTagsFor(pos: Int):Array[Int]
-
   def leftChildRefinement(rule: Int, ruleRef: Int):Int
   def rightChildRefinement(rule: Int, ruleRef: Int):Int
   def parentRefinement(rule: Int, ruleRef: Int):Int
   def childRefinement(rule: Int, ruleRef: Int):Int
 
-
   def ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int):Int
   def ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int, refC: Int):Int
-
 }
 
 object DerivationScorer {
 
-  /**
-   * In contrast to [[scalanlp.parser.Grammar]], this grammar
-   * is tasked with assigning weights to derivations.
-   *
-   * Rather than inheriting [[scalanlp.parser.Grammar]], this trait
-   * has one.
-   *
-   * @author dlwh
-   */
   trait Factory[L, W] extends Serializable {
     def grammar: Grammar[L]
+    def lexicon: Lexicon[L, W]
 
     def root = grammar.root
     def index = grammar.index

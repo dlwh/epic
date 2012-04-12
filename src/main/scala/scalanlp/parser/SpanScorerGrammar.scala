@@ -8,13 +8,13 @@ import scalanlp.util.TypeTags
  * A grammar that creates a span scorer as the Specialization and parses with it.
  * @author dlwh
  */
-class SpanScorerGrammar[L, W](val grammar: Grammar[L], factory: SpanScorer.Factory[L, W]) extends DerivationScorer.Factory[L, W] {
+class SpanScorerGrammar[L, W](val grammar: Grammar[L], val lexicon: Lexicon[L, W], factory: SpanScorer.Factory[L, W]) extends DerivationScorer.Factory[L, W] {
   def specialize(words: Seq[W]):Specialization = {
     val scorer = factory.mkSpanScorer(words)
-    new Spec(DerivationScorerFactory.oneOff(grammar, scorer).specialize(words), words)
+    new Spec(DerivationScorerFactory.oneOff(grammar, lexicon, scorer).specialize(words), words)
   }
   
-  private class Spec(spec: DerivationScorer[L,W], val words: Seq[W]) extends super.Specialization {
+  private class Spec(spec: DerivationScorer[L, W], val words: Seq[W]) extends super.Specialization {
     def scoreSpan(begin: Int, end: Int, label: Int, ref: Int) = {
       spec.scoreSpan(begin, end, label, ref)
     }
@@ -41,10 +41,6 @@ class SpanScorerGrammar[L, W](val grammar: Grammar[L], factory: SpanScorer.Facto
 
     def validUnaryRuleRefinementsGivenChild(begin: Int, end: Int, rule: Int, childRef: Int) = {
       spec.validUnaryRuleRefinementsGivenChild(begin, end, rule, childRef)
-    }
-
-    def validTagsFor(pos: Int) = {
-      spec.validTagsFor(pos)
     }
 
     def leftChildRefinement(rule: Int, ruleRef: Int) = {

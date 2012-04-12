@@ -5,6 +5,7 @@ import java.io._
 import scalanlp.trees._
 import scalanlp.util._
 import scalala.library.Library
+import scalanlp.text.tokenize.EnglishWordClassGenerator
 
 
 /**
@@ -20,12 +21,14 @@ object ParserParams {
   case class BaseParser(path: File = null) {
     def xbarGrammar(trees: IndexedSeq[TreeInstance[AnnotatedLabel, String]]) = Option(path) match {
       case Some(f) =>
-        readObject[Grammar[AnnotatedLabel]](f)
+        readObject[(Grammar[AnnotatedLabel],Lexicon[AnnotatedLabel, String])](f)
       case None =>
         val (words, xbarBinaries, xbarUnaries) = GenerativeParser.extractCounts(trees.map(_.mapLabels(_.baseAnnotatedLabel)))
-        val tags = words.keys.map(_._1).toSet
 
-        Grammar(AnnotatedLabel.TOP, xbarBinaries.keysIterator.map(_._2) ++ xbarUnaries.keysIterator.map(_._2), tags)
+        val g = Grammar(AnnotatedLabel.TOP, xbarBinaries.keysIterator.map(_._2) ++ xbarUnaries.keysIterator.map(_._2))
+        val lex = new SignatureLexicon(words, EnglishWordClassGenerator)
+        g -> lex
+
     }
   }
 
@@ -72,7 +75,7 @@ trait ParserPipeline {
   def main(args: Array[String]) {
     val (baseConfig, files) = scalanlp.config.CommandLineParser.parseArguments(args)
     val config = baseConfig backoff Configuration.fromPropertiesFiles(files.map(new File(_)))
-    val params = config.readIn[ProcessedTreebank]("parser")
+    val params = config.readIn[ProcessedTreebank]("treebank")
     val specificParams = config.readIn[Params]("trainer")
     println("Training Parser...")
     println(params)

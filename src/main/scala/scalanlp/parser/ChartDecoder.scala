@@ -117,27 +117,24 @@ class ViterbiDecoder[L, W] extends ChartDecoder[L, W] with Serializable {
 /**
  * Tries to extract a tree that maximizes rule product in the coarse grammar
  **/
-case class MaxRuleProductDecoder[L, W](grammar: Grammar[L]) extends ChartDecoder[L, W] {
+case class MaxRuleProductDecoder[L, W](grammar: Grammar[L], lexicon: Lexicon[L, W]) extends ChartDecoder[L, W] {
   val p = new AnchoredRuleMarginalProjector[L,W]()
 
   def extractBestParse(marginal: ChartMarginal[ParseChart, L, W]) = {
     val scorer = p.buildSpanScorer(marginal)
-    val oneoff: DerivationScorer.Factory[L, W] = DerivationScorerFactory.oneOff(grammar, scorer)
+    val oneoff = DerivationScorerFactory.oneOff(grammar, lexicon, scorer)
     val newMarg = ChartMarginal.fromSentence(oneoff, marginal.words)
     val tree = new ViterbiDecoder[L,W].extractBestParse(newMarg)
     tree
   }
 }
 
-/**
- * Tries to extract a tree that maximizes... XXX
- **/
-class MaxVariationalDecoder[L, W](grammar: Grammar[L]) extends ChartDecoder[L, W] {
+class MaxVariationalDecoder[L, W](grammar: Grammar[L], lexicon: Lexicon[L, W]) extends ChartDecoder[L, W] {
   val p = new AnchoredPCFGProjector[L,W](grammar)
 
   def extractBestParse(marginal: ChartMarginal[ParseChart, L, W]) = {
     val scorer = p.buildSpanScorer(marginal)
-    val oneoff: DerivationScorer.Factory[L, W] = DerivationScorerFactory.oneOff(grammar, scorer)
+    val oneoff = DerivationScorerFactory.oneOff(grammar, lexicon, scorer)
     val newMarg = ChartMarginal.fromSentence(oneoff, marginal.words)
     val tree = new ViterbiDecoder[L,W].extractBestParse(newMarg)
     tree

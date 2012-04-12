@@ -7,9 +7,9 @@ import scalala.tensor.sparse.SparseVector
 import scalala.tensor.dense.DenseVector
 import scalanlp.collection.mutable.{ArrayMap, OpenAddressHashArray}
 import features.Feature
-import scalanlp.trees.Rule
 import scalanlp.util.{TypeTags, Encoder, Index}
 import TypeTags._
+import scalanlp.trees.{LexicalProduction, Rule}
 
 /**
  * FeatureIndexers give you an indexed encoding of the features for each rule and label
@@ -136,8 +136,8 @@ object FeatureIndexer {
    * Creates a FeatureIndexer by featurizing all rules/words and indexing them
    */
   def apply[L, L2, W](grammar: Grammar[L],
+                      lexicon: Lexicon[L, W],
                       f: Featurizer[L2, W],
-                      lex: Iterable[(L2, W)],
                       indexedProjections: GrammarRefinements[L, L2]) = {
     val featureIndex = Index[Feature]()
     val ruleIndex = indexedProjections.rules.fineIndex
@@ -157,7 +157,8 @@ object FeatureIndexer {
 
     // lex
     for {
-      (lSplit, w) <- lex
+      LexicalProduction(l, w) <- lexicon.knownLexicalProductions
+      lSplit <- indexedProjections.labels.refinementsOf(l)
     } {
       val feats = f.featuresFor(lSplit, w)
       lexicalCache(indexedProjections.labels.fineIndex(lSplit))(w) = feats

@@ -12,6 +12,7 @@ package scalanlp.parser
  * @tparam W the word type
  */
 case class ChartMarginal[+Chart[X]<:ParseChart[X], L, W](grammar: Grammar[L],
+                                                         lexicon: Lexicon[L, W],
                                                          spec: DerivationScorer[L, W],
                                                          words: Seq[W],
                                                          inside: Chart[L],
@@ -27,7 +28,8 @@ case class ChartMarginal[+Chart[X]<:ParseChart[X], L, W](grammar: Grammar[L],
     // handle lexical
     for (i <- 0 until words.length) {
       for {
-        a <- spec.validTagsFor(i)
+        aa <- lexicon.tagsForWord(words(i))
+        a = grammar.labelIndex(aa)
         ref <- spec.validLabelRefinements(i, i+ 1, a)
       } {
         val score:Double = spec.scoreSpan(i, i+1, a, ref) + outside.bot(i, i+1, a, ref) - partition

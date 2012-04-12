@@ -16,22 +16,20 @@ class KMModel[L, L3, W](featurizer: Featurizer[L3, W],
                         ann: (BinarizedTree[L], Seq[W])=>BinarizedTree[L3],
                         val projections: GrammarRefinements[L, L3],
                         grammar: Grammar[L],
-                        knownTagWords: Iterable[(L3, W)],
-                        openTags: Set[L3],
-                        closedWords: Set[W],
+                        lexicon: Lexicon[L, W],
                         initialFeatureVal: (Feature=>Option[Double]) = { _ => None}) extends ParserModel[L, W] {
   type L2 = L3
   type Inference = DiscParserInference[L, L2, W]
 
-  val indexedFeatures: FeatureIndexer[L, L2, W]  = FeatureIndexer(grammar, featurizer, knownTagWords, projections)
+  val indexedFeatures: FeatureIndexer[L, L2, W]  = FeatureIndexer(grammar, lexicon, featurizer, projections)
   def featureIndex = indexedFeatures.index
 
   override def initialValueForFeature(f: Feature) = initialFeatureVal(f) getOrElse 0.0
 
   def emptyCounts = new ExpectedCounts(featureIndex)
   def inferenceFromWeights(weights: DenseVector[Double]) = {
-    val lexicon = new FeaturizedLexicon(openTags, closedWords, weights, indexedFeatures)
-    val grammar = FeaturizedGrammar(this.grammar, projections, weights, indexedFeatures, lexicon)
+    val lexicon = new FeaturizedLexicon(weights, indexedFeatures)
+    val grammar = FeaturizedGrammar(this.grammar, this.lexicon, projections, weights, indexedFeatures, lexicon)
 
     new DiscParserInference(indexedFeatures, ann, grammar, projections)
   }
@@ -81,8 +79,8 @@ case class KMModelFactory(baseParser: ParserParams.BaseParser,
 
     val (initLexicon, initBinaries, initUnaries) = this.extractBasicCounts(transformed)
 
-    val grammar = baseParser.xbarGrammar(trainTrees)
-    val refGrammar = Grammar(AnnotatedLabel.TOP, initBinaries, initUnaries, initLexicon)
+    val (grammar,lexicon) = baseParser.xbarGrammar(trainTrees)
+    val refGrammar = Grammar(AnnotatedLabel.TOP, initBinaries, initUnaries)
     val indexedRefinements = GrammarRefinements(grammar, refGrammar, {(_:AnnotatedLabel).baseAnnotatedLabel})
 
     val gen = new WordShapeFeaturizer(Library.sum(initLexicon))
@@ -96,16 +94,12 @@ case class KMModelFactory(baseParser: ParserParams.BaseParser,
       xbarLexicon(t.baseAnnotatedLabel, w) += v
     }
 
-    val openTags = determineOpenTags(xbarLexicon, indexedRefinements)
-    val knownTagWords = determineKnownTags(initLexicon, indexedRefinements)
-    val closedWords = determineClosedWords(initLexicon)
-
     val featureCounter = if(oldWeights ne null) {
       scalanlp.util.readObject[Counter[Feature, Double]](oldWeights)
     } else {
       Counter[Feature, Double]()
     }
-    new KMModel[AnnotatedLabel, AnnotatedLabel, String](feat, pipeline, indexedRefinements, grammar, knownTagWords, openTags, closedWords, {featureCounter.get(_)})
+    new KMModel[AnnotatedLabel, AnnotatedLabel, String](feat, pipeline, indexedRefinements, grammar, lexicon, {featureCounter.get(_)})
   }
 
 }

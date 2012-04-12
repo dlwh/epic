@@ -5,12 +5,12 @@ import scalanlp.trees._
 import scalala.tensor.Counter2
 import scalala.library.Library
 
-
 object DerivationScorerFactory {
-  def oneOff[L, W](grammar: Grammar[L], scorer: SpanScorer[L]): DerivationScorer.Factory[L, W] = {
+  def oneOff[L, W](grammar: Grammar[L], lex: Lexicon[L,W], scorer: SpanScorer[L]): DerivationScorer.Factory[L, W] = {
     val g = grammar
     new DerivationScorer.Factory[L, W] {
       def grammar = g
+      def lexicon = lex
 
       def specialize(w: Seq[W]) = new Specialization {
         def words = w
@@ -41,10 +41,6 @@ object DerivationScorerFactory {
           valid
         }
 
-        def validTagsFor(pos: Int) = {
-          g.indexedTags
-        }
-
         def leftChildRefinement(rule: Int, ruleRef: Int) = (0)
 
         def rightChildRefinement(rule: Int, ruleRef: Int) = (0)
@@ -69,19 +65,17 @@ object DerivationScorerFactory {
   def generative[L, W](root: L,
                        binaryProductions: Counter2[L, BinaryRule[L], Double],
                        unaryProductions: Counter2[L, UnaryRule[L], Double],
-                       lexicon: Lexicon[L, W]):DerivationScorer.Factory[L, W] = {
-    val grammar = Grammar(root,
-      binaryProductions.keysIterator.map(_._2) ++ unaryProductions.keysIterator.map(_._2),
-      lexicon.tags
-    )
+                       wordCounts: Counter2[L, W, Double]):DerivationScorer.Factory[L, W] = {
+    val grammar = Grammar(root, binaryProductions.keysIterator.map(_._2) ++ unaryProductions.keysIterator.map(_._2))
+    val lexicon = new SimpleLexicon[L, W](wordCounts)
 
-    generative(grammar, binaryProductions, unaryProductions, lexicon)
+    generative(grammar, lexicon, binaryProductions, unaryProductions, wordCounts)
   }
 
-  def generative[L, W](grammar: Grammar[L],
+  def generative[L, W](grammar: Grammar[L], lexicon: Lexicon[L, W],
                        binaryProductions: Counter2[L, BinaryRule[L], Double],
                        unaryProductions: Counter2[L, UnaryRule[L], Double],
-                       lexicon: Lexicon[L, W]):DerivationScorer.Factory[L, W] = {
+                       wordCounts: Counter2[L, W, Double]):DerivationScorer.Factory[L, W] = {
     val loggedB = Library.logAndNormalizeRows(binaryProductions)
     val loggedU= Library.logAndNormalizeRows(unaryProductions)
 
@@ -94,20 +88,21 @@ object DerivationScorerFactory {
     
     val spanScoreArray = grammar.labelEncoder.mkArray[Double]
 
-    refined(grammar, ref, ruleScoreArray, spanScoreArray, lexicon)
+    refined(grammar, lexicon, ref, ruleScoreArray, spanScoreArray, new SimpleTagScorer(wordCounts))
   }
 
-  def refined[L, L2, W](grammar: Grammar[L],
+  def refined[L, L2, W](grammar: Grammar[L], lexicon: Lexicon[L, W],
                         refinements: GrammarRefinements[L, L2],
                         refinedRuleScores: Array[Double],
                         refinedSpanScores: Array[Double],
-                        lexicon: Lexicon[L2,W]) = {
+                        tagScorer: TagScorer[L2, W]) = {
 
     val g = grammar
+    val l = lexicon
     
     val refinedGrammar = Grammar(refinements.labels.refinementsOf(grammar.root)(0),
       refinements.labels.fineIndex,
-      refinements.rules.fineIndex, tags = grammar.tags.flatMap(refinements.labels.refinementsOf _))
+      refinements.rules.fineIndex)
 
     val ruleScoreArray: Array[Array[Double]] = Array.tabulate(grammar.index.size){ (r: Int) =>
       val refs = refinements.rules.refinementsOf(r)
@@ -130,6 +125,7 @@ object DerivationScorerFactory {
 
     new DerivationScorer.Factory[L, W] {
       def grammar = g
+      def lexicon = l
 
       def specialize(w: Seq[W]) = new Specialization {
         def words = w
@@ -137,7 +133,7 @@ object DerivationScorerFactory {
         def scoreSpan(begin: Int, end: Int, label: Int, ref: Int) = {
           val baseScore = if(begin + 1 == end) {
             val fullId = refinements.labels.globalize(label, ref)
-            lexicon.wordScore(words, refinements.labels.fineIndex.get(fullId), begin)
+            tagScorer.scoreTag(refinements.labels.fineIndex.get(fullId), words, begin)
           } else {
             0.0
           }
@@ -162,10 +158,6 @@ object DerivationScorerFactory {
 
         def validUnaryRuleRefinementsGivenChild(begin: Int, end: Int, rule: Int, childRef: Int) = {
           refinements.rules.localRefinements(rule)
-        }
-
-        def validTagsFor(pos: Int) = {
-          (lexicon.tagScores(words(pos)).keysIterator.map(refinements.labels.fineIndex).toArray)
         }
 
         def leftChildRefinement(rule: Int, ruleRef: Int) = {

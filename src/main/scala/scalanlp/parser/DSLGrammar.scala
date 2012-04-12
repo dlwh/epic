@@ -23,10 +23,10 @@ object DSLGrammar {
         lexicon(a, word) = w
     }
 
-    val normLex = new UnsmoothedLexicon(Library.logAndNormalizeRows(lexicon))
 
-    val grammar = Grammar("S",binaryProductions.keysIterator.map(_._2) ++ unaryProductions.keysIterator.map(_._2), lexicon.keysIterator.map(_._1))
-    DerivationScorerFactory.generative(grammar, binaryProductions, unaryProductions, normLex)
+    val grammar = Grammar("S", binaryProductions, unaryProductions)
+    val unsmoothed = new UnsmoothedLexicon(lexicon.keysIterator.map{ case (k,v) => LexicalProduction(k,v)}.toSet)
+    DerivationScorerFactory.generative(grammar, unsmoothed, binaryProductions, unaryProductions, lexicon)
   }
 
   def simpleGrammar =  grammar(

@@ -49,23 +49,4 @@ trait ParserModelFactory[L, W] extends ParserExtractableModelFactory[L, W] {
   protected def extractBasicCounts[L, W](trees: IndexedSeq[TreeInstance[L, W]]): (Counter2[L, W, Double], Counter2[L, BinaryRule[L], Double], Counter2[L, UnaryRule[L], Double]) = {
     GenerativeParser.extractCounts(trees)
   }
-
-  protected def determineOpenTags[L, L2, W](initLexicon: Counter2[L, W, Double], indexedRefinements: GrammarRefinements[L, L2]): Set[L2] = {
-    Set.empty ++ {
-      for (t <- initLexicon.nonzero.keys.map(_._1) if initLexicon(t, ::).size > 50; t2 <- indexedRefinements.labels.refinementsOf(t)) yield t2
-    }
-  }
-
-  protected def determineKnownTags[L, L2, W](baseLexicon: Lexicon[L, W], indexedRefinements: GrammarRefinements[L, L2]): Set[(L2, W)] = {
-    for ((t, w) <- baseLexicon.knownTagWords.toIterable; t2 <- indexedRefinements.labels.refinementsOf(t)) yield (t2, w)
-  }.toSet
-
-  protected def determineClosedWords[L, W](initLexicon: Counter2[L, W, Double]): Set[W] = {
-    Set.empty ++ {
-      val wordCounts = Library.sum(initLexicon)
-      wordCounts.nonzero.pairs.iterator.filter(_._2 > 5).map(_._1)
-    }
-  }
-
-
 }

@@ -2,10 +2,10 @@ package scalanlp.parser
 
 import scalanlp.collection.mutable.OpenAddressHashArray
 import collection.mutable.ArrayBuffer
-import scalanlp.trees.{UnaryRule, Rule, BinaryRule}
 import scalanlp.util.{TypeTags, Index, Encoder}
 import TypeTags.{ID,tag,tagArray}
 import scalala.tensor.Counter2
+import scalanlp.trees._
 
 
 /**
@@ -13,7 +13,6 @@ import scalala.tensor.Counter2
  *
  * That is, it has enough information to decide what parse trees for a given sentence are admissible
  * given a tagged sentence.
- *
  *
  * @author dlwh
  */
@@ -37,35 +36,33 @@ trait Grammar[L] extends Encoder[Rule[L]] with Serializable {
   def indexedBinaryRulesWithRightChild(c: Int):Array[Int]
   def indexedUnaryRulesWithChild(l: Int):Array[Int]
   def indexedUnaryRulesWithParent(l: Int):Array[Int]
-
-  val tags: Set[L]
-  val indexedTags: Array[Int]
 }
 
 object Grammar {
-  def apply[L](root: L, productions: TraversableOnce[Rule[L]], tags: TraversableOnce[L]): Grammar[L] = {
+  def apply[L, W](root: L, productions: TraversableOnce[Rule[L]]): Grammar[L] = {
     val index = Index[L]();
     val ruleIndex = Index[Rule[L]]()
+    val lex = new ArrayBuffer[LexicalProduction[L, W]]()
     for(r <- productions) {
       index.index(r.parent);
       r.children.foreach(index.index(_))
       ruleIndex.index(r)
     }
-    apply(root: L, index, ruleIndex, tags)
+    apply(root: L, index, ruleIndex)
   }
   
-  def apply[L](root: L, binaries: Counter2[L, _<:Rule[L], _], unaries: Counter2[L, _ <: Rule[L], _], tags: Counter2[L, _, Double]): Grammar[L] = {
-    apply(root, binaries.keysIterator.map(_._2) ++ unaries.keysIterator.map(_._2), tags.keysIterator.map(_._1))
+  def apply[L](root: L,
+               binaries: Counter2[L, _<:Rule[L], _],
+               unaries: Counter2[L, _ <: Rule[L], _]): Grammar[L] = {
+    apply(root, binaries.keysIterator.map(_._2) ++ unaries.keysIterator.map(_._2))
   }
 
   def apply[L, W](root: L,
                   labelIndex: Index[L],
-                  ruleIndex: Index[Rule[L]],
-                  tags: TraversableOnce[L]):Grammar[L] = {
+                  ruleIndex: Index[Rule[L]]):Grammar[L] = {
     val li = labelIndex
     val ri = ruleIndex
     val r = root
-    val t = tags.toSet
 
     new Grammar[L] {
       val index = ri
@@ -104,10 +101,6 @@ object Grammar {
           binaryRulesByRightChild.map(_.toArray),
           unaryRulesByChild.map(_.toArray))
       }
-
-      val tags = t
-
-      val indexedTags = (tags.map(labelIndex).toArray)
 
       def ruleIndex(a: Int, b: Int, c: Int) = binaryRuleTable(a)(c + labelIndex.size * b)
       def ruleIndex(a: Int, b: Int) = unaryRuleTable(b + labelIndex.size * a)

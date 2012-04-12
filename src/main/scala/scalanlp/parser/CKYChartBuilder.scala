@@ -11,7 +11,7 @@ import scalanlp.util.TypeTags
  * @tparam W word type
  */
 class CKYChartBuilder[+Chart[X]<:ParseChart[X], L, W](val grammar: DerivationScorer.Factory[L, W],
-                                                      val chartFactory: Factory[Chart]) extends ChartBuilder[Chart, L, W] {
+                                                      val chartFactory: Factory[Chart]) extends ChartBuilder[Chart, L, W] with Serializable {
 
   def charts(words: Seq[W]) = {
     val spec = grammar.specialize(words)
@@ -19,9 +19,8 @@ class CKYChartBuilder[+Chart[X]<:ParseChart[X], L, W](val grammar: DerivationSco
     val outside = buildOutsideChart(inside, spec)
     val partition = rootScore(spec, inside)
 
-    new ChartMarginal[Chart, L, W](grammar.grammar, spec, words, inside, outside, partition)
+    new ChartMarginal[Chart, L, W](grammar.grammar, grammar.lexicon, spec, words, inside, outside, partition)
   }
-
 
   def withCharts[Chart2[X] <: ParseChart[X]](prob: Factory[Chart2]) = new CKYChartBuilder(grammar, prob)
 
@@ -44,7 +43,8 @@ class CKYChartBuilder[+Chart[X]<:ParseChart[X], L, W](val grammar: DerivationSco
     for{i <- 0 until words.length} {
       var foundSomething = false
       for {
-        a <- spec.validTagsFor(i)
+        aa <- grammar.lexicon.tagsForWord(words(i))
+        a = grammar.labelIndex(aa)
         ref <- spec.validLabelRefinements(i, i+ 1, a)
       } {
         val score:Double = spec.scoreSpan(i, i+1, a, ref)

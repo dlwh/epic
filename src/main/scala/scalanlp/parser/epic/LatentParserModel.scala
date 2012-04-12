@@ -16,14 +16,12 @@ class LatentParserModel[L, L3, W](featurizer: Featurizer[L3, W],
                                   reannotate: (BinarizedTree[L], Seq[W])=>BinarizedTree[L],
                                   val projections: GrammarRefinements[L, L3],
                                   grammar: Grammar[L],
-                                  knownTagWords: Iterable[(L3, W)],
-                                  openTags: Set[L3],
-                                  closedWords: Set[W],
+                                  lexicon: Lexicon[L, W],
                                   initialFeatureVal: (Feature=>Option[Double]) = { _ => None}) extends ParserModel[L, W] {
   type L2 = L3
   type Inference = LatentParserInference[L, L2, W]
 
-  val indexedFeatures: FeatureIndexer[L, L2, W]  = FeatureIndexer(grammar, featurizer, knownTagWords, projections)
+  val indexedFeatures: FeatureIndexer[L, L2, W]  = FeatureIndexer(grammar, lexicon, featurizer, projections)
   def featureIndex = indexedFeatures.index
 
   override def initialValueForFeature(f: Feature) = {
@@ -33,8 +31,8 @@ class LatentParserModel[L, L3, W](featurizer: Featurizer[L3, W],
   def emptyCounts = new scalanlp.parser.ExpectedCounts(featureIndex)
 
   def inferenceFromWeights(weights: DenseVector[Double]) = {
-    val lexicon = new FeaturizedLexicon(openTags, closedWords, weights, indexedFeatures)
-    val grammar = FeaturizedGrammar(this.grammar, projections, weights, indexedFeatures, lexicon)
+    val lexicon = new FeaturizedLexicon(weights, indexedFeatures)
+    val grammar = FeaturizedGrammar(this.grammar, this.lexicon, projections, weights, indexedFeatures, lexicon)
 
     new LatentParserInference(indexedFeatures, reannotate, grammar, projections)
   }
@@ -78,9 +76,9 @@ case class LatentParserModelFactory(baseParser: ParserParams.BaseParser,
   def unsplit(x: (AnnotatedLabel, Int)) = x._1
 
   def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]]) = {
-    val (xbarLexicon, xbarBinaries, xbarUnaries) = this.extractBasicCounts(trainTrees.map(_.mapLabels(_.baseAnnotatedLabel)))
+    val (xbarWords, xbarBinaries, xbarUnaries) = this.extractBasicCounts(trainTrees.map(_.mapLabels(_.baseAnnotatedLabel)))
 
-    val xbarParser = baseParser.xbarGrammar(trainTrees)
+    val (xbarParser,xbarLexicon) = baseParser.xbarGrammar(trainTrees)
 
     val substateMap = if(substates != null && substates.exists) {
       val in = Source.fromFile(substates).getLines()
@@ -93,17 +91,13 @@ case class LatentParserModelFactory(baseParser: ParserParams.BaseParser,
       Map(xbarParser.root -> 1)
     }
 
-    val gen = new WordShapeFeaturizer(Library.sum(xbarLexicon))
+    val gen = new WordShapeFeaturizer(Library.sum(xbarWords))
     def labelFlattener(l: (AnnotatedLabel, Int)) = {
       val basic = Seq(l)
       basic map(IndicatorFeature)
     }
     val feat = new SumFeaturizer[(AnnotatedLabel, Int), String](new RuleFeaturizer(labelFlattener _), new LexFeaturizer(gen, labelFlattener _))
     val indexedRefinements = GrammarRefinements(xbarParser, split(_:AnnotatedLabel, substateMap, numStates), unsplit)
-
-    val openTags = determineOpenTags(xbarLexicon, indexedRefinements)
-    val knownTagWords = determineKnownTags(xbarLexicon, indexedRefinements)
-    val closedWords = determineClosedWords(xbarLexicon)
 
     val featureCounter = if(oldWeights ne null) {
       val baseCounter = scalanlp.util.readObject[Counter[Feature, Double]](oldWeights)
@@ -117,9 +111,7 @@ case class LatentParserModelFactory(baseParser: ParserParams.BaseParser,
                                                                       reannotate,
                                                                       indexedRefinements,
                                                                       xbarParser,
-                                                                      knownTagWords,
-                                                                      openTags,
-                                                                      closedWords,
+                                                                      xbarLexicon,
                                                                       {featureCounter.get(_)})
   }
 }

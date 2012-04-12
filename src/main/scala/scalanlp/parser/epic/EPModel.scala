@@ -183,7 +183,7 @@ case class EPParserModelFactory(ep: EPParams,
   )
 
   def make(train: IndexedSeq[TreeInstance[AnnotatedLabel, String]]) = {
-    val xbarGrammar = baseParser.xbarGrammar(train)
+    val (xbarGrammar,xbarLexicon) = baseParser.xbarGrammar(train)
 
     type ModelType = EPModel.CompatibleModel[TreeInstance[AnnotatedLabel, String], SpanScorerFactor[AnnotatedLabel, String]]
     val models = Seq(model1, model2, model3, model4, model5, model6, model7, model8).filterNot(_ eq null) map { model =>
@@ -198,6 +198,7 @@ case class EPParserModelFactory(ep: EPParams,
 
     new EPModel(ep.iterations, {featureCounter.get(_)}, models:_*) with EPParser.Extractor[AnnotatedLabel, String] with Serializable {
       def grammar = xbarGrammar
+      def lexicon = xbarLexicon
     }
   }
 }

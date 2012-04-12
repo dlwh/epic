@@ -22,7 +22,8 @@ class ChartDecoderTest extends ParserTestHarness with FunSuite {
   }
 
   test("MaxRuleProductDecoder") {
-    val decoder = new MaxRuleProductDecoder[AnnotatedLabel, String](ParserTestHarness.simpleParser.builder.grammar.grammar)
+    val factory = ParserTestHarness.simpleParser.builder.grammar
+    val decoder = new MaxRuleProductDecoder[AnnotatedLabel, String](factory.grammar, factory.lexicon)
     val gen = new SimpleChartParser(ParserTestHarness.simpleParser.builder, decoder)
 
     val res = evalParser(getTestTrees(), gen)
@@ -31,7 +32,8 @@ class ChartDecoderTest extends ParserTestHarness with FunSuite {
   }
 
   test("MaxVariationalDecoder") {
-    val decoder = new MaxVariationalDecoder[AnnotatedLabel, String](ParserTestHarness.simpleParser.builder.grammar.grammar)
+    val factory = ParserTestHarness.simpleParser.builder.grammar
+    val decoder = new MaxVariationalDecoder[AnnotatedLabel, String](factory.grammar, factory.lexicon)
     val gen = new SimpleChartParser(ParserTestHarness.simpleParser.builder, decoder)
 
     val res = evalParser(getTestTrees(), gen)

@@ -25,8 +25,7 @@ object GenerativeParser {
     val root = data.head.tree.label
     val (words, binary, unary) = extractCounts(data)
     val grammar = Grammar(root,
-      binary.keysIterator.map(_._2) ++ unary.keysIterator.map(_._2),
-      words.keysIterator.map(_._1)
+      binary.keysIterator.map(_._2) ++ unary.keysIterator.map(_._2)
     )
 
     val lexicon = new SimpleLexicon(words)
@@ -74,10 +73,10 @@ object GenerativePipeline extends ParserPipeline {
   def trainParser(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]],
                   validate: Parser[AnnotatedLabel, String]=>ParseEval.Statistics,
                   config: Params) = {
-    val xbar = config.baseParser.xbarGrammar(trainTrees)
+    val (xbar,xbarLexicon) = config.baseParser.xbarGrammar(trainTrees)
     val trees = trainTrees.map(_.mapLabels(_.clearFeatures))
     val (words, binary, unary) = GenerativeParser.extractCounts(trees)
-    val grammar = DerivationScorerFactory.generative(xbar, binary, unary, words)
+    val grammar = DerivationScorerFactory.generative[AnnotatedLabel, String](xbar, xbarLexicon, binary, unary, words)
     val parser = SimpleChartParser(grammar)
     Iterator.single(("Gen", parser))
   }
