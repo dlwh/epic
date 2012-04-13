@@ -15,8 +15,7 @@ import scalanlp.util.Index
  * 
  * @author dlwh
  */
-
-class ConstraintScorer[L, W](val scores: Array[BitSet], topScores: Array[BitSet]) extends UnrefinedDerivationScorer[L, W] {
+class ConstraintScorer[L, W](val scores: Array[BitSet], topScores: Array[BitSet]) extends UnrefinedDerivationScorer[L, W] with Serializable {
   def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = 0.0
 
   def scoreUnaryRule(begin: Int, end: Int, rule: Int) = {
@@ -112,12 +111,10 @@ class ConstraintScorerFactory[L, W](parser: ChartBuilder[ParseChart, L, W], thre
 
 
 case class ProjectionParams(treebank: ProcessedTreebank,
-                            parser: File, out: File = new File("spans"), maxParseLength: Int = 40, project: Boolean = true) {
+                            parser: File, out: File = new File("constraints.ser.gz"), maxParseLength: Int = 80, project: Boolean = true) {
 }
 
 object ProjectTreebankToConstraints {
-
-  import SpanBroker._
 
   def main(args: Array[String]) {
     val (baseConfig, files) = scalanlp.config.CommandLineParser.parseArguments(args)
@@ -127,14 +124,15 @@ object ProjectTreebankToConstraints {
     println(params)
     val parser = loadParser[Any](params.parser)
 
-    val outDir = params.out
-    outDir.mkdirs()
+    val out = params.out
+    out.getParentFile.mkdirs()
 
     val factory = new ConstraintScorerFactory[AnnotatedLabel, String](parser.builder, -7)
-    scalanlp.util.writeObject(new File(outDir, XBAR_GRAMMAR_NAME), parser.builder.grammar.grammar)
-    serializeSpans(mapTrees(factory, treebank.trainTrees, parser.builder.grammar.labelIndex, true, params.maxParseLength), new File(outDir, TRAIN_SPANS_NAME))
-    serializeSpans(mapTrees(factory, treebank.testTrees, parser.builder.grammar.labelIndex, false, 10000), new File(outDir, TEST_SPANS_NAME))
-    serializeSpans(mapTrees(factory, treebank.devTrees, parser.builder.grammar.labelIndex, false, 10000), new File(outDir, DEV_SPANS_NAME))
+    val train = mapTrees(factory, treebank.trainTrees, parser.builder.grammar.labelIndex, true, params.maxParseLength)
+    val test = mapTrees(factory, treebank.testTrees, parser.builder.grammar.labelIndex, false, 10000)
+    val dev = mapTrees(factory, treebank.devTrees, parser.builder.grammar.labelIndex, false, 10000)
+    val map = Map.empty ++ train ++ test ++ dev
+    scalanlp.util.writeObject(out, map)
   }
 
   def loadParser[T](loc: File) = {
@@ -151,16 +149,10 @@ object ProjectTreebankToConstraints {
       val TreeInstance(id, tree, words) = ti
       println(id, words)
       try {
-        val pruner:GoldTagPolicy[L] = if(useTree) {
-          val mappedTree = tree.map(l => index(l))
-          GoldTagPolicy.goldTreeForcing(mappedTree)
-        } else {
-          GoldTagPolicy.noGoldTags
-        }
         val scorer = factory.specialize(words)
-        id -> scorer
+        words -> scorer
       } catch {
-        case e: Exception => e.printStackTrace(); id -> DerivationScorer.identity[L, String]
+        case e: Exception => e.printStackTrace(); words -> DerivationScorer.identity[L, String]
       }
     }.seq
   }
