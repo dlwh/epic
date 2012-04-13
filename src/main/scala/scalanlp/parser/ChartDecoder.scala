@@ -20,6 +20,12 @@ trait ChartDecoder[L, W] extends Serializable{
   def extractBestParse(marginal: ChartMarginal[ParseChart, L, W]):BinarizedTree[L]
 }
 
+object ChartDecoder extends Serializable {
+  def apply[L,W](grammar: Grammar[L], lexicon: Lexicon[L, W]):ChartDecoder[L, W] = {
+    new MaxRuleProductDecoder(grammar, lexicon)
+  }
+}
+
 /**
  * Tries to extract a tree that maximizes log score.
  */

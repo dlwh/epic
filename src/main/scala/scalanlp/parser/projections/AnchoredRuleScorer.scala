@@ -13,7 +13,7 @@ import scalanlp.trees.Rule
  */
 case class AnchoredPCFGProjector[L, W](grammar: Grammar[L], threshold: Double = Double.NegativeInfinity) extends ChartProjector[L, W] {
 
-  type MyScorer = AnchoredRuleScorer[L];
+  type MyScorer = AnchoredRuleScorer[L, W]
   private def normalize(ruleScores: OldSparseVector, totals: OldSparseVector):OldSparseVector = {
     if(ruleScores eq null) null
     else {
@@ -29,7 +29,7 @@ case class AnchoredPCFGProjector[L, W](grammar: Grammar[L], threshold: Double = 
   }
 
   protected def createSpanScorer(ruleData: AnchoredRuleProjector.AnchoredData, sentProb: Double) = {
-    val AnchoredRuleProjector.AnchoredData(lexicalScores, unaryScores, totalsUnaries, binaryScores, totalsBinaries) = ruleData;
+    val AnchoredRuleProjector.AnchoredData(lexicalScores, unaryScores, totalsUnaries, binaryScores, totalsBinaries) = ruleData
     val normUnaries:Array[OldSparseVector] = for((ruleScores, totals) <- unaryScores zip totalsUnaries) yield {
       normalize(ruleScores, totals)
     }
@@ -38,7 +38,7 @@ case class AnchoredPCFGProjector[L, W](grammar: Grammar[L], threshold: Double = 
       if(splits eq null) null
       else for(ruleScores <- splits) yield normalize(ruleScores, totals)
     }
-    new AnchoredRuleScorer(lexicalScores, normUnaries, normBinaries);
+    new AnchoredRuleScorer(lexicalScores, normUnaries, normBinaries)
   }
 
 }
@@ -61,9 +61,9 @@ case class AnchoredRuleMarginalProjector[L, W](threshold: Double = Double.Negati
     }
   }
 
-  type MyScorer = AnchoredRuleScorer[L];
+  type MyScorer = AnchoredRuleScorer[L, W]
   protected def createSpanScorer(ruleData: AnchoredRuleProjector.AnchoredData, sentProb: Double) = {
-    val AnchoredRuleProjector.AnchoredData(lexicalScores, unaryScores, _, binaryScores, _) = ruleData;
+    val AnchoredRuleProjector.AnchoredData(lexicalScores, unaryScores, _, binaryScores, _) = ruleData
     val normUnaries:Array[OldSparseVector] = for(ruleScores <- unaryScores) yield {
       normalize(ruleScores)
     }
@@ -72,18 +72,17 @@ case class AnchoredRuleMarginalProjector[L, W](threshold: Double = Double.Negati
       if(splits eq null) null
       else for(ruleScores <- splits) yield normalize(ruleScores)
     }
-    new AnchoredRuleScorer(lexicalScores, normUnaries, normBinaries);
+    new AnchoredRuleScorer(lexicalScores, normUnaries, normBinaries)
   }
-
 }
 
 
 @SerialVersionUID(3)
-class AnchoredRuleScorer[L](spanScores: Array[OldSparseVector], // triangular index -> label -> score
-                            // (begin, end) -> rule -> score
-                            unaryScores: Array[OldSparseVector],
-                            // (begin, end) -> (split-begin) -> rule -> score
-                            binaryScores: Array[Array[OldSparseVector]]) extends SpanScorer[L] with Serializable {
+class AnchoredRuleScorer[L, W](spanScores: Array[OldSparseVector], // triangular index -> label -> score
+                               // (begin, end) -> rule -> score
+                               unaryScores: Array[OldSparseVector],
+                               // (begin, end) -> (split-begin) -> rule -> score
+                               binaryScores: Array[Array[OldSparseVector]]) extends UnrefinedDerivationScorer[L, W] with Serializable {
 
   def scoreUnaryRule(begin: Int, end: Int, rule: Int) = {
     val forSpan = unaryScores(TriangularArray.index(begin, end))

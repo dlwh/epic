@@ -1,6 +1,6 @@
 package scalanlp.parser
 
-import projections.ProjectionIndexer
+import projections.{GrammarRefinements, ProjectionIndexer}
 import scalanlp.util.TypeTags._
 import java.util.Arrays
 import scalanlp.trees._
@@ -239,6 +239,11 @@ case class LatentTreeMarginal[L, W](grammar: Grammar[L],
 }
 
 object LatentTreeMarginal {
+  def apply[L, L2, W](grammar: Grammar[L], scorer: DerivationScorer[L, W], ref: ProjectionIndexer[L, L2], words: Seq[W], tree: BinarizedTree[L]): LatentTreeMarginal[L, W] = {
+    new LatentTreeMarginal(grammar, scorer, words,
+      tree.map { l => (l, ref.localRefinements(grammar.labelIndex(l)).toIndexedSeq)})
+
+  }
 
   def apply[L, W](grammar: DerivationScorer.Factory[L, W],
                   words: Seq[W],
@@ -250,8 +255,7 @@ object LatentTreeMarginal {
                       ref: ProjectionIndexer[L, L2],
                       words: Seq[W],
                       tree: BinarizedTree[L]):LatentTreeMarginal[L, W] = {
-    LatentTreeMarginal(grammar.grammar, grammar.specialize(words), words,
-      tree.map { l => (l, ref.localRefinements(grammar.labelIndex(l)).toIndexedSeq)})
+    apply(grammar.grammar, grammar.specialize(words), ref, words, tree)
   }
 
 

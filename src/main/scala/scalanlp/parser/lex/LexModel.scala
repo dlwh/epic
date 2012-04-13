@@ -617,10 +617,10 @@ case class LexInference[L, W](reannotate: (BinarizedTree[L], Seq[W])=>BinarizedT
                               featurizer: IndexedFeaturizer[L, W],
                               headFinder: HeadFinder[L]) extends ParserInference[L, W] {
 
-  def goldCounts(ti: TreeInstance[L, W], augment: DerivationScorer.Factory[L, W]) = {
+  def goldCounts(ti: TreeInstance[L, W], augment: DerivationScorer[L, W]) = {
     val reannotated = reannotate(ti.tree, ti.words)
     val headed = headFinder.annotateHeadIndices(reannotated).asInstanceOf[BinarizedTree[(L,Int)]]
-    TreeMarginal(augment, ti.words, headed).expectedCounts(featurizer)
+    TreeMarginal(grammar.grammar, augment, ti.words, headed).expectedCounts(featurizer)
   }
 }
 

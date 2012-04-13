@@ -2,7 +2,7 @@ package scalanlp.parser.epic
 
 import scalanlp.parser._
 import features.{Feature, IndicatorFeature, WordShapeFeaturizer}
-import projections.{ProjectingSpanScorer, GrammarRefinements}
+import projections.GrammarRefinements
 import ParseChart.LogProbabilityParseChart
 import scalala.tensor.dense.DenseVector
 import scalala.tensor.sparse.SparseVector
@@ -53,9 +53,9 @@ case class LatentParserInference[L, L2, W](featurizer: DerivationFeaturizer[L, W
                                            projections: GrammarRefinements[L, L2]) extends ParserInference[L, W] {
 
   // E[T-z|T, params]
-  def goldCounts(ti: TreeInstance[L, W], grammar: DerivationScorer.Factory[L, W]) = {
+  def goldCounts(ti: TreeInstance[L, W], grammar: DerivationScorer[L, W]) = {
     val reannotated = reannotate(ti.tree, ti.words)
-    val ecounts = LatentTreeMarginal(grammar, projections.labels, ti.words, reannotated).expectedCounts(featurizer)
+    val ecounts = LatentTreeMarginal(this.grammar.grammar, grammar, projections.labels, ti.words, reannotated).expectedCounts(featurizer)
 
     ecounts
   }

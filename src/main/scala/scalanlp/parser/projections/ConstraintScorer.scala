@@ -16,7 +16,7 @@ import scalanlp.util.Index
  * @author dlwh
  */
 
-class ConstraintScorer[L](val scores: Array[BitSet], topScores: Array[BitSet]) extends SpanScorer[L] {
+class ConstraintScorer[L, W](val scores: Array[BitSet], topScores: Array[BitSet]) extends UnrefinedDerivationScorer[L, W] {
   def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = 0.0
 
   def scoreUnaryRule(begin: Int, end: Int, rule: Int) = {
@@ -37,15 +37,26 @@ class ConstraintScorer[L](val scores: Array[BitSet], topScores: Array[BitSet]) e
  * Creates labeled span scorers for a set of trees from some parser.
  * @author dlwh
  */
-class ConstraintScorerFactory[L, W](parser: ChartBuilder[ParseChart, L, W], threshold: Double) extends SpanScorer.Factory[L, W] {
+class ConstraintScorerFactory[L, W](parser: ChartBuilder[ParseChart, L, W], threshold: Double) extends DerivationScorer.Factory[L, W] {
+  def grammar = parser.grammar.grammar
+  def lexicon = parser.grammar.lexicon
 
-  def mkSpanScorer(s: Seq[W], goldTags: GoldTagPolicy[L] = GoldTagPolicy.noGoldTags[L]) = {
-    val charts = parser.charts(s)
-    val chartScorer = buildSpanScorer(charts, goldTags)
+
+  def specialize(words: Seq[W]) = {
+    val charts = parser.charts(words)
+    val chartScorer = buildScorer(charts)
     chartScorer
   }
 
-  private def scoresForCharts(marg: ChartMarginal[ParseChart, L, W], gold: GoldTagPolicy[L]) = {
+  def buildScorer(charts: Marginal[L, W],
+                  goldTags: GoldTagPolicy[L] = GoldTagPolicy.noGoldTags[L]):ConstraintScorer[L, W] = {
+
+    val (label,unary) = scoresForCharts(charts, goldTags)
+
+    new ConstraintScorer[L, W](label, unary)
+  }
+
+  private def scoresForCharts(marg: Marginal[L, W], gold: GoldTagPolicy[L]) = {
     val length = marg.length
     val scores = TriangularArray.raw(length+1, null: Array[Double])
     val topScores = TriangularArray.raw(length+1, null: Array[Double])
@@ -74,6 +85,8 @@ class ConstraintScorerFactory[L, W](parser: ChartBuilder[ParseChart, L, W], thre
       }
     }
 
+    marg.visit(visitor)
+
     // TODO: gold tags!
     val labelThresholds = scores.map { case arr =>
       if(arr eq null) null
@@ -88,14 +101,7 @@ class ConstraintScorerFactory[L, W](parser: ChartBuilder[ParseChart, L, W], thre
     (labelThresholds, unaryThresholds)
   }
 
-  def buildSpanScorer(charts: ChartMarginal[ParseChart, L, W],
-                      goldTags: GoldTagPolicy[L] = GoldTagPolicy.noGoldTags[L]):ConstraintScorer[L] = {
-    import charts._
 
-    val (label,unary) = scoresForCharts(charts, goldTags)
-
-    new ConstraintScorer[L](label, unary)
-  }
 
 }
 
@@ -146,10 +152,10 @@ object ProjectTreebankToConstraints {
         } else {
           GoldTagPolicy.noGoldTags
         }
-        val scorer = factory.mkSpanScorer(words, pruner)
+        val scorer = factory.specialize(words)
         id -> scorer
       } catch {
-        case e: Exception => e.printStackTrace(); id -> SpanScorer.identity[L]
+        case e: Exception => e.printStackTrace(); id -> DerivationScorer.identity[L, String]
       }
     }.seq
   }

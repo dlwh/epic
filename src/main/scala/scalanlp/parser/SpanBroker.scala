@@ -8,44 +8,26 @@ import scalanlp.util.Index
  * 
  * @author dlwh
  */
-
-trait SpanBroker[T] {
-  def spanForId(id: String):SpanScorer[T]
+trait SpanBroker[T,W] {
+  def spanForId(id: String):DerivationScorer[T, W]
 }
 
 object SpanBroker {
-  def load[T](file: File):SpanBroker[T] = {
-    val it = loadSpansFile[T](file)
-    val m = Map.empty[String,SpanScorer[T]] ++ it
-    new SpanBroker[T] {
+  def load[T, W](file: File):SpanBroker[T, W] = {
+    val it = loadSpansFile[T, W](file)
+    val m = Map.empty[String,DerivationScorer[T, W]] ++ it
+    new SpanBroker[T, W] {
       def spanForId(id: String) = m(id)
     }
   }
 
-  def serializeSpans[T](spans: Iterable[(String,SpanScorer[T])], file: File) = {
+  def serializeSpans[T, W](spans: Iterable[(String,DerivationScorer[T, W])], file: File) = {
     FileIterable.write(spans,file)
   }
 
-  def zeroBroker[T]:SpanBroker[T] = {
-    new SpanBroker[T] {
-      def spanForId(id: String) = SpanScorer.identity[T]
-    }
-
-  }
-
-  private def loadSpans(spanDir: File) = {
-    if(!spanDir.exists || !spanDir.isDirectory) sys.error(spanDir + " must exist and be a directory!")
-
-    val trainSpans = loadSpansFile(new File(spanDir,TRAIN_SPANS_NAME))
-    val devSpans = loadSpansFile(new File(spanDir,DEV_SPANS_NAME))
-    val testSpans = loadSpansFile(new File(spanDir,TEST_SPANS_NAME))
-
-    (trainSpans,devSpans,testSpans)
-  }
-
-  private def loadSpansFile[T](spanFile: File):Iterable[(String,SpanScorer[T])] = {
+  private def loadSpansFile[T, W](spanFile: File):Iterable[(String,DerivationScorer[T, W])] = {
     require(spanFile.exists, spanFile + " must exist!")
-    new FileIterable[(String,SpanScorer[T])](spanFile)
+    new FileIterable[(String,DerivationScorer[T, W])](spanFile)
   }
 
   def loadSpanIndex(spanFile: File) = {

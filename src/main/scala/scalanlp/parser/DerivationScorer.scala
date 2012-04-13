@@ -11,6 +11,7 @@ package scalanlp.parser
  */
 trait DerivationScorer[L, W] {
 
+
   /**
    * Scores the indexed label rule with refinenemnt ref, when it occurs at (begin, end). Can be used for s, or for a
    * "bottom" label. Mainly used for s.
@@ -59,6 +60,8 @@ trait DerivationScorer[L, W] {
 }
 
 object DerivationScorer {
+  def identity[L, W]: DerivationScorer[L, W] = UnrefinedDerivationScorer.identity[L, W]
+
 
   trait Factory[L, W] extends Serializable {
     def grammar: Grammar[L]

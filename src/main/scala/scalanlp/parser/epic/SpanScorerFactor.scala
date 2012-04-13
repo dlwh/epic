@@ -7,10 +7,10 @@ import projections.{AnchoredPCFGProjector, ScalingSpanScorer}
 case class SpanScorerFactor[L, W](grammar: Grammar[L],
                                   lexicon: Lexicon[L, W],
                                   words: Seq[W],
-                                  scorer: SpanScorer[L]) extends Factor[SpanScorerFactor[L, W]] {
-  def *(f: SpanScorerFactor[L, W]) = copy(scorer=SpanScorer.sum(scorer, f.scorer))
+                                  scorer: UnrefinedDerivationScorer[L, W]) extends Factor[SpanScorerFactor[L, W]] {
+  def *(f: SpanScorerFactor[L, W]) = copy(scorer=scorer * f.scorer)
 
-  def /(f: SpanScorerFactor[L, W]) = copy(scorer=ScalingSpanScorer(scorer, f.scorer, 0.0, -1))
+  def /(f: SpanScorerFactor[L, W]) = copy(scorer=scorer / f.scorer)
 
   def *(f: Double) =  this
 
@@ -25,9 +25,9 @@ case class SpanScorerFactor[L, W](grammar: Grammar[L],
     val scorer2 = other.scorer
 
 
+
     /**
      * TODO: include at least spans in this computation
-     */
     for { span <- (1 to length) } {
       var i = 0;
       while(i < length-span) {
@@ -58,15 +58,16 @@ case class SpanScorerFactor[L, W](grammar: Grammar[L],
         i += 1
       }
     }
+     */
 
-    true
+    false
   }
 }
 
 trait EPProjector[L, W] {
   def project(inf: ParserInference[L, W],
               instance: TreeInstance[L, W],
-              marginal: ChartMarginal[ParseChart.LogProbabilityParseChart, L, W]):DerivationScorer.Factory[L, W]
+              marginal: ChartMarginal[ParseChart.LogProbabilityParseChart, L, W]):DerivationScorer[L,W]
 }
 
 @SerialVersionUID(1)
@@ -74,9 +75,9 @@ class AnchoredRuleApproximator[L, W](pruningThreshold: Double = Double.NegativeI
 
   def project(inf: ParserInference[L, W],
               instance: TreeInstance[L, W],
-              marginal: ChartMarginal[ParseChart.LogProbabilityParseChart, L, W]):DerivationScorer.Factory[L, W] = {
+              marginal: ChartMarginal[ParseChart.LogProbabilityParseChart, L, W]):DerivationScorer[L, W] = {
     val factory = new AnchoredPCFGProjector[L, W](marginal.grammar)
-    DerivationScorerFactory.oneOff(inf.grammar.grammar, inf.grammar.lexicon, factory.buildSpanScorer(marginal))
+    factory.buildSpanScorer(marginal)
   }
 
 }

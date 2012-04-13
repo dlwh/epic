@@ -24,12 +24,12 @@ class LabeledSpanScorerFactory[C,L,W](parser: ChartParser[C,L,W], threshold: Dou
       sys.error("Couldn't parse " + s + " " + sentProb)
     }
 
-    val chartScorer = buildSpanScorer(charts,sentProb, scorer, goldTag)
+    val chartScorer = buildScorer(charts,sentProb, scorer, goldTag)
 
     chartScorer
   }
 
-  def buildSpanScorer(charts: ChartMarginal[ParseChart,L], sentProb: Double,
+  def buildScorer(charts: ChartMarginal[ParseChart,L], sentProb: Double,
                       coarseScorer: SpanScorer[C] = SpanScorer.identity,
                       goldTag: GoldTagPolicy[C] = GoldTagPolicy.noGoldTags):LabeledSpanScorer[C] = {
     import charts._

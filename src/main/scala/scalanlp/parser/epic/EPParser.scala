@@ -14,9 +14,9 @@ class EPParser[L, W](grammar: Grammar[L],
                      inference: EPInference[TreeInstance[L, W], SpanScorerFactor[L, W]]) extends Parser[L, W] with Serializable {
   def bestParse(s: Seq[W]) = {
     val inst = new TreeInstance[L, W]("", null, s)
-    val augment = inference.getMarginals(inst, new SpanScorerFactor(grammar, lexicon, s, SpanScorer.identity))._2
-    val wgrammar = DerivationScorerFactory.oneOff[L, W](grammar, lexicon, augment.scorer)
-    SimpleChartParser(wgrammar).bestParse(s)
+    val augment = inference.getMarginals(inst, new SpanScorerFactor(grammar, lexicon, s, UnrefinedDerivationScorer.identity))._2
+    val marg = ChartMarginal.fromSentence(grammar, lexicon, augment.scorer, s)
+    ChartDecoder(grammar, lexicon).extractBestParse(marg)
   }
 
 }
@@ -32,13 +32,16 @@ object EPParser {
   }
 
   /*
-  def fromChartParsers[L, W](grammar: Grammar[L], parsers: (SimpleChartParser[L, W])*) = {
-    val infs = parsers.map{ p => 
-      new LatentParserInference({(a:BinarizedTree[L], b:Seq[W])=>a},
-        p.builder.withCharts(ParseChart.logProb),
-        p.projections)
+  def fromChartParsers[L, W](grammar: Grammar[L],
+                             lexicon: Lexicon[L, W],
+                             grammars: (DerivationScorer.Factory[L, W])*) = {
+    val infs = grammars.map{ p =>
+      new DiscParserInference(null,
+      {(a:BinarizedTree[L], b:Seq[W])=>a},
+        p,
+        null)
     }
-    new EPParser(grammar, epinf)
+    new EPParser(grammar, lexicon, infs)
   }
   */
 }

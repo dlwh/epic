@@ -50,25 +50,6 @@ case class ProcessedTreebank(path: File,
   val process = new StandardTreeProcessor(headRules)
 }
 
-case class SpanParams[T](directory: File = null) {
-  def loadSpans(path: Option[File]):SpanBroker[T] = path match {
-    case Some(path) =>  SpanBroker.load(path)
-    case None => SpanBroker.zeroBroker[T]
-  }
-  import SpanBroker._
-
-  val trainSpansFile = Option(directory).map{dir => new File(dir, TRAIN_SPANS_NAME)}
-  lazy val trainSpans = loadSpans(trainSpansFile);
-
-  val devSpansFile = Option(directory).map{dir => new File(dir, DEV_SPANS_NAME)}
-  lazy val devSpans = loadSpans(devSpansFile);
-
-  val testSpansFile = Option(directory).map{dir => new File(dir, TEST_SPANS_NAME)}
-  lazy val testSpans = loadSpans(testSpansFile);
-
-  def index = Option(directory).map { dir => SpanBroker.loadSpanIndex(new File(directory, XBAR_GRAMMAR_NAME))}
-}
-
 case class TreeInstance[L, +W](id: String,
                                tree: BinarizedTree[L],
                                words: Seq[W]) extends Example[Tree[L], Seq[W]] {

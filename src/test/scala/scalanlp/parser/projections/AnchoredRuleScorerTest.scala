@@ -20,12 +20,10 @@ class AnchoredRuleScorerTest  extends ParserTestHarness with FunSuite {
     val genFactory = gen.builder.grammar
     val f = new AnchoredPCFGProjector[AnnotatedLabel, String](genFactory.grammar, Double.NegativeInfinity)
 
-    val factory = new ProjectingScorerFactory(gen.builder.withCharts(ParseChart.logProb), f)
-    val grammar = new SpanScorerGrammar(genFactory.grammar, genFactory.lexicon, factory)
+    val grammar = new ProjectingScorerFactory(gen.builder.withCharts(ParseChart.logProb), f)
     val chartParser = SimpleChartParser(grammar)
 
-    val factoryNext = new ProjectingScorerFactory(chartParser.builder.withCharts(ParseChart.logProb), f)
-    val grammarNext = new SpanScorerGrammar(genFactory.grammar, genFactory.lexicon, factoryNext)
+    val grammarNext = new ProjectingScorerFactory(chartParser.builder.withCharts(ParseChart.logProb), f)
     val chartNext = SimpleChartParser(grammarNext)
 
     for( TreeInstance(_, t, w) <- getTestTrees()) try {
@@ -42,8 +40,7 @@ class AnchoredRuleScorerTest  extends ParserTestHarness with FunSuite {
   test("Parsing kind of works using it") {
     val gen = ParserTestHarness.simpleParser
     val f = new AnchoredPCFGProjector[AnnotatedLabel, String](gen.builder.grammar.grammar, Double.NegativeInfinity)
-    val factory = new ProjectingScorerFactory(gen.builder.withCharts(ParseChart.logProb), f)
-    val grammar = new SpanScorerGrammar(gen.builder.grammar.grammar, gen.builder.grammar.lexicon, factory)
+    val grammar = new ProjectingScorerFactory(gen.builder.withCharts(ParseChart.logProb), f)
 
     val chartParser = SimpleChartParser(grammar)
 

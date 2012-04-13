@@ -2,7 +2,6 @@ package scalanlp.parser.epic
 
 import scalanlp.parser._
 import features.Feature
-import projections.GrammarRefinements
 import scalala.tensor.{Counter2, ::}
 import scalala.library.Library
 import scalanlp.trees.{BinaryRule, UnaryRule, BinarizedTree}
@@ -17,28 +16,27 @@ trait ParserModel[L, W] extends Model[TreeInstance[L, W]] with ParserExtractable
   type Inference <: ParserInference[L, W]
 }
 
-trait ParserInference[L, W] extends ProjectableInference[TreeInstance[L, W], DerivationScorer.Factory[L, W]] {
+trait ParserInference[L, W] extends ProjectableInference[TreeInstance[L, W], DerivationScorer[L, W]] {
   type ExpectedCounts = scalanlp.parser.ExpectedCounts[Feature]
   type Marginal = ChartMarginal[ParseChart.LogProbabilityParseChart, L, W]
 
   def grammar: DerivationScorer.Factory[L, W]
   def featurizer: DerivationFeaturizer[L, W, Feature]
 
-  def marginal(v: TreeInstance[L, W], aug: DerivationScorer.Factory[L, W]) = {
-    val builder = CKYChartBuilder(grammar, ParseChart.logProb)
-    val charts = builder.charts(v.words)
+  def marginal(v: TreeInstance[L, W], aug: DerivationScorer[L, W]) = {
+    val charts = ChartMarginal.fromSentence(grammar.grammar, grammar.lexicon, aug, v.words)
     charts -> charts.partition
   }
 
-  def guessCountsFromMarginals(v: TreeInstance[L, W], marg: Marginal, aug: DerivationScorer.Factory[L, W]) = {
+  def guessCountsFromMarginals(v: TreeInstance[L, W], marg: Marginal, aug: DerivationScorer[L, W]) = {
     marg.expectedCounts(featurizer)
   }
 
-  def baseAugment(v: TreeInstance[L, W]) = grammar
+  def baseAugment(v: TreeInstance[L, W]) = grammar.specialize(v.words)
 
   protected def projector: EPProjector[L, W] = new AnchoredRuleApproximator(Double.NegativeInfinity)
 
-  def project(v: TreeInstance[L, W], m: Marginal, oldAugment: DerivationScorer.Factory[L, W]) = {
+  def project(v: TreeInstance[L, W], m: Marginal, oldAugment: DerivationScorer[L, W]) = {
     projector.project(this, v, m)
   }
 }

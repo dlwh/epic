@@ -6,59 +6,13 @@ import scalala.tensor.Counter2
 import scalala.library.Library
 
 object DerivationScorerFactory {
-  def oneOff[L, W](grammar: Grammar[L], lex: Lexicon[L,W], scorer: SpanScorer[L]): DerivationScorer.Factory[L, W] = {
+  def oneOff[L, W](grammar: Grammar[L], lex: Lexicon[L,W], scorer: DerivationScorer[L, W]): DerivationScorer.Factory[L, W] = {
     val g = grammar
     new DerivationScorer.Factory[L, W] {
       def grammar = g
       def lexicon = lex
 
-      def specialize(w: Seq[W]) = new Specialization {
-        def words = w
-
-        def scoreSpan(begin: Int, end: Int, label: Int, ref: Int) = {
-          scorer.scoreSpan(begin, end, label)
-        }
-
-        def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int) = {
-          scorer.scoreBinaryRule(begin, split, end, rule)
-        }
-
-        def scoreUnaryRule(begin: Int, end: Int, rule: Int, ref: Int) = {
-          scorer.scoreUnaryRule(begin, end, rule)
-        }
-
-        val valid = Array(0)
-        val vldl = valid
-        def validLabelRefinements(begin: Int, end: Int, label: Int) = (vldl)
-
-        def numValidRefinements(label: Int) = 1
-
-        def validRuleRefinementsGivenParent(begin: Int, end: Int, rule: Int, parentRef: Int) = {
-          valid
-        }
-
-        def validUnaryRuleRefinementsGivenChild(begin: Int, end: Int, rule: Int, childRef: Int) = {
-          valid
-        }
-
-        def leftChildRefinement(rule: Int, ruleRef: Int) = (0)
-
-        def rightChildRefinement(rule: Int, ruleRef: Int) = (0)
-
-        def parentRefinement(rule: Int, ruleRef: Int) = (0)
-
-        def childRefinement(rule: Int, ruleRef: Int) = (0)
-
-        def ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int, refC: Int) = {
-          (0)
-        }
-
-        def ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int) = {
-          (0)
-        }
-
-
-      }
+      def specialize(words: Seq[W]) = scorer
     }
   }
 

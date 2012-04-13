@@ -1,22 +1,19 @@
 package scalanlp.parser
 package projections
 
-import scalanlp.util.TypeTags._
-import scalanlp.trees.Rule
-
 /**
  * 
  * @author dlwh
  */
 object ScalingSpanScorer {
-  def apply[C](num: SpanScorer[C], denom: SpanScorer[C], constant:Double, root: Int):SpanScorer[C] = new SpanScorer[C] {
+  def apply[C, W](num: UnrefinedDerivationScorer[C, W], denom: UnrefinedDerivationScorer[C, W]):UnrefinedDerivationScorer[C, W] = new UnrefinedDerivationScorer[C, W] {
     def scoreSpan(begin: Int, end: Int, tag: Int) = {
       val ns = num.scoreSpan(begin, end, tag)
       if(ns == Double.NegativeInfinity) ns
       else {
         val ds = denom.scoreSpan(begin, end, tag)
         if(ns == Double.NegativeInfinity || ds == Double.NegativeInfinity) Double.NegativeInfinity;
-        else ns - ds + {if(tag == root) constant else 0.0 }
+        else ns - ds
       }
     }
 
@@ -41,26 +38,4 @@ object ScalingSpanScorer {
     }
   }
 
-  /*
-  def rescaleParentScorer(num: SpanScorer, denom: SpanScorer, constant: Double, len: Int, numSymbols: Int) = {
-    val scores = TriangularArray.raw(inside.length+1,null:SparseVector);
-    var density = 0;
-    var labelDensity = 0;
-    for(begin <-  0 until inside.length; end <- begin+1 to (inside.length)) {
-      val index = TriangularArray.index(begin, end)
-      for(l <- 0 until numSymbols) {
-        val pL = indexedProjections.project(l)
-        val myScore =
-        if(scores(index) == null) {
-          scores(index) = new SparseVector(numSymbols,1);
-          density += 1;
-        }
-        val currentScore = scores(index)(pL);
-        if(currentScore == Double.NegativeInfinity) labelDensity += 1;
-        scores(index)(pL) = Numerics.logSum(currentScore,myScore);
-      }
-    }
-    new LabeledSpanScorer(scores);
-  }
-  */
 }

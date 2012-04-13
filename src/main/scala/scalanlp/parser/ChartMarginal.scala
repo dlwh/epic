@@ -130,4 +130,9 @@ object ChartMarginal {
     val builder = ChartBuilder(grammar)
     builder.charts(sent)
   }
+
+  def fromSentence[L, W](grammar: Grammar[L], lexicon: Lexicon[L, W], scorer: DerivationScorer[L, W], sent: Seq[W]) = {
+    val builder = ChartBuilder(DerivationScorerFactory.oneOff(grammar, lexicon, scorer))
+    builder.charts(sent)
+  }
 }
