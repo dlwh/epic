@@ -36,8 +36,7 @@ class KMModel[L, L3, W](featurizer: Featurizer[L3, W],
 
   def extractParser(weights: DenseVector[Double]):ChartParser[L, W] = {
     val inf = inferenceFromWeights(weights)
-    val builder = CKYChartBuilder(inf.grammar, ParseChart.logProb)
-    new SimpleChartParser(builder, new MaxConstituentDecoder[L, W])
+    SimpleChartParser(inf.grammar)
   }
 
   def expectedCountsToObjective(ecounts: ExpectedCounts) = {
