@@ -20,16 +20,21 @@ class ConstraintScorer[L, W](val scores: Array[BitSet], topScores: Array[BitSet]
   def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = 0.0
 
   def scoreUnaryRule(begin: Int, end: Int, rule: Int) = {
-    val set = topScores(TriangularArray.index(begin, end))
-    if(set == null || !set.contains(rule)) Double.NegativeInfinity
-    else 0.0
-//    0.0
+    if (topScores eq null) 0.0
+    else {
+      val set = topScores(TriangularArray.index(begin, end))
+      if(set == null || !set.contains(rule)) Double.NegativeInfinity
+      else 0.0
+    }
   }
 
   def scoreSpan(begin: Int, end: Int, tag: Int) = {
-    val set = scores(TriangularArray.index(begin, end))
-    if(set == null || !set.contains(tag)) Double.NegativeInfinity
-    else 0.0
+    if(scores eq null) 0.0
+    else {
+      val set = scores(TriangularArray.index(begin, end))
+      if(set == null || !set.contains(tag)) Double.NegativeInfinity
+      else 0.0
+    }
   }
 }
 
