@@ -2,20 +2,21 @@ package scalanlp.parser
 package projections
 
 import collection.immutable.BitSet
-import scalala.library.Numerics
-import java.util.Arrays
 import scalanlp.config.Configuration
 import java.io._
-import scalanlp.collection.mutable.{OpenAddressHashArray, TriangularArray}
+import scalanlp.collection.mutable.TriangularArray
 import scalanlp.trees._
-import scalanlp.util.TypeTags._
 import scalanlp.util.Index
 
 /**
  * 
  * @author dlwh
  */
-class ConstraintScorer[L, W](val scores: Array[BitSet], topScores: Array[BitSet]) extends UnrefinedDerivationScorer[L, W] with Serializable {
+class ConstraintScorer[L, W](val grammar: Grammar[L],
+                             val lexicon: Lexicon[L, W],
+                             val words: Seq[W],
+                             scores: Array[BitSet],
+                             topScores: Array[BitSet]) extends UnrefinedDerivationScorer[L, W] with Serializable {
   def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = 0.0
 
   def scoreUnaryRule(begin: Int, end: Int, rule: Int) = {
@@ -57,7 +58,7 @@ class ConstraintScorerFactory[L, W](parser: ChartBuilder[ParseChart, L, W], thre
 
     val (label,unary) = scoresForCharts(charts, goldTags)
 
-    new ConstraintScorer[L, W](label, unary)
+    new ConstraintScorer[L, W](charts.scorer.grammar, charts.scorer.lexicon, charts.scorer.words, label, unary)
   }
 
   private def scoresForCharts(marg: Marginal[L, W], gold: GoldTagPolicy[L]) = {
@@ -152,7 +153,8 @@ object ProjectTreebankToConstraints {
         val scorer = factory.specialize(words)
         words -> scorer
       } catch {
-        case e: Exception => e.printStackTrace(); words -> DerivationScorer.identity[L, String]
+        case e: Exception => e.printStackTrace();
+        words -> DerivationScorer.identity[L, String](factory.grammar, factory.lexicon, words)
       }
     }.seq
   }

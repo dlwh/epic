@@ -391,7 +391,9 @@ case class LexGrammarBundle[L, W](baseGrammar: Grammar[L],
       // binaryRule is (head * words.length + dep)
       // unaryRule is (head)
       // parent/leftchild/rightchild is (head)
-      final class Spec(val words: Seq[W]) extends super.Specialization {
+      final class Spec(val words: Seq[W]) extends DerivationScorer[L, W] {
+        val grammar = baseGrammar
+        val lexicon = baseLexicon
         val indexed = words.map(wordIndex)
         val f = fi.specialize(words)
         val indexedValidTags: Seq[Array[Int]] = words.map(lexicon.tagsForWord(_)).map(_.map(labelIndex).toArray)
@@ -459,6 +461,8 @@ case class LexGrammarBundle[L, W](baseGrammar: Grammar[L],
         def validLabelRefinements(begin: Int, end: Int, label: Int) = Array.range(begin,end)
 
         def numValidRefinements(label: Int) = words.length
+
+        def numValidRuleRefinements(rule: Int) = words.length * words.length
 
         def validRuleRefinementsGivenParent(begin: Int, end: Int, rule: Int, parentRef: Int) = {
           if(!binaries(rule)) {
@@ -620,7 +624,8 @@ case class LexInference[L, W](reannotate: (BinarizedTree[L], Seq[W])=>BinarizedT
   def goldCounts(ti: TreeInstance[L, W], augment: DerivationScorer[L, W]) = {
     val reannotated = reannotate(ti.tree, ti.words)
     val headed = headFinder.annotateHeadIndices(reannotated).asInstanceOf[BinarizedTree[(L,Int)]]
-    TreeMarginal(grammar.grammar, augment, ti.words, headed).expectedCounts(featurizer)
+    val product = grammar.specialize(ti.words) * augment
+    TreeMarginal(product, headed).expectedCounts(featurizer)
   }
 }
 

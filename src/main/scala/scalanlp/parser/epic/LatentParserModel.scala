@@ -53,9 +53,10 @@ case class LatentParserInference[L, L2, W](featurizer: DerivationFeaturizer[L, W
                                            projections: GrammarRefinements[L, L2]) extends ParserInference[L, W] {
 
   // E[T-z|T, params]
-  def goldCounts(ti: TreeInstance[L, W], grammar: DerivationScorer[L, W]) = {
+  def goldCounts(ti: TreeInstance[L, W], augment: DerivationScorer[L, W]) = {
     val reannotated = reannotate(ti.tree, ti.words)
-    val ecounts = LatentTreeMarginal(this.grammar.grammar, grammar, projections.labels, ti.words, reannotated).expectedCounts(featurizer)
+    val product = grammar.specialize(ti.words) * augment
+    val ecounts = LatentTreeMarginal(product,  projections.labels, reannotated).expectedCounts(featurizer)
 
     ecounts
   }

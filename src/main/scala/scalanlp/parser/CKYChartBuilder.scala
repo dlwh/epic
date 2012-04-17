@@ -10,6 +10,7 @@ import scalanlp.util.TypeTags
  * @tparam L label type
  * @tparam W word type
  */
+@SerialVersionUID(1L)
 class CKYChartBuilder[+Chart[X]<:ParseChart[X], L, W](val grammar: DerivationScorer.Factory[L, W],
                                                       val chartFactory: Factory[Chart]) extends ChartBuilder[Chart, L, W] with Serializable {
 
@@ -19,7 +20,7 @@ class CKYChartBuilder[+Chart[X]<:ParseChart[X], L, W](val grammar: DerivationSco
     val outside = buildOutsideChart(inside, spec)
     val partition = rootScore(spec, inside)
 
-    new ChartMarginal[Chart, L, W](grammar.grammar, grammar.lexicon, spec, words, inside, outside, partition)
+    new ChartMarginal[Chart, L, W](spec, inside, outside, partition)
   }
 
   def withCharts[Chart2[X] <: ParseChart[X]](prob: Factory[Chart2]) = new CKYChartBuilder(grammar, prob)

@@ -43,11 +43,11 @@ class ViterbiDecoder[L, W] extends ChartDecoder[L, W] with Serializable {
       var maxChildRef = -1
       for {
         r <- grammar.indexedUnaryRulesWithParent(root)
-        refR <- spec.validRuleRefinementsGivenParent(begin, end, r, rootRef)
+        refR <- scorer.validRuleRefinementsGivenParent(begin, end, r, rootRef)
       } {
-        val ruleScore = spec.scoreUnaryRule(begin, end, r, refR)
+        val ruleScore = scorer.scoreUnaryRule(begin, end, r, refR)
         val b = grammar.child(r)
-        val refB = spec.childRefinement(r, refR)
+        val refB = scorer.childRefinement(r, refR)
         val score = ruleScore + inside.bot(begin, end, b, refB)
         if(score > maxScore) {
           maxScore = score
@@ -75,17 +75,17 @@ class ViterbiDecoder[L, W] extends ChartDecoder[L, W] with Serializable {
         return NullaryTree(labelIndex.get(root))(Span(begin, end))
       }
 
-      val spanScore = spec.scoreSpan(begin, end, root, rootRef)
+      val spanScore = scorer.scoreSpan(begin, end, root, rootRef)
       for {
         r <- grammar.indexedBinaryRulesWithParent(root)
         b = grammar.leftChild(r)
         c = grammar.rightChild(r)
-        refR <- spec.validRuleRefinementsGivenParent(begin, end, r, rootRef)
-        refB = spec.leftChildRefinement(r, refR)
-        refC = spec.rightChildRefinement(r, refR)
+        refR <- scorer.validRuleRefinementsGivenParent(begin, end, r, rootRef)
+        refB = scorer.leftChildRefinement(r, refR)
+        refC = scorer.rightChildRefinement(r, refR)
         split <- inside.top.feasibleSpan(begin, end, b, refB, c, refC)
       } {
-        val ruleScore = spec.scoreBinaryRule(begin, split, end, r, refR)
+        val ruleScore = scorer.scoreBinaryRule(begin, split, end, r, refR)
         val score = (
           ruleScore
             + inside.top.labelScore(begin, split, b, refB)
@@ -114,7 +114,7 @@ class ViterbiDecoder[L, W] extends ChartDecoder[L, W] with Serializable {
 
     }
 
-    val maxRootRef = spec.validLabelRefinements(0, inside.length, rootIndex).maxBy(ref => inside.top(0, inside.length, rootIndex, ref))
+    val maxRootRef = scorer.validLabelRefinements(0, inside.length, rootIndex).maxBy(ref => inside.top(0, inside.length, rootIndex, ref))
     val t = buildTreeUnary(0, inside.length, rootIndex, maxRootRef)
     t
   }
@@ -128,7 +128,7 @@ case class MaxRuleProductDecoder[L, W](grammar: Grammar[L], lexicon: Lexicon[L, 
 
   def extractBestParse(marginal: ChartMarginal[ParseChart, L, W]) = {
     val scorer = p.buildSpanScorer(marginal)
-    val oneoff = DerivationScorerFactory.oneOff(grammar, lexicon, scorer)
+    val oneoff = DerivationScorerFactory.oneOff(scorer)
     val newMarg = ChartMarginal.fromSentence(oneoff, marginal.words)
     val tree = new ViterbiDecoder[L,W].extractBestParse(newMarg)
     tree
@@ -140,7 +140,7 @@ class MaxVariationalDecoder[L, W](grammar: Grammar[L], lexicon: Lexicon[L, W]) e
 
   def extractBestParse(marginal: ChartMarginal[ParseChart, L, W]) = {
     val scorer = p.buildSpanScorer(marginal)
-    val oneoff = DerivationScorerFactory.oneOff(grammar, lexicon, scorer)
+    val oneoff = DerivationScorerFactory.oneOff(scorer)
     val newMarg = ChartMarginal.fromSentence(oneoff, marginal.words)
     val tree = new ViterbiDecoder[L,W].extractBestParse(newMarg)
     tree

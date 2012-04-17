@@ -3,7 +3,7 @@ package scalanlp.parser
 /**
  * Holds the information for the marginals for a sentence
  *
- * @param spec the specialization for a sentence.
+ * @param scorer the specialization for a sentence.
  * @param inside inside chart
  * @param outside outside chart
  * @param partition the normalization constant aka inside score of the root aka probability of the sentence
@@ -11,10 +11,7 @@ package scalanlp.parser
  * @tparam L the label type
  * @tparam W the word type
  */
-case class ChartMarginal[+Chart[X]<:ParseChart[X], L, W](grammar: Grammar[L],
-                                                         lexicon: Lexicon[L, W],
-                                                         spec: DerivationScorer[L, W],
-                                                         words: Seq[W],
+case class ChartMarginal[+Chart[X]<:ParseChart[X], L, W](scorer: DerivationScorer[L, W],
                                                          inside: Chart[L],
                                                          outside: Chart[L],
                                                          partition: Double) extends Marginal[L, W] {
@@ -30,9 +27,9 @@ case class ChartMarginal[+Chart[X]<:ParseChart[X], L, W](grammar: Grammar[L],
       for {
         aa <- lexicon.tagsForWord(words(i))
         a = grammar.labelIndex(aa)
-        ref <- spec.validLabelRefinements(i, i+ 1, a)
+        ref <- scorer.validLabelRefinements(i, i+ 1, a)
       } {
-        val score:Double = spec.scoreSpan(i, i+1, a, ref) + outside.bot(i, i+1, a, ref) - partition
+        val score:Double = scorer.scoreSpan(i, i+1, a, ref) + outside.bot(i, i+1, a, ref) - partition
         if (score != Double.NegativeInfinity) {
           spanVisitor.visitSpan(i, i+1, a, ref, math.exp(score))
         }
@@ -55,7 +52,7 @@ case class ChartMarginal[+Chart[X]<:ParseChart[X], L, W](grammar: Grammar[L],
       for (a <- inside.bot.enteredLabelIndexes(begin, end); refA <- inside.bot.enteredLabelRefinements(begin, end, a)) {
         var i = 0;
         val rules = grammar.indexedBinaryRulesWithParent(a)
-        val spanScore = spec.scoreSpan(begin, end, a, refA)
+        val spanScore = scorer.scoreSpan(begin, end, a, refA)
         val aScore = outside.bot.labelScore(begin, end, a, refA) + spanScore
         var count = 0.0
         if (!aScore.isInfinite)
@@ -66,9 +63,9 @@ case class ChartMarginal[+Chart[X]<:ParseChart[X], L, W](grammar: Grammar[L],
             i += 1
             // this is too slow, so i'm having to inline it.
             //              val feasibleSpan = itop.feasibleSpanX(begin, end, b, c)
-            for (refR <- spec.validRuleRefinementsGivenParent(begin, end, r, refA)) {
-              val refB = spec.leftChildRefinement(r, refR)
-              val refC = spec.rightChildRefinement(r, refR)
+            for (refR <- scorer.validRuleRefinementsGivenParent(begin, end, r, refA)) {
+              val refB = scorer.leftChildRefinement(r, refR)
+              val refC = scorer.rightChildRefinement(r, refR)
               val narrowR:Int = narrowRight(b)(refB)
               val narrowL:Int = narrowLeft(c)(refC)
 
@@ -85,7 +82,7 @@ case class ChartMarginal[+Chart[X]<:ParseChart[X], L, W](grammar: Grammar[L],
               var split = (feasibleSpan >> 32).toInt
               val endSplit = feasibleSpan.toInt // lower 32 bits
               while(split < endSplit) {
-                val ruleScore = spec.scoreBinaryRule(begin, split, end, r, refR)
+                val ruleScore = scorer.scoreBinaryRule(begin, split, end, r, refR)
                 val bInside = itop.labelScore(begin, split, b, refB)
                 val cInside = itop.labelScore(split, end, c, refC)
                 val score = aScore + ruleScore + bInside + cInside - partition
@@ -111,12 +108,12 @@ case class ChartMarginal[+Chart[X]<:ParseChart[X], L, W](grammar: Grammar[L],
       a <- inside.top.enteredLabelIndexes(begin, end)
       refA <- inside.top.enteredLabelRefinements(begin, end, a)
     } {
-      for (r <- grammar.indexedUnaryRulesWithParent(a); refR <- spec.validRuleRefinementsGivenParent(begin, end, r, refA)) {
+      for (r <- grammar.indexedUnaryRulesWithParent(a); refR <- scorer.validRuleRefinementsGivenParent(begin, end, r, refA)) {
         val b = grammar.child(r)
-        val refB = spec.childRefinement(r, refR)
+        val refB = scorer.childRefinement(r, refR)
         val bScore = inside.bot.labelScore(begin, end, b, refB)
         val aScore = outside.top.labelScore(begin, end, a, refA)
-        val rScore = spec.scoreUnaryRule(begin, end, r, refR)
+        val rScore = scorer.scoreUnaryRule(begin, end, r, refR)
         val prob = math.exp(bScore + aScore + rScore - partition);
         if (prob > 0)
           spanVisitor.visitUnaryRule(begin, end, r, refR, prob)
@@ -131,8 +128,8 @@ object ChartMarginal {
     builder.charts(sent)
   }
 
-  def fromSentence[L, W](grammar: Grammar[L], lexicon: Lexicon[L, W], scorer: DerivationScorer[L, W], sent: Seq[W]) = {
-    val builder = ChartBuilder(DerivationScorerFactory.oneOff(grammar, lexicon, scorer))
+  def fromSentence[L, W](scorer: DerivationScorer[L, W], sent: Seq[W]) = {
+    val builder = ChartBuilder(DerivationScorerFactory.oneOff(scorer))
     builder.charts(sent)
   }
 }

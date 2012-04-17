@@ -13,6 +13,6 @@ class FileCachedScorerFactory[L, W](val grammar: Grammar[L],
   private val cache = scalanlp.util.readObject[Map[Seq[W], DerivationScorer[L, W]]](file)
 
   def specialize(words: Seq[W]) = {
-    cache.getOrElse(words, DerivationScorer.identity[L, W])
+    cache.getOrElse(words, DerivationScorer.identity(grammar, lexicon, words))
   }
 }

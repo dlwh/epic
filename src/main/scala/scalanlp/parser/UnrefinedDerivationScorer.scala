@@ -8,10 +8,8 @@ package scalanlp.parser
  */
 @SerialVersionUID(1)
 trait UnrefinedDerivationScorer[L, W] extends DerivationScorer[L, W] {
-  // product and division (for EP)
-  def *(scorer: UnrefinedDerivationScorer[L, W]) = UnrefinedDerivationScorer.product(this,scorer)
-  def /(scorer: UnrefinedDerivationScorer[L, W]) = UnrefinedDerivationScorer.product(this,scorer,-1)
-  
+  override final def annotationTag = 0
+
   /**
    * Scores the indexed [[scalanlp.trees.BinaryRule]] rule when it occurs at (begin,split,end)
    */
@@ -42,6 +40,8 @@ trait UnrefinedDerivationScorer[L, W] extends DerivationScorer[L, W] {
 
   final def numValidRefinements(label: Int) = 1
 
+  final def numValidRuleRefinements(rule: Int) = 1
+
   final def validRuleRefinementsGivenParent(begin: Int, end: Int, rule: Int, parentRef: Int) = Array(0)
 
   final def validUnaryRuleRefinementsGivenChild(begin: Int, end: Int, rule: Int, childRef: Int) = Array(0)
@@ -60,37 +60,26 @@ trait UnrefinedDerivationScorer[L, W] extends DerivationScorer[L, W] {
 }
 
 object UnrefinedDerivationScorer {
-  def identity[L, W]:UnrefinedDerivationScorer[L, W] = new UnrefinedDerivationScorer[L, W] {
-    def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = 0.0
-
-    def scoreUnaryRule(begin: Int, end: Int, rule: Int) = 0.0
-
-    def scoreSpan(begin: Int, end: Int, tag: Int) = 0.0
-  }
-
-  def product[L, W](s1: UnrefinedDerivationScorer[L, W],
-                    s2: UnrefinedDerivationScorer[L, W],
-                    alpha: Double = 1.0):UnrefinedDerivationScorer[L,W] = {
+  def identity[L, W](grammar: Grammar[L],
+                     lexicon: Lexicon[L, W],
+                     words: Seq[W]):UnrefinedDerivationScorer[L, W] = {
+    val g = grammar
+    val l = lexicon
+    val w = words
     new UnrefinedDerivationScorer[L, W] {
-      def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int): Double = {
-        val r1 = s1.scoreBinaryRule(begin, split, end, rule);
-        if(r1 == Double.NegativeInfinity) r1
-        else r1 + alpha * s2.scoreBinaryRule(begin, split, end, rule);
-      }
-      def scoreUnaryRule(begin: Int, end: Int, rule: Int): Double = {
-        val r1 = s1.scoreUnaryRule(begin, end, rule);
-        if(r1 == Double.NegativeInfinity) r1
-        else r1 + alpha * s2.scoreUnaryRule(begin, end, rule);
-      }
 
-      def scoreSpan(begin: Int, end: Int, tag: Int): Double = {
-        val r1 = s1.scoreSpan(begin, end, tag);
-        if(r1 == Double.NegativeInfinity) r1
-        else r1 + alpha * s2.scoreSpan(begin, end, tag)
-      }
+      def grammar = g
 
+      def lexicon = l
+
+      def words = w
+
+      def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = 0.0
+
+      def scoreUnaryRule(begin: Int, end: Int, rule: Int) = 0.0
+
+      def scoreSpan(begin: Int, end: Int, tag: Int) = 0.0
     }
-
   }
 
 

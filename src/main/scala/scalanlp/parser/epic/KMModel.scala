@@ -51,7 +51,7 @@ case class DiscParserInference[L, L2, W](featurizer: DerivationFeaturizer[L, W, 
                                          projections: GrammarRefinements[L, L2]) extends ParserInference[L, W] {
 
   // E[T-z|T, params]
-  def goldCounts(ti: TreeInstance[L, W], grammar: DerivationScorer[L, W]) = {
+  def goldCounts(ti: TreeInstance[L, W], aug: DerivationScorer[L, W]) = {
     val tree = ti.tree
     val words = ti.words
     val annotated = ann(tree, words)
@@ -60,7 +60,9 @@ case class DiscParserInference[L, L2, W](featurizer: DerivationFeaturizer[L, W, 
       projections.labels.project(l) -> projections.labels.localize(l)
     }
 
-    TreeMarginal(this.grammar.grammar, grammar, ti.words, localized).expectedCounts(featurizer)
+    val product = grammar.specialize(words) * aug
+
+    TreeMarginal(product, localized).expectedCounts(featurizer)
   }
 
 }

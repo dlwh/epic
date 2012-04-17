@@ -6,6 +6,7 @@ import scalanlp.collection.mutable.TriangularArray
 import scalanlp.tensor.sparse.OldSparseVector
 import scalanlp.util.TypeTags.{tag,ID}
 import scalanlp.trees.Rule
+import projections.AnchoredRuleProjector.AnchoredData
 
 /**
  * Creates labeled span scorers for a set of trees from some parser. Projects from L to C.
@@ -28,7 +29,8 @@ case class AnchoredPCFGProjector[L, W](grammar: Grammar[L], threshold: Double = 
     }
   }
 
-  protected def createSpanScorer(ruleData: AnchoredRuleProjector.AnchoredData, sentProb: Double) = {
+
+  protected def createSpanScorer(charts: Marginal[L, W], ruleData: AnchoredData, sentProb: Double) = {
     val AnchoredRuleProjector.AnchoredData(lexicalScores, unaryScores, totalsUnaries, binaryScores, totalsBinaries) = ruleData
     val normUnaries:Array[OldSparseVector] = for((ruleScores, totals) <- unaryScores zip totalsUnaries) yield {
       normalize(ruleScores, totals)
@@ -38,7 +40,7 @@ case class AnchoredPCFGProjector[L, W](grammar: Grammar[L], threshold: Double = 
       if(splits eq null) null
       else for(ruleScores <- splits) yield normalize(ruleScores, totals)
     }
-    new AnchoredRuleScorer(lexicalScores, normUnaries, normBinaries)
+    new AnchoredRuleScorer(charts.grammar, charts.lexicon, charts.words, lexicalScores, normUnaries, normBinaries)
   }
 
 }
@@ -62,7 +64,9 @@ case class AnchoredRuleMarginalProjector[L, W](threshold: Double = Double.Negati
   }
 
   type MyScorer = AnchoredRuleScorer[L, W]
-  protected def createSpanScorer(ruleData: AnchoredRuleProjector.AnchoredData, sentProb: Double) = {
+
+
+  protected def createSpanScorer(charts: Marginal[L, W], ruleData: AnchoredData, sentProb: Double) = {
     val AnchoredRuleProjector.AnchoredData(lexicalScores, unaryScores, _, binaryScores, _) = ruleData
     val normUnaries:Array[OldSparseVector] = for(ruleScores <- unaryScores) yield {
       normalize(ruleScores)
@@ -72,13 +76,16 @@ case class AnchoredRuleMarginalProjector[L, W](threshold: Double = Double.Negati
       if(splits eq null) null
       else for(ruleScores <- splits) yield normalize(ruleScores)
     }
-    new AnchoredRuleScorer(lexicalScores, normUnaries, normBinaries)
+    new AnchoredRuleScorer(charts.grammar, charts.lexicon, charts.words, lexicalScores, normUnaries, normBinaries)
   }
 }
 
 
 @SerialVersionUID(3)
-class AnchoredRuleScorer[L, W](spanScores: Array[OldSparseVector], // triangular index -> label -> score
+class AnchoredRuleScorer[L, W](val grammar: Grammar[L],
+                               val lexicon: Lexicon[L, W],
+                               val words: Seq[W],
+                               spanScores: Array[OldSparseVector], // triangular index -> label -> score
                                // (begin, end) -> rule -> score
                                unaryScores: Array[OldSparseVector],
                                // (begin, end) -> (split-begin) -> rule -> score

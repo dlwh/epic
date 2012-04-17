@@ -8,10 +8,11 @@ import scalanlp.util.TypeTags._
  * @author dlwh
  */
 trait Marginal[L, W] {
-  def spec: DerivationScorer[L, W]
-  def grammar:Grammar[L]
+  def scorer: DerivationScorer[L, W]
+  def grammar:Grammar[L] = scorer.grammar
+  def lexicon = scorer.lexicon
   def partition: Double
-  def words:Seq[W]
+  def words:Seq[W] = scorer.words
   def length = words.length
 
   def expectedCounts[Feat](featurizer: DerivationFeaturizer[L, W, Feat]) = {

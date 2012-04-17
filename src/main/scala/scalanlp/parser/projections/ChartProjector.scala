@@ -9,7 +9,9 @@ package projections
 trait ChartProjector[L, W] {
   type MyScorer <: UnrefinedDerivationScorer[L, W]
   protected def threshold:Double
-  protected def createSpanScorer(ruleData: AnchoredRuleProjector.AnchoredData, sentProb: Double):MyScorer
+  protected def createSpanScorer(charts: Marginal[L, W],
+                                 ruleData: AnchoredRuleProjector.AnchoredData,
+                                 sentProb: Double):MyScorer
 
   private def proj = new AnchoredRuleProjector(threshold)
 
@@ -17,6 +19,6 @@ trait ChartProjector[L, W] {
                       goldTagPolicy: GoldTagPolicy[L] = GoldTagPolicy.noGoldTags[L]):MyScorer = {
 
     val ruleData = proj.projectRulePosteriors(charts, goldTagPolicy)
-    createSpanScorer(ruleData, charts.partition)
+    createSpanScorer(charts, ruleData, charts.partition)
   }
 }

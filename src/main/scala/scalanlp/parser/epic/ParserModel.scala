@@ -3,7 +3,6 @@ package scalanlp.parser.epic
 import scalanlp.parser._
 import features.Feature
 import scalala.tensor.{Counter2, ::}
-import scalala.library.Library
 import scalanlp.trees.{BinaryRule, UnaryRule, BinarizedTree}
 
 /**
@@ -24,7 +23,7 @@ trait ParserInference[L, W] extends ProjectableInference[TreeInstance[L, W], Der
   def featurizer: DerivationFeaturizer[L, W, Feature]
 
   def marginal(v: TreeInstance[L, W], aug: DerivationScorer[L, W]) = {
-    val charts = ChartMarginal.fromSentence(grammar.grammar, grammar.lexicon, aug, v.words)
+    val charts = (grammar.specialize(v.words) * aug).marginal
     charts -> charts.partition
   }
 

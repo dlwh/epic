@@ -6,11 +6,10 @@ import scalala.tensor.Counter2
 import scalala.library.Library
 
 object DerivationScorerFactory {
-  def oneOff[L, W](grammar: Grammar[L], lex: Lexicon[L,W], scorer: DerivationScorer[L, W]): DerivationScorer.Factory[L, W] = {
-    val g = grammar
+  def oneOff[L, W](scorer: DerivationScorer[L, W]): DerivationScorer.Factory[L, W] = {
     new DerivationScorer.Factory[L, W] {
-      def grammar = g
-      def lexicon = lex
+      def grammar = scorer.grammar
+      def lexicon = scorer.lexicon
 
       def specialize(words: Seq[W]) = scorer
     }
@@ -82,6 +81,8 @@ object DerivationScorerFactory {
       def lexicon = l
 
       def specialize(w: Seq[W]) = new Specialization {
+        val grammar = g
+        val lexicon = l
         def words = w
 
         def scoreSpan(begin: Int, end: Int, label: Int, ref: Int) = {
@@ -157,6 +158,7 @@ object DerivationScorerFactory {
         }
 
         def numValidRefinements(label: Int) = refinements.labels.refinementsOf(label).length
+        def numValidRuleRefinements(rule: Int) = refinements.rules.refinementsOf(rule).length
       }
     }
 

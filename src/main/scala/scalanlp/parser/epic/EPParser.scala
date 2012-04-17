@@ -11,18 +11,18 @@ import scalanlp.trees.BinarizedTree
  */
 class EPParser[L, W](grammar: Grammar[L],
                      lexicon: Lexicon[L,  W],
-                     inference: EPInference[TreeInstance[L, W], SpanScorerFactor[L, W]]) extends Parser[L, W] with Serializable {
+                     inference: EPInference[TreeInstance[L, W], DerivationScorer[L, W]]) extends Parser[L, W] with Serializable {
   def bestParse(s: Seq[W]) = {
     val inst = new TreeInstance[L, W]("", null, s)
-    val augment = inference.getMarginals(inst, new SpanScorerFactor(grammar, lexicon, s, UnrefinedDerivationScorer.identity))._2
-    val marg = ChartMarginal.fromSentence(grammar, lexicon, augment.scorer, s)
+    val augment = inference.getMarginals(inst, inference.baseAugment(inst))._2
+    val marg = augment.marginal
     ChartDecoder(grammar, lexicon).extractBestParse(marg)
   }
 
 }
 
 object EPParser {
-  trait Extractor[L, W] extends EPModel[TreeInstance[L, W], SpanScorerFactor[L, W]] with ParserExtractable[L, W] {
+  trait Extractor[L, W] extends EPModel[TreeInstance[L, W], DerivationScorer[L, W]] with ParserExtractable[L, W] {
     def grammar: Grammar[L]
     def lexicon: Lexicon[L, W]
 
@@ -31,7 +31,6 @@ object EPParser {
     }
   }
 
-  /*
   def fromChartParsers[L, W](grammar: Grammar[L],
                              lexicon: Lexicon[L, W],
                              grammars: (DerivationScorer.Factory[L, W])*) = {
@@ -41,7 +40,7 @@ object EPParser {
         p,
         null)
     }
-    new EPParser(grammar, lexicon, infs)
+    val ep = new EPInference(infs.toIndexedSeq, 5)
+    new EPParser(grammar, lexicon, ep)
   }
-  */
 }
