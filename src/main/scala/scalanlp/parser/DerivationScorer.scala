@@ -191,6 +191,8 @@ object DerivationScorer {
 
 
   trait Factory[L, W] extends Serializable {
+    def *(factory: Factory[L, W]) = DerivationScorerFactory.product(this, factory)
+
     def grammar: Grammar[L]
     def lexicon: Lexicon[L, W]
 

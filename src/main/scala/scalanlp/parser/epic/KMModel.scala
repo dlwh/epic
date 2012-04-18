@@ -15,6 +15,7 @@ import scalala.tensor.mutable.Counter2
 class KMModel[L, L3, W](featurizer: Featurizer[L3, W],
                         ann: (BinarizedTree[L], Seq[W])=>BinarizedTree[L3],
                         val projections: GrammarRefinements[L, L3],
+                        baseFactory: DerivationScorer.Factory[L, W],
                         grammar: Grammar[L],
                         lexicon: Lexicon[L, W],
                         initialFeatureVal: (Feature=>Option[Double]) = { _ => None}) extends ParserModel[L, W] {
@@ -31,7 +32,7 @@ class KMModel[L, L3, W](featurizer: Featurizer[L3, W],
     val lexicon = new FeaturizedLexicon(weights, indexedFeatures)
     val grammar = FeaturizedGrammar(this.grammar, this.lexicon, projections, weights, indexedFeatures, lexicon)
 
-    new DiscParserInference(indexedFeatures, ann, grammar, projections)
+    new DiscParserInference(indexedFeatures, ann, grammar * baseFactory, projections)
   }
 
   def extractParser(weights: DenseVector[Double]):ChartParser[L, W] = {
@@ -68,6 +69,7 @@ case class DiscParserInference[L, L2, W](featurizer: DerivationFeaturizer[L, W, 
 }
 
 case class KMModelFactory(baseParser: ParserParams.BaseParser,
+                          constraints: ParserParams.Constraints[AnnotatedLabel, String],
                           pipeline: KMPipeline,
                           oldWeights: File = null) extends ParserModelFactory[AnnotatedLabel, String] {
   type MyModel = KMModel[AnnotatedLabel, AnnotatedLabel, String]
@@ -80,9 +82,14 @@ case class KMModelFactory(baseParser: ParserParams.BaseParser,
 
     val (initLexicon, initBinaries, initUnaries) = this.extractBasicCounts(transformed)
 
+
     val (grammar,lexicon) = baseParser.xbarGrammar(trainTrees)
     val refGrammar = Grammar(AnnotatedLabel.TOP, initBinaries, initUnaries)
     val indexedRefinements = GrammarRefinements(grammar, refGrammar, {(_:AnnotatedLabel).baseAnnotatedLabel})
+
+    val (xbarWords, xbarBinaries, xbarUnaries) = this.extractBasicCounts(trainTrees.map(_.mapLabels(_.baseAnnotatedLabel)))
+    val baseFactory = DerivationScorerFactory.generative(grammar, lexicon, xbarBinaries, xbarUnaries, xbarWords)
+    val cFactory = constraints.cachedFactory(baseFactory)
 
     val gen = new WordShapeFeaturizer(Library.sum(initLexicon))
     def labelFlattener(l: AnnotatedLabel) = {
@@ -90,17 +97,13 @@ case class KMModelFactory(baseParser: ParserParams.BaseParser,
       basic map {IndicatorFeature(_)}
     }
     val feat = new SumFeaturizer[AnnotatedLabel, String](new RuleFeaturizer(labelFlattener _), new LexFeaturizer(gen, labelFlattener _))
-    val xbarLexicon = Counter2[AnnotatedLabel, String, Double]()
-    for( (t, w, v) <- initLexicon.triplesIterator) {
-      xbarLexicon(t.baseAnnotatedLabel, w) += v
-    }
 
     val featureCounter = if(oldWeights ne null) {
       scalanlp.util.readObject[Counter[Feature, Double]](oldWeights)
     } else {
       Counter[Feature, Double]()
     }
-    new KMModel[AnnotatedLabel, AnnotatedLabel, String](feat, pipeline, indexedRefinements, grammar, lexicon, {featureCounter.get(_)})
+    new KMModel[AnnotatedLabel, AnnotatedLabel, String](feat, pipeline, indexedRefinements, cFactory, grammar, lexicon, {featureCounter.get(_)})
   }
 
 }

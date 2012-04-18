@@ -4,8 +4,30 @@ import projections.GrammarRefinements
 import scalanlp.trees._
 import scalala.tensor.Counter2
 import scalala.library.Library
+import scalanlp.parser.DerivationScorer.Factory
 
 object DerivationScorerFactory {
+  def product[L, W](f1: Factory[L, W], f2: Factory[L, W]):Factory[L, W] = new Factory[L, W] {
+    def grammar = f1.grammar
+    def lexicon = f1.lexicon
+
+    def specialize(words: Seq[W]) = new ProductDerivationScorer(f1.specialize(words), f2.specialize(words))
+  }
+
+  def identity[L, W](grammar: Grammar[L], lexicon: Lexicon[L, W]): DerivationScorer.Factory[L, W] = {
+    val g = grammar
+    val l = lexicon
+    new DerivationScorer.Factory[L, W] {
+      def grammar = g
+
+      def lexicon = l
+
+      def specialize(words: Seq[W]) = {
+        DerivationScorer.identity(grammar, lexicon, words)
+      }
+    }
+  }
+
   def oneOff[L, W](scorer: DerivationScorer[L, W]): DerivationScorer.Factory[L, W] = {
     new DerivationScorer.Factory[L, W] {
       def grammar = scorer.grammar

@@ -585,6 +585,7 @@ object IndexedFeaturizer {
 class LexModel[L, W](bundle: LexGrammarBundle[L, W],
                      reannotate: (BinarizedTree[L], Seq[W])=>BinarizedTree[L],
                      indexed: IndexedFeaturizer[L, W],
+                     baseFactory: DerivationScorer.Factory[L, W],
                      coarse: Grammar[L],
                      coarseLex: Lexicon[L, W],
                      initFeatureValue: Feature=>Option[Double]) extends Model[TreeInstance[L, W]] with Serializable with ParserExtractable[L, W] {
@@ -677,6 +678,7 @@ class SimpleWordShapeGen[L](tagWordCounts: Counter2[L, String, Double],
 }
 
 case class LexParserModelFactory(baseParser: ParserParams.BaseParser,
+                                 constraints: ParserParams.Constraints[AnnotatedLabel, String],
                                  oldWeights: File = null,
                                  dummyFeats: Double = 0.5,
                                  minFeatCutoff: Int = 1) extends ParserExtractableModelFactory[AnnotatedLabel, String] {
@@ -694,6 +696,9 @@ case class LexParserModelFactory(baseParser: ParserParams.BaseParser,
 
     val lexicon:Lexicon[AnnotatedLabel, String] = initLexicon
 
+    val baseFactory = DerivationScorerFactory.generative(xbarGrammar,
+      xbarLexicon, initBinaries, initUnaries, initLexicon)
+    val cFactory = constraints.cachedFactory(baseFactory)
 
     def ruleGen(r: Rule[AnnotatedLabel]) = IndexedSeq(RuleFeature(r))
     def validTag(w: String) = lexicon.tagsForWord(w).toArray
@@ -727,7 +732,7 @@ case class LexParserModelFactory(baseParser: ParserParams.BaseParser,
     }
 
     def reannotate(tree: BinarizedTree[AnnotatedLabel], words: Seq[String]) = tree.map(_.baseAnnotatedLabel)
-    val model = new LexModel[AnnotatedLabel, String](bundle, reannotate, indexed, xbarGrammar, xbarLexicon, {featureCounter.get(_)})
+    val model = new LexModel[AnnotatedLabel, String](bundle, reannotate, indexed, cFactory, xbarGrammar, xbarLexicon, {featureCounter.get(_)})
 
     model
 

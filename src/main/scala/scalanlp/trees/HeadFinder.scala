@@ -144,8 +144,7 @@ case class HeadRule[L](dir: Dir, dis: Boolean, heads: Seq[L]) {
   }
 }
 
-trait HeadRules[L] extends Serializable {
-  outer =>
+trait HeadRules[L] extends Serializable { outer =>
   protected type InnerLabel
 
   protected def findRules(l: InnerLabel): Seq[HeadRule[InnerLabel]]
@@ -191,6 +190,7 @@ object HeadRules {
     protected def findRules(l: L) = map.getOrElse(l, Seq.empty)
 
     protected def proj(l: L) = l
+
   }
 
   private def shr[L](dir: Dir, dis: Boolean, heads: L*) = HeadRule(dir, dis, heads);
@@ -252,6 +252,7 @@ object HeadRules {
           lbl -> (shr(Left, false, lbl) +: rules)
     }
   }
+
 }
 
 

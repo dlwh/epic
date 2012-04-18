@@ -3,18 +3,18 @@ package scalanlp.parser.epic
 import scalanlp.parser._
 import features.{Feature, IndicatorFeature, WordShapeFeaturizer}
 import projections.GrammarRefinements
-import ParseChart.LogProbabilityParseChart
 import scalala.tensor.dense.DenseVector
-import scalala.tensor.sparse.SparseVector
 import scalala.library.Library
 import java.io.File
 import io.Source
 import scalala.tensor.Counter
 import scalanlp.trees.{BinarizedTree, AnnotatedLabel}
+import scalanlp.parser.DerivationScorer.Factory
 
 class LatentParserModel[L, L3, W](featurizer: Featurizer[L3, W],
                                   reannotate: (BinarizedTree[L], Seq[W])=>BinarizedTree[L],
                                   val projections: GrammarRefinements[L, L3],
+                                  baseFactory: DerivationScorer.Factory[L, W],
                                   grammar: Grammar[L],
                                   lexicon: Lexicon[L, W],
                                   initialFeatureVal: (Feature=>Option[Double]) = { _ => None}) extends ParserModel[L, W] {
@@ -32,9 +32,12 @@ class LatentParserModel[L, L3, W](featurizer: Featurizer[L3, W],
 
   def inferenceFromWeights(weights: DenseVector[Double]) = {
     val lexicon = new FeaturizedLexicon(weights, indexedFeatures)
-    val grammar = FeaturizedGrammar(this.grammar, this.lexicon, projections, weights, indexedFeatures, lexicon)
+    val grammar: Factory[L, W] = FeaturizedGrammar(this.grammar, this.lexicon, projections, weights, indexedFeatures, lexicon)
 
-    new LatentParserInference(indexedFeatures, reannotate, grammar, projections)
+    // TODO: be able to statically enforce that baseFactory is unrefined.
+    val product = grammar * baseFactory
+
+    new LatentParserInference(indexedFeatures, reannotate, product, projections)
   }
 
   def extractParser(weights: DenseVector[Double]):ChartParser[L, W] = {
@@ -64,6 +67,7 @@ case class LatentParserInference[L, L2, W](featurizer: DerivationFeaturizer[L, W
 }
 
 case class LatentParserModelFactory(baseParser: ParserParams.BaseParser,
+                                    constraints: ParserParams.Constraints[AnnotatedLabel, String],
                                     substates: File = null,
                                     numStates: Int = 2,
                                     oldWeights: File = null,
@@ -80,6 +84,9 @@ case class LatentParserModelFactory(baseParser: ParserParams.BaseParser,
     val (xbarWords, xbarBinaries, xbarUnaries) = this.extractBasicCounts(trainTrees.map(_.mapLabels(_.baseAnnotatedLabel)))
 
     val (xbarParser,xbarLexicon) = baseParser.xbarGrammar(trainTrees)
+
+    val baseFactory = DerivationScorerFactory.generative(xbarParser, xbarLexicon, xbarBinaries, xbarUnaries, xbarWords)
+    val cFactory = constraints.cachedFactory(baseFactory)
 
     val substateMap = if(substates != null && substates.exists) {
       val in = Source.fromFile(substates).getLines()
@@ -111,6 +118,7 @@ case class LatentParserModelFactory(baseParser: ParserParams.BaseParser,
     new LatentParserModel[AnnotatedLabel, (AnnotatedLabel, Int), String](feat,
                                                                       reannotate,
                                                                       indexedRefinements,
+                                                                      cFactory,
                                                                       xbarParser,
                                                                       xbarLexicon,
                                                                       {featureCounter.get(_)})

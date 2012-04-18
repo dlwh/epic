@@ -1,5 +1,6 @@
 package scalanlp.parser
 
+import projections.ConstraintScorerFactory
 import scalanlp.config._
 import java.io._
 import scalanlp.trees._
@@ -32,6 +33,27 @@ object ParserParams {
     }
   }
 
+  case class Constraints[L, W](path: File = null) {
+    def cachedFactory(baseFactory: DerivationScorer.Factory[L, W], threshold: Double = -7) = {
+      if(constraintsCache.contains(path)) {
+        constraintsCache(path).asInstanceOf[DerivationScorer.Factory[L, W]]
+      } else {
+        val uncached = if(path eq null) {
+          new ConstraintScorerFactory[L,W](ChartBuilder(baseFactory), threshold)
+        }
+        else {
+          val constraint = new ConstraintScorerFactory[L,W](ChartBuilder(baseFactory), threshold)
+          new FileCachedScorerFactory(constraint, path)
+        }
+
+        constraintsCache(path) = uncached
+        uncached
+      }
+
+    }
+  }
+  
+  private val constraintsCache = new MapCache[File, DerivationScorer.Factory[_, _]]
 }
 
 /**
