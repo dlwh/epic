@@ -1,8 +1,5 @@
 package scalanlp.parser
 
-import scalanlp.util.TypeTags.{ID, tag}
-import scalanlp.parser.ParseChart.logProb
-
 /**
  *
  * @author dlwh
@@ -10,7 +7,7 @@ import scalanlp.parser.ParseChart.logProb
 trait ChartBuilder[+Chart[X]<:ParseChart[X], L, W] {
 
   def root: L = grammar.root
-  def rootIndex: Int = tag[L](grammar.labelIndex(root))
+  def rootIndex: Int = grammar.labelIndex(root)
   def grammar: DerivationScorer.Factory[L, W]
 
   def charts(words: Seq[W]):ChartMarginal[Chart, L, W]

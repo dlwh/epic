@@ -4,7 +4,6 @@ package projections
 import java.io._
 import scalanlp.collection.mutable.TriangularArray
 import scalanlp.tensor.sparse.OldSparseVector
-import scalanlp.util.TypeTags.{tag,ID}
 import scalanlp.trees.Rule
 import projections.AnchoredRuleProjector.AnchoredData
 
@@ -20,7 +19,7 @@ case class AnchoredPCFGProjector[L, W](grammar: Grammar[L], threshold: Double = 
     else {
       val r = new OldSparseVector(ruleScores.length, Double.NegativeInfinity, ruleScores.activeSize * 3 / 2)
       for( (rule, score) <- ruleScores.activeIterator) {
-        val parent = grammar.parent(tag[Rule[L]](rule))
+        val parent = grammar.parent(rule)
         if(score > 0)
           r(rule) = math.log(score) - math.log(totals(parent))
 //        r(rule) = score - totals(parent)

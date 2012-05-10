@@ -12,18 +12,18 @@ final case class ExpectedCounts[Feat](index: Index[Feat],
   def decode = Encoder.fromIndex(index).decode(counts)
 
   def +=(c: ExpectedCounts[Feat]) = {
-    val ExpectedCounts(index, wCounts, tProb) = c
+    val ExpectedCounts(_, wCounts, tProb) = c
 
-    this.counts += c.counts
+    this.counts += wCounts
 
     loss += tProb
     this
   }
 
   def -=(c: ExpectedCounts[Feat]) = {
-    val ExpectedCounts(_, counts, tProb) = c
+    val ExpectedCounts(_, cc, tProb) = c
 
-    this.counts -= c.counts
+    this.counts -= cc
 
     loss -= tProb
     this

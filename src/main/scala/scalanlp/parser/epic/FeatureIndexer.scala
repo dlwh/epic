@@ -7,8 +7,7 @@ import scalala.tensor.sparse.SparseVector
 import scalala.tensor.dense.DenseVector
 import scalanlp.collection.mutable.{ArrayMap, OpenAddressHashArray}
 import features.Feature
-import scalanlp.util.{TypeTags, Encoder, Index}
-import TypeTags._
+import scalanlp.util.{Encoder, Index}
 import scalanlp.trees.{LexicalProduction, Rule}
 
 /**

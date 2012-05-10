@@ -1,8 +1,5 @@
 package scalanlp.parser
 
-import scalanlp.trees.Rule
-import scalanlp.util.TypeTags._
-
 /**
  * Represents marginals over trees. Can also extract expected counts
  * @author dlwh
@@ -15,7 +12,7 @@ trait Marginal[L, W] {
   def words:Seq[W] = scorer.words
   def length = words.length
 
-  def expectedCounts[Feat](featurizer: DerivationFeaturizer[L, W, Feat]) = {
+  def expectedCounts[Feat](featurizer: DerivationFeaturizer[L, W, Feat]): ExpectedCounts[Feat] = {
     val spec = featurizer.specialize(words)
     val counts = new ExpectedCounts[Feat](featurizer.index)
     val visitor = Marginal.mkVisitor(counts, spec)

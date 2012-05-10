@@ -1,6 +1,5 @@
 package scalanlp.parser
 import scalanlp.parser.ParseChart.Factory
-import scalanlp.util.TypeTags
 
 /**
  * Builds charts over a sentence, giving chart marginals
@@ -46,7 +45,7 @@ class CKYChartBuilder[+Chart[X]<:ParseChart[X], L, W](val grammar: DerivationSco
       for {
         aa <- grammar.lexicon.tagsForWord(words(i))
         a = grammar.labelIndex(aa)
-        ref <- spec.validLabelRefinements(i, i+ 1, a)
+        ref <- spec.validLabelRefinements(i, i+1, a)
       } {
         val score:Double = spec.scoreSpan(i, i+1, a, ref)
         if (score != Double.NegativeInfinity) {
@@ -74,7 +73,7 @@ class CKYChartBuilder[+Chart[X]<:ParseChart[X], L, W](val grammar: DerivationSco
       val narrowLeft = top.narrowLeft(end)
       val wideRight = top.wideRight(begin)
       val wideLeft = top.wideLeft(end)
-      for ( ai <- 0 until grammar.labelIndex.size; refA <- spec.validLabelRefinements(begin, end, TypeTags.tag(ai))) {
+      for ( ai <- 0 until grammar.labelIndex.size; refA <- spec.validLabelRefinements(begin, end, ai)) {
         val a = ai
         val passScore = spec.scoreSpan(begin, end, a, refA)
         var offset = 0 // into scoreArray

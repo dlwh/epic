@@ -15,12 +15,10 @@ package scalanlp.parser
 */
 
 import scalanlp.collection.mutable.TriangularArray
-import scalanlp.trees.Span
 
 import math._
 import java.util.Arrays
-import scalanlp.util.{Index, Encoder}
-import scalanlp.util.TypeTags._
+import scalanlp.util.Index
 
 @SerialVersionUID(3)
 abstract class ParseChart[L](val index: Index[L],

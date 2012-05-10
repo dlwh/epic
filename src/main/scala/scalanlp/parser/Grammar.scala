@@ -2,8 +2,7 @@ package scalanlp.parser
 
 import scalanlp.collection.mutable.OpenAddressHashArray
 import collection.mutable.ArrayBuffer
-import scalanlp.util.{TypeTags, Index, Encoder}
-import TypeTags.{ID,tag,tagArray}
+import scalanlp.util.{Index, Encoder}
 import scalala.tensor.Counter2
 import scalanlp.trees._
 
@@ -25,10 +24,10 @@ trait Grammar[L] extends Encoder[Rule[L]] with Serializable {
   def root: L
 
   // Accessors for properties of indexed rules
-  def parent(r: Int):Int = tag[L](indexedRules(r).parent)
-  def leftChild(r: Int): Int = TypeTags.tag[L](indexedRules(r).asInstanceOf[BinaryRule[Int]].left)
-  def rightChild(r: Int): Int = tag[L](indexedRules(r).asInstanceOf[BinaryRule[Int]].right)
-  def child(r: Int): Int = tag[L](indexedRules(r).asInstanceOf[UnaryRule[Int]].child)
+  def parent(r: Int):Int = indexedRules(r).parent
+  def leftChild(r: Int): Int = indexedRules(r).asInstanceOf[BinaryRule[Int]].left
+  def rightChild(r: Int): Int = indexedRules(r).asInstanceOf[BinaryRule[Int]].right
+  def child(r: Int): Int = indexedRules(r).asInstanceOf[UnaryRule[Int]].child
 
   // query by parent or child
   def indexedBinaryRulesWithParent(l: Int):Array[Int]

@@ -31,7 +31,7 @@ trait ParserInference[L, W] extends ProjectableInference[TreeInstance[L, W], Der
     marg.expectedCounts(featurizer)
   }
 
-  def baseAugment(v: TreeInstance[L, W]) = grammar.specialize(v.words)
+  def baseAugment(v: TreeInstance[L, W])  = DerivationScorer.identity(grammar.grammar, grammar.lexicon, v.words)
 
   protected def projector: EPProjector[L, W] = new AnchoredRuleApproximator(Double.NegativeInfinity)
 

@@ -9,8 +9,7 @@ import collection.mutable.ArrayBuffer
  * 
  * There are two indexes maintained for the fine symbols: a globally unique
  * id, and a local per-symbol id (in the range 0...numRefinements(coarseSym).
- * The global id is an Int, while the local one is an ID[ Ref[C] ].
- * 
+ *
  * Yuck.
  * 
  * @author dlwh
@@ -21,7 +20,8 @@ final class ProjectionIndexer[C, F] private (val coarseIndex: Index[C],
                                                  indexedProjections: Array[Int]) extends (Int=>Int) with Serializable {
   val coarseEncoder = Encoder.fromIndex(coarseIndex)
 
-  val globalRefinements = {
+  // coarseSymbolIndex -> localizedFineSymbol -> globalizedFineSymbolIndex
+  val globalRefinements: Array[Array[Int]] = {
     val result = Encoder.fromIndex(coarseIndex).fillArray(new ArrayBuffer[Int])
     for( (coarse, fine) <- (indexedProjections.asInstanceOf[Array[Int]]).zipWithIndex) {
       result(coarse) += fine
@@ -29,7 +29,9 @@ final class ProjectionIndexer[C, F] private (val coarseIndex: Index[C],
     result.map(arr => (arr.toArray))
   }
 
+  // globaleRefined -> localRefined
   val localizationArray = new Array[Int](indexedProjections.length)
+  // just coarseSymbolIndex -> (0 until numGlobalRefinements(coarseSymbolIndex))
   val perSymbolRefinements = globalRefinements.map { arr =>
     for( (global,local) <- (arr.asInstanceOf[Array[Int]]).zipWithIndex) {
       localizationArray(global) = local
@@ -38,7 +40,7 @@ final class ProjectionIndexer[C, F] private (val coarseIndex: Index[C],
   }
 
   def localize(f: Int):Int =  localizationArray(f)
-  def globalize(c: Int, f: Int):Int =  globalRefinements(c)(f)
+  def globalize(c: Int, f: Int):Int = globalRefinements(c)(f)
 
   def localize(f: F):Int =  localizationArray(fineIndex(f))
 

@@ -3,7 +3,6 @@ package projections
 
 import scalanlp.collection.mutable.TriangularArray
 import scalanlp.tensor.sparse.OldSparseVector
-import scalanlp.util.TypeTags
 
 /**
  * Used for computed the expected number of anchored rules that occur at each span/split.

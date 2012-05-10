@@ -7,7 +7,6 @@ import scalanlp.trees._
 import scalanlp.collection.mutable.TriangularArray
 import scalanlp.util._
 import scalala.library.Numerics._
-import TypeTags._
 
 
 /**

@@ -21,13 +21,15 @@ object ParserParams {
 
   case class BaseParser(path: File = null) {
     def xbarGrammar(trees: IndexedSeq[TreeInstance[AnnotatedLabel, String]]) = Option(path) match {
-      case Some(f) =>
+      case Some(f) if f.exists =>
         readObject[(Grammar[AnnotatedLabel],Lexicon[AnnotatedLabel, String])](f)
-      case None =>
+      case _ =>
         val (words, xbarBinaries, xbarUnaries) = GenerativeParser.extractCounts(trees.map(_.mapLabels(_.baseAnnotatedLabel)))
 
         val g = Grammar(AnnotatedLabel.TOP, xbarBinaries.keysIterator.map(_._2) ++ xbarUnaries.keysIterator.map(_._2))
         val lex = new SignatureLexicon(words, EnglishWordClassGenerator)
+        if(path ne null)
+          writeObject(path, g -> lex)
         g -> lex
 
     }
@@ -35,7 +37,7 @@ object ParserParams {
 
   case class Constraints[L, W](path: File = null) {
     def cachedFactory(baseFactory: DerivationScorer.Factory[L, W], threshold: Double = -7) = {
-      if(constraintsCache.contains(path)) {
+      if(path != null && constraintsCache.contains(path)) {
         constraintsCache(path).asInstanceOf[DerivationScorer.Factory[L, W]]
       } else {
         val uncached = if(path eq null) {
@@ -46,7 +48,8 @@ object ParserParams {
           new FileCachedScorerFactory(constraint, path)
         }
 
-        constraintsCache(path) = uncached
+        if(path != null)
+          constraintsCache(path) = uncached
         uncached
       }
 

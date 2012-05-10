@@ -1,28 +1,18 @@
 package scalanlp.parser
 package lex
 
-import collection.immutable.BitSet
 import collection.mutable.{ArrayBuilder, ArrayBuffer}
 import epic._
 import features._
 import java.io.File
-import java.util.Arrays
-import projections.GrammarRefinements
 import scalala.library.Library
 import scalala.tensor.::
 import scalala.tensor.Counter2
 import scalala.tensor.dense.DenseVector
 import scalala.tensor.mutable.Counter
-import scalala.tensor.sparse.SparseVector
 import scalanlp.collection.mutable.OpenAddressHashArray
-import scalanlp.optimize.FirstOrderMinimizer.OptParams
-import scalanlp.optimize.{RandomizedGradientCheckingFunction, BatchDiffFunction, FirstOrderMinimizer, CachedBatchDiffFunction}
-import scalanlp.parser.ParseChart._
-import scalanlp.parser.ParseEval.Statistics
-import scalanlp.tensor.sparse.OldSparseVector
 import scalanlp.trees._
 import scalanlp.util._
-import scalanlp.util.TypeTags._
 import collection.Seq
 import scalanlp.text.tokenize.EnglishWordClassGenerator
 
@@ -86,7 +76,11 @@ class IndexedFeaturizer[L, W](f: LexFeaturizer[L, W],
       indexedFeaturesForRuleHead(rule, ref)
     }
 
-    def featuresForSpan(begin: Int, end: Int, tag: Int, ref: Int) = null
+    def featuresForSpan(begin: Int, end: Int, tag: Int, ref: Int) = {
+      if(begin +1 == end)
+        featuresForTag(tag, ref)
+      else Array.empty[Int]
+    }
 
     private val fspec = f.specialize(words)
     def featuresForTag(tag: Int, head: Int): Array[Int] = {
@@ -420,7 +414,7 @@ case class LexGrammarBundle[L, W](baseGrammar: Grammar[L],
 
 
         def scoreSpan(begin: Int, end: Int, label: Int, ref: Int) = {
-          if(ref < begin || ref >= end) Double.NegativeInfinity
+          if(ref < begin || ref >= end) error("grrr")
           else dot(f.featuresForSpan(begin, end, label, ref))
         }
 
@@ -468,9 +462,21 @@ case class LexGrammarBundle[L, W](baseGrammar: Grammar[L],
           if(!binaries(rule)) {
             Array(parentRef:Int)
           } else if(isLeftRule(rule)) {
-            Array.range(parentRef, end)
+            val result = new Array[Int](end - (parentRef+1))
+            var h = parentRef + 1
+            while(h < end) {
+              result(h - parentRef - 1) = parentRef * words.length + h
+              h += 1
+            }
+            result
           } else {
-            Array.range(begin, parentRef)
+            val result = new Array[Int](parentRef - begin)
+            var h = begin
+            while(h < parentRef) {
+              result(h - begin) = parentRef * words.length + h
+              h += 1
+            }
+            result
           }
         }
 

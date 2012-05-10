@@ -163,7 +163,7 @@ object DerivationScorerFactory {
           val b = grammar.child(r)
           val a2 = refinements.labels.globalize(a, refA)
           val b2 = refinements.labels.globalize(b, refB)
-          (refinements.rules.fineIndex(UnaryRule(refinements.labels.fineIndex.get(a2),refinements.labels.fineIndex.get(b2))))
+         refinements.rules.localize(refinements.rules.fineIndex(UnaryRule(refinements.labels.fineIndex.get(a2),refinements.labels.fineIndex.get(b2))))
         }
 
         def ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int, refC: Int) = {
@@ -173,7 +173,7 @@ object DerivationScorerFactory {
           val a2 = refinements.labels.globalize(a, refA)
           val b2 = refinements.labels.globalize(b, refB)
           val c2 = refinements.labels.globalize(c, refC)
-          (refinements.rules.fineIndex(BinaryRule(refinements.labels.fineIndex.get(a2),
+          refinements.rules.localize(refinements.rules.fineIndex(BinaryRule(refinements.labels.fineIndex.get(a2),
             refinements.labels.fineIndex.get(b2),
             refinements.labels.fineIndex.get(c2)
           ))  )

@@ -50,7 +50,8 @@ class ModelObjective[Datum](val model: Model[Datum],
   def initialWeightVector(randomize: Boolean): DenseVector[Double] = {
    val v = Encoder.fromIndex(featureIndex).tabulateDenseVector(f => model.initialValueForFeature(f))
     if(randomize) {
-      v += DenseVector.rand(numFeatures) * 1E-5
+      println("Random1")
+      v += DenseVector.rand(numFeatures) * 1E-3
     }
     v
   }
@@ -72,7 +73,8 @@ class ModelObjective[Datum](val model: Model[Datum],
         counts
       } catch {
         case e =>
-          new Exception("While processing " + datum, e).printStackTrace()
+          e.printStackTrace()
+//          new Exception("While processing " + datum, e).printStackTrace()
           countsSoFar
       }
     },{ (a,b) => b += a})

@@ -1,9 +1,8 @@
 package scalanlp.parser
 
 import projections.GrammarRefinements
-import scalanlp.util.TypeTags._
 import scalanlp.trees.{LexicalProduction, Production, Rule}
-import scalanlp.util.{TypeTags, Index}
+import scalanlp.util.Index
 
 /**
  *
@@ -43,7 +42,7 @@ object DerivationFeaturizer {
     val ind = Index[Production[L2,W]](proj.rules.fineIndex ++ refinedTagWords)
     
     val refinedRuleIndices = Array.tabulate(coarse.index.size) { r =>
-      proj.rules.refinementsOf(tag[Rule[L]](r)).map(fr => ind(proj.rules.fineIndex.get(fr)))
+      proj.rules.refinementsOf(r).map(fr => ind(proj.rules.fineIndex.get(fr)))
     }
 
     new DerivationFeaturizer[L, W, Production[L2, W]] {

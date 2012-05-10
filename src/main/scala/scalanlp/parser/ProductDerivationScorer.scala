@@ -171,10 +171,10 @@ class ProductDerivationScorer[L,W](s1: DerivationScorer[L, W],
     else {
       val a1 = label1Ref(grammar.parent(r), refA)
       val a2 = label2Ref(grammar.parent(r), refA)
-      val b1 = label1Ref(grammar.child(r), refB)
-      val b2 = label2Ref(grammar.child(r), refB)
-      val c1 = label1Ref(grammar.child(r), refC)
-      val c2 = label2Ref(grammar.child(r), refC)
+      val b1 = label1Ref(grammar.leftChild(r), refB)
+      val b2 = label2Ref(grammar.leftChild(r), refB)
+      val c1 = label1Ref(grammar.rightChild(r), refC)
+      val c2 = label2Ref(grammar.rightChild(r), refC)
       val l1 = s1.ruleRefinementFromRefinements(r, a1, b1, c1)
       val l2 = s2.ruleRefinementFromRefinements(r, a2, b2, c2)
       l1 * s1.numValidRuleRefinements(r) + l2

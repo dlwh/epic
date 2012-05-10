@@ -20,6 +20,7 @@ case class ChartMarginal[+Chart[X]<:ParseChart[X], L, W](scorer: DerivationScore
    * @param spanVisitor
    */
   def visitPostorder(spanVisitor: DerivationVisitor[L]) {
+    assert(!partition.isInfinite)
     val itop = inside.top
 
     // handle lexical
@@ -89,7 +90,7 @@ case class ChartMarginal[+Chart[X]<:ParseChart[X], L, W](scorer: DerivationScore
                 if (!java.lang.Double.isInfinite(score)) {
                   val expScore = math.exp(score)
                   count += expScore
-                  spanVisitor.visitBinaryRule(begin, split, end, r, refR, math.exp(score))
+                  spanVisitor.visitBinaryRule(begin, split, end, r, refR, expScore)
                 }
 
                 split += 1
