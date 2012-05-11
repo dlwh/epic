@@ -15,16 +15,25 @@ case class TreeMarginal[L, W](scorer: DerivationScorer[L, W],
     def rec(t: BinarizedTree[(L,Int) ]) = t match {
       case n@NullaryTree( (a, ref) ) =>
         val aI = grammar.labelIndex(a)
-        score += scorer.scoreSpan(t.span.start, t.span.end, aI, ref)
+        var score2 = scorer.scoreSpan(t.span.start, t.span.end, aI, ref)
+        if(score2.isInfinite)
+          score2 = -20
+        score += score2
       case UnaryTree( (a, refA), Tree((b, refB), _)) =>
         val r = grammar.index(UnaryRule(a, b))
         val ruleRef = scorer.ruleRefinementFromRefinements(r, refA, refB)
-        score +=  scorer.scoreUnaryRule(t.span.start, t.span.end, r, ruleRef)
+        var score2 = scorer.scoreUnaryRule(t.span.start, t.span.end, r, ruleRef)
+        if(score2.isInfinite)
+          score2 = -20
+        score +=  score2
       case t@BinaryTree( (a, refA), bt@Tree( (b, refB), _), Tree((c, refC), _)) =>
         val aI = grammar.labelIndex(a)
         val rule = grammar.index(BinaryRule(a, b, c))
         val ruleRef = scorer.ruleRefinementFromRefinements(rule, refA, refB, refC)
-        score += scorer.scoreSpan(t.span.start, t.span.end, aI, refA)
+        var score2 = scorer.scoreSpan(t.span.start, t.span.end, aI, refA)
+        if(score2.isInfinite)
+          score2 = -20
+        score += score2
         score += scorer.scoreBinaryRule(t.span.start, bt.span.end, t.span.end, rule, ruleRef)
     }
     rec(tree)

@@ -57,7 +57,8 @@ case class AnnotatedLabel(label: String,
     if(features.nonEmpty)
       components += features.toString
 
-    components.mkString(label+"[", ", ", "]")
+    if(components.nonEmpty) components.mkString(label+"[", ", ", "]")
+    else label
   }
 }
 

@@ -25,7 +25,7 @@ class LatentParserModel[L, L3, W](featurizer: Featurizer[L3, W],
   def featureIndex = indexedFeatures.index
 
   override def initialValueForFeature(f: Feature) = {
-    initialFeatureVal(f) getOrElse (math.random * 1E-3)
+    initialFeatureVal(f) getOrElse (math.random * 1E-4)
   }
 
   def emptyCounts = new scalanlp.parser.ExpectedCounts(featureIndex)
@@ -35,7 +35,7 @@ class LatentParserModel[L, L3, W](featurizer: Featurizer[L3, W],
     val grammar: Factory[L, W] = FeaturizedGrammar(this.grammar, this.lexicon, projections, weights, indexedFeatures, lexicon)
 
     // TODO: be able to statically enforce that baseFactory is unrefined.
-    val product = grammar * baseFactory
+    val product = grammar// * baseFactory
 
     new LatentParserInference(indexedFeatures, reannotate, product, projections)
   }

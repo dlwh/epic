@@ -22,7 +22,7 @@ object ParserPipeline extends scalanlp.parser.ParserPipeline {
 
     val model = modelFactory.make(trainTrees)
 
-    val obj = new ModelObjective(model,trainTrees)
+    val obj = new ModelObjective(model,trainTrees.take(100))
     val cachedObj = new CachedBatchDiffFunction(obj)
     val checking = new RandomizedGradientCheckingFunction(cachedObj, toString = {(i:Int) => model.featureIndex.get(i).toString})
     val init = obj.initialWeightVector(randomize)

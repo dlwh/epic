@@ -147,7 +147,6 @@ trait DerivationScorer[L, W] extends Factor[DerivationScorer[L, W]] {
 
   def annotationTag: Int = -1
 
-
   // stuff related to reachability
   /**
    * For a given span, what refinements to the label are allowed?
@@ -155,7 +154,6 @@ trait DerivationScorer[L, W] extends Factor[DerivationScorer[L, W]] {
    * method may return a subset.
    * @return array of valid refinements. Don't modify!
    */
-
   def validLabelRefinements(begin: Int, end: Int, label: Int):Array[Int]
 
   def numValidRefinements(label: Int):Int

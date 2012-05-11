@@ -47,6 +47,8 @@ object Marginal {
       }
 
       def visitSpan(begin: Int, end: Int, tag: Int, ref: Int, score: Double) {
+       // if(begin+1 == end)
+         // println(begin,end,tag,ref,score)
         addScale(counts, spec.featuresForSpan(begin, end, tag, ref), score)
       }
     }
@@ -54,8 +56,11 @@ object Marginal {
   }
 
   private def addScale[Feat](counts: ExpectedCounts[Feat], features: Array[Int], score: Double) {
-    for (f <- features) {
-      counts.counts(f) += score
+    val data = counts.counts.data
+    var i = 0
+    while(i < features.length) {
+      data(features(i)) += score
+      i += 1
     }
   }
 }

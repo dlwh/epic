@@ -20,7 +20,7 @@ case class ChartMarginal[+Chart[X]<:ParseChart[X], L, W](scorer: DerivationScore
    * @param spanVisitor
    */
   def visitPostorder(spanVisitor: DerivationVisitor[L]) {
-    assert(!partition.isInfinite)
+    if(partition.isInfinite) throw new RuntimeException("No parse for " + words)
     val itop = inside.top
 
     // handle lexical
@@ -32,6 +32,7 @@ case class ChartMarginal[+Chart[X]<:ParseChart[X], L, W](scorer: DerivationScore
       } {
         val score:Double = scorer.scoreSpan(i, i+1, a, ref) + outside.bot(i, i+1, a, ref) - partition
         if (score != Double.NegativeInfinity) {
+          //println(scorer.scoreSpan(i, i+1, a, ref), outside.bot(i, i+1, a, ref), partition)
           spanVisitor.visitSpan(i, i+1, a, ref, math.exp(score))
         }
       }
@@ -97,7 +98,7 @@ case class ChartMarginal[+Chart[X]<:ParseChart[X], L, W](scorer: DerivationScore
               }
             }
           }
-          spanVisitor.visitSpan(begin, end, a, refA, count)
+        spanVisitor.visitSpan(begin, end, a, refA, count)
       }
     }
 
@@ -109,11 +110,11 @@ case class ChartMarginal[+Chart[X]<:ParseChart[X], L, W](scorer: DerivationScore
       a <- inside.top.enteredLabelIndexes(begin, end)
       refA <- inside.top.enteredLabelRefinements(begin, end, a)
     } {
+      val aScore = outside.top.labelScore(begin, end, a, refA)
       for (r <- grammar.indexedUnaryRulesWithParent(a); refR <- scorer.validRuleRefinementsGivenParent(begin, end, r, refA)) {
         val b = grammar.child(r)
         val refB = scorer.childRefinement(r, refR)
         val bScore = inside.bot.labelScore(begin, end, b, refB)
-        val aScore = outside.top.labelScore(begin, end, a, refA)
         val rScore = scorer.scoreUnaryRule(begin, end, r, refR)
         val prob = math.exp(bScore + aScore + rScore - partition);
         if (prob > 0)

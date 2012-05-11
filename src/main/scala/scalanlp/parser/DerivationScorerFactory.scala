@@ -5,6 +5,7 @@ import scalanlp.trees._
 import scalala.tensor.Counter2
 import scalala.library.Library
 import scalanlp.parser.DerivationScorer.Factory
+import collection.mutable.ArrayBuffer
 
 object DerivationScorerFactory {
   def product[L, W](f1: Factory[L, W], f2: Factory[L, W]):Factory[L, W] = new Factory[L, W] {
@@ -79,6 +80,7 @@ object DerivationScorerFactory {
       refinements.labels.fineIndex,
       refinements.rules.fineIndex)
 
+    // localized rule scores
     val ruleScoreArray: Array[Array[Double]] = Array.tabulate(grammar.index.size){ (r: Int) =>
       val refs = refinements.rules.refinementsOf(r)
       val arr = new Array[Double](refs.length)
@@ -88,14 +90,39 @@ object DerivationScorerFactory {
       arr
     }
 
-    val spanScoreArray: Array[Array[Double]] = Array.tabulate(grammar.labelIndex.size){ (rr: Int) =>
-      val r: Int= (rr);
+    val spanScoreArray: Array[Array[Double]] = Array.tabulate(grammar.labelIndex.size){ (r: Int) =>
       val refs = refinements.labels.refinementsOf(r)
       val arr = new Array[Double](refs.length)
       for (i <- 0 until refs.length) {
         arr(i) = refinedSpanScores(refs(i))
       }
       arr
+    }
+
+    // rule -> parentRef -> [ruleRef]
+    val parentCompatibleRefinements: Array[Array[Array[Int]]] = Array.tabulate(grammar.index.size) { r =>
+      val parent = grammar.parent(r)
+      val parentRefs = Array.fill(refinements.labels.refinementsOf(parent).length){ArrayBuffer[Int]()}
+      for(ruleRef <- refinements.rules.refinementsOf(r)) {
+        val refParent = refinements.labels.localize(refinedGrammar.parent(ruleRef))
+        parentRefs(refParent) += refinements.rules.localize(ruleRef)
+      }
+      parentRefs.map(_.toArray)
+    }
+
+    // rule -> parentRef -> [ruleRef]
+    val childCompatibleRefinements: Array[Array[Array[Int]]] = Array.tabulate(grammar.index.size) { r =>
+      if(grammar.index.get(r).isInstanceOf[UnaryRule[L]]) {
+        val child = grammar.child(r)
+        val childRefs = Array.fill(refinements.labels.refinementsOf(child).length){ArrayBuffer[Int]()}
+        for(ruleRef <- refinements.rules.refinementsOf(r)) {
+          val refChild = refinements.labels.localize(refinedGrammar.child(ruleRef))
+          childRefs(refChild) += refinements.rules.localize(ruleRef)
+        }
+        childRefs.map(_.toArray)
+      } else {
+        null
+      }
     }
 
     new DerivationScorer.Factory[L, W] {
@@ -130,11 +157,11 @@ object DerivationScorerFactory {
         }
 
         def validRuleRefinementsGivenParent(begin: Int, end: Int, rule: Int, parentRef: Int) = {
-          refinements.rules.localRefinements(rule)
+          parentCompatibleRefinements(rule)(parentRef)
         }
 
         def validUnaryRuleRefinementsGivenChild(begin: Int, end: Int, rule: Int, childRef: Int) = {
-          refinements.rules.localRefinements(rule)
+          childCompatibleRefinements(rule)(childRef)
         }
 
         def leftChildRefinement(rule: Int, ruleRef: Int) = {
