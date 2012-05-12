@@ -31,8 +31,8 @@ object DerivationScorerFactory {
 
   def oneOff[L, W](scorer: DerivationScorer[L, W]): DerivationScorer.Factory[L, W] = {
     new DerivationScorer.Factory[L, W] {
-      def grammar = scorer.grammar
-      def lexicon = scorer.lexicon
+      val grammar = scorer.grammar
+      val lexicon = scorer.lexicon
 
       def specialize(words: Seq[W]) = scorer
     }

@@ -82,8 +82,6 @@ case class LatentTreeMarginal[L, W](scorer: DerivationScorer[L, W],
 
   // private stuff to do the computation
 
-
-
   private def insideScores() = {
     val indexedTree:BinarizedTree[Beliefs[L]] = tree.map{ case (l, refs) => Beliefs(grammar.labelIndex(l), refs) }
     val arr = new Array[Double](64 * 64)
@@ -117,9 +115,7 @@ case class LatentTreeMarginal[L, W](scorer: DerivationScorer[L, W],
             val aRef = aLabels(ai)
             val cRef = cLabels(i)
             val ruleRef = scorer.ruleRefinementFromRefinements(rule, aRef, cRef)
-            var score = scorer.scoreUnaryRule(t.span.start, t.span.end, rule, ruleRef)
-            if(score.isInfinite)
-              score = -100
+            val score = scorer.scoreUnaryRule(t.span.start, t.span.end, rule, ruleRef)
             val ruleScore = ( cScores(i) + score)
             if(!ruleScore.isInfinite) {
               foundOne = true
@@ -155,8 +151,7 @@ case class LatentTreeMarginal[L, W](scorer: DerivationScorer[L, W],
             while(ci < cLabels.length) {
               val cRef = cLabels(ci)
               val ruleRef = scorer.ruleRefinementFromRefinements(rule, aRef, bRef, cRef)
-              var spanScore = scorer.scoreSpan(begin, end, a, aRef)
-              if(spanScore.isInfinite) spanScore = 0.0
+              val spanScore = scorer.scoreSpan(begin, end, a, aRef)
               arr(i) = ( bScores(bi)
                 + cScores(ci)
                 + scorer.scoreBinaryRule(begin, split, end, rule, ruleRef)

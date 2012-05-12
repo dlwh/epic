@@ -57,11 +57,13 @@ class CKYChartBuilder[+Chart[X]<:ParseChart[X], L, W](val grammar: DerivationSco
       updateInsideUnaries(chart, spec,  i, i+1)
     }
 
+
     // buffer. Set to 1000. If we ever fill it up, accumulate everything into
     // elem 0 and try again
     val scoreArray = new Array[Double](1000)
 
     val top = chart.top
+    val g = grammar.grammar
 
     // a -> bc over [begin, split, end)
     for {
@@ -78,14 +80,19 @@ class CKYChartBuilder[+Chart[X]<:ParseChart[X], L, W](val grammar: DerivationSco
         val passScore = spec.scoreSpan(begin, end, a, refA)
         var offset = 0 // into scoreArray
         if(!passScore.isInfinite) {
-          var ruleIndex = 0 // into rules
-          val rules = grammar.grammar.indexedBinaryRulesWithParent(a)
+          var ruleIndex = 0
+          // into rules
+          val rules = g.indexedBinaryRulesWithParent(a)
           while(ruleIndex < rules.length) {
             val r = rules(ruleIndex)
-            val b = grammar.grammar.leftChild(r)
-            val c = grammar.grammar.rightChild(r)
+            val b = g.leftChild(r)
+            val c = g.rightChild(r)
             ruleIndex += 1
-            for( refR <- spec.validRuleRefinementsGivenParent(begin, end, r, refA)) {
+            val refinements = spec.validRuleRefinementsGivenParent(begin, end, r, refA)
+            var ruleRefIndex = 0
+            while(ruleRefIndex < refinements.length) {
+              val refR = refinements(ruleRefIndex)
+              ruleRefIndex += 1
               val refB = spec.leftChildRefinement(r, refR)
               val refC = spec.rightChildRefinement(r, refR)
               // narrowR etc is hard to understand, and should be a different methood

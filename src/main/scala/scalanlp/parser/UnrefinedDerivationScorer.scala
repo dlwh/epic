@@ -63,24 +63,16 @@ object UnrefinedDerivationScorer {
   def identity[L, W](grammar: Grammar[L],
                      lexicon: Lexicon[L, W],
                      words: Seq[W]):UnrefinedDerivationScorer[L, W] = {
-    val g = grammar
-    val l = lexicon
-    val w = words
-    new UnrefinedDerivationScorer[L, W] {
-
-      def grammar = g
-
-      def lexicon = l
-
-      def words = w
-
-      def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = 0.0
-
-      def scoreUnaryRule(begin: Int, end: Int, rule: Int) = 0.0
-
-      def scoreSpan(begin: Int, end: Int, tag: Int) = 0.0
-    }
+    new Identity(grammar, lexicon, words)
   }
 
+  case class Identity[L, W](grammar: Grammar[L], lexicon: Lexicon[L, W], words: Seq[W]) extends UnrefinedDerivationScorer[L, W] {
 
+    def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = 0.0
+
+    def scoreUnaryRule(begin: Int, end: Int, rule: Int) = 0.0
+
+    def scoreSpan(begin: Int, end: Int, tag: Int) = 0.0
+  }
 }
+

@@ -5,11 +5,11 @@ package scalanlp.parser
  * @author dlwh
  */
 
-class ProductDerivationScorer[L,W](s1: DerivationScorer[L, W],
+final class ProductDerivationScorer[L,W](s1: DerivationScorer[L, W],
                                    s2: DerivationScorer[L, W],
                                    alpha: Double = 1.0) extends DerivationScorer[L, W] {
 
-  def grammar = s1.grammar
+  val grammar = s1.grammar
   def lexicon = s1.lexicon
   def words = s1.words
 

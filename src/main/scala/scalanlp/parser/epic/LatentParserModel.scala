@@ -35,7 +35,7 @@ class LatentParserModel[L, L3, W](featurizer: Featurizer[L3, W],
     val grammar: Factory[L, W] = FeaturizedGrammar(this.grammar, this.lexicon, projections, weights, indexedFeatures, lexicon)
 
     // TODO: be able to statically enforce that baseFactory is unrefined.
-    val product = grammar// * baseFactory
+    val product = grammar * baseFactory
 
     new LatentParserInference(indexedFeatures, reannotate, product, projections)
   }

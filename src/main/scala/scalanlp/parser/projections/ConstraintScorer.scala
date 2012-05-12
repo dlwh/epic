@@ -61,6 +61,13 @@ class ConstraintScorerFactory[L, W](parser: ChartBuilder[ParseChart, L, W], thre
     new ConstraintScorer[L, W](charts.scorer.grammar, charts.scorer.lexicon, charts.scorer.words, label, unary)
   }
 
+  def buildScorer(words: Seq[W],
+                  goldTags: GoldTagPolicy[L]):ConstraintScorer[L, W] = {
+
+    val charts = parser.charts(words)
+    buildScorer(charts, goldTags)
+  }
+
   private def scoresForCharts(marg: Marginal[L, W], gold: GoldTagPolicy[L]) = {
     val length = marg.length
     val scores = TriangularArray.raw(length+1, null: Array[Double])
@@ -92,16 +99,25 @@ class ConstraintScorerFactory[L, W](parser: ChartBuilder[ParseChart, L, W], thre
 
     marg.visit(visitor)
 
-    // TODO: gold tags!
-    val labelThresholds = scores.map { case arr =>
-      if(arr eq null) null
-      else BitSet(0 until arr.length filter {s => math.log(arr(s)) > threshold}:_*)
-    }
+    val labelThresholds = new TriangularArray[BitSet](length+1, {(i, j) =>
+      val arr = scores(TriangularArray.index(i, j))
+      val thresholdedGoldTags = if(arr eq null) {
+        BitSet.empty
+      } else BitSet.empty ++ (0 until arr.length filter {s => math.log(arr(s)) > threshold})
+      val result = thresholdedGoldTags ++ (0 until grammar.labelIndex.size).filter{gold.isGoldTag(i, j, _)}
+      if(result.nonEmpty) result
+      else null
+    }).data
 
-    val unaryThresholds = topScores.map { arr =>
-      if(arr eq null) null
-      else BitSet(0 until arr.length filter {s => math.log(arr(s)) > threshold}:_*)
-    }
+    val unaryThresholds = new TriangularArray[BitSet](length+1, {(i, j) =>
+      val arr = topScores(TriangularArray.index(i, j))
+      val thresholdedGoldTags = if(arr eq null) {
+        BitSet.empty
+      } else BitSet.empty ++ (0 until arr.length filter {s => math.log(arr(s)) > threshold})
+      val result = thresholdedGoldTags ++ (0 until grammar.index.size).filter{r => gold.isGoldTag(i, j, grammar.parent(r))}
+      if (result.nonEmpty) result
+      else null
+    }).data
 
     (labelThresholds, unaryThresholds)
   }
@@ -141,20 +157,25 @@ object ProjectTreebankToConstraints {
     parser
   }
 
-  def mapTrees[L](factory: ConstraintScorerFactory[L, String], 
-                  trees: IndexedSeq[TreeInstance[L, String]],
-                  index: Index[L],
-                  useTree: Boolean, maxL: Int) = {
+  def mapTrees(factory: ConstraintScorerFactory[AnnotatedLabel, String],
+               trees: IndexedSeq[TreeInstance[AnnotatedLabel, String]],
+               index: Index[AnnotatedLabel],
+               useTree: Boolean, maxL: Int) = {
     // TODO: have ability to use other span scorers.
-    trees.toIndexedSeq.par.map { (ti:TreeInstance[L, String]) =>
+    trees.toIndexedSeq.par.map { (ti:TreeInstance[AnnotatedLabel, String]) =>
       val TreeInstance(id, tree, words) = ti
       println(id, words)
       try {
-        val scorer = factory.specialize(words)
+        val policy = if(useTree) {
+          GoldTagPolicy.goldTreeForcing[AnnotatedLabel](tree.map(_.baseAnnotatedLabel).map(index))
+        } else {
+          GoldTagPolicy.noGoldTags[AnnotatedLabel]
+        }
+        val scorer = factory.buildScorer(words, policy)
         words -> scorer
       } catch {
         case e: Exception => e.printStackTrace();
-        words -> DerivationScorer.identity[L, String](factory.grammar, factory.lexicon, words)
+        words -> DerivationScorer.identity[AnnotatedLabel, String](factory.grammar, factory.lexicon, words)
       }
     }.seq
   }

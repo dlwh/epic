@@ -23,7 +23,12 @@ trait ParserInference[L, W] extends ProjectableInference[TreeInstance[L, W], Der
   def featurizer: DerivationFeaturizer[L, W, Feature]
 
   def marginal(v: TreeInstance[L, W], aug: DerivationScorer[L, W]) = {
-    val charts = (grammar.specialize(v.words) * aug).marginal
+    val fullGrammar = if(aug.isInstanceOf[UnrefinedDerivationScorer.Identity[L, W]]) {
+      grammar.specialize(v.words)
+    } else {
+      grammar.specialize(v.words) * aug
+    }
+    val charts = fullGrammar.marginal
     charts -> charts.partition
   }
 

@@ -608,7 +608,7 @@ class LexModel[L, W](bundle: LexGrammarBundle[L, W],
   def initialValueForFeature(f: Feature) = initFeatureValue(f).getOrElse(0)
 
   def inferenceFromWeights(weights: DenseVector[Double]) = {
-    val gram: DerivationScorer.Factory[L, W] = bundle.makeGrammar(indexed, weights)
+    val gram: DerivationScorer.Factory[L, W] = bundle.makeGrammar(indexed, weights) * baseFactory
     new LexInference(reannotate, gram, indexed, headFinder)
   }
 

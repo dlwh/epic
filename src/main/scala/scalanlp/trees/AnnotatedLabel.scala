@@ -65,7 +65,7 @@ case class AnnotatedLabel(label: String,
 object AnnotatedLabel {
   val TOP = AnnotatedLabel("TOP")
 
-  implicit val stringLens:Lens[AnnotatedLabel, String] = new Lens[AnnotatedLabel, String] {
+  implicit val stringLens:Lens[AnnotatedLabel, String] = new Lens[AnnotatedLabel, String] with Serializable {
     def get(t: AnnotatedLabel) = t.label
     def set(t: AnnotatedLabel, u: String) = t.copy(u)
   }
