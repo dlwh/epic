@@ -42,7 +42,11 @@ trait DerivationScorer[L, W] extends Factor[DerivationScorer[L, W]] {
    * @return
    */
   def *(other: DerivationScorer[L, W]):DerivationScorer[L,W] = {
-    new ProductDerivationScorer(this,other)
+    // hacky multimethod dispatch is hacky
+    if (other eq null) this // ugh
+    else if(other.isInstanceOf[UnrefinedDerivationScorer.Identity[L, W]]) this
+    else if(this.isInstanceOf[UnrefinedDerivationScorer.Identity[L, W]]) other
+    else new ProductDerivationScorer(this,other)
   }
 
   /**
@@ -54,10 +58,9 @@ trait DerivationScorer[L, W] extends Factor[DerivationScorer[L, W]] {
    * @return
    */
   def /(other: DerivationScorer[L, W]):DerivationScorer[L,W] = {
-    new ProductDerivationScorer(this,other,-1)
+    if(other.eq(null) || other.isInstanceOf[UnrefinedDerivationScorer.Identity[L, W]]) this
+    else new ProductDerivationScorer(this,other,-1)
   }
-
-  def *(f: Double) = new ScaledDerivationScorer(this, f)
 
   def logPartition = {
     marginal.partition

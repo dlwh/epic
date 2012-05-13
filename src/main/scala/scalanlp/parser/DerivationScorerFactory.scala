@@ -130,6 +130,7 @@ object DerivationScorerFactory {
       def lexicon = l
 
       def specialize(w: Seq[W]) = new Specialization {
+        override def toString() = "RefinedDerivationScorer(...)"
         val grammar = g
         val lexicon = l
         def words = w

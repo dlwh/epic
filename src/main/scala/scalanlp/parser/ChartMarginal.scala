@@ -65,7 +65,11 @@ case class ChartMarginal[+Chart[X]<:ParseChart[X], L, W](scorer: DerivationScore
             i += 1
             // this is too slow, so i'm having to inline it.
             //              val feasibleSpan = itop.feasibleSpanX(begin, end, b, c)
-            for (refR <- scorer.validRuleRefinementsGivenParent(begin, end, r, refA)) {
+            val refinements = scorer.validRuleRefinementsGivenParent(begin, end, r, refA)
+            var ruleRefIndex = 0
+            while(ruleRefIndex < refinements.length) {
+              val refR = refinements(ruleRefIndex)
+              ruleRefIndex += 1
               val refB = scorer.leftChildRefinement(r, refR)
               val refC = scorer.rightChildRefinement(r, refR)
               val narrowR:Int = narrowRight(b)(refB)

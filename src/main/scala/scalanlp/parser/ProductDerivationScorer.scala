@@ -1,14 +1,17 @@
 package scalanlp.parser
 
+import projections.ConstraintScorer
+
 /**
  *
  * @author dlwh
  */
 
-final class ProductDerivationScorer[L,W](s1: DerivationScorer[L, W],
-                                   s2: DerivationScorer[L, W],
-                                   alpha: Double = 1.0) extends DerivationScorer[L, W] {
+final case class ProductDerivationScorer[L,W](s1: DerivationScorer[L, W],
+                                              s2: DerivationScorer[L, W],
+                                              alpha: Double = 1.0) extends DerivationScorer[L, W] {
 
+  if(s2.isInstanceOf[ConstraintScorer[L, W]] && alpha == -1.0) throw new Exception("...")
   val grammar = s1.grammar
   def lexicon = s1.lexicon
   def words = s1.words
