@@ -128,7 +128,7 @@ case class EPInference[Datum, Augment](inferences: IndexedSeq[ProjectableInferen
     val ep = new ExpectationPropagation(project _)
 
     var state : ep.State = null
-    val iterates = ep.inference(augment, 0 until inferences.length, inferences.map(_.baseAugment(datum)))
+    val iterates = ep.inference(augment, 0 until inferences.length, IndexedSeq.fill[Augment](inferences.length)(null.asInstanceOf[Augment]))
     var iter = 0
     var converged = false
     while(!converged && iter < maxEPIter && iterates.hasNext) {

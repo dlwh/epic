@@ -4,7 +4,7 @@ package scalanlp.parser
  * Adds score to the root .
  * @author dlwh
  */
-class ScaledDerivationScorer[L, W](s: DerivationScorer[L, W], score: Double) extends DerivationScorer[L, W] {
+case class ScaledDerivationScorer[L, W](s: DerivationScorer[L, W], score: Double) extends DerivationScorer[L, W] {
   def grammar = s.grammar
 
   def lexicon = s.lexicon
@@ -50,4 +50,6 @@ class ScaledDerivationScorer[L, W](s: DerivationScorer[L, W], score: Double) ext
   def ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int) = s.ruleRefinementFromRefinements(r, refA, refB)
 
   def ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int, refC: Int) = s.ruleRefinementFromRefinements(r, refA, refB, refC)
+
+  override def annotationTag = s.annotationTag
 }

@@ -33,11 +33,13 @@ object EPParser {
 
   def fromChartParsers[L, W](grammar: Grammar[L],
                              lexicon: Lexicon[L, W],
+                             base: DerivationScorer.Factory[L, W],
                              grammars: (DerivationScorer.Factory[L, W])*) = {
     val infs = grammars.map{ p =>
       new DiscParserInference(null,
       {(a:BinarizedTree[L], b:Seq[W])=>a},
         p,
+        base,
         null)
     }
     val ep = new EPInference(infs.toIndexedSeq, 5)

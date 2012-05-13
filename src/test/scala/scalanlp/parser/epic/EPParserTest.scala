@@ -18,7 +18,7 @@ class EPParserTest extends ParserTestHarness with FunSuite {
   test("basic test") {
     val factory = ParserTestHarness.simpleParser.builder.grammar
     val product = EPParser.fromChartParsers(factory.grammar,
-      factory.lexicon, factory)
+      factory.lexicon, DerivationScorerFactory.identity(factory.grammar, factory.lexicon), factory)
 
     val rprod = evalParser(getTestTrees(), product)
     println(rprod, evalParser(getTestTrees(), ParserTestHarness.simpleParser));
@@ -28,7 +28,7 @@ class EPParserTest extends ParserTestHarness with FunSuite {
   test("two parsers test") {
     val factory = ParserTestHarness.simpleParser.builder.grammar
     val product = EPParser.fromChartParsers(factory.grammar,
-      factory.lexicon, factory, factory)
+      factory.lexicon, DerivationScorerFactory.identity(factory.grammar, factory.lexicon), factory, factory)
 
     val rprod = evalParser(getTestTrees(), product)
     println(rprod, evalParser(getTestTrees(), ParserTestHarness.simpleParser));

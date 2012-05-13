@@ -12,6 +12,7 @@ import scalanlp.util.Index
  * 
  * @author dlwh
  */
+@SerialVersionUID(1L)
 class ConstraintScorer[L, W](val grammar: Grammar[L],
                              val lexicon: Lexicon[L, W],
                              val words: Seq[W],

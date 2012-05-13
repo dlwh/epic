@@ -34,10 +34,7 @@ class LatentParserModel[L, L3, W](featurizer: Featurizer[L3, W],
     val lexicon = new FeaturizedLexicon(weights, indexedFeatures)
     val grammar: Factory[L, W] = FeaturizedGrammar(this.grammar, this.lexicon, projections, weights, indexedFeatures, lexicon)
 
-    // TODO: be able to statically enforce that baseFactory is unrefined.
-    val product = grammar * baseFactory
-
-    new LatentParserInference(indexedFeatures, reannotate, product, projections)
+    new LatentParserInference(indexedFeatures, reannotate, grammar, baseFactory, projections)
   }
 
   def extractParser(weights: DenseVector[Double]):ChartParser[L, W] = {
@@ -53,6 +50,7 @@ class LatentParserModel[L, L3, W](featurizer: Featurizer[L3, W],
 case class LatentParserInference[L, L2, W](featurizer: DerivationFeaturizer[L, W, Feature],
                                            reannotate: (BinarizedTree[L], Seq[W])=>BinarizedTree[L],
                                            grammar: DerivationScorer.Factory[L, W],
+                                           baseMeasure: DerivationScorer.Factory[L, W],
                                            projections: GrammarRefinements[L, L2]) extends ParserInference[L, W] {
 
   // E[T-z|T, params]

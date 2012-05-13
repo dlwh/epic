@@ -42,9 +42,10 @@ trait UnrefinedDerivationScorer[L, W] extends DerivationScorer[L, W] {
 
   final def numValidRuleRefinements(rule: Int) = 1
 
-  final def validRuleRefinementsGivenParent(begin: Int, end: Int, rule: Int, parentRef: Int) = Array(0)
+  private final val zeroArray = Array(0)
+  final def validRuleRefinementsGivenParent(begin: Int, end: Int, rule: Int, parentRef: Int) = zeroArray
 
-  final def validUnaryRuleRefinementsGivenChild(begin: Int, end: Int, rule: Int, childRef: Int) = Array(0)
+  final def validUnaryRuleRefinementsGivenChild(begin: Int, end: Int, rule: Int, childRef: Int) = zeroArray
 
   final def leftChildRefinement(rule: Int, ruleRef: Int) = 0
 
@@ -66,6 +67,7 @@ object UnrefinedDerivationScorer {
     new Identity(grammar, lexicon, words)
   }
 
+  @SerialVersionUID(1L)
   case class Identity[L, W](grammar: Grammar[L], lexicon: Lexicon[L, W], words: Seq[W]) extends UnrefinedDerivationScorer[L, W] {
 
     def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = 0.0

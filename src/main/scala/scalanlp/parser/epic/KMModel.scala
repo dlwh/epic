@@ -32,7 +32,7 @@ class KMModel[L, L3, W](featurizer: Featurizer[L3, W],
     val lexicon = new FeaturizedLexicon(weights, indexedFeatures)
     val grammar = FeaturizedGrammar(this.grammar, this.lexicon, projections, weights, indexedFeatures, lexicon)
 
-    new DiscParserInference(indexedFeatures, ann, grammar * baseFactory, projections)
+    new DiscParserInference(indexedFeatures, ann, grammar, baseFactory, projections)
   }
 
   def extractParser(weights: DenseVector[Double]):ChartParser[L, W] = {
@@ -49,6 +49,7 @@ class KMModel[L, L3, W](featurizer: Featurizer[L3, W],
 case class DiscParserInference[L, L2, W](featurizer: DerivationFeaturizer[L, W, Feature],
                                          ann: (BinarizedTree[L], Seq[W])=>BinarizedTree[L2],
                                          grammar: DerivationScorer.Factory[L, W],
+                                         baseMeasure: DerivationScorer.Factory[L, W],
                                          projections: GrammarRefinements[L, L2]) extends ParserInference[L, W] {
 
   // E[T-z|T, params]

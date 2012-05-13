@@ -608,8 +608,8 @@ class LexModel[L, W](bundle: LexGrammarBundle[L, W],
   def initialValueForFeature(f: Feature) = initFeatureValue(f).getOrElse(0)
 
   def inferenceFromWeights(weights: DenseVector[Double]) = {
-    val gram: DerivationScorer.Factory[L, W] = bundle.makeGrammar(indexed, weights) * baseFactory
-    new LexInference(reannotate, gram, indexed, headFinder)
+    val gram: DerivationScorer.Factory[L, W] = bundle.makeGrammar(indexed, weights)
+    new LexInference(reannotate, gram, indexed, baseFactory, headFinder)
   }
 
   type Inference = LexInference[L, W]
@@ -626,6 +626,7 @@ class LexModel[L, W](bundle: LexGrammarBundle[L, W],
 case class LexInference[L, W](reannotate: (BinarizedTree[L], Seq[W])=>BinarizedTree[L],
                               grammar: DerivationScorer.Factory[L, W],
                               featurizer: IndexedFeaturizer[L, W],
+                              baseMeasure: DerivationScorer.Factory[L, W],
                               headFinder: HeadFinder[L]) extends ParserInference[L, W] {
 
   def goldCounts(ti: TreeInstance[L, W], augment: DerivationScorer[L, W]) = {
