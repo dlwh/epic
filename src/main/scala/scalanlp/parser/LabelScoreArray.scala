@@ -31,10 +31,23 @@ class LabelScoreArray[L](length: Int, grammarSize: Int, fill: Double) extends Se
     enteredRefinements(TriangularArray.index(begin, end))(label).iterator
   }
 
-  def enteredLabelScores(begin: Int, end: Int) = {
+  final def enteredLabelScores(begin: Int, end: Int) = {
     val scoreArray = score(TriangularArray.index(begin, end))
     if(scoreArray eq null) Iterator.empty
     else enteredLabels(TriangularArray.index(begin, end)).iterator.map { i => (i, scoreArray(i))}
+  }
+
+  protected final def ensureLabelArray(begin: Int, end: Int, parent: Int, numRefinements: Int):Array[Double] = {
+    val index = TriangularArray.index(begin, end)
+    var arr = score(index)
+    if(arr eq null) {
+      score(index) = new Array[Array[Double]](grammarSize)
+      arr = score(index)
+    }
+    if(arr(parent) eq null) {
+      arr(parent) = LabelScoreArray.mkGrammarVector(numRefinements, fill)
+    }
+    arr(parent)
   }
 }
 

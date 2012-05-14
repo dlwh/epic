@@ -35,18 +35,10 @@ abstract class ParseChart[L](val index: Index[L],
 
     def enter(begin: Int, end: Int, parent: Int, ref: Int, w: Double):Boolean = {
       val index = TriangularArray.index(begin, end)
-      var arr = score(index)
-      if(arr eq null) {
-        score(index) = new Array[Array[Double]](grammarSize)
-        score(index)(parent) = LabelScoreArray.mkGrammarVector(refinementsFor(parent), zero)
-        arr = score(index)
-      }
-      if(arr(parent) eq null) {
-        arr(parent) = LabelScoreArray.mkGrammarVector(refinementsFor(parent), zero)
-      }
-      val oldScore = arr(parent)(ref)
+      val arr = ensureLabelArray(begin, end, parent, refinementsFor(parent))
+      val oldScore = arr(ref)
       val newScore = sum(oldScore, w)
-      score(index)(parent)(ref) = newScore
+      arr(ref) = newScore
 
       if(oldScore == zero) {
         updateExtents(index, parent, ref, begin, end)
