@@ -1,4 +1,4 @@
-package scalanlp.parser
+package scalanlp.parser.projections
 
 import scalanlp.trees.BinarizedTree
 import scalanlp.collection.mutable.TriangularArray
