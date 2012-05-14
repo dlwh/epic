@@ -1,7 +1,8 @@
 package scalanlp.parser.models
 
-import scalanlp.parser.{DerivationScorer, ParseChart, ChartMarginal, TreeInstance}
+import scalanlp.parser.{DerivationScorer, ParseChart, ChartMarginal}
 import scalanlp.parser.projections.AnchoredPCFGProjector
+import scalanlp.trees.TreeInstance
 
 trait EPProjector[L, W] {
   def project(inf: ParserInference[L, W],

@@ -2,8 +2,8 @@ package scalanlp.parser
 package models
 
 import scalala.tensor.dense.DenseVector
-import scalanlp.trees.BinarizedTree
 import scalanlp.epic.{EPModel, EPInference}
+import scalanlp.trees.{TreeInstance, BinarizedTree}
 
 /**
  * Parser that runs EP using the EPInference object and extracts a parse

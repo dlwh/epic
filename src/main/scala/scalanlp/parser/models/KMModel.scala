@@ -4,12 +4,11 @@ package models
 import scalala.tensor.dense.DenseVector
 import projections.GrammarRefinements
 import scalanlp.epic.Feature
-import epic._
-import scalanlp.trees.{AnnotatedLabel, BinarizedTree}
 import java.io.File
 import scalala.library.Library
 import features._
 import scalala.tensor.Counter
+import scalanlp.trees.{TreeInstance, AnnotatedLabel, BinarizedTree}
 
 class KMModel[L, L2, W](featurizer: Featurizer[L2, W],
                         ann: (BinarizedTree[L], Seq[W]) => BinarizedTree[L2],

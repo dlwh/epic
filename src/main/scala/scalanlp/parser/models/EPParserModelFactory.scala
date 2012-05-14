@@ -3,10 +3,10 @@ package scalanlp.parser.models
 import scalanlp.parser._
 import java.io.File
 import scalala.tensor.Counter
-import scalanlp.trees.AnnotatedLabel
 import scalanlp.epic._
 
 import scalanlp.util._
+import scalanlp.trees.{TreeInstance, AnnotatedLabel}
 
 case class EPParams(iterations: Int = 5, pruningThreshold: Double = -15)
 

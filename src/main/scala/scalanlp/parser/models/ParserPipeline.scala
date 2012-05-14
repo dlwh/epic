@@ -2,11 +2,11 @@ package scalanlp.parser.models
 
 import scalanlp.epic._
 import scalanlp.optimize.FirstOrderMinimizer.OptParams
-import scalanlp.parser.{Parser, TreeInstance}
+import scalanlp.parser.Parser
 import scalanlp.parser.ParseEval.Statistics
 import scalala.tensor.dense.DenseVector
 import scalanlp.optimize.{RandomizedGradientCheckingFunction, BatchDiffFunction, FirstOrderMinimizer, CachedBatchDiffFunction}
-import scalanlp.trees.AnnotatedLabel
+import scalanlp.trees.{TreeInstance, AnnotatedLabel}
 
 object ParserPipeline extends scalanlp.parser.ParserPipeline {
 

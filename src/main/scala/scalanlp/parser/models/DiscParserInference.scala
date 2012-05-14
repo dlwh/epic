@@ -1,8 +1,8 @@
 package scalanlp.parser.models
 
 import scalanlp.epic.Feature
-import scalanlp.trees.BinarizedTree
-import scalanlp.parser.{TreeInstance, TreeMarginal, DerivationScorer, DerivationFeaturizer}
+import scalanlp.parser.{TreeMarginal, DerivationScorer, DerivationFeaturizer}
+import scalanlp.trees.{TreeInstance, BinarizedTree}
 
 case class DiscParserInference[L, W](featurizer: DerivationFeaturizer[L, W, Feature],
                                      ann: (BinarizedTree[L], Seq[W]) => BinarizedTree[(L, Int)],

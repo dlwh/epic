@@ -2,7 +2,8 @@ package scalanlp.parser.models
 
 import scalanlp.epic.{Model, ModelFactory}
 import scalala.tensor.dense.DenseVector
-import scalanlp.parser.{Parser, TreeInstance}
+import scalanlp.parser.Parser
+import scalanlp.trees.TreeInstance
 
 /**
  *

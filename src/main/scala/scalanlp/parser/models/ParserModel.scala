@@ -3,8 +3,8 @@ package models
 
 import scalanlp.epic._
 import scalala.tensor.Counter2
-import scalanlp.trees.{UnaryRule, BinaryRule}
-import scalanlp.parser.{GenerativeParser, TreeInstance}
+import scalanlp.parser.GenerativeParser
+import scalanlp.trees.{TreeInstance, UnaryRule, BinaryRule}
 
 /**
  * Base trait for "normal" Parser-type models
