@@ -15,13 +15,17 @@ import scalanlp.trees._
  *
  * @author dlwh
  */
-trait Grammar[L] extends Encoder[Rule[L]] with Serializable {
-  override val index: Index[Rule[L]]
-  val labelIndex: Index[L];
+@SerialVersionUID(1)
+final class Grammar[L] private (val root: L,
+                                val labelIndex: Index[L],
+                                val index: Index[Rule[L]],
+                                indexedRules: Array[Rule[Int]],
+                                binaryRulesByParent: Array[Array[Int]],
+                                unaryRulesByParent: Array[Array[Int]],
+                                binaryRulesByLeftChild: Array[Array[Int]],
+                                binaryRulesByRightChild: Array[Array[Int]],
+                                unaryRulesByChild: Array[Array[Int]]) extends Encoder[Rule[L]] with Serializable {
   def labelEncoder  = Encoder.fromIndex(labelIndex)
-  protected val indexedRules: Array[Rule[Int]];
-
-  def root: L
 
   // Accessors for properties of indexed rules
   def parent(r: Int):Int = indexedRules(r).parent
@@ -30,11 +34,11 @@ trait Grammar[L] extends Encoder[Rule[L]] with Serializable {
   def child(r: Int): Int = indexedRules(r).asInstanceOf[UnaryRule[Int]].child
 
   // query by parent or child
-  def indexedBinaryRulesWithParent(l: Int):Array[Int]
-  def indexedBinaryRulesWithLeftChild(b: Int):Array[Int]
-  def indexedBinaryRulesWithRightChild(c: Int):Array[Int]
-  def indexedUnaryRulesWithChild(l: Int):Array[Int]
-  def indexedUnaryRulesWithParent(l: Int):Array[Int]
+  def indexedBinaryRulesWithParent(l: Int) = binaryRulesByParent(l)
+  def indexedUnaryRulesWithParent(l: Int) = unaryRulesByParent(l)
+  def indexedUnaryRulesWithChild(l: Int) = unaryRulesByChild(l)
+  def indexedBinaryRulesWithLeftChild(b: Int) = binaryRulesByLeftChild(b)
+  def indexedBinaryRulesWithRightChild(c: Int) = binaryRulesByRightChild(c)
 }
 
 object Grammar {
@@ -47,7 +51,7 @@ object Grammar {
       r.children.foreach(index.index(_))
       ruleIndex.index(r)
     }
-    apply(root: L, index, ruleIndex)
+    apply(root, index, ruleIndex)
   }
   
   def apply[L](root: L,
@@ -59,59 +63,41 @@ object Grammar {
   def apply[L, W](root: L,
                   labelIndex: Index[L],
                   ruleIndex: Index[Rule[L]]):Grammar[L] = {
-    val li = labelIndex
-    val ri = ruleIndex
-    val r = root
-
-    new Grammar[L] {
-      val index = ri
-      val labelIndex = li
-      def root = r
-
-      val indexedRules = for ( r <- index.toArray) yield r match {
-        case BinaryRule(a, b, c) => BinaryRule(labelIndex(a), labelIndex(b), labelIndex(c)):Rule[Int]
-        case UnaryRule(a, b) => UnaryRule(labelIndex(a), labelIndex(b)):Rule[Int]
-      }
-
-      val binaryRuleTable = labelEncoder.fillArray(new OpenAddressHashArray[Int](labelIndex.size * labelIndex.size, -1, 4))
-      val unaryRuleTable = new OpenAddressHashArray[Int](labelIndex.size * labelIndex.size, -1)
-
-      private val (binaryRulesByParent, unaryRulesByParent, binaryRulesByLeftChild, binaryRulesByRightChild, unaryRulesByChild) = {
-        val binaryRulesByParent = Array.fill(labelIndex.size)(new ArrayBuffer[Int]())
-        val unaryRulesByParent = Array.fill(labelIndex.size)(new ArrayBuffer[Int]())
-        val binaryRulesByLeftChild = Array.fill(labelIndex.size)(new ArrayBuffer[Int]())
-        val binaryRulesByRightChild = Array.fill(labelIndex.size)(new ArrayBuffer[Int]())
-        val unaryRulesByChild = Array.fill(labelIndex.size)(new ArrayBuffer[Int]())
-        for ( (r, i) <- indexedRules.zipWithIndex) r match {
-          case BinaryRule(p, l, rc) =>
-            binaryRulesByParent(p) += i
-            binaryRulesByLeftChild(l) += i
-            binaryRulesByRightChild(rc) += i
-            binaryRuleTable(p)(rc + labelIndex.size * l) = i
-          case UnaryRule(p, c) =>
-            unaryRulesByParent(p) += i
-            unaryRulesByChild(c) += i
-            unaryRuleTable(c + labelIndex.size * (p)) = i
-        }
-
-        (binaryRulesByParent.map(_.toArray),
-          unaryRulesByParent.map(_.toArray),
-          binaryRulesByLeftChild.map(_.toArray),
-          binaryRulesByRightChild.map(_.toArray),
-          unaryRulesByChild.map(_.toArray))
-      }
-
-      def ruleIndex(a: Int, b: Int, c: Int) = binaryRuleTable(a)(c + labelIndex.size * b)
-      def ruleIndex(a: Int, b: Int) = unaryRuleTable(b + labelIndex.size * a)
-
-      def indexedBinaryRulesWithParent(l: Int) = binaryRulesByParent(l)
-      def indexedUnaryRulesWithParent(l: Int) = unaryRulesByParent(l)
-      def indexedUnaryRulesWithChild(l: Int) = unaryRulesByChild(l)
-      def indexedBinaryRulesWithLeftChild(b: Int) = binaryRulesByLeftChild(b)
-      def indexedBinaryRulesWithRightChild(c: Int) = binaryRulesByRightChild(c)
-
+    val indexedRules = for ( r <- ruleIndex.toArray) yield r match {
+      case BinaryRule(a, b, c) => BinaryRule(labelIndex(a), labelIndex(b), labelIndex(c)):Rule[Int]
+      case UnaryRule(a, b) => UnaryRule(labelIndex(a), labelIndex(b)):Rule[Int]
     }
 
+    val binaryRuleTable = Array.fill(labelIndex.size)(new OpenAddressHashArray[Int](labelIndex.size * labelIndex.size, -1, 4))
+    val unaryRuleTable = new OpenAddressHashArray[Int](labelIndex.size * labelIndex.size, -1)
+
+    val binaryRulesByParent: Array[ArrayBuffer[Int]] = Array.fill(labelIndex.size)(new ArrayBuffer[Int]())
+    val unaryRulesByParent = Array.fill(labelIndex.size)(new ArrayBuffer[Int]())
+    val binaryRulesByLeftChild = Array.fill(labelIndex.size)(new ArrayBuffer[Int]())
+    val binaryRulesByRightChild = Array.fill(labelIndex.size)(new ArrayBuffer[Int]())
+    val unaryRulesByChild = Array.fill(labelIndex.size)(new ArrayBuffer[Int]())
+    for ( (r, i) <- indexedRules.zipWithIndex) r match {
+      case BinaryRule(p, l, rc) =>
+        binaryRulesByParent(p) += i
+        binaryRulesByLeftChild(l) += i
+        binaryRulesByRightChild(rc) += i
+        binaryRuleTable(p)(rc + labelIndex.size * l) = i
+      case UnaryRule(p, c) =>
+        unaryRulesByParent(p) += i
+        unaryRulesByChild(c) += i
+        unaryRuleTable(c + labelIndex.size * (p)) = i
+    }
+
+    new Grammar(
+      root,
+      labelIndex,
+      ruleIndex,
+      indexedRules,
+      binaryRulesByParent.map(_.toArray),
+      unaryRulesByParent.map(_.toArray),
+      binaryRulesByLeftChild.map(_.toArray),
+      binaryRulesByRightChild.map(_.toArray),
+      unaryRulesByChild.map(_.toArray))
   }
 }
 
