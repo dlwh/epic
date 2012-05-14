@@ -3,6 +3,7 @@ package epic
 
 import scalala.tensor.dense.DenseVector
 import scalanlp.trees.BinarizedTree
+import scalanlp.epic.{EPModel, EPInference}
 
 /**
  * Parser that runs EP using the EPInference object and extracts a parse

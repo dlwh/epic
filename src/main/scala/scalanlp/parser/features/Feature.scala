@@ -2,12 +2,7 @@ package scalanlp.parser.features
 
 import scalanlp.trees.Rule
 import scalanlp.util.CachedHashCode
-
-/**
- * 
- * @author dlwh
- */
-trait Feature;
+import scalanlp.epic._
 
 // Meta Features
 /** conjoins some features */

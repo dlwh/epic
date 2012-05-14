@@ -1,5 +1,6 @@
 package scalanlp.parser.epic
 
+import scalanlp.epic._
 import scalanlp.optimize.FirstOrderMinimizer.OptParams
 import scalanlp.parser.{Parser, TreeInstance}
 import scalanlp.parser.ParseEval.Statistics

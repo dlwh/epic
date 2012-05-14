@@ -6,9 +6,10 @@ import scalala.tensor.Counter
 import scalala.tensor.sparse.SparseVector
 import scalala.tensor.dense.DenseVector
 import scalanlp.collection.mutable.{ArrayMap, OpenAddressHashArray}
-import features.Feature
 import scalanlp.util.{Encoder, Index}
 import scalanlp.trees.{LexicalProduction, Rule}
+import features.{Featurizer}
+import scalanlp.epic.Feature
 
 /**
  * FeatureIndexers give you an indexed encoding of the features for each rule and label

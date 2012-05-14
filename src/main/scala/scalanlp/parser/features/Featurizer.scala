@@ -1,25 +1,25 @@
-package scalanlp.parser.epic
+package scalanlp.parser.features
 
 import scalala.tensor.Counter
 import collection.mutable.ArrayBuffer
 import scalanlp.trees.{UnaryRule, BinaryRule, Rule}
-import scalanlp.parser.features._
+import scalanlp.epic.Feature
 
 /**
  * A Featurizer turns decisions in a grammar into a set of features, possibly weighted
  * @author dlwh
  *
- * // TODO: make it about decisions so we can use with other kinds of models
+ *         // TODO: make it about decisions so we can use with other kinds of models
  */
 @SerialVersionUID(1)
-trait Featurizer[L,W] extends Serializable {
-  def featuresFor(r: Rule[L]):Counter[Feature, Double]
-  def featuresFor(l: L, w: W):Counter[Feature, Double]
+trait Featurizer[L, W] extends Serializable {
+  def featuresFor(r: Rule[L]): Counter[Feature, Double]
 
-  /** should return 0.0 if we don't care about this feature. */
-  def initialValueForFeature(f: Feature):Double
+  def featuresFor(l: L, w: W): Counter[Feature, Double]
+
+  /**should return 0.0 if we don't care about this feature. */
+  def initialValueForFeature(f: Feature): Double
 }
-
 
 /**
  * Just returns features on the input rules

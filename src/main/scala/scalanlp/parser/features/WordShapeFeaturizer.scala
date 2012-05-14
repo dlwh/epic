@@ -1,7 +1,7 @@
 package scalanlp.parser.features
 
+import scalanlp.epic.Feature
 import scalala.tensor.Counter
-import scalanlp.parser.epic._
 import collection.mutable.ArrayBuffer
 import scalanlp.text.tokenize.{WordShapeGenerator, EnglishWordClassGenerator}
 

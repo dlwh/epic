@@ -1,9 +1,9 @@
 package scalanlp.parser.epic
 
 import scalanlp.parser._
-import features.Feature
 import scalala.tensor.{Counter2, ::}
 import scalanlp.trees.{BinaryRule, UnaryRule, BinarizedTree}
+import scalanlp.epic._
 
 /**
  * Base trait for "normal" Parser-type models

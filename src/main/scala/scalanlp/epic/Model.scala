@@ -1,39 +1,40 @@
-package scalanlp.parser.epic
+package scalanlp.epic
 
-import scalanlp.optimize.BatchDiffFunction
 import collection.GenTraversable
-import scalala.tensor.sparse.SparseVector
-import scalala.tensor.dense.{DenseVectorCol, DenseVector}
+import scalanlp.optimize.BatchDiffFunction
 import actors.threadpool.AtomicInteger
-import scalanlp.parser.features.Feature
-import scalanlp.util.{Encoder, Index}
+import scalanlp.util.{Index, Encoder}
+import scalala.tensor.dense.{DenseVectorCol, DenseVector}
 import java.io.File
 
-
-trait Model[Datum] { self =>
-  type ExpectedCounts <: scalanlp.parser.epic.ExpectedCounts[ExpectedCounts]
-  type Inference <: scalanlp.parser.epic.Inference[Datum] {
+trait Model[Datum] {
+  self =>
+  type ExpectedCounts <: scalanlp.epic.ExpectedCounts[ExpectedCounts]
+  type Inference <: scalanlp.epic.Inference[Datum] {
     type ExpectedCounts = self.ExpectedCounts
   }
 
   def featureIndex: Index[Feature]
+
   def numFeatures = featureIndex.size
 
   // just saves feature weights to disk as a serialized counter. The file is prefix.ser.gz
   def cacheFeatureWeights(weights: DenseVector[Double], prefix: String = "weights") {
     val ctr = Encoder.fromIndex(featureIndex).decode(weights)
-    scalanlp.util.writeObject(new File(prefix+".ser.gz"),  ctr)
+    scalanlp.util.writeObject(new File(prefix + ".ser.gz"), ctr)
   }
 
-  def initialValueForFeature(f: Feature):Double// = 0
+  def initialValueForFeature(f: Feature): Double // = 0
 
-  def inferenceFromWeights(weights: DenseVector[Double]):Inference
+  def inferenceFromWeights(weights: DenseVector[Double]): Inference
 
   def emptyCounts: ExpectedCounts
-  def expectedCountsToObjective(ecounts: ExpectedCounts):(Double,DenseVectorCol[Double])
+
+  def expectedCountsToObjective(ecounts: ExpectedCounts): (Double, DenseVectorCol[Double])
 }
+
 /**
- * 
+ *
  * @author dlwh
  */
 class ModelObjective[Datum](val model: Model[Datum],

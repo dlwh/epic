@@ -5,7 +5,7 @@ import scalanlp.util.{Encoder, Index}
 
 final case class ExpectedCounts[Feat](index: Index[Feat],
                                       counts: DenseVectorCol[Double],
-                                      var loss: Double) extends epic.ExpectedCounts[ExpectedCounts[Feat]] {
+                                      var loss: Double) extends scalanlp.epic.ExpectedCounts[ExpectedCounts[Feat]] {
 
   def this(index: Index[Feat]) = this(index, DenseVectorCol.zeros(index.size), 0.0)
 

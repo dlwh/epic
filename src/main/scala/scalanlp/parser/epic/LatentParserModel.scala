@@ -1,7 +1,7 @@
 package scalanlp.parser.epic
 
 import scalanlp.parser._
-import features.{Feature, IndicatorFeature, WordShapeFeaturizer}
+import features._
 import projections.GrammarRefinements
 import scalala.tensor.dense.DenseVector
 import scalala.library.Library
@@ -10,6 +10,7 @@ import io.Source
 import scalala.tensor.Counter
 import scalanlp.trees.{BinarizedTree, AnnotatedLabel}
 import scalanlp.parser.DerivationScorer.Factory
+import scalanlp.epic.Feature
 
 class LatentParserModel[L, L3, W](featurizer: Featurizer[L3, W],
                                   reannotate: (BinarizedTree[L], Seq[W])=>BinarizedTree[L],

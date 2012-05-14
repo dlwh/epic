@@ -1,16 +1,14 @@
 package scalanlp.parser.epic
 
 import scalanlp.parser._
-import features.{Feature, IndicatorFeature, WordShapeFeaturizer}
+import features._
 import projections.GrammarRefinements
-import ParseChart.LogProbabilityParseChart
 import scalala.tensor.dense.DenseVector
-import scalala.tensor.sparse.SparseVector
 import scalala.library.Library
 import scalanlp.trees._
 import java.io.File
 import scalala.tensor.Counter
-import scalala.tensor.mutable.Counter2
+import scalanlp.epic.Feature
 
 class KMModel[L, L3, W](featurizer: Featurizer[L3, W],
                         ann: (BinarizedTree[L], Seq[W])=>BinarizedTree[L3],

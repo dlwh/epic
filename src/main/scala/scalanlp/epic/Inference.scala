@@ -1,16 +1,17 @@
-package scalanlp.parser.epic
+package scalanlp.epic
 
 /**
- * 
+ *
  * @author dlwh
  */
 trait Inference[Datum] extends Serializable {
   type ExpectedCounts;
-  def expectedCounts(datum: Datum):ExpectedCounts
+
+  def expectedCounts(datum: Datum): ExpectedCounts
 }
 
 trait GoldGuessInference[Datum] extends Inference[Datum] {
-  type ExpectedCounts <: scalanlp.parser.epic.ExpectedCounts[ExpectedCounts]
+  type ExpectedCounts <: scalanlp.epic.ExpectedCounts[ExpectedCounts]
 
   def guessCounts(value: Datum):ExpectedCounts
   def goldCounts(value: Datum):ExpectedCounts
@@ -46,4 +47,3 @@ trait MarginalInference[Datum,Augment] extends AugmentableInference[Datum,Augmen
 trait ProjectableInference[Datum,Augment] extends MarginalInference[Datum,Augment] {
   def project(v: Datum, m: Marginal, oldAugment: Augment):Augment
 }
-

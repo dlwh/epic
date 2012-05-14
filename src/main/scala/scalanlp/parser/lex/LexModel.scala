@@ -1,7 +1,7 @@
 package scalanlp.parser
 package lex
 
-import collection.mutable.{ArrayBuilder, ArrayBuffer}
+import collection.mutable.ArrayBuffer
 import epic._
 import features._
 import java.io.File
@@ -15,6 +15,7 @@ import scalanlp.trees._
 import scalanlp.util._
 import collection.Seq
 import scalanlp.text.tokenize.EnglishWordClassGenerator
+import scalanlp.epic.{Feature, Model}
 
 trait LexFeaturizer[L, W] extends Serializable {
   def specialize(words: Seq[W]):Specialization
