@@ -1,12 +1,12 @@
-package scalanlp.parser.epic
+package scalanlp.parser.models
 
-import scalanlp.parser._
-import projections.{AnchoredPCFGProjector}
+import scalanlp.parser.{DerivationScorer, ParseChart, ChartMarginal, TreeInstance}
+import scalanlp.parser.projections.AnchoredPCFGProjector
 
 trait EPProjector[L, W] {
   def project(inf: ParserInference[L, W],
               instance: TreeInstance[L, W],
-              marginal: ChartMarginal[ParseChart.LogProbabilityParseChart, L, W]):DerivationScorer[L,W]
+              marginal: ChartMarginal[ParseChart.LogProbabilityParseChart, L, W]): DerivationScorer[L, W]
 }
 
 @SerialVersionUID(1)
@@ -20,4 +20,3 @@ class AnchoredRuleApproximator[L, W](pruningThreshold: Double = Double.NegativeI
   }
 
 }
-

@@ -1,19 +1,21 @@
-package scalanlp.parser.epic
+package scalanlp.parser
+package models
 
-import scalanlp.parser._
-import scalala.tensor.{Counter2, ::}
-import scalanlp.trees.{BinaryRule, UnaryRule, BinarizedTree}
 import scalanlp.epic._
+import scalala.tensor.Counter2
+import scalanlp.trees.{UnaryRule, BinaryRule}
+import scalanlp.parser.{GenerativeParser, TreeInstance}
 
 /**
  * Base trait for "normal" Parser-type models
  * @author dlwh
  */
 trait ParserModel[L, W] extends Model[TreeInstance[L, W]] with ParserExtractable[L, W] {
-  type L2 // refined label type
   type ExpectedCounts = scalanlp.parser.ExpectedCounts[Feature]
   type Inference <: ParserInference[L, W]
 }
+
+
 
 trait ParserInference[L, W] extends ProjectableInference[TreeInstance[L, W], DerivationScorer[L, W]] {
   type ExpectedCounts = scalanlp.parser.ExpectedCounts[Feature]

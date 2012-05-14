@@ -1,11 +1,12 @@
 package scalanlp.parser
-package epic
+package models
 
 import org.junit.runner.RunWith;
 import org.scalatest._;
 import org.scalatest.junit._
 import projections.{GrammarRefinements, ProjectionIndexer}
 import scalanlp.trees.AnnotatedLabel
+import models.EPParser
 
 
 /**

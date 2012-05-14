@@ -1,4 +1,4 @@
-package scalanlp.parser.epic
+package scalanlp.parser.models
 
 import scalanlp.parser._
 import features._
@@ -13,16 +13,19 @@ import scalanlp.parser.DerivationScorer.Factory
 import scalanlp.epic.Feature
 
 class LatentParserModel[L, L3, W](featurizer: Featurizer[L3, W],
-                                  reannotate: (BinarizedTree[L], Seq[W])=>BinarizedTree[L],
+                                  reannotate: (BinarizedTree[L], Seq[W]) => BinarizedTree[L],
                                   val projections: GrammarRefinements[L, L3],
                                   baseFactory: DerivationScorer.Factory[L, W],
                                   grammar: Grammar[L],
                                   lexicon: Lexicon[L, W],
-                                  initialFeatureVal: (Feature=>Option[Double]) = { _ => None}) extends ParserModel[L, W] {
+                                  initialFeatureVal: (Feature => Option[Double]) = {
+                                    _ => None
+                                  }) extends ParserModel[L, W] {
   type L2 = L3
   type Inference = LatentParserInference[L, L2, W]
 
-  val indexedFeatures: FeatureIndexer[L, L2, W]  = FeatureIndexer(grammar, lexicon, featurizer, projections)
+  val indexedFeatures: FeatureIndexer[L, L2, W] = FeatureIndexer(grammar, lexicon, featurizer, projections)
+
   def featureIndex = indexedFeatures.index
 
   override def initialValueForFeature(f: Feature) = {
@@ -38,7 +41,7 @@ class LatentParserModel[L, L3, W](featurizer: Featurizer[L3, W],
     new LatentParserInference(indexedFeatures, reannotate, grammar, baseFactory, projections)
   }
 
-  def extractParser(weights: DenseVector[Double]):ChartParser[L, W] = {
+  def extractParser(weights: DenseVector[Double]): ChartParser[L, W] = {
     SimpleChartParser(inferenceFromWeights(weights).grammar)
   }
 
@@ -49,7 +52,7 @@ class LatentParserModel[L, L3, W](featurizer: Featurizer[L3, W],
 }
 
 case class LatentParserInference[L, L2, W](featurizer: DerivationFeaturizer[L, W, Feature],
-                                           reannotate: (BinarizedTree[L], Seq[W])=>BinarizedTree[L],
+                                           reannotate: (BinarizedTree[L], Seq[W]) => BinarizedTree[L],
                                            grammar: DerivationScorer.Factory[L, W],
                                            baseMeasure: DerivationScorer.Factory[L, W],
                                            projections: GrammarRefinements[L, L2]) extends ParserInference[L, W] {
@@ -58,7 +61,7 @@ case class LatentParserInference[L, L2, W](featurizer: DerivationFeaturizer[L, W
   def goldCounts(ti: TreeInstance[L, W], augment: DerivationScorer[L, W]) = {
     val reannotated = reannotate(ti.tree, ti.words)
     val product = grammar.specialize(ti.words) * augment
-    val ecounts = LatentTreeMarginal(product,  projections.labels, reannotated).expectedCounts(featurizer)
+    val ecounts = LatentTreeMarginal(product, projections.labels, reannotated).expectedCounts(featurizer)
 
     ecounts
   }
@@ -74,7 +77,7 @@ case class LatentParserModelFactory(baseParser: ParserParams.BaseParser,
   type MyModel = LatentParserModel[AnnotatedLabel, (AnnotatedLabel, Int), String]
 
   def split(x: AnnotatedLabel, counts: Map[AnnotatedLabel, Int], numStates: Int) = {
-    for(i <- 0 until counts.getOrElse(x, numStates)) yield (x, i)
+    for (i <- 0 until counts.getOrElse(x, numStates)) yield (x, i)
   }
 
   def unsplit(x: (AnnotatedLabel, Int)) = x._1
@@ -82,14 +85,14 @@ case class LatentParserModelFactory(baseParser: ParserParams.BaseParser,
   def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]]) = {
     val (xbarWords, xbarBinaries, xbarUnaries) = this.extractBasicCounts(trainTrees.map(_.mapLabels(_.baseAnnotatedLabel)))
 
-    val (xbarParser,xbarLexicon) = baseParser.xbarGrammar(trainTrees)
+    val (xbarParser, xbarLexicon) = baseParser.xbarGrammar(trainTrees)
 
     val baseFactory = DerivationScorerFactory.generative(xbarParser, xbarLexicon, xbarBinaries, xbarUnaries, xbarWords)
     val cFactory = constraints.cachedFactory(baseFactory)
 
-    val substateMap = if(substates != null && substates.exists) {
+    val substateMap = if (substates != null && substates.exists) {
       val in = Source.fromFile(substates).getLines()
-      val pairs = for( line <- in) yield {
+      val pairs = for (line <- in) yield {
         val split = line.split("\\s+")
         AnnotatedLabel(split(0)) -> split(1).toInt
       }
@@ -101,12 +104,12 @@ case class LatentParserModelFactory(baseParser: ParserParams.BaseParser,
     val gen = new WordShapeFeaturizer(Library.sum(xbarWords))
     def labelFlattener(l: (AnnotatedLabel, Int)) = {
       val basic = Seq(l)
-      basic map(IndicatorFeature)
+      basic map (IndicatorFeature)
     }
-    val feat = new SumFeaturizer[(AnnotatedLabel, Int), String](new RuleFeaturizer(labelFlattener _), new LexFeaturizer(gen, labelFlattener _))
-    val indexedRefinements = GrammarRefinements(xbarParser, split(_:AnnotatedLabel, substateMap, numStates), unsplit)
+    val feat = new GenFeaturizer[(AnnotatedLabel, Int), String](gen, labelFlattener _)
+    val indexedRefinements = GrammarRefinements(xbarParser, split(_: AnnotatedLabel, substateMap, numStates), unsplit)
 
-    val featureCounter = if(oldWeights ne null) {
+    val featureCounter = if (oldWeights ne null) {
       val baseCounter = scalanlp.util.readObject[Counter[Feature, Double]](oldWeights)
       baseCounter
     } else {
@@ -115,12 +118,13 @@ case class LatentParserModelFactory(baseParser: ParserParams.BaseParser,
 
     def reannotate(tree: BinarizedTree[AnnotatedLabel], words: Seq[String]) = tree.map(_.baseAnnotatedLabel)
     new LatentParserModel[AnnotatedLabel, (AnnotatedLabel, Int), String](feat,
-                                                                      reannotate,
-                                                                      indexedRefinements,
-                                                                      cFactory,
-                                                                      xbarParser,
-                                                                      xbarLexicon,
-                                                                      {featureCounter.get(_)})
+    reannotate,
+    indexedRefinements,
+    cFactory,
+    xbarParser,
+    xbarLexicon, {
+      featureCounter.get(_)
+    })
   }
 }
 

@@ -1,15 +1,15 @@
 package scalanlp.parser
-package epic
+package models
 
+import scalanlp.epic._
+import scalanlp.util._
 import projections._
-import scalala.tensor.Counter
+import features.Featurizer
 import scalala.tensor.sparse.SparseVector
-import scalala.tensor.dense.DenseVector
+import scalala.tensor.Counter
 import scalanlp.collection.mutable.{ArrayMap, OpenAddressHashArray}
-import scalanlp.util.{Encoder, Index}
-import scalanlp.trees.{LexicalProduction, Rule}
-import features.{Featurizer}
-import scalanlp.epic.Feature
+import scalanlp.trees.LexicalProduction
+import scalala.tensor.dense.DenseVector
 
 /**
  * FeatureIndexers give you an indexed encoding of the features for each rule and label
@@ -19,11 +19,13 @@ import scalanlp.epic.Feature
  */
 @SerialVersionUID(1)
 trait FeatureIndexer[L, L2, W] extends DerivationFeaturizer[L, W, Feature] with Encoder[Feature] with Serializable {
-  val index:Index[Feature]
+  val index: Index[Feature]
   val featurizer: Featurizer[L2, W]
   val grammar: Grammar[L]
   val proj: GrammarRefinements[L, L2]
+
   def labelIndex = proj.labels.fineIndex
+
   def ruleIndex = proj.rules.fineIndex
 
   // r -> SparseVector[Double] of feature weights
@@ -37,20 +39,20 @@ trait FeatureIndexer[L, L2, W] extends DerivationFeaturizer[L, W, Feature] with 
   }
 
   def featuresFor(a: Int, w: W) = {
-    if(!lexicalCache(a).contains(w)) {
+    if (!lexicalCache(a).contains(w)) {
       stripEncode(featurizer.featuresFor(labelIndex.get(a), w))
     }
     else lexicalCache(a)(w)
   }
 
   def dotProjectOfFeatures(a: Int, w: W, weights: DenseVector[Double]) = {
-    if(lexicalCache(a).contains(w)) lexicalCache(a)(w) dot weights
+    if (lexicalCache(a).contains(w)) lexicalCache(a)(w) dot weights
     else {
       var score = 0.0
       val feats = featurizer.featuresFor(labelIndex.get(a), w)
-      for( (k, v) <- feats.nonzero.pairs) {
+      for ((k, v) <- feats.nonzero.pairs) {
         val ind = index(k)
-        if(ind != -1) {
+        if (ind != -1) {
           score += v * weights(ind)
         }
       }
@@ -61,23 +63,23 @@ trait FeatureIndexer[L, L2, W] extends DerivationFeaturizer[L, W, Feature] with 
 
   def specialize(words: Seq[W]) = new Spec(words)
 
-  def initialValueFor(f: Feature):Double = featurizer.initialValueForFeature(f)
+  def initialValueFor(f: Feature): Double = featurizer.initialValueForFeature(f)
 
-  def initialValueFor(f: Int):Double = initialValueFor(index.get(f))
+  def initialValueFor(f: Int): Double = initialValueFor(index.get(f))
 
   // strips out features we haven't seen before.
   private def stripEncode(ctr: Counter[Feature, Double]) = {
     val res = mkSparseVector()
-    for( (k, v) <- ctr.nonzero.pairs) {
+    for ((k, v) <- ctr.nonzero.pairs) {
       val ind = index(k)
-      if(ind != -1) {
+      if (ind != -1) {
         res(ind) = v
       }
     }
     res
   }
 
-  case class Spec private[FeatureIndexer] (words: Seq[W]) extends super.Specialization {
+  case class Spec private[FeatureIndexer](words: Seq[W]) extends super.Specialization {
     def featuresForBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int) = {
       val globalRule = proj.rules.globalize(rule, ref)
       featuresFor(globalRule).data.indexArray
@@ -89,12 +91,13 @@ trait FeatureIndexer[L, L2, W] extends DerivationFeaturizer[L, W, Feature] with 
     }
 
     def featuresForSpan(begin: Int, end: Int, tag: Int, ref: Int) = {
-      if(begin+1 == end) {
+      if (begin + 1 == end) {
         val globalTag = proj.labels.globalize(tag, ref)
         featuresFor(globalTag, words(begin)).data.indexArray
       } else Array.empty[Int]
     }
   }
+
 }
 
 object FeatureIndexer {
@@ -199,4 +202,3 @@ object FeatureIndexer {
   }
 
 }
-

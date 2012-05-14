@@ -1,5 +1,5 @@
 package scalanlp.parser
-package epic
+package models
 
 import scalala.tensor.dense.DenseVector
 import scalanlp.trees.BinarizedTree
@@ -11,7 +11,7 @@ import scalanlp.epic.{EPModel, EPInference}
  * @author dlwh
  */
 class EPParser[L, W](grammar: Grammar[L],
-                     lexicon: Lexicon[L,  W],
+                     lexicon: Lexicon[L, W],
                      inference: EPInference[TreeInstance[L, W], DerivationScorer[L, W]]) extends Parser[L, W] with Serializable {
   def bestParse(s: Seq[W]) = {
     val inst = new TreeInstance[L, W]("", null, s)
@@ -23,8 +23,10 @@ class EPParser[L, W](grammar: Grammar[L],
 }
 
 object EPParser {
+
   trait Extractor[L, W] extends EPModel[TreeInstance[L, W], DerivationScorer[L, W]] with ParserExtractable[L, W] {
     def grammar: Grammar[L]
+
     def lexicon: Lexicon[L, W]
 
     def extractParser(weights: DenseVector[Double]) = {
@@ -36,12 +38,13 @@ object EPParser {
                              lexicon: Lexicon[L, W],
                              base: DerivationScorer.Factory[L, W],
                              grammars: (DerivationScorer.Factory[L, W])*) = {
-    val infs = grammars.map{ p =>
-      new DiscParserInference(null,
-      {(a:BinarizedTree[L], b:Seq[W])=>a},
+    val infs = grammars.map {
+      p =>
+        new DiscParserInference(null, {
+          (a: BinarizedTree[L], b: Seq[W]) => a.map(_ -> 0)
+        },
         p,
-        base,
-        null)
+        base)
     }
     val ep = new EPInference(infs.toIndexedSeq, 5)
     new EPParser(grammar, lexicon, ep)

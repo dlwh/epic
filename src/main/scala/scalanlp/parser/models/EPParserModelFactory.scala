@@ -1,8 +1,5 @@
-package scalanlp.parser.epic
+package scalanlp.parser.models
 
-import collection.mutable.ArrayBuffer
-import scalanlp.inference.{Factor, ExpectationPropagation}
-import scalala.tensor.dense.DenseVector
 import scalanlp.parser._
 import java.io.File
 import scalala.tensor.Counter
@@ -11,7 +8,7 @@ import scalanlp.epic._
 
 import scalanlp.util._
 
-case class EPParams(iterations: Int= 5, pruningThreshold: Double = -15)
+case class EPParams(iterations: Int = 5, pruningThreshold: Double = -15)
 
 object EPParserModelFactory {
   type CompatibleFactory = ModelFactory[TreeInstance[AnnotatedLabel, String]] {
@@ -33,25 +30,29 @@ case class EPParserModelFactory(ep: EPParams,
                                 oldWeights: File = null) extends ParserExtractableModelFactory[AnnotatedLabel, String] {
   type MyModel = (
     EPModel[TreeInstance[AnnotatedLabel, String], DerivationScorer[AnnotatedLabel, String]]
-    with EPParser.Extractor[AnnotatedLabel, String]
-  )
+      with EPParser.Extractor[AnnotatedLabel, String]
+    )
 
   def make(train: IndexedSeq[TreeInstance[AnnotatedLabel, String]]) = {
-    val (xbarGrammar,xbarLexicon) = baseParser.xbarGrammar(train)
+    val (xbarGrammar, xbarLexicon) = baseParser.xbarGrammar(train)
 
     type ModelType = EPModel.CompatibleModel[TreeInstance[AnnotatedLabel, String], DerivationScorer[AnnotatedLabel, String]]
-    val models = Seq(model1, model2, model3, model4, model5, model6, model7, model8).filterNot(_ eq null) map { model =>
-      model.make(train):ModelType
+    val models = Seq(model1, model2, model3, model4, model5, model6, model7, model8).filterNot(_ eq null) map {
+      model =>
+        model.make(train): ModelType
     }
 
-    val featureCounter = if(oldWeights ne null) {
+    val featureCounter = if (oldWeights ne null) {
       readObject[Counter[Feature, Double]](oldWeights)
     } else {
       Counter[Feature, Double]()
     }
 
-    new EPModel(ep.iterations, {featureCounter.get(_)}, models:_*) with EPParser.Extractor[AnnotatedLabel, String] with Serializable {
+    new EPModel(ep.iterations, {
+      featureCounter.get(_)
+    }, models: _*) with EPParser.Extractor[AnnotatedLabel, String] with Serializable {
       def grammar = xbarGrammar
+
       def lexicon = xbarLexicon
     }
   }

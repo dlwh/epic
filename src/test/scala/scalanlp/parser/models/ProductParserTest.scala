@@ -1,5 +1,5 @@
 package scalanlp.parser
-package epic
+package models
 
 import org.junit.runner.RunWith;
 import org.scalatest._;

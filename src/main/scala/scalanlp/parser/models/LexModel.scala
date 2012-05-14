@@ -1,24 +1,64 @@
 package scalanlp.parser
-package lex
+package models
 
-import collection.mutable.ArrayBuffer
-import epic._
-import features._
-import java.io.File
-import scalala.library.Library
-import scalala.tensor.::
-import scalala.tensor.Counter2
+import scalanlp.epic._
+import scalanlp.collection.mutable.OpenAddressHashArray
 import scalala.tensor.dense.DenseVector
 import scalala.tensor.mutable.Counter
-import scalanlp.collection.mutable.OpenAddressHashArray
-import scalanlp.trees._
-import scalanlp.util._
-import collection.Seq
+import scalala.tensor.{Counter2,::}
 import scalanlp.text.tokenize.EnglishWordClassGenerator
-import scalanlp.epic.{Feature, Model}
+import scalanlp.trees._
+import java.io.File
+import features._
+import scalala.library.Library
+import scalanlp.parser._
+import features.RuleFeature
+import scalanlp.util._
+import collection.mutable.ArrayBuffer
+
+class LexModel[L, W](bundle: LexGrammarBundle[L, W],
+                     reannotate: (BinarizedTree[L], Seq[W])=>BinarizedTree[L],
+                     indexed: IndexedFeaturizer[L, W],
+                     baseFactory: DerivationScorer.Factory[L, W],
+                     coarse: Grammar[L],
+                     coarseLex: Lexicon[L, W],
+                     initFeatureValue: Feature=>Option[Double]) extends Model[TreeInstance[L, W]] with Serializable with ParserExtractable[L, W] {
+
+  def extractParser(weights: DenseVector[Double]) = {
+    val inf = inferenceFromWeights(weights)
+    SimpleChartParser(inf.grammar)
+  }
+
+  val featureIndex = indexed.index
+
+  import bundle._
+
+  def initialValueForFeature(f: Feature) = initFeatureValue(f).getOrElse(0)
+
+  def inferenceFromWeights(weights: DenseVector[Double]) = {
+    val gram: DerivationScorer.Factory[L, W] = bundle.makeGrammar(indexed, weights)
+    def ann(tree: BinarizedTree[L], words: Seq[W]):BinarizedTree[(L, Int)] = {
+      val reannotated = reannotate(tree, words)
+      val headed = headFinder.annotateHeadIndices(reannotated)
+      headed
+
+    }
+    new DiscParserInference(indexed, ann _, gram, baseFactory)
+  }
+
+  type Inference = DiscParserInference[L, W]
+  type ExpectedCounts = scalanlp.parser.ExpectedCounts[Feature]
+
+  def emptyCounts = new ExpectedCounts(indexed.index)
+
+  def expectedCountsToObjective(ecounts: ExpectedCounts) = {
+    (ecounts.loss, ecounts.counts)
+  }
+
+}
 
 trait LexFeaturizer[L, W] extends Serializable {
-  def specialize(words: Seq[W]):Specialization
+  def specialize(words: Seq[W]): Specialization
 
   /**
    * Specialization assumes that features are of several kinds, so that we can efficiently cache them.
@@ -27,20 +67,23 @@ trait LexFeaturizer[L, W] extends Serializable {
 
     // Features for this rule with this head (and corresponding head child, as appropriate). For unaries.
     def featuresForHead(rule: Int, head: Int): Array[Feature]
+
     // Features for this rule with this dependent (and corresponding head child, as appropriate)
     def featuresForDep(rule: Int, dep: Int): Array[Feature]
+
     // Features for the unlabeled attachment of these two words
-    def featuresForBilex(head: Int, dep: Int):Array[Feature]
+    def featuresForBilex(head: Int, dep: Int): Array[Feature]
+
     // all features for this attachment not captured by the above.
-    def featuresForAttach(r: Int, head: Int, dep: Int):Array[Feature]
+    def featuresForAttach(r: Int, head: Int, dep: Int): Array[Feature]
 
 
     def featuresForTag(tag: Int, head: Int): Array[Feature]
   }
+
 }
 
-case class HashFeature(hashBucket: Int) extends Feature
-case object LowCount extends Feature
+
 
 /**
  * Indexes and caches features for more efficient access.
@@ -70,7 +113,7 @@ class IndexedFeaturizer[L, W](f: LexFeaturizer[L, W],
 
 
   case class Spec(words: Seq[W]) extends super.Specialization {
-    
+
     def length = words.length
 
     def featuresForUnaryRule(begin: Int, end: Int, rule: Int, ref: Int) = {
@@ -206,15 +249,6 @@ class IndexedFeaturizer[L, W](f: LexFeaturizer[L, W],
 
 }
 
-case class HeadFeature[P](r: Feature, head: P) extends Feature
-
-case class DepFeature[P](r: Feature, dep: P) extends Feature
-case class HeadDepFeature[P](r: Feature, head: P, dep: P) extends Feature
-
-case class BilexicalFeature[W](head: W, dep: W, dir: Symbol) extends Feature
-case class TagFeature[L, W](tag: L, dep: W) extends Feature
-case class DistFeature(dist: Int, f: Feature) extends Feature
-case class PartFeature[P](feature: Feature, part: P) extends Feature
 
 case class StandardFeaturizer[L, W>:Null, P](wordIndex: Index[W],
                                              labelIndex: Index[L],
@@ -371,7 +405,6 @@ case class LexGrammarBundle[L, W](baseGrammar: Grammar[L],
   }
 
   def makeGrammar(fi: IndexedFeaturizer[L, W], weights: DenseVector[Double]): DerivationScorer.Factory[L, W] = {
-    val wi = wordIndex
     new DerivationScorer.Factory[L, W] {
       val grammar = baseGrammar
       val lexicon = baseLexicon
@@ -402,17 +435,6 @@ case class LexGrammarBundle[L, W](baseGrammar: Grammar[L],
           }
           score
         }
-
-        /*
-        def tagScores(head: Int) = {
-          val sv = new OldSparseVector(labelIndex.size, Double.NegativeInfinity, indexedValidTags(head).size)
-          for (l <- indexedValidTags(head)) {
-            sv(l) = dot(f.featuresForTag(l, head))
-          }
-          sv
-        }
-        */
-
 
         def scoreSpan(begin: Int, end: Int, label: Int, ref: Int) = {
           if(ref < begin || ref >= end) error("grrr")
@@ -570,7 +592,7 @@ object IndexedFeaturizer {
       rec(ti.tree)
       set
     }, {(a, b) => a += b})
-    
+
 
     val goldFeatureIndex = Index[Feature]()
     val lowCountFeatures = collection.mutable.Set[Feature]()
@@ -589,56 +611,7 @@ object IndexedFeaturizer {
 
 
 
-class LexModel[L, W](bundle: LexGrammarBundle[L, W],
-                     reannotate: (BinarizedTree[L], Seq[W])=>BinarizedTree[L],
-                     indexed: IndexedFeaturizer[L, W],
-                     baseFactory: DerivationScorer.Factory[L, W],
-                     coarse: Grammar[L],
-                     coarseLex: Lexicon[L, W],
-                     initFeatureValue: Feature=>Option[Double]) extends Model[TreeInstance[L, W]] with Serializable with ParserExtractable[L, W] {
 
-  def extractParser(weights: DenseVector[Double]) = {
-    val inf = inferenceFromWeights(weights)
-    SimpleChartParser(inf.grammar)
-  }
-
-  val featureIndex = indexed.index
-
-  import bundle._
-
-  def initialValueForFeature(f: Feature) = initFeatureValue(f).getOrElse(0)
-
-  def inferenceFromWeights(weights: DenseVector[Double]) = {
-    val gram: DerivationScorer.Factory[L, W] = bundle.makeGrammar(indexed, weights)
-    new LexInference(reannotate, gram, indexed, baseFactory, headFinder)
-  }
-
-  type Inference = LexInference[L, W]
-  type ExpectedCounts = scalanlp.parser.ExpectedCounts[Feature]
-
-  def emptyCounts = new ExpectedCounts(indexed.index)
-
-  def expectedCountsToObjective(ecounts: ExpectedCounts) = {
-    (ecounts.loss, ecounts.counts)
-  }
-
-}
-
-case class LexInference[L, W](reannotate: (BinarizedTree[L], Seq[W])=>BinarizedTree[L],
-                              grammar: DerivationScorer.Factory[L, W],
-                              featurizer: IndexedFeaturizer[L, W],
-                              baseMeasure: DerivationScorer.Factory[L, W],
-                              headFinder: HeadFinder[L]) extends ParserInference[L, W] {
-
-  def goldCounts(ti: TreeInstance[L, W], augment: DerivationScorer[L, W]) = {
-    val reannotated = reannotate(ti.tree, ti.words)
-    val headed = headFinder.annotateHeadIndices(reannotated).asInstanceOf[BinarizedTree[(L,Int)]]
-    val product = grammar.specialize(ti.words) * augment
-    TreeMarginal(product, headed).expectedCounts(featurizer)
-  }
-}
-
-case class SubstringFeature(w: String) extends Feature
 
 class SimpleWordShapeGen[L](tagWordCounts: Counter2[L, String, Double],
                             counts: Counter[String, Double], noShapeThreshold: Int = 100, minCountThreshold: Int = 5) extends (String=>IndexedSeq[String]) with Serializable {
