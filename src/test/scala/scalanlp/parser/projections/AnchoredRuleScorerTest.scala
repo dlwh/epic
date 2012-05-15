@@ -5,7 +5,7 @@ import org.junit.runner.RunWith
 import org.scalatest._
 import org.scalatest.junit._
 import org.scalatest.prop._
-import scalanlp.trees.AnnotatedLabel
+import scalanlp.trees.{TreeInstance, AnnotatedLabel}
 
 
 /**
