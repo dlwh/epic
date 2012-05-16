@@ -60,10 +60,16 @@ abstract class ParseChart[L](val index: Index[L],
     private def updateExtents(index: Int, parent: Int, ref: Int, begin: Int, end: Int) {
       enteredLabels(index) += parent
       enteredRefinements(index)(parent) += ref
+
       narrowLeft(end)(parent)(ref) = math.max(begin, narrowLeft(end)(parent)(ref))
       wideLeft(end)(parent)(ref) = math.min(begin, wideLeft(end)(parent)(ref))
       wideRight(begin)(parent)(ref) = math.max(end, wideRight(begin)(parent)(ref))
       narrowRight(begin)(parent)(ref) = math.min(end, narrowRight(begin)(parent)(ref))
+
+      coarseNarrowLeft(end)(parent) = math.max(begin, coarseNarrowLeft(end)(parent))
+      coarseWideLeft(end)(parent) = math.min(begin, coarseWideLeft(end)(parent))
+      coarseWideRight(begin)(parent) = math.max(end, coarseWideRight(begin)(parent))
+      coarseNarrowRight(begin)(parent) = math.min(end, coarseNarrowRight(begin)(parent))
     }
 
     def feasibleSpanX(begin: Int, end: Int, leftState: Int, leftRef: Int, rightState: Int, rightRef: Int):Long = {
@@ -105,14 +111,23 @@ abstract class ParseChart[L](val index: Index[L],
     }
 
 
-    // right most place a left constituent with label l can start and end at position i
-    val narrowLeft = makeExtentArray(-1)
-    // left most place a left constituent with label l can start and end at position i
+    /** right most place a left constituent with label l can start and end at position i. (start)(sym)(ref) */
+    val narrowLeft: Array[Array[Array[Int]]] = makeExtentArray(-1)
+    /** left most place a left constituent with label l can start and end at position i. (start)(sym)(ref) */
     val wideLeft = makeExtentArray(length+1)
-    // left most place a right constituent with label l--which starts at position i--can end.
+    /** left most place a right constituent with label l--which starts at position i--can end. (end)(sym)(ref) */
     val narrowRight = makeExtentArray(length+1)
-    // right-most place a right constituent with label l--which starts at position i--can end.
+    /** right-most place a right constituent with label l--which starts at position i--can end. (end)(sym)(ref) */
     val wideRight = makeExtentArray(-1)
+
+    /** right most place a left constituent with label l can start and end at position i. (start)(sym) */
+    val coarseNarrowLeft = makeCoarseExtentArray(-1)
+    /** left most place a left constituent with label l can start and end at position i  (start)(sym) */
+    val coarseWideLeft = makeCoarseExtentArray(length+1)
+    /** left most place a right constituent with label l--which starts at position i--can end. (end)(sym) */
+    val coarseNarrowRight = makeCoarseExtentArray(length+1)
+    /** right-most place a right constituent with label l--which starts at position i--can end. (end)(sym)*/
+    val coarseWideRight = makeCoarseExtentArray(-1)
   }
 
   private def makeExtentArray(value: Int) = {
@@ -120,6 +135,14 @@ abstract class ParseChart[L](val index: Index[L],
     for(arr1 <- arr; j <- 0 until arr1.length) {
       arr1(j) = new Array[Int](refinementsFor(j))
       Arrays.fill(arr1(j), value)
+    }
+    arr
+  }
+
+  private def makeCoarseExtentArray(value: Int) = {
+    val arr = Array.ofDim[Int](length + 1, grammarSize)
+    for(arr1 <- arr) {
+      Arrays.fill(arr1, value)
     }
     arr
   }

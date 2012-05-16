@@ -46,10 +46,16 @@ case class ChartMarginal[+Chart[X]<:ParseChart[X], L, W](scorer: DerivationScore
     } {
       val end = begin + span
 
+      // I get a 20% speedup if i inline these arrays. so be it.
       val narrowRight = inside.top.narrowRight(begin)
       val narrowLeft = inside.top.narrowLeft(end)
       val wideRight = inside.top.wideRight(begin)
       val wideLeft = inside.top.wideLeft(end)
+
+      val coarseNarrowRight = inside.top.coarseNarrowRight(begin)
+      val coarseNarrowLeft = inside.top.coarseNarrowLeft(end)
+      val coarseWideRight = inside.top.coarseWideRight(begin)
+      val coarseWideLeft = inside.top.coarseWideLeft(end)
 
       for (a <- inside.bot.enteredLabelIndexes(begin, end); refA <- inside.bot.enteredLabelRefinements(begin, end, a)) {
         var i = 0;
@@ -63,42 +69,57 @@ case class ChartMarginal[+Chart[X]<:ParseChart[X], L, W](scorer: DerivationScore
             val b = grammar.leftChild(r)
             val c = grammar.rightChild(r)
             i += 1
-            // this is too slow, so i'm having to inline it.
-            //              val feasibleSpan = itop.feasibleSpanX(begin, end, b, c)
-            val refinements = scorer.validRuleRefinementsGivenParent(begin, end, r, refA)
-            var ruleRefIndex = 0
-            while(ruleRefIndex < refinements.length) {
-              val refR = refinements(ruleRefIndex)
-              ruleRefIndex += 1
-              val refB = scorer.leftChildRefinement(r, refR)
-              val refC = scorer.rightChildRefinement(r, refR)
-              val narrowR:Int = narrowRight(b)(refB)
-              val narrowL:Int = narrowLeft(c)(refC)
 
-              val feasibleSpan = if (narrowR >= end || narrowL < narrowR) {
-                0L
-              } else {
-                val trueX:Int = wideLeft(c)(refC)
-                val trueMin = if (narrowR > trueX) narrowR else trueX
-                val wr:Int = wideRight(b)(refB)
-                val trueMax = if (wr < narrowL) wr else narrowL
-                if (trueMin > narrowL || trueMin > trueMax)  0L
-                else ((trueMin:Long) << 32) | ((trueMax + 1):Long)
-              }
-              var split = (feasibleSpan >> 32).toInt
-              val endSplit = feasibleSpan.toInt // lower 32 bits
-              while(split < endSplit) {
-                val ruleScore = scorer.scoreBinaryRule(begin, split, end, r, refR)
-                val bInside = itop.labelScore(begin, split, b, refB)
-                val cInside = itop.labelScore(split, end, c, refC)
-                val score = aScore + ruleScore + bInside + cInside - partition
-                if (!java.lang.Double.isInfinite(score)) {
-                  val expScore = math.exp(score)
-                  count += expScore
-                  spanVisitor.visitBinaryRule(begin, split, end, r, refR, expScore)
+            val narrowR:Int = coarseNarrowRight(b)
+            val narrowL:Int = coarseNarrowLeft(c)
+
+            val canBuildThisRule = if (narrowR >= end || narrowL < narrowR) {
+              false
+            } else {
+              val trueX:Int = coarseWideLeft(c)
+              val trueMin = if(narrowR > trueX) narrowR else trueX
+              val wr:Int = coarseWideRight(b)
+              val trueMax = if(wr < narrowL) wr else narrowL
+              if(trueMin > narrowL || trueMin > trueMax) false
+              else trueMin < trueMax + 1
+            }
+
+            if(canBuildThisRule) {
+              val refinements = scorer.validRuleRefinementsGivenParent(begin, end, r, refA)
+              var ruleRefIndex = 0
+              while(ruleRefIndex < refinements.length) {
+                val refR = refinements(ruleRefIndex)
+                ruleRefIndex += 1
+                val refB = scorer.leftChildRefinement(r, refR)
+                val refC = scorer.rightChildRefinement(r, refR)
+                val narrowR:Int = narrowRight(b)(refB)
+                val narrowL:Int = narrowLeft(c)(refC)
+
+                val feasibleSpan = if (narrowR >= end || narrowL < narrowR) {
+                  0L
+                } else {
+                  val trueX:Int = wideLeft(c)(refC)
+                  val trueMin = if (narrowR > trueX) narrowR else trueX
+                  val wr:Int = wideRight(b)(refB)
+                  val trueMax = if (wr < narrowL) wr else narrowL
+                  if (trueMin > narrowL || trueMin > trueMax)  0L
+                  else ((trueMin:Long) << 32) | ((trueMax + 1):Long)
                 }
+                var split = (feasibleSpan >> 32).toInt
+                val endSplit = feasibleSpan.toInt // lower 32 bits
+                while(split < endSplit) {
+                  val bInside = itop.labelScore(begin, split, b, refB)
+                  val cInside = itop.labelScore(split, end, c, refC)
+                  if (!java.lang.Double.isInfinite(bInside + cInside)) {
+                    val ruleScore = scorer.scoreBinaryRule(begin, split, end, r, refR)
+                    val score = aScore + ruleScore + bInside + cInside - partition
+                    val expScore = math.exp(score)
+                    count += expScore
+                    spanVisitor.visitBinaryRule(begin, split, end, r, refR, expScore)
+                  }
 
-                split += 1
+                  split += 1
+                }
               }
             }
           }

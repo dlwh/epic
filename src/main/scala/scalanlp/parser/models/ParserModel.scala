@@ -5,6 +5,7 @@ import scalanlp.epic._
 import scalala.tensor.Counter2
 import scalanlp.parser.GenerativeParser
 import scalanlp.trees.{TreeInstance, UnaryRule, BinaryRule}
+import scalala.tensor.dense.DenseVector
 
 /**
  * Base trait for "normal" Parser-type models
@@ -13,6 +14,11 @@ import scalanlp.trees.{TreeInstance, UnaryRule, BinaryRule}
 trait ParserModel[L, W] extends Model[TreeInstance[L, W]] with ParserExtractable[L, W] {
   type ExpectedCounts = scalanlp.parser.ExpectedCounts[Feature]
   type Inference <: ParserInference[L, W]
+
+  def extractParser(weights: DenseVector[Double]) = {
+    val inf = inferenceFromWeights(weights)
+    SimpleChartParser(inf.grammar * inf.baseMeasure)
+  }
 }
 
 

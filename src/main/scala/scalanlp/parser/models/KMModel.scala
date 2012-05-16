@@ -46,11 +46,6 @@ class KMModel[L, L2, W](featurizer: Featurizer[L2, W],
     new DiscParserInference(indexedFeatures, reannotate, grammar, baseFactory)
   }
 
-  def extractParser(weights: DenseVector[Double]): ChartParser[L, W] = {
-    val inf = inferenceFromWeights(weights)
-    SimpleChartParser(inf.grammar)
-  }
-
   def expectedCountsToObjective(ecounts: ExpectedCounts) = {
     (ecounts.loss, ecounts.counts)
   }

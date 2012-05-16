@@ -22,12 +22,7 @@ class LexModel[L, W](bundle: LexGrammarBundle[L, W],
                      baseFactory: DerivationScorer.Factory[L, W],
                      coarse: Grammar[L],
                      coarseLex: Lexicon[L, W],
-                     initFeatureValue: Feature=>Option[Double]) extends Model[TreeInstance[L, W]] with Serializable with ParserExtractable[L, W] {
-
-  def extractParser(weights: DenseVector[Double]) = {
-    val inf = inferenceFromWeights(weights)
-    SimpleChartParser(inf.grammar)
-  }
+                     initFeatureValue: Feature=>Option[Double]) extends ParserModel[L, W] with Serializable with ParserExtractable[L, W] {
 
   val featureIndex = indexed.index
 
@@ -47,9 +42,8 @@ class LexModel[L, W](bundle: LexGrammarBundle[L, W],
   }
 
   type Inference = DiscParserInference[L, W]
-  type ExpectedCounts = scalanlp.parser.ExpectedCounts[Feature]
 
-  def emptyCounts = new ExpectedCounts(indexed.index)
+  def emptyCounts = new scalanlp.parser.ExpectedCounts(indexed.index)
 
   def expectedCountsToObjective(ecounts: ExpectedCounts) = {
     (ecounts.loss, ecounts.counts)
@@ -100,7 +94,7 @@ class IndexedFeaturizer[L, W](f: LexFeaturizer[L, W],
                              ruleIndex: Index[Rule[L]],
                              val trueFeatureIndex: Index[Feature],
                              lowCountFeatures: Set[Feature],
-                             dummyFeatures: Int) extends DerivationFeaturizer[L, W, Feature] {
+                             dummyFeatures: Int) extends DerivationFeaturizer[L, W, Feature] with Serializable {
   def specialize(words: Seq[W]):Specialization = new Spec(words)
 
   val (index:Index[Feature], lowCountFeature) = {
@@ -123,8 +117,11 @@ class IndexedFeaturizer[L, W](f: LexFeaturizer[L, W],
     def featuresForSpan(begin: Int, end: Int, tag: Int, ref: Int) = {
       if(begin +1 == end)
         featuresForTag(tag, ref)
-      else Array.empty[Int]
+      else
+        emptyArray
     }
+
+    private val emptyArray = Array.empty[Int]
 
     private val fspec = f.specialize(words)
     def featuresForTag(tag: Int, head: Int): Array[Int] = {
@@ -149,7 +146,7 @@ class IndexedFeaturizer[L, W](f: LexFeaturizer[L, W],
       var rcache = binaryCache(head)
       if(rcache eq null) {
         rcache = new OpenAddressHashArray[Array[Int]](ruleIndex.size * words.size)
-        headCache(head) = rcache
+        binaryCache(head) = rcache
       }
       val i = rule * words.size + dep
       var cache = rcache(i)

@@ -71,10 +71,17 @@ class CKYChartBuilder[+Chart[X]<:ParseChart[X], L, W](val grammar: DerivationSco
       begin <- 0 to (words.length - span)
       end = begin + span
     } {
+      // I get a 20% speedup by inlining code dealing with these arrays. sigh.
       val narrowRight = top.narrowRight(begin)
       val narrowLeft = top.narrowLeft(end)
       val wideRight = top.wideRight(begin)
       val wideLeft = top.wideLeft(end)
+
+      val coarseNarrowRight = top.coarseNarrowRight(begin)
+      val coarseNarrowLeft = top.coarseNarrowLeft(end)
+      val coarseWideRight = top.coarseWideRight(begin)
+      val coarseWideLeft = top.coarseWideLeft(end)
+
       for ( ai <- 0 until grammar.labelIndex.size; refA <- spec.validLabelRefinements(begin, end, ai)) {
         val a = ai
         val passScore = spec.scoreSpan(begin, end, a, refA)
@@ -88,49 +95,71 @@ class CKYChartBuilder[+Chart[X]<:ParseChart[X], L, W](val grammar: DerivationSco
             val b = g.leftChild(r)
             val c = g.rightChild(r)
             ruleIndex += 1
-            val refinements = spec.validRuleRefinementsGivenParent(begin, end, r, refA)
-            var ruleRefIndex = 0
-            while(ruleRefIndex < refinements.length) {
-              val refR = refinements(ruleRefIndex)
-              ruleRefIndex += 1
-              val refB = spec.leftChildRefinement(r, refR)
-              val refC = spec.rightChildRefinement(r, refR)
-              // narrowR etc is hard to understand, and should be a different methood
-              // but caching the arrays speeds things up by 20% or more...
-              // so it's inlined.
-              //
-              // See [[ParseChart]] for what these labels mean
-              val narrowR:Int = narrowRight(b)(refB)
-              val narrowL:Int = narrowLeft(c)(refC)
 
-              val feasibleSpan = if (narrowR >= end || narrowL < narrowR) {
-                0L
-              } else {
-                val trueX:Int = wideLeft(c)(refC)
-                val trueMin = if(narrowR > trueX) narrowR else trueX
-                val wr:Int = wideRight(b)(refB)
-                val trueMax = if(wr < narrowL) wr else narrowL
-                if(trueMin > narrowL || trueMin > trueMax)  0L
-                else ((trueMin:Long) << 32) | ((trueMax + 1):Long)
-              }
-              var split = (feasibleSpan >> 32).toInt
-              val endSplit = feasibleSpan.toInt // lower 32 bits
-              while(split < endSplit) {
-                val ruleScore = spec.scoreBinaryRule(begin, split, end, r, refR)
-                val bScore = chart.top.labelScore(begin, split, b, refB)
-                val cScore = chart.top.labelScore(split, end, c, refC)
-                val totalA = ruleScore + passScore
-                val prob = bScore + cScore + totalA
-                if(!java.lang.Double.isInfinite(prob)) {
-                  scoreArray(offset) = prob
-                  offset += 1
-                  // buffer full
-                  if(offset == scoreArray.length) {
-                    scoreArray(0) = chart.sum(scoreArray, offset)
-                    offset = 1
-                  }
+            // Check: can we build any refinement of this rule?
+            // basically, we can if
+            val narrowR:Int = coarseNarrowRight(b)
+            val narrowL:Int = coarseNarrowLeft(c)
+
+            val canBuildThisRule = if (narrowR >= end || narrowL < narrowR) {
+              false
+            } else {
+              val trueX:Int = coarseWideLeft(c)
+              val trueMin = if(narrowR > trueX) narrowR else trueX
+              val wr:Int = coarseWideRight(b)
+              val trueMax = if(wr < narrowL) wr else narrowL
+              if(trueMin > narrowL || trueMin > trueMax) false
+              else trueMin < trueMax + 1
+            }
+
+            if(canBuildThisRule) {
+              val refinements = spec.validRuleRefinementsGivenParent(begin, end, r, refA)
+              var ruleRefIndex = 0
+              while(ruleRefIndex < refinements.length) {
+                val refR = refinements(ruleRefIndex)
+                ruleRefIndex += 1
+                val refB = spec.leftChildRefinement(r, refR)
+                val refC = spec.rightChildRefinement(r, refR)
+                // narrowR etc is hard to understand, and should be a different methood
+                // but caching the arrays speeds things up by 20% or more...
+                // so it's inlined.
+                //
+                // See [[ParseChart]] for what these labels mean
+                val narrowR:Int = narrowRight(b)(refB)
+                val narrowL:Int = narrowLeft(c)(refC)
+
+                val feasibleSpan = if (narrowR >= end || narrowL < narrowR) {
+                  0L
+                } else {
+                  val trueX:Int = wideLeft(c)(refC)
+                  val trueMin = if(narrowR > trueX) narrowR else trueX
+                  val wr:Int = wideRight(b)(refB)
+                  val trueMax = if(wr < narrowL) wr else narrowL
+                  if(trueMin > narrowL || trueMin > trueMax)  0L
+                  else ((trueMin:Long) << 32) | ((trueMax + 1):Long)
                 }
-                split += 1
+                var split = (feasibleSpan >> 32).toInt
+                val endSplit = feasibleSpan.toInt // lower 32 bits
+                while(split < endSplit) {
+                  val bScore = chart.top.labelScore(begin, split, b, refB)
+                  val cScore = chart.top.labelScore(split, end, c, refC)
+                  val withoutRule = bScore + cScore + passScore
+                  if(withoutRule != Double.NegativeInfinity) {
+                    // scoring a rule can be slow, so we don't check it if we don't need to.
+                    val ruleScore = spec.scoreBinaryRule(begin, split, end, r, refR)
+                    val prob = withoutRule + ruleScore
+                    if(!java.lang.Double.isInfinite(prob)) {
+                      scoreArray(offset) = prob
+                      offset += 1
+                      // buffer full
+                      if(offset == scoreArray.length) {
+                        scoreArray(0) = chart.sum(scoreArray, offset)
+                        offset = 1
+                      }
+                    }
+                  }
+                  split += 1
+                }
               }
             }
           }
@@ -163,6 +192,12 @@ class CKYChartBuilder[+Chart[X]<:ParseChart[X], L, W](val grammar: DerivationSco
       val narrowLeft = itop.narrowLeft(end)
       val wideRight = itop.wideRight(begin)
       val wideLeft = itop.wideLeft(end)
+
+      val coarseNarrowRight = inside.top.coarseNarrowRight(begin)
+      val coarseNarrowLeft = inside.top.coarseNarrowLeft(end)
+      val coarseWideRight = inside.top.coarseWideRight(begin)
+      val coarseWideLeft = inside.top.coarseWideLeft(end)
+
       updateOutsideUnaries(outside, inside, spec, begin, end)
       if(span > 1)
       // a ->  bc  [begin, split, end)
@@ -176,39 +211,59 @@ class CKYChartBuilder[+Chart[X]<:ParseChart[X], L, W](val grammar: DerivationSco
               val b = grammar.grammar.leftChild(r)
               val c = grammar.grammar.rightChild(r)
               br += 1
-              // this is too slow, so i'm having to inline it.
-              //              val feasibleSpan = itop.feasibleSpanX(begin, end, b, c)
-              for(refR <- spec.validRuleRefinementsGivenParent(begin, end, r, refA)) {
-                val refB = spec.leftChildRefinement(r, refR)
-                val refC = spec.rightChildRefinement(r, refR)
-                val narrowR:Int = narrowRight(b)(refB)
-                val narrowL:Int = narrowLeft(c)(refC)
 
-                val feasibleSpan = if (narrowR >= end || narrowL < narrowR) {
-                  0L
-                } else {
-                  val trueX:Int = wideLeft(c)(refC)
-                  val trueMin = if(narrowR > trueX) narrowR else trueX
-                  val wr:Int = wideRight(b)(refB)
-                  val trueMax = if(wr < narrowL) wr else narrowL
-                  if(trueMin > narrowL || trueMin > trueMax)  0L
-                  else ((trueMin:Long) << 32) | ((trueMax + 1):Long)
-                }
-                var split = (feasibleSpan >> 32).toInt
-                val endSplit = feasibleSpan.toInt // lower 32 bits
-                while(split < endSplit) {
-                  val ruleScore = spec.scoreBinaryRule(begin, split, end, r, refR)
-                  val score = aScore + ruleScore
-                  val bInside = itop.labelScore(begin, split, b, refB)
-                  val cInside = itop.labelScore(split, end, c, refC)
-                  val bOutside = score + cInside
-                  val cOutside = score + bInside
-                  if(!java.lang.Double.isInfinite(bOutside) && !java.lang.Double.isInfinite(cOutside)) {
-                    outside.top.enter(begin, split, b, refB, bOutside)
-                    outside.top.enter(split, end, c, refC, cOutside)
+              // can I possibly build any refinement of this rule?
+              val narrowR:Int = coarseNarrowRight(b)
+              val narrowL:Int = coarseNarrowLeft(c)
+
+              val canBuildThisRule = if (narrowR >= end || narrowL < narrowR) {
+                false
+              } else {
+                val trueX:Int = coarseWideLeft(c)
+                val trueMin = if(narrowR > trueX) narrowR else trueX
+                val wr:Int = coarseWideRight(b)
+                val trueMax = if(wr < narrowL) wr else narrowL
+                if(trueMin > narrowL || trueMin > trueMax) false
+                else trueMin < trueMax + 1
+              }
+
+              if(canBuildThisRule) {
+                for(refR <- spec.validRuleRefinementsGivenParent(begin, end, r, refA)) {
+                  val refB = spec.leftChildRefinement(r, refR)
+                  val refC = spec.rightChildRefinement(r, refR)
+                  val narrowR:Int = narrowRight(b)(refB)
+                  val narrowL:Int = narrowLeft(c)(refC)
+
+                  // this is too slow, so i'm having to inline it.
+                  //              val feasibleSpan = itop.feasibleSpanX(begin, end, b, c)
+                  val feasibleSpan = if (narrowR >= end || narrowL < narrowR) {
+                    0L
+                  } else {
+                    val trueX:Int = wideLeft(c)(refC)
+                    val trueMin = if(narrowR > trueX) narrowR else trueX
+                    val wr:Int = wideRight(b)(refB)
+                    val trueMax = if(wr < narrowL) wr else narrowL
+                    if(trueMin > narrowL || trueMin > trueMax)  0L
+                    else ((trueMin:Long) << 32) | ((trueMax + 1):Long)
                   }
 
-                  split += 1
+                  var split = (feasibleSpan >> 32).toInt
+                  val endSplit = feasibleSpan.toInt // lower 32 bits
+
+                  while(split < endSplit) {
+                    val bInside = itop.labelScore(begin, split, b, refB)
+                    val cInside = itop.labelScore(split, end, c, refC)
+                    if (bInside != Double.NegativeInfinity && cInside != Double.NegativeInfinity && aScore != Double.NegativeInfinity) {
+                      val ruleScore = spec.scoreBinaryRule(begin, split, end, r, refR)
+                      val score = aScore + ruleScore
+                      val bOutside = score + cInside
+                      val cOutside = score + bInside
+                      outside.top.enter(begin, split, b, refB, bOutside)
+                      outside.top.enter(split, end, c, refC, cOutside)
+                    }
+
+                    split += 1
+                  }
                 }
               }
             }

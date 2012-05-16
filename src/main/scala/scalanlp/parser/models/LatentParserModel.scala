@@ -41,10 +41,6 @@ class LatentParserModel[L, L3, W](featurizer: Featurizer[L3, W],
     new LatentParserInference(indexedFeatures, reannotate, grammar, baseFactory, projections)
   }
 
-  def extractParser(weights: DenseVector[Double]): ChartParser[L, W] = {
-    SimpleChartParser(inferenceFromWeights(weights).grammar)
-  }
-
   def expectedCountsToObjective(ecounts: ExpectedCounts) = {
     (ecounts.loss, ecounts.counts)
   }
