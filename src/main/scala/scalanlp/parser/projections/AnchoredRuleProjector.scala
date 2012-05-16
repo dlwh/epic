@@ -1,8 +1,7 @@
 package scalanlp.parser
 package projections
 
-import scalanlp.collection.mutable.TriangularArray
-import scalanlp.tensor.sparse.OldSparseVector
+import scalanlp.collection.mutable.{OpenAddressHashArray, TriangularArray}
 
 /**
  * Used for computed the expected number of anchored rules that occur at each span/split.
@@ -29,11 +28,11 @@ class AnchoredRuleProjector(threshold: Double) extends Serializable {
     val numProjectedLabels = charts.grammar.labelIndex.size
     val numProjectedRules = charts.grammar.index.size
     def projVector() = {
-      new OldSparseVector(numProjectedLabels, 0.0);
+      new OpenAddressHashArray(numProjectedLabels, 0.0, 2);
     }
 
     def projRuleVector() = {
-      new OldSparseVector(numProjectedRules, 0.0);
+      new OpenAddressHashArray(numProjectedRules, 0.0, 2);
     }
 
     def getOrElseUpdate[T<:AnyRef](arr: Array[T], i: Int, t : =>T) = {
@@ -44,12 +43,12 @@ class AnchoredRuleProjector(threshold: Double) extends Serializable {
     }
 
     // The data, and initialization. most things init'd to null
-    val lexicalScores = TriangularArray.raw(length+1, null:OldSparseVector)
-    val unaryScores = TriangularArray.raw(length+1, null:OldSparseVector);
-    val binaryScores = TriangularArray.raw[Array[OldSparseVector]](length+1, null);
+    val lexicalScores = TriangularArray.raw(length+1, null:OpenAddressHashArray[Double])
+    val unaryScores = TriangularArray.raw(length+1, null:OpenAddressHashArray[Double]);
+    val binaryScores = TriangularArray.raw[Array[OpenAddressHashArray[Double]]](length+1, null);
 
-    val totals = TriangularArray.raw(length+1, null:OldSparseVector);
-    val totalsUnaries = TriangularArray.raw(length+1, null:OldSparseVector);
+    val totals = TriangularArray.raw(length+1, null:OpenAddressHashArray[Double]);
+    val totalsUnaries = TriangularArray.raw(length+1, null:OpenAddressHashArray[Double]);
 
 
     val visitor = new DerivationVisitor[L] {
@@ -68,7 +67,7 @@ class AnchoredRuleProjector(threshold: Double) extends Serializable {
 
           if(binaryScores(index) eq null) {
             val numSplits = end - begin;
-            binaryScores(TriangularArray.index(begin, end)) = Array.fill(numSplits)(null:OldSparseVector)
+            binaryScores(TriangularArray.index(begin, end)) = Array.fill(numSplits)(null:OpenAddressHashArray[Double])
           }
 
           val parentArray = if(binaryScores(index)(split-begin) eq null) {
@@ -111,15 +110,15 @@ object AnchoredRuleProjector {
    * POJO for anchored rule counts. entries may be null.
    */
   case class AnchoredData(/** spanScore(trianuglarIndex)(label) = score of tag at position pos */
-                          spanScores: Array[OldSparseVector],
+                          spanScores: Array[OpenAddressHashArray[Double]],
                           /** unaryScores(triangularIndex)(rule) => score of unary from parent to child */
-                          unaryScores: Array[OldSparseVector],
+                          unaryScores: Array[OpenAddressHashArray[Double]],
                           /** (triangularIndex)(parent) => same, but for unaries*/
-                          unaryTotals: Array[OldSparseVector],
+                          unaryTotals: Array[OpenAddressHashArray[Double]],
                           /** binaryScores(triangularIndex)(split)(rule) => score of unary from parent to child */
-                          binaryScores: Array[Array[OldSparseVector]],
+                          binaryScores: Array[Array[OpenAddressHashArray[Double]]],
                           /** (triangularIndex)(parent) => sum of all binary rules at parent. */
-                          binaryTotals: Array[OldSparseVector]);
+                          binaryTotals: Array[OpenAddressHashArray[Double]]);
 
 }
 
