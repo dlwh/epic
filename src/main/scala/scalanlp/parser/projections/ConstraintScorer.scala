@@ -143,7 +143,7 @@ object ProjectTreebankToConstraints {
     val parser = loadParser[Any](params.parser)
 
     val out = params.out
-    out.getParentFile.mkdirs()
+    out.getAbsoluteFile.getParentFile.mkdirs()
 
     val factory = new ConstraintScorerFactory[AnnotatedLabel, String](parser.builder, -7)
     val train = mapTrees(factory, treebank.trainTrees, parser.builder.grammar.labelIndex, true, params.maxParseLength)
