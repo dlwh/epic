@@ -61,8 +61,21 @@ abstract class ParseChart[L](val index: Index[L],
       enteredLabels(index) += parent
       enteredRefinements(index)(parent) += ref
 
+      if(narrowLeft(end)(parent) eq null) {
+        narrowLeft(end)(parent) = new Array[Int](refinementsFor(parent))
+        Arrays.fill(narrowLeft(end)(parent), -1)
+        wideLeft(end)(parent) = new Array[Int](refinementsFor(parent))
+        Arrays.fill(wideLeft(end)(parent), length+1)
+      }
       narrowLeft(end)(parent)(ref) = math.max(begin, narrowLeft(end)(parent)(ref))
       wideLeft(end)(parent)(ref) = math.min(begin, wideLeft(end)(parent)(ref))
+
+      if(wideRight(begin)(parent) eq null) {
+        wideRight(begin)(parent) = new Array[Int](refinementsFor(parent))
+        Arrays.fill(wideRight(begin)(parent), -1)
+        narrowRight(begin)(parent) = new Array[Int](refinementsFor(parent))
+        Arrays.fill(narrowRight(begin)(parent), length+1)
+      }
       wideRight(begin)(parent)(ref) = math.max(end, wideRight(begin)(parent)(ref))
       narrowRight(begin)(parent)(ref) = math.min(end, narrowRight(begin)(parent)(ref))
 
@@ -73,19 +86,24 @@ abstract class ParseChart[L](val index: Index[L],
     }
 
     def feasibleSpanX(begin: Int, end: Int, leftState: Int, leftRef: Int, rightState: Int, rightRef: Int):Long = {
-      val narrowR = narrowRight(begin)(leftState)(leftRef)
-      val narrowL = narrowLeft(end)(rightState)(rightRef)
-
-      if (narrowR >= end || narrowL < narrowR) {
+      if(narrowRight(begin)(leftState) == null || narrowLeft(end)(rightState) == null)  {
         0L
       } else {
-        val trueX = wideLeft(end)(rightState)(rightRef)
-        val trueMin = if(narrowR > trueX) narrowR else trueX
-        val wr = wideRight(begin)(leftState)(leftRef)
-        val trueMax = if(wr < narrowL) wr else narrowL
-        if(trueMin > narrowL || trueMin > trueMax)  0L
-        else ((trueMin:Long) << 32) | ((trueMax + 1):Long)
+        val narrowR = narrowRight(begin)(leftState)(leftRef)
+        val narrowL = narrowLeft(end)(rightState)(rightRef)
+
+        if (narrowR >= end || narrowL < narrowR) {
+          0L
+        } else {
+          val trueX = wideLeft(end)(rightState)(rightRef)
+          val trueMin = if(narrowR > trueX) narrowR else trueX
+          val wr = wideRight(begin)(leftState)(leftRef)
+          val trueMax = if(wr < narrowL) wr else narrowL
+          if(trueMin > narrowL || trueMin > trueMax)  0L
+          else ((trueMin:Long) << 32) | ((trueMax + 1):Long)
+        }
       }
+
     }
 
     def feasibleSpan(begin: Int, end: Int, leftState: Int, leftRef: Int, rightState: Int, rightRef: Int):Range = {
@@ -112,13 +130,13 @@ abstract class ParseChart[L](val index: Index[L],
 
 
     /** right most place a left constituent with label l can start and end at position i. (start)(sym)(ref) */
-    val narrowLeft: Array[Array[Array[Int]]] = makeExtentArray(-1)
+    val narrowLeft: Array[Array[Array[Int]]] = Array.ofDim[Array[Int]](length+1, grammarSize)
     /** left most place a left constituent with label l can start and end at position i. (start)(sym)(ref) */
-    val wideLeft = makeExtentArray(length+1)
+    val wideLeft = Array.ofDim[Array[Int]](length+1, grammarSize)
     /** left most place a right constituent with label l--which starts at position i--can end. (end)(sym)(ref) */
-    val narrowRight = makeExtentArray(length+1)
+    val narrowRight = Array.ofDim[Array[Int]](length+1, grammarSize)
     /** right-most place a right constituent with label l--which starts at position i--can end. (end)(sym)(ref) */
-    val wideRight = makeExtentArray(-1)
+    val wideRight = Array.ofDim[Array[Int]](length+1, grammarSize)
 
     /** right most place a left constituent with label l can start and end at position i. (start)(sym) */
     val coarseNarrowLeft = makeCoarseExtentArray(-1)
