@@ -23,3 +23,5 @@ case class SubstateFeature[T](f: Feature, states: Seq[T]) extends Feature with C
 case class IndicatorFeature(a: Any) extends Feature with CachedHashCode
 
 case class PairFeature(a: Feature, b: Feature) extends Feature with CachedHashCode
+
+case class LabelFeature[L](l: L) extends Feature with CachedHashCode

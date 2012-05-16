@@ -261,10 +261,6 @@ case class StandardFeaturizer[L, W>:Null, P](wordIndex: Index[W],
   val wordPartIndex = Index[P]()
 
   // binned distances
-  val distBins = Array(0, 1,5, 10)
-  val minimums = Array(1, 2,5, 10)
-  val numDistBins = distBins.length
-
   private def binDistance(dist2:Int) = {
     val dist = dist2.abs - 1
     if (dist >= 10) 3
@@ -605,10 +601,6 @@ object IndexedFeaturizer {
     new IndexedFeaturizer(featurizer, labelIndex, ruleIndex, goldFeatureIndex, Set.empty ++ lowCountFeatures, (goldFeatureIndex.size * dummyFeatScale).toInt)
   }
 }
-
-
-
-
 
 class SimpleWordShapeGen[L](tagWordCounts: Counter2[L, String, Double],
                             counts: Counter[String, Double], noShapeThreshold: Int = 100, minCountThreshold: Int = 5) extends (String=>IndexedSeq[String]) with Serializable {
