@@ -15,5 +15,6 @@ object StandardSpanFeatures {
   case class BeginSentFeature[L](label: L) extends SpanFeature
   // Huang's WordEdges Feature without distance
   case class WordEdges[L, W](label: L, left: W, right: W) extends SpanFeature
+  case class ShortUnary[ W](rule: Int, w: W) extends SpanFeature
 }
 
