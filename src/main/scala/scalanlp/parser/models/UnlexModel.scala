@@ -9,9 +9,10 @@ import scalala.library.Library
 import features._
 import scalala.tensor.Counter
 import scalanlp.trees.{TreeInstance, AnnotatedLabel, BinarizedTree}
+import scalanlp.trees.annotations.{KMAnnotator, TreeAnnotator}
 
-class KMModel[L, L2, W](featurizer: Featurizer[L2, W],
-                        ann: (BinarizedTree[L], Seq[W]) => BinarizedTree[L2],
+class UnlexModel[L, L2, W](featurizer: Featurizer[L2, W],
+                        ann: TreeAnnotator[L, W, L2],
                         val projections: GrammarRefinements[L, L2],
                         baseFactory: DerivationScorer.Factory[L, W],
                         grammar: Grammar[L],
@@ -52,11 +53,11 @@ class KMModel[L, L2, W](featurizer: Featurizer[L2, W],
 
 }
 
-case class KMModelFactory(baseParser: ParserParams.BaseParser,
+case class UnlexModelFactory(baseParser: ParserParams.BaseParser,
                           constraints: ParserParams.Constraints[AnnotatedLabel, String],
-                          pipeline: KMPipeline,
+                          pipeline: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = KMAnnotator(),
                           oldWeights: File = null) extends ParserModelFactory[AnnotatedLabel, String] {
-  type MyModel = KMModel[AnnotatedLabel, AnnotatedLabel, String]
+  type MyModel = UnlexModel[AnnotatedLabel, AnnotatedLabel, String]
 
   def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]]): MyModel = {
     val transformed = trainTrees.par.map {
@@ -92,7 +93,7 @@ case class KMModelFactory(baseParser: ParserParams.BaseParser,
     } else {
       Counter[Feature, Double]()
     }
-    new KMModel[AnnotatedLabel, AnnotatedLabel, String](feat, pipeline, indexedRefinements, cFactory, grammar, lexicon, {
+    new UnlexModel[AnnotatedLabel, AnnotatedLabel, String](feat, pipeline, indexedRefinements, cFactory, grammar, lexicon, {
       featureCounter.get(_)
     })
   }

@@ -5,7 +5,7 @@ import scalanlp.trees.{Production, LexicalProduction}
 
 
 /**
- * A simple Featurizer that just counts derivations
+ * A simple Featurizer that just counts lexical and rule productions that are used.
  * @author dlwh
  */
 class ProductionFeaturizer[L, W](grammar: Grammar[L],

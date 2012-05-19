@@ -11,6 +11,7 @@ import scalala.tensor.Counter
 import scalanlp.parser.DerivationScorer.Factory
 import scalanlp.epic.Feature
 import scalanlp.trees.{TreeInstance, BinarizedTree, AnnotatedLabel}
+import scalanlp.trees.annotations.{FilterAnnotations, TreeAnnotator}
 
 class LatentParserModel[L, L3, W](featurizer: Featurizer[L3, W],
                                   reannotate: (BinarizedTree[L], Seq[W]) => BinarizedTree[L],
@@ -66,6 +67,7 @@ case class LatentParserInference[L, L2, W](featurizer: DerivationFeaturizer[L, W
 
 case class LatentParserModelFactory(baseParser: ParserParams.BaseParser,
                                     constraints: ParserParams.Constraints[AnnotatedLabel, String],
+                                    annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = FilterAnnotations(),
                                     substates: File = null,
                                     numStates: Int = 2,
                                     oldWeights: File = null,
@@ -79,11 +81,13 @@ case class LatentParserModelFactory(baseParser: ParserParams.BaseParser,
   def unsplit(x: (AnnotatedLabel, Int)) = x._1
 
   def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]]) = {
-    val (xbarWords, xbarBinaries, xbarUnaries) = this.extractBasicCounts(trainTrees.map(_.mapLabels(_.baseAnnotatedLabel)))
+    val annTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]] = trainTrees.map(annotator(_))
+    val (annWords, annBinaries, annUnaries) = this.extractBasicCounts(annTrees)
+
 
     val (xbarParser, xbarLexicon) = baseParser.xbarGrammar(trainTrees)
 
-    val baseFactory = DerivationScorerFactory.generative(xbarParser, xbarLexicon, xbarBinaries, xbarUnaries, xbarWords)
+    val baseFactory = DerivationScorerFactory.generative(xbarParser, xbarLexicon, annBinaries, annUnaries, annWords)
     val cFactory = constraints.cachedFactory(baseFactory)
 
     val substateMap = if (substates != null && substates.exists) {
@@ -97,13 +101,18 @@ case class LatentParserModelFactory(baseParser: ParserParams.BaseParser,
       Map(xbarParser.root -> 1)
     }
 
-    val gen = new WordShapeFeaturizer(Library.sum(xbarWords))
+    val gen = new WordShapeFeaturizer(Library.sum(annWords))
     def labelFlattener(l: (AnnotatedLabel, Int)) = {
       val basic = Seq(l)
       basic map (IndicatorFeature)
     }
     val feat = new GenFeaturizer[(AnnotatedLabel, Int), String](gen, labelFlattener _)
-    val indexedRefinements = GrammarRefinements(xbarParser, split(_: AnnotatedLabel, substateMap, numStates), unsplit)
+
+    val annGrammar: Grammar[AnnotatedLabel] = Grammar(annTrees.head.tree.label, annBinaries, annUnaries)
+    val firstLevelRefinements = GrammarRefinements(xbarParser, annGrammar, {(_: AnnotatedLabel).baseAnnotatedLabel})
+    val secondLevel = GrammarRefinements(annGrammar, split(_: AnnotatedLabel, substateMap, numStates), unsplit)
+    val finalRefinements = firstLevelRefinements compose secondLevel
+    println(finalRefinements)
 
     val featureCounter = if (oldWeights ne null) {
       val baseCounter = scalanlp.util.readObject[Counter[Feature, Double]](oldWeights)
@@ -112,10 +121,9 @@ case class LatentParserModelFactory(baseParser: ParserParams.BaseParser,
       Counter[Feature, Double]()
     }
 
-    def reannotate(tree: BinarizedTree[AnnotatedLabel], words: Seq[String]) = tree.map(_.baseAnnotatedLabel)
     new LatentParserModel[AnnotatedLabel, (AnnotatedLabel, Int), String](feat,
-    reannotate,
-    indexedRefinements,
+    annotator,
+    finalRefinements,
     cFactory,
     xbarParser,
     xbarLexicon, {
@@ -123,6 +131,4 @@ case class LatentParserModelFactory(baseParser: ParserParams.BaseParser,
     })
   }
 }
-
-
 

@@ -11,7 +11,7 @@ import scalanlp.trees._
 
 @SerialVersionUID(1L)
 case class GrammarRefinements[C,F](labels: ProjectionIndexer[C,F], rules: ProjectionIndexer[Rule[C],Rule[F]]) {
-  def compose[F2](other: GrammarRefinements[F,F2]) = new GrammarRefinements(labels compose other.labels, rules compose other.rules)
+  def compose[F2](other: GrammarRefinements[F,F2]):GrammarRefinements[C, F2] = new GrammarRefinements(labels compose other.labels, rules compose other.rules)
 
 }
 

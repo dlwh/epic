@@ -17,6 +17,7 @@ package scalanlp.parser
 
 import scalanlp.trees._
 
+import annotations.{FilterAnnotations, TreeAnnotator}
 import scalala.tensor.Counter2
 import scalanlp.parser.ParserParams.{BaseParser, NoParams}
 
@@ -67,14 +68,15 @@ object GenerativeParser {
 }
 
 object GenerativePipeline extends ParserPipeline {
-  case class Params(baseParser: BaseParser)
+  case class Params(baseParser: BaseParser,
+                    annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = new FilterAnnotations(Set.empty[Annotation]))
   protected val paramManifest = manifest[Params]
 
   def trainParser(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]],
                   validate: Parser[AnnotatedLabel, String]=>ParseEval.Statistics,
-                  config: Params) = {
-    val (xbar,xbarLexicon) = config.baseParser.xbarGrammar(trainTrees)
-    val trees = trainTrees.map(_.mapLabels(_.clearFeatures))
+                  params: Params) = {
+    val (xbar,xbarLexicon) = params.baseParser.xbarGrammar(trainTrees)
+    val trees = trainTrees.map(params.annotator(_))
     val (words, binary, unary) = GenerativeParser.extractCounts(trees)
     val grammar = DerivationScorerFactory.generative[AnnotatedLabel, String](xbar, xbarLexicon, binary, unary, words)
     val parser = SimpleChartParser(grammar)
