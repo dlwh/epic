@@ -55,14 +55,14 @@ class UnlexModel[L, L2, W](featurizer: Featurizer[L2, W],
 
 case class UnlexModelFactory(baseParser: ParserParams.BaseParser,
                           constraints: ParserParams.Constraints[AnnotatedLabel, String],
-                          pipeline: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = KMAnnotator(),
+                          annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = KMAnnotator(),
                           oldWeights: File = null) extends ParserModelFactory[AnnotatedLabel, String] {
   type MyModel = UnlexModel[AnnotatedLabel, AnnotatedLabel, String]
 
   def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]]): MyModel = {
     val transformed = trainTrees.par.map {
       ti =>
-        val t = pipeline(ti.tree, ti.words)
+        val t = annotator(ti.tree, ti.words)
         TreeInstance(ti.id, t, ti.words)
     }.seq.toIndexedSeq
 
@@ -93,7 +93,7 @@ case class UnlexModelFactory(baseParser: ParserParams.BaseParser,
     } else {
       Counter[Feature, Double]()
     }
-    new UnlexModel[AnnotatedLabel, AnnotatedLabel, String](feat, pipeline, indexedRefinements, cFactory, grammar, lexicon, {
+    new UnlexModel[AnnotatedLabel, AnnotatedLabel, String](feat, annotator, indexedRefinements, cFactory, grammar, lexicon, {
       featureCounter.get(_)
     })
   }
