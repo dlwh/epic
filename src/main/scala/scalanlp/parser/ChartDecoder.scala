@@ -170,6 +170,10 @@ class MaxConstituentDecoder[L, W] extends ChartDecoder[L, W] {
         val myScore = ichart.labelScore(begin, end, l, lRef) + ochart.labelScore(begin, end, l, lRef) - partition
         buffer(bufOff) = myScore
         bufOff += 1
+        if(bufOff == 1000) {
+          buffer(0) = inside.sum(buffer, buffer.length)
+          bufOff = 1
+        }
       }
       inside.sum(buffer, bufOff)
     }
