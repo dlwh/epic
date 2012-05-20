@@ -27,11 +27,13 @@ object ChartDecoder extends Serializable {
 
 /**
  * Tries to extract a tree that maximizes log score.
+ *
+ * @author dlwh
  */
 @SerialVersionUID(2)
 class ViterbiDecoder[L, W] extends ChartDecoder[L, W] with Serializable {
 
-  override def extractBestParse(marginal: ChartMarginal[ParseChart, L, W]):BinarizedTree[L] = {
+  override def extractBestParse(marginal: ChartMarginal[ParseChart, L, W]): BinarizedTree[L] = {
     import marginal._
     val labelIndex = grammar.labelIndex
     val rootIndex = (grammar.labelIndex(grammar.root))
@@ -120,36 +122,50 @@ class ViterbiDecoder[L, W] extends ChartDecoder[L, W] with Serializable {
 }
 
 /**
- * Tries to extract a tree that maximizes rule product in the coarse grammar
- **/
+ * Tries to extract a tree that maximizes rule product in the coarse grammar.
+ * This is Slav's Max-Rule-Product
+ *
+ * @author dlwh
+ */
 case class MaxRuleProductDecoder[L, W](grammar: Grammar[L], lexicon: Lexicon[L, W]) extends ChartDecoder[L, W] {
-  val p = new AnchoredRuleMarginalProjector[L,W]()
+  private val p = new AnchoredRuleMarginalProjector[L,W]()
 
-  def extractBestParse(marginal: ChartMarginal[ParseChart, L, W]) = {
+  def extractBestParse(marginal: ChartMarginal[ParseChart, L, W]): BinarizedTree[L] = {
     val scorer = p.buildSpanScorer(marginal)
     val oneoff = DerivationScorerFactory.oneOff(scorer)
     val newMarg = ChartMarginal.fromSentence(oneoff, marginal.words)
-    val tree = new ViterbiDecoder[L,W].extractBestParse(newMarg)
-    tree
+    new ViterbiDecoder[L, W].extractBestParse(newMarg)
   }
 }
 
+/**
+ * Projects a tree to an anchored PCFG and then does viterbi on that tree.
+ * This is the Max-Variational method in Matsuzaki
+ *
+ * @author dlwh
+ */
 class MaxVariationalDecoder[L, W](grammar: Grammar[L], lexicon: Lexicon[L, W]) extends ChartDecoder[L, W] {
-  val p = new AnchoredPCFGProjector[L,W](grammar)
+  private val p = new AnchoredPCFGProjector[L,W](grammar)
 
-  def extractBestParse(marginal: ChartMarginal[ParseChart, L, W]) = {
+  def extractBestParse(marginal: ChartMarginal[ParseChart, L, W]): BinarizedTree[L] = {
     val scorer = p.buildSpanScorer(marginal)
     val oneoff = DerivationScorerFactory.oneOff(scorer)
     val newMarg = ChartMarginal.fromSentence(oneoff, marginal.words)
-    val tree = new ViterbiDecoder[L,W].extractBestParse(newMarg)
-    tree
+    new ViterbiDecoder[L, W].extractBestParse(newMarg)
   }
 }
 
+/**
+ * Attempts to find a parse that maximizes the expected number
+ * of correct labels. This is Goodman's MaxRecall algorithm.
+ *
+ * @tparam L label type
+ * @tparam W word type
+ */
 @SerialVersionUID(2L)
 class MaxConstituentDecoder[L, W] extends ChartDecoder[L, W] {
 
-  def extractBestParse(marginal: ChartMarginal[ParseChart, L, W]) = {
+  def extractBestParse(marginal: ChartMarginal[ParseChart, L, W]): BinarizedTree[L] = {
     import marginal._
 
     val labelIndex = marginal.grammar.labelIndex
