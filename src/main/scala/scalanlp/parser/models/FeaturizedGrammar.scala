@@ -12,12 +12,10 @@ object FeaturizedGrammar {
                       weights: DenseVector[Double],
                       features: FeatureIndexer[L, L2, W],
                       tagScorer: TagScorer[L2, W]) = {
-    val ruleCache = new Array[Double](refinements.rules.fineIndex.size)
-    val spanCache = new Array[Double](refinements.labels.fineIndex.size)
-
-    for ((feats, r) <- features.ruleCache.iterator.zipWithIndex) {
-      ruleCache(r) = feats dot weights;
+    val ruleCache = Array.tabulate[Double](refinements.rules.fineIndex.size){r =>
+      features.computeWeight(r,weights)
     }
+    val spanCache = new Array[Double](refinements.labels.fineIndex.size)
 
     DerivationScorerFactory.refined(xbar, lexicon, refinements, ruleCache, spanCache, tagScorer)
   }

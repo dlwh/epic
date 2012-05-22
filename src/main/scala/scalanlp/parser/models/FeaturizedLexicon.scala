@@ -23,24 +23,17 @@ class FeaturizedLexicon[L, L2, W](val weights: DenseVector[Double],
   }
 
   private def scoreUnknown(label: L2, w: W): Double = {
-    val feats = featureIndexer.featuresFor(featureIndexer.labelIndex(label), w);
-    val score = feats dot weights;
-    score;
+    featureIndexer.computeWeight(featureIndexer.labelIndex(label), w, weights)
   }
 
 
-  private val wordScores = Counter2[W, L2, Double]();
+  private val wordScores = Counter2[W, L2, Double]()
   for ((wordMap, tagIndex) <- featureIndexer.lexicalCache.iterator.zipWithIndex;
        (word, feats) <- wordMap) {
-    val score = feats dot weights;
-    if (score.isNaN) {
-      sys.error("Score for " + word + "is NaN!" + feats.nonzero.keys.map {
-        k => (featureIndexer.index.get(k), weights(k))
-      }.toIndexedSeq);
-    }
-    wordScores(word, featureIndexer.labelIndex.get(tagIndex)) = score;
+    val score = featureIndexer.computeWeight(tagIndex, word, weights)
+    wordScores(word, featureIndexer.labelIndex.get(tagIndex)) = score
     assert(wordScores(word, featureIndexer.labelIndex.get(tagIndex)) != Double.NegativeInfinity, (word, featureIndexer.labelIndex.get(tagIndex)).toString + "\n" +
-      featureIndexer.decode(feats) + " " + featureIndexer.decode(weights));
+      featureIndexer.decode(feats) + " " + featureIndexer.decode(weights))
   }
 
 
