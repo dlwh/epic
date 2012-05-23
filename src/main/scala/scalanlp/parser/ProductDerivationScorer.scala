@@ -1,17 +1,22 @@
 package scalanlp.parser
 
-import projections.ConstraintScorer
-
 /**
+ * Creates a product of two derivation scorers, seamlessly combining their
+ * refinements as appropriate.
+ *
+ * This class is the main motivation for the "annotationTag" on
+ * [[scalanlp.parser.DerivationScorer]] instances. If one of the annotation tags is "0"
+ * then it does not use refinements, and so we can avoid clever games.
+ *
+ * Similarly, if the tags matched, then we can use the same tags. I'm not 100% convinced
+ * this is necessary any more. But I have it for now.
  *
  * @author dlwh
  */
 
 final case class ProductDerivationScorer[L,W](s1: DerivationScorer[L, W],
                                               s2: DerivationScorer[L, W],
-                                              alpha: Double = 1.0) extends DerivationScorer[L, W] {
-
-  if(s2.isInstanceOf[ConstraintScorer[L, W]] && alpha == -1.0) throw new Exception("...")
+                                              alpha: Double = 1.0) extends ProductRefinementsHandler(s1, s2) with DerivationScorer[L, W] {
   val grammar = s1.grammar
   def lexicon = s1.lexicon
   def words = s1.words
@@ -19,46 +24,6 @@ final case class ProductDerivationScorer[L,W](s1: DerivationScorer[L, W],
   override def annotationTag = {
     if(refinementController == null) -1
     else refinementController.annotationTag
-  }
-  
-  private val refinementController = {
-    if(s1.annotationTag == 0) s2
-    else if(s2.annotationTag == 0) s1
-    else if (s1.annotationTag < 0 || s2.annotationTag < 0) null
-    else if(s1.annotationTag == s2.annotationTag) s1
-    else null
-  }
-
-  private def label1Ref(label: Int, ref: Int) = {
-    if(refinementController != null) ref
-    else {
-      val num = s1.numValidRefinements(label)
-      ref / num
-    }
-  }
-
-  private def label2Ref(label: Int, ref: Int) = {
-    if(refinementController != null) ref
-    else {
-      val num = s1.numValidRefinements(label)
-      ref % num
-    }
-  }
-
-  private def rule1Ref(rule: Int, ref: Int) = {
-    if(refinementController != null) ref
-    else {
-      val num = s1.numValidRuleRefinements(rule)
-      ref / num
-    }
-  }
-
-  private def rule2Ref(rule: Int, ref: Int) = {
-    if(refinementController != null) ref
-    else {
-      val num = s1.numValidRuleRefinements(rule)
-      ref % num
-    }
   }
 
   def scoreSpan(begin: Int, end: Int, label: Int, ref: Int) = {
@@ -183,5 +148,51 @@ final case class ProductDerivationScorer[L,W](s1: DerivationScorer[L, W],
       l1 * s1.numValidRuleRefinements(r) + l2
     }
 
+  }
+}
+
+abstract class ProductRefinementsHandler[L, W](s1: DerivationScorer[L, W], s2: DerivationScorer[L, W]) {
+  protected final val refinementController: DerivationScorer[L, W] = {
+    if(s1.annotationTag == 0) s2
+    else if(s2.annotationTag == 0) s1
+    else if (s1.annotationTag < 0 || s2.annotationTag < 0) null
+    else if(s1.annotationTag == s2.annotationTag) s1
+    else null
+  }
+
+  @inline
+  protected final def label1Ref(label: Int, ref: Int): Int = {
+    if(refinementController != null) ref
+    else {
+      val num = s1.numValidRefinements(label)
+      ref / num
+    }
+  }
+
+  @inline
+  protected final def label2Ref(label: Int, ref: Int): Int = {
+    if(refinementController != null) ref
+    else {
+      val num = s1.numValidRefinements(label)
+      ref % num
+    }
+  }
+
+  @inline
+  protected final def rule1Ref(rule: Int, ref: Int): Int = {
+    if(refinementController != null) ref
+    else {
+      val num = s1.numValidRuleRefinements(rule)
+      ref / num
+    }
+  }
+
+  @inline
+  protected final def rule2Ref(rule: Int, ref: Int): Int = {
+    if(refinementController != null) ref
+    else {
+      val num = s1.numValidRuleRefinements(rule)
+      ref % num
+    }
   }
 }
