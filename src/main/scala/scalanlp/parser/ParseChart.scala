@@ -61,23 +61,27 @@ abstract class ParseChart[L](val index: Index[L],
       enteredLabels(index) += parent
       enteredRefinements(index)(parent) += ref
 
-      if(narrowLeft(end)(parent) eq null) {
-        narrowLeft(end)(parent) = new Array[Int](refinementsFor(parent))
-        Arrays.fill(narrowLeft(end)(parent), -1)
-        wideLeft(end)(parent) = new Array[Int](refinementsFor(parent))
-        Arrays.fill(wideLeft(end)(parent), length+1)
+      val narrowLeftEnd = narrowLeft(end)
+      val wideLeftEnd = wideLeft(end)
+      if(narrowLeftEnd(parent) eq null) {
+        narrowLeftEnd(parent) = new Array[Int](refinementsFor(parent))
+        Arrays.fill(narrowLeftEnd(parent), -1)
+        wideLeftEnd(parent) = new Array[Int](refinementsFor(parent))
+        Arrays.fill(wideLeftEnd(parent), length+1)
       }
-      narrowLeft(end)(parent)(ref) = math.max(begin, narrowLeft(end)(parent)(ref))
-      wideLeft(end)(parent)(ref) = math.min(begin, wideLeft(end)(parent)(ref))
+      narrowLeftEnd(parent)(ref) = math.max(begin, narrowLeftEnd(parent)(ref))
+      wideLeftEnd(parent)(ref) = math.min(begin, wideLeftEnd(parent)(ref))
 
-      if(wideRight(begin)(parent) eq null) {
-        wideRight(begin)(parent) = new Array[Int](refinementsFor(parent))
-        Arrays.fill(wideRight(begin)(parent), -1)
-        narrowRight(begin)(parent) = new Array[Int](refinementsFor(parent))
-        Arrays.fill(narrowRight(begin)(parent), length+1)
+      val wideRightBegin = wideRight(begin)
+      val narrowRightBegin = narrowRight(begin)
+      if(wideRightBegin(parent) eq null) {
+        wideRightBegin(parent) = new Array[Int](refinementsFor(parent))
+        Arrays.fill(wideRightBegin(parent), -1)
+        narrowRightBegin(parent) = new Array[Int](refinementsFor(parent))
+        Arrays.fill(narrowRightBegin(parent), length+1)
       }
-      wideRight(begin)(parent)(ref) = math.max(end, wideRight(begin)(parent)(ref))
-      narrowRight(begin)(parent)(ref) = math.min(end, narrowRight(begin)(parent)(ref))
+      wideRightBegin(parent)(ref) = math.max(end, wideRightBegin(parent)(ref))
+      narrowRightBegin(parent)(ref) = math.min(end, narrowRightBegin(parent)(ref))
 
       coarseNarrowLeft(end)(parent) = math.max(begin, coarseNarrowLeft(end)(parent))
       coarseWideLeft(end)(parent) = math.min(begin, coarseWideLeft(end)(parent))

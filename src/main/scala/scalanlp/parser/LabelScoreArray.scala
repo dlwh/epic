@@ -1,7 +1,9 @@
 package scalanlp.parser
 
 import scalanlp.collection.mutable.TriangularArray
+import LabelScoreArray._
 import java.util.Arrays
+import collection.mutable.BitSet
 
 /**
  * A LabelScoreArray is just a triangular array whose entries are arrays. Admits efficient
@@ -11,11 +13,21 @@ import java.util.Arrays
 @SerialVersionUID(2)
 class LabelScoreArray[L](length: Int, grammarSize: Int, fill: Double) extends Serializable {
 
-  final val score = TriangularArray.raw(length+1, null:Array[Array[Double]])
-  final val enteredLabels = TriangularArray.raw(length+1, new collection.mutable.BitSet())
-  final val enteredRefinements = TriangularArray.raw(length+1, Array.fill(grammarSize)(new collection.mutable.BitSet()))
+  // (begin,end) -> label ->  refinement -> score
+  final val score: Array[Array[Array[Double]]] = new Array[Array[Array[Double]]](TriangularArray.arraySize(length+1))
+  final val enteredLabels: Array[BitSet] = mkBitSetArray(TriangularArray.arraySize(length+1))
+  final val enteredRefinements: Array[Array[BitSet]] = TriangularArray.raw(length+1, mkBitSetArray(grammarSize))
 
+  /**
+   * Same as labelScore
+   * @return
+   */
   final def apply(begin: Int, end: Int, label: Int, ref: Int) = labelScore(begin, end, label, ref)
+
+  /**
+   * Returns the score of this (labe,refinement) pair over the span (begin,end)
+   * @return
+   */
   @inline final def labelScore(begin: Int, end: Int, label: Int, ref: Int):Double = {
     val ind = TriangularArray.index(begin, end)
     if (score(ind) eq null) Double.NegativeInfinity
@@ -56,6 +68,18 @@ object LabelScoreArray {
   def mkGrammarVector(grammarSize: Int, fill: Double) = {
     val arr = new Array[Double](grammarSize)
     Arrays.fill(arr, fill)
+    arr
+  }
+
+  @inline def mkBitSetArray(grammarSize: Int) = {
+    // too slow :(
+    // Array.fill(grammarSize)(new collection.mutable.BitSet())
+    val arr = new Array[collection.mutable.BitSet](grammarSize)
+    var i = 0
+    while (i < arr.length) {
+      arr(i) = new collection.mutable.BitSet()
+      i += 1
+    }
     arr
   }
 }

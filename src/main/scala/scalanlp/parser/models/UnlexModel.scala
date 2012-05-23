@@ -36,8 +36,7 @@ class UnlexModel[L, L2, W](featurizer: Featurizer[L2, W],
     def reannotate(tree: BinarizedTree[L], words: Seq[W]) = {
       val annotated = ann(tree, words)
 
-      val localized = annotated.map {
-        l =>
+      val localized = annotated.map { l =>
           projections.labels.project(l) -> projections.labels.localize(l)
       }
 

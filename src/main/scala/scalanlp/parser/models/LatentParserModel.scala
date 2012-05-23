@@ -112,7 +112,7 @@ case class LatentParserModelFactory(baseParser: ParserParams.BaseParser,
     val firstLevelRefinements = GrammarRefinements(xbarParser, annGrammar, {(_: AnnotatedLabel).baseAnnotatedLabel})
     val secondLevel = GrammarRefinements(annGrammar, split(_: AnnotatedLabel, substateMap, numStates), unsplit)
     val finalRefinements = firstLevelRefinements compose secondLevel
-    println(finalRefinements)
+    println(finalRefinements.labels)
 
     val featureCounter = if (oldWeights ne null) {
       val baseCounter = scalanlp.util.readObject[Counter[Feature, Double]](oldWeights)
