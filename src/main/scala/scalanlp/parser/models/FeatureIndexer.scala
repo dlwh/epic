@@ -150,7 +150,7 @@ object FeatureIndexer {
       feats.foreach {featureIndex.index _ }
     }
 
-    cachedFeaturesToIndexedFeatures[L, L2, W](grammar, indexedProjections, f, featureIndex, ruleCache, lexicalCache.mapValues(Map.empty ++ _).toMap)
+    cachedFeaturesToIndexedFeatures[L, L2, W](grammar, indexedProjections, f, featureIndex, ruleCache, lexicalCache.map{ case (k,v) => k -> (Map.empty ++ v)}.toMap)
   }
 
   private def cachedFeaturesToIndexedFeatures[L, L2, W](grammar: Grammar[L],
@@ -164,7 +164,7 @@ object FeatureIndexer {
     }
 
     val lrc = Array.tabulate(refinements.labels.fineIndex.size){ (a) =>
-      lexicalCache(a).mapValues(_ map featureIndex)
+      lexicalCache(a).map{ case (k,v) => k -> (v map featureIndex)}
     }
 
     val g = grammar
