@@ -58,7 +58,7 @@ case class ChartMarginal[+Chart[X]<:ParseChart[X], L, W](scorer: DerivationScore
       val coarseWideLeft = inside.top.coarseWideLeft(end)
 
       for (a <- inside.bot.enteredLabelIndexes(begin, end); refA <- inside.bot.enteredLabelRefinements(begin, end, a)) {
-        var i = 0;
+        var i = 0
         val rules = grammar.indexedBinaryRulesWithParent(a)
         val spanScore = scorer.scoreSpan(begin, end, a, refA)
         val aScore = outside.bot.labelScore(begin, end, a, refA) + spanScore
@@ -141,7 +141,7 @@ case class ChartMarginal[+Chart[X]<:ParseChart[X], L, W](scorer: DerivationScore
         val refB = scorer.childRefinement(r, refR)
         val bScore = inside.bot.labelScore(begin, end, b, refB)
         val rScore = scorer.scoreUnaryRule(begin, end, r, refR)
-        val prob = math.exp(bScore + aScore + rScore - partition);
+        val prob = math.exp(bScore + aScore + rScore - partition)
         if (prob > 0)
           spanVisitor.visitUnaryRule(begin, end, r, refR, prob)
       }
