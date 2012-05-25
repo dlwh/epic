@@ -10,9 +10,9 @@ import scalanlp.trees.{TreeInstance, BinarizedTree}
  *
  * @author dlwh
  */
-class EPParser[L, W](grammar: Grammar[L],
+class EPParser[L, W](grammar: BaseGrammar[L],
                      lexicon: Lexicon[L, W],
-                     inference: EPInference[TreeInstance[L, W], DerivationScorer[L, W]]) extends Parser[L, W] with Serializable {
+                     inference: EPInference[TreeInstance[L, W], CoreAnchoring[L, W]]) extends Parser[L, W] with Serializable {
   def bestParse(s: Seq[W]) = {
     val inst = new TreeInstance[L, W]("", null, s)
     val augment = inference.getMarginals(inst, inference.baseAugment(inst))._2
@@ -24,8 +24,8 @@ class EPParser[L, W](grammar: Grammar[L],
 
 object EPParser {
 
-  trait Extractor[L, W] extends EPModel[TreeInstance[L, W], DerivationScorer[L, W]] with ParserExtractable[L, W] {
-    def grammar: Grammar[L]
+  trait Extractor[L, W] extends EPModel[TreeInstance[L, W], CoreAnchoring[L, W]] with ParserExtractable[L, W] {
+    def grammar: BaseGrammar[L]
 
     def lexicon: Lexicon[L, W]
 
@@ -34,10 +34,10 @@ object EPParser {
     }
   }
 
-  def fromChartParsers[L, W](grammar: Grammar[L],
+  def fromChartParsers[L, W](grammar: BaseGrammar[L],
                              lexicon: Lexicon[L, W],
-                             base: DerivationScorer.Factory[L, W],
-                             grammars: (DerivationScorer.Factory[L, W])*) = {
+                             base: CoreGrammar[L, W],
+                             grammars: (RefinedGrammar[L, W])*) = {
     val infs = grammars.map {
       p =>
         new DiscParserInference(null, {

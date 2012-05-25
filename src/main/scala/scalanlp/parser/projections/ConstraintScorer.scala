@@ -13,11 +13,11 @@ import scalanlp.util.Index
  * @author dlwh
  */
 @SerialVersionUID(1L)
-class ConstraintScorer[L, W](val grammar: Grammar[L],
+class ConstraintScorer[L, W](val grammar: BaseGrammar[L],
                              val lexicon: Lexicon[L, W],
                              val words: Seq[W],
                              scores: Array[BitSet],
-                             topScores: Array[BitSet]) extends UnrefinedDerivationScorer[L, W] with Serializable {
+                             topScores: Array[BitSet]) extends CoreAnchoring[L, W] with Serializable {
   def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = 0.0
 
   def scoreUnaryRule(begin: Int, end: Int, rule: Int) = {
@@ -43,13 +43,13 @@ class ConstraintScorer[L, W](val grammar: Grammar[L],
  * Creates labeled span scorers for a set of trees from some parser.
  * @author dlwh
  */
-class ConstraintScorerFactory[L, W](parser: ChartBuilder[ParseChart, L, W], threshold: Double) extends DerivationScorer.Factory[L, W] {
-  def grammar = parser.grammar.grammar
-  def lexicon = parser.grammar.lexicon
+class ConstraintScorerCoreGrammar[L, W](augmentedGrammar: AugmentedGrammar[L, W], threshold: Double) extends CoreGrammar[L, W] {
+  def grammar = augmentedGrammar.grammar
+  def lexicon = augmentedGrammar.lexicon
 
 
   def specialize(words: Seq[W]) = {
-    val charts = parser.charts(words)
+    val charts = ChartMarginal(augmentedGrammar, words, ParseChart.logProb)
     val chartScorer = buildScorer(charts)
     chartScorer
   }
@@ -65,7 +65,7 @@ class ConstraintScorerFactory[L, W](parser: ChartBuilder[ParseChart, L, W], thre
   def buildScorer(words: Seq[W],
                   goldTags: GoldTagPolicy[L]):ConstraintScorer[L, W] = {
 
-    val charts = parser.charts(words)
+    val charts = ChartMarginal(augmentedGrammar, words, ParseChart.logProb)
     buildScorer(charts, goldTags)
   }
 
@@ -73,14 +73,14 @@ class ConstraintScorerFactory[L, W](parser: ChartBuilder[ParseChart, L, W], thre
     val length = marg.length
     val scores = TriangularArray.raw(length+1, null: Array[Double])
     val topScores = TriangularArray.raw(length+1, null: Array[Double])
-    val visitor = new DerivationVisitor[L] {
+    val visitor = new AnchoredVisitor[L] {
       def visitBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int, score: Double) {}
 
       def visitUnaryRule(begin: Int, end: Int, rule: Int, ref: Int, score: Double) {
         val index = TriangularArray.index(begin, end)
         if(score != 0.0) {
           if(topScores(index) eq null) {
-            topScores(index) = new Array[Double](parser.grammar.index.size)
+            topScores(index) = new Array[Double](grammar.index.size)
           }
           topScores(index)(rule) += score
         }
@@ -91,7 +91,7 @@ class ConstraintScorerFactory[L, W](parser: ChartBuilder[ParseChart, L, W], thre
         val index = TriangularArray.index(begin, end)
         if(score != 0.0) {
           if(scores(index) eq null) {
-            scores(index) = new Array[Double](parser.grammar.labelIndex.size)
+            scores(index) = new Array[Double](grammar.labelIndex.size)
           }
           scores(index)(tag) += score
         }
@@ -145,10 +145,10 @@ object ProjectTreebankToConstraints {
     val out = params.out
     out.getAbsoluteFile.getParentFile.mkdirs()
 
-    val factory = new ConstraintScorerFactory[AnnotatedLabel, String](parser.builder, -7)
-    val train = mapTrees(factory, treebank.trainTrees, parser.builder.grammar.labelIndex, true, params.maxParseLength)
-    val test = mapTrees(factory, treebank.testTrees, parser.builder.grammar.labelIndex, false, 10000)
-    val dev = mapTrees(factory, treebank.devTrees, parser.builder.grammar.labelIndex, false, 10000)
+    val factory = new ConstraintScorerCoreGrammar[AnnotatedLabel, String](parser.augmentedGrammar, -7)
+    val train = mapTrees(factory, treebank.trainTrees, parser.grammar.labelIndex, useTree = true, maxL = params.maxParseLength)
+    val test = mapTrees(factory, treebank.testTrees, parser.grammar.labelIndex, useTree = false, maxL = 10000)
+    val dev = mapTrees(factory, treebank.devTrees, parser.grammar.labelIndex, useTree = false, maxL = 10000)
     val map = Map.empty ++ train ++ test ++ dev
     scalanlp.util.writeObject(out, map)
   }
@@ -158,7 +158,7 @@ object ProjectTreebankToConstraints {
     parser
   }
 
-  def mapTrees(factory: ConstraintScorerFactory[AnnotatedLabel, String],
+  def mapTrees(factory: ConstraintScorerCoreGrammar[AnnotatedLabel, String],
                trees: IndexedSeq[TreeInstance[AnnotatedLabel, String]],
                index: Index[AnnotatedLabel],
                useTree: Boolean, maxL: Int) = {
@@ -176,7 +176,7 @@ object ProjectTreebankToConstraints {
         words -> scorer
       } catch {
         case e: Exception => e.printStackTrace();
-        words -> DerivationScorer.identity[AnnotatedLabel, String](factory.grammar, factory.lexicon, words)
+        words -> RefinedAnchoring.identity[AnnotatedLabel, String](factory.grammar, factory.lexicon, words)
       }
     }.seq
   }

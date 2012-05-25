@@ -4,54 +4,63 @@ import projections.GrammarRefinements
 import scalanlp.trees._
 import scalala.tensor.Counter2
 import scalala.library.Library
-import scalanlp.parser.DerivationScorer.Factory
 import collection.mutable.ArrayBuffer
 
-object DerivationScorerFactory {
-  def product[L, W](f1: Factory[L, W], f2: Factory[L, W]):Factory[L, W] = new Factory[L, W] {
+/**
+ * TODO docs
+ * @tparam L
+ * @tparam W
+ */
+trait RefinedGrammar[L, W] extends Serializable {
+  def *(refined: RefinedGrammar[L, W]) = RefinedGrammar.product(this, refined)
+
+  def grammar: BaseGrammar[L]
+  def lexicon: Lexicon[L, W]
+
+  def root = grammar.root
+  def index = grammar.index
+  def labelIndex = grammar.labelIndex
+  def labelEncoder = grammar.labelEncoder
+
+  def specialize(words: Seq[W]):RefinedAnchoring[L, W]
+}
+
+object RefinedGrammar {
+  def product[L, W](f1: RefinedGrammar[L, W], f2: RefinedGrammar[L, W]):RefinedGrammar[L, W] = new RefinedGrammar[L, W] {
     def grammar = f1.grammar
     def lexicon = f1.lexicon
 
-    def specialize(words: Seq[W]) = new ProductDerivationScorer(f1.specialize(words), f2.specialize(words))
+    def specialize(words: Seq[W]) = new ProductRefinedAnchoring(f1.specialize(words), f2.specialize(words))
   }
 
-  def identity[L, W](grammar: Grammar[L], lexicon: Lexicon[L, W]): DerivationScorer.Factory[L, W] = {
+  def identity[L, W](grammar: BaseGrammar[L], lexicon: Lexicon[L, W]): RefinedGrammar[L, W] = {
     val g = grammar
     val l = lexicon
-    new DerivationScorer.Factory[L, W] {
+    new RefinedGrammar[L, W] {
       def grammar = g
 
       def lexicon = l
 
       def specialize(words: Seq[W]) = {
-        DerivationScorer.identity(grammar, lexicon, words)
+        RefinedAnchoring.identity(grammar, lexicon, words)
       }
-    }
-  }
-
-  def oneOff[L, W](scorer: DerivationScorer[L, W]): DerivationScorer.Factory[L, W] = {
-    new DerivationScorer.Factory[L, W] {
-      val grammar = scorer.grammar
-      val lexicon = scorer.lexicon
-
-      def specialize(words: Seq[W]) = scorer
     }
   }
 
   def generative[L, W](root: L,
                        binaryProductions: Counter2[L, BinaryRule[L], Double],
                        unaryProductions: Counter2[L, UnaryRule[L], Double],
-                       wordCounts: Counter2[L, W, Double]):DerivationScorer.Factory[L, W] = {
-    val grammar = Grammar(root, binaryProductions.keysIterator.map(_._2) ++ unaryProductions.keysIterator.map(_._2))
+                       wordCounts: Counter2[L, W, Double]):RefinedGrammar[L, W] = {
+    val grammar = BaseGrammar(root, binaryProductions.keysIterator.map(_._2) ++ unaryProductions.keysIterator.map(_._2))
     val lexicon = new SimpleLexicon[L, W](wordCounts)
 
     generative(grammar, lexicon, binaryProductions, unaryProductions, wordCounts)
   }
 
-  def generative[L, W](grammar: Grammar[L], lexicon: Lexicon[L, W],
+  def generative[L, W](grammar: BaseGrammar[L], lexicon: Lexicon[L, W],
                        binaryProductions: Counter2[L, BinaryRule[L], Double],
                        unaryProductions: Counter2[L, UnaryRule[L], Double],
-                       wordCounts: Counter2[L, W, Double]):DerivationScorer.Factory[L, W] = {
+                       wordCounts: Counter2[L, W, Double]):RefinedGrammar[L, W] = {
     val loggedB = Library.logAndNormalizeRows(binaryProductions)
     val loggedU= Library.logAndNormalizeRows(unaryProductions)
 
@@ -64,10 +73,10 @@ object DerivationScorerFactory {
     
     val spanScoreArray = grammar.labelEncoder.mkArray[Double]
 
-    refined(grammar, lexicon, ref, ruleScoreArray, spanScoreArray, new SimpleTagScorer(wordCounts))
+    unanchored(grammar, lexicon, ref, ruleScoreArray, spanScoreArray, new SimpleTagScorer(wordCounts))
   }
 
-  def refined[L, L2, W](grammar: Grammar[L], lexicon: Lexicon[L, W],
+  def unanchored[L, L2, W](grammar: BaseGrammar[L], lexicon: Lexicon[L, W],
                         refinements: GrammarRefinements[L, L2],
                         refinedRuleScores: Array[Double],
                         refinedSpanScores: Array[Double],
@@ -76,7 +85,7 @@ object DerivationScorerFactory {
     val g = grammar
     val l = lexicon
     
-    val refinedGrammar = Grammar(refinements.labels.refinementsOf(grammar.root)(0),
+    val refinedGrammar = BaseGrammar(refinements.labels.refinementsOf(grammar.root)(0),
       refinements.labels.fineIndex,
       refinements.rules.fineIndex)
 
@@ -125,12 +134,12 @@ object DerivationScorerFactory {
       }
     }
 
-    new DerivationScorer.Factory[L, W] {
+    new RefinedGrammar[L, W] {
       def grammar = g
       def lexicon = l
 
-      def specialize(w: Seq[W]) = new Specialization {
-        override def toString() = "RefinedDerivationScorer(...)"
+      def specialize(w: Seq[W]) = new RefinedAnchoring[L, W] {
+        override def toString() = "RefinedAnchoring(...)"
         val grammar = g
         val lexicon = l
         def words = w

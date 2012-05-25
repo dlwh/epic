@@ -8,10 +8,10 @@ import scalanlp.trees.{TreeInstance, AnnotatedLabel}
 import io.Source
 import scalala.library.Library
 import scalanlp.parser.features.{GenFeaturizer, IndicatorFeature, WordShapeFeaturizer}
-import scalanlp.parser.{Grammar, DerivationScorerFactory, ParserParams}
 import scalanlp.parser.projections.GrammarRefinements
 import scalala.tensor.Counter
 import scalanlp.epic.{ComponentFeature, Feature}
+import scalanlp.parser.{AugmentedGrammar, BaseGrammar, RefinedGrammar, ParserParams}
 
 /**
  *
@@ -48,8 +48,8 @@ case class ProductParserModelFactory(baseParser: ParserParams.BaseParser,
 
     val (xbarParser, xbarLexicon) = baseParser.xbarGrammar(trainTrees)
 
-    val baseFactory = DerivationScorerFactory.generative(xbarParser, xbarLexicon, annBinaries, annUnaries, annWords)
-    val cFactory = constraints.cachedFactory(baseFactory)
+    val baseFactory = RefinedGrammar.generative(xbarParser, xbarLexicon, annBinaries, annUnaries, annWords)
+    val cFactory = constraints.cachedFactory(AugmentedGrammar.fromRefined(baseFactory))
 
     val substateMap = if (substates != null && substates.exists) {
       val in = Source.fromFile(substates).getLines()
@@ -69,7 +69,7 @@ case class ProductParserModelFactory(baseParser: ParserParams.BaseParser,
     }
     val feat = new GenFeaturizer[(AnnotatedLabel, Seq[Int]), String](gen, labelFlattener _)
 
-    val annGrammar: Grammar[AnnotatedLabel] = Grammar(annTrees.head.tree.label, annBinaries, annUnaries)
+    val annGrammar = BaseGrammar(annTrees.head.tree.label, annBinaries, annUnaries)
     val firstLevelRefinements = GrammarRefinements(xbarParser, annGrammar, {(_: AnnotatedLabel).baseAnnotatedLabel})
     val secondLevel = GrammarRefinements(annGrammar, split(_: AnnotatedLabel, substateMap), unsplit)
     val finalRefinements = firstLevelRefinements compose secondLevel

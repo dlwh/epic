@@ -8,8 +8,8 @@ import java.util.concurrent.ConcurrentHashMap
  * @author dlwh
  */
 @SerialVersionUID(1L)
-class MapCacheScorerFactory[L, W](trueFactory: DerivationScorer.Factory[L, W]) extends DerivationScorer.Factory[L, W] with Serializable {
-  private val cache = new ConcurrentHashMap[Seq[W], DerivationScorer[L, W]]
+class MapCacheCoreGrammar[L, W](trueFactory: CoreGrammar[L, W]) extends CoreGrammar[L, W] with Serializable {
+  private val cache = new ConcurrentHashMap[Seq[W], CoreAnchoring[L, W]]
 
   def grammar = trueFactory.grammar
   def lexicon = trueFactory.lexicon

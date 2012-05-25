@@ -7,7 +7,7 @@ package projections
  * @author dlwh
  */
 trait ChartProjector[L, W] {
-  type MyScorer <: UnrefinedDerivationScorer[L, W]
+  type MyScorer <: CoreAnchoring[L, W]
   protected def threshold:Double
   protected def createSpanScorer(charts: Marginal[L, W],
                                  ruleData: AnchoredRuleProjector.AnchoredData,

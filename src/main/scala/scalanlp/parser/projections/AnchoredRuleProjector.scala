@@ -51,7 +51,7 @@ class AnchoredRuleProjector(threshold: Double) extends Serializable {
     val totalsUnaries = TriangularArray.raw(length+1, null:OpenAddressHashArray[Double]);
 
 
-    val visitor = new DerivationVisitor[L] {
+    val visitor = new AnchoredVisitor[L] {
       def visitSpan(begin: Int, end: Int, tag: Int, ref: Int, score: Double) {
         // fill in spans with 0 if they're active
         getOrElseUpdate(lexicalScores, TriangularArray.index(begin, end), projVector())(tag) = 0

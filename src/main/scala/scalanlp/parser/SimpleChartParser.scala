@@ -8,14 +8,11 @@ trait ChartParser[L, W] extends Parser[L, W] with Serializable {
 
   def decoder: ChartDecoder[L, W]
 
-  def root: L
-  protected def grammar: Grammar[L]
-
   override def bestParse(w: Seq[W]):BinarizedTree[L] = try {
     val chart = charts(w)
     decoder.extractBestParse(chart)
   } catch {
-    case e => throw e;
+    case e => throw e
   }
 }
 
@@ -25,20 +22,17 @@ trait ChartParser[L, W] extends Parser[L, W] with Serializable {
  * @author dlwh
  */
 @SerialVersionUID(1)
-class SimpleChartParser[L, W](val builder: ChartBuilder[ParseChart, L, W],
+class SimpleChartParser[L, W](val augmentedGrammar: AugmentedGrammar[L, W],
                               val decoder: ChartDecoder[L, W]) extends ChartParser[L, W] with Serializable {
 
-  def charts(w: Seq[W]) = builder.charts(w)
+  def charts(w: Seq[W]) = ChartMarginal(augmentedGrammar, w, ParseChart.logProb)
+  def grammar = augmentedGrammar.grammar
 
-  def root = builder.root
-  protected def grammar = builder.grammar.grammar
 }
 
 object SimpleChartParser {
-  def apply[L, W](grammar: DerivationScorer.Factory[L, W]) = {
-    new SimpleChartParser[L, W](ChartBuilder(grammar), new MaxConstituentDecoder)
+  def apply[L, W](grammar: AugmentedGrammar[L, W]) = {
+    new SimpleChartParser[L, W](grammar, new MaxRuleProductDecoder(grammar.grammar, grammar.lexicon))
   }
-
-
 
 }

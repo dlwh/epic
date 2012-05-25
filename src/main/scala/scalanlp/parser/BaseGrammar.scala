@@ -16,15 +16,15 @@ import scalanlp.trees._
  * @author dlwh
  */
 @SerialVersionUID(1)
-final class Grammar[L] private (val root: L,
-                                val labelIndex: Index[L],
-                                val index: Index[Rule[L]],
-                                indexedRules: Array[Rule[Int]],
-                                binaryRulesByParent: Array[Array[Int]],
-                                unaryRulesByParent: Array[Array[Int]],
-                                binaryRulesByLeftChild: Array[Array[Int]],
-                                binaryRulesByRightChild: Array[Array[Int]],
-                                unaryRulesByChild: Array[Array[Int]]) extends Encoder[Rule[L]] with Serializable {
+final class BaseGrammar[L] private (val root: L,
+                                    val labelIndex: Index[L],
+                                    val index: Index[Rule[L]],
+                                    indexedRules: Array[Rule[Int]],
+                                    binaryRulesByParent: Array[Array[Int]],
+                                    unaryRulesByParent: Array[Array[Int]],
+                                    binaryRulesByLeftChild: Array[Array[Int]],
+                                    binaryRulesByRightChild: Array[Array[Int]],
+                                    unaryRulesByChild: Array[Array[Int]]) extends Encoder[Rule[L]] with Serializable {
   def labelEncoder  = Encoder.fromIndex(labelIndex)
 
   // Accessors for properties of indexed rules
@@ -41,8 +41,8 @@ final class Grammar[L] private (val root: L,
   def indexedBinaryRulesWithRightChild(c: Int) = binaryRulesByRightChild(c)
 }
 
-object Grammar {
-  def apply[L, W](root: L, productions: TraversableOnce[Rule[L]]): Grammar[L] = {
+object BaseGrammar {
+  def apply[L, W](root: L, productions: TraversableOnce[Rule[L]]): BaseGrammar[L] = {
     val index = Index[L]();
     val ruleIndex = Index[Rule[L]]()
     val lex = new ArrayBuffer[LexicalProduction[L, W]]()
@@ -56,13 +56,13 @@ object Grammar {
   
   def apply[L](root: L,
                binaries: Counter2[L, _<:Rule[L], _],
-               unaries: Counter2[L, _ <: Rule[L], _]): Grammar[L] = {
+               unaries: Counter2[L, _ <: Rule[L], _]): BaseGrammar[L] = {
     apply(root, binaries.keysIterator.map(_._2) ++ unaries.keysIterator.map(_._2))
   }
 
   def apply[L, W](root: L,
                   labelIndex: Index[L],
-                  ruleIndex: Index[Rule[L]]):Grammar[L] = {
+                  ruleIndex: Index[Rule[L]]):BaseGrammar[L] = {
     val indexedRules = for ( r <- ruleIndex.toArray) yield r match {
       case BinaryRule(a, b, c) => BinaryRule(labelIndex(a), labelIndex(b), labelIndex(c)):Rule[Int]
       case UnaryRule(a, b) => UnaryRule(labelIndex(a), labelIndex(b)):Rule[Int]
@@ -88,7 +88,7 @@ object Grammar {
         unaryRuleTable(c + labelIndex.size * (p)) = i
     }
 
-    new Grammar(
+    new BaseGrammar(
       root,
       labelIndex,
       ruleIndex,

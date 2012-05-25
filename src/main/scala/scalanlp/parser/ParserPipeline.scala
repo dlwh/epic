@@ -1,6 +1,6 @@
 package scalanlp.parser
 
-import projections.ConstraintScorerFactory
+import projections.ConstraintScorerCoreGrammar
 import scalanlp.config._
 import java.io._
 import scalanlp.trees._
@@ -22,11 +22,11 @@ object ParserParams {
   case class BaseParser(path: File = null) {
     def xbarGrammar(trees: IndexedSeq[TreeInstance[AnnotatedLabel, String]]) = Option(path) match {
       case Some(f) if f.exists =>
-        readObject[(Grammar[AnnotatedLabel],Lexicon[AnnotatedLabel, String])](f)
+        readObject[(BaseGrammar[AnnotatedLabel],Lexicon[AnnotatedLabel, String])](f)
       case _ =>
         val (words, xbarBinaries, xbarUnaries) = GenerativeParser.extractCounts(trees.map(_.mapLabels(_.baseAnnotatedLabel)))
 
-        val g = Grammar(AnnotatedLabel.TOP, xbarBinaries.keysIterator.map(_._2) ++ xbarUnaries.keysIterator.map(_._2))
+        val g = BaseGrammar(AnnotatedLabel.TOP, xbarBinaries.keysIterator.map(_._2) ++ xbarUnaries.keysIterator.map(_._2))
         val lex = new SignatureLexicon(words, EnglishWordClassGenerator)
         if(path ne null)
           writeObject(path, g -> lex)
@@ -36,16 +36,15 @@ object ParserParams {
   }
 
   case class Constraints[L, W](path: File = null) {
-    def cachedFactory(baseFactory: DerivationScorer.Factory[L, W], threshold: Double = -7) = {
+    def cachedFactory(baseFactory: AugmentedGrammar[L, W], threshold: Double = -7):CoreGrammar[L, W] = {
       if(path != null && constraintsCache.contains(path)) {
-        constraintsCache(path).asInstanceOf[DerivationScorer.Factory[L, W]]
+        constraintsCache(path).asInstanceOf[CoreGrammar[L, W]]
       } else {
-        val uncached = if(path eq null) {
-          new ConstraintScorerFactory[L,W](ChartBuilder(baseFactory), threshold)
-        }
-        else {
-          val constraint = new ConstraintScorerFactory[L,W](ChartBuilder(baseFactory), threshold)
-          new FileCachedScorerFactory(constraint, path)
+        val uncached: CoreGrammar[L, W] = if(path eq null) {
+          new ConstraintScorerCoreGrammar[L,W](baseFactory, threshold)
+        } else {
+          val constraint = new ConstraintScorerCoreGrammar[L,W](baseFactory, threshold)
+          new FileCachedCoreGrammar(constraint, path)
         }
 
         if(path != null)
@@ -56,7 +55,7 @@ object ParserParams {
     }
   }
   
-  private val constraintsCache = new MapCache[File, DerivationScorer.Factory[_, _]]
+  private val constraintsCache = new MapCache[File, CoreGrammar[_, _]]
 }
 
 /**

@@ -24,9 +24,9 @@ object DSLGrammar {
     }
 
 
-    val grammar = Grammar("S", binaryProductions, unaryProductions)
+    val grammar = BaseGrammar("S", binaryProductions, unaryProductions)
     val unsmoothed = new UnsmoothedLexicon(lexicon.keysIterator.map{ case (k,v) => LexicalProduction(k,v)}.toSet)
-    DerivationScorerFactory.generative(grammar, unsmoothed, binaryProductions, unaryProductions, lexicon)
+    AugmentedGrammar.fromRefined(RefinedGrammar.generative(grammar, unsmoothed, binaryProductions, unaryProductions, lexicon))
   }
 
   def simpleGrammar =  grammar(

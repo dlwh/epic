@@ -17,35 +17,35 @@ trait ParserModel[L, W] extends Model[TreeInstance[L, W]] with ParserExtractable
 
   def extractParser(weights: DenseVector[Double]) = {
     val inf = inferenceFromWeights(weights)
-    SimpleChartParser(inf.grammar * inf.baseMeasure)
+    SimpleChartParser(AugmentedGrammar(inf.grammar, inf.baseMeasure))
   }
 }
 
 
 
-trait ParserInference[L, W] extends ProjectableInference[TreeInstance[L, W], DerivationScorer[L, W]] {
+trait ParserInference[L, W] extends ProjectableInference[TreeInstance[L, W], CoreAnchoring[L, W]] {
   type ExpectedCounts = scalanlp.parser.ExpectedCounts[Feature]
   type Marginal = ChartMarginal[ParseChart.LogProbabilityParseChart, L, W]
 
-  def grammar: DerivationScorer.Factory[L, W]
-  def featurizer: DerivationFeaturizer[L, W, Feature]
-  def baseMeasure: DerivationScorer.Factory[L, W]
+  def grammar: RefinedGrammar[L, W]
+  def featurizer: RefinedFeaturizer[L, W, Feature]
+  def baseMeasure: CoreGrammar[L, W]
 
-  def marginal(v: TreeInstance[L, W], aug: DerivationScorer[L, W]) = {
-    val fullGrammar = grammar.specialize(v.words) * baseMeasure.specialize(v.words) * aug
+  def marginal(v: TreeInstance[L, W], aug: CoreAnchoring[L, W]) = {
+    val fullGrammar = AugmentedAnchoring(grammar.specialize(v.words), baseMeasure.specialize(v.words) * aug)
     val charts = fullGrammar.marginal
     charts -> charts.partition
   }
 
-  def guessCountsFromMarginals(v: TreeInstance[L, W], marg: Marginal, aug: DerivationScorer[L, W]) = {
+  def guessCountsFromMarginals(v: TreeInstance[L, W], marg: Marginal, aug: CoreAnchoring[L, W]) = {
     marg.expectedCounts(featurizer)
   }
 
-  def baseAugment(v: TreeInstance[L, W])  = DerivationScorer.identity(grammar.grammar, grammar.lexicon, v.words)
+  def baseAugment(v: TreeInstance[L, W])  = CoreAnchoring.identity(grammar.grammar, grammar.lexicon, v.words)
 
   protected def projector: EPProjector[L, W] = new AnchoredRuleApproximator(Double.NegativeInfinity)
 
-  def project(v: TreeInstance[L, W], m: Marginal, oldAugment: DerivationScorer[L, W]) = {
+  def project(v: TreeInstance[L, W], m: Marginal, oldAugment: CoreAnchoring[L, W]) = {
     projector.project(this, v, m)
   }
 }

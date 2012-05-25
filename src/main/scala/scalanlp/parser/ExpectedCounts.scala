@@ -3,6 +3,13 @@ package scalanlp.parser
 import scalala.tensor.dense.DenseVectorCol
 import scalanlp.util.{Encoder, Index}
 
+/**
+ * TODO
+ * @param index
+ * @param counts
+ * @param loss
+ * @tparam Feat
+ */
 final case class ExpectedCounts[Feat](index: Index[Feat],
                                       counts: DenseVectorCol[Double],
                                       var loss: Double) extends scalanlp.epic.ExpectedCounts[ExpectedCounts[Feat]] {

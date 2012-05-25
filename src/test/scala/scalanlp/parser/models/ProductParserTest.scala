@@ -14,23 +14,23 @@ import org.scalatest.junit._
 class ProductParserTest extends ParserTestHarness with FunSuite {
 
   test("basic test") {
-    val factory = ParserTestHarness.simpleParser.builder.grammar
+    val factory = ParserTestHarness.simpleParser.augmentedGrammar
     val product = ProductParser.fromChartParsers(factory.grammar,
-      factory.lexicon, factory)
+      factory.lexicon, factory.refined)
 
     val rprod = evalParser(getTestTrees(), product)
-    println(rprod, evalParser(getTestTrees(), ParserTestHarness.simpleParser));
-    assert(rprod.f1 > 0.6, rprod);
+    println(rprod, evalParser(getTestTrees(), ParserTestHarness.simpleParser))
+    assert(rprod.f1 > 0.6, rprod)
   }
 
   test("two parsers test") {
-    val factory = ParserTestHarness.simpleParser.builder.grammar
+    val factory = ParserTestHarness.simpleParser.augmentedGrammar
     val product = ProductParser.fromChartParsers(factory.grammar,
-      factory.lexicon, factory, factory)
+      factory.lexicon, factory.refined, factory.refined)
 
     val rprod = evalParser(getTestTrees(), product)
-    println(rprod, evalParser(getTestTrees(), ParserTestHarness.simpleParser));
-    assert(rprod.f1 > 0.6, rprod);
+    println(rprod, evalParser(getTestTrees(), ParserTestHarness.simpleParser))
+    assert(rprod.f1 > 0.6, rprod)
   }
 }
 

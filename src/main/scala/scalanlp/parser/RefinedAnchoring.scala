@@ -3,7 +3,7 @@ package scalanlp.parser
 import scalanlp.inference.Factor
 
 /**
- * A DerivationScorer is a refined grammar that has been tuned to a particular sentence (if applicable).
+ * A RefinedAnchoring is a refined grammar that has been tuned to a particular sentence (if applicable).
  * It knows how to do two things: assign scores to rules and spans, and determine reachability of various refinements.
  *
  * It might be nice to consider a refined grammar that doesn't need sentence-specific tuning, but
@@ -11,8 +11,8 @@ import scalanlp.inference.Factor
  *
  * @author dlwh
  */
-trait DerivationScorer[L, W] extends Factor[DerivationScorer[L, W]] {
-  def grammar: Grammar[L]
+trait RefinedAnchoring[L, W] extends Factor[RefinedAnchoring[L, W]] {
+  def grammar: BaseGrammar[L]
   def lexicon: Lexicon[L, W]
   def words: Seq[W]
 
@@ -41,12 +41,12 @@ trait DerivationScorer[L, W] extends Factor[DerivationScorer[L, W]] {
    * @param other
    * @return
    */
-  def *(other: DerivationScorer[L, W]):DerivationScorer[L,W] = {
+  def *(other: RefinedAnchoring[L, W]):RefinedAnchoring[L,W] = {
     // hacky multimethod dispatch is hacky
     if (other eq null) this // ugh
-    else if(other.isInstanceOf[UnrefinedDerivationScorer.Identity[L, W]]) this
-    else if(this.isInstanceOf[UnrefinedDerivationScorer.Identity[L, W]]) other
-    else new ProductDerivationScorer(this,other)
+    else if(other.isInstanceOf[CoreAnchoring.Identity[L, W]]) this
+    else if(this.isInstanceOf[CoreAnchoring.Identity[L, W]]) other
+    else new ProductRefinedAnchoring(this,other)
   }
 
   /**
@@ -57,22 +57,23 @@ trait DerivationScorer[L, W] extends Factor[DerivationScorer[L, W]] {
    * @param other
    * @return
    */
-  def /(other: DerivationScorer[L, W]):DerivationScorer[L,W] = {
-    if(other.eq(null) || other.isInstanceOf[UnrefinedDerivationScorer.Identity[L, W]]) this
-    else new ProductDerivationScorer(this,other,-1)
+  def /(other: RefinedAnchoring[L, W]):RefinedAnchoring[L,W] = {
+    if(other.eq(null) || other.isInstanceOf[CoreAnchoring.Identity[L, W]]) this
+    else new ProductRefinedAnchoring(this,other,-1)
   }
 
   def logPartition = {
     marginal.partition
   }
 
-  lazy val marginal = ChartMarginal.fromSentence(this, words)
+  lazy val marginal = AugmentedAnchoring.fromRefined(this).marginal
 
-  def isConvergedTo(f: DerivationScorer[L, W], diff: Double):Boolean = {
+
+  def isConvergedTo(f: RefinedAnchoring[L, W], diff: Double):Boolean = {
     import scala.util.control.Breaks._
     var ok = false
     breakable {
-      marginal visit new DerivationVisitor[L] {
+      marginal visit new AnchoredVisitor[L] {
         def visitBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int, score: Double) {
           val myScore = scoreBinaryRule(begin, split, end, rule, ref)
           val theirScore = f.scoreBinaryRule(begin, split, end, rule, ref)
@@ -183,27 +184,14 @@ trait DerivationScorer[L, W] extends Factor[DerivationScorer[L, W]] {
   def ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int, refC: Int):Int
 }
 
-object DerivationScorer {
-  def identity[L, W](grammar: Grammar[L],
+object RefinedAnchoring {
+  def identity[L, W](grammar: BaseGrammar[L],
                      lexicon: Lexicon[L, W],
-                     words: Seq[W]): DerivationScorer[L, W] = {
-    UnrefinedDerivationScorer.identity[L, W](grammar, lexicon, words)
+                     words: Seq[W]): RefinedAnchoring[L, W] = {
+    LiftedCoreAnchoring(CoreAnchoring.identity[L, W](grammar, lexicon, words))
   }
 
 
-  trait Factory[L, W] extends Serializable {
-    def *(factory: Factory[L, W]) = DerivationScorerFactory.product(this, factory)
 
-    def grammar: Grammar[L]
-    def lexicon: Lexicon[L, W]
-
-    def root = grammar.root
-    def index = grammar.index
-    def labelIndex = grammar.labelIndex
-    def labelEncoder = grammar.labelEncoder
-
-    def specialize(words: Seq[W]):Specialization
-    type Specialization = DerivationScorer[L, W]
-  }
 
 }

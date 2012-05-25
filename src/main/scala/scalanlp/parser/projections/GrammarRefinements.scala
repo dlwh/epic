@@ -16,11 +16,11 @@ case class GrammarRefinements[C,F](labels: ProjectionIndexer[C,F], rules: Projec
 }
 
 object GrammarRefinements {
-  def identity[L](grammar: Grammar[L]): GrammarRefinements[L, L] = {
+  def identity[L](grammar: BaseGrammar[L]): GrammarRefinements[L, L] = {
     apply(grammar, grammar, Predef.identity[L] _)
   }
 
-  def apply[C,F](coarse: Grammar[C], fine: Grammar[F], proj: F=>C): GrammarRefinements[C, F] = {
+  def apply[C,F](coarse: BaseGrammar[C], fine: BaseGrammar[F], proj: F=>C): GrammarRefinements[C, F] = {
     def projRule(r: Rule[F]) = r match {
       case BinaryRule(a,b,c) => BinaryRule(proj(a),proj(b),proj(c))
       case UnaryRule(a,b) => UnaryRule(proj(a),proj(b))
@@ -31,7 +31,7 @@ object GrammarRefinements {
     new GrammarRefinements(labels,rules)
   }
 
-  def apply[C,F](coarse: Grammar[C], split: C=>Seq[F], proj: F=>C) = {
+  def apply[C,F](coarse: BaseGrammar[C], split: C=>Seq[F], proj: F=>C) = {
     def splitRule(r: Rule[C]) = r match {
       case BinaryRule(a,b,c) => for(a_ <- split(a); b_ <- split(b); c_ <- split(c)) yield BinaryRule(a_,b_,c_)
       case UnaryRule(a,b) => for(a_ <- split(a); b_ <- split(b)) yield UnaryRule(a_,b_)

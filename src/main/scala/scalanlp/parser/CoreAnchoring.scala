@@ -1,5 +1,7 @@
 package scalanlp.parser
 
+import scalanlp.inference.Factor
+
 /**
  * SpanScorers are used in [[scalanlp.parser.ChartParser]]s to reweight rules in a particular context.
  * Typically, they're indexed for a *particular* set of rules and labels for speed.
@@ -7,8 +9,10 @@ package scalanlp.parser
  * @author dlwh
  */
 @SerialVersionUID(1)
-trait UnrefinedDerivationScorer[L, W] extends DerivationScorer[L, W] {
-  override final def annotationTag = 0
+trait CoreAnchoring[L, W] extends Factor[CoreAnchoring[L, W]] {
+  def grammar: BaseGrammar[L]
+  def lexicon: Lexicon[L, W]
+  def words: Seq[W]
 
   /**
    * Scores the indexed [[scalanlp.trees.BinaryRule]] rule when it occurs at (begin,split,end)
@@ -24,16 +28,72 @@ trait UnrefinedDerivationScorer[L, W] extends DerivationScorer[L, W] {
    */
   def scoreSpan(begin: Int, end: Int, tag: Int): Double
 
+
+  // Factor stuff
+  def *(other: CoreAnchoring[L, W]) = {
+    // hacky multimethod dispatch is hacky
+    if (other eq null) this // ugh
+    else if(other.isInstanceOf[CoreAnchoring.Identity[L, W]]) this
+    else if(this.isInstanceOf[CoreAnchoring.Identity[L, W]]) other
+    else new ProductCoreAnchoring(this,other)
+  }
+
+    // Factor stuff
+  def /(other: CoreAnchoring[L, W]) = {
+    // hacky multimethod dispatch is hacky
+    if (other eq null) this // ugh
+    else if(other.isInstanceOf[CoreAnchoring.Identity[L, W]]) this
+    else new ProductCoreAnchoring(this, other, -1)
+  }
+
+  def logPartition = marginal.partition
+
+  def isConvergedTo(f: CoreAnchoring[L, W], diff: Double) = lift.isConvergedTo(f.lift,diff)
+
+  lazy val marginal = AugmentedAnchoring.fromCore(this).marginal
+
+  def lift:RefinedAnchoring[L, W] = LiftedCoreAnchoring(this)
+}
+
+object CoreAnchoring {
+  def identity[L, W](grammar: BaseGrammar[L],
+                     lexicon: Lexicon[L, W],
+                     words: Seq[W]):CoreAnchoring[L, W] = {
+    new Identity(grammar, lexicon, words)
+  }
+
+  @SerialVersionUID(1L)
+  case class Identity[L, W](grammar: BaseGrammar[L], lexicon: Lexicon[L, W], words: Seq[W]) extends CoreAnchoring[L, W] {
+
+    def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = 0.0
+
+    def scoreUnaryRule(begin: Int, end: Int, rule: Int) = 0.0
+
+    def scoreSpan(begin: Int, end: Int, tag: Int) = 0.0
+  }
+
+}
+
+case class LiftedCoreAnchoring[L, W](core: CoreAnchoring[L, W]) extends RefinedAnchoring[L, W] {
+  override def annotationTag = 0
+
+
+  def grammar = core.grammar
+
+  def lexicon = core.lexicon
+
+  def words = core.words
+
   final def scoreSpan(begin: Int, end: Int, label: Int, ref: Int) = {
-    scoreSpan(begin, end, label)
+    core.scoreSpan(begin, end, label)
   }
 
   final def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int) = {
-    scoreBinaryRule(begin, split, end, rule)
+    core.scoreBinaryRule(begin, split, end, rule)
   }
 
   final def scoreUnaryRule(begin: Int, end: Int, rule: Int, ref: Int) = {
-    scoreUnaryRule(begin, end, rule)
+    core.scoreUnaryRule(begin, end, rule)
   }
 
   final def validLabelRefinements(begin: Int, end: Int, label: Int) = Array(0)
@@ -58,23 +118,8 @@ trait UnrefinedDerivationScorer[L, W] extends DerivationScorer[L, W] {
   final def ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int) = 0
 
   final def ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int, refC: Int) = 0
+
 }
 
-object UnrefinedDerivationScorer {
-  def identity[L, W](grammar: Grammar[L],
-                     lexicon: Lexicon[L, W],
-                     words: Seq[W]):UnrefinedDerivationScorer[L, W] = {
-    new Identity(grammar, lexicon, words)
-  }
 
-  @SerialVersionUID(1L)
-  case class Identity[L, W](grammar: Grammar[L], lexicon: Lexicon[L, W], words: Seq[W]) extends UnrefinedDerivationScorer[L, W] {
-
-    def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = 0.0
-
-    def scoreUnaryRule(begin: Int, end: Int, rule: Int) = 0.0
-
-    def scoreSpan(begin: Int, end: Int, tag: Int) = 0.0
-  }
-}
 

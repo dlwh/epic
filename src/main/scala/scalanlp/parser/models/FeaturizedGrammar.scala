@@ -3,10 +3,10 @@ package scalanlp.parser.models
 import scalala.tensor.dense._
 import scalanlp.trees.{BinaryRule, UnaryRule}
 import scalanlp.parser.projections.GrammarRefinements
-import scalanlp.parser.{TagScorer, Lexicon, DerivationScorerFactory, Grammar}
+import scalanlp.parser.{TagScorer, Lexicon, RefinedGrammar, BaseGrammar}
 
 object FeaturizedGrammar {
-  def apply[L, L2, W](xbar: Grammar[L],
+  def apply[L, L2, W](xbar: BaseGrammar[L],
                       lexicon: Lexicon[L, W],
                       refinements: GrammarRefinements[L, L2],
                       weights: DenseVector[Double],
@@ -17,6 +17,6 @@ object FeaturizedGrammar {
     }
     val spanCache = new Array[Double](refinements.labels.fineIndex.size)
 
-    DerivationScorerFactory.refined(xbar, lexicon, refinements, ruleCache, spanCache, tagScorer)
+    RefinedGrammar.unanchored(xbar, lexicon, refinements, ruleCache, spanCache, tagScorer)
   }
 }

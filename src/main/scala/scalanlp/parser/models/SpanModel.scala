@@ -16,11 +16,11 @@ import scalanlp.epic.Feature
  *
  * @author dlwh
  */
-class SpanModel[L, W](featurizer: DerivationFeaturizer[L, W, Feature],
+class SpanModel[L, W](featurizer: RefinedFeaturizer[L, W, Feature],
                       val featureIndex: Index[Feature],
                       ann: (BinarizedTree[L], Seq[W]) => BinarizedTree[L],
-                      baseFactory: DerivationScorer.Factory[L, W],
-                      grammar: Grammar[L],
+                      baseFactory: CoreGrammar[L, W],
+                      grammar: BaseGrammar[L],
                       lexicon: Lexicon[L, W],
                       initialFeatureVal: (Feature => Option[Double]) = {
                         _ => None
@@ -46,11 +46,11 @@ class SpanModel[L, W](featurizer: DerivationFeaturizer[L, W, Feature],
 }
 
 
-class DotProductGrammar[L, W, Feature](val grammar: Grammar[L],
+class DotProductGrammar[L, W, Feature](val grammar: BaseGrammar[L],
                                        val lexicon: Lexicon[L, W],
                                        val weights: DenseVector[Double],
-                                       val featurizer: DerivationFeaturizer[L, W, Feature]) extends DerivationScorer.Factory[L, W] {
-  def specialize(w: Seq[W]):DerivationScorer[L, W] = new UnrefinedDerivationScorer[L, W] {
+                                       val featurizer: RefinedFeaturizer[L, W, Feature]) extends RefinedGrammar[L, W] {
+  def specialize(w: Seq[W]):RefinedAnchoring[L, W] = LiftedCoreAnchoring(new CoreAnchoring[L, W] {
 
     val grammar = DotProductGrammar.this.grammar
     val lexicon = DotProductGrammar.this.lexicon
@@ -81,7 +81,7 @@ class DotProductGrammar[L, W, Feature](val grammar: Grammar[L],
       score
     }
 
-  }
+  })
 }
 
 trait SpanFeaturizer[L, W] extends Serializable {
@@ -101,9 +101,9 @@ trait SpanFeaturizer[L, W] extends Serializable {
 
 
 class IndexedSpanFeaturizer[L, W](f: SpanFeaturizer[L, W],
-                                  grammar: Grammar[L],
+                                  grammar: BaseGrammar[L],
                                   val trueFeatureIndex: Index[Feature],
-                                  dummyFeatures: Int) extends DerivationFeaturizer[L, W, Feature] with Serializable {
+                                  dummyFeatures: Int) extends RefinedFeaturizer[L, W, Feature] with Serializable {
   val index:Index[Feature] = {
     val r = Index[Feature]()
     (trueFeatureIndex) foreach (r.index(_))
@@ -111,9 +111,9 @@ class IndexedSpanFeaturizer[L, W](f: SpanFeaturizer[L, W],
     r
   }
 
-  def specialize(words: Seq[W]):Specialization = new Spec(words)
+  def specialize(words: Seq[W]):Anchoring = new Spec(words)
 
-  case class Spec(words: Seq[W]) extends super.Specialization {
+  case class Spec(words: Seq[W]) extends super.Anchoring {
     def length = words.length
     private val fspec = f.specialize(words)
 
@@ -202,7 +202,7 @@ class IndexedSpanFeaturizer[L, W](f: SpanFeaturizer[L, W],
 object IndexedSpanFeaturizer {
   def extract[L, W](featurizer: SpanFeaturizer[L, W],
                     ann: (BinarizedTree[L], Seq[W]) => BinarizedTree[L],
-                    grammar: Grammar[L],
+                    grammar: BaseGrammar[L],
                     dummyFeatScale: Double,
                     trees: Traversable[TreeInstance[L, W]]): IndexedSpanFeaturizer[L, W] = {
 
@@ -248,7 +248,7 @@ object IndexedSpanFeaturizer {
   }
 }
 
-class StandardSpanFeaturizer[L, W](grammar: Grammar[L],
+class StandardSpanFeaturizer[L, W](grammar: BaseGrammar[L],
                                    wordGen: W=>Traversable[String],
                                    labelFeatures: Array[Array[Feature]],
                                    ruleFeatures: Array[Array[Feature]]) extends SpanFeaturizer[L, W] {
@@ -373,9 +373,9 @@ case class SpanModelFactory(baseParser: ParserParams.BaseParser,
 
     val lexicon:Lexicon[AnnotatedLabel, String] = initLexicon
 
-    val baseFactory = DerivationScorerFactory.generative(xbarGrammar,
+    val baseFactory = RefinedGrammar.generative(xbarGrammar,
       xbarLexicon, initBinaries, initUnaries, initLexicon)
-    val cFactory = constraints.cachedFactory(baseFactory)
+    val cFactory = constraints.cachedFactory(AugmentedGrammar.fromRefined(baseFactory))
 
     val labelFeatures = xbarGrammar.labelEncoder.tabulateArray(l => Array(LabelFeature(l):Feature))
     val ruleFeatures = xbarGrammar.tabulateArray(l => Array(RuleFeature(l):Feature))

@@ -7,18 +7,18 @@ import scalanlp.util.EitherIndex
  * @author dlwh
  */
 
-class ProductDerivationFeaturizer[L, W, Feat1, Feat2](sf1: DerivationScorer.Factory[L, W],
-                                        sf2: DerivationScorer.Factory[L, W],
-                                        feat1: DerivationFeaturizer[L, W, Feat1],
-                                        feat2: DerivationFeaturizer[L, W, Feat2]) extends DerivationFeaturizer[L, W, Either[Feat1, Feat2]] {
+class ProductRefinedFeaturizer[L, W, Feat1, Feat2](sf1: RefinedGrammar[L, W],
+                                        sf2: RefinedGrammar[L, W],
+                                        feat1: RefinedFeaturizer[L, W, Feat1],
+                                        feat2: RefinedFeaturizer[L, W, Feat2]) extends RefinedFeaturizer[L, W, Either[Feat1, Feat2]] {
   def index: EitherIndex[Feat1, Feat2] = feat1.index | feat2.index
 
-  def specialize(w: Seq[W]):Specialization = {
+  def specialize(w: Seq[W]):Anchoring = {
     val s1 = sf1.specialize(w)
     val s2 = sf2.specialize(w)
     val f1 = feat1.specialize(w)
     val f2 = feat1.specialize(w)
-    new ProductRefinementsHandler[L, W](s1, s2) with Specialization {
+    new ProductRefinementsHandler[L, W](s1, s2) with Anchoring {
       def words = w
 
       def featuresForBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int) = {

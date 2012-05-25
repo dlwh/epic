@@ -5,7 +5,7 @@ import scalala.tensor.{Counter, Counter2, ::}
 import scalala.library.Library.{sum,Axis}
 
 /**
- *
+ * TODO
  * @author dlwh
  */
 trait TagScorer[L, W] extends Serializable {

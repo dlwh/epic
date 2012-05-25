@@ -17,12 +17,12 @@ import collection.mutable.ArrayBuilder
  * @author dlwh
  */
 @SerialVersionUID(1)
-trait FeatureIndexer[L, L2, W] extends DerivationFeaturizer[L, W, Feature] with Encoder[Feature] with Serializable {
+trait FeatureIndexer[L, L2, W] extends RefinedFeaturizer[L, W, Feature] with Encoder[Feature] with Serializable {
 
 
   val index: Index[Feature]
   val featurizer: Featurizer[L2, W]
-  val grammar: Grammar[L]
+  val grammar: BaseGrammar[L]
   val proj: GrammarRefinements[L, L2]
 
   def labelIndex = proj.labels.fineIndex
@@ -94,7 +94,7 @@ trait FeatureIndexer[L, L2, W] extends DerivationFeaturizer[L, W, Feature] with 
     result.result
   }
 
-  case class Spec private[FeatureIndexer](words: Seq[W]) extends super.Specialization {
+  case class Spec private[FeatureIndexer](words: Seq[W]) extends super.Anchoring {
     def featuresForBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int) = {
       val globalRule = proj.rules.globalize(rule, ref)
       featuresFor(globalRule)
@@ -120,7 +120,7 @@ object FeatureIndexer {
   /**
    * Creates a FeatureIndexer by featurizing all rules/words and indexing them
    */
-  def apply[L, L2, W](grammar: Grammar[L],
+  def apply[L, L2, W](grammar: BaseGrammar[L],
                       lexicon: Lexicon[L, W],
                       f: Featurizer[L2, W],
                       indexedProjections: GrammarRefinements[L, L2]) = {
@@ -153,7 +153,7 @@ object FeatureIndexer {
     cachedFeaturesToIndexedFeatures[L, L2, W](grammar, indexedProjections, f, featureIndex, ruleCache, lexicalCache.map{ case (k,v) => k -> (Map.empty ++ v)}.toMap)
   }
 
-  private def cachedFeaturesToIndexedFeatures[L, L2, W](grammar: Grammar[L],
+  private def cachedFeaturesToIndexedFeatures[L, L2, W](grammar: BaseGrammar[L],
                                                         refinements: GrammarRefinements[L, L2],
                                                         f: Featurizer[L2, W],
                                                         featureIndex: Index[Feature],

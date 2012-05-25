@@ -19,8 +19,8 @@ import collection.mutable.ArrayBuffer
 class LexModel[L, W](bundle: LexGrammarBundle[L, W],
                      reannotate: (BinarizedTree[L], Seq[W])=>BinarizedTree[L],
                      indexed: IndexedFeaturizer[L, W],
-                     baseFactory: DerivationScorer.Factory[L, W],
-                     coarse: Grammar[L],
+                     baseFactory: CoreGrammar[L, W],
+                     coarse: BaseGrammar[L],
                      coarseLex: Lexicon[L, W],
                      initFeatureValue: Feature=>Option[Double]) extends ParserModel[L, W] with Serializable with ParserExtractable[L, W] {
 
@@ -31,7 +31,7 @@ class LexModel[L, W](bundle: LexGrammarBundle[L, W],
   def initialValueForFeature(f: Feature) = initFeatureValue(f).getOrElse(0)
 
   def inferenceFromWeights(weights: DenseVector[Double]) = {
-    val gram: DerivationScorer.Factory[L, W] = bundle.makeGrammar(indexed, weights)
+    val gram = bundle.makeGrammar(indexed, weights)
     def ann(tree: BinarizedTree[L], words: Seq[W]):BinarizedTree[(L, Int)] = {
       val reannotated = reannotate(tree, words)
       val headed = headFinder.annotateHeadIndices(reannotated)
@@ -94,8 +94,8 @@ class IndexedFeaturizer[L, W](f: LexFeaturizer[L, W],
                              ruleIndex: Index[Rule[L]],
                              val trueFeatureIndex: Index[Feature],
                              lowCountFeatures: Set[Feature],
-                             dummyFeatures: Int) extends DerivationFeaturizer[L, W, Feature] with Serializable {
-  def specialize(words: Seq[W]):Specialization = new Spec(words)
+                             dummyFeatures: Int) extends RefinedFeaturizer[L, W, Feature] with Serializable {
+  def specialize(words: Seq[W]):Anchoring = new Spec(words)
 
   val (index:Index[Feature], lowCountFeature) = {
     val r: MutableIndex[Feature] = Index[Feature]()
@@ -106,7 +106,7 @@ class IndexedFeaturizer[L, W](f: LexFeaturizer[L, W],
   }
 
 
-  case class Spec(words: Seq[W]) extends super.Specialization {
+  case class Spec(words: Seq[W]) extends super.Anchoring {
 
     def length = words.length
 
@@ -378,7 +378,7 @@ case class StandardFeaturizer[L, W>:Null, P](wordIndex: Index[W],
   }
 }
 
-case class LexGrammarBundle[L, W](baseGrammar: Grammar[L],
+case class LexGrammarBundle[L, W](baseGrammar: BaseGrammar[L],
                                   baseLexicon: Lexicon[L, W],
                                  headFinder: HeadFinder[L],
                                  wordIndex: Index[W]) { bundle =>
@@ -397,8 +397,8 @@ case class LexGrammarBundle[L, W](baseGrammar: Grammar[L],
     }
   }
 
-  def makeGrammar(fi: IndexedFeaturizer[L, W], weights: DenseVector[Double]): DerivationScorer.Factory[L, W] = {
-    new DerivationScorer.Factory[L, W] {
+  def makeGrammar(fi: IndexedFeaturizer[L, W], weights: DenseVector[Double]): RefinedGrammar[L, W] = {
+    new RefinedGrammar[L, W] {
       val grammar = baseGrammar
       val lexicon = baseLexicon
 
@@ -412,7 +412,7 @@ case class LexGrammarBundle[L, W](baseGrammar: Grammar[L],
       // binaryRule is (head * words.length + dep)
       // unaryRule is (head)
       // parent/leftchild/rightchild is (head)
-      final class Spec(val words: Seq[W]) extends DerivationScorer[L, W] {
+      final class Spec(val words: Seq[W]) extends RefinedAnchoring[L, W] {
         val grammar = baseGrammar
         val lexicon = baseLexicon
         val indexed = words.map(wordIndex)
@@ -430,7 +430,7 @@ case class LexGrammarBundle[L, W](baseGrammar: Grammar[L],
         }
 
         def scoreSpan(begin: Int, end: Int, label: Int, ref: Int) = {
-          if(ref < begin || ref >= end) error("grrr")
+          if(ref < begin || ref >= end) throw new Exception("Label refinement for lex parser (i.e. head word) must be in [begin,end)!")
           else dot(f.featuresForSpan(begin, end, label, ref))
         }
 
@@ -666,9 +666,9 @@ case class LexParserModelFactory(baseParser: ParserParams.BaseParser,
 
     val lexicon:Lexicon[AnnotatedLabel, String] = initLexicon
 
-    val baseFactory = DerivationScorerFactory.generative(xbarGrammar,
+    val baseFactory = RefinedGrammar.generative(xbarGrammar,
       xbarLexicon, initBinaries, initUnaries, initLexicon)
-    val cFactory = constraints.cachedFactory(baseFactory)
+    val cFactory = constraints.cachedFactory(AugmentedGrammar.fromRefined(baseFactory))
 
     def ruleGen(r: Rule[AnnotatedLabel]) = IndexedSeq(RuleFeature(r))
     def validTag(w: String) = lexicon.tagsForWord(w).toArray

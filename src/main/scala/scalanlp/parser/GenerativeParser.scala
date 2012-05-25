@@ -25,7 +25,7 @@ object GenerativeParser {
   def extractLexiconAndGrammar[L, W](data: Traversable[TreeInstance[AnnotatedLabel, String]]) = {
     val root = data.head.tree.label
     val (words, binary, unary) = extractCounts(data)
-    val grammar = Grammar(root,
+    val grammar = BaseGrammar(root,
       binary.keysIterator.map(_._2) ++ unary.keysIterator.map(_._2)
     )
 
@@ -35,12 +35,12 @@ object GenerativeParser {
 
   def fromTrees[L, W](data: Traversable[TreeInstance[L, W]]):SimpleChartParser[L, W] = {
     val grammar = extractGrammar(data.head.tree.label, data)
-    SimpleChartParser(grammar)
+    SimpleChartParser(AugmentedGrammar.fromRefined(grammar))
   }
 
-  def extractGrammar[L, W](root: L, data: TraversableOnce[TreeInstance[L, W]]): DerivationScorer.Factory[L, W] = {
+  def extractGrammar[L, W](root: L, data: TraversableOnce[TreeInstance[L, W]]): RefinedGrammar[L, W] = {
     val (wordCounts, binaryProductions, unaryProductions) = extractCounts(data)
-    DerivationScorerFactory.generative(root, binaryProductions, unaryProductions, wordCounts)
+    RefinedGrammar.generative(root, binaryProductions, unaryProductions, wordCounts)
   }
 
   def extractCounts[L, W](data: TraversableOnce[TreeInstance[L, W]]) = {
@@ -78,8 +78,8 @@ object GenerativePipeline extends ParserPipeline {
     val (xbar,xbarLexicon) = params.baseParser.xbarGrammar(trainTrees)
     val trees = trainTrees.map(params.annotator(_))
     val (words, binary, unary) = GenerativeParser.extractCounts(trees)
-    val grammar = DerivationScorerFactory.generative[AnnotatedLabel, String](xbar, xbarLexicon, binary, unary, words)
-    val parser = SimpleChartParser(grammar)
+    val grammar = RefinedGrammar.generative[AnnotatedLabel, String](xbar, xbarLexicon, binary, unary, words)
+    val parser = SimpleChartParser(AugmentedGrammar.fromRefined(grammar))
     Iterator.single(("Gen", parser))
   }
 }

@@ -8,8 +8,8 @@ import scalanlp.trees.{Production, LexicalProduction}
  * A simple Featurizer that just counts lexical and rule productions that are used.
  * @author dlwh
  */
-class ProductionFeaturizer[L, W](grammar: Grammar[L],
-                                 lexicalProductions: Iterable[LexicalProduction[L, W]]) extends DerivationFeaturizer[L, W, Production[L,W]] {
+class ProductionFeaturizer[L, W](grammar: BaseGrammar[L],
+                                 lexicalProductions: Iterable[LexicalProduction[L, W]]) extends RefinedFeaturizer[L, W, Production[L,W]] {
   val index = {
     val index = Index[Production[L, W]]()
     grammar.index foreach {index.index(_)}
@@ -17,7 +17,7 @@ class ProductionFeaturizer[L, W](grammar: Grammar[L],
     index
   }
 
-  def specialize(w: Seq[W]) = new Specialization {
+  def specialize(w: Seq[W]) = new Anchoring {
     val words = w
 
     def featuresForBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int) = {

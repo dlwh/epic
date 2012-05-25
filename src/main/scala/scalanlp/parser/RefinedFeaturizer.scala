@@ -9,12 +9,12 @@ import scalanlp.util.Index
  * @author dlwh
  */
 
-trait DerivationFeaturizer[L, W, Feat] {
+trait RefinedFeaturizer[L, W, Feat] {
   def index: Index[Feat]
   
-  def specialize(words: Seq[W]):Specialization
+  def specialize(words: Seq[W]):Anchoring
   
-  trait Specialization {
+  trait Anchoring {
     def words: Seq[W]
 
     def featuresForBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int):Array[Int]
@@ -24,15 +24,15 @@ trait DerivationFeaturizer[L, W, Feat] {
 
 }
 
-object DerivationFeaturizer {
+object RefinedFeaturizer {
   
-  def forGrammar[L, W](grammar: Grammar[L], lexicon: Lexicon[L, W]):DerivationFeaturizer[L, W, Production[L, W]] = {
+  def forGrammar[L, W](grammar: BaseGrammar[L], lexicon: Lexicon[L, W]):RefinedFeaturizer[L, W, Production[L, W]] = {
     forRefinedGrammar(grammar, lexicon, GrammarRefinements.identity(grammar))
   }
   
-  def forRefinedGrammar[L, L2, W](coarse: Grammar[L],
+  def forRefinedGrammar[L, L2, W](coarse: BaseGrammar[L],
                                   lexicon: Lexicon[L, W],
-                                  proj: GrammarRefinements[L, L2]):DerivationFeaturizer[L, W, Production[L2, W]] = {
+                                  proj: GrammarRefinements[L, L2]):RefinedFeaturizer[L, W, Production[L2, W]] = {
 
     val refinedTagWords = for {
       LexicalProduction(l, w) <- lexicon.knownLexicalProductions
@@ -45,10 +45,10 @@ object DerivationFeaturizer {
       proj.rules.refinementsOf(r).map(fr => ind(proj.rules.fineIndex.get(fr)))
     }
 
-    new DerivationFeaturizer[L, W, Production[L2, W]] {
+    new RefinedFeaturizer[L, W, Production[L2, W]] {
       def index = ind
 
-      def specialize(w: Seq[W]) = new Specialization {
+      def specialize(w: Seq[W]) = new Anchoring {
         val words = w
 
         def featuresForBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int) = {

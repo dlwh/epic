@@ -43,6 +43,6 @@ object ParserTestHarness extends ParserTestHarness {
   val simpleParser: SimpleChartParser[AnnotatedLabel, String] = {
     val trees = getTrainTrees()
     val grammar = GenerativeParser.extractGrammar[AnnotatedLabel, String](trees.head.label.label, trees.map(_.mapLabels(_.baseAnnotatedLabel)))
-    SimpleChartParser(grammar)
+    SimpleChartParser(AugmentedGrammar.fromRefined(grammar))
   }
 }

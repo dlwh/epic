@@ -14,8 +14,8 @@ import scalanlp.trees.annotations.{KMAnnotator, TreeAnnotator}
 class UnlexModel[L, L2, W](featurizer: Featurizer[L2, W],
                         ann: TreeAnnotator[L, W, L2],
                         val projections: GrammarRefinements[L, L2],
-                        baseFactory: DerivationScorer.Factory[L, W],
-                        grammar: Grammar[L],
+                        baseFactory: CoreGrammar[L, W],
+                        grammar: BaseGrammar[L],
                         lexicon: Lexicon[L, W],
                         initialFeatureVal: (Feature => Option[Double]) = {
                           _ => None
@@ -69,14 +69,14 @@ case class UnlexModelFactory(baseParser: ParserParams.BaseParser,
 
 
     val (grammar, lexicon) = baseParser.xbarGrammar(trainTrees)
-    val refGrammar = Grammar(AnnotatedLabel.TOP, initBinaries, initUnaries)
+    val refGrammar = BaseGrammar(AnnotatedLabel.TOP, initBinaries, initUnaries)
     val indexedRefinements = GrammarRefinements(grammar, refGrammar, {
       (_: AnnotatedLabel).baseAnnotatedLabel
     })
 
     val (xbarWords, xbarBinaries, xbarUnaries) = this.extractBasicCounts(trainTrees.map(_.mapLabels(_.baseAnnotatedLabel)))
-    val baseFactory = DerivationScorerFactory.generative(grammar, lexicon, xbarBinaries, xbarUnaries, xbarWords)
-    val cFactory = constraints.cachedFactory(baseFactory)
+    val baseFactory = RefinedGrammar.generative(grammar, lexicon, xbarBinaries, xbarUnaries, xbarWords)
+    val cFactory = constraints.cachedFactory(AugmentedGrammar.fromRefined(baseFactory))
 
     val gen = new WordShapeFeaturizer(Library.sum(initLexicon))
     def labelFlattener(l: AnnotatedLabel) = {

@@ -5,7 +5,7 @@ package scalanlp.parser
  * refinements as appropriate.
  *
  * This class is the main motivation for the "annotationTag" on
- * [[scalanlp.parser.DerivationScorer]] instances. If one of the annotation tags is "0"
+ * [[scalanlp.parser.RefinedAnchoring]] instances. If one of the annotation tags is "0"
  * then it does not use refinements, and so we can avoid clever games.
  *
  * Similarly, if the tags matched, then we can use the same tags. I'm not 100% convinced
@@ -14,9 +14,9 @@ package scalanlp.parser
  * @author dlwh
  */
 
-final case class ProductDerivationScorer[L,W](s1: DerivationScorer[L, W],
-                                              s2: DerivationScorer[L, W],
-                                              alpha: Double = 1.0) extends ProductRefinementsHandler(s1, s2) with DerivationScorer[L, W] {
+final case class ProductRefinedAnchoring[L,W](s1: RefinedAnchoring[L, W],
+                                              s2: RefinedAnchoring[L, W],
+                                              alpha: Double = 1.0) extends ProductRefinementsHandler(s1, s2) with RefinedAnchoring[L, W] {
   val grammar = s1.grammar
   def lexicon = s1.lexicon
   def words = s1.words
@@ -151,8 +151,8 @@ final case class ProductDerivationScorer[L,W](s1: DerivationScorer[L, W],
   }
 }
 
-abstract class ProductRefinementsHandler[L, W](s1: DerivationScorer[L, W], s2: DerivationScorer[L, W]) {
-  protected final val refinementController: DerivationScorer[L, W] = {
+abstract class ProductRefinementsHandler[L, W](s1: RefinedAnchoring[L, W], s2: RefinedAnchoring[L, W]) {
+  protected final val refinementController: RefinedAnchoring[L, W] = {
     if(s1.annotationTag == 0) s2
     else if(s2.annotationTag == 0) s1
     else if (s1.annotationTag < 0 || s2.annotationTag < 0) null

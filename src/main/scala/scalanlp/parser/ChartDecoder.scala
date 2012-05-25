@@ -20,7 +20,7 @@ trait ChartDecoder[L, W] extends Serializable{
 }
 
 object ChartDecoder extends Serializable {
-  def apply[L,W](grammar: Grammar[L], lexicon: Lexicon[L, W]):ChartDecoder[L, W] = {
+  def apply[L,W](grammar: BaseGrammar[L], lexicon: Lexicon[L, W]):ChartDecoder[L, W] = {
     new MaxRuleProductDecoder(grammar, lexicon)
   }
 }
@@ -37,6 +37,7 @@ class ViterbiDecoder[L, W] extends ChartDecoder[L, W] with Serializable {
     import marginal._
     val labelIndex = grammar.labelIndex
     val rootIndex = (grammar.labelIndex(grammar.root))
+    val refined = scorer.refined
 
     def buildTreeUnary(begin: Int, end:Int, root: Int, rootRef: Int):BinarizedTree[L] = {
       var maxScore = Double.NegativeInfinity
@@ -44,11 +45,11 @@ class ViterbiDecoder[L, W] extends ChartDecoder[L, W] with Serializable {
       var maxChildRef = -1
       for {
         r <- grammar.indexedUnaryRulesWithParent(root)
-        refR <- scorer.validRuleRefinementsGivenParent(begin, end, r, rootRef)
+        refR <- refined.validRuleRefinementsGivenParent(begin, end, r, rootRef)
       } {
         val ruleScore = scorer.scoreUnaryRule(begin, end, r, refR)
         val b = grammar.child(r)
-        val refB = scorer.childRefinement(r, refR)
+        val refB = refined.childRefinement(r, refR)
         val score = ruleScore + inside.bot(begin, end, b, refB)
         if(score > maxScore) {
           maxScore = score
@@ -81,9 +82,9 @@ class ViterbiDecoder[L, W] extends ChartDecoder[L, W] with Serializable {
         r <- grammar.indexedBinaryRulesWithParent(root)
         b = grammar.leftChild(r)
         c = grammar.rightChild(r)
-        refR <- scorer.validRuleRefinementsGivenParent(begin, end, r, rootRef)
-        refB = scorer.leftChildRefinement(r, refR)
-        refC = scorer.rightChildRefinement(r, refR)
+        refR <- refined.validRuleRefinementsGivenParent(begin, end, r, rootRef)
+        refB = refined.leftChildRefinement(r, refR)
+        refC = refined.rightChildRefinement(r, refR)
         split <- inside.top.feasibleSpan(begin, end, b, refB, c, refC)
       } {
         val ruleScore = scorer.scoreBinaryRule(begin, split, end, r, refR)
@@ -115,7 +116,7 @@ class ViterbiDecoder[L, W] extends ChartDecoder[L, W] with Serializable {
 
     }
 
-    val maxRootRef = scorer.validLabelRefinements(0, inside.length, rootIndex).maxBy(ref => inside.top(0, inside.length, rootIndex, ref))
+    val maxRootRef = refined.validLabelRefinements(0, inside.length, rootIndex).maxBy(ref => inside.top(0, inside.length, rootIndex, ref))
     val t = buildTreeUnary(0, inside.length, rootIndex, maxRootRef)
     t
   }
@@ -127,13 +128,12 @@ class ViterbiDecoder[L, W] extends ChartDecoder[L, W] with Serializable {
  *
  * @author dlwh
  */
-case class MaxRuleProductDecoder[L, W](grammar: Grammar[L], lexicon: Lexicon[L, W]) extends ChartDecoder[L, W] {
+case class MaxRuleProductDecoder[L, W](grammar: BaseGrammar[L], lexicon: Lexicon[L, W]) extends ChartDecoder[L, W] {
   private val p = new AnchoredRuleMarginalProjector[L,W]()
 
   def extractBestParse(marginal: ChartMarginal[ParseChart, L, W]): BinarizedTree[L] = {
     val scorer = p.buildSpanScorer(marginal)
-    val oneoff = DerivationScorerFactory.oneOff(scorer)
-    val newMarg = ChartMarginal.fromSentence(oneoff, marginal.words)
+    val newMarg = scorer.marginal
     new ViterbiDecoder[L, W].extractBestParse(newMarg)
   }
 }
@@ -144,13 +144,12 @@ case class MaxRuleProductDecoder[L, W](grammar: Grammar[L], lexicon: Lexicon[L, 
  *
  * @author dlwh
  */
-class MaxVariationalDecoder[L, W](grammar: Grammar[L], lexicon: Lexicon[L, W]) extends ChartDecoder[L, W] {
+class MaxVariationalDecoder[L, W](grammar: BaseGrammar[L], lexicon: Lexicon[L, W]) extends ChartDecoder[L, W] {
   private val p = new AnchoredPCFGProjector[L,W](grammar)
 
   def extractBestParse(marginal: ChartMarginal[ParseChart, L, W]): BinarizedTree[L] = {
     val scorer = p.buildSpanScorer(marginal)
-    val oneoff = DerivationScorerFactory.oneOff(scorer)
-    val newMarg = ChartMarginal.fromSentence(oneoff, marginal.words)
+    val newMarg = scorer.marginal
     new ViterbiDecoder[L, W].extractBestParse(newMarg)
   }
 }

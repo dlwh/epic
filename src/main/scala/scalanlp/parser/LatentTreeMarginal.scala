@@ -14,7 +14,7 @@ import scala._
  * @author dlwh
  */
 
-case class LatentTreeMarginal[L, W](scorer: DerivationScorer[L, W],
+case class LatentTreeMarginal[L, W](scorer: AugmentedAnchoring[L, W],
                                     tree: BinarizedTree[(L, Seq[Int])]) extends Marginal[L, W] {
 
   private val stree = insideScores()
@@ -22,7 +22,7 @@ case class LatentTreeMarginal[L, W](scorer: DerivationScorer[L, W],
 
   val partition = Numerics.logSum(stree.label.inside, stree.label.inside.length)
 
-  def visitPostorder(spanVisitor: DerivationVisitor[L]) = {
+  def visitPostorder(spanVisitor: AnchoredVisitor[L]) = {
     // normalizer
     if (partition.isInfinite || partition.isNaN)
       sys.error("NAn or infinite" + partition + " " + tree.render(words))
@@ -50,7 +50,7 @@ case class LatentTreeMarginal[L, W](scorer: DerivationScorer[L, W],
             val cRef = cLabels(ci)
             val icScore = cScores(ci)
             ci += 1
-            val ruleRef = scorer.ruleRefinementFromRefinements(rule, aRef, cRef)
+            val ruleRef = scorer.refined.ruleRefinementFromRefinements(rule, aRef, cRef)
             val ruleScore = opScore + icScore + scorer.scoreUnaryRule(t.span.start, t.span.end, rule, ruleRef) - partition
             assert(!ruleScore.isNaN)
             // assert(exp(ruleScore) > 0, " " + ruleScore)
@@ -69,7 +69,7 @@ case class LatentTreeMarginal[L, W](scorer: DerivationScorer[L, W],
           (bRef, ilScore) <- bLabels zip bScores
           (cRef, irScore) <- cLabels zip cScores
         } {
-          val ruleRef = scorer.ruleRefinementFromRefinements(rule, aRef, bRef, cRef)
+          val ruleRef = scorer.refined.ruleRefinementFromRefinements(rule, aRef, bRef, cRef)
           val rs = scorer.scoreBinaryRule(begin, split, end, rule, ruleRef) + scorer.scoreSpan(begin, end, a, aRef)
           val ruleScore = opScore + irScore + ilScore + rs - partition
           val count = exp(ruleScore)
@@ -114,7 +114,7 @@ case class LatentTreeMarginal[L, W](scorer: DerivationScorer[L, W],
           while(i < cLabels.length) {
             val aRef = aLabels(ai)
             val cRef = cLabels(i)
-            val ruleRef = scorer.ruleRefinementFromRefinements(rule, aRef, cRef)
+            val ruleRef = scorer.refined.ruleRefinementFromRefinements(rule, aRef, cRef)
             val score = scorer.scoreUnaryRule(t.span.start, t.span.end, rule, ruleRef)
             val ruleScore = ( cScores(i) + score)
             if(!ruleScore.isInfinite) {
@@ -150,7 +150,7 @@ case class LatentTreeMarginal[L, W](scorer: DerivationScorer[L, W],
             var ci = 0
             while(ci < cLabels.length) {
               val cRef = cLabels(ci)
-              val ruleRef = scorer.ruleRefinementFromRefinements(rule, aRef, bRef, cRef)
+              val ruleRef = scorer.refined.ruleRefinementFromRefinements(rule, aRef, bRef, cRef)
               val spanScore = scorer.scoreSpan(begin, end, a, aRef)
               arr(i) = ( bScores(bi)
                 + cScores(ci)
@@ -201,7 +201,7 @@ case class LatentTreeMarginal[L, W](scorer: DerivationScorer[L, W],
           cRef = rchild.label.candidates(ci)
           cScore = rchild.label.inside(ci)
         } {
-          val ruleRef = scorer.ruleRefinementFromRefinements(rule, aRef, bRef, cRef)
+          val ruleRef = scorer.refined.ruleRefinementFromRefinements(rule, aRef, bRef, cRef)
           val spanScore = (
             scorer.scoreBinaryRule(t.span.start, lchild.span.end, t.span.end, rule, ruleRef)
               + scorer.scoreSpan(t.span.start, t.span.end, a, aRef)
@@ -222,7 +222,7 @@ case class LatentTreeMarginal[L, W](scorer: DerivationScorer[L, W],
           for {
             (aRef, aScore) <- t.label.candidates zip t.label.outside
           } {
-            val ruleRef = scorer.ruleRefinementFromRefinements(rule, aRef, cRef)
+            val ruleRef = scorer.refined.ruleRefinementFromRefinements(rule, aRef, cRef)
             val ruleScore = scorer.scoreUnaryRule(t.span.start, t.span.end, rule, ruleRef)
             arr(i) = aScore + ruleScore
             i += 1
@@ -235,24 +235,22 @@ case class LatentTreeMarginal[L, W](scorer: DerivationScorer[L, W],
 
   }
 
-
-
 }
 
 object LatentTreeMarginal {
-  def apply[L, L2, W](scorer: DerivationScorer[L, W], ref: ProjectionIndexer[L, L2], tree: BinarizedTree[L]): LatentTreeMarginal[L, W] = {
+  def apply[L, L2, W](scorer: AugmentedAnchoring[L, W], ref: ProjectionIndexer[L, L2], tree: BinarizedTree[L]): LatentTreeMarginal[L, W] = {
     new LatentTreeMarginal(scorer,
       tree.map { l => (l, ref.localRefinements(scorer.grammar.labelIndex(l)).toIndexedSeq)})
 
   }
 
-  def apply[L, W](grammar: DerivationScorer.Factory[L, W],
+  def apply[L, W](grammar: AugmentedGrammar[L, W],
                   words: Seq[W],
                   tree: BinarizedTree[(L,Seq[Int])]):LatentTreeMarginal[L, W] = {
     LatentTreeMarginal(grammar.specialize(words), tree)
   }
 
-  def apply[L, L2, W](grammar: DerivationScorer.Factory[L, W],
+  def apply[L, L2, W](grammar: AugmentedGrammar[L, W],
                       ref: ProjectionIndexer[L, L2],
                       words: Seq[W],
                       tree: BinarizedTree[L]):LatentTreeMarginal[L, W] = {
@@ -264,7 +262,7 @@ object LatentTreeMarginal {
                            val candidates: Seq[Int],
                            val inside: Array[Double],
                            val outside: Array[Double]) {
-    override def toString() = {
+    override def toString = {
       "Beliefs(" + label +" "  + candidates + ", " + inside.mkString("{", ", ", " }") +", " + outside.mkString("{", ", ", "}")+")"
     }
 

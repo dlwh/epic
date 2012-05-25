@@ -14,40 +14,36 @@ import scalanlp.trees.AnnotatedLabel
 class ChartDecoderTest extends ParserTestHarness with FunSuite {
 
   test("ViterbiDecoder") {
-    val gen = new SimpleChartParser(ParserTestHarness.simpleParser.builder, new ViterbiDecoder)
+    val gen = new SimpleChartParser(ParserTestHarness.simpleParser.augmentedGrammar, new ViterbiDecoder)
 
     val res = evalParser(getTestTrees(), gen)
-    assert(res.f1 > 0.5, res.f1)
-
+    assert(res.f1 > 0.6, res.f1)
   }
 
   test("MaxRuleProductDecoder") {
-    val factory = ParserTestHarness.simpleParser.builder.grammar
+    val factory = ParserTestHarness.simpleParser.augmentedGrammar
     val decoder = new MaxRuleProductDecoder[AnnotatedLabel, String](factory.grammar, factory.lexicon)
-    val gen = new SimpleChartParser(ParserTestHarness.simpleParser.builder, decoder)
+    val gen = new SimpleChartParser(factory, decoder)
 
     val res = evalParser(getTestTrees(), gen)
-    assert(res.f1 > 0.5, res.f1)
-
+    assert(res.f1 > 0.6, res.f1)
   }
 
   test("MaxVariationalDecoder") {
-    val factory = ParserTestHarness.simpleParser.builder.grammar
+    val factory = ParserTestHarness.simpleParser.augmentedGrammar
     val decoder = new MaxVariationalDecoder[AnnotatedLabel, String](factory.grammar, factory.lexicon)
-    val gen = new SimpleChartParser(ParserTestHarness.simpleParser.builder, decoder)
+    val gen = new SimpleChartParser(factory, decoder)
 
     val res = evalParser(getTestTrees(), gen)
-    assert(res.f1 > 0.5, res.f1)
-
+    assert(res.f1 > 0.6, res.f1)
   }
 
 
   test("MaxConstituentDecoder") {
-    val gen = new SimpleChartParser(ParserTestHarness.simpleParser.builder, new MaxConstituentDecoder)
+    val gen = new SimpleChartParser(ParserTestHarness.simpleParser.augmentedGrammar, new MaxConstituentDecoder)
 
     val res = evalParser(getTestTrees(), gen)
-    assert(res.f1 > 0.5, res.f1)
-
+    assert(res.f1 > 0.6, res.f1)
   }
 
 }

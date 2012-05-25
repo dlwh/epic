@@ -12,7 +12,7 @@ case class EPParams(iterations: Int = 5, pruningThreshold: Double = -15)
 
 object EPParserModelFactory {
   type CompatibleFactory = ModelFactory[TreeInstance[AnnotatedLabel, String]] {
-    type MyModel <: EPModel.CompatibleModel[TreeInstance[AnnotatedLabel, String], DerivationScorer[AnnotatedLabel, String]]
+    type MyModel <: EPModel.CompatibleModel[TreeInstance[AnnotatedLabel, String], CoreAnchoring[AnnotatedLabel, String]]
   }
 }
 
@@ -29,14 +29,14 @@ case class EPParserModelFactory(ep: EPParams,
                                 model8: EPParserModelFactory.CompatibleFactory = null,
                                 oldWeights: File = null) extends ParserExtractableModelFactory[AnnotatedLabel, String] {
   type MyModel = (
-    EPModel[TreeInstance[AnnotatedLabel, String], DerivationScorer[AnnotatedLabel, String]]
+    EPModel[TreeInstance[AnnotatedLabel, String], CoreAnchoring[AnnotatedLabel, String]]
       with EPParser.Extractor[AnnotatedLabel, String]
     )
 
   def make(train: IndexedSeq[TreeInstance[AnnotatedLabel, String]]) = {
     val (xbarGrammar, xbarLexicon) = baseParser.xbarGrammar(train)
 
-    type ModelType = EPModel.CompatibleModel[TreeInstance[AnnotatedLabel, String], DerivationScorer[AnnotatedLabel, String]]
+    type ModelType = EPModel.CompatibleModel[TreeInstance[AnnotatedLabel, String], CoreAnchoring[AnnotatedLabel, String]]
     val models = Seq(model1, model2, model3, model4, model5, model6, model7, model8).filterNot(_ eq null) map {
       model =>
         model.make(train): ModelType

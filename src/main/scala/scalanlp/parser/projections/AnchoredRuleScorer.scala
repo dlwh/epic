@@ -9,7 +9,7 @@ import scalanlp.collection.mutable.{OpenAddressHashArray, TriangularArray}
  * Creates labeled span scorers for a set of trees from some parser. Projects from L to C.
  * @author dlwh
  */
-case class AnchoredPCFGProjector[L, W](grammar: Grammar[L], threshold: Double = Double.NegativeInfinity) extends ChartProjector[L, W] {
+case class AnchoredPCFGProjector[L, W](grammar: BaseGrammar[L], threshold: Double = Double.NegativeInfinity) extends ChartProjector[L, W] {
 
   type MyScorer = AnchoredRuleScorer[L, W]
   private def normalize(ruleScores: OpenAddressHashArray[Double], totals: OpenAddressHashArray[Double]):OpenAddressHashArray[Double] = {
@@ -77,14 +77,14 @@ case class AnchoredRuleMarginalProjector[L, W](threshold: Double = Double.Negati
 
 
 @SerialVersionUID(3)
-class AnchoredRuleScorer[L, W](val grammar: Grammar[L],
+class AnchoredRuleScorer[L, W](val grammar: BaseGrammar[L],
                                val lexicon: Lexicon[L, W],
                                val words: Seq[W],
                                spanScores: Array[OpenAddressHashArray[Double]], // triangular index -> label -> score
                                // (begin, end) -> rule -> score
                                unaryScores: Array[OpenAddressHashArray[Double]],
                                // (begin, end) -> (split-begin) -> rule -> score
-                               binaryScores: Array[Array[OpenAddressHashArray[Double]]]) extends UnrefinedDerivationScorer[L, W] with Serializable {
+                               binaryScores: Array[Array[OpenAddressHashArray[Double]]]) extends CoreAnchoring[L, W] with Serializable {
 
   def scoreUnaryRule(begin: Int, end: Int, rule: Int) = {
     val forSpan = unaryScores(TriangularArray.index(begin, end))

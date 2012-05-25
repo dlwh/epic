@@ -8,7 +8,6 @@ import scalala.library.Library
 import java.io.File
 import io.Source
 import scalala.tensor.Counter
-import scalanlp.parser.DerivationScorer.Factory
 import scalanlp.epic.Feature
 import scalanlp.trees.{TreeInstance, BinarizedTree, AnnotatedLabel}
 import scalanlp.trees.annotations.{FilterAnnotations, TreeAnnotator}
@@ -16,8 +15,8 @@ import scalanlp.trees.annotations.{FilterAnnotations, TreeAnnotator}
 class LatentParserModel[L, L3, W](featurizer: Featurizer[L3, W],
                                   reannotate: (BinarizedTree[L], Seq[W]) => BinarizedTree[L],
                                   val projections: GrammarRefinements[L, L3],
-                                  baseFactory: DerivationScorer.Factory[L, W],
-                                  grammar: Grammar[L],
+                                  baseFactory: CoreGrammar[L, W],
+                                  grammar: BaseGrammar[L],
                                   lexicon: Lexicon[L, W],
                                   initialFeatureVal: (Feature => Option[Double]) = {
                                     _ => None
@@ -37,7 +36,7 @@ class LatentParserModel[L, L3, W](featurizer: Featurizer[L3, W],
 
   def inferenceFromWeights(weights: DenseVector[Double]) = {
     val lexicon = new FeaturizedLexicon(weights, indexedFeatures)
-    val grammar: Factory[L, W] = FeaturizedGrammar(this.grammar, this.lexicon, projections, weights, indexedFeatures, lexicon)
+    val grammar = FeaturizedGrammar(this.grammar, this.lexicon, projections, weights, indexedFeatures, lexicon)
 
     new LatentParserInference(indexedFeatures, reannotate, grammar, baseFactory, projections)
   }
@@ -48,16 +47,16 @@ class LatentParserModel[L, L3, W](featurizer: Featurizer[L3, W],
 
 }
 
-case class LatentParserInference[L, L2, W](featurizer: DerivationFeaturizer[L, W, Feature],
+case class LatentParserInference[L, L2, W](featurizer: RefinedFeaturizer[L, W, Feature],
                                            reannotate: (BinarizedTree[L], Seq[W]) => BinarizedTree[L],
-                                           grammar: DerivationScorer.Factory[L, W],
-                                           baseMeasure: DerivationScorer.Factory[L, W],
+                                           grammar: RefinedGrammar[L, W],
+                                           baseMeasure: CoreGrammar[L, W],
                                            projections: GrammarRefinements[L, L2]) extends ParserInference[L, W] {
 
   // E[T-z|T, params]
-  def goldCounts(ti: TreeInstance[L, W], augment: DerivationScorer[L, W]) = {
+  def goldCounts(ti: TreeInstance[L, W], augment: CoreAnchoring[L, W]) = {
     val reannotated = reannotate(ti.tree, ti.words)
-    val product = grammar.specialize(ti.words) * augment
+    val product = AugmentedAnchoring(grammar.specialize(ti.words), augment)
     val ecounts = LatentTreeMarginal(product, projections.labels, reannotated).expectedCounts(featurizer)
 
     ecounts
@@ -87,8 +86,8 @@ case class LatentParserModelFactory(baseParser: ParserParams.BaseParser,
 
     val (xbarParser, xbarLexicon) = baseParser.xbarGrammar(trainTrees)
 
-    val baseFactory = DerivationScorerFactory.generative(xbarParser, xbarLexicon, annBinaries, annUnaries, annWords)
-    val cFactory = constraints.cachedFactory(baseFactory)
+    val baseFactory = RefinedGrammar.generative(xbarParser, xbarLexicon, annBinaries, annUnaries, annWords)
+    val cFactory = constraints.cachedFactory(AugmentedGrammar.fromRefined(baseFactory))
 
     val substateMap = if (substates != null && substates.exists) {
       val in = Source.fromFile(substates).getLines()
@@ -108,7 +107,7 @@ case class LatentParserModelFactory(baseParser: ParserParams.BaseParser,
     }
     val feat = new GenFeaturizer[(AnnotatedLabel, Int), String](gen, labelFlattener _)
 
-    val annGrammar: Grammar[AnnotatedLabel] = Grammar(annTrees.head.tree.label, annBinaries, annUnaries)
+    val annGrammar: BaseGrammar[AnnotatedLabel] = BaseGrammar(annTrees.head.tree.label, annBinaries, annUnaries)
     val firstLevelRefinements = GrammarRefinements(xbarParser, annGrammar, {(_: AnnotatedLabel).baseAnnotatedLabel})
     val secondLevel = GrammarRefinements(annGrammar, split(_: AnnotatedLabel, substateMap, numStates), unsplit)
     val finalRefinements = firstLevelRefinements compose secondLevel
