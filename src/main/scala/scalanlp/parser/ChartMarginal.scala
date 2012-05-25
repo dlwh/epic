@@ -37,6 +37,8 @@ case class ChartMarginal[+Chart[X]<:ParseChart[X], L, W](scorer: AugmentedAnchor
       }
     }
 
+    // cache to hold cores
+    val coreScoreArray = new Array[Double](words.length)
 
     // handle binaries
     for {
@@ -69,25 +71,20 @@ case class ChartMarginal[+Chart[X]<:ParseChart[X], L, W](scorer: AugmentedAnchor
             val c = grammar.rightChild(r)
             i += 1
 
-            val narrowR:Int = coarseNarrowRight(b)
-            val narrowL:Int = coarseNarrowLeft(c)
-
-            val canBuildThisRule = if (narrowR >= end || narrowL < narrowR) {
-              false
-            } else {
-              val trueX:Int = coarseWideLeft(c)
-              val trueMin = if(narrowR > trueX) narrowR else trueX
-              val wr:Int = coarseWideRight(b)
-              val trueMax = if(wr < narrowL) wr else narrowL
-              if(trueMin > narrowL || trueMin > trueMax) false
-              else trueMin < trueMax + 1
-            }
+            val narrowR = coarseNarrowRight(b)
+            val narrowL = coarseNarrowLeft(c)
+            val coarseSplitBegin = math.max(narrowR, coarseWideLeft(c))
+            val coarseSplitEnd = math.min(coarseWideRight(b), narrowL) + 1
+            val canBuildThisRule = narrowR < end && narrowL >= narrowR && coarseSplitBegin <= narrowL && coarseSplitBegin < coarseSplitEnd
 
             if(canBuildThisRule) {
-
-
               // initialize core scores
-
+              ChartMarginal.fillCoreScores(coreScoreArray,
+                begin, end,
+                scorer.core,
+                coarseSplitBegin, coarseSplitEnd,
+                r,
+                inside)
 
               val refinements = scorer.refined.validRuleRefinementsGivenParent(begin, end, r, refA)
               var ruleRefIndex = 0
@@ -96,27 +93,23 @@ case class ChartMarginal[+Chart[X]<:ParseChart[X], L, W](scorer: AugmentedAnchor
                 ruleRefIndex += 1
                 val refB = scorer.refined.leftChildRefinement(r, refR)
                 val refC = scorer.refined.rightChildRefinement(r, refR)
-                val narrowR:Int = narrowRight(b)(refB)
-                val narrowL:Int = narrowLeft(c)(refC)
 
-                val feasibleSpan = if (narrowR >= end || narrowL < narrowR) {
-                  0L
-                } else {
-                  val trueX:Int = wideLeft(c)(refC)
-                  val trueMin = if (narrowR > trueX) narrowR else trueX
-                  val wr:Int = wideRight(b)(refB)
-                  val trueMax = if (wr < narrowL) wr else narrowL
-                  if (trueMin > narrowL || trueMin > trueMax)  0L
-                  else ((trueMin:Long) << 32) | ((trueMax + 1):Long)
-                }
-                var split = (feasibleSpan >> 32).toInt
-                val endSplit = feasibleSpan.toInt // lower 32 bits
+                val narrowR = narrowRight(b)(refB)
+                val narrowL = narrowLeft(c)(refC)
+                var split = math.max(narrowR, wideLeft(c)(refC))
+                val endSplit = math.min(wideRight(b)(refB), narrowL) + 1
+                val canBuildThisRule = narrowR < end && narrowL >= narrowR && split <= narrowL && split < endSplit
+                if(!canBuildThisRule)
+                  split = endSplit
+
                 while(split < endSplit) {
                   val bInside = itop.labelScore(begin, split, b, refB)
                   val cInside = itop.labelScore(split, end, c, refC)
-                  if (!java.lang.Double.isInfinite(bInside + cInside)) {
-                    val ruleScore = scorer.scoreBinaryRule(begin, split, end, r, refR)
-                    val score = aScore + ruleScore + bInside + cInside - partition
+                  val coreScore = coreScoreArray(split)
+                  val withoutRefined = bInside + cInside + coreScore
+                  if (!java.lang.Double.isInfinite(withoutRefined)) {
+                    val ruleScore = scorer.refined.scoreBinaryRule(begin, split, end, r, refR)
+                    val score = aScore + withoutRefined + ruleScore - partition
                     val expScore = math.exp(score)
                     count += expScore
                     spanVisitor.visitBinaryRule(begin, split, end, r, refR, expScore)
@@ -223,6 +216,8 @@ object ChartMarginal {
     // buffer. Set to 1000. If we ever fill it up, accumulate everything into
     // elem 0 and try again
     val scoreArray = new Array[Double](1000)
+    // cache for coreScores
+    val coreScoreArray = new Array[Double](words.length)
 
     val top = inside.top
     val g = grammar
@@ -231,8 +226,8 @@ object ChartMarginal {
     for {
       span <- 2 to words.length
       begin <- 0 to (words.length - span)
-      end = begin + span
     } {
+      val end = begin + span
       // I get a 20% speedup by inlining code dealing with these arrays. sigh.
       val narrowRight = top.narrowRight(begin)
       val narrowLeft = top.narrowLeft(end)
@@ -262,22 +257,24 @@ object ChartMarginal {
             ruleIndex += 1
 
             // Check: can we build any refinement of this rule?
-            // basically, we can if
-            val narrowR:Int = coarseNarrowRight(b)
-            val narrowL:Int = coarseNarrowLeft(c)
-
-            val canBuildThisRule = if (narrowR >= end || narrowL < narrowR) {
-              false
-            } else {
-              val trueX:Int = coarseWideLeft(c)
-              val trueMin = if(narrowR > trueX) narrowR else trueX
-              val wr:Int = coarseWideRight(b)
-              val trueMax = if(wr < narrowL) wr else narrowL
-              if(trueMin > narrowL || trueMin > trueMax) false
-              else trueMin < trueMax + 1
-            }
+            // basically, we can if TODO
+            val narrowR = coarseNarrowRight(b)
+            val narrowL = coarseNarrowLeft(c)
+            val coarseSplitBegin = math.max(narrowR, coarseWideLeft(c))
+            val coarseSplitEnd = math.min(coarseWideRight(b), narrowL) + 1
+            val canBuildThisRule = narrowR < end && narrowL >= narrowR && coarseSplitBegin <= narrowL && coarseSplitBegin < coarseSplitEnd
 
             if(canBuildThisRule) {
+
+              // initialize core scores
+              ChartMarginal.fillCoreScores(coreScoreArray,
+                begin, end,
+                anchoring.core,
+                coarseSplitBegin, coarseSplitEnd,
+                r,
+                inside)
+
+
               val refinements = refined.validRuleRefinementsGivenParent(begin, end, r, refA)
               var ruleRefIndex = 0
               while(ruleRefIndex < refinements.length) {
@@ -285,37 +282,22 @@ object ChartMarginal {
                 ruleRefIndex += 1
                 val refB = refined.leftChildRefinement(r, refR)
                 val refC = refined.rightChildRefinement(r, refR)
-                // narrowR etc is hard to understand, and should be a different methood
-                // but caching the arrays speeds things up by 20% or more...
-                // so it's inlined.
-                //
-                // See [[ParseChart]] for what these labels mean
-                val narrowR:Int = narrowRight(b)(refB)
-                val narrowL:Int = narrowLeft(c)(refC)
 
-                val feasibleSpan = if (narrowR >= end || narrowL < narrowR) {
-                  0L
-                } else {
-                  val trueX:Int = wideLeft(c)(refC)
-                  val trueMin = if(narrowR > trueX) narrowR else trueX
-                  val wr:Int = wideRight(b)(refB)
-                  val trueMax = if(wr < narrowL) wr else narrowL
-                  if(trueMin > narrowL || trueMin > trueMax)  0L
-                  else ((trueMin:Long) << 32) | ((trueMax + 1):Long)
-                }
-                var split = (feasibleSpan >> 32).toInt
-                val endSplit = feasibleSpan.toInt // lower 32 bits
+                val narrowR = narrowRight(b)(refB)
+                val narrowL = narrowLeft(c)(refC)
+                var split = math.max(narrowR, wideLeft(c)(refC))
+                val endSplit = math.min(wideRight(b)(refB), narrowL) + 1
+                val canBuildThisRule = narrowR < end && narrowL >= narrowR && split <= narrowL && split < endSplit
+                if(!canBuildThisRule)
+                  split = endSplit
+
                 while(split < endSplit) {
                   val bScore = inside.top.labelScore(begin, split, b, refB)
                   val cScore = inside.top.labelScore(split, end, c, refC)
-                  val withoutRule = bScore + cScore + passScore
+                  val withoutRule = bScore + cScore + passScore + coreScoreArray(split)
                   if(withoutRule != Double.NegativeInfinity) {
 
-                    val prob = (
-                      withoutRule
-                        + (refined.scoreBinaryRule(begin, split, end, r, refR)
-                        + core.scoreBinaryRule(begin, split, end, r))
-                      )
+                    val prob = withoutRule + refined.scoreBinaryRule(begin, split, end, r, refR)
 
                     if(!java.lang.Double.isInfinite(prob)) {
                       scoreArray(offset) = prob
@@ -353,6 +335,9 @@ object ChartMarginal {
 
     val grammar = anchoring.grammar
     val rootIndex = grammar.labelIndex(grammar.root)
+
+    // cache for coreScores
+    val coreScoreArray = new Array[Double](inside.length)
 
     val length = inside.length
     val outside = chartFactory(grammar.labelIndex, Array.tabulate(grammar.labelIndex.size)(refined.numValidRefinements), length)
@@ -392,48 +377,40 @@ object ChartMarginal {
               br += 1
 
               // can I possibly build any refinement of this rule?
-              val narrowR:Int = coarseNarrowRight(b)
-              val narrowL:Int = coarseNarrowLeft(c)
-
-              val canBuildThisRule = if (narrowR >= end || narrowL < narrowR) {
-                false
-              } else {
-                val trueX:Int = coarseWideLeft(c)
-                val trueMin = if(narrowR > trueX) narrowR else trueX
-                val wr:Int = coarseWideRight(b)
-                val trueMax = if(wr < narrowL) wr else narrowL
-                if(trueMin > narrowL || trueMin > trueMax) false
-                else trueMin < trueMax + 1
-              }
+              val narrowR = coarseNarrowRight(b)
+              val narrowL = coarseNarrowLeft(c)
+              val coarseSplitBegin = math.max(narrowR, coarseWideLeft(c))
+              val coarseSplitEnd = math.min(coarseWideRight(b), narrowL) + 1
+              val canBuildThisRule = narrowR < end && narrowL >= narrowR && coarseSplitBegin <= narrowL && coarseSplitBegin < coarseSplitEnd
 
               if(canBuildThisRule) {
+                // initialize core scores
+                ChartMarginal.fillCoreScores(coreScoreArray,
+                  begin, end,
+                  anchoring.core,
+                  coarseSplitBegin, coarseSplitEnd,
+                  r,
+                  inside)
+
+
+
                 for(refR <- refined.validRuleRefinementsGivenParent(begin, end, r, refA)) {
                   val refB = refined.leftChildRefinement(r, refR)
                   val refC = refined.rightChildRefinement(r, refR)
-                  val narrowR:Int = narrowRight(b)(refB)
-                  val narrowL:Int = narrowLeft(c)(refC)
 
-                  // this is too slow, so i'm having to inline it.
-                  //              val feasibleSpan = itop.feasibleSpanX(begin, end, b, c)
-                  val feasibleSpan = if (narrowR >= end || narrowL < narrowR) {
-                    0L
-                  } else {
-                    val trueX:Int = wideLeft(c)(refC)
-                    val trueMin = if(narrowR > trueX) narrowR else trueX
-                    val wr:Int = wideRight(b)(refB)
-                    val trueMax = if(wr < narrowL) wr else narrowL
-                    if(trueMin > narrowL || trueMin > trueMax)  0L
-                    else ((trueMin:Long) << 32) | ((trueMax + 1):Long)
-                  }
-
-                  var split = (feasibleSpan >> 32).toInt
-                  val endSplit = feasibleSpan.toInt // lower 32 bits
+                  val narrowR = narrowRight(b)(refB)
+                  val narrowL = narrowLeft(c)(refC)
+                  var split = math.max(narrowR, wideLeft(c)(refC))
+                  val endSplit = math.min(wideRight(b)(refB), narrowL) + 1
+                  val canBuildThisRule = narrowR < end && narrowL >= narrowR && split <= narrowL && split < endSplit
+                  if(!canBuildThisRule)
+                    split = endSplit
 
                   while(split < endSplit) {
                     val bInside = itop.labelScore(begin, split, b, refB)
                     val cInside = itop.labelScore(split, end, c, refC)
                     if (bInside != Double.NegativeInfinity && cInside != Double.NegativeInfinity && aScore != Double.NegativeInfinity) {
-                      val ruleScore = refined.scoreBinaryRule(begin, split, end, r, refR) + core.scoreBinaryRule(begin, split, end, r)
+                      val ruleScore = refined.scoreBinaryRule(begin, split, end, r, refR) + coreScoreArray(split)
                       val score = aScore + ruleScore
                       val bOutside = score + cInside
                       val cOutside = score + bInside
@@ -514,5 +491,19 @@ object ChartMarginal {
       }
     }
 
+  }
+
+  private def fillCoreScores[L, W](coreScores: Array[Double],
+                           begin: Int, end: Int,
+                           anchoring: CoreAnchoring[L, W],
+                           splitBegin: Int, splitEnd: Int,
+                           rule: Int,
+                           chart: ParseChart[L]) = {
+    var split = splitBegin
+    while (split < splitEnd) {
+      coreScores(split) = anchoring.scoreBinaryRule(begin, split, end, rule)
+
+      split += 1
+    }
   }
 }
