@@ -31,17 +31,21 @@ object GrammarRefinements {
     new GrammarRefinements(labels,rules)
   }
 
-  def apply[C,F](coarse: BaseGrammar[C], split: C=>Seq[F], proj: F=>C) = {
+  def apply[C,F](coarse: BaseGrammar[C], split: C=>Seq[F], proj: F=>C): GrammarRefinements[C, F] = {
     def splitRule(r: Rule[C]) = r match {
       case BinaryRule(a,b,c) => for(a_ <- split(a); b_ <- split(b); c_ <- split(c)) yield BinaryRule(a_,b_,c_)
       case UnaryRule(a,b) => for(a_ <- split(a); b_ <- split(b)) yield UnaryRule(a_,b_)
     }
+    apply(coarse, split, splitRule, proj)
+  }
+
+  def apply[C,F](coarse: BaseGrammar[C], split: C=>Seq[F], splitRule: Rule[C]=>Seq[Rule[F]], proj: F=>C): GrammarRefinements[C, F] = {
     val fineIndex = {
-      val index = Index[F]();
+      val index = Index[F]()
       for( l <- coarse.labelIndex; l2 <- split(l)) {
         index.index(l2)
       }
-      index;
+      index
     }
     val ruleIndex = {
       val index = Index[Rule[F]]()

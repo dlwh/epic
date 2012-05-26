@@ -12,7 +12,8 @@ package scalanlp.parser
  * @tparam W the word type
  */
 case class ChartMarginal[+Chart[X]<:ParseChart[X], L, W](scorer: AugmentedAnchoring[L, W],
-                                                         inside: Chart[L], outside: Chart[L], partition: Double) extends Marginal[L, W] {
+                                                         inside: Chart[L], outside: Chart[L],
+                                                         partition: Double) extends Marginal[L, W] {
 
 
   /**

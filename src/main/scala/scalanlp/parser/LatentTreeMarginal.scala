@@ -51,10 +51,12 @@ case class LatentTreeMarginal[L, W](scorer: AugmentedAnchoring[L, W],
             val icScore = cScores(ci)
             ci += 1
             val ruleRef = scorer.refined.ruleRefinementFromRefinements(rule, aRef, cRef)
-            val ruleScore = opScore + icScore + scorer.scoreUnaryRule(t.span.start, t.span.end, rule, ruleRef) - partition
-            assert(!ruleScore.isNaN)
-            // assert(exp(ruleScore) > 0, " " + ruleScore)
-            spanVisitor.visitUnaryRule(t.span.start, t.span.end, rule, ruleRef, exp(ruleScore))
+            if(ruleRef != -1 ) {
+              val ruleScore = opScore + icScore + scorer.scoreUnaryRule(t.span.start, t.span.end, rule, ruleRef) - partition
+              assert(!ruleScore.isNaN)
+              // assert(exp(ruleScore) > 0, " " + ruleScore)
+              spanVisitor.visitUnaryRule(t.span.start, t.span.end, rule, ruleRef, exp(ruleScore))
+            }
           }
         }
       case t@BinaryTree(Beliefs(a, aLabels, _, aScores), Tree(Beliefs(b, bLabels, bScores, _), _), Tree(Beliefs(c, cLabels, cScores, _), _)) =>
@@ -110,19 +112,25 @@ case class LatentTreeMarginal[L, W](scorer: AugmentedAnchoring[L, W],
         var foundOne = false
         var ai = 0
         while(ai < aLabels.length) {
+          val aRef = aLabels(ai)
+
           var i = 0
-          while(i < cLabels.length) {
-            val aRef = aLabels(ai)
-            val cRef = cLabels(i)
+          var ci = 0
+          while(ci < cLabels.length) {
+            val cRef = cLabels(ci)
             val ruleRef = scorer.refined.ruleRefinementFromRefinements(rule, aRef, cRef)
-            val score = scorer.scoreUnaryRule(t.span.start, t.span.end, rule, ruleRef)
-            val ruleScore = ( cScores(i) + score)
-            if(!ruleScore.isInfinite) {
-              foundOne = true
+            if (ruleRef != -1) {
+              val score = scorer.scoreUnaryRule(t.span.start, t.span.end, rule, ruleRef)
+              val ruleScore = ( cScores(ci) + score)
+              if(!ruleScore.isInfinite) {
+                foundOne = true
+              }
+              arr(i) = ruleScore
+              i += 1
             }
-            arr(i) = ruleScore
-            i += 1
+            ci += 1
           }
+
           aScores(ai) = Numerics.logSum(arr, i)
           ai += 1
         }
@@ -223,11 +231,13 @@ case class LatentTreeMarginal[L, W](scorer: AugmentedAnchoring[L, W],
             (aRef, aScore) <- t.label.candidates zip t.label.outside
           } {
             val ruleRef = scorer.refined.ruleRefinementFromRefinements(rule, aRef, cRef)
-            val ruleScore = scorer.scoreUnaryRule(t.span.start, t.span.end, rule, ruleRef)
-            arr(i) = aScore + ruleScore
-            i += 1
+            if(ruleRef != -1) {
+              val ruleScore = scorer.scoreUnaryRule(t.span.start, t.span.end, rule, ruleRef)
+              arr(i) = aScore + ruleScore
+              i += 1
+            }
           }
-          child.label.outside(ci) = Numerics.logSum(arr, arr.length)
+          child.label.outside(ci) = Numerics.logSum(arr, i)
         }
 
 

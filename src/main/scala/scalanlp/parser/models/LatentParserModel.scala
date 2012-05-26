@@ -9,8 +9,8 @@ import java.io.File
 import io.Source
 import scalala.tensor.Counter
 import scalanlp.epic.Feature
-import scalanlp.trees.{TreeInstance, BinarizedTree, AnnotatedLabel}
 import scalanlp.trees.annotations.{FilterAnnotations, TreeAnnotator}
+import scalanlp.trees._
 
 class LatentParserModel[L, L3, W](featurizer: Featurizer[L3, W],
                                   reannotate: (BinarizedTree[L], Seq[W]) => BinarizedTree[L],
@@ -73,13 +73,9 @@ case class LatentParserModelFactory(baseParser: ParserParams.BaseParser,
                                     splitFactor: Int = 1) extends ParserModelFactory[AnnotatedLabel, String] {
   type MyModel = LatentParserModel[AnnotatedLabel, (AnnotatedLabel, Int), String]
 
-  def split(x: AnnotatedLabel, counts: Map[AnnotatedLabel, Int], numStates: Int) = {
-    for (i <- 0 until counts.getOrElse(x, numStates)) yield (x, i)
-  }
 
-  def unsplit(x: (AnnotatedLabel, Int)) = x._1
 
-  def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]]) = {
+  def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]]):MyModel = {
     val annTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]] = trainTrees.map(annotator(_))
     val (annWords, annBinaries, annUnaries) = this.extractBasicCounts(annTrees)
 
@@ -100,6 +96,20 @@ case class LatentParserModelFactory(baseParser: ParserParams.BaseParser,
       Map(xbarParser.root -> 1)
     }
 
+
+    def split(x: AnnotatedLabel): Seq[(AnnotatedLabel, Int)] = {
+      for (i <- 0 until substateMap.getOrElse(x, numStates)) yield (x, i)
+    }
+
+    def unsplit(x: (AnnotatedLabel, Int)): AnnotatedLabel = x._1
+
+    def splitRule[L, L2](r: Rule[L], split: L=>Seq[L2]):Seq[Rule[L2]] = r match {
+      case BinaryRule(a, b, c) => for(aa <- split(a); bb <- split(b); cc <- split(c)) yield BinaryRule(aa, bb, cc)
+        // don't allow ref
+      case UnaryRule(a, b) if a == b => for(aa <- split(a)) yield UnaryRule(aa, aa)
+      case UnaryRule(a, b) => for(aa <- split(a); bb <- split(b)) yield UnaryRule(aa, bb)
+    }
+
     val gen = new WordShapeFeaturizer(Library.sum(annWords))
     def labelFlattener(l: (AnnotatedLabel, Int)) = {
       val basic = Seq(l)
@@ -109,7 +119,7 @@ case class LatentParserModelFactory(baseParser: ParserParams.BaseParser,
 
     val annGrammar: BaseGrammar[AnnotatedLabel] = BaseGrammar(annTrees.head.tree.label, annBinaries, annUnaries)
     val firstLevelRefinements = GrammarRefinements(xbarParser, annGrammar, {(_: AnnotatedLabel).baseAnnotatedLabel})
-    val secondLevel = GrammarRefinements(annGrammar, split(_: AnnotatedLabel, substateMap, numStates), unsplit)
+    val secondLevel = GrammarRefinements(annGrammar, split _, {splitRule(_ :Rule[AnnotatedLabel], split _)}, unsplit)
     val finalRefinements = firstLevelRefinements compose secondLevel
     println(finalRefinements.labels)
 

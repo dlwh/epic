@@ -20,6 +20,7 @@ case class TreeMarginal[L, W](scorer: AugmentedAnchoring[L, W],
       case UnaryTree( (a, refA), child@Tree((b, refB), _)) =>
         val r = grammar.index(UnaryRule(a, b))
         val ruleRef = scorer.refined.ruleRefinementFromRefinements(r, refA, refB)
+        if(ruleRef < 0) throw new Exception("Bad refined rule in gold tree!: " + UnaryRule(a, b) + " aRef: " + refA + " bRef: " + refB)
 
         score += scorer.scoreUnaryRule(t.span.start, t.span.end, r, ruleRef)
         if(score.isInfinite) throw new Exception("Could not score gold tree!")
@@ -48,6 +49,7 @@ case class TreeMarginal[L, W](scorer: AugmentedAnchoring[L, W],
       case t@UnaryTree( (a, refA), Tree((b, refB), _)) =>
         val r = grammar.index(UnaryRule(a, b))
         val ruleRef = scorer.refined.ruleRefinementFromRefinements(r, refA, refB)
+        if(ruleRef < 0) throw new Exception("Bad refined rule in gold tree!: " + UnaryRule(a, b) + " aRef: " + refA + " bRef: " + refB)
         visitor.visitUnaryRule(t.span.start, t.span.end, r, ruleRef, 1.0)
       case t@BinaryTree( (a, refA), bt@Tree( (b, refB), _), Tree((c, refC), _)) =>
         val aI = grammar.labelIndex(a)

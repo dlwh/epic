@@ -68,7 +68,6 @@ trait RefinedAnchoring[L, W] extends Factor[RefinedAnchoring[L, W]] {
 
   lazy val marginal = AugmentedAnchoring.fromRefined(this).marginal
 
-
   def isConvergedTo(f: RefinedAnchoring[L, W], diff: Double):Boolean = {
     import scala.util.control.Breaks._
     var ok = false
@@ -180,7 +179,25 @@ trait RefinedAnchoring[L, W] extends Factor[RefinedAnchoring[L, W]] {
   def parentRefinement(rule: Int, ruleRef: Int):Int
   def childRefinement(rule: Int, ruleRef: Int):Int
 
+  /**
+   * Returns the refined rule given parent and child refinements for a unary rule.
+   * May return -1 if no such rule is allowed.
+   * @param r rule index
+   * @param refA parent index
+   * @param refB child index
+   * @return rule refinement id, or -1 if rule is not allowed with those refinements
+   */
   def ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int):Int
+
+  /**
+   * Returns the refined rule given parent and child refinements for a unary rule.
+   * May return -1 if no such rule is allowed.
+   * @param r rule Index
+   * @param refA parent index
+   * @param refB left child index
+   * @param refC right child index
+   * @return rule refinement id, or -1 if rule is not allowed with those refinements
+   */
   def ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int, refC: Int):Int
 }
 

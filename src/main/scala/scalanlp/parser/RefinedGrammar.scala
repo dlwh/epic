@@ -200,7 +200,12 @@ object RefinedGrammar {
           val b = grammar.child(r)
           val a2 = refinements.labels.globalize(a, refA)
           val b2 = refinements.labels.globalize(b, refB)
-         refinements.rules.localize(refinements.rules.fineIndex(UnaryRule(refinements.labels.fineIndex.get(a2),refinements.labels.fineIndex.get(b2))))
+          val refinedRuleIndex = refinements.rules.fineIndex(UnaryRule(refinements.labels.fineIndex.get(a2), refinements.labels.fineIndex.get(b2)))
+          if(refinedRuleIndex < 0) {
+            -1
+          } else {
+            refinements.rules.localize(refinedRuleIndex)
+          }
         }
 
         def ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int, refC: Int) = {

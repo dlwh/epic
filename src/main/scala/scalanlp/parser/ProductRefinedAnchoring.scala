@@ -130,7 +130,8 @@ final case class ProductRefinedAnchoring[L,W](s1: RefinedAnchoring[L, W],
       val b2 = label2Ref(grammar.child(r), refB)
       val l1 = s1.ruleRefinementFromRefinements(r, a1, b1)
       val l2 = s2.ruleRefinementFromRefinements(r, a2, b2)
-      l1 * s1.numValidRuleRefinements(r) + l2
+      if(l1 < 0 || l2 < 0) -1
+      else l1 * s1.numValidRuleRefinements(r) + l2
     }
   }
 
@@ -145,7 +146,8 @@ final case class ProductRefinedAnchoring[L,W](s1: RefinedAnchoring[L, W],
       val c2 = label2Ref(grammar.rightChild(r), refC)
       val l1 = s1.ruleRefinementFromRefinements(r, a1, b1, c1)
       val l2 = s2.ruleRefinementFromRefinements(r, a2, b2, c2)
-      l1 * s1.numValidRuleRefinements(r) + l2
+      if(l1 < 0 || l2 < 0) -1
+      else l1 * s1.numValidRuleRefinements(r) + l2
     }
 
   }
