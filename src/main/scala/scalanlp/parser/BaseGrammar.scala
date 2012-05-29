@@ -39,6 +39,40 @@ final class BaseGrammar[L] private (val root: L,
   def indexedUnaryRulesWithChild(l: Int) = unaryRulesByChild(l)
   def indexedBinaryRulesWithLeftChild(b: Int) = binaryRulesByLeftChild(b)
   def indexedBinaryRulesWithRightChild(c: Int) = binaryRulesByRightChild(c)
+
+  def prettyString = {
+    val builder = new StringBuilder()
+    builder ++= ("Root: " + root.toString + "\n")
+//    builder ++= labelIndex.addString(builder, "Labels:\n", ", ", "\n\n")
+    val labelStrings = labelIndex.map(_.toString).toIndexedSeq
+    val startLength = labelStrings.view.map(_.length).max + 1
+    val blocks = indexedRules.groupBy(_.parent)
+    for( (parent,block) <- blocks) {
+      var first = true
+      for (r <- block) {
+        if(!first)
+          builder ++= (" "*startLength)
+        else
+          builder ++= labelStrings(parent).padTo(startLength, ' ')
+
+        builder ++= "-> "
+
+        r match {
+          case UnaryRule(a, b) =>
+            builder ++= labelStrings(b)
+          case BinaryRule(a, b, c) =>
+            builder ++= labelStrings(b)
+            builder += ' '
+            builder ++= labelStrings(c)
+        }
+        builder += '\n'
+
+        first = false
+
+      }
+    }
+    builder.toString()
+  }
 }
 
 object BaseGrammar {
