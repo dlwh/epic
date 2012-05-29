@@ -216,23 +216,22 @@ object IndexedSpanFeaturizer {
     val goldFeatures = trees.par.aggregate(null: Counter[Feature, Int])( {(feats, ti) =>
       val set = if(feats eq null) Counter[Feature, Int]() else feats
       val spec = featurizer.anchor(ti.words)
-      // returns head
       def rec(t: BinarizedTree[L]):Unit = t match {
-        case n@NullaryTree(a) =>
+        case NullaryTree(a, span) =>
           val aI = labelIndex(a)
-          add(set, spec.featuresForSpan(n.span.start, n.span.end, aI))
-        case u@UnaryTree(a, b) =>
+          add(set, spec.featuresForSpan(span.start, span.end, aI))
+        case UnaryTree(a, b, span) =>
           val r = ruleIndex(UnaryRule(a, b.label))
-          rec(u.child)
-          add(set, spec.featuresForRule(u.span.start, u.span.end, r))
-        case t@BinaryTree(a, bt@Tree(b, _), ct@Tree(c, _)) =>
-          rec(t.leftChild)
-          rec(t.rightChild)
-          val r = ruleIndex(BinaryRule(a, b, c))
+          rec(b)
+          add(set, spec.featuresForRule(span.start, span.end, r))
+        case BinaryTree(a, b, c, span) =>
+          rec(b)
+          rec(c)
+          val r = ruleIndex(BinaryRule(a, b.label, c.label))
           val aI = labelIndex(a)
-          add(set, spec.featuresForSpan(t.span.start, t.span.end, aI))
-          add(set, spec.featuresForRule(t.span.start, t.span.end, r))
-          add(set, spec.featuresForBinaryRule(t.span.start, bt.span.end, t.span.end, r))
+          add(set, spec.featuresForSpan(span.start, span.end, aI))
+          add(set, spec.featuresForRule(span.start, span.end, r))
+          add(set, spec.featuresForBinaryRule(span.start, b.span.end, span.end, r))
       }
       rec(ann(ti.tree, ti.words))
       set

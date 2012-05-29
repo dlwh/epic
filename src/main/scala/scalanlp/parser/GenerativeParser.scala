@@ -81,9 +81,9 @@ object GenerativeParser {
       val TreeInstance(_, tree, words) = ti
       val leaves = tree.leaves map (l => (l, words(l.span.start)))
       tree.allChildren foreach { 
-        case t @ BinaryTree(a, bc, cc) =>
+        case BinaryTree(a, bc, cc, span) =>
           binaryProductions(a, BinaryRule(a, bc.label, cc.label)) += 1.0
-        case t@UnaryTree(a, bc) =>
+        case UnaryTree(a, bc, span) =>
           unaryProductions(a, UnaryRule(a, bc.label)) += 1.0
         case t => 
       }

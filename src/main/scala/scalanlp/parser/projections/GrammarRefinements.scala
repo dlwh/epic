@@ -55,10 +55,7 @@ object GrammarRefinements {
       index
     }
 
-    def projRule(r: Rule[F]) = r match {
-      case BinaryRule(a,b,c) => BinaryRule(proj(a),proj(b),proj(c))
-      case UnaryRule(a,b) => UnaryRule(proj(a),proj(b))
-    }
+    def projRule(r: Rule[F]) = r map proj
 
     val rules = ProjectionIndexer(coarse.index,ruleIndex, projRule)
     val labels = ProjectionIndexer(coarse.labelIndex,fineIndex, proj)

@@ -99,6 +99,7 @@ object UnaryRule {
       assert(isUnary)
       val p = DataSerialization.read[L](source)
       val c = DataSerialization.read[L](source)
+      val chain = DataSerialization.read[Seq[L]](source)
       UnaryRule(p, c)
     }
   }

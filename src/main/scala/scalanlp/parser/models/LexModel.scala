@@ -562,16 +562,16 @@ object IndexedLexFeaturizer {
       val spec = featurizer.anchor(ti.words)
       // returns head
       def rec(t: BinarizedTree[L]):Int= t match {
-        case n@NullaryTree(a) =>
+        case NullaryTree(a, span) =>
           val aI = labelIndex(a)
-          add(set, spec.featuresForTag(aI, n.span.start))
-          n.span.start
-        case UnaryTree(a, b) =>
+          add(set, spec.featuresForTag(aI, span.start))
+          span.start
+        case UnaryTree(a, b, _) =>
           val h = rec(b)
           val r = ruleIndex(UnaryRule(a, b.label))
           add(set, spec.featuresForHead(r, h))
           h
-        case t@BinaryTree(a, bt@Tree(b, _), Tree(c, _)) =>
+        case t@BinaryTree(a, bt@Tree(b, _, _), Tree(c, _, _), span) =>
           val childHeads = IndexedSeq(rec(t.leftChild), rec(t.rightChild))
           val headIsLeft = headFinder.findHeadChild(t) == 0
           val (head, dep) = if(headIsLeft) childHeads(0) -> childHeads(1) else childHeads(1) -> childHeads(0)
@@ -670,10 +670,7 @@ case class LexParserModelFactory(baseParser: ParserParams.BaseParser,
       xbarLexicon, initBinaries, initUnaries, initLexicon)
     val cFactory = constraints.cachedFactory(AugmentedGrammar.fromRefined(baseFactory))
 
-    def ruleGen(r: Rule[AnnotatedLabel]) = r match {
-      case UnaryRule(a,b) => IndexedSeq(RuleFeature(r), RuleFeature(UnaryRule(a.label, b.label)))
-      case BinaryRule(a, b, c) => IndexedSeq(RuleFeature(r))
-    }
+    def ruleGen(r: Rule[AnnotatedLabel]) = IndexedSeq(RuleFeature(r))
     def validTag(w: String) = lexicon.tagsForWord(w).toArray
 
     val headFinder = HeadFinder.collins

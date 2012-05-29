@@ -63,7 +63,7 @@ class ViterbiDecoder[L, W] extends ChartDecoder[L, W] with Serializable {
         sys.error("Couldn't find a tree!" + begin + " " + end + " " + grammar.labelIndex.get(root))
       }
       val child = buildTree(begin, end, maxChild, maxChildRef)
-      UnaryTree(labelIndex.get(root), child)(Span(begin, end))
+      UnaryTree(labelIndex.get(root), child, Span(begin, end))
     }
 
     def buildTree(begin: Int, end: Int, root: Int, rootRef: Int):BinarizedTree[L] = {
@@ -74,7 +74,7 @@ class ViterbiDecoder[L, W] extends ChartDecoder[L, W] with Serializable {
       var maxRightRef = -1
       var maxSplit = -1
       if(begin +1 == end) {
-        return NullaryTree(labelIndex.get(root))(Span(begin, end))
+        return NullaryTree(labelIndex.get(root), Span(begin, end))
       }
 
       val spanScore = anchoring.scoreSpan(begin, end, root, rootRef)
@@ -110,7 +110,7 @@ class ViterbiDecoder[L, W] extends ChartDecoder[L, W] with Serializable {
       } else {
         val lchild = buildTreeUnary(begin, maxSplit, maxLeft, maxLeftRef)
         val rchild = buildTreeUnary(maxSplit, end, maxRight, maxRightRef)
-        BinaryTree(labelIndex.get(root), lchild, rchild)(Span(begin, end))
+        BinaryTree(labelIndex.get(root), lchild, rchild, Span(begin, end))
       }
 
 
@@ -242,15 +242,15 @@ class MaxConstituentDecoder[L, W] extends ChartDecoder[L, W] {
       val lower = if(begin + 1== end) {
         if(maxBotScore(begin, end) == Double.NegativeInfinity)
           throw new RuntimeException("Couldn't make a good score for " + (begin, end) + ". InsideIndices: " + inside.bot.enteredLabelIndexes(begin, end).toIndexedSeq + " outside: " + outside.bot.enteredLabelIndexes(begin, end).toIndexedSeq)
-        NullaryTree(labelIndex.get(maxBotLabel(begin, end)))(Span(begin, end))
+        NullaryTree(labelIndex.get(maxBotLabel(begin, end)), Span(begin, end))
       } else {
         val split = maxSplit(begin, end)
         val left = extract(begin, split)
         val right = extract(split, end)
-        BinaryTree(labelIndex.get(maxBotLabel(begin, end)), left, right)(Span(begin, end))
+        BinaryTree(labelIndex.get(maxBotLabel(begin, end)), left, right, Span(begin, end))
       }
 
-      UnaryTree(labelIndex.get(maxTopLabel(begin, end)), lower)(Span(begin, end))
+      UnaryTree(labelIndex.get(maxTopLabel(begin, end)), lower, Span(begin, end))
     }
 
     extract(0, inside.length)

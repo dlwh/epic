@@ -28,16 +28,16 @@ object UnaryChainRemover {
   def removeUnaryChains(tree: BinarizedTree[AnnotatedLabel]) = {
 
     def transform(t: BinarizedTree[AnnotatedLabel],parentWasUnary:Boolean):BinarizedTree[AnnotatedLabel] = t match {
-      case UnaryTree(l,c) =>
+      case UnaryTree(l,c, span) =>
         val (chain,cn) = stripChain(c);
         val cnFinal = cn.relabelRoot(l => l.copy(unaryChain = chain.reverse))
-        UnaryTree(l,transform(cnFinal,true))(t.span);
-      case BinaryTree(l,lchild,rchild) =>
-        if(parentWasUnary) BinaryTree(l,transform(lchild,false),transform(rchild,false))(t.span);
-        else UnaryTree(l,BinaryTree(l,transform(lchild,false),transform(rchild,false))(t.span))(t.span);
-      case NullaryTree(l) =>
-        if(parentWasUnary) NullaryTree(l)(t.span);
-        else UnaryTree(l,NullaryTree(l)(t.span))(t.span);
+        UnaryTree(l,transform(cnFinal,true), span);
+      case BinaryTree(l,lchild,rchild, span) =>
+        if(parentWasUnary) BinaryTree(l,transform(lchild,false),transform(rchild,false), span);
+        else UnaryTree(l,BinaryTree(l,transform(lchild,false),transform(rchild,false), span), span);
+      case NullaryTree(l, span) =>
+        if(parentWasUnary) NullaryTree(l, span);
+        else UnaryTree(l,NullaryTree(l, span), span);
       case t => t;
     }
 
@@ -45,7 +45,7 @@ object UnaryChainRemover {
   }
 
   private def stripChain(t: BinarizedTree[AnnotatedLabel]):(List[String],BinarizedTree[AnnotatedLabel]) = t match {
-    case UnaryTree(l,c) =>
+    case UnaryTree(l,c, span) =>
       val (chain,tn) = stripChain(c);
       (l.label :: chain, tn);
     case _ => (List.empty,t);
@@ -58,18 +58,18 @@ trait UnaryChainReplacer[L] {
 
 object AnnotatedLabelChainReplacer extends UnaryChainReplacer[AnnotatedLabel] {
   def replaceUnaries(t: Tree[AnnotatedLabel]):Tree[AnnotatedLabel] = t match {
-    case UnaryTree(a,child) if a.label == child.label.label =>
+    case UnaryTree(a,child, span) if a.label == child.label.label =>
       replaceUnaries(child)
-    case UnaryTree(a,child) =>
+    case UnaryTree(a,child, span) =>
       val c = child.label
       val replacements = child.label.unaryChain
       val deunaried = replaceUnaries(child).asInstanceOf[BinarizedTree[AnnotatedLabel]]
-      val withChain = replacements.foldLeft(deunaried)( (child,lbl) => UnaryTree(AnnotatedLabel(lbl),child)(child.span))
-      UnaryTree(a,withChain)(t.span);
-    case t@BinaryTree(a,lchild,rchild) =>
+      val withChain = replacements.foldLeft(deunaried)( (child,lbl) => UnaryTree(AnnotatedLabel(lbl),child, child.span))
+      UnaryTree(a,withChain, span);
+    case t@BinaryTree(a,lchild,rchild, span) =>
       BinaryTree(a,
         replaceUnaries(lchild).asInstanceOf[BinarizedTree[AnnotatedLabel]],
-        replaceUnaries(rchild).asInstanceOf[BinarizedTree[AnnotatedLabel]])(t.span)
+        replaceUnaries(rchild).asInstanceOf[BinarizedTree[AnnotatedLabel]], span)
     case t => t;
   }
 }
