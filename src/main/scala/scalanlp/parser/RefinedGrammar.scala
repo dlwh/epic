@@ -82,9 +82,6 @@ object RefinedGrammar {
                         refinedSpanScores: Array[Double],
                         tagScorer: TagScorer[L2, W]) = {
 
-    val g = grammar
-    val l = lexicon
-    
     val refinedGrammar = BaseGrammar(refinements.labels.refinementsOf(grammar.root)(0),
       refinements.labels.fineIndex,
       refinements.rules.fineIndex)

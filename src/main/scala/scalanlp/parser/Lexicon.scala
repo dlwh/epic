@@ -97,7 +97,7 @@ class SignatureLexicon[L,W](initCounts: Counter2[L,W,Double],
 
   def tagsForWord(w: W) = {
     val sig = asSignature(w)
-    byWord.getOrElse(sig,Set.empty[L]).iterator
+    byWord.getOrElse(sig,initCounts.keys.map(_._1)).iterator
   }
 
   def knownLexicalProductions = wordCounts.keysIterator.flatMap(w => tagsForWord(w).map(LexicalProduction(_,w)))

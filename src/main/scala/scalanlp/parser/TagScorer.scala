@@ -18,20 +18,17 @@ class SimpleTagScorer[L, W](counts: Counter2[L, W, Double]) extends TagScorer[L,
     var cWord = wordCounts(w)
     var cTagWord = counts(l, w)
     assert(cWord >= cTagWord)
-    if(wordCounts(w) < 10) {
+    if(cWord < 10) {
       cWord += 1.0
       cTagWord += counts(l, ::).size.toDouble / wordCounts.size
     }
-    if(cWord == 0) {
-      Double.NegativeInfinity
-    } else {
-      val pW = cWord / (totalCount + 1.0)
-      val pTgW = cTagWord / cWord
-      val pTag = labelCounts(l) / totalCount
-      val result = log(pW) + log(pTgW) - log(pTag)
-      assert(cTagWord == 0 || result > Double.NegativeInfinity)
-      result
-    }
+
+    val pW = cWord / (totalCount + 1.0)
+    val pTgW = cTagWord / cWord
+    val pTag = labelCounts(l) / totalCount
+    val result = log(pW) + log(pTgW) - log(pTag)
+    assert(cTagWord == 0 || result > Double.NegativeInfinity)
+    result
 
   }
 
