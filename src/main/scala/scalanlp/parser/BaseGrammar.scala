@@ -31,63 +31,27 @@ final class BaseGrammar[L] private (
   def labelEncoder  = Encoder.fromIndex(labelIndex)
 
   // Accessors for properties of indexed rules
-  /**
-   * Returns the parent label index from the rule index
-   * @param r
-   * @return
-   */
+  /** Returns the parent label index from the rule index */
   def parent(r: Int):Int = indexedRules(r).parent
-  /**
-   * Returns the left child label index from the rule index
-   * @param r
-   * @return
-   */
+  /** Returns the left child label index from the rule index */
   def leftChild(r: Int): Int = indexedRules(r).asInstanceOf[BinaryRule[Int]].left
-  /**
-   * Returns the right child label index from the rule index
-   * @param r
-   * @return
-   */
+  /** Returns the right child label index from the rule index */
   def rightChild(r: Int): Int = indexedRules(r).asInstanceOf[BinaryRule[Int]].right
-  /**
-   * Returns the child label index from the (unary) rule index
-   * @param r
-   * @return
-   */
+  /** Returns the child label index from the (unary) rule index */
   def child(r: Int): Int = indexedRules(r).asInstanceOf[UnaryRule[Int]].child
 
   // query by parent or child
-  /**
-   * Gives all binary rule indices with this parent
-   * @param l
-   * @return
-   */
+  /** Gives all binary rule indices with this parent */
   def indexedBinaryRulesWithParent(l: Int) = binaryRulesByParent(l)
-  /**
-   * Gives all unary rule indices with this parent
-   * @param l
-   * @return
-   */
+  /** Gives all unary rule indices with this parent */
   def indexedUnaryRulesWithParent(l: Int) = unaryRulesByParent(l)
-  /**
-   * Gives all unary rule indices with this child
-   * @param l
-   * @return
-   */
+  /** Gives all unary rule indices with this child */
   def indexedUnaryRulesWithChild(l: Int) = unaryRulesByChild(l)
 
-  /**
-   * gives all binary rule indices with this left child
-   * @param b the left child index
-   * @return
-   */
+  /** Gives all binary rule indices with this left child */
   def indexedBinaryRulesWithLeftChild(b: Int) = binaryRulesByLeftChild(b)
 
-  /**
-   * gives all binary rule indices with this right child
-   * @param c the right child index
-   * @return
-   */
+  /** Gives all binary rule indices with this right child */
   def indexedBinaryRulesWithRightChild(c: Int) = binaryRulesByRightChild(c)
 
   def prettyString = {
@@ -126,9 +90,7 @@ final class BaseGrammar[L] private (
 }
 
 object BaseGrammar {
-  /**
-   * Builds a grammar just from some productions
-   */
+  /** Builds a grammar just from some productions */
   def apply[L, W](root: L, productions: TraversableOnce[Rule[L]]): BaseGrammar[L] = {
     val index = Index[L]();
     val ruleIndex = Index[Rule[L]]()

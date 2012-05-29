@@ -11,13 +11,8 @@ import scalanlp.collection.mutable.{OpenAddressHashArray, TriangularArray}
 class AnchoredRuleProjector(threshold: Double) extends Serializable {
 
   /**
-   * Projects an inside and outside chart to anchored rule posteriors.
+   * Projects a [[scalanlp.parser.Marginal]] to marginals on anchored rules.
    *
-   * @param inside inside chart
-   * @param outside outside chart
-   * @param sentProb log probability of the root. probably a log partition
-   * @param anchoring: anchoring used to produce this tree.
-   * @param pruneLabel should return a threshold to determine if we need to prune. (prune if posterior <= threshold) See companion object for good choices.
    */
   def projectRulePosteriors[L,W](charts: Marginal[L, W],
                                  goldTagPolicy: GoldTagPolicy[L] = GoldTagPolicy.noGoldTags[L]):AnchoredRuleProjector.AnchoredData = {

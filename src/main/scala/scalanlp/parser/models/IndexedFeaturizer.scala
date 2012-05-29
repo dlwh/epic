@@ -11,15 +11,14 @@ import scalala.tensor.dense.DenseVector
 import collection.mutable.ArrayBuilder
 
 /**
- * FeatureIndexers give you an indexed encoding of the features for each rule and label
- * using indexed rule and indexed labels. Handles Featurizers
+ * [[scalanlp.parser.models.IndexedFeaturizer]] are featurizers for "normal" unanchored grammars.
+ * They define an indexed encoding of the features for each rule and label
+ * using indexed rule and indexed labels. Handles [[scalanlp.parser.features.Featurizer]] instances
  *
  * @author dlwh
  */
 @SerialVersionUID(1)
 trait IndexedFeaturizer[L, L2, W] extends RefinedFeaturizer[L, W, Feature] with Encoder[Feature] with Serializable {
-
-
   val index: Index[Feature]
   val featurizer: Featurizer[L2, W]
   val grammar: BaseGrammar[L]
@@ -123,7 +122,7 @@ object IndexedFeaturizer {
   def apply[L, L2, W](grammar: BaseGrammar[L],
                       lexicon: Lexicon[L, W],
                       f: Featurizer[L2, W],
-                      indexedProjections: GrammarRefinements[L, L2]) = {
+                      indexedProjections: GrammarRefinements[L, L2]): IndexedFeaturizer[L, L2, W] = {
     val featureIndex = Index[Feature]()
     val ruleIndex = indexedProjections.rules.fineIndex
 
@@ -158,7 +157,7 @@ object IndexedFeaturizer {
                                                         f: Featurizer[L2, W],
                                                         featureIndex: Index[Feature],
                                                         ruleCache: OpenAddressHashArray[Array[Feature]],
-                                                        lexicalCache: Map[Int, Map[W, Array[Feature]]]) = {
+                                                        lexicalCache: Map[Int, Map[W, Array[Feature]]]): IndexedFeaturizer[L, L2, W]  = {
     val brc =  Array.tabulate(refinements.rules.fineIndex.size){ r =>
       ruleCache(r) map featureIndex
     }
@@ -173,11 +172,9 @@ object IndexedFeaturizer {
       val index = featureIndex
       val featurizer = f
 
-      // a -> b c -> SparseVector[Double] of feature weights
       val grammar = g
       val proj = refinements
       val ruleCache = brc
-      // a -> W map
       val lexicalCache = lrc
     }
   }
