@@ -62,7 +62,7 @@ object RefinedGrammar {
                        unaryProductions: Counter2[L, UnaryRule[L], Double],
                        wordCounts: Counter2[L, W, Double]):RefinedGrammar[L, W] = {
     val loggedB = Library.logAndNormalizeRows(binaryProductions)
-    val loggedU= Library.logAndNormalizeRows(unaryProductions)
+    val loggedU = Library.logAndNormalizeRows(unaryProductions)
 
     val ref = GrammarRefinements.identity(grammar)
 
@@ -134,97 +134,10 @@ object RefinedGrammar {
       }
     }
 
-    new RefinedGrammar[L, W] {
-      def grammar = g
-      def lexicon = l
+    new SimpleRefinedGrammar[L, L2, W](grammar, lexicon, refinements,
+      refinedGrammar, ruleScoreArray, spanScoreArray,
+      parentCompatibleRefinements, childCompatibleRefinements, tagScorer)
 
-      def anchor(w: Seq[W]) = new RefinedAnchoring[L, W] {
-        override def toString() = "RefinedAnchoring(...)"
-        val grammar = g
-        val lexicon = l
-        def words = w
-
-        def scoreSpan(begin: Int, end: Int, label: Int, ref: Int) = {
-          val baseScore = if(begin + 1 == end) {
-            val fullId = refinements.labels.globalize(label, ref)
-            tagScorer.scoreTag(refinements.labels.fineIndex.get(fullId), words, begin)
-          } else {
-            0.0
-          }
-          baseScore + spanScoreArray(label)(ref)
-        }
-
-        def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int) = {
-          ruleScoreArray(rule)(ref)
-        }
-
-        def scoreUnaryRule(begin: Int, end: Int, rule: Int, ref: Int) = {
-          ruleScoreArray(rule)(ref)
-        }
-
-        def validLabelRefinements(begin: Int, end: Int, label: Int) = {
-          refinements.labels.localRefinements(label)
-        }
-
-        def validRuleRefinementsGivenParent(begin: Int, end: Int, rule: Int, parentRef: Int) = {
-          parentCompatibleRefinements(rule)(parentRef)
-        }
-
-        def validUnaryRuleRefinementsGivenChild(begin: Int, end: Int, rule: Int, childRef: Int) = {
-          childCompatibleRefinements(rule)(childRef)
-        }
-
-        def leftChildRefinement(rule: Int, ruleRef: Int) = {
-          val refinedRuleId = refinements.rules.globalize(rule, ruleRef)
-          refinements.labels.localize(refinedGrammar.leftChild(refinedRuleId))
-        }
-
-        def rightChildRefinement(rule: Int, ruleRef: Int) = {
-          val refinedRuleId = refinements.rules.globalize(rule, ruleRef)
-          refinements.labels.localize(refinedGrammar.rightChild(refinedRuleId))
-        }
-
-        def parentRefinement(rule: Int, ruleRef: Int) = {
-          val refinedRuleId = refinements.rules.globalize(rule, ruleRef)
-          refinements.labels.localize(refinedGrammar.parent(refinedRuleId))
-        }
-
-        def childRefinement(rule: Int, ruleRef: Int) = {
-          val refinedRuleId = refinements.rules.globalize(rule, ruleRef)
-          refinements.labels.localize(refinedGrammar.child(refinedRuleId))
-        }
-
-        // TODO: make this not terminally slow!
-        def ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int) = {
-          val a = grammar.parent(r)
-          val b = grammar.child(r)
-          val a2 = refinements.labels.globalize(a, refA)
-          val b2 = refinements.labels.globalize(b, refB)
-          val refinedRuleIndex = refinements.rules.fineIndex(UnaryRule(refinements.labels.fineIndex.get(a2), refinements.labels.fineIndex.get(b2)))
-          if(refinedRuleIndex < 0) {
-            -1
-          } else {
-            refinements.rules.localize(refinedRuleIndex)
-          }
-        }
-
-        def ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int, refC: Int) = {
-          val a = grammar.parent(r)
-          val b = grammar.leftChild(r)
-          val c = grammar.rightChild(r)
-          val a2 = refinements.labels.globalize(a, refA)
-          val b2 = refinements.labels.globalize(b, refB)
-          val c2 = refinements.labels.globalize(c, refC)
-          refinements.rules.localize(refinements.rules.fineIndex(BinaryRule(refinements.labels.fineIndex.get(a2),
-            refinements.labels.fineIndex.get(b2),
-            refinements.labels.fineIndex.get(c2)
-          ))  )
-        }
-
-        def numValidRefinements(label: Int) = refinements.labels.refinementsOf(label).length
-        def numValidRuleRefinements(rule: Int) = refinements.rules.refinementsOf(rule).length
-      }
-    }
 
   }
 
