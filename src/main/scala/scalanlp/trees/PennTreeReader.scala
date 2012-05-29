@@ -70,9 +70,9 @@ class PennTreeReader(val reader : Reader,
     val spanEnd = pos + words.length
     readRightParen();
     if (!lowercase || children.size > 0) {
-      new Tree[String](label, children, Span(pos, spanEnd)) -> words
+      Tree[String](label, children, Span(pos, spanEnd)) -> words
     } else {
-      new Tree[String](label.toLowerCase.intern, children, Span(pos, spanEnd)) -> words
+      Tree[String](label.toLowerCase.intern, children, Span(pos, spanEnd)) -> words
     }
   }
 

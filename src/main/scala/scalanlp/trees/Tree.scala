@@ -1,9 +1,9 @@
-package scalanlp.trees;
+package scalanlp.trees
 
 /*
  Copyright 2012 David Hall
 
- Licensed under the Apache License, Version 2.0 (the "License");
+ Licensed under the Apache License, Version 2.0 (the "License")
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
 
@@ -17,14 +17,19 @@ package scalanlp.trees;
 */
 
 
-import scala.collection.mutable.ArrayBuffer;
+import scala.collection.mutable.ArrayBuffer
 import scalanlp.serialization.DataSerialization
 import scalanlp.serialization.DataSerialization._
 import java.io.{StringReader, DataInput, DataOutput}
 import scalanlp.util.Lens
 
-class Tree[+L](val label: L, val children: IndexedSeq[Tree[L]], val span: Span) {
-  def isLeaf = children.size == 0;
+@SerialVersionUID(1L)
+trait Tree[+L] extends Serializable {
+  def label: L
+  def children: IndexedSeq[Tree[L]]
+  def span: Span
+
+  def isLeaf = children.size == 0
   /**
   * A tree is valid if this' span contains all children's spans 
   * and each child abuts the next one.
@@ -61,10 +66,10 @@ class Tree[+L](val label: L, val children: IndexedSeq[Tree[L]], val span: Span) 
   }
 
 
-  def map[M](f: L=>M):Tree[M] = Tree( f(label), children map { _ map f}, span);
+  def map[M](f: L=>M):Tree[M] = Tree( f(label), children map { _ map f}, span)
   def extend[B](f: Tree[L]=>B):Tree[B] = Tree(f(this),children map { _ extend f}, span)
 
-  def allChildren = preorder;
+  def allChildren = preorder
 
   def preorder: Iterator[Tree[L]] = {
     children.map(_.preorder).foldLeft( Iterator(this)) { _ ++ _ }
@@ -76,89 +81,95 @@ class Tree[+L](val label: L, val children: IndexedSeq[Tree[L]], val span: Span) 
 
   def leftHeight:Int = if(isLeaf) 0 else 1 + children(0).leftHeight
 
-  import Tree._;
-  override def toString = recursiveToString(this,0,new StringBuilder).toString;
-  def render[W](words: Seq[W], newline: Boolean = true) = recursiveRender(this,0,words, newline, new StringBuilder).toString;
+  import Tree._
+  override def toString = recursiveToString(this,0,new StringBuilder).toString
+  def render[W](words: Seq[W], newline: Boolean = true) = recursiveRender(this,0,words, newline, new StringBuilder).toString
 }
 
 object Tree {
-  def apply[L](label: L, children: IndexedSeq[Tree[L]], span: Span) = new Tree(label,children, span);
-  def unapply[L](t: Tree[L]): Option[(L,IndexedSeq[Tree[L]], Span)] = Some((t.label,t.children, t.span));
+  def apply[L](label: L, children: IndexedSeq[Tree[L]], span: Span): NaryTree[L] = NaryTree(label,children, span)
+  def unapply[L](t: Tree[L]): Option[(L,IndexedSeq[Tree[L]], Span)] = Some((t.label,t.children, t.span))
   def fromString(input: String):(Tree[String],Seq[String]) = new PennTreeReader(new StringReader(input)).next
 
   private def recursiveToString[L](tree: Tree[L], depth: Int, sb: StringBuilder):StringBuilder = {
-    import tree._;
-    sb append "( " append tree.label append " [" append span.start append "," append span.end append "] ";
+    import tree._
+    sb append "( " append tree.label append " [" append span.start append "," append span.end append "] "
     for( c <- tree.children ) {
-      recursiveToString(c,depth+1,sb) append " ";
+      recursiveToString(c,depth+1,sb) append " "
     }
-    sb append ")";
+    sb append ")"
     sb
   }
 
 
   private def recursiveRender[L,W](tree: Tree[L], depth: Int, words: Seq[W], newline: Boolean, sb: StringBuilder): StringBuilder =  {
-    import tree._;
-    if(newline) sb append "\n" append "  " * depth;
-    else sb.append(" ");
+    import tree._
+    if(newline) sb append "\n" append "  " * depth
+    else sb.append(" ")
     sb append "(" append tree.label
     if(isLeaf) {
-      sb append span.map(words).mkString(" "," ","");
+      sb append span.map(words).mkString(" "," ","")
     } else {
       //sb append "\n"
       for( c <- children ) {
-        recursiveRender(c,depth+1,words,newline, sb);
+        recursiveRender(c,depth+1,words,newline, sb)
       }
     }
-    sb append ")";
+    sb append ")"
     sb
   }
 
   implicit def treeSerializationReadWritable[L:ReadWritable]: ReadWritable[Tree[L]] = new ReadWritable[Tree[L]] {
     def write(data: DataOutput, t: Tree[L]) = {
-      implicitly[ReadWritable[L]].write(data,t.label);
-      DataSerialization.write(data,t.children);
-      data.writeInt(t.span.start);
-      data.writeInt(t.span.end);
+      implicitly[ReadWritable[L]].write(data,t.label)
+      DataSerialization.write(data,t.children)
+      data.writeInt(t.span.start)
+      data.writeInt(t.span.end)
     }
     def read(data: DataInput) = {
-      val label = implicitly[ReadWritable[L]].read(data);
-      val children = indexedSeqReadWritable(this).read(data);
-      val begin = data.readInt();
-      val end = data.readInt();
-      new Tree(label, children, Span(begin,end));
+      val label = implicitly[ReadWritable[L]].read(data)
+      val children = indexedSeqReadWritable(this).read(data)
+      val begin = data.readInt()
+      val end = data.readInt()
+      Tree(label, children, Span(begin,end))
     }
   }
 
 }
 
+case class NaryTree[L](label: L, children: IndexedSeq[Tree[L]], span: Span) extends Tree[L]
+
 sealed trait BinarizedTree[+L] extends Tree[L] {
-  override def map[M](f: L=>M): BinarizedTree[M] = null;
+  override def map[M](f: L=>M): BinarizedTree[M] = null
   // have to override to trick scala to refine the type
   override def extend[B](f: Tree[L]=>B):BinarizedTree[B] = {sys.error("...")}
   def relabelRoot[B>:L](f: L=>B):BinarizedTree[B]
 }
 
-case class BinaryTree[+L](l: L,
+case class BinaryTree[+L](label: L,
                           leftChild: BinarizedTree[L],
                           rightChild: BinarizedTree[L],
-                          override val span: Span
-                        ) extends Tree[L](l,IndexedSeq(leftChild,rightChild), span) with BinarizedTree[L] {
-  override def map[M](f: L=>M):BinaryTree[M] = BinaryTree( f(label), leftChild map f, rightChild map f, span);
-  override def extend[B](f: Tree[L]=>B) = BinaryTree( f(this), leftChild extend f, rightChild extend f, span);
+                          span: Span) extends BinarizedTree[L] {
+  def children = IndexedSeq(leftChild, rightChild)
+
+  override def map[M](f: L=>M):BinaryTree[M] = BinaryTree( f(label), leftChild map f, rightChild map f, span)
+  override def extend[B](f: Tree[L]=>B) = BinaryTree( f(this), leftChild extend f, rightChild extend f, span)
   def relabelRoot[B>:L](f: L=>B):BinarizedTree[B] = BinaryTree(f(label), leftChild, rightChild, span)
   def splitPoint = leftChild.span.end
 }
 
-case class UnaryTree[+L](l: L, child: BinarizedTree[L], override val span: Span) extends Tree[L](l,IndexedSeq(child), span) with BinarizedTree[L] {
-  override def map[M](f: L=>M): UnaryTree[M] = UnaryTree( f(label), child map f, span);
-  override def extend[B](f: Tree[L]=>B) = UnaryTree( f(this), child extend f, span);
+case class UnaryTree[+L](label: L, child: BinarizedTree[L], span: Span) extends BinarizedTree[L] {
+  def children = IndexedSeq(child)
+  override def map[M](f: L=>M): UnaryTree[M] = UnaryTree( f(label), child map f, span)
+  override def extend[B](f: Tree[L]=>B) = UnaryTree( f(this), child extend f, span)
   def relabelRoot[B>:L](f: L=>B):BinarizedTree[B] = UnaryTree(f(label), child, span)
 }
 
-case class NullaryTree[+L](l: L, override val span: Span) extends Tree[L](l, IndexedSeq.empty, span) with BinarizedTree[L]{
-  override def map[M](f: L=>M): NullaryTree[M] = NullaryTree( f(label), span);
-  override def extend[B](f: Tree[L]=>B) = NullaryTree( f(this), span);
+case class NullaryTree[+L](label: L, span: Span) extends BinarizedTree[L] {
+  def children = IndexedSeq.empty
+
+  override def map[M](f: L=>M): NullaryTree[M] = NullaryTree( f(label), span)
+  override def extend[B](f: Tree[L]=>B) = NullaryTree( f(this), span)
   def relabelRoot[B>:L](f: L=>B):BinarizedTree[B] = NullaryTree(f(label), span)
 }
 
@@ -233,30 +244,30 @@ object Trees {
 
 
   def debinarize[L](tree: Tree[L], isBinarized: L=>Boolean):Tree[L] = {
-    val l = tree.label;
-    val children = tree.children;
-    val buf = new ArrayBuffer[Tree[L]];
+    val l = tree.label
+    val children = tree.children
+    val buf = new ArrayBuffer[Tree[L]]
     for(c <- children) {
       if(isBinarized(c.label)) {
-        buf ++= debinarize(c,isBinarized).children;
+        buf ++= debinarize(c,isBinarized).children
       } else {
-        buf += debinarize(c,isBinarized);
+        buf += debinarize(c,isBinarized)
       }
     }
-    Tree(l,buf, tree.span);
+    Tree(l,buf, tree.span)
   }
 
-  def debinarize(tree: Tree[String]):Tree[String] = debinarize(tree, (x:String) => x.startsWith("@"));
+  def debinarize(tree: Tree[String]):Tree[String] = debinarize(tree, (x:String) => x.startsWith("@"))
 
   def annotateParents[L](tree: Tree[L], join: (L,L)=>L, depth: Int, history: List[L] = List.empty):Tree[L] = {
     if(depth == 0) tree
     else {
-      val newLabel = (tree.label :: history).iterator.take(depth).reduceLeft(join);
-      new Tree(newLabel,tree.children.map(c => annotateParents[L](c,join,depth,tree.label :: history.take(depth-1 max 0))), tree.span)
+      val newLabel = (tree.label :: history).iterator.take(depth).reduceLeft(join)
+      Tree(newLabel,tree.children.map(c => annotateParents[L](c,join,depth,tree.label :: history.take(depth-1 max 0))), tree.span)
     }
   }
 
-  def annotateParents(tree: Tree[String], depth: Int):Tree[String] = annotateParents(tree,{(x:String,b:String)=>x + '^' + b},depth);
+  def annotateParents(tree: Tree[String], depth: Int):Tree[String] = annotateParents(tree,{(x:String,b:String)=>x + '^' + b},depth)
 
   /**
    * Adds parent-markovization to an already binarized tree. Also handles the unary layering we do by ignoring
@@ -293,7 +304,7 @@ object Trees {
 
   def annotateParentsBinarized(tree: BinarizedTree[String], depth: Int):BinarizedTree[String] = {
     annotateParentsBinarized(tree,{(x:String,b:String)=>x + '^' + b},(_:String).startsWith("@"),depth)
-  };
+  }
 
   object Transforms {
 
@@ -312,7 +323,7 @@ object Trees {
     class XOverXRemover[L] extends (Tree[L]=>Tree[L]) {
       def apply(tree: Tree[L]):Tree[L] = {
         if(tree.children.size == 1 && tree.label == tree.children(0).label) {
-          this(tree.children(0));
+          this(tree.children(0))
         } else {
           Tree(tree.label,tree.children.map(this), tree.span)
         }
@@ -333,11 +344,11 @@ object Trees {
     }
 
     object StandardStringTransform extends (Tree[String]=>Tree[String]) {
-      private val ens = new EmptyNodeStripper[String];
-      private val xox = new XOverXRemover[String];
-//      private val fns = new FunctionNodeStripper[String];
+      private val ens = new EmptyNodeStripper[String]
+      private val xox = new XOverXRemover[String]
+//      private val fns = new FunctionNodeStripper[String]
       def apply(tree: Tree[String]): Tree[String] = {
-        xox(ens(tree).get) map (_.intern);
+        xox(ens(tree).get) map (_.intern)
       }
     }
 
@@ -347,18 +358,18 @@ object Trees {
       private val fns = new FunctionNodeStripper[T]
 
       def apply(tree: Tree[T]) = {
-        xox(fns(ens(tree).get)) map ( l => lens.set(l,lens.get(l).intern));
+        xox(fns(ens(tree).get)) map ( l => lens.set(l,lens.get(l).intern))
       }
     }
 
     /*
     object GermanTreebankTransform extends (Tree[String]=>Tree[String]) {
-      private val ens = new EmptyNodeStripper;
-      private val xox = new XOverXRemover[String];
-      private val fns = new FunctionNodeStripper;
-      private val tr = GermanTraceRemover;
+      private val ens = new EmptyNodeStripper
+      private val xox = new XOverXRemover[String]
+      private val fns = new FunctionNodeStripper
+      private val tr = GermanTraceRemover
       def apply(tree: Tree[String]): Tree[String] = {
-        xox(tr(fns(ens(tree).get))) map (_.intern);
+        xox(tr(fns(ens(tree).get))) map (_.intern)
       }
     }
 
