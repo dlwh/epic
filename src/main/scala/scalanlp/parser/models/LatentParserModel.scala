@@ -106,8 +106,8 @@ case class LatentParserModelFactory(baseParser: ParserParams.BaseParser,
     def splitRule[L, L2](r: Rule[L], split: L=>Seq[L2]):Seq[Rule[L2]] = r match {
       case BinaryRule(a, b, c) => for(aa <- split(a); bb <- split(b); cc <- split(c)) yield BinaryRule(aa, bb, cc)
         // don't allow ref
-      case UnaryRule(a, b) if a == b => for(aa <- split(a)) yield UnaryRule(aa, aa)
-      case UnaryRule(a, b) => for(aa <- split(a); bb <- split(b)) yield UnaryRule(aa, bb)
+      case UnaryRule(a, b, chain) if a == b => for(aa <- split(a)) yield UnaryRule(aa, aa, chain)
+      case UnaryRule(a, b, chain) => for(aa <- split(a); bb <- split(b)) yield UnaryRule(aa, bb, chain)
     }
 
     val gen = new WordShapeFeaturizer(Library.sum(annWords))

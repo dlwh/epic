@@ -38,8 +38,8 @@ case class LatentTreeMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
           // assert(exp(ruleScore) > 0, " " + ruleScore)
           spanVisitor.visitSpan(t.span.start, t.span.end, label, l, exp(ruleScore))
         }
-      case t@UnaryTree(Beliefs(a, aLabels, _, aScores), Tree(Beliefs(c, cLabels, cScores, _), _, _), span) =>
-        val rule = grammar.index(UnaryRule(grammar.labelIndex.get(a), grammar.labelIndex.get(c)))
+      case t@UnaryTree(Beliefs(a, aLabels, _, aScores), Tree(Beliefs(c, cLabels, cScores, _), _, _), chain, span) =>
+        val rule = grammar.index(UnaryRule(grammar.labelIndex.get(a), grammar.labelIndex.get(c), chain))
         var pi = 0
         while(pi < aLabels.size) {
           val aRef = aLabels(pi)
@@ -107,8 +107,8 @@ case class LatentTreeMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
         if(!foundOne) {
           sys.error("Trouble with lexical " + words(t.span.start))
         }
-      case t@UnaryTree(Beliefs(a, aLabels, aScores, _), Tree(Beliefs(c, cLabels, cScores, _), _, _), span) =>
-        val rule = grammar.index(UnaryRule(grammar.labelIndex.get(a), grammar.labelIndex.get(c)))
+      case t@UnaryTree(Beliefs(a, aLabels, aScores, _), Tree(Beliefs(c, cLabels, cScores, _), _, _), chain, span) =>
+        val rule = grammar.index(UnaryRule(grammar.labelIndex.get(a), grammar.labelIndex.get(c), chain))
         var foundOne = false
         var ai = 0
         while(ai < aLabels.length) {
@@ -218,10 +218,10 @@ case class LatentTreeMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
           rchild.label.outside(ci) = Numerics.logSum(rchild.label.outside(ci), aScore + bScore + spanScore)
         }
       case tree: NullaryTree[Seq[Int]] => () // do nothing
-      case t @ UnaryTree(_, child, span) =>
+      case t @ UnaryTree(_, child, chain, span) =>
         val a = t.label.label
         val c = child.label.label
-        val rule = grammar.index(UnaryRule(grammar.labelIndex.get(a), grammar.labelIndex.get(c)))
+        val rule = grammar.index(UnaryRule(grammar.labelIndex.get(a), grammar.labelIndex.get(c), chain))
         val arr = new Array[Double](t.label.candidates.size)
         for {
           (cRef, ci) <- child.label.candidates.zipWithIndex

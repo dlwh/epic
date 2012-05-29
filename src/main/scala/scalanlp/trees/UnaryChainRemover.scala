@@ -3,7 +3,7 @@ package scalanlp.trees
 /*
  Copyright 2012 David Hall
 
- Licensed under the Apache License, Version 2.0 (the "License");
+ Licensed under the Apache License, Version 2.0 (the "License")
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
 
@@ -28,27 +28,26 @@ object UnaryChainRemover {
   def removeUnaryChains(tree: BinarizedTree[AnnotatedLabel]) = {
 
     def transform(t: BinarizedTree[AnnotatedLabel],parentWasUnary:Boolean):BinarizedTree[AnnotatedLabel] = t match {
-      case UnaryTree(l,c, span) =>
-        val (chain,cn) = stripChain(c);
-        val cnFinal = cn.relabelRoot(l => l.copy(unaryChain = chain.reverse))
-        UnaryTree(l,transform(cnFinal,true), span);
+      case UnaryTree(l,c, chain, span) =>
+        val (chain,cn) = stripChain(c)
+        UnaryTree(l,transform(cn,true), chain, t.span)
       case BinaryTree(l,lchild,rchild, span) =>
-        if(parentWasUnary) BinaryTree(l,transform(lchild,false),transform(rchild,false), span);
-        else UnaryTree(l,BinaryTree(l,transform(lchild,false),transform(rchild,false), span), span);
+        if(parentWasUnary) BinaryTree(l,transform(lchild,false),transform(rchild,false), t.span)
+        else UnaryTree(l,BinaryTree(l,transform(lchild,false),transform(rchild,false), t.span), Seq.empty, t.span)
       case NullaryTree(l, span) =>
-        if(parentWasUnary) NullaryTree(l, span);
-        else UnaryTree(l,NullaryTree(l, span), span);
-      case t => t;
+        if(parentWasUnary) NullaryTree(l, t.span)
+        else UnaryTree(l,NullaryTree(l, t.span), Seq.empty, t.span)
+      case t => t
     }
 
     transform(tree,true)
   }
 
   private def stripChain(t: BinarizedTree[AnnotatedLabel]):(List[String],BinarizedTree[AnnotatedLabel]) = t match {
-    case UnaryTree(l,c, span) =>
-      val (chain,tn) = stripChain(c);
-      (l.label :: chain, tn);
-    case _ => (List.empty,t);
+    case UnaryTree(l, c, _, span) =>
+      val (chain,tn) = stripChain(c)
+      (l.label :: chain, tn)
+    case _ => (List.empty,t)
   }
 }
 
@@ -58,18 +57,18 @@ trait UnaryChainReplacer[L] {
 
 object AnnotatedLabelChainReplacer extends UnaryChainReplacer[AnnotatedLabel] {
   def replaceUnaries(t: Tree[AnnotatedLabel]):Tree[AnnotatedLabel] = t match {
-    case UnaryTree(a,child, span) if a.label == child.label.label =>
+    case UnaryTree(a, child, chain, span) if a.label == child.label.label && chain.isEmpty =>
       replaceUnaries(child)
-    case UnaryTree(a,child, span) =>
-      val c = child.label
-      val replacements = child.label.unaryChain
+    case UnaryTree(a, child, chain, span) =>
       val deunaried = replaceUnaries(child).asInstanceOf[BinarizedTree[AnnotatedLabel]]
-      val withChain = replacements.foldLeft(deunaried)( (child,lbl) => UnaryTree(AnnotatedLabel(lbl),child, child.span))
-      UnaryTree(a,withChain, span);
-    case t@BinaryTree(a,lchild,rchild, span) =>
+      val withChain = chain.foldRight(deunaried){ (label, child) =>
+        UnaryTree(AnnotatedLabel(label), child.asInstanceOf[BinarizedTree[AnnotatedLabel]], Seq.empty, span)
+      }
+      UnaryTree(a,withChain, Seq.empty, t.span)
+    case t@BinaryTree(a, lchild, rchild, span) =>
       BinaryTree(a,
         replaceUnaries(lchild).asInstanceOf[BinarizedTree[AnnotatedLabel]],
-        replaceUnaries(rchild).asInstanceOf[BinarizedTree[AnnotatedLabel]], span)
-    case t => t;
+        replaceUnaries(rchild).asInstanceOf[BinarizedTree[AnnotatedLabel]], t.span)
+    case t => t
   }
 }

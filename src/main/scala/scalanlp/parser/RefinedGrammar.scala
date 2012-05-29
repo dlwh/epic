@@ -67,8 +67,8 @@ object RefinedGrammar {
     val ref = GrammarRefinements.identity(grammar)
 
     val ruleScoreArray = for(r <- grammar.index.toArray) yield r match {
-      case r@BinaryRule(a,_,_) => loggedB(a,r)
-      case r@UnaryRule(a,_) => loggedU(a,r)
+      case r@BinaryRule(a, _, _) => loggedB(a, r)
+      case r@UnaryRule(a, _, _) => loggedU(a, r)
     }
     
     val spanScoreArray = grammar.labelEncoder.mkArray[Double]

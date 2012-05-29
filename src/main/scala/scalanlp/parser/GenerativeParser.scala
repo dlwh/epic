@@ -83,8 +83,8 @@ object GenerativeParser {
       tree.allChildren foreach { 
         case BinaryTree(a, bc, cc, span) =>
           binaryProductions(a, BinaryRule(a, bc.label, cc.label)) += 1.0
-        case UnaryTree(a, bc, span) =>
-          unaryProductions(a, UnaryRule(a, bc.label)) += 1.0
+        case UnaryTree(a, bc, chain, span) =>
+          unaryProductions(a, UnaryRule(a, bc.label, chain)) += 1.0
         case t => 
       }
       for( (l, w) <- leaves) {

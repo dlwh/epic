@@ -566,9 +566,9 @@ object IndexedLexFeaturizer {
           val aI = labelIndex(a)
           add(set, spec.featuresForTag(aI, span.start))
           span.start
-        case UnaryTree(a, b, _) =>
+        case UnaryTree(a, b, chain, _) =>
           val h = rec(b)
-          val r = ruleIndex(UnaryRule(a, b.label))
+          val r = ruleIndex(UnaryRule(a, b.label, chain))
           add(set, spec.featuresForHead(r, h))
           h
         case t@BinaryTree(a, bt@Tree(b, _, _), Tree(c, _, _), span) =>

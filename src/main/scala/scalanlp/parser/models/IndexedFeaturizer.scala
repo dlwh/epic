@@ -163,7 +163,7 @@ object IndexedFeaturizer {
     }
 
     val lrc = Array.tabulate(refinements.labels.fineIndex.size){ (a) =>
-      lexicalCache(a).map{ case (k,v) => k -> (v map featureIndex)}
+      lexicalCache.getOrElse(a,Map.empty).map{ case (k,v) => k -> (v map featureIndex)}
     }
 
     val g = grammar

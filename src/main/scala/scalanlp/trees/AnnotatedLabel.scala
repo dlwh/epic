@@ -22,7 +22,6 @@ case class FunctionalTag(tag: String) extends Annotation
 case class AnnotatedLabel(label: String,
                           parents: Seq[String] = Seq.empty,
                           siblings: Seq[Either[String, String]] = Seq.empty,
-                          unaryChain: Seq[String] = Seq.empty,
                           features: Set[Annotation] = Set.empty) {
 
   def annotate(sym: Annotation) = copy(features = features + sym)
@@ -31,16 +30,13 @@ case class AnnotatedLabel(label: String,
 
   def baseLabel = label.dropWhile(_ == '@')
 
-  def baseAnnotatedLabel = AnnotatedLabel(label,unaryChain=unaryChain)
+  def baseAnnotatedLabel = AnnotatedLabel(label)
   def clearFeatures = copy(features=Set.empty)
 
   override def toString = {
     val components = new ArrayBuffer[String]()
-    if(unaryChain.nonEmpty || parents.nonEmpty) {
-      var s = ""
-      if(unaryChain.nonEmpty)
-        s = unaryChain.mkString("(","^",")")
-      components += parents.mkString(s,"^","")
+    if(parents.nonEmpty) {
+      components += parents.mkString("^")
     }
     if(siblings.nonEmpty) {
       val b = new StringBuilder()

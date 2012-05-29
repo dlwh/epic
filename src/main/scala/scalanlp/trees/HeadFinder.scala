@@ -50,7 +50,7 @@ class HeadFinder[L](defaultDirection: Dir = Left,
 
 
   def findHeadChild(r: Rule[L]): Int = r match {
-    case UnaryRule(_, _) => 0
+    case UnaryRule(_, _, _) => 0
     case BinaryRule(a, b, c) =>
       findHeadChild(a, b, c)
   }
@@ -92,9 +92,9 @@ class HeadFinder[L](defaultDirection: Dir = Left,
   
   def annotateHeadIndices[W](t: BinarizedTree[L]): BinarizedTree[(L, Int)] = t match {
     case NullaryTree(l, span) =>  NullaryTree(l -> t.span.start, t.span)
-    case UnaryTree(a, b, span) =>
+    case u@UnaryTree(a, b, chain, span) =>
       val rec = annotateHeadIndices(b)
-      UnaryTree(a -> rec.label._2, rec, t.span)
+      u.copy(a -> rec.label._2, rec)
     case BinaryTree(a, b, c, span) =>
       val headChild = findHeadChild(t)
       val recB = annotateHeadIndices(b)

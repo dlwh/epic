@@ -43,6 +43,7 @@ class ViterbiDecoder[L, W] extends ChartDecoder[L, W] with Serializable {
       var maxScore = Double.NegativeInfinity
       var maxChild = -1
       var maxChildRef = -1
+      var maxRule = -1
       for {
         r <- grammar.indexedUnaryRulesWithParent(root)
         refR <- refined.validRuleRefinementsGivenParent(begin, end, r, rootRef)
@@ -55,6 +56,7 @@ class ViterbiDecoder[L, W] extends ChartDecoder[L, W] with Serializable {
           maxScore = score
           maxChild = b
           maxChildRef = refB
+          maxRule = r
         }
       }
 
@@ -63,7 +65,7 @@ class ViterbiDecoder[L, W] extends ChartDecoder[L, W] with Serializable {
         sys.error("Couldn't find a tree!" + begin + " " + end + " " + grammar.labelIndex.get(root))
       }
       val child = buildTree(begin, end, maxChild, maxChildRef)
-      UnaryTree(labelIndex.get(root), child, Span(begin, end))
+      UnaryTree(labelIndex.get(root), child, grammar.chain(maxRule), Span(begin, end))
     }
 
     def buildTree(begin: Int, end: Int, root: Int, rootRef: Int):BinarizedTree[L] = {
@@ -73,6 +75,7 @@ class ViterbiDecoder[L, W] extends ChartDecoder[L, W] with Serializable {
       var maxLeftRef = -1
       var maxRightRef = -1
       var maxSplit = -1
+      var maxRule = -1
       if(begin +1 == end) {
         return NullaryTree(labelIndex.get(root), Span(begin, end))
       }
@@ -101,6 +104,7 @@ class ViterbiDecoder[L, W] extends ChartDecoder[L, W] with Serializable {
           maxRight = c
           maxRightRef = refC
           maxSplit = split
+          maxRule = r
         }
       }
 
@@ -235,22 +239,60 @@ class MaxConstituentDecoder[L, W] extends ChartDecoder[L, W] {
 
       maxSplit(begin, end) = split
       maxTopScore(begin, end) = logSum(maxTopScore(begin, end), splitScore)
-      //maxBotScore(begin, end) = logSum(maxBotScore(begin, end), splitScore)
+    }
+
+    def bestUnaryChain(begin: Int, end: Int, bestBot: Int, bestTop: Int): Seq[String] = {
+      val candidateUnaries = grammar.indexedUnaryRulesWithChild(bestBot).filter(r => grammar.parent(r) == bestTop)
+      val bestChain = if (candidateUnaries.isEmpty) {
+        Seq.empty
+      } else if (candidateUnaries.length == 1) {
+        grammar.chain(candidateUnaries(0))
+      } else {
+        var bestRule = candidateUnaries(0)
+        var bestScore = Double.NegativeInfinity
+        for (r <- candidateUnaries) {
+          val aRefinements = outside.top.enteredLabelRefinements(begin, end, bestTop).toArray
+          val bRefinements = inside.bot.enteredLabelRefinements(begin, end, bestBot).toArray
+          val arr = new Array[Double](aRefinements.length * bRefinements.length)
+          var i = 0
+          for (aRef <- aRefinements; bRef <- bRefinements) {
+            val ref = anchoring.refined.ruleRefinementFromRefinements(r, aRef, bRef)
+            arr(i) = (anchoring.scoreUnaryRule(begin, end, r, ref)
+              + outside.top.labelScore(begin, end, bestTop, aRef)
+              + inside.bot.labelScore(begin, end, bestBot, bRef)
+              - partition
+              )
+            i += 1
+          }
+          val score = logSum(arr, i)
+          if (score > bestScore) {
+            bestRule = r
+            bestScore = score
+          }
+
+        }
+        grammar.chain(bestRule)
+      }
+      bestChain
     }
 
     def extract(begin: Int, end: Int):BinarizedTree[L] = {
+      val bestBot = maxBotLabel(begin, end)
       val lower = if(begin + 1== end) {
         if(maxBotScore(begin, end) == Double.NegativeInfinity)
           throw new RuntimeException("Couldn't make a good score for " + (begin, end) + ". InsideIndices: " + inside.bot.enteredLabelIndexes(begin, end).toIndexedSeq + " outside: " + outside.bot.enteredLabelIndexes(begin, end).toIndexedSeq)
-        NullaryTree(labelIndex.get(maxBotLabel(begin, end)), Span(begin, end))
+        NullaryTree(labelIndex.get(bestBot), Span(begin, end))
       } else {
         val split = maxSplit(begin, end)
         val left = extract(begin, split)
         val right = extract(split, end)
-        BinaryTree(labelIndex.get(maxBotLabel(begin, end)), left, right, Span(begin, end))
+        BinaryTree(labelIndex.get(bestBot), left, right, Span(begin, end))
       }
 
-      UnaryTree(labelIndex.get(maxTopLabel(begin, end)), lower, Span(begin, end))
+      val bestTop = maxTopLabel(begin, end)
+      val bestChain = bestUnaryChain(begin, end, bestBot, bestTop)
+
+      UnaryTree(labelIndex.get(bestTop), lower, bestChain, Span(begin, end))
     }
 
     extract(0, inside.length)

@@ -220,8 +220,8 @@ object IndexedSpanFeaturizer {
         case NullaryTree(a, span) =>
           val aI = labelIndex(a)
           add(set, spec.featuresForSpan(span.start, span.end, aI))
-        case UnaryTree(a, b, span) =>
-          val r = ruleIndex(UnaryRule(a, b.label))
+        case UnaryTree(a, b, chain, span) =>
+          val r = ruleIndex(UnaryRule(a, b.label, chain))
           rec(b)
           add(set, spec.featuresForRule(span.start, span.end, r))
         case BinaryTree(a, b, c, span) =>

@@ -158,11 +158,11 @@ case class BinaryTree[+L](label: L,
   def splitPoint = leftChild.span.end
 }
 
-case class UnaryTree[+L](label: L, child: BinarizedTree[L], span: Span) extends BinarizedTree[L] {
+case class UnaryTree[+L](label: L, child: BinarizedTree[L], chain: Seq[String], span: Span) extends BinarizedTree[L] {
   def children = IndexedSeq(child)
-  override def map[M](f: L=>M): UnaryTree[M] = UnaryTree( f(label), child map f, span)
-  override def extend[B](f: Tree[L]=>B) = UnaryTree( f(this), child extend f, span)
-  def relabelRoot[B>:L](f: L=>B):BinarizedTree[B] = UnaryTree(f(label), child, span)
+  override def map[M](f: L=>M): UnaryTree[M] = UnaryTree( f(label), child map f, chain, span)
+  override def extend[B](f: Tree[L]=>B) = UnaryTree( f(this), child extend f, chain, span)
+  def relabelRoot[B>:L](f: L=>B):BinarizedTree[B] = UnaryTree(f(label), child, chain, span)
 }
 
 case class NullaryTree[+L](label: L, span: Span) extends BinarizedTree[L] {
@@ -179,7 +179,7 @@ object Trees {
                   makeIntermediate: L=>L,
                   headFinder: HeadFinder[L]):BinarizedTree[L] = tree match {
     case Tree(l, Seq(), span) => NullaryTree(l, span)
-    case Tree(l, Seq(oneChild), span) => UnaryTree(l,binarize(oneChild, makeIntermediate, headFinder), tree.span)
+    case Tree(l, Seq(oneChild), span) => UnaryTree(l,binarize(oneChild, makeIntermediate, headFinder), Seq.empty, tree.span)
     case Tree(l, Seq(leftChild,rightChild), span) =>
       BinaryTree(l,binarize(leftChild, makeIntermediate, headFinder),binarize(rightChild, makeIntermediate, headFinder), tree.span)
     case Tree(l, children, span) =>
@@ -226,8 +226,8 @@ object Trees {
         case BinaryTree(_, t1, t2, span) =>
           val newHistory = if(isIntermediate(tree.label)) history.take(order) else List.empty
           BinaryTree(newLabel, rec(t1,Right(t2.label) :: newHistory), rec(t2,Left(t1.label)::newHistory), tree.span)
-        case UnaryTree(label, child, span) =>
-          UnaryTree(newLabel,rec(child,if(child.label == label) history else List.empty), tree.span)
+        case UnaryTree(label, child, chain, span) =>
+          UnaryTree(newLabel,rec(child,if(child.label == label) history else List.empty), chain, tree.span)
         case NullaryTree(_, span) =>
           NullaryTree(newLabel, span)
       }
@@ -289,10 +289,10 @@ object Trees {
           val lchild = rec(t1,newHistory)
           val rchild = rec(t2,newHistory)
           BinaryTree(newLabel, lchild, rchild, span)
-        case UnaryTree(label, child, span) =>
+        case UnaryTree(label, child, chain, span) =>
           val newLabel = if(!isIntermediate(label)) history.take(depth-1).foldLeft(label)(join) else history.drop(1).foldLeft(label)(join)
           val newHistory = if(!isIntermediate(label) && label != child.label) (label :: history) take depth else history
-          UnaryTree(newLabel,rec(child,newHistory), span)
+          UnaryTree(newLabel,rec(child,newHistory), chain, span)
         case NullaryTree(label, span) =>
           val newLabel = if(history.head == label) history.reduceLeft(join) else history.take(depth-1).foldLeft(label)(join)
           NullaryTree(newLabel, span)

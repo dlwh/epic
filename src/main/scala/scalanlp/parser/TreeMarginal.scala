@@ -23,10 +23,10 @@ case class TreeMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
         val aI = grammar.labelIndex(a)
         score += anchoring.scoreSpan(span.start, span.end, aI, ref)
         if(score.isInfinite) throw new Exception("Could not score gold tree!")
-      case UnaryTree( (a, refA), child@Tree((b, refB), _, _), span) =>
-        val r = grammar.index(UnaryRule(a, b))
+      case UnaryTree( (a, refA), child@Tree((b, refB), _, _), chain,  span) =>
+        val r = grammar.index(UnaryRule(a, b, chain))
         val ruleRef = anchoring.refined.ruleRefinementFromRefinements(r, refA, refB)
-        if(ruleRef < 0) throw new Exception("Bad refined rule in gold tree!: " + UnaryRule(a, b) + " aRef: " + refA + " bRef: " + refB)
+        if(ruleRef < 0) throw new Exception("Bad refined rule in gold tree!: " + UnaryRule(a, b, chain) + " aRef: " + refA + " bRef: " + refB)
 
         score += anchoring.scoreUnaryRule(t.span.start, t.span.end, r, ruleRef)
         if(score.isInfinite) throw new Exception("Could not score gold tree!")
@@ -52,10 +52,10 @@ case class TreeMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
       case n@NullaryTree( (a, ref), span ) =>
         val aI = grammar.labelIndex(a)
         visitor.visitSpan(n.span.start, n.span.end, aI, ref, 1.0)
-      case t@UnaryTree( (a, refA), Tree((b, refB), _, _), span) =>
-        val r = grammar.index(UnaryRule(a, b))
+      case t@UnaryTree( (a, refA), Tree((b, refB), _, _), chain, span) =>
+        val r = grammar.index(UnaryRule(a, b, chain))
         val ruleRef = anchoring.refined.ruleRefinementFromRefinements(r, refA, refB)
-        if(ruleRef < 0) throw new Exception("Bad refined rule in gold tree!: " + UnaryRule(a, b) + " aRef: " + refA + " bRef: " + refB)
+        if(ruleRef < 0) throw new Exception("Bad refined rule in gold tree!: " + UnaryRule(a, b, chain) + " aRef: " + refA + " bRef: " + refB)
         visitor.visitUnaryRule(t.span.start, t.span.end, r, ruleRef, 1.0)
       case t@BinaryTree( (a, refA), bt@Tree( (b, refB), _, _), Tree((c, refC), _, _), span) =>
         val aI = grammar.labelIndex(a)
