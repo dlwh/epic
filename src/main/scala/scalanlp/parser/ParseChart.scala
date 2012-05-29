@@ -31,6 +31,7 @@ abstract class ParseChart[L](val index: Index[L],
   final val bot = new ChartScores()
 
   final class ChartScores private[ParseChart]() extends LabelScoreArray[L](length, grammarSize, zero) {
+
     private[ParseChart] def scoreArray = score
 
     def enter(begin: Int, end: Int, parent: Int, ref: Int, w: Double):Boolean = {
@@ -89,50 +90,6 @@ abstract class ParseChart[L](val index: Index[L],
       coarseNarrowRight(begin)(parent) = math.min(end, coarseNarrowRight(begin)(parent))
     }
 
-    def feasibleSpanX(begin: Int, end: Int, leftState: Int, leftRef: Int, rightState: Int, rightRef: Int):Long = {
-      if(narrowRight(begin)(leftState) == null || narrowLeft(end)(rightState) == null)  {
-        0L
-      } else {
-        val narrowR = narrowRight(begin)(leftState)(leftRef)
-        val narrowL = narrowLeft(end)(rightState)(rightRef)
-
-        if (narrowR >= end || narrowL < narrowR) {
-          0L
-        } else {
-          val trueX = wideLeft(end)(rightState)(rightRef)
-          val trueMin = if(narrowR > trueX) narrowR else trueX
-          val wr = wideRight(begin)(leftState)(leftRef)
-          val trueMax = if(wr < narrowL) wr else narrowL
-          if(trueMin > narrowL || trueMin > trueMax)  0L
-          else ((trueMin:Long) << 32) | ((trueMax + 1):Long)
-        }
-      }
-
-    }
-
-    def feasibleSpan(begin: Int, end: Int, leftState: Int, leftRef: Int, rightState: Int, rightRef: Int):Range = {
-      val span = feasibleSpanX(begin, end, leftState, leftRef, rightState, rightRef)
-      val split = (span >> 32).toInt
-      val endSplit = span.toInt // lower 32 bits
-      Range(split,endSplit)
-    }
-
-    def rightChildExtent(begin: Int, rightState: Int, ref: Int):Long = {
-      val nr = narrowRight(begin)(rightState)(ref)
-      val wr = wideRight(begin)(rightState)(ref)
-      if (nr > length || wr < 0) 0L
-      else ((nr:Long) << 32)|((wr+1):Long)
-    }
-
-
-    def leftChildExtent(end: Int, leftState: Int, ref: Int):Long = {
-      val nl = narrowLeft(end)(leftState)(ref)
-      val wl = wideLeft(end)(leftState)(ref)
-      if (wl > length || nl < 0) 0L
-      else ((wl:Long) << 32)|( (nl+1):Long)
-    }
-
-
     /** right most place a left constituent with label l can start and end at position i. (start)(sym)(ref) */
     val narrowLeft: Array[Array[Array[Int]]] = Array.ofDim[Array[Int]](length+1, grammarSize)
     /** left most place a left constituent with label l can start and end at position i. (start)(sym)(ref) */
@@ -150,15 +107,23 @@ abstract class ParseChart[L](val index: Index[L],
     val coarseNarrowRight = makeCoarseExtentArray(length+1)
     /** right-most place a right constituent with label l--which starts at position i--can end. (end)(sym)*/
     val coarseWideRight = makeCoarseExtentArray(-1)
-  }
 
-  private def makeExtentArray(value: Int) = {
-    val arr = Array.ofDim[Array[Int]](length + 1, grammarSize)
-    for(arr1 <- arr; j <- 0 until arr1.length) {
-      arr1(j) = new Array[Int](refinementsFor(j))
-      Arrays.fill(arr1(j), value)
+
+    def feasibleSpan(begin: Int, end: Int, b: Int, refB: Int, c: Int, refC: Int) = {
+      if(narrowRight(begin)(b) == null || narrowLeft(end)(c) == null) {
+        Range(0,0)
+      } else {
+        val narrowR = narrowRight(begin)(b)(refB)
+        val narrowL = narrowLeft(end)(c)(refC)
+        var split = math.max(narrowR, wideLeft(end)(c)(refC))
+        val endSplit = math.min(wideRight(begin)(b)(refB), narrowL) + 1
+        val canBuildThisRule = narrowR < end && narrowL >= narrowR && split <= narrowL && split < endSplit
+        if(!canBuildThisRule)
+          split = endSplit
+
+        Range(split, endSplit)
+      }
     }
-    arr
   }
 
   private def makeCoarseExtentArray(value: Int) = {

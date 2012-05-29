@@ -21,6 +21,7 @@ case class EPInference[Datum, Augment](inferences: IndexedSeq[ProjectableInferen
     val marginals = ArrayBuffer.fill(inferences.length)(null.asInstanceOf[ProjectableInference[Datum, Augment]#Marginal])
     def project(q: Augment, i: Int) = {
       val inf = inferences(i)
+      marginals(i) = null.asInstanceOf[ProjectableInference[Datum, Augment]#Marginal]
       val (marg, contributionToLikelihood) = inf.marginal(datum, q)
       val newAugment = inf.project(datum, marg, q)
       marginals(i) = marg

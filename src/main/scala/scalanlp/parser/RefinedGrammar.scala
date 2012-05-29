@@ -22,7 +22,7 @@ trait RefinedGrammar[L, W] extends Serializable {
   def labelIndex = grammar.labelIndex
   def labelEncoder = grammar.labelEncoder
 
-  def specialize(words: Seq[W]):RefinedAnchoring[L, W]
+  def anchor(words: Seq[W]):RefinedAnchoring[L, W]
 }
 
 object RefinedGrammar {
@@ -30,7 +30,7 @@ object RefinedGrammar {
     def grammar = f1.grammar
     def lexicon = f1.lexicon
 
-    def specialize(words: Seq[W]) = new ProductRefinedAnchoring(f1.specialize(words), f2.specialize(words))
+    def anchor(words: Seq[W]) = new ProductRefinedAnchoring(f1.anchor(words), f2.anchor(words))
   }
 
   def identity[L, W](grammar: BaseGrammar[L], lexicon: Lexicon[L, W]): RefinedGrammar[L, W] = {
@@ -41,7 +41,7 @@ object RefinedGrammar {
 
       def lexicon = l
 
-      def specialize(words: Seq[W]) = {
+      def anchor(words: Seq[W]) = {
         RefinedAnchoring.identity(grammar, lexicon, words)
       }
     }
@@ -138,7 +138,7 @@ object RefinedGrammar {
       def grammar = g
       def lexicon = l
 
-      def specialize(w: Seq[W]) = new RefinedAnchoring[L, W] {
+      def anchor(w: Seq[W]) = new RefinedAnchoring[L, W] {
         override def toString() = "RefinedAnchoring(...)"
         val grammar = g
         val lexicon = l

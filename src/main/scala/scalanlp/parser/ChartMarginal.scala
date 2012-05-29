@@ -1,9 +1,11 @@
 package scalanlp.parser
 
 /**
- * Holds the information for the marginals for a sentence
+ * Holds the information for the marginals for a sentence.
+ * That is, the inside and outside scores for a sentence
+ * and anchoring.
  *
- * @param scorer the specialization for a sentence.
+ * @param anchoring the specialized grammar used to construct the marginals for this sentence
  * @param inside inside chart
  * @param outside outside chart
  * @param partition the normalization constant aka inside score of the root aka probability of the sentence
@@ -11,7 +13,7 @@ package scalanlp.parser
  * @tparam L the label type
  * @tparam W the word type
  */
-case class ChartMarginal[+Chart[X]<:ParseChart[X], L, W](scorer: AugmentedAnchoring[L, W],
+case class ChartMarginal[+Chart[X]<:ParseChart[X], L, W](anchoring: AugmentedAnchoring[L, W],
                                                          inside: Chart[L], outside: Chart[L],
                                                          partition: Double) extends Marginal[L, W] {
 
@@ -28,17 +30,16 @@ case class ChartMarginal[+Chart[X]<:ParseChart[X], L, W](scorer: AugmentedAnchor
       for {
         aa <- lexicon.tagsForWord(words(i))
         a = grammar.labelIndex(aa)
-        ref <- scorer.refined.validLabelRefinements(i, i+ 1, a)
+        ref <- anchoring.refined.validLabelRefinements(i, i+ 1, a)
       } {
-        val score:Double = scorer.scoreSpan(i, i+1, a, ref) + outside.bot(i, i+1, a, ref) - partition
+        val score:Double = anchoring.scoreSpan(i, i+1, a, ref) + outside.bot(i, i+1, a, ref) - partition
         if (score != Double.NegativeInfinity) {
-          //println(scorer.scoreSpan(i, i+1, a, ref), outside.bot(i, i+1, a, ref), partition)
           spanVisitor.visitSpan(i, i+1, a, ref, math.exp(score))
         }
       }
     }
 
-    // cache to hold cores
+    // cache to hold core scores for binary rules
     val coreScoreArray = new Array[Double](words.length)
 
     // handle binaries
@@ -62,7 +63,7 @@ case class ChartMarginal[+Chart[X]<:ParseChart[X], L, W](scorer: AugmentedAnchor
       for (a <- inside.bot.enteredLabelIndexes(begin, end); refA <- inside.bot.enteredLabelRefinements(begin, end, a)) {
         var i = 0
         val rules = grammar.indexedBinaryRulesWithParent(a)
-        val spanScore = scorer.scoreSpan(begin, end, a, refA)
+        val spanScore = anchoring.scoreSpan(begin, end, a, refA)
         val aScore = outside.bot.labelScore(begin, end, a, refA) + spanScore
         var count = 0.0
         if (!aScore.isInfinite)
@@ -82,18 +83,18 @@ case class ChartMarginal[+Chart[X]<:ParseChart[X], L, W](scorer: AugmentedAnchor
               // initialize core scores
               ChartMarginal.fillCoreScores(coreScoreArray,
                 begin, end,
-                scorer.core,
+                anchoring.core,
                 coarseSplitBegin, coarseSplitEnd,
                 r,
                 inside)
 
-              val refinements = scorer.refined.validRuleRefinementsGivenParent(begin, end, r, refA)
+              val refinements = anchoring.refined.validRuleRefinementsGivenParent(begin, end, r, refA)
               var ruleRefIndex = 0
               while(ruleRefIndex < refinements.length) {
                 val refR = refinements(ruleRefIndex)
                 ruleRefIndex += 1
-                val refB = scorer.refined.leftChildRefinement(r, refR)
-                val refC = scorer.refined.rightChildRefinement(r, refR)
+                val refB = anchoring.refined.leftChildRefinement(r, refR)
+                val refC = anchoring.refined.rightChildRefinement(r, refR)
 
                 val narrowR = narrowRight(b)(refB)
                 val narrowL = narrowLeft(c)(refC)
@@ -109,7 +110,7 @@ case class ChartMarginal[+Chart[X]<:ParseChart[X], L, W](scorer: AugmentedAnchor
                   val coreScore = coreScoreArray(split)
                   val withoutRefined = bInside + cInside + coreScore
                   if (!java.lang.Double.isInfinite(withoutRefined)) {
-                    val ruleScore = scorer.refined.scoreBinaryRule(begin, split, end, r, refR)
+                    val ruleScore = anchoring.refined.scoreBinaryRule(begin, split, end, r, refR)
                     val score = aScore + withoutRefined + ruleScore - partition
                     val expScore = math.exp(score)
                     count += expScore
@@ -134,11 +135,11 @@ case class ChartMarginal[+Chart[X]<:ParseChart[X], L, W](scorer: AugmentedAnchor
       refA <- inside.top.enteredLabelRefinements(begin, end, a)
     } {
       val aScore = outside.top.labelScore(begin, end, a, refA)
-      for (r <- grammar.indexedUnaryRulesWithParent(a); refR <- scorer.refined.validRuleRefinementsGivenParent(begin, end, r, refA)) {
+      for (r <- grammar.indexedUnaryRulesWithParent(a); refR <- anchoring.refined.validRuleRefinementsGivenParent(begin, end, r, refA)) {
         val b = grammar.child(r)
-        val refB = scorer.refined.childRefinement(r, refR)
+        val refB = anchoring.refined.childRefinement(r, refR)
         val bScore = inside.bot.labelScore(begin, end, b, refB)
-        val rScore = scorer.scoreUnaryRule(begin, end, r, refR)
+        val rScore = anchoring.scoreUnaryRule(begin, end, r, refR)
         val prob = math.exp(bScore + aScore + rScore - partition)
         if (prob > 0)
           spanVisitor.visitUnaryRule(begin, end, r, refR, prob)
@@ -147,7 +148,7 @@ case class ChartMarginal[+Chart[X]<:ParseChart[X], L, W](scorer: AugmentedAnchor
   }
 
   def withCharts[Chart2[X] <: ParseChart[X]](factory: ParseChart.Factory[Chart2]) = {
-    ChartMarginal(scorer, scorer.words, factory)
+    ChartMarginal(anchoring, anchoring.words, factory)
   }
 
 }
@@ -156,22 +157,22 @@ object ChartMarginal {
   def apply[L, W, Chart[X] <: ParseChart[X]](grammar: AugmentedGrammar[L, W],
                                              sent: Seq[W],
                                              chartFactory: ParseChart.Factory[Chart]): ChartMarginal[Chart, L, W] = {
-    apply(grammar.specialize(sent), sent, chartFactory)
+    apply(grammar.anchor(sent), sent, chartFactory)
   }
 
-  def apply[L, W, Chart[X] <: ParseChart[X]](scorer: AugmentedAnchoring[L, W],
+  def apply[L, W, Chart[X] <: ParseChart[X]](anchoring: AugmentedAnchoring[L, W],
                                              sent: Seq[W],
                                              chartFactory: ParseChart.Factory[Chart]): ChartMarginal[Chart, L, W] = {
-    val inside = buildInsideChart(scorer, sent, chartFactory)
-    val outside = buildOutsideChart(scorer, inside, chartFactory)
-    val partition = rootScore(scorer, inside)
-    ChartMarginal(scorer, inside, outside, partition)
+    val inside = buildInsideChart(anchoring, sent, chartFactory)
+    val outside = buildOutsideChart(anchoring, inside, chartFactory)
+    val partition = rootScore(anchoring, inside)
+    ChartMarginal(anchoring, inside, outside, partition)
   }
 
 
-  private def rootScore[L, W](scorer: AugmentedAnchoring[L, W], inside: ParseChart[L]): Double = {
-    val rootIndex: Int = scorer.grammar.labelIndex(scorer.grammar.root)
-    val rootScores = new Array[Double](scorer.refined.validLabelRefinements(0, inside.length, rootIndex).length)
+  private def rootScore[L, W](anchoring: AugmentedAnchoring[L, W], inside: ParseChart[L]): Double = {
+    val rootIndex: Int = anchoring.grammar.labelIndex(anchoring.grammar.root)
+    val rootScores = new Array[Double](anchoring.refined.validLabelRefinements(0, inside.length, rootIndex).length)
     var offset = 0
     for(ref <- inside.top.enteredLabelRefinements(0, inside.length, rootIndex)) {
       val score = inside.top.labelScore(0, inside.length, rootIndex, ref)

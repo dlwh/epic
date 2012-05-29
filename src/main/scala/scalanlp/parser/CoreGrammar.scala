@@ -1,7 +1,12 @@
 package scalanlp.parser
 
 /**
- * TODO
+ * A CoreGrammar is a weighted grammar over x-bar symbols
+ * (that is, symbols that are not refined or annotated) that
+ * can be "anchored" to a sentence, giving a
+ * [[scalanlp.parser.CoreAnchoring]]. This anchoring
+ * can be used to parse.
+ *
  * @author dlwh
  * @tparam L label type
  * @tparam W word type
@@ -15,9 +20,12 @@ trait CoreGrammar[L, W] extends Serializable {
   def labelIndex = grammar.labelIndex
   def labelEncoder = grammar.labelEncoder
 
-  def specialize(words: Seq[W]):CoreAnchoring[L, W]
-
-
+  /**
+   * Returns a [[scalanlp.parser.CoreAnchoring]] for this particular sentence.
+   * @param words
+   * @return
+   */
+  def anchor(words: Seq[W]):CoreAnchoring[L, W]
 }
 
 object CoreGrammar {
@@ -28,7 +36,7 @@ object CoreGrammar {
       def grammar =  g
       def lexicon = l
 
-      def specialize(words: Seq[W]) = CoreAnchoring.identity(grammar, lexicon, words)
+      def anchor(words: Seq[W]) = CoreAnchoring.identity(grammar, lexicon, words)
     }
   }
 }

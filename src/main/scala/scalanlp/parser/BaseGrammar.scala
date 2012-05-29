@@ -9,15 +9,18 @@ import scalanlp.trees._
 
 /**
  * A minimalist grammar that encodes just enough information to get reachability.
- *
- * That is, it has enough information to decide what parse trees for a given sentence are admissible
- * given a tagged sentence.
+ * That is, it has enough information to decide what parse trees for a given
+ * sentence are admissible given a tagged sentence.
  *
  * @author dlwh
  */
 @SerialVersionUID(1)
-final class BaseGrammar[L] private (val root: L,
+final class BaseGrammar[L] private (
+                                   /** The "start" symbol. Usually "TOP" in this parser. */
+                                     val root: L,
+                                    /** Index for all symbols, including synthetic symbols from binarization */
                                     val labelIndex: Index[L],
+                                    /** Index over all acceptable rules */
                                     val index: Index[Rule[L]],
                                     indexedRules: Array[Rule[Int]],
                                     binaryRulesByParent: Array[Array[Int]],
@@ -28,16 +31,63 @@ final class BaseGrammar[L] private (val root: L,
   def labelEncoder  = Encoder.fromIndex(labelIndex)
 
   // Accessors for properties of indexed rules
+  /**
+   * Returns the parent label index from the rule index
+   * @param r
+   * @return
+   */
   def parent(r: Int):Int = indexedRules(r).parent
+  /**
+   * Returns the left child label index from the rule index
+   * @param r
+   * @return
+   */
   def leftChild(r: Int): Int = indexedRules(r).asInstanceOf[BinaryRule[Int]].left
+  /**
+   * Returns the right child label index from the rule index
+   * @param r
+   * @return
+   */
   def rightChild(r: Int): Int = indexedRules(r).asInstanceOf[BinaryRule[Int]].right
+  /**
+   * Returns the child label index from the (unary) rule index
+   * @param r
+   * @return
+   */
   def child(r: Int): Int = indexedRules(r).asInstanceOf[UnaryRule[Int]].child
 
   // query by parent or child
+  /**
+   * Gives all binary rule indices with this parent
+   * @param l
+   * @return
+   */
   def indexedBinaryRulesWithParent(l: Int) = binaryRulesByParent(l)
+  /**
+   * Gives all unary rule indices with this parent
+   * @param l
+   * @return
+   */
   def indexedUnaryRulesWithParent(l: Int) = unaryRulesByParent(l)
+  /**
+   * Gives all unary rule indices with this child
+   * @param l
+   * @return
+   */
   def indexedUnaryRulesWithChild(l: Int) = unaryRulesByChild(l)
+
+  /**
+   * gives all binary rule indices with this left child
+   * @param b the left child index
+   * @return
+   */
   def indexedBinaryRulesWithLeftChild(b: Int) = binaryRulesByLeftChild(b)
+
+  /**
+   * gives all binary rule indices with this right child
+   * @param c the right child index
+   * @return
+   */
   def indexedBinaryRulesWithRightChild(c: Int) = binaryRulesByRightChild(c)
 
   def prettyString = {
@@ -76,6 +126,9 @@ final class BaseGrammar[L] private (val root: L,
 }
 
 object BaseGrammar {
+  /**
+   * Builds a grammar just from some productions
+   */
   def apply[L, W](root: L, productions: TraversableOnce[Rule[L]]): BaseGrammar[L] = {
     val index = Index[L]();
     val ruleIndex = Index[Rule[L]]()
@@ -87,13 +140,29 @@ object BaseGrammar {
     }
     apply(root, index, ruleIndex)
   }
-  
+
+  /**
+   * Given a bunch of counts, builds a grammar.
+   * @param root the root label
+   * @param binaries presumably counts of binary rules
+   * @param unaries presumably counts of unary rules
+   * @tparam L label type
+   * @return a base grammar instance
+   */
   def apply[L](root: L,
                binaries: Counter2[L, _<:Rule[L], _],
                unaries: Counter2[L, _ <: Rule[L], _]): BaseGrammar[L] = {
     apply(root, binaries.keysIterator.map(_._2) ++ unaries.keysIterator.map(_._2))
   }
 
+  /**
+   * Given the indices necessary to make a grammar, builds the other data structures
+   * that enable fast access to parent/child information, etc.
+   * @param root root label
+   * @param labelIndex index of grammar symbols
+   * @param ruleIndex index of rules
+   * @return
+   */
   def apply[L, W](root: L,
                   labelIndex: Index[L],
                   ruleIndex: Index[Rule[L]]):BaseGrammar[L] = {

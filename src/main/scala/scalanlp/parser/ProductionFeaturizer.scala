@@ -17,7 +17,7 @@ class ProductionFeaturizer[L, W](grammar: BaseGrammar[L],
     index
   }
 
-  def specialize(w: Seq[W]) = new Anchoring {
+  def anchor(w: Seq[W]) = new Anchoring {
     val words = w
 
     def featuresForBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int) = {

@@ -20,24 +20,53 @@ import scalanlp.trees._
 import annotations.{FilterAnnotations, TreeAnnotator}
 import scalala.tensor.Counter2
 import scalanlp.parser.ParserParams.{BaseParser, NoParams}
+import scalanlp.text.tokenize.EnglishWordClassGenerator
 
+/**
+ * Contains codes to read off parsers and grammars from
+ * a treebank.
+ */
 object GenerativeParser {
-  def extractLexiconAndGrammar[L, W](data: Traversable[TreeInstance[AnnotatedLabel, String]]) = {
+  /**
+   * Extracts a [[scalanlp.parser.BaseGrammar]] and [[scalanlp.parser.Lexicon]]
+   * from a treebank
+   * @param data the treebank
+   * @return
+   */
+  def extractLexiconAndGrammar(data: Traversable[TreeInstance[AnnotatedLabel, String]]): (SignatureLexicon[AnnotatedLabel, String], BaseGrammar[AnnotatedLabel]) = {
     val root = data.head.tree.label
     val (words, binary, unary) = extractCounts(data)
     val grammar = BaseGrammar(root,
       binary.keysIterator.map(_._2) ++ unary.keysIterator.map(_._2)
     )
 
-    val lexicon = new SimpleLexicon(words)
+    val lexicon = new SignatureLexicon(words, EnglishWordClassGenerator)
     (lexicon, grammar)
   }
 
+  /**
+   * Makes a basic
+   * @param data
+   * @tparam L
+   * @tparam W
+   * @return
+   */
   def fromTrees[L, W](data: Traversable[TreeInstance[L, W]]):SimpleChartParser[L, W] = {
     val grammar = extractGrammar(data.head.tree.label, data)
     SimpleChartParser(AugmentedGrammar.fromRefined(grammar))
   }
 
+
+  /**
+   * Extracts a RefinedGrammar from a raw treebank. The refined grammar could be a core grammar,
+   * maybe I should do that.
+   *
+   * @param root
+   * @param data
+   * @tparam L
+   * @tparam W
+   * @return
+   */
   def extractGrammar[L, W](root: L, data: TraversableOnce[TreeInstance[L, W]]): RefinedGrammar[L, W] = {
     val (wordCounts, binaryProductions, unaryProductions) = extractCounts(data)
     RefinedGrammar.generative(root, binaryProductions, unaryProductions, wordCounts)

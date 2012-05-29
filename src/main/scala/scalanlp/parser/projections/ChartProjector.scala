@@ -3,22 +3,22 @@ package projections
 
 
 /**
- * Projects a chart to a span scorer
+ * Projects a chart to a span anchoring
  * @author dlwh
  */
 trait ChartProjector[L, W] {
-  type MyScorer <: CoreAnchoring[L, W]
+  type MyAnchoring <: CoreAnchoring[L, W]
   protected def threshold:Double
-  protected def createSpanScorer(charts: Marginal[L, W],
+  protected def createAnchoring(charts: Marginal[L, W],
                                  ruleData: AnchoredRuleProjector.AnchoredData,
-                                 sentProb: Double):MyScorer
+                                 sentProb: Double):MyAnchoring
 
   private def proj = new AnchoredRuleProjector(threshold)
 
-  def buildSpanScorer(charts: Marginal[L, W],
-                      goldTagPolicy: GoldTagPolicy[L] = GoldTagPolicy.noGoldTags[L]):MyScorer = {
+  def project(charts: Marginal[L, W],
+              goldTagPolicy: GoldTagPolicy[L] = GoldTagPolicy.noGoldTags[L]):MyAnchoring = {
 
     val ruleData = proj.projectRulePosteriors(charts, goldTagPolicy)
-    createSpanScorer(charts, ruleData, charts.partition)
+    createAnchoring(charts, ruleData, charts.partition)
   }
 }

@@ -10,7 +10,7 @@ object FeaturizedGrammar {
                       lexicon: Lexicon[L, W],
                       refinements: GrammarRefinements[L, L2],
                       weights: DenseVector[Double],
-                      features: FeatureIndexer[L, L2, W],
+                      features: IndexedFeaturizer[L, L2, W],
                       tagScorer: TagScorer[L2, W]) = {
     val ruleCache = Array.tabulate[Double](refinements.rules.fineIndex.size){r =>
       features.computeWeight(r,weights)

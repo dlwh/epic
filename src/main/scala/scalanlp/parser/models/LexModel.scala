@@ -18,7 +18,7 @@ import collection.mutable.ArrayBuffer
 
 class LexModel[L, W](bundle: LexGrammarBundle[L, W],
                      reannotate: (BinarizedTree[L], Seq[W])=>BinarizedTree[L],
-                     indexed: IndexedFeaturizer[L, W],
+                     indexed: IndexedLexFeaturizer[L, W],
                      baseFactory: CoreGrammar[L, W],
                      coarse: BaseGrammar[L],
                      coarseLex: Lexicon[L, W],
@@ -52,12 +52,12 @@ class LexModel[L, W](bundle: LexGrammarBundle[L, W],
 }
 
 trait LexFeaturizer[L, W] extends Serializable {
-  def specialize(words: Seq[W]): Specialization
+  def anchor(words: Seq[W]): Anchoring
 
   /**
    * Specialization assumes that features are of several kinds, so that we can efficiently cache them.
    */
-  trait Specialization {
+  trait Anchoring {
 
     // Features for this rule with this head (and corresponding head child, as appropriate). For unaries.
     def featuresForHead(rule: Int, head: Int): Array[Feature]
@@ -89,13 +89,13 @@ trait LexFeaturizer[L, W] extends Serializable {
  * @tparam L Label
  * @tparam W Word
  */
-class IndexedFeaturizer[L, W](f: LexFeaturizer[L, W],
-                             labelIndex: Index[L],
-                             ruleIndex: Index[Rule[L]],
-                             val trueFeatureIndex: Index[Feature],
-                             lowCountFeatures: Set[Feature],
-                             dummyFeatures: Int) extends RefinedFeaturizer[L, W, Feature] with Serializable {
-  def specialize(words: Seq[W]):Anchoring = new Spec(words)
+class IndexedLexFeaturizer[L, W](f: LexFeaturizer[L, W],
+                                 labelIndex: Index[L],
+                                 ruleIndex: Index[Rule[L]],
+                                 val trueFeatureIndex: Index[Feature],
+                                 lowCountFeatures: Set[Feature],
+                                 dummyFeatures: Int) extends RefinedFeaturizer[L, W, Feature] with Serializable {
+  def anchor(words: Seq[W]):Anchoring = new Spec(words)
 
   val (index:Index[Feature], lowCountFeature) = {
     val r: MutableIndex[Feature] = Index[Feature]()
@@ -123,7 +123,7 @@ class IndexedFeaturizer[L, W](f: LexFeaturizer[L, W],
 
     private val emptyArray = Array.empty[Int]
 
-    private val fspec = f.specialize(words)
+    private val fspec = f.anchor(words)
     def featuresForTag(tag: Int, head: Int): Array[Int] = {
       var rcache = wordCache(head)
       if(rcache eq null) {
@@ -254,7 +254,7 @@ case class StandardFeaturizer[L, W>:Null, P](wordIndex: Index[W],
                                              featGen: (W) => IndexedSeq[P],
                                              tagFeatGen: (W=>IndexedSeq[P])) extends LexFeaturizer[L, W] {
 
-  def specialize(words: Seq[W]) = new Spec(words)
+  def anchor(words: Seq[W]) = new Spec(words)
 
 
   // word parts are things like suffixes, etc.
@@ -294,7 +294,7 @@ case class StandardFeaturizer[L, W>:Null, P](wordIndex: Index[W],
     }
   }
 
-  final class Spec(words: Seq[W]) extends Specialization {
+  final class Spec(words: Seq[W]) extends Anchoring {
     val indexed = words.map(wordIndex).toArray
 
     def featuresForHead(rule: Int, head: Int) = {
@@ -397,7 +397,7 @@ case class LexGrammarBundle[L, W](baseGrammar: BaseGrammar[L],
     }
   }
 
-  def makeGrammar(fi: IndexedFeaturizer[L, W], weights: DenseVector[Double]): RefinedGrammar[L, W] = {
+  def makeGrammar(fi: IndexedLexFeaturizer[L, W], weights: DenseVector[Double]): RefinedGrammar[L, W] = {
     new RefinedGrammar[L, W] {
       val grammar = baseGrammar
       val lexicon = baseLexicon
@@ -406,7 +406,7 @@ case class LexGrammarBundle[L, W](baseGrammar: BaseGrammar[L],
 
       def isRightRule(r: Int) = rightRules(r)
 
-      def specialize(sent: Seq[W]) = new Spec(sent)
+      def anchor(sent: Seq[W]) = new Spec(sent)
 
       // refinement scheme:
       // binaryRule is (head * words.length + dep)
@@ -416,7 +416,7 @@ case class LexGrammarBundle[L, W](baseGrammar: BaseGrammar[L],
         val grammar = baseGrammar
         val lexicon = baseLexicon
         val indexed = words.map(wordIndex)
-        val f = fi.specialize(words)
+        val f = fi.anchor(words)
         val indexedValidTags: Seq[Array[Int]] = words.map(lexicon.tagsForWord(_)).map(_.map(labelIndex).toArray)
 
         private def dot(features: Array[Int]) = {
@@ -543,14 +543,14 @@ case class LexGrammarBundle[L, W](baseGrammar: BaseGrammar[L],
   }
 }
 
-object IndexedFeaturizer {
+object IndexedLexFeaturizer {
   def extract[L, W](featurizer: LexFeaturizer[L, W],
                     headFinder: HeadFinder[L],
                     ruleIndex: Index[Rule[L]],
                     labelIndex: Index[L],
                     dummyFeatScale: Double,
                     minFeatCutoff: Int,
-                    trees: Traversable[TreeInstance[L, W]]): IndexedFeaturizer[L, W] = {
+                    trees: Traversable[TreeInstance[L, W]]): IndexedLexFeaturizer[L, W] = {
 
     def add(ctr: Counter[Feature, Int], feats: Array[Feature]) {
       for (f <- feats) {
@@ -559,7 +559,7 @@ object IndexedFeaturizer {
     }
     val goldFeatures = trees.par.aggregate(null: Counter[Feature, Int])( {(feats, ti) =>
       val set = if(feats eq null) Counter[Feature, Int]() else feats
-      val spec = featurizer.specialize(ti.words)
+      val spec = featurizer.anchor(ti.words)
       // returns head
       def rec(t: BinarizedTree[L]):Int= t match {
         case n@NullaryTree(a) =>
@@ -598,7 +598,7 @@ object IndexedFeaturizer {
 
     }
 
-    new IndexedFeaturizer(featurizer, labelIndex, ruleIndex, goldFeatureIndex, Set.empty ++ lowCountFeatures, (goldFeatureIndex.size * dummyFeatScale).toInt)
+    new IndexedLexFeaturizer(featurizer, labelIndex, ruleIndex, goldFeatureIndex, Set.empty ++ lowCountFeatures, (goldFeatureIndex.size * dummyFeatScale).toInt)
   }
 }
 
@@ -670,7 +670,10 @@ case class LexParserModelFactory(baseParser: ParserParams.BaseParser,
       xbarLexicon, initBinaries, initUnaries, initLexicon)
     val cFactory = constraints.cachedFactory(AugmentedGrammar.fromRefined(baseFactory))
 
-    def ruleGen(r: Rule[AnnotatedLabel]) = IndexedSeq(RuleFeature(r))
+    def ruleGen(r: Rule[AnnotatedLabel]) = r match {
+      case UnaryRule(a,b) => IndexedSeq(RuleFeature(r), RuleFeature(UnaryRule(a.label, b.label)))
+      case BinaryRule(a, b, c) => IndexedSeq(RuleFeature(r))
+    }
     def validTag(w: String) = lexicon.tagsForWord(w).toArray
 
     val headFinder = HeadFinder.collins
@@ -681,7 +684,7 @@ case class LexParserModelFactory(baseParser: ParserParams.BaseParser,
     shapeGen,
     { (w:String) => tagShapeGen.featuresFor(w)})
 
-    val indexed =  IndexedFeaturizer.extract[AnnotatedLabel, String](feat,
+    val indexed =  IndexedLexFeaturizer.extract[AnnotatedLabel, String](feat,
       headFinder,
       xbarGrammar.index,
       xbarGrammar.labelIndex,

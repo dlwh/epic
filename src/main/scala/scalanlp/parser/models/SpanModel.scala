@@ -50,14 +50,14 @@ class DotProductGrammar[L, W, Feature](val grammar: BaseGrammar[L],
                                        val lexicon: Lexicon[L, W],
                                        val weights: DenseVector[Double],
                                        val featurizer: RefinedFeaturizer[L, W, Feature]) extends RefinedGrammar[L, W] {
-  def specialize(w: Seq[W]):RefinedAnchoring[L, W] = LiftedCoreAnchoring(new CoreAnchoring[L, W] {
+  def anchor(w: Seq[W]):RefinedAnchoring[L, W] = LiftedCoreAnchoring(new CoreAnchoring[L, W] {
 
     val grammar = DotProductGrammar.this.grammar
     val lexicon = DotProductGrammar.this.lexicon
 
     def words = w
 
-    val fspec = featurizer.specialize(w)
+    val fspec = featurizer.anchor(w)
     def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = {
       dot(fspec.featuresForBinaryRule(begin, split, end, rule, 0))
     }
@@ -85,12 +85,12 @@ class DotProductGrammar[L, W, Feature](val grammar: BaseGrammar[L],
 }
 
 trait SpanFeaturizer[L, W] extends Serializable {
-  def specialize(words: Seq[W]): Specialization
+  def anchor(words: Seq[W]): Anchoring
 
   /**
    * Specialization assumes that features are of several kinds, so that we can efficiently cache them.
    */
-  trait Specialization {
+  trait Anchoring {
     def words: Seq[W]
     def featuresForSpan(begin: Int, end: Int, label: Int): Array[Feature]
     def featuresForRule(begin: Int, end: Int, rule: Int): Array[Feature]
@@ -111,11 +111,11 @@ class IndexedSpanFeaturizer[L, W](f: SpanFeaturizer[L, W],
     r
   }
 
-  def specialize(words: Seq[W]):Anchoring = new Spec(words)
+  def anchor(words: Seq[W]):Anchoring = new Spec(words)
 
   case class Spec(words: Seq[W]) extends super.Anchoring {
     def length = words.length
-    private val fspec = f.specialize(words)
+    private val fspec = f.anchor(words)
 
     def featuresForSpan(begin: Int, end: Int, tag: Int, ref: Int) = {
       require(ref == 0)
@@ -215,7 +215,7 @@ object IndexedSpanFeaturizer {
     }
     val goldFeatures = trees.par.aggregate(null: Counter[Feature, Int])( {(feats, ti) =>
       val set = if(feats eq null) Counter[Feature, Int]() else feats
-      val spec = featurizer.specialize(ti.words)
+      val spec = featurizer.anchor(ti.words)
       // returns head
       def rec(t: BinarizedTree[L]):Unit = t match {
         case n@NullaryTree(a) =>
@@ -252,7 +252,7 @@ class StandardSpanFeaturizer[L, W](grammar: BaseGrammar[L],
                                    wordGen: W=>Traversable[String],
                                    labelFeatures: Array[Array[Feature]],
                                    ruleFeatures: Array[Array[Feature]]) extends SpanFeaturizer[L, W] {
-  def specialize(w: Seq[W]):Specialization = new Specialization {
+  def anchor(w: Seq[W]):Anchoring = new Anchoring {
     def words = w
     val length = w.length
     val wordFeats = w.toIndexedSeq.map(wordGen).map(_.map(IndicatorFeature(_)))

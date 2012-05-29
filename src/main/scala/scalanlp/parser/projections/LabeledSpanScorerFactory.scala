@@ -16,15 +16,15 @@ import scalala.library.Numerics
 class LabeledSpanScorerFactory[C,L,W](parser: ChartParser[C,L,W], threshold: Double) extends SpanScorer.Factory[C,L,W] {
   def indexedProjections = parser.projections.labels
 
-  def mkSpanScorer(s: Seq[W], scorer: SpanScorer[C] = SpanScorer.identity, goldTag: GoldTagPolicy[C] = GoldTagPolicy.noGoldTags) = {
-    val charts = parser.charts(s,scorer)
+  def project(s: Seq[W], anchoring: SpanScorer[C] = SpanScorer.identity, goldTag: GoldTagPolicy[C] = GoldTagPolicy.noGoldTags) = {
+    val charts = parser.charts(s,anchoring)
 
     val sentProb = charts.inside.top.labelScore(0,s.length,parser.root)
     if(sentProb.isInfinite) {
       sys.error("Couldn't parse " + s + " " + sentProb)
     }
 
-    val chartScorer = buildScorer(charts,sentProb, scorer, goldTag)
+    val chartScorer = buildScorer(charts,sentProb, anchoring, goldTag)
 
     chartScorer
   }

@@ -14,13 +14,13 @@ class MapCacheCoreGrammar[L, W](trueFactory: CoreGrammar[L, W]) extends CoreGram
   def grammar = trueFactory.grammar
   def lexicon = trueFactory.lexicon
 
-  def specialize(words: Seq[W]) = {
+  def anchor(words: Seq[W]) = {
     val r = cache.get(words)
     if (r != null) r
     else {
-      val scorer = trueFactory.specialize(words)
-      cache.putIfAbsent(words, scorer)
-      scorer
+      val anchoring = trueFactory.anchor(words)
+      cache.putIfAbsent(words, anchoring)
+      anchoring
     }
   }
 }

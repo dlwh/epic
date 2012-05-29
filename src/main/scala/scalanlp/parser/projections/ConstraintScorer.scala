@@ -48,7 +48,7 @@ class ConstraintScorerCoreGrammar[L, W](augmentedGrammar: AugmentedGrammar[L, W]
   def lexicon = augmentedGrammar.lexicon
 
 
-  def specialize(words: Seq[W]) = {
+  def anchor(words: Seq[W]) = {
     val charts = ChartMarginal(augmentedGrammar, words, ParseChart.logProb)
     val chartScorer = buildScorer(charts)
     chartScorer
@@ -59,7 +59,7 @@ class ConstraintScorerCoreGrammar[L, W](augmentedGrammar: AugmentedGrammar[L, W]
 
     val (label,unary) = scoresForCharts(charts, goldTags)
 
-    new ConstraintScorer[L, W](charts.scorer.grammar, charts.scorer.lexicon, charts.scorer.words, label, unary)
+    new ConstraintScorer[L, W](charts.anchoring.grammar, charts.anchoring.lexicon, charts.anchoring.words, label, unary)
   }
 
   def buildScorer(words: Seq[W],
@@ -176,7 +176,7 @@ object ProjectTreebankToConstraints {
         words -> scorer
       } catch {
         case e: Exception => e.printStackTrace();
-        words -> RefinedAnchoring.identity[AnnotatedLabel, String](factory.grammar, factory.lexicon, words)
+        words -> CoreAnchoring.identity[AnnotatedLabel, String](factory.grammar, factory.lexicon, words)
       }
     }.seq
   }

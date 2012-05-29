@@ -5,15 +5,15 @@ package scalanlp.parser
  * @author dlwh
  */
 trait Marginal[L, W] {
-  def scorer: AugmentedAnchoring[L, W]
-  def grammar:BaseGrammar[L] = scorer.grammar
-  def lexicon = scorer.lexicon
+  def anchoring: AugmentedAnchoring[L, W]
+  def grammar:BaseGrammar[L] = anchoring.grammar
+  def lexicon = anchoring.lexicon
   def partition: Double
-  def words:Seq[W] = scorer.words
+  def words:Seq[W] = anchoring.words
   def length = words.length
 
   def expectedCounts[Feat](featurizer: RefinedFeaturizer[L, W, Feat]): ExpectedCounts[Feat] = {
-    val spec = featurizer.specialize(words)
+    val spec = featurizer.anchor(words)
     val counts = new ExpectedCounts[Feat](featurizer.index)
     val visitor = Marginal.mkVisitor(counts, spec)
     visit(visitor)

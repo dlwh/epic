@@ -13,9 +13,9 @@ import scalanlp.trees.{TreeInstance, AnnotatedLabel}
  * @author dlwh
  */
 @RunWith(classOf[JUnitRunner])
-class AnchoredRuleScorerTest  extends ParserTestHarness with FunSuite {
+class SimpleAnchoringTest  extends ParserTestHarness with FunSuite {
 
-  test("We can parse using span scorer") {
+  test("We can parse using span anchoring") {
     val gen = ParserTestHarness.simpleParser
     val genFactory = gen.augmentedGrammar
     val f = new AnchoredPCFGProjector[AnnotatedLabel, String](genFactory.grammar, Double.NegativeInfinity)

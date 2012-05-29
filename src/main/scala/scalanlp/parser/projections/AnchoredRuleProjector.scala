@@ -16,7 +16,7 @@ class AnchoredRuleProjector(threshold: Double) extends Serializable {
    * @param inside inside chart
    * @param outside outside chart
    * @param sentProb log probability of the root. probably a log partition
-   * @param scorer: scorer used to produce this tree.
+   * @param anchoring: anchoring used to produce this tree.
    * @param pruneLabel should return a threshold to determine if we need to prune. (prune if posterior <= threshold) See companion object for good choices.
    */
   def projectRulePosteriors[L,W](charts: Marginal[L, W],
@@ -66,8 +66,8 @@ class AnchoredRuleProjector(threshold: Double) extends Serializable {
           totals(index)(charts.grammar.parent(rule)) += count
 
           if(binaryScores(index) eq null) {
-            val numSplits = end - begin;
-            binaryScores(TriangularArray.index(begin, end)) = Array.fill(numSplits)(null:OpenAddressHashArray[Double])
+            val numSplits = end - begin
+            binaryScores(TriangularArray.index(begin, end)) = new Array[OpenAddressHashArray[Double]](numSplits)
           }
 
           val parentArray = if(binaryScores(index)(split-begin) eq null) {

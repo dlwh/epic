@@ -3,7 +3,11 @@ package scalanlp.parser
 import java.io.File
 
 /**
- *  TODO
+ * A CoreGrammar that relies on a file cache, which stores
+ * a Map[Seq[W], CoreAnchoring] and a backoff grammar.
+ * Currently, only [[scalanlp.parser.projections.ProjectTreebankToConstraints]]
+ * creates these.
+ *
  * @author dlwh
  */
 @SerialVersionUID(1L)
@@ -17,7 +21,7 @@ class FileCachedCoreGrammar[L, W](backoff: CoreGrammar[L,W], file: File) extends
 
   private val cache = scalanlp.util.readObject[Map[Seq[W], CoreAnchoring[L, W]]](file)
 
-  def specialize(words: Seq[W]) = {
-    cache.getOrElse(words, backoff.specialize(words))
+  def anchor(words: Seq[W]) = {
+    cache.getOrElse(words, backoff.anchor(words))
   }
 }

@@ -10,8 +10,8 @@ import scalala.library.Numerics._
 
 
 /**
- * A ChartDecoder can turn an inside chart (and optionally an outside chart) from some
- * parse chart over symbols F into a tree over symbols C
+ * A ChartDecoder converts marginals into a binarized tree. Post-processing
+ * to debinarize and strip useless annotations is still necessary.
  *
  * @author dlwh
  */
@@ -37,7 +37,7 @@ class ViterbiDecoder[L, W] extends ChartDecoder[L, W] with Serializable {
     import marginal._
     val labelIndex = grammar.labelIndex
     val rootIndex = (grammar.labelIndex(grammar.root))
-    val refined = scorer.refined
+    val refined = anchoring.refined
 
     def buildTreeUnary(begin: Int, end:Int, root: Int, rootRef: Int):BinarizedTree[L] = {
       var maxScore = Double.NegativeInfinity
@@ -47,7 +47,7 @@ class ViterbiDecoder[L, W] extends ChartDecoder[L, W] with Serializable {
         r <- grammar.indexedUnaryRulesWithParent(root)
         refR <- refined.validRuleRefinementsGivenParent(begin, end, r, rootRef)
       } {
-        val ruleScore = scorer.scoreUnaryRule(begin, end, r, refR)
+        val ruleScore = anchoring.scoreUnaryRule(begin, end, r, refR)
         val b = grammar.child(r)
         val refB = refined.childRefinement(r, refR)
         val score = ruleScore + inside.bot(begin, end, b, refB)
@@ -77,7 +77,7 @@ class ViterbiDecoder[L, W] extends ChartDecoder[L, W] with Serializable {
         return NullaryTree(labelIndex.get(root))(Span(begin, end))
       }
 
-      val spanScore = scorer.scoreSpan(begin, end, root, rootRef)
+      val spanScore = anchoring.scoreSpan(begin, end, root, rootRef)
       for {
         r <- grammar.indexedBinaryRulesWithParent(root)
         b = grammar.leftChild(r)
@@ -87,7 +87,7 @@ class ViterbiDecoder[L, W] extends ChartDecoder[L, W] with Serializable {
         refC = refined.rightChildRefinement(r, refR)
         split <- inside.top.feasibleSpan(begin, end, b, refB, c, refC)
       } {
-        val ruleScore = scorer.scoreBinaryRule(begin, split, end, r, refR)
+        val ruleScore = anchoring.scoreBinaryRule(begin, split, end, r, refR)
         val score = (
           ruleScore
             + inside.top.labelScore(begin, split, b, refB)
@@ -132,9 +132,9 @@ case class MaxRuleProductDecoder[L, W](grammar: BaseGrammar[L], lexicon: Lexicon
   private val p = new AnchoredRuleMarginalProjector[L,W]()
 
   def extractBestParse(marginal: ChartMarginal[ParseChart, L, W]): BinarizedTree[L] = {
-    val scorer = p.buildSpanScorer(marginal)
-    val newMarg = scorer.marginal
-    new ViterbiDecoder[L, W].extractBestParse(newMarg)
+    val anchoring = p.project(marginal)
+    val newMarg = anchoring.marginal
+    new MaxConstituentDecoder[L, W].extractBestParse(newMarg)
   }
 }
 
@@ -148,9 +148,9 @@ class MaxVariationalDecoder[L, W](grammar: BaseGrammar[L], lexicon: Lexicon[L, W
   private val p = new AnchoredPCFGProjector[L,W](grammar)
 
   def extractBestParse(marginal: ChartMarginal[ParseChart, L, W]): BinarizedTree[L] = {
-    val scorer = p.buildSpanScorer(marginal)
-    val newMarg = scorer.marginal
-    new ViterbiDecoder[L, W].extractBestParse(newMarg)
+    val anchoring = p.project(marginal)
+    val newMarg = anchoring.marginal
+    new MaxConstituentDecoder[L, W].extractBestParse(newMarg)
   }
 }
 

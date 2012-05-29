@@ -22,7 +22,7 @@ class UnlexModel[L, L2, W](featurizer: Featurizer[L2, W],
                         }) extends ParserModel[L, W] {
   type Inference = DiscParserInference[L, W]
 
-  val indexedFeatures: FeatureIndexer[L, L2, W] = FeatureIndexer(grammar, lexicon, featurizer, projections)
+  val indexedFeatures: IndexedFeaturizer[L, L2, W] = IndexedFeaturizer(grammar, lexicon, featurizer, projections)
 
   def featureIndex = indexedFeatures.index
 

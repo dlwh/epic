@@ -6,7 +6,7 @@ import scalanlp.trees.{LexicalProduction, Rule, BinaryRule, UnaryRule}
 
 /**
  * A DSL Grammar allows us to define simple weighted PCFG's quickly.
- * Useful for testing. See definition of simpleGrammar for an example
+ * Useful for testing. See definition of simpleGrammar for an example.
  * @author dlwh
  */
 object DSLGrammar {
@@ -66,11 +66,20 @@ object DSLGrammar {
 
 }
 
+/**
+ * objects part of the dsl to create grammars nicely. You won't create these directly.
+ */
 sealed trait DSLGrammarPart
+/** You won't use this directly. */
 case class DSLBRule(rule: BinaryRule[String], weight: Double) extends DSLGrammarPart
+/** You won't use this directly. */
 case class DSLURule(rule: UnaryRule[String], weight: Double) extends DSLGrammarPart
+/** You won't use this directly. */
 case class DSLLex(sym: String, word: String, weight: Double) extends DSLGrammarPart
 
+/**
+ * contains implicits to create dsl grammars. You won't use this directly.
+ */
 object DSLGrammarPart {
   implicit def binaryRule(r: ((Symbol, (Symbol, Symbol)), Double)):DSLGrammarPart = r match {
     case ((a, (b, c)), w) => DSLBRule(BinaryRule(a.name, b.name, c.name), w)

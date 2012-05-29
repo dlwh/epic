@@ -10,7 +10,7 @@ import scalanlp.parser.{TagScorer, Lexicon}
  *
  */
 class FeaturizedLexicon[L, L2, W](val weights: DenseVector[Double],
-                                  val featureIndexer: FeatureIndexer[L, L2, W]) extends TagScorer[L2, W] {
+                                  val featureIndexer: IndexedFeaturizer[L, L2, W]) extends TagScorer[L2, W] {
 
 
   def scoreTag(l: L2, words: Seq[W], pos: Int) = {

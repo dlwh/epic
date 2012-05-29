@@ -24,7 +24,7 @@ class LatentParserModel[L, L3, W](featurizer: Featurizer[L3, W],
   type L2 = L3
   type Inference = LatentParserInference[L, L2, W]
 
-  val indexedFeatures: FeatureIndexer[L, L2, W] = FeatureIndexer(grammar, lexicon, featurizer, projections)
+  val indexedFeatures: IndexedFeaturizer[L, L2, W] = IndexedFeaturizer(grammar, lexicon, featurizer, projections)
 
   def featureIndex = indexedFeatures.index
 
@@ -56,7 +56,7 @@ case class LatentParserInference[L, L2, W](featurizer: RefinedFeaturizer[L, W, F
   // E[T-z|T, params]
   def goldCounts(ti: TreeInstance[L, W], augment: CoreAnchoring[L, W]) = {
     val reannotated = reannotate(ti.tree, ti.words)
-    val product = AugmentedAnchoring(grammar.specialize(ti.words), augment)
+    val product = AugmentedAnchoring(grammar.anchor(ti.words), augment)
     val ecounts = LatentTreeMarginal(product, projections.labels, reannotated).expectedCounts(featurizer)
 
     ecounts
@@ -112,7 +112,7 @@ case class LatentParserModelFactory(baseParser: ParserParams.BaseParser,
 
     val gen = new WordShapeFeaturizer(Library.sum(annWords))
     def labelFlattener(l: (AnnotatedLabel, Int)) = {
-      val basic = Seq(l)
+      val basic = Seq(l, l._1.label -> l._1)
       basic map (IndicatorFeature)
     }
     val feat = new GenFeaturizer[(AnnotatedLabel, Int), String](gen, labelFlattener _)

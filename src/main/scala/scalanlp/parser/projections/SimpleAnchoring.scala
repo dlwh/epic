@@ -11,7 +11,7 @@ import scalanlp.collection.mutable.{OpenAddressHashArray, TriangularArray}
  */
 case class AnchoredPCFGProjector[L, W](grammar: BaseGrammar[L], threshold: Double = Double.NegativeInfinity) extends ChartProjector[L, W] {
 
-  type MyScorer = AnchoredRuleScorer[L, W]
+  type MyScorer = SimpleAnchoring[L, W]
   private def normalize(ruleScores: OpenAddressHashArray[Double], totals: OpenAddressHashArray[Double]):OpenAddressHashArray[Double] = {
     if(ruleScores eq null) null
     else {
@@ -36,7 +36,7 @@ case class AnchoredPCFGProjector[L, W](grammar: BaseGrammar[L], threshold: Doubl
       if(splits eq null) null
       else for(ruleScores <- splits) yield normalize(ruleScores, totals)
     }
-    new AnchoredRuleScorer(charts.grammar, charts.lexicon, charts.words, lexicalScores, normUnaries, normBinaries)
+    new SimpleAnchoring(charts.grammar, charts.lexicon, charts.words, lexicalScores, normUnaries, normBinaries)
   }
 
 }
@@ -58,7 +58,7 @@ case class AnchoredRuleMarginalProjector[L, W](threshold: Double = Double.Negati
     }
   }
 
-  type MyScorer = AnchoredRuleScorer[L, W]
+  type MyScorer = SimpleAnchoring[L, W]
 
 
   protected def createSpanScorer(charts: Marginal[L, W], ruleData: AnchoredData, sentProb: Double) = {
@@ -71,13 +71,13 @@ case class AnchoredRuleMarginalProjector[L, W](threshold: Double = Double.Negati
       if(splits eq null) null
       else for(ruleScores <- splits) yield normalize(ruleScores)
     }
-    new AnchoredRuleScorer(charts.grammar, charts.lexicon, charts.words, lexicalScores, normUnaries, normBinaries)
+    new SimpleAnchoring(charts.grammar, charts.lexicon, charts.words, lexicalScores, normUnaries, normBinaries)
   }
 }
 
 
 @SerialVersionUID(3)
-class AnchoredRuleScorer[L, W](val grammar: BaseGrammar[L],
+class SimpleAnchoring[L, W](val grammar: BaseGrammar[L],
                                val lexicon: Lexicon[L, W],
                                val words: Seq[W],
                                spanScores: Array[OpenAddressHashArray[Double]], // triangular index -> label -> score

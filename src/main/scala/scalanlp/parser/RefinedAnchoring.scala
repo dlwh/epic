@@ -143,7 +143,7 @@ trait RefinedAnchoring[L, W] extends Factor[RefinedAnchoring[L, W]] {
    * The annotationTag controls if two grammars are over the same refinements.
    * If they are, then * and / can be much faster.
    *
-   * Note that 0 is reserved for unrefined scorers, and -1 never matches other tags.
+   * Note that 0 is reserved for unrefined anchorings, and -1 never matches other tags.
    *
    * 0's will be optimized
    */
@@ -207,8 +207,4 @@ object RefinedAnchoring {
                      words: Seq[W]): RefinedAnchoring[L, W] = {
     LiftedCoreAnchoring(CoreAnchoring.identity[L, W](grammar, lexicon, words))
   }
-
-
-
-
 }

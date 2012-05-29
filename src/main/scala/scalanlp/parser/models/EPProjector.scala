@@ -18,7 +18,7 @@ class AnchoredRuleApproximator[L, W](pruningThreshold: Double = Double.NegativeI
               instance: TreeInstance[L, W],
               marginal: ChartMarginal[ParseChart.LogProbabilityParseChart, L, W]):CoreAnchoring[L, W] = {
     val factory = new AnchoredPCFGProjector[L, W](marginal.grammar)
-    factory.buildSpanScorer(marginal)
+    factory.project(marginal)
   }
 
 }

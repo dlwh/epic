@@ -12,7 +12,7 @@ import scalanlp.util.Index
 trait RefinedFeaturizer[L, W, Feat] {
   def index: Index[Feat]
   
-  def specialize(words: Seq[W]):Anchoring
+  def anchor(words: Seq[W]):Anchoring
   
   trait Anchoring {
     def words: Seq[W]
@@ -48,7 +48,7 @@ object RefinedFeaturizer {
     new RefinedFeaturizer[L, W, Production[L2, W]] {
       def index = ind
 
-      def specialize(w: Seq[W]) = new Anchoring {
+      def anchor(w: Seq[W]) = new Anchoring {
         val words = w
 
         def featuresForBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int) = {

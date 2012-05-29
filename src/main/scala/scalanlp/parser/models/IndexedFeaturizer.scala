@@ -17,7 +17,7 @@ import collection.mutable.ArrayBuilder
  * @author dlwh
  */
 @SerialVersionUID(1)
-trait FeatureIndexer[L, L2, W] extends RefinedFeaturizer[L, W, Feature] with Encoder[Feature] with Serializable {
+trait IndexedFeaturizer[L, L2, W] extends RefinedFeaturizer[L, W, Feature] with Encoder[Feature] with Serializable {
 
 
   val index: Index[Feature]
@@ -75,7 +75,7 @@ trait FeatureIndexer[L, L2, W] extends RefinedFeaturizer[L, W, Feature] with Enc
   }
 
 
-  def specialize(words: Seq[W]) = new Spec(words)
+  def anchor(words: Seq[W]) = new Spec(words)
 
   def initialValueFor(f: Feature): Double = featurizer.initialValueForFeature(f)
 
@@ -94,7 +94,7 @@ trait FeatureIndexer[L, L2, W] extends RefinedFeaturizer[L, W, Feature] with Enc
     result.result
   }
 
-  case class Spec private[FeatureIndexer](words: Seq[W]) extends super.Anchoring {
+  case class Spec private[IndexedFeaturizer](words: Seq[W]) extends super.Anchoring {
     def featuresForBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int) = {
       val globalRule = proj.rules.globalize(rule, ref)
       featuresFor(globalRule)
@@ -115,7 +115,7 @@ trait FeatureIndexer[L, L2, W] extends RefinedFeaturizer[L, W, Feature] with Enc
 
 }
 
-object FeatureIndexer {
+object IndexedFeaturizer {
 
   /**
    * Creates a FeatureIndexer by featurizing all rules/words and indexing them
@@ -169,7 +169,7 @@ object FeatureIndexer {
 
     val g = grammar
 
-    new FeatureIndexer[L, L2, W] {
+    new IndexedFeaturizer[L, L2, W] {
       val index = featureIndex
       val featurizer = f
 
