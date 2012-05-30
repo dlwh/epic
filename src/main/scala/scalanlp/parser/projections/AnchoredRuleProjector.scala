@@ -14,8 +14,8 @@ class AnchoredRuleProjector(threshold: Double) extends Serializable {
    * Projects a [[scalanlp.parser.Marginal]] to marginals on anchored rules.
    *
    */
-  def projectRulePosteriors[L,W](charts: Marginal[L, W],
-                                 goldTagPolicy: GoldTagPolicy[L] = GoldTagPolicy.noGoldTags[L]):AnchoredRuleProjector.AnchoredData = {
+  def projectRulePosteriors[L, W](charts: Marginal[L, W],
+                                  goldTagPolicy: GoldTagPolicy[L] = GoldTagPolicy.noGoldTags[L]):AnchoredRuleProjector.AnchoredData = {
 
     val length = charts.length
     // preliminaries: we're not going to fill in everything: some things will be null.
@@ -23,53 +23,56 @@ class AnchoredRuleProjector(threshold: Double) extends Serializable {
     val numProjectedLabels = charts.grammar.labelIndex.size
     val numProjectedRules = charts.grammar.index.size
     def projVector() = {
-      new OpenAddressHashArray(numProjectedLabels, 0.0, 2);
+      new OpenAddressHashArray(numProjectedLabels, 0.0, 2)
     }
 
     def projRuleVector() = {
-      new OpenAddressHashArray(numProjectedRules, 0.0, 2);
+      new OpenAddressHashArray(numProjectedRules, 0.0, 2)
     }
 
     def getOrElseUpdate[T<:AnyRef](arr: Array[T], i: Int, t : =>T) = {
       if(arr(i) == null) {
-        arr(i) = t;
+        arr(i) = t
       }
-      arr(i);
+      arr(i)
     }
 
     // The data, and initialization. most things init'd to null
     val lexicalScores = TriangularArray.raw(length+1, null:OpenAddressHashArray[Double])
-    val unaryScores = TriangularArray.raw(length+1, null:OpenAddressHashArray[Double]);
-    val binaryScores = TriangularArray.raw[Array[OpenAddressHashArray[Double]]](length+1, null);
+    val unaryScores = TriangularArray.raw(length+1, null:OpenAddressHashArray[Double])
+    val binaryScores = TriangularArray.raw[Array[OpenAddressHashArray[Double]]](length+1, null)
 
-    val totals = TriangularArray.raw(length+1, null:OpenAddressHashArray[Double]);
-    val totalsUnaries = TriangularArray.raw(length+1, null:OpenAddressHashArray[Double]);
-
+    val totals = TriangularArray.raw(length+1, null:OpenAddressHashArray[Double])
+    val totalsUnaries = TriangularArray.raw(length+1, null:OpenAddressHashArray[Double])
 
     val visitor = new AnchoredVisitor[L] {
       def visitSpan(begin: Int, end: Int, tag: Int, ref: Int, score: Double) {
         // fill in spans with 0 if they're active
-        getOrElseUpdate(lexicalScores, TriangularArray.index(begin, end), projVector())(tag) = 0
-      }
-
-      def visitBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int, count: Double) {
-        val index = TriangularArray.index(begin, end)
-        if(count > 0.0) {
+        if(score > 0.0) {
+          val index = TriangularArray.index(begin, end)
+          getOrElseUpdate(lexicalScores, index, projVector())(tag) = 0
           if(totals(index) eq null) {
             totals(index) = projVector()
           }
-          totals(index)(charts.grammar.parent(rule)) += count
+          totals(index)(tag) += score
+        }
+      }
 
-          if(binaryScores(index) eq null) {
+      def visitBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int, count: Double) {
+        if(count > 0.0) {
+          val index = TriangularArray.index(begin, end)
+          var forSpan = binaryScores(index)
+          if(forSpan eq null) {
             val numSplits = end - begin
-            binaryScores(TriangularArray.index(begin, end)) = new Array[OpenAddressHashArray[Double]](numSplits)
+            forSpan = new Array[OpenAddressHashArray[Double]](numSplits)
+            binaryScores(index) = forSpan
           }
 
-          val parentArray = if(binaryScores(index)(split-begin) eq null) {
-            binaryScores(index)(split-begin) = projRuleVector()
-            binaryScores(index)(split-begin)
+          val parentArray = if(forSpan(split-begin) eq null) {
+            forSpan(split-begin) = projRuleVector()
+            forSpan(split-begin)
           } else {
-            binaryScores(index)(split-begin)
+            forSpan(split-begin)
           }
           parentArray(rule) += count
         }
@@ -92,9 +95,9 @@ class AnchoredRuleProjector(threshold: Double) extends Serializable {
 
     }
 
-    charts.visit(visitor)
+    charts.visitPostorder(visitor, threshold)
 
-    new AnchoredRuleProjector.AnchoredData(lexicalScores, unaryScores, totalsUnaries, binaryScores, totals);
+    new AnchoredRuleProjector.AnchoredData(lexicalScores, unaryScores, totalsUnaries, binaryScores, totals)
   }
 }
 
@@ -113,7 +116,7 @@ object AnchoredRuleProjector {
                           /** binaryScores(triangularIndex)(split)(rule) => score of unary from parent to child */
                           binaryScores: Array[Array[OpenAddressHashArray[Double]]],
                           /** (triangularIndex)(parent) => sum of all binary rules at parent. */
-                          binaryTotals: Array[OpenAddressHashArray[Double]]);
+                          binaryTotals: Array[OpenAddressHashArray[Double]])
 
 }
 

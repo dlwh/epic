@@ -31,7 +31,7 @@ trait Marginal[L, W] {
    * Forest traversal that visits spans in a "bottom up" order.
    * @param spanVisitor
    */
-  def visitPostorder(spanVisitor: AnchoredVisitor[L])
+  def visitPostorder(spanVisitor: AnchoredVisitor[L], spanThreshold: Double = Double.NegativeInfinity)
 }
 
 object Marginal {

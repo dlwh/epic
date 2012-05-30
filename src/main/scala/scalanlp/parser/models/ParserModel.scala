@@ -32,7 +32,7 @@ trait ParserInference[L, W] extends ProjectableInference[TreeInstance[L, W], Cor
   def baseMeasure: CoreGrammar[L, W]
 
   def marginal(v: TreeInstance[L, W], aug: CoreAnchoring[L, W]) = {
-    val fullGrammar = AugmentedAnchoring(grammar.anchor(v.words), baseMeasure.anchor(v.words) * aug)
+    val fullGrammar = AugmentedAnchoring(grammar.anchor(v.words), aug)
     val charts = fullGrammar.marginal
     charts -> charts.partition
   }
@@ -41,9 +41,9 @@ trait ParserInference[L, W] extends ProjectableInference[TreeInstance[L, W], Cor
     marg.expectedCounts(featurizer)
   }
 
-  def baseAugment(v: TreeInstance[L, W])  = CoreAnchoring.identity(grammar.grammar, grammar.lexicon, v.words)
+  def baseAugment(v: TreeInstance[L, W])  = baseMeasure.anchor(v.words)
 
-  protected def projector: EPProjector[L, W] = new AnchoredRuleApproximator(Double.NegativeInfinity)
+  protected def projector: EPProjector[L, W] = new AnchoredRuleApproximator(-14)
 
   def project(v: TreeInstance[L, W], m: Marginal, oldAugment: CoreAnchoring[L, W]) = {
     projector.project(this, v, m)

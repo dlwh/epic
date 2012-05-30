@@ -21,7 +21,7 @@ case class ChartMarginal[+Chart[X]<:ParseChart[X], L, W](anchoring: AugmentedAnc
   /**
    * Forest traversal that visits spans in a "bottom up" order.
    */
-  def visitPostorder(spanVisitor: AnchoredVisitor[L]) {
+  def visitPostorder(spanVisitor: AnchoredVisitor[L], spanThreshold: Double = Double.NegativeInfinity) {
     if(partition.isInfinite) throw new RuntimeException("No parse for " + words)
     val itop = inside.top
 
@@ -62,11 +62,14 @@ case class ChartMarginal[+Chart[X]<:ParseChart[X], L, W](anchoring: AugmentedAnc
 
       for (a <- inside.bot.enteredLabelIndexes(begin, end); refA <- inside.bot.enteredLabelRefinements(begin, end, a)) {
         var i = 0
-        val rules = grammar.indexedBinaryRulesWithParent(a)
         val spanScore = anchoring.scoreSpan(begin, end, a, refA)
-        val aScore = outside.bot.labelScore(begin, end, a, refA) + spanScore
-        var count = 0.0
-        if (!aScore.isInfinite)
+        var aScore = outside.bot.labelScore(begin, end, a, refA)
+        val fullScore = aScore + inside.bot.labelScore(begin, end, a, refA) - partition
+        aScore += spanScore
+        if(fullScore > spanThreshold) {
+          spanVisitor.visitSpan(begin, end, a, refA, math.exp(fullScore))
+
+          val rules = grammar.indexedBinaryRulesWithParent(a)
           while(i < rules.length) {
             val r = rules(i)
             val b = grammar.leftChild(r)
@@ -113,7 +116,6 @@ case class ChartMarginal[+Chart[X]<:ParseChart[X], L, W](anchoring: AugmentedAnc
                     val ruleScore = anchoring.refined.scoreBinaryRule(begin, split, end, r, refR)
                     val score = aScore + withoutRefined + ruleScore - partition
                     val expScore = math.exp(score)
-                    count += expScore
                     spanVisitor.visitBinaryRule(begin, split, end, r, refR, expScore)
                   }
 
@@ -122,7 +124,7 @@ case class ChartMarginal[+Chart[X]<:ParseChart[X], L, W](anchoring: AugmentedAnc
               }
             }
           }
-        spanVisitor.visitSpan(begin, end, a, refA, count)
+        }
       }
     }
 

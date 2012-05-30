@@ -108,6 +108,7 @@ object GenerativePipeline extends ParserPipeline {
     val trees = trainTrees.map(params.annotator(_))
     val (words, binary, unary) = GenerativeParser.extractCounts(trees)
     val grammar = RefinedGrammar.generative[AnnotatedLabel, String](xbar, xbarLexicon, binary, unary, words)
+//    println(grammar.refinedGrammar)
     val parser = SimpleChartParser(AugmentedGrammar.fromRefined(grammar))
     Iterator.single(("Gen", parser))
   }

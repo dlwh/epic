@@ -60,7 +60,7 @@ object RefinedGrammar {
   def generative[L, W](grammar: BaseGrammar[L], lexicon: Lexicon[L, W],
                        binaryProductions: Counter2[L, BinaryRule[L], Double],
                        unaryProductions: Counter2[L, UnaryRule[L], Double],
-                       wordCounts: Counter2[L, W, Double]):RefinedGrammar[L, W] = {
+                       wordCounts: Counter2[L, W, Double]): SimpleRefinedGrammar[L, L, W] = {
     val loggedB = Library.logAndNormalizeRows(binaryProductions)
     val loggedU = Library.logAndNormalizeRows(unaryProductions)
 
@@ -80,7 +80,7 @@ object RefinedGrammar {
                         refinements: GrammarRefinements[L, L2],
                         refinedRuleScores: Array[Double],
                         refinedSpanScores: Array[Double],
-                        tagScorer: TagScorer[L2, W]) = {
+                        tagScorer: TagScorer[L2, W]): SimpleRefinedGrammar[L, L2, W] = {
 
     val refinedGrammar = BaseGrammar(refinements.labels.refinementsOf(grammar.root)(0),
       refinements.labels.fineIndex,

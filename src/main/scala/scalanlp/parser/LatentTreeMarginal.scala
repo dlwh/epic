@@ -22,7 +22,7 @@ case class LatentTreeMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
 
   val partition = Numerics.logSum(stree.label.inside, stree.label.inside.length)
 
-  def visitPostorder(spanVisitor: AnchoredVisitor[L]) = {
+  def visitPostorder(spanVisitor: AnchoredVisitor[L], threshold: Double = Double.NegativeInfinity) = {
     // normalizer
     if (partition.isInfinite || partition.isNaN)
       sys.error("NAn or infinite" + partition + " " + tree.render(words))
