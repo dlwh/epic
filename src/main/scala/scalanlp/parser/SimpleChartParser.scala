@@ -25,7 +25,18 @@ trait ChartParser[L, W] extends Parser[L, W] with Serializable {
 class SimpleChartParser[L, W](val augmentedGrammar: AugmentedGrammar[L, W],
                               val decoder: ChartDecoder[L, W]) extends ChartParser[L, W] with Serializable {
 
-  def charts(w: Seq[W]) = ChartMarginal(augmentedGrammar, w, ParseChart.logProb)
+  def charts(w: Seq[W]) = try {
+    ChartMarginal(augmentedGrammar, w, ParseChart.logProb)
+  } catch {
+    case e =>
+      try {
+        ChartMarginal(AugmentedGrammar.fromRefined(augmentedGrammar.refined), w, ParseChart.logProb)
+      } catch {
+        case e2 =>
+          throw e
+
+      }
+  }
   def grammar = augmentedGrammar.grammar
 
 }

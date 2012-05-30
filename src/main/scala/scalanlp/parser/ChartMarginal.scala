@@ -330,7 +330,6 @@ object ChartMarginal {
     inside
   }
 
-
   private def buildOutsideChart[L, W, Chart[X] <: ParseChart[X]](anchoring: AugmentedAnchoring[L, W],
                                                                  inside: Chart[L],
                                                                  chartFactory: ParseChart.Factory[Chart]):Chart[L] = {
@@ -395,8 +394,6 @@ object ChartMarginal {
                   coarseSplitBegin, coarseSplitEnd,
                   r,
                   inside)
-
-
 
                 for(refR <- refined.validRuleRefinementsGivenParent(begin, end, r, refA)) {
                   val refB = refined.leftChildRefinement(r, refR)

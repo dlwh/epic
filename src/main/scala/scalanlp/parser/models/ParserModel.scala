@@ -22,7 +22,6 @@ trait ParserModel[L, W] extends Model[TreeInstance[L, W]] with ParserExtractable
 }
 
 
-
 trait ParserInference[L, W] extends ProjectableInference[TreeInstance[L, W], CoreAnchoring[L, W]] {
   type ExpectedCounts = scalanlp.parser.ExpectedCounts[Feature]
   type Marginal = ChartMarginal[ParseChart.LogProbabilityParseChart, L, W]
@@ -33,7 +32,17 @@ trait ParserInference[L, W] extends ProjectableInference[TreeInstance[L, W], Cor
 
   def marginal(v: TreeInstance[L, W], aug: CoreAnchoring[L, W]) = {
     val fullGrammar = AugmentedAnchoring(grammar.anchor(v.words), aug)
-    val charts = fullGrammar.marginal
+    val charts = try {
+      fullGrammar.marginal
+    } catch {
+      case e =>
+      try {
+        AugmentedAnchoring.fromRefined(grammar.anchor(v.words)).marginal
+      } catch {
+        case e2 =>
+          throw e
+      }
+    }
     charts -> charts.partition
   }
 
