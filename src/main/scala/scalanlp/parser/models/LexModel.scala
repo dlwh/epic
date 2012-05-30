@@ -537,7 +537,10 @@ case class LexGrammarBundle[L, W](baseGrammar: BaseGrammar[L],
             refA * words.length + refB
           }
         }
+
+        def validCoarseRulesGivenParentRefinement(a: Int, refA: Int) = grammar.indexedBinaryRulesWithParent(a)
       }
+
     }
 
   }

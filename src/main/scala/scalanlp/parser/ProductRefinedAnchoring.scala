@@ -151,6 +151,8 @@ final case class ProductRefinedAnchoring[L,W](s1: RefinedAnchoring[L, W],
     }
 
   }
+
+  def validCoarseRulesGivenParentRefinement(a: Int, refA: Int) = refinementController.validCoarseRulesGivenParentRefinement(a, refA)
 }
 
 abstract class ProductRefinementsHandler[L, W](s1: RefinedAnchoring[L, W], s2: RefinedAnchoring[L, W]) {

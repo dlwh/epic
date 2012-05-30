@@ -2,6 +2,7 @@ package scalanlp.parser
 
 import projections.GrammarRefinements
 import scalanlp.trees.{BinaryRule, UnaryRule}
+import collection.mutable.ArrayBuffer
 
 /**
  *
@@ -17,6 +18,19 @@ class SimpleRefinedGrammar[L, L2, W](val grammar: BaseGrammar[L],
                                      parentCompatibleRefinements: Array[Array[Array[Int]]],
                                      childCompatibleRefinements: Array[Array[Array[Int]]],
                                      tagScorer: TagScorer[L2, W]) extends RefinedGrammar[L, W] with Serializable {
+
+  //
+  private val coarseRulesGivenParentRefinement = Array.tabulate(grammar.labelIndex.size) { p =>
+    // refinement -> rules
+    val result = Array.fill(refinements.labels.refinementsOf(p).size)(ArrayBuffer[Int]())
+    for(r <- grammar.indexedBinaryRulesWithParent(p); ref <- 0 until result.length) {
+      if(parentCompatibleRefinements(r)(ref).nonEmpty) {
+        result(ref) += r
+      }
+    }
+
+    result.map(_.toArray)
+  }
 
   def anchor(w: Seq[W]) = new RefinedAnchoring[L, W] {
     override def toString() = "SimpleAnchoring(...)"
@@ -104,5 +118,7 @@ class SimpleRefinedGrammar[L, L2, W](val grammar: BaseGrammar[L],
 
     def numValidRefinements(label: Int) = refinements.labels.refinementsOf(label).length
     def numValidRuleRefinements(rule: Int) = refinements.rules.refinementsOf(rule).length
+
+    def validCoarseRulesGivenParentRefinement(a: Int, refA: Int) = coarseRulesGivenParentRefinement(a)(refA)
   }
 }

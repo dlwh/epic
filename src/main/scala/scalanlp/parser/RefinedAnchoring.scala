@@ -12,6 +12,7 @@ import scalanlp.inference.Factor
  * @author dlwh
  */
 trait RefinedAnchoring[L, W] extends Factor[RefinedAnchoring[L, W]] {
+
   def grammar: BaseGrammar[L]
   def lexicon: Lexicon[L, W]
   def words: Seq[W]
@@ -199,6 +200,8 @@ trait RefinedAnchoring[L, W] extends Factor[RefinedAnchoring[L, W]] {
    * @return rule refinement id, or -1 if rule is not allowed with those refinements
    */
   def ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int, refC: Int):Int
+
+  def validCoarseRulesGivenParentRefinement(a: Int, refA: Int): Array[Int]
 }
 
 object RefinedAnchoring {

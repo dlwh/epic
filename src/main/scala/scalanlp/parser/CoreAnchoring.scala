@@ -167,6 +167,7 @@ case class LiftedCoreAnchoring[L, W](core: CoreAnchoring[L, W]) extends RefinedA
 
   final def ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int, refC: Int) = 0
 
+  def validCoarseRulesGivenParentRefinement(a: Int, refA: Int) = grammar.indexedBinaryRulesWithParent(a)
 }
 
 

@@ -69,7 +69,7 @@ case class ChartMarginal[+Chart[X]<:ParseChart[X], L, W](anchoring: AugmentedAnc
         if(fullScore > spanThreshold) {
           spanVisitor.visitSpan(begin, end, a, refA, math.exp(fullScore))
 
-          val rules = grammar.indexedBinaryRulesWithParent(a)
+          val rules = anchoring.refined.validCoarseRulesGivenParentRefinement(a, refA)
           while(i < rules.length) {
             val r = rules(i)
             val b = grammar.leftChild(r)
@@ -253,7 +253,7 @@ object ChartMarginal {
         if(!passScore.isInfinite) {
           var ruleIndex = 0
           // into rules
-          val rules = g.indexedBinaryRulesWithParent(a)
+          val rules = anchoring.refined.validCoarseRulesGivenParentRefinement(a, refA)
           while(ruleIndex < rules.length) {
             val r = rules(ruleIndex)
             val b = g.leftChild(r)
@@ -372,7 +372,7 @@ object ChartMarginal {
           val coreScore = core.scoreSpan(begin, end, a)
           val aScore:Double = outside.bot.labelScore(begin, end, a, refA) + refined.scoreSpan(begin, end, a, refA) + coreScore
           if (!aScore.isInfinite) {
-            val rules = grammar.indexedBinaryRulesWithParent(a)
+            val rules = anchoring.refined.validCoarseRulesGivenParentRefinement(a, refA)
             var br = 0
             while(br < rules.length) {
               val r = rules(br)
