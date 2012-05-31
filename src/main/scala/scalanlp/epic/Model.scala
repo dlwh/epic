@@ -51,7 +51,7 @@ class ModelObjective[Datum](val model: Model[Datum],
   def initialWeightVector(randomize: Boolean): DenseVector[Double] = {
    val v = Encoder.fromIndex(featureIndex).tabulateDenseVector(f => model.initialValueForFeature(f))
     if(randomize) {
-      v += DenseVector.rand(numFeatures) * 1E-5
+      v += DenseVector.rand(numFeatures) * 1E-6
     }
     v
   }

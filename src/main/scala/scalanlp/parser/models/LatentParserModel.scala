@@ -29,7 +29,7 @@ class LatentParserModel[L, L3, W](featurizer: Featurizer[L3, W],
   def featureIndex = indexedFeatures.index
 
   override def initialValueForFeature(f: Feature) = {
-    initialFeatureVal(f) getOrElse (math.random * 1E-4)
+    initialFeatureVal(f) getOrElse (math.random * 1E-5)
   }
 
   def emptyCounts = new scalanlp.parser.ExpectedCounts(featureIndex)
