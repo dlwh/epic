@@ -2,6 +2,7 @@ package scalanlp.trees
 package annotations
 
 import scalanlp.trees.BinarizedTree
+import runtime.ScalaRunTime
 
 /**
  *
@@ -23,6 +24,11 @@ trait TreeAnnotator[L, W, M] extends ((BinarizedTree[L], Seq[W])=>BinarizedTree[
 
   final def compose[N](other: TreeAnnotator[N, W, L]) = other map this
 
+  override def toString() = this match {
+    case x: Product =>  ScalaRunTime._toString(x)
+    case _ => this.getClass.toString +"()"
+  }
+
 }
 
 case class ComposedAnnotator[L, W, M, N](a: TreeAnnotator[L, W, M],
@@ -30,6 +36,22 @@ case class ComposedAnnotator[L, W, M, N](a: TreeAnnotator[L, W, M],
 
   def apply(tree: BinarizedTree[L], words: Seq[W]):BinarizedTree[N] = {
     b(a(tree, words),words)
+  }
+
+}
+
+/** to be used with the config stuff, because I haven't figured out how to handle seqs yet... */
+case class PipelineAnnotator[L, W](ann1: TreeAnnotator[L, W, L],
+                                   ann2: TreeAnnotator[L, W, L] = null,
+                                   ann3: TreeAnnotator[L, W, L] = null,
+                                   ann4: TreeAnnotator[L, W, L] = null,
+                                   ann5: TreeAnnotator[L, W, L] = null,
+                                   ann6: TreeAnnotator[L, W, L] = null) extends TreeAnnotator[L, W, L] {
+
+  val pipeline = Seq(ann1, ann2, ann3, ann4, ann5, ann6).filterNot(null eq).reduceLeft(_ andThen _)
+
+  def apply(tree: BinarizedTree[L], words: Seq[W]):BinarizedTree[L] = {
+    pipeline(tree, words)
   }
 
 }
@@ -45,6 +67,12 @@ case class FilterAnnotations[W](toKeep: Set[Annotation]=Set.empty) extends TreeA
   def this(keep: String*) = this(keep.map(FunctionalTag).toSet[Annotation])
   def apply(tree: BinarizedTree[AnnotatedLabel], words: Seq[W]) = {
     tree.map(l => l.copy(features = l.features.filter(toKeep)))
+  }
+}
+
+case class StripAnnotations[W]() extends TreeAnnotator[AnnotatedLabel, W, AnnotatedLabel] {
+  def apply(tree: BinarizedTree[AnnotatedLabel], words: Seq[W]) = {
+    tree.map(l => l.copy(features = Set.empty))
   }
 }
 

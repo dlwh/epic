@@ -183,3 +183,68 @@ object ProjectTreebankToConstraints {
 
 
 }
+
+case class FillParams(parser: File, in: File,
+                      out: File = new File("constraints.ser.gz"), maxParseLength: Int = 80, project: Boolean = true) {
+}
+
+object FillOutConstraints {
+
+  def main(args: Array[String]) {
+    val (baseConfig, files) = scalanlp.config.CommandLineParser.parseArguments(args)
+    val config = baseConfig backoff Configuration.fromPropertiesFiles(files.map(new File(_)))
+    val params = config.readIn[FillParams]("")
+    println(params)
+    val parser = loadParser[Any](params.parser)
+    val cache = scalanlp.util.readObject[Map[Seq[String], CoreAnchoring[AnnotatedLabel, String]]](params.in)
+    val result = collection.mutable.Map[Seq[String], CoreAnchoring[AnnotatedLabel, String]]()
+    val factory = new ConstraintScorerCoreGrammar[AnnotatedLabel, String](parser.augmentedGrammar, -7)
+    for( (sent, cons) <- cache) {
+      if(cons.isInstanceOf[CoreAnchoring.Identity[AnnotatedLabel, String]]) {
+        try {
+          val scorer = factory.anchor(sent)
+          result(sent) = scorer
+        } catch {
+          case e =>
+          result(sent) = CoreAnchoring.identity[AnnotatedLabel, String](factory.grammar, factory.lexicon, sent)
+        }
+      } else {
+        result(sent) = cons
+      }
+    }
+
+    val out = params.out
+    out.getAbsoluteFile.getParentFile.mkdirs()
+    scalanlp.util.writeObject(out, Map.empty ++  result)
+  }
+
+  def loadParser[T](loc: File) = {
+    val parser = scalanlp.util.readObject[SimpleChartParser[AnnotatedLabel, String]](loc)
+    parser
+  }
+
+  def mapTrees(factory: ConstraintScorerCoreGrammar[AnnotatedLabel, String],
+               trees: IndexedSeq[TreeInstance[AnnotatedLabel, String]],
+               index: Index[AnnotatedLabel],
+               useTree: Boolean, maxL: Int) = {
+    // TODO: have ability to use other span scorers.
+    trees.toIndexedSeq.par.map { (ti:TreeInstance[AnnotatedLabel, String]) =>
+      val TreeInstance(id, tree, words) = ti
+      println(id, words)
+      try {
+        val policy = if(useTree) {
+          GoldTagPolicy.goldTreeForcing[AnnotatedLabel](tree.map(_.baseAnnotatedLabel).map(index))
+        } else {
+          GoldTagPolicy.noGoldTags[AnnotatedLabel]
+        }
+        val scorer = factory.buildScorer(words, policy)
+        words -> scorer
+      } catch {
+        case e: Exception => e.printStackTrace();
+        words -> CoreAnchoring.identity[AnnotatedLabel, String](factory.grammar, factory.lexicon, words)
+      }
+    }.seq
+  }
+
+
+}

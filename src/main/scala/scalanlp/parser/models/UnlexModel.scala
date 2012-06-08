@@ -11,6 +11,7 @@ import scalala.tensor.Counter
 import scalanlp.trees.{TreeInstance, AnnotatedLabel, BinarizedTree}
 import scalanlp.trees.annotations.{KMAnnotator, TreeAnnotator}
 
+@SerialVersionUID(1L)
 class UnlexModel[L, L2, W](featurizer: Featurizer[L2, W],
                         ann: TreeAnnotator[L, W, L2],
                         val projections: GrammarRefinements[L, L2],
@@ -19,7 +20,7 @@ class UnlexModel[L, L2, W](featurizer: Featurizer[L2, W],
                         lexicon: Lexicon[L, W],
                         initialFeatureVal: (Feature => Option[Double]) = {
                           _ => None
-                        }) extends ParserModel[L, W] {
+                        }) extends ParserModel[L, W] with Serializable {
   type Inference = DiscParserInference[L, W]
 
   val indexedFeatures: IndexedFeaturizer[L, L2, W] = IndexedFeaturizer(grammar, lexicon, featurizer, projections)
@@ -80,18 +81,12 @@ case class UnlexModelFactory(baseParser: ParserParams.BaseParser,
 
     val gen = new WordShapeFeaturizer(Library.sum(initLexicon))
     def labelFlattener(l: AnnotatedLabel) = {
-      val basic = Seq(l, l.copy(features = Set.empty))
-      basic map {
-        IndicatorFeature(_)
-      }
+      val basic = Seq(l)
+      basic map { IndicatorFeature(_) }
     }
     val feat = new GenFeaturizer[AnnotatedLabel, String](gen, labelFlattener _)
 
-    val featureCounter = if (oldWeights ne null) {
-      scalanlp.util.readObject[Counter[Feature, Double]](oldWeights)
-    } else {
-      Counter[Feature, Double]()
-    }
+    val featureCounter = readWeights(oldWeights)
     new UnlexModel[AnnotatedLabel, AnnotatedLabel, String](feat, annotator, indexedRefinements, cFactory, grammar, lexicon, {
       featureCounter.get(_)
     })

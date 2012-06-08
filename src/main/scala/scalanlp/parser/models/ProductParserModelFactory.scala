@@ -4,7 +4,6 @@ package scalanlp.parser.models
 import java.io.File
 import scalanlp.trees.annotations.FilterAnnotations
 import scalanlp.trees.annotations.TreeAnnotator
-import scalanlp.trees.{TreeInstance, AnnotatedLabel}
 import io.Source
 import scalala.library.Library
 import scalanlp.parser.features.{GenFeaturizer, IndicatorFeature, WordShapeFeaturizer}
@@ -12,6 +11,7 @@ import scalanlp.parser.projections.GrammarRefinements
 import scalala.tensor.Counter
 import scalanlp.epic.{ComponentFeature, Feature}
 import scalanlp.parser.{AugmentedGrammar, BaseGrammar, RefinedGrammar, ParserParams}
+import scalanlp.trees._
 
 /**
  *
@@ -40,6 +40,14 @@ case class ProductParserModelFactory(baseParser: ParserParams.BaseParser,
   }
 
   def unsplit(x: (AnnotatedLabel, Seq[Int])) = x._1
+
+
+  def splitRule[L, L2](r: Rule[L], split: L=>Seq[L2]):Seq[Rule[L2]] = r match {
+    case BinaryRule(a, b, c) => for(aa <- split(a); bb <- split(b); cc <- split(c)) yield BinaryRule(aa, bb, cc)
+      // don't allow ref
+    case UnaryRule(a, b, chain) if a == b => for(aa <- split(a)) yield UnaryRule(aa, aa, chain)
+    case UnaryRule(a, b, chain) => for(aa <- split(a); bb <- split(b)) yield UnaryRule(aa, bb, chain)
+  }
 
   def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]]) = {
     val annTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]] = trainTrees.map(annotator(_))
@@ -71,7 +79,7 @@ case class ProductParserModelFactory(baseParser: ParserParams.BaseParser,
 
     val annGrammar = BaseGrammar(annTrees.head.tree.label, annBinaries, annUnaries)
     val firstLevelRefinements = GrammarRefinements(xbarParser, annGrammar, {(_: AnnotatedLabel).baseAnnotatedLabel})
-    val secondLevel = GrammarRefinements(annGrammar, split(_: AnnotatedLabel, substateMap), unsplit)
+    val secondLevel = GrammarRefinements(annGrammar, {split(_:AnnotatedLabel,substateMap)}, {splitRule(_ :Rule[AnnotatedLabel], {split(_:AnnotatedLabel,substateMap)})}, unsplit)
     val finalRefinements = firstLevelRefinements compose secondLevel
     println(finalRefinements.labels)
 

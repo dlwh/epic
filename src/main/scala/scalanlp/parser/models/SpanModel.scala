@@ -11,11 +11,13 @@ import java.io.File
 import scalala.library.Library
 import scalanlp.util._
 import scalanlp.epic.Feature
+import projections.GrammarRefinements
 
 /**
  *
  * @author dlwh
  */
+@SerialVersionUID(1L)
 class SpanModel[L, W](featurizer: RefinedFeaturizer[L, W, Feature],
                       val featureIndex: Index[Feature],
                       ann: (BinarizedTree[L], Seq[W]) => BinarizedTree[L],
@@ -24,7 +26,7 @@ class SpanModel[L, W](featurizer: RefinedFeaturizer[L, W, Feature],
                       lexicon: Lexicon[L, W],
                       initialFeatureVal: (Feature => Option[Double]) = {
                         _ => None
-                      }) extends ParserModel[L, W] {
+                      }) extends ParserModel[L, W] with Serializable {
   type Inference = DiscParserInference[L, W]
 
   override def initialValueForFeature(f: Feature) = initialFeatureVal(f) getOrElse 0.0
@@ -372,8 +374,11 @@ case class SpanModelFactory(baseParser: ParserParams.BaseParser,
 
     val lexicon:Lexicon[AnnotatedLabel, String] = initLexicon
 
-    val baseFactory = RefinedGrammar.generative(xbarGrammar,
-      xbarLexicon, initBinaries, initUnaries, initLexicon)
+    val ref = GrammarRefinements.identity(xbarGrammar)
+    val baseFactory = RefinedGrammar.generative[AnnotatedLabel, AnnotatedLabel, String](xbarGrammar,
+      xbarLexicon,
+      ref,
+      initBinaries, initUnaries, initLexicon)
     val cFactory = constraints.cachedFactory(AugmentedGrammar.fromRefined(baseFactory))
 
     val labelFeatures = xbarGrammar.labelEncoder.tabulateArray(l => Array(LabelFeature(l):Feature))
@@ -391,12 +396,7 @@ case class SpanModelFactory(baseParser: ParserParams.BaseParser,
       dummyFeats,
       trees)
 
-    val featureCounter = if(oldWeights ne null) {
-      readObject[Counter[Feature, Double]](oldWeights)
-    } else {
-      Counter[Feature, Double]()
-    }
-
+    val featureCounter = readWeights(oldWeights)
 
     new SpanModel[AnnotatedLabel, String](indexed, indexed.index, reannotate _, cFactory, xbarGrammar, xbarLexicon, {
       featureCounter.get(_)

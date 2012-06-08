@@ -77,14 +77,14 @@ trait RefinedAnchoring[L, W] extends Factor[RefinedAnchoring[L, W]] {
         def visitBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int, score: Double) {
           val myScore = scoreBinaryRule(begin, split, end, rule, ref)
           val theirScore = f.scoreBinaryRule(begin, split, end, rule, ref)
-          assert(!myScore.isInfinite)
 
-          if (theirScore.isInfinite) {
-            ok = true
-            break()
-          }
+
 
           if(myScore != theirScore)  {
+            if (theirScore.isInfinite || myScore.isInfinite) {
+                ok = true
+                break()
+              }
             val df = (myScore - theirScore).abs / math.max(myScore,theirScore).abs
             if(df > diff) {
               ok = true
@@ -99,12 +99,12 @@ trait RefinedAnchoring[L, W] extends Factor[RefinedAnchoring[L, W]] {
           val theirScore = f.scoreUnaryRule(begin, end, rule, ref)
           assert(!myScore.isInfinite)
 
-          if(theirScore.isInfinite) {
-            ok = true
-            break()
-          }
 
           if(myScore != theirScore)  {
+            if (theirScore.isInfinite || myScore.isInfinite) {
+              ok = true
+              break()
+            }
             val df = (myScore - theirScore).abs / math.max(myScore,theirScore).abs
             if(df > diff) {
               ok = true
@@ -117,14 +117,13 @@ trait RefinedAnchoring[L, W] extends Factor[RefinedAnchoring[L, W]] {
         def visitSpan(begin: Int, end: Int, tag: Int, ref: Int, score: Double) = {
           val myScore = scoreSpan(begin, end, tag, ref)
           val theirScore = f.scoreSpan(begin, end, tag, ref)
-          assert(!myScore.isInfinite)
 
-          if(theirScore.isInfinite) {
-            ok = true
-            break()
-          }
 
           if(myScore != theirScore)  {
+            if(theirScore.isInfinite || myScore.isInfinite) {
+              ok = true
+              break()
+            }
             val df = (myScore - theirScore).abs / math.max(myScore,theirScore).abs
             if(df > diff) {
               ok = true

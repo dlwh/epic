@@ -15,6 +15,7 @@ package scalanlp.parser
  limitations under the License.
 */
 
+import projections.GrammarRefinements
 import scalanlp.trees._
 
 import annotations.{FilterAnnotations, TreeAnnotator}
@@ -105,11 +106,20 @@ object GenerativePipeline extends ParserPipeline {
                   validate: Parser[AnnotatedLabel, String]=>ParseEval.Statistics,
                   params: Params) = {
     val (xbar,xbarLexicon) = params.baseParser.xbarGrammar(trainTrees)
-    val trees = trainTrees.map(params.annotator(_))
-    val (words, binary, unary) = GenerativeParser.extractCounts(trees)
-    val grammar = RefinedGrammar.generative[AnnotatedLabel, String](xbar, xbarLexicon, binary, unary, words)
-//    println(grammar.refinedGrammar)
-    val parser = SimpleChartParser(AugmentedGrammar.fromRefined(grammar))
+
+    val transformed = trainTrees.par.map { ti => params.annotator(ti) }.seq.toIndexedSeq
+
+    val (initLexicon, initBinaries, initUnaries) = GenerativeParser.extractCounts(transformed)
+
+    val (grammar, lexicon) = params.baseParser.xbarGrammar(trainTrees)
+    val refGrammar = BaseGrammar(AnnotatedLabel.TOP, initBinaries, initUnaries)
+    val indexedRefinements = GrammarRefinements(grammar, refGrammar, {
+      (_: AnnotatedLabel).baseAnnotatedLabel
+    })
+
+    val (words, binary, unary) = GenerativeParser.extractCounts(transformed)
+    val refinedGrammar = RefinedGrammar.generative(xbar, xbarLexicon, indexedRefinements, binary, unary, words)
+    val parser = SimpleChartParser(AugmentedGrammar.fromRefined(refinedGrammar))
     Iterator.single(("Gen", parser))
   }
 }

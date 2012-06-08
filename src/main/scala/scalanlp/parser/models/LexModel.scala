@@ -698,11 +698,7 @@ case class LexParserModelFactory(baseParser: ParserParams.BaseParser,
       wordIndex
     )
 
-    val featureCounter = if(oldWeights ne null) {
-      readObject[Counter[Feature, Double]](oldWeights)
-    } else {
-      Counter[Feature, Double]()
-    }
+    val featureCounter = readWeights(oldWeights)
 
     def reannotate(tree: BinarizedTree[AnnotatedLabel], words: Seq[String]) = tree.map(_.baseAnnotatedLabel)
     val model = new LexModel[AnnotatedLabel, String](bundle, reannotate, indexed, cFactory, xbarGrammar, xbarLexicon, {featureCounter.get(_)})

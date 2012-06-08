@@ -42,11 +42,7 @@ case class EPParserModelFactory(ep: EPParams,
         model.make(train): ModelType
     }
 
-    val featureCounter = if (oldWeights ne null) {
-      readObject[Counter[Feature, Double]](oldWeights)
-    } else {
-      Counter[Feature, Double]()
-    }
+    val featureCounter = readWeights(oldWeights)
 
     new EPModel(ep.iterations, {
       featureCounter.get(_)

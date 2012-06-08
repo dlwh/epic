@@ -8,7 +8,7 @@ package annotations
 
 case class KMAnnotator() extends TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] {
   val pipeline = (
-    new FilterAnnotations("TMP") andThen
+    StripAnnotations[String]() andThen
     AddMarkovization[String](2,2) andThen
     SplitAuxiliary() andThen
     SplitVP() andThen

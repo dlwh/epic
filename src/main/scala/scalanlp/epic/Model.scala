@@ -5,7 +5,10 @@ import scalanlp.optimize.BatchDiffFunction
 import actors.threadpool.AtomicInteger
 import scalanlp.util.{Index, Encoder}
 import scalala.tensor.dense.{DenseVectorCol, DenseVector}
-import java.io.File
+import scalanlp.serialization.DataSerialization
+import java.util.zip.GZIPOutputStream
+import java.io.{ObjectOutputStream, FileOutputStream, BufferedOutputStream, File}
+import scalala.tensor.Counter
 
 trait Model[Datum] {
   self =>
@@ -21,7 +24,11 @@ trait Model[Datum] {
   // just saves feature weights to disk as a serialized counter. The file is prefix.ser.gz
   def cacheFeatureWeights(weights: DenseVector[Double], prefix: String = "weights") {
     val ctr = Encoder.fromIndex(featureIndex).decode(weights)
-    scalanlp.util.writeObject(new File(prefix + ".ser.gz"), ctr)
+    val out = new ObjectOutputStream(new BufferedOutputStream(new GZIPOutputStream(new FileOutputStream(new File(prefix + ".ser.gz")))))
+    implicit val serFeature: DataSerialization.ReadWritable[Feature] = DataSerialization.naiveReadWritable
+    implicit val ctrWritable: DataSerialization.Writable[Counter[Feature, Double]] = DataSerialization.counterReadWritable(serFeature, DataSerialization.doubleReadWritable, scalala.scalar.Scalar.scalarD)
+    DataSerialization.write(out, ctr:Counter[Feature, Double])
+    out.close()
   }
 
   def initialValueForFeature(f: Feature): Double // = 0
@@ -59,7 +66,7 @@ class ModelObjective[Datum](val model: Model[Datum],
   var iter = 0
 
   def calculate(x: DenseVector[Double], batch: IndexedSeq[Int]) = {
-    if(iter % 10 == 0) {
+    if(iter % 30 == 0) {
       model.cacheFeatureWeights(x, "weights")
     }
     iter += 1

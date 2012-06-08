@@ -54,26 +54,33 @@ object RefinedGrammar {
     val grammar = BaseGrammar(root, binaryProductions.keysIterator.map(_._2) ++ unaryProductions.keysIterator.map(_._2))
     val lexicon = new SimpleLexicon[L, W](wordCounts)
 
-    generative(grammar, lexicon, binaryProductions, unaryProductions, wordCounts)
+    generative(grammar, lexicon,  binaryProductions, unaryProductions, wordCounts)
   }
 
   def generative[L, W](grammar: BaseGrammar[L], lexicon: Lexicon[L, W],
                        binaryProductions: Counter2[L, BinaryRule[L], Double],
                        unaryProductions: Counter2[L, UnaryRule[L], Double],
                        wordCounts: Counter2[L, W, Double]): SimpleRefinedGrammar[L, L, W] = {
+    val ref = GrammarRefinements.identity(grammar)
+    generative(grammar, lexicon, ref, binaryProductions, unaryProductions, wordCounts)
+  }
+
+  def generative[L, L2, W](grammar: BaseGrammar[L], lexicon: Lexicon[L, W],
+                           refinements: GrammarRefinements[L, L2],
+                           binaryProductions: Counter2[L2, BinaryRule[L2], Double],
+                           unaryProductions: Counter2[L2, UnaryRule[L2], Double],
+                           wordCounts: Counter2[L2, W, Double]): SimpleRefinedGrammar[L, L2, W] = {
     val loggedB = Library.logAndNormalizeRows(binaryProductions)
     val loggedU = Library.logAndNormalizeRows(unaryProductions)
 
-    val ref = GrammarRefinements.identity(grammar)
-
-    val ruleScoreArray = for(r <- grammar.index.toArray) yield r match {
+    val ruleScoreArray = for(r <- refinements.rules.fineIndex.toArray) yield r match {
       case r@BinaryRule(a, _, _) => loggedB(a, r)
       case r@UnaryRule(a, _, _) => loggedU(a, r)
     }
     
-    val spanScoreArray = grammar.labelEncoder.mkArray[Double]
+    val spanScoreArray = new Array[Double](refinements.labels.fineIndex.size)
 
-    unanchored(grammar, lexicon, ref, ruleScoreArray, spanScoreArray, new SimpleTagScorer(wordCounts))
+    unanchored[L, L2, W](grammar, lexicon, refinements, ruleScoreArray, spanScoreArray, new SimpleTagScorer(wordCounts))
   }
 
   def unanchored[L, L2, W](grammar: BaseGrammar[L], lexicon: Lexicon[L, W],
