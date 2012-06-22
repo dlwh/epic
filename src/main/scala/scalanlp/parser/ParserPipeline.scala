@@ -1,6 +1,6 @@
 package scalanlp.parser
 
-import projections.ConstraintScorerCoreGrammar
+import projections.{FileCachedCoreGrammar, ConstraintCoreGrammar}
 import scalanlp.config._
 import java.io._
 import scalanlp.trees._
@@ -41,9 +41,9 @@ object ParserParams {
         constraintsCache(path).asInstanceOf[CoreGrammar[L, W]]
       } else {
         val uncached: CoreGrammar[L, W] = if(path eq null) {
-          new ConstraintScorerCoreGrammar[L,W](baseFactory, threshold)
+          new ConstraintCoreGrammar[L,W](baseFactory, threshold)
         } else {
-          val constraint = new ConstraintScorerCoreGrammar[L,W](baseFactory, threshold)
+          val constraint = new ConstraintCoreGrammar[L,W](baseFactory, threshold)
           new FileCachedCoreGrammar(constraint, path)
         }
 

@@ -20,7 +20,7 @@ case class LabeledSpanProjector[L, W](grammar: BaseGrammar[L], threshold: Double
         if(score > 0.9999999) {
           r(rule) = 10
         } else if(score > 0) {
-          r(rule) = math.log(score) - math.log(1-score)
+          r(rule) = math.log(score) - math.log1p(-score)
         }
       }
       r
@@ -35,7 +35,7 @@ case class LabeledSpanProjector[L, W](grammar: BaseGrammar[L], threshold: Double
         if(score > 0.9999999) {
           r(parent) = 10
         } else if(score > 0) {
-          r(parent) = math.log(score) - math.log(1-score)
+          r(parent) = math.log(score) - math.log1p(-score)
         }
       }
       r

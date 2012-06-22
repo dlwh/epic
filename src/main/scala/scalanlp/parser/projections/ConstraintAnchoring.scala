@@ -1,19 +1,20 @@
 package scalanlp.parser
 package projections
 
-import collection.immutable.BitSet
 import scalanlp.config.Configuration
 import java.io._
 import scalanlp.collection.mutable.TriangularArray
 import scalanlp.trees._
 import scalanlp.util.Index
+import projections.ConstraintAnchoring.RawConstraints
+import collection.immutable.BitSet
 
 /**
  * 
  * @author dlwh
  */
 @SerialVersionUID(1L)
-class ConstraintScorer[L, W](val grammar: BaseGrammar[L],
+class ConstraintAnchoring[L, W](val grammar: BaseGrammar[L],
                              val lexicon: Lexicon[L, W],
                              val words: Seq[W],
                              scores: Array[BitSet],
@@ -39,37 +40,51 @@ class ConstraintScorer[L, W](val grammar: BaseGrammar[L],
   }
 }
 
+object ConstraintAnchoring {
+  @SerialVersionUID(1)
+  case class RawConstraints(bottom: Array[BitSet], top: Array[BitSet]) {
+    def toAnchoring[L, W](grammar: BaseGrammar[L], lexicon: Lexicon[L, W], words: Seq[W]) = {
+      new ConstraintAnchoring(grammar, lexicon, words, bottom, top)
+    }
+  }
+}
+
 /**
  * Creates labeled span scorers for a set of trees from some parser.
  * @author dlwh
  */
-class ConstraintScorerCoreGrammar[L, W](augmentedGrammar: AugmentedGrammar[L, W], threshold: Double) extends CoreGrammar[L, W] {
+class ConstraintCoreGrammar[L, W](augmentedGrammar: AugmentedGrammar[L, W], threshold: Double) extends CoreGrammar[L, W] {
   def grammar = augmentedGrammar.grammar
   def lexicon = augmentedGrammar.lexicon
 
 
   def anchor(words: Seq[W]) = {
     val charts = ChartMarginal(augmentedGrammar, words, ParseChart.logProb)
-    val chartScorer = buildScorer(charts)
+    val chartScorer = buildConstraints(charts)
     chartScorer
   }
 
-  def buildScorer(charts: Marginal[L, W],
-                  goldTags: GoldTagPolicy[L] = GoldTagPolicy.noGoldTags[L]):ConstraintScorer[L, W] = {
+  def buildConstraints(charts: Marginal[L, W],
+                  goldTags: GoldTagPolicy[L] = GoldTagPolicy.noGoldTags[L]):ConstraintAnchoring[L, W] = {
 
-    val (label,unary) = scoresForCharts(charts, goldTags)
+    val RawConstraints(label,unary) = rawConstraints(charts, goldTags)
 
-    new ConstraintScorer[L, W](charts.anchoring.grammar, charts.anchoring.lexicon, charts.anchoring.words, label, unary)
+    new ConstraintAnchoring[L, W](charts.anchoring.grammar, charts.anchoring.lexicon, charts.anchoring.words, label, unary)
   }
 
-  def buildScorer(words: Seq[W],
-                  goldTags: GoldTagPolicy[L]):ConstraintScorer[L, W] = {
+  def buildConstraints(words: Seq[W],
+                       goldTags: GoldTagPolicy[L]):ConstraintAnchoring[L, W] = {
 
     val charts = ChartMarginal(augmentedGrammar, words, ParseChart.logProb)
-    buildScorer(charts, goldTags)
+    buildConstraints(charts, goldTags)
   }
 
-  private def scoresForCharts(marg: Marginal[L, W], gold: GoldTagPolicy[L]) = {
+  def rawConstraints(words: Seq[W], gold: GoldTagPolicy[L]):RawConstraints = {
+    val charts = ChartMarginal(augmentedGrammar, words, ParseChart.logProb)
+    rawConstraints(charts, gold)
+  }
+
+  def rawConstraints(marg: Marginal[L, W], gold: GoldTagPolicy[L]): RawConstraints = {
     val length = marg.length
     val scores = TriangularArray.raw(length+1, null: Array[Double])
     val topScores = TriangularArray.raw(length+1, null: Array[Double])
@@ -120,7 +135,7 @@ class ConstraintScorerCoreGrammar[L, W](augmentedGrammar: AugmentedGrammar[L, W]
       else null
     }).data
 
-    (labelThresholds, unaryThresholds)
+    RawConstraints(labelThresholds, unaryThresholds)
   }
 
 
@@ -145,11 +160,11 @@ object ProjectTreebankToConstraints {
     val out = params.out
     out.getAbsoluteFile.getParentFile.mkdirs()
 
-    val factory = new ConstraintScorerCoreGrammar[AnnotatedLabel, String](parser.augmentedGrammar, -7)
+    val factory = new ConstraintCoreGrammar[AnnotatedLabel, String](parser.augmentedGrammar, -7)
     val train = mapTrees(factory, treebank.trainTrees, parser.grammar.labelIndex, useTree = true, maxL = params.maxParseLength)
     val test = mapTrees(factory, treebank.testTrees, parser.grammar.labelIndex, useTree = false, maxL = 10000)
     val dev = mapTrees(factory, treebank.devTrees, parser.grammar.labelIndex, useTree = false, maxL = 10000)
-    val map = Map.empty ++ train ++ test ++ dev
+    val map: Map[Seq[String], RawConstraints] = Map.empty ++ train ++ test ++ dev
     scalanlp.util.writeObject(out, map)
   }
 
@@ -158,12 +173,11 @@ object ProjectTreebankToConstraints {
     parser
   }
 
-  def mapTrees(factory: ConstraintScorerCoreGrammar[AnnotatedLabel, String],
+  def mapTrees(factory: ConstraintCoreGrammar[AnnotatedLabel, String],
                trees: IndexedSeq[TreeInstance[AnnotatedLabel, String]],
                index: Index[AnnotatedLabel],
-               useTree: Boolean, maxL: Int) = {
-    // TODO: have ability to use other span scorers.
-    trees.toIndexedSeq.par.map { (ti:TreeInstance[AnnotatedLabel, String]) =>
+               useTree: Boolean, maxL: Int): Seq[(Seq[String], RawConstraints)] = {
+    trees.toIndexedSeq.par.flatMap { (ti:TreeInstance[AnnotatedLabel, String]) =>
       val TreeInstance(id, tree, words) = ti
       println(id, words)
       try {
@@ -172,76 +186,11 @@ object ProjectTreebankToConstraints {
         } else {
           GoldTagPolicy.noGoldTags[AnnotatedLabel]
         }
-        val scorer = factory.buildScorer(words, policy)
-        words -> scorer
+        val scorer = factory.rawConstraints(words, policy)
+        Seq(words -> scorer)
       } catch {
-        case e: Exception => e.printStackTrace();
-        words -> CoreAnchoring.identity[AnnotatedLabel, String](factory.grammar, factory.lexicon, words)
-      }
-    }.seq
-  }
-
-
-}
-
-case class FillParams(parser: File, in: File,
-                      out: File = new File("constraints.ser.gz"), maxParseLength: Int = 80, project: Boolean = true) {
-}
-
-object FillOutConstraints {
-
-  def main(args: Array[String]) {
-    val (baseConfig, files) = scalanlp.config.CommandLineParser.parseArguments(args)
-    val config = baseConfig backoff Configuration.fromPropertiesFiles(files.map(new File(_)))
-    val params = config.readIn[FillParams]("")
-    println(params)
-    val parser = loadParser[Any](params.parser)
-    val cache = scalanlp.util.readObject[Map[Seq[String], CoreAnchoring[AnnotatedLabel, String]]](params.in)
-    val result = collection.mutable.Map[Seq[String], CoreAnchoring[AnnotatedLabel, String]]()
-    val factory = new ConstraintScorerCoreGrammar[AnnotatedLabel, String](parser.augmentedGrammar, -7)
-    for( (sent, cons) <- cache) {
-      if(cons.isInstanceOf[CoreAnchoring.Identity[AnnotatedLabel, String]]) {
-        try {
-          val scorer = factory.anchor(sent)
-          result(sent) = scorer
-        } catch {
-          case e =>
-          result(sent) = CoreAnchoring.identity[AnnotatedLabel, String](factory.grammar, factory.lexicon, sent)
-        }
-      } else {
-        result(sent) = cons
-      }
-    }
-
-    val out = params.out
-    out.getAbsoluteFile.getParentFile.mkdirs()
-    scalanlp.util.writeObject(out, Map.empty ++  result)
-  }
-
-  def loadParser[T](loc: File) = {
-    val parser = scalanlp.util.readObject[SimpleChartParser[AnnotatedLabel, String]](loc)
-    parser
-  }
-
-  def mapTrees(factory: ConstraintScorerCoreGrammar[AnnotatedLabel, String],
-               trees: IndexedSeq[TreeInstance[AnnotatedLabel, String]],
-               index: Index[AnnotatedLabel],
-               useTree: Boolean, maxL: Int) = {
-    // TODO: have ability to use other span scorers.
-    trees.toIndexedSeq.par.map { (ti:TreeInstance[AnnotatedLabel, String]) =>
-      val TreeInstance(id, tree, words) = ti
-      println(id, words)
-      try {
-        val policy = if(useTree) {
-          GoldTagPolicy.goldTreeForcing[AnnotatedLabel](tree.map(_.baseAnnotatedLabel).map(index))
-        } else {
-          GoldTagPolicy.noGoldTags[AnnotatedLabel]
-        }
-        val scorer = factory.buildScorer(words, policy)
-        words -> scorer
-      } catch {
-        case e: Exception => e.printStackTrace();
-        words -> CoreAnchoring.identity[AnnotatedLabel, String](factory.grammar, factory.lexicon, words)
+        case e: Exception => e.printStackTrace()
+        Seq.empty[(Seq[String],RawConstraints)]
       }
     }.seq
   }

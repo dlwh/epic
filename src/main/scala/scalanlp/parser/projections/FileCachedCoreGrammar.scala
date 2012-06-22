@@ -1,6 +1,8 @@
-package scalanlp.parser
+package scalanlp.parser.projections
 
 import java.io.File
+import scalanlp.parser.{CoreAnchoring, Lexicon, BaseGrammar, CoreGrammar}
+import scalanlp.parser.projections.ConstraintAnchoring.RawConstraints
 
 /**
  * A CoreGrammar that relies on a file cache, which stores
@@ -11,7 +13,7 @@ import java.io.File
  * @author dlwh
  */
 @SerialVersionUID(1L)
-class FileCachedCoreGrammar[L, W](backoff: CoreGrammar[L,W], file: File) extends CoreGrammar[L, W] with Serializable {
+class FileCachedCoreGrammar[L, W](backoff: CoreGrammar[L, W], file: File) extends CoreGrammar[L, W] with Serializable {
   def this(grammar: BaseGrammar[L], lexicon: Lexicon[L, W], file: File) = {
     this(CoreGrammar.identity(grammar, lexicon), file)
   }
@@ -19,9 +21,9 @@ class FileCachedCoreGrammar[L, W](backoff: CoreGrammar[L,W], file: File) extends
   val grammar = backoff.grammar
   val lexicon = backoff.lexicon
 
-  private val cache = scalanlp.util.readObject[Map[Seq[W], CoreAnchoring[L, W]]](file)
+  private val cache = scalanlp.util.readObject[Map[Seq[W], RawConstraints]](file)
 
   def anchor(words: Seq[W]) = {
-    cache.getOrElse(words, backoff.anchor(words))
+    cache.get(words).map(_.toAnchoring(grammar, lexicon, words)).getOrElse(backoff.anchor(words))
   }
 }
