@@ -66,7 +66,7 @@ case class Sentence(id: String,
           None
         } else {
           if(newHeight < 0) newHeight = 0
-          val newTree = Tree(t.label,finalChildren)(Span(offset,moff))
+          val newTree = Tree(t.label,finalChildren, Span(offset,moff))
           idMap(t.span.start -> oldHeight) = (offset -> newHeight)
           Some((newTree,newWords,newHeight))
         }
@@ -143,7 +143,7 @@ object Sentence {
         r._1
       }
 
-      Tree(OntoLabel(tag,sense,entity.getOrElse(NERType.NotEntity), coref, prop), children)(Span(offset,moff)) -> words
+      Tree(OntoLabel(tag,sense,entity.getOrElse(NERType.NotEntity), coref, prop), children, Span(offset,moff)) -> words
     }
 
     val (t2,words) = rec(tree.head)

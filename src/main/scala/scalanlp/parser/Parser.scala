@@ -34,12 +34,11 @@ trait Parser[L,W] extends (Seq[W]=>Tree[L]) {
   def apply(s: Seq[W]) = bestParse(s);
 
   /**
-   * Returns the best parse for the sentence. Optionally takes a [[scalanlp.parser.SpanScorer]], which
+   * Returns the best parse for the sentence. Optionally takes a [[scalanlp.parser.CoreAnchoring]], which
    * can be used to provide additional information about the weight of particular spans or
    * rules in a sentence.
    *
    * @param s sentence
-   * @param spanScorer the span scorer
    */
-  def bestParse(s: Seq[W], spanScorer: SpanScorer[L] = SpanScorer.identity):Tree[L];
+  def bestParse(s: Seq[W]):Tree[L];
 }

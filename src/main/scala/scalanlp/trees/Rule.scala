@@ -6,7 +6,7 @@ import java.io.DataOutput
 /*
  Copyright 2010 David Hall
 
- Licensed under the Apache License, Version 2.0 (the "License");
+ Licensed under the Apache License, Version 2.0 (the "License")
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
 
@@ -19,11 +19,15 @@ import java.io.DataOutput
  limitations under the License.
 */
 
+sealed trait Production[@specialized(Int) +L, +W] {
+  def parent: L
+  def map[A](f: L => A): Production[A, W]
+}
 
-sealed trait Rule[@specialized(Int) +L] {
-  def parent: L;
+sealed trait Rule[@specialized(Int) +L] extends Production[L, Nothing] {
+  def parent: L
 
-  def children: Seq[L];
+  def children: Seq[L]
 
   def symbols = parent +: children
 
@@ -33,29 +37,34 @@ sealed trait Rule[@specialized(Int) +L] {
 }
 
 final case class BinaryRule[@specialized(Int) +L](parent: L, left: L, right: L) extends Rule[L] {
-  def children = Seq(left, right);
+  def children = Seq(left, right)
 
   def map[A](f: L => A) = BinaryRule(f(parent), f(left), f(right))
 
   def mapChildren[A >: L](f: L => A) = BinaryRule(parent, f(left), f(right))
 }
 
-final case class UnaryRule[@specialized(Int) +L](parent: L, child: L) extends Rule[L] {
-  def children = Seq(child);
+final case class UnaryRule[@specialized(Int) +L](parent: L, child: L, chain: Seq[String]) extends Rule[L] {
+  def children = Seq(child)
 
-  def map[A](f: L => A) = UnaryRule(f(parent), f(child))
+  def map[A](f: L => A) = UnaryRule(f(parent), f(child), chain)
 
-  def mapChildren[A >: L](f: L => A) = UnaryRule(parent, f(child))
+  def mapChildren[A >: L](f: L => A) = UnaryRule(parent, f(child), chain)
+}
+
+final case class LexicalProduction[@specialized(Int) +L, +W](parent: L, word: W) extends Production[L, W] {
+  def map[A](f: L => A) = LexicalProduction(f(parent), word)
 }
 
 
 object Rule {
   implicit def ruleReadWritable[L: DataSerialization.ReadWritable] = new DataSerialization.ReadWritable[Rule[L]] {
     def write(sink: DataOutput, r: Rule[L]) = r match {
-      case r@UnaryRule(_, _) =>
+      case r@UnaryRule(_, _, _) =>
         sink.writeBoolean(false)
         DataSerialization.write(sink, r.parent)
         DataSerialization.write(sink, r.child)
+        DataSerialization.write(sink, r.chain)
       case r@BinaryRule(_, _, _) =>
         sink.writeBoolean(true)
         DataSerialization.write(sink, r.parent)
@@ -67,7 +76,8 @@ object Rule {
       if (source.readBoolean()) {
         val p = DataSerialization.read[L](source)
         val c = DataSerialization.read[L](source)
-        UnaryRule(p, c)
+        val chain = DataSerialization.read[Seq[String]](source)
+        UnaryRule(p, c, chain)
       } else {
         val p = DataSerialization.read[L](source)
         val l = DataSerialization.read[L](source)
@@ -91,7 +101,8 @@ object UnaryRule {
       assert(isUnary)
       val p = DataSerialization.read[L](source)
       val c = DataSerialization.read[L](source)
-      UnaryRule(p, c)
+      val chain = DataSerialization.read[Seq[String]](source)
+      UnaryRule(p, c, chain)
     }
   }
 }

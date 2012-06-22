@@ -15,58 +15,131 @@ package scalanlp.parser
  limitations under the License.
 */
 
-
-
-import math.log
 import scalala.tensor.{Counter2, Counter}
 import scalala.tensor.::
-import scalala.library.Library._;
+import scalala.library.Library._
+import scalanlp.trees.LexicalProduction
 
 /**
- * Scores (label,word) pairs in a sentence
+ * Just knows what tags are appropriate for a given word
  */
 @SerialVersionUID(1)
-trait Lexicon[L,W] extends Serializable {
-  def wordScore(label: L, w: W): Double;
-  def tagScores(w: W): Counter[L,Double] = Counter( tags.map { l => (l,wordScore(l,w))});
-  def tags: Iterator[L];
-
-  def knownTagWords: Iterator[(L,W)]
+trait Lexicon[L, W] extends Serializable {
+  def tagsForWord(w: W):Iterator[L]
+  def knownLexicalProductions: Iterator[LexicalProduction[L, W]]
 }
 
-// counter should be in log space
-class UnsmoothedLexicon[L,W](lexicon: Counter2[L,W,Double]) extends Lexicon[L,W] {
-  def wordScore(l: L, w: W) = if(lexicon.contains(l,w)) lexicon(l,w)  else Double.NegativeInfinity
-  def tags = lexicon.domain._1.iterator
-  def knownTagWords = lexicon.nonzero.keys.iterator;
+object Lexicon {
+  // TODO Probably delete this implicit soon
+  implicit def apply[L, W](wordCounts: Counter2[L, W, Double]) = new SimpleLexicon(wordCounts)
 }
 
-// counter should be in normal space
-class SimpleLexicon[L,W](private val lexicon: Counter2[L,W,Double]) extends Lexicon[L,W] {
-  private val wordCounts:Counter[W,Double] = sum(lexicon)
-  private val labelCounts:Counter[L,Double] = sum(lexicon,Axis.Vertical)
-  private val totalCount = wordCounts.sum
-  def knownTagWords = lexicon.nonzero.keys.iterator;
+class UnsmoothedLexicon[L, W](knownProductions: Set[LexicalProduction[L, W]]) extends Lexicon[L, W] {
+  import collection.mutable._
+  private val byWord = new HashMap[W, Set[L]] with MultiMap[W, L];
+  for( LexicalProduction(l, w) <- knownProductions) {
+    byWord.addBinding(w, l)
+  }
 
-  def wordScore(l: L, w: W) = {
-    var cWord = wordCounts(w);
-    var cTagWord = lexicon(l,w);
-    assert(cWord >= cTagWord);
-    if(wordCounts(w) < 10 && lexicon(l,::).size > 50) {
-      cWord += 1.0;
-      cTagWord += lexicon(l,::).size.toDouble / wordCounts.size
-    }
-    if(cWord == 0) {
-      Double.NegativeInfinity
-    } else {
-      val pW = (1.0 + cWord) / (totalCount + 1.0)
-      val pTgW = (cTagWord) / (cWord);
-      val pTag = labelCounts(l) / totalCount
-      val result = log(pW) + log(pTgW) - log(pTag);
-      assert(cTagWord == 0 || result > Double.NegativeInfinity)
-      result;
+  def knownLexicalProductions = knownProductions.iterator
+
+  def tagsForWord(w: W) = byWord(w).iterator
+}
+
+/**
+ * A simple lexicon that thresholds to decide when to open up the rare word to all (open) tags
+ * @param wordTagCounts (tag -> word -> count)
+ * @param openTagThreshold how many different word types does a tag have to be seen with to be considered open.
+ * @param closedWordThreshold How many
+ */
+class SimpleLexicon[L, W](wordTagCounts: Counter2[L, W, Double],
+                          openTagThreshold: Int = 50,
+                          closedWordThreshold: Int= 10) extends Lexicon[L, W] {
+  private val wordCounts:Counter[W, Double] = sum(wordTagCounts)
+  private val labelCounts:Counter[L, Double] = sum(wordTagCounts, Axis.Vertical)
+
+  import collection.mutable._
+
+  private val byWord = new HashMap[W, Set[L]] with MultiMap[W, L];
+  for( (l, w) <- wordTagCounts.keysIterator) {
+    byWord.addBinding(w, l)
+  }
+
+  private val openTags = labelCounts.keysIterator.filter(l => wordTagCounts(l, ::).size > openTagThreshold).toSet
+  for( (w,v) <- wordCounts.pairsIterator if v < closedWordThreshold) {
+    byWord.get(w) match {
+      case None => byWord(w) = collection.mutable.Set() ++= openTags
+      case Some(set) => set ++= openTags
     }
   }
 
-  def tags = lexicon.domain._1.iterator;
+  def knownLexicalProductions = for( (w,set) <- byWord.iterator; l <- set.iterator) yield LexicalProduction(l, w)
+
+  def tagsForWord(w: W) = byWord.getOrElse(w,openTags).iterator
 }
+
+/**
+ *
+ * @author dlwh
+ */
+@SerialVersionUID(1L)
+class SignatureLexicon[L,W](initCounts: Counter2[L,W,Double],
+                            sigGen: W=>W,
+                            signatureThreshold: Double = 2) extends Lexicon[L,W] {
+  val (wordCounts, lexicon, sigCounts) = SignatureLexicon.makeSignatureCounts(sigGen, initCounts, signatureThreshold)
+
+  import collection.mutable._
+
+  private val byWord = new HashMap[W, Set[L]] with MultiMap[W, L]
+  for( (l, w) <- lexicon.keysIterator) {
+    byWord.addBinding(w, l)
+  }
+
+  def tagsForWord(w: W) = {
+    val sig = asSignature(w)
+    byWord.getOrElse(sig,initCounts.keys.map(_._1)).iterator
+  }
+
+  def knownLexicalProductions = wordCounts.keysIterator.flatMap(w => tagsForWord(w).map(LexicalProduction(_,w)))
+
+  private def asSignature(w: W): W = {
+    if (wordCounts(w) < signatureThreshold) {
+      sigGen(w)
+    } else {
+      w
+    }
+  }
+
+}
+
+object SignatureLexicon {
+  /**
+   * Remaps words by their signatures, if they are sufficiently rare (otherwise, a word's signature is itself.)
+   *
+   * Kind of a horrible hacky method. Sorry.
+   *
+   * @param sigGen
+   * @param counts
+   * @param threshold
+   * @return word counts, (tag,signature) counts, signature counts
+   */
+  def makeSignatureCounts[L,W](sigGen: W=>W,
+                               counts: Counter2[L, W, Double],
+                               threshold: Double): (Counter[W, Double], Counter2[L, W, Double], Counter[W, Double]) = {
+    val wordCounts = Counter[W,Double]()
+    for( ((l,w),count) <- counts.nonzero.pairs) {
+      wordCounts(w) += count
+    }
+    val lexicon = Counter2[L,W,Double]()
+    val sigCounts = Counter[W,Double]()
+    for( ((l,w),count) <- counts.nonzero.pairs) {
+      val sig = if(wordCounts(w) < threshold) sigGen(w) else w
+
+      sigCounts(sig) += count
+      lexicon(l,sig) += count
+    }
+
+    (wordCounts, lexicon, sigCounts)
+  }
+}
+

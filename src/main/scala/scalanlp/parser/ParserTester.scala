@@ -3,7 +3,7 @@ package scalanlp.parser
 import scalanlp.config.Configuration
 import java.io.File
 import scalanlp.util._
-import scalanlp.trees.{AnnotatedLabel, AnnotatedLabelChainReplacer}
+import scalanlp.trees.{TreeInstance, ProcessedTreebank, AnnotatedLabel, AnnotatedLabelChainReplacer}
 
 /**
  * ParserTester just tests a grammar

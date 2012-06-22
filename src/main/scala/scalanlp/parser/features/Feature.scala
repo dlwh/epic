@@ -1,15 +1,8 @@
 package scalanlp.parser.features
 
 import scalanlp.trees.Rule
-import scalanlp.parser.Rule
 import scalanlp.util.CachedHashCode
-import scalala.tensor.Counter
-
-/**
- * 
- * @author dlwh
- */
-trait Feature;
+import scalanlp.epic._
 
 // Meta Features
 /** conjoins some features */
@@ -30,3 +23,5 @@ case class SubstateFeature[T](f: Feature, states: Seq[T]) extends Feature with C
 case class IndicatorFeature(a: Any) extends Feature with CachedHashCode
 
 case class PairFeature(a: Feature, b: Feature) extends Feature with CachedHashCode
+
+case class LabelFeature[L](l: L) extends Feature with CachedHashCode

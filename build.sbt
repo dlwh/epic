@@ -1,4 +1,7 @@
 import AssemblyKeys._ // put this at the top of the file
+import de.johoop.jacoco4sbt._
+import JacocoPlugin._
+
 name := "parser"
 
 version := "1.0"
@@ -36,7 +39,7 @@ credentials += Credentials(Path.userHome / ".ivy2" / ".credentials")
 
 javacOptions ++= Seq("-source", "1.5", "-target", "1.5")
 
-scalacOptions ++= Seq("-no-specialization","-deprecation","-target:jvm-1.5")
+scalacOptions ++= Seq("-deprecation","-target:jvm-1.5")
 
 javaOptions += "-Xmx2g"
 
@@ -44,3 +47,4 @@ javaOptions += "-Xmx2g"
 seq(assemblySettings: _*)
 
 
+seq(jacoco.settings : _*)

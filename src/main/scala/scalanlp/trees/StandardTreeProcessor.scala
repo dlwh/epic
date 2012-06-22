@@ -2,6 +2,7 @@ package scalanlp.trees
 
 import scalanlp.util.Interner
 
+
 /*
  Copyright 2012 David Hall
 
@@ -24,16 +25,18 @@ import scalanlp.util.Interner
  */
 case class StandardTreeProcessor(headFinder: HeadFinder[AnnotatedLabel] = HeadFinder.collins) extends (Tree[String]=>BinarizedTree[AnnotatedLabel]) {
   import Trees.Transforms._
-  private val ens = new EmptyNodeStripper[String];
-  private val xox = new XOverXRemover[String];
+  private val ens = new EmptyNodeStripper[String]
+  private val xox = new XOverXRemover[String]
+  private val interner = new Interner[AnnotatedLabel]
 
   def apply(tree: Tree[String]):BinarizedTree[AnnotatedLabel] = {
     val transformed = xox(ens(tree).get)
     val ann = transformed.map { label =>
-      val split = label.split("[-=]").filterNot(s => s.nonEmpty && s.charAt(0).isDigit)
-      AnnotatedLabel(split(0).intern,
+      val fields = if(label.startsWith("-")) Array(label) else label.split("[-=]")
+      val split = fields.filterNot(s => s.nonEmpty && s.charAt(0).isDigit)
+      interner.intern(AnnotatedLabel(split(0).intern,
         features= split.iterator.drop(1).map(_.intern).map(FunctionalTag(_)).toSet
-      )
+      ))
     }
     val r = Trees.binarize(ann, {(l:AnnotatedLabel) => l.copy("@"+l.label)}, headFinder)
     r.relabelRoot(_ => AnnotatedLabel.TOP)

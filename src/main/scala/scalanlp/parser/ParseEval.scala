@@ -103,9 +103,9 @@ object ParseEval {
     // TODO: make less horrible
 
     def evalSentence(sent: TreeInstance[L,String]) = try {
-      val TreeInstance(id,goldTree,words,scorer) = sent;
+      val TreeInstance(id,goldTree,words) = sent;
       val startTime = System.currentTimeMillis;
-      val tree: Tree[String] = chainReplacer.replaceUnaries(parser.bestParse(words,scorer)).map(asString)
+      val tree: Tree[String] = chainReplacer.replaceUnaries(parser.bestParse(words)).map(asString)
       val guessTree = Trees.debinarize(Trees.deannotate(tree))
       val deBgold = Trees.debinarize(Trees.deannotate(goldTree.map(asString)));
       val stats = peval(guessTree,deBgold);
