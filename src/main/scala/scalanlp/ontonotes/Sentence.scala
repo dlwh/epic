@@ -1,6 +1,6 @@
 package scalanlp.ontonotes
 
-import scalanlp.data.Example
+import breeze.data.Example
 import scalanlp.trees.{Span, Tree}
 import java.io.{PushbackReader, Reader, InputStream}
 import collection.mutable.ArrayBuffer

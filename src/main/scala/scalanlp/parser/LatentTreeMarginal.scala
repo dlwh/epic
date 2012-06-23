@@ -3,8 +3,7 @@ package scalanlp.parser
 import projections.{GrammarRefinements, ProjectionIndexer}
 import java.util.Arrays
 import scalanlp.trees._
-import scalala.library.Numerics
-import scala.math.exp
+import breeze.numerics._
 
 import LatentTreeMarginal._
 import scala._
@@ -20,7 +19,7 @@ case class LatentTreeMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
   private val stree = insideScores()
   outsideScores(stree)
 
-  val partition = Numerics.logSum(stree.label.inside, stree.label.inside.length)
+  val partition = logSum(stree.label.inside, stree.label.inside.length)
 
   def visitPostorder(spanVisitor: AnchoredVisitor[L], threshold: Double = Double.NegativeInfinity) = {
     // normalizer
@@ -131,7 +130,7 @@ case class LatentTreeMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
             ci += 1
           }
 
-          aScores(ai) = Numerics.logSum(arr, i)
+          aScores(ai) = logSum(arr, i)
           ai += 1
         }
 
@@ -170,7 +169,7 @@ case class LatentTreeMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
             }
             bi += 1
           }
-          aScores(ai) = Numerics.logSum(arr, i)
+          aScores(ai) = logSum(arr, i)
           if(!aScores(ai).isInfinite) foundOne = true
           ai += 1
         }
@@ -214,8 +213,8 @@ case class LatentTreeMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
             anchoring.scoreBinaryRule(span.start, lchild.span.end, span.end, rule, ruleRef)
               + anchoring.scoreSpan(t.span.start, t.span.end, a, aRef)
             )
-          lchild.label.outside(bi) = Numerics.logSum(lchild.label.outside(bi), aScore + cScore + spanScore)
-          rchild.label.outside(ci) = Numerics.logSum(rchild.label.outside(ci), aScore + bScore + spanScore)
+          lchild.label.outside(bi) = logSum(lchild.label.outside(bi), aScore + cScore + spanScore)
+          rchild.label.outside(ci) = logSum(rchild.label.outside(ci), aScore + bScore + spanScore)
         }
       case tree: NullaryTree[Seq[Int]] => () // do nothing
       case t @ UnaryTree(_, child, chain, span) =>
@@ -237,7 +236,7 @@ case class LatentTreeMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
               i += 1
             }
           }
-          child.label.outside(ci) = Numerics.logSum(arr, i)
+          child.label.outside(ci) = logSum(arr, i)
         }
 
 

@@ -2,7 +2,7 @@ package scalanlp.parser
 
 import projections.GrammarRefinements
 import scalanlp.trees.{LexicalProduction, Production, Rule}
-import scalanlp.util.Index
+import breeze.util.Index
 
 /**
  *

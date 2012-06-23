@@ -1,6 +1,5 @@
 package scalanlp.trees
 
-import java.io.{FileReader, File, FileInputStream, InputStreamReader}
 /*
  Copyright 2010 David Hall
 
@@ -18,6 +17,7 @@ import java.io.{FileReader, File, FileInputStream, InputStreamReader}
 */
 
 
+import java.io.{FileReader, File, FileInputStream, InputStreamReader}
 import java.io.File
 import io.Codec
 

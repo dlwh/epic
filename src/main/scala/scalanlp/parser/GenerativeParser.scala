@@ -19,9 +19,9 @@ import projections.GrammarRefinements
 import scalanlp.trees._
 
 import annotations.{FilterAnnotations, TreeAnnotator}
-import scalala.tensor.Counter2
+import breeze.linalg.Counter2
 import scalanlp.parser.ParserParams.{BaseParser, NoParams}
-import scalanlp.text.tokenize.EnglishWordClassGenerator
+import breeze.text.tokenize.EnglishWordClassGenerator
 
 /**
  * Contains codes to read off parsers and grammars from

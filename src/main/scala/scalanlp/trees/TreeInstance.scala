@@ -1,6 +1,6 @@
 package scalanlp.trees
 
-import scalanlp.data.Example
+import breeze.data.Example
 
 case class TreeInstance[L, +W](id: String,
                                tree: BinarizedTree[L],

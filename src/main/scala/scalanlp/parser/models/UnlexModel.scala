@@ -1,13 +1,11 @@
 package scalanlp.parser
 package models
 
-import scalala.tensor.dense.DenseVector
 import projections.GrammarRefinements
-import scalanlp.epic.Feature
+import scalanlp.framework.Feature
 import java.io.File
-import scalala.library.Library
 import features._
-import scalala.tensor.Counter
+import breeze.linalg._
 import scalanlp.trees.{TreeInstance, AnnotatedLabel, BinarizedTree}
 import scalanlp.trees.annotations.{KMAnnotator, TreeAnnotator}
 
@@ -79,7 +77,7 @@ case class UnlexModelFactory(baseParser: ParserParams.BaseParser,
     val baseFactory = RefinedGrammar.generative(grammar, lexicon, xbarBinaries, xbarUnaries, xbarWords)
     val cFactory = constraints.cachedFactory(AugmentedGrammar.fromRefined(baseFactory))
 
-    val gen = new WordShapeFeaturizer(Library.sum(initLexicon))
+    val gen = new WordShapeFeaturizer(sum(initLexicon, Axis._0))
     def labelFlattener(l: AnnotatedLabel) = {
       val basic = Seq(l)
       basic map { IndicatorFeature(_) }

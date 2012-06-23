@@ -1,6 +1,6 @@
 package scalanlp.parser
 
-import scalanlp.inference.Factor
+import breeze.inference.Factor
 
 /**
  * [[scalanlp.parser.CoreAnchoring]] score rules and labels in a particular context

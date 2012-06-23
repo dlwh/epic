@@ -1,7 +1,6 @@
 package scalanlp.parser
 
-import scalala.library.Library
-import scalala.tensor.Counter2
+import breeze.linalg._
 import scalanlp.trees.{LexicalProduction, Rule, BinaryRule, UnaryRule}
 
 /**
@@ -10,7 +9,7 @@ import scalanlp.trees.{LexicalProduction, Rule, BinaryRule, UnaryRule}
  * @author dlwh
  */
 object DSLGrammar {
-  def grammar(rewrites: DSLGrammarPart*) = {
+  def grammar(rewrites: DSLGrammarPart*): AugmentedGrammar[String, String] = {
     val binaryProductions = Counter2[String, BinaryRule[String], Double]
     val unaryProductions = Counter2[String, UnaryRule[String], Double]
     val lexicon = Counter2[String, String, Double]

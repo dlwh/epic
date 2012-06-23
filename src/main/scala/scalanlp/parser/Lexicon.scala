@@ -15,9 +15,7 @@ package scalanlp.parser
  limitations under the License.
 */
 
-import scalala.tensor.{Counter2, Counter}
-import scalala.tensor.::
-import scalala.library.Library._
+import breeze.linalg._
 import scalanlp.trees.LexicalProduction
 
 /**
@@ -55,8 +53,8 @@ class UnsmoothedLexicon[L, W](knownProductions: Set[LexicalProduction[L, W]]) ex
 class SimpleLexicon[L, W](wordTagCounts: Counter2[L, W, Double],
                           openTagThreshold: Int = 50,
                           closedWordThreshold: Int= 10) extends Lexicon[L, W] {
-  private val wordCounts:Counter[W, Double] = sum(wordTagCounts)
-  private val labelCounts:Counter[L, Double] = sum(wordTagCounts, Axis.Vertical)
+  private val wordCounts:Counter[W, Double] = sum(wordTagCounts, Axis._0)
+  private val labelCounts:Counter[L, Double] = sum(wordTagCounts, Axis._1)
 
   import collection.mutable._
 
@@ -66,7 +64,7 @@ class SimpleLexicon[L, W](wordTagCounts: Counter2[L, W, Double],
   }
 
   private val openTags = labelCounts.keysIterator.filter(l => wordTagCounts(l, ::).size > openTagThreshold).toSet
-  for( (w,v) <- wordCounts.pairsIterator if v < closedWordThreshold) {
+  for( (w,v) <- wordCounts.iterator if v < closedWordThreshold) {
     byWord.get(w) match {
       case None => byWord(w) = collection.mutable.Set() ++= openTags
       case Some(set) => set ++= openTags
@@ -97,7 +95,7 @@ class SignatureLexicon[L,W](initCounts: Counter2[L,W,Double],
 
   def tagsForWord(w: W) = {
     val sig = asSignature(w)
-    byWord.getOrElse(sig,initCounts.keys.map(_._1)).iterator
+    byWord.get(sig).map(_.iterator).getOrElse(initCounts.keysIterator.map(_._1))
   }
 
   def knownLexicalProductions = wordCounts.keysIterator.flatMap(w => tagsForWord(w).map(LexicalProduction(_,w)))
@@ -126,13 +124,10 @@ object SignatureLexicon {
   def makeSignatureCounts[L,W](sigGen: W=>W,
                                counts: Counter2[L, W, Double],
                                threshold: Double): (Counter[W, Double], Counter2[L, W, Double], Counter[W, Double]) = {
-    val wordCounts = Counter[W,Double]()
-    for( ((l,w),count) <- counts.nonzero.pairs) {
-      wordCounts(w) += count
-    }
+    val wordCounts = sum(counts, Axis._0)
     val lexicon = Counter2[L,W,Double]()
     val sigCounts = Counter[W,Double]()
-    for( ((l,w),count) <- counts.nonzero.pairs) {
+    for( ((l,w),count) <- counts.activeIterator) {
       val sig = if(wordCounts(w) < threshold) sigGen(w) else w
 
       sigCounts(sig) += count

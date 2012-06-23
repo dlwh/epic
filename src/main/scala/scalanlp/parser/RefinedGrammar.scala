@@ -2,8 +2,7 @@ package scalanlp.parser
 
 import projections.GrammarRefinements
 import scalanlp.trees._
-import scalala.tensor.Counter2
-import scalala.library.Library
+import breeze.linalg._
 import collection.mutable.ArrayBuffer
 
 /**
@@ -70,8 +69,8 @@ object RefinedGrammar {
                            binaryProductions: Counter2[L2, BinaryRule[L2], Double],
                            unaryProductions: Counter2[L2, UnaryRule[L2], Double],
                            wordCounts: Counter2[L2, W, Double]): SimpleRefinedGrammar[L, L2, W] = {
-    val loggedB = Library.logAndNormalizeRows(binaryProductions)
-    val loggedU = Library.logAndNormalizeRows(unaryProductions)
+    val loggedB:Counter2[L2, BinaryRule[L2], Double] = logAndNormalize(binaryProductions, Axis._1)
+    val loggedU:Counter2[L2, UnaryRule[L2], Double] = logAndNormalize(unaryProductions, Axis._1)
 
     val ruleScoreArray = for(r <- refinements.rules.fineIndex.toArray) yield r match {
       case r@BinaryRule(a, _, _) => loggedB(a, r)

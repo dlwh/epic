@@ -1,7 +1,7 @@
 package scalanlp.parser
 package projections
 
-import scalanlp.collection.mutable.{OpenAddressHashArray, TriangularArray}
+import breeze.collection.mutable.{TriangularArray, OpenAddressHashArray}
 
 /**
  * Used for computed the expected number of anchored rules that occur at each span/split.
@@ -23,11 +23,11 @@ class AnchoredRuleProjector(threshold: Double) extends Serializable {
     val numProjectedLabels = charts.grammar.labelIndex.size
     val numProjectedRules = charts.grammar.index.size
     def projVector() = {
-      new OpenAddressHashArray(numProjectedLabels, 0.0, 2)
+      new OpenAddressHashArray(numProjectedLabels, 0.0)
     }
 
     def projRuleVector() = {
-      new OpenAddressHashArray(numProjectedRules, 0.0, 2)
+      new OpenAddressHashArray(numProjectedRules, 0.0)
     }
 
     def getOrElseUpdate[T<:AnyRef](arr: Array[T], i: Int, t : =>T) = {

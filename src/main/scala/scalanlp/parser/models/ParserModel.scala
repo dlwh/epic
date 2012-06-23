@@ -1,11 +1,10 @@
 package scalanlp.parser
 package models
 
-import scalanlp.epic._
-import scalala.tensor.Counter2
+import scalanlp.framework._
+import breeze.linalg._
 import scalanlp.parser.GenerativeParser
 import scalanlp.trees.{TreeInstance, UnaryRule, BinaryRule}
-import scalala.tensor.dense.DenseVector
 
 /**
  * Base trait for "normal" Parser-type models

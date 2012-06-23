@@ -1,6 +1,6 @@
 package scalanlp.trees
 
-import scalanlp.util.Interner
+import breeze.util.Interner
 
 
 /*

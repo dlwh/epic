@@ -3,12 +3,10 @@ package models
 
 import features._
 import projections.GrammarRefinements
-import scalala.tensor.dense.DenseVector
-import scalala.library.Library
+import breeze.linalg._
 import java.io.File
 import io.Source
-import scalala.tensor.Counter
-import scalanlp.epic.Feature
+import scalanlp.framework.Feature
 import scalanlp.trees.annotations.{FilterAnnotations, TreeAnnotator}
 import scalanlp.trees._
 
@@ -110,7 +108,7 @@ case class LatentParserModelFactory(baseParser: ParserParams.BaseParser,
       case UnaryRule(a, b, chain) => for(aa <- split(a); bb <- split(b)) yield UnaryRule(aa, bb, chain)
     }
 
-    val gen = new WordShapeFeaturizer(Library.sum(annWords))
+    val gen = new WordShapeFeaturizer(sum(annWords, Axis._0))
     def labelFlattener(l: (AnnotatedLabel, Int)) = {
       val basic = Seq(l)
       basic map (IndicatorFeature)

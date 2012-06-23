@@ -4,9 +4,9 @@ package scalanlp.parser
 import java.util.Arrays
 import projections.{AnchoredPCFGProjector, AnchoredRuleMarginalProjector}
 import scalanlp.trees._
-import scalanlp.collection.mutable.TriangularArray
-import scalanlp.util._
-import scalala.library.Numerics._
+import breeze.collection.mutable.TriangularArray
+import breeze.util._
+import breeze.numerics._
 
 
 /**

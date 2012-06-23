@@ -1,6 +1,6 @@
 package scalanlp.parser.models
 
-import scalanlp.epic.Feature
+import scalanlp.framework.Feature
 import scalanlp.trees.{TreeInstance, BinarizedTree}
 import scalanlp.parser._
 

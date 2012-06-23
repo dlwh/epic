@@ -1,6 +1,6 @@
 package scalanlp.trees
 
-import scalanlp.util.Lens
+import breeze.util.Lens
 import collection.mutable.ArrayBuffer
 
 /**

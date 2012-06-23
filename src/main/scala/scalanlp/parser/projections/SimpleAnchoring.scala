@@ -3,7 +3,7 @@ package projections
 
 import java.io._
 import projections.AnchoredRuleProjector.AnchoredData
-import scalanlp.collection.mutable.{OpenAddressHashArray, TriangularArray}
+import breeze.collection.mutable.{OpenAddressHashArray, TriangularArray}
 
 /**
  * Creates a locally-normalized anchored PCFG from some refined forest.
@@ -15,8 +15,8 @@ case class AnchoredPCFGProjector[L, W](grammar: BaseGrammar[L], threshold: Doubl
   private def normalize(ruleScores: OpenAddressHashArray[Double], totals: OpenAddressHashArray[Double]):OpenAddressHashArray[Double] = {
     if(ruleScores eq null) null
     else {
-      val r = new OpenAddressHashArray[Double](ruleScores.length, Double.NegativeInfinity, ruleScores.activeSize * 3 / 2)
-      for( (rule, score) <- ruleScores.pairsIterator) {
+      val r = new OpenAddressHashArray[Double](ruleScores.length, Double.NegativeInfinity)
+      for( (rule, score) <- ruleScores.activeIterator) {
         val parent = grammar.parent(rule)
         if(score > 0)
           r(rule) = math.log(score) - math.log(totals(parent))
@@ -49,8 +49,8 @@ case class AnchoredRuleMarginalProjector[L, W](threshold: Double = Double.Negati
   private def normalize(ruleScores: OpenAddressHashArray[Double]):OpenAddressHashArray[Double] = {
     if(ruleScores eq null) null
     else {
-      val r = new OpenAddressHashArray[Double](ruleScores.length, Double.NegativeInfinity, ruleScores.activeSize)
-      for( (rule, score) <- ruleScores.pairsIterator) {
+      val r = new OpenAddressHashArray[Double](ruleScores.length, Double.NegativeInfinity)
+      for( (rule, score) <- ruleScores.activeIterator) {
         r(rule) = math.log(score)
       }
       r

@@ -1,7 +1,7 @@
 package scalanlp.parser
 package projections
 
-import scalanlp.util.{Encoder, Index}
+import breeze.util.{Encoder, Index}
 import collection.mutable.ArrayBuffer
 
 /**

@@ -1,6 +1,6 @@
 package scalanlp.parser
 
-import scalanlp.inference.Factor
+import breeze.inference.Factor
 
 /**
  * A RefinedAnchoring is a refined grammar that has been tuned to a particular sentence (if applicable).

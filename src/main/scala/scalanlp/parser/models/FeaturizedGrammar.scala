@@ -1,6 +1,6 @@
 package scalanlp.parser.models
 
-import scalala.tensor.dense._
+import breeze.linalg._
 import scalanlp.trees.{BinaryRule, UnaryRule}
 import scalanlp.parser.projections.GrammarRefinements
 import scalanlp.parser.{TagScorer, Lexicon, RefinedGrammar, BaseGrammar}

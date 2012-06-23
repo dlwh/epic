@@ -1,6 +1,6 @@
 package scalanlp.parser
 
-import scalanlp.collection.mutable.TriangularArray
+import breeze.collection.mutable.TriangularArray
 import LabelScoreArray._
 import java.util.Arrays
 import collection.mutable.BitSet

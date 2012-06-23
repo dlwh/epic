@@ -1,9 +1,9 @@
-package scalanlp.epic
+package scalanlp.framework
 
 import java.util.zip.GZIPInputStream
 import java.io.{File, FileInputStream, BufferedInputStream, ObjectInputStream}
-import scalanlp.serialization.DataSerialization
-import scalala.tensor.Counter
+import breeze.serialization.DataSerialization
+import breeze.linalg.Counter
 
 /**
  *

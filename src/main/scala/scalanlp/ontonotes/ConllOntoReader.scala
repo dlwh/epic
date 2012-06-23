@@ -4,13 +4,12 @@ import io.Source
 import collection.{IndexedSeq, Iterator}
 import java.lang.String
 import scalanlp.trees.{HeadFinder, Tree}
-import scalala.tensor.Counter
 import collection.mutable.{MultiMap, Stack, ArrayBuffer}
 import collection.immutable.HashMap
 import java.io.{PrintStream, FileOutputStream, BufferedOutputStream, File}
 
 /**
- * REads the Conll 2011 shared task format. See http://conll.cemantix.org/2011/data.html
+ * Reads the Conll 2011 shared task format. See http://conll.cemantix.org/2011/data.html
  * @author dlwh
  */
 

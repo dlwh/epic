@@ -1,8 +1,8 @@
 package scalanlp.parser.features
 
-import scalala.tensor.Counter
+import breeze.linalg.Counter
 import scalanlp.trees.{UnaryRule, BinaryRule, Rule}
-import scalanlp.epic.Feature
+import scalanlp.framework.Feature
 import collection.mutable.{ArrayBuilder, ArrayBuffer}
 
 /**

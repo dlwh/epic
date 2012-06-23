@@ -1,8 +1,8 @@
 package scalanlp.parser.features
 
 import scalanlp.trees.Rule
-import scalanlp.util.CachedHashCode
-import scalanlp.epic._
+import breeze.util.CachedHashCode
+import scalanlp.framework._
 
 // Meta Features
 /** conjoins some features */

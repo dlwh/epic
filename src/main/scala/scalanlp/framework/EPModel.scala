@@ -1,9 +1,9 @@
-package scalanlp.epic
+package scalanlp.framework
 
-import scalala.tensor.dense.DenseVector
+import breeze.linalg._
 import collection.mutable.ArrayBuffer
-import scalanlp.inference.Factor
-import scalanlp.util._
+import breeze.inference.Factor
+import breeze.util._
 
 /**
  *
@@ -72,7 +72,7 @@ object EPModel {
   type CompatibleModel[Datum, Augment] = Model[Datum] { type Inference <: ProjectableInference[Datum, Augment]}
 }
 
-case class EPExpectedCounts(var loss: Double, counts: IndexedSeq[ExpectedCounts[_]]) extends scalanlp.epic.ExpectedCounts[EPExpectedCounts] {
+case class EPExpectedCounts(var loss: Double, counts: IndexedSeq[ExpectedCounts[_]]) extends scalanlp.framework.ExpectedCounts[EPExpectedCounts] {
   def +=(other: EPExpectedCounts) = {
     for( (t, u) <- counts zip other.counts) {
       t.asInstanceOf[{ def +=(e: ExpectedCounts[_]):ExpectedCounts[_]}] += u

@@ -1,7 +1,7 @@
 package scalanlp.parser
 
-import scalala.tensor.dense.DenseVectorCol
-import scalanlp.util.{Encoder, Index}
+import breeze.linalg._
+import breeze.util.{Encoder, Index}
 
 /**
  * Used to count the occurences of features in a set
@@ -13,10 +13,10 @@ import scalanlp.util.{Encoder, Index}
  * @tparam Feat
  */
 final case class ExpectedCounts[Feat](index: Index[Feat],
-                                      counts: DenseVectorCol[Double],
-                                      var loss: Double) extends scalanlp.epic.ExpectedCounts[ExpectedCounts[Feat]] {
+                                      counts: DenseVector[Double],
+                                      var loss: Double) extends scalanlp.framework.ExpectedCounts[ExpectedCounts[Feat]] {
 
-  def this(index: Index[Feat]) = this(index, DenseVectorCol.zeros(index.size), 0.0)
+  def this(index: Index[Feat]) = this(index, DenseVector.zeros(index.size), 0.0)
 
   def decode = Encoder.fromIndex(index).decode(counts)
 

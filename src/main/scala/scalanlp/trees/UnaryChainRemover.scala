@@ -62,7 +62,7 @@ object AnnotatedLabelChainReplacer extends UnaryChainReplacer[AnnotatedLabel] {
     case UnaryTree(a, child, chain, span) =>
       val deunaried = replaceUnaries(child).asInstanceOf[BinarizedTree[AnnotatedLabel]]
       val withChain = chain.foldRight(deunaried){ (label, child) =>
-        UnaryTree(AnnotatedLabel(label), child.asInstanceOf[BinarizedTree[AnnotatedLabel]], Seq.empty, span)
+        UnaryTree(AnnotatedLabel(label), child, Seq.empty, span)
       }
       UnaryTree(a,withChain, Seq.empty, t.span)
     case t@BinaryTree(a, lchild, rchild, span) =>

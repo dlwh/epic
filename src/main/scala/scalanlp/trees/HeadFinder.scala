@@ -17,7 +17,7 @@ package scalanlp.trees
 */
 
 import scalanlp.trees.HeadRules.{Dir, Left, Right}
-import scalanlp.util.Lens
+import breeze.util.Lens
 
 /**
  * Implements HeadFinding as in the Collins parser.

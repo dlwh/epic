@@ -14,11 +14,12 @@ package scalanlp.parser
  limitations under the License.
 */
 
-import scalanlp.collection.mutable.TriangularArray
 
 import math._
 import java.util.Arrays
-import scalanlp.util.Index
+import breeze.util.Index
+import breeze.collection.mutable.TriangularArray
+import breeze.numerics.logSum
 
 @SerialVersionUID(3)
 abstract class ParseChart[L](val index: Index[L],
@@ -186,7 +187,7 @@ object ParseChart {
       else if (a < b) b + log(1+exp(a - b))
       else a + log(1+exp(b - a))
     }
-    final def sum(arr: Array[Double], length: Int) = scalala.library.Numerics.logSum(arr, length)
+    final def sum(arr: Array[Double], length: Int) = logSum(arr, length)
   }
   type LogProbabilityParseChart[L] = ParseChart[L] with LogProbability
 

@@ -1,13 +1,13 @@
 package scalanlp.parser
 package models
 
-import scalanlp.epic._
-import scalanlp.util._
+import scalanlp.framework._
+import breeze.util._
 import projections._
 import features.Featurizer
-import scalanlp.collection.mutable.{ArrayMap, OpenAddressHashArray}
+import breeze.collection.mutable.{ArrayMap, OpenAddressHashArray}
 import scalanlp.trees.LexicalProduction
-import scalala.tensor.dense.DenseVector
+import breeze.linalg.DenseVector
 import collection.mutable.ArrayBuilder
 
 /**

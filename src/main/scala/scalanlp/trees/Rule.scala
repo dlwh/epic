@@ -1,6 +1,6 @@
 package scalanlp.trees
 
-import scalanlp.serialization.DataSerialization
+import breeze.serialization.DataSerialization
 import java.io.DataOutput
 
 /*
@@ -76,7 +76,7 @@ object Rule {
       if (source.readBoolean()) {
         val p = DataSerialization.read[L](source)
         val c = DataSerialization.read[L](source)
-        val chain = DataSerialization.read[Seq[String]](source)
+        val chain = DataSerialization.read[Seq[String]](source)(DataSerialization.seqReadWritable[String])
         UnaryRule(p, c, chain)
       } else {
         val p = DataSerialization.read[L](source)
@@ -101,7 +101,7 @@ object UnaryRule {
       assert(isUnary)
       val p = DataSerialization.read[L](source)
       val c = DataSerialization.read[L](source)
-      val chain = DataSerialization.read[Seq[String]](source)
+      val chain = DataSerialization.read[Seq[String]](source)(DataSerialization.seqReadWritable[String])
       UnaryRule(p, c, chain)
     }
   }

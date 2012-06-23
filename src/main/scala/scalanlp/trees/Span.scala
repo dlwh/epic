@@ -1,8 +1,8 @@
-package scalanlp.trees;
+package scalanlp.trees
 /*
  Copyright 2010 David Hall
 
- Licensed under the Apache License, Version 2.0 (the "License");
+ Licensed under the Apache License, Version 2.0 (the "License")
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
 
@@ -17,7 +17,7 @@ package scalanlp.trees;
 
 
 case class Span(st: Int, e: Int) extends Range(st,e,1)  {
-  require(start <= end);
+  require(start <= end)
 
   /**
   * return true if the ranges have a non-empty intersection
@@ -32,9 +32,9 @@ case class Span(st: Int, e: Int) extends Range(st,e,1)  {
   * Return true if this' range contains the other range.
   */
   def contains(other:Span) = {
-    start <= other.start && end >= other.end;
+    start <= other.start && end >= other.end
   }
 
-  override def toString = "Span("+start + "," + end + ")";
+  override def toString = "Span("+start + "," + end + ")"
 
 }

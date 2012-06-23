@@ -5,11 +5,10 @@ import java.io.File
 import scalanlp.trees.annotations.FilterAnnotations
 import scalanlp.trees.annotations.TreeAnnotator
 import io.Source
-import scalala.library.Library
+import breeze.linalg._
 import scalanlp.parser.features.{GenFeaturizer, IndicatorFeature, WordShapeFeaturizer}
 import scalanlp.parser.projections.GrammarRefinements
-import scalala.tensor.Counter
-import scalanlp.epic.{ComponentFeature, Feature}
+import scalanlp.framework.{ComponentFeature, Feature}
 import scalanlp.parser.{AugmentedGrammar, BaseGrammar, RefinedGrammar, ParserParams}
 import scalanlp.trees._
 
@@ -30,8 +29,8 @@ case class ProductParserModelFactory(baseParser: ParserParams.BaseParser,
 
   type MyModel = LatentParserModel[AnnotatedLabel, (AnnotatedLabel, Seq[Int]), String]
 
-  def genSplits(numModels: Int, numStates: Int):Seq[Vector[Int]] = {
-    if(numModels == 0)  Seq(Vector.empty)
+  def genSplits(numModels: Int, numStates: Int):Seq[IndexedSeq[Int]] = {
+    if(numModels == 0)  Seq(IndexedSeq.empty)
     else for(r <- genSplits(numModels -1, numStates); i <- 0 until numStates) yield i +: r
   }
 
@@ -70,7 +69,7 @@ case class ProductParserModelFactory(baseParser: ParserParams.BaseParser,
       Map(xbarParser.root -> 1)
     }
 
-    val gen = new WordShapeFeaturizer(Library.sum(annWords))
+    val gen = new WordShapeFeaturizer(sum(annWords, Axis._0))
     def labelFlattener(l: (AnnotatedLabel, Seq[Int])) = {
       val basic = for( (ref,m) <- l._2.zipWithIndex) yield ComponentFeature(m, IndicatorFeature(l._1, ref))
       basic
@@ -84,7 +83,7 @@ case class ProductParserModelFactory(baseParser: ParserParams.BaseParser,
     println(finalRefinements.labels)
 
     val featureCounter = if (oldWeights ne null) {
-      val baseCounter = scalanlp.util.readObject[Counter[Feature, Double]](oldWeights)
+      val baseCounter = breeze.util.readObject[Counter[Feature, Double]](oldWeights)
       baseCounter
     } else {
       Counter[Feature, Double]()

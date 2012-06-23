@@ -2,15 +2,13 @@ package scalanlp.parser
 package models
 
 import features._
-import scalala.tensor.dense.DenseVector
-import scalanlp.collection.mutable.{TriangularArray, OpenAddressHashArray}
-import scalala.tensor.mutable.Counter
+import breeze.collection.mutable.{TriangularArray, OpenAddressHashArray}
+import breeze.linalg._
 import scalanlp.trees._
 import collection.mutable.ArrayBuilder
 import java.io.File
-import scalala.library.Library
-import scalanlp.util._
-import scalanlp.epic.Feature
+import breeze.util._
+import scalanlp.framework.Feature
 import projections.GrammarRefinements
 
 /**
@@ -240,7 +238,7 @@ object IndexedSpanFeaturizer {
     }, {(a, b) => a += b})
 
     val goldFeatureIndex = Index[Feature]()
-    for( (f, v) <- goldFeatures.pairsIteratorNonZero) {
+    for( (f, v) <- goldFeatures.activeIterator) {
        goldFeatureIndex.index(f)
     }
     println(goldFeatureIndex.size)
@@ -368,7 +366,7 @@ case class SpanModelFactory(baseParser: ParserParams.BaseParser,
     val (initLexicon, initBinaries, initUnaries) = GenerativeParser.extractCounts(trees)
 
     val (xbarGrammar, xbarLexicon) = baseParser.xbarGrammar(trees)
-    val summedCounts = Library.sum(initLexicon)
+    val summedCounts = sum(initLexicon, Axis._0)
     val shapeGen = new SimpleWordShapeGen(initLexicon, summedCounts)
 //    val tagShapeGen = new WordShapeFeaturizer(summedCounts)
 

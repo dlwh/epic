@@ -1,6 +1,6 @@
 package scalanlp.parser
 
-import scalanlp.util.Index
+import breeze.util.Index
 import scalanlp.trees.{Production, LexicalProduction}
 
 

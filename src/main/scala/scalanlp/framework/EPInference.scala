@@ -1,7 +1,7 @@
-package scalanlp.epic
+package scalanlp.framework
 
 import collection.mutable.ArrayBuffer
-import scalanlp.inference.{ExpectationPropagation, Factor}
+import breeze.inference.{ExpectationPropagation, Factor}
 
 case class EPInference[Datum, Augment](inferences: IndexedSeq[ProjectableInference[Datum, Augment]],
                                        maxEPIter: Int)(implicit aIsFactor: Augment <:< Factor[Augment]) extends AugmentableInference[Datum, Augment] {

@@ -1,12 +1,11 @@
 package scalanlp.parser
 
 import projections.{FileCachedCoreGrammar, ConstraintCoreGrammar}
-import scalanlp.config._
+import breeze.config._
 import java.io._
 import scalanlp.trees._
-import scalanlp.util._
-import scalala.library.Library
-import scalanlp.text.tokenize.EnglishWordClassGenerator
+import breeze.util._
+import breeze.text.tokenize.EnglishWordClassGenerator
 
 
 /**
@@ -97,7 +96,7 @@ trait ParserPipeline {
    * Trains a sequence of parsers and evaluates them.
    */
   def main(args: Array[String]) {
-    val (baseConfig, files) = scalanlp.config.CommandLineParser.parseArguments(args)
+    val (baseConfig, files) = CommandLineParser.parseArguments(args)
     val config = baseConfig backoff Configuration.fromPropertiesFiles(files.map(new File(_)))
     val params = config.readIn[ProcessedTreebank]("treebank")
     val specificParams = config.readIn[Params]("trainer")

@@ -1,7 +1,7 @@
 package scalanlp.parser
 package projections
 
-import scalanlp.util.Index
+import breeze.util.Index
 import scalanlp.trees._
 
 /**

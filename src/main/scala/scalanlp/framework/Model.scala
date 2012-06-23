@@ -1,19 +1,18 @@
-package scalanlp.epic
+package scalanlp.framework
 
 import collection.GenTraversable
-import scalanlp.optimize.BatchDiffFunction
+import breeze.optimize.BatchDiffFunction
 import actors.threadpool.AtomicInteger
-import scalanlp.util.{Index, Encoder}
-import scalala.tensor.dense.{DenseVectorCol, DenseVector}
-import scalanlp.serialization.DataSerialization
+import breeze.util.{Index, Encoder}
+import breeze.linalg._
+import breeze.serialization._
 import java.util.zip.GZIPOutputStream
 import java.io.{ObjectOutputStream, FileOutputStream, BufferedOutputStream, File}
-import scalala.tensor.Counter
 
 trait Model[Datum] {
   self =>
-  type ExpectedCounts <: scalanlp.epic.ExpectedCounts[ExpectedCounts]
-  type Inference <: scalanlp.epic.Inference[Datum] {
+  type ExpectedCounts <: scalanlp.framework.ExpectedCounts[ExpectedCounts]
+  type Inference <: scalanlp.framework.Inference[Datum] {
     type ExpectedCounts = self.ExpectedCounts
   }
 
@@ -26,7 +25,6 @@ trait Model[Datum] {
     val ctr = Encoder.fromIndex(featureIndex).decode(weights)
     val out = new ObjectOutputStream(new BufferedOutputStream(new GZIPOutputStream(new FileOutputStream(new File(prefix + ".ser.gz")))))
     implicit val serFeature: DataSerialization.ReadWritable[Feature] = DataSerialization.naiveReadWritable
-    implicit val ctrWritable: DataSerialization.Writable[Counter[Feature, Double]] = DataSerialization.counterReadWritable(serFeature, DataSerialization.doubleReadWritable, scalala.scalar.Scalar.scalarD)
     DataSerialization.write(out, ctr:Counter[Feature, Double])
     out.close()
   }
@@ -37,7 +35,7 @@ trait Model[Datum] {
 
   def emptyCounts: ExpectedCounts
 
-  def expectedCountsToObjective(ecounts: ExpectedCounts): (Double, DenseVectorCol[Double])
+  def expectedCountsToObjective(ecounts: ExpectedCounts): (Double, DenseVector[Double])
 }
 
 /**

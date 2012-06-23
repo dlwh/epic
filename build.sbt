@@ -2,9 +2,9 @@ import AssemblyKeys._ // put this at the top of the file
 import de.johoop.jacoco4sbt._
 import JacocoPlugin._
 
-name := "parser"
+name := "epicparser"
 
-version := "1.0"
+version := "0.1"
 
 organization := "org.scalanlp"
 
@@ -17,10 +17,9 @@ resolvers ++= Seq(
 
 libraryDependencies ++= Seq(
   "junit" % "junit" % "4.5" % "test",
-  "org.scalala" %% "scalala" % "1.0.0.RC3-SNAPSHOT",
-  "org.scalanlp" %% "scalanlp-data" % "0.5-SNAPSHOT",
-  "org.scalanlp" %% "scalanlp-learn" % "0.5-SNAPSHOT",
-  "org.scalanlp" %% "scalanlp-graphs" % "0.5-SNAPSHOT"
+  "org.scalanlp" %% "breeze-math" % "0.1-SNAPSHOT",
+  "org.scalanlp" %% "breeze-process" % "0.1-SNAPSHOT",
+  "org.scalanlp" %% "breeze-learn" % "0.1-SNAPSHOT"
 )
 
 libraryDependencies <<= (scalaVersion, libraryDependencies) { (sv, deps) =>

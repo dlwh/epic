@@ -18,10 +18,10 @@ package scalanlp.trees
 
 
 import scala.collection.mutable.ArrayBuffer
-import scalanlp.serialization.DataSerialization
-import scalanlp.serialization.DataSerialization._
+import breeze.serialization.DataSerialization
+import breeze.serialization.DataSerialization._
 import java.io.{StringReader, DataInput, DataOutput}
-import scalanlp.util.Lens
+import breeze.util.Lens
 
 @SerialVersionUID(1L)
 trait Tree[+L] extends Serializable {

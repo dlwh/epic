@@ -1,6 +1,6 @@
 package scalanlp.parser.features
 
-import scalanlp.epic.Feature
+import scalanlp.framework.Feature
 
 trait LexFeature extends Feature
 

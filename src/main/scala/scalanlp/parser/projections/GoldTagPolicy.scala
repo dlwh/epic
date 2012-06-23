@@ -1,7 +1,7 @@
 package scalanlp.parser.projections
 
 import scalanlp.trees.BinarizedTree
-import scalanlp.collection.mutable.TriangularArray
+import breeze.collection.mutable.TriangularArray
 
 trait GoldTagPolicy[L] {
   def isGoldTag(start: Int, end: Int, tag: Int): Boolean

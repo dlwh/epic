@@ -1,6 +1,6 @@
 package scalanlp.parser
 
-import scalanlp.util.EitherIndex
+import breeze.util.EitherIndex
 
 /**
  *

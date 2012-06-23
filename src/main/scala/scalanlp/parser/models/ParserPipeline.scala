@@ -1,11 +1,11 @@
 package scalanlp.parser.models
 
-import scalanlp.epic._
-import scalanlp.optimize.FirstOrderMinimizer.OptParams
+import scalanlp.framework._
+import breeze.optimize.FirstOrderMinimizer.OptParams
 import scalanlp.parser.Parser
 import scalanlp.parser.ParseEval.Statistics
-import scalala.tensor.dense.DenseVector
-import scalanlp.optimize.{RandomizedGradientCheckingFunction, BatchDiffFunction, FirstOrderMinimizer, CachedBatchDiffFunction}
+import breeze.linalg._
+import breeze.optimize._
 import scalanlp.trees.{TreeInstance, AnnotatedLabel}
 
 object ParserPipeline extends scalanlp.parser.ParserPipeline {

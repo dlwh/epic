@@ -1,4 +1,4 @@
-package scalanlp.epic
+package scalanlp.framework
 
 /**
  *
@@ -11,7 +11,7 @@ trait Inference[Datum] extends Serializable {
 }
 
 trait GoldGuessInference[Datum] extends Inference[Datum] {
-  type ExpectedCounts <: scalanlp.epic.ExpectedCounts[ExpectedCounts]
+  type ExpectedCounts <: scalanlp.framework.ExpectedCounts[ExpectedCounts]
 
   def guessCounts(value: Datum):ExpectedCounts
   def goldCounts(value: Datum):ExpectedCounts

@@ -1,7 +1,7 @@
 package scalanlp.trees
 
 import java.io.File
-import scalanlp.data.Example
+import breeze.data.Example
 
 /**
  * Represents a treebank with attendant spans, binarization, etc. Used in all the parser trainers.

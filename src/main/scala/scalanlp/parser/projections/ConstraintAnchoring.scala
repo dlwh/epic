@@ -1,13 +1,13 @@
 package scalanlp.parser
 package projections
 
-import scalanlp.config.Configuration
-import java.io._
-import scalanlp.collection.mutable.TriangularArray
-import scalanlp.trees._
-import scalanlp.util.Index
-import projections.ConstraintAnchoring.RawConstraints
+import breeze.collection.mutable.TriangularArray
+import breeze.config.Configuration
+import breeze.util.Index
 import collection.immutable.BitSet
+import java.io._
+import ConstraintAnchoring.RawConstraints
+import scalanlp.trees._
 
 /**
  * 
@@ -150,7 +150,7 @@ case class ProjectionParams(treebank: ProcessedTreebank,
 object ProjectTreebankToConstraints {
 
   def main(args: Array[String]) {
-    val (baseConfig, files) = scalanlp.config.CommandLineParser.parseArguments(args)
+    val (baseConfig, files) = breeze.config.CommandLineParser.parseArguments(args)
     val config = baseConfig backoff Configuration.fromPropertiesFiles(files.map(new File(_)))
     val params = config.readIn[ProjectionParams]("")
     val treebank = params.treebank.copy(maxLength = 1000000)
@@ -165,11 +165,11 @@ object ProjectTreebankToConstraints {
     val test = mapTrees(factory, treebank.testTrees, parser.grammar.labelIndex, useTree = false, maxL = 10000)
     val dev = mapTrees(factory, treebank.devTrees, parser.grammar.labelIndex, useTree = false, maxL = 10000)
     val map: Map[Seq[String], RawConstraints] = Map.empty ++ train ++ test ++ dev
-    scalanlp.util.writeObject(out, map)
+    breeze.util.writeObject(out, map)
   }
 
-  def loadParser[T](loc: File) = {
-    val parser = scalanlp.util.readObject[SimpleChartParser[AnnotatedLabel, String]](loc)
+  def loadParser[T](loc: File): SimpleChartParser[AnnotatedLabel, String] = {
+    val parser = breeze.util.readObject[SimpleChartParser[AnnotatedLabel, String]](loc)
     parser
   }
 

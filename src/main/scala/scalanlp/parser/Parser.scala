@@ -1,8 +1,8 @@
-package scalanlp.parser;
+package scalanlp.parser
 /*
  Copyright 2010 David Hall
 
- Licensed under the Apache License, Version 2.0 (the "License");
+ Licensed under the Apache License, Version 2.0 (the "License")
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
 
@@ -16,7 +16,7 @@ package scalanlp.parser;
 */
 
 
-import scalanlp.trees._;
+import scalanlp.trees._
 
 
 /**
@@ -31,7 +31,7 @@ trait Parser[L,W] extends (Seq[W]=>Tree[L]) {
    *
    * @param s the sentence
    */
-  def apply(s: Seq[W]) = bestParse(s);
+  def apply(s: Seq[W]) = bestParse(s)
 
   /**
    * Returns the best parse for the sentence. Optionally takes a [[scalanlp.parser.CoreAnchoring]], which
@@ -40,5 +40,5 @@ trait Parser[L,W] extends (Seq[W]=>Tree[L]) {
    *
    * @param s sentence
    */
-  def bestParse(s: Seq[W]):Tree[L];
+  def bestParse(s: Seq[W]):Tree[L]
 }

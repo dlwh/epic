@@ -1,7 +1,7 @@
 package scalanlp.parser.models
 
-import scalanlp.epic.{Model, ModelFactory}
-import scalala.tensor.dense.DenseVector
+import scalanlp.framework.{Model, ModelFactory}
+import breeze.linalg._
 import scalanlp.parser.Parser
 import scalanlp.trees.TreeInstance
 

@@ -2,7 +2,7 @@ package scalanlp.parser
 package projections
 
 import projections.AnchoredRuleProjector.AnchoredData
-import scalanlp.collection.mutable.{TriangularArray, OpenAddressHashArray}
+import breeze.collection.mutable.{TriangularArray, OpenAddressHashArray}
 
 /**
  * Creates a grammar using only span marginals and unary rule marginals
@@ -14,8 +14,8 @@ case class LabeledSpanProjector[L, W](grammar: BaseGrammar[L], threshold: Double
   private def normalize(ruleScores: OpenAddressHashArray[Double], totals: OpenAddressHashArray[Double]):OpenAddressHashArray[Double] = {
     if(ruleScores eq null) null
     else {
-      val r = new OpenAddressHashArray[Double](ruleScores.length, Double.NegativeInfinity, ruleScores.activeSize * 3 / 2)
-      for( (rule, score) <- ruleScores.pairsIterator) {
+      val r = new OpenAddressHashArray[Double](ruleScores.length, Double.NegativeInfinity)
+      for( (rule, score) <- ruleScores.activeIterator) {
         val parent = grammar.parent(rule)
         if(score > 0.9999999) {
           r(rule) = 10
@@ -30,8 +30,8 @@ case class LabeledSpanProjector[L, W](grammar: BaseGrammar[L], threshold: Double
   private def normalizeSpans(totals: OpenAddressHashArray[Double]):OpenAddressHashArray[Double] = {
     if(totals eq null) null
     else {
-      val r = new OpenAddressHashArray[Double](totals.length, Double.NegativeInfinity, totals.activeSize * 3 / 2)
-      for( (parent, score) <- totals.pairsIterator) {
+      val r = new OpenAddressHashArray[Double](totals.length, Double.NegativeInfinity)
+      for( (parent, score) <- totals.activeIterator) {
         if(score > 0.9999999) {
           r(parent) = 10
         } else if(score > 0) {

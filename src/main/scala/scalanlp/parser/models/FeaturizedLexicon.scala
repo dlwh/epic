@@ -1,7 +1,6 @@
 package scalanlp.parser.models
 
-import scalala.tensor.dense._
-import scalala.tensor.{Counter2, Counter, ::}
+import breeze.linalg._
 import scalanlp.parser.{TagScorer, Lexicon}
 
 /**

@@ -1,19 +1,16 @@
 package scalanlp.parser
 package models
 
-import scalanlp.epic._
-import scalanlp.collection.mutable.OpenAddressHashArray
-import scalala.tensor.dense.DenseVector
-import scalala.tensor.mutable.Counter
-import scalala.tensor.{Counter2,::}
-import scalanlp.text.tokenize.EnglishWordClassGenerator
+import scalanlp.framework._
+import breeze.collection.mutable.OpenAddressHashArray
+import breeze.linalg._
+import breeze.text.tokenize.EnglishWordClassGenerator
 import scalanlp.trees._
 import java.io.File
 import features._
-import scalala.library.Library
 import scalanlp.parser._
 import features.RuleFeature
-import scalanlp.util._
+import breeze.util._
 import collection.mutable.ArrayBuffer
 
 class LexModel[L, W](bundle: LexGrammarBundle[L, W],
@@ -434,8 +431,8 @@ case class LexGrammarBundle[L, W](baseGrammar: BaseGrammar[L],
           else dot(f.featuresForSpan(begin, end, label, ref))
         }
 
-        val bCache = new OpenAddressHashArray[Double](words.size * words.size * index.size, Double.NaN, words.size * index.size)
-        val uCache = new OpenAddressHashArray[Double](words.size * index.size, Double.NaN, words.size * index.size)
+        val bCache = new OpenAddressHashArray[Double](words.size * words.size * index.size, Double.NaN)
+        val uCache = new OpenAddressHashArray[Double](words.size * index.size, Double.NaN)
 
         def scoreUnaryRule(begin: Int, end: Int, rule: Int, head: Int) = {
           val cacheIndex = head + words.size * rule
@@ -592,7 +589,7 @@ object IndexedLexFeaturizer {
 
     val goldFeatureIndex = Index[Feature]()
     val lowCountFeatures = collection.mutable.Set[Feature]()
-    for( (f, v) <- goldFeatures.pairsIteratorNonZero) {
+    for( (f, v) <- goldFeatures.activeIterator) {
       if(v >= minFeatCutoff) {
         goldFeatureIndex.index(f)
       } else {
@@ -663,7 +660,7 @@ case class LexParserModelFactory(baseParser: ParserParams.BaseParser,
 
     val (xbarGrammar, xbarLexicon) = baseParser.xbarGrammar(trees)
     val wordIndex = Index(trainTrees.iterator.flatMap(_.words))
-    val summedCounts = Library.sum(initLexicon)
+    val summedCounts = sum(initLexicon, Axis._0)
     val shapeGen = new SimpleWordShapeGen(initLexicon, summedCounts)
     val tagShapeGen = new WordShapeFeaturizer(summedCounts)
 

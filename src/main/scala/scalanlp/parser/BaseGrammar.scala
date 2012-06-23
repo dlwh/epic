@@ -1,9 +1,8 @@
 package scalanlp.parser
 
-import scalanlp.collection.mutable.OpenAddressHashArray
 import collection.mutable.ArrayBuffer
-import scalanlp.util.{Index, Encoder}
-import scalala.tensor.Counter2
+import breeze.util.{Index, Encoder}
+import breeze.linalg.Counter2
 import scalanlp.trees._
 
 

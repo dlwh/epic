@@ -1,8 +1,8 @@
 package scalanlp.parser
 package models
 
-import scalala.tensor.dense.DenseVector
-import scalanlp.epic.{EPModel, EPInference}
+import breeze.linalg._
+import scalanlp.framework.{EPModel, EPInference}
 import scalanlp.trees.{TreeInstance, BinarizedTree}
 
 /**
