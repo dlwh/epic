@@ -16,7 +16,9 @@ class LabelScoreArray[L](length: Int, grammarSize: Int, fill: Double) extends Se
   // (begin,end) -> label ->  refinement -> score
   final val score: Array[Array[Array[Double]]] = new Array[Array[Array[Double]]](TriangularArray.arraySize(length+1))
   final val enteredLabels: Array[BitSet] = mkBitSetArray(TriangularArray.arraySize(length+1))
-  final val enteredRefinements: Array[Array[BitSet]] = TriangularArray.raw(length+1, mkBitSetArray(grammarSize))
+
+
+  final val enteredRefinements: Array[Array[BitSet]] = mkRefinementArray(TriangularArray.arraySize(length+1),grammarSize)
 
   /**
    * Same as labelScore
@@ -78,6 +80,18 @@ object LabelScoreArray {
     var i = 0
     while (i < arr.length) {
       arr(i) = new collection.mutable.BitSet()
+      i += 1
+    }
+    arr
+  }
+
+
+  @inline
+  def mkRefinementArray(length: Int, grammarSize: Int): Array[Array[BitSet]] = {
+    val arr = new Array[Array[BitSet]](length)
+    var i = 0
+    while (i < arr.length) {
+      arr(i) = mkBitSetArray(grammarSize)
       i += 1
     }
     arr

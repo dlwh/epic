@@ -243,87 +243,91 @@ object ChartMarginal {
       val coarseWideRight = top.coarseWideRight(begin)
       val coarseWideLeft = top.coarseWideLeft(end)
 
-      for {
-        a <- 0 until grammar.labelIndex.size
-        coreSpan = core.scoreSpan(begin, end, a) if coreSpan != Double.NegativeInfinity
-        refA <- refined.validLabelRefinements(begin, end, a)
-      } {
-        val passScore = refined.scoreSpan(begin, end, a, refA) + coreSpan
-        var offset = 0 // into scoreArray
-        if(!passScore.isInfinite) {
-          var ruleIndex = 0
-          // into rules
-          val rules = anchoring.refined.validCoarseRulesGivenParentRefinement(a, refA)
-          while(ruleIndex < rules.length) {
-            val r = rules(ruleIndex)
-            val b = g.leftChild(r)
-            val c = g.rightChild(r)
-            ruleIndex += 1
+      for ( a <- 0 until grammar.labelIndex.size ) {
+        val coreSpan = core.scoreSpan(begin, end, a)
+        if (coreSpan != Double.NegativeInfinity) {
+          val validA = refined.validLabelRefinements(begin, end, a)
+          var ai = 0
+          while(ai < validA.length) {
+            val refA = validA(ai)
+            ai += 1
+            val passScore = refined.scoreSpan(begin, end, a, refA) + coreSpan
+            var offset = 0 // into scoreArray
+            if(!passScore.isInfinite) {
+              var ruleIndex = 0
+              // into rules
+              val rules = anchoring.refined.validCoarseRulesGivenParentRefinement(a, refA)
+              while(ruleIndex < rules.length) {
+                val r = rules(ruleIndex)
+                val b = g.leftChild(r)
+                val c = g.rightChild(r)
+                ruleIndex += 1
 
-            // Check: can we build any refinement of this rule?
-            // basically, we can if TODO
-            val narrowR = coarseNarrowRight(b)
-            val narrowL = coarseNarrowLeft(c)
-            val coarseSplitBegin = math.max(narrowR, coarseWideLeft(c))
-            val coarseSplitEnd = math.min(coarseWideRight(b), narrowL) + 1
-            val canBuildThisRule = narrowR < end && narrowL >= narrowR && coarseSplitBegin <= narrowL && coarseSplitBegin < coarseSplitEnd
+                // Check: can we build any refinement of this rule?
+                // basically, we can if TODO
+                val narrowR = coarseNarrowRight(b)
+                val narrowL = coarseNarrowLeft(c)
+                val coarseSplitBegin = math.max(narrowR, coarseWideLeft(c))
+                val coarseSplitEnd = math.min(coarseWideRight(b), narrowL) + 1
+                val canBuildThisRule = narrowR < end && narrowL >= narrowR && coarseSplitBegin <= narrowL && coarseSplitBegin < coarseSplitEnd
 
-            if(canBuildThisRule) {
+                if(canBuildThisRule) {
 
-              // initialize core scores
-              ChartMarginal.fillCoreScores(coreScoreArray,
-                begin, end,
-                anchoring.core,
-                coarseSplitBegin, coarseSplitEnd,
-                r,
-                inside)
+                  // initialize core scores
+                  ChartMarginal.fillCoreScores(coreScoreArray,
+                    begin, end,
+                    anchoring.core,
+                    coarseSplitBegin, coarseSplitEnd,
+                    r,
+                    inside)
 
 
-              val refinements = refined.validRuleRefinementsGivenParent(begin, end, r, refA)
-              var ruleRefIndex = 0
-              while(ruleRefIndex < refinements.length) {
-                val refR = refinements(ruleRefIndex)
-                ruleRefIndex += 1
-                val refB = refined.leftChildRefinement(r, refR)
-                val refC = refined.rightChildRefinement(r, refR)
+                  val refinements = refined.validRuleRefinementsGivenParent(begin, end, r, refA)
+                  var ruleRefIndex = 0
+                  while(ruleRefIndex < refinements.length) {
+                    val refR = refinements(ruleRefIndex)
+                    ruleRefIndex += 1
+                    val refB = refined.leftChildRefinement(r, refR)
+                    val refC = refined.rightChildRefinement(r, refR)
 
-                val narrowR = narrowRight(b)(refB)
-                val narrowL = narrowLeft(c)(refC)
-                var split = math.max(narrowR, wideLeft(c)(refC))
-                val endSplit = math.min(wideRight(b)(refB), narrowL) + 1
-                val canBuildThisRule = narrowR < end && narrowL >= narrowR && split <= narrowL && split < endSplit
-                if(!canBuildThisRule)
-                  split = endSplit
+                    val narrowR = narrowRight(b)(refB)
+                    val narrowL = narrowLeft(c)(refC)
+                    var split = math.max(narrowR, wideLeft(c)(refC))
+                    val endSplit = math.min(wideRight(b)(refB), narrowL) + 1
+                    val canBuildThisRule = narrowR < end && narrowL >= narrowR && split <= narrowL && split < endSplit
+                    if(!canBuildThisRule)
+                      split = endSplit
 
-                while(split < endSplit) {
-                  val bScore = inside.top.labelScore(begin, split, b, refB)
-                  val cScore = inside.top.labelScore(split, end, c, refC)
-                  val withoutRule = bScore + cScore + passScore + coreScoreArray(split)
-                  if(withoutRule != Double.NegativeInfinity) {
+                    while(split < endSplit) {
+                      val bScore = inside.top.labelScore(begin, split, b, refB)
+                      val cScore = inside.top.labelScore(split, end, c, refC)
+                      val withoutRule = bScore + cScore + passScore + coreScoreArray(split)
+                      if(withoutRule != Double.NegativeInfinity) {
 
-                    val prob = withoutRule + refined.scoreBinaryRule(begin, split, end, r, refR)
+                        val prob = withoutRule + refined.scoreBinaryRule(begin, split, end, r, refR)
 
-                    if(!java.lang.Double.isInfinite(prob)) {
-                      scoreArray(offset) = prob
-                      offset += 1
-                      // buffer full
-                      if(offset == scoreArray.length) {
-                        scoreArray(0) = inside.sum(scoreArray, offset)
-                        offset = 1
+                        if(!java.lang.Double.isInfinite(prob)) {
+                          scoreArray(offset) = prob
+                          offset += 1
+                          // buffer full
+                          if(offset == scoreArray.length) {
+                            scoreArray(0) = inside.sum(scoreArray, offset)
+                            offset = 1
+                          }
+                        }
                       }
+                      split += 1
                     }
                   }
-                  split += 1
                 }
               }
             }
+            // done updating vector, do an enter:
+            if(offset > 0) {
+              inside.bot.enterSum(begin, end, a, refA, scoreArray, offset)
+            }
           }
         }
-        // done updating vector, do an enter:
-        if(offset > 0) {
-          inside.bot.enterSum(begin, end, a, refA, scoreArray, offset)
-        }
-
       }
       updateInsideUnaries(inside, anchoring, begin, end)
     }
