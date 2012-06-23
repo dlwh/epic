@@ -15,7 +15,7 @@ case class AnchoredPCFGProjector[L, W](grammar: BaseGrammar[L], threshold: Doubl
   private def normalize(ruleScores: OpenAddressHashArray[Double], totals: OpenAddressHashArray[Double]):OpenAddressHashArray[Double] = {
     if(ruleScores eq null) null
     else {
-      val r = new OpenAddressHashArray[Double](ruleScores.length, Double.NegativeInfinity)
+      val r = new OpenAddressHashArray[Double](ruleScores.length, Double.NegativeInfinity, ruleScores.activeSize)
       for( (rule, score) <- ruleScores.activeIterator) {
         val parent = grammar.parent(rule)
         if(score > 0)
@@ -49,7 +49,7 @@ case class AnchoredRuleMarginalProjector[L, W](threshold: Double = Double.Negati
   private def normalize(ruleScores: OpenAddressHashArray[Double]):OpenAddressHashArray[Double] = {
     if(ruleScores eq null) null
     else {
-      val r = new OpenAddressHashArray[Double](ruleScores.length, Double.NegativeInfinity)
+      val r = new OpenAddressHashArray[Double](ruleScores.length, Double.NegativeInfinity, ruleScores.activeSize)
       for( (rule, score) <- ruleScores.activeIterator) {
         r(rule) = math.log(score)
       }
