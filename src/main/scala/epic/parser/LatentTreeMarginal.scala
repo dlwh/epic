@@ -24,7 +24,7 @@ case class LatentTreeMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
   def visitPostorder(spanVisitor: AnchoredVisitor[L], threshold: Double = Double.NegativeInfinity) = {
     // normalizer
     if (partition.isInfinite || partition.isNaN)
-      sys.error("NAn or infinite" + partition + " " + tree.render(words))
+      sys.error("NAn or infinite" + partition + " " + stree.label.inside.mkString(", "))
 
     stree.postorder foreach {
       case t@NullaryTree(Beliefs(label, labels, iScores, oScores), span) =>
@@ -101,6 +101,7 @@ case class LatentTreeMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
         } {
           scores(i) = wScore
           assert(!wScore.isInfinite)
+          assert(!wScore.isNaN)
           foundOne = true
         }
         if(!foundOne) {
@@ -121,6 +122,7 @@ case class LatentTreeMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
             if (ruleRef != -1) {
               val score = anchoring.scoreUnaryRule(t.span.start, t.span.end, rule, ruleRef)
               val ruleScore = ( cScores(ci) + score)
+              assert(!ruleScore.isNaN)
               if(!ruleScore.isInfinite) {
                 foundOne = true
               }
@@ -164,6 +166,7 @@ case class LatentTreeMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
                 + anchoring.scoreBinaryRule(begin, split, end, rule, ruleRef)
                 + spanScore
                 )
+              assert(!arr(i).isNaN)
               i += 1
               ci += 1
             }

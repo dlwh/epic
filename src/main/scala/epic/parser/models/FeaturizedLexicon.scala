@@ -30,6 +30,7 @@ class FeaturizedLexicon[L, L2, W](val weights: DenseVector[Double],
   for ((wordMap, tagIndex) <- featureIndexer.lexicalCache.iterator.zipWithIndex;
        (word, feats) <- wordMap) {
     val score = featureIndexer.computeWeight(tagIndex, word, weights)
+    assert(!score.isNaN, tagIndex + " " + word + weights.valuesIterator.exists(_.isNaN))
     wordScores(word, featureIndexer.labelIndex.get(tagIndex)) = score
     assert(wordScores(word, featureIndexer.labelIndex.get(tagIndex)) != Double.NegativeInfinity, (word, featureIndexer.labelIndex.get(tagIndex)).toString + "\n" +
       featureIndexer.decode(feats) + " " + featureIndexer.decode(weights))
