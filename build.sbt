@@ -8,7 +8,7 @@ version := "0.1"
 
 organization := "org.scalanlp"
 
-scalaVersion := "2.9.1"
+scalaVersion := "2.9.2"
 
 resolvers ++= Seq(
   "ScalaNLP Maven2" at "http://repo.scalanlp.org/repo",
@@ -24,9 +24,8 @@ libraryDependencies ++= Seq(
 
 libraryDependencies <<= (scalaVersion, libraryDependencies) { (sv, deps) =>
   sv match {
-    case "2.9.1" =>
-      (deps :+ ("org.scalatest" % "scalatest" % "1.4.RC2" % "test")
-            :+ ("org.scala-tools.testing" %% "scalacheck" % "1.9" % "test"))
+    case "2.9.2" =>
+      (deps :+ ("org.scalatest" % "scalatest" % "1.4.RC2" % "test"))
     case x if x.startsWith("2.8") =>
       (deps :+ ("org.scalatest" % "scalatest" % "1.3" % "test")
             :+ ("org.scala-tools.testing" % "scalacheck_2.8.1" % "1.8" % "test"))
