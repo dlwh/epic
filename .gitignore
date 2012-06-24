@@ -1,0 +1,16 @@
+target/
+gold
+guess
+cache/
+profiles/
+scripts/
+parsers/
+.idea
+lib_managed/
+tmp/
+*_managed
+*target
+.scala_dependencies
+.*.swp
+*.jar
+.idea*
