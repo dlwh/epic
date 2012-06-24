@@ -1,9 +1,9 @@
 package epic.trees
 
 /*
- Copyright 2010 David Hall
+ Copyright 2012 David Hall
 
- Licensed under the Apache License, Version 2.0 (the "License");
+ Licensed under the Apache License, Version 2.0 (the "License")
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
 
@@ -19,7 +19,6 @@ package epic.trees
 
 import java.io.{FileReader, File, FileInputStream, InputStreamReader}
 import java.io.File
-import io.Codec
 
 /**
  * A Treebank contains a train set, a test set, and a dev set, which are "Portions". Portions
@@ -33,7 +32,7 @@ trait Treebank[L] { outer =>
    * Class for a split of a training set.
    */
   case class Portion(name: String, sections: Seq[String]) {
-    def trees = treesFromSections(sections);
+    def trees = treesFromSections(sections)
   }
 
   /**
@@ -56,39 +55,38 @@ trait Treebank[L] { outer =>
   /**
    * Every section in the treebank
    */
-  def sections: Seq[String];
+  def sections: Seq[String]
 
   /**
    * Read the trees from a section
    */
-  def treesFromSection(sec: String): Iterator[(Tree[L],Seq[String])];
+  def treesFromSection(sec: String): Iterator[(Tree[L],Seq[String])]
 
   def treesFromSections(secs: Seq[String]) = {
-    for(sec <- secs.iterator;
-        tree <- treesFromSection(sec))
-      yield tree;
+    for(sec <- secs.iterator; tree <- treesFromSection(sec))
+      yield tree
   }
 
   /**
    * All trees
    */
-  def trees: Iterator[(Tree[L],Seq[String])] = treesFromSections(sections);
+  def trees: Iterator[(Tree[L],Seq[String])] = treesFromSections(sections)
 }
 
 object Treebank {
 
-  import scala.io.Source;
+  import scala.io.Source
   /**
   * Reads a treebank from the "mrg/wsj" section
   * of the parsed Treebank.
   */
   def fromPennTreebankDir(dir: File):Treebank[String] = new Treebank[String] {
-    def sections = dir.listFiles.filter(_.isDirectory).map(_.getName);
-    val train = Portion("train", Seq.range(2,10).map("0" + _) ++ Seq.range(10,22).map(""+_));
+    def sections = dir.listFiles.filter(_.isDirectory).map(_.getName)
+    val train = Portion("train", Seq.range(2,10).map("0" + _) ++ Seq.range(10,22).map(""+_))
 
-    val test = Portion("test",Seq("23"));
+    val test = Portion("test",Seq("23"))
 
-    val dev = Portion("dev",Seq("22"));
+    val dev = Portion("dev",Seq("22"))
 
     def treesFromSection(sec: String) = {
       for(file <- new File(dir,sec).listFiles.iterator;
@@ -100,12 +98,12 @@ object Treebank {
 
   def fromGermanTreebank(dir: File):Treebank[String] = {
     import scala.io.Codec.ISO8859
-    implicit val cod = ISO8859;
+    implicit val cod = ISO8859
     new SimpleTreebank(new File(dir + "/negra_1.mrg"),new File(dir + "/negra_2.mrg"),new File(dir + "/negra_3.mrg"))
   }
 
   def fromChineseTreebankDir(dir: File):Treebank[String] = new Treebank[String] {
-    def sections = dir.listFiles.map(_.getName);
+    def sections = dir.listFiles.map(_.getName)
     private def id_to_name(id: Int) = "chtb_" + {if(id < 100)  "0" + id else id} +".mrg"
 
     val train = Portion("train",{(1 to 270) ++ (400 to 1151)} map(id_to_name))
@@ -115,7 +113,7 @@ object Treebank {
     def treesFromSection(sec: String) = {
       val file = new File(dir,sec)
       println(file)
-      val pennReader = new PennTreeReader(new InputStreamReader(new FileInputStream(file),"UTF-8"));
+      val pennReader = new PennTreeReader(new InputStreamReader(new FileInputStream(file),"UTF-8"))
       for(tree <- pennReader)
         yield tree
     }

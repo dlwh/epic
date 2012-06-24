@@ -4,7 +4,7 @@ import breeze.serialization.DataSerialization
 import java.io.DataOutput
 
 /*
- Copyright 2010 David Hall
+ Copyright 2012 David Hall
 
  Licensed under the Apache License, Version 2.0 (the "License")
  you may not use this file except in compliance with the License.

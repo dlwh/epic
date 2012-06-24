@@ -1,6 +1,6 @@
-package epic.trees;
+package epic.trees
 /*
- Copyright 2011 David Hall
+ Copyright 2012 David Hall
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
