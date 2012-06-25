@@ -37,27 +37,24 @@ trait ChartParser[L, W] extends Parser[L, W] with Serializable {
  */
 @SerialVersionUID(1)
 class SimpleChartParser[L, W](val augmentedGrammar: AugmentedGrammar[L, W],
-                              val decoder: ChartDecoder[L, W]) extends ChartParser[L, W] with Serializable {
+                              val decoder: ChartDecoder[L, W],
+                              val maxMarginals: Boolean = false) extends ChartParser[L, W] with Serializable {
 
   def charts(w: Seq[W]) = try {
-    ChartMarginal(augmentedGrammar, w, ParseChart.logProb)
+    ChartMarginal(augmentedGrammar, w, if(maxMarginals) ParseChart.viterbi else ParseChart.logProb)
   } catch {
-    case e =>
-      try {
-        ChartMarginal(AugmentedGrammar.fromRefined(augmentedGrammar.refined), w, ParseChart.logProb)
-      } catch {
-        case e2 =>
-          throw e
-
-      }
+    case e => throw e
   }
   def grammar = augmentedGrammar.grammar
 
 }
 
 object SimpleChartParser {
-  def apply[L, W](grammar: AugmentedGrammar[L, W]) = {
-    new SimpleChartParser[L, W](grammar, new MaxRuleProductDecoder(grammar.grammar, grammar.lexicon))
+  def apply[L, W](grammar: AugmentedGrammar[L, W], viterbi: Boolean = false) = {
+    if(!viterbi)
+      new SimpleChartParser[L, W](grammar, new MaxRuleProductDecoder(grammar.grammar, grammar.lexicon), false)
+    else
+     new SimpleChartParser[L, W](grammar, new ViterbiDecoder, false)
   }
 
 }

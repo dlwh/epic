@@ -147,7 +147,7 @@ class ViterbiDecoder[L, W] extends ChartDecoder[L, W] with Serializable {
  * @author dlwh
  */
 case class MaxRuleProductDecoder[L, W](grammar: BaseGrammar[L], lexicon: Lexicon[L, W]) extends ChartDecoder[L, W] {
-  private val p = new AnchoredRuleMarginalProjector[L,W]()
+  private val p = new AnchoredRuleMarginalProjector[L,W](-7)
 
   def extractBestParse(marginal: ChartMarginal[ParseChart, L, W]): BinarizedTree[L] = {
     val anchoring = p.project(marginal)

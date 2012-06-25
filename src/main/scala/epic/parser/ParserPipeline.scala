@@ -54,9 +54,9 @@ object ParserParams {
         constraintsCache(path).asInstanceOf[CoreGrammar[L, W]]
       } else {
         val uncached: CoreGrammar[L, W] = if(path eq null) {
-          new ConstraintCoreGrammar[L,W](baseFactory, threshold)
+          new ConstraintCoreGrammar[L,W](baseFactory, threshold, true)
         } else {
-          val constraint = new ConstraintCoreGrammar[L,W](baseFactory, threshold)
+          val constraint = new ConstraintCoreGrammar[L,W](baseFactory, threshold, true)
           new FileCachedCoreGrammar(constraint, path)
         }
 
@@ -124,6 +124,10 @@ trait ParserPipeline {
 
     for((name, parser) <- parsers) {
       println("Parser " + name)
+      val outDir = new File("parsers/")
+      outDir.mkdirs()
+      val out = new File(outDir, name +".parser")
+      writeObject(out, parser)
 
       println("Evaluating Parser...")
       val stats = evalParser(devTrees, parser, name+"-dev")
@@ -131,10 +135,6 @@ trait ParserPipeline {
       import stats._
       println("Eval finished. Results:")
       println( "P: " + precision + " R:" + recall + " F1: " + f1 +  " Ex:" + exact + " Tag Accuracy: " + tagAccuracy)
-      val outDir = new File("parsers/")
-      outDir.mkdirs()
-      val out = new File(outDir, name +".parser")
-      writeObject(out, parser)
     }
   }
 

@@ -31,6 +31,9 @@ trait RefinedAnchoring[L, W] extends Factor[RefinedAnchoring[L, W]] {
   def lexicon: Lexicon[L, W]
   def words: Seq[W]
 
+
+  def logPartition: Double = marginal.partition
+
   /**
    * Scores the indexed label rule with refinenemnt ref, when it occurs at (begin, end). Can be used for s, or for a
    * "bottom" label. Mainly used for s.
@@ -77,11 +80,7 @@ trait RefinedAnchoring[L, W] extends Factor[RefinedAnchoring[L, W]] {
     else new ProductRefinedAnchoring(this,other,-1)
   }
 
-  def logPartition = {
-    marginal.partition
-  }
-
-  lazy val marginal = AugmentedAnchoring.fromRefined(this).marginal
+  def marginal = AugmentedAnchoring.fromRefined(this).marginal
 
   def isConvergedTo(f: RefinedAnchoring[L, W], diff: Double):Boolean = {
     import scala.util.control.Breaks._

@@ -19,24 +19,35 @@ import epic.trees.BinarizedTree
 import breeze.collection.mutable.TriangularArray
 
 trait GoldTagPolicy[L] {
-  def isGoldTag(start: Int, end: Int, tag: Int): Boolean
+  def isGoldTopTag(start: Int, end: Int, tag: Int): Boolean
+  def isGoldBotTag(start: Int, end: Int, tag: Int): Boolean
 }
 
 object GoldTagPolicy {
   def noGoldTags[L]:GoldTagPolicy[L] = new GoldTagPolicy[L] {
-    def isGoldTag(start: Int, end: Int, tag: Int) = false
+    def isGoldTopTag(start: Int, end: Int, tag: Int): Boolean = false
+    def isGoldBotTag(start: Int, end: Int, tag: Int): Boolean = false
   }
 
   def candidateTreeForcing[L](tree: BinarizedTree[Seq[Int]]):GoldTagPolicy[L] ={
-    val gold = TriangularArray.raw(tree.span.end+1,collection.mutable.BitSet());
+    val goldTop = TriangularArray.raw(tree.span.end+1,collection.mutable.BitSet())
+    val goldBot = TriangularArray.raw(tree.span.end+1,collection.mutable.BitSet())
     if(tree != null) {
       for( t <- tree.allChildren) {
-        gold(TriangularArray.index(t.span.start,t.span.end)) ++= t.label
+        if(t.children.size == 1)
+          goldTop(TriangularArray.index(t.span.start,t.span.end)) ++= t.label
+        else
+          goldBot(TriangularArray.index(t.span.start,t.span.end)) ++= t.label
       }
     }
     new GoldTagPolicy[L] {
-      def isGoldTag(start: Int, end: Int, tag: Int) = {
-        val set = gold(TriangularArray.index(start,end))
+      def isGoldTopTag(start: Int, end: Int, tag: Int) = {
+        val set = goldTop(TriangularArray.index(start,end))
+        set != null && set.contains(tag)
+      }
+
+      def isGoldBotTag(start: Int, end: Int, tag: Int): Boolean = {
+        val set = goldBot(TriangularArray.index(start,end))
         set != null && set.contains(tag)
       }
     }
@@ -44,17 +55,27 @@ object GoldTagPolicy {
 
 
   def goldTreeForcing[L](trees: BinarizedTree[Int]*):GoldTagPolicy[L] ={
-    val gold = TriangularArray.raw(trees.head.span.end+1,collection.mutable.BitSet());
+    val goldTop = TriangularArray.raw(trees.head.span.end+1,collection.mutable.BitSet())
+    val goldBot = TriangularArray.raw(trees.head.span.end+1,collection.mutable.BitSet())
     for(tree <- trees) {
       if(tree != null) {
         for( t <- tree.allChildren) {
-          gold(TriangularArray.index(t.span.start,t.span.end)) += t.label
+          if(t.children.size == 1)
+            goldTop(TriangularArray.index(t.span.start,t.span.end)) += t.label
+          else
+            goldBot(TriangularArray.index(t.span.start,t.span.end)) += t.label
         }
       }
     }
     new GoldTagPolicy[L] {
-      def isGoldTag(start: Int, end: Int, tag: Int) = {
-        gold(TriangularArray.index(start,end)) contains tag
+      def isGoldTopTag(start: Int, end: Int, tag: Int) = {
+        val set = goldTop(TriangularArray.index(start,end))
+        set != null && set.contains(tag)
+      }
+
+      def isGoldBotTag(start: Int, end: Int, tag: Int): Boolean = {
+        val set = goldBot(TriangularArray.index(start,end))
+        set != null && set.contains(tag)
       }
     }
   }

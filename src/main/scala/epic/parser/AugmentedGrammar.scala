@@ -59,13 +59,14 @@ object AugmentedGrammar {
  * the refined and core anchorings it contains.
  */
 @SerialVersionUID(2L)
-final case class AugmentedAnchoring[L, W](refined: RefinedAnchoring[L, W], core: CoreAnchoring[L, W]) {
+final case class AugmentedAnchoring[L, W](refined: RefinedAnchoring[L, W], core: CoreAnchoring[L, W], viterbi: Boolean = false) {
   def grammar: BaseGrammar[L] = refined.grammar
   def lexicon: Lexicon[L, W] = refined.lexicon
   def words = refined.words
 
   /** The marginal associated with this anchoring (i.e. inside and outside scores) */
   def marginal = ChartMarginal(this, words, ParseChart.logProb)
+  def maxMarginal = ChartMarginal(this, words, ParseChart.viterbi)
 
   /**
    * Scores the [[epic.trees.BinaryRule]] with its refinement in this context.
@@ -116,13 +117,13 @@ final case class AugmentedAnchoring[L, W](refined: RefinedAnchoring[L, W], core:
 }
 
 object AugmentedAnchoring {
-  def fromRefined[L, W](refined: RefinedAnchoring[L, W]) = {
-    AugmentedAnchoring(refined, CoreAnchoring.identity(refined.grammar, refined.lexicon, refined.words))
+  def fromRefined[L, W](refined: RefinedAnchoring[L, W], viterbi: Boolean = false) = {
+    AugmentedAnchoring(refined, CoreAnchoring.identity(refined.grammar, refined.lexicon, refined.words), viterbi)
   }
 
 
-  def fromCore[L, W](core: CoreAnchoring[L, W]) = {
-    AugmentedAnchoring(RefinedAnchoring.identity(core.grammar, core.lexicon, core.words), core)
+  def fromCore[L, W](core: CoreAnchoring[L, W], viterbi: Boolean = false) = {
+    AugmentedAnchoring(RefinedAnchoring.identity(core.grammar, core.lexicon, core.words), core, viterbi)
   }
 }
 

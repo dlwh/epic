@@ -52,7 +52,7 @@ abstract class ParseChart[L](val index: Index[L],
       enter(begin, end, parent, ref, sum(w,length))
     }
 
-    def labelScore(begin: Int, end: Int, parent: L, ref: Int):Double = {
+    @inline final def labelScore(begin: Int, end: Int, parent: L, ref: Int):Double = {
       labelScore(begin, end, index(parent), ref)
     }
 

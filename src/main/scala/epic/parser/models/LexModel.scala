@@ -139,7 +139,7 @@ class IndexedLexFeaturizer[L, W](f: LexFeaturizer[L, W],
     def featuresForTag(tag: Int, head: Int): Array[Int] = {
       var rcache = wordCache(head)
       if(rcache eq null) {
-        rcache = new OpenAddressHashArray[Array[Int]](labelIndex.size)
+        rcache = new OpenAddressHashArray[Array[Int]](labelIndex.size, null:Array[Int], 2)
         wordCache(head) = rcache
       }
       var cache = rcache(tag)

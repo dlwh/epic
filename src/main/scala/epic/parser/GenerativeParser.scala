@@ -99,7 +99,9 @@ object GenerativeParser {
 
 object GenerativePipeline extends ParserPipeline {
   case class Params(baseParser: BaseParser,
-                    annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = new FilterAnnotations(Set.empty[Annotation]))
+                    annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = new FilterAnnotations(Set.empty[Annotation]),
+                    viterbi: Boolean= true,
+                    maxRule: Boolean = false)
   protected val paramManifest = manifest[Params]
 
   def trainParser(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]],
@@ -119,7 +121,8 @@ object GenerativePipeline extends ParserPipeline {
 
     val (words, binary, unary) = GenerativeParser.extractCounts(transformed)
     val refinedGrammar = RefinedGrammar.generative(xbar, xbarLexicon, indexedRefinements, binary, unary, words)
-    val parser = SimpleChartParser(AugmentedGrammar.fromRefined(refinedGrammar))
+    val decoder = if (params.maxRule) new MaxRuleProductDecoder(xbar, xbarLexicon) else new ViterbiDecoder[AnnotatedLabel, String]
+    val parser = new SimpleChartParser(AugmentedGrammar.fromRefined(refinedGrammar), decoder, maxMarginals = params.viterbi)
     Iterator.single(("Gen", parser))
   }
 }
