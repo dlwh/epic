@@ -33,22 +33,25 @@ abstract class ParseChart[L](val index: Index[L],
 
   final class ChartScores private[ParseChart]() extends LabelScoreArray[L](length, grammarSize, zero) {
 
-    private[ParseChart] def scoreArray = score
-
-    def enter(begin: Int, end: Int, parent: Int, ref: Int, w: Double):Boolean = {
-      val index = TriangularArray.index(begin, end)
+    def rawEnter(begin: Int, end: Int, parent: Int, ref: Int, w: Double) = {
       val arr = ensureLabelArray(begin, end, parent, refinementsFor(parent))
       val oldScore = arr(ref)
       val newScore = sum(oldScore, w)
       arr(ref) = newScore
-
-      if(oldScore == zero) {
-        updateExtents(index, parent, ref, begin, end)
-      }
-      newScore > oldScore
+      oldScore
     }
 
-    def enterSum(begin: Int, end: Int, parent: Int, ref: Int, w: Array[Double], length: Int):Boolean = {
+
+    def enter(begin: Int, end: Int, parent: Int, ref: Int, w: Double) {
+      val oldScore =  rawEnter(begin, end, parent, ref, w)
+
+      if(oldScore == zero) {
+        val index = TriangularArray.index(begin, end)
+        updateExtents(index, parent, ref, begin, end)
+      }
+    }
+
+    def enterSum(begin: Int, end: Int, parent: Int, ref: Int, w: Array[Double], length: Int) = {
       enter(begin, end, parent, ref, sum(w,length))
     }
 

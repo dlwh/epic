@@ -113,10 +113,7 @@ class InsideOutsideTest extends FunSuite {
 
     assert(outside.top.enteredLabelScores(0,3).toSeq.length near 0)
     assert((outside.top.labelScore(1,4, "VPu", 0) - math.log(1.0/3.0)).abs < 1E-4, outside.top.enteredLabelScores(1,4).toIndexedSeq)
-    assert(outside.top.enteredLabelScores(1,4).toSeq.length near 1)
 
-    assert(outside.top.enteredLabelScores(0,2).toSeq.length near 0)
-    assert(outside.top.enteredLabelScores(1,3).toSeq.length near 0)
     assert((outside.bot.labelScore(0,1,"PRP", 0) - math.log(1.0/9.0)).abs < 1E-5, outside.bot.labelScore(0,1,"PRP", 0) + " " + math.log(1.0/9.0))
 
     assert((outside.top.labelScore(2,4, "NPu", 0) - math.log(1.0/6.0)).abs < 1E-6, outside.top.labelScore(2,4,"NPu", 0) -> "NP" -> outside.bot.labelScore(2,4,"NPb", 0))
@@ -124,9 +121,7 @@ class InsideOutsideTest extends FunSuite {
 
     assert((outside.top.labelScore(0,1,"NPu", 0) - math.log(1.0/3.0)).abs < 1E-5, outside.top.enteredLabelScores(0,1).toIndexedSeq + "NPu")
     assert((outside.bot.labelScore(1,2,"VBZ", 0) - math.log(1.0/9.0)).abs < 1E-5, outside.bot.enteredLabelScores(1,2).toIndexedSeq + "VBZb")
-    assert(outside.top.enteredLabelScores(1,2).toSeq.length near 1)
     assert((outside.bot.labelScore(2,3,"JJ", 0) - math.log(1.0/9.0)).abs < 1E-5, outside.bot.enteredLabelScores(2,3).toIndexedSeq + "JJ")
-    assert(outside.bot.enteredLabelScores(2,3).toSeq.length near 1)
     assert((outside.top.labelScore(3,4, "NPu", 0) - math.log(1.0/6.0)).abs < 1E-5, outside.top.enteredLabelScores(3,4).toIndexedSeq + "NP")
     assert((outside.bot.labelScore(3,4,"NN", 0) - math.log(1.0/9.0)).abs < 1E-5, outside.bot.labelScore(3,4,"NN", 0) + "NN")
   }

@@ -385,8 +385,8 @@ object ChartMarginal {
       updateOutsideUnaries(outside, inside, anchoring, begin, end)
       if(span > 1)
       // a ->  bc  [begin, split, end)
-        for ( a <- outside.bot.enteredLabelIndexes(begin, end);
-              refA <- outside.bot.enteredLabelRefinements(begin, end, a) ) {
+        for ( a <- inside.bot.enteredLabelIndexes(begin, end);
+              refA <- inside.bot.enteredLabelRefinements(begin, end, a) ) {
           val coreScore = core.scoreSpan(begin, end, a)
           val aScore:Double = outside.bot.labelScore(begin, end, a, refA) + refined.scoreSpan(begin, end, a, refA) + coreScore
           if (!aScore.isInfinite) {
@@ -434,8 +434,8 @@ object ChartMarginal {
                       val score = aScore + ruleScore
                       val bOutside = score + cInside
                       val cOutside = score + bInside
-                      outside.top.enter(begin, split, b, refB, bOutside)
-                      outside.top.enter(split, end, c, refC, cOutside)
+                      outside.top.rawEnter(begin, split, b, refB, bOutside)
+                      outside.top.rawEnter(split, end, c, refC, cOutside)
                     }
 
                     split += 1
@@ -488,7 +488,7 @@ object ChartMarginal {
     val refined = anchoring.refined
     val core = anchoring.core
     val grammar = anchoring.grammar
-    for(ai <- chart.top.enteredLabelIndexes(begin, end); refA <- chart.top.enteredLabelRefinements(begin, end, ai)) {
+    for(ai <- inside.top.enteredLabelIndexes(begin, end); refA <- inside.top.enteredLabelRefinements(begin, end, ai)) {
       val a = ai
       val bScore = chart.top.labelScore(begin, end, a, refA)
       val rules = grammar.indexedUnaryRulesWithParent(a)
@@ -503,7 +503,7 @@ object ChartMarginal {
             val ruleScore: Double = refined.scoreUnaryRule(begin, end, rules(j), refR) + coreScore
             val prob: Double = bScore + ruleScore
             if(prob != Double.NegativeInfinity) {
-              chart.bot.enter(begin, end, b, refB, prob)
+              chart.bot.rawEnter(begin, end, b, refB, prob)
             }
           }
         }

@@ -265,7 +265,7 @@ class MaxConstituentDecoder[L, W] extends ChartDecoder[L, W] {
         var bestRule = candidateUnaries(0)
         var bestScore = Double.NegativeInfinity
         for (r <- candidateUnaries) {
-          val aRefinements = outside.top.enteredLabelRefinements(begin, end, bestTop).toArray
+          val aRefinements = inside.top.enteredLabelRefinements(begin, end, bestTop).toArray
           val bRefinements = inside.bot.enteredLabelRefinements(begin, end, bestBot).toArray
           val arr = new Array[Double](aRefinements.length * bRefinements.length)
           var i = 0
