@@ -20,20 +20,6 @@ import epic.trees.{Span, Tree}
 import java.io.{PushbackReader, Reader, InputStream}
 import collection.mutable.ArrayBuffer
 
-/**
- * Represents an ontonotes document (a single file)
- */
-case class Document(id: String, sentences: Seq[Sentence])
-
-object Document {
-  /**
-   * Reads a single document reprseented as the XML file format
-   * <document id="..."> <sentence> ... </sentence> </document>
-   */
-  def fromXML(node: xml.Node) = {
-    Document(node \ "@id" text, node \ "sentence" map {Sentence.fromXML _})
-  }
-}
 
 /**
  * represents an annotation ontonotes sentence. Doesn't include raw sentence, for now.
@@ -46,7 +32,7 @@ case class Sentence(id: String,
   def features = words
   def label = tree
 
-  def stripTraces = {
+  def stripTraces: Sentence = {
     // walk the tree twice. first time patching everything except srl, which
     // has to be fixed later because of the indexed strategy
     val idMap = collection.mutable.Map[(Int,Int),(Int,Int)]()
