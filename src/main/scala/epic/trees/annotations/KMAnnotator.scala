@@ -20,10 +20,10 @@ package annotations
  * @author dlwh
  */
 
-case class KMAnnotator() extends TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] {
+case class KMAnnotator( horizontal: Int = 2, vertical: Int = 2) extends TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] {
   val pipeline = (
     StripAnnotations[String]() andThen
-    AddMarkovization[String](2,2) andThen
+    AddMarkovization[String](horizontal,vertical) andThen
     SplitAuxiliary() andThen
     SplitVP() andThen
     SplitIN[String]() andThen

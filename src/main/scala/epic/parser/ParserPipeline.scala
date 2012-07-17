@@ -20,6 +20,7 @@ import java.io._
 import epic.trees._
 import breeze.util._
 import breeze.text.tokenize.EnglishWordClassGenerator
+import java.util.concurrent.ConcurrentHashMap
 
 
 /**
@@ -51,7 +52,7 @@ object ParserParams {
   case class Constraints[L, W](path: File = null) {
     def cachedFactory(baseFactory: AugmentedGrammar[L, W], threshold: Double = -7):CoreGrammar[L, W] = {
       if(path != null && constraintsCache.contains(path)) {
-        constraintsCache(path).asInstanceOf[CoreGrammar[L, W]]
+        constraintsCache.get(path).asInstanceOf[CoreGrammar[L, W]]
       } else {
         val uncached: CoreGrammar[L, W] = if(path eq null) {
           new ConstraintCoreGrammar[L,W](baseFactory, threshold, true)
@@ -61,14 +62,14 @@ object ParserParams {
         }
 
         if(path != null)
-          constraintsCache(path) = uncached
+          constraintsCache.putIfAbsent(path, uncached)
         uncached
       }
 
     }
   }
   
-  private val constraintsCache = new MapCache[File, CoreGrammar[_, _]]
+  private val constraintsCache = new ConcurrentHashMap[File, CoreGrammar[_, _]]
 }
 
 /**

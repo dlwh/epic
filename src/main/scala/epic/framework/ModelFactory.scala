@@ -15,10 +15,9 @@ package epic.framework
  See the License for the specific language governing permissions and
  limitations under the License.
 */
-import java.util.zip.GZIPInputStream
-import java.io.{File, FileInputStream, BufferedInputStream, ObjectInputStream}
-import breeze.serialization.DataSerialization
-import breeze.linalg.Counter
+import java.io.File
+import breeze.linalg.{DenseVector, Counter}
+import breeze.util._
 
 /**
  *
@@ -30,10 +29,7 @@ trait ModelFactory[Datum] {
   def make(train: IndexedSeq[Datum]): MyModel
 
   def readWeights(file: File):Counter[Feature, Double] = if(file != null && file.exists) {
-    val in = new ObjectInputStream(new BufferedInputStream(new GZIPInputStream(new FileInputStream(file))))
-    implicit val serFeature: DataSerialization.ReadWritable[Feature] = DataSerialization.naiveReadWritable
-    val ctr = DataSerialization.read[Counter[Feature,Double]](in)
-    in.close()
-    ctr
+    val (index, vector) = readObject[(Index[Feature], DenseVector[Double])](file)
+    Encoder.fromIndex(index).decode(vector)
   } else Counter()
 }

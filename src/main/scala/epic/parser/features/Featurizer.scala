@@ -65,7 +65,10 @@ class SumFeaturizer[L, W](f1: Featurizer[L, W], f2: Featurizer[L, W]) extends Fe
   def initialValueForFeature(f:  Feature) = f1.initialValueForFeature(f) + f2.initialValueForFeature(f)
 }
 
-class GenFeaturizer[L, W](wGen: W=>IndexedSeq[Feature], lGen: L=>Seq[Feature] = {(x:L)=>Seq(IndicatorFeature(x))}) extends Featurizer[L, W] {
+class GenFeaturizer[L, W](wGen: W=>IndexedSeq[Feature],
+                          lGen: L=>Seq[Feature] = {(x:L)=>Seq(IndicatorFeature(x))},
+                          rGen: Rule[L] => Seq[Feature] = {(x: Rule[L]) => Seq(IndicatorFeature(x))}
+                           ) extends Featurizer[L, W] {
   def featuresFor(l: L, w: W) = {
     val result = ArrayBuilder.make[Feature]
     val wfFeats = wGen(w)
@@ -77,28 +80,7 @@ class GenFeaturizer[L, W](wGen: W=>IndexedSeq[Feature], lGen: L=>Seq[Feature] = 
     result.result()
   }
 
-  def featuresFor(r: Rule[L]) = r match {
-    case BinaryRule(a, b, c) =>
-      val result = ArrayBuilder.make[Feature]
-      val af = lGen(a)
-      val bf = lGen(b)
-      val cf = lGen(c)
-      result.sizeHint(af.size * bf.size * cf.size)
-      for(aa <- af; bb <- bf; cc <- cf) {
-        result += RuleFeature(BinaryRule(aa, bb, cc))
-      }
-      result.result()
-    case UnaryRule(a, b, chain) =>
-      val result = ArrayBuilder.make[Feature]
-      val af = lGen(a)
-      val bf = lGen(b)
-      result.sizeHint(af.size * bf.size)
-      for(aa <- af; bb <- bf) {
-        result += RuleFeature(UnaryRule(aa, bb, chain))
-      }
-      result.result()
-
-  }
+  def featuresFor(r: Rule[L]) =  rGen(r).toArray
 
   def initialValueForFeature(f: Feature) = 0.0
 }

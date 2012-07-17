@@ -321,14 +321,12 @@ object ChartMarginal {
 
                         val prob = withoutRule + refined.scoreBinaryRule(begin, split, end, r, refR)
 
-                        if(!java.lang.Double.isInfinite(prob)) {
-                          scoreArray(offset) = prob
-                          offset += 1
-                          // buffer full
-                          if(offset == scoreArray.length) {
-                            scoreArray(0) = inside.sum(scoreArray, offset)
-                            offset = 1
-                          }
+                        scoreArray(offset) = prob
+                        offset += 1
+                        // buffer full
+                        if(offset == scoreArray.length) {
+                          scoreArray(0) = inside.sum(scoreArray, offset)
+                          offset = 1
                         }
                       }
                       split += 1

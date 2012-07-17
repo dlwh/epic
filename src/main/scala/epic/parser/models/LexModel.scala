@@ -351,7 +351,7 @@ case class StandardFeaturizer[L, W>:Null, P](wordIndex: Index[W],
     }
 
 
-    def featuresForAttach(r: Int, head: Int, dep: Int) = {
+    def featuresForAttach(r: Int, head: Int, dep: Int): Array[Feature] = {
       val f = for(rf <- ruleCache(r)) yield DistFeature(binDistance(head-dep), rf):Feature
 //      val rc = ruleCache(r)
 //      val ah = indexedFeaturesForWord(indexed(head), words(head)).take(2)
@@ -361,7 +361,7 @@ case class StandardFeaturizer[L, W>:Null, P](wordIndex: Index[W],
 //        HeadDepFeature(rf, h, d)
 //      }
 //      f ++ f2
-      f
+      f ++ ruleCache(r)
     }
 
 

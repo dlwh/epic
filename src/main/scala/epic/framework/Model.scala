@@ -37,11 +37,8 @@ trait Model[Datum] {
 
   // just saves feature weights to disk as a serialized counter. The file is prefix.ser.gz
   def cacheFeatureWeights(weights: DenseVector[Double], prefix: String = "weights") {
-    val ctr = Encoder.fromIndex(featureIndex).decode(weights)
-    val out = new ObjectOutputStream(new BufferedOutputStream(new GZIPOutputStream(new FileOutputStream(new File(prefix + ".ser.gz")))))
-    implicit val serFeature: DataSerialization.ReadWritable[Feature] = DataSerialization.naiveReadWritable
-    DataSerialization.write(out, ctr:Counter[Feature, Double])
-    out.close()
+    val out = new File(prefix + ".ser.gz")
+    breeze.util.writeObject(out, (featureIndex, weights))
   }
 
   def initialValueForFeature(f: Feature): Double // = 0
