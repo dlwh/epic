@@ -31,6 +31,7 @@ final case class SignatureFeature(str: String) extends Feature
  * @author dlwh
  */
 class WordShapeFeaturizer(wordCounts: Counter[String, Double], minCountUnknown: Int = 5) extends (String=>IndexedSeq[Feature]) with Serializable {
+  import WordShapeFeaturizer._
   val signatureGenerator = EnglishWordClassGenerator
 
   def apply(w: String) = featuresFor(w)
@@ -52,24 +53,25 @@ class WordShapeFeaturizer(wordCounts: Counter[String, Double], minCountUnknown: 
       val hasLower = w.exists(_.isLower)
       val hasDash = w.contains('-')
 
-      if(numCaps > 0) features += (IndicatorWSFeature('HasCap))
-      if(numCaps > 1) features += (IndicatorWSFeature('HasManyCap))
-      if(numCaps > 1 && !hasLower) features += (IndicatorWSFeature('AllCaps))
+      if(numCaps > 0)  features += hasCapFeature
+      if(numCaps > 1)  features += hasManyCapFeature
+      if(numCaps > 1 && !hasLower) features += isAllCapsFeature
       if(w(0).isUpper || w(0).isTitleCase) {
         //TODO add INITC
-        features += (IndicatorWSFeature('HasInitCap))
+        features += hasInitCapFeature
         if(wordCounts(w.toLowerCase) > 3 && wordCounts(w) <= 3) {
-          features += IndicatorWSFeature('HasKnownLC)
+          features += hasKnownLCFeature
         }
       }
-      if(!hasLower) features += (IndicatorWSFeature('HasNoLower))
-      if(hasDash) features += (IndicatorWSFeature('HasDash))
-      if(hasDigit) features += (IndicatorWSFeature('HasDigit))
-      if(!hasLetter) features += (IndicatorWSFeature('HasNoLetter))
-      if(hasNotLetter) features += (IndicatorWSFeature('HasNotLetter))
+
+      if(!hasLower) features += hasNoLower
+      if(hasDash) features += hasDashFeature
+      if(hasDigit)  features += hasDigitFeature
+      if(!hasLetter)  features += hasNoLetterFeature
+      if(hasNotLetter)  features += hasNotLetterFeature
 
       if(wlen > 3 && w.endsWith("s") && !w.endsWith("ss") && !w.endsWith("us") && !w.endsWith("is"))
-         features += (IndicatorWSFeature('EndsWithS))
+        features += endsWithSFeature
       else if(wlen >= 5 && !(hasDigit && numCaps > 0) && !hasDash)  {
         features += (SuffixFeature(w.substring(wlen-3)))
         features += (SuffixFeature(w.substring(wlen-2)))
@@ -80,13 +82,31 @@ class WordShapeFeaturizer(wordCounts: Counter[String, Double], minCountUnknown: 
       }
 
       if(wlen > 10) {
-        features += (IndicatorWSFeature('LongWord))
+        features += longWordFeature
       } else if(wlen < 5) {
-        features += (IndicatorWSFeature('ShortWord))
+        features += shortWordFeature
       }
       features
     }
 
   }
 
+}
+
+object WordShapeFeaturizer {
+
+  // features
+  val hasNoLower = IndicatorWSFeature('HasNoLower)
+  val hasDashFeature = IndicatorWSFeature('HasDash)
+  val hasDigitFeature = IndicatorWSFeature('HasDigit)
+  val hasNoLetterFeature = IndicatorWSFeature('HasNoLetter)
+  val hasNotLetterFeature = IndicatorWSFeature('HasNotLetter)
+  val endsWithSFeature = IndicatorWSFeature('EndsWithS)
+  val longWordFeature = IndicatorWSFeature('LongWord)
+  val shortWordFeature = IndicatorWSFeature('ShortWord)
+  val hasKnownLCFeature = IndicatorWSFeature('HasKnownLC)
+  val hasInitCapFeature = IndicatorWSFeature('HasInitCap)
+  val hasCapFeature = IndicatorWSFeature('HasCap)
+  val hasManyCapFeature = IndicatorWSFeature('HasManyCap)
+  val isAllCapsFeature = IndicatorWSFeature('AllCaps)
 }

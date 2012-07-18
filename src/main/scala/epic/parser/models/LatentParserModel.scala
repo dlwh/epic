@@ -83,16 +83,12 @@ case class LatentParserModelFactory(baseParser: ParserParams.BaseParser,
                                     annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = FilterAnnotations(),
                                     substates: File = null,
                                     numStates: Int = 2,
-                                    oldWeights: File = null,
-                                    splitFactor: Int = 1) extends ParserModelFactory[AnnotatedLabel, String] {
+                                    oldWeights: File = null) extends ParserModelFactory[AnnotatedLabel, String] {
   type MyModel = LatentParserModel[AnnotatedLabel, (AnnotatedLabel, Int), String]
-
-
 
   def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]]):MyModel = {
     val annTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]] = trainTrees.map(annotator(_))
     val (annWords, annBinaries, annUnaries) = this.extractBasicCounts(annTrees)
-
 
     val (xbarParser, xbarLexicon) = baseParser.xbarGrammar(trainTrees)
 
@@ -119,7 +115,7 @@ case class LatentParserModelFactory(baseParser: ParserParams.BaseParser,
 
     def splitRule[L, L2](r: Rule[L], split: L=>Seq[L2]):Seq[Rule[L2]] = r match {
       case BinaryRule(a, b, c) => for(aa <- split(a); bb <- split(b); cc <- split(c)) yield BinaryRule(aa, bb, cc)
-        // don't allow ref
+        // don't allow non-identity rule refinements for identity rewrites
       case UnaryRule(a, b, chain) if a == b => for(aa <- split(a)) yield UnaryRule(aa, aa, chain)
       case UnaryRule(a, b, chain) => for(aa <- split(a); bb <- split(b)) yield UnaryRule(aa, bb, chain)
     }
