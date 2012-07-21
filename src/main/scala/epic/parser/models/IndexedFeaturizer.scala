@@ -37,6 +37,7 @@ trait IndexedFeaturizer[L, L2, W] extends RefinedFeaturizer[L, W, Feature] with 
   val index: Index[Feature]
   val featurizer: Featurizer[L2, W]
   val grammar: BaseGrammar[L]
+  val lexicon: Lexicon[L, W]
   val proj: GrammarRefinements[L, L2]
 
   def labelIndex = proj.labels.fineIndex
@@ -45,8 +46,6 @@ trait IndexedFeaturizer[L, L2, W] extends RefinedFeaturizer[L, W, Feature] with 
 
   // r -> SparseVector[Double] of feature weights
   val ruleCache: Array[Array[Int]]
-  // a -> W map
-  val lexicalCache: Array[Map[W, Array[Int]]]
 
 
   def featuresFor(r: Int) = {
@@ -54,10 +53,7 @@ trait IndexedFeaturizer[L, L2, W] extends RefinedFeaturizer[L, W, Feature] with 
   }
 
   def featuresFor(a: Int, w: W) = {
-    if (!lexicalCache(a).contains(w)) {
-      stripEncode(featurizer.featuresFor(labelIndex.get(a), w))
-    }
-    else lexicalCache(a)(w)
+    stripEncode(featurizer.featuresFor(labelIndex.get(a), w))
   }
 
   def computeWeight(r: Int, weights: DenseVector[Double]): Double = dot(featuresFor(r),weights)
@@ -74,18 +70,15 @@ trait IndexedFeaturizer[L, L2, W] extends RefinedFeaturizer[L, W, Feature] with 
   }
 
   def dotProjectOfFeatures(a: Int, w: W, weights: DenseVector[Double]) = {
-    if (lexicalCache(a).contains(w)) dot(lexicalCache(a)(w), weights)
-    else {
-      var score = 0.0
-      val feats = featurizer.featuresFor(labelIndex.get(a), w)
-      for ( k <- feats) {
-        val ind = index(k)
-        if (ind != -1) {
-          score += weights(ind)
-        }
+    var score = 0.0
+    val feats = featurizer.featuresFor(labelIndex.get(a), w)
+    for ( k <- feats) {
+      val ind = index(k)
+      if (ind != -1) {
+        score += weights(ind)
       }
-      score
     }
+    score
   }
 
 
@@ -143,8 +136,6 @@ object IndexedFeaturizer {
 
     // a -> b c -> SparseVector[Double] of feature weights
     val ruleCache = new OpenAddressHashArray[Array[Feature]](Int.MaxValue/3)
-    // a -> W map
-    val lexicalCache = new ArrayMap(collection.mutable.Map[W, Array[Feature]]())
 
     // rules
     for (rule <- indexedProjections.rules.fineIndex) {
@@ -160,37 +151,32 @@ object IndexedFeaturizer {
       lSplit <- indexedProjections.labels.refinementsOf(l)
     } {
       val feats = f.featuresFor(lSplit, w)
-      lexicalCache(indexedProjections.labels.fineIndex(lSplit))(w) = feats
       feats.foreach {featureIndex.index _ }
     }
 
-    cachedFeaturesToIndexedFeatures[L, L2, W](grammar, indexedProjections, f, featureIndex, ruleCache, lexicalCache.map{ case (k,v) => k -> (Map.empty ++ v)}.toMap)
+    cachedFeaturesToIndexedFeatures[L, L2, W](grammar, lexicon, indexedProjections, f, featureIndex, ruleCache)
   }
 
-  private def cachedFeaturesToIndexedFeatures[L, L2, W](grammar: BaseGrammar[L],
+  private def cachedFeaturesToIndexedFeatures[L, L2, W](grammar: BaseGrammar[L], lexicon: Lexicon[L, W],
                                                         refinements: GrammarRefinements[L, L2],
                                                         f: Featurizer[L2, W],
                                                         featureIndex: Index[Feature],
-                                                        ruleCache: OpenAddressHashArray[Array[Feature]],
-                                                        lexicalCache: Map[Int, Map[W, Array[Feature]]]): IndexedFeaturizer[L, L2, W]  = {
+                                                        ruleCache: OpenAddressHashArray[Array[Feature]]): IndexedFeaturizer[L, L2, W]  = {
     val brc =  Array.tabulate(refinements.rules.fineIndex.size){ r =>
       ruleCache(r) map featureIndex
     }
 
-    val lrc = Array.tabulate(refinements.labels.fineIndex.size){ (a) =>
-      lexicalCache.getOrElse(a,Map.empty).map{ case (k,v) => k -> (v map featureIndex)}
-    }
-
     val g = grammar
+    val l = lexicon
 
     new IndexedFeaturizer[L, L2, W] {
       val index = featureIndex
       val featurizer = f
 
       val grammar = g
+      val lexicon = l
       val proj = refinements
       val ruleCache = brc
-      val lexicalCache = lrc
     }
   }
 

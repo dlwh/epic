@@ -17,6 +17,7 @@ package epic.parser.models
 */
 import breeze.linalg._
 import epic.parser.{TagScorer, Lexicon}
+import epic.trees.LexicalProduction
 
 /**
  *
@@ -42,13 +43,13 @@ class FeaturizedLexicon[L, L2, W](val weights: DenseVector[Double],
 
 
   private val wordScores = Counter2[W, L2, Double]()
-  for ((wordMap, tagIndex) <- featureIndexer.lexicalCache.iterator.zipWithIndex;
-       (word, feats) <- wordMap) {
+  // lex: recompute features
+  for {
+    LexicalProduction(l, word) <- featureIndexer.lexicon.knownLexicalProductions
+    tagIndex <- featureIndexer.proj.labels.refinementsOf(featureIndexer.proj.labels.coarseIndex(l))
+  } {
     val score = featureIndexer.computeWeight(tagIndex, word, weights)
-    assert(!score.isNaN, tagIndex + " " + word + weights.valuesIterator.exists(_.isNaN))
     wordScores(word, featureIndexer.labelIndex.get(tagIndex)) = score
-    assert(wordScores(word, featureIndexer.labelIndex.get(tagIndex)) != Double.NegativeInfinity, (word, featureIndexer.labelIndex.get(tagIndex)).toString + "\n" +
-      featureIndexer.decode(feats) + " " + featureIndexer.decode(weights))
   }
 
 

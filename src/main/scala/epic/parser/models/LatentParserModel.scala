@@ -106,10 +106,11 @@ case class LatentParserModelFactory(baseParser: ParserParams.BaseParser,
       Map(xbarParser.root -> 1)
     }
 
-
     def split(x: AnnotatedLabel): Seq[(AnnotatedLabel, Int)] = {
       for (i <- 0 until substateMap.getOrElse(x, numStates)) yield (x, i)
     }
+
+    val presplit = xbarParser.labelIndex.map(l => l -> split(l)).toMap
 
     def unsplit(x: (AnnotatedLabel, Int)): AnnotatedLabel = x._1
 
@@ -129,7 +130,7 @@ case class LatentParserModelFactory(baseParser: ParserParams.BaseParser,
 
     val annGrammar: BaseGrammar[AnnotatedLabel] = BaseGrammar(annTrees.head.tree.label, annBinaries, annUnaries)
     val firstLevelRefinements = GrammarRefinements(xbarParser, annGrammar, {(_: AnnotatedLabel).baseAnnotatedLabel})
-    val secondLevel = GrammarRefinements(annGrammar, split _, {splitRule(_ :Rule[AnnotatedLabel], split _)}, unsplit)
+    val secondLevel = GrammarRefinements(annGrammar, split _, {splitRule(_ :Rule[AnnotatedLabel], presplit)}, unsplit)
     val finalRefinements = firstLevelRefinements compose secondLevel
     println(finalRefinements.labels)
 
