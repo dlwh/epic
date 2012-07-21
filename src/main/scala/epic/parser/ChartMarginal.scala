@@ -77,12 +77,11 @@ case class ChartMarginal[+Chart[X]<:ParseChart[X], L, W](anchoring: AugmentedAnc
 
       for (a <- inside.bot.enteredLabelIndexes(begin, end); refA <- inside.bot.enteredLabelRefinements(begin, end, a)) {
         var i = 0
-        val spanScore = anchoring.scoreSpan(begin, end, a, refA)
-        var aScore = outside.bot.labelScore(begin, end, a, refA)
-        val fullScore = aScore + inside.bot.labelScore(begin, end, a, refA) - partition
-        aScore += spanScore
-        if(fullScore > spanThreshold) {
-          spanVisitor.visitSpan(begin, end, a, refA, math.exp(fullScore))
+        val aOutside = outside.bot.labelScore(begin, end, a, refA)
+        val labelMarginal = aOutside + inside.bot.labelScore(begin, end, a, refA) - partition
+        val aScore = aOutside + anchoring.scoreSpan(begin, end, a, refA)
+        if(labelMarginal > spanThreshold) {
+          spanVisitor.visitSpan(begin, end, a, refA, math.exp(labelMarginal))
 
           val rules = anchoring.refined.validCoarseRulesGivenParentRefinement(a, refA)
           while(i < rules.length) {
