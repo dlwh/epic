@@ -65,7 +65,7 @@ class AnchoredRuleProjector(threshold: Double) extends Serializable {
         // fill in spans with 0 if they're active
         if(score > 0.0) {
           val index = TriangularArray.index(begin, end)
-          getOrElseUpdate(lexicalScores, index, projVector())(tag) = 0
+          getOrElseUpdate(lexicalScores, index, projVector())(tag) = 1.0
           if(totals(index) eq null) {
             totals(index) = projVector()
           }

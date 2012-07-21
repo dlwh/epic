@@ -21,27 +21,50 @@ import breeze.util.Index
 import breeze.collection.mutable.TriangularArray
 import breeze.numerics.logSum
 import collection.mutable.BitSet
+import collection.immutable
 
 @SerialVersionUID(3)
 abstract class ParseChart[L](val index: Index[L],
                              // label => number of refinements
                              refinementsFor: Array[Int],
-                             val length: Int) extends Serializable {
+                             val length: Int,
+                             sparsity: ParseChart.SparsityPattern) extends Serializable {
   private val grammarSize = index.size
 
-  final val top = new ChartScores()
-  final val bot = new ChartScores()
+  final val top = new ChartScores(sparsity.activeLabelsTop _)
+  final val bot = new ChartScores(sparsity.activeLabelsBot _)
 
   /**
    * A ChartScores is just a triangular array whose entries are arrays. Admits efficient
    * iteration over "on" elements in an (i, j) index.
    * @author dlwh
    */
-  final class ChartScores private[ParseChart]() {
+  final class ChartScores private[ParseChart](sparsityLabel: (Int,Int)=>immutable.BitSet) {
+
     import ParseChart._
 
     /** (begin,end) -> label ->  refinement -> score */
-    val score: Array[Array[Array[Double]]] = new Array[Array[Array[Double]]](TriangularArray.arraySize(length+1))
+    // fill in arrays for spans we might touch
+    val score: Array[Array[Array[Double]]] = Array.tabulate(TriangularArray.arraySize(length+1)){i =>
+      if(sparsity.activeTriangularIndices.contains(i)) {
+        new Array[Array[Double]](index.size)
+      } else {
+        null
+      }
+    }
+
+    // now fill in components of touch spans
+    for(b <- 0 until length; e <- b to length) {
+      val ind = TriangularArray.index(b, e)
+      val arr = score(ind)
+      if(arr != null) {
+        for(l <- sparsityLabel(b, e)) {
+          arr(l) = mkGrammarVector(refinementsFor(l), zero)
+        }
+      }
+    }
+
+
     /** (begin,end) -> which labels are on */
     val enteredLabels: Array[BitSet] = mkBitSetArray(TriangularArray.arraySize(length+1))
     /** (begin,end) -> label -> which refinements of label are on */
@@ -51,7 +74,7 @@ abstract class ParseChart[L](val index: Index[L],
     def apply(begin: Int, end: Int, label: Int, ref: Int) = labelScore(begin, end, label, ref)
 
     /**
-     * Returns the score of this (labe,refinement) pair over the span (begin,end)
+     * Returns the score of this (label,refinement) pair over the span (begin,end)
      * @return
      */
     def labelScore(begin: Int, end: Int, label: Int, ref: Int):Double = {
@@ -61,12 +84,16 @@ abstract class ParseChart[L](val index: Index[L],
       else score(ind)(label)(ref)
     }
 
-    @inline final def labelScore(begin: Int, end: Int, parent: L, ref: Int):Double = {
+    @inline def labelScore(begin: Int, end: Int, parent: L, ref: Int):Double = {
       labelScore(begin, end, index(parent), ref)
     }
 
     def enteredLabelIndexes(begin: Int, end: Int): Iterator[Int] = {
       enteredLabels(TriangularArray.index(begin, end)).iterator
+    }
+
+    def isLabelEntered(begin: Int, end: Int, l: Int): Boolean = {
+      enteredLabels(TriangularArray.index(begin,end)).contains(l)
     }
 
     def enteredLabelRefinements(begin: Int, end: Int, label: Int) = {
@@ -81,7 +108,8 @@ abstract class ParseChart[L](val index: Index[L],
 
 
     def rawEnter(begin: Int, end: Int, parent: Int, ref: Int, w: Double) = {
-      val arr = ensureLabelArray(begin, end, parent, refinementsFor(parent))
+      val arrx = score(TriangularArray.index(begin, end))
+      val arr = arrx(parent)
       val oldScore = arr(ref)
       val newScore = sum(oldScore, w)
       arr(ref) = newScore
@@ -102,19 +130,6 @@ abstract class ParseChart[L](val index: Index[L],
       enter(begin, end, parent, ref, sum(w,length))
     }
 
-    private def ensureLabelArray(begin: Int, end: Int, parent: Int, numRefinements: Int):Array[Double] = {
-      val index = TriangularArray.index(begin, end)
-      var arr = score(index)
-      if(arr eq null) {
-        score(index) = new Array[Array[Double]](grammarSize)
-        arr = score(index)
-      }
-      if(arr(parent) eq null) {
-        arr(parent) = mkGrammarVector(numRefinements, Double.NegativeInfinity)
-      }
-      arr(parent)
-    }
-
     /**
      * Updates the extent arrays for a given set of refinements
      */
@@ -122,25 +137,13 @@ abstract class ParseChart[L](val index: Index[L],
       enteredLabels(index) += parent
       enteredRefinements(index)(parent) += ref
 
-      val narrowLeftEnd = narrowLeft(end)
+      val narrowLeftEndParent = narrowLeft(end)(parent)
       val wideLeftEnd = wideLeft(end)
-      if(narrowLeftEnd(parent) eq null) {
-        narrowLeftEnd(parent) = new Array[Int](refinementsFor(parent))
-        Arrays.fill(narrowLeftEnd(parent), -1)
-        wideLeftEnd(parent) = new Array[Int](refinementsFor(parent))
-        Arrays.fill(wideLeftEnd(parent), length+1)
-      }
-      narrowLeftEnd(parent)(ref) = math.max(begin, narrowLeftEnd(parent)(ref))
+      narrowLeftEndParent(ref) = math.max(begin, narrowLeftEndParent(ref))
       wideLeftEnd(parent)(ref) = math.min(begin, wideLeftEnd(parent)(ref))
 
       val wideRightBegin = wideRight(begin)
       val narrowRightBegin = narrowRight(begin)
-      if(wideRightBegin(parent) eq null) {
-        wideRightBegin(parent) = new Array[Int](refinementsFor(parent))
-        Arrays.fill(wideRightBegin(parent), -1)
-        narrowRightBegin(parent) = new Array[Int](refinementsFor(parent))
-        Arrays.fill(narrowRightBegin(parent), length+1)
-      }
       wideRightBegin(parent)(ref) = math.max(end, wideRightBegin(parent)(ref))
       narrowRightBegin(parent)(ref) = math.min(end, narrowRightBegin(parent)(ref))
 
@@ -151,13 +154,29 @@ abstract class ParseChart[L](val index: Index[L],
     }
 
     /** right most place a left constituent with label l can start and end at position i. (start)(sym)(ref) */
-    val narrowLeft: Array[Array[Array[Int]]] = Array.ofDim[Array[Int]](length+1, grammarSize)
+    val narrowLeft: Array[Array[Array[Int]]] = Array.tabulate(length+1, grammarSize){ (i, l) =>
+      val arr = new Array[Int](refinementsFor(l))
+      Arrays.fill(arr, -1)
+      arr
+    }
     /** left most place a left constituent with label l can start and end at position i. (start)(sym)(ref) */
-    val wideLeft = Array.ofDim[Array[Int]](length+1, grammarSize)
+    val wideLeft = Array.tabulate[Array[Int]](length+1, grammarSize){ (i, l) =>
+      val arr = new Array[Int](refinementsFor(l))
+      Arrays.fill(arr, length + 1)
+      arr
+    }
     /** left most place a right constituent with label l--which starts at position i--can end. (end)(sym)(ref) */
-    val narrowRight = Array.ofDim[Array[Int]](length+1, grammarSize)
+    val narrowRight = Array.tabulate[Array[Int]](length+1, grammarSize){ (i, l) =>
+      val arr = new Array[Int](refinementsFor(l))
+      Arrays.fill(arr, length + 1)
+      arr
+    }
     /** right-most place a right constituent with label l--which starts at position i--can end. (end)(sym)(ref) */
-    val wideRight = Array.ofDim[Array[Int]](length+1, grammarSize)
+    val wideRight = Array.tabulate[Array[Int]](length+1, grammarSize) { (i, l) =>
+      val arr = new Array[Int](refinementsFor(l))
+      Arrays.fill(arr, -1)
+      arr
+    }
 
     /** right most place a left constituent with label l can start and end at position i. (start)(sym) */
     val coarseNarrowLeft = makeCoarseExtentArray(-1)
@@ -203,7 +222,76 @@ abstract class ParseChart[L](val index: Index[L],
 
 
 object ParseChart {
-  def apply[L](g: Index[L], refinements: Array[Int], length: Int) = viterbi(g, refinements, length)
+
+  @SerialVersionUID(1L)
+  trait SparsityPattern extends Serializable {
+    def activeTriangularIndices: immutable.BitSet
+    def activeLabelsTop(begin: Int, end: Int): immutable.BitSet
+    def activeLabelsBot(begin: Int, end: Int): immutable.BitSet
+  }
+
+  object SparsityPattern {
+    def noSparsity[L](labels: Index[L], length: Int):SparsityPattern = new SparsityPattern {
+      def activeTriangularIndices: immutable.BitSet = {
+        immutable.BitSet.empty ++ Range(0, TriangularArray.arraySize(length+1))
+      }
+
+      val allLabels = immutable.BitSet.empty ++ Range(0, labels.size)
+
+      def activeLabelsTop(begin: Int, end: Int) = allLabels
+      def activeLabelsBot(begin: Int, end: Int) = allLabels
+    }
+  }
+
+  def apply[L](g: Index[L], refinements: Array[Int], length: Int) = logProb(g, refinements, length)
+
+  @SerialVersionUID(1)
+  trait Factory[+Chart[X]<:ParseChart[X]] extends Serializable {
+    def apply[L](g: Index[L], refinements: Array[Int], length: Int):Chart[L] = {
+      apply(g, refinements, length, SparsityPattern.noSparsity(g, length))
+    }
+
+    def apply[L](g: Index[L], refinements: Array[Int], length: Int, sparsity: SparsityPattern):Chart[L]
+  }
+
+  // concrete factories:
+  object viterbi extends Factory[ViterbiParseChart] {
+    def apply[L](g: Index[L], refinements: Array[Int], length: Int, sparsity: SparsityPattern) = {
+      new ParseChart(g, refinements, length, sparsity) with Viterbi
+    }
+  }
+
+  object logProb extends Factory[LogProbabilityParseChart] {
+    def apply[L](g: Index[L], refinements: Array[Int], length: Int, sparsity: SparsityPattern) = {
+      new ParseChart(g, refinements, length, sparsity) with LogProbability
+    }
+  }
+
+  private def mkGrammarVector(grammarSize: Int, fill: Double) = {
+    val arr = new Array[Double](grammarSize)
+    Arrays.fill(arr, fill)
+    arr
+  }
+
+  private def mkBitSetArray(grammarSize: Int) = {
+    val arr = new Array[collection.mutable.BitSet](grammarSize)
+    var i = 0
+    while (i < arr.length) {
+      arr(i) = new collection.mutable.BitSet()
+      i += 1
+    }
+    arr
+  }
+
+  private def mkRefinementArray(length: Int, grammarSize: Int): Array[Array[BitSet]] = {
+    val arr = new Array[Array[BitSet]](length)
+    var i = 0
+    while (i < arr.length) {
+      arr(i) = mkBitSetArray(grammarSize)
+      i += 1
+    }
+    arr
+  }
 
   trait Viterbi {
     final def sum(a: Double, b: Double) = math.max(a, b)
@@ -233,50 +321,6 @@ object ParseChart {
     final def sum(arr: Array[Double], length: Int) = logSum(arr, length)
   }
   type LogProbabilityParseChart[L] = ParseChart[L] with LogProbability
-
-  @SerialVersionUID(1)
-  trait Factory[+Chart[X]<:ParseChart[X]] extends Serializable {
-    def apply[L](g: Index[L], refinements: Array[Int], length: Int):Chart[L]
-  }
-
-  // concrete factories:
-  object viterbi extends Factory[ViterbiParseChart] {
-    def apply[L](g: Index[L], refinements: Array[Int], length: Int) = new ParseChart(g, refinements, length) with Viterbi
-  }
-
-  object logProb extends Factory[LogProbabilityParseChart] {
-    def apply[L](g: Index[L], refinements: Array[Int], length: Int) = new ParseChart(g, refinements, length) with LogProbability
-  }
-
-  @inline
-  private def mkGrammarVector(grammarSize: Int, fill: Double) = {
-    val arr = new Array[Double](grammarSize)
-    Arrays.fill(arr, fill)
-    arr
-  }
-
-  @inline
-  private def mkBitSetArray(grammarSize: Int) = {
-    val arr = new Array[collection.mutable.BitSet](grammarSize)
-    var i = 0
-    while (i < arr.length) {
-      arr(i) = new collection.mutable.BitSet()
-      i += 1
-    }
-    arr
-  }
-
-
-  @inline
-  private def mkRefinementArray(length: Int, grammarSize: Int): Array[Array[BitSet]] = {
-    val arr = new Array[Array[BitSet]](length)
-    var i = 0
-    while (i < arr.length) {
-      arr(i) = mkBitSetArray(grammarSize)
-      i += 1
-    }
-    arr
-  }
 
 }
 

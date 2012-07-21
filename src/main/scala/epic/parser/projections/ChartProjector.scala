@@ -25,8 +25,8 @@ trait ChartProjector[L, W] {
   type MyAnchoring <: CoreAnchoring[L, W]
   protected def threshold:Double
   protected def createAnchoring(charts: Marginal[L, W],
-                                 ruleData: AnchoredRuleProjector.AnchoredData,
-                                 sentProb: Double):MyAnchoring
+                                ruleData: AnchoredRuleProjector.AnchoredData,
+                                sentProb: Double):MyAnchoring
 
   private def proj = new AnchoredRuleProjector(threshold)
 

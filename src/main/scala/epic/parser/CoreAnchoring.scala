@@ -30,6 +30,8 @@ trait CoreAnchoring[L, W] extends Factor[CoreAnchoring[L, W]] {
   def lexicon: Lexicon[L, W]
   def words: Seq[W]
 
+  def sparsityPattern = ParseChart.SparsityPattern.noSparsity(grammar.labelIndex, words.length)
+
   /**
    * Scores the indexed [[epic.trees.BinaryRule]] rule when it occurs at (begin,split,end)
    */

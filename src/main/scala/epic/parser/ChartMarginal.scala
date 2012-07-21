@@ -211,7 +211,8 @@ object ChartMarginal {
 
     val inside = chartFactory(grammar.labelIndex,
       Array.tabulate(grammar.labelIndex.size)(refined.numValidRefinements),
-      words.length)
+      words.length,
+      core.sparsityPattern)
     for{i <- 0 until words.length} {
       var foundSomething = false
       for {
@@ -359,7 +360,10 @@ object ChartMarginal {
     val coreScoreArray = new Array[Double](inside.length)
 
     val length = inside.length
-    val outside = chartFactory(grammar.labelIndex, Array.tabulate(grammar.labelIndex.size)(refined.numValidRefinements), length)
+    val outside = chartFactory(grammar.labelIndex,
+      Array.tabulate(grammar.labelIndex.size)(refined.numValidRefinements),
+      length,
+      core.sparsityPattern)
     for(refRoot <- refined.validLabelRefinements(0, inside.length, rootIndex)) {
       outside.top.enter(0, inside.length, rootIndex, refRoot, 0.0)
     }
@@ -411,7 +415,11 @@ object ChartMarginal {
                   r,
                   inside)
 
-                for(refR <- refined.validRuleRefinementsGivenParent(begin, end, r, refA)) {
+                val ruleRefinements = refined.validRuleRefinementsGivenParent(begin, end, r, refA)
+                var rfI = 0
+                while(rfI < ruleRefinements.length) {
+                  val refR = ruleRefinements(rfI)
+                  rfI += 1
                   val refB = refined.leftChildRefinement(r, refR)
                   val refC = refined.rightChildRefinement(r, refR)
 
@@ -495,6 +503,7 @@ object ChartMarginal {
         val coreScore = core.scoreUnaryRule(begin, end, r)
         if(coreScore != Double.NegativeInfinity) {
           val b = grammar.child(r)
+          if(inside.bot.isLabelEntered(begin, end, b))
           for(refR <- refined.validRuleRefinementsGivenParent(begin, end, rules(j), refA)) {
             val refB = refined.childRefinement(rules(j), refR)
             val ruleScore: Double = refined.scoreUnaryRule(begin, end, rules(j), refR) + coreScore

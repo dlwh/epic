@@ -28,17 +28,19 @@ import breeze.stats.distributions.{Rand, Binomial}
 import projections.ConstraintCoreGrammar.PruningStatistics
 import actors.threadpool.Arrays
 import breeze.linalg.DenseVector
+import epic.parser.ParseChart.SparsityPattern
 
 /**
  * 
  * @author dlwh
  */
-@SerialVersionUID(1L)
+@SerialVersionUID(2L)
 class ConstraintAnchoring[L, W](val grammar: BaseGrammar[L],
                              val lexicon: Lexicon[L, W],
                              val words: Seq[W],
                              scores: Array[BitSet],
-                             topScores: Array[BitSet]) extends CoreAnchoring[L, W] with Serializable {
+                             topScores: Array[BitSet],
+                             override val sparsityPattern: SparsityPattern) extends CoreAnchoring[L, W] with Serializable {
   def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = 0.0
 
   def scoreUnaryRule(begin: Int, end: Int, rule: Int) = {
@@ -61,10 +63,10 @@ class ConstraintAnchoring[L, W](val grammar: BaseGrammar[L],
 }
 
 object ConstraintAnchoring {
-  @SerialVersionUID(1)
-  case class RawConstraints(bottom: Array[BitSet], top: Array[BitSet]) {
+  @SerialVersionUID(2)
+  case class RawConstraints(bottom: Array[BitSet], top: Array[BitSet], sparsity: ParseChart.SparsityPattern) {
     def toAnchoring[L, W](grammar: BaseGrammar[L], lexicon: Lexicon[L, W], words: Seq[W]) = {
-      new ConstraintAnchoring(grammar, lexicon, words, bottom, top)
+      new ConstraintAnchoring(grammar, lexicon, words, bottom, top, sparsity)
     }
   }
 }
@@ -86,9 +88,9 @@ class ConstraintCoreGrammar[L, W](augmentedGrammar: AugmentedGrammar[L, W], thre
   def buildConstraints(charts: Marginal[L, W],
                   goldTags: GoldTagPolicy[L] = GoldTagPolicy.noGoldTags[L]):ConstraintAnchoring[L, W] = {
 
-    val RawConstraints(label,unary) = rawConstraints(charts, goldTags)
+    val RawConstraints(label,unary, sparsity) = rawConstraints(charts, goldTags)
 
-    new ConstraintAnchoring[L, W](charts.anchoring.grammar, charts.anchoring.lexicon, charts.anchoring.words, label, unary)
+    new ConstraintAnchoring[L, W](charts.anchoring.grammar, charts.anchoring.lexicon, charts.anchoring.words, label, unary, sparsity)
   }
 
   def buildConstraints(words: Seq[W],
@@ -105,31 +107,44 @@ class ConstraintCoreGrammar[L, W](augmentedGrammar: AugmentedGrammar[L, W], thre
 
   def rawConstraints(marg: Marginal[L, W], gold: GoldTagPolicy[L]): RawConstraints = {
     val length = marg.length
-    val (scores, topScores) = computeScores(length, marg)
+    val (botLabelScores, unaryScores) = computeScores(length, marg)
 
-    val labelThresholds = new TriangularArray[BitSet](length+1, {(i, j) =>
-      val arr = scores(TriangularArray.index(i, j))
-      val thresholdedGoldTags = if(arr eq null) {
-        BitSet.empty
-      } else BitSet.empty ++ (0 until arr.length filter {s => math.log(arr(s)) > threshold})
-      val result = thresholdedGoldTags ++ (0 until grammar.labelIndex.size).filter{gold.isGoldBotTag(i, j, _)}
-      if(result.nonEmpty) result
-      else null
-    }).data
+    val labelThresholds = extractLabelThresholds(length,
+                                                 grammar.labelIndex.size,
+                                                 botLabelScores,
+                                                 gold.isGoldBotTag(_, _, _))
+    val unaryThresholds = extractLabelThresholds(length,
+                                                 grammar.index.size,
+                                                 unaryScores,
+                                                 { (i, j, r) => gold.isGoldTopTag(i, j, grammar.parent(r))})
 
-    val unaryThresholds = new TriangularArray[BitSet](length+1, {(i, j) =>
-      val arr = topScores(TriangularArray.index(i, j))
-      val thresholdedGoldTags = if(arr eq null) {
-        BitSet.empty
-      } else BitSet.empty ++ (0 until arr.length filter {s => math.log(arr(s)) > threshold})
-      val result = thresholdedGoldTags ++ (0 until grammar.index.size).filter{r => gold.isGoldTopTag(i, j, grammar.parent(r))}
-      if (result.nonEmpty) result
-      else null
-    }).data
+    val topLabelThresholds = unaryThresholds.map { rules =>
+      if(rules == null) null else rules.map(r => grammar.parent(r))
+    }
 
-    RawConstraints(labelThresholds, unaryThresholds)
+    val pattern = ConstraintCoreGrammar.ConstraintSparsity(labelThresholds, topLabelThresholds)
+
+    RawConstraints(labelThresholds, unaryThresholds, pattern)
   }
 
+
+  private def extractLabelThresholds(length: Int, numLabels: Int,
+                                     scores: Array[Array[Double]],
+                                     isGold: (Int, Int, Int)=>Boolean): Array[BitSet] = {
+    new TriangularArray[BitSet](length + 1, {
+      (i, j) =>
+        val arr = scores(TriangularArray.index(i, j))
+        val thresholdedTags = if (arr eq null) {
+          BitSet.empty
+        } else BitSet.empty ++ (0 until arr.length filter { s =>
+          math.log(arr(s)) > threshold
+        })
+        val goldTags = (0 until numLabels).filter { isGold(i, j, _) }
+        val result = thresholdedTags ++ goldTags
+        if (result.nonEmpty) result
+        else null
+    }).data
+  }
 
   def computePruningStatistics(words: Seq[W], gold: GoldTagPolicy[L]): (PruningStatistics, PruningStatistics) = {
     val charts = ChartMarginal(augmentedGrammar, words, if(viterbi) ParseChart.viterbi else ParseChart.logProb)
@@ -228,6 +243,17 @@ object ConstraintCoreGrammar {
   object PruningStatistics {
     def empty(nsyms: Int) = PruningStatistics(Array.empty, 0, DenseVector.zeros(nsyms))
   }
+
+  @SerialVersionUID(1L)
+  private case class ConstraintSparsity(bot: Array[BitSet], top: Array[BitSet]) extends SparsityPattern with Serializable {
+    val activeTriangularIndices: BitSet = BitSet.empty ++ (0 until bot.length).filter{ i =>
+      (bot(i) != null && bot(i).nonEmpty) || (top(i) != null && top(i).nonEmpty)
+    }
+
+    def activeLabelsTop(begin: Int, end: Int): BitSet = top(TriangularArray.index(begin, end))
+    def activeLabelsBot(begin: Int, end: Int): BitSet = bot(TriangularArray.index(begin, end))
+  }
+
 }
 
 

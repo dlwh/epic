@@ -18,6 +18,7 @@ package projections
 import java.io._
 import projections.AnchoredRuleProjector.AnchoredData
 import breeze.collection.mutable.{OpenAddressHashArray, TriangularArray}
+import epic.parser.ParseChart.SparsityPattern
 
 /**
  * Creates a locally-normalized anchored PCFG from some refined forest.
@@ -39,6 +40,17 @@ case class AnchoredPCFGProjector[L, W](grammar: BaseGrammar[L], threshold: Doubl
     }
   }
 
+  private def logify(ruleScores: OpenAddressHashArray[Double]):OpenAddressHashArray[Double] = {
+    if(ruleScores eq null) null
+    else {
+      val r = new OpenAddressHashArray[Double](ruleScores.length, Double.NegativeInfinity, ruleScores.activeSize)
+      for( (rule, score) <- ruleScores.activeIterator) {
+        r(rule) = math.log(score)
+      }
+      r
+    }
+  }
+
   protected def createAnchoring(charts: Marginal[L, W], ruleData: AnchoredData, sentProb: Double) = {
     val AnchoredRuleProjector.AnchoredData(lexicalScores, unaryScores, totalsUnaries, binaryScores, totalsBinaries) = ruleData
     val normUnaries:Array[OpenAddressHashArray[Double]] = for((ruleScores, totals) <- unaryScores zip totalsUnaries) yield {
@@ -49,7 +61,8 @@ case class AnchoredPCFGProjector[L, W](grammar: BaseGrammar[L], threshold: Doubl
       if(splits eq null) null
       else for(ruleScores <- splits) yield normalize(ruleScores, totals)
     }
-    new SimpleAnchoring(charts.grammar, charts.lexicon, charts.words, lexicalScores, normUnaries, normBinaries)
+    val sparsity = charts.anchoring.core.sparsityPattern
+    new SimpleAnchoring(charts.grammar, charts.lexicon, charts.words, lexicalScores.map(logify), normUnaries, normBinaries, sparsity)
   }
 
 }
@@ -73,17 +86,18 @@ case class AnchoredRuleMarginalProjector[L, W](threshold: Double = Double.Negati
 
   type MyAnchoring = SimpleAnchoring[L, W]
 
-  protected def createAnchoring(charts: Marginal[L, W], ruleData: AnchoredData, sentProb: Double) = {
+  protected def createAnchoring(charts: Marginal[L, W],
+                                ruleData: AnchoredData,
+                                sentProb: Double) = {
     val AnchoredRuleProjector.AnchoredData(lexicalScores, unaryScores, _, binaryScores, _) = ruleData
-    val normUnaries:Array[OpenAddressHashArray[Double]] = for(ruleScores <- unaryScores) yield {
-      normalize(ruleScores)
-    }
+    val normUnaries:Array[OpenAddressHashArray[Double]] = unaryScores.map(normalize)
 
     val normBinaries:Array[Array[OpenAddressHashArray[Double]]] = for (splits <- binaryScores) yield {
       if(splits eq null) null
-      else for(ruleScores <- splits) yield normalize(ruleScores)
+      else splits.map(normalize)
     }
-    new SimpleAnchoring(charts.grammar, charts.lexicon, charts.words, lexicalScores, normUnaries, normBinaries)
+    val sparsity = charts.anchoring.core.sparsityPattern
+    new SimpleAnchoring(charts.grammar, charts.lexicon, charts.words, lexicalScores.map(normalize), normUnaries, normBinaries, sparsity)
   }
 }
 
@@ -95,7 +109,8 @@ class SimpleAnchoring[L, W](val grammar: BaseGrammar[L],
                             // (begin, end) -> rule -> score
                             unaryScores: Array[OpenAddressHashArray[Double]],
                             // (begin, end) -> (split-begin) -> rule -> score
-                            binaryScores: Array[Array[OpenAddressHashArray[Double]]]) extends CoreAnchoring[L, W] with Serializable {
+                            binaryScores: Array[Array[OpenAddressHashArray[Double]]],
+                            override val sparsityPattern: SparsityPattern) extends CoreAnchoring[L, W] with Serializable {
 
   def scoreUnaryRule(begin: Int, end: Int, rule: Int) = {
     val forSpan = unaryScores(TriangularArray.index(begin, end))

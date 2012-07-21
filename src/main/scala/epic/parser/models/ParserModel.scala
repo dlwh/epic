@@ -51,6 +51,7 @@ trait ParserInference[L, W] extends ProjectableInference[TreeInstance[L, W], Cor
     } catch {
       case e =>
       try {
+        e.printStackTrace()
         AugmentedAnchoring.fromRefined(grammar.anchor(v.words)).marginal
       } catch {
         case e2 =>
