@@ -491,18 +491,22 @@ case class LexGrammarBundle[L, W](baseGrammar: BaseGrammar[L],
             Array(parentRef:Int)
           } else if(isLeftRule(rule)) {
             val result = new Array[Int](end - (parentRef+1))
-            var h = parentRef + 1
-            while(h < end) {
-              result(h - parentRef - 1) = parentRef * words.length + h
-              h += 1
+            var ref = parentRef * words.length + parentRef + 1
+            var i = 0
+            while(i < result.length) {
+              result(i) = ref
+              ref += 1
+              i += 1
             }
             result
           } else {
             val result = new Array[Int](parentRef - begin)
-            var h = begin
-            while(h < parentRef) {
-              result(h - begin) = parentRef * words.length + h
-              h += 1
+            var ref = parentRef * words.length + begin
+            var i = 0
+            while(i < result.length) {
+              result(i) = ref
+              i += 1
+              ref += 1
             }
             result
           }
