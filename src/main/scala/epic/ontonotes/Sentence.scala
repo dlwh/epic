@@ -35,7 +35,7 @@ case class Sentence(id: String,
   def stripTraces: Sentence = {
     // walk the tree twice. first time patching everything except srl, which
     // has to be fixed later because of the indexed strategy
-    val idMap = collection.mutable.Map[(Int,Int),(Int,Int)]()
+    val idMap = collection.mutable.Map[(Int,Int),(Int,Int)]() // old-span -> new-span
     def isTrace(t: Tree[OntoLabel]) = t.label.tag.startsWith("-NONE-")
     def rec1(t: Tree[OntoLabel], offset:Int = 0):Option[(Tree[OntoLabel],Seq[String],Int)] = {
       var moff = offset
