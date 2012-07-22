@@ -71,6 +71,7 @@ object ConllOntoReader {
 
       val mentions = collection.mutable.Map[(Int,Int), Mention]()
       // stupid nested mentions. It's not quite a stack. I don't know why they did it this way.
+      // (entity id -> stack of open parens for that id
       val stack = new collection.mutable.HashMap[Int, Stack[Int]]() {
         override def default(key: Int) = getOrElseUpdate(key,new Stack())
       }
