@@ -145,26 +145,45 @@ class PairwiseInference(feat: PairwiseFeaturizer,
     }
   }
 
-  def decode(inst: IndexedCorefInstance): IndexedSeq[Set[MentionCandidate]] = {
+  def decode(inst: IndexedCorefInstance, forceMergeSingletons: Boolean): IndexedSeq[Set[MentionCandidate]] = {
     val links = Array.fill(inst.numMentions + 1)(null:mutable.BitSet)
+    val nonRoot = new Array[Int](inst.numMentions + 1)
     val trueClusters = ArrayBuffer[mutable.BitSet]()
     for(i <- 1 to inst.numMentions) {
       var maxJ = -1
       var maxScore = Double.NegativeInfinity
+      var maxNotRoot = -1
+      var maxNotRootScore = Double.NegativeInfinity
       for(j <- 0 until i) {
         val score = weights dot inst.featuresFor(j, i)
         if(score > maxScore) {
           maxJ = j
           maxScore = score
         }
+        if(j != 0 && score > maxNotRootScore) {
+          maxNotRoot = j
+          maxNotRootScore = score
+        }
 
       }
       if(maxJ == 0) {
         links(i) = mutable.BitSet(i)
         trueClusters += links(i)
+        nonRoot(i) = maxNotRoot
       } else {
         links(i) = links(maxJ)
         links(i) += i
+      }
+    }
+
+    if (forceMergeSingletons) {
+      // go in reverse and merge things as necessary
+      for(i <- inst.numMentions to 1 by -1) {
+        assert(links(i) != null, i)
+        if (links(i).size == 1 && nonRoot(i) != -1) {
+          links(nonRoot(i)) ++= links(i)
+          trueClusters -= links(i)
+        }
       }
     }
 
