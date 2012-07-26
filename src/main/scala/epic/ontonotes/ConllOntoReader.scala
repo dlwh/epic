@@ -91,14 +91,29 @@ object ConllOntoReader {
       }
 
       val tree = stringTree.extend { t =>
-        if(t.isLeaf) OntoLabel(t.label)
-        else {
           val mention = mentions.get(t.span.start -> t.span.end)
           val entity = entities.getOrElse(t.span.start -> t.span.end, NERType.NotEntity)
+          if(mention.nonEmpty) mentions -= (t.span.start -> t.span.end)
+
+          if(entity != NERType.NotEntity) entities -= (t.span.start -> t.span.end)
 
           OntoLabel(t.label,mention=mention,entity=entity)
+      }
+
+
+      /*
+      if(mentions.nonEmpty) {
+        val spans = tree.allChildren.map(_.span).toSet
+        println("missing mentions! " + mentions.keys.map(span => span -> (span._1 until span._2 map words)))
+        println(words)
+        println("Tree:")
+        println(stringTree render words)
+        println("matches: ")
+        for( (beg, end) <- mentions.keys) {
+          println( (beg -> end) -> spans.filter(s => math.abs(s.start - beg) < 3 && math.abs(s.end - end) < 3))
         }
       }
+      */
 
       Sentence(file.getName + "-" + index,words,tree)
     }
