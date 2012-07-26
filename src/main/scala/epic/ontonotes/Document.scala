@@ -20,7 +20,7 @@ package epic.ontonotes
 /**
  * Represents an ontonotes document (a single file)
  */
-case class Document(id: String, sentences: Seq[Sentence])
+case class Document(id: String, sentences: IndexedSeq[Sentence])
 
 object Document {
   /**
@@ -28,6 +28,6 @@ object Document {
    * <document id="..."> <sentence> ... </sentence> </document>
    */
   def fromXML(node: xml.Node) = {
-    Document(node \ "@id" text, node \ "sentence" map {Sentence.fromXML _})
+    Document(node \ "@id" text, node \ "sentence" map {Sentence.fromXML _} toIndexedSeq)
   }
 }

@@ -27,10 +27,13 @@ import collection.mutable.ArrayBuffer
  * @author dlwh
  */
 case class Sentence(id: String,
-                   words: Seq[String],
+                   words: IndexedSeq[String],
                    tree: Tree[OntoLabel]) extends Example[Tree[OntoLabel],Seq[String]] {
   def features = words
   def label = tree
+
+  def mentions:Iterator[(Mention,Span)] = tree.allChildren.flatMap(t => for(m <- t.label.mention) yield m -> t.span)
+  def ner: Iterator[(NERType.Value,Span)] = tree.allChildren.map(t => t.label.entity -> t.span).filterNot(_._1 == NERType.NotEntity)
 
   def stripTraces: Sentence = {
     // walk the tree twice. first time patching everything except srl, which
@@ -88,7 +91,7 @@ case class Sentence(id: String,
       }
     }
 
-    Sentence(id,w2,t3)
+    Sentence(id,w2.toIndexedSeq,t3)
 
   }
 }
