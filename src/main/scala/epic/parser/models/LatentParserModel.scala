@@ -88,6 +88,7 @@ case class LatentParserModelFactory(baseParser: ParserParams.BaseParser,
 
   def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]]):MyModel = {
     val annTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]] = trainTrees.map(annotator(_))
+
     val (annWords, annBinaries, annUnaries) = this.extractBasicCounts(annTrees)
 
     val (xbarParser, xbarLexicon) = baseParser.xbarGrammar(trainTrees)

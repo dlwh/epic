@@ -94,7 +94,6 @@ case class UnlexModelFactory(baseParser: ParserParams.BaseParser,
       augmentedBinaries(l.baseAnnotatedLabel, r.map(_.baseAnnotatedLabel)) = 0.5
     }
 
-
     val (grammar, lexicon) = baseParser.xbarGrammar(trainTrees)
     val refGrammar = BaseGrammar(AnnotatedLabel.TOP, augmentedBinaries, initUnaries)
     val indexedRefinements = GrammarRefinements(grammar, refGrammar, {

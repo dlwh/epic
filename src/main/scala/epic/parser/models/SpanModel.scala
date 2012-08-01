@@ -21,6 +21,7 @@ import features._
 import breeze.collection.mutable.{TriangularArray, OpenAddressHashArray}
 import breeze.linalg._
 import epic.trees._
+import annotations.{FilterAnnotations, TreeAnnotator}
 import collection.mutable.ArrayBuilder
 import java.io.File
 import breeze.util._
@@ -116,7 +117,8 @@ trait SpanFeaturizer[L, W] extends Serializable {
 }
 
 
-class IndexedSpanFeaturizer[L, W](f: SpanFeaturizer[L, W],
+class IndexedSpanFeaturizer[L, L2, W](f: SpanFeaturizer[L2, W],
+                                  refinements: GrammarRefinements[L, L2],
                                   grammar: BaseGrammar[L],
                                   val trueFeatureIndex: Index[Feature],
                                   dummyFeatures: Int) extends RefinedFeaturizer[L, W, Feature] with Serializable {
@@ -134,7 +136,8 @@ class IndexedSpanFeaturizer[L, W](f: SpanFeaturizer[L, W],
     private val fspec = f.anchor(words)
 
     def featuresForSpan(begin: Int, end: Int, tag: Int, ref: Int) = {
-      require(ref == 0)
+      val globalized = refinements.labels.globalize(tag, ref)
+
       val ind = TriangularArray.index(begin, end)
       var rcache = spanCache(ind)
       if(rcache eq null) {
@@ -143,13 +146,14 @@ class IndexedSpanFeaturizer[L, W](f: SpanFeaturizer[L, W],
       }
       var cache = rcache(tag)
       if(cache == null)  {
-        cache = stripEncode(index, fspec.featuresForSpan(begin, end, tag))
+        cache = stripEncode(index, fspec.featuresForSpan(begin, end, globalized))
         rcache(tag) = cache
       }
       cache
     }
 
     def featuresForUnaryRule(begin: Int, end: Int, rule: Int, ref: Int) = {
+      val globalized = refinements.rules.globalize(rule, ref)
       val ind = TriangularArray.index(begin, end)
       var rcache = unaryCache(ind)
       if(rcache eq null) {
@@ -158,13 +162,14 @@ class IndexedSpanFeaturizer[L, W](f: SpanFeaturizer[L, W],
       }
       var cache = rcache(rule)
       if(cache == null)  {
-        cache = stripEncode(index, fspec.featuresForRule(begin, end, rule))
+        cache = stripEncode(index, fspec.featuresForRule(begin, end, globalized))
         rcache(rule) = cache
       }
       cache
     }
 
     def featuresForBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int) = {
+      val globalized = refinements.rules.globalize(rule, ref)
       val ind = TriangularArray.index(begin, end)
       var rcache = binaryCache(ind)
       if(rcache eq null) {
@@ -178,7 +183,7 @@ class IndexedSpanFeaturizer[L, W](f: SpanFeaturizer[L, W],
       }
       var cache = scache(rule)
       if(cache == null)  {
-        cache = stripEncode(index, fspec.featuresForBinaryRule(begin, split, end, rule)) ++ featuresForUnaryRule(begin, end, rule, 0)
+        cache = stripEncode(index, fspec.featuresForBinaryRule(begin, split, end, globalized)) ++ featuresForUnaryRule(begin, end, globalized, globalized)
         scache(rule) = cache
       }
       cache
@@ -216,14 +221,16 @@ class IndexedSpanFeaturizer[L, W](f: SpanFeaturizer[L, W],
 }
 
 object IndexedSpanFeaturizer {
-  def extract[L, W](featurizer: SpanFeaturizer[L, W],
-                    ann: (BinarizedTree[L], Seq[W]) => BinarizedTree[L],
+  def extract[L, L2, W](featurizer: SpanFeaturizer[L2, W],
+                    ann: (BinarizedTree[L], Seq[W]) => BinarizedTree[L2],
+                    refinements: GrammarRefinements[L, L2],
                     grammar: BaseGrammar[L],
                     dummyFeatScale: Double,
-                    trees: Traversable[TreeInstance[L, W]]): IndexedSpanFeaturizer[L, W] = {
+                    trees: Traversable[TreeInstance[L, W]]): IndexedSpanFeaturizer[L, L2, W] = {
 
-    import grammar.labelIndex
-    import grammar.{index=>ruleIndex}
+    val labelIndex = refinements.labels.fineIndex
+    val ruleIndex = refinements.rules.fineIndex
+
     def add(ctr: Counter[Feature, Int], feats: Array[Feature]) {
       for (f <- feats) {
         ctr(f) += 1
@@ -232,7 +239,7 @@ object IndexedSpanFeaturizer {
     val goldFeatures = trees.par.aggregate(null: Counter[Feature, Int])( {(feats, ti) =>
       val set = if(feats eq null) Counter[Feature, Int]() else feats
       val spec = featurizer.anchor(ti.words)
-      def rec(t: BinarizedTree[L]):Unit = t match {
+      def rec(t: BinarizedTree[L2]):Unit = t match {
         case NullaryTree(a, span) =>
           val aI = labelIndex(a)
           add(set, spec.featuresForSpan(span.start, span.end, aI))
@@ -259,7 +266,7 @@ object IndexedSpanFeaturizer {
     }
     println(goldFeatureIndex.size)
 
-    new IndexedSpanFeaturizer(featurizer, grammar, goldFeatureIndex, (goldFeatureIndex.size * dummyFeatScale).toInt)
+    new IndexedSpanFeaturizer(featurizer, refinements, grammar, goldFeatureIndex, (goldFeatureIndex.size * dummyFeatScale).toInt)
   }
 }
 
@@ -371,27 +378,31 @@ class StandardSpanFeaturizer[L, W](grammar: BaseGrammar[L],
 }
 
 case class SpanModelFactory(baseParser: ParserParams.BaseParser,
-                                 constraints: ParserParams.Constraints[AnnotatedLabel, String],
-                                 oldWeights: File = null,
-                                 dummyFeats: Double = 0.5,
-                                 minFeatCutoff: Int = 1) extends ParserExtractableModelFactory[AnnotatedLabel, String] {
+                            annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = FilterAnnotations(),
+                            constraints: ParserParams.Constraints[AnnotatedLabel, String],
+                            oldWeights: File = null,
+                            dummyFeats: Double = 0.5,
+                            minFeatCutoff: Int = 1) extends ParserModelFactory[AnnotatedLabel, String] {
   type MyModel = SpanModel[AnnotatedLabel, String]
 
   def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]]) = {
+    val annTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]] = trainTrees.map(annotator(_))
+    val (annWords, annBinaries, annUnaries) = this.extractBasicCounts(annTrees)
+    val refGrammar = BaseGrammar(AnnotatedLabel.TOP, annBinaries, annUnaries)
+
     val trees = trainTrees.map(_.mapLabels(_.baseAnnotatedLabel))
     val (initLexicon, initBinaries, initUnaries) = GenerativeParser.extractCounts(trees)
 
     val (xbarGrammar, xbarLexicon) = baseParser.xbarGrammar(trees)
     val summedCounts = sum(initLexicon, Axis._0)
     val shapeGen = new SimpleWordShapeGen(initLexicon, summedCounts)
-//    val tagShapeGen = new WordShapeFeaturizer(summedCounts)
 
-    val lexicon:Lexicon[AnnotatedLabel, String] = initLexicon
+    val indexedRefinements = GrammarRefinements(xbarGrammar, refGrammar, {
+      (_: AnnotatedLabel).baseAnnotatedLabel
+    })
 
-    val ref = GrammarRefinements.identity(xbarGrammar)
-    val baseFactory = RefinedGrammar.generative[AnnotatedLabel, AnnotatedLabel, String](xbarGrammar,
+    val baseFactory = RefinedGrammar.generative[AnnotatedLabel, String](xbarGrammar,
       xbarLexicon,
-      ref,
       initBinaries, initUnaries, initLexicon)
     val cFactory = constraints.cachedFactory(AugmentedGrammar.fromRefined(baseFactory))
 
@@ -399,20 +410,21 @@ case class SpanModelFactory(baseParser: ParserParams.BaseParser,
     val ruleFeatures = xbarGrammar.tabulateArray(l => Array(RuleFeature(l):Feature))
 
     val feat = new StandardSpanFeaturizer[AnnotatedLabel, String](
-    xbarGrammar,
+      xbarGrammar,
       shapeGen,
-    labelFeatures, ruleFeatures)
+      labelFeatures, ruleFeatures)
 
-    def reannotate(tree: BinarizedTree[AnnotatedLabel], words: Seq[String]) = tree.map(_.baseAnnotatedLabel)
-    val indexed =  IndexedSpanFeaturizer.extract[AnnotatedLabel, String](feat,
-      reannotate,
+
+    val indexed =  IndexedSpanFeaturizer.extract[AnnotatedLabel, AnnotatedLabel, String](feat,
+      annotator,
+      indexedRefinements,
       xbarGrammar,
       dummyFeats,
       trees)
 
     val featureCounter = readWeights(oldWeights)
 
-    new SpanModel[AnnotatedLabel, String](indexed, indexed.index, reannotate _, cFactory, xbarGrammar, xbarLexicon, {
+    new SpanModel[AnnotatedLabel, String](indexed, indexed.index, annotator, cFactory, xbarGrammar, xbarLexicon, {
       featureCounter.get(_)
     })
   }
