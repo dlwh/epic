@@ -155,8 +155,6 @@ object RefinedGrammar {
     new SimpleRefinedGrammar[L, L2, W](grammar, lexicon, refinements,
       refinedGrammar, ruleScoreArray, spanScoreArray,
       parentCompatibleRefinements, childCompatibleRefinements, tagScorer)
-
-
   }
 
 }

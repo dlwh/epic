@@ -30,7 +30,6 @@ case class DiscParserInference[L, W](featurizer: RefinedFeaturizer[L, W, Feature
     val words = ti.words
     val annotated = ann(tree, words)
 
-
     TreeMarginal(AugmentedGrammar.fromRefined(grammar), words, annotated).expectedCounts(featurizer)
   }
 

@@ -39,6 +39,7 @@ case class TreeMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
         if(score.isInfinite) throw new Exception("Could not score gold tree!")
       case UnaryTree( (a, refA), child@Tree((b, refB), _, _), chain,  span) =>
         val r = grammar.index(UnaryRule(a, b, chain))
+        assert(r != -1, "Could not find rule " + UnaryRule(a, b, chain))
         val ruleRef = anchoring.refined.ruleRefinementFromRefinements(r, refA, refB)
         if(ruleRef < 0) throw new Exception("Bad refined rule in gold tree!: " + UnaryRule(a, b, chain) + " aRef: " + refA + " bRef: " + refB)
 

@@ -22,7 +22,7 @@ import breeze.collection.mutable.{TriangularArray, OpenAddressHashArray}
 import breeze.linalg._
 import epic.trees._
 import annotations.{FilterAnnotations, TreeAnnotator}
-import collection.mutable.ArrayBuilder
+import collection.mutable.{ArrayBuffer, ArrayBuilder}
 import java.io.File
 import breeze.util._
 import epic.framework.Feature
@@ -33,12 +33,14 @@ import projections.GrammarRefinements
  * @author dlwh
  */
 @SerialVersionUID(1L)
-class SpanModel[L, W](featurizer: RefinedFeaturizer[L, W, Feature],
+class SpanModel[L, L2, W](featurizer: RefinedFeaturizer[L, W, Feature],
                       val featureIndex: Index[Feature],
-                      ann: (BinarizedTree[L], Seq[W]) => BinarizedTree[L],
+                      ann: (BinarizedTree[L], Seq[W]) => BinarizedTree[L2],
                       baseFactory: CoreGrammar[L, W],
                       grammar: BaseGrammar[L],
                       lexicon: Lexicon[L, W],
+                      val refinedGrammar: BaseGrammar[L2],
+                      val refinements: GrammarRefinements[L, L2],
                       initialFeatureVal: (Feature => Option[Double]) = {
                         _ => None
                       }) extends ParserModel[L, W] with Serializable {
@@ -48,11 +50,15 @@ class SpanModel[L, W](featurizer: RefinedFeaturizer[L, W, Feature],
   def emptyCounts = new ExpectedCounts(featureIndex)
 
   def inferenceFromWeights(weights: DenseVector[Double]) = {
-    val factory = new DotProductGrammar(grammar, lexicon, weights, featurizer)
+    val factory = new DotProductGrammar(grammar, lexicon, refinedGrammar, refinements, weights, featurizer)
     def reannotate(bt: BinarizedTree[L], words: Seq[W]) = {
-      ann(bt, words).map { l =>
-        l -> 0
+      val annotated = ann(bt, words)
+
+      val localized = annotated.map { l =>
+        refinements.labels.project(l) -> refinements.labels.localize(l)
       }
+
+      localized
     }
     new DiscParserInference(featurizer, reannotate, factory, baseFactory)
   }
@@ -63,11 +69,55 @@ class SpanModel[L, W](featurizer: RefinedFeaturizer[L, W, Feature],
 }
 
 
-class DotProductGrammar[L, W, Feature](val grammar: BaseGrammar[L],
+class DotProductGrammar[L, L2, W, Feature](val grammar: BaseGrammar[L],
                                        val lexicon: Lexicon[L, W],
+                                       val refinedGrammar: BaseGrammar[L2],
+                                       val refinements: GrammarRefinements[L, L2],
                                        val weights: DenseVector[Double],
                                        val featurizer: RefinedFeaturizer[L, W, Feature]) extends RefinedGrammar[L, W] {
-  def anchor(w: Seq[W]):RefinedAnchoring[L, W] = LiftedCoreAnchoring(new CoreAnchoring[L, W] {
+
+
+  // rule -> parentRef -> [ruleRef]
+  private val parentCompatibleRefinements: Array[Array[Array[Int]]] = Array.tabulate(grammar.index.size) { r =>
+    val parent = grammar.parent(r)
+    val parentRefs = Array.fill(refinements.labels.refinementsOf(parent).length){ArrayBuffer[Int]()}
+    for(ruleRef <- refinements.rules.refinementsOf(r)) {
+      val refParent = refinements.labels.localize(refinements.rules.fineIndex.get(ruleRef).asInstanceOf[Rule[L2]].parent)
+      parentRefs(refParent) += refinements.rules.localize(ruleRef)
+    }
+    parentRefs.map(_.toArray)
+  }
+
+  // rule -> parentRef -> [ruleRef]
+  private val childCompatibleRefinements: Array[Array[Array[Int]]] = Array.tabulate(grammar.index.size) { r =>
+    if(grammar.index.get(r).isInstanceOf[UnaryRule[L]]) {
+      val child = grammar.child(r)
+      val childRefs = Array.fill(refinements.labels.refinementsOf(child).length){ArrayBuffer[Int]()}
+      for(ruleRef <- refinements.rules.refinementsOf(r)) {
+        val refChild = refinements.labels.localize(refinements.rules.fineIndex.get(ruleRef).asInstanceOf[UnaryRule[L2]].child)
+        childRefs(refChild) += refinements.rules.localize(ruleRef)
+      }
+      childRefs.map(_.toArray)
+    } else {
+      null
+    }
+  }
+
+  private val coarseRulesGivenParentRefinement = Array.tabulate(grammar.labelIndex.size) { p =>
+  // refinement -> rules
+    val result = Array.fill(refinements.labels.refinementsOf(p).size)(ArrayBuffer[Int]())
+    for(r <- grammar.indexedBinaryRulesWithParent(p); ref <- 0 until result.length) {
+      if(parentCompatibleRefinements(r)(ref).nonEmpty) {
+        result(ref) += r
+      }
+    }
+
+    result.map(_.toArray)
+  }
+
+
+  def anchor(w: Seq[W]):RefinedAnchoring[L, W] = new RefinedAnchoring[L, W] {
+
 
     val grammar = DotProductGrammar.this.grammar
     val lexicon = DotProductGrammar.this.lexicon
@@ -75,16 +125,16 @@ class DotProductGrammar[L, W, Feature](val grammar: BaseGrammar[L],
     def words = w
 
     val fspec = featurizer.anchor(w)
-    def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = {
-      dot(fspec.featuresForBinaryRule(begin, split, end, rule, 0))
+    def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int) = {
+      dot(fspec.featuresForBinaryRule(begin, split, end, rule, ref))
     }
 
-    def scoreUnaryRule(begin: Int, end: Int, rule: Int) = {
-      dot(fspec.featuresForUnaryRule(begin, end, rule, 0))
+    def scoreUnaryRule(begin: Int, end: Int, rule: Int, ref: Int) = {
+      dot(fspec.featuresForUnaryRule(begin, end, rule, ref))
     }
 
-    def scoreSpan(begin: Int, end: Int, tag: Int) = {
-      dot(fspec.featuresForSpan(begin, end, tag, 0))
+    def scoreSpan(begin: Int, end: Int, tag: Int, ref: Int) = {
+      dot(fspec.featuresForSpan(begin, end, tag, ref))
     }
 
     private def dot(features: Array[Int]) = {
@@ -98,7 +148,72 @@ class DotProductGrammar[L, W, Feature](val grammar: BaseGrammar[L],
       score
     }
 
-  })
+    def validLabelRefinements(begin: Int, end: Int, label: Int) = {
+      refinements.labels.localRefinements(label)
+    }
+
+    def validRuleRefinementsGivenParent(begin: Int, end: Int, rule: Int, parentRef: Int) = {
+      parentCompatibleRefinements(rule)(parentRef)
+    }
+
+    def validUnaryRuleRefinementsGivenChild(begin: Int, end: Int, rule: Int, childRef: Int) = {
+      childCompatibleRefinements(rule)(childRef)
+    }
+
+    def leftChildRefinement(rule: Int, ruleRef: Int) = {
+      val refinedRuleId = refinements.rules.globalize(rule, ruleRef)
+      refinements.labels.localize(refinedGrammar.leftChild(refinedRuleId))
+    }
+
+    def rightChildRefinement(rule: Int, ruleRef: Int) = {
+      val refinedRuleId = refinements.rules.globalize(rule, ruleRef)
+      refinements.labels.localize(refinedGrammar.rightChild(refinedRuleId))
+    }
+
+    def parentRefinement(rule: Int, ruleRef: Int) = {
+      val refinedRuleId = refinements.rules.globalize(rule, ruleRef)
+      refinements.labels.localize(refinedGrammar.parent(refinedRuleId))
+    }
+
+    def childRefinement(rule: Int, ruleRef: Int) = {
+      val refinedRuleId = refinements.rules.globalize(rule, ruleRef)
+      refinements.labels.localize(refinedGrammar.child(refinedRuleId))
+    }
+
+    // TODO: make this not terminally slow!
+    def ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int) = {
+      val a = grammar.parent(r)
+      val b = grammar.child(r)
+      val a2 = refinements.labels.globalize(a, refA)
+      val b2 = refinements.labels.globalize(b, refB)
+      val rule = UnaryRule(refinements.labels.fineIndex.get(a2), refinements.labels.fineIndex.get(b2), grammar.chain(r))
+      val refinedRuleIndex = refinements.rules.fineIndex(rule)
+      if(refinedRuleIndex < 0) {
+        -1
+      } else {
+        refinements.rules.localize(refinedRuleIndex)
+      }
+    }
+
+    def ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int, refC: Int) = {
+      val a = grammar.parent(r)
+      val b = grammar.leftChild(r)
+      val c = grammar.rightChild(r)
+      val a2 = refinements.labels.globalize(a, refA)
+      val b2 = refinements.labels.globalize(b, refB)
+      val c2 = refinements.labels.globalize(c, refC)
+      refinements.rules.localize(refinements.rules.fineIndex(BinaryRule(refinements.labels.fineIndex.get(a2),
+        refinements.labels.fineIndex.get(b2),
+        refinements.labels.fineIndex.get(c2)
+      ))  )
+    }
+
+    def numValidRefinements(label: Int) = refinements.labels.refinementsOf(label).length
+    def numValidRuleRefinements(rule: Int) = refinements.rules.refinementsOf(rule).length
+
+    def validCoarseRulesGivenParentRefinement(a: Int, refA: Int) = coarseRulesGivenParentRefinement(a)(refA)
+
+  }
 }
 
 trait SpanFeaturizer[L, W] extends Serializable {
@@ -141,13 +256,13 @@ class IndexedSpanFeaturizer[L, L2, W](f: SpanFeaturizer[L2, W],
       val ind = TriangularArray.index(begin, end)
       var rcache = spanCache(ind)
       if(rcache eq null) {
-        rcache = new OpenAddressHashArray[Array[Int]](grammar.labelIndex.size)
+        rcache = new OpenAddressHashArray[Array[Int]](refinements.labels.fineIndex.size)
         spanCache(ind) = rcache
       }
-      var cache = rcache(tag)
+      var cache = rcache(globalized)
       if(cache == null)  {
         cache = stripEncode(index, fspec.featuresForSpan(begin, end, globalized))
-        rcache(tag) = cache
+        rcache(globalized) = cache
       }
       cache
     }
@@ -157,13 +272,13 @@ class IndexedSpanFeaturizer[L, L2, W](f: SpanFeaturizer[L2, W],
       val ind = TriangularArray.index(begin, end)
       var rcache = unaryCache(ind)
       if(rcache eq null) {
-        rcache = new OpenAddressHashArray[Array[Int]](grammar.index.size)
+        rcache = new OpenAddressHashArray[Array[Int]](refinements.rules.fineIndex.size)
         unaryCache(ind) = rcache
       }
-      var cache = rcache(rule)
+      var cache = rcache(globalized)
       if(cache == null)  {
         cache = stripEncode(index, fspec.featuresForRule(begin, end, globalized))
-        rcache(rule) = cache
+        rcache(globalized) = cache
       }
       cache
     }
@@ -178,13 +293,13 @@ class IndexedSpanFeaturizer[L, L2, W](f: SpanFeaturizer[L2, W],
       }
       var scache = rcache(split - begin)
       if(scache eq null) {
-        scache = new OpenAddressHashArray[Array[Int]](grammar.index.size)
+        scache = new OpenAddressHashArray[Array[Int]](refinements.rules.fineIndex.size)
         rcache(split - begin) = scache
       }
-      var cache = scache(rule)
+      var cache = scache(globalized)
       if(cache == null)  {
-        cache = stripEncode(index, fspec.featuresForBinaryRule(begin, split, end, globalized)) ++ featuresForUnaryRule(begin, end, globalized, globalized)
-        scache(rule) = cache
+        cache = stripEncode(index, fspec.featuresForBinaryRule(begin, split, end, globalized)) ++ featuresForUnaryRule(begin, end, rule, ref)
+        scache(globalized) = cache
       }
       cache
 
@@ -383,7 +498,7 @@ case class SpanModelFactory(baseParser: ParserParams.BaseParser,
                             oldWeights: File = null,
                             dummyFeats: Double = 0.5,
                             minFeatCutoff: Int = 1) extends ParserModelFactory[AnnotatedLabel, String] {
-  type MyModel = SpanModel[AnnotatedLabel, String]
+  type MyModel = SpanModel[AnnotatedLabel, AnnotatedLabel, String]
 
   def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]]) = {
     val annTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]] = trainTrees.map(annotator(_))
@@ -406,11 +521,11 @@ case class SpanModelFactory(baseParser: ParserParams.BaseParser,
       initBinaries, initUnaries, initLexicon)
     val cFactory = constraints.cachedFactory(AugmentedGrammar.fromRefined(baseFactory))
 
-    val labelFeatures = xbarGrammar.labelEncoder.tabulateArray(l => Array(LabelFeature(l):Feature))
-    val ruleFeatures = xbarGrammar.tabulateArray(l => Array(RuleFeature(l):Feature))
+    val labelFeatures = refGrammar.labelEncoder.tabulateArray(l => Array(LabelFeature(l):Feature))
+    val ruleFeatures = refGrammar.tabulateArray(l => Array(RuleFeature(l):Feature))
 
     val feat = new StandardSpanFeaturizer[AnnotatedLabel, String](
-      xbarGrammar,
+      refGrammar,
       shapeGen,
       labelFeatures, ruleFeatures)
 
@@ -424,7 +539,7 @@ case class SpanModelFactory(baseParser: ParserParams.BaseParser,
 
     val featureCounter = readWeights(oldWeights)
 
-    new SpanModel[AnnotatedLabel, String](indexed, indexed.index, annotator, cFactory, xbarGrammar, xbarLexicon, {
+    new SpanModel[AnnotatedLabel, AnnotatedLabel, String](indexed, indexed.index, annotator, cFactory, xbarGrammar, xbarLexicon, refGrammar, indexedRefinements, {
       featureCounter.get(_)
     })
   }
