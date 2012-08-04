@@ -34,14 +34,7 @@ object EPParserModelFactory {
 case class EPParserModelFactory(ep: EPParams,
                                 baseParser: ParserParams.BaseParser,
                                 // I realy need ot figure out how to get this into my config language...
-                                model1: EPParserModelFactory.CompatibleFactory = null,
-                                model2: EPParserModelFactory.CompatibleFactory = null,
-                                model3: EPParserModelFactory.CompatibleFactory = null,
-                                model4: EPParserModelFactory.CompatibleFactory = null,
-                                model5: EPParserModelFactory.CompatibleFactory = null,
-                                model6: EPParserModelFactory.CompatibleFactory = null,
-                                model7: EPParserModelFactory.CompatibleFactory = null,
-                                model8: EPParserModelFactory.CompatibleFactory = null,
+                                model: Seq[EPParserModelFactory.CompatibleFactory],
                                 oldWeights: File = null) extends ParserExtractableModelFactory[AnnotatedLabel, String] {
   type MyModel = (
     EPModel[TreeInstance[AnnotatedLabel, String], CoreAnchoring[AnnotatedLabel, String]]
@@ -52,7 +45,7 @@ case class EPParserModelFactory(ep: EPParams,
     val (xbarGrammar, xbarLexicon) = baseParser.xbarGrammar(train)
 
     type ModelType = EPModel.CompatibleModel[TreeInstance[AnnotatedLabel, String], CoreAnchoring[AnnotatedLabel, String]]
-    val models = Seq(model1, model2, model3, model4, model5, model6, model7, model8).filterNot(_ eq null) map {
+    val models = model.filterNot(_ eq null) map {
       model =>
         model.make(train): ModelType
     }

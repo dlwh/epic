@@ -8,7 +8,6 @@ import runtime.ScalaRunTime
  *
  * @author dlwh
  */
-
 trait TreeAnnotator[L, W, M] extends ((BinarizedTree[L], Seq[W])=>BinarizedTree[M]) with (TreeInstance[L, W]=>TreeInstance[M, W]) with Serializable {
   def apply(tree: BinarizedTree[L], words: Seq[W]):BinarizedTree[M]
   def apply(ti: TreeInstance[L, W]):TreeInstance[M, W] = {
@@ -41,14 +40,9 @@ case class ComposedAnnotator[L, W, M, N](a: TreeAnnotator[L, W, M],
 }
 
 /** to be used with the config stuff, because I haven't figured out how to handle seqs yet... */
-case class PipelineAnnotator[L, W](ann1: TreeAnnotator[L, W, L],
-                                   ann2: TreeAnnotator[L, W, L] = null,
-                                   ann3: TreeAnnotator[L, W, L] = null,
-                                   ann4: TreeAnnotator[L, W, L] = null,
-                                   ann5: TreeAnnotator[L, W, L] = null,
-                                   ann6: TreeAnnotator[L, W, L] = null) extends TreeAnnotator[L, W, L] {
+case class PipelineAnnotator[L, W](ann: Seq[TreeAnnotator[L, W, L]]) extends TreeAnnotator[L, W, L] {
 
-  val pipeline = Seq(ann1, ann2, ann3, ann4, ann5, ann6).filterNot(null eq).reduceLeft(_ andThen _)
+  val pipeline = ann.filterNot(null eq).reduceLeft(_ andThen _)
 
   def apply(tree: BinarizedTree[L], words: Seq[W]):BinarizedTree[L] = {
     pipeline(tree, words)
