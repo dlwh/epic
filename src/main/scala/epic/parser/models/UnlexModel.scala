@@ -82,20 +82,9 @@ case class UnlexModelFactory(baseParser: ParserParams.BaseParser,
     }.seq.toIndexedSeq
 
     val (initLexicon, initBinaries, initUnaries) = this.extractBasicCounts(transformed)
-    def noSiblings(a: AnnotatedLabel) = a.copy(siblings = Seq.empty)
-    // add in rules without siblings, because of reachability problems with the pruning
-    val augmentedBinaries = Counter2[AnnotatedLabel, BinaryRule[AnnotatedLabel], Double]()
-    for( (l, r) <- initBinaries.keysIterator) {
-      augmentedBinaries(l, r) = 1.0
-      // no siblings
-      val BinaryRule(a, b, c) = r
-      augmentedBinaries(l,  BinaryRule(a, noSiblings(b), noSiblings(c))) = 0.5
-      // base rule, just in case
-      augmentedBinaries(l.baseAnnotatedLabel, r.map(_.baseAnnotatedLabel)) = 0.5
-    }
 
     val (grammar, lexicon) = baseParser.xbarGrammar(trainTrees)
-    val refGrammar = BaseGrammar(AnnotatedLabel.TOP, augmentedBinaries, initUnaries)
+    val refGrammar = BaseGrammar(AnnotatedLabel.TOP, initBinaries, initUnaries)
     val indexedRefinements = GrammarRefinements(grammar, refGrammar, {
       (_: AnnotatedLabel).baseAnnotatedLabel
     })
@@ -109,11 +98,7 @@ case class UnlexModelFactory(baseParser: ParserParams.BaseParser,
       val basic = Seq(l)
       basic map { IndicatorFeature(_) }
     }
-    def stripChildSiblings(r: Rule[AnnotatedLabel]) = r match {
-      case BinaryRule(a, b, c) => BinaryRule(a, noSiblings(b), noSiblings(c))
-      case UnaryRule(a, b, c) => UnaryRule(a, noSiblings(b), c)
-    }
-    def ruleFlattener(r: Rule[AnnotatedLabel]) = IndexedSeq(r, stripChildSiblings(r), r.map(_.baseAnnotatedLabel)).map(IndicatorFeature)
+    def ruleFlattener(r: Rule[AnnotatedLabel]) = IndexedSeq(r).map(IndicatorFeature)
     val feat = new GenFeaturizer[AnnotatedLabel, String](gen, labelFlattener _, ruleFlattener _)
 
     val featureCounter = readWeights(oldWeights)
