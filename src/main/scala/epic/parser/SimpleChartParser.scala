@@ -43,7 +43,14 @@ class SimpleChartParser[L, W](val augmentedGrammar: AugmentedGrammar[L, W],
   def charts(w: Seq[W]) = try {
     ChartMarginal(augmentedGrammar, w, if(maxMarginals) ParseChart.viterbi else ParseChart.logProb)
   } catch {
-    case e => throw e
+    case e =>
+      try {
+        ChartMarginal(AugmentedGrammar.fromRefined(augmentedGrammar.refined), w, if(maxMarginals) ParseChart.viterbi else ParseChart.logProb)
+      } catch {
+        case e =>
+        throw e
+      }
+
   }
   def grammar = augmentedGrammar.grammar
 
