@@ -1,4 +1,5 @@
 package epic.coref
+package pairwise
 
 import epic.framework._
 import breeze.linalg._
@@ -32,8 +33,13 @@ class PairwiseModel(feat: PairwiseFeaturizer, val featureIndex: Index[Feature]) 
 }
 
 case class ECounts(var loss: Double, counts: DenseVector[Double]) extends ExpectedCounts[ECounts] {
-  def +=(that: ECounts): ECounts =  {this.loss += that.loss; this.counts += that.counts; this}
-  def -=(that: ECounts): ECounts =  {this.loss -= that.loss; this.counts -= that.counts; this}
+  def +=(that: ECounts): ECounts = {
+    this.loss += that.loss; this.counts += that.counts; this
+  }
+
+  def -=(that: ECounts): ECounts = {
+    this.loss -= that.loss; this.counts -= that.counts; this
+  }
 }
 
 
@@ -42,66 +48,26 @@ class PairwiseInference(feat: PairwiseFeaturizer,
   type ExpectedCounts = ECounts
 
 
-  /*
-  def expectedCounts(inst: IndexedCorefInstance) = {
-    var ll = 0.0
-    var n = 0
-    val goldAssignments = new Array[BitSet](inst.numMentions + 1)
-    for(cluster <- inst.goldClusters; i <- cluster) {
-      assert(goldAssignments(i) == null)
-      goldAssignments(i) = cluster
-    }
-    assert(goldAssignments(0) == null)
-    val ecounts = DenseVector.zeros[Double](weights.size)
-    for(i <- 1 to inst.numMentions) {
-      val scores = DenseVector.zeros[Double](i)
-      val goldScores = DenseVector.zeros[Double](i)
-      util.Arrays.fill(goldScores.data, Double.NegativeInfinity)
-      assert(goldAssignments(i) != null, i + " " + " :(")
-      for(j <- 0 until i) {
-        scores(j) = weights dot inst.featuresFor(j, i)
-        if(j == 0 || goldAssignments(i)(j)) {
-          goldScores(j) = scores(j)
-        }
-      }
-      val sm = softmax(scores)
-      val gsm = softmax(goldScores)
-      ll += sm
-      ll -= gsm
-      println("Gg: " + sm + " " + gsm)
-
-      for(j <- 0 until i) {
-        ecounts +=  inst.featuresFor(j, i) * math.exp(scores(j) - sm)
-        if(j == 0 || goldAssignments(i)(j)) {
-          ecounts -= inst.featuresFor(j, i) * math.exp(goldScores(j) - gsm)
-        }
-        n += 1
-      }
-    }
-    new ECounts(ll, ecounts)
-  }
-  */
-
   def goldCounts(inst: IndexedCorefInstance) = {
     var ll = 0.0
     val ecounts = DenseVector.zeros[Double](weights.size)
-    for(cluster <- inst.goldClusters) {
+    for (cluster <- inst.goldClusters) {
       var isFirst = true
-      for(i <- cluster) {
-        if(isFirst) {
+      for (i <- cluster) {
+        if (isFirst) {
           ll += weights dot inst.featuresFor(0, i)
           ecounts += inst.featuresFor(0, i)
           isFirst = false
         } else {
           val scores = DenseVector.zeros[Double](i)
           util.Arrays.fill(scores.data, Double.NegativeInfinity)
-          for(j <- cluster if j < i) {
+          for (j <- cluster if j < i) {
             scores(j) = weights dot inst.featuresFor(j, i)
           }
           val sm = softmax(scores)
           ll += sm
 
-          for(j <- cluster if j < i) {
+          for (j <- cluster if j < i) {
             addIntoScale(ecounts, inst.featuresFor(j, i), math.exp(scores(j) - sm))
           }
         }
@@ -115,15 +81,15 @@ class PairwiseInference(feat: PairwiseFeaturizer,
   def guessCounts(inst: IndexedCorefInstance) = {
     var ll = 0.0
     val ecounts = DenseVector.zeros[Double](weights.size)
-    for(i <- 1 to inst.numMentions) {
+    for (i <- 1 to inst.numMentions) {
       val scores = DenseVector.zeros[Double](i)
-      for(j <- 0 until i) {
+      for (j <- 0 until i) {
         scores(j) = weights dot inst.featuresFor(j, i)
       }
       val sm = softmax(scores)
       ll += sm
 
-      for(j <- 0 until i) {
+      for (j <- 0 until i) {
         addIntoScale(ecounts, inst.featuresFor(j, i), math.exp(scores(j) - sm))
       }
     }
@@ -131,14 +97,14 @@ class PairwiseInference(feat: PairwiseFeaturizer,
   }
 
   private def addIntoScale(v: DenseVector[Double], sv: SparseVector[Double], scale: Double) {
-    if(scale != 0)  {
+    if (scale != 0) {
       var i = 0
       val bi = sv.index
       val bd = sv.data
       val ad = v.data
       val aoff = v.offset
       val astride = v.stride
-      while(i < sv.used) {
+      while (i < sv.used) {
         ad(aoff + astride * bi(i)) += bd(i) * scale
         i += 1
       }
@@ -146,27 +112,27 @@ class PairwiseInference(feat: PairwiseFeaturizer,
   }
 
   def decode(inst: IndexedCorefInstance, forceMergeSingletons: Boolean): IndexedSeq[Set[MentionCandidate]] = {
-    val links = Array.fill(inst.numMentions + 1)(null:mutable.BitSet)
+    val links = Array.fill(inst.numMentions + 1)(null: mutable.BitSet)
     val nonRoot = new Array[Int](inst.numMentions + 1)
     val trueClusters = ArrayBuffer[mutable.BitSet]()
-    for(i <- 1 to inst.numMentions) {
+    for (i <- 1 to inst.numMentions) {
       var maxJ = -1
       var maxScore = Double.NegativeInfinity
       var maxNotRoot = -1
       var maxNotRootScore = Double.NegativeInfinity
-      for(j <- 0 until i) {
+      for (j <- 0 until i) {
         val score = weights dot inst.featuresFor(j, i)
-        if(score > maxScore) {
+        if (score > maxScore) {
           maxJ = j
           maxScore = score
         }
-        if(j != 0 && score > maxNotRootScore) {
+        if (j != 0 && score > maxNotRootScore) {
           maxNotRoot = j
           maxNotRootScore = score
         }
 
       }
-      if(maxJ == 0) {
+      if (maxJ == 0) {
         links(i) = mutable.BitSet(i)
         trueClusters += links(i)
         nonRoot(i) = maxNotRoot
@@ -178,7 +144,7 @@ class PairwiseInference(feat: PairwiseFeaturizer,
 
     if (forceMergeSingletons) {
       // go in reverse and merge things as necessary
-      for(i <- inst.numMentions to 1 by -1) {
+      for (i <- inst.numMentions to 1 by -1) {
         assert(links(i) != null, i)
         if (links(i).size == 1 && nonRoot(i) != -1) {
           links(nonRoot(i)) ++= links(i)
@@ -187,8 +153,10 @@ class PairwiseInference(feat: PairwiseFeaturizer,
       }
     }
 
-    {for(cluster <- trueClusters) yield {
-      for(i <- cluster) yield inst.unindexed.mentions(i-1)
-    }.toSet}.toIndexedSeq
+    {
+      for (cluster <- trueClusters) yield {
+        for (i <- cluster) yield inst.unindexed.mentions(i - 1)
+      }.toSet
+    }.toIndexedSeq
   }
 }

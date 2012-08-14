@@ -10,6 +10,7 @@ import breeze.optimize.RandomizedGradientCheckingFunction
 import breeze.util.Encoder
 import collection.immutable.IndexedSeq
 import breeze.stats.ContingencyStats
+import pairwise._
 
 /**
  *
