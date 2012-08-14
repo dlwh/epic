@@ -1,4 +1,5 @@
 package epic.coref
+package pairwise
 
 import breeze.linalg.Counter
 import epic.framework.Feature
@@ -9,8 +10,9 @@ import breeze.text.tokenize.PorterStemmer
  * @author dlwh
  */
 trait PairwiseFeaturizer {
-  def featuresFor(a: MentionCandidate, b: MentionCandidate, context: IndexedSeq[IndexedSeq[String]]):Counter[Feature, Double]
-  def featuresForRoot(a: MentionCandidate, context: IndexedSeq[IndexedSeq[String]]):Counter[Feature, Double]
+  def featuresFor(a: MentionCandidate, b: MentionCandidate, context: IndexedSeq[IndexedSeq[String]]): Counter[Feature, Double]
+
+  def featuresForRoot(a: MentionCandidate, context: IndexedSeq[IndexedSeq[String]]): Counter[Feature, Double]
 }
 
 class SimplePairwiseFeaturizer extends PairwiseFeaturizer {
