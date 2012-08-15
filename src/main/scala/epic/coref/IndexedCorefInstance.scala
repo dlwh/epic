@@ -11,7 +11,9 @@ import collection.immutable.BitSet
 
 case class IndexedCorefInstance(unindexed: CorefInstance,
                                 goldClusters: IndexedSeq[BitSet],
-                                features: TriangularArray[SparseVector[Double]]) {
+                                features: TriangularArray[SparseVector[Double]],
+                                // instance -> property -> value for property (-1 is unknown)
+                                properties: Array[Array[Int]]) {
   def numMentions = unindexed.numMentions
   def featuresFor(a: Int, b: Int) = {
     features(a, b)
