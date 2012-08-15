@@ -3,6 +3,7 @@ import epic.framework._
 import breeze.util.Index
 import breeze.linalg._
 import breeze.numerics._
+import java.util
 
 class PropModel(val featureIndex: Index[Feature]) extends Model[IndexedCorefInstance] {
   type ExpectedCounts = StandardExpectedCounts
@@ -84,17 +85,8 @@ class PropInference(properties: Array[Property], weights: DenseVector[Double]) e
     }
   }
 
-  private def initializeProperties(inst: IndexedCorefInstance):Array[Array[Array[Double]]] = {
-    inst.properties.map{arr =>
-      Array.tabulate(arr.length) { p =>
-        val probs = new Array[Double](properties(p).choices.size)
-        if (arr(p) >= 0) {
-          probs(arr(p)) = 1.0
-        }
-
-      }
-    }
-
+  private def initializeProperties(inst: IndexedCorefInstance):PropertyBeliefs = {
+    PropertyBeliefs.forInstance(properties, inst)
   }
 
 }
