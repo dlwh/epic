@@ -105,8 +105,3 @@ class ModelObjective[Datum](val model: Model[Datum],
   }
 }
 
-trait ExpectedCounts[Self<:ExpectedCounts[Self]] { this:Self =>
-  def +=(other: Self):Self
-  def -=(other: Self):Self
-  def loss: Double
-}
