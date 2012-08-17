@@ -2,25 +2,22 @@ package epic.coref
 
 import epic.ontonotes.{Document, Sentence, Mention}
 import epic.trees.Span
-import breeze.data.Example
+import breeze.data.{Observation, Example}
 
 /**
  *
  * @author dlwh
  */
-
 case class CorefInstance(id: String,
                          clusters: Set[Set[MentionCandidate]],
                          mentions: IndexedSeq[MentionCandidate],
-                         words: IndexedSeq[IndexedSeq[String]]) extends Example[Set[Set[MentionCandidate]], (IndexedSeq[MentionCandidate],IndexedSeq[IndexedSeq[String]])] {
+                         words: IndexedSeq[IndexedSeq[String]]) extends CorefDocument with Example[Set[Set[MentionCandidate]], (IndexedSeq[MentionCandidate],IndexedSeq[IndexedSeq[String]])] {
   def numMentions = mentions.length
-  def features = mentions -> words
 
   def label = clusters
 
   def wordsForMention(m: (Int, Span)) = m._2 map words(m._1)
 }
-
 
 
 object CorefInstance {
@@ -38,24 +35,23 @@ object CorefInstance {
   }
 }
 
-case class MentionCandidate(sentence: Int, span: Span, words: IndexedSeq[String]) extends Ordered[MentionCandidate] {
-  def compare(that: MentionCandidate): Int = {
-    if (this.sentence < that.sentence) -1
-    else if (this.sentence > that.sentence) 1
-    else if (this.span.start < that.span.start) -1
-    else if (this.span.start > that.span.start) 1
-    else if (this.span.end < that.span.end) -1
-    else if (this.span.end > that.span.end) 1
-    else 0
-  }
 
+trait CorefDocument extends Observation[(IndexedSeq[MentionCandidate],IndexedSeq[IndexedSeq[String]])] {
+  def mentions: IndexedSeq[MentionCandidate]
+  def words: IndexedSeq[IndexedSeq[String]]
 
-  override def toString() = ("MC["+sentence + ":"+span.start + "-" + span.end + ", " + words.mkString(" ") + "]")
+  def features = mentions -> words
 }
 
-object MentionCandidate {
-  implicit val ordering = new Ordering[MentionCandidate] {
-    def compare(x: MentionCandidate, y: MentionCandidate): Int = x compare y
+object CorefDocument {
+  def apply(id: String, mentions: IndexedSeq[MentionCandidate], words: IndexedSeq[IndexedSeq[String]]):CorefDocument = {
+    val i = id
+    val m = mentions
+    val w = words
+    new CorefDocument {
+      def mentions = m
+      def words = w
+      def id = i
+    }
   }
 }
-

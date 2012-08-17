@@ -5,6 +5,7 @@ import breeze.linalg._
 import breeze.numerics._
 import java.util
 
+/*
 class PropModel(val featureIndex: Index[Feature]) extends Model[IndexedCorefInstance] {
   type ExpectedCounts = StandardExpectedCounts
   type Inference = PropInference
@@ -67,6 +68,7 @@ class PropInference(properties: Array[Property], weights: DenseVector[Double]) e
   }
 
   def guessCounts(value: IndexedCorefInstance) = {
+    null
 
   }
 
@@ -90,3 +92,5 @@ class PropInference(properties: Array[Property], weights: DenseVector[Double]) e
   }
 
 }
+
+*/

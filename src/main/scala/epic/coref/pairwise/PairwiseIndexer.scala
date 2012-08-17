@@ -44,7 +44,7 @@ object PairwiseIndexer {
       val mentionMap = Map.empty ++ (null +: inst.mentions).zipWithIndex
       val clusters = for (cluster: Set[MentionCandidate] <- inst.clusters.toIndexedSeq) yield BitSet.empty ++ cluster.map(mentionMap)
 
-      new IndexedCorefInstance(inst, clusters, array)
+      new IndexedCorefInstance(inst, clusters, array, null)
     }
 
 
