@@ -36,3 +36,9 @@ case class SentenceDistance(bin: Int) extends Feature
 // Other features
 case object SpanContained extends Feature
 
+// features for properties. not created by featurizers.
+case class PropertyAgreementFeature(name: String) extends Feature
+
+case class PropertyMismatchFeature(name: String) extends Feature
+case class PropertyFeature(name: String, a: Symbol, b: Symbol) extends Feature
+

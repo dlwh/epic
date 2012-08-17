@@ -30,8 +30,10 @@ object CorefPipeline extends App {
 
 
   val feat = new SimplePairwiseFeaturizer
-  val indexed = PairwiseIndexer(feat, instances)
+  val extractors = Properties.allExtractors
+  val indexed = PropIndexer(feat, extractors, instances)
 
+  /*
   val model = new PairwiseModel(feat, indexed.index)
   val obj = new ModelObjective(model, indexed.instances)
 
@@ -109,4 +111,5 @@ object CorefPipeline extends App {
       b = cc(j)
     } yield (a -> b)
   }
+  */
 }
