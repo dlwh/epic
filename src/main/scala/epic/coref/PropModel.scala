@@ -5,21 +5,29 @@ import breeze.linalg._
 import breeze.numerics._
 import java.util
 
-/*
-class PropModel(val featureIndex: Index[Feature]) extends Model[IndexedCorefInstance] {
+class PropModel(propIndexer: PropIndexer, val featureIndex: Index[Feature]) extends Model[IndexedCorefInstance] {
   type ExpectedCounts = StandardExpectedCounts
   type Inference = PropInference
 
   def initialValueForFeature(f: Feature) = 0.0
 
-  def inferenceFromWeights(weights: DenseVector[Double]) = new PropInference(weights)
+  def inferenceFromWeights(weights: DenseVector[Double]) = new PropInference(propIndexer, weights)
 
   def emptyCounts = StandardExpectedCounts.zero(featureIndex)
+
+  def expectedCountsToObjective(ecounts: ExpectedCounts) =  {
+    ecounts.loss -> ecounts.counts
+  }
 }
 
 
-class PropInference(properties: Array[Property], weights: DenseVector[Double]) extends GoldGuessInference[IndexedCorefInstance] {
+class PropInference(propIndexer: PropIndexer,
+                    weights: DenseVector[Double]) extends GoldGuessInference[IndexedCorefInstance] {
   type ExpectedCounts = StandardExpectedCounts
+
+  val agreeWeights = propIndexer.featuresForProperties.map(p => weights(p.agree))
+  val disagreeWeights = propIndexer.featuresForProperties.map(p => weights(p.mismatch))
+  val pairMatchWeights = propIndexer.featuresForProperties.map(p => p.pairs.map(_.map(weights apply _)))
 
   def goldCounts(inst: IndexedCorefInstance) = {
     var ll = Double.NegativeInfinity
@@ -30,6 +38,8 @@ class PropInference(properties: Array[Property], weights: DenseVector[Double]) e
 
     val props = initializeProperties(inst)
 
+    val assignmentVariables = Array.fill(inst.numMentions+1)()
+
     while (!converged && iter < maxIterations) {
       val lastLL = ll
       ll = 0.0
@@ -39,14 +49,14 @@ class PropInference(properties: Array[Property], weights: DenseVector[Double]) e
         var isFirst = true
         for (i <- cluster) {
           if (isFirst) {
-            ll += computeScore(None, Some(props(i)), inst.featuresFor(0, i))
+            ll += computeScore(props, 0, i, inst.featuresFor(0, i))
             ecounts += inst.featuresFor(0, i)
             isFirst = false
           } else {
             val scores = DenseVector.zeros[Double](i)
             java.util.Arrays.fill(scores.data, Double.NegativeInfinity)
             for (j <- cluster if j < i) {
-              scores(j) = computeScore(Some(props(i)), Some(props(j)), inst.featuresFor(i, j))
+              scores(j) = computeScore(props, j, i, inst.featuresFor(j, i))
             }
             val sm = softmax(scores)
             ll += sm
@@ -67,9 +77,42 @@ class PropInference(properties: Array[Property], weights: DenseVector[Double]) e
     new StandardExpectedCounts(ll, ecounts)
   }
 
-  def guessCounts(value: IndexedCorefInstance) = {
-    null
+  def guessCounts(inst: IndexedCorefInstance) = {
+    var ll = Double.NegativeInfinity
+    var ecounts:DenseVector[Double] = null
+    var converged = false
+    var iter = 0
+    val maxIterations = 5
 
+    val anaBeliefs = Array.tabulate(inst.numMentions + 1){i =>
+      val dv = DenseVector.zeros[Double](i)
+      if(i != 0)
+        dv := 1.0 / i
+      dv
+    }
+    val mainToAnaMessages = Array.tabulate(inst.numMentions + 1){i =>
+      DenseVector.ones[Double](i)
+    }
+    val anaZ = new Array[Double](inst.numMentions + 1)
+
+    val propBeliefs = initializeProperties(inst)
+
+    while (!converged && iter < maxIterations) {
+      val lastLL = ll
+      ll = 0.0
+      ecounts = DenseVector.zeros[Double](weights.size)
+
+    }
+    null
+  }
+
+  private def computeScore(beliefs: PropertyBeliefs, a: Int, b: Int, features: SparseVector[Double]):Double = {
+    val baseScore = weights dot features
+    val ma = beliefs.marginals(a)
+    val mb = beliefs.marginals(b)
+    var agreeScore =  0.0
+
+    0.0
   }
 
   private def addIntoScale(v: DenseVector[Double], sv: SparseVector[Double], scale: Double) {
@@ -88,9 +131,8 @@ class PropInference(properties: Array[Property], weights: DenseVector[Double]) e
   }
 
   private def initializeProperties(inst: IndexedCorefInstance):PropertyBeliefs = {
-    PropertyBeliefs.forInstance(properties, inst)
+    propIndexer.initialBeliefs(inst)
   }
 
 }
 
-*/

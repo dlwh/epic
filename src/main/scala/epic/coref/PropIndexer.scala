@@ -6,6 +6,7 @@ import breeze.collection.mutable.TriangularArray
 import breeze.linalg.SparseVector
 import collection.immutable.BitSet
 import pairwise.PairwiseFeaturizer
+import java.util
 
 /**
  * Computes and indexes all features, along with what features
@@ -16,9 +17,36 @@ case class PropIndexer(index: Index[Feature],
                        feat: PairwiseFeaturizer,
                        extractors: IndexedSeq[PropertyExtractor],
                        instances: IndexedSeq[IndexedCorefInstance],
-                       featuresForProperties: Array[IndexedPropertyFeatures])
+                       featuresForProperties: Array[IndexedPropertyFeatures]) {
+  def initialBeliefs(inst: IndexedCorefInstance) = {
+    val marginals: Array[Array[Array[Double]]] = inst.properties.map { myProperties =>
+      Array.tabulate(featuresForProperties.length){ p =>
+        val probs = new Array[Double](featuresForProperties(p).prop.choices.size)
+        if (myProperties(p) >= 0) {
+          probs(p) = 1.0
+        } else {
+          util.Arrays.fill(probs, 1.0/probs.length)
+        }
+        probs
+      }
+    }
 
-case class IndexedPropertyFeatures(agree: Int, mismatch: Int, pairs: Array[Array[Int]])
+    val messages = Array.fill(marginals.length){
+      val to = inst.properties.map { myProperties =>
+        Array.tabulate(featuresForProperties.length){ p =>
+          val probs = new Array[Double](featuresForProperties(p).prop.choices.size)
+          util.Arrays.fill(probs, 1.0)
+          probs
+        }
+      }
+      to
+    }
+
+    new PropertyBeliefs(marginals, messages)
+  }
+}
+
+case class IndexedPropertyFeatures(prop: Property, agree: Int, mismatch: Int, pairs: Array[Array[Int]])
 
 object PropIndexer {
   def apply(feat: PairwiseFeaturizer, extractors: IndexedSeq[PropertyExtractor], instances: IndexedSeq[CorefInstance]): PropIndexer = {
@@ -47,7 +75,7 @@ object PropIndexer {
         index.index(PropertyFeature(prop.name, prop.choices.get(i), prop.choices.get(j)))
       }
 
-      IndexedPropertyFeatures(agg, dis, pairArray)
+      IndexedPropertyFeatures(prop, agg, dis, pairArray)
     }
 
     // we set SparseVectors to have length maxint, now we set them right.
