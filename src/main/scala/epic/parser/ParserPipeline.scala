@@ -19,7 +19,7 @@ import breeze.config._
 import java.io._
 import epic.trees._
 import breeze.util._
-import breeze.text.tokenize.EnglishWordClassGenerator
+import breeze.text.analyze._
 import java.util.concurrent.ConcurrentHashMap
 
 

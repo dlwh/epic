@@ -18,7 +18,7 @@ package epic.parser.features
 import epic.framework.Feature
 import breeze.linalg.Counter
 import collection.mutable.ArrayBuffer
-import breeze.text.tokenize.{WordShapeGenerator, EnglishWordClassGenerator}
+import breeze.text.analyze.{WordShapeGenerator, EnglishWordClassGenerator}
 
 final case class IndicatorWSFeature(name: Symbol) extends Feature
 final case class SuffixFeature(str: String) extends Feature

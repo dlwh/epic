@@ -19,7 +19,7 @@ package models
 import epic.framework._
 import breeze.collection.mutable.OpenAddressHashArray
 import breeze.linalg._
-import breeze.text.tokenize.EnglishWordClassGenerator
+import breeze.text.analyze.EnglishWordClassGenerator
 import epic.trees._
 import java.io.File
 import features._

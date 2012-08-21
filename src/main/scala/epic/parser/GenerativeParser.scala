@@ -21,7 +21,7 @@ import epic.trees._
 import annotations.{FilterAnnotations, TreeAnnotator}
 import breeze.linalg.Counter2
 import epic.parser.ParserParams.{BaseParser, NoParams}
-import breeze.text.tokenize.EnglishWordClassGenerator
+import breeze.text.analyze.EnglishWordClassGenerator
 
 /**
  * Contains codes to read off parsers and grammars from
