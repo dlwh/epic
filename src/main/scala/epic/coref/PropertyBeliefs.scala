@@ -8,4 +8,3 @@ import java.util.Arrays
  */
 case class PropertyBeliefs(marginals: Array[Array[Array[Double]]], messages: Array[Array[Array[Array[Double]]]])
 
-

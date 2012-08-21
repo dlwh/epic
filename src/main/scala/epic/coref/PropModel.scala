@@ -21,13 +21,8 @@ class PropModel(propIndexer: PropIndexer, val featureIndex: Index[Feature]) exte
 }
 
 
-class PropInference(propIndexer: PropIndexer,
-                    weights: DenseVector[Double]) extends GoldGuessInference[IndexedCorefInstance] {
+class PropInference(propIndexer: PropIndexer, weights: DenseVector[Double]) extends GoldGuessInference[IndexedCorefInstance] {
   type ExpectedCounts = StandardExpectedCounts
-
-  val agreeWeights = propIndexer.featuresForProperties.map(p => weights(p.agree))
-  val disagreeWeights = propIndexer.featuresForProperties.map(p => weights(p.mismatch))
-  val pairMatchWeights = propIndexer.featuresForProperties.map(p => p.pairs.map(_.map(weights apply _)))
 
   def goldCounts(inst: IndexedCorefInstance) = {
     var ll = Double.NegativeInfinity
@@ -35,8 +30,6 @@ class PropInference(propIndexer: PropIndexer,
     var converged = false
     var iter = 0
     val maxIterations = 5
-
-    val props = initializeProperties(inst)
 
     val assignmentVariables = Array.fill(inst.numMentions+1)()
 
@@ -49,14 +42,14 @@ class PropInference(propIndexer: PropIndexer,
         var isFirst = true
         for (i <- cluster) {
           if (isFirst) {
-            ll += computeScore(props, 0, i, inst.featuresFor(0, i))
+//            ll += computeScore(None, Some(props(i)), inst.featuresFor(0, i))
             ecounts += inst.featuresFor(0, i)
             isFirst = false
           } else {
             val scores = DenseVector.zeros[Double](i)
             java.util.Arrays.fill(scores.data, Double.NegativeInfinity)
             for (j <- cluster if j < i) {
-              scores(j) = computeScore(props, j, i, inst.featuresFor(j, i))
+//              scores(j) = computeScore(Some(props(i)), Some(props(j)), inst.featuresFor(i, j))
             }
             val sm = softmax(scores)
             ll += sm
@@ -114,6 +107,7 @@ class PropInference(propIndexer: PropIndexer,
 
     0.0
   }
+
 
   private def addIntoScale(v: DenseVector[Double], sv: SparseVector[Double], scale: Double) {
     if (scale != 0) {

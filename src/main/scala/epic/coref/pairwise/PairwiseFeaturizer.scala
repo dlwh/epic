@@ -3,7 +3,7 @@ package pairwise
 
 import breeze.linalg.Counter
 import epic.framework.Feature
-import breeze.text.tokenize.PorterStemmer
+import breeze.text.analyze.PorterStemmer
 
 /**
  *
