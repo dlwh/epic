@@ -67,7 +67,7 @@ case class EPInference[Datum, Augment](inferences: IndexedSeq[ProjectableInferen
 
     val finalCounts = for (((inf, f_~), i) <- (inferences zip f_~).zipWithIndex) yield {
       val marg = marginals(i)
-      val augment = f_~
+      val augment = finalAugment / f_~
       inf.guessCountsFromMarginals(datum, marg.asInstanceOf[inf.Marginal], augment)
     }
 
