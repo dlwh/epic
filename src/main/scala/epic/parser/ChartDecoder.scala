@@ -187,11 +187,11 @@ class MaxConstituentDecoder[L, W] extends ChartDecoder[L, W] {
 
     val labelIndex = marginal.grammar.labelIndex
 
-    val maxSplit = new TriangularArray[Int](inside.length+1, 0)
-    val maxBotLabel = new TriangularArray[Int](inside.length+1, -1)
-    val maxBotScore = new TriangularArray[Double](inside.length+1, Double.NegativeInfinity)
-    val maxTopLabel = new TriangularArray[Int](inside.length+1, -1)
-    val maxTopScore = new TriangularArray[Double](inside.length+1, Double.NegativeInfinity)
+    val maxSplit = TriangularArray.fill[Int](inside.length+1)(0)
+    val maxBotLabel = TriangularArray.fill[Int](inside.length+1)(-1)
+    val maxBotScore = TriangularArray.fill[Double](inside.length+1)(Double.NegativeInfinity)
+    val maxTopLabel = TriangularArray.fill[Int](inside.length+1)(-1)
+    val maxTopScore = TriangularArray.fill[Double](inside.length+1)(Double.NegativeInfinity)
 
 
     val scores = marginal.grammar.labelEncoder.fillArray(Double.NegativeInfinity)

@@ -131,8 +131,7 @@ class ConstraintCoreGrammar[L, W](augmentedGrammar: AugmentedGrammar[L, W], thre
   private def extractLabelThresholds(length: Int, numLabels: Int,
                                      scores: Array[Array[Double]],
                                      isGold: (Int, Int, Int)=>Boolean): Array[BitSet] = {
-    new TriangularArray[BitSet](length + 1, {
-      (i, j) =>
+    TriangularArray.tabulate[BitSet](length + 1) { (i, j) =>
         val arr = scores(TriangularArray.index(i, j))
         val thresholdedTags = if (arr eq null) {
           BitSet.empty
@@ -143,7 +142,7 @@ class ConstraintCoreGrammar[L, W](augmentedGrammar: AugmentedGrammar[L, W], thre
         val result = thresholdedTags ++ goldTags
         if (result.nonEmpty) result
         else null
-    }).data
+    }.data
   }
 
   def computePruningStatistics(words: Seq[W], gold: GoldTagPolicy[L]): (PruningStatistics, PruningStatistics) = {
