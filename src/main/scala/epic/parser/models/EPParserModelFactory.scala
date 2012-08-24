@@ -22,8 +22,9 @@ import epic.framework._
 
 import breeze.util._
 import epic.trees.{TreeInstance, AnnotatedLabel}
+import breeze.config.Help
 
-case class EPParams(iterations: Int = 5, pruningThreshold: Double = -15)
+case class EPParams(maxIterations: Int = 5, pruningThreshold: Double = -15)
 
 object EPParserModelFactory {
   type CompatibleFactory = ModelFactory[TreeInstance[AnnotatedLabel, String]] {
@@ -32,9 +33,10 @@ object EPParserModelFactory {
 }
 
 case class EPParserModelFactory(ep: EPParams,
-                                baseParser: ParserParams.BaseParser,
-                                // I realy need ot figure out how to get this into my config language...
+                                baseParser: ParserParams.XbarGrammar,
+                                @Help(text="ModelFactories to use. use --model.0, --model.1, etc.")
                                 model: Seq[EPParserModelFactory.CompatibleFactory],
+                                @Help(text="Path to old weights used for initialization")
                                 oldWeights: File = null) extends ParserExtractableModelFactory[AnnotatedLabel, String] {
   type MyModel = (
     EPModel[TreeInstance[AnnotatedLabel, String], CoreAnchoring[AnnotatedLabel, String]]
@@ -52,7 +54,7 @@ case class EPParserModelFactory(ep: EPParams,
 
     val featureCounter = readWeights(oldWeights)
 
-    new EPModel(ep.iterations, {
+    new EPModel(ep.maxIterations, {
       featureCounter.get(_)
     }, models: _*) with EPParser.Extractor[AnnotatedLabel, String] with Serializable {
       def grammar = xbarGrammar

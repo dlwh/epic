@@ -27,9 +27,11 @@ import java.io.File
 import breeze.util._
 import epic.framework.Feature
 import projections.GrammarRefinements
+import breeze.config.Help
 
 /**
- *
+ * A rather more sophisticated discriminative parser. Uses features on
+ * the underlying span.
  * @author dlwh
  */
 @SerialVersionUID(1L)
@@ -44,7 +46,7 @@ class SpanModel[L, L2, W](featurizer: RefinedFeaturizer[L, W, Feature],
                       initialFeatureVal: (Feature => Option[Double]) = {
                         _ => None
                       }) extends ParserModel[L, W] with Serializable {
-  type Inference = DiscParserInference[L, W]
+  type Inference = AnnotatedParserInference[L, W]
 
   override def initialValueForFeature(f: Feature) = initialFeatureVal(f) getOrElse 0.0
   def emptyCounts = new ExpectedCounts(featureIndex)
@@ -60,7 +62,7 @@ class SpanModel[L, L2, W](featurizer: RefinedFeaturizer[L, W, Feature],
 
       localized
     }
-    new DiscParserInference(featurizer, reannotate, factory, baseFactory)
+    new AnnotatedParserInference(featurizer, reannotate, factory, baseFactory)
   }
 
   def expectedCountsToObjective(ecounts: ExpectedCounts) = {
@@ -492,11 +494,18 @@ class StandardSpanFeaturizer[L, W](grammar: BaseGrammar[L],
   }
 }
 
-case class SpanModelFactory(baseParser: ParserParams.BaseParser,
+case class SpanModelFactory(baseParser: ParserParams.XbarGrammar,
+                            @Help(text=
+                              """The kind of annotation to do on the refined grammar. Default uses no annotations.
+You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Manning 2003.
+                              """)
                             annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = FilterAnnotations(),
                             constraints: ParserParams.Constraints[AnnotatedLabel, String],
+                            @Help(text="Old weights to initialize with. Optional")
                             oldWeights: File = null,
+                            @Help(text="For features not seen in gold trees, we bin them into dummyFeats * numGoldFeatures bins using hashing.")
                             dummyFeats: Double = 0.5,
+                            @Help(text="How common must a feature be before we remember it?")
                             minFeatCutoff: Int = 1) extends ParserModelFactory[AnnotatedLabel, String] {
   type MyModel = SpanModel[AnnotatedLabel, AnnotatedLabel, String]
 

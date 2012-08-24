@@ -24,6 +24,7 @@ import breeze.serialization._
 import java.util.zip.GZIPOutputStream
 import java.io.{ObjectOutputStream, FileOutputStream, BufferedOutputStream, File}
 
+
 trait Model[Datum] {
   self =>
   type ExpectedCounts <: epic.framework.ExpectedCounts[ExpectedCounts]

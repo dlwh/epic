@@ -25,6 +25,7 @@ import io.Source
 import epic.framework.Feature
 import epic.trees.annotations.{FilterAnnotations, TreeAnnotator}
 import epic.trees._
+import breeze.config.Help
 
 class LatentParserModel[L, L3, W](featurizer: Featurizer[L3, W],
                                   reannotate: (BinarizedTree[L], Seq[W]) => BinarizedTree[L],
@@ -78,12 +79,28 @@ case class LatentParserInference[L, L2, W](featurizer: RefinedFeaturizer[L, W, F
 
 }
 
-case class LatentParserModelFactory(baseParser: ParserParams.BaseParser,
-                                    constraints: ParserParams.Constraints[AnnotatedLabel, String],
-                                    annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = FilterAnnotations(),
-                                    substates: File = null,
-                                    numStates: Int = 2,
-                                    oldWeights: File = null) extends ParserModelFactory[AnnotatedLabel, String] {
+/**
+ * Model for latent annotated grammars (Petrov and Klein, 2008).
+ * @param baseParser
+ * @param constraints
+ * @param annotator
+ * @param substates
+ * @param numStates
+ * @param oldWeights
+ */
+case class LatentModelFactory(baseParser: ParserParams.XbarGrammar,
+                              constraints: ParserParams.Constraints[AnnotatedLabel, String],
+                              @Help(text=
+                                """The kind of annotation to do on the refined grammar. Default uses no annotations.
+You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Manning 2003.
+                                """)
+                              annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = FilterAnnotations(),
+                              @Help(text="Path to substates to use for each symbol. Uses numStates for missing states.")
+                              substates: File = null,
+                              @Help(text="Number of states to use. Overridden by substates file")
+                              numStates: Int = 2,
+                              @Help(text="Old weights to initialize with. Optional.")
+                              oldWeights: File = null) extends ParserModelFactory[AnnotatedLabel, String] {
   type MyModel = LatentParserModel[AnnotatedLabel, (AnnotatedLabel, Int), String]
 
   def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]]):MyModel = {

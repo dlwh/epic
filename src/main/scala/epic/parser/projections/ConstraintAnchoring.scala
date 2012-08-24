@@ -17,7 +17,7 @@ package projections
  limitations under the License.
 */
 import breeze.collection.mutable.TriangularArray
-import breeze.config.Configuration
+import breeze.config.{Help, Configuration}
 import breeze.util.Index
 import collection.immutable.BitSet
 import java.io._
@@ -257,7 +257,12 @@ object ConstraintCoreGrammar {
 
 
 case class ProjectionParams(treebank: ProcessedTreebank,
-                            parser: File, out: File = new File("constraints.ser.gz"), maxParseLength: Int = 80,
+                            @Help(text="Location of the parser")
+                            parser: File,
+                            @Help(text="Where to save constraints")
+                            out: File = new File("constraints.ser.gz"),
+                            @Help(text="Longest train sentence to build constraints for.")
+                            maxParseLength: Int = 80,
                             viterbi: Boolean = true) {
 }
 
@@ -313,6 +318,11 @@ object ProjectTreebankToConstraints {
 }
 
 
+/**
+ * Computes a CDF for how many labels are pruned at different levels of pruning.
+ *
+ * @author dlwh
+ */
 object ComputePruningThresholds {
 
   def main(args: Array[String]) {

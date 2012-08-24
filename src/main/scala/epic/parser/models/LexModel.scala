@@ -27,6 +27,7 @@ import epic.parser._
 import features.RuleFeature
 import breeze.util._
 import collection.mutable.ArrayBuffer
+import breeze.config.Help
 
 class LexModel[L, W](bundle: LexGrammarBundle[L, W],
                      reannotate: (BinarizedTree[L], Seq[W])=>BinarizedTree[L],
@@ -50,10 +51,10 @@ class LexModel[L, W](bundle: LexGrammarBundle[L, W],
       headed
 
     }
-    new DiscParserInference(indexed, ann _, gram, baseFactory)
+    new AnnotatedParserInference(indexed, ann _, gram, baseFactory)
   }
 
-  type Inference = DiscParserInference[L, W]
+  type Inference = AnnotatedParserInference[L, W]
 
   def emptyCounts = new epic.parser.ExpectedCounts(indexed.index)
 
@@ -666,11 +667,14 @@ class SimpleWordShapeGen[L](tagWordCounts: Counter2[L, String, Double],
   }
 }
 
-case class LexParserModelFactory(baseParser: ParserParams.BaseParser,
-                                 constraints: ParserParams.Constraints[AnnotatedLabel, String],
-                                 oldWeights: File = null,
-                                 dummyFeats: Double = 0.5,
-                                 minFeatCutoff: Int = 1) extends ParserExtractableModelFactory[AnnotatedLabel, String] {
+case class LexModelFactory(baseParser: ParserParams.XbarGrammar,
+                           constraints: ParserParams.Constraints[AnnotatedLabel, String],
+                           @Help(text="Old weights to initialize with. Optional")
+                           oldWeights: File = null,
+                           @Help(text="For features not seen in gold trees, we bin them into dummyFeats * numGoldFeatures bins using hashing.")
+                           dummyFeats: Double = 0.5,
+                           @Help(text="How common must a feature be before we remember it?")
+                           minFeatCutoff: Int = 1) extends ParserExtractableModelFactory[AnnotatedLabel, String] {
   type MyModel = LexModel[AnnotatedLabel, String]
 
   def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]]) = {

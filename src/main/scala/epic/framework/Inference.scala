@@ -20,7 +20,7 @@ package epic.framework
  * @author dlwh
  */
 trait Inference[Datum] extends Serializable {
-  type ExpectedCounts;
+  type ExpectedCounts
 
   def expectedCounts(datum: Datum): ExpectedCounts
 }
