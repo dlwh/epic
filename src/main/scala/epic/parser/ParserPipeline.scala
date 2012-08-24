@@ -29,11 +29,9 @@ import collection.mutable
  * Mostly a utility class for parsertrainers.
  */
 object ParserParams {
-  case class Params()
-  trait NoParams { self: ParserPipeline =>
-    type Params = ParserParams.Params
-    protected val paramManifest = manifest[Params]
-  }
+  case class JointParams[M](treebank: ProcessedTreebank,
+                            trainer: M,
+                            @Help(text="Print this and exit.") help: Boolean = false)
 
   @Help(text="Stores/loads a baseline xbar grammar needed to extracting trees.")
   case class XbarGrammar(path: File = new File("xbar.gr")) {
@@ -94,9 +92,6 @@ trait ParserPipeline {
    */
   protected implicit val paramManifest: Manifest[Params]
 
-  case class JointParams[M](treebank: ProcessedTreebank,
-                            trainer: M,
-                            @Help(text="Print this and exit.") help: Boolean)
 
   /**
    * The main point of entry for implementors. Should return a sequence
@@ -123,14 +118,17 @@ trait ParserPipeline {
    * Trains a sequence of parsers and evaluates them.
    */
   def main(args: Array[String]) {
+    import ParserParams.JointParams
+
     val (baseConfig, files) = CommandLineParser.parseArguments(args)
     val config = baseConfig backoff Configuration.fromPropertiesFiles(files.map(new File(_)))
     val params = try {
       config.readIn[JointParams[Params]]("test")
     } catch {
       case e =>
-      println(breeze.config.GenerateHelp[JointParams[Params]](config))
-      sys.exit(1)
+        e.printStackTrace()
+        println(breeze.config.GenerateHelp[JointParams[Params]](config))
+        sys.exit(1)
     }
 
     if(params.help) {
