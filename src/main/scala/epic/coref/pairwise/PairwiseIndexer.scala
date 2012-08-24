@@ -22,8 +22,7 @@ object PairwiseIndexer {
 
     val indexed = for (inst <- instances) yield {
       val length = inst.numMentions
-      val array = new TriangularArray[SparseVector[Double]](length + 1, {
-        (a: Int, b: Int) =>
+      val array = TriangularArray.tabulate[SparseVector[Double]](length + 1) { (a: Int, b: Int) =>
           if (a == 0 && b == 0) null
           else {
             val ctr = if (a == 0) {
@@ -37,7 +36,7 @@ object PairwiseIndexer {
             }
             vec
           }
-      })
+      }
 
       // now for clusters
       // 0 is for root
@@ -49,7 +48,7 @@ object PairwiseIndexer {
 
 
     // we set sparsevectors to have length maxint, now we set them right.
-    val fixed = indexed.map(inst => inst.copy(features = new TriangularArray[SparseVector[Double]](inst.numMentions + 1, {
+    val fixed = indexed.map(inst => inst.copy(features = TriangularArray.tabulate(inst.numMentions + 1){
       (a, b) =>
         if (a == 0 && b == 0) null
         else {
@@ -58,7 +57,7 @@ object PairwiseIndexer {
           val justRight = new SparseVector[Double](tooLong.index, tooLong.data, tooLong.used, index.size)
           justRight
         }
-    })))
+    }))
 
     new PairwiseIndexer(index, feat, fixed)
   }

@@ -18,35 +18,11 @@ case class PropIndexer(index: Index[Feature],
                        extractors: IndexedSeq[PropertyExtractor],
                        instances: IndexedSeq[IndexedCorefInstance],
                        featuresForProperties: Array[IndexedPropertyFeatures]) {
-  def initialBeliefs(inst: IndexedCorefInstance) = {
-    val marginals: Array[Array[Array[Double]]] = inst.properties.map { myProperties =>
-      Array.tabulate(featuresForProperties.length){ p =>
-        val probs = new Array[Double](featuresForProperties(p).prop.choices.size)
-        if (myProperties(p) >= 0) {
-          probs(p) = 1.0
-        } else {
-          util.Arrays.fill(probs, 1.0/probs.length)
-        }
-        probs
-      }
-    }
-
-    val messages = Array.fill(marginals.length){
-      val to = inst.properties.map { myProperties =>
-        Array.tabulate(featuresForProperties.length){ p =>
-          val probs = new Array[Double](featuresForProperties(p).prop.choices.size)
-          util.Arrays.fill(probs, 1.0)
-          probs
-        }
-      }
-      to
-    }
-
-    new PropertyBeliefs(marginals, messages)
-  }
 }
 
-case class IndexedPropertyFeatures(prop: Property, agree: Int, mismatch: Int, pairs: Array[Array[Int]])
+case class IndexedPropertyFeatures(prop: Property, agree: Int, mismatch: Int, pairs: Array[Array[Int]]) {
+  def arity = prop.arity
+}
 
 object PropIndexer {
   def apply(feat: PairwiseFeaturizer, extractors: IndexedSeq[PropertyExtractor], instances: IndexedSeq[CorefInstance]): PropIndexer = {
@@ -54,7 +30,7 @@ object PropIndexer {
 
     val indexed = for (inst <- instances) yield {
       val length = inst.numMentions
-      val pairArray = new TriangularArray[SparseVector[Double]](length + 1, { indexPair(inst, _, _, feat, index) })
+      val pairArray = TriangularArray.tabulate[SparseVector[Double]](length + 1){ indexPair(inst, _, _, feat, index) }
       val properties = inst.mentions.toArray.map(indexProperties(extractors, _, inst))
 
       // now for clusters
@@ -79,7 +55,7 @@ object PropIndexer {
     }
 
     // we set SparseVectors to have length maxint, now we set them right.
-    val fixed = indexed.map(inst => inst.copy(features = new TriangularArray[SparseVector[Double]](inst.numMentions + 1, {
+    val fixed = indexed.map(inst => inst.copy(features = TriangularArray.tabulate[SparseVector[Double]](inst.numMentions + 1){
       (a, b) =>
         if (a == 0 && b == 0) null
         else {
@@ -88,7 +64,7 @@ object PropIndexer {
           val justRight = new SparseVector[Double](tooLong.index, tooLong.data, tooLong.used, index.size)
           justRight
         }
-    })))
+    }))
 
     new PropIndexer(index, feat, extractors, fixed, featuresForProperties)
   }
