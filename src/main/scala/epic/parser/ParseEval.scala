@@ -22,6 +22,7 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.PrintStream
 import scala.actors.Actor
+import java.util.concurrent.atomic.AtomicInteger
 
 
 /**
@@ -90,35 +91,49 @@ object ParseEval {
     }
   }
 
+  case class ParseResult[L](sent: TreeInstance[L, String], gold: Tree[String], guess: Tree[String], time: Double) {
+    val stats =  new ParseEval(Set("","''", "``", ".", ":", ",", "TOP")) apply (guess, gold)
+  }
+
+  def parseAll[L](trees: IndexedSeq[TreeInstance[L,String]],
+                  parser: Parser[L,String],
+                  chainReplacer: UnaryChainReplacer[L],
+                  asString: L=>String,
+                  logProgress: Boolean = true): Seq[ParseResult[L]] = {
+    val acc = new AtomicInteger(0)
+    trees.par.flatMap { sent =>
+      try {
+        val TreeInstance(id,goldTree,words) = sent
+        val startTime = System.currentTimeMillis
+        val tree: Tree[String] = chainReplacer.replaceUnaries(parser.bestParse(words)).map(asString)
+        val guessTree = Trees.debinarize(Trees.deannotate(tree))
+        val deBgold = Trees.debinarize(Trees.deannotate(goldTree.map(asString)))
+        val endTime = System.currentTimeMillis
+        if(logProgress) {
+          val i = acc.incrementAndGet()
+          if(i % 1000 == 0) {
+            println("Parsed %d/%d sentences.".format(i, trees.length))
+          }
+        }
+        Some(ParseResult(sent, deBgold, guessTree, (endTime-startTime) / 1000.0))
+      } catch {
+        case e =>
+          new RuntimeException("Error while parsing " + sent.words, e).printStackTrace()
+          None
+
+      }
+    }.seq
+  }
+
   type PostParseFn = (Tree[String],Tree[String],Seq[String],Statistics,Int)=>Unit
   val noPostParseFn = (_:Tree[String],_:Tree[String],_:Seq[String],_:Statistics,_:Int)=>()
 
   def evaluate[L](trees: IndexedSeq[TreeInstance[L,String]],
                   parser: Parser[L,String],
                   chainReplacer: UnaryChainReplacer[L],
-                  postEval: PostParseFn = noPostParseFn,
-                  asString: L=>String) = {
-
-    val peval = new ParseEval(Set("","''", "``", ".", ":", ",", "TOP"))
-    // TODO: make less horrible
-
-    def evalSentence(sent: TreeInstance[L,String]) = try {
-      val TreeInstance(id,goldTree,words) = sent
-      val startTime = System.currentTimeMillis
-      val tree: Tree[String] = chainReplacer.replaceUnaries(parser.bestParse(words)).map(asString)
-      val guessTree = Trees.debinarize(Trees.deannotate(tree))
-      val deBgold = Trees.debinarize(Trees.deannotate(goldTree.map(asString)))
-      val stats = peval(guessTree,deBgold)
-      val endTime = System.currentTimeMillis
-      postEval(guessTree,deBgold,words,stats,(endTime-startTime).toInt)
-      stats
-    } catch {
-      case e:RuntimeException => e.printStackTrace()
-      Statistics(0, peval.labeledConstituents(sent.tree.map(asString)).size, 0, 0, 0, sent.words.length, 1)
-    }
-    val stats = trees.par.view.map { evalSentence _ }.reduce { (_:Statistics) + (_:Statistics)}
-
-    stats
+                  asString: L=>String, logProgress: Boolean = true): Statistics = {
+    val results = parseAll(trees, parser, chainReplacer, asString, logProgress)
+    results.map(_.stats).reduceLeft(_ + _)
   }
 
   def evaluateAndLog[L](trees: IndexedSeq[TreeInstance[L,String]],
@@ -131,35 +146,28 @@ object ParseEval {
     parsedir.exists() || parsedir.mkdirs() || sys.error("Couldn't make directory: " + parsedir)
     val goldOut = new PrintStream(new BufferedOutputStream(new FileOutputStream(new File(parsedir,"gold"))))
     val guessOut = new PrintStream(new BufferedOutputStream(new FileOutputStream(new File(parsedir,"guess"))))
-
-    import Actor._
-    val appender = actor {
-      loop {
-        react {
-          case Some((guess,gold)) =>  goldOut.println(gold); guessOut.println(guess)
-          case None => goldOut.close(); guessOut.close(); Actor.exit()
-        }
-      }
-    }
-
-    def postEval(guessTree: Tree[String], goldTree: Tree[String], words: Seq[String],
-                 stats: Statistics, time: Int) = {
+    val results = parseAll(trees, parser, chainReplacer, asString)
+    results foreach { res =>
+      import res._
       val buf = new StringBuilder()
       buf ++= "======\n"
-      buf ++= words.mkString(",")
+      buf ++= sent.words.mkString(",")
       buf ++= "\nGold:\n"
-      buf ++= goldTree.render(words)
+      buf ++= gold.render(sent.words)
       buf ++= "\nGuess:\n"
-      buf ++= guessTree.render(words)
+      buf ++= guess.render(sent.words)
       buf ++= ("\nLocal Accuracy:" + (stats.precision,stats.recall,stats.f1,stats.exact,stats.tagAccuracy) + "\n")
       buf ++= (time / 1000.0 + " Seconds")
       buf ++= "\n======"
+      goldOut.println(gold); guessOut.println(guess)
       println(buf.toString)
-      appender ! Some((guessTree.render(words,newline=false)), goldTree.render(words,newline=false))
     }
 
-    val r = evaluate(trees, parser, chainReplacer, postEval _, asString)
-    appender ! None
-    r
+    guessOut.close()
+    goldOut.close()
+
+    val allStats = results.map(_.stats).reduceLeft(_ + _)
+
+    allStats
   }
 }
