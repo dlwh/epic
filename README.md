@@ -26,9 +26,9 @@ $ java -cp target/epicparser-assembly-0.1.jar epic.parser.models.ParserPipeline 
 You'll get a list of all the available options (so many!) The important ones are:
 
 <pre>
---treebank.path <path/to/treebank>
---constraints.path <path/to/constraints.ser.gz>
---baseParser.path <path/to/xbar.gr>
+--treebank.path "path/to/treebank"
+--constraints.path "path/to/constraints.ser.gz"
+--baseParser.path "path/to/xbar.gr"
 --modelFactory                                   # the kind of parser to train. See below.
 --opt.useStochastic true                         # turn on stochastic gradient
 </pre>
@@ -43,10 +43,10 @@ There are 4 kinds of base models you can train, and you can tie them together wi
 
 These models all have their own options. You can see those by specifying the modelFactory and adding --help: 
 <pre>
-$ java -cp target/epicparser-assembly-0.1.jar epic.parser.models.ParserPipeline --modelFactory <model> --help
+$ java -cp target/epicparser-assembly-0.1.jar epic.parser.models.ParserPipeline --modelFactory "model" --help
 </pre>
 
 None of these models are good by themselves: you need to train them jointly. To do that, use epic.models.EPParserModelFactory:
 <pre>
-$ java -cp target/epicparser-assembly-0.1.jar epic.parser.models.ParserPipeline --modelFactory epic.models.EPParserModelFactory --model.0 <model the first> --model.1 <model the second> // etc.
+$ java -cp target/epicparser-assembly-0.1.jar epic.parser.models.ParserPipeline --modelFactory epic.models.EPParserModelFactory --model.0 "model the first" --model.1 "model the second" // etc.
 </pre>
