@@ -29,28 +29,7 @@ class FeaturizedLexicon[L, L2, W](val weights: DenseVector[Double],
 
 
   def scoreTag(l: L2, words: Seq[W], pos: Int) = {
-    val w = words(pos)
-    if (wordScores.contains(w, l))
-      wordScores(w, l)
-    else scoreUnknown(l, w)
-
-
+    featureIndexer.computeWeight(featureIndexer.labelIndex(l), words, pos, weights)
   }
-
-  private def scoreUnknown(label: L2, w: W): Double = {
-    featureIndexer.computeWeight(featureIndexer.labelIndex(label), w, weights)
-  }
-
-
-  private val wordScores = Counter2[W, L2, Double]()
-  // lex: recompute features
-  for {
-    LexicalProduction(l, word) <- featureIndexer.lexicon.knownLexicalProductions
-    tagIndex <- featureIndexer.proj.labels.refinementsOf(featureIndexer.proj.labels.coarseIndex(l))
-  } {
-    val score = featureIndexer.computeWeight(tagIndex, word, weights)
-    wordScores(word, featureIndexer.labelIndex.get(tagIndex)) = score
-  }
-
 
 }

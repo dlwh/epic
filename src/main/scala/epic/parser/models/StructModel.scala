@@ -41,7 +41,7 @@ import breeze.config.Help
  * @tparam W
  */
 @SerialVersionUID(1L)
-class StructModel[L, L2, W](featurizer: Featurizer[L2, W],
+class StructModel[L, L2, W](indexedFeatures: IndexedFeaturizer[L, L2, W],
                         ann: TreeAnnotator[L, W, L2],
                         val projections: GrammarRefinements[L, L2],
                         baseFactory: CoreGrammar[L, W],
@@ -51,8 +51,6 @@ class StructModel[L, L2, W](featurizer: Featurizer[L2, W],
                           _ => None
                         }) extends ParserModel[L, W] with Serializable {
   type Inference = AnnotatedParserInference[L, W]
-
-  val indexedFeatures: IndexedFeaturizer[L, L2, W] = IndexedFeaturizer(grammar, lexicon, featurizer, projections)
 
   def featureIndex = indexedFeatures.index
 
@@ -99,17 +97,17 @@ case class StructModelFactory(baseParser: ParserParams.XbarGrammar,
 
     val (initLexicon, initBinaries, initUnaries) = this.extractBasicCounts(transformed)
 
-    val (grammar, lexicon) = baseParser.xbarGrammar(trainTrees)
+    val (xbarGrammar, xbarLexicon) = baseParser.xbarGrammar(trainTrees)
     val refGrammar = BaseGrammar(AnnotatedLabel.TOP, initBinaries, initUnaries)
-    val indexedRefinements = GrammarRefinements(grammar, refGrammar, {
+    val indexedRefinements = GrammarRefinements(xbarGrammar, refGrammar, {
       (_: AnnotatedLabel).baseAnnotatedLabel
     })
 
     val (xbarWords, xbarBinaries, xbarUnaries) = this.extractBasicCounts(trainTrees.map(_.mapLabels(_.baseAnnotatedLabel)))
-    val baseFactory = RefinedGrammar.generative(grammar, lexicon, xbarBinaries, xbarUnaries, xbarWords)
+    val baseFactory = RefinedGrammar.generative(xbarGrammar, xbarLexicon, xbarBinaries, xbarUnaries, xbarWords)
     val cFactory = constraints.cachedFactory(AugmentedGrammar.fromRefined(baseFactory))
 
-    val gen = new WordShapeFeaturizer(sum(initLexicon, Axis._0))
+    val gen = new WordShapeFeaturizer(initLexicon)
     def labelFlattener(l: AnnotatedLabel) = {
       val basic = Seq(l)
       basic map { IndicatorFeature(_) }
@@ -118,9 +116,15 @@ case class StructModelFactory(baseParser: ParserParams.XbarGrammar,
     val feat = new GenFeaturizer[AnnotatedLabel, String](gen, labelFlattener _, ruleFlattener _)
 
     val featureCounter = readWeights(oldWeights)
-    new StructModel[AnnotatedLabel, AnnotatedLabel, String](feat, annotator, indexedRefinements, cFactory, grammar, lexicon, {
-      featureCounter.get(_)
-    })
+    val indexedFeaturizer = IndexedFeaturizer(xbarGrammar, xbarLexicon, trainTrees, feat, indexedRefinements)
+
+    new StructModel[AnnotatedLabel, AnnotatedLabel, String](indexedFeaturizer,
+    annotator,
+    indexedRefinements,
+    cFactory,
+    xbarGrammar,
+    xbarLexicon,
+    { featureCounter.get(_) })
   }
 
 }

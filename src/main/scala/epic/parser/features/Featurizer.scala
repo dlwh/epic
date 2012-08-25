@@ -36,7 +36,7 @@ import breeze.util.Interner
 trait Featurizer[L, W] extends Serializable {
   def featuresFor(r: Rule[L]): Array[Feature]
 
-  def featuresFor(l: L, w: W): Array[Feature]
+  def featuresFor(l: L, w: Seq[W], pos: Int): Array[Feature]
 
   /**should return 0.0 if we don't care about this feature. */
   def initialValueForFeature(f: Feature): Double
@@ -47,20 +47,21 @@ trait Featurizer[L, W] extends Serializable {
  */
 class SimpleFeaturizer[L, W] extends Featurizer[L, W] {
   def featuresFor(r: Rule[L]) = Array(RuleFeature(r):Feature)
-  def featuresFor(l: L, w: W) = Array(LexicalFeature(l, w):Feature)
+  def featuresFor(l: L, w: Seq[W], pos: Int) = Array(LexicalFeature(l, w):Feature)
 
   def initialValueForFeature(f: Feature) = -1.0
 }
 
-class GenFeaturizer[L, W](wGen: W=>IndexedSeq[Feature],
+class GenFeaturizer[L, W](wGen: (Seq[W], Int)=>IndexedSeq[Feature],
                           lGen: L=>Seq[Feature] = {(x:L)=>Seq(IndicatorFeature(x))},
                           rGen: Rule[L] => Seq[Feature] = {(x: Rule[L]) => Seq(IndicatorFeature(x))}
                            ) extends Featurizer[L, W] {
 
   val featureInterner = Interner[Feature]
-  def featuresFor(l: L, w: W) = {
+
+  def featuresFor(l: L, w: Seq[W], pos: Int) = {
     val result = ArrayBuilder.make[Feature]
-    val wfFeats = wGen(w).map(featureInterner)
+    val wfFeats = wGen(w, pos).map(featureInterner)
     val lfFeats = lGen(l).map(featureInterner)
     result.sizeHint(wfFeats.size * lfFeats.size)
     for ( wf <- wfFeats; lf <- lfFeats) {

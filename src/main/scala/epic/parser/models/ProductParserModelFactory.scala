@@ -68,9 +68,9 @@ case class ProductParserModelFactory(baseParser: ParserParams.XbarGrammar,
     val (annWords, annBinaries, annUnaries) = this.extractBasicCounts(annTrees)
 
 
-    val (xbarParser, xbarLexicon) = baseParser.xbarGrammar(trainTrees)
+    val (xbarGrammar, xbarLexicon) = baseParser.xbarGrammar(trainTrees)
 
-    val baseFactory = RefinedGrammar.generative(xbarParser, xbarLexicon, annBinaries, annUnaries, annWords)
+    val baseFactory = RefinedGrammar.generative(xbarGrammar, xbarLexicon, annBinaries, annUnaries, annWords)
     val cFactory = constraints.cachedFactory(AugmentedGrammar.fromRefined(baseFactory))
 
     val substateMap = if (substates != null && substates.exists) {
@@ -79,12 +79,12 @@ case class ProductParserModelFactory(baseParser: ParserParams.XbarGrammar,
         val split = line.split("\\s+")
         AnnotatedLabel(split(0)) -> split(1).toInt
       }
-      pairs.toMap + (xbarParser.root -> 1)
+      pairs.toMap + (xbarGrammar.root -> 1)
     } else {
-      Map(xbarParser.root -> 1)
+      Map(xbarGrammar.root -> 1)
     }
 
-    val gen = new WordShapeFeaturizer(sum(annWords, Axis._0))
+    val gen = new WordShapeFeaturizer(annWords)
     def labelFlattener(l: (AnnotatedLabel, Seq[Int])) = {
       val basic = for( (ref,m) <- l._2.zipWithIndex) yield ComponentFeature(m, IndicatorFeature(l._1, ref))
       basic
@@ -92,7 +92,7 @@ case class ProductParserModelFactory(baseParser: ParserParams.XbarGrammar,
     val feat = new GenFeaturizer[(AnnotatedLabel, Seq[Int]), String](gen, labelFlattener _)
 
     val annGrammar = BaseGrammar(annTrees.head.tree.label, annBinaries, annUnaries)
-    val firstLevelRefinements = GrammarRefinements(xbarParser, annGrammar, {(_: AnnotatedLabel).baseAnnotatedLabel})
+    val firstLevelRefinements = GrammarRefinements(xbarGrammar, annGrammar, {(_: AnnotatedLabel).baseAnnotatedLabel})
     val secondLevel = GrammarRefinements(annGrammar, {split(_:AnnotatedLabel,substateMap)}, {splitRule(_ :Rule[AnnotatedLabel], {split(_:AnnotatedLabel,substateMap)})}, unsplit)
     val finalRefinements = firstLevelRefinements compose secondLevel
     println(finalRefinements.labels)
@@ -104,11 +104,13 @@ case class ProductParserModelFactory(baseParser: ParserParams.XbarGrammar,
       Counter[Feature, Double]()
     }
 
-    new LatentParserModel[AnnotatedLabel, (AnnotatedLabel, Seq[Int]), String](feat,
+    val indexedFeaturizer = IndexedFeaturizer(xbarGrammar, xbarLexicon, trainTrees, feat, finalRefinements)
+
+    new LatentParserModel[AnnotatedLabel, (AnnotatedLabel, Seq[Int]), String](indexedFeaturizer,
     annotator,
     finalRefinements,
     cFactory,
-    xbarParser,
+    xbarGrammar,
     xbarLexicon, {
       featureCounter.get(_)
     })

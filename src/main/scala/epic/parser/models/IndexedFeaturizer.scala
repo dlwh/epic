@@ -21,7 +21,7 @@ import breeze.util._
 import projections._
 import features.Featurizer
 import breeze.collection.mutable.{ArrayMap, OpenAddressHashArray}
-import epic.trees.LexicalProduction
+import epic.trees.{TreeInstance, LexicalProduction}
 import breeze.linalg.DenseVector
 import collection.mutable.ArrayBuilder
 
@@ -52,12 +52,12 @@ trait IndexedFeaturizer[L, L2, W] extends RefinedFeaturizer[L, W, Feature] with 
     ruleCache(r)
   }
 
-  def featuresFor(a: Int, w: W) = {
-    stripEncode(featurizer.featuresFor(labelIndex.get(a), w))
+  def featuresFor(a: Int, w: Seq[W], pos: Int) = {
+    stripEncode(featurizer.featuresFor(labelIndex.get(a), w, pos))
   }
 
   def computeWeight(r: Int, weights: DenseVector[Double]): Double = dot(featuresFor(r),weights)
-  def computeWeight(l: Int, w: W, weights: DenseVector[Double]) = dot(featuresFor(l, w), weights)
+  def computeWeight(l: Int, w: Seq[W], pos: Int, weights: DenseVector[Double]) = dot(featuresFor(l, w, pos), weights)
 
   private def dot(features: Array[Int], weights: DenseVector[Double]) = {
     var i = 0
@@ -68,19 +68,6 @@ trait IndexedFeaturizer[L, L2, W] extends RefinedFeaturizer[L, W, Feature] with 
     }
     score
   }
-
-  def dotProjectOfFeatures(a: Int, w: W, weights: DenseVector[Double]) = {
-    var score = 0.0
-    val feats = featurizer.featuresFor(labelIndex.get(a), w)
-    for ( k <- feats) {
-      val ind = index(k)
-      if (ind != -1) {
-        score += weights(ind)
-      }
-    }
-    score
-  }
-
 
   def anchor(words: Seq[W]) = new Spec(words)
 
@@ -115,7 +102,7 @@ trait IndexedFeaturizer[L, L2, W] extends RefinedFeaturizer[L, W, Feature] with 
     def featuresForSpan(begin: Int, end: Int, tag: Int, ref: Int) = {
       if (begin + 1 == end) {
         val globalTag = proj.labels.globalize(tag, ref)
-        featuresFor(globalTag, words(begin))
+        featuresFor(globalTag, words, begin)
       } else Array.empty[Int]
     }
   }
@@ -129,6 +116,7 @@ object IndexedFeaturizer {
    */
   def apply[L, L2, W](grammar: BaseGrammar[L],
                       lexicon: Lexicon[L, W],
+                      trees: IndexedSeq[TreeInstance[L, W]],
                       f: Featurizer[L2, W],
                       indexedProjections: GrammarRefinements[L, L2]): IndexedFeaturizer[L, L2, W] = {
     val featureIndex = Index[Feature]()
@@ -147,10 +135,12 @@ object IndexedFeaturizer {
 
     // lex
     for {
-      LexicalProduction(l, w) <- lexicon.knownLexicalProductions
+      ex <- trees
+      i <- 0 until ex.words.length
+      l <- lexicon.tagsForWord(ex.words(i))
       lSplit <- indexedProjections.labels.refinementsOf(l)
     } {
-      val feats = f.featuresFor(lSplit, w)
+      val feats = f.featuresFor(lSplit, ex.words, i)
       feats.foreach {featureIndex.index _ }
     }
 
