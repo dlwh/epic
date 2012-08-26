@@ -18,7 +18,7 @@ package epic.parser
 import projections.GrammarRefinements
 import epic.trees._
 
-import annotations.{FilterAnnotations, TreeAnnotator}
+import annotations.{AddMarkovization, PipelineAnnotator, FilterAnnotations, TreeAnnotator}
 import breeze.linalg.Counter2
 import breeze.text.analyze.EnglishWordClassGenerator
 import breeze.config.Help
@@ -102,8 +102,8 @@ object GenerativeTrainer extends ParserPipeline {
   @Help(text="Training parameters")
   case class Params(@Help(text="Location to read/write the baseParser") baseParser: XbarGrammar,
                     @Help(text=
-                      """The kind of annotation to do on the refined grammar. Default uses no annotations.""")
-                    annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = new FilterAnnotations(Set.empty[Annotation]),
+                      "The kind of annotation to do on the refined grammar. Default uses v2h1 markovization and nothing else.")
+                    annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = PipelineAnnotator(Seq(FilterAnnotations(), AddMarkovization(1,2))),
                     @Help(text="Use viterbi parse charts")
                     viterbi: Boolean= true,
                     @Help(text="Use max rule decoding instead of max constituent")

@@ -263,6 +263,7 @@ case class ProjectionParams(treebank: ProcessedTreebank,
                             out: File = new File("constraints.ser.gz"),
                             @Help(text="Longest train sentence to build constraints for.")
                             maxParseLength: Int = 80,
+                            threshold: Double = -5,
                             viterbi: Boolean = true) {
 }
 
@@ -279,7 +280,7 @@ object ProjectTreebankToConstraints {
     val out = params.out
     out.getAbsoluteFile.getParentFile.mkdirs()
 
-    val factory = new ConstraintCoreGrammar[AnnotatedLabel, String](parser.augmentedGrammar, -6, params.viterbi)
+    val factory = new ConstraintCoreGrammar[AnnotatedLabel, String](parser.augmentedGrammar, params.threshold, params.viterbi)
     val train = mapTrees(factory, treebank.trainTrees, parser.grammar.labelIndex, useTree = true, maxL = params.maxParseLength)
     val test = mapTrees(factory, treebank.testTrees, parser.grammar.labelIndex, useTree = false, maxL = 10000)
     val dev = mapTrees(factory, treebank.devTrees, parser.grammar.labelIndex, useTree = false, maxL = 10000)
@@ -332,9 +333,6 @@ object ComputePruningThresholds {
     val treebank = params.treebank.copy(maxLength = 1000000)
     println(params)
     val parser = loadParser[Any](params.parser)
-
-    val out = params.out
-    out.getAbsoluteFile.getParentFile.mkdirs()
 
     val factory = new ConstraintCoreGrammar[AnnotatedLabel, String](parser.augmentedGrammar, -7, params.viterbi)
     val (all, gold) = mapTrees(factory, treebank.devTrees, parser.grammar.labelIndex)

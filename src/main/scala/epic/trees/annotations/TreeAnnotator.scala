@@ -70,7 +70,7 @@ case class StripAnnotations[W]() extends TreeAnnotator[AnnotatedLabel, W, Annota
   }
 }
 
-case class AddMarkovization[W](horizontal: Int=2, vertical: Int=2) extends TreeAnnotator[AnnotatedLabel, W, AnnotatedLabel] {
+case class AddMarkovization[W](horizontal: Int=1, vertical: Int=2) extends TreeAnnotator[AnnotatedLabel, W, AnnotatedLabel] {
   def apply(tree: BinarizedTree[AnnotatedLabel], words: Seq[W]) = {
     annHorz(annVert(tree))
   }
