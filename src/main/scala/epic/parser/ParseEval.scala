@@ -159,7 +159,7 @@ object ParseEval {
       buf ++= ("\nLocal Accuracy:" + (stats.precision,stats.recall,stats.f1,stats.exact,stats.tagAccuracy) + "\n")
       buf ++= (time / 1000.0 + " Seconds")
       buf ++= "\n======"
-      goldOut.println(gold); guessOut.println(guess)
+      goldOut.println(gold.render(sent.words, newline=false)); guessOut.println(guess.render(sent.words, newline=false))
       println(buf.toString)
     }
 
