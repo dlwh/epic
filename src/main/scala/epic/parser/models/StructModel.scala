@@ -25,9 +25,23 @@ import epic.trees._
 import epic.trees.annotations.{KMAnnotator, TreeAnnotator}
 import features.IndicatorFeature
 import epic.trees.TreeInstance
+import breeze.config.Help
 
+/**
+ * Model for structural annotations, a la Klein and Manning 2003.
+ * @param featurizer
+ * @param ann
+ * @param projections
+ * @param baseFactory
+ * @param grammar
+ * @param lexicon
+ * @param initialFeatureVal
+ * @tparam L
+ * @tparam L2
+ * @tparam W
+ */
 @SerialVersionUID(1L)
-class UnlexModel[L, L2, W](featurizer: Featurizer[L2, W],
+class StructModel[L, L2, W](indexedFeatures: IndexedFeaturizer[L, L2, W],
                         ann: TreeAnnotator[L, W, L2],
                         val projections: GrammarRefinements[L, L2],
                         baseFactory: CoreGrammar[L, W],
@@ -36,9 +50,7 @@ class UnlexModel[L, L2, W](featurizer: Featurizer[L2, W],
                         initialFeatureVal: (Feature => Option[Double]) = {
                           _ => None
                         }) extends ParserModel[L, W] with Serializable {
-  type Inference = DiscParserInference[L, W]
-
-  val indexedFeatures: IndexedFeaturizer[L, L2, W] = IndexedFeaturizer(grammar, lexicon, featurizer, projections)
+  type Inference = AnnotatedParserInference[L, W]
 
   def featureIndex = indexedFeatures.index
 
@@ -59,7 +71,7 @@ class UnlexModel[L, L2, W](featurizer: Featurizer[L2, W],
       localized
     }
 
-    new DiscParserInference(indexedFeatures, reannotate, grammar, baseFactory)
+    new AnnotatedParserInference(indexedFeatures, reannotate, grammar, baseFactory)
   }
 
   def expectedCountsToObjective(ecounts: ExpectedCounts) = {
@@ -68,11 +80,13 @@ class UnlexModel[L, L2, W](featurizer: Featurizer[L2, W],
 
 }
 
-case class UnlexModelFactory(baseParser: ParserParams.BaseParser,
-                          constraints: ParserParams.Constraints[AnnotatedLabel, String],
-                          annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = KMAnnotator(),
-                          oldWeights: File = null) extends ParserModelFactory[AnnotatedLabel, String] {
-  type MyModel = UnlexModel[AnnotatedLabel, AnnotatedLabel, String]
+case class StructModelFactory(baseParser: ParserParams.XbarGrammar,
+                              constraints: ParserParams.Constraints[AnnotatedLabel, String],
+                              @Help(text= "The kind of annotation to do on the refined grammar. Defaults to ~KM2003")
+                              annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = KMAnnotator(),
+                              @Help(text="Old weights to initialize with. Optional")
+                              oldWeights: File = null) extends ParserModelFactory[AnnotatedLabel, String] {
+  type MyModel = StructModel[AnnotatedLabel, AnnotatedLabel, String]
 
   def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]]): MyModel = {
     val transformed = trainTrees.par.map {
@@ -83,17 +97,17 @@ case class UnlexModelFactory(baseParser: ParserParams.BaseParser,
 
     val (initLexicon, initBinaries, initUnaries) = this.extractBasicCounts(transformed)
 
-    val (grammar, lexicon) = baseParser.xbarGrammar(trainTrees)
+    val (xbarGrammar, xbarLexicon) = baseParser.xbarGrammar(trainTrees)
     val refGrammar = BaseGrammar(AnnotatedLabel.TOP, initBinaries, initUnaries)
-    val indexedRefinements = GrammarRefinements(grammar, refGrammar, {
+    val indexedRefinements = GrammarRefinements(xbarGrammar, refGrammar, {
       (_: AnnotatedLabel).baseAnnotatedLabel
     })
 
     val (xbarWords, xbarBinaries, xbarUnaries) = this.extractBasicCounts(trainTrees.map(_.mapLabels(_.baseAnnotatedLabel)))
-    val baseFactory = RefinedGrammar.generative(grammar, lexicon, xbarBinaries, xbarUnaries, xbarWords)
+    val baseFactory = RefinedGrammar.generative(xbarGrammar, xbarLexicon, xbarBinaries, xbarUnaries, xbarWords)
     val cFactory = constraints.cachedFactory(AugmentedGrammar.fromRefined(baseFactory))
 
-    val gen = new WordShapeFeaturizer(sum(initLexicon, Axis._0))
+    val gen = new WordShapeFeaturizer(initLexicon)
     def labelFlattener(l: AnnotatedLabel) = {
       val basic = Seq(l)
       basic map { IndicatorFeature(_) }
@@ -102,9 +116,15 @@ case class UnlexModelFactory(baseParser: ParserParams.BaseParser,
     val feat = new GenFeaturizer[AnnotatedLabel, String](gen, labelFlattener _, ruleFlattener _)
 
     val featureCounter = readWeights(oldWeights)
-    new UnlexModel[AnnotatedLabel, AnnotatedLabel, String](feat, annotator, indexedRefinements, cFactory, grammar, lexicon, {
-      featureCounter.get(_)
-    })
+    val indexedFeaturizer = IndexedFeaturizer(xbarGrammar, xbarLexicon, trainTrees, feat, indexedRefinements)
+
+    new StructModel[AnnotatedLabel, AnnotatedLabel, String](indexedFeaturizer,
+    annotator,
+    indexedRefinements,
+    cFactory,
+    xbarGrammar,
+    xbarLexicon,
+    { featureCounter.get(_) })
   }
 
 }

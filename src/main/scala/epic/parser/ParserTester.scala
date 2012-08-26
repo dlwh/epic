@@ -14,7 +14,7 @@ package epic.parser
  See the License for the specific language governing permissions and
  limitations under the License.
 */
-import breeze.config.{CommandLineParser, Configuration}
+import breeze.config.{Help, CommandLineParser, Configuration}
 import java.io.File
 import breeze.util._
 import epic.trees.{TreeInstance, ProcessedTreebank, AnnotatedLabel, AnnotatedLabelChainReplacer}
@@ -27,25 +27,44 @@ object ParserTester {
   /**
    * The type of the parameters to read in via dlwh.epic.config
    */
-  case class Params(name: String, parser: File)
+  case class Params(treebank: ProcessedTreebank,
+                    @Help(text="Prefix for the name of the eval directory. Sentences are dumped for EVALB to read.")
+                    name: String,
+                    @Help(text="Path to the parser file. Look in parsers/")
+                    parser: File,
+                    @Help(text="Should we evaluate on the test set? Or just the train set?")
+                    evalOnTest: Boolean = false,
+                    @Help(text="Print this and exit.")
+                    help: Boolean = false)
 
   /**
-   * Trains a sequence of parsers and evaluates them.
+   * Evaluates a parser on dev and possibly test.
    */
   def main(args: Array[String]) {
     val (baseConfig,files) = CommandLineParser.parseArguments(args)
     val config = baseConfig backoff Configuration.fromPropertiesFiles(files.map(new File(_)))
-    val params = config.readIn[ProcessedTreebank]("parser")
-    val specificParams = config.readIn[Params]("test")
+    val params = try {
+      config.readIn[Params]("test")
+    } catch {
+      case e =>
+      println(breeze.config.GenerateHelp[Params](config))
+      sys.exit(1)
+    }
+
+    if(params.help) {
+      println(breeze.config.GenerateHelp[Params](config))
+      System.exit(1)
+    }
     println("Evaluating Parser...")
     println(params)
-    println(specificParams)
 
-    val parser = readObject[Parser[AnnotatedLabel,String]](specificParams.parser)
+    import params.treebank._
+
+    val parser = readObject[Parser[AnnotatedLabel,String]](params.parser)
 
     import params._
 
-    val name = specificParams.name
+    val name = params.name
 
     println("Parser " + name)
 
@@ -57,7 +76,7 @@ object ParserTester {
       println( "P: " + precision + " R:" + recall + " F1: " + f1 +  " Ex:" + exact + " Tag Accuracy: " + tagAccuracy)
     }
 
-    {
+    if (params.evalOnTest) {
       println("Evaluating Parser on test...")
       val stats = evalParser(testTrees,parser,name+ "-test")
       import stats._
@@ -67,7 +86,7 @@ object ParserTester {
   }
 
   def evalParser(testTrees: IndexedSeq[TreeInstance[AnnotatedLabel,String]],
-          parser: Parser[AnnotatedLabel,String], name: String):ParseEval.Statistics = {
+                 parser: Parser[AnnotatedLabel,String], name: String):ParseEval.Statistics = {
     ParseEval.evaluateAndLog(testTrees, parser, name, AnnotatedLabelChainReplacer)
   }
 

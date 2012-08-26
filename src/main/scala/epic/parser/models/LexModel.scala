@@ -27,6 +27,7 @@ import epic.parser._
 import features.RuleFeature
 import breeze.util._
 import collection.mutable.ArrayBuffer
+import breeze.config.Help
 
 class LexModel[L, W](bundle: LexGrammarBundle[L, W],
                      reannotate: (BinarizedTree[L], Seq[W])=>BinarizedTree[L],
@@ -50,10 +51,10 @@ class LexModel[L, W](bundle: LexGrammarBundle[L, W],
       headed
 
     }
-    new DiscParserInference(indexed, ann _, gram, baseFactory)
+    new AnnotatedParserInference(indexed, ann _, gram, baseFactory)
   }
 
-  type Inference = DiscParserInference[L, W]
+  type Inference = AnnotatedParserInference[L, W]
 
   def emptyCounts = new epic.parser.ExpectedCounts(indexed.index)
 
@@ -264,7 +265,7 @@ case class StandardFeaturizer[L, W>:Null, P](wordIndex: Index[W],
                                              ruleIndex: Index[Rule[L]],
                                              ruleFeatGen: Rule[L]=>IndexedSeq[Feature],
                                              featGen: (W) => IndexedSeq[P],
-                                             tagFeatGen: (W=>IndexedSeq[P])) extends LexFeaturizer[L, W] {
+                                             tagFeatGen: ((Seq[W],Int)=>IndexedSeq[P])) extends LexFeaturizer[L, W] {
 
   def anchor(words: Seq[W]) = new Spec(words)
 
@@ -287,8 +288,6 @@ case class StandardFeaturizer[L, W>:Null, P](wordIndex: Index[W],
 
   // wordIndex -> seq of feature indices
   val wordCache: Array[Array[Int]] = Encoder.fromIndex(wordIndex).tabulateArray(w => featGen(w).map(wordPartIndex.index(_)).toArray)
-  // these are features used by the tagger
-  val tagCache = Encoder.fromIndex(wordIndex).tabulateArray(w => tagFeatGen(w).map(wordPartIndex.index(_)).toArray)
   // used by rule
   val ruleCache = Encoder.fromIndex(ruleIndex).tabulateArray(r => ruleFeatGen(r).toArray)
 
@@ -296,13 +295,6 @@ case class StandardFeaturizer[L, W>:Null, P](wordIndex: Index[W],
     if(w >= 0) wordCache(w)
     else {
       featGen(ww).view.map(wordPartIndex).filter(_ >= 0).toArray
-    }
-  }
-
-  def indexedTagFeaturesForWord(w: Int, ww: W): Array[Int] = {
-    if(w >= 0) tagCache(w)
-    else {
-      tagFeatGen(ww).view.map(wordPartIndex).filter(_ >= 0).toArray
     }
   }
 
@@ -366,7 +358,7 @@ case class StandardFeaturizer[L, W>:Null, P](wordIndex: Index[W],
 
 
     def featuresForTag(tag: Int, head: Int) = {
-      for(f <- indexedTagFeaturesForWord(indexed(head), words(head))) yield TagFeature(labelIndex.get(tag), wordPartIndex.get(f)):Feature
+      (for(f <- tagFeatGen(words, head)) yield TagFeature(labelIndex.get(tag), f):Feature).toArray
     }
 
     private def crossProduct(rc: Array[Feature], ifw: Array[Int], join: (Feature, Int) => Feature): Array[Feature] = {
@@ -666,11 +658,14 @@ class SimpleWordShapeGen[L](tagWordCounts: Counter2[L, String, Double],
   }
 }
 
-case class LexParserModelFactory(baseParser: ParserParams.BaseParser,
-                                 constraints: ParserParams.Constraints[AnnotatedLabel, String],
-                                 oldWeights: File = null,
-                                 dummyFeats: Double = 0.5,
-                                 minFeatCutoff: Int = 1) extends ParserExtractableModelFactory[AnnotatedLabel, String] {
+case class LexModelFactory(baseParser: ParserParams.XbarGrammar,
+                           constraints: ParserParams.Constraints[AnnotatedLabel, String],
+                           @Help(text="Old weights to initialize with. Optional")
+                           oldWeights: File = null,
+                           @Help(text="For features not seen in gold trees, we bin them into dummyFeats * numGoldFeatures bins using hashing.")
+                           dummyFeats: Double = 0.5,
+                           @Help(text="How common must a feature be before we remember it?")
+                           minFeatCutoff: Int = 1) extends ParserExtractableModelFactory[AnnotatedLabel, String] {
   type MyModel = LexModel[AnnotatedLabel, String]
 
   def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]]) = {
@@ -681,7 +676,7 @@ case class LexParserModelFactory(baseParser: ParserParams.BaseParser,
     val wordIndex = Index(trainTrees.iterator.flatMap(_.words))
     val summedCounts = sum(initLexicon, Axis._0)
     val shapeGen = new SimpleWordShapeGen(initLexicon, summedCounts)
-    val tagShapeGen = new WordShapeFeaturizer(summedCounts)
+    val tagShapeGen = new WordShapeFeaturizer(initLexicon)
 
     val lexicon:Lexicon[AnnotatedLabel, String] = initLexicon
 
@@ -698,7 +693,7 @@ case class LexParserModelFactory(baseParser: ParserParams.BaseParser,
     xbarGrammar.index,
     ruleGen,
     shapeGen,
-    { (w:String) => tagShapeGen.featuresFor(w)})
+    { (w:Seq[String], pos: Int) => tagShapeGen.featuresFor(w, pos)})
 
     val indexed =  IndexedLexFeaturizer.extract[AnnotatedLabel, String](feat,
       headFinder,

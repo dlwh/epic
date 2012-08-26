@@ -39,6 +39,11 @@ class EPParser[L, W](grammar: BaseGrammar[L],
 
 object EPParser {
 
+  /**
+   * EPModels that support pulling out a tree.
+   * @tparam L
+   * @tparam W
+   */
   trait Extractor[L, W] extends EPModel[TreeInstance[L, W], CoreAnchoring[L, W]] with ParserExtractable[L, W] {
     def grammar: BaseGrammar[L]
 
@@ -55,7 +60,7 @@ object EPParser {
                              grammars: (RefinedGrammar[L, W])*) = {
     val infs = grammars.map {
       p =>
-        new DiscParserInference(null, {
+        new AnnotatedParserInference(null, {
           (a: BinarizedTree[L], b: Seq[W]) => a.map(_ -> 0)
         },
         p,

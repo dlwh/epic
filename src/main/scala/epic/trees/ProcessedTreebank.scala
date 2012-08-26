@@ -16,14 +16,22 @@ package epic.trees
 */
 import java.io.File
 import breeze.data.Example
+import breeze.config.Help
 
 /**
  * Represents a treebank with attendant spans, binarization, etc. Used in all the parser trainers.
  *
  * @author dlwh
  */
-case class ProcessedTreebank(path: File,
-                             maxLength: Int = 40,
+
+@Help(text="Parameters for reading and processing a treebank.")
+case class ProcessedTreebank(@Help(text="Location of the treebank directory")
+                             path: File,
+                             @Help(text="Max length for training sentences")
+                             maxLength: Int = 50,
+                             @Help(text="Should we add the dev set for training, do this only for final test.")
+                             includeDevInTrain: Boolean = false,
+                             @Help(text="What kind of binarization to do. Options: left, right, head. Head is best.")
                              binarization: String = "head") {
 
   lazy val treebank = {

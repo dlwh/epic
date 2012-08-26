@@ -21,22 +21,23 @@ import epic.trees._
 import breeze.util._
 import breeze.text.analyze._
 import java.util.concurrent.ConcurrentHashMap
+import epic.parser
+import collection.mutable
 
 
 /**
  * Mostly a utility class for parsertrainers.
  */
 object ParserParams {
-  case class Params()
-  trait NoParams { self: ParserPipeline =>
-    type Params = ParserParams.Params
-    protected val paramManifest = manifest[Params]
-  }
+  case class JointParams[M](treebank: ProcessedTreebank,
+                            trainer: M,
+                            @Help(text="Print this and exit.") help: Boolean = false)
 
-  case class BaseParser(path: File = null) {
+  @Help(text="Stores/loads a baseline xbar grammar needed to extracting trees.")
+  case class XbarGrammar(path: File = new File("xbar.gr")) {
     def xbarGrammar(trees: IndexedSeq[TreeInstance[AnnotatedLabel, String]]) = Option(path) match {
       case Some(f) if f.exists =>
-        readObject[(BaseGrammar[AnnotatedLabel],Lexicon[AnnotatedLabel, String])](f)
+        XbarGrammar.cache.getOrElseUpdate(f, readObject[(parser.BaseGrammar[AnnotatedLabel],Lexicon[AnnotatedLabel, String])](f))
       case _ =>
         val (words, xbarBinaries, xbarUnaries) = GenerativeParser.extractCounts(trees.map(_.mapLabels(_.baseAnnotatedLabel)))
 
@@ -49,6 +50,11 @@ object ParserParams {
     }
   }
 
+  object XbarGrammar {
+    private val cache = new mutable.HashMap[File, (parser.BaseGrammar[AnnotatedLabel],Lexicon[AnnotatedLabel, String])]() with mutable.SynchronizedMap[File, (parser.BaseGrammar[AnnotatedLabel],Lexicon[AnnotatedLabel, String])]
+  }
+
+  @Help(text="Stores/saves a baseline xbar grammar needed to extracting trees.")
   case class Constraints[L, W](path: File = null) {
     def cachedFactory(baseFactory: AugmentedGrammar[L, W], threshold: Double = -7):CoreGrammar[L, W] = {
       if(path != null && constraintsCache.contains(path)) {
@@ -73,7 +79,7 @@ object ParserParams {
 }
 
 /**
- * ParserTrainer is a base-trait for the parser training pipeline. Handles
+ * ParserPipeline is a base-trait for the parser training pipeline. Handles
  * reading in the treebank and params and such
  */
 trait ParserPipeline {
@@ -85,6 +91,7 @@ trait ParserPipeline {
    * Required manifest for the params
    */
   protected implicit val paramManifest: Manifest[Params]
+
 
   /**
    * The main point of entry for implementors. Should return a sequence
@@ -111,17 +118,29 @@ trait ParserPipeline {
    * Trains a sequence of parsers and evaluates them.
    */
   def main(args: Array[String]) {
+    import ParserParams.JointParams
+
     val (baseConfig, files) = CommandLineParser.parseArguments(args)
     val config = baseConfig backoff Configuration.fromPropertiesFiles(files.map(new File(_)))
-    val params = config.readIn[ProcessedTreebank]("treebank")
-    val specificParams = config.readIn[Params]("trainer")
+    val params = try {
+      config.readIn[JointParams[Params]]("test")
+    } catch {
+      case e =>
+        e.printStackTrace()
+        println(breeze.config.GenerateHelp[JointParams[Params]](config))
+        sys.exit(1)
+    }
+
+    if(params.help) {
+      println(breeze.config.GenerateHelp[JointParams[Params]](config))
+      System.exit(1)
+    }
     println("Training Parser...")
     println(params)
-    println(specificParams)
 
-    val parsers = trainParser(params, specificParams)
+    val parsers = trainParser(params.treebank, params.trainer)
 
-    import params._
+    import params.treebank._
 
     for((name, parser) <- parsers) {
       println("Parser " + name)
@@ -131,8 +150,7 @@ trait ParserPipeline {
       writeObject(out, parser)
 
       println("Evaluating Parser...")
-      val stats = evalParser(devTrees, parser, name+"-dev")
-      evalParser(testTrees, parser, name+"-test")
+      val stats = evalParser(devTrees.filter(_.words.length <= 40), parser, name+"-len40-dev")
       import stats._
       println("Eval finished. Results:")
       println( "P: " + precision + " R:" + recall + " F1: " + f1 +  " Ex:" + exact + " Tag Accuracy: " + tagAccuracy)

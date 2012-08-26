@@ -19,7 +19,19 @@ import epic.framework.Feature
 import epic.trees.{TreeInstance, BinarizedTree}
 import epic.parser._
 
-case class DiscParserInference[L, W](featurizer: RefinedFeaturizer[L, W, Feature],
+/**
+ * Parser inference for parses that have only observed annotations. Handles Structured, Span, and Lexicalized
+ * annotations.
+ * @param featurizer
+ * @param ann
+ * @param grammar
+ * @param baseMeasure
+ * @tparam L
+ * @tparam W
+ *
+ * @author dlwh
+ */
+case class AnnotatedParserInference[L, W](featurizer: RefinedFeaturizer[L, W, Feature],
                                      ann: (BinarizedTree[L], Seq[W]) => BinarizedTree[(L, Int)],
                                      grammar: RefinedGrammar[L, W],
                                      baseMeasure: CoreGrammar[L, W]) extends ParserInference[L, W] {

@@ -20,8 +20,9 @@ import epic.trees._
 
 import annotations.{FilterAnnotations, TreeAnnotator}
 import breeze.linalg.Counter2
-import epic.parser.ParserParams.{BaseParser, NoParams}
 import breeze.text.analyze.EnglishWordClassGenerator
+import breeze.config.Help
+import epic.parser.ParserParams.XbarGrammar
 
 /**
  * Contains codes to read off parsers and grammars from
@@ -97,10 +98,15 @@ object GenerativeParser {
   }
 }
 
-object GenerativePipeline extends ParserPipeline {
-  case class Params(baseParser: BaseParser,
+object GenerativeTrainer extends ParserPipeline {
+  @Help(text="Training parameters")
+  case class Params(@Help(text="Location to read/write the baseParser") baseParser: XbarGrammar,
+                    @Help(text=
+                      """The kind of annotation to do on the refined grammar. Default uses no annotations.""")
                     annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = new FilterAnnotations(Set.empty[Annotation]),
+                    @Help(text="Use viterbi parse charts")
                     viterbi: Boolean= true,
+                    @Help(text="Use max rule decoding instead of max constituent")
                     maxRule: Boolean = false)
   protected val paramManifest = manifest[Params]
 

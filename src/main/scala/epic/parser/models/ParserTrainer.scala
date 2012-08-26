@@ -22,14 +22,27 @@ import epic.parser.ParseEval.Statistics
 import breeze.linalg._
 import breeze.optimize._
 import epic.trees.{TreeInstance, AnnotatedLabel}
+import breeze.config.Help
 
-object ParserPipeline extends epic.parser.ParserPipeline {
+/**
+ * The main entry point for training discriminative parsers.
+ * Has a main method inherited from ParserPipeline.
+ * Use --help to see options, or just look at the Params class.
+ *
+ *
+ */
+object ParserTrainer extends epic.parser.ParserPipeline {
 
-  case class Params(modelFactory: ParserExtractableModelFactory[AnnotatedLabel, String],
+  case class Params(@Help(text="What parser to build. LatentModelFactory,StructModelFactory,LexModelFactory,SpanModelFactory")
+                    modelFactory: ParserExtractableModelFactory[AnnotatedLabel, String],
                     opt: OptParams,
-                    iterationsPerEval: Int = 50,
+                    @Help(text="How often to run on the dev set.")
+                    iterationsPerEval: Int = 100,
+                    @Help(text="How many iterations to run.")
                     maxIterations: Int = 1002,
+                    @Help(text="How often to look at a small set of the dev set.")
                     iterPerValidate: Int = 10,
+                    @Help(text="Should we randomize weights? Some models will force randomization.")
                     randomize: Boolean = false);
   protected val paramManifest = manifest[Params]
 

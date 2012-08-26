@@ -193,7 +193,6 @@ class MaxConstituentDecoder[L, W] extends ChartDecoder[L, W] {
     val maxTopLabel = TriangularArray.fill[Int](inside.length+1)(-1)
     val maxTopScore = TriangularArray.fill[Double](inside.length+1)(Double.NegativeInfinity)
 
-
     val scores = marginal.grammar.labelEncoder.fillArray(Double.NegativeInfinity)
     val buffer = Array.fill(1000)(Double.NegativeInfinity)
 

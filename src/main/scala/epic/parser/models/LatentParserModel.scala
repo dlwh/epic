@@ -25,8 +25,9 @@ import io.Source
 import epic.framework.Feature
 import epic.trees.annotations.{FilterAnnotations, TreeAnnotator}
 import epic.trees._
+import breeze.config.Help
 
-class LatentParserModel[L, L3, W](featurizer: Featurizer[L3, W],
+class LatentParserModel[L, L3, W](indexedFeatures: IndexedFeaturizer[L, L3, W],
                                   reannotate: (BinarizedTree[L], Seq[W]) => BinarizedTree[L],
                                   val projections: GrammarRefinements[L, L3],
                                   baseFactory: CoreGrammar[L, W],
@@ -37,8 +38,6 @@ class LatentParserModel[L, L3, W](featurizer: Featurizer[L3, W],
                                   }) extends ParserModel[L, W] {
   type L2 = L3
   type Inference = LatentParserInference[L, L2, W]
-
-  val indexedFeatures: IndexedFeaturizer[L, L2, W] = IndexedFeaturizer(grammar, lexicon, featurizer, projections)
 
   def featureIndex = indexedFeatures.index
 
@@ -78,12 +77,28 @@ case class LatentParserInference[L, L2, W](featurizer: RefinedFeaturizer[L, W, F
 
 }
 
-case class LatentParserModelFactory(baseParser: ParserParams.BaseParser,
-                                    constraints: ParserParams.Constraints[AnnotatedLabel, String],
-                                    annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = FilterAnnotations(),
-                                    substates: File = null,
-                                    numStates: Int = 2,
-                                    oldWeights: File = null) extends ParserModelFactory[AnnotatedLabel, String] {
+/**
+ * Model for latent annotated grammars (Petrov and Klein, 2008).
+ * @param baseParser
+ * @param constraints
+ * @param annotator
+ * @param substates
+ * @param numStates
+ * @param oldWeights
+ */
+case class LatentModelFactory(baseParser: ParserParams.XbarGrammar,
+                              constraints: ParserParams.Constraints[AnnotatedLabel, String],
+                              @Help(text=
+                                """The kind of annotation to do on the refined grammar. Default uses no annotations.
+You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Manning 2003.
+                                """)
+                              annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = FilterAnnotations(),
+                              @Help(text="Path to substates to use for each symbol. Uses numStates for missing states.")
+                              substates: File = null,
+                              @Help(text="Number of states to use. Overridden by substates file")
+                              numStates: Int = 2,
+                              @Help(text="Old weights to initialize with. Optional.")
+                              oldWeights: File = null) extends ParserModelFactory[AnnotatedLabel, String] {
   type MyModel = LatentParserModel[AnnotatedLabel, (AnnotatedLabel, Int), String]
 
   def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]]):MyModel = {
@@ -91,9 +106,9 @@ case class LatentParserModelFactory(baseParser: ParserParams.BaseParser,
 
     val (annWords, annBinaries, annUnaries) = this.extractBasicCounts(annTrees)
 
-    val (xbarParser, xbarLexicon) = baseParser.xbarGrammar(trainTrees)
+    val (xbarGrammar, xbarLexicon) = baseParser.xbarGrammar(trainTrees)
 
-    val baseFactory = RefinedGrammar.generative(xbarParser, xbarLexicon, annBinaries, annUnaries, annWords)
+    val baseFactory = RefinedGrammar.generative(xbarGrammar, xbarLexicon, annBinaries, annUnaries, annWords)
     val cFactory = constraints.cachedFactory(AugmentedGrammar.fromRefined(baseFactory))
 
     val substateMap = if (substates != null && substates.exists) {
@@ -102,16 +117,16 @@ case class LatentParserModelFactory(baseParser: ParserParams.BaseParser,
         val split = line.split("\\s+")
         AnnotatedLabel(split(0)) -> split(1).toInt
       }
-      pairs.toMap + (xbarParser.root -> 1)
+      pairs.toMap + (xbarGrammar.root -> 1)
     } else {
-      Map(xbarParser.root -> 1)
+      Map(xbarGrammar.root -> 1)
     }
 
     def split(x: AnnotatedLabel): Seq[(AnnotatedLabel, Int)] = {
       for (i <- 0 until substateMap.getOrElse(x, numStates)) yield (x, i)
     }
 
-    val presplit = xbarParser.labelIndex.map(l => l -> split(l)).toMap
+    val presplit = xbarGrammar.labelIndex.map(l => l -> split(l)).toMap
 
     def unsplit(x: (AnnotatedLabel, Int)): AnnotatedLabel = x._1
 
@@ -122,7 +137,7 @@ case class LatentParserModelFactory(baseParser: ParserParams.BaseParser,
       case UnaryRule(a, b, chain) => for(aa <- split(a); bb <- split(b)) yield UnaryRule(aa, bb, chain)
     }
 
-    val gen = new WordShapeFeaturizer(sum(annWords, Axis._0))
+    val gen = new WordShapeFeaturizer(annWords)
     def labelFlattener(l: (AnnotatedLabel, Int)) = {
       val basic = Seq(l)
       basic map (IndicatorFeature)
@@ -130,18 +145,20 @@ case class LatentParserModelFactory(baseParser: ParserParams.BaseParser,
     val feat = new GenFeaturizer[(AnnotatedLabel, Int), String](gen, labelFlattener _)
 
     val annGrammar: BaseGrammar[AnnotatedLabel] = BaseGrammar(annTrees.head.tree.label, annBinaries, annUnaries)
-    val firstLevelRefinements = GrammarRefinements(xbarParser, annGrammar, {(_: AnnotatedLabel).baseAnnotatedLabel})
+    val firstLevelRefinements = GrammarRefinements(xbarGrammar, annGrammar, {(_: AnnotatedLabel).baseAnnotatedLabel})
     val secondLevel = GrammarRefinements(annGrammar, split _, {splitRule(_ :Rule[AnnotatedLabel], presplit)}, unsplit)
     val finalRefinements = firstLevelRefinements compose secondLevel
     println(finalRefinements.labels)
 
     val featureCounter = readWeights(oldWeights)
 
-    new LatentParserModel[AnnotatedLabel, (AnnotatedLabel, Int), String](feat,
+    val indexedFeaturizer = IndexedFeaturizer(xbarGrammar, xbarLexicon, trainTrees, feat, finalRefinements)
+
+    new LatentParserModel[AnnotatedLabel, (AnnotatedLabel, Int), String](indexedFeaturizer,
     annotator,
     finalRefinements,
     cFactory,
-    xbarParser,
+    xbarGrammar,
     xbarLexicon, {
       featureCounter.get(_)
     })

@@ -16,7 +16,7 @@ package epic.parser.features
  limitations under the License.
 */
 import epic.framework.Feature
-import breeze.linalg.Counter
+import breeze.linalg._
 import collection.mutable.ArrayBuffer
 import breeze.text.analyze.{WordShapeGenerator, EnglishWordClassGenerator}
 
@@ -25,20 +25,32 @@ final case class SuffixFeature(str: String) extends Feature
 final case class PrefixFeature(str: String) extends Feature
 final case class ShapeFeature(str: String) extends Feature
 final case class SignatureFeature(str: String) extends Feature
+final case class SeenWithTagFeature(str: Any) extends Feature
+final case class LeftWordFeature(str: Any) extends Feature
+final case class RightWordFeature(str: Any) extends Feature
 
 /**
  * 
  * @author dlwh
  */
-class WordShapeFeaturizer(wordCounts: Counter[String, Double], minCountUnknown: Int = 5) extends (String=>IndexedSeq[Feature]) with Serializable {
+class WordShapeFeaturizer[L](tagWordCounts: Counter2[L, String, Double], minCountUnknown: Int = 5) extends ((Seq[String], Int)=>IndexedSeq[Feature]) with Serializable {
   import WordShapeFeaturizer._
+
+  val wordCounts = sum(tagWordCounts, Axis._0)
   val signatureGenerator = EnglishWordClassGenerator
 
-  def apply(w: String) = featuresFor(w)
+  val tagDiversity: Counter[String, Int] = {
+     Counter(tagWordCounts.keySet.groupBy(_._2).mapValues(_.size))
+  }
 
-  def featuresFor(w: String):ArrayBuffer[Feature] = {
-    if(wordCounts(w) > minCountUnknown) ArrayBuffer(IndicatorFeature(w))
-    else {
+  def apply(w: Seq[String], pos: Int) = featuresFor(w, pos)
+
+  def featuresFor(words: Seq[String], pos: Int):ArrayBuffer[Feature] = {
+    val w = words(pos)
+    val wc = wordCounts(w)
+    val basicFeatures = if(wc > minCountUnknown) {
+      ArrayBuffer(IndicatorFeature(w):Feature)
+    } else {
       val features = ArrayBuffer[Feature]()
       features += IndicatorFeature(w)
       features += ShapeFeature(WordShapeGenerator(w))
@@ -57,10 +69,13 @@ class WordShapeFeaturizer(wordCounts: Counter[String, Double], minCountUnknown: 
       if(numCaps > 1)  features += hasManyCapFeature
       if(numCaps > 1 && !hasLower) features += isAllCapsFeature
       if(w(0).isUpper || w(0).isTitleCase) {
-        //TODO add INITC
-        features += hasInitCapFeature
-        if(wordCounts(w.toLowerCase) > 3 && wordCounts(w) <= 3) {
-          features += hasKnownLCFeature
+        if(pos == 0) {
+          features += startOfSentenceFeature
+        } else {
+          features += hasInitCapFeature
+          if(wordCounts(w.toLowerCase) > 3) {
+            features += hasKnownLCFeature
+          }
         }
       }
 
@@ -81,6 +96,13 @@ class WordShapeFeaturizer(wordCounts: Counter[String, Double], minCountUnknown: 
         features += PrefixFeature(w.substring(0,3))
       }
 
+      for( (l,v) <- tagWordCounts(::, w).iterator) {
+        if(v > 1) {
+          features += SeenWithTagFeature(l)
+        }
+
+      }
+
       if(wlen > 10) {
         features += longWordFeature
       } else if(wlen < 5) {
@@ -88,6 +110,28 @@ class WordShapeFeaturizer(wordCounts: Counter[String, Double], minCountUnknown: 
       }
       features
     }
+
+    // if tag is not super common, or if it's ambiguous, add context features of left and right word
+    // contexts are the word itself if it's common, and the word shape otherwise.
+    if(wc < 30 || tagDiversity(w) > 1) {
+      if (pos > 0) {
+        val prevWord: String = words(pos - 1)
+        if(wordCounts(prevWord) > 30)
+          basicFeatures  += LeftWordFeature(prevWord)
+        else
+          basicFeatures  += LeftWordFeature(WordShapeGenerator(prevWord))
+      }
+
+      if(pos < words.length - 1 && wordCounts(words(pos+1)) > 30) {
+        val rightWord: String = words(pos + 1)
+        if(wordCounts(rightWord) > 30)
+          basicFeatures  += RightWordFeature(rightWord)
+        else
+          basicFeatures  += RightWordFeature(WordShapeGenerator(rightWord))
+      }
+    }
+
+    basicFeatures
 
   }
 
@@ -109,4 +153,5 @@ object WordShapeFeaturizer {
   val hasCapFeature = IndicatorWSFeature('HasCap)
   val hasManyCapFeature = IndicatorWSFeature('HasManyCap)
   val isAllCapsFeature = IndicatorWSFeature('AllCaps)
+  val startOfSentenceFeature = IndicatorWSFeature('StartOfSentence)
 }
