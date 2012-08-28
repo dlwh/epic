@@ -31,7 +31,8 @@ import collection.mutable
 object ParserParams {
   case class JointParams[M](treebank: ProcessedTreebank,
                             trainer: M,
-                            @Help(text="Print this and exit.") help: Boolean = false)
+                            @Help(text="Print this and exit.") help: Boolean = false,
+                            @Help(text="Default number of threads to use. Default is as many as possible.") threads: Int = -1)
 
   @Help(text="Stores/loads a baseline xbar grammar needed to extracting trees.")
   case class XbarGrammar(path: File = new File("xbar.gr")) {
@@ -149,11 +150,21 @@ trait ParserPipeline {
       val out = new File(outDir, name +".parser")
       writeObject(out, parser)
 
+      var parl = -1
+      if(params.threads >= 1) {
+        parl = collection.parallel.ForkJoinTasks.defaultForkJoinPool.getParallelism
+        collection.parallel.ForkJoinTasks.defaultForkJoinPool.setParallelism(params.threads)
+      }
+
       println("Evaluating Parser...")
       val stats = evalParser(devTrees.filter(_.words.length <= 40), parser, name+"-len40-dev")
       import stats._
       println("Eval finished. Results:")
       println( "P: " + precision + " R:" + recall + " F1: " + f1 +  " Ex:" + exact + " Tag Accuracy: " + tagAccuracy)
+
+      if(params.threads >= 1) {
+        collection.parallel.ForkJoinTasks.defaultForkJoinPool.setParallelism(parl)
+      }
     }
   }
 

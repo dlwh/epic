@@ -42,6 +42,8 @@ object ParserTrainer extends epic.parser.ParserPipeline {
                     maxIterations: Int = 1002,
                     @Help(text="How often to look at a small set of the dev set.")
                     iterPerValidate: Int = 10,
+                    @Help(text="How many threads to use, default is to use whatever Scala thinks is best.")
+                    threads: Int = -1,
                     @Help(text="Should we randomize weights? Some models will force randomization.")
                     randomize: Boolean = false);
   protected val paramManifest = manifest[Params]
@@ -49,6 +51,9 @@ object ParserTrainer extends epic.parser.ParserPipeline {
   def trainParser(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]],
                   validate: (Parser[AnnotatedLabel, String]) => Statistics, params: Params) = {
     import params._
+
+    if(threads >= 1)
+      collection.parallel.ForkJoinTasks.defaultForkJoinPool.setParallelism(params.threads)
 
     val model = modelFactory.make(trainTrees)
 
