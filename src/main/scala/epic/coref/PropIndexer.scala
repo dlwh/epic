@@ -31,7 +31,7 @@ object PropIndexer {
     val indexed = for (inst <- instances) yield {
       val length = inst.numMentions
       val pairArray = TriangularArray.tabulate[SparseVector[Double]](length + 1){ indexPair(inst, _, _, feat, index) }
-      val properties = inst.mentions.toArray.map(indexProperties(extractors, _, inst))
+      val properties = null +: inst.mentions.toArray.map(indexProperties(extractors, _, inst))
 
       // now for clusters
       // 0 is for root

@@ -6,9 +6,8 @@ import epic.ontonotes.ConllOntoReader
 import breeze.linalg.{DenseVector, Counter}
 import epic.framework.{ModelObjective, Feature}
 import breeze.optimize.FirstOrderMinimizer.OptParams
-import breeze.optimize.RandomizedGradientCheckingFunction
+import breeze.optimize.{CachedBatchDiffFunction, GradientCheckingDiffFunction, RandomizedGradientCheckingFunction}
 import breeze.util.Encoder
-import collection.immutable.IndexedSeq
 import breeze.stats.ContingencyStats
 import pairwise._
 
@@ -18,12 +17,12 @@ import pairwise._
  */
 
 object CorefPipeline extends App {
-  case class Params(path: File)
+  case class Params(path: File, nfiles: Int = 100000)
   val (baseConfig, files) = CommandLineParser.parseArguments(args)
   val config = baseConfig backoff Configuration.fromPropertiesFiles(files.map(new File(_)))
   val params = config.readIn[Params]("")
   val instances = for {
-    file <- params.path.listFiles take 100
+    file <- params.path.listFiles take params.nfiles
     doc <- ConllOntoReader.readDocuments(file)
   } yield CorefInstance.fromDocument(doc)
 
@@ -33,14 +32,15 @@ object CorefPipeline extends App {
   val extractors = Properties.allExtractors
   val indexed = PropIndexer(feat, extractors, instances)
 
-  /*
-  val model = new PairwiseModel(feat, indexed.index)
+  val model = new PropModel(indexed, indexed.index)
   val obj = new ModelObjective(model, indexed.instances)
+  val cached = new CachedBatchDiffFunction(obj)
 
 
 
   println(indexed.index)
-  val optimum =  OptParams(useStochastic = false).minimize(obj, DenseVector.zeros[Double](indexed.index.size))
+  val init = OptParams(useStochastic=true, batchSize=25, tolerance=1E-3, maxIterations = 100).minimize(cached, DenseVector.rand(indexed.index.size) * 2.0 - 1.0)
+  val optimum =  OptParams(useStochastic = false, tolerance = 1E-3).minimize(cached, init)
   val inference = model.inferenceFromWeights(optimum)
 
 
@@ -56,7 +56,7 @@ object CorefPipeline extends App {
       println(formatCluster(cluster))
     }
     println("Guess: ")
-    val guess = inference.decode(i, forceMergeSingletons = false)
+    val guess = inference.decode(i)
     for(cluster <- sortClusters(guess)) {
       println(formatCluster(cluster))
     }
@@ -111,5 +111,4 @@ object CorefPipeline extends App {
       b = cc(j)
     } yield (a -> b)
   }
-  */
 }

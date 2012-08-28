@@ -75,7 +75,6 @@ class ModelObjective[Datum](val model: Model[Datum],
   }
 
   var iter = 0
-
   def calculate(x: DenseVector[Double], batch: IndexedSeq[Int]) = {
     if(iter % 30 == 0) {
       model.cacheFeatureWeights(x, "weights")
