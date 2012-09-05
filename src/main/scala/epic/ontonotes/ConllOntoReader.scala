@@ -30,7 +30,8 @@ import java.io.{PrintStream, FileOutputStream, BufferedOutputStream, File}
 
 object ConllOntoReader {
   def readDocuments(file: File):IndexedSeq[Document] = {
-    for ( (rawSentences_ :IndexedSeq[IndexedSeq[String]]) <- new RawDocumentIterator(Source.fromFile(file).getLines()).toIndexedSeq) yield {
+    val docIterator = new RawDocumentIterator(Source.fromFile(file).getLines())
+    for ( (rawSentences_ :IndexedSeq[IndexedSeq[String]], docIndex: Int) <- docIterator.zipWithIndex.toIndexedSeq) yield {
       val rawSentences = rawSentences_.collect { case seq if seq.nonEmpty =>
         seq.map(_.split("\\s+").toIndexedSeq)
       }
@@ -115,10 +116,10 @@ object ConllOntoReader {
       }
       */
 
-      Sentence(file.getName + "-" + index,words,tree)
+      Sentence(file.getName + "-" + docIndex +"-" + index,words,tree)
     }
 
-      Document(file.getName,sentences.toIndexedSeq)
+      Document(file.toString + "-" + docIndex,sentences.toIndexedSeq)
     }
   }
 
@@ -151,3 +152,4 @@ object ConllOntoReader {
     }
   }
 }
+

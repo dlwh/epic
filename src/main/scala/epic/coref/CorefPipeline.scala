@@ -2,7 +2,7 @@ package epic.coref
 
 import java.io.File
 import breeze.config.{Configuration, CommandLineParser}
-import epic.ontonotes.ConllOntoReader
+import epic.ontonotes.{Document, ConllOntoReader}
 import breeze.linalg.{DenseVector, Counter}
 import epic.framework.{ModelObjective, Feature}
 import breeze.optimize.FirstOrderMinimizer.OptParams
@@ -10,6 +10,7 @@ import breeze.optimize.{CachedBatchDiffFunction, GradientCheckingDiffFunction, R
 import breeze.util.Encoder
 import breeze.stats.ContingencyStats
 import pairwise._
+import collection.mutable.ArrayBuffer
 
 /**
  *
@@ -17,7 +18,7 @@ import pairwise._
  */
 
 object CorefPipeline extends App {
-  case class Params(path: File, nfiles: Int = 100000)
+  case class Params(path: File, name: String = "eval/coref", nfiles: Int = 100000)
   val (baseConfig, files) = CommandLineParser.parseArguments(args)
   val config = baseConfig backoff Configuration.fromPropertiesFiles(files.map(new File(_)))
   val params = config.readIn[Params]("")
@@ -47,6 +48,7 @@ object CorefPipeline extends App {
   var allResults = Stats(0, 0, 0)
 
 
+  var output = new ArrayBuffer[(Document,Seq[Set[MentionCandidate]])]
   for(i <- indexed.instances) {
     println("=================")
     println("Text: ")
@@ -61,6 +63,9 @@ object CorefPipeline extends App {
       println(formatCluster(cluster))
     }
 
+    output += (i.unindexed.doc -> guess)
+
+
     val results = eval(i.unindexed.clusters.toIndexedSeq, guess)
     println(results)
     allResults += results
@@ -73,6 +78,9 @@ object CorefPipeline extends App {
   }
   println("=================")
   println(allResults)
+
+  println("Copying output results to " + params.name + " for use in official evaluation")
+  ConllEval.evaluate(params.name, output)
 
   case class Stats(numInter: Int, numGold: Int, numGuess: Int) {
     def +(stats: Stats) = Stats(numInter + stats.numInter, numGold + stats.numGold, numGuess + stats.numGuess)
@@ -89,6 +97,14 @@ object CorefPipeline extends App {
   def eval(gold: IndexedSeq[Set[MentionCandidate]], guess: IndexedSeq[Set[MentionCandidate]]) = {
     val pairsGold = getCoreferentPairs(gold)
     val pairsGuess = getCoreferentPairs(guess)
+
+    val missedPairs = pairsGold.toSet -- pairsGuess.toSet
+    println("Missed Pairs:")
+    missedPairs foreach println
+
+    val wrongPairs = pairsGuess.toSet -- pairsGold.toSet
+    println("Wrong Pairs:")
+    wrongPairs foreach println
 
     Stats(pairsGold.toSet & pairsGuess.toSet size, pairsGold.size, pairsGuess.size)
   }

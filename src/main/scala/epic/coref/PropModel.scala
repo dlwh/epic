@@ -48,9 +48,11 @@ class PropInference(propIndexer: PropIndexer, weights: DenseVector[Double]) exte
     // TODO: we can set contribution to exp(0) a prior and not need to sum over them... how to
     // do this?
     val agreementFactors = new ArrayBuffer[AgreementFactor]()
+    /*
     for(c <- inst.goldClusters; i <- c; j <- c if j < i && j != 0; p <- 0 until propIndexer.featuresForProperties.length) {
       agreementFactors += agreementFactor(propertyVariables, assignmentVariables, j, i, p)
     }
+    */
 
     val flattenedProp = propertyVariables.flatten.filter(_ ne null)
 
@@ -75,9 +77,11 @@ class PropInference(propIndexer: PropIndexer, weights: DenseVector[Double]) exte
       }
     }
 
+    /*
     for(f <- agreementFactors) {
       f.tallyAgreeExpectedCounts(bp, expCounts)
     }
+    */
 
 
     new StandardExpectedCounts(ll, expCounts)
@@ -97,10 +101,13 @@ class PropInference(propIndexer: PropIndexer, weights: DenseVector[Double]) exte
     // doesn't support that yet.
     // TODO: we can set contribution to exp(0) a prior and not need to sum over them... how to
     // do this?
+
     val agreementFactors = new ArrayBuffer[AgreementFactor]()
+    /*
     for(i <- 1 to inst.numMentions; j <- 1 until i; p <- 0 until propIndexer.featuresForProperties.length) {
       agreementFactors += agreementFactor(propertyVariables, assignmentVariables, j, i, p)
     }
+    */
 
     val flattenedProp = propertyVariables.flatten.filter( _ ne null)
 
@@ -121,9 +128,11 @@ class PropInference(propIndexer: PropIndexer, weights: DenseVector[Double]) exte
       }
     }
 
+    /*
     for(f <- agreementFactors) {
       f.tallyAgreeExpectedCounts(bp, expCounts)
     }
+    */
 
     new StandardExpectedCounts(ll, expCounts)
   }

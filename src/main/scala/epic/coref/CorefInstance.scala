@@ -9,6 +9,7 @@ import breeze.data.{Observation, Example}
  * @author dlwh
  */
 case class CorefInstance(id: String,
+                         doc: Document,
                          clusters: Set[Set[MentionCandidate]],
                          mentions: IndexedSeq[MentionCandidate],
                          words: IndexedSeq[IndexedSeq[String]]) extends CorefDocument with Example[Set[Set[MentionCandidate]], (IndexedSeq[MentionCandidate],IndexedSeq[IndexedSeq[String]])] {
@@ -28,7 +29,7 @@ object CorefInstance {
         .groupBy(_._1)
         .mapValues( set => set.map(_._2) )
         .values.toSet)
-    CorefInstance(doc.id + "-coref",
+    CorefInstance(doc.id + "-coref", doc,
       grouped,
       allMentions.map(_._2),
       doc.sentences.map(_.words))
