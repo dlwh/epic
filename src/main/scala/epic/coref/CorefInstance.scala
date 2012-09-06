@@ -1,6 +1,6 @@
 package epic.coref
 
-import epic.ontonotes.{Document, Sentence, Mention}
+import epic.everything.Document
 import epic.trees.Span
 import breeze.data.{Observation, Example}
 
@@ -23,7 +23,10 @@ case class CorefInstance(id: String,
 
 object CorefInstance {
   def fromDocument(doc: Document) = {
-    val allMentions = {for( (s, sI) <- doc.sentences.zipWithIndex; (m, span) <- s.mentions) yield (m.id, MentionCandidate(sI, span, span map s.words))}
+    val allMentions = for {
+       (s, sI) <- doc.sentences.zipWithIndex
+       (dspan,m) <- s.coref
+    } yield (m.id, MentionCandidate(sI, dspan.span, dspan.span map s.words))
     val grouped = (
       allMentions.toSet[(Int, MentionCandidate)]
         .groupBy(_._1)

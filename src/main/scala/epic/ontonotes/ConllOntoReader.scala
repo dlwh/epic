@@ -18,10 +18,10 @@ package epic.ontonotes
 import io.Source
 import collection.{IndexedSeq, Iterator}
 import java.lang.String
-import epic.trees.{HeadFinder, Tree}
-import collection.mutable.{MultiMap, Stack, ArrayBuffer}
-import collection.immutable.HashMap
-import java.io.{PrintStream, FileOutputStream, BufferedOutputStream, File}
+import epic.trees.{AnnotatedLabel, Tree}
+import collection.mutable.{Stack, ArrayBuffer}
+import java.io.File
+import epic.everything._
 
 /**
  * Reads the Conll 2011 shared task format. See http://conll.cemantix.org/2011/data.html
@@ -91,32 +91,16 @@ object ConllOntoReader {
           }
       }
 
-      val tree = stringTree.extend { t =>
-          val mention = mentions.get(t.span.start -> t.span.end)
-          val entity = entities.getOrElse(t.span.start -> t.span.end, NERType.NotEntity)
-          if(mention.nonEmpty) mentions -= (t.span.start -> t.span.end)
-
-          if(entity != NERType.NotEntity) entities -= (t.span.start -> t.span.end)
-
-          OntoLabel(t.label,mention=mention,entity=entity)
-      }
+      val docId = file.getName + "-" + docIndex
+      val tree = stringTree.extend { t => AnnotatedLabel(t.label) }
+      val ner = Map.empty ++ entities.map { case ((beg,end),v) => DSpan(docId,index,beg,end) -> v}
+      val coref = Map.empty ++ mentions.map { case ((beg,end),v) => DSpan(docId,index,beg,end) -> v}
+      val annotations = OntoAnnotations(tree, ner, coref)
 
 
-      /*
-      if(mentions.nonEmpty) {
-        val spans = tree.allChildren.map(_.span).toSet
-        println("missing mentions! " + mentions.keys.map(span => span -> (span._1 until span._2 map words)))
-        println(words)
-        println("Tree:")
-        println(stringTree render words)
-        println("matches: ")
-        for( (beg, end) <- mentions.keys) {
-          println( (beg -> end) -> spans.filter(s => math.abs(s.start - beg) < 3 && math.abs(s.end - end) < 3))
-        }
-      }
-      */
 
-      Sentence(file.getName + "-" + docIndex +"-" + index,words,tree)
+
+      Sentence(docId, index,words, annotations)
     }
 
       Document(file.toString + "-" + docIndex,sentences.toIndexedSeq)

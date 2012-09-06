@@ -2,13 +2,13 @@ package epic.coref
 
 import java.io.File
 import breeze.config.{Configuration, CommandLineParser}
-import epic.ontonotes.{Document, ConllOntoReader}
-import breeze.linalg.{DenseVector, Counter}
+import epic.everything.Document
+import epic.ontonotes.ConllOntoReader
+import breeze.linalg.DenseVector
 import epic.framework.{ModelObjective, Feature}
 import breeze.optimize.FirstOrderMinimizer.OptParams
-import breeze.optimize.{CachedBatchDiffFunction, GradientCheckingDiffFunction, RandomizedGradientCheckingFunction}
+import breeze.optimize.CachedBatchDiffFunction
 import breeze.util.Encoder
-import breeze.stats.ContingencyStats
 import pairwise._
 import collection.mutable.ArrayBuffer
 

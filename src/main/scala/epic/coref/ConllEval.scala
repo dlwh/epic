@@ -1,11 +1,9 @@
 package epic.coref
 
-import epic.ontonotes.{OntoLabel, Document, Mention}
 import java.io.{PrintStream, FileOutputStream, File}
 import io.{Codec, Source}
 import collection.mutable.ArrayBuffer
-import breeze.data.Example
-import epic.trees.Tree
+import epic.everything.Document
 
 /**
  *
@@ -18,7 +16,6 @@ object ConllEval {
    * parses the IDs. Sorry, bad coding form, I know.
    * @param prefix prefix of path names
    * @param docs
-   * @param stripLastColumn
    */
   def evaluate(prefix: String, docs: IndexedSeq[(Document,Seq[Set[MentionCandidate]])]) = {
     val goldOutF = new File(prefix + "_gold")

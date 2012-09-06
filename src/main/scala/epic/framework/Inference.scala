@@ -57,13 +57,23 @@ trait AugmentableInference[Datum, Augment] extends GoldGuessInference[Datum] {
 trait MarginalInference[Datum,Augment] extends AugmentableInference[Datum,Augment] {
   type Marginal <: AnyRef
   def marginal(v: Datum, aug: Augment):(Marginal,Double)
-  def guessCountsFromMarginals(v: Datum, marg: Marginal, aug: Augment):ExpectedCounts
+  def countsFromMarginal(v: Datum, marg: Marginal, aug: Augment):ExpectedCounts
   def guessCounts(datum: Datum, augment: Augment) = {
     val m = marginal(datum,augment)
-    guessCountsFromMarginals(datum,m._1,augment)
+    countsFromMarginal(datum,m._1,augment)
   }
 }
 
 trait ProjectableInference[Datum,Augment] extends MarginalInference[Datum,Augment] {
   def project(v: Datum, m: Marginal, oldAugment: Augment):Augment
+}
+
+trait FullProjectableInference[Datum, Augment] extends ProjectableInference[Datum, Augment] {
+  def projectGold(v: Datum, m: Marginal, oldAugment: Augment):Augment
+  def goldMarginal(v: Datum, aug: Augment):(Marginal,Double)
+
+  def goldCounts(value: Datum, augment: Augment): ExpectedCounts = {
+    val m = goldMarginal(value, augment)
+    countsFromMarginal(value, m._1, augment)
+  }
 }

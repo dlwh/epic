@@ -61,7 +61,7 @@ trait ParserInference[L, W] extends ProjectableInference[TreeInstance[L, W], Cor
     charts -> charts.partition
   }
 
-  def guessCountsFromMarginals(v: TreeInstance[L, W], marg: Marginal, aug: CoreAnchoring[L, W]) = {
+  def countsFromMarginal(v: TreeInstance[L, W], marg: Marginal, aug: CoreAnchoring[L, W]) = {
     marg.expectedCounts(featurizer)
   }
 

@@ -22,7 +22,6 @@ import java.lang.String
 /**
  * 
  * @author dlwh
- */
 class Corpus(path: File, split: Corpus.Split) extends Treebank[OntoLabel] { outer =>
   val train = Portion("train",split.trainSections)
   val test = Portion("test",split.testSections)
@@ -74,4 +73,5 @@ object Corpus {
     val spl = splits(path.getName().toUpperCase)
     new Corpus(path,spl)
   }
-}
+} */
+
