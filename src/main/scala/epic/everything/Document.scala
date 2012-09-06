@@ -2,12 +2,6 @@ package epic.everything
 
 import breeze.data.Example
 import epic.trees.{AnnotatedLabel, Tree}
-import epic.ontonotes._
-import epic.everything.OntoAnnotations
-import epic.everything.DSpan
-import epic.ontonotes.DSpan
-import epic.ontonotes.OntoAnnotations
-import epic.ontonotes.Sentence
 
 
 /*
@@ -41,3 +35,8 @@ case class Document(id: String, sentences: IndexedSeq[Sentence]) extends Example
   def coref: Map[DSpan, Mention] = sentences.map(_.coref).reduceLeft(_ ++ _)
 }
 
+
+/**
+ * Adds or updates one of the annotation fields of the contained sentences for a document...
+ */
+trait DocumentAnnotator extends (Document=>Document)
