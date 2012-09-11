@@ -17,9 +17,9 @@ resolvers ++= Seq(
 
 libraryDependencies ++= Seq(
   "junit" % "junit" % "4.5" % "test",
-  "org.scalanlp" %% "breeze-math" % "0.1-SNAPSHOT",
-  "org.scalanlp" %% "breeze-process" % "0.1-SNAPSHOT",
-  "org.scalanlp" %% "breeze-learn" % "0.1-SNAPSHOT"
+  "org.scalanlp" %% "breeze-math" % "0.2-SNAPSHOT",
+  "org.scalanlp" %% "breeze-process" % "0.2-SNAPSHOT",
+  "org.scalanlp" %% "breeze-learn" % "0.2-SNAPSHOT"
 )
 
 libraryDependencies <<= (scalaVersion, libraryDependencies) { (sv, deps) =>

@@ -110,4 +110,7 @@ object NERType extends Enumeration {
   val Time = Value
   val WorkOfArt = Value
   val NotEntity = Value
+  val OutsideSentence = Value // useful for chains
+
+
 }

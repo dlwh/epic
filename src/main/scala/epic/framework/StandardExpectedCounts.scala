@@ -22,4 +22,14 @@ case class StandardExpectedCounts(var loss: Double,
 
 object StandardExpectedCounts {
   def zero(index: Index[_]) = StandardExpectedCounts(0.0, DenseVector.zeros(index.size))
+
+  trait Model { this:epic.framework.Model[_] =>
+    type ExpectedCounts = StandardExpectedCounts
+
+    def emptyCounts = zero(featureIndex)
+
+    def expectedCountsToObjective(ecounts: ExpectedCounts): (Double, DenseVector[Double]) = {
+      ecounts.loss -> ecounts.counts
+    }
+  }
 }

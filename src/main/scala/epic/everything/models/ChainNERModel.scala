@@ -9,7 +9,6 @@ import breeze.sequences.CRF
 /**
  *
  * @author dlwh
- */
 class ChainNERModel(val featureIndex: Index[Feature],
                     featurizer: CrfFeaturizer) extends DocumentAnnotatingModel {
   type ExpectedCounts = StandardExpectedCounts
@@ -32,11 +31,5 @@ class ChainNERModel(val featureIndex: Index[Feature],
 case class ChainNERInference(weights: DenseVector[Double], index: Index[Feature], featurizer: CRFFeaturizer) {
 
 }
+ */
 
-
-trait CrfFeaturizer {
-}
-
-trait IndexedCrfFeaturizer {
-    def featuresFor(pos: Int, w: W, l: Int, ln: Int):Iterator[Int]
-}

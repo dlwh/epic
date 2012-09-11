@@ -6,7 +6,7 @@ import breeze.collection.mutable.TriangularArray
 import breeze.linalg.SparseVector
 import collection.immutable.BitSet
 import pairwise.PairwiseFeaturizer
-import java.util
+import epic.everything.models.Property
 
 /**
  * Computes and indexes all features, along with what features

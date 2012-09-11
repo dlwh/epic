@@ -1,7 +1,6 @@
 package epic.everything
 package models
 
-import epic.coref.Property
 import breeze.util.Index
 import breeze.collection.mutable.TriangularArray
 
