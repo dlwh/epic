@@ -33,11 +33,11 @@ trait GoldGuessInference[Datum] extends Inference[Datum] {
 
   def expectedCounts(datum: Datum):ExpectedCounts = {
     val guess = guessCounts(datum)
-//    val gold = goldCounts(datum)
-//    if(guess.loss * 1.0001 < gold.loss ) {
-//      println("Odd... guess ll is smaller than gold score?" + guess.loss + " " + gold.loss)
-//    }
-//    guess -= gold
+    val gold = goldCounts(datum)
+    if(guess.loss * 1.0001 < gold.loss ) {
+      println("Odd... guess ll is smaller than gold score?" + guess.loss + " " + gold.loss)
+    }
+    guess -= gold
     guess
   }
 }

@@ -4,7 +4,7 @@ import breeze.util.Index
 import epic.trees.Span
 import breeze.numerics
 import epic.sequences.SemiCRF.{Marginal, Anchoring}
-import breeze.linalg.SparseVector
+import breeze.linalg.{HashVector, SparseVector}
 import epic.framework.{StandardExpectedCounts, Feature}
 import java.util
 
@@ -71,8 +71,6 @@ object SemiCRF {
       val forwardScores: Array[Array[Double]] = this.forwardScores(scorer)
       val backwardScore: Array[Array[Double]] = this.backwardScores(scorer)
       val partition = numerics.logSum(forwardScores.last)
-      val partition2 = backwardScore(0)(scorer.labelIndex(scorer.startSymbol))
-
       val _s = scorer
 
 
@@ -84,7 +82,7 @@ object SemiCRF {
         def visit(f: TransitionVisitor[L, W]) {
           val numLabels = scorer.labelIndex.size
           var end = 1
-          while (end < length) {
+          while (end <= length) {
             var label = 0
             while (label < numLabels) {
 
@@ -93,7 +91,8 @@ object SemiCRF {
                 var prevLabel = 0
                 while (prevLabel < numLabels) {
                   val score = math.exp(transitionMarginal(prevLabel, label, start, end))
-                  f(prevLabel, label, start, end, score)
+                  if(score != 0.0)
+                    f(prevLabel, label, start, end, score)
                   prevLabel += 1
                 }
                 start += 1
@@ -108,7 +107,9 @@ object SemiCRF {
 
         /** Log-normalized probability of seing segment with transition */
         def transitionMarginal(prev: Int, cur: Int, beg: Int, end: Int): Double = {
-          forwardScores(beg)(prev) + backwardScore(end)(cur) + anchoring.scoreTransition(prev, cur, beg, end) - logPartition
+          val withoutTrans = forwardScores(beg)(prev) + backwardScore(end)(cur)
+          if(withoutTrans.isInfinite) withoutTrans
+          else withoutTrans + anchoring.scoreTransition(prev, cur, beg, end) - logPartition
         }
 
         def logPartition: Double = partition
@@ -179,7 +180,6 @@ object SemiCRF {
 
       val accumArray = new Array[Double](numLabels * length)
 
-      // forward scores
       var end = 1
       while (end <= length) {
         var label = 0
@@ -271,8 +271,10 @@ object SemiCRF {
   }
 
   trait AnchoredFeaturizer[L, W] {
+    def featureIndex: Index[Feature]
     def featuresForTransition(prev: Int, cur: Int, start: Int, end: Int):SparseVector[Double]
   }
+
 
 }
 
