@@ -19,6 +19,12 @@ case class Sentence(docId: String, sentId: Int,
   def tree = annotations.tree
   def ner = annotations.ner
   def coref = annotations.coref
+
+  def annotate(tree: Tree[AnnotatedLabel] = tree,
+               ner: Map[DSpan,NERType.Value] = ner,
+               coref: Map[DSpan,Mention] = coref) = {
+    copy(annotations=OntoAnnotations(tree,ner,coref))
+  }
 }
 
 case class DSpan(doc: String, sent: Int, begin: Int, end: Int) {
