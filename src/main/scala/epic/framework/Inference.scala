@@ -20,7 +20,8 @@ package epic.framework
  * @author dlwh
  */
 trait Inference[Datum] extends Serializable {
-  type ExpectedCounts
+  type ExpectedCounts <: AnyRef
+  def emptyCounts: ExpectedCounts
 
   def expectedCounts(datum: Datum): ExpectedCounts
 }
@@ -48,10 +49,10 @@ trait GoldGuessInference[Datum] extends Inference[Datum] {
 trait AugmentableInference[Datum, Augment] extends GoldGuessInference[Datum] {
   def baseAugment(v: Datum):Augment
 
-  def guessCounts(value: Datum):ExpectedCounts = guessCounts(value,baseAugment(value))
+  def guessCounts(value: Datum):ExpectedCounts = guessCounts(value, baseAugment(value))
   def guessCounts(value: Datum, augment: Augment):ExpectedCounts
 
-  def goldCounts(value: Datum):ExpectedCounts = goldCounts(value,baseAugment(value))
+  def goldCounts(value: Datum):ExpectedCounts = goldCounts(value, baseAugment(value))
   def goldCounts(value: Datum, augment: Augment):ExpectedCounts
 }
 
@@ -59,7 +60,7 @@ trait MarginalInference[Datum,Augment] extends AugmentableInference[Datum,Augmen
   type Marginal <: AnyRef
   def marginal(v: Datum, aug: Augment):(Marginal,Double)
   def countsFromMarginal(v: Datum, marg: Marginal, aug: Augment):ExpectedCounts
-  def guessCounts(datum: Datum, augment: Augment) = {
+  override def guessCounts(datum: Datum,  augment: Augment) = {
     val m = marginal(datum,augment)
     countsFromMarginal(datum,m._1,augment)
   }
@@ -73,7 +74,7 @@ trait FullProjectableInference[Datum, Augment] extends ProjectableInference[Datu
   def projectGold(v: Datum, m: Marginal, oldAugment: Augment):Augment
   def goldMarginal(v: Datum, aug: Augment):(Marginal,Double)
 
-  def goldCounts(value: Datum, augment: Augment): ExpectedCounts = {
+  override def goldCounts(value: Datum, augment: Augment): ExpectedCounts = {
     val m = goldMarginal(value, augment)
     countsFromMarginal(value, m._1, augment)
   }

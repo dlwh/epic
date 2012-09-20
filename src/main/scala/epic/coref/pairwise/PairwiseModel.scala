@@ -15,42 +15,31 @@ import collection.immutable.IndexedSeq
  * @author dlwh
  */
 
-class PairwiseModel(feat: PairwiseFeaturizer, val featureIndex: Index[Feature]) extends Model[IndexedCorefInstance] {
+class PairwiseModel(feat: PairwiseFeaturizer, val featureIndex: Index[Feature]) extends Model[IndexedCorefInstance] with StandardExpectedCounts.Model {
   type Inference = PairwiseInference
-  type ExpectedCounts = ECounts
 
   def initialValueForFeature(f: Feature): Double = 0.0
 
   def inferenceFromWeights(weights: DenseVector[Double]) = {
-    new PairwiseInference(feat, weights)
+    new PairwiseInference(feat, featureIndex, weights)
   }
 
-  def emptyCounts: PairwiseModel#ExpectedCounts = ECounts(0.0, DenseVector.zeros[Double](featureIndex.size))
 
-  def expectedCountsToObjective(ecounts: PairwiseModel#ExpectedCounts): (Double, DenseVector[Double]) = {
-    ecounts.loss -> ecounts.counts
-  }
-}
-
-case class ECounts(var loss: Double, counts: DenseVector[Double]) extends ExpectedCounts[ECounts] {
-  def +=(that: ECounts): ECounts = {
-    this.loss += that.loss; this.counts += that.counts; this
-  }
-
-  def -=(that: ECounts): ECounts = {
-    this.loss -= that.loss; this.counts -= that.counts; this
-  }
 }
 
 
-class PairwiseInference(feat: PairwiseFeaturizer,
+
+
+class PairwiseInference(feat: PairwiseFeaturizer, val featureIndex: Index[Feature],
                         weights: DenseVector[Double]) extends GoldGuessInference[IndexedCorefInstance] {
-  type ExpectedCounts = ECounts
+  type ExpectedCounts = StandardExpectedCounts[Feature]
 
+  def emptyCounts: ExpectedCounts = StandardExpectedCounts.zero(featureIndex)
 
   def goldCounts(inst: IndexedCorefInstance) = {
-    var ll = 0.0
-    val ecounts = DenseVector.zeros[Double](weights.size)
+    val ec = emptyCounts
+    var ll = ec.loss
+    val ecounts = ec.counts
     for (cluster <- inst.goldClusters) {
       var isFirst = true
       for (i <- cluster) {
@@ -75,12 +64,13 @@ class PairwiseInference(feat: PairwiseFeaturizer,
 
 
     }
-    new ECounts(ll, ecounts)
+    ec
   }
 
   def guessCounts(inst: IndexedCorefInstance) = {
-    var ll = 0.0
-    val ecounts = DenseVector.zeros[Double](weights.size)
+    val ec = emptyCounts
+    var ll = ec.loss
+    val ecounts = ec.counts
     for (i <- 1 to inst.numMentions) {
       val scores = DenseVector.zeros[Double](i)
       for (j <- 0 until i) {
@@ -93,7 +83,7 @@ class PairwiseInference(feat: PairwiseFeaturizer,
         addIntoScale(ecounts, inst.featuresFor(j, i), math.exp(scores(j) - sm))
       }
     }
-    new ECounts(ll, ecounts)
+    ec
   }
 
   private def addIntoScale(v: DenseVector[Double], sv: SparseVector[Double], scale: Double) {

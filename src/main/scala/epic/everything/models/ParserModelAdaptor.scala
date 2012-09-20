@@ -10,7 +10,6 @@ import epic.everything.{Document, DocumentAnnotator}
 /**
  *
  * @author dlwh
- */
 class ParserModelAdaptor(val inner: ParserModel[AnnotatedLabel, String]) extends DocumentAnnotatingModel {
   type ExpectedCounts = inner.ExpectedCounts
 
@@ -44,10 +43,11 @@ class ParserInferenceAdaptor(val inner: ParserInference[AnnotatedLabel, String])
 
   type ExpectedCounts = inner.ExpectedCounts
 
-  def guessCounts(value: Document, augment: DocumentBeliefs): ParserInferenceAdaptor#ExpectedCounts = {
+  def guessCounts(value: Document, augment: DocumentBeliefs): ExpectedCounts = {
 
   }
 
-  def goldCounts(value: Document, augment: DocumentBeliefs): ParserInferenceAdaptor#ExpectedCounts = null
+  def goldCounts(value: Document, augment: DocumentBeliefs): ExpectedCounts = null
 
-}
+} */
+

@@ -249,8 +249,16 @@ object ConstraintCoreGrammar {
       (bot(i) != null && bot(i).nonEmpty) || (top(i) != null && top(i).nonEmpty)
     }
 
-    def activeLabelsTop(begin: Int, end: Int): BitSet = top(TriangularArray.index(begin, end))
-    def activeLabelsBot(begin: Int, end: Int): BitSet = bot(TriangularArray.index(begin, end))
+    def activeLabelsTop(begin: Int, end: Int): BitSet = {
+      val r = top(TriangularArray.index(begin, end))
+      if(r == null) BitSet.empty
+      else r
+    }
+    def activeLabelsBot(begin: Int, end: Int): BitSet = {
+      val r = bot(TriangularArray.index(begin, end))
+      if(r == null) BitSet.empty
+      else r
+    }
   }
 
 }

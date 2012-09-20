@@ -13,6 +13,11 @@ import collection.mutable.ArrayBuffer
 class SemiCRFModel[L, W](val featureIndex: Index[Feature],
                          featurizer: SemiCRFModel.BIEOFeaturizer[L, W],
                          maxSegmentLength: Int=>Int) extends Model[Segmentation[L, W]] with StandardExpectedCounts.Model {
+  def extractCRF(weights: DenseVector[Double]) = {
+    val grammar = inferenceFromWeights(weights)
+    new SemiCRF(grammar)
+  }
+
   type Inference = SemiCRFInference[L, W]
 
   def initialValueForFeature(f: Feature): Double = 0.0
@@ -23,7 +28,7 @@ class SemiCRFModel[L, W](val featureIndex: Index[Feature],
 
 object SemiCRFModel {
   trait BIEOFeaturizer[L, W] extends SemiCRF.IndexedFeaturizer[L, W] {
-    def anchor(w: W): BIEOAnchoredFeaturizer[L, W]
+    def anchor(w: IndexedSeq[W]): BIEOAnchoredFeaturizer[L, W]
   }
 
   trait BIEOAnchoredFeaturizer[L, W] extends SemiCRF.AnchoredFeaturizer[L, W] {
@@ -68,25 +73,32 @@ object SemiCRFModel {
 class SemiCRFInference[L, W](weights: DenseVector[Double],
                              featureIndex: Index[Feature],
                              featurizer: SemiCRFModel.BIEOFeaturizer[L, W],
-                             maxLength: Int=>Int) extends MarginalInference[Segmentation[L, W], SemiCRF.Anchoring[L, W]] {
+                             maxLength: Int=>Int) extends MarginalInference[Segmentation[L, W], SemiCRF.Anchoring[L, W]] with SemiCRF.Grammar[L, W] {
   type Marginal = SemiCRF.Marginal[L, W]
-  type ExpectedCounts = StandardExpectedCounts
+  type ExpectedCounts = StandardExpectedCounts[Feature]
 
+  def emptyCounts = StandardExpectedCounts.zero(this.featureIndex)
+
+  def anchor(w: IndexedSeq[W]) = new Anchoring(w, new IdentityAnchoring(w))
+
+
+  def labelIndex = featurizer.labelIndex
+  def startSymbol = featurizer.startSymbol
 
   def marginal(v: Segmentation[L, W], aug: SemiCRF.Anchoring[L, W]): (Marginal, Double) = {
-    val m = SemiCRF.Marginal(new Anchoring(v.words, v.length, aug))
+    val m = SemiCRF.Marginal(new Anchoring(v.words, aug))
     m -> m.logPartition
   }
 
 
-  def goldCounts(v: Segmentation[L, W], augment: SemiCRF.Anchoring[L, W]): ExpectedCounts = {
-    val m = SemiCRF.Marginal.goldMarginal(new Anchoring(v.words, v.length, augment), v.segments, v.words)
+  override def goldCounts(v: Segmentation[L, W], augment: SemiCRF.Anchoring[L, W]): ExpectedCounts = {
+    val m = SemiCRF.Marginal.goldMarginal[L, W](new Anchoring(v.words, augment), v.segments)
     this.countsFromMarginal(v, m, augment)
   }
 
 
   def countsFromMarginal(v: Segmentation[L, W], marg: Marginal, aug: SemiCRF.Anchoring[L, W]): ExpectedCounts = {
-    val counts = StandardExpectedCounts.zero(featureIndex)
+    val counts = emptyCounts
     counts.loss = marg.logPartition
     val localization = marg.anchoring.asInstanceOf[Anchoring].localization
     val visitor = new TransitionVisitor[L, W] {
@@ -123,11 +135,9 @@ class SemiCRFInference[L, W](weights: DenseVector[Double],
   }
 
 
-  def baseAugment(v: Segmentation[L, W]): SemiCRF.Anchoring[L, W] = new SemiCRF.Anchoring[L, W] {
-    def w: W = v.words
+  def baseAugment(v: Segmentation[L, W]): SemiCRF.Anchoring[L, W] = new IdentityAnchoring(v.words)
 
-    def length: Int = v.length
-
+  class IdentityAnchoring(val w: IndexedSeq[W]) extends SemiCRF.Anchoring[L, W] {
     def maxSegmentLength(l: Int): Int = maxLength(l)
 
     def scoreTransition(prev: Int, cur: Int, beg: Int, end: Int): Double = 0.0
@@ -137,7 +147,7 @@ class SemiCRFInference[L, W](weights: DenseVector[Double],
     def startSymbol: L = featurizer.startSymbol
   }
 
-  class Anchoring(val w: W, val length: Int, augment: SemiCRF.Anchoring[L, W]) extends SemiCRF.Anchoring[L, W] {
+  class Anchoring(val w: IndexedSeq[W], augment: SemiCRF.Anchoring[L, W]) extends SemiCRF.Anchoring[L, W] {
     val localization = featurizer.anchor(w)
     def maxSegmentLength(l: Int): Int = SemiCRFInference.this.maxLength(l)
 

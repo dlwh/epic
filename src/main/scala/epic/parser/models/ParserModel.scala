@@ -26,7 +26,7 @@ import epic.trees.{TreeInstance, UnaryRule, BinaryRule}
  * @author dlwh
  */
 trait ParserModel[L, W] extends Model[TreeInstance[L, W]] with ParserExtractable[L, W] {
-  type ExpectedCounts = epic.parser.ExpectedCounts[Feature]
+  type ExpectedCounts = StandardExpectedCounts[Feature]
   type Inference <: ParserInference[L, W]
 
   def extractParser(weights: DenseVector[Double]) = {
@@ -37,8 +37,11 @@ trait ParserModel[L, W] extends Model[TreeInstance[L, W]] with ParserExtractable
 
 
 trait ParserInference[L, W] extends ProjectableInference[TreeInstance[L, W], CoreAnchoring[L, W]] {
-  type ExpectedCounts = epic.parser.ExpectedCounts[Feature]
+  type ExpectedCounts = StandardExpectedCounts[Feature]
   type Marginal = ChartMarginal[ParseChart.LogProbabilityParseChart, L, W]
+
+
+  def emptyCounts = StandardExpectedCounts.zero(featurizer.index)
 
   def grammar: RefinedGrammar[L, W]
   def featurizer: RefinedFeaturizer[L, W, Feature]

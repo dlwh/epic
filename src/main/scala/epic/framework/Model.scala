@@ -46,7 +46,6 @@ trait Model[Datum] {
 
   def inferenceFromWeights(weights: DenseVector[Double]): Inference
 
-  def emptyCounts: ExpectedCounts
 
   def expectedCountsToObjective(ecounts: ExpectedCounts): (Double, DenseVector[Double])
 }
@@ -83,7 +82,7 @@ class ModelObjective[Datum](val model: Model[Datum],
     val inference = inferenceFromWeights(x)
     val timeIn = System.currentTimeMillis()
     val success = new AtomicInteger(0)
-    val finalCounts = select(batch).aggregate(emptyCounts)({ (countsSoFar,datum) =>
+    val finalCounts = select(batch).aggregate(inference.emptyCounts)({ (countsSoFar,datum) =>
       try {
         val counts = inference.expectedCounts(datum) += countsSoFar
         success.incrementAndGet()

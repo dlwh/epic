@@ -44,10 +44,7 @@ class EPModel[Datum, Augment](maxEPIter: Int, initFeatureValue: Feature => Optio
 
   private val offsets = models.map(_.numFeatures).unfold(0)(_ + _)
 
-  def emptyCounts = {
-    val counts = for ((m: Model[Datum] {type Inference <: ProjectableInference[Datum, Augment]}) <- models.toIndexedSeq) yield m.emptyCounts
-    EPExpectedCounts(0.0, counts)
-  }
+
 
   def expectedCountsToObjective(ecounts: EPModel[Datum, Augment]#ExpectedCounts) = {
     val vectors = for ((m, e) <- models zip ecounts.counts) yield m.expectedCountsToObjective(e.asInstanceOf[m.ExpectedCounts])._2

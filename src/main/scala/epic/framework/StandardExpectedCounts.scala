@@ -9,27 +9,30 @@ import breeze.util.Index
  * @param loss
  * @param counts
  */
-case class StandardExpectedCounts(var loss: Double,
-                                  counts: DenseVector[Double]) extends ExpectedCounts[StandardExpectedCounts] {
-  def +=(that: StandardExpectedCounts): StandardExpectedCounts = {
+case class StandardExpectedCounts[F](var loss: Double,
+                                  counts: DenseVector[Double],
+                                  index: Index[F]) extends ExpectedCounts[StandardExpectedCounts[F]] {
+  def +=(that: StandardExpectedCounts[F]): StandardExpectedCounts[F] = {
     this.loss += that.loss; this.counts += that.counts; this
   }
 
-  def -=(that: StandardExpectedCounts): StandardExpectedCounts = {
+  def -=(that: StandardExpectedCounts[F]): StandardExpectedCounts[F] = {
     this.loss -= that.loss; this.counts -= that.counts; this
   }
+
+  def apply(f: F) = counts(index(f))
 }
 
 object StandardExpectedCounts {
-  def zero(index: Index[_]) = StandardExpectedCounts(0.0, DenseVector.zeros(index.size))
+  def zero[F](index: Index[F]) = StandardExpectedCounts(0.0, DenseVector.zeros(index.size), index)
 
   trait Model { this:epic.framework.Model[_] =>
-    type ExpectedCounts = StandardExpectedCounts
+    type ExpectedCounts = StandardExpectedCounts[Feature]
 
-    def emptyCounts = zero(featureIndex)
 
     def expectedCountsToObjective(ecounts: ExpectedCounts): (Double, DenseVector[Double]) = {
       ecounts.loss -> ecounts.counts
     }
   }
+
 }

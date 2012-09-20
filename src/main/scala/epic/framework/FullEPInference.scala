@@ -7,6 +7,12 @@ case class FullEPInference[Datum, Augment](inferences: IndexedSeq[FullProjectabl
                                            maxEPIter: Int)(implicit aIsFactor: Augment <:< Factor[Augment]) extends AugmentableInference[Datum, Augment] {
   type ExpectedCounts = EPExpectedCounts
 
+
+  def emptyCounts = {
+    val counts = for (m <- inferences) yield m.emptyCounts
+    EPExpectedCounts(0.0, counts)
+  }
+
   def baseAugment(v: Datum) = inferences(0).baseAugment(v)
 
   // ugh code duplication...
@@ -77,7 +83,7 @@ case class FullEPInference[Datum, Augment](inferences: IndexedSeq[FullProjectabl
     EPExpectedCounts(partition, finalCounts)
   }
 
-  def goldCounts(datum: Datum, augment: Augment) = {
+  override def goldCounts(datum: Datum, augment: Augment) = {
      val (partition, finalAugment, marginals, f_~) = getGoldMarginals(datum, augment)
 
      val finalCounts = jointCounts(datum, marginals, finalAugment, f_~)
@@ -85,7 +91,10 @@ case class FullEPInference[Datum, Augment](inferences: IndexedSeq[FullProjectabl
      EPExpectedCounts(partition, finalCounts)
    }
 
-  def jointCounts(datum: Datum, marginals: ArrayBuffer[ProjectableInference[Datum, Augment]#Marginal], finalAugment: Augment, f_~ : IndexedSeq[Augment]) = {
+  def jointCounts(datum: Datum,
+                  marginals: ArrayBuffer[ProjectableInference[Datum, Augment]#Marginal],
+                  finalAugment: Augment,
+                  f_~ : IndexedSeq[Augment]) = {
     for (((inf, f_~), i) <- (inferences zip f_~).zipWithIndex) yield {
       val marg = marginals(i)
       val augment = finalAugment / f_~

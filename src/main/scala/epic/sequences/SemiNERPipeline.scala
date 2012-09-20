@@ -10,11 +10,11 @@ import breeze.text.analyze.{EnglishWordClassGenerator, WordShapeGenerator}
 import breeze.linalg.{DenseVector, SparseVector}
 import collection.immutable
 import epic.framework.{ModelObjective, Feature}
-import breeze.optimize.{RandomizedGradientCheckingFunction, LBFGS, GradientCheckingDiffFunction, CachedBatchDiffFunction}
+import breeze.optimize._
+import breeze.collection.mutable.{TriangularArray, OpenAddressHashArray}
 import breeze.optimize.FirstOrderMinimizer.OptParams
 import epic.trees.Span
 import epic.everything.DSpan
-import breeze.collection.mutable.{TriangularArray, OpenAddressHashArray}
 
 /**
  *
@@ -22,7 +22,7 @@ import breeze.collection.mutable.{TriangularArray, OpenAddressHashArray}
  */
 object SemiNERPipeline {
 
-  def makeSegmentation(ner: Map[DSpan, NERType.Value], words: IndexedSeq[String], id: String): Segmentation[NERType.Value, IndexedSeq[String]]  = {
+  def makeSegmentation(ner: Map[DSpan, NERType.Value], words: IndexedSeq[String], id: String): Segmentation[NERType.Value, String]  = {
     val sorted = ner.toIndexedSeq.sortBy((_: (DSpan, NERType.Value))._1.begin)
     var out = new ArrayBuffer[(NERType.Value, Span)]()
     var last = 0
@@ -40,11 +40,11 @@ object SemiNERPipeline {
       last += 1
     }
 
-    Segmentation(out, words, words.length, id)
+    Segmentation(out, words, id)
   }
 
   case class SFeature(w: String, kind: Symbol) extends Feature
-  case class BeginFeature[L](w: Feature, prev: L, cur: L) extends Feature
+  case class BeginFeature[L](w: Feature, cur: L) extends Feature
   case class EndFeature[L](w: Feature, cur: L) extends Feature
   case class SpanFeature[L](distance: Feature, cur: L) extends Feature
   case class UnigramFeature[L](w: Feature, cur: L) extends Feature
@@ -64,8 +64,8 @@ object SemiNERPipeline {
         Array(SFeature(classes(pos), 'Class),
           SFeature(shapes(pos), 'Shape),
           SFeature(words(pos), 'Word),
-          SFeature(if(pos == 0) "##" else words(pos-1), 'PrevWord),
-          SFeature(if(pos == words.length - 1) "##" else words(pos+1), 'NextWord),
+//          SFeature(if(pos == 0) "##" else words(pos-1), 'PrevWord),
+//          SFeature(if(pos == words.length - 1) "##" else words(pos+1), 'NextWord),
           SFeature(if(pos == 0) "##" else shapes(pos-1), 'PrevWordShape),
           SFeature(if(pos == words.length - 1) "##" else shapes(pos+1), 'NextWordShape),
           SFeature(if(pos == 0) "##" else classes(pos-1), 'PrevWordClass),
@@ -83,7 +83,7 @@ object SemiNERPipeline {
         else if(len <= 4) 2
         else if(len <= 8) 3
         else if(len <= 16) 4
-        else 6
+        else 5
       }
     }
 
@@ -91,16 +91,16 @@ object SemiNERPipeline {
 
   class IndexedStandardFeaturizer(f: StandardFeaturizer,
                                   val labelIndex: Index[NERType.Value],
-                                  val basicFeatureIndex: Index[Feature]) extends SemiCRFModel.BIEOFeaturizer[NERType.Value,IndexedSeq[String]] {
+                                  val basicFeatureIndex: Index[Feature]) extends SemiCRFModel.BIEOFeaturizer[NERType.Value,String] {
 
     def startSymbol: NERType.Value = NERType.OutsideSentence
     private val label2Index = new PairIndex(labelIndex, labelIndex)
     private val labeledFeatureIndex = new PairIndex(labelIndex, basicFeatureIndex)
     private val labeled2FeatureIndex = new PairIndex(label2Index, basicFeatureIndex)
     // feature mappings... sigh
-    private implicit val beginIso = Isomorphism[((NERType.Value, NERType.Value), Feature), BeginFeature[NERType.Value]](
-      tu={pair => BeginFeature(pair._2, pair._1._1, pair._1._2)},
-      ut={f => ((f.prev, f.cur), f.w) }
+    private implicit val beginIso = Isomorphism[(NERType.Value, Feature), BeginFeature[NERType.Value]](
+      tu={pair => BeginFeature(pair._2, pair._1)},
+      ut={f => (f.cur, f.w) }
     )
     private implicit val endIso = Isomorphism[(NERType.Value, Feature), EndFeature[NERType.Value]](
       tu={pair => EndFeature(pair._2, pair._1)},
@@ -112,15 +112,18 @@ object SemiNERPipeline {
       ut={f => (f.cur, f.w) }
     )
 
-    private implicit val spanIso = Isomorphism[(NERType.Value, Feature), SpanFeature[NERType.Value]](
+    private implicit val spanIso = Isomorphism[((NERType.Value, NERType.Value), Feature), SpanFeature[(NERType.Value, NERType.Value)]](
       tu={pair => SpanFeature(pair._2, pair._1)},
       ut={f => (f.cur, f.distance) }
     )
 
-    val compositeIndex = new CompositeIndex[Feature](new IsomorphismIndex(labeled2FeatureIndex)(beginIso),
+    private val distanceFeatureIndex = Index[Feature](Iterator(DistanceFeature(1), DistanceFeature(2), DistanceFeature(3), DistanceFeature(4), DistanceFeature(5)))
+    private val spanFeatureIndex = new PairIndex(label2Index, distanceFeatureIndex)
+
+    val compositeIndex = new CompositeIndex[Feature](new IsomorphismIndex(labeledFeatureIndex)(beginIso),
       new IsomorphismIndex(labeledFeatureIndex)(endIso),
       new IsomorphismIndex(labeledFeatureIndex)(uniIso),
-      new IsomorphismIndex(labeledFeatureIndex)(spanIso)
+      new IsomorphismIndex(spanFeatureIndex)(spanIso)
     )
 
     val BEGIN_COMP = 0
@@ -134,8 +137,9 @@ object SemiNERPipeline {
     )
 
     val featureIndex: IsomorphismIndex[(Int, Feature), Feature] = new IsomorphismIndex(compositeIndex)(featureIso)
+    println(featureIndex.size)
 
-    def anchor(w: IndexedSeq[String]): SemiCRFModel.BIEOAnchoredFeaturizer[NERType.Value, IndexedSeq[String]] = new SemiCRFModel.BIEOAnchoredFeaturizer[NERType.Value, IndexedSeq[String]] {
+    def anchor(w: IndexedSeq[String]): SemiCRFModel.BIEOAnchoredFeaturizer[NERType.Value, String] = new SemiCRFModel.BIEOAnchoredFeaturizer[NERType.Value, String] {
       val loc = f.localize(w)
 
       val basicFeatureCache = Array.tabulate(w.length){ pos =>
@@ -149,7 +153,7 @@ object SemiNERPipeline {
         builder.sizeHint(feats.length)
         var i = 0
         while(i < feats.length) {
-          val index = compositeIndex.mapIndex(BEGIN_COMP, labeled2FeatureIndex.mapIndex(label2Index.mapIndex(p, c), feats(i)))
+          val index = compositeIndex.mapIndex(BEGIN_COMP, labeledFeatureIndex.mapIndex(c, feats(i)))
           if(index != -1) {
             builder.add(index, 1.0)
           }
@@ -204,16 +208,16 @@ object SemiNERPipeline {
       }
 
       private val spanCache = TriangularArray.tabulate(w.length+1){ (beg,end) =>
-        loc.featuresForSpan(beg, end).map(basicFeatureIndex).filter(_ >= 0)
+        loc.featuresForSpan(beg, end).map(distanceFeatureIndex).filter(_ >= 0)
       }
-      private val spanFeatures = Array.tabulate(labelIndex.size){ (cur) =>
+      private val spanFeatures = Array.tabulate(labelIndex.size, labelIndex.size){ (prev, cur) =>
         TriangularArray.tabulate(w.length+1) { (beg, end) =>
           val feats = spanCache(beg, end)
           val builder = new SparseVector.Builder[Double](featureIndex.size)
           builder.sizeHint(feats.length)
           var i = 0
           while(i < feats.length) {
-            val index = compositeIndex.mapIndex(SPAN_COMP, labeledFeatureIndex.mapIndex(cur, feats(i)))
+            val index = compositeIndex.mapIndex(SPAN_COMP, spanFeatureIndex.mapIndex(label2Index.mapIndex(prev, cur), feats(i)))
             if(index != -1) {
               builder.add(index, 1.0)
             }
@@ -223,8 +227,9 @@ object SemiNERPipeline {
         }
       }
 
+
       def featuresForSpan(prev: Int, cur: Int, beg: Int, end: Int): SparseVector[Double] = {
-        spanFeatures(cur)(beg,end)
+        spanFeatures(prev)(cur)(beg,end)
       }
 
 
@@ -233,7 +238,7 @@ object SemiNERPipeline {
   }
 
   object IndexedStandardFeaturizer {
-    def apply(f: StandardFeaturizer, data: IndexedSeq[Segmentation[NERType.Value, IndexedSeq[String]]], maxLength: Int=>Int) = {
+    def apply(f: StandardFeaturizer, data: IndexedSeq[Segmentation[NERType.Value, String]], maxLength: Int=>Int) = {
       val labelIndex: Index[NERType.Value] = EnumerationIndex(NERType)
       val featureIndex = Index[Feature]()
 
@@ -257,7 +262,9 @@ object SemiNERPipeline {
     }
 
   }
-  case class Params(path: File, name: String = "eval/ner", nfiles: Int = 100000, opt: OptParams)
+  case class Params(path: File, name: String = "eval/ner", nfiles: Int = 100000,
+                    iterPerEval: Int = 20,
+                    opt: OptParams)
 
   def main(args: Array[String]) {
     val (baseConfig, files) = CommandLineParser.parseArguments(args)
@@ -269,23 +276,31 @@ object SemiNERPipeline {
       s <- doc.sentences
     } yield makeSegmentation(s.ner, s.words, s.id)
 
-    val maxLengthMap = instances.flatMap(_.segments.iterator).groupBy(_._1).mapValues(arr => arr.map(_._2.length).max)
+    val train = instances.take(instances.length * 9 / 10)
+    val test = instances.drop(instances.length * 9 / 10)
+
+    val maxLengthMap = train.flatMap(_.segments.iterator).groupBy(_._1).mapValues(arr => arr.map(_._2.length).max)
     val labelIndex: Index[NERType.Value] = EnumerationIndex(NERType)
     val maxLengthArray = Encoder.fromIndex(labelIndex).tabulateArray(maxLengthMap.getOrElse(_, 0))
     println("Max Length: " + maxLengthMap)
 
     // build feature Index
     val feat = new SemiNERPipeline.StandardFeaturizer
-    val indexed = IndexedStandardFeaturizer(feat, instances, maxLengthArray)
+    val indexed = IndexedStandardFeaturizer(feat, train, maxLengthArray)
 
     val model = new SemiCRFModel(indexed.featureIndex, indexed, maxLengthArray)
-    val obj = new ModelObjective(model, instances)
+    val obj = new ModelObjective(model, train)
     val cached = new CachedBatchDiffFunction(obj)
 
 //    val checking = new RandomizedGradientCheckingFunction[Int, DenseVector[Double]](cached, toString={ (i: Int) => indexed.featureIndex.get(i).toString})
+//
+    def eval(state: FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State) {
+      val crf = model.extractCRF(state.x)
+      println("Eval + " + (state.iter+1) + " " + SegmentationEval.eval(crf, test, NERType.NotEntity))
+    }
 
-    val weights = params.opt.minimize(cached, obj.initialWeightVector(randomize=true))
-//    val weights = new LBFGS[DenseVector[Double]]().minimize(checking, obj.initialWeightVector(randomize=true))
+    val weights = params.opt.iterations(cached, obj.initialWeightVector(randomize=true)).tee(state => if((state.iter +1) % params.iterPerEval == 0) eval(state)).last
+    eval(weights)
 
 
 

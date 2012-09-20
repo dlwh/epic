@@ -7,20 +7,27 @@ import epic.sequences.SemiCRF.{Marginal, Anchoring}
 import breeze.linalg.{HashVector, SparseVector}
 import epic.framework.{StandardExpectedCounts, Feature}
 import java.util
+import collection.mutable.ArrayBuffer
 
 /**
  * A Semi-Markov Linear Chain Conditional Random Field, that is, the length
  * of time spent in a state may be longer than 1 tick. Useful for field segmentation or NER.
+ *
+ * As usual in Epic, all the heavy lifting is done in the companion object and Marginals.
  * @author dlwh
  */
 class SemiCRF[L, W](val model: SemiCRF.Grammar[L, W]) {
 
-  def marginal(w: W) = {
+  def marginal(w: IndexedSeq[W]) = {
      SemiCRF.Marginal(model.anchor(w))
   }
 
-  def goldMarginal(segmentation: IndexedSeq[(L,Span)], w: W):Marginal[L, W] = {
-    SemiCRF.Marginal.goldMarginal(model.anchor(w), segmentation, w)
+  def goldMarginal(segmentation: IndexedSeq[(L,Span)], w: IndexedSeq[W]):Marginal[L, W] = {
+    SemiCRF.Marginal.goldMarginal(model.anchor(w), segmentation)
+  }
+
+  def bestSequence(w: IndexedSeq[W], id: String = "") = {
+    SemiCRF.viterbi(model.anchor(w), id)
   }
 
 
@@ -29,21 +36,20 @@ class SemiCRF[L, W](val model: SemiCRF.Grammar[L, W]) {
 object SemiCRF {
 
   trait Grammar[L, W] {
-    def anchor(w: W): Anchoring[L, W]
+    def anchor(w: IndexedSeq[W]): Anchoring[L, W]
     def labelIndex: Index[L]
     def startSymbol: L
   }
 
 
   trait Anchoring[L, W] {
-    def w : W
-    def length: Int
+    def w : IndexedSeq[W]
+    def length: Int = w.length
     def maxSegmentLength(label: Int): Int
     def scoreTransition(prev: Int, cur: Int, beg: Int, end: Int):Double
     def labelIndex: Index[L]
     def startSymbol: L
   }
-
 
   trait TransitionVisitor[L, W] {
     def apply(prev: Int, cur: Int, beg: Int, end: Int, count: Double)
@@ -52,7 +58,7 @@ object SemiCRF {
   trait Marginal[L, W] {
 
     def anchoring: Anchoring[L, W]
-    def w: W = anchoring.w
+    def w: IndexedSeq[W] = anchoring.w
     def length: Int = anchoring.length
     /** Visits spans with non-zero score, useful for expected counts */
     def visit( f: TransitionVisitor[L, W])
@@ -61,7 +67,6 @@ object SemiCRF {
     def transitionMarginal(prev:Int, cur: Int, beg: Int, end: Int):Double
     def logPartition: Double
 
-    /** Log-normalized probability of seeing segment */
   }
 
   object Marginal {
@@ -117,7 +122,7 @@ object SemiCRF {
 
     }
 
-    def goldMarginal[L, W](scorer: Anchoring[L, W], segmentation: IndexedSeq[(L,Span)], w: W):Marginal[L, W] = {
+    def goldMarginal[L, W](scorer: Anchoring[L, W], segmentation: IndexedSeq[(L,Span)]):Marginal[L, W] = {
       var lastSymbol = scorer.labelIndex(scorer.startSymbol)
       var score = 0.0
       var lastEnd = 0
@@ -259,10 +264,12 @@ object SemiCRF {
       backwardScores
     }
 
+
+
   }
 
   trait IndexedFeaturizer[L, W] {
-    def anchor(w: W):AnchoredFeaturizer[L, W]
+    def anchor(w: IndexedSeq[W]):AnchoredFeaturizer[L, W]
 
     def startSymbol: L
 
@@ -276,5 +283,54 @@ object SemiCRF {
   }
 
 
+  def viterbi[L, W](scorer: Anchoring[L ,W], id: String=""):Segmentation[L, W] = {
+    val length = scorer.length
+    val numLabels = scorer.labelIndex.size
+    // total weight (logSum) for ending in pos with label l.
+    val forwardScores = Array.fill(length+1, numLabels)(Double.NegativeInfinity)
+    val forwardLabelPointers = Array.fill(length+1, numLabels)(-1)
+    val forwardBeginPointers = Array.fill(length+1, numLabels)(-1)
+    forwardScores(0)(scorer.labelIndex(scorer.startSymbol)) = 0.0
+
+    var end = 1
+    while (end <= length) {
+      var label = 0
+      while (label < numLabels) {
+        var start = math.max(end - scorer.maxSegmentLength(label), 0)
+        while (start < end) {
+          var prevLabel = 0
+          while (prevLabel < numLabels) {
+            val prevScore = forwardScores(start)(prevLabel)
+            if (prevScore != Double.NegativeInfinity) {
+              val score = scorer.scoreTransition(prevLabel, label, start, end) + prevScore
+              if(score > forwardScores(end)(label)) {
+                forwardScores(end)(label) = score
+                forwardLabelPointers(end)(label) = prevLabel
+                forwardBeginPointers(end)(label) = start
+              }
+            }
+
+            prevLabel += 1
+          }
+          start += 1
+        }
+        label += 1
+      }
+
+      end += 1
+    }
+    val segments = ArrayBuffer[(L, Span)]()
+    def rec(end: Int, label: Int) {
+      if(end != 0) {
+        val bestStart = forwardBeginPointers(end)(label)
+        segments += (scorer.labelIndex.get(label) -> Span(bestStart, end))
+        rec(bestStart, forwardLabelPointers(end)(label))
+      }
+
+    }
+    rec(length, (0 until numLabels).maxBy(forwardScores(length)(_)))
+
+    Segmentation(segments.reverse, scorer.w, id)
+  }
 }
 

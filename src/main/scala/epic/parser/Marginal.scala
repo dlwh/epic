@@ -1,4 +1,7 @@
 package epic.parser
+
+import epic.framework.StandardExpectedCounts
+
 /*
  Copyright 2012 David Hall
 
@@ -27,9 +30,9 @@ trait Marginal[L, W] {
   def words:Seq[W] = anchoring.words
   def length = words.length
 
-  def expectedCounts[Feat](featurizer: RefinedFeaturizer[L, W, Feat]): ExpectedCounts[Feat] = {
+  def expectedCounts[Feat](featurizer: RefinedFeaturizer[L, W, Feat]): StandardExpectedCounts[Feat] = {
     val spec = featurizer.anchor(words)
-    val counts = new ExpectedCounts[Feat](featurizer.index)
+    val counts = StandardExpectedCounts.zero(featurizer.index)
     val visitor = Marginal.mkVisitor(counts, spec)
     visit(visitor)
     counts.loss = partition
@@ -50,7 +53,7 @@ trait Marginal[L, W] {
 }
 
 object Marginal {
-  private def mkVisitor[L, W, Feat](counts: ExpectedCounts[Feat],
+  private def mkVisitor[L, W, Feat](counts: StandardExpectedCounts[Feat],
                                     spec: RefinedFeaturizer[L, W, Feat]#Anchoring):AnchoredVisitor[L] = {
     new AnchoredVisitor[L] {
       def visitBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int, score: Double) {
@@ -70,7 +73,7 @@ object Marginal {
 
   }
 
-  private def addScale[Feat](counts: ExpectedCounts[Feat], features: Array[Int], score: Double) {
+  private def addScale[Feat](counts: StandardExpectedCounts[Feat], features: Array[Int], score: Double) {
     val data = counts.counts.data
     var i = 0
     while(i < features.length) {

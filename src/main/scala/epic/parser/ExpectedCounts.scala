@@ -32,8 +32,6 @@ final case class ExpectedCounts[Feat](index: Index[Feat],
 
   def this(index: Index[Feat]) = this(index, DenseVector.zeros(index.size), 0.0)
 
-  def decode = Encoder.fromIndex(index).decode(counts)
-
   def +=(c: ExpectedCounts[Feat]) = {
     val ExpectedCounts(_, wCounts, tProb) = c
 
@@ -52,10 +50,4 @@ final case class ExpectedCounts[Feat](index: Index[Feat],
     this
   }
 
-  /**
-   * Gets the count of the feature.
-   */
-  def apply(f: Feat) = {
-    counts(index(f))
-  }
 }

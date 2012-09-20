@@ -9,24 +9,19 @@ import breeze.collection.mutable.TriangularArray
 import collection.mutable.ArrayBuffer
 import collection.immutable.BitSet
 
-class PropModel(propIndexer: PropIndexer, val featureIndex: Index[Feature]) extends Model[IndexedCorefInstance] {
-  type ExpectedCounts = StandardExpectedCounts
+class PropModel(propIndexer: PropIndexer, val featureIndex: Index[Feature]) extends Model[IndexedCorefInstance] with StandardExpectedCounts.Model {
   type Inference = PropInference
 
   def initialValueForFeature(f: Feature) = 0.0
 
   def inferenceFromWeights(weights: DenseVector[Double]) = new PropInference(propIndexer, weights)
-
-  def emptyCounts = StandardExpectedCounts.zero(featureIndex)
-
-  def expectedCountsToObjective(ecounts: ExpectedCounts) =  {
-    ecounts.loss -> ecounts.counts
-  }
 }
 
 
 class PropInference(propIndexer: PropIndexer, weights: DenseVector[Double]) extends GoldGuessInference[IndexedCorefInstance] {
-  type ExpectedCounts = StandardExpectedCounts
+  type ExpectedCounts = StandardExpectedCounts[Feature]
+
+  def emptyCounts = StandardExpectedCounts.zero(propIndexer.index)
 
   def goldCounts(inst: IndexedCorefInstance) = {
     val (assignmentVariables: Array[Variable[Int]], propertyVariables: Array[Array[Variable[Int]]]) = makeVariables(inst)
@@ -48,11 +43,9 @@ class PropInference(propIndexer: PropIndexer, weights: DenseVector[Double]) exte
     // TODO: we can set contribution to exp(0) a prior and not need to sum over them... how to
     // do this?
     val agreementFactors = new ArrayBuffer[AgreementFactor]()
-    /*
     for(c <- inst.goldClusters; i <- c; j <- c if j < i && j != 0; p <- 0 until propIndexer.featuresForProperties.length) {
       agreementFactors += agreementFactor(propertyVariables, assignmentVariables, j, i, p)
     }
-    */
 
     val flattenedProp = propertyVariables.flatten.filter(_ ne null)
 
@@ -62,7 +55,8 @@ class PropInference(propIndexer: PropIndexer, weights: DenseVector[Double]) exte
     val ll = bp.logPartition
 
     // actually get the expected counts!
-    val expCounts = DenseVector.zeros[Double](propIndexer.index.size)
+    val expCounts = emptyCounts
+    expCounts.loss = ll
 
     val clusterMins = BitSet.empty ++ inst.goldClusters.map(_.min)
 
@@ -70,21 +64,18 @@ class PropInference(propIndexer: PropIndexer, weights: DenseVector[Double]) exte
       val i = i_minus_1 + 1
       val arr = Array(0)
       if(clusterMins.contains(i))
-        addIntoScale(expCounts, inst.featuresFor(0, i), bp.beliefs(i)(0))
+        addIntoScale(expCounts.counts, inst.featuresFor(0, i), bp.beliefs(i)(0))
       else for(j <- clusterFor(i) if j < i) {
         arr(0) = j
-        addIntoScale(expCounts, inst.featuresFor(j, i), bp.beliefs(i)(j))
+        addIntoScale(expCounts.counts, inst.featuresFor(j, i), bp.beliefs(i)(j))
       }
     }
 
-    /*
     for(f <- agreementFactors) {
-      f.tallyAgreeExpectedCounts(bp, expCounts)
+      f.tallyAgreeExpectedCounts(bp, expCounts.counts)
     }
-    */
 
-
-    new StandardExpectedCounts(ll, expCounts)
+    expCounts
   }
 
   def guessCounts(inst: IndexedCorefInstance) = {
@@ -103,11 +94,9 @@ class PropInference(propIndexer: PropIndexer, weights: DenseVector[Double]) exte
     // do this?
 
     val agreementFactors = new ArrayBuffer[AgreementFactor]()
-    /*
     for(i <- 1 to inst.numMentions; j <- 1 until i; p <- 0 until propIndexer.featuresForProperties.length) {
       agreementFactors += agreementFactor(propertyVariables, assignmentVariables, j, i, p)
     }
-    */
 
     val flattenedProp = propertyVariables.flatten.filter( _ ne null)
 
@@ -117,24 +106,23 @@ class PropInference(propIndexer: PropIndexer, weights: DenseVector[Double]) exte
     val ll = bp.logPartition
 
     // actually get the expected counts!
-    val expCounts = DenseVector.zeros[Double](propIndexer.index.size)
+    val expCounts = emptyCounts
+    expCounts.loss = ll
 
     for(i_minus_1 <- 0 until assignmentFactors.length) {
       val i = i_minus_1 + 1
       val arr = Array(0)
       for(j <- 0 until i) {
         arr(0) = j
-        addIntoScale(expCounts, inst.featuresFor(j, i), bp.beliefs(i)(j))
+        addIntoScale(expCounts.counts, inst.featuresFor(j, i), bp.beliefs(i)(j))
       }
     }
 
-    /*
     for(f <- agreementFactors) {
-      f.tallyAgreeExpectedCounts(bp, expCounts)
+      f.tallyAgreeExpectedCounts(bp, expCounts.counts)
     }
-    */
 
-    new StandardExpectedCounts(ll, expCounts)
+    expCounts
   }
 
 

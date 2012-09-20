@@ -56,8 +56,6 @@ class StructModel[L, L2, W](indexedFeatures: IndexedFeaturizer[L, L2, W],
 
   override def initialValueForFeature(f: Feature) = initialFeatureVal(f) getOrElse 0.0
 
-  def emptyCounts = new ExpectedCounts(featureIndex)
-
   def inferenceFromWeights(weights: DenseVector[Double]) = {
     val lexicon = new FeaturizedLexicon(weights, indexedFeatures)
     val grammar = FeaturizedGrammar(this.grammar, this.lexicon, projections, weights, indexedFeatures, lexicon)

@@ -2,6 +2,7 @@ package epic.trees
 
 import breeze.serialization.DataSerialization
 import java.io.DataOutput
+import epic.framework.Feature
 
 /*
  Copyright 2012 David Hall
@@ -19,7 +20,7 @@ import java.io.DataOutput
  limitations under the License.
 */
 
-sealed trait Production[@specialized(Int) +L, +W] {
+sealed trait Production[@specialized(Int) +L, +W] extends Feature {
   def parent: L
   def map[A](f: L => A): Production[A, W]
 }
