@@ -105,7 +105,7 @@ case class StructModelFactory(baseParser: ParserParams.XbarGrammar,
     val baseFactory = RefinedGrammar.generative(xbarGrammar, xbarLexicon, xbarBinaries, xbarUnaries, xbarWords)
     val cFactory = constraints.cachedFactory(AugmentedGrammar.fromRefined(baseFactory))
 
-    val gen = new WordShapeFeaturizer(initLexicon)
+    val gen = new TagAwareWordShapeFeaturizer(initLexicon)
     def labelFlattener(l: AnnotatedLabel) = {
       val basic = Seq(l)
       basic map { IndicatorFeature(_) }

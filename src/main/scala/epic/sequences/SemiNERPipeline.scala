@@ -7,7 +7,7 @@ import epic.everything.{NERType, DSpan}
 import collection.mutable.ArrayBuffer
 import breeze.util._
 import breeze.text.analyze.{EnglishWordClassGenerator, WordShapeGenerator}
-import breeze.linalg.{DenseVector, SparseVector}
+import breeze.linalg.{Counter, DenseVector, SparseVector}
 import collection.immutable
 import epic.framework.{ModelObjective, Feature}
 import breeze.optimize._
@@ -15,6 +15,7 @@ import breeze.collection.mutable.{TriangularArray, OpenAddressHashArray}
 import breeze.optimize.FirstOrderMinimizer.OptParams
 import epic.trees.Span
 import epic.everything.DSpan
+import epic.parser.features.WordShapeFeaturizer
 
 /**
  *
@@ -22,7 +23,9 @@ import epic.everything.DSpan
  */
 object SemiNERPipeline {
 
-  def makeSegmentation(ner: Map[DSpan, NERType.Value], words: IndexedSeq[String], id: String): Segmentation[NERType.Value, String]  = {
+  def makeSegmentation(ner: Map[DSpan, NERType.Value],
+                       words: IndexedSeq[String],
+                       id: String): Segmentation[NERType.Value, String]  = {
     val sorted = ner.toIndexedSeq.sortBy((_: (DSpan, NERType.Value))._1.begin)
     var out = new ArrayBuffer[(NERType.Value, Span)]()
     var last = 0
@@ -52,7 +55,16 @@ object SemiNERPipeline {
   case class DistanceFeature(distanceBin: Int) extends Feature
 
   // features that can be quickly computed
-  class StandardFeaturizer {
+  class StandardFeaturizer(wordCounts: Counter[String, Double],
+                           gazetteer: Map[IndexedSeq[String], String]) {
+
+    val flattenedGazetteer = {
+      val justWords = for((seq, kind) <- gazetteer.toIndexedSeq; w <- seq) yield (w, kind)
+      justWords.groupBy(_._1).mapValues(_.map(_._2)).toMap
+    }
+
+    val inner = new WordShapeFeaturizer(wordCounts)
+
     def localize(words: IndexedSeq[String])= new Localization(words)
 
     val interner = new Interner[Feature]
@@ -60,21 +72,23 @@ object SemiNERPipeline {
     class Localization(words: IndexedSeq[String]) {
       val classes = words.map(EnglishWordClassGenerator)
       val shapes = words.map(WordShapeGenerator)
+
       val featuresForWord: immutable.IndexedSeq[Array[Feature]] = 0 until words.length map { pos =>
-        Array(SFeature(classes(pos), 'Class),
-          SFeature(shapes(pos), 'Shape),
-          SFeature(words(pos), 'Word),
-//          SFeature(if(pos == 0) "##" else words(pos-1), 'PrevWord),
-//          SFeature(if(pos == words.length - 1) "##" else words(pos+1), 'NextWord),
+        val feats = new ArrayBuffer[Feature]()
+        feats ++= inner.featuresFor(words, pos)
+        feats ++= Array(
           SFeature(if(pos == 0) "##" else shapes(pos-1), 'PrevWordShape),
           SFeature(if(pos == words.length - 1) "##" else shapes(pos+1), 'NextWordShape),
           SFeature(if(pos == 0) "##" else classes(pos-1), 'PrevWordClass),
-          SFeature(if(pos == words.length - 1) "##" else classes(pos+1), 'NextWordClass)
-        ).map(interner.intern _)
+          SFeature(if(pos == words.length - 1) "##" else classes(pos+1), 'NextWordClass))
+        feats ++= flattenedGazetteer.getOrElse(words(pos), IndexedSeq.empty).map(SFeature(_, 'WordSeenInSegment))
+        feats.map(interner.intern _).toArray
       }
 
       def featuresForSpan(start: Int, end: Int):Array[Feature] = {
-        Array(DistanceFeature(binDistance(end - start)))
+        val arr = Array[Feature](DistanceFeature(binDistance(end - start)))
+
+        gazetteer.get(Span(start, end).map(words).toIndexedSeq).map(arr :+ SFeature(_, 'WordSeenInSegment)).getOrElse(arr)
 //        IndexedSeq.empty
       }
 
@@ -270,7 +284,7 @@ object SemiNERPipeline {
     val (baseConfig, files) = CommandLineParser.parseArguments(args)
     val config = baseConfig backoff Configuration.fromPropertiesFiles(files.map(new File(_)))
     val params = config.readIn[Params]("")
-    val instances = for {
+    val instances: Array[Segmentation[NERType.Value, String]] = for {
       file <- params.path.listFiles take params.nfiles
       doc <- ConllOntoReader.readDocuments(file)
       s <- doc.sentences
@@ -284,23 +298,27 @@ object SemiNERPipeline {
     val maxLengthArray = Encoder.fromIndex(labelIndex).tabulateArray(maxLengthMap.getOrElse(_, 0))
     println("Max Length: " + maxLengthMap)
 
+    val wordCounts:Counter[String, Double] = Counter.count(instances.flatMap(_.words):_*).mapValues(_.toDouble)
+    val gazeteer = NERGazetteer.load("en")
+
     // build feature Index
-    val feat = new SemiNERPipeline.StandardFeaturizer
+    val feat = new SemiNERPipeline.StandardFeaturizer(wordCounts, gazeteer)
     val indexed = IndexedStandardFeaturizer(feat, train, maxLengthArray)
 
     val model = new SemiCRFModel(indexed.featureIndex, indexed, maxLengthArray)
     val obj = new ModelObjective(model, train)
     val cached = new CachedBatchDiffFunction(obj)
 
-//    val checking = new RandomizedGradientCheckingFunction[Int, DenseVector[Double]](cached, toString={ (i: Int) => indexed.featureIndex.get(i).toString})
+    val checking = new RandomizedGradientCheckingFunction[Int, DenseVector[Double]](cached, toString={ (i: Int) => indexed.featureIndex.get(i).toString})
 //
     def eval(state: FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State) {
       val crf = model.extractCRF(state.x)
       println("Eval + " + (state.iter+1) + " " + SegmentationEval.eval(crf, test, NERType.NotEntity))
     }
 
-    val weights = params.opt.iterations(cached, obj.initialWeightVector(randomize=true)).tee(state => if((state.iter +1) % params.iterPerEval == 0) eval(state)).last
-    eval(weights)
+    val weights = params.opt.iterations(cached, obj.initialWeightVector(randomize=true)).tee(state => if((state.iter +1) % params.iterPerEval == 0) eval(state)).take(params.opt.maxIterations).last
+//    eval(weights)
+    val weights2 = new LBFGS[DenseVector[Double]].minimize(checking, weights.x)
 
 
 

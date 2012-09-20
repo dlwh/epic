@@ -21,7 +21,7 @@ import epic.trees.annotations.FilterAnnotations
 import epic.trees.annotations.TreeAnnotator
 import io.Source
 import breeze.linalg._
-import epic.parser.features.{GenFeaturizer, IndicatorFeature, WordShapeFeaturizer}
+import epic.parser.features.{GenFeaturizer, IndicatorFeature, TagAwareWordShapeFeaturizer}
 import epic.parser.projections.GrammarRefinements
 import epic.framework.{ComponentFeature, Feature}
 import epic.parser.{AugmentedGrammar, BaseGrammar, RefinedGrammar, ParserParams}
@@ -84,7 +84,7 @@ case class ProductParserModelFactory(baseParser: ParserParams.XbarGrammar,
       Map(xbarGrammar.root -> 1)
     }
 
-    val gen = new WordShapeFeaturizer(annWords)
+    val gen = new TagAwareWordShapeFeaturizer(annWords)
     def labelFlattener(l: (AnnotatedLabel, Seq[Int])) = {
       val basic = for( (ref,m) <- l._2.zipWithIndex) yield ComponentFeature(m, IndicatorFeature(l._1, ref))
       basic

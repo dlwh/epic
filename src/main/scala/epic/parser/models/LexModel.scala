@@ -676,7 +676,7 @@ case class LexModelFactory(baseParser: ParserParams.XbarGrammar,
     val wordIndex = Index(trainTrees.iterator.flatMap(_.words))
     val summedCounts = sum(initLexicon, Axis._0)
     val shapeGen = new SimpleWordShapeGen(initLexicon, summedCounts)
-    val tagShapeGen = new WordShapeFeaturizer(initLexicon)
+    val tagShapeGen = new TagAwareWordShapeFeaturizer(initLexicon)
 
     val lexicon:Lexicon[AnnotatedLabel, String] = initLexicon
 

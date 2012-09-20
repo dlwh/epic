@@ -137,7 +137,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
       case UnaryRule(a, b, chain) => for(aa <- split(a); bb <- split(b)) yield UnaryRule(aa, bb, chain)
     }
 
-    val gen = new WordShapeFeaturizer(annWords)
+    val gen = new TagAwareWordShapeFeaturizer(annWords)
     def labelFlattener(l: (AnnotatedLabel, Int)) = {
       val basic = Seq(l)
       basic map (IndicatorFeature)
