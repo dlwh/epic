@@ -110,7 +110,6 @@ object SemiNERPipeline {
     def startSymbol: NERType.Value = NERType.OutsideSentence
     private val label2Index = new PairIndex(labelIndex, labelIndex)
     private val labeledFeatureIndex = new PairIndex(labelIndex, basicFeatureIndex)
-    private val labeled2FeatureIndex = new PairIndex(label2Index, basicFeatureIndex)
     // feature mappings... sigh
     private implicit val beginIso = Isomorphism[(NERType.Value, Feature), BeginFeature[NERType.Value]](
       tu={pair => BeginFeature(pair._2, pair._1)},
