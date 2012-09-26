@@ -10,6 +10,7 @@ import breeze.text.analyze.{WordShapeGenerator, EnglishWordClassGenerator}
 import collection.immutable
 import breeze.collection.mutable.TriangularArray
 import epic.trees.Span
+import epic.parser.features.StandardSpanFeatures.WordEdges
 
 /**
  *
@@ -233,17 +234,20 @@ class SegmentationModelFactory[L](val startSymbol: L,
       }
 
       def featuresForSpan(start: Int, end: Int):Array[Feature] = {
-        val arr = Array[Feature](DistanceFeature(binDistance(end - start)))
-
-        gazetteer.lookupSpan(Span(start, end).map(words).toIndexedSeq).map(arr :+ SFeature(_, 'SegmentKnown)).getOrElse(arr)
+        val feats = ArrayBuffer[Feature](DistanceFeature(binDistance(end - start)))
+        feats ++= gazetteer.lookupSpan(Span(start, end).map(words).toIndexedSeq).map(SFeature(_, 'SegmentKnown))
+        if(start != end - 1)
+          for(wA <- featuresForWord(start); wB <- featuresForWord(end-1)) {
+            feats += WordEdges(0, wA, wB)
+          }
+        feats.toArray
       }
 
-      private def binDistance(len: Int) = {
-        if(len <= 1) 1
-        else if(len <= 4) 2
-        else if(len <= 8) 3
-        else if(len <= 16) 4
-        else 5
+      private def binDistance(dist2:Int) = {
+        val dist = dist2.abs - 1
+        if (dist >= 20) 7
+        else if (dist > 5) 6
+        else dist
       }
     }
 
@@ -253,7 +257,8 @@ class SegmentationModelFactory[L](val startSymbol: L,
 
   class IndexedStandardFeaturizer(f: StandardFeaturizer,
                                   val labelIndex: Index[L],
-                                  val basicFeatureIndex: Index[Feature]) extends SemiCRFModel.BIEOFeaturizer[L,String] {
+                                  val basicFeatureIndex: Index[Feature],
+                                  val basicSpanFeatureIndex: Index[Feature]) extends SemiCRFModel.BIEOFeaturizer[L,String] {
 
     val startSymbol = SegmentationModelFactory.this.startSymbol
 
@@ -279,8 +284,7 @@ class SegmentationModelFactory[L](val startSymbol: L,
       ut={f => (f.cur, f.distance) }
     )
 
-    private val distanceFeatureIndex = Index[Feature](Iterator(DistanceFeature(1), DistanceFeature(2), DistanceFeature(3), DistanceFeature(4), DistanceFeature(5)))
-    private val spanFeatureIndex = new PairIndex(label2Index, distanceFeatureIndex)
+    private val spanFeatureIndex = new PairIndex(label2Index, basicSpanFeatureIndex)
 
     val compositeIndex = new CompositeIndex[Feature](new IsomorphismIndex(labeledFeatureIndex)(beginIso),
       new IsomorphismIndex(labeledFeatureIndex)(endIso),
@@ -370,7 +374,7 @@ class SegmentationModelFactory[L](val startSymbol: L,
       }
 
       private val spanCache = TriangularArray.tabulate(w.length+1){ (beg,end) =>
-        loc.featuresForSpan(beg, end).map(distanceFeatureIndex).filter(_ >= 0)
+        loc.featuresForSpan(beg, end).map(basicSpanFeatureIndex).filter(_ >= 0)
       }
       private val spanFeatures = Array.tabulate(labelIndex.size, labelIndex.size){ (prev, cur) =>
         TriangularArray.tabulate(w.length+1) { (beg, end) =>
@@ -407,6 +411,7 @@ class SegmentationModelFactory[L](val startSymbol: L,
     val wordCounts:Counter[String, Double] = Counter.count(train.flatMap(_.words):_*).mapValues(_.toDouble)
     val f = new StandardFeaturizer(wordCounts)
     val basicFeatureIndex = Index[Feature]()
+    val spanFeatureIndex = Index[Feature]()
 
     val maxMaxLength = (0 until labelIndex.size).map(maxLengthArray).max
     var i = 0
@@ -418,14 +423,14 @@ class SegmentationModelFactory[L](val startSymbol: L,
       for(b <- 0 until s.length) {
         loc.featuresForWord(b) foreach {basicFeatureIndex.index _}
         for(e <- (b+1) until math.min(s.length,b+maxMaxLength)) {
-          loc.featuresForSpan(b, e) foreach {basicFeatureIndex.index _}
+          loc.featuresForSpan(b, e) foreach {spanFeatureIndex.index _}
         }
 
       }
       i += 1
     }
     println(train.length + "/" + train.length)
-    val indexed = new IndexedStandardFeaturizer(f, labelIndex, basicFeatureIndex)
+    val indexed = new IndexedStandardFeaturizer(f, labelIndex, basicFeatureIndex, spanFeatureIndex)
     val model = new SemiCRFModel(indexed.featureIndex, indexed, maxLengthArray)
 
     model
