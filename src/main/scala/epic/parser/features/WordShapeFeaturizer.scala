@@ -53,10 +53,13 @@ class WordShapeFeaturizer(wordCounts: Counter[String, Double], minCountUnknown: 
       val hasNonDigit = hasLetter || w.exists(!_.isDigit)
       val hasLower = w.exists(_.isLower)
       val hasDash = w.contains('-')
+      val hasPeriod = w.contains('.')
 
       if(numCaps > 0)  features += hasCapFeature
       if(numCaps > 1)  features += hasManyCapFeature
-      if(numCaps > 1 && !hasLower) features += isAllCapsFeature
+      val isAllCaps = numCaps > 1 && !hasLower && !hasNotLetter
+      if(isAllCaps) features += isAllCapsFeature
+      var knownLowerCase = false
       if(w(0).isUpper || w(0).isTitleCase) {
         if(pos == 0) {
           features += startOfSentenceFeature
@@ -64,6 +67,7 @@ class WordShapeFeaturizer(wordCounts: Counter[String, Double], minCountUnknown: 
           features += hasInitCapFeature
           if(wordCounts(w.toLowerCase) > 3) {
             features += hasKnownLCFeature
+            knownLowerCase = true
           }
         }
       }
@@ -73,6 +77,21 @@ class WordShapeFeaturizer(wordCounts: Counter[String, Double], minCountUnknown: 
       if(hasDigit)  features += hasDigitFeature
       if(!hasLetter)  features += hasNoLetterFeature
       if(hasNotLetter)  features += hasNotLetterFeature
+
+      // acronyms are all upper case with maybe some periods interspersed
+      val hasAcronymShape = (
+        wlen >= 3 && isAllCaps && wlen < 6
+        || wlen >= 2 && hasPeriod && !hasLower && numCaps > 0 && !hasDigit && w.forall(c => c.isLetter || c == '.')
+        )
+      // make sure it doesn't have a lwoer case or title case variant, common for titles and place names...
+      if(hasAcronymShape  && !knownLowerCase && wordCounts(w(0).toUpper + w.substring(1).toLowerCase) == 0) {
+        features += isProbablyAcronymFeature
+      } else if(wlen == 4 && !hasNonDigit) {
+        val year = try{w.toInt} catch {case e => 0}
+        if(year >= 1400 && year < 2300) {
+          features += isProbablyYearFeature
+        }
+      }
 
       if(wlen > 3 && w.endsWith("s") && !w.endsWith("ss") && !w.endsWith("us") && !w.endsWith("is"))
         features += endsWithSFeature
@@ -116,6 +135,8 @@ object WordShapeFeaturizer {
   val hasCapFeature = IndicatorWSFeature('HasCap)
   val hasManyCapFeature = IndicatorWSFeature('HasManyCap)
   val isAllCapsFeature = IndicatorWSFeature('AllCaps)
+  val isProbablyAcronymFeature = IndicatorWSFeature('ProbablyAcronym)
+  val isProbablyYearFeature = IndicatorWSFeature('ProbablyYear)
   val startOfSentenceFeature = IndicatorWSFeature('StartOfSentence)
 }
 

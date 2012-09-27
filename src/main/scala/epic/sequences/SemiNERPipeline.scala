@@ -1,6 +1,6 @@
 package epic.sequences
 
-import java.io.{FileInputStream, File}
+import java.io._
 import breeze.config.{Configuration, CommandLineParser}
 import epic.ontonotes.ConllOntoReader
 import epic.everything.NERType
@@ -8,11 +8,12 @@ import collection.mutable.ArrayBuffer
 import breeze.linalg.DenseVector
 import epic.framework.ModelObjective
 import breeze.optimize._
-import breeze.optimize.FirstOrderMinimizer.OptParams
-import epic.trees.Span
-import epic.everything.DSpan
 import breeze.corpora.CONLLSequenceReader
 import breeze.data.Example
+import breeze.util.Encoder
+import epic.trees.Span
+import breeze.optimize.FirstOrderMinimizer.OptParams
+import epic.everything.DSpan
 
 
 /**
@@ -106,28 +107,37 @@ object SemiConllNERPipeline {
       l(0) match {
         case 'O' =>
           if(start < i)
-            out += (labels(start).replaceAll("B-","") -> Span(start, i))
-          out += ("O" -> Span(i, i+1))
+            out += (labels(start).replaceAll(".-","").intern -> Span(start, i))
+          out += ("O".intern -> Span(i, i+1))
           start = i + 1
         case 'B' =>
           if(start < i)
-            out += (labels(start).replaceAll("B-","") -> Span(start, i))
+            out += (labels(start).replaceAll(".-","").intern -> Span(start, i))
           start = i
         case 'I' =>
-          // do nothing
+          if(start >= i) {
+            start = i
+          } else if(labels(start) != l){
+            out += (labels(start).replaceAll(".-","").intern -> Span(start, i))
+            start = i
+          } // else, still in a field, do nothing.
         case _  =>
          sys.error("weird label?!?" + l)
       }
 
       i += 1
     }
+    if(start < i)
+      out += (labels(start).replaceAll(".-","").intern -> Span(start, i))
 
+    assert(out.nonEmpty && out.last._2.end == words.length, out + " " + words + " " + labels)
     Segmentation(out, words, ex.id)
   }
 
 
 
   case class Params(path: File,
+                    test: File,
                     name: String = "eval/ner",
                     nfiles: Int = 100000,
                     iterPerEval: Int = 20,
@@ -139,8 +149,7 @@ object SemiConllNERPipeline {
     val params = config.readIn[Params]("")
     val (train,test) = {
           val standardTrain = CONLLSequenceReader.readTrain(new FileInputStream(params.path), params.path.getName).toIndexedSeq
-          val testPath = new File(params.path.getAbsolutePath.replaceAll("train","dev"))
-          val standardTest = CONLLSequenceReader.readTrain(new FileInputStream(params.path), params.path.getName).toIndexedSeq
+          val standardTest = CONLLSequenceReader.readTrain(new FileInputStream(params.test), params.path.getName).toIndexedSeq
 
           standardTrain.map(makeSegmentation) -> standardTest.map(makeSegmentation)
     }
@@ -156,8 +165,11 @@ object SemiConllNERPipeline {
     val checking = new RandomizedGradientCheckingFunction[Int, DenseVector[Double]](cached, toString={ (i: Int) => model.featureIndex.get(i).toString})
 //
     def eval(state: FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State) {
+      val out = new PrintWriter(new BufferedOutputStream(new FileOutputStream("weights.txt")))
+      Encoder.fromIndex(model.featureIndex).decode(state.x).iterator foreach {case (x, v) if v.abs > 1E-6 => out.println(x -> v) case _ => }
       val crf: SemiCRF[String, String] = model.extractCRF(state.x)
       println("Eval + " + (state.iter+1) + " " + SegmentationEval.eval(crf, test, "O"))
+      out.close()
     }
 
     val weights = params.opt.iterations(cached, obj.initialWeightVector(randomize=true)).tee(state => if((state.iter +1) % params.iterPerEval == 0) eval(state)).take(params.opt.maxIterations).last

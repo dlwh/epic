@@ -28,9 +28,9 @@ object SpanShapeGenerator extends ((IndexedSeq[String],Span)=>String) with Seria
       } else {
         val c = w(0)
         val x = binCharacter(c)
-        if (result.length > 0 && (result.last == x)) {
+        if (result.length > 1 && (result.last == x)) {
           result += 'e'
-        } else if (result.length > 1 && result.last == 'e' && result(result.length - 2) == x) {
+        } else if (result.length > 2 && result.last == 'e' && result(result.length - 2) == x) {
           () // nothing, already have our e
         } else  if(x.isLetterOrDigit) {
           result += x

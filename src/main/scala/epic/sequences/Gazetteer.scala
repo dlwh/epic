@@ -39,10 +39,15 @@ object Gazetteer {
       justWords.groupBy(_._1).mapValues(_.map(_._2).toSet.toIndexedSeq).toMap
     }
 
+    val endWordsGazetteer:Map[String,IndexedSeq[String]] = {
+      val justWords = for((seq, kind) <- map.toIndexedSeq; w = seq.last) yield (w, kind)
+      justWords.groupBy(_._1).mapValues(_.map("END-" + _._2).toSet.toIndexedSeq).toMap
+    }
+
     resource.close()
     new Gazetteer[String, String] {
       def lookupWord(w: String): IndexedSeq[String] = {
-        flattenedGazetteer.getOrElse(w, IndexedSeq.empty)
+        flattenedGazetteer.getOrElse(w, IndexedSeq.empty) ++  endWordsGazetteer.getOrElse(w, IndexedSeq.empty)
 
       }
 
