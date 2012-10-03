@@ -32,10 +32,12 @@ object ParserTester {
                     name: String,
                     @Help(text="Path to the parser file. Look in parsers/")
                     parser: File,
-                    @Help(text="Should we evaluate on the test set? Or just the train set?")
+                    @Help(text="Should we evaluate on the test set? Or just the dev set?")
                     evalOnTest: Boolean = false,
                     @Help(text="Print this and exit.")
-                    help: Boolean = false)
+                    help: Boolean = false,
+                    @Help(text="How many threads to parse with. Default is whatever Scala wants")
+                    threads: Int = -1)
 
   /**
    * Evaluates a parser on dev and possibly test.
@@ -67,6 +69,10 @@ object ParserTester {
     val name = params.name
 
     println("Parser " + name)
+
+    if(params.threads >= 1) {
+      collection.parallel.ForkJoinTasks.defaultForkJoinPool.setParallelism(params.threads)
+    }
 
     {
       println("Evaluating Parser on dev...")

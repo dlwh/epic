@@ -2,9 +2,9 @@ import AssemblyKeys._ // put this at the top of the file
 import de.johoop.jacoco4sbt._
 import JacocoPlugin._
 
-name := "epicparser"
+name := "epic"
 
-version := "0.1"
+version := "0.1-SNAPSHOT"
 
 organization := "org.scalanlp"
 
