@@ -39,22 +39,28 @@ case class ProcessedTreebank(@Help(text="Location of the treebank directory")
     else DenseTreebank.fromZipFile(path);
   }
 
-  lazy val trainTreesWithUnaries = transformTrees(treebank.train, maxLength);
-  lazy val trainTrees = trainTreesWithUnaries.map(ti => ti.copy(tree = UnaryChainRemover.removeUnaryChains(ti.tree)))
+  lazy val trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]] = transformTrees(treebank.train, maxLength, removeUnaries = true)
   lazy val devTrees = transformTrees(treebank.dev, 100000);
   lazy val testTrees = transformTrees(treebank.test, 1000000);
 
 
-  def transformTrees(portion: treebank.Portion, maxL: Int): IndexedSeq[TreeInstance[AnnotatedLabel, String]] = {
+  def transformTrees(portion: treebank.Portion, maxL: Int, removeUnaries: Boolean = false): IndexedSeq[TreeInstance[AnnotatedLabel, String]] = {
     val binarizedAndTransformed = for (
       ((tree, words), index) <- portion.trees.zipWithIndex if words.length <= maxL
     ) yield {
-      val transformed = process(tree)
       val name = portion.name + "-" + index
-      TreeInstance(name, transformed, words)
+      makeTreeInstance(name, tree, words, removeUnaries)
     }
 
     binarizedAndTransformed.toIndexedSeq
+  }
+
+
+  def makeTreeInstance(name: String, tree: Tree[String], words: Seq[String], removeUnaries: Boolean): TreeInstance[AnnotatedLabel, String] = {
+    var transformed = process(tree)
+    if (removeUnaries)
+      transformed = UnaryChainRemover.removeUnaryChains(transformed)
+    TreeInstance(name, transformed, words)
   }
 
   def headRules = {

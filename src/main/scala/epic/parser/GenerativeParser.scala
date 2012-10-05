@@ -96,6 +96,28 @@ object GenerativeParser {
     }
     (lexicon, binaryProductions, unaryProductions)
   }
+
+  def annotated(baseParser: XbarGrammar, annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel],
+                trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]]) = {
+    val (xbar,xbarLexicon) = baseParser.xbarGrammar(trainTrees)
+
+    val transformed = trainTrees.par.map { ti => annotator(ti) }.seq.toIndexedSeq
+
+    val (initLexicon, initBinaries, initUnaries) = GenerativeParser.extractCounts(transformed)
+
+    val (grammar, lexicon) = baseParser.xbarGrammar(trainTrees)
+    val refGrammar = BaseGrammar(AnnotatedLabel.TOP, initBinaries, initUnaries)
+    val indexedRefinements = GrammarRefinements(grammar, refGrammar, {
+      (_: AnnotatedLabel).baseAnnotatedLabel
+    })
+
+
+    val (words, binary, unary) = GenerativeParser.extractCounts(transformed)
+    val refinedGrammar = RefinedGrammar.generative(xbar, xbarLexicon, indexedRefinements, binary, unary, words)
+    val parser = SimpleChartParser(AugmentedGrammar.fromRefined(refinedGrammar))
+
+    parser
+  }
 }
 
 object GenerativeTrainer extends ParserPipeline {
@@ -113,13 +135,15 @@ object GenerativeTrainer extends ParserPipeline {
   def trainParser(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]],
                   validate: Parser[AnnotatedLabel, String]=>ParseEval.Statistics,
                   params: Params) = {
-    val (xbar,xbarLexicon) = params.baseParser.xbarGrammar(trainTrees)
+    val annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = params.annotator
+    val baseParser: XbarGrammar = params.baseParser
+    val (xbar,xbarLexicon) = baseParser.xbarGrammar(trainTrees)
 
-    val transformed = trainTrees.par.map { ti => params.annotator(ti) }.seq.toIndexedSeq
+    val transformed = trainTrees.par.map { ti => annotator(ti) }.seq.toIndexedSeq
 
     val (initLexicon, initBinaries, initUnaries) = GenerativeParser.extractCounts(transformed)
 
-    val (grammar, lexicon) = params.baseParser.xbarGrammar(trainTrees)
+    val (grammar, lexicon) = baseParser.xbarGrammar(trainTrees)
     val refGrammar = BaseGrammar(AnnotatedLabel.TOP, initBinaries, initUnaries)
     val indexedRefinements = GrammarRefinements(grammar, refGrammar, {
       (_: AnnotatedLabel).baseAnnotatedLabel

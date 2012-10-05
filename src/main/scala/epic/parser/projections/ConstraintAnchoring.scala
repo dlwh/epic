@@ -308,7 +308,9 @@ object ProjectTreebankToConstraints {
     trees.toIndexedSeq.par.flatMap { (ti:TreeInstance[AnnotatedLabel, String]) =>
       val TreeInstance(id, tree, words) = ti
       println(id, words)
-      try {
+      if(words.length > maxL) {
+        Seq.empty
+      } else  try {
         val policy = if(useTree) {
           GoldTagPolicy.goldTreeForcing[AnnotatedLabel](tree.map(_.baseAnnotatedLabel).map(index))
         } else {

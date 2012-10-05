@@ -67,6 +67,18 @@ object SemiCRF {
     def transitionMarginal(prev:Int, cur: Int, beg: Int, end: Int):Double
     def logPartition: Double
 
+    def spanMarginal(cur: Int, begin: Int, end: Int) = {
+      var prev = 0
+      val numLabels: Int = anchoring.labelIndex.size
+      var sum = 0.0
+      while(prev <  numLabels) {
+        sum += math.exp(transitionMarginal(prev, cur, begin, end))
+
+        prev += 1
+      }
+      sum
+    }
+
   }
 
   object Marginal {
@@ -117,6 +129,8 @@ object SemiCRF {
           else withoutTrans + anchoring.scoreTransition(prev, cur, beg, end) - logPartition
         }
 
+
+
         def logPartition: Double = partition
       }
 
@@ -164,6 +178,7 @@ object SemiCRF {
         def transitionMarginal(prev: Int, cur: Int, beg: Int, end: Int): Double = {
           numerics.logI(goldEnds(beg) == end && goldLabels(beg) == cur && goldPrevLabels(beg) == prev)
         }
+
 
         def logPartition: Double = score
       }

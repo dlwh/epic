@@ -2,7 +2,7 @@ package epic.sequences
 
 import epic.framework._
 import breeze.util._
-import breeze.linalg.{Counter, SparseVector, DenseVector}
+import breeze.linalg.{VectorBuilder, Counter, SparseVector, DenseVector}
 import epic.sequences.SemiCRF.{TransitionVisitor}
 import collection.mutable.ArrayBuffer
 import epic.parser.features.{PairFeature, SpanShapeGenerator, WordShapeFeaturizer}
@@ -363,9 +363,9 @@ class SegmentationModelFactory[L](val startSymbol: L,
       }
 
       val beginCache = Array.tabulate(labelIndex.size, labelIndex.size, w.length){ (p,c,w) =>
-        val builder = new SparseVector.Builder[Double](featureIndex.size)
+        val builder = new VectorBuilder[Double](featureIndex.size)
         val feats = basicFeatureCache(w)
-        builder.sizeHint(feats.length)
+        builder.reserve(feats.length)
         var i = 0
         while(i < feats.length) {
           val index = compositeIndex.mapIndex(BEGIN_COMP, labeledFeatureIndex.mapIndex(c, feats(i)))
@@ -375,10 +375,10 @@ class SegmentationModelFactory[L](val startSymbol: L,
 
           i += 1
         }
-        builder.result()
+        builder.toSparseVector
       }
       val endCache = Array.tabulate(labelIndex.size, w.length){ (l, w) =>
-        val builder = new SparseVector.Builder[Double](featureIndex.size)
+        val builder = new VectorBuilder[Double](featureIndex.size)
         /*
         val feats = basicFeatureCache(w)
         builder.sizeHint(feats.length)
@@ -392,12 +392,12 @@ class SegmentationModelFactory[L](val startSymbol: L,
           i += 1
         }
         */
-        builder.result()
+        builder.toSparseVector
       }
       val wordCache = Array.tabulate(labelIndex.size, w.length){ (l, w) =>
-        val builder = new SparseVector.Builder[Double](featureIndex.size)
+        val builder = new VectorBuilder[Double](featureIndex.size)
         val feats = basicFeatureCache(w)
-        builder.sizeHint(feats.length)
+        builder.reserve(feats.length)
         var i = 0
         while(i < feats.length) {
           val index = compositeIndex.mapIndex(UNI_COMP, labeledFeatureIndex.mapIndex(l, feats(i)))
@@ -407,7 +407,7 @@ class SegmentationModelFactory[L](val startSymbol: L,
 
           i += 1
         }
-        builder.result()
+        builder.toSparseVector
       }
 
       def featureIndex: Index[Feature] = IndexedStandardFeaturizer.this.featureIndex
@@ -431,11 +431,11 @@ class SegmentationModelFactory[L](val startSymbol: L,
       }
       private val spanFeatures = Array.tabulate(labelIndex.size, labelIndex.size){ (prev, cur) =>
         TriangularArray.tabulate(w.length+1) { (beg, end) =>
-          val builder = new SparseVector.Builder[Double](featureIndex.size)
+          val builder = new VectorBuilder[Double](featureIndex.size)
           if(beg < end) {
             val feats = spanCache(beg, end)
             val tfeats = loc.featuresForTransition(beg, end).map(basicTransFeatureIndex)
-            builder.sizeHint(feats.length + tfeats.length)
+            builder.reserve(feats.length + tfeats.length)
             var i = 0
             while(i < feats.length) {
               val index = compositeIndex.mapIndex(SPAN_COMP, spanFeatureIndex.mapIndex(cur, feats(i)))
@@ -453,7 +453,7 @@ class SegmentationModelFactory[L](val startSymbol: L,
               i += 1
             }
           }
-          builder.result()
+          builder.toSparseVector
         }
       }
 

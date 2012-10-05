@@ -53,6 +53,7 @@ class SimpleChartParser[L, W](val augmentedGrammar: AugmentedGrammar[L, W],
 
   }
   def grammar = augmentedGrammar.grammar
+  def lexicon = augmentedGrammar.lexicon
 
 }
 

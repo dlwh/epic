@@ -95,6 +95,7 @@ object NERType extends Enumeration {
     case "time" => Time
     case "work_of_art" | "workofart" => WorkOfArt
     case "notentity" | "none" => NotEntity
+    case "bos" | "eos" | "outsidesentence" => OutsideSentence
   }
 
   val Cardinal = Value
