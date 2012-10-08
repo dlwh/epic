@@ -1,44 +1,45 @@
 package epic.everything
 package models
 
-import breeze.util.Index
+import breeze.util.{Encoder, Index}
 import breeze.collection.mutable.TriangularArray
 
 /**
  *
- * @param spanBeliefs  sentence -> property type (by index) -> SpanBeliefs
+ * @param sentenceBeliefs  sentence -> property type (by index) -> SpanBeliefs
  *@author dlwh
  */
-class DocumentBeliefs(val index: Index[Property], val spanBeliefs: Array[SentenceBeliefs]) {
+case class DocumentBeliefs(spanProperties: Index[Property[_]],
+                           wordProperties: Index[Property[_]],
+                           sentenceBeliefs: Array[SentenceBeliefs]) {
   def beliefsForProperty(s: Int, property: Int): SpanBeliefs = {
-    spanBeliefs(s)(property)
+    sentenceBeliefs(s)(property)
   }
 
-  def beliefsForSentence(s: Int) = spanBeliefs(s)
+  def beliefsForSentence(s: Int) = sentenceBeliefs(s)
 }
 
 object DocumentBeliefs {
-  def forDocument(propIndex: Index[Property], arities: Array[Int])(document: Document) = {
-    assert(arities.size == propIndex.size)
-    val sentenceBeliefs = document.sentences.map(SentenceBeliefs.forSentence(propIndex, arities)(_)).toArray
-    new DocumentBeliefs(propIndex, sentenceBeliefs)
+  def forDocument(spanProperties: Index[Property[_]], wordProperties: Index[Property[_]])(document: Document) = {
+    val sentenceBeliefs = document.sentences.map(SentenceBeliefs.forSentence(spanProperties, wordProperties)(_)).toArray
+    new DocumentBeliefs(spanProperties, wordProperties, sentenceBeliefs)
 
   }
 }
 
 
-case class SentenceBeliefs(beliefs: Array[SpanBeliefs]) {
-  def apply(p: Int) = beliefs(p)
+case class SentenceBeliefs(spans: Array[SpanBeliefs], words: Array[WordBeliefs]) {
+  def apply(p: Int) = spans(p)
 }
 
 object SentenceBeliefs {
-  def forSentence(propIndex: Index[Property], arities: Array[Int])(sentence: Sentence) = {
-    assert(arities.size == propIndex.size)
-    val spans = Array.tabulate(propIndex.size){p =>
-      SpanBeliefs(p, TriangularArray.fill(sentence.length)(new Array[Double](arities(p))))
-    }
-    SentenceBeliefs(spans)
+  def forSentence(spanProperties: Index[Property[_]], wordProperties: Index[Property[_]])(s: Sentence) = {
+    val forSpans = Array.tabulate(spanProperties.size)(i => SpanBeliefs(i, TriangularArray.fill(s.length)(new Array[Double](spanProperties.get(i).arity))))
+    val forWords = Array.tabulate(wordProperties.size)(i => WordBeliefs(i, Array.fill(s.length)(new Array[Double](wordProperties.get(i).arity))))
+
+    SentenceBeliefs(forSpans, forWords)
   }
+
 }
 
 /**
@@ -49,4 +50,15 @@ object SentenceBeliefs {
 case class SpanBeliefs(prop: Int, beliefs: TriangularArray[Array[Double]]) {
   def forSpan(begin: Int, end: Int):Array[Double] = beliefs(begin, end)
   def apply(begin: Int, end: Int, propValue: Int) = beliefs(begin,end)(propValue)
+}
+
+
+/**
+ * (begin, end) triangular index -> value for belief -> score
+ * @param prop
+ * @param beliefs
+ */
+case class WordBeliefs(prop: Int, beliefs: Array[Array[Double]]) {
+  def forWord(begin: Int):Array[Double] = beliefs(begin)
+  def apply(begin: Int, propValue: Int) = beliefs(begin)(propValue)
 }

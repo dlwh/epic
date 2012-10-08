@@ -6,11 +6,7 @@ import breeze.util.Index
  * Basically just a multinomial valued property. Entities
  * in the system will have one of these,
  */
-trait Property {
-  def choices: Index[String]
-
-  def name: String
-
+case class Property[T](name: String, choices: Index[T]) {
   def arity = choices.size
 
   override def toString = choices.mkString(name + "[", ", ", "]")
@@ -19,12 +15,7 @@ trait Property {
 
 
 object Property {
-  def apply(name: String)(choices: String*):Property = {
-    val c = Index(choices)
-    val n = name
-    new Property {
-      def choices = c
-      def name = n
-    }
+  def apply[T](name: String)(choices: T*):Property[T] = {
+    new Property(name, Index(choices))
   }
 }

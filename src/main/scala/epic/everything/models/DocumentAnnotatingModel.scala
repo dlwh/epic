@@ -8,9 +8,8 @@ import breeze.linalg.DenseVector
  *
  * @author dlwh
  */
-trait DocumentAnnotatingModel extends Model[Document] {
-  type EC = this.ExpectedCounts
-  type Inference <: DocumentAnnotatingInference {type ExpectedCounts = EC }
+trait DocumentAnnotatingModel extends Model[Document] { self =>
+  type Inference <: DocumentAnnotatingInference {type ExpectedCounts = self.ExpectedCounts }
 
   def annotator(weights: DenseVector[Double]): DocumentAnnotator
 }
