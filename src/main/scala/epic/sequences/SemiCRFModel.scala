@@ -17,8 +17,10 @@ import epic.parser.features.StandardSpanFeatures.WordEdges
  * @author dlwh
  */
 class SemiCRFModel[L, W](val featureIndex: Index[Feature],
-                         featurizer: SemiCRFModel.BIEOFeaturizer[L, W],
+                         val featurizer: SemiCRFModel.BIEOFeaturizer[L, W],
                          maxSegmentLength: Int=>Int) extends Model[Segmentation[L, W]] with StandardExpectedCounts.Model {
+  def labelIndex: Index[L] = featurizer.labelIndex
+
   def extractCRF(weights: DenseVector[Double]) = {
     val grammar = inferenceFromWeights(weights)
     new SemiCRF(grammar)
@@ -79,7 +81,11 @@ object SemiCRFModel {
 class SemiCRFInference[L, W](weights: DenseVector[Double],
                              featureIndex: Index[Feature],
                              featurizer: SemiCRFModel.BIEOFeaturizer[L, W],
-                             maxLength: Int=>Int) extends MarginalInference[Segmentation[L, W], SemiCRF.Anchoring[L, W]] with SemiCRF.Grammar[L, W] {
+                             val maxLength: Int=>Int) extends MarginalInference[Segmentation[L, W], SemiCRF.Anchoring[L, W]] with SemiCRF.Grammar[L, W] {
+  def viterbi(sentence: IndexedSeq[W], anchoring: SemiCRF.Anchoring[L, W]) = {
+    SemiCRF.viterbi(new Anchoring(sentence, anchoring))
+  }
+
   type Marginal = SemiCRF.Marginal[L, W]
   type ExpectedCounts = StandardExpectedCounts[Feature]
 
@@ -96,12 +102,16 @@ class SemiCRFInference[L, W](weights: DenseVector[Double],
     m -> m.logPartition
   }
 
-
   override def goldCounts(v: Segmentation[L, W], augment: SemiCRF.Anchoring[L, W]): ExpectedCounts = {
-    val m = SemiCRF.Marginal.goldMarginal[L, W](new Anchoring(v.words, augment), v.segments)
+    val m: SemiCRF.Marginal[L, W] = goldMarginal(v, augment)
     this.countsFromMarginal(v, m, augment)
   }
 
+
+  def goldMarginal(v: Segmentation[L, W], augment: SemiCRF.Anchoring[L, W]): SemiCRF.Marginal[L, W] = {
+    val m = SemiCRF.Marginal.goldMarginal[L, W](new Anchoring(v.words, augment), v.segments)
+    m
+  }
 
   def countsFromMarginal(v: Segmentation[L, W], marg: Marginal, aug: SemiCRF.Anchoring[L, W]): ExpectedCounts = {
     val counts = emptyCounts

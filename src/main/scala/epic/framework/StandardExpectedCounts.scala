@@ -12,6 +12,8 @@ import breeze.util.Index
 case class StandardExpectedCounts[F](var loss: Double,
                                   counts: DenseVector[Double],
                                   index: Index[F]) extends ExpectedCounts[StandardExpectedCounts[F]] {
+  def toObjective: (Double, DenseVector[Double]) = loss -> counts
+
   def +=(that: StandardExpectedCounts[F]): StandardExpectedCounts[F] = {
     this.loss += that.loss; this.counts += that.counts; this
   }

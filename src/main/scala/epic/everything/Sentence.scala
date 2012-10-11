@@ -2,6 +2,8 @@ package epic.everything
 
 import epic.trees.{Span, AnnotatedLabel, Tree}
 import breeze.data.Example
+import epic.sequences.Segmentation
+import collection.mutable.ArrayBuffer
 
 /**
  * represents an annotation ontonotes sentence. Doesn't include raw sentence, for now.
@@ -18,6 +20,27 @@ case class Sentence(docId: String, sentId: Int,
   def length = words.length
   def tree = annotations.tree
   def ner = annotations.ner
+
+  lazy val nerSegmentation: Segmentation[NERType.Value, String]  = {
+    val sorted = ner.toIndexedSeq.sortBy((_: (DSpan, NERType.Value))._1.begin)
+    var out = new ArrayBuffer[(NERType.Value, Span)]()
+    var last = 0
+    for( (dspan, label) <- sorted ) {
+      assert(last <= dspan.begin)
+      while(dspan.begin != last) {
+        out += (NERType.NotEntity -> Span(last,last+1))
+        last += 1
+      }
+      out += (label -> Span(dspan.begin, dspan.end))
+      last = dspan.end
+    }
+    while(words.length != last) {
+      out += (NERType.NotEntity -> Span(last,last+1))
+      last += 1
+    }
+
+    Segmentation(out, words, id)
+  }
   def coref = annotations.coref
 
   def annotate(tree: Tree[AnnotatedLabel] = tree,
@@ -25,6 +48,7 @@ case class Sentence(docId: String, sentId: Int,
                coref: Map[DSpan,Mention] = coref) = {
     copy(annotations=OntoAnnotations(tree,ner,coref))
   }
+
 }
 
 case class DSpan(doc: String, sent: Int, begin: Int, end: Int) {

@@ -3,20 +3,18 @@ package models
 
 import breeze.util.{Encoder, Index}
 import breeze.collection.mutable.TriangularArray
+import collection.immutable.BitSet
 
 /**
  *
- * @param sentenceBeliefs  sentence -> property type (by index) -> SpanBeliefs
+ * @param sentenceBeliefs  sentence -> property type (by index) -> PropertyBeliefs
  *@author dlwh
  */
 case class DocumentBeliefs(spanProperties: Index[Property[_]],
                            wordProperties: Index[Property[_]],
                            sentenceBeliefs: Array[SentenceBeliefs]) {
-  def beliefsForProperty(s: Int, property: Int): SpanBeliefs = {
-    sentenceBeliefs(s)(property)
-  }
-
   def beliefsForSentence(s: Int) = sentenceBeliefs(s)
+
 }
 
 object DocumentBeliefs {
@@ -25,17 +23,76 @@ object DocumentBeliefs {
     new DocumentBeliefs(spanProperties, wordProperties, sentenceBeliefs)
 
   }
+
+  case class Lens(allSpanProperties: Index[Property[_]],
+                  allWordProperties: Index[Property[_]],
+                  narrowSpanProperties: Index[Property[_]],
+                  narrowWordProperties: Index[Property[_]]) {
+    def initialFullBeliefs(document: Document): DocumentBeliefs = {
+      forDocument(allSpanProperties, allWordProperties)(document)
+    }
+
+    val spanMapping = Encoder.fromIndex(narrowSpanProperties).tabulateArray(p => allSpanProperties(p))
+    val wordMapping = Encoder.fromIndex(narrowWordProperties).tabulateArray(p => allWordProperties(p))
+    def slice(allBeliefs: DocumentBeliefs) = {
+      val mapped = allBeliefs.sentenceBeliefs.map(s =>
+        SentenceBeliefs(s.spans.map(span => PropertyBeliefs(spanMapping.map(span.beliefs))),
+          s.words.map(word => PropertyBeliefs(wordMapping.map(word.beliefs)))
+        )
+      )
+      new DocumentBeliefs(narrowSpanProperties, narrowWordProperties, mapped)
+    }
+
+    /**
+     * Merges updated beliefs from projected into allBeliefs, creating a new DocumentBeliefs object.
+     * @param allBeliefs
+     * @param projected
+     */
+    def recombine(allBeliefs: DocumentBeliefs, projected: DocumentBeliefs):DocumentBeliefs = {
+      def patch(fromAll: PropertyBeliefs, fromProjected: PropertyBeliefs, mapping: Array[Int]) = {
+        val result = fromAll.copy(beliefs=fromAll.beliefs.clone)
+        var i = 0
+        while(i <  mapping.size) {
+          result.beliefs(mapping(i)) = fromProjected(i)
+          i += 1
+        }
+        result
+      }
+      val mapped = for( (sa, sp) <- allBeliefs.sentenceBeliefs zip projected.sentenceBeliefs) yield {
+        val spans = TriangularArray.tabulate(sa.words.length){ (b,e) =>
+          val fromAll = sa.spanBeliefs(b,e)
+          if(fromAll == null) null
+          else {
+            patch(fromAll, sp.spanBeliefs(b, e), spanMapping)
+          }
+        }
+        val words = Array.tabulate(sa.words.length){ (w) =>
+          val fromAll = sa.wordBeliefs(w)
+          if(fromAll == null) null
+          else {
+            patch(fromAll, sp.wordBeliefs(w), wordMapping)
+          }
+        }
+        SentenceBeliefs(spans, words)
+      }
+      allBeliefs.copy(sentenceBeliefs=mapped)
+    }
+  }
 }
 
 
-case class SentenceBeliefs(spans: Array[SpanBeliefs], words: Array[WordBeliefs]) {
+case class SentenceBeliefs(spans: TriangularArray[PropertyBeliefs], words: Array[PropertyBeliefs]) {
   def apply(p: Int) = spans(p)
+
+  def wordBeliefs(w: Int) = words(w)
+  def spanBeliefs(beg: Int, end: Int) = spans(beg,end)
 }
 
 object SentenceBeliefs {
   def forSentence(spanProperties: Index[Property[_]], wordProperties: Index[Property[_]])(s: Sentence) = {
-    val forSpans = Array.tabulate(spanProperties.size)(i => SpanBeliefs(i, TriangularArray.fill(s.length)(new Array[Double](spanProperties.get(i).arity))))
-    val forWords = Array.tabulate(wordProperties.size)(i => WordBeliefs(i, Array.fill(s.length)(new Array[Double](wordProperties.get(i).arity))))
+    def beliefs(props: Index[Property[_]]) = PropertyBeliefs(Array.tabulate(props.size)(i => Array.fill(props.get(i).arity)(1.0/props.get(i).arity)))
+    val forSpans = TriangularArray.fill(s.length)(beliefs(spanProperties))
+    val forWords = Array.fill(s.length)(beliefs(wordProperties))
 
     SentenceBeliefs(forSpans, forWords)
   }
@@ -43,22 +100,12 @@ object SentenceBeliefs {
 }
 
 /**
- * (begin, end) triangular index -> value for belief -> score
- * @param prop
+ * property -> value for property -> score
  * @param beliefs
  */
-case class SpanBeliefs(prop: Int, beliefs: TriangularArray[Array[Double]]) {
-  def forSpan(begin: Int, end: Int):Array[Double] = beliefs(begin, end)
-  def apply(begin: Int, end: Int, propValue: Int) = beliefs(begin,end)(propValue)
+case class PropertyBeliefs(beliefs: Array[Array[Double]]) {
+  def apply(property: Int, propValue: Int) = beliefs(property)(propValue)
+  def apply(property:Int) = beliefs(property)
 }
 
 
-/**
- * (begin, end) triangular index -> value for belief -> score
- * @param prop
- * @param beliefs
- */
-case class WordBeliefs(prop: Int, beliefs: Array[Array[Double]]) {
-  def forWord(begin: Int):Array[Double] = beliefs(begin)
-  def apply(begin: Int, propValue: Int) = beliefs(begin)(propValue)
-}

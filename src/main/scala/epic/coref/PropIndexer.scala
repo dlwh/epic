@@ -17,10 +17,10 @@ case class PropIndexer(index: Index[Feature],
                        feat: PairwiseFeaturizer,
                        extractors: IndexedSeq[PropertyExtractor],
                        instances: IndexedSeq[IndexedCorefInstance],
-                       featuresForProperties: Array[IndexedPropertyFeatures]) {
+                       featuresForProperties: Array[IndexedPropertyFeatures[_]]) {
 }
 
-case class IndexedPropertyFeatures(prop: Property, agree: Int, mismatch: Int, pairs: Array[Array[Int]]) {
+case class IndexedPropertyFeatures[T](prop: Property[T], agree: Int, mismatch: Int, pairs: Array[Array[Int]]) {
   def arity = prop.arity
 }
 
@@ -66,7 +66,7 @@ object PropIndexer {
         }
     }))
 
-    new PropIndexer(index, feat, extractors, fixed, featuresForProperties)
+    new PropIndexer(index, feat, extractors, fixed, featuresForProperties.asInstanceOf[Array[IndexedPropertyFeatures[_]]])
   }
 
   private def indexPair(inst: CorefInstance, a: Int, b: Int, feat: PairwiseFeaturizer, index: MutableIndex[Feature]): SparseVector[Double] = {

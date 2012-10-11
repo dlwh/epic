@@ -22,31 +22,6 @@ import epic.everything.DSpan
  */
 object SemiNERPipeline {
 
-  def makeSegmentation(ner: Map[DSpan, NERType.Value],
-                       words: IndexedSeq[String],
-                       id: String): Segmentation[NERType.Value, String]  = {
-    val sorted = ner.toIndexedSeq.sortBy((_: (DSpan, NERType.Value))._1.begin)
-    var out = new ArrayBuffer[(NERType.Value, Span)]()
-    var last = 0
-    for( (dspan, label) <- sorted ) {
-      assert(last <= dspan.begin)
-      while(dspan.begin != last) {
-        out += (NERType.NotEntity -> Span(last,last+1))
-        last += 1
-      }
-      out += (label -> Span(dspan.begin, dspan.end))
-      last = dspan.end
-    }
-    while(words.length != last) {
-      out += (NERType.NotEntity -> Span(last,last+1))
-      last += 1
-    }
-
-    Segmentation(out, words, id)
-  }
-
-
-
   case class Params(path: File,
                     name: String = "eval/ner",
                     nfiles: Int = 100000,
@@ -62,7 +37,7 @@ object SemiNERPipeline {
         file <- params.path.listFiles take params.nfiles
         doc <- ConllOntoReader.readDocuments(file)
         s <- doc.sentences
-      } yield makeSegmentation(s.ner, s.words, s.id)
+      } yield s.nerSegmentation
       val train = instances.take(instances.length * 9 / 10)
       val test = instances.drop(instances.length * 9 / 10)
       (train,test)
