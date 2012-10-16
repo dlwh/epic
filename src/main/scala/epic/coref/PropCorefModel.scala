@@ -9,16 +9,16 @@ import breeze.collection.mutable.TriangularArray
 import collection.mutable.ArrayBuffer
 import collection.immutable.BitSet
 
-class PropModel(propIndexer: PropIndexer, val featureIndex: Index[Feature]) extends Model[IndexedCorefInstance] with StandardExpectedCounts.Model {
-  type Inference = PropInference
+class PropCorefModel(propIndexer: PropIndexer, val featureIndex: Index[Feature]) extends Model[IndexedCorefInstance] with StandardExpectedCounts.Model {
+  type Inference = PropCorefInference
 
   def initialValueForFeature(f: Feature) = 0.0
 
-  def inferenceFromWeights(weights: DenseVector[Double]) = new PropInference(propIndexer, weights)
+  def inferenceFromWeights(weights: DenseVector[Double]) = new PropCorefInference(propIndexer, weights)
 }
 
 
-class PropInference(propIndexer: PropIndexer, weights: DenseVector[Double]) extends GoldGuessInference[IndexedCorefInstance] {
+class PropCorefInference(propIndexer: PropIndexer, weights: DenseVector[Double]) extends GoldGuessInference[IndexedCorefInstance] {
   type ExpectedCounts = StandardExpectedCounts[Feature]
 
   def emptyCounts = StandardExpectedCounts.zero(propIndexer.index)

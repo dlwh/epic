@@ -51,15 +51,7 @@ case class ChainNERInference(inner: SemiCRFInference[NERType.Value, String],
     doc.copy(sentences=newSentences)
   }
 
-  def apply(v1: Document): Document = {
-    apply(v1, baseAugment(v1))
-  }
-
-
-
   // inference methods
-
-
   def goldMarginal(doc: Document, aug: DocumentBeliefs): (Marginal, Double) = {
     val anchorings = beliefsToAnchoring(doc, aug)
     val marginals = for((s,anchoring) <- doc.sentences zip anchorings) yield {

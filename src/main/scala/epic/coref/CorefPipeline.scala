@@ -33,7 +33,7 @@ object CorefPipeline extends App {
   val extractors = Properties.allExtractors
   val indexed = PropIndexer(feat, extractors, instances)
 
-  val model = new PropModel(indexed, indexed.index)
+  val model = new PropCorefModel(indexed, indexed.index)
   val obj = new ModelObjective(model, indexed.instances)
   val cached = new CachedBatchDiffFunction(obj)
 

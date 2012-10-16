@@ -3,7 +3,6 @@ package models
 
 import breeze.util.{Encoder, Index}
 import breeze.collection.mutable.TriangularArray
-import collection.immutable.BitSet
 import breeze.inference.Factor
 import breeze.linalg._
 import breeze.linalg.NumericOps.Arrays._

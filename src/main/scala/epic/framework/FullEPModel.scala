@@ -25,9 +25,9 @@ import breeze.util._
  * @author dlwh
  */
 class FullEPModel[Datum, Augment](maxEPIter: Int, initFeatureValue: Feature => Option[Double],
-                              models: EPModel.CompatibleModel[Datum, Augment]*)(implicit aIsFactor: Augment <:< Factor[Augment]) extends Model[Datum] {
+                              models: FullEPModel.CompatibleModel[Datum, Augment]*)(implicit aIsFactor: Augment <:< Factor[Augment]) extends Model[Datum] {
   type ExpectedCounts = EPExpectedCounts
-  type Inference = EPInference[Datum, Augment]
+  type Inference = FullEPInference[Datum, Augment]
 
   val featureIndex: Index[Feature] = {
     val index = Index[Feature]()
@@ -57,7 +57,7 @@ class FullEPModel[Datum, Augment](maxEPIter: Int, initFeatureValue: Feature => O
       i =>
         models(i).inferenceFromWeights(allWeights(i))
     }
-    new EPInference(builders, maxEPIter)
+    new FullEPInference(builders, maxEPIter)
   }
 
   private def partitionWeights(weights: DenseVector[Double]): Array[DenseVector[Double]] = {
@@ -80,6 +80,9 @@ class FullEPModel[Datum, Augment](maxEPIter: Int, initFeatureValue: Feature => O
   }
 }
 
+object FullEPModel {
+  type CompatibleModel[Datum, Augment] = Model[Datum] { type Inference <: FullProjectableInference[Datum, Augment]}
+}
 
 
 

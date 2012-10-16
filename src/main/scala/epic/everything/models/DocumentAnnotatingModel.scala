@@ -12,4 +12,6 @@ trait DocumentAnnotatingModel extends Model[Document] { self =>
   type Inference <: DocumentAnnotatingInference {type ExpectedCounts = self.ExpectedCounts }
 }
 
-trait DocumentAnnotatingInference extends AugmentableInference[Document, DocumentBeliefs] with DocumentAnnotator
+trait DocumentAnnotatingInference extends AugmentableInference[Document, DocumentBeliefs] with DocumentAnnotator {
+  def apply(doc: Document): Document = apply(doc, baseAugment(doc))
+}
