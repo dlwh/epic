@@ -20,4 +20,5 @@ object Property {
   def apply[T](name: String)(choices: T*):Property[T] = {
     new Property(name, Index(choices))
   }
+
 }

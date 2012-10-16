@@ -8,7 +8,6 @@ import collection.immutable.BitSet
  *
  * @author dlwh
  */
-
 case class IndexedCorefInstance(unindexed: CorefInstance,
                                 goldClusters: IndexedSeq[BitSet],
                                 features: TriangularArray[SparseVector[Double]],

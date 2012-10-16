@@ -31,7 +31,7 @@ final case class RightWordFeature(str: Any) extends Feature
 
 
 
-class WordShapeFeaturizer(wordCounts: Counter[String, Double], minCountUnknown: Int = 5) extends ((Seq[String],Int)=>IndexedSeq[Feature]) {
+class WordShapeFeaturizer(wordCounts: Counter[String, Double], minCountUnknown: Int = 5) extends ((Seq[String],Int)=>IndexedSeq[Feature]) with Serializable {
   import WordShapeFeaturizer._
   val signatureGenerator = EnglishWordClassGenerator
   def featuresFor(words: Seq[String], pos: Int): IndexedSeq[Feature] = {

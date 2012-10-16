@@ -92,13 +92,4 @@ object ConllEval {
 
   }
 
-  private def copyAppend(src: File, dest: File) {
-    import java.io.{FileInputStream,FileOutputStream}
-    val channel = new FileOutputStream(dest, true).getChannel
-    channel.transferFrom(
-      new FileInputStream(src).getChannel,
-      channel.size(), Long.MaxValue )
-    channel.close()
-  }
-
 }

@@ -1,24 +1,28 @@
 package epic.everything
 
 import java.io.File
-import breeze.optimize.FirstOrderMinimizer.OptParams
 import breeze.config.{Configuration, CommandLineParser}
 import epic.ontonotes.ConllOntoReader
-import epic.trees.{Span, TreeInstance, ProcessedTreebank, AnnotatedLabel}
+import epic.trees.AnnotatedLabel
 import epic.parser._
 import epic.parser.projections.{ConstraintAnchoring, ConstraintCoreGrammar}
 import breeze.util.logging.ConsoleLogging
-import epic.parser.projections.ConstraintAnchoring.RawConstraints
 import collection.immutable.BitSet
 import epic.sequences.{SegmentationEval, SegmentationModelFactory, SemiCRFModel, Segmentation}
 import collection.mutable.ArrayBuffer
-import epic.sequences.SemiCRFModel.{BIEOFeaturizer, BIEOAnchoredFeaturizer}
-import breeze.util.Index
-import epic.framework.ModelObjective
+import epic.framework.{FullEPModel, ModelObjective}
 import breeze.collection.mutable.TriangularArray
-import breeze.optimize.CachedBatchDiffFunction
-import epic.trees.annotations.KMAnnotator
+import breeze.optimize.{BatchDiffFunction, CachedBatchDiffFunction}
 import epic.parser.ParserParams.XbarGrammar
+import models._
+import epic.trees.ProcessedTreebank
+import epic.trees.TreeInstance
+import epic.trees.annotations.KMAnnotator
+import breeze.optimize.FirstOrderMinimizer.OptParams
+import epic.sequences.Segmentation
+import epic.trees.Span
+import projections.ConstraintAnchoring.RawConstraints
+import breeze.util.Index
 
 
 object EverythingPipeline {
@@ -43,7 +47,34 @@ object EverythingPipeline {
       (train,test)
     }
 
+    // base models
+    val baseNERModel = new SegmentationModelFactory[NERType.Value](NERType.OutsideSentence).makeModel(train.flatMap(_.sentences).map(_.nerSegmentation))
 
+    // properties
+    val nerProp = Property("NERType", baseNERModel.labelIndex)
+
+    val spanIndex = Index[Property[_]](Iterator(nerProp))
+    val wordIndex = Index[Property[_]]()
+
+    val nerLens = new DocumentBeliefs.Lens(spanIndex, wordIndex, Index[Property[_]](Iterator(nerProp)), wordIndex)
+
+
+    // joint-aware models
+    val nerModel = new ChainNERModel(baseNERModel, nerLens)
+
+    val propBuilder = new PropertyPropagator.Builder(spanIndex, wordIndex)
+
+    val propModel = new PropertyPropagatingModel(propBuilder)
+
+    // the big model!
+    val epModel = new FullEPModel(5, {_ => None}, nerModel, propModel)
+
+    val obj = new ModelObjective(epModel, train)
+
+    val opt = params.opt
+    for( s <- opt.iterations(new CachedBatchDiffFunction(obj), obj.initialWeightVector(randomize = true))) {
+      println(s)
+    }
   }
 }
 
