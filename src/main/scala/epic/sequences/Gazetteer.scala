@@ -7,7 +7,7 @@ import io.{Codec, Source}
  * A Gazeteer is a map from IndexedSeq[W]->L, where the second string is NER type.
  * @author dlwh
  */
-trait Gazetteer[L, W] {
+trait Gazetteer[+L, -W] {
   def lookupWord(w: W):IndexedSeq[L]
   def lookupSpan(w: IndexedSeq[W]):Option[L]
 }

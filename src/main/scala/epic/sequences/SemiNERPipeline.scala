@@ -3,7 +3,7 @@ package epic.sequences
 import java.io._
 import breeze.config.{Configuration, CommandLineParser}
 import epic.ontonotes.ConllOntoReader
-import epic.everything.NERType
+import epic.everything.{Mention, DSpan, NERType}
 import collection.mutable.ArrayBuffer
 import breeze.linalg.DenseVector
 import epic.framework.ModelObjective
@@ -13,7 +13,7 @@ import breeze.data.Example
 import breeze.util.Encoder
 import epic.trees.Span
 import breeze.optimize.FirstOrderMinimizer.OptParams
-import epic.everything.DSpan
+import epic.coref.Phrases
 
 
 /**
@@ -26,6 +26,8 @@ object SemiNERPipeline {
                     name: String = "eval/ner",
                     nfiles: Int = 100000,
                     iterPerEval: Int = 20,
+                    useCorefFeatures: Boolean = false,
+                    useCorefSpans: Boolean = false,
                     opt: OptParams)
 
   def main(args: Array[String]) {
@@ -43,10 +45,45 @@ object SemiNERPipeline {
       (train,test)
     }
 
+    val pronouns = Phrases.pronouns
+
+    val gazetteer = if(params.useCorefFeatures) {
+      val corefHints: Map[IndexedSeq[String], NERType.Value] =  {for {
+        file <- params.path.listFiles take params.nfiles
+        doc <- ConllOntoReader.readDocuments(file)
+        corefClusters: Map[Int, Set[NERType.Value]] = doc.coref.toIndexedSeq[(DSpan, Mention)].groupBy(_._2.id).mapValues(_.map(_._1).flatMap(span => doc.ner.get(span).iterator).toSet)
+        (span, m) <- doc.coref; yd = span.getYield(doc)
+        if yd.length != 1 || !pronouns.contains(yd.head)
+        nertpe <- corefClusters(m.id).headOption.iterator
+      } yield span.getYield(doc) -> nertpe}.toMap
+      new Gazetteer[NERType.Value, String] {
+        def lookupWord(w: String): IndexedSeq[NERType.Value] = IndexedSeq.empty
+
+        def lookupSpan(w: IndexedSeq[String]): Option[NERType.Value] = corefHints.get(w)
+      }
+
+    } else if(params.useCorefSpans) {
+      val corefHints: Set[IndexedSeq[String]] =  {for {
+        file <- params.path.listFiles take params.nfiles
+        doc <- ConllOntoReader.readDocuments(file)
+        corefClusters: Map[Int, Set[NERType.Value]] = doc.coref.toIndexedSeq[(DSpan, Mention)].groupBy(_._2.id).mapValues(_.map(_._1).flatMap(span => doc.ner.get(span).iterator).toSet)
+        (span, m) <- doc.coref; yd = span.getYield(doc)
+        if yd.length != 1 || !pronouns.contains(yd.head)
+        if corefClusters(m.id).nonEmpty
+      } yield span.getYield(doc)}.toSet
+      new Gazetteer[Boolean, String] {
+        def lookupWord(w: String): IndexedSeq[Boolean] = IndexedSeq.empty
+
+        def lookupSpan(w: IndexedSeq[String]): Option[Boolean] = Some(corefHints(w))
+      }
+
+    } else {
+      Gazetteer.ner("en")
+    }
 
 
     // build feature Index
-    val model = new SegmentationModelFactory(NERType.OutsideSentence, gazetteer = Gazetteer.ner("en")).makeModel(train)
+    val model = new SegmentationModelFactory(NERType.OutsideSentence, gazetteer = gazetteer).makeModel(train)
     val obj = new ModelObjective(model, train)
     val cached = new CachedBatchDiffFunction(obj)
 

@@ -201,7 +201,7 @@ class SemiCRFInference[L, W](weights: DenseVector[Double],
 
 
 object SegmentationModelFactory {
-  case class SFeature(w: String, kind: Symbol) extends Feature
+  case class SFeature(w: Any, kind: Symbol) extends Feature
   case class BeginFeature[L](w: Feature, cur: L) extends Feature
   case class EndFeature[L](w: Feature, cur: L) extends Feature
   case class TrigramFeature(a: Any, b: Any, c: Any) extends Feature
@@ -215,7 +215,7 @@ object SegmentationModelFactory {
 }
 
 class SegmentationModelFactory[L](val startSymbol: L,
-                                  gazetteer: Gazetteer[String, String] = Gazetteer.empty[String, String]) {
+                                  gazetteer: Gazetteer[Any, String] = Gazetteer.empty[String, String]) {
 
   import SegmentationModelFactory._
 
@@ -298,7 +298,7 @@ class SegmentationModelFactory[L](val startSymbol: L,
           feats += TrigramFeature(shapes(pos-1), shapes(pos), shapes(pos+1))
           feats += TrigramFeature(classes(pos-1), classes(pos), classes(pos+1))
         }
-//        feats ++= gazetteer.lookupWord(words(pos)).map(SFeature(_, 'WordSeenInSegment))
+        feats ++= gazetteer.lookupWord(words(pos)).map(SFeature(_, 'WordSeenInSegment))
         feats.map(interner.intern _).toArray
       }
 
@@ -309,7 +309,7 @@ class SegmentationModelFactory[L](val startSymbol: L,
 
       def featuresForSpan(start: Int, end: Int):Array[Feature] = {
         val feats = ArrayBuffer[Feature]()
-//        feats ++= gazetteer.lookupSpan(Span(start, end).map(words).toIndexedSeq).map(SFeature(_, 'SegmentKnown))
+        feats ++= gazetteer.lookupSpan(Span(start, end).map(words).toIndexedSeq).map(SFeature(_, 'SegmentKnown))
         if(start < end - 1) {
           feats += WordEdges('Inside, basicFeature(start)(0), basicFeature(end-1)(0))
           feats += WordEdges('Outside, basicFeature(start-1)(0), basicFeature(end)(0))
