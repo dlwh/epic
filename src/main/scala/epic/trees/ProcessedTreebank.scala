@@ -72,7 +72,7 @@ case class ProcessedTreebank(@Help(text="Location of the treebank directory")
     }
   }
 
-  val process = new StandardTreeProcessor(headRules)
+  val process: StandardTreeProcessor = new StandardTreeProcessor(headRules)
 }
 
 

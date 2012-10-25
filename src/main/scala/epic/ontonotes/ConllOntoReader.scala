@@ -95,7 +95,8 @@ object ConllOntoReader {
       val tree = stringTree.extend { t => AnnotatedLabel(t.label) }
       val ner = Map.empty ++ entities.map { case ((beg,end),v) => DSpan(docId,index,beg,end) -> v}
       val coref = Map.empty ++ mentions.map { case ((beg,end),v) => DSpan(docId,index,beg,end) -> v}
-      val annotations = OntoAnnotations(tree, ner, coref)
+      val speaker = s.map(_(9)).find(_ != "-")
+      val annotations = OntoAnnotations(tree, ner, coref, speaker)
 
 
 

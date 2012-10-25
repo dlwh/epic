@@ -6,7 +6,7 @@ import breeze.inference.bp
 import bp.{BeliefPropagation, Variable, Factor}
 import breeze.linalg.DenseVector
 import collection.mutable.ArrayBuffer
-import epic.everything.{DocumentAnnotator, Document}
+import epic.everything.{DocumentAnnotator, ProcessedDocument}
 import breeze.collection.mutable.TriangularArray
 
 /**
@@ -30,14 +30,11 @@ class PropertyPropagatingModel(builder: PropertyPropagator.Builder) extends Docu
 
 
 class PropertyPropagator(builder: PropertyPropagator.Builder,
-                         weights: DenseVector[Double]) extends DocumentAnnotatingInference with FullProjectableInference[Document, DocumentBeliefs] {
+                         weights: DenseVector[Double]) extends DocumentAnnotatingInference with FullProjectableInference[ProcessedDocument, DocumentBeliefs] {
   type ExpectedCounts = epic.framework.StandardExpectedCounts[Feature]
   def emptyCounts = StandardExpectedCounts.zero[Feature](builder.features)
 
-
-  def apply(v1: Document): Document = v1
-
-  def apply(v1: Document, v2: DocumentBeliefs): Document = v1
+  def apply(v1: ProcessedDocument, v2: DocumentBeliefs): ProcessedDocument = v1
 
   case class Marginal(sentences: IndexedSeq[SentenceMarginal])
   case class SentenceMarginal(spans: TriangularArray[bp.BeliefPropagation.Beliefs],
@@ -46,7 +43,7 @@ class PropertyPropagator(builder: PropertyPropagator.Builder,
   val wordModel = builder.words.toBP(weights)
 
 
-  def countsFromMarginal(doc: Document, marg: Marginal, aug: DocumentBeliefs): ExpectedCounts = {
+  def countsFromMarginal(doc: ProcessedDocument, marg: Marginal, aug: DocumentBeliefs): ExpectedCounts = {
     val ec = emptyCounts
      for( (s, marginals) <- doc.sentences zip marg.sentences) {
       if(marginals ne null) {
@@ -84,7 +81,7 @@ class PropertyPropagator(builder: PropertyPropagator.Builder,
   }
 
 
-  def project(v: Document, m: Marginal, oldAugment: DocumentBeliefs): DocumentBeliefs = {
+  def project(v: ProcessedDocument, m: Marginal, oldAugment: DocumentBeliefs): DocumentBeliefs = {
     val sentences = for(s <- m.sentences) yield {
       val wordBeliefs = s.words.map(b => new PropertyBeliefs(b.beliefs.toArray.map(_.data)))
       val spanBeliefs = s.spans.map(b => new PropertyBeliefs(b.beliefs.toArray.map(_.data)))
@@ -95,9 +92,9 @@ class PropertyPropagator(builder: PropertyPropagator.Builder,
     oldAugment.copy(sentenceBeliefs=sentences.toArray)
   }
 
-  def baseAugment(v: Document): DocumentBeliefs = null
+  def baseAugment(v: ProcessedDocument): DocumentBeliefs = null
 
-  def marginal(doc: Document, beliefs: DocumentBeliefs): (Marginal, Double) = {
+  def marginal(doc: ProcessedDocument, beliefs: DocumentBeliefs): (Marginal, Double) = {
     val sentences = for( (s, sentBeliefs) <- doc.sentences zip beliefs.sentenceBeliefs) yield {
       if(sentBeliefs eq null) null
       else {
@@ -132,9 +129,9 @@ class PropertyPropagator(builder: PropertyPropagator.Builder,
   }
 
 
-  def goldMarginal(v: Document, aug: DocumentBeliefs): (Marginal, Double) = marginal(v, aug)
+  def goldMarginal(v: ProcessedDocument, aug: DocumentBeliefs): (Marginal, Double) = marginal(v, aug)
 
-  def projectGold(v: Document, m: Marginal, oldAugment: DocumentBeliefs): DocumentBeliefs = {
+  def projectGold(v: ProcessedDocument, m: Marginal, oldAugment: DocumentBeliefs): DocumentBeliefs = {
     project(v, m, oldAugment)
   }
 }

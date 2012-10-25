@@ -2,38 +2,83 @@ package epic.coref
 import epic.framework._
 import breeze.util.Index
 import breeze.linalg._
-import breeze.numerics._
-import java.util
 import breeze.inference.bp.{BeliefPropagation, Factor, Variable}
-import breeze.collection.mutable.TriangularArray
 import collection.mutable.ArrayBuffer
 import collection.immutable.BitSet
+import epic.everything.DSpan
+import epic.everything.models.{DocumentBeliefs, Property}
 
-class PropCorefModel(propIndexer: PropIndexer, val featureIndex: Index[Feature]) extends Model[IndexedCorefInstance] with StandardExpectedCounts.Model {
+class PropCorefModel(featurizer: PropCorefModel.Featurizer, val featureIndex: Index[Feature]) extends Model[CorefInstance] with StandardExpectedCounts.Model {
   type Inference = PropCorefInference
 
   def initialValueForFeature(f: Feature) = 0.0
 
-  def inferenceFromWeights(weights: DenseVector[Double]) = new PropCorefInference(propIndexer, weights)
+  def inferenceFromWeights(weights: DenseVector[Double]) = new PropCorefInference(featurizer, featureIndex, weights)
+}
+
+object PropCorefModel {
+  trait Featurizer {
+    def properties: IndexedSeq[PropertyFeatures[_]]
+
+    trait Localization {
+      def featuresFor(anaphor: Int, mention: Int):VectorBuilder[Double]
+      def propertyValueFor(mention: Int, prop: Int): Int
+    }
+    def localize(sent: CorefDocument):Localization
+  }
+
+  case class PropertyFeatures[T](prop: Property[T], agree: Int, mismatch: Int, pairs: Array[Array[Int]]) {
+    def arity = prop.arity
+  }
 }
 
 
-class PropCorefInference(propIndexer: PropIndexer, weights: DenseVector[Double]) extends GoldGuessInference[IndexedCorefInstance] {
+class PropCorefInference(featurizer: PropCorefModel.Featurizer,
+                         index: Index[Feature],
+                         weights: DenseVector[Double]) extends FullProjectableInference[CorefInstance, DocumentBeliefs] {
   type ExpectedCounts = StandardExpectedCounts[Feature]
 
-  def emptyCounts = StandardExpectedCounts.zero(propIndexer.index)
+  def emptyCounts = StandardExpectedCounts.zero(index)
 
-  def goldCounts(inst: IndexedCorefInstance) = {
-    val (assignmentVariables: Array[Variable[Int]], propertyVariables: Array[Array[Variable[Int]]]) = makeVariables(inst)
 
-    val clusterFor = new Array[BitSet](inst.numMentions + 1)
-    for(c <- inst.goldClusters; i <- c) {
-      clusterFor(i) = c
+
+  case class Marginal(marginals: BeliefPropagation.Beliefs,
+                      agreementFactors: IndexedSeq[AgreementFactor],
+                      assignmentFactors: IndexedSeq[Factor])
+
+
+  def countsFromMarginal(inst: CorefInstance, marg: Marginal, aug: DocumentBeliefs): ExpectedCounts = {
+    val loc = featurizer.localize(inst)
+    val expCounts = emptyCounts
+    import marg._
+    expCounts.loss = marginals.logPartition
+
+    val clusterMins = BitSet.empty ++ inst.clusters.map(_.min)
+
+    for(i <- 0 until assignmentFactors.length) {
+      val arr = Array(0)
+      if(clusterMins.contains(i))
+        addIntoScale(expCounts.counts, loc.featuresFor(i, i), marginals.beliefs(i)(i))
+      else for(j <- inst.clusterFor(i) if j < i) {
+        arr(0) = j
+        addIntoScale(expCounts.counts, loc.featuresFor(j, i), marginals.beliefs(i)(j))
+      }
     }
 
+    for(f <- agreementFactors) {
+      f.tallyAgreeExpectedCounts(marginals, expCounts.counts)
+    }
+
+    expCounts
+  }
+
+  def goldMarginal(inst: CorefInstance, aug: DocumentBeliefs) = {
+    val loc = featurizer.localize(inst)
+    val (assignmentVariables: Array[Variable[Int]], propertyVariables: Array[Array[Variable[Int]]]) = makeVariables(inst, loc)
+
     // skip factor for 0, since it doesn't get assigned.
-    val assignmentFactors = Array.tabulate[Factor](inst.numMentions) { i_minus_1 =>
-      goldAssignmentFactor(assignmentVariables, i_minus_1 + 1, inst, clusterFor(i_minus_1 + 1))
+    val assignmentFactors = Array.tabulate[Factor](inst.numMentions) { i =>
+      goldAssignmentFactor(assignmentVariables, i, loc, inst.clusterFor(i))
     }
 
     // this ends up being a little inefficient. We can actually
@@ -43,7 +88,7 @@ class PropCorefInference(propIndexer: PropIndexer, weights: DenseVector[Double])
     // TODO: we can set contribution to exp(0) a prior and not need to sum over them... how to
     // do this?
     val agreementFactors = new ArrayBuffer[AgreementFactor]()
-    for(c <- inst.goldClusters; i <- c; j <- c if j < i && j != 0; p <- 0 until propIndexer.featuresForProperties.length) {
+    for(c <- inst.clusters; i <- c; j <- c if j < i && j != 0; p <- 0 until featurizer.properties.length) {
       agreementFactors += agreementFactor(propertyVariables, assignmentVariables, j, i, p)
     }
 
@@ -52,38 +97,21 @@ class PropCorefInference(propIndexer: PropIndexer, weights: DenseVector[Double])
     val model = new breeze.inference.bp.Model(assignmentVariables ++ flattenedProp, assignmentFactors ++ agreementFactors)
     val bp = BeliefPropagation.infer(model)
 
-    val ll = bp.logPartition
-
-    // actually get the expected counts!
-    val expCounts = emptyCounts
-    expCounts.loss = ll
-
-    val clusterMins = BitSet.empty ++ inst.goldClusters.map(_.min)
-
-    for(i_minus_1 <- 0 until assignmentFactors.length) {
-      val i = i_minus_1 + 1
-      val arr = Array(0)
-      if(clusterMins.contains(i))
-        addIntoScale(expCounts.counts, inst.featuresFor(0, i), bp.beliefs(i)(0))
-      else for(j <- clusterFor(i) if j < i) {
-        arr(0) = j
-        addIntoScale(expCounts.counts, inst.featuresFor(j, i), bp.beliefs(i)(j))
-      }
-    }
-
-    for(f <- agreementFactors) {
-      f.tallyAgreeExpectedCounts(bp, expCounts.counts)
-    }
-
-    expCounts
+    new Marginal(bp, agreementFactors, assignmentFactors) -> bp.logPartition
   }
 
-  def guessCounts(inst: IndexedCorefInstance) = {
-    val (assignmentVariables: Array[Variable[Int]], propertyVariables: Array[Array[Variable[Int]]]) = makeVariables(inst)
+
+  def project(v: CorefInstance, m: Marginal, oldAugment: DocumentBeliefs): DocumentBeliefs = error("TODO")
+
+  def baseAugment(v: CorefInstance): DocumentBeliefs = null
+
+  def marginal(inst: CorefInstance, aug: DocumentBeliefs): (Marginal, Double) = {
+    val loc = featurizer.localize(inst)
+    val (assignmentVariables: Array[Variable[Int]], propertyVariables: Array[Array[Variable[Int]]]) = makeVariables(inst, loc)
 
     // skip factor for 0, since it doesn't get assigned.
-    val assignmentFactors = Array.tabulate[Factor](inst.numMentions) { i_minus_1 =>
-      assignmentFactor(assignmentVariables, i_minus_1 + 1, inst)
+    val assignmentFactors = Array.tabulate[Factor](inst.numMentions) { i =>
+      assignmentFactor(assignmentVariables, i, loc)
     }
 
     // this ends up being a little inefficient. We can actually
@@ -94,7 +122,7 @@ class PropCorefInference(propIndexer: PropIndexer, weights: DenseVector[Double])
     // do this?
 
     val agreementFactors = new ArrayBuffer[AgreementFactor]()
-    for(i <- 1 to inst.numMentions; j <- 1 until i; p <- 0 until propIndexer.featuresForProperties.length) {
+    for(i <- 0 until inst.numMentions; j <- 0 to i; p <- 0 until featurizer.properties.length) {
       agreementFactors += agreementFactor(propertyVariables, assignmentVariables, j, i, p)
     }
 
@@ -103,77 +131,35 @@ class PropCorefInference(propIndexer: PropIndexer, weights: DenseVector[Double])
     val model = new breeze.inference.bp.Model(assignmentVariables ++ flattenedProp, assignmentFactors ++ agreementFactors)
     val bp = BeliefPropagation.infer(model)
 
-    val ll = bp.logPartition
-
-    // actually get the expected counts!
-    val expCounts = emptyCounts
-    expCounts.loss = ll
-
-    for(i_minus_1 <- 0 until assignmentFactors.length) {
-      val i = i_minus_1 + 1
-      val arr = Array(0)
-      for(j <- 0 until i) {
-        arr(0) = j
-        addIntoScale(expCounts.counts, inst.featuresFor(j, i), bp.beliefs(i)(j))
-      }
-    }
-
-    for(f <- agreementFactors) {
-      f.tallyAgreeExpectedCounts(bp, expCounts.counts)
-    }
-
-    expCounts
+    new Marginal(bp, agreementFactors, assignmentFactors) -> bp.logPartition
   }
 
 
-  private def makeVariables(inst: IndexedCorefInstance): (Array[Variable[Int]], Array[Array[Variable[Int]]]) = {
+  private def makeVariables(inst: CorefInstance, loc: featurizer.Localization): (Array[Variable[Int]], Array[Array[Variable[Int]]]) = {
     // assignmentVariables
-    val aV: Array[Variable[Int]] = Array.tabulate(inst.numMentions + 1)(i => if (i == 0) Variable(0 to 0) else Variable(0 until i))
+    val aV: Array[Variable[Int]] = Array.tabulate(inst.numMentions + 1)(i => Variable(0 to i))
     // propertyVariables
-    val pV: Array[Array[Variable[Int]]] = Array.tabulate(inst.numMentions + 1, propIndexer.featuresForProperties.length) {
+    val pV: Array[Array[Variable[Int]]] = Array.tabulate(inst.numMentions, featurizer.properties.length) {
       (i, pi) =>
-        if (i == 0) null
-        else {
-          val assignment = inst.properties(i)(pi)
-          if (assignment == -1)
-            Variable(0 until propIndexer.featuresForProperties(pi).arity)
-          else
-            Variable(assignment to assignment)
-        }
+        val assignment = loc.propertyValueFor(i, pi)
+        if (assignment == -1)
+          Variable(0 until featurizer.properties(pi).arity)
+        else
+          Variable(assignment to assignment)
     }
 
     (aV, pV)
   }
 
-  def decode(inst: IndexedCorefInstance) : IndexedSeq[Set[MentionCandidate]] = {
-    val (assignmentVariables: Array[Variable[Int]], propertyVariables: Array[Array[Variable[Int]]]) = makeVariables(inst)
+  def decode(inst: CorefInstance, aug: DocumentBeliefs) : IndexedSeq[Set[DSpan]] = {
+    val marg: Marginal = marginal(inst, aug)._1
+    import marg._
 
-    // skip factor for 0, since it doesn't get assigned.
-    val assignmentFactors = Array.tabulate[Factor](inst.numMentions) { i_minus_1 =>
-      assignmentFactor(assignmentVariables, i_minus_1 + 1, inst)
-    }
-
-    // this ends up being a little inefficient. We can actually
-    // have 1 big factor with all properties of a given type,
-    // and only visit certain assignments, but the bp framework
-    // doesn't support that yet.
-    // TODO: we can set contribution to exp(0) a prior and not need to sum over them... how to
-    // do this?
-    val agreementFactors = new ArrayBuffer[Factor]()
-    for(i <- 1 to inst.numMentions; j <- 1 until i; p <- 0 until propIndexer.featuresForProperties.length) {
-      agreementFactors += agreementFactor(propertyVariables, assignmentVariables, j, i, p)
-    }
-
-    val flattenedProp = propertyVariables.flatten.filter(_ ne null)
-
-    val model = new breeze.inference.bp.Model(assignmentVariables ++ flattenedProp, assignmentFactors ++ agreementFactors)
-    val bp = BeliefPropagation.infer(model)
-
-    val links = Array.fill(inst.numMentions + 1)(null: collection.mutable.BitSet)
+    val links = Array.fill(inst.numMentions)(null: collection.mutable.BitSet)
     val trueClusters = ArrayBuffer[collection.mutable.BitSet]()
-    for (i <- 1 to inst.numMentions) {
-      val link = bp.beliefs(i).argmax
-      if (link == 0) {
+    for (i <- 0 until inst.numMentions) {
+      val link = marginals.beliefs(i).argmax
+      if (link == i) {
         links(i) = collection.mutable.BitSet(i)
         trueClusters += links(i)
       } else {
@@ -184,27 +170,27 @@ class PropCorefInference(propIndexer: PropIndexer, weights: DenseVector[Double])
 
     {
       for (cluster <- trueClusters) yield {
-        for (i <- cluster) yield inst.unindexed.mentions(i - 1)
+        for (i <- cluster) yield inst.mentions(i)
       }.toSet
     }.toIndexedSeq
 
   }
 
-  def assignmentFactor(assignmentVariables: Array[Variable[Int]], i: Int, inst: IndexedCorefInstance): Factor = {
+  def assignmentFactor(assignmentVariables: Array[Variable[Int]], i: Int, loc: featurizer.Localization): Factor = {
     val variable = assignmentVariables(i)
     new Factor {
       val variables = IndexedSeq(variable)
 
       def logApply(assignments: Array[Int]) = {
         val j = assignments(0)
-        weights dot inst.featuresFor(j, i)
+        weights dot loc.featuresFor(j, i)
       }
     }
   }
 
 
   def goldAssignmentFactor(assignmentVariables: Array[Variable[Int]], i: Int,
-                           inst: IndexedCorefInstance, cluster: BitSet): Factor = {
+                           loc: featurizer.Localization, cluster: BitSet): Factor = {
     val variable = assignmentVariables(i)
     val i_is_min = cluster.min == i
     new Factor {
@@ -212,7 +198,7 @@ class PropCorefInference(propIndexer: PropIndexer, weights: DenseVector[Double])
 
       def logApply(assignments: Array[Int]) = {
         val j = assignments(0)
-        weights dot inst.featuresFor(j, i)
+        weights dot loc.featuresFor(j, i)
       }
 
       override def foreachAssignment(f: (Array[Int]) => Any) {
@@ -227,9 +213,14 @@ class PropCorefInference(propIndexer: PropIndexer, weights: DenseVector[Double])
     }
   }
 
+
+  def projectGold(v: CorefInstance, m: Marginal, oldAugment: DocumentBeliefs): DocumentBeliefs = {
+    project(v, m, oldAugment)
+  }
+
   case class AgreementFactor(p: Int, p_j: Variable[Int], p_i: Variable[Int], a_i: Variable[Int], j: Int) extends Factor {
-    val w_agree = weights(propIndexer.featuresForProperties(p).agree)
-    val w_disagree = weights(propIndexer.featuresForProperties(p).mismatch)
+    val w_agree = weights(featurizer.properties(p).agree)
+    val w_disagree = weights(featurizer.properties(p).mismatch)
 
     val variables = IndexedSeq(p_j, p_i, a_i)
 
@@ -240,7 +231,7 @@ class PropCorefInference(propIndexer: PropIndexer, weights: DenseVector[Double])
         val p_j_ass = p_j.domain.get(assignments(0))
         val p_i_ass = p_i.domain.get(assignments(1))
         val base = if (p_j_ass == p_i_ass) w_agree else w_disagree
-        base + weights(propIndexer.featuresForProperties(p).pairs(p_j_ass)(p_i_ass))
+        base + weights(featurizer.properties(p).pairs(p_j_ass)(p_i_ass))
       }
     }
 
@@ -254,10 +245,10 @@ class PropCorefInference(propIndexer: PropIndexer, weights: DenseVector[Double])
 
           val prob = marg(assignments)
           if (p_j_ass == p_i_ass)
-            expCounts(propIndexer.featuresForProperties(p).agree) += prob
+            expCounts(featurizer.properties(p).agree) += prob
           else
-            expCounts(propIndexer.featuresForProperties(p).mismatch) += prob
-          expCounts(propIndexer.featuresForProperties(p).pairs(p_j_ass)(p_i_ass)) += prob
+            expCounts(featurizer.properties(p).mismatch) += prob
+          expCounts(featurizer.properties(p).pairs(p_j_ass)(p_i_ass)) += prob
         }
       }
     }
@@ -271,20 +262,21 @@ class PropCorefInference(propIndexer: PropIndexer, weights: DenseVector[Double])
     AgreementFactor(p, p_j, p_i, a, j)
   }
 
-  private def addIntoScale(v: DenseVector[Double], sv: SparseVector[Double], scale: Double) {
-        if (scale != 0) {
-          var i = 0
+  private def addIntoScale(v: DenseVector[Double], sv: VectorBuilder[Double], scale: Double) {
+    if (scale != 0) {
+      var i = 0
       val bi = sv.index
       val bd = sv.data
       val ad = v.data
       val aoff = v.offset
       val astride = v.stride
-      while (i < sv.used) {
+      while (i < sv.activeSize) {
         ad(aoff + astride * bi(i)) += bd(i) * scale
         i += 1
       }
     }
   }
+
 
 }
 

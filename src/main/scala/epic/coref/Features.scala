@@ -40,5 +40,5 @@ case object SpanContained extends Feature
 case class PropertyAgreementFeature(name: String) extends Feature
 
 case class PropertyMismatchFeature(name: String) extends Feature
-case class PropertyFeature(name: String, a: String, b: String) extends Feature
+case class PropertyFeature(name: String, a: Any, b: Any) extends Feature
 

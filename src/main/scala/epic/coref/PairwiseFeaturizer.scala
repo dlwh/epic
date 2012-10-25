@@ -1,6 +1,6 @@
 package epic.coref
-package pairwise
 
+import epic.everything.DSpan
 import breeze.linalg.Counter
 import epic.framework.Feature
 import breeze.text.analyze.PorterStemmer
@@ -10,39 +10,42 @@ import breeze.text.analyze.PorterStemmer
  * @author dlwh
  */
 trait PairwiseFeaturizer {
-  def featuresFor(a: MentionCandidate, b: MentionCandidate, context: IndexedSeq[IndexedSeq[String]]): Counter[Feature, Double]
+  def featuresFor(a: DSpan, b: DSpan, context: CorefDocument): Counter[Feature, Double]
 
-  def featuresForRoot(a: MentionCandidate, context: IndexedSeq[IndexedSeq[String]]): Counter[Feature, Double]
+  def featuresForRoot(a: DSpan, context: CorefDocument): Counter[Feature, Double]
 }
 
+
 class SimplePairwiseFeaturizer extends PairwiseFeaturizer {
-  def featuresFor(a: MentionCandidate,
-                  b: MentionCandidate,
-                  context: IndexedSeq[IndexedSeq[String]]): Counter[Feature, Double] = {
+  def featuresFor(a: DSpan,
+                  b: DSpan,
+                  context: CorefDocument): Counter[Feature, Double] = {
     val res = Counter[Feature, Double]()
 
-    val tpeA = mentionType(a)
-    val tpeB = mentionType(b)
+    val tpeA = mentionType(a, context)
+    val tpeB = mentionType(b, context)
     val typeFeature = PairFeature(tpeA, tpeB)
     res(typeFeature) = 1.0
 
     // exact match
-    if(a.words == b.words) {
+    val aWords = a.getYield(context.words)
+    val bWords = b.getYield(context.words)
+    if(aWords == bWords) {
       res(PairFeature(typeFeature, ExactStringMatch)) = 1.0
     }
 
-    val aLower = a.words.map(_.toLowerCase)
-    val bLower = b.words.map(_.toLowerCase)
+    val aLower = aWords.map(_.toLowerCase)
+    val bLower = bWords.map(_.toLowerCase)
     if(aLower == bLower) {
       res(PairFeature(typeFeature, LowerStringMatch)) = 1.0
     }
 
-    val aLSet = a.words.toSet
-    val bLSet = b.words.toSet
+    val aLSet = aWords.toSet
+    val bLSet = bWords.toSet
 
     // head match
-    val headA = semHead(a.words)
-    val headB = semHead(b.words)
+    val headA = semHead(aWords)
+    val headB = semHead(bWords)
     if(headA == headB) {
       res(PairFeature(HeadMatch, typeFeature)) = 1.0
     } else if (PorterStemmer(headA) == PorterStemmer(headB)) {
@@ -56,14 +59,14 @@ class SimplePairwiseFeaturizer extends PairwiseFeaturizer {
     }
 
     // hack to get coordinate:
-    if(a.words.contains("and") || a.words.contains("both")) {
+    if(aWords.contains("and") || aWords.contains("both")) {
       if(tpeB == 'Pronoun)
         res(PairFeature(CoordinationL,headB)) = 1.0
       else tpeB
         res(PairFeature(CoordinationL,typeFeature)) = 1.0
     }
 
-    if(b.words.contains("and") || b.words.contains("both")) {
+    if(bWords.contains("and") || bWords.contains("both")) {
       if(tpeA == 'Pronoun)
         res(PairFeature(CoordinationR,headA)) = 1.0
       else tpeA
@@ -73,8 +76,8 @@ class SimplePairwiseFeaturizer extends PairwiseFeaturizer {
 
     // string match
     if(tpeA != 'Pronoun && tpeB != 'Pronoun) {
-      val aSet = a.words.toSet
-      val bSet = b.words.toSet
+      val aSet = aWords.toSet
+      val bSet = bWords.toSet
       val inter = (aSet & bSet)
       res(PartialStringMatch('Jacard)) = inter.size.toDouble / (aSet | bSet).size
 
@@ -120,18 +123,20 @@ class SimplePairwiseFeaturizer extends PairwiseFeaturizer {
     res
   }
 
-  def featuresForRoot(a: MentionCandidate, context: IndexedSeq[IndexedSeq[String]]): Counter[Feature, Double] = {
+  def featuresForRoot(a: DSpan, context: CorefDocument): Counter[Feature, Double] = {
     val res = Counter[Feature, Double]()
-    res(PairFeature('Root, mentionType(a))) = 1.0
-    res(PairFeature(PairFeature('Root, mentionType(a)),SentenceDistance(binnedSentenceDistance(0, a.sentence)))) = 1.0
+    val mt = mentionType(a, context)
+    res(PairFeature('Root, mt)) = 1.0
+    res(PairFeature(PairFeature('Root, mt),SentenceDistance(binnedSentenceDistance(0, a.sentence)))) = 1.0
 
 
     res
   }
 
-  def mentionType(a: MentionCandidate) = {
-    if (a.words.length == 1 && isPronoun(a.words(0))) 'Pronoun
-    else if (a.words(0)(0).isUpper) 'Proper
+  def mentionType(a: DSpan, context: CorefDocument) = {
+    val awords = a.getYield(context.words)
+    if (awords.length == 1 && isPronoun(awords(0))) 'Pronoun
+    else if (awords(0)(0).isUpper) 'Proper
     else 'Nominal
   }
 

@@ -3,7 +3,7 @@ package epic.coref
 import java.io.{PrintStream, FileOutputStream, File}
 import io.{Codec, Source}
 import collection.mutable.ArrayBuffer
-import epic.everything.Document
+import epic.everything.{DSpan, Document}
 
 /**
  *
@@ -17,7 +17,7 @@ object ConllEval {
    * @param prefix prefix of path names
    * @param docs
    */
-  def evaluate(prefix: String, docs: IndexedSeq[(Document,Seq[Set[MentionCandidate]])]) = {
+  def evaluate(prefix: String, docs: IndexedSeq[(Document,Seq[Set[DSpan]])]) {
     val goldOutF = new File(prefix + "_gold")
     val guessOutF = new File(prefix + "_guess")
     goldOutF.getParentFile.mkdirs()

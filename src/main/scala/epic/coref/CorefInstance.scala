@@ -1,61 +1,55 @@
 package epic.coref
 
-import epic.everything.Document
-import epic.trees.Span
-import breeze.data.{Observation, Example}
+import collection.immutable.BitSet
+import epic.everything.{Document, DSpan}
+
 
 /**
- *
+ * 
  * @author dlwh
  */
-case class CorefInstance(id: String,
-                         doc: Document,
-                         clusters: Set[Set[MentionCandidate]],
-                         mentions: IndexedSeq[MentionCandidate],
-                         words: IndexedSeq[IndexedSeq[String]]) extends CorefDocument with Example[Set[Set[MentionCandidate]], (IndexedSeq[MentionCandidate],IndexedSeq[IndexedSeq[String]])] {
+case class CorefInstance(doc: Document,
+                         mentions: IndexedSeq[DSpan],
+                         clusters: Set[BitSet],
+                         reverseClusters: IndexedSeq[BitSet], // mention -> cluster
+                         speaker: IndexedSeq[Option[String]]) extends CorefDocument {
+  def words = doc.words
+  def unindexedClusters: Iterable[Set[DSpan]] = clusters.map(_.map(mentions))
+
+  def clusterFor(m: Int) = reverseClusters(m)
+
   def numMentions = mentions.length
-
-  def label = clusters
-
-  def wordsForMention(m: (Int, Span)) = m._2 map words(m._1)
 }
 
 
 object CorefInstance {
-  def fromDocument(doc: Document) = {
-    val allMentions = for {
-       (s, sI) <- doc.sentences.zipWithIndex
-       (dspan,m) <- s.coref
-    } yield (m.id, MentionCandidate(sI, dspan.span, dspan.span map s.words))
-    val grouped = (
-      allMentions.toSet[(Int, MentionCandidate)]
-        .groupBy(_._1)
-        .mapValues( set => set.map(_._2) )
-        .values.toSet)
-    CorefInstance(doc.id + "-coref", doc,
-      grouped,
-      allMentions.map(_._2),
-      doc.sentences.map(_.words))
-  }
-}
+  class Factory(mentionDetector: Document=>IndexedSeq[DSpan]) {
+    def apply(doc: Document) = {
+      val mentions = mentionDetector(doc)
+      val (coreferent, singletons) = (0 until mentions.length).partition(i => doc.coref.contains(mentions(i)))
+
+      val clusters = collection.mutable.Set[BitSet]()
+      clusters ++= singletons.map(BitSet(_))
+      clusters ++= coreferent.groupBy(i => doc.coref(mentions(i))).values.map(BitSet.empty ++ _)
 
 
-trait CorefDocument extends Observation[(IndexedSeq[MentionCandidate],IndexedSeq[IndexedSeq[String]])] {
-  def mentions: IndexedSeq[MentionCandidate]
-  def words: IndexedSeq[IndexedSeq[String]]
+      val clusterFor = new Array[BitSet](mentions.length)
+      for(c <- clusters; i <- c) {
+        clusterFor(i) = c
+      }
 
-  def features = mentions -> words
-}
-
-object CorefDocument {
-  def apply(id: String, mentions: IndexedSeq[MentionCandidate], words: IndexedSeq[IndexedSeq[String]]):CorefDocument = {
-    val i = id
-    val m = mentions
-    val w = words
-    new CorefDocument {
-      def mentions = m
-      def words = w
-      def id = i
+      CorefInstance(doc, mentions, clusters.toSet, clusterFor, doc.sentences.map(_.speaker))
     }
+
   }
+
+  val goldMentions = {(doc: Document) => doc.coref.keys.toIndexedSeq.sorted}
 }
+
+
+trait CorefDocument {
+  def words: IndexedSeq[IndexedSeq[String]]
+  def mentions: IndexedSeq[DSpan]
+  def speaker: IndexedSeq[Option[String]]
+}
+

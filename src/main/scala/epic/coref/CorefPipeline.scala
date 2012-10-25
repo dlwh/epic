@@ -2,7 +2,7 @@ package epic.coref
 
 import java.io.File
 import breeze.config.{Configuration, CommandLineParser}
-import epic.everything.Document
+import epic.everything.{DSpan, Document}
 import epic.ontonotes.ConllOntoReader
 import breeze.linalg.DenseVector
 import epic.framework.{ModelObjective, Feature}
@@ -22,25 +22,24 @@ object CorefPipeline extends App {
   val (baseConfig, files) = CommandLineParser.parseArguments(args)
   val config = baseConfig backoff Configuration.fromPropertiesFiles(files.map(new File(_)))
   val params = config.readIn[Params]("")
+
+  val instanceFactory = new CorefInstance.Factory(CorefInstance.goldMentions)
+
   val instances = for {
     file <- params.path.listFiles take params.nfiles
     doc <- ConllOntoReader.readDocuments(file)
-  } yield CorefInstance.fromDocument(doc)
-
+  } yield instanceFactory(doc)
 
 
   val feat = new SimplePairwiseFeaturizer
   val extractors = Properties.allExtractors
-  val indexed = PropIndexer(feat, extractors, instances)
+  val model = new PropCorefModelFactory(feat, extractors).makeModel(instances)
 
-  val model = new PropCorefModel(indexed, indexed.index)
-  val obj = new ModelObjective(model, indexed.instances)
+  val obj = new ModelObjective(model, instances)
   val cached = new CachedBatchDiffFunction(obj)
 
-
-
-  println(indexed.index)
-  val init = OptParams(useStochastic=true, batchSize=25, tolerance=1E-3, maxIterations = 100).minimize(cached, DenseVector.rand(indexed.index.size) * 2.0 - 1.0)
+  println(model.featureIndex)
+  val init = OptParams(useStochastic=true, batchSize=25, tolerance=1E-3, maxIterations = 100).minimize(cached, obj.initialWeightVector(randomize = true))
   val optimum =  OptParams(useStochastic = false, tolerance = 1E-3).minimize(cached, init)
   val inference = model.inferenceFromWeights(optimum)
 
@@ -48,32 +47,32 @@ object CorefPipeline extends App {
   var allResults = Stats(0, 0, 0)
 
 
-  var output = new ArrayBuffer[(Document,Seq[Set[MentionCandidate]])]
-  for(i <- indexed.instances) {
+  var output = new ArrayBuffer[(Document,Seq[Set[DSpan]])]
+  for(i <- instances) {
     println("=================")
     println("Text: ")
-    i.unindexed.words foreach { s => println(s.mkString(" "))}
+    i.words foreach { s => println(s.mkString(" "))}
     println("Gold: ")
-    for(cluster <- sortClusters(i.unindexed.clusters)) {
+    for(cluster <- sortClusters(i.unindexedClusters)) {
       println(formatCluster(cluster))
     }
     println("Guess: ")
-    val guess = inference.decode(i)
+    val guess = inference.decode(i, inference.baseAugment(i))
     for(cluster <- sortClusters(guess)) {
       println(formatCluster(cluster))
     }
 
-    output += (i.unindexed.doc -> guess)
+    output += (i.doc -> guess)
 
 
-    val results = eval(i.unindexed.clusters.toIndexedSeq, guess)
+    val results = eval(i.unindexedClusters.toIndexedSeq, guess)
     println(results)
     allResults += results
   }
   println("=================")
 
   println("Weights: ")
-  for( (f,v) <- Encoder.fromIndex(indexed.index).decode(optimum).iterator.toIndexedSeq[(Feature, Double)].sortBy(_._2)) {
+  for( (f,v) <- Encoder.fromIndex(model.featureIndex).decode(optimum).iterator.toIndexedSeq[(Feature, Double)].sortBy(_._2)) {
     println(v + " " + f)
   }
   println("=================")
@@ -94,7 +93,7 @@ object CorefPipeline extends App {
     }
   }
 
-  def eval(gold: IndexedSeq[Set[MentionCandidate]], guess: IndexedSeq[Set[MentionCandidate]]) = {
+  def eval(gold: IndexedSeq[Set[DSpan]], guess: IndexedSeq[Set[DSpan]]) = {
     val pairsGold = getCoreferentPairs(gold)
     val pairsGuess = getCoreferentPairs(guess)
 
@@ -109,15 +108,15 @@ object CorefPipeline extends App {
     Stats(pairsGold.toSet & pairsGuess.toSet size, pairsGold.size, pairsGuess.size)
   }
 
-  def sortClusters(clusters: Iterable[Set[MentionCandidate]]):IndexedSeq[Set[MentionCandidate]] = {
-    clusters.toIndexedSeq[Set[MentionCandidate]].sortBy(_.min)
+  def sortClusters(clusters: Iterable[Set[DSpan]]):IndexedSeq[Set[DSpan]] = {
+    clusters.toIndexedSeq[Set[DSpan]].sortBy(_.min)
   }
 
-  def formatCluster(set: Set[MentionCandidate]) = {
-    set.toIndexedSeq[MentionCandidate].sorted.mkString(", ")
+  def formatCluster(set: Set[DSpan]) = {
+    set.toIndexedSeq[DSpan].sorted.mkString(", ")
   }
 
-  def getCoreferentPairs(clusters: IndexedSeq[Set[MentionCandidate]]): IndexedSeq[(MentionCandidate, MentionCandidate)] = {
+  def getCoreferentPairs(clusters: IndexedSeq[Set[DSpan]]): IndexedSeq[(DSpan, DSpan)] = {
     for {
       cluster <- clusters
       cc = cluster.toIndexedSeq

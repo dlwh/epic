@@ -23,10 +23,12 @@ import epic.sequences.Segmentation
 import epic.trees.Span
 import projections.ConstraintAnchoring.RawConstraints
 import breeze.util.Index
+import epic.coref.{CorefInstance, Properties, SimplePairwiseFeaturizer, PropCorefModelFactory}
 
 
 object EverythingPipeline {
   case class Params(path: File,
+                    treebank: ProcessedTreebank,
                     nfiles: Int = 100000,
                     iterPerEval: Int = 20,
                     constraints: ParserParams.Constraints[AnnotatedLabel, String],
@@ -47,29 +49,49 @@ object EverythingPipeline {
       (train,test)
     }
 
-    // base models
-    val baseNERModel = new SegmentationModelFactory[NERType.Value](NERType.OutsideSentence).makeModel(train.flatMap(_.sentences).map(_.nerSegmentation))
+    val mentionDetector = CorefInstance.goldMentions
+    val corefInstanceFactory = new CorefInstance.Factory(mentionDetector)
+    val docProcessor = new ProcessedDocument.Factory(params.treebank.process, corefInstanceFactory)
 
-    // properties
-    val nerProp = Property("NERType", baseNERModel.labelIndex)
+    /////////////////
+    // base models///
+    /////////////////
+    // NER
+    val nerModel = new SegmentationModelFactory[NERType.Value](NERType.OutsideSentence).makeModel(train.flatMap(_.sentences).map(_.nerSegmentation))
+      // NERProperties
+    val nerProp = Property("NER::Type", nerModel.labelIndex)
 
-    val spanIndex = Index[Property[_]](Iterator(nerProp))
+    // Coref
+    val corefNerProp = nerProp.copy(name = "Coref::NER") // own copy of corefNer, since we're using soft agreement.
+    val corefExtractors = Properties.allExtractors :+ Properties.alwaysUnobservedExtractor(corefNerProp)
+    val corefProperties = corefExtractors.map(_.property)
+    val corefModel = new PropCorefModelFactory(new SimplePairwiseFeaturizer, corefExtractors).makeModel(train.map(corefInstanceFactory(_)))
+
+
+    // propagation
+
+    val spanIndex = Index[Property[_]](Iterator(nerProp) ++ corefProperties)
     val wordIndex = Index[Property[_]]()
 
+    // lenses
     val nerLens = new DocumentBeliefs.Lens(spanIndex, wordIndex, Index[Property[_]](Iterator(nerProp)), wordIndex)
-
+    val corefLens = new DocumentBeliefs.Lens(spanIndex, wordIndex, Index[Property[_]](corefProperties), wordIndex)
 
     // joint-aware models
-    val nerModel = new ChainNERModel(baseNERModel, nerLens)
+    val adaptedNerModel = new ChainNERModel(nerModel, nerLens)
+    val adaptedCorefModel = new CorefModelAdaptor(corefModel, corefLens)
 
     val propBuilder = new PropertyPropagator.Builder(spanIndex, wordIndex)
+    propBuilder.spans.associate(nerProp, corefNerProp, agreement = true)
 
     val propModel = new PropertyPropagatingModel(propBuilder)
 
     // the big model!
-    val epModel = new FullEPModel(5, {_ => None}, nerModel, propModel)
+    val epModel = new FullEPModel[ProcessedDocument, DocumentBeliefs](5, {_ => None}, adaptedNerModel,
+    adaptedCorefModel,
+    propModel)
 
-    val obj = new ModelObjective(epModel, train)
+    val obj = new ModelObjective(epModel, train.map(docProcessor))
 
     val opt = params.opt
     for( s <- opt.iterations(new CachedBatchDiffFunction(obj), obj.initialWeightVector(randomize = true))) {

@@ -38,23 +38,23 @@ case class DocumentBeliefs(spanProperties: Index[Property[_]],
 }
 
 object DocumentBeliefs {
-  def forDocument(spanProperties: Index[Property[_]], wordProperties: Index[Property[_]])(document: Document) = {
+  def forDocument(spanProperties: Index[Property[_]], wordProperties: Index[Property[_]])(document: ProcessedDocument) = {
     val sentenceBeliefs = document.sentences.map(SentenceBeliefs.forSentence(spanProperties, wordProperties)(_)).toArray
     new DocumentBeliefs(spanProperties, wordProperties, sentenceBeliefs)
-
   }
 
   case class Lens(allSpanProperties: Index[Property[_]],
                   allWordProperties: Index[Property[_]],
                   narrowSpanProperties: Index[Property[_]],
                   narrowWordProperties: Index[Property[_]]) {
-    def initialFullBeliefs(document: Document): DocumentBeliefs = {
+    def initialFullBeliefs(document: ProcessedDocument): DocumentBeliefs = {
       forDocument(allSpanProperties, allWordProperties)(document)
     }
 
     val spanMapping = Encoder.fromIndex(narrowSpanProperties).tabulateArray(p => allSpanProperties(p))
     val wordMapping = Encoder.fromIndex(narrowWordProperties).tabulateArray(p => allWordProperties(p))
     def slice(allBeliefs: DocumentBeliefs) = {
+      assert(allBeliefs.spanProperties eq allSpanProperties)
       val mapped = allBeliefs.sentenceBeliefs.map(s =>
         SentenceBeliefs(s.spans.map(span => PropertyBeliefs(spanMapping.map(span.beliefs))),
           s.words.map(word => PropertyBeliefs(wordMapping.map(word.beliefs)))
@@ -142,7 +142,7 @@ case class SentenceBeliefs(spans: TriangularArray[PropertyBeliefs], words: Array
 }
 
 object SentenceBeliefs {
-  def forSentence(spanProperties: Index[Property[_]], wordProperties: Index[Property[_]])(s: Sentence) = {
+  def forSentence(spanProperties: Index[Property[_]], wordProperties: Index[Property[_]])(s: ProcessedSentence) = {
     def beliefs(props: Index[Property[_]]) = PropertyBeliefs(Array.tabulate(props.size)(i => Array.fill(props.get(i).arity)(1.0/props.get(i).arity)))
     val forSpans = TriangularArray.fill(s.length)(beliefs(spanProperties))
     val forWords = Array.fill(s.length)(beliefs(wordProperties))

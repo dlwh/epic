@@ -20,6 +20,7 @@ case class Sentence(docId: String, sentId: Int,
   def length = words.length
   def tree = annotations.tree
   def ner = annotations.ner
+  def speaker = annotations.speaker
 
   lazy val nerSegmentation: Segmentation[NERType.Value, String]  = {
     val sorted = ner.toIndexedSeq.sortBy((_: (DSpan, NERType.Value))._1.begin)
@@ -46,21 +47,18 @@ case class Sentence(docId: String, sentId: Int,
   def annotate(tree: Tree[AnnotatedLabel] = tree,
                ner: Map[DSpan,NERType.Value] = ner,
                coref: Map[DSpan,Mention] = coref) = {
-    copy(annotations=OntoAnnotations(tree,ner,coref))
+    copy(annotations=OntoAnnotations(tree, ner, coref, speaker))
   }
 
 }
 
-case class DSpan(doc: String, sent: Int, begin: Int, end: Int) {
-  def span = Span(begin, end)
 
-  override def toString = doc + ":" + sent + ":" + begin + "-" + end
-}
 
 
 case class OntoAnnotations(tree: Tree[AnnotatedLabel],
                            ner: Map[DSpan,NERType.Value],
-                           coref: Map[DSpan,Mention])
+                           coref: Map[DSpan,Mention],
+                           speaker: Option[String])
 
 
 

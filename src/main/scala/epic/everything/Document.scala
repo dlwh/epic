@@ -25,19 +25,21 @@ import models.DocumentBeliefs
  * Represents an ontonotes document (a single file, or portion thereof)
  */
 case class Document(id: String, sentences: IndexedSeq[Sentence]) extends Example[IndexedSeq[OntoAnnotations], IndexedSeq[IndexedSeq[String]]] {
-  def features = sentences.map(_.words)
+  def words: IndexedSeq[IndexedSeq[String]] = sentences.map(_.words)
 
-  def label: IndexedSeq[OntoAnnotations] = sentences.map(_.label)
+  def features = words
 
-  def trees: IndexedSeq[Tree[AnnotatedLabel]] = sentences.map(_.tree)
+  lazy val label: IndexedSeq[OntoAnnotations] = sentences.map(_.label)
 
-  def ner: Map[DSpan, NERType.Value] = sentences.map(_.ner).reduceLeft(_ ++ _)
+  lazy val trees: IndexedSeq[Tree[AnnotatedLabel]] = sentences.map(_.tree)
 
-  def coref: Map[DSpan, Mention] = sentences.map(_.coref).reduceLeft(_ ++ _)
+  lazy val ner: Map[DSpan, NERType.Value] = sentences.map(_.ner).reduceLeft(_ ++ _)
+
+  lazy val coref: Map[DSpan, Mention] = sentences.map(_.coref).reduceLeft(_ ++ _)
 }
 
 
 /**
  * Adds or updates one of the annotation fields of the contained sentences for a document...
  */
-trait DocumentAnnotator extends ((Document,DocumentBeliefs)=>Document) with (Document=>Document)
+trait DocumentAnnotator extends ((ProcessedDocument,DocumentBeliefs)=>ProcessedDocument) with (ProcessedDocument=>ProcessedDocument)

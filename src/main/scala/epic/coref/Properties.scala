@@ -1,6 +1,7 @@
 package epic.coref
 
 import epic.everything.models.Property
+import epic.everything.DSpan
 
 object Properties {
   def allExtractors = IndexedSeq(genderExtractor, numberExtractor, personExtractor)
@@ -9,12 +10,13 @@ object Properties {
   val Number = Property("Number")("Sing", "Plural")
   val Person = Property("Person")("First", "Second", "Third")
 
-  val genderExtractor = new PropertyExtractor {
+  val genderExtractor = new PropertyExtractor[String] {
     def property = Gender
 
-    def extract(c: MentionCandidate, context: CorefDocument) = {
-      if(c.words.length == 1 && Phrases.isPronoun(c.words.head)) {
-        c.words.head.toLowerCase match {
+
+    def extract(c: DSpan, context: CorefDocument) = {
+      if(c.length == 1 && Phrases.isPronoun(c.getYield(context.words).head)) {
+        c.getYield(context.words).head.toLowerCase match {
           case "he" | "him" | "his" => Gender.choices("Masc")
           case "she" | "her" | "hers" => Gender.choices("Fem")
           case "it" | "its" => Gender.choices("Neuter")
@@ -27,25 +29,27 @@ object Properties {
     }
   }
 
-  val numberExtractor = new PropertyExtractor {
+  val numberExtractor = new PropertyExtractor[String] {
     def property = Number
 
-    def extract(c: MentionCandidate, context: CorefDocument) = {
-      val word = Phrases.headFor(c.words)
+    def extract(c: DSpan, context: CorefDocument) = {
+      val cWords = c.getYield(context.words)
+      val word = Phrases.headFor(cWords)
       if(Phrases.isPlural(word)) 1
       else 0
     }
   }
 
-  val personExtractor = new PropertyExtractor {
+  val personExtractor = new PropertyExtractor[String] {
     def property = Person
 
     /**
      * Returns index of choice. -1 for unknown
      */
-    def extract(c: MentionCandidate, context: CorefDocument) = {
-       if(c.words.length == 1 && Phrases.isPronoun(c.words.head)) {
-        c.words.head.toLowerCase match {
+    def extract(c: DSpan, context: CorefDocument) = {
+      val cWords = c.getYield(context.words)
+      if(cWords.length == 1 && Phrases.isPronoun(cWords.head)) {
+        cWords.head.toLowerCase match {
           case  "you" | "your" => Person.choices("Second")
           case  "I" | "me" | "we" | "us" | "my" | "our" => Person.choices("First")
           case _ => Person.choices("Third")
@@ -54,5 +58,11 @@ object Properties {
         Person.choices("Third")
       }
     }
+  }
+
+  def alwaysUnobservedExtractor[T](prop: Property[T]):PropertyExtractor[T] = new PropertyExtractor[T] {
+    def property: Property[T] = prop
+
+    def extract(c: DSpan, context: CorefDocument): Int = -1
   }
 }

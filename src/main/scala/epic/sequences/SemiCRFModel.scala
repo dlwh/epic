@@ -219,6 +219,41 @@ class SegmentationModelFactory[L](val startSymbol: L,
 
   import SegmentationModelFactory._
 
+  def makeModel(train: IndexedSeq[Segmentation[L, String]], labelIndex: Option[Index[L]] = None): SemiCRFModel[L, String] = {
+    val maxLengthMap = train.flatMap(_.segments.iterator).groupBy(_._1).mapValues(arr => arr.map(_._2.length).max)
+    val labelIndex: Index[L] = Index[L](Iterator(startSymbol) ++ train.iterator.flatMap(_.label.map(_._1)))
+    val maxLengthArray = Encoder.fromIndex(labelIndex).tabulateArray(maxLengthMap.getOrElse(_, 0))
+
+    val wordCounts:Counter[String, Double] = Counter.count(train.flatMap(_.words):_*).mapValues(_.toDouble)
+    val f = new StandardFeaturizer(wordCounts)
+    val basicFeatureIndex = Index[Feature]()
+    val spanFeatureIndex = Index[Feature]()
+    val transFeatureIndex = Index[Feature]()
+
+    val maxMaxLength = (0 until labelIndex.size).map(maxLengthArray).max
+    var i = 0
+    for(s <- train) {
+      if(i % 250 == 0)
+        println(i + "/" + train.length)
+      val loc = f.localize(s.words)
+
+      for(b <- 0 until s.length) {
+        loc.featuresForWord(b) foreach {basicFeatureIndex.index _}
+        for(e <- (b+1) until math.min(s.length,b+maxMaxLength)) {
+          loc.featuresForSpan(b, e) foreach {spanFeatureIndex.index _}
+          loc.featuresForTransition(b, e) foreach {transFeatureIndex.index _}
+        }
+
+      }
+      i += 1
+    }
+    println(train.length + "/" + train.length)
+    val indexed = new IndexedStandardFeaturizer(f, labelIndex, basicFeatureIndex, spanFeatureIndex, transFeatureIndex)
+    val model = new SemiCRFModel(indexed.featureIndex, indexed, maxLengthArray)
+
+    model
+  }
+
 
   /**
    * Computes basic features from word counts
@@ -477,39 +512,5 @@ class SegmentationModelFactory[L](val startSymbol: L,
     }
   }
 
-  def makeModel(train: IndexedSeq[Segmentation[L, String]]): SemiCRFModel[L, String] = {
-    val maxLengthMap = train.flatMap(_.segments.iterator).groupBy(_._1).mapValues(arr => arr.map(_._2.length).max)
-    val labelIndex: Index[L] = Index[L](Iterator(startSymbol) ++ train.iterator.flatMap(_.label.map(_._1)))
-    val maxLengthArray = Encoder.fromIndex(labelIndex).tabulateArray(maxLengthMap.getOrElse(_, 0))
-
-    val wordCounts:Counter[String, Double] = Counter.count(train.flatMap(_.words):_*).mapValues(_.toDouble)
-    val f = new StandardFeaturizer(wordCounts)
-    val basicFeatureIndex = Index[Feature]()
-    val spanFeatureIndex = Index[Feature]()
-    val transFeatureIndex = Index[Feature]()
-
-    val maxMaxLength = (0 until labelIndex.size).map(maxLengthArray).max
-    var i = 0
-    for(s <- train) {
-      if(i % 250 == 0)
-        println(i + "/" + train.length)
-      val loc = f.localize(s.words)
-
-      for(b <- 0 until s.length) {
-        loc.featuresForWord(b) foreach {basicFeatureIndex.index _}
-        for(e <- (b+1) until math.min(s.length,b+maxMaxLength)) {
-          loc.featuresForSpan(b, e) foreach {spanFeatureIndex.index _}
-          loc.featuresForTransition(b, e) foreach {transFeatureIndex.index _}
-        }
-
-      }
-      i += 1
-    }
-    println(train.length + "/" + train.length)
-    val indexed = new IndexedStandardFeaturizer(f, labelIndex, basicFeatureIndex, spanFeatureIndex, transFeatureIndex)
-    val model = new SemiCRFModel(indexed.featureIndex, indexed, maxLengthArray)
-
-    model
-  }
 
 }

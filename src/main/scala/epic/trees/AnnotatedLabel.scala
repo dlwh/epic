@@ -47,6 +47,8 @@ case class AnnotatedLabel(label: String,
   def baseAnnotatedLabel = AnnotatedLabel(label)
   def clearFeatures = copy(features=Set.empty)
 
+  def treebankString = (label +: features.collect{ case t: FunctionalTag => t.tag}.toIndexedSeq).mkString("-")
+
   override def toString = {
     val components = new ArrayBuffer[String]()
     if(parents.nonEmpty) {

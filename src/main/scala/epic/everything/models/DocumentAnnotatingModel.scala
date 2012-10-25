@@ -1,17 +1,17 @@
 package epic.everything.models
 
 import epic.framework.{AugmentableInference, Model}
-import epic.everything.{DocumentAnnotator, Document}
+import epic.everything._
 import breeze.linalg.DenseVector
 
 /**
  *
  * @author dlwh
  */
-trait DocumentAnnotatingModel extends Model[Document] { self =>
+trait DocumentAnnotatingModel extends Model[ProcessedDocument] { self =>
   type Inference <: DocumentAnnotatingInference {type ExpectedCounts = self.ExpectedCounts }
 }
 
-trait DocumentAnnotatingInference extends AugmentableInference[Document, DocumentBeliefs] with DocumentAnnotator {
-  def apply(doc: Document): Document = apply(doc, baseAugment(doc))
+trait DocumentAnnotatingInference extends AugmentableInference[ProcessedDocument, DocumentBeliefs] with DocumentAnnotator {
+  def apply(doc: ProcessedDocument): ProcessedDocument = apply(doc, baseAugment(doc))
 }
