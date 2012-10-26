@@ -1,7 +1,7 @@
 package epic.everything
 
 import epic.trees._
-import epic.coref.CorefInstance
+import epic.coref.{CorefInstanceFeaturizer, FeaturizedCorefInstance, CorefInstance}
 import epic.sequences.Segmentation
 import epic.trees.StandardTreeProcessor
 
@@ -10,7 +10,7 @@ import epic.trees.StandardTreeProcessor
  * @author dlwh
  */
 case class ProcessedDocument(sentences: IndexedSeq[ProcessedSentence],
-                             coref: CorefInstance,
+                             coref: FeaturizedCorefInstance,
                              id: String="") {
 
 }
@@ -25,7 +25,8 @@ case class ProcessedSentence(words: IndexedSeq[String],
 
 
 object ProcessedDocument {
-  case class Factory(treeProcessor: StandardTreeProcessor, corefProcessor: CorefInstance.Factory) extends (Document=>ProcessedDocument) {
+  case class Factory(treeProcessor: StandardTreeProcessor,
+                     corefFeaturizer: CorefInstanceFeaturizer) extends (Document=>ProcessedDocument) {
 
     def apply(d: Document):ProcessedDocument = {
       val newSentences = for(s <- d.sentences) yield {
@@ -36,9 +37,7 @@ object ProcessedDocument {
         ProcessedSentence(s.words, tree, seg, s.speaker, s.id)
       }
 
-      val coref = corefProcessor(d)
-
-      ProcessedDocument(newSentences, coref, d.id)
+      ProcessedDocument(newSentences, corefFeaturizer.featurizeDocument(d), d.id)
     }
 
   }

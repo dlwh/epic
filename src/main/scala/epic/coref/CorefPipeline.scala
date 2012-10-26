@@ -23,17 +23,21 @@ object CorefPipeline extends App {
   val config = baseConfig backoff Configuration.fromPropertiesFiles(files.map(new File(_)))
   val params = config.readIn[Params]("")
 
-  val instanceFactory = new CorefInstance.Factory(CorefInstance.goldMentions)
 
-  val instances = for {
+  val docs = for {
     file <- params.path.listFiles take params.nfiles
     doc <- ConllOntoReader.readDocuments(file)
-  } yield instanceFactory(doc)
+  } yield doc
 
+  val (train, test) = (docs.take(docs.length * 9 / 10), docs.take(docs.length/10))
+
+  val instanceFactory = new CorefInstance.Factory(CorefInstance.goldMentions)
+  val (featurizer, instances) = CorefInstanceFeaturizer.fromTrainingSet(feat, extractors, instanceFactory)(train)
 
   val feat = new SimplePairwiseFeaturizer
   val extractors = Properties.allExtractors
-  val model = new PropCorefModelFactory(feat, extractors).makeModel(instances)
+
+  val model = new PropCorefModel(featurizer.propertyFeatures, featurizer.featureIndex)
 
   val obj = new ModelObjective(model, instances)
   val cached = new CachedBatchDiffFunction(obj)
@@ -51,9 +55,9 @@ object CorefPipeline extends App {
   for(i <- instances) {
     println("=================")
     println("Text: ")
-    i.words foreach { s => println(s.mkString(" "))}
+    i.unindexed.words foreach { s => println(s.mkString(" "))}
     println("Gold: ")
-    for(cluster <- sortClusters(i.unindexedClusters)) {
+    for(cluster <- sortClusters(i.unindexed.unindexedClusters)) {
       println(formatCluster(cluster))
     }
     println("Guess: ")
@@ -62,10 +66,10 @@ object CorefPipeline extends App {
       println(formatCluster(cluster))
     }
 
-    output += (i.doc -> guess)
+    output += (i.unindexed.doc -> guess)
 
 
-    val results = eval(i.unindexedClusters.toIndexedSeq, guess)
+    val results = eval(i.unindexed.unindexedClusters.toIndexedSeq, guess)
     println(results)
     allResults += results
   }

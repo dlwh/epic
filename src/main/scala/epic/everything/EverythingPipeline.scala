@@ -15,6 +15,8 @@ import breeze.collection.mutable.TriangularArray
 import breeze.optimize.{BatchDiffFunction, CachedBatchDiffFunction}
 import epic.parser.ParserParams.XbarGrammar
 import models._
+import breeze.util.Index
+import epic.coref._
 import epic.trees.ProcessedTreebank
 import epic.trees.TreeInstance
 import epic.trees.annotations.KMAnnotator
@@ -22,8 +24,6 @@ import breeze.optimize.FirstOrderMinimizer.OptParams
 import epic.sequences.Segmentation
 import epic.trees.Span
 import projections.ConstraintAnchoring.RawConstraints
-import breeze.util.Index
-import epic.coref.{CorefInstance, Properties, SimplePairwiseFeaturizer, PropCorefModelFactory}
 
 
 object EverythingPipeline {
@@ -49,23 +49,27 @@ object EverythingPipeline {
       (train,test)
     }
 
-    val mentionDetector = CorefInstance.goldMentions
-    val corefInstanceFactory = new CorefInstance.Factory(mentionDetector)
-    val docProcessor = new ProcessedDocument.Factory(params.treebank.process, corefInstanceFactory)
+
 
     /////////////////
     // base models///
     /////////////////
     // NER
     val nerModel = new SegmentationModelFactory[NERType.Value](NERType.OutsideSentence).makeModel(train.flatMap(_.sentences).map(_.nerSegmentation))
-      // NERProperties
+    // NERProperties
     val nerProp = Property("NER::Type", nerModel.labelIndex)
+
 
     // Coref
     val corefNerProp = nerProp.copy(name = "Coref::NER") // own copy of corefNer, since we're using soft agreement.
     val corefExtractors = Properties.allExtractors :+ Properties.alwaysUnobservedExtractor(corefNerProp)
     val corefProperties = corefExtractors.map(_.property)
-    val corefModel = new PropCorefModelFactory(new SimplePairwiseFeaturizer, corefExtractors).makeModel(train.map(corefInstanceFactory(_)))
+    val mentionDetector = CorefInstance.goldMentions
+    val corefInstanceFactory = new CorefInstance.Factory(mentionDetector)
+    val corefFeaturizer:CorefInstanceFeaturizer = CorefInstanceFeaturizer.fromTrainingSet(new SimplePairwiseFeaturizer, corefExtractors, corefInstanceFactory)(train)._1
+    val docProcessor = new ProcessedDocument.Factory(params.treebank.process, corefFeaturizer)
+    val processedTrain = train.map(docProcessor)
+    val corefModel = new PropCorefModel(corefFeaturizer.propertyFeatures, corefFeaturizer.featureIndex)
 
 
     // propagation
@@ -91,7 +95,7 @@ object EverythingPipeline {
     adaptedCorefModel,
     propModel)
 
-    val obj = new ModelObjective(epModel, train.map(docProcessor))
+    val obj = new ModelObjective(epModel, processedTrain)
 
     val opt = params.opt
     for( s <- opt.iterations(new CachedBatchDiffFunction(obj), obj.initialWeightVector(randomize = true))) {
