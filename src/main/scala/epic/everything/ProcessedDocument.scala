@@ -4,6 +4,7 @@ import epic.trees._
 import epic.coref.{CorefInstanceFeaturizer, FeaturizedCorefInstance, CorefInstance}
 import epic.sequences.Segmentation
 import epic.trees.StandardTreeProcessor
+import epic.parser.ParseChart.SparsityPattern
 
 /**
  * 
@@ -17,6 +18,7 @@ case class ProcessedDocument(sentences: IndexedSeq[ProcessedSentence],
 
 case class ProcessedSentence(words: IndexedSeq[String],
                              tree: BinarizedTree[AnnotatedLabel],
+                             sparsity: SparsityPattern,
                              ner: Segmentation[NERType.Value, String],
                              speaker: Option[String],
                              id: String="") {
@@ -34,7 +36,8 @@ object ProcessedDocument {
         var tree = treeProcessor(s.tree.map(_.treebankString))
         tree = UnaryChainRemover.removeUnaryChains(tree)
 
-        ProcessedSentence(s.words, tree, seg, s.speaker, s.id)
+//        ProcessedSentence(s.words, tree, seg, s.speaker, s.id)
+        error("TODO")
       }
 
       ProcessedDocument(newSentences, corefFeaturizer.featurizeDocument(d), d.id)

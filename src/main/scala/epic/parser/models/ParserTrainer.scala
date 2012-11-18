@@ -23,6 +23,8 @@ import breeze.linalg._
 import breeze.optimize._
 import epic.trees.{TreeInstance, AnnotatedLabel}
 import breeze.config.Help
+import breeze.util.Implicits._
+
 
 /**
  * The main entry point for training discriminative parsers.

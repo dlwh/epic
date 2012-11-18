@@ -78,22 +78,18 @@ object EverythingPipeline {
     val wordIndex = Index[Property[_]]()
 
     // lenses
-    val nerLens = new DocumentBeliefs.Lens(spanIndex, wordIndex, Index[Property[_]](Iterator(nerProp)), wordIndex)
-    val corefLens = new DocumentBeliefs.Lens(spanIndex, wordIndex, Index[Property[_]](corefProperties), wordIndex)
-
     // joint-aware models
-    val adaptedNerModel = new ChainNERModel(nerModel, nerLens)
-    val adaptedCorefModel = new CorefModelAdaptor(corefModel, corefLens)
+    val adaptedNerModel = new ChainNERModel(nerModel)
 
-    val propBuilder = new PropertyPropagator.Builder(spanIndex, wordIndex)
-    propBuilder.spans.associate(nerProp, corefNerProp, agreement = true)
-
-    val propModel = new PropertyPropagatingModel(propBuilder)
+//    val propBuilder = new PropertyPropagator.Builder(spanIndex, wordIndex)
+//    propBuilder.spans.associate(nerProp, corefNerProp, agreement = true)
+//
+//    val propModel = new PropertyPropagatingModel(propBuilder)
 
     // the big model!
-    val epModel = new FullEPModel[ProcessedDocument, DocumentBeliefs](5, {_ => None}, adaptedNerModel,
-    adaptedCorefModel,
-    propModel)
+    val epModel = new FullEPModel[ProcessedDocument, DocumentBeliefs](5, {_ => None}, adaptedNerModel)
+//    corefModel)
+    //propModel)
 
     val obj = new ModelObjective(epModel, processedTrain)
 

@@ -12,14 +12,13 @@ import breeze.collection.mutable.TriangularArray
  *
  * @author dlwh
  */
-class ChainNERModel(val inner: SemiCRFModel[NERType.Value, String],
-                    val lens: DocumentBeliefs.Lens) extends DocumentAnnotatingModel {
+class ChainNERModel(val inner: SemiCRFModel[NERType.Value, String]) extends DocumentAnnotatingModel {
   def featureIndex: Index[Feature] = inner.featureIndex
   type ExpectedCounts = inner.ExpectedCounts
 
-  def initialValueForFeature(f: Feature): Double = 0.0
+  def initialValueForFeature(f: Feature): Double = inner.initialValueForFeature(f)
 
-  def inferenceFromWeights(weights: DenseVector[Double]): Inference = new ChainNERInference(inner.inferenceFromWeights(weights), inner.labelIndex, lens)
+  def inferenceFromWeights(weights: DenseVector[Double]): Inference = new ChainNERInference(inner.inferenceFromWeights(weights), inner.labelIndex)
 
   def emptyCounts: ExpectedCounts = StandardExpectedCounts.zero(featureIndex)
 
@@ -31,8 +30,7 @@ class ChainNERModel(val inner: SemiCRFModel[NERType.Value, String],
 }
 
 case class ChainNERInference(inner: SemiCRFInference[NERType.Value, String],
-                             labels: Index[NERType.Value],
-                             lens: DocumentBeliefs.Lens) extends DocumentAnnotatingInference with FullProjectableInference[ProcessedDocument, DocumentBeliefs] {
+                             labels: Index[NERType.Value]) extends DocumentAnnotatingInference with FullProjectableInference[ProcessedDocument, DocumentBeliefs] {
   type ExpectedCounts = inner.ExpectedCounts
   case class Marginal(sentences: IndexedSeq[inner.Marginal], partition: Double)
 
@@ -74,7 +72,7 @@ case class ChainNERInference(inner: SemiCRFInference[NERType.Value, String],
 
 
   def baseAugment(doc: ProcessedDocument): DocumentBeliefs = {
-    lens.initialFullBeliefs(doc)
+    sys.error("TODO")
   }
 
 
@@ -84,15 +82,17 @@ case class ChainNERInference(inner: SemiCRFInference[NERType.Value, String],
 
 
   def project(doc: ProcessedDocument, m: Marginal, oldBeliefs: DocumentBeliefs): DocumentBeliefs = {
-    val newSentences = for(i <- 0 until doc.sentences.length) yield {
-      val marg = m.sentences(i)
-      val newSpans = TriangularArray.tabulate(doc.sentences(i).length){ (b,e) =>
-        new PropertyBeliefs(Array(Array.tabulate(labels.size){marg.spanMarginal(_, b, e)}))
+    val newSentences = Array.tabulate(doc.sentences.length) { s =>
+      val marg = m.sentences(s)
+      val sentenceBeliefs = oldBeliefs.beliefsForSentence(s)
+      val newSpans = TriangularArray.tabulate(doc.sentences(s).length){ (b,e) =>
+        val spanBeliefs = sentenceBeliefs.spanBeliefs(b, e)
+        spanBeliefs.copy(ner = spanBeliefs.ner.copy(beliefs=DenseVector.tabulate(labels.size){marg.spanMarginal(_, b, e)}))
       }
-      new SentenceBeliefs(newSpans,Array())
+      sentenceBeliefs.copy(newSpans)
     }
 
-    lens.recombine(oldBeliefs, lens.slice(oldBeliefs).copy(sentenceBeliefs = newSentences.toArray))
+    DocumentBeliefs(newSentences)
   }
 
   def marginal(doc: ProcessedDocument, aug: DocumentBeliefs): (Marginal, Double) = {
@@ -106,7 +106,7 @@ case class ChainNERInference(inner: SemiCRFInference[NERType.Value, String],
   }
 
   def beliefsToAnchoring(doc: ProcessedDocument, beliefs: DocumentBeliefs):IndexedSeq[SemiCRF.Anchoring[NERType.Value, String]] = {
-    lens.slice(beliefs).sentenceBeliefs.zip(doc.sentences).map { case(b, s) =>
+    beliefs.sentenceBeliefs.zip(doc.sentences).map { case(b, s) =>
       new Anchoring[NERType.Value, String] {
         def labelIndex: Index[NERType.Value] = labels
 
@@ -115,7 +115,7 @@ case class ChainNERInference(inner: SemiCRFInference[NERType.Value, String],
         def maxSegmentLength(label: Int): Int = inner.maxLength(label)
 
         def scoreTransition(prev: Int, cur: Int, beg: Int, end: Int): Double = {
-          math.log(b.spanBeliefs(cur,beg)(0)(cur)) - math.log1p(-b.spanBeliefs(cur,beg)(0)(cur))
+          math.log(b.spanBeliefs(cur,beg).ner(cur)) - math.log1p(-b.spanBeliefs(cur,beg).ner(cur))
         }
 
         def startSymbol = inner.startSymbol

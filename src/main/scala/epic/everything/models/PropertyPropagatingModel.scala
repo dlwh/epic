@@ -12,7 +12,6 @@ import breeze.collection.mutable.TriangularArray
 /**
  * 
  * @author dlwh
- */
 class PropertyPropagatingModel(builder: PropertyPropagator.Builder) extends DocumentAnnotatingModel {
   type ExpectedCounts = StandardExpectedCounts[Feature]
   type Inference = PropertyPropagator
@@ -221,4 +220,5 @@ object PropertyPropagator {
 
   }
 }
+ */
 

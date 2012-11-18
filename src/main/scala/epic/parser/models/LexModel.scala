@@ -382,10 +382,163 @@ case class StandardFeaturizer[L, W>:Null, P](wordIndex: Index[W],
   }
 }
 
+class LexGrammar[L, W](val grammar: BaseGrammar[L],
+                       val lexicon: Lexicon[L, W],
+                       wordIndex: Index[W],
+                       fi: IndexedLexFeaturizer[L, W],
+                       weights: DenseVector[Double],
+                       binaries: Array[Boolean],
+                       leftRules: Array[Boolean],
+                       rightRules: Array[Boolean]) extends RefinedGrammar[L, W] {
+  def isLeftRule(r: Int) = leftRules(r)
+
+  def isRightRule(r: Int) = rightRules(r)
+
+  def anchor(sent: Seq[W]) = new Spec(sent)
+
+  // refinement scheme:
+  // binaryRule is (head * words.length + dep)
+  // unaryRule is (head)
+  // parent/leftchild/rightchild is (head)
+  final class Spec(val words: Seq[W]) extends RefinedAnchoring[L, W] {
+    val grammar = LexGrammar.this.grammar
+    val lexicon = LexGrammar.this.lexicon
+    val indexed = words.map(wordIndex)
+    private val f = fi.anchor(words)
+    val indexedValidTags: Seq[Array[Int]] = words.map(lexicon.tagsForWord(_)).map(_.map(labelIndex).toArray)
+
+    private def dot(features: Array[Int]) = {
+      var i = 0
+      var score = 0.0
+      while(i < features.length) {
+        score += weights(features(i))
+        i += 1
+      }
+      score
+    }
+
+    def scoreSpan(begin: Int, end: Int, label: Int, ref: Int) = {
+      if(ref < begin || ref >= end) throw new Exception("Label refinement for lex parser (i.e. head word) must be in [begin,end)!")
+      else dot(f.featuresForSpan(begin, end, label, ref))
+    }
+
+    val bCache = new OpenAddressHashArray[Double](words.size * words.size * index.size, Double.NaN)
+    val uCache = new OpenAddressHashArray[Double](words.size * index.size, Double.NaN)
+
+    def scoreUnaryRule(begin: Int, end: Int, rule: Int, head: Int) = {
+      val cacheIndex = head + words.size * rule
+      val score = uCache(cacheIndex)
+
+      if (!score.isNaN)
+        score
+      else {
+        val score = dot(f.featuresForUnaryRule(begin, end, rule, head))
+        uCache(cacheIndex) = score
+        score
+      }
+    }
+
+
+    def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int) = {
+      val head = (ref:Int) / words.length
+      val dep = (ref:Int) % words.length
+      val cacheIndex = head + words.size * (dep + words.size * rule)
+      val score = bCache(cacheIndex)
+
+      if (!score.isNaN)
+        score
+      else {
+        val score = dot(f.featuresForBinaryRule(begin, split, end, rule, ref))
+        bCache(cacheIndex) = score
+        score
+      }
+
+    }
+
+
+    def validLabelRefinements(begin: Int, end: Int, label: Int) = Array.range(begin,end)
+
+    def numValidRefinements(label: Int) = words.length
+
+    def numValidRuleRefinements(rule: Int) = words.length * words.length
+
+    def validRuleRefinementsGivenParent(begin: Int, end: Int, rule: Int, parentRef: Int) = {
+      if(!binaries(rule)) {
+        Array(parentRef:Int)
+      } else if(isLeftRule(rule)) {
+        val result = new Array[Int](end - (parentRef+1))
+        var ref = parentRef * words.length + parentRef + 1
+        var i = 0
+        while(i < result.length) {
+          result(i) = ref
+          ref += 1
+          i += 1
+        }
+        result
+      } else {
+        val result = new Array[Int](parentRef - begin)
+        var ref = parentRef * words.length + begin
+        var i = 0
+        while(i < result.length) {
+          result(i) = ref
+          i += 1
+          ref += 1
+        }
+        result
+      }
+    }
+
+    def validUnaryRuleRefinementsGivenChild(begin: Int, end: Int, rule: Int, childRef: Int) = {
+      Array(childRef)
+    }
+
+    def validTagsFor(pos: Int) = {
+      indexedValidTags(pos)
+    }
+
+    def leftChildRefinement(rule: Int, ruleRef: Int) = {
+      if(isLeftRule(rule)) ruleRef / words.length
+      else ruleRef % words.length
+    }
+
+    def rightChildRefinement(rule: Int, ruleRef: Int) = {
+      if(isRightRule(rule)) ruleRef / words.length
+      else ruleRef % words.length
+    }
+
+    def parentRefinement(rule: Int, ruleRef: Int) = {
+      if(binaries(rule)) ruleRef / words.length
+      else ruleRef
+    }
+
+    def childRefinement(rule: Int, ruleRef: Int) = {
+      ruleRef
+    }
+
+    def ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int) = {
+      require(refA == (refB:Int))
+      refA
+    }
+
+    def ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int, refC: Int) = {
+      if(isLeftRule(r)) {
+        require(refA == (refB:Int))
+        refA * words.length + refC
+      } else {
+        require(refA == (refC:Int))
+        refA * words.length + refB
+      }
+    }
+
+    def validCoarseRulesGivenParentRefinement(a: Int, refA: Int) = grammar.indexedBinaryRulesWithParent(a)
+  }
+
+}
+
 case class LexGrammarBundle[L, W](baseGrammar: BaseGrammar[L],
                                   baseLexicon: Lexicon[L, W],
-                                 headFinder: HeadFinder[L],
-                                 wordIndex: Index[W]) { bundle =>
+                                  headFinder: HeadFinder[L],
+                                  wordIndex: Index[W]) { bundle =>
   val bg = baseGrammar
   val leftRules = new Array[Boolean](bg.index.size)
   val rightRules = new Array[Boolean](bg.index.size)
@@ -402,155 +555,7 @@ case class LexGrammarBundle[L, W](baseGrammar: BaseGrammar[L],
   }
 
   def makeGrammar(fi: IndexedLexFeaturizer[L, W], weights: DenseVector[Double]): RefinedGrammar[L, W] = {
-    new RefinedGrammar[L, W] {
-      val grammar = baseGrammar
-      val lexicon = baseLexicon
-
-      def isLeftRule(r: Int) = leftRules(r)
-
-      def isRightRule(r: Int) = rightRules(r)
-
-      def anchor(sent: Seq[W]) = new Spec(sent)
-
-      // refinement scheme:
-      // binaryRule is (head * words.length + dep)
-      // unaryRule is (head)
-      // parent/leftchild/rightchild is (head)
-      final class Spec(val words: Seq[W]) extends RefinedAnchoring[L, W] {
-        val grammar = baseGrammar
-        val lexicon = baseLexicon
-        val indexed = words.map(wordIndex)
-        val f = fi.anchor(words)
-        val indexedValidTags: Seq[Array[Int]] = words.map(lexicon.tagsForWord(_)).map(_.map(labelIndex).toArray)
-
-        private def dot(features: Array[Int]) = {
-          var i = 0
-          var score = 0.0
-          while(i < features.length) {
-            score += weights(features(i))
-            i += 1
-          }
-          score
-        }
-
-        def scoreSpan(begin: Int, end: Int, label: Int, ref: Int) = {
-          if(ref < begin || ref >= end) throw new Exception("Label refinement for lex parser (i.e. head word) must be in [begin,end)!")
-          else dot(f.featuresForSpan(begin, end, label, ref))
-        }
-
-        val bCache = new OpenAddressHashArray[Double](words.size * words.size * index.size, Double.NaN)
-        val uCache = new OpenAddressHashArray[Double](words.size * index.size, Double.NaN)
-
-        def scoreUnaryRule(begin: Int, end: Int, rule: Int, head: Int) = {
-          val cacheIndex = head + words.size * rule
-          val score = uCache(cacheIndex)
-
-          if (!score.isNaN)
-            score
-          else {
-            val score = dot(f.featuresForUnaryRule(begin, end, rule, head))
-            uCache(cacheIndex) = score
-            score
-          }
-        }
-
-
-        def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int) = {
-          val head = (ref:Int) / words.length
-          val dep = (ref:Int) % words.length
-          val cacheIndex = head + words.size * (dep + words.size * rule)
-          val score = bCache(cacheIndex)
-
-          if (!score.isNaN)
-            score
-          else {
-            val score = dot(f.featuresForBinaryRule(begin, split, end, rule, ref))
-            bCache(cacheIndex) = score
-            score
-          }
-
-        }
-
-
-        def validLabelRefinements(begin: Int, end: Int, label: Int) = Array.range(begin,end)
-
-        def numValidRefinements(label: Int) = words.length
-
-        def numValidRuleRefinements(rule: Int) = words.length * words.length
-
-        def validRuleRefinementsGivenParent(begin: Int, end: Int, rule: Int, parentRef: Int) = {
-          if(!binaries(rule)) {
-            Array(parentRef:Int)
-          } else if(isLeftRule(rule)) {
-            val result = new Array[Int](end - (parentRef+1))
-            var ref = parentRef * words.length + parentRef + 1
-            var i = 0
-            while(i < result.length) {
-              result(i) = ref
-              ref += 1
-              i += 1
-            }
-            result
-          } else {
-            val result = new Array[Int](parentRef - begin)
-            var ref = parentRef * words.length + begin
-            var i = 0
-            while(i < result.length) {
-              result(i) = ref
-              i += 1
-              ref += 1
-            }
-            result
-          }
-        }
-
-        def validUnaryRuleRefinementsGivenChild(begin: Int, end: Int, rule: Int, childRef: Int) = {
-          Array(childRef)
-        }
-
-        def validTagsFor(pos: Int) = {
-          indexedValidTags(pos)
-        }
-
-        def leftChildRefinement(rule: Int, ruleRef: Int) = {
-          if(isLeftRule(rule)) ruleRef / words.length
-          else ruleRef % words.length
-        }
-
-        def rightChildRefinement(rule: Int, ruleRef: Int) = {
-          if(isRightRule(rule)) ruleRef / words.length
-          else ruleRef % words.length
-        }
-
-        def parentRefinement(rule: Int, ruleRef: Int) = {
-          if(binaries(rule)) ruleRef / words.length
-          else ruleRef
-        }
-
-        def childRefinement(rule: Int, ruleRef: Int) = {
-          ruleRef
-        }
-
-        def ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int) = {
-          require(refA == (refB:Int))
-          refA
-        }
-
-        def ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int, refC: Int) = {
-          if(isLeftRule(r)) {
-            require(refA == (refB:Int))
-            refA * words.length + refC
-          } else {
-            require(refA == (refC:Int))
-            refA * words.length + refB
-          }
-        }
-
-        def validCoarseRulesGivenParentRefinement(a: Int, refA: Int) = grammar.indexedBinaryRulesWithParent(a)
-      }
-
-    }
-
+    new LexGrammar(baseGrammar, baseLexicon, wordIndex, fi, weights, binaries, leftRules, rightRules)
   }
 }
 
