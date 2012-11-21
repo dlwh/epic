@@ -26,6 +26,7 @@ object SemiNERPipeline {
                     name: String = "eval/ner",
                     nfiles: Int = 100000,
                     iterPerEval: Int = 20,
+                    useGazetteer: Boolean = false,
                     useCorefFeatures: Boolean = false,
                     useCorefSpans: Boolean = false,
                     opt: OptParams)
@@ -48,18 +49,20 @@ object SemiNERPipeline {
     val pronouns = Phrases.pronouns
 
     val gazetteer = if(params.useCorefFeatures) {
+      val default = Gazetteer.ner("en")
       val corefHints: Map[IndexedSeq[String], NERType.Value] =  {for {
         file <- params.path.listFiles take params.nfiles
         doc <- ConllOntoReader.readDocuments(file)
-        corefClusters: Map[Int, Set[NERType.Value]] = doc.coref.toIndexedSeq[(DSpan, Mention)].groupBy(_._2.id).mapValues(_.map(_._1).flatMap(span => doc.ner.get(span).iterator).toSet)
+        corefClusters: Map[Int, IndexedSeq[(DSpan, NERType.Value)]] = doc.coref.toIndexedSeq[(DSpan, Mention)].groupBy(_._2.id).mapValues(_.map(_._1).flatMap(span => doc.ner.get(span).map(span -> _).iterator))
         (span, m) <- doc.coref; yd = span.getYield(doc)
-        if yd.length != 1 || !pronouns.contains(yd.head)
-        nertpe <- corefClusters(m.id).headOption.iterator
+        if yd.length != 1 || !pronouns.contains(yd.head) // not a pronoun?
+      // if there is a mention that corefers to this one and has an entity type
+        nertpe <- corefClusters(m.id).collectFirst{ case (span2, ner) if span2 != span => ner}
       } yield span.getYield(doc) -> nertpe}.toMap
-      new Gazetteer[NERType.Value, String] {
-        def lookupWord(w: String): IndexedSeq[NERType.Value] = IndexedSeq.empty
+      new Gazetteer[String, String] {
+        def lookupWord(w: String): IndexedSeq[String] = default.lookupWord(w)
 
-        def lookupSpan(w: IndexedSeq[String]): Option[NERType.Value] = corefHints.get(w)
+        def lookupSpan(w: IndexedSeq[String]): Option[String] = corefHints.get(w).map(_.toString)
       }
 
     } else if(params.useCorefSpans) {
@@ -77,8 +80,10 @@ object SemiNERPipeline {
         def lookupSpan(w: IndexedSeq[String]): Option[Boolean] = Some(corefHints(w))
       }
 
-    } else {
+    } else if(params.useGazetteer) {
       Gazetteer.ner("en")
+    } else {
+      Gazetteer.empty[Nothing, String]
     }
 
 

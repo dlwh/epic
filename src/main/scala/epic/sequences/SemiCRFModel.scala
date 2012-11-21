@@ -303,13 +303,14 @@ class SegmentationModelFactory[L](val startSymbol: L,
       }
 
       def featuresForTransition(beg: Int, end: Int) = {
-        val feats = ArrayBuffer[Feature](DistanceFeature(binDistance(end - beg)), TransitionFeature)
-        feats.toArray
+        val feats = Array(DistanceFeature(binDistance(end - beg)), TransitionFeature)
+        feats
       }
 
       def featuresForSpan(start: Int, end: Int):Array[Feature] = {
         val feats = ArrayBuffer[Feature]()
-        feats ++= gazetteer.lookupSpan(Span(start, end).map(words).toIndexedSeq).map(SFeature(_, 'SegmentKnown))
+        val gFeature: Iterable[SFeature] = gazetteer.lookupSpan(Span(start, end).map(words).toIndexedSeq).map(SFeature(_, 'SegmentKnown))
+        feats ++= gFeature
         if(start < end - 1) {
           feats += WordEdges('Inside, basicFeature(start)(0), basicFeature(end-1)(0))
           feats += WordEdges('Outside, basicFeature(start-1)(0), basicFeature(end)(0))
