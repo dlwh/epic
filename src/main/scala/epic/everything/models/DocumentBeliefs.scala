@@ -6,15 +6,14 @@ import breeze.collection.mutable.TriangularArray
 import breeze.inference.Factor
 import breeze.linalg._
 import breeze.linalg.NumericOps.Arrays._
+import epic.trees.{Span, AnnotatedLabel}
 
 /**
  *
  * @param sentenceBeliefs  sentence -> property type (by index) -> PropertyBeliefs
  *@author dlwh
  */
-case class DocumentBeliefs(spanProperties: Index[Property[_]],
-                           wordProperties: Index[Property[_]],
-                           sentenceBeliefs: Array[SentenceBeliefs]) extends Factor[DocumentBeliefs] {
+case class DocumentBeliefs(sentenceBeliefs: Array[SentenceBeliefs]) extends Factor[DocumentBeliefs] {
 
   def numSentences = sentenceBeliefs.length
 
@@ -22,12 +21,12 @@ case class DocumentBeliefs(spanProperties: Index[Property[_]],
 
   def *(f: DocumentBeliefs): DocumentBeliefs = {
     require(sentenceBeliefs.length == f.sentenceBeliefs.length)
-    DocumentBeliefs(spanProperties, wordProperties, sentenceBeliefs zip f.sentenceBeliefs map { case (a,b) => a * b})
+    DocumentBeliefs(sentenceBeliefs zip f.sentenceBeliefs map { case (a,b) => a * b})
   }
 
   def /(f: DocumentBeliefs): DocumentBeliefs = {
     require(sentenceBeliefs.length == f.sentenceBeliefs.length)
-    DocumentBeliefs(spanProperties, wordProperties, sentenceBeliefs zip f.sentenceBeliefs map { case (a,b) => a / b})
+    DocumentBeliefs(sentenceBeliefs zip f.sentenceBeliefs map { case (a,b) => a / b})
   }
 
   def logPartition: Double = sentenceBeliefs.map(_.logPartition).sum
@@ -38,70 +37,15 @@ case class DocumentBeliefs(spanProperties: Index[Property[_]],
 }
 
 object DocumentBeliefs {
-  def forDocument(spanProperties: Index[Property[_]], wordProperties: Index[Property[_]])(document: ProcessedDocument) = {
-    val sentenceBeliefs = document.sentences.map(SentenceBeliefs.forSentence(spanProperties, wordProperties)(_)).toArray
-    new DocumentBeliefs(spanProperties, wordProperties, sentenceBeliefs)
-  }
+  def forDocument(doc: ProcessedDocument) = {
+//    val sentences = doc.sentences.map(SentenceBeliefs.forSentence(_, doc.coref))
 
-  case class Lens(allSpanProperties: Index[Property[_]],
-                  allWordProperties: Index[Property[_]],
-                  narrowSpanProperties: Index[Property[_]],
-                  narrowWordProperties: Index[Property[_]]) {
-    def initialFullBeliefs(document: ProcessedDocument): DocumentBeliefs = {
-      forDocument(allSpanProperties, allWordProperties)(document)
-    }
-
-    val spanMapping = Encoder.fromIndex(narrowSpanProperties).tabulateArray(p => allSpanProperties(p))
-    val wordMapping = Encoder.fromIndex(narrowWordProperties).tabulateArray(p => allWordProperties(p))
-    def slice(allBeliefs: DocumentBeliefs) = {
-      assert(allBeliefs.spanProperties eq allSpanProperties)
-      val mapped = allBeliefs.sentenceBeliefs.map(s =>
-        SentenceBeliefs(s.spans.map(span => PropertyBeliefs(spanMapping.map(span.beliefs))),
-          s.words.map(word => PropertyBeliefs(wordMapping.map(word.beliefs)))
-        )
-      )
-      new DocumentBeliefs(narrowSpanProperties, narrowWordProperties, mapped)
-    }
-
-    /**
-     * Merges updated beliefs from projected into allBeliefs, creating a new DocumentBeliefs object.
-     * @param allBeliefs
-     * @param projected
-     */
-    def recombine(allBeliefs: DocumentBeliefs, projected: DocumentBeliefs):DocumentBeliefs = {
-      def patch(fromAll: PropertyBeliefs, fromProjected: PropertyBeliefs, mapping: Array[Int]) = {
-        val result = fromAll.copy(beliefs=fromAll.beliefs.clone)
-        var i = 0
-        while(i <  mapping.size) {
-          result.beliefs(mapping(i)) = fromProjected(i)
-          i += 1
-        }
-        result
-      }
-      val mapped = for( (sa, sp) <- allBeliefs.sentenceBeliefs zip projected.sentenceBeliefs) yield {
-        val spans = TriangularArray.tabulate(sa.words.length){ (b,e) =>
-          val fromAll = sa.spanBeliefs(b,e)
-          if(fromAll == null) null
-          else {
-            patch(fromAll, sp.spanBeliefs(b, e), spanMapping)
-          }
-        }
-        val words = Array.tabulate(sa.words.length){ (w) =>
-          val fromAll = sa.wordBeliefs(w)
-          if(fromAll == null) null
-          else {
-            patch(fromAll, sp.wordBeliefs(w), wordMapping)
-          }
-        }
-        SentenceBeliefs(spans, words)
-      }
-      allBeliefs.copy(sentenceBeliefs=mapped)
-    }
+    sys.error("TODO")
   }
 }
 
 
-case class SentenceBeliefs(spans: TriangularArray[PropertyBeliefs], words: Array[PropertyBeliefs]) extends Factor[SentenceBeliefs] {
+case class SentenceBeliefs(spans: TriangularArray[SpanBeliefs], words: Array[WordBeliefs]) extends Factor[SentenceBeliefs] {
   def length = words.length
   def apply(p: Int) = spans(p)
 
@@ -110,7 +54,7 @@ case class SentenceBeliefs(spans: TriangularArray[PropertyBeliefs], words: Array
 
   def *(f: SentenceBeliefs): SentenceBeliefs = {
     require(words.length == f.words.length)
-    val newSpans = TriangularArray.tabulate(words.length) { (i,j) => spans(i,j) * f.spans(i,j)}
+    val newSpans = TriangularArray.tabulate(words.length) { (i,j) => if(spans(i, j) eq null) null else spans(i,j) * f.spans(i,j)}
     val newWords = Array.tabulate(words.length) { (i) => words(i) * f.words(i)}
     SentenceBeliefs(newSpans, newWords)
   }
@@ -124,7 +68,7 @@ case class SentenceBeliefs(spans: TriangularArray[PropertyBeliefs], words: Array
   }
 
 
-  def logPartition: Double = spans.map(_.logPartition).data.sum + words.map(_.logPartition).sum
+  def logPartition: Double = spans.map(s => if(s eq null) 0.0 else s.logPartition).data.sum + words.map(_.logPartition).sum
 
   def isConvergedTo(f: SentenceBeliefs, diff: Double): Boolean = {
     var i = 0
@@ -141,39 +85,66 @@ case class SentenceBeliefs(spans: TriangularArray[PropertyBeliefs], words: Array
   }
 }
 
-object SentenceBeliefs {
-  def forSentence(spanProperties: Index[Property[_]], wordProperties: Index[Property[_]])(s: ProcessedSentence) = {
-    def beliefs(props: Index[Property[_]]) = PropertyBeliefs(Array.tabulate(props.size)(i => Array.fill(props.get(i).arity)(1.0/props.get(i).arity)))
-    val forSpans = TriangularArray.fill(s.length)(beliefs(spanProperties))
-    val forWords = Array.fill(s.length)(beliefs(wordProperties))
-
-    SentenceBeliefs(forSpans, forWords)
-  }
-
-}
 
 /**
- * property -> value for property -> score
- * @param beliefs
+ * Represents distributions over certain span properties
+ * @param span which span I'm talking about
+ * @param governor which word governs my span. not my head. my head's head. length = root (i.e. whole setnence), length+1 == off
+ * @param label my syntactic label type
+ * @param ner my ner type,
+ * @param observedNer whether or not the NER is emitted.
  */
-case class PropertyBeliefs(beliefs: Array[Array[Double]]) extends Factor[PropertyBeliefs] {
-  def apply(property: Int, propValue: Int) = beliefs(property)(propValue)
-  def apply(property:Int) = beliefs(property)
+case class SpanBeliefs(span: DSpan,
+                       governor: Beliefs[Int], // which word governs me. This isn't my head, it's my head's head.
+                       label: Beliefs[String], // syntactic label type.
+                       ner: Beliefs[NERType.Value],
+                       observedNer: Beliefs[Boolean]) extends Factor[SpanBeliefs] {
+  def *(f: SpanBeliefs): SpanBeliefs = SpanBeliefs(span, governor * f.governor, label * f.label, ner * f.ner, observedNer * f.observedNer)
+  def /(f: SpanBeliefs): SpanBeliefs = SpanBeliefs(span, governor / f.governor, label / f.label, ner / f.ner, observedNer / f.observedNer)
 
-  def *(f: PropertyBeliefs): PropertyBeliefs = {
-    PropertyBeliefs((beliefs zip f.beliefs).map{ case (a,b) => (new DenseVector(a) :* new DenseVector(b)).data})
-  }
+  def logPartition: Double = governor.logPartition + label.logPartition + ner.logPartition + observedNer.logPartition
+
+  def isConvergedTo(f: SpanBeliefs, diff: Double): Boolean = (
+    governor.isConvergedTo(f.governor, diff)
+      && label.isConvergedTo(f.label, diff)
+      && ner.isConvergedTo(f.ner, diff)
+      && observedNer.isConvergedTo(f.observedNer, diff)
+    )
+}
 
 
-  def /(f: PropertyBeliefs): PropertyBeliefs = {
-    PropertyBeliefs((beliefs zip f.beliefs).map{ case (a,b) => (new DenseVector(a) :/ new DenseVector(b)).data})
-  }
+case class WordBeliefs(pos: DPos,
+                       governor: Beliefs[Int],
+                       span: Beliefs[Span],
+                       tag: Beliefs[String],
+                       maximalLabel: Beliefs[String],
+                       anaphoric: Beliefs[Boolean],
+                       anaphor: Beliefs[DPos],
+                       coref: Array[Beliefs[Int]]
+                       ) extends Factor[WordBeliefs] {
+  def *(f: WordBeliefs): WordBeliefs = WordBeliefs(pos, governor * f.governor, span * f.span, tag * f.tag, maximalLabel * f.maximalLabel, f.anaphoric * f.anaphoric, f.anaphor * f.anaphor, Array.tabulate(coref.length)(i => coref(i) * f.coref(i)))
 
-  def isConvergedTo(f: PropertyBeliefs, diff: Double): Boolean = {
-    (0 until beliefs.length).forall(i => norm(new DenseVector(f.beliefs(i)) :- new DenseVector(beliefs(i))) <= diff)
-  }
+ def /(f: WordBeliefs): WordBeliefs = WordBeliefs(pos, governor / f.governor, span / f.span, tag / f.tag, maximalLabel / f.maximalLabel, f.anaphoric / f.anaphoric, f.anaphor / f.anaphor, Array.tabulate(coref.length)(i => coref(i) / f.coref(i)))
 
-  def logPartition: Double = beliefs.map(b => math.log(b.sum)).sum
+  def logPartition: Double = (
+    governor.logPartition
+      + span.logPartition
+      + tag.logPartition
+      + anaphoric.logPartition
+      + anaphor.logPartition
+      + coref.foldLeft(0.0)(_ + _.logPartition)
+    )
+
+  def isConvergedTo(f: WordBeliefs, diff: Double): Boolean = (this eq f) || (
+    governor.isConvergedTo(f.governor, diff)
+      && span.isConvergedTo(f.span, diff)
+      && tag.isConvergedTo(f.tag, diff)
+      && anaphoric.isConvergedTo(f.anaphoric, diff)
+      && anaphor.isConvergedTo(f.anaphor, diff)
+      && tag.isConvergedTo(f.tag, diff)
+      && maximalLabel.isConvergedTo(f.tag, diff)
+      && (0 until coref.length).forall(i => coref(i).isConvergedTo(f.coref(i), diff))
+    )
 }
 
 

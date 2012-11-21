@@ -22,6 +22,7 @@ case class CorefInstance(doc: Document,
 }
 
 
+
 object CorefInstance {
   class Factory(mentionDetector: Document=>IndexedSeq[DSpan]) {
     def apply(doc: Document) = {

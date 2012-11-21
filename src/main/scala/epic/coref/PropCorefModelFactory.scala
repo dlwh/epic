@@ -3,21 +3,53 @@ package epic.coref
 import breeze.util.{MutableIndex, Index}
 import epic.framework.Feature
 import breeze.collection.mutable.TriangularArray
-import breeze.linalg.{VectorBuilder, SparseVector}
-import collection.immutable.BitSet
-import epic.everything.models.Property
-import epic.everything.{Document, DSpan}
-import epic.coref.PropCorefModel.PropertyFeatures
+import breeze.linalg.VectorBuilder
+import epic.everything.Document
 
 
-class PropCorefModelFactory(featurizer: PairwiseFeaturizer, extractors: IndexedSeq[PropertyExtractor[_]]) {
-  def makeModel(instances: IndexedSeq[CorefInstance]): PropCorefModel = {
+trait CorefInstanceFeaturizer {
+  def featureIndex: Index[Feature]
+  def propertyFeatures: IndexedSeq[PropertyFeatures[_]]
+  def featurize(inst: CorefInstance):FeaturizedCorefInstance
+  def featurizeDocument(inst: Document): FeaturizedCorefInstance
+}
+
+object CorefInstanceFeaturizer {
+  def fromTrainingSet(featurizer: PairwiseFeaturizer,
+                      extractors: IndexedSeq[PropertyExtractor[_]],
+                      processor: CorefInstance.Factory)
+                     (instances: IndexedSeq[Document]):(CorefInstanceFeaturizer, IndexedSeq[FeaturizedCorefInstance]) = {
     val index = Index[Feature]()
-    for (inst <- instances) {
-      val length = inst.numMentions
-      for (i <- 0 until length; j <- 0 to i) {
-        indexPair(inst, j, i, index)
+
+    def indexPair(inst: CorefDocument, a: Int, b: Int, index: MutableIndex[Feature]) = {
+      val ctr = if (a == b) {
+        featurizer.featuresForRoot(inst.mentions(b), inst)
+      } else {
+        featurizer.featuresFor(inst.mentions(a), inst.mentions(b), inst)
       }
+      val vb = new VectorBuilder[Double](Int.MaxValue, ctr.size)
+      for ((f,v) <- ctr.iterator) {
+        vb.add(index.index(f), v)
+      }
+      vb
+    }
+
+    val preinstances = for (doc <- instances) yield {
+      val inst = processor(doc)
+      val length = inst.numMentions
+      val pairwiseFeatures = TriangularArray.tabulate(length){ (anaphor, mention) =>
+        indexPair(inst, anaphor, mention, index)
+      }
+      val properties = Array.tabulate(length){ mention =>
+        extractors.map(_.extract(inst.mentions(mention), inst)).toArray
+      }
+
+      (inst, pairwiseFeatures, properties)
+    }
+
+    val fixedInstances = for( (inst, pf, prop) <- preinstances) yield {
+      val fixedFeatures = pf.map{vb => vb.length = index.size; vb.toSparseVector}
+      FeaturizedCorefInstance(inst, fixedFeatures, prop)
     }
 
     // index all property-features
@@ -33,41 +65,49 @@ class PropCorefModelFactory(featurizer: PairwiseFeaturizer, extractors: IndexedS
       PropertyFeatures(prop, agg, dis, pairArray)
     }
 
-    val indexedFeaturizer = new IndexedFeaturizer(index, featuresForProperties)
-    new PropCorefModel(indexedFeaturizer,  index)
-  }
+    val feat = new CorefInstanceFeaturizer {
+      val featureIndex = index
 
-  case class IndexedFeaturizer(index: Index[Feature], properties: IndexedSeq[PropertyFeatures[_]]) extends PropCorefModel.Featurizer {
+      def propertyFeatures: IndexedSeq[PropertyFeatures[_]] = featuresForProperties
 
-    def localize(inst: CorefDocument): Localization = new Localization {
-      def featuresFor(anaphor: Int, mention: Int): VectorBuilder[Double] = {
-        val ctr = if (anaphor == mention) {
-          featurizer.featuresForRoot(inst.mentions(anaphor), inst)
+      def featurize(inst: CorefInstance): FeaturizedCorefInstance = {
+        val length = inst.numMentions
+        val pairwiseFeatures = TriangularArray.tabulate(length){ (anaphor, mention) =>
+          innerPair(inst, anaphor, mention, index)
+        }
+        val properties = Array.tabulate(length){ mention =>
+          extractors.map(_.extract(inst.mentions(mention), inst)).toArray
+        }
+
+        FeaturizedCorefInstance(inst, pairwiseFeatures, properties)
+      }
+
+
+      def featurizeDocument(inst: Document): FeaturizedCorefInstance = {
+        featurize(processor(inst))
+      }
+
+      def innerPair(inst: CorefDocument, a: Int, b: Int, index: Index[Feature]) = {
+        val ctr = if (a == b) {
+          featurizer.featuresForRoot(inst.mentions(b), inst)
         } else {
-          featurizer.featuresFor(inst.mentions(anaphor), inst.mentions(mention), inst)
+          featurizer.featuresFor(inst.mentions(a), inst.mentions(b), inst)
         }
-        val vec = new VectorBuilder[Double](Int.MaxValue)
-        for ((f, v) <- ctr.iterator) {
-          vec.add(index(f),v)
+        val vb = new VectorBuilder[Double](Int.MaxValue, ctr.size)
+        for ((f,v) <- ctr.iterator) {
+          val fg = index(f)
+          if(fg != -1)
+            vb.add(fg, v)
         }
-        vec
-      }
-
-      def propertyValueFor(mention: Int, prop: Int): Int = {
-        extractors(prop).extract(inst.mentions(mention), inst)
+        vb.toSparseVector
       }
     }
+
+
+
+    feat -> fixedInstances
+
   }
 
-  private def indexPair(inst: CorefDocument, a: Int, b: Int, index: MutableIndex[Feature]) {
-    val ctr = if (a == b) {
-      featurizer.featuresForRoot(inst.mentions(b), inst)
-    } else {
-      featurizer.featuresFor(inst.mentions(a), inst.mentions(b), inst)
-    }
-    for (f <- ctr.keysIterator) {
-      index.index(f)
-    }
-  }
 
 }

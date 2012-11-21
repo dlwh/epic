@@ -31,3 +31,20 @@ object DSpan {
     }
   }
 }
+
+case class DPos(doc: String, sentence: Int, pos: Int)
+
+
+object DPos {
+  implicit val ordering: Ordering[DPos] = new Ordering[DPos] {
+    def compare(x: DPos, y: DPos): Int = {
+      x.doc.compare(y.doc) match {
+        case 0 =>
+          if(x.sentence < y.sentence) -1
+          else if(x.sentence > y.sentence) 1
+          else x.pos - y.pos
+        case z => z
+      }
+    }
+  }
+}
