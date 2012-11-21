@@ -12,7 +12,8 @@ scalaVersion := "2.9.2"
 
 resolvers ++= Seq(
   "ScalaNLP Maven2" at "http://repo.scalanlp.org/repo",
-  "Scala Tools Snapshots" at "http://scala-tools.org/repo-snapshots/"
+  "Scala Tools Snapshots" at "http://scala-tools.org/repo-snapshots/",
+  "Sonatype snapshots" at "http://oss.sonatype.org/content/groups/public"
 )
 
 libraryDependencies ++= Seq(
@@ -20,7 +21,8 @@ libraryDependencies ++= Seq(
   "org.scalanlp" %% "breeze-core" % "0.2-SNAPSHOT",
   "org.scalanlp" %% "breeze-math" % "0.2-SNAPSHOT",
   "org.scalanlp" %% "breeze-process" % "0.2-SNAPSHOT",
-  "org.scalanlp" %% "breeze-learn" % "0.2-SNAPSHOT"
+  "org.scalanlp" %% "breeze-learn" % "0.2-SNAPSHOT",
+  "com.nativelibs4java" % "javacl" % "1.0-SNAPSHOT"
 )
 
 libraryDependencies <<= (scalaVersion, libraryDependencies) { (sv, deps) =>
@@ -47,3 +49,7 @@ seq(assemblySettings: _*)
 
 
 seq(jacoco.settings : _*)
+
+unmanagedResourceDirectories in Compile <+= (baseDirectory) { bd => bd/  "src/main/opencl/" }
+
+unmanagedResourceDirectories in Runtime <+= (baseDirectory) { bd => bd/"src/main/opencl/" }
