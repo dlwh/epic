@@ -42,6 +42,7 @@ final class BaseGrammar[L] private (
                                     binaryRulesByRightChild: Array[Array[Int]],
                                     unaryRulesByChild: Array[Array[Int]]) extends Encoder[Rule[L]] with Serializable {
 
+
   def labelEncoder  = Encoder.fromIndex(labelIndex)
 
   // Accessors for properties of indexed rules
@@ -54,6 +55,8 @@ final class BaseGrammar[L] private (
   /** Returns the child label index from the (unary) rule index */
   def child(r: Int): Int = indexedRules(r).asInstanceOf[UnaryRule[Int]].child
   def chain(r: Int): Seq[String] = indexedRules(r).asInstanceOf[UnaryRule[Int]].chain
+
+  def isBinary(r: Int): Boolean = indexedRules(r).isInstanceOf[BinaryRule[Int]]
 
   // query by parent or child
   /** Gives all binary rule indices with this parent */
