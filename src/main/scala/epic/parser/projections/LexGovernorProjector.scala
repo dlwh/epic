@@ -13,14 +13,14 @@ import models.LexGrammar
 class LexGovernorProjector[L, W](grammar: LexGrammar[L, W], notConstituent: L) {
   private val nc = grammar.grammar.labelIndex(notConstituent)
 
-  def apply(chart: Marginal[L, W]):LexGovernorInfo = {
-    val v = new Visitor(chart.length)
+  def apply(anch: LexGrammar[L,W]#Spec, chart: Marginal[L, W]):LexGovernorInfo = {
+    val v = new Visitor(anch, chart.length)
     chart.visit(v)
     LexGovernorInfo(v.spanType, v.spanGovernorCounts, v.wordGovernorCounts, v.maximalLabelType)
   }
 
   // WHENEVER you change this, be sure to change PropertyParsingAnchoring
-  private class Visitor(length: Int) extends AnchoredVisitor[L] {
+  private class Visitor(spec: LexGrammar[L, W]#Spec, length: Int) extends AnchoredVisitor[L] {
     val spanType = TriangularArray.fill(length)(labelBeliefs)
     val spanGovernorCounts = TriangularArray.fill(length)(baseDV)
     val wordGovernorCounts = Array.fill(length)(DenseVector.zeros[Double](length+1))
@@ -28,8 +28,8 @@ class LexGovernorProjector[L, W](grammar: LexGrammar[L, W], notConstituent: L) {
     val wordTagType = Array.fill(length)(labelBeliefs)
 
     def visitBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int, score: Double) {
-      val head = (ref:Int) / length
-      val dep = (ref:Int) % length
+      val head = spec.headIndex(ref)
+      val dep = spec.depIndex(ref)
       wordGovernorCounts(dep)(head) += score
       if (grammar.isRightRule(rule)) { // head on the right
         spanGovernorCounts(begin, split)(head) += score
@@ -53,12 +53,13 @@ class LexGovernorProjector[L, W](grammar: LexGrammar[L, W], notConstituent: L) {
     }
 
     def visitSpan(begin: Int, end: Int, tag: Int, ref: Int, score: Double) {
+      val head = spec.unaryHeadIndex(ref)
       if (begin == 0 && end == length) { // root, get the length
-        wordGovernorCounts(ref)(length) += score
+        wordGovernorCounts(head)(length) += score
         spanGovernorCounts(begin, end)(length) += score
         spanGovernorCounts(begin, end)(notASpan) -= score
-        maximalLabelType(ref)(tag) += score
-        maximalLabelType(ref)(tag) -= score
+        maximalLabelType(head)(tag) += score
+        maximalLabelType(head)(tag) -= score
       }
 
       if(begin + 1 == end) {

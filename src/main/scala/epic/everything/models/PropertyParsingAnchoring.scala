@@ -36,8 +36,8 @@ final class PropertyParsingAnchoring[L, W](val lexGrammar: LexGrammar[L, W],
   }
 
   def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int): Double = {
-    val head = (ref:Int) / length
-    val dep = (ref:Int) % length
+    val head = anchoring.headIndex(ref)
+    val dep = anchoring.depIndex(ref)
     val score = beliefs.words(dep).governor(head)
     if (lexGrammar.isRightRule(rule)) { // head on the right
       math.log(score * beliefs.spans(begin, split).governor(head) / beliefs.spanBeliefs(begin, split).governor(length+1))

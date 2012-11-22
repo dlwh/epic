@@ -124,7 +124,7 @@ class IndexedLexFeaturizer[L, W](f: LexFeaturizer[L, W],
     def length = words.length
 
     def featuresForUnaryRule(begin: Int, end: Int, rule: Int, ref: Int) = {
-      indexedFeaturesForRuleHead(rule, ref)
+      indexedFeaturesForRuleHead(rule, unaryHeadIndex(ref))
     }
 
     def featuresForSpan(begin: Int, end: Int, tag: Int, ref: Int) = {
@@ -152,9 +152,22 @@ class IndexedLexFeaturizer[L, W](f: LexFeaturizer[L, W],
     }
 
 
+    def headIndex(ruleRef: Int) = {
+      ruleRef / words.length
+    }
+
+    def depIndex(ruleRef: Int) = {
+      ruleRef / words.length
+    }
+
+    def unaryHeadIndex(ref: Int) = {
+      ref
+    }
+
+
     def featuresForBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int) =  {
-      val head = (ref:Int) / words.length
-      val dep = (ref:Int) % words.length
+      val head = headIndex(ref)
+      val dep = depIndex(ref)
 
       var rcache = binaryCache(head)
       if(rcache eq null) {
@@ -382,14 +395,14 @@ case class StandardFeaturizer[L, W>:Null, P](wordIndex: Index[W],
   }
 }
 
-class LexGrammar[L, W](val grammar: BaseGrammar[L],
-                       val lexicon: Lexicon[L, W],
-                       wordIndex: Index[W],
-                       fi: IndexedLexFeaturizer[L, W],
-                       weights: DenseVector[Double],
-                       binaries: Array[Boolean],
-                       leftRules: Array[Boolean],
-                       rightRules: Array[Boolean]) extends RefinedGrammar[L, W] {
+final class LexGrammar[L, W](val grammar: BaseGrammar[L],
+                             val lexicon: Lexicon[L, W],
+                             wordIndex: Index[W],
+                             fi: IndexedLexFeaturizer[L, W],
+                             weights: DenseVector[Double],
+                             binaries: Array[Boolean],
+                             leftRules: Array[Boolean],
+                             rightRules: Array[Boolean]) extends RefinedGrammar[L, W] {
   def isLeftRule(r: Int) = leftRules(r)
 
   def isRightRule(r: Int) = rightRules(r)
@@ -425,14 +438,14 @@ class LexGrammar[L, W](val grammar: BaseGrammar[L],
     val bCache = new OpenAddressHashArray[Double](words.size * words.size * index.size, Double.NaN)
     val uCache = new OpenAddressHashArray[Double](words.size * index.size, Double.NaN)
 
-    def scoreUnaryRule(begin: Int, end: Int, rule: Int, head: Int) = {
-      val cacheIndex = head + words.size * rule
+    def scoreUnaryRule(begin: Int, end: Int, rule: Int, ref: Int) = {
+      val cacheIndex = ref + words.size * rule
       val score = uCache(cacheIndex)
 
       if (!score.isNaN)
         score
       else {
-        val score = dot(f.featuresForUnaryRule(begin, end, rule, head))
+        val score = dot(f.featuresForUnaryRule(begin, end, rule, ref))
         uCache(cacheIndex) = score
         score
       }
@@ -440,8 +453,8 @@ class LexGrammar[L, W](val grammar: BaseGrammar[L],
 
 
     def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int) = {
-      val head = (ref:Int) / words.length
-      val dep = (ref:Int) % words.length
+      val head = headIndex(ref)
+      val dep = depIndex(ref)
       val cacheIndex = head + words.size * (dep + words.size * rule)
       val score = bCache(cacheIndex)
 
@@ -455,6 +468,17 @@ class LexGrammar[L, W](val grammar: BaseGrammar[L],
 
     }
 
+    def headIndex(ruleRef: Int) = {
+      ruleRef / words.length
+    }
+
+    def depIndex(ruleRef: Int) = {
+      ruleRef / words.length
+    }
+
+    def unaryHeadIndex(ref: Int) = {
+      ref
+    }
 
     def validLabelRefinements(begin: Int, end: Int, label: Int) = Array.range(begin,end)
 
@@ -495,6 +519,7 @@ class LexGrammar[L, W](val grammar: BaseGrammar[L],
     def validTagsFor(pos: Int) = {
       indexedValidTags(pos)
     }
+
 
     def leftChildRefinement(rule: Int, ruleRef: Int) = {
       if(isLeftRule(rule)) ruleRef / words.length
