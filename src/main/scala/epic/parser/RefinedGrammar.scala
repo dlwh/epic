@@ -64,7 +64,7 @@ object RefinedGrammar {
   def generative[L, W](root: L,
                        binaryProductions: Counter2[L, BinaryRule[L], Double],
                        unaryProductions: Counter2[L, UnaryRule[L], Double],
-                       wordCounts: Counter2[L, W, Double]):RefinedGrammar[L, W] = {
+                       wordCounts: Counter2[L, W, Double]):SimpleRefinedGrammar[L, L, W] = {
     val grammar = BaseGrammar(root, binaryProductions.keysIterator.map(_._2) ++ unaryProductions.keysIterator.map(_._2))
     val lexicon = new SimpleLexicon[L, W](wordCounts)
 

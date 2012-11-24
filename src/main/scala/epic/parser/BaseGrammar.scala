@@ -57,6 +57,7 @@ final class BaseGrammar[L] private (
   def chain(r: Int): Seq[String] = indexedRules(r).asInstanceOf[UnaryRule[Int]].chain
 
   def isBinary(r: Int): Boolean = indexedRules(r).isInstanceOf[BinaryRule[Int]]
+  def indexedRule(r: Int) = indexedRules(r)
 
   // query by parent or child
   /** Gives all binary rule indices with this parent */
