@@ -15,9 +15,13 @@ import collection.mutable.ArrayBuffer
 import breeze.collection.mutable.TriangularArray
 import com.nativelibs4java.opencl.CLMem.Usage
 import breeze.linalg.SparseVector
+import epic.parser.ParseChart.LogProbability
 
 class GrammarKernel[L, L2, W](context: CLContext,
-                              grammar: SimpleRefinedGrammar[L, L2, W], program: CLProgram, maxCells: Int = 40000) {
+                              grammar: SimpleRefinedGrammar[L, L2, W],
+                              inside: CLProgram,
+                              outside: CLProgram,
+                              maxCells: Int = 40000) {
 
 
   val nsyms = grammar.refinedGrammar.labelIndex.size
@@ -65,8 +69,10 @@ class GrammarKernel[L, L2, W](context: CLContext,
     trees.toIndexedSeq
   }
 
-  val binaries = program.createKernel("inside_inner")
-  val unaries = program.createKernel("inside_unary")
+  val binaries = inside.createKernel("inside_inner")
+  val unaries = inside.createKernel("inside_unary")
+  val obinaries = outside.createKernel("outside_inner")
+  val ounaries = outside.createKernel("outside_unary")
 
   def doParse(buffer: Array[Float], offsets: Array[Int], lengths: Array[Int]):IndexedSeq[BinarizedTree[L]] = {
     val bufPtr = pointerToFloats(buffer:_*)
@@ -85,25 +91,46 @@ class GrammarKernel[L, L2, W](context: CLContext,
     unaries.setArg(3, 1)
     val queue = context.createDefaultQueue()
     var lastU = unaries.enqueueNDRange(queue, Array(offsets.length, maxLength))
-    queue.finish()
     for(len <- 2 to maxLength) {
       unaries.setArg(3, len)
       binaries.setArg(3, len)
-      val b = binaries.enqueueNDRange(queue, Array(offsets.length, maxLength), lastU)
-      queue.finish()
-      lastU = unaries.enqueueNDRange(queue, Array(offsets.length, maxLength), b)
-      queue.finish()
+      val b = binaries.enqueueNDRange(queue, Array(offsets.length, maxLength+1-len), lastU)
+      lastU = unaries.enqueueNDRange(queue, Array(offsets.length, maxLength+1-len), b)
+    }
+    // outside
+    // fill outsideDev with zeros...
+    val outside = new Array[Float](buffer.length)
+    val outsidePtr = pointerToFloats(outside:_*)
+    val outsideDev = context.createBuffer(Usage.InputOutput, outsidePtr)
+    obinaries.setArg(0, outsideDev)
+    obinaries.setArg(1, bufDev)
+    obinaries.setArg(2, offDev)
+    obinaries.setArg(3, lenDev)
+    ounaries.setArg(0, outsideDev)
+    ounaries.setArg(1, offDev)
+    ounaries.setArg(2, lenDev)
+    ounaries.setArg(3, maxLength)
+    lastU = ounaries.enqueueNDRange(queue, Array(offsets.length, 1), lastU)
+    for(len <- (maxLength-1) to 1 by -1) {
+      obinaries.setArg(4, len)
+      val b = obinaries.enqueueNDRange(queue, Array(offsets.length, maxLength+1-len), lastU)
+      ounaries.setArg(3, len)
+      lastU = ounaries.enqueueNDRange(queue, Array(offsets.length, maxLength+1-len), b)
     }
     queue.finish()
-    val out = bufDev.read(queue, lastU).getFloats
 
-    val rootScores = for(i <- 0 until offsets.length) yield {
+    val in = bufDev.read(queue, lastU).getFloats
+    val out = outsideDev.read(queue, lastU).getFloats
+
+    val marginals = for(i <- 0 until offsets.length) yield {
       val off = offsets(i)
       val len = lengths(i)
-      Marginal(out, off, len)
+      Marginal(in, out, off, len)
     }
 
-    println(rootScores.map(_.rootScore).mkString("\n"))
+    println(marginals.map(m => breeze.numerics.logSum((0 until grammar.refinedGrammar.labelIndex.size).map(i => m.topOutsideScore(0,1,i) + m.topInsideScore(0, 1, i)))))
+//        println(marginals.mkString("\n...\n"))
+    println(marginals.map(_.rootScore).mkString("\n"))
 
     bufPtr.release()
     offPtr.release()
@@ -114,23 +141,60 @@ class GrammarKernel[L, L2, W](context: CLContext,
     IndexedSeq.empty
   }
 
-  case class Marginal(inside: Array[Float], offset: Int, length: Int) {
-    def topScore(begin: Int, end: Int, label: Int) =  {
-      val score = inside(offset + TriangularArray.index(begin, end) * nsyms * 2 + label)
+  case class Marginal(inside: Array[Float], outside: Array[Float], offset: Int, length: Int) {
+    def topInsideScore(begin: Int, end: Int, label: Int) =  {
+      val score = inside(topIndex(begin, end, label))
 //      java.lang.Math.scalb(score, -10 * ((end-begin)-1))
       math.log(score) - 10 * ((end-begin)-1) * math.log(2)
     }
 
-    def botScore(begin: Int, end: Int, label: Int) =  {
-      val score = inside(offset + TriangularArray.index(begin, end) * nsyms * 2 + nsyms + label)
+
+    def botInsideScore(begin: Int, end: Int, label: Int) =  {
+      val score = inside(botIndex(begin, end, label))
 //      java.lang.Math.scalb(score, -10 * ((end-begin)-1))
 //      math.log(score)
       math.log(score) - 10 * ((end-begin)-1) * math.log(2)
     }
 
-    def rootScore = topScore(0, length, root)
+    def topOutsideScore(begin: Int, end: Int, label: Int) =  {
+      val score = outside(topIndex(begin, end, label))
+//      java.lang.Math.scalb(score, -10 * ((end-begin)-1))
+      math.log(score) - 10 * (length-(end-begin)) * math.log(2)
+    }
 
-    override def toString = TriangularArray.tabulate(length){ (beg, end) => (beg, end, {val s = SparseVector.tabulate(nsyms)(topScore(beg, end, _)); s.compact(); s}, {val x = SparseVector.tabulate(nsyms)(botScore(beg, end, _)); x.compact(); x})}.toString
+
+    def botOutsideScore(begin: Int, end: Int, label: Int) =  {
+      val score = outside(botIndex(begin, end, label))
+//      java.lang.Math.scalb(score, -10 * ((end-begin)-1))
+//      math.log(score)
+      math.log(score) - 10 * (length-(end-begin)) * math.log(2)
+    }
+
+    @inline
+    private def topIndex(begin: Int, end: Int, label: Int): Int = {
+      offset + TriangularArray.index(begin, end) * nsyms * 2 + label
+    }
+
+    @inline
+    private def botIndex(begin: Int, end: Int, label: Int): Int = topIndex(begin, end, label) + nsyms
+
+
+    override def toString() = {
+      val pieces = for {
+        i <- 0 until length
+        end <- (i+1) to length
+        l <- 0 until nsyms
+        ts = topOutsideScore(i, end, l)
+        bs = botOutsideScore(i, end, l)
+        if !ts.isInfinite || !bs.isInfinite
+      } yield {
+        (i,end,l) + " " + ts + " " + bs
+      }
+
+      pieces.mkString("\n")
+    }
+
+    def rootScore = topInsideScore(0, length, root)
   }
 }
 
@@ -166,8 +230,14 @@ object GrammarKernel {
     kern.parse(train.map(_.words.toIndexedSeq))
     println("Done: " + (System.currentTimeMillis() - timeIn))
     val timeX = System.currentTimeMillis()
-    val marg = train.map(_.words).map(ChartMarginal(AugmentedGrammar.fromRefined(grammar), _, ParseChart.logProb).partition)
-    println(marg.mkString("\n"))
+    val marg = train.map(_.words).map(ChartMarginal(AugmentedGrammar.fromRefined(grammar), _, ParseChart.logProb))
+    def unroll(m: ChartMarginal[ParseChart.LogProbabilityParseChart, AnnotatedLabel, String]) = {
+//      for(l <- 0 until grammar.labelIndex.size; ref <- grammar.refinements.labels.localRefinements(l)) yield{
+//        m.outside.top(0,1,l, ref)
+//      }
+      m.partition
+    }
+    println(marg.map(m => unroll(m)).mkString("\n"))
     println("Done: " + (System.currentTimeMillis() - timeX))
   }
 
@@ -180,12 +250,17 @@ object GrammarKernel {
     val unaryRuleScores = sortedUnary.map { r => indexedRule(r).asInstanceOf[UnaryRule[Int]] -> grammar.ruleScore(r) }
     val binaryRuleScores = sortedBinary.map { r => indexedRule(r).asInstanceOf[BinaryRule[Int]] -> grammar.ruleScore(r) }
     val insideBinaryText = insideTemplate(labelIndex.size, binaryRuleScores, unaryRuleScores)
+    val outsideBinaryText = outsideTemplate(labelIndex.size, grammar.refinedGrammar.rootIndex, binaryRuleScores, unaryRuleScores)
 
     val context = JavaCL.createBestContext()
+//    val cpuPlatform = JavaCL.listPlatforms().filter(_.listCPUDevices(true).nonEmpty).head
+//    val context = cpuPlatform.createContext(new java.util.HashMap(), cpuPlatform.listCPUDevices(true):_*)
+//    println(context)
 
     val program = context.createProgram(insideBinaryText)
+    val outside = context.createProgram(outsideBinaryText)
 
-    val kern = new GrammarKernel(context, grammar, program)
+    val kern = new GrammarKernel(context, grammar, program, outside)
 
     kern
   }
@@ -193,7 +268,14 @@ object GrammarKernel {
   def insideUnaryUpdates(rules: IndexedSeq[(UnaryRule[Int], Double)]): String = {
     // TODO fma
    val individual = for( (r,score) <- rules) yield
-      """top[%d] += %ff * bot[%d]; """.format(r.parent, math.exp(score.toFloat), r.child)
+      """top[%d] += %ff * bot[%d];""".format(r.parent, math.exp(score.toFloat), r.child)
+    individual.mkString("\n    ")
+  }
+
+  def outsideUnaryUpdates(rules: IndexedSeq[(UnaryRule[Int], Double)]): String = {
+    // TODO fma
+   val individual = for( (r,score) <- rules) yield
+      """bot[%d] += %ff * top[%d];""".format(r.child, math.exp(score.toFloat), r.parent)
     individual.mkString("\n    ")
   }
 
@@ -201,6 +283,23 @@ object GrammarKernel {
     // TODO fma
    val individual = for( (r,score) <- rules) yield
       """out[%d] += %ff * left[%d] * right[%d];""".format(r.parent, math.exp(score.toFloat), r.left, r.right)
+    individual.mkString("\n      ")
+  }
+
+
+  // otarget is the left child, completion on right.
+  def outsideRightCompletionUpdates(rules: IndexedSeq[(BinaryRule[Int], Double)]): String = {
+    // TODO fma
+   val individual = for( (r,score) <- rules) yield
+      """otarget[%d] += %ff * oparent[%d] * icompl[%d];""".format(r.left, math.exp(score.toFloat), r.parent, r.right)
+    individual.mkString("\n      ")
+  }
+
+  // otarget is the right child, completion on left.
+  def outsideLeftCompletionUpdates(rules: IndexedSeq[(BinaryRule[Int], Double)]): String = {
+    // TODO fma
+   val individual = for( (r,score) <- rules) yield
+      """otarget[%d] += %ff * oparent[%d] * icompl[%d];""".format(r.right, math.exp(score.toFloat), r.parent, r.left)
     individual.mkString("\n      ")
   }
 
@@ -264,5 +363,88 @@ __kernel void inside_unary(__global float * charts,
     %s
   }
 }
+
     """.stripMargin.format(numSyms, insideRuleUpdates(rules), insideUnaryUpdates(unaries))
+
+def outsideTemplate(numSyms: Int, root: Int,
+                   rules: IndexedSeq[(BinaryRule[Int], Double)],
+                   unaries: IndexedSeq[(UnaryRule[Int], Double)]): String ="""
+#define SCALE_FACTOR 10
+#define NUM_SYMS %d
+#define CELL_TOP(chart, begin, end) (chart + ((end) * ((end)+1)/2 + begin) * NUM_SYMS * 2)
+#define CELL_BOT(chart, begin, end) (CELL_TOP(chart, begin, end) + NUM_SYMS)
+  __kernel void outside_unary(__global float * charts,
+                __global const int* offsets,
+                __global const int* lengths,
+                const int spanLength) {
+    const int sentence = get_global_id(0);
+    const int begin = get_global_id(1);
+    const int end = begin + spanLength;
+    const int length = lengths[sentence];
+
+    if(spanLength == length) {
+      __global float* outside = charts + offsets[sentence];
+      (CELL_TOP(outside, 0, length))[%d] = 1.0f;
+    }
+
+    if (end <= length) {
+      __global float* chart = charts + offsets[sentence];
+      __global const float* top = CELL_TOP(chart, begin, end);
+      __global float* bot = CELL_BOT(chart, begin, end);
+      %s
+    }
+  }
+
+  __kernel void outside_inner(__global float* outsides,
+                __global const float * insides,
+                __global const int* offsets,
+                __global const int* lengths,
+                const int spanLength) {
+    const int sentence = get_global_id(0);
+    const int begin = get_global_id(1);
+    const int end = begin + spanLength;
+    const int length = lengths[sentence];
+    float oparent[NUM_SYMS], icompl[NUM_SYMS], otarget[NUM_SYMS];
+    if (end <= length) {
+      __global const float* inside = insides + offsets[sentence];
+      __global float* outside = outsides + offsets[sentence];
+      for(int i = 0; i < NUM_SYMS; ++i) {
+        otarget[i] = 0.0f;
+      }
+      // complete looking right
+      for(int completion = end+1; completion <= length; ++completion) {
+         __global const float * gparent = CELL_BOT(outside, begin, completion); // scale factor of (2 ^ SCALE_FACTOR)^(length-(completion - begin))
+         __global const float * gright = CELL_TOP(inside, end, completion); // scale factor of (2 ^ SCALE_FACTOR)^((end - completion) - 1)
+         // product of gparent and gright has scale (2^SCALE_FACTOR)^(length-(end-begin)-1), so need to scale by 1 to maintain invariant
+         for(int i = 0; i < NUM_SYMS; ++i) {
+           icompl[i] = gright[i];
+         }
+         for(int i = 0; i < NUM_SYMS; ++i) {
+           oparent[i] = gparent[i];
+         }
+         %s
+      }
+
+     // complete looking left
+      for(int completion = 0; completion < begin; ++completion) {
+         __global float * gparent = CELL_BOT(outside, completion, end); // scale factor of (2 ^ SCALE_FACTOR)^(length-(end-completion))
+         __global const float * gleft = CELL_TOP(inside, completion, begin); // scale factor of (2 ^ SCALE_FACTOR)^((begin - completion) - 1)
+         // product of gparent and gleft has scale (2^SCALE_FACTOR)^(length-(end-begin)-1), so need to scale by 1 to maintain invariant
+         for(int i = 0; i < NUM_SYMS; ++i) {
+           icompl[i] = gleft[i];
+         }
+         for(int i = 0; i < NUM_SYMS; ++i) {
+           oparent[i] = gparent[i];
+         }
+         %s
+      }
+
+      // multiply in a 2^SCALE_FACTOR to re-achieve balance.
+      __global float* gout = CELL_TOP(outside, begin, end);
+      for(int i = 0; i < NUM_SYMS; ++i) {
+        gout[i] = ldexp(otarget[i], SCALE_FACTOR);
+      }
+    }
+  }
+                                                                                              """.format(numSyms, root, outsideUnaryUpdates(unaries), outsideRightCompletionUpdates(rules), outsideLeftCompletionUpdates(rules))
 }

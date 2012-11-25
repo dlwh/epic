@@ -27,7 +27,7 @@ import epic.trees._
  *
  * @author dlwh
  */
-@SerialVersionUID(1)
+@SerialVersionUID(2)
 final class BaseGrammar[L] private (
                                    /** The "start" symbol. Usually "TOP" in this parser. */
                                      val root: L,
@@ -41,6 +41,7 @@ final class BaseGrammar[L] private (
                                     binaryRulesByLeftChild: Array[Array[Int]],
                                     binaryRulesByRightChild: Array[Array[Int]],
                                     unaryRulesByChild: Array[Array[Int]]) extends Encoder[Rule[L]] with Serializable {
+  val rootIndex: Int = labelIndex(root)
 
 
   def labelEncoder  = Encoder.fromIndex(labelIndex)
