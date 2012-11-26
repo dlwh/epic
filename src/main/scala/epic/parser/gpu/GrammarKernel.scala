@@ -10,7 +10,7 @@ import java.{util, lang}
 import com.nativelibs4java.util.IOUtils
 import scala.Array
 import breeze.config.{Configuration, CommandLineParser}
-import java.io.File
+import java.io.{FileWriter, File}
 import collection.mutable.ArrayBuffer
 import breeze.collection.mutable.TriangularArray
 import com.nativelibs4java.opencl.CLMem.Usage
@@ -261,7 +261,7 @@ object GrammarKernel {
   def fromSimpleGrammar[L, L2, W](grammar: SimpleRefinedGrammar[L, L2, W]) = {
     import grammar.refinedGrammar._
     val (binaryRules, unaryRules) = (0 until index.size).partition(isBinary(_))
-    val sortedBinary: IndexedSeq[Int] = binaryRules.sortBy{r1 => (leftChild(r1), rightChild(r1), parent(r1))}(Ordering.Tuple3)
+    val sortedBinary: IndexedSeq[Int] = binaryRules.sortBy{r1 => (leftChild(r1), parent(r1), rightChild(r1))}(Ordering.Tuple3)
     val sortedUnary = unaryRules.sortBy(r => parent(r) -> child(r))(Ordering.Tuple2)
 
     val unaryRuleScores = sortedUnary.map { r => indexedRule(r).asInstanceOf[UnaryRule[Int]] -> grammar.ruleScore(r) }
@@ -269,13 +269,20 @@ object GrammarKernel {
     val insideBinaryText = insideTemplate(labelIndex.size, binaryRuleScores, unaryRuleScores)
     val outsideBinaryText = outsideTemplate(labelIndex.size, grammar.refinedGrammar.rootIndex, binaryRuleScores, unaryRuleScores)
 
+    if(true) {val o = new FileWriter("inside.cl"); o.write(insideBinaryText); o.close()}
+    if(true) {val o = new FileWriter("outside.cl"); o.write(outsideBinaryText); o.close()}
+
     val context = JavaCL.createBestContext()
 //    val cpuPlatform = JavaCL.listPlatforms().filter(_.listCPUDevices(true).nonEmpty).head
 //    val context = cpuPlatform.createContext(new java.util.HashMap(), cpuPlatform.listCPUDevices(true):_*)
 //    println(context)
 
     val program = context.createProgram(insideBinaryText)
+    program.setFastRelaxedMath()
+    program.setUnsafeMathOptimizations()
     val outside = context.createProgram(outsideBinaryText)
+    outside.setUnsafeMathOptimizations()
+    outside.setFastRelaxedMath()
 
     val kern = new GrammarKernel(context, grammar, program, outside)
 
@@ -283,9 +290,8 @@ object GrammarKernel {
   }
 
   def insideUnaryUpdates(rules: IndexedSeq[(UnaryRule[Int], Double)]): String = {
-    // TODO fma
    val individual = for( (r,score) <- rules) yield
-      """top[%d] += %ff * bot[%d];""".format(r.parent, math.exp(score.toFloat), r.child)
+      """top[%d] += mad(%ff, bot[%d], top[%d]);""".format(r.parent, math.exp(score.toFloat), r.child, r.parent)
     individual.mkString("\n    ")
   }
 
@@ -299,7 +305,6 @@ object GrammarKernel {
   def insideRuleUpdates(rules: IndexedSeq[(BinaryRule[Int], Double)]): String = {
     // TODO fma
     var lastLeft = -1
-    var lastRight = -1
     val sb = new ArrayBuffer[String]
     sb += "float currentLeftScore;"
     for((r@BinaryRule(p, l, right), score) <- rules) {
