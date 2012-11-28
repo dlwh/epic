@@ -502,6 +502,37 @@ def outsideTemplate(numSyms: Int, root: Int,
 //        gout[i] = otarget[i];
       }
     }
+  }""".format(numSyms, root, outsideUnaryUpdates(unaries), outsideRightCompletionUpdates(rules), outsideLeftCompletionUpdates(rules))
+
+  """
+  #define SCALE_FACTOR 10
+  #define NUM_SYMS %d
+  #define NUM_RULES %d
+  #define CELL_TOP(chart, begin, end) (chart + ((end) * ((end)+1)/2 + begin) * NUM_SYMS * 2)
+  #define CELL_BOT(chart, begin, end) (CELL_TOP(chart, begin, end) + NUM_SYMS)
+
+  __kernel void binary_ecounts(__global float* ecounts,
+     __global const float* outsides,
+     __global const float * insides,
+     __global const int* offsets,
+     __global const int* lengths,
+     const int span_length,
+     __local float* buffer
+     ) {
+    const int sentence = get_global_id(0);
+    const int begin = get_global_id(1);
+    const int end = begin + span_length;
+    const int length = lengths[sentence];
+    const int split = begin + get_global_id(2) + 1;
+    if(end <= length) {
+      const int mybuf = buffer + get_local_id(0)  * MAX_NUM_RULES_PER_SYMBOL;
+      // FOR each parent
+      // READ IN PARENT OSCORE
+      // if oscore != 0:
+      // compute local expected counts for this split point
+
+    }
   }
-                                                                                              """.format(numSyms, root, outsideUnaryUpdates(unaries), outsideRightCompletionUpdates(rules), outsideLeftCompletionUpdates(rules))
+
+  """.format(numRules)
 }
