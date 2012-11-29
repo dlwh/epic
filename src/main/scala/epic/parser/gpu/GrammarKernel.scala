@@ -247,7 +247,7 @@ object GrammarKernel {
     kern.parse(train.map(_.words.toIndexedSeq))
     println("Done: " + (System.currentTimeMillis() - timeIn))
     val timeX = System.currentTimeMillis()
-//    val marg = train.map(_.words).map(ChartMarginal(AugmentedGrammar.fromRefined(grammar), _, ParseChart.logProb))
+    val marg = train.map(_.words).par.foreach(ChartMarginal(AugmentedGrammar.fromRefined(grammar), _, ParseChart.logProb))
 //    def unroll(m: ChartMarginal[ParseChart.LogProbabilityParseChart, AnnotatedLabel, String]) = {
 //      for(l <- 0 until grammar.labelIndex.size; ref <- grammar.refinements.labels.localRefinements(l)) yield{
 //        m.outside.top(0,1,l, ref)
@@ -255,7 +255,7 @@ object GrammarKernel {
 //      m.partition
 //    }
 //    println(marg.map(m => unroll(m)).mkString("\n"))
-//    println("Done: " + (System.currentTimeMillis() - timeX))
+    println("Done: " + (System.currentTimeMillis() - timeX))
   }
 
   def fromSimpleGrammar[L, L2, W](grammar: SimpleRefinedGrammar[L, L2, W]) = {
@@ -268,9 +268,11 @@ object GrammarKernel {
     val binaryRuleScores = sortedBinary.map { r => indexedRule(r).asInstanceOf[BinaryRule[Int]] -> grammar.ruleScore(r) }
     val insideBinaryText = insideTemplate(labelIndex.size, binaryRuleScores, unaryRuleScores)
     val outsideBinaryText = outsideTemplate(labelIndex.size, grammar.refinedGrammar.rootIndex, binaryRuleScores, unaryRuleScores)
+    val ecountsText = ecountsTemplate(labelIndex.size, grammar.refinedGrammar.rootIndex, binaryRuleScores)
 
     if(true) {val o = new FileWriter("inside.cl"); o.write(insideBinaryText); o.close()}
     if(true) {val o = new FileWriter("outside.cl"); o.write(outsideBinaryText); o.close()}
+    if(true) {val o = new FileWriter("ecounts.cl"); o.write(ecountsText); o.close()}
 
     val context = JavaCL.createBestContext()
 //    val cpuPlatform = JavaCL.listPlatforms().filter(_.listCPUDevices(true).nonEmpty).head
@@ -283,6 +285,10 @@ object GrammarKernel {
     val outside = context.createProgram(outsideBinaryText)
     outside.setUnsafeMathOptimizations()
     outside.setFastRelaxedMath()
+    val ecounts = context.createProgram(ecountsText)
+    ecounts.setUnsafeMathOptimizations()
+    ecounts.setFastRelaxedMath()
+    ecounts.createKernel("binary_ecounts")
 
     val kern = new GrammarKernel(context, grammar, program, outside)
 
@@ -504,10 +510,16 @@ def outsideTemplate(numSyms: Int, root: Int,
     }
   }""".format(numSyms, root, outsideUnaryUpdates(unaries), outsideRightCompletionUpdates(rules), outsideLeftCompletionUpdates(rules))
 
-  """
+
+
+  def ecountsTemplate(numSyms: Int, root: Int, rules: IndexedSeq[(BinaryRule[Int], Double)]) = {
+    val byParent = rules.zipWithIndex.groupBy(_._1._1.parent)
+    """
   #define SCALE_FACTOR 10
   #define NUM_SYMS %d
+  #define ROOT %d
   #define NUM_RULES %d
+  #define MAX_NUM_RULES_PER_SYMBOL %d
   #define CELL_TOP(chart, begin, end) (chart + ((end) * ((end)+1)/2 + begin) * NUM_SYMS * 2)
   #define CELL_BOT(chart, begin, end) (CELL_TOP(chart, begin, end) + NUM_SYMS)
 
@@ -523,16 +535,73 @@ def outsideTemplate(numSyms: Int, root: Int,
     const int begin = get_global_id(1);
     const int end = begin + span_length;
     const int length = lengths[sentence];
-    const int split = begin + get_global_id(2) + 1;
+    const float root_score = CELL_TOP(inside + sentence, 0, length)[ROOT]; // scale is 2^(SCALE_FACTOR)^(length-1)
+    const int split = begin + get_global_id(2);
+    __global const float* my_ecounts = ecounts + NUM_RULES * sentence;
+    __global const float* outside = outsides + offsets[i];
+    __global const float* inside = insides + offsets[i];
+//    const int split = begin + get_global_id(2) + 1;
     if(end <= length) {
-      const int mybuf = buffer + get_local_id(0)  * MAX_NUM_RULES_PER_SYMBOL;
+      __local float* mybuf = buffer + get_local_id(2)  * MAX_NUM_RULES_PER_SYMBOL;
+      float oscore;
+      __global const float* oparents = CELL_BOT(outside, begin, end);
+
       // FOR each parent
       // READ IN PARENT OSCORE
       // if oscore != 0:
       // compute local expected counts for this split point
+      // barrier(CLK_LOCAL_MEM_FENCE);
+      // total = 0.0
+      // if(local_id == 0) {
+      //   FOR EACH RULE with PARENT:
+      // float ruleTotal =
+      // for(int i = 0; i < get_local_size(2); ++i) {
+      //   my_ecounts[r] += (buffer + i * MAX_NUM_RULES_PER_SYMBOL)[local_r]
+      //
+      // }
+      %s
+
+
 
     }
   }
 
-  """.format(numRules)
+    """.format(numSyms, root, rules.length, byParent.values.map(_.size).max, ecountBinaryRules(byParent))
+  }
+
+  private def ecountBinaryRules(byParent: Map[Int, IndexedSeq[((BinaryRule[Int], Double), Int)]]):String = {
+    val buf = new ArrayBuffer[String]()
+    for((par, rules) <- byParent) {
+      buf += "oscore = oparents[%d];".format(par)
+      buf += "if (oscore != 0.0) {"
+      // do each rule into local buf
+      for((((BinaryRule(_, l, r), score), globalR), localR) <- rules.zipWithIndex) {
+        buf += "  mybuf[%d] = %ff * CELL_TOP(inside, begin, split)[%d] * CELL_TOP(inside, split, end)[%d];".format(localR, math.exp(score).toFloat, l, r)
+      }
+      buf += "  barrier(CLK_LOCAL_MEM_FENCE);"
+      buf += "  if (local_id == 0) {"
+      buf += "    for(int otherSplit = 1;\n          otherSplit < get_local_size(2);\n           ++otherSplit) {"
+      buf += "      __local float* theirbuf = buffer + otherSplit * MAX_NUM_RULES_PER_SYMBOL;"
+
+      // accumulate rules into 0's storage
+      for((((BinaryRule(_, l, r), score), globalR), localR) <- rules.zipWithIndex) {
+        buf += "      mybuf[%d] += theirbuf[%d];".format(localR, localR)
+      }
+      buf += "    }\n"
+      buf += "normOutside = oparent / root_score;" // oparent has scale length + begin - end, root has scale length - 1
+                                                   // left * right has scale (end - begin-2)
+                                                   // left * right * oparent / root has scale -1
+      // accumulation done, now flush to global
+      for(((_, globalR), localR) <- rules.zipWithIndex) {
+        buf += "    my_ecounts[%d] += ldexp(mybuf[%d] * normOutside, SCALE_FACTOR);".format(globalR, localR)
+      }
+      buf += "  }" // end local_id == 0
+      // don't let other threads continue until local_id 0 is done.
+      buf += "  barrier(CLK_LOCAL_MEM_FENCE);"
+      buf += "}" // end oscore != 0
+
+    }
+
+    buf.mkString("\n    ")
+  }
 }
