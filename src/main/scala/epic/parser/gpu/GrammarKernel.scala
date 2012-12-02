@@ -16,7 +16,8 @@ import com.nativelibs4java.opencl.CLMem.Usage
 import breeze.linalg.DenseVector
 import gpu.GrammarKernel.ZeroMemory
 import org.bridj.Pointer
-import breeze.util.Encoder
+import breeze.util.{Index, Encoder}
+import collection.mutable
 
 class GrammarKernel[L, L2, W](context: CLContext,
                               grammar: SimpleRefinedGrammar[L, L2, W],
@@ -71,7 +72,6 @@ class GrammarKernel[L, L2, W](context: CLContext,
       val (lengths,offsets) = layoutIntoMemory(partition)
       val in = System.currentTimeMillis()
       val r = new DenseVector[Double](doExpectedCounts(offsets, lengths).map(_.toDouble))
-      println("doEC " + (System.currentTimeMillis() - in))
       r
     }
 
@@ -134,8 +134,8 @@ class GrammarKernel[L, L2, W](context: CLContext,
     val marginals = getMarginals(buffer, offsets, lengths)
 
 //    println(marginals.mkString("\n...\n"))
-    println(marginals.map(_.rootScore).mkString("\n"))
-    println(marginals.map(m => breeze.numerics.logSum((0 until grammar.refinedGrammar.labelIndex.size).map(i => m.topOutsideScore(0,1,i) + m.topInsideScore(0, 1, i)))))
+//    println(marginals.map(_.rootScore).mkString("\n"))
+//    println(marginals.map(m => breeze.numerics.logSum((0 until grammar.refinedGrammar.labelIndex.size).map(i => m.topOutsideScore(0,1,i) + m.topInsideScore(0, 1, i)))))
 
 
     IndexedSeq.empty
@@ -191,7 +191,7 @@ class GrammarKernel[L, L2, W](context: CLContext,
 
     println("ecounts: " + euCount +" " + ebCount +" " + rCount + " " + wobCount)
 
-    val mem = ecountsDev.read(queue, 0, nrules, ruleVector, true,  lastEvent)
+    ecountsDev.read(queue, 0, nrules, ruleVector, true,  lastEvent)
     val arr = ruleVector.getFloats
     arr
   }
@@ -389,7 +389,7 @@ object GrammarKernel {
     val marg = train.map(_.words).foldLeft(DenseVector.zeros[Double](feat.index.size)){ (acc, s) =>
       val m = ChartMarginal(AugmentedGrammar.fromRefined(grammar), s, ParseChart.logProb)
       val counts = m.expectedCounts(feat).counts
-      println(m.partition)
+//      println(m.partition)
       acc += counts
       acc
     }
@@ -755,20 +755,59 @@ __kernel void unary_ecounts(
     """.format(numSyms, root, rules.length, byParent.values.map(_.size).max, ecountBinaryRules(byParent), ecountUnaries(uByParent))
   }
 
+  val registersToUse = 40
+
   private def ecountBinaryRules(byParent: Map[Int, IndexedSeq[(BinaryRule[Int], Double, Int)]]):String = {
     val buf = new ArrayBuffer[String]()
-    for((par, rules) <- byParent) {
+    buf += (0 until registersToUse).map("r" + _).mkString("float ", ", ", ";")
+    for((par, rx) <- byParent) {
+      val rules = rx.sortBy(r => r._1.left -> r._1.right)(Ordering.Tuple2)
+
       // oparent has scale length + begin - end, root has scale length - 1
       // left * right has scale (end - begin-2)
       // left * right * oparent / root has scale -1
       buf += "oscore = ldexp(oparents[%d]/root_score, SCALE_FACTOR);".format(par)
       buf += "if (oscore != 0.0) {"
-      buf += "  for(int split = begin + 1; split < end; ++split) {"
-      for((BinaryRule(_, l, r), score, globalR) <- rules) {
-        buf += "    mybuf[%d] += %ff * CELL_TOP(inside, begin, split)[%d] * oscore * CELL_TOP(inside, split, end)[%d];".format(globalR, math.exp(score).toFloat, l, r)
+      var r = 0
+      while(r < rules.length) {
+        val assignments = Index[(Symbol,Int)]()
+        val setThisRound = mutable.BitSet.empty
+        val ruleRegisters = ArrayBuffer[(Int, Int)]() // Register -> Rule
+        val regInitializerPos = buf.size
+        buf += "XXX"
+
+        buf += "  for(int split = begin + 1; split < end; ++split) {"
+        var lastLeft = -1
+        assignments.index(('left -> 1))
+        while(r < rules.length && assignments.size < registersToUse) {
+          val (BinaryRule(_, l, right), score, ruleIndex) = rules(r)
+          if(lastLeft != l) {
+            buf += "    r0 = CELL_TOP(inside, begin, split)[%d];".format(l)
+            lastLeft = l
+          }
+          val rightR = assignments.index(('right, right))
+          val ruleR = assignments.index(('rule, ruleIndex))
+          if(assignments.size < registersToUse) {
+            ruleRegisters += (ruleR -> ruleIndex)
+            if (!setThisRound(rightR)) {
+              buf += "    r%d = CELL_TOP(inside, split, end)[%d];".format(rightR, right)
+              setThisRound += rightR
+            }
+            buf += "    r%d = fma(%ff, r0 * r%d * oscore, r%d);".format(ruleR, math.exp(score).toFloat, rightR, ruleR)
+            r += 1
+          }
+        }
+
+        buf += "  }\n"
+
+        // register flush time!
+        buf += "  // flush time!"
+        for( (reg, rule) <- ruleRegisters) {
+          buf += "  mybuf[%d] = r%d;".format(rule, reg)
+        }
+        buf(regInitializerPos) = ruleRegisters.map { case (reg, rule) => "r%d = 0.0f;".format(reg)}.mkString("  ", " ", "");
       }
-      buf += "  }"
-      buf += "}"
+      buf += "}\n"
     }
     buf.mkString("\n    ")
   }
@@ -792,7 +831,7 @@ __kernel void unary_ecounts(
 
   private val sumECountVectors =
     """
-__kernel void sum_vectors(__global float* vec, const size_t maxLen, size_t pivot) {
+__kernel void sum_vectors(__global float* vec, const int maxLen, int pivot) {
   int trg = get_global_id(0);
   if(trg < maxLen)
     vec[trg] += vec[trg + pivot];
@@ -802,7 +841,7 @@ __kernel void sum_vectors(__global float* vec, const size_t maxLen, size_t pivot
   class ZeroMemory(context: CLContext) {
     val kernel = context.createProgram{
 """
-__kernel void mem_zero(__global float* data, size_t len) {
+__kernel void mem_zero(__global float* data, int len) {
   int trg = get_global_id(0);
   if(trg < len)
     data[trg] = 0.0f;
@@ -811,7 +850,7 @@ __kernel void mem_zero(__global float* data, size_t len) {
     }.createKernel("mem_zero")
 
     def zeroMemory(queue: CLQueue, data: CLBuffer[java.lang.Float]): CLEvent = {
-      kernel.setArgs(data, java.lang.Long.valueOf(data.getElementCount))
+      kernel.setArgs(data, java.lang.Integer.valueOf(data.getElementCount.toInt))
       kernel.enqueueNDRange(queue, Array(data.getElementCount.toInt))
     }
   }
