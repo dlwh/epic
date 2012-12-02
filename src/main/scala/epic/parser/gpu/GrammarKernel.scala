@@ -15,16 +15,18 @@ import breeze.collection.mutable.TriangularArray
 import com.nativelibs4java.opencl.CLMem.Usage
 import breeze.linalg.DenseVector
 import gpu.GrammarKernel.ZeroMemory
+import org.bridj.Pointer
+import breeze.util.Encoder
 
 class GrammarKernel[L, L2, W](context: CLContext,
                               grammar: SimpleRefinedGrammar[L, L2, W],
                               inside: CLProgram,
                               outside: CLProgram,
                               ecounts: CLProgram,
-                              maxCells: Int = 95000,
-                              maxSentences: Int = 95000/ 10) {
+                              maxCells: Int = 12000,
+                              maxSentences: Int = 12000/ 10) {
   val nsyms = grammar.refinedGrammar.labelIndex.size
-  val nrules = grammar.refinedGrammar.labelIndex.size
+  val nrules = grammar.refinedGrammar.index.size
   val root = grammar.refinedGrammar.labelIndex(grammar.refinedGrammar.root)
   private val queue = context.createDefaultProfilingQueue()
   private val binaries = inside.createKernel("inside_inner")
@@ -37,8 +39,8 @@ class GrammarKernel[L, L2, W](context: CLContext,
   private val memZero = new ZeroMemory(context)
 
 
-  private val bufDev = context.createFloatBuffer(Usage.InputOutput, maxCells * nsyms * 2)
-  private val bufPtr = bufDev.allocateCompatibleMemory(context.getDevices()(0))
+  private val insideDev = context.createFloatBuffer(Usage.InputOutput, maxCells * nsyms * 2)
+  private val bufPtr = insideDev.allocateCompatibleMemory(context.getDevices()(0))
   private val outsideDev = context.createFloatBuffer(Usage.InputOutput, maxCells * nsyms * 2 )
   private val outsidePtr = outsideDev.allocateCompatibleMemory(context.getDevices()(0))
   private val ecountsDev = context.createFloatBuffer(Usage.InputOutput, maxCells * nrules)
@@ -46,9 +48,11 @@ class GrammarKernel[L, L2, W](context: CLContext,
   private val offPtr = offDev.allocateCompatibleMemory(context.getDevices()(0))
   private val lenDev = context.createIntBuffer(Usage.Input, maxSentences)
   private val lenPtr = lenDev.allocateCompatibleMemory(context.getDevices()(0))
+  private val ruleVector = Pointer.allocateFloats(nrules)
 
   private val buffer = new Array[Float](maxCells * nsyms * 2)
-  private val outsideBuffer = new Array[Float](buffer.length)
+  println(maxCells * nsyms * 4 * 2 / 1024)
+  println(maxCells * nrules * 4 / 1024)
 
   def parse(sentences: IndexedSeq[IndexedSeq[W]]):IndexedSeq[BinarizedTree[L]] = synchronized {
     {for {
@@ -62,10 +66,13 @@ class GrammarKernel[L, L2, W](context: CLContext,
 
   def expectedRuleCounts(sentences: IndexedSeq[IndexedSeq[W]]): DenseVector[Double] = synchronized {
     val allCounts = for {
-      partition <- getPartitions(sentences)
+      partition <- getPartitions(sentences).iterator
     } yield {
       val (lengths,offsets) = layoutIntoMemory(partition)
-      new DenseVector[Double](doExpectedCounts(offsets, lengths).map(_.toDouble))
+      val in = System.currentTimeMillis()
+      val r = new DenseVector[Double](doExpectedCounts(offsets, lengths).map(_.toDouble))
+      println("doEC " + (System.currentTimeMillis() - in))
+      r
     }
 
     allCounts.reduceOption{_ += _}.getOrElse(DenseVector.zeros[Double](nrules))
@@ -92,9 +99,9 @@ class GrammarKernel[L, L2, W](context: CLContext,
       }
 
 
-      offset += TriangularArray.arraySize(s.length+1) * nsyms * 2
+      offset += TriangularArray.arraySize(s.length+1)
     }
-    assert(lengths.length == offsets.length)
+    offsets += offset
 
     lengths.toArray -> offsets.toArray
   }
@@ -120,14 +127,14 @@ class GrammarKernel[L, L2, W](context: CLContext,
 
 
   private def cellBottom(offset: Int, begin: Int, end: Int, sym: Int) = {
-    offset + TriangularArray.index(begin, end) * nsyms * 2 + nsyms + sym
+    (offset + TriangularArray.index(begin, end)) * nsyms * 2 + nsyms + sym
   }
 
   private def doParse(offsets: Array[Int], lengths: Array[Int]):IndexedSeq[BinarizedTree[L]] = synchronized {
     val marginals = getMarginals(buffer, offsets, lengths)
 
 //    println(marginals.mkString("\n...\n"))
-//    println(marginals.map(_.rootScore).mkString("\n"))
+    println(marginals.map(_.rootScore).mkString("\n"))
 //    println(marginals.map(m => breeze.numerics.logSum((0 until grammar.refinedGrammar.labelIndex.size).map(i => m.topOutsideScore(0,1,i) + m.topInsideScore(0, 1, i)))))
 
 
@@ -135,31 +142,35 @@ class GrammarKernel[L, L2, W](context: CLContext,
   }
 
   private def doExpectedCounts(offsets: Array[Int], lengths: Array[Int]) = synchronized {
+    val wOB = memZero.zeroMemory(queue, ecountsDev)
     var lastEvent = insideOutside(offsets, lengths)
 
     val eu, eb, r = new ArrayBuffer[CLEvent]()
-    val maxLength = lengths.max
-    binaries.setArg(0, ecountsDev)
-    binaries.setArg(1, bufDev)
-    binaries.setArg(2, outsideDev)
-    binaries.setArg(3, offDev)
-    binaries.setArg(4, lenDev)
 
-    unaries.setArg(0, ecountsDev)
-    unaries.setArg(1, bufDev)
-    unaries.setArg(2, outsideDev)
-    unaries.setArg(3, offDev)
-    unaries.setArg(4, lenDev)
+    val maxLength = lengths.max
+    ebinaries.setArg(0, ecountsDev)
+    ebinaries.setArg(1, insideDev)
+    ebinaries.setArg(2, outsideDev)
+    ebinaries.setArg(3, offDev)
+    ebinaries.setArg(4, lenDev)
+
+    eunaries.setArg(0, ecountsDev)
+    eunaries.setArg(1, insideDev)
+    eunaries.setArg(2, outsideDev)
+    eunaries.setArg(3, offDev)
+    eunaries.setArg(4, lenDev)
     for (len <- 2 to maxLength) {
-      unaries.setArg(5, len)
-      binaries.setArg(5, len)
-      eb += ebinaries.enqueueNDRange(queue, Array(offsets.length, maxLength+1-len), lastEvent)
-      eu += eunaries.enqueueNDRange(queue, Array(offsets.length, maxLength+1-len), lastEvent)
+      eunaries.setArg(5, len)
+      ebinaries.setArg(5, len)
+      eb += ebinaries.enqueueNDRange(queue, Array(lengths.length, maxLength+1-len), lastEvent, wOB)
+      eu += eunaries.enqueueNDRange(queue, Array(lengths.length, maxLength+1-len), lastEvent, wOB)
     }
+    eunaries.setArg(5, 1)
+    eu += eunaries.enqueueNDRange(queue, Array(lengths.length, maxLength), lastEvent, wOB)
     queue.finish()
 
     // reduce to a single array
-    var numCellsLeft = offsets.length / nsyms / 2
+    var numCellsLeft = offsets.last
     sumVector.setArg(0, ecountsDev)
     while(numCellsLeft > 1) {
       val half = numCellsLeft / 2
@@ -172,23 +183,31 @@ class GrammarKernel[L, L2, W](context: CLContext,
       lastEvent = sumVector.enqueueNDRange(queue, Array(half * nrules), lastEvent)
       r += lastEvent
     }
-    val euCount = eu.map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum
-    val ebCount = eb.map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum
-    val rCount = r.map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum
+    queue.finish()
+    val euCount = eu.map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum / 1E9
+    val ebCount = eb.map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum / 1E9
+    val rCount = r.map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum / 1E9
+    val wobCount = (wOB.getProfilingCommandEnd - wOB.getProfilingCommandStart) / 1E9
 
-    println("ecounts: " + euCount +" " + ebCount +" " + rCount)
+    println("ecounts: " + euCount +" " + ebCount +" " + rCount + " " + wobCount)
 
-    ecountsDev.read(queue, 0, nrules, lastEvent).toArray
+    val mem = ecountsDev.read(queue, 0, nrules, ruleVector, true,  lastEvent)
+    val arr = ruleVector.getFloats
+    arr
   }
 
 
   private def getMarginals(buffer: Array[Float], offsets: Array[Int], lengths: Array[Int]) =  {
     val lastEvent = insideOutside(offsets, lengths)
 
-    val in = bufDev.read(queue, lastEvent).getFloats
-    val out = outsideDev.read(queue, lastEvent).getFloats
+    val inM = insideDev.read(queue, lastEvent)
+    val outM = outsideDev.read(queue, lastEvent)
+    val in = inM.getFloats
+    val out = outM.getFloats
+    inM.release()
+    outM.release()
 
-    for (i <- 0 until offsets.length) yield {
+    for (i <- 0 until lengths.length) yield {
       val off = offsets(i)
       val len = lengths(i)
       Marginal(in, out, off, len)
@@ -201,54 +220,54 @@ class GrammarKernel[L, L2, W](context: CLContext,
     offPtr.setInts(offsets)
     lenPtr.setInts(lengths)
 
-    val wB = bufDev.write(queue, 0, buffer.length, bufPtr, false)
+    val wB = insideDev.write(queue, 0, buffer.length, bufPtr, false)
     val wOB = memZero.zeroMemory(queue, outsideDev)
-    val wO = offDev.write(queue, 0, offsets.length, offPtr, false)
+    val wO = offDev.write(queue, 0, lengths.length, offPtr, false)
     val wL = lenDev.write(queue, 0, lengths.length, lenPtr, false)
 
     val maxLength = lengths.max
-    binaries.setArgs(bufDev, offDev, lenDev, Integer.valueOf(1))
-    unaries.setArgs(bufDev, offDev, lenDev, Integer.valueOf(1))
+    binaries.setArgs(insideDev, offDev, lenDev, Integer.valueOf(1))
+    unaries.setArgs(insideDev, offDev, lenDev, Integer.valueOf(1))
 
     val iu, ib, ou, ob = new ArrayBuffer[CLEvent]()
 
-    var lastU = unaries.enqueueNDRange(queue, Array(offsets.length, maxLength), wB, wO, wL)
+    var lastU = unaries.enqueueNDRange(queue, Array(lengths.length, maxLength), wB, wO, wL)
     iu += lastU
 
     for (len <- 2 to maxLength) {
       binaries.setArg(3, len)
-      val b = binaries.enqueueNDRange(queue, Array(offsets.length, maxLength + 1 - len), lastU)
+      val b = binaries.enqueueNDRange(queue, Array(lengths.length, maxLength + 1 - len), lastU)
       ib += b
 
       unaries.setArg(3, len)
-      lastU = unaries.enqueueNDRange(queue, Array(offsets.length, maxLength + 1 - len), b)
+      lastU = unaries.enqueueNDRange(queue, Array(lengths.length, maxLength + 1 - len), b)
       iu += lastU
     }
 
     // outside
-    obinaries.setArgs(outsideDev, bufDev, offDev, lenDev, Integer.valueOf(maxLength))
+    obinaries.setArgs(outsideDev, insideDev, offDev, lenDev, Integer.valueOf(maxLength))
     ounaries.setArgs(outsideDev, offDev, lenDev, Integer.valueOf(maxLength))
 
-    lastU = ounaries.enqueueNDRange(queue, Array(offsets.length, 1), lastU, wOB)
+    lastU = ounaries.enqueueNDRange(queue, Array(lengths.length, 1), lastU, wOB)
     ou += lastU
 
     for (len <- (maxLength - 1) to 1 by -1) {
       obinaries.setArg(4, len)
-      val b = obinaries.enqueueNDRange(queue, Array(offsets.length, maxLength + 1 - len), lastU)
+      val b = obinaries.enqueueNDRange(queue, Array(lengths.length, maxLength + 1 - len), lastU)
       ob += b
       ounaries.setArg(3, len)
-      lastU = ounaries.enqueueNDRange(queue, Array(offsets.length, maxLength + 1 - len), b)
+      lastU = ounaries.enqueueNDRange(queue, Array(lengths.length, maxLength + 1 - len), b)
       ou += lastU
     }
 
     queue.finish()
 
 
-    val iuCount = iu.map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum
-    val ibCount = ib.map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum
-    val ouCount = ou.map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum
-    val obCount = ob.map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum
-    val writeCounts = IndexedSeq(wB, wOB, wO, wL).map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum
+    val iuCount = iu.map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum / 1E9
+    val ibCount = ib.map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum / 1E9
+    val ouCount = ou.map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum / 1E9
+    val obCount = ob.map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum / 1E9
+    val writeCounts = IndexedSeq(wB, wOB, wO, wL).map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum / 1E9
 
     println(iuCount + " " + ibCount + " " + ouCount + " " + obCount + " " + writeCounts)
     lastU
@@ -258,7 +277,7 @@ class GrammarKernel[L, L2, W](context: CLContext,
     bufPtr.release()
     offPtr.release()
     lenPtr.release()
-    bufDev.release()
+    insideDev.release()
     offDev.release()
     lenDev.release()
     outsideDev.release()
@@ -296,7 +315,7 @@ class GrammarKernel[L, L2, W](context: CLContext,
 
     @inline
     private def topIndex(begin: Int, end: Int, label: Int): Int = {
-      offset + TriangularArray.index(begin, end) * nsyms * 2 + label
+      (offset + TriangularArray.index(begin, end)) * nsyms * 2 + label
     }
 
     @inline
@@ -324,7 +343,7 @@ class GrammarKernel[L, L2, W](context: CLContext,
 
 object GrammarKernel {
   case class Params(annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = FilterAnnotations(),
-                    useGPU: Boolean = true)
+                    useGPU: Boolean = true, numToParse: Int = 1000)
 
   def main(args: Array[String]) {
     import ParserParams.JointParams
@@ -344,6 +363,8 @@ object GrammarKernel {
       println(breeze.config.GenerateHelp[JointParams[Params]](config))
       System.exit(1)
     }
+    import params._
+    import params.trainer._
     println("Training Parser...")
     println(params)
     val annotator = FilterAnnotations[String]()
@@ -352,18 +373,29 @@ object GrammarKernel {
 
     val kern = fromSimpleGrammar(grammar, params.trainer.useGPU)
     println("Parsing...")
-    val train = transformed.slice(0,1000)
+    val train = transformed.slice(0,numToParse)
     val timeIn = System.currentTimeMillis()
     kern.parse(train.map(_.words.toIndexedSeq))
     println("Done: " + (System.currentTimeMillis() - timeIn))
+    println("ecounts...")
     val time2 = System.currentTimeMillis()
     val counts = kern.expectedRuleCounts(train.map(_.words.toIndexedSeq))
     val time3 = System.currentTimeMillis()
-    println(counts)
+    println(counts.sum)
+//    println(Encoder.fromIndex(grammar.refinedGrammar.index).decode(counts))
     println("Done ecounts: " + (time3 - time2))
     val timeX = System.currentTimeMillis()
-    val marg = train.map(_.words).par.map{
-      ChartMarginal(AugmentedGrammar.fromRefined(grammar), _, ParseChart.logProb).partition}
+    val feat = new ProductionFeaturizer(grammar.grammar, grammar.lexicon.knownLexicalProductions)
+    val marg = train.map(_.words).foldLeft(DenseVector.zeros[Double](feat.index.size)){ (acc, s) =>
+      val m = ChartMarginal(AugmentedGrammar.fromRefined(grammar), s, ParseChart.logProb)
+      val counts = m.expectedCounts(feat).counts
+      println(m.partition)
+      acc += counts
+      acc
+    }
+    println(marg.slice(0, grammar.grammar.index.size).sum)
+
+//    println(Encoder.fromIndex(grammar.grammar.index).decode(marg.slice(0, grammar.grammar.index.size)))
 //    def unroll(m: ChartMarginal[ParseChart.LogProbabilityParseChart, AnnotatedLabel, String]) = {
 //      for(l <- 0 until grammar.labelIndex.size; ref <- grammar.refinements.labels.localRefinements(l)) yield{
 //        m.outside.top(0,1,l, ref)
@@ -408,7 +440,6 @@ object GrammarKernel {
     val ecounts = context.createProgram(ecountsText)
     ecounts.setUnsafeMathOptimizations()
     ecounts.setFastRelaxedMath()
-    ecounts.createKernel("binary_ecounts")
 
     val kern = new GrammarKernel(context, grammar, program, outside, ecounts)
 
@@ -539,7 +570,7 @@ __kernel void inside_inner(__global float * charts,
   const int length = lengths[sentence];
   float out[NUM_SYMS], right[NUM_SYMS];
   if (end <= length) {
-    __global float* chart = charts + offsets[sentence];
+    __global float* chart = charts + offsets[sentence] * NUM_SYMS * 2;
      for(int i = 0; i < NUM_SYMS; ++i) {
        out[i] = 0.0f;
      }
@@ -572,7 +603,7 @@ __kernel void inside_unary(__global float * charts,
   const int length = lengths[sentence];
 
   if (end <= length) {
-    __global float* chart = charts + offsets[sentence];
+    __global float* chart = charts + offsets[sentence] * NUM_SYMS * 2;
     __global float* top = CELL_TOP(chart, begin, end);
     __global const float* bot = CELL_BOT(chart, begin, end);
     %s
@@ -598,12 +629,12 @@ def outsideTemplate(numSyms: Int, root: Int,
     const int length = lengths[sentence];
 
     if(spanLength == length) {
-      __global float* outside = charts + offsets[sentence];
+      __global float* outside = charts + offsets[sentence]* NUM_SYMS * 2;
       (CELL_TOP(outside, 0, length))[%d] = 1.0f;
     }
 
     if (end <= length) {
-      __global float* chart = charts + offsets[sentence];
+      __global float* chart = charts + offsets[sentence] * NUM_SYMS * 2;
       __global const float* top = CELL_TOP(chart, begin, end);
       __global float* bot = CELL_BOT(chart, begin, end);
       %s
@@ -621,8 +652,8 @@ def outsideTemplate(numSyms: Int, root: Int,
     const int length = lengths[sentence];
     float oparent[NUM_SYMS], otarget[NUM_SYMS];
     if (end <= length) {
-      __global const float* inside = insides + offsets[sentence];
-      __global float* outside = outsides + offsets[sentence];
+      __global const float* inside = insides + offsets[sentence]* NUM_SYMS * 2;
+      __global float* outside = outsides + offsets[sentence]* NUM_SYMS * 2;
       for(int i = 0; i < NUM_SYMS; ++i) {
         otarget[i] = 0.0f;
       }
@@ -672,7 +703,8 @@ def outsideTemplate(numSyms: Int, root: Int,
 #define ROOT %d
 #define NUM_RULES %d
 #define MAX_NUM_RULES_PER_SYMBOL %d
-#define CELL_TOP(chart, begin, end) (chart + ((end) * ((end)+1)/2 + begin) * NUM_SYMS * 2)
+#define TRIANGULAR_INDEX(begin, end) ((end) * ((end)+1)/2 + begin)
+#define CELL_TOP(chart, begin, end) (chart + TRIANGULAR_INDEX(begin, end) * NUM_SYMS * 2)
 #define CELL_BOT(chart, begin, end) (CELL_TOP(chart, begin, end) + NUM_SYMS)
 
 __kernel void binary_ecounts(__global float* ecounts,
@@ -686,18 +718,14 @@ __kernel void binary_ecounts(__global float* ecounts,
   const int begin = get_global_id(1);
   const int end = begin + span_length;
   const int length = lengths[sentence];
-  __global float* mybuf = ecounts + offsets[sentence] / NUM_SYMS / 2 * NUM_RULES; // todo needs to take into account num_rules
-  __global const float* outside = outsides + offsets[sentence];
-  __global const float* inside = insides + offsets[sentence];
+  __global float* mybuf = ecounts + (offsets[sentence] + TRIANGULAR_INDEX(begin, end)) * NUM_RULES;
+  __global const float* outside = outsides + offsets[sentence] * NUM_SYMS * 2;
+  __global const float* inside = insides + offsets[sentence] * NUM_SYMS * 2;
   const float root_score = CELL_TOP(inside, 0, length)[ROOT]; // scale is 2^(SCALE_FACTOR)^(length-1)
-//    const int split = begin + get_global_id(2) + 1;
   if(end <= length) {
     float oscore;
     __global const float* oparents = CELL_BOT(outside, begin, end);
     %s
-
-
-
   }
 }
 
@@ -715,13 +743,12 @@ __kernel void unary_ecounts(
   const int length = lengths[sentence];
 
   if (end <= length) {
-    __global const float* outside = outsides + offsets[sentence];
-    __global const float* inside = insides + offsets[sentence];
+    __global const float* outside = outsides + offsets[sentence] * NUM_SYMS * 2;
+    __global const float* inside = insides + offsets[sentence] * NUM_SYMS * 2;
     const float root_score = CELL_TOP(inside, 0, length)[ROOT]; // scale is 2^(SCALE_FACTOR)^(length-1)
-    __global float* mybuf = ecounts + offsets[sentence] / NUM_SYMS / 2 * NUM_RULES;
-    __global const float* top = CELL_TOP(outside, begin, end);
+    __global float* mybuf = ecounts + (offsets[sentence] + TRIANGULAR_INDEX(begin, end)) * NUM_RULES;
     __global const float* bot = CELL_BOT(inside, begin, end);
-    __global const float* oparents = CELL_BOT(outside, begin, end);
+    __global const float* oparents = CELL_TOP(outside, begin, end);
     %s
   }
 }
@@ -734,17 +761,14 @@ __kernel void unary_ecounts(
       // oparent has scale length + begin - end, root has scale length - 1
       // left * right has scale (end - begin-2)
       // left * right * oparent / root has scale -1
-//      buf += "oscore = ldexp(oparents[%d]/root_score, SCALE_FACTOR);".format(par)
-//      buf += "if (oscore != 0.0) {"
-//      for((BinaryRule(_, l, r), score, globalR) <- rules) {
-//        buf += "    mybuf[%d] = 0.0f;".format(globalR)
-//      }
-//      buf += "  for(int split = begin + 1; split < end; ++split) {"
-//      for((BinaryRule(_, l, r), score, globalR) <- rules) {
-//        buf += "    mybuf[%d] += %ff * CELL_TOP(inside, begin, split)[%d] * CELL_TOP(inside, split, end)[%d];".format(globalR, math.exp(score).toFloat, l, r)
-//      }
-//      buf += "  }"
-//      buf += "}"
+      buf += "oscore = ldexp(oparents[%d]/root_score, SCALE_FACTOR);".format(par)
+      buf += "if (oscore != 0.0) {"
+      buf += "  for(int split = begin + 1; split < end; ++split) {"
+      for((BinaryRule(_, l, r), score, globalR) <- rules) {
+        buf += "    mybuf[%d] += %ff * CELL_TOP(inside, begin, split)[%d] * oscore * CELL_TOP(inside, split, end)[%d];".format(globalR, math.exp(score).toFloat, l, r)
+      }
+      buf += "  }"
+      buf += "}"
     }
     buf.mkString("\n    ")
   }
@@ -758,7 +782,7 @@ __kernel void unary_ecounts(
       // child * oparent / root has scale 0 (yay!)
       buf += "oscore = oparents[%d]/root_score;".format(par)
       for( (r,score,index) <- rules) {
-        buf += "mybuf[%d] = %ff * oscore * CELL_BOT(inside, begin, end)[%d];".format(index, math.exp(score), r.child)
+        buf += "mybuf[%d] = %ff * oscore * bot[%d];".format(index, math.exp(score), r.child)
       }
     }
 

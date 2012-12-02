@@ -23,7 +23,7 @@ import epic.trees.{Production, LexicalProduction}
  * @author dlwh
  */
 class ProductionFeaturizer[L, W](grammar: BaseGrammar[L],
-                                 lexicalProductions: Iterable[LexicalProduction[L, W]]) extends RefinedFeaturizer[L, W, Production[L,W]] {
+                                 lexicalProductions: TraversableOnce[LexicalProduction[L, W]]) extends RefinedFeaturizer[L, W, Production[L,W]] {
   val index = {
     val index = Index[Production[L, W]]()
     grammar.index foreach {index.index(_)}
