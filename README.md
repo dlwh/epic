@@ -67,7 +67,7 @@ also just call it directly with "sbt" in `CHALK_DIR`.
 
 Assuming you have completed all of the above steps, including running the "compile" action in SBT, you should now be able to try out some examples. There is no documentation specific to Chalk at this time, but you should be able to follow the OpenNLP documentation:
 
-         <http://opennlp.apache.org/documentation/1.5.2-incubating/manual/opennlp.html>
+<http://opennlp.apache.org/documentation/1.5.2-incubating/manual/opennlp.html>
 
 However, you'll need to substitute 'chalk cli' for 'opennlp' in that manual. Here's an example to do sentence detection.
 
