@@ -28,9 +28,9 @@ class GrammarKernel[L, L2, W](context: CLContext,
 
   val nsyms = grammar.refinedGrammar.labelIndex.size
   val nrules = grammar.refinedGrammar.index.size
+  val root = grammar.refinedGrammar.labelIndex(grammar.refinedGrammar.root)
 
   val maxCells = ((context.getMaxMemAllocSize / math.max(nsyms * 2, nrules)).toInt / 4 ) min (100000)
-  val root = grammar.refinedGrammar.labelIndex(grammar.refinedGrammar.root)
   private val queue = context.createDefaultProfilingQueue()
   private val binaries = inside.createKernel("inside_inner")
   private val unaries = inside.createKernel("inside_unary")
@@ -464,13 +464,15 @@ object GrammarKernel {
 
     val unaryRuleScores = sortedUnary.map { r => indexedRule(r).asInstanceOf[UnaryRule[Int]] -> grammar.ruleScore(r) }
     val binaryRuleScores = sortedBinary.map { r => indexedRule(r).asInstanceOf[BinaryRule[Int]] -> grammar.ruleScore(r) }
-    val insideBinaryText = insideTemplate(labelIndex.size, binaryRuleScores, unaryRuleScores)
-    val outsideBinaryText = outsideTemplate(labelIndex.size, grammar.refinedGrammar.rootIndex, binaryRuleScores, unaryRuleScores)
-    val ecountsText = ecountsTemplate(labelIndex.size, grammar.refinedGrammar.rootIndex, (0 until index.size).map(r => indexedRule(r) -> grammar.ruleScore(r)))
+    val insideBinaryText = insideTemplate(binaryRuleScores, unaryRuleScores)
+    val outsideBinaryText = outsideTemplate(binaryRuleScores, unaryRuleScores)
+    val ecountsText = ecountsTemplate((0 until index.size).map(r => indexedRule(r) -> grammar.ruleScore(r)))
 
-    if(true) {val o = new FileWriter("inside.cl"); o.write(insideBinaryText); o.close()}
-    if(true) {val o = new FileWriter("outside.cl"); o.write(outsideBinaryText); o.close()}
-    if(true) {val o = new FileWriter("ecounts.cl"); o.write(ecountsText); o.close()}
+    val headerText = header(labelIndex.size, grammar.refinedGrammar.rootIndex, binaryRuleScores)
+
+    if(true) {val o = new FileWriter("inside.cl"); o.write(headerText); o.write(insideBinaryText); o.close()}
+    if(true) {val o = new FileWriter("outside.cl"); o.write(headerText); o.write(outsideBinaryText); o.close()}
+    if(true) {val o = new FileWriter("ecounts.cl"); o.write(headerText); o.write(ecountsText); o.close()}
 
     val context = if(useGPU) {
       JavaCL.createBestContext()
@@ -481,19 +483,40 @@ object GrammarKernel {
     println(context)
 
     println(grammar.refinedGrammar.labelIndex)
-    val program = context.createProgram(insideBinaryText)
+    val program = context.createProgram(headerText,insideBinaryText)
     program.setFastRelaxedMath()
     program.setUnsafeMathOptimizations()
-    val outside = context.createProgram(outsideBinaryText)
+    val outside = context.createProgram(headerText, outsideBinaryText)
     outside.setUnsafeMathOptimizations()
     outside.setFastRelaxedMath()
-    val ecounts = context.createProgram(ecountsText)
+    val ecounts = context.createProgram(headerText, ecountsText)
     ecounts.setUnsafeMathOptimizations()
     ecounts.setFastRelaxedMath()
 
     val kern = new GrammarKernel(context, grammar, program, outside, ecounts)
 
     kern
+  }
+
+    private def header(numSyms: Int, root: Int, rules: IndexedSeq[(Rule[Int], Double)]) = {
+    val byParent = rules.groupBy(_._1.parent).values.map(_.size).max
+      """#define SCALE_FACTOR 10
+#define NUM_SYMS %d
+#define ROOT %d
+#define NUM_RULES %d
+#define MAX_NUM_RULES_PER_SYMBOL %d
+#define TRIANGULAR_INDEX(begin, end) ((end) * ((end)+1)/2 + begin)
+#define CELL_TOP(chart, begin, end) (chart + TRIANGULAR_INDEX(begin, end) * NUM_SYMS * 2)
+#define CELL_BOT(chart, begin, end) (CELL_TOP(chart, begin, end) + NUM_SYMS)
+
+typedef struct {
+  float top[NUM_SYMS], bot[NUM_SYMS];
+} parse_cell;
+
+typedef struct {
+  float rules[NUM_RULES];
+} rule_cell;
+      """.format(numSyms, root, rules.size, byParent)
   }
 
   def insideUnaryUpdates(rules: IndexedSeq[(UnaryRule[Int], Double)]): String = {
@@ -602,14 +625,8 @@ object GrammarKernel {
     sb.mkString("\n    ")
   }
 
-  def insideTemplate(numSyms: Int,
-                     rules: IndexedSeq[(BinaryRule[Int], Double)],
-                     unaries: IndexedSeq[(UnaryRule[Int], Double)]): String =
+  def insideTemplate(rules: IndexedSeq[(BinaryRule[Int], Double)], unaries: IndexedSeq[(UnaryRule[Int], Double)]): String =
     """
-#define SCALE_FACTOR 10
-#define NUM_SYMS %d
-#define CELL_TOP(chart, begin, end) (chart + ((end) * ((end)+1)/2 + begin) * NUM_SYMS * 2)
-#define CELL_BOT(chart, begin, end) (CELL_TOP(chart, begin, end) + NUM_SYMS)
 __kernel void inside_inner(__global float * charts,
               __global const int* offsets,
               __global const int* lengths,
@@ -660,15 +677,9 @@ __kernel void inside_unary(__global float * charts,
   }
 }
 
-    """.stripMargin.format(numSyms, insideRuleUpdates(rules), insideUnaryUpdates(unaries))
+    """.stripMargin.format(insideRuleUpdates(rules), insideUnaryUpdates(unaries))
 
-def outsideTemplate(numSyms: Int, root: Int,
-                   rules: IndexedSeq[(BinaryRule[Int], Double)],
-                   unaries: IndexedSeq[(UnaryRule[Int], Double)]): String ="""
-#define SCALE_FACTOR 10
-#define NUM_SYMS %d
-#define CELL_TOP(chart, begin, end) (chart + ((end) * ((end)+1)/2 + begin) * NUM_SYMS * 2)
-#define CELL_BOT(chart, begin, end) (CELL_TOP(chart, begin, end) + NUM_SYMS)
+def outsideTemplate(rules: IndexedSeq[(BinaryRule[Int], Double)], unaries: IndexedSeq[(UnaryRule[Int], Double)]): String ="""
   __kernel void outside_unary(__global float * charts,
                 __global const int* offsets,
                 __global const int* lengths,
@@ -680,7 +691,7 @@ def outsideTemplate(numSyms: Int, root: Int,
 
     if(spanLength == length) {
       __global float* outside = charts + offsets[sentence]* NUM_SYMS * 2;
-      (CELL_TOP(outside, 0, length))[%d] = 1.0f;
+      (CELL_TOP(outside, 0, length))[ROOT] = 1.0f;
     }
 
     if (end <= length) {
@@ -739,24 +750,16 @@ def outsideTemplate(numSyms: Int, root: Int,
 //        gout[i] = otarget[i];
       }
     }
-  }""".format(numSyms, root, outsideUnaryUpdates(unaries), outsideRightCompletionUpdates(rules), outsideLeftCompletionUpdates(rules))
+  }""".format(outsideUnaryUpdates(unaries), outsideRightCompletionUpdates(rules), outsideLeftCompletionUpdates(rules))
 
 
 
-  def ecountsTemplate(numSyms: Int, root: Int, rules: IndexedSeq[(Rule[Int], Double)]) = {
+
+  def ecountsTemplate(rules: IndexedSeq[(Rule[Int], Double)]) = {
     val (binary,unary) = rules.zipWithIndex.partition(_._1._1.isInstanceOf[BinaryRule[Int]])
     val byParent: Map[Int, IndexedSeq[(BinaryRule[Int], Double, Int)]] = binary.map{ case ((r,s),i)=> (r.asInstanceOf[BinaryRule[Int]], s, i)}.groupBy(_._1.parent)
     val uByParent: Map[Int, IndexedSeq[(UnaryRule[Int], Double, Int)]] = unary.map{ case ((r,s),i)=> (r.asInstanceOf[UnaryRule[Int]], s, i)}.groupBy(_._1.parent)
     """
-#define SCALE_FACTOR 10
-#define NUM_SYMS %d
-#define ROOT %d
-#define NUM_RULES %d
-#define MAX_NUM_RULES_PER_SYMBOL %d
-#define TRIANGULAR_INDEX(begin, end) ((end) * ((end)+1)/2 + begin)
-#define CELL_TOP(chart, begin, end) (chart + TRIANGULAR_INDEX(begin, end) * NUM_SYMS * 2)
-#define CELL_BOT(chart, begin, end) (CELL_TOP(chart, begin, end) + NUM_SYMS)
-
 __kernel void binary_ecounts(__global float* ecounts,
    __global const float * insides,
    __global const float* outsides,
@@ -826,10 +829,10 @@ __kernel void terminal_ecounts(
     mybuf[sym] = (ibot[sym] * obot[sym])/root_score;
   }
 }
-    """.format(numSyms, root, rules.length, byParent.values.map(_.size).max, ecountBinaryRules(byParent), ecountUnaries(uByParent))
+    """.format(ecountBinaryRules(byParent), ecountUnaries(uByParent))
   }
 
-  val registersToUse = 40
+  val registersToUse = 60
 
   private def ecountBinaryRules(byParent: Map[Int, IndexedSeq[(BinaryRule[Int], Double, Int)]]):String = {
     val buf = new ArrayBuffer[String]()
