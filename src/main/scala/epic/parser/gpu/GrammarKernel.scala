@@ -24,10 +24,14 @@ class GrammarKernel[L, L2, W](context: CLContext,
                               inside: CLProgram,
                               outside: CLProgram,
                               ecounts: CLProgram,
-                              maxCells: Int = 12000,
-                              maxSentences: Int = 12000/ 10) {
+                              maxSentences: Int = 10000) {
+
   val nsyms = grammar.refinedGrammar.labelIndex.size
   val nrules = grammar.refinedGrammar.index.size
+
+  val maxCells = {
+    (context.getMaxMemAllocSize / math.max(nsyms * 2, nrules)).toInt / 4
+  }
   val root = grammar.refinedGrammar.labelIndex(grammar.refinedGrammar.root)
   private val queue = context.createDefaultProfilingQueue()
   private val binaries = inside.createKernel("inside_inner")
@@ -38,7 +42,6 @@ class GrammarKernel[L, L2, W](context: CLContext,
   private val eunaries = ecounts.createKernel("unary_ecounts")
   private val sumVector = context.createProgram(GrammarKernel.sumECountVectors).createKernel("sum_vectors")
   private val memZero = new ZeroMemory(context)
-
 
   private val insideDev = context.createFloatBuffer(Usage.InputOutput, maxCells * nsyms * 2)
   private val bufPtr = insideDev.allocateCompatibleMemory(context.getDevices()(0))
