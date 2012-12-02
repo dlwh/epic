@@ -57,7 +57,7 @@ To make sure all the tests pass, do:
 
 	$ bin/build test
 
-Documentation for SBT is at <https://github.com/harrah/xsbt/wiki>
+Documentation for SBT is at <http://www.scala-sbt.org/>
 
 Note: if you have SBT already installed on your system, you can
 also just call it directly with "sbt" in `CHALK_DIR`.
@@ -67,11 +67,11 @@ also just call it directly with "sbt" in `CHALK_DIR`.
 
 Assuming you have completed all of the above steps, including running the "compile" action in SBT, you should now be able to try out some examples. There is no documentation specific to Chalk at this time, but you should be able to follow the OpenNLP documentation:
 
-         http://opennlp.apache.org/documentation/1.5.2-incubating/manual/opennlp.html
+         <http://opennlp.apache.org/documentation/1.5.2-incubating/manual/opennlp.html>
 
 However, you'll need to substitute 'chalk cli' for 'opennlp' in that manual. Here's an example to do sentence detection.
 
-         $ echo "Pierre Vinken, 61 years old, will join the board as a nonexecutive director Nov. 29. Mr. Vinken is chairman of Elsevier N.V., the Dutch publishing group. Rudolph Agnew, 55 years old and former chairman of Consolidated Gold Fields PLC, was named a director of this British industrial conglomerate." > input.txt
+        $ echo "Pierre Vinken, 61 years old, will join the board as a nonexecutive director Nov. 29. Mr. Vinken is chairman of Elsevier N.V., the Dutch publishing group. Rudolph Agnew, 55 years old and former chairman of Consolidated Gold Fields PLC, was named a director of this British industrial conglomerate." > input.txt
  
         $ wget http://opennlp.sourceforge.net/models-1.5/en-sent.bin
 
