@@ -135,7 +135,7 @@ class GrammarKernel[L, L2, W](context: CLContext,
 
 //    println(marginals.mkString("\n...\n"))
     println(marginals.map(_.rootScore).mkString("\n"))
-//    println(marginals.map(m => breeze.numerics.logSum((0 until grammar.refinedGrammar.labelIndex.size).map(i => m.topOutsideScore(0,1,i) + m.topInsideScore(0, 1, i)))))
+    println(marginals.map(m => breeze.numerics.logSum((0 until grammar.refinedGrammar.labelIndex.size).map(i => m.topOutsideScore(0,1,i) + m.topInsideScore(0, 1, i)))))
 
 
     IndexedSeq.empty
@@ -811,8 +811,8 @@ __kernel void mem_zero(__global float* data, size_t len) {
     }.createKernel("mem_zero")
 
     def zeroMemory(queue: CLQueue, data: CLBuffer[java.lang.Float]): CLEvent = {
-      kernel.setArgs(data, java.lang.Long.valueOf(data.getElementSize * data.getElementCount))
-      kernel.enqueueTask(queue)
+      kernel.setArgs(data, java.lang.Long.valueOf(data.getElementCount))
+      kernel.enqueueNDRange(queue, Array(data.getElementCount.toInt))
     }
   }
 
