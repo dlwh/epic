@@ -13,7 +13,7 @@ import java.io.{FileWriter, File}
 import collection.mutable.ArrayBuffer
 import breeze.collection.mutable.TriangularArray
 import com.nativelibs4java.opencl.CLMem.Usage
-import breeze.linalg.DenseVector
+import breeze.linalg.{Counter, DenseVector}
 import gpu.GrammarKernel.ZeroMemory
 import org.bridj.Pointer
 import breeze.util.{Index, Encoder}
@@ -29,9 +29,7 @@ class GrammarKernel[L, L2, W](context: CLContext,
   val nsyms = grammar.refinedGrammar.labelIndex.size
   val nrules = grammar.refinedGrammar.index.size
 
-  val maxCells = {
-    (context.getMaxMemAllocSize / math.max(nsyms * 2, nrules)).toInt / 4
-  }
+  val maxCells = ((context.getMaxMemAllocSize / math.max(nsyms * 2, nrules)).toInt / 4 ) min (100000)
   val root = grammar.refinedGrammar.labelIndex(grammar.refinedGrammar.root)
   private val queue = context.createDefaultProfilingQueue()
   private val binaries = inside.createKernel("inside_inner")
@@ -40,6 +38,7 @@ class GrammarKernel[L, L2, W](context: CLContext,
   private val ounaries = outside.createKernel("outside_unary")
   private val ebinaries = ecounts.createKernel("binary_ecounts")
   private val eunaries = ecounts.createKernel("unary_ecounts")
+  private val eterms = ecounts.createKernel("terminal_ecounts")
   private val sumVector = context.createProgram(GrammarKernel.sumECountVectors).createKernel("sum_vectors")
   private val memZero = new ZeroMemory(context)
 
@@ -48,15 +47,16 @@ class GrammarKernel[L, L2, W](context: CLContext,
   private val outsideDev = context.createFloatBuffer(Usage.InputOutput, maxCells * nsyms * 2 )
   private val outsidePtr = outsideDev.allocateCompatibleMemory(context.getDevices()(0))
   private val ecountsDev = context.createFloatBuffer(Usage.InputOutput, maxCells * nrules)
+  private val termECountsDev = context.createFloatBuffer(Usage.InputOutput, maxCells * nsyms)
   private val offDev = context.createIntBuffer(Usage.Input, maxSentences)
   private val offPtr = offDev.allocateCompatibleMemory(context.getDevices()(0))
+  private val offLengthsDev = context.createIntBuffer(Usage.Input, maxSentences)
+  private val offLengthsPtr = offLengthsDev.allocateCompatibleMemory(context.getDevices()(0))
   private val lenDev = context.createIntBuffer(Usage.Input, maxSentences)
   private val lenPtr = lenDev.allocateCompatibleMemory(context.getDevices()(0))
   private val ruleVector = Pointer.allocateFloats(nrules)
 
   private val buffer = new Array[Float](maxCells * nsyms * 2)
-  println(maxCells * nsyms * 4 * 2 / 1024)
-  println(maxCells * nrules * 4 / 1024)
 
   def parse(sentences: IndexedSeq[IndexedSeq[W]]):IndexedSeq[BinarizedTree[L]] = synchronized {
     {for {
@@ -68,17 +68,17 @@ class GrammarKernel[L, L2, W](context: CLContext,
     }}.toIndexedSeq
   }
 
-  def expectedRuleCounts(sentences: IndexedSeq[IndexedSeq[W]]): DenseVector[Double] = synchronized {
+  def expectedRuleCounts(sentences: IndexedSeq[IndexedSeq[W]]): (DenseVector[Double], Array[Counter[W, Double]]) = synchronized {
     val allCounts = for {
       partition <- getPartitions(sentences).iterator
     } yield {
       val (lengths,offsets) = layoutIntoMemory(partition)
-      val in = System.currentTimeMillis()
-      val r = new DenseVector[Double](doExpectedCounts(offsets, lengths).map(_.toDouble))
-      r
+      val (counts: Array[Float], wordCounts: Array[Counter[W, Double]]) = doExpectedCounts(offsets, lengths, partition)
+      val r = new DenseVector[Double](counts.map(_.toDouble))
+      r -> wordCounts
     }
 
-    allCounts.reduceOption{_ += _}.getOrElse(DenseVector.zeros[Double](nrules))
+    allCounts.reduceOption{ (c1, c2) => c1._1 += c2._1; for( (a,b) <- c1._2 zip c2._2) a += b; c1}.getOrElse(DenseVector.zeros[Double](nrules) -> Array.fill(nsyms)(Counter[W, Double]()))
   }
 
 
@@ -144,9 +144,21 @@ class GrammarKernel[L, L2, W](context: CLContext,
     IndexedSeq.empty
   }
 
-  private def doExpectedCounts(offsets: Array[Int], lengths: Array[Int]) = synchronized {
+  private def doExpectedCounts(offsets: Array[Int],
+                               lengths: Array[Int],
+                               words: IndexedSeq[IndexedSeq[W]]) = synchronized {
     val wOB = memZero.zeroMemory(queue, ecountsDev)
+    val wterm = memZero.zeroMemory(queue, termECountsDev)
     var lastEvent = insideOutside(offsets, lengths)
+
+    val partialLengths = new Array[Int](lengths.size)
+    var totalLength = 0
+    var i = 0
+    while(i < partialLengths.length) {
+      partialLengths(i) = totalLength
+      totalLength += lengths(i)
+      i += 1
+    }
 
     val eu, eb, r = new ArrayBuffer[CLEvent]()
 
@@ -162,6 +174,17 @@ class GrammarKernel[L, L2, W](context: CLContext,
     eunaries.setArg(2, outsideDev)
     eunaries.setArg(3, offDev)
     eunaries.setArg(4, lenDev)
+
+    eterms.setArg(0, termECountsDev)
+    eterms.setArg(1, insideDev)
+    eterms.setArg(2, outsideDev)
+    eterms.setArg(3, offDev)
+    eterms.setArg(4, lenDev)
+    offLengthsPtr.setInts(partialLengths)
+    val copyOffLengths = offLengthsDev.write(queue, offLengthsPtr, false)
+    eterms.setArg(5, offLengthsDev)
+
+    val termFinished = eterms.enqueueNDRange(queue, Array(nsyms, lengths.length, maxLength), Array(nsyms, 1, 1), lastEvent, wterm, copyOffLengths)
     for (len <- 2 to maxLength) {
       eunaries.setArg(5, len)
       ebinaries.setArg(5, len)
@@ -170,33 +193,55 @@ class GrammarKernel[L, L2, W](context: CLContext,
     }
     eunaries.setArg(5, 1)
     eu += eunaries.enqueueNDRange(queue, Array(lengths.length, maxLength), lastEvent, wOB)
+
+    val termOut = termECountsDev.read(queue).getFloats
+    val wordEcounts = tallyTermExpectedCounts(termOut, words, partialLengths)
+
+
     queue.finish()
 
     // reduce to a single array
-    var numCellsLeft = offsets.last
-    sumVector.setArg(0, ecountsDev)
-    while(numCellsLeft > 1) {
-      val half = numCellsLeft / 2
-      numCellsLeft -= half
-      sumVector.setArg(1, half * nrules) // don't go past the first half, rounded down.
-      sumVector.setArg(2, numCellsLeft * nrules) // pull from the corresponding second half.
-      // the reason these are different are for odd splits.
-      // if there are 5 cells remaining, we want to sum the last two into the first two, and then
-      // the third into the first, and then the second into the first.
-      lastEvent = sumVector.enqueueNDRange(queue, Array(half * nrules), lastEvent)
-      r += lastEvent
-    }
+    lastEvent = collapseArray(ecountsDev, offsets.last, nrules, lastEvent)
+
     queue.finish()
     val euCount = eu.map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum / 1E9
     val ebCount = eb.map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum / 1E9
-    val rCount = r.map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum / 1E9
     val wobCount = (wOB.getProfilingCommandEnd - wOB.getProfilingCommandStart) / 1E9
 
-    println("ecounts: " + euCount +" " + ebCount +" " + rCount + " " + wobCount)
+    println("ecounts: " + euCount +" " + ebCount +" " + wobCount)
 
     ecountsDev.read(queue, 0, nrules, ruleVector, true,  lastEvent)
     val arr = ruleVector.getFloats
-    arr
+    arr -> wordEcounts
+  }
+
+  private def tallyTermExpectedCounts(counts: Array[Float], words: IndexedSeq[IndexedSeq[W]], offsets: Array[Int]) = {
+    val r = Array.fill(nsyms)(Counter[W, Double]())
+    for(s <- 0 until words.length; i <- 0 until words(s).length; sym <- 0 until nsyms) {
+      val count = counts( (offsets(s) + i) * nsyms + sym)
+      if(count != 0) {
+        r(sym)(words(s)(i)) += count.toDouble
+      }
+    }
+
+    r
+  }
+
+  private def collapseArray(v: CLBuffer[lang.Float], len: Int, width: Int, toAwait: CLEvent) = {
+    var lastEvent = toAwait
+    var numCellsLeft = len
+    while(numCellsLeft > 1) {
+      val half = numCellsLeft / 2
+      numCellsLeft -= half
+      sumVector.setArg(0, v)
+      sumVector.setArg(1, half * width) // don't go past the first half, rounded down.
+      sumVector.setArg(2, numCellsLeft * width) // pull from the corresponding second half.
+      // the reason these are different are for odd splits.
+      // if there are 5 cells remaining, we want to sum the last two into the first two, and then
+      // the third into the first, and then the second into the first.
+      lastEvent = sumVector.enqueueNDRange(queue, Array(half * width), lastEvent)
+    }
+    lastEvent
   }
 
 
@@ -384,7 +429,8 @@ object GrammarKernel {
     val time2 = System.currentTimeMillis()
     val counts = kern.expectedRuleCounts(train.map(_.words.toIndexedSeq))
     val time3 = System.currentTimeMillis()
-    println(counts.sum)
+    println(counts._1.sum)
+    println(counts._2.map(_.sum).sum)
 //    println(Encoder.fromIndex(grammar.refinedGrammar.index).decode(counts))
     println("Done ecounts: " + (time3 - time2))
     val timeX = System.currentTimeMillis()
@@ -396,7 +442,9 @@ object GrammarKernel {
       acc += counts
       acc
     }
+    println("Done: " + (System.currentTimeMillis() - timeX))
     println(marg.slice(0, grammar.grammar.index.size).sum)
+    println(marg.slice(grammar.grammar.index.size, marg.length).sum)
 
 //    println(Encoder.fromIndex(grammar.grammar.index).decode(marg.slice(0, grammar.grammar.index.size)))
 //    def unroll(m: ChartMarginal[ParseChart.LogProbabilityParseChart, AnnotatedLabel, String]) = {
@@ -405,7 +453,6 @@ object GrammarKernel {
 //      }
 //      m.partition
 //    }
-    println("Done: " + (System.currentTimeMillis() - timeX))
 //    println(marg)
   }
 
@@ -755,6 +802,30 @@ __kernel void unary_ecounts(
     %s
   }
 }
+
+__kernel void terminal_ecounts(
+   __global float* term_ecounts,
+   __global const float * insides,
+   __global const float * outsides,
+   __global const int* offsets,
+   __global const int* lengths,
+   __global const int* lengthOffsets) {
+  const int sym = get_global_id(0);
+  const int sentence = get_global_id(1);
+  const int begin = get_global_id(2);
+  const int end = begin  + 1;
+  const int length = lengths[sentence];
+  if (begin < length) {
+    __global const float* outside = outsides + offsets[sentence] * NUM_SYMS * 2;
+    __global const float* inside = insides + offsets[sentence] * NUM_SYMS * 2;
+    const float root_score = CELL_TOP(inside, 0, length)[ROOT]; // scale is 2^(SCALE_FACTOR)^(length-1)
+    __global const float* ibot = CELL_BOT(inside, begin, end);
+    __global const float* obot = CELL_BOT(outside, begin, end);
+    __global float* mybuf = term_ecounts + (lengthOffsets[sentence] + begin) * NUM_SYMS;
+    // ibot has scale 0, obot has scale length - 1, root_score has scale length - 1. Woot.
+    mybuf[sym] = (ibot[sym] * obot[sym])/root_score;
+  }
+}
     """.format(numSyms, root, rules.length, byParent.values.map(_.size).max, ecountBinaryRules(byParent), ecountUnaries(uByParent))
   }
 
@@ -831,6 +902,8 @@ __kernel void unary_ecounts(
     buf.mkString("\n    ")
 
   }
+
+
 
   private val sumECountVectors =
     """
