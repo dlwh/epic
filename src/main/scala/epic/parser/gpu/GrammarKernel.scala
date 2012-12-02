@@ -506,8 +506,8 @@ object GrammarKernel {
 #define NUM_RULES %d
 #define MAX_NUM_RULES_PER_SYMBOL %d
 #define TRIANGULAR_INDEX(begin, end) ((end) * ((end)+1)/2 + begin)
-#define CELL_TOP(chart, begin, end) (chart + TRIANGULAR_INDEX(begin, end) * NUM_SYMS * 2)
-#define CELL_BOT(chart, begin, end) (CELL_TOP(chart, begin, end) + NUM_SYMS)
+#define CELL_TOP(chart, begin, end) ((chart)[TRIANGULAR_INDEX(begin, end)].top)
+#define CELL_BOT(chart, begin, end) ((chart)[TRIANGULAR_INDEX(begin, end)].bot)
 
 typedef struct {
   float top[NUM_SYMS], bot[NUM_SYMS];
@@ -637,24 +637,24 @@ __kernel void inside_inner(__global float * charts,
   const int length = lengths[sentence];
   float out[NUM_SYMS], right[NUM_SYMS];
   if (end <= length) {
-    __global float* chart = charts + offsets[sentence] * NUM_SYMS * 2;
-     for(int i = 0; i < NUM_SYMS; ++i) {
-       out[i] = 0.0f;
-     }
+    __global parse_cell* chart = ((__global parse_cell*)charts) + offsets[sentence];
+    for(int i = 0; i < NUM_SYMS; ++i) {
+      out[i] = 0.0f;
+    }
+
     for(int split = begin + 1; split < end; ++split) {
-       __global const float * left = CELL_TOP(chart, begin, split); // scale factor of (2 ^ SCALE_FACTOR)^((split - begin) - 1)
-       __global const float * gright = CELL_TOP(chart, split, end); // scale factor of (2^ SCALE_FACTOR)((end-split) - 1)
-       for(int i = 0; i < NUM_SYMS; ++i) {
-         right[i] = gright[i];
-       }
-       %s
+      __global const float * left = CELL_TOP(chart, begin, split); // scale factor of (2 ^ SCALE_FACTOR)^((split - begin) - 1)
+      __global const float * gright = CELL_TOP(chart, split, end); // scale factor of (2^ SCALE_FACTOR)((end-split) - 1)
+      for(int i = 0; i < NUM_SYMS; ++i) {
+        right[i] = gright[i];
+      }
+      %s
     }
     // out has a scale factor of (2^SCALE_FACTOR)^((end-split) + (split-begin) - 2) = (2^SCALE_FACTOR)^(end-begin-2)
     // multiply in a 2^SCALE_FACTOR to reachive balance.
     __global float* gout = CELL_BOT(chart, begin, end);
     for(int i = 0; i < NUM_SYMS; ++i) {
       gout[i] = ldexp(out[i], SCALE_FACTOR);
-//      gout[i] = out[i];
     }
   }
 }
@@ -670,7 +670,7 @@ __kernel void inside_unary(__global float * charts,
   const int length = lengths[sentence];
 
   if (end <= length) {
-    __global float* chart = charts + offsets[sentence] * NUM_SYMS * 2;
+    __global parse_cell* chart = ((__global parse_cell*)charts) + offsets[sentence];
     __global float* top = CELL_TOP(chart, begin, end);
     __global const float* bot = CELL_BOT(chart, begin, end);
     %s
@@ -690,14 +690,14 @@ def outsideTemplate(rules: IndexedSeq[(BinaryRule[Int], Double)], unaries: Index
     const int length = lengths[sentence];
 
     if(spanLength == length) {
-      __global float* outside = charts + offsets[sentence]* NUM_SYMS * 2;
+      __global parse_cell* outside = ((__global parse_cell*)charts) + offsets[sentence];
       (CELL_TOP(outside, 0, length))[ROOT] = 1.0f;
     }
 
     if (end <= length) {
-      __global float* chart = charts + offsets[sentence] * NUM_SYMS * 2;
-      __global const float* top = CELL_TOP(chart, begin, end);
-      __global float* bot = CELL_BOT(chart, begin, end);
+      __global parse_cell* outside = ((__global parse_cell*)charts) + offsets[sentence];
+      __global const float* top = CELL_TOP(outside, begin, end);
+      __global float* bot = CELL_BOT(outside, begin, end);
       %s
     }
   }
@@ -713,8 +713,8 @@ def outsideTemplate(rules: IndexedSeq[(BinaryRule[Int], Double)], unaries: Index
     const int length = lengths[sentence];
     float oparent[NUM_SYMS], otarget[NUM_SYMS];
     if (end <= length) {
-      __global const float* inside = insides + offsets[sentence]* NUM_SYMS * 2;
-      __global float* outside = outsides + offsets[sentence]* NUM_SYMS * 2;
+      __global const parse_cell* inside = ((__global parse_cell*)insides) + offsets[sentence];
+      __global parse_cell* outside = ((__global parse_cell*)outsides) + offsets[sentence];
       for(int i = 0; i < NUM_SYMS; ++i) {
         otarget[i] = 0.0f;
       }
@@ -772,8 +772,8 @@ __kernel void binary_ecounts(__global float* ecounts,
   const int end = begin + span_length;
   const int length = lengths[sentence];
   __global float* mybuf = ecounts + (offsets[sentence] + TRIANGULAR_INDEX(begin, end)) * NUM_RULES;
-  __global const float* outside = outsides + offsets[sentence] * NUM_SYMS * 2;
-  __global const float* inside = insides + offsets[sentence] * NUM_SYMS * 2;
+  __global const parse_cell* outside = ((__global const parse_cell*)outsides) + offsets[sentence];
+  __global const parse_cell* inside = ((__global const parse_cell*)insides) + offsets[sentence];
   const float root_score = CELL_TOP(inside, 0, length)[ROOT]; // scale is 2^(SCALE_FACTOR)^(length-1)
   if(end <= length) {
     float oscore;
@@ -796,8 +796,8 @@ __kernel void unary_ecounts(
   const int length = lengths[sentence];
 
   if (end <= length) {
-    __global const float* outside = outsides + offsets[sentence] * NUM_SYMS * 2;
-    __global const float* inside = insides + offsets[sentence] * NUM_SYMS * 2;
+    __global const parse_cell* outside = ((__global const parse_cell*)outsides) + offsets[sentence];
+    __global const parse_cell* inside = ((__global const parse_cell*)insides) + offsets[sentence];
     const float root_score = CELL_TOP(inside, 0, length)[ROOT]; // scale is 2^(SCALE_FACTOR)^(length-1)
     __global float* mybuf = ecounts + (offsets[sentence] + TRIANGULAR_INDEX(begin, end)) * NUM_RULES;
     __global const float* bot = CELL_BOT(inside, begin, end);
@@ -819,8 +819,8 @@ __kernel void terminal_ecounts(
   const int end = begin  + 1;
   const int length = lengths[sentence];
   if (begin < length) {
-    __global const float* outside = outsides + offsets[sentence] * NUM_SYMS * 2;
-    __global const float* inside = insides + offsets[sentence] * NUM_SYMS * 2;
+    __global const parse_cell* outside = ((__global const parse_cell*)outsides) + offsets[sentence];
+    __global const parse_cell* inside = ((__global const parse_cell*)insides) + offsets[sentence];
     const float root_score = CELL_TOP(inside, 0, length)[ROOT]; // scale is 2^(SCALE_FACTOR)^(length-1)
     __global const float* ibot = CELL_BOT(inside, begin, end);
     __global const float* obot = CELL_BOT(outside, begin, end);
