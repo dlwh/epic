@@ -1,0 +1,292 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package chalk.tools.namefind;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+
+import chalk.tools.util.FilterObjectStream;
+import chalk.tools.util.ObjectStream;
+import chalk.tools.util.TrainingParameters;
+import chalk.tools.util.eval.CrossValidationPartitioner;
+import chalk.tools.util.eval.FMeasure;
+import chalk.tools.util.model.ModelUtil;
+
+
+public class TokenNameFinderCrossValidator {
+
+  private class DocumentSample {
+    
+    private NameSample samples[];
+    
+    DocumentSample(NameSample samples[]) {
+      this.samples = samples;
+    }
+    
+    private NameSample[] getSamples() {
+      return samples;
+    }
+  }
+  
+  /**
+   * Reads Name Samples to group them as a document based on the clear adaptive data flag.
+   */
+  private class NameToDocumentSampleStream extends FilterObjectStream<NameSample, DocumentSample> {
+
+    private NameSample beginSample;
+    
+    protected NameToDocumentSampleStream(ObjectStream<NameSample> samples) {
+      super(samples);
+    }
+
+    public DocumentSample read() throws IOException {
+      
+      List<NameSample> document = new ArrayList<NameSample>();
+      
+      if (beginSample == null) {
+        // Assume that the clear flag is set
+        beginSample = samples.read();
+      }
+      
+      // Underlying stream is exhausted! 
+      if (beginSample == null) {
+        return null;
+      }
+      
+      document.add(beginSample);
+      
+      NameSample sample;
+      while ((sample = samples.read()) != null) {
+        
+        if (sample.isClearAdaptiveDataSet()) {
+          beginSample = sample;
+          break;
+        }
+        
+        document.add(sample);
+      }
+      
+      // Underlying stream is exhausted,
+      // next call must return null
+      if (sample == null) {
+        beginSample = null;
+      }
+      
+      return new DocumentSample(document.toArray(new NameSample[document.size()]));
+    }
+    
+    @Override
+    public void reset() throws IOException, UnsupportedOperationException {
+      super.reset();
+      
+      beginSample = null;
+    }
+  }
+  
+  /**
+   * Splits DocumentSample into NameSamples. 
+   */
+  private class DocumentToNameSampleStream extends FilterObjectStream<DocumentSample, NameSample>{
+
+    protected DocumentToNameSampleStream(ObjectStream<DocumentSample> samples) {
+      super(samples);
+    }
+
+    private Iterator<NameSample> documentSamples = Collections.<NameSample>emptyList().iterator();
+
+    public NameSample read() throws IOException {
+
+      // Note: Empty document samples should be skipped
+
+      if (documentSamples.hasNext()) {
+        return documentSamples.next();
+      }
+      else {
+        DocumentSample docSample = samples.read();
+
+        if (docSample != null) {
+          documentSamples = Arrays.asList(docSample.getSamples()).iterator();
+
+          return read();
+        }
+        else {
+          return null;
+        }
+      }
+    }
+  }
+
+  private final String languageCode;
+  private final TrainingParameters params;
+  private final String type;
+  private final byte[] featureGeneratorBytes;
+  private final Map<String, Object> resources;
+  private TokenNameFinderEvaluationMonitor[] listeners;
+  
+
+  private FMeasure fmeasure = new FMeasure();
+
+  /**
+   * Name finder cross validator
+   *  
+   * @param languageCode 
+   *          the language of the training data
+   * @param cutoff
+   * @param iterations
+   * 
+   * @deprecated use {@link #TokenNameFinderCrossValidator(String, String, TrainingParameters, byte[], Map, TokenNameFinderEvaluationMonitor...)}
+   * instead and pass in a TrainingParameters object.
+   */
+  @Deprecated  
+  public TokenNameFinderCrossValidator(String languageCode, int cutoff,
+      int iterations) {
+    this(languageCode, null, cutoff, iterations);
+  }
+
+  /**
+   * Name finder cross validator
+   * 
+   * @param languageCode
+   *          the language of the training data
+   * @param type
+   *          null or an override type for all types in the training data
+   * @param cutoff
+   *          specifies the min number of times a feature must be seen
+   * @param iterations
+   *          the number of iterations
+   *          
+   * @deprecated use {@link #TokenNameFinderCrossValidator(String, String, TrainingParameters, byte[], Map, TokenNameFinderEvaluationMonitor...)}
+   * instead and pass in a TrainingParameters object.
+   */
+  @Deprecated
+  public TokenNameFinderCrossValidator(String languageCode, String type,
+      int cutoff, int iterations) {
+    this.languageCode = languageCode;
+    this.type = type;
+    
+    this.params = ModelUtil.createTrainingParameters(iterations, cutoff);
+    this.featureGeneratorBytes = null;
+    this.resources = Collections.<String, Object>emptyMap(); 
+  }
+
+  /**
+   * Name finder cross validator
+   * 
+   * @param languageCode
+   *          the language of the training data
+   * @param type
+   *          null or an override type for all types in the training data
+   * @param featureGeneratorBytes
+   *          descriptor to configure the feature generation or null
+   * @param resources
+   *          the resources for the name finder or null if none
+   * @param cutoff
+   *          specifies the min number of times a feature must be seen
+   * @param iterations
+   *          the number of iterations
+   *          
+   * @deprecated use {@link #TokenNameFinderCrossValidator(String, String, TrainingParameters, byte[], Map, TokenNameFinderEvaluationMonitor...)}
+   * instead and pass in a TrainingParameters object.
+   */
+  @Deprecated
+  public TokenNameFinderCrossValidator(String languageCode, String type,
+      byte[] featureGeneratorBytes,
+      Map<String, Object> resources, int iterations, int cutoff) {
+    this.languageCode = languageCode;
+    this.type = type;
+    this.featureGeneratorBytes = featureGeneratorBytes;
+    this.resources = resources;
+    
+    this.params = ModelUtil.createTrainingParameters(iterations, cutoff);;
+  }
+
+  /**
+   * Name finder cross validator
+   * 
+   * @param languageCode
+   *          the language of the training data
+   * @param type
+   *          null or an override type for all types in the training data
+   * @param trainParams
+   *          machine learning train parameters
+   * @param featureGeneratorBytes
+   *          descriptor to configure the feature generation or null
+   * @param listeners
+   *          a list of listeners
+   * @param resources
+   *          the resources for the name finder or null if none
+   */
+  public TokenNameFinderCrossValidator(String languageCode, String type,
+      TrainingParameters trainParams, byte[] featureGeneratorBytes,
+      Map<String, Object> resources,
+      TokenNameFinderEvaluationMonitor... listeners) {
+    
+    this.languageCode = languageCode;
+    this.type = type;
+    this.featureGeneratorBytes = featureGeneratorBytes;
+    this.resources = resources;
+
+    this.params = trainParams;
+    
+    this.listeners = listeners;
+  }
+
+  /**
+   * Starts the evaluation.
+   * 
+   * @param samples
+   *          the data to train and test
+   * @param nFolds
+   *          number of folds
+   * @throws IOException
+   */
+  public void evaluate(ObjectStream<NameSample> samples, int nFolds)
+      throws IOException {
+
+    // Note: The name samples need to be grouped on a document basis.
+
+    CrossValidationPartitioner<DocumentSample> partitioner = new CrossValidationPartitioner<DocumentSample>(
+        new NameToDocumentSampleStream(samples), nFolds);
+
+    while (partitioner.hasNext()) {
+
+      CrossValidationPartitioner.TrainingSampleStream<DocumentSample> trainingSampleStream = partitioner
+          .next();
+
+      TokenNameFinderModel model  = chalk.tools.namefind.NameFinderME.train(languageCode, type,
+            new DocumentToNameSampleStream(trainingSampleStream), params, featureGeneratorBytes, resources);
+
+      // do testing
+      TokenNameFinderEvaluator evaluator = new TokenNameFinderEvaluator(
+          new NameFinderME(model), listeners);
+
+      evaluator.evaluate(new DocumentToNameSampleStream(trainingSampleStream.getTestSampleStream()));
+
+      fmeasure.mergeInto(evaluator.getFMeasure());
+    }
+  }
+
+  public FMeasure getFMeasure() {
+    return fmeasure;
+  }
+}

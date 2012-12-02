@@ -1,0 +1,54 @@
+#!/bin/bash
+
+EXIT_CODE=0
+
+if [ -z $CHALK_DIR ] 
+then
+   CHALK_DIR=`dirname $0`/../
+fi
+
+if [ -z $JAVA_MEM_FLAG ] 
+then
+    JAVA_MEM_FLAG=-Xmx4g
+fi
+
+#JARS="`find $CHALK_DIR/lib_managed/jars -name '*.jar' -print | tr '\n' ':'`"
+
+SCALA_LIB="$HOME/.sbt/boot/scala-2.9.2/lib/scala-library.jar"
+
+CP="$CHALK_DIR/target/classes:$SCALA_LIB:$CHALK_DIR/src/main/resources:$JARS:$CLASSPATH"
+
+JAVA="$JAVA_HOME/bin/java"
+JAVA_COMMAND="$JAVA -classpath $CP -Dchalk.dir=$CHALK_DIR"
+
+CMD=$1
+shift
+
+help()
+{
+cat <<EOF
+chalk 0.1 commands: 
+
+  cli           run the chalk command-line interface
+  run           run the main method of a given class
+  trun          run the main method of a given sub-class of the chalk.tool package
+
+Include --help with any option for more information
+EOF
+}
+
+CLASS=
+
+case $CMD in
+    cli) CLASS=chalk.tools.cmdline.CLI;;
+    run) CLASS=$1; shift;;
+    trun) CLASS=chalk.tool.$1; shift;;
+    help) help; exit 1;;
+    *) echo "Unrecognized command: $CMD"; help; exit 1;;
+esac
+
+$JAVA_COMMAND $CLASS ${1+"$@"}
+(( EXIT_CODE += $? ))
+
+exit $EXIT_CODE
+

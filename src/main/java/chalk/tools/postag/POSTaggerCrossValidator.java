@@ -1,0 +1,244 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package chalk.tools.postag;
+
+import java.io.File;
+import java.io.IOException;
+
+import chalk.tools.dictionary.Dictionary;
+import chalk.tools.util.ObjectStream;
+import chalk.tools.util.TrainingParameters;
+import chalk.tools.util.eval.CrossValidationPartitioner;
+import chalk.tools.util.eval.Mean;
+import chalk.tools.util.model.ModelType;
+import chalk.tools.util.model.ModelUtil;
+
+
+public class POSTaggerCrossValidator {
+
+  private final String languageCode;
+  
+  private final TrainingParameters params;
+  
+  private Integer ngramCutoff;
+
+  private Mean wordAccuracy = new Mean();
+  private POSTaggerEvaluationMonitor[] listeners;
+
+  /* this will be used to load the factory after the ngram dictionary was created */
+  private String factoryClassName;
+  /* user can also send a ready to use factory */
+  private POSTaggerFactory factory;
+
+  private Integer tagdicCutoff = null;
+  private File tagDictionaryFile;
+  
+  /**
+   * Creates a {@link POSTaggerCrossValidator} that builds a ngram dictionary
+   * dynamically. It instantiates a sub-class of {@link POSTaggerFactory} using
+   * the tag and the ngram dictionaries.
+   */
+  public POSTaggerCrossValidator(String languageCode,
+      TrainingParameters trainParam, File tagDictionary,
+      Integer ngramCutoff, Integer tagdicCutoff, String factoryClass,
+      POSTaggerEvaluationMonitor... listeners) {
+    this.languageCode = languageCode;
+    this.params = trainParam;
+    this.ngramCutoff = ngramCutoff;
+    this.listeners = listeners;
+    this.factoryClassName = factoryClass;
+    this.tagdicCutoff = tagdicCutoff;
+    this.tagDictionaryFile = tagDictionary;
+  }
+
+  /**
+   * Creates a {@link POSTaggerCrossValidator} using the given
+   * {@link POSTaggerFactory}.
+   */
+  public POSTaggerCrossValidator(String languageCode,
+      TrainingParameters trainParam, POSTaggerFactory factory,
+      POSTaggerEvaluationMonitor... listeners) {
+    this.languageCode = languageCode;
+    this.params = trainParam;
+    this.listeners = listeners;
+    this.factory = factory;
+    this.ngramCutoff = null;
+    this.tagdicCutoff = null;
+  }
+  
+  /**
+   * @deprecated use
+   *             {@link #POSTaggerCrossValidator(String, TrainingParameters, POSTaggerFactory, POSTaggerEvaluationMonitor...)}
+   *             instead and pass in a {@link TrainingParameters} object and a
+   *             {@link POSTaggerFactory}.
+   */
+  public POSTaggerCrossValidator(String languageCode, ModelType modelType, POSDictionary tagDictionary,
+      Dictionary ngramDictionary, int cutoff, int iterations) {
+    this(languageCode, create(modelType, cutoff, iterations), create(ngramDictionary, tagDictionary));
+  }
+  
+  /**
+   * @deprecated use
+   *             {@link #POSTaggerCrossValidator(String, TrainingParameters, POSTaggerFactory, POSTaggerEvaluationMonitor...)}
+   *             instead and pass in a {@link TrainingParameters} object and a
+   *             {@link POSTaggerFactory}.
+   */
+  public POSTaggerCrossValidator(String languageCode, ModelType modelType, POSDictionary tagDictionary,
+      Dictionary ngramDictionary) {
+    this(languageCode, create(modelType, 5, 100), create(ngramDictionary, tagDictionary));
+  }
+
+  /**
+   * @deprecated use
+   *             {@link #POSTaggerCrossValidator(String, TrainingParameters, POSTaggerFactory, POSTaggerEvaluationMonitor...)}
+   *             instead and pass in a {@link POSTaggerFactory}.
+   */
+  public POSTaggerCrossValidator(String languageCode,
+      TrainingParameters trainParam, POSDictionary tagDictionary,
+      POSTaggerEvaluationMonitor... listeners) {
+    this(languageCode, trainParam, create(null, tagDictionary), listeners);
+  }
+  
+  /**
+   * @deprecated use
+   *             {@link #POSTaggerCrossValidator(String, TrainingParameters, POSDictionary, Integer, String, POSTaggerEvaluationMonitor...)}
+   *             instead and pass in the name of {@link POSTaggerFactory}
+   *             sub-class.
+   */
+  public POSTaggerCrossValidator(String languageCode,
+      TrainingParameters trainParam, POSDictionary tagDictionary,
+      Integer ngramCutoff, POSTaggerEvaluationMonitor... listeners) {
+    this(languageCode, trainParam, create(null, tagDictionary), listeners);
+    this.ngramCutoff = ngramCutoff;
+  }
+
+  /**
+   * @deprecated use
+   *             {@link #POSTaggerCrossValidator(String, TrainingParameters, POSTaggerFactory, POSTaggerEvaluationMonitor...)}
+   *             instead and pass in a {@link POSTaggerFactory}.
+   */
+  public POSTaggerCrossValidator(String languageCode,
+      TrainingParameters trainParam, POSDictionary tagDictionary,
+      Dictionary ngramDictionary, POSTaggerEvaluationMonitor... listeners) {
+    this(languageCode, trainParam, create(ngramDictionary, tagDictionary), listeners);
+  }
+  
+  /**
+   * Starts the evaluation.
+   * 
+   * @param samples
+   *          the data to train and test
+   * @param nFolds
+   *          number of folds
+   * 
+   * @throws IOException
+   */
+  public void evaluate(ObjectStream<POSSample> samples, int nFolds) throws IOException {
+    
+    CrossValidationPartitioner<POSSample> partitioner = new CrossValidationPartitioner<POSSample>(
+        samples, nFolds);
+
+    while (partitioner.hasNext()) {
+
+      CrossValidationPartitioner.TrainingSampleStream<POSSample> trainingSampleStream = partitioner
+          .next();
+      
+      if (this.factory == null) {
+        this.factory = POSTaggerFactory.create(this.factoryClassName, null,
+            null);
+      }
+
+      Dictionary ngramDict = this.factory.getDictionary();
+      if (ngramDict == null) {
+        if(this.ngramCutoff != null) {
+          System.err.print("Building ngram dictionary ... ");
+          ngramDict = POSTaggerME.buildNGramDictionary(trainingSampleStream,
+              this.ngramCutoff);
+          trainingSampleStream.reset();
+          System.err.println("done");
+        }
+        this.factory.setDictionary(ngramDict);
+      }
+      
+      if (this.tagDictionaryFile != null
+          && this.factory.getTagDictionary() == null) {
+        this.factory.setTagDictionary(this.factory
+            .createTagDictionary(tagDictionaryFile));
+      }
+      if (this.tagdicCutoff != null) {
+        TagDictionary dict = this.factory.getTagDictionary();
+        if (dict == null) {
+          dict = this.factory.createEmptyTagDictionary();
+          this.factory.setTagDictionary(dict);
+        }
+        if (dict instanceof MutableTagDictionary) {
+          POSTaggerME.populatePOSDictionary(trainingSampleStream, (MutableTagDictionary)dict,
+              this.tagdicCutoff);
+        } else {
+          throw new IllegalArgumentException(
+              "Can't extend a TagDictionary that does not implement MutableTagDictionary.");
+        }
+        trainingSampleStream.reset();
+      }
+      
+      POSModel model = POSTaggerME.train(languageCode, trainingSampleStream,
+          params, this.factory);
+
+      POSEvaluator evaluator = new POSEvaluator(new POSTaggerME(model), listeners);
+      
+      evaluator.evaluate(trainingSampleStream.getTestSampleStream());
+
+      wordAccuracy.add(evaluator.getWordAccuracy(), evaluator.getWordCount());
+
+      if (this.tagdicCutoff != null) {
+        this.factory.setTagDictionary(null);
+      }
+
+    }
+  }
+  
+  /**
+   * Retrieves the accuracy for all iterations.
+   * 
+   * @return the word accuracy
+   */
+  public double getWordAccuracy() {
+    return wordAccuracy.mean();
+  }
+  
+  /**
+   * Retrieves the number of words which where validated
+   * over all iterations. The result is the amount of folds
+   * multiplied by the total number of words.
+   * 
+   * @return the word count
+   */
+  public long getWordCount() {
+    return wordAccuracy.count();
+  }
+  
+  private static TrainingParameters create(ModelType type, int cutoff, int iterations) {
+    TrainingParameters params = ModelUtil.createTrainingParameters(iterations, cutoff);
+    params.put(TrainingParameters.ALGORITHM_PARAM, type.toString());
+    return params;
+  }
+  
+  private static POSTaggerFactory create(Dictionary ngram, TagDictionary pos) {
+    return new POSTaggerFactory(ngram, pos);
+  }
+}
