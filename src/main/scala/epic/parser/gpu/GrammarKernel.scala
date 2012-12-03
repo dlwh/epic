@@ -770,7 +770,7 @@ __kernel void binary_ecounts(__global float* ecounts,
   const int begin = get_global_id(1);
   const int end = begin + span_length;
   const int length = lengths[sentence];
-  __global float* mybuf = ecounts + (offsets[sentence] + TRIANGULAR_INDEX(begin, end)) * NUM_RULES;
+  __global rule_cell* ruleCounts = ((__global rule_cell*)ecounts) + (offsets[sentence] + TRIANGULAR_INDEX(begin, end));
   __global const parse_cell* outside = ((__global const parse_cell*)outsides) + offsets[sentence];
   __global const parse_cell* inside = ((__global const parse_cell*)insides) + offsets[sentence];
   const float root_score = CELL(inside, 0, length)->top[ROOT]; // scale is 2^(SCALE_FACTOR)^(length-1)
@@ -798,7 +798,7 @@ __kernel void unary_ecounts(
     __global const parse_cell* outside = ((__global const parse_cell*)outsides) + offsets[sentence];
     __global const parse_cell* inside = ((__global const parse_cell*)insides) + offsets[sentence];
     const float root_score = CELL(inside, 0, length)->top[ROOT]; // scale is 2^(SCALE_FACTOR)^(length-1)
-    __global float* mybuf = ecounts + (offsets[sentence] + TRIANGULAR_INDEX(begin, end)) * NUM_RULES;
+    __global rule_cell* ruleCounts = ((__global rule_cell*)ecounts) + (offsets[sentence] + TRIANGULAR_INDEX(begin, end));
     __global const parse_cell* in = CELL(inside, begin, end);
     __global const parse_cell* out = CELL(outside, begin, end);
     %s
@@ -879,7 +879,7 @@ __kernel void terminal_ecounts(
         // register flush time!
         buf += "  // flush time!"
         for( (reg, rule) <- ruleRegisters) {
-          buf += "  mybuf[%d] = r%d;".format(rule, reg)
+          buf += "  ruleCounts->rules[%d] = r%d;".format(rule, reg)
         }
         buf(regInitializerPos) = ruleRegisters.map { case (reg, rule) => "r%d = 0.0f;".format(reg)}.mkString("  ", " ", "");
       }
@@ -897,7 +897,7 @@ __kernel void terminal_ecounts(
       // child * oparent / root has scale 0 (yay!)
       buf += "oscore = out->top[%d]/root_score;".format(par)
       for( (r,score,index) <- rules) {
-        buf += "mybuf[%d] = %ff * oscore * in->bot[%d];".format(index, math.exp(score), r.child)
+        buf += "ruleCounts->rules[%d] = %ff * oscore * in->bot[%d];".format(index, math.exp(score), r.child)
       }
     }
 
