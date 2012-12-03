@@ -186,7 +186,20 @@ class GrammarKernel[L, L2, W](context: CLContext,
     val copyOffLengths = offLengthsDev.write(queue, offLengthsPtr, false)
     eterms.setArg(5, offLengthsDev)
 
-    val termFinished = eterms.enqueueNDRange(queue, Array(nsyms * numGrammars, lengths.length, maxLength), Array(nsyms * numGrammars, 1, 1), lastEvent, wterm, copyOffLengths)
+    println(queue.getDevice.getMaxWorkGroupSize + " " + queue.getDevice.getMaxWorkItemSizes.mkString(", ") + " " + numGrammars * nsyms)
+
+    val maxDim1Size = queue.getDevice.getMaxWorkItemSizes()(0)
+    if(maxDim1Size < nsyms * numGrammars) {
+      eterms.setArg(6, numGrammars / 8 + 1)
+    } else {
+      eterms.setArg(6, 1)
+    }
+    val gramMultiplier = if(maxDim1Size < nsyms * numGrammars) {
+      8
+    } else {
+      numGrammars
+    }
+    val termFinished =  eterms.enqueueNDRange(queue, Array(nsyms * gramMultiplier, lengths.length, maxLength), Array(nsyms * gramMultiplier, 1, 1), lastEvent, wterm, copyOffLengths)
     for (len <- 2 to maxLength) {
       eunaries.setArg(5, len)
       ebinaries.setArg(5, len)
@@ -822,9 +835,10 @@ __kernel void terminal_ecounts(
    __global const parse_cell * outsides,
    __global const int* offsets,
    __global const int* lengths,
-   __global const int* lengthOffsets) {
+   __global const int* lengthOffsets,
+   const int numGrammarsToDo) {
   const int sym = get_global_id(0)/ NUM_GRAMMARS;
-  const int grammar = get_global_id(0) %% NUM_GRAMMARS;
+  int grammar = get_global_id(0) %% NUM_GRAMMARS;
   const int sentence = get_global_id(1);
   const int begin = get_global_id(2);
   const int end = begin  + 1;
@@ -837,6 +851,10 @@ __kernel void terminal_ecounts(
     __global sym_cell* mybuf = term_ecounts + (lengthOffsets[sentence] + begin);
     // ibot has scale 0, obot has scale length - 1, root_score has scale length - 1. Woot.
     mybuf->syms[sym][grammar] = (in->bot[sym][grammar] * out->bot[sym][grammar])/root_score;
+    for(int i = 1; i < numGrammarsToDo && grammar < NUM_GRAMMARS; ++i) {
+      grammar += (NUM_GRAMMARS / numGrammarsToDo);
+      mybuf->syms[sym][grammar] = (in->bot[sym][grammar] * out->bot[sym][grammar])/root_score;
+    }
   }
 }
     """.format(ecountBinaryRules(byParent), ecountUnaries(uByParent))
