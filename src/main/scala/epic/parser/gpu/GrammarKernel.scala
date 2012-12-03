@@ -59,6 +59,8 @@ class GrammarKernel[L, L2, W](context: CLContext,
 
   private val buffer = new Array[Float](maxCells * nsyms * 2 * numGrammars)
 
+  private val rules = context.createFloatBuffer(Usage.Input, nrules * numGrammars)
+
   def parse(sentences: IndexedSeq[IndexedSeq[W]]):IndexedSeq[BinarizedTree[L]] = synchronized {
     {for {
       partition <- getPartitions(sentences).iterator
@@ -516,11 +518,13 @@ object GrammarKernel {
 
     private def header(numSyms: Int, root: Int, rules: IndexedSeq[(Rule[Int], Double)], numGrammars: Int = 1) = {
     val byParent = rules.groupBy(_._1.parent).values.map(_.size).max
+    val (numBinary, numUnary) = rules.partition(_._1.isInstanceOf[BinaryRule[_]])
       """#define SCALE_FACTOR 10
 #define NUM_SYMS %d
 #define NUM_GRAMMARS %d
 #define ROOT %d
-#define NUM_RULES %d
+#define NUM_BINARY %d
+#define NUM_UNARY %d
 #define MAX_NUM_RULES_PER_SYMBOL %d
 #define TRIANGULAR_INDEX(begin, end) ((end) * ((end)+1)/2 + begin)
 #define CELL(chart, begin, end)   ((chart) + TRIANGULAR_INDEX(begin, end))
@@ -530,13 +534,14 @@ typedef struct {
 } parse_cell;
 
 typedef struct {
-  float rules[NUM_RULES][NUM_GRAMMARS];
+  float binaries[NUM_BINARY][NUM_GRAMMARS];
+  float unaries[NUM_UNARY][NUM_GRAMMARS];
 } rule_cell;
 
 typedef struct {
   float syms[NUM_SYMS][NUM_GRAMMARS];
 } sym_cell;
-      """.format(numSyms, numGrammars, root, rules.size, byParent)
+      """.format(numSyms, numGrammars, root, numBinary.size, numUnary.size, byParent)
   }
 
   def insideUnaryUpdates(rules: IndexedSeq[(UnaryRule[Int], Double)]): String = {
@@ -777,9 +782,9 @@ def outsideTemplate(rules: IndexedSeq[(BinaryRule[Int], Double)], unaries: Index
 
 
   def ecountsTemplate(rules: IndexedSeq[(Rule[Int], Double)]) = {
-    val (binary,unary) = rules.zipWithIndex.partition(_._1._1.isInstanceOf[BinaryRule[Int]])
-    val byParent: Map[Int, IndexedSeq[(BinaryRule[Int], Double, Int)]] = binary.map{ case ((r,s),i)=> (r.asInstanceOf[BinaryRule[Int]], s, i)}.groupBy(_._1.parent)
-    val uByParent: Map[Int, IndexedSeq[(UnaryRule[Int], Double, Int)]] = unary.map{ case ((r,s),i)=> (r.asInstanceOf[UnaryRule[Int]], s, i)}.groupBy(_._1.parent)
+    val (binary,unary) = rules.partition(_._1.isInstanceOf[BinaryRule[Int]])
+    val byParent: Map[Int, IndexedSeq[(BinaryRule[Int], Double, Int)]] = binary.zipWithIndex.map{ case ((r,s),i)=> (r.asInstanceOf[BinaryRule[Int]], s, i)}.groupBy(_._1.parent)
+    val uByParent: Map[Int, IndexedSeq[(UnaryRule[Int], Double, Int)]] = unary.zipWithIndex.map{ case ((r,s),i)=> (r.asInstanceOf[UnaryRule[Int]], s, i)}.groupBy(_._1.parent)
     """
 __kernel void binary_ecounts(__global rule_cell* ecounts,
    __global const parse_cell * insides,
@@ -908,7 +913,7 @@ __kernel void terminal_ecounts(
         // register flush time!
         buf += "  // flush time!"
         for( (reg, rule) <- ruleRegisters) {
-          buf += "  ruleCounts->rules[%d][gram] = r%d;".format(rule, reg)
+          buf += "  ruleCounts->binaries[%d][gram] = r%d;".format(rule, reg)
         }
         buf(regInitializerPos) = ruleRegisters.map { case (reg, rule) => "r%d = 0.0f;".format(reg)}.mkString("  ", " ", "");
       }
@@ -926,7 +931,7 @@ __kernel void terminal_ecounts(
       // child * oparent / root has scale 0 (yay!)
       buf += "oscore = out->top[%d][gram]/root_score;".format(par)
       for( (r,score,index) <- rules) {
-        buf += "ruleCounts->rules[%d][gram] = %ff * oscore * in->bot[%d][gram];".format(index, math.exp(score), r.child)
+        buf += "ruleCounts->unaries[%d][gram] = %ff * oscore * in->bot[%d][gram];".format(index, math.exp(score), r.child)
       }
     }
 
