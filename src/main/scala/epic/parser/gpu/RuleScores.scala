@@ -12,10 +12,10 @@ object RuleScores {
     val binaries = Array.ofDim[Double](bin.length, numStates * numStates * numStates)
     val unaries = Array.ofDim[Double](un.length, numStates * numStates)
     for( (b, i) <- bin; ref <- 0 until binaries(i).length) {
-      binaries(i)(ref) = grammar.ruleScore(i, ref)
+      binaries(i)(ref) = grammar.ruleScore(i, 0) // TODO: ref here
     }
     for( (b, i) <- un; ref <- 0 until unaries(i-bin.length).length) {
-      unaries(i - bin.length)(ref) = grammar.ruleScore(i, 0)
+      unaries(i - bin.length)(ref) = grammar.ruleScore(i, 0) // TODO: ref here.
     }
 
     RuleScores(binaries, unaries)

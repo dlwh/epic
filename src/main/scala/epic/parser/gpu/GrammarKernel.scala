@@ -44,8 +44,9 @@ class GrammarKernel[L, W](context: CLContext,
   val numStatesPerBinary = numStates * numStates * numStates
   val numStatesPerUnary = numStates * numStates
   val totalRules: Int = nbinaries * numStatesPerBinary * numGrammars + nunaries * numStatesPerUnary * numGrammars
+  val cellSize = nsyms * 2 * numGrammars * numStates
+  val maxCells =  ((context.getMaxMemAllocSize / math.max(cellSize, totalRules)).toInt / 4) min (100000)
 
-  val maxCells = ((context.getMaxMemAllocSize / math.max(nsyms * 2 * numGrammars * numStates, totalRules)).toInt / 4) min (100000)
   private val queue = context.createDefaultProfilingQueue()
   private val binaries = inside.createKernel("inside_binaries")
   private val unaries = inside.createKernel("inside_unaries")
@@ -57,12 +58,11 @@ class GrammarKernel[L, W](context: CLContext,
   private val sumVector = context.createProgram(GrammarKernel.sumECountVectors).createKernel("sum_vectors")
   private val memZero = new ZeroMemory(context)
 
-  private val insideDev = context.createFloatBuffer(Usage.InputOutput, maxCells * nsyms * 2 * numGrammars)
+  private val insideDev = context.createFloatBuffer(Usage.InputOutput, maxCells * cellSize)
   private val bufPtr = insideDev.allocateCompatibleMemory(context.getDevices()(0))
-  private val outsideDev = context.createFloatBuffer(Usage.InputOutput, maxCells * nsyms * 2 * numGrammars)
-  private val outsidePtr = outsideDev.allocateCompatibleMemory(context.getDevices()(0))
-  private val ecountsDev = context.createFloatBuffer(Usage.InputOutput, maxCells * nrules * numGrammars)
-  private val termECountsDev = context.createFloatBuffer(Usage.InputOutput, maxCells * nsyms * numGrammars)
+  private val outsideDev = context.createFloatBuffer(Usage.InputOutput, maxCells * cellSize)
+  private val ecountsDev = context.createFloatBuffer(Usage.InputOutput, maxCells * totalRules)
+  private val termECountsDev = context.createFloatBuffer(Usage.InputOutput, maxCells * cellSize / 2)
   private val offDev = context.createIntBuffer(Usage.Input, maxSentences)
   private val offPtr = offDev.allocateCompatibleMemory(context.getDevices()(0))
   private val offLengthsDev = context.createIntBuffer(Usage.Input, maxSentences)
@@ -71,7 +71,7 @@ class GrammarKernel[L, W](context: CLContext,
   private val lenPtr = lenDev.allocateCompatibleMemory(context.getDevices()(0))
   private val ruleVector = Pointer.allocateFloats(totalRules)
 
-  private val buffer = new Array[Float](maxCells * nsyms * 2 * numGrammars * numStates)
+  private val buffer = new Array[Float](maxCells * cellSize)
 
   private val rulesDev = context.createFloatBuffer(Usage.Input, totalRules)
   ruleScores = _ruleScores
@@ -224,9 +224,13 @@ class GrammarKernel[L, W](context: CLContext,
     }
     eunaries.setArg(5, 1)
     eu += eunaries.enqueueNDRange(queue, Array(lengths.length, maxLength, numGrammars), Array(1, 1, numGrammars), lastEvent, wOB)
+    queue.finish()
 
-    val termOut = termECountsDev.read(queue, termFinished).getFloats
-    val wordEcounts = tallyTermExpectedCounts(termOut, words, partialLengths)
+    val termVector = Pointer.allocateFloats(totalLength * cellSize / 2)
+    val termOut = termECountsDev.read(queue, termVector, true, termFinished)
+    val floats = termVector.getFloats
+    termVector.release()
+    val wordEcounts = tallyTermExpectedCounts(floats, words, partialLengths)
 
 
     queue.finish()
@@ -238,6 +242,7 @@ class GrammarKernel[L, W](context: CLContext,
     val euCount = eu.map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum / 1E9
     val ebCount = eb.map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum / 1E9
     val wobCount = (wOB.getProfilingCommandEnd - wOB.getProfilingCommandStart) / 1E9
+//    val termCount = (termOut.getProfilingCommandEnd - termOut.getProfilingCommandStart) / 1E9
 
     println("ecounts: " + euCount +" " + ebCount +" " + wobCount)
 
@@ -361,7 +366,6 @@ class GrammarKernel[L, W](context: CLContext,
     offDev.release()
     lenDev.release()
     outsideDev.release()
-    outsidePtr.release()
   }
 
   case class Marginal(inside: Array[Float], outside: Array[Float], offset: Int, length: Int) {
@@ -455,7 +459,7 @@ object GrammarKernel {
     println("Parsing...")
     val train = transformed.slice(0,numToParse)
     val timeIn = System.currentTimeMillis()
-    kern.parse(train.map(_.words.toIndexedSeq))
+//    kern.parse(train.map(_.words.toIndexedSeq))
     println("Done: " + (System.currentTimeMillis() - timeIn))
     println("ecounts...")
     val time2 = System.currentTimeMillis()
@@ -525,7 +529,7 @@ object GrammarKernel {
     ecounts.setUnsafeMathOptimizations()
     ecounts.setFastRelaxedMath()
 
-    val grammars = Array.fill(numGrammars)(RuleScores.fromRefinedGrammar(grammar))
+    val grammars = Array.fill(numGrammars)(RuleScores.fromRefinedGrammar(grammar, numBits))
     val scorers = Array.fill(numGrammars){ (w: IndexedSeq[W], pos: Int, label: Int) =>
       grammar.anchor(w).scoreSpan(pos, pos+1, label, 0)
     }
