@@ -79,7 +79,7 @@ class GrammarKernel[L, L2, W](context: CLContext,
       r -> wordCounts
     }
 
-    allCounts.reduceOption{ (c1, c2) => c1._1 += c2._1; for( (a,b) <- c1._2 zip c2._2) for((a2,b2) <- a zip b) a2 += b2; c1}.getOrElse(DenseVector.zeros[Double](nrules) -> Array.fill(numGrammars, nsyms)(Counter[W, Double]()))
+    allCounts.reduceOption{ (c1, c2) => c1._1 += c2._1; for( (a,b) <- c1._2 zip c2._2) for((a2,b2) <- a zip b) a2 += b2; c1}.getOrElse(DenseVector.zeros[Double](nrules * numGrammars) -> Array.fill(numGrammars, nsyms)(Counter[W, Double]()))
   }
 
 
@@ -99,7 +99,8 @@ class GrammarKernel[L, L2, W](context: CLContext,
           ref <- anch.validLabelRefinements(pos, pos+1, a)) {
         val globalizedRefinement = grammar.refinements.labels.globalize(a, ref)
         val score = anch.scoreSpan(pos, pos + 1, a, ref)
-        buffer(cellBottom(offset, pos, pos+1, 0, globalizedRefinement)) = math.exp(score).toFloat
+        for(g <- 0 until numGrammars)
+          buffer(cellBottom(offset, pos, pos+1, g, globalizedRefinement)) = math.exp(score).toFloat
       }
 
 
@@ -185,17 +186,17 @@ class GrammarKernel[L, L2, W](context: CLContext,
     val copyOffLengths = offLengthsDev.write(queue, offLengthsPtr, false)
     eterms.setArg(5, offLengthsDev)
 
-    val termFinished = eterms.enqueueNDRange(queue, Array(nsyms, lengths.length, maxLength), Array(nsyms, 1, 1), lastEvent, wterm, copyOffLengths)
+    val termFinished = eterms.enqueueNDRange(queue, Array(nsyms * numGrammars, lengths.length, maxLength), Array(nsyms * numGrammars, 1, 1), lastEvent, wterm, copyOffLengths)
     for (len <- 2 to maxLength) {
       eunaries.setArg(5, len)
       ebinaries.setArg(5, len)
-      eb += ebinaries.enqueueNDRange(queue, Array(lengths.length, maxLength+1-len), lastEvent, wOB)
-      eu += eunaries.enqueueNDRange(queue, Array(lengths.length, maxLength+1-len), lastEvent, wOB)
+      eb += ebinaries.enqueueNDRange(queue, Array(lengths.length, maxLength+1-len, numGrammars), Array(1, 1, numGrammars), lastEvent, wOB)
+      eu += eunaries.enqueueNDRange(queue, Array(lengths.length, maxLength+1-len, numGrammars), Array(1, 1, numGrammars), lastEvent, wOB)
     }
     eunaries.setArg(5, 1)
-    eu += eunaries.enqueueNDRange(queue, Array(lengths.length, maxLength), lastEvent, wOB)
+    eu += eunaries.enqueueNDRange(queue, Array(lengths.length, maxLength, numGrammars), Array(1, 1, numGrammars), lastEvent, wOB)
 
-    val termOut = termECountsDev.read(queue).getFloats
+    val termOut = termECountsDev.read(queue, termFinished).getFloats
     val wordEcounts = tallyTermExpectedCounts(termOut, words, partialLengths)
 
 
@@ -280,16 +281,16 @@ class GrammarKernel[L, L2, W](context: CLContext,
 
     val iu, ib, ou, ob = new ArrayBuffer[CLEvent]()
 
-    var lastU = unaries.enqueueNDRange(queue, Array(lengths.length, maxLength), wB, wO, wL)
+    var lastU = unaries.enqueueNDRange(queue, Array(lengths.length, maxLength, numGrammars), Array(1, 1, numGrammars), wB, wO, wL)
     iu += lastU
 
     for (len <- 2 to maxLength) {
       binaries.setArg(3, len)
-      val b = binaries.enqueueNDRange(queue, Array(lengths.length, maxLength + 1 - len), lastU)
+      val b = binaries.enqueueNDRange(queue, Array(lengths.length, maxLength + 1 - len, numGrammars), Array(1, 1, numGrammars), lastU)
       ib += b
 
       unaries.setArg(3, len)
-      lastU = unaries.enqueueNDRange(queue, Array(lengths.length, maxLength + 1 - len), b)
+      lastU = unaries.enqueueNDRange(queue, Array(lengths.length, maxLength + 1 - len, numGrammars), Array(1, 1, numGrammars), b)
       iu += lastU
     }
 
@@ -297,15 +298,15 @@ class GrammarKernel[L, L2, W](context: CLContext,
     obinaries.setArgs(outsideDev, insideDev, offDev, lenDev, Integer.valueOf(maxLength))
     ounaries.setArgs(outsideDev, offDev, lenDev, Integer.valueOf(maxLength))
 
-    lastU = ounaries.enqueueNDRange(queue, Array(lengths.length, 1), lastU, wOB)
+    lastU = ounaries.enqueueNDRange(queue, Array(lengths.length, 1, numGrammars), Array(1, 1, numGrammars), lastU, wOB)
     ou += lastU
 
     for (len <- (maxLength - 1) to 1 by -1) {
       obinaries.setArg(4, len)
-      val b = obinaries.enqueueNDRange(queue, Array(lengths.length, maxLength + 1 - len), lastU)
+      val b = obinaries.enqueueNDRange(queue, Array(lengths.length, maxLength + 1 - len, numGrammars), Array(1, 1, numGrammars), lastU)
       ob += b
       ounaries.setArg(3, len)
-      lastU = ounaries.enqueueNDRange(queue, Array(lengths.length, maxLength + 1 - len), b)
+      lastU = ounaries.enqueueNDRange(queue, Array(lengths.length, maxLength + 1 - len, numGrammars), Array(1, 1, numGrammars), b)
       ou += lastU
     }
 
@@ -392,7 +393,7 @@ class GrammarKernel[L, L2, W](context: CLContext,
 
 object GrammarKernel {
   case class Params(annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = FilterAnnotations(),
-                    useGPU: Boolean = true, numToParse: Int = 1000)
+                    useGPU: Boolean = true, numToParse: Int = 1000, numGrammars: Int = 1)
 
   def main(args: Array[String]) {
     import ParserParams.JointParams
@@ -420,7 +421,7 @@ object GrammarKernel {
     val transformed = params.treebank.trainTrees.par.map { ti => annotator(ti) }.seq.toIndexedSeq
     val grammar = GenerativeParser.extractGrammar(AnnotatedLabel.TOP, transformed)
 
-    val kern = fromSimpleGrammar(grammar, params.trainer.useGPU)
+    val kern = fromSimpleGrammar(grammar, params.trainer.useGPU, numGrammars)
     println("Parsing...")
     val train = transformed.slice(0,numToParse)
     val timeIn = System.currentTimeMillis()
@@ -457,7 +458,7 @@ object GrammarKernel {
 //    println(marg)
   }
 
-  def fromSimpleGrammar[L, L2, W](grammar: SimpleRefinedGrammar[L, L2, W], useGPU: Boolean = true) = {
+  def fromSimpleGrammar[L, L2, W](grammar: SimpleRefinedGrammar[L, L2, W], useGPU: Boolean = true, numGrammars: Int = 1) = {
     import grammar.refinedGrammar._
     val (binaryRules, unaryRules) = (0 until index.size).partition(isBinary(_))
     val sortedBinary: IndexedSeq[Int] = binaryRules.sortBy{r1 => (leftChild(r1), parent(r1), rightChild(r1))}(Ordering.Tuple3)
@@ -470,7 +471,7 @@ object GrammarKernel {
     val outsideBinaryText = outsideTemplate(binaryRuleScores, unaryRuleScores)
     val ecountsText = ecountsTemplate(ruleScores)
 
-    val headerText = header(labelIndex.size, grammar.refinedGrammar.rootIndex, ruleScores)
+    val headerText = header(labelIndex.size, grammar.refinedGrammar.rootIndex, ruleScores, numGrammars)
 
     if(true) {val o = new FileWriter("inside.cl"); o.write(headerText); o.write(insideBinaryText); o.close()}
     if(true) {val o = new FileWriter("outside.cl"); o.write(headerText); o.write(outsideBinaryText); o.close()}
@@ -495,7 +496,7 @@ object GrammarKernel {
     ecounts.setUnsafeMathOptimizations()
     ecounts.setFastRelaxedMath()
 
-    val kern = new GrammarKernel(context, grammar, 1, program, outside, ecounts)
+    val kern = new GrammarKernel(context, grammar, numGrammars, program, outside, ecounts)
 
     kern
   }
@@ -510,9 +511,6 @@ object GrammarKernel {
 #define MAX_NUM_RULES_PER_SYMBOL %d
 #define TRIANGULAR_INDEX(begin, end) ((end) * ((end)+1)/2 + begin)
 #define CELL(chart, begin, end)   ((chart) + TRIANGULAR_INDEX(begin, end))
-
-#define gram 0
-
 
 typedef struct {
   float top[NUM_SYMS][NUM_GRAMMARS], bot[NUM_SYMS][NUM_GRAMMARS];
@@ -642,6 +640,7 @@ __kernel void inside_inner(__global parse_cell * charts,
               const int spanLength) {
   const int sentence = get_global_id(0);
   const int begin = get_global_id(1);
+  const int gram = get_global_id(2);
   const int end = begin + spanLength;
   const int length = lengths[sentence];
   float out[NUM_SYMS], right[NUM_SYMS];
@@ -675,6 +674,7 @@ __kernel void inside_unary(__global parse_cell * charts,
               const int spanLength) {
   const int sentence = get_global_id(0);
   const int begin = get_global_id(1);
+  const int gram = get_global_id(2);
   const int end = begin + spanLength;
   const int length = lengths[sentence];
 
@@ -693,6 +693,7 @@ def outsideTemplate(rules: IndexedSeq[(BinaryRule[Int], Double)], unaries: Index
                 const int spanLength) {
     const int sentence = get_global_id(0);
     const int begin = get_global_id(1);
+    const int gram = get_global_id(2);
     const int end = begin + spanLength;
     const int length = lengths[sentence];
 
@@ -715,6 +716,7 @@ def outsideTemplate(rules: IndexedSeq[(BinaryRule[Int], Double)], unaries: Index
                 const int spanLength) {
     const int sentence = get_global_id(0);
     const int begin = get_global_id(1);
+    const int gram = get_global_id(2);
     const int end = begin + spanLength;
     const int length = lengths[sentence];
     float oparent[NUM_SYMS], otarget[NUM_SYMS];
@@ -775,6 +777,7 @@ __kernel void binary_ecounts(__global rule_cell* ecounts,
    ) {
   const int sentence = get_global_id(0);
   const int begin = get_global_id(1);
+  const int gram = get_global_id(2);
   const int end = begin + span_length;
   const int length = lengths[sentence];
   __global rule_cell* ruleCounts = ecounts + (offsets[sentence] + TRIANGULAR_INDEX(begin, end));
@@ -798,6 +801,7 @@ __kernel void unary_ecounts(
               const int spanLength) {
   const int sentence = get_global_id(0);
   const int begin = get_global_id(1);
+  const int gram = get_global_id(2);
   const int end = begin + spanLength;
   const int length = lengths[sentence];
 
@@ -819,19 +823,20 @@ __kernel void terminal_ecounts(
    __global const int* offsets,
    __global const int* lengths,
    __global const int* lengthOffsets) {
-  const int sym = get_global_id(0);
+  const int sym = get_global_id(0)/ NUM_GRAMMARS;
+  const int grammar = get_global_id(0) %% NUM_GRAMMARS;
   const int sentence = get_global_id(1);
   const int begin = get_global_id(2);
   const int end = begin  + 1;
   const int length = lengths[sentence];
   if (begin < length) {
     __global const parse_cell* inside = insides + offsets[sentence];
-    const float root_score = CELL(inside, 0, length)->top[ROOT][gram]; // scale is 2^(SCALE_FACTOR)^(length-1)
+    const float root_score = CELL(inside, 0, length)->top[ROOT][grammar]; // scale is 2^(SCALE_FACTOR)^(length-1)
     __global const parse_cell* in = CELL(inside, begin, end);
     __global const parse_cell* out = CELL(outsides + offsets[sentence], begin, end);
     __global sym_cell* mybuf = term_ecounts + (lengthOffsets[sentence] + begin);
     // ibot has scale 0, obot has scale length - 1, root_score has scale length - 1. Woot.
-    mybuf->syms[sym][gram] = (in->bot[sym][gram] * out->bot[sym][gram])/root_score;
+    mybuf->syms[sym][grammar] = (in->bot[sym][grammar] * out->bot[sym][grammar])/root_score;
   }
 }
     """.format(ecountBinaryRules(byParent), ecountUnaries(uByParent))
