@@ -17,7 +17,7 @@ import breeze.linalg.{Counter, DenseVector}
 import gpu.GrammarKernel.ZeroMemory
 import org.bridj.Pointer
 import breeze.util.{Index, Encoder}
-import collection.mutable
+import collection.{immutable, mutable}
 
 class GrammarKernel[L, L2, W](context: CLContext,
                               grammar: SimpleRefinedGrammar[L, L2, W],
@@ -461,14 +461,15 @@ object GrammarKernel {
     val (binaryRules, unaryRules) = (0 until index.size).partition(isBinary(_))
     val sortedBinary: IndexedSeq[Int] = binaryRules.sortBy{r1 => (leftChild(r1), parent(r1), rightChild(r1))}(Ordering.Tuple3)
     val sortedUnary = unaryRules.sortBy(r => parent(r) -> child(r))(Ordering.Tuple2)
+    val ruleScores = (0 until index.size).map(r => indexedRule(r) -> grammar.ruleScore(r))
 
     val unaryRuleScores = sortedUnary.map { r => indexedRule(r).asInstanceOf[UnaryRule[Int]] -> grammar.ruleScore(r) }
     val binaryRuleScores = sortedBinary.map { r => indexedRule(r).asInstanceOf[BinaryRule[Int]] -> grammar.ruleScore(r) }
     val insideBinaryText = insideTemplate(binaryRuleScores, unaryRuleScores)
     val outsideBinaryText = outsideTemplate(binaryRuleScores, unaryRuleScores)
-    val ecountsText = ecountsTemplate((0 until index.size).map(r => indexedRule(r) -> grammar.ruleScore(r)))
+    val ecountsText = ecountsTemplate(ruleScores)
 
-    val headerText = header(labelIndex.size, grammar.refinedGrammar.rootIndex, binaryRuleScores)
+    val headerText = header(labelIndex.size, grammar.refinedGrammar.rootIndex, ruleScores)
 
     if(true) {val o = new FileWriter("inside.cl"); o.write(headerText); o.write(insideBinaryText); o.close()}
     if(true) {val o = new FileWriter("outside.cl"); o.write(headerText); o.write(outsideBinaryText); o.close()}
@@ -506,8 +507,8 @@ object GrammarKernel {
 #define NUM_RULES %d
 #define MAX_NUM_RULES_PER_SYMBOL %d
 #define TRIANGULAR_INDEX(begin, end) ((end) * ((end)+1)/2 + begin)
-#define CELL_TOP(chart, begin, end) ((chart)[TRIANGULAR_INDEX(begin, end)].top)
-#define CELL_BOT(chart, begin, end) ((chart)[TRIANGULAR_INDEX(begin, end)].bot)
+#define CELL(chart, begin, end)   ((chart) + TRIANGULAR_INDEX(begin, end))
+
 
 typedef struct {
   float top[NUM_SYMS], bot[NUM_SYMS];
@@ -527,16 +528,16 @@ typedef struct {
     for( (r, score) <- rules2) {
       if(r.parent != lastParent) {
         if(lastParent != -1) {
-          sb += """top[%d] = parent;""".format(lastParent)
+          sb += """cell->top[%d] = parent;""".format(lastParent)
         }
-        sb += """parent = %ff * bot[%d];""".format(math.exp(score.toFloat), r.child)
+        sb += """parent = %ff * cell->bot[%d];""".format(math.exp(score.toFloat), r.child)
         lastParent = r.parent
       } else {
-        sb += """parent = mad(%ff, bot[%d], parent);""".format(math.exp(score.toFloat), r.child)
+        sb += """parent = mad(%ff, cell->bot[%d], parent);""".format(math.exp(score.toFloat), r.child)
       }
     }
     if(lastParent != -1) {
-      sb += """top[%d] = parent;""".format(lastParent)
+      sb += """cell->top[%d] = parent;""".format(lastParent)
     }
     sb.mkString("\n    ")
   }
@@ -549,16 +550,16 @@ typedef struct {
     for( (r, score) <- rules2) {
       if(r.child != lastChild) {
         if(lastChild != -1) {
-          sb += """bot[%d] = child;""".format(lastChild)
+          sb += """out->bot[%d] = child;""".format(lastChild)
         }
-        sb += """child = %ff * top[%d];""".format(math.exp(score.toFloat), r.parent)
+        sb += """child = %ff * out->top[%d];""".format(math.exp(score.toFloat), r.parent)
         lastChild = r.child
       } else {
-        sb += """child = mad(%ff, top[%d], child);""".format(math.exp(score.toFloat), r.parent)
+        sb += """child = mad(%ff, out->top[%d], child);""".format(math.exp(score.toFloat), r.parent)
       }
     }
     if(lastChild != -1) {
-      sb += """bot[%d] = child;""".format(lastChild)
+      sb += """out->bot[%d] = child;""".format(lastChild)
     }
     sb.mkString("\n    ")
   }
@@ -571,7 +572,7 @@ typedef struct {
       if(lastLeft != l) {
         if(lastLeft != -1)
           sb += "}"
-        sb += "currentLeftScore = left[%d];" format l
+        sb += "currentLeftScore = left->top[%d];" format l
         sb += "if(currentLeftScore != 0.0) {"
         lastLeft = l
       }
@@ -594,7 +595,7 @@ typedef struct {
       if(lastRight != right) {
         if(lastRight != -1)
           sb += "}"
-        sb += "currentCompl = gright[%d];" format right
+        sb += "currentCompl = gright->top[%d];" format right
         sb += "if(currentCompl != 0.0) {"
         lastRight = right
       }
@@ -614,7 +615,7 @@ typedef struct {
       if(lastLeft != l) {
         if(lastLeft != -1)
           sb += "}"
-        sb += "currentCompl = gleft[%d];" format l
+        sb += "currentCompl = gleft->top[%d];" format l
         sb += "if(currentCompl != 0.0) {"
         lastLeft = l
       }
@@ -643,18 +644,18 @@ __kernel void inside_inner(__global float * charts,
     }
 
     for(int split = begin + 1; split < end; ++split) {
-      __global const float * left = CELL_TOP(chart, begin, split); // scale factor of (2 ^ SCALE_FACTOR)^((split - begin) - 1)
-      __global const float * gright = CELL_TOP(chart, split, end); // scale factor of (2^ SCALE_FACTOR)((end-split) - 1)
+      __global const parse_cell * left = CELL(chart, begin, split); // scale factor of (2 ^ SCALE_FACTOR)^((split - begin) - 1)
+      __global const parse_cell * gright = CELL(chart, split, end); // scale factor of (2^ SCALE_FACTOR)((end-split) - 1)
       for(int i = 0; i < NUM_SYMS; ++i) {
-        right[i] = gright[i];
+        right[i] = gright->top[i];
       }
       %s
     }
     // out has a scale factor of (2^SCALE_FACTOR)^((end-split) + (split-begin) - 2) = (2^SCALE_FACTOR)^(end-begin-2)
     // multiply in a 2^SCALE_FACTOR to reachive balance.
-    __global float* gout = CELL_BOT(chart, begin, end);
+    __global parse_cell* gout = CELL(chart, begin, end);
     for(int i = 0; i < NUM_SYMS; ++i) {
-      gout[i] = ldexp(out[i], SCALE_FACTOR);
+      gout->bot[i] = ldexp(out[i], SCALE_FACTOR);
     }
   }
 }
@@ -671,8 +672,7 @@ __kernel void inside_unary(__global float * charts,
 
   if (end <= length) {
     __global parse_cell* chart = ((__global parse_cell*)charts) + offsets[sentence];
-    __global float* top = CELL_TOP(chart, begin, end);
-    __global const float* bot = CELL_BOT(chart, begin, end);
+    __global parse_cell* cell = CELL(chart, begin, end);
     %s
   }
 }
@@ -691,13 +691,12 @@ def outsideTemplate(rules: IndexedSeq[(BinaryRule[Int], Double)], unaries: Index
 
     if(spanLength == length) {
       __global parse_cell* outside = ((__global parse_cell*)charts) + offsets[sentence];
-      (CELL_TOP(outside, 0, length))[ROOT] = 1.0f;
+      (CELL(outside, 0, length))->top[ROOT] = 1.0f;
     }
 
     if (end <= length) {
       __global parse_cell* outside = ((__global parse_cell*)charts) + offsets[sentence];
-      __global const float* top = CELL_TOP(outside, begin, end);
-      __global float* bot = CELL_BOT(outside, begin, end);
+      __global parse_cell* out = CELL(outside, begin, end);
       %s
     }
   }
@@ -720,33 +719,33 @@ def outsideTemplate(rules: IndexedSeq[(BinaryRule[Int], Double)], unaries: Index
       }
       // complete looking right
       for(int completion = end+1; completion <= length; ++completion) {
-         __global const float * gparent = CELL_BOT(outside, begin, completion); // scale factor of (2 ^ SCALE_FACTOR)^(length-(completion - begin))
-         __global const float * gright = CELL_TOP(inside, end, completion); // scale factor of (2 ^ SCALE_FACTOR)^((end - completion) - 1)
+         __global const parse_cell * gparent = CELL(outside, begin, completion); // scale factor of (2 ^ SCALE_FACTOR)^(length-(completion - begin))
+         __global const parse_cell * gright = CELL(inside, end, completion); // scale factor of (2 ^ SCALE_FACTOR)^((end - completion) - 1)
          // product of gparent and gright has scale (2^SCALE_FACTOR)^(length-(end-begin)-1), so need to scale by 1 to maintain invariant
          for(int i = 0; i < NUM_SYMS; ++i) {
-           oparent[i] = gparent[i];
+           oparent[i] = gparent->bot[i];
          }
          %s
       }
 
      // complete looking left
       for(int completion = 0; completion < begin; ++completion) {
-         __global float * gparent = CELL_BOT(outside, completion, end); // scale factor of (2 ^ SCALE_FACTOR)^(length-(end-completion))
-         __global const float * gleft = CELL_TOP(inside, completion, begin); // scale factor of (2 ^ SCALE_FACTOR)^((begin - completion) - 1)
+         __global const parse_cell * gparent = CELL(outside, completion, end); // scale factor of (2 ^ SCALE_FACTOR)^(length-(end-completion))
+         __global const parse_cell * gleft = CELL(inside, completion, begin); // scale factor of (2 ^ SCALE_FACTOR)^((begin - completion) - 1)
          // product of gparent and gleft has scale (2^SCALE_FACTOR)^(length-(end-begin)-1), so need to scale by 1 to maintain invariant
 //         for(int i = 0; i < NUM_SYMS; ++i) {
 //           icompl[i] = gleft[i];
 //         }
          for(int i = 0; i < NUM_SYMS; ++i) {
-           oparent[i] = gparent[i];
+           oparent[i] = gparent->bot[i];
          }
          %s
       }
 
       // multiply in a 2^SCALE_FACTOR to re-achieve balance.
-      __global float* gout = CELL_TOP(outside, begin, end);
+      __global parse_cell* gout = CELL(outside, begin, end);
       for(int i = 0; i < NUM_SYMS; ++i) {
-        gout[i] = ldexp(otarget[i], SCALE_FACTOR);
+        gout->top[i] = ldexp(otarget[i], SCALE_FACTOR);
 //        gout[i] = otarget[i];
       }
     }
@@ -774,10 +773,10 @@ __kernel void binary_ecounts(__global float* ecounts,
   __global float* mybuf = ecounts + (offsets[sentence] + TRIANGULAR_INDEX(begin, end)) * NUM_RULES;
   __global const parse_cell* outside = ((__global const parse_cell*)outsides) + offsets[sentence];
   __global const parse_cell* inside = ((__global const parse_cell*)insides) + offsets[sentence];
-  const float root_score = CELL_TOP(inside, 0, length)[ROOT]; // scale is 2^(SCALE_FACTOR)^(length-1)
+  const float root_score = CELL(inside, 0, length)->top[ROOT]; // scale is 2^(SCALE_FACTOR)^(length-1)
   if(end <= length) {
     float oscore;
-    __global const float* oparents = CELL_BOT(outside, begin, end);
+    __global const parse_cell* oparents = CELL(outside, begin, end);
     %s
   }
 }
@@ -798,10 +797,10 @@ __kernel void unary_ecounts(
   if (end <= length) {
     __global const parse_cell* outside = ((__global const parse_cell*)outsides) + offsets[sentence];
     __global const parse_cell* inside = ((__global const parse_cell*)insides) + offsets[sentence];
-    const float root_score = CELL_TOP(inside, 0, length)[ROOT]; // scale is 2^(SCALE_FACTOR)^(length-1)
+    const float root_score = CELL(inside, 0, length)->top[ROOT]; // scale is 2^(SCALE_FACTOR)^(length-1)
     __global float* mybuf = ecounts + (offsets[sentence] + TRIANGULAR_INDEX(begin, end)) * NUM_RULES;
-    __global const float* bot = CELL_BOT(inside, begin, end);
-    __global const float* oparents = CELL_TOP(outside, begin, end);
+    __global const parse_cell* in = CELL(inside, begin, end);
+    __global const parse_cell* out = CELL(outside, begin, end);
     %s
   }
 }
@@ -821,12 +820,12 @@ __kernel void terminal_ecounts(
   if (begin < length) {
     __global const parse_cell* outside = ((__global const parse_cell*)outsides) + offsets[sentence];
     __global const parse_cell* inside = ((__global const parse_cell*)insides) + offsets[sentence];
-    const float root_score = CELL_TOP(inside, 0, length)[ROOT]; // scale is 2^(SCALE_FACTOR)^(length-1)
-    __global const float* ibot = CELL_BOT(inside, begin, end);
-    __global const float* obot = CELL_BOT(outside, begin, end);
+    const float root_score = CELL(inside, 0, length)->top[ROOT]; // scale is 2^(SCALE_FACTOR)^(length-1)
+    __global const parse_cell* in = CELL(inside, begin, end);
+    __global const parse_cell* out = CELL(outside, begin, end);
     __global float* mybuf = term_ecounts + (lengthOffsets[sentence] + begin) * NUM_SYMS;
     // ibot has scale 0, obot has scale length - 1, root_score has scale length - 1. Woot.
-    mybuf[sym] = (ibot[sym] * obot[sym])/root_score;
+    mybuf[sym] = (in->bot[sym] * out->bot[sym])/root_score;
   }
 }
     """.format(ecountBinaryRules(byParent), ecountUnaries(uByParent))
@@ -843,7 +842,7 @@ __kernel void terminal_ecounts(
       // oparent has scale length + begin - end, root has scale length - 1
       // left * right has scale (end - begin-2)
       // left * right * oparent / root has scale -1
-      buf += "oscore = ldexp(oparents[%d]/root_score, SCALE_FACTOR);".format(par)
+      buf += "oscore = ldexp(oparents->bot[%d]/root_score, SCALE_FACTOR);".format(par)
       buf += "if (oscore != 0.0) {"
       var r = 0
       while(r < rules.length) {
@@ -859,7 +858,7 @@ __kernel void terminal_ecounts(
         while(r < rules.length && assignments.size < registersToUse) {
           val (BinaryRule(_, l, right), score, ruleIndex) = rules(r)
           if(lastLeft != l) {
-            buf += "    r0 = CELL_TOP(inside, begin, split)[%d];".format(l)
+            buf += "    r0 = CELL(inside, begin, split)->top[%d];".format(l)
             lastLeft = l
           }
           val rightR = assignments.index(('right, right))
@@ -867,7 +866,7 @@ __kernel void terminal_ecounts(
           if(assignments.size < registersToUse) {
             ruleRegisters += (ruleR -> ruleIndex)
             if (!setThisRound(rightR)) {
-              buf += "    r%d = CELL_TOP(inside, split, end)[%d];".format(rightR, right)
+              buf += "    r%d = CELL(inside, split, end)->top[%d];".format(rightR, right)
               setThisRound += rightR
             }
             buf += "    r%d = fma(%ff, r0 * r%d * oscore, r%d);".format(ruleR, math.exp(score).toFloat, rightR, ruleR)
@@ -896,9 +895,9 @@ __kernel void terminal_ecounts(
       // oparent has scale length + begin - end, root has scale length - 1
       // child has scale (end - begin-1)
       // child * oparent / root has scale 0 (yay!)
-      buf += "oscore = oparents[%d]/root_score;".format(par)
+      buf += "oscore = out->top[%d]/root_score;".format(par)
       for( (r,score,index) <- rules) {
-        buf += "mybuf[%d] = %ff * oscore * bot[%d];".format(index, math.exp(score), r.child)
+        buf += "mybuf[%d] = %ff * oscore * in->bot[%d];".format(index, math.exp(score), r.child)
       }
     }
 
