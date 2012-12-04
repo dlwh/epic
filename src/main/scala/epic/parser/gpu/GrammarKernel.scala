@@ -20,8 +20,6 @@ import breeze.util.{Index, Encoder}
 import collection.{immutable, mutable}
 import java.nio.{FloatBuffer, ByteBuffer}
 
-
-
 class GrammarKernel[L, W](context: CLContext,
                           grammar: BaseGrammar[L],
                           lexicon: Lexicon[L, W],
@@ -30,7 +28,8 @@ class GrammarKernel[L, W](context: CLContext,
                           inside: CLProgram,
                           outside: CLProgram,
                           ecounts: CLProgram,
-                          maxSentences: Int = 10000) {
+                          maxSentences: Int = 10000,
+                          maxTotalLength: Int = 10000) {
   def ruleScores = _ruleScores
 
   val numGrammars = ruleScores.length
@@ -55,10 +54,9 @@ class GrammarKernel[L, W](context: CLContext,
   private val memZero = new ZeroMemory(context)
 
   private val insideDev = context.createFloatBuffer(Usage.InputOutput, maxCells * cellSize)
-  private val bufPtr = insideDev.allocateCompatibleMemory(context.getDevices()(0))
   private val outsideDev = context.createFloatBuffer(Usage.InputOutput, maxCells * cellSize)
   private val ecountsDev = context.createFloatBuffer(Usage.InputOutput, maxCells * totalRules)
-  private val termECountsDev = context.createFloatBuffer(Usage.InputOutput, maxCells * cellSize / 2)
+  private val termECountsDev = context.createFloatBuffer(Usage.InputOutput, maxTotalLength * cellSize / 2)
   private val offDev = context.createIntBuffer(Usage.Input, maxSentences)
   private val offPtr = offDev.allocateCompatibleMemory(context.getDevices()(0))
   private val offLengthsDev = context.createIntBuffer(Usage.Input, maxSentences)
@@ -67,7 +65,8 @@ class GrammarKernel[L, W](context: CLContext,
   private val lenPtr = lenDev.allocateCompatibleMemory(context.getDevices()(0))
   private val ruleVector = Pointer.allocateFloats(totalRules)
 
-  private val buffer = new Array[Float](maxCells * cellSize)
+  private val posTagsDev = context.createFloatBuffer(Usage.InputOutput, maxTotalLength * cellSize / 2)
+  private val posTagsPtr = posTagsDev.allocateCompatibleMemory(context.getDevices()(0))
 
   private val rulesDev = context.createFloatBuffer(Usage.Input, totalRules)
   ruleScores = _ruleScores
@@ -92,8 +91,8 @@ class GrammarKernel[L, W](context: CLContext,
   def parse(sentences: IndexedSeq[IndexedSeq[W]]):IndexedSeq[BinarizedTree[L]] = synchronized {
     {for {
       partition <- getPartitions(sentences).iterator
-      (lengths, offsets) = layoutIntoMemory(partition)
-      t <- doParse(offsets, lengths)
+      batch = layoutIntoMemory(partition)
+      t <- doParse(batch)
     } yield {
       t
     }}.toIndexedSeq
@@ -103,8 +102,8 @@ class GrammarKernel[L, W](context: CLContext,
     val allCounts = for {
       partition <- getPartitions(sentences).iterator
     } yield {
-      val (lengths,offsets) = layoutIntoMemory(partition)
-      val (counts: Array[Float], wordCounts: Array[Array[Counter[W, Double]]]) = doExpectedCounts(offsets, lengths, partition)
+      val batch = layoutIntoMemory(partition)
+      val (counts: Array[Float], wordCounts: Array[Array[Counter[W, Double]]]) = doExpectedCounts(batch)
       val r = new DenseVector[Double](counts.map(_.toDouble))
       r -> wordCounts
     }
@@ -116,21 +115,40 @@ class GrammarKernel[L, W](context: CLContext,
     allCounts.reduceOption{ (c1, c2) => c1._1 += c2._1; sumCounts(c1._2, c2._2); c1}.getOrElse(DenseVector.zeros[Double](totalRules) -> Array.fill(numGrammars, nsyms)(Counter[W, Double]()))
   }
 
+  case class Batch(lengths: Array[Int],
+                   offsets: Array[Int],
+                   lengthTotals: Array[Int],
+                   totalLength: Int,
+                   sentences: IndexedSeq[IndexedSeq[W]],
+                   posTags: Array[Float]) {
 
-  private def layoutIntoMemory(sentences: IndexedSeq[IndexedSeq[W]]): (Array[Int], Array[Int]) = {
+  }
+
+
+  private def layoutIntoMemory(sentences: IndexedSeq[IndexedSeq[W]]): Batch = {
     val lengths = sentences.map(_.length)
     val offsets = new ArrayBuffer[Int]()
-    util.Arrays.fill(buffer, 0.0f)
 
     var offset = 0
 
-    for(s <- sentences) {
+    val partialLengths = new Array[Int](lengths.size)
+    var totalLength = 0
+    var i = 0
+    while(i < partialLengths.length) {
+      partialLengths(i) = totalLength
+      totalLength += lengths(i)
+      i += 1
+    }
+
+    val posTags = new Array[Float](totalLength)
+
+    for( (s, i) <- sentences.zipWithIndex) {
       offsets += offset
       for(pos <- (0 until s.length);
           aa <- lexicon.tagsForWord(s(pos));
           a = grammar.labelIndex(aa)) {
         for(g <- 0 until numGrammars)
-          buffer(cellBottom(offset, pos, pos+1, g, a)) = math.exp(tagScores(g)(s, pos, a)).toFloat
+          posTags(partialLengths(i) + pos * nsyms + a) = math.exp(tagScores(g)(s, pos, a)).toFloat
       }
 
 
@@ -138,16 +156,18 @@ class GrammarKernel[L, W](context: CLContext,
     }
     offsets += offset
 
-    lengths.toArray -> offsets.toArray
+    Batch(lengths.toArray, offsets.toArray, partialLengths, totalLength, sentences, posTags)
   }
 
   private def getPartitions(sentences: IndexedSeq[IndexedSeq[W]]): IndexedSeq[IndexedSeq[IndexedSeq[W]]] = {
     val result = ArrayBuffer[IndexedSeq[IndexedSeq[W]]]()
     var current = ArrayBuffer[IndexedSeq[W]]()
     var currentCellTotal = 0
+    var currentLengthTotal = 0
     for(s <- sentences) {
       currentCellTotal += TriangularArray.arraySize(s.length+1)
-      if(currentCellTotal > maxCells) {
+      currentLengthTotal += s.length
+      if(currentCellTotal > maxCells || current.size >= maxSentences || currentLengthTotal > maxTotalLength) {
         assert(current.nonEmpty)
         result += current
         currentCellTotal = TriangularArray.arraySize(s.length+1)
@@ -165,8 +185,8 @@ class GrammarKernel[L, W](context: CLContext,
     ((offset + TriangularArray.index(begin, end)) * nsyms * 2 + nsyms + sym) * numGrammars + grammar
   }
 
-  private def doParse(offsets: Array[Int], lengths: Array[Int]):IndexedSeq[BinarizedTree[L]] = synchronized {
-    val marginals = getMarginals(buffer, offsets, lengths)
+  private def doParse(batch: Batch):IndexedSeq[BinarizedTree[L]] = synchronized {
+    val marginals = getMarginals(batch)
 
 //    println(marginals.mkString("\n...\n"))
 //    println(marginals.map(_.rootScore(0)).mkString("\n"))
@@ -176,23 +196,15 @@ class GrammarKernel[L, W](context: CLContext,
     IndexedSeq.empty
   }
 
-  private def doExpectedCounts(offsets: Array[Int],
-                               lengths: Array[Int],
-                               words: IndexedSeq[IndexedSeq[W]]) = synchronized {
+  private def doExpectedCounts(batch: Batch) = synchronized {
+    import batch._
     val wOB = memZero.zeroMemory(queue, ecountsDev)
     val wterm = memZero.zeroMemory(queue, termECountsDev)
-    var lastEvent = insideOutside(offsets, lengths)
+    var lastEvent = insideOutside(batch)
 //    var lastEvent = wOB
 
-    val partialLengths = new Array[Int](lengths.size)
-    var totalLength = 0
-    var i = 0
-    while(i < partialLengths.length) {
-      partialLengths(i) = totalLength
-      totalLength += lengths(i)
-      i += 1
-    }
-    offLengthsPtr.setInts(partialLengths)
+
+    offLengthsPtr.setInts(lengthTotals)
     val copyOffLengths = offLengthsDev.write(queue, offLengthsPtr, false)
 
     val eu, eb, r = new ArrayBuffer[CLEvent]()
@@ -226,7 +238,7 @@ class GrammarKernel[L, W](context: CLContext,
     val termOut = termECountsDev.read(queue, termVector, true, termFinished)
     val floats = termVector.getFloats
     termVector.release()
-    val wordEcounts = tallyTermExpectedCounts(floats, words, partialLengths)
+    val wordEcounts = tallyTermExpectedCounts(floats, sentences, lengthTotals)
 
 
     queue.finish()
@@ -278,8 +290,9 @@ class GrammarKernel[L, W](context: CLContext,
   }
 
 
-  private def getMarginals(buffer: Array[Float], offsets: Array[Int], lengths: Array[Int]) =  {
-    val lastEvent = insideOutside(offsets, lengths)
+  private def getMarginals(batch: Batch) =  {
+    val lastEvent = insideOutside(batch)
+    import batch._
 
     val inM = insideDev.read(queue, lastEvent)
     val outM = outsideDev.read(queue, lastEvent)
@@ -296,12 +309,14 @@ class GrammarKernel[L, W](context: CLContext,
   }
 
 
-  private def insideOutside(offsets: Array[Int], lengths: Array[Int]) = {
-    bufPtr.setFloats(buffer)
+  private def insideOutside(batch: Batch) = synchronized {
+    import batch._
+    posTagsPtr.setFloats(batch.posTags)
     offPtr.setInts(offsets)
     lenPtr.setInts(lengths)
 
-    val wB = insideDev.write(queue, 0, buffer.length, bufPtr, false)
+    val wPos = posTagsDev.write(queue, posTagsPtr, false)
+    val wB = memZero.zeroMemory(queue, insideDev)
     val wOB = memZero.zeroMemory(queue, outsideDev)
     val wO = offDev.write(queue, 0, lengths.length, offPtr, false)
     val wL = lenDev.write(queue, 0, lengths.length, lenPtr, false)
@@ -312,9 +327,11 @@ class GrammarKernel[L, W](context: CLContext,
 
     val iu, ib, ou, ob = new ArrayBuffer[CLEvent]()
 
-    var lastU = unaries.enqueueNDRange(queue, Array(lengths.length, maxLength, numGrammars), Array(1, 1, numGrammars), wB, wO, wL)
+    var lastU = unaries.enqueueNDRange(queue, Array(lengths.length, maxLength, numGrammars), Array(1, 1, numGrammars), wB, wO, wL, wPos)
     iu += lastU
 
+    // TODO: retrofit inside/outside binaries and unaries to look at posTagsPointer....
+    // TODO: also get ecounts...
     for (len <- 2 to maxLength) {
       binaries.setArg(3, len)
       val b = binaries.enqueueNDRange(queue, Array(lengths.length, maxLength + 1 - len, numGrammars), Array(1, 1, numGrammars), lastU)
@@ -356,7 +373,6 @@ class GrammarKernel[L, W](context: CLContext,
   }
 
   override protected def finalize() {
-    bufPtr.release()
     offPtr.release()
     lenPtr.release()
     insideDev.release()
