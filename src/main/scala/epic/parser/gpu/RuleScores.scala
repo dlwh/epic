@@ -3,19 +3,18 @@ package epic.parser.gpu
 import epic.parser.{SimpleRefinedGrammar, RefinedGrammar}
 import epic.trees.BinaryRule
 
-case class RuleScores(binaries: Array[Array[Double]], unaries: Array[Array[Double]])
+case class RuleScores(binaries: Array[Double], unaries: Array[Double])
 
 object RuleScores {
-  def fromRefinedGrammar[L, W](grammar: SimpleRefinedGrammar[L, _, W], numBits: Int = 0) = {
-    val numStates = 1 << numBits
+  def fromRefinedGrammar[L, W](grammar: SimpleRefinedGrammar[L, _, W]) = {
     val (bin, un) = grammar.grammar.index.toIndexedSeq.zipWithIndex.partition(_._1.isInstanceOf[BinaryRule[_]])
-    val binaries = Array.ofDim[Double](bin.length, numStates * numStates * numStates)
-    val unaries = Array.ofDim[Double](un.length, numStates * numStates)
-    for( (b, i) <- bin; ref <- 0 until binaries(i).length) {
-      binaries(i)(ref) = grammar.ruleScore(i, 0) // TODO: ref here
+    val binaries = new Array[Double](bin.length)
+    val unaries = new Array[Double](un.length)
+    for( (b, i) <- bin) {
+      binaries(i) = grammar.ruleScore(i, 0)
     }
-    for( (b, i) <- un; ref <- 0 until unaries(i-bin.length).length) {
-      unaries(i - bin.length)(ref) = grammar.ruleScore(i, 0) // TODO: ref here.
+    for( (b, i) <- un) {
+      unaries(i - bin.length) = grammar.ruleScore(i, 0)
     }
 
     RuleScores(binaries, unaries)
