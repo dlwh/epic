@@ -191,7 +191,7 @@ class GrammarKernel[L, W](context: CLContext,
     val marginals = getMarginals(batch)
 
 //    println(marginals.mkString("\n...\n"))
-    println(marginals.map(_.rootScore(0)).mkString("\n"))
+//    println(marginals.map(_.rootScore(0)).mkString("\n"))
 //    println(marginals.map(m => breeze.numerics.logSum((0 until grammar.refinedGrammar.labelIndex.size).map(i => m.topOutsideScore(0,1,i) + m.topInsideScore(0, 1, i)))))
 
 
