@@ -28,7 +28,8 @@ class GrammarKernel[L, W](context: CLContext,
                           inside: CLProgram,
                           outside: CLProgram,
                           ecounts: CLProgram,
-                          maxSentences: Int = 10000,
+                          copyPosTags: CLProgram,
+                          maxSentences: Int = 1000,
                           maxTotalLength: Int = 10000) {
   def ruleScores = _ruleScores
 
@@ -50,6 +51,7 @@ class GrammarKernel[L, W](context: CLContext,
   private val ebinaries = ecounts.createKernel("ecount_binaries")
   private val eunaries = ecounts.createKernel("ecount_unaries")
   private val eterms = ecounts.createKernel("ecount_terminals")
+  private val copyTags = copyPosTags.createKernel("copy_pos_to_charts")
   private val sumVector = context.createProgram(GrammarKernel.sumECountVectors).createKernel("sum_vectors")
   private val memZero = new ZeroMemory(context)
 
@@ -140,7 +142,7 @@ class GrammarKernel[L, W](context: CLContext,
       i += 1
     }
 
-    val posTags = new Array[Float](totalLength)
+    val posTags = new Array[Float](totalLength * nsyms * numGrammars)
 
     for( (s, i) <- sentences.zipWithIndex) {
       offsets += offset
@@ -148,7 +150,7 @@ class GrammarKernel[L, W](context: CLContext,
           aa <- lexicon.tagsForWord(s(pos));
           a = grammar.labelIndex(aa)) {
         for(g <- 0 until numGrammars)
-          posTags(partialLengths(i) + pos * nsyms + a) = math.exp(tagScores(g)(s, pos, a)).toFloat
+          posTags(((partialLengths(i) + pos) * nsyms +  a)*numGrammars + g) = math.exp(tagScores(g)(s, pos, a)).toFloat
       }
 
 
@@ -189,7 +191,7 @@ class GrammarKernel[L, W](context: CLContext,
     val marginals = getMarginals(batch)
 
 //    println(marginals.mkString("\n...\n"))
-//    println(marginals.map(_.rootScore(0)).mkString("\n"))
+    println(marginals.map(_.rootScore(0)).mkString("\n"))
 //    println(marginals.map(m => breeze.numerics.logSum((0 until grammar.refinedGrammar.labelIndex.size).map(i => m.topOutsideScore(0,1,i) + m.topInsideScore(0, 1, i)))))
 
 
@@ -311,23 +313,42 @@ class GrammarKernel[L, W](context: CLContext,
 
   private def insideOutside(batch: Batch) = synchronized {
     import batch._
+    val maxLength = lengths.max
     posTagsPtr.setFloats(batch.posTags)
     offPtr.setInts(offsets)
     lenPtr.setInts(lengths)
 
-    val wPos = posTagsDev.write(queue, posTagsPtr, false)
+//    println(posTags.slice(batch.lengthTotals(1) * nsyms, batch.totalLength * nsyms).mkString(", "))
+
+    val wPos = posTagsDev.write(queue, 0, batch.posTags.length, posTagsPtr, false)
     val wB = memZero.zeroMemory(queue, insideDev)
     val wOB = memZero.zeroMemory(queue, outsideDev)
     val wO = offDev.write(queue, 0, lengths.length, offPtr, false)
     val wL = lenDev.write(queue, 0, lengths.length, lenPtr, false)
+    offLengthsPtr.setInts(lengthTotals)
+    val copyOffLengths = offLengthsDev.write(queue, offLengthsPtr, false)
 
-    val maxLength = lengths.max
+    copyTags.setArgs(posTagsDev, insideDev, offDev, lenDev, offLengthsDev, Integer.valueOf(1))
+    val maxDim1Size = queue.getDevice.getMaxWorkItemSizes()(0)
+    if(maxDim1Size < nsyms * numGrammars) {
+      copyTags.setArg(5, numGrammars / 8 + 1)
+    }
+    val gramMultiplier = if(maxDim1Size < nsyms * numGrammars) {
+      8
+    } else {
+      numGrammars
+    }
+    queue.finish()
+    val initCharts = copyTags.enqueueNDRange(queue,  Array(nsyms * gramMultiplier, lengths.length, maxLength), Array(nsyms * gramMultiplier, 1, 1), wPos, wB, wO, wL, copyOffLengths)
+    queue.finish()
+
+
     binaries.setArgs(insideDev, offDev, lenDev, Integer.valueOf(1), rulesDev)
     unaries.setArgs(insideDev, offDev, lenDev, Integer.valueOf(1), rulesDev)
 
     val iu, ib, ou, ob = new ArrayBuffer[CLEvent]()
 
-    var lastU = unaries.enqueueNDRange(queue, Array(lengths.length, maxLength, numGrammars), Array(1, 1, numGrammars), wB, wO, wL, wPos)
+    var lastU = unaries.enqueueNDRange(queue, Array(lengths.length, maxLength, numGrammars), Array(1, 1, numGrammars), initCharts)
     iu += lastU
 
     // TODO: retrofit inside/outside binaries and unaries to look at posTagsPointer....
@@ -542,6 +563,10 @@ object GrammarKernel {
     ecounts.setUnsafeMathOptimizations()
     ecounts.setFastRelaxedMath()
 
+    val copyPos = context.createProgram(headerText, copyPosToCharts)
+    copyPos.setUnsafeMathOptimizations()
+    copyPos.setFastRelaxedMath()
+
     val rscores = RuleScores.fromRefinedGrammar(grammar)
     val grammars = new Array[RuleScores](numGrammars)
     util.Arrays.fill(grammars.asInstanceOf[Array[AnyRef]], rscores)
@@ -551,7 +576,7 @@ object GrammarKernel {
       grammar.anchor(w).scoreSpan(pos, pos+1, label, 0)
     }
 
-    val kern = new GrammarKernel(context, grammar.grammar, grammar.lexicon, grammars, scorers, program, outside, ecounts)
+    val kern = new GrammarKernel(context, grammar.grammar, grammar.lexicon, grammars, scorers, program, outside, ecounts, copyPos)
 
     kern
   }
@@ -909,6 +934,33 @@ __kernel void ecount_terminals(
 }
     """.format(ecountBinaryRules(byParent), ecountUnaries(uByParent))
   }
+
+  private val copyPosToCharts =
+  """
+__kernel void copy_pos_to_charts(
+  __global const sym_cell* pos_tags,
+  __global parse_cell * insides,
+  __global const int* offsets,
+  __global const int* lengths,
+  __global const int* lengthOffsets,
+  const int numGrammarsToDo) {
+  const int sym = get_global_id(0)/ NUM_GRAMMARS;
+  int grammar = get_global_id(0) % NUM_GRAMMARS;
+  const int sentence = get_global_id(1);
+  const int begin = get_global_id(2);
+  const int end = begin  + 1;
+  const int length = lengths[sentence];
+  if (begin < length) {
+    __global parse_cell* inside = insides + offsets[sentence];
+    __global parse_cell* in = CELL(inside, begin, end);
+    __global const sym_cell* mybuf = pos_tags + (lengthOffsets[sentence] + begin);
+    // ibot has scale 0, obot has scale length - 1, root_score has scale length - 1. Woot.
+    for(int i = 0; i < numGrammarsToDo && grammar < NUM_GRAMMARS; ++i) {
+      in->bot[sym][grammar] = mybuf->syms[sym][grammar];
+      grammar += (NUM_GRAMMARS / numGrammarsToDo);
+    }
+  }
+}"""
 
   val registersToUse = 60
 
