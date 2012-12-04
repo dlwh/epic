@@ -186,6 +186,7 @@ class GrammarKernel[L, W](context: CLContext,
     val wOB = memZero.zeroMemory(queue, ecountsDev)
     val wterm = memZero.zeroMemory(queue, termECountsDev)
     var lastEvent = insideOutside(offsets, lengths)
+//    var lastEvent = wOB
 
     val partialLengths = new Array[Int](lengths.size)
     var totalLength = 0
@@ -224,7 +225,6 @@ class GrammarKernel[L, W](context: CLContext,
     }
     eunaries.setArg(5, 1)
     eu += eunaries.enqueueNDRange(queue, Array(lengths.length, maxLength, numGrammars), Array(1, 1, numGrammars), lastEvent, wOB)
-    queue.finish()
 
     val termVector = Pointer.allocateFloats(totalLength * cellSize / 2)
     val termOut = termECountsDev.read(queue, termVector, true, termFinished)
@@ -234,8 +234,9 @@ class GrammarKernel[L, W](context: CLContext,
 
 
     queue.finish()
+//    println("sum..." + ecountsDev.read(queue).getFloats.sum)
 
-    // reduce to a single array
+//    reduce to a single array
     lastEvent = collapseArray(ecountsDev, offsets.last, totalRules, lastEvent)
 
     queue.finish()
@@ -459,7 +460,7 @@ object GrammarKernel {
     println("Parsing...")
     val train = transformed.slice(0,numToParse)
     val timeIn = System.currentTimeMillis()
-//    kern.parse(train.map(_.words.toIndexedSeq))
+    kern.parse(train.map(_.words.toIndexedSeq))
     println("Done: " + (System.currentTimeMillis() - timeIn))
     println("ecounts...")
     val time2 = System.currentTimeMillis()
@@ -529,7 +530,11 @@ object GrammarKernel {
     ecounts.setUnsafeMathOptimizations()
     ecounts.setFastRelaxedMath()
 
-    val grammars = Array.fill(numGrammars)(RuleScores.fromRefinedGrammar(grammar, numBits))
+    val rscores = RuleScores.fromRefinedGrammar(grammar, numBits)
+    val grammars = new Array[RuleScores](numGrammars)
+    util.Arrays.fill(grammars.asInstanceOf[Array[AnyRef]], rscores)
+    // segfaults java. your guess is as good as mine.
+//    val grammars2 = Array.fill(numGrammars)(RuleScores.fromRefinedGrammar(grammar, numBits))
     val scorers = Array.fill(numGrammars){ (w: IndexedSeq[W], pos: Int, label: Int) =>
       grammar.anchor(w).scoreSpan(pos, pos+1, label, 0)
     }
@@ -545,7 +550,7 @@ object GrammarKernel {
     val byParent = binary.groupBy(_._1.parent).values.map(_.size).max
     val numStates = 1 << numBits
     val numStatesPerBinary = numStates * numStates * numStates
-    val numStatesPerUnary = numStates * numStates * numStates
+    val numStatesPerUnary = numStates * numStates
     """#define SCALE_FACTOR 10
 #define NUM_SYMS %d
 #define NUM_GRAMMARS %d
@@ -949,7 +954,7 @@ __kernel void ecount_terminals(
         // register flush time!
         buf += "  // flush time!"
         for( (reg, rule) <- ruleRegisters) {
-          buf += "  ruleCounts->binaries[%d][bit][gram] = r%d;".format(rule, reg)
+          buf += "  ruleCounts->binaries[%d][bit][gram] =  r%d;".format(rule, reg)
         }
         buf(regInitializerPos) = ruleRegisters.map { case (reg, rule) => "r%d = 0.0f;".format(reg)}.mkString("  ", " ", "");
       }
