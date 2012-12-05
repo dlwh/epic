@@ -59,7 +59,7 @@ class GrammarKernel[L, W](context: CLContext,
   private val insideTopDev, insideBotDev = context.createFloatBuffer(Usage.InputOutput, maxCells * cellSize)
   private val outsideTopDev, outsideBotDev = context.createFloatBuffer(Usage.InputOutput, maxCells * cellSize)
   private val ecountsDev = context.createFloatBuffer(Usage.InputOutput, maxCells * totalRules)
-  private val termECountsDev = context.createFloatBuffer(Usage.InputOutput, maxTotalLength * cellSize / 2)
+  private val termECountsDev = context.createFloatBuffer(Usage.InputOutput, maxTotalLength * cellSize)
   private val offDev = context.createIntBuffer(Usage.Input, maxSentences)
   private val offPtr = offDev.allocateCompatibleMemory(context.getDevices()(0))
   private val offLengthsDev = context.createIntBuffer(Usage.Input, maxSentences)
@@ -68,7 +68,7 @@ class GrammarKernel[L, W](context: CLContext,
   private val lenPtr = lenDev.allocateCompatibleMemory(context.getDevices()(0))
   private val ruleVector = Pointer.allocateFloats(totalRules)
 
-  private val posTagsDev = context.createFloatBuffer(Usage.InputOutput, maxTotalLength * cellSize / 2)
+  private val posTagsDev = context.createFloatBuffer(Usage.InputOutput, maxTotalLength * cellSize)
   private val posTagsPtr = posTagsDev.allocateCompatibleMemory(context.getDevices()(0))
 
   private val rulesDev = context.createFloatBuffer(Usage.Input, totalRules)
@@ -183,17 +183,12 @@ class GrammarKernel[L, W](context: CLContext,
     result
   }
 
-
-  private def cellBottom(offset: Int, begin: Int, end: Int, grammar: Int, sym: Int) = {
-    ((offset + TriangularArray.index(begin, end)) * nsyms * 2 + nsyms + sym) * numGrammars + grammar
-  }
-
   private def doParse(batch: Batch):IndexedSeq[BinarizedTree[L]] = synchronized {
     val marginals = getMarginals(batch)
 
 //    println(marginals.mkString("\n...\n"))
 //    println(marginals.map(_.rootScore(0)).mkString("\n"))
-//    println(marginals.map(m => breeze.numerics.logSum((0 until grammar.refinedGrammar.labelIndex.size).map(i => m.topOutsideScore(0,1,i) + m.topInsideScore(0, 1, i)))))
+//    println(marginals.map(m => breeze.numerics.logSum((0 until grammar.labelIndex.size).map(i => m.topOutsideScore(0,1,0, i) + m.topInsideScore(0, 1, 0, i)))))
 
 
     IndexedSeq.empty
@@ -215,7 +210,7 @@ class GrammarKernel[L, W](context: CLContext,
     val maxLength = lengths.max
     ebinaries.setArgs(ecountsDev, insideTopDev, outsideBotDev, offDev, lenDev, Integer.valueOf(1), rulesDev)
     eunaries.setArgs(ecountsDev, insideTopDev, insideBotDev, outsideTopDev, offDev, lenDev, Integer.valueOf(1), rulesDev)
-    eterms.setArgs(termECountsDev, insideBotDev, outsideBotDev, offDev, lenDev, offLengthsDev, Integer.valueOf(1))
+    eterms.setArgs(termECountsDev, insideTopDev, insideBotDev, outsideBotDev, offDev, lenDev, offLengthsDev, Integer.valueOf(1))
     val maxDim1Size = queue.getDevice.getMaxWorkItemSizes()(0)
     if(maxDim1Size < nsyms * numGrammars) {
       eterms.setArg(6, numGrammars / 8 + 1)
@@ -230,14 +225,14 @@ class GrammarKernel[L, W](context: CLContext,
     val termFinished =  eterms.enqueueNDRange(queue, Array(nsyms * gramMultiplier, lengths.length, maxLength), Array(nsyms * gramMultiplier, 1, 1), lastEvent, wterm, copyOffLengths)
     for (len <- 2 to maxLength) {
       eunaries.setArg(6, len)
-      ebinaries.setArg(6, len)
+      ebinaries.setArg(5, len)
       eb += ebinaries.enqueueNDRange(queue, Array(lengths.length, maxLength+1-len, numGrammars), Array(1, 1, numGrammars), lastEvent, wOB)
       eu += eunaries.enqueueNDRange(queue, Array(lengths.length, maxLength+1-len, numGrammars), Array(1, 1, numGrammars), lastEvent, wOB)
     }
     eunaries.setArg(6, 1)
     eu += eunaries.enqueueNDRange(queue, Array(lengths.length, maxLength, numGrammars), Array(1, 1, numGrammars), lastEvent, wOB)
 
-    val termVector = Pointer.allocateFloats(totalLength * cellSize / 2)
+    val termVector = Pointer.allocateFloats(totalLength * cellSize)
     val termOut = termECountsDev.read(queue, termVector, true, termFinished)
     val floats = termVector.getFloats
     termVector.release()
@@ -373,17 +368,17 @@ class GrammarKernel[L, W](context: CLContext,
     }
 
     // outside
-    obinaries.setArgs(outsideBotDev, insideTopDev, offDev, lenDev, Integer.valueOf(maxLength), rulesDev)
+    obinaries.setArgs(outsideTopDev, outsideBotDev, insideTopDev, offDev, lenDev, Integer.valueOf(maxLength), rulesDev)
     ounaries.setArgs(outsideTopDev, outsideBotDev, offDev, lenDev, Integer.valueOf(maxLength), rulesDev)
 
     lastU = ounaries.enqueueNDRange(queue, Array(lengths.length, 1, numGrammars), Array(1, 1, numGrammars), lastU, wOB, wOT)
     ou += lastU
 
     for (len <- (maxLength - 1) to 1 by -1) {
-      obinaries.setArg(4, len)
+      obinaries.setArg(5, len)
       val b = obinaries.enqueueNDRange(queue, Array(lengths.length, maxLength + 1 - len, numGrammars), Array(1, 1, numGrammars), lastU)
       ob += b
-      ounaries.setArg(3, len)
+      ounaries.setArg(4, len)
       lastU = ounaries.enqueueNDRange(queue, Array(lengths.length, maxLength + 1 - len, numGrammars), Array(1, 1, numGrammars), b)
       ou += lastU
     }
@@ -740,10 +735,10 @@ __kernel void inside_binaries(
     }
 
     for(int split = begin + 1; split < end; ++split) {
-      __global const parse_cell * left_top = CELL(chart_top, begin, split); // scale factor of (2 ^ SCALE_FACTOR)^((split - begin) - 1)
-      __global const parse_cell * gright_top = CELL(chart_top, split, end); // scale factor of (2^ SCALE_FACTOR)((end-split) - 1)
+      __global const parse_cell * left = CELL(chart_top, begin, split); // scale factor of (2 ^ SCALE_FACTOR)^((split - begin) - 1)
+      __global const parse_cell * gright = CELL(chart_top, split, end); // scale factor of (2^ SCALE_FACTOR)((end-split) - 1)
       for(int i = 0; i < NUM_SYMS; ++i) {
-        right[i] = gright[i][gram];
+        right[i] = gright->syms[i][gram];
       }
       %s
     }
@@ -751,7 +746,7 @@ __kernel void inside_binaries(
     // multiply in a 2^SCALE_FACTOR to reachive balance.
     __global parse_cell* gout = CELL(inside_bots + offsets[sentence], begin, end);
     for(int i = 0; i < NUM_SYMS; ++i) {
-      gout[i][gram] = ldexp(out[i], SCALE_FACTOR);
+      gout->syms[i][gram] = ldexp(out[i], SCALE_FACTOR);
     }
   }
 }
@@ -792,18 +787,18 @@ def outsideTemplate(rules: IndexedSeq[(BinaryRule[Int], Int)], unaries: IndexedS
     const int length = lengths[sentence];
 
     if(spanLength == length) {
-      __global parse_cell* outside = charts + offsets[sentence];
-      CELL(outside_tops, 0, length)[ROOT][gram] = 1.0f;
+      CELL(outside_tops + offsets[sentence], 0, length)->syms[ROOT][gram] = 1.0f;
     }
 
     if (end <= length) {
-    __global const parse_cell* top = CELL(outside_tops + offsets[sentence], begin, end);
-    __global parse_cell* bot = CELL(outside_bots + offsets[sentence], begin, end);
+      __global const parse_cell* top = CELL(outside_tops + offsets[sentence], begin, end);
+      __global parse_cell* bot = CELL(outside_bots + offsets[sentence], begin, end);
       %s
     }
   }
 
-  __kernel void outside_binaries(__global parse_cell* outsides_bot,
+  __kernel void outside_binaries(__global parse_cell* outsides_top,
+                __global const parse_cell* outsides_bot,
                 __global const parse_cell * insides_top,
                 __global const int* offsets,
                 __global const int* lengths,
@@ -817,13 +812,13 @@ def outsideTemplate(rules: IndexedSeq[(BinaryRule[Int], Int)], unaries: IndexedS
     float oparent[NUM_SYMS], otarget[NUM_SYMS];
     if (end <= length) {
       __global const parse_cell* inside = insides_top + offsets[sentence];
-      __global parse_cell* outside = outsides_bot + offsets[sentence];
+      __global parse_cell* obot = outsides_bot + offsets[sentence];
       for(int i = 0; i < NUM_SYMS; ++i) {
         otarget[i] = 0.0f;
       }
       // complete looking right
       for(int completion = end+1; completion <= length; ++completion) {
-         __global const parse_cell * gparent = CELL(outside, begin, completion); // scale factor of (2 ^ SCALE_FACTOR)^(length-(completion - begin))
+         __global const parse_cell * gparent = CELL(obot, begin, completion); // scale factor of (2 ^ SCALE_FACTOR)^(length-(completion - begin))
          __global const parse_cell * gright = CELL(inside, end, completion); // scale factor of (2 ^ SCALE_FACTOR)^((end - completion) - 1)
          // product of gparent and gright has scale (2^SCALE_FACTOR)^(length-(end-begin)-1), so need to scale by 1 to maintain invariant
          for(int i = 0; i < NUM_SYMS; ++i) {
@@ -834,7 +829,7 @@ def outsideTemplate(rules: IndexedSeq[(BinaryRule[Int], Int)], unaries: IndexedS
 
      // complete looking left
       for(int completion = 0; completion < begin; ++completion) {
-         __global const parse_cell * gparent = CELL(outside, completion, end); // scale factor of (2 ^ SCALE_FACTOR)^(length-(end-completion))
+         __global const parse_cell * gparent = CELL(obot, completion, end); // scale factor of (2 ^ SCALE_FACTOR)^(length-(end-completion))
          __global const parse_cell * gleft = CELL(inside, completion, begin); // scale factor of (2 ^ SCALE_FACTOR)^((begin - completion) - 1)
          // product of gparent and gleft has scale (2^SCALE_FACTOR)^(length-(end-begin)-1), so need to scale by 1 to maintain invariant
 //         for(int i = 0; i < NUM_SYMS; ++i) {
@@ -847,7 +842,7 @@ def outsideTemplate(rules: IndexedSeq[(BinaryRule[Int], Int)], unaries: IndexedS
       }
 
       // multiply in a 2^SCALE_FACTOR to re-achieve balance.
-      __global parse_cell* gout = CELL(outside, begin, end);
+      __global parse_cell* gout = CELL(outsides_top + offsets[sentence], begin, end);
       for(int i = 0; i < NUM_SYMS; ++i) {
         gout->syms[i][gram] = ldexp(otarget[i], SCALE_FACTOR);
 //        gout[i] = otarget[i];
@@ -890,7 +885,7 @@ __kernel void ecount_unaries(
               __global rule_cell* ecounts,
               __global const parse_cell * insides_top,
               __global const parse_cell * insides_bot,
-              __global const parse_cell * outside_top,
+              __global const parse_cell * outsides_top,
               __global const int* offsets,
               __global const int* lengths,
               const int spanLength,
@@ -905,7 +900,7 @@ __kernel void ecount_unaries(
     __global const parse_cell* itop = insides_top + offsets[sentence];
     __global const parse_cell* outside = outsides_top + offsets[sentence];
     __global const parse_cell* inside = insides_bot + offsets[sentence];
-    const float root_score = CELL(itop, 0, length)[ROOT][gram]; // scale is 2^(SCALE_FACTOR)^(length-1)
+    const float root_score = CELL(itop, 0, length)->syms[ROOT][gram]; // scale is 2^(SCALE_FACTOR)^(length-1)
     __global rule_cell* ruleCounts = ecounts + (offsets[sentence] + TRIANGULAR_INDEX(begin, end));
     __global const parse_cell* in = CELL(inside, begin, end);
     __global const parse_cell* out = CELL(outside, begin, end);
@@ -933,11 +928,11 @@ __kernel void ecount_terminals(
     __global const parse_cell* itop = insides_top + offsets[sentence];
     __global const parse_cell* in = CELL(inside, begin, end);
     __global const parse_cell* out = CELL(outsides_bot + offsets[sentence], begin, end);
-    __global sym_cell* mybuf = term_ecounts + (lengthOffsets[sentence] + begin);
+    __global parse_cell* mybuf = term_ecounts + (lengthOffsets[sentence] + begin);
     // ibot has scale 0, obot has scale length - 1, root_score has scale length - 1. Woot.
     for(int i = 0; i < numGrammarsToDo && grammar < NUM_GRAMMARS; ++i) {
-      const float root_score = CELL(itop, 0, length)[ROOT][grammar]; // scale is 2^(SCALE_FACTOR)^(length-1)
-      mybuf[sym][grammar] = (in[sym][grammar] * out[sym][grammar])/root_score;
+      const float root_score = CELL(itop, 0, length)->syms[ROOT][grammar]; // scale is 2^(SCALE_FACTOR)^(length-1)
+      mybuf->syms[sym][grammar] = (in->syms[sym][grammar] * out->syms[sym][grammar])/root_score;
       grammar += (NUM_GRAMMARS / numGrammarsToDo);
     }
   }
@@ -1033,7 +1028,7 @@ __kernel void copy_pos_to_charts(
   if (begin < length) {
     __global parse_cell* inside = insides_bot + offsets[sentence];
     __global parse_cell* in = CELL(inside, begin, end);
-    __global const sym_cell* mybuf = pos_tags + (lengthOffsets[sentence] + begin);
+    __global const parse_cell* mybuf = pos_tags + (lengthOffsets[sentence] + begin);
     // ibot has scale 0, obot has scale length - 1, root_score has scale length - 1. Woot.
     for(int i = 0; i < numGrammarsToDo && grammar < NUM_GRAMMARS; ++i) {
       in->syms[sym][grammar] = mybuf->syms[sym][grammar];
@@ -1054,7 +1049,7 @@ __kernel void copy_pos_to_charts(
       // left * right has scale (end - begin-2)
       // left * right * oparent / root has scale -1
       buf += "oscore = ldexp(oparents->syms[%d][gram]/root_score, SCALE_FACTOR);".format(par)
-      buf += "if (oscore != 0.0) {"
+      buf += "if (oscore != 0.0f) {"
       var r = 0
       while(r < rules.length) {
         val assignments = Index[(Symbol,Int)]()
