@@ -41,7 +41,7 @@ class GrammarKernel[L, W](context: CLContext,
   val nunaries = ruleScores.head.unaries.length
   val root = grammar.labelIndex(grammar.root)
   val totalRules: Int = nbinaries * numGrammars + nunaries * numGrammars
-  val cellSize = nsyms * 2 * numGrammars
+  val cellSize = nsyms * numGrammars
   val maxCells =  ((context.getMaxMemAllocSize / math.max(cellSize, totalRules)).toInt / 4) min (100000)
 
   private val queue = context.createDefaultProfilingQueue()
@@ -56,8 +56,8 @@ class GrammarKernel[L, W](context: CLContext,
   private val sumVector = context.createProgram(GrammarKernel.sumECountVectors).createKernel("sum_vectors")
   private val memZero = new ZeroMemory(context)
 
-  private val insideDev = context.createFloatBuffer(Usage.InputOutput, maxCells * cellSize)
-  private val outsideDev = context.createFloatBuffer(Usage.InputOutput, maxCells * cellSize)
+  private val insideTopDev, insideBotDev = context.createFloatBuffer(Usage.InputOutput, maxCells * cellSize)
+  private val outsideTopDev, outsideBotDev = context.createFloatBuffer(Usage.InputOutput, maxCells * cellSize)
   private val ecountsDev = context.createFloatBuffer(Usage.InputOutput, maxCells * totalRules)
   private val termECountsDev = context.createFloatBuffer(Usage.InputOutput, maxTotalLength * cellSize / 2)
   private val offDev = context.createIntBuffer(Usage.Input, maxSentences)
@@ -213,9 +213,9 @@ class GrammarKernel[L, W](context: CLContext,
     val eu, eb, r = new ArrayBuffer[CLEvent]()
 
     val maxLength = lengths.max
-    ebinaries.setArgs(ecountsDev, insideDev, outsideDev, offDev, lenDev, Integer.valueOf(1), rulesDev)
-    eunaries.setArgs(ecountsDev, insideDev, outsideDev, offDev, lenDev, Integer.valueOf(1), rulesDev)
-    eterms.setArgs(termECountsDev, insideDev, outsideDev, offDev, lenDev, offLengthsDev, Integer.valueOf(1))
+    ebinaries.setArgs(ecountsDev, insideTopDev, outsideBotDev, offDev, lenDev, Integer.valueOf(1), rulesDev)
+    eunaries.setArgs(ecountsDev, insideTopDev, insideBotDev, outsideTopDev, offDev, lenDev, Integer.valueOf(1), rulesDev)
+    eterms.setArgs(termECountsDev, insideBotDev, outsideBotDev, offDev, lenDev, offLengthsDev, Integer.valueOf(1))
     val maxDim1Size = queue.getDevice.getMaxWorkItemSizes()(0)
     if(maxDim1Size < nsyms * numGrammars) {
       eterms.setArg(6, numGrammars / 8 + 1)
@@ -229,12 +229,12 @@ class GrammarKernel[L, W](context: CLContext,
     }
     val termFinished =  eterms.enqueueNDRange(queue, Array(nsyms * gramMultiplier, lengths.length, maxLength), Array(nsyms * gramMultiplier, 1, 1), lastEvent, wterm, copyOffLengths)
     for (len <- 2 to maxLength) {
-      eunaries.setArg(5, len)
-      ebinaries.setArg(5, len)
+      eunaries.setArg(6, len)
+      ebinaries.setArg(6, len)
       eb += ebinaries.enqueueNDRange(queue, Array(lengths.length, maxLength+1-len, numGrammars), Array(1, 1, numGrammars), lastEvent, wOB)
       eu += eunaries.enqueueNDRange(queue, Array(lengths.length, maxLength+1-len, numGrammars), Array(1, 1, numGrammars), lastEvent, wOB)
     }
-    eunaries.setArg(5, 1)
+    eunaries.setArg(6, 1)
     eu += eunaries.enqueueNDRange(queue, Array(lengths.length, maxLength, numGrammars), Array(1, 1, numGrammars), lastEvent, wOB)
 
     val termVector = Pointer.allocateFloats(totalLength * cellSize / 2)
@@ -297,17 +297,23 @@ class GrammarKernel[L, W](context: CLContext,
     val lastEvent = insideOutside(batch)
     import batch._
 
-    val inM = insideDev.read(queue, lastEvent)
-    val outM = outsideDev.read(queue, lastEvent)
-    val in = inM.getFloats
-    val out = outM.getFloats
+    val inM = insideTopDev.read(queue, lastEvent)
+    val outM = outsideTopDev.read(queue, lastEvent)
+    val inBM = insideBotDev.read(queue, lastEvent)
+    val outBM = outsideBotDev.read(queue, lastEvent)
+    val inTop = inM.getFloats
+    val outTop = outM.getFloats
+    val inBot = inBM.getFloats
+    val outBot = outBM.getFloats
     inM.release()
     outM.release()
+    inBM.release()
+    outBM.release()
 
     for (i <- 0 until lengths.length) yield {
       val off = offsets(i)
       val len = lengths(i)
-      Marginal(in, out, off, len)
+      Marginal(inTop, inBot, outTop, inBot, off, len)
     }
   }
 
@@ -322,14 +328,16 @@ class GrammarKernel[L, W](context: CLContext,
 //    println(posTags.slice(batch.lengthTotals(1) * nsyms, batch.totalLength * nsyms).mkString(", "))
 
     val wPos = posTagsDev.write(queue, 0, batch.posTags.length, posTagsPtr, false)
-    val wB = memZero.zeroMemory(queue, insideDev)
-    val wOB = memZero.zeroMemory(queue, outsideDev)
+    val wIB = memZero.zeroMemory(queue, insideBotDev)
+    val wIT = memZero.zeroMemory(queue, insideTopDev)
+    val wOT = memZero.zeroMemory(queue, outsideTopDev)
+    val wOB = memZero.zeroMemory(queue, outsideBotDev)
     val wO = offDev.write(queue, 0, lengths.length, offPtr, false)
     val wL = lenDev.write(queue, 0, lengths.length, lenPtr, false)
     offLengthsPtr.setInts(lengthTotals)
     val copyOffLengths = offLengthsDev.write(queue, offLengthsPtr, false)
 
-    copyTags.setArgs(posTagsDev, insideDev, offDev, lenDev, offLengthsDev, Integer.valueOf(1))
+    copyTags.setArgs(posTagsDev, insideBotDev, offDev, lenDev, offLengthsDev, Integer.valueOf(1))
     val maxDim1Size = queue.getDevice.getMaxWorkItemSizes()(0)
     if(maxDim1Size < nsyms * numGrammars) {
       copyTags.setArg(5, numGrammars / 8 + 1)
@@ -340,35 +348,35 @@ class GrammarKernel[L, W](context: CLContext,
       numGrammars
     }
     queue.finish()
-    val initCharts = copyTags.enqueueNDRange(queue,  Array(nsyms * gramMultiplier, lengths.length, maxLength), Array(nsyms * gramMultiplier, 1, 1), wPos, wB, wO, wL, copyOffLengths)
+    val initCharts = copyTags.enqueueNDRange(queue,  Array(nsyms * gramMultiplier, lengths.length, maxLength), Array(nsyms * gramMultiplier, 1, 1), wPos, wIB, wL, copyOffLengths)
     queue.finish()
 
 
-    binaries.setArgs(insideDev, offDev, lenDev, Integer.valueOf(1), rulesDev)
-    unaries.setArgs(insideDev, offDev, lenDev, Integer.valueOf(1), rulesDev)
+    binaries.setArgs(insideBotDev, insideTopDev, offDev, lenDev, Integer.valueOf(1), rulesDev)
+    unaries.setArgs(insideBotDev, insideTopDev, offDev, lenDev, Integer.valueOf(1), rulesDev)
 
     val iu, ib, ou, ob = new ArrayBuffer[CLEvent]()
 
-    var lastU = unaries.enqueueNDRange(queue, Array(lengths.length, maxLength, numGrammars), Array(1, 1, numGrammars), initCharts)
+    var lastU = unaries.enqueueNDRange(queue, Array(lengths.length, maxLength, numGrammars), Array(1, 1, numGrammars), initCharts, wIT)
     iu += lastU
 
     // TODO: retrofit inside/outside binaries and unaries to look at posTagsPointer....
     // TODO: also get ecounts...
     for (len <- 2 to maxLength) {
-      binaries.setArg(3, len)
+      binaries.setArg(4, len)
       val b = binaries.enqueueNDRange(queue, Array(lengths.length, maxLength + 1 - len, numGrammars), Array(1, 1, numGrammars), lastU)
       ib += b
 
-      unaries.setArg(3, len)
+      unaries.setArg(4, len)
       lastU = unaries.enqueueNDRange(queue, Array(lengths.length, maxLength + 1 - len, numGrammars), Array(1, 1, numGrammars), b)
       iu += lastU
     }
 
     // outside
-    obinaries.setArgs(outsideDev, insideDev, offDev, lenDev, Integer.valueOf(maxLength), rulesDev)
-    ounaries.setArgs(outsideDev, offDev, lenDev, Integer.valueOf(maxLength), rulesDev)
+    obinaries.setArgs(outsideBotDev, insideTopDev, offDev, lenDev, Integer.valueOf(maxLength), rulesDev)
+    ounaries.setArgs(outsideTopDev, outsideBotDev, offDev, lenDev, Integer.valueOf(maxLength), rulesDev)
 
-    lastU = ounaries.enqueueNDRange(queue, Array(lengths.length, 1, numGrammars), Array(1, 1, numGrammars), lastU, wOB)
+    lastU = ounaries.enqueueNDRange(queue, Array(lengths.length, 1, numGrammars), Array(1, 1, numGrammars), lastU, wOB, wOT)
     ou += lastU
 
     for (len <- (maxLength - 1) to 1 by -1) {
@@ -387,59 +395,56 @@ class GrammarKernel[L, W](context: CLContext,
     val ibCount = ib.map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum / 1E9
     val ouCount = ou.map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum / 1E9
     val obCount = ob.map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum / 1E9
-    val writeCounts = IndexedSeq(wB, wOB, wO, wL).map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum / 1E9
-    val wc = IndexedSeq(wB).map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum / 1E9
+    val writeCounts = IndexedSeq(wIT, wOT, wIB, wOB, wO, wL, initCharts).map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum / 1E9
 
-    println(iuCount + " " + ibCount + " " + ouCount + " " + obCount + " " + writeCounts + " " + wc)
+    println(iuCount + " " + ibCount + " " + ouCount + " " + obCount + " " + writeCounts)
     lastU
   }
 
   override protected def finalize() {
     offPtr.release()
     lenPtr.release()
-    insideDev.release()
     offDev.release()
     lenDev.release()
-    outsideDev.release()
+    outsideTopDev.release()
+    insideTopDev.release()
+    outsideBotDev.release()
+    insideBotDev.release()
   }
 
-  case class Marginal(inside: Array[Float], outside: Array[Float], offset: Int, length: Int) {
+  case class Marginal(inTop: Array[Float], inBot: Array[Float], outTop: Array[Float], outBot: Array[Float], offset: Int, length: Int) {
     def topInsideScore(begin: Int, end: Int, grammar: Int, label: Int) =  {
-      val score = inside(topIndex(begin, end, grammar, label))
+      val score = inTop(index(begin, end, grammar, label))
 //      java.lang.Math.scalb(score, -10 * ((end-begin)-1))
       math.log(score) - 10 * ((end-begin)-1) * math.log(2)
     }
 
 
     def botInsideScore(begin: Int, end: Int, grammar: Int, label: Int) =  {
-      val score = inside(botIndex(begin, end, grammar, label))
+      val score = inBot(index(begin, end, grammar, label))
 //      java.lang.Math.scalb(score, -10 * ((end-begin)-1))
 //      math.log(score)
       math.log(score) - 10 * ((end-begin)-1) * math.log(2)
     }
 
     def topOutsideScore(begin: Int, end: Int, grammar: Int, label: Int) =  {
-      val score = outside(topIndex(begin, end, grammar, label))
+      val score = outTop(index(begin, end, grammar, label))
 //      java.lang.Math.scalb(score, -10 * ((end-begin)-1))
       math.log(score) - 10 * (length-(end-begin)) * math.log(2)
     }
 
 
     def botOutsideScore(begin: Int, end: Int, grammar: Int, label: Int) =  {
-      val score = outside(botIndex(begin, end, grammar, label))
+      val score = outBot(index(begin, end, grammar, label))
 //      java.lang.Math.scalb(score, -10 * ((end-begin)-1))
 //      math.log(score)
       math.log(score) - 10 * (length-(end-begin)) * math.log(2)
     }
 
     @inline
-    private def topIndex(begin: Int, end: Int, grammar: Int, label: Int): Int = {
-      ((offset + TriangularArray.index(begin, end)) * nsyms * 2 + label) * numGrammars + grammar
+    private def index(begin: Int, end: Int, grammar: Int, label: Int): Int = {
+      ((offset + TriangularArray.index(begin, end)) * nsyms + label) * numGrammars + grammar
     }
-
-    @inline
-    private def botIndex(begin: Int, end: Int, grammar: Int, label: Int): Int = topIndex(begin, end, grammar, label) + nsyms * numGrammars
-
 
     override def toString() = {
       val pieces = for {
@@ -597,17 +602,13 @@ object GrammarKernel {
 #define CELL(chart, begin, end)   ((chart) + TRIANGULAR_INDEX(begin, end))
 
 typedef struct {
-  float top[NUM_SYMS][NUM_GRAMMARS], bot[NUM_SYMS][NUM_GRAMMARS];
-} parse_cell;
-
-typedef struct {
   float binaries[NUM_BINARY][NUM_GRAMMARS];
   float unaries[NUM_UNARY][NUM_GRAMMARS];
 } rule_cell;
 
 typedef struct {
   float syms[NUM_SYMS][NUM_GRAMMARS];
-} sym_cell;
+} parse_cell;
     """.format(numSyms, numGrammars, root, binary.size, unary.size, byParent)
   }
 
@@ -619,16 +620,16 @@ typedef struct {
     for( (r, index) <- rules2) {
       if(r.parent != lastParent) {
         if(lastParent != -1) {
-          sb += """cell->top[%d][gram] = parent;""".format(lastParent)
+          sb += """top->syms[%d][gram] = parent;""".format(lastParent)
         }
-        sb += """parent = rules->unaries[%d][gram] * cell->bot[%d][gram];""".format(index, r.child)
+        sb += """parent = rules->unaries[%d][gram] * bot->syms[%d][gram];""".format(index, r.child)
         lastParent = r.parent
       } else {
-        sb += """parent = mad(rules->unaries[%d][gram], cell->bot[%d][gram], parent);""".format(index, r.child)
+        sb += """parent = mad(rules->unaries[%d][gram], bot->syms[%d][gram], parent);""".format(index, r.child)
       }
     }
     if(lastParent != -1) {
-      sb += """cell->top[%d][gram] = parent;""".format(lastParent)
+      sb += """top->syms[%d][gram] = parent;""".format(lastParent)
     }
     sb.mkString("\n    ")
   }
@@ -641,16 +642,16 @@ typedef struct {
     for( (r, index) <- rules2) {
       if(r.child != lastChild) {
         if(lastChild != -1) {
-          sb += """out->bot[%d][gram] = child;""".format(lastChild)
+          sb += """bot->syms[%d][gram] = child;""".format(lastChild)
         }
-        sb += """child = rules->unaries[%d][gram] * out->top[%d][gram];""".format(index, r.parent)
+        sb += """child = rules->unaries[%d][gram] * top->syms[%d][gram];""".format(index, r.parent)
         lastChild = r.child
       } else {
-        sb += """child = mad(rules->unaries[%d][gram], out->top[%d][gram], child);""".format(index, r.parent)
+        sb += """child = mad(rules->unaries[%d][gram], top->syms[%d][gram], child);""".format(index, r.parent)
       }
     }
     if(lastChild != -1) {
-      sb += """out->bot[%d][gram] = child;""".format(lastChild)
+      sb += """bot->syms[%d][gram] = child;""".format(lastChild)
     }
     sb.mkString("\n    ")
   }
@@ -663,7 +664,7 @@ typedef struct {
       if(lastLeft != l) {
         if(lastLeft != -1)
           sb += "}"
-        sb += "currentLeftScore = left->top[%d][gram];" format l
+        sb += "currentLeftScore = left->syms[%d][gram];" format l
         sb += "if(currentLeftScore != 0.0) {"
         lastLeft = l
       }
@@ -686,7 +687,7 @@ typedef struct {
       if(lastRight != right) {
         if(lastRight != -1)
           sb += "}"
-        sb += "currentCompl = gright->top[%d][gram];" format right
+        sb += "currentCompl = gright->syms[%d][gram];" format right
         sb += "if(currentCompl != 0.0) {"
         lastRight = right
       }
@@ -706,7 +707,7 @@ typedef struct {
       if(lastLeft != l) {
         if(lastLeft != -1)
           sb += "}"
-        sb += "currentCompl = gleft->top[%d][gram];" format l
+        sb += "currentCompl = gleft->syms[%d][gram];" format l
         sb += "if(currentCompl != 0.0) {"
         lastLeft = l
       }
@@ -719,7 +720,9 @@ typedef struct {
 
   def insideTemplate(rules: IndexedSeq[(BinaryRule[Int], Int)], unaries: IndexedSeq[(UnaryRule[Int], Int)]): String =
     """
-__kernel void inside_binaries(__global parse_cell * charts,
+__kernel void inside_binaries(
+              __global parse_cell * inside_bots,
+              __global const parse_cell * inside_tops,
               __global const int* offsets,
               __global const int* lengths,
               const int spanLength,
@@ -731,30 +734,31 @@ __kernel void inside_binaries(__global parse_cell * charts,
   const int length = lengths[sentence];
   float out[NUM_SYMS], right[NUM_SYMS];
   if (end <= length) {
-    __global parse_cell* chart = charts + offsets[sentence];
+    __global const parse_cell* chart_top =  inside_tops + offsets[sentence];
     for(int i = 0; i < NUM_SYMS; ++i) {
       out[i] = 0.0f;
     }
 
     for(int split = begin + 1; split < end; ++split) {
-      __global const parse_cell * left = CELL(chart, begin, split); // scale factor of (2 ^ SCALE_FACTOR)^((split - begin) - 1)
-      __global const parse_cell * gright = CELL(chart, split, end); // scale factor of (2^ SCALE_FACTOR)((end-split) - 1)
+      __global const parse_cell * left_top = CELL(chart_top, begin, split); // scale factor of (2 ^ SCALE_FACTOR)^((split - begin) - 1)
+      __global const parse_cell * gright_top = CELL(chart_top, split, end); // scale factor of (2^ SCALE_FACTOR)((end-split) - 1)
       for(int i = 0; i < NUM_SYMS; ++i) {
-        right[i] = gright->top[i][gram];
+        right[i] = gright[i][gram];
       }
       %s
     }
     // out has a scale factor of (2^SCALE_FACTOR)^((end-split) + (split-begin) - 2) = (2^SCALE_FACTOR)^(end-begin-2)
     // multiply in a 2^SCALE_FACTOR to reachive balance.
-    __global parse_cell* gout = CELL(chart, begin, end);
+    __global parse_cell* gout = CELL(inside_bots + offsets[sentence], begin, end);
     for(int i = 0; i < NUM_SYMS; ++i) {
-      gout->bot[i][gram] = ldexp(out[i], SCALE_FACTOR);
+      gout[i][gram] = ldexp(out[i], SCALE_FACTOR);
     }
   }
 }
 
 
-__kernel void inside_unaries(__global parse_cell * charts,
+__kernel void inside_unaries(__global const parse_cell * inside_bots,
+              __global parse_cell * inside_tops,
               __global const int* offsets,
               __global const int* lengths,
               const int spanLength,
@@ -766,7 +770,8 @@ __kernel void inside_unaries(__global parse_cell * charts,
   const int length = lengths[sentence];
 
   if (end <= length) {
-    __global parse_cell* cell = CELL(charts + offsets[sentence], begin, end);
+    __global parse_cell* top = CELL(inside_tops + offsets[sentence], begin, end);
+    __global const parse_cell* bot = CELL(inside_bots + offsets[sentence], begin, end);
     %s
   }
 }
@@ -774,7 +779,8 @@ __kernel void inside_unaries(__global parse_cell * charts,
     """.stripMargin.format(insideRuleUpdates(rules), insideUnaryUpdates(unaries))
 
 def outsideTemplate(rules: IndexedSeq[(BinaryRule[Int], Int)], unaries: IndexedSeq[(UnaryRule[Int], Int)]): String ="""
-  __kernel void outside_unaries(__global parse_cell * charts,
+  __kernel void outside_unaries(__global parse_cell * outside_tops,
+                __global parse_cell * outside_bots,
                 __global const int* offsets,
                 __global const int* lengths,
                 const int spanLength,
@@ -787,18 +793,18 @@ def outsideTemplate(rules: IndexedSeq[(BinaryRule[Int], Int)], unaries: IndexedS
 
     if(spanLength == length) {
       __global parse_cell* outside = charts + offsets[sentence];
-      CELL(outside, 0, length)->top[ROOT][gram] = 1.0f;
+      CELL(outside_tops, 0, length)[ROOT][gram] = 1.0f;
     }
 
     if (end <= length) {
-      __global parse_cell* outside = charts + offsets[sentence];
-      __global parse_cell* out = CELL(outside, begin, end);
+    __global const parse_cell* top = CELL(outside_tops + offsets[sentence], begin, end);
+    __global parse_cell* bot = CELL(outside_bots + offsets[sentence], begin, end);
       %s
     }
   }
 
-  __kernel void outside_binaries(__global parse_cell* outsides,
-                __global const parse_cell * insides,
+  __kernel void outside_binaries(__global parse_cell* outsides_bot,
+                __global const parse_cell * insides_top,
                 __global const int* offsets,
                 __global const int* lengths,
                 const int spanLength,
@@ -810,8 +816,8 @@ def outsideTemplate(rules: IndexedSeq[(BinaryRule[Int], Int)], unaries: IndexedS
     const int length = lengths[sentence];
     float oparent[NUM_SYMS], otarget[NUM_SYMS];
     if (end <= length) {
-      __global const parse_cell* inside = insides + offsets[sentence];
-      __global parse_cell* outside = outsides + offsets[sentence];
+      __global const parse_cell* inside = insides_top + offsets[sentence];
+      __global parse_cell* outside = outsides_bot + offsets[sentence];
       for(int i = 0; i < NUM_SYMS; ++i) {
         otarget[i] = 0.0f;
       }
@@ -821,7 +827,7 @@ def outsideTemplate(rules: IndexedSeq[(BinaryRule[Int], Int)], unaries: IndexedS
          __global const parse_cell * gright = CELL(inside, end, completion); // scale factor of (2 ^ SCALE_FACTOR)^((end - completion) - 1)
          // product of gparent and gright has scale (2^SCALE_FACTOR)^(length-(end-begin)-1), so need to scale by 1 to maintain invariant
          for(int i = 0; i < NUM_SYMS; ++i) {
-           oparent[i] = gparent->bot[i][gram];
+           oparent[i] = gparent->syms[i][gram];
          }
          %s
       }
@@ -835,7 +841,7 @@ def outsideTemplate(rules: IndexedSeq[(BinaryRule[Int], Int)], unaries: IndexedS
 //           icompl[i] = gleft[i];
 //         }
          for(int i = 0; i < NUM_SYMS; ++i) {
-           oparent[i] = gparent->bot[i][gram];
+           oparent[i] = gparent->syms[i][gram];
          }
          %s
       }
@@ -843,7 +849,7 @@ def outsideTemplate(rules: IndexedSeq[(BinaryRule[Int], Int)], unaries: IndexedS
       // multiply in a 2^SCALE_FACTOR to re-achieve balance.
       __global parse_cell* gout = CELL(outside, begin, end);
       for(int i = 0; i < NUM_SYMS; ++i) {
-        gout->top[i][gram] = ldexp(otarget[i], SCALE_FACTOR);
+        gout->syms[i][gram] = ldexp(otarget[i], SCALE_FACTOR);
 //        gout[i] = otarget[i];
       }
     }
@@ -857,8 +863,8 @@ def outsideTemplate(rules: IndexedSeq[(BinaryRule[Int], Int)], unaries: IndexedS
     val uByParent: Map[Int, IndexedSeq[(UnaryRule[Int], Int)]] = unary.groupBy(_._1.parent)
     """
 __kernel void ecount_binaries(__global rule_cell* ecounts,
-   __global const parse_cell * insides,
-   __global const parse_cell* outsides,
+   __global const parse_cell * insides_top,
+   __global const parse_cell* outsides_bot,
    __global const int* offsets,
    __global const int* lengths,
    const int span_length,
@@ -869,12 +875,12 @@ __kernel void ecount_binaries(__global rule_cell* ecounts,
   const int end = begin + span_length;
   const int length = lengths[sentence];
   __global rule_cell* ruleCounts = ecounts + (offsets[sentence] + TRIANGULAR_INDEX(begin, end));
-  __global const parse_cell* outside = outsides + offsets[sentence];
-  __global const parse_cell* inside = insides + offsets[sentence];
-  const float root_score = CELL(inside, 0, length)->top[ROOT][gram]; // scale is 2^(SCALE_FACTOR)^(length-1)
+  __global const parse_cell* obot = outsides_bot + offsets[sentence];
+  __global const parse_cell* itop = insides_top + offsets[sentence];
+  const float root_score = CELL(itop, 0, length)->syms[ROOT][gram]; // scale is 2^(SCALE_FACTOR)^(length-1)
   if(end <= length) {
     float oscore;
-    __global const parse_cell* oparents = CELL(outside, begin, end);
+    __global const parse_cell* oparents = CELL(obot, begin, end);
     %s
   }
 }
@@ -882,8 +888,9 @@ __kernel void ecount_binaries(__global rule_cell* ecounts,
 
 __kernel void ecount_unaries(
               __global rule_cell* ecounts,
-              __global const parse_cell * insides,
-              __global const parse_cell * outsides,
+              __global const parse_cell * insides_top,
+              __global const parse_cell * insides_bot,
+              __global const parse_cell * outside_top,
               __global const int* offsets,
               __global const int* lengths,
               const int spanLength,
@@ -895,9 +902,10 @@ __kernel void ecount_unaries(
   const int length = lengths[sentence];
 
   if (end <= length) {
-    __global const parse_cell* outside = outsides + offsets[sentence];
-    __global const parse_cell* inside = insides + offsets[sentence];
-    const float root_score = CELL(inside, 0, length)->top[ROOT][gram]; // scale is 2^(SCALE_FACTOR)^(length-1)
+    __global const parse_cell* itop = insides_top + offsets[sentence];
+    __global const parse_cell* outside = outsides_top + offsets[sentence];
+    __global const parse_cell* inside = insides_bot + offsets[sentence];
+    const float root_score = CELL(itop, 0, length)[ROOT][gram]; // scale is 2^(SCALE_FACTOR)^(length-1)
     __global rule_cell* ruleCounts = ecounts + (offsets[sentence] + TRIANGULAR_INDEX(begin, end));
     __global const parse_cell* in = CELL(inside, begin, end);
     __global const parse_cell* out = CELL(outside, begin, end);
@@ -906,9 +914,10 @@ __kernel void ecount_unaries(
 }
 
 __kernel void ecount_terminals(
-   __global sym_cell* term_ecounts,
-   __global const parse_cell * insides,
-   __global const parse_cell * outsides,
+   __global parse_cell* term_ecounts,
+   __global const parse_cell * insides_top,
+   __global const parse_cell * insides_bot,
+   __global const parse_cell * outsides_bot,
    __global const int* offsets,
    __global const int* lengths,
    __global const int* lengthOffsets,
@@ -920,16 +929,16 @@ __kernel void ecount_terminals(
   const int end = begin  + 1;
   const int length = lengths[sentence];
   if (begin < length) {
-    __global const parse_cell* inside = insides + offsets[sentence];
-    const float root_score = CELL(inside, 0, length)->top[ROOT][grammar]; // scale is 2^(SCALE_FACTOR)^(length-1)
+    __global const parse_cell* inside = insides_bot + offsets[sentence];
+    __global const parse_cell* itop = insides_top + offsets[sentence];
     __global const parse_cell* in = CELL(inside, begin, end);
-    __global const parse_cell* out = CELL(outsides + offsets[sentence], begin, end);
+    __global const parse_cell* out = CELL(outsides_bot + offsets[sentence], begin, end);
     __global sym_cell* mybuf = term_ecounts + (lengthOffsets[sentence] + begin);
     // ibot has scale 0, obot has scale length - 1, root_score has scale length - 1. Woot.
-    mybuf->syms[sym][grammar] = (in->bot[sym][grammar] * out->bot[sym][grammar])/root_score;
-    for(int i = 1; i < numGrammarsToDo && grammar < NUM_GRAMMARS; ++i) {
+    for(int i = 0; i < numGrammarsToDo && grammar < NUM_GRAMMARS; ++i) {
+      const float root_score = CELL(itop, 0, length)[ROOT][grammar]; // scale is 2^(SCALE_FACTOR)^(length-1)
+      mybuf[sym][grammar] = (in[sym][grammar] * out[sym][grammar])/root_score;
       grammar += (NUM_GRAMMARS / numGrammarsToDo);
-      mybuf->syms[sym][grammar] = (in->bot[sym][grammar] * out->bot[sym][grammar])/root_score;
     }
   }
 }
@@ -949,6 +958,7 @@ typedef {
 } projected_symbols;
 
 __kernel void project_nterms(__global projected_parse_cell* projected,
+                             __global const parse_cell* insides_top,
                              __global const parse_cell* insides,
                              __global const parse_cell* outsides,
                              __global const int* offsets,
@@ -960,24 +970,15 @@ __kernel void project_nterms(__global projected_parse_cell* projected,
   const int length = lengths[sentence];
 
   if(end <= length) {
-    __global const parse_cell* outside = outsides + offsets[sentence];
-    __global const parse_cell* inside = insides + offsets[sentence];
-    __global parse_cell* my_projected = projected + offsets[sentence];
-    const float root_score = CELL(inside, 0, length)->top[ROOT][gram]; // scale is 2^(SCALE_FACTOR)^(length-1)
+    __global const parse_cell* out = outsides + offsets[sentence];
+    __global const parse_cell* in = insides + offsets[sentence];
+    __global const parse_cell* itop = insides_top + offsets[sentence];
+    const float root_score = CELL(itop, 0, length)[ROOT][gram]; // scale is 2^(SCALE_FACTOR)^(length-1)
     __global const parse_cell* in = CELL(inside, begin, end);
     __global const parse_cell* out = CELL(outside, begin, end);
+    __global projected_symbols* target = CELL(projected + offsets[sentence], begin, end)
 
-    __global float (*target)[NUM_PROJECTED_SYMS][NUM_GRAMMARS] = CELL(my_projected, begin, end)->top;
-    __global const float (*in)[NUM_SYMS][NUM_GRAMMARS] = CELL(inside, begin, end)->top;
-    __global const float (*out)[NUM_SYMS][NUM_GRAMMARS] = CELL(outside, begin, end)->top;
-    int times = 0
-    while(times < 2) {
-      %s
-      target = CELL(my_projected, begin, end)->bot;
-      in = CELL(inside, begin, end)->bot;
-      out = CELL(outside, begin, end)->bot;
-      times += 1
-    }
+    %s
   }
 
 }
@@ -994,20 +995,20 @@ __kernel void project_nterms(__global projected_parse_cell* projected,
     for(coarse <- 0 until projections.coarseIndex.size) {
       buf += "cur = 0.0;"
       for(ref <- projections.refinementsOf(coarse)) {
-        buf += "cur = mad(in[%d][gram], out[%d][gram], cur);".format(ref, ref)
+        buf += "cur = mad(in->syms[%d][gram], out->syms[%d][gram], cur);".format(ref, ref)
       }
       if(odds_ratio) {
         buf += "sum += cur;"
-        buf += "target[%d][gram] = cur;".format(coarse)
+        buf += "target->syms[%d][gram] = cur;".format(coarse)
       } else {
-        buf += "target[%d][gram] = cur/root_score;".format(coarse)
+        buf += "target->syms[%d][gram] = cur/root_score;".format(coarse)
       }
     }
 
     if(odds_ratio) {
       buf += "const float norm = root_score - sum;"
       buf += "for (int i = 0; i < NUM_PROJECTED_SYMS; ++i) {"
-      buf += "  target[%d][gram] /= norm;"
+      buf += "  target->syms[%d][gram] /= norm;"
       buf += "}"
     }
     buf.mkString("\n      ")
@@ -1017,8 +1018,8 @@ __kernel void project_nterms(__global projected_parse_cell* projected,
   private val copyPosToCharts =
   """
 __kernel void copy_pos_to_charts(
-  __global const sym_cell* pos_tags,
-  __global parse_cell * insides,
+  __global const parse_cell* pos_tags,
+  __global parse_cell * insides_bot,
   __global const int* offsets,
   __global const int* lengths,
   __global const int* lengthOffsets,
@@ -1030,12 +1031,12 @@ __kernel void copy_pos_to_charts(
   const int end = begin  + 1;
   const int length = lengths[sentence];
   if (begin < length) {
-    __global parse_cell* inside = insides + offsets[sentence];
+    __global parse_cell* inside = insides_bot + offsets[sentence];
     __global parse_cell* in = CELL(inside, begin, end);
     __global const sym_cell* mybuf = pos_tags + (lengthOffsets[sentence] + begin);
     // ibot has scale 0, obot has scale length - 1, root_score has scale length - 1. Woot.
     for(int i = 0; i < numGrammarsToDo && grammar < NUM_GRAMMARS; ++i) {
-      in->bot[sym][grammar] = mybuf->syms[sym][grammar];
+      in->syms[sym][grammar] = mybuf->syms[sym][grammar];
       grammar += (NUM_GRAMMARS / numGrammarsToDo);
     }
   }
@@ -1052,7 +1053,7 @@ __kernel void copy_pos_to_charts(
       // oparent has scale length + begin - end, root has scale length - 1
       // left * right has scale (end - begin-2)
       // left * right * oparent / root has scale -1
-      buf += "oscore = ldexp(oparents->bot[%d][gram]/root_score, SCALE_FACTOR);".format(par)
+      buf += "oscore = ldexp(oparents->syms[%d][gram]/root_score, SCALE_FACTOR);".format(par)
       buf += "if (oscore != 0.0) {"
       var r = 0
       while(r < rules.length) {
@@ -1068,7 +1069,7 @@ __kernel void copy_pos_to_charts(
         while(r < rules.length && assignments.size < registersToUse) {
           val (BinaryRule(_, l, right), ruleIndex) = rules(r)
           if(lastLeft != l) {
-            buf += "    r0 = CELL(inside, begin, split)->top[%d][gram];".format(l)
+            buf += "    r0 = CELL(itop, begin, split)->syms[%d][gram];".format(l)
             lastLeft = l
           }
           val rightR = assignments.index(('right, right))
@@ -1076,7 +1077,7 @@ __kernel void copy_pos_to_charts(
           if(assignments.size < registersToUse) {
             ruleRegisters += (ruleR -> ruleIndex)
             if (!setThisRound(rightR)) {
-              buf += "    r%d = CELL(inside, split, end)->top[%d][gram];".format(rightR, right)
+              buf += "    r%d = CELL(itop, split, end)->syms[%d][gram];".format(rightR, right)
               setThisRound += rightR
             }
             buf += "    r%d = fma(rules->binaries[%d][gram], r0 * r%d * oscore, r%d);".format(ruleR, ruleIndex, rightR, ruleR)
@@ -1105,9 +1106,9 @@ __kernel void copy_pos_to_charts(
       // oparent has scale length + begin - end, root has scale length - 1
       // child has scale (end - begin-1)
       // child * oparent / root has scale 0 (yay!)
-      buf += "oscore = out->top[%d][gram]/root_score;".format(par)
+      buf += "oscore = out->syms[%d][gram]/root_score;".format(par)
       for( (r,index) <- rules) {
-        buf += "ruleCounts->unaries[%d][gram] = rules->unaries[%d][gram] * oscore * in->bot[%d][gram];".format(index, index, r.child)
+        buf += "ruleCounts->unaries[%d][gram] = rules->unaries[%d][gram] * oscore * in->syms[%d][gram];".format(index, index, r.child)
       }
     }
 
