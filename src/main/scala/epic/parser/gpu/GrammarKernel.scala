@@ -19,6 +19,7 @@ import org.bridj.Pointer
 import breeze.util.{Index, Encoder}
 import collection.{immutable, mutable}
 import java.nio.{FloatBuffer, ByteBuffer}
+import projections.ProjectionIndexer
 
 class GrammarKernel[L, W](context: CLContext,
                           grammar: BaseGrammar[L],
@@ -934,6 +935,84 @@ __kernel void ecount_terminals(
 }
     """.format(ecountBinaryRules(byParent), ecountUnaries(uByParent))
   }
+
+  private def projectMarginalsKernel[L, L2](projections: ProjectionIndexer[L, L2], odds_ratio: Boolean) = {
+    """
+#define NUM_PROJECTED_SYMS  %d
+typedef {
+  float top[NUM_PROJECTED_SYMS][NUM_GRAMMARS], bot[NUM_PROJECTED_SYMS][NUM_GRAMMARS];
+} projected_parse_cell;
+
+
+typedef {
+  float syms[NUM_PROJECTED_SYMS][NUM_GRAMMARS];
+} projected_symbols;
+
+__kernel void project_nterms(__global projected_parse_cell* projected,
+                             __global const parse_cell* insides,
+                             __global const parse_cell* outsides,
+                             __global const int* offsets,
+                             __global const int* lengths) {
+  const int sentence = get_global_id(0);
+  const int begin = get_global_id(1);
+  const int gram = get_global_id(2);
+  const int end = begin + spanLength;
+  const int length = lengths[sentence];
+
+  if(end <= length) {
+    __global const parse_cell* outside = outsides + offsets[sentence];
+    __global const parse_cell* inside = insides + offsets[sentence];
+    __global parse_cell* my_projected = projected + offsets[sentence];
+    const float root_score = CELL(inside, 0, length)->top[ROOT][gram]; // scale is 2^(SCALE_FACTOR)^(length-1)
+    __global const parse_cell* in = CELL(inside, begin, end);
+    __global const parse_cell* out = CELL(outside, begin, end);
+
+    __global float (*target)[NUM_PROJECTED_SYMS][NUM_GRAMMARS] = CELL(my_projected, begin, end)->top;
+    __global const float (*in)[NUM_SYMS][NUM_GRAMMARS] = CELL(inside, begin, end)->top;
+    __global const float (*out)[NUM_SYMS][NUM_GRAMMARS] = CELL(outside, begin, end)->top;
+    int times = 0
+    while(times < 2) {
+      %s
+      target = CELL(my_projected, begin, end)->bot;
+      in = CELL(inside, begin, end)->bot;
+      out = CELL(outside, begin, end)->bot;
+      times += 1
+    }
+  }
+
+}
+
+    """.format(projections.coarseIndex.size, projectNonterminalsInner(projections, odds_ratio))
+  }
+
+
+  private def projectNonterminalsInner[L, L2](projections: ProjectionIndexer[L, L2], odds_ratio: Boolean) = {
+    val buf = new ArrayBuffer[String]()
+    if(odds_ratio)
+      buf += "float sum = 0.0;"
+    buf += "float cur;"
+    for(coarse <- 0 until projections.coarseIndex.size) {
+      buf += "cur = 0.0;"
+      for(ref <- projections.refinementsOf(coarse)) {
+        buf += "cur = mad(in[%d][gram], out[%d][gram], cur);".format(ref, ref)
+      }
+      if(odds_ratio) {
+        buf += "sum += cur;"
+        buf += "target[%d][gram] = cur;".format(coarse)
+      } else {
+        buf += "target[%d][gram] = cur/root_score;".format(coarse)
+      }
+    }
+
+    if(odds_ratio) {
+      buf += "const float norm = root_score - sum;"
+      buf += "for (int i = 0; i < NUM_PROJECTED_SYMS; ++i) {"
+      buf += "  target[%d][gram] /= norm;"
+      buf += "}"
+    }
+    buf.mkString("\n      ")
+  }
+
 
   private val copyPosToCharts =
   """
