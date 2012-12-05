@@ -15,7 +15,6 @@ class OutsideKernel[L](ruleStructure: RuleStructure[L], numGrammars: Int)(implic
                  maxLength: Int,
                  rules: CLBuffer[JFloat],
                  events: CLEvent*)(implicit queue: CLQueue) = {
-    println("start outside.")
     val ou, ob= new ArrayBuffer[CLEvent]()
     binaries.setArgs(outsideTop, outsideBot, insideTop, offsets, lengths, Integer.valueOf(maxLength), rules)
     unaries.setArgs(outsideTop, outsideBot, offsets, lengths, Integer.valueOf(maxLength), rules)
@@ -123,7 +122,7 @@ __kernel void outside_binaries(__global parse_cell* outsides_top,
   outsideRightCompletionUpdates(ruleStructure.binaryRulesWithIndices),
   outsideLeftCompletionUpdates(ruleStructure.binaryRulesWithIndices))
 
-def outsideUnaryUpdates(rules: IndexedSeq[(UnaryRule[Int], Int)]): String = {
+  def outsideUnaryUpdates(rules: IndexedSeq[(UnaryRule[Int], Int)]): String = {
     val sb = new ArrayBuffer[String]
     sb += "float child;"
     val rules2 = rules.sortBy(_._1.child)
