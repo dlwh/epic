@@ -6,7 +6,13 @@ import collection.mutable.ArrayBuffer
 
 case class RuleStructure[L](grammar: BaseGrammar[L]) {
   import grammar._
+  def numSyms = grammar.labelIndex.size
+  def root = grammar.rootIndex
   val (binaryRules, unaryRules) = (0 until index.size).partition(isBinary(_))
+
+  def numBinaries = binaryRules.length
+  def numUnaries = unaryRules.length
+
   val unaryRulesWithIndices = unaryRules.map { r => indexedRule(r).asInstanceOf[UnaryRule[Int]] -> (r-binaryRules.length)}
   val binaryRulesWithIndices = binaryRules.map { r => indexedRule(r).asInstanceOf[BinaryRule[Int]] -> r }
 
