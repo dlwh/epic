@@ -87,6 +87,7 @@ class GrammarKernel[C, L, W](coarseGrammar: BaseGrammar[C],
   private val lenDev = context.createIntBuffer(Usage.Input, maxSentences)
   private val lenPtr = lenDev.allocateCompatibleMemory(context.getDevices()(0))
   private val ruleVector = Pointer.allocateFloats(totalRules)
+  private val decodeDev = context.createIntBuffer(Usage.InputOutput, maxCells * 4) // top, bot, split, score
 
   private val posTagsDev = context.createFloatBuffer(Usage.InputOutput, maxTotalLength * cellSize)
   private val posTagsPtr = posTagsDev.allocateCompatibleMemory(context.getDevices()(0))
@@ -209,31 +210,43 @@ class GrammarKernel[C, L, W](coarseGrammar: BaseGrammar[C],
   private def doParse(batch: Batch):IndexedSeq[BinarizedTree[C]] = synchronized {
     import batch._
     var lastEvent = insideOutside(batch)
+    val zt = memZero.zeroMemory(projTopDev)
+    val zb = memZero.zeroMemory(projBotDev)
 
     lastEvent = projection.projectCells(projTopDev, projBotDev,
       insideTopDev, insideBotDev,
       outsideTopDev, outsideBotDev,
-      offDev, lenDev, lengths.max, lastEvent)
+      offDev, lenDev, lengths.max, lastEvent, zt, zb)
 
-    val guineaPig = outsideTopDev.asCLIntBuffer()
-    lastEvent = memZero.zeroMemory(guineaPig.asCLFloatBuffer(), lastEvent)
-    lastEvent = decoder.makeBackpointers(guineaPig,
+    lastEvent = memZero.zeroMemory(decodeDev, lastEvent)
+    lastEvent = decoder.makeBackpointers(decodeDev,
       projTopDev, projBotDev,
       offDev, lenDev, lengths.max, lastEvent)
 
-    val backPointers = guineaPig.read(queue, lastEvent).getInts(maxCells * 4)
+    val backPointers = decodeDev.read(queue, lastEvent).getInts(maxCells * 4)
     // 0 is top, 1 is bot, 2 is split, 3 is score (unused, actually a float)
     val trees = for(i <- 0 until batch.sentences.length) yield {
+//      for(len <- 1 to sentences(i).length; begin <- 0 until (sentences(i).length + 1 - len))  {
+//        val end = begin + len
+//        val bestTop = backPointers( (offsets(i) + TriangularArray.index(begin, end)) * 4 + 0)
+//        val bestBot = backPointers( (offsets(i) + TriangularArray.index(begin, end)) * 4 + 1)
+//        val split = backPointers( (offsets(i) + TriangularArray.index(begin, end)) * 4 + 2)
+//        val bestScore = lang.Float.intBitsToFloat(backPointers( (offsets(i) + TriangularArray.index(begin, end)) * 4 + 3))
+//        println(begin,split,end,bestBot,bestTop,bestScore)
+//      }
       def extract(begin: Int, end: Int):BinarizedTree[C] = {
         val bestTop = backPointers( (offsets(i) + TriangularArray.index(begin, end)) * 4 + 0)
         val bestBot = backPointers( (offsets(i) + TriangularArray.index(begin, end)) * 4 + 1)
         val split = backPointers( (offsets(i) + TriangularArray.index(begin, end)) * 4 + 2)
+        val bestScore = lang.Float.intBitsToFloat(backPointers( (offsets(i) + TriangularArray.index(begin, end)) * 4 + 3))
 //        println(split + " " + begin + " " + end)
         val lower = if(begin + 1== end) {
           NullaryTree(coarseGrammar.labelIndex.get(bestBot), Span(begin, end))
         } else {
+          assert(split > begin && split < end, (i, sentences(i),begin,split,end,coarseGrammar.labelIndex.get(bestBot),coarseGrammar.labelIndex.get(bestTop),bestScore))
           val left = extract(begin, split)
           val right = extract(split, end)
+//          println(begin,split,end,bestBot,bestTop,bestScore)
           BinaryTree(coarseGrammar.labelIndex.get(bestBot), left, right, Span(begin, end))
         }
 
@@ -247,7 +260,7 @@ class GrammarKernel[C, L, W](coarseGrammar: BaseGrammar[C],
 
 //    println(marginals.mkString("\n...\n"))
 //    println(marginals.map(_.rootScore(0)).mkString("\n"))
-//    println(marginals.map(m => breeze.numerics.logSum((0 until grammar.labelIndex.size).map(i => m.topOutsideScore(0,1,0, i) + m.topInsideScore(0, 1, 0, i)))))
+//    println(marginals.map(m => breeze.numerics.logSum((0 until grammar.labelIndex.size).map(i => m.topOutsideScore(m.length-1,m.length,0, i) + m.topInsideScore(m.length-1, m.length, 0, i)))))
 
 
     trees
@@ -484,11 +497,11 @@ object GrammarKernel {
     val train = transformed.slice(0,numToParse)
     val timeIn = System.currentTimeMillis()
     val trees = kern.parse(train.map(_.words.toIndexedSeq))
-    for( (guess, inst) <- trees zip train) {
-      println("========")
-      println(guess.render(inst.words, false))
-      println(inst.tree.render(inst.words, false))
-    }
+//    for( (guess, inst) <- trees zip train) {
+//      println("========")
+//      println(guess.render(inst.words, false))
+//      println(inst.tree.render(inst.words, false))
+//    }
     println("Done: " + (System.currentTimeMillis() - timeIn))
     println("ecounts...")
     val time2 = System.currentTimeMillis()

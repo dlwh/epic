@@ -15,14 +15,13 @@ class MaxRecallKernel[Coarse](rules: RuleStructure[Coarse])(implicit context: CL
     max_recall.setArgs(backPointers, projectedTop, projectedBot, offsets, lengths, Integer.valueOf(1))
     val mr = new ArrayBuffer[CLEvent]()
 
-    var event:Seq[CLEvent] = events
-    for (len <- 1 to maxLength) {
+    var event = max_recall.enqueueNDRange(queue, Array(lengths.getElementCount.toInt, maxLength), events:_*)
+    for (len <- 2 to maxLength) {
       max_recall.setArg(5, len)
-      val newEvent = max_recall.enqueueNDRange(queue, Array(lengths.getElementCount.toInt, maxLength + 1 - len), event:_*)
-      event = Array(newEvent)
+      event = max_recall.enqueueNDRange(queue, Array(lengths.getElementCount.toInt, maxLength + 1 - len), event)
     }
 
-    event.head
+    event
   }
 
 
@@ -54,9 +53,9 @@ __kernel void max_recall(
   const int gram = 0;
   const int end = begin + spanLength;
   const int length = lengths[sentence];
-  float maxSymBotV = -1000.0f;
+  float maxSymBotV = 0.0f;
   int maxSymBot = -1;
-  float maxSymTopV = -1000.0f;
+  float maxSymTopV = 0.0f;
   int maxSymTop = -1;
   __global backpointer* back = backpointers + offsets[sentence];
 
@@ -90,7 +89,10 @@ __kernel void max_recall(
         bestScore = score;
       }
     }
-    bp->score = bestScore + maxSymBotV + maxSymTopV;
+    if(bestScore == 0.0 && spanLength != 1)
+      bp->score = -10000.0f;
+    else
+      bp->score = bestScore + maxSymBotV + maxSymTopV;
     bp->split = bestSplit;
   }
 }"""

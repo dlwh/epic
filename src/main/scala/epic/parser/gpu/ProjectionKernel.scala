@@ -29,6 +29,10 @@ class ProjectionKernel[L, L2](rules: RuleStructure[L2], projections: ProjectionI
       project_nterms.setArg(6, len)
       val b = project_nterms.enqueueNDRange(queue, Array(lengths.getElementCount.toInt, maxLength + 1 - len, numGrammars), Array(1, 1, numGrammars), events:_*)
       pn += b
+    }
+
+
+    for(len <- 1 to maxLength) {
       project_nterms.setArg(0, projectedTop)
       project_nterms.setArg(1, insideTop)
       project_nterms.setArg(2, outsideTop)
@@ -76,8 +80,7 @@ __kernel void project_nterms(__global projected_parse_cell* projected,
   const int length = lengths[sentence];
 
   if(end <= length) {
-    __global const parse_cell* itop = insides_top + offsets[sentence];
-    const float root_score = CELL(itop, 0, length)->syms[ROOT][gram]; // scale is 2^(SCALE_FACTOR)^(length-1)
+    const float root_score = CELL(insides_top + offsets[sentence], 0, length)->syms[ROOT][gram]; // scale is 2^(SCALE_FACTOR)^(length-1)
     __global const parse_cell* in = CELL(insides + offsets[sentence], begin, end);
     __global const parse_cell* out = CELL(outsides + offsets[sentence], begin, end);
     __global projected_parse_cell* target = CELL(projected + offsets[sentence], begin, end);
@@ -88,7 +91,6 @@ __kernel void project_nterms(__global projected_parse_cell* projected,
 }
 
                                                              """.format(projections.coarseIndex.size, projectNonterminalsInner)
-
 
   private def projectNonterminalsInner = {
     val buf = new ArrayBuffer[String]()
@@ -104,7 +106,7 @@ __kernel void project_nterms(__global projected_parse_cell* projected,
         buf += "sum += cur;"
         buf += "target->syms[%d][gram] = cur;".format(coarse)
       } else {
-        buf += "target->syms[%d][gram] = cur/root_score;".format(coarse)
+        buf += "target->syms[%d][gram] = cur/root_score;".format(coarse,coarse)
       }
     }
 
