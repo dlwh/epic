@@ -256,11 +256,11 @@ class GrammarKernel[C, L, W](coarseGrammar: BaseGrammar[C],
       extract(0, sentences(i).length)
     }
 
-//    val marginals = getMarginals(batch)
+    val marginals = getMarginals(batch)
 
 //    println(marginals.mkString("\n...\n"))
-//    println(marginals.map(_.rootScore(0)).mkString("\n"))
-//    println(marginals.map(m => breeze.numerics.logSum((0 until grammar.labelIndex.size).map(i => m.topOutsideScore(m.length-1,m.length,0, i) + m.topInsideScore(m.length-1, m.length, 0, i)))))
+    println(marginals.map(_.rootScore(0)).mkString("\n"))
+    println(marginals.map(m => breeze.numerics.logSum((0 until grammar.labelIndex.size).map(i => m.topOutsideScore(m.length-1,m.length,0, i) + m.topInsideScore(m.length-1, m.length, 0, i)))))
 
 
     trees
@@ -385,7 +385,7 @@ class GrammarKernel[C, L, W](coarseGrammar: BaseGrammar[C],
     }
     val initCharts = copyTags.enqueueNDRange(queue,  Array(nsyms * gramMultiplier, lengths.length, maxLength), Array(nsyms * gramMultiplier, 1, 1), wPos, wIB, wL, copyOffLengths)
 
-    var lastU = inside.insidePass(insideBotDev, insideTopDev, offDev, lenDev, maxLength, rulesDev, initCharts, wIT)
+    var lastU = inside.insidePass(insideBotDev, insideTopDev, posTagsDev, offDev, lenDev, maxLength, offLengthsDev, rulesDev, initCharts, wIT)
     lastU = outside.outsidePass(outsideTopDev, outsideBotDev, insideTopDev, offDev, lenDev, maxLength, rulesDev, lastU, wOB, wOT)
 
 
@@ -516,7 +516,7 @@ object GrammarKernel {
     val marg = train.map(_.words).foldLeft(DenseVector.zeros[Double](feat.index.size)){ (acc, s) =>
       val m = ChartMarginal(AugmentedGrammar.fromRefined(grammar), s, ParseChart.logProb)
       val counts = m.expectedCounts(feat).counts
-//      println(m.partition)
+      println(m.partition)
       acc += counts
       acc
     }
