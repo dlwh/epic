@@ -190,9 +190,10 @@ __kernel void outside_binaries(__global parse_cell* outsides_top,
     sb.mkString("\n    ")
   }
 
-  lazy val program = {
+  val program = {
     val p = context.createProgram(text)
     p.setFastRelaxedMath()
     p.setUnsafeMathOptimizations()
     p.build()
-  }}
+  }
+}

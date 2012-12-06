@@ -20,13 +20,13 @@ import collection.{immutable, mutable}
 import java.nio.{FloatBuffer, ByteBuffer}
 import projections.{GrammarRefinements, ProjectionIndexer}
 
-class GrammarKernel[C, L, W](
-//                          projections: GrammarRefinements[C, L],
-                          grammar: BaseGrammar[L],
-                          lexicon: Lexicon[L, W],
-                          private var _ruleScores: Array[RuleScores],
-                          tagScores: Array[(IndexedSeq[W], Int, Int)=>Double],
-                          maxSentences: Int = 1000)(implicit val context: CLContext) {
+class GrammarKernel[C, L, W](coarseGrammar: BaseGrammar[C],
+                             projections: GrammarRefinements[C, L],
+                             grammar: BaseGrammar[L],
+                             lexicon: Lexicon[L, W],
+                             private var _ruleScores: Array[RuleScores],
+                             tagScores: Array[(IndexedSeq[W], Int, Int)=>Double],
+                             maxSentences: Int = 1000)(implicit val context: CLContext) {
   def ruleScores = _ruleScores
 
   val numGrammars = _ruleScores.length
@@ -72,9 +72,12 @@ class GrammarKernel[C, L, W](
   private val copyTags = copyPosTags.createKernel("copy_pos_to_charts")
   private val sumVector = context.createProgram(GrammarKernel.sumECountVectors).createKernel("sum_vectors")
   private val memZero = new ZeroMemoryKernel
+  private val projection = new ProjectionKernel(structure, projections.labels,  numGrammars)
+  private val decoder = new MaxRecallKernel(new RuleStructure(coarseGrammar))
 
   private val insideTopDev, insideBotDev = context.createFloatBuffer(Usage.InputOutput, maxCells * cellSize)
   private val outsideTopDev, outsideBotDev = context.createFloatBuffer(Usage.InputOutput, maxCells * cellSize)
+  private val projTopDev, projBotDev = context.createFloatBuffer(Usage.InputOutput, maxCells * coarseGrammar.labelIndex.size)
   private val ecountsDev = context.createFloatBuffer(Usage.InputOutput, maxTotalLength * totalRules)
   private val termECountsDev = context.createFloatBuffer(Usage.InputOutput, maxTotalLength * cellSize)
   private val offDev = context.createIntBuffer(Usage.Input, maxSentences)
@@ -108,7 +111,7 @@ class GrammarKernel[C, L, W](
   }
 
 
-  def parse(sentences: IndexedSeq[IndexedSeq[W]]):IndexedSeq[BinarizedTree[L]] = synchronized {
+  def parse(sentences: IndexedSeq[IndexedSeq[W]]):IndexedSeq[BinarizedTree[C]] = synchronized {
     {for {
       partition <- getPartitions(sentences).iterator
       batch = layoutIntoMemory(partition)
@@ -119,6 +122,7 @@ class GrammarKernel[C, L, W](
   }
 
   def expectedRuleCounts(sentences: IndexedSeq[IndexedSeq[W]]): (DenseVector[Double], Array[Array[Counter[W, Double]]]) = synchronized {
+    queue.finish()
     val allCounts = for {
       partition <- getPartitions(sentences).iterator
     } yield {
@@ -202,8 +206,43 @@ class GrammarKernel[C, L, W](
     result
   }
 
-  private def doParse(batch: Batch):IndexedSeq[BinarizedTree[L]] = synchronized {
+  private def doParse(batch: Batch):IndexedSeq[BinarizedTree[C]] = synchronized {
+    import batch._
     var lastEvent = insideOutside(batch)
+
+    lastEvent = projection.projectCells(projTopDev, projBotDev,
+      insideTopDev, insideBotDev,
+      outsideTopDev, outsideBotDev,
+      offDev, lenDev, lengths.max, lastEvent)
+
+    val guineaPig = outsideTopDev.asCLIntBuffer()
+    lastEvent = memZero.zeroMemory(guineaPig.asCLFloatBuffer(), lastEvent)
+    lastEvent = decoder.makeBackpointers(guineaPig,
+      projTopDev, projBotDev,
+      offDev, lenDev, lengths.max, lastEvent)
+
+    val backPointers = guineaPig.read(queue, lastEvent).getInts(maxCells * 4)
+    // 0 is top, 1 is bot, 2 is split, 3 is score (unused, actually a float)
+    val trees = for(i <- 0 until batch.sentences.length) yield {
+      def extract(begin: Int, end: Int):BinarizedTree[C] = {
+        val bestTop = backPointers( (offsets(i) + TriangularArray.index(begin, end)) * 4 + 0)
+        val bestBot = backPointers( (offsets(i) + TriangularArray.index(begin, end)) * 4 + 1)
+        val split = backPointers( (offsets(i) + TriangularArray.index(begin, end)) * 4 + 2)
+//        println(split + " " + begin + " " + end)
+        val lower = if(begin + 1== end) {
+          NullaryTree(coarseGrammar.labelIndex.get(bestBot), Span(begin, end))
+        } else {
+          val left = extract(begin, split)
+          val right = extract(split, end)
+          BinaryTree(coarseGrammar.labelIndex.get(bestBot), left, right, Span(begin, end))
+        }
+
+        UnaryTree[C](coarseGrammar.labelIndex.get(bestTop), lower, IndexedSeq.empty, Span(begin, end))
+      }
+
+      extract(0, sentences(i).length)
+    }
+
 //    val marginals = getMarginals(batch)
 
 //    println(marginals.mkString("\n...\n"))
@@ -211,7 +250,7 @@ class GrammarKernel[C, L, W](
 //    println(marginals.map(m => breeze.numerics.logSum((0 until grammar.labelIndex.size).map(i => m.topOutsideScore(0,1,0, i) + m.topInsideScore(0, 1, 0, i)))))
 
 
-    IndexedSeq.empty
+    trees
   }
 
   private def doExpectedCounts(batch: Batch) = synchronized {
@@ -220,6 +259,7 @@ class GrammarKernel[C, L, W](
     val wterm = memZero.zeroMemory(termECountsDev)
     var lastEvent = insideOutside(batch)
 //    var lastEvent = wOB
+    queue.finish()
 
 
     offLengthsPtr.setInts(lengthTotals)
@@ -227,11 +267,10 @@ class GrammarKernel[C, L, W](
 
     lastEvent = ecounts.expectedCounts(ecountsDev, termECountsDev,
       insideBotDev, insideTopDev,
-      outsideBotDev,
-      outsideTopDev,
+      outsideBotDev, outsideTopDev,
       offDev, lenDev, offLengthsDev, lengths.max, rulesDev, lastEvent, wOB, copyOffLengths, wterm)
 
-
+//                  println("sum..." + ecountsDev.read(queue).getFloats.sum)
     val termVector = Pointer.allocateFloats(totalLength * cellSize)
     val termOut = termECountsDev.read(queue, termVector, true, lastEvent)
     val floats = termVector.getFloats
@@ -241,10 +280,6 @@ class GrammarKernel[C, L, W](
     lastEvent = collapseArray(ecountsDev, totalLength, totalRules, lastEvent)
 
     queue.finish()
-    val wobCount = (wOB.getProfilingCommandEnd - wOB.getProfilingCommandStart) / 1E9
-//    val termCount = (termOut.getProfilingCommandEnd - termOut.getProfilingCommandStart) / 1E9
-
-    println("write: " + wobCount)
 
     ecountsDev.read(queue, 0, totalRules, ruleVector, true,  lastEvent)
     val arr = ruleVector.getFloats
@@ -448,7 +483,12 @@ object GrammarKernel {
     println("Parsing...")
     val train = transformed.slice(0,numToParse)
     val timeIn = System.currentTimeMillis()
-    kern.parse(train.map(_.words.toIndexedSeq))
+    val trees = kern.parse(train.map(_.words.toIndexedSeq))
+    for( (guess, inst) <- trees zip train) {
+      println("========")
+      println(guess.render(inst.words, false))
+      println(inst.tree.render(inst.words, false))
+    }
     println("Done: " + (System.currentTimeMillis() - timeIn))
     println("ecounts...")
     val time2 = System.currentTimeMillis()
@@ -510,7 +550,7 @@ object GrammarKernel {
       grammar.anchor(w).scoreSpan(pos, pos+1, label, 0)
     }
 
-    val kern = new GrammarKernel(grammar.grammar, grammar.lexicon, grammars, scorers)
+    val kern = new GrammarKernel(grammar.grammar, GrammarRefinements.identity(grammar.grammar), grammar.grammar, grammar.lexicon, grammars, scorers)
 
     kern
   }
@@ -524,74 +564,7 @@ object GrammarKernel {
 
 
 
-  private def projectMarginalsKernel[L, L2](projections: ProjectionIndexer[L, L2], odds_ratio: Boolean) = {
-    """
-#define NUM_PROJECTED_SYMS  %d
-typedef {
-  float top[NUM_PROJECTED_SYMS][NUM_GRAMMARS], bot[NUM_PROJECTED_SYMS][NUM_GRAMMARS];
-} projected_parse_cell;
 
-
-typedef {
-  float syms[NUM_PROJECTED_SYMS][NUM_GRAMMARS];
-} projected_symbols;
-
-__kernel void project_nterms(__global projected_parse_cell* projected,
-                             __global const parse_cell* insides_top,
-                             __global const parse_cell* insides,
-                             __global const parse_cell* outsides,
-                             __global const int* offsets,
-                             __global const int* lengths) {
-  const int sentence = get_global_id(0);
-  const int begin = get_global_id(1);
-  const int gram = get_global_id(2);
-  const int end = begin + spanLength;
-  const int length = lengths[sentence];
-
-  if(end <= length) {
-    __global const parse_cell* out = outsides + offsets[sentence];
-    __global const parse_cell* in = insides + offsets[sentence];
-    __global const parse_cell* itop = insides_top + offsets[sentence];
-    const float root_score = CELL(itop, 0, length)[ROOT][gram]; // scale is 2^(SCALE_FACTOR)^(length-1)
-    __global const parse_cell* in = CELL(inside, begin, end);
-    __global const parse_cell* out = CELL(outside, begin, end);
-    __global projected_symbols* target = CELL(projected + offsets[sentence], begin, end)
-
-    %s
-  }
-
-}
-
-    """.format(projections.coarseIndex.size, projectNonterminalsInner(projections, odds_ratio))
-  }
-
-
-  private def projectNonterminalsInner[L, L2](projections: ProjectionIndexer[L, L2], odds_ratio: Boolean) = {
-    val buf = new ArrayBuffer[String]()
-    if(odds_ratio)
-      buf += "float sum = 0.0;"
-    buf += "float cur;"
-    for(coarse <- 0 until projections.coarseIndex.size) {
-      buf += "cur = 0.0;"
-      for(ref <- projections.refinementsOf(coarse)) {
-        buf += "cur = mad(in->syms[%d][gram], out->syms[%d][gram], cur);".format(ref, ref)
-      }
-      if(odds_ratio) {
-        buf += "sum += cur;"
-        buf += "target->syms[%d][gram] = cur;".format(coarse)
-      } else {
-        buf += "target->syms[%d][gram] = cur/root_score;".format(coarse)
-      }
-    }
-
-    if(odds_ratio) {
-      buf += "const float norm = root_score - sum;"
-      buf += "for (int i = 0; i < NUM_PROJECTED_SYMS; ++i) {"
-      buf += "  target->syms[%d][gram] /= norm;"
-      buf += "}"
-    }
-    buf.mkString("\n      ")
-  }
 
 
   private val copyPosToCharts =

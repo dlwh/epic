@@ -148,7 +148,7 @@ __kernel void inside_unaries(__global const parse_cell * inside_bots,
     sb.mkString("\n    ")
   }
 
-  lazy val program = {
+  val program = {
     val p = context.createProgram(text)
     p.setFastRelaxedMath()
     p.setUnsafeMathOptimizations()

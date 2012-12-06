@@ -52,7 +52,8 @@ class ExpectedCountsKernel[L](ruleStructure: RuleStructure[L], numGrammars: Int)
       eu += lastUDep
     }
     unaries.setArg(7, 1)
-    eu += unaries.enqueueNDRange(queue, Array(lengths.getElementCount.toInt, maxLength, numGrammars), Array(1, 1, numGrammars), lastUDep, lastBDep)
+   lastUDep =  unaries.enqueueNDRange(queue, Array(lengths.getElementCount.toInt, maxLength, numGrammars), Array(1, 1, numGrammars), lastUDep, lastBDep)
+    eu += lastUDep
 
     if(queue.getProperties.contains(CLDevice.QueueProperties.ProfilingEnable)) {
       queue.finish()
@@ -61,7 +62,7 @@ class ExpectedCountsKernel[L](ruleStructure: RuleStructure[L], numGrammars: Int)
       println("ecounts: " + iuCount + " " + ibCount)
     }
 
-    eu.last
+    lastUDep
   }
 
 
@@ -69,12 +70,6 @@ class ExpectedCountsKernel[L](ruleStructure: RuleStructure[L], numGrammars: Int)
   private lazy val unaries = program.createKernel("ecount_unaries")
   private lazy val terms = program.createKernel("ecount_terminals")
 
-  lazy val program = {
-    val p = context.createProgram(text)
-    p.setFastRelaxedMath()
-    p.setUnsafeMathOptimizations()
-    p.build()
-  }
 
   lazy val text = {
     import ruleStructure._
@@ -104,7 +99,6 @@ __kernel void ecount_binaries(__global rule_cell* ecounts,
     %s
   }
 }
-
 
 __kernel void ecount_unaries(
               __global rule_cell* ecounts,
@@ -238,5 +232,13 @@ __kernel void ecount_terminals(
 
     buf.mkString("\n    ")
 
+  }
+
+
+  val program = {
+    val p = context.createProgram(text)
+    p.setFastRelaxedMath()
+    p.setUnsafeMathOptimizations()
+    p.build()
   }
 }
