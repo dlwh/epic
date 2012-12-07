@@ -7,8 +7,9 @@ import java.lang.{Float=>JFloat, Integer=>JInt}
 
 class ProjectionKernel[L, L2](rules: RuleStructure[L2], projections: ProjectionIndexer[L, L2], numGrammars: Int, odds_ratio: Boolean=false)(implicit context: CLContext) {
 
-  def projectCells(projectedTop: CLBuffer[JFloat],
-                  projectedBot: CLBuffer[JFloat],
+  def projectCells(numSentences: Int,
+                 projectedTop: CLBuffer[JFloat],
+                 projectedBot: CLBuffer[JFloat],
                  insideTop: CLBuffer[JFloat],
                  insideBot: CLBuffer[JFloat],
                  outsideTop: CLBuffer[JFloat],
@@ -27,7 +28,7 @@ class ProjectionKernel[L, L2](rules: RuleStructure[L2], projections: ProjectionI
       project_nterms.setArg(1, insideBot)
       project_nterms.setArg(2, outsideBot)
       project_nterms.setArg(6, len)
-      val b = project_nterms.enqueueNDRange(queue, Array(lengths.getElementCount.toInt, maxLength + 1 - len, numGrammars), Array(1, 1, numGrammars), events:_*)
+      val b = project_nterms.enqueueNDRange(queue, Array(numSentences, maxLength + 1 - len, numGrammars), Array(1, 1, numGrammars), events:_*)
       pn += b
     }
 
@@ -37,7 +38,7 @@ class ProjectionKernel[L, L2](rules: RuleStructure[L2], projections: ProjectionI
       project_nterms.setArg(1, insideTop)
       project_nterms.setArg(2, outsideTop)
       project_nterms.setArg(6, len)
-      val b2 = project_nterms.enqueueNDRange(queue, Array(lengths.getElementCount.toInt, maxLength + 1 - len, numGrammars), Array(1, 1, numGrammars), events:_*)
+      val b2 = project_nterms.enqueueNDRange(queue, Array(numSentences, maxLength + 1 - len, numGrammars), Array(1, 1, numGrammars), events:_*)
       pn += b2
     }
 

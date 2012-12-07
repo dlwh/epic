@@ -62,8 +62,8 @@ class GrammarKernel[C, L, W](coarseGrammar: BaseGrammar[C],
   val cellSize = nsyms * numGrammars
   val (maxCells, maxTotalLength) = {
     val totalBytes = context.getDevices.map(_.getGlobalMemSize).min
-    val maxSize = ((totalBytes / cellSize).toInt / 4 / 12).toInt
-    val maxTotalLength = (context.getMaxMemAllocSize / totalRules / 4).toInt min (maxSize * cellSize / totalRules)
+    val maxSize = ((totalBytes / cellSize).toInt / 4 / 12).toInt min 100000
+    val maxTotalLength = (context.getMaxMemAllocSize / totalRules / 4).toInt min (maxSize * cellSize / totalRules) min 50000
 
     maxSize ->  maxTotalLength
   }
@@ -80,7 +80,7 @@ class GrammarKernel[C, L, W](coarseGrammar: BaseGrammar[C],
   private val projTopDev, projBotDev = context.createFloatBuffer(Usage.InputOutput, maxCells * coarseGrammar.labelIndex.size)
   private val ecountsDev = context.createFloatBuffer(Usage.InputOutput, maxTotalLength * totalRules)
   private val termECountsDev = context.createFloatBuffer(Usage.InputOutput, maxTotalLength * cellSize)
-  private val offDev = context.createIntBuffer(Usage.Input, maxSentences)
+  private val offDev = context.createIntBuffer(Usage.Input, maxSentences + 1)
   private val offPtr = offDev.allocateCompatibleMemory(context.getDevices()(0))
   private val offLengthsDev = context.createIntBuffer(Usage.Input, maxSentences)
   private val offLengthsPtr = offLengthsDev.allocateCompatibleMemory(context.getDevices()(0))
@@ -106,6 +106,7 @@ class GrammarKernel[C, L, W](coarseGrammar: BaseGrammar[C],
         arr(nbinaries * numGrammars + u * numGrammars + g) = math.exp(ruleScores(g).unaries(u)).toFloat
       }
     }
+
     val pointer = Pointer.pointerToFloats(arr:_*)
     rulesDev.write(queue, pointer, true)
     pointer.release()
@@ -116,6 +117,7 @@ class GrammarKernel[C, L, W](coarseGrammar: BaseGrammar[C],
     {for {
       partition <- getPartitions(sentences).iterator
       batch = layoutIntoMemory(partition)
+//    _ = getMarginals(batch)
       t <- doParse(batch)
     } yield {
       t
@@ -146,6 +148,7 @@ class GrammarKernel[C, L, W](coarseGrammar: BaseGrammar[C],
                    totalLength: Int,
                    sentences: IndexedSeq[IndexedSeq[W]],
                    posTags: Array[Float]) {
+    def numSentences = sentences.length
 
   }
 
@@ -213,17 +216,13 @@ class GrammarKernel[C, L, W](coarseGrammar: BaseGrammar[C],
     val zt = memZero.zeroMemory(projTopDev)
     val zb = memZero.zeroMemory(projBotDev)
 
-    println("project");
-    /*
-    lastEvent = projection.projectCells(projTopDev, projBotDev,
+    lastEvent = projection.projectCells(numSentences, projTopDev, projBotDev,
       insideTopDev, insideBotDev,
       outsideTopDev, outsideBotDev,
       offDev, lenDev, lengths.max, lastEvent, zt, zb)
-      */
 
-    println("last");
     lastEvent = memZero.zeroMemory(decodeDev.asCLFloatBuffer(), lastEvent)
-    lastEvent = decoder.makeBackpointers(decodeDev,
+    lastEvent = decoder.makeBackpointers(numSentences, decodeDev,
       projTopDev, projBotDev,
       offDev, lenDev, lengths.max, lastEvent)
 
@@ -260,11 +259,6 @@ class GrammarKernel[C, L, W](coarseGrammar: BaseGrammar[C],
       extract(0, sentences(i).length)
     }
 
-    val marginals = getMarginals(batch)
-
-//    println(marginals.mkString("\n...\n"))
-    println(marginals.map(_.rootScore(0)).mkString("\n"))
-    println(marginals.map(m => breeze.numerics.logSum((0 until grammar.labelIndex.size).map(i => m.topOutsideScore(m.length-1,m.length,0, i) + m.topInsideScore(m.length-1, m.length, 0, i)))))
 
 
     trees
@@ -276,10 +270,9 @@ class GrammarKernel[C, L, W](coarseGrammar: BaseGrammar[C],
     val wterm = memZero.zeroMemory(termECountsDev)
     var lastEvent = insideOutside(batch)
 //    var lastEvent = wOB
-    println("quueue.finish!")
     queue.finish()
 
-    lastEvent = ecounts.expectedCounts(ecountsDev, termECountsDev,
+    lastEvent = ecounts.expectedCounts(numSentences, ecountsDev, termECountsDev,
       insideBotDev, insideTopDev,
       outsideBotDev, outsideTopDev,
       offDev, lenDev, offLengthsDev, lengths.max, rulesDev, lastEvent, wOB, wterm)
@@ -330,7 +323,7 @@ class GrammarKernel[C, L, W](coarseGrammar: BaseGrammar[C],
   }
 
 
-  private def getMarginals(batch: Batch) =  {
+  def getMarginals(batch: Batch) =  synchronized {
     val lastEvent = insideOutside(batch)
     import batch._
 
@@ -347,34 +340,40 @@ class GrammarKernel[C, L, W](coarseGrammar: BaseGrammar[C],
     inBM.release()
     outBM.release()
 
-    for (i <- 0 until lengths.length) yield {
+    val marginals = for (i <- 0 until lengths.length) yield {
       val off = offsets(i)
       val len = lengths(i)
       Marginal(inTop, inBot, outTop, inBot, off, len)
     }
+
+    for(m <- marginals) {
+      println(m.rootScore(0))
+
+    }
+    marginals
   }
 
 
   private def insideOutside(batch: Batch) = synchronized {
     import batch._
     val maxLength = lengths.max
-//    posTagsPtr.setFloats(batch.posTags)
+    posTagsPtr.setFloats(batch.posTags)
     offPtr.setInts(offsets)
     lenPtr.setInts(lengths)
 
     var wIT, wOB, wOT, wL, wO, wIB, wPos, copyOffLengths  = null:CLEvent
 //    println(posTags.slice(batch.lengthTotals(1) * nsyms, batch.totalLength * nsyms).mkString(", "))
-//    wPos = posTagsDev.write(queue, 0, posTags.length, posTagsPtr, false)
-//    wIB = memZero.zeroMemory(insideBotDev)
-//    wIT = memZero.zeroMemory(insideTopDev)
-//    wOT = memZero.zeroMemory(outsideTopDev)
-//    wOB = memZero.zeroMemory(outsideBotDev)
+    wPos = posTagsDev.write(queue, 0, posTags.length, posTagsPtr, false)
+    wIB = memZero.zeroMemory(insideBotDev)
+    wIT = memZero.zeroMemory(insideTopDev)
+    wOT = memZero.zeroMemory(outsideTopDev)
+    wOB = memZero.zeroMemory(outsideBotDev)
     wO = offDev.write(queue, 0, lengths.length, offPtr, false)
     wL = lenDev.write(queue, 0, lengths.length, lenPtr, false)
     offLengthsPtr.setInts(lengthTotals)
     copyOffLengths = offLengthsDev.write(queue, offLengthsPtr, false)
 
-//    copyTags.setArgs(posTagsDev, insideBotDev, offDev, lenDev, offLengthsDev, Integer.valueOf(1))
+    copyTags.setArgs(posTagsDev, insideBotDev, offDev, lenDev, offLengthsDev, Integer.valueOf(1))
     val maxDim1Size = queue.getDevice.getMaxWorkItemSizes()(0)
     if(maxDim1Size < nsyms * numGrammars) {
       copyTags.setArg(5, numGrammars / 8 + 1)
@@ -384,20 +383,19 @@ class GrammarKernel[C, L, W](coarseGrammar: BaseGrammar[C],
     } else {
       numGrammars
     }
-    val initCharts = wPos//copyTags.enqueueNDRange(queue,  Array(nsyms * gramMultiplier, lengths.length, maxLength), Array(nsyms * gramMultiplier, 1, 1), wPos, wIB, wL, copyOffLengths)
+    val initCharts = copyTags.enqueueNDRange(queue,  Array(nsyms * gramMultiplier, lengths.length, maxLength), Array(nsyms * gramMultiplier, 1, 1), wPos, wIB, wL, copyOffLengths)
     queue.finish()
 
 
-    var lastU = inside.insidePass(insideBotDev, insideTopDev, posTagsDev, offDev, lenDev, maxLength, offLengthsDev, rulesDev, initCharts, wIT)
-    lastU = outside.outsidePass(outsideTopDev, outsideBotDev, insideTopDev, offDev, lenDev, maxLength, rulesDev, lastU, wOB, wOT)
+    var lastU = inside.insidePass(numSentences, insideBotDev, insideTopDev, posTagsDev, offDev, lenDev, maxLength, offLengthsDev, rulesDev, initCharts, wIT, wO)
+    lastU = outside.outsidePass(numSentences, outsideTopDev, outsideBotDev, insideTopDev, offDev, lenDev, maxLength, rulesDev, lastU, wOB, wOT)
 
-    println("last finish?!?")
     queue.finish()
 
 
     val writeCounts = IndexedSeq(wIT, wOT, wIB, wOB, wO, wL, initCharts).filter(_ ne null).map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum / 1E9
 
-    println(writeCounts)
+    println("io write: " + writeCounts)
     lastU
   }
 
@@ -498,12 +496,18 @@ object GrammarKernel {
     val kern = fromSimpleGrammar(grammar, params.trainer.useGPU, numGrammars)
     println("Parsing...")
     val train = transformed.slice(0,numToParse)
+
+
+
     println("ecounts...")
     val time2 = System.currentTimeMillis()
     val counts = kern.expectedRuleCounts(train.map(_.words.toIndexedSeq))
     val time3 = System.currentTimeMillis()
     println(counts._1.sum)
     println(counts._2.map(_.map(_.sum).sum).sum)
+    //    println(Encoder.fromIndex(grammar.refinedGrammar.index).decode(counts))
+    println("Done ecounts: " + (time3 - time2))
+
     val timeIn = System.currentTimeMillis()
     val trees = kern.parse(train.map(_.words.toIndexedSeq))
 //    for( (guess, inst) <- trees zip train) {
@@ -513,14 +517,13 @@ object GrammarKernel {
 //    }
     println("Done: " + (System.currentTimeMillis() - timeIn))
 
-//    println(Encoder.fromIndex(grammar.refinedGrammar.index).decode(counts))
-    println("Done ecounts: " + (time3 - time2))
+
     val timeX = System.currentTimeMillis()
     val feat = new ProductionFeaturizer(grammar.grammar, grammar.lexicon.knownLexicalProductions)
     val marg = train.map(_.words).foldLeft(DenseVector.zeros[Double](feat.index.size)){ (acc, s) =>
       val m = ChartMarginal(AugmentedGrammar.fromRefined(grammar), s, ParseChart.logProb)
       val counts = m.expectedCounts(feat).counts
-      println(m.partition)
+//      println(m.partition)
       acc += counts
       acc
     }
@@ -603,7 +606,6 @@ __kernel void copy_pos_to_charts(
     __global parse_cell* inside = insides_bot + offsets[sentence];
     __global parse_cell* in = CELL(inside, begin, end);
     __global const parse_cell* mybuf = pos_tags + (lengthOffsets[sentence] + begin);
-    // ibot has scale 0, obot has scale length - 1, root_score has scale length - 1. Woot.
     for(int i = 0; i < numGrammarsToDo && grammar < NUM_GRAMMARS; ++i) {
       in->syms[sym][grammar] = mybuf->syms[sym][grammar];
       grammar += (NUM_GRAMMARS / numGrammarsToDo);

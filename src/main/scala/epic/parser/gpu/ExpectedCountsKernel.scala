@@ -9,7 +9,8 @@ import collection.mutable
 
 class ExpectedCountsKernel[L](ruleStructure: RuleStructure[L], numGrammars: Int)(implicit context: CLContext) {
 
-  def expectedCounts(ecounts: CLBuffer[JFloat],
+  def expectedCounts(numSentences: Int,
+                     ecounts: CLBuffer[JFloat],
                      termECounts: CLBuffer[JFloat],
                      insideBot: CLBuffer[JFloat],
                      insideTop: CLBuffer[JFloat],
@@ -21,7 +22,6 @@ class ExpectedCountsKernel[L](ruleStructure: RuleStructure[L], numGrammars: Int)
                      maxLength: Int,
                      rules: CLBuffer[JFloat],
                      events: CLEvent*)(implicit queue: CLQueue)  = {
-    println("ecounts!")
 
     val eu, eb = new ArrayBuffer[CLEvent]()
     binaries.setArgs(ecounts, insideTop, outsideBot, offsets, lengths, offLengths, Integer.valueOf(1), rules)
@@ -40,21 +40,20 @@ class ExpectedCountsKernel[L](ruleStructure: RuleStructure[L], numGrammars: Int)
     }
 
     queue.enqueueWaitForEvents(events:_*)
-    println("wait!!")
 
-    val termFinished =  terms.enqueueNDRange(queue, Array(nsyms * gramMultiplier, lengths.getElementCount.toInt, maxLength), Array(nsyms * gramMultiplier, 1, 1))
+    val termFinished =  terms.enqueueNDRange(queue, Array(nsyms * gramMultiplier, numSentences, maxLength), Array(nsyms * gramMultiplier, 1, 1))
     var lastBDep = termFinished
     var lastUDep = termFinished
     for (len <- 2 to maxLength) {
       unaries.setArg(7, len)
       binaries.setArg(6, len)
-      lastBDep = binaries.enqueueNDRange(queue, Array(lengths.getElementCount.toInt, maxLength+1-len, numGrammars), Array(1, 1, numGrammars), lastBDep)
+      lastBDep = binaries.enqueueNDRange(queue, Array(numSentences, maxLength+1-len, numGrammars), Array(1, 1, numGrammars), lastBDep)
       eb += lastBDep
-      lastUDep = unaries.enqueueNDRange(queue, Array(lengths.getElementCount.toInt, maxLength+1-len, numGrammars), Array(1, 1, numGrammars), lastUDep)
+      lastUDep = unaries.enqueueNDRange(queue, Array(numSentences, maxLength+1-len, numGrammars), Array(1, 1, numGrammars), lastUDep)
       eu += lastUDep
     }
     unaries.setArg(7, 1)
-   lastUDep =  unaries.enqueueNDRange(queue, Array(lengths.getElementCount.toInt, maxLength, numGrammars), Array(1, 1, numGrammars), lastUDep, lastBDep)
+   lastUDep =  unaries.enqueueNDRange(queue, Array(numSentences, maxLength, numGrammars), Array(1, 1, numGrammars), lastUDep, lastBDep)
     eu += lastUDep
 
     if(queue.getProperties.contains(CLDevice.QueueProperties.ProfilingEnable)) {
@@ -62,7 +61,7 @@ class ExpectedCountsKernel[L](ruleStructure: RuleStructure[L], numGrammars: Int)
       queue.finish()
       val iuCount = eu.map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum / 1E9
       val ibCount = eb.map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum / 1E9
-      println("ecounts: " + iuCount + " " + ibCount)
+      println("ecounts: " + iuCount + " " + ibCount + " " + (termFinished.getProfilingCommandEnd - termFinished.getProfilingCommandStart)/1E9)
     }
 
     lastUDep
@@ -87,7 +86,6 @@ __kernel void ecount_binaries(__global rule_cell* ecounts,
   __global const int* lengthOffsets,
    const int span_length,
    __global const rule_cell* rules) {
-/*
   const int sentence = get_global_id(0);
   const int begin = get_global_id(1);
   const int gram = get_global_id(2);
@@ -102,7 +100,6 @@ __kernel void ecount_binaries(__global rule_cell* ecounts,
     __global const parse_cell* oparents = CELL(obot, begin, end);
     %s
   }
-  */
 }
 
 __kernel void ecount_unaries(
@@ -115,7 +112,6 @@ __kernel void ecount_unaries(
               __global const int* lengthOffsets,
               const int spanLength,
               __global const rule_cell* rules) {
-              /*
   const int sentence = get_global_id(0);
   const int begin = get_global_id(1);
   const int gram = get_global_id(2);
@@ -132,7 +128,6 @@ __kernel void ecount_unaries(
     __global const parse_cell* out = CELL(outside, begin, end);
     %s
   }
-  */
 }
 
 __kernel void ecount_terminals(
@@ -144,7 +139,6 @@ __kernel void ecount_terminals(
    __global const int* lengths,
    __global const int* lengthOffsets,
    const int numGrammarsToDo) {
-   /*
   const int sym = get_global_id(0)/ NUM_GRAMMARS;
   int grammar = get_global_id(0) %% NUM_GRAMMARS;
   const int sentence = get_global_id(1);
@@ -164,7 +158,6 @@ __kernel void ecount_terminals(
       grammar += (NUM_GRAMMARS / numGrammarsToDo);
     }
   }
-  */
 }
                                                       """.format(ecountBinaryRules(byParent), ecountUnaries(uByParent))
   }

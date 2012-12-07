@@ -8,7 +8,8 @@ import java.io.FileWriter
 
 
 class OutsideKernel[L](ruleStructure: RuleStructure[L], numGrammars: Int)(implicit context: CLContext) {
-  def outsidePass(outsideTop: CLBuffer[JFloat],
+  def outsidePass(numSentences: Int,
+                 outsideTop: CLBuffer[JFloat],
                  outsideBot: CLBuffer[JFloat],
                  insideTop: CLBuffer[JFloat],
                  offsets: CLBuffer[JInt],
@@ -16,24 +17,22 @@ class OutsideKernel[L](ruleStructure: RuleStructure[L], numGrammars: Int)(implic
                  maxLength: Int,
                  rules: CLBuffer[JFloat],
                  events: CLEvent*)(implicit queue: CLQueue) = {
-    println("outside...")
     val ou, ob= new ArrayBuffer[CLEvent]()
     var lastU = null:CLEvent
     binaries.setArgs(outsideTop, outsideBot, insideTop, offsets, lengths, Integer.valueOf(maxLength), rules)
     unaries.setArgs(outsideTop, outsideBot, offsets, lengths, Integer.valueOf(maxLength), rules)
-    lastU = unaries.enqueueNDRange(queue, Array(lengths.getElementCount.toInt, 1, numGrammars), Array(1, 1, numGrammars), events:_*)
+    lastU = unaries.enqueueNDRange(queue, Array(numSentences, 1, numGrammars), Array(1, 1, numGrammars), events:_*)
     ou += lastU
 
     for (len <- (maxLength - 1) to 1 by -1) {
       binaries.setArg(5, len)
-      lastU = binaries.enqueueNDRange(queue, Array(lengths.getElementCount.toInt, maxLength + 1 - len, numGrammars), Array(1, 1, numGrammars), lastU)
+      lastU = binaries.enqueueNDRange(queue, Array(numSentences, maxLength + 1 - len, numGrammars), Array(1, 1, numGrammars), lastU)
       ob += lastU
       unaries.setArg(4, len)
-      lastU = unaries.enqueueNDRange(queue, Array(lengths.getElementCount.toInt, maxLength + 1 - len, numGrammars), Array(1, 1, numGrammars), lastU)
+      lastU = unaries.enqueueNDRange(queue, Array(numSentences, maxLength + 1 - len, numGrammars), Array(1, 1, numGrammars), lastU)
       ou += lastU
     }
     if(queue.getProperties.contains(CLDevice.QueueProperties.ProfilingEnable)) {
-      println("outside finish...")
       queue.finish()
       val ouCount = ou.map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum / 1E9
       val obCount = ob.map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum / 1E9
@@ -92,16 +91,16 @@ __kernel void outside_binaries(__global parse_cell* outsides_top,
     }
     // complete looking right
     for(int completion = end+1; completion <= length; ++completion) {
-       __global const parse_cell * gparent = CELL(obot, begin, end); // scale factor of (2 ^ SCALE_FACTOR)^(length-(completion - begin))
-       __global const parse_cell * gright = CELL(inside, begin, end); // scale factor of (2 ^ SCALE_FACTOR)^((end - completion) - 1)
+       __global const parse_cell * gparent = CELL(obot, begin, completion); // scale factor of (2 ^ SCALE_FACTOR)^(length-(completion - begin))
+       __global const parse_cell * gright = CELL(inside, end, completion); // scale factor of (2 ^ SCALE_FACTOR)^((end - completion) - 1)
        // product of gparent and gright has scale (2^SCALE_FACTOR)^(length-(end-begin)-1), so need to scale by 1 to maintain invariant
        %s
     }
 
    // complete looking left
     for(int completion = 0; completion < begin; ++completion) {
-       __global const parse_cell * gparent = CELL(obot, begin, end); // scale factor of (2 ^ SCALE_FACTOR)^(length-(end-completion))
-       __global const parse_cell * gleft = CELL(inside, begin, end); // scale factor of (2 ^ SCALE_FACTOR)^((begin - completion) - 1)
+       __global const parse_cell * gparent = CELL(obot, completion, end); // scale factor of (2 ^ SCALE_FACTOR)^(length-(end-completion))
+       __global const parse_cell * gleft = CELL(inside, completion, begin); // scale factor of (2 ^ SCALE_FACTOR)^((begin - completion) - 1)
        // product of gparent and gleft has scale (2^SCALE_FACTOR)^(length-(end-begin)-1), so need to scale by 1 to maintain invariant
        %s
     }
@@ -176,7 +175,7 @@ __kernel void outside_binaries(__global parse_cell* outsides_top,
       sb += "}"
     }
 
-    sb.mkString("\n    ")
+    sb.mkString("\n      ")
   }
 
 
@@ -218,7 +217,7 @@ __kernel void outside_binaries(__global parse_cell* outsides_top,
       sb += "}"
     }
 
-    sb.mkString("\n    ")
+    sb.mkString("\n      ")
 
   }
 

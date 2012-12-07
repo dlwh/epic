@@ -5,7 +5,8 @@ import collection.mutable.ArrayBuffer
 import java.lang.{Float=>JFloat, Integer=>JInt}
 
 class MaxRecallKernel[Coarse](rules: RuleStructure[Coarse])(implicit context: CLContext) {
-  def makeBackpointers(backPointers: CLBuffer[JInt],
+  def makeBackpointers(numSentences:Int,
+                       backPointers: CLBuffer[JInt],
                        projectedTop: CLBuffer[JFloat],
                        projectedBot: CLBuffer[JFloat],
                        offsets: CLBuffer[JInt],
@@ -15,10 +16,10 @@ class MaxRecallKernel[Coarse](rules: RuleStructure[Coarse])(implicit context: CL
     max_recall.setArgs(backPointers, projectedTop, projectedBot, offsets, lengths, Integer.valueOf(1))
     val mr = new ArrayBuffer[CLEvent]()
 
-    var event = max_recall.enqueueNDRange(queue, Array(lengths.getElementCount.toInt, maxLength), events:_*)
+    var event = max_recall.enqueueNDRange(queue, Array(numSentences, maxLength), events:_*)
     for (len <- 2 to maxLength) {
       max_recall.setArg(5, len)
-      event = max_recall.enqueueNDRange(queue, Array(lengths.getElementCount.toInt, maxLength + 1 - len), event)
+      event = max_recall.enqueueNDRange(queue, Array(numSentences, maxLength + 1 - len), event)
     }
 
     event

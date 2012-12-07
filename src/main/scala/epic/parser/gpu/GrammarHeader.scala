@@ -1,7 +1,7 @@
 package epic.parser.gpu
 
 object GrammarHeader {
-  val SCALE_FACTOR = 12
+  val SCALE_FACTOR = 8
   def header[L](rules: RuleStructure[L], numGrammars: Int = 1) = {
     import rules._
     val byParent = rules.binaryRulesWithIndices.groupBy(_._1.parent).values.map(_.size).max
