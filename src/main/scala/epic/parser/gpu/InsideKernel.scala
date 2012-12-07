@@ -20,7 +20,9 @@ class InsideKernel[L](ruleStructure: RuleStructure[L], numGrammars: Int)(implici
     termBinaries.setArgs(insideBot, insideTop, posTags, offsets, lengths, lengthOffsets, Integer.valueOf(1), rules)
     unaries.setArgs(insideBot, insideTop, offsets, lengths, Integer.valueOf(1), rules)
     val iu, ib, it = new ArrayBuffer[CLEvent]()
-    var lastU = unaries.enqueueNDRange(queue, Array(lengths.getElementCount.toInt, maxLength, numGrammars), Array(1, 1, numGrammars), events:_*)
+    var lastU:CLEvent = null
+    println("enter...")
+    lastU = unaries.enqueueNDRange(queue, Array(lengths.getElementCount.toInt, maxLength, numGrammars), Array(1, 1, numGrammars), events:_*)
     iu += lastU
 
     // TODO: retrofit inside/outside binaries and unaries to look at posTagsPointer....
@@ -40,7 +42,9 @@ class InsideKernel[L](ruleStructure: RuleStructure[L], numGrammars: Int)(implici
     }
 
     if(queue.getProperties.contains(CLDevice.QueueProperties.ProfilingEnable)) {
+      println("inside finish...")
       queue.finish()
+      println("post finish...")
       val iuCount = iu.map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum / 1E9
       val ibCount = ib.map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum / 1E9
       val itCount = it.map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum / 1E9
@@ -186,7 +190,7 @@ __kernel void inside_unaries(__global const parse_cell * inside_bots,
         if(lastLeft != -1)
           sb += "}"
         sb += "currentLeftScore = left->syms[%d][gram];" format l
-        sb += "if(currentLeftScore != 0.0) {"
+        sb += "if(currentLeftScore != 0.0f) {"
         lastLeft = l
       }
       sb += """out[%d] = mad(rules->binaries[%d][gram], currentLeftScore * right[%d], out[%d]);""".format(r.parent, index, r.right, r.parent)
@@ -207,7 +211,7 @@ __kernel void inside_unaries(__global const parse_cell * inside_bots,
         if(lastLeft != -1)
           sb += "}"
         sb += "currentLeftScore = leftTerm->syms[%d][gram];" format l
-        sb += "if(currentLeftScore != 0.0) {"
+        sb += "if(currentLeftScore != 0.0f) {"
         lastLeft = l
       }
       sb += """out[%d] = mad(rules->binaries[%d][gram], currentLeftScore * right->syms[%d][gram], out[%d]);""".format(r.parent, index, r.right, r.parent)
@@ -220,7 +224,7 @@ __kernel void inside_unaries(__global const parse_cell * inside_bots,
         if(lastLeft != -1)
           sb += "  }"
         sb += "  currentLeftScore = leftTerm->syms[%d][gram];" format l
-        sb += "  if(currentLeftScore != 0.0) {"
+        sb += "  if(currentLeftScore != 0.0f) {"
         lastLeft = l
       }
       sb += """  out[%d] = mad(rules->binaries[%d][gram], currentLeftScore * rightTerm->syms[%d][gram], out[%d]);""".format(r.parent, index, r.right, r.parent)
@@ -233,7 +237,7 @@ __kernel void inside_unaries(__global const parse_cell * inside_bots,
         if(lastRight != -1)
           sb += "}"
         sb += "currentRightScore = rightTerm->syms[%d][gram];" format right
-        sb += "if(currentRightScore != 0.0) {"
+        sb += "if(currentRightScore != 0.0f) {"
         lastRight = right
       }
       sb += """out[%d] = mad(rules->binaries[%d][gram], currentRightScore * left->syms[%d][gram], out[%d]);""".format(r.parent, index, l, p)
@@ -246,7 +250,8 @@ __kernel void inside_unaries(__global const parse_cell * inside_bots,
     val p = context.createProgram(text)
     p.setFastRelaxedMath()
     p.setUnsafeMathOptimizations()
-//    p.build()
+    p.addBuildOption("-Werror")
+    p.build()
     p
   }
 }

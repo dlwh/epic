@@ -21,8 +21,6 @@ case class RuleStructure[L](grammar: BaseGrammar[L]) {
     (0 until labelIndex.size).filterNot(onLHS).toSet - grammar.rootIndex
   }
 
-  println(terminalSymbols.map(labelIndex.get _))
-
   val (ntRules, leftTermRules, rightTermRules, bothTermRules) = {
     val ntRules, leftTermRules, rightTermRules, bothTermRules = ArrayBuffer[(BinaryRule[Int], Int)]()
     for(r <- binaryRulesWithIndices) {

@@ -89,8 +89,8 @@ class GrammarKernel[C, L, W](coarseGrammar: BaseGrammar[C],
   private val ruleVector = Pointer.allocateFloats(totalRules)
   private val decodeDev = context.createIntBuffer(Usage.InputOutput, maxCells * 4) // top, bot, split, score
 
-  private val posTagsDev = context.createFloatBuffer(Usage.InputOutput, maxTotalLength * cellSize)
-  private val posTagsPtr = posTagsDev.allocateCompatibleMemory(context.getDevices()(0))
+  private val posTagsDev = context.createFloatBuffer(Usage.Input, maxTotalLength * cellSize)
+  private val posTagsPtr = Pointer.allocateFloats(maxTotalLength * cellSize)
 
   private val rulesDev = context.createFloatBuffer(Usage.Input, totalRules)
   ruleScores = _ruleScores
@@ -213,12 +213,16 @@ class GrammarKernel[C, L, W](coarseGrammar: BaseGrammar[C],
     val zt = memZero.zeroMemory(projTopDev)
     val zb = memZero.zeroMemory(projBotDev)
 
+    println("project");
+    /*
     lastEvent = projection.projectCells(projTopDev, projBotDev,
       insideTopDev, insideBotDev,
       outsideTopDev, outsideBotDev,
       offDev, lenDev, lengths.max, lastEvent, zt, zb)
+      */
 
-    lastEvent = memZero.zeroMemory(decodeDev, lastEvent)
+    println("last");
+    lastEvent = memZero.zeroMemory(decodeDev.asCLFloatBuffer(), lastEvent)
     lastEvent = decoder.makeBackpointers(decodeDev,
       projTopDev, projBotDev,
       offDev, lenDev, lengths.max, lastEvent)
@@ -272,16 +276,13 @@ class GrammarKernel[C, L, W](coarseGrammar: BaseGrammar[C],
     val wterm = memZero.zeroMemory(termECountsDev)
     var lastEvent = insideOutside(batch)
 //    var lastEvent = wOB
+    println("quueue.finish!")
     queue.finish()
-
-
-    offLengthsPtr.setInts(lengthTotals)
-    val copyOffLengths = offLengthsDev.write(queue, offLengthsPtr, false)
 
     lastEvent = ecounts.expectedCounts(ecountsDev, termECountsDev,
       insideBotDev, insideTopDev,
       outsideBotDev, outsideTopDev,
-      offDev, lenDev, offLengthsDev, lengths.max, rulesDev, lastEvent, wOB, copyOffLengths, wterm)
+      offDev, lenDev, offLengthsDev, lengths.max, rulesDev, lastEvent, wOB, wterm)
 
 //                  println("sum..." + ecountsDev.read(queue).getFloats.sum)
     val termVector = Pointer.allocateFloats(totalLength * cellSize)
@@ -357,23 +358,23 @@ class GrammarKernel[C, L, W](coarseGrammar: BaseGrammar[C],
   private def insideOutside(batch: Batch) = synchronized {
     import batch._
     val maxLength = lengths.max
-    posTagsPtr.setFloats(batch.posTags)
+//    posTagsPtr.setFloats(batch.posTags)
     offPtr.setInts(offsets)
     lenPtr.setInts(lengths)
 
+    var wIT, wOB, wOT, wL, wO, wIB, wPos, copyOffLengths  = null:CLEvent
 //    println(posTags.slice(batch.lengthTotals(1) * nsyms, batch.totalLength * nsyms).mkString(", "))
-
-    val wPos = posTagsDev.write(queue, 0, batch.posTags.length, posTagsPtr, false)
-    val wIB = memZero.zeroMemory(insideBotDev)
-    val wIT = memZero.zeroMemory(insideTopDev)
-    val wOT = memZero.zeroMemory(outsideTopDev)
-    val wOB = memZero.zeroMemory(outsideBotDev)
-    val wO = offDev.write(queue, 0, lengths.length, offPtr, false)
-    val wL = lenDev.write(queue, 0, lengths.length, lenPtr, false)
+//    wPos = posTagsDev.write(queue, 0, posTags.length, posTagsPtr, false)
+//    wIB = memZero.zeroMemory(insideBotDev)
+//    wIT = memZero.zeroMemory(insideTopDev)
+//    wOT = memZero.zeroMemory(outsideTopDev)
+//    wOB = memZero.zeroMemory(outsideBotDev)
+    wO = offDev.write(queue, 0, lengths.length, offPtr, false)
+    wL = lenDev.write(queue, 0, lengths.length, lenPtr, false)
     offLengthsPtr.setInts(lengthTotals)
-    val copyOffLengths = offLengthsDev.write(queue, offLengthsPtr, false)
+    copyOffLengths = offLengthsDev.write(queue, offLengthsPtr, false)
 
-    copyTags.setArgs(posTagsDev, insideBotDev, offDev, lenDev, offLengthsDev, Integer.valueOf(1))
+//    copyTags.setArgs(posTagsDev, insideBotDev, offDev, lenDev, offLengthsDev, Integer.valueOf(1))
     val maxDim1Size = queue.getDevice.getMaxWorkItemSizes()(0)
     if(maxDim1Size < nsyms * numGrammars) {
       copyTags.setArg(5, numGrammars / 8 + 1)
@@ -383,16 +384,18 @@ class GrammarKernel[C, L, W](coarseGrammar: BaseGrammar[C],
     } else {
       numGrammars
     }
-    val initCharts = copyTags.enqueueNDRange(queue,  Array(nsyms * gramMultiplier, lengths.length, maxLength), Array(nsyms * gramMultiplier, 1, 1), wPos, wIB, wL, copyOffLengths)
+    val initCharts = wPos//copyTags.enqueueNDRange(queue,  Array(nsyms * gramMultiplier, lengths.length, maxLength), Array(nsyms * gramMultiplier, 1, 1), wPos, wIB, wL, copyOffLengths)
+    queue.finish()
+
 
     var lastU = inside.insidePass(insideBotDev, insideTopDev, posTagsDev, offDev, lenDev, maxLength, offLengthsDev, rulesDev, initCharts, wIT)
     lastU = outside.outsidePass(outsideTopDev, outsideBotDev, insideTopDev, offDev, lenDev, maxLength, rulesDev, lastU, wOB, wOT)
 
-
+    println("last finish?!?")
     queue.finish()
 
 
-    val writeCounts = IndexedSeq(wIT, wOT, wIB, wOB, wO, wL, initCharts).map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum / 1E9
+    val writeCounts = IndexedSeq(wIT, wOT, wIB, wOB, wO, wL, initCharts).filter(_ ne null).map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum / 1E9
 
     println(writeCounts)
     lastU
@@ -413,7 +416,7 @@ class GrammarKernel[C, L, W](coarseGrammar: BaseGrammar[C],
     def topInsideScore(begin: Int, end: Int, grammar: Int, label: Int) =  {
       val score = inTop(index(begin, end, grammar, label))
 //      java.lang.Math.scalb(score, -10 * ((end-begin)-1))
-      math.log(score) - 10 * ((end-begin)-1) * math.log(2)
+      math.log(score) - GrammarHeader.SCALE_FACTOR * ((end-begin)-1) * math.log(2)
     }
 
 
@@ -421,13 +424,13 @@ class GrammarKernel[C, L, W](coarseGrammar: BaseGrammar[C],
       val score = inBot(index(begin, end, grammar, label))
 //      java.lang.Math.scalb(score, -10 * ((end-begin)-1))
 //      math.log(score)
-      math.log(score) - 10 * ((end-begin)-1) * math.log(2)
+      math.log(score) - GrammarHeader.SCALE_FACTOR * ((end-begin)-1) * math.log(2)
     }
 
     def topOutsideScore(begin: Int, end: Int, grammar: Int, label: Int) =  {
       val score = outTop(index(begin, end, grammar, label))
 //      java.lang.Math.scalb(score, -10 * ((end-begin)-1))
-      math.log(score) - 10 * (length-(end-begin)) * math.log(2)
+      math.log(score) - GrammarHeader.SCALE_FACTOR * (length-(end-begin)) * math.log(2)
     }
 
 
@@ -435,7 +438,7 @@ class GrammarKernel[C, L, W](coarseGrammar: BaseGrammar[C],
       val score = outBot(index(begin, end, grammar, label))
 //      java.lang.Math.scalb(score, -10 * ((end-begin)-1))
 //      math.log(score)
-      math.log(score) - 10 * (length-(end-begin)) * math.log(2)
+      math.log(score) - GrammarHeader.SCALE_FACTOR * (length-(end-begin)) * math.log(2)
     }
 
     @inline
@@ -495,6 +498,12 @@ object GrammarKernel {
     val kern = fromSimpleGrammar(grammar, params.trainer.useGPU, numGrammars)
     println("Parsing...")
     val train = transformed.slice(0,numToParse)
+    println("ecounts...")
+    val time2 = System.currentTimeMillis()
+    val counts = kern.expectedRuleCounts(train.map(_.words.toIndexedSeq))
+    val time3 = System.currentTimeMillis()
+    println(counts._1.sum)
+    println(counts._2.map(_.map(_.sum).sum).sum)
     val timeIn = System.currentTimeMillis()
     val trees = kern.parse(train.map(_.words.toIndexedSeq))
 //    for( (guess, inst) <- trees zip train) {
@@ -503,12 +512,7 @@ object GrammarKernel {
 //      println(inst.tree.render(inst.words, false))
 //    }
     println("Done: " + (System.currentTimeMillis() - timeIn))
-    println("ecounts...")
-    val time2 = System.currentTimeMillis()
-    val counts = kern.expectedRuleCounts(train.map(_.words.toIndexedSeq))
-    val time3 = System.currentTimeMillis()
-    println(counts._1.sum)
-    println(counts._2.map(_.map(_.sum).sum).sum)
+
 //    println(Encoder.fromIndex(grammar.refinedGrammar.index).decode(counts))
     println("Done ecounts: " + (time3 - time2))
     val timeX = System.currentTimeMillis()
