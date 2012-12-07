@@ -60,7 +60,7 @@ trait Treebank[L] { outer =>
   /**
    * Read the trees from a section
    */
-  def treesFromSection(sec: String): Iterator[(Tree[L],Seq[String])]
+  def treesFromSection(sec: String): Iterator[(Tree[L],IndexedSeq[String])]
 
   def treesFromSections(secs: Seq[String]) = {
     for(sec <- secs.iterator; tree <- treesFromSection(sec))

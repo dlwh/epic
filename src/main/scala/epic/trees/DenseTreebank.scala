@@ -88,7 +88,7 @@ object DenseTreebank {
       val dev = Portion("dev",devSections)
       val train = Portion("train",trainSections)
 
-      def treesFromSection(sec: String): Iterator[(Tree[String],Seq[String])] = {
+      override def treesFromSection(sec: String): Iterator[(Tree[String],IndexedSeq[String])] = {
         val iterator = {
           val section = zipFile.getEntry("sections/"+sec)
           val sectionIn = zipFile.getInputStream(section)

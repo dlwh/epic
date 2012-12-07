@@ -19,13 +19,14 @@ import breeze.util.{Index, Encoder}
 import collection.{immutable, mutable}
 import java.nio.{FloatBuffer, ByteBuffer}
 import projections.{GrammarRefinements, ProjectionIndexer}
+import models.FeaturizedLexicon
 
 class GrammarKernel[C, L, W](coarseGrammar: BaseGrammar[C],
                              projections: GrammarRefinements[C, L],
                              grammar: BaseGrammar[L],
                              lexicon: Lexicon[L, W],
                              private var _ruleScores: Array[RuleScores],
-                             tagScores: Array[(IndexedSeq[W], Int, Int)=>Double],
+                             var tagScorers: Array[(IndexedSeq[W],Int,Int)=>Double],
                              maxSentences: Int = 1000)(implicit val context: CLContext) {
   def ruleScores = _ruleScores
 
@@ -74,6 +75,7 @@ class GrammarKernel[C, L, W](coarseGrammar: BaseGrammar[C],
   private val memZero = new ZeroMemoryKernel
   private val projection = new ProjectionKernel(structure, projections.labels,  numGrammars)
   private val decoder = new MaxRecallKernel(new RuleStructure(coarseGrammar))
+  private val partitionGetter = new PartitionCalculatorKernel(structure)
 
   private val insideTopDev, insideBotDev = context.createFloatBuffer(Usage.InputOutput, maxCells * cellSize)
   private val outsideTopDev, outsideBotDev = context.createFloatBuffer(Usage.InputOutput, maxCells * cellSize)
@@ -115,7 +117,7 @@ class GrammarKernel[C, L, W](coarseGrammar: BaseGrammar[C],
 
   def parse(sentences: IndexedSeq[IndexedSeq[W]]):IndexedSeq[BinarizedTree[C]] = synchronized {
     {for {
-      partition <- getPartitions(sentences).iterator
+      partition <- getBatches(sentences).iterator
       batch = layoutIntoMemory(partition)
     _ = getMarginals(batch)
       t <- doParse(batch)
@@ -124,22 +126,25 @@ class GrammarKernel[C, L, W](coarseGrammar: BaseGrammar[C],
     }}.toIndexedSeq
   }
 
-  def expectedRuleCounts(sentences: IndexedSeq[IndexedSeq[W]]): (DenseVector[Double], Array[Array[Counter[W, Double]]]) = synchronized {
+  case class ExpectedCounts(rules: DenseVector[Double], wordCounts: ArrayBuffer[IndexedSeq[DenseVector[Double]]], var partition: Double) {
+    def +=(o: ExpectedCounts):this.type = {
+      rules += o.rules
+      wordCounts ++= o.wordCounts
+      partition += o.partition
+      this
+    }
+  }
+
+  def expectedRuleCounts(sentences: IndexedSeq[IndexedSeq[W]]): ExpectedCounts = synchronized {
     queue.finish()
     val allCounts = for {
-      partition <- getPartitions(sentences).iterator
+      partition <- getBatches(sentences).iterator
     } yield {
       val batch = layoutIntoMemory(partition)
-      val (counts: Array[Float], wordCounts: Array[Array[Counter[W, Double]]]) = doExpectedCounts(batch)
-      val r = new DenseVector[Double](counts.map(_.toDouble))
-      r -> wordCounts
+      doExpectedCounts(batch)
     }
 
-    def sumCounts(words: Array[Array[Counter[W, Double]]], words2: Array[Array[Counter[W, Double]]]) {
-      for( (a,b) <- words zip words2; (a2,b2) <- a zip b) a2 += b2
-    }
-
-    allCounts.reduceOption{ (c1, c2) => c1._1 += c2._1; sumCounts(c1._2, c2._2); c1}.getOrElse(DenseVector.zeros[Double](totalRules) -> Array.fill(numGrammars, nsyms)(Counter[W, Double]()))
+    allCounts.reduceOption{ _ += _ }.getOrElse(ExpectedCounts(DenseVector.zeros(structure.numRules), ArrayBuffer.empty, 0.0))
   }
 
   case class Batch(lengths: Array[Int],
@@ -177,7 +182,7 @@ class GrammarKernel[C, L, W](coarseGrammar: BaseGrammar[C],
           aa <- lexicon.tagsForWord(s(pos));
           a = grammar.labelIndex(aa)) {
         for(g <- 0 until numGrammars)
-          posTags(((partialLengths(i) + pos) * nsyms +  a)*numGrammars + g) = math.exp(tagScores(g)(s, pos, a)).toFloat
+          posTags(((partialLengths(i) + pos) * nsyms +  a)*numGrammars + g) = math.exp(tagScorers(g)(s, pos, a)).toFloat
       }
 
 
@@ -188,7 +193,7 @@ class GrammarKernel[C, L, W](coarseGrammar: BaseGrammar[C],
     Batch(lengths.toArray, offsets.toArray, partialLengths, totalLength, sentences, posTags)
   }
 
-  private def getPartitions(sentences: IndexedSeq[IndexedSeq[W]]): IndexedSeq[IndexedSeq[IndexedSeq[W]]] = {
+  private def getBatches(sentences: IndexedSeq[IndexedSeq[W]]): IndexedSeq[IndexedSeq[IndexedSeq[W]]] = {
     val result = ArrayBuffer[IndexedSeq[IndexedSeq[W]]]()
     var current = ArrayBuffer[IndexedSeq[W]]()
     var currentCellTotal = 0
@@ -264,7 +269,7 @@ class GrammarKernel[C, L, W](coarseGrammar: BaseGrammar[C],
     trees
   }
 
-  private def doExpectedCounts(batch: Batch) = synchronized {
+  private def doExpectedCounts(batch: Batch):ExpectedCounts = synchronized {
     import batch._
     val wOB = memZero.zeroMemory(ecountsDev)
     val wterm = memZero.zeroMemory(termECountsDev)
@@ -282,28 +287,30 @@ class GrammarKernel[C, L, W](coarseGrammar: BaseGrammar[C],
     val termOut = termECountsDev.read(queue, termVector, true, lastEvent)
     val floats = termVector.getFloats
     termVector.release()
-    val wordEcounts = tallyTermExpectedCounts(floats, sentences, lengthTotals)
 
     lastEvent = collapseArray(ecountsDev, totalLength, totalRules, lastEvent)
 
     queue.finish()
 
     ecountsDev.read(queue, 0, totalRules, ruleVector, true,  lastEvent)
-    val arr = ruleVector.getFloats
-    arr -> wordEcounts
+    val arr = DenseVector(ruleVector.getFloats.map(_.toDouble))
+    ExpectedCounts(arr, splitUpTerms(batch, floats), computePartitions(batch).sum)
   }
 
-  private def tallyTermExpectedCounts(counts: Array[Float], words: IndexedSeq[IndexedSeq[W]], offsets: Array[Int]) = {
-    val r = Array.fill(numGrammars, nsyms)(Counter[W, Double]())
-    for(s <- 0 until words.length; g <- 0 until numGrammars; i <- 0 until words(s).length; sym <- 0 until nsyms) {
-      val count = counts( ((offsets(s) + i) * nsyms + sym)*numGrammars + g)
-      if(count != 0) {
-        r(g)(sym)(words(s)(i)) += count.toDouble
+
+  private def splitUpTerms(batch: Batch, terms: Array[Float]):ArrayBuffer[IndexedSeq[DenseVector[Double]]] = ArrayBuffer.empty ++= {
+    var floatPos = 0
+    for (s <- batch.sentences) yield {
+      for(i <- 0 until s.length) yield {
+        DenseVector.tabulate(grammar.labelIndex.size){i => val f = terms(floatPos).toDouble; floatPos += 1; f}
       }
     }
-
-    r
   }
+
+  private def computePartitions(batch: Batch, events: CLEvent*):Array[Double] = {
+    partitionGetter.partitions(insideTopDev, offDev, lenDev, batch.numSentences, events: _*).map(_.toDouble)
+  }
+
 
   private def collapseArray(v: CLBuffer[lang.Float], len: Int, width: Int, toAwait: CLEvent) = {
     var lastEvent = toAwait
@@ -343,7 +350,7 @@ class GrammarKernel[C, L, W](coarseGrammar: BaseGrammar[C],
     val marginals = for (i <- 0 until lengths.length) yield {
       val off = offsets(i)
       val len = lengths(i)
-      Marginal(inTop, inBot, outTop, inBot, off, len)
+      Marginal(inTop, inBot, outTop, outBot, off, len)
     }
 
     for(m <- marginals) {
@@ -504,8 +511,8 @@ object GrammarKernel {
     val time2 = System.currentTimeMillis()
     val counts = kern.expectedRuleCounts(train.map(_.words.toIndexedSeq))
     val time3 = System.currentTimeMillis()
-    println(counts._1.sum)
-    println(counts._2.map(_.map(_.sum).sum).sum)
+    println(counts.rules.sum)
+    println(counts.wordCounts.map(_.map(_.sum).sum).sum)
     //    println(Encoder.fromIndex(grammar.refinedGrammar.index).decode(counts))
     println("Done ecounts: " + (time3 - time2))
 

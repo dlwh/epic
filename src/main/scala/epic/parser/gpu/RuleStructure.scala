@@ -4,8 +4,11 @@ import epic.trees._
 import epic.parser.BaseGrammar
 import collection.mutable.ArrayBuffer
 import collection.immutable.BitSet
+import breeze.linalg.DenseVector
 
 case class RuleStructure[L](grammar: BaseGrammar[L]) {
+
+
   import grammar._
   def numSyms = grammar.labelIndex.size
   def root = grammar.rootIndex
@@ -13,6 +16,7 @@ case class RuleStructure[L](grammar: BaseGrammar[L]) {
 
   def numBinaries = binaryRules.length
   def numUnaries = unaryRules.length
+  def numRules: Int = numBinaries + numUnaries
 
   val unaryRulesWithIndices = unaryRules.map { r => indexedRule(r).asInstanceOf[UnaryRule[Int]] -> (r-binaryRules.length)}
   val binaryRulesWithIndices = binaryRules.map { r => indexedRule(r).asInstanceOf[BinaryRule[Int]] -> r }
@@ -59,6 +63,18 @@ case class RuleStructure[L](grammar: BaseGrammar[L]) {
 
 
     (termUnaries: IndexedSeq[(UnaryRule[Int], Int)], ntermUnaries: IndexedSeq[(UnaryRule[Int], Int)], termIdentUnaries.toIndexedSeq)
+  }
+
+
+  /**
+   * 1 if the corresponding unary rule is not a terminal->terminal unary rule.
+   */
+  val nonIdentityMask = {
+    val arr = Array.fill(numUnaries)(1.0)
+    for(t <- termIdentUnaries) {
+      arr(t._2) = 0.0
+    }
+    arr
   }
 }
 

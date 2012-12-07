@@ -28,7 +28,7 @@ import epic.trees.{TreeInstance, BinarizedTree}
 class EPParser[L, W](grammar: BaseGrammar[L],
                      lexicon: Lexicon[L, W],
                      inference: EPInference[TreeInstance[L, W], CoreAnchoring[L, W]]) extends Parser[L, W] with Serializable {
-  def bestParse(s: Seq[W]) = {
+  def bestParse(s: IndexedSeq[W]) = {
     val inst = new TreeInstance[L, W]("", null, s)
     val augment = inference.getMarginals(inst, inference.baseAugment(inst))._2
     val marg = augment.marginal

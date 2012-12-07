@@ -28,7 +28,7 @@ class ProductParser[L, W](grammar: BaseGrammar[L],
                           factories: RefinedGrammar[L, W]*) extends Parser[L, W] with Serializable {
   val proj = new AnchoredRuleMarginalProjector[L, W]
 
-  def bestParse(s: Seq[W]) = {
+  override def bestParse(s: IndexedSeq[W]) = {
     val augments = factories.map(_.anchor(s).marginal).map(proj.project(_))
     val marg = augments.reduceLeft[CoreAnchoring[L, W]](_ * _).marginal
     ChartDecoder(grammar, lexicon).extractBestParse(marg)

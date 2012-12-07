@@ -25,13 +25,13 @@ import epic.trees._
  *
  * @author dlwh
  */
-trait Parser[L,W] extends (Seq[W]=>Tree[L]) {
+trait Parser[L,W] extends (IndexedSeq[W]=>Tree[L]) {
   /**
    * Returns the best parse (calls bestParse) for the sentence
    *
    * @param s the sentence
    */
-  def apply(s: Seq[W]) = bestParse(s)
+  def apply(s: IndexedSeq[W]) = bestParse(s)
 
   /**
    * Returns the best parse for the sentence. Optionally takes a [[epic.parser.CoreAnchoring]], which
@@ -40,5 +40,5 @@ trait Parser[L,W] extends (Seq[W]=>Tree[L]) {
    *
    * @param s sentence
    */
-  def bestParse(s: Seq[W]):Tree[L]
+  def bestParse(s: IndexedSeq[W]):Tree[L]
 }

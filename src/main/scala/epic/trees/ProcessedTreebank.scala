@@ -56,7 +56,7 @@ case class ProcessedTreebank(@Help(text="Location of the treebank directory")
   }
 
 
-  def makeTreeInstance(name: String, tree: Tree[String], words: Seq[String], removeUnaries: Boolean): TreeInstance[AnnotatedLabel, String] = {
+  def makeTreeInstance(name: String, tree: Tree[String], words: IndexedSeq[String], removeUnaries: Boolean): TreeInstance[AnnotatedLabel, String] = {
     var transformed = process(tree)
     if (removeUnaries)
       transformed = UnaryChainRemover.removeUnaryChains(transformed)

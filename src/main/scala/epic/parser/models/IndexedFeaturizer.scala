@@ -38,11 +38,11 @@ trait IndexedFeaturizer[L, L2, W] extends RefinedFeaturizer[L, W, Feature] with 
   val featurizer: Featurizer[L2, W]
   val grammar: BaseGrammar[L]
   val lexicon: Lexicon[L, W]
-  val proj: GrammarRefinements[L, L2]
+  val projections: GrammarRefinements[L, L2]
 
-  def labelIndex = proj.labels.fineIndex
+  def labelIndex = projections.labels.fineIndex
 
-  def ruleIndex = proj.rules.fineIndex
+  def ruleIndex = projections.rules.fineIndex
 
   // r -> SparseVector[Double] of feature weights
   val ruleCache: Array[Array[Int]]
@@ -90,18 +90,18 @@ trait IndexedFeaturizer[L, L2, W] extends RefinedFeaturizer[L, W, Feature] with 
 
   case class Spec private[IndexedFeaturizer](words: Seq[W]) extends super.Anchoring {
     def featuresForBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int) = {
-      val globalRule = proj.rules.globalize(rule, ref)
+      val globalRule = projections.rules.globalize(rule, ref)
       featuresFor(globalRule)
     }
 
     def featuresForUnaryRule(begin: Int, end: Int, rule: Int, ref: Int) = {
-      val globalRule = proj.rules.globalize(rule, ref)
+      val globalRule = projections.rules.globalize(rule, ref)
       featuresFor(globalRule)
     }
 
     def featuresForSpan(begin: Int, end: Int, tag: Int, ref: Int) = {
       if (begin + 1 == end) {
-        val globalTag = proj.labels.globalize(tag, ref)
+        val globalTag = projections.labels.globalize(tag, ref)
         featuresFor(globalTag, words, begin)
       } else Array.empty[Int]
     }
@@ -165,7 +165,7 @@ object IndexedFeaturizer {
 
       val grammar = g
       val lexicon = l
-      val proj = refinements
+      val projections = refinements
       val ruleCache = brc
     }
   }

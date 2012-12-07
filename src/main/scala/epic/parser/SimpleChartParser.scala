@@ -18,11 +18,11 @@ import epic.trees.BinarizedTree
 
 @SerialVersionUID(1)
 trait ChartParser[L, W] extends Parser[L, W] with Serializable {
-  def charts(w: Seq[W]):ChartMarginal[ParseChart, L, W]
+  def charts(w: IndexedSeq[W]):ChartMarginal[ParseChart, L, W]
 
   def decoder: ChartDecoder[L, W]
 
-  override def bestParse(w: Seq[W]):BinarizedTree[L] = try {
+  override def bestParse(w: IndexedSeq[W]):BinarizedTree[L] = try {
     val chart = charts(w)
     decoder.extractBestParse(chart)
   } catch {
@@ -40,7 +40,7 @@ class SimpleChartParser[L, W](val augmentedGrammar: AugmentedGrammar[L, W],
                               val decoder: ChartDecoder[L, W],
                               val maxMarginals: Boolean = false) extends ChartParser[L, W] with Serializable {
 
-  def charts(w: Seq[W]) = try {
+  def charts(w: IndexedSeq[W]) = try {
     ChartMarginal(augmentedGrammar, w, if(maxMarginals) ParseChart.viterbi else ParseChart.logProb)
   } catch {
     case e =>
