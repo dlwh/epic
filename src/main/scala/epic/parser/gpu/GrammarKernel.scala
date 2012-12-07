@@ -117,7 +117,7 @@ class GrammarKernel[C, L, W](coarseGrammar: BaseGrammar[C],
     {for {
       partition <- getPartitions(sentences).iterator
       batch = layoutIntoMemory(partition)
-//    _ = getMarginals(batch)
+    _ = getMarginals(batch)
       t <- doParse(batch)
     } yield {
       t
@@ -348,6 +348,7 @@ class GrammarKernel[C, L, W](coarseGrammar: BaseGrammar[C],
 
     for(m <- marginals) {
       println(m.rootScore(0))
+      println(breeze.numerics.logSum({for(i <- 0 until grammar.labelIndex.size) yield m.botOutsideScore(0, 1, 0, i) + m.botOutsideScore(0, 1, 0, i)}))
 
     }
     marginals
@@ -388,7 +389,7 @@ class GrammarKernel[C, L, W](coarseGrammar: BaseGrammar[C],
 
 
     var lastU = inside.insidePass(numSentences, insideBotDev, insideTopDev, posTagsDev, offDev, lenDev, maxLength, offLengthsDev, rulesDev, initCharts, wIT, wO)
-    lastU = outside.outsidePass(numSentences, outsideTopDev, outsideBotDev, insideTopDev, offDev, lenDev, maxLength, rulesDev, lastU, wOB, wOT)
+    lastU = outside.outsidePass(numSentences, outsideTopDev, outsideBotDev, insideTopDev, posTagsDev, offDev, lenDev, offLengthsDev, maxLength, rulesDev, lastU, wOB, wOT)
 
     queue.finish()
 
@@ -523,7 +524,7 @@ object GrammarKernel {
     val marg = train.map(_.words).foldLeft(DenseVector.zeros[Double](feat.index.size)){ (acc, s) =>
       val m = ChartMarginal(AugmentedGrammar.fromRefined(grammar), s, ParseChart.logProb)
       val counts = m.expectedCounts(feat).counts
-//      println(m.partition)
+      println(m.partition)
       acc += counts
       acc
     }

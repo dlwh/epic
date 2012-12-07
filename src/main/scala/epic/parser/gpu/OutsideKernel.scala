@@ -12,15 +12,19 @@ class OutsideKernel[L](ruleStructure: RuleStructure[L], numGrammars: Int)(implic
                  outsideTop: CLBuffer[JFloat],
                  outsideBot: CLBuffer[JFloat],
                  insideTop: CLBuffer[JFloat],
+                 posTags: CLBuffer[JFloat],
                  offsets: CLBuffer[JInt],
                  lengths: CLBuffer[JInt],
+                 lengthOffsets: CLBuffer[JInt],
                  maxLength: Int,
                  rules: CLBuffer[JFloat],
                  events: CLEvent*)(implicit queue: CLQueue) = {
-    val ou, ob= new ArrayBuffer[CLEvent]()
+    val ou, ob, ot= new ArrayBuffer[CLEvent]()
     var lastU = null:CLEvent
     binaries.setArgs(outsideTop, outsideBot, insideTop, offsets, lengths, Integer.valueOf(maxLength), rules)
     unaries.setArgs(outsideTop, outsideBot, offsets, lengths, Integer.valueOf(maxLength), rules)
+    termbs.setArgs(outsideTop, outsideBot, insideTop, posTags, offsets, lengths, lengthOffsets, Integer.valueOf(maxLength), rules)
+    bterms.setArgs(outsideTop, outsideBot, insideTop, offsets, lengths, rules)
     lastU = unaries.enqueueNDRange(queue, Array(numSentences, 1, numGrammars), Array(1, 1, numGrammars), events:_*)
     ou += lastU
 
@@ -28,21 +32,29 @@ class OutsideKernel[L](ruleStructure: RuleStructure[L], numGrammars: Int)(implic
       binaries.setArg(5, len)
       lastU = binaries.enqueueNDRange(queue, Array(numSentences, maxLength + 1 - len, numGrammars), Array(1, 1, numGrammars), lastU)
       ob += lastU
+//      lastU = termbs.enqueueNDRange(queue, Array(numSentences, maxLength + 1 - len, numGrammars), Array(1, 1, numGrammars), lastU)
+//      ot += lastU
       unaries.setArg(4, len)
       lastU = unaries.enqueueNDRange(queue, Array(numSentences, maxLength + 1 - len, numGrammars), Array(1, 1, numGrammars), lastU)
       ou += lastU
     }
+//    lastU = bterms.enqueueNDRange(queue, Array(numSentences, maxLength, numGrammars), Array(1, 1, numGrammars), lastU)
+
+    ot += lastU
     if(queue.getProperties.contains(CLDevice.QueueProperties.ProfilingEnable)) {
       queue.finish()
       val ouCount = ou.map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum / 1E9
       val obCount = ob.map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum / 1E9
-      println("outside: " + ouCount + " " + obCount)
+      val otCount = ot.map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum / 1E9
+      println("outside: " + ouCount + " " + obCount + " " + otCount)
     }
 
     lastU
   }
 
   private lazy val binaries = program.createKernel("outside_binaries")
+  private lazy val termbs = program.createKernel("outside_term_binaries")
+  private lazy val bterms = program.createKernel("outside_binary_terms")
   private lazy val unaries = program.createKernel("outside_unaries")
 
   lazy val text = GrammarHeader.header(ruleStructure, numGrammars) +
@@ -108,12 +120,104 @@ __kernel void outside_binaries(__global parse_cell* outsides_top,
     // multiply in a 2^SCALE_FACTOR to re-achieve balance.
     __global parse_cell* gout = CELL(outsides_top + offsets[sentence], begin, end);
     for(int i = 0; i < NUM_SYMS; ++i) {
-      gout->syms[i][gram] = ldexp(otarget[i], SCALE_FACTOR);
+      gout->syms[i][gram] += ldexp(otarget[i], SCALE_FACTOR);
     }
   }
-}""".format(outsideUnaryUpdates(ruleStructure.unaryRulesWithIndices),
-  outsideRightCompletionUpdates(ruleStructure.binaryRulesWithIndices),
-  outsideLeftCompletionUpdates(ruleStructure.binaryRulesWithIndices))
+}
+
+__kernel void outside_term_binaries(__global parse_cell* outsides_top,
+              __global const parse_cell* outsides_bot,
+              __global const parse_cell * insides_top,
+              __global const parse_cell * inside_tags,
+              __global const int* offsets,
+              __global const int* lengths,
+              __global const int* lengthOffsets,
+              const int spanLength,
+            __global const rule_cell* rules) {
+
+  const int sentence = get_global_id(0);
+  const int begin = get_global_id(1);
+  const int gram = get_global_id(2);
+  const int end = begin + spanLength;
+  const int length = lengths[sentence];
+  float otarget[NUM_SYMS];
+  if (end <= length) {
+    __global const parse_cell* inside = insides_top + offsets[sentence];
+    __global const parse_cell* obot = outsides_bot + offsets[sentence];
+    for(int i = 0; i < NUM_SYMS; ++i) {
+      otarget[i] = 0.0f;
+    }
+
+
+    if (begin > 0) { // look left
+      __global const parse_cell * gparent =  CELL(obot, begin-1, end);
+      __global const parse_cell * gleft = inside_tags + lengthOffsets[sentence] + (begin - 1);
+      %s
+    }
+
+    if (end < length) { // look right
+      __global const parse_cell * gparent =  CELL(obot, begin, end+1);
+      __global const parse_cell * gright = inside_tags + lengthOffsets[sentence] + (end);
+      %s
+    }
+
+    __global parse_cell* gout = CELL(outsides_top + offsets[sentence], begin, end);
+    for(int i = 0; i < NUM_SYMS; ++i) {
+      gout->syms[i][gram] += ldexp(otarget[i], SCALE_FACTOR);
+    }
+  }
+}
+
+ __kernel void outside_binary_terms(__global parse_cell* outsides_top,
+              __global const parse_cell* outsides_bot,
+              __global const parse_cell * insides_top,
+              __global const int* offsets,
+              __global const int* lengths,
+            __global const rule_cell* rules) {
+  const int sentence = get_global_id(0);
+  const int begin = get_global_id(1);
+  const int gram = get_global_id(2);
+  const int length = lengths[sentence];
+  const int end = begin + 1;
+  float otarget[NUM_SYMS];
+  if (end <= length) {
+    __global const parse_cell* inside = insides_top + offsets[sentence];
+    __global const parse_cell* obot = outsides_bot + offsets[sentence];
+    for(int i = 0; i < NUM_SYMS; ++i) {
+      otarget[i] = 0.0f;
+    }
+    // complete looking right
+    for(int completion = end+1; completion <= length; ++completion) {
+       __global const parse_cell * gparent = CELL(obot, begin, completion); // scale factor of (2 ^ SCALE_FACTOR)^(length-(completion - begin))
+       __global const parse_cell * gright = CELL(inside, end, completion); // scale factor of (2 ^ SCALE_FACTOR)^((end - completion) - 1)
+       // product of gparent and gright has scale (2^SCALE_FACTOR)^(length-(end-begin)-1), so need to scale by 1 to maintain invariant
+       %s
+    }
+
+   // complete looking left
+    for(int completion = 0; completion < begin; ++completion) {
+       __global const parse_cell * gparent = CELL(obot, completion, end); // scale factor of (2 ^ SCALE_FACTOR)^(length-(end-completion))
+       __global const parse_cell * gleft = CELL(inside, completion, begin); // scale factor of (2 ^ SCALE_FACTOR)^((begin - completion) - 1)
+       // product of gparent and gleft has scale (2^SCALE_FACTOR)^(length-(end-begin)-1), so need to scale by 1 to maintain invariant
+       %s
+    }
+
+    // multiply in a 2^SCALE_FACTOR to re-achieve balance.
+    __global parse_cell* gout = CELL(outsides_top + offsets[sentence], begin, end);
+    for(int i = 0; i < NUM_SYMS; ++i) {
+      gout->syms[i][gram] += ldexp(otarget[i], SCALE_FACTOR);
+    }
+  }
+}
+
+    """.format(outsideUnaryUpdates(ruleStructure.unaryRulesWithIndices),
+    outsideRightCompletionUpdates(ruleStructure.ntRules ++ ruleStructure.bothTermRules),
+    outsideLeftCompletionUpdates(ruleStructure.ntRules ++ ruleStructure.bothTermRules),
+    outsideLeftCompletionUpdates(ruleStructure.leftTermRules),
+    outsideRightCompletionUpdates(ruleStructure.rightTermRules),
+    outsideRightCompletionUpdates(ruleStructure.leftTermRules),
+    outsideLeftCompletionUpdates(ruleStructure.rightTermRules)
+  )
 
   if(true) {val o = new FileWriter("outside.cl"); o.write(text); o.close()}
   def outsideUnaryUpdates(rules: IndexedSeq[(UnaryRule[Int], Int)]): String = {
