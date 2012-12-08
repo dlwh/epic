@@ -32,15 +32,18 @@ class OutsideKernel[L](ruleStructure: RuleStructure[L], numGrammars: Int)(implic
       binaries.setArg(5, len)
       lastU = binaries.enqueueNDRange(queue, Array(numSentences, maxLength + 1 - len, numGrammars), Array(1, 1, numGrammars), lastU)
       ob += lastU
-//      lastU = termbs.enqueueNDRange(queue, Array(numSentences, maxLength + 1 - len, numGrammars), Array(1, 1, numGrammars), lastU)
-//      ot += lastU
+      termbs.setArg(7, len)
+      lastU = termbs.enqueueNDRange(queue, Array(numSentences, maxLength + 1 - len, numGrammars), Array(1, 1, numGrammars), lastU)
+      ot += lastU
+      if(len == 1) {
+        lastU = bterms.enqueueNDRange(queue, Array(numSentences, maxLength, numGrammars), Array(1, 1, numGrammars), lastU)
+        ot += lastU
+      }
       unaries.setArg(4, len)
       lastU = unaries.enqueueNDRange(queue, Array(numSentences, maxLength + 1 - len, numGrammars), Array(1, 1, numGrammars), lastU)
       ou += lastU
     }
-//    lastU = bterms.enqueueNDRange(queue, Array(numSentences, maxLength, numGrammars), Array(1, 1, numGrammars), lastU)
 
-    ot += lastU
     if(queue.getProperties.contains(CLDevice.QueueProperties.ProfilingEnable)) {
       queue.finish()
       val ouCount = ou.map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum / 1E9
@@ -120,7 +123,7 @@ __kernel void outside_binaries(__global parse_cell* outsides_top,
     // multiply in a 2^SCALE_FACTOR to re-achieve balance.
     __global parse_cell* gout = CELL(outsides_top + offsets[sentence], begin, end);
     for(int i = 0; i < NUM_SYMS; ++i) {
-      gout->syms[i][gram] += ldexp(otarget[i], SCALE_FACTOR);
+      gout->syms[i][gram] = ldexp(otarget[i], SCALE_FACTOR);
     }
   }
 }
@@ -141,18 +144,11 @@ __kernel void outside_term_binaries(__global parse_cell* outsides_top,
   const int end = begin + spanLength;
   const int length = lengths[sentence];
   float otarget[NUM_SYMS];
-  if (end <= length) {
+   if (end <= length) {
     __global const parse_cell* inside = insides_top + offsets[sentence];
     __global const parse_cell* obot = outsides_bot + offsets[sentence];
     for(int i = 0; i < NUM_SYMS; ++i) {
       otarget[i] = 0.0f;
-    }
-
-
-    if (begin > 0) { // look left
-      __global const parse_cell * gparent =  CELL(obot, begin-1, end);
-      __global const parse_cell * gleft = inside_tags + lengthOffsets[sentence] + (begin - 1);
-      %s
     }
 
     if (end < length) { // look right
@@ -161,6 +157,14 @@ __kernel void outside_term_binaries(__global parse_cell* outsides_top,
       %s
     }
 
+   // complete looking left
+      if (begin > 0) { // look left
+      __global const parse_cell * gparent =  CELL(obot, begin-1, end);
+      __global const parse_cell * gleft = inside_tags + lengthOffsets[sentence] + (begin - 1);
+      %s
+     }
+
+    // multiply in a 2^SCALE_FACTOR to re-achieve balance.
     __global parse_cell* gout = CELL(outsides_top + offsets[sentence], begin, end);
     for(int i = 0; i < NUM_SYMS; ++i) {
       gout->syms[i][gram] += ldexp(otarget[i], SCALE_FACTOR);
@@ -205,18 +209,20 @@ __kernel void outside_term_binaries(__global parse_cell* outsides_top,
     // multiply in a 2^SCALE_FACTOR to re-achieve balance.
     __global parse_cell* gout = CELL(outsides_top + offsets[sentence], begin, end);
     for(int i = 0; i < NUM_SYMS; ++i) {
+//      if(otarget[i] != gout->syms[i][gram])
+//        printf("%%d %%d %%e %%e %%e\n", begin, i, gout->syms[i][gram], ldexp(otarget[i], SCALE_FACTOR), gout->syms[i][gram]- ldexp(otarget[i], SCALE_FACTOR));
       gout->syms[i][gram] += ldexp(otarget[i], SCALE_FACTOR);
     }
   }
 }
 
     """.format(outsideUnaryUpdates(ruleStructure.unaryRulesWithIndices),
-    outsideRightCompletionUpdates(ruleStructure.ntRules ++ ruleStructure.bothTermRules),
-    outsideLeftCompletionUpdates(ruleStructure.ntRules ++ ruleStructure.bothTermRules),
-    outsideLeftCompletionUpdates(ruleStructure.leftTermRules),
+    outsideRightCompletionUpdates(ruleStructure.ntRules),
+    outsideLeftCompletionUpdates(ruleStructure.ntRules),
     outsideRightCompletionUpdates(ruleStructure.rightTermRules),
-    outsideRightCompletionUpdates(ruleStructure.leftTermRules),
-    outsideLeftCompletionUpdates(ruleStructure.rightTermRules)
+      outsideLeftCompletionUpdates(ruleStructure.leftTermRules),
+    outsideRightCompletionUpdates(ruleStructure.leftTermRules ++ ruleStructure.bothTermRules),
+    outsideLeftCompletionUpdates(ruleStructure.rightTermRules ++ ruleStructure.bothTermRules)
   )
 
   if(true) {val o = new FileWriter("outside.cl"); o.write(text); o.close()}
@@ -241,8 +247,6 @@ __kernel void outside_term_binaries(__global parse_cell* outsides_top,
     }
     sb.mkString("\n    ")
   }
-
-
 
 
   // otarget is the left child, completion on right.

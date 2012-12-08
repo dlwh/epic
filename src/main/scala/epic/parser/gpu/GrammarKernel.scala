@@ -343,12 +343,12 @@ class GrammarKernel[C, L, W](coarseGrammar: BaseGrammar[C],
     val marginals = for (i <- 0 until lengths.length) yield {
       val off = offsets(i)
       val len = lengths(i)
-      Marginal(inTop, inBot, outTop, inBot, off, len)
+      Marginal(inTop, inBot, outTop, outBot, off, len)
     }
 
     for(m <- marginals) {
       println(m.rootScore(0))
-      println(breeze.numerics.logSum({for(i <- 0 until grammar.labelIndex.size) yield m.botOutsideScore(0, 1, 0, i) + m.botOutsideScore(0, 1, 0, i)}))
+      println(breeze.numerics.logSum({for(i <- 0 until grammar.labelIndex.size) yield m.botOutsideScore(0, 1, 0, i) + m.botInsideScore(0, 1, 0, i)}))
 
     }
     marginals
