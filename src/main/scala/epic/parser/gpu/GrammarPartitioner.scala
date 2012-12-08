@@ -2,16 +2,17 @@ package epic.parser.gpu
 
 import epic.trees.BinaryRule
 import collection.mutable
+import collection.immutable.BitSet
 
 object GrammarPartitioner {
   sealed trait TargetLabel {
-    def clusterPieces[L](r: BinaryRule[L]) = this match {
-      case Parent => Set(r.left) -> Set(r.right)
-      case LeftChild => Set(r.parent) -> Set(r.right)
-      case RightChild => Set(r.parent) -> Set(r.left)
+    def clusterPieces(r: BinaryRule[Int]) = this match {
+      case Parent => BitSet(r.left) -> BitSet(r.right)
+      case LeftChild => BitSet(r.parent) -> BitSet(r.right)
+      case RightChild => BitSet(r.parent) -> BitSet(r.left)
     }
 
-    def target[L](r: BinaryRule[L]) = this match {
+    def target(r: BinaryRule[Int]) = this match {
       case Parent => r.parent
       case LeftChild => r.left
       case RightChild => r.parent
@@ -26,7 +27,7 @@ object GrammarPartitioner {
                 numRestarts: Int = 40,
                 targetLabel: TargetLabel = Parent) = {
 
-    case class Partition(targets: Set[Int], group1: Set[Int], group2: Set[Int], isPure: Boolean = true) {
+    case class Partition(targets: BitSet, group1: BitSet, group2: BitSet, isPure: Boolean = true) {
       def merge(p: Partition) = Partition(targets ++ p.targets, group1 ++ p.group1, group2 ++ p.group2, false)
 
       def tSize = targets.size
@@ -40,7 +41,7 @@ object GrammarPartitioner {
     def restart(random: =>Double) = {
       var clusters = clusters_x.map { case (p:Int, r: IndexedSeq[(BinaryRule[Int], Int)]) =>
         val (g1, g2) = r.map(rr => targetLabel.clusterPieces(rr._1)).unzip
-        Partition(Set(p), g1.reduce( _ ++ _), g2.reduce(_ ++ _))
+        Partition(BitSet(p), g1.reduce( _ ++ _), g2.reduce(_ ++ _))
       }.toSet
       val initialClusters = clusters.map(p => p.targets.head -> p).toMap
 

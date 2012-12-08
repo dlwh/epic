@@ -21,7 +21,7 @@ class OutsideKernel[L](ruleStructure: RuleStructure[L], numGrammars: Int)(implic
                  maxLength: Int,
                  rules: CLBuffer[JFloat],
                  events: CLEvent*)(implicit queue: CLQueue) = {
-    val ou, ob, ot= new ArrayBuffer[CLEvent]()
+    val ou, ob, otb, ot = new ArrayBuffer[CLEvent]()
     var lastU = null:CLEvent
     lbinaries.foreach(_.setArgs(outsideTop, outsideBot, insideTop, offsets, lengths, Integer.valueOf(maxLength), rules))
     rbinaries.foreach(_.setArgs(outsideTop, outsideBot, insideTop, offsets, lengths, Integer.valueOf(maxLength), rules))
@@ -41,7 +41,7 @@ class OutsideKernel[L](ruleStructure: RuleStructure[L], numGrammars: Int)(implic
       ob ++= lastRB
       termbs.setArg(7, len)
       lastU = termbs.enqueueNDRange(queue, Array(numSentences, maxLength + 1 - len, numGrammars), Array(1, 1, numGrammars), lastRB:_*)
-      ot += lastU
+      otb += lastU
       if(len == 1) {
         lastU = bterms.enqueueNDRange(queue, Array(numSentences, maxLength, numGrammars), Array(1, 1, numGrammars), lastU)
         ot += lastU
@@ -57,8 +57,9 @@ class OutsideKernel[L](ruleStructure: RuleStructure[L], numGrammars: Int)(implic
       queue.finish()
       val ouCount = ou.map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum / 1E9
       val obCount = ob.map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum / 1E9
+      val otbCount = otb.map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum / 1E9
       val otCount = ot.map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum / 1E9
-      println("outside: " + ouCount + " " + obCount + " " + otCount)
+      println("outside: " + ouCount + " " + obCount + " " + otCount + " " + otbCount)
     }
 
     lastU
