@@ -8,7 +8,7 @@ import java.io.FileWriter
 import collection.immutable
 
 class InsideKernel[L](ruleStructure: RuleStructure[L], numGrammars: Int)(implicit context: CLContext) {
-  val partitionsParent: IndexedSeq[IndexedSeq[(BinaryRule[Int], Int)]] = GrammarPartitioner.partition(ruleStructure.ntRules).toIndexedSeq
+  val partitionsParent: IndexedSeq[IndexedSeq[(BinaryRule[Int], Int)]] = GrammarPartitioner.partition(ruleStructure.ntRules, 45).toIndexedSeq
 
   def insidePass(numSentences: Int,
                  insideBot: CLBuffer[JFloat],
@@ -178,6 +178,10 @@ __kernel void inside_unaries(__global const parse_cell * inside_bots,
         sb += "}"
         sb += "currentSum = 0.0f;"
        }
+
+       sb += "// out has a scale factor of (2^SCALE_FACTOR)^((end-split) + (split-begin) - 2) = (2^SCALE_FACTOR)^(end-begin-2)"
+       sb += "// multiply in a 2^SCALE_FACTOR to reachive balance."
+       sb += "gout->syms[%d][gram] = ldexp(p%d, SCALE_FACTOR);".format(p,p)
     }
 
     sb.mkString("\n      ")
@@ -267,6 +271,7 @@ __kernel void inside_binaries_%d(
   const int length = lengths[sentence];
   if (end <= length) {
     __global const parse_cell* chart_top =  inside_tops + offsets[sentence];
+    __global parse_cell* gout = CELL(inside_bots + offsets[sentence], begin, end);
     %s
 
     for(int split = begin + 1; split < end; ++split) {
@@ -274,15 +279,10 @@ __kernel void inside_binaries_%d(
       __global const parse_cell * right = CELL(chart_top, split, end); // scale factor of (2^ SCALE_FACTOR)((end-split) - 1)
       %s
     }
-    // out has a scale factor of (2^SCALE_FACTOR)^((end-split) + (split-begin) - 2) = (2^SCALE_FACTOR)^(end-begin-2)
-    // multiply in a 2^SCALE_FACTOR to reachive balance.
-    __global parse_cell* gout = CELL(inside_bots + offsets[sentence], begin, end);
-    %s
   }
 }
     """.format(id,
       rules.map(_._1.parent).toSet[Int].map("p" + _).mkString("float ", " = 0.0f,", " = 0.0f;"),
-      insideRuleUpdates(rules),
-      rules.map(_._1.parent).toSet[Int].map(i => "gout->syms[%d][gram] = ldexp(p%d, SCALE_FACTOR);".format(i,i)).mkString("\n    "))
+      insideRuleUpdates(rules) )
   }
 }

@@ -77,7 +77,6 @@ object GrammarPartitioner {
             if(clusters.contains(l) && clusters.contains(r)) {
               import sm._
               if(!newP2.isTooBig) {
-                println("Split!")
                 clusters -= l
                 clusters -= r
                 queue ++= {for(p2 <- clusters) yield Merge(newP1, p2, newP1 merge p2)}
@@ -92,13 +91,12 @@ object GrammarPartitioner {
         }
       }
 
-      println(clusters.map(_.badness).sum)
       clusters
     }
 
     val clusters = ((0 until 40).map(new java.util.Random(_)).map(r => restart(0.5 + 0.5 * r.nextDouble()))).minBy(_.map(p => p.badness).sum)
 
-    println("Best badness: " + clusters.map(_.badness).sum)
+    println("Best badness: " + targetLabel  + " " + clusters.map(_.badness).sum)
 
     var p = 0
     for( Partition(targets, g1, g2, _) <- clusters) {

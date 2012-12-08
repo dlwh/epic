@@ -8,6 +8,8 @@ import java.io.FileWriter
 
 
 class OutsideKernel[L](ruleStructure: RuleStructure[L], numGrammars: Int)(implicit context: CLContext) {
+  val partitionsRight: IndexedSeq[IndexedSeq[(BinaryRule[Int], Int)]] = GrammarPartitioner.partition(ruleStructure.ntRules, targetLabel = GrammarPartitioner.RightChild).toIndexedSeq
+  val partitionsLeft: IndexedSeq[IndexedSeq[(BinaryRule[Int], Int)]] = GrammarPartitioner.partition(ruleStructure.ntRules, targetLabel = GrammarPartitioner.LeftChild).toIndexedSeq
   def outsidePass(numSentences: Int,
                  outsideTop: CLBuffer[JFloat],
                  outsideBot: CLBuffer[JFloat],
