@@ -24,7 +24,7 @@ class OutsideKernel[L](ruleStructure: RuleStructure[L], numGrammars: Int)(implic
     binaries.setArgs(outsideTop, outsideBot, insideTop, offsets, lengths, Integer.valueOf(maxLength), rules)
     unaries.setArgs(outsideTop, outsideBot, offsets, lengths, Integer.valueOf(maxLength), rules)
     termbs.setArgs(outsideTop, outsideBot, insideTop, posTags, offsets, lengths, lengthOffsets, Integer.valueOf(maxLength), rules)
-    bterms.setArgs(outsideTop, outsideBot, insideTop, offsets, lengths, rules)
+    bterms.setArgs(outsideTop, outsideBot, insideTop, posTags, offsets, lengths, lengthOffsets, rules)
     lastU = unaries.enqueueNDRange(queue, Array(numSentences, 1, numGrammars), Array(1, 1, numGrammars), events:_*)
     ou += lastU
 
@@ -175,8 +175,10 @@ __kernel void outside_term_binaries(__global parse_cell* outsides_top,
  __kernel void outside_binary_terms(__global parse_cell* outsides_top,
               __global const parse_cell* outsides_bot,
               __global const parse_cell * insides_top,
+              __global const parse_cell * inside_tags,
               __global const int* offsets,
               __global const int* lengths,
+              __global const int* lengthOffsets,
             __global const rule_cell* rules) {
   const int sentence = get_global_id(0);
   const int begin = get_global_id(1);
@@ -206,6 +208,18 @@ __kernel void outside_term_binaries(__global parse_cell* outsides_top,
        %s
     }
 
+    if (end < length) { // look right
+      __global const parse_cell * gparent =  CELL(obot, begin, end+1);
+      __global const parse_cell * gright = inside_tags + lengthOffsets[sentence] + (end);
+      %s
+    }
+
+   // complete looking left
+      if (begin > 0) { // look left
+      __global const parse_cell * gparent =  CELL(obot, begin-1, end);
+      __global const parse_cell * gleft = inside_tags + lengthOffsets[sentence] + (begin - 1);
+      %s
+     }
     // multiply in a 2^SCALE_FACTOR to re-achieve balance.
     __global parse_cell* gout = CELL(outsides_top + offsets[sentence], begin, end);
     for(int i = 0; i < NUM_SYMS; ++i) {
@@ -221,8 +235,10 @@ __kernel void outside_term_binaries(__global parse_cell* outsides_top,
     outsideLeftCompletionUpdates(ruleStructure.ntRules),
     outsideRightCompletionUpdates(ruleStructure.rightTermRules),
       outsideLeftCompletionUpdates(ruleStructure.leftTermRules),
-    outsideRightCompletionUpdates(ruleStructure.leftTermRules ++ ruleStructure.bothTermRules),
-    outsideLeftCompletionUpdates(ruleStructure.rightTermRules ++ ruleStructure.bothTermRules)
+    outsideRightCompletionUpdates(ruleStructure.leftTermRules),
+    outsideLeftCompletionUpdates(ruleStructure.rightTermRules),
+    outsideRightCompletionUpdates(ruleStructure.bothTermRules),
+    outsideLeftCompletionUpdates(ruleStructure.bothTermRules)
   )
 
   if(true) {val o = new FileWriter("outside.cl"); o.write(text); o.close()}
