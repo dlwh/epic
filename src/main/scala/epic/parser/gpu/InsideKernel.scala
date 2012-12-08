@@ -235,8 +235,9 @@ __kernel void inside_unaries(__global const parse_cell * inside_bots,
       }
       sb += """  out[%d] = mad(rules->binaries[%d][gram], currentLeftScore * right->syms[%d][gram], out[%d]); // %s""".format(r.parent, index, r.right, r.parent, ruleString(index))
     }
+    if(lastLeft != -1)
+      sb += "}"
     lastLeft = -1
-    sb += "}"
     sb += "if (spanLength == 2) {"
     for((r@BinaryRule(p, left, right), index) <- ruleStructure.bothTermRules.sortBy(_._1.left)) {
       if(lastLeft != left) {
@@ -248,7 +249,8 @@ __kernel void inside_unaries(__global const parse_cell * inside_bots,
       }
       sb += """    out[%d] = mad(rules->binaries[%d][gram], currentLeftScore * rightTerm->syms[%d][gram], out[%d]); // %s """.format(r.parent, index, r.right, r.parent, ruleString(index))
     }
-    sb += "  }"
+    if(lastLeft != -1)
+      sb += "  }"
     sb += "}"
     var lastRight = -1
     for((r@BinaryRule(p, l, right), index) <- ruleStructure.rightTermRules.sortBy(_._1.right)) {

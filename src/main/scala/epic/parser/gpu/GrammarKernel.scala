@@ -13,7 +13,7 @@ import java.io.{FileWriter, File}
 import collection.mutable.ArrayBuffer
 import breeze.collection.mutable.TriangularArray
 import com.nativelibs4java.opencl.CLMem.Usage
-import breeze.linalg.{Counter, DenseVector}
+import breeze.linalg.{DenseMatrix, Counter, DenseVector}
 import org.bridj.Pointer
 import breeze.util.{Index, Encoder}
 import collection.{immutable, mutable}
@@ -27,6 +27,7 @@ class GrammarKernel[C, L, W](coarseGrammar: BaseGrammar[C],
                              lexicon: Lexicon[L, W],
                              private var _ruleScores: Array[RuleScores],
                              var tagScorers: Array[(IndexedSeq[W],Int,Int)=>Double],
+                             profile: Boolean = true,
                              maxSentences: Int = 1000)(implicit val context: CLContext) {
   def ruleScores = _ruleScores
 
@@ -69,13 +70,13 @@ class GrammarKernel[C, L, W](coarseGrammar: BaseGrammar[C],
     maxSize ->  maxTotalLength
   }
 
-  private implicit val queue = context.createDefaultProfilingQueue()
+  private implicit val queue = if(profile) context.createDefaultProfilingQueue() else context.createDefaultOutOfOrderQueueIfPossible()
   private val copyTags = copyPosTags.createKernel("copy_pos_to_charts")
   private val sumVector = context.createProgram(GrammarKernel.sumECountVectors).createKernel("sum_vectors")
   private val memZero = new ZeroMemoryKernel
   private val projection = new ProjectionKernel(structure, projections.labels,  numGrammars)
   private val decoder = new MaxRecallKernel(new RuleStructure(coarseGrammar))
-  private val partitionGetter = new PartitionCalculatorKernel(structure)
+  private val partitionGetter = new PartitionCalculatorKernel(structure, numGrammars)
 
   private val insideTopDev, insideBotDev = context.createFloatBuffer(Usage.InputOutput, maxCells * cellSize)
   private val outsideTopDev, outsideBotDev = context.createFloatBuffer(Usage.InputOutput, maxCells * cellSize)
@@ -126,9 +127,12 @@ class GrammarKernel[C, L, W](coarseGrammar: BaseGrammar[C],
     }}.toIndexedSeq
   }
 
-  case class ExpectedCounts(rules: DenseVector[Double], wordCounts: ArrayBuffer[IndexedSeq[DenseVector[Double]]], var partition: Double) {
+  // wordcounts is sentence -> grammar -> symbol -> score
+  case class ExpectedCounts(rules: Array[DenseVector[Double]], wordCounts: ArrayBuffer[IndexedSeq[IndexedSeq[DenseVector[Double]]]], var partition: Double) {
     def +=(o: ExpectedCounts):this.type = {
-      rules += o.rules
+      for( (r,or) <- rules zip o.rules) {
+        r += or
+      }
       wordCounts ++= o.wordCounts
       partition += o.partition
       this
@@ -144,7 +148,7 @@ class GrammarKernel[C, L, W](coarseGrammar: BaseGrammar[C],
       doExpectedCounts(batch)
     }
 
-    allCounts.reduceOption{ _ += _ }.getOrElse(ExpectedCounts(DenseVector.zeros(structure.numRules), ArrayBuffer.empty, 0.0))
+    allCounts.reduceOption{ _ += _ }.getOrElse(ExpectedCounts(Array.fill(numGrammars)(DenseVector.zeros(structure.numRules)), ArrayBuffer.empty, 0.0))
   }
 
   case class Batch(lengths: Array[Int],
@@ -294,22 +298,24 @@ class GrammarKernel[C, L, W](coarseGrammar: BaseGrammar[C],
     queue.finish()
 
     ecountsDev.read(queue, 0, totalRules, ruleVector, true,  lastEvent)
-    val arr = DenseVector(ruleVector.getFloats.map(_.toDouble))
-    ExpectedCounts(arr, splitUpTerms(batch, floats), computePartitions(batch).sum)
+    val ruleMat = new DenseMatrix(numGrammars, ruleVector.getFloats.map(_.toDouble))
+    val arrs = Array.tabulate(numGrammars)(r => ruleMat.t.apply (::, r).copy)
+    ExpectedCounts(arrs, splitUpTerms(batch, floats), computePartitions(batch).sum)
   }
 
 
-  private def splitUpTerms(batch: Batch, terms: Array[Float]):ArrayBuffer[IndexedSeq[DenseVector[Double]]] = ArrayBuffer.empty ++= {
-    var floatPos = 0
-    for (s <- batch.sentences) yield {
-      for(i <- 0 until s.length) yield {
-        DenseVector.tabulate(grammar.labelIndex.size){i => val f = terms(floatPos).toDouble; floatPos += 1; f}
+  private def splitUpTerms(batch: Batch, terms: Array[Float]):ArrayBuffer[IndexedSeq[IndexedSeq[DenseVector[Double]]]] = ArrayBuffer.empty ++= {
+    for ( (s, index) <- batch.sentences.zipWithIndex) yield {
+      IndexedSeq.tabulate(numGrammars, s.length){ (g, i) =>
+        DenseVector.tabulate(nsyms){i => terms(batch.lengthTotals(index) * nsyms * numGrammars + i * numGrammars + g).toDouble}
       }
     }
   }
 
   private def computePartitions(batch: Batch, events: CLEvent*):Array[Double] = {
-    partitionGetter.partitions(insideTopDev, offDev, lenDev, batch.numSentences, events: _*).map(_.toDouble)
+    val partitions = partitionGetter.partitions(insideTopDev, offDev, lenDev, batch.numSentences, events: _*).map(_.toDouble)
+//    println(partitions.mkString(", "))
+    partitions
   }
 
 
@@ -399,12 +405,11 @@ class GrammarKernel[C, L, W](coarseGrammar: BaseGrammar[C],
     var lastU = inside.insidePass(numSentences, insideBotDev, insideTopDev, posTagsDev, offDev, lenDev, maxLength, offLengthsDev, rulesDev, initCharts, wIT, wO)
     lastU = outside.outsidePass(numSentences, outsideTopDev, outsideBotDev, insideTopDev, posTagsDev, offDev, lenDev, offLengthsDev, maxLength, rulesDev, lastU, wOB, wOT)
 
-    queue.finish()
-
-
-    val writeCounts = IndexedSeq(wIT, wOT, wIB, wOB, wO, wL, initCharts).filter(_ ne null).map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum / 1E9
-
-    println("io write: " + writeCounts)
+    if(queue.getProperties.contains(CLDevice.QueueProperties.ProfilingEnable)) {
+      queue.finish()
+      val writeCounts = IndexedSeq(wIT, wOT, wIB, wOB, wO, wL, initCharts).filter(_ ne null).map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum / 1E9
+      println("io write: " + writeCounts)
+    }
     lastU
   }
 
@@ -512,8 +517,8 @@ object GrammarKernel {
     val time2 = System.currentTimeMillis()
     val counts = kern.expectedRuleCounts(train.map(_.words.toIndexedSeq))
     val time3 = System.currentTimeMillis()
-    println(counts.rules.sum)
-    println(counts.wordCounts.map(_.map(_.sum).sum).sum)
+    println(counts.rules.map(_.sum).sum)
+    println(counts.wordCounts.map(_.map(_.map(_.sum).sum).sum))
     //    println(Encoder.fromIndex(grammar.refinedGrammar.index).decode(counts))
     println("Done ecounts: " + (time3 - time2))
 

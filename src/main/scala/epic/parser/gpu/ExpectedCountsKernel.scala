@@ -70,7 +70,6 @@ class ExpectedCountsKernel[L](ruleStructure: RuleStructure[L], numGrammars: Int)
     et += lastBDep
 
     if(queue.getProperties.contains(CLDevice.QueueProperties.ProfilingEnable)) {
-      println("finish!")
       queue.finish()
       val iuCount = eu.map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum / 1E9
       val ibCount = eb.map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum / 1E9

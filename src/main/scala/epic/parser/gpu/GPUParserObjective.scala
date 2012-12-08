@@ -40,34 +40,51 @@ class GPUParserObjective[C, L, W](parser: GrammarKernel[C, L, W],
                                   reannotate: (BinarizedTree[C], Seq[W]) => BinarizedTree[C],
                                   indexedFeatures: IndexedFeaturizer[C, L, W],
                                   sentences: IndexedSeq[TreeInstance[C, W]]) extends BatchDiffFunction[DenseVector[Double]] {
-  def initialWeightVector(randomize: Boolean) = if(randomize) DenseVector.rand(featureIndex.size) else DenseVector.zeros[Double](featureIndex.size)
+  def initialWeightVector(randomize: Boolean) = if(randomize) -DenseVector.rand(featureIndex.size * numGrammars) else DenseVector.zeros[Double](featureIndex.size * numGrammars)
 
+  val lengthOfOneFeatureVector = featureIndex.size
+  def numGrammars: Int = parser.numGrammars
   def projections = indexedFeatures.projections.labels
   def featureIndex = indexedFeatures.index
   def grammar = indexedFeatures.grammar
   def lexicon = indexedFeatures.lexicon
 
-  def calculate(x: DenseVector[Double], batch: IndexedSeq[Int]): (Double, DenseVector[Double]) = {
-    val lexicon = new FeaturizedLexicon(x, indexedFeatures)
-    def scoreTag(w: IndexedSeq[W], pos: Int, tag: Int) = lexicon.scoreTag(projections.fineIndex.get(tag), w, pos)
-    val weights = RuleScores(x.data.take(parser.structure.numBinaries), x.data.slice(parser.structure.numBinaries, parser.structure.numBinaries + parser.structure.numUnaries) :* parser.structure.nonIdentityMask)
-    parser.ruleScores = Array(weights)
-    parser.tagScorers = Array(scoreTag _)
+  def calculate(nx: DenseVector[Double], batch: IndexedSeq[Int]): (Double, DenseVector[Double]) = {
+    val x = -breeze.numerics.exp(nx)
+    val ruleScores = Array.tabulate(numGrammars){ g =>
+      val myScores = x.data.drop(g*featureIndex.size)
+      RuleScores(myScores.take(parser.structure.numBinaries), myScores.slice(parser.structure.numBinaries, parser.structure.numBinaries + parser.structure.numUnaries) :* parser.structure.nonIdentityMask)
+    }
+    val tagScorers = Array.tabulate(numGrammars){ g =>
+      val myScores = x.slice(g * featureIndex.size, (g+1) * featureIndex.size)
+      val lexicon = new FeaturizedLexicon(myScores, indexedFeatures)
+      def scoreTag(w: IndexedSeq[W], pos: Int, tag: Int) = lexicon.scoreTag(projections.fineIndex.get(tag), w, pos)
+      scoreTag _
+    }
+    parser.ruleScores = ruleScores
+    parser.tagScorers = tagScorers
 
     val mySents = batch.map(sentences)
     val parser.ExpectedCounts(ruleCounts, tagCounts, partition) = parser.expectedRuleCounts(mySents.map(_.words))
-    val wordCounts = computeFeaturesForLexicon(mySents, tagCounts)
-    val gc = goldCounts(mySents, x)
-    val finalCounts = new StandardExpectedCounts(partition, DenseVector.vertcat(ruleCounts, wordCounts), featureIndex) -= gc
-    finalCounts.loss -> finalCounts.counts
+    val wordCounts = for(i <- (0 until numGrammars).par) yield computeFeaturesForLexicon(mySents, tagCounts.map(_(i)))
+    val allCounts = for(g <- 0 until numGrammars) yield {
+      val gc = goldCounts(mySents, x.slice(g * featureIndex.size, (g+1) * featureIndex.size))
+      wordCounts(g)(0 until ruleCounts(g).length) += ruleCounts(g)
+      val finalCounts = new StandardExpectedCounts(0.0, wordCounts(g), featureIndex) -= gc
+      finalCounts.counts.slice(parser.structure.numBinaries, parser.structure.numBinaries + parser.structure.numUnaries) :*= new DenseVector(parser.structure.nonIdentityMask)
+      finalCounts
+    }
+    println("guess: " + partition)
+    val xx = (partition + allCounts.map(_.loss).sum) -> (DenseVector.vertcat(allCounts.map(_.counts) :_*) :* x)
+    xx
   }
 
   def fullRange: IndexedSeq[Int] = 0 until sentences.length
 
   private def computeFeaturesForLexicon(sents: IndexedSeq[TreeInstance[C, W]], counts: IndexedSeq[IndexedSeq[DenseVector[Double]]]) = {
     val feats = DenseVector.zeros[Double](featureIndex.size)
-    for( (s,c) <- (sents zip counts)) {
-      for(i <- 0 until s.words.length; a <- 0 until projections.fineIndex.size)
+    for( ((s,c),p) <- (sents zip counts).zipWithIndex) {
+      for(i <- 0 until s.words.length; a <- 0 until projections.fineIndex.size if c(i)(a) != 0)
         for(f <- indexedFeatures.featuresFor(a, s.words, i)) {
           feats(f) += c(i)(a)
         }
@@ -79,13 +96,16 @@ class GPUParserObjective[C, L, W](parser: GrammarKernel[C, L, W],
   private def goldCounts(sents: IndexedSeq[TreeInstance[C, W]], weights: DenseVector[Double]) = {
     val lexicon = new FeaturizedLexicon(weights, indexedFeatures)
     val grammar = FeaturizedGrammar(this.grammar, this.lexicon, indexedFeatures.projections, weights, indexedFeatures, lexicon)
-    sents.foldLeft(StandardExpectedCounts.zero(featureIndex)) { (counts, ti) =>
+    val result = sents.foldLeft(StandardExpectedCounts.zero(featureIndex)) { (counts, ti) =>
       val reannotated = reannotate(ti.tree, ti.words)
       val product = AugmentedAnchoring.fromRefined(grammar.anchor(ti.words))
       val ecounts = LatentTreeMarginal(product, projections, reannotated).expectedCounts(indexedFeatures)
 
       counts += ecounts
     }
+
+    println("gold: " + result.loss)
+    result
   }
 }
 
@@ -145,8 +165,9 @@ object GPUParserTrainer {
                     @Help(text="How many threads to use, default is to use whatever Scala thinks is best.")
                     threads: Int = -1,
                     @Help(text="Should we randomize weights? Some models will force randomization.")
-                    randomize: Boolean = false,
-                    useGPU: Boolean = true)
+                    randomize: Boolean = true,
+                    useGPU: Boolean = true,
+                    numGrammars: Int = 1)
 
   protected val paramManifest: Manifest[Params] = implicitly[Manifest[Params]]
 
@@ -194,7 +215,7 @@ object GPUParserTrainer {
       val basic = Seq(l)
       basic map (IndicatorFeature)
     }
-    val feat = new GenFeaturizer[(AnnotatedLabel, Int), String](gen, labelFlattener _)
+    val feat = new GenFeaturizer[(AnnotatedLabel, Int), String]({ (i,b) => IndexedSeq(IndicatorFeature(i(b)))}, labelFlattener _)
 
     val annGrammar: BaseGrammar[AnnotatedLabel] = BaseGrammar(annTrees.head.tree.label, annBinaries, annUnaries)
     val firstLevelRefinements = GrammarRefinements(xbarGrammar, annGrammar, {(_: AnnotatedLabel).baseAnnotatedLabel})
@@ -206,8 +227,6 @@ object GPUParserTrainer {
       refinements.labels.fineIndex,
       refinements.rules.fineIndex)
 
-    val refinedLexicon = Lexicon
-
     implicit val context = if(useGPU) {
       JavaCL.createBestContext()
     } else {
@@ -216,7 +235,7 @@ object GPUParserTrainer {
     }
     println(context)
 
-    val gpuParser = new GrammarKernel[AnnotatedLabel, (AnnotatedLabel, Int), String](xbarGrammar, finalRefinements, refinedGrammar,  xbarLexicon.flatMap(split _), Array(RuleScores.zeros(refinedGrammar)), Array[(IndexedSeq[String], Int, Int) => Double]())
+    val gpuParser = new GrammarKernel[AnnotatedLabel, (AnnotatedLabel, Int), String](xbarGrammar, finalRefinements, refinedGrammar,  xbarLexicon.flatMap(split _), Array.fill(numGrammars)(RuleScores.zeros(refinedGrammar)), Array[(IndexedSeq[String], Int, Int) => Double](), false)
 
     println(finalRefinements.labels)
 
@@ -224,20 +243,22 @@ object GPUParserTrainer {
 
     val obj = new GPUParserObjective(gpuParser, annotator, indexedFeaturizer, trainTrees)
     val cachedObj = new CachedBatchDiffFunction(obj)
-    val checking = new RandomizedGradientCheckingFunction(cachedObj, 1E-4, toString = {
-      (i: Int) => obj.featureIndex.get(i).toString
-    })
+//    val checking = new RandomizedGradientCheckingFunction(cachedObj, 1E-2, Array(1E-4), toString = {
+//      (i: Int) => obj.featureIndex.get(i).toString
+//    })
     val init = obj.initialWeightVector(randomize)
 
     type OptState = FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State
 
 
-    for ((state, iter) <- params.opt.iterations(cachedObj, init).take(maxIterations).zipWithIndex
+    val iter = for ((state, iter) <- params.opt.iterations(cachedObj, init).take(100).zipWithIndex
          if iter != 0 && iter % iterationsPerEval == 0) yield try {
       gpuParser
     } catch {
       case e => println(e); e.printStackTrace(); throw e
     }
+
+    iter.drop(90).next
   }
 
 
