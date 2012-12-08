@@ -21,7 +21,10 @@ object GrammarPartitioner {
   case object LeftChild extends TargetLabel
   case object RightChild extends TargetLabel
 
-  def partition(rules: IndexedSeq[(BinaryRule[Int], Int)], maxPartitionLabelSize: Int = 50, targetLabel: TargetLabel = Parent) = {
+  def partition(rules: IndexedSeq[(BinaryRule[Int], Int)],
+                maxPartitionLabelSize: Int = 50,
+                numRestarts: Int = 40,
+                targetLabel: TargetLabel = Parent) = {
 
     case class Partition(targets: Set[Int], group1: Set[Int], group2: Set[Int], isPure: Boolean = true) {
       def merge(p: Partition) = Partition(targets ++ p.targets, group1 ++ p.group1, group2 ++ p.group2, false)
@@ -94,7 +97,7 @@ object GrammarPartitioner {
       clusters
     }
 
-    val clusters = ((0 until 40).map(new java.util.Random(_)).map(r => restart(0.5 + 0.5 * r.nextDouble()))).minBy(_.map(p => p.badness).sum)
+    val clusters = ((0 until numRestarts).map(new java.util.Random(_)).map(r => restart(0.5 + 0.5 * r.nextDouble())) :+ restart(1.0)).minBy(_.map(p => p.badness).sum)
 
     println("Best badness: " + targetLabel  + " " + clusters.map(_.badness).sum)
 

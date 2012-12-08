@@ -157,7 +157,7 @@ __kernel void inside_unaries(__global const parse_cell * inside_bots,
     val lefts = _rules.map(_._1.left).toSet
     val rights = _rules.map(_._1.right).toSet
     sb += "float currentSum = 0.0f;"
-    lefts.map(l => "const float l%d = left->syms[%d][gram];".format(l,l)).foreach(sb += _)
+    lefts.map(l => "const float left%d = left->syms[%d][gram];".format(l,l)).foreach(sb += _)
     rights.map(r => "const float r%d = right->syms[%d][gram];".format(r,r)).foreach(sb += _)
     for( (p, rules) <- byParent) {
       var lastLeft = -1
@@ -165,16 +165,16 @@ __kernel void inside_unaries(__global const parse_cell * inside_bots,
         if(lastLeft != l) {
           if(lastLeft != -1) {
             sb += "}"
-            sb += "p%d = mad(l%d, currentSum, p%d);".format(r.parent, lastLeft, r.parent)
+            sb += "p%d = mad(left%d, currentSum, p%d);".format(r.parent, lastLeft, r.parent)
           }
           sb += "currentSum = 0.0f;"
-          sb += "if(l%d != 0.0f) { // %s".format(r.left, symbolName(r.left))
+          sb += "if(left%d != 0.0f) { // %s".format(r.left, symbolName(r.left))
           lastLeft = l
         }
         sb += "  currentSum = mad(rules->binaries[%d][gram], r%d, currentSum); // %s".format(index, right, ruleString(index))
       }
       if(lastLeft != -1) {
-        sb += "p%d = mad(l%d, currentSum, p%d);".format(p, lastLeft, p)
+        sb += "p%d = mad(left%d, currentSum, p%d);".format(p, lastLeft, p)
         sb += "}"
         sb += "currentSum = 0.0f;"
        }
