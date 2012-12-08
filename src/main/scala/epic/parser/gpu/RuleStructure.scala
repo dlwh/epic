@@ -49,10 +49,10 @@ case class RuleStructure[L](grammar: BaseGrammar[L]) {
   val (termUnaries, ntermUnaries, termIdentUnaries) = {
     val termUnaries, ntermUnaries, termIdentUnaries = ArrayBuffer[(UnaryRule[Int], Int)]()
     for(r <- unaryRulesWithIndices) {
-      val leftTerm =  terminalSymbols(r._1.child)
+      val childTerm =  terminalSymbols(r._1.child)
       val pTerm =  terminalSymbols(r._1.parent)
       if(pTerm) assert(r._1.child == r._1.parent, grammar.labelIndex.get(r._1.parent) + " " + grammar.labelIndex.get(r._1.child))
-      if(leftTerm) {
+      if(childTerm) {
         if(r._1.child != r._1.parent)
           termUnaries += r
         else termIdentUnaries += r

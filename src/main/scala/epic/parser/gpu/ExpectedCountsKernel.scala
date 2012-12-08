@@ -16,6 +16,7 @@ class ExpectedCountsKernel[L](ruleStructure: RuleStructure[L], numGrammars: Int)
                      insideTop: CLBuffer[JFloat],
                      outsideBot: CLBuffer[JFloat],
                      outsideTop: CLBuffer[JFloat],
+                     insidePos: CLBuffer[JFloat],
                      offsets: CLBuffer[JInt],
                      lengths: CLBuffer[JInt],
                      offLengths: CLBuffer[JInt],
@@ -23,8 +24,11 @@ class ExpectedCountsKernel[L](ruleStructure: RuleStructure[L], numGrammars: Int)
                      rules: CLBuffer[JFloat],
                      events: CLEvent*)(implicit queue: CLQueue)  = {
 
-    val eu, eb = new ArrayBuffer[CLEvent]()
+    val eu, eb, et = new ArrayBuffer[CLEvent]()
     binaries.setArgs(ecounts, insideTop, outsideBot, offsets, lengths, offLengths, Integer.valueOf(1), rules)
+    binary_lterms.setArgs(ecounts, insideTop, outsideBot, insidePos, offsets, lengths, offLengths, Integer.valueOf(1), rules)
+    binary_rterms.setArgs(ecounts, insideTop, outsideBot, insidePos, offsets, lengths, offLengths, rules)
+    binary_terms.setArgs(ecounts, insideTop, outsideBot, insidePos, offsets, lengths, offLengths, rules)
     unaries.setArgs(ecounts, insideTop, insideBot, outsideTop, offsets, lengths, offLengths, Integer.valueOf(1), rules)
     terms.setArgs(termECounts, insideTop, insideBot, outsideBot, offsets, lengths, offLengths, Integer.valueOf(1))
 
@@ -47,21 +51,31 @@ class ExpectedCountsKernel[L](ruleStructure: RuleStructure[L], numGrammars: Int)
     for (len <- 2 to maxLength) {
       unaries.setArg(7, len)
       binaries.setArg(6, len)
+      binary_lterms.setArg(7, len)
       lastBDep = binaries.enqueueNDRange(queue, Array(numSentences, maxLength+1-len, numGrammars), Array(1, 1, numGrammars), lastBDep)
       eb += lastBDep
+      lastBDep = binary_lterms.enqueueNDRange(queue, Array(numSentences, maxLength+1-len, numGrammars), Array(1, 1, numGrammars), lastBDep)
+      et += lastBDep
       lastUDep = unaries.enqueueNDRange(queue, Array(numSentences, maxLength+1-len, numGrammars), Array(1, 1, numGrammars), lastUDep)
       eu += lastUDep
     }
+
     unaries.setArg(7, 1)
    lastUDep =  unaries.enqueueNDRange(queue, Array(numSentences, maxLength, numGrammars), Array(1, 1, numGrammars), lastUDep, lastBDep)
     eu += lastUDep
+
+   lastBDep = binary_rterms.enqueueNDRange(queue, Array(numSentences, maxLength, numGrammars), Array(1, 1, numGrammars), lastBDep, lastUDep)
+   et += lastBDep
+    lastBDep = binary_terms.enqueueNDRange(queue, Array(numSentences, maxLength, numGrammars), Array(1, 1, numGrammars), lastBDep)
+    et += lastBDep
 
     if(queue.getProperties.contains(CLDevice.QueueProperties.ProfilingEnable)) {
       println("finish!")
       queue.finish()
       val iuCount = eu.map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum / 1E9
       val ibCount = eb.map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum / 1E9
-      println("ecounts: " + iuCount + " " + ibCount + " " + (termFinished.getProfilingCommandEnd - termFinished.getProfilingCommandStart)/1E9)
+      val etCount = et.map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum / 1E9
+      println("ecounts: " + iuCount + " " + ibCount + " " + etCount + " " + (termFinished.getProfilingCommandEnd - termFinished.getProfilingCommandStart)/1E9)
     }
 
     lastUDep
@@ -69,14 +83,15 @@ class ExpectedCountsKernel[L](ruleStructure: RuleStructure[L], numGrammars: Int)
 
 
   private lazy val binaries = program.createKernel("ecount_binaries")
+  private lazy val binary_lterms = program.createKernel("ecount_binary_lterms")
+  private lazy val binary_rterms = program.createKernel("ecount_binary_rterms")
+  private lazy val binary_terms = program.createKernel("ecount_binary_terms")
   private lazy val unaries = program.createKernel("ecount_unaries")
   private lazy val terms = program.createKernel("ecount_terminals")
 
 
   lazy val text = {
     import ruleStructure._
-    val byParent: Map[Int, IndexedSeq[(BinaryRule[Int], Int)]] = binaryRulesWithIndices.groupBy(_._1.parent)
-    val uByParent: Map[Int, IndexedSeq[(UnaryRule[Int], Int)]] = unaryRulesWithIndices.groupBy(_._1.parent)
     GrammarHeader.header(ruleStructure, numGrammars) +"""
 __kernel void ecount_binaries(__global rule_cell* ecounts,
    __global const parse_cell * insides_top,
@@ -99,6 +114,87 @@ __kernel void ecount_binaries(__global rule_cell* ecounts,
     float oscore;
     __global const parse_cell* oparents = CELL(obot, begin, end);
     %s
+  }
+}
+
+ __kernel void ecount_binary_lterms(__global rule_cell* ecounts,
+   __global const parse_cell * insides_top,
+   __global const parse_cell* outsides_bot,
+   __global const parse_cell * insides_pos,
+   __global const int* offsets,
+   __global const int* lengths,
+  __global const int* lengthOffsets,
+   const int span_length,
+   __global const rule_cell* rules) {
+  const int sentence = get_global_id(0);
+  const int begin = get_global_id(1);
+  const int gram = get_global_id(2);
+  const int end = begin + span_length;
+  const int length = lengths[sentence];
+  __global rule_cell* ruleCounts = ecounts + (lengthOffsets[sentence] + begin);
+  __global const parse_cell* obot = outsides_bot + offsets[sentence];
+  __global const parse_cell* itop = insides_top + offsets[sentence];
+  __global const parse_cell* ipos = insides_pos + (lengthOffsets[sentence] + begin);
+  const float root_score = CELL(itop, 0, length)->syms[ROOT][gram]; // scale is 2^(SCALE_FACTOR)^(length-1)
+  if(end <= length) {
+    float oscore;
+    __global const parse_cell* oparents = CELL(obot, begin, end);
+
+    %s
+
+  }
+}
+
+__kernel void ecount_binary_terms(__global rule_cell* ecounts,
+   __global const parse_cell * insides_top,
+   __global const parse_cell* outsides_bot,
+   __global const parse_cell * insides_pos,
+   __global const int* offsets,
+   __global const int* lengths,
+  __global const int* lengthOffsets,
+   __global const rule_cell* rules) {
+  const int sentence = get_global_id(0);
+  const int begin = get_global_id(1);
+  const int gram = get_global_id(2);
+  const int end = begin + 2;
+  const int split = begin + 1;
+  const int length = lengths[sentence];
+  __global rule_cell* ruleCounts = ecounts + (lengthOffsets[sentence] + begin);
+  __global const parse_cell* obot = outsides_bot + offsets[sentence];
+  __global const parse_cell* itop = insides_top + offsets[sentence];
+  __global const parse_cell* ipos = insides_pos + lengthOffsets[sentence];
+  const float root_score = CELL(itop, 0, length)->syms[ROOT][gram]; // scale is 2^(SCALE_FACTOR)^(length-1)
+  if(end <= length) {
+    float oscore;
+    __global const parse_cell* oparents = CELL(obot, begin, end);
+
+    %s
+
+  }
+}
+
+__kernel void ecount_binary_rterms(__global rule_cell* ecounts,
+   __global const parse_cell * insides_top,
+   __global const parse_cell* outsides_bot,
+   __global const parse_cell * insides_pos,
+   __global const int* offsets,
+   __global const int* lengths,
+  __global const int* lengthOffsets,
+   __global const rule_cell* rules) {
+  const int sentence = get_global_id(0);
+  const int split = get_global_id(1);
+  const int gram = get_global_id(2);
+  const int end = split + 1;
+  const int length = lengths[sentence];
+  __global rule_cell* ruleCounts = ecounts + (lengthOffsets[sentence] + split);
+  __global const parse_cell* obot = outsides_bot + offsets[sentence];
+  __global const parse_cell* itop = insides_top + offsets[sentence];
+  __global const parse_cell* ipos = insides_pos + lengthOffsets[sentence];
+  const float root_score = CELL(itop, 0, length)->syms[ROOT][gram]; // scale is 2^(SCALE_FACTOR)^(length-1)
+  if(end <= length) {
+    float oscore, irscore;
+    %s
+
   }
 }
 
@@ -159,12 +255,13 @@ __kernel void ecount_terminals(
     }
   }
 }
-                                                      """.format(ecountBinaryRules(byParent), ecountUnaries(uByParent))
+                                                      """.format(ecountBinaryRules(ntRules), ecountBinaryLeftTerms(leftTermRules), ecountBinaryTerms(bothTermRules), ecountBinaryRightTerms(rightTermRules), ecountUnaries(unaryRulesWithIndices))
   }
 
-  val registersToUse = 60
+  val registersToUse = 30
 
-  private def ecountBinaryRules(byParent: Map[Int, IndexedSeq[(BinaryRule[Int], Int)]]):String = {
+  private def ecountBinaryRules(binaries: IndexedSeq[(BinaryRule[Int], Int)]):String = {
+    val byParent: Map[Int, IndexedSeq[(BinaryRule[Int], Int)]] = binaries.groupBy(_._1.parent)
     val buf = new ArrayBuffer[String]()
     buf += (0 until registersToUse).map("r" + _).mkString("float ", ", ", ";")
     for((par, rx) <- byParent) {
@@ -200,7 +297,7 @@ __kernel void ecount_terminals(
               buf += "    r%d = CELL(itop, split, end)->syms[%d][gram];".format(rightR, right)
               setThisRound += rightR
             }
-            buf += "    r%d = fma(rules->binaries[%d][gram], r0 * r%d * oscore, r%d);".format(ruleR, ruleIndex, rightR, ruleR)
+            buf += "    r%d = fma(rules->binaries[%d][gram], r0 * r%d, r%d);".format(ruleR, ruleIndex, rightR, ruleR)
             r += 1
           }
         }
@@ -210,7 +307,7 @@ __kernel void ecount_terminals(
         // register flush time!
         buf += "  // flush time!"
         for( (reg, rule) <- ruleRegisters) {
-          buf += "  ruleCounts->binaries[%d][gram] +=  r%d;".format(rule, reg)
+          buf += "  ruleCounts->binaries[%d][gram] +=  r%d * oscore;".format(rule, reg)
         }
         buf(regInitializerPos) = ruleRegisters.map { case (reg, rule) => "r%d = 0.0f;".format(reg)}.mkString("  ", " ", "");
       }
@@ -219,7 +316,168 @@ __kernel void ecount_terminals(
     buf.mkString("\n    ")
   }
 
-  private def ecountUnaries(byParent: Map[Int,IndexedSeq[(UnaryRule[Int], Int)]]): String = {
+   private def ecountBinaryTerms(binaries: IndexedSeq[(BinaryRule[Int], Int)]):String = {
+    val byParent: Map[Int, IndexedSeq[(BinaryRule[Int], Int)]] = binaries.groupBy(_._1.parent)
+    val buf = new ArrayBuffer[String]()
+    buf += (0 until registersToUse).map("r" + _).mkString("float ", ", ", ";")
+    for((par, rx) <- byParent) {
+      val rules = rx.sortBy(r => r._1.left -> r._1.right)(Ordering.Tuple2)
+
+      // oparent has scale length + begin - end, root has scale length - 1
+      // left * right has scale (end - begin-2)
+      // left * right * oparent / root has scale -1
+      buf += "oscore = ldexp(oparents->syms[%d][gram]/root_score, SCALE_FACTOR);".format(par)
+      buf += "if (oscore != 0.0f) {"
+      var r = 0
+      while(r < rules.length) {
+        val assignments = Index[(Symbol,Int)]()
+        val setThisRound = mutable.BitSet.empty
+        val ruleRegisters = ArrayBuffer[(Int, Int)]() // Register -> Rule
+        val regInitializerPos = buf.size
+        buf += "XXX"
+
+        var lastLeft = -1
+        assignments.index(('left -> 1))
+        while(r < rules.length && assignments.size < registersToUse) {
+          val (BinaryRule(_, l, right), ruleIndex) = rules(r)
+          if(lastLeft != l) {
+            buf += "    r0 = ipos[begin].syms[%d][gram];".format(l)
+            lastLeft = l
+          }
+          val rightR = assignments.index(('right, right))
+          val ruleR = assignments.index(('rule, ruleIndex))
+          if(assignments.size < registersToUse) {
+            ruleRegisters += (ruleR -> ruleIndex)
+            if (!setThisRound(rightR)) {
+              buf += "    r%d = ipos[split].syms[%d][gram];".format(rightR, right)
+              setThisRound += rightR
+            }
+            buf += "    r%d = fma(rules->binaries[%d][gram], r0 * r%d, r%d);".format(ruleR, ruleIndex, rightR, ruleR)
+            r += 1
+          }
+        }
+
+        // register flush time!
+        buf += "  // flush time!"
+        for( (reg, rule) <- ruleRegisters) {
+          buf += "  ruleCounts->binaries[%d][gram] +=  r%d * oscore;".format(rule, reg)
+        }
+        buf(regInitializerPos) = ruleRegisters.map { case (reg, rule) => "r%d = 0.0f;".format(reg)}.mkString("  ", " ", "");
+      }
+      buf += "}\n"
+    }
+    buf.mkString("\n    ")
+  }
+
+  private def ecountBinaryLeftTerms(binaries: IndexedSeq[(BinaryRule[Int], Int)]):String = {
+    val byLeftChild: Map[Int, IndexedSeq[(BinaryRule[Int], Int)]] = binaries.groupBy(_._1.left)
+    val buf = new ArrayBuffer[String]()
+    buf += (0 until registersToUse).map("r" + _).mkString("float ", ", ", ";")
+    buf += "float ilscore;"
+    for((left, rx) <- byLeftChild) {
+      val rules = rx.sortBy(r => r._1.parent -> r._1.right)(Ordering.Tuple2)
+      // oparent has scale length + begin - end, root has scale length - 1
+      // left * right has scale (end - begin-2)
+      // left * right * oparent / root has scale -1
+      buf += "ilscore = ldexp(ipos->syms[%d][gram] / root_score, SCALE_FACTOR);".format(left)
+
+      buf += "if (ilscore != 0.0f) {"
+      var r = 0
+      while(r < rules.length) {
+        val assignments = Index[(Symbol,Int)]()
+        val setThisRound = mutable.BitSet.empty
+        val ruleRegisters = ArrayBuffer[(Int, Int)]() // Register -> Rule
+        val regInitializerPos = buf.size
+        buf += "XXX"
+
+        var lastParent = -1
+        while(r < rules.length && assignments.size < registersToUse) {
+          val (BinaryRule(parent, l, right), ruleIndex) = rules(r)
+          if(lastParent != parent) {
+            buf += "oscore = CELL(obot, begin, end)->syms[%d][gram];".format(parent)
+            lastParent = parent
+          }
+          val rightR = assignments.index(('right, right))
+          val ruleR = assignments.index(('rule, ruleIndex))
+          if(assignments.size < registersToUse) {
+            ruleRegisters += (ruleR -> ruleIndex)
+            if (!setThisRound(rightR)) {
+              buf += "    r%d = CELL(itop, begin+1, end)->syms[%d][gram];".format(rightR, right)
+              setThisRound += rightR
+            }
+            buf += "    r%d = fma(rules->binaries[%d][gram], oscore * r%d, r%d);".format(ruleR, ruleIndex, rightR, ruleR)
+            r += 1
+          }
+        }
+        // register flush time!
+        buf += "  // flush time!"
+        for( (reg, rule) <- ruleRegisters) {
+          buf += "  ruleCounts->binaries[%d][gram] +=  r%d * ilscore;".format(rule, reg)
+        }
+        buf(regInitializerPos) = ruleRegisters.map { case (reg, rule) => "r%d = 0.0f;".format(reg)}.mkString("  ", " ", "");
+      }
+      buf += "}\n"
+    }
+    buf.mkString("\n    ")
+  }
+
+  private def ecountBinaryRightTerms(binaries: IndexedSeq[(BinaryRule[Int], Int)]):String = {
+    val byRight: Map[Int, IndexedSeq[(BinaryRule[Int], Int)]] = binaries.groupBy(_._1.right)
+    val buf = new ArrayBuffer[String]()
+    buf += (0 until registersToUse).map("r" + _).mkString("float ", ", ", ";")
+    for((right, rx) <- byRight) {
+      val rules = rx.sortBy(r => r._1.parent -> r._1.left)(Ordering.Tuple2)
+
+      // oparent has scale length + begin - end, root has scale length - 1
+      // left * right has scale (end - begin-2)
+      // left * right * oparent / root has scale -1
+      buf += "irscore = ldexp(ipos[split].syms[%d][gram]/root_score, SCALE_FACTOR);".format(right)
+      buf += "if (irscore != 0.0f) {"
+      var r = 0
+      while(r < rules.length) {
+        val assignments = Index[(Symbol,Int)]()
+        val setThisRound = mutable.BitSet.empty
+        val ruleRegisters = ArrayBuffer[(Int, Int)]() // Register -> Rule
+        val regInitializerPos = buf.size
+        buf += "XXX"
+
+        buf += "  for(int begin = 0; begin < split; ++begin) {"
+        var lastParent = -1
+        while(r < rules.length && assignments.size < registersToUse) {
+          val (BinaryRule(par, left, _), ruleIndex) = rules(r)
+          if(lastParent != par) {
+            buf += "    oscore = CELL(obot, begin, end)->syms[%d][gram];".format(par)
+            lastParent = par
+          }
+          val leftR = assignments.index(('left, left))
+          val ruleR = assignments.index(('rule, ruleIndex))
+          if(assignments.size < registersToUse) {
+            ruleRegisters += (ruleR -> ruleIndex)
+            if (!setThisRound(leftR)) {
+              buf += "    r%d = CELL(itop, begin, split)->syms[%d][gram];".format(leftR, left)
+              setThisRound += leftR
+            }
+            buf += "    r%d = fma(rules->binaries[%d][gram], oscore * r%d, r%d);".format(ruleR, ruleIndex, leftR, ruleR)
+            r += 1
+          }
+        }
+
+        buf += "  }\n"
+
+        // register flush time!
+        buf += "  // flush time!"
+        for( (reg, rule) <- ruleRegisters) {
+          buf += "  ruleCounts->binaries[%d][gram] +=  r%d * irscore;".format(rule, reg)
+        }
+        buf(regInitializerPos) = ruleRegisters.map { case (reg, rule) => "r%d = 0.0f;".format(reg)}.mkString("  ", " ", "");
+      }
+      buf += "}\n"
+    }
+    buf.mkString("\n    ")
+  }
+
+  private def ecountUnaries(unaries: IndexedSeq[(UnaryRule[Int], Int)]): String = {
+    val byParent: Map[Int, IndexedSeq[(UnaryRule[Int], Int)]] = unaries.groupBy(_._1.parent)
     val buf = new ArrayBuffer[String]()
     buf += "    float oscore;"
     for( (par, rules) <- byParent) {
