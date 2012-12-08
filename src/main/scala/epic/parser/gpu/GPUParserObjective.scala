@@ -118,6 +118,8 @@ object GPUParserTrainer {
     val parsers = trainParser(params.treebank.trainTrees, params.trainer)
 
     import params.treebank._
+
+    parsers
   }
 
 
@@ -153,7 +155,7 @@ object GPUParserTrainer {
    * of parsers
    */
   def trainParser(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]],
-                  params: Params): Iterator[(String, Parser[AnnotatedLabel, String])] = {
+                  params: Params) = {
     import params._
     val annTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]] = trainTrees.map(annotator(_))
 
@@ -204,6 +206,8 @@ object GPUParserTrainer {
       refinements.labels.fineIndex,
       refinements.rules.fineIndex)
 
+    val refinedLexicon = Lexicon
+
     implicit val context = if(useGPU) {
       JavaCL.createBestContext()
     } else {
@@ -212,7 +216,7 @@ object GPUParserTrainer {
     }
     println(context)
 
-    val gpuParser = new GrammarKernel(xbarGrammar, finalRefinements, refinedGrammar,  xbarLexicon, Array(RuleScores(DenseVector.zeros(), DenseVector.zeros())), Array(null))
+    val gpuParser = new GrammarKernel[AnnotatedLabel, (AnnotatedLabel, Int), String](xbarGrammar, finalRefinements, refinedGrammar,  xbarLexicon.flatMap(split _), Array(RuleScores.zeros(refinedGrammar)), Array[(IndexedSeq[String], Int, Int) => Double]())
 
     println(finalRefinements.labels)
 
