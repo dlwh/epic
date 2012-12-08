@@ -7,6 +7,7 @@ import java.lang.{Float=>JFloat, Integer=>JInt}
 import java.io.FileWriter
 
 class InsideKernel[L](ruleStructure: RuleStructure[L], numGrammars: Int)(implicit context: CLContext) {
+  val partitionsParent = GrammarPartitioner.partition(ruleStructure.ntRules)
 
   def insidePass(numSentences: Int,
                  insideBot: CLBuffer[JFloat],

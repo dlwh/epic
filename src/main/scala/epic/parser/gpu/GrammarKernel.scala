@@ -314,7 +314,6 @@ class GrammarKernel[C, L, W](coarseGrammar: BaseGrammar[C],
 
   private def computePartitions(batch: Batch, events: CLEvent*):Array[Double] = {
     val partitions = partitionGetter.partitions(insideTopDev, offDev, lenDev, batch.numSentences, events: _*).map(_.toDouble)
-//    println(partitions.mkString(", "))
     partitions
   }
 
@@ -518,7 +517,7 @@ object GrammarKernel {
     val counts = kern.expectedRuleCounts(train.map(_.words.toIndexedSeq))
     val time3 = System.currentTimeMillis()
     println(counts.rules.map(_.sum).sum)
-    println(counts.wordCounts.map(_.map(_.map(_.sum).sum).sum))
+//    println(counts.wordCounts.map(_.map(_.map(_.sum).sum).sum))
     //    println(Encoder.fromIndex(grammar.refinedGrammar.index).decode(counts))
     println("Done ecounts: " + (time3 - time2))
 
