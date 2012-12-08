@@ -179,9 +179,6 @@ __kernel void inside_unaries(__global const parse_cell * inside_bots,
         sb += "currentSum = 0.0f;"
        }
 
-       sb += "// out has a scale factor of (2^SCALE_FACTOR)^((end-split) + (split-begin) - 2) = (2^SCALE_FACTOR)^(end-begin-2)"
-       sb += "// multiply in a 2^SCALE_FACTOR to reachive balance."
-       sb += "gout->syms[%d][gram] = ldexp(p%d, SCALE_FACTOR);".format(p,p)
     }
 
     sb.mkString("\n      ")
@@ -279,10 +276,16 @@ __kernel void inside_binaries_%d(
       __global const parse_cell * right = CELL(chart_top, split, end); // scale factor of (2^ SCALE_FACTOR)((end-split) - 1)
       %s
     }
+
+    // out has a scale factor of (2^SCALE_FACTOR)^((end-split) + (split-begin) - 2) = (2^SCALE_FACTOR)^(end-begin-2)
+    // multiply in a 2^SCALE_FACTOR to re-achieve balance.
+    %s
   }
 }
     """.format(id,
       rules.map(_._1.parent).toSet[Int].map("p" + _).mkString("float ", " = 0.0f,", " = 0.0f;"),
-      insideRuleUpdates(rules) )
+      insideRuleUpdates(rules),
+      rules.map(_._1.parent).toSet[Int].map(p => "gout->syms[%d][gram] = ldexp(p%d, SCALE_FACTOR);".format(p,p)).mkString("\n   ")
+    )
   }
 }
