@@ -5,9 +5,10 @@ import collection.mutable.ArrayBuffer
 import com.nativelibs4java.opencl._
 import java.lang.{Float=>JFloat, Integer=>JInt}
 import java.io.FileWriter
+import collection.immutable
 
 class InsideKernel[L](ruleStructure: RuleStructure[L], numGrammars: Int)(implicit context: CLContext) {
-  val partitionsParent = GrammarPartitioner.partition(ruleStructure.ntRules)
+  val partitionsParent: IndexedSeq[IndexedSeq[(BinaryRule[Int], Int)]] = GrammarPartitioner.partition(ruleStructure.ntRules).toIndexedSeq
 
   def insidePass(numSentences: Int,
                  insideBot: CLBuffer[JFloat],
@@ -19,7 +20,7 @@ class InsideKernel[L](ruleStructure: RuleStructure[L], numGrammars: Int)(implici
                  lengthOffsets: CLBuffer[JInt],
                  rules: CLBuffer[JFloat],
                  events: CLEvent*)(implicit queue: CLQueue) = synchronized {
-    binaries.setArgs(insideBot, insideTop, offsets, lengths, Integer.valueOf(1), rules)
+    binaries.foreach(_.setArgs(insideBot, insideTop, offsets, lengths, Integer.valueOf(1), rules))
     termBinaries.setArgs(insideBot, insideTop, posTags, offsets, lengths, lengthOffsets, Integer.valueOf(1), rules)
     unaries.setArgs(insideBot, insideTop, offsets, lengths, Integer.valueOf(1), rules)
     val iu, ib, it = new ArrayBuffer[CLEvent]()
@@ -30,12 +31,12 @@ class InsideKernel[L](ruleStructure: RuleStructure[L], numGrammars: Int)(implici
     // TODO: retrofit inside/outside binaries and unaries to look at posTagsPointer....
     // TODO: also get ecounts...
     for (len <- 2 to maxLength) {
-      binaries.setArg(4, len)
-      val b = binaries.enqueueNDRange(queue, Array(numSentences, maxLength + 1 - len, numGrammars), Array(1, 1, numGrammars), lastU)
-      ib += b
+      binaries.foreach(_.setArg(4, len))
+      val b = binaries.map(_.enqueueNDRange(queue, Array(numSentences, maxLength + 1 - len, numGrammars), Array(1, 1, numGrammars), lastU))
+      ib ++= b
 
       termBinaries.setArg(6, len)
-      val t = termBinaries.enqueueNDRange(queue, Array(numSentences, maxLength + 1 - len, numGrammars), Array(1, 1, numGrammars), b)
+      val t = termBinaries.enqueueNDRange(queue, Array(numSentences, maxLength + 1 - len, numGrammars), Array(1, 1, numGrammars), b:_*)
       it += t
 
       unaries.setArg(4, len)
@@ -55,47 +56,15 @@ class InsideKernel[L](ruleStructure: RuleStructure[L], numGrammars: Int)(implici
 
   }
 
-  private lazy val binaries = program.createKernel("inside_binaries")
+  private lazy val binaries = Array.tabulate(partitionsParent.length)(i => program.createKernel("inside_binaries_" + i))
   private lazy val termBinaries = program.createKernel("inside_term_binaries")
   private lazy val unaries = program.createKernel("inside_unaries")
 
+
+
   lazy val text = GrammarHeader.header(ruleStructure, numGrammars) +
     """
-__kernel void inside_binaries(
-              __global parse_cell * inside_bots,
-              __global const parse_cell * inside_tops,
-              __global const int* offsets,
-              __global const int* lengths,
-              const int spanLength,
-              __global const rule_cell* rules) {
-  const int sentence = get_global_id(0);
-  const int begin = get_global_id(1);
-  const int gram = get_global_id(2);
-  const int end = begin + spanLength;
-  const int length = lengths[sentence];
-  float out[NUM_SYMS], right[NUM_SYMS];
-  if (end <= length) {
-    __global const parse_cell* chart_top =  inside_tops + offsets[sentence];
-    for(int i = 0; i < NUM_SYMS; ++i) {
-      out[i] = 0.0f;
-    }
 
-    for(int split = begin + 1; split < end; ++split) {
-      __global const parse_cell * left = CELL(chart_top, begin, split); // scale factor of (2 ^ SCALE_FACTOR)^((split - begin) - 1)
-      __global const parse_cell * gright = CELL(chart_top, split, end); // scale factor of (2^ SCALE_FACTOR)((end-split) - 1)
-      for(int i = 0; i < NUM_SYMS; ++i) {
-        right[i] = gright->syms[i][gram];
-      }
-      %s
-    }
-    // out has a scale factor of (2^SCALE_FACTOR)^((end-split) + (split-begin) - 2) = (2^SCALE_FACTOR)^(end-begin-2)
-    // multiply in a 2^SCALE_FACTOR to reachive balance.
-    __global parse_cell* gout = CELL(inside_bots + offsets[sentence], begin, end);
-    for(int i = 0; i < NUM_SYMS; ++i) {
-      gout->syms[i][gram] = ldexp(out[i], SCALE_FACTOR);
-    }
-  }
-}
 
  __kernel void inside_term_binaries(
               __global parse_cell * inside_bots,
@@ -153,10 +122,10 @@ __kernel void inside_unaries(__global const parse_cell * inside_bots,
   }
 }
 
-    """.stripMargin.format(insideRuleUpdates(ruleStructure.ntRules), // ntrules
+    """.stripMargin.format(
       insideTermRuleUpdates,
 //      insideRuleUpdates(ruleStructure.leftTermRules ++ ruleStructure.rightTermRules ++ ruleStructure.bothTermRules),
-      insideUnaryUpdates(ruleStructure.unaryRulesWithIndices))
+      insideUnaryUpdates(ruleStructure.unaryRulesWithIndices)) ++ (0 until partitionsParent.length).map(i => ntBinaryPartition(partitionsParent(i), i)).mkString("\n")
 
   if(true) {val o = new FileWriter("inside.cl"); o.write(text); o.close()}
 
@@ -185,28 +154,33 @@ __kernel void inside_unaries(__global const parse_cell * inside_bots,
   def insideRuleUpdates( _rules: IndexedSeq[(BinaryRule[Int], Int)]): String = {
     val byParent = _rules.sortBy(_._1.left).groupBy(_._1.parent)
     val sb = new ArrayBuffer[String]
-    sb += "float currentLeftScore, currentSum = 0.0f;"
+    val lefts = _rules.map(_._1.left).toSet
+    val rights = _rules.map(_._1.right).toSet
+    sb += "float currentSum = 0.0f;"
+    lefts.map(l => "const float l%d = left->syms[%d][gram];".format(l,l)).foreach(sb += _)
+    rights.map(r => "const float r%d = right->syms[%d][gram];".format(r,r)).foreach(sb += _)
     for( (p, rules) <- byParent) {
       var lastLeft = -1
       for((r@BinaryRule(p, l, right), index) <- rules) {
         if(lastLeft != l) {
           if(lastLeft != -1) {
             sb += "}"
-            sb += "out[%d] = mad(currentLeftScore, currentSum, out[%d]);".format(r.parent, r.parent)
+            sb += "p%d = mad(l%d, currentSum, p%d);".format(r.parent, lastLeft, r.parent)
           }
-          sb += "currentLeftScore = left->syms[%d][gram];" format l
           sb += "currentSum = 0.0f;"
-          sb += "if(currentLeftScore != 0.0f) {"
+          sb += "if(l%d != 0.0f) { // %s".format(r.left, symbolName(r.left))
           lastLeft = l
         }
-        sb += "  currentSum = mad(rules->binaries[%d][gram], right[%d], currentSum);".format(index, right)
+        sb += "  currentSum = mad(rules->binaries[%d][gram], r%d, currentSum); // %s".format(index, right, ruleString(index))
       }
-      if(lastLeft != -1)
-        sb += "  out[%d] = mad(currentLeftScore, currentSum, out[%d]);".format(p, p)
-      sb += "}"
+      if(lastLeft != -1) {
+        sb += "p%d = mad(l%d, currentSum, p%d);".format(p, lastLeft, p)
+        sb += "}"
+        sb += "currentSum = 0.0f;"
+       }
     }
 
-    sb.mkString("\n    ")
+    sb.mkString("\n      ")
   }
 
   def symbolName(sym: Int): L = {
@@ -275,5 +249,40 @@ __kernel void inside_unaries(__global const parse_cell * inside_bots,
     p.addBuildOption("-Werror")
     p.build()
     p
+  }
+
+  private def ntBinaryPartition(rules: IndexedSeq[(BinaryRule[Int], Int)], id: Int) = {
+    """
+__kernel void inside_binaries_%d(
+              __global parse_cell * inside_bots,
+              __global const parse_cell * inside_tops,
+              __global const int* offsets,
+              __global const int* lengths,
+              const int spanLength,
+              __global const rule_cell* rules) {
+  const int sentence = get_global_id(0);
+  const int begin = get_global_id(1);
+  const int gram = get_global_id(2);
+  const int end = begin + spanLength;
+  const int length = lengths[sentence];
+  if (end <= length) {
+    __global const parse_cell* chart_top =  inside_tops + offsets[sentence];
+    %s
+
+    for(int split = begin + 1; split < end; ++split) {
+      __global const parse_cell * left = CELL(chart_top, begin, split); // scale factor of (2 ^ SCALE_FACTOR)^((split - begin) - 1)
+      __global const parse_cell * right = CELL(chart_top, split, end); // scale factor of (2^ SCALE_FACTOR)((end-split) - 1)
+      %s
+    }
+    // out has a scale factor of (2^SCALE_FACTOR)^((end-split) + (split-begin) - 2) = (2^SCALE_FACTOR)^(end-begin-2)
+    // multiply in a 2^SCALE_FACTOR to reachive balance.
+    __global parse_cell* gout = CELL(inside_bots + offsets[sentence], begin, end);
+    %s
+  }
+}
+    """.format(id,
+      rules.map(_._1.parent).toSet[Int].map("p" + _).mkString("float ", " = 0.0f,", " = 0.0f;"),
+      insideRuleUpdates(rules),
+      rules.map(_._1.parent).toSet[Int].map(i => "gout->syms[%d][gram] = ldexp(p%d, SCALE_FACTOR);".format(i,i)).mkString("\n    "))
   }
 }
