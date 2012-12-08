@@ -8,6 +8,7 @@ import breeze.util.Index
 import collection.mutable
 
 class ExpectedCountsKernel[L](ruleStructure: RuleStructure[L], numGrammars: Int)(implicit context: CLContext) {
+  import ruleStructure._
 
   def expectedCounts(numSentences: Int,
                      ecounts: CLBuffer[JFloat],
@@ -25,7 +26,7 @@ class ExpectedCountsKernel[L](ruleStructure: RuleStructure[L], numGrammars: Int)
                      events: CLEvent*)(implicit queue: CLQueue)  = {
 
     val eu, eb, et = new ArrayBuffer[CLEvent]()
-    binaries.setArgs(ecounts, insideTop, outsideBot, offsets, lengths, offLengths, Integer.valueOf(1), rules)
+    binaries.foreach(_.setArgs(ecounts, insideTop, outsideBot, offsets, lengths, offLengths, Integer.valueOf(1), rules))
     binary_lterms.setArgs(ecounts, insideTop, outsideBot, insidePos, offsets, lengths, offLengths, Integer.valueOf(1), rules)
     binary_rterms.setArgs(ecounts, insideTop, outsideBot, insidePos, offsets, lengths, offLengths, rules)
     binary_terms.setArgs(ecounts, insideTop, outsideBot, insidePos, offsets, lengths, offLengths, rules)
@@ -50,11 +51,11 @@ class ExpectedCountsKernel[L](ruleStructure: RuleStructure[L], numGrammars: Int)
     var lastUDep = termFinished
     for (len <- 2 to maxLength) {
       unaries.setArg(7, len)
-      binaries.setArg(6, len)
+      binaries.foreach(_.setArg(6, len))
       binary_lterms.setArg(7, len)
-      lastBDep = binaries.enqueueNDRange(queue, Array(numSentences, maxLength+1-len, numGrammars), Array(1, 1, numGrammars), lastBDep)
-      eb += lastBDep
-      lastBDep = binary_lterms.enqueueNDRange(queue, Array(numSentences, maxLength+1-len, numGrammars), Array(1, 1, numGrammars), lastBDep)
+      val lastBDeps = binaries.map(_.enqueueNDRange(queue, Array(numSentences, maxLength+1-len, numGrammars), Array(1, 1, numGrammars), lastBDep))
+      eb ++= lastBDeps
+      lastBDep = binary_lterms.enqueueNDRange(queue, Array(numSentences, maxLength+1-len, numGrammars), Array(1, 1, numGrammars), lastBDeps:_*)
       et += lastBDep
       lastUDep = unaries.enqueueNDRange(queue, Array(numSentences, maxLength+1-len, numGrammars), Array(1, 1, numGrammars), lastUDep)
       eu += lastUDep
@@ -81,7 +82,7 @@ class ExpectedCountsKernel[L](ruleStructure: RuleStructure[L], numGrammars: Int)
   }
 
 
-  private lazy val binaries = program.createKernel("ecount_binaries")
+  private lazy val binaries = Array.tabulate(partitionsParent.length)(i => program.createKernel("ecount_binaries_" + i))
   private lazy val binary_lterms = program.createKernel("ecount_binary_lterms")
   private lazy val binary_rterms = program.createKernel("ecount_binary_rterms")
   private lazy val binary_terms = program.createKernel("ecount_binary_terms")
@@ -92,29 +93,7 @@ class ExpectedCountsKernel[L](ruleStructure: RuleStructure[L], numGrammars: Int)
   lazy val text = {
     import ruleStructure._
     GrammarHeader.header(ruleStructure, numGrammars) +"""
-__kernel void ecount_binaries(__global rule_cell* ecounts,
-   __global const parse_cell * insides_top,
-   __global const parse_cell* outsides_bot,
-   __global const int* offsets,
-   __global const int* lengths,
-  __global const int* lengthOffsets,
-   const int span_length,
-   __global const rule_cell* rules) {
-  const int sentence = get_global_id(0);
-  const int begin = get_global_id(1);
-  const int gram = get_global_id(2);
-  const int end = begin + span_length;
-  const int length = lengths[sentence];
-  __global rule_cell* ruleCounts = ecounts + (lengthOffsets[sentence] + begin);
-  __global const parse_cell* obot = outsides_bot + offsets[sentence];
-  __global const parse_cell* itop = insides_top + offsets[sentence];
-  const float root_score = CELL(itop, 0, length)->syms[ROOT][gram]; // scale is 2^(SCALE_FACTOR)^(length-1)
-  if(end <= length) {
-    float oscore;
-    __global const parse_cell* oparents = CELL(obot, begin, end);
-    %s
-  }
-}
+
 
  __kernel void ecount_binary_lterms(__global rule_cell* ecounts,
    __global const parse_cell * insides_top,
@@ -254,7 +233,40 @@ __kernel void ecount_terminals(
     }
   }
 }
-                                                      """.format(ecountBinaryRules(ntRules), ecountBinaryLeftTerms(leftTermRules), ecountBinaryTerms(bothTermRules), ecountBinaryRightTerms(rightTermRules), ecountUnaries(unaryRulesWithIndices))
+
+""".format(ecountBinaryLeftTerms(leftTermRules),
+      ecountBinaryTerms(bothTermRules),
+      ecountBinaryRightTerms(rightTermRules),
+      ecountUnaries(unaryRulesWithIndices)
+    )  ++ (0 until partitionsParent.length).map(i => ecountBinaryPartition(partitionsParent(i), i)).mkString("\n")
+  }
+
+  def ecountBinaryPartition(rules: IndexedSeq[(BinaryRule[Int], Int)], id: Int) = {
+"""
+    __kernel void ecount_binaries_%d(__global rule_cell* ecounts,
+   __global const parse_cell * insides_top,
+   __global const parse_cell* outsides_bot,
+   __global const int* offsets,
+   __global const int* lengths,
+  __global const int* lengthOffsets,
+   const int span_length,
+   __global const rule_cell* rules) {
+  const int sentence = get_global_id(0);
+  const int begin = get_global_id(1);
+  const int gram = get_global_id(2);
+  const int end = begin + span_length;
+  const int length = lengths[sentence];
+  __global rule_cell* ruleCounts = ecounts + (lengthOffsets[sentence] + begin);
+  __global const parse_cell* obot = outsides_bot + offsets[sentence];
+  __global const parse_cell* itop = insides_top + offsets[sentence];
+  const float root_score = CELL(itop, 0, length)->syms[ROOT][gram]; // scale is 2^(SCALE_FACTOR)^(length-1)
+  if(end <= length) {
+    float oscore;
+    __global const parse_cell* oparents = CELL(obot, begin, end);
+    %s
+  }
+}
+""".format(id, ecountBinaryRules(rules))
   }
 
   val registersToUse = 30

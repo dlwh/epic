@@ -8,7 +8,7 @@ import java.io.FileWriter
 import collection.immutable
 
 class InsideKernel[L](ruleStructure: RuleStructure[L], numGrammars: Int)(implicit context: CLContext) {
-  val partitionsParent: IndexedSeq[IndexedSeq[(BinaryRule[Int], Int)]] = GrammarPartitioner.partition(ruleStructure.ntRules, 45).toIndexedSeq
+  import ruleStructure._
 
   def insidePass(numSentences: Int,
                  insideBot: CLBuffer[JFloat],
