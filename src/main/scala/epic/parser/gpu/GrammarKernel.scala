@@ -117,7 +117,7 @@ class GrammarKernel[C, L, W](coarseGrammar: BaseGrammar[C],
     {for {
       partition <- getPartitions(sentences).iterator
       batch = layoutIntoMemory(partition)
-    _ = getMarginals(batch)
+//    _ = getMarginals(batch)
       t <- doParse(batch)
     } yield {
       t
@@ -275,6 +275,7 @@ class GrammarKernel[C, L, W](coarseGrammar: BaseGrammar[C],
     lastEvent = ecounts.expectedCounts(numSentences, ecountsDev, termECountsDev,
       insideBotDev, insideTopDev,
       outsideBotDev, outsideTopDev,
+      posTagsDev,
       offDev, lenDev, offLengthsDev, lengths.max, rulesDev, lastEvent, wOB, wterm)
 
 //                  println("sum..." + ecountsDev.read(queue).getFloats.sum)
@@ -524,7 +525,7 @@ object GrammarKernel {
     val marg = train.map(_.words).foldLeft(DenseVector.zeros[Double](feat.index.size)){ (acc, s) =>
       val m = ChartMarginal(AugmentedGrammar.fromRefined(grammar), s, ParseChart.logProb)
       val counts = m.expectedCounts(feat).counts
-      println(m.partition)
+//      println(m.partition)
       acc += counts
       acc
     }

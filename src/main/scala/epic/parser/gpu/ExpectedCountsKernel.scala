@@ -16,6 +16,7 @@ class ExpectedCountsKernel[L](ruleStructure: RuleStructure[L], numGrammars: Int)
                      insideTop: CLBuffer[JFloat],
                      outsideBot: CLBuffer[JFloat],
                      outsideTop: CLBuffer[JFloat],
+                     insidePos: CLBuffer[JFloat],
                      offsets: CLBuffer[JInt],
                      lengths: CLBuffer[JInt],
                      offLengths: CLBuffer[JInt],
@@ -25,9 +26,9 @@ class ExpectedCountsKernel[L](ruleStructure: RuleStructure[L], numGrammars: Int)
 
     val eu, eb, et = new ArrayBuffer[CLEvent]()
     binaries.setArgs(ecounts, insideTop, outsideBot, offsets, lengths, offLengths, Integer.valueOf(1), rules)
-    binary_lterms.setArgs(ecounts, insideTop, outsideBot, offsets, lengths, offLengths, Integer.valueOf(1), rules)
-    binary_rterms.setArgs(ecounts, insideTop, outsideBot, offsets, lengths, offLengths, rules)
-    binary_terms.setArgs(ecounts, insideTop, outsideBot, offsets, lengths, offLengths, rules)
+    binary_lterms.setArgs(ecounts, insideTop, outsideBot, insidePos, offsets, lengths, offLengths, Integer.valueOf(1), rules)
+    binary_rterms.setArgs(ecounts, insideTop, outsideBot, insidePos, offsets, lengths, offLengths, rules)
+    binary_terms.setArgs(ecounts, insideTop, outsideBot, insidePos, offsets, lengths, offLengths, rules)
     unaries.setArgs(ecounts, insideTop, insideBot, outsideTop, offsets, lengths, offLengths, Integer.valueOf(1), rules)
     terms.setArgs(termECounts, insideTop, insideBot, outsideBot, offsets, lengths, offLengths, Integer.valueOf(1))
 
@@ -50,7 +51,7 @@ class ExpectedCountsKernel[L](ruleStructure: RuleStructure[L], numGrammars: Int)
     for (len <- 2 to maxLength) {
       unaries.setArg(7, len)
       binaries.setArg(6, len)
-      binary_lterms.setArg(6, len)
+      binary_lterms.setArg(7, len)
       lastBDep = binaries.enqueueNDRange(queue, Array(numSentences, maxLength+1-len, numGrammars), Array(1, 1, numGrammars), lastBDep)
       eb += lastBDep
       lastBDep = binary_lterms.enqueueNDRange(queue, Array(numSentences, maxLength+1-len, numGrammars), Array(1, 1, numGrammars), lastBDep)
@@ -119,6 +120,7 @@ __kernel void ecount_binaries(__global rule_cell* ecounts,
  __kernel void ecount_binary_lterms(__global rule_cell* ecounts,
    __global const parse_cell * insides_top,
    __global const parse_cell* outsides_bot,
+   __global const parse_cell * insides_pos,
    __global const int* offsets,
    __global const int* lengths,
   __global const int* lengthOffsets,
@@ -132,6 +134,7 @@ __kernel void ecount_binaries(__global rule_cell* ecounts,
   __global rule_cell* ruleCounts = ecounts + (lengthOffsets[sentence] + begin);
   __global const parse_cell* obot = outsides_bot + offsets[sentence];
   __global const parse_cell* itop = insides_top + offsets[sentence];
+  __global const parse_cell* ipos = insides_pos + (lengthOffsets[sentence] + begin);
   const float root_score = CELL(itop, 0, length)->syms[ROOT][gram]; // scale is 2^(SCALE_FACTOR)^(length-1)
   if(end <= length) {
     float oscore;
@@ -145,6 +148,7 @@ __kernel void ecount_binaries(__global rule_cell* ecounts,
 __kernel void ecount_binary_terms(__global rule_cell* ecounts,
    __global const parse_cell * insides_top,
    __global const parse_cell* outsides_bot,
+   __global const parse_cell * insides_pos,
    __global const int* offsets,
    __global const int* lengths,
   __global const int* lengthOffsets,
@@ -158,6 +162,7 @@ __kernel void ecount_binary_terms(__global rule_cell* ecounts,
   __global rule_cell* ruleCounts = ecounts + (lengthOffsets[sentence] + begin);
   __global const parse_cell* obot = outsides_bot + offsets[sentence];
   __global const parse_cell* itop = insides_top + offsets[sentence];
+  __global const parse_cell* ipos = insides_pos + lengthOffsets[sentence];
   const float root_score = CELL(itop, 0, length)->syms[ROOT][gram]; // scale is 2^(SCALE_FACTOR)^(length-1)
   if(end <= length) {
     float oscore;
@@ -171,6 +176,7 @@ __kernel void ecount_binary_terms(__global rule_cell* ecounts,
 __kernel void ecount_binary_rterms(__global rule_cell* ecounts,
    __global const parse_cell * insides_top,
    __global const parse_cell* outsides_bot,
+   __global const parse_cell * insides_pos,
    __global const int* offsets,
    __global const int* lengths,
   __global const int* lengthOffsets,
@@ -183,6 +189,7 @@ __kernel void ecount_binary_rterms(__global rule_cell* ecounts,
   __global rule_cell* ruleCounts = ecounts + (lengthOffsets[sentence] + split);
   __global const parse_cell* obot = outsides_bot + offsets[sentence];
   __global const parse_cell* itop = insides_top + offsets[sentence];
+  __global const parse_cell* ipos = insides_pos + lengthOffsets[sentence];
   const float root_score = CELL(itop, 0, length)->syms[ROOT][gram]; // scale is 2^(SCALE_FACTOR)^(length-1)
   if(end <= length) {
     float oscore, irscore;
@@ -251,7 +258,7 @@ __kernel void ecount_terminals(
                                                       """.format(ecountBinaryRules(ntRules), ecountBinaryLeftTerms(leftTermRules), ecountBinaryTerms(bothTermRules), ecountBinaryRightTerms(rightTermRules), ecountUnaries(unaryRulesWithIndices))
   }
 
-  val registersToUse = 60
+  val registersToUse = 30
 
   private def ecountBinaryRules(binaries: IndexedSeq[(BinaryRule[Int], Int)]):String = {
     val byParent: Map[Int, IndexedSeq[(BinaryRule[Int], Int)]] = binaries.groupBy(_._1.parent)
@@ -334,7 +341,7 @@ __kernel void ecount_terminals(
         while(r < rules.length && assignments.size < registersToUse) {
           val (BinaryRule(_, l, right), ruleIndex) = rules(r)
           if(lastLeft != l) {
-            buf += "    r0 = CELL(itop, begin, split)->syms[%d][gram];".format(l)
+            buf += "    r0 = ipos[begin].syms[%d][gram];".format(l)
             lastLeft = l
           }
           val rightR = assignments.index(('right, right))
@@ -342,7 +349,7 @@ __kernel void ecount_terminals(
           if(assignments.size < registersToUse) {
             ruleRegisters += (ruleR -> ruleIndex)
             if (!setThisRound(rightR)) {
-              buf += "    r%d = CELL(itop, split, end)->syms[%d][gram];".format(rightR, right)
+              buf += "    r%d = ipos[split].syms[%d][gram];".format(rightR, right)
               setThisRound += rightR
             }
             buf += "    r%d = fma(rules->binaries[%d][gram], r0 * r%d, r%d);".format(ruleR, ruleIndex, rightR, ruleR)
@@ -372,7 +379,7 @@ __kernel void ecount_terminals(
       // oparent has scale length + begin - end, root has scale length - 1
       // left * right has scale (end - begin-2)
       // left * right * oparent / root has scale -1
-      buf += "ilscore = ldexp(CELL(itop, begin, begin+1)->syms[%d][gram] / root_score, SCALE_FACTOR);".format(left)
+      buf += "ilscore = ldexp(ipos->syms[%d][gram] / root_score, SCALE_FACTOR);".format(left)
 
       buf += "if (ilscore != 0.0f) {"
       var r = 0
@@ -424,7 +431,7 @@ __kernel void ecount_terminals(
       // oparent has scale length + begin - end, root has scale length - 1
       // left * right has scale (end - begin-2)
       // left * right * oparent / root has scale -1
-      buf += "irscore = ldexp(CELL(itop, split, end)->syms[%d][gram]/root_score, SCALE_FACTOR);".format(right)
+      buf += "irscore = ldexp(ipos[split].syms[%d][gram]/root_score, SCALE_FACTOR);".format(right)
       buf += "if (irscore != 0.0f) {"
       var r = 0
       while(r < rules.length) {
