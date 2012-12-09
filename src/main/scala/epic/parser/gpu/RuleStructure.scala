@@ -12,6 +12,7 @@ case class RuleStructure[C, L](refinements: GrammarRefinements[C, L], grammar: B
 
   import grammar._
   def numSyms = grammar.labelIndex.size
+  def numCoarseSyms = refinements.labels.coarseIndex.size
   def root = grammar.rootIndex
   val (binaryRules, unaryRules) = (0 until index.size).partition(isBinary(_))
 
@@ -47,8 +48,8 @@ case class RuleStructure[C, L](refinements: GrammarRefinements[C, L], grammar: B
     (ntRules: IndexedSeq[(BinaryRule[Int], Int)], leftTermRules: IndexedSeq[(BinaryRule[Int], Int)], rightTermRules: IndexedSeq[(BinaryRule[Int], Int)], bothTermRules: IndexedSeq[(BinaryRule[Int], Int)])
   }
   lazy val partitionsParent: IndexedSeq[IndexedSeq[(BinaryRule[Int], Int)]] = GrammarPartitioner.partition(ntRules, targetLabel = GrammarPartitioner.Parent).toIndexedSeq
-  lazy val partitionsLeft: IndexedSeq[IndexedSeq[(BinaryRule[Int], Int)]] = GrammarPartitioner.partition(ntRules, targetLabel = GrammarPartitioner.Parent).toIndexedSeq
-  lazy val partitionsRight: IndexedSeq[IndexedSeq[(BinaryRule[Int], Int)]] = GrammarPartitioner.partition(ntRules, targetLabel = GrammarPartitioner.Parent).toIndexedSeq
+  lazy val partitionsLeft: IndexedSeq[IndexedSeq[(BinaryRule[Int], Int)]] = partitionsParent
+  lazy val partitionsRight: IndexedSeq[IndexedSeq[(BinaryRule[Int], Int)]] = partitionsParent
 
   val (termUnaries, ntermUnaries, termIdentUnaries) = {
     val termUnaries, ntermUnaries, termIdentUnaries = ArrayBuffer[(UnaryRule[Int], Int)]()

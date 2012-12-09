@@ -1,6 +1,5 @@
 package epic.parser.gpu
 
-import epic.parser.projections.ProjectionIndexer
 import com.nativelibs4java.opencl._
 import collection.mutable.ArrayBuffer
 import java.lang.{Float=>JFloat, Integer=>JInt}
@@ -63,12 +62,6 @@ class ProjectionKernel[L, L2](rules: RuleStructure[L, L2],numGrammars: Int, odds
   }
 
   lazy val text = GrammarHeader.header(rules, numGrammars) + """
-#define NUM_PROJECTED_SYMS  %d
-
-typedef struct {
-  float syms[NUM_PROJECTED_SYMS][NUM_GRAMMARS];
-} projected_parse_cell;
-
 __kernel void project_nterms(__global projected_parse_cell* projected,
                              __global const parse_cell* insides,
                              __global const parse_cell* outsides,
@@ -93,7 +86,7 @@ __kernel void project_nterms(__global projected_parse_cell* projected,
 
 }
 
-                                                             """.format(projections.coarseIndex.size, projectNonterminalsInner)
+                                                             """.format(projectNonterminalsInner)
 
   private def projectNonterminalsInner = {
     val buf = new ArrayBuffer[String]()
