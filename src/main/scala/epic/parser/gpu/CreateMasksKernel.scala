@@ -16,7 +16,7 @@ class CreateMasksKernel[L, L2](rules: RuleStructure[L, L2],numGrammars: Int, odd
                  events: CLEvent*)(implicit queue: CLQueue) = synchronized {
     set_coarse_masks.setArgs(masks, projectedTop, projectedBot, offsets)
     val pn = new ArrayBuffer[CLEvent]()
-    val b = set_coarse_masks.enqueueNDRange(queue, Array(numCells, rules.numCoarseSyms), Array(1, rules.numCoarseSyms), events:_*)
+    val b = set_coarse_masks.enqueueNDRange(queue, Array(numCells), events:_*)
     pn += b
 
     if(queue.getProperties.contains(CLDevice.QueueProperties.ProfilingEnable)) {
@@ -38,17 +38,20 @@ class CreateMasksKernel[L, L2](rules: RuleStructure[L, L2],numGrammars: Int, odd
   }
 
   lazy val text = GrammarHeader.header(rules, numGrammars) + """
-#define PRUNING_THRESHOLD 3.3E-4 // approx exp(-8)
+#define PRUNING_THRESHOLD 3.3E-4f // approx exp(-8)
 
 __kernel void set_coarse_masks(__global pruning_mask* masks,
                              __global projected_parse_cell* projected_top,
                              __global projected_parse_cell* projected_bot,
                              __global const int* offsets) {
   const int cell = get_global_id(0);
-  const int sym = get_global_id(1);
 
-  if(projected_top[cell].syms[sym][0] > PRUNING_THRESHOLD || projected_bot[cell].syms[sym][0] > PRUNING_THRESHOLD)
-    SET_COARSE(masks[cell], sym);
+  for(int sym = 0; sym < NUM_PROJECTED_SYMS; ++sym) {
+    if (projected_top[cell].syms[sym][0] > PRUNING_THRESHOLD
+      || projected_bot[cell].syms[sym][0] > PRUNING_THRESHOLD) {
+      SET_COARSE(masks[cell], sym);
+    }
+  }
 
 
 }

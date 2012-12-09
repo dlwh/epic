@@ -20,6 +20,7 @@ import collection.{immutable, mutable}
 import java.nio.{FloatBuffer, ByteBuffer}
 import projections.{GrammarRefinements, ProjectionIndexer}
 import models.FeaturizedLexicon
+import gpu.GPUGrammar.PruningMask
 
 class GPUGrammar[C, L, W](coarseGrammar: BaseGrammar[C],
                              projections: GrammarRefinements[C, L],
@@ -94,6 +95,7 @@ class GPUGrammar[C, L, W](coarseGrammar: BaseGrammar[C],
   private val decodeDev = context.createIntBuffer(Usage.InputOutput, maxCells * 4) // top, bot, split, score
   private val maskOutDev = context.createLongBuffer(Usage.InputOutput, maxCells * (structure.numCoarseSyms/64 + {if(structure.numCoarseSyms % 64 != 0) 1 else 0}))
   private val maskUseDev = context.createLongBuffer(Usage.Input, maxCells * (structure.numCoarseSyms/64 + {if(structure.numCoarseSyms % 64 != 0) 1 else 0}))
+  private val maskUsePtr = maskUseDev.allocateCompatibleMemory(context.getDevices()(0))
 
   private val posTagsDev = context.createFloatBuffer(Usage.Input, maxTotalLength * cellSize)
   private val posTagsPtr = Pointer.allocateFloats(maxTotalLength * cellSize)
@@ -119,9 +121,9 @@ class GPUGrammar[C, L, W](coarseGrammar: BaseGrammar[C],
   }
 
 
-  def parse(sentences: IndexedSeq[IndexedSeq[W]]):IndexedSeq[BinarizedTree[C]] = synchronized {
+  def parse(sentences: IndexedSeq[IndexedSeq[W]], masks: IndexedSeq[PruningMask] = null):IndexedSeq[BinarizedTree[C]] = synchronized {
     {for {
-      partition <- getBatches(sentences).iterator
+      partition <- getBatches(sentences, masks).iterator
       batch = layoutIntoMemory(partition)
 //    _ = getMarginals(batch)
       t <- doParse(batch)
@@ -142,9 +144,9 @@ class GPUGrammar[C, L, W](coarseGrammar: BaseGrammar[C],
     }
   }
 
-  def expectedRuleCounts(sentences: IndexedSeq[IndexedSeq[W]]): ExpectedCounts = synchronized {
+  def expectedRuleCounts(sentences: IndexedSeq[IndexedSeq[W]], masks: IndexedSeq[PruningMask] = null): ExpectedCounts = synchronized {
     val allCounts = for {
-      partition <- getBatches(sentences).iterator
+      partition <- getBatches(sentences, masks).iterator
     } yield {
       val batch = layoutIntoMemory(partition)
       doExpectedCounts(batch)
@@ -153,9 +155,9 @@ class GPUGrammar[C, L, W](coarseGrammar: BaseGrammar[C],
     allCounts.reduceOption{ _ += _ }.getOrElse(ExpectedCounts(Array.fill(numGrammars)(DenseVector.zeros(structure.numRules)), ArrayBuffer.empty, 0.0))
   }
 
-  def createPruningMasks(sentences: IndexedSeq[IndexedSeq[W]]): IndexedSeq[Array[Long]] = synchronized {
+  def createPruningMasks(sentences: IndexedSeq[IndexedSeq[W]], masks: IndexedSeq[PruningMask] = null): IndexedSeq[PruningMask] = synchronized {
     val allCounts = for {
-      partition <- getBatches(sentences).iterator
+      partition <- getBatches(sentences, masks).iterator
     } yield {
       val batch = layoutIntoMemory(partition)
       doCreateMasks(batch)
@@ -169,14 +171,15 @@ class GPUGrammar[C, L, W](coarseGrammar: BaseGrammar[C],
                    lengthTotals: Array[Int],
                    totalLength: Int,
                    sentences: IndexedSeq[IndexedSeq[W]],
-                   posTags: Array[Float]) {
+                   posTags: Array[Float],
+                   mask: Array[Long]) {
     def numSentences = sentences.length
     def numCells = offsets.last
   }
 
 
-  private def layoutIntoMemory(sentences: IndexedSeq[IndexedSeq[W]]): Batch = {
-    val lengths = sentences.map(_.length)
+  private def layoutIntoMemory(sentences: IndexedSeq[(IndexedSeq[W], Option[PruningMask])]): Batch = {
+    val lengths = sentences.map(_._1.length)
     val offsets = new ArrayBuffer[Int]()
 
     var offset = 0
@@ -192,8 +195,10 @@ class GPUGrammar[C, L, W](coarseGrammar: BaseGrammar[C],
     assert(maxTotalLength >= totalLength, maxTotalLength -> totalLength)
 
     val posTags = new Array[Float](totalLength * cellSize)
+    val fullMask = Array.fill(maxCells * structure.pruningMaskFieldSize)(-1L)
 
-    for( (s, i) <- sentences.zipWithIndex) {
+
+    for( ((s, mask), i) <- sentences.zipWithIndex) {
       offsets += offset
       for(pos <- (0 until s.length);
           aa <- lexicon.tagsForWord(s(pos));
@@ -201,21 +206,24 @@ class GPUGrammar[C, L, W](coarseGrammar: BaseGrammar[C],
         for(g <- 0 until numGrammars)
           posTags(((partialLengths(i) + pos) * nsyms +  a)*numGrammars + g) = math.exp(tagScorers(g)(s, pos, a)).toFloat
       }
-
+      for( m <- mask) {
+        assert(m.bits.length == TriangularArray.arraySize(s.length + 1) * structure.pruningMaskFieldSize, m.bits.length + " " + TriangularArray.arraySize(s.length + 1))
+        System.arraycopy(m.bits, 0, fullMask, offset * structure.pruningMaskFieldSize, m.bits.length)
+      }
 
       offset += TriangularArray.arraySize(s.length+1)
     }
     offsets += offset
 
-    Batch(lengths.toArray, offsets.toArray, partialLengths, totalLength, sentences, posTags)
+    Batch(lengths.toArray, offsets.toArray, partialLengths, totalLength, sentences.map(_._1), posTags, fullMask)
   }
 
-  private def getBatches(sentences: IndexedSeq[IndexedSeq[W]]): IndexedSeq[IndexedSeq[IndexedSeq[W]]] = {
-    val result = ArrayBuffer[IndexedSeq[IndexedSeq[W]]]()
-    var current = ArrayBuffer[IndexedSeq[W]]()
+  private def getBatches(sentences: IndexedSeq[IndexedSeq[W]], masks: IndexedSeq[PruningMask]): IndexedSeq[IndexedSeq[(IndexedSeq[W], Option[PruningMask])]] = {
+    val result = ArrayBuffer[IndexedSeq[(IndexedSeq[W], Option[PruningMask])]]()
+    var current = ArrayBuffer[(IndexedSeq[W], Option[PruningMask])]()
     var currentCellTotal = 0
     var currentLengthTotal = 0
-    for(s <- sentences) {
+    for( (s, i) <- sentences.zipWithIndex) {
       currentCellTotal += TriangularArray.arraySize(s.length+1)
       currentLengthTotal += s.length
       if(currentCellTotal > maxCells || current.size >= maxSentences || currentLengthTotal > maxTotalLength) {
@@ -223,9 +231,9 @@ class GPUGrammar[C, L, W](coarseGrammar: BaseGrammar[C],
         result += current
         currentCellTotal = TriangularArray.arraySize(s.length+1)
         currentLengthTotal = s.length
-        current = ArrayBuffer[IndexedSeq[W]]()
+        current = ArrayBuffer()
       }
-      current += s
+      current += (s -> Option(masks).map(_(i)))
     }
 
     if(current.nonEmpty) result += current
@@ -287,7 +295,7 @@ class GPUGrammar[C, L, W](coarseGrammar: BaseGrammar[C],
   }
 
 
-  private def doCreateMasks(batch: Batch):IndexedSeq[Array[Long]] = synchronized {
+  private def doCreateMasks(batch: Batch):IndexedSeq[PruningMask] = synchronized {
     import batch._
     val wmo = memZero.zeroMemory(maskOutDev.asCLFloatBuffer())
     val wpt = memZero.zeroMemory(projTopDev)
@@ -303,25 +311,16 @@ class GPUGrammar[C, L, W](coarseGrammar: BaseGrammar[C],
 
     val ptr = maskOutDev.read(queue, lastEvent)
     val longs = ptr.getLongs()
-    println(computeOnBits(longs) * 1.0 / longs.length / 4 * structure.numNonTerms)
+    println(computeOnBits(longs) * 1.0 / batch.offsets.last / structure.numSyms)
     ptr.release()
     for(i <- 0 until numSentences) yield {
-      longs.slice(offsets(i), offsets(i+1))
+       PruningMask(longs.slice(offsets(i) * structure.pruningMaskFieldSize, offsets(i+1)*structure.pruningMaskFieldSize))
     }
 
   }
 
   private def computeOnBits(array: Array[Long]) = {
-    array.par.map{ _v =>
-      var v = _v
-      var c = 0L
-      while(v != 0) {
-        v &= v - 1; // clear the least significant bit set
-        c += 1
-      }
-
-      c
-    }.sum
+    array.par.aggregate(0L)({ (a,b) => a + java.lang.Long.bitCount(b)},(_ + _))
   }
 
   private def doExpectedCounts(batch: Batch):ExpectedCounts = synchronized {
@@ -336,7 +335,7 @@ class GPUGrammar[C, L, W](coarseGrammar: BaseGrammar[C],
       insideBotDev, insideTopDev,
       outsideBotDev, outsideTopDev,
       posTagsDev,
-      offDev, lenDev, offLengthsDev, lengths.max, rulesDev, lastEvent, wOB, wterm)
+      offDev, lenDev, offLengthsDev, maskUseDev, lengths.max, rulesDev, lastEvent, wOB, wterm)
 
 //                  println("sum..." + ecountsDev.read(queue).getFloats.sum)
     val termVector = Pointer.allocateFloats(totalLength * cellSize)
@@ -438,6 +437,9 @@ class GPUGrammar[C, L, W](coarseGrammar: BaseGrammar[C],
     offLengthsPtr.setInts(lengthTotals)
     copyOffLengths = offLengthsDev.write(queue, offLengthsPtr, false)
 
+    maskUsePtr.setLongs(mask)
+    val writeMasks = maskUseDev.write(queue, maskUsePtr, false)
+
     copyTags.setArgs(posTagsDev, insideBotDev, offDev, lenDev, offLengthsDev, Integer.valueOf(1))
     val maxDim1Size = queue.getDevice.getMaxWorkItemSizes()(0)
     if(maxDim1Size < nsyms * numGrammars) {
@@ -448,16 +450,16 @@ class GPUGrammar[C, L, W](coarseGrammar: BaseGrammar[C],
     } else {
       numGrammars
     }
-    val initCharts = copyTags.enqueueNDRange(queue,  Array(nsyms * gramMultiplier, lengths.length, maxLength), Array(nsyms * gramMultiplier, 1, 1), wPos, wIB, wL, copyOffLengths)
+    val initCharts = copyTags.enqueueNDRange(queue,  Array(nsyms * gramMultiplier, lengths.length, maxLength), Array(nsyms * gramMultiplier, 1, 1), wPos, wIB, wL, copyOffLengths, writeMasks)
     queue.finish()
 
 
-    var lastU = inside.insidePass(numSentences, insideBotDev, insideTopDev, posTagsDev, offDev, lenDev, maxLength, offLengthsDev, rulesDev, initCharts, wIT, wO)
-    lastU = outside.outsidePass(numSentences, outsideTopDev, outsideBotDev, insideTopDev, posTagsDev, offDev, lenDev, offLengthsDev, maxLength, rulesDev, lastU, wOB, wOT)
+    var lastU = inside.insidePass(numSentences, insideBotDev, insideTopDev, posTagsDev, offDev, lenDev, maxLength, offLengthsDev, maskUseDev, rulesDev, initCharts, wIT, wO)
+    lastU = outside.outsidePass(numSentences, outsideTopDev, outsideBotDev, insideTopDev, posTagsDev, offDev, lenDev, offLengthsDev, maskUseDev, maxLength, rulesDev, lastU, wOB, wOT)
 
     if(queue.getProperties.contains(CLDevice.QueueProperties.ProfilingEnable)) {
       queue.finish()
-      val writeCounts = IndexedSeq(wIT, wOT, wIB, wOB, wO, wL, initCharts).filter(_ ne null).map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum / 1E9
+      val writeCounts = IndexedSeq(wIT, wOT, wIB, wOB, wO, wL, initCharts, writeMasks).filter(_ ne null).map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum / 1E9
       println("io write: " + writeCounts)
     }
     lastU
@@ -472,6 +474,16 @@ class GPUGrammar[C, L, W](coarseGrammar: BaseGrammar[C],
     insideTopDev.release()
     outsideBotDev.release()
     insideBotDev.release()
+    maskOutDev.release()
+    maskUseDev.release()
+    maskUsePtr.release()
+    posTagsDev.release()
+    posTagsPtr.release()
+    decodeDev.release()
+    termECountsDev.release()
+    projTopDev.release()
+    projBotDev.release()
+    ecountsDev.release()
   }
 
   case class Marginal(inTop: Array[Float], inBot: Array[Float], outTop: Array[Float], outBot: Array[Float], offset: Int, length: Int) {
@@ -528,6 +540,8 @@ class GPUGrammar[C, L, W](coarseGrammar: BaseGrammar[C],
 }
 
 object GPUGrammar {
+  case class PruningMask(bits: Array[Long])
+
   case class Params(annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = FilterAnnotations(),
                     useGPU: Boolean = true, numToParse: Int = 1000, numGrammars: Int = 1)
 
@@ -562,13 +576,14 @@ object GPUGrammar {
 
 
     println("masks")
-    kern.createPruningMasks(train.map(_.words.toIndexedSeq))
+    val masks = kern.createPruningMasks(train.map(_.words.toIndexedSeq))
 
     println("ecounts...")
     val time2 = System.currentTimeMillis()
     val counts = kern.expectedRuleCounts(train.map(_.words.toIndexedSeq))
     val time3 = System.currentTimeMillis()
-    println(counts.rules.map(_.sum).sum)
+    println(counts.rules.map(_.map(x => x * x).sum).sum)
+
 //    println(counts.wordCounts.map(_.map(_.map(_.sum).sum).sum))
     //    println(Encoder.fromIndex(grammar.refinedGrammar.index).decode(counts))
     println("Done ecounts: " + (time3 - time2))
@@ -582,18 +597,25 @@ object GPUGrammar {
 //    }
     println("Done: " + (System.currentTimeMillis() - timeIn))
 
+    println("once more, with feeling:")
+
+    val timeIn2 = System.currentTimeMillis()
+    val trees2 = kern.expectedRuleCounts(train.map(_.words.toIndexedSeq), masks)
+    println(trees2.rules.map(_.values.map(x => x * x).sum).sum)
+    println("Done: " + (System.currentTimeMillis() - timeIn2))
 
     val feat = new ProductionFeaturizer(grammar.grammar, grammar.lexicon.knownLexicalProductions)
     val timeX = System.currentTimeMillis()
     val marg = train.map(_.words).foldLeft(DenseVector.zeros[Double](feat.index.size)){ (acc, s) =>
       val m = ChartMarginal(AugmentedGrammar.fromRefined(grammar), s, ParseChart.logProb)
-//      val counts = m.expectedCounts(feat).counts
+      val counts = m.expectedCounts(feat).counts
 //      println(m.partition)
-//      acc += counts
+      acc += counts
       acc
     }
     println("Done: " + (System.currentTimeMillis() - timeX))
     println(marg.slice(0, grammar.grammar.index.size).sum)
+    println(marg.slice(0, grammar.grammar.index.size).values.map(x => x * x).sum)
     println(marg.slice(grammar.grammar.index.size, marg.length).sum)
 
 //    println(Encoder.fromIndex(grammar.grammar.index).decode(marg.slice(0, grammar.grammar.index.size)))

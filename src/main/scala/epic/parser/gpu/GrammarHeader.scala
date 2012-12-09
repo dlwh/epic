@@ -36,7 +36,9 @@ typedef struct {
   unsigned long allowed[%d];
 } pruning_mask;
 
-#define COARSE_IS_SET(mask, coarse) ((mask).allowed[(coarse)>>6]&(1<<(coarse&63)) != 0)
+#define COARSE_IS_SET(mask, coarse) ( ((mask).allowed[(coarse)>>6]&(1<<(coarse&63))) != 0)
 #define SET_COARSE(mask, coarse) ((mask).allowed[(coarse)>>6] |= (1<<(coarse&63)))
-    """.format(SCALE_FACTOR, numSyms, numGrammars, root, numBinaries, numUnaries, byParent,  rules.numCoarseSyms, numCoarseSyms/64 + {if(numCoarseSyms % 64 != 0) 1 else 0})
+#define IS_ANY_SET(mask) %s
+
+    """.format(SCALE_FACTOR, numSyms, numGrammars, root, numBinaries, numUnaries, byParent, numCoarseSyms, pruningMaskFieldSize, Array.tabulate(pruningMaskFieldSize)("(mask).allowed[%d]" format _).mkString("((", "|", ") != 0)"))
   }}

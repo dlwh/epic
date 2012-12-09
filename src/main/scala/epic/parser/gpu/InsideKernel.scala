@@ -3,7 +3,7 @@ package epic.parser.gpu
 import epic.trees.{BinaryRule, UnaryRule}
 import collection.mutable.ArrayBuffer
 import com.nativelibs4java.opencl._
-import java.lang.{Float=>JFloat, Integer=>JInt}
+import java.lang.{Float=>JFloat, Integer=>JInt, Long=>JLong}
 import java.io.FileWriter
 import collection.immutable
 
@@ -18,10 +18,11 @@ class InsideKernel[C, L](ruleStructure: RuleStructure[C, L], numGrammars: Int)(i
                  lengths: CLBuffer[JInt],
                  maxLength: Int,
                  lengthOffsets: CLBuffer[JInt],
+                 masks: CLBuffer[JLong],
                  rules: CLBuffer[JFloat],
                  events: CLEvent*)(implicit queue: CLQueue) = synchronized {
-    binaries.foreach(_.setArgs(insideBot, insideTop, offsets, lengths, Integer.valueOf(1), rules))
-    termBinaries.setArgs(insideBot, insideTop, posTags, offsets, lengths, lengthOffsets, Integer.valueOf(1), rules)
+    binaries.foreach(_.setArgs(insideBot, insideTop, offsets, lengths, Integer.valueOf(1), masks, rules))
+    termBinaries.setArgs(insideBot, insideTop, posTags, offsets, lengths, lengthOffsets, masks, Integer.valueOf(1), rules)
     unaries.setArgs(insideBot, insideTop, offsets, lengths, Integer.valueOf(1), rules)
     val iu, ib, it = new ArrayBuffer[CLEvent]()
     var lastU:CLEvent = null
@@ -35,7 +36,7 @@ class InsideKernel[C, L](ruleStructure: RuleStructure[C, L], numGrammars: Int)(i
       val b = binaries.map(_.enqueueNDRange(queue, Array(numSentences, maxLength + 1 - len, numGrammars), Array(1, 1, numGrammars), lastU))
       ib ++= b
 
-      termBinaries.setArg(6, len)
+      termBinaries.setArg(7, len)
       val t = termBinaries.enqueueNDRange(queue, Array(numSentences, maxLength + 1 - len, numGrammars), Array(1, 1, numGrammars), b:_*)
       it += t
 
@@ -73,6 +74,7 @@ class InsideKernel[C, L](ruleStructure: RuleStructure[C, L], numGrammars: Int)(i
               __global const int* offsets,
               __global const int* lengths,
               __global const int* lengthOffsets,
+              __global const pruning_mask* masks,
               const int spanLength,
               __global const rule_cell* rules) {
   const int sentence = get_global_id(0);
@@ -82,7 +84,8 @@ class InsideKernel[C, L](ruleStructure: RuleStructure[C, L], numGrammars: Int)(i
   const int length = lengths[sentence];
 //  float out[NUM_SYMS];
   float out[NUM_SYMS], right[NUM_SYMS];
-  if (end <= length) {
+  __global const pruning_mask* pmask =  masks + offsets[sentence] + TRIANGULAR_INDEX(begin, end);
+  if (end <= length && IS_ANY_SET(*pmask)) {
     __global const parse_cell* chart_top =  inside_tops + offsets[sentence];
     for(int i = 0; i < NUM_SYMS; ++i) {
       out[i] = 0.0f;
@@ -124,7 +127,6 @@ __kernel void inside_unaries(__global const parse_cell * inside_bots,
 
     """.stripMargin.format(
       insideTermRuleUpdates,
-//      insideRuleUpdates(ruleStructure.leftTermRules ++ ruleStructure.rightTermRules ++ ruleStructure.bothTermRules),
       insideUnaryUpdates(ruleStructure.unaryRulesWithIndices)) ++ (0 until partitionsParent.length).map(i => ntBinaryPartition(partitionsParent(i), i)).mkString("\n")
 
   if(true) {val o = new FileWriter("inside.cl"); o.write(text); o.close()}
@@ -158,30 +160,32 @@ __kernel void inside_unaries(__global const parse_cell * inside_bots,
     val rights = _rules.map(_._1.right).toSet
     sb += "float currentSum = 0.0f;"
     lefts.map(l => "const float left%d = left->syms[%d][gram];".format(l,l)).foreach(sb += _)
-    rights.map(r => "const float r%d = right->syms[%d][gram];".format(r,r)).foreach(sb += _)
+    rights.map(r => "const float right%d = right->syms[%d][gram];".format(r,r)).foreach(sb += _)
     for( (p, rules) <- byParent) {
       var lastLeft = -1
+      sb += "if (COARSE_IS_SET(*pmask, %d)) {".format(ruleStructure.refinements.labels.project(p))
       for((r@BinaryRule(p, l, right), index) <- rules) {
         if(lastLeft != l) {
           if(lastLeft != -1) {
-            sb += "}"
-            sb += "p%d = mad(left%d, currentSum, p%d);".format(r.parent, lastLeft, r.parent)
+            sb += "  }"
+            sb += "  parent%d = mad(left%d, currentSum, parent%d);".format(r.parent, lastLeft, r.parent)
           }
-          sb += "currentSum = 0.0f;"
-          sb += "if(left%d != 0.0f) { // %s".format(r.left, symbolName(r.left))
+          sb += "  currentSum = 0.0f;"
+          sb += "  if(left%d != 0.0f) { // %s".format(r.left, symbolName(r.left))
           lastLeft = l
         }
-        sb += "  currentSum = mad(rules->binaries[%d][gram], r%d, currentSum); // %s".format(index, right, ruleString(index))
+        sb += "    currentSum = mad(rules->binaries[%d][gram], right%d, currentSum); // %s".format(index, right, ruleString(index))
       }
       if(lastLeft != -1) {
-        sb += "p%d = mad(left%d, currentSum, p%d);".format(p, lastLeft, p)
-        sb += "}"
-        sb += "currentSum = 0.0f;"
+        sb += "  }"
+        sb += "  parent%d = mad(left%d, currentSum, parent%d);".format(p, lastLeft, p)
+        sb += "  currentSum = 0.0f;"
        }
+      sb += "}"
 
     }
 
-    sb.mkString("\n      ")
+    sb.mkString("\n        ")
   }
 
   def symbolName(sym: Int): L = {
@@ -260,21 +264,27 @@ __kernel void inside_binaries_%d(
               __global const int* offsets,
               __global const int* lengths,
               const int spanLength,
+              __global const pruning_mask* masks,
               __global const rule_cell* rules) {
   const int sentence = get_global_id(0);
   const int begin = get_global_id(1);
   const int gram = get_global_id(2);
   const int end = begin + spanLength;
   const int length = lengths[sentence];
-  if (end <= length) {
+  __global const pruning_mask* pmask =  masks + offsets[sentence] + TRIANGULAR_INDEX(begin, end);
+  if (end <= length && IS_ANY_SET(*pmask)) {
     __global const parse_cell* chart_top =  inside_tops + offsets[sentence];
     __global parse_cell* gout = CELL(inside_bots + offsets[sentence], begin, end);
     %s
 
     for(int split = begin + 1; split < end; ++split) {
-      __global const parse_cell * left = CELL(chart_top, begin, split); // scale factor of (2 ^ SCALE_FACTOR)^((split - begin) - 1)
-      __global const parse_cell * right = CELL(chart_top, split, end); // scale factor of (2^ SCALE_FACTOR)((end-split) - 1)
-      %s
+      __global const pruning_mask* lmask =  masks + offsets[sentence] + TRIANGULAR_INDEX(begin, split);
+      __global const pruning_mask* rmask =  masks + offsets[sentence] + TRIANGULAR_INDEX(split, end);
+      if(IS_ANY_SET(*lmask) && IS_ANY_SET(*rmask)) {
+        __global const parse_cell * left = CELL(chart_top, begin, split); // scale factor of (2 ^ SCALE_FACTOR)^((split - begin) - 1)
+        __global const parse_cell * right = CELL(chart_top, split, end); // scale factor of (2^ SCALE_FACTOR)((end-split) - 1)
+        %s
+      }
     }
 
     // out has a scale factor of (2^SCALE_FACTOR)^((end-split) + (split-begin) - 2) = (2^SCALE_FACTOR)^(end-begin-2)
@@ -283,9 +293,9 @@ __kernel void inside_binaries_%d(
   }
 }
     """.format(id,
-      rules.map(_._1.parent).toSet[Int].map("p" + _).mkString("float ", " = 0.0f,", " = 0.0f;"),
+      rules.map(_._1.parent).toSet[Int].map("parent" + _).mkString("float ", " = 0.0f,", " = 0.0f;"),
       insideRuleUpdates(rules),
-      rules.map(_._1.parent).toSet[Int].map(p => "gout->syms[%d][gram] = ldexp(p%d, SCALE_FACTOR);".format(p,p)).mkString("\n   ")
+      rules.map(_._1.parent).toSet[Int].map(p => "gout->syms[%d][gram] = ldexp(parent%d, SCALE_FACTOR);".format(p,p)).mkString("\n   ")
     )
   }
 }

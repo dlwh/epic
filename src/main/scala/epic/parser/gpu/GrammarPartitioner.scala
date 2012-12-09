@@ -51,6 +51,7 @@ object GrammarPartitioner {
       val priority = (p1.badness + p2.badness - newP1.badness - newP2.badness)*random
     }
 
+
     implicit val order = Ordering[Double].on[Action](_.priority)
 
     val queue = new mutable.PriorityQueue[Action]
@@ -102,7 +103,6 @@ object GrammarPartitioner {
         val (g1, g2) = r.map(rr => targetLabel.clusterPieces(rr._1)).unzip
         p -> Partition(BitSet(p), g1.reduce( _ ++ _), g2.reduce(_ ++ _))
       }
-
 
     val clusters = ((0 until numRestarts).par.aggregate(restart(initialClusters, maxPartitionLabelSize, 1.0))({ (c1, seed) =>
       val r = new java.util.Random(seed)

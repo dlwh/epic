@@ -82,5 +82,8 @@ case class RuleStructure[C, L](refinements: GrammarRefinements[C, L], grammar: B
     }
     arr
   }
+
+  // pruning stuff
+  val pruningMaskFieldSize = numCoarseSyms/64 + {if(numCoarseSyms % 64 != 0) 1 else 0}
 }
 
