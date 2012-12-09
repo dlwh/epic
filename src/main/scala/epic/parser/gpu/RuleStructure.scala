@@ -5,8 +5,9 @@ import epic.parser.BaseGrammar
 import collection.mutable.ArrayBuffer
 import collection.immutable.BitSet
 import breeze.linalg.DenseVector
+import epic.parser.projections.GrammarRefinements
 
-case class RuleStructure[L](grammar: BaseGrammar[L]) {
+case class RuleStructure[C, L](refinements: GrammarRefinements[C, L], grammar: BaseGrammar[L]) {
 
 
   import grammar._

@@ -4,7 +4,7 @@ import com.nativelibs4java.opencl._
 import collection.mutable.ArrayBuffer
 import java.lang.{Float=>JFloat, Integer=>JInt}
 
-class MaxRecallKernel[Coarse](rules: RuleStructure[Coarse])(implicit context: CLContext) {
+class MaxRecallKernel[Coarse](rules: RuleStructure[Coarse, Coarse])(implicit context: CLContext) {
   def makeBackpointers(numSentences:Int,
                        backPointers: CLBuffer[JInt],
                        projectedTop: CLBuffer[JFloat],

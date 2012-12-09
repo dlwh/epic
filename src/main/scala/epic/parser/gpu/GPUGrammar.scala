@@ -32,7 +32,7 @@ class GPUGrammar[C, L, W](coarseGrammar: BaseGrammar[C],
   def ruleScores = _ruleScores
 
   val numGrammars = _ruleScores.length
-  val structure = RuleStructure[L](grammar)
+  val structure = RuleStructure[C, L](projections, grammar)
 
   val (inside, outside, ecounts, copyPosTags) = {
     import GPUGrammar._
@@ -74,8 +74,8 @@ class GPUGrammar[C, L, W](coarseGrammar: BaseGrammar[C],
   private val copyTags = copyPosTags.createKernel("copy_pos_to_charts")
   private val sumVector = context.createProgram(GPUGrammar.sumECountVectors).createKernel("sum_vectors")
   private val memZero = new ZeroMemoryKernel
-  private val projection = new ProjectionKernel(structure, projections.labels,  numGrammars)
-  private val decoder = new MaxRecallKernel(new RuleStructure(coarseGrammar))
+  private val projection = new ProjectionKernel(structure, numGrammars)
+  private val decoder = new MaxRecallKernel(new RuleStructure(GrammarRefinements.identity(coarseGrammar), coarseGrammar))
   private val partitionGetter = new PartitionCalculatorKernel(structure, numGrammars)
 
   private val insideTopDev, insideBotDev = context.createFloatBuffer(Usage.InputOutput, maxCells * cellSize)

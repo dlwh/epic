@@ -7,7 +7,7 @@ import java.lang.{Float=>JFloat, Integer=>JInt}
  * 
  * @author dlwh
  */
-class PartitionCalculatorKernel[L](rules: RuleStructure[L], numGrammars: Int)(implicit context: CLContext) {
+class PartitionCalculatorKernel[C, L](rules: RuleStructure[C, L], numGrammars: Int)(implicit context: CLContext) {
 
   def partitions(insideTop: CLBuffer[JFloat], offsets: CLBuffer[JInt], lengths: CLBuffer[JInt], numSentences: Int, events: CLEvent*)(implicit queue: CLQueue) = synchronized {
     val partitions = context.createFloatBuffer(CLMem.Usage.Output, numSentences * numGrammars)

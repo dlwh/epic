@@ -5,7 +5,9 @@ import com.nativelibs4java.opencl._
 import collection.mutable.ArrayBuffer
 import java.lang.{Float=>JFloat, Integer=>JInt}
 
-class ProjectionKernel[L, L2](rules: RuleStructure[L2], projections: ProjectionIndexer[L, L2], numGrammars: Int, odds_ratio: Boolean=false)(implicit context: CLContext) {
+class ProjectionKernel[L, L2](rules: RuleStructure[L, L2],numGrammars: Int, odds_ratio: Boolean=false)(implicit context: CLContext) {
+
+  def projections = rules.refinements.labels
 
   def projectCells(numSentences: Int,
                  projectedTop: CLBuffer[JFloat],

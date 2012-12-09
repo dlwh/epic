@@ -7,7 +7,7 @@ import java.lang.{Float=>JFloat, Integer=>JInt}
 import breeze.util.Index
 import collection.mutable
 
-class ExpectedCountsKernel[L](ruleStructure: RuleStructure[L], numGrammars: Int)(implicit context: CLContext) {
+class ExpectedCountsKernel[C, L](ruleStructure: RuleStructure[C, L], numGrammars: Int)(implicit context: CLContext) {
   import ruleStructure._
 
 

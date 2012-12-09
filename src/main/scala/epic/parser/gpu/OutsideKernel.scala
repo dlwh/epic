@@ -7,7 +7,7 @@ import java.lang.{Float=>JFloat, Integer=>JInt}
 import java.io.FileWriter
 
 
-class OutsideKernel[L](ruleStructure: RuleStructure[L], numGrammars: Int)(implicit context: CLContext) {
+class OutsideKernel[C, L](ruleStructure: RuleStructure[C, L], numGrammars: Int)(implicit context: CLContext) {
   import ruleStructure._
   def outsidePass(numSentences: Int,
                  outsideTop: CLBuffer[JFloat],

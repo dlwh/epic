@@ -7,7 +7,7 @@ import java.lang.{Float=>JFloat, Integer=>JInt}
 import java.io.FileWriter
 import collection.immutable
 
-class InsideKernel[L](ruleStructure: RuleStructure[L], numGrammars: Int)(implicit context: CLContext) {
+class InsideKernel[C, L](ruleStructure: RuleStructure[C, L], numGrammars: Int)(implicit context: CLContext) {
   import ruleStructure._
 
   def insidePass(numSentences: Int,
