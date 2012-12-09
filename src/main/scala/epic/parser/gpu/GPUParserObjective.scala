@@ -36,7 +36,7 @@ import com.nativelibs4java.opencl.JavaCL
  * 
  * @author dlwh
  */
-class GPUParserObjective[C, L, W](parser: GrammarKernel[C, L, W],
+class GPUParserObjective[C, L, W](parser: GPUGrammar[C, L, W],
                                   reannotate: (BinarizedTree[C], Seq[W]) => BinarizedTree[C],
                                   indexedFeatures: IndexedFeaturizer[C, L, W],
                                   sentences: IndexedSeq[TreeInstance[C, W]]) extends BatchDiffFunction[DenseVector[Double]] {
@@ -235,7 +235,7 @@ object GPUParserTrainer {
     }
     println(context)
 
-    val gpuParser = new GrammarKernel[AnnotatedLabel, (AnnotatedLabel, Int), String](xbarGrammar, finalRefinements, refinedGrammar,  xbarLexicon.flatMap(split _), Array.fill(numGrammars)(RuleScores.zeros(refinedGrammar)), Array[(IndexedSeq[String], Int, Int) => Double](), false)
+    val gpuParser = new GPUGrammar[AnnotatedLabel, (AnnotatedLabel, Int), String](xbarGrammar, finalRefinements, refinedGrammar,  xbarLexicon.flatMap(split _), Array.fill(numGrammars)(RuleScores.zeros(refinedGrammar)), Array[(IndexedSeq[String], Int, Int) => Double](), false)
 
     println(finalRefinements.labels)
 

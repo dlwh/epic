@@ -21,7 +21,7 @@ import java.nio.{FloatBuffer, ByteBuffer}
 import projections.{GrammarRefinements, ProjectionIndexer}
 import models.FeaturizedLexicon
 
-class GrammarKernel[C, L, W](coarseGrammar: BaseGrammar[C],
+class GPUGrammar[C, L, W](coarseGrammar: BaseGrammar[C],
                              projections: GrammarRefinements[C, L],
                              grammar: BaseGrammar[L],
                              lexicon: Lexicon[L, W],
@@ -35,7 +35,7 @@ class GrammarKernel[C, L, W](coarseGrammar: BaseGrammar[C],
   val structure = RuleStructure[L](grammar)
 
   val (inside, outside, ecounts, copyPosTags) = {
-    import GrammarKernel._
+    import GPUGrammar._
     import structure.{grammar=>_, _ }
     val insideKernel = new InsideKernel(structure, numGrammars)
     val outsideKernel = new OutsideKernel(structure, numGrammars)
@@ -72,7 +72,7 @@ class GrammarKernel[C, L, W](coarseGrammar: BaseGrammar[C],
 
   private implicit val queue = if(profile) context.createDefaultProfilingQueue() else context.createDefaultOutOfOrderQueueIfPossible()
   private val copyTags = copyPosTags.createKernel("copy_pos_to_charts")
-  private val sumVector = context.createProgram(GrammarKernel.sumECountVectors).createKernel("sum_vectors")
+  private val sumVector = context.createProgram(GPUGrammar.sumECountVectors).createKernel("sum_vectors")
   private val memZero = new ZeroMemoryKernel
   private val projection = new ProjectionKernel(structure, projections.labels,  numGrammars)
   private val decoder = new MaxRecallKernel(new RuleStructure(coarseGrammar))
@@ -476,7 +476,7 @@ class GrammarKernel[C, L, W](coarseGrammar: BaseGrammar[C],
   }
 }
 
-object GrammarKernel {
+object GPUGrammar {
   case class Params(annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = FilterAnnotations(),
                     useGPU: Boolean = true, numToParse: Int = 1000, numGrammars: Int = 1)
 
@@ -583,7 +583,7 @@ object GrammarKernel {
       grammar.anchor(w).scoreSpan(pos, pos+1, label, 0)
     }
 
-    val kern = new GrammarKernel(grammar.grammar, GrammarRefinements.identity(grammar.grammar), grammar.grammar, grammar.lexicon, grammars, scorers)
+    val kern = new GPUGrammar(grammar.grammar, grammar.refinements, grammar.refinedGrammar, grammar.lexicon.flatMap(grammar.refinements.labels.refinementsOf _), grammars, scorers)
 
     kern
   }
