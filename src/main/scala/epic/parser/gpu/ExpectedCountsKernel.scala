@@ -10,6 +10,7 @@ import collection.mutable
 class ExpectedCountsKernel[L](ruleStructure: RuleStructure[L], numGrammars: Int)(implicit context: CLContext) {
   import ruleStructure._
 
+
   def expectedCounts(numSentences: Int,
                      ecounts: CLBuffer[JFloat],
                      termECounts: CLBuffer[JFloat],
@@ -242,15 +243,15 @@ __kernel void ecount_terminals(
   }
 
   def ecountBinaryPartition(rules: IndexedSeq[(BinaryRule[Int], Int)], id: Int) = {
-"""
-    __kernel void ecount_binaries_%d(__global rule_cell* ecounts,
-   __global const parse_cell * insides_top,
-   __global const parse_cell* outsides_bot,
-   __global const int* offsets,
-   __global const int* lengths,
-  __global const int* lengthOffsets,
-   const int span_length,
-   __global const rule_cell* rules) {
+    """
+__kernel void ecount_binaries_%d(__global rule_cell* ecounts,
+                                 __global const parse_cell * insides_top,
+                                 __global const parse_cell* outsides_bot,
+                                 __global const int* offsets,
+                                 __global const int* lengths,
+                                __global const int* lengthOffsets,
+                                 const int span_length,
+                                 __global const rule_cell* rules) {
   const int sentence = get_global_id(0);
   const int begin = get_global_id(1);
   const int gram = get_global_id(2);
@@ -266,7 +267,7 @@ __kernel void ecount_terminals(
     %s
   }
 }
-""".format(id, ecountBinaryRules(rules))
+    """.format(id, ecountBinaryRules(rules))
   }
 
   val registersToUse = 30

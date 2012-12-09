@@ -23,8 +23,8 @@ object GrammarPartitioner {
   case object RightChild extends TargetLabel
 
   def partition(rules: IndexedSeq[(BinaryRule[Int], Int)],
-                maxPartitionLabelSize: Int = 50,
-                numRestarts: Int = 40,
+                maxPartitionLabelSize: Int = 45,
+                numRestarts: Int = 50,
                 targetLabel: TargetLabel = Parent) = {
 
     case class Partition(targets: BitSet, group1: BitSet, group2: BitSet, isPure: Boolean = true) {
@@ -38,12 +38,14 @@ object GrammarPartitioner {
       def isTooBig = !isPure && (group1.size + group2.size + targets.size) > maxPartitionLabelSize
     }
     var clusters_x = rules.groupBy(r => targetLabel.target(r._1))
-    def restart(random: =>Double) = {
-      var clusters = clusters_x.map { case (p:Int, r: IndexedSeq[(BinaryRule[Int], Int)]) =>
+
+     val initialClusters = clusters_x.map { case (p:Int, r: IndexedSeq[(BinaryRule[Int], Int)]) =>
         val (g1, g2) = r.map(rr => targetLabel.clusterPieces(rr._1)).unzip
-        Partition(BitSet(p), g1.reduce( _ ++ _), g2.reduce(_ ++ _))
-      }.toSet
-      val initialClusters = clusters.map(p => p.targets.head -> p).toMap
+        p -> Partition(BitSet(p), g1.reduce( _ ++ _), g2.reduce(_ ++ _))
+      }
+    def restart(random: =>Double) = {
+
+      var clusters = initialClusters.map { case (k,v) => BitSet(k) -> v}
 
       def remove(p: Partition, t: Int) = {
         (for(t2 <- p.targets if t != t2) yield initialClusters(t2)).reduceLeft(_ merge _)
@@ -62,33 +64,33 @@ object GrammarPartitioner {
       implicit val order = Ordering[Double].on[Action](_.priority)
 
       val queue = new mutable.PriorityQueue[Action]
-      queue ++= {for(p1 <- clusters; p2 <- clusters if p1 != p2) yield Merge(p1, p2, p1 merge p2)}
+      queue ++= {for(p1 <- clusters.values; p2 <- clusters.values if p1 != p2) yield Merge(p1, p2, p1 merge p2)}
 
       while(queue.nonEmpty) {
         queue.dequeue() match {
           case sm@Merge(l, r, merger) =>
-            if(clusters.contains(l) && clusters.contains(r)) {
+            if(clusters.contains(l.targets) && clusters.contains(r.targets)) {
               if(!merger.isTooBig) {
-                clusters -= l
-                clusters -= r
-                queue ++= {for(p2 <- clusters) yield Merge(merger, p2, merger merge p2)}
-                queue ++= {for(p2 <- clusters; rm  <- merger.targets) yield SplitMerge(merger, p2, rm)}
-                clusters += merger
+                clusters -= l.targets
+                clusters -= r.targets
+                queue ++= {for(p2 <- clusters.values) yield Merge(merger, p2, merger merge p2)}
+                queue ++= {for(p2 <- clusters.values; rm  <- merger.targets) yield SplitMerge(merger, p2, rm)}
+                clusters += (merger.targets -> merger)
 
               }
             }
           case sm@SplitMerge(l, r, _) =>
-            if(clusters.contains(l) && clusters.contains(r)) {
+            if(clusters.contains(l.targets) && clusters.contains(r.targets)) {
               import sm._
               if(!newP2.isTooBig) {
-                clusters -= l
-                clusters -= r
-                queue ++= {for(p2 <- clusters) yield Merge(newP1, p2, newP1 merge p2)}
-                queue ++= {for(p2 <- clusters) yield Merge(newP2, p2, newP2 merge p2)}
-                queue ++= {for(p2 <- clusters; rm  <- newP1.targets if newP1.targets.size > 1) yield SplitMerge(newP1, p2, rm)}
-                queue ++= {for(p2 <- clusters; rm  <- newP2.targets if newP2.targets.size > 1) yield SplitMerge(newP2, p2, rm)}
-                clusters += newP1
-                clusters += newP2
+                clusters -= l.targets
+                clusters -= r.targets
+                queue ++= {for(p2 <- clusters.values) yield Merge(newP1, p2, newP1 merge p2)}
+                queue ++= {for(p2 <- clusters.values) yield Merge(newP2, p2, newP2 merge p2)}
+                queue ++= {for(p2 <- clusters.values; rm  <- newP1.targets if newP1.targets.size > 1) yield SplitMerge(newP1, p2, rm)}
+                queue ++= {for(p2 <- clusters.values; rm  <- newP2.targets if newP2.targets.size > 1) yield SplitMerge(newP2, p2, rm)}
+                clusters += (newP1.targets -> newP1)
+                clusters += (newP2.targets -> newP2)
 
               }
             }
@@ -98,12 +100,12 @@ object GrammarPartitioner {
       clusters
     }
 
-    val clusters = ((0 until numRestarts).map(new java.util.Random(_)).map(r => restart(0.5 + 0.5 * r.nextDouble())) :+ restart(1.0)).minBy(_.map(p => p.badness).sum)
+    val clusters = ((0 until numRestarts).par.view.map(new java.util.Random(_)).map(r => restart(0.3 + 0.8 * r.nextDouble())) :+ restart(1.0)).minBy(_.values.map(_.badness).sum)
 
-    println("Best badness: " + targetLabel  + " " + clusters.map(_.badness).sum)
+    println("Best badness: " + targetLabel  + " " + clusters.values.map(_.badness).sum)
 
     var p = 0
-    for( Partition(targets, g1, g2, _) <- clusters) {
+    for( Partition(targets, g1, g2, _) <- clusters.values) {
       println("Partition " + p)
       println("G1: " + g1.size + " " + g1)
       println("G2: " + g2.size + " "  + g2)
@@ -111,8 +113,8 @@ object GrammarPartitioner {
       p += 1
     }
 
-    assert(clusters.flatMap(_.targets).toSet.size == clusters_x.keySet.size)
-    clusters.map(p => p.targets.flatMap(clusters_x).toIndexedSeq)
+    assert(clusters.values.flatMap(_.targets).toSet.size == clusters_x.keySet.size)
+    clusters.values.map(p => p.targets.flatMap(clusters_x).toIndexedSeq)
   }
 
 }
