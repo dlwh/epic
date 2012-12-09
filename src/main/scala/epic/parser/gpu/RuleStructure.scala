@@ -28,6 +28,7 @@ case class RuleStructure[C, L](refinements: GrammarRefinements[C, L], grammar: B
     val onURHS = Set.empty ++ unaryRulesWithIndices.map(_._1.child)
     BitSet.empty ++ (0 until labelIndex.size).filterNot(onLHS).filter(onURHS)
   }
+  val numNonTerms = numSyms - terminalSymbols.size
 
   val (ntRules, leftTermRules, rightTermRules, bothTermRules) = {
     val ntRules, leftTermRules, rightTermRules, bothTermRules = ArrayBuffer[(BinaryRule[Int], Int)]()
