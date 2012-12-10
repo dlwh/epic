@@ -35,26 +35,17 @@ class GPUGrammar[C, L, W](coarseGrammar: BaseGrammar[C],
   val numGrammars = _ruleScores.length
   val structure = RuleStructure[C, L](projections, grammar)
 
-  val (inside, outside, ecounts, copyPosTags) = {
     import GPUGrammar._
     import structure.{grammar=>_, _ }
-    val insideKernel = new InsideKernel(structure, numGrammars)
-    val outsideKernel = new OutsideKernel(structure, numGrammars)
-    val ecountsKernel = new ExpectedCountsKernel(structure, numGrammars)
+  val epKernel = new EPKernel(structure, numGrammars)
+  val inside = new InsideKernel(structure, numGrammars)
+  val outside = new OutsideKernel(structure, numGrammars)
+  val ecounts = new ExpectedCountsKernel(structure, numGrammars)
 
-    val headerText = GrammarHeader.header(structure, numGrammars)
-    if(true) {val o = new FileWriter("inside.cl");  o.write(insideKernel.text); o.close()}
-    if(true) {val o = new FileWriter("outside.cl"); o.write(outsideKernel.text); o.close()}
-    if(true) {val o = new FileWriter("ecounts.cl"); o.write(ecountsKernel.text); o.close()}
-
-    val inside = insideKernel
-    val outside = outsideKernel
-    val copyPos = context.createProgram(headerText, copyPosToCharts)
-    copyPos.setUnsafeMathOptimizations()
-    copyPos.setFastRelaxedMath()
-
-    (inside, outside, ecountsKernel, copyPos)
-  }
+  val headerText = GrammarHeader.header(structure, numGrammars)
+  val copyPosTags = context.createProgram(headerText, copyPosToCharts)
+  copyPosTags.setUnsafeMathOptimizations()
+  copyPosTags.setFastRelaxedMath()
 
   val nsyms = grammar.labelIndex.size
   val nrules = grammar.index.size
@@ -63,6 +54,7 @@ class GPUGrammar[C, L, W](coarseGrammar: BaseGrammar[C],
   val root = grammar.labelIndex(grammar.root)
   val totalRules: Int = nbinaries * numGrammars + nunaries * numGrammars
   val cellSize = nsyms * numGrammars
+  val coarseCellSize = (structure.numCoarseSyms+1) * numGrammars
   val (maxCells, maxTotalLength) = {
     val totalBytes = context.getDevices.map(_.getGlobalMemSize).min
     val maxSize = ((totalBytes / cellSize).toInt / 4 / 12).toInt min 100000
@@ -76,13 +68,14 @@ class GPUGrammar[C, L, W](coarseGrammar: BaseGrammar[C],
   private val sumVector = context.createProgram(GPUGrammar.sumECountVectors).createKernel("sum_vectors")
   private val memZero = new ZeroMemoryKernel
   private val projection = new ProjectionKernel(structure, numGrammars)
-  private val decoder = new MaxRecallKernel(new RuleStructure(GrammarRefinements.identity(coarseGrammar), coarseGrammar))
+  private val decoder = new MaxRecallKernel(structure, numGrammars)
   private val masker = new CreateMasksKernel(structure, numGrammars)
   private val partitionGetter = new PartitionCalculatorKernel(structure, numGrammars)
 
   private val insideTopDev, insideBotDev = context.createFloatBuffer(Usage.InputOutput, maxCells * cellSize)
   private val outsideTopDev, outsideBotDev = context.createFloatBuffer(Usage.InputOutput, maxCells * cellSize)
-  private val projTopDev, projBotDev = context.createFloatBuffer(Usage.InputOutput, maxCells * coarseGrammar.labelIndex.size)
+  private val projTopDev, projBotDev, msgTopDev, msgBotDev = context.createFloatBuffer(Usage.InputOutput, maxCells * coarseCellSize * numGrammars)
+  private val qBotDev, qTopDev = context.createFloatBuffer(Usage.InputOutput, maxCells * coarseCellSize)
   private val ecountsDev = context.createFloatBuffer(Usage.InputOutput, maxTotalLength * totalRules)
   private val termECountsDev = context.createFloatBuffer(Usage.InputOutput, maxTotalLength * cellSize)
   private val offDev = context.createIntBuffer(Usage.Input, maxSentences + 1)
@@ -464,6 +457,65 @@ class GPUGrammar[C, L, W](coarseGrammar: BaseGrammar[C],
     }
     lastU
   }
+
+  private def epInsideOutside(batch: Batch, epIterations: Int) = synchronized {
+    import batch._
+    val maxLength = lengths.max
+    posTagsPtr.setFloats(batch.posTags)
+    offPtr.setInts(offsets)
+    lenPtr.setInts(lengths)
+
+    var wIT, wOB, wOT, wL, wO, wIB, wPos, copyOffLengths  = null:CLEvent
+//    println(posTags.slice(batch.lengthTotals(1) * nsyms, batch.totalLength * nsyms).mkString(", "))
+    wPos = posTagsDev.write(queue, 0, posTags.length, posTagsPtr, false)
+    wIB = memZero.zeroMemory(insideBotDev)
+    wIT = memZero.zeroMemory(insideTopDev)
+    wOT = memZero.zeroMemory(outsideTopDev)
+    wOB = memZero.zeroMemory(outsideBotDev)
+    wO = offDev.write(queue, 0, lengths.length, offPtr, false)
+    wL = lenDev.write(queue, 0, lengths.length, lenPtr, false)
+    offLengthsPtr.setInts(lengthTotals)
+    copyOffLengths = offLengthsDev.write(queue, offLengthsPtr, false)
+
+    maskUsePtr.setLongs(mask)
+    val writeMasks = maskUseDev.write(queue, maskUsePtr, false)
+
+    copyTags.setArgs(posTagsDev, insideBotDev, offDev, lenDev, offLengthsDev, Integer.valueOf(1))
+    val maxDim1Size = queue.getDevice.getMaxWorkItemSizes()(0)
+    if(maxDim1Size < nsyms * numGrammars) {
+      copyTags.setArg(5, numGrammars / 8 + 1)
+    }
+    val gramMultiplier = if(maxDim1Size < nsyms * numGrammars) {
+      8
+    } else {
+      numGrammars
+    }
+    val initCharts = copyTags.enqueueNDRange(queue,  Array(nsyms * gramMultiplier, lengths.length, maxLength), Array(nsyms * gramMultiplier, 1, 1), wPos, wIB, wL, copyOffLengths, writeMasks)
+    queue.finish()
+
+
+    var lastU = initCharts
+    for(i <- 0 until epIterations) {
+      def insideBotHook(length: Int, event: CLEvent) = Some(epKernel.updateCharts(numSentences, insideBotDev, qBotDev, msgBotDev, offDev, lenDev, length, maxLength, event))
+      def insideTopHook(length: Int, event: CLEvent) = Some(epKernel.updateCharts(numSentences, insideTopDev, qTopDev, msgTopDev, offDev, lenDev, length, maxLength, event))
+      def outsideBotHook(length: Int, event: CLEvent) = Some(epKernel.updateCharts(numSentences, outsideBotDev, qBotDev, msgBotDev, offDev, lenDev, length, maxLength, event))
+      def outsideTopHook(length: Int, event: CLEvent) = Some(epKernel.updateCharts(numSentences, outsideTopDev, qTopDev, msgTopDev, offDev, lenDev, length, maxLength, event))
+      lastU = inside.epInsidePass(numSentences,
+        insideBotDev, insideTopDev, posTagsDev,
+        offDev, lenDev, maxLength,
+        offLengthsDev, maskUseDev, rulesDev, insideBotHook, insideTopHook, lastU, wIT, wO)
+      lastU = outside.epOutsidePass(numSentences, outsideTopDev, outsideBotDev, insideTopDev, posTagsDev, offDev, lenDev, offLengthsDev, maskUseDev, maxLength, rulesDev,  outsideBotHook, outsideTopHook, lastU, wOB, wOT)
+      lastU = epKernel.updateQs(numSentences, projTopDev, projBotDev, insideTopDev, insideBotDev, outsideTopDev, outsideBotDev, qTopDev, qBotDev, msgTopDev, msgBotDev, offDev, lenDev, maxLength)
+    }
+
+    if(queue.getProperties.contains(CLDevice.QueueProperties.ProfilingEnable)) {
+      queue.finish()
+      val writeCounts = IndexedSeq(wIT, wOT, wIB, wOB, wO, wL, initCharts, writeMasks).filter(_ ne null).map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum / 1E9
+      println("io write: " + writeCounts)
+    }
+    lastU
+  }
+
 
   override protected def finalize() {
     offPtr.release()

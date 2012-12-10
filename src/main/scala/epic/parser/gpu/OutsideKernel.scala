@@ -21,7 +21,24 @@ class OutsideKernel[C, L](ruleStructure: RuleStructure[C, L], numGrammars: Int)(
                  maxLength: Int,
                  rules: CLBuffer[JFloat],
                  events: CLEvent*)(implicit queue: CLQueue) = {
-    val ou, ob, otb, ot = new ArrayBuffer[CLEvent]()
+    epOutsidePass(numSentences, outsideTop, outsideBot, insideTop, posTags, offsets, lengths, lengthOffsets, masks, maxLength,  rules, {(_,_)=>None}, {(_,_)=>None}, events:_*)
+  }
+
+    def epOutsidePass(numSentences: Int,
+                 outsideTop: CLBuffer[JFloat],
+                 outsideBot: CLBuffer[JFloat],
+                 insideTop: CLBuffer[JFloat],
+                 posTags: CLBuffer[JFloat],
+                 offsets: CLBuffer[JInt],
+                 lengths: CLBuffer[JInt],
+                 lengthOffsets: CLBuffer[JInt],
+                 masks: CLBuffer[JLong],
+                 maxLength: Int,
+                 rules: CLBuffer[JFloat],
+                 botHook: (Int, CLEvent)=>Option[CLEvent],
+                 topHook: (Int, CLEvent)=>Option[CLEvent],
+                 events: CLEvent*)(implicit queue: CLQueue) = {
+    val ou, ob, otb, ot, hooks = new ArrayBuffer[CLEvent]()
     var lastU = null:CLEvent
     lbinaries.foreach(_.setArgs(outsideTop, outsideBot, insideTop, offsets, lengths, masks, Integer.valueOf(maxLength), rules))
     rbinaries.foreach(_.setArgs(outsideTop, outsideBot, insideTop, offsets, lengths, masks, Integer.valueOf(maxLength), rules))
@@ -29,8 +46,13 @@ class OutsideKernel[C, L](ruleStructure: RuleStructure[C, L], numGrammars: Int)(
     tunaries.setArgs(outsideTop, outsideBot, offsets, lengths, rules)
     termbs.setArgs(outsideTop, outsideBot, insideTop, posTags, offsets, lengths, lengthOffsets, Integer.valueOf(maxLength), masks, rules)
     bterms.setArgs(outsideTop, outsideBot, insideTop, posTags, offsets, lengths, lengthOffsets, masks, rules)
+
     lastU = unaries.enqueueNDRange(queue, Array(numSentences, 1, numGrammars), Array(1, 1, numGrammars), events:_*)
     ou += lastU
+    for( h <- topHook(maxLength, lastU)) {
+      lastU = h
+      hooks += h
+    }
 
     for (len <- (maxLength - 1) to 1 by -1) {
       lbinaries.foreach(_.setArg(6, len))
@@ -44,12 +66,25 @@ class OutsideKernel[C, L](ruleStructure: RuleStructure[C, L], numGrammars: Int)(
       otb += lastU
       if(len == 1) {
         lastU = bterms.enqueueNDRange(queue, Array(numSentences, maxLength, numGrammars), Array(1, 1, numGrammars), lastU)
+        for( h <- botHook(len, lastU)) {
+          lastU = h
+          hooks += h
+        }
         ot += lastU
         lastU = tunaries.enqueueNDRange(queue, Array(numSentences, maxLength, numGrammars), Array(1, 1, numGrammars), lastU)
       } else {
+        for( h <- botHook(len, lastU)) {
+          lastU = h
+          hooks += h
+        }
         unaries.setArg(4, len)
         lastU = unaries.enqueueNDRange(queue, Array(numSentences, maxLength + 1 - len, numGrammars), Array(1, 1, numGrammars), lastU)
       }
+
+      for( h <- topHook(len, lastU)) {
+          lastU = h
+          hooks += h
+        }
       ou += lastU
     }
 

@@ -21,13 +21,39 @@ class InsideKernel[C, L](ruleStructure: RuleStructure[C, L], numGrammars: Int)(i
                  masks: CLBuffer[JLong],
                  rules: CLBuffer[JFloat],
                  events: CLEvent*)(implicit queue: CLQueue) = synchronized {
+    epInsidePass(numSentences, insideBot, insideTop, posTags, offsets, lengths, maxLength, lengthOffsets, masks, rules, {(_,_)=>None}, {(_,_)=>None}, events:_*)
+
+  }
+
+  def epInsidePass(numSentences: Int,
+                 insideBot: CLBuffer[JFloat],
+                 insideTop: CLBuffer[JFloat],
+                 posTags: CLBuffer[JFloat],
+                 offsets: CLBuffer[JInt],
+                 lengths: CLBuffer[JInt],
+                 maxLength: Int,
+                 lengthOffsets: CLBuffer[JInt],
+                 masks: CLBuffer[JLong],
+                 rules: CLBuffer[JFloat],
+                 botHook: (Int, CLEvent)=>Option[CLEvent],
+                 topHook: (Int, CLEvent)=>Option[CLEvent],
+                 events: CLEvent*)(implicit queue: CLQueue) = synchronized {
     binaries.foreach(_.setArgs(insideBot, insideTop, offsets, lengths, Integer.valueOf(1), masks, rules))
     termBinaries.setArgs(insideBot, insideTop, posTags, offsets, lengths, lengthOffsets, masks, Integer.valueOf(1), rules)
     unaries.setArgs(insideBot, insideTop, offsets, lengths, Integer.valueOf(1), rules)
-    val iu, ib, it = new ArrayBuffer[CLEvent]()
+    val iu, ib, it, hooks = new ArrayBuffer[CLEvent]()
     var lastU:CLEvent = null
-    lastU = unaries.enqueueNDRange(queue, Array(numSentences, maxLength, numGrammars), Array(1, 1, numGrammars), events:_*)
+    queue.finish()
+    for( h <- botHook(1, lastU)) {
+      lastU = h
+      hooks += h
+    }
+    lastU = unaries.enqueueNDRange(queue, Array(numSentences, maxLength, numGrammars), Array(1, 1, numGrammars), lastU)
     iu += lastU
+    for( h <- topHook(1, lastU)) {
+      lastU = h
+      hooks += h
+    }
 
     // TODO: retrofit inside/outside binaries and unaries to look at posTagsPointer....
     // TODO: also get ecounts...
@@ -40,9 +66,19 @@ class InsideKernel[C, L](ruleStructure: RuleStructure[C, L], numGrammars: Int)(i
       val t = termBinaries.enqueueNDRange(queue, Array(numSentences, maxLength + 1 - len, numGrammars), Array(1, 1, numGrammars), b:_*)
       it += t
 
+      for( h <- botHook(len, t)) {
+        lastU = h
+        hooks += h
+      }
+
       unaries.setArg(4, len)
-      lastU = unaries.enqueueNDRange(queue, Array(numSentences, maxLength + 1 - len, numGrammars), Array(1, 1, numGrammars), t)
+      lastU = unaries.enqueueNDRange(queue, Array(numSentences, maxLength + 1 - len, numGrammars), Array(1, 1, numGrammars), t, lastU)
       iu += lastU
+
+      for( h <- topHook(len, lastU)) {
+        lastU = h
+        hooks += h
+      }
     }
 
     if(queue.getProperties.contains(CLDevice.QueueProperties.ProfilingEnable)) {
@@ -50,7 +86,8 @@ class InsideKernel[C, L](ruleStructure: RuleStructure[C, L], numGrammars: Int)(i
       val iuCount = iu.map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum / 1E9
       val ibCount = ib.map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum / 1E9
       val itCount = it.map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum / 1E9
-      println("inside: " + iuCount + " " + ibCount + " " + itCount)
+      val hc = hooks.map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum / 1E9
+      println("inside: " + iuCount + " " + ibCount + " " + itCount + " " + hc)
     }
 
     lastU

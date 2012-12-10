@@ -30,7 +30,15 @@ typedef struct {
 
 typedef struct {
   float syms[NUM_PROJECTED_SYMS][NUM_GRAMMARS];
+  float off[NUM_GRAMMARS];
 } projected_parse_cell;
+
+
+typedef struct {
+  float syms[NUM_PROJECTED_SYMS];
+  float off;
+} projected_q;
+
 
 typedef struct {
   unsigned long allowed[%d];

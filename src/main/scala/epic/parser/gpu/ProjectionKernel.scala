@@ -90,27 +90,20 @@ __kernel void project_nterms(__global projected_parse_cell* projected,
 
   private def projectNonterminalsInner = {
     val buf = new ArrayBuffer[String]()
-    if(odds_ratio)
-      buf += "float sum = 0.0;"
+    buf += "float sum = 0.0f;"
     buf += "float cur;"
     for(coarse <- 0 until projections.coarseIndex.size) {
       buf += "cur = 0.0;"
       for(ref <- projections.refinementsOf(coarse)) {
         buf += "cur = mad(in->syms[%d][gram], out->syms[%d][gram], cur);".format(ref, ref)
       }
-      if(odds_ratio) {
-        buf += "sum += cur;"
-        buf += "target->syms[%d][gram] = cur;".format(coarse)
-      } else {
-        buf += "target->syms[%d][gram] = cur/root_score;".format(coarse,coarse)
-      }
+      buf += "sum += cur;"
+      buf += "target->syms[%d][gram] = cur/root_score;".format(coarse)
     }
 
-    if(odds_ratio) {
-      buf += "const float norm = root_score - sum;"
-      buf += "for (int i = 0; i < NUM_PROJECTED_SYMS; ++i) {"
-      buf += "  target->syms[%d][gram] /= norm;"
-      buf += "}"
-    }
+    buf += "const float norm = 1.0f - sum/root_score;"
+    buf += "target->off[gram] = norm;"
     buf.mkString("\n      ")
-  }}
+  }
+
+}
