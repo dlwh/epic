@@ -3,6 +3,7 @@ package epic.parser.gpu
 import com.nativelibs4java.opencl._
 import collection.mutable.ArrayBuffer
 import java.lang.{Float=>JFloat, Integer=>JInt}
+import java.io.FileWriter
 
 class EPKernel[L, L2](rules: RuleStructure[L, L2],numGrammars: Int)(implicit context: CLContext) {
 
@@ -52,7 +53,7 @@ class EPKernel[L, L2](rules: RuleStructure[L, L2],numGrammars: Int)(implicit con
       pn += b
       update_msg.setArg(5, len)
       um += update_msg.enqueueNDRange(queue, Array(numSentences, maxLength + 1 - len, numGrammars), Array(1, 1, numGrammars), b)
-      update_msg.setArg(4, len)
+      update_q.setArg(4, len)
       uq += update_q.enqueueNDRange(queue, Array(numSentences, maxLength + 1 - len, numGrammars), Array(1, 1, numGrammars), um.last)
     }
 
@@ -65,7 +66,7 @@ class EPKernel[L, L2](rules: RuleStructure[L, L2],numGrammars: Int)(implicit con
       pn += b2
       update_msg.setArg(5, len)
       um += update_msg.enqueueNDRange(queue, Array(numSentences, maxLength + 1 - len, numGrammars), Array(1, 1, numGrammars), b2)
-      update_msg.setArg(4, len)
+      update_q.setArg(4, len)
       uq += update_q.enqueueNDRange(queue, Array(numSentences, maxLength + 1 - len, numGrammars), Array(1, 1, numGrammars), um.last)
     }
 
@@ -84,6 +85,8 @@ class EPKernel[L, L2](rules: RuleStructure[L, L2],numGrammars: Int)(implicit con
 
   val program = {
     val p = context.createProgram(text)
+
+    if(true) {val o = new FileWriter("ep.cl"); o.write(text); o.close()}
     p.setFastRelaxedMath()
     p.setUnsafeMathOptimizations()
     p.addBuildOption("-Werror")
@@ -92,7 +95,7 @@ class EPKernel[L, L2](rules: RuleStructure[L, L2],numGrammars: Int)(implicit con
 
   private val update_chart = program.createKernel("ep_update_chart")
   private val update_msg = program.createKernel("ep_update_msg")
-  private val update_q = program.createKernel("ep_update_msg")
+  private val update_q = program.createKernel("ep_update_q")
   private val project_qnews = program.createKernel("ep_project_charts")
 
 
@@ -137,7 +140,7 @@ __kernel void ep_update_msg(__global const projected_q* qs,
     __global const projected_q* q = CELL(qs + offsets[sentence], begin, end);
     __global projected_parse_cell* msg = CELL(msgs + offsets[sentence], begin, end);
     __global const projected_parse_cell* qnew = CELL(qnews + offsets[sentence], begin, end);
-    float off = q->off * (msg->off[gram] / qnew->off[gram]);
+    float off = qnew->off[gram] * (msg->off[gram] / q->off);
     msg->off[gram] = (!isfinite(off) && off >= 0.0f) ? off : 1.0f;
     %s
   }
@@ -183,7 +186,7 @@ __kernel void ep_project_charts(__global projected_parse_cell* projected,
     __global const projected_q* q = CELL(qs + offsets[sentence], begin, end);
     __global projected_parse_cell* target = CELL(projected + offsets[sentence], begin, end);
     float off = q->off / msg->off[gram];
-    if(msg->off[gram] == 0.0 || q->off == 0.0f) off = 1.0f;
+    if(msg->off[gram] == 0.0f || q->off == 0.0f) off = 1.0f;
 
     %s
   }
@@ -195,7 +198,8 @@ __kernel void ep_project_charts(__global projected_parse_cell* projected,
     buf += "float cur;"
     for(coarse <- 0 until projections.coarseIndex.size) {
       buf += "cur = q->syms[%d] * off / msg->syms[%d][gram];".format(coarse, coarse)
-      for(ref <- projections.refinementsOf(coarse)) {
+      for( ref <- projections.refinementsOf(coarse)) {
+//        buf += """if(chart->syms[%d][gram] != 0.0f && (cur != 1.0f && cur != 0.0f)) printf("rs: (%%d, %%d, %d) %%e %%e %%e %%e %%e\n", begin, end, cur, chart->syms[%d][gram], chart->syms[%d][gram] *cur, q->syms[%d], msg->syms[%d][gram]);""".format(ref,ref,ref, ref, coarse, coarse)
         buf += "chart->syms[%d][gram] *= cur;".format(ref)
       }
     }
@@ -205,8 +209,9 @@ __kernel void ep_project_charts(__global projected_parse_cell* projected,
   private def updateMsgInner = {
     val buf = new ArrayBuffer[String]()
     for(coarse <- 0 until projections.coarseIndex.size) {
-      buf += "float r%d = q->syms[%d] * (msg->syms[%d][gram] / qnew->syms[%d][gram]);".format(coarse, coarse, coarse, coarse)
-      buf += "msg->syms[%d][gram] = (isfinite(r%d) && r%d > 0.0f) ? r%d : 1.0f;".format(coarse, coarse, coarse, coarse)
+      buf += "float r%d = qnew->syms[%d][gram] * (msg->syms[%d][gram] / q->syms[%d]);".format(coarse, coarse, coarse, coarse)
+      buf += "msg->syms[%d][gram] = (isfinite(r%d) && r%d > 0.0f) ? pow(r%d, 1.0f/NUM_GRAMMARS): 1.0f;".format(coarse, coarse, coarse, coarse, coarse)
+//      buf += """if(msg->syms[%d][gram] != 1.0f && msg->syms[%d][gram] != qnew->syms[%d][gram]) printf("rqs: (%%d, %%d, %d) %%e %%e %%e\n", begin, end, q->syms[%d], msg->syms[%d][gram], qnew->syms[%d][gram]);""".format(coarse, coarse, coarse, coarse, coarse,coarse, coarse)
     }
     buf.mkString("\n      ")
   }
@@ -218,7 +223,7 @@ __kernel void ep_project_charts(__global projected_parse_cell* projected,
     for(coarse <- 0 until projections.coarseIndex.size) {
       buf += "cur = 1.0f;"
       for(ref <- 0 until numGrammars) {
-        buf += "cur *= msg->syms[%d][%d];".format(coarse, ref)
+        buf += "cur *= msg->syms[%d][gram];".format(coarse)
       }
       buf += "sum += cur;"
       buf += "q->syms[%d] = cur;".format(coarse)
@@ -242,14 +247,15 @@ __kernel void ep_project_charts(__global projected_parse_cell* projected,
   private def projectNonterminalsInner = {
     val buf = new ArrayBuffer[String]()
     buf += "float sum = 0.0f;"
-    buf += "float cur, rescale;"
+    buf += "float cur, rescale = 1.0f;"
     for(coarse <- 0 until projections.coarseIndex.size) {
       buf += "// nb, inverse of update_charts. we have to remove one of these scales from either in or out to not overcount."
       buf += "rescale = msg->syms[%d][gram] / q->syms[%d] * off;".format(coarse, coarse)
-      buf += "cur = 0.0;"
+      buf += "cur = 0.0f;"
       for(ref <- projections.refinementsOf(coarse)) {
-        buf += "cur = mad(in->syms[%d][gram], out->syms[%d][gram] * rescale, cur);".format(ref, ref)
+        buf += "cur = mad(in->syms[%d][gram], out->syms[%d][gram], cur);".format(ref, ref)
       }
+      buf += "cur *= rescale;"
       buf += "sum += cur;"
       buf += "target->syms[%d][gram] = cur/root_score;".format(coarse)
     }

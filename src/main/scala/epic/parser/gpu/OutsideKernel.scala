@@ -66,11 +66,11 @@ class OutsideKernel[C, L](ruleStructure: RuleStructure[C, L], numGrammars: Int)(
       otb += lastU
       if(len == 1) {
         lastU = bterms.enqueueNDRange(queue, Array(numSentences, maxLength, numGrammars), Array(1, 1, numGrammars), lastU)
+        ot += lastU
         for( h <- botHook(len, lastU)) {
           lastU = h
           hooks += h
         }
-        ot += lastU
         lastU = tunaries.enqueueNDRange(queue, Array(numSentences, maxLength, numGrammars), Array(1, 1, numGrammars), lastU)
       } else {
         for( h <- botHook(len, lastU)) {
@@ -81,11 +81,11 @@ class OutsideKernel[C, L](ruleStructure: RuleStructure[C, L], numGrammars: Int)(
         lastU = unaries.enqueueNDRange(queue, Array(numSentences, maxLength + 1 - len, numGrammars), Array(1, 1, numGrammars), lastU)
       }
 
+      ou += lastU
       for( h <- topHook(len, lastU)) {
           lastU = h
           hooks += h
         }
-      ou += lastU
     }
 
     if(queue.getProperties.contains(CLDevice.QueueProperties.ProfilingEnable)) {

@@ -86,7 +86,7 @@ class InsideKernel[C, L](ruleStructure: RuleStructure[C, L], numGrammars: Int)(i
       val iuCount = iu.map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum / 1E9
       val ibCount = ib.map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum / 1E9
       val itCount = it.map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum / 1E9
-      val hc = hooks.map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum / 1E9
+      val hc = hooks.filter(_ ne null).map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum / 1E9
       println("inside: " + iuCount + " " + ibCount + " " + itCount + " " + hc)
     }
 
