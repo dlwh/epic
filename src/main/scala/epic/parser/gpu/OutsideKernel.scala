@@ -27,8 +27,8 @@ class OutsideKernel[C, L](ruleStructure: RuleStructure[C, L], numGrammars: Int)(
     rbinaries.foreach(_.setArgs(outsideTop, outsideBot, insideTop, offsets, lengths, masks, Integer.valueOf(maxLength), rules))
     unaries.setArgs(outsideTop, outsideBot, offsets, lengths, Integer.valueOf(maxLength), rules)
     tunaries.setArgs(outsideTop, outsideBot, offsets, lengths, rules)
-    termbs.setArgs(outsideTop, outsideBot, insideTop, posTags, offsets, lengths, lengthOffsets, Integer.valueOf(maxLength), rules)
-    bterms.setArgs(outsideTop, outsideBot, insideTop, posTags, offsets, lengths, lengthOffsets, rules)
+    termbs.setArgs(outsideTop, outsideBot, insideTop, posTags, offsets, lengths, lengthOffsets, Integer.valueOf(maxLength), masks, rules)
+    bterms.setArgs(outsideTop, outsideBot, insideTop, posTags, offsets, lengths, lengthOffsets, masks, rules)
     lastU = unaries.enqueueNDRange(queue, Array(numSentences, 1, numGrammars), Array(1, 1, numGrammars), events:_*)
     ou += lastU
 
@@ -129,6 +129,7 @@ __kernel void outside_term_binaries(__global parse_cell* outsides_top,
               __global const int* lengths,
               __global const int* lengthOffsets,
               const int spanLength,
+              __global const pruning_mask* masks,
             __global const rule_cell* rules) {
 
   const int sentence = get_global_id(0);
@@ -136,31 +137,34 @@ __kernel void outside_term_binaries(__global parse_cell* outsides_top,
   const int gram = get_global_id(2);
   const int end = begin + spanLength;
   const int length = lengths[sentence];
-  float otarget[NUM_SYMS];
+  __global const pruning_mask* mask =  masks + offsets[sentence] + TRIANGULAR_INDEX(begin, end);
    if (end <= length) {
-    __global const parse_cell* inside = insides_top + offsets[sentence];
-    __global const parse_cell* obot = outsides_bot + offsets[sentence];
-    for(int i = 0; i < NUM_SYMS; ++i) {
-      otarget[i] = 0.0f;
-    }
+    if( IS_ANY_SET(*mask)) {
+      float otarget[NUM_SYMS];
+      __global const parse_cell* inside = insides_top + offsets[sentence];
+      __global const parse_cell* obot = outsides_bot + offsets[sentence];
+      for(int i = 0; i < NUM_SYMS; ++i) {
+        otarget[i] = 0.0f;
+      }
 
-    if (end < length) { // look right
-      __global const parse_cell * gparent =  CELL(obot, begin, end+1);
-      __global const parse_cell * gright = inside_tags + lengthOffsets[sentence] + (end);
-      %s
-    }
+      if (end < length) { // look right
+        __global const parse_cell * gparent =  CELL(obot, begin, end+1);
+        __global const parse_cell * gright = inside_tags + lengthOffsets[sentence] + (end);
+        %s
+      }
 
-   // complete looking left
-      if (begin > 0) { // look left
-      __global const parse_cell * gparent =  CELL(obot, begin-1, end);
-      __global const parse_cell * gleft = inside_tags + lengthOffsets[sentence] + (begin - 1);
-      %s
-     }
+     // complete looking left
+        if (begin > 0) { // look left
+        __global const parse_cell * gparent =  CELL(obot, begin-1, end);
+        __global const parse_cell * gleft = inside_tags + lengthOffsets[sentence] + (begin - 1);
+        %s
+       }
 
-    // multiply in a 2^SCALE_FACTOR to re-achieve balance.
-    __global parse_cell* gout = CELL(outsides_top + offsets[sentence], begin, end);
-    for(int i = 0; i < NUM_SYMS; ++i) {
-      gout->syms[i][gram] += ldexp(otarget[i], SCALE_FACTOR);
+      // multiply in a 2^SCALE_FACTOR to re-achieve balance.
+      __global parse_cell* gout = CELL(outsides_top + offsets[sentence], begin, end);
+      for(int i = 0; i < NUM_SYMS; ++i) {
+        gout->syms[i][gram] += ldexp(otarget[i], SCALE_FACTOR);
+      }
     }
   }
 }
@@ -172,6 +176,7 @@ __kernel void outside_term_binaries(__global parse_cell* outsides_top,
               __global const int* offsets,
               __global const int* lengths,
               __global const int* lengthOffsets,
+              __global const pruning_mask* masks,
             __global const rule_cell* rules) {
   const int sentence = get_global_id(0);
   const int begin = get_global_id(1);
@@ -354,7 +359,7 @@ __kernel void outside_term_binaries(__global parse_cell* outsides_top,
   }
 
   private def outside_binaries_left(rules: IndexedSeq[(BinaryRule[Int], Int)], id: Int = 0) = {
-    """
+   pruningCheckForSyms(rules.map(_._1.left).toSet, id+300) +    """
       __kernel void outside_binaries_left_%d(__global parse_cell* outsides_top,
               __global const parse_cell* outsides_bot,
               __global const parse_cell * insides_top,
@@ -369,7 +374,7 @@ __kernel void outside_term_binaries(__global parse_cell* outsides_top,
   const int end = begin + spanLength;
   const int length = lengths[sentence];
   __global const pruning_mask* lmask =  masks + offsets[sentence] + TRIANGULAR_INDEX(begin, end);
-  if (end <= length && IS_ANY_SET(*lmask)) {
+  if (end <= length && IS_ANY_IN_BLOCK_%d(*lmask)) {
     %s
     __global const parse_cell* inside = insides_top + offsets[sentence];
     __global const parse_cell* obot = outsides_bot + offsets[sentence];
@@ -390,7 +395,7 @@ __kernel void outside_term_binaries(__global parse_cell* outsides_top,
     %s
   }
 }
-    """.stripMargin.format(id,
+    """.stripMargin.format(id,id+300,
       rules.map(_._1.left).toSet[Int].map("left" + _).mkString("float ", " = 0.0f,", " = 0.0f;"),
       outsideNTRightCompletionUpdates(rules),
       rules.map(_._1.left).toSet[Int].map(p => "gout->syms[%d][gram] += ldexp(left%d, SCALE_FACTOR);".format(p,p)).mkString("\n   ")
@@ -399,7 +404,7 @@ __kernel void outside_term_binaries(__global parse_cell* outsides_top,
 
 
   private def outside_binaries_right(rules: IndexedSeq[(BinaryRule[Int], Int)], id: Int = 0) = {
-      """
+    pruningCheckForSyms(rules.map(_._1.right).toSet, id) +  """
       __kernel void outside_binaries_right_%d(__global parse_cell* outsides_top,
               __global const parse_cell* outsides_bot,
               __global const parse_cell * insides_top,
@@ -414,7 +419,7 @@ __kernel void outside_term_binaries(__global parse_cell* outsides_top,
   const int end = begin + spanLength;
   const int length = lengths[sentence];
   __global const pruning_mask* rmask =  masks + offsets[sentence] + TRIANGULAR_INDEX(begin, end);
-  if (end <= length && IS_ANY_SET(*rmask)) {
+  if (end <= length && IS_ANY_IN_BLOCK_%d(*rmask)) {
     %s
     __global const parse_cell* inside = insides_top + offsets[sentence];
     __global const parse_cell* obot = outsides_bot + offsets[sentence];
@@ -435,7 +440,7 @@ __kernel void outside_term_binaries(__global parse_cell* outsides_top,
    %s
   }
 }
-      """.stripMargin.format(id,
+      """.stripMargin.format(id, id,
       rules.map(_._1.right).toSet[Int].map("right" + _).mkString("float ", " = 0.0f,", " = 0.0f;"),
       outsideNTLeftCompletionUpdates(rules),
       rules.map(_._1.right).toSet[Int].map(p => "gout->syms[%d][gram] += ldexp(right%d, SCALE_FACTOR);".format(p,p)).mkString("\n    ")

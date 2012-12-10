@@ -257,7 +257,7 @@ __kernel void inside_unaries(__global const parse_cell * inside_bots,
   }
 
   private def ntBinaryPartition(rules: IndexedSeq[(BinaryRule[Int], Int)], id: Int) = {
-    """
+    pruningCheckForSyms(rules.map(_._1.parent).toSet, id) +"""
 __kernel void inside_binaries_%d(
               __global parse_cell * inside_bots,
               __global const parse_cell * inside_tops,
@@ -272,7 +272,7 @@ __kernel void inside_binaries_%d(
   const int end = begin + spanLength;
   const int length = lengths[sentence];
   __global const pruning_mask* pmask =  masks + offsets[sentence] + TRIANGULAR_INDEX(begin, end);
-  if (end <= length && IS_ANY_SET(*pmask)) {
+  if (end <= length && IS_ANY_IN_BLOCK_%d(*pmask)) {
     __global const parse_cell* chart_top =  inside_tops + offsets[sentence];
     __global parse_cell* gout = CELL(inside_bots + offsets[sentence], begin, end);
     %s
@@ -292,7 +292,7 @@ __kernel void inside_binaries_%d(
     %s
   }
 }
-    """.format(id,
+    """.format(id, id,
       rules.map(_._1.parent).toSet[Int].map("parent" + _).mkString("float ", " = 0.0f,", " = 0.0f;"),
       insideRuleUpdates(rules),
       rules.map(_._1.parent).toSet[Int].map(p => "gout->syms[%d][gram] = ldexp(parent%d, SCALE_FACTOR);".format(p,p)).mkString("\n   ")

@@ -32,7 +32,7 @@ class ExpectedCountsKernel[C, L](ruleStructure: RuleStructure[C, L], numGrammars
     binary_lterms.setArgs(ecounts, insideTop, outsideBot, insidePos, offsets, lengths, offLengths, Integer.valueOf(1), rules)
     binary_rterms.setArgs(ecounts, insideTop, outsideBot, insidePos, offsets, lengths, offLengths, rules)
     binary_terms.setArgs(ecounts, insideTop, outsideBot, insidePos, offsets, lengths, offLengths, rules)
-    unaries.setArgs(ecounts, insideTop, insideBot, outsideTop, offsets, lengths, offLengths, Integer.valueOf(1), rules)
+    unaries.setArgs(ecounts, insideTop, insideBot, outsideTop, offsets, lengths, offLengths, Integer.valueOf(1), masks, rules)
     terms.setArgs(termECounts, insideTop, insideBot, outsideBot, offsets, lengths, offLengths, Integer.valueOf(1))
 
     val maxDim1Size = queue.getDevice.getMaxWorkItemSizes()(0)
@@ -131,7 +131,7 @@ __kernel void ecount_binary_terms(__global rule_cell* ecounts,
    __global const parse_cell * insides_pos,
    __global const int* offsets,
    __global const int* lengths,
-  __global const int* lengthOffsets,
+   __global const int* lengthOffsets,
    __global const rule_cell* rules) {
   const int sentence = get_global_id(0);
   const int begin = get_global_id(1);
@@ -187,6 +187,7 @@ __kernel void ecount_unaries(
               __global const int* lengths,
               __global const int* lengthOffsets,
               const int spanLength,
+               __global const pruning_mask* masks,
               __global const rule_cell* rules) {
   const int sentence = get_global_id(0);
   const int begin = get_global_id(1);
@@ -194,7 +195,8 @@ __kernel void ecount_unaries(
   const int end = begin + spanLength;
   const int length = lengths[sentence];
 
-  if (end <= length) {
+  __global const pruning_mask* pmask =  masks + offsets[sentence] + TRIANGULAR_INDEX(begin, end);
+  if (end <= length && IS_ANY_SET(*pmask)) {
     __global const parse_cell* itop = insides_top + offsets[sentence];
     __global const parse_cell* outside = outsides_top + offsets[sentence];
     __global const parse_cell* inside = insides_bot + offsets[sentence];
@@ -504,9 +506,11 @@ __kernel void ecount_binaries_%d(__global rule_cell* ecounts,
       // child has scale (end - begin-1)
       // child * oparent / root has scale 0 (yay!)
       buf += "oscore = out->syms[%d][gram]/root_score;".format(par)
+      buf += "if(oscore != 0.0f) {"
       for( (r,index) <- rules) {
-        buf += "ruleCounts->unaries[%d][gram] += rules->unaries[%d][gram] * oscore * in->syms[%d][gram];".format(index, index, r.child)
+        buf += "  ruleCounts->unaries[%d][gram] += rules->unaries[%d][gram] * oscore * in->syms[%d][gram];".format(index, index, r.child)
       }
+      buf += "}"
     }
 
     buf.mkString("\n    ")

@@ -85,5 +85,21 @@ case class RuleStructure[C, L](refinements: GrammarRefinements[C, L], grammar: B
 
   // pruning stuff
   val pruningMaskFieldSize = numCoarseSyms/64 + {if(numCoarseSyms % 64 != 0) 1 else 0}
+
+  def pruningMaskForSyms(syms: Iterable[Int]) = {
+    val coarsened = syms.map(refinements.labels.project(_)).toSet
+    val mask = Array.fill(pruningMaskFieldSize)("")
+    for( (field, coarses) <- coarsened.groupBy(_ / 64)) {
+      mask(field) = coarses.map(c => "(1L << %d)".format(c-64*field)).mkString("(", "|", ")")
+    }
+    mask
+  }
+
+  def pruningCheckForSyms(syms: Iterable[Int], id: Int) = {
+    val mask = pruningMaskForSyms(syms)
+    val checks = mask.zipWithIndex.map{ case (mask, field) => "(((mask)).allowed[" + field + "] &(" + mask +"))"}
+    checks.mkString("#define IS_ANY_IN_BLOCK_" +id +"(mask)  (", "||", ")")
+
+  }
 }
 
