@@ -110,7 +110,7 @@ case class ChainNERInference(inner: SemiCRFInference[NERType.Value, String],
       new Anchoring[NERType.Value, String] {
         def labelIndex: Index[NERType.Value] = labels
 
-        def w: IndexedSeq[String] = s.words
+        def words: IndexedSeq[String] = s.words
 
         def maxSegmentLength(label: Int): Int = inner.maxLength(label)
 

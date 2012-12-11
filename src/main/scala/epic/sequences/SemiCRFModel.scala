@@ -153,7 +153,7 @@ class SemiCRFInference[L, W](weights: DenseVector[Double],
 
   def baseAugment(v: Segmentation[L, W]): SemiCRF.Anchoring[L, W] = new IdentityAnchoring(v.words)
 
-  class IdentityAnchoring(val w: IndexedSeq[W]) extends SemiCRF.Anchoring[L, W] {
+  class IdentityAnchoring(val words: IndexedSeq[W]) extends SemiCRF.Anchoring[L, W] {
     def maxSegmentLength(l: Int): Int = maxLength(l)
 
     def scoreTransition(prev: Int, cur: Int, beg: Int, end: Int): Double = 0.0
@@ -163,8 +163,8 @@ class SemiCRFInference[L, W](weights: DenseVector[Double],
     def startSymbol: L = featurizer.startSymbol
   }
 
-  class Anchoring(val w: IndexedSeq[W], augment: SemiCRF.Anchoring[L, W]) extends SemiCRF.Anchoring[L, W] {
-    val localization = featurizer.anchor(w)
+  class Anchoring(val words: IndexedSeq[W], augment: SemiCRF.Anchoring[L, W]) extends SemiCRF.Anchoring[L, W] {
+    val localization = featurizer.anchor(words)
     def maxSegmentLength(l: Int): Int = SemiCRFInference.this.maxLength(l)
 
     val beginCache = Array.tabulate(labelIndex.size, labelIndex.size, length){ (p,c,w) =>

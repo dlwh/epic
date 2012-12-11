@@ -112,7 +112,6 @@ case class SpanBeliefs(span: DSpan,
     )
 }
 
-
 case class WordBeliefs(pos: DPos,
                        governor: Beliefs[Int],
                        span: Beliefs[Span],

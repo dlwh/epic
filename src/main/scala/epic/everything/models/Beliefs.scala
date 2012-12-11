@@ -1,13 +1,13 @@
 package epic.everything.models
 
-import breeze.linalg.DenseVector
+import breeze.linalg._
 import breeze.inference.Factor
 
 /**
  * 
  * @author dlwh
  */
-case class Beliefs[T](property: Property[T], beliefs: DenseVector[Double]) extends Factor[Beliefs[T]] {
+final case class Beliefs[T](property: Property[T], beliefs: DenseVector[Double]) extends Factor[Beliefs[T]] {
   def apply(i: Int) = beliefs(i)
 
   def beliefFor(i: T) = apply(property.choices(i))
@@ -24,5 +24,17 @@ case class Beliefs[T](property: Property[T], beliefs: DenseVector[Double]) exten
       i += 1
     }
     true
+  }
+
+  def newBuilder = Beliefs.Builder(property)
+}
+
+object Beliefs {
+  case class Builder[T](property: Property[T]) {
+    val counts = property.mkDenseVector()
+    def tallyCount(assignment: Int, count: Double) {
+      counts(assignment) += count
+    }
+    def result() = Beliefs(property, normalize(counts, 1.0))
   }
 }
