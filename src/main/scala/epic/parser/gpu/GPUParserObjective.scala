@@ -15,6 +15,7 @@ import breeze.config.{Configuration, CommandLineParser, Help}
 import epic.trees.annotations.{FilterAnnotations, TreeAnnotator}
 import epic.parser.features.{GenFeaturizer, IndicatorFeature, TagAwareWordShapeFeaturizer}
 import features.IndicatorFeature
+import gpu.GPUGrammar.PruningMask
 import java.io.File
 import epic.parser.ParseEval.Statistics
 import epic.trees.annotations.FilterAnnotations
@@ -39,7 +40,7 @@ import com.nativelibs4java.opencl.JavaCL
 class GPUParserObjective[C, L, W](parser: GPUGrammar[C, L, W],
                                   reannotate: (BinarizedTree[C], Seq[W]) => BinarizedTree[C],
                                   indexedFeatures: IndexedFeaturizer[C, L, W],
-                                  sentences: IndexedSeq[TreeInstance[C, W]]) extends BatchDiffFunction[DenseVector[Double]] {
+                                  sentences: IndexedSeq[(TreeInstance[C, W], PruningMask)]) extends BatchDiffFunction[DenseVector[Double]] {
   def initialWeightVector(randomize: Boolean) = if(randomize) -DenseVector.rand(featureIndex.size * numGrammars) else DenseVector.zeros[Double](featureIndex.size * numGrammars)
 
   val lengthOfOneFeatureVector = featureIndex.size
@@ -65,10 +66,10 @@ class GPUParserObjective[C, L, W](parser: GPUGrammar[C, L, W],
     parser.tagScorers = tagScorers
 
     val mySents = batch.map(sentences)
-    val parser.ExpectedCounts(ruleCounts, tagCounts, partition) = parser.expectedRuleCounts(mySents.map(_.words))
-    val wordCounts = for(i <- (0 until numGrammars).par) yield computeFeaturesForLexicon(mySents, tagCounts.map(_(i)))
+    val parser.ExpectedCounts(ruleCounts, tagCounts, partition) = parser.expectedRuleCounts(mySents.map(_._1.words), mySents.map(_._2))
+    val wordCounts = for(i <- (0 until numGrammars).par) yield computeFeaturesForLexicon(mySents.map(_._1), tagCounts.map(_(i)))
     val allCounts = for(g <- 0 until numGrammars) yield {
-      val gc = goldCounts(mySents, x.slice(g * featureIndex.size, (g+1) * featureIndex.size))
+      val gc = goldCounts(mySents.map(_._1), x.slice(g * featureIndex.size, (g+1) * featureIndex.size))
       wordCounts(g)(0 until ruleCounts(g).length) += ruleCounts(g)
       val finalCounts = new StandardExpectedCounts(0.0, wordCounts(g), featureIndex) -= gc
       finalCounts.counts.slice(parser.structure.numBinaries, parser.structure.numBinaries + parser.structure.numUnaries) :*= new DenseVector(parser.structure.nonIdentityMask)
@@ -215,7 +216,7 @@ object GPUParserTrainer {
       val basic = Seq(l)
       basic map (IndicatorFeature)
     }
-    val feat = new GenFeaturizer[(AnnotatedLabel, Int), String]({ (i,b) => IndexedSeq(IndicatorFeature(i(b)))}, labelFlattener _)
+    val feat = new GenFeaturizer[(AnnotatedLabel, Int), String](gen, labelFlattener _)
 
     val annGrammar: BaseGrammar[AnnotatedLabel] = BaseGrammar(annTrees.head.tree.label, annBinaries, annUnaries)
     val firstLevelRefinements = GrammarRefinements(xbarGrammar, annGrammar, {(_: AnnotatedLabel).baseAnnotatedLabel})
@@ -235,13 +236,24 @@ object GPUParserTrainer {
     }
     println(context)
 
-    val gpuParser = new GPUGrammar[AnnotatedLabel, (AnnotatedLabel, Int), String](xbarGrammar, finalRefinements, refinedGrammar,  xbarLexicon.flatMap(split _), Array.fill(numGrammars)(RuleScores.zeros(refinedGrammar)), Array[(IndexedSeq[String], Int, Int) => Double](), false)
+    val grammar = GenerativeParser.extractGrammar(AnnotatedLabel.TOP, annTrees)
+
+    val masks = {
+      val kern = GPUGrammar.fromSimpleGrammar(grammar, useGPU, 1)
+      kern.createPruningMasks(trainTrees.map(_.words))
+    }
+    println("done with masks!")
+    System.gc()
+    System.gc()
+    System.gc()
+
+    val gpuParser = new GPUGrammar[AnnotatedLabel, (AnnotatedLabel, Int), String](xbarGrammar, finalRefinements, refinedGrammar,  xbarLexicon.flatMap(split _), Array.fill(numGrammars)(RuleScores.zeros(refinedGrammar)), Array[(IndexedSeq[String], Int, Int) => Double](), true)
 
     println(finalRefinements.labels)
 
     val indexedFeaturizer = IndexedFeaturizer(xbarGrammar, xbarLexicon, trainTrees, feat, finalRefinements)
 
-    val obj = new GPUParserObjective(gpuParser, annotator, indexedFeaturizer, trainTrees)
+    val obj = new GPUParserObjective(gpuParser, annotator, indexedFeaturizer, trainTrees zip masks)
     val cachedObj = new CachedBatchDiffFunction(obj)
 //    val checking = new RandomizedGradientCheckingFunction(cachedObj, 1E-2, Array(1E-4), toString = {
 //      (i: Int) => obj.featureIndex.get(i).toString

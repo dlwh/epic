@@ -97,7 +97,7 @@ case class RuleStructure[C, L](refinements: GrammarRefinements[C, L], grammar: B
 
   def pruningCheckForSyms(syms: Iterable[Int], id: Int) = {
     val mask = pruningMaskForSyms(syms)
-    val checks = mask.zipWithIndex.map{ case (mask, field) => "(((mask)).allowed[" + field + "] &(" + mask +"))"}
+    val checks = mask.zipWithIndex.filter(_._1.nonEmpty).map{ case (mask, field) => "(((mask)).allowed[" + field + "] &(" + mask +"))"}
     checks.mkString("#define IS_ANY_IN_BLOCK_" +id +"(mask)  (", "||", ")")
 
   }

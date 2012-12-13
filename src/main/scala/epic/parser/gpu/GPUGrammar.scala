@@ -578,6 +578,7 @@ class GPUGrammar[C, L, W](coarseGrammar: BaseGrammar[C],
 
 
   override protected def finalize() {
+    println("Release!")
     offPtr.release()
     lenPtr.release()
     offDev.release()
@@ -596,6 +597,10 @@ class GPUGrammar[C, L, W](coarseGrammar: BaseGrammar[C],
     projTopDev.release()
     projBotDev.release()
     ecountsDev.release()
+    qTopDev.release()
+    qBotDev.release()
+    msgTopDev.release()
+    msgBotDev.release()
   }
 
   case class Marginal(inTop: Array[Float], inBot: Array[Float], outTop: Array[Float], outBot: Array[Float], offset: Int, length: Int) {
