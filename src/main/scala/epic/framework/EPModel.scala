@@ -100,6 +100,7 @@ case class EPExpectedCounts(var loss: Double, counts: IndexedSeq[ExpectedCounts[
     this.loss -= other.loss
     this
   }
+
 }
 
 case class ComponentFeature(index: Int, feature: Feature) extends Feature

@@ -27,7 +27,7 @@ import java.io.{ObjectOutputStream, FileOutputStream, BufferedOutputStream, File
 
 trait Model[Datum] {
   self =>
-  type ExpectedCounts <: epic.framework.ExpectedCounts[ExpectedCounts]
+  type ExpectedCounts >: Null <: epic.framework.ExpectedCounts[ExpectedCounts]
   type Inference <: epic.framework.Inference[Datum] {
     type ExpectedCounts = self.ExpectedCounts
   }
@@ -82,20 +82,21 @@ class ModelObjective[Datum](val model: Model[Datum],
     val inference = inferenceFromWeights(x)
     val timeIn = System.currentTimeMillis()
     val success = new AtomicInteger(0)
-    val finalCounts = select(batch).aggregate(inference.emptyCounts)({ (countsSoFar,datum) =>
+    val finalCounts = select(batch).aggregate(null:inference.ExpectedCounts)({ ( _countsSoFar,datum) =>
       try {
-        val counts = inference.expectedCounts(datum) += countsSoFar
+        val countsSoFar:inference.ExpectedCounts = if (_countsSoFar ne null) _countsSoFar else inference.emptyCounts
+        inference.expectedCounts(datum, countsSoFar, 1.0)
         success.incrementAndGet()
-        counts
+        countsSoFar
       } catch {
         case e =>
           e.printStackTrace()
 //          new Exception("While processing " + datum, e).printStackTrace()
-          countsSoFar
+          _countsSoFar
       }
     },{ (a,b) => b += a})
     val timeOut = System.currentTimeMillis()
-    println("Parsing took: " + (timeOut - timeIn) * 1.0/1000 + "s" )
+    println("Inference took: " + (timeOut - timeIn) * 1.0/1000 + "s" )
 
     val (loss,grad) = expectedCountsToObjective(finalCounts)
     val timeOut2 = System.currentTimeMillis()

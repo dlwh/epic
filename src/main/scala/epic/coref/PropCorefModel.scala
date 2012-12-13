@@ -37,20 +37,19 @@ class PropCorefInference(index: Index[Feature],
                       assignmentFactors: IndexedSeq[Factor])
 
 
-  def countsFromMarginal(inst: FeaturizedCorefInstance, marg: Marginal, aug: DocumentBeliefs): ExpectedCounts = {
-    val expCounts = emptyCounts
+  override def countsFromMarginal(inst: FeaturizedCorefInstance, marg: Marginal, aug: DocumentBeliefs, expCounts: ExpectedCounts, scale: Double): ExpectedCounts = {
     import marg._
-    expCounts.loss = marginals.logPartition
+    expCounts.loss += marginals.logPartition * scale
 
     val clusterMins = BitSet.empty ++ inst.clusters.map(_.min)
 
     for(i <- 0 until assignmentFactors.length) {
       val arr = Array(0)
       if(clusterMins.contains(i))
-        addIntoScale(expCounts.counts, inst.featuresFor(i, i), marginals.beliefs(i)(i))
+        addIntoScale(expCounts.counts, inst.featuresFor(i, i), marginals.beliefs(i)(i) * scale)
       else for(j <- inst.clusterFor(i) if j < i) {
         arr(0) = j
-        addIntoScale(expCounts.counts, inst.featuresFor(j, i), marginals.beliefs(i)(j))
+        addIntoScale(expCounts.counts, inst.featuresFor(j, i), marginals.beliefs(i)(j) * scale)
       }
     }
 

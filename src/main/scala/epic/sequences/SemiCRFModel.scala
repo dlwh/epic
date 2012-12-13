@@ -102,9 +102,9 @@ class SemiCRFInference[L, W](weights: DenseVector[Double],
     m -> m.logPartition
   }
 
-  override def goldCounts(v: Segmentation[L, W], augment: SemiCRF.Anchoring[L, W]): ExpectedCounts = {
+  override def goldCounts(v: Segmentation[L, W], augment: SemiCRF.Anchoring[L, W], accum: ExpectedCounts, scale: Double): ExpectedCounts = {
     val m: SemiCRF.Marginal[L, W] = goldMarginal(v, augment)
-    this.countsFromMarginal(v, m, augment)
+    this.countsFromMarginal(v, m, augment, accum, scale)
   }
 
 
@@ -113,9 +113,8 @@ class SemiCRFInference[L, W](weights: DenseVector[Double],
     m
   }
 
-  def countsFromMarginal(v: Segmentation[L, W], marg: Marginal, aug: SemiCRF.Anchoring[L, W]): ExpectedCounts = {
-    val counts = emptyCounts
-    counts.loss = marg.logPartition
+  def countsFromMarginal(v: Segmentation[L, W], marg: Marginal, aug: SemiCRF.Anchoring[L, W], counts: ExpectedCounts, scale: Double): ExpectedCounts = {
+    counts.loss += marg.logPartition * scale
     val localization = marg.anchoring.asInstanceOf[Anchoring].localization
     val visitor = new TransitionVisitor[L, W] {
 
@@ -125,7 +124,7 @@ class SemiCRFInference[L, W](weights: DenseVector[Double],
         val data = vector.data
         while(i < vector.iterableSize) {
 //          if(vector.isActive(i))
-            counts(index(i)) += d * data(i)
+            counts(index(i)) += d * data(i) * scale
           i += 1
         }
 

@@ -37,12 +37,12 @@ case class AnnotatedParserInference[L, W](featurizer: RefinedFeaturizer[L, W, Fe
                                      baseMeasure: CoreGrammar[L, W]) extends ParserInference[L, W] {
 
   // E[T-z|T, params]
-  def goldCounts(ti: TreeInstance[L, W], aug: CoreAnchoring[L, W]) = {
+  def goldCounts(ti: TreeInstance[L, W], aug: CoreAnchoring[L, W], accum: ExpectedCounts, scale: Double) = {
     val tree = ti.tree
     val words = ti.words
     val annotated = ann(tree, words)
 
-    TreeMarginal(AugmentedGrammar.fromRefined(grammar), words, annotated).expectedCounts(featurizer)
+    TreeMarginal(AugmentedGrammar.fromRefined(grammar), words, annotated).expectedCounts(featurizer, accum, scale)
   }
 
 }

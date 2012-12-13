@@ -67,7 +67,7 @@ case class LatentParserInference[L, L2, W](featurizer: RefinedFeaturizer[L, W, F
                                            projections: GrammarRefinements[L, L2]) extends ParserInference[L, W] {
 
   // E[T-z|T, params]
-  def goldCounts(ti: TreeInstance[L, W], augment: CoreAnchoring[L, W]) = {
+  def goldCounts(ti: TreeInstance[L, W], augment: CoreAnchoring[L, W], accum: ExpectedCounts, scale: Double) = {
     val reannotated = reannotate(ti.tree, ti.words)
     val product = AugmentedAnchoring.fromRefined(grammar.anchor(ti.words))
     val ecounts = LatentTreeMarginal(product, projections.labels, reannotated).expectedCounts(featurizer)
