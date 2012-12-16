@@ -9,7 +9,6 @@ import epic.framework.{ModelObjective, Feature}
 import breeze.optimize.FirstOrderMinimizer.OptParams
 import breeze.optimize.CachedBatchDiffFunction
 import breeze.util.Encoder
-import pairwise._
 import collection.mutable.ArrayBuffer
 
 /**

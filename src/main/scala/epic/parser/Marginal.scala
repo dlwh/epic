@@ -31,11 +31,15 @@ trait Marginal[L, W] {
   def length = words.length
 
   def expectedCounts[Feat](featurizer: RefinedFeaturizer[L, W, Feat]): StandardExpectedCounts[Feat] = {
-    val spec = featurizer.anchor(words)
     val counts = StandardExpectedCounts.zero(featurizer.index)
-    val visitor = Marginal.mkVisitor(counts, spec)
+    expectedCounts(featurizer, counts, 1.0)
+  }
+
+  def expectedCounts[Feat](featurizer: RefinedFeaturizer[L, W, Feat], counts: StandardExpectedCounts[Feat], scale: Double): StandardExpectedCounts[Feat] = {
+    val spec = featurizer.anchor(words)
+    val visitor = Marginal.mkVisitor(counts, spec, scale)
     visit(visitor)
-    counts.loss = partition
+    counts.loss += partition * scale
     counts
   }
 
@@ -54,20 +58,21 @@ trait Marginal[L, W] {
 
 object Marginal {
   private def mkVisitor[L, W, Feat](counts: StandardExpectedCounts[Feat],
-                                    spec: RefinedFeaturizer[L, W, Feat]#Anchoring):AnchoredVisitor[L] = {
+                                    spec: RefinedFeaturizer[L, W, Feat]#Anchoring,
+                                    scale: Double):AnchoredVisitor[L] = {
     new AnchoredVisitor[L] {
       def visitBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int, score: Double) {
-        addScale(counts, spec.featuresForBinaryRule(begin, split, end, rule, ref), score)
+        addScale(counts, spec.featuresForBinaryRule(begin, split, end, rule, ref), score * scale)
       }
 
       def visitUnaryRule(begin: Int, end: Int, rule: Int, ref: Int, score: Double) {
-        addScale(counts, spec.featuresForUnaryRule(begin, end, rule, ref), score)
+        addScale(counts, spec.featuresForUnaryRule(begin, end, rule, ref), score * scale)
       }
 
       def visitSpan(begin: Int, end: Int, tag: Int, ref: Int, score: Double) {
        // if(begin+1 == end)
          // println(begin,end,tag,ref,score)
-        addScale(counts, spec.featuresForSpan(begin, end, tag, ref), score)
+        addScale(counts, spec.featuresForSpan(begin, end, tag, ref), score * scale)
       }
     }
 

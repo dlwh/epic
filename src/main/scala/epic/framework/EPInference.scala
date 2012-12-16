@@ -31,8 +31,8 @@ case class EPInference[Datum, Augment](inferences: IndexedSeq[ProjectableInferen
   }
 
   // assume we don't need gold  to do EP, at least for now
-  override def goldCounts(value: Datum, augment: Augment) = {
-    val counts = for( inf <- inferences) yield inf.goldCounts(value, augment)
+  override def goldCounts(value: Datum, augment: Augment, accum: ExpectedCounts, scale: Double) = {
+    val counts = for( (inf, acc) <- inferences zip accum.counts) yield inf.goldCounts(value, augment, acc.asInstanceOf[inf.ExpectedCounts], scale)
     EPExpectedCounts(counts.foldLeft(0.0) {
       _ + _.loss
     }, counts)
@@ -67,13 +67,13 @@ case class EPInference[Datum, Augment](inferences: IndexedSeq[ProjectableInferen
     (state.logPartition, state.q, marginals, state.f_~)
   }
 
-  override def guessCounts(datum: Datum, augment: Augment) = {
+  override def guessCounts(datum: Datum, augment: Augment, accum: ExpectedCounts, scale: Double) = {
     val (partition, finalAugment, marginals, f_~) = getMarginals(datum, augment)
 
     val finalCounts = for (((inf, f_~), i) <- (inferences zip f_~).zipWithIndex) yield {
       val marg = marginals(i)
       val augment = finalAugment / f_~
-      inf.countsFromMarginal(datum, marg.asInstanceOf[inf.Marginal], augment)
+      inf.countsFromMarginal(datum, marg.asInstanceOf[inf.Marginal], augment, accum.counts(i).asInstanceOf[inf.ExpectedCounts], scale)
     }
 
     EPExpectedCounts(partition, finalCounts)

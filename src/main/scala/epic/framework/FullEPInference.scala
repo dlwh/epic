@@ -75,18 +75,18 @@ case class FullEPInference[Datum, Augment](inferences: IndexedSeq[FullProjectabl
     (state.logPartition, state.q, marginals, state.f_~)
   }
 
-  def guessCounts(datum: Datum, augment: Augment) = {
+  def guessCounts(datum: Datum, augment: Augment, accum:ExpectedCounts, scale: Double) = {
     val (partition, finalAugment, marginals, f_~) = getMarginals(datum, augment)
 
-    val finalCounts = jointCounts(datum, marginals, finalAugment, f_~)
+    val finalCounts = jointCounts(datum, marginals, finalAugment, f_~, accum, scale)
 
     EPExpectedCounts(partition, finalCounts)
   }
 
-  override def goldCounts(datum: Datum, augment: Augment) = {
+  override def goldCounts(datum: Datum, augment: Augment, accum: ExpectedCounts, scale: Double) = {
      val (partition, finalAugment, marginals, f_~) = getGoldMarginals(datum, augment)
 
-     val finalCounts = jointCounts(datum, marginals, finalAugment, f_~)
+     val finalCounts = jointCounts(datum, marginals, finalAugment, f_~, accum, scale)
 
      EPExpectedCounts(partition, finalCounts)
    }
@@ -94,11 +94,12 @@ case class FullEPInference[Datum, Augment](inferences: IndexedSeq[FullProjectabl
   def jointCounts(datum: Datum,
                   marginals: ArrayBuffer[ProjectableInference[Datum, Augment]#Marginal],
                   finalAugment: Augment,
-                  f_~ : IndexedSeq[Augment]) = {
+                  f_~ : IndexedSeq[Augment],
+                  accum: ExpectedCounts, scale: Double) = {
     for (((inf, f_~), i) <- (inferences zip f_~).zipWithIndex) yield {
       val marg = marginals(i)
       val augment = finalAugment / f_~
-      inf.countsFromMarginal(datum, marg.asInstanceOf[inf.Marginal], augment)
+      inf.countsFromMarginal(datum, marg.asInstanceOf[inf.Marginal], augment, accum.counts(i).asInstanceOf[inf.ExpectedCounts], scale)
     }
   }
 }

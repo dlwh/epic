@@ -59,11 +59,11 @@ case class ChainNERInference(inner: SemiCRFInference[NERType.Value, String],
   }
 
 
-  def countsFromMarginal(doc: ProcessedDocument, marg: Marginal, aug: DocumentBeliefs): ExpectedCounts = {
+  def countsFromMarginal(doc: ProcessedDocument, marg: Marginal, aug: DocumentBeliefs, accum: ExpectedCounts, scale: Double): ExpectedCounts = {
     val counts = emptyCounts
     val anchorings = beliefsToAnchoring(doc, aug)
     for(i <- 0 until doc.sentences.length) {
-      counts += inner.countsFromMarginal(doc.sentences(i).ner, marg.sentences(i), anchorings(i))
+      counts += inner.countsFromMarginal(doc.sentences(i).ner, marg.sentences(i), anchorings(i), accum, scale)
     }
 
     counts
