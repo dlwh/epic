@@ -38,7 +38,7 @@ build and use Chalk.
 Chalk uses SBT (Simple Build Tool) with a standard directory
 structure.  To build Chalk, type (in the `$CHALK_DIR` directory):
 
-	$ bin/build update compile
+	$ ./build update compile
 
 This will compile the source files and put them in
 `./target/classes`. If this is your first time running it, you will see
@@ -47,7 +47,7 @@ expected. Once that is over, the Chalk code will be compiled.
 
 To try out other build targets, do:
 
-	$ bin/build
+	$ ./build
 
 This will drop you into the SBT interface. To see the actions that are
 possible, hit the TAB key. (In general, you can do auto-completion on
@@ -55,7 +55,7 @@ any command prefix in SBT, hurrah!)
 
 To make sure all the tests pass, do:
 
-	$ bin/build test
+	$ ./build test
 
 Documentation for SBT is at <http://www.scala-sbt.org/>
 
