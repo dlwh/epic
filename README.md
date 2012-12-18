@@ -10,6 +10,20 @@ I've called this Chalk because my son has a stuffed elephant that he named Chalk
 
 In addition to OpenNLP, there are two other related projects. One is Scalabha (https://github.com/utcompling/Scalabha), which I started as a package for teaching Scala in computational linguistics projects, and which I may pilfer as Chalk develops. The other is Breeze, which is a Scala-based machine learning and NLP project that I've been peripherally involved with. It's a great and very general library; ultimately, I expect to bring Breeze in as a dependency and then Chalk will in some respects be an example of building an NLP library on top of the core capabilities provided by Breeze.
 
+## Using Chalk
+
+In SBT:
+
+    libraryDependencies += "com.jasonbaldridge" %% "chalk" % "1.0"
+
+In Maven:
+
+    <dependency>
+       <groupId>com.jasonbaldridge</groupId>
+       <artifactId>chalk</artifactId>
+       <version>1.0</version>
+    </dependency>
+
 ## Requirements
 
 * Version 1.6 of the Java 2 SDK (http://java.sun.com)
