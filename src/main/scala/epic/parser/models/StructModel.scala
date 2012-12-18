@@ -87,11 +87,7 @@ case class StructModelFactory(baseParser: ParserParams.XbarGrammar,
   type MyModel = StructModel[AnnotatedLabel, AnnotatedLabel, String]
 
   def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]]): MyModel = {
-    val transformed = trainTrees.par.map {
-      ti =>
-        val t = annotator(ti.tree, ti.words)
-        TreeInstance(ti.id, t, ti.words)
-    }.seq.toIndexedSeq
+    val transformed = trainTrees.par.map(annotator).seq.toIndexedSeq
 
     val (initLexicon, initBinaries, initUnaries) = this.extractBasicCounts(transformed)
 
