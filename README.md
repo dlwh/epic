@@ -14,7 +14,7 @@ In addition to OpenNLP, there are two other related projects. One is Scalabha (h
 
 In SBT:
 
-    libraryDependencies += "com.jasonbaldridge" %% "chalk" % "1.0"
+    libraryDependencies += "com.jasonbaldridge" % "chalk" % "1.0"
 
 In Maven:
 
