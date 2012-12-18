@@ -21,6 +21,7 @@ import breeze.collection.mutable.OpenAddressHashArray
 import breeze.linalg._
 import breeze.text.analyze.EnglishWordClassGenerator
 import epic.trees._
+import annotations.{StripAnnotations, TreeAnnotator}
 import java.io.File
 import features._
 import epic.parser._
@@ -157,7 +158,7 @@ class IndexedLexFeaturizer[L, W](f: LexFeaturizer[L, W],
     }
 
     def depIndex(ruleRef: Int) = {
-      ruleRef / words.length
+      ruleRef % words.length
     }
 
     def unaryHeadIndex(ref: Int) = {
@@ -690,6 +691,8 @@ class SimpleWordShapeGen[L](tagWordCounts: Counter2[L, String, Double],
 
 case class LexModelFactory(baseParser: ParserParams.XbarGrammar,
                            constraints: ParserParams.Constraints[AnnotatedLabel, String],
+                           @Help(text= "The kind of annotation to do on the refined grammar. Defaults to ~KM2003")
+                           annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = StripAnnotations(),
                            @Help(text="Old weights to initialize with. Optional")
                            oldWeights: File = null,
                            @Help(text="For features not seen in gold trees, we bin them into dummyFeats * numGoldFeatures bins using hashing.")
@@ -699,10 +702,10 @@ case class LexModelFactory(baseParser: ParserParams.XbarGrammar,
   type MyModel = LexModel[AnnotatedLabel, String]
 
   def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]]) = {
-    val trees = trainTrees.map(_.mapLabels(_.baseAnnotatedLabel))
+    val trees = trainTrees.map(annotator)
     val (initLexicon, initBinaries, initUnaries) = GenerativeParser.extractCounts(trees)
 
-    val (xbarGrammar, xbarLexicon) = baseParser.xbarGrammar(trees)
+    val (xbarGrammar, xbarLexicon) = baseParser.xbarGrammar(trainTrees)
     val wordIndex = Index(trainTrees.iterator.flatMap(_.words))
     val summedCounts = sum(initLexicon, Axis._0)
     val shapeGen = new SimpleWordShapeGen(initLexicon, summedCounts)
