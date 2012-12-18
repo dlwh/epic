@@ -32,7 +32,7 @@ trait RefinedAnchoring[L, W] extends Factor[RefinedAnchoring[L, W]] {
   def words: Seq[W]
 
 
-  def logPartition: Double = marginal.partition
+  def logPartition: Double = marginal.logPartition
 
   /**
    * Scores the indexed label rule with refinenemnt ref, when it occurs at (begin, end). Can be used for s, or for a

@@ -19,26 +19,65 @@ package epic.framework
 import collection.mutable.ArrayBuffer
 import breeze.inference.{ExpectationPropagation, Factor}
 
-case class EPInference[Datum, Augment](inferences: IndexedSeq[ProjectableInference[Datum, Augment]],
-                                       maxEPIter: Int)(implicit aIsFactor: Augment <:< Factor[Augment]) extends AugmentableInference[Datum, Augment] {
+class EPInference[Datum, Augment](inferences: IndexedSeq[ProjectableInference[Datum, Augment]],
+                                  val maxEPIter: Int,
+                                  val epInGold: Boolean = false)(implicit aIsFactor: Augment <:< Factor[Augment]) extends ProjectableInference[Datum, Augment] with Serializable {
+  type Marginal = EPMarginal[Augment, ProjectableInference[Datum, Augment]#Marginal]
   type ExpectedCounts = EPExpectedCounts
-
-  def baseAugment(v: Datum) = inferences(0).baseAugment(v)
 
   def emptyCounts = {
     val counts = for (m <- inferences) yield m.emptyCounts
     EPExpectedCounts(0.0, counts)
   }
 
+  def baseAugment(v: Datum) = inferences(0).baseAugment(v)
+
+  def project(v: Datum, m: Marginal, oldAugment: Augment): Augment = m.q
+
   // assume we don't need gold  to do EP, at least for now
   override def goldCounts(value: Datum, augment: Augment, accum: ExpectedCounts, scale: Double) = {
-    val counts = for( (inf, acc) <- inferences zip accum.counts) yield inf.goldCounts(value, augment, acc.asInstanceOf[inf.ExpectedCounts], scale)
-    EPExpectedCounts(counts.foldLeft(0.0) {
-      _ + _.loss
-    }, counts)
+    if(epInGold) {
+      val counts = for( (inf, acc) <- inferences zip accum.counts) yield inf.goldCounts(value, augment, acc.asInstanceOf[inf.ExpectedCounts], scale)
+      EPExpectedCounts(counts.foldLeft(0.0) {
+        _ + _.loss
+      }, counts)
+    } else {
+      super.goldCounts(value, augment, accum, scale)
+    }
   }
 
-  def getMarginals(datum: Datum, augment: Augment) = {
+  // ugh code duplication...
+  def goldMarginal(datum: Datum, augment: Augment) = {
+    val marginals = ArrayBuffer.fill(inferences.length)(null.asInstanceOf[ProjectableInference[Datum, Augment]#Marginal])
+    def project(q: Augment, i: Int) = {
+      val inf = inferences(i)
+      marginals(i) = null.asInstanceOf[ProjectableInference[Datum, Augment]#Marginal]
+      val (marg, contributionToLikelihood) = inf.goldMarginal(datum, q)
+      val newAugment = inf.project(datum, marg, q)
+      marginals(i) = marg
+      newAugment -> contributionToLikelihood
+    }
+    val ep = new ExpectationPropagation(project _)
+
+    var state: ep.State = null
+    val iterates = ep.inference(augment, 0 until inferences.length, IndexedSeq.fill[Augment](inferences.length)(null.asInstanceOf[Augment]))
+    var iter = 0
+    var converged = false
+    while (!converged && iter < maxEPIter && iterates.hasNext) {
+      val s = iterates.next()
+      if (state != null) {
+        converged = (s.logPartition - state.logPartition).abs / math.max(s.logPartition, state.logPartition) < 1E-4
+      }
+      iter += 1
+      state = s
+    }
+    print(iter + " ")
+
+    EPMarginal(state.logPartition, state.q, marginals, state.f_~) -> state.logPartition
+  }
+
+
+  def marginal(datum: Datum, augment: Augment) = {
     val marginals = ArrayBuffer.fill(inferences.length)(null.asInstanceOf[ProjectableInference[Datum, Augment]#Marginal])
     def project(q: Augment, i: Int) = {
       val inf = inferences(i)
@@ -64,18 +103,20 @@ case class EPInference[Datum, Augment](inferences: IndexedSeq[ProjectableInferen
     }
     print(iter + " ")
 
-    (state.logPartition, state.q, marginals, state.f_~)
+    EPMarginal(state.logPartition, state.q, marginals, state.f_~) -> state.logPartition
   }
 
-  override def guessCounts(datum: Datum, augment: Augment, accum: ExpectedCounts, scale: Double) = {
-    val (partition, finalAugment, marginals, f_~) = getMarginals(datum, augment)
 
-    val finalCounts = for (((inf, f_~), i) <- (inferences zip f_~).zipWithIndex) yield {
+  def countsFromMarginal(datum: Datum, marg: Marginal, accum: EPExpectedCounts, scale: Double) = {
+    import marg._
+    for (((inf, f_~), i) <- (inferences zip messages).zipWithIndex) yield {
       val marg = marginals(i)
-      val augment = finalAugment / f_~
-      inf.countsFromMarginal(datum, marg.asInstanceOf[inf.Marginal], augment, accum.counts(i).asInstanceOf[inf.ExpectedCounts], scale)
+      inf.countsFromMarginal(datum, marg.asInstanceOf[inf.Marginal], accum.counts(i).asInstanceOf[inf.ExpectedCounts], scale)
     }
-
-    EPExpectedCounts(partition, finalCounts)
+    accum
   }
 }
+
+
+case class EPMarginal[Augment, Marginal](logPartition: Double, q: Augment, marginals: IndexedSeq[Marginal], messages: IndexedSeq[Augment]) extends epic.framework.Marginal
+

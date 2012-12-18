@@ -27,6 +27,7 @@ class SemiCRFModel[L, W](val featureIndex: Index[Feature],
   }
 
   type Inference = SemiCRFInference[L, W]
+  type Marginal = SemiCRF.Marginal[L, W]
 
   def initialValueForFeature(f: Feature): Double = 0.0
 
@@ -81,7 +82,7 @@ object SemiCRFModel {
 class SemiCRFInference[L, W](weights: DenseVector[Double],
                              featureIndex: Index[Feature],
                              featurizer: SemiCRFModel.BIEOFeaturizer[L, W],
-                             val maxLength: Int=>Int) extends MarginalInference[Segmentation[L, W], SemiCRF.Anchoring[L, W]] with SemiCRF.Grammar[L, W] {
+                             val maxLength: Int=>Int) extends AugmentableInference[Segmentation[L, W], SemiCRF.Anchoring[L, W]] with SemiCRF.Grammar[L, W] {
   def viterbi(sentence: IndexedSeq[W], anchoring: SemiCRF.Anchoring[L, W]) = {
     SemiCRF.viterbi(new Anchoring(sentence, anchoring))
   }
@@ -102,18 +103,12 @@ class SemiCRFInference[L, W](weights: DenseVector[Double],
     m -> m.logPartition
   }
 
-  override def goldCounts(v: Segmentation[L, W], augment: SemiCRF.Anchoring[L, W], accum: ExpectedCounts, scale: Double): ExpectedCounts = {
-    val m: SemiCRF.Marginal[L, W] = goldMarginal(v, augment)
-    this.countsFromMarginal(v, m, augment, accum, scale)
-  }
-
-
-  def goldMarginal(v: Segmentation[L, W], augment: SemiCRF.Anchoring[L, W]): SemiCRF.Marginal[L, W] = {
+  def goldMarginal(v: Segmentation[L, W], augment: SemiCRF.Anchoring[L, W]) = {
     val m = SemiCRF.Marginal.goldMarginal[L, W](new Anchoring(v.words, augment), v.segments)
-    m
+    m -> m.logPartition
   }
 
-  def countsFromMarginal(v: Segmentation[L, W], marg: Marginal, aug: SemiCRF.Anchoring[L, W], counts: ExpectedCounts, scale: Double): ExpectedCounts = {
+  def countsFromMarginal(v: Segmentation[L, W], marg: Marginal, counts: ExpectedCounts, scale: Double): ExpectedCounts = {
     counts.loss += marg.logPartition * scale
     val localization = marg.anchoring.asInstanceOf[Anchoring].localization
     val visitor = new TransitionVisitor[L, W] {

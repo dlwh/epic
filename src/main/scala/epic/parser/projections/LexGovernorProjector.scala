@@ -13,7 +13,7 @@ import models.LexGrammar
 class LexGovernorProjector[L, W](grammar: LexGrammar[L, W], notConstituent: L) {
   private val nc = grammar.grammar.labelIndex(notConstituent)
 
-  def apply(anch: LexGrammar[L,W]#Spec, chart: Marginal[L, W]):LexGovernorInfo = {
+  def apply(anch: LexGrammar[L,W]#Spec, chart: ParseMarginal[L, W]):LexGovernorInfo = {
     val v = new Visitor(anch, chart.length)
     chart.visit(v)
     LexGovernorInfo(v.spanType, v.spanGovernorCounts, v.wordGovernorCounts, v.maximalLabelType)

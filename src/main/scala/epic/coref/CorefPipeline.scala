@@ -18,10 +18,8 @@ import collection.mutable.ArrayBuffer
 
 object CorefPipeline extends App {
   case class Params(path: File, name: String = "eval/coref", nfiles: Int = 100000)
-  val (baseConfig, files) = CommandLineParser.parseArguments(args)
-  val config = baseConfig backoff Configuration.fromPropertiesFiles(files.map(new File(_)))
-  val params = config.readIn[Params]("")
 
+  val params = CommandLineParser.readIn[Params](args)
 
   val docs = for {
     file <- params.path.listFiles take params.nfiles

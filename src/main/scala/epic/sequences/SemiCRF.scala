@@ -55,7 +55,7 @@ object SemiCRF {
     def apply(prev: Int, cur: Int, beg: Int, end: Int, count: Double)
   }
 
-  trait Marginal[L, W] {
+  trait Marginal[L, W] extends epic.framework.Marginal {
 
     def anchoring: Anchoring[L, W]
     def w: IndexedSeq[W] = anchoring.words

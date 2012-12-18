@@ -17,7 +17,7 @@ package projections
  limitations under the License.
 */
 import breeze.collection.mutable.TriangularArray
-import breeze.config.{Help, Configuration}
+import breeze.config.{CommandLineParser, Help, Configuration}
 import breeze.util.Index
 import collection.immutable.BitSet
 import java.io._
@@ -85,7 +85,7 @@ class ConstraintCoreGrammar[L, W](augmentedGrammar: AugmentedGrammar[L, W], thre
     chartScorer
   }
 
-  def buildConstraints(charts: Marginal[L, W],
+  def buildConstraints(charts: ParseMarginal[L, W],
                   goldTags: GoldTagPolicy[L] = GoldTagPolicy.noGoldTags[L]):ConstraintAnchoring[L, W] = {
 
     val RawConstraints(label,unary, sparsity) = rawConstraints(charts, goldTags)
@@ -105,7 +105,7 @@ class ConstraintCoreGrammar[L, W](augmentedGrammar: AugmentedGrammar[L, W], thre
     rawConstraints(charts, gold)
   }
 
-  def rawConstraints(marg: Marginal[L, W], gold: GoldTagPolicy[L]): RawConstraints = {
+  def rawConstraints(marg: ParseMarginal[L, W], gold: GoldTagPolicy[L]): RawConstraints = {
     val length = marg.length
     val (botLabelScores, unaryScores) = computeScores(length, marg)
 
@@ -150,7 +150,7 @@ class ConstraintCoreGrammar[L, W](augmentedGrammar: AugmentedGrammar[L, W], thre
     computePruningStatistics(charts, gold)
   }
 
-  def computePruningStatistics(marg: Marginal[L, W], gold: GoldTagPolicy[L]): (PruningStatistics, PruningStatistics) = {
+  def computePruningStatistics(marg: ParseMarginal[L, W], gold: GoldTagPolicy[L]): (PruningStatistics, PruningStatistics) = {
     val counts = DenseVector.zeros[Double](grammar.labelIndex.size)
     val (scores, topScores) = computeScores(marg.length, marg)
     var nConstructed = 0
@@ -191,7 +191,7 @@ class ConstraintCoreGrammar[L, W](augmentedGrammar: AugmentedGrammar[L, W], thre
   }
 
 
-  private def computeScores(length: Int, marg: Marginal[L, W]) = {
+  private def computeScores(length: Int, marg: ParseMarginal[L, W]) = {
     val scores = TriangularArray.raw(length + 1, null: Array[Double])
     val topScores = TriangularArray.raw(length + 1, null: Array[Double])
     val visitor = new AnchoredVisitor[L] {
@@ -278,9 +278,7 @@ case class ProjectionParams(treebank: ProcessedTreebank,
 object ProjectTreebankToConstraints {
 
   def main(args: Array[String]) {
-    val (baseConfig, files) = breeze.config.CommandLineParser.parseArguments(args)
-    val config = baseConfig backoff Configuration.fromPropertiesFiles(files.map(new File(_)))
-    val params = config.readIn[ProjectionParams]("")
+    val params = CommandLineParser.readIn[ProjectionParams](args)
     val treebank = params.treebank.copy(maxLength = 1000000)
     println(params)
     val parser = loadParser[Any](params.parser)
@@ -337,9 +335,7 @@ object ProjectTreebankToConstraints {
 object ComputePruningThresholds {
 
   def main(args: Array[String]) {
-    val (baseConfig, files) = breeze.config.CommandLineParser.parseArguments(args)
-    val config = baseConfig backoff Configuration.fromPropertiesFiles(files.map(new File(_)))
-    val params = config.readIn[ProjectionParams]("")
+    val params = CommandLineParser.readIn[ProjectionParams](args)
     val treebank = params.treebank.copy(maxLength = 1000000)
     println(params)
     val parser = loadParser[Any](params.parser)

@@ -20,17 +20,24 @@ package epic.framework
  * @author dlwh
  */
 trait Inference[Datum] extends Serializable {
-  type ExpectedCounts <: AnyRef
+  type ExpectedCounts <: epic.framework.ExpectedCounts[ExpectedCounts]
+  type Marginal <: epic.framework.Marginal
   def emptyCounts: ExpectedCounts
 
-  def expectedCounts(datum: Datum, accum: ExpectedCounts, scale: Double): ExpectedCounts
-}
+  def goldMarginal(v: Datum):(Marginal,Double)
+  def marginal(v: Datum):(Marginal,Double)
+  def countsFromMarginal(v: Datum, marg: Marginal, accum: ExpectedCounts, scale: Double):ExpectedCounts
 
-trait GoldGuessInference[Datum] extends Inference[Datum] {
-  type ExpectedCounts <: epic.framework.ExpectedCounts[ExpectedCounts]
 
-  def guessCounts(value: Datum, accum: ExpectedCounts, scale: Double):ExpectedCounts
-  def goldCounts(value: Datum, accum: ExpectedCounts, scale: Double):ExpectedCounts
+  def guessCounts(value: Datum, accum: ExpectedCounts, scale: Double):ExpectedCounts = {
+    val marg = marginal(value)
+    countsFromMarginal(value, marg._1, accum, scale)
+  }
+
+  def goldCounts(value: Datum, accum: ExpectedCounts, scale: Double):ExpectedCounts = {
+    val marg = goldMarginal(value)
+    countsFromMarginal(value, marg._1, accum, scale)
+  }
 
   def expectedCounts(datum: Datum, accum: ExpectedCounts, scale: Double) = {
     guessCounts(datum, accum, scale)
@@ -39,39 +46,28 @@ trait GoldGuessInference[Datum] extends Inference[Datum] {
   }
 }
 
-/**
- * Used for loss-augmented inference or EP inference
- */
-trait AugmentableInference[Datum, Augment] extends GoldGuessInference[Datum] {
+
+trait AugmentableInference[Datum,Augment] extends Inference[Datum] {
   def baseAugment(v: Datum):Augment
 
-  override def guessCounts(value: Datum, accum: ExpectedCounts, scale: Double) =  guessCounts(value, baseAugment(value), accum, scale)
-  def guessCounts(value: Datum, augment: Augment, accum: ExpectedCounts, scale: Double):ExpectedCounts
-
-  override def goldCounts(value: Datum, accum: ExpectedCounts, scale: Double):ExpectedCounts = goldCounts(value, baseAugment(value), accum, scale)
-  def goldCounts(value: Datum, augment: Augment, accum: ExpectedCounts, scale: Double):ExpectedCounts
-}
-
-trait MarginalInference[Datum,Augment] extends AugmentableInference[Datum,Augment] {
-  type Marginal <: AnyRef
+  def marginal(v: Datum):(Marginal,Double) = marginal(v, baseAugment(v))
   def marginal(v: Datum, aug: Augment):(Marginal,Double)
-  def countsFromMarginal(v: Datum, marg: Marginal, aug: Augment, accum: ExpectedCounts, scale: Double):ExpectedCounts
-  override def guessCounts(datum: Datum,  augment: Augment, accum: ExpectedCounts, scale: Double) = {
-    val m = marginal(datum,augment)
-    countsFromMarginal(datum,m._1,augment, accum, scale)
-  }
-}
 
-trait ProjectableInference[Datum,Augment] extends MarginalInference[Datum,Augment] {
-  def project(v: Datum, m: Marginal, oldAugment: Augment):Augment
-}
-
-trait FullProjectableInference[Datum, Augment] extends ProjectableInference[Datum, Augment] {
-  def projectGold(v: Datum, m: Marginal, oldAugment: Augment):Augment
+  def goldMarginal(v: Datum):(Marginal,Double)  = goldMarginal(v, baseAugment(v))
   def goldMarginal(v: Datum, aug: Augment):(Marginal,Double)
 
-  override def goldCounts(value: Datum, augment: Augment, accum: ExpectedCounts, scale: Double): ExpectedCounts = {
-    val m = goldMarginal(value, augment)
-    countsFromMarginal(value, m._1, augment, accum, scale)
+  def guessCounts(datum: Datum,  augment: Augment, accum: ExpectedCounts, scale: Double) = {
+    val m = marginal(datum,augment)
+    countsFromMarginal(datum,m._1, accum, scale)
   }
+
+  def goldCounts(value: Datum, augment: Augment, accum: ExpectedCounts, scale: Double): ExpectedCounts = {
+    val m = goldMarginal(value, augment)
+    countsFromMarginal(value, m._1, accum, scale)
+  }
+
+}
+
+trait ProjectableInference[Datum,Augment] extends AugmentableInference[Datum,Augment] {
+  def project(v: Datum, m: Marginal, oldAugment: Augment):Augment
 }

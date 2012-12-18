@@ -28,17 +28,17 @@ import scala._
  */
 
 case class LatentTreeMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
-                                    tree: BinarizedTree[(L, Seq[Int])]) extends Marginal[L, W] {
+                                    tree: BinarizedTree[(L, Seq[Int])]) extends ParseMarginal[L, W] {
 
   private val stree = insideScores()
   outsideScores(stree)
 
-  val partition = logSum(stree.label.inside, stree.label.inside.length)
+  val logPartition = logSum(stree.label.inside, stree.label.inside.length)
 
   def visitPostorder(spanVisitor: AnchoredVisitor[L], threshold: Double = Double.NegativeInfinity) = {
     // normalizer
-    if (partition.isInfinite || partition.isNaN)
-      sys.error("NAn or infinite" + partition + " " + stree.label.inside.mkString(", "))
+    if (logPartition.isInfinite || logPartition.isNaN)
+      sys.error("NAn or infinite" + logPartition + " " + stree.label.inside.mkString(", "))
 
     stree.postorder foreach {
       case t@NullaryTree(Beliefs(label, labels, iScores, oScores), span) =>
@@ -46,7 +46,7 @@ case class LatentTreeMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
           val l = labels(i)
           val iS = iScores(i)
           val oS = oScores(i)
-          val ruleScore = (iS + oS - partition)
+          val ruleScore = (iS + oS - logPartition)
           assert(!ruleScore.isNaN)
           // assert(exp(ruleScore) > 0, " " + ruleScore)
           spanVisitor.visitSpan(t.span.start, t.span.end, label, l, exp(ruleScore))
@@ -65,7 +65,7 @@ case class LatentTreeMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
             ci += 1
             val ruleRef = anchoring.refined.ruleRefinementFromRefinements(rule, aRef, cRef)
             if(ruleRef != -1 ) {
-              val ruleScore = opScore + icScore + anchoring.scoreUnaryRule(t.span.start, t.span.end, rule, ruleRef) - partition
+              val ruleScore = opScore + icScore + anchoring.scoreUnaryRule(t.span.start, t.span.end, rule, ruleRef) - logPartition
               assert(!ruleScore.isNaN)
               // assert(exp(ruleScore) > 0, " " + ruleScore)
               spanVisitor.visitUnaryRule(t.span.start, t.span.end, rule, ruleRef, exp(ruleScore))
@@ -86,7 +86,7 @@ case class LatentTreeMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
         } {
           val ruleRef = anchoring.refined.ruleRefinementFromRefinements(rule, aRef, bRef, cRef)
           val rs = anchoring.scoreBinaryRule(begin, split, end, rule, ruleRef) + anchoring.scoreSpan(begin, end, a, aRef)
-          val ruleScore = opScore + irScore + ilScore + rs - partition
+          val ruleScore = opScore + irScore + ilScore + rs - logPartition
           val count = exp(ruleScore)
           spanVisitor.visitSpan(begin, end, a, aRef, count)
           spanVisitor.visitBinaryRule(begin, split, end, rule, ruleRef, count)

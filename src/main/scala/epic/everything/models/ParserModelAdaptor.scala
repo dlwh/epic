@@ -3,7 +3,7 @@ package epic.everything.models
 import epic.parser.models.{ParserInference, ParserModel}
 import epic.trees.{TreeInstance, Tree, AnnotatedLabel}
 import breeze.util.Index
-import epic.framework.{FullProjectableInference, FullEPInference, Feature}
+import epic.framework.{Feature}
 import breeze.linalg.DenseVector
 import epic.everything.{ProcessedDocument, DocumentAnnotator}
 import epic.parser.CoreAnchoring
@@ -34,7 +34,7 @@ class ParserModelAdaptor(val inner: ParserModel[AnnotatedLabel, String], lens: D
 
 class ParserInferenceAdaptor(val inner: ParserInference[AnnotatedLabel, String],
                             lens: DocumentBeliefs.Lens) extends DocumentAnnotatingInference with FullProjectableInference[ProcessedDocument, DocumentBeliefs] {
-  case class Marginal(sentences: IndexedSeq[inner.Marginal], partition: Double)
+  case class Marginal(sentences: IndexedSeq[inner.Marginal], logPartition: Double)
   type ExpectedCounts = inner.ExpectedCounts
   def emptyCounts = inner.emptyCounts
 

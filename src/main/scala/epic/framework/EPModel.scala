@@ -24,10 +24,11 @@ import breeze.util._
  *
  * @author dlwh
  */
-class EPModel[Datum, Augment](maxEPIter: Int, initFeatureValue: Feature => Option[Double],
+class EPModel[Datum, Augment](maxEPIter: Int, initFeatureValue: Feature => Option[Double] = {(_:Feature) => None}, epInGold: Boolean = false)(
                               models: EPModel.CompatibleModel[Datum, Augment]*)(implicit aIsFactor: Augment <:< Factor[Augment]) extends Model[Datum] {
   type ExpectedCounts = EPExpectedCounts
   type Inference = EPInference[Datum, Augment]
+  type Marginal = EPMarginal[Augment, ProjectableInference[Datum, Augment]#Marginal]
 
   val featureIndex: Index[Feature] = {
     val index = Index[Feature]()
@@ -57,7 +58,7 @@ class EPModel[Datum, Augment](maxEPIter: Int, initFeatureValue: Feature => Optio
       i =>
         models(i).inferenceFromWeights(allWeights(i))
     }
-    new EPInference(builders, maxEPIter)
+    new EPInference(builders, maxEPIter, epInGold = epInGold)
   }
 
   private def partitionWeights(weights: DenseVector[Double]): Array[DenseVector[Double]] = {

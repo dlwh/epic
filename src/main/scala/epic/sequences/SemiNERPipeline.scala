@@ -32,9 +32,7 @@ object SemiNERPipeline {
                     opt: OptParams)
 
   def main(args: Array[String]) {
-    val (baseConfig, files) = CommandLineParser.parseArguments(args)
-    val config = baseConfig backoff Configuration.fromPropertiesFiles(files.map(new File(_)))
-    val params = config.readIn[Params]("")
+    val params = CommandLineParser.readIn[Params](args)
     val (train, test) = {
       val instances =  for {
         file <- params.path.listFiles take params.nfiles
@@ -158,9 +156,7 @@ object SemiConllNERPipeline {
                     opt: OptParams)
 
   def main(args: Array[String]) {
-    val (baseConfig, files) = CommandLineParser.parseArguments(args)
-    val config = baseConfig backoff Configuration.fromPropertiesFiles(files.map(new File(_)))
-    val params = config.readIn[Params]("")
+    val params = CommandLineParser.readIn[Params](args)
     val (train,test) = {
           val standardTrain = CONLLSequenceReader.readTrain(new FileInputStream(params.path), params.path.getName).toIndexedSeq
           val standardTest = CONLLSequenceReader.readTrain(new FileInputStream(params.test), params.path.getName).toIndexedSeq

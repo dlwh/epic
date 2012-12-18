@@ -1,6 +1,6 @@
 package epic.parser
 
-import epic.framework.StandardExpectedCounts
+import epic.framework.{Marginal, StandardExpectedCounts}
 
 /*
  Copyright 2012 David Hall
@@ -22,11 +22,11 @@ import epic.framework.StandardExpectedCounts
  * Represents marginals over trees. Can also extract expected counts
  * @author dlwh
  */
-trait Marginal[L, W] {
+trait ParseMarginal[L, W] extends Marginal {
   def anchoring: AugmentedAnchoring[L, W]
   def grammar:BaseGrammar[L] = anchoring.grammar
   def lexicon = anchoring.lexicon
-  def partition: Double
+  def logPartition: Double
   def words:Seq[W] = anchoring.words
   def length = words.length
 
@@ -37,9 +37,9 @@ trait Marginal[L, W] {
 
   def expectedCounts[Feat](featurizer: RefinedFeaturizer[L, W, Feat], counts: StandardExpectedCounts[Feat], scale: Double): StandardExpectedCounts[Feat] = {
     val spec = featurizer.anchor(words)
-    val visitor = Marginal.mkVisitor(counts, spec, scale)
+    val visitor = ParseMarginal.mkVisitor(counts, spec, scale)
     visit(visitor)
-    counts.loss += partition * scale
+    counts.loss += logPartition * scale
     counts
   }
 
@@ -56,7 +56,7 @@ trait Marginal[L, W] {
   def visitPostorder(spanVisitor: AnchoredVisitor[L], spanThreshold: Double = Double.NegativeInfinity)
 }
 
-object Marginal {
+object ParseMarginal {
   private def mkVisitor[L, W, Feat](counts: StandardExpectedCounts[Feat],
                                     spec: RefinedFeaturizer[L, W, Feat]#Anchoring,
                                     scale: Double):AnchoredVisitor[L] = {

@@ -19,6 +19,7 @@ package models
 import breeze.linalg._
 import epic.framework.{EPModel, EPInference}
 import epic.trees.{TreeInstance, BinarizedTree}
+import epic.parser.ParseChart.LogProbabilityParseChart
 
 /**
  * Parser that runs EP using the EPInference object and extracts a parse
@@ -30,9 +31,9 @@ class EPParser[L, W](grammar: BaseGrammar[L],
                      inference: EPInference[TreeInstance[L, W], CoreAnchoring[L, W]]) extends Parser[L, W] with Serializable {
   def bestParse(s: Seq[W]) = {
     val inst = new TreeInstance[L, W]("", null, s)
-    val augment = inference.getMarginals(inst, inference.baseAugment(inst))._2
-    val marg = augment.marginal
-    ChartDecoder(grammar, lexicon).extractBestParse(marg)
+    val augment = inference.marginal(inst, inference.baseAugment(inst))
+    val marg = augment._1
+    ChartDecoder(grammar, lexicon).extractBestParse(marg.marginals.head.asInstanceOf[ChartMarginal[LogProbabilityParseChart, L, W]])
   }
 
 }

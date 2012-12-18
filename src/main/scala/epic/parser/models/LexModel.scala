@@ -40,15 +40,13 @@ class LexModel[L, W](bundle: LexGrammarBundle[L, W],
 
   val featureIndex = indexed.index
 
-  import bundle._
-
   def initialValueForFeature(f: Feature) = initFeatureValue(f).getOrElse(0)
 
   def inferenceFromWeights(weights: DenseVector[Double]) = {
     val gram = bundle.makeGrammar(indexed, weights)
     def ann(tree: BinarizedTree[L], words: Seq[W]):BinarizedTree[(L, Int)] = {
       val reannotated = reannotate(tree, words)
-      val headed = headFinder.annotateHeadIndices(reannotated)
+      val headed = bundle.headFinder.annotateHeadIndices(reannotated)
       headed
 
     }

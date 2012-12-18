@@ -199,7 +199,7 @@ class MaxConstituentDecoder[L, W] extends ChartDecoder[L, W] {
     def marginalizeRefinements(begin: Int, end: Int, l: Int, ichart: inside.ChartScores, ochart: outside.ChartScores): Double = {
       var bufOff = 0
       for (lRef <- ichart.enteredLabelRefinements(begin, end, l)) {
-        val myScore = ichart.labelScore(begin, end, l, lRef) + ochart.labelScore(begin, end, l, lRef) - partition
+        val myScore = ichart.labelScore(begin, end, l, lRef) + ochart.labelScore(begin, end, l, lRef) - logPartition
         buffer(bufOff) = myScore
         bufOff += 1
         if(bufOff == 1000) {
@@ -273,7 +273,7 @@ class MaxConstituentDecoder[L, W] extends ChartDecoder[L, W] {
             arr(i) = (anchoring.scoreUnaryRule(begin, end, r, ref)
               + outside.top.labelScore(begin, end, bestTop, aRef)
               + inside.bot.labelScore(begin, end, bestBot, bRef)
-              - partition
+              - logPartition
               )
             i += 1
           }

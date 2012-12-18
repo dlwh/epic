@@ -10,7 +10,7 @@ import breeze.util.logging.ConsoleLogging
 import collection.immutable.BitSet
 import epic.sequences.{SegmentationEval, SegmentationModelFactory, SemiCRFModel, Segmentation}
 import collection.mutable.ArrayBuffer
-import epic.framework.{FullEPModel, ModelObjective}
+import epic.framework.{EPModel, ModelObjective}
 import breeze.collection.mutable.TriangularArray
 import breeze.optimize.{BatchDiffFunction, CachedBatchDiffFunction}
 import epic.parser.ParserParams.XbarGrammar
@@ -36,9 +36,9 @@ object EverythingPipeline {
                     opt: OptParams)
 
   def main(args: Array[String]) {
-    val (baseConfig, files) = CommandLineParser.parseArguments(args)
-    val config = baseConfig backoff Configuration.fromPropertiesFiles(files.map(new File(_)))
-    val params = config.readIn[Params]("")
+
+    val params = CommandLineParser.readIn[Params](args)
+
     val (train, test) = {
       val instances =  for {
         file <- params.path.listFiles take params.nfiles
@@ -87,7 +87,7 @@ object EverythingPipeline {
 //    val propModel = new PropertyPropagatingModel(propBuilder)
 
     // the big model!
-    val epModel = new FullEPModel[ProcessedDocument, DocumentBeliefs](5, {_ => None}, adaptedNerModel)
+    val epModel = new EPModel[ProcessedDocument, DocumentBeliefs](5, epInGold = true)(adaptedNerModel)
 //    corefModel)
     //propModel)
 
@@ -111,9 +111,7 @@ object EverythingConstraints extends ConsoleLogging {
 
 
   def main(args: Array[String]) {
-    val (baseConfig, files) = CommandLineParser.parseArguments(args)
-    val config = baseConfig backoff Configuration.fromPropertiesFiles(files.map(new File(_)))
-    val params = config.readIn[Params]("")
+    val params = CommandLineParser.readIn[Params](args)
     val (train, dev) = {
       val instances =  for {
         file <- params.path.listFiles take params.nfiles

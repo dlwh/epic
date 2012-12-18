@@ -2,7 +2,7 @@ package epic.everything.models
 
 import breeze.linalg.DenseVector
 import epic.everything.{DSpan, ProcessedDocument, NERType, DocumentAnnotator}
-import epic.framework.{FullProjectableInference, StandardExpectedCounts, Feature}
+import epic.framework.{ProjectableInference, StandardExpectedCounts, Feature}
 import breeze.util.{Encoder, Index}
 import epic.sequences.{SemiCRF, SemiCRFInference, SemiCRFModel}
 import epic.sequences.SemiCRF.Anchoring
@@ -14,7 +14,9 @@ import breeze.collection.mutable.TriangularArray
  */
 class ChainNERModel(val inner: SemiCRFModel[NERType.Value, String]) extends DocumentAnnotatingModel {
   def featureIndex: Index[Feature] = inner.featureIndex
+  type Inference = ChainNERInference
   type ExpectedCounts = inner.ExpectedCounts
+  type Marginal = ChainNERMarginal[inner.Marginal]
 
   def initialValueForFeature(f: Feature): Double = inner.initialValueForFeature(f)
 
@@ -26,13 +28,14 @@ class ChainNERModel(val inner: SemiCRFModel[NERType.Value, String]) extends Docu
     ecounts.toObjective
   }
 
-  type Inference = ChainNERInference
 }
 
+case class ChainNERMarginal[Inner](sentences: IndexedSeq[Inner], logPartition: Double) extends epic.framework.Marginal
+
 case class ChainNERInference(inner: SemiCRFInference[NERType.Value, String],
-                             labels: Index[NERType.Value]) extends DocumentAnnotatingInference with FullProjectableInference[ProcessedDocument, DocumentBeliefs] {
+                             labels: Index[NERType.Value]) extends DocumentAnnotatingInference with ProjectableInference[ProcessedDocument, DocumentBeliefs] {
   type ExpectedCounts = inner.ExpectedCounts
-  case class Marginal(sentences: IndexedSeq[inner.Marginal], partition: Double)
+  type Marginal = ChainNERMarginal[inner.Marginal]
 
   def emptyCounts = inner.emptyCounts
 
@@ -54,16 +57,15 @@ case class ChainNERInference(inner: SemiCRFInference[NERType.Value, String],
       inner.goldMarginal(s.ner, anchoring )
     }
 
-    val partition = marginals.map(_.logPartition).sum
-    Marginal(marginals, partition) -> partition
+    val partition = marginals.map(_._2).sum
+    ChainNERMarginal(marginals.map(_._1), partition) -> partition
   }
 
 
-  def countsFromMarginal(doc: ProcessedDocument, marg: Marginal, aug: DocumentBeliefs, accum: ExpectedCounts, scale: Double): ExpectedCounts = {
+  def countsFromMarginal(doc: ProcessedDocument, marg: Marginal, accum: ExpectedCounts, scale: Double): ExpectedCounts = {
     val counts = emptyCounts
-    val anchorings = beliefsToAnchoring(doc, aug)
     for(i <- 0 until doc.sentences.length) {
-      counts += inner.countsFromMarginal(doc.sentences(i).ner, marg.sentences(i), anchorings(i), accum, scale)
+      counts += inner.countsFromMarginal(doc.sentences(i).ner, marg.sentences(i), accum, scale)
     }
 
     counts
@@ -102,7 +104,7 @@ case class ChainNERInference(inner: SemiCRFInference[NERType.Value, String],
     }
 
     val partition = marginals.map(_._2).sum
-    Marginal(marginals.map(_._1), partition) -> partition
+    ChainNERMarginal(marginals.map(_._1), partition) -> partition
   }
 
   def beliefsToAnchoring(doc: ProcessedDocument, beliefs: DocumentBeliefs):IndexedSeq[SemiCRF.Anchoring[NERType.Value, String]] = {

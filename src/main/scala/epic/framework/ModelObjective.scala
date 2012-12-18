@@ -1,0 +1,62 @@
+package epic.framework
+
+import collection.GenTraversable
+import breeze.optimize.BatchDiffFunction
+import breeze.linalg.DenseVector
+import breeze.util.Encoder
+import actors.threadpool.AtomicInteger
+
+/**
+ *
+ * @author dlwh
+ */
+class ModelObjective[Datum](val model: Model[Datum],
+                            batchSelector: IndexedSeq[Int]=>GenTraversable[Datum],
+                            val fullRange: IndexedSeq[Int]) extends BatchDiffFunction[DenseVector[Double]] {
+  def this(model: Model[Datum], data: IndexedSeq[Datum]) = this(model,_.par.map(data), 0 until data.length)
+  import model.{ExpectedCounts => _, _}
+
+  type Builder = model.Inference
+
+  // Selects a set of data to use
+  protected def select(batch: IndexedSeq[Int]):GenTraversable[Datum] = batchSelector(batch)
+
+  def initialWeightVector(randomize: Boolean): DenseVector[Double] = {
+   val v = Encoder.fromIndex(featureIndex).tabulateDenseVector(f => model.initialValueForFeature(f))
+    if(randomize) {
+      v += DenseVector.rand(numFeatures) * 1E-6
+    }
+    v
+  }
+
+  var iter = 0
+  def calculate(x: DenseVector[Double], batch: IndexedSeq[Int]) = {
+    if(iter % 30 == 0) {
+      model.cacheFeatureWeights(x, "weights")
+    }
+    iter += 1
+    val inference = inferenceFromWeights(x)
+    val timeIn = System.currentTimeMillis()
+    val success = new AtomicInteger(0)
+    val finalCounts = select(batch).aggregate(null:inference.ExpectedCounts)({ ( _countsSoFar,datum) =>
+      try {
+        val countsSoFar:inference.ExpectedCounts = if (_countsSoFar ne null) _countsSoFar else inference.emptyCounts
+        inference.expectedCounts(datum, countsSoFar, 1.0)
+        success.incrementAndGet()
+        countsSoFar
+      } catch {
+        case e =>
+          e.printStackTrace()
+//          new Exception("While processing " + datum, e).printStackTrace()
+          _countsSoFar
+      }
+    },{ (a,b) => b += a})
+    val timeOut = System.currentTimeMillis()
+    println("Inference took: " + (timeOut - timeIn) * 1.0/1000 + "s" )
+
+    val (loss,grad) = expectedCountsToObjective(finalCounts)
+    val timeOut2 = System.currentTimeMillis()
+    println("Finishing took: " + (timeOut2 - timeOut) * 1.0/1000 + "s" )
+    (loss/success.intValue() * fullRange.size,  grad * (fullRange.size * 1.0 / success.intValue))
+  }
+}
