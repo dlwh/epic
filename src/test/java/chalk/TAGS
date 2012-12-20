@@ -1,151 +1,0 @@
-
-tools/formats/ad/ADChunkSampleStreamTest.java,322
-public class ADChunkSampleStreamTest 35,1178
-  List<ChunkSample> samples ADChunkSampleStreamTest.samples37,1218
-  public void testSimpleCount(ADChunkSampleStreamTest.testSimpleCount40,1287
-  public void testChunks(ADChunkSampleStreamTest.testChunks45,1424
-  public void setup(ADChunkSampleStreamTest.setup70,2344
-
-tools/formats/ad/ADNameSampleStreamTest.java,667
-public class ADNameSampleStreamTest 36,1207
-  List<NameSample> samples ADNameSampleStreamTest.samples38,1246
-  public void testSimpleCount(ADNameSampleStreamTest.testSimpleCount41,1313
-  public void testCheckMergedContractions(ADNameSampleStreamTest.testCheckMergedContractions46,1452
-  public void testSize(ADNameSampleStreamTest.testSize61,2068
-  public void testNames(ADNameSampleStreamTest.testNames69,2365
-  public void testSmallSentence(ADNameSampleStreamTest.testSmallSentence104,4628
-  public void testMissingRightContraction(ADNameSampleStreamTest.testMissingRightContraction109,4756
-  public void setup(ADNameSampleStreamTest.setup116,5058
-
-tools/formats/ad/ADParagraphStreamTest.java,392
-public class ADParagraphStreamTest 31,1059
-  public static final int NUM_SENTENCES ADParagraphStreamTest.NUM_SENTENCES33,1097
-  public void testSimpleReading(ADParagraphStreamTest.testSimpleReading36,1151
-  public void testLeadingWithContraction(ADParagraphStreamTest.testLeadingWithContraction53,1555
-  private static ADSentenceStream openData(ADParagraphStreamTest.openData68,1913
-
-tools/formats/ad/ADPOSSampleStreamTest.java,261
-public class ADPOSSampleStreamTest 31,1069
-  public void testSimple(ADPOSSampleStreamTest.testSimple34,1115
-  public void testExpandME(ADPOSSampleStreamTest.testExpandME60,1990
-  public void testIncludeFeats(ADPOSSampleStreamTest.testIncludeFeats89,2954
-
-tools/formats/ad/ADSentenceSampleStreamTest.java,346
-public class ADSentenceSampleStreamTest 37,1263
-  List<SentenceSample> samples ADSentenceSampleStreamTest.samples39,1306
-  public void testSimpleCount(ADSentenceSampleStreamTest.testSimpleCount42,1381
-  public void testSentences(ADSentenceSampleStreamTest.testSentences47,1484
-  public void setup(ADSentenceSampleStreamTest.setup56,1805
-
-tools/formats/ad/ADTokenSampleStreamTest.java,328
-public class ADTokenSampleStreamTest 37,1249
-  List<TokenSample> samples ADTokenSampleStreamTest.samples39,1289
-  public void testSimpleCount(ADTokenSampleStreamTest.testSimpleCount42,1358
-  public void testSentences(ADTokenSampleStreamTest.testSentences47,1495
-  public void setup(ADTokenSampleStreamTest.setup52,1627
-
-tools/formats/frenchtreebank/ConstitParseSampleStreamTest.java,410
-public class ConstitParseSampleStreamTest 33,1175
-  private String sample1Tokens[ConstitParseSampleStreamTest.sample1Tokens35,1220
-  static byte[] getSample1(ConstitParseSampleStreamTest.getSample190,2050
-  public void testThereIsExactlyOneSent(ConstitParseSampleStreamTest.testThereIsExactlyOneSent110,2532
-  public void testTokensAreCorrect(ConstitParseSampleStreamTest.testTokensAreCorrect120,2860
-
-tools/formats/muc/DocumentSplitterStreamTest.java,143
-public class DocumentSplitterStreamTest 31,1059
-  public void testSplitTwoDocuments(DocumentSplitterStreamTest.testSplitTwoDocuments34,1110
-
-tools/formats/muc/SgmlParserTest.java,96
-public class SgmlParserTest 28,990
-  public void testParse1(SgmlParserTest.testParse131,1029
-
-tools/parser/chunking/ParserTest.java,121
-public class ParserTest 37,1262
-  public void testChunkingParserTraining(ParserTest.testChunkingParserTraining44,1387
-
-tools/parser/treeinsert/ParserTest.java,125
-public class ParserTest 37,1266
-  public void testTreeInsertParserTraining(ParserTest.testTreeInsertParserTraining44,1391
-
-tools/util/eval/CrossValidationPartitionerTest.java,383
-public class CrossValidationPartitionerTest 44,1495
-  public void testEmptyDataSet(CrossValidationPartitionerTest.testEmptyDataSet47,1550
-  public void test3FoldCV(CrossValidationPartitionerTest.test3FoldCV77,2312
-  public void testFailSafty(CrossValidationPartitionerTest.testFailSafty157,5024
-  public void testToString(CrossValidationPartitionerTest.testToString210,6447
-
-tools/util/eval/FMeasureTest.java,808
-public class FMeasureTest 30,1023
-  private static final double DELTA FMeasureTest.DELTA32,1052
-  private Span gold[FMeasureTest.gold34,1102
-  private Span predicted[FMeasureTest.predicted43,1274
-  private Span predictedCompletelyDistinct[FMeasureTest.predictedCompletelyDistinct51,1438
-  private Span goldToMerge[FMeasureTest.goldToMerge59,1624
-  private Span predictedToMerge[FMeasureTest.predictedToMerge69,1828
-  public void testCountTruePositives(FMeasureTest.testCountTruePositives84,2127
-  public void testPrecision(FMeasureTest.testPrecision95,2573
-  public void testRecall(FMeasureTest.testRecall107,3081
-  public void testEmpty(FMeasureTest.testEmpty116,3485
-  public void testPerfect(FMeasureTest.testPerfect124,3706
-  public void testMerge(FMeasureTest.testMerge133,3960
-
-tools/util/eval/MeanTest.java,124
-public class MeanTest FMeasureTest.MeanTest30,986
-  public void testMeanCalculation(MeanTest.testMeanCalculation33,1019
-
-tools/util/ext/ExtensionLoaderTest.java,419
-public class ExtensionLoaderTest 26,929
-  interface TestStringGenerator ExtensionLoaderTest.TestStringGenerator29,995
-  static class TestStringGeneratorImpl ExtensionLoaderTest.TestStringGeneratorImpl33,1069
-    public String generateTestString(ExtensionLoaderTest.TestStringGeneratorImpl.generateTestString34,1141
-  public void testLoadingStringGenerator(ExtensionLoaderTest.testLoadingStringGenerator40,1224
-
-tools/util/featuregen/CachedFeatureGeneratorTest.java,670
-public class CachedFeatureGeneratorTest 35,1213
-  private AdaptiveFeatureGenerator identityGenerator[CachedFeatureGeneratorTest.identityGenerator37,1256
-  private String testSentence1[CachedFeatureGeneratorTest.testSentence140,1386
-  private String testSentence2[CachedFeatureGeneratorTest.testSentence242,1421
-  private List<String> features;CachedFeatureGeneratorTest.features44,1456
-  public void setUp(CachedFeatureGeneratorTest.setUp47,1500
-  public void testCachingOfSentence(CachedFeatureGeneratorTest.testCachingOfSentence60,1803
-  public void testCacheClearAfterSentenceChange(CachedFeatureGeneratorTest.testCacheClearAfterSentenceChange116,3351
-
-tools/util/featuregen/GeneratorFactoryTest.java,353
-public class GeneratorFactoryTest CachedFeatureGeneratorTest.GeneratorFactoryTest37,1354
-  public void testCreationWihtSimpleDescriptor(GeneratorFactoryTest.testCreationWihtSimpleDescriptor40,1399
-  public void testCreationWithCustomGenerator(GeneratorFactoryTest.testCreationWithCustomGenerator70,2471
-  @Test(GeneratorFactoryTest.@Test94,3476
-
-tools/util/featuregen/IdentityFeatureGenerator.java,162
-class IdentityFeatureGenerator GeneratorFactoryTest.IdentityFeatureGenerator25,926
-  public void createFeatures(IdentityFeatureGenerator.createFeatures27,992
-
-tools/util/featuregen/PreviousMapFeatureGeneratorTest.java,210
-public class PreviousMapFeatureGeneratorTest IdentityFeatureGenerator.PreviousMapFeatureGeneratorTest33,1155
-  public void testFeatureGeneration(PreviousMapFeatureGeneratorTest.testFeatureGeneration36,1211
-
-tools/util/featuregen/StringPatternTest.java,993
-public class StringPatternTest 26,950
-  public void testIsAllLetters(StringPatternTest.testIsAllLetters29,992
-  public void testIsInitialCapitalLetter(StringPatternTest.testIsInitialCapitalLetter38,1364
-  public void testIsAllCapitalLetter(StringPatternTest.testIsAllCapitalLetter46,1727
-  public void testIsAllLowerCaseLetter(StringPatternTest.testIsAllLowerCaseLetter54,2108
-  public void testIsAllDigit(StringPatternTest.testIsAllDigit65,2687
-  public void testDigits(StringPatternTest.testDigits72,2929
-  public void testContainsPeriod(StringPatternTest.testContainsPeriod79,3166
-  public void testContainsComma(StringPatternTest.testContainsComma86,3422
-  public void testContainsSlash(StringPatternTest.testContainsSlash93,3674
-  public void testContainsDigit(StringPatternTest.testContainsDigit100,3926
-  public void testContainsHyphen(StringPatternTest.testContainsHyphen107,4176
-  public void testContainsLetters(StringPatternTest.testContainsLetters114,4433
-
-tools/util/featuregen/WindowFeatureGeneratorTest.java,746
-public class WindowFeatureGeneratorTest 35,1213
-  private String[] testSentence WindowFeatureGeneratorTest.testSentence37,1256
-  private List<String> features;WindowFeatureGeneratorTest.features40,1352
-  public void setUp(WindowFeatureGeneratorTest.setUp43,1396
-  public void testWithoutWindow(WindowFeatureGeneratorTest.testWithoutWindow52,1622
-  public void testWindowSizeOne(WindowFeatureGeneratorTest.testWindowSizeOne67,2027
-  public void testWindowAtBeginOfSentence(WindowFeatureGeneratorTest.testWindowAtBeginOfSentence79,2363
-  public void testWindowAtEndOfSentence(WindowFeatureGeneratorTest.testWindowAtEndOfSentence93,2775
-  public void testForCorrectFeatures(WindowFeatureGeneratorTest.testForCorrectFeatures110,3300
