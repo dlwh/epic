@@ -314,7 +314,6 @@ class GrammarKernel[C, L, W](coarseGrammar: BaseGrammar[C],
 
   private def computePartitions(batch: Batch, events: CLEvent*):Array[Double] = {
     val partitions = partitionGetter.partitions(insideTopDev, offDev, lenDev, batch.numSentences, events: _*).map(_.toDouble)
-//    println(partitions.mkString(", "))
     partitions
   }
 
@@ -518,7 +517,7 @@ object GrammarKernel {
     val counts = kern.expectedRuleCounts(train.map(_.words.toIndexedSeq))
     val time3 = System.currentTimeMillis()
     println(counts.rules.map(_.sum).sum)
-    println(counts.wordCounts.map(_.map(_.map(_.sum).sum).sum))
+//    println(counts.wordCounts.map(_.map(_.map(_.sum).sum).sum))
     //    println(Encoder.fromIndex(grammar.refinedGrammar.index).decode(counts))
     println("Done ecounts: " + (time3 - time2))
 
@@ -532,13 +531,13 @@ object GrammarKernel {
     println("Done: " + (System.currentTimeMillis() - timeIn))
 
 
-    val timeX = System.currentTimeMillis()
     val feat = new ProductionFeaturizer(grammar.grammar, grammar.lexicon.knownLexicalProductions)
+    val timeX = System.currentTimeMillis()
     val marg = train.map(_.words).foldLeft(DenseVector.zeros[Double](feat.index.size)){ (acc, s) =>
       val m = ChartMarginal(AugmentedGrammar.fromRefined(grammar), s, ParseChart.logProb)
-      val counts = m.expectedCounts(feat).counts
+//      val counts = m.expectedCounts(feat).counts
 //      println(m.partition)
-      acc += counts
+//      acc += counts
       acc
     }
     println("Done: " + (System.currentTimeMillis() - timeX))
