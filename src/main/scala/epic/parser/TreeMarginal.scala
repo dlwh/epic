@@ -28,9 +28,9 @@ import epic.trees._
  * @author dlwh
  */
 case class TreeMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
-                              tree: BinarizedTree[(L,Int)]) extends Marginal[L, W] {
+                              tree: BinarizedTree[(L,Int)]) extends ParseMarginal[L, W] {
 
-  val partition = {
+  val logPartition = {
     var score = 0.0
     def rec(t: BinarizedTree[(L,Int) ]):Unit = t match {
       case n@NullaryTree( (a, ref), span ) =>

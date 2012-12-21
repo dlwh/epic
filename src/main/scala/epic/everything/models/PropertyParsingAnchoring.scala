@@ -3,17 +3,31 @@ package epic.everything.models
 import epic.parser.{Lexicon, BaseGrammar, RefinedAnchoring}
 import epic.parser.models.LexGrammar
 import epic.trees.Span
+import breeze.collection.mutable.TriangularArray
 
 /**
  *
  * @author dlwh
  */
 final class PropertyParsingAnchoring[L, W](val lexGrammar: LexGrammar[L, W],
-                                           notConstituent: L,
                                            val words: IndexedSeq[W],
                                            val beliefs: SentenceBeliefs) extends RefinedAnchoring[L, W] {
+
+  /**
+   * The annotationTag controls if two grammars are over the same refinements.
+   * If they are, then * and / can be much faster.
+   *
+   * Note that 0 is reserved for unrefined anchorings, and -1 never matches other tags.
+   *
+   * Reserved:
+   * 1 - Lexicalized Parsers with no symbol or rule annotation
+   *
+   * 0's will be optimized
+   */
+  override def annotationTag: Int = 1
+
   val anchoring = lexGrammar.anchor(words)
-  private val nc = grammar.labelIndex(notConstituent)
+  private val notConstituent = grammar.labelIndex.size
 
   def length = words.length
   def grammar: BaseGrammar[L] = lexGrammar.grammar
@@ -22,33 +36,38 @@ final class PropertyParsingAnchoring[L, W](val lexGrammar: LexGrammar[L, W],
 
   def scoreSpan(begin: Int, end: Int, label: Int, ref: Int): Double = {
 
-    val baseScore = if (begin == 0 && end == length) ( // root, get the length
-       math.log(beliefs.wordBeliefs(ref).governor(length)
+    var baseScore = anchoring.scoreSpan(begin, end, label, ref)
+    if (begin == 0 && end == length) ( // root, get the length
+      baseScore += math.log(beliefs.wordBeliefs(ref).governor(length)
        * beliefs.spanBeliefs(begin, end).governor(length)
-       / beliefs.spanBeliefs(begin, end).governor(length+1))
-     ) else 0.0
+//       * beliefs.wordBeliefs(ref).span(TriangularArray.index(begin,end))
+        / beliefs.spanBeliefs(begin, end).governor(length+1))
+     )
 
      if(begin + 1 == end) {
-       baseScore + math.log(beliefs.words(begin).tag(label))
+       baseScore + math.log(beliefs.wordBeliefs(begin).tag(label))
      } else {
        baseScore
      }
   }
 
   def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int): Double = {
-    val head = (ref:Int) / length
-    val dep = (ref:Int) % length
-    val score = beliefs.words(dep).governor(head)
+    val head = anchoring.headIndex(ref)
+    val dep = anchoring.depIndex(ref)
+    val score = beliefs.wordBeliefs(dep).governor(head)
+
     if (lexGrammar.isRightRule(rule)) { // head on the right
-      math.log(score * beliefs.spans(begin, split).governor(head) / beliefs.spanBeliefs(begin, split).governor(length+1))
+      anchoring.scoreBinaryRule(begin, split, end, rule, ref)  +
+        math.log(score /* * beliefs.words(dep).span(TriangularArray.index(begin,split)) */ * beliefs.spans(begin, split).governor(head) / beliefs.spanBeliefs(begin, split).governor(length+1))
     } else {
-      math.log(score * beliefs.spans(split, end).governor(head) / beliefs.spanBeliefs(split, end).governor(length+1))
+     anchoring.scoreBinaryRule(begin, split, end, rule, ref) +
+       math.log(score /* * beliefs.words(dep).span(TriangularArray.index(split,end)) */* beliefs.spans(split, end).governor(head) / beliefs.spanBeliefs(split, end).governor(length+1))
     }
   }
 
   def scoreUnaryRule(begin: Int, end: Int, rule: Int, ref: Int): Double = {
     val parent = grammar.parent(rule)
-    math.log(beliefs.spanBeliefs(begin, end).label(parent) / beliefs.spanBeliefs(begin, end).label(nc))
+   anchoring.scoreUnaryRule(begin, end, rule, ref) +  math.log(beliefs.spanBeliefs(begin, end).label(parent) / beliefs.spanBeliefs(begin, end).label(notConstituent))
   }
 
   def validLabelRefinements(begin: Int, end: Int, label: Int): Array[Int] = anchoring.validLabelRefinements(begin, end, label)

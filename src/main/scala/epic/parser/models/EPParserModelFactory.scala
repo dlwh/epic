@@ -54,9 +54,7 @@ case class EPParserModelFactory(ep: EPParams,
 
     val featureCounter = readWeights(oldWeights)
 
-    new EPModel(ep.maxIterations, {
-      featureCounter.get(_)
-    }, models: _*) with EPParser.Extractor[AnnotatedLabel, String] with Serializable {
+    new EPModel(ep.maxIterations, { featureCounter.get(_) }, epInGold = false)(models: _*) with EPParser.Extractor[AnnotatedLabel, String] with Serializable {
       def grammar = xbarGrammar
 
       def lexicon = xbarLexicon

@@ -43,8 +43,8 @@ object SemiCRF {
 
 
   trait Anchoring[L, W] {
-    def w : IndexedSeq[W]
-    def length: Int = w.length
+    def words : IndexedSeq[W]
+    def length: Int = words.length
     def maxSegmentLength(label: Int): Int
     def scoreTransition(prev: Int, cur: Int, beg: Int, end: Int):Double
     def labelIndex: Index[L]
@@ -55,10 +55,10 @@ object SemiCRF {
     def apply(prev: Int, cur: Int, beg: Int, end: Int, count: Double)
   }
 
-  trait Marginal[L, W] {
+  trait Marginal[L, W] extends epic.framework.Marginal {
 
     def anchoring: Anchoring[L, W]
-    def w: IndexedSeq[W] = anchoring.w
+    def w: IndexedSeq[W] = anchoring.words
     def length: Int = anchoring.length
     /** Visits spans with non-zero score, useful for expected counts */
     def visit( f: TransitionVisitor[L, W])
@@ -345,7 +345,7 @@ object SemiCRF {
     }
     rec(length, (0 until numLabels).maxBy(forwardScores(length)(_)))
 
-    Segmentation(segments.reverse, scorer.w, id)
+    Segmentation(segments.reverse, scorer.words, id)
   }
 }
 

@@ -17,7 +17,7 @@ package projections
  limitations under the License.
 */
 import breeze.collection.mutable.TriangularArray
-import breeze.config.{Help, Configuration}
+import breeze.config.{CommandLineParser, Help, Configuration}
 import breeze.util.Index
 import collection.immutable.BitSet
 import java.io._
@@ -38,35 +38,24 @@ import epic.parser.ParseChart.SparsityPattern
 class ConstraintAnchoring[L, W](val grammar: BaseGrammar[L],
                              val lexicon: Lexicon[L, W],
                              val words: Seq[W],
-                             scores: Array[BitSet],
-                             topScores: Array[BitSet],
                              override val sparsityPattern: SparsityPattern) extends CoreAnchoring[L, W] with Serializable {
   def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = 0.0
 
+
   def scoreUnaryRule(begin: Int, end: Int, rule: Int) = {
-    if (topScores eq null) 0.0
-    else {
-      val set = topScores(TriangularArray.index(begin, end))
-      if(set == null || !set.contains(rule)) Double.NegativeInfinity
-      else 0.0
-    }
+    breeze.numerics.logI(sparsityPattern.activeLabelsTop(begin, end).contains(grammar.parent(rule)))
   }
 
   def scoreSpan(begin: Int, end: Int, tag: Int) = {
-    if(scores eq null) 0.0
-    else {
-      val set = scores(TriangularArray.index(begin, end))
-      if(set == null || !set.contains(tag)) Double.NegativeInfinity
-      else 0.0
-    }
+    breeze.numerics.logI(sparsityPattern.activeLabelsBot(begin, end).contains(tag))
   }
 }
 
 object ConstraintAnchoring {
   @SerialVersionUID(2)
-  case class RawConstraints(bottom: Array[BitSet], top: Array[BitSet], sparsity: ParseChart.SparsityPattern) {
+  case class RawConstraints(sparsity: ParseChart.SparsityPattern) {
     def toAnchoring[L, W](grammar: BaseGrammar[L], lexicon: Lexicon[L, W], words: Seq[W]) = {
-      new ConstraintAnchoring(grammar, lexicon, words, bottom, top, sparsity)
+      new ConstraintAnchoring(grammar, lexicon, words, sparsity)
     }
   }
 }
@@ -85,12 +74,12 @@ class ConstraintCoreGrammar[L, W](augmentedGrammar: AugmentedGrammar[L, W], thre
     chartScorer
   }
 
-  def buildConstraints(charts: Marginal[L, W],
+  def buildConstraints(charts: ParseMarginal[L, W],
                   goldTags: GoldTagPolicy[L] = GoldTagPolicy.noGoldTags[L]):ConstraintAnchoring[L, W] = {
 
-    val RawConstraints(label,unary, sparsity) = rawConstraints(charts, goldTags)
+    val RawConstraints(sparsity) = rawConstraints(charts, goldTags)
 
-    new ConstraintAnchoring[L, W](charts.anchoring.grammar, charts.anchoring.lexicon, charts.anchoring.words, label, unary, sparsity)
+    new ConstraintAnchoring[L, W](charts.anchoring.grammar, charts.anchoring.lexicon, charts.anchoring.words, sparsity)
   }
 
   def buildConstraints(words: Seq[W],
@@ -100,12 +89,12 @@ class ConstraintCoreGrammar[L, W](augmentedGrammar: AugmentedGrammar[L, W], thre
     buildConstraints(charts, goldTags)
   }
 
-  def rawConstraints(words: Seq[W], gold: GoldTagPolicy[L]):RawConstraints = {
+  def rawConstraints(words: Seq[W], gold: GoldTagPolicy[L] = GoldTagPolicy.noGoldTags):RawConstraints = {
     val charts = ChartMarginal(augmentedGrammar, words, if(viterbi) ParseChart.viterbi else ParseChart.logProb)
     rawConstraints(charts, gold)
   }
 
-  def rawConstraints(marg: Marginal[L, W], gold: GoldTagPolicy[L]): RawConstraints = {
+  def rawConstraints(marg: ParseMarginal[L, W], gold: GoldTagPolicy[L]): RawConstraints = {
     val length = marg.length
     val (botLabelScores, unaryScores) = computeScores(length, marg)
 
@@ -124,7 +113,7 @@ class ConstraintCoreGrammar[L, W](augmentedGrammar: AugmentedGrammar[L, W], thre
 
     val pattern = ConstraintCoreGrammar.ConstraintSparsity(labelThresholds, topLabelThresholds)
 
-    RawConstraints(labelThresholds, unaryThresholds, pattern)
+    RawConstraints(pattern)
   }
 
 
@@ -150,7 +139,7 @@ class ConstraintCoreGrammar[L, W](augmentedGrammar: AugmentedGrammar[L, W], thre
     computePruningStatistics(charts, gold)
   }
 
-  def computePruningStatistics(marg: Marginal[L, W], gold: GoldTagPolicy[L]): (PruningStatistics, PruningStatistics) = {
+  def computePruningStatistics(marg: ParseMarginal[L, W], gold: GoldTagPolicy[L]): (PruningStatistics, PruningStatistics) = {
     val counts = DenseVector.zeros[Double](grammar.labelIndex.size)
     val (scores, topScores) = computeScores(marg.length, marg)
     var nConstructed = 0
@@ -191,7 +180,7 @@ class ConstraintCoreGrammar[L, W](augmentedGrammar: AugmentedGrammar[L, W], thre
   }
 
 
-  private def computeScores(length: Int, marg: Marginal[L, W]) = {
+  private def computeScores(length: Int, marg: ParseMarginal[L, W]) = {
     val scores = TriangularArray.raw(length + 1, null: Array[Double])
     val topScores = TriangularArray.raw(length + 1, null: Array[Double])
     val visitor = new AnchoredVisitor[L] {
@@ -278,9 +267,7 @@ case class ProjectionParams(treebank: ProcessedTreebank,
 object ProjectTreebankToConstraints {
 
   def main(args: Array[String]) {
-    val (baseConfig, files) = breeze.config.CommandLineParser.parseArguments(args)
-    val config = baseConfig backoff Configuration.fromPropertiesFiles(files.map(new File(_)))
-    val params = config.readIn[ProjectionParams]("")
+    val params = CommandLineParser.readIn[ProjectionParams](args)
     val treebank = params.treebank.copy(maxLength = 1000000)
     println(params)
     val parser = loadParser[Any](params.parser)
@@ -337,9 +324,7 @@ object ProjectTreebankToConstraints {
 object ComputePruningThresholds {
 
   def main(args: Array[String]) {
-    val (baseConfig, files) = breeze.config.CommandLineParser.parseArguments(args)
-    val config = baseConfig backoff Configuration.fromPropertiesFiles(files.map(new File(_)))
-    val params = config.readIn[ProjectionParams]("")
+    val params = CommandLineParser.readIn[ProjectionParams](args)
     val treebank = params.treebank.copy(maxLength = 1000000)
     println(params)
     val parser = loadParser[Any](params.parser)

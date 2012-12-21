@@ -32,17 +32,15 @@ import epic.parser._
  * @author dlwh
  */
 case class AnnotatedParserInference[L, W](featurizer: RefinedFeaturizer[L, W, Feature],
-                                     ann: (BinarizedTree[L], Seq[W]) => BinarizedTree[(L, Int)],
-                                     grammar: RefinedGrammar[L, W],
-                                     baseMeasure: CoreGrammar[L, W]) extends ParserInference[L, W] {
+                                          ann: (BinarizedTree[L], Seq[W]) => BinarizedTree[(L, Int)],
+                                          grammar: RefinedGrammar[L, W],
+                                          baseMeasure: CoreGrammar[L, W]) extends ParserInference[L, W] {
 
-  // E[T-z|T, params]
-  def goldCounts(ti: TreeInstance[L, W], aug: CoreAnchoring[L, W]) = {
-    val tree = ti.tree
-    val words = ti.words
+
+  def goldMarginal(ti: TreeInstance[L, W], aug: CoreAnchoring[L, W]): (Marginal, Double) = {
+    import ti._
     val annotated = ann(tree, words)
-
-    TreeMarginal(AugmentedGrammar.fromRefined(grammar), words, annotated).expectedCounts(featurizer)
+    val marg = TreeMarginal(AugmentedGrammar.fromRefined(grammar), words, annotated)
+    marg -> marg.logPartition
   }
-
 }

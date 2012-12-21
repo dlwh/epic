@@ -8,8 +8,10 @@ import collection.immutable.BitSet
 import epic.everything.DSpan
 import epic.everything.models.{DocumentBeliefs, Property}
 
+import PropCoref._
 class PropCorefModel(properties: IndexedSeq[PropertyFeatures[_]], val featureIndex: Index[Feature]) extends Model[FeaturizedCorefInstance] with StandardExpectedCounts.Model {
   type Inference = PropCorefInference
+  type Marginal = PropCoref.Marginal
 
   def initialValueForFeature(f: Feature) = 0.0
 
@@ -25,32 +27,26 @@ case class PropertyFeatures[T](prop: Property[T],
 
 class PropCorefInference(index: Index[Feature],
                          properties: IndexedSeq[PropertyFeatures[_]],
-                         weights: DenseVector[Double]) extends FullProjectableInference[FeaturizedCorefInstance, DocumentBeliefs] {
+                         weights: DenseVector[Double]) extends ProjectableInference[FeaturizedCorefInstance, DocumentBeliefs] {
   type ExpectedCounts = StandardExpectedCounts[Feature]
+  type Marginal = PropCoref.Marginal
 
   def emptyCounts = StandardExpectedCounts.zero(index)
 
 
-
-  case class Marginal(marginals: BeliefPropagation.Beliefs,
-                      agreementFactors: IndexedSeq[AgreementFactor],
-                      assignmentFactors: IndexedSeq[Factor])
-
-
-  def countsFromMarginal(inst: FeaturizedCorefInstance, marg: Marginal, aug: DocumentBeliefs): ExpectedCounts = {
-    val expCounts = emptyCounts
+  override def countsFromMarginal(inst: FeaturizedCorefInstance, marg: Marginal, expCounts: ExpectedCounts, scale: Double): ExpectedCounts = {
     import marg._
-    expCounts.loss = marginals.logPartition
+    expCounts.loss += marginals.logPartition * scale
 
     val clusterMins = BitSet.empty ++ inst.clusters.map(_.min)
 
     for(i <- 0 until assignmentFactors.length) {
       val arr = Array(0)
       if(clusterMins.contains(i))
-        addIntoScale(expCounts.counts, inst.featuresFor(i, i), marginals.beliefs(i)(i))
+        axpy(marginals.beliefs(i)(i) * scale, inst.featuresFor(i, i), expCounts.counts)
       else for(j <- inst.clusterFor(i) if j < i) {
         arr(0) = j
-        addIntoScale(expCounts.counts, inst.featuresFor(j, i), marginals.beliefs(i)(j))
+        axpy(marginals.beliefs(i)(j) * scale, inst.featuresFor(j, i), expCounts.counts)
       }
     }
 
@@ -85,7 +81,7 @@ class PropCorefInference(index: Index[Feature],
     val model = new breeze.inference.bp.Model(assignmentVariables ++ flattenedProp, assignmentFactors ++ agreementFactors)
     val bp = BeliefPropagation.infer(model)
 
-    new Marginal(bp, agreementFactors, assignmentFactors) -> bp.logPartition
+    new PropCoref.Marginal(bp, agreementFactors, assignmentFactors, bp.logPartition) -> bp.logPartition
   }
 
 
@@ -118,7 +114,7 @@ class PropCorefInference(index: Index[Feature],
     val model = new breeze.inference.bp.Model(assignmentVariables ++ flattenedProp, assignmentFactors ++ agreementFactors)
     val bp = BeliefPropagation.infer(model)
 
-    new Marginal(bp, agreementFactors, assignmentFactors) -> bp.logPartition
+    new Marginal(bp, agreementFactors, assignmentFactors, bp.logPartition) -> bp.logPartition
   }
 
 
@@ -205,9 +201,32 @@ class PropCorefInference(index: Index[Feature],
     project(v, m, oldAugment)
   }
 
-  case class AgreementFactor(p: Int, p_j: Variable[Int], p_i: Variable[Int], a_i: Variable[Int], j: Int) extends Factor {
-    val w_agree = weights(properties(p).agree)
-    val w_disagree = weights(properties(p).mismatch)
+
+  def agreementFactor(propertyVariables: Array[Array[Variable[Int]]], assignmentVariables: Array[Variable[Int]], j: Int, i: Int, p: Int) = {
+    val p_j = propertyVariables(j)(p)
+    val p_i = propertyVariables(i)(p)
+    val a = assignmentVariables(i)
+
+    AgreementFactor(weights: DenseVector[Double], properties(p), p_j, p_i, a, j)
+  }
+
+}
+
+object PropCoref {
+
+  case class Marginal(marginals: BeliefPropagation.Beliefs,
+                      agreementFactors: IndexedSeq[AgreementFactor],
+                      assignmentFactors: IndexedSeq[Factor],
+                      logPartition: Double) extends epic.framework.Marginal {
+
+  }
+
+
+case class AgreementFactor(weights: DenseVector[Double],
+                             feats: PropertyFeatures[_],
+                             p_j: Variable[Int], p_i: Variable[Int], a_i: Variable[Int], j: Int) extends Factor {
+    val w_agree = weights(feats.agree)
+    val w_disagree = weights(feats.mismatch)
 
     val variables = IndexedSeq(p_j, p_i, a_i)
 
@@ -218,7 +237,7 @@ class PropCorefInference(index: Index[Feature],
         val p_j_ass = p_j.domain.get(assignments(0))
         val p_i_ass = p_i.domain.get(assignments(1))
         val base = if (p_j_ass == p_i_ass) w_agree else w_disagree
-        base + weights(properties(p).pairs(p_j_ass)(p_i_ass))
+        base + weights(feats.pairs(p_j_ass)(p_i_ass))
       }
     }
 
@@ -232,38 +251,13 @@ class PropCorefInference(index: Index[Feature],
 
           val prob = marg(assignments)
           if (p_j_ass == p_i_ass)
-            expCounts(properties(p).agree) += prob
+            expCounts(feats.agree) += prob
           else
-            expCounts(properties(p).mismatch) += prob
-          expCounts(properties(p).pairs(p_j_ass)(p_i_ass)) += prob
+            expCounts(feats.mismatch) += prob
+          expCounts(feats.pairs(p_j_ass)(p_i_ass)) += prob
         }
       }
     }
   }
-
-  def agreementFactor(propertyVariables: Array[Array[Variable[Int]]], assignmentVariables: Array[Variable[Int]], j: Int, i: Int, p: Int) = {
-    val p_j = propertyVariables(j)(p)
-    val p_i = propertyVariables(i)(p)
-    val a = assignmentVariables(i)
-
-    AgreementFactor(p, p_j, p_i, a, j)
-  }
-
-  private def addIntoScale(v: DenseVector[Double], sv: SparseVector[Double], scale: Double) {
-    if (scale != 0) {
-      var i = 0
-      val bi = sv.index
-      val bd = sv.data
-      val ad = v.data
-      val aoff = v.offset
-      val astride = v.stride
-      while (i < sv.activeSize) {
-        ad(aoff + astride * bi(i)) += bd(i) * scale
-        i += 1
-      }
-    }
-  }
-
-
 }
 

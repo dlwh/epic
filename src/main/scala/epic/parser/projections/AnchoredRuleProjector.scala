@@ -26,10 +26,10 @@ import breeze.collection.mutable.{TriangularArray, OpenAddressHashArray}
 class AnchoredRuleProjector(threshold: Double) extends Serializable {
 
   /**
-   * Projects a [[epic.parser.Marginal]] to marginals on anchored rules.
+   * Projects a [[epic.parser.ParseMarginal]] to marginals on anchored rules.
    *
    */
-  def projectRulePosteriors[L, W](charts: Marginal[L, W],
+  def projectRulePosteriors[L, W](charts: ParseMarginal[L, W],
                                   goldTagPolicy: GoldTagPolicy[L] = GoldTagPolicy.noGoldTags[L]):AnchoredRuleProjector.AnchoredData = {
 
     val length = charts.length

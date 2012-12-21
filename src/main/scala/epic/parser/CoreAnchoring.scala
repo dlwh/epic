@@ -79,12 +79,12 @@ trait CoreAnchoring[L, W] extends Factor[CoreAnchoring[L, W]] {
   }
 
   /**
-   * Computes the log-partition for this anchoring,
+   * Computes the log-logPartition for this anchoring,
    * which is to say the inside score at the root.
    *
    * @return
    */
-  def logPartition = marginal.partition
+  def logPartition = marginal.logPartition
 
   /** Is this CoreAnchoring nearly the same as that core anchoring? */
   def isConvergedTo(f: CoreAnchoring[L, W], diff: Double) = lift.isConvergedTo(f.lift,diff)

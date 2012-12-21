@@ -121,21 +121,7 @@ trait ParserPipeline {
   def main(args: Array[String]) {
     import ParserParams.JointParams
 
-    val (baseConfig, files) = CommandLineParser.parseArguments(args)
-    val config = baseConfig backoff Configuration.fromPropertiesFiles(files.map(new File(_)))
-    val params = try {
-      config.readIn[JointParams[Params]]("test")
-    } catch {
-      case e =>
-        e.printStackTrace()
-        println(breeze.config.GenerateHelp[JointParams[Params]](config))
-        sys.exit(1)
-    }
-
-    if(params.help) {
-      println(breeze.config.GenerateHelp[JointParams[Params]](config))
-      System.exit(1)
-    }
+    val params = CommandLineParser.readIn[JointParams[Params]](args)
     println("Training Parser...")
     println(params)
 

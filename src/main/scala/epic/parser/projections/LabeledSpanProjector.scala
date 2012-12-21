@@ -58,7 +58,7 @@ case class LabeledSpanProjector[L, W](grammar: BaseGrammar[L], threshold: Double
     }
   }
 
-  protected def createAnchoring(charts: Marginal[L, W], ruleData: AnchoredData, sentProb: Double) = {
+  protected def createAnchoring(charts: ParseMarginal[L, W], ruleData: AnchoredData, sentProb: Double) = {
     val AnchoredRuleProjector.AnchoredData(lexicalScores, unaryScores, totalsUnaries, binaryScores, totalsBinaries) = ruleData
     val normUnaries:Array[OpenAddressHashArray[Double]] = for((ruleScores, totals) <- unaryScores zip totalsUnaries) yield {
       normalize(ruleScores, totals)
