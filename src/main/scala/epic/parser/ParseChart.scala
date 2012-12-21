@@ -22,6 +22,8 @@ import breeze.collection.mutable.TriangularArray
 import breeze.numerics.logSum
 import collection.mutable.BitSet
 import collection.immutable
+import collection.immutable.BitSet.BitSetN
+import java.util
 
 @SerialVersionUID(3)
 abstract class ParseChart[L](val index: Index[L],
@@ -58,8 +60,11 @@ abstract class ParseChart[L](val index: Index[L],
       val ind = TriangularArray.index(b, e)
       val arr = score(ind)
       if(arr != null) {
-        for(l <- sparsityLabel(b, e)) {
-          arr(l) = mkGrammarVector(refinementsFor(l), zero)
+        var l = 0
+        while(l < grammarSize) {
+          if(sparsityLabel(b, e).contains(l))
+            arr(l) = mkGrammarVector(refinementsFor(l), zero)
+          l += 1
         }
       }
     }
@@ -232,11 +237,17 @@ object ParseChart {
 
   object SparsityPattern {
     def noSparsity[L](labels: Index[L], length: Int):SparsityPattern = new SparsityPattern {
-      def activeTriangularIndices: immutable.BitSet = {
-        immutable.BitSet.empty ++ Range(0, TriangularArray.arraySize(length+1))
+      val activeTriangularIndices: immutable.BitSet = {
+        val arr = new Array[Long]((TriangularArray.arraySize(length+1)+63)/64)
+        util.Arrays.fill(arr, -1L)
+        new BitSetN(arr)
       }
 
-      val allLabels = immutable.BitSet.empty ++ Range(0, labels.size)
+      val allLabels = {
+        val arr = new Array[Long]((labels.size + 63)/64)
+        util.Arrays.fill(arr, -1L)
+        new BitSetN(arr)
+      }
 
       def activeLabelsTop(begin: Int, end: Int) = allLabels
       def activeLabelsBot(begin: Int, end: Int) = allLabels

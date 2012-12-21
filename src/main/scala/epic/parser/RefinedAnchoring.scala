@@ -15,6 +15,7 @@ package epic.parser
  limitations under the License.
 */
 import breeze.inference.Factor
+import epic.parser.ParseChart.SparsityPattern
 
 /**
  * A RefinedAnchoring is a refined grammar that has been tuned to a particular sentence (if applicable).
@@ -26,6 +27,7 @@ import breeze.inference.Factor
  * @author dlwh
  */
 trait RefinedAnchoring[L, W] extends Factor[RefinedAnchoring[L, W]] {
+
 
   def grammar: BaseGrammar[L]
   def lexicon: Lexicon[L, W]
@@ -157,6 +159,9 @@ trait RefinedAnchoring[L, W] extends Factor[RefinedAnchoring[L, W]] {
    * If they are, then * and / can be much faster.
    *
    * Note that 0 is reserved for unrefined anchorings, and -1 never matches other tags.
+   *
+   * Reserved:
+   * 1 - Lexicalized Parsers with no symbol or rule annotation
    *
    * 0's will be optimized
    */

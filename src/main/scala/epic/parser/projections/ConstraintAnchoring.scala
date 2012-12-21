@@ -38,35 +38,24 @@ import epic.parser.ParseChart.SparsityPattern
 class ConstraintAnchoring[L, W](val grammar: BaseGrammar[L],
                              val lexicon: Lexicon[L, W],
                              val words: Seq[W],
-                             scores: Array[BitSet],
-                             topScores: Array[BitSet],
                              override val sparsityPattern: SparsityPattern) extends CoreAnchoring[L, W] with Serializable {
   def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = 0.0
 
+
   def scoreUnaryRule(begin: Int, end: Int, rule: Int) = {
-    if (topScores eq null) 0.0
-    else {
-      val set = topScores(TriangularArray.index(begin, end))
-      if(set == null || !set.contains(rule)) Double.NegativeInfinity
-      else 0.0
-    }
+    breeze.numerics.logI(sparsityPattern.activeLabelsTop(begin, end).contains(grammar.parent(rule)))
   }
 
   def scoreSpan(begin: Int, end: Int, tag: Int) = {
-    if(scores eq null) 0.0
-    else {
-      val set = scores(TriangularArray.index(begin, end))
-      if(set == null || !set.contains(tag)) Double.NegativeInfinity
-      else 0.0
-    }
+    breeze.numerics.logI(sparsityPattern.activeLabelsBot(begin, end).contains(tag))
   }
 }
 
 object ConstraintAnchoring {
   @SerialVersionUID(2)
-  case class RawConstraints(bottom: Array[BitSet], top: Array[BitSet], sparsity: ParseChart.SparsityPattern) {
+  case class RawConstraints(sparsity: ParseChart.SparsityPattern) {
     def toAnchoring[L, W](grammar: BaseGrammar[L], lexicon: Lexicon[L, W], words: Seq[W]) = {
-      new ConstraintAnchoring(grammar, lexicon, words, bottom, top, sparsity)
+      new ConstraintAnchoring(grammar, lexicon, words, sparsity)
     }
   }
 }
@@ -88,9 +77,9 @@ class ConstraintCoreGrammar[L, W](augmentedGrammar: AugmentedGrammar[L, W], thre
   def buildConstraints(charts: ParseMarginal[L, W],
                   goldTags: GoldTagPolicy[L] = GoldTagPolicy.noGoldTags[L]):ConstraintAnchoring[L, W] = {
 
-    val RawConstraints(label,unary, sparsity) = rawConstraints(charts, goldTags)
+    val RawConstraints(sparsity) = rawConstraints(charts, goldTags)
 
-    new ConstraintAnchoring[L, W](charts.anchoring.grammar, charts.anchoring.lexicon, charts.anchoring.words, label, unary, sparsity)
+    new ConstraintAnchoring[L, W](charts.anchoring.grammar, charts.anchoring.lexicon, charts.anchoring.words, sparsity)
   }
 
   def buildConstraints(words: Seq[W],
@@ -100,7 +89,7 @@ class ConstraintCoreGrammar[L, W](augmentedGrammar: AugmentedGrammar[L, W], thre
     buildConstraints(charts, goldTags)
   }
 
-  def rawConstraints(words: Seq[W], gold: GoldTagPolicy[L]):RawConstraints = {
+  def rawConstraints(words: Seq[W], gold: GoldTagPolicy[L] = GoldTagPolicy.noGoldTags):RawConstraints = {
     val charts = ChartMarginal(augmentedGrammar, words, if(viterbi) ParseChart.viterbi else ParseChart.logProb)
     rawConstraints(charts, gold)
   }
@@ -124,7 +113,7 @@ class ConstraintCoreGrammar[L, W](augmentedGrammar: AugmentedGrammar[L, W], thre
 
     val pattern = ConstraintCoreGrammar.ConstraintSparsity(labelThresholds, topLabelThresholds)
 
-    RawConstraints(labelThresholds, unaryThresholds, pattern)
+    RawConstraints(pattern)
   }
 
 

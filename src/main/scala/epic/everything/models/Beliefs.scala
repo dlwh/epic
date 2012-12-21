@@ -2,6 +2,7 @@ package epic.everything.models
 
 import breeze.linalg._
 import breeze.inference.Factor
+import breeze.util.Index
 
 /**
  * 
@@ -30,6 +31,9 @@ final case class Beliefs[T](property: Property[T], beliefs: DenseVector[Double])
 }
 
 object Beliefs {
+  def improperUninformed[T](name: String, index: Index[T]): Beliefs[T] = improperUninformed(Property(name, index))
+  def improperUninformed[T](prop: Property[T]): Beliefs[T] = Beliefs(prop, DenseVector.ones(prop.index.size))
+
   case class Builder[T](property: Property[T]) {
     val counts = property.mkDenseVector()
     def tallyCount(assignment: Int, count: Double) {

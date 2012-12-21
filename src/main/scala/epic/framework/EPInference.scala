@@ -101,7 +101,7 @@ class EPInference[Datum, Augment](inferences: IndexedSeq[ProjectableInference[Da
       iter += 1
       state = s
     }
-    print(iter + " ")
+//    print(iter + " " + state.logPartition)
 
     EPMarginal(state.logPartition, state.q, marginals, state.f_~) -> state.logPartition
   }
@@ -113,6 +113,7 @@ class EPInference[Datum, Augment](inferences: IndexedSeq[ProjectableInference[Da
       val marg = marginals(i)
       inf.countsFromMarginal(datum, marg.asInstanceOf[inf.Marginal], accum.counts(i).asInstanceOf[inf.ExpectedCounts], scale)
     }
+    accum.loss += scale * marg.logPartition
     accum
   }
 }

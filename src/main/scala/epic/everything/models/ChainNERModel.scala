@@ -12,7 +12,8 @@ import breeze.collection.mutable.TriangularArray
  *
  * @author dlwh
  */
-class ChainNERModel(val inner: SemiCRFModel[NERType.Value, String]) extends DocumentAnnotatingModel {
+class ChainNERModel(beliefsFactory: DocumentBeliefs.Factory,
+                    val inner: SemiCRFModel[NERType.Value, String]) extends DocumentAnnotatingModel {
   def featureIndex: Index[Feature] = inner.featureIndex
   type Inference = ChainNERInference
   type ExpectedCounts = inner.ExpectedCounts
@@ -20,7 +21,7 @@ class ChainNERModel(val inner: SemiCRFModel[NERType.Value, String]) extends Docu
 
   def initialValueForFeature(f: Feature): Double = inner.initialValueForFeature(f)
 
-  def inferenceFromWeights(weights: DenseVector[Double]): Inference = new ChainNERInference(inner.inferenceFromWeights(weights), inner.labelIndex)
+  def inferenceFromWeights(weights: DenseVector[Double]): Inference = new ChainNERInference(beliefsFactory, inner.inferenceFromWeights(weights), inner.labelIndex)
 
   def emptyCounts: ExpectedCounts = StandardExpectedCounts.zero(featureIndex)
 
@@ -32,7 +33,8 @@ class ChainNERModel(val inner: SemiCRFModel[NERType.Value, String]) extends Docu
 
 case class ChainNERMarginal[Inner](sentences: IndexedSeq[Inner], logPartition: Double) extends epic.framework.Marginal
 
-case class ChainNERInference(inner: SemiCRFInference[NERType.Value, String],
+case class ChainNERInference(beliefsFactory: DocumentBeliefs.Factory,
+                             inner: SemiCRFInference[NERType.Value, String],
                              labels: Index[NERType.Value]) extends DocumentAnnotatingInference with ProjectableInference[ProcessedDocument, DocumentBeliefs] {
   type ExpectedCounts = inner.ExpectedCounts
   type Marginal = ChainNERMarginal[inner.Marginal]
@@ -66,17 +68,16 @@ case class ChainNERInference(inner: SemiCRFInference[NERType.Value, String],
     val counts = emptyCounts
     for(i <- 0 until doc.sentences.length) {
       counts += inner.countsFromMarginal(doc.sentences(i).ner, marg.sentences(i), accum, scale)
+      assert(!counts.counts.valuesIterator.exists(_.isNaN), doc.sentences(i).words + " " + i)
     }
 
     counts
   }
 
 
-
   def baseAugment(doc: ProcessedDocument): DocumentBeliefs = {
-    sys.error("TODO")
+    beliefsFactory(doc)
   }
-
 
   def projectGold(doc: ProcessedDocument, m: Marginal, oldAugment: DocumentBeliefs): DocumentBeliefs = {
     project(doc, m, oldAugment)
@@ -87,11 +88,13 @@ case class ChainNERInference(inner: SemiCRFInference[NERType.Value, String],
     val newSentences = Array.tabulate(doc.sentences.length) { s =>
       val marg = m.sentences(s)
       val sentenceBeliefs = oldBeliefs.beliefsForSentence(s)
-      val newSpans = TriangularArray.tabulate(doc.sentences(s).length){ (b,e) =>
-        val spanBeliefs = sentenceBeliefs.spanBeliefs(b, e)
-        spanBeliefs.copy(ner = spanBeliefs.ner.copy(beliefs=DenseVector.tabulate(labels.size){marg.spanMarginal(_, b, e)}))
+      val newSpans = TriangularArray.tabulate(doc.sentences(s).length+1){ (b,e) =>
+        if(b < e) {
+          val spanBeliefs = sentenceBeliefs.spanBeliefs(b, e)
+          spanBeliefs.copy(ner = spanBeliefs.ner.copy(beliefs=DenseVector.tabulate(labels.size){marg.spanMarginal(_, b, e)}))
+        } else null
       }
-      sentenceBeliefs.copy(newSpans)
+      sentenceBeliefs.copy(spans=newSpans)
     }
 
     DocumentBeliefs(newSentences)
@@ -117,7 +120,9 @@ case class ChainNERInference(inner: SemiCRFInference[NERType.Value, String],
         def maxSegmentLength(label: Int): Int = inner.maxLength(label)
 
         def scoreTransition(prev: Int, cur: Int, beg: Int, end: Int): Double = {
-          math.log(b.spanBeliefs(cur,beg).ner(cur)) - math.log1p(-b.spanBeliefs(cur,beg).ner(cur))
+          if(b.spanBeliefs(beg, end).ner(cur) == 0.0) Double.NegativeInfinity
+          else if(b.spanBeliefs(beg, end).ner(cur) == 1.0) 0.0
+          else  math.log(b.spanBeliefs(beg,end).ner(cur)) - math.log1p(-b.spanBeliefs(beg,end).ner(cur))
         }
 
         def startSymbol = inner.startSymbol

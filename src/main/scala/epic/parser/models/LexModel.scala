@@ -413,6 +413,8 @@ final class LexGrammar[L, W](val grammar: BaseGrammar[L],
   // unaryRule is (head)
   // parent/leftchild/rightchild is (head)
   final class Spec(val words: Seq[W]) extends RefinedAnchoring[L, W] {
+    override def annotationTag: Int = 1
+
     val grammar = LexGrammar.this.grammar
     val lexicon = LexGrammar.this.lexicon
     val indexed = words.map(wordIndex)
@@ -475,7 +477,7 @@ final class LexGrammar[L, W](val grammar: BaseGrammar[L],
       ruleRef / words.length
     }
 
-    def unaryHeadIndex(ref: Int) = {
+    def spanHeadIndex(ref: Int) = {
       ref
     }
 
@@ -578,7 +580,7 @@ case class LexGrammarBundle[L, W](baseGrammar: BaseGrammar[L],
     }
   }
 
-  def makeGrammar(fi: IndexedLexFeaturizer[L, W], weights: DenseVector[Double]): RefinedGrammar[L, W] = {
+  def makeGrammar(fi: IndexedLexFeaturizer[L, W], weights: DenseVector[Double]): LexGrammar[L, W] = {
     new LexGrammar(baseGrammar, baseLexicon, wordIndex, fi, weights, binaries, leftRules, rightRules)
   }
 }

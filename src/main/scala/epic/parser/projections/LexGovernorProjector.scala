@@ -10,61 +10,63 @@ import models.LexGrammar
  * 
  * @author dlwh
  */
-class LexGovernorProjector[L, W](grammar: LexGrammar[L, W], notConstituent: L) {
-  private val nc = grammar.grammar.labelIndex(notConstituent)
+class LexGovernorProjector[L, W](grammar: LexGrammar[L, W]) {
+  val notAConstituent = grammar.labelIndex.size
 
-  def apply(anch: LexGrammar[L,W]#Spec, chart: ParseMarginal[L, W]):LexGovernorInfo = {
+  def apply(anch: RefinedAnchoring[L, W], chart: ParseMarginal[L, W]):LexGovernorInfo = {
+    assert(anch.annotationTag == 1)
     val v = new Visitor(anch, chart.length)
     chart.visit(v)
-    LexGovernorInfo(v.spanType, v.spanGovernorCounts, v.wordGovernorCounts, v.maximalLabelType)
+    LexGovernorInfo(v.spanType, v.spanGovernorCounts, v.governedSpan, v.wordGovernorCounts, v.wordTagType, v.maximalLabelType)
   }
 
   // WHENEVER you change this, be sure to change PropertyParsingAnchoring
-  private class Visitor(spec: LexGrammar[L, W]#Spec, length: Int) extends AnchoredVisitor[L] {
-    val spanType = TriangularArray.fill(length)(labelBeliefs)
-    val spanGovernorCounts = TriangularArray.fill(length)(baseDV)
+  private class Visitor(spec: RefinedAnchoring[L, W], length: Int) extends AnchoredVisitor[L] {
+    val spanType = TriangularArray.fill(length+1)(optionalLabelBeliefs)
+    val spanGovernorCounts = TriangularArray.fill(length+1)(baseDV)
     val wordGovernorCounts = Array.fill(length)(DenseVector.zeros[Double](length+1))
+    val governedSpan = Array.fill(length)(DenseVector.zeros[Double](TriangularArray.arraySize(length+1)))
     val maximalLabelType = Array.fill(length)(labelBeliefs)
     val wordTagType = Array.fill(length)(labelBeliefs)
+    val otherAnch = grammar.anchor(spec.words)
 
     def visitBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int, score: Double) {
-      val head = spec.headIndex(ref)
-      val dep = spec.depIndex(ref)
+      val head = otherAnch.headIndex(ref)
+      val dep = otherAnch.depIndex(ref)
       wordGovernorCounts(dep)(head) += score
       if (grammar.isRightRule(rule)) { // head on the right
         spanGovernorCounts(begin, split)(head) += score
         spanGovernorCounts(begin, split)(notASpan) -= score
         val label = grammar.grammar.rightChild(rule)
         maximalLabelType(dep)(label) += score
-        maximalLabelType(dep)(label) -= score
+        governedSpan(dep)(TriangularArray.index(begin,split)) += score
       } else {
         spanGovernorCounts(split, end)(head) += score
         spanGovernorCounts(split, end)(notASpan) -= score
         val label = grammar.grammar.leftChild(rule)
         maximalLabelType(dep)(label) += score
-        maximalLabelType(dep)(label) -= score
+        governedSpan(dep)(TriangularArray.index(split,end)) += score
       }
     }
 
     def visitUnaryRule(begin: Int, end: Int, rule: Int, ref: Int, score: Double) {
       val parent = grammar.grammar.parent(rule)
       spanType(begin,end)(parent) += score
-      spanType(begin,end)(nc) -= score
+      spanType(begin,end)(notAConstituent) -= score
     }
 
     def visitSpan(begin: Int, end: Int, tag: Int, ref: Int, score: Double) {
-      val head = spec.unaryHeadIndex(ref)
+      val head = otherAnch.spanHeadIndex(ref)
       if (begin == 0 && end == length) { // root, get the length
         wordGovernorCounts(head)(length) += score
         spanGovernorCounts(begin, end)(length) += score
         spanGovernorCounts(begin, end)(notASpan) -= score
         maximalLabelType(head)(tag) += score
-        maximalLabelType(head)(tag) -= score
+        governedSpan(head)(TriangularArray.index(begin,end)) += score
       }
 
       if(begin + 1 == end) {
         wordTagType(begin)(tag) += score
-        wordTagType(begin)(nc) -= score
       }
     }
 
@@ -78,8 +80,13 @@ class LexGovernorProjector[L, W](grammar: LexGrammar[L, W], notConstituent: L) {
 
     private val notASpan = length+1
     def labelBeliefs = {
-      val r = grammar.grammar.mkDenseVector()
-      r(nc) = 1.0
+      val r = grammar.grammar.labelEncoder.mkDenseVector()
+      r
+    }
+
+    def optionalLabelBeliefs = {
+      val r = DenseVector.zeros[Double](grammar.grammar.labelIndex.size + 1)
+      r(notAConstituent) = 1.0
       r
     }
   }
@@ -94,5 +101,7 @@ class LexGovernorProjector[L, W](grammar: LexGrammar[L, W], notConstituent: L) {
  */
 case class LexGovernorInfo(spanType: TriangularArray[DenseVector[Double]],
                            spanGovernor: TriangularArray[DenseVector[Double]],
+                           governedSpan: Array[DenseVector[Double]],
                            wordGovernor: Array[DenseVector[Double]],
+                           wordTag: Array[DenseVector[Double]],
                            maximalLabelType: Array[DenseVector[Double]])
