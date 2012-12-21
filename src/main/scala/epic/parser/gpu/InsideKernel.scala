@@ -11,24 +11,22 @@ class InsideKernel[L](ruleStructure: RuleStructure[L], numGrammars: Int)(implici
   import ruleStructure._
 
   def insidePass(numSentences: Int,
-                 insideBot: CLBuffer[JFloat],
-                 insideTop: CLBuffer[JFloat],
-                 posTags: CLBuffer[JFloat],
+                 inside: GPUCharts,
                  offsets: CLBuffer[JInt],
                  lengths: CLBuffer[JInt],
                  maxLength: Int,
                  lengthOffsets: CLBuffer[JInt],
                  rules: CLBuffer[JFloat],
                  events: CLEvent*)(implicit queue: CLQueue) = synchronized {
-    binaries.foreach(_.setArgs(insideBot, insideTop, offsets, lengths, Integer.valueOf(1), rules))
-    termBinaries.setArgs(insideBot, insideTop, posTags, offsets, lengths, lengthOffsets, Integer.valueOf(1), rules)
-    unaries.setArgs(insideBot, insideTop, offsets, lengths, Integer.valueOf(1), rules)
+    binaries.foreach(_.setArgs(inside.bot, inside.top, offsets, lengths, Integer.valueOf(1), rules))
+    termBinaries.setArgs(inside.bot, inside.top, inside.tags, offsets, lengths, lengthOffsets, Integer.valueOf(1), rules)
+    unaries.setArgs(inside.bot, inside.top, offsets, lengths, Integer.valueOf(1), rules)
     val iu, ib, it = new ArrayBuffer[CLEvent]()
     var lastU:CLEvent = null
     lastU = unaries.enqueueNDRange(queue, Array(numSentences, maxLength, numGrammars), Array(1, 1, numGrammars), events:_*)
     iu += lastU
 
-    // TODO: retrofit inside/outside binaries and unaries to look at posTagsPointer....
+    // TODO: retrofit inside/outside binaries and unaries to look at inside.tagsPointer....
     // TODO: also get ecounts...
     for (len <- 2 to maxLength) {
       binaries.foreach(_.setArg(4, len))
@@ -81,9 +79,8 @@ class InsideKernel[L](ruleStructure: RuleStructure[L], numGrammars: Int)(implici
   const int end = begin + spanLength;
   const int length = lengths[sentence];
 //  float out[NUM_SYMS];
-  float out[NUM_SYMS], right[NUM_SYMS];
+  float out[NUM_SYMS];
   if (end <= length) {
-    __global const parse_cell* chart_top =  inside_tops + offsets[sentence];
     for(int i = 0; i < NUM_SYMS; ++i) {
       out[i] = 0.0f;
     }
@@ -198,7 +195,7 @@ __kernel void inside_unaries(__global const parse_cell * inside_bots,
   def insideTermRuleUpdates: String = {
     var lastLeft = -1
     val sb = new ArrayBuffer[String]
-    sb += "float currentLeftScore, currentRightScore, currentSum = 0.0f;"
+    sb += "float currentLeftScore, currentRightScore;"
     // do A -> Term NonTerm
     for((r@BinaryRule(p, l, right), index) <- ruleStructure.leftTermRules.sortBy(_._1.left)) {
       if(lastLeft != l) {

@@ -10,10 +10,8 @@ import java.io.FileWriter
 class OutsideKernel[L](ruleStructure: RuleStructure[L], numGrammars: Int)(implicit context: CLContext) {
   import ruleStructure._
   def outsidePass(numSentences: Int,
-                 outsideTop: CLBuffer[JFloat],
-                 outsideBot: CLBuffer[JFloat],
-                 insideTop: CLBuffer[JFloat],
-                 posTags: CLBuffer[JFloat],
+                 outside: GPUCharts,
+                 inside: GPUCharts,
                  offsets: CLBuffer[JInt],
                  lengths: CLBuffer[JInt],
                  lengthOffsets: CLBuffer[JInt],
@@ -22,12 +20,12 @@ class OutsideKernel[L](ruleStructure: RuleStructure[L], numGrammars: Int)(implic
                  events: CLEvent*)(implicit queue: CLQueue) = {
     val ou, ob, otb, ot = new ArrayBuffer[CLEvent]()
     var lastU = null:CLEvent
-    lbinaries.foreach(_.setArgs(outsideTop, outsideBot, insideTop, offsets, lengths, Integer.valueOf(maxLength), rules))
-    rbinaries.foreach(_.setArgs(outsideTop, outsideBot, insideTop, offsets, lengths, Integer.valueOf(maxLength), rules))
-    unaries.setArgs(outsideTop, outsideBot, offsets, lengths, Integer.valueOf(maxLength), rules)
-    tunaries.setArgs(outsideTop, outsideBot, offsets, lengths, rules)
-    termbs.setArgs(outsideTop, outsideBot, insideTop, posTags, offsets, lengths, lengthOffsets, Integer.valueOf(maxLength), rules)
-    bterms.setArgs(outsideTop, outsideBot, insideTop, posTags, offsets, lengths, lengthOffsets, rules)
+    lbinaries.foreach(_.setArgs(outside.top, outside.bot, inside.top, offsets, lengths, Integer.valueOf(maxLength), rules))
+    rbinaries.foreach(_.setArgs(outside.top, outside.bot, inside.top, offsets, lengths, Integer.valueOf(maxLength), rules))
+    unaries.setArgs(outside.top, outside.bot, offsets, lengths, Integer.valueOf(maxLength), rules)
+    tunaries.setArgs(outside.top, outside.bot, offsets, lengths, rules)
+    termbs.setArgs(outside.top, outside.bot, inside.top, inside.tags, offsets, lengths, lengthOffsets, Integer.valueOf(maxLength), rules)
+    bterms.setArgs(outside.top, outside.bot, outside.tags, inside.top, inside.tags, offsets, lengths, lengthOffsets, rules)
     lastU = unaries.enqueueNDRange(queue, Array(numSentences, 1, numGrammars), Array(1, 1, numGrammars), events:_*)
     ou += lastU
 
@@ -137,7 +135,6 @@ __kernel void outside_term_binaries(__global parse_cell* outsides_top,
   const int length = lengths[sentence];
   float otarget[NUM_SYMS];
    if (end <= length) {
-    __global const parse_cell* inside = insides_top + offsets[sentence];
     __global const parse_cell* obot = outsides_bot + offsets[sentence];
     for(int i = 0; i < NUM_SYMS; ++i) {
       otarget[i] = 0.0f;
@@ -166,6 +163,7 @@ __kernel void outside_term_binaries(__global parse_cell* outsides_top,
 
  __kernel void outside_binary_terms(__global parse_cell* outsides_top,
               __global parse_cell* outsides_bot,
+              __global parse_cell* outsides_tags,
               __global const parse_cell * insides_top,
               __global const parse_cell * inside_tags,
               __global const int* offsets,
@@ -215,19 +213,23 @@ __kernel void outside_term_binaries(__global parse_cell* outsides_top,
     // multiply in a 2^SCALE_FACTOR to re-achieve balance.
     __global parse_cell* gout = CELL(outsides_top + offsets[sentence], begin, end);
     __global parse_cell* gout2 = CELL(outsides_bot + offsets[sentence], begin, end);
+    __global parse_cell* gout3 = CELL(outsides_tags + lengthOffsets[sentence], begin, end);
     for(int i = 0; i < NUM_SYMS; ++i) {
 //      if(otarget[i] != gout->syms[i][gram])
 //        printf("%%d %%d %%e %%e %%e\n", begin, i, gout->syms[i][gram], ldexp(otarget[i], SCALE_FACTOR), gout->syms[i][gram]- ldexp(otarget[i], SCALE_FACTOR));
       gout->syms[i][gram] += ldexp(otarget[i], SCALE_FACTOR);
       gout2->syms[i][gram] += ldexp(otarget[i], SCALE_FACTOR);
+      gout3->syms[i][gram] += ldexp(otarget[i], SCALE_FACTOR);
     }
   }
 }
 
     """.format(outsideUnaryUpdates(ruleStructure.ntermUnaries),
     outsideUnaryUpdates(ruleStructure.termUnaries),
+    // term_binaries
     outsideRightCompletionUpdates(ruleStructure.rightTermRules),
       outsideLeftCompletionUpdates(ruleStructure.leftTermRules),
+    // binary_terms
     outsideRightCompletionUpdates(ruleStructure.leftTermRules),
     outsideLeftCompletionUpdates(ruleStructure.rightTermRules),
     outsideRightCompletionUpdates(ruleStructure.bothTermRules),

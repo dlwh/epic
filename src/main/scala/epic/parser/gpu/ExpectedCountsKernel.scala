@@ -6,19 +6,18 @@ import com.nativelibs4java.opencl._
 import java.lang.{Float=>JFloat, Integer=>JInt}
 import breeze.util.Index
 import collection.mutable
+import java.lang
+import java.io.FileWriter
 
 class ExpectedCountsKernel[L](ruleStructure: RuleStructure[L], numGrammars: Int)(implicit context: CLContext) {
   import ruleStructure._
 
 
-  def expectedCounts(numSentences: Int,
+  def expectedCounts(numSentences: Int, totalLength: Int,
                      ecounts: CLBuffer[JFloat],
                      termECounts: CLBuffer[JFloat],
-                     insideBot: CLBuffer[JFloat],
-                     insideTop: CLBuffer[JFloat],
-                     outsideBot: CLBuffer[JFloat],
-                     outsideTop: CLBuffer[JFloat],
-                     insidePos: CLBuffer[JFloat],
+                     inside: GPUCharts,
+                     outside: GPUCharts,
                      offsets: CLBuffer[JInt],
                      lengths: CLBuffer[JInt],
                      offLengths: CLBuffer[JInt],
@@ -27,12 +26,12 @@ class ExpectedCountsKernel[L](ruleStructure: RuleStructure[L], numGrammars: Int)
                      events: CLEvent*)(implicit queue: CLQueue)  = {
 
     val eu, eb, et = new ArrayBuffer[CLEvent]()
-    binaries.foreach(_.setArgs(ecounts, insideTop, outsideBot, offsets, lengths, offLengths, Integer.valueOf(1), rules))
-    binary_lterms.setArgs(ecounts, insideTop, outsideBot, insidePos, offsets, lengths, offLengths, Integer.valueOf(1), rules)
-    binary_rterms.setArgs(ecounts, insideTop, outsideBot, insidePos, offsets, lengths, offLengths, rules)
-    binary_terms.setArgs(ecounts, insideTop, outsideBot, insidePos, offsets, lengths, offLengths, rules)
-    unaries.setArgs(ecounts, insideTop, insideBot, outsideTop, offsets, lengths, offLengths, Integer.valueOf(1), rules)
-    terms.setArgs(termECounts, insideTop, insideBot, outsideBot, offsets, lengths, offLengths, Integer.valueOf(1))
+    binaries.foreach(_.setArgs(ecounts, inside.top, outside.bot, offsets, lengths, offLengths, Integer.valueOf(1), rules))
+    binary_lterms.setArgs(ecounts, inside.top, outside.bot, inside.tags, offsets, lengths, offLengths, Integer.valueOf(1), rules)
+    binary_rterms.setArgs(ecounts, inside.top, outside.bot, inside.tags, offsets, lengths, offLengths,  Integer.valueOf(1), rules)
+    binary_terms.setArgs(ecounts, inside.top, outside.bot, inside.tags, offsets, lengths, offLengths, rules)
+    unaries.setArgs(ecounts, inside.top, inside.bot, outside.top, offsets, lengths, offLengths, Integer.valueOf(1), rules)
+    terms.setArgs(termECounts, inside.top, inside.bot, outside.bot, offsets, lengths, offLengths, Integer.valueOf(1))
 
     val maxDim1Size = queue.getDevice.getMaxWorkItemSizes()(0)
     val nsyms = ruleStructure.numSyms
@@ -54,9 +53,12 @@ class ExpectedCountsKernel[L](ruleStructure: RuleStructure[L], numGrammars: Int)
       unaries.setArg(7, len)
       binaries.foreach(_.setArg(6, len))
       binary_lterms.setArg(7, len)
+      binary_rterms.setArg(7, len)
       val lastBDeps = binaries.map(_.enqueueNDRange(queue, Array(numSentences, maxLength+1-len, numGrammars), Array(1, 1, numGrammars), lastBDep))
       eb ++= lastBDeps
       lastBDep = binary_lterms.enqueueNDRange(queue, Array(numSentences, maxLength+1-len, numGrammars), Array(1, 1, numGrammars), lastBDeps:_*)
+      et += lastBDep
+      lastBDep = binary_rterms.enqueueNDRange(queue, Array(numSentences, maxLength+1-len, numGrammars), Array(1, 1, numGrammars), lastBDeps:_*)
       et += lastBDep
       lastUDep = unaries.enqueueNDRange(queue, Array(numSentences, maxLength+1-len, numGrammars), Array(1, 1, numGrammars), lastUDep)
       eu += lastUDep
@@ -66,8 +68,6 @@ class ExpectedCountsKernel[L](ruleStructure: RuleStructure[L], numGrammars: Int)
    lastUDep =  unaries.enqueueNDRange(queue, Array(numSentences, maxLength, numGrammars), Array(1, 1, numGrammars), lastUDep, lastBDep)
     eu += lastUDep
 
-   lastBDep = binary_rterms.enqueueNDRange(queue, Array(numSentences, maxLength, numGrammars), Array(1, 1, numGrammars), lastBDep, lastUDep)
-   et += lastBDep
     lastBDep = binary_terms.enqueueNDRange(queue, Array(numSentences, maxLength, numGrammars), Array(1, 1, numGrammars), lastBDep)
     et += lastBDep
 
@@ -79,16 +79,12 @@ class ExpectedCountsKernel[L](ruleStructure: RuleStructure[L], numGrammars: Int)
       println("ecounts: " + iuCount + " " + ibCount + " " + etCount + " " + (termFinished.getProfilingCommandEnd - termFinished.getProfilingCommandStart)/1E9)
     }
 
-    lastUDep
+
+    val totalRules: Int = this.ruleStructure.numBinaries * numGrammars + ruleStructure.numUnaries * numGrammars
+    collapseArray(ecounts, totalLength, totalRules, lastBDep)
   }
 
 
-  private lazy val binaries = Array.tabulate(partitionsParent.length)(i => program.createKernel("ecount_binaries_" + i))
-  private lazy val binary_lterms = program.createKernel("ecount_binary_lterms")
-  private lazy val binary_rterms = program.createKernel("ecount_binary_rterms")
-  private lazy val binary_terms = program.createKernel("ecount_binary_terms")
-  private lazy val unaries = program.createKernel("ecount_unaries")
-  private lazy val terms = program.createKernel("ecount_terminals")
 
 
   lazy val text = {
@@ -96,33 +92,7 @@ class ExpectedCountsKernel[L](ruleStructure: RuleStructure[L], numGrammars: Int)
     GrammarHeader.header(ruleStructure, numGrammars) +"""
 
 
- __kernel void ecount_binary_lterms(__global rule_cell* ecounts,
-   __global const parse_cell * insides_top,
-   __global const parse_cell* outsides_bot,
-   __global const parse_cell * insides_pos,
-   __global const int* offsets,
-   __global const int* lengths,
-  __global const int* lengthOffsets,
-   const int span_length,
-   __global const rule_cell* rules) {
-  const int sentence = get_global_id(0);
-  const int begin = get_global_id(1);
-  const int gram = get_global_id(2);
-  const int end = begin + span_length;
-  const int length = lengths[sentence];
-  __global rule_cell* ruleCounts = ecounts + (lengthOffsets[sentence] + begin);
-  __global const parse_cell* obot = outsides_bot + offsets[sentence];
-  __global const parse_cell* itop = insides_top + offsets[sentence];
-  __global const parse_cell* ipos = insides_pos + (lengthOffsets[sentence] + begin);
-  const float root_score = CELL(itop, 0, length)->syms[ROOT][gram]; // scale is 2^(SCALE_FACTOR)^(length-1)
-  if(end <= length) {
-    float oscore;
-    __global const parse_cell* oparents = CELL(obot, begin, end);
 
-    %s
-
-  }
-}
 
 __kernel void ecount_binary_terms(__global rule_cell* ecounts,
    __global const parse_cell * insides_top,
@@ -152,6 +122,34 @@ __kernel void ecount_binary_terms(__global rule_cell* ecounts,
   }
 }
 
+__kernel void ecount_binary_lterms(__global rule_cell* ecounts,
+   __global const parse_cell * insides_top,
+   __global const parse_cell* outsides_bot,
+   __global const parse_cell * insides_pos,
+   __global const int* offsets,
+   __global const int* lengths,
+  __global const int* lengthOffsets,
+   const int span_length,
+   __global const rule_cell* rules) {
+  const int sentence = get_global_id(0);
+  const int gram = get_global_id(2);
+  const int begin = get_global_id(1);
+  const int end = begin + span_length;
+  const int length = lengths[sentence];
+  __global rule_cell* ruleCounts = ecounts + (lengthOffsets[sentence] + begin);
+  __global const parse_cell* obot = outsides_bot + offsets[sentence];
+  __global const parse_cell* itop = insides_top + offsets[sentence];
+  __global const parse_cell* ipos = insides_pos + (lengthOffsets[sentence] + begin);
+  const float root_score = CELL(itop, 0, length)->syms[ROOT][gram]; // scale is 2^(SCALE_FACTOR)^(length-1)
+  if(end <= length) {
+    float oscore;
+    __global const parse_cell* oparents = CELL(obot, begin, end);
+
+    %s
+
+  }
+}
+
 __kernel void ecount_binary_rterms(__global rule_cell* ecounts,
    __global const parse_cell * insides_top,
    __global const parse_cell* outsides_bot,
@@ -159,11 +157,13 @@ __kernel void ecount_binary_rterms(__global rule_cell* ecounts,
    __global const int* offsets,
    __global const int* lengths,
   __global const int* lengthOffsets,
+   const int span_length,
    __global const rule_cell* rules) {
   const int sentence = get_global_id(0);
-  const int split = get_global_id(1);
   const int gram = get_global_id(2);
-  const int end = split + 1;
+  const int begin = get_global_id(1);
+  const int end = begin + span_length;
+  const int split = end-1;
   const int length = lengths[sentence];
   __global rule_cell* ruleCounts = ecounts + (lengthOffsets[sentence] + split);
   __global const parse_cell* obot = outsides_bot + offsets[sentence];
@@ -204,7 +204,6 @@ __kernel void ecount_unaries(
     %s
   }
 }
-
 __kernel void ecount_terminals(
    __global parse_cell* term_ecounts,
    __global const parse_cell * insides_top,
@@ -235,12 +234,20 @@ __kernel void ecount_terminals(
   }
 }
 
-""".format(ecountBinaryLeftTerms(leftTermRules),
+__kernel void sum_vectors(__global float* vec, const int maxLen, int pivot) {
+  int trg = get_global_id(0);
+  if (trg < maxLen)
+    vec[trg] += vec[trg + pivot];
+}
+                                                      """.format(
       ecountBinaryTerms(bothTermRules),
+      ecountBinaryLeftTerms(leftTermRules),
       ecountBinaryRightTerms(rightTermRules),
       ecountUnaries(unaryRulesWithIndices)
     )  ++ (0 until partitionsParent.length).map(i => ecountBinaryPartition(partitionsParent(i), i)).mkString("\n")
   }
+
+
 
   def ecountBinaryPartition(rules: IndexedSeq[(BinaryRule[Int], Int)], id: Int) = {
     """
@@ -270,7 +277,7 @@ __kernel void ecount_binaries_%d(__global rule_cell* ecounts,
     """.format(id, ecountBinaryRules(rules))
   }
 
-  val registersToUse = 30
+  val registersToUse = 40
 
   private def ecountBinaryRules(binaries: IndexedSeq[(BinaryRule[Int], Int)]):String = {
     val byParent: Map[Int, IndexedSeq[(BinaryRule[Int], Int)]] = binaries.groupBy(_._1.parent)
@@ -309,7 +316,7 @@ __kernel void ecount_binaries_%d(__global rule_cell* ecounts,
               buf += "    r%d = CELL(itop, split, end)->syms[%d][gram];".format(rightR, right)
               setThisRound += rightR
             }
-            buf += "    r%d = fma(rules->binaries[%d][gram], r0 * r%d, r%d);".format(ruleR, ruleIndex, rightR, ruleR)
+            buf += "    r%d = fma(r0, r%d, r%d);".format(ruleR,  rightR, ruleR)
             r += 1
           }
         }
@@ -319,7 +326,7 @@ __kernel void ecount_binaries_%d(__global rule_cell* ecounts,
         // register flush time!
         buf += "  // flush time!"
         for( (reg, rule) <- ruleRegisters) {
-          buf += "  ruleCounts->binaries[%d][gram] +=  r%d * oscore;".format(rule, reg)
+          buf += "  ruleCounts->binaries[%d][gram] += rules->binaries[%d][gram]* r%d * oscore;".format(rule, rule, reg)
         }
         buf(regInitializerPos) = ruleRegisters.map { case (reg, rule) => "r%d = 0.0f;".format(reg)}.mkString("  ", " ", "");
       }
@@ -364,7 +371,7 @@ __kernel void ecount_binaries_%d(__global rule_cell* ecounts,
               buf += "    r%d = ipos[split].syms[%d][gram];".format(rightR, right)
               setThisRound += rightR
             }
-            buf += "    r%d = fma(rules->binaries[%d][gram], r0 * r%d, r%d);".format(ruleR, ruleIndex, rightR, ruleR)
+            buf += "    r%d = fma(r0, r%d, r%d);".format(ruleR, rightR, ruleR)
             r += 1
           }
         }
@@ -372,7 +379,7 @@ __kernel void ecount_binaries_%d(__global rule_cell* ecounts,
         // register flush time!
         buf += "  // flush time!"
         for( (reg, rule) <- ruleRegisters) {
-          buf += "  ruleCounts->binaries[%d][gram] +=  r%d * oscore;".format(rule, reg)
+          buf += "  ruleCounts->binaries[%d][gram] += rules->binaries[%d][gram] * r%d * oscore;".format(rule, rule, reg)
         }
         buf(regInitializerPos) = ruleRegisters.map { case (reg, rule) => "r%d = 0.0f;".format(reg)}.mkString("  ", " ", "");
       }
@@ -417,14 +424,14 @@ __kernel void ecount_binaries_%d(__global rule_cell* ecounts,
               buf += "    r%d = CELL(itop, begin+1, end)->syms[%d][gram];".format(rightR, right)
               setThisRound += rightR
             }
-            buf += "    r%d = fma(rules->binaries[%d][gram], oscore * r%d, r%d);".format(ruleR, ruleIndex, rightR, ruleR)
+            buf += "    r%d = fma(oscore, r%d, r%d);".format(ruleR,  rightR, ruleR)
             r += 1
           }
         }
         // register flush time!
         buf += "  // flush time!"
         for( (reg, rule) <- ruleRegisters) {
-          buf += "  ruleCounts->binaries[%d][gram] +=  r%d * ilscore;".format(rule, reg)
+          buf += "  ruleCounts->binaries[%d][gram] += rules->binaries[%d][gram] * r%d * ilscore;".format(rule, rule, reg)
         }
         buf(regInitializerPos) = ruleRegisters.map { case (reg, rule) => "r%d = 0.0f;".format(reg)}.mkString("  ", " ", "");
       }
@@ -436,7 +443,8 @@ __kernel void ecount_binaries_%d(__global rule_cell* ecounts,
   private def ecountBinaryRightTerms(binaries: IndexedSeq[(BinaryRule[Int], Int)]):String = {
     val byRight: Map[Int, IndexedSeq[(BinaryRule[Int], Int)]] = binaries.groupBy(_._1.right)
     val buf = new ArrayBuffer[String]()
-    buf += (0 until registersToUse).map("r" + _).mkString("float ", ", ", ";")
+    buf += "XXX"
+    var maxReg = 0
     for((right, rx) <- byRight) {
       val rules = rx.sortBy(r => r._1.parent -> r._1.left)(Ordering.Tuple2)
 
@@ -453,7 +461,6 @@ __kernel void ecount_binaries_%d(__global rule_cell* ecounts,
         val regInitializerPos = buf.size
         buf += "XXX"
 
-        buf += "  for(int begin = 0; begin < split; ++begin) {"
         var lastParent = -1
         while(r < rules.length && assignments.size < registersToUse) {
           val (BinaryRule(par, left, _), ruleIndex) = rules(r)
@@ -469,22 +476,22 @@ __kernel void ecount_binaries_%d(__global rule_cell* ecounts,
               buf += "    r%d = CELL(itop, begin, split)->syms[%d][gram];".format(leftR, left)
               setThisRound += leftR
             }
-            buf += "    r%d = fma(rules->binaries[%d][gram], oscore * r%d, r%d);".format(ruleR, ruleIndex, leftR, ruleR)
+            buf += "    r%d = fma(oscore, r%d, r%d);".format(ruleR, leftR, ruleR)
             r += 1
           }
         }
 
-        buf += "  }\n"
-
         // register flush time!
         buf += "  // flush time!"
         for( (reg, rule) <- ruleRegisters) {
-          buf += "  ruleCounts->binaries[%d][gram] +=  r%d * irscore;".format(rule, reg)
+          buf += "  ruleCounts->binaries[%d][gram] += rules->binaries[%d][gram] * r%d * irscore;".format(rule, rule, reg)
         }
+        maxReg = maxReg max assignments.size
         buf(regInitializerPos) = ruleRegisters.map { case (reg, rule) => "r%d = 0.0f;".format(reg)}.mkString("  ", " ", "");
       }
       buf += "}\n"
     }
+    buf(0) = (0 until registersToUse).map("r" + _).mkString("float ", ", ", ";")
     buf.mkString("\n    ")
   }
 
@@ -506,11 +513,38 @@ __kernel void ecount_binaries_%d(__global rule_cell* ecounts,
 
   }
 
-
   val program = {
+    if(true) {val o = new FileWriter("ecounts.cl"); o.write(text); o.close()}
     val p = context.createProgram(text)
     p.setFastRelaxedMath()
     p.setUnsafeMathOptimizations()
     p.build()
+  }
+
+
+  lazy val binaries = Array.tabulate(partitionsParent.length)(i => program.createKernel("ecount_binaries_" + i))
+  lazy val binary_lterms = program.createKernel("ecount_binary_lterms")
+  lazy val binary_rterms = program.createKernel("ecount_binary_rterms")
+  lazy val binary_terms = program.createKernel("ecount_binary_terms")
+  lazy val unaries = program.createKernel("ecount_unaries")
+  lazy val terms = program.createKernel("ecount_terminals")
+  lazy val sumVector = program.createKernel("sum_vectors")
+
+
+  private def collapseArray(v: CLBuffer[lang.Float], len: Int, width: Int, toAwait: CLEvent)(implicit queue: CLQueue) = {
+    var lastEvent = toAwait
+    var numCellsLeft = len
+    while(numCellsLeft > 1) {
+      val half = numCellsLeft / 2
+      numCellsLeft -= half
+      sumVector.setArg(0, v)
+      sumVector.setArg(1, half * width) // don't go past the first half, rounded down.
+      sumVector.setArg(2, numCellsLeft * width) // pull from the corresponding second half.
+      // the reason these are different are for odd splits.
+      // if there are 5 cells remaining, we want to sum the last two into the first two, and then
+      // the third into the first, and then the second into the first.
+      lastEvent = sumVector.enqueueNDRange(queue, Array(half * width), lastEvent)
+    }
+    lastEvent
   }
 }
