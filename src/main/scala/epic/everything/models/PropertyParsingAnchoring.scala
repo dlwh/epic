@@ -54,14 +54,22 @@ final class PropertyParsingAnchoring[L, W](val lexGrammar: LexGrammar[L, W],
   def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int): Double = {
     val head = anchoring.headIndex(ref)
     val dep = anchoring.depIndex(ref)
-    val score = beliefs.wordBeliefs(dep).governor(head)
+    val depScore = beliefs.wordBeliefs(dep).governor(head)
 
-    if (lexGrammar.isRightRule(rule)) { // head on the right
-      anchoring.scoreBinaryRule(begin, split, end, rule, ref)  +
-        math.log(score /* * beliefs.words(dep).span(TriangularArray.index(begin,split)) */ * beliefs.spans(begin, split).governor(head) / beliefs.spanBeliefs(begin, split).governor(length+1))
+    if (lexGrammar.isRightRule(rule)) {
+      val sGovScore = beliefs.spans(begin, split).governor(head)
+      val notASpan = beliefs.spanBeliefs(begin, split).governor(length + 1)
+      if(depScore == 0.0 || sGovScore == 0.0 || notASpan >= 1.0) {
+        Double.NegativeInfinity
+      } else {
+        val baseScore = anchoring.scoreBinaryRule(begin, split, end, rule, ref)  +
+          math.log(depScore * sGovScore / notASpan)
+        baseScore
+      }
+      // head on the right
     } else {
      anchoring.scoreBinaryRule(begin, split, end, rule, ref) +
-       math.log(score /* * beliefs.words(dep).span(TriangularArray.index(split,end)) */* beliefs.spans(split, end).governor(head) / beliefs.spanBeliefs(split, end).governor(length+1))
+       math.log(depScore * beliefs.spans(split, end).governor(head) / beliefs.spanBeliefs(split, end).governor(length+1))
     }
   }
 
