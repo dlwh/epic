@@ -106,8 +106,8 @@ object DocLexParser {
     }
 
 
-    def adapt(words: IndexedSeq[String], t: SentenceBeliefs): RefinedAnchoring[AnnotatedLabel, String] = {
-      new PropertyParsingAnchoring(grammar, words, t)
+    def adapt(words: IndexedSeq[String], t: SentenceBeliefs): Anchoring[AnnotatedLabel, String] = {
+      new Anchoring(grammar, words, t)
     }
 
     def project(v: ProcessedDocument, marg: Marginal, oldAugment: DocumentBeliefs): DocumentBeliefs = {
@@ -141,6 +141,125 @@ object DocLexParser {
     def apply(v1: ProcessedDocument, v2: DocumentBeliefs): ProcessedDocument = error("TODO")
   }
 
+  /**
+   *
+   * @author dlwh
+   */
+  final class Anchoring[L, W](val lexGrammar: LexGrammar[L, W],
+                              val words: IndexedSeq[W],
+                              val beliefs: SentenceBeliefs) extends RefinedAnchoring[L, W] {
+
+    private val anchoring = lexGrammar.anchor(words)
+    override def annotationTag: Int = anchoring.annotationTag
+
+    private val notConstituent = grammar.labelIndex.size
+
+    def length = words.length
+    def grammar: BaseGrammar[L] = lexGrammar.grammar
+
+    def lexicon: Lexicon[L, W] = lexGrammar.lexicon
+
+    def scoreSpan(begin: Int, end: Int, label: Int, ref: Int): Double = {
+      var baseScore = anchoring.scoreSpan(begin, end, label, ref)
+      if (begin == 0 && end == length) { // root, get the length
+        baseScore += math.log(beliefs.wordBeliefs(ref).governor(length))
+        //       * beliefs.wordBeliefs(ref).span(TriangularArray.index(begin,end))
+      }
+
+      if(begin + 1 == end) {
+        baseScore += math.log(beliefs.wordBeliefs(begin).tag(label))
+      }
+
+      baseScore
+    }
+
+    def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int): Double = {
+      val head = anchoring.headIndex(ref)
+      val dep = anchoring.depIndex(ref)
+      val depScore = beliefs.wordBeliefs(dep).governor(head)
+
+      if (lexGrammar.isRightRule(rule)) {
+        val sGovScore = beliefs.spans(begin, split).governor(head)
+        var notASpan = beliefs.spanBeliefs(begin, split).governor(length + 1)
+        if(notASpan == 0.0) notASpan = 1.0
+        val sMax = beliefs.wordBeliefs(dep).maximalLabel(grammar.rightChild(rule))
+        if(depScore == 0.0 || sGovScore == 0.0 || sMax == 0.0) {
+          Double.NegativeInfinity
+        } else {
+           anchoring.scoreBinaryRule(begin, split, end, rule, ref)  +
+            math.log(depScore * sGovScore / notASpan * sMax)
+        }
+        // head on the right
+      } else {
+        val sGovScore = beliefs.spans(split, end).governor(head)
+        var notASpan = beliefs.spanBeliefs(split, end).governor(length + 1)
+        if(notASpan == 0.0) notASpan = 1.0
+        val sMax = beliefs.wordBeliefs(dep).maximalLabel(grammar.leftChild(rule))
+        if(depScore == 0.0 || sGovScore == 0.0 || sMax == 0.0) {
+          Double.NegativeInfinity
+        } else {
+          anchoring.scoreBinaryRule(begin, split, end, rule, ref)  +
+            math.log(depScore * sGovScore / notASpan * sMax)
+        }
+      }
+    }
+
+    def scoreUnaryRule(begin: Int, end: Int, rule: Int, ref: Int): Double = {
+      val parent = grammar.parent(rule)
+      val sLabel = beliefs.spanBeliefs(begin, end).label(parent)
+      var notASpan = beliefs.spanBeliefs(begin, end).label(notConstituent)
+      if(notASpan == 0.0) notASpan = 1.0
+      if(sLabel == 0.0) {
+        Double.NegativeInfinity
+      } else {
+        anchoring.scoreUnaryRule(begin, end, rule, ref) +  math.log(sLabel / notASpan)
+      }
+    }
+
+    def validLabelRefinements(begin: Int, end: Int, label: Int): Array[Int] = anchoring.validLabelRefinements(begin, end, label)
+
+    def numValidRefinements(label: Int): Int = anchoring.numValidRefinements(label)
+
+    def numValidRuleRefinements(rule: Int): Int = anchoring.numValidRuleRefinements(rule)
+
+    def validRuleRefinementsGivenParent(begin: Int, end: Int, rule: Int, parentRef: Int): Array[Int] = {
+      anchoring.validRuleRefinementsGivenParent(begin, end, rule, parentRef)
+    }
+
+    def validUnaryRuleRefinementsGivenChild(begin: Int, end: Int, rule: Int, childRef: Int): Array[Int] = {
+      anchoring.validUnaryRuleRefinementsGivenChild(begin, end, rule, childRef)
+    }
+
+    def leftChildRefinement(rule: Int, ruleRef: Int): Int = {
+      anchoring.leftChildRefinement(rule, ruleRef)
+    }
+
+    def rightChildRefinement(rule: Int, ruleRef: Int): Int = {
+      anchoring.rightChildRefinement(rule, ruleRef)
+    }
+
+    def parentRefinement(rule: Int, ruleRef: Int): Int = {
+      anchoring.parentRefinement(rule, ruleRef)
+    }
+
+    def childRefinement(rule: Int, ruleRef: Int): Int = {
+      anchoring.childRefinement(rule, ruleRef)
+    }
+
+
+    def ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int): Int = {
+      anchoring.ruleRefinementFromRefinements(r, refA, refB)
+    }
+
+    def ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int, refC: Int): Int = {
+      anchoring.ruleRefinementFromRefinements(r, refA, refB, refC)
+    }
+
+
+    def validCoarseRulesGivenParentRefinement(a: Int, refA: Int): Array[Int] = {
+      anchoring.validCoarseRulesGivenParentRefinement(a, refA)
+    }
+  }
 
 }
 
