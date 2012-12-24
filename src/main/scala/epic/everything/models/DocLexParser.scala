@@ -115,10 +115,10 @@ object DocLexParser {
         val info = new LexGovernorProjector(grammar).apply(m.anchoring.refined, m)
         val words = Array.tabulate(s.length) { w =>
           val oldW = old.wordBeliefs(w)
-          oldW.copy(governor=oldW.governor.copy(beliefs=info.wordGovernor(w)),
+          oldW.copy(governor=oldW.governor.updated(info.wordGovernor(w)),
 //            span=oldW.span.copy(beliefs=info.governedSpan(w)),
-            tag=oldW.tag.copy(beliefs=info.wordTag(w)),
-            maximalLabel=oldW.maximalLabel.copy(beliefs=info.maximalLabelType(w))
+            tag=oldW.tag.updated(info.wordTag(w)),
+            maximalLabel=oldW.maximalLabel.updated(info.maximalLabelType(w))
                     )
 
         }
@@ -127,8 +127,8 @@ object DocLexParser {
           if(old.spanBeliefs(r, c) == null) null
           else {
             val span: SpanBeliefs = old.spanBeliefs(r, c)
-            span.copy(governor=span.governor.copy(beliefs = info.spanGovernor(r, c)),
-            label=span.label.copy(beliefs = info.spanType(r,c))
+            span.copy(governor=span.governor.updated(info.spanGovernor(r, c)),
+            label=span.label.updated(info.spanType(r,c))
             )
           }
         }
@@ -162,13 +162,13 @@ object DocLexParser {
     def scoreSpan(begin: Int, end: Int, label: Int, ref: Int): Double = {
       var baseScore = anchoring.scoreSpan(begin, end, label, ref)
       if (begin == 0 && end == length) { // root, get the length
-        baseScore += math.log(beliefs.wordBeliefs(ref).governor(length))
-        //       * beliefs.wordBeliefs(ref).span(TriangularArray.index(begin,end))
+//        baseScore += math.log(beliefs.wordBeliefs(ref).governor(length))
+//               * beliefs.wordBeliefs(ref).span(TriangularArray.index(begin,end))
       }
 
-      if(begin + 1 == end) {
-        baseScore += math.log(beliefs.wordBeliefs(begin).tag(label))
-      }
+//      if(begin + 1 == end) {
+//        baseScore += math.log(beliefs.wordBeliefs(begin).tag(label))
+//      }
 
       baseScore
     }
@@ -183,24 +183,24 @@ object DocLexParser {
         var notASpan = beliefs.spanBeliefs(begin, split).governor(length + 1)
         if(notASpan == 0.0) notASpan = 1.0
         val sMax = beliefs.wordBeliefs(dep).maximalLabel(grammar.rightChild(rule))
-        if(depScore == 0.0 || sGovScore == 0.0 || sMax == 0.0) {
-          Double.NegativeInfinity
-        } else {
-           anchoring.scoreBinaryRule(begin, split, end, rule, ref)  +
-            math.log(depScore * sGovScore / notASpan * sMax)
-        }
+//        if(depScore == 0.0 || sGovScore == 0.0 || sMax == 0.0) {
+//          Double.NegativeInfinity
+//        } else {
+           anchoring.scoreBinaryRule(begin, split, end, rule, ref)  + 0.0
+//            math.log(depScore * sGovScore / notASpan * sMax)
+//        }
         // head on the right
       } else {
         val sGovScore = beliefs.spans(split, end).governor(head)
         var notASpan = beliefs.spanBeliefs(split, end).governor(length + 1)
         if(notASpan == 0.0) notASpan = 1.0
         val sMax = beliefs.wordBeliefs(dep).maximalLabel(grammar.leftChild(rule))
-        if(depScore == 0.0 || sGovScore == 0.0 || sMax == 0.0) {
-          Double.NegativeInfinity
-        } else {
-          anchoring.scoreBinaryRule(begin, split, end, rule, ref)  +
-            math.log(depScore * sGovScore / notASpan * sMax)
-        }
+//        if(depScore == 0.0 || sGovScore == 0.0 || sMax == 0.0) {
+//          Double.NegativeInfinity
+//        } else {
+          anchoring.scoreBinaryRule(begin, split, end, rule, ref)  + 0.0
+//            math.log(depScore * sGovScore / notASpan * sMax)
+//        }
       }
     }
 
@@ -208,12 +208,12 @@ object DocLexParser {
       val parent = grammar.parent(rule)
       val sLabel = beliefs.spanBeliefs(begin, end).label(parent)
       var notASpan = beliefs.spanBeliefs(begin, end).label(notConstituent)
-      if(notASpan == 0.0) notASpan = 1.0
-      if(sLabel == 0.0) {
-        Double.NegativeInfinity
-      } else {
-        anchoring.scoreUnaryRule(begin, end, rule, ref) +  math.log(sLabel / notASpan)
-      }
+//      if(notASpan == 0.0) notASpan = 1.0
+//      if(sLabel == 0.0) {
+//        Double.NegativeInfinity
+//      } else {
+        anchoring.scoreUnaryRule(begin, end, rule, ref) //+  math.log(sLabel / notASpan)
+//      }
     }
 
     def validLabelRefinements(begin: Int, end: Int, label: Int): Array[Int] = anchoring.validLabelRefinements(begin, end, label)

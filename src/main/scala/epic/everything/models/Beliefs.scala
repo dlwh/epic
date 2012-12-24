@@ -9,14 +9,21 @@ import breeze.util.Index
  * @author dlwh
  */
 final case class Beliefs[T](property: Property[T], beliefs: DenseVector[Double]) extends Factor[Beliefs[T]] {
+  def isOk: Boolean = !beliefs.valuesIterator.exists(_.isNaN)
+  assert(isOk)
+
   def apply(i: Int) = beliefs(i)
 
   def beliefFor(i: T) = apply(property.choices(i))
 
-  def *(f: Beliefs[T]): Beliefs[T] = copy(beliefs=beliefs :* f.beliefs)
-  def /(f: Beliefs[T]): Beliefs[T] = copy(beliefs=beliefs :/ f.beliefs)
+  def *(f: Beliefs[T]): Beliefs[T] = copy(beliefs = Beliefs.stripNaNs(beliefs :* f.beliefs))
+  def /(f: Beliefs[T]): Beliefs[T] = copy(beliefs = Beliefs.stripNaNs(beliefs :/ f.beliefs))
 
-  def logPartition: Double = beliefs.sum
+  def logPartition: Double = {
+    val sum = beliefs.sum
+    if (sum == beliefs.length && norm(beliefs-1.0) == 0.0) 0.0
+    else math.log(sum)
+  };
 
   def isConvergedTo(f: Beliefs[T], diff: Double): Boolean = {
     var i = 0
@@ -28,6 +35,8 @@ final case class Beliefs[T](property: Property[T], beliefs: DenseVector[Double])
   }
 
   def newBuilder = Beliefs.Builder(property)
+
+  def updated(newBeliefs: DenseVector[Double]) = Beliefs(property, newBeliefs)
 }
 
 object Beliefs {
@@ -40,5 +49,19 @@ object Beliefs {
       counts(assignment) += count
     }
     def result() = Beliefs(property, normalize(counts, 1.0))
+  }
+
+  private def stripNaNs(beliefs: DenseVector[Double]) = {
+    var i = 0
+    var p = beliefs.offset
+    while(i < beliefs.length) {
+      if (java.lang.Double.isNaN(beliefs(p))) {
+        beliefs(p) = 0.0
+      }
+      p += beliefs.stride
+      i += 1
+    }
+
+    beliefs
   }
 }

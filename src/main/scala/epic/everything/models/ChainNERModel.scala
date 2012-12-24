@@ -92,7 +92,7 @@ case class ChainNERInference(beliefsFactory: DocumentBeliefs.Factory,
       val newSpans = TriangularArray.tabulate(doc.sentences(s).length+1){ (b,e) =>
         if(b < e) {
           val spanBeliefs = sentenceBeliefs.spanBeliefs(b, e)
-          val copy = spanBeliefs.copy(ner = spanBeliefs.ner.copy(beliefs=DenseVector.tabulate(labels.size){marg.spanMarginal(_, b, e)}))
+          val copy = spanBeliefs.copy(ner = spanBeliefs.ner.updated(DenseVector.tabulate(labels.size){marg.spanMarginal(_, b, e)}))
           copy.ner.beliefs(notNER) = 1 - sum(copy.ner.beliefs)
           copy
         } else null
