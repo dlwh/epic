@@ -38,7 +38,8 @@ case class ChainNERInference(beliefsFactory: DocumentBeliefs.Factory,
                              labels: Index[NERType.Value]) extends DocumentAnnotatingInference with ProjectableInference[ProcessedDocument, DocumentBeliefs] {
   type ExpectedCounts = inner.ExpectedCounts
   type Marginal = ChainNERMarginal[inner.Marginal]
-  val notNER = NERType.OutsideSentence.id
+  val notNER = labels(NERType.OutsideSentence)
+  assert(notNER != -1)
 
   def emptyCounts = inner.emptyCounts
 

@@ -151,7 +151,7 @@ object EverythingPipeline {
 //    val propModel = new PropertyPropagatingModel(propBuilder)
 
     // the big model!
-    val epModel = new EPModel[ProcessedDocument, DocumentBeliefs](5, epInGold = false)( lexParseModel)
+    val epModel = new EPModel[ProcessedDocument, DocumentBeliefs](5, epInGold = false)(adaptedNerModel, lexParseModel)
 //    corefModel)
     //propModel)
 //    val epModel = lexParseModel

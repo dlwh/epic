@@ -9,8 +9,6 @@ import breeze.util.Index
  * @author dlwh
  */
 final case class Beliefs[T](property: Property[T], beliefs: DenseVector[Double]) extends Factor[Beliefs[T]] {
-  def isOk: Boolean = !beliefs.valuesIterator.exists(_.isNaN)
-  assert(isOk)
 
   def apply(i: Int) = beliefs(i)
 
@@ -20,7 +18,7 @@ final case class Beliefs[T](property: Property[T], beliefs: DenseVector[Double])
   def /(f: Beliefs[T]): Beliefs[T] = copy(beliefs = Beliefs.stripNaNs(beliefs :/ f.beliefs))
 
   def logPartition: Double = {
-    val sum = beliefs.sum
+    val sum = breeze.linalg.sum(beliefs)
     if (sum == beliefs.length && norm(beliefs-1.0) == 0.0) 0.0
     else math.log(sum)
   };

@@ -474,7 +474,7 @@ final class LexGrammar[L, W](val grammar: BaseGrammar[L],
     }
 
     def depIndex(ruleRef: Int) = {
-      ruleRef / words.length
+      ruleRef % words.length
     }
 
     def spanHeadIndex(ref: Int) = {
@@ -523,17 +523,17 @@ final class LexGrammar[L, W](val grammar: BaseGrammar[L],
 
 
     def leftChildRefinement(rule: Int, ruleRef: Int) = {
-      if(isLeftRule(rule)) ruleRef / words.length
-      else ruleRef % words.length
+      if(isLeftRule(rule)) headIndex(ruleRef)
+      else depIndex(ruleRef)
     }
 
     def rightChildRefinement(rule: Int, ruleRef: Int) = {
-      if(isRightRule(rule)) ruleRef / words.length
-      else ruleRef % words.length
+      if(isRightRule(rule)) headIndex(ruleRef)
+      else depIndex(ruleRef)
     }
 
     def parentRefinement(rule: Int, ruleRef: Int) = {
-      if(binaries(rule)) ruleRef / words.length
+      if(binaries(rule)) headIndex(ruleRef)
       else ruleRef
     }
 
@@ -542,16 +542,16 @@ final class LexGrammar[L, W](val grammar: BaseGrammar[L],
     }
 
     def ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int) = {
-      require(refA == (refB:Int))
+      require(refA == refB)
       refA
     }
 
     def ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int, refC: Int) = {
       if(isLeftRule(r)) {
-        require(refA == (refB:Int))
+        require(refA == refB)
         refA * words.length + refC
       } else {
-        require(refA == (refC:Int))
+        require(refA == refC)
         refA * words.length + refB
       }
     }

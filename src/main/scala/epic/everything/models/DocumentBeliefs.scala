@@ -172,7 +172,7 @@ case class WordBeliefs(pos: DPos,
 
   def logPartition: Double =  (
     0.0
-//    + governor.logPartition
+    + governor.logPartition
 //      + span.logPartition
       + tag.logPartition
       + maximalLabel.logPartition
