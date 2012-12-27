@@ -18,7 +18,7 @@ import epic.trees.BinarizedTree
 
 @SerialVersionUID(1)
 trait ChartParser[L, W] extends Parser[L, W] with Serializable {
-  def charts(w: Seq[W]):ChartMarginal[ParseChart, L, W]
+  def charts(w: Seq[W]):ChartMarginal[L, W]
 
   def decoder: ChartDecoder[L, W]
 
@@ -41,11 +41,11 @@ class SimpleChartParser[L, W](val augmentedGrammar: AugmentedGrammar[L, W],
                               val maxMarginals: Boolean = false) extends ChartParser[L, W] with Serializable {
 
   def charts(w: Seq[W]) = try {
-    ChartMarginal(augmentedGrammar, w, if(maxMarginals) ParseChart.viterbi else ParseChart.logProb)
+    ChartMarginal(augmentedGrammar, w)
   } catch {
     case e =>
       try {
-        ChartMarginal(AugmentedGrammar.fromRefined(augmentedGrammar.refined), w, if(maxMarginals) ParseChart.viterbi else ParseChart.logProb)
+        ChartMarginal(AugmentedGrammar.fromRefined(augmentedGrammar.refined), w)
       } catch {
         case e =>
         throw e
@@ -58,11 +58,8 @@ class SimpleChartParser[L, W](val augmentedGrammar: AugmentedGrammar[L, W],
 }
 
 object SimpleChartParser {
-  def apply[L, W](grammar: AugmentedGrammar[L, W], viterbi: Boolean = false) = {
-    if(!viterbi)
+  def apply[L, W](grammar: AugmentedGrammar[L, W]) = {
       new SimpleChartParser[L, W](grammar, new MaxRuleProductDecoder(grammar.grammar, grammar.lexicon), false)
-    else
-     new SimpleChartParser[L, W](grammar, new ViterbiDecoder, false)
   }
 
 }

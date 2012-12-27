@@ -30,7 +30,7 @@ import breeze.numerics._
  * @author dlwh
  */
 trait ChartDecoder[L, W] extends Serializable{
-  def extractBestParse(marginal: ChartMarginal[ParseChart, L, W]):BinarizedTree[L]
+  def extractBestParse(marginal: ChartMarginal[L, W]):BinarizedTree[L]
 }
 
 object ChartDecoder extends Serializable {
@@ -47,7 +47,7 @@ object ChartDecoder extends Serializable {
 @SerialVersionUID(2)
 class ViterbiDecoder[L, W] extends ChartDecoder[L, W] with Serializable {
 
-  override def extractBestParse(marginal: ChartMarginal[ParseChart, L, W]): BinarizedTree[L] = {
+  override def extractBestParse(marginal: ChartMarginal[L, W]): BinarizedTree[L] = {
     import marginal._
     val labelIndex = grammar.labelIndex
     val rootIndex = (grammar.labelIndex(grammar.root))
@@ -149,7 +149,7 @@ class ViterbiDecoder[L, W] extends ChartDecoder[L, W] with Serializable {
 case class MaxRuleProductDecoder[L, W](grammar: BaseGrammar[L], lexicon: Lexicon[L, W]) extends ChartDecoder[L, W] {
   private val p = new AnchoredRuleMarginalProjector[L,W](-7)
 
-  def extractBestParse(marginal: ChartMarginal[ParseChart, L, W]): BinarizedTree[L] = {
+  def extractBestParse(marginal: ChartMarginal[L, W]): BinarizedTree[L] = {
     val anchoring = p.project(marginal)
     val newMarg = anchoring.marginal
     new MaxConstituentDecoder[L, W].extractBestParse(newMarg)
@@ -165,7 +165,7 @@ case class MaxRuleProductDecoder[L, W](grammar: BaseGrammar[L], lexicon: Lexicon
 class MaxVariationalDecoder[L, W](grammar: BaseGrammar[L], lexicon: Lexicon[L, W]) extends ChartDecoder[L, W] {
   private val p = new AnchoredPCFGProjector[L,W](grammar)
 
-  def extractBestParse(marginal: ChartMarginal[ParseChart, L, W]): BinarizedTree[L] = {
+  def extractBestParse(marginal: ChartMarginal[L, W]): BinarizedTree[L] = {
     val anchoring = p.project(marginal)
     val newMarg = anchoring.marginal
     new MaxConstituentDecoder[L, W].extractBestParse(newMarg)
@@ -182,7 +182,7 @@ class MaxVariationalDecoder[L, W](grammar: BaseGrammar[L], lexicon: Lexicon[L, W
 @SerialVersionUID(2L)
 class MaxConstituentDecoder[L, W] extends ChartDecoder[L, W] {
 
-  def extractBestParse(marginal: ChartMarginal[ParseChart, L, W]): BinarizedTree[L] = {
+  def extractBestParse(marginal: ChartMarginal[L, W]): BinarizedTree[L] = {
     import marginal._
 
     val labelIndex = marginal.grammar.labelIndex

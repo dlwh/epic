@@ -79,7 +79,7 @@ object EverythingPipeline {
     val parser: SimpleChartParser[AnnotatedLabel, String] = GenerativeParser.annotated(new XbarGrammar(), km, trainTrees)
 
     val docProcessor = new ProcessedDocument.Factory(params.treebank.process,
-      new ConstraintCoreGrammar(parser.augmentedGrammar, -7, false), null)
+      new ConstraintCoreGrammar(parser.augmentedGrammar, -7), null)
 
     val beliefsFactory = new DocumentBeliefs.Factory(parser.grammar, nerProp)
     /*

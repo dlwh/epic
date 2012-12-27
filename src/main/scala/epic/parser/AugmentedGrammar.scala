@@ -69,8 +69,7 @@ final case class AugmentedAnchoring[L, W](refined: RefinedAnchoring[L, W], core:
   def words = refined.words
 
   /** The marginal associated with this anchoring (i.e. inside and outside scores) */
-  def marginal = ChartMarginal(this, words, ParseChart.logProb)
-  def maxMarginal = ChartMarginal(this, words, ParseChart.viterbi)
+  def marginal = ChartMarginal(this, words)
 
   /**
    * Scores the [[epic.trees.BinaryRule]] with its refinement in this context.
