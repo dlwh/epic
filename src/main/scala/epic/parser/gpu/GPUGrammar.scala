@@ -3,24 +3,18 @@ package gpu
 
 import epic.parser.SimpleRefinedGrammar
 import epic.trees._
-import annotations.FilterAnnotations
 import annotations.{TreeAnnotator, FilterAnnotations}
 import com.nativelibs4java.opencl._
 import java.{util, lang}
 import scala.Array
 import breeze.config.{Configuration, CommandLineParser}
-import java.io.{FileWriter, File}
+import java.io.File
 import collection.mutable.ArrayBuffer
 import breeze.collection.mutable.TriangularArray
 import com.nativelibs4java.opencl.CLMem.Usage
-import breeze.linalg.{DenseMatrix, Counter, DenseVector}
+import breeze.linalg.{DenseMatrix, DenseVector}
 import org.bridj.Pointer
-import breeze.util.{Index, Encoder}
-import collection.{immutable, mutable}
-import java.nio.{FloatBuffer, ByteBuffer}
-import projections.{GrammarRefinements, ProjectionIndexer}
-import models.FeaturizedLexicon
-import gpu.GPUGrammar.PruningMask
+import projections.GrammarRefinements
 
 class GPUGrammar[C, L, W](coarseGrammar: BaseGrammar[C],
                              projections: GrammarRefinements[C, L],
