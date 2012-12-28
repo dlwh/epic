@@ -3,13 +3,13 @@ package epic.parser.gpu
 import epic.trees.{BinaryRule, UnaryRule}
 import collection.mutable.ArrayBuffer
 import com.nativelibs4java.opencl._
-import java.lang.{Float=>JFloat, Integer=>JInt}
+import java.lang.{Float=>JFloat, Integer=>JInt, Long=>JLong}
 import breeze.util.Index
 import collection.mutable
 import java.lang
 import java.io.FileWriter
 
-class ExpectedCountsKernel[L](ruleStructure: RuleStructure[L], numGrammars: Int)(implicit context: CLContext) {
+class ExpectedCountsKernel[C, L](ruleStructure: RuleStructure[C, L], numGrammars: Int)(implicit context: CLContext) {
   import ruleStructure._
 
 
@@ -21,6 +21,7 @@ class ExpectedCountsKernel[L](ruleStructure: RuleStructure[L], numGrammars: Int)
                      offsets: CLBuffer[JInt],
                      lengths: CLBuffer[JInt],
                      offLengths: CLBuffer[JInt],
+                     masks: CLBuffer[JLong],
                      maxLength: Int,
                      rules: CLBuffer[JFloat],
                      events: CLEvent*)(implicit queue: CLQueue)  = {
@@ -186,6 +187,7 @@ __kernel void ecount_unaries(
               __global const int* lengths,
               __global const int* lengthOffsets,
               const int spanLength,
+               __global const pruning_mask* masks,
               __global const rule_cell* rules) {
   const int sentence = get_global_id(0);
   const int begin = get_global_id(1);
@@ -193,7 +195,8 @@ __kernel void ecount_unaries(
   const int end = begin + spanLength;
   const int length = lengths[sentence];
 
-  if (end <= length) {
+  __global const pruning_mask* pmask =  masks + offsets[sentence] + TRIANGULAR_INDEX(begin, end);
+  if (end <= length && IS_ANY_SET(*pmask)) {
     __global const parse_cell* itop = insides_top + offsets[sentence];
     __global const parse_cell* outside = outsides_top + offsets[sentence];
     __global const parse_cell* inside = insides_bot + offsets[sentence];
@@ -258,6 +261,7 @@ __kernel void ecount_binaries_%d(__global rule_cell* ecounts,
                                  __global const int* lengths,
                                 __global const int* lengthOffsets,
                                  const int span_length,
+                                 __global const pruning_mask* masks,
                                  __global const rule_cell* rules) {
   const int sentence = get_global_id(0);
   const int begin = get_global_id(1);
@@ -268,7 +272,8 @@ __kernel void ecount_binaries_%d(__global rule_cell* ecounts,
   __global const parse_cell* obot = outsides_bot + offsets[sentence];
   __global const parse_cell* itop = insides_top + offsets[sentence];
   const float root_score = CELL(itop, 0, length)->syms[ROOT][gram]; // scale is 2^(SCALE_FACTOR)^(length-1)
-  if(end <= length) {
+  __global const pruning_mask* pmask =  masks + offsets[sentence] + TRIANGULAR_INDEX(begin, end);
+  if (end <= length && IS_ANY_SET(*pmask)) {
     float oscore;
     __global const parse_cell* oparents = CELL(obot, begin, end);
     %s
@@ -289,6 +294,7 @@ __kernel void ecount_binaries_%d(__global rule_cell* ecounts,
       // oparent has scale length + begin - end, root has scale length - 1
       // left * right has scale (end - begin-2)
       // left * right * oparent / root has scale -1
+      buf += "if (COARSE_IS_SET(*pmask, %d)) {".format(ruleStructure.refinements.labels.project(par))
       buf += "oscore = ldexp(oparents->syms[%d][gram]/root_score, SCALE_FACTOR);".format(par)
       buf += "if (oscore != 0.0f) {"
       var r = 0
@@ -300,6 +306,8 @@ __kernel void ecount_binaries_%d(__global rule_cell* ecounts,
         buf += "XXX"
 
         buf += "  for(int split = begin + 1; split < end; ++split) {"
+        buf += "__global const pruning_mask* lmask =  masks + offsets[sentence] + TRIANGULAR_INDEX(begin, split);"
+        buf += "__global const pruning_mask* rmask =  masks + offsets[sentence] + TRIANGULAR_INDEX(split, end);"
         var lastLeft = -1
         assignments.index(('left -> 1))
         while(r < rules.length && assignments.size < registersToUse) {
@@ -330,6 +338,7 @@ __kernel void ecount_binaries_%d(__global rule_cell* ecounts,
         }
         buf(regInitializerPos) = ruleRegisters.map { case (reg, rule) => "r%d = 0.0f;".format(reg)}.mkString("  ", " ", "");
       }
+      buf += "}\n"
       buf += "}\n"
     }
     buf.mkString("\n    ")
@@ -504,9 +513,11 @@ __kernel void ecount_binaries_%d(__global rule_cell* ecounts,
       // child has scale (end - begin-1)
       // child * oparent / root has scale 0 (yay!)
       buf += "oscore = out->syms[%d][gram]/root_score;".format(par)
+      buf += "if(oscore != 0.0f) {"
       for( (r,index) <- rules) {
-        buf += "ruleCounts->unaries[%d][gram] += rules->unaries[%d][gram] * oscore * in->syms[%d][gram];".format(index, index, r.child)
+        buf += "  ruleCounts->unaries[%d][gram] += rules->unaries[%d][gram] * oscore * in->syms[%d][gram];".format(index, index, r.child)
       }
+      buf += "}"
     }
 
     buf.mkString("\n    ")

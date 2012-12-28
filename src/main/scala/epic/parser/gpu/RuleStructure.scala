@@ -5,12 +5,14 @@ import epic.parser.BaseGrammar
 import collection.mutable.ArrayBuffer
 import collection.immutable.BitSet
 import breeze.linalg.DenseVector
+import epic.parser.projections.GrammarRefinements
 
-case class RuleStructure[L](grammar: BaseGrammar[L]) {
+case class RuleStructure[C, L](refinements: GrammarRefinements[C, L], grammar: BaseGrammar[L]) {
 
 
   import grammar._
   def numSyms = grammar.labelIndex.size
+  def numCoarseSyms = refinements.labels.coarseIndex.size
   def root = grammar.rootIndex
   val (binaryRules, unaryRules) = (0 until index.size).partition(isBinary(_))
 
@@ -26,6 +28,7 @@ case class RuleStructure[L](grammar: BaseGrammar[L]) {
     val onURHS = Set.empty ++ unaryRulesWithIndices.map(_._1.child)
     BitSet.empty ++ (0 until labelIndex.size).filterNot(onLHS).filter(onURHS)
   }
+  val numNonTerms = numSyms - terminalSymbols.size
 
   val (ntRules, leftTermRules, rightTermRules, bothTermRules) = {
     val ntRules, leftTermRules, rightTermRules, bothTermRules = ArrayBuffer[(BinaryRule[Int], Int)]()
@@ -46,8 +49,8 @@ case class RuleStructure[L](grammar: BaseGrammar[L]) {
     (ntRules: IndexedSeq[(BinaryRule[Int], Int)], leftTermRules: IndexedSeq[(BinaryRule[Int], Int)], rightTermRules: IndexedSeq[(BinaryRule[Int], Int)], bothTermRules: IndexedSeq[(BinaryRule[Int], Int)])
   }
   lazy val partitionsParent: IndexedSeq[IndexedSeq[(BinaryRule[Int], Int)]] = GrammarPartitioner.partition(ntRules, targetLabel = GrammarPartitioner.Parent).toIndexedSeq
-  lazy val partitionsLeft: IndexedSeq[IndexedSeq[(BinaryRule[Int], Int)]] = GrammarPartitioner.partition(ntRules, targetLabel = GrammarPartitioner.Parent).toIndexedSeq
-  lazy val partitionsRight: IndexedSeq[IndexedSeq[(BinaryRule[Int], Int)]] = GrammarPartitioner.partition(ntRules, targetLabel = GrammarPartitioner.Parent).toIndexedSeq
+  lazy val partitionsLeft: IndexedSeq[IndexedSeq[(BinaryRule[Int], Int)]] = partitionsParent
+  lazy val partitionsRight: IndexedSeq[IndexedSeq[(BinaryRule[Int], Int)]] = partitionsParent
 
   val (termUnaries, ntermUnaries, termIdentUnaries) = {
     val termUnaries, ntermUnaries, termIdentUnaries = ArrayBuffer[(UnaryRule[Int], Int)]()
@@ -78,6 +81,25 @@ case class RuleStructure[L](grammar: BaseGrammar[L]) {
       arr(t._2) = 0.0
     }
     arr
+  }
+
+  // pruning stuff
+  val pruningMaskFieldSize = numCoarseSyms/64 + {if(numCoarseSyms % 64 != 0) 1 else 0}
+
+  def pruningMaskForSyms(syms: Iterable[Int]) = {
+    val coarsened = syms.map(refinements.labels.project(_)).toSet
+    val mask = Array.fill(pruningMaskFieldSize)("")
+    for( (field, coarses) <- coarsened.groupBy(_ / 64)) {
+      mask(field) = coarses.map(c => "(1L << %d)".format(c-64*field)).mkString("(", "|", ")")
+    }
+    mask
+  }
+
+  def pruningCheckForSyms(syms: Iterable[Int], id: Int) = {
+    val mask = pruningMaskForSyms(syms)
+    val checks = mask.zipWithIndex.filter(_._1.nonEmpty).map{ case (mask, field) => "(((mask)).allowed[" + field + "] &(" + mask +"))"}
+    checks.mkString("#define IS_ANY_IN_BLOCK_" +id +"(mask)  (", "||", ")")
+
   }
 }
 

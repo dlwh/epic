@@ -4,7 +4,7 @@ import com.nativelibs4java.opencl._
 import collection.mutable.ArrayBuffer
 import java.lang.{Float=>JFloat, Integer=>JInt}
 
-class MaxRecallKernel[Coarse](rules: RuleStructure[Coarse])(implicit context: CLContext) {
+class MaxRecallKernel[Coarse, Fine](rules: RuleStructure[Coarse, Fine], numGrammars: Int)(implicit context: CLContext) {
   def makeBackpointers(numSentences:Int,
                        backPointers: CLBuffer[JInt],
                        projected: GPUCharts,
@@ -33,7 +33,7 @@ class MaxRecallKernel[Coarse](rules: RuleStructure[Coarse])(implicit context: CL
     p.build()
   }
 
-  lazy val text = GrammarHeader.header(rules, 1) +
+  lazy val text = GrammarHeader.header(rules, numGrammars) +
     """
 typedef struct {
   int top, bot, split;
@@ -42,8 +42,8 @@ typedef struct {
 
 __kernel void max_recall(
               __global backpointer* backpointers,
-              __global const parse_cell * marg_tops,
-              __global const parse_cell * marg_bots,
+              __global const projected_parse_cell * marg_tops,
+              __global const projected_parse_cell * marg_bots,
               __global const int* offsets,
               __global const int* lengths,
               const int spanLength) {
@@ -62,7 +62,7 @@ __kernel void max_recall(
     __global backpointer* bp = CELL(back, begin, end);
     __global const parse_cell* mb = CELL(marg_bots + offsets[sentence], begin, end);
     __global const parse_cell* mt = CELL(marg_tops + offsets[sentence], begin, end);
-    for(int i = 0; i < NUM_SYMS; ++i) {
+    for(int i = 0; i < NUM_PROJECTED_SYMS; ++i) {
       float score = mb->syms[i][gram];
       if(score > maxSymBotV) {
         maxSymBotV = score;

@@ -1,11 +1,12 @@
 package epic.parser.gpu
 
-import epic.parser.projections.ProjectionIndexer
 import com.nativelibs4java.opencl._
 import collection.mutable.ArrayBuffer
 import java.lang.{Float=>JFloat, Integer=>JInt}
 
-class ProjectionKernel[L, L2](rules: RuleStructure[L2], projections: ProjectionIndexer[L, L2], numGrammars: Int, odds_ratio: Boolean=false)(implicit context: CLContext) {
+class ProjectionKernel[L, L2](rules: RuleStructure[L, L2],numGrammars: Int, odds_ratio: Boolean=false)(implicit context: CLContext) {
+
+  def projections = rules.refinements.labels
 
   def projectCells(numSentences: Int,
                  projected: GPUCharts,
@@ -58,12 +59,6 @@ class ProjectionKernel[L, L2](rules: RuleStructure[L2], projections: ProjectionI
   }
 
   lazy val text = GrammarHeader.header(rules, numGrammars) + """
-#define NUM_PROJECTED_SYMS  %d
-
-typedef struct {
-  float syms[NUM_PROJECTED_SYMS][NUM_GRAMMARS];
-} projected_parse_cell;
-
 __kernel void project_nterms(__global projected_parse_cell* projected,
                              __global const parse_cell* insides,
                              __global const parse_cell* outsides,
@@ -88,31 +83,24 @@ __kernel void project_nterms(__global projected_parse_cell* projected,
 
 }
 
-                                                             """.format(projections.coarseIndex.size, projectNonterminalsInner)
+                                                             """.format(projectNonterminalsInner)
 
   private def projectNonterminalsInner = {
     val buf = new ArrayBuffer[String]()
-    if(odds_ratio)
-      buf += "float sum = 0.0;"
+    buf += "float sum = 0.0f;"
     buf += "float cur;"
     for(coarse <- 0 until projections.coarseIndex.size) {
       buf += "cur = 0.0;"
       for(ref <- projections.refinementsOf(coarse)) {
         buf += "cur = mad(in->syms[%d][gram], out->syms[%d][gram], cur);".format(ref, ref)
       }
-      if(odds_ratio) {
-        buf += "sum += cur;"
-        buf += "target->syms[%d][gram] = cur;".format(coarse)
-      } else {
-        buf += "target->syms[%d][gram] = cur/root_score;".format(coarse,coarse)
-      }
+      buf += "sum += cur;"
+      buf += "target->syms[%d][gram] = cur/root_score;".format(coarse)
     }
 
-    if(odds_ratio) {
-      buf += "const float norm = root_score - sum;"
-      buf += "for (int i = 0; i < NUM_PROJECTED_SYMS; ++i) {"
-      buf += "  target->syms[%d][gram] /= norm;"
-      buf += "}"
-    }
+    buf += "const float norm = 1.0f - sum/root_score;"
+    buf += "target->off[gram] = norm;"
     buf.mkString("\n      ")
-  }}
+  }
+
+}

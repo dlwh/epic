@@ -1,6 +1,6 @@
 package epic.everything.models
 
-import epic.framework.{FullProjectableInference, StandardExpectedCounts, Feature}
+import epic.framework.{StandardExpectedCounts, Feature}
 import breeze.util.{Encoder, MutableIndex, Index}
 import breeze.inference.bp
 import bp.{BeliefPropagation, Variable, Factor}

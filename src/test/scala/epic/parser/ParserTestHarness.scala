@@ -30,7 +30,7 @@ trait ParserTestHarness {
     massageTrees(TstTreebank.treebank.test.trees, maxLength)
   }
 
-  def massageTrees(trees: Iterator[(Tree[String], Seq[String])], maxLength:Int=15) = {
+  def massageTrees(trees: Iterator[(Tree[String], IndexedSeq[String])], maxLength:Int=15) = {
     val trainTrees = ArrayBuffer() ++= (for( (tree, words) <- trees.filter(_._2.length <= maxLength))
     yield TreeInstance("", transform(tree), words))
 

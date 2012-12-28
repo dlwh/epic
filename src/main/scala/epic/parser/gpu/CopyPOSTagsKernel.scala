@@ -7,7 +7,7 @@ import java.lang.{Float=>JFloat, Integer=>JInt}
  * 
  * @author dlwh
  */
-class CopyPOSTagsKernel[L](rules: RuleStructure[L], numGrammars: Int)(implicit context: CLContext)  {
+class CopyPOSTagsKernel[C, L](rules: RuleStructure[C, L], numGrammars: Int)(implicit context: CLContext)  {
 
   def copyTags(numSentences: Int, maxLength: Int, tags: CLBuffer[JFloat], insideBot: CLBuffer[JFloat], offsets: CLBuffer[JInt], lens: CLBuffer[JInt], offLen: CLBuffer[JInt], events: CLEvent*)(implicit queue: CLQueue) = {
     kernel.setArgs(tags, insideBot, offsets, lens, offLen, Integer.valueOf(1))

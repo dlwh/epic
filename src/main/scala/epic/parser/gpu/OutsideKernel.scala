@@ -3,11 +3,11 @@ package epic.parser.gpu
 import epic.trees._
 import com.nativelibs4java.opencl._
 import collection.mutable.ArrayBuffer
-import java.lang.{Float=>JFloat, Integer=>JInt}
+import java.lang.{Float=>JFloat, Integer=>JInt, Long=>JLong}
 import java.io.FileWriter
 
 
-class OutsideKernel[L](ruleStructure: RuleStructure[L], numGrammars: Int)(implicit context: CLContext) {
+class OutsideKernel[C, L](ruleStructure: RuleStructure[C, L], numGrammars: Int)(implicit context: CLContext) {
   import ruleStructure._
   def outsidePass(numSentences: Int,
                  outside: GPUCharts,
@@ -15,10 +15,26 @@ class OutsideKernel[L](ruleStructure: RuleStructure[L], numGrammars: Int)(implic
                  offsets: CLBuffer[JInt],
                  lengths: CLBuffer[JInt],
                  lengthOffsets: CLBuffer[JInt],
+                 masks: CLBuffer[JLong],
                  maxLength: Int,
                  rules: CLBuffer[JFloat],
                  events: CLEvent*)(implicit queue: CLQueue) = {
-    val ou, ob, otb, ot = new ArrayBuffer[CLEvent]()
+    epOutsidePass(numSentences, outside, inside, offsets, lengths, lengthOffsets, masks, maxLength,  rules, {(_,_)=>None}, {(_,_)=>None}, events:_*)
+  }
+
+    def epOutsidePass(numSentences: Int,
+                 outside: GPUCharts,
+                 inside: GPUCharts,
+                 offsets: CLBuffer[JInt],
+                 lengths: CLBuffer[JInt],
+                 lengthOffsets: CLBuffer[JInt],
+                 masks: CLBuffer[JLong],
+                 maxLength: Int,
+                 rules: CLBuffer[JFloat],
+                 botHook: (Int, CLEvent)=>Option[CLEvent],
+                 topHook: (Int, CLEvent)=>Option[CLEvent],
+                 events: CLEvent*)(implicit queue: CLQueue) = {
+    val ou, ob, otb, ot, hooks = new ArrayBuffer[CLEvent]()
     var lastU = null:CLEvent
     lbinaries.foreach(_.setArgs(outside.top, outside.bot, inside.top, offsets, lengths, Integer.valueOf(maxLength), rules))
     rbinaries.foreach(_.setArgs(outside.top, outside.bot, inside.top, offsets, lengths, Integer.valueOf(maxLength), rules))
@@ -26,12 +42,17 @@ class OutsideKernel[L](ruleStructure: RuleStructure[L], numGrammars: Int)(implic
     tunaries.setArgs(outside.top, outside.bot, offsets, lengths, rules)
     termbs.setArgs(outside.top, outside.bot, inside.top, inside.tags, offsets, lengths, lengthOffsets, Integer.valueOf(maxLength), rules)
     bterms.setArgs(outside.top, outside.bot, outside.tags, inside.top, inside.tags, offsets, lengths, lengthOffsets, rules)
+
     lastU = unaries.enqueueNDRange(queue, Array(numSentences, 1, numGrammars), Array(1, 1, numGrammars), events:_*)
     ou += lastU
+    for( h <- topHook(maxLength, lastU)) {
+      lastU = h
+      hooks += h
+    }
 
     for (len <- (maxLength - 1) to 1 by -1) {
-      lbinaries.foreach(_.setArg(5, len))
-      rbinaries.foreach(_.setArg(5, len))
+      lbinaries.foreach(_.setArg(6, len))
+      rbinaries.foreach(_.setArg(6, len))
       val lastLB = lbinaries.map(_.enqueueNDRange(queue, Array(numSentences, maxLength + 1 - len, numGrammars), Array(1, 1, numGrammars), lastU))
       ob ++= lastLB
       val lastRB = for( (rb, block) <- rbinaries zip lastLB) yield rb.enqueueNDRange(queue, Array(numSentences, maxLength + 1 - len, numGrammars), Array(1, 1, numGrammars), block)
@@ -42,12 +63,25 @@ class OutsideKernel[L](ruleStructure: RuleStructure[L], numGrammars: Int)(implic
       if(len == 1) {
         lastU = bterms.enqueueNDRange(queue, Array(numSentences, maxLength, numGrammars), Array(1, 1, numGrammars), lastU)
         ot += lastU
+        for( h <- botHook(len, lastU)) {
+          lastU = h
+          hooks += h
+        }
         lastU = tunaries.enqueueNDRange(queue, Array(numSentences, maxLength, numGrammars), Array(1, 1, numGrammars), lastU)
       } else {
+        for( h <- botHook(len, lastU)) {
+          lastU = h
+          hooks += h
+        }
         unaries.setArg(4, len)
         lastU = unaries.enqueueNDRange(queue, Array(numSentences, maxLength + 1 - len, numGrammars), Array(1, 1, numGrammars), lastU)
       }
+
       ou += lastU
+      for( h <- topHook(len, lastU)) {
+          lastU = h
+          hooks += h
+        }
     }
 
     if(queue.getProperties.contains(CLDevice.QueueProperties.ProfilingEnable)) {
@@ -126,6 +160,7 @@ __kernel void outside_term_binaries(__global parse_cell* outsides_top,
               __global const int* lengths,
               __global const int* lengthOffsets,
               const int spanLength,
+              __global const pruning_mask* masks,
             __global const rule_cell* rules) {
 
   const int sentence = get_global_id(0);
@@ -133,30 +168,34 @@ __kernel void outside_term_binaries(__global parse_cell* outsides_top,
   const int gram = get_global_id(2);
   const int end = begin + spanLength;
   const int length = lengths[sentence];
-  float otarget[NUM_SYMS];
+  __global const pruning_mask* mask =  masks + offsets[sentence] + TRIANGULAR_INDEX(begin, end);
    if (end <= length) {
-    __global const parse_cell* obot = outsides_bot + offsets[sentence];
-    for(int i = 0; i < NUM_SYMS; ++i) {
-      otarget[i] = 0.0f;
-    }
 
-    if (end < length) { // look right
-      __global const parse_cell * gparent =  CELL(obot, begin, end+1);
-      __global const parse_cell * gright = inside_tags + lengthOffsets[sentence] + (end);
-      %s
-    }
+    if( IS_ANY_SET(*mask)) {
+      float otarget[NUM_SYMS];
+      __global const parse_cell* obot = outsides_bot + offsets[sentence];
+      for(int i = 0; i < NUM_SYMS; ++i) {
+        otarget[i] = 0.0f;
+      }
 
-   // complete looking left
-      if (begin > 0) { // look left
-      __global const parse_cell * gparent =  CELL(obot, begin-1, end);
-      __global const parse_cell * gleft = inside_tags + lengthOffsets[sentence] + (begin - 1);
-      %s
-     }
+      if (end < length) { // look right
+        __global const parse_cell * gparent =  CELL(obot, begin, end+1);
+        __global const parse_cell * gright = inside_tags + lengthOffsets[sentence] + (end);
+        %s
+      }
 
-    // multiply in a 2^SCALE_FACTOR to re-achieve balance.
-    __global parse_cell* gout = CELL(outsides_top + offsets[sentence], begin, end);
-    for(int i = 0; i < NUM_SYMS; ++i) {
-      gout->syms[i][gram] += ldexp(otarget[i], SCALE_FACTOR);
+     // complete looking left
+        if (begin > 0) { // look left
+        __global const parse_cell * gparent =  CELL(obot, begin-1, end);
+        __global const parse_cell * gleft = inside_tags + lengthOffsets[sentence] + (begin - 1);
+        %s
+       }
+
+      // multiply in a 2^SCALE_FACTOR to re-achieve balance.
+      __global parse_cell* gout = CELL(outsides_top + offsets[sentence], begin, end);
+      for(int i = 0; i < NUM_SYMS; ++i) {
+        gout->syms[i][gram] += ldexp(otarget[i], SCALE_FACTOR);
+      }
     }
   }
 }
@@ -169,6 +208,7 @@ __kernel void outside_term_binaries(__global parse_cell* outsides_top,
               __global const int* offsets,
               __global const int* lengths,
               __global const int* lengthOffsets,
+              __global const pruning_mask* masks,
             __global const rule_cell* rules) {
   const int sentence = get_global_id(0);
   const int begin = get_global_id(1);
@@ -355,12 +395,13 @@ __kernel void outside_term_binaries(__global parse_cell* outsides_top,
   }
 
   private def outside_binaries_left(rules: IndexedSeq[(BinaryRule[Int], Int)], id: Int = 0) = {
-    """
+   pruningCheckForSyms(rules.map(_._1.left).toSet, id+300) +    """
       __kernel void outside_binaries_left_%d(__global parse_cell* outsides_top,
               __global const parse_cell* outsides_bot,
               __global const parse_cell * insides_top,
               __global const int* offsets,
               __global const int* lengths,
+              __global const pruning_mask* masks,
               const int spanLength,
             __global const rule_cell* rules) {
   const int sentence = get_global_id(0);
@@ -368,8 +409,9 @@ __kernel void outside_term_binaries(__global parse_cell* outsides_top,
   const int gram = get_global_id(2);
   const int end = begin + spanLength;
   const int length = lengths[sentence];
-       %s
-  if (end <= length) {
+  __global const pruning_mask* lmask =  masks + offsets[sentence] + TRIANGULAR_INDEX(begin, end);
+  if (end <= length && IS_ANY_IN_BLOCK_%d(*lmask)) {
+    %s
     __global const parse_cell* inside = insides_top + offsets[sentence];
     __global const parse_cell* obot = outsides_bot + offsets[sentence];
     __global parse_cell* gout = CELL(outsides_top + offsets[sentence], begin, end);
@@ -377,15 +419,19 @@ __kernel void outside_term_binaries(__global parse_cell* outsides_top,
     for(int completion = end+1; completion <= length; ++completion) {
        __global const parse_cell * gparent = CELL(obot, begin, completion); // scale factor of (2 ^ SCALE_FACTOR)^(length-(completion - begin))
        __global const parse_cell * gright = CELL(inside, end, completion); // scale factor of (2 ^ SCALE_FACTOR)^((end - completion) - 1)
+       __global const pruning_mask* rmask =  masks + offsets[sentence] + TRIANGULAR_INDEX(end, completion);
+       __global const pruning_mask* pmask =  masks + offsets[sentence] + TRIANGULAR_INDEX(begin, completion);
+       if(IS_ANY_SET(*rmask) && IS_ANY_SET(*pmask)) {
        // product of gparent and gright has scale (2^SCALE_FACTOR)^(length-(end-begin)-1), so need to scale by 1 to maintain invariant
        %s
+       }
     }
 
     // multiply in a 2^SCALE_FACTOR to re-achieve balance.
     %s
   }
 }
-    """.stripMargin.format(id,
+    """.stripMargin.format(id,id+300,
       rules.map(_._1.left).toSet[Int].map("left" + _).mkString("float ", " = 0.0f,", " = 0.0f;"),
       outsideNTRightCompletionUpdates(rules),
       rules.map(_._1.left).toSet[Int].map(p => "gout->syms[%d][gram] += ldexp(left%d, SCALE_FACTOR);".format(p,p)).mkString("\n   ")
@@ -394,22 +440,23 @@ __kernel void outside_term_binaries(__global parse_cell* outsides_top,
 
 
   private def outside_binaries_right(rules: IndexedSeq[(BinaryRule[Int], Int)], id: Int = 0) = {
-      """
+    pruningCheckForSyms(rules.map(_._1.right).toSet, id) +  """
       __kernel void outside_binaries_right_%d(__global parse_cell* outsides_top,
               __global const parse_cell* outsides_bot,
               __global const parse_cell * insides_top,
               __global const int* offsets,
               __global const int* lengths,
+              __global const pruning_mask* masks,
               const int spanLength,
-
             __global const rule_cell* rules) {
   const int sentence = get_global_id(0);
   const int begin = get_global_id(1);
   const int gram = get_global_id(2);
   const int end = begin + spanLength;
   const int length = lengths[sentence];
-  %s
-  if (end <= length) {
+  __global const pruning_mask* rmask =  masks + offsets[sentence] + TRIANGULAR_INDEX(begin, end);
+  if (end <= length && IS_ANY_IN_BLOCK_%d(*rmask)) {
+    %s
     __global const parse_cell* inside = insides_top + offsets[sentence];
     __global const parse_cell* obot = outsides_bot + offsets[sentence];
     __global parse_cell* gout = CELL(outsides_top + offsets[sentence], begin, end);
@@ -417,15 +464,19 @@ __kernel void outside_term_binaries(__global parse_cell* outsides_top,
     for(int completion = 0; completion < begin; ++completion) {
        __global const parse_cell * gparent = CELL(obot, completion, end); // scale factor of (2 ^ SCALE_FACTOR)^(length-(end-completion))
        __global const parse_cell * gleft = CELL(inside, completion, begin); // scale factor of (2 ^ SCALE_FACTOR)^((begin - completion) - 1)
-       // product of gparent and gleft has scale (2^SCALE_FACTOR)^(length-(end-begin)-1), so need to scale by 1 to maintain invariant
-       %s
+       __global const pruning_mask* lmask =  masks + offsets[sentence] + TRIANGULAR_INDEX(completion, begin);
+       __global const pruning_mask* pmask =  masks + offsets[sentence] + TRIANGULAR_INDEX(completion, end);
+       if(IS_ANY_SET(*lmask) && IS_ANY_SET(*pmask)) {
+         // product of gparent and gleft has scale (2^SCALE_FACTOR)^(length-(end-begin)-1), so need to scale by 1 to maintain invariant
+         %s
+       }
     }
 
     // multiply in a 2^SCALE_FACTOR to re-achieve balance.
    %s
   }
 }
-      """.stripMargin.format(id,
+      """.stripMargin.format(id, id,
       rules.map(_._1.right).toSet[Int].map("right" + _).mkString("float ", " = 0.0f,", " = 0.0f;"),
       outsideNTLeftCompletionUpdates(rules),
       rules.map(_._1.right).toSet[Int].map(p => "gout->syms[%d][gram] += ldexp(right%d, SCALE_FACTOR);".format(p,p)).mkString("\n    ")
@@ -444,6 +495,7 @@ __kernel void outside_term_binaries(__global parse_cell* outsides_top,
     rights.map(r => "const float right%d = gright->syms[%d][gram];".format(r,r)).foreach(sb += _)
     for( (p, byParent) <- newrules) {
       var lastLeft = -1
+      sb += "if (COARSE_IS_SET(*pmask, %d)) {".format(ruleStructure.refinements.labels.project(p))
       sb += "if (parent%d != 0.0f) { // %s".format(p, symbolName(p))
       for((r@BinaryRule(p, left, right), index) <- byParent) {
         if(lastLeft != left) {
@@ -461,6 +513,7 @@ __kernel void outside_term_binaries(__global parse_cell* outsides_top,
         sb += "  left%d = mad(parent%d, currentSum, left%d); // %s".format(lastLeft,p, lastLeft, symbolName(lastLeft))
         sb += "  currentSum = 0.0f;"
       }
+      sb += "}"
       sb += "}"
     }
 
@@ -486,6 +539,7 @@ __kernel void outside_term_binaries(__global parse_cell* outsides_top,
     lefts.map(l => "const float left%d = gleft->syms[%d][gram];".format(l,l)).foreach(sb += _)
     for( (p, byParent) <- newrules) {
       var lastRight = -1
+      sb += "if (COARSE_IS_SET(*pmask, %d)) {".format(ruleStructure.refinements.labels.project(p))
       sb += "if (parent%d != 0.0f) { // %s".format(p, symbolName(p))
       for((r@BinaryRule(p, left, right), index) <- byParent) {
         if(lastRight != right) {
@@ -503,6 +557,7 @@ __kernel void outside_term_binaries(__global parse_cell* outsides_top,
         sb += "  right%d = mad(parent%d, currentSum, right%d); // %s ".format(lastRight, p, lastRight, symbolName(lastRight))
         sb += "  currentSum = 0.0f;"
       }
+      sb += "}"
       sb += "}"
     }
 

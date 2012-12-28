@@ -11,6 +11,13 @@ import com.nativelibs4java.opencl.CLMem.Usage
 case class GPUCharts(top: CLBuffer[JFloat],
                      bot: CLBuffer[JFloat],
                      tags: CLBuffer[JFloat]) {
+  def setTo(fl: Float, events: CLEvent*)(implicit context: CLContext, queue: CLQueue) = {
+    val zmk = ZeroMemoryKernel()
+    var a  = zmk.fillMemory(top, 1.0f, events:_*)
+    a = zmk.fillMemory(bot, 1.0f, Seq(a) ++  events:_*)
+    zmk.fillMemory(tags, 1.0f, Seq(a) ++  events:_*)
+  }
+
   def release() {
     top.release()
     bot.release()
@@ -31,7 +38,7 @@ case class GPUCharts(top: CLBuffer[JFloat],
 }
 
 object GPUCharts {
-  def forGrammar[L](structure: RuleStructure[L],
+  def forGrammar[C, L](structure: RuleStructure[C, L],
                     numGrammars: Int,
                     maxCells: Int,
                     maxTotalLength: Int)(implicit context: CLContext) = {
@@ -42,7 +49,7 @@ object GPUCharts {
     new GPUCharts(insideTopDev, insideBotDev, posTagsDev)
   }
 
-  def computeMaxSizes[L](totalBytes: Long, maxAllocSize: Long, structure: RuleStructure[L], numGrammars: Int) = {
+  def computeMaxSizes[C, L](totalBytes: Long, maxAllocSize: Long, structure: RuleStructure[C, L], numGrammars: Int) = {
     val cellSize = structure.numSyms * numGrammars
     val maxCells = ((totalBytes / cellSize).toInt / 4 / 2)  min 100000
     val maxTotalLength = (maxAllocSize / structure.numRules / 4).toInt min (maxCells * cellSize / structure.numRules) min 50000
