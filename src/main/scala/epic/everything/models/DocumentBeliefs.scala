@@ -103,7 +103,7 @@ case class SentenceBeliefs(spans: TriangularArray[SpanBeliefs],
   }
 
 
-  def logPartition: Double = spans.map(s => if(s eq null) 0.0 else s.logPartition).data.sum + wordBeliefs.map(_.logPartition).sum
+  def logPartition: Double = spans.map(s => if(s eq null) 0.0 else s.logPartition).data.filter(_ != Double.NegativeInfinity).sum + wordBeliefs.map(_.logPartition).filter(_ != Double.NegativeInfinity).sum
 
   def isConvergedTo(f: SentenceBeliefs, diff: Double): Boolean = {
     var i = 0
@@ -168,9 +168,11 @@ case class WordBeliefs(pos: DPos,
      tag / f.tag,
      maximalLabel / f.maximalLabel)
  }//, f.anaphoric / f.anaphoric, f.anaphor / f.anaphor, Array.tabulate(coref.length)(i => coref(i) / f.coref(i)))
+ //*/
 
-  def logPartition: Double = (
-    governor.logPartition
+  def logPartition: Double =  (
+    0.0
+    + governor.logPartition
 //      + span.logPartition
       + tag.logPartition
       + maximalLabel.logPartition
@@ -185,7 +187,6 @@ case class WordBeliefs(pos: DPos,
       && tag.isConvergedTo(f.tag, diff)
 //      && anaphoric.isConvergedTo(f.anaphoric, diff)
 //      && anaphor.isConvergedTo(f.anaphor, diff)
-      && tag.isConvergedTo(f.tag, diff)
       && maximalLabel.isConvergedTo(f.tag, diff)
 //      && (0 until coref.length).forall(i => coref(i).isConvergedTo(f.coref(i), diff))
     )

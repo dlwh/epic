@@ -657,7 +657,7 @@ object GPUGrammar {
     val feat = new ProductionFeaturizer(grammar.grammar, grammar.lexicon.knownLexicalProductions)
     val timeX = System.currentTimeMillis()
     val marg = train.map(_.words).foldLeft(DenseVector.zeros[Double](feat.index.size)){ (acc, s) =>
-      val m = ChartMarginal(AugmentedGrammar.fromRefined(grammar), s, ParseChart.logProb)
+      val m = ChartMarginal(AugmentedGrammar.fromRefined(grammar), s)
       val counts = m.expectedCounts(feat).counts
 //      println(m.partition)
       acc += counts

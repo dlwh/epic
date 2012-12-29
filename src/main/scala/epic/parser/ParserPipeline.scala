@@ -62,9 +62,9 @@ object ParserParams {
         constraintsCache.get(path).asInstanceOf[CoreGrammar[L, W]]
       } else {
         val uncached: CoreGrammar[L, W] = if(path eq null) {
-          new ConstraintCoreGrammar[L,W](baseFactory, threshold, true)
+          new ConstraintCoreGrammar[L,W](baseFactory, threshold)
         } else {
-          val constraint = new ConstraintCoreGrammar[L,W](baseFactory, threshold, true)
+          val constraint = new ConstraintCoreGrammar[L,W](baseFactory, threshold)
           new FileCachedCoreGrammar(constraint, path)
         }
 

@@ -174,15 +174,18 @@ class SemiCRFInference[L, W](weights: DenseVector[Double],
 
     def scoreTransition(prev: Int, cur: Int, beg: Int, end: Int): Double = {
       var score = augment.scoreTransition(prev, cur, beg, end)
-      score += beginCache(prev)(cur)(beg)
-      score += endCache(cur)(end-1)
-      var pos = beg + 1
-      while(pos < end) {
-        score += wordCache(cur)(pos)
-        pos += 1
-      }
+      if(score != Double.NegativeInfinity) {
+        score += beginCache(prev)(cur)(beg)
+        score += endCache(cur)(end-1)
+        var pos = beg + 1
+        while(pos < end) {
+          score += wordCache(cur)(pos)
+          pos += 1
+        }
 
-      score + (weights dot localization.featuresForSpan(prev, cur, beg, end))
+        score += (weights dot localization.featuresForSpan(prev, cur, beg, end))
+      }
+      score
     }
 
     def labelIndex: Index[L] = featurizer.labelIndex

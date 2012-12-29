@@ -32,7 +32,7 @@ case class ProjectingCoreGrammar[L, W](parser: AugmentedGrammar[L, W],
   }
 
   def project(s: Seq[W], goldTagPolicy: GoldTagPolicy[L] = GoldTagPolicy.noGoldTags) = {
-    val charts = ChartMarginal(parser, s, ParseChart.logProb)
+    val charts = ChartMarginal(parser, s)
 
     projector.project(charts, goldTagPolicy)
   }

@@ -1,12 +1,12 @@
 package epic.everything.models
 
-import breeze.linalg.DenseVector
 import epic.everything.{DSpan, ProcessedDocument, NERType, DocumentAnnotator}
 import epic.framework.{ProjectableInference, StandardExpectedCounts, Feature}
 import breeze.util.{Encoder, Index}
 import epic.sequences.{SemiCRF, SemiCRFInference, SemiCRFModel}
 import epic.sequences.SemiCRF.Anchoring
 import breeze.collection.mutable.TriangularArray
+import breeze.linalg._
 
 /**
  *
@@ -38,6 +38,8 @@ case class ChainNERInference(beliefsFactory: DocumentBeliefs.Factory,
                              labels: Index[NERType.Value]) extends DocumentAnnotatingInference with ProjectableInference[ProcessedDocument, DocumentBeliefs] {
   type ExpectedCounts = inner.ExpectedCounts
   type Marginal = ChainNERMarginal[inner.Marginal]
+  val notNER = labels(NERType.OutsideSentence)
+  assert(notNER != -1)
 
   def emptyCounts = inner.emptyCounts
 
@@ -91,7 +93,9 @@ case class ChainNERInference(beliefsFactory: DocumentBeliefs.Factory,
       val newSpans = TriangularArray.tabulate(doc.sentences(s).length+1){ (b,e) =>
         if(b < e) {
           val spanBeliefs = sentenceBeliefs.spanBeliefs(b, e)
-          spanBeliefs.copy(ner = spanBeliefs.ner.copy(beliefs=DenseVector.tabulate(labels.size){marg.spanMarginal(_, b, e)}))
+          val copy = spanBeliefs.copy(ner = spanBeliefs.ner.updated(DenseVector.tabulate(labels.size){marg.spanMarginal(_, b, e)}))
+          copy.ner.beliefs(notNER) = 1 - sum(copy.ner.beliefs)
+          copy
         } else null
       }
       sentenceBeliefs.copy(spans=newSpans)
@@ -120,9 +124,13 @@ case class ChainNERInference(beliefsFactory: DocumentBeliefs.Factory,
         def maxSegmentLength(label: Int): Int = inner.maxLength(label)
 
         def scoreTransition(prev: Int, cur: Int, beg: Int, end: Int): Double = {
-          if(b.spanBeliefs(beg, end).ner(cur) == 0.0) Double.NegativeInfinity
-          else if(b.spanBeliefs(beg, end).ner(cur) == 1.0) 0.0
-          else  math.log(b.spanBeliefs(beg,end).ner(cur)) - math.log1p(-b.spanBeliefs(beg,end).ner(cur))
+          if(cur == notNER) Double.NegativeInfinity
+          else if(b.spanBeliefs(beg, end).ner(cur) == 0.0) Double.NegativeInfinity
+          else if(b.spanBeliefs(beg, end).ner(notNER) == 0.0) {
+            math.log(b.spanBeliefs(beg,end).ner(cur))
+          } else {
+            math.log(b.spanBeliefs(beg,end).ner(cur) / b.spanBeliefs(beg,end).ner(notNER))
+          }
         }
 
         def startSymbol = inner.startSymbol

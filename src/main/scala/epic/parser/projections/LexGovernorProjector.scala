@@ -37,13 +37,13 @@ class LexGovernorProjector[L, W](grammar: LexGrammar[L, W]) {
       if (grammar.isRightRule(rule)) { // head on the right
         spanGovernorCounts(begin, split)(head) += score
         spanGovernorCounts(begin, split)(notASpan) -= score
-        val label = grammar.grammar.rightChild(rule)
+        val label = grammar.grammar.leftChild(rule)
         maximalLabelType(dep)(label) += score
         governedSpan(dep)(TriangularArray.index(begin,split)) += score
       } else {
         spanGovernorCounts(split, end)(head) += score
         spanGovernorCounts(split, end)(notASpan) -= score
-        val label = grammar.grammar.leftChild(rule)
+        val label = grammar.grammar.rightChild(rule)
         maximalLabelType(dep)(label) += score
         governedSpan(dep)(TriangularArray.index(split,end)) += score
       }
@@ -53,17 +53,19 @@ class LexGovernorProjector[L, W](grammar: LexGrammar[L, W]) {
       val parent = grammar.grammar.parent(rule)
       spanType(begin,end)(parent) += score
       spanType(begin,end)(notAConstituent) -= score
-    }
-
-    def visitSpan(begin: Int, end: Int, tag: Int, ref: Int, score: Double) {
       val head = otherAnch.spanHeadIndex(ref)
+
       if (begin == 0 && end == length) { // root, get the length
         wordGovernorCounts(head)(length) += score
         spanGovernorCounts(begin, end)(length) += score
         spanGovernorCounts(begin, end)(notASpan) -= score
-        maximalLabelType(head)(tag) += score
+        maximalLabelType(head)(parent) += score
         governedSpan(head)(TriangularArray.index(begin,end)) += score
       }
+    }
+
+    def visitSpan(begin: Int, end: Int, tag: Int, ref: Int, score: Double) {
+
 
       if(begin + 1 == end) {
         wordTagType(begin)(tag) += score

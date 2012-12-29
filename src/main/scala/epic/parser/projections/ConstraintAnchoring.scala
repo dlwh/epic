@@ -64,7 +64,7 @@ object ConstraintAnchoring {
  * Creates labeled span scorers for a set of trees from some parser.
  * @author dlwh
  */
-class ConstraintCoreGrammar[L, W](augmentedGrammar: AugmentedGrammar[L, W], threshold: Double, viterbi: Boolean) extends CoreGrammar[L, W] {
+class ConstraintCoreGrammar[L, W](augmentedGrammar: AugmentedGrammar[L, W], threshold: Double) extends CoreGrammar[L, W] {
   def grammar = augmentedGrammar.grammar
   def lexicon = augmentedGrammar.lexicon
 
@@ -85,12 +85,12 @@ class ConstraintCoreGrammar[L, W](augmentedGrammar: AugmentedGrammar[L, W], thre
   def buildConstraints(words: Seq[W],
                        goldTags: GoldTagPolicy[L]):ConstraintAnchoring[L, W] = {
 
-    val charts = ChartMarginal(augmentedGrammar, words, if(viterbi) ParseChart.viterbi else ParseChart.logProb)
+    val charts = ChartMarginal(augmentedGrammar, words)
     buildConstraints(charts, goldTags)
   }
 
   def rawConstraints(words: Seq[W], gold: GoldTagPolicy[L] = GoldTagPolicy.noGoldTags):RawConstraints = {
-    val charts = ChartMarginal(augmentedGrammar, words, if(viterbi) ParseChart.viterbi else ParseChart.logProb)
+    val charts = ChartMarginal(augmentedGrammar, words)
     rawConstraints(charts, gold)
   }
 
@@ -135,7 +135,7 @@ class ConstraintCoreGrammar[L, W](augmentedGrammar: AugmentedGrammar[L, W], thre
   }
 
   def computePruningStatistics(words: Seq[W], gold: GoldTagPolicy[L]): (PruningStatistics, PruningStatistics) = {
-    val charts = ChartMarginal(augmentedGrammar, words, if(viterbi) ParseChart.viterbi else ParseChart.logProb)
+    val charts = ChartMarginal(augmentedGrammar, words)
     computePruningStatistics(charts, gold)
   }
 
@@ -260,8 +260,7 @@ case class ProjectionParams(treebank: ProcessedTreebank,
                             out: File = new File("constraints.ser.gz"),
                             @Help(text="Longest train sentence to build constraints for.")
                             maxParseLength: Int = 80,
-                            threshold: Double = -5,
-                            viterbi: Boolean = true) {
+                            threshold: Double = -5) {
 }
 
 object ProjectTreebankToConstraints {
@@ -275,7 +274,7 @@ object ProjectTreebankToConstraints {
     val out = params.out
     out.getAbsoluteFile.getParentFile.mkdirs()
 
-    val factory = new ConstraintCoreGrammar[AnnotatedLabel, String](parser.augmentedGrammar, params.threshold, params.viterbi)
+    val factory = new ConstraintCoreGrammar[AnnotatedLabel, String](parser.augmentedGrammar, params.threshold)
     val train = mapTrees(factory, treebank.trainTrees, parser.grammar.labelIndex, useTree = true, maxL = params.maxParseLength)
     val test = mapTrees(factory, treebank.testTrees, parser.grammar.labelIndex, useTree = false, maxL = 10000)
     val dev = mapTrees(factory, treebank.devTrees, parser.grammar.labelIndex, useTree = false, maxL = 10000)
@@ -329,7 +328,7 @@ object ComputePruningThresholds {
     println(params)
     val parser = loadParser[Any](params.parser)
 
-    val factory = new ConstraintCoreGrammar[AnnotatedLabel, String](parser.augmentedGrammar, -7, params.viterbi)
+    val factory = new ConstraintCoreGrammar[AnnotatedLabel, String](parser.augmentedGrammar, -7)
     val (all, gold) = mapTrees(factory, treebank.devTrees, parser.grammar.labelIndex)
     Arrays.sort(all.data)
     Arrays.sort(gold.data)

@@ -22,11 +22,11 @@ import epic.trees._
  * @author dlwh
  */
 trait ParserTestHarness {
-  def getTrainTrees(maxLength:Int= 15) = {
+  def getTrainTrees(maxLength:Int= 15): IndexedSeq[TreeInstance[AnnotatedLabel, String]] = {
     massageTrees(TstTreebank.treebank.train.trees,  maxLength).map(ti => ti.copy(tree=UnaryChainRemover.removeUnaryChains(ti.tree)))
   }
 
-  def getTestTrees(maxLength:Int= 15) = {
+  def getTestTrees(maxLength:Int= 15): IndexedSeq[TreeInstance[AnnotatedLabel, String]] = {
     massageTrees(TstTreebank.treebank.test.trees, maxLength)
   }
 

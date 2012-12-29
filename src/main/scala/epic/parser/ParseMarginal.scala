@@ -1,6 +1,7 @@
 package epic.parser
 
 import epic.framework.{Marginal, StandardExpectedCounts}
+import epic.trees.Production
 
 /*
  Copyright 2012 David Hall
@@ -29,6 +30,13 @@ trait ParseMarginal[L, W] extends Marginal {
   def logPartition: Double
   def words:Seq[W] = anchoring.words
   def length = words.length
+
+
+  def expectedProductionCounts: StandardExpectedCounts[Production[L, W]] = {
+    val featurizer = new ProductionFeaturizer[L, W](grammar, lexicon.knownLexicalProductions.toIndexedSeq)
+    val counts = StandardExpectedCounts.zero(featurizer.index)
+    expectedCounts(featurizer, counts, 1.0)
+  }
 
   def expectedCounts[Feat](featurizer: RefinedFeaturizer[L, W, Feat]): StandardExpectedCounts[Feat] = {
     val counts = StandardExpectedCounts.zero(featurizer.index)
