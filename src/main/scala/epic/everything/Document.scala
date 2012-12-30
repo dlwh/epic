@@ -25,6 +25,8 @@ import models.DocumentBeliefs
  * Represents an ontonotes document (a single file, or portion thereof)
  */
 case class Document(id: String, sentences: IndexedSeq[Sentence]) extends Example[IndexedSeq[OntoAnnotations], IndexedSeq[IndexedSeq[String]]] {
+  def dspans = sentences.flatMap(_.dspans)
+
   def words: IndexedSeq[IndexedSeq[String]] = sentences.map(_.words)
 
   def features = words
