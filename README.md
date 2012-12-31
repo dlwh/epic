@@ -4,13 +4,15 @@ Author: **Jason Baldridge** (jasonbaldridge@gmail.com)
 
 ## Introduction
 
-Chalk is a library for natural language processing (NLP). The present version (1.0) is pretty much an exact copy of Apache OpenNLP v1.5.3 (opennlp.apache.org), except that "chalk" has been substituted for "opennlp" in the package names, and SBT is used to configure and build the project. Why do this? Basically, I would like to be able to change and extend OpenNLP using Scala and Akka, and I wanted to release the first version as essentially unchanged from OpenNLP. That makes the history of changes easier to track, and it might provide some useful examples for making Java-to-Scala transitions. Ultimately, I see this diverging substantatially from OpenNLP, and no attempt for compatibility will be made as of this breaking point. (I think the OpenNLP team is great and as one of the co-creators of OpenNLP, I am still very much interested in seeing OpenNLP evolve and improve. However, I really want to explore some ideas using Scala and Akka and figured this was the most straightforward and nimble way to move forward on it.)
+Chalk is a library for natural language processing (NLP).
 
-I've called this Chalk because my son has a stuffed elephant that he named Chalk. "Chalk" obviously has a great connection to writing (and thus text processing). Of course, it also follows the what-your-kid-called-his-elephant naming convention precedent established with Hadoop. :)
+The name Chalk comes from my son's stuffed elephant. "Chalk" obviously has a great connection to writing (and thus text processing). Of course, it also follows the what-your-kid-called-his-elephant naming convention precedent established with Hadoop. :)
 
 In addition to OpenNLP, there are two other related projects. One is Scalabha (https://github.com/utcompling/Scalabha), which I started as a package for teaching Scala in computational linguistics projects, and which I may pilfer as Chalk develops. The other is Breeze, which is a Scala-based machine learning and NLP project that I've been peripherally involved with. It's a great and very general library; ultimately, I expect to bring Breeze in as a dependency and then Chalk will in some respects be an example of building an NLP library on top of the core capabilities provided by Breeze.
 
 ## Using Chalk
+
+The latest stable release is 1.0, which corresponds quite directly to Apache OpenNLP v1.5.3. 
 
 In SBT:
 
