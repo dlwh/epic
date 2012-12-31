@@ -12,11 +12,12 @@ then
     JAVA_MEM_FLAG=-Xmx4g
 fi
 
-#JARS="`find $CHALK_DIR/lib_managed/jars -name '*.jar' -print | tr '\n' ':'`"
+#JARS="`find $HOME/.ivy2/ -name '*.jar' -print | tr '\n' ':'`"
+MANAGED_JARS="`find $CHALK_DIR/lib_managed -name '*.jar' -print | tr '\n' ':'`"
 
 SCALA_LIB="$HOME/.sbt/boot/scala-2.9.2/lib/scala-library.jar"
 
-CP="$CHALK_DIR/target/classes:$SCALA_LIB:$CHALK_DIR/src/main/resources:$JARS:$CLASSPATH"
+CP="$CHALK_DIR/target/classes:$SCALA_LIB:$CHALK_DIR/src/main/resources:$MANAGED_JARS"
 
 JAVA="$JAVA_HOME/bin/java"
 JAVA_COMMAND="$JAVA -classpath $CP -Dchalk.dir=$CHALK_DIR"
@@ -27,7 +28,7 @@ shift
 help()
 {
 cat <<EOF
-chalk 0.1 commands: 
+chalk 1.1.0 commands: 
 
   cli           run the chalk command-line interface
   run           run the main method of a given class
@@ -47,7 +48,7 @@ case $CMD in
     *) echo "Unrecognized command: $CMD"; help; exit 1;;
 esac
 
-$JAVA_COMMAND $CLASS ${1+"$@"}
+$JAVA_COMMAND $CLASS ${1+"$@"} 
 (( EXIT_CODE += $? ))
 
 exit $EXIT_CODE
