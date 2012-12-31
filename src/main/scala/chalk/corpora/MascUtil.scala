@@ -1,38 +1,42 @@
 package chalk.corpora
 
 import com.codecommit.antixml._
+import java.io._
 import io.Codec
+
+case class MNode(id: String, targets: Seq[String])
+case class MAnnotation(id: String, label: String, ref: String, features: Map[String,String])
+case class MEdge(id: String, from: String, to: String)
+case class MRegion(id: String, start: Int, end: Int) extends Ordered[MRegion] {
+  def compare(that: MRegion) = this.start - that.start
+}
+
 
 /**
  * Convert native MASC xml into CONLL format for named entity recognition.
  *
  * @author jasonbaldridge
  */
-object MascNer {
+object MascTransform {
 
   import io.Source
-  import java.io._
   import MascUtil._
-
-  lazy val outsideNe = MAnnotation("outside", "outside", "none", Map[String,String]())
-
-  lazy val nerLabelStandardizer = Map(
-    "location" -> "LOC",
-    "person" -> "PER",
-    "org" -> "ORG",
-    //"date" -> "DAT"
-    "date" -> "MISC"
-  ).withDefault(x=>"O")
 
   def main(args: Array[String]) {
     val mascDir = args(0)
+    val outputDir = new File(if (args.length > 1) args(1) else "/tmp")
+    outputDir.mkdirs
+
     val targets = collectTargets(new File(mascDir))
 
     // Get 3/5 for train, 1/5 for dev, and 1/5 for test
     val targetsAndIndices = targets.zipWithIndex
-    processSet("train", targetsAndIndices.filter(_._2 % 5 < 3).unzip._1)
-    processSet("dev", targetsAndIndices.filter(_._2 % 5 == 3).unzip._1)
-    processSet("test", targetsAndIndices.filter(_._2 % 5 == 4).unzip._1)
+    val trainSet = targetsAndIndices.filter(_._2 % 5 < 3).unzip._1
+    val devSet = targetsAndIndices.filter(_._2 % 5 == 3).unzip._1
+    val testSet = targetsAndIndices.filter(_._2 % 5 == 4).unzip._1
+    processSet(outputDir, "train", trainSet)
+    processSet(outputDir, "dev", devSet)
+    processSet(outputDir, "test", testSet)
   }
 
   def collectTargets(dir: File): Seq[(File,String)] = {
@@ -40,39 +44,95 @@ object MascNer {
     val filesInDir = files
       .filter(_.getName.endsWith(".txt"))
       .map(file => (dir, file.getName.dropRight(4)))
-
     filesInDir ++ files.filter(_.isDirectory).flatMap(collectTargets)
   }
 
-  def processSet(outputName: String, targets: Seq[(File, String)]) {
+  def processSet(parentDir: File, outputName: String, targets: Seq[(File, String)]) {
     System.err.println("Creating " + outputName)
-    val output = new FileWriter(outputName)
-    for ((file, prefix) <- targets) {
-      try {
-        val allDataBySentence: Seq[(Seq[String], Seq[String], Seq[String], Seq[MRegion])] = processTarget(file,prefix)
-        for (sentenceInfo <- allDataBySentence) {
-          // sigh, no zipped on tuple4
-          (0 until sentenceInfo._1.length).foreach {  i =>
-            val (tok, pos, ner, region) = (sentenceInfo._1(i), sentenceInfo._2(i), sentenceInfo._3(i), sentenceInfo._4(i))
-            if(tok.exists(_.isSpaceChar)) {
-              println("Weird token! '" + tok +"' " + file + "/" + prefix +".txt:" + + region.start + "-" + region.end)
+    val outputDir = new File(parentDir, outputName)
+    outputDir.mkdirs
+
+    val outputSentences = new FileWriter(new File(outputDir,outputName+"-sent.txt"))
+    val outputTokens = new FileWriter(new File(outputDir,outputName+"-tok.txt"))
+    val outputNer = new FileWriter(new File(outputDir,outputName+"-ner.txt"))
+
+    for (mfile <- MascFile(targets)) {
+      for (sentence <- mfile.sentences) {
+        val tokenizedSentence = new StringBuffer
+        val MascSentence(tokens,postags,nerLabels,regions) = sentence
+        (0 until sentence.numTokens).foreach { i => {
+          val (tok, pos, ner, region) = (tokens(i), postags(i), nerLabels(i), regions(i))
+            if (tok.exists(_.isSpaceChar)) {
+              println("Weird token! '" + tok +"' " + mfile.dir + "/" + mfile.prefix +".txt:" + + region.start + "-" + region.end)
             }
-            output.write(tok + " " + pos + " " + pos + " " + ner + "\n")
-          }
-          output.write("\n")
-        }
-        System.err.println("Success: " + file + "," + prefix)
-      } 
-      catch { 
-        case e: Throwable => System.err.println("Failure: " + file + "," + prefix)
+          val split = 
+            if (i<sentence.numTokens-1 && region.end == regions(i+1).start) "<SPLIT>" else " "
+          tokenizedSentence.append(tok).append(split)
+          outputNer.write(tok + " " + pos + " " + pos + " " + ner + "\n")
+        }}
+        outputNer.write("\n")
+        val sentStart = sentence.orderedRegions.head.start
+        val sentEnd = sentence.orderedRegions.last.end
+        val sentenceText = mfile.rawtext.slice(sentStart,sentEnd).replaceAll("\n"," ")
+        outputSentences.write(sentenceText+"\n")
+        outputTokens.write(tokenizedSentence.toString.trim + "\n")
       }
     }
-    output.flush
-    output.close
+    outputNer.flush
+    outputNer.close
+    outputSentences.flush
+    outputSentences.close
+    outputTokens.flush
+    outputTokens.close
     System.err.println
   }
 
-  def processTarget(dir: File, prefix: String): Seq[(Seq[String], Seq[String], Seq[String], Seq[MRegion])] = {
+}
+
+
+case class MascSentence (
+  orderedTokens: Seq[String],
+  orderedPos: Seq[String], 
+  bioLabels: Seq[String],
+  orderedRegions: Seq[MRegion]
+) {
+
+  lazy val numTokens = orderedTokens.length
+}
+
+class MascFile (
+  val dir: File,
+  val prefix: String,
+  val rawtext: String,
+  val sentences: Seq[MascSentence]
+) {
+
+  lazy val numSentences = sentences.length
+
+}
+
+object MascFile {
+
+  import MascUtil._
+  import io.Source
+
+  lazy val outsideNe = MAnnotation("outside", "outside", "none", Map[String,String]())
+
+  def apply(targets: Seq[(File, String)]): Iterator[MascFile] = {
+    targets.toIterator.flatMap { case(file, prefix) => {
+      try { 
+        val mfile = MascFile(file,prefix)
+        System.err.println("Success: " + file + "," + prefix)
+        Some(mfile)
+      }
+      catch { case e: Throwable => 
+        System.err.println("Failure: " + file + "," + prefix)
+        None
+      }
+    }}
+  }
+
+  def apply(dir: File, prefix: String): MascFile = {
 
     def dirFile(prefix: String) = new File(dir, prefix)
 
@@ -130,7 +190,7 @@ object MascNer {
               prefix+nerLabelStandardizer(curr.label)
             }
         }
-        Some(orderedTokens, orderedPos, bioLabels, orderedRegions)
+        Some(MascSentence(orderedTokens, orderedPos, bioLabels, orderedRegions))
       }
     }
 
@@ -160,12 +220,13 @@ object MascNer {
         orderedTokPosNer(sentence)
       }
     }}
-    
-    allDataBySentence
 
+    new MascFile(dir, prefix, rawtext, allDataBySentence)
   }
 
 }
+
+
 
 /**
  * Simple objects and functions for working with MASC data.
@@ -174,14 +235,16 @@ object MascNer {
  */
 object MascUtil {
 
-  case class MNode(id: String, targets: Seq[String])
-  case class MAnnotation(id: String, label: String, ref: String, features: Map[String,String])
-  case class MEdge(id: String, from: String, to: String)
-  case class MRegion(id: String, start: Int, end: Int) extends Ordered[MRegion] {
-    def compare(that: MRegion) = this.start - that.start
-  }
-
   val idQname = QName(Some("xml"),"id")
+
+  lazy val nerLabelStandardizer = Map(
+    "location" -> "LOC",
+    "person" -> "PER",
+    "org" -> "ORG",
+    //"date" -> "DAT"
+    "date" -> "MISC"
+  ).withDefault(x=>"O")
+
 
   def getRegions(doc: Elem) = (doc \\ "region").toSeq.map { rxml =>
     val Array(start, end) = rxml.attrs("anchors").split(" ")
