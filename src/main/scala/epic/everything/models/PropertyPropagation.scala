@@ -1,218 +1,201 @@
 package epic.everything.models
 
 import epic.everything.{ProcessedDocument, DPos, Document, DSpan}
-import breeze.linalg.DenseVector
+import breeze.linalg.{DenseMatrix, DenseVector}
 import breeze.inference.bp
 import bp.{BeliefPropagation, Variable}
 import epic.framework.{ProjectableInference, StandardExpectedCounts, Feature}
 import breeze.util.{Index, Lens}
 import breeze.collection.mutable.TriangularArray
+import collection.mutable.ArrayBuffer
 
+/*
 /**
  *
  * @author dlwh
  */
 object PropertyPropagation {
-
-  class Model(builder: GraphBuilder) extends DocumentAnnotatingModel {
-    type ExpectedCounts = StandardExpectedCounts[Feature]
-    type Inference = PropertyPropagator
-    type Marginal = PropertyPropagation.Marginal
-
-    def featureIndex: Index[Feature] = builder.features
-
-    def initialValueForFeature(f: Feature): Double = math.random * 1E-4
-
-    def inferenceFromWeights(weights: DenseVector[Double]) = new PropertyPropagator(builder, weights)
-
-    def expectedCountsToObjective(ecounts: ExpectedCounts): (Double, DenseVector[Double]) = {
-      ecounts.loss -> ecounts.counts
+  class Inference(beliefsFactory: DocumentBeliefs.Factory,
+                  val featureIndex: Index[Feature]) extends epic.framework.ProjectableInference[ProcessedDocument, DocumentBeliefs] {
+    def baseAugment(doc: ProcessedDocument): DocumentBeliefs = {
+      beliefsFactory(doc)
     }
-  }
 
-  class PropertyPropagator(builder: GraphBuilder,
-                           weights: DenseVector[Double]) extends DocumentAnnotatingInference with ProjectableInference[ProcessedDocument, DocumentBeliefs] {
-    type ExpectedCounts = epic.framework.StandardExpectedCounts[Feature]
-    type Marginal = PropertyPropagation.Marginal
-    def emptyCounts = StandardExpectedCounts.zero[Feature](builder.features)
-
-    def apply(v1: ProcessedDocument, v2: DocumentBeliefs): ProcessedDocument = v1
-
-    def countsFromMarginal(doc: ProcessedDocument, marg: Marginal, aug: DocumentBeliefs): ExpectedCounts = {
-      val ec = emptyCounts
-      for( (s, marginals) <- doc.sentences zip marg.sentences) {
-        if(marginals ne null) {
-          var b = 0
-          while(b < s.length) {
-            var e = b+1
-            while(e <= s.length) {
-              val spans = marginals.spans(b,e)
-              if( spans ne null) {
-                ec.loss += spans.logPartition
-                for( ff@Factor(_,_,) <- spans.model.factorIndex)  {
-                  ff.tallyExpectedCounts(spans, ec.counts)
-                }
-
-              }
-              e += 1
-            }
-            b += 1
+    def marginal(doc: ProcessedDocument, aug: DocumentBeliefs): (Marginal, Double) = {
+      val sentences = for ((sentence, sentenceBeliefs) <- doc.sentences zip aug.sentences) yield {
+        val spans = TriangularArray.tabulate(sentence.length + 1) { (begin, end) =>
+          val current = sentenceBeliefs.spanBeliefs(begin, end)
+          if (begin == end || (current eq null))  {
+            null
+          } else {
+            val graph: bp.Model = graphMaker.forSpan(sentence, begin, end, current)
+            val beliefs = BeliefPropagation.infer(graph)
+            beliefs
           }
-
-          /*
-          b = 0
-          while(b < s.length) {
-            val words = marginals.words(b)
-            ec.loss += words.logPartition
-            for( ff@Factor(_,_,_,_) <- words.model.factorIndex)  {
-              ff.tallyExpectedCounts(words, ec.counts)
-            }
-            b += 1
-          }
-          */
         }
+
+        new SentenceMarginal(spans)
       }
-
-      ec
-
+      val marginal = new PropertyPropagation.Marginal(sentences)
+      marginal -> marginal.logPartition
     }
-
-
-    def project(v: ProcessedDocument, m: Marginal, oldAugment: DocumentBeliefs): DocumentBeliefs = {
-      val sentences = for(s <- m.sentences) yield {
-        val wordBeliefs = s.words.map(b => new PropertyBeliefs(b.beliefs.toArray.map(_.data)))
-        val spanBeliefs = s.spans.map(b => new PropertyBeliefs(b.beliefs.toArray.map(_.data)))
-        new SentenceBeliefs(spanBeliefs, wordBeliefs)
-      }
-
-
-      oldAugment.copy(sentenceBeliefs=sentences.toArray)
-    }
-
-    def baseAugment(v: ProcessedDocument): DocumentBeliefs = null
-
-    def marginal(doc: ProcessedDocument, beliefs: DocumentBeliefs): (Marginal, Double) = {
-      val sentences = for( (s, sentBeliefs) <- doc.sentences zip beliefs.sentenceBeliefs) yield {
-        if(sentBeliefs eq null) null
-        else {
-          val spans = TriangularArray.tabulate(s.length){ (b,e) =>
-            val spanInput: PropertyBeliefs = sentBeliefs.spanBeliefs(b,e)
-            if(spanInput == null) null
-            else {
-              val factors = (0 until spanInput.beliefs.length) map { prop =>
-                val variable = beliefs.spanProperties.get(prop).toVariable
-                Factor(variable)(spanInput(prop))
-              }
-
-              BeliefPropagation.infer((spanModel /: factors)(_ + _))
-            }
-          }
-
-          val words = Array.tabulate(s.length){ (b) =>
-            val wordInput = sentBeliefs.wordBeliefs(b)
-            val factors = (0 until wordInput.beliefs.length) map { prop =>
-              val variable = beliefs.wordProperties.get(prop).toVariable
-              Factor(variable)(wordInput(prop))
-            }
-
-            BeliefPropagation.infer((wordModel /: factors)(_ + _))
-          }
-
-          new SentenceMarginal(spans, words)
-        }
-      }
-
-      (Marginal(sentences),sentences.filter(_ ne null).map(s => s.spans.data.filter( _ ne null).map(_.logPartition).sum + s.words.map(_.logPartition).sum).sum)
-    }
-
 
     def goldMarginal(v: ProcessedDocument, aug: DocumentBeliefs): (Marginal, Double) = marginal(v, aug)
 
-    def projectGold(v: ProcessedDocument, m: Marginal, oldAugment: DocumentBeliefs): DocumentBeliefs = {
-      project(v, m, oldAugment)
+
+    type ExpectedCounts = StandardExpectedCounts[Feature]
+    type Marginal = PropertyPropagation.Marginal
+
+    def emptyCounts = StandardExpectedCounts.zero(featureIndex)
+
+    def countsFromMarginal(doc: ProcessedDocument, marg: Marginal, accum: ExpectedCounts, scale: Double): ExpectedCounts = {
+      for(s <- marg.sentences; sp <- s.spans; f@Factor(_, _) <- sp.model.factors) {
+        f.tallyExpectedCounts(sp, accum.counts, scale)
+      }
+
+      accum
+    }
+
+    def project(doc: ProcessedDocument, m: Marginal, oldAugment: DocumentBeliefs): DocumentBeliefs = {
+      for( (myBeliefs, oldBeliefs) <- m.sentences zip oldAugment.sentences) yield {
+        val newSpans = TriangularArray.tabulate(oldBeliefs.length+1) { (begin, end) =>
+          val current: BeliefPropagation.Beliefs = myBeliefs.spans(begin, end)
+          val old: SpanBeliefs = oldBeliefs.spanBeliefs(begin, end)
+        }
+
+      }
+
     }
   }
 
   case class Marginal(sentences: IndexedSeq[SentenceMarginal]) extends epic.framework.Marginal {
-    def logPartition: Double = sentences.map(_.logPartition).sum
+    val logPartition = sentences.map(_.logPartition).sum
   }
-  case class SentenceMarginal(spans: TriangularArray[bp.BeliefPropagation.Beliefs],
-                              words: Array[bp.BeliefPropagation.Beliefs],
-                              logPartition: Double) extends epic.framework.Marginal
-
-  class GraphBuilder(factory: LinkFactory, val features: Index[Feature]) {
-    def buildLinks(doc: Document):IndexedSeq[TriangularArray[IndexedSeq[IndexedLink[_, _]]]] = {
-      for(s <- doc.sentences) yield TriangularArray.tabulate(s.length) {(b, e) =>
-        factory.linksFor(doc, DSpan(s.docId, s.sentId, b, e)).map(_.indexed(features))
-      }
-    }
+  case class SentenceMarginal(spans: TriangularArray[BeliefPropagation.Beliefs]) {
+    val logPartition = spans.map(s => if (s eq null) 0.0 else s.logPartition).data.sum
   }
 
-  trait LinkFactory {
-    def linksFor(doc: Document, span: DSpan):IndexedSeq[Link[_, _]]
-    //    def linksFor(doc: Document, span: DPos):IndexedSeq[Link[_, _]]
-    def featuresFor(docs: IndexedSeq[Document]):Iterable[Feature]
-  }
-
-
-  class BasicLinkFactory[T, U](p1: Property[T],  p2: Property[U],  agreement: Boolean = false) extends LinkFactory with Serializable {
-    val link = Link(p1, p2, Array.tabulate(p1.size, p2.size){(a,b) =>
-      if(agreement) {
-        if(a == b)
-          Array(AgreementFeature(p1.name, p2.name), AssociationFeature(p1.name, p2.name, a, b) )
-        else
-          Array(DisagreementFeature(p1.name, p2.name), AssociationFeature(p1.name, p2.name, a, b) )
-      } else {
-        Array(AssociationFeature(p1.name, p2.name, a, b))
-      }
-    })
-
-    def linksFor(doc: Document, span: DSpan): IndexedSeq[Link[_, _]] = {
-      IndexedSeq(link)
-    }
-
-    //    def linksFor(doc: Document, span: DPos):IndexedSeq[Link[_, _]]
-    def featuresFor(docs: IndexedSeq[Document]): Iterable[Feature] = link.features.flatten.flatten
-  }
-
-  case class AssociationFeature(prop1: String, prop2: String, v1: Any, v2: Any) extends Feature
-  case class AgreementFeature(prop1: String, prop2: String) extends Feature
-  case class DisagreementFeature(prop1: String, prop2: String) extends Feature
-
-  case class Link[T, U](p1: Property[T], p2: Property[U], features: Array[Array[Array[Feature]]]) {
-    def indexed(index: Index[Feature]): IndexedLink[T, U] = IndexedLink(p1, p2, features.map(_.map(_.map(index))))
-  }
-
-  case class IndexedLink[T, U](p1: Property[T], p2: Property[U],
-                               features: Array[Array[Array[Int]]]) {
-
-    def factor(weights: DenseVector[Double]):Factor[T, U] = {
-      val scores: Array[Array[Double]] = features.map(_ map (_.map(i => if(i >= 0) weights(i) else 0.0).sum))
-      new Factor(this, scores)
-    }
-  }
-
-  case class Factor[T, U](link: IndexedLink[T, U],
-                          scores: Array[Array[Double]]) extends bp.Factor {
+  case class Factor[T, U](link: IndexedLink[T, U], scores: DenseMatrix[Double]) extends bp.Factor {
     import link._
-    val variables: IndexedSeq[Variable[_]] = IndexedSeq(p1.toVariable, p2.toVariable)
+    val variables: IndexedSeq[Variable[_]] = IndexedSeq(link.p1.toVariable, link.p2.toVariable)
 
     def logApply(assignments: Array[Int]): Double = {
-      scores(assignments(0))(assignments(1))
+      scores(assignments(0), assignments(1))
     }
 
-    def tallyExpectedCounts(beliefs: bp.BeliefPropagation.Beliefs, weights: DenseVector[Double]) {
+    def tallyExpectedCounts(beliefs: bp.BeliefPropagation.Beliefs, weights: DenseVector[Double], scale: Double) {
       val marg = beliefs.factorMarginalFor(this)
       val arr = Array(0,0)
       for(i <- 0 until p1.choices.size; j <- 0 until p2.choices.size) {
         arr(0) = i
         arr(1) = j
         val count = marg(arr)
-        for(f <- features(i)(j)) weights(f) += count
+        for (f <- features(i)(j))
+          weights(f) += count * scale
       }
     }
+
+
+
+  }
+
+  trait Association[T, U] {
+    def ground(d: ProcessedDocument, span: DSpan, beliefs: SpanBeliefs):Link[T, U]
+  }
+
+  trait Link[T, U] {
+    def prop1: Property[T]
+    def prop2: Property[U]
+    def featuresFor(a: Int, b: Int):Array[Feature]
+
+    def indexed(index: Index[Feature]) = {
+      val features = Array.tabulate(prop1.size, prop2.size){ (p1, p2) =>
+        featuresFor(p1, p2).map(index(_)).filter(_ == -1)
+      }
+
+      new IndexedLink(prop1, prop2, features)
+    }
+  }
+
+  case class IndexedAssociation[T, U](association: Association[T, U], index: Index[Feature]) {
+
+    def factor(weights: DenseVector[Double], d: ProcessedDocument, span: DSpan, beliefs: SpanBeliefs) = {
+      association.ground(d, span, beliefs).indexed(index).factor(weights)
+    }
+
+  }
+
+  case class IndexedLink[T, U](p1: Property[T], p2: Property[U],
+                        features: Array[Array[Array[Int]]]) {
+    def factor(weights: DenseVector[Double]):Factor[T, U] = {
+      val scores = DenseMatrix.tabulate(p1.index.size, p2.index.size){ (a,b) =>
+        dot(weights: DenseVector[Double], features(a)(b))
+      }
+      new Factor(this, scores)
+    }
+
+    private def dot(weights: DenseVector[Double], features: Array[Int]) = {
+      var i = 0
+      var score = 0.0
+      while(i < features.length) {
+        val f = features(i)
+        if (f != -1)
+          score += weights(f)
+        i += 1
+      }
+      score
+    }
+  }
+
+
+
+
+  case class LenAssociation[T, U](lens1: Lens[SpanBeliefs, Beliefs[T]], lens2: Lens[SpanBeliefs, Beliefs[U]]) extends Association {
+  }
+
+  class GraphBuilder {
+    val spans = new Associations
+    class Associations {
+      def associations = _associations
+
+      val _associations = ArrayBuffer[Association[_, _]]()
+
+      def +=[T, U](assoc: Association[T, U]) {_associations += assoc}
+    }
+
+    def buildFactory(beliefsFactory: DocumentBeliefs.Factory, docs: IndexedSeq[ProcessedDocument]):GraphFactory = {
+      val index = Index[Feature]()
+
+      for(d <- docs) {
+        val beliefs = beliefsFactory(d)
+        for(s <- beliefs.sentences; span <- s.spans.data if span != null) {
+          for(assoc <- spans.associations) {
+            val link = assoc.ground(d, span.span, span)
+            for(p1 <- 0 until  link.prop1.size; p2 <- 0 until link.prop2.size) {
+              for(f <- link.featuresFor(p1, p2)) {
+                index.index(f)
+              }
+            }
+          }
+        }
+      }
+
+      new GraphFactory(this, index)
+    }
+  }
+
+  case class GraphFactory(builder: GraphBuilder, featureIndex: Index[Feature]) {
+
+    def graphFor(doc: ProcessedDocument, span: DSpan, beliefs: SpanBeliefs, weights: DenseVector[Double]):bp.Model = {
+      // factors
+      val factors = for(assoc <- builder.spans.associations) yield assoc.ground(doc, span, beliefs).indexed(featureIndex).factor(weights)
+      // current beliefs:
+      for(p <- factors.toSet.flatMap(_.variables)
+
+    }
+
   }
 
 }
 
-
+*/

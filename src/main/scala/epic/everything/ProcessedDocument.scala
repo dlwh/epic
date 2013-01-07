@@ -5,10 +5,8 @@ import epic.coref.{CorefInstanceFeaturizer, FeaturizedCorefInstance, CorefInstan
 import epic.sequences.Segmentation
 import epic.trees.StandardTreeProcessor
 import epic.parser.ParseChart.SparsityPattern
-import models.PropertyPropagation.IndexedLink
-import models.{PropertyPropagation, DocumentBeliefs}
+//import models.PropertyPropagation.IndexedLink
 import epic.parser.projections.ConstraintCoreGrammar
-import breeze.collection.mutable.TriangularArray
 
 /**
  * 
@@ -35,7 +33,7 @@ case class ProcessedSentence(words: IndexedSeq[String],
 object ProcessedDocument {
   case class Factory(treeProcessor: StandardTreeProcessor,
                      constraints: ConstraintCoreGrammar[AnnotatedLabel, String],
-                     graphFeaturizer: PropertyPropagation.GraphBuilder,
+//                     graphFeaturizer: PropertyPropagation.GraphBuilder,
                      corefFeaturizer: CorefInstanceFeaturizer) extends (Document=>ProcessedDocument) {
 
     def apply(d: Document):ProcessedDocument = {

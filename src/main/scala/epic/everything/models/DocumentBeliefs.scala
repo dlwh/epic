@@ -11,37 +11,37 @@ import epic.parser.BaseGrammar
 
 /**
  *
- * @param sentenceBeliefs  sentence -> property type (by index) -> PropertyBeliefs
+ * @param sentences  sentence -> property type (by index) -> PropertyBeliefs
  *@author dlwh
  */
-case class DocumentBeliefs(sentenceBeliefs: Array[SentenceBeliefs]) extends Factor[DocumentBeliefs] {
+case class DocumentBeliefs(sentences: Array[SentenceBeliefs]) extends Factor[DocumentBeliefs] {
 
-  def numSentences = sentenceBeliefs.length
+  def numSentences = sentences.length
 
-  def beliefsForSentence(s: Int) = sentenceBeliefs(s)
+  def beliefsForSentence(s: Int) = sentences(s)
 
   def *(f: DocumentBeliefs): DocumentBeliefs = {
     if (f eq null) this
     else {
-      require(sentenceBeliefs.length == f.sentenceBeliefs.length)
-      DocumentBeliefs(sentenceBeliefs zip f.sentenceBeliefs map { case (a,b) => a * b})
+      require(sentences.length == f.sentences.length)
+      DocumentBeliefs(sentences zip f.sentences map { case (a,b) => a * b})
     }
   }
 
   def /(f: DocumentBeliefs): DocumentBeliefs = {
     if (f eq null) this
     else {
-      require(sentenceBeliefs.length == f.sentenceBeliefs.length)
-      DocumentBeliefs(sentenceBeliefs zip f.sentenceBeliefs map { case (a,b) => a / b})
+      require(sentences.length == f.sentences.length)
+      DocumentBeliefs(sentences zip f.sentences map { case (a,b) => a / b})
     }
   }
 
-  def logPartition: Double = sentenceBeliefs.map(_.logPartition).sum
+  def logPartition: Double = sentences.map(_.logPartition).sum
 
   def isConvergedTo(f: DocumentBeliefs, diff: Double): Boolean = {
     if (f eq null) false
     else {
-      (0 until numSentences) forall { i => sentenceBeliefs(i).isConvergedTo(f.sentenceBeliefs(i), diff)}
+      (0 until numSentences) forall { i => sentences(i).isConvergedTo(f.sentences(i), diff)}
     }
   }
 }

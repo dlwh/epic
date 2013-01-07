@@ -115,7 +115,7 @@ case class ChainNERInference(beliefsFactory: DocumentBeliefs.Factory,
   }
 
   def beliefsToAnchoring(doc: ProcessedDocument, beliefs: DocumentBeliefs):IndexedSeq[SemiCRF.Anchoring[NERType.Value, String]] = {
-    beliefs.sentenceBeliefs.zip(doc.sentences).map { case(b, s) =>
+    beliefs.sentences.zip(doc.sentences).map { case(b, s) =>
       new Anchoring[NERType.Value, String] {
         def labelIndex: Index[NERType.Value] = labels
 

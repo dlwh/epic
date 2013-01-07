@@ -14,7 +14,7 @@ package epic.trees
  See the License for the specific language governing permissions and
  limitations under the License.
 */
-import breeze.util.Lens
+import breeze.util.{Interner, Lens}
 import collection.mutable.ArrayBuffer
 
 /**
@@ -75,6 +75,11 @@ case class AnnotatedLabel(label: String,
 }
 
 object AnnotatedLabel {
+
+  def apply(lbl: String):AnnotatedLabel = interner.intern(new AnnotatedLabel(lbl))
+
+  private val interner: Interner[AnnotatedLabel] = new Interner[AnnotatedLabel]()
+
   val TOP = AnnotatedLabel("TOP")
 
   implicit val stringLens:Lens[AnnotatedLabel, String] = new Lens[AnnotatedLabel, String] with Serializable {

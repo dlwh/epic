@@ -11,7 +11,8 @@ import breeze.collection.mutable.TriangularArray
 import epic.everything.Document
 import models.SentenceBeliefs
 
-object PropertyPropagationXXX {
+/*
+object PropertyPropagation {
   /**
    *
    * @author dlwh
@@ -98,13 +99,13 @@ object PropertyPropagationXXX {
       }
 
 
-      oldAugment.copy(sentenceBeliefs=sentences.toArray)
+      oldAugment.copy(sentences=sentences.toArray)
     }
 
     def baseAugment(v: ProcessedDocument): DocumentBeliefs = null
 
     def marginal(doc: ProcessedDocument, beliefs: DocumentBeliefs): (Marginal, Double) = {
-      val sentences = for( (s, sentBeliefs) <- doc.sentences zip beliefs.sentenceBeliefs) yield {
+      val sentences = for( (s, sentBeliefs) <- doc.sentences zip beliefs.sentences) yield {
         if(sentBeliefs eq null) null
         else {
           val spans = TriangularArray.tabulate(s.length){ (b,e) =>
@@ -149,7 +150,7 @@ object PropertyPropagationXXX {
   //
   //
   //
-  //
+
 
   class DocAgreementGraph(links: IndexedSeq[Link[_, _]]) {
 
@@ -184,7 +185,6 @@ object PropertyPropagationXXX {
       def logApply(assignments: Array[Int]): Double = {
         scores(assignments(0))(assignments(1)) + {if (assignments(0) == assignments(1)) agreeScore else disagreeScore}
       }
-
       def tallyExpectedCounts(beliefs: bp.BeliefPropagation.Beliefs, weights: DenseVector[Double]) {
         val marg = beliefs.factorMarginalFor(this)
         val arr = Array(0,0)
@@ -246,3 +246,4 @@ object PropertyPropagationXXX {
 
     }
 }
+*/
