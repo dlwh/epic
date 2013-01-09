@@ -1,13 +1,219 @@
 package epic.everything.models
 
-import epic.everything.{ProcessedDocument, DPos, Document, DSpan}
+import epic.everything.{ProcessedDocument}
 import breeze.linalg.{DenseMatrix, DenseVector}
 import breeze.inference.bp
-import bp.{BeliefPropagation, Variable}
-import epic.framework.{ProjectableInference, StandardExpectedCounts, Feature}
-import breeze.util.{Index, Lens}
+import epic.framework.{StandardExpectedCounts, Feature}
+import breeze.util.{Encoder, Index, Lens}
 import breeze.collection.mutable.TriangularArray
-import collection.mutable.ArrayBuffer
+import java.io.{PrintWriter, FileWriter}
+
+
+object PropertyPropagation {
+
+  def simpleModel[T, U](beliefsFactory: DocumentBeliefs.Factory,
+                        prop1: Property[T], lens1: Lens[SpanBeliefs, Beliefs[T]],
+                        prop2: Property[U], lens2: Lens[SpanBeliefs, Beliefs[U]]): PropertyPropagation.Model[T, U] = {
+    val l1 = lens1
+    val l2 = lens2
+
+    val fi = Index[Feature]()
+    val features = Array.tabulate(prop1.size, prop2.size){(p1,p2) =>
+      val f = AssociationFeature(prop1.index.get(p1), prop2.index.get(p2))
+      Array(fi.index(f))
+    }
+
+
+    val assoc = new AssociationFeaturizer[T, U] {
+      def lens1: Lens[SpanBeliefs, Beliefs[T]] = l1
+      def lens2: Lens[SpanBeliefs, Beliefs[U]] = l2
+
+      val featureIndex: Index[Feature] =  fi
+
+      val grounding = new AssociationGrounding[T, U] {
+        def featuresFor(p1: Int, p2: Int): Array[Int] = features(p1)(p2)
+      }
+
+      def ground(doc: ProcessedDocument, sent: Int, begin: Int, end: Int): AssociationGrounding[T, U] = grounding
+    }
+
+    new Model(beliefsFactory, assoc)
+  }
+
+  case class AssociationFeature[T, U](a: T, b: U) extends Feature
+
+  /**
+   *
+   * @author dlwh
+   */
+  class Model[T, U](beliefsFactory: DocumentBeliefs.Factory, assoc: AssociationFeaturizer[T, U]) extends DocumentAnnotatingModel {
+    type ExpectedCounts = StandardExpectedCounts[Feature]
+    type Inference = PropertyPropagation.Inference[T, U]
+    type Marginal = PropertyPropagation.Marginal
+
+    def featureIndex: Index[Feature] = assoc.featureIndex
+
+    def initialValueForFeature(f: Feature): Double = math.random * 1E-4
+
+    def inferenceFromWeights(weights: DenseVector[Double]) = {
+      val out = new PrintWriter(new FileWriter("xx.weights.txt"))
+      out.println(Encoder.fromIndex(featureIndex).decode(weights))
+      out.close()
+      new Inference(beliefsFactory, weights, assoc)
+    }
+
+    def expectedCountsToObjective(ecounts: ExpectedCounts): (Double, DenseVector[Double]) = {
+      ecounts.loss -> ecounts.counts
+    }
+  }
+
+
+  class Inference[T, U](beliefsFactory: DocumentBeliefs.Factory,
+                        weights: DenseVector[Double],
+                        scorer: AssociationFeaturizer[T, U]) extends epic.framework.ProjectableInference[ProcessedDocument, DocumentBeliefs] with DocumentAnnotatingInference {
+    type ExpectedCounts = StandardExpectedCounts[Feature]
+    type Marginal = PropertyPropagation.Marginal
+
+
+    def apply(v1: ProcessedDocument, v2: DocumentBeliefs): ProcessedDocument = v1
+
+    def baseAugment(doc: ProcessedDocument): DocumentBeliefs = {
+      beliefsFactory(doc)
+    }
+
+    def score(grounding: AssociationGrounding[T, U], i: Int, i1: Int) = {
+      math.exp(dot(weights, grounding.featuresFor(i, i1)))
+    }
+
+    def marginal(doc: ProcessedDocument, aug: DocumentBeliefs): (Marginal, Double) = {
+      val sentences = for ((sentence, sentenceBeliefs) <- doc.sentences zip aug.sentences) yield {
+        val spans = TriangularArray.tabulate(sentence.length + 1) { (begin, end) =>
+
+          val grounding = scorer.ground(doc, sentence.index, begin, end)
+          val current = sentenceBeliefs.spanBeliefs(begin, end)
+          if (begin == end || (current eq null))  {
+            null
+          } else {
+            val b1 = scorer.lens1(current)
+            val b2 = scorer.lens2(current)
+            val r = DenseMatrix.tabulate(b1.property.size, b2.property.size)((p1,p2) => b1(p1) * score(grounding, p1,p2) * b2(p2))
+            val partition = breeze.linalg.sum(r)
+            assert(partition != 0.0, partition + "\n" + b1 +"\n\n" + b2)
+            assert(!partition.isInfinite, partition + "\n" + b1 +"\n\n" + b2)
+            assert(!partition.isNaN, partition)
+            r
+          }
+        }
+
+        new SentenceMarginal(spans)
+      }
+      val marginal = new PropertyPropagation.Marginal(sentences)
+      marginal -> marginal.logPartition
+    }
+
+    def goldMarginal(v: ProcessedDocument, aug: DocumentBeliefs): (Marginal, Double) = marginal(v, aug)
+
+    def emptyCounts = StandardExpectedCounts.zero(scorer.featureIndex)
+
+    def countsFromMarginal(doc: ProcessedDocument, marg: Marginal, accum: ExpectedCounts, scale: Double): ExpectedCounts = {
+      accum.loss += marg.logPartition * scale
+      for ( (sentence, sm) <- doc.sentences zip marg.sentences; begin <- 0 until sentence.length; end <- (begin+1) to sentence.length) {
+        val grounding = scorer.ground(doc, sentence.index, begin, end)
+        val current = sm.spans(begin, end)
+        val partition = breeze.linalg.sum(current)
+        if (begin == end || (current eq null))  {
+          null
+        } else {
+          var p1 = 0
+          while( p1 < current.rows) {
+            var p2 = 0
+            while(p2 < current.cols) {
+              val features = grounding.featuresFor(p1, p2)
+              for(f <- features) {
+                accum.counts(f) += scale * current(p1,p2) / partition
+              }
+              p2 += 1
+            }
+            p1 += 1
+          }
+        }
+      }
+
+      accum
+    }
+
+    def project(doc: ProcessedDocument, m: Marginal, oldAugment: DocumentBeliefs): DocumentBeliefs = {
+      val newSentences = for( (myBeliefs, oldBeliefs) <- m.sentences zip oldAugment.sentences) yield {
+        val newSpans = TriangularArray.tabulate(oldBeliefs.length+1) { (begin, end) =>
+          val current = myBeliefs.spans(begin, end)
+          if(current eq null) null
+          else {
+            val old: SpanBeliefs = oldBeliefs.spanBeliefs(begin, end)
+            var marg1 = DenseVector.zeros[Double](current.rows)
+            var marg2 = DenseVector.zeros[Double](current.cols)
+            var p1 = 0
+            while( p1 < current.rows) {
+              var p2 = 0
+              var rsum = 0.0
+              while(p2 < current.cols) {
+                rsum += current(p1,p2)
+                marg2(p2) += current(p1, p2)
+                p2 += 1
+              }
+              marg1(p1) = rsum
+              p1 += 1
+            }
+            val partition = breeze.linalg.sum(marg1)
+            marg1 /= partition
+            marg2 /= partition
+
+            val half = scorer.lens1.set(old, scorer.lens1.get(old).copy(beliefs=marg1))
+            scorer.lens2.set(half, scorer.lens2.get(half).copy(beliefs=marg2))
+          }
+        }
+
+        oldBeliefs.copy(spans=newSpans)
+      }
+
+      DocumentBeliefs(newSentences.toArray)
+    }
+  }
+
+
+
+  trait AssociationFeaturizer[T, U] {
+    def lens1: Lens[SpanBeliefs, Beliefs[T]]
+    def lens2: Lens[SpanBeliefs, Beliefs[U]]
+    def featureIndex: Index[Feature]
+    def ground(doc: ProcessedDocument, sent: Int, begin: Int, end: Int):AssociationGrounding[T, U]
+  }
+
+  trait AssociationGrounding[T, U] {
+    def featuresFor(p1: Int, p2: Int):Array[Int]
+  }
+
+
+  private def dot(weights: DenseVector[Double], features: Array[Int]) = {
+    var i = 0
+    var score = 0.0
+    val w = weights.data
+    while(i < features.length) {
+      val f = features(i)
+      if (f != -1)
+        score += w(weights.offset + weights.stride * f)
+      i += 1
+    }
+    score
+  }
+
+
+  case class Marginal(sentences: IndexedSeq[SentenceMarginal]) extends epic.framework.Marginal {
+    val logPartition = sentences.map(_.logPartition).sum
+  }
+  case class SentenceMarginal(spans: TriangularArray[DenseMatrix[Double]]) {
+    val logPartition = spans.map(s => if (s eq null) 0.0 else math.log(breeze.linalg.sum(s))).data.sum
+  }
+}
 
 /*
 /**
@@ -190,12 +396,13 @@ object PropertyPropagation {
       // factors
       val factors = for(assoc <- builder.spans.associations) yield assoc.ground(doc, span, beliefs).indexed(featureIndex).factor(weights)
       // current beliefs:
-      for(p <- factors.toSet.flatMap(_.variables)
+      for(p <- factors.toSet.flatMap(_.variables)) {
+
+      }
 
     }
 
   }
 
 }
-
 */

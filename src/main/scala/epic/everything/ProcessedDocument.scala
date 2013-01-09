@@ -24,6 +24,7 @@ case class ProcessedSentence(words: IndexedSeq[String],
                              sparsity: SparsityPattern,
                              ner: Segmentation[NERType.Value, String],
                              speaker: Option[String],
+                             index: Int,
                              id: String="") {
 
   def length= words.length
@@ -44,7 +45,7 @@ object ProcessedDocument {
 
 //        val graph = TriangularArray.tabulate(s.length)((b,e) => graphFeaturizer.linksFor(d, DSpan(d.id, s.sentId, b, e)))
 
-        ProcessedSentence(s.words, tree, constraints.rawConstraints(s.words).sparsity, seg, s.speaker, /*graph,*/ s.id)
+        ProcessedSentence(s.words, tree, constraints.rawConstraints(s.words).sparsity, seg, s.speaker, s.sentId, /*graph,*/ s.id)
       }
 
       ProcessedDocument(newSentences, /*corefFeaturizer.featurizeDocument(d),*/ d.id)

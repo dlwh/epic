@@ -20,6 +20,7 @@ final case class Property[T](name: String, choices: Index[T]) extends Encoder[T]
 
 
 object Property {
+
   def apply[T](name: String)(choices: T*):Property[T] = {
     new Property(name, Index(choices))
   }

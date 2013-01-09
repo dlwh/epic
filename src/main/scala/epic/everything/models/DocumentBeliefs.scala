@@ -47,15 +47,21 @@ case class DocumentBeliefs(sentences: Array[SentenceBeliefs]) extends Factor[Doc
 }
 
 object DocumentBeliefs {
-  class Factory(grammar: BaseGrammar[AnnotatedLabel], nerProp: Property[NERType.Value]) {
+  class Factory(grammar: BaseGrammar[AnnotatedLabel], val nerProp: Property[NERType.Value]) {
     private val initNERBelief = Beliefs.improperUninformed(nerProp)
+
+    val labelProp = Property("label", grammar.labelIndex)
+    val optionLabelProp = Property("option[label]", new OptionIndex(grammar.labelIndex))
+
+
+
     def apply(doc: ProcessedDocument):DocumentBeliefs = {
       val sentences = for((s,i) <- doc.sentences.zipWithIndex.toArray) yield {
         val spanGovernorBeliefs = Beliefs.improperUninformed("wordPos+None", new DenseIntIndex(0, s.length+2))
         val wordGovernorBeliefs = Beliefs.improperUninformed("wordPos", new DenseIntIndex(0, s.length+1))
 //        val governedSpanBeliefs = Beliefs.improperUninformed("span", Index{for(b <- 0 until s.length + 1; end <- b until s.length + 1) yield Span(b,end)})
-        val optionLabelBeliefs = Beliefs.improperUninformed("option[label]", new OptionIndex(grammar.labelIndex))
-        val labelBeliefs = Beliefs.improperUninformed("label", grammar.labelIndex)
+        val optionLabelBeliefs = Beliefs.improperUninformed(optionLabelProp)
+        val labelBeliefs = Beliefs.improperUninformed(labelProp)
         val spans = TriangularArray.tabulate(s.length+1) { (begin, end) =>
           if(begin < end)
             SpanBeliefs(DSpan(doc.id,i,begin, end), spanGovernorBeliefs, optionLabelBeliefs, initNERBelief)

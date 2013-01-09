@@ -127,6 +127,8 @@ object DocLexParser {
           if(old.spanBeliefs(r, c) == null) null
           else {
             val span: SpanBeliefs = old.spanBeliefs(r, c)
+            assert(!info.spanType(r,c).valuesIterator.exists(_.isInfinite), info.spanType(r,c))
+            assert(info.spanType(r,c).sum != 0.0, info.spanType(r,c))
             span.copy(governor=span.governor.updated(info.spanGovernor(r, c)),
             label=span.label.updated(info.spanType(r,c))
             )
