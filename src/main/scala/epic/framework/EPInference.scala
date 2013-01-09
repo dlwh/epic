@@ -55,7 +55,6 @@ class EPInference[Datum, Augment](inferences: IndexedSeq[ProjectableInference[Da
       val (marg, contributionToLikelihood) = inf.goldMarginal(datum, q)
       val newAugment = inf.project(datum, marg, q)
       marginals(i) = marg
-      println("gold??? " + marginals(i).logPartition + " " + inf.goldMarginal(datum)._1.logPartition)
       newAugment -> contributionToLikelihood
     }
     val ep = new ExpectationPropagation(project _)
@@ -86,7 +85,6 @@ class EPInference[Datum, Augment](inferences: IndexedSeq[ProjectableInference[Da
       val (marg, contributionToLikelihood) = inf.marginal(datum, q)
       val newAugment = inf.project(datum, marg, q)
       marginals(i) = marg
-      println("guess... " + marginals(i).logPartition + " " + inf.marginal(datum)._1.logPartition)
       newAugment -> contributionToLikelihood
     }
     val ep = new ExpectationPropagation(project _)

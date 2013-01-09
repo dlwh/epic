@@ -7,8 +7,10 @@ import breeze.inference.bp
 import bp.{BeliefPropagation, Variable, Factor}
 import breeze.linalg.DenseVector
 import collection.mutable.ArrayBuffer
-import epic.everything.{DocumentAnnotator, ProcessedDocument}
+import epic.everything._
 import breeze.collection.mutable.TriangularArray
+import epic.everything.Document
+import models.SentenceBeliefs
 
 /*
 object PropertyPropagation {
@@ -98,13 +100,13 @@ object PropertyPropagation {
       }
 
 
-      oldAugment.copy(sentenceBeliefs=sentences.toArray)
+      oldAugment.copy(sentences=sentences.toArray)
     }
 
     def baseAugment(v: ProcessedDocument): DocumentBeliefs = null
 
     def marginal(doc: ProcessedDocument, beliefs: DocumentBeliefs): (Marginal, Double) = {
-      val sentences = for( (s, sentBeliefs) <- doc.sentences zip beliefs.sentenceBeliefs) yield {
+      val sentences = for( (s, sentBeliefs) <- doc.sentences zip beliefs.sentences) yield {
         if(sentBeliefs eq null) null
         else {
           val spans = TriangularArray.tabulate(s.length){ (b,e) =>
@@ -145,7 +147,33 @@ object PropertyPropagation {
     }
   }
 
-  object PropertyPropagator {
+  //
+  //
+  //
+  //
+
+
+  class DocAgreementGraph(links: IndexedSeq[Link[_, _]]) {
+
+  }
+
+
+  trait AssociationFeaturizer[D] {
+    def apply(doc: Document, s1: D, s2: D, ass1: Int, ass2: Int):IndexedSeq[Feature]
+  }
+
+  case class Link[T, U](p1: Property[T], p2: Property[U],
+                        features: Array[Array[Int]],
+                        agreeFeature: Int = -1,
+                        disagreeFeature: Int = -1) {
+    def factor(weights: DenseVector[Double]):Factor[T, U] = {
+      val scores: Array[Array[Double]] = features.map(_ map (weights apply _))
+      val agreeScore = if(agreeFeature >= 0) weights(agreeFeature) else 0.0
+      val disagreeScore = if(agreeFeature >= 0) weights(disagreeFeature) else 0.0
+      new Factor(this, scores, agreeScore, disagreeScore)
+    }
+  }
+
 
     case class Factor[T, U](link: Link[T, U],
                             scores: Array[Array[Double]],
@@ -158,7 +186,6 @@ object PropertyPropagation {
       def logApply(assignments: Array[Int]): Double = {
         scores(assignments(0))(assignments(1)) + {if (assignments(0) == assignments(1)) agreeScore else disagreeScore}
       }
-
       def tallyExpectedCounts(beliefs: bp.BeliefPropagation.Beliefs, weights: DenseVector[Double]) {
         val marg = beliefs.factorMarginalFor(this)
         val arr = Array(0,0)
@@ -176,17 +203,7 @@ object PropertyPropagation {
       }
     }
 
-    case class Link[T, U](p1: Property[T], p2: Property[U],
-                          features: Array[Array[Int]],
-                          agreeFeature: Int = -1,
-                          disagreeFeature: Int = -1) {
-      def factor(weights: DenseVector[Double]):Factor[T, U] = {
-        val scores: Array[Array[Double]] = features.map(_ map (weights apply _))
-        val agreeScore = if(agreeFeature >= 0) weights(agreeFeature) else 0.0
-        val disagreeScore = if(agreeFeature >= 0) weights(disagreeFeature) else 0.0
-        new Factor(this, scores, agreeScore, disagreeScore)
-      }
-    }
+
 
     case class AssociationFeature(prop1: String, prop2: String, v1: Any, v2: Any) extends Feature
     case class AgreementFeature(prop1: String, prop2: String) extends Feature
@@ -229,7 +246,5 @@ object PropertyPropagation {
 
 
     }
-  }
-
 }
 */

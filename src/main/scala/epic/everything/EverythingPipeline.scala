@@ -12,11 +12,11 @@ import epic.sequences.{SegmentationEval, SegmentationModelFactory}
 import collection.mutable.ArrayBuffer
 import epic.framework.{EPModel, ModelObjective}
 import breeze.collection.mutable.TriangularArray
-import breeze.optimize.CachedBatchDiffFunction
+import breeze.optimize.{RandomizedGradientCheckingFunction, CachedBatchDiffFunction}
 import epic.parser.ParserParams.XbarGrammar
 import features.{RuleFeature, TagAwareWordShapeFeaturizer}
 import models._
-import breeze.util.Index
+import breeze.util.{Lens, Index}
 import epic.parser.models._
 import breeze.linalg._
 import epic.trees.annotations.StripAnnotations
@@ -123,7 +123,7 @@ object EverythingPipeline {
         headFinder,
         parser.grammar.index,
         parser.grammar.labelIndex,
-        100,
+        1, // TODO was 100
         -1,
         trees)
 
@@ -138,10 +138,14 @@ object EverythingPipeline {
     }
     // propagation
 
-    val spanIndex = Index[Property[_]](Iterator(nerProp))
-    val wordIndex = Index[Property[_]]()
-
     // lenses
+    val nerLens: Lens[SpanBeliefs,Beliefs[NERType.Value]] = Lens({_.ner}, {(a,b) => a.copy(ner=b)})
+    val symLens: Lens[SpanBeliefs,Beliefs[Option[AnnotatedLabel]]] = Lens({_.label}, {(a,b) => a.copy(label=b)})
+
+    val assocSynNer = PropertyPropagation.simpleModel(beliefsFactory,
+      nerProp, nerLens,
+      beliefsFactory.optionLabelProp, symLens)
+
     // joint-aware models
     val adaptedNerModel = new ChainNERModel(beliefsFactory, nerModel)
 
@@ -151,15 +155,26 @@ object EverythingPipeline {
 //    val propModel = new PropertyPropagatingModel(propBuilder)
 
     // the big model!
-    val epModel = new EPModel[ProcessedDocument, DocumentBeliefs](5, epInGold = false)(adaptedNerModel, lexParseModel)
+    val epModel = new EPModel[ProcessedDocument, DocumentBeliefs](30, epInGold = false)(
+
+      adaptedNerModel
+      , lexParseModel
+      , assocSynNer
+    )
 //    corefModel)
     //propModel)
 //    val epModel = lexParseModel
 
     val obj = new ModelObjective(epModel, processedTrain)
+    val cachedObj = new CachedBatchDiffFunction(obj)
+
+
+    val checking = new RandomizedGradientCheckingFunction(cachedObj, 1E-4, toString = {
+      (i: Int) => epModel.featureIndex.get(i).toString
+    })
 
     val opt = params.opt
-    for( s <- opt.iterations(new CachedBatchDiffFunction(obj), obj.initialWeightVector(randomize = true))) {
+    for( s <- opt.iterations(cachedObj, obj.initialWeightVector(randomize = true))) {
       println(s.value)
     }
   }

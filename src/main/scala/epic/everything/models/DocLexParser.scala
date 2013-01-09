@@ -70,7 +70,7 @@ object DocLexParser {
 
     def marginal(doc: ProcessedDocument, aug: DocumentBeliefs): (Marginal, Double) = {
       val trees = doc.treeInstances
-      val lenses = for( (b, s) <- aug.sentenceBeliefs zip doc.sentences) yield adapt(s.words, b)
+      val lenses = for( (b, s) <- aug.sentences zip doc.sentences) yield adapt(s.words, b)
 
       val marginals = for (i <- 0 until trees.length) yield {
         AugmentedAnchoring(lenses(i), doc.sentences(i).sparsity).marginal
@@ -86,7 +86,7 @@ object DocLexParser {
 
     def goldMarginal(doc: ProcessedDocument, aug: DocumentBeliefs): (Marginal, Double) = {
       val trees = doc.treeInstances
-      val lenses = for( (b, s) <- aug.sentenceBeliefs zip doc.sentences) yield adapt(s.words, b)
+      val lenses = for( (b, s) <- aug.sentences zip doc.sentences) yield adapt(s.words, b)
 
       val marginals = for (i <- 0 until trees.length) yield {
         new TreeMarginal(AugmentedAnchoring(lenses(i), doc.sentences(i).sparsity), reannotate(trees(i).tree, trees(i).words))
@@ -111,7 +111,7 @@ object DocLexParser {
     }
 
     def project(v: ProcessedDocument, marg: Marginal, oldAugment: DocumentBeliefs): DocumentBeliefs = {
-      val sentences = for ( (old, (s, m)) <- oldAugment.sentenceBeliefs.zip(v.sentences zip marg.sentences)) yield {
+      val sentences = for ( (old, (s, m)) <- oldAugment.sentences.zip(v.sentences zip marg.sentences)) yield {
         val info = new LexGovernorProjector(grammar).apply(m.anchoring.refined, m)
         val words = Array.tabulate(s.length) { w =>
           val oldW = old.wordBeliefs(w)
@@ -127,6 +127,8 @@ object DocLexParser {
           if(old.spanBeliefs(r, c) == null) null
           else {
             val span: SpanBeliefs = old.spanBeliefs(r, c)
+            assert(!info.spanType(r,c).valuesIterator.exists(_.isInfinite), info.spanType(r,c))
+            assert(info.spanType(r,c).sum != 0.0, info.spanType(r,c))
             span.copy(governor=span.governor.updated(info.spanGovernor(r, c)),
             label=span.label.updated(info.spanType(r,c))
             )

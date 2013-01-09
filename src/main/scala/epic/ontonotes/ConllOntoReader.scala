@@ -36,7 +36,7 @@ object ConllOntoReader {
         seq.map(_.split("\\s+").toIndexedSeq)
       }
 
-    val sentences = for( (s,index) <- rawSentences.zipWithIndex) yield {
+    val sentences = for( (s,sentenceIndex) <- rawSentences.zipWithIndex) yield {
       val words = s.map(_(3))
       val tags = s.map(_(4))
 
@@ -86,27 +86,33 @@ object ConllOntoReader {
             }
             if(id.endsWith(")")) {
               val start = stack(tid).pop()
-              mentions(start -> (i+1)) = Mention(tid)
+              mentions(start -> (i+1)) = mention(tid)
             }
           }
       }
 
       val docId = file.getName + "-" + docIndex
       val tree = stringTree.extend { t => AnnotatedLabel(t.label) }
-      val ner = Map.empty ++ entities.map { case ((beg,end),v) => DSpan(docId,index,beg,end) -> v}
-      val coref = Map.empty ++ mentions.map { case ((beg,end),v) => DSpan(docId,index,beg,end) -> v}
+      val ner = Map.empty ++ entities.map { case ((beg,end),v) => DSpan(docId,sentenceIndex,beg,end) -> v}
+      val coref = Map.empty ++ mentions.map { case ((beg,end),v) => DSpan(docId,sentenceIndex,beg,end) -> v}
       val speaker = s.map(_(9)).find(_ != "-")
       val annotations = OntoAnnotations(tree, ner, coref, speaker)
 
 
 
 
-      Sentence(docId, index,words, annotations)
+      Sentence(docId, sentenceIndex,words, annotations)
     }
 
       Document(file.toString + "-" + docIndex,sentences.toIndexedSeq)
     }
+
+
   }
+
+  private val mentionCache = Array.tabulate(100)(i => Mention(i))
+
+  private def mention(id: Int) = if(id < mentionCache.length) mentionCache(id) else Mention(id)
 
   private class RawDocumentIterator(it: Iterator[String]) extends Iterator[IndexedSeq[IndexedSeq[String]]] {
     def hasNext = it.hasNext

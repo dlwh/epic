@@ -8,6 +8,8 @@ import breeze.inference.bp.Variable
  * in the system will have one of these,
  */
 final case class Property[T](name: String, choices: Index[T]) extends Encoder[T] {
+  def size: Int = arity
+
   def toVariable = Variable(name, choices)
   def arity = choices.size
   val index = choices
@@ -18,6 +20,7 @@ final case class Property[T](name: String, choices: Index[T]) extends Encoder[T]
 
 
 object Property {
+
   def apply[T](name: String)(choices: T*):Property[T] = {
     new Property(name, Index(choices))
   }

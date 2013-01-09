@@ -5,7 +5,7 @@ import epic.coref.{CorefInstanceFeaturizer, FeaturizedCorefInstance, CorefInstan
 import epic.sequences.Segmentation
 import epic.trees.StandardTreeProcessor
 import epic.parser.ParseChart.SparsityPattern
-import models.DocumentBeliefs
+//import models.PropertyPropagation.IndexedLink
 import epic.parser.projections.ConstraintCoreGrammar
 
 /**
@@ -24,6 +24,7 @@ case class ProcessedSentence(words: IndexedSeq[String],
                              sparsity: SparsityPattern,
                              ner: Segmentation[NERType.Value, String],
                              speaker: Option[String],
+                             index: Int,
                              id: String="") {
 
   def length= words.length
@@ -33,6 +34,7 @@ case class ProcessedSentence(words: IndexedSeq[String],
 object ProcessedDocument {
   case class Factory(treeProcessor: StandardTreeProcessor,
                      constraints: ConstraintCoreGrammar[AnnotatedLabel, String],
+//                     graphFeaturizer: PropertyPropagation.GraphBuilder,
                      corefFeaturizer: CorefInstanceFeaturizer) extends (Document=>ProcessedDocument) {
 
     def apply(d: Document):ProcessedDocument = {
@@ -41,7 +43,9 @@ object ProcessedDocument {
         var tree = treeProcessor(s.tree.map(_.treebankString))
         tree = UnaryChainRemover.removeUnaryChains(tree)
 
-        ProcessedSentence(s.words, tree, constraints.rawConstraints(s.words).sparsity, seg, s.speaker, s.id)
+//        val graph = TriangularArray.tabulate(s.length)((b,e) => graphFeaturizer.linksFor(d, DSpan(d.id, s.sentId, b, e)))
+
+        ProcessedSentence(s.words, tree, constraints.rawConstraints(s.words).sparsity, seg, s.speaker, s.sentId, /*graph,*/ s.id)
       }
 
       ProcessedDocument(newSentences, /*corefFeaturizer.featurizeDocument(d),*/ d.id)

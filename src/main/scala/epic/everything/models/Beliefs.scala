@@ -14,8 +14,8 @@ final case class Beliefs[T](property: Property[T], beliefs: DenseVector[Double])
 
   def beliefFor(i: T) = apply(property.choices(i))
 
-  def *(f: Beliefs[T]): Beliefs[T] = copy(beliefs = Beliefs.stripNaNs(beliefs :* f.beliefs))
-  def /(f: Beliefs[T]): Beliefs[T] = copy(beliefs = Beliefs.stripNaNs(beliefs :/ f.beliefs))
+  def *(f: Beliefs[T]): Beliefs[T] = copy(beliefs = Beliefs.stripNaNs(beliefs :* f.beliefs, beliefs, f.beliefs))
+  def /(f: Beliefs[T]): Beliefs[T] = copy(beliefs = Beliefs.stripNaNs(beliefs :/ f.beliefs, beliefs, f.beliefs))
 
   def logPartition: Double = {
     val sum = breeze.linalg.sum(beliefs)
@@ -49,11 +49,12 @@ object Beliefs {
     def result() = Beliefs(property, normalize(counts, 1.0))
   }
 
-  private def stripNaNs(beliefs: DenseVector[Double]) = {
+  private def stripNaNs(beliefs: DenseVector[Double], a: DenseVector[Double], b: DenseVector[Double]) = {
     var i = 0
     var p = beliefs.offset
     while(i < beliefs.length) {
-      if (java.lang.Double.isNaN(beliefs(p))) {
+      if (java.lang.Double.isNaN(beliefs(p)) || java.lang.Double.isInfinite(beliefs(p))) {
+        assert(!a(p).isNaN, a.toString + " " + b)
         beliefs(p) = 0.0
       }
       p += beliefs.stride
