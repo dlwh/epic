@@ -36,12 +36,12 @@ class OutsideKernel[C, L](ruleStructure: RuleStructure[C, L], numGrammars: Int)(
                  events: CLEvent*)(implicit queue: CLQueue) = {
     val ou, ob, otb, ot, hooks = new ArrayBuffer[CLEvent]()
     var lastU = null:CLEvent
-    lbinaries.foreach(_.setArgs(outside.top, outside.bot, inside.top, offsets, lengths, Integer.valueOf(maxLength), rules))
-    rbinaries.foreach(_.setArgs(outside.top, outside.bot, inside.top, offsets, lengths, Integer.valueOf(maxLength), rules))
+    lbinaries.foreach(_.setArgs(outside.top, outside.bot, inside.top, offsets, lengths, masks, Integer.valueOf(maxLength), rules))
+    rbinaries.foreach(_.setArgs(outside.top, outside.bot, inside.top, offsets, lengths, masks, Integer.valueOf(maxLength), rules))
     unaries.setArgs(outside.top, outside.bot, offsets, lengths, Integer.valueOf(maxLength), rules)
     tunaries.setArgs(outside.top, outside.bot, offsets, lengths, rules)
-    termbs.setArgs(outside.top, outside.bot, inside.top, inside.tags, offsets, lengths, lengthOffsets, Integer.valueOf(maxLength), rules)
-    bterms.setArgs(outside.top, outside.bot, outside.tags, inside.top, inside.tags, offsets, lengths, lengthOffsets, rules)
+    termbs.setArgs(outside.top, outside.bot, inside.top, inside.tags, offsets, lengths, lengthOffsets, Integer.valueOf(maxLength), masks, rules)
+    bterms.setArgs(outside.top, outside.bot, outside.tags, inside.top, inside.tags, offsets, lengths, lengthOffsets, masks, rules)
 
     lastU = unaries.enqueueNDRange(queue, Array(numSentences, 1, numGrammars), Array(1, 1, numGrammars), events:_*)
     ou += lastU
@@ -185,11 +185,11 @@ __kernel void outside_term_binaries(__global parse_cell* outsides_top,
       }
 
      // complete looking left
-        if (begin > 0) { // look left
-        __global const parse_cell * gparent =  CELL(obot, begin-1, end);
-        __global const parse_cell * gleft = inside_tags + lengthOffsets[sentence] + (begin - 1);
-        %s
-       }
+      if (begin > 0) { // look left
+      __global const parse_cell * gparent =  CELL(obot, begin-1, end);
+      __global const parse_cell * gleft = inside_tags + lengthOffsets[sentence] + (begin - 1);
+      %s
+     }
 
       // multiply in a 2^SCALE_FACTOR to re-achieve balance.
       __global parse_cell* gout = CELL(outsides_top + offsets[sentence], begin, end);

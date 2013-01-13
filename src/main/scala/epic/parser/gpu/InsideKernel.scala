@@ -33,8 +33,8 @@ class InsideKernel[C, L](ruleStructure: RuleStructure[C, L], numGrammars: Int)(i
                  botHook: (Int, CLEvent)=>Option[CLEvent],
                  topHook: (Int, CLEvent)=>Option[CLEvent],
                  events: CLEvent*)(implicit queue: CLQueue) = synchronized {
-    binaries.foreach(_.setArgs(inside.bot, inside.top, offsets, lengths, Integer.valueOf(1), rules))
-    termBinaries.setArgs(inside.bot, inside.top, inside.tags, offsets, lengths, lengthOffsets, Integer.valueOf(1), rules)
+    binaries.foreach(_.setArgs(inside.bot, inside.top, offsets, lengths, Integer.valueOf(1), masks, rules))
+    termBinaries.setArgs(inside.bot, inside.top, inside.tags, offsets, lengths, lengthOffsets, masks, Integer.valueOf(1), rules)
     unaries.setArgs(inside.bot, inside.top, offsets, lengths, Integer.valueOf(1), rules)
     val iu, ib, it, hooks = new ArrayBuffer[CLEvent]()
 

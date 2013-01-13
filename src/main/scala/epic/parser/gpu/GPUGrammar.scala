@@ -17,13 +17,13 @@ import org.bridj.Pointer
 import projections.GrammarRefinements
 
 class GPUGrammar[C, L, W](coarseGrammar: BaseGrammar[C],
-                             projections: GrammarRefinements[C, L],
-                             grammar: BaseGrammar[L],
-                             lexicon: Lexicon[L, W],
-                             private var _ruleScores: Array[RuleScores],
-                             var tagScorers: Array[(IndexedSeq[W],Int,Int)=>Double],
-                             profile: Boolean = true,
-                             maxSentences: Int = 1000)(implicit val context: CLContext) {
+                          projections: GrammarRefinements[C, L],
+                          grammar: BaseGrammar[L],
+                          lexicon: Lexicon[L, W],
+                          private var _ruleScores: Array[RuleScores],
+                          var tagScorers: Array[(IndexedSeq[W],Int,Int)=>Double],
+                          profile: Boolean = true,
+                          maxSentences: Int = 1000)(implicit val context: CLContext) {
   def ruleScores = _ruleScores
 
   val numGrammars = _ruleScores.length
@@ -422,7 +422,6 @@ class GPUGrammar[C, L, W](coarseGrammar: BaseGrammar[C],
     for(m <- marginals) {
       println(m.rootScore(0))
       println(breeze.numerics.logSum({for(i <- 0 until grammar.labelIndex.size) yield m.botOutsideScore(0, 1, 0, i) + m.botInsideScore(0, 1, 0, i)}))
-
     }
     marginals
   }
