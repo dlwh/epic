@@ -75,13 +75,13 @@ object EverythingPipeline {
       trainTrees ++= params.treebank.trainTrees
     }
 
-    val km = new PipelineAnnotator[AnnotatedLabel, String](Seq(StripAnnotations(), AddMarkovization()))
-    val parser: SimpleChartParser[AnnotatedLabel, String] = GenerativeParser.annotated(new XbarGrammar(), km, trainTrees)
+    val annotator = new PipelineAnnotator[AnnotatedLabel, String](Seq(StripAnnotations(), AddMarkovization()))
+    val baseParser = GenerativeParser.annotated(new XbarGrammar(), annotator, trainTrees)
 
     val docProcessor = new ProcessedDocument.Factory(params.treebank.process,
-      new ConstraintCoreGrammar(parser.augmentedGrammar, -7), null)
+      new ConstraintCoreGrammar(baseParser.augmentedGrammar, -7), null)
 
-    val beliefsFactory = new DocumentBeliefs.Factory(parser.grammar, nerProp)
+    val beliefsFactory = new DocumentBeliefs.Factory(baseParser.grammar, nerProp)
     /*
     // Coref
     val corefNerProp = nerProp.copy(name = "Coref::NER") // own copy of corefNer, since we're using soft agreement.
@@ -96,46 +96,7 @@ object EverythingPipeline {
 
     val processedTrain = train.map(docProcessor)
 
-    val lexParseModel = {
-
-      val trees = trainTrees.map(StripAnnotations())
-      val (initLexicon, initBinaries, initUnaries) = GenerativeParser.extractCounts(trees)
-
-      val wordIndex: Index[String] = Index(trainTrees.iterator.flatMap(_.words))
-      val summedCounts = sum(initLexicon, Axis._0)
-      val shapeGen = new SimpleWordShapeGen(initLexicon, summedCounts)
-      val tagShapeGen = new TagAwareWordShapeFeaturizer(initLexicon)
-
-      val lexicon:Lexicon[AnnotatedLabel, String] = initLexicon
-
-      def ruleGen(r: Rule[AnnotatedLabel]) = IndexedSeq(RuleFeature(r))
-      def validTag(w: String) = lexicon.tagsForWord(w).toArray
-
-      val headFinder = HeadFinder.collins
-      val feat = new StandardFeaturizer(wordIndex,
-      parser.grammar.labelIndex,
-      parser.grammar.index,
-      ruleGen,
-      shapeGen,
-      { (w:Seq[String], pos: Int) => tagShapeGen.featuresFor(w, pos)})
-
-      val indexed =  IndexedLexFeaturizer.extract[AnnotatedLabel, String](feat,
-        headFinder,
-        parser.grammar.index,
-        parser.grammar.labelIndex,
-        1, // TODO was 100
-        -1,
-        trees)
-
-      val bundle = new LexGrammarBundle[AnnotatedLabel, String](parser.grammar,
-        parser.lexicon,
-        headFinder,
-        wordIndex
-      )
-
-      def reannotate(tree: BinarizedTree[AnnotatedLabel], words: Seq[String]) = tree.map(_.baseAnnotatedLabel)
-      new DocLexParser.Model(beliefsFactory, bundle, reannotate, indexed)
-    }
+    val lexParseModel = extractLexParserModel(trainTrees, baseParser, beliefsFactory)
     // propagation
 
     // lenses
@@ -177,6 +138,50 @@ object EverythingPipeline {
     for( s <- opt.iterations(cachedObj, obj.initialWeightVector(randomize = true))) {
       println(s.value)
     }
+  }
+
+  def extractLexParserModel(trainTrees: Array[TreeInstance[AnnotatedLabel, String]], parser: SimpleChartParser[AnnotatedLabel, String], beliefsFactory: DocumentBeliefs.Factory): DocLexParser.Model = {
+
+
+    val trees = trainTrees.map(StripAnnotations())
+    val (initLexicon, initBinaries, initUnaries) = GenerativeParser.extractCounts(trees)
+
+    val wordIndex: Index[String] = Index(trainTrees.iterator.flatMap(_.words))
+    val summedCounts = sum(initLexicon, Axis._0)
+    val shapeGen = new SimpleWordShapeGen(initLexicon, summedCounts)
+    val tagShapeGen = new TagAwareWordShapeFeaturizer(initLexicon)
+
+    val lexicon: Lexicon[AnnotatedLabel, String] = initLexicon
+
+    def ruleGen(r: Rule[AnnotatedLabel]) = IndexedSeq(RuleFeature(r))
+    def validTag(w: String) = lexicon.tagsForWord(w).toArray
+
+    val headFinder = HeadFinder.collins
+    val feat = new StandardFeaturizer(wordIndex,
+    parser.grammar.labelIndex,
+    parser.grammar.index,
+    ruleGen,
+    shapeGen, {
+      (w: Seq[String], pos: Int) => tagShapeGen.featuresFor(w, pos)
+    })
+
+    val indexed = IndexedLexFeaturizer.extract[AnnotatedLabel, String](feat,
+      headFinder,
+      parser.grammar.index,
+      parser.grammar.labelIndex,
+      1, // TODO was 100
+      -1,
+      trees)
+
+    val bundle = new LexGrammarBundle[AnnotatedLabel, String](parser.grammar,
+      parser.lexicon,
+      headFinder,
+      wordIndex
+    )
+
+    def reannotate(tree: BinarizedTree[AnnotatedLabel], words: Seq[String]) = tree.map(_.baseAnnotatedLabel)
+    new DocLexParser.Model(beliefsFactory, bundle, reannotate, indexed)
+
   }
 }
 
