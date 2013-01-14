@@ -43,22 +43,10 @@ object ParserTester {
    * Evaluates a parser on dev and possibly test.
    */
   def main(args: Array[String]) {
-    val (baseConfig,files) = CommandLineParser.parseArguments(args)
-    val config = baseConfig backoff Configuration.fromPropertiesFiles(files.map(new File(_)))
-    val params = try {
-      config.readIn[Params]("test")
-    } catch {
-      case e =>
-      println(breeze.config.GenerateHelp[Params](config))
-      sys.exit(1)
-    }
-
-    if(params.help) {
-      println(breeze.config.GenerateHelp[Params](config))
-      System.exit(1)
-    }
+    val params = CommandLineParser.readIn[Params](args)
     println("Evaluating Parser...")
     println(params)
+    import params._
 
     import params.treebank._
 

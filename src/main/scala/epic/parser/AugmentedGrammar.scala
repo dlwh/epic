@@ -1,4 +1,8 @@
 package epic.parser
+
+import epic.parser.ParseChart.SparsityPattern
+import projections.ConstraintAnchoring
+
 /*
  Copyright 2012 David Hall
 
@@ -65,8 +69,7 @@ final case class AugmentedAnchoring[L, W](refined: RefinedAnchoring[L, W], core:
   def words = refined.words
 
   /** The marginal associated with this anchoring (i.e. inside and outside scores) */
-  def marginal = ChartMarginal(this, words, ParseChart.logProb)
-  def maxMarginal = ChartMarginal(this, words, ParseChart.viterbi)
+  def marginal = ChartMarginal(this, words)
 
   /**
    * Scores the [[epic.trees.BinaryRule]] with its refinement in this context.
@@ -119,6 +122,10 @@ final case class AugmentedAnchoring[L, W](refined: RefinedAnchoring[L, W], core:
 object AugmentedAnchoring {
   def fromRefined[L, W](refined: RefinedAnchoring[L, W], viterbi: Boolean = false) = {
     AugmentedAnchoring(refined, CoreAnchoring.identity(refined.grammar, refined.lexicon, refined.words), viterbi)
+  }
+
+  def apply[L, W](refined: RefinedAnchoring[L, W], sparsity: SparsityPattern) = {
+    new AugmentedAnchoring(refined, new ConstraintAnchoring(refined.grammar, refined.lexicon, refined.words, sparsity))
   }
 
 

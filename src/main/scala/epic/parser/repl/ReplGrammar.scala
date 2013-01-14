@@ -1,4 +1,5 @@
-package epic.parser
+package epic.parser.repl
+
 /*
  Copyright 2012 David Hall
 

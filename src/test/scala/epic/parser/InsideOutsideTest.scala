@@ -19,6 +19,7 @@ import epic.trees._
 import org.junit.runner.RunWith
 import org.scalatest._
 import org.scalatest.junit._
+import repl.DSLGrammar
 
 /**
  * 
@@ -34,7 +35,7 @@ class InsideOutsideTest extends FunSuite {
   test("Simple test from iobasics") {
     val grammar = DSLGrammar.simpleGrammar
     val sent = "She eats pizza without anchovies" split " "
-    val io = ChartMarginal(grammar, sent, ParseChart.logProb)
+    val io = ChartMarginal(grammar, sent)
     val counts = io.expectedCounts(new ProductionFeaturizer(grammar.grammar, DSLGrammar.lexicon))
     assert(counts(BinaryRule("Sb","NPu","VPu")) near 1.0)
     assert(counts(BinaryRule("NPb","Nu","PPu")) near 1.0)
@@ -51,7 +52,7 @@ class InsideOutsideTest extends FunSuite {
     val grammar = grammarForComplexExample
     val lexicon = lexiconForComplexExample
     val sent = "He has good control" split " "
-    val io = ChartMarginal(grammar, sent, ParseChart.logProb)
+    val io = ChartMarginal(grammar, sent)
     val counts = io.expectedCounts(new ProductionFeaturizer(grammar.grammar, lexicon))
     assert(counts(BinaryRule("Sb","NPu","VPu")) near  1.0)
     assert(counts(BinaryRule("VPb","VBZu","NPu")) near  0.5)
@@ -72,7 +73,7 @@ class InsideOutsideTest extends FunSuite {
     val grammar = grammarForComplexExample
     val lexicon = lexiconForComplexExample
     val sent = "He has good control" split " "
-    val io = ChartMarginal.apply(grammar, sent, ParseChart.logProb)
+    val io = ChartMarginal.apply(grammar, sent)
     import io._
     assert(inside.bot.labelScore(0,1,"PRP", 0) near 0.0)
     assert(inside.top.labelScore(0,1,"NPu", 0) near math.log(1.0/3.0))

@@ -7,14 +7,12 @@ import java.lang.{Float=>JFloat, Integer=>JInt}
 class MaxRecallKernel[Coarse, Fine](rules: RuleStructure[Coarse, Fine], numGrammars: Int)(implicit context: CLContext) {
   def makeBackpointers(numSentences:Int,
                        backPointers: CLBuffer[JInt],
-                       projectedTop: CLBuffer[JFloat],
-                       projectedBot: CLBuffer[JFloat],
+                       projected: GPUCharts,
                        offsets: CLBuffer[JInt],
                        lengths: CLBuffer[JInt],
                        maxLength: Int,
                        events: CLEvent*)(implicit queue: CLQueue) = synchronized {
-    max_recall.setArgs(backPointers, projectedTop, projectedBot, offsets, lengths, Integer.valueOf(1))
-    val mr = new ArrayBuffer[CLEvent]()
+    max_recall.setArgs(backPointers, projected.top, projected.bot, offsets, lengths, Integer.valueOf(1))
 
     var event = max_recall.enqueueNDRange(queue, Array(numSentences, maxLength), events:_*)
     for (len <- 2 to maxLength) {

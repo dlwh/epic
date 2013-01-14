@@ -50,6 +50,8 @@ case class Sentence(docId: String, sentId: Int,
     copy(annotations=OntoAnnotations(tree, ner, coref, speaker))
   }
 
+  def dspans = for(begin <- 0 until length; end <- (begin+1) to length) yield DSpan(docId, sentId, begin, end)
+
 }
 
 

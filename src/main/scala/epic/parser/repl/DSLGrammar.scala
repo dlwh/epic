@@ -1,4 +1,5 @@
-package epic.parser
+package epic.parser.repl
+
 /*
  Copyright 2012 David Hall
 
@@ -16,6 +17,7 @@ package epic.parser
 */
 import breeze.linalg._
 import epic.trees.{LexicalProduction, Rule, BinaryRule, UnaryRule}
+import epic.parser.{RefinedGrammar, UnsmoothedLexicon, BaseGrammar, AugmentedGrammar}
 
 /**
  * A DSL Grammar allows us to define simple weighted PCFG's quickly.

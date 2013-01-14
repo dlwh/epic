@@ -26,16 +26,11 @@ class EPKernel[L, L2](rules: RuleStructure[L, L2],numGrammars: Int)(implicit con
 
 
   def updateQs(numSentences: Int,
-               projectedTop: CLBuffer[JFloat],
-               projectedBot: CLBuffer[JFloat],
-               insideTop: CLBuffer[JFloat],
-               insideBot: CLBuffer[JFloat],
-               outsideTop: CLBuffer[JFloat],
-               outsideBot: CLBuffer[JFloat],
-               qTop: CLBuffer[JFloat],
-               qBot: CLBuffer[JFloat],
-               msgTop: CLBuffer[JFloat],
-               msgBot: CLBuffer[JFloat],
+               projected: GPUCharts,
+               inside: GPUCharts,
+               outside: GPUCharts,
+               q: GPUCharts,
+               msg: GPUCharts,
                offsets: CLBuffer[JInt],
                lengths: CLBuffer[JInt],
                maxLength: Int,
@@ -43,9 +38,9 @@ class EPKernel[L, L2](rules: RuleStructure[L, L2],numGrammars: Int)(implicit con
     val pn = new ArrayBuffer[CLEvent]()
     val um = new ArrayBuffer[CLEvent]()
     val uq = new ArrayBuffer[CLEvent]()
-    project_qnews.setArgs(projectedBot, insideBot, outsideBot, insideTop, qBot, msgBot, offsets, lengths, Integer.valueOf(1))
-    update_msg.setArgs(qBot, projectedBot, msgBot, offsets, lengths, Integer.valueOf(1))
-    update_q.setArgs(qBot, msgBot, offsets, lengths, Integer.valueOf(1))
+    project_qnews.setArgs(projected.bot, inside.bot, outside.bot, inside.top, q.bot, msg.bot, offsets, lengths, Integer.valueOf(1))
+    update_msg.setArgs(q.bot, projected.bot, msg.bot, offsets, lengths, Integer.valueOf(1))
+    update_q.setArgs(q.bot, msg.bot, offsets, lengths, Integer.valueOf(1))
 
     for (len <- 1 to maxLength) {
       project_qnews.setArg(8, len)
@@ -57,9 +52,9 @@ class EPKernel[L, L2](rules: RuleStructure[L, L2],numGrammars: Int)(implicit con
       uq += update_q.enqueueNDRange(queue, Array(numSentences, maxLength + 1 - len, numGrammars), Array(1, 1, numGrammars), um.last)
     }
 
-    project_qnews.setArgs(projectedTop, insideTop, outsideTop, insideTop, qTop, msgTop, offsets, lengths, Integer.valueOf(1))
-    update_msg.setArgs(qTop, projectedTop, msgTop, offsets, lengths, Integer.valueOf(1))
-    update_q.setArgs(qTop, msgTop, offsets, lengths, Integer.valueOf(1))
+    project_qnews.setArgs(projected.top, inside.top, outside.top, inside.top, q.top, msg.top, offsets, lengths, Integer.valueOf(1))
+    update_msg.setArgs(q.top, projected.top, msg.top, offsets, lengths, Integer.valueOf(1))
+    update_q.setArgs(q.top, msg.top, offsets, lengths, Integer.valueOf(1))
     for(len <- 1 to maxLength) {
       project_qnews.setArg(8, len)
       val b2 = project_qnews.enqueueNDRange(queue, Array(numSentences, maxLength + 1 - len, numGrammars), Array(1, 1, numGrammars), events:_*)

@@ -11,9 +11,7 @@ class InsideKernel[C, L](ruleStructure: RuleStructure[C, L], numGrammars: Int)(i
   import ruleStructure._
 
   def insidePass(numSentences: Int,
-                 insideBot: CLBuffer[JFloat],
-                 insideTop: CLBuffer[JFloat],
-                 posTags: CLBuffer[JFloat],
+                 inside: GPUCharts,
                  offsets: CLBuffer[JInt],
                  lengths: CLBuffer[JInt],
                  maxLength: Int,
@@ -21,14 +19,11 @@ class InsideKernel[C, L](ruleStructure: RuleStructure[C, L], numGrammars: Int)(i
                  masks: CLBuffer[JLong],
                  rules: CLBuffer[JFloat],
                  events: CLEvent*)(implicit queue: CLQueue) = synchronized {
-    epInsidePass(numSentences, insideBot, insideTop, posTags, offsets, lengths, maxLength, lengthOffsets, masks, rules, {(_,_)=>None}, {(_,_)=>None}, events:_*)
-
+    epInsidePass(numSentences, inside, offsets, lengths, maxLength, lengthOffsets, masks, rules, {(_,_)=>None}, {(_,_)=>None}, events:_*)
   }
 
   def epInsidePass(numSentences: Int,
-                 insideBot: CLBuffer[JFloat],
-                 insideTop: CLBuffer[JFloat],
-                 posTags: CLBuffer[JFloat],
+                 inside: GPUCharts,
                  offsets: CLBuffer[JInt],
                  lengths: CLBuffer[JInt],
                  maxLength: Int,
@@ -38,10 +33,11 @@ class InsideKernel[C, L](ruleStructure: RuleStructure[C, L], numGrammars: Int)(i
                  botHook: (Int, CLEvent)=>Option[CLEvent],
                  topHook: (Int, CLEvent)=>Option[CLEvent],
                  events: CLEvent*)(implicit queue: CLQueue) = synchronized {
-    binaries.foreach(_.setArgs(insideBot, insideTop, offsets, lengths, Integer.valueOf(1), masks, rules))
-    termBinaries.setArgs(insideBot, insideTop, posTags, offsets, lengths, lengthOffsets, masks, Integer.valueOf(1), rules)
-    unaries.setArgs(insideBot, insideTop, offsets, lengths, Integer.valueOf(1), rules)
+    binaries.foreach(_.setArgs(inside.bot, inside.top, offsets, lengths, Integer.valueOf(1), masks, rules))
+    termBinaries.setArgs(inside.bot, inside.top, inside.tags, offsets, lengths, lengthOffsets, masks, Integer.valueOf(1), rules)
+    unaries.setArgs(inside.bot, inside.top, offsets, lengths, Integer.valueOf(1), rules)
     val iu, ib, it, hooks = new ArrayBuffer[CLEvent]()
+
     var lastU:CLEvent = null
     queue.finish()
     for( h <- botHook(1, lastU)) {
@@ -55,7 +51,7 @@ class InsideKernel[C, L](ruleStructure: RuleStructure[C, L], numGrammars: Int)(i
       hooks += h
     }
 
-    // TODO: retrofit inside/outside binaries and unaries to look at posTagsPointer....
+    // TODO: retrofit inside/outside binaries and unaries to look at inside.tagsPointer....
     // TODO: also get ecounts...
     for (len <- 2 to maxLength) {
       binaries.foreach(_.setArg(4, len))
@@ -119,11 +115,9 @@ class InsideKernel[C, L](ruleStructure: RuleStructure[C, L], numGrammars: Int)(i
   const int gram = get_global_id(2);
   const int end = begin + spanLength;
   const int length = lengths[sentence];
-//  float out[NUM_SYMS];
-  float out[NUM_SYMS], right[NUM_SYMS];
+  float out[NUM_SYMS];
   __global const pruning_mask* pmask =  masks + offsets[sentence] + TRIANGULAR_INDEX(begin, end);
   if (end <= length && IS_ANY_SET(*pmask)) {
-    __global const parse_cell* chart_top =  inside_tops + offsets[sentence];
     for(int i = 0; i < NUM_SYMS; ++i) {
       out[i] = 0.0f;
     }
@@ -239,7 +233,7 @@ __kernel void inside_unaries(__global const parse_cell * inside_bots,
   def insideTermRuleUpdates: String = {
     var lastLeft = -1
     val sb = new ArrayBuffer[String]
-    sb += "float currentLeftScore, currentRightScore, currentSum = 0.0f;"
+    sb += "float currentLeftScore, currentRightScore;"
     // do A -> Term NonTerm
     for((r@BinaryRule(p, l, right), index) <- ruleStructure.leftTermRules.sortBy(_._1.left)) {
       if(lastLeft != l) {

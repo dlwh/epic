@@ -28,6 +28,7 @@ import epic.trees.{TreeInstance, UnaryRule, BinaryRule}
 trait ParserModel[L, W] extends Model[TreeInstance[L, W]] with ParserExtractable[L, W] {
   type ExpectedCounts = StandardExpectedCounts[Feature]
   type Inference <: ParserInference[L, W]
+  type Marginal = epic.parser.ParseMarginal[L, W]
 
   def extractParser(weights: DenseVector[Double]) = {
     val inf = inferenceFromWeights(weights)
@@ -38,7 +39,7 @@ trait ParserModel[L, W] extends Model[TreeInstance[L, W]] with ParserExtractable
 
 trait ParserInference[L, W] extends ProjectableInference[TreeInstance[L, W], CoreAnchoring[L, W]] {
   type ExpectedCounts = StandardExpectedCounts[Feature]
-  type Marginal = ChartMarginal[ParseChart.LogProbabilityParseChart, L, W]
+  type Marginal = epic.parser.ParseMarginal[L, W]
 
 
   def emptyCounts = StandardExpectedCounts.zero(featurizer.index)
@@ -61,11 +62,11 @@ trait ParserInference[L, W] extends ProjectableInference[TreeInstance[L, W], Cor
           throw e
       }
     }
-    charts -> charts.partition
+    charts -> charts.logPartition
   }
 
-  def countsFromMarginal(v: TreeInstance[L, W], marg: Marginal, aug: CoreAnchoring[L, W]) = {
-    marg.expectedCounts(featurizer)
+  def countsFromMarginal(v: TreeInstance[L, W], marg: Marginal, accum: ExpectedCounts, scale: Double) = {
+    marg.expectedCounts(featurizer, accum, scale)
   }
 
   def baseAugment(v: TreeInstance[L, W])  = baseMeasure.anchor(v.words)

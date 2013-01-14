@@ -103,6 +103,21 @@ class HeadFinder[L](defaultDirection: Dir = Left,
       BinaryTree(a -> head, recB, recC, t.span)
   }
 
+  def annotateHeadTags[W](t: BinarizedTree[L]): BinarizedTree[(L, L)] = t match {
+    case NullaryTree(l, span) =>
+      NullaryTree(l -> l, t.span)
+    case u@UnaryTree(a, b, chain, span) =>
+      val rec: BinarizedTree[(L, L)] = annotateHeadTags(b)
+      u.copy(a -> rec.label._2, rec)
+    case BinaryTree(a, b, c, span) =>
+      val headChild = findHeadChild(t)
+      val recB: BinarizedTree[(L, L)] = annotateHeadTags(b)
+      val recC: BinarizedTree[(L, L)] = annotateHeadTags(c)
+      val head = if(headChild == 0) recB.label._2 else recC.label._2
+      BinaryTree(a -> head, recB, recC, t.span)
+  }
+
+
 
   def projected[U](f: U => L): HeadFinder[U] = new HeadFinder[U](defaultDirection, rules.projected(f))
 

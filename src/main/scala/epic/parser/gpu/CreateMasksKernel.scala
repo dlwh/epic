@@ -4,17 +4,16 @@ import com.nativelibs4java.opencl._
 import collection.mutable.ArrayBuffer
 import java.lang.{Float=>JFloat, Integer=>JInt, Long=>JLong}
 
-class CreateMasksKernel[L, L2](rules: RuleStructure[L, L2],numGrammars: Int, odds_ratio: Boolean=false)(implicit context: CLContext) {
+class CreateMasksKernel[L, L2](rules: RuleStructure[L, L2], numGrammars: Int)(implicit context: CLContext) {
 
   def projections = rules.refinements.labels
 
   def createMasks(numSentences: Int, numCells: Int,
                  masks: CLBuffer[JLong],
-                 projectedTop: CLBuffer[JFloat],
-                 projectedBot: CLBuffer[JFloat],
+                 projected: GPUCharts,
                  offsets: CLBuffer[JInt],
                  events: CLEvent*)(implicit queue: CLQueue) = synchronized {
-    set_coarse_masks.setArgs(masks, projectedTop, projectedBot, offsets)
+    set_coarse_masks.setArgs(masks, projected.top, projected.bot, offsets)
     val pn = new ArrayBuffer[CLEvent]()
     val b = set_coarse_masks.enqueueNDRange(queue, Array(numCells), events:_*)
     pn += b

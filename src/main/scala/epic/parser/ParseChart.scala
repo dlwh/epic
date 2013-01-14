@@ -22,9 +22,11 @@ import breeze.collection.mutable.TriangularArray
 import breeze.numerics.logSum
 import collection.mutable.BitSet
 import collection.immutable
+import collection.immutable.BitSet.BitSetN
+import java.util
 
-@SerialVersionUID(3)
-abstract class ParseChart[L](val index: Index[L],
+@SerialVersionUID(4)
+class ParseChart[L](val index: Index[L],
                              // label => number of refinements
                              refinementsFor: Array[Int],
                              val length: Int,
@@ -58,8 +60,11 @@ abstract class ParseChart[L](val index: Index[L],
       val ind = TriangularArray.index(b, e)
       val arr = score(ind)
       if(arr != null) {
-        for(l <- sparsityLabel(b, e)) {
-          arr(l) = mkGrammarVector(refinementsFor(l), zero)
+        var l = 0
+        while(l < grammarSize) {
+          if(sparsityLabel(b, e).contains(l))
+            arr(l) = mkGrammarVector(refinementsFor(l), zero)
+          l += 1
         }
       }
     }
@@ -213,12 +218,18 @@ abstract class ParseChart[L](val index: Index[L],
 
   }
 
-  // requirements: sum(a, b) >= a, \forall b that might be used.
-  def sum(a:Double, b: Double):Double
-  // possibly faster sum
-  def sum(arr: Array[Double], length: Int):Double
   protected final def zero = Double.NegativeInfinity
+  final def sum(a: Double, b: Double) = {
+    // log1p isn't optimized, and I don't really care about accuracy that much
+    // scalala.library.Numerics.logSum(a, b)
+    if (a == Double.NegativeInfinity) b
+    else if (b == Double.NegativeInfinity) a
+    else if (a < b) b + log(1+exp(a - b))
+    else a + log(1+exp(b - a))
+  }
+  final def sum(arr: Array[Double], length: Int) = logSum(arr, length)
 }
+
 
 
 object ParseChart {
@@ -232,11 +243,17 @@ object ParseChart {
 
   object SparsityPattern {
     def noSparsity[L](labels: Index[L], length: Int):SparsityPattern = new SparsityPattern {
-      def activeTriangularIndices: immutable.BitSet = {
-        immutable.BitSet.empty ++ Range(0, TriangularArray.arraySize(length+1))
+      val activeTriangularIndices: immutable.BitSet = {
+        val arr = new Array[Long]((TriangularArray.arraySize(length+1)+63)/64)
+        util.Arrays.fill(arr, -1L)
+        new BitSetN(arr)
       }
 
-      val allLabels = immutable.BitSet.empty ++ Range(0, labels.size)
+      val allLabels = {
+        val arr = new Array[Long]((labels.size + 63)/64)
+        util.Arrays.fill(arr, -1L)
+        new BitSetN(arr)
+      }
 
       def activeLabelsTop(begin: Int, end: Int) = allLabels
       def activeLabelsBot(begin: Int, end: Int) = allLabels
@@ -254,16 +271,9 @@ object ParseChart {
     def apply[L](g: Index[L], refinements: Array[Int], length: Int, sparsity: SparsityPattern):Chart[L]
   }
 
-  // concrete factories:
-  object viterbi extends Factory[ViterbiParseChart] {
+  object logProb extends Factory[ParseChart] {
     def apply[L](g: Index[L], refinements: Array[Int], length: Int, sparsity: SparsityPattern) = {
-      new ParseChart(g, refinements, length, sparsity) with Viterbi
-    }
-  }
-
-  object logProb extends Factory[LogProbabilityParseChart] {
-    def apply[L](g: Index[L], refinements: Array[Int], length: Int, sparsity: SparsityPattern) = {
-      new ParseChart(g, refinements, length, sparsity) with LogProbability
+      new ParseChart(g, refinements, length, sparsity)
     }
   }
 
@@ -293,34 +303,7 @@ object ParseChart {
     arr
   }
 
-  trait Viterbi {
-    final def sum(a: Double, b: Double) = math.max(a, b)
 
-    def sum(a: Array[Double], length: Int) = {
-      var i = 1
-      var max =  a(0)
-      while(i < length) {
-        if(a(i) > max) max = a(i)
-        i += 1
-      }
-      max
-
-    }
-  }
-  type ViterbiParseChart[L] = ParseChart[L] with Viterbi
-
-  trait LogProbability {
-    final def sum(a: Double, b: Double) = {
-      // log1p isn't optimized, and I don't really care about accuracy that much
-      // scalala.library.Numerics.logSum(a, b)
-      if (a == Double.NegativeInfinity) b
-      else if (b == Double.NegativeInfinity) a
-      else if (a < b) b + log(1+exp(a - b))
-      else a + log(1+exp(b - a))
-    }
-    final def sum(arr: Array[Double], length: Int) = logSum(arr, length)
-  }
-  type LogProbabilityParseChart[L] = ParseChart[L] with LogProbability
 
 }
 

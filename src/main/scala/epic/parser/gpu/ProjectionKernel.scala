@@ -9,25 +9,22 @@ class ProjectionKernel[L, L2](rules: RuleStructure[L, L2],numGrammars: Int, odds
   def projections = rules.refinements.labels
 
   def projectCells(numSentences: Int,
-                 projectedTop: CLBuffer[JFloat],
-                 projectedBot: CLBuffer[JFloat],
-                 insideTop: CLBuffer[JFloat],
-                 insideBot: CLBuffer[JFloat],
-                 outsideTop: CLBuffer[JFloat],
-                 outsideBot: CLBuffer[JFloat],
+                 projected: GPUCharts,
+                 inside: GPUCharts,
+                 outside: GPUCharts,
                  offsets: CLBuffer[JInt],
                  lengths: CLBuffer[JInt],
                  maxLength: Int,
                  events: CLEvent*)(implicit queue: CLQueue) = synchronized {
-    project_nterms.setArgs(projectedBot, insideBot, outsideBot, insideTop, offsets, lengths, Integer.valueOf(1))
+    project_nterms.setArgs(projected.bot, inside.bot, outside.bot, inside.top, offsets, lengths, Integer.valueOf(1))
     val pn = new ArrayBuffer[CLEvent]()
 
     // TODO: retrofit inside/outside binaries and unaries to look at posTagsPointer....
     // TODO: also get ecounts...
     for (len <- 1 to maxLength) {
-      project_nterms.setArg(0, projectedBot)
-      project_nterms.setArg(1, insideBot)
-      project_nterms.setArg(2, outsideBot)
+      project_nterms.setArg(0, projected.bot)
+      project_nterms.setArg(1, inside.bot)
+      project_nterms.setArg(2, outside.bot)
       project_nterms.setArg(6, len)
       val b = project_nterms.enqueueNDRange(queue, Array(numSentences, maxLength + 1 - len, numGrammars), Array(1, 1, numGrammars), events:_*)
       pn += b
@@ -35,9 +32,9 @@ class ProjectionKernel[L, L2](rules: RuleStructure[L, L2],numGrammars: Int, odds
 
 
     for(len <- 1 to maxLength) {
-      project_nterms.setArg(0, projectedTop)
-      project_nterms.setArg(1, insideTop)
-      project_nterms.setArg(2, outsideTop)
+      project_nterms.setArg(0, projected.top)
+      project_nterms.setArg(1, inside.top)
+      project_nterms.setArg(2, outside.top)
       project_nterms.setArg(6, len)
       val b2 = project_nterms.enqueueNDRange(queue, Array(numSentences, maxLength + 1 - len, numGrammars), Array(1, 1, numGrammars), events:_*)
       pn += b2

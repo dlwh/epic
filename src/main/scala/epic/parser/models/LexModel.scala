@@ -21,6 +21,7 @@ import breeze.collection.mutable.OpenAddressHashArray
 import breeze.linalg._
 import breeze.text.analyze.EnglishWordClassGenerator
 import epic.trees._
+import annotations.{StripAnnotations, TreeAnnotator}
 import java.io.File
 import features._
 import epic.parser._
@@ -39,15 +40,13 @@ class LexModel[L, W](bundle: LexGrammarBundle[L, W],
 
   val featureIndex = indexed.index
 
-  import bundle._
-
   def initialValueForFeature(f: Feature) = initFeatureValue(f).getOrElse(0)
 
   def inferenceFromWeights(weights: DenseVector[Double]) = {
     val gram = bundle.makeGrammar(indexed, weights)
     def ann(tree: BinarizedTree[L], words: Seq[W]):BinarizedTree[(L, Int)] = {
       val reannotated = reannotate(tree, words)
-      val headed = headFinder.annotateHeadIndices(reannotated)
+      val headed = bundle.headFinder.annotateHeadIndices(reannotated)
       headed
 
     }
@@ -124,7 +123,7 @@ class IndexedLexFeaturizer[L, W](f: LexFeaturizer[L, W],
     def length = words.length
 
     def featuresForUnaryRule(begin: Int, end: Int, rule: Int, ref: Int) = {
-      indexedFeaturesForRuleHead(rule, ref)
+      indexedFeaturesForRuleHead(rule, unaryHeadIndex(ref))
     }
 
     def featuresForSpan(begin: Int, end: Int, tag: Int, ref: Int) = {
@@ -152,9 +151,22 @@ class IndexedLexFeaturizer[L, W](f: LexFeaturizer[L, W],
     }
 
 
+    def headIndex(ruleRef: Int) = {
+      ruleRef / words.length
+    }
+
+    def depIndex(ruleRef: Int) = {
+      ruleRef % words.length
+    }
+
+    def unaryHeadIndex(ref: Int) = {
+      ref
+    }
+
+
     def featuresForBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int) =  {
-      val head = (ref:Int) / words.length
-      val dep = (ref:Int) % words.length
+      val head = headIndex(ref)
+      val dep = depIndex(ref)
 
       var rcache = binaryCache(head)
       if(rcache eq null) {
@@ -382,14 +394,14 @@ case class StandardFeaturizer[L, W>:Null, P](wordIndex: Index[W],
   }
 }
 
-class LexGrammar[L, W](val grammar: BaseGrammar[L],
-                       val lexicon: Lexicon[L, W],
-                       wordIndex: Index[W],
-                       fi: IndexedLexFeaturizer[L, W],
-                       weights: DenseVector[Double],
-                       binaries: Array[Boolean],
-                       leftRules: Array[Boolean],
-                       rightRules: Array[Boolean]) extends RefinedGrammar[L, W] {
+final class LexGrammar[L, W](val grammar: BaseGrammar[L],
+                             val lexicon: Lexicon[L, W],
+                             wordIndex: Index[W],
+                             fi: IndexedLexFeaturizer[L, W],
+                             weights: DenseVector[Double],
+                             binaries: Array[Boolean],
+                             leftRules: Array[Boolean],
+                             rightRules: Array[Boolean]) extends RefinedGrammar[L, W] {
   def isLeftRule(r: Int) = leftRules(r)
 
   def isRightRule(r: Int) = rightRules(r)
@@ -401,6 +413,8 @@ class LexGrammar[L, W](val grammar: BaseGrammar[L],
   // unaryRule is (head)
   // parent/leftchild/rightchild is (head)
   final class Spec(val words: Seq[W]) extends RefinedAnchoring[L, W] {
+    override def annotationTag: Int = 1
+
     val grammar = LexGrammar.this.grammar
     val lexicon = LexGrammar.this.lexicon
     val indexed = words.map(wordIndex)
@@ -425,14 +439,14 @@ class LexGrammar[L, W](val grammar: BaseGrammar[L],
     val bCache = new OpenAddressHashArray[Double](words.size * words.size * index.size, Double.NaN)
     val uCache = new OpenAddressHashArray[Double](words.size * index.size, Double.NaN)
 
-    def scoreUnaryRule(begin: Int, end: Int, rule: Int, head: Int) = {
-      val cacheIndex = head + words.size * rule
+    def scoreUnaryRule(begin: Int, end: Int, rule: Int, ref: Int) = {
+      val cacheIndex = ref + words.size * rule
       val score = uCache(cacheIndex)
 
       if (!score.isNaN)
         score
       else {
-        val score = dot(f.featuresForUnaryRule(begin, end, rule, head))
+        val score = dot(f.featuresForUnaryRule(begin, end, rule, ref))
         uCache(cacheIndex) = score
         score
       }
@@ -440,8 +454,8 @@ class LexGrammar[L, W](val grammar: BaseGrammar[L],
 
 
     def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int) = {
-      val head = (ref:Int) / words.length
-      val dep = (ref:Int) % words.length
+      val head = headIndex(ref)
+      val dep = depIndex(ref)
       val cacheIndex = head + words.size * (dep + words.size * rule)
       val score = bCache(cacheIndex)
 
@@ -455,6 +469,17 @@ class LexGrammar[L, W](val grammar: BaseGrammar[L],
 
     }
 
+    def headIndex(ruleRef: Int) = {
+      ruleRef / words.length
+    }
+
+    def depIndex(ruleRef: Int) = {
+      ruleRef % words.length
+    }
+
+    def spanHeadIndex(ref: Int) = {
+      ref
+    }
 
     def validLabelRefinements(begin: Int, end: Int, label: Int) = Array.range(begin,end)
 
@@ -496,18 +521,19 @@ class LexGrammar[L, W](val grammar: BaseGrammar[L],
       indexedValidTags(pos)
     }
 
+
     def leftChildRefinement(rule: Int, ruleRef: Int) = {
-      if(isLeftRule(rule)) ruleRef / words.length
-      else ruleRef % words.length
+      if(isLeftRule(rule)) headIndex(ruleRef)
+      else depIndex(ruleRef)
     }
 
     def rightChildRefinement(rule: Int, ruleRef: Int) = {
-      if(isRightRule(rule)) ruleRef / words.length
-      else ruleRef % words.length
+      if(isRightRule(rule)) headIndex(ruleRef)
+      else depIndex(ruleRef)
     }
 
     def parentRefinement(rule: Int, ruleRef: Int) = {
-      if(binaries(rule)) ruleRef / words.length
+      if(binaries(rule)) headIndex(ruleRef)
       else ruleRef
     }
 
@@ -516,16 +542,16 @@ class LexGrammar[L, W](val grammar: BaseGrammar[L],
     }
 
     def ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int) = {
-      require(refA == (refB:Int))
+      require(refA == refB)
       refA
     }
 
     def ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int, refC: Int) = {
       if(isLeftRule(r)) {
-        require(refA == (refB:Int))
+        require(refA == refB)
         refA * words.length + refC
       } else {
-        require(refA == (refC:Int))
+        require(refA == refC)
         refA * words.length + refB
       }
     }
@@ -554,7 +580,7 @@ case class LexGrammarBundle[L, W](baseGrammar: BaseGrammar[L],
     }
   }
 
-  def makeGrammar(fi: IndexedLexFeaturizer[L, W], weights: DenseVector[Double]): RefinedGrammar[L, W] = {
+  def makeGrammar(fi: IndexedLexFeaturizer[L, W], weights: DenseVector[Double]): LexGrammar[L, W] = {
     new LexGrammar(baseGrammar, baseLexicon, wordIndex, fi, weights, binaries, leftRules, rightRules)
   }
 }
@@ -665,6 +691,8 @@ class SimpleWordShapeGen[L](tagWordCounts: Counter2[L, String, Double],
 
 case class LexModelFactory(baseParser: ParserParams.XbarGrammar,
                            constraints: ParserParams.Constraints[AnnotatedLabel, String],
+                           @Help(text= "The kind of annotation to do on the refined grammar. Defaults to ~KM2003")
+                           annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = StripAnnotations(),
                            @Help(text="Old weights to initialize with. Optional")
                            oldWeights: File = null,
                            @Help(text="For features not seen in gold trees, we bin them into dummyFeats * numGoldFeatures bins using hashing.")
@@ -674,10 +702,10 @@ case class LexModelFactory(baseParser: ParserParams.XbarGrammar,
   type MyModel = LexModel[AnnotatedLabel, String]
 
   def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]]) = {
-    val trees = trainTrees.map(_.mapLabels(_.baseAnnotatedLabel))
+    val trees = trainTrees.map(annotator)
     val (initLexicon, initBinaries, initUnaries) = GenerativeParser.extractCounts(trees)
 
-    val (xbarGrammar, xbarLexicon) = baseParser.xbarGrammar(trees)
+    val (xbarGrammar, xbarLexicon) = baseParser.xbarGrammar(trainTrees)
     val wordIndex = Index(trainTrees.iterator.flatMap(_.words))
     val summedCounts = sum(initLexicon, Axis._0)
     val shapeGen = new SimpleWordShapeGen(initLexicon, summedCounts)

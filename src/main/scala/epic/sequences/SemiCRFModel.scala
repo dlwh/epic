@@ -27,6 +27,7 @@ class SemiCRFModel[L, W](val featureIndex: Index[Feature],
   }
 
   type Inference = SemiCRFInference[L, W]
+  type Marginal = SemiCRF.Marginal[L, W]
 
   def initialValueForFeature(f: Feature): Double = 0.0
 
@@ -81,7 +82,7 @@ object SemiCRFModel {
 class SemiCRFInference[L, W](weights: DenseVector[Double],
                              featureIndex: Index[Feature],
                              featurizer: SemiCRFModel.BIEOFeaturizer[L, W],
-                             val maxLength: Int=>Int) extends MarginalInference[Segmentation[L, W], SemiCRF.Anchoring[L, W]] with SemiCRF.Grammar[L, W] {
+                             val maxLength: Int=>Int) extends AugmentableInference[Segmentation[L, W], SemiCRF.Anchoring[L, W]] with SemiCRF.Grammar[L, W] {
   def viterbi(sentence: IndexedSeq[W], anchoring: SemiCRF.Anchoring[L, W]) = {
     SemiCRF.viterbi(new Anchoring(sentence, anchoring))
   }
@@ -102,20 +103,13 @@ class SemiCRFInference[L, W](weights: DenseVector[Double],
     m -> m.logPartition
   }
 
-  override def goldCounts(v: Segmentation[L, W], augment: SemiCRF.Anchoring[L, W]): ExpectedCounts = {
-    val m: SemiCRF.Marginal[L, W] = goldMarginal(v, augment)
-    this.countsFromMarginal(v, m, augment)
-  }
-
-
-  def goldMarginal(v: Segmentation[L, W], augment: SemiCRF.Anchoring[L, W]): SemiCRF.Marginal[L, W] = {
+  def goldMarginal(v: Segmentation[L, W], augment: SemiCRF.Anchoring[L, W]) = {
     val m = SemiCRF.Marginal.goldMarginal[L, W](new Anchoring(v.words, augment), v.segments)
-    m
+    m -> m.logPartition
   }
 
-  def countsFromMarginal(v: Segmentation[L, W], marg: Marginal, aug: SemiCRF.Anchoring[L, W]): ExpectedCounts = {
-    val counts = emptyCounts
-    counts.loss = marg.logPartition
+  def countsFromMarginal(v: Segmentation[L, W], marg: Marginal, counts: ExpectedCounts, scale: Double): ExpectedCounts = {
+    counts.loss += marg.logPartition * scale
     val localization = marg.anchoring.asInstanceOf[Anchoring].localization
     val visitor = new TransitionVisitor[L, W] {
 
@@ -125,7 +119,7 @@ class SemiCRFInference[L, W](weights: DenseVector[Double],
         val data = vector.data
         while(i < vector.iterableSize) {
 //          if(vector.isActive(i))
-            counts(index(i)) += d * data(i)
+            counts(index(i)) += d * data(i) * scale
           i += 1
         }
 
@@ -153,7 +147,7 @@ class SemiCRFInference[L, W](weights: DenseVector[Double],
 
   def baseAugment(v: Segmentation[L, W]): SemiCRF.Anchoring[L, W] = new IdentityAnchoring(v.words)
 
-  class IdentityAnchoring(val w: IndexedSeq[W]) extends SemiCRF.Anchoring[L, W] {
+  class IdentityAnchoring(val words: IndexedSeq[W]) extends SemiCRF.Anchoring[L, W] {
     def maxSegmentLength(l: Int): Int = maxLength(l)
 
     def scoreTransition(prev: Int, cur: Int, beg: Int, end: Int): Double = 0.0
@@ -163,8 +157,8 @@ class SemiCRFInference[L, W](weights: DenseVector[Double],
     def startSymbol: L = featurizer.startSymbol
   }
 
-  class Anchoring(val w: IndexedSeq[W], augment: SemiCRF.Anchoring[L, W]) extends SemiCRF.Anchoring[L, W] {
-    val localization = featurizer.anchor(w)
+  class Anchoring(val words: IndexedSeq[W], augment: SemiCRF.Anchoring[L, W]) extends SemiCRF.Anchoring[L, W] {
+    val localization = featurizer.anchor(words)
     def maxSegmentLength(l: Int): Int = SemiCRFInference.this.maxLength(l)
 
     val beginCache = Array.tabulate(labelIndex.size, labelIndex.size, length){ (p,c,w) =>
@@ -180,15 +174,18 @@ class SemiCRFInference[L, W](weights: DenseVector[Double],
 
     def scoreTransition(prev: Int, cur: Int, beg: Int, end: Int): Double = {
       var score = augment.scoreTransition(prev, cur, beg, end)
-      score += beginCache(prev)(cur)(beg)
-      score += endCache(cur)(end-1)
-      var pos = beg + 1
-      while(pos < end) {
-        score += wordCache(cur)(pos)
-        pos += 1
-      }
+      if(score != Double.NegativeInfinity) {
+        score += beginCache(prev)(cur)(beg)
+        score += endCache(cur)(end-1)
+        var pos = beg + 1
+        while(pos < end) {
+          score += wordCache(cur)(pos)
+          pos += 1
+        }
 
-      score + (weights dot localization.featuresForSpan(prev, cur, beg, end))
+        score += (weights dot localization.featuresForSpan(prev, cur, beg, end))
+      }
+      score
     }
 
     def labelIndex: Index[L] = featurizer.labelIndex

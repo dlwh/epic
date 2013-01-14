@@ -58,7 +58,6 @@ object GenerativeParser {
     SimpleChartParser(AugmentedGrammar.fromRefined(grammar))
   }
 
-
   /**
    * Extracts a RefinedGrammar from a raw treebank. The refined grammar could be a core grammar,
    * maybe I should do that.

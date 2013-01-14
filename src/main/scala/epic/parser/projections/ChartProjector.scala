@@ -24,16 +24,16 @@ package projections
 trait ChartProjector[L, W] {
   type MyAnchoring <: CoreAnchoring[L, W]
   protected def threshold:Double
-  protected def createAnchoring(charts: Marginal[L, W],
+  protected def createAnchoring(charts: ParseMarginal[L, W],
                                 ruleData: AnchoredRuleProjector.AnchoredData,
                                 sentProb: Double):MyAnchoring
 
   private def proj = new AnchoredRuleProjector(threshold)
 
-  def project(charts: Marginal[L, W],
+  def project(charts: ParseMarginal[L, W],
               goldTagPolicy: GoldTagPolicy[L] = GoldTagPolicy.noGoldTags[L]):MyAnchoring = {
 
     val ruleData = proj.projectRulePosteriors(charts, goldTagPolicy)
-    createAnchoring(charts, ruleData, charts.partition)
+    createAnchoring(charts, ruleData, charts.logPartition)
   }
 }
