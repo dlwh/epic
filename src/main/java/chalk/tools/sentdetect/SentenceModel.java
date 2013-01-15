@@ -27,8 +27,8 @@ import java.io.InputStream;
 import java.net.URL;
 import java.util.Map;
 
-import chalk.learn.model.AbstractModel;
-import chalk.learn.model.GenericModelReader;
+import nak.model.AbstractModel;
+import nak.model.GenericModelReader;
 import chalk.tools.dictionary.Dictionary;
 import chalk.tools.util.BaseToolFactory;
 import chalk.tools.util.InvalidFormatException;

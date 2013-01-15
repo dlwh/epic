@@ -27,7 +27,7 @@ import junit.framework.Assert;
 
 import org.junit.Test;
 
-import chalk.learn.model.EventStream;
+import nak.model.EventStream;
 import chalk.tools.namefind.NameFinderEventStream;
 import chalk.tools.namefind.NameFinderME;
 import chalk.tools.namefind.NameSample;

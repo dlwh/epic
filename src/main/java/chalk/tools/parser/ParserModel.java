@@ -28,7 +28,7 @@ import java.io.OutputStreamWriter;
 import java.net.URL;
 import java.util.Map;
 
-import chalk.learn.model.AbstractModel;
+import nak.model.AbstractModel;
 import chalk.tools.chunker.ChunkerModel;
 import chalk.tools.postag.POSModel;
 import chalk.tools.util.InvalidFormatException;

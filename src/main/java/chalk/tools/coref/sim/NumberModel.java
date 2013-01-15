@@ -23,11 +23,11 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
-import chalk.learn.io.SuffixSensitiveGISModelReader;
-import chalk.learn.io.SuffixSensitiveGISModelWriter;
-import chalk.learn.maxent.GIS;
-import chalk.learn.model.Event;
-import chalk.learn.model.MaxentModel;
+import nak.io.SuffixSensitiveGISModelReader;
+import nak.io.SuffixSensitiveGISModelWriter;
+import nak.maxent.GIS;
+import nak.model.Event;
+import nak.model.MaxentModel;
 import chalk.tools.coref.resolver.ResolverUtils;
 import chalk.tools.util.CollectionEventStream;
 import chalk.tools.util.HashList;

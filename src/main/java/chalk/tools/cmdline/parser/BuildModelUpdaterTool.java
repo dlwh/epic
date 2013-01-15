@@ -19,7 +19,7 @@ package chalk.tools.cmdline.parser;
 
 import java.io.IOException;
 
-import chalk.learn.model.AbstractModel;
+import nak.model.AbstractModel;
 import chalk.tools.dictionary.Dictionary;
 import chalk.tools.parser.Parse;
 import chalk.tools.parser.ParserEventTypeEnum;
@@ -47,7 +47,7 @@ public final class BuildModelUpdaterTool extends ModelUpdaterTool {
       // TODO: training individual models should be in the chunking parser, not here
       // Training build
       System.out.println("Training builder");
-      chalk.learn.model.EventStream bes = new ParserEventStream(parseSamples, 
+      nak.model.EventStream bes = new ParserEventStream(parseSamples, 
           originalModel.getHeadRules(), ParserEventTypeEnum.BUILD, mdict);
       AbstractModel buildModel = Parser.train(bes, 
           parameters.getIterations(), parameters.getCutoff());

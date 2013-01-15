@@ -25,9 +25,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import chalk.learn.io.SuffixSensitiveGISModelReader;
-import chalk.learn.model.AbstractModel;
-import chalk.learn.model.Event;
+import nak.io.SuffixSensitiveGISModelReader;
+import nak.model.AbstractModel;
+import nak.model.Event;
 import chalk.tools.dictionary.Dictionary;
 import chalk.tools.parser.AbstractBottomUpParser;
 import chalk.tools.parser.AbstractParserEventStream;
@@ -380,7 +380,7 @@ public class ParserEventStream extends AbstractParserEventStream {
     if (fun) {
       Parse.useFunctionTags(true);
     }
-    chalk.learn.model.EventStream es = new ParserEventStream(new ParseSampleStream(new PlainTextByLineStream(new java.io.InputStreamReader(System.in))), rules, etype, dict);
+    nak.model.EventStream es = new ParserEventStream(new ParseSampleStream(new PlainTextByLineStream(new java.io.InputStreamReader(System.in))), rules, etype, dict);
     while (es.hasNext()) {
       Event e = es.next();
       if (model != null) {

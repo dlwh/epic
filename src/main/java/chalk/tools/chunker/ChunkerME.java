@@ -23,10 +23,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import chalk.learn.model.AbstractModel;
-import chalk.learn.model.EventStream;
-import chalk.learn.model.MaxentModel;
-import chalk.learn.model.TrainUtil;
+import nak.model.AbstractModel;
+import nak.model.EventStream;
+import nak.model.MaxentModel;
+import nak.model.TrainUtil;
 import chalk.tools.util.BeamSearch;
 import chalk.tools.util.ObjectStream;
 import chalk.tools.util.Sequence;

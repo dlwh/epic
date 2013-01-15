@@ -29,8 +29,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
-import chalk.learn.model.AbstractModel;
-import chalk.learn.model.MaxentModel;
+import nak.model.AbstractModel;
+import nak.model.MaxentModel;
 import chalk.tools.util.InvalidFormatException;
 import chalk.tools.util.featuregen.AdaptiveFeatureGenerator;
 import chalk.tools.util.featuregen.AggregatedFeatureGenerator;

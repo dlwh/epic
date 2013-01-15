@@ -23,7 +23,7 @@ import java.io.InputStream;
 import java.net.URL;
 import java.util.Map;
 
-import chalk.learn.model.AbstractModel;
+import nak.model.AbstractModel;
 import chalk.tools.util.InvalidFormatException;
 import chalk.tools.util.model.BaseModel;
 

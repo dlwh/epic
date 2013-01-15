@@ -28,7 +28,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-import chalk.learn.model.AbstractModel;
+import nak.model.AbstractModel;
 import chalk.tools.dictionary.Dictionary;
 import chalk.tools.util.BaseToolFactory;
 import chalk.tools.util.InvalidFormatException;

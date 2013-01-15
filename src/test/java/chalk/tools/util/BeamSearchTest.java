@@ -27,7 +27,7 @@ import java.util.Map;
 
 import org.junit.Test;
 
-import chalk.learn.model.MaxentModel;
+import nak.model.MaxentModel;
 import chalk.tools.util.BeamSearch;
 import chalk.tools.util.BeamSearchContextGenerator;
 import chalk.tools.util.Sequence;

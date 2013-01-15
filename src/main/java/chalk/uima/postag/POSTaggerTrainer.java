@@ -41,7 +41,7 @@ import org.apache.uima.util.Level;
 import org.apache.uima.util.Logger;
 import org.apache.uima.util.ProcessTrace;
 
-import chalk.learn.maxent.GIS;
+import nak.maxent.GIS;
 import chalk.tools.postag.POSDictionary;
 import chalk.tools.postag.POSModel;
 import chalk.tools.postag.POSSample;

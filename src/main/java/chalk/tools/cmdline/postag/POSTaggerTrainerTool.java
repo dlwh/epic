@@ -20,7 +20,7 @@ package chalk.tools.cmdline.postag;
 import java.io.File;
 import java.io.IOException;
 
-import chalk.learn.model.TrainUtil;
+import nak.model.TrainUtil;
 import chalk.tools.cmdline.AbstractTrainerTool;
 import chalk.tools.cmdline.CmdLineUtil;
 import chalk.tools.cmdline.TerminateToolException;

@@ -27,8 +27,8 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.util.zip.GZIPInputStream;
 
-import chalk.learn.io.BinaryGISModelReader;
-import chalk.learn.model.AbstractModel;
+import nak.io.BinaryGISModelReader;
+import nak.model.AbstractModel;
 import chalk.tools.dictionary.Dictionary;
 import chalk.tools.util.StringList;
 import chalk.tools.util.model.BaseModel;

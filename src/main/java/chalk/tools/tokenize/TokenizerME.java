@@ -27,10 +27,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-import chalk.learn.model.AbstractModel;
-import chalk.learn.model.EventStream;
-import chalk.learn.model.MaxentModel;
-import chalk.learn.model.TrainUtil;
+import nak.model.AbstractModel;
+import nak.model.EventStream;
+import nak.model.MaxentModel;
+import nak.model.TrainUtil;
 import chalk.tools.dictionary.Dictionary;
 import chalk.tools.tokenize.lang.Factory;
 import chalk.tools.util.ObjectStream;

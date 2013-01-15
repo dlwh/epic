@@ -27,9 +27,9 @@ import java.util.Map.Entry;
 import java.util.StringTokenizer;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import chalk.learn.model.AbstractModel;
-import chalk.learn.model.EventStream;
-import chalk.learn.model.TrainUtil;
+import nak.model.AbstractModel;
+import nak.model.EventStream;
+import nak.model.TrainUtil;
 import chalk.tools.dictionary.Dictionary;
 import chalk.tools.ngram.NGramModel;
 import chalk.tools.util.BeamSearch;

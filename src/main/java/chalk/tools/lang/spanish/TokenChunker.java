@@ -21,7 +21,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
 
-import chalk.learn.io.SuffixSensitiveGISModelReader;
+import nak.io.SuffixSensitiveGISModelReader;
 import chalk.tools.namefind.NameFinderEventStream;
 import chalk.tools.namefind.NameFinderME;
 import chalk.tools.util.Span;

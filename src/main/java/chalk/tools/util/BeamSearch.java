@@ -20,7 +20,7 @@ package chalk.tools.util;
 import java.util.Arrays;
 import java.util.List;
 
-import chalk.learn.model.MaxentModel;
+import nak.model.MaxentModel;
 
 
 /**

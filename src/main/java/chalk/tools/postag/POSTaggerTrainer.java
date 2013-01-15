@@ -25,15 +25,15 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 
-import chalk.learn.io.SuffixSensitiveGISModelWriter;
-import chalk.learn.maxent.DataStream;
-import chalk.learn.maxent.GISModel;
-import chalk.learn.model.AbstractModel;
-import chalk.learn.model.EventStream;
-import chalk.learn.model.SequenceStream;
-import chalk.learn.model.TwoPassDataIndexer;
-import chalk.learn.perceptron.SimplePerceptronSequenceTrainer;
-import chalk.learn.perceptron.SuffixSensitivePerceptronModelWriter;
+import nak.io.SuffixSensitiveGISModelWriter;
+import nak.maxent.DataStream;
+import nak.maxent.GISModel;
+import nak.model.AbstractModel;
+import nak.model.EventStream;
+import nak.model.SequenceStream;
+import nak.model.TwoPassDataIndexer;
+import nak.perceptron.SimplePerceptronSequenceTrainer;
+import nak.perceptron.SuffixSensitivePerceptronModelWriter;
 import chalk.tools.dictionary.Dictionary;
 import chalk.tools.ngram.NGramModel;
 import chalk.tools.util.ObjectStream;
@@ -69,7 +69,7 @@ public class POSTaggerTrainer {
   public static POSModel train(String languageCode, ObjectStream<POSSample> samples, POSDictionary tagDictionary,
       Dictionary ngramDictionary, int cutoff, int iterations) throws IOException {
 
-    GISModel posModel = chalk.learn.maxent.GIS.trainModel(iterations,
+    GISModel posModel = nak.maxent.GIS.trainModel(iterations,
         new TwoPassDataIndexer(new POSSampleEventStream(samples,
         new DefaultPOSContextGenerator(ngramDictionary)), cutoff));
 
@@ -100,11 +100,11 @@ public class POSTaggerTrainer {
    */
   @Deprecated
   public static AbstractModel trainMaxentModel(EventStream es, int iterations, int cut) throws IOException {
-    return chalk.learn.maxent.GIS.trainModel(iterations, new TwoPassDataIndexer(es, cut));
+    return nak.maxent.GIS.trainModel(iterations, new TwoPassDataIndexer(es, cut));
   }
 
   public static AbstractModel trainPerceptronModel(EventStream es, int iterations, int cut, boolean useAverage) throws IOException {
-    return new chalk.learn.perceptron.PerceptronTrainer().trainModel(iterations, new TwoPassDataIndexer(es, cut, false), cut, useAverage);
+    return new nak.perceptron.PerceptronTrainer().trainModel(iterations, new TwoPassDataIndexer(es, cut, false), cut, useAverage);
   }
 
   public static AbstractModel trainPerceptronModel(EventStream es, int iterations, int cut) throws IOException {
@@ -280,7 +280,7 @@ public class POSTaggerTrainer {
 
     NGramModel ngramModel = new NGramModel();
 
-    DataStream data = new chalk.learn.maxent.PlainTextByLineDataStream(new java.io.FileReader(inFile));
+    DataStream data = new nak.maxent.PlainTextByLineDataStream(new java.io.FileReader(inFile));
     while(data.hasNext()) {
       String tagStr = (String) data.nextToken();
       String[] tt = tagStr.split(" ");

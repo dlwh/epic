@@ -23,11 +23,11 @@ import java.io.ObjectStreamException;
 import java.util.HashMap;
 import java.util.Map;
 
-import chalk.learn.maxent.GIS;
-import chalk.learn.model.AbstractModel;
-import chalk.learn.model.MaxentModel;
-import chalk.learn.model.TrainUtil;
-import chalk.learn.model.TwoPassDataIndexer;
+import nak.maxent.GIS;
+import nak.model.AbstractModel;
+import nak.model.MaxentModel;
+import nak.model.TrainUtil;
+import nak.model.TwoPassDataIndexer;
 import chalk.tools.tokenize.SimpleTokenizer;
 import chalk.tools.tokenize.Tokenizer;
 import chalk.tools.util.ObjectStream;

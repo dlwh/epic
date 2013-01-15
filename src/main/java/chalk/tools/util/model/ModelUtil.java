@@ -28,10 +28,10 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-import chalk.learn.model.AbstractModel;
-import chalk.learn.model.GenericModelWriter;
-import chalk.learn.model.MaxentModel;
-import chalk.learn.model.TrainUtil;
+import nak.model.AbstractModel;
+import nak.model.GenericModelWriter;
+import nak.model.MaxentModel;
+import nak.model.TrainUtil;
 import chalk.tools.util.TrainingParameters;
 
 

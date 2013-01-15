@@ -22,7 +22,7 @@ import junit.framework.Assert;
 
 import org.junit.Test;
 
-import chalk.learn.model.EventStream;
+import nak.model.EventStream;
 import chalk.tools.postag.POSSample;
 import chalk.tools.postag.POSSampleEventStream;
 import chalk.tools.util.ObjectStreamUtils;

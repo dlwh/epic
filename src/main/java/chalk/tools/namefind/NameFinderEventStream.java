@@ -22,8 +22,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
-import chalk.learn.model.Event;
-import chalk.learn.model.EventStream;
+import nak.model.Event;
+import nak.model.EventStream;
 import chalk.tools.util.ObjectStream;
 import chalk.tools.util.PlainTextByLineStream;
 import chalk.tools.util.Span;

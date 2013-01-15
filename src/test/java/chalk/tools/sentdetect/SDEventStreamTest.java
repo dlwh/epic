@@ -26,7 +26,7 @@ import java.io.IOException;
 
 import org.junit.Test;
 
-import chalk.learn.model.EventStream;
+import nak.model.EventStream;
 import chalk.tools.sentdetect.SDEventStream;
 import chalk.tools.sentdetect.SentenceDetectorME;
 import chalk.tools.sentdetect.SentenceSample;

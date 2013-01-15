@@ -23,8 +23,8 @@ import java.math.BigInteger;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
-import chalk.learn.model.Event;
-import chalk.learn.model.EventStream;
+import nak.model.Event;
+import nak.model.EventStream;
 
 
 @Deprecated

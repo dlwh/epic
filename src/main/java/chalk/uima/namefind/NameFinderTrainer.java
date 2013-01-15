@@ -46,7 +46,7 @@ import org.apache.uima.util.Level;
 import org.apache.uima.util.Logger;
 import org.apache.uima.util.ProcessTrace;
 
-import chalk.learn.maxent.GIS;
+import nak.maxent.GIS;
 import chalk.tools.cmdline.namefind.TokenNameFinderTrainerTool;
 import chalk.tools.namefind.NameFinderME;
 import chalk.tools.namefind.NameSample;

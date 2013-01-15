@@ -27,7 +27,7 @@ import java.io.IOException;
 
 import org.junit.Test;
 
-import chalk.learn.model.EventStream;
+import nak.model.EventStream;
 import chalk.tools.tokenize.TokSpanEventStream;
 import chalk.tools.tokenize.TokenSample;
 import chalk.tools.tokenize.TokenSampleStream;

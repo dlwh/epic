@@ -28,9 +28,9 @@ import java.io.OutputStream;
 import java.net.URL;
 import java.util.Map;
 
-import chalk.learn.io.BinaryGISModelReader;
-import chalk.learn.model.AbstractModel;
-import chalk.learn.model.MaxentModel;
+import nak.io.BinaryGISModelReader;
+import nak.model.AbstractModel;
+import nak.model.MaxentModel;
 import chalk.tools.dictionary.Dictionary;
 import chalk.tools.util.BaseToolFactory;
 import chalk.tools.util.InvalidFormatException;

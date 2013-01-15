@@ -28,8 +28,8 @@ import java.io.OutputStream;
 
 import org.apache.uima.resource.ResourceInitializationException;
 
-import chalk.learn.maxent.GISModel;
-import chalk.learn.model.TrainUtil;
+import nak.maxent.GISModel;
+import nak.model.TrainUtil;
 import chalk.tools.util.TrainingParameters;
 import chalk.tools.util.model.BaseModel;
 

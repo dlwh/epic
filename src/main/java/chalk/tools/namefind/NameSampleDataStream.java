@@ -19,7 +19,7 @@ package chalk.tools.namefind;
 
 import java.io.IOException;
 
-import chalk.learn.maxent.DataStream;
+import nak.maxent.DataStream;
 import chalk.tools.util.FilterObjectStream;
 import chalk.tools.util.ObjectStream;
 

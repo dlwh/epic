@@ -21,7 +21,7 @@ package chalk.tools.sentdetect;
 import java.util.ArrayList;
 import java.util.List;
 
-import chalk.learn.maxent.IntegerPool;
+import nak.maxent.IntegerPool;
 
 
 /**

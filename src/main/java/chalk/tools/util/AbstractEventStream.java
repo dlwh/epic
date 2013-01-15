@@ -22,8 +22,8 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.Iterator;
 
-import chalk.learn.model.Event;
-import chalk.learn.model.EventStream;
+import nak.model.Event;
+import nak.model.EventStream;
 
 
 /**
@@ -31,7 +31,7 @@ import chalk.learn.model.EventStream;
  * It takes an {@link Iterator} of sample objects as input and
  * outputs the events creates by a subclass.
  */
-public abstract class AbstractEventStream<T> extends chalk.learn.model.AbstractEventStream {
+public abstract class AbstractEventStream<T> extends nak.model.AbstractEventStream {
 
   private ObjectStream<T> samples;
 

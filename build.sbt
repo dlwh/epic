@@ -14,6 +14,8 @@ resolvers ++= Seq(
   "opennlp sourceforge repo" at "http://opennlp.sourceforge.net/maven2"
 )
 
+resolvers += "Sonatype snapshots" at "http://oss.sonatype.org/content/repositories/snapshots/"
+
 // Original OpenNLP dependencies
 libraryDependencies ++= Seq(
   "com.novocode" % "junit-interface" % "0.8" % "test->default",
@@ -25,7 +27,8 @@ libraryDependencies ++= Seq(
 
 // New dependencies
 libraryDependencies ++= Seq(
-  "com.codecommit" % "anti-xml_2.9.1" % "0.3"
+  "com.codecommit" % "anti-xml_2.9.1" % "0.3",
+  "com.jasonbaldridge" % "nak" % "1.0-SNAPSHOT"
 )
 
 publishTo <<= version { v: String =>
