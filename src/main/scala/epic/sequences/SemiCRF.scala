@@ -3,11 +3,17 @@ package epic.sequences
 import breeze.util.Index
 import epic.trees.Span
 import breeze.numerics
-import epic.sequences.SemiCRF.{Marginal, Anchoring}
-import breeze.linalg.{HashVector, SparseVector}
-import epic.framework.{StandardExpectedCounts, Feature}
+import epic.sequences.SemiCRF.Marginal
+import breeze.linalg.SparseVector
+import epic.framework.{ModelObjective, Feature}
 import java.util
 import collection.mutable.ArrayBuffer
+import util.concurrent.ConcurrentHashMap
+import collection.immutable.BitSet
+import breeze.collection.mutable.TriangularArray
+import java.io.{ObjectInputStream, IOException}
+import breeze.optimize.FirstOrderMinimizer.OptParams
+import breeze.optimize.CachedBatchDiffFunction
 
 /**
  * A Semi-Markov Linear Chain Conditional Random Field, that is, the length
@@ -16,7 +22,8 @@ import collection.mutable.ArrayBuffer
  * As usual in Epic, all the heavy lifting is done in the companion object and Marginals.
  * @author dlwh
  */
-class SemiCRF[L, W](val model: SemiCRF.Grammar[L, W]) {
+@SerialVersionUID(1L)
+class SemiCRF[L, W](val model: SemiCRF.Grammar[L, W]) extends Serializable {
 
   def marginal(w: IndexedSeq[W]) = {
      SemiCRF.Marginal(model.anchor(w))
@@ -35,12 +42,36 @@ class SemiCRF[L, W](val model: SemiCRF.Grammar[L, W]) {
 
 object SemiCRF {
 
+  def buildSimple[L](data: IndexedSeq[Segmentation[L, String]],
+                     startSymbol: L,
+                     gazetteer: Gazetteer[Any, String] = Gazetteer.empty[Any, String],
+                     opt: OptParams = OptParams()):SemiCRF[L, String] = {
+    val model = new SegmentationModelFactory[L](startSymbol, gazetteer = gazetteer).makeModel(data)
+
+    val obj = new ModelObjective(model, data)
+    val cached = new CachedBatchDiffFunction(obj)
+    val weights = opt.minimize(cached, obj.initialWeightVector(randomize = true))
+    val crf = model.extractCRF(weights)
+
+    crf
+  }
+
+  def buildIOModel[L](data: IndexedSeq[Segmentation[L, String]],
+                      outsideSymbol: L,
+                      gazetteer: Gazetteer[Any, String] = Gazetteer.empty[Any, String],
+                      opt: OptParams = OptParams()): SemiCRF[Boolean, String] = {
+    val fixedData: IndexedSeq[Segmentation[Boolean, String]] = data.map{s =>
+      s.copy(segments=s.segments.map{case (l,span) => (l == outsideSymbol, span)})
+    }
+    buildSimple(fixedData, false, gazetteer, opt)
+  }
+
+
   trait Grammar[L, W] {
     def anchor(w: IndexedSeq[W]): Anchoring[L, W]
     def labelIndex: Index[L]
     def startSymbol: L
   }
-
 
   trait Anchoring[L, W] {
     def words : IndexedSeq[W]
@@ -73,12 +104,36 @@ object SemiCRF {
       var sum = 0.0
       while(prev <  numLabels) {
         sum += math.exp(transitionMarginal(prev, cur, begin, end))
-
         prev += 1
       }
       sum
     }
 
+    def computeSpanConstraints(threshold: Double = 0.001):SpanConstraints = {
+      val spanMarginals = TriangularArray.fill(length+1)(new Array[Double](anchoring.labelIndex.size))
+
+      this visit new TransitionVisitor[L, W] {
+        def apply(prev: Int, cur: Int, beg: Int, end: Int, count: Double)  {
+          spanMarginals(beg, end)(cur) += count
+        }
+      }
+
+      val allowedLabels = spanMarginals.map {  arr =>
+         BitSet.empty ++ (0 until arr.length).filter(i => arr(i) >= threshold)
+      }
+
+      val maxLengths = new Array[Int](anchoring.labelIndex.size)
+      val allowedStarts = new Array[collection.mutable.BitSet](length)
+      for(begin <- 0 until length; end <- (begin+1) to length) {
+        for(l <- allowedLabels(begin, end)) {
+          maxLengths(l) = math.max(maxLengths(l), end - begin)
+          allowedStarts(begin) += l
+        }
+      }
+
+
+      new SpanConstraints(maxLengths, allowedStarts.map(BitSet.empty ++ _), allowedLabels)
+    }
   }
 
   object Marginal {
@@ -282,6 +337,58 @@ object SemiCRF {
 
 
   }
+
+  @SerialVersionUID(1L)
+  case class SpanConstraints(maxLengths: Array[Int],
+                             allowedStarts: Array[BitSet],
+                             allowedLabels: TriangularArray[BitSet])
+
+  @SerialVersionUID(1L)
+  class ConstraintGrammar[L, W](val crf: SemiCRF[L, W], val threshold: Double = 0.001) extends Grammar[L, W] with Serializable {
+    def startSymbol: L = crf.model.startSymbol
+    def labelIndex: Index[L] = crf.model.labelIndex
+
+    // TODO: make weak
+    @transient
+    private var cache = new ConcurrentHashMap[IndexedSeq[W], SpanConstraints]()
+
+    // Don't delete.
+    @throws(classOf[IOException])
+    @throws(classOf[ClassNotFoundException])
+    private def readObject(oin: ObjectInputStream) {
+      oin.defaultReadObject()
+      cache = new ConcurrentHashMap[IndexedSeq[W], SpanConstraints]()
+    }
+
+    def constraints(w: IndexedSeq[W]) = {
+      var c = cache.get(w)
+      if(c eq null) {
+        c = crf.marginal(w).computeSpanConstraints(threshold)
+        cache.put(w, c)
+      }
+
+      c
+    }
+
+    def anchor(w: IndexedSeq[W]): Anchoring[L, W] = {
+      val c = constraints(w)
+
+      new Anchoring[L, W] {
+        def words: IndexedSeq[W] = w
+
+        def maxSegmentLength(label: Int): Int = c.maxLengths(label)
+
+        def startSymbol: L = crf.model.startSymbol
+        def labelIndex: Index[L] = crf.model.labelIndex
+
+        def scoreTransition(prev: Int, cur: Int, beg: Int, end: Int): Double =
+          numerics.logI(c.allowedLabels(beg, end).contains(cur))
+
+      }
+
+    }
+  }
+
 
   trait IndexedFeaturizer[L, W] {
     def anchor(w: IndexedSeq[W]):AnchoredFeaturizer[L, W]

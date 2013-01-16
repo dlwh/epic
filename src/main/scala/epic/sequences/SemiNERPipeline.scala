@@ -81,6 +81,7 @@ object SemiNERPipeline {
     }
 
 
+
     // build feature Index
     val model = new SegmentationModelFactory(NERType.OutsideSentence, gazetteer = gazetteer).makeModel(train)
     val obj = new ModelObjective(model, train)
@@ -95,9 +96,6 @@ object SemiNERPipeline {
 
     val weights = params.opt.iterations(cached, obj.initialWeightVector(randomize=true)).tee(state => if((state.iter +1) % params.iterPerEval == 0) eval(state)).take(params.opt.maxIterations).last
     eval(weights)
-
-
-
 
   }
 
