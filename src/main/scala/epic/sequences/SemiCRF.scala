@@ -119,11 +119,12 @@ object SemiCRF {
       }
 
       val allowedLabels = spanMarginals.map {  arr =>
-         BitSet.empty ++ (0 until arr.length).filter(i => arr(i) >= threshold)
+//         BitSet.empty ++ (0 until arr.length).filter(i => arr(i) >= threshold)
+           BitSet.empty ++ (0 until arr.length)
       }
 
       val maxLengths = new Array[Int](anchoring.labelIndex.size)
-      val allowedStarts = new Array[collection.mutable.BitSet](length)
+      val allowedStarts = Array.fill(length)(collection.mutable.BitSet.empty)
       for(begin <- 0 until length; end <- (begin+1) to length) {
         for(l <- allowedLabels(begin, end)) {
           maxLengths(l) = math.max(maxLengths(l), end - begin)

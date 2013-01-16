@@ -4,16 +4,20 @@ import java.io.File
 import breeze.config.CommandLineParser
 import epic.ontonotes.ConllOntoReader
 import epic.trees._
+import annotations.AddMarkovization
+import annotations.PipelineAnnotator
+import annotations.StripAnnotations
 import epic.parser._
 import epic.parser.projections.{ConstraintAnchoring, ConstraintCoreGrammar}
 import breeze.util.logging.ConsoleLogging
 import collection.immutable.BitSet
-import epic.sequences.{SegmentationEval, SegmentationModelFactory}
+import epic.sequences._
 import collection.mutable.ArrayBuffer
 import epic.framework.{EPModel, ModelObjective}
 import breeze.collection.mutable.TriangularArray
 import breeze.optimize.{RandomizedGradientCheckingFunction, CachedBatchDiffFunction}
 import epic.parser.ParserParams.XbarGrammar
+import features.RuleFeature
 import features.{RuleFeature, TagAwareWordShapeFeaturizer}
 import models._
 import breeze.util.{Lens, Index}
@@ -26,10 +30,15 @@ import epic.trees.annotations.PipelineAnnotator
 import epic.trees.ProcessedTreebank
 import epic.trees.TreeInstance
 import breeze.optimize.FirstOrderMinimizer.OptParams
-import epic.sequences.Segmentation
 import epic.parser.models.LexGrammarBundle
 import epic.trees.Span
+import models.SpanBeliefs
 import projections.ConstraintAnchoring.RawConstraints
+import epic.trees.ProcessedTreebank
+import epic.trees.TreeInstance
+import epic.parser.models.StandardFeaturizer
+import breeze.optimize.FirstOrderMinimizer.OptParams
+import epic.parser.models.LexGrammarBundle
 
 
 object EverythingPipeline {
@@ -39,6 +48,7 @@ object EverythingPipeline {
                     iterPerEval: Int = 20,
                     constraints: ParserParams.Constraints[AnnotatedLabel, String],
                     baseParser: ParserParams.XbarGrammar,
+                    baseNERModel: File = new File("ner.model.gz"),
                     opt: OptParams)
 
   def main(args: Array[String]) {
@@ -61,14 +71,24 @@ object EverythingPipeline {
     // base models///
     /////////////////
     // NER
-    val nerModel = new SegmentationModelFactory[NERType.Value](NERType.OutsideSentence).makeModel(train.flatMap(_.sentences).map(_.nerSegmentation))
+
+
+    val nerSegments = for(d <- train; s <- d.sentences) yield s.nerSegmentation
+    val baseNER = if(params.baseNERModel.exists) {
+      breeze.util.readObject[SemiCRF[NERType.Value, String]](params.baseNERModel)
+    } else {
+      println("Building basic NER model...")
+      SemiCRF.buildSimple(nerSegments, NERType.OutsideSentence, Gazetteer.ner("en"), params.opt)
+    }
+
+    val nerPruningModel = new SemiCRF.ConstraintGrammar(baseNER)
+    val nerModel = new SegmentationModelFactory(NERType.OutsideSentence, None /*Some(nerPruningModel)*/, Gazetteer.ner("en")).makeModel(nerSegments)
     // NERProperties
     val nerProp = Property("NER::Type", nerModel.labelIndex)
 
 
-
     var trainTrees = for (d <- train; s <- d.sentences) yield {
-      params.treebank.makeTreeInstance(s.id, s.tree.map(_.label), s.words, true)
+      params.treebank.makeTreeInstance(s.id, s.tree.map(_.label), s.words, removeUnaries = true)
     }
 
     if(params.treebank.path.exists) {
@@ -79,7 +99,9 @@ object EverythingPipeline {
     val baseParser = GenerativeParser.annotated(new XbarGrammar(), annotator, trainTrees)
 
     val docProcessor = new ProcessedDocument.Factory(params.treebank.process,
-      new ConstraintCoreGrammar(baseParser.augmentedGrammar, -7), null)
+      new ConstraintCoreGrammar(baseParser.augmentedGrammar, -7), 
+      nerPruningModel,
+      null)
 
     val beliefsFactory = new DocumentBeliefs.Factory(baseParser.grammar, nerProp)
     /*

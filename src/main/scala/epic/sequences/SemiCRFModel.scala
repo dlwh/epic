@@ -243,8 +243,6 @@ class SegmentationModelFactory[L](val startSymbol: L,
     val maxMaxLength = (0 until labelIndex.size).map(maxLengthArray).max
     var i = 0
     for(s <- train) {
-      if(i % 250 == 0)
-        println(i + "/" + train.length)
       val loc = f.localize(s.words)
 
       for(b <- 0 until s.length) {
@@ -257,7 +255,6 @@ class SegmentationModelFactory[L](val startSymbol: L,
       }
       i += 1
     }
-    println(train.length + "/" + train.length)
     val indexed = new IndexedStandardFeaturizer(f, labelIndex, basicFeatureIndex, spanFeatureIndex, transFeatureIndex, pruningModel)
     val model = new SemiCRFModel(indexed.featureIndex, indexed, maxLengthArray)
 
