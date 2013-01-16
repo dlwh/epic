@@ -4,26 +4,24 @@ Author: **Jason Baldridge** (jasonbaldridge@gmail.com)
 
 ## Introduction
 
-Chalk is a library for natural language processing (NLP).
+Chalk is a library for natural language processing (NLP). It is based on the [OpenNLP](http://opennlp.apache.org/) library, but will be transitioning to more use of Scala (rather than Java) as new capabilities are added.
 
 The name Chalk comes from my son's stuffed elephant. "Chalk" obviously has a great connection to writing (and thus text processing). Of course, it also follows the what-your-kid-called-his-elephant naming convention precedent established with Hadoop. :)
 
-In addition to OpenNLP, there are two other related projects. One is Scalabha (https://github.com/utcompling/Scalabha), which I started as a package for teaching Scala in computational linguistics projects, and which I may pilfer as Chalk develops. The other is Breeze, which is a Scala-based machine learning and NLP project that I've been peripherally involved with. It's a great and very general library; ultimately, I expect to bring Breeze in as a dependency and then Chalk will in some respects be an example of building an NLP library on top of the core capabilities provided by Breeze.
-
 ## Using Chalk
 
-The latest stable release is 1.0, which corresponds quite directly to Apache OpenNLP v1.5.3. 
+The latest stable release is 1.1.0. 
 
 In SBT:
 
-    libraryDependencies += "com.jasonbaldridge" % "chalk" % "1.0"
+    libraryDependencies += "com.jasonbaldridge" % "chalk" % "1.1.0"
 
 In Maven:
 
     <dependency>
        <groupId>com.jasonbaldridge</groupId>
        <artifactId>chalk</artifactId>
-       <version>1.0</version>
+       <version>1.1.0</version>
     </dependency>
 
 ## Requirements
@@ -49,7 +47,7 @@ build and use Chalk.
 ## Building the system from source
 
 Chalk uses SBT (Simple Build Tool) with a standard directory
-structure.  To build Chalk, type (in the `$CHALK_DIR` directory):
+structure.  To build Chalk, type (in the `CHALK_DIR` directory):
 
 	$ ./build update compile
 
