@@ -25,8 +25,7 @@ import java.util.List;
 
 import chalk.tools.chunker.ChunkSample;
 import chalk.tools.formats.ad.ADSentenceStream.Sentence;
-import chalk.tools.formats.ad.ADSentenceStream.SentenceParser.Leaf;
-import chalk.tools.formats.ad.ADSentenceStream.SentenceParser.Node;
+import chalk.tools.formats.ad.ADSentenceStream.SentenceParser;
 import chalk.tools.formats.ad.ADSentenceStream.SentenceParser.TreeElement;
 import chalk.tools.namefind.NameSample;
 import chalk.tools.util.ObjectStream;
@@ -112,7 +111,7 @@ public class ADChunkSampleStream implements ObjectStream<ChunkSample> {
 				index++;
 				// skip this one
 			} else {
-				Node root = paragraph.getRoot();
+				SentenceParser.Node root = paragraph.getRoot();
 				List<String> sentence = new ArrayList<String>();
 				List<String> tags = new ArrayList<String>();
 				List<String> target = new ArrayList<String>();
@@ -130,21 +129,21 @@ public class ADChunkSampleStream implements ObjectStream<ChunkSample> {
 		return null;
 	}
 
-	protected void processRoot(Node root, List<String> sentence, List<String> tags,
+	protected void processRoot(SentenceParser.Node root, List<String> sentence, List<String> tags,
 			List<String> target) {
 		if (root != null) {
 			TreeElement[] elements = root.getElements();
 			for (int i = 0; i < elements.length; i++) {
 				if (elements[i].isLeaf()) {
-					processLeaf((Leaf) elements[i], false, OTHER, sentence, tags, target);
+					processLeaf((SentenceParser.Leaf) elements[i], false, OTHER, sentence, tags, target);
 				} else {
-					processNode((Node) elements[i], sentence, tags, target, null);
+					processNode((SentenceParser.Node) elements[i], sentence, tags, target, null);
 				}
 			}
 		}
 	}
 
-    private void processNode(Node node, List<String> sentence, List<String> tags,
+    private void processNode(SentenceParser.Node node, List<String> sentence, List<String> tags,
         List<String> target, String inheritedTag) {
     String phraseTag = getChunkTag(node);
     
@@ -159,7 +158,7 @@ public class ADChunkSampleStream implements ObjectStream<ChunkSample> {
         if (elements[i].isLeaf()) {
             boolean isIntermediate = false;
             String tag = phraseTag;
-            Leaf leaf = (Leaf) elements[i];
+            SentenceParser.Leaf leaf = (SentenceParser.Leaf) elements[i];
             
             String localChunk = getChunkTag(leaf);
             if(localChunk != null && !tag.equals(localChunk)) {
@@ -182,7 +181,7 @@ public class ADChunkSampleStream implements ObjectStream<ChunkSample> {
                     tags, target);
         } else {
             int before = target.size();
-            processNode((Node) elements[i], sentence, tags, target, phraseTag);
+            processNode((SentenceParser.Node) elements[i], sentence, tags, target, phraseTag);
             
             // if the child node was of a different type we should break the chunk sequence
             for (int j = target.size() - 1; j >= before; j--) {
@@ -196,7 +195,7 @@ public class ADChunkSampleStream implements ObjectStream<ChunkSample> {
 }
 
 
-  protected void processLeaf(Leaf leaf, boolean isIntermediate, String phraseTag,
+  protected void processLeaf(SentenceParser.Leaf leaf, boolean isIntermediate, String phraseTag,
 			List<String> sentence, List<String> tags, List<String> target) {
 		String chunkTag;
 		
@@ -242,7 +241,7 @@ public class ADChunkSampleStream implements ObjectStream<ChunkSample> {
     return t;
   }
   
-  protected String getChunkTag(Leaf leaf) {
+  protected String getChunkTag(SentenceParser.Leaf leaf) {
     String tag = leaf.getSyntacticTag();
     if("P".equals(tag)) {
       return "VP";
@@ -250,7 +249,7 @@ public class ADChunkSampleStream implements ObjectStream<ChunkSample> {
     return null;
   }
 
-  protected String getChunkTag(Node node) {
+  protected String getChunkTag(SentenceParser.Node node) {
     String tag = node.getSyntacticTag();
     
     String phraseTag = tag.substring(tag.lastIndexOf(":") + 1);

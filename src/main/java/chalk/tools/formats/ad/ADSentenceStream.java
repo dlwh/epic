@@ -26,7 +26,6 @@ import java.util.Stack;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import chalk.tools.formats.ad.ADSentenceStream.SentenceParser.Node;
 import chalk.tools.util.FilterObjectStream;
 import chalk.tools.util.ObjectStream;
 
@@ -50,7 +49,7 @@ public class ADSentenceStream extends
   public static class Sentence {
 
     private String text;
-    private Node root;
+    private SentenceParser.Node root;
     private String metadata;
     
     public static final String META_LABEL_FINAL = "final";
@@ -63,11 +62,11 @@ public class ADSentenceStream extends
       this.text = text;
     }
 
-    public Node getRoot() {
+    public SentenceParser.Node getRoot() {
       return root;
     }
 
-    public void setRoot(Node root) {
+    public void setRoot(SentenceParser.Node root) {
       this.root = root;
     }
 
