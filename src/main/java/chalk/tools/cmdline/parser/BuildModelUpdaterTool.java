@@ -37,7 +37,7 @@ public final class BuildModelUpdaterTool extends ModelUpdaterTool {
   
   @Override
   protected ParserModel trainAndUpdate(ParserModel originalModel,
-      ObjectStream<Parse> parseSamples, ModelUpdaterParams parameters)
+      ObjectStream<Parse> parseSamples, ModelUpdaterTool.ModelUpdaterParams parameters)
       throws IOException {
     
       Dictionary mdict = ParserTrainerTool.buildDictionary(parseSamples, originalModel.getHeadRules(), parameters.getCutoff());
