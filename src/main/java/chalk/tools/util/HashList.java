@@ -27,14 +27,14 @@ import java.util.List;
  * Class which creates mapping between keys and a list of values.
  */
 @SuppressWarnings("unchecked")
-public class HashList extends HashMap {
+  public class HashList<K> extends HashMap<K,List> {
 
   private static final long serialVersionUID = 1;
 
   public HashList() {
   }
 
-  public Object get(Object key, int index) {
+  public Object get(K key, int index) {
     if (get(key) != null) {
       return ((List) get(key)).get(index);
     }
@@ -43,7 +43,7 @@ public class HashList extends HashMap {
     }
   }
 
-  public Object putAll(Object key, Collection values) {
+  public Object putAll(K key, Collection values) {
     List o = (List) get(key);
 
     if (o == null) {
@@ -59,8 +59,7 @@ public class HashList extends HashMap {
       return o;
   }
 
-  @Override
-  public List put(Object key, Object value) {
+  public List addToList(K key, Object value) {
     List o = (List) get(key);
 
     if (o == null) {

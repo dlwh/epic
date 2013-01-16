@@ -28,7 +28,6 @@ import chalk.tools.parser.chunking.Parser;
 import chalk.tools.parser.chunking.ParserEventStream;
 import chalk.tools.util.ObjectStream;
 
-
 // trains a new check model ...
 public final class CheckModelUpdaterTool extends ModelUpdaterTool {
 
