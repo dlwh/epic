@@ -1,6 +1,6 @@
 package chalk.corpora
 
-import com.codecommit.antixml._
+import scala.xml._
 import java.io._
 import io.Codec
 
@@ -13,10 +13,10 @@ case class MRegion(id: String, start: Int, end: Int) extends Ordered[MRegion] {
 
 
 /**
- * Convert native MASC xml into CONLL format for named entity recognition.
- *
- * @author jasonbaldridge
- */
+* Convert native MASC xml into CONLL format for named entity recognition.
+*
+* @author jasonbaldridge
+*/
 object MascTransform {
 
   import io.Source
@@ -65,7 +65,7 @@ object MascTransform {
             if (tok.exists(_.isSpaceChar)) {
               println("Weird token! '" + tok +"' " + mfile.dir + "/" + mfile.prefix +".txt:" + + region.start + "-" + region.end)
             }
-          val split = 
+          val split =
             if (i<sentence.numTokens-1 && region.end == regions(i+1).start) "<SPLIT>" else " "
           tokenizedSentence.append(tok).append(split)
           outputNer.write(tok + " " + pos + " " + pos + " " + ner + "\n")
@@ -92,7 +92,7 @@ object MascTransform {
 
 case class MascSentence (
   orderedTokens: Seq[String],
-  orderedPos: Seq[String], 
+  orderedPos: Seq[String],
   bioLabels: Seq[String],
   orderedRegions: Seq[MRegion]
 ) {
@@ -120,12 +120,12 @@ object MascFile {
 
   def apply(targets: Seq[(File, String)]): Iterator[MascFile] = {
     targets.toIterator.flatMap { case(file, prefix) => {
-      try { 
+      try {
         val mfile = MascFile(file,prefix)
         System.err.println("Success: " + file + "," + prefix)
         Some(mfile)
       }
-      catch { case e: Throwable => 
+      catch { case e: Throwable =>
         System.err.println("Failure: " + file + "," + prefix)
         None
       }
@@ -135,24 +135,26 @@ object MascFile {
   def apply(dir: File, prefix: String): MascFile = {
 
     def dirFile(prefix: String) = new File(dir, prefix)
+    def loadXML(file: File) = XML.load(new InputStreamReader( new FileInputStream(file), "UTF-8"))
 
-    implicit val codec = Codec.UTF8 
+    implicit val codec = Codec.UTF8
 
     // Raw text
     val rawtext = Source.fromFile(dirFile(prefix+".txt"))(codec).mkString
 
     // Sentence information
-    val sentenceXml = XML.fromSource(Source.fromFile(dirFile(prefix+"-s.xml"))(Codec.UTF8))
+    val sentenceXml = loadXML(dirFile(prefix+"-s.xml"))
     val sentenceRegions = getRegions(sentenceXml).sorted
 
+    
     // Basic segment information
-    val segmentXml = XML.fromSource(Source.fromFile(dirFile(prefix+"-seg.xml"))(Codec.UTF8))
+    val segmentXml = loadXML(dirFile(prefix+"-seg.xml"))
     val segmentRegions = getRegions(segmentXml).map(r => (r.id -> r)).toMap
 
     // POS information
-    val pennXml = XML.fromSource(Source.fromFile(dirFile(prefix+"-penn.xml"))(Codec.UTF8))
+    val pennXml = loadXML(dirFile(prefix+"-penn.xml"))
 
-    val tokenRegions =  getNodes(pennXml).map { n =>
+    val tokenRegions = getNodes(pennXml).map { n =>
       val regions = n.targets.map(segmentRegions).sorted
       (n.id -> MRegion(n.id, regions.head.start, regions.last.end))
     }.toMap
@@ -161,15 +163,15 @@ object MascFile {
     val posAnnotations = getAnnotations(pennXml).map(anno => (anno.ref -> anno)).toMap
 
     // NER information
-    val neXml = XML.fromSource(Source.fromFile(dirFile(prefix+"-ne.xml"))(Codec.UTF8))
-    val neAnnotations = 
+    val neXml = loadXML(dirFile(prefix+"-ne.xml"))
+    val neAnnotations =
       getAnnotations(neXml).map(anno => (anno.ref -> anno)).toMap.withDefault(x=>outsideNe)
 
-    val neEdges = 
+    val neEdges =
       getEdges(neXml).map(edge => (edge.to -> edge.from)).toMap.withDefault(x=>"outside")
 
-    // A helper function for pulling out the information associated with a 
-    // subsequence of the tokens in the document. 
+    // A helper function for pulling out the information associated with a
+    // subsequence of the tokens in the document.
     def orderedTokPosNer(orderedRegions: Seq[MRegion]) = {
       if (orderedRegions.length == 0) None
       else {
@@ -181,7 +183,7 @@ object MascFile {
           (getPos(posAnno), neAnno)
         }}.unzip
         
-        val bioLabels = (outsideNe +: orderedNe).sliding(2).toSeq.map { 
+        val bioLabels = (outsideNe +: orderedNe).sliding(2).toSeq.map {
           case Seq(prev, curr) =>
             if (curr.label == "outside")
               nerLabelStandardizer(curr.label)
@@ -195,16 +197,18 @@ object MascFile {
     }
 
 
-    // Insert the "missing" sentences. (Content not marked as a sentence, 
+    // Insert the "missing" sentences. (Content not marked as a sentence,
     // but containing tokens.)
-    val paddedSentenceRegionBuffer = 
+    val paddedSentenceRegionBuffer =
       collection.mutable.ListBuffer[MRegion](sentenceRegions.head)
 
-    sentenceRegions.sliding(2).foreach { case Seq(prev, curr) => {
-      if (prev.end+1 < curr.start)
-        paddedSentenceRegionBuffer.append(MRegion("", prev.end+1, curr.start-1))
-      paddedSentenceRegionBuffer.append(curr)
-    }}
+    sentenceRegions.sliding(2).foreach {
+      case Seq(prev, curr) => {
+        if (prev.end + 1 < curr.start)
+          paddedSentenceRegionBuffer.append(MRegion("", prev.end + 1, curr.start - 1))
+        paddedSentenceRegionBuffer.append(curr)
+      }
+    }
     
     val paddedSentenceRegions = paddedSentenceRegionBuffer.toSeq
 
@@ -226,16 +230,14 @@ object MascFile {
 
 }
 
-
-
 /**
- * Simple objects and functions for working with MASC data.
- *
- * @author jasonbaldridge
- */
+* Simple objects and functions for working with MASC data.
+*
+* @author jasonbaldridge
+*/
 object MascUtil {
 
-  val idQname = QName(Some("xml"),"id")
+  def xmlId(node: Node) = (node \ "@{http://www.w3.org/XML/1998/namespace}id").toString
 
   lazy val nerLabelStandardizer = Map(
     "location" -> "LOC",
@@ -247,22 +249,25 @@ object MascUtil {
 
 
   def getRegions(doc: Elem) = (doc \\ "region").toSeq.map { rxml =>
-    val Array(start, end) = rxml.attrs("anchors").split(" ")
-    MRegion(rxml.attrs(idQname), start.toInt, end.toInt)
+    val Array(start, end) = (rxml \ "@anchors").toString.split(" ")
+    MRegion(xmlId(rxml), start.toInt, end.toInt)
   }
     
-  def getNodes(doc: Elem) = (doc \\ "node").toSeq.map { nxml =>
-    val targets = (nxml \ "link").head.attrs("targets").split(" ").toSeq
-    MNode(nxml.attrs(idQname), targets)
+  def getNodes(doc: Elem) = (doc \\ "node").toSeq.flatMap { nxml =>
+    val link = (nxml \ "link")
+    if (!link.isEmpty) {
+      val targets = (link.head \ "@targets").toString.split(" ").toSeq
+      Some(MNode(xmlId(nxml), targets))
+    } else throw new Exception("Missing link element.") //None OK?
   }
   
   def getEdges(doc: Elem) = (doc \\ "edge").toSeq
-    .map(exml => MEdge(exml.attrs(idQname), exml.attrs("from"), exml.attrs("to")))
+    .map(exml => MEdge(xmlId(exml), (exml \ "@from").toString, (exml \ "@to").toString))
   
-  def getAnnotations(doc: Elem) = (doc \\ "a").toSeq.map { axml => 
+  def getAnnotations(doc: Elem) = (doc \\ "a").toSeq.map { axml =>
     val features = (axml \\ "f").toSeq
-      .map(fnode => (fnode.attrs("name") -> fnode.children.toString)).toMap
-    MAnnotation(axml.attrs(idQname),axml.attrs("label"),axml.attrs("ref"), features)
+      .map(fnode => ((fnode \ "@name").toString -> fnode.child.toString)).toMap
+    MAnnotation(xmlId(axml), (axml \ "@label").toString, (axml \ "@ref").toString, features)
   }
 
   // Have to go through some pains to make sure we get a POS for every token.

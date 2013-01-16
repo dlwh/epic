@@ -25,7 +25,6 @@ libraryDependencies ++= Seq(
 
 // New dependencies
 libraryDependencies ++= Seq(
-  "com.codecommit" % "anti-xml_2.9.1" % "0.3",
   "com.jasonbaldridge" % "nak" % "1.0"
 )
 
