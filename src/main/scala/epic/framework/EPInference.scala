@@ -83,7 +83,6 @@ class EPInference[Datum, Augment](inferences: IndexedSeq[ProjectableInference[Da
       val inf = inferences(i)
       marginals(i) = null.asInstanceOf[ProjectableInference[Datum, Augment]#Marginal]
       val (marg, contributionToLikelihood) = inf.marginal(datum, q)
-      println("proj " +  i)
       val newAugment = inf.project(datum, marg, q)
       marginals(i) = marg
       newAugment -> contributionToLikelihood

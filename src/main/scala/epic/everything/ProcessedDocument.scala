@@ -34,6 +34,7 @@ case class ProcessedSentence(words: IndexedSeq[String],
   def length= words.length
 
   def isPossibleSpan(begin: Int, end: Int) = (
+//    true
     sparsity.activeTriangularIndices.contains(TriangularArray.index(begin,end))
       || (nerConstraints.allowedLabels(begin,end).ne(null) && nerConstraints.allowedLabels(begin,end).nonEmpty)
   )

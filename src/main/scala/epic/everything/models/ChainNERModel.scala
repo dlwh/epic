@@ -98,7 +98,7 @@ case class ChainNERInference(beliefsFactory: DocumentBeliefs.Factory,
             null
           } else {
             val copy = spanBeliefs.copy(ner = spanBeliefs.ner.updated(DenseVector.tabulate(labels.size){marg.spanMarginal(_, b, e)}))
-            assert(copy.ner.beliefs(notNER) == 0.0)
+            assert(copy.ner.beliefs(notNER) == 0.0, copy.ner.beliefs)
             copy.ner.beliefs(notNER) = 1 - sum(copy.ner.beliefs)
             assert( (sum(copy.ner.beliefs) - 1.0).abs < 1E-4, copy.ner + " " + spanBeliefs.ner)
             copy
@@ -130,7 +130,7 @@ case class ChainNERInference(beliefsFactory: DocumentBeliefs.Factory,
 
         def maxSegmentLength(label: Int): Int = inner.maxLength(label)
 
-        def scoreTransition(prev: Int, cur: Int, beg: Int, end: Int): Double = 0.0 /*{
+        def scoreTransition(prev: Int, cur: Int, beg: Int, end: Int): Double = {
           if(cur == notNER) Double.NegativeInfinity
           else if(b.spanBeliefs(beg, end).eq(null) || b.spanBeliefs(beg, end).ner(cur) == 0.0) Double.NegativeInfinity
           else if(b.spanBeliefs(beg, end).ner(notNER) == 0.0) {
@@ -139,7 +139,7 @@ case class ChainNERInference(beliefsFactory: DocumentBeliefs.Factory,
              math.log(b.spanBeliefs(beg,end).ner(cur) / b.spanBeliefs(beg,end).ner(notNER))
 
           }
-        }*/
+        }
 
         def startSymbol = inner.startSymbol
       }

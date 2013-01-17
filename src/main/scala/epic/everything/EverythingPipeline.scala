@@ -82,7 +82,7 @@ object EverythingPipeline {
     }
 
     val nerPruningModel = new SemiCRF.ConstraintGrammar(baseNER)
-    val nerModel = new SegmentationModelFactory(NERType.OutsideSentence, None /*Some(nerPruningModel)*/, Gazetteer.ner("en")).makeModel(nerSegments)
+    val nerModel = new SegmentationModelFactory(NERType.OutsideSentence, Some(nerPruningModel), Gazetteer.ner("en")).makeModel(nerSegments)
     // NERProperties
     val nerProp = Property("NER::Type", nerModel.labelIndex)
 

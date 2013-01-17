@@ -119,8 +119,8 @@ object SemiCRF {
       }
 
       val allowedLabels = spanMarginals.map {  arr =>
-//         BitSet.empty ++ (0 until arr.length).filter(i => arr(i) >= threshold)
-           BitSet.empty ++ (0 until arr.length)
+         BitSet.empty ++ (0 until arr.length).filter(i => arr(i) >= threshold)
+//           BitSet.empty ++ (0 until arr.length)
       }
 
       val maxLengths = new Array[Int](anchoring.labelIndex.size)
@@ -370,6 +370,7 @@ object SemiCRF {
 
       c
     }
+
 
     def anchor(w: IndexedSeq[W]): Anchoring[L, W] = {
       val c = constraints(w)

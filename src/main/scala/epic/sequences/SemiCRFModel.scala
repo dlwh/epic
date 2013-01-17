@@ -255,6 +255,10 @@ class SegmentationModelFactory[L](val startSymbol: L,
       }
       i += 1
     }
+
+    for(f <- pruningModel) {
+      assert(f.labelIndex == labelIndex, f.labelIndex + " " + labelIndex)
+    }
     val indexed = new IndexedStandardFeaturizer(f, labelIndex, basicFeatureIndex, spanFeatureIndex, transFeatureIndex, pruningModel)
     val model = new SemiCRFModel(indexed.featureIndex, indexed, maxLengthArray)
 
@@ -492,7 +496,7 @@ class SegmentationModelFactory[L](val startSymbol: L,
       }
       private val spanFeatures = Array.tabulate(labelIndex.size, labelIndex.size){ (prev, cur) =>
         TriangularArray.tabulate(w.length+1) { (beg, end) =>
-          val ok = constraints.forall(_.allowedLabels(beg, end).contains(prev))
+          val ok = constraints.forall(_.allowedLabels(beg, end).contains(cur))
           if(!ok) {
             null
           } else {
