@@ -32,7 +32,7 @@ class ExpectedCountsKernel[C, L](ruleStructure: RuleStructure[C, L], numGrammars
     binary_rterms.setArgs(ecounts, inside.top, outside.bot, inside.tags, offsets, lengths, offLengths,  Integer.valueOf(1), rules)
     binary_terms.setArgs(ecounts, inside.top, outside.bot, inside.tags, offsets, lengths, offLengths, rules)
     unaries.setArgs(ecounts, inside.top, inside.bot, outside.top, offsets, lengths, offLengths, Integer.valueOf(1), masks, rules)
-    terms.setArgs(termECounts, inside.top, inside.bot, outside.bot, offsets, lengths, offLengths, Integer.valueOf(1))
+    terms.setArgs(termECounts, inside.top, inside.tags, outside.tags, offsets, lengths, offLengths, Integer.valueOf(1))
 
     val maxDim1Size = queue.getDevice.getMaxWorkItemSizes()(0)
     val nsyms = ruleStructure.numSyms
@@ -91,37 +91,6 @@ class ExpectedCountsKernel[C, L](ruleStructure: RuleStructure[C, L], numGrammars
   lazy val text = {
     import ruleStructure._
     GrammarHeader.header(ruleStructure, numGrammars) +"""
-
-       /*
-
- __kernel void ecount_binary_terms(__global rule_cell* ecounts,
-    __global const parse_cell * insides_top,
-    __global const parse_cell* outsides_pos,
-    __global const parse_cell * insides_pos,
-    __global const int* offsets,
-    __global const int* lengths,
-   __global const int* lengthOffsets,
-    __global const rule_cell* rules) {
-   const int sentence = get_global_id(0);
-   const int begin = get_global_id(1);
-   const int gram = get_global_id(2);
-   const int end = begin + 2;
-   const int split = begin + 1;
-   const int length = lengths[sentence];
-   __global rule_cell* ruleCounts = ecounts + (lengthOffsets[sentence] + begin);
-   __global const parse_cell* obot = outsides_pos + lengthOffsets[sentence];
-   __global const parse_cell* itop = insides_top + offsets[sentence];
-   __global const parse_cell* ipos = insides_pos + lengthOffsets[sentence];
-   const float root_score = CELL(itop, 0, length)->syms[ROOT][gram]; // scale is 2^(SCALE_FACTOR)^(length-1)
-   if(end <= length) {
-     float oscore;
-     __global const parse_cell* oparents = obot + begin;
-
-   }
- }
-                                                       */
-
-
 
 __kernel void ecount_binary_terms(__global rule_cell* ecounts,
    __global const parse_cell * insides_top,
@@ -238,8 +207,8 @@ __kernel void ecount_unaries(
 __kernel void ecount_terminals(
    __global parse_cell* term_ecounts,
    __global const parse_cell * insides_top,
-   __global const parse_cell * insides_bot,
-   __global const parse_cell * outsides_bot,
+   __global const parse_cell * insides_pos,
+   __global const parse_cell * outsides_pos,
    __global const int* offsets,
    __global const int* lengths,
    __global const int* lengthOffsets,
@@ -251,10 +220,10 @@ __kernel void ecount_terminals(
   const int end = begin  + 1;
   const int length = lengths[sentence];
   if (begin < length) {
-    __global const parse_cell* inside = insides_bot + offsets[sentence];
     __global const parse_cell* itop = insides_top + offsets[sentence];
-    __global const parse_cell* in = CELL(inside, begin, end);
-    __global const parse_cell* out = CELL(outsides_bot + offsets[sentence], begin, end);
+    __global const parse_cell* in = insides_pos + lengthOffsets[sentence] + begin;
+    __global const parse_cell* out = outsides_pos + lengthOffsets[sentence] + begin;
+//    __global const parse_cell* out = CELL(outsides_bot + offsets[sentence], begin, end);
     __global parse_cell* mybuf = term_ecounts + (lengthOffsets[sentence] + begin);
     // ibot has scale 0, obot has scale length - 1, root_score has scale length - 1. Woot.
     for(int i = 0; i < numGrammarsToDo && grammar < NUM_GRAMMARS; ++i) {
@@ -281,7 +250,7 @@ __kernel void elementwise_mult(__global const float* src, __global float* vec, c
       ecountBinaryLeftTerms(leftTermRules),
       ecountBinaryRightTerms(rightTermRules),
       ecountUnaries(unaryRulesWithIndices)
-    )  ++ (0 until partitionsSmall.length).map(i => ecountBinaryPartition(partitionsSmall(i), i)).mkString("\n")
+    )  ++ (0 until partitionsParent.length).map(i => ecountBinaryPartition(partitionsParent(i), i)).mkString("\n")
   }
 
 
@@ -550,7 +519,7 @@ __kernel void ecount_binaries_%d(__global rule_cell* ecounts,
       buf += "oscore = out->syms[%d][gram]/root_score;".format(par)
       buf += "if(oscore != 0.0f) {"
       for( (r,index) <- rules) {
-        buf += "  ruleCounts->unaries[%d][gram] += rules->unaries[%d][gram] * oscore * in->syms[%d][gram];".format(index, index, r.child)
+        buf += "  ruleCounts->unaries[%d][gram] += oscore * in->syms[%d][gram];".format(index, r.child)
       }
       buf += "}"
     }

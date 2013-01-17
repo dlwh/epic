@@ -245,12 +245,12 @@ class GPUGrammar[C, L, W](coarseGrammar: BaseGrammar[C],
       proj,
       inside,
       outside,
-      offDev, lenDev, lengths.max, lastEvent, zt)
+      offDev, offLengthsDev, lenDev, lengths.max, lastEvent, zt)
 
     lastEvent = memZero.zeroMemory(decodeDev.asCLFloatBuffer(), lastEvent)
     lastEvent = decoder.makeBackpointers(numSentences, decodeDev,
       proj,
-      offDev, lenDev, lengths.max, lastEvent)
+      offDev, offLengthsDev, lenDev, lengths.max, lastEvent)
 
     val backPointers = decodeDev.read(queue, lastEvent).getInts(maxCells * 4)
     // 0 is top, 1 is bot, 2 is split, 3 is score (unused, actually a float)
@@ -297,7 +297,7 @@ class GPUGrammar[C, L, W](coarseGrammar: BaseGrammar[C],
     lastEvent = memZero.zeroMemory(decodeDev.asCLFloatBuffer(), lastEvent)
     lastEvent = decoder.makeBackpointers(numSentences, decodeDev,
       proj,
-      offDev, lenDev, lengths.max, lastEvent)
+      offDev, offLengthsDev, lenDev, lengths.max, lastEvent)
 
     val backPointers = decodeDev.read(queue, lastEvent).getInts(maxCells * 4)
     // 0 is top, 1 is bot, 2 is split, 3 is score (unused, actually a float)
@@ -346,7 +346,7 @@ class GPUGrammar[C, L, W](coarseGrammar: BaseGrammar[C],
     lastEvent = projection.projectCells(numSentences, proj,
       inside,
       outside,
-      offDev, lenDev, lengths.max, lastEvent)
+      offDev, offLengthsDev, lenDev, lengths.max, lastEvent)
 
     lastEvent = masker.createMasks(numSentences, numCells, maskOutDev, proj, offDev, wmo)
 
@@ -357,10 +357,6 @@ class GPUGrammar[C, L, W](coarseGrammar: BaseGrammar[C],
        PruningMask(longs.slice(offsets(i) * structure.pruningMaskFieldSize, offsets(i+1)*structure.pruningMaskFieldSize))
     }
 
-  }
-
-  private def computeOnBits(array: Array[Long]) = {
-    array.par.aggregate(0L)({ (a,b) => a + java.lang.Long.bitCount(b)},(_ + _))
   }
 
   private def doExpectedCounts(batch: Batch):ExpectedCounts = synchronized {
@@ -646,19 +642,21 @@ object GPUGrammar {
 
     println("EP Parsing...")
     val timeIn3 = System.currentTimeMillis()
-    val trees3 = kern.epParse(train.map(_.words.toIndexedSeq), 3)
+//    val trees3 = kern.epParse(train.map(_.words.toIndexedSeq), 3)
 //    for( (guess, inst) <- trees zip train) {
 //      println("========")
 //      println(guess.render(inst.words, false))
 //      println(inst.tree.render(inst.words, false))
 //    }
-    println("Done: " + (System.currentTimeMillis() - timeIn3))
+//    println("Done: " + (System.currentTimeMillis() - timeIn3))
 
     println("once more, with feeling:")
 
     val timeIn2 = System.currentTimeMillis()
-    val trees2 = kern.expectedRuleCounts(train.map(_.words.toIndexedSeq), masks)
+    val trees2 = kern.expectedRuleCounts(train.map(_.words.toIndexedSeq)/*, masks*/)
+    println(trees2.rules.map(_.sum).sum)
     println(trees2.rules.map(_.values.map(x => x * x).sum).sum)
+    println(counts.wordCounts.map(_.map(_.map(_.sum).sum).sum).sum)
     println("Done: " + (System.currentTimeMillis() - timeIn2))
 
     val feat = new ProductionFeaturizer(grammar.grammar, grammar.lexicon.knownLexicalProductions)
@@ -674,6 +672,8 @@ object GPUGrammar {
     println(marg.slice(0, grammar.grammar.index.size).sum)
     println(marg.slice(0, grammar.grammar.index.size).values.map(x => x * x).sum)
     println(marg.slice(grammar.grammar.index.size, marg.length).sum)
+//    println( Encoder.fromIndex(grammar.grammar.index).decode(trees2.rules.reduce(_ + _) - marg.slice(0, grammar.grammar.index.size)))
+//    println( trees2.rules.reduce(_ + _) - marg.slice(0, grammar.grammar.index.size))
 
 //    println(Encoder.fromIndex(grammar.grammar.index).decode(marg.slice(0, grammar.grammar.index.size)))
 //    def unroll(m: ChartMarginal[ParseChart.LogProbabilityParseChart, AnnotatedLabel, String]) = {

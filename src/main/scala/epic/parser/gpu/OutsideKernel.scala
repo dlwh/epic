@@ -33,13 +33,13 @@ class OutsideKernel[C, L](ruleStructure: RuleStructure[C, L], numGrammars: Int)(
                  rules: CLBuffer[JFloat],
                  botHook: (Int, CLEvent)=>Option[CLEvent],
                  topHook: (Int, CLEvent)=>Option[CLEvent],
-                 events: CLEvent*)(implicit queue: CLQueue) = {
+                 events: CLEvent*)(implicit queue: CLQueue): CLEvent = {
     val ou, ob, otb, ot, hooks = new ArrayBuffer[CLEvent]()
     var lastU = null:CLEvent
     lbinaries.foreach(_.setArgs(outside.top, outside.bot, inside.top, offsets, lengths, masks, Integer.valueOf(maxLength), rules))
     rbinaries.foreach(_.setArgs(outside.top, outside.bot, inside.top, offsets, lengths, masks, Integer.valueOf(maxLength), rules))
     unaries.setArgs(outside.top, outside.bot, offsets, lengths, Integer.valueOf(maxLength), rules)
-    tunaries.setArgs(outside.top, outside.bot, offsets, lengths, rules)
+    tunaries.setArgs(outside.top, outside.bot, outside.tags, offsets, lengthOffsets, lengths, rules)
     termbs.setArgs(outside.top, outside.bot, inside.top, inside.tags, offsets, lengths, lengthOffsets, Integer.valueOf(maxLength), masks, rules)
     bterms.setArgs(outside.top, outside.bot, outside.tags, inside.top, inside.tags, offsets, lengths, lengthOffsets, masks, rules)
 
@@ -130,7 +130,9 @@ __kernel void outside_unaries(__global parse_cell * outside_tops,
 
 __kernel void outside_term_unaries(__global parse_cell * outside_tops,
               __global parse_cell * outside_bots,
+              __global parse_cell * outside_pos,
               __global const int* offsets,
+              __global const int* lengthOffsets,
               __global const int* lengths,
             __global const rule_cell* rules) {
   const int sentence = get_global_id(0);
@@ -145,7 +147,8 @@ __kernel void outside_term_unaries(__global parse_cell * outside_tops,
 
   if (end <= length) {
     __global const parse_cell* top = CELL(outside_tops + offsets[sentence], begin, end);
-    __global parse_cell* bot = CELL(outside_bots + offsets[sentence], begin, end);
+//    __global parse_cell* bot = CELL(outside_bots + offsets[sentence], begin, end);
+    __global parse_cell* bot = outside_pos + lengthOffsets[sentence] + begin;
     %s
   }
 }
@@ -253,7 +256,7 @@ __kernel void outside_term_binaries(__global parse_cell* outsides_top,
     // multiply in a 2^SCALE_FACTOR to re-achieve balance.
     __global parse_cell* gout = CELL(outsides_top + offsets[sentence], begin, end);
     __global parse_cell* gout2 = CELL(outsides_bot + offsets[sentence], begin, end);
-    __global parse_cell* gout3 = CELL(outsides_tags + lengthOffsets[sentence], begin, end);
+    __global parse_cell* gout3 = outsides_tags + lengthOffsets[sentence] + begin;
     for(int i = 0; i < NUM_SYMS; ++i) {
 //      if(otarget[i] != gout->syms[i][gram])
 //        printf("%%d %%d %%e %%e %%e\n", begin, i, gout->syms[i][gram], ldexp(otarget[i], SCALE_FACTOR), gout->syms[i][gram]- ldexp(otarget[i], SCALE_FACTOR));

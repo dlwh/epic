@@ -13,6 +13,7 @@ class ProjectionKernel[L, L2](rules: RuleStructure[L, L2],numGrammars: Int, odds
                  inside: GPUCharts,
                  outside: GPUCharts,
                  offsets: CLBuffer[JInt],
+                 lengthOffsets: CLBuffer[JInt],
                  lengths: CLBuffer[JInt],
                  maxLength: Int,
                  events: CLEvent*)(implicit queue: CLQueue) = synchronized {
@@ -40,6 +41,10 @@ class ProjectionKernel[L, L2](rules: RuleStructure[L, L2],numGrammars: Int, odds
       pn += b2
     }
 
+    project_terms.setArgs(projected.tags, inside.tags, outside.tags, inside.top, offsets, lengthOffsets, lengths)
+    pn += project_terms.enqueueNDRange(queue, Array(numSentences, maxLength, numGrammars), Array(1, 1, numGrammars), events:_*)
+
+
     if(queue.getProperties.contains(CLDevice.QueueProperties.ProfilingEnable)) {
       queue.finish()
       val iuCount = pn.map(e => e.getProfilingCommandEnd - e.getProfilingCommandStart).sum / 1E9
@@ -50,6 +55,7 @@ class ProjectionKernel[L, L2](rules: RuleStructure[L, L2],numGrammars: Int, odds
   }
 
   private lazy val project_nterms = program.createKernel("project_nterms")
+  private lazy val project_terms = program.createKernel("project_terms")
 
   val program = {
     val p = context.createProgram(text)
@@ -83,7 +89,31 @@ __kernel void project_nterms(__global projected_parse_cell* projected,
 
 }
 
-                                                             """.format(projectNonterminalsInner)
+ __kernel void project_terms(__global projected_parse_cell* projected,
+                             __global const parse_cell* insides,
+                             __global const parse_cell* outsides,
+                             __global const parse_cell* insides_top,
+                             __global const int* offsets,
+                             __global const int* lengthOffsets,
+                             __global const int* lengths) {
+  const int sentence = get_global_id(0);
+  const int begin = get_global_id(1);
+  const int gram = get_global_id(2);
+  const int end = begin + 1;
+  const int length = lengths[sentence];
+
+  if(end <= length) {
+    const float root_score = CELL(insides_top + offsets[sentence], 0, length)->syms[ROOT][gram]; // scale is 2^(SCALE_FACTOR)^(length-1)
+    __global const parse_cell* in = insides + lengthOffsets[sentence] + begin;
+    __global const parse_cell* out = outsides + lengthOffsets[sentence] + begin;
+    __global projected_parse_cell* target = projected + lengthOffsets[sentence] + begin;
+
+    %s
+  }
+
+}
+
+                                                             """.format(projectNonterminalsInner, projectNonterminalsInner)
 
   private def projectNonterminalsInner = {
     val buf = new ArrayBuffer[String]()

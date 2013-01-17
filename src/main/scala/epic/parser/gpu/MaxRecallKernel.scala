@@ -9,14 +9,15 @@ class MaxRecallKernel[Coarse, Fine](rules: RuleStructure[Coarse, Fine], numGramm
                        backPointers: CLBuffer[JInt],
                        projected: GPUCharts,
                        offsets: CLBuffer[JInt],
+                       lengthOffsets: CLBuffer[JInt],
                        lengths: CLBuffer[JInt],
                        maxLength: Int,
                        events: CLEvent*)(implicit queue: CLQueue) = synchronized {
-    max_recall.setArgs(backPointers, projected.top, projected.bot, offsets, lengths, Integer.valueOf(1))
+    max_recall.setArgs(backPointers, projected.top, projected.bot, projected.tags, offsets, lengthOffsets, lengths, Integer.valueOf(1))
 
     var event = max_recall.enqueueNDRange(queue, Array(numSentences, maxLength), events:_*)
     for (len <- 2 to maxLength) {
-      max_recall.setArg(5, len)
+      max_recall.setArg(7, len)
       event = max_recall.enqueueNDRange(queue, Array(numSentences, maxLength + 1 - len), event)
     }
 
@@ -44,7 +45,9 @@ __kernel void max_recall(
               __global backpointer* backpointers,
               __global const projected_parse_cell * marg_tops,
               __global const projected_parse_cell * marg_bots,
+              __global const projected_parse_cell * marg_tags,
               __global const int* offsets,
+              __global const int* lengthOffsets,
               __global const int* lengths,
               const int spanLength) {
   const int sentence = get_global_id(0);
@@ -60,8 +63,8 @@ __kernel void max_recall(
 
   if (end <= length) {
     __global backpointer* bp = CELL(back, begin, end);
-    __global const parse_cell* mb = CELL(marg_bots + offsets[sentence], begin, end);
-    __global const parse_cell* mt = CELL(marg_tops + offsets[sentence], begin, end);
+    __global const projected_parse_cell* mb = CELL(marg_bots + offsets[sentence], begin, end);
+    __global const projected_parse_cell* mt = CELL(marg_tops + offsets[sentence], begin, end);
     for(int i = 0; i < NUM_PROJECTED_SYMS; ++i) {
       float score = mb->syms[i][gram];
       if(score > maxSymBotV) {
@@ -74,10 +77,23 @@ __kernel void max_recall(
         maxSymTop = i;
       }
     }
+
+    if (spanLength == 1) {
+      __global const projected_parse_cell* mp = marg_tags + lengthOffsets[sentence] + begin;
+      for(int i = 0; i < NUM_PROJECTED_SYMS; ++i) {
+        float score = mp->syms[i][gram];
+        if(score > maxSymBotV) {
+          maxSymBotV = score;
+          maxSymBot = i;
+        }
+      }
+
+    }
+
     bp->top = maxSymTop;
     bp->bot = maxSymBot;
     int bestSplit = -1;
-    float bestScore = 0.0;
+    float bestScore = 0.0f;
     for(int split = begin + 1; split < end; ++split) {
       __global const backpointer* left = CELL(back, begin, split);
       __global const backpointer* right = CELL(back, split, end);
@@ -88,7 +104,7 @@ __kernel void max_recall(
         bestScore = score;
       }
     }
-    if(bestScore == 0.0 && spanLength != 1)
+    if(bestScore == 0.0f && spanLength != 1)
       bp->score = -10000.0f;
     else
       bp->score = bestScore + maxSymBotV + maxSymTopV;
