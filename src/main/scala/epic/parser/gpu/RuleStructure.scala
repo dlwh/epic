@@ -30,6 +30,9 @@ case class RuleStructure[C, L](refinements: GrammarRefinements[C, L], grammar: B
   }
   val numNonTerms = numSyms - terminalSymbols.size
 
+  val terminalMap = Array.tabulate(numSyms)(i => i)
+  val nonterminalMap = Array.tabulate(numSyms)(i => i)
+
   val (ntRules, leftTermRules, rightTermRules, bothTermRules) = {
     val ntRules, leftTermRules, rightTermRules, bothTermRules = ArrayBuffer[(BinaryRule[Int], Int)]()
     for(r <- binaryRulesWithIndices) {

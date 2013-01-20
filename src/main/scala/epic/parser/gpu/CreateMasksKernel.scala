@@ -28,6 +28,7 @@ class CreateMasksKernel[L, L2](rules: RuleStructure[L, L2], numGrammars: Int)(im
   }
 
   private lazy val set_coarse_masks = program.createKernel("set_coarse_masks")
+  private lazy val set_coarse_masks_term = program.createKernel("set_coarse_masks_term")
 
   val program = {
     val p = context.createProgram(text)
@@ -46,14 +47,34 @@ __kernel void set_coarse_masks(__global pruning_mask* masks,
   const int cell = get_global_id(0);
 
   for(int sym = 0; sym < NUM_PROJECTED_SYMS; ++sym) {
-    if (projected_top[cell].syms[sym][0] > PRUNING_THRESHOLD
-      || projected_bot[cell].syms[sym][0] > PRUNING_THRESHOLD) {
+    if (projected_top[cell].syms[sym][0] > PRUNING_THRESHOLD || projected_bot[cell].syms[sym][0] > PRUNING_THRESHOLD) {
       SET_COARSE(masks[cell], sym);
     }
   }
-
-
 }
+
+     /*
+__kernel void set_coarse_masks_term(__global pruning_mask* masks,
+                               __global projected_parse_cell* projected_term,
+                               __global const int* offsets,
+                               __global const int* lengthOffsets,
+                               __global const int* lengths) {
+
+  const int sentence = get_global_id(0);
+  const int begin = get_global_id(1);
+  const int end = begin + 1;
+  if(end < lengths[sentence]) {
+    __global pruning_mask* mask = CELL(masks + offsets[sentence], begin, end);
+    __global projected_parse_cell* cell = projected_term + lengthOffsets[sentence] + begin;
+
+    for(int sym = 0; sym < NUM_PROJECTED_SYMS; ++sym) {
+      if (cell->syms[sym][0] > PRUNING_THRESHOLD) {
+        SET_COARSE(mask, sym);
+      }
+    }
+  }
+}
+*/
 
                                                              """
 

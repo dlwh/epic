@@ -298,7 +298,7 @@ __kernel void ecount_binaries_%d(__global rule_cell* ecounts,
       // left * right has scale (end - begin-2)
       // left * right * oparent / root has scale -1
       buf += "if (COARSE_IS_SET(*pmask, %d)) {".format(ruleStructure.refinements.labels.project(par))
-      buf += "oscore = ldexp(oparents->syms[%d][gram]/root_score, SCALE_FACTOR);".format(par)
+      buf += "oscore = ldexp(oparents->syms[%d][gram]/root_score, SCALE_FACTOR); // %s".format(nonterminalMap(par), symbolName(par))
       buf += "if (oscore != 0.0f) {"
       var r = 0
       while(r < rules.length) {
@@ -316,7 +316,7 @@ __kernel void ecount_binaries_%d(__global rule_cell* ecounts,
         while(r < rules.length && assignments.size < registersToUse) {
           val (BinaryRule(_, l, right), ruleIndex) = rules(r)
           if(lastLeft != l) {
-            buf += "    r0 = CELL(itop, begin, split)->syms[%d][gram];".format(l)
+            buf += "    r0 = CELL(itop, begin, split)->syms[%d][gram]; // %s".format(nonterminalMap(l), symbolName(l))
             lastLeft = l
           }
           val rightR = assignments.index(('right, right))
@@ -324,10 +324,10 @@ __kernel void ecount_binaries_%d(__global rule_cell* ecounts,
           if(assignments.size < registersToUse) {
             ruleRegisters += (ruleR -> ruleIndex)
             if (!setThisRound(rightR)) {
-              buf += "    r%d = CELL(itop, split, end)->syms[%d][gram];".format(rightR, right)
+              buf += "    r%d = CELL(itop, split, end)->syms[%d][gram]; // %s".format(rightR, nonterminalMap(right), symbolName(right))
               setThisRound += rightR
             }
-            buf += "    r%d = mad(r0, r%d, r%d);".format(ruleR,  rightR, ruleR)
+            buf += "    r%d = mad(r0, r%d, r%d); // %s".format(ruleR,  rightR, ruleR, ruleString(ruleIndex))
             r += 1
           }
         }
@@ -337,7 +337,7 @@ __kernel void ecount_binaries_%d(__global rule_cell* ecounts,
         // register flush time!
         buf += "  // flush time!"
         for( (reg, rule) <- ruleRegisters) {
-          buf += "  ruleCounts->binaries[%d][gram] += r%d * oscore;".format(rule, reg)
+          buf += "  ruleCounts->binaries[%d][gram] += r%d * oscore; // %s".format(rule, reg, ruleString(rule))
         }
         buf(regInitializerPos) = ruleRegisters.map { case (reg, rule) => "r%d = 0.0f;".format(reg)}.mkString("  ", " ", "");
       }
@@ -358,7 +358,7 @@ __kernel void ecount_binaries_%d(__global rule_cell* ecounts,
       // oparent has scale length + begin - end, root has scale length - 1
       // left * right has scale (end - begin-2)
       // left * right * oparent / root has scale -1
-      buf += "oscore = ldexp(oparents->syms[%d][gram]/root_score, SCALE_FACTOR);".format(par)
+      buf += "oscore = ldexp(oparents->syms[%d][gram]/root_score, SCALE_FACTOR); // %s".format(nonterminalMap(par), symbolName(par))
       buf += "if (oscore != 0.0f) {"
       var r = 0
       while(r < rules.length) {
@@ -373,7 +373,7 @@ __kernel void ecount_binaries_%d(__global rule_cell* ecounts,
         while(r < rules.length && assignments.size < registersToUse) {
           val (BinaryRule(_, l, right), ruleIndex) = rules(r)
           if(lastLeft != l) {
-            buf += "    r0 = ipos[begin].syms[%d][gram];".format(l)
+            buf += "    r0 = ipos[begin].syms[%d][gram]; // %s".format(terminalMap(l), symbolName(l))
             lastLeft = l
           }
           val rightR = assignments.index(('right, right))
@@ -381,10 +381,10 @@ __kernel void ecount_binaries_%d(__global rule_cell* ecounts,
           if(assignments.size < registersToUse) {
             ruleRegisters += (ruleR -> ruleIndex)
             if (!setThisRound(rightR)) {
-              buf += "    r%d = ipos[split].syms[%d][gram];".format(rightR, right)
+              buf += "    r%d = ipos[split].syms[%d][gram]; // %s".format(rightR, terminalMap(right), symbolName(right))
               setThisRound += rightR
             }
-            buf += "    r%d = mad(r0, r%d, r%d);".format(ruleR, rightR, ruleR)
+            buf += "    r%d = mad(r0, r%d, r%d); // %s".format(ruleR, rightR, ruleR, ruleString(ruleIndex))
             r += 1
           }
         }
@@ -392,7 +392,7 @@ __kernel void ecount_binaries_%d(__global rule_cell* ecounts,
         // register flush time!
         buf += "  // flush time!"
         for( (reg, rule) <- ruleRegisters) {
-          buf += "  ruleCounts->binaries[%d][gram] += r%d * oscore;".format(rule, reg)
+          buf += "  ruleCounts->binaries[%d][gram] += r%d * oscore; // %s".format(rule, reg, ruleString(rule))
         }
         buf(regInitializerPos) = ruleRegisters.map { case (reg, rule) => "r%d = 0.0f;".format(reg)}.mkString("  ", " ", "");
       }
@@ -411,7 +411,7 @@ __kernel void ecount_binaries_%d(__global rule_cell* ecounts,
       // oparent has scale length + begin - end, root has scale length - 1
       // left * right has scale (end - begin-2)
       // left * right * oparent / root has scale -1
-      buf += "ilscore = ldexp(ipos->syms[%d][gram] / root_score, SCALE_FACTOR);".format(left)
+      buf += "ilscore = ldexp(ipos->syms[%d][gram] / root_score, SCALE_FACTOR); // %s".format(terminalMap(left), symbolName(left))
 
       buf += "if (ilscore != 0.0f) {"
       var r = 0
@@ -426,7 +426,7 @@ __kernel void ecount_binaries_%d(__global rule_cell* ecounts,
         while(r < rules.length && assignments.size < registersToUse) {
           val (BinaryRule(parent, l, right), ruleIndex) = rules(r)
           if(lastParent != parent) {
-            buf += "oscore = CELL(obot, begin, end)->syms[%d][gram];".format(parent)
+            buf += "oscore = CELL(obot, begin, end)->syms[%d][gram]; // parent = %s".format(nonterminalMap(parent), symbolName(parent))
             lastParent = parent
           }
           val rightR = assignments.index(('right, right))
@@ -434,17 +434,17 @@ __kernel void ecount_binaries_%d(__global rule_cell* ecounts,
           if(assignments.size < registersToUse) {
             ruleRegisters += (ruleR -> ruleIndex)
             if (!setThisRound(rightR)) {
-              buf += "    r%d = CELL(itop, begin+1, end)->syms[%d][gram];".format(rightR, right)
+              buf += "    r%d = CELL(itop, begin+1, end)->syms[%d][gram]; // %s".format(rightR, nonterminalMap(right), symbolName(right))
               setThisRound += rightR
             }
-            buf += "    r%d = mad(oscore, r%d, r%d);".format(ruleR,  rightR, ruleR)
+            buf += "    r%d = mad(oscore, r%d, r%d); // %s".format(ruleR,  rightR, ruleR, ruleString(ruleIndex))
             r += 1
           }
         }
         // register flush time!
         buf += "  // flush time!"
         for( (reg, rule) <- ruleRegisters) {
-          buf += "  ruleCounts->binaries[%d][gram] += r%d * ilscore;".format(rule, reg)
+          buf += "  ruleCounts->binaries[%d][gram] += r%d * ilscore; // %s".format(rule, reg, ruleString(rule))
         }
         buf(regInitializerPos) = ruleRegisters.map { case (reg, rule) => "r%d = 0.0f;".format(reg)}.mkString("  ", " ", "");
       }
@@ -464,7 +464,7 @@ __kernel void ecount_binaries_%d(__global rule_cell* ecounts,
       // oparent has scale length + begin - end, root has scale length - 1
       // left * right has scale (end - begin-2)
       // left * right * oparent / root has scale -1
-      buf += "irscore = ldexp(ipos[split].syms[%d][gram]/root_score, SCALE_FACTOR);".format(right)
+      buf += "irscore = ldexp(ipos[split].syms[%d][gram]/root_score, SCALE_FACTOR); // %s".format(terminalMap(right), symbolName(right))
       buf += "if (irscore != 0.0f) {"
       var r = 0
       while(r < rules.length) {
@@ -478,7 +478,7 @@ __kernel void ecount_binaries_%d(__global rule_cell* ecounts,
         while(r < rules.length && assignments.size < registersToUse) {
           val (BinaryRule(par, left, _), ruleIndex) = rules(r)
           if(lastParent != par) {
-            buf += "    oscore = CELL(obot, begin, end)->syms[%d][gram];".format(par)
+            buf += "    oscore = CELL(obot, begin, end)->syms[%d][gram]; // %s".format(nonterminalMap(par), symbolName(par))
             lastParent = par
           }
           val leftR = assignments.index(('left, left))
@@ -486,7 +486,7 @@ __kernel void ecount_binaries_%d(__global rule_cell* ecounts,
           if(assignments.size < registersToUse) {
             ruleRegisters += (ruleR -> ruleIndex)
             if (!setThisRound(leftR)) {
-              buf += "    r%d = CELL(itop, begin, split)->syms[%d][gram];".format(leftR, left)
+              buf += "    r%d = CELL(itop, begin, split)->syms[%d][gram]; // %s".format(leftR, nonterminalMap(left), symbolName(left))
               setThisRound += leftR
             }
             buf += "    r%d = mad(oscore, r%d, r%d);".format(ruleR, leftR, ruleR)
@@ -497,7 +497,7 @@ __kernel void ecount_binaries_%d(__global rule_cell* ecounts,
         // register flush time!
         buf += "  // flush time!"
         for( (reg, rule) <- ruleRegisters) {
-          buf += "  ruleCounts->binaries[%d][gram] += r%d * irscore;".format(rule, reg)
+          buf += "  ruleCounts->binaries[%d][gram] += r%d * irscore; // %s".format(rule, reg, ruleString(rule))
         }
         maxReg = maxReg max assignments.size
         buf(regInitializerPos) = ruleRegisters.map { case (reg, rule) => "r%d = 0.0f;".format(reg)}.mkString("  ", " ", "");
@@ -508,6 +508,19 @@ __kernel void ecount_binaries_%d(__global rule_cell* ecounts,
     buf.mkString("\n    ")
   }
 
+  private def symbolName(sym: Int): L = {
+    ruleStructure.grammar.labelIndex.get(sym)
+  }
+
+  private def ruleString(r: Int) = {
+    ruleStructure.grammar.index.get(r) match {
+      case BinaryRule(a, b, c) => "%s -> %s %s".format(a,b,c)
+      case UnaryRule(a, b, c) => "%s -> %s (%s)".format(a,b,c)
+    }
+  }
+
+
+
   private def ecountUnaries(unaries: IndexedSeq[(UnaryRule[Int], Int)]): String = {
     val byParent: Map[Int, IndexedSeq[(UnaryRule[Int], Int)]] = unaries.groupBy(_._1.parent)
     val buf = new ArrayBuffer[String]()
@@ -516,10 +529,10 @@ __kernel void ecount_binaries_%d(__global rule_cell* ecounts,
       // oparent has scale length + begin - end, root has scale length - 1
       // child has scale (end - begin-1)
       // child * oparent / root has scale 0 (yay!)
-      buf += "oscore = out->syms[%d][gram]/root_score;".format(par)
+      buf += "oscore = out->syms[%d][gram]/root_score; // %s".format(nonterminalMap(par), symbolName(par))
       buf += "if(oscore != 0.0f) {"
       for( (r,index) <- rules) {
-        buf += "  ruleCounts->unaries[%d][gram] += oscore * in->syms[%d][gram];".format(index, r.child)
+        buf += "  ruleCounts->unaries[%d][gram] += oscore * in->syms[%d][gram]; // %s".format(index, nonterminalMap(r.child), ruleString(index))
       }
       buf += "}"
     }
@@ -567,4 +580,5 @@ __kernel void ecount_binaries_%d(__global rule_cell* ecounts,
     lastEvent = multVector.enqueueNDRange(queue, Array(width), lastEvent)
     lastEvent
   }
+
 }

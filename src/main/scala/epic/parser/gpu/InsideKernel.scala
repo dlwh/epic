@@ -51,8 +51,6 @@ class InsideKernel[C, L](ruleStructure: RuleStructure[C, L], numGrammars: Int)(i
       hooks += h
     }
 
-    // TODO: retrofit inside/outside binaries and unaries to look at inside.tagsPointer....
-    // TODO: also get ecounts...
     for (len <- 2 to maxLength) {
       binaries.foreach(_.setArg(4, len))
       val b = binaries.map(_.enqueueNDRange(queue, Array(numSentences, maxLength + 1 - len, numGrammars), Array(1, 1, numGrammars), lastU))
@@ -164,22 +162,23 @@ __kernel void inside_unaries(__global const parse_cell * inside_bots,
 
   def insideUnaryUpdates(rules: IndexedSeq[(UnaryRule[Int], Int)]): String = {
     val sb = new ArrayBuffer[String]
-    sb += "float parent;"
+    sb += "float parentScore;"
     val rules2 = rules.sortBy(_._1.parent)
     var lastParent = -1
-    for( (r, index) <- rules2) {
+    for( (r, ruleIndex) <- rules2) {
       if(r.parent != lastParent) {
         if(lastParent != -1) {
-          sb += """top->syms[%d][gram] = parent;""".format(lastParent)
+          sb += """top->syms[%d][gram] = parentScore;""".format(ruleStructure.nonterminalMap(lastParent))
         }
-        sb += """parent = rules->unaries[%d][gram] * bot->syms[%d][gram];""".format(index, r.child)
+        sb += "// parent = %s".format(symbolName(r.parent))
+        sb += """parent = rules->unaries[%d][gram] * bot->syms[%d][gram]; // %s""".format(ruleIndex, ruleStructure.nonterminalMap(r.child), ruleString(ruleIndex))
         lastParent = r.parent
       } else {
-        sb += """parent = mad(rules->unaries[%d][gram], bot->syms[%d][gram], parent);""".format(index, r.child)
+        sb += """parent = mad(rules->unaries[%d][gram], bot->syms[%d][gram], parentScore);""".format(ruleIndex, ruleStructure.nonterminalMap(r.child))
       }
     }
     if(lastParent != -1) {
-      sb += """top->syms[%d][gram] = parent;""".format(lastParent)
+      sb += """top->syms[%d][gram] = parentScore;""".format(ruleStructure.nonterminalMap(lastParent))
     }
     sb.mkString("\n    ")
   }
@@ -190,26 +189,28 @@ __kernel void inside_unaries(__global const parse_cell * inside_bots,
     val lefts = _rules.map(_._1.left).toSet
     val rights = _rules.map(_._1.right).toSet
     sb += "float currentSum = 0.0f;"
-    lefts.map(l => "const float left%d = left->syms[%d][gram];".format(l,l)).foreach(sb += _)
-    rights.map(r => "const float right%d = right->syms[%d][gram];".format(r,r)).foreach(sb += _)
+    lefts.map(l => "const float left%d = left->syms[%d][gram]; /* %s */".format(ruleStructure.nonterminalMap(l),
+                                                                     ruleStructure.nonterminalMap(l), symbolName(l) )).foreach(sb += _)
+    rights.map(r => "const float right%d = right->syms[%d][gram]; /* %s */".format(ruleStructure.nonterminalMap(r),ruleStructure.nonterminalMap(r), symbolName(r))).foreach(sb += _)
     for( (p, rules) <- byParent) {
       var lastLeft = -1
+      sb += "// parent: " + symbolName(p)
       sb += "if (COARSE_IS_SET(*pmask, %d)) {".format(ruleStructure.refinements.labels.project(p))
       for((r@BinaryRule(p, l, right), index) <- rules) {
         if(lastLeft != l) {
           if(lastLeft != -1) {
             sb += "  }"
-            sb += "  parent%d = mad(left%d, currentSum, parent%d);".format(r.parent, lastLeft, r.parent)
+            sb += "  parent%d = mad(left%d, currentSum, parent%d);".format(ruleStructure.nonterminalMap(r.parent), ruleStructure.nonterminalMap(lastLeft), ruleStructure.nonterminalMap(r.parent))
           }
           sb += "  currentSum = 0.0f;"
-          sb += "  if(left%d != 0.0f) { // %s".format(r.left, symbolName(r.left))
+          sb += "  if(left%d != 0.0f) { // left is %s".format(ruleStructure.nonterminalMap(r.left), symbolName(r.left))
           lastLeft = l
         }
-        sb += "    currentSum = mad(rules->binaries[%d][gram], right%d, currentSum); // %s".format(index, right, ruleString(index))
+        sb += "    currentSum = mad(rules->binaries[%d][gram], right%d, currentSum); // %s".format(index, ruleStructure.nonterminalMap(right), ruleString(index))
       }
       if(lastLeft != -1) {
         sb += "  }"
-        sb += "  parent%d = mad(left%d, currentSum, parent%d);".format(p, lastLeft, p)
+        sb += "  parent%d = mad(left%d, currentSum, parent%d);".format(ruleStructure.nonterminalMap(p), ruleStructure.nonterminalMap(lastLeft), ruleStructure.nonterminalMap(p))
         sb += "  currentSum = 0.0f;"
        }
       sb += "}"
@@ -240,11 +241,11 @@ __kernel void inside_unaries(__global const parse_cell * inside_bots,
         if(lastLeft != -1) {
           sb += "}"
         }
-        sb += "currentLeftScore = leftTerm->syms[%d][gram]; // %s".format(l, symbolName(l))
+        sb += "currentLeftScore = leftTerm->syms[%d][gram]; // %s".format(ruleStructure.terminalMap(l), symbolName(l))
         sb += "if(currentLeftScore != 0.0f) {"
         lastLeft = l
       }
-      sb += """  out[%d] = mad(rules->binaries[%d][gram], currentLeftScore * right->syms[%d][gram], out[%d]); // %s""".format(r.parent, index, r.right, r.parent, ruleString(index))
+      sb += """  out[%d] = mad(rules->binaries[%d][gram], currentLeftScore * right->syms[%d][gram], out[%d]); // %s""".format(ruleStructure.nonterminalMap(p), index, ruleStructure.nonterminalMap(right), ruleStructure.nonterminalMap(r.parent), ruleString(index))
     }
     if(lastLeft != -1)
       sb += "}"
@@ -254,11 +255,11 @@ __kernel void inside_unaries(__global const parse_cell * inside_bots,
       if(lastLeft != left) {
         if(lastLeft != -1)
           sb += "  }"
-        sb += "  currentLeftScore = leftTerm->syms[%d][gram]; // %s".format(left, symbolName(left))
+        sb += "  currentLeftScore = leftTerm->syms[%d][gram]; // %s".format(ruleStructure.terminalMap(left), symbolName(left))
         sb += "  if(currentLeftScore != 0.0f) {"
         lastLeft = left
       }
-      sb += """    out[%d] = mad(rules->binaries[%d][gram], currentLeftScore * rightTerm->syms[%d][gram], out[%d]); // %s """.format(r.parent, index, r.right, r.parent, ruleString(index))
+      sb += """    out[%d] = mad(rules->binaries[%d][gram], currentLeftScore * rightTerm->syms[%d][gram], out[%d]); // %s """.format(ruleStructure.nonterminalMap(p), index, ruleStructure.terminalMap(right), ruleStructure.nonterminalMap(p), ruleString(index))
     }
     if(lastLeft != -1)
       sb += "  }"
@@ -268,11 +269,11 @@ __kernel void inside_unaries(__global const parse_cell * inside_bots,
       if(lastRight != right) {
         if(lastRight != -1)
           sb += "}"
-        sb += "currentRightScore = rightTerm->syms[%d][gram]; // right = %s".format(right, symbolName(right))
+        sb += "currentRightScore = rightTerm->syms[%d][gram]; // right = %s".format(ruleStructure.terminalMap(right), symbolName(right))
         sb += "if(currentRightScore != 0.0f) {"
         lastRight = right
       }
-      sb += """  out[%d] = mad(rules->binaries[%d][gram], currentRightScore * left->syms[%d][gram], out[%d]); // %s""".format(r.parent, index, l, p, ruleString(index))
+      sb += """  out[%d] = mad(rules->binaries[%d][gram], currentRightScore * left->syms[%d][gram], out[%d]); // %s""".format(ruleStructure.nonterminalMap(p), index, ruleStructure.nonterminalMap(l), ruleStructure.nonterminalMap(p), ruleString(index))
     }
     sb += "}"
     sb.mkString("\n    ")
@@ -324,9 +325,9 @@ __kernel void inside_binaries_%d(
   }
 }
     """.format(id, id,
-      rules.map(_._1.parent).toSet[Int].map("parent" + _).mkString("float ", " = 0.0f,", " = 0.0f;"),
+      rules.map(_._1.parent).toSet[Int].map(p => "parent" + ruleStructure.nonterminalMap(p) +" /* " + symbolName(p) + "*/  ").mkString("float ", " = 0.0f,", " = 0.0f;"),
       insideRuleUpdates(rules),
-      rules.map(_._1.parent).toSet[Int].map(p => "gout->syms[%d][gram] = ldexp(parent%d, SCALE_FACTOR);".format(p,p)).mkString("\n   ")
+      rules.map(_._1.parent).toSet[Int].map(p => "gout->syms[%d][gram] = ldexp(parent%d, SCALE_FACTOR);".format(ruleStructure.nonterminalMap(p),ruleStructure.nonterminalMap(p))).mkString("\n   ")
     )
   }
 }

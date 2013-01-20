@@ -203,6 +203,7 @@ __kernel void outside_term_binaries(__global parse_cell* outsides_top,
   }
 }
 
+     // update a terminal child whose sibling is a nonterminal or a terminal
  __kernel void outside_binary_terms(__global parse_cell* outsides_top,
               __global parse_cell* outsides_bot,
               __global parse_cell* outsides_tags,
@@ -267,16 +268,16 @@ __kernel void outside_term_binaries(__global parse_cell* outsides_top,
   }
 }
 
-    """.format(outsideUnaryUpdates(ruleStructure.ntermUnaries),
-    outsideUnaryUpdates(ruleStructure.termUnaries),
+    """.format(outsideUnaryUpdates(ruleStructure.ntermUnaries, nonterminalMap(_)),
+    outsideUnaryUpdates(ruleStructure.termUnaries, terminalMap(_)),
     // term_binaries
-    outsideRightCompletionUpdates(ruleStructure.rightTermRules),
-      outsideLeftCompletionUpdates(ruleStructure.leftTermRules),
+    outsideRightCompletionUpdates(ruleStructure.rightTermRules, nonterminalMap(_), terminalMap(_)),
+      outsideLeftCompletionUpdates(ruleStructure.leftTermRules, terminalMap(_), nonterminalMap(_)),
     // binary_terms
-    outsideRightCompletionUpdates(ruleStructure.leftTermRules),
-    outsideLeftCompletionUpdates(ruleStructure.rightTermRules),
-    outsideRightCompletionUpdates(ruleStructure.bothTermRules),
-    outsideLeftCompletionUpdates(ruleStructure.bothTermRules)
+    outsideRightCompletionUpdates(ruleStructure.leftTermRules, terminalMap(_), nonterminalMap(_)),
+    outsideLeftCompletionUpdates(ruleStructure.rightTermRules, nonterminalMap(_), terminalMap(_)),
+    outsideRightCompletionUpdates(ruleStructure.bothTermRules, terminalMap(_), terminalMap(_)),
+    outsideLeftCompletionUpdates(ruleStructure.bothTermRules, terminalMap(_), terminalMap(_))
   ) ++ (
     (0 until partitionsLeft.length).map(i => outside_binaries_left(partitionsLeft(i), i)).mkString("\n")
   ) ++ (
@@ -286,7 +287,7 @@ __kernel void outside_term_binaries(__global parse_cell* outsides_top,
   if(true) {val o = new FileWriter("outside.cl"); o.write(text); o.close()}
 
 
-  def outsideUnaryUpdates(rules: IndexedSeq[(UnaryRule[Int], Int)]): String = {
+  def outsideUnaryUpdates(rules: IndexedSeq[(UnaryRule[Int], Int)], childMap: Int=>Int): String = {
     val sb = new ArrayBuffer[String]
     sb += "float child;"
     val rules2 = rules.sortBy(_._1.child)
@@ -294,23 +295,23 @@ __kernel void outside_term_binaries(__global parse_cell* outsides_top,
     for( (r, index) <- rules2) {
       if(r.child != lastChild) {
         if(lastChild != -1) {
-          sb += """bot->syms[%d][gram] += child;""".format(lastChild)
+          sb += """bot->syms[%d][gram] += child;""".format(childMap(lastChild))
         }
-        sb += """child = rules->unaries[%d][gram] * top->syms[%d][gram];""".format(index, r.parent)
+        sb += """child = rules->unaries[%d][gram] * top->syms[%d][gram];""".format(index, nonterminalMap(r.parent))
         lastChild = r.child
       } else {
-        sb += """child = mad(rules->unaries[%d][gram], top->syms[%d][gram], child);""".format(index, r.parent)
+        sb += """child = mad(rules->unaries[%d][gram], top->syms[%d][gram], child);""".format(index, nonterminalMap(r.parent))
       }
     }
     if(lastChild != -1) {
-      sb += """bot->syms[%d][gram] += child;""".format(lastChild)
+      sb += """bot->syms[%d][gram] += child;""".format(childMap(lastChild))
     }
     sb.mkString("\n    ")
   }
 
 
   // otarget is the left child, completion on right.
-  def outsideRightCompletionUpdates(rules: IndexedSeq[(BinaryRule[Int], Int)]): String = {
+  def outsideRightCompletionUpdates(rules: IndexedSeq[(BinaryRule[Int], Int)], leftMap: Int=>Int, rightMap: Int=>Int): String = {
     val newrules = rules.sortBy(r => (r._1.left, r._1.parent, r._1.right))(Ordering.Tuple3).groupBy(_._1.parent)
     val sb = new ArrayBuffer[String]
     sb += "float currentParent;"
@@ -318,26 +319,26 @@ __kernel void outside_term_binaries(__global parse_cell* outsides_top,
     var lastLeft = -1
     for( (p, byParent) <- newrules) {
       val loaded = collection.mutable.BitSet.empty
-      sb += "currentParent = gparent->syms[%d][gram]; // %s".format(p, symbolName(p))
+      sb += "currentParent = gparent->syms[%d][gram]; // %s".format(ruleStructure.nonterminalMap(p), symbolName(p))
       sb += "if (currentParent != 0.0f) {"
       for((r@BinaryRule(p, left, right), index) <- byParent) {
         if(lastLeft != left) {
           if(lastLeft != -1) {
-            sb += "  otarget[%d] = mad(currentParent, currentSum, otarget[%d]);".format(lastLeft,lastLeft)
+            sb += "  otarget[%d] = mad(currentParent, currentSum, otarget[%d]);".format(leftMap(lastLeft),leftMap(lastLeft))
             sb += "  currentSum = 0.0f;"
           }
           sb += "  // left is %s".format(symbolName(left))
           lastLeft = left
         }
         if(!loaded(right)) {
-          sb += "  float right%d = gright->syms[%d][gram]; // %s ".format(right, right, symbolName(right))
+          sb += "  float right%d = gright->syms[%d][gram]; // %s ".format(rightMap(right), rightMap(right), symbolName(right))
           loaded += right
         }
-        sb += "  currentSum = mad(rules->binaries[%d][gram], right%d, currentSum);".format(index, right)
+        sb += "  currentSum = mad(rules->binaries[%d][gram], right%d, currentSum);".format(index, rightMap(right))
       }
 
       if(lastLeft != -1) {
-        sb += "  otarget[%d] = mad(currentParent, currentSum, otarget[%d]);".format(lastLeft,lastLeft)
+        sb += "  otarget[%d] = mad(currentParent, currentSum, otarget[%d]);".format(leftMap(lastLeft),leftMap(lastLeft))
         sb += "  currentSum = 0.0f;"
       }
       sb += "}"
@@ -352,7 +353,7 @@ __kernel void outside_term_binaries(__global parse_cell* outsides_top,
   }
 
   // otarget is the right child, completion on left.
-  private def outsideLeftCompletionUpdates(rules: IndexedSeq[(BinaryRule[Int], Int)]): String = {
+  private def outsideLeftCompletionUpdates(rules: IndexedSeq[(BinaryRule[Int], Int)], leftMap: Int=>Int, rightMap: Int=>Int): String = {
     val newrules = rules.sortBy(r => (r._1.right, r._1.parent, r._1.left))(Ordering.Tuple3).groupBy(_._1.parent)
     val sb = new ArrayBuffer[String]
     sb += "float currentParent;"
@@ -360,26 +361,26 @@ __kernel void outside_term_binaries(__global parse_cell* outsides_top,
     var lastRight = -1
     for( (p, byParent) <- newrules) {
       val loaded = collection.mutable.BitSet.empty
-      sb += "currentParent = gparent->syms[%d][gram]; // %s".format(p, symbolName(p))
+      sb += "currentParent = gparent->syms[%d][gram]; // %s".format(ruleStructure.nonterminalMap(p), symbolName(p))
       sb += "if (currentParent != 0.0f) {"
       for((r@BinaryRule(p, left, right), index) <- byParent) {
         if(lastRight != right) {
           if(lastRight != -1) {
-            sb += "  otarget[%d] = mad(currentParent, currentSum, otarget[%d]);".format(lastRight,lastRight)
+            sb += "  otarget[%d] = mad(currentParent, currentSum, otarget[%d]);".format(rightMap(lastRight),rightMap(lastRight))
             sb += "  currentSum = 0.0f;"
           }
           sb += "  // right is %s".format(symbolName(right))
           lastRight = right
         }
         if(!loaded(left)) {
-          sb += "  float right%d = gleft->syms[%d][gram]; // %s ".format(left, left, symbolName(left))
+          sb += "  float left%d = gleft->syms[%d][gram]; // %s ".format(leftMap(left), leftMap(left), symbolName(left))
           loaded += left
         }
-        sb += "  currentSum = mad(rules->binaries[%d][gram], right%d, currentSum);".format(index, left)
+        sb += "  currentSum = mad(rules->binaries[%d][gram], left%d, currentSum);".format(index, leftMap(left))
       }
 
       if(lastRight != -1) {
-        sb += "  otarget[%d] = mad(currentParent, currentSum, otarget[%d]);".format(lastRight,lastRight)
+        sb += "  otarget[%d] = mad(currentParent, currentSum, otarget[%d]);".format(rightMap(lastRight),rightMap(lastRight))
         sb += "  currentSum = 0.0f;"
       }
       sb += "}"
@@ -435,9 +436,9 @@ __kernel void outside_term_binaries(__global parse_cell* outsides_top,
   }
 }
     """.stripMargin.format(id,id+300,
-      rules.map(_._1.left).toSet[Int].map("left" + _).mkString("float ", " = 0.0f,", " = 0.0f;"),
+      rules.map(_._1.left).toSet[Int].map(l => "left" + ruleStructure.nonterminalMap(l)).mkString("float ", " = 0.0f,", " = 0.0f;"),
       outsideNTRightCompletionUpdates(rules),
-      rules.map(_._1.left).toSet[Int].map(p => "gout->syms[%d][gram] += ldexp(left%d, SCALE_FACTOR);".format(p,p)).mkString("\n   ")
+      rules.map(_._1.left).toSet[Int].map(l => "gout->syms[%d][gram] += ldexp(left%d, SCALE_FACTOR);".format(ruleStructure.nonterminalMap(l),ruleStructure.nonterminalMap(l))).mkString("\n   ")
     )
   }
 
@@ -480,9 +481,9 @@ __kernel void outside_term_binaries(__global parse_cell* outsides_top,
   }
 }
       """.stripMargin.format(id, id,
-      rules.map(_._1.right).toSet[Int].map("right" + _).mkString("float ", " = 0.0f,", " = 0.0f;"),
+      rules.map(_._1.right).toSet[Int].map(r => "right" + ruleStructure.nonterminalMap(r)).mkString("float ", " = 0.0f,", " = 0.0f;"),
       outsideNTLeftCompletionUpdates(rules),
-      rules.map(_._1.right).toSet[Int].map(p => "gout->syms[%d][gram] += ldexp(right%d, SCALE_FACTOR);".format(p,p)).mkString("\n    ")
+      rules.map(_._1.right).toSet[Int].map(r => "gout->syms[%d][gram] += ldexp(right%d, SCALE_FACTOR);".format(ruleStructure.nonterminalMap(r),ruleStructure.nonterminalMap(r))).mkString("\n    ")
       )
   }
 
@@ -494,26 +495,26 @@ __kernel void outside_term_binaries(__global parse_cell* outsides_top,
     val parents = rules.map(_._1.parent).toSet
     val rights = rules.map(_._1.right).toSet
     sb += "float currentSum = 0.0f; // sum for current left child"
-    parents.map(p => "const float parent%d = gparent->syms[%d][gram];".format(p,p)).foreach(sb += _)
-    rights.map(r => "const float right%d = gright->syms[%d][gram];".format(r,r)).foreach(sb += _)
+    parents.map(p => "const float parent%d = gparent->syms[%d][gram];".format(ruleStructure.nonterminalMap(p),ruleStructure.nonterminalMap(p))).foreach(sb += _)
+    rights.map(r => "const float right%d = gright->syms[%d][gram];".format(ruleStructure.nonterminalMap(r),ruleStructure.nonterminalMap(r))).foreach(sb += _)
     for( (p, byParent) <- newrules) {
       var lastLeft = -1
       sb += "if (COARSE_IS_SET(*pmask, %d)) {".format(ruleStructure.refinements.labels.project(p))
-      sb += "if (parent%d != 0.0f) { // %s".format(p, symbolName(p))
+      sb += "if (parent%d != 0.0f) { // %s".format(ruleStructure.nonterminalMap(p), symbolName(p))
       for((r@BinaryRule(p, left, right), index) <- byParent) {
         if(lastLeft != left) {
           if(lastLeft != -1) {
-            sb += "  left%d = mad(parent%d, currentSum, left%d); // %s".format(lastLeft, p, lastLeft, symbolName(lastLeft))
+            sb += "  left%d = mad(parent%d, currentSum, left%d); // %s".format(ruleStructure.nonterminalMap(lastLeft), ruleStructure.nonterminalMap(p), ruleStructure.nonterminalMap(lastLeft), symbolName(lastLeft))
             sb += "  currentSum = 0.0f;"
           }
           sb += "  // left is %s".format(symbolName(left))
           lastLeft = left
         }
-        sb += "  currentSum = mad(rules->binaries[%d][gram], right%d, currentSum); // %s".format(index, right, ruleString(index))
+        sb += "  currentSum = mad(rules->binaries[%d][gram], right%d, currentSum); // %s".format(index, ruleStructure.nonterminalMap(right), ruleString(index))
       }
 
       if(lastLeft != -1) {
-        sb += "  left%d = mad(parent%d, currentSum, left%d); // %s".format(lastLeft,p, lastLeft, symbolName(lastLeft))
+        sb += "  left%d = mad(parent%d, currentSum, left%d); // %s".format(ruleStructure.nonterminalMap(lastLeft), ruleStructure.nonterminalMap(p), ruleStructure.nonterminalMap(lastLeft), symbolName(lastLeft))
         sb += "  currentSum = 0.0f;"
       }
       sb += "}"
@@ -538,26 +539,26 @@ __kernel void outside_term_binaries(__global parse_cell* outsides_top,
     val parents = rules.map(_._1.parent).toSet
     val lefts = rules.map(_._1.left).toSet
     sb += "float currentSum = 0.0f; // sum for current right child"
-    parents.map(p => "const float parent%d = gparent->syms[%d][gram];".format(p,p)).foreach(sb += _)
-    lefts.map(l => "const float left%d = gleft->syms[%d][gram];".format(l,l)).foreach(sb += _)
+    parents.map(p => "const float parent%d = gparent->syms[%d][gram]; // %s".format(ruleStructure.nonterminalMap(p),ruleStructure.nonterminalMap(p), symbolName(p))).foreach(sb += _)
+    lefts.map(l => "const float left%d = gleft->syms[%d][gram]; // %s".format(ruleStructure.nonterminalMap(l),ruleStructure.nonterminalMap(l), symbolName(l))).foreach(sb += _)
     for( (p, byParent) <- newrules) {
       var lastRight = -1
       sb += "if (COARSE_IS_SET(*pmask, %d)) {".format(ruleStructure.refinements.labels.project(p))
-      sb += "if (parent%d != 0.0f) { // %s".format(p, symbolName(p))
+      sb += "if (parent%d != 0.0f) { // %s".format(ruleStructure.nonterminalMap(p), symbolName(p))
       for((r@BinaryRule(p, left, right), index) <- byParent) {
         if(lastRight != right) {
           if(lastRight != -1) {
-            sb += "  right%d = mad(parent%d, currentSum, right%d); // %s".format(lastRight,p, lastRight, symbolName(lastRight))
+            sb += "  right%d = mad(parent%d, currentSum, right%d); // %s".format(ruleStructure.nonterminalMap(lastRight), ruleStructure.nonterminalMap(p), ruleStructure.nonterminalMap(lastRight), symbolName(lastRight))
             sb += "  currentSum = 0.0f;"
           }
           sb += "  // right is %s".format(symbolName(right))
           lastRight = right
         }
-        sb += "  currentSum = mad(rules->binaries[%d][gram], left%d, currentSum); // %s".format(index, left, ruleString(index))
+        sb += "  currentSum = mad(rules->binaries[%d][gram], left%d, currentSum); // %s".format(index, ruleStructure.nonterminalMap(left), ruleString(index))
       }
 
       if(lastRight != -1) {
-        sb += "  right%d = mad(parent%d, currentSum, right%d); // %s ".format(lastRight, p, lastRight, symbolName(lastRight))
+        sb += "  right%d = mad(parent%d, currentSum, right%d); // %s ".format(ruleStructure.nonterminalMap(lastRight), ruleStructure.nonterminalMap(p), ruleStructure.nonterminalMap(lastRight), symbolName(lastRight))
         sb += "  currentSum = 0.0f;"
       }
       sb += "}"
