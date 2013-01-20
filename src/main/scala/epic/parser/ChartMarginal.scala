@@ -24,7 +24,6 @@ package epic.parser
  * @param inside inside chart
  * @param outside outside chart
  * @param logPartition the normalization constant aka inside score of the root aka probability of the sentence
- * @tparam Chart The kind of parse chart
  * @tparam L the label type
  * @tparam W the word type
  */
