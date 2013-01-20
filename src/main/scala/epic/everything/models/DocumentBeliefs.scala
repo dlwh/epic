@@ -53,8 +53,6 @@ object DocumentBeliefs {
     val labelProp = Property("label", grammar.labelIndex)
     val optionLabelProp = Property("option[label]", new OptionIndex(grammar.labelIndex))
 
-
-
     def apply(doc: ProcessedDocument):DocumentBeliefs = {
       val sentences = for((s,i) <- doc.sentences.zipWithIndex.toArray) yield {
         val spanGovernorBeliefs = Beliefs.improperUninformed("wordPos+None", new DenseIntIndex(0, s.length+2))
@@ -63,7 +61,7 @@ object DocumentBeliefs {
         val optionLabelBeliefs = Beliefs.improperUninformed(optionLabelProp)
         val labelBeliefs = Beliefs.improperUninformed(labelProp)
         val spans = TriangularArray.tabulate(s.length+1) { (begin, end) =>
-          if(begin < end)
+          if(begin < end && s.isPossibleSpan(begin, end))
             SpanBeliefs(DSpan(doc.id,i,begin, end), spanGovernorBeliefs, optionLabelBeliefs, initNERBelief)
           else
             null

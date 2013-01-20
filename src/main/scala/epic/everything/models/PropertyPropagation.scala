@@ -120,21 +120,23 @@ object PropertyPropagation {
       for ( (sentence, sm) <- doc.sentences zip marg.sentences; begin <- 0 until sentence.length; end <- (begin+1) to sentence.length) {
         val grounding = scorer.ground(doc, sentence.index, begin, end)
         val current = sm.spans(begin, end)
-        val partition = breeze.linalg.sum(current)
-        if (begin == end || (current eq null))  {
-          null
-        } else {
-          var p1 = 0
-          while( p1 < current.rows) {
-            var p2 = 0
-            while(p2 < current.cols) {
-              val features = grounding.featuresFor(p1, p2)
-              for(f <- features) {
-                accum.counts(f) += scale * current(p1,p2) / partition
+        if(current != null) {
+          val partition = breeze.linalg.sum(current)
+          if (begin == end || (current eq null))  {
+            null
+          } else {
+            var p1 = 0
+            while( p1 < current.rows) {
+              var p2 = 0
+              while(p2 < current.cols) {
+                val features = grounding.featuresFor(p1, p2)
+                for(f <- features) {
+                  accum.counts(f) += scale * current(p1,p2) / partition
+                }
+                p2 += 1
               }
-              p2 += 1
+              p1 += 1
             }
-            p1 += 1
           }
         }
       }

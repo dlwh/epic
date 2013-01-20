@@ -14,14 +14,14 @@ final case class Beliefs[T](property: Property[T], beliefs: DenseVector[Double])
 
   def beliefFor(i: T) = apply(property.choices(i))
 
-  def *(f: Beliefs[T]): Beliefs[T] = copy(beliefs = Beliefs.stripNaNs(beliefs :* f.beliefs, beliefs, f.beliefs))
-  def /(f: Beliefs[T]): Beliefs[T] = copy(beliefs = Beliefs.stripNaNs(beliefs :/ f.beliefs, beliefs, f.beliefs))
+  def *(f: Beliefs[T]): Beliefs[T] = if (beliefs eq null) f else if (f.beliefs eq null) this else copy(beliefs = Beliefs.stripNaNs(beliefs :* f.beliefs, beliefs, f.beliefs))
+  def /(f: Beliefs[T]): Beliefs[T] = if (f.beliefs eq null) this else if (beliefs eq f.beliefs) Beliefs(property, null) else copy(beliefs = Beliefs.stripNaNs(beliefs :/ f.beliefs, beliefs, f.beliefs))
 
   def logPartition: Double = {
     val sum = breeze.linalg.sum(beliefs)
     if (sum == beliefs.length && norm(beliefs-1.0) == 0.0) 0.0
     else math.log(sum)
-  };
+  }
 
   def isConvergedTo(f: Beliefs[T], diff: Double): Boolean = {
     var i = 0

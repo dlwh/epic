@@ -24,6 +24,7 @@ import breeze.util.Implicits._
 object SemiNERPipeline {
 
   case class Params(path: File,
+                    modelOut: File = new File("ner.model.gz"),
                     name: String = "eval/ner",
                     nfiles: Int = 100000,
                     iterPerEval: Int = 20,
@@ -81,6 +82,7 @@ object SemiNERPipeline {
     }
 
 
+
     // build feature Index
     val model = new SegmentationModelFactory(NERType.OutsideSentence, gazetteer = gazetteer).makeModel(train)
     val obj = new ModelObjective(model, train)
@@ -93,11 +95,10 @@ object SemiNERPipeline {
       println("Eval + " + (state.iter+1) + " " + SegmentationEval.eval(crf, test, NERType.NotEntity))
     }
 
-    val weights = params.opt.iterations(cached, obj.initialWeightVector(randomize=true)).tee(state => if((state.iter +1) % params.iterPerEval == 0) eval(state)).take(params.opt.maxIterations).last
-    eval(weights)
+    val finalState = params.opt.iterations(cached, obj.initialWeightVector(randomize=true)).tee(state => if((state.iter +1) % params.iterPerEval == 0) eval(state)).take(params.opt.maxIterations).last
+    eval(finalState)
 
-
-
+    breeze.util.writeObject(params.modelOut, model.extractCRF(finalState.x))
 
   }
 

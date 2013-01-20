@@ -89,13 +89,20 @@ case class ChainNERInference(beliefsFactory: DocumentBeliefs.Factory,
   def project(doc: ProcessedDocument, m: Marginal, oldBeliefs: DocumentBeliefs): DocumentBeliefs = {
     val newSentences = Array.tabulate(doc.sentences.length) { s =>
       val marg = m.sentences(s)
+      assert(!marg.logPartition.isInfinite)
       val sentenceBeliefs = oldBeliefs.beliefsForSentence(s)
       val newSpans = TriangularArray.tabulate(doc.sentences(s).length+1){ (b,e) =>
         if(b < e) {
           val spanBeliefs = sentenceBeliefs.spanBeliefs(b, e)
-          val copy = spanBeliefs.copy(ner = spanBeliefs.ner.updated(DenseVector.tabulate(labels.size){marg.spanMarginal(_, b, e)}))
-          copy.ner.beliefs(notNER) = 1 - sum(copy.ner.beliefs)
-          copy
+          if(spanBeliefs eq null) {
+            null
+          } else {
+            val copy = spanBeliefs.copy(ner = spanBeliefs.ner.updated(DenseVector.tabulate(labels.size){marg.spanMarginal(_, b, e)}))
+            assert(copy.ner.beliefs(notNER) == 0.0, copy.ner.beliefs)
+            copy.ner.beliefs(notNER) = 1 - sum(copy.ner.beliefs)
+            assert( (sum(copy.ner.beliefs) - 1.0).abs < 1E-4, copy.ner + " " + spanBeliefs.ner)
+            copy
+          }
         } else null
       }
       sentenceBeliefs.copy(spans=newSpans)
@@ -125,11 +132,12 @@ case class ChainNERInference(beliefsFactory: DocumentBeliefs.Factory,
 
         def scoreTransition(prev: Int, cur: Int, beg: Int, end: Int): Double = {
           if(cur == notNER) Double.NegativeInfinity
-          else if(b.spanBeliefs(beg, end).ner(cur) == 0.0) Double.NegativeInfinity
+          else if(b.spanBeliefs(beg, end).eq(null) || b.spanBeliefs(beg, end).ner(cur) == 0.0) Double.NegativeInfinity
           else if(b.spanBeliefs(beg, end).ner(notNER) == 0.0) {
             math.log(b.spanBeliefs(beg,end).ner(cur))
           } else {
-            math.log(b.spanBeliefs(beg,end).ner(cur) / b.spanBeliefs(beg,end).ner(notNER))
+             math.log(b.spanBeliefs(beg,end).ner(cur) / b.spanBeliefs(beg,end).ner(notNER))
+
           }
         }
 
