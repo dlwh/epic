@@ -213,7 +213,7 @@ class SemiCRFInference[L, W](weights: DenseVector[Double],
 class SegmentationModelFactory[L](val startSymbol: L,
                                   pruningModel: Option[SemiCRF.ConstraintGrammar[L, String]] = None,
                                   gazetteer: Gazetteer[Any, String] = Gazetteer.empty[String, String],
-                                  weights: Counter[Feature, Double] = Counter[Feature, Double]()) {
+                                  weights: Feature=>Double = { (f:Feature) => 0.0}) {
 
   import SegmentationModelFactory._
 

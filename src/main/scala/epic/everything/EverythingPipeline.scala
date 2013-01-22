@@ -68,7 +68,7 @@ object EverythingPipeline {
     val weightsCache = if (params.weightsCache.exists()) {
       loadWeights(params.weightsCache)
     } else {
-      Counter[Feature, Double]()
+      Counter[String, Double]()
     }
 
 
@@ -84,7 +84,7 @@ object EverythingPipeline {
       breeze.util.readObject[SemiCRF[NERType.Value, String]](params.baseNERModel)
     } else {
       println("Building basic NER model...")
-      val model: SemiCRFModel[NERType.Value, String] = new SegmentationModelFactory(NERType.OutsideSentence, gazetteer = Gazetteer.ner("en"), weights=weightsCache).makeModel(nerSegments)
+      val model: SemiCRFModel[NERType.Value, String] = new SegmentationModelFactory(NERType.OutsideSentence, gazetteer = Gazetteer.ner("en"), weights={(f:Feature) => weightsCache(f.toString)}).makeModel(nerSegments)
 
       val obj = new ModelObjective(model, nerSegments)
       val cached = new CachedBatchDiffFunction(obj)
@@ -100,7 +100,7 @@ object EverythingPipeline {
     }
 
     val nerPruningModel = new SemiCRF.ConstraintGrammar(baseNER)
-    val nerModel = new SegmentationModelFactory(NERType.OutsideSentence, Some(nerPruningModel), Gazetteer.ner("en"), weightsCache).makeModel(nerSegments)
+    val nerModel = new SegmentationModelFactory(NERType.OutsideSentence, Some(nerPruningModel), Gazetteer.ner("en"), {(f: Feature) => weightsCache(f.toString)}).makeModel(nerSegments)
     // NERProperties
     val nerProp = Property("NER::Type", nerModel.labelIndex)
 
@@ -171,7 +171,7 @@ object EverythingPipeline {
 //    val propModel = new PropertyPropagatingModel(propBuilder)
 
     // the big model!
-    val epModel = new EPModel[ProcessedDocument, DocumentBeliefs](30, epInGold = false, initFeatureValue = {f => Some(weightsCache(f))})(
+    val epModel = new EPModel[ProcessedDocument, DocumentBeliefs](30, epInGold = false, initFeatureValue = {f => Some(weightsCache(f.toString)).filter(_ != 0.0)})(
 
       adaptedNerModel
       ,
@@ -240,22 +240,22 @@ object EverythingPipeline {
 
   }
 
-  private def updateWeights(out: File, weightsCache: Counter[Feature, Double], newWeights: Counter[Feature, Double]) {
+  private def updateWeights(out: File, weightsCache: Counter[String, Double], newWeights: Counter[Feature, Double]) {
     for ( (f,w) <- newWeights.activeIterator) {
-      weightsCache(f) = w
+      weightsCache(f.toString) = w
     }
     breeze.util.writeObject(out, weightsCache.activeIterator.toIndexedSeq)
   }
 
   private def loadWeights(in: File) = {
-    val ctr = Counter[Feature, Double]()
+    val ctr = Counter[String, Double]()
     breeze.util.readObject[AnyRef](in) match {
-      case seq: IndexedSeq[(Feature, Double)] =>
+      case seq: IndexedSeq[(String, Double)] =>
         for ( (k, v) <- seq) {
           ctr(k) = v
         }
         println(norm(ctr, 2.0))
-      case ctr2: Counter[Feature, Double] =>
+      case ctr2: Counter[String, Double] =>
         ctr += ctr2
     }
     ctr
