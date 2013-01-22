@@ -31,26 +31,29 @@ trait ChartParser[L, W] extends Parser[L, W] with Serializable {
 }
 
 /**
- * A SimpleChartParser produces trees with labels C from a ChartBuilder with labels L, a decoder from C to L, and
- * projections from C to L
+ * Produces parses by getting marginals from the grammar and decoding with the decoder.
+ *
  * @author dlwh
  */
 @SerialVersionUID(1)
 class SimpleChartParser[L, W](val augmentedGrammar: AugmentedGrammar[L, W],
-                              val decoder: ChartDecoder[L, W],
-                              val maxMarginals: Boolean = false) extends ChartParser[L, W] with Serializable {
+                              val decoder: ChartDecoder[L, W]) extends ChartParser[L, W] with Serializable {
 
-  def charts(w: Seq[W]) = try {
-    ChartMarginal(augmentedGrammar, w)
-  } catch {
-    case e =>
-      try {
-        ChartMarginal(AugmentedGrammar.fromRefined(augmentedGrammar.refined), w)
-      } catch {
-        case e =>
-        throw e
-      }
-
+  def charts(w: Seq[W]) = {
+   try {
+      val mm = ChartMarginal(augmentedGrammar, w)
+      if (mm.logPartition.isInfinite)
+        throw new Exception("infinite partition")
+      mm
+    } catch {
+      case e =>
+        try {
+          ChartMarginal(AugmentedGrammar.fromRefined(augmentedGrammar.refined), w)
+        } catch {
+          case e =>
+            throw e
+        }
+    }
   }
   def grammar = augmentedGrammar.grammar
   def lexicon = augmentedGrammar.lexicon
@@ -59,7 +62,7 @@ class SimpleChartParser[L, W](val augmentedGrammar: AugmentedGrammar[L, W],
 
 object SimpleChartParser {
   def apply[L, W](grammar: AugmentedGrammar[L, W]) = {
-      new SimpleChartParser[L, W](grammar, new MaxRuleProductDecoder(grammar.grammar, grammar.lexicon), false)
+      new SimpleChartParser[L, W](grammar, new MaxRuleProductDecoder(grammar.grammar, grammar.lexicon))
   }
 
 }

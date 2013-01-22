@@ -50,7 +50,7 @@ class ModelObjective[Datum](val model: Model[Datum],
 //          new Exception("While processing " + datum, e).printStackTrace()
           _countsSoFar
       }
-    },{ (a,b) => b += a})
+    },{ (a,b) => if(a eq null) b else if (b eq null) a else b += a})
     val timeOut = System.currentTimeMillis()
     println("Inference took: " + (timeOut - timeIn) * 1.0/1000 + "s" )
 

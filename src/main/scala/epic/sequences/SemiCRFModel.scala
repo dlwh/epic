@@ -16,9 +16,11 @@ import epic.parser.features.StandardSpanFeatures.WordEdges
  *
  * @author dlwh
  */
+@SerialVersionUID(1L)
 class SemiCRFModel[L, W](val featureIndex: Index[Feature],
                          val featurizer: SemiCRFModel.BIEOFeaturizer[L, W],
-                         maxSegmentLength: Int=>Int) extends Model[Segmentation[L, W]] with StandardExpectedCounts.Model {
+                         maxSegmentLength: Int=>Int,
+                         initialWeights: Feature=>Double = {(_: Feature) => 0.0}) extends Model[Segmentation[L, W]] with StandardExpectedCounts.Model with Serializable {
   def labelIndex: Index[L] = featurizer.labelIndex
 
   def extractCRF(weights: DenseVector[Double]) = {
@@ -29,7 +31,7 @@ class SemiCRFModel[L, W](val featureIndex: Index[Feature],
   type Inference = SemiCRFInference[L, W]
   type Marginal = SemiCRF.Marginal[L, W]
 
-  def initialValueForFeature(f: Feature): Double = 0.0
+  def initialValueForFeature(f: Feature): Double = initialWeights(f)
 
   def inferenceFromWeights(weights: DenseVector[Double]): Inference = new SemiCRFInference(weights, featureIndex, featurizer, maxSegmentLength)
 
@@ -208,24 +210,10 @@ class SemiCRFInference[L, W](weights: DenseVector[Double],
 
 }
 
-
-object SegmentationModelFactory {
-  case class SFeature(w: Any, kind: Symbol) extends Feature
-  case class BeginFeature[L](w: Feature, cur: L) extends Feature
-  case class EndFeature[L](w: Feature, cur: L) extends Feature
-  case class TrigramFeature(a: Any, b: Any, c: Any) extends Feature
-  case class SpanFeature[L](distance: Feature, cur: L) extends Feature
-  case class UnigramFeature[L](w: Feature, cur: L) extends Feature
-  case class CFeature(component: Int, f: Feature) extends Feature
-  case class DistanceFeature(distanceBin: Int) extends Feature
-  case object TransitionFeature extends Feature
-  case object SpanStartsSentence extends Feature
-  case object SpansWholeSentence extends Feature
-}
-
 class SegmentationModelFactory[L](val startSymbol: L,
                                   pruningModel: Option[SemiCRF.ConstraintGrammar[L, String]] = None,
-                                  gazetteer: Gazetteer[Any, String] = Gazetteer.empty[String, String]) {
+                                  gazetteer: Gazetteer[Any, String] = Gazetteer.empty[String, String],
+                                  weights: Counter[Feature, Double] = Counter[Feature, Double]()) {
 
   import SegmentationModelFactory._
 
@@ -235,7 +223,7 @@ class SegmentationModelFactory[L](val startSymbol: L,
     val maxLengthArray = Encoder.fromIndex(labelIndex).tabulateArray(maxLengthMap.getOrElse(_, 0))
 
     val wordCounts:Counter[String, Double] = Counter.count(train.flatMap(_.words):_*).mapValues(_.toDouble)
-    val f = new StandardFeaturizer(wordCounts)
+    val f = new StandardFeaturizer[L](gazetteer, wordCounts)
     val basicFeatureIndex = Index[Feature]()
     val spanFeatureIndex = Index[Feature]()
     val transFeatureIndex = Index[Feature]()
@@ -259,18 +247,33 @@ class SegmentationModelFactory[L](val startSymbol: L,
     for(f <- pruningModel) {
       assert(f.labelIndex == labelIndex, f.labelIndex + " " + labelIndex)
     }
-    val indexed = new IndexedStandardFeaturizer(f, labelIndex, basicFeatureIndex, spanFeatureIndex, transFeatureIndex, pruningModel)
-    val model = new SemiCRFModel(indexed.featureIndex, indexed, maxLengthArray)
+    val indexed = new IndexedStandardFeaturizer[L](f, startSymbol, labelIndex, basicFeatureIndex, spanFeatureIndex, transFeatureIndex, pruningModel)
+    val model = new SemiCRFModel(indexed.featureIndex, indexed, maxLengthArray, weights(_))
 
     model
   }
 
+}
+
+object SegmentationModelFactory {
+  case class SFeature(w: Any, kind: Symbol) extends Feature
+  case class BeginFeature[L](w: Feature, cur: L) extends Feature
+  case class EndFeature[L](w: Feature, cur: L) extends Feature
+  case class TrigramFeature(a: Any, b: Any, c: Any) extends Feature
+  case class SpanFeature[L](distance: Feature, cur: L) extends Feature
+  case class UnigramFeature[L](w: Feature, cur: L) extends Feature
+  case class CFeature(component: Int, f: Feature) extends Feature
+  case class DistanceFeature(distanceBin: Int) extends Feature
+  case object TransitionFeature extends Feature
+  case object SpanStartsSentence extends Feature
+  case object SpansWholeSentence extends Feature
 
   /**
    * Computes basic features from word counts
    * @param wordCounts
    */
-  class StandardFeaturizer(wordCounts: Counter[String, Double] ) {
+  @SerialVersionUID(1L)
+  class StandardFeaturizer[L](gazetteer: Gazetteer[Any, String], wordCounts: Counter[String, Double] ) extends Serializable {
     val inner = new WordShapeFeaturizer(wordCounts)
 
     def localize(words: IndexedSeq[String])= new Localization(words)
@@ -289,7 +292,7 @@ class SegmentationModelFactory[L](val startSymbol: L,
       } map {_.map(_.intern)}
 
       def basicFeature(pos: Int) = {
-         if(pos < 0 || pos >= words.length) IndexedSeq("#")
+        if(pos < 0 || pos >= words.length) IndexedSeq("#")
         else basicFeatures(pos)
       }
 
@@ -303,7 +306,7 @@ class SegmentationModelFactory[L](val startSymbol: L,
         feats ++= inner.featuresFor(words, pos)
         for (a <- basicLeft; b <- basic) feats += PairFeature(a,b)
         for (a <- basic; b <- basicRight) feats += PairFeature(a,b)
-//        for (a <- basicLeft; b <- basicRight) feats += PairFeature(a,b)
+        //        for (a <- basicLeft; b <- basicRight) feats += PairFeature(a,b)
         feats += TrigramFeature(basicLeft(0), basic(0), basicRight(0))
         if(pos > 0 && pos < words.length - 1) {
           feats += TrigramFeature(shapes(pos-1), shapes(pos), shapes(pos+1))
@@ -349,15 +352,14 @@ class SegmentationModelFactory[L](val startSymbol: L,
   }
 
   @SerialVersionUID(1L)
-  class IndexedStandardFeaturizer(f: StandardFeaturizer,
+  class IndexedStandardFeaturizer[L](
+                                  f: StandardFeaturizer[L],
+                                  val startSymbol: L,
                                   val labelIndex: Index[L],
                                   val basicFeatureIndex: Index[Feature],
                                   val basicSpanFeatureIndex: Index[Feature],
                                   val basicTransFeatureIndex: Index[Feature],
                                   val pruningModel: Option[SemiCRF.ConstraintGrammar[L, String]] = None) extends SemiCRFModel.BIEOFeaturizer[L,String] with Serializable {
-
-    val startSymbol = SegmentationModelFactory.this.startSymbol
-
     // feature mappings... sigh
     // basically we want to build a big index for all features
     // (beginFeatures ++ endFeatures ++ unigramFeatures ++ spanFeatures ++ transitionFeatures)
@@ -392,14 +394,14 @@ class SegmentationModelFactory[L](val startSymbol: L,
     private val transFeatureIndex = new PairIndex(label2Index, basicTransFeatureIndex)
 
     val compositeIndex = new CompositeIndex[Feature](new IsomorphismIndex(labeledFeatureIndex)(beginIso),
-//      new IsomorphismIndex(labeledFeatureIndex)(endIso),
+      //      new IsomorphismIndex(labeledFeatureIndex)(endIso),
       new IsomorphismIndex(labeledFeatureIndex)(uniIso),
       new IsomorphismIndex(spanFeatureIndex)(spanIso),
       new IsomorphismIndex(transFeatureIndex)(transIso)
     )
 
     val BEGIN_COMP = 0
-//    val END_COMP = 1
+    //    val END_COMP = 1
     val UNI_COMP = 1
     val SPAN_COMP = 2
     val TRANS_COMP = 3

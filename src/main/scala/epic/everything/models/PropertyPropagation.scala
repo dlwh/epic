@@ -96,7 +96,7 @@ object PropertyPropagation {
           } else {
             val b1 = scorer.lens1(current)
             val b2 = scorer.lens2(current)
-            val r = DenseMatrix.tabulate(b1.property.size, b2.property.size)((p1,p2) => b1(p1) * score(grounding, p1,p2) * b2(p2))
+            val r = DenseMatrix.tabulate(b1.property.size, b2.property.size)((p1,p2) => b1(p1) * (score(grounding, p1,p2)- 2.0) * b2(p2))
             val partition = breeze.linalg.sum(r)
             assert(partition != 0.0, partition + "\n" + b1 +"\n\n" + b2)
             assert(!partition.isInfinite, partition + "\n" + b1 +"\n\n" + b2)

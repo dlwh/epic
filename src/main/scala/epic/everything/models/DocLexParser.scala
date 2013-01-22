@@ -204,17 +204,17 @@ object DocLexParser {
     def scoreUnaryRule(begin: Int, end: Int, rule: Int, ref: Int): Double = {
       val parent = grammar.parent(rule)
       val sLabel = beliefs.spanBeliefs(begin, end).label(parent)
-      var baseScore = anchoring.scoreUnaryRule(begin, end, rule, ref)
-      if (begin == 0 && end == length) { // root, get the length
-        val sMax = beliefs.wordBeliefs(ref).maximalLabel(parent)
-        baseScore += math.log(beliefs.wordBeliefs(ref).governor(length) * sMax)
-//            * beliefs.wordBeliefs(ref).span(TriangularArray.index(begin,end))
-      }
-      var notASpan = beliefs.spanBeliefs(begin, end).label(notConstituent)
-      if(notASpan == 0.0) notASpan = 1.0
       if(sLabel == 0.0) {
         Double.NegativeInfinity
       } else {
+        var baseScore = anchoring.scoreUnaryRule(begin, end, rule, ref)
+        if (begin == 0 && end == length) { // root, get the length
+        val sMax = beliefs.wordBeliefs(ref).maximalLabel(parent)
+          baseScore += math.log(beliefs.wordBeliefs(ref).governor(length) * sMax)
+          //            * beliefs.wordBeliefs(ref).span(TriangularArray.index(begin,end))
+        }
+        var notASpan = beliefs.spanBeliefs(begin, end).label(notConstituent)
+        if(notASpan == 0.0) notASpan = 1.0
         baseScore +=  math.log(sLabel / notASpan)
         baseScore
       }

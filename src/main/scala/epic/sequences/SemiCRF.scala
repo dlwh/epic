@@ -46,7 +46,7 @@ object SemiCRF {
                      startSymbol: L,
                      gazetteer: Gazetteer[Any, String] = Gazetteer.empty[Any, String],
                      opt: OptParams = OptParams()):SemiCRF[L, String] = {
-    val model = new SegmentationModelFactory[L](startSymbol, gazetteer = gazetteer).makeModel(data)
+    val model: SemiCRFModel[L, String] = new SegmentationModelFactory[L](startSymbol, gazetteer = gazetteer).makeModel(data)
 
     val obj = new ModelObjective(model, data)
     val cached = new CachedBatchDiffFunction(obj)

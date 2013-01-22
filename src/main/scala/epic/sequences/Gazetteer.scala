@@ -45,13 +45,16 @@ object Gazetteer {
     }
 
     resource.close()
-    new Gazetteer[String, String] {
-      def lookupWord(w: String): IndexedSeq[String] = {
-        flattenedGazetteer.getOrElse(w, IndexedSeq.empty) ++  endWordsGazetteer.getOrElse(w, IndexedSeq.empty)
+    new SimpleGazetteer(flattenedGazetteer, endWordsGazetteer, map)
+  }
 
-      }
+  @SerialVersionUID(1L)
+  final class SimpleGazetteer[L, W](flattenedGazetteer: Map[W, IndexedSeq[L]], endWords: Map[W, IndexedSeq[L]], spanMap: Map[IndexedSeq[W], L]) extends Gazetteer[L, W] with Serializable {
+    def lookupWord(w: W): IndexedSeq[L] = {
+      flattenedGazetteer.getOrElse(w, IndexedSeq.empty) ++  endWords.getOrElse(w, IndexedSeq.empty)
 
-      def lookupSpan(w: IndexedSeq[String]): Option[String] = map.get(w)
     }
+
+    def lookupSpan(w: IndexedSeq[W]): Option[L] = spanMap.get(w)
   }
 }

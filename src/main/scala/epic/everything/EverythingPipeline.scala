@@ -13,18 +13,17 @@ import breeze.util.logging.ConsoleLogging
 import collection.immutable.BitSet
 import epic.sequences._
 import collection.mutable.ArrayBuffer
-import epic.framework.{EPModel, ModelObjective}
+import epic.framework.{Feature, EPModel, ModelObjective}
 import breeze.collection.mutable.TriangularArray
 import breeze.optimize.{RandomizedGradientCheckingFunction, CachedBatchDiffFunction}
 import epic.parser.ParserParams.XbarGrammar
 import features.RuleFeature
 import features.{RuleFeature, TagAwareWordShapeFeaturizer}
 import models._
-import breeze.util.{Lens, Index}
+import breeze.util.{Encoder, Lens, Index}
 import epic.parser.models._
 import breeze.linalg._
 import epic.trees.annotations.StripAnnotations
-import epic.trees.annotations.KMAnnotator
 import epic.trees.annotations.AddMarkovization
 import epic.trees.annotations.PipelineAnnotator
 import epic.trees.ProcessedTreebank
@@ -49,6 +48,7 @@ object EverythingPipeline {
                     constraints: ParserParams.Constraints[AnnotatedLabel, String],
                     baseParser: ParserParams.XbarGrammar,
                     baseNERModel: File = new File("ner.model.gz"),
+                    weightsCache: File = new File("everything.weights.gz"),
                     opt: OptParams)
 
   def main(args: Array[String]) {
@@ -65,6 +65,12 @@ object EverythingPipeline {
       (train,test)
     }
 
+    val weightsCache = if (params.weightsCache.exists()) {
+      loadWeights(params.weightsCache)
+    } else {
+      Counter[Feature, Double]()
+    }
+
 
 
     /////////////////
@@ -78,11 +84,23 @@ object EverythingPipeline {
       breeze.util.readObject[SemiCRF[NERType.Value, String]](params.baseNERModel)
     } else {
       println("Building basic NER model...")
-      SemiCRF.buildSimple(nerSegments, NERType.OutsideSentence, Gazetteer.ner("en"), params.opt)
+      val model: SemiCRFModel[NERType.Value, String] = new SegmentationModelFactory(NERType.OutsideSentence, gazetteer = Gazetteer.ner("en"), weights=weightsCache).makeModel(nerSegments)
+
+      val obj = new ModelObjective(model, nerSegments)
+      val cached = new CachedBatchDiffFunction(obj)
+
+      val weights = params.opt.minimize(cached, obj.initialWeightVector(randomize = false))
+      val crf = model.extractCRF(weights)
+      val decoded: Counter[Feature, Double] = Encoder.fromIndex(model.featureIndex).decode(weights)
+      updateWeights(params.weightsCache, weightsCache, decoded)
+//      if (params.baseNERModel.getAbsoluteFile.getParentFile.exists()) {
+//        breeze.util.writeObject(params.baseNERModel, crf)
+//      }
+      crf
     }
 
     val nerPruningModel = new SemiCRF.ConstraintGrammar(baseNER)
-    val nerModel = new SegmentationModelFactory(NERType.OutsideSentence, Some(nerPruningModel), Gazetteer.ner("en")).makeModel(nerSegments)
+    val nerModel = new SegmentationModelFactory(NERType.OutsideSentence, Some(nerPruningModel), Gazetteer.ner("en"), weightsCache).makeModel(nerSegments)
     // NERProperties
     val nerProp = Property("NER::Type", nerModel.labelIndex)
 
@@ -116,9 +134,24 @@ object EverythingPipeline {
     val corefModel = new PropCorefModel(corefFeaturizer.propertyFeatures, corefFeaturizer.featureIndex)
     */
 
+
     val processedTrain = train.map(docProcessor)
 
     val lexParseModel = extractLexParserModel(trainTrees, baseParser, beliefsFactory)
+    // train the lex parse model
+    println("Training base lex parse model...")
+    val lexWeights = {
+      val obj = new ModelObjective(lexParseModel, processedTrain)
+      val cached = new CachedBatchDiffFunction(obj)
+      val weights = params.opt.minimize(cached, obj.initialWeightVector(randomize = true))
+//      if (params.baseNERModel.getAbsoluteFile.getParentFile.exists()) {
+//        breeze.util.writeObject(params.baseNERModel, crf)
+//      }
+      updateWeights(params.weightsCache, weightsCache, Encoder.fromIndex(lexParseModel.featureIndex).decode(weights))
+     weights
+    }
+
+
     // propagation
 
     // lenses
@@ -138,11 +171,12 @@ object EverythingPipeline {
 //    val propModel = new PropertyPropagatingModel(propBuilder)
 
     // the big model!
-    val epModel = new EPModel[ProcessedDocument, DocumentBeliefs](30, epInGold = false)(
+    val epModel = new EPModel[ProcessedDocument, DocumentBeliefs](30, epInGold = false, initFeatureValue = {f => Some(weightsCache(f))})(
 
       adaptedNerModel
-      , lexParseModel
-      , assocSynNer
+      ,
+      lexParseModel
+     , assocSynNer
     )
 //    corefModel)
     //propModel)
@@ -157,7 +191,7 @@ object EverythingPipeline {
     })
 
     val opt = params.opt
-    for( s <- opt.iterations(cachedObj, obj.initialWeightVector(randomize = true))) {
+    for( s <- opt.iterations(checking, obj.initialWeightVector(randomize = true))) {
       println(s.value)
     }
   }
@@ -205,5 +239,29 @@ object EverythingPipeline {
     new DocLexParser.Model(beliefsFactory, bundle, reannotate, indexed)
 
   }
+
+  private def updateWeights(out: File, weightsCache: Counter[Feature, Double], newWeights: Counter[Feature, Double]) {
+    for ( (f,w) <- newWeights.activeIterator) {
+      weightsCache(f) = w
+    }
+    breeze.util.writeObject(out, weightsCache.activeIterator.toIndexedSeq)
+  }
+
+  private def loadWeights(in: File) = {
+    val ctr = Counter[Feature, Double]()
+    breeze.util.readObject[AnyRef](in) match {
+      case seq: IndexedSeq[(Feature, Double)] =>
+        for ( (k, v) <- seq) {
+          ctr(k) = v
+        }
+        println(norm(ctr, 2.0))
+      case ctr2: Counter[Feature, Double] =>
+        ctr += ctr2
+    }
+    ctr
+  }
+
+
+
 }
 
