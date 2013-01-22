@@ -89,7 +89,7 @@ case class ChainNERInference(beliefsFactory: DocumentBeliefs.Factory,
   def project(doc: ProcessedDocument, m: Marginal, oldBeliefs: DocumentBeliefs): DocumentBeliefs = {
     val newSentences = Array.tabulate(doc.sentences.length) { s =>
       val marg = m.sentences(s)
-      assert(!marg.logPartition.isInfinite)
+      assert(!marg.logPartition.isInfinite, doc.sentences(s))
       val sentenceBeliefs = oldBeliefs.beliefsForSentence(s)
       val newSpans = TriangularArray.tabulate(doc.sentences(s).length+1){ (b,e) =>
         if(b < e) {

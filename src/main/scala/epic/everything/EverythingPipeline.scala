@@ -117,7 +117,7 @@ object EverythingPipeline {
     val baseParser = GenerativeParser.annotated(new XbarGrammar(), annotator, trainTrees)
 
     val docProcessor = new ProcessedDocument.Factory(params.treebank.process,
-      new ConstraintCoreGrammar(baseParser.augmentedGrammar, -7), 
+      new ConstraintCoreGrammar(baseParser.augmentedGrammar, -10),
       nerPruningModel,
       null)
 

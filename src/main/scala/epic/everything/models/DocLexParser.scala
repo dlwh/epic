@@ -215,7 +215,7 @@ object DocLexParser {
         }
         var notASpan = beliefs.spanBeliefs(begin, end).label(notConstituent)
         if(notASpan == 0.0) notASpan = 1.0
-        baseScore +=  math.log(sLabel / notASpan)
+//        baseScore +=  math.log(sLabel / notASpan)
         baseScore
       }
     }
