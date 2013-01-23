@@ -36,7 +36,7 @@ class EPInference[Datum, Augment](inferences: IndexedSeq[ProjectableInference[Da
 
   // assume we don't need gold  to do EP, at least for now
   override def goldCounts(value: Datum, augment: Augment, accum: ExpectedCounts, scale: Double) = {
-    if(epInGold) {
+    if(!epInGold) {
       val counts = for( (inf, acc) <- inferences zip accum.counts) yield inf.goldCounts(value, augment, acc.asInstanceOf[inf.ExpectedCounts], scale)
       EPExpectedCounts(counts.foldLeft(0.0) {
         _ + _.loss
@@ -53,6 +53,8 @@ class EPInference[Datum, Augment](inferences: IndexedSeq[ProjectableInference[Da
       val inf = inferences(i)
       marginals(i) = null.asInstanceOf[ProjectableInference[Datum, Augment]#Marginal]
       val (marg, contributionToLikelihood) = inf.goldMarginal(datum, q)
+      assert(!contributionToLikelihood.isInfinite, "Model " + i + " is misbehaving!")
+      assert(!contributionToLikelihood.isNaN, "Model " + i + " is misbehaving!")
       val newAugment = inf.project(datum, marg, q)
       marginals(i) = marg
       newAugment -> contributionToLikelihood
@@ -71,9 +73,9 @@ class EPInference[Datum, Augment](inferences: IndexedSeq[ProjectableInference[Da
       iter += 1
       state = s
     }
-    print(iter + " gold(" + state.logPartition+") ")
+//    print(iter + " gold(" + state.logPartition+") ")
 
-    EPMarginal(state.logPartition, state.q, marginals, state.f_~) -> state.logPartition
+    EPMarginal(state.logPartition, state.q, marginals) -> state.logPartition
   }
 
 
@@ -83,6 +85,8 @@ class EPInference[Datum, Augment](inferences: IndexedSeq[ProjectableInference[Da
       val inf = inferences(i)
       marginals(i) = null.asInstanceOf[ProjectableInference[Datum, Augment]#Marginal]
       val (marg, contributionToLikelihood) = inf.marginal(datum, q)
+      assert(!contributionToLikelihood.isInfinite, "Model " + i + " is misbehaving!")
+      assert(!contributionToLikelihood.isNaN, "Model " + i + " is misbehaving!")
       val newAugment = inf.project(datum, marg, q)
       marginals(i) = marg
       newAugment -> contributionToLikelihood
@@ -96,20 +100,20 @@ class EPInference[Datum, Augment](inferences: IndexedSeq[ProjectableInference[Da
     while (!converged && iter < maxEPIter && iterates.hasNext) {
       val s = iterates.next()
       if (state != null) {
-        converged = (s.logPartition - state.logPartition).abs / math.max(s.logPartition, state.logPartition) < 1E-4
+        converged = iter >= 4 //false //(s.logPartition - state.logPartition).abs / math.max(s.logPartition, state.logPartition) < 1E-4
       }
       iter += 1
       state = s
     }
     print(iter + " guess(" + state.logPartition+") ")
 
-    EPMarginal(state.logPartition, state.q, marginals, state.f_~) -> state.logPartition
+    EPMarginal(state.logPartition, state.q, marginals) -> state.logPartition
   }
 
 
   def countsFromMarginal(datum: Datum, marg: Marginal, accum: EPExpectedCounts, scale: Double) = {
     import marg._
-    for (((inf, f_~), i) <- (inferences zip messages).zipWithIndex) yield {
+    for ( (inf, i) <- inferences.zipWithIndex) yield {
       val marg = marginals(i)
       inf.countsFromMarginal(datum, marg.asInstanceOf[inf.Marginal], accum.counts(i).asInstanceOf[inf.ExpectedCounts], scale)
     }
@@ -119,5 +123,5 @@ class EPInference[Datum, Augment](inferences: IndexedSeq[ProjectableInference[Da
 }
 
 
-case class EPMarginal[Augment, Marginal](logPartition: Double, q: Augment, marginals: IndexedSeq[Marginal], messages: IndexedSeq[Augment]) extends epic.framework.Marginal
+case class EPMarginal[Augment, Marginal](logPartition: Double, q: Augment, marginals: IndexedSeq[Marginal]) extends epic.framework.Marginal
 

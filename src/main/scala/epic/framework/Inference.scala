@@ -40,7 +40,7 @@ trait Inference[Datum] extends Serializable {
   }
 
   def expectedCounts(datum: Datum, accum: ExpectedCounts, scale: Double) = {
-    guessCounts(datum, accum, scale)
+//    guessCounts(datum, accum, scale)
     goldCounts(datum, accum, -scale)
     accum
   }
@@ -66,6 +66,13 @@ trait AugmentableInference[Datum,Augment] extends Inference[Datum] {
     countsFromMarginal(value, m._1, accum, scale)
   }
 
+  override def goldCounts(value: Datum, accum: ExpectedCounts, scale: Double): ExpectedCounts = {
+    goldCounts(value, baseAugment(value), accum, scale)
+  }
+
+  override def guessCounts(value: Datum, accum: ExpectedCounts, scale: Double): ExpectedCounts = {
+    guessCounts(value, baseAugment(value), accum, scale)
+  }
 }
 
 trait ProjectableInference[Datum,Augment] extends AugmentableInference[Datum,Augment] {

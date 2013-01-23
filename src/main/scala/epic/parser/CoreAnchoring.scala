@@ -74,6 +74,7 @@ trait CoreAnchoring[L, W] extends Factor[CoreAnchoring[L, W]] {
   def /(other: CoreAnchoring[L, W]) = {
     // hacky multimethod dispatch is hacky
     if (other eq null) this // ugh
+    else if(this eq other) new CoreAnchoring.Identity[L, W](grammar, lexicon, words)
     else if(other.isInstanceOf[CoreAnchoring.Identity[L, W]]) this
     else new ProductCoreAnchoring(this, other, -1)
   }

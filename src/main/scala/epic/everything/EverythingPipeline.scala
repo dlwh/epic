@@ -137,7 +137,7 @@ object EverythingPipeline {
 
     val processedTrain = train.map(docProcessor)
 
-    val lexParseModel = extractLexParserModel(trainTrees, baseParser, beliefsFactory)
+    val lexParseModel = extractLexParserModel(trainTrees, baseParser, beliefsFactory, weightsCache)
     // train the lex parse model
     println("Training base lex parse model...")
     val lexWeights = {
@@ -171,10 +171,9 @@ object EverythingPipeline {
 //    val propModel = new PropertyPropagatingModel(propBuilder)
 
     // the big model!
-    val epModel = new EPModel[ProcessedDocument, DocumentBeliefs](30, epInGold = false, initFeatureValue = {f => Some(weightsCache(f.toString)).filter(_ != 0.0)})(
+    val epModel = new EPModel[ProcessedDocument, DocumentBeliefs](30, epInGold = true, initFeatureValue = {f => Some(weightsCache(f.toString)).filter(_ != 0.0)})(
 
-      adaptedNerModel
-      ,
+      adaptedNerModel,
       lexParseModel
      , assocSynNer
     )
@@ -186,7 +185,7 @@ object EverythingPipeline {
     val cachedObj = new CachedBatchDiffFunction(obj)
 
 
-    val checking = new RandomizedGradientCheckingFunction(cachedObj, 1E-4, toString = {
+    val checking = new RandomizedGradientCheckingFunction(cachedObj, 1E-2, toString = {
       (i: Int) => epModel.featureIndex.get(i).toString
     })
 
@@ -196,7 +195,10 @@ object EverythingPipeline {
     }
   }
 
-  def extractLexParserModel(trainTrees: Array[TreeInstance[AnnotatedLabel, String]], parser: SimpleChartParser[AnnotatedLabel, String], beliefsFactory: DocumentBeliefs.Factory): DocLexParser.Model = {
+  def extractLexParserModel(trainTrees: Array[TreeInstance[AnnotatedLabel, String]],
+                            parser: SimpleChartParser[AnnotatedLabel, String],
+                            beliefsFactory: DocumentBeliefs.Factory,
+                            weightsCache: Counter[String, Double]): DocLexParser.Model = {
 
 
     val trees = trainTrees.map(StripAnnotations())
@@ -236,7 +238,7 @@ object EverythingPipeline {
     )
 
     def reannotate(tree: BinarizedTree[AnnotatedLabel], words: Seq[String]) = tree.map(_.baseAnnotatedLabel)
-    new DocLexParser.Model(beliefsFactory, bundle, reannotate, indexed)
+    new DocLexParser.Model(beliefsFactory, bundle, reannotate, indexed, {(f: Feature) => Some(weightsCache(f.toString))})
 
   }
 
