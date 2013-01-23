@@ -40,9 +40,8 @@ trait Inference[Datum] extends Serializable {
   }
 
   def expectedCounts(datum: Datum, accum: ExpectedCounts, scale: Double) = {
-//    guessCounts(datum, accum, scale)
-    goldCounts(datum, accum, -scale)
-    accum
+    val result1 = guessCounts(datum, accum, scale)
+    goldCounts(datum, result1, -scale)
   }
 }
 

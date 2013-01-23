@@ -37,10 +37,15 @@ class EPInference[Datum, Augment](inferences: IndexedSeq[ProjectableInference[Da
   // assume we don't need gold  to do EP, at least for now
   override def goldCounts(value: Datum, augment: Augment, accum: ExpectedCounts, scale: Double) = {
     if(!epInGold) {
-      val counts = for( (inf, acc) <- inferences zip accum.counts) yield inf.goldCounts(value, augment, acc.asInstanceOf[inf.ExpectedCounts], scale)
-      EPExpectedCounts(counts.foldLeft(0.0) {
-        _ + _.loss
-      }, counts)
+      var totalDelta = 0.0
+      for( (inf, acc) <- inferences zip accum.counts) {
+        val oldPart = acc.loss
+        inf.goldCounts(value, augment, acc.asInstanceOf[inf.ExpectedCounts], scale)
+        val newPart = acc.loss
+        totalDelta += (newPart - oldPart)
+      }
+      accum.loss += totalDelta
+      accum
     } else {
       super.goldCounts(value, augment, accum, scale)
     }
@@ -100,12 +105,12 @@ class EPInference[Datum, Augment](inferences: IndexedSeq[ProjectableInference[Da
     while (!converged && iter < maxEPIter && iterates.hasNext) {
       val s = iterates.next()
       if (state != null) {
-        converged = iter >= 4 //false //(s.logPartition - state.logPartition).abs / math.max(s.logPartition, state.logPartition) < 1E-4
+        converged = (s.logPartition - state.logPartition).abs / math.max(s.logPartition, state.logPartition) < 1E-4
       }
       iter += 1
       state = s
     }
-    print(iter + " guess(" + state.logPartition+") ")
+//    print(iter + " guess(" + state.logPartition+") ")
 
     EPMarginal(state.logPartition, state.q, marginals) -> state.logPartition
   }
