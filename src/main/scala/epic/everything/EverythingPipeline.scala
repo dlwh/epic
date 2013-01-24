@@ -89,7 +89,7 @@ object EverythingPipeline {
       val obj = new ModelObjective(model, nerSegments)
       val cached = new CachedBatchDiffFunction(obj)
 
-      val weights = params.opt.minimize(cached, obj.initialWeightVector(randomize = false))
+      val weights = obj.initialWeightVector(randomize=false)//params.opt.minimize(cached, obj.initialWeightVector(randomize = false))
       val crf = model.extractCRF(weights)
       val decoded: Counter[Feature, Double] = Encoder.fromIndex(model.featureIndex).decode(weights)
       updateWeights(params.weightsCache, weightsCache, decoded)
@@ -143,12 +143,12 @@ object EverythingPipeline {
     val lexWeights = {
       val obj = new ModelObjective(lexParseModel, processedTrain)
       val cached = new CachedBatchDiffFunction(obj)
-      val weights = params.opt.minimize(cached, obj.initialWeightVector(randomize = true))
+//      val weights = params.opt.minimize(cached, obj.initialWeightVector(randomize = true))
 //      if (params.baseNERModel.getAbsoluteFile.getParentFile.exists()) {
 //        breeze.util.writeObject(params.baseNERModel, crf)
 //      }
-      updateWeights(params.weightsCache, weightsCache, Encoder.fromIndex(lexParseModel.featureIndex).decode(weights))
-     weights
+//      updateWeights(params.weightsCache, weightsCache, Encoder.fromIndex(lexParseModel.featureIndex).decode(weights))
+//     weights
     }
 
 
@@ -173,9 +173,9 @@ object EverythingPipeline {
     // the big model!
     val epModel = new EPModel[ProcessedDocument, DocumentBeliefs](30, epInGold = true, initFeatureValue = {f => Some(weightsCache(f.toString)).filter(_ != 0.0)})(
 
+      lexParseModel,
       adaptedNerModel,
-      lexParseModel
-     , assocSynNer
+     assocSynNer
     )
 //    corefModel)
     //propModel)
@@ -256,7 +256,6 @@ object EverythingPipeline {
         for ( (k, v) <- seq) {
           ctr(k) = v
         }
-        println(norm(ctr, 2.0))
       case ctr2: Counter[String, Double] =>
         ctr += ctr2
     }

@@ -143,6 +143,7 @@ object DocLexParser {
     def apply(v1: ProcessedDocument, v2: DocumentBeliefs): ProcessedDocument = error("TODO")
   }
 
+
   /**
    *
    * @author dlwh
@@ -175,8 +176,9 @@ object DocLexParser {
       val head = anchoring.headIndex(ref)
       val dep = anchoring.depIndex(ref)
       val depScore = beliefs.wordBeliefs(dep).governor(head)
+      if(beliefs.spans(begin, split) == null || beliefs.spans(split, end) == null) return Double.NegativeInfinity
 
-      if (lexGrammar.isRightRule(rule)) {
+      val score = if (lexGrammar.isRightRule(rule)) {
         val sGovScore = beliefs.spans(begin, split).governor(head)
         var notASpan = beliefs.spanBeliefs(begin, split).governor(length + 1)
         if(notASpan == 0.0) notASpan = 1.0
@@ -196,9 +198,10 @@ object DocLexParser {
           Double.NegativeInfinity
         } else (
           anchoring.scoreBinaryRule(begin, split, end, rule, ref)
-            + math.log(depScore * sGovScore / notASpan * sMax)
+            + math.log(depScore * sGovScore / notASpan  *   sMax)
         )
       }
+      score
     }
 
     def scoreUnaryRule(begin: Int, end: Int, rule: Int, ref: Int): Double = {

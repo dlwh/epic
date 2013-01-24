@@ -30,11 +30,11 @@ object PropertyPropagation {
 
       val featureIndex: Index[Feature] =  fi
 
-      val grounding = new AssociationGrounding[T, U] {
+      val grounding = new AssociationAnchoring[T, U] {
         def featuresFor(p1: Int, p2: Int): Array[Int] = features(p1)(p2)
       }
 
-      def ground(doc: ProcessedDocument, sent: Int, begin: Int, end: Int): AssociationGrounding[T, U] = grounding
+      def anchor(doc: ProcessedDocument, sent: Int, begin: Int, end: Int): AssociationAnchoring[T, U] = grounding
     }
 
     new Model(beliefsFactory, assoc)
@@ -53,7 +53,7 @@ object PropertyPropagation {
 
     def featureIndex: Index[Feature] = assoc.featureIndex
 
-    def initialValueForFeature(f: Feature): Double = math.random * 1E-4
+    def initialValueForFeature(f: Feature): Double = math.random * 1E-4 - 2
 
     def inferenceFromWeights(weights: DenseVector[Double]) = {
       val out = new PrintWriter(new FileWriter("xx.weights.txt"))
@@ -81,22 +81,37 @@ object PropertyPropagation {
       beliefsFactory(doc)
     }
 
-    def score(grounding: AssociationGrounding[T, U], i: Int, i1: Int) = {
-      math.exp(dot(weights, grounding.featuresFor(i, i1)) - 2.0)
+    def score(grounding: AssociationAnchoring[T, U], ass1: Int, ass2: Int) = {
+      math.exp(dot(weights, grounding.featuresFor(ass1, ass2)) )
+    }
+
+    def scores(grounding: AssociationAnchoring[T, U], prop1: Property[_], prop2: Property[_]) = {
+      val result = DenseMatrix.zeros[Double](prop1.size, prop2.size)
+      var p1 = 0
+      while (p1 < result.rows) {
+        var p2 = 0
+        while (p2 < result.cols) {
+          result(p1, p2) = score(grounding, p1, p2)
+          p2 += 1
+        }
+        p1 += 1
+      }
+
+      result
     }
 
     def marginal(doc: ProcessedDocument, aug: DocumentBeliefs): (Marginal, Double) = {
       val sentences = for ((sentence, sentenceBeliefs) <- doc.sentences zip aug.sentences) yield {
         val spans = TriangularArray.tabulate(sentence.length + 1) { (begin, end) =>
 
-          val grounding = scorer.ground(doc, sentence.index, begin, end)
+          val grounding = scorer.anchor(doc, sentence.index, begin, end)
           val current = sentenceBeliefs.spanBeliefs(begin, end)
           if (begin == end || (current eq null))  {
             null
           } else {
             val b1 = scorer.lens1(current)
             val b2 = scorer.lens2(current)
-            val r = DenseMatrix.tabulate(b1.property.size, b2.property.size)((p1,p2) => b1(p1) * (score(grounding, p1,p2)) * b2(p2))
+            val r = (b1.beliefs * b2.beliefs.t) :*= scores(grounding, b1.property, b2.property)
             val partition = breeze.linalg.sum(r)
             assert(partition != 0.0, partition + "\n" + b1 +"\n\n" + b2)
             assert(!partition.isInfinite, partition + "\n" + b1 +"\n\n" + b2)
@@ -119,19 +134,23 @@ object PropertyPropagation {
 
     def countsFromMarginal(doc: ProcessedDocument, marg: Marginal, accum: ExpectedCounts, scale: Double): ExpectedCounts = {
       accum.loss += marg.logPartition * scale
-      for ( (sentence, sm) <- doc.sentences zip marg.sentences; begin <- 0 until sentence.length; end <- (begin+1) to sentence.length) {
-        val grounding = scorer.ground(doc, sentence.index, begin, end)
-        val current = sm.spans(begin, end)
+      for {
+        (sentence, sentenceMarginal) <- doc.sentences zip marg.sentences
+        begin <- 0 until sentence.length
+        end <- (begin+1) to sentence.length
+      } {
+        val anchoring = scorer.anchor(doc, sentence.index, begin, end)
+        val current = sentenceMarginal.spans(begin, end)
         if(current != null) {
           val partition = breeze.linalg.sum(current)
           if (begin == end || (current eq null))  {
             null
           } else {
             var p1 = 0
-            while( p1 < current.rows) {
+            while (p1 < current.rows) {
               var p2 = 0
-              while(p2 < current.cols) {
-                val features = grounding.featuresFor(p1, p2)
+              while (p2 < current.cols) {
+                val features = anchoring.featuresFor(p1, p2)
                 for(f <- features) {
                   accum.counts(f) += scale * current(p1,p2) / partition
                 }
@@ -153,8 +172,8 @@ object PropertyPropagation {
           if(current eq null) null
           else {
             val old: SpanBeliefs = oldBeliefs.spanBeliefs(begin, end)
-            var marg1 = DenseVector.zeros[Double](current.rows)
-            var marg2 = DenseVector.zeros[Double](current.cols)
+            val marg1 = DenseVector.zeros[Double](current.rows)
+            val marg2 = DenseVector.zeros[Double](current.cols)
             var p1 = 0
             while( p1 < current.rows) {
               var p2 = 0
@@ -189,10 +208,10 @@ object PropertyPropagation {
     def lens1: Lens[SpanBeliefs, Beliefs[T]]
     def lens2: Lens[SpanBeliefs, Beliefs[U]]
     def featureIndex: Index[Feature]
-    def ground(doc: ProcessedDocument, sent: Int, begin: Int, end: Int):AssociationGrounding[T, U]
+    def anchor(doc: ProcessedDocument, sent: Int, begin: Int, end: Int):AssociationAnchoring[T, U]
   }
 
-  trait AssociationGrounding[T, U] {
+  trait AssociationAnchoring[T, U] {
     def featuresFor(p1: Int, p2: Int):Array[Int]
   }
 
@@ -314,7 +333,7 @@ object PropertyPropagation {
   }
 
   trait Association[T, U] {
-    def ground(d: ProcessedDocument, span: DSpan, beliefs: SpanBeliefs):Link[T, U]
+    def anchor(d: ProcessedDocument, span: DSpan, beliefs: SpanBeliefs):Link[T, U]
   }
 
   trait Link[T, U] {
@@ -334,7 +353,7 @@ object PropertyPropagation {
   case class IndexedAssociation[T, U](association: Association[T, U], index: Index[Feature]) {
 
     def factor(weights: DenseVector[Double], d: ProcessedDocument, span: DSpan, beliefs: SpanBeliefs) = {
-      association.ground(d, span, beliefs).indexed(index).factor(weights)
+      association.anchor(d, span, beliefs).indexed(index).factor(weights)
     }
 
   }
@@ -384,7 +403,7 @@ object PropertyPropagation {
         val beliefs = beliefsFactory(d)
         for(s <- beliefs.sentences; span <- s.spans.data if span != null) {
           for(assoc <- spans.associations) {
-            val link = assoc.ground(d, span.span, span)
+            val link = assoc.anchor(d, span.span, span)
             for(p1 <- 0 until  link.prop1.size; p2 <- 0 until link.prop2.size) {
               for(f <- link.featuresFor(p1, p2)) {
                 index.index(f)
@@ -402,7 +421,7 @@ object PropertyPropagation {
 
     def graphFor(doc: ProcessedDocument, span: DSpan, beliefs: SpanBeliefs, weights: DenseVector[Double]):bp.Model = {
       // factors
-      val factors = for(assoc <- builder.spans.associations) yield assoc.ground(doc, span, beliefs).indexed(featureIndex).factor(weights)
+      val factors = for(assoc <- builder.spans.associations) yield assoc.anchor(doc, span, beliefs).indexed(featureIndex).factor(weights)
       // current beliefs:
       for(p <- factors.toSet.flatMap(_.variables)) {
 

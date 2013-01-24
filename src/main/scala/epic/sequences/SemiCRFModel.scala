@@ -498,8 +498,7 @@ object SegmentationModelFactory {
       }
       private val spanFeatures = Array.tabulate(labelIndex.size, labelIndex.size){ (prev, cur) =>
         TriangularArray.tabulate(w.length+1) { (beg, end) =>
-          val ok = constraints.forall(_.allowedLabels(beg, end).contains(cur))
-          if(!ok) {
+          if(!(constraints == None || constraints.get.allowedLabels(beg, end).contains(cur))) {
             null
           } else {
             val builder = new VectorBuilder[Double](featureIndex.size)

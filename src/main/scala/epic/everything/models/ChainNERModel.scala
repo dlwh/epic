@@ -100,6 +100,10 @@ case class ChainNERInference(beliefsFactory: DocumentBeliefs.Factory,
             val copy = spanBeliefs.copy(ner = spanBeliefs.ner.updated(DenseVector.tabulate(labels.size){marg.spanMarginal(_, b, e)}))
             assert(copy.ner.beliefs(notNER) == 0.0, copy.ner.beliefs)
             copy.ner.beliefs(notNER) = 1 - sum(copy.ner.beliefs)
+            if(copy.ner.beliefs(notNER) < 1E-6) {
+              assert(copy.ner.beliefs(notNER) > -1E-6)
+              copy.ner.beliefs(notNER) = 0.0
+            }
             assert( (sum(copy.ner.beliefs) - 1.0).abs < 1E-4, copy.ner + " " + spanBeliefs.ner)
             copy
           }
@@ -124,6 +128,7 @@ case class ChainNERInference(beliefsFactory: DocumentBeliefs.Factory,
   def beliefsToAnchoring(doc: ProcessedDocument, beliefs: DocumentBeliefs):IndexedSeq[SemiCRF.Anchoring[NERType.Value, String]] = {
     beliefs.sentences.zip(doc.sentences).map { case(b, s) =>
       new Anchoring[NERType.Value, String] {
+        private def passAssert(v: Double, pred: Double=>Boolean, stuff: Any*) = if(pred(v)) v else throw new AssertionError("Value " + v + ": other stuff:" + stuff.mkString(" "))
         def labelIndex: Index[NERType.Value] = labels
 
         def words: IndexedSeq[String] = s.words
@@ -136,7 +141,7 @@ case class ChainNERInference(beliefsFactory: DocumentBeliefs.Factory,
           else if(b.spanBeliefs(beg, end).ner(notNER) == 0.0) {
             math.log(b.spanBeliefs(beg,end).ner(cur))
           } else {
-             math.log(b.spanBeliefs(beg,end).ner(cur) / b.spanBeliefs(beg,end).ner(notNER))
+             passAssert(math.log(b.spanBeliefs(beg,end).ner(cur) / b.spanBeliefs(beg,end).ner(notNER)), {!_.isNaN}, b.spanBeliefs(beg,end).ner(cur), b.spanBeliefs(beg,end).ner(notNER))
 
           }
         }

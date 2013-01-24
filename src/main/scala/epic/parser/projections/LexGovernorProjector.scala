@@ -37,12 +37,20 @@ class LexGovernorProjector[L, W](grammar: LexGrammar[L, W]) {
       if (grammar.isRightRule(rule)) { // head on the right
         spanGovernorCounts(begin, split)(head) += score
         spanGovernorCounts(begin, split)(notASpan) -= score
+        if(spanGovernorCounts(begin, split)(notASpan) < 0) {
+          assert(spanGovernorCounts(begin, split)(notASpan) > -1E-6)
+          spanGovernorCounts(begin, split)(notASpan) = 0.0
+        }
         val label = grammar.grammar.leftChild(rule)
         maximalLabelType(dep)(label) += score
         governedSpan(dep)(TriangularArray.index(begin,split)) += score
       } else {
         spanGovernorCounts(split, end)(head) += score
         spanGovernorCounts(split, end)(notASpan) -= score
+        if(spanGovernorCounts(split, end)(notASpan) < 0) {
+          assert(spanGovernorCounts(split, end)(notASpan) > -1E-6)
+          spanGovernorCounts(split, end)(notASpan) = 0.0
+        }
         val label = grammar.grammar.rightChild(rule)
         maximalLabelType(dep)(label) += score
         governedSpan(dep)(TriangularArray.index(split,end)) += score
@@ -59,6 +67,10 @@ class LexGovernorProjector[L, W](grammar: LexGrammar[L, W]) {
         wordGovernorCounts(head)(length) += score
         spanGovernorCounts(begin, end)(length) += score
         spanGovernorCounts(begin, end)(notASpan) -= score
+        if(spanGovernorCounts(begin, end)(notASpan) < 0) {
+          assert(spanGovernorCounts(begin, end)(notASpan) > -1E-6)
+          spanGovernorCounts(begin, end)(notASpan) = 0.0
+        }
         maximalLabelType(head)(parent) += score
         governedSpan(head)(TriangularArray.index(begin,end)) += score
       }
@@ -80,7 +92,7 @@ class LexGovernorProjector[L, W](grammar: LexGrammar[L, W]) {
       r
     }
 
-    private val notASpan = length+1
+    private def notASpan = length+1
     def labelBeliefs = {
       val r = grammar.grammar.labelEncoder.mkDenseVector()
       r
