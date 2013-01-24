@@ -1,7 +1,7 @@
 package epic.everything.models
 
 import epic.everything.{DSpan, ProcessedDocument, NERType, DocumentAnnotator}
-import epic.framework.{ProjectableInference, StandardExpectedCounts, Feature}
+import epic.framework.{Marginal, ProjectableInference, StandardExpectedCounts, Feature}
 import breeze.util.{Encoder, Index}
 import epic.sequences.{SemiCRF, SemiCRFInference, SemiCRFModel}
 import epic.sequences.SemiCRF.Anchoring
@@ -31,7 +31,9 @@ class ChainNERModel(beliefsFactory: DocumentBeliefs.Factory,
 
 }
 
-case class ChainNERMarginal[Inner](sentences: IndexedSeq[Inner], logPartition: Double) extends epic.framework.Marginal
+case class ChainNERMarginal[Inner<:Marginal](sentences: IndexedSeq[Inner]) extends epic.framework.Marginal {
+  val logPartition = sentences.map(_.logPartition).sum
+}
 
 case class ChainNERInference(beliefsFactory: DocumentBeliefs.Factory,
                              inner: SemiCRFInference[NERType.Value, String],
@@ -55,14 +57,13 @@ case class ChainNERInference(beliefsFactory: DocumentBeliefs.Factory,
   }
 
   // inference methods
-  def goldMarginal(doc: ProcessedDocument, aug: DocumentBeliefs): (Marginal, Double) = {
+  def goldMarginal(doc: ProcessedDocument, aug: DocumentBeliefs): Marginal = {
     val anchorings = beliefsToAnchoring(doc, aug)
     val marginals = for((s,anchoring) <- doc.sentences zip anchorings) yield {
       inner.goldMarginal(s.ner, anchoring )
     }
 
-    val partition = marginals.map(_._2).sum
-    ChainNERMarginal(marginals.map(_._1), partition) -> partition
+    ChainNERMarginal(marginals)
   }
 
 
@@ -115,14 +116,13 @@ case class ChainNERInference(beliefsFactory: DocumentBeliefs.Factory,
     DocumentBeliefs(newSentences)
   }
 
-  def marginal(doc: ProcessedDocument, aug: DocumentBeliefs): (Marginal, Double) = {
+  def marginal(doc: ProcessedDocument, aug: DocumentBeliefs): Marginal = {
     val anchorings = beliefsToAnchoring(doc, aug)
     val marginals = for((s,anchoring) <- doc.sentences zip anchorings) yield {
       inner.marginal(s.ner, anchoring )
     }
 
-    val partition = marginals.map(_._2).sum
-    ChainNERMarginal(marginals.map(_._1), partition) -> partition
+    ChainNERMarginal(marginals)
   }
 
   def beliefsToAnchoring(doc: ProcessedDocument, beliefs: DocumentBeliefs):IndexedSeq[SemiCRF.Anchoring[NERType.Value, String]] = {

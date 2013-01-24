@@ -68,7 +68,7 @@ object DocLexParser {
     }
 
 
-    def marginal(doc: ProcessedDocument, aug: DocumentBeliefs): (Marginal, Double) = {
+    def marginal(doc: ProcessedDocument, aug: DocumentBeliefs): Marginal = {
       val trees = doc.treeInstances
       val lenses = for( (b, s) <- aug.sentences zip doc.sentences) yield adapt(s.words, b)
 
@@ -76,7 +76,7 @@ object DocLexParser {
         AugmentedAnchoring(lenses(i), doc.sentences(i).sparsity).marginal
       }
 
-      Marginal(marginals) -> marginals.map(_.logPartition).sum
+      Marginal(marginals)
     }
 
     def projectGold(v: ProcessedDocument, m: Marginal, oldAugment: DocumentBeliefs): DocumentBeliefs = {
@@ -84,7 +84,7 @@ object DocLexParser {
     }
 
 
-    def goldMarginal(doc: ProcessedDocument, aug: DocumentBeliefs): (Marginal, Double) = {
+    def goldMarginal(doc: ProcessedDocument, aug: DocumentBeliefs): Marginal = {
       val trees = doc.treeInstances
       val lenses = for( (b, s) <- aug.sentences zip doc.sentences) yield adapt(s.words, b)
 
@@ -92,7 +92,7 @@ object DocLexParser {
         new TreeMarginal(AugmentedAnchoring(lenses(i), doc.sentences(i).sparsity), reannotate(trees(i).tree, trees(i).words))
       }
 
-      Marginal(marginals) -> marginals.map(_.logPartition).sum
+      Marginal(marginals)
     }
 
     def countsFromMarginal(doc: ProcessedDocument,

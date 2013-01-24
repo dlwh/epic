@@ -101,14 +101,12 @@ class SemiCRFInference[L, W](weights: DenseVector[Double],
   def labelIndex = featurizer.labelIndex
   def startSymbol = featurizer.startSymbol
 
-  def marginal(v: Segmentation[L, W], aug: SemiCRF.Anchoring[L, W]): (Marginal, Double) = {
-    val m = SemiCRF.Marginal(new Anchoring(v.words, aug))
-    m -> m.logPartition
+  def marginal(v: Segmentation[L, W], aug: SemiCRF.Anchoring[L, W]): Marginal = {
+    SemiCRF.Marginal(new Anchoring(v.words, aug))
   }
 
-  def goldMarginal(v: Segmentation[L, W], augment: SemiCRF.Anchoring[L, W]) = {
-    val m = SemiCRF.Marginal.goldMarginal[L, W](new Anchoring(v.words, augment), v.segments)
-    m -> m.logPartition
+  def goldMarginal(v: Segmentation[L, W], augment: SemiCRF.Anchoring[L, W]): SemiCRF.Marginal[L, W] = {
+    SemiCRF.Marginal.goldMarginal[L, W](new Anchoring(v.words, augment), v.segments)
   }
 
   def countsFromMarginal(v: Segmentation[L, W], marg: Marginal, counts: ExpectedCounts, scale: Double): ExpectedCounts = {

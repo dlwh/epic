@@ -62,7 +62,7 @@ trait ParserInference[L, W] extends ProjectableInference[TreeInstance[L, W], Cor
           throw e
       }
     }
-    charts -> charts.logPartition
+    charts
   }
 
   def countsFromMarginal(v: TreeInstance[L, W], marg: Marginal, accum: ExpectedCounts, scale: Double) = {

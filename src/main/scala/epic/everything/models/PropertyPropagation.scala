@@ -100,7 +100,7 @@ object PropertyPropagation {
       result
     }
 
-    def marginal(doc: ProcessedDocument, aug: DocumentBeliefs): (Marginal, Double) = {
+    def marginal(doc: ProcessedDocument, aug: DocumentBeliefs): (Marginal) = {
       val sentences = for ((sentence, sentenceBeliefs) <- doc.sentences zip aug.sentences) yield {
         val spans = TriangularArray.tabulate(sentence.length + 1) { (begin, end) =>
 
@@ -125,10 +125,10 @@ object PropertyPropagation {
       val marginal = new PropertyPropagation.Marginal(sentences)
       assert(!marginal.logPartition.isNaN)
       assert(!marginal.logPartition.isInfinite)
-      marginal -> marginal.logPartition
+      marginal
     }
 
-    def goldMarginal(v: ProcessedDocument, aug: DocumentBeliefs): (Marginal, Double) = marginal(v, aug)
+    def goldMarginal(v: ProcessedDocument, aug: DocumentBeliefs): (Marginal) = marginal(v, aug)
 
     def emptyCounts = StandardExpectedCounts.zero(scorer.featureIndex)
 
@@ -254,7 +254,7 @@ object PropertyPropagation {
       beliefsFactory(doc)
     }
 
-    def marginal(doc: ProcessedDocument, aug: DocumentBeliefs): (Marginal, Double) = {
+    def marginal(doc: ProcessedDocument, aug: DocumentBeliefs): (Marginal) = {
       val sentences = for ((sentence, sentenceBeliefs) <- doc.sentences zip aug.sentences) yield {
         val spans = TriangularArray.tabulate(sentence.length + 1) { (begin, end) =>
           val current = sentenceBeliefs.spanBeliefs(begin, end)
@@ -270,10 +270,10 @@ object PropertyPropagation {
         new SentenceMarginal(spans)
       }
       val marginal = new PropertyPropagation.Marginal(sentences)
-      marginal -> marginal.logPartition
+      marginal
     }
 
-    def goldMarginal(v: ProcessedDocument, aug: DocumentBeliefs): (Marginal, Double) = marginal(v, aug)
+    def goldMarginal(v: ProcessedDocument, aug: DocumentBeliefs): (Marginal) = marginal(v, aug)
 
 
     type ExpectedCounts = StandardExpectedCounts[Feature]

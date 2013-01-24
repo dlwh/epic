@@ -81,7 +81,7 @@ class PropCorefInference(index: Index[Feature],
     val model = new breeze.inference.bp.Model(assignmentVariables ++ flattenedProp, assignmentFactors ++ agreementFactors)
     val bp = BeliefPropagation.infer(model)
 
-    new PropCoref.Marginal(bp, agreementFactors, assignmentFactors, bp.logPartition) -> bp.logPartition
+    new PropCoref.Marginal(bp, agreementFactors, assignmentFactors, bp.logPartition)
   }
 
 
@@ -89,7 +89,7 @@ class PropCorefInference(index: Index[Feature],
 
   def baseAugment(v: FeaturizedCorefInstance): DocumentBeliefs = null
 
-  def marginal(inst: FeaturizedCorefInstance, aug: DocumentBeliefs): (Marginal, Double) = {
+  def marginal(inst: FeaturizedCorefInstance, aug: DocumentBeliefs): Marginal = {
     val (assignmentVariables: Array[Variable[Int]], propertyVariables: Array[Array[Variable[Int]]]) = makeVariables(inst)
 
     // skip factor for 0, since it doesn't get assigned.
@@ -114,7 +114,7 @@ class PropCorefInference(index: Index[Feature],
     val model = new breeze.inference.bp.Model(assignmentVariables ++ flattenedProp, assignmentFactors ++ agreementFactors)
     val bp = BeliefPropagation.infer(model)
 
-    new Marginal(bp, agreementFactors, assignmentFactors, bp.logPartition) -> bp.logPartition
+    new Marginal(bp, agreementFactors, assignmentFactors, bp.logPartition)
   }
 
 
@@ -134,7 +134,7 @@ class PropCorefInference(index: Index[Feature],
   }
 
   def decode(inst: FeaturizedCorefInstance, aug: DocumentBeliefs) : IndexedSeq[Set[DSpan]] = {
-    val marg: Marginal = marginal(inst, aug)._1
+    val marg: Marginal = marginal(inst, aug)
     import marg._
 
     val links = Array.fill(inst.numMentions)(null: collection.mutable.BitSet)

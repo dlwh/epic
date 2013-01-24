@@ -57,7 +57,8 @@ class EPInference[Datum, Augment](inferences: IndexedSeq[ProjectableInference[Da
     def project(q: Augment, i: Int) = {
       val inf = inferences(i)
       marginals(i) = null.asInstanceOf[ProjectableInference[Datum, Augment]#Marginal]
-      val (marg, contributionToLikelihood) = inf.goldMarginal(datum, q)
+      val marg = inf.goldMarginal(datum, q)
+      val contributionToLikelihood = marg.logPartition
       assert(!contributionToLikelihood.isInfinite, "Model " + i + " is misbehaving!")
       assert(!contributionToLikelihood.isNaN, "Model " + i + " is misbehaving!")
       val newAugment = inf.project(datum, marg, q)
@@ -80,7 +81,7 @@ class EPInference[Datum, Augment](inferences: IndexedSeq[ProjectableInference[Da
     }
 //    print(iter + " gold(" + state.logPartition+") ")
 
-    EPMarginal(state.logPartition, state.q, marginals) -> state.logPartition
+    EPMarginal(state.logPartition, state.q, marginals)
   }
 
 
@@ -91,7 +92,8 @@ class EPInference[Datum, Augment](inferences: IndexedSeq[ProjectableInference[Da
     def project(q: Augment, i: Int) = {
       val inf = inferences(i)
       marginals(i) = null.asInstanceOf[ProjectableInference[Datum, Augment]#Marginal]
-      val (marg, contributionToLikelihood) = inf.marginal(datum, q)
+      val marg = inf.marginal(datum, q)
+      val contributionToLikelihood = marg.logPartition
       assert(!contributionToLikelihood.isInfinite, "Model " + i + " is misbehaving on iter %d!".format(iter))
       assert(!contributionToLikelihood.isNaN, "Model " + i + " is misbehaving on iter %d!".format(iter))
       val newAugment = inf.project(datum, marg, q)
@@ -114,7 +116,7 @@ class EPInference[Datum, Augment](inferences: IndexedSeq[ProjectableInference[Da
     }
 //    print(iter + " guess(" + state.logPartition+") ")
 
-    EPMarginal(state.logPartition, state.q, marginals) -> state.logPartition
+    EPMarginal(state.logPartition, state.q, marginals)
   }
 
 

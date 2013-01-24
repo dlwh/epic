@@ -24,19 +24,19 @@ trait Inference[Datum] extends Serializable {
   type Marginal <: epic.framework.Marginal
   def emptyCounts: ExpectedCounts
 
-  def goldMarginal(v: Datum):(Marginal,Double)
-  def marginal(v: Datum):(Marginal,Double)
+  def goldMarginal(v: Datum):Marginal
+  def marginal(v: Datum):Marginal
   def countsFromMarginal(v: Datum, marg: Marginal, accum: ExpectedCounts, scale: Double):ExpectedCounts
 
 
   def guessCounts(value: Datum, accum: ExpectedCounts, scale: Double):ExpectedCounts = {
     val marg = marginal(value)
-    countsFromMarginal(value, marg._1, accum, scale)
+    countsFromMarginal(value, marg, accum, scale)
   }
 
   def goldCounts(value: Datum, accum: ExpectedCounts, scale: Double):ExpectedCounts = {
     val marg = goldMarginal(value)
-    countsFromMarginal(value, marg._1, accum, scale)
+    countsFromMarginal(value, marg, accum, scale)
   }
 
   def expectedCounts(datum: Datum, accum: ExpectedCounts, scale: Double) = {
@@ -49,20 +49,20 @@ trait Inference[Datum] extends Serializable {
 trait AugmentableInference[Datum,Augment] extends Inference[Datum] {
   def baseAugment(v: Datum):Augment
 
-  def marginal(v: Datum):(Marginal,Double) = marginal(v, baseAugment(v))
-  def marginal(v: Datum, aug: Augment):(Marginal,Double)
+  def marginal(v: Datum):(Marginal) = marginal(v, baseAugment(v))
+  def marginal(v: Datum, aug: Augment):(Marginal)
 
-  def goldMarginal(v: Datum):(Marginal,Double)  = goldMarginal(v, baseAugment(v))
-  def goldMarginal(v: Datum, aug: Augment):(Marginal,Double)
+  def goldMarginal(v: Datum):(Marginal)  = goldMarginal(v, baseAugment(v))
+  def goldMarginal(v: Datum, aug: Augment):(Marginal)
 
   def guessCounts(datum: Datum,  augment: Augment, accum: ExpectedCounts, scale: Double) = {
     val m = marginal(datum,augment)
-    countsFromMarginal(datum,m._1, accum, scale)
+    countsFromMarginal(datum, m, accum, scale)
   }
 
   def goldCounts(value: Datum, augment: Augment, accum: ExpectedCounts, scale: Double): ExpectedCounts = {
     val m = goldMarginal(value, augment)
-    countsFromMarginal(value, m._1, accum, scale)
+    countsFromMarginal(value, m, accum, scale)
   }
 
   override def goldCounts(value: Datum, accum: ExpectedCounts, scale: Double): ExpectedCounts = {

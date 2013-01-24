@@ -70,8 +70,7 @@ case class LatentParserInference[L, L2, W](featurizer: RefinedFeaturizer[L, W, F
   def goldMarginal(ti: TreeInstance[L, W], aug: CoreAnchoring[L, W]) = {
     val reannotated = reannotate(ti.tree, ti.words)
     val product = AugmentedAnchoring.fromRefined(grammar.anchor(ti.words))
-    val marg =  LatentTreeMarginal(product, projections.labels, reannotated)
-    marg -> marg.logPartition
+    LatentTreeMarginal(product, projections.labels, reannotated)
   }
 }
 
