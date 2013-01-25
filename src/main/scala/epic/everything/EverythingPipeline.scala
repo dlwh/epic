@@ -154,7 +154,7 @@ object EverythingPipeline {
     val lexWeights = {
       val obj = new ModelObjective(lexParseModel, processedTrain)
       val cached = new CachedBatchDiffFunction(obj)
-      val weights = params.opt.minimize(cached, obj.initialWeightVector(randomize = true))
+      val weights = params.opt.minimize(cached, obj.initialWeightVector(randomize = false))
 //      if (params.baseNERModel.getAbsoluteFile.getParentFile.exists()) {
 //        breeze.util.writeObject(params.baseNERModel, crf)
 //      }
@@ -183,7 +183,7 @@ object EverythingPipeline {
 
     // the big model!
     val epModel = new EPModel[ProcessedDocument, DocumentBeliefs](30, epInGold = true, initFeatureValue = {f => Some(weightsCache(f.toString)).filter(_ != 0.0)})(
-      lexParseModel,
+//      lexParseModel,
       adaptedNerModel,
       assocSynNer
     )
@@ -199,7 +199,7 @@ object EverythingPipeline {
       (i: Int) => epModel.featureIndex.get(i).toString
     })
 
-    val featureICareAbout = epModel.featureIndex.iterator.toIndexedSeq.indexWhere(_.toString == "ComponentFeature(2,AssociationFeature(NotEntity,Some(JJ)))")
+    val featureICareAbout = epModel.featureIndex.iterator.toIndexedSeq.indexWhere(_.toString == "ComponentFeature(1,AssociationFeature(NotEntity,Some(JJ)))")
     type OptState = FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State
     def bump(unreg: Double, gradx: DenseVector[Double], s: OptState, featureICareAbout: Int) = {
       val grad = gradx(featureICareAbout)
@@ -212,13 +212,15 @@ object EverythingPipeline {
     }
 
 
+
     val opt = params.opt
-    for( s:OptState <- opt.iterations(cachedObj, obj.initialWeightVector(randomize = true))) {
-//      val (unregularized, deriv) = obj.calculate(s.x)
-//      bump(unregularized, deriv, s, 3)
-//      bump(unregularized, deriv, s, 4)
-//      bump(unregularized, deriv, s, featureICareAbout)
-//      bump(unregularized, deriv, s, featureICareAbout + 1)
+    for( s:OptState <- opt.iterations(cachedObj, obj.initialWeightVector(randomize = false))) {
+      updateWeights(params.weightsCache, weightsCache, Encoder.fromIndex(epModel.featureIndex).decode(s.x))
+      val (unregularized, deriv) = obj.calculate(s.x)
+      bump(unregularized, deriv, s, 3)
+      bump(unregularized, deriv, s, 4)
+      bump(unregularized, deriv, s, featureICareAbout)
+      bump(unregularized, deriv, s, featureICareAbout + 1)
     }
 
   }

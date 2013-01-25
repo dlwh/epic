@@ -99,6 +99,7 @@ class EPInference[Datum, Augment](inferences: IndexedSeq[ProjectableInference[Da
       assert(!contributionToLikelihood.isNaN, "Model " + i + " is misbehaving on iter %d!".format(iter))
       val newAugment = inf.project(datum, marg, q)
       marginals(i) = marg
+//      println("Leaving " + i)
       newAugment -> contributionToLikelihood
     }
 

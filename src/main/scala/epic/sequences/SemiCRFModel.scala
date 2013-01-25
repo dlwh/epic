@@ -322,19 +322,18 @@ object SegmentationModelFactory {
       def featuresForSpan(start: Int, end: Int):Array[Feature] = {
         val feats = ArrayBuffer[Feature]()
         feats ++= gazetteer.lookupSpan(Span(start, end).map(words).toIndexedSeq).map(SFeature(_, 'SegmentKnown))
-        if(start < end - 1) {
+        if (start < end - 1) {
           feats += WordEdges('Inside, basicFeature(start)(0), basicFeature(end-1)(0))
           feats += WordEdges('Outside, basicFeature(start-1)(0), basicFeature(end)(0))
           feats += WordEdges('Begin, basicFeature(start-1)(0), basicFeature(start)(0))
           feats += WordEdges('End, basicFeature(end-1)(0), basicFeature(end)(0))
-          if(start == 0)
-            feats += SpanStartsSentence
-          if(start == 0 && end == words.length)
-            feats += SpansWholeSentence
-
+          feats += SFeature(SpanShapeGenerator.apply(words, Span(start,end)), 'SpanShape)
         }
+        if(start == 0)
+          feats += SpanStartsSentence
+        if(start == 0 && end == words.length)
+          feats += SpansWholeSentence
 
-        feats += SFeature(SpanShapeGenerator.apply(words, Span(start,end)), 'SpanShape)
         feats.toArray
       }
 

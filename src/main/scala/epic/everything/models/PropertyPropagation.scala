@@ -82,15 +82,16 @@ object PropertyPropagation {
       math.exp(dot(weights, grounding.featuresFor(ass1, ass2)) )
     }
 
-    def scores(grounding: AssociationAnchoring[T, U], prop1: Property[_], prop2: Property[_]) = {
-      val result = DenseMatrix.zeros[Double](prop1.size, prop2.size)
+    def scores(grounding: AssociationAnchoring[T, U], b1: Beliefs[_], b2: Beliefs[_]) = {
+      val result = DenseMatrix.zeros[Double](b1.size, b2.size)
       var p1 = 0
       while (p1 < result.rows) {
         var p2 = 0
-        while (p2 < result.cols) {
-          result(p1, p2) = score(grounding, p1, p2)
-          p2 += 1
-        }
+        if (b1.beliefs(p1) != 0.0)
+          while (p2 < result.cols) {
+            result(p1, p2) = score(grounding, p1, p2) * b1.beliefs(p1) * b2.beliefs(p2)
+            p2 += 1
+          }
         p1 += 1
       }
 
@@ -108,7 +109,7 @@ object PropertyPropagation {
           } else {
             val b1 = scorer.lens1(current)
             val b2 = scorer.lens2(current)
-            val r = (b1.beliefs * b2.beliefs.t) :*= scores(grounding, b1.property, b2.property)
+            val r = scores(grounding, b1, b2)
             val partition = breeze.linalg.sum(r)
             assert(partition != 0.0, partition + "\n" + b1 +"\n\n" + b2)
             assert(!partition.isInfinite, partition + "\n" + b1 +"\n\n" + b2)

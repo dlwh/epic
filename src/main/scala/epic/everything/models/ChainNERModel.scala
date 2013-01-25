@@ -99,13 +99,22 @@ case class ChainNERInference(beliefsFactory: DocumentBeliefs.Factory,
             null
           } else {
             val copy = spanBeliefs.copy(ner = spanBeliefs.ner.updated(DenseVector.tabulate(labels.size){marg.spanMarginal(_, b, e)}))
+            var l = 0
             assert(copy.ner.beliefs(notNER) == 0.0, copy.ner.beliefs)
-            copy.ner.beliefs(notNER) = 1 - sum(copy.ner.beliefs)
-            if(copy.ner.beliefs(notNER) < 1E-6) {
+            // dealing with some stupid rounding issues...
+            if (spanBeliefs.ner.beliefs(notNER) == 0.0) {
+              copy.ner.beliefs(notNER) = 0.0
+            } else {
+              copy.ner.beliefs(notNER) = 1 - sum(copy.ner.beliefs)
+              if(copy.ner.beliefs(notNER) < 1E-6) {
               assert(copy.ner.beliefs(notNER) > -1E-6)
               copy.ner.beliefs(notNER) = 0.0
+              }
             }
-            assert( (sum(copy.ner.beliefs) - 1.0).abs < 1E-4, copy.ner + " " + spanBeliefs.ner)
+            val normalizer: Double = sum(copy.ner.beliefs)
+            // make sure it's close to normalized already...
+            assert( (normalizer - 1.0).abs < 1E-3, copy.ner + " " + spanBeliefs.ner)
+            copy.ner.beliefs /= normalizer
             copy
           }
         } else null

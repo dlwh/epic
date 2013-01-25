@@ -4,7 +4,7 @@ import collection.GenTraversable
 import breeze.optimize.BatchDiffFunction
 import breeze.linalg.DenseVector
 import breeze.util.Encoder
-import actors.threadpool.AtomicInteger
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  *
@@ -45,7 +45,7 @@ class ModelObjective[Datum](val model: Model[Datum],
         success.incrementAndGet()
         countsSoFar
       } catch {
-        case e =>
+        case e: Exception =>
           e.printStackTrace()
 //          new Exception("While processing " + datum, e).printStackTrace()
           _countsSoFar

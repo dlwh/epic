@@ -31,7 +31,7 @@ object ParseText {
 
     val parser = readObject[Parser[AnnotatedLabel,String]](params.parser)
     if(params.threads >= 1) {
-      collection.parallel.ForkJoinTasks.defaultForkJoinPool.setParallelism(params.threads)
+//      collection.parallel.ForkJoinTasks.defaultForkJoinPool.setParallelism(params.threads)
     }
 
     val sentenceSegmenter = LanguagePack.English.sentenceSegmenter

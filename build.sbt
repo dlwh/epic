@@ -1,6 +1,4 @@
 import AssemblyKeys._ // put this at the top of the file
-import de.johoop.jacoco4sbt._
-import JacocoPlugin._
 
 name := "epic"
 
@@ -8,7 +6,7 @@ version := "0.1-SNAPSHOT"
 
 organization := "org.scalanlp"
 
-scalaVersion := "2.9.2"
+scalaVersion := "2.10.0"
 
 resolvers ++= Seq(
   "ScalaNLP Maven2" at "http://repo.scalanlp.org/repo",
@@ -30,7 +28,9 @@ libraryDependencies <<= (scalaVersion, libraryDependencies) { (sv, deps) =>
     case x if x.startsWith("2.8") =>
       (deps :+ ("org.scalatest" % "scalatest" % "1.3" % "test")
             :+ ("org.scala-tools.testing" % "scalacheck_2.8.1" % "1.8" % "test"))
-    case x  => error("Unsupported Scala version " + x)
+    case _       =>
+     (deps :+ ("org.scalacheck" %% "scalacheck" % "1.10.0" % "test")
+           :+ ("org.scalatest" %% "scalatest" % "2.0.M5b" % "test"))
   }
 }
 
@@ -45,5 +45,3 @@ javaOptions += "-Xmx2g"
 
 seq(assemblySettings: _*)
 
-
-seq(jacoco.settings : _*)

@@ -45,6 +45,8 @@ final case class Beliefs[T](property: Property[T], beliefs: DenseVector[Double])
   def newBuilder = Beliefs.Builder(property)
 
   def updated(newBeliefs: DenseVector[Double]) = Beliefs(property, newBeliefs)
+
+  def size = property.size
 }
 
 object Beliefs {
@@ -64,7 +66,7 @@ object Beliefs {
     var p = beliefs.offset
     while(i < beliefs.length) {
       if (java.lang.Double.isNaN(beliefs(p)) || java.lang.Double.isInfinite(beliefs(p))) {
-        assert(a(p) <= 1E-5 && b(p) <= 1E-5, a.toString + " " + b)
+        if(a(p) > 1E-6 || b(p) > 1E-6) throw new RuntimeException("Something is wrong with this division!" +  a.toString + " " + b)
         beliefs(p) = 0.0
       }
       p += beliefs.stride

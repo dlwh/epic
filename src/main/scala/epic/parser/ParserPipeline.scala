@@ -137,10 +137,10 @@ trait ParserPipeline {
       writeObject(out, parser)
 
       var parl = -1
-      if(params.threads >= 1) {
-        parl = collection.parallel.ForkJoinTasks.defaultForkJoinPool.getParallelism
-        collection.parallel.ForkJoinTasks.defaultForkJoinPool.setParallelism(params.threads)
-      }
+//      if(params.threads >= 1) {
+//        parl = collection.parallel.ForkJoinTasks.defaultForkJoinPool.getParallelism
+//        collection.parallel.ForkJoinTasks.defaultForkJoinPool.setParallelism(params.threads)
+//      }
 
       println("Evaluating Parser...")
       val stats = evalParser(devTrees.filter(_.words.length <= 40), parser, name+"-len40-dev")
@@ -148,9 +148,9 @@ trait ParserPipeline {
       println("Eval finished. Results:")
       println( "P: " + precision + " R:" + recall + " F1: " + f1 +  " Ex:" + exact + " Tag Accuracy: " + tagAccuracy)
 
-      if(params.threads >= 1) {
-        collection.parallel.ForkJoinTasks.defaultForkJoinPool.setParallelism(parl)
-      }
+//      if(params.threads >= 1) {
+//        collection.parallel.ForkJoinTasks.defaultForkJoinPool.setParallelism(parl)
+//      }
     }
   }
 

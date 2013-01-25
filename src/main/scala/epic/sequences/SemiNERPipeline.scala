@@ -51,7 +51,7 @@ object SemiNERPipeline {
       val corefHints: Map[IndexedSeq[String], NERType.Value] =  {for {
         file <- params.path.listFiles take params.nfiles
         doc <- ConllOntoReader.readDocuments(file)
-        corefClusters: Map[Int, Set[NERType.Value]] = doc.coref.toIndexedSeq[(DSpan, Mention)].groupBy(_._2.id).mapValues(_.map(_._1).flatMap(span => doc.ner.get(span).iterator).toSet)
+        corefClusters: Map[Int, Set[NERType.Value]] = doc.coref.toIndexedSeq.groupBy(_._2.id).mapValues(_.map(_._1).flatMap(span => doc.ner.get(span).iterator).toSet)
         (span, m) <- doc.coref; yd = span.getYield(doc)
         if yd.length != 1 || !pronouns.contains(yd.head)
         nertpe <- corefClusters(m.id).headOption.iterator
@@ -66,7 +66,7 @@ object SemiNERPipeline {
       val corefHints: Set[IndexedSeq[String]] =  {for {
         file <- params.path.listFiles take params.nfiles
         doc <- ConllOntoReader.readDocuments(file)
-        corefClusters: Map[Int, Set[NERType.Value]] = doc.coref.toIndexedSeq[(DSpan, Mention)].groupBy(_._2.id).mapValues(_.map(_._1).flatMap(span => doc.ner.get(span).iterator).toSet)
+        corefClusters: Map[Int, Set[NERType.Value]] = doc.coref.toIndexedSeq.groupBy(_._2.id).mapValues(_.map(_._1).flatMap(span => doc.ner.get(span).iterator).toSet)
         (span, m) <- doc.coref; yd = span.getYield(doc)
         if yd.length != 1 || !pronouns.contains(yd.head)
         if corefClusters(m.id).nonEmpty

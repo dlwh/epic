@@ -21,7 +21,6 @@ import java.io.BufferedOutputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.io.PrintStream
-import scala.actors.Actor
 import java.util.concurrent.atomic.AtomicInteger
 
 
@@ -117,7 +116,7 @@ object ParseEval {
         }
         Some(ParseResult(sent, deBgold, guessTree, (endTime-startTime) / 1000.0))
       } catch {
-        case e =>
+        case e: Exception =>
           new RuntimeException("Error while parsing " + sent.words, e).printStackTrace()
           None
 

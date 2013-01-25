@@ -58,9 +58,9 @@ object ParserTester {
 
     println("Parser " + name)
 
-    if(params.threads >= 1) {
-      collection.parallel.ForkJoinTasks.defaultForkJoinPool.setParallelism(params.threads)
-    }
+//    if(params.threads >= 1) {
+//      collection.parallel.ForkJoinTasks.defaultForkJoinPool.setParallelism(params.threads)
+//    }
 
     {
       println("Evaluating Parser on dev...")

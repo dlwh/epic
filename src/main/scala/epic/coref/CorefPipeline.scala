@@ -73,7 +73,7 @@ object CorefPipeline extends App {
   println("=================")
 
   println("Weights: ")
-  for( (f,v) <- Encoder.fromIndex(model.featureIndex).decode(optimum).iterator.toIndexedSeq[(Feature, Double)].sortBy(_._2)) {
+  for( (f,v) <- Encoder.fromIndex(model.featureIndex).decode(optimum).iterator.toIndexedSeq.sortBy(_._2)) {
     println(v + " " + f)
   }
   println("=================")
@@ -110,11 +110,11 @@ object CorefPipeline extends App {
   }
 
   def sortClusters(clusters: Iterable[Set[DSpan]]):IndexedSeq[Set[DSpan]] = {
-    clusters.toIndexedSeq[Set[DSpan]].sortBy(_.min)
+    clusters.toIndexedSeq.sortBy(_.min)
   }
 
   def formatCluster(set: Set[DSpan]) = {
-    set.toIndexedSeq[DSpan].sorted.mkString(", ")
+    set.toIndexedSeq.sorted.mkString(", ")
   }
 
   def getCoreferentPairs(clusters: IndexedSeq[Set[DSpan]]): IndexedSeq[(DSpan, DSpan)] = {

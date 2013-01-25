@@ -22,11 +22,9 @@ trait ChartParser[L, W] extends Parser[L, W] with Serializable {
 
   def decoder: ChartDecoder[L, W]
 
-  override def bestParse(w: Seq[W]):BinarizedTree[L] = try {
+  override def bestParse(w: Seq[W]):BinarizedTree[L] = {
     val chart = charts(w)
     decoder.extractBestParse(chart)
-  } catch {
-    case e => throw e
   }
 }
 
@@ -46,11 +44,11 @@ class SimpleChartParser[L, W](val augmentedGrammar: AugmentedGrammar[L, W],
         throw new Exception("infinite partition")
       mm
     } catch {
-      case e =>
+      case e: Exception =>
         try {
           ChartMarginal(AugmentedGrammar.fromRefined(augmentedGrammar.refined), w)
         } catch {
-          case e =>
+          case e: Exception =>
             throw e
         }
     }

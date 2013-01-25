@@ -54,8 +54,8 @@ object ParserTrainer extends epic.parser.ParserPipeline {
                   validate: (Parser[AnnotatedLabel, String]) => Statistics, params: Params) = {
     import params._
 
-    if(threads >= 1)
-      collection.parallel.ForkJoinTasks.defaultForkJoinPool.setParallelism(params.threads)
+//    if(threads >= 1)
+//      collection.parallel.ForkJoinTasks.defaultForkJoinPool.setParallelism(params.threads)
 
     val model = modelFactory.make(trainTrees)
 
@@ -82,7 +82,7 @@ object ParserTrainer extends epic.parser.ParserPipeline {
       val parser = model.extractParser(state.x)
       ("LatentDiscrim-" + iter.toString, parser)
     } catch {
-      case e => println(e); e.printStackTrace(); throw e
+      case e: Exception => e.printStackTrace(); throw e
     }
   }
 }

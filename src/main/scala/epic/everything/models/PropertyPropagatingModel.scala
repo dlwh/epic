@@ -9,7 +9,6 @@ import collection.mutable.ArrayBuffer
 import epic.everything._
 import breeze.collection.mutable.TriangularArray
 import epic.everything.Document
-import models.SentenceBeliefs
 
 /*
 object PropertyPropagation {

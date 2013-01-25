@@ -26,9 +26,9 @@ import epic.trees._
 import collection.mutable.ArrayBuffer
 import breeze.stats.distributions.{Rand, Binomial}
 import projections.ConstraintCoreGrammar.PruningStatistics
-import actors.threadpool.Arrays
 import breeze.linalg.DenseVector
 import epic.parser.ParseChart.SparsityPattern
+import java.util
 
 /**
  * 
@@ -330,8 +330,8 @@ object ComputePruningThresholds {
 
     val factory = new ConstraintCoreGrammar[AnnotatedLabel, String](parser.augmentedGrammar, -7)
     val (all, gold) = mapTrees(factory, treebank.devTrees, parser.grammar.labelIndex)
-    Arrays.sort(all.data)
-    Arrays.sort(gold.data)
+    util.Arrays.sort(all.data)
+    util.Arrays.sort(gold.data)
     val goldOut = new PrintStream(new BufferedOutputStream(new FileOutputStream("gold.txt")))
     gold.data foreach goldOut.println _
     goldOut.close()
