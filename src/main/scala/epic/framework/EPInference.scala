@@ -18,6 +18,7 @@ package epic.framework
 
 import collection.mutable.ArrayBuffer
 import breeze.inference.{ExpectationPropagation, Factor}
+import epic.everything.models.DocumentBeliefs
 
 class EPInference[Datum, Augment](inferences: IndexedSeq[ProjectableInference[Datum, Augment]],
                                   val maxEPIter: Int,
@@ -108,9 +109,11 @@ class EPInference[Datum, Augment](inferences: IndexedSeq[ProjectableInference[Da
     var converged = false
     while (!converged && iter < maxEPIter && iterates.hasNext) {
       val s = iterates.next()
-      if (state != null) {
-        converged = (s.logPartition - state.logPartition).abs / math.max(s.logPartition, state.logPartition) < 1E-4
-      }
+//      if (state != null) {
+//        converged = (s.logPartition - state.logPartition).abs / math.max(s.logPartition, state.logPartition) < 1E-5
+//        println(s.q.isConvergedTo(state.q) + " " + s.logPartition + " " + state.logPartition)
+//      }
+
       iter += 1
       state = s
     }

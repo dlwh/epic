@@ -44,6 +44,15 @@ case class DocumentBeliefs(sentences: Array[SentenceBeliefs]) extends Factor[Doc
       (0 until numSentences) forall { i => sentences(i).isConvergedTo(f.sentences(i), diff)}
     }
   }
+
+  def maxChange(f: DocumentBeliefs): Double = {
+    if (f eq null) 0.0
+    else {
+      (0 until numSentences) map { i => sentences(i).maxChange(f.sentences(i))} max
+    }
+  }
+
+
 }
 
 object DocumentBeliefs {
@@ -117,10 +126,27 @@ case class SentenceBeliefs(spans: TriangularArray[SpanBeliefs],
         if(spans(i,j).ne(null) && !spans(i,j).isConvergedTo(f.spans(i,j), diff) ) return false
         j += 1
       }
-      if(!wordBeliefs(i).isConvergedTo(f.wordBeliefs(i), diff) ) return false
+//      if(!wordBeliefs(i).isConvergedTo(f.wordBeliefs(i), diff) ) return false
       i += 1
     }
     true
+  }
+
+  def maxChange(f: SentenceBeliefs): Double = {
+    var i = 0
+    var max = 0.0
+    while(i < length) {
+      var j = i + 1
+      while(j <= length) {
+        if(spans(i,j).ne(null) && !spans(i,j).isConvergedTo(f.spans(i,j))) {
+          max = max max spans(i,j).maxChange(f.spans(i, j))
+        }
+        j += 1
+      }
+//      max = max max wordBeliefs(i).maxChange(f.wordBeliefs(i))
+      i += 1
+    }
+    max
   }
 }
 
@@ -151,6 +177,10 @@ case class SpanBeliefs(span: DSpan,
       && ner.isConvergedTo(f.ner, diff)
 //      && observedNer.isConvergedTo(f.observedNer, diff)
     )
+
+  def maxChange(f: SpanBeliefs): Double = {
+    governor.maxChange(f.governor) max label.maxChange(f.label) max ner.maxChange(f.ner)
+  }
 }
 
 case class WordBeliefs(pos: DPos,

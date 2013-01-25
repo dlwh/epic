@@ -5,7 +5,10 @@ import breeze.config.CommandLineParser
 import epic.ontonotes.ConllOntoReader
 import epic.trees._
 import annotations.AddMarkovization
+import annotations.AddMarkovization
 import annotations.PipelineAnnotator
+import annotations.PipelineAnnotator
+import annotations.StripAnnotations
 import annotations.StripAnnotations
 import epic.parser._
 import epic.parser.projections.{ConstraintAnchoring, ConstraintCoreGrammar}
@@ -15,8 +18,9 @@ import epic.sequences._
 import collection.mutable.ArrayBuffer
 import epic.framework.{Feature, EPModel, ModelObjective}
 import breeze.collection.mutable.TriangularArray
-import breeze.optimize.{RandomizedGradientCheckingFunction, CachedBatchDiffFunction}
+import breeze.optimize._
 import epic.parser.ParserParams.XbarGrammar
+import features.RuleFeature
 import features.RuleFeature
 import features.{RuleFeature, TagAwareWordShapeFeaturizer}
 import models._
@@ -32,9 +36,16 @@ import breeze.optimize.FirstOrderMinimizer.OptParams
 import epic.parser.models.LexGrammarBundle
 import epic.trees.Span
 import models.SpanBeliefs
+import models.SpanBeliefs
 import projections.ConstraintAnchoring.RawConstraints
 import epic.trees.ProcessedTreebank
 import epic.trees.TreeInstance
+import epic.parser.models.StandardFeaturizer
+import breeze.optimize.FirstOrderMinimizer.OptParams
+import epic.parser.models.LexGrammarBundle
+import epic.trees.ProcessedTreebank
+import epic.trees.TreeInstance
+import scala.Some
 import epic.parser.models.StandardFeaturizer
 import breeze.optimize.FirstOrderMinimizer.OptParams
 import epic.parser.models.LexGrammarBundle
@@ -172,10 +183,9 @@ object EverythingPipeline {
 
     // the big model!
     val epModel = new EPModel[ProcessedDocument, DocumentBeliefs](30, epInGold = true, initFeatureValue = {f => Some(weightsCache(f.toString)).filter(_ != 0.0)})(
-
       lexParseModel,
       adaptedNerModel,
-     assocSynNer
+      assocSynNer
     )
 //    corefModel)
     //propModel)
@@ -189,10 +199,28 @@ object EverythingPipeline {
       (i: Int) => epModel.featureIndex.get(i).toString
     })
 
-    val opt = params.opt
-    for( s <- opt.iterations(checking, obj.initialWeightVector(randomize = true))) {
-      println(s.value)
+    val featureICareAbout = epModel.featureIndex.iterator.toIndexedSeq.indexWhere(_.toString == "ComponentFeature(2,AssociationFeature(NotEntity,Some(JJ)))")
+    type OptState = FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State
+    def bump(unreg: Double, gradx: DenseVector[Double], s: OptState, featureICareAbout: Int) = {
+      val grad = gradx(featureICareAbout)
+      val weights = s.x
+      weights(featureICareAbout) += 1E-5
+      val bump = obj.valueAt(weights)
+      val bumpedGrad = (bump - unreg)/1E-5
+      weights(featureICareAbout) -= 1E-5
+      println(epModel.featureIndex.get(featureICareAbout) + " " + grad + " " + bumpedGrad + " rel: " + (grad - bumpedGrad)/math.max(grad, bumpedGrad + 1E-5) )
     }
+
+
+    val opt = params.opt
+    for( s:OptState <- opt.iterations(cachedObj, obj.initialWeightVector(randomize = true))) {
+//      val (unregularized, deriv) = obj.calculate(s.x)
+//      bump(unregularized, deriv, s, 3)
+//      bump(unregularized, deriv, s, 4)
+//      bump(unregularized, deriv, s, featureICareAbout)
+//      bump(unregularized, deriv, s, featureICareAbout + 1)
+    }
+
   }
 
   def extractLexParserModel(trainTrees: Array[TreeInstance[AnnotatedLabel, String]],

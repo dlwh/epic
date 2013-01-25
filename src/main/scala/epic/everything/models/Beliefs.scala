@@ -32,6 +32,16 @@ final case class Beliefs[T](property: Property[T], beliefs: DenseVector[Double])
     true
   }
 
+  def maxChange(f: Beliefs[T]): Double = {
+    var i = 0
+    var maxChange = 0.0
+    while(i < beliefs.size) {
+      maxChange = (math.abs(f.beliefs(i) - beliefs(i)) )
+      i += 1
+    }
+    maxChange
+  }
+
   def newBuilder = Beliefs.Builder(property)
 
   def updated(newBeliefs: DenseVector[Double]) = Beliefs(property, newBeliefs)
@@ -54,7 +64,7 @@ object Beliefs {
     var p = beliefs.offset
     while(i < beliefs.length) {
       if (java.lang.Double.isNaN(beliefs(p)) || java.lang.Double.isInfinite(beliefs(p))) {
-        assert(!a(p).isNaN, a.toString + " " + b)
+        assert(a(p) <= 1E-5 && b(p) <= 1E-5, a.toString + " " + b)
         beliefs(p) = 0.0
       }
       p += beliefs.stride

@@ -56,9 +56,6 @@ object PropertyPropagation {
     def initialValueForFeature(f: Feature): Double = math.random * 1E-4 - 2
 
     def inferenceFromWeights(weights: DenseVector[Double]) = {
-      val out = new PrintWriter(new FileWriter("xx.weights.txt"))
-      out.println(Encoder.fromIndex(featureIndex).decode(weights))
-      out.close()
       new Inference(beliefsFactory, weights, assoc)
     }
 
@@ -165,6 +162,7 @@ object PropertyPropagation {
       accum
     }
 
+    // turns the marginal p(var1,var2) => q(var1)q(var2)
     def project(doc: ProcessedDocument, m: Marginal, oldAugment: DocumentBeliefs): DocumentBeliefs = {
       val newSentences = for( (myBeliefs, oldBeliefs) <- m.sentences zip oldAugment.sentences) yield {
         val newSpans = TriangularArray.tabulate(oldBeliefs.length+1) { (begin, end) =>
