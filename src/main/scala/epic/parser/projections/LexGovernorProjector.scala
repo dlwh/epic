@@ -7,7 +7,8 @@ import models.LexGrammar
 
 
 /**
- * 
+ * This class is used to get information about the distribution of dependencies and label types
+ * in a lexicalized chart.
  * @author dlwh
  */
 class LexGovernorProjector[L, W](grammar: LexGrammar[L, W]) {
@@ -107,10 +108,12 @@ class LexGovernorProjector[L, W](grammar: LexGrammar[L, W]) {
 }
 
 /**
- *
- * @param spanType
+ * Holds information produced by LexGovernorProjector. Basically a hodgepodge
+ * of marginal statistics about dependencies and label types.
+ * @param spanType the label of the span. labelIndex.size + 1 is notASpan
  * @param spanGovernor which word governs my span. not my head. my head's head. length = root (i.e. whole setnence), length+1 == off
  * @param wordGovernor which word governs me, i.e. head. length = root
+ * @param wordTag the pos tag
  * @param maximalLabelType for each word the type of its maximal projection
  */
 case class LexGovernorInfo(spanType: TriangularArray[DenseVector[Double]],

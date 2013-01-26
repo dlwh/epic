@@ -22,6 +22,7 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.PrintStream
 import java.util.concurrent.atomic.AtomicInteger
+import epic.framework.EvaluationResult
 
 
 /**
@@ -67,7 +68,7 @@ object ParseEval {
 
   case class Statistics(guess: Int, gold: Int, right: Int, numExact: Int,
                         tagsRight: Int, numWords: Int,
-                        numParses: Int) {
+                        numParses: Int) extends EvaluationResult[Statistics] {
     def +(stats: Statistics) = {
       Statistics(guess + stats.guess,
         gold + stats.gold,

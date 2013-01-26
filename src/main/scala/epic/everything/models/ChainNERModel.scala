@@ -1,9 +1,9 @@
 package epic.everything.models
 
-import epic.everything.{DSpan, ProcessedDocument, NERType, DocumentAnnotator}
+import epic.everything.{DSpan, ProcessedDocument, NERType}
 import epic.framework.{Marginal, ProjectableInference, StandardExpectedCounts, Feature}
 import breeze.util.{Encoder, Index}
-import epic.sequences.{SemiCRF, SemiCRFInference, SemiCRFModel}
+import epic.sequences.{SegmentationEval, SemiCRF, SemiCRFInference, SemiCRFModel}
 import epic.sequences.SemiCRF.Anchoring
 import breeze.collection.mutable.TriangularArray
 import breeze.linalg._
@@ -29,6 +29,15 @@ class ChainNERModel(beliefsFactory: DocumentBeliefs.Factory,
     ecounts.toObjective
   }
 
+  type EvaluationResult = SegmentationEval.Stats
+
+  def evaluate(guess: ProcessedDocument, gold: ProcessedDocument): EvaluationResult = {
+    val individuals = for( (gld, gss) <- guess.sentences.map(_.ner).zip(gold.sentences.map(_.ner))) yield {
+      SegmentationEval.evaluateExample(Set(NERType.NotEntity, NERType.OutsideSentence), gold = gld, guess = gss)
+    }
+
+    individuals.reduceLeft(_ + _)
+  }
 }
 
 case class ChainNERMarginal[Inner<:Marginal](sentences: IndexedSeq[Inner]) extends epic.framework.Marginal {
@@ -38,6 +47,8 @@ case class ChainNERMarginal[Inner<:Marginal](sentences: IndexedSeq[Inner]) exten
 case class ChainNERInference(beliefsFactory: DocumentBeliefs.Factory,
                              inner: SemiCRFInference[NERType.Value, String],
                              labels: Index[NERType.Value]) extends DocumentAnnotatingInference with ProjectableInference[ProcessedDocument, DocumentBeliefs] {
+
+
   type ExpectedCounts = inner.ExpectedCounts
   type Marginal = ChainNERMarginal[inner.Marginal]
   val notNER = labels(NERType.OutsideSentence)
@@ -45,16 +56,16 @@ case class ChainNERInference(beliefsFactory: DocumentBeliefs.Factory,
 
   def emptyCounts = inner.emptyCounts
 
-  // annotation methods
-  def apply(doc: ProcessedDocument, beliefs: DocumentBeliefs): ProcessedDocument = {
-    val anchorings = beliefsToAnchoring(doc, beliefs)
-    val newSentences = for( (s,i) <- doc.sentences.zipWithIndex) yield {
-      val segmentation = inner.viterbi(s.words, anchorings(i))
-      s.copy(ner=segmentation)
+  def annotate(doc: ProcessedDocument, m: Marginal): ProcessedDocument = {
+    val newSentences = for ( (s, sentMarg) <- doc.sentences zip m.sentences) yield {
+      val decodedNer = inner.posteriorDecode(sentMarg)
+      s.copy(ner=decodedNer)
     }
 
-    doc.copy(sentences=newSentences)
+    doc.copy(newSentences)
   }
+
+
 
   // inference methods
   def goldMarginal(doc: ProcessedDocument, aug: DocumentBeliefs): Marginal = {
@@ -71,7 +82,6 @@ case class ChainNERInference(beliefsFactory: DocumentBeliefs.Factory,
     val counts = emptyCounts
     for(i <- 0 until doc.sentences.length) {
       counts += inner.countsFromMarginal(doc.sentences(i).ner, marg.sentences(i), accum, scale)
-      assert(!counts.counts.valuesIterator.exists(_.isNaN), doc.sentences(i).words + " " + i)
     }
 
     counts
@@ -99,7 +109,6 @@ case class ChainNERInference(beliefsFactory: DocumentBeliefs.Factory,
             null
           } else {
             val copy = spanBeliefs.copy(ner = spanBeliefs.ner.updated(DenseVector.tabulate(labels.size){marg.spanMarginal(_, b, e)}))
-            var l = 0
             assert(copy.ner.beliefs(notNER) == 0.0, copy.ner.beliefs)
             // dealing with some stupid rounding issues...
             if (spanBeliefs.ner.beliefs(notNER) == 0.0) {
@@ -136,6 +145,12 @@ case class ChainNERInference(beliefsFactory: DocumentBeliefs.Factory,
 
   def beliefsToAnchoring(doc: ProcessedDocument, beliefs: DocumentBeliefs):IndexedSeq[SemiCRF.Anchoring[NERType.Value, String]] = {
     beliefs.sentences.zip(doc.sentences).map { case(b, s) =>
+      // (same trick as in parser:)
+      // we employ the trick in Klein's thesis and in the Smith & Eisner BP paper
+      // which is as follows: we want to multiply \prod_(all spans) p(span type of span or not a span)
+      // but the dynamic program does not visit all spans for all parses, only those
+      // in the actual parse. So instead, we premultiply by \prod_{all spans} p(not span)
+      // and then we divide out p(not span) for spans in the tree.
       new Anchoring[NERType.Value, String] {
         private def passAssert(v: Double, pred: Double=>Boolean, stuff: Any*) = if(pred(v)) v else throw new AssertionError("Value " + v + ": other stuff:" + stuff.mkString(" "))
         def labelIndex: Index[NERType.Value] = labels
@@ -144,15 +159,23 @@ case class ChainNERInference(beliefsFactory: DocumentBeliefs.Factory,
 
         def maxSegmentLength(label: Int): Int = inner.maxLength(label)
 
+        val normalizingPiece = b.spans.data.filter(_ ne null).map { b =>
+          val notNerScore = b.ner(notNER)
+
+          if(notNerScore < 1E-4) 0.0 else math.log(notNerScore)
+        }.sum
+
         def scoreTransition(prev: Int, cur: Int, beg: Int, end: Int): Double = {
-          if(cur == notNER) Double.NegativeInfinity
+          val score = if(cur == notNER) Double.NegativeInfinity
           else if(b.spanBeliefs(beg, end).eq(null) || b.spanBeliefs(beg, end).ner(cur) == 0.0) Double.NegativeInfinity
-          else if(b.spanBeliefs(beg, end).ner(notNER) == 0.0) {
+          else if(b.spanBeliefs(beg, end).ner(notNER) < 1E-4) {
             math.log(b.spanBeliefs(beg,end).ner(cur))
           } else {
              passAssert(math.log(b.spanBeliefs(beg,end).ner(cur) / b.spanBeliefs(beg,end).ner(notNER)), {!_.isNaN}, b.spanBeliefs(beg,end).ner(cur), b.spanBeliefs(beg,end).ner(notNER))
 
           }
+
+          if (beg == 0) score + normalizingPiece else score
         }
 
         def startSymbol = inner.startSymbol

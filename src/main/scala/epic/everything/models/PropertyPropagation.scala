@@ -9,8 +9,16 @@ import breeze.collection.mutable.TriangularArray
 import java.io.{PrintWriter, FileWriter}
 
 
+/**
+ * PropertyPropagation associates two variables in the same span with on another, for
+ * instance the label of the span and the ner type.
+ */
 object PropertyPropagation {
 
+  /**
+   * For properties that do not depend on the sentence, this is a model
+   * for associating them.
+   */
   def simpleModel[T, U](beliefsFactory: DocumentBeliefs.Factory,
                         prop1: Property[T], lens1: Lens[SpanBeliefs, Beliefs[T]],
                         prop2: Property[U], lens2: Lens[SpanBeliefs, Beliefs[U]]): PropertyPropagation.Model[T, U] = {
@@ -62,6 +70,14 @@ object PropertyPropagation {
     def expectedCountsToObjective(ecounts: ExpectedCounts): (Double, DenseVector[Double]) = {
       ecounts.loss -> ecounts.counts
     }
+
+    case class EvaluationResult() extends epic.framework.EvaluationResult[EvaluationResult] {
+      def +(other: EvaluationResult): EvaluationResult = this
+    }
+
+    def evaluate(guess: ProcessedDocument, gold: ProcessedDocument): EvaluationResult = {
+      EvaluationResult()
+    }
   }
 
 
@@ -71,6 +87,8 @@ object PropertyPropagation {
     type ExpectedCounts = StandardExpectedCounts[Feature]
     type Marginal = PropertyPropagation.Marginal
 
+
+    def annotate(doc: ProcessedDocument, m: Marginal): ProcessedDocument = doc
 
     def apply(v1: ProcessedDocument, v2: DocumentBeliefs): ProcessedDocument = v1
 
@@ -171,16 +189,20 @@ object PropertyPropagation {
           if(current eq null) null
           else {
             val old: SpanBeliefs = oldBeliefs.spanBeliefs(begin, end)
+            val old1: Beliefs[T] = scorer.lens1.get(old)
+            val old2: Beliefs[U] = scorer.lens2.get(old)
             val marg1 = DenseVector.zeros[Double](current.rows)
             val marg2 = DenseVector.zeros[Double](current.cols)
             var p1 = 0
             while( p1 < current.rows) {
               var p2 = 0
               var rsum = 0.0
-              while(p2 < current.cols) {
-                rsum += current(p1,p2)
-                marg2(p2) += current(p1, p2)
-                p2 += 1
+              if (old1(p1) != 0.0) {
+                while(p2 < current.cols) {
+                  rsum += current(p1,p2)
+                  marg2(p2) += current(p1, p2)
+                  p2 += 1
+                }
               }
               marg1(p1) = rsum
               p1 += 1
@@ -189,8 +211,8 @@ object PropertyPropagation {
             marg1 /= partition
             marg2 /= partition
 
-            val half = scorer.lens1.set(old, scorer.lens1.get(old).copy(beliefs=marg1))
-            scorer.lens2.set(half, scorer.lens2.get(half).copy(beliefs=marg2))
+            val half = scorer.lens1.set(old, old1.copy(beliefs=marg1))
+            scorer.lens2.set(half, old2.copy(beliefs=marg2))
           }
         }
 

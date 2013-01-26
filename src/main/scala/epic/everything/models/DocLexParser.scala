@@ -1,23 +1,27 @@
 package epic.everything.models
 
 import epic.parser.models._
-import epic.trees.{BinarizedTree, TreeInstance, Tree, AnnotatedLabel}
-import breeze.util.{Lens, Index}
+import epic.trees._
+import breeze.util.Index
 import epic.framework.{StandardExpectedCounts, ProjectableInference, Feature}
 import breeze.linalg.DenseVector
-import epic.everything.{ProcessedDocument, DocumentAnnotator}
+import epic.everything.ProcessedDocument
 import epic.parser._
+import models.LexGrammarBundle
 import projections.LexGovernorProjector
 import breeze.collection.mutable.TriangularArray
 
 
+/**
+ * Model class for the lexicalized parser in the DocumentBeliefs framework.
+ *
+ * @author dlwh
+ */
 object DocLexParser {
+  // laziness
   type L = AnnotatedLabel
   type W = String
-  /**
-   *
-   * @author dlwh
-   */
+
   class Model(factory: DocumentBeliefs.Factory,
               bundle: LexGrammarBundle[L, W],
               reannotate: (BinarizedTree[L], Seq[W])=>BinarizedTree[L],
@@ -47,7 +51,24 @@ object DocLexParser {
     }
 
 
+    // evaluation
+    type EvaluationResult = ParseEval.Statistics
 
+    def evaluate(guess: ProcessedDocument, gold: ProcessedDocument): ParseEval.Statistics = {
+      val individual = for ( (gs, gd) <- guess.sentences zip gold.sentences) yield {
+
+        val stats =  new ParseEval(Set("","''", "``", ".", ":", ",", "TOP")) apply (makeNormalTree(gs.tree), makeNormalTree(gd.tree))
+
+        stats
+      }
+
+      individual.reduceLeft(_ + _)
+    }
+
+    def makeNormalTree(tree: BinarizedTree[AnnotatedLabel]):Tree[String] = {
+      val chains = AnnotatedLabelChainReplacer
+      Trees.debinarize(chains.replaceUnaries(tree).map(_.label))
+    }
   }
 
   case class Marginal[+Inner<:epic.framework.Marginal](sentences: IndexedSeq[Inner]) extends epic.framework.Marginal {
@@ -140,17 +161,37 @@ object DocLexParser {
       new DocumentBeliefs(sentences)
     }
 
-    def apply(v1: ProcessedDocument, v2: DocumentBeliefs): ProcessedDocument = error("TODO")
+
+    // annotation methods
+    def annotate(doc: ProcessedDocument, m: Marginal): ProcessedDocument = {
+      val newSentences = for ( (s, marg) <- doc.sentences zip m.sentences) yield {
+        // TODO: ugh
+        val newTree = new MaxConstituentDecoder[AnnotatedLabel, String]().extractBestParse(marg.asInstanceOf[ChartMarginal[AnnotatedLabel, String]])
+        s.copy(tree=newTree)
+      }
+
+      doc.copy(newSentences)
+
+    }
   }
 
 
   /**
-   *
+   * This anchoring corresponds to the information produced by LexGovernorProjector,
+   * along with the LexGrammar's information.
    * @author dlwh
    */
   final class Anchoring[L, W](val lexGrammar: LexGrammar[L, W],
                               val words: IndexedSeq[W],
                               val beliefs: SentenceBeliefs) extends RefinedAnchoring[L, W] {
+    // we employ the trick in Klein's thesis and in the Smith & Eisner BP paper
+    // which is as follows: we want to multiply \prod_(all spans) p(span type of span or not a span)
+    // but the dynamic program does not visit all spans for all parses, only those
+    // in the actual parse. So instead, we premultiply by \prod_{all spans} p(not span)
+    // and then we divide out p(not span) for spans in the tree.
+
+    // Also note that this code and the Visitor in LexGovernorProjector are basically
+    // duals of one another. IF you change one you should change the other.
 
     private val anchoring = lexGrammar.anchor(words)
     override def annotationTag: Int = anchoring.annotationTag
@@ -162,15 +203,20 @@ object DocLexParser {
 
     def lexicon: Lexicon[L, W] = lexGrammar.lexicon
 
-    def scoreSpan(begin: Int, end: Int, label: Int, ref: Int): Double = {
-      var baseScore = anchoring.scoreSpan(begin, end, label, ref)
+    /**
+     * The premultiplication constant.
+     */
+    private val normalizingPiece = beliefs.spans.data.filter(_ ne null).map { b =>
+      val notCon1 = b.label(notConstituent)
+      val notCon2 = b.governor(length + 1)
 
-      if(begin + 1 == end) {
-        baseScore += math.log(beliefs.wordBeliefs(begin).tag(label))
-      }
+      val score1 = if(notCon1 < 1E-4) 0.0 else math.log(notCon1)
+      val score2 = if(notCon2 < 1E-4) 0.0 else math.log(notCon2)
 
-      baseScore
-    }
+      score1 + score2
+    }.sum
+
+
 
     def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int): Double = {
       val head = anchoring.headIndex(ref)
@@ -192,7 +238,7 @@ object DocLexParser {
       } else {// head on the right
         val sGovScore = beliefs.spans(split, end).governor(head)
         var notASpan = beliefs.spanBeliefs(split, end).governor(length + 1)
-        if(notASpan == 0.0) notASpan = 1.0
+        if(notASpan < 1E-4) notASpan = 1.0
         val sMax = beliefs.wordBeliefs(dep).maximalLabel(grammar.rightChild(rule))
         if(depScore == 0.0 || sGovScore == 0.0 || sMax == 0.0) {
           Double.NegativeInfinity
@@ -207,20 +253,40 @@ object DocLexParser {
     def scoreUnaryRule(begin: Int, end: Int, rule: Int, ref: Int): Double = {
       val parent = grammar.parent(rule)
       val sLabel = beliefs.spanBeliefs(begin, end).label(parent)
+      var notASpan = beliefs.spanBeliefs(begin, end).label(notConstituent)
       if(sLabel == 0.0) {
         Double.NegativeInfinity
       } else {
+        if(notASpan < 1E-4) notASpan = 1.0
         var baseScore = anchoring.scoreUnaryRule(begin, end, rule, ref)
+        baseScore += math.log(sLabel / notASpan)
         if (begin == 0 && end == length) { // root, get the length
-        val sMax = beliefs.wordBeliefs(ref).maximalLabel(parent)
+
+          val sSpanGov =  beliefs.spanBeliefs(begin, end).governor(length)
+          var sNotSpan2 = beliefs.spanBeliefs(begin, end).governor(length + 1)
+          if (sNotSpan2 < 1E-4) sNotSpan2 = 1.0
+
+          val sMax = beliefs.wordBeliefs(ref).maximalLabel(parent)
           baseScore += math.log(beliefs.wordBeliefs(ref).governor(length) * sMax)
+          baseScore += math.log(sSpanGov / sNotSpan2)
           //            * beliefs.wordBeliefs(ref).span(TriangularArray.index(begin,end))
         }
-        var notASpan = beliefs.spanBeliefs(begin, end).label(notConstituent)
-        if(notASpan == 0.0) notASpan = 1.0
-//        baseScore +=  math.log(sLabel / notASpan)
+
+        if(begin == 0 && end == length) {
+          baseScore += normalizingPiece
+        }
         baseScore
       }
+    }
+
+    def scoreSpan(begin: Int, end: Int, label: Int, ref: Int): Double = {
+      var baseScore = anchoring.scoreSpan(begin, end, label, ref)
+
+      if(begin + 1 == end) {
+        baseScore += math.log(beliefs.wordBeliefs(begin).tag(label))
+      }
+
+      baseScore
     }
 
     def validLabelRefinements(begin: Int, end: Int, label: Int): Array[Int] = anchoring.validLabelRefinements(begin, end, label)

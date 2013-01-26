@@ -41,7 +41,3 @@ case class Document(id: String, sentences: IndexedSeq[Sentence]) extends Example
 }
 
 
-/**
- * Adds or updates one of the annotation fields of the contained sentences for a document...
- */
-trait DocumentAnnotator extends ((ProcessedDocument,DocumentBeliefs)=>ProcessedDocument) with (ProcessedDocument=>ProcessedDocument)

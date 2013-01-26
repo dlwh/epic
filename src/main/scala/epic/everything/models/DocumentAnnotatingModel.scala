@@ -9,8 +9,11 @@ import epic.everything._
  */
 trait DocumentAnnotatingModel extends Model[ProcessedDocument] { self =>
   type Inference <: DocumentAnnotatingInference {type ExpectedCounts = self.ExpectedCounts; type Marginal = self.Marginal }
+
+  type EvaluationResult <: epic.framework.EvaluationResult[self.EvaluationResult]
+  def evaluate(guess: ProcessedDocument, gold: ProcessedDocument):EvaluationResult
 }
 
-trait DocumentAnnotatingInference extends AugmentableInference[ProcessedDocument, DocumentBeliefs] with DocumentAnnotator {
-  def apply(doc: ProcessedDocument): ProcessedDocument = apply(doc, baseAugment(doc))
+trait DocumentAnnotatingInference extends AugmentableInference[ProcessedDocument, DocumentBeliefs] {
+  def annotate(doc: ProcessedDocument, m: Marginal): ProcessedDocument
 }

@@ -89,12 +89,12 @@ object SemiCRF {
   trait Marginal[L, W] extends epic.framework.Marginal {
 
     def anchoring: Anchoring[L, W]
-    def w: IndexedSeq[W] = anchoring.words
+    def words: IndexedSeq[W] = anchoring.words
     def length: Int = anchoring.length
     /** Visits spans with non-zero score, useful for expected counts */
     def visit( f: TransitionVisitor[L, W])
 
-    /** Log-normalized probability of seeing segment with transition */
+    /** normalized probability of seeing segment with transition */
     def transitionMarginal(prev:Int, cur: Int, beg: Int, end: Int):Double
     def logPartition: Double
 
@@ -103,7 +103,7 @@ object SemiCRF {
       val numLabels: Int = anchoring.labelIndex.size
       var sum = 0.0
       while(prev <  numLabels) {
-        sum += math.exp(transitionMarginal(prev, cur, begin, end))
+        sum += transitionMarginal(prev, cur, begin, end)
         prev += 1
       }
       sum
@@ -163,7 +163,7 @@ object SemiCRF {
               while (start < end) {
                 var prevLabel = 0
                 while (prevLabel < numLabels) {
-                  val score = math.exp(transitionMarginal(prevLabel, label, start, end))
+                  val score = transitionMarginal(prevLabel, label, start, end)
                   if(score != 0.0)
                     f(prevLabel, label, start, end, score)
                   prevLabel += 1
@@ -181,8 +181,8 @@ object SemiCRF {
         /** Log-normalized probability of seing segment with transition */
         def transitionMarginal(prev: Int, cur: Int, beg: Int, end: Int): Double = {
           val withoutTrans = forwardScores(beg)(prev) + backwardScore(end)(cur)
-          if(withoutTrans.isInfinite) withoutTrans
-          else withoutTrans + anchoring.scoreTransition(prev, cur, beg, end) - logPartition
+          if(withoutTrans.isInfinite) 0.0
+          else math.exp(withoutTrans + anchoring.scoreTransition(prev, cur, beg, end) - logPartition)
         }
 
 
@@ -230,9 +230,9 @@ object SemiCRF {
 
         }
 
-        /** Log-normalized probability of seing segment with transition */
+        /** normalized probability of seeing segment with transition */
         def transitionMarginal(prev: Int, cur: Int, beg: Int, end: Int): Double = {
-          numerics.logI(goldEnds(beg) == end && goldLabels(beg) == cur && goldPrevLabels(beg) == prev)
+          numerics.I(goldEnds(beg) == end && goldLabels(beg) == cur && goldPrevLabels(beg) == prev)
         }
 
 
@@ -455,6 +455,56 @@ object SemiCRF {
     rec(length, (0 until numLabels).maxBy(forwardScores(length)(_)))
 
     Segmentation(segments.reverse, scorer.words, id)
+  }
+
+
+  def posteriorDecode[L, W](m: Marginal[L, W], id: String = "") = {
+    val length = m.length
+    val numLabels = m.anchoring.labelIndex.size
+    val forwardScores = Array.fill(length+1, numLabels)(0.0)
+    val forwardLabelPointers = Array.fill(length+1, numLabels)(-1)
+    val forwardBeginPointers = Array.fill(length+1, numLabels)(-1)
+    forwardScores(0)(m.anchoring.labelIndex(m.anchoring.startSymbol)) = 1.0
+
+    var end = 1
+    while (end <= length) {
+      var label = 0
+      while (label < numLabels) {
+        var start = math.max(end - m.anchoring.maxSegmentLength(label), 0)
+        while (start < end) {
+          var prevLabel = 0
+          while (prevLabel < numLabels) {
+            val prevScore = forwardScores(start)(prevLabel)
+            if (prevScore != 0.0) {
+              val score = m.transitionMarginal(prevLabel, label, start, end) + prevScore
+              if(score > forwardScores(end)(label)) {
+                forwardScores(end)(label) = score
+                forwardLabelPointers(end)(label) = prevLabel
+                forwardBeginPointers(end)(label) = start
+              }
+            }
+
+            prevLabel += 1
+          }
+          start += 1
+        }
+        label += 1
+      }
+
+      end += 1
+    }
+    val segments = ArrayBuffer[(L, Span)]()
+    def rec(end: Int, label: Int) {
+      if(end != 0) {
+        val bestStart = forwardBeginPointers(end)(label)
+        segments += (m.anchoring.labelIndex.get(label) -> Span(bestStart, end))
+        rec(bestStart, forwardLabelPointers(end)(label))
+      }
+
+    }
+    rec(length, (0 until numLabels).maxBy(forwardScores(length)(_)))
+
+    Segmentation(segments.reverse, m.words, id)
   }
 }
 

@@ -20,7 +20,7 @@ import collection.mutable.ArrayBuffer
 import breeze.inference.{ExpectationPropagation, Factor}
 import epic.everything.models.DocumentBeliefs
 
-class EPInference[Datum, Augment](inferences: IndexedSeq[ProjectableInference[Datum, Augment]],
+class EPInference[Datum, Augment](val inferences: IndexedSeq[ProjectableInference[Datum, Augment]],
                                   val maxEPIter: Int,
                                   val epInGold: Boolean = false)(implicit aIsFactor: Augment <:< Factor[Augment]) extends ProjectableInference[Datum, Augment] with Serializable {
   type Marginal = EPMarginal[Augment, ProjectableInference[Datum, Augment]#Marginal]

@@ -86,9 +86,10 @@ class SemiCRFInference[L, W](weights: DenseVector[Double],
                              featureIndex: Index[Feature],
                              featurizer: SemiCRFModel.BIEOFeaturizer[L, W],
                              val maxLength: Int=>Int) extends AugmentableInference[Segmentation[L, W], SemiCRF.Anchoring[L, W]] with SemiCRF.Grammar[L, W] with Serializable {
-  def viterbi(sentence: IndexedSeq[W], anchoring: SemiCRF.Anchoring[L, W]) = {
+  def viterbi(sentence: IndexedSeq[W], anchoring: SemiCRF.Anchoring[L, W]): Segmentation[L, W] = {
     SemiCRF.viterbi(new Anchoring(sentence, anchoring))
   }
+
 
   type Marginal = SemiCRF.Marginal[L, W]
   type ExpectedCounts = StandardExpectedCounts[Feature]
@@ -206,6 +207,10 @@ class SemiCRFInference[L, W](weights: DenseVector[Double],
   }
 
 
+
+  def posteriorDecode(m: Marginal):Segmentation[L, W] = {
+    SemiCRF.posteriorDecode(m)
+  }
 }
 
 class SegmentationModelFactory[L](val startSymbol: L,

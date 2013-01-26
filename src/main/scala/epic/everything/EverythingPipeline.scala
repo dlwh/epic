@@ -16,7 +16,7 @@ import breeze.util.logging.ConsoleLogging
 import collection.immutable.BitSet
 import epic.sequences._
 import collection.mutable.ArrayBuffer
-import epic.framework.{Feature, EPModel, ModelObjective}
+import epic.framework.{EvaluationResult, Feature, EPModel, ModelObjective}
 import breeze.collection.mutable.TriangularArray
 import breeze.optimize._
 import epic.parser.ParserParams.XbarGrammar
@@ -30,12 +30,6 @@ import breeze.linalg._
 import epic.trees.annotations.StripAnnotations
 import epic.trees.annotations.AddMarkovization
 import epic.trees.annotations.PipelineAnnotator
-import epic.trees.ProcessedTreebank
-import epic.trees.TreeInstance
-import breeze.optimize.FirstOrderMinimizer.OptParams
-import epic.parser.models.LexGrammarBundle
-import epic.trees.Span
-import models.SpanBeliefs
 import models.SpanBeliefs
 import projections.ConstraintAnchoring.RawConstraints
 import epic.trees.ProcessedTreebank
@@ -49,6 +43,7 @@ import scala.Some
 import epic.parser.models.StandardFeaturizer
 import breeze.optimize.FirstOrderMinimizer.OptParams
 import epic.parser.models.LexGrammarBundle
+import collection.immutable
 
 
 object EverythingPipeline {
@@ -183,7 +178,7 @@ object EverythingPipeline {
 
     // the big model!
     val epModel = new EPModel[ProcessedDocument, DocumentBeliefs](30, epInGold = true, initFeatureValue = {f => Some(weightsCache(f.toString)).filter(_ != 0.0)})(
-//      lexParseModel,
+      lexParseModel,
       adaptedNerModel,
       assocSynNer
     )
@@ -199,7 +194,7 @@ object EverythingPipeline {
       (i: Int) => epModel.featureIndex.get(i).toString
     })
 
-    val featureICareAbout = epModel.featureIndex.iterator.toIndexedSeq.indexWhere(_.toString == "ComponentFeature(1,AssociationFeature(NotEntity,Some(JJ)))")
+    val featureICareAbout = epModel.featureIndex.iterator.toIndexedSeq.indexWhere(_.toString == "ComponentFeature(2,AssociationFeature(NotEntity,Some(JJ)))")
     type OptState = FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State
     def bump(unreg: Double, gradx: DenseVector[Double], s: OptState, featureICareAbout: Int) = {
       val grad = gradx(featureICareAbout)
@@ -212,15 +207,33 @@ object EverythingPipeline {
     }
 
 
+    val myTest = train.take(5).map(docProcessor)
 
     val opt = params.opt
     for( s:OptState <- opt.iterations(cachedObj, obj.initialWeightVector(randomize = false))) {
       updateWeights(params.weightsCache, weightsCache, Encoder.fromIndex(epModel.featureIndex).decode(s.x))
       val (unregularized, deriv) = obj.calculate(s.x)
-      bump(unregularized, deriv, s, 3)
-      bump(unregularized, deriv, s, 4)
+      bump(unregularized, deriv, s, 1000)
+      bump(unregularized, deriv, s, 12000)
       bump(unregularized, deriv, s, featureICareAbout)
       bump(unregularized, deriv, s, featureICareAbout + 1)
+
+      val inf = epModel.inferenceFromWeights(s.x)
+      val results: Array[immutable.IndexedSeq[DocumentAnnotatingModel#EvaluationResult]] = for (d <- myTest) yield {
+        val epMarg = inf.marginal(d)
+        for ( i <- 0 until epMarg.marginals.length) yield {
+          val casted =  inf.inferences(i).asInstanceOf[DocumentAnnotatingInference]
+          val newDoc = casted.annotate(d, epMarg.marginals(i).asInstanceOf[casted.Marginal])
+          epModel.models(i).asInstanceOf[DocumentAnnotatingModel].evaluate(newDoc, d)
+        }
+      }
+
+      val hacketyHack = results.toIndexedSeq.transpose.map(_.reduce{ (a: Object, b: Object) =>
+        val aa = a.asInstanceOf[{def +(other: EvaluationResult[_]):EvaluationResult[_]}]
+       (aa + b.asInstanceOf[EvaluationResult[_]]).asInstanceOf[Object]
+      })
+
+      println(hacketyHack)
     }
 
   }
