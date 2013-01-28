@@ -2,8 +2,7 @@ package epic.sequences
 
 import java.io._
 import breeze.config.{Configuration, CommandLineParser}
-import epic.ontonotes.ConllOntoReader
-import epic.everything.{Mention, DSpan, NERType}
+import epic.ontonotes.{NERType, ConllOntoReader}
 import collection.mutable.ArrayBuffer
 import breeze.linalg.DenseVector
 import epic.framework.ModelObjective

@@ -18,7 +18,7 @@ package epic.ontonotes
 import io.Source
 import collection.{IndexedSeq, Iterator}
 import java.lang.String
-import epic.trees.{AnnotatedLabel, Tree}
+import epic.trees.{Span, AnnotatedLabel, Tree}
 import collection.mutable.{Stack, ArrayBuffer}
 import java.io.File
 import epic.everything._
@@ -67,8 +67,39 @@ object ConllOntoReader {
         }
       }
 
-      // TODO: lemmas
-      // TODO: SRL
+      val lemmas = s.map(_(6))
+      val frames = s.map(_(7))
+
+      val srl = for(column <- 11 until (s.head.length-1)) yield {
+        val lastValue = collection.mutable.Stack[(String, Int)]()
+        val arguments = ArrayBuffer[Argument]()
+        var verb = -1
+        for (i <- 0 until s.length) {
+          if (s(i)(column).startsWith("(")) {
+            val trimmed = s(i)(column).substring(1, s(i)(column).lastIndexOf("*"))
+            for(name <- trimmed.split("[(]"))
+              lastValue.push(name.trim -> i)
+          }
+
+          if (s(i)(column).endsWith(")")) {
+            for(close <- 0 until s(i)(column).count(_ == ')')) {
+              assert(lastValue.nonEmpty, s.map(_(column)).mkString(",") + " " + i)
+              val (name, start) = lastValue.pop()
+              if(name == "V") {
+                assert(start == i)
+                verb = i
+              } else {
+                arguments += Argument(name, Span(start, i+1))
+              }
+            }
+          }
+
+        }
+
+        assert(verb != -1,  s.map(_(column)).mkString(",") )
+        assert(lastValue.isEmpty, s.map(_(column)).mkString(",") )
+        Frame(lemmas(verb), frames(verb).toInt, arguments)
+      }
 
       val mentions = collection.mutable.Map[(Int,Int), Mention]()
       // stupid nested mentions. It's not quite a stack. I don't know why they did it this way.
@@ -96,7 +127,7 @@ object ConllOntoReader {
       val ner = Map.empty ++ entities.map { case ((beg,end),v) => DSpan(docId,sentenceIndex,beg,end) -> v}
       val coref = Map.empty ++ mentions.map { case ((beg,end),v) => DSpan(docId,sentenceIndex,beg,end) -> v}
       val speaker = s.map(_(9)).find(_ != "-")
-      val annotations = OntoAnnotations(tree, ner, coref, speaker)
+      val annotations = OntoAnnotations(tree, ner, coref, srl, speaker)
 
 
 

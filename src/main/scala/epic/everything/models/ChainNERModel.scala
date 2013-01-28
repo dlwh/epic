@@ -1,12 +1,13 @@
 package epic.everything.models
 
-import epic.everything.{DSpan, ProcessedDocument, NERType}
+import epic.everything.{ProcessedDocument}
 import epic.framework.{Marginal, ProjectableInference, StandardExpectedCounts, Feature}
 import breeze.util.{Encoder, Index}
 import epic.sequences.{SegmentationEval, SemiCRF, SemiCRFInference, SemiCRFModel}
 import epic.sequences.SemiCRF.Anchoring
 import breeze.collection.mutable.TriangularArray
 import breeze.linalg._
+import epic.ontonotes.NERType
 
 /**
  *

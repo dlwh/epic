@@ -3,7 +3,7 @@ package epic.coref
 import java.io.{PrintStream, FileOutputStream, File}
 import io.{Codec, Source}
 import collection.mutable.ArrayBuffer
-import epic.everything.{DSpan, Document}
+import epic.ontonotes.{DSpan, Document}
 
 /**
  *

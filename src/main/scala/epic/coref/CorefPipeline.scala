@@ -2,8 +2,7 @@ package epic.coref
 
 import java.io.File
 import breeze.config.{Configuration, CommandLineParser}
-import epic.everything.{DSpan, Document}
-import epic.ontonotes.ConllOntoReader
+import epic.ontonotes.{DSpan, Document, ConllOntoReader}
 import breeze.linalg.DenseVector
 import epic.framework.{ModelObjective, Feature}
 import breeze.optimize.FirstOrderMinimizer.OptParams

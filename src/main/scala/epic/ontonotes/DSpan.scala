@@ -1,4 +1,4 @@
-package epic.everything
+package epic.ontonotes
 
 import epic.trees.Span
 

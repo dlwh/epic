@@ -1,8 +1,7 @@
-package epic.everything
+package epic.ontonotes
 
 import breeze.data.Example
 import epic.trees.{AnnotatedLabel, Tree}
-import models.DocumentBeliefs
 
 
 /*

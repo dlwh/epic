@@ -1,7 +1,7 @@
 package epic.coref
 
 import collection.immutable.BitSet
-import epic.everything.{Document, DSpan}
+import epic.ontonotes.{DSpan, Document}
 
 
 /**

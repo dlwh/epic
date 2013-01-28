@@ -2,7 +2,7 @@ package epic.everything
 
 import java.io.File
 import breeze.config.CommandLineParser
-import epic.ontonotes.ConllOntoReader
+import epic.ontonotes.{NERType, ConllOntoReader}
 import epic.trees._
 import annotations.AddMarkovization
 import annotations.AddMarkovization

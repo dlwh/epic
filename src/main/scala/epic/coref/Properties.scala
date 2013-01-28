@@ -1,7 +1,7 @@
 package epic.coref
 
 import epic.everything.models.Property
-import epic.everything.DSpan
+import epic.ontonotes.DSpan
 
 object Properties {
   def allExtractors = IndexedSeq(genderExtractor, numberExtractor, personExtractor)

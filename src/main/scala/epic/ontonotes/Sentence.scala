@@ -1,4 +1,4 @@
-package epic.everything
+package epic.ontonotes
 
 import epic.trees.{Span, AnnotatedLabel, Tree}
 import breeze.data.Example
@@ -21,6 +21,7 @@ case class Sentence(docId: String, sentId: Int,
   def tree = annotations.tree
   def ner = annotations.ner
   def speaker = annotations.speaker
+  def srl = annotations.srl
 
   lazy val nerSegmentation: Segmentation[NERType.Value, String]  = {
     val sorted = ner.toIndexedSeq.sortBy((_: (DSpan, NERType.Value))._1.begin)
@@ -46,8 +47,10 @@ case class Sentence(docId: String, sentId: Int,
 
   def annotate(tree: Tree[AnnotatedLabel] = tree,
                ner: Map[DSpan,NERType.Value] = ner,
-               coref: Map[DSpan,Mention] = coref) = {
-    copy(annotations=OntoAnnotations(tree, ner, coref, speaker))
+               coref: Map[DSpan,Mention] = coref,
+               srl: IndexedSeq[Frame] = srl,
+               speaker: Option[String] = speaker) = {
+    copy(annotations=OntoAnnotations(tree, ner, coref, srl, speaker))
   }
 
   def dspans = for(begin <- 0 until length; end <- (begin+1) to length) yield DSpan(docId, sentId, begin, end)
@@ -60,6 +63,7 @@ case class Sentence(docId: String, sentId: Int,
 case class OntoAnnotations(tree: Tree[AnnotatedLabel],
                            ner: Map[DSpan,NERType.Value],
                            coref: Map[DSpan,Mention],
+                           srl: IndexedSeq[Frame],
                            speaker: Option[String])
 
 
@@ -73,7 +77,7 @@ case class Mention(id: Int, mentionType: MentionType = MentionType.Ident)
  * A Propbank mention
  */
 case class Frame(lemma: String, sense: Int, args: Seq[Argument])
-case class Argument(arg: String, fillers: Seq[(Int,Int)]) // leaf:height pairs
+case class Argument(arg: String, span: Span)
 
 /**
  * A wordnet sense

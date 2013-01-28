@@ -8,7 +8,7 @@ import breeze.linalg.DenseVector
 import collection.mutable.ArrayBuffer
 import epic.everything._
 import breeze.collection.mutable.TriangularArray
-import epic.everything.Document
+import epic.ontonotes.Document
 
 /*
 object PropertyPropagation {

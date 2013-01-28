@@ -8,6 +8,7 @@ import breeze.linalg._
 import breeze.linalg.NumericOps.Arrays._
 import epic.trees.{Span, AnnotatedLabel}
 import epic.parser.BaseGrammar
+import epic.ontonotes.{DPos, DSpan, NERType}
 
 /**
  *

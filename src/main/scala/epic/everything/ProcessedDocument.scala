@@ -6,6 +6,7 @@ import epic.sequences.{SemiCRF, Segmentation}
 import epic.trees.StandardTreeProcessor
 import epic.parser.ParseChart.SparsityPattern
 import breeze.collection.mutable.TriangularArray
+import epic.ontonotes.{Document, NERType}
 
 //import models.PropertyPropagation.IndexedLink
 import epic.parser.projections.ConstraintCoreGrammar
