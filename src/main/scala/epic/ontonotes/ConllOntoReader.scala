@@ -98,7 +98,7 @@ object ConllOntoReader {
 
         assert(verb != -1,  s.map(_(column)).mkString(",") )
         assert(lastValue.isEmpty, s.map(_(column)).mkString(",") )
-        Frame(lemmas(verb), frames(verb).toInt, arguments)
+        Frame(lemmas(verb), verb, frames(verb).toInt, arguments)
       }
 
       val mentions = collection.mutable.Map[(Int,Int), Mention]()

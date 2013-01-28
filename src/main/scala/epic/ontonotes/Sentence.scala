@@ -4,6 +4,7 @@ import epic.trees.{Span, AnnotatedLabel, Tree}
 import breeze.data.Example
 import epic.sequences.Segmentation
 import collection.mutable.ArrayBuffer
+import epic.srl.SrlInstance
 
 /**
  * represents an annotation ontonotes sentence. Doesn't include raw sentence, for now.
@@ -13,6 +14,7 @@ import collection.mutable.ArrayBuffer
 case class Sentence(docId: String, sentId: Int,
                    words: IndexedSeq[String],
                    annotations: OntoAnnotations) extends Example[OntoAnnotations,Seq[String]] {
+
   def id = docId +":"+sentId
   def features = words
   def label = annotations
@@ -53,6 +55,9 @@ case class Sentence(docId: String, sentId: Int,
     copy(annotations=OntoAnnotations(tree, ner, coref, srl, speaker))
   }
 
+
+  def srlInstances = srl.map(frame => new SrlInstance(words, frame, s"$id-srl-${frame.pos}"))
+
   def dspans = for(begin <- 0 until length; end <- (begin+1) to length) yield DSpan(docId, sentId, begin, end)
 
 }
@@ -76,7 +81,8 @@ case class Mention(id: Int, mentionType: MentionType = MentionType.Ident)
 /**
  * A Propbank mention
  */
-case class Frame(lemma: String, sense: Int, args: Seq[Argument])
+case class Frame(lemma: String, pos: Int, sense: Int, args: IndexedSeq[Argument])
+
 case class Argument(arg: String, span: Span)
 
 /**
