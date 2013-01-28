@@ -9,7 +9,7 @@ import breeze.collection.mutable.TriangularArray
 import epic.ontonotes.{Document, NERType}
 
 //import models.PropertyPropagation.IndexedLink
-import epic.parser.projections.ConstraintCoreGrammar
+import epic.parser.projections.{GoldTagPolicy, ConstraintCoreGrammar}
 
 /**
  * 
@@ -49,7 +49,10 @@ object ProcessedDocument {
                      nerConstraints: SemiCRF.ConstraintGrammar[NERType.Value, String],
                      corefFeaturizer: CorefInstanceFeaturizer) extends (Document=>ProcessedDocument) {
 
-    def apply(d: Document):ProcessedDocument = {
+    def apply(d: Document):ProcessedDocument = apply(d, keepGoldTree = false)
+
+
+    def apply(d: Document, keepGoldTree: Boolean = false):ProcessedDocument = {
       val newSentences = for(s <- d.sentences) yield {
         val seg = s.nerSegmentation
         var tree = treeProcessor(s.tree.map(_.treebankString))
@@ -57,9 +60,10 @@ object ProcessedDocument {
 
 //        val graph = TriangularArray.tabulate(s.length)((b,e) => graphFeaturizer.linksFor(d, DSpan(d.id, s.sentId, b, e)))
 
+        val policy: GoldTagPolicy[AnnotatedLabel] = if (keepGoldTree) GoldTagPolicy.goldTreeForcing(tree.map(constraints.grammar.labelIndex)) else GoldTagPolicy.noGoldTags
         ProcessedSentence(s.words,
           tree,
-          constraints.rawConstraints(s.words).sparsity,
+          constraints.rawConstraints(s.words, policy).sparsity,
           seg,
           nerConstraints.constraints(s.words),
           s.speaker,

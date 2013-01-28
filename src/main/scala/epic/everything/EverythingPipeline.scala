@@ -61,6 +61,8 @@ object EverythingPipeline {
 
     val params = CommandLineParser.readIn[Params](args)
 
+    require(params.path.exists(), params.path + " does not exist!")
+
     val (train, test) = {
       val instances =  for {
         file <- params.path.listFiles take params.nfiles
@@ -122,6 +124,9 @@ object EverythingPipeline {
     val annotator = new PipelineAnnotator[AnnotatedLabel, String](Seq(StripAnnotations(), AddMarkovization()))
     val baseParser = GenerativeParser.annotated(new XbarGrammar(), annotator, trainTrees)
 
+    println(baseParser.lexicon.tagsForWord("in").toIndexedSeq)
+    println(baseParser.lexicon.tagsForWord("follow").toIndexedSeq)
+
     val docProcessor = new ProcessedDocument.Factory(params.treebank.process,
       new ConstraintCoreGrammar(baseParser.augmentedGrammar, -10),
       nerPruningModel,
@@ -141,7 +146,7 @@ object EverythingPipeline {
     */
 
 
-    val processedTrain = train.map(docProcessor)
+    val processedTrain = train.map(docProcessor(_, keepGoldTree=true))
 
     val lexParseModel = extractLexParserModel(trainTrees, baseParser, beliefsFactory, weightsCache)
     // train the lex parse model
@@ -207,33 +212,36 @@ object EverythingPipeline {
     }
 
 
-    val myTest = train.take(5).map(docProcessor)
+    val myTest = test.take(20).map(docProcessor)
 
     val opt = params.opt
     for( s:OptState <- opt.iterations(cachedObj, obj.initialWeightVector(randomize = false))) {
       updateWeights(params.weightsCache, weightsCache, Encoder.fromIndex(epModel.featureIndex).decode(s.x))
-      val (unregularized, deriv) = obj.calculate(s.x)
-      bump(unregularized, deriv, s, 1000)
-      bump(unregularized, deriv, s, 12000)
-      bump(unregularized, deriv, s, featureICareAbout)
-      bump(unregularized, deriv, s, featureICareAbout + 1)
+//      val (unregularized, deriv) = obj.calculate(s.x)
+//      bump(unregularized, deriv, s, 1000)
+//      bump(unregularized, deriv, s, 12000)
+//      bump(unregularized, deriv, s, featureICareAbout)
+//      bump(unregularized, deriv, s, featureICareAbout + 1)
 
-      val inf = epModel.inferenceFromWeights(s.x)
-      val results: Array[immutable.IndexedSeq[DocumentAnnotatingModel#EvaluationResult]] = for (d <- myTest) yield {
-        val epMarg = inf.marginal(d)
-        for ( i <- 0 until epMarg.marginals.length) yield {
-          val casted =  inf.inferences(i).asInstanceOf[DocumentAnnotatingInference]
-          val newDoc = casted.annotate(d, epMarg.marginals(i).asInstanceOf[casted.Marginal])
-          epModel.models(i).asInstanceOf[DocumentAnnotatingModel].evaluate(newDoc, d)
+      if( s.iter % 5 == 0) {
+        val inf = epModel.inferenceFromWeights(s.x)
+        val results: Array[immutable.IndexedSeq[DocumentAnnotatingModel#EvaluationResult]] = for (d <- myTest) yield {
+          val epMarg = inf.marginal(d)
+          for ( i <- 0 until epMarg.marginals.length) yield {
+            val casted =  inf.inferences(i).asInstanceOf[DocumentAnnotatingInference]
+            val newDoc = casted.annotate(d, epMarg.marginals(i).asInstanceOf[casted.Marginal])
+            epModel.models(i).asInstanceOf[DocumentAnnotatingModel].evaluate(newDoc, d)
+          }
         }
+
+        val hacketyHack = results.toIndexedSeq.transpose.map(_.reduce{ (a: Object, b: Object) =>
+          val aa = a.asInstanceOf[{def +(other: EvaluationResult[_]):EvaluationResult[_]}]
+          (aa + b.asInstanceOf[EvaluationResult[_]]).asInstanceOf[Object]
+        })
+
+        println(hacketyHack)
       }
 
-      val hacketyHack = results.toIndexedSeq.transpose.map(_.reduce{ (a: Object, b: Object) =>
-        val aa = a.asInstanceOf[{def +(other: EvaluationResult[_]):EvaluationResult[_]}]
-       (aa + b.asInstanceOf[EvaluationResult[_]]).asInstanceOf[Object]
-      })
-
-      println(hacketyHack)
     }
 
   }

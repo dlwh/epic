@@ -100,16 +100,12 @@ class ConstraintCoreGrammar[L, W](augmentedGrammar: AugmentedGrammar[L, W], thre
 
     val labelThresholds = extractLabelThresholds(length,
                                                  grammar.labelIndex.size,
-                                                 botLabelScores,
+                                                 botLabelScores, grammar.labelIndex,
                                                  gold.isGoldBotTag(_, _, _))
-    val unaryThresholds = extractLabelThresholds(length,
-                                                 grammar.index.size,
-                                                 unaryScores,
-                                                 { (i, j, r) => gold.isGoldTopTag(i, j, grammar.parent(r))})
-
-    val topLabelThresholds = unaryThresholds.map { rules =>
-      if(rules == null) null else rules.map(r => grammar.parent(r))
-    }
+    val topLabelThresholds = extractLabelThresholds(length,
+                                                    grammar.labelIndex.size,
+                                                    unaryScores,grammar.labelIndex,
+                                                    gold.isGoldTopTag(_, _, _))
 
     val pattern = ConstraintCoreGrammar.ConstraintSparsity(labelThresholds, topLabelThresholds)
 
@@ -119,6 +115,7 @@ class ConstraintCoreGrammar[L, W](augmentedGrammar: AugmentedGrammar[L, W], thre
 
   private def extractLabelThresholds(length: Int, numLabels: Int,
                                      scores: Array[Array[Double]],
+                                     index: Index[_],
                                      isGold: (Int, Int, Int)=>Boolean): Array[BitSet] = {
     TriangularArray.tabulate[BitSet](length + 1) { (i, j) =>
         val arr = scores(TriangularArray.index(i, j))
@@ -128,6 +125,8 @@ class ConstraintCoreGrammar[L, W](augmentedGrammar: AugmentedGrammar[L, W], thre
           math.log(arr(s)) > threshold
         })
         val goldTags = (0 until numLabels).filter { isGold(i, j, _) }
+        for(t <- goldTags if arr(t) == 0) println("Got a zero for a goldTag!" + index.get(t))
+        for(t <- goldTags if arr(t) < math.exp(threshold)) println("Got a below threshold for a goldTag!" + arr(t) + " " + math.exp(threshold))
         val result = thresholdedTags ++ goldTags
         if (result.nonEmpty) result
         else null
@@ -190,9 +189,9 @@ class ConstraintCoreGrammar[L, W](augmentedGrammar: AugmentedGrammar[L, W], thre
         val index = TriangularArray.index(begin, end)
         if (score != 0.0) {
           if (topScores(index) eq null) {
-            topScores(index) = new Array[Double](grammar.index.size)
+            topScores(index) = new Array[Double](grammar.labelIndex.size)
           }
-          topScores(index)(rule) += score
+          topScores(index)(grammar.parent(rule)) += score
         }
       }
 
