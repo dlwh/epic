@@ -19,7 +19,6 @@ import breeze.util
 /**
  *
  * @author dlwh
- */
 @SerialVersionUID(1L)
 class SemiSRLModel(val featureIndex: Index[Feature],
                    val featurizer: SemiSRLModel.Featurizer,
@@ -320,3 +319,4 @@ object SemiSRLModelFactory {
 
 
 }
+ */

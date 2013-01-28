@@ -4,7 +4,8 @@ import epic.trees.{Span, AnnotatedLabel, Tree}
 import breeze.data.Example
 import epic.sequences.Segmentation
 import collection.mutable.ArrayBuffer
-import epic.srl.SrlInstance
+import epic.srl.SRLInstance
+import collection.mutable
 
 /**
  * represents an annotation ontonotes sentence. Doesn't include raw sentence, for now.
@@ -56,7 +57,7 @@ case class Sentence(docId: String, sentId: Int,
   }
 
 
-  def srlInstances = srl.map(frame => new SrlInstance(words, frame, s"$id-srl-${frame.pos}"))
+  def srlInstances = srl.map(frame => new SRLInstance(words, frame, s"$id-srl-${frame.pos}"))
 
   def dspans = for(begin <- 0 until length; end <- (begin+1) to length) yield DSpan(docId, sentId, begin, end)
 
@@ -81,7 +82,28 @@ case class Mention(id: Int, mentionType: MentionType = MentionType.Ident)
 /**
  * A Propbank mention
  */
-case class Frame(lemma: String, pos: Int, sense: Int, args: IndexedSeq[Argument])
+case class Frame(lemma: String, pos: Int, sense: Int, args: IndexedSeq[Argument]) {
+  /**
+   * Embedded arguments are very rare in SRL, (.2% on CoNLL 2011 training set),
+   * and they're a pain... so...
+   * @return
+   */
+  def stripEmbedded = {
+    val newArgs = mutable.Stack[Argument]()
+    val sorted = args.sortBy(a => (a.span.start, -a.span.length))(Ordering.Tuple2)
+    for(arg <- sorted) {
+      if(newArgs.isEmpty || !(newArgs.top.span.contains(arg.span))// don't overlap at all
+        ) {
+        while(newArgs.nonEmpty && arg.span.contains(newArgs.top)) {
+          newArgs.pop()
+        }
+        assert(newArgs.isEmpty || !arg.span.crosses(newArgs.top.span))
+        newArgs push arg
+      }
+    }
+    copy(args=newArgs.toIndexedSeq)
+  }
+}
 
 case class Argument(arg: String, span: Span)
 

@@ -29,6 +29,7 @@ import epic.everything._
  */
 
 object ConllOntoReader {
+
   def readDocuments(file: File):IndexedSeq[Document] = {
     val docIterator = new RawDocumentIterator(Source.fromFile(file).getLines())
     for ( (rawSentences_ :IndexedSeq[IndexedSeq[String]], docIndex: Int) <- docIterator.zipWithIndex.toIndexedSeq) yield {
