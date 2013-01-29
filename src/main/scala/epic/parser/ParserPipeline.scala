@@ -146,7 +146,7 @@ trait ParserPipeline {
       val stats = evalParser(devTrees.filter(_.words.length <= 40), parser, name+"-len40-dev")
       import stats._
       println("Eval finished. Results:")
-      println( "P: " + precision + " R:" + recall + " F1: " + f1 +  " Ex:" + exact + " Tag Accuracy: " + tagAccuracy)
+      println( s"P: $precision  R:$recall F1: $f1 Ex:$exact  Tag Accuracy: $tagAccuracy")
 
 //      if(params.threads >= 1) {
 //        collection.parallel.ForkJoinTasks.defaultForkJoinPool.setParallelism(parl)

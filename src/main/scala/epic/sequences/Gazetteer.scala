@@ -27,7 +27,7 @@ object Gazetteer {
    * @return
    */
   def ner(lang: String="en"):Gazetteer[String, String] = {
-    val resource = this.getClass.getClassLoader.getResourceAsStream("ner/" + lang +".lst")
+    val resource = this.getClass.getClassLoader.getResourceAsStream(s"ner/$lang.lst")
     val src = Source.fromInputStream(resource)(Codec.UTF8)
     val map: Map[IndexedSeq[String], String] = {for(line <- src.getLines()) yield {
       val arr = line.split(" " )

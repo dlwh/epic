@@ -52,11 +52,10 @@ class ModelObjective[Datum](val model: Model[Datum],
       }
     },{ (a,b) => if(a eq null) b else if (b eq null) a else b += a})
     val timeOut = System.currentTimeMillis()
-    println("Inference took: " + (timeOut - timeIn) * 1.0/1000 + "s" )
+    println(f"Inference took: ${(timeOut - timeIn) * 1.0/1000}%.3fs" )
 
     val (loss,grad) = expectedCountsToObjective(finalCounts)
     val timeOut2 = System.currentTimeMillis()
-    println("Finishing took: " + (timeOut2 - timeOut) * 1.0/1000 + "s" )
     (loss/success.intValue() * fullRange.size,  grad * (fullRange.size * 1.0 / success.intValue))
   }
 }

@@ -208,7 +208,7 @@ object EverythingPipeline {
       val bump = obj.valueAt(weights)
       val bumpedGrad = (bump - unreg)/1E-5
       weights(featureICareAbout) -= 1E-5
-      println(epModel.featureIndex.get(featureICareAbout) + " " + grad + " " + bumpedGrad + " rel: " + (grad - bumpedGrad)/math.max(grad, bumpedGrad + 1E-5) )
+      println(epModel.featureIndex.get(featureICareAbout) + s" grad:$grad bumped:$bumpedGrad rel: ${(grad - bumpedGrad)/math.max(grad, bumpedGrad + 1E-5)}" )
     }
 
 

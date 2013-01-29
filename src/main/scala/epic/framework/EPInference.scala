@@ -55,13 +55,14 @@ class EPInference[Datum, Augment](val inferences: IndexedSeq[ProjectableInferenc
   // ugh code duplication...
   def goldMarginal(datum: Datum, augment: Augment) = {
     val marginals = ArrayBuffer.fill(inferences.length)(null.asInstanceOf[ProjectableInference[Datum, Augment]#Marginal])
+    var iter = 0
     def project(q: Augment, i: Int) = {
       val inf = inferences(i)
       marginals(i) = null.asInstanceOf[ProjectableInference[Datum, Augment]#Marginal]
       val marg = inf.goldMarginal(datum, q)
       val contributionToLikelihood = marg.logPartition
-      assert(!contributionToLikelihood.isInfinite, "Model " + i + " is misbehaving!")
-      assert(!contributionToLikelihood.isNaN, "Model " + i + " is misbehaving!")
+      assert(!contributionToLikelihood.isInfinite, s"Model $i is misbehaving ($contributionToLikelihood) on iter $iter! Datum: " + datum )
+      assert(!contributionToLikelihood.isNaN, s"Model $i is misbehaving (NaN) on iter $iter!")
       val newAugment = inf.project(datum, marg, q)
       marginals(i) = marg
       newAugment -> contributionToLikelihood
@@ -70,7 +71,6 @@ class EPInference[Datum, Augment](val inferences: IndexedSeq[ProjectableInferenc
 
     var state: ep.State = null
     val iterates = ep.inference(augment, 0 until inferences.length, IndexedSeq.fill[Augment](inferences.length)(null.asInstanceOf[Augment]))
-    var iter = 0
     var converged = false
     while (!converged && iter < maxEPIter && iterates.hasNext) {
       val s = iterates.next()
@@ -95,8 +95,8 @@ class EPInference[Datum, Augment](val inferences: IndexedSeq[ProjectableInferenc
       marginals(i) = null.asInstanceOf[ProjectableInference[Datum, Augment]#Marginal]
       val marg = inf.marginal(datum, q)
       val contributionToLikelihood = marg.logPartition
-      assert(!contributionToLikelihood.isInfinite, "Model " + i + " is misbehaving on iter %d!".format(iter))
-      assert(!contributionToLikelihood.isNaN, "Model " + i + " is misbehaving on iter %d!".format(iter))
+      assert(!contributionToLikelihood.isInfinite, s"Model $i is misbehaving ($contributionToLikelihood) on iter $iter! Datum: " + datum )
+      assert(!contributionToLikelihood.isNaN, s"Model $i is misbehaving (NaN) on iter $iter!")
       val newAugment = inf.project(datum, marg, q)
       marginals(i) = marg
 //      println("Leaving " + i)

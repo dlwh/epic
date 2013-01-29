@@ -129,9 +129,9 @@ object PropertyPropagation {
             val b2 = scorer.lens2(current)
             val r = scores(grounding, b1, b2)
             val partition = breeze.linalg.sum(r)
-            assert(partition != 0.0, partition + "\n" + b1 +"\n\n" + b2)
-            assert(!partition.isInfinite, partition + "\n" + b1 +"\n\n" + b2)
-            assert(!partition.isNaN, partition)
+            assert(partition != 0.0, f"$partition%.3E $b1 $b2")
+            assert(!partition.isInfinite, f"$partition%.3E $b1 $b2")
+            assert(!partition.isNaN, f"$partition%.3E $b1 $b2")
             r
           }
         }

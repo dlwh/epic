@@ -39,5 +39,5 @@ case class Span(st: Int, e: Int) extends Range(st,e,1)  {
     start <= other.start && end >= other.end
   }
 
-  override def toString = "Span("+start + "," + end + ")"
+  override def toString = s"Span($start, $end)"
 }

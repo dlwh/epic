@@ -67,7 +67,7 @@ object ParserTester {
       val stats = evalParser(devTrees,parser,name+ "-dev")
       import stats._
       println("Eval finished. Results:")
-      println( "P: " + precision + " R:" + recall + " F1: " + f1 +  " Ex:" + exact + " Tag Accuracy: " + tagAccuracy)
+      println(stats)
     }
 
     if (params.evalOnTest) {
@@ -75,7 +75,7 @@ object ParserTester {
       val stats = evalParser(testTrees,parser,name+ "-test")
       import stats._
       println("Eval finished. Results:")
-      println( "P: " + precision + " R:" + recall + " F1: " + f1 +  " Ex:" + exact + " Tag Accuracy: " + tagAccuracy)
+      println(stats)
     }
   }
 

@@ -202,6 +202,7 @@ object SemiCRF {
       for( (l,span) <- segmentation) {
         assert(span.start == lastEnd)
         val symbol = scorer.labelIndex(l)
+        assert(symbol != -1, s"$l not in index: ${scorer.labelIndex}")
         score += scorer.scoreTransition(lastSymbol, symbol, span.start, span.end)
         goldEnds(span.start) = span.end
         goldLabels(span.start) = symbol

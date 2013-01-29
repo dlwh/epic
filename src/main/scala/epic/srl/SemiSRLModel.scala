@@ -2,7 +2,7 @@ package epic.srl
 
 import epic.sequences.{Gazetteer, Segmentation, SemiCRFModel, SemiCRF}
 import breeze.util._
-import epic.framework.{StandardExpectedCounts, Model, Feature}
+import epic.framework.{AugmentableInference, StandardExpectedCounts, Model, Feature}
 import breeze.linalg.{SparseVector, VectorBuilder, Counter, DenseVector}
 import collection.mutable.ArrayBuffer
 import epic.parser.features.{SpanShapeGenerator, PairFeature, WordShapeFeaturizer}
@@ -15,15 +15,17 @@ import epic.trees.Span
 import epic.parser.features.StandardSpanFeatures.WordEdges
 import breeze.collection.mutable.TriangularArray
 import breeze.util
+import epic.sequences.SemiCRF.{TransitionVisitor, Anchoring}
 
 /**
  *
  * @author dlwh
+ */
 @SerialVersionUID(1L)
 class SemiSRLModel(val featureIndex: Index[Feature],
-                   val featurizer: SemiSRLModel.Featurizer,
+                   val featurizer: SemiSRLModelFactory.IndexedStandardFeaturizer,
                    maxSegmentLength: Int=>Int,
-                   initialWeights: Feature=>Double = {(_: Feature) => 0.0}) extends Model[SrlInstance] with StandardExpectedCounts.Model with Serializable {
+                   initialWeights: Feature=>Double = {(_: Feature) => 0.0}) extends Model[SRLInstance] with StandardExpectedCounts.Model with Serializable {
 
   def extractCRF(weights: DenseVector[Double]) = {
     val grammar = inferenceFromWeights(weights)
@@ -31,11 +33,126 @@ class SemiSRLModel(val featureIndex: Index[Feature],
   }
 
   type Marginal = SemiCRF.Marginal[String, String]
+  type Inference = SemiSRLInference
 
   def initialValueForFeature(f: Feature): Double = initialWeights(f)
 
   def inferenceFromWeights(weights: DenseVector[Double]): Inference = new SemiSRLInference(weights, featureIndex, featurizer, maxSegmentLength)
 
+}
+
+object SemiSRLModel {
+}
+
+class SemiSRLInference(weights: DenseVector[Double],
+                       featureIndex: Index[Feature],
+                       featurizer: SemiSRLModelFactory.IndexedStandardFeaturizer,
+                       val maxLength: Int=>Int) extends AugmentableInference[SRLInstance, SemiCRF.Anchoring[String, String]] {
+  type Marginal = SemiCRF.Marginal[String, String]
+  type ExpectedCounts = StandardExpectedCounts[Feature]
+  def baseAugment(v: SRLInstance): SemiCRF.Anchoring[String, String] = new IdentityAnchoring(v.words)
+
+  class IdentityAnchoring(val words: IndexedSeq[String]) extends SemiCRF.Anchoring[String, String] {
+    def maxSegmentLength(l: Int): Int = maxLength(l)
+
+    def scoreTransition(prev: Int, cur: Int, beg: Int, end: Int): Double = 0.0
+
+    def labelIndex: Index[String] = featurizer.labelIndex
+
+    def startSymbol: String = featurizer.startSymbol
+  }
+
+
+  def marginal(v: SRLInstance, aug: SemiCRF.Anchoring[String, String]): Marginal = {
+    SemiCRF.Marginal(new Anchoring(v.words, v.frame.lemma, v.frame.pos, aug))
+  }
+
+  def goldMarginal(v: SRLInstance, augment: SemiCRF.Anchoring[String, String]): SemiCRF.Marginal[String, String] = {
+    SemiCRF.Marginal.goldMarginal[String, String](new Anchoring(v.words, v.frame.lemma, v.frame.pos, augment), v.asSegments(outsideLabel=featurizer.outsideSymbol))
+  }
+
+  def countsFromMarginal(v: SRLInstance, marg: Marginal, counts: ExpectedCounts, scale: Double): ExpectedCounts = {
+    counts.loss += marg.logPartition * scale
+    val localization = marg.anchoring.asInstanceOf[Anchoring].localization
+    val visitor = new TransitionVisitor[String, String] {
+
+      def daxpy(d: Double, vector: SparseVector[Double], counts: DenseVector[Double]) {
+        var i = 0
+        val index = vector.index
+        val data = vector.data
+        while(i < vector.iterableSize) {
+          //          if(vector.isActive(i))
+          counts(index(i)) += d * data(i) * scale
+          i += 1
+        }
+
+      }
+
+      def apply(prev: Int, cur: Int, start: Int, end: Int, count: Double) {
+        import localization._
+        daxpy(count, featuresForBegin(prev, cur, start), counts.counts)
+        daxpy(count, featuresForEnd(cur, end), counts.counts)
+        var p = start+1
+        while(p < end) {
+          daxpy(count, featuresForInterior(cur, p), counts.counts)
+          p += 1
+        }
+
+        daxpy(count, featuresForSpan(prev, cur, start, end), counts.counts)
+
+      }
+    }
+    marg.visit(visitor)
+    counts
+
+  }
+
+  class Anchoring(val words: IndexedSeq[String], lemma: String, pos: Int, augment: SemiCRF.Anchoring[String, String]) extends SemiCRF.Anchoring[String, String] {
+    val localization = featurizer.anchor(words, lemma, pos)
+    def maxSegmentLength(l: Int): Int = SemiSRLInference.this.maxLength(l)
+
+    val beginCache = Array.tabulate(labelIndex.size, labelIndex.size, length){ (p,c,w) =>
+      val f = localization.featuresForBegin(p, c, w)
+      if(f eq null) Double.NegativeInfinity
+      else weights dot f
+    }
+    val endCache = Array.tabulate(labelIndex.size, length){ (l, w) =>
+      val f = localization.featuresForEnd(l, w + 1)
+      if(f eq null) Double.NegativeInfinity
+      else weights dot f
+    }
+    val wordCache = Array.tabulate(labelIndex.size, length){ (l, w) =>
+      val f = localization.featuresForInterior(l, w)
+      if(f eq null) Double.NegativeInfinity
+      else weights dot f
+    }
+
+
+    def scoreTransition(prev: Int, cur: Int, beg: Int, end: Int): Double = {
+      var score = augment.scoreTransition(prev, cur, beg, end)
+      if(score != Double.NegativeInfinity) {
+        val span = localization.featuresForSpan(prev, cur, beg, end)
+        if(span eq null)  {
+          score = Double.NegativeInfinity
+        } else {
+          score += (weights dot span)
+
+          score += beginCache(prev)(cur)(beg)
+          score += endCache(cur)(end-1)
+          var pos = beg + 1
+          while(pos < end) {
+            score += wordCache(cur)(pos)
+            pos += 1
+          }
+        }
+      }
+      score
+    }
+
+    def labelIndex: Index[String] = featurizer.labelIndex
+
+    def startSymbol = featurizer.startSymbol
+  }
 }
 
 object SemiSRLModelFactory {
@@ -56,7 +173,8 @@ object SemiSRLModelFactory {
    * @param wordCounts
    */
   @SerialVersionUID(1L)
-  class StandardFeaturizer(gazetteer: Gazetteer[Any, String], wordCounts: Counter[String, Double] ) extends Serializable {
+  class StandardFeaturizer(wordCounts: Counter[String, Double],
+                           lemmas: Index[String]) extends Serializable {
     val inner = new WordShapeFeaturizer(wordCounts)
 
     def localize(words: IndexedSeq[String], lemma: String, pos: Int)= new Localization(words)
@@ -95,7 +213,6 @@ object SemiSRLModelFactory {
           feats += TrigramFeature(shapes(pos-1), shapes(pos), shapes(pos+1))
           feats += TrigramFeature(classes(pos-1), classes(pos), classes(pos+1))
         }
-        feats ++= gazetteer.lookupWord(words(pos)).map(SFeature(_, 'WordSeenInSegment))
         feats.map(interner.intern _).toArray
       }
 
@@ -106,7 +223,6 @@ object SemiSRLModelFactory {
 
       def featuresForSpan(start: Int, end: Int):Array[Feature] = {
         val feats = ArrayBuffer[Feature]()
-        feats ++= gazetteer.lookupSpan(Span(start, end).map(words).toIndexedSeq).map(SFeature(_, 'SegmentKnown))
         if (start < end - 1) {
           feats += WordEdges('Inside, basicFeature(start)(0), basicFeature(end-1)(0))
           feats += WordEdges('Outside, basicFeature(start-1)(0), basicFeature(end)(0))
@@ -136,6 +252,7 @@ object SemiSRLModelFactory {
   @SerialVersionUID(1L)
   class IndexedStandardFeaturizer(f: StandardFeaturizer,
                                   val startSymbol: String,
+                                  val outsideSymbol: String,
                                   val labelIndex: Index[String],
                                   val basicFeatureIndex: Index[Feature],
                                   val basicSpanFeatureIndex: Index[Feature],
@@ -319,4 +436,3 @@ object SemiSRLModelFactory {
 
 
 }
- */

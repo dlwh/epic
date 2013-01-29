@@ -123,7 +123,7 @@ object ConllOntoReader {
           }
       }
 
-      val docId = file.getName + "-" + docIndex
+      val docId = s"$file.getName-$docIndex"
       val tree = stringTree.extend { t => AnnotatedLabel(t.label) }
       val ner = Map.empty ++ entities.map { case ((beg,end),v) => DSpan(docId,sentenceIndex,beg,end) -> v}
       val coref = Map.empty ++ mentions.map { case ((beg,end),v) => DSpan(docId,sentenceIndex,beg,end) -> v}
@@ -136,7 +136,7 @@ object ConllOntoReader {
       Sentence(docId, sentenceIndex,words, annotations)
     }
 
-      Document(file.toString + "-" + docIndex,sentences.toIndexedSeq)
+      Document(s"${file.toString}-$docIndex",sentences.toIndexedSeq)
     }
 
 

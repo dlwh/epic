@@ -41,10 +41,10 @@ case class TreeMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
         val r = grammar.index(UnaryRule(a, b, chain))
         assert(r != -1, "Could not find rule " + UnaryRule(a, b, chain))
         val ruleRef = anchoring.refined.ruleRefinementFromRefinements(r, refA, refB)
-        if(ruleRef < 0) throw new Exception("Bad refined rule in gold tree!: " + UnaryRule(a, b, chain) + " aRef: " + refA + " bRef: " + refB)
+        if(ruleRef < 0) throw new Exception(s"Bad refined rule in gold tree!: ${UnaryRule(a, b, chain)} aRef: $refA  bRef: $refB")
 
         score += anchoring.scoreUnaryRule(t.span.start, t.span.end, r, ruleRef)
-        if(score.isInfinite) throw new Exception("Could not score gold tree!" + "\n" + t.render(words))
+        if(score.isInfinite) throw new Exception("Could not score gold tree!\n" + t.render(words))
         rec(child)
       case t@BinaryTree( (a, refA), bt@Tree( (b, refB), _, _), ct@Tree((c, refC), _, _), span) =>
         val aI = grammar.labelIndex(a)
@@ -52,7 +52,7 @@ case class TreeMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
         val ruleRef = anchoring.refined.ruleRefinementFromRefinements(rule, refA, refB, refC)
         score += anchoring.scoreSpan(t.span.start, t.span.end, aI, refA)
         score += anchoring.scoreBinaryRule(t.span.start, bt.span.end, t.span.end, rule, ruleRef)
-        if(score.isInfinite) throw new Exception("Could not score gold tree!")
+        if(score.isInfinite) throw new Exception("Could not score gold tree!" + t.render(words))
         rec(bt)
         rec(ct)
     }
@@ -70,7 +70,7 @@ case class TreeMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
       case t@UnaryTree( (a, refA), Tree((b, refB), _, _), chain, span) =>
         val r = grammar.index(UnaryRule(a, b, chain))
         val ruleRef = anchoring.refined.ruleRefinementFromRefinements(r, refA, refB)
-        if(ruleRef < 0) throw new Exception("Bad refined rule in gold tree!: " + UnaryRule(a, b, chain) + " aRef: " + refA + " bRef: " + refB)
+        if(ruleRef < 0) throw new Exception("Bad refined rule in gold tree!: ${UnaryRule(a, b, chain)}  aRef: $refA  bRef: $refB")
         visitor.visitUnaryRule(t.span.start, t.span.end, r, ruleRef, 1.0)
       case t@BinaryTree( (a, refA), bt@Tree( (b, refB), _, _), Tree((c, refC), _, _), span) =>
         val aI = grammar.labelIndex(a)

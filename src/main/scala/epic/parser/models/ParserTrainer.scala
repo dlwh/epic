@@ -80,7 +80,7 @@ object ParserTrainer extends epic.parser.ParserPipeline {
     for ((state, iter) <- params.opt.iterations(cachedObj, init).take(maxIterations).zipWithIndex.tee(evalAndCache _);
          if iter != 0 && iter % iterationsPerEval == 0) yield try {
       val parser = model.extractParser(state.x)
-      ("LatentDiscrim-" + iter.toString, parser)
+      (s"LatentDiscrim-$iter", parser)
     } catch {
       case e: Exception => e.printStackTrace(); throw e
     }

@@ -66,7 +66,7 @@ object Beliefs {
     var p = beliefs.offset
     while(i < beliefs.length) {
       if (java.lang.Double.isNaN(beliefs(p)) || java.lang.Double.isInfinite(beliefs(p))) {
-        if(a(p) > 1E-6 || b(p) > 1E-6) throw new RuntimeException("Something is wrong with this division!" +  a.toString + " " + b)
+        if(a(p) > 1E-6 || b(p) > 1E-6) throw new RuntimeException(s"Something is wrong with this division! $a $b")
         beliefs(p) = 0.0
       }
       p += beliefs.stride

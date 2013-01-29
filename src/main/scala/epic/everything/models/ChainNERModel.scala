@@ -123,7 +123,7 @@ case class ChainNERInference(beliefsFactory: DocumentBeliefs.Factory,
             }
             val normalizer: Double = sum(copy.ner.beliefs)
             // make sure it's close to normalized already...
-            assert( (normalizer - 1.0).abs < 1E-3, copy.ner + " " + spanBeliefs.ner)
+            assert( (normalizer - 1.0).abs < 1E-3, s"NER not normalized! new: ${copy.ner} old: ${spanBeliefs.ner}")
             copy.ner.beliefs /= normalizer
             copy
           }
@@ -153,7 +153,7 @@ case class ChainNERInference(beliefsFactory: DocumentBeliefs.Factory,
       // in the actual parse. So instead, we premultiply by \prod_{all spans} p(not span)
       // and then we divide out p(not span) for spans in the tree.
       new Anchoring[NERType.Value, String] {
-        private def passAssert(v: Double, pred: Double=>Boolean, stuff: Any*) = if(pred(v)) v else throw new AssertionError("Value " + v + ": other stuff:" + stuff.mkString(" "))
+        private def passAssert(v: Double, pred: Double=>Boolean, stuff: Any*) = if(pred(v)) v else throw new AssertionError(s"Value $v: other stuff: ${stuff.mkString(" ")}")
         def labelIndex: Index[NERType.Value] = labels
 
         def words: IndexedSeq[String] = s.words

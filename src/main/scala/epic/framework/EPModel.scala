@@ -76,7 +76,7 @@ class EPModel[Datum, Augment](maxEPIter: Int, initFeatureValue: Feature => Optio
   override def cacheFeatureWeights(weights: DenseVector[Double], prefix: String) {
     super.cacheFeatureWeights(weights, prefix)
     for (((w, m), i) <- (partitionWeights(weights) zip models).zipWithIndex) {
-      m.cacheFeatureWeights(w, prefix + "-model-" + i)
+      m.cacheFeatureWeights(w, s"$prefix-model-$i")
     }
   }
 }

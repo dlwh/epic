@@ -73,12 +73,12 @@ object CorefPipeline extends App {
 
   println("Weights: ")
   for( (f,v) <- Encoder.fromIndex(model.featureIndex).decode(optimum).iterator.toIndexedSeq.sortBy(_._2)) {
-    println(v + " " + f)
+    println(s"$f $v")
   }
   println("=================")
   println(allResults)
 
-  println("Copying output results to " + params.name + " for use in official evaluation")
+  println(s"Copying output results to ${params.name} for use in official evaluation")
   ConllEval.evaluate(params.name, output)
 
   case class Stats(numInter: Int, numGold: Int, numGuess: Int) {
@@ -89,7 +89,7 @@ object CorefPipeline extends App {
     def f1 = 2.0 / (1.0/precision + 1.0/recall)
 
     override def toString() = {
-      "Stats( f1 = " + f1 + ", precision = " + precision + ", recall = "  + recall +")"
+      s"Stats( f1 = $f1, precision = $precision, recall = $recall)"
     }
   }
 

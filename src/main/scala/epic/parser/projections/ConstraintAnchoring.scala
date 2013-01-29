@@ -125,8 +125,7 @@ class ConstraintCoreGrammar[L, W](augmentedGrammar: AugmentedGrammar[L, W], thre
           math.log(arr(s)) > threshold
         })
         val goldTags = (0 until numLabels).filter { isGold(i, j, _) }
-        for(t <- goldTags if arr(t) == 0) println("Got a zero for a goldTag!" + index.get(t))
-        for(t <- goldTags if arr(t) < math.exp(threshold)) println("Got a below threshold for a goldTag!" + arr(t) + " " + math.exp(threshold))
+        for(t <- goldTags if arr(t) < math.exp(threshold)) println(s"Got a below threshold for a goldTag! + ${arr(t)} ${math.exp(threshold)}")
         val result = thresholdedTags ++ goldTags
         if (result.nonEmpty) result
         else null

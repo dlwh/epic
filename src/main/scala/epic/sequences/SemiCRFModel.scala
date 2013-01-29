@@ -224,6 +224,7 @@ class SegmentationModelFactory[L](val startSymbol: L,
     val maxLengthMap = train.flatMap(_.segments.iterator).groupBy(_._1).mapValues(arr => arr.map(_._2.length).max)
     val labelIndex: Index[L] = Index[L](Iterator(startSymbol) ++ train.iterator.flatMap(_.label.map(_._1)))
     val maxLengthArray = Encoder.fromIndex(labelIndex).tabulateArray(maxLengthMap.getOrElse(_, 0))
+    println(maxLengthMap)
 
     val wordCounts:Counter[String, Double] = Counter.count(train.flatMap(_.words):_*).mapValues(_.toDouble)
     val f = new StandardFeaturizer[L](gazetteer, wordCounts)
@@ -250,7 +251,7 @@ class SegmentationModelFactory[L](val startSymbol: L,
     for(f <- pruningModel) {
       assert(f.labelIndex == labelIndex, f.labelIndex + " " + labelIndex)
     }
-    val indexed = new IndexedStandardFeaturizer[L](f, startSymbol, labelIndex, basicFeatureIndex, spanFeatureIndex, transFeatureIndex, pruningModel)
+    val indexed = new IndexedStandardFeaturizer[L](f, startSymbol, labelIndex, basicFeatureIndex, spanFeatureIndex, transFeatureIndex, maxLengthArray(_), pruningModel)
     val model = new SemiCRFModel(indexed.featureIndex, indexed, maxLengthArray, weights(_))
 
     model
@@ -361,6 +362,7 @@ object SegmentationModelFactory {
                                   val basicFeatureIndex: Index[Feature],
                                   val basicSpanFeatureIndex: Index[Feature],
                                   val basicTransFeatureIndex: Index[Feature],
+                                  val maxLength: Int=>Int,
                                   val pruningModel: Option[SemiCRF.ConstraintGrammar[L, String]] = None) extends SemiCRFModel.BIEOFeaturizer[L,String] with Serializable {
     // feature mappings... sigh
     // basically we want to build a big index for all features
@@ -498,16 +500,16 @@ object SegmentationModelFactory {
           loc.featuresForSpan(beg, end).map(basicSpanFeatureIndex).filter(_ >= 0)
         else null
       }
-      private val spanFeatures = Array.tabulate(labelIndex.size, labelIndex.size){ (prev, cur) =>
+
+      private val justSpanFeatures = Array.tabulate(labelIndex.size){ cur =>
         TriangularArray.tabulate(w.length+1) { (beg, end) =>
-          if(!(constraints == None || constraints.get.allowedLabels(beg, end).contains(cur))) {
+          if(maxLength(cur) < (end-beg) ||  !(constraints == None || constraints.get.allowedLabels(beg, end).contains(cur))) {
             null
           } else {
-            val builder = new VectorBuilder[Double](featureIndex.size)
             if(beg < end) {
+              val builder = new VectorBuilder[Double](featureIndex.size)
               val feats = spanCache(beg, end)
-              val tfeats = loc.featuresForTransition(beg, end).map(basicTransFeatureIndex)
-              builder.reserve(feats.length + tfeats.length)
+              builder.reserve(feats.length)
               var i = 0
               while(i < feats.length) {
                 val index = compositeIndex.mapIndex(SPAN_COMP, spanFeatureIndex.mapIndex(cur, feats(i)))
@@ -516,7 +518,25 @@ object SegmentationModelFactory {
                 }
                 i += 1
               }
-              i = 0
+              builder.toSparseVector
+            } else {
+              null
+            }
+
+          }
+        }
+      }
+
+      private val spanFeatures = Array.tabulate(labelIndex.size, labelIndex.size){ (prev, cur) =>
+        TriangularArray.tabulate(w.length+1) { (beg, end) =>
+          if(maxLength(cur) < (end-beg) || !(constraints == None || constraints.get.allowedLabels(beg, end).contains(cur))) {
+            null
+          } else {
+            if(beg < end) {
+              val builder = new VectorBuilder[Double](featureIndex.size)
+              val tfeats = loc.featuresForTransition(beg, end).map(basicTransFeatureIndex)
+              builder.reserve(tfeats.length)
+              var i = 0
               while(i < tfeats.length) {
                 val index = compositeIndex.mapIndex(TRANS_COMP, transFeatureIndex.mapIndex(label2Index.mapIndex(prev, cur), tfeats(i)))
                 if(index != -1) {
@@ -524,8 +544,12 @@ object SegmentationModelFactory {
                 }
                 i += 1
               }
+              val v = builder.toSparseVector
+              v += justSpanFeatures(cur)(beg, end)
+              v
+            } else {
+              null
             }
-            builder.toSparseVector
           }
         }
       }

@@ -76,7 +76,7 @@ class ViterbiDecoder[L, W] extends ChartDecoder[L, W] with Serializable {
 
       if(maxScore == Double.NegativeInfinity) {
         println("entered things: " + inside.bot.enteredLabelScores(begin, end).map { case (i, v) => (grammar.labelIndex.get(i), v)}.toList)
-        sys.error("Couldn't find a tree!" + begin + " " + end + " " + grammar.labelIndex.get(root))
+        sys.error(s"Couldn't find a tree! [$begin,$end) $grammar.labelIndex.get(root)")
       }
       val child = buildTree(begin, end, maxChild, maxChildRef)
       UnaryTree(labelIndex.get(root), child, grammar.chain(maxRule), Span(begin, end))
@@ -124,7 +124,7 @@ class ViterbiDecoder[L, W] extends ChartDecoder[L, W] with Serializable {
 
       if(maxScore == Double.NegativeInfinity) {
         println("entered things: " + inside.bot.enteredLabelScores(begin, end).map { case (i, v) => (grammar.labelIndex.get(i), v)}.toList)
-        sys.error("Couldn't find a tree!" + begin + " " + end + " " + grammar.labelIndex.get(root))
+        sys.error(s"Couldn't find a tree! [$begin,$end) $grammar.labelIndex.get(root)")
       } else {
         val lchild = buildTreeUnary(begin, maxSplit, maxLeft, maxLeftRef)
         val rchild = buildTreeUnary(maxSplit, end, maxRight, maxRightRef)
@@ -293,7 +293,7 @@ class MaxConstituentDecoder[L, W] extends ChartDecoder[L, W] {
       val bestBot = maxBotLabel(begin, end)
       val lower = if(begin + 1== end) {
         if(maxBotScore(begin, end) == Double.NegativeInfinity)
-          throw new RuntimeException("Couldn't make a good score for " + (begin, end) + ". InsideIndices: " + inside.bot.enteredLabelIndexes(begin, end).toIndexedSeq + " outside: " + outside.bot.enteredLabelIndexes(begin, end).toIndexedSeq)
+          throw new RuntimeException(s"Couldn't make a good score for ${(begin, end)}. InsideIndices:  ${inside.bot.enteredLabelIndexes(begin, end).toIndexedSeq}\noutside: ${outside.bot.enteredLabelIndexes(begin, end).toIndexedSeq}")
         NullaryTree(labelIndex.get(bestBot), Span(begin, end))
       } else {
         val split = maxSplit(begin, end)

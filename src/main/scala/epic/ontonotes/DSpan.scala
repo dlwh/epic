@@ -26,7 +26,7 @@ case class DSpan(doc: String, sentence: Int, begin: Int, end: Int) {
   def getYield(doc: Document):IndexedSeq[String] = getYield(doc.sentences.map(_.words))
   def getYield(doc: IndexedSeq[IndexedSeq[String]]):IndexedSeq[String] = (begin until end).map(doc(sentence))
 
-  override def toString = doc + ":" + sentence + ":" + begin + "-" + end
+  override def toString = s"$doc:$sentence:$begin-$end"
 }
 
 object DSpan {

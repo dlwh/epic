@@ -86,8 +86,7 @@ object ParseEval {
     def f1 = (2 * precision * recall)/(precision + recall)
 
     override def toString() = {
-      "Statistics(precision=" + precision +
-        ", recall=" + recall + ", f1=" + f1 + ", exact=" + exact + ", tagAccuracy=" + tagAccuracy +")"
+      s"Statistics(precision=$precision, recall=$recall, f1=$f1, exact=$exact, tagAccuracy=$tagAccuracy)"
     }
   }
 
