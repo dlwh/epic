@@ -109,7 +109,7 @@ object SemiCRF {
       sum
     }
 
-    def computeSpanConstraints(threshold: Double = 0.001):SpanConstraints = {
+    def computeSpanConstraints(threshold: Double = 1E-5):SpanConstraints = {
       val spanMarginals = TriangularArray.fill(length+1)(new Array[Double](anchoring.labelIndex.size))
 
       this visit new TransitionVisitor[L, W] {
@@ -343,10 +343,17 @@ object SemiCRF {
   @SerialVersionUID(1L)
   case class SpanConstraints(maxLengths: Array[Int],
                              allowedStarts: Array[BitSet],
-                             allowedLabels: TriangularArray[BitSet])
+                             allowedLabels: TriangularArray[BitSet]) {
+    def +(constraints: SpanConstraints) = {
+      SpanConstraints(Array.tabulate(maxLengths.length)(i => maxLengths(i) max constraints.maxLengths(i)),
+        allowedStarts zip constraints.allowedStarts map {case (a,b) => a | b},
+        TriangularArray.tabulate(allowedStarts.length+1)((b,e) => allowedLabels(b,e) | constraints.allowedLabels(b, e))
+      )
+    }
+  }
 
   @SerialVersionUID(1L)
-  class ConstraintGrammar[L, W](val crf: SemiCRF[L, W], val threshold: Double = 0.001) extends Grammar[L, W] with Serializable {
+  class ConstraintGrammar[L, W](val crf: SemiCRF[L, W], val threshold: Double = 1E-5) extends Grammar[L, W] with Serializable {
     def startSymbol: L = crf.model.startSymbol
     def labelIndex: Index[L] = crf.model.labelIndex
 
@@ -362,7 +369,7 @@ object SemiCRF {
       cache = new ConcurrentHashMap[IndexedSeq[W], SpanConstraints]()
     }
 
-    def constraints(w: IndexedSeq[W]) = {
+    def constraints(w: IndexedSeq[W]): SpanConstraints = {
       var c = cache.get(w)
       if(c eq null) {
         c = crf.marginal(w).computeSpanConstraints(threshold)
@@ -370,6 +377,15 @@ object SemiCRF {
       }
 
       c
+    }
+
+    def constraints(seg: Segmentation[L,W], keepGold: Boolean = true): SpanConstraints = {
+      val orig: SpanConstraints = constraints(seg.words)
+      if(keepGold) {
+        orig + crf.goldMarginal(seg.segments, seg.words).computeSpanConstraints()
+      } else {
+        orig
+      }
     }
 
 

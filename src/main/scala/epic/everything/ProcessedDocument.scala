@@ -65,7 +65,7 @@ object ProcessedDocument {
           tree,
           constraints.rawConstraints(s.words, policy).sparsity,
           seg,
-          nerConstraints.constraints(s.words),
+          nerConstraints.constraints(s.nerSegmentation, keepGold = keepGoldTree),
           s.speaker,
           s.sentId, /*graph,*/ s.id)
       }

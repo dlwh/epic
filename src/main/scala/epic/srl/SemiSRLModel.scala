@@ -27,10 +27,10 @@ class SemiSRLModel(val featureIndex: Index[Feature],
                    maxSegmentLength: Int=>Int,
                    initialWeights: Feature=>Double = {(_: Feature) => 0.0}) extends Model[SRLInstance] with StandardExpectedCounts.Model with Serializable {
 
-  def extractCRF(weights: DenseVector[Double]) = {
-    val grammar = inferenceFromWeights(weights)
-    new SemiCRF(grammar)
-  }
+//  def extractCRF(weights: DenseVector[Double]) = {
+//    val grammar = inferenceFromWeights(weights)
+//    new SemiCRF(grammar)
+//  }
 
   type Marginal = SemiCRF.Marginal[String, String]
   type Inference = SemiSRLInference
@@ -50,6 +50,13 @@ class SemiSRLInference(weights: DenseVector[Double],
                        val maxLength: Int=>Int) extends AugmentableInference[SRLInstance, SemiCRF.Anchoring[String, String]] {
   type Marginal = SemiCRF.Marginal[String, String]
   type ExpectedCounts = StandardExpectedCounts[Feature]
+
+  def viterbi(words: IndexedSeq[String], lemma: String, pos: Int) = {
+    SemiCRF.viterbi(new Anchoring(words, lemma, pos, new IdentityAnchoring(words)))
+  }
+
+  def emptyCounts = StandardExpectedCounts.zero(featureIndex)
+
   def baseAugment(v: SRLInstance): SemiCRF.Anchoring[String, String] = new IdentityAnchoring(v.words)
 
   class IdentityAnchoring(val words: IndexedSeq[String]) extends SemiCRF.Anchoring[String, String] {
@@ -155,6 +162,53 @@ class SemiSRLInference(weights: DenseVector[Double],
   }
 }
 
+class SemiSRLModelFactory(val startSymbol: String, val outsideSymbol: String = "O",
+                          pruningModel: Option[SemiCRF.ConstraintGrammar[String, String]] = None,
+                          weights: Feature=>Double = { (f:Feature) => 0.0}) {
+
+  import SemiSRLModelFactory._
+
+  def makeModel(train: IndexedSeq[SRLInstance]) = {
+    val maxLengthMap = train.flatMap(_.args.iterator).groupBy(_.arg).mapValues(arr => arr.map(_.span.length).max)
+    val labelIndex: Index[String] = Index[String](Iterator(startSymbol, outsideSymbol) ++ train.iterator.flatMap(_.label.map(_.arg)))
+    val lemmaIndex = Index(train.iterator.map(_.lemma))
+    val maxLengthArray = Encoder.fromIndex(labelIndex).tabulateArray(maxLengthMap.getOrElse(_, 0))
+    maxLengthArray(1) = 1
+    println(maxLengthMap)
+
+    val wordCounts:Counter[String, Double] = Counter.count(train.flatMap(_.words):_*).mapValues(_.toDouble)
+    val f = new StandardFeaturizer(wordCounts, lemmaIndex)
+    val basicFeatureIndex = Index[Feature]()
+    val spanFeatureIndex = Index[Feature]()
+    val transFeatureIndex = Index[Feature]()
+
+    val maxMaxLength = (0 until labelIndex.size).map(maxLengthArray).max
+    var i = 0
+    for(s <- train) {
+      val loc = f.localize(s.words, s.lemma, s.pos)
+
+      for(b <- 0 until s.length) {
+        loc.featuresForWord(b) foreach {basicFeatureIndex.index _}
+        for(e <- (b+1) until math.min(s.length,b+maxMaxLength)) {
+          loc.featuresForSpan(b, e) foreach {spanFeatureIndex.index _}
+          loc.featuresForTransition(b, e) foreach {transFeatureIndex.index _}
+        }
+
+      }
+      i += 1
+    }
+
+    for(f <- pruningModel) {
+      assert(f.labelIndex == labelIndex, f.labelIndex + " " + labelIndex)
+    }
+    val indexed = new IndexedStandardFeaturizer(f, startSymbol, outsideSymbol, labelIndex, basicFeatureIndex, spanFeatureIndex, transFeatureIndex, maxLengthArray(_), pruningModel)
+    val model = new SemiSRLModel(indexed.featureIndex, indexed, maxLengthArray, weights(_))
+
+    model
+  }
+
+}
+
 object SemiSRLModelFactory {
   case class SFeature(w: Any, kind: Symbol) extends Feature
   case class BeginFeature(w: Feature, cur: String) extends Feature
@@ -167,6 +221,8 @@ object SemiSRLModelFactory {
   case object TransitionFeature extends Feature
   case object SpanStartsSentence extends Feature
   case object SpansWholeSentence extends Feature
+  case object ContainsPred extends Feature
+  case class DistanceToPredFeature(dist: Int, dir: Symbol, voice: Symbol) extends Feature
 
   /**
    * Computes basic features from word counts
@@ -177,13 +233,16 @@ object SemiSRLModelFactory {
                            lemmas: Index[String]) extends Serializable {
     val inner = new WordShapeFeaturizer(wordCounts)
 
-    def localize(words: IndexedSeq[String], lemma: String, pos: Int)= new Localization(words)
+    def localize(words: IndexedSeq[String], lemma: String, pos: Int)= new Localization(words, lemma, pos)
 
     val interner = new Interner[Feature]
+    val passivizingWords = Set("been", "is", "was", "were", "are", "being", "am")
 
-    class Localization(words: IndexedSeq[String]) {
+    class Localization(words: IndexedSeq[String], lemma: String, pos: Int) {
       val classes = words.map(EnglishWordClassGenerator)
       val shapes = words.map(WordShapeGenerator)
+
+      val predLooksPassive = words.slice(math.max(0, pos-3),pos).exists(passivizingWords) || (pos < words.length - 1 && words(pos+1) == "by")
 
       val basicFeatures = (0 until words.length) map { i =>
         val w = words(i)
@@ -207,7 +266,6 @@ object SemiSRLModelFactory {
         feats ++= inner.featuresFor(words, pos)
         for (a <- basicLeft; b <- basic) feats += PairFeature(a,b)
         for (a <- basic; b <- basicRight) feats += PairFeature(a,b)
-        //        for (a <- basicLeft; b <- basicRight) feats += PairFeature(a,b)
         feats += TrigramFeature(basicLeft(0), basic(0), basicRight(0))
         if(pos > 0 && pos < words.length - 1) {
           feats += TrigramFeature(shapes(pos-1), shapes(pos), shapes(pos+1))
@@ -235,6 +293,15 @@ object SemiSRLModelFactory {
         if(start == 0 && end == words.length)
           feats += SpansWholeSentence
 
+        if(pos < start) {
+          feats += DistanceToPredFeature(binDistance(start - pos), 'Right, if(predLooksPassive) 'Passive else 'Active)
+        }  else if(pos >= end) {
+          feats += DistanceToPredFeature(binDistance(end - pos + 1), 'Left, if(predLooksPassive) 'Passive else 'Active)
+        } else {
+          feats += ContainsPred
+        }
+
+
         feats.toArray
       }
 
@@ -257,6 +324,7 @@ object SemiSRLModelFactory {
                                   val basicFeatureIndex: Index[Feature],
                                   val basicSpanFeatureIndex: Index[Feature],
                                   val basicTransFeatureIndex: Index[Feature],
+                                  val maxLength: Int=>Int,
                                   val pruningModel: Option[SemiCRF.ConstraintGrammar[String, String]] = None) extends Serializable {
     // feature mappings... sigh
     // basically we want to build a big index for all features
@@ -394,16 +462,16 @@ object SemiSRLModelFactory {
           loc.featuresForSpan(beg, end).map(basicSpanFeatureIndex).filter(_ >= 0)
         else null
       }
-      private val spanFeatures = Array.tabulate(labelIndex.size, labelIndex.size){ (prev, cur) =>
+
+      private val justSpanFeatures = Array.tabulate(labelIndex.size){ cur =>
         TriangularArray.tabulate(w.length+1) { (beg, end) =>
-          if(!(constraints == None || constraints.get.allowedLabels(beg, end).contains(cur))) {
+          if(maxLength(cur) < (end-beg) ||  !(constraints == None || constraints.get.allowedLabels(beg, end).contains(cur))) {
             null
           } else {
-            val builder = new VectorBuilder[Double](featureIndex.size)
             if(beg < end) {
+              val builder = new VectorBuilder[Double](featureIndex.size)
               val feats = spanCache(beg, end)
-              val tfeats = loc.featuresForTransition(beg, end).map(basicTransFeatureIndex)
-              builder.reserve(feats.length + tfeats.length)
+              builder.reserve(feats.length)
               var i = 0
               while(i < feats.length) {
                 val index = compositeIndex.mapIndex(SPAN_COMP, spanFeatureIndex.mapIndex(cur, feats(i)))
@@ -412,7 +480,25 @@ object SemiSRLModelFactory {
                 }
                 i += 1
               }
-              i = 0
+              builder.toSparseVector
+            } else {
+              null
+            }
+
+          }
+        }
+      }
+
+      private val spanFeatures = Array.tabulate(labelIndex.size, labelIndex.size){ (prev, cur) =>
+        TriangularArray.tabulate(w.length+1) { (beg, end) =>
+          if(maxLength(cur) < (end-beg) || !(constraints == None || constraints.get.allowedLabels(beg, end).contains(cur))) {
+            null
+          } else {
+            if(beg < end) {
+              val builder = new VectorBuilder[Double](featureIndex.size)
+              val tfeats = loc.featuresForTransition(beg, end).map(basicTransFeatureIndex)
+              builder.reserve(tfeats.length)
+              var i = 0
               while(i < tfeats.length) {
                 val index = compositeIndex.mapIndex(TRANS_COMP, transFeatureIndex.mapIndex(label2Index.mapIndex(prev, cur), tfeats(i)))
                 if(index != -1) {
@@ -420,8 +506,12 @@ object SemiSRLModelFactory {
                 }
                 i += 1
               }
+              val v = builder.toSparseVector
+              v += justSpanFeatures(cur)(beg, end)
+              v
+            } else {
+              null
             }
-            builder.toSparseVector
           }
         }
       }
