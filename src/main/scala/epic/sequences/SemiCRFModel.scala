@@ -239,7 +239,7 @@ class SegmentationModelFactory[L](val startSymbol: L,
 
       for(b <- 0 until s.length) {
         loc.featuresForWord(b) foreach {basicFeatureIndex.index _}
-        for(e <- (b+1) until math.min(s.length,b+maxMaxLength)) {
+        for(e <- (b+1) to math.min(s.length,b+maxMaxLength)) {
           loc.featuresForSpan(b, e) foreach {spanFeatureIndex.index _}
           loc.featuresForTransition(b, e) foreach {transFeatureIndex.index _}
         }

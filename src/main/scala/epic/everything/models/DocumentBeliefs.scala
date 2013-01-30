@@ -57,10 +57,11 @@ case class DocumentBeliefs(sentences: Array[SentenceBeliefs]) extends Factor[Doc
 }
 
 object DocumentBeliefs {
-  class Factory(grammar: BaseGrammar[AnnotatedLabel], val nerProp: Property[NERType.Value]) {
+  class Factory(grammar: BaseGrammar[AnnotatedLabel], val nerProp: Property[NERType.Value], val srlProp: Property[Option[String]]) {
     private val initNERBelief = Beliefs.improperUninformed(nerProp)
+    private val initSRLBelief = Beliefs.improperUninformed(srlProp)
 
-    val labelProp = Property("label", grammar.labelIndex)
+    private val labelProp = Property("label", grammar.labelIndex)
     val optionLabelProp = Property("option[label]", new OptionIndex(grammar.labelIndex))
 
     def apply(doc: ProcessedDocument):DocumentBeliefs = {
@@ -72,7 +73,7 @@ object DocumentBeliefs {
         val labelBeliefs = Beliefs.improperUninformed(labelProp)
         val spans = TriangularArray.tabulate(s.length+1) { (begin, end) =>
           if(begin < end && s.isPossibleSpan(begin, end))
-            SpanBeliefs(DSpan(doc.id,i,begin, end), spanGovernorBeliefs, optionLabelBeliefs, initNERBelief)
+            SpanBeliefs(DSpan(doc.id,i,begin, end), spanGovernorBeliefs, optionLabelBeliefs, initNERBelief, Array.fill(s.frames.length)(initSRLBelief))
           else
             null
         }
@@ -163,14 +164,22 @@ case class SentenceBeliefs(spans: TriangularArray[SpanBeliefs],
 case class SpanBeliefs(span: DSpan,
                        governor: Beliefs[Int], // which word governs me. This isn't my head, it's my head's head.
                        label: Beliefs[Option[AnnotatedLabel]], // syntactic label type. None == Not Constituent
-                       ner: Beliefs[NERType.Value]) extends Factor[SpanBeliefs] {
-  def *(f: SpanBeliefs): SpanBeliefs = SpanBeliefs(span, governor * f.governor, label * f.label, ner * f.ner)
+                       ner: Beliefs[NERType.Value],
+                       frames: IndexedSeq[Beliefs[Option[String]]]) extends Factor[SpanBeliefs] {
+  def *(f: SpanBeliefs): SpanBeliefs = {
+    SpanBeliefs(span,
+    governor * f.governor,
+    label * f.label,
+    ner * f.ner,
+    {for ((a,b) <- frames zip f.frames) yield a * b})
+  }
   def /(f: SpanBeliefs): SpanBeliefs = SpanBeliefs(span,
     governor / f.governor,
     label / f.label,
-    ner / f.ner)
+    ner / f.ner,
+    {for ((a,b) <- frames zip f.frames) yield a * b})
 
-  def logPartition: Double = governor.logPartition + label.logPartition + ner.logPartition
+  def logPartition: Double = governor.logPartition + label.logPartition + ner.logPartition + frames.map(_.logPartition).sum
 
   def isConvergedTo(f: SpanBeliefs, diff: Double): Boolean = (
     governor.isConvergedTo(f.governor, diff)

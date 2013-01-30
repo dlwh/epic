@@ -6,7 +6,8 @@ import epic.sequences.{SemiCRF, Segmentation}
 import epic.trees.StandardTreeProcessor
 import epic.parser.ParseChart.SparsityPattern
 import breeze.collection.mutable.TriangularArray
-import epic.ontonotes.{Document, NERType}
+import epic.ontonotes.{Frame, Document, NERType}
+import java.util
 
 //import models.PropertyPropagation.IndexedLink
 import epic.parser.projections.{GoldTagPolicy, ConstraintCoreGrammar}
@@ -28,9 +29,16 @@ case class ProcessedSentence(words: IndexedSeq[String],
                              sparsity: SparsityPattern,
                              ner: Segmentation[NERType.Value, String],
                              nerConstraints: SemiCRF.SpanConstraints,
+                             frames: IndexedSeq[Frame],
                              speaker: Option[String],
                              index: Int,
                              id: String="") {
+  def validConstituents: collection.immutable.BitSet = sparsity.activeTriangularIndices
+
+  def isPossibleConstituent(begin: Int, end: Int) = {
+    sparsity.activeTriangularIndices.contains(TriangularArray.index(begin, end))
+  }
+
 
   def length= words.length
 
@@ -66,6 +74,7 @@ object ProcessedDocument {
           constraints.rawConstraints(s.words, policy).sparsity,
           seg,
           nerConstraints.constraints(s.nerSegmentation, keepGold = keepGoldTree),
+          s.srl,
           s.speaker,
           s.sentId, /*graph,*/ s.id)
       }
