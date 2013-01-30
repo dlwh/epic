@@ -417,7 +417,7 @@ class StandardSpanFeaturizer[L, W](grammar: BaseGrammar[L],
           builder += PairFeature(lf, w)
       } else {
         if(end == length)
-          builder += BeginSentFeature(lf)
+          builder += PairFeature(EndSentFeature,lf)
         else for(w <- wordFeats(end)) {
           val tf = TaggedFeature(w, 'NextWord)
           builder += tf
@@ -425,7 +425,7 @@ class StandardSpanFeaturizer[L, W](grammar: BaseGrammar[L],
         }
 
         if(begin == 0)
-          builder += BeginSentFeature(lf)
+          builder += PairFeature(BeginSentFeature, lf)
         else for(w <- wordFeats(begin - 1)) {
           val tf = TaggedFeature(w, 'PrevWord)
           builder += tf
@@ -447,7 +447,7 @@ class StandardSpanFeaturizer[L, W](grammar: BaseGrammar[L],
         if(begin > 0 && end < length) {
           for(wA <- wordFeats(begin-1);
               wB <- wordFeats(end)) {
-            val edge = WordEdges(label, wA, wB)
+            val edge = PairFeature(lf, WordEdges('Outside, label, wB))
             builder += edge
             builder += PairFeature(edge, lengthFeature)
           }

@@ -284,9 +284,10 @@ object SegmentationModelFactory {
 
     val interner = new Interner[Feature]
 
+    val noShapeThreshold = 100
     class Localization(words: IndexedSeq[String]) {
-      val classes = words.map(EnglishWordClassGenerator)
-      val shapes = words.map(WordShapeGenerator)
+      private val classes = words.map(w => if(wordCounts(w) > noShapeThreshold) w else EnglishWordClassGenerator(w))
+      private val shapes = words.map(w => if(wordCounts(w) > noShapeThreshold) w else WordShapeGenerator(w))
 
       val basicFeatures = (0 until words.length) map { i =>
         val w = words(i)
@@ -299,6 +300,7 @@ object SegmentationModelFactory {
         if(pos < 0 || pos >= words.length) IndexedSeq("#")
         else basicFeatures(pos)
       }
+
 
       val featuresForWord: immutable.IndexedSeq[Array[Feature]] = 0 until words.length map { pos =>
         val feats = new ArrayBuffer[Feature]()

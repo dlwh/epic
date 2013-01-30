@@ -67,7 +67,7 @@ object ProcessedDocument {
           seg,
           nerConstraints.constraints(s.nerSegmentation, keepGold = keepGoldTree),
           s.speaker,
-          s.sentId, /*graph,*/ s.id)
+          s.index, /*graph,*/ s.id)
       }
 
       ProcessedDocument(newSentences, /*corefFeaturizer.featurizeDocument(d),*/ d.id)

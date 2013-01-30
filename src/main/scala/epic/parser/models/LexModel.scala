@@ -19,7 +19,7 @@ package models
 import epic.framework._
 import breeze.collection.mutable.OpenAddressHashArray
 import breeze.linalg._
-import breeze.text.analyze.EnglishWordClassGenerator
+import breeze.text.analyze.{WordShapeGenerator, EnglishWordClassGenerator}
 import epic.trees._
 import annotations.{StripAnnotations, TreeAnnotator}
 import java.io.File
@@ -652,7 +652,7 @@ class SimpleWordShapeGen[L](tagWordCounts: Counter2[L, String, Double],
     } else {
       val buf = ArrayBuffer[String](//IndicatorFeature(w),
         EnglishWordClassGenerator(w),
-        makeShapeFeature(w)
+        WordShapeGenerator(w)
       )
       if(counts(w) > minCountThreshold) {
         buf += w
@@ -670,23 +670,7 @@ class SimpleWordShapeGen[L](tagWordCounts: Counter2[L, String, Double],
 
   }
 
-  def makeShapeFeature(word: String) = {
-    val result = new StringBuilder(word.length);
-    var i = 0;
-    while(i < word.length) {
-      val c = word(i);
-      val x = if(c.isLetter && c.isUpper) 'X' else if(c.isLetter) 'x' else if(c.isDigit) 'd' else c;
-      if(result.length > 1 && (result.last == x) && result(result.length - 2) == x) {
-        result += 'e'
-      } else if (result.length > 1 && result.last == 'e' && result(result.length - 2) == x) {
-        () // nothing
-      }else {
-        result += x;
-      }
-      i +=1;
-    }
-    result.toString
-  }
+
 }
 
 case class LexModelFactory(baseParser: ParserParams.XbarGrammar,

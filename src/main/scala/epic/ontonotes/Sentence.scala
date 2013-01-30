@@ -12,11 +12,11 @@ import collection.mutable
  *
  * @author dlwh
  */
-case class Sentence(docId: String, sentId: Int,
+case class Sentence(docId: String, index: Int,
                    words: IndexedSeq[String],
                    annotations: OntoAnnotations) extends Example[OntoAnnotations,Seq[String]] {
 
-  def id = docId +":"+sentId
+  def id = docId +":"+index
   def features = words
   def label = annotations
 
@@ -59,7 +59,7 @@ case class Sentence(docId: String, sentId: Int,
 
   def srlInstances = srl.map(frame => new SRLInstance(words, frame, s"$id-srl-${frame.pos}"))
 
-  def dspans = for(begin <- 0 until length; end <- (begin+1) to length) yield DSpan(docId, sentId, begin, end)
+  def dspans = for(begin <- 0 until length; end <- (begin+1) to length) yield DSpan(docId, index, begin, end)
 
 }
 

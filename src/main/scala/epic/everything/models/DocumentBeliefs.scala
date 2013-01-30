@@ -9,6 +9,7 @@ import breeze.linalg.NumericOps.Arrays._
 import epic.trees.{Span, AnnotatedLabel}
 import epic.parser.BaseGrammar
 import epic.ontonotes.{DPos, DSpan, NERType}
+import epic.redux.FeaturizedSentence
 
 /**
  *
@@ -149,6 +150,38 @@ case class SentenceBeliefs(spans: TriangularArray[SpanBeliefs],
     }
     max
   }
+}
+
+object SentenceBeliefs {
+  class Factory(grammar: BaseGrammar[AnnotatedLabel], val nerProp: Property[NERType.Value]) {
+   private val initNERBelief = Beliefs.improperUninformed(nerProp)
+
+   val labelProp = Property("label", grammar.labelIndex)
+   val optionLabelProp = Property("option[label]", new OptionIndex(grammar.labelIndex))
+
+   def apply(s: FeaturizedSentence):SentenceBeliefs = {
+     val spanGovernorBeliefs = Beliefs.improperUninformed("wordPos+None", new DenseIntIndex(0, s.length+2))
+     val wordGovernorBeliefs = Beliefs.improperUninformed("wordPos", new DenseIntIndex(0, s.length+1))
+     //        val governedSpanBeliefs = Beliefs.improperUninformed("span", Index{for(b <- 0 until s.length + 1; end <- b until s.length + 1) yield Span(b,end)})
+     val optionLabelBeliefs = Beliefs.improperUninformed(optionLabelProp)
+     val labelBeliefs = Beliefs.improperUninformed(labelProp)
+     val spans = TriangularArray.tabulate(s.length+1) { (begin, end) =>
+       if(begin < end && s.isPossibleSpan(begin, end))
+         SpanBeliefs(DSpan(s.id,s.index,begin, end), spanGovernorBeliefs, optionLabelBeliefs, initNERBelief)
+       else
+         null
+     }
+     val words = Array.tabulate(s.length) { (pos) =>
+       WordBeliefs(DPos(s.id,s.index,pos),
+         wordGovernorBeliefs,
+         //            governedSpanBeliefs,
+         labelBeliefs,
+         labelBeliefs)
+     }
+
+     SentenceBeliefs(spans, words)
+   }
+ }
 }
 
 
