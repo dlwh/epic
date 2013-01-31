@@ -1,4 +1,5 @@
-package epic.everything.models
+
+/*package epic.everything.models
 
 import breeze.util._
 import epic.framework.{AugmentableInference, StandardExpectedCounts, Feature}
@@ -461,3 +462,4 @@ object DocSRL {
 
 
 }
+*/

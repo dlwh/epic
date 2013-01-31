@@ -133,8 +133,8 @@ object EverythingPipeline {
       null)
 
     // srl
-    val srlModel = new DocSRL.ModelFactory().makeModel(train)
-    val srlLabels: Index[String] = srlModel.labelIndex
+//    val srlModel = new DocSRL.ModelFactory().makeModel(train)
+    val srlLabels: Index[String] = Index[String]()
     val srlProp = Property("srl", new OptionIndex(srlLabels))
 
 
