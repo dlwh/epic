@@ -4,7 +4,7 @@ import breeze.collection.mutable.TriangularArray
 import epic.trees._
 import epic.parser.ParseChart.SparsityPattern
 import epic.sequences.{SemiCRF, Segmentation}
-import epic.ontonotes.{Document, NERType}
+import epic.ontonotes.{Frame, Document, NERType}
 import epic.parser.projections.{GoldTagPolicy, ConstraintCoreGrammar}
 import epic.coref.CorefInstanceFeaturizer
 import breeze.util.Index
@@ -14,7 +14,6 @@ import epic.parser.features.BasicFeaturizer
 import epic.trees.StandardTreeProcessor
 import epic.sequences.Segmentation
 import scala.Some
-import epic.ontonotes.Document
 import epic.parser._
 
 /**
@@ -28,6 +27,7 @@ case class FeaturizedSentence(index: Int, words: IndexedSeq[String],
                               constituentSparsity: SparsityPattern,
                               nerOpt: Option[Segmentation[NERType.Value, String]],
                               nerConstraints: SemiCRF.SpanConstraints,
+                              frames: IndexedSeq[Frame],
                               wordFeatures: IndexedSeq[Array[Int]],
                               spanFeatures: TriangularArray[Array[Int]],
                               speaker: Option[String] = None,
@@ -98,6 +98,7 @@ object FeaturizedDocument {
           constituentSparsity,
           Some(seg),
           nerConstraints,
+          s.srl,
           words, spans,
           s.speaker,
           s.id)
@@ -155,6 +156,7 @@ object FeaturizedDocument {
          constituentSparsity,
          Some(seg),
          nerConstraints,
+         s.srl,
          words, spans,
          s.speaker,
          s.id)

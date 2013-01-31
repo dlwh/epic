@@ -24,7 +24,7 @@ import features.RuleFeature
 import features.RuleFeature
 import features.{RuleFeature, TagAwareWordShapeFeaturizer}
 import models._
-import breeze.util.{Encoder, Lens, Index}
+import breeze.util.{OptionIndex, Encoder, Lens, Index}
 import epic.parser.models._
 import breeze.linalg._
 import epic.trees.annotations.StripAnnotations
@@ -112,7 +112,7 @@ object EverythingPipeline {
     // NERProperties
 
 
-    var trainTrees = for (d <- train; s <- d.sentences) yield {
+    var trainTrees: Array[TreeInstance[AnnotatedLabel, String]] = for (d <- train; s <- d.sentences) yield {
       params.treebank.makeTreeInstance(s.id, s.tree.map(_.label), s.words, removeUnaries = true)
     }
 
@@ -131,7 +131,12 @@ object EverythingPipeline {
       nerPruningModel,
       null)
 
-    val beliefsFactory = new DocumentBeliefs.Factory(baseParser.grammar, nerModel.labelIndex)
+    //    val srlModel = new DocSRL.ModelFactory().makeModel(train)
+    val srlLabels: Index[String] = Index[String]()
+    val srlProp = Property("srl", new OptionIndex(srlLabels))
+    val beliefsFactory = new DocumentBeliefs.Factory(baseParser.grammar, nerModel.labelIndex, srlLabels)
+    // srl
+
     /*
     // Coref
     val corefNerProp = nerProp.copy(name = "Coref::NER") // own copy of corefNer, since we're using soft agreement.
@@ -145,7 +150,7 @@ object EverythingPipeline {
     */
 
 
-    val processedTrain = train.map(docProcessor(_, keepGoldTree=true))
+    val processedTrain = train.par.map(docProcessor(_, keepGoldTree=true)).seq
 
     val lexParseModel = extractLexParserModel(trainTrees, baseParser, beliefsFactory, weightsCache)
     // train the lex parse model
@@ -211,7 +216,7 @@ object EverythingPipeline {
     }
 
 
-    val myTest = test.take(20).map(docProcessor)
+    val myTest = test.take(20).par.map(docProcessor).seq
 
     val opt = params.opt
     for( s:OptState <- opt.iterations(cachedObj, obj.initialWeightVector(randomize = false))) {
@@ -224,7 +229,7 @@ object EverythingPipeline {
 
       if( s.iter % 5 == 0) {
         val inf = epModel.inferenceFromWeights(s.x)
-        val results: Array[immutable.IndexedSeq[DocumentAnnotatingModel#EvaluationResult]] = for (d <- myTest) yield {
+        val results = for (d <- myTest) yield {
           val epMarg = inf.marginal(d)
           for ( i <- 0 until epMarg.marginals.length) yield {
             val casted =  inf.inferences(i).asInstanceOf[DocumentAnnotatingInference]

@@ -78,7 +78,7 @@ object AnnotatingPipeline {
     val (docProcessor, processedTrain) = buildProcessor(train, weightsCache, params)
     val processedTest = test.par.map(docProcessor(_)).seq.flatMap(_.sentences)
 
-    val beliefsFactory = new SentenceBeliefs.Factory(docProcessor.grammar, docProcessor.nerLabelIndex)
+    val beliefsFactory = new SentenceBeliefs.Factory(docProcessor.grammar, docProcessor.nerLabelIndex, Index[String]())
 
     // now build the individual models
     val nerModel = makeNERModel(beliefsFactory, docProcessor, processedTrain, weightsCache)
