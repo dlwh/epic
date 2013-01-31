@@ -110,7 +110,6 @@ object EverythingPipeline {
     val nerPruningModel = new SemiCRF.ConstraintGrammar(baseNER)
     val nerModel = new SegmentationModelFactory(NERType.OutsideSentence, Some(nerPruningModel), Gazetteer.ner("en"), {(f: Feature) => weightsCache(f.toString)}).makeModel(nerSegments)
     // NERProperties
-    val nerProp = Property("NER::Type", nerModel.labelIndex)
 
 
     var trainTrees = for (d <- train; s <- d.sentences) yield {
@@ -132,7 +131,7 @@ object EverythingPipeline {
       nerPruningModel,
       null)
 
-    val beliefsFactory = new DocumentBeliefs.Factory(baseParser.grammar, nerProp)
+    val beliefsFactory = new DocumentBeliefs.Factory(baseParser.grammar, nerModel.labelIndex)
     /*
     // Coref
     val corefNerProp = nerProp.copy(name = "Coref::NER") // own copy of corefNer, since we're using soft agreement.
@@ -170,7 +169,7 @@ object EverythingPipeline {
     val symLens: Lens[SpanBeliefs,Beliefs[Option[AnnotatedLabel]]] = Lens({_.label}, {(a,b) => a.copy(label=b)})
 
     val assocSynNer = PropertyPropagation.simpleModel(beliefsFactory,
-      nerProp, nerLens,
+      beliefsFactory.nerProp, nerLens,
       beliefsFactory.optionLabelProp, symLens)
 
     // joint-aware models
@@ -278,7 +277,7 @@ object EverythingPipeline {
       headFinder,
       parser.grammar.index,
       parser.grammar.labelIndex,
-      1, // TODO was 100
+      100,
       -1,
       trees)
 

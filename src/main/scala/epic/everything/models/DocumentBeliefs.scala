@@ -58,7 +58,8 @@ case class DocumentBeliefs(sentences: Array[SentenceBeliefs]) extends Factor[Doc
 }
 
 object DocumentBeliefs {
-  class Factory(grammar: BaseGrammar[AnnotatedLabel], val nerProp: Property[NERType.Value]) {
+  class Factory(grammar: BaseGrammar[AnnotatedLabel], val nerLabelIndex: Index[NERType.Value]) {
+    val nerProp = Property("ner", nerLabelIndex)
     private val initNERBelief = Beliefs.improperUninformed(nerProp)
 
     val labelProp = Property("label", grammar.labelIndex)
@@ -153,35 +154,37 @@ case class SentenceBeliefs(spans: TriangularArray[SpanBeliefs],
 }
 
 object SentenceBeliefs {
-  class Factory(grammar: BaseGrammar[AnnotatedLabel], val nerProp: Property[NERType.Value]) {
-   private val initNERBelief = Beliefs.improperUninformed(nerProp)
+  class Factory(grammar: BaseGrammar[AnnotatedLabel], val nerLabelIndex: Index[NERType.Value]) {
 
-   val labelProp = Property("label", grammar.labelIndex)
-   val optionLabelProp = Property("option[label]", new OptionIndex(grammar.labelIndex))
+    val nerProp = Property("ner", nerLabelIndex)
+    val labelProp = Property("label", grammar.labelIndex)
+    val optionLabelProp = Property("option[label]", new OptionIndex(grammar.labelIndex))
 
-   def apply(s: FeaturizedSentence):SentenceBeliefs = {
-     val spanGovernorBeliefs = Beliefs.improperUninformed("wordPos+None", new DenseIntIndex(0, s.length+2))
-     val wordGovernorBeliefs = Beliefs.improperUninformed("wordPos", new DenseIntIndex(0, s.length+1))
-     //        val governedSpanBeliefs = Beliefs.improperUninformed("span", Index{for(b <- 0 until s.length + 1; end <- b until s.length + 1) yield Span(b,end)})
-     val optionLabelBeliefs = Beliefs.improperUninformed(optionLabelProp)
-     val labelBeliefs = Beliefs.improperUninformed(labelProp)
-     val spans = TriangularArray.tabulate(s.length+1) { (begin, end) =>
-       if(begin < end && s.isPossibleSpan(begin, end))
-         SpanBeliefs(DSpan(s.id,s.index,begin, end), spanGovernorBeliefs, optionLabelBeliefs, initNERBelief)
-       else
-         null
-     }
-     val words = Array.tabulate(s.length) { (pos) =>
-       WordBeliefs(DPos(s.id,s.index,pos),
-         wordGovernorBeliefs,
-         //            governedSpanBeliefs,
-         labelBeliefs,
-         labelBeliefs)
-     }
+    private val initNERBelief = Beliefs.improperUninformed(nerProp)
+    private val labelBeliefs = Beliefs.improperUninformed(labelProp)
+    private val optionLabelBeliefs = Beliefs.improperUninformed(optionLabelProp)
 
-     SentenceBeliefs(spans, words)
-   }
- }
+    def apply(s: FeaturizedSentence):SentenceBeliefs = {
+      val spanGovernorBeliefs = Beliefs.improperUninformed("wordPos+None", new DenseIntIndex(0, s.length+2))
+      val wordGovernorBeliefs = Beliefs.improperUninformed("wordPos", new DenseIntIndex(0, s.length+1))
+      //        val governedSpanBeliefs = Beliefs.improperUninformed("span", Index{for(b <- 0 until s.length + 1; end <- b until s.length + 1) yield Span(b,end)})
+      val spans = TriangularArray.tabulate(s.length+1) { (begin, end) =>
+        if(begin < end && s.isPossibleSpan(begin, end))
+          SpanBeliefs(DSpan(s.id,s.index,begin, end), spanGovernorBeliefs, optionLabelBeliefs, initNERBelief)
+        else
+          null
+      }
+      val words = Array.tabulate(s.length) { (pos) =>
+        WordBeliefs(DPos(s.id,s.index,pos),
+          wordGovernorBeliefs,
+          //            governedSpanBeliefs,
+          labelBeliefs,
+          labelBeliefs)
+      }
+
+      SentenceBeliefs(spans, words)
+    }
+  }
 }
 
 
@@ -209,7 +212,7 @@ case class SpanBeliefs(span: DSpan,
     governor.isConvergedTo(f.governor, diff)
       && label.isConvergedTo(f.label, diff)
       && ner.isConvergedTo(f.ner, diff)
-//      && observedNer.isConvergedTo(f.observedNer, diff)
+    //      && observedNer.isConvergedTo(f.observedNer, diff)
     )
 
   def maxChange(f: SpanBeliefs): Double = {
@@ -219,44 +222,44 @@ case class SpanBeliefs(span: DSpan,
 
 case class WordBeliefs(pos: DPos,
                        governor: Beliefs[Int],
-//                       span: Beliefs[Span],
+                       //                       span: Beliefs[Span],
                        tag: Beliefs[AnnotatedLabel],
                        maximalLabel: Beliefs[AnnotatedLabel]
                        //,
-//                       anaphoric: Beliefs[Boolean],
-//                       anaphor: Beliefs[DPos],
-//                       coref: Array[Beliefs[Int]]
-                       ) extends Factor[WordBeliefs] {
+                       //                       anaphoric: Beliefs[Boolean],
+                       //                       anaphor: Beliefs[DPos],
+                       //                       coref: Array[Beliefs[Int]]
+                        ) extends Factor[WordBeliefs] {
   def *(f: WordBeliefs): WordBeliefs = WordBeliefs(pos, governor * f.governor, /*span * f.span,*/ tag * f.tag, maximalLabel * f.maximalLabel)//, f.anaphoric * f.anaphoric, f.anaphor * f.anaphor, Array.tabulate(coref.length)(i => coref(i) * f.coref(i)))
 
- def /(f: WordBeliefs): WordBeliefs = {
-   WordBeliefs(pos,
-     governor / f.governor,
-     /*span / f.span,*/
-     tag / f.tag,
-     maximalLabel / f.maximalLabel)
- }//, f.anaphoric / f.anaphoric, f.anaphor / f.anaphor, Array.tabulate(coref.length)(i => coref(i) / f.coref(i)))
- //*/
+  def /(f: WordBeliefs): WordBeliefs = {
+    WordBeliefs(pos,
+      governor / f.governor,
+      /*span / f.span,*/
+      tag / f.tag,
+      maximalLabel / f.maximalLabel)
+  }//, f.anaphoric / f.anaphoric, f.anaphor / f.anaphor, Array.tabulate(coref.length)(i => coref(i) / f.coref(i)))
+  //*/
 
   def logPartition: Double =  (
     0.0
-    + governor.logPartition
-//      + span.logPartition
+      + governor.logPartition
+      //      + span.logPartition
       + tag.logPartition
       + maximalLabel.logPartition
-//      + anaphoric.logPartition
-//      + anaphor.logPartition
-//      + coref.foldLeft(0.0)(_ + _.logPartition)
+    //      + anaphoric.logPartition
+    //      + anaphor.logPartition
+    //      + coref.foldLeft(0.0)(_ + _.logPartition)
     )
 
   def isConvergedTo(f: WordBeliefs, diff: Double): Boolean = (this eq f) || (
     governor.isConvergedTo(f.governor, diff)
-//      && span.isConvergedTo(f.span, diff)
+      //      && span.isConvergedTo(f.span, diff)
       && tag.isConvergedTo(f.tag, diff)
-//      && anaphoric.isConvergedTo(f.anaphoric, diff)
-//      && anaphor.isConvergedTo(f.anaphor, diff)
+      //      && anaphoric.isConvergedTo(f.anaphoric, diff)
+      //      && anaphor.isConvergedTo(f.anaphor, diff)
       && maximalLabel.isConvergedTo(f.tag, diff)
-//      && (0 until coref.length).forall(i => coref(i).isConvergedTo(f.coref(i), diff))
+    //      && (0 until coref.length).forall(i => coref(i).isConvergedTo(f.coref(i), diff))
     )
 }
 

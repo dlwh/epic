@@ -15,6 +15,7 @@ import epic.trees.StandardTreeProcessor
 import epic.sequences.Segmentation
 import scala.Some
 import epic.ontonotes.Document
+import epic.parser._
 
 /**
  * 
@@ -31,6 +32,10 @@ case class FeaturizedSentence(index: Int, words: IndexedSeq[String],
                               spanFeatures: TriangularArray[Array[Int]],
                               speaker: Option[String] = None,
                               id: String = "")  {
+  def featuresForSpan(begin: Int, end: Int) = spanFeatures(begin, end)
+
+  def featuresForWord(w: Int) = wordFeatures(w)
+
   def withTree(tree: BinarizedTree[AnnotatedLabel]) = copy(treeOpt = Some(tree))
 
   def treeInstance = TreeInstance(id +"-tree", tree, words)
@@ -56,8 +61,7 @@ object FeaturizedDocument {
                   nerConstrainer: SemiCRF.ConstraintGrammar[NERType.Value, String],
                   tagWordCounts: Counter2[AnnotatedLabel, String, Double],
                   corefFeaturizer: CorefInstanceFeaturizer)(docs: IndexedSeq[Document]): (Factory, IndexedSeq[FeaturizedDocument]) = {
-    val wordFeatureIndex = Index[Feature]()
-    val spanFeatureIndex = Index[Feature]()
+    val wordFeatureIndex, spanFeatureIndex = Index[Feature]()
 
     val featurizer = new BasicFeaturizer(tagWordCounts, breeze.linalg.sum(tagWordCounts, Axis._0))
 
@@ -114,7 +118,12 @@ object FeaturizedDocument {
                     wordFeatureIndex: Index[Feature],
                     spanFeatureIndex: Index[Feature]) extends (Document=>FeaturizedDocument) {
 
-   def apply(d: Document):FeaturizedDocument = apply(d, keepGoldTree = false)
+    def grammar: BaseGrammar[AnnotatedLabel] = parseConstrainer.grammar
+    def lexicon: Lexicon[AnnotatedLabel, String] = parseConstrainer.lexicon
+    def nerLabelIndex = nerConstrainer.labelIndex
+
+
+    def apply(d: Document):FeaturizedDocument = apply(d, keepGoldTree = false)
 
 
    def apply(d: Document, keepGoldTree: Boolean = false):FeaturizedDocument = {
