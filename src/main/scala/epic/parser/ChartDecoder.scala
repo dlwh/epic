@@ -268,8 +268,8 @@ class MaxConstituentDecoder[L, W] extends ChartDecoder[L, W] {
           val bRefinements = inside.bot.enteredLabelRefinements(begin, end, bestBot).toArray
           val arr = new Array[Double](aRefinements.length * bRefinements.length)
           var i = 0
-          for (aRef <- aRefinements; bRef <- bRefinements) {
-            val ref = anchoring.refined.ruleRefinementFromRefinements(r, aRef, bRef)
+          for (bRef <- bRefinements; ref <- anchoring.refined.validUnaryRuleRefinementsGivenChild(begin, end, r, bRef)) {
+            val aRef = anchoring.refined.parentRefinement(r, ref)
             arr(i) = (anchoring.scoreUnaryRule(begin, end, r, ref)
               + outside.top.labelScore(begin, end, bestTop, aRef)
               + inside.bot.labelScore(begin, end, bestBot, bRef)

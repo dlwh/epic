@@ -63,7 +63,7 @@ case class ChartMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
     } {
       val end = begin + span
 
-      // I get a 20% speedup if i inline these arrays. so be it.
+      // I get a 20% speedup if I inline these arrays. so be it.
       val narrowRight = inside.top.narrowRight(begin)
       val narrowLeft = inside.top.narrowLeft(end)
       val wideRight = inside.top.wideRight(begin)
@@ -190,7 +190,9 @@ object ChartMarginal {
         offset += 1
       }
     }
-    inside.sum(rootScores, offset)
+    val score = inside.sum(rootScores, offset)
+    assert(!score.isNaN)
+    score
   }
 
   private def buildInsideChart[L, W, Chart[X] <: ParseChart[X]](anchoring: AugmentedAnchoring[L, W],

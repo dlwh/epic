@@ -15,6 +15,7 @@ import epic.trees.StandardTreeProcessor
 import epic.sequences.Segmentation
 import scala.Some
 import epic.parser._
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * 
@@ -71,18 +72,24 @@ object FeaturizedDocument {
 
     val featurizer = new BasicFeaturizer(tagWordCounts, breeze.linalg.sum(tagWordCounts, Axis._0))
 
-    val constraints = for(d <- docs.par) yield for(s <- d.sentences) yield {
-      val seg = s.nerSegmentation
-      var tree = treeProcessor(s.tree.map(_.treebankString))
-      tree = UnaryChainRemover.removeUnaryChains(tree)
-      val policy: GoldTagPolicy[AnnotatedLabel] = GoldTagPolicy.goldTreeForcing(tree.map(parseConstrainer.grammar.labelIndex))
-      val constituentSparsity = parseConstrainer.rawConstraints(s.words, policy).sparsity
-      val nerConstraints = nerConstrainer.constraints(s.nerSegmentation, keepGold = true)
+    val count = new AtomicInteger(0)
+    val constraints = for(d <- docs.par) yield {
+      println(s"in ${d.id}")
+      val r = for(s <- d.sentences.par) yield {
+        val seg = s.nerSegmentation
+        var tree = treeProcessor(s.tree.map(_.treebankString))
+        tree = UnaryChainRemover.removeUnaryChains(tree)
+        val policy: GoldTagPolicy[AnnotatedLabel] = GoldTagPolicy.goldTreeForcing(tree.map(parseConstrainer.grammar.labelIndex))
+        val constituentSparsity = parseConstrainer.rawConstraints(s.words, policy).sparsity
+        val nerConstraints = nerConstrainer.constraints(s.nerSegmentation, keepGold = true)
 
-      (tree, seg, constituentSparsity, nerConstraints)
+        (tree, seg, constituentSparsity, nerConstraints)
+      }
+      println(s"done: ${d.id} ${count.getAndIncrement}/${docs.length}")
+      r.seq
     }
 
-    val featurized = for( (d, other) <- docs zip constraints.seq) yield {
+    val featurized = for( ((d, other)) <- docs zip constraints.seq) yield {
       val newSentences = for( (s, (tree, seg, constituentSparsity, nerConstraints)) <- d.sentences zip other) yield {
         def isPossibleSpan(begin: Int, end: Int) = (
           constituentSparsity.activeTriangularIndices.contains(TriangularArray.index(begin,end))
@@ -98,6 +105,7 @@ object FeaturizedDocument {
             null
           }
         }
+
 
         FeaturizedSentence(s.index, s.words,
           Some(tree),

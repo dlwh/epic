@@ -18,7 +18,7 @@ package epic.framework
 
 import collection.mutable.ArrayBuffer
 import breeze.inference.{ExpectationPropagation, Factor}
-import epic.everything.models.DocumentBeliefs
+import epic.everything.models.{SentenceBeliefs, DocumentBeliefs}
 
 class EPInference[Datum, Augment](val inferences: IndexedSeq[ProjectableInference[Datum, Augment]],
                                   val maxEPIter: Int,
@@ -67,7 +67,7 @@ class EPInference[Datum, Augment](val inferences: IndexedSeq[ProjectableInferenc
       marginals(i) = marg
       newAugment -> contributionToLikelihood
     }
-    val ep = new ExpectationPropagation(project _)
+    val ep = new ExpectationPropagation(project _, 1E-3)
 
     var state: ep.State = null
     val iterates = ep.inference(augment, 0 until inferences.length, IndexedSeq.fill[Augment](inferences.length)(null.asInstanceOf[Augment]))
@@ -75,12 +75,15 @@ class EPInference[Datum, Augment](val inferences: IndexedSeq[ProjectableInferenc
     while (!converged && iter < maxEPIter && iterates.hasNext) {
       val s = iterates.next()
       if (state != null) {
-        converged = (s.logPartition - state.logPartition).abs / math.max(s.logPartition, state.logPartition) < 1E-4
+        //        converged = (s.logPartition - state.logPartition).abs / math.max(s.logPartition, state.logPartition) < 1E-4
+//        if (s.q.isInstanceOf[SentenceBeliefs]) {
+//          println(iter + " gold " + s.q.asInstanceOf[SentenceBeliefs].maxChange(state.q.asInstanceOf[SentenceBeliefs]) + " " + s.logPartition + " " + state.logPartition)
+//        }
       }
       iter += 1
       state = s
     }
-//    print(iter + " gold(" + state.logPartition+") ")
+//    print(s"gold($iter:${state.logPartition})")
 
     EPMarginal(state.logPartition, state.q, marginals)
   }
@@ -103,22 +106,25 @@ class EPInference[Datum, Augment](val inferences: IndexedSeq[ProjectableInferenc
       newAugment -> contributionToLikelihood
     }
 
-    val ep = new ExpectationPropagation(project _)
+    val ep = new ExpectationPropagation(project _, 1E-3)
 
     var state: ep.State = null
     val iterates = ep.inference(augment, 0 until inferences.length, IndexedSeq.fill[Augment](inferences.length)(null.asInstanceOf[Augment]))
     var converged = false
     while (!converged && iter < maxEPIter && iterates.hasNext) {
       val s = iterates.next()
-//      if (state != null) {
+      if (state != null) {
 //        converged = (s.logPartition - state.logPartition).abs / math.max(s.logPartition, state.logPartition) < 1E-5
-//        println(s.q.isConvergedTo(state.q) + " " + s.logPartition + " " + state.logPartition)
-//      }
+//        println(iter + " guess " + s.q.isConvergedTo(state.q) + " " + s.logPartition + " " + state.logPartition)
+//        if (s.q.isInstanceOf[SentenceBeliefs]) {
+//          println(iter + " guess " + s.q.asInstanceOf[SentenceBeliefs].maxChange(state.q.asInstanceOf[SentenceBeliefs]) + " " + s.logPartition + " " + state.logPartition)
+//        }
+      }
 
       iter += 1
       state = s
     }
-//    print(iter + " guess(" + state.logPartition+") ")
+//    print(s"guess($iter:${state.logPartition})")
 
     EPMarginal(state.logPartition, state.q, marginals)
   }
