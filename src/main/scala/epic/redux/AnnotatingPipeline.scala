@@ -88,11 +88,14 @@ object AnnotatingPipeline {
     if(params.trainBaseModels) {
       println("Training base models")
       for(m <- IndexedSeq(nerModel, lexModel)) {
-        println("Training " + m)
+        println("Training " + m.getClass.getName)
         val obj = new ModelObjective(m, processedTrain.flatMap(_.sentences))
-        val cached = new CachedBatchDiffFunction(obj)
-        val weights = params.baseOpt.minimize(cached, obj.initialWeightVector(randomize = false))
-        updateWeights(params.weightsCache, weightsCache, Encoder.fromIndex(nerModel.featureIndex).decode(weights))
+        val cachedObj = new CachedBatchDiffFunction(obj)
+        val checking = new RandomizedGradientCheckingFunction(cachedObj, 1E-2, toString = {
+          (i: Int) => m.featureIndex.get(i).toString
+        })
+        val weights = params.baseOpt.minimize(cachedObj, obj.initialWeightVector(randomize = false))
+        updateWeights(params.weightsCache, weightsCache, Encoder.fromIndex(m.featureIndex).decode(weights))
         println(s"Decoding $m...")
         println(s"Evaluation result for $m: " + m.evaluate(processedTrain.flatMap(_.sentences), weights))
       }
@@ -189,8 +192,12 @@ object AnnotatingPipeline {
 
     val nerPruningModel = new SemiCRF.ConstraintGrammar(baseNER)
 
-    val trainTrees = for (d <- train; s <- d.sentences) yield {
+    var trainTrees = for (d <- train; s <- d.sentences) yield {
       params.treebank.makeTreeInstance(s.id, s.tree.map(_.label), s.words, removeUnaries = true)
+    }
+
+    if(params.treebank.path.exists) {
+      trainTrees ++= params.treebank.trainTrees
     }
 
     val annotator = new PipelineAnnotator[AnnotatedLabel, String](Seq(StripAnnotations(), AddMarkovization(horizontal = 1, vertical = 2)))

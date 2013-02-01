@@ -542,7 +542,7 @@ final class LexGrammar[L, W](val grammar: BaseGrammar[L],
     }
 
     def ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int) = {
-      require(refA == refB)
+      require(refA == refB, s"Parent head for rule ${grammar.index.get(r)} was '${words(refA)}' and child head was '${words(refB)}', but should be the same!" + words)
       refA
     }
 

@@ -100,14 +100,14 @@ object ChainNER {
               copy.ner.beliefs(notNER) = 0.0
             } else {
               copy.ner.beliefs(notNER) = 1 - sum(copy.ner.beliefs)
-              if (copy.ner.beliefs(notNER) < 1E-6) {
-                assert(copy.ner.beliefs(notNER) > -1E-6)
-                copy.ner.beliefs(notNER) = 0.0
-              }
+//              if (copy.ner.beliefs(notNER) < 1E-6) {
+//                assert(copy.ner.beliefs(notNER) > -1E-3, "copy.ner.beliefs(notNER) should have been bigger than " + copy.ner.beliefs(notNER) + " " + copy.ner.beliefs + " " + spanBeliefs.ner)
+//                copy.ner.beliefs(notNER) = 0.0
+//              }
             }
             val normalizer: Double = sum(copy.ner.beliefs)
             // make sure it's close to normalized already...
-            assert( (normalizer - 1.0).abs < 1E-3, s"NER not normalized! new: ${copy.ner} old: ${spanBeliefs.ner}")
+//            assert( (normalizer - 1.0).abs < 1E-3, s"NER not normalized! new: ${copy.ner} old: ${spanBeliefs.ner}")
             copy.ner.beliefs /= normalizer
             copy
           }
@@ -214,7 +214,7 @@ object ChainNER {
         if (f eq null) Double.NegativeInfinity
         else dot(weights, f, wordFeatures(l)(1))
       }
-      val endCache = Array.tabulate(labelIndex.size, length+1){ (l, w) =>
+      val endCache = Array.tabulate(labelIndex.size, length){ (l, w) =>
         val f = fs.featuresForWord(w)
         if (f eq null) Double.NegativeInfinity
         else dot(weights, f, wordFeatures(l)(2))
@@ -261,7 +261,7 @@ object ChainNER {
         } else {
           score += beginCache(cur)(beg)
           score += endCache(cur)(end-1)
-          var pos = beg
+          var pos = beg+1
           while(pos < end) {
             score += wordCache(cur)(pos)
             pos += 1
@@ -277,7 +277,7 @@ object ChainNER {
           def daxpy(d: Double, vector: Array[Int], featureMap: Array[Int], counts: DenseVector[Double]) {
             var i = 0
             while(i < vector.length) {
-              counts(vector(i)) += d * scale
+              counts(featureMap(vector(i))) += d * scale
               i += 1
             }
 

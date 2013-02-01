@@ -106,18 +106,27 @@ case class SentenceBeliefs(spans: TriangularArray[SpanBeliefs],
   def spanBeliefs(beg: Int, end: Int) = spans(beg,end)
 
   def *(f: SentenceBeliefs): SentenceBeliefs = {
-    require(wordBeliefs.length == f.wordBeliefs.length)
-    val newSpans = TriangularArray.tabulate(wordBeliefs.length+1) { (i,j) => if(spans(i, j) eq null) null else spans(i,j) * f.spans(i,j)}
-    val newWords = Array.tabulate(wordBeliefs.length) { (i) => wordBeliefs(i) * f.wordBeliefs(i)}
-    SentenceBeliefs(newSpans, newWords)
+    if (f eq null) {
+      this
+    } else {
+
+      require(wordBeliefs.length == f.wordBeliefs.length)
+      val newSpans = TriangularArray.tabulate(wordBeliefs.length+1) { (i,j) => if(spans(i, j) eq null) null else spans(i,j) * f.spans(i,j)}
+      val newWords = Array.tabulate(wordBeliefs.length) { (i) => wordBeliefs(i) * f.wordBeliefs(i)}
+      SentenceBeliefs(newSpans, newWords)
+    }
   }
 
 
   def /(f: SentenceBeliefs): SentenceBeliefs = {
-    require(wordBeliefs.length == f.wordBeliefs.length)
-    val newSpans = TriangularArray.tabulate(wordBeliefs.length+1) { (i,j) => if(spans(i,j) eq null) null else spans(i,j) / f.spans(i,j)}
-    val newWords = Array.tabulate(wordBeliefs.length) { (i) => wordBeliefs(i) / f.wordBeliefs(i)}
-    SentenceBeliefs(newSpans, newWords)
+    if (f eq null) {
+      this
+    } else {
+      require(wordBeliefs.length == f.wordBeliefs.length)
+      val newSpans = TriangularArray.tabulate(wordBeliefs.length+1) { (i,j) => if(spans(i,j) eq null) null else spans(i,j) / f.spans(i,j)}
+      val newWords = Array.tabulate(wordBeliefs.length) { (i) => wordBeliefs(i) / f.wordBeliefs(i)}
+      SentenceBeliefs(newSpans, newWords)
+    }
   }
 
 
@@ -216,7 +225,7 @@ case class SpanBeliefs(span: DSpan,
     governor / f.governor,
     label / f.label,
     ner / f.ner,
-    {for ((a,b) <- frames zip f.frames) yield a * b})
+    {for ((a,b) <- frames zip f.frames) yield a / b})
 
   def logPartition: Double = governor.logPartition + label.logPartition + ner.logPartition + frames.map(_.logPartition).sum
 
@@ -224,11 +233,12 @@ case class SpanBeliefs(span: DSpan,
     governor.isConvergedTo(f.governor, diff)
       && label.isConvergedTo(f.label, diff)
       && ner.isConvergedTo(f.ner, diff)
+      && {for ((a,b) <- frames zip f.frames iterator) yield a isConvergedTo b}.forall(_ == true)
     //      && observedNer.isConvergedTo(f.observedNer, diff)
     )
 
   def maxChange(f: SpanBeliefs): Double = {
-    governor.maxChange(f.governor) max label.maxChange(f.label) max ner.maxChange(f.ner)
+    governor.maxChange(f.governor) max label.maxChange(f.label) max ner.maxChange(f.ner) max  {if (frames.isEmpty) 0.0 else {for ((a,b) <- frames zip f.frames) yield a.maxChange(b)}.max}
   }
 }
 

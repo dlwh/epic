@@ -48,7 +48,7 @@ case class ProcessedTreebank(@Help(text="Location of the treebank directory")
     val binarizedAndTransformed = for (
       ((tree, words), index) <- portion.trees.zipWithIndex if words.length <= maxL
     ) yield {
-      val name = s"{portion.name}-$index"
+      val name = s"${portion.name}-$index"
       makeTreeInstance(name, tree, words, removeUnaries)
     }
 

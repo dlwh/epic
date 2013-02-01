@@ -16,12 +16,11 @@ package annotations
  limitations under the License.
 */
 /**
- * More or less the annotator that does Klein&Manning 2003 annotations. The defaults use no
- * horizontal markovization, because v2h2 markovization can't reach all trees on the dev set...
+ * More or less the annotator that does Klein&Manning 2003 annotations.
  * @author dlwh
  */
 
-case class KMAnnotator( horizontal: Int = 1, vertical: Int = 2) extends TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] {
+case class KMAnnotator( horizontal: Int = 2, vertical: Int = 2) extends TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] {
   val pipeline = (
     StripAnnotations[String]() andThen
     AddMarkovization[String](horizontal,vertical) andThen
