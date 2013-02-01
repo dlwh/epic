@@ -82,7 +82,7 @@ object AnnotatingPipeline {
       println("Training base models")
       for(m <- IndexedSeq(nerModel, lexModel)) {
         println("Training " + m.getClass.getName)
-        val obj = new ModelObjective(m, processedTrain.flatMap(_.sentences))
+        val obj = new ModelObjective(m, processedTrain.flatMap(_.sentences).filter(_.words.filter(_(0).isLetterOrDigit).length <= 40))
         val cachedObj = new CachedBatchDiffFunction(obj)
         val weights = params.baseOpt.minimize(cachedObj, obj.initialWeightVector(randomize = false))
         updateWeights(params.weightsCache, weightsCache, Encoder.fromIndex(m.featureIndex).decode(weights))
@@ -108,7 +108,7 @@ object AnnotatingPipeline {
       assocSynNer
     )
 
-    val obj = new ModelObjective(epModel, processedTrain.flatMap(_.sentences))
+    val obj = new ModelObjective(epModel, processedTrain.flatMap(_.sentences).filter(_.words.filter(_(0).isLetterOrDigit).length <= 40))
     val cachedObj = new CachedBatchDiffFunction(obj)
 
     val checking = new RandomizedGradientCheckingFunction(cachedObj, 1E-2, toString = {

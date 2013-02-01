@@ -62,6 +62,10 @@ class LexGovernorProjector[L, W](grammar: LexGrammar[L, W]) {
       val parent = grammar.grammar.parent(rule)
       spanType(begin,end)(parent) += score
       spanType(begin,end)(notAConstituent) -= score
+      if(spanType(begin, end)(notAConstituent) < 0) {
+        assert(spanType(begin, end)(notAConstituent) > -1E-6)
+        spanType(begin, end)(notAConstituent) = 0.0
+      }
       val head = otherAnch.spanHeadIndex(ref)
 
       if (begin == 0 && end == length) { // root, get the length

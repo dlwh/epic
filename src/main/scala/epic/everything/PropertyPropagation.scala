@@ -102,9 +102,10 @@ object PropertyPropagation {
       var p1 = 0
       while (p1 < result.rows) {
         var p2 = 0
-        if (b1.beliefs(p1) != 0.0)
+        if (b1.beliefs(p1) > 1E-6)
           while (p2 < result.cols) {
-            result(p1, p2) = score(grounding, p1, p2) * b1.beliefs(p1) * b2.beliefs(p2)
+            if(b2.beliefs(p2) > 1E-6)
+              result(p1, p2) = score(grounding, p1, p2) * b1.beliefs(p1) * b2.beliefs(p2)
             p2 += 1
           }
         p1 += 1
