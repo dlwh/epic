@@ -50,6 +50,12 @@ case class FeaturizedSentence(index: Int, words: IndexedSeq[String],
     constituentSparsity.activeTriangularIndices.contains(TriangularArray.index(begin,end))
       || (nerConstraints.allowedLabels(begin,end).ne(null) && nerConstraints.allowedLabels(begin,end).nonEmpty)
   )
+
+  def validConstituents: collection.immutable.BitSet = constituentSparsity.activeTriangularIndices
+
+  def isPossibleConstituent(begin: Int, end: Int) = {
+    constituentSparsity.activeTriangularIndices.contains(TriangularArray.index(begin, end))
+  }
 }
 
 

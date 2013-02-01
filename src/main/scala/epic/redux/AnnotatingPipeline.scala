@@ -2,9 +2,6 @@ package epic.redux
 
 import java.io.File
 import epic.trees._
-import annotations.AddMarkovization
-import annotations.PipelineAnnotator
-import annotations.StripAnnotations
 import epic.parser.{Lexicon, GenerativeParser, ParserParams}
 import epic.parser.ParserParams.XbarGrammar
 import breeze.config.{Help, CommandLineParser}
@@ -21,15 +18,6 @@ import epic.trees.annotations.AddMarkovization
 import epic.trees.annotations.PipelineAnnotator
 import epic.parser.models.{IndexedLexFeaturizer, SimpleWordShapeGen}
 import epic.parser.features.TagAwareWordShapeFeaturizer
-import epic.trees.ProcessedTreebank
-import epic.parser.features.RuleFeature
-import scala.Some
-import epic.parser.models.StandardFeaturizer
-import breeze.optimize.FirstOrderMinimizer.OptParams
-import epic.ontonotes.Document
-import epic.everything.models.SpanBeliefs
-import epic.parser.models.LexGrammarBundle
-import epic.redux.FeaturizedDocument.Factory
 import collection.immutable
 import epic.trees.ProcessedTreebank
 import epic.parser.features.RuleFeature
@@ -37,7 +25,6 @@ import scala.Some
 import epic.parser.models.StandardFeaturizer
 import breeze.optimize.FirstOrderMinimizer.OptParams
 import epic.ontonotes.Document
-import epic.redux.FeaturizedSentence
 import epic.everything.models.SpanBeliefs
 import epic.parser.models.LexGrammarBundle
 import epic.redux.FeaturizedDocument.Factory
