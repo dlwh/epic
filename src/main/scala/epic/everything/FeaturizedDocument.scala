@@ -1,4 +1,4 @@
-package epic.redux
+package epic.everything
 
 import breeze.collection.mutable.TriangularArray
 import epic.trees._

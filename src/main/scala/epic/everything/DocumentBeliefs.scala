@@ -1,5 +1,4 @@
 package epic.everything
-package models
 
 import breeze.util.{OptionIndex, DenseIntIndex, Encoder, Index}
 import breeze.collection.mutable.TriangularArray
@@ -9,7 +8,7 @@ import breeze.linalg.NumericOps.Arrays._
 import epic.trees.{Span, AnnotatedLabel}
 import epic.parser.BaseGrammar
 import epic.ontonotes.{DPos, DSpan, NERType}
-import epic.redux.FeaturizedSentence
+import epic.everything.FeaturizedSentence
 
 /**
  *
@@ -59,36 +58,17 @@ case class DocumentBeliefs(sentences: Array[SentenceBeliefs]) extends Factor[Doc
 
 object DocumentBeliefs {
   class Factory(grammar: BaseGrammar[AnnotatedLabel], val nerLabelIndex: Index[NERType.Value], val srlLabelIndex: Index[String]) {
-    val nerProp = Property("ner", nerLabelIndex)
-    val srlProp = Property("srl", new OptionIndex(srlLabelIndex))
+    val sentenceFactory = new SentenceBeliefs.Factory(grammar, nerLabelIndex, srlLabelIndex)
+    def nerProp = sentenceFactory.nerProp
+    def srlProp = sentenceFactory.srlProp
+    def labelProp = sentenceFactory.labelProp
+    def optionLabelProp = sentenceFactory.optionLabelProp
     private val initNERBelief = Beliefs.improperUninformed(nerProp)
     private val initSRLBelief = Beliefs.improperUninformed(srlProp)
 
-    private val labelProp = Property("label", grammar.labelIndex)
-    val optionLabelProp = Property("option[label]", new OptionIndex(grammar.labelIndex))
-
-    def apply(doc: ProcessedDocument):DocumentBeliefs = {
-      val sentences = for((s,i) <- doc.sentences.zipWithIndex.toArray) yield {
-        val spanGovernorBeliefs = Beliefs.improperUninformed("wordPos+None", new DenseIntIndex(0, s.length+2))
-        val wordGovernorBeliefs = Beliefs.improperUninformed("wordPos", new DenseIntIndex(0, s.length+1))
-//        val governedSpanBeliefs = Beliefs.improperUninformed("span", Index{for(b <- 0 until s.length + 1; end <- b until s.length + 1) yield Span(b,end)})
-        val optionLabelBeliefs = Beliefs.improperUninformed(optionLabelProp)
-        val labelBeliefs = Beliefs.improperUninformed(labelProp)
-        val spans = TriangularArray.tabulate(s.length+1) { (begin, end) =>
-          if(begin < end && s.isPossibleSpan(begin, end))
-            SpanBeliefs(DSpan(doc.id,i,begin, end), spanGovernorBeliefs, optionLabelBeliefs, initNERBelief, Array.fill(s.frames.length)(initSRLBelief))
-          else
-            null
-        }
-        val words = Array.tabulate(s.length) { (pos) =>
-          WordBeliefs(DPos(doc.id,i,pos),
-            wordGovernorBeliefs,
-//            governedSpanBeliefs,
-            labelBeliefs,
-            labelBeliefs)
-        }
-
-        SentenceBeliefs(spans, words)
+    def apply(doc: FeaturizedDocument):DocumentBeliefs = {
+      val sentences = for(s <- doc.sentences.toArray) yield {
+        sentenceFactory(s)
       }
 
       DocumentBeliefs(sentences)

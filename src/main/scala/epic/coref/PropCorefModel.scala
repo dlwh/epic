@@ -5,10 +5,10 @@ import breeze.linalg._
 import breeze.inference.bp.{BeliefPropagation, Factor, Variable}
 import collection.mutable.ArrayBuffer
 import collection.immutable.BitSet
-import epic.everything.models.{DocumentBeliefs, Property}
 
 import PropCoref._
 import epic.ontonotes.DSpan
+import epic.everything.{DocumentBeliefs, Property}
 
 class PropCorefModel(properties: IndexedSeq[PropertyFeatures[_]], val featureIndex: Index[Feature]) extends Model[FeaturizedCorefInstance] with StandardExpectedCounts.Model {
   type Inference = PropCorefInference

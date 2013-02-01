@@ -1,4 +1,4 @@
-package epic.redux
+package epic.everything
 
 import java.io.File
 import epic.trees._
@@ -12,7 +12,6 @@ import epic.sequences.{Gazetteer, SegmentationModelFactory, SemiCRFModel, SemiCR
 import breeze.optimize.{BatchDiffFunction, FirstOrderMinimizer, RandomizedGradientCheckingFunction, CachedBatchDiffFunction}
 import breeze.util.{Lens, Index, Encoder}
 import epic.parser.projections.ConstraintCoreGrammar
-import epic.everything.models._
 import epic.trees.annotations.StripAnnotations
 import epic.trees.annotations.AddMarkovization
 import epic.trees.annotations.PipelineAnnotator
@@ -25,9 +24,7 @@ import scala.Some
 import epic.parser.models.StandardFeaturizer
 import breeze.optimize.FirstOrderMinimizer.OptParams
 import epic.ontonotes.Document
-import epic.everything.models.SpanBeliefs
 import epic.parser.models.LexGrammarBundle
-import epic.redux.FeaturizedDocument.Factory
 
 /**
  * 
@@ -78,9 +75,6 @@ object AnnotatingPipeline {
         println("Training " + m.getClass.getName)
         val obj = new ModelObjective(m, processedTrain.flatMap(_.sentences))
         val cachedObj = new CachedBatchDiffFunction(obj)
-        val checking = new RandomizedGradientCheckingFunction(cachedObj, 1E-2, toString = {
-          (i: Int) => m.featureIndex.get(i).toString
-        })
         val weights = params.baseOpt.minimize(cachedObj, obj.initialWeightVector(randomize = false))
         updateWeights(params.weightsCache, weightsCache, Encoder.fromIndex(m.featureIndex).decode(weights))
         println(s"Decoding $m...")
@@ -159,7 +153,7 @@ object AnnotatingPipeline {
   }
 
 
-  def buildProcessor(train: Array[Document], weightsCache: Counter[String, Double], params: AnnotatingPipeline.Params): (Factory, IndexedSeq[FeaturizedDocument]) = {
+  def buildProcessor(train: Array[Document], weightsCache: Counter[String, Double], params: AnnotatingPipeline.Params): (FeaturizedDocument.Factory, IndexedSeq[FeaturizedDocument]) = {
     val nerSegments = for (d <- train; s <- d.sentences) yield s.nerSegmentation
     println("Building basic NER model...")
     val baseNER = {

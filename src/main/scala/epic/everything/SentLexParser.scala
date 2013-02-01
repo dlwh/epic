@@ -1,35 +1,32 @@
-package epic.everything.models
+package epic.everything
 
-import epic.parser.models._
+import breeze.linalg._
 import epic.trees._
-import breeze.util.Index
-import epic.framework.{StandardExpectedCounts, ProjectableInference, Feature}
-import breeze.linalg.DenseVector
-import epic.everything.ProcessedDocument
 import epic.parser._
+import epic.parser.models._
+import epic.framework._
 import models.LexGrammarBundle
+import breeze.util.Index
 import projections.LexGovernorProjector
 import breeze.collection.mutable.TriangularArray
 
-
 /**
- * Model class for the lexicalized parser in the DocumentBeliefs framework.
- *
+ * Sentence Lexicalized Parser
  * @author dlwh
  */
-object DocLexParser {
-  // laziness
+object SentLexParser {
+// laziness
   type L = AnnotatedLabel
   type W = String
 
-  class Model(factory: DocumentBeliefs.Factory,
+  class Model(factory: SentenceBeliefs.Factory,
               bundle: LexGrammarBundle[L, W],
               reannotate: (BinarizedTree[L], Seq[W])=>BinarizedTree[L],
               indexed: IndexedLexFeaturizer[L, W],
-              initFeatureValue: Feature=>Option[Double] = {(f: Feature) => None}) extends DocumentAnnotatingModel {
+              initFeatureValue: Feature=>Option[Double] = {(f: Feature) => None}) extends EvaluableModel[FeaturizedSentence] {
     type ExpectedCounts = StandardExpectedCounts[Feature]
-    type Marginal = DocLexParser.Marginal[ParseMarginal[AnnotatedLabel, String]]
-    type Inference = DocLexParser.Inference
+    type Marginal = ParseMarginal[AnnotatedLabel, String]
+    type Inference = SentLexParser.Inference
 
     def featureIndex: Index[Feature] = indexed.index
 
@@ -54,75 +51,50 @@ object DocLexParser {
     // evaluation
     type EvaluationResult = ParseEval.Statistics
 
-    def evaluate(guess: ProcessedDocument, gold: ProcessedDocument): ParseEval.Statistics = {
-      val individual = for ( (gs, gd) <- guess.sentences zip gold.sentences) yield {
-
-        val stats =  new ParseEval(Set("","''", "``", ".", ":", ",", "TOP")) apply (makeNormalTree(gs.tree), makeNormalTree(gd.tree))
-
-        stats
-      }
-
-      individual.reduceLeft(_ + _)
+    def evaluate(guess: FeaturizedSentence, gold: FeaturizedSentence): ParseEval.Statistics = {
+      new ParseEval(Set("","''", "``", ".", ":", ",", "TOP")) apply (makeNormalTree(guess.tree), makeNormalTree(gold.tree))
     }
 
-    def makeNormalTree(tree: BinarizedTree[AnnotatedLabel]):Tree[String] = {
+    private def makeNormalTree(tree: BinarizedTree[AnnotatedLabel]):Tree[String] = {
       val chains = AnnotatedLabelChainReplacer
       Trees.debinarize(chains.replaceUnaries(tree).map(_.label))
     }
   }
 
-  case class Marginal[+Inner<:epic.framework.Marginal](sentences: IndexedSeq[Inner]) extends epic.framework.Marginal {
-    val logPartition = sentences.map(_.logPartition).sum
-  }
-
-  class Inference(beliefsFactory: DocumentBeliefs.Factory,
+  class Inference(beliefsFactory: SentenceBeliefs.Factory,
                   grammar: LexGrammar[AnnotatedLabel, String],
                   reannotate: (BinarizedTree[AnnotatedLabel], Seq[String])=>BinarizedTree[(AnnotatedLabel, Int)],
-                  featurizer: IndexedLexFeaturizer[AnnotatedLabel, String]) extends DocumentAnnotatingInference with ProjectableInference[ProcessedDocument, DocumentBeliefs] {
+                  featurizer: IndexedLexFeaturizer[AnnotatedLabel, String]) extends AnnotatingInference[FeaturizedSentence] with ProjectableInference[FeaturizedSentence, SentenceBeliefs] {
 
-    type Marginal = DocLexParser.Marginal[ParseMarginal[AnnotatedLabel, String]]
+    type Marginal = ParseMarginal[AnnotatedLabel, String]
     type ExpectedCounts = StandardExpectedCounts[Feature]
     def emptyCounts = StandardExpectedCounts.zero(featurizer.index)
 
-    def baseAugment(doc: ProcessedDocument): DocumentBeliefs = {
-      beliefsFactory(doc)
+    def baseAugment(sent: FeaturizedSentence): SentenceBeliefs = {
+      beliefsFactory(sent)
     }
 
 
-    def marginal(doc: ProcessedDocument, aug: DocumentBeliefs): Marginal = {
-      val trees = doc.treeInstances
-      val lenses = for( (b, s) <- aug.sentences zip doc.sentences) yield adapt(s.words, b)
-
-      val marginals = for (i <- 0 until trees.length) yield {
-        AugmentedAnchoring(lenses(i), doc.sentences(i).sparsity).marginal
-      }
-
-      Marginal(marginals)
+    def marginal(sent: FeaturizedSentence, aug: SentenceBeliefs): Marginal = {
+      val anchoring = adapt(sent.words, aug)
+       AugmentedAnchoring(anchoring, sent.constituentSparsity).marginal
     }
 
-    def projectGold(v: ProcessedDocument, m: Marginal, oldAugment: DocumentBeliefs): DocumentBeliefs = {
+    def projectGold(v: FeaturizedSentence, m: Marginal, oldAugment: SentenceBeliefs): SentenceBeliefs = {
       project(v, m, oldAugment)
     }
 
 
-    def goldMarginal(doc: ProcessedDocument, aug: DocumentBeliefs): Marginal = {
-      val trees = doc.treeInstances
-      val lenses = for( (b, s) <- aug.sentences zip doc.sentences) yield adapt(s.words, b)
-
-      val marginals = for (i <- 0 until trees.length) yield {
-        new TreeMarginal(AugmentedAnchoring(lenses(i), doc.sentences(i).sparsity), reannotate(trees(i).tree, trees(i).words))
-      }
-
-      Marginal(marginals)
+    def goldMarginal(sent: FeaturizedSentence, aug: SentenceBeliefs): Marginal = {
+      val anchoring = adapt(sent.words, aug)
+      new TreeMarginal(AugmentedAnchoring(anchoring, sent.constituentSparsity), reannotate(sent.tree, sent.words))
     }
 
-    def countsFromMarginal(doc: ProcessedDocument,
+    def countsFromMarginal(sent: FeaturizedSentence,
                            marg: Marginal,
                            counts: ExpectedCounts,
                            scale: Double): ExpectedCounts = {
-      for( i <- (0 until marg.sentences.length)) {
-        marg.sentences(i).expectedCounts(featurizer, counts, scale)
-      }
+      marg.expectedCounts(featurizer, counts, scale)
       counts
     }
 
@@ -131,47 +103,40 @@ object DocLexParser {
       new Anchoring(grammar, words, t)
     }
 
-    def project(v: ProcessedDocument, marg: Marginal, oldAugment: DocumentBeliefs): DocumentBeliefs = {
-      val sentences = for ( (old, (s, m)) <- oldAugment.sentences.zip(v.sentences zip marg.sentences)) yield {
-        val info = new LexGovernorProjector(grammar).apply(m.anchoring.refined, m)
-        val words = Array.tabulate(s.length) { w =>
-          val oldW = old.wordBeliefs(w)
-          oldW.copy(governor=oldW.governor.updated(info.wordGovernor(w)),
-//            span=oldW.span.copy(beliefs=info.governedSpan(w)),
-            tag=oldW.tag.updated(info.wordTag(w)),
-            maximalLabel=oldW.maximalLabel.updated(info.maximalLabelType(w))
-                    )
+    def project(s: FeaturizedSentence, marg: Marginal, oldAugment: SentenceBeliefs): SentenceBeliefs = {
+      val m = marg
+      val old = oldAugment
+      val info = new LexGovernorProjector(grammar).apply(m.anchoring.refined, m)
+      val words = Array.tabulate(s.length) { w =>
+        val oldW = old.wordBeliefs(w)
+        oldW.copy(governor=oldW.governor.updated(info.wordGovernor(w)),
+          //            span=oldW.span.copy(beliefs=info.governedSpan(w)),
+          tag=oldW.tag.updated(info.wordTag(w)),
+          maximalLabel=oldW.maximalLabel.updated(info.maximalLabelType(w))
+        )
 
-        }
-
-        val spans = TriangularArray.tabulate(m.length+1) { (r, c) =>
-          if(old.spanBeliefs(r, c) == null) null
-          else {
-            val span: SpanBeliefs = old.spanBeliefs(r, c)
-            assert(!info.spanType(r,c).valuesIterator.exists(_.isInfinite), info.spanType(r,c))
-            assert(info.spanType(r,c).sum != 0.0, info.spanType(r,c))
-            span.copy(governor=span.governor.updated(info.spanGovernor(r, c)),
-            label=span.label.updated(info.spanType(r,c))
-            )
-          }
-        }
-
-        old.copy(spans=spans, wordBeliefs=words)
       }
-      new DocumentBeliefs(sentences)
+
+      val spans = TriangularArray.tabulate(m.length+1) { (r, c) =>
+        if(old.spanBeliefs(r, c) == null) null
+        else {
+          val span: SpanBeliefs = old.spanBeliefs(r, c)
+          assert(!info.spanType(r,c).valuesIterator.exists(_.isInfinite), info.spanType(r,c))
+          assert(info.spanType(r,c).sum != 0.0, info.spanType(r,c))
+          span.copy(governor=span.governor.updated(info.spanGovernor(r, c)),
+            label=span.label.updated(info.spanType(r,c))
+          )
+        }
+      }
+
+      oldAugment.copy(spans=spans, wordBeliefs=words)
     }
 
 
     // annotation methods
-    def annotate(doc: ProcessedDocument, m: Marginal): ProcessedDocument = {
-      val newSentences = for ( (s, marg) <- doc.sentences zip m.sentences) yield {
-        // TODO: ugh
-        val newTree = new MaxConstituentDecoder[AnnotatedLabel, String]().extractBestParse(marg.asInstanceOf[ChartMarginal[AnnotatedLabel, String]])
-        s.copy(tree=newTree)
-      }
-
-      doc.copy(newSentences)
-
+    def annotate(sent: FeaturizedSentence, m: Marginal): FeaturizedSentence = {
+      val newTree = new MaxConstituentDecoder[AnnotatedLabel, String]().extractBestParse(m.asInstanceOf[ChartMarginal[AnnotatedLabel, String]])
+      sent.withTree(newTree)
     }
   }
 
@@ -229,7 +194,7 @@ object DocLexParser {
         var notASpan = beliefs.spanBeliefs(begin, split).governor(length + 1)
         if(notASpan == 0.0) notASpan = 1.0
         val sMax = beliefs.wordBeliefs(dep).maximalLabel(grammar.leftChild(rule))
-        if(depScore == 0.0 || sGovScore == 0.0 || sMax == 0.0) {
+        if(depScore <= 0.0 || sGovScore <= 0.0 || sMax <= 0.0) {
           Double.NegativeInfinity
         } else (
          anchoring.scoreBinaryRule(begin, split, end, rule, ref)
@@ -240,13 +205,14 @@ object DocLexParser {
         var notASpan = beliefs.spanBeliefs(split, end).governor(length + 1)
         if(notASpan < 1E-4) notASpan = 1.0
         val sMax = beliefs.wordBeliefs(dep).maximalLabel(grammar.rightChild(rule))
-        if(depScore == 0.0 || sGovScore == 0.0 || sMax == 0.0) {
+        if(depScore <= 0.0 || sGovScore <= 0.0 || sMax <= 0.0) {
           Double.NegativeInfinity
         } else (
           anchoring.scoreBinaryRule(begin, split, end, rule, ref)
             + math.log(depScore * sGovScore / notASpan  *   sMax)
         )
       }
+      assert(!score.isNaN)
       score
     }
 
@@ -254,7 +220,7 @@ object DocLexParser {
       val parent = grammar.parent(rule)
       val sLabel = beliefs.spanBeliefs(begin, end).label(parent)
       var notASpan = beliefs.spanBeliefs(begin, end).label(notConstituent)
-      if(sLabel == 0.0) {
+      if(sLabel <= 1E-6) {
         Double.NegativeInfinity
       } else {
         if(notASpan < 1E-4) notASpan = 1.0
@@ -275,6 +241,7 @@ object DocLexParser {
         if(begin == 0 && end == length) {
           baseScore += normalizingPiece
         }
+        assert(!baseScore.isNaN, s"norma: $normalizingPiece slabel: $sLabel notaspan: $notASpan ${anchoring.scoreUnaryRule(begin, end, rule, ref)}")
         baseScore
       }
     }
@@ -285,6 +252,7 @@ object DocLexParser {
       if(begin + 1 == end) {
         baseScore += math.log(beliefs.wordBeliefs(begin).tag(label))
       }
+      assert(!baseScore.isNaN)
 
       baseScore
     }
@@ -332,10 +300,6 @@ object DocLexParser {
     def validCoarseRulesGivenParentRefinement(a: Int, refA: Int): Array[Int] = {
       anchoring.validCoarseRulesGivenParentRefinement(a, refA)
     }
+
   }
-
 }
-
-
-
-

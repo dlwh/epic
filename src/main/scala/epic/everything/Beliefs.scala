@@ -1,4 +1,4 @@
-package epic.everything.models
+package epic.everything
 
 import breeze.linalg._
 import breeze.inference.Factor

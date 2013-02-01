@@ -1,11 +1,9 @@
-package epic.redux
+package epic.everything
 
 import epic.framework._
-import epic.everything.models.{DocumentBeliefs, SentenceBeliefs}
 import breeze.util.Index
 import breeze.linalg.DenseVector
-import epic.everything.ProcessedDocument
-import epic.redux.DocumentModelAdaptor.TypeHack
+import epic.everything.DocumentModelAdaptor.TypeHack
 
 object DocumentModelAdaptor {
   type CompatibleModel = EvaluableModel[FeaturizedSentence] { type Inference <: DocumentInferenceAdaptor.SentenceInference}
@@ -54,7 +52,7 @@ class DocumentInferenceAdaptor[Inf<:DocumentInferenceAdaptor.SentenceInference]
                                val sentenceInference: Inf) extends
                               ProjectableInference[FeaturizedDocument, DocumentBeliefs]
                                   with AnnotatingInference[FeaturizedDocument] {
-  def baseAugment(v: FeaturizedDocument): DocumentBeliefs = factory(v.asInstanceOf[ProcessedDocument])
+  def baseAugment(v: FeaturizedDocument): DocumentBeliefs = factory(v)
 
   type ExpectedCounts = sentenceInference.ExpectedCounts
   type Marginal = DocumentModelAdaptor.Marginal[sentenceInference.Marginal]

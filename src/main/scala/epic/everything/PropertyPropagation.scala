@@ -1,11 +1,9 @@
-package epic.redux
+package epic.everything
 
 import breeze.linalg.{DenseMatrix, DenseVector}
 import epic.framework._
 import breeze.util.{Index, Lens}
 import breeze.collection.mutable.TriangularArray
-import epic.everything.models.{Beliefs, SpanBeliefs, SentenceBeliefs, Property}
-import epic.everything.models.SpanBeliefs
 
 
 /**

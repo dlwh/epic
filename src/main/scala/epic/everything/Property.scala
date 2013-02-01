@@ -1,4 +1,4 @@
-package epic.everything.models
+package epic.everything
 
 import breeze.util.{Encoder, Index}
 import breeze.inference.bp.Variable

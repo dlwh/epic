@@ -1,7 +1,7 @@
 package epic.coref
 
-import epic.everything.models.Property
 import epic.ontonotes.DSpan
+import epic.everything.Property
 
 
 trait PropertyExtractor[T] {

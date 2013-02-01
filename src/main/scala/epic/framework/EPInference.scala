@@ -18,7 +18,6 @@ package epic.framework
 
 import collection.mutable.ArrayBuffer
 import breeze.inference.{ExpectationPropagation, Factor}
-import epic.everything.models.{SentenceBeliefs, DocumentBeliefs}
 
 class EPInference[Datum, Augment](val inferences: IndexedSeq[ProjectableInference[Datum, Augment]],
                                   val maxEPIter: Int,

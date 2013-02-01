@@ -1,9 +1,8 @@
-package epic.redux
+package epic.everything
 
 import epic.framework._
 import epic.ontonotes.NERType
 import epic.sequences._
-import epic.everything.models.SentenceBeliefs
 import breeze.linalg._
 import breeze.util._
 import breeze.collection.mutable.TriangularArray
