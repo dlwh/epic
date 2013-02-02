@@ -308,7 +308,8 @@ object Trees {
 
   object Transforms {
 
-    class EmptyNodeStripper[T](implicit lens: Lens[T,String]) extends (Tree[T]=>Option[Tree[T]]) {
+    @SerialVersionUID(1L)
+    class EmptyNodeStripper[T](implicit lens: Lens[T,String]) extends (Tree[T]=>Option[Tree[T]]) with Serializable {
       def apply(tree: Tree[T]):Option[Tree[T]] = {
         if(lens.get(tree.label) == "-NONE-") None
         else if(tree.span.start == tree.span.end) None // screw stupid spans

@@ -1,6 +1,6 @@
 package epic.everything
 
-import java.io.File
+import java.io.{FileWriter, PrintWriter, File}
 import epic.trees._
 import epic.parser.{Lexicon, GenerativeParser, ParserParams}
 import epic.parser.ParserParams.XbarGrammar
@@ -26,6 +26,8 @@ import breeze.optimize.FirstOrderMinimizer.OptParams
 import epic.ontonotes.Document
 import epic.parser.models.LexGrammarBundle
 
+
+
 /**
  * 
  * @author dlwh
@@ -33,6 +35,7 @@ import epic.parser.models.LexGrammarBundle
 object AnnotatingPipeline {
   case class Params(corpus: File,
                     treebank: ProcessedTreebank,
+                    cache: IntermediateCache,
                     nfiles: Int = 100000,
                     iterPerEval: Int = 20,
                     constraints: ParserParams.Constraints[AnnotatedLabel, String],
@@ -51,7 +54,9 @@ object AnnotatingPipeline {
 
     val corpus = params.corpus
     val nfiles = params.nfiles
-    val (train, test) = readTrainTestSplit(corpus, nfiles)
+    val traintest = readTrainTestSplit(corpus, nfiles)
+    val train = traintest._1
+    val test = traintest._2
 
     val weightsCache = if (params.weightsCache.exists()) {
       loadWeights(params.weightsCache)
@@ -59,8 +64,12 @@ object AnnotatingPipeline {
       Counter[String, Double]()
     }
 
-    val (docProcessor, processedTrain) = buildProcessor(train, weightsCache, params)
-    val processedTest = test.par.map(docProcessor(_)).seq.flatMap(_.sentences)
+    val (docProcessor, processedTrain) = params.cache.cached("processorAndTrain", train){
+      buildProcessor(train, weightsCache, params)
+    }
+    val processedTest = params.cache.cached("test", test, docProcessor) {
+      test.par.map(docProcessor(_)).seq.flatMap(_.sentences)
+    }
 
     val beliefsFactory = new SentenceBeliefs.Factory(docProcessor.grammar, docProcessor.nerLabelIndex, Index[String]())
 
@@ -118,7 +127,7 @@ object AnnotatingPipeline {
 
       if( s.iter % 5 == 0) {
         val inf = epModel.inferenceFromWeights(s.x)
-        val results: IndexedSeq[immutable.IndexedSeq[EvaluationResult[_]]] = {for (d <- processedTest.par) yield {
+        val results = {for (d <- processedTest.par) yield {
           val epMarg = inf.marginal(d)
           for ( i <- 0 until epMarg.marginals.length) yield {
             val casted =  inf.inferences(i).asInstanceOf[AnnotatingInference[FeaturizedSentence]]
@@ -140,7 +149,7 @@ object AnnotatingPipeline {
   }
 
 
-  def readTrainTestSplit(corpus: File, nfiles: Int): (Array[Document], Array[Document]) = {
+  def readTrainTestSplit(corpus: File, nfiles: Int): (IndexedSeq[Document], IndexedSeq[Document]) = {
 
     val instances = for {
       file <- corpus.listFiles take nfiles
@@ -148,31 +157,34 @@ object AnnotatingPipeline {
     } yield doc
     val train = instances.take(instances.length * 9 / 10)
     val test = instances.drop(instances.length * 9 / 10)
-    (train, test)
+    (train.toIndexedSeq, test.toIndexedSeq)
 
   }
 
 
-  def buildProcessor(train: Array[Document], weightsCache: Counter[String, Double], params: AnnotatingPipeline.Params): (FeaturizedDocument.Factory, IndexedSeq[FeaturizedDocument]) = {
+  def buildProcessor(train: IndexedSeq[Document], weightsCache: Counter[String, Double], params: AnnotatingPipeline.Params): (FeaturizedDocument.Factory, IndexedSeq[FeaturizedDocument]) = {
     val nerSegments = for (d <- train; s <- d.sentences) yield s.nerSegmentation
-    println("Building basic NER model...")
-    val baseNER = {
-      val model: SemiCRFModel[NERType.Value, String] = new SegmentationModelFactory(NERType.OutsideSentence, gazetteer = Gazetteer.ner("en"), weights = {
-        (f: Feature) => weightsCache(f.toString)
-      }).makeModel(nerSegments)
+    val nerPruningModel = params.cache.cached("baseNER", nerSegments.toSet) {
+      println("Building basic NER model...")
+      val baseNER = {
+        val model: SemiCRFModel[NERType.Value, String] = new SegmentationModelFactory(NERType.OutsideSentence, gazetteer = Gazetteer.ner("en"), weights = {
+          (f: Feature) => weightsCache(f.toString)
+        }).makeModel(nerSegments)
 
-      val obj = new ModelObjective(model, nerSegments)
-      val cached = new CachedBatchDiffFunction(obj)
+        val obj = new ModelObjective(model, nerSegments)
+        val cached = new CachedBatchDiffFunction(obj)
 
-      val weights = params.opt.minimize(cached, obj.initialWeightVector(randomize = false))
-      val crf = model.extractCRF(weights)
-      val decoded: Counter[Feature, Double] = Encoder.fromIndex(model.featureIndex).decode(weights)
-      updateWeights(params.weightsCache, weightsCache, decoded)
-      crf
+        val weights = params.opt.minimize(cached, obj.initialWeightVector(randomize = false))
+        val crf = model.extractCRF(weights)
+        val decoded: Counter[Feature, Double] = Encoder.fromIndex(model.featureIndex).decode(weights)
+        updateWeights(params.weightsCache, weightsCache, decoded)
+        crf
+      }
+      new SemiCRF.ConstraintGrammar(baseNER)
     }
 
-    val nerPruningModel = new SemiCRF.ConstraintGrammar(baseNER)
 
+    println("Building basic parsing model...")
     var trainTrees = for (d <- train; s <- d.sentences) yield {
       params.treebank.makeTreeInstance(s.id, s.tree.map(_.label), s.words, removeUnaries = true)
     }
@@ -181,13 +193,16 @@ object AnnotatingPipeline {
       trainTrees ++= params.treebank.trainTrees
     }
 
-    val annotator = new PipelineAnnotator[AnnotatedLabel, String](Seq(StripAnnotations(), AddMarkovization(horizontal = 1, vertical = 2)))
-    val baseParser = GenerativeParser.annotated(new XbarGrammar(), annotator, trainTrees)
+    val baseParser = params.cache.cached("baseParser", trainTrees.toSet) {
+      val annotator = new PipelineAnnotator[AnnotatedLabel, String](Seq(StripAnnotations(), AddMarkovization(horizontal = 1, vertical = 2)))
+      GenerativeParser.annotated(new XbarGrammar(), annotator, trainTrees)
+    }
 
     FeaturizedDocument.makeFactory(params.treebank.process,
       new ConstraintCoreGrammar(baseParser.augmentedGrammar, -8),
       nerPruningModel, GenerativeParser.extractCounts(trainTrees)._1, null)(train)
   }
+
 
   private def makeNERModel(beliefsFactory: SentenceBeliefs.Factory, processor: FeaturizedDocument.Factory, docs: IndexedSeq[FeaturizedDocument], weightsCache: Counter[String, Double]) = {
     new ChainNER.ModelFactory(beliefsFactory, processor, weights={(f: Feature)=>Some(weightsCache(f.toString)).filter(_ != 0)}).makeModel(docs.flatMap(_.sentences))

@@ -1,6 +1,7 @@
 package epic.trees
 
 import breeze.util.Interner
+import java.io.{ObjectInputStream, IOException}
 
 
 /*
@@ -25,9 +26,20 @@ import breeze.util.Interner
  */
 case class StandardTreeProcessor(headFinder: HeadFinder[AnnotatedLabel] = HeadFinder.collins) extends (Tree[String]=>BinarizedTree[AnnotatedLabel]) {
   import Trees.Transforms._
-  private val ens = new EmptyNodeStripper[String]
-  private val xox = new XOverXRemover[String]
-  private val interner = new Interner[AnnotatedLabel]
+  private def ens = new EmptyNodeStripper[String]
+  private def xox = new XOverXRemover[String]
+  @transient
+  private var interner = new Interner[AnnotatedLabel]
+
+
+  // Don't delete.
+  @throws(classOf[IOException])
+  @throws(classOf[ClassNotFoundException])
+  private def readObject(oin: ObjectInputStream) {
+    oin.defaultReadObject()
+    interner = new Interner[AnnotatedLabel]
+  }
+
 
   def apply(tree: Tree[String]):BinarizedTree[AnnotatedLabel] = {
     val transformed = xox(ens(tree).get)

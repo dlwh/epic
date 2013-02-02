@@ -1,6 +1,5 @@
 package epic.parser.features
 
-import StandardSpanFeatures._
 import epic.framework.Feature
 import epic.trees.Span
 
@@ -18,7 +17,8 @@ import breeze.util.Interner
  *
  * @author dlwh
  */
-class BasicFeaturizer(tagWordCounts: Counter2[_, String, Double], wordCounts: Counter[String, Double], noShapeThreshold: Int = 100, minCountThreshold: Int = 5) {
+@SerialVersionUID(1L)
+class BasicFeaturizer(tagWordCounts: Counter2[_, String, Double], wordCounts: Counter[String, Double], noShapeThreshold: Int = 100, minCountThreshold: Int = 5) extends Serializable {
   def anchor(words: IndexedSeq[String]): Anchoring = new Anchoring(words)
 
   val interner = new Interner[Feature]

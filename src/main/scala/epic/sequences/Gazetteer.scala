@@ -36,12 +36,12 @@ object Gazetteer {
 
     val flattenedGazetteer:Map[String,IndexedSeq[String]] = {
       val justWords = for((seq, kind) <- map.toIndexedSeq; w <- seq) yield (w, kind)
-      justWords.groupBy(_._1).mapValues(_.map(_._2).toSet.toIndexedSeq).toMap
+      justWords.groupBy(_._1).map{ case (k,v) => k -> v.map(_._2).toSet.toIndexedSeq}
     }
 
     val endWordsGazetteer:Map[String,IndexedSeq[String]] = {
       val justWords = for((seq, kind) <- map.toIndexedSeq; w = seq.last) yield (w, kind)
-      justWords.groupBy(_._1).mapValues(_.map("END-" + _._2).toSet.toIndexedSeq).toMap
+      justWords.groupBy(_._1).map{ case (k, v) => k -> v.map("END-" + _._2).toSet.toIndexedSeq}
     }
 
     resource.close()
