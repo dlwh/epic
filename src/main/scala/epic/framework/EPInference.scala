@@ -82,7 +82,7 @@ class EPInference[Datum, Augment](val inferences: IndexedSeq[ProjectableInferenc
       iter += 1
       state = s
     }
-//    print(s"gold($iter:${state.logPartition})")
+    //    print(f"gold($iter%d:${state.logPartition%.1f})")
 
     EPMarginal(state.logPartition, state.q, marginals)
   }
@@ -92,20 +92,31 @@ class EPInference[Datum, Augment](val inferences: IndexedSeq[ProjectableInferenc
     var iter = 0
     val marginals = ArrayBuffer.fill(inferences.length)(null.asInstanceOf[ProjectableInference[Datum, Augment]#Marginal])
 
+    var retries = 0
     def project(q: Augment, i: Int) = {
       val inf = inferences(i)
       marginals(i) = null.asInstanceOf[ProjectableInference[Datum, Augment]#Marginal]
-      val marg = inf.marginal(datum, q)
-      val contributionToLikelihood = marg.logPartition
-      assert(!contributionToLikelihood.isInfinite, s"Model $i is misbehaving ($contributionToLikelihood) on iter $iter! Datum: " + datum )
-      assert(!contributionToLikelihood.isNaN, s"Model $i is misbehaving (NaN) on iter $iter!")
+      var marg = inf.marginal(datum, q)
+      var contributionToLikelihood = marg.logPartition
+      if (contributionToLikelihood.isInfinite || contributionToLikelihood.isNaN) {
+        println(s"Model $i is misbehaving ($contributionToLikelihood) on iter $iter! Datum: " + datum )
+        retries += 1
+        if (retries > 3) {
+          throw new RuntimeException("EP is being sad!")
+        }
+        marg = inf.marginal(datum)
+        contributionToLikelihood = marg.logPartition
+        if (contributionToLikelihood.isInfinite || contributionToLikelihood.isNaN) {
+          throw new RuntimeException(s"Model $i is misbehaving ($contributionToLikelihood) on iter $iter! Datum: " + datum )
+        }
+      }
       val newAugment = inf.project(datum, marg, q)
       marginals(i) = marg
 //      println("Leaving " + i)
       newAugment -> contributionToLikelihood
     }
 
-    val ep = new ExpectationPropagation(project _, 1E-3)
+    val ep = new ExpectationPropagation(project _, 1E-5)
 
     var state: ep.State = null
     val iterates = ep.inference(augment, 0 until inferences.length, IndexedSeq.fill[Augment](inferences.length)(null.asInstanceOf[Augment]))
@@ -123,7 +134,7 @@ class EPInference[Datum, Augment](val inferences: IndexedSeq[ProjectableInferenc
       iter += 1
       state = s
     }
-//    print(s"guess($iter:${state.logPartition})")
+//    print(f"guess($iter%d:${state.logPartition%.1f})")
 
     EPMarginal(state.logPartition, state.q, marginals)
   }

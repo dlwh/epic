@@ -83,7 +83,7 @@ object SemiNERPipeline {
 
 
     // build feature Index
-    val model = new SegmentationModelFactory(NERType.OutsideSentence, gazetteer = gazetteer).makeModel(train)
+    val model = new SegmentationModelFactory(NERType.OutsideSentence, NERType.NotEntity, gazetteer = gazetteer).makeModel(train)
     val obj = new ModelObjective(model, train)
     val cached = new CachedBatchDiffFunction(obj)
 
@@ -168,7 +168,7 @@ object SemiConllNERPipeline {
 
 
     // build feature Index
-    val model: SemiCRFModel[String, String] = new SegmentationModelFactory("##", gazetteer = Gazetteer.ner("en")).makeModel(train)
+    val model: SemiCRFModel[String, String] = new SegmentationModelFactory("##", "O", gazetteer = Gazetteer.ner("en")).makeModel(train)
     val obj = new ModelObjective(model, train)
     val cached = new CachedBatchDiffFunction(obj)
 

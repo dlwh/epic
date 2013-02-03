@@ -6,7 +6,7 @@ import epic.parser._
 import epic.parser.models._
 import epic.framework._
 import models.LexGrammarBundle
-import breeze.util.Index
+import breeze.util.{Encoder, OptionIndex, Index}
 import projections.LexGovernorProjector
 import breeze.collection.mutable.TriangularArray
 
@@ -76,8 +76,22 @@ object SentLexParser {
 
 
     def marginal(sent: FeaturizedSentence, aug: SentenceBeliefs): Marginal = {
+//      checkForTree(aug, sent.tree)
       val anchoring = adapt(sent.words, aug)
        AugmentedAnchoring(anchoring, sent.constituentSparsity).marginal
+    }
+
+    def checkForTree(aug: SentenceBeliefs, tree: BinarizedTree[L]) = {
+      for (t <- tree.allChildren) t match {
+        case UnaryTree( label, _, _, span) =>
+          val labelScore = aug.spanBeliefs(t.span.start, t.span.end).label(grammar.labelIndex(label))
+          if (labelScore <= 0) {
+            println("problem with unary: " + label + " " + span + " "
+              + " " + Encoder.fromIndex(new OptionIndex(grammar.labelIndex)).decode(aug.spanBeliefs(t.span.start, t.span.end).label.beliefs))
+          }
+        case _ =>
+      }
+      this
     }
 
     def projectGold(v: FeaturizedSentence, m: Marginal, oldAugment: SentenceBeliefs): SentenceBeliefs = {

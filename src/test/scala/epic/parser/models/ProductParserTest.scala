@@ -34,7 +34,6 @@ class ProductParserTest extends ParserTestHarness with FunSuite {
       factory.lexicon, factory.refined)
 
     val rprod = evalParser(getTestTrees(), product)
-    println(rprod, evalParser(getTestTrees(), ParserTestHarness.simpleParser))
     assert(rprod.f1 > 0.6, rprod)
   }
 
@@ -44,7 +43,6 @@ class ProductParserTest extends ParserTestHarness with FunSuite {
       factory.lexicon, factory.refined, factory.refined)
 
     val rprod = evalParser(getTestTrees(), product)
-    println(rprod, evalParser(getTestTrees(), ParserTestHarness.simpleParser))
     assert(rprod.f1 > 0.6, rprod)
   }
 }
