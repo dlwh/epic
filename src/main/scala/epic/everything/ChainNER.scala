@@ -154,8 +154,8 @@ object ChainNER {
 
   }
 
-  case class Label1Feature(label: NERType.Value, f: Feature, kind: Symbol) extends Feature
-  case class TransitionFeature(label: NERType.Value, label2: NERType.Value) extends Feature
+  case class Label1Feature[L](label: L, f: Feature, kind: Symbol) extends Feature
+  case class TransitionFeature[L](label: L, label2: L) extends Feature
 
   case class IndexedFeaturizer(maxLength: Array[Int], labelIndex: Index[NERType.Value], baseWordFeatureIndex: Index[Feature], baseSpanFeatureIndex: Index[Feature]) {
 
