@@ -78,11 +78,11 @@ object AnnotatingPipeline {
     // now build the individual models
     val nerModel = makeNERModel(beliefsFactory, docProcessor, processedTrain, weightsCache)
     val lexModel = makeLexParserModel(beliefsFactory, docProcessor, processedTrain, weightsCache)
-    val srlModel = makeSRLModel(beliefsFactory, docProcessor, processedTrain, weightsCache)
+//    val srlModel = makeSRLModel(beliefsFactory, docProcessor, processedTrain, weightsCache)
 
     if (params.trainBaseModels && params.checkGradient) {
        println("Checking gradients...")
-      for(m <- IndexedSeq(srlModel, nerModel, lexModel)) {
+      for(m <- IndexedSeq(nerModel, lexModel)) {
         println("Checking " + m.getClass.getName)
         val obj = new ModelObjective(m, processedTrain.flatMap(_.sentences).filter(_.words.filter(_(0).isLetterOrDigit).length <= 40))
         val cachedObj = new CachedBatchDiffFunction(obj)
@@ -93,7 +93,7 @@ object AnnotatingPipeline {
     // initial models
     if(params.trainBaseModels) {
       println("Training base models")
-      for(m <- IndexedSeq(srlModel, nerModel, lexModel)) {
+      for(m <- IndexedSeq(nerModel, lexModel)) {
         println("Training " + m.getClass.getName)
         val obj = new ModelObjective(m, processedTrain.flatMap(_.sentences).filter(_.words.filter(_(0).isLetterOrDigit).length <= 40))
         val cachedObj = new CachedBatchDiffFunction(obj)
@@ -117,7 +117,7 @@ object AnnotatingPipeline {
     // the big model!
     val epModel = new EPModel[FeaturizedSentence, SentenceBeliefs](10, epInGold = true, initFeatureValue = {f => Some(weightsCache(f.toString)).filter(_ != 0.0)})(
       lexModel,
-      srlModel,
+//      srlModel,
       nerModel,
       assocSynNer
     )

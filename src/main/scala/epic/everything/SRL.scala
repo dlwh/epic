@@ -262,8 +262,8 @@ object SRL {
   }
 
   class ModelFactory(factory: SentenceBeliefs.Factory,
-                  processor: FeaturizedDocument.Factory,
-                  weights: Feature=>Option[Double] = { (f:Feature) => None}) {
+                     processor: FeaturizedDocument.Factory,
+                     weights: Feature=>Option[Double] = { (f:Feature) => None}) {
 
     def makeModel(sents: IndexedSeq[FeaturizedSentence]) = {
       val frames = sents.flatMap(_.frames)
@@ -308,20 +308,20 @@ object SRL {
 
     val (featureIndex: Index[Feature], wordFeatures, spanFeatures, distanceToLemmaFeatures, lemmaContainedFeature) = {
       val featureIndex = Index[Feature]()
-//      val labelFeatures = Array.tabulate(labelIndex.size, lemmaIndex.size + 1, kinds.length, baseWordFeatureIndex.size) { (l, lem, k, f) =>
-//        if(lem == lemmaIndex.size)
-//          featureIndex.index(Label1Feature(labelIndex.get(l), baseWordFeatureIndex.get(f), kinds(k)))
-//        else
-//          featureIndex.index(Label1Feature( (labelIndex.get(l) + lemmaIndex.get(lem)).intern, baseWordFeatureIndex.get(f), kinds(k)))
-//      }
+      //      val labelFeatures = Array.tabulate(labelIndex.size, lemmaIndex.size + 1, kinds.length, baseWordFeatureIndex.size) { (l, lem, k, f) =>
+      //        if(lem == lemmaIndex.size)
+      //          featureIndex.index(Label1Feature(labelIndex.get(l), baseWordFeatureIndex.get(f), kinds(k)))
+      //        else
+      //          featureIndex.index(Label1Feature( (labelIndex.get(l) + lemmaIndex.get(lem)).intern, baseWordFeatureIndex.get(f), kinds(k)))
+      //      }
       val labelFeatures = null
 
       val spanFeatures = Array.tabulate(labelIndex.size, lemmaIndex.size + 1, baseSpanFeatureIndex.size) { (l, lem, f) =>
         if(lem == lemmaIndex.size)
           featureIndex.index(Label1Feature(labelIndex.get(l), baseSpanFeatureIndex.get(f), 'Span))
         else -1
-//        else
-//          featureIndex.index(Label1Feature((labelIndex.get(l) + " " + lemmaIndex.get(lem)).intern, baseSpanFeatureIndex.get(f), 'Span))
+        //        else
+        //          featureIndex.index(Label1Feature((labelIndex.get(l) + " " + lemmaIndex.get(lem)).intern, baseSpanFeatureIndex.get(f), 'Span))
       }
 
       val distanceToLemmaFeatures = Array.tabulate(labelIndex.size, lemmaIndex.size + 1, propKinds.length, 2, numDistBins) { (l, lem, kind, dir, dist) =>
@@ -356,12 +356,12 @@ object SRL {
       }
 
       val beginCache = Array.tabulate(labelIndex.size, fs.words.length){ (label,w) =>
-//        val feats = fs.wordFeatures(w)
+      //        val feats = fs.wordFeatures(w)
         val builder = Array.newBuilder[Int]
-//        builder.sizeHint(if(lemmaInd == -1) feats.length else 2 * feats.length)
-//        appendFeatures(builder, feats, wordFeatures(label)(lemmaIndex.size)(0))
-//        if(lemmaInd >= 0)
-//          appendFeatures(builder, feats, wordFeatures(label)(lemmaInd)(0))
+        //        builder.sizeHint(if(lemmaInd == -1) feats.length else 2 * feats.length)
+        //        appendFeatures(builder, feats, wordFeatures(label)(lemmaIndex.size)(0))
+        //        if(lemmaInd >= 0)
+        //          appendFeatures(builder, feats, wordFeatures(label)(lemmaInd)(0))
         builder.result()
       }
 
@@ -375,22 +375,22 @@ object SRL {
       }
 
       val endCache = Array.tabulate(labelIndex.size, fs.words.length){ (label,w) =>
-//        val feats = fs.wordFeatures(w)
+      //        val feats = fs.wordFeatures(w)
         val builder = Array.newBuilder[Int]
-//        builder.sizeHint(if(lemmaInd == -1) feats.length else 2 * feats.length)
-//        appendFeatures(builder, feats, wordFeatures(label)(lemmaIndex.size)(2))
-//        if(lemmaInd >= 0)
-//          appendFeatures(builder, feats, wordFeatures(label)(lemmaInd)(2))
+        //        builder.sizeHint(if(lemmaInd == -1) feats.length else 2 * feats.length)
+        //        appendFeatures(builder, feats, wordFeatures(label)(lemmaIndex.size)(2))
+        //        if(lemmaInd >= 0)
+        //          appendFeatures(builder, feats, wordFeatures(label)(lemmaInd)(2))
         builder.result()
       }
 
       val interiorCache = Array.tabulate(labelIndex.size, fs.words.length){ (label,w) =>
-//        val feats = fs.wordFeatures(w)
+      //        val feats = fs.wordFeatures(w)
         val builder = Array.newBuilder[Int]
-//        builder.sizeHint(if(lemmaInd == -1) feats.length else 2 * feats.length)
-//        appendFeatures(builder, feats, wordFeatures(label)(lemmaIndex.size)(1))
-//        if(lemmaInd >= 0)
-//          appendFeatures(builder, feats, wordFeatures(label)(lemmaInd)(1))
+        //        builder.sizeHint(if(lemmaInd == -1) feats.length else 2 * feats.length)
+        //        appendFeatures(builder, feats, wordFeatures(label)(lemmaIndex.size)(1))
+        //        if(lemmaInd >= 0)
+        //          appendFeatures(builder, feats, wordFeatures(label)(lemmaInd)(1))
         builder.result()
       }
 
@@ -410,7 +410,7 @@ object SRL {
 
       private val spanFeatures: Array[TriangularArray[Array[Int]]] = Array.tabulate(labelIndex.size){ label =>
         TriangularArray.tabulate(fs.words.length+1) { (beg, end) =>
-          if(!fs.isPossibleMaximalSpan(beg, end) || beg == end || (pos < end && pos >= beg && (end-beg) > 1)) {
+          if(!fs.isPossibleMaximalSpan(beg, end) || beg == end ) {
             null
           } else {
             val acc = new ArrayBuffer[Array[Int]]()
@@ -435,14 +435,18 @@ object SRL {
             }
             val forSpan = fs.featuresForSpan(beg, end)
             appendFeatures(builder, forSpan, outer.spanFeatures(label)(lemmaIndex.size))
-//            if(lemmaInd >= 0)
-//              appendFeatures(builder, forSpan, outer.spanFeatures(label)(lemmaInd))
+            //            if(lemmaInd >= 0)
+            //              appendFeatures(builder, forSpan, outer.spanFeatures(label)(lemmaInd))
 
-           val dir = if(pos < beg) 0 else 1
+            val dir = if(pos < beg) 0 else 1
 
-            builder += distanceToLemmaFeatures(label)(lemmaIndex.size)(voiceIndex)(dir)(binDistance(beg - pos))
-            if(lemmaInd >= 0)
-              builder += distanceToLemmaFeatures(label)(lemmaInd)(voiceIndex)(dir)(binDistance(beg - pos))
+            if (pos >= beg && pos < end) {
+              builder += lemmaContainedFeature
+            } else {
+              builder += distanceToLemmaFeatures(label)(lemmaIndex.size)(voiceIndex)(dir)(binDistance(beg - pos))
+              if(lemmaInd >= 0)
+                builder += distanceToLemmaFeatures(label)(lemmaInd)(voiceIndex)(dir)(binDistance(beg - pos))
+            }
             builder.result()
           }
         }
