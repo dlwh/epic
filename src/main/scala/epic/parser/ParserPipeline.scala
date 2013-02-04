@@ -56,15 +56,15 @@ object ParserParams {
   }
 
   @Help(text="Stores/saves a baseline xbar grammar needed to extracting trees.")
-  case class Constraints[L, W](path: File = null) {
-    def cachedFactory(baseFactory: AugmentedGrammar[L, W], threshold: Double = -7):CoreGrammar[L, W] = {
+  case class Constraints[W](path: File = null) {
+    def cachedFactory(baseFactory: AugmentedGrammar[AnnotatedLabel, W], threshold: Double = -7):CoreGrammar[AnnotatedLabel, W] = {
       if(path != null && constraintsCache.contains(path)) {
-        constraintsCache.get(path).asInstanceOf[CoreGrammar[L, W]]
+        constraintsCache.get(path).asInstanceOf[CoreGrammar[AnnotatedLabel, W]]
       } else {
-        val uncached: CoreGrammar[L, W] = if(path eq null) {
-          new ConstraintCoreGrammar[L,W](baseFactory, threshold)
+        val uncached: CoreGrammar[AnnotatedLabel, W] = if(path eq null) {
+          new ConstraintCoreGrammar[AnnotatedLabel,W](baseFactory, {(_:AnnotatedLabel).isIntermediate}, threshold)
         } else {
-          val constraint = new ConstraintCoreGrammar[L,W](baseFactory, threshold)
+          val constraint = new ConstraintCoreGrammar[AnnotatedLabel,W](baseFactory, {(_:AnnotatedLabel).isIntermediate}, threshold)
           new FileCachedCoreGrammar(constraint, path)
         }
 

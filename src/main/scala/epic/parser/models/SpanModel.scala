@@ -499,7 +499,7 @@ case class SpanModelFactory(baseParser: ParserParams.XbarGrammar,
 You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Manning 2003.
                               """)
                             annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = FilterAnnotations(),
-                            constraints: ParserParams.Constraints[AnnotatedLabel, String],
+                            constraints: ParserParams.Constraints[String],
                             @Help(text="Old weights to initialize with. Optional")
                             oldWeights: File = null,
                             @Help(text="For features not seen in gold trees, we bin them into dummyFeats * numGoldFeatures bins using hashing.")

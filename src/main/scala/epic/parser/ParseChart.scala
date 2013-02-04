@@ -237,8 +237,11 @@ object ParseChart {
   @SerialVersionUID(1L)
   trait SparsityPattern extends Serializable {
     def activeTriangularIndices: immutable.BitSet
+    def isActiveSpan(begin: Int, end: Int)  = activeTriangularIndices.contains(TriangularArray.index(begin, end))
     def activeLabelsTop(begin: Int, end: Int): immutable.BitSet
     def activeLabelsBot(begin: Int, end: Int): immutable.BitSet
+
+    def hasMaximalLabel(begin: Int, end: Int):Boolean
   }
 
   object SparsityPattern {
@@ -257,6 +260,8 @@ object ParseChart {
 
       def activeLabelsTop(begin: Int, end: Int) = allLabels
       def activeLabelsBot(begin: Int, end: Int) = allLabels
+
+      def hasMaximalLabel(begin: Int, end: Int): Boolean = true
     }
   }
 

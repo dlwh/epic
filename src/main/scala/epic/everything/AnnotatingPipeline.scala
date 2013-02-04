@@ -36,7 +36,6 @@ object AnnotatingPipeline {
                     cache: IntermediateCache,
                     nfiles: Int = 100000,
                     iterPerEval: Int = 20,
-                    constraints: ParserParams.Constraints[AnnotatedLabel, String],
                     baseParser: ParserParams.XbarGrammar,
                     weightsCache: File = new File("everything.weights.gz"),
                     trainBaseModels: Boolean = true,
@@ -228,7 +227,7 @@ object AnnotatingPipeline {
     }
 
     FeaturizedDocument.makeFactory(params.treebank.process,
-      new ConstraintCoreGrammar(baseParser.augmentedGrammar, -8),
+      new ConstraintCoreGrammar(baseParser.augmentedGrammar, {(_:AnnotatedLabel).isIntermediate}, -8),
       nerPruningModel, GenerativeParser.extractCounts(trainTrees)._1, null)(train)
   }
 

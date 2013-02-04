@@ -33,7 +33,7 @@ import epic.trees._
  */
 
 case class ProductParserModelFactory(baseParser: ParserParams.XbarGrammar,
-                                     constraints: ParserParams.Constraints[AnnotatedLabel, String],
+                                     constraints: ParserParams.Constraints[String],
                                      annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = FilterAnnotations(),
                                      substates: File = null,
                                      numStates: Int = 2,

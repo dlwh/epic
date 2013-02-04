@@ -674,7 +674,7 @@ class SimpleWordShapeGen[L](tagWordCounts: Counter2[L, String, Double],
 }
 
 case class LexModelFactory(baseParser: ParserParams.XbarGrammar,
-                           constraints: ParserParams.Constraints[AnnotatedLabel, String],
+                           constraints: ParserParams.Constraints[String],
                            @Help(text= "The kind of annotation to do on the refined grammar. Defaults to ~KM2003")
                            annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = StripAnnotations(),
                            @Help(text="Old weights to initialize with. Optional")

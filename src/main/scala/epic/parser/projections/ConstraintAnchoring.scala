@@ -64,9 +64,11 @@ object ConstraintAnchoring {
  * Creates labeled span scorers for a set of trees from some parser.
  * @author dlwh
  */
-class ConstraintCoreGrammar[L, W](augmentedGrammar: AugmentedGrammar[L, W], threshold: Double) extends CoreGrammar[L, W] {
+class ConstraintCoreGrammar[L, W](augmentedGrammar: AugmentedGrammar[L, W], isIntermediate: L=>Boolean, threshold: Double) extends CoreGrammar[L, W] {
   def grammar = augmentedGrammar.grammar
   def lexicon = augmentedGrammar.lexicon
+
+  private val synthetics = BitSet.empty ++ (0 until grammar.labelIndex.size).filter(l => isIntermediate(labelIndex.get(l)))
 
 
   def anchor(words: Seq[W]): ConstraintAnchoring[L, W] = {
@@ -107,7 +109,11 @@ class ConstraintCoreGrammar[L, W](augmentedGrammar: AugmentedGrammar[L, W], thre
                                                     unaryScores,grammar.labelIndex,
                                                     gold.isGoldTopTag(_, _, _))
 
-    val pattern = ConstraintCoreGrammar.ConstraintSparsity(labelThresholds, topLabelThresholds)
+    val hasMaximalProjection: BitSet = BitSet.empty ++ (0 until labelThresholds.length).filter{ i =>
+      (labelThresholds(i) ne null) && ((labelThresholds(i)|topLabelThresholds(i)) -- synthetics).nonEmpty
+    }
+
+    val pattern = ConstraintCoreGrammar.ConstraintSparsity(labelThresholds, topLabelThresholds, hasMaximalProjection)
 
     RawConstraints(pattern)
   }
@@ -235,10 +241,12 @@ object ConstraintCoreGrammar {
   }
 
   @SerialVersionUID(1L)
-  private case class ConstraintSparsity(bot: Array[BitSet], top: Array[BitSet]) extends SparsityPattern with Serializable {
+  private case class ConstraintSparsity(bot: Array[BitSet], top: Array[BitSet], maximalProjectionIndices: BitSet) extends SparsityPattern with Serializable {
     val activeTriangularIndices: BitSet = BitSet.empty ++ (0 until bot.length).filter{ i =>
       (bot(i) != null && bot(i).nonEmpty) || (top(i) != null && top(i).nonEmpty)
     }
+
+
 
     def activeLabelsTop(begin: Int, end: Int): BitSet = {
       val r = top(TriangularArray.index(begin, end))
@@ -250,6 +258,8 @@ object ConstraintCoreGrammar {
       if(r == null) BitSet.empty
       else r
     }
+
+    def hasMaximalLabel(begin: Int, end: Int): Boolean = maximalProjectionIndices(TriangularArray.index(begin, end))
   }
 
 }
@@ -276,7 +286,7 @@ object ProjectTreebankToConstraints {
     val out = params.out
     out.getAbsoluteFile.getParentFile.mkdirs()
 
-    val factory = new ConstraintCoreGrammar[AnnotatedLabel, String](parser.augmentedGrammar, params.threshold)
+    val factory = new ConstraintCoreGrammar[AnnotatedLabel, String](parser.augmentedGrammar, {(_:AnnotatedLabel).isIntermediate}, params.threshold)
     val train = mapTrees(factory, treebank.trainTrees, parser.grammar.labelIndex, useTree = true, maxL = params.maxParseLength)
     val test = mapTrees(factory, treebank.testTrees, parser.grammar.labelIndex, useTree = false, maxL = 10000)
     val dev = mapTrees(factory, treebank.devTrees, parser.grammar.labelIndex, useTree = false, maxL = 10000)
@@ -330,7 +340,7 @@ object ComputePruningThresholds {
     println(params)
     val parser = loadParser[Any](params.parser)
 
-    val factory = new ConstraintCoreGrammar[AnnotatedLabel, String](parser.augmentedGrammar, -7)
+    val factory = new ConstraintCoreGrammar[AnnotatedLabel, String](parser.augmentedGrammar, {(_:AnnotatedLabel).isIntermediate}, params.threshold)
     val (all, gold) = mapTrees(factory, treebank.devTrees, parser.grammar.labelIndex)
     util.Arrays.sort(all.data)
     util.Arrays.sort(gold.data)

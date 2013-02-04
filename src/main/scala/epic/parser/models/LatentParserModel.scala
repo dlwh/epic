@@ -84,7 +84,7 @@ case class LatentParserInference[L, L2, W](featurizer: RefinedFeaturizer[L, W, F
  * @param oldWeights
  */
 case class LatentModelFactory(baseParser: ParserParams.XbarGrammar,
-                              constraints: ParserParams.Constraints[AnnotatedLabel, String],
+                              constraints: ParserParams.Constraints[String],
                               @Help(text=
                                 """The kind of annotation to do on the refined grammar. Default uses no annotations.
 You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Manning 2003.
