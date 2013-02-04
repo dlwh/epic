@@ -1,6 +1,6 @@
 package epic.everything
 
-import java.io.{FileWriter, PrintWriter, File}
+import java.io.File
 import epic.trees._
 import epic.parser.{Lexicon, GenerativeParser, ParserParams}
 import epic.parser.ParserParams.XbarGrammar
@@ -9,7 +9,7 @@ import epic.ontonotes.{NERType, ConllOntoReader}
 import breeze.linalg._
 import epic.framework._
 import epic.sequences.{Gazetteer, SegmentationModelFactory, SemiCRFModel, SemiCRF}
-import breeze.optimize.{BatchDiffFunction, FirstOrderMinimizer, RandomizedGradientCheckingFunction, CachedBatchDiffFunction}
+import breeze.optimize._
 import breeze.util.{Lens, Index, Encoder}
 import epic.parser.projections.ConstraintCoreGrammar
 import epic.trees.annotations.StripAnnotations
@@ -17,7 +17,6 @@ import epic.trees.annotations.AddMarkovization
 import epic.trees.annotations.PipelineAnnotator
 import epic.parser.models.{IndexedLexFeaturizer, SimpleWordShapeGen}
 import epic.parser.features.TagAwareWordShapeFeaturizer
-import collection.immutable
 import epic.trees.ProcessedTreebank
 import epic.parser.features.RuleFeature
 import scala.Some
@@ -25,7 +24,6 @@ import epic.parser.models.StandardFeaturizer
 import breeze.optimize.FirstOrderMinimizer.OptParams
 import epic.ontonotes.Document
 import epic.parser.models.LexGrammarBundle
-
 
 
 /**
@@ -42,6 +40,7 @@ object AnnotatingPipeline {
                     baseParser: ParserParams.XbarGrammar,
                     weightsCache: File = new File("everything.weights.gz"),
                     trainBaseModels: Boolean = true,
+                    checkGradient: Boolean = false,
                     @Help(text="For optimizing the base models")
                     baseOpt: OptParams,
                     @Help(text="For optimizing the joint model")
@@ -69,25 +68,39 @@ object AnnotatingPipeline {
     }
     val processedTest = params.cache.cached("test", test, docProcessor) {
       test.par.map(docProcessor(_)).seq.flatMap(_.sentences)
-    }
+    }.toIndexedSeq
 
-    val beliefsFactory = new SentenceBeliefs.Factory(docProcessor.grammar, docProcessor.nerLabelIndex, Index[String]())
+    println(s"${processedTrain.length} training documents totalling ${processedTrain.flatMap(_.sentences).length} sentences.")
+    println(s"${processedTest.length} test sentences.")
+
+    val beliefsFactory = new SentenceBeliefs.Factory(docProcessor.grammar, docProcessor.nerLabelIndex, docProcessor.srlLabelIndex)
 
     // now build the individual models
     val nerModel = makeNERModel(beliefsFactory, docProcessor, processedTrain, weightsCache)
     val lexModel = makeLexParserModel(beliefsFactory, docProcessor, processedTrain, weightsCache)
+    val srlModel = makeSRLModel(beliefsFactory, docProcessor, processedTrain, weightsCache)
+
+    if (params.trainBaseModels && params.checkGradient) {
+       println("Checking gradients...")
+      for(m <- IndexedSeq(srlModel, nerModel, lexModel)) {
+        println("Checking " + m.getClass.getName)
+        val obj = new ModelObjective(m, processedTrain.flatMap(_.sentences).filter(_.words.filter(_(0).isLetterOrDigit).length <= 40))
+        val cachedObj = new CachedBatchDiffFunction(obj)
+        GradientTester.test(cachedObj, obj.initialWeightVector(randomize = true), randFraction = 1E-4, toString={(x:Int) => m.featureIndex.get(x).toString})
+      }
+    }
 
     // initial models
     if(params.trainBaseModels) {
       println("Training base models")
-      for(m <- IndexedSeq(nerModel, lexModel)) {
+      for(m <- IndexedSeq(srlModel, nerModel, lexModel)) {
         println("Training " + m.getClass.getName)
-        val obj = new ModelObjective(m, processedTrain.flatMap(_.sentences))
+        val obj = new ModelObjective(m, processedTrain.flatMap(_.sentences).filter(_.words.filter(_(0).isLetterOrDigit).length <= 40))
         val cachedObj = new CachedBatchDiffFunction(obj)
         val weights = params.baseOpt.minimize(cachedObj, obj.initialWeightVector(randomize = false))
         updateWeights(params.weightsCache, weightsCache, Encoder.fromIndex(m.featureIndex).decode(weights))
         println(s"Decoding $m...")
-        println(s"Evaluation result for $m: " + m.evaluate(processedTrain.flatMap(_.sentences), weights))
+        println(s"Evaluation result for $m: " + m.evaluate(processedTest, weights))
       }
     }
 
@@ -102,18 +115,31 @@ object AnnotatingPipeline {
       beliefsFactory.optionLabelProp, symLens)
 
     // the big model!
-    val epModel = new EPModel[FeaturizedSentence, SentenceBeliefs](5, epInGold = true, initFeatureValue = {f => Some(weightsCache(f.toString)).filter(_ != 0.0)})(
+    val epModel = new EPModel[FeaturizedSentence, SentenceBeliefs](10, epInGold = true, initFeatureValue = {f => Some(weightsCache(f.toString)).filter(_ != 0.0)})(
       lexModel,
+      srlModel,
       nerModel,
       assocSynNer
     )
 
-    val obj = new ModelObjective(epModel, processedTrain.flatMap(_.sentences))
+    val obj = new ModelObjective(epModel, processedTrain.flatMap(_.sentences).filter(_.words.filter(_(0).isLetterOrDigit).length <= 40))
     val cachedObj = new CachedBatchDiffFunction(obj)
 
-    val checking = new RandomizedGradientCheckingFunction(cachedObj, 1E-2, toString = {
-      (i: Int) => epModel.featureIndex.get(i).toString
-    })
+    if (params.checkGradient) {
+      println("Checking gradients...")
+//      val w = obj.initialWeightVector(true)
+//      val (v, grad) = obj.calculate(w)
+//      for (i <- (epModel.featureIndex.size-1 to epModel.featureIndex.size-2000) by -3) {
+//        w(i) += 1E-8
+//        val v2 = obj.valueAt(w)
+//        w(i) -= 1E-8
+//        val emp = (v2-v)/1E-8
+//        val rel = ((grad(i) - emp)/math.max(emp.abs, grad(i).abs).max(1E-6)).abs
+//        println(i + " " + epModel.featureIndex.get(i) + " " + grad(i) + " " + emp + " " + rel)
+//
+//      }
+      GradientTester.test(cachedObj, obj.initialWeightVector(randomize = true), toString={(x:Int) => epModel.featureIndex.get(x).toString})
+    }
 
     type OptState = FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State
     val opt = params.opt
@@ -141,7 +167,10 @@ object AnnotatingPipeline {
           (aa + b.asInstanceOf[EvaluationResult[_]]).asInstanceOf[Object]
         })
 
-        println(hacketyHack)
+        println("Joint results:")
+        for ( (result, model) <- hacketyHack zip epModel.models) {
+          println(model.getClass.getName + ": " + result )
+        }
       }
 
     }
@@ -167,7 +196,7 @@ object AnnotatingPipeline {
     val nerPruningModel = params.cache.cached("baseNER", nerSegments.toSet) {
       println("Building basic NER model...")
       val baseNER = {
-        val model: SemiCRFModel[NERType.Value, String] = new SegmentationModelFactory(NERType.OutsideSentence, gazetteer = Gazetteer.ner("en"), weights = {
+        val model: SemiCRFModel[NERType.Value, String] = new SegmentationModelFactory(NERType.OutsideSentence, NERType.NotEntity, gazetteer = Gazetteer.ner("en"), weights = {
           (f: Feature) => weightsCache(f.toString)
         }).makeModel(nerSegments)
 
@@ -208,6 +237,11 @@ object AnnotatingPipeline {
     new ChainNER.ModelFactory(beliefsFactory, processor, weights={(f: Feature)=>Some(weightsCache(f.toString)).filter(_ != 0)}).makeModel(docs.flatMap(_.sentences))
   }
 
+
+  private def makeSRLModel(beliefsFactory: SentenceBeliefs.Factory, processor: FeaturizedDocument.Factory, docs: IndexedSeq[FeaturizedDocument], weightsCache: Counter[String, Double]) = {
+    new SRL.ModelFactory(beliefsFactory, processor, weights={(f: Feature)=>Some(weightsCache(f.toString)).filter(_ != 0)}).makeModel(docs.flatMap(_.sentences))
+  }
+
   def makeLexParserModel(beliefsFactory: SentenceBeliefs.Factory,
                          docProcessor: FeaturizedDocument.Factory,
                          train: IndexedSeq[FeaturizedDocument],
@@ -239,7 +273,8 @@ object AnnotatingPipeline {
       headFinder,
       docProcessor.grammar.index,
       docProcessor.grammar.labelIndex,
-      100,
+    2,
+//      100,
       -1,
       trees)
 

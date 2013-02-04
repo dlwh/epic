@@ -1,4 +1,7 @@
 package epic.parser
+
+import epic.trees.{UnaryTree, BinarizedTree}
+
 /*
  Copyright 2012 David Hall
 
@@ -30,6 +33,22 @@ package epic.parser
 case class ChartMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
                                inside: ParseChart[L], outside: ParseChart[L],
                                logPartition: Double) extends ParseMarginal[L, W] {
+
+  def checkForTree(tree: BinarizedTree[(L, Int)]) = {
+    for (t <- tree.allChildren) t match {
+      case UnaryTree( (label, ref), _, _, span) =>
+        val labelScore = inside.top(span.start, span.end, anchoring.grammar.labelIndex(label), ref)
+        if (labelScore.isInfinite) {
+          println("problem with unary: " + (label, ref) + " " + span)
+        }
+      case _ =>
+        val labelScore = inside.bot(tree.span.start, tree.span.end, anchoring.grammar.labelIndex(tree.label._1), tree.label._2)
+        if (labelScore.isInfinite) {
+          println("problem with other: " + t.label + " " + tree.span)
+        }
+    }
+    this
+  }
 
 
   /**

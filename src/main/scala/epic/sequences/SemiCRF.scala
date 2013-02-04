@@ -43,10 +43,10 @@ class SemiCRF[L, W](val model: SemiCRF.Grammar[L, W]) extends Serializable {
 object SemiCRF {
 
   def buildSimple[L](data: IndexedSeq[Segmentation[L, String]],
-                     startSymbol: L,
+                     startSymbol: L, outsideSymbol: L,
                      gazetteer: Gazetteer[Any, String] = Gazetteer.empty[Any, String],
                      opt: OptParams = OptParams()):SemiCRF[L, String] = {
-    val model: SemiCRFModel[L, String] = new SegmentationModelFactory[L](startSymbol, gazetteer = gazetteer).makeModel(data)
+    val model: SemiCRFModel[L, String] = new SegmentationModelFactory[L](startSymbol, outsideSymbol, gazetteer = gazetteer).makeModel(data)
 
     val obj = new ModelObjective(model, data)
     val cached = new CachedBatchDiffFunction(obj)
@@ -63,7 +63,7 @@ object SemiCRF {
     val fixedData: IndexedSeq[Segmentation[Boolean, String]] = data.map{s =>
       s.copy(segments=s.segments.map{case (l,span) => (l == outsideSymbol, span)})
     }
-    buildSimple(fixedData, false, gazetteer, opt)
+    buildSimple(fixedData, false, false, gazetteer, opt)
   }
 
 

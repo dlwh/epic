@@ -55,7 +55,7 @@ case class FeaturizedSentence(index: Int, words: IndexedSeq[String],
   def validConstituents: collection.immutable.BitSet = constituentSparsity.activeTriangularIndices
 
   def isPossibleConstituent(begin: Int, end: Int) = {
-    constituentSparsity.activeTriangularIndices.contains(TriangularArray.index(begin, end))
+    (end - begin) > 0 && constituentSparsity.activeTriangularIndices.contains(TriangularArray.index(begin, end))
   }
 }
 
@@ -71,6 +71,8 @@ object FeaturizedDocument {
     val wordFeatureIndex, spanFeatureIndex = Index[Feature]()
 
     val featurizer = new BasicFeaturizer(tagWordCounts, breeze.linalg.sum(tagWordCounts, Axis._0))
+
+    val srlLabels = Index[String](docs.iterator.flatMap(_.sentences).flatMap(_.srl).flatMap(_.args).map(_.arg))
 
     val count = new AtomicInteger(0)
     val constraints = for(d <- docs.par) yield {
@@ -121,13 +123,14 @@ object FeaturizedDocument {
       FeaturizedDocument(newSentences, d.id+"-featurized")
     }
 
-    new Factory(treeProcessor, parseConstrainer, nerConstrainer, featurizer, corefFeaturizer, wordFeatureIndex, spanFeatureIndex) -> featurized
+    new Factory(treeProcessor, parseConstrainer, nerConstrainer, srlLabels, featurizer, corefFeaturizer, wordFeatureIndex, spanFeatureIndex) -> featurized
   }
 
   case class Factory(treeProcessor: StandardTreeProcessor,
                     parseConstrainer: ConstraintCoreGrammar[AnnotatedLabel, String],
 //                     graphFeaturizer: PropertyPropagation.GraphBuilder,
                     nerConstrainer: SemiCRF.ConstraintGrammar[NERType.Value, String],
+                    srlLabelIndex: Index[String],
                     featurizer: BasicFeaturizer,
                     corefFeaturizer: CorefInstanceFeaturizer,
                     wordFeatureIndex: Index[Feature],
@@ -150,7 +153,7 @@ object FeaturizedDocument {
        val constituentSparsity = parseConstrainer.rawConstraints(s.words, policy).sparsity
        val nerConstraints = nerConstrainer.constraints(s.nerSegmentation, keepGold = keepGoldTree)
 
-       def isPossibleSpan(begin: Int, end: Int) = (
+       def isPossibleSpan(begin: Int, end: Int) = begin != end && (
          constituentSparsity.activeTriangularIndices.contains(TriangularArray.index(begin,end))
            || (nerConstraints.allowedLabels(begin,end).ne(null) && nerConstraints.allowedLabels(begin,end).nonEmpty)
          )

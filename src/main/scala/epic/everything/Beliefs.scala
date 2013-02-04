@@ -15,7 +15,7 @@ final case class Beliefs[T](property: Property[T], beliefs: DenseVector[Double])
   def beliefFor(i: T) = apply(property.choices(i))
 
   def *(f: Beliefs[T]): Beliefs[T] = if (beliefs eq null) f else if (f.beliefs eq null) this else copy(beliefs = Beliefs.stripNaNs(beliefs :* f.beliefs, beliefs, f.beliefs))
-  def /(f: Beliefs[T]): Beliefs[T] = if (f.beliefs eq null) this else if (beliefs eq f.beliefs) Beliefs(property, null) else copy(beliefs = Beliefs.stripNaNs(beliefs :/ f.beliefs, beliefs, f.beliefs))
+  def /(f: Beliefs[T]): Beliefs[T] = if (f.beliefs eq null) this else if (beliefs eq f.beliefs) Beliefs(property, null) else copy(beliefs = Beliefs.safeDiv(property.index, beliefs, f.beliefs))
 
   def logPartition: Double = {
     val sum = breeze.linalg.sum(beliefs)
@@ -66,10 +66,30 @@ object Beliefs {
     var p = beliefs.offset
     while(i < beliefs.length) {
       if (java.lang.Double.isNaN(beliefs(p)) || java.lang.Double.isInfinite(beliefs(p))) {
-        if(a(p) > 1E-6 || b(p) > 1E-6) throw new RuntimeException(s"Something is wrong with this division! $a $b")
+        if (java.lang.Double.isNaN(beliefs(p))) if(a(p) > 1E-5 || b(p) > 1E-5) throw new RuntimeException(s"Something is wrong with this division! $a $b")
         beliefs(p) = 0.0
       }
       p += beliefs.stride
+      i += 1
+    }
+
+    beliefs
+  }
+
+  private def safeDiv[T](index: Index[T], a: DenseVector[Double], b: DenseVector[Double]) = {
+    var i = 0
+    val beliefs = DenseVector.zeros[Double](a.length)
+    while(i < beliefs.length) {
+      val result =  if (a(i) == 0.0 && b(i) != 0.0) {
+        0.0
+      } else if (a(i) != 0.0 && b(i) == 0.0) {
+        a(i)
+      } else if (a(i) == 0.0 && b(i) == 0.0) {
+        0.0
+      } else {
+        a(i) / b(i)
+      }
+      beliefs(i) = result
       i += 1
     }
 

@@ -9,7 +9,7 @@ import epic.ontonotes.Argument
 import epic.trees.Span
 import epic.sequences.{Segmentation, SegmentationEval}
 import collection.mutable.ArrayBuffer
-import epic.everything.ChainNER.{TransitionFeature, Label1Feature}
+import epic.everything.ChainNER.Label1Feature
 import collection.mutable
 
 /**
@@ -20,14 +20,14 @@ object SRL {
   class Model(factory: SentenceBeliefs.Factory,
               val labelIndex: Index[String],
               val featurizer: IndexedFeaturizer,
-              initialWeights: Feature=>Double = {(_: Feature) => 0.0}) extends EvaluableModel[FeaturizedSentence] with StandardExpectedCounts.Model with Serializable {
+              initialWeights: Feature=>Option[Double] = {(_: Feature) => None}) extends EvaluableModel[FeaturizedSentence] with StandardExpectedCounts.Model with Serializable {
 
     def featureIndex = featurizer.featureIndex
 
     type Marginal = SRL.Marginal
     type Inference = SRL.Inference
 
-    def initialValueForFeature(f: Feature): Double = initialWeights(f)
+    def initialValueForFeature(f: Feature): Double = initialWeights(f).getOrElse(0.0)
 
     def inferenceFromWeights(weights: DenseVector[Double]): Inference = new SRL.Inference(factory, labelIndex, weights, featurizer)
 
@@ -38,7 +38,7 @@ object SRL {
         SegmentationEval.evaluateExample(Set("O","V"), asSegments(guess.words, guessf.args), asSegments(gold.words, goldf.args))
       }
 
-      pieces.reduceLeft(_ + _)
+      pieces.foldLeft(new SegmentationEval.Stats())(_ + _)
 
     }
 
@@ -104,7 +104,7 @@ object SRL {
 
     def marginal(s: FeaturizedSentence, aug: SentenceBeliefs): Marginal = {
       val pieces =  for ((f, fi) <- s.frames.zipWithIndex) yield {
-        val anchoring = new Anchoring(featurizer.anchor(s.validConstituents,  s, f.lemma, f.pos), weights, aug, fi)
+        val anchoring = new Anchoring(featurizer.anchor(s.validConstituents,  s, f.lemma, f.pos), labelIndex.size, weights, aug, fi)
         var partition = 0.0
         val arr = TriangularArray.tabulate(s.length+1) {(begin, end) =>
           if (s.isPossibleConstituent(begin, end)) {
@@ -115,7 +115,7 @@ object SRL {
             breeze.numerics.exp.inPlace(b -= logNormalizer)
             aug.spanBeliefs(begin, end).frames(fi).copy(beliefs=b)
           } else {
-            null
+            labelZeros
           }
 
         }
@@ -129,19 +129,15 @@ object SRL {
     private val labelZeros = {
       val z = DenseVector.zeros[Double](labelIndex.size + 1)
       z(labelIndex.size) = 1.0
-      z
+      Beliefs(beliefsFactory.srlProp, z)
     }
 
     def goldMarginal(s: FeaturizedSentence, augment: SentenceBeliefs): Marginal = {
       val pieces = for ((f, fi) <- s.frames.zipWithIndex) yield {
-        val anchoring = new Anchoring(featurizer.anchor(s.constituentSparsity.activeTriangularIndices, s, f.lemma, f.pos), weights, augment, fi)
+        val anchoring = new Anchoring(featurizer.anchor(s.constituentSparsity.activeTriangularIndices, s, f.lemma, f.pos), labelIndex.size, weights, augment, fi)
         var partition = 0.0
         val arr = TriangularArray.tabulate(s.length+1) {(begin, end) =>
-          if (s.isPossibleConstituent(begin, end)) {
-            augment.spanBeliefs(begin, end).frames(fi).copy(beliefs=labelZeros)
-          } else {
-            null
-          }
+          labelZeros
         }
         for (arg <- f.args) {
           val argy = DenseVector.zeros[Double](labelIndex.size + 1)
@@ -161,7 +157,7 @@ object SRL {
       counts.loss += marg.logPartition * scale
       for ( f <- marg.frames) {
         val localization = f.anchoring.featurizer
-        for ( begin <- 0 until s.length; end <- (begin+1) to s.length if s.isPossibleConstituent(begin, end); l <- 0 to labelIndex.size) {
+        for ( begin <- 0 until s.length; end <- (begin+1) to s.length if s.isPossibleConstituent(begin, end); l <- 0 until labelIndex.size) {
           val score = f.arr(begin, end).beliefs(l)
           if (score != 0.0) {
             for (f <- localization.featuresFor(begin, end, l))
@@ -186,7 +182,9 @@ object SRL {
             val copy = spanBeliefs.copy(frames = newFrames)
             copy
           }
-        } else null
+        } else {
+          null
+        }
       }
       sentenceBeliefs.copy(spans=newSpans)
     }
@@ -203,27 +201,38 @@ object SRL {
   }
 
 
-  class Anchoring(val featurizer: FeatureAnchoring, weights: DenseVector[Double],  sentenceBeliefs: SentenceBeliefs, frameIndex: Int) {
+  class Anchoring(val featurizer: FeatureAnchoring, notSRLLabel: Int, weights: DenseVector[Double],  sentenceBeliefs: SentenceBeliefs, frameIndex: Int) {
     def score(begin: Int, end: Int, label: Int):Double = {
       val init = sentenceBeliefs.spanBeliefs(begin, end).frames(frameIndex).beliefs(label)
       if (init <= 0.0) Double.NegativeInfinity
-      else math.log(init) + dot(featurizer.featuresFor(begin, end, label), weights)
+      else {
+        val feats: Array[Int] = featurizer.featuresFor(begin, end, label)
+        if (feats == null && label == notSRLLabel) {
+          0.0
+        } else {
+          math.log(init) + dot(feats, weights)
+        }
+      }
     }
 
     private def dot(features: Array[Int], weights: DenseVector[Double]) = {
       var i =0
       var score = 0.0
-      while(i < features.length) {
-        score += weights(features(i))
-        i += 1
+      if (features eq null) {
+        Double.NegativeInfinity
+      } else {
+        while(i < features.length) {
+          score += weights(features(i))
+          i += 1
+        }
+        score
       }
-      score
     }
   }
 
   class ModelFactory(factory: SentenceBeliefs.Factory,
                   processor: FeaturizedDocument.Factory,
-                  weights: Feature=>Double = { (f:Feature) => 0.0}) {
+                  weights: Feature=>Option[Double] = { (f:Feature) => None}) {
 
     def makeModel(sents: IndexedSeq[FeaturizedSentence]) = {
       val frames = sents.flatMap(_.frames)
@@ -253,6 +262,8 @@ object SRL {
     val propKinds = Array('PassiveProp, 'ActiveProp)
     val leftRight = Array('Left, 'Right)
 
+    println(lemmaIndex.size + " " + labelIndex.size)
+
     private def binDistance(dist2:Int) = {
       val dist = dist2.abs - 1
       if (dist >= 20) 4
@@ -267,18 +278,20 @@ object SRL {
 
     val (featureIndex: Index[Feature], wordFeatures, spanFeatures, distanceToLemmaFeatures, lemmaContainedFeature) = {
       val featureIndex = Index[Feature]()
-      val labelFeatures = Array.tabulate(labelIndex.size, lemmaIndex.size + 1, kinds.length, baseWordFeatureIndex.size) { (l, lem, k, f) =>
-        if(lem == lemmaIndex.size)
-          featureIndex.index(Label1Feature(labelIndex.get(l), baseWordFeatureIndex.get(f), kinds(k)))
-        else
-          featureIndex.index(Label1Feature( (labelIndex.get(l) + lemmaIndex.get(lem)).intern, baseWordFeatureIndex.get(f), kinds(k)))
-      }
+//      val labelFeatures = Array.tabulate(labelIndex.size, lemmaIndex.size + 1, kinds.length, baseWordFeatureIndex.size) { (l, lem, k, f) =>
+//        if(lem == lemmaIndex.size)
+//          featureIndex.index(Label1Feature(labelIndex.get(l), baseWordFeatureIndex.get(f), kinds(k)))
+//        else
+//          featureIndex.index(Label1Feature( (labelIndex.get(l) + lemmaIndex.get(lem)).intern, baseWordFeatureIndex.get(f), kinds(k)))
+//      }
+      val labelFeatures = null
 
       val spanFeatures = Array.tabulate(labelIndex.size, lemmaIndex.size + 1, baseSpanFeatureIndex.size) { (l, lem, f) =>
         if(lem == lemmaIndex.size)
           featureIndex.index(Label1Feature(labelIndex.get(l), baseSpanFeatureIndex.get(f), 'Span))
-        else
-          featureIndex.index(Label1Feature((labelIndex.get(l) + " " + lemmaIndex.get(lem)).intern, baseSpanFeatureIndex.get(f), 'Span))
+        else -1
+//        else
+//          featureIndex.index(Label1Feature((labelIndex.get(l) + " " + lemmaIndex.get(lem)).intern, baseSpanFeatureIndex.get(f), 'Span))
       }
 
       val distanceToLemmaFeatures = Array.tabulate(labelIndex.size, lemmaIndex.size + 1, propKinds.length, 2, numDistBins) { (l, lem, kind, dir, dist) =>
@@ -292,6 +305,8 @@ object SRL {
 
       (featureIndex, labelFeatures, spanFeatures, distanceToLemmaFeatures, lemmaContainedFeature)
     }
+
+    println("SRL features: " + featureIndex.size)
 
 
     def anchor(validSpans: BitSet, fs: FeaturizedSentence, lemma: String, pos: Int): FeatureAnchoring = {
@@ -311,12 +326,12 @@ object SRL {
       }
 
       val beginCache = Array.tabulate(labelIndex.size, fs.words.length){ (label,w) =>
-        val feats = fs.wordFeatures(w)
+//        val feats = fs.wordFeatures(w)
         val builder = Array.newBuilder[Int]
-        builder.sizeHint(if(lemmaInd == -1) feats.length else 2 * feats.length)
-        appendFeatures(builder, feats, wordFeatures(label)(lemmaIndex.size)(0))
-        if(lemmaInd >= 0)
-          appendFeatures(builder, feats, wordFeatures(label)(lemmaInd)(0))
+//        builder.sizeHint(if(lemmaInd == -1) feats.length else 2 * feats.length)
+//        appendFeatures(builder, feats, wordFeatures(label)(lemmaIndex.size)(0))
+//        if(lemmaInd >= 0)
+//          appendFeatures(builder, feats, wordFeatures(label)(lemmaInd)(0))
         builder.result()
       }
 
@@ -330,22 +345,22 @@ object SRL {
       }
 
       val endCache = Array.tabulate(labelIndex.size, fs.words.length){ (label,w) =>
-        val feats = fs.wordFeatures(w)
+//        val feats = fs.wordFeatures(w)
         val builder = Array.newBuilder[Int]
-        builder.sizeHint(if(lemmaInd == -1) feats.length else 2 * feats.length)
-        appendFeatures(builder, feats, wordFeatures(label)(lemmaIndex.size)(2))
-        if(lemmaInd >= 0)
-          appendFeatures(builder, feats, wordFeatures(label)(lemmaInd)(2))
+//        builder.sizeHint(if(lemmaInd == -1) feats.length else 2 * feats.length)
+//        appendFeatures(builder, feats, wordFeatures(label)(lemmaIndex.size)(2))
+//        if(lemmaInd >= 0)
+//          appendFeatures(builder, feats, wordFeatures(label)(lemmaInd)(2))
         builder.result()
       }
 
       val interiorCache = Array.tabulate(labelIndex.size, fs.words.length){ (label,w) =>
-        val feats = fs.wordFeatures(w)
+//        val feats = fs.wordFeatures(w)
         val builder = Array.newBuilder[Int]
-        builder.sizeHint(if(lemmaInd == -1) feats.length else 2 * feats.length)
-        appendFeatures(builder, feats, wordFeatures(label)(lemmaIndex.size)(1))
-        if(lemmaInd >= 0)
-          appendFeatures(builder, feats, wordFeatures(label)(lemmaInd)(1))
+//        builder.sizeHint(if(lemmaInd == -1) feats.length else 2 * feats.length)
+//        appendFeatures(builder, feats, wordFeatures(label)(lemmaIndex.size)(1))
+//        if(lemmaInd >= 0)
+//          appendFeatures(builder, feats, wordFeatures(label)(lemmaInd)(1))
         builder.result()
       }
 
@@ -390,8 +405,8 @@ object SRL {
             }
             val forSpan = fs.featuresForSpan(beg, end)
             appendFeatures(builder, forSpan, outer.spanFeatures(label)(lemmaIndex.size))
-            if(lemmaInd >= 0)
-              appendFeatures(builder, forSpan, outer.spanFeatures(label)(lemmaInd))
+//            if(lemmaInd >= 0)
+//              appendFeatures(builder, forSpan, outer.spanFeatures(label)(lemmaInd))
 
            val dir = if(pos < beg) 0 else 1
 
