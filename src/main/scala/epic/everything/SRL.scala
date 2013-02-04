@@ -108,11 +108,11 @@ object SRL {
         var partition = 0.0
         val arr = TriangularArray.tabulate(s.length+1) {(begin, end) =>
           if (s.isPossibleConstituent(begin, end)) {
-            val b = DenseVector.tabulate(numLabels)(l => math.exp(anchoring.score(begin, end, l)))
-            val normalizer = breeze.linalg.sum(b)
-            partition += math.log(normalizer)
-            assert(normalizer >= 0.0)
-            b /= normalizer
+            val b = DenseVector.tabulate(numLabels)(l => anchoring.score(begin, end, l))
+            val logNormalizer = breeze.linalg.softmax(b)
+            partition += logNormalizer
+            assert(!logNormalizer.isInfinite)
+            breeze.numerics.exp.inPlace(b -= logNormalizer)
             aug.spanBeliefs(begin, end).frames(fi).copy(beliefs=b)
           } else {
             null
