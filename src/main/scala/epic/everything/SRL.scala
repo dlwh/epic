@@ -2,15 +2,20 @@ package epic.everything
 
 import breeze.util.Index
 import epic.framework._
-import breeze.linalg.{Counter, SparseVector, DenseVector}
+import breeze.linalg._
 import breeze.collection.mutable.TriangularArray
 import collection.immutable.BitSet
 import epic.ontonotes.Argument
 import epic.trees.Span
-import epic.sequences.{Segmentation, SegmentationEval}
+import epic.sequences.{SemiCRFInference, SemiCRF, Segmentation, SegmentationEval}
 import collection.mutable.ArrayBuffer
-import epic.everything.ChainNER.Label1Feature
 import collection.mutable
+import epic.sequences.SemiCRF.TransitionVisitor
+import scala.Some
+import epic.ontonotes.Argument
+import epic.sequences.Segmentation
+import epic.everything.ChainNER.Label1Feature
+import epic.trees.Span
 
 /**
  *
@@ -18,9 +23,11 @@ import collection.mutable
  */
 object SRL {
   class Model(factory: SentenceBeliefs.Factory,
-              val labelIndex: Index[String],
+              val labelIndex: Index[Option[String]],
+              outsideLabel: String,
               val featurizer: IndexedFeaturizer,
               initialWeights: Feature=>Option[Double] = {(_: Feature) => None}) extends EvaluableModel[FeaturizedSentence] with StandardExpectedCounts.Model with Serializable {
+    assert(labelIndex(Some(outsideLabel)) != -1)
 
     def featureIndex = featurizer.featureIndex
 
@@ -29,20 +36,20 @@ object SRL {
 
     def initialValueForFeature(f: Feature): Double = initialWeights(f).getOrElse(0.0)
 
-    def inferenceFromWeights(weights: DenseVector[Double]): Inference = new SRL.Inference(factory, labelIndex, weights, featurizer)
+    def inferenceFromWeights(weights: DenseVector[Double]): Inference = new SRL.Inference(factory, labelIndex, outsideLabel, weights, featurizer)
 
     type EvaluationResult = SegmentationEval.Stats
 
     def evaluate(guess: FeaturizedSentence, gold: FeaturizedSentence): EvaluationResult = {
       val pieces = guess.frames.zip(gold.frames) map { case (guessf, goldf) =>
-        SegmentationEval.evaluateExample(Set("O","V"), asSegments(guess.words, guessf.args), asSegments(gold.words, goldf.args))
+        SegmentationEval.evaluateExample(Set(outsideLabel,"V"), asSegments(guess.words, guessf.args), asSegments(gold.words, goldf.args))
       }
 
       pieces.foldLeft(new SegmentationEval.Stats())(_ + _)
 
     }
 
-    private def asSegments(words: IndexedSeq[String], frame: IndexedSeq[Argument], outsideLabel: String="O"): Segmentation[String, String] = {
+    private def asSegments(words: IndexedSeq[String], frame: IndexedSeq[Argument]): Segmentation[String, String] = {
       val sorted = frame.sortBy(_.span.start)
       var out = new ArrayBuffer[(String, Span)]()
       var last = 0
@@ -64,17 +71,20 @@ object SRL {
     }
   }
 
-  case class Marginal(frames: IndexedSeq[FrameMarginal]) extends epic.framework.Marginal {
+  case class Marginal(frames: IndexedSeq[SemiCRF.Marginal[Option[String], String]]) extends epic.framework.Marginal {
     def logPartition: Double = frames.map(_.logPartition).sum
   }
-  case class FrameMarginal(logPartition: Double, arr: TriangularArray[Beliefs[Option[String]]], anchoring: Anchoring) extends epic.framework.Marginal
 
   class Inference(beliefsFactory: SentenceBeliefs.Factory,
-                  labelIndex: Index[String],
+                  labelIndex: Index[Option[String]],
+                  outsideLabel: String,
                   weights: DenseVector[Double],
                   featurizer: IndexedFeaturizer) extends ProjectableInference[FeaturizedSentence, SentenceBeliefs] with AnnotatingInference[FeaturizedSentence] {
     type Marginal = SRL.Marginal
     type ExpectedCounts = StandardExpectedCounts[Feature]
+
+    val notSRL = labelIndex(None)
+
 
     def emptyCounts = StandardExpectedCounts.zero(featurizer.featureIndex)
 
@@ -87,16 +97,8 @@ object SRL {
 
     def annotate(s: FeaturizedSentence, m: Marginal): FeaturizedSentence = {
       val pieces =  for ((margf, fi) <- m.frames.zipWithIndex) yield {
-        val result = collection.mutable.ArrayBuffer.empty[Argument]
-        for(begin <- 0 until s.length; end <- (begin+1) to s.length) {
-          if (s.isPossibleConstituent(begin, end)) {
-            val maxLabel = margf.arr(begin, end).beliefs.argmax
-            if(maxLabel < labelIndex.size) {
-              result += Argument(labelIndex.get(maxLabel), Span(begin, end))
-            }
-          }
-        }
-        s.frames(fi).copy(args=result)
+        val segments: Segmentation[Option[String], String] = SemiCRF.posteriorDecode(margf)
+        s.frames(fi).copy(args=segments.label.collect { case (Some(l),span) => Argument(l,span)})
       }
 
       s.copy(frames=pieces)
@@ -104,50 +106,18 @@ object SRL {
 
     def marginal(s: FeaturizedSentence, aug: SentenceBeliefs): Marginal = {
       val pieces =  for ((f, fi) <- s.frames.zipWithIndex) yield {
-        val anchoring = new Anchoring(featurizer.anchor(s.validConstituents,  s, f.lemma, f.pos), labelIndex.size, weights, aug, fi)
-        var partition = 0.0
-        val arr = TriangularArray.tabulate(s.length+1) {(begin, end) =>
-          if (s.isPossibleConstituent(begin, end)) {
-            val b = DenseVector.tabulate(numLabels)(l => anchoring.score(begin, end, l))
-            val logNormalizer = breeze.linalg.softmax(b)
-            partition += logNormalizer
-            assert(!logNormalizer.isInfinite)
-            breeze.numerics.exp.inPlace(b -= logNormalizer)
-            aug.spanBeliefs(begin, end).frames(fi).copy(beliefs=b)
-          } else {
-            labelZeros
-          }
-
-        }
-        new FrameMarginal(partition, arr, anchoring)
-
+        SemiCRF.Marginal(new Anchoring(featurizer.anchor(s, f.lemma, f.pos), s.words, labelIndex, outsideLabel, weights, aug, fi))
       }
-
       new Marginal(pieces)
     }
 
-    private val labelZeros = {
-      val z = DenseVector.zeros[Double](labelIndex.size + 1)
-      z(labelIndex.size) = 1.0
-      Beliefs(beliefsFactory.srlProp, z)
-    }
+
 
     def goldMarginal(s: FeaturizedSentence, augment: SentenceBeliefs): Marginal = {
       val pieces = for ((f, fi) <- s.frames.zipWithIndex) yield {
-        val anchoring = new Anchoring(featurizer.anchor(s.constituentSparsity.activeTriangularIndices, s, f.lemma, f.pos), labelIndex.size, weights, augment, fi)
-        var partition = 0.0
-        val arr = TriangularArray.tabulate(s.length+1) {(begin, end) =>
-          labelZeros
-        }
-        for (arg <- f.args) {
-          val argy = DenseVector.zeros[Double](labelIndex.size + 1)
-          val label: Int = labelIndex(arg.arg)
-          argy(label) = 1.0
-          partition += anchoring.score(arg.span.start, arg.span.end, label)
-          arr(arg.span.start, arg.span.end) = arr(arg.span.start, arg.span.end).copy(beliefs=argy)
-        }
-
-        new FrameMarginal(partition, arr, anchoring)
+        val seg = f.stripEmbedded.asSegments(s.words)
+        val anchoring = new Anchoring(featurizer.anchor(s, f.lemma, f.pos), s.words, labelIndex, outsideLabel, weights, augment, fi)
+        SemiCRF.Marginal.goldMarginal(anchoring, seg)
       }
 
       new Marginal(pieces)
@@ -156,18 +126,22 @@ object SRL {
     def countsFromMarginal(s: FeaturizedSentence, marg: Marginal, counts: ExpectedCounts, scale: Double): ExpectedCounts = {
       counts.loss += marg.logPartition * scale
       for ( f <- marg.frames) {
-        val localization = f.anchoring.featurizer
-        for ( begin <- 0 until s.length; end <- (begin+1) to s.length if s.isPossibleConstituent(begin, end); l <- 0 until labelIndex.size) {
-          val score = f.arr(begin, end).beliefs(l)
-          if (score != 0.0) {
-            for (f <- localization.featuresFor(begin, end, l))
-              counts.counts(f) += score * scale
+        val localization = f.anchoring.asInstanceOf[Anchoring].featurizer
+        f visit new TransitionVisitor[Option[String], String] {
+          def apply(prev: Int, cur: Int, beg: Int, end: Int, count: Double) {
+            if (count != 0.0) {
+              try {
+                for (f <- localization.featuresFor(beg, end, cur))
+                  counts.counts(f) += count * scale
+              } catch {
+                case ex =>
+                  throw new RuntimeException(s.words + " " + count + " " + beg + " " + end + " " + labelIndex.get(cur) + " " + s.frames(f.anchoring.asInstanceOf[Anchoring].frameIndex) + " " + s.isPossibleMaximalSpan(beg,end) + " " + s.constituentSparsity.activeLabelsTop(beg,end).map(f.anchoring.asInstanceOf[Anchoring].sentenceBeliefs.spanBeliefs(0,s.length).label.property.index.get(_)))
+              }
+            }
           }
         }
-
       }
       counts
-
     }
 
     def project(sent: FeaturizedSentence, marg: Marginal, sentenceBeliefs: SentenceBeliefs): SentenceBeliefs = {
@@ -178,9 +152,21 @@ object SRL {
           if (spanBeliefs eq null) {
             null
           } else {
-            val newFrames: IndexedSeq[Beliefs[Option[String]]] = marg.frames.map(_.arr(b, e))
-            val copy = spanBeliefs.copy(frames = newFrames)
-            copy
+            val newFrames: IndexedSeq[Beliefs[Option[String]]] = for(i <- 0 until marg.frames.size) yield {
+              val beliefs = DenseVector.tabulate(labelIndex.size) {
+                marg.frames(i).spanMarginal(_, b, e)
+              }
+              assert(beliefs(notSRL) == 0.0, beliefs)
+              if (spanBeliefs.frames(i)(notSRL) == 0.0 || beliefs(notSRL) < 0.0) {
+                beliefs(notSRL) = 0.0
+              } else {
+                beliefs(notSRL) = 1 - breeze.linalg.sum(beliefs)
+              }
+              val normalizer: Double = breeze.linalg.sum(beliefs)
+              beliefs /= normalizer
+              Beliefs(spanBeliefs.frames(i).property, beliefs)
+            }
+            spanBeliefs.copy(frames = newFrames)
           }
         } else {
           null
@@ -193,24 +179,69 @@ object SRL {
 
   trait IndexedFeaturizer {
     def featureIndex: Index[Feature]
-    def anchor(validSpans: BitSet, fs: FeaturizedSentence, lemma: String, pos: Int):FeatureAnchoring
+    def anchor(fs: FeaturizedSentence, lemma: String, pos: Int):FeatureAnchoring
   }
 
   trait FeatureAnchoring {
     def featuresFor(begin: Int, end: Int, label: Int):Array[Int]
   }
 
+  class Anchoring(val featurizer: FeatureAnchoring,
+                  val words: IndexedSeq[String],
+                  val labelIndex: Index[Option[String]],
+                  val outsideLabel: String,
+                  weights: DenseVector[Double],  val sentenceBeliefs: SentenceBeliefs, val frameIndex: Int) extends SemiCRF.Anchoring[Option[String], String] {
 
-  class Anchoring(val featurizer: FeatureAnchoring, notSRLLabel: Int, weights: DenseVector[Double],  sentenceBeliefs: SentenceBeliefs, frameIndex: Int) {
+    def startSymbol: Option[String] = Some(outsideLabel)
+
+    val iNone = labelIndex(None)
+    val iOutside = labelIndex(Some(outsideLabel))
+
+    def maxSegmentLength(label: Int): Int = if(label == iNone) 0 else if(label == iOutside) 1 else 50
+
+
+    def scoreTransition(prev: Int, cur: Int, beg: Int, end: Int): Double = {
+      val init = beliefPiece(prev, cur, beg, end)
+      if (init != Double.NegativeInfinity)
+        init + score(beg, end, cur)
+      else Double.NegativeInfinity
+    }
+
+    // (same trick as in parser:)
+    // we employ the trick in Klein's thesis and in the Smith & Eisner BP paper
+    // which is as follows: we want to multiply \prod_(all spans) p(span type of span or not a span)
+    // but the dynamic program does not visit all spans for all parses, only those
+    // in the actual parse. So instead, we premultiply by \prod_{all spans} p(not span)
+    // and then we divide out p(not span) for spans in the tree.
+
+    val normalizingPiece = sentenceBeliefs.spans.data.filter(_ ne null).map { b =>
+      val notNerScore = b.frames(frameIndex).beliefs(iNone)
+
+      if (notNerScore < 1E-6) 0.0 else math.log(notNerScore)
+    }.sum
+
+    private def beliefPiece(prev: Int, cur: Int, beg: Int, end: Int): Double = {
+      val score = if (cur == iNone) Double.NegativeInfinity
+      else if (sentenceBeliefs.spanBeliefs(beg, end).eq(null) || sentenceBeliefs.spanBeliefs(beg, end).frames(frameIndex)(cur) == 0.0) Double.NegativeInfinity
+      else if (sentenceBeliefs.spanBeliefs(beg, end).frames(frameIndex)(iNone) < 1E-6) {
+        math.log(sentenceBeliefs.spanBeliefs(beg,end).frames(frameIndex)(cur))
+      } else {
+        math.log(sentenceBeliefs.spanBeliefs(beg,end).frames(frameIndex)(cur) / sentenceBeliefs.spanBeliefs(beg,end).frames(frameIndex)(iNone))
+      }
+
+      if (beg == 0) score + normalizingPiece else score
+    }
+
+
     def score(begin: Int, end: Int, label: Int):Double = {
-      val init = sentenceBeliefs.spanBeliefs(begin, end).frames(frameIndex).beliefs(label)
-      if (init <= 0.0) Double.NegativeInfinity
+      val init = sentenceBeliefs.spanBeliefs(begin, end).frames(frameIndex)(label)
+      if (init == Double.NegativeInfinity) Double.NegativeInfinity
       else {
         val feats: Array[Int] = featurizer.featuresFor(begin, end, label)
-        if (feats == null && label == notSRLLabel) {
-          0.0
+        if (feats eq null) {
+          Double.NegativeInfinity
         } else {
-          math.log(init) + dot(feats, weights)
+          init + dot(feats, weights)
         }
       }
     }
@@ -237,11 +268,10 @@ object SRL {
     def makeModel(sents: IndexedSeq[FeaturizedSentence]) = {
       val frames = sents.flatMap(_.frames)
       val lemmaIndex = Index(frames.iterator.map(_.lemma))
-      val labelIndex = factory.srlLabelIndex
 
 
       val featurizer = new StandardFeaturizer(factory.srlProp.index, lemmaIndex, processor.wordFeatureIndex, processor.spanFeatureIndex)
-      val model = new Model(factory, labelIndex, featurizer, weights(_))
+      val model = new Model(factory, factory.srlProp.index, factory.srlOutsideLabel, featurizer, weights(_))
 
       model
     }
@@ -309,12 +339,12 @@ object SRL {
     println("SRL features: " + featureIndex.size)
 
 
-    def anchor(validSpans: BitSet, fs: FeaturizedSentence, lemma: String, pos: Int): FeatureAnchoring = {
-      new Anchoring(validSpans, fs, lemma, pos)
+    def anchor(fs: FeaturizedSentence, lemma: String, pos: Int): FeatureAnchoring = {
+      new Anchoring(fs, lemma, pos)
 
     }
 
-    class Anchoring(validSpans: BitSet, fs: FeaturizedSentence, lemma: String, pos: Int) extends FeatureAnchoring {
+    class Anchoring(fs: FeaturizedSentence, lemma: String, pos: Int) extends FeatureAnchoring {
       val voiceIndex = if(pos > 0 &&
         Set("was", "were", "being", "been").contains(fs.words(pos-1))
         || (pos > 1 && Set("was", "were", "being", "been").contains(fs.words(pos-2)))) 0 else 1
@@ -380,7 +410,7 @@ object SRL {
 
       private val spanFeatures: Array[TriangularArray[Array[Int]]] = Array.tabulate(labelIndex.size){ label =>
         TriangularArray.tabulate(fs.words.length+1) { (beg, end) =>
-          if(!validSpans(TriangularArray.index(beg, end)) || beg == end || (pos < end && pos >= beg)) {
+          if(!fs.isPossibleMaximalSpan(beg, end) || beg == end || (pos < end && pos >= beg && (end-beg) > 1)) {
             null
           } else {
             val acc = new ArrayBuffer[Array[Int]]()

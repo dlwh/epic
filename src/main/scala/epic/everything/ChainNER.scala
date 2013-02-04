@@ -79,11 +79,6 @@ object ChainNER {
       beliefsFactory(sent)
     }
 
-    def projectGold(sent: FeaturizedSentence, m: Marginal, oldAugment: SentenceBeliefs): SentenceBeliefs = {
-      project(sent, m, oldAugment)
-    }
-
-
     def project(sent: FeaturizedSentence, marg: Marginal, sentenceBeliefs: SentenceBeliefs): SentenceBeliefs = {
       assert(!marg.logPartition.isInfinite, "Infinite partition! " + sent)
       val newSpans = TriangularArray.tabulate(sent.length+1){ (b,e) =>
@@ -237,13 +232,13 @@ object ChainNER {
       val normalizingPiece = beliefs.spans.data.filter(_ ne null).map { b =>
         val notNerScore = b.ner(notNER)
 
-        if (notNerScore < 1E-4) 0.0 else math.log(notNerScore)
+        if (notNerScore < 1E-6) 0.0 else math.log(notNerScore)
       }.sum
 
       private def beliefPiece(prev: Int, cur: Int, beg: Int, end: Int): Double = {
         val score = if (cur == notNER) Double.NegativeInfinity
         else if (beliefs.spanBeliefs(beg, end).eq(null) || beliefs.spanBeliefs(beg, end).ner(cur) == 0.0) Double.NegativeInfinity
-        else if (beliefs.spanBeliefs(beg, end).ner(notNER) < 1E-4) {
+        else if (beliefs.spanBeliefs(beg, end).ner(notNER) < 1E-6) {
           math.log(beliefs.spanBeliefs(beg,end).ner(cur))
         } else {
           math.log(beliefs.spanBeliefs(beg,end).ner(cur) / beliefs.spanBeliefs(beg,end).ner(notNER))

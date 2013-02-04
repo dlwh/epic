@@ -103,6 +103,27 @@ case class Frame(lemma: String, pos: Int, sense: Int, args: IndexedSeq[Argument]
     }
     copy(args=newArgs.toIndexedSeq)
   }
+
+  def asSegments(words: IndexedSeq[String]):IndexedSeq[(Option[String], Span)] = {
+    val sorted = args.sortBy(_.span.start)
+    var out = new ArrayBuffer[(Option[String], Span)]()
+    var last = 0
+    for( arg <- sorted ) {
+      assert(last <= arg.span.start)
+      while(arg.span.start != last) {
+        out += (None -> Span(last,last+1))
+        last += 1
+      }
+      out += (Some(arg.arg) -> Span(arg.span.start, arg.span.end))
+      last = arg.span.end
+    }
+    while(words.length != last) {
+      out += (None -> Span(last,last+1))
+      last += 1
+    }
+
+    out
+  }
 }
 
 case class Argument(arg: String, span: Span)

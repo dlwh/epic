@@ -110,7 +110,7 @@ class ConstraintCoreGrammar[L, W](augmentedGrammar: AugmentedGrammar[L, W], isIn
                                                     gold.isGoldTopTag(_, _, _))
 
     val hasMaximalProjection: BitSet = BitSet.empty ++ (0 until labelThresholds.length).filter{ i =>
-      (labelThresholds(i) ne null) && ((labelThresholds(i)|topLabelThresholds(i)) -- synthetics).nonEmpty
+      ((labelThresholds(i) ne null) && (topLabelThresholds(i) ne null)) && ((labelThresholds(i)|topLabelThresholds(i)) -- synthetics).nonEmpty
     }
 
     val pattern = ConstraintCoreGrammar.ConstraintSparsity(labelThresholds, topLabelThresholds, hasMaximalProjection)

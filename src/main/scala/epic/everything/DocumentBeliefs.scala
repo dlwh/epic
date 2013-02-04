@@ -8,7 +8,6 @@ import breeze.linalg.NumericOps.Arrays._
 import epic.trees.{Span, AnnotatedLabel}
 import epic.parser.BaseGrammar
 import epic.ontonotes.{DPos, DSpan, NERType}
-import epic.everything.FeaturizedSentence
 
 /**
  *
@@ -57,14 +56,12 @@ case class DocumentBeliefs(sentences: Array[SentenceBeliefs]) extends Factor[Doc
 }
 
 object DocumentBeliefs {
-  class Factory(grammar: BaseGrammar[AnnotatedLabel], val nerLabelIndex: Index[NERType.Value], val srlLabelIndex: Index[String]) {
-    val sentenceFactory = new SentenceBeliefs.Factory(grammar, nerLabelIndex, srlLabelIndex)
+  class Factory(grammar: BaseGrammar[AnnotatedLabel], val nerLabelIndex: Index[NERType.Value], val srlLabelIndex: Index[String], val outsideSrlLabel: String) {
+    val sentenceFactory = new SentenceBeliefs.Factory(grammar, nerLabelIndex, srlLabelIndex, outsideSrlLabel)
     def nerProp = sentenceFactory.nerProp
     def srlProp = sentenceFactory.srlProp
     def labelProp = sentenceFactory.labelProp
     def optionLabelProp = sentenceFactory.optionLabelProp
-    private val initNERBelief = Beliefs.improperUninformed(nerProp)
-    private val initSRLBelief = Beliefs.improperUninformed(srlProp)
 
     def apply(doc: FeaturizedDocument):DocumentBeliefs = {
       val sentences = for(s <- doc.sentences.toArray) yield {
@@ -145,7 +142,8 @@ case class SentenceBeliefs(spans: TriangularArray[SpanBeliefs],
 }
 
 object SentenceBeliefs {
-  class Factory(grammar: BaseGrammar[AnnotatedLabel], val nerLabelIndex: Index[NERType.Value], val srlLabelIndex: Index[String]) {
+  class Factory(grammar: BaseGrammar[AnnotatedLabel], val nerLabelIndex: Index[NERType.Value], val srlLabelIndex: Index[String], val srlOutsideLabel: String) {
+    assert(srlLabelIndex(srlOutsideLabel) != -1, srlLabelIndex + " " + srlOutsideLabel)
 
     val nerProp = Property("ner", nerLabelIndex)
     val labelProp = Property("label", grammar.labelIndex)

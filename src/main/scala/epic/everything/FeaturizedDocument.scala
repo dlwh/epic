@@ -52,6 +52,10 @@ case class FeaturizedSentence(index: Int, words: IndexedSeq[String],
       || (nerConstraints.allowedLabels(begin,end).ne(null) && nerConstraints.allowedLabels(begin,end).nonEmpty)
   )
 
+  def isPossibleMaximalSpan(begin: Int, end: Int) = (
+    (end-begin) == 1 || constituentSparsity.hasMaximalLabel(begin, end)
+    )
+
   def validConstituents: collection.immutable.BitSet = constituentSparsity.activeTriangularIndices
 
   def isPossibleConstituent(begin: Int, end: Int) = {
@@ -72,7 +76,7 @@ object FeaturizedDocument {
 
     val featurizer = new BasicFeaturizer(tagWordCounts, breeze.linalg.sum(tagWordCounts, Axis._0))
 
-    val srlLabels = Index[String](docs.iterator.flatMap(_.sentences).flatMap(_.srl).flatMap(_.args).map(_.arg))
+    val srlLabels = Index[String](Iterator("O") ++ docs.iterator.flatMap(_.sentences).flatMap(_.srl).flatMap(_.args).map(_.arg))
 
     val count = new AtomicInteger(0)
     val constraints = for(d <- docs.par) yield {
@@ -135,6 +139,8 @@ object FeaturizedDocument {
                     corefFeaturizer: CorefInstanceFeaturizer,
                     wordFeatureIndex: Index[Feature],
                     spanFeatureIndex: Index[Feature]) extends (Document=>FeaturizedDocument) {
+    def outsideSrlLabel: String = "O"
+
 
     def grammar: BaseGrammar[AnnotatedLabel] = parseConstrainer.grammar
     def lexicon: Lexicon[AnnotatedLabel, String] = parseConstrainer.lexicon

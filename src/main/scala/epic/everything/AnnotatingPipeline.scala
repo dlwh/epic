@@ -65,14 +65,15 @@ object AnnotatingPipeline {
     val (docProcessor, processedTrain) = params.cache.cached("processorAndTrain", train){
       buildProcessor(train, weightsCache, params)
     }
-    val processedTest = params.cache.cached("test", test, docProcessor) {
-      test.par.map(docProcessor(_)).seq.flatMap(_.sentences)
+    val processedTest = params.cache.cached("test", train, docProcessor) {
+//      test.par.map(docProcessor(_)).seq.flatMap(_.sentences)
+      processedTrain.flatMap(_.sentences).take(10)
     }.toIndexedSeq
 
     println(s"${processedTrain.length} training documents totalling ${processedTrain.flatMap(_.sentences).length} sentences.")
     println(s"${processedTest.length} test sentences.")
 
-    val beliefsFactory = new SentenceBeliefs.Factory(docProcessor.grammar, docProcessor.nerLabelIndex, docProcessor.srlLabelIndex)
+    val beliefsFactory = new SentenceBeliefs.Factory(docProcessor.grammar, docProcessor.nerLabelIndex, docProcessor.srlLabelIndex, docProcessor.outsideSrlLabel)
 
     // now build the individual models
     val nerModel = makeNERModel(beliefsFactory, docProcessor, processedTrain, weightsCache)
