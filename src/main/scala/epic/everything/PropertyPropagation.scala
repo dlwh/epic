@@ -94,27 +94,30 @@ object PropertyPropagation {
     }
 
     def score(grounding: AssociationAnchoring[T, U], ass1: Int, ass2: Int) = {
-      math.exp(dot(weights, grounding.featuresFor(ass1, ass2)) )
+      dot(weights, grounding.featuresFor(ass1, ass2))
     }
 
     def scores(grounding: AssociationAnchoring[T, U], b1: Beliefs[_], b2: Beliefs[_]) = {
       val result = DenseMatrix.zeros[Double](b1.size, b2.size)
+      result := Double.NegativeInfinity
       var p1 = 0
       while (p1 < result.rows) {
         var p2 = 0
         if (b1.beliefs(p1) > 1E-6)
           while (p2 < result.cols) {
             if(b2.beliefs(p2) > 1E-6)
-              result(p1, p2) = score(grounding, p1, p2) * b1.beliefs(p1) * b2.beliefs(p2)
+              result(p1, p2) = score(grounding, p1, p2) + math.log(b1.beliefs(p1) * b2.beliefs(p2))
             p2 += 1
           }
         p1 += 1
       }
 
+
       result
     }
 
     def marginal(sentence: FeaturizedSentence, sentenceBeliefs: SentenceBeliefs): (Marginal) = {
+      var logPartition = 0.0
       val spans = TriangularArray.tabulate(sentence.length + 1) { (begin, end) =>
         val grounding = scorer.anchor(sentence, begin, end)
         val current = sentenceBeliefs.spanBeliefs(begin, end)
@@ -124,15 +127,16 @@ object PropertyPropagation {
           val b1 = scorer.lens1(current)
           val b2 = scorer.lens2(current)
           val r = scores(grounding, b1, b2)
-          val partition = breeze.linalg.sum(r)
-          assert(partition >= 0.0, f"$partition%.3E $b1 $b2")
+          val partition = breeze.linalg.softmax(r)
+          logPartition += partition
+          breeze.numerics.exp.inPlace(r -= partition)
           assert(!partition.isInfinite, f"$partition%.3E $b1 $b2")
           assert(!partition.isNaN, f"$partition%.3E $b1 $b2")
           r
         }
       }
 
-      val marginal =  new Marginal(spans)
+      val marginal =  new Marginal(logPartition, spans)
       assert(!marginal.logPartition.isNaN)
       assert(!marginal.logPartition.isInfinite)
       marginal
@@ -151,7 +155,6 @@ object PropertyPropagation {
         val anchoring = scorer.anchor(sentence, begin, end)
         val current = sentenceMarginal.spans(begin, end)
         if(current != null) {
-          val partition = breeze.linalg.sum(current)
           if (begin == end || (current eq null))  {
             null
           } else {
@@ -161,7 +164,7 @@ object PropertyPropagation {
               while (p2 < current.cols) {
                 val features = anchoring.featuresFor(p1, p2)
                 for(f <- features) {
-                  accum.counts(f) += scale * current(p1,p2) / partition
+                  accum.counts(f) += scale * current(p1,p2)
                 }
                 p2 += 1
               }
@@ -240,12 +243,12 @@ object PropertyPropagation {
   }
 
 
-  case class Marginal(spans: TriangularArray[DenseMatrix[Double]]) extends epic.framework.Marginal {
-    val logPartition = {
-      val part = spans.map(s => if (s eq null) 0.0 else math.log(breeze.linalg.sum(s))).data.sum
-      assert(!part.isNaN, spans.data.mkString("{", ",", "}"))
-      part
-    }
+  case class Marginal(logPartition: Double, spans: TriangularArray[DenseMatrix[Double]]) extends epic.framework.Marginal {
+//    val logPartition = {
+//      val part = spans.map(s => if (s eq null) 0.0 else math.log(breeze.linalg.sum(s))).data.sum
+//      assert(!part.isNaN, spans.data.mkString("{", ",", "}"))
+//      part
+//    }
   }
 }
 

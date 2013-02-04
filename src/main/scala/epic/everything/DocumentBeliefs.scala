@@ -205,7 +205,11 @@ case class SpanBeliefs(span: DSpan,
     governor / f.governor,
     label / f.label,
     ner / f.ner,
-    {for ((a,b) <- frames zip f.frames) yield a / b})
+    {for ((a,b) <- frames
+      zip
+      f.frames) yield
+      a /
+        b})
 
   def logPartition: Double = governor.logPartition + label.logPartition + ner.logPartition + frames.map(_.logPartition).sum
 

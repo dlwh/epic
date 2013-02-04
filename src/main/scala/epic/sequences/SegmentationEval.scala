@@ -23,7 +23,7 @@ object SegmentationEval {
     myStats
   }
 
-  class Stats(val nRight: Int, val nGuess: Int, val nGold: Int) extends EvaluationResult[Stats] {
+  class Stats(val nRight: Int = 0, val nGuess: Int = 0, val nGold: Int = 0) extends EvaluationResult[Stats] {
     def precision = nRight * 1.0 / nGuess
     def recall = nRight * 1.0 / nGold
     def f1 = 2 * precision * recall / (precision + recall)
