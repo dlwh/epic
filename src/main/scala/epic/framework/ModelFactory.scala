@@ -20,7 +20,7 @@ import breeze.linalg.{DenseVector, Counter}
 import breeze.util._
 
 /**
- *
+ * Interface for producing Models from training data.
  * @author dlwh
  */
 trait ModelFactory[Datum] {

@@ -3,7 +3,9 @@ package epic.framework
 import breeze.linalg.DenseVector
 
 /**
- * 
+ * A model that has some kind of evaluation function.
+ * Used with an [[epic.framework.AnnotatingInference]], you
+ * can make predictions for a test set and then get the performance.
  * @author dlwh
  */
 trait EvaluableModel[Datum] extends Model[Datum] { self =>

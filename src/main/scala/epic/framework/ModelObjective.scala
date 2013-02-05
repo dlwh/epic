@@ -7,7 +7,10 @@ import breeze.util.Encoder
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- *
+ * The objective function for training a [[epic.framework.Model]]. Selects
+ * a batch, creates an [[epic.framework.Inference]] object using the model,
+ * computes expected counts using the inference, and then turns them into
+ * the objective value.
  * @author dlwh
  */
 class ModelObjective[Datum](val model: Model[Datum],
