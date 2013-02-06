@@ -87,7 +87,7 @@ object AnnotatingPipeline {
         println("Checking " + m.getClass.getName)
         val obj = new ModelObjective(m, processedTrain.flatMap(_.sentences).filter(_.words.filter(_(0).isLetterOrDigit).length <= 40))
         val cachedObj = new CachedBatchDiffFunction(obj)
-        GradientTester.test(cachedObj, obj.initialWeightVector(randomize = true), randFraction = 1E-4, skipZeros = true, toString={(x:Int) => m.featureIndex.get(x).toString})
+        GradientTester.test(cachedObj, obj.initialWeightVector(randomize = true), randFraction = 1E-4, toString={(x:Int) => m.featureIndex.get(x).toString})
       }
     }
 
@@ -140,7 +140,7 @@ object AnnotatingPipeline {
 //        println(i + " " + epModel.featureIndex.get(i) + " " + grad(i) + " " + emp + " " + rel)
 //
 //      }
-      GradientTester.test(cachedObj, obj.initialWeightVector(randomize = true), randFraction = 1E-1, skipZeros=true, toString={(x:Int) => epModel.featureIndex.get(x).toString})
+      GradientTester.test(cachedObj, obj.initialWeightVector(randomize = true), randFraction = 1E-1, toString={(x:Int) => epModel.featureIndex.get(x).toString})
     }
 
     type OptState = FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State
