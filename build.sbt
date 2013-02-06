@@ -10,7 +10,8 @@ scalaVersion := "2.10.0"
 
 resolvers ++= Seq(
   "ScalaNLP Maven2" at "http://repo.scalanlp.org/repo",
-  "Scala Tools Snapshots" at "http://scala-tools.org/repo-snapshots/"
+  "Scala Tools Snapshots" at "http://scala-tools.org/repo-snapshots/",
+  "Sonatype Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots/"
 )
 
 libraryDependencies ++= Seq(
