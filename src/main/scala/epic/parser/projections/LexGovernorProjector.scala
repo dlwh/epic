@@ -18,10 +18,11 @@ class LexGovernorProjector[L, W](grammar: LexGrammar[L, W]) {
     assert(anch.annotationTag == 1)
     val v = new Visitor(anch, chart.length)
     chart.visit(v)
+
     LexGovernorInfo(v.spanType, v.spanGovernorCounts, v.governedSpan, v.wordGovernorCounts, v.wordTagType, v.maximalLabelType)
   }
 
-  // WHENEVER you change this, be sure to change PropertyParsingAnchoring
+  /** WHENEVER you change this, be sure to change [[epic.everything.SentLexParser.Anchoring]] */
   private class Visitor(spec: RefinedAnchoring[L, W], length: Int) extends AnchoredVisitor[L] {
     val spanType = TriangularArray.fill(length+1)(optionalLabelBeliefs)
     val spanGovernorCounts = TriangularArray.fill(length+1)(baseDV)

@@ -40,9 +40,24 @@ object SRL {
 
     type EvaluationResult = SegmentationEval.Stats
 
-    def evaluate(guess: FeaturizedSentence, gold: FeaturizedSentence): EvaluationResult = {
+    def evaluate(guess: FeaturizedSentence, gold: FeaturizedSentence, logResults: Boolean): EvaluationResult = {
       val pieces = guess.frames.zip(gold.frames) map { case (guessf, goldf) =>
-        SegmentationEval.evaluateExample(Set(outsideLabel,"V"), asSegments(guess.words, guessf.args), asSegments(gold.words, goldf.args))
+        val guessSeg: Segmentation[String, String] = asSegments(guess.words, guessf.args)
+        val goldSeg: Segmentation[String, String] = asSegments(gold.words, goldf.args)
+        val stats = SegmentationEval.evaluateExample(Set(outsideLabel,"V"), guessSeg, goldSeg)
+        if (logResults) {
+          val sentence =(0 until guess.words.length).map{i => if (i == guessf.pos) "[" + guess.words(i) + "]" else guess.words(i)}.mkString(" ")
+          println(s"""
+          |=============================
+          |Predicate: $sentence
+          |Guess: ${guessSeg.render(badLabel=outsideLabel)}
+          |
+          |Gold: ${goldSeg.render(badLabel=outsideLabel)}
+          |
+          |Stats: $stats
+          |==============================""".stripMargin('|'))
+        }
+        stats
       }
 
       pieces.foldLeft(new SegmentationEval.Stats())(_ + _)
@@ -73,6 +88,8 @@ object SRL {
 
   case class Marginal(frames: IndexedSeq[SemiCRF.Marginal[Option[String], String]]) extends epic.framework.Marginal {
     def logPartition: Double = frames.map(_.logPartition).sum
+    assert(!logPartition.isNaN)
+    assert(!logPartition.isInfinite)
   }
 
   class Inference(beliefsFactory: SentenceBeliefs.Factory,
@@ -126,20 +143,49 @@ object SRL {
     def countsFromMarginal(s: FeaturizedSentence, marg: Marginal, counts: ExpectedCounts, scale: Double): ExpectedCounts = {
       counts.loss += marg.logPartition * scale
       for ( f <- marg.frames) {
+        val labelMarginals = TriangularArray.fill(s.length+1)(null:Array[Double])
         val localization = f.anchoring.asInstanceOf[Anchoring].featurizer
         f visit new TransitionVisitor[Option[String], String] {
           def apply(prev: Int, cur: Int, beg: Int, end: Int, count: Double) {
-            if (count != 0.0) {
-              try {
-                for (f <- localization.featuresFor(beg, end, cur))
-                  counts.counts(f) += count * scale
-              } catch {
-                case ex =>
-                  throw new RuntimeException(s.words + " " + count + " " + beg + " " + end + " " + labelIndex.get(cur) + " " + s.frames(f.anchoring.asInstanceOf[Anchoring].frameIndex) + " " + s.isPossibleMaximalSpan(beg,end) + " " + s.constituentSparsity.activeLabelsTop(beg,end).map(f.anchoring.asInstanceOf[Anchoring].sentenceBeliefs.spanBeliefs(0,s.length).label.property.index.get(_)))
-              }
+            var arr = labelMarginals(beg,end)
+            if (arr eq null) {
+              arr = new Array[Double](labelIndex.size)
+              labelMarginals(beg,end) = arr
             }
+            arr(cur) += count
           }
         }
+        for (b <- 0 until s.length; e <- (b+1) to s.length) {
+          val arr = labelMarginals(b,e)
+          if (arr ne null) {
+            var label = 0
+            while(label < arr.length) {
+              val count = arr(label)
+              if (count != 0.0) {
+                val feats = localization.featuresFor(b, e, label)
+                var f = 0
+                while(f < feats.length) {
+                  counts.counts(feats(f)) += count * scale
+                  f += 1
+                }
+              }
+              label += 1
+            }
+          }
+
+        }
+//        f visit new TransitionVisitor[Option[String], String] {
+//          def apply(prev: Int, cur: Int, beg: Int, end: Int, count: Double) {
+//            if (count != 0.0) {
+//              var f = 0
+//              val feats = localization.featuresFor(beg, end, cur)
+//              while(f < feats.length) {
+//                counts.counts(feats(f)) += count * scale
+//                f += 1
+//              }
+//            }
+//          }
+//        }
       }
       counts
     }
@@ -201,10 +247,7 @@ object SRL {
 
 
     def scoreTransition(prev: Int, cur: Int, beg: Int, end: Int): Double = {
-      val init = beliefPiece(prev, cur, beg, end)
-      if (init != Double.NegativeInfinity)
-        init + score(beg, end, cur)
-      else Double.NegativeInfinity
+      score(beg, end, cur)
     }
 
     // (same trick as in parser:)
@@ -220,7 +263,7 @@ object SRL {
       if (notNerScore < 1E-6) 0.0 else math.log(notNerScore)
     }.sum
 
-    private def beliefPiece(prev: Int, cur: Int, beg: Int, end: Int): Double = {
+    private def beliefPiece(beg:Int, end:Int, cur: Int): Double = {
       val score = if (cur == iNone) Double.NegativeInfinity
       else if (sentenceBeliefs.spanBeliefs(beg, end).eq(null) || sentenceBeliefs.spanBeliefs(beg, end).frames(frameIndex)(cur) == 0.0) Double.NegativeInfinity
       else if (sentenceBeliefs.spanBeliefs(beg, end).frames(frameIndex)(iNone) < 1E-6) {
@@ -234,17 +277,25 @@ object SRL {
 
 
     def score(begin: Int, end: Int, label: Int):Double = {
-      val init = sentenceBeliefs.spanBeliefs(begin, end).frames(frameIndex)(label)
-      if (init == Double.NegativeInfinity) Double.NegativeInfinity
-      else {
-        val feats: Array[Int] = featurizer.featuresFor(begin, end, label)
-        if (feats eq null) {
-          Double.NegativeInfinity
-        } else {
-          init + dot(feats, weights)
+      if(scoreCache(begin,end)(label).isNaN) {
+        val init = beliefPiece(begin, end, label)
+        val score = {
+          if (init == Double.NegativeInfinity) Double.NegativeInfinity
+          else {
+            val feats: Array[Int] = featurizer.featuresFor(begin, end, label)
+            if (feats eq null) {
+              Double.NegativeInfinity
+            } else {
+              init + dot(feats, weights)
+            }
+          }
         }
+        scoreCache(begin,end)(label) = score
       }
+      scoreCache(begin,end)(label)
     }
+
+    private val scoreCache = TriangularArray.fill(length+1)(Array.fill(labelIndex.size)(Double.NaN))
 
     private def dot(features: Array[Int], weights: DenseVector[Double]) = {
       var i =0
@@ -308,20 +359,12 @@ object SRL {
 
     val (featureIndex: Index[Feature], wordFeatures, spanFeatures, distanceToLemmaFeatures, lemmaContainedFeature) = {
       val featureIndex = Index[Feature]()
-      //      val labelFeatures = Array.tabulate(labelIndex.size, lemmaIndex.size + 1, kinds.length, baseWordFeatureIndex.size) { (l, lem, k, f) =>
-      //        if(lem == lemmaIndex.size)
-      //          featureIndex.index(Label1Feature(labelIndex.get(l), baseWordFeatureIndex.get(f), kinds(k)))
-      //        else
-      //          featureIndex.index(Label1Feature( (labelIndex.get(l) + lemmaIndex.get(lem)).intern, baseWordFeatureIndex.get(f), kinds(k)))
-      //      }
-      val labelFeatures = null
+      val labelFeatures = Array.tabulate(labelIndex.size, kinds.length, baseWordFeatureIndex.size) { (l, k, f) =>
+          featureIndex.index(Label1Feature(labelIndex.get(l), baseWordFeatureIndex.get(f), kinds(k)))
+      }
 
-      val spanFeatures = Array.tabulate(labelIndex.size, lemmaIndex.size + 1, baseSpanFeatureIndex.size) { (l, lem, f) =>
-        if(lem == lemmaIndex.size)
+      val spanFeatures = Array.tabulate(labelIndex.size, baseSpanFeatureIndex.size) { (l, f) =>
           featureIndex.index(Label1Feature(labelIndex.get(l), baseSpanFeatureIndex.get(f), 'Span))
-        else -1
-        //        else
-        //          featureIndex.index(Label1Feature((labelIndex.get(l) + " " + lemmaIndex.get(lem)).intern, baseSpanFeatureIndex.get(f), 'Span))
       }
 
       val distanceToLemmaFeatures = Array.tabulate(labelIndex.size, lemmaIndex.size + 1, propKinds.length, 2, numDistBins) { (l, lem, kind, dir, dist) =>
@@ -356,12 +399,10 @@ object SRL {
       }
 
       val beginCache = Array.tabulate(labelIndex.size, fs.words.length){ (label,w) =>
-      //        val feats = fs.wordFeatures(w)
+              val feats = fs.wordFeatures(w)
         val builder = Array.newBuilder[Int]
-        //        builder.sizeHint(if(lemmaInd == -1) feats.length else 2 * feats.length)
-        //        appendFeatures(builder, feats, wordFeatures(label)(lemmaIndex.size)(0))
-        //        if(lemmaInd >= 0)
-        //          appendFeatures(builder, feats, wordFeatures(label)(lemmaInd)(0))
+        builder.sizeHint(if(lemmaInd == -1) feats.length else 2 * feats.length)
+        appendFeatures(builder, feats, wordFeatures(label)(0))
         builder.result()
       }
 
@@ -375,22 +416,18 @@ object SRL {
       }
 
       val endCache = Array.tabulate(labelIndex.size, fs.words.length){ (label,w) =>
-      //        val feats = fs.wordFeatures(w)
+        val feats = fs.wordFeatures(w)
         val builder = Array.newBuilder[Int]
-        //        builder.sizeHint(if(lemmaInd == -1) feats.length else 2 * feats.length)
-        //        appendFeatures(builder, feats, wordFeatures(label)(lemmaIndex.size)(2))
-        //        if(lemmaInd >= 0)
-        //          appendFeatures(builder, feats, wordFeatures(label)(lemmaInd)(2))
+        builder.sizeHint(if(lemmaInd == -1) feats.length else 2 * feats.length)
+        appendFeatures(builder, feats, wordFeatures(label)(2))
         builder.result()
       }
 
       val interiorCache = Array.tabulate(labelIndex.size, fs.words.length){ (label,w) =>
-      //        val feats = fs.wordFeatures(w)
+        val feats = fs.wordFeatures(w)
         val builder = Array.newBuilder[Int]
-        //        builder.sizeHint(if(lemmaInd == -1) feats.length else 2 * feats.length)
-        //        appendFeatures(builder, feats, wordFeatures(label)(lemmaIndex.size)(1))
-        //        if(lemmaInd >= 0)
-        //          appendFeatures(builder, feats, wordFeatures(label)(lemmaInd)(1))
+        builder.sizeHint(if(lemmaInd == -1) feats.length else 2 * feats.length)
+        appendFeatures(builder, feats, wordFeatures(label)(1))
         builder.result()
       }
 
@@ -434,9 +471,7 @@ object SRL {
               i += 1
             }
             val forSpan = fs.featuresForSpan(beg, end)
-            appendFeatures(builder, forSpan, outer.spanFeatures(label)(lemmaIndex.size))
-            //            if(lemmaInd >= 0)
-            //              appendFeatures(builder, forSpan, outer.spanFeatures(label)(lemmaInd))
+            appendFeatures(builder, forSpan, outer.spanFeatures(label))
 
             val dir = if(pos < beg) 0 else 1
 

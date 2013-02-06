@@ -99,7 +99,7 @@ class EPInference[Datum, Augment](val inferences: IndexedSeq[ProjectableInferenc
       var marg = inf.marginal(datum, q)
       var contributionToLikelihood = marg.logPartition
       if (contributionToLikelihood.isInfinite || contributionToLikelihood.isNaN) {
-        println(s"Model $i is misbehaving ($contributionToLikelihood) on iter $iter! Datum: " + datum )
+        println(s"Model $i is misbehaving ($contributionToLikelihood) on iter $iter!" )
         retries += 1
         if (retries > 3) {
           throw new RuntimeException("EP is being sad!")

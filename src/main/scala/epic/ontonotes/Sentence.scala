@@ -12,6 +12,7 @@ import collection.mutable
  *
  * @author dlwh
  */
+@SerialVersionUID(1L)
 case class Sentence(docId: String, index: Int,
                    words: IndexedSeq[String],
                    annotations: OntoAnnotations) extends Example[OntoAnnotations,Seq[String]] {
@@ -66,6 +67,7 @@ case class Sentence(docId: String, index: Int,
 
 
 
+@SerialVersionUID(1L)
 case class OntoAnnotations(tree: Tree[AnnotatedLabel],
                            ner: Map[DSpan,NERType.Value],
                            coref: Map[DSpan,Mention],
@@ -77,11 +79,13 @@ case class OntoAnnotations(tree: Tree[AnnotatedLabel],
 /**
  * A coref mention
  */
+@SerialVersionUID(1L)
 case class Mention(id: Int, mentionType: MentionType = MentionType.Ident)
 
 /**
  * A Propbank mention
  */
+@SerialVersionUID(1L)
 case class Frame(lemma: String, pos: Int, sense: Int, args: IndexedSeq[Argument]) {
   /**
    * Embedded arguments are very rare in SRL, (.2% on CoNLL 2011 training set),
@@ -104,21 +108,21 @@ case class Frame(lemma: String, pos: Int, sense: Int, args: IndexedSeq[Argument]
     copy(args=newArgs.toIndexedSeq)
   }
 
-  def asSegments(words: IndexedSeq[String]):IndexedSeq[(Option[String], Span)] = {
+  def asSegments(words: IndexedSeq[String], outside: String = "O"):IndexedSeq[(Option[String], Span)] = {
     val sorted = args.sortBy(_.span.start)
     var out = new ArrayBuffer[(Option[String], Span)]()
     var last = 0
     for( arg <- sorted ) {
       assert(last <= arg.span.start)
       while(arg.span.start != last) {
-        out += (None -> Span(last,last+1))
+        out += (Some(outside) -> Span(last,last+1))
         last += 1
       }
       out += (Some(arg.arg) -> Span(arg.span.start, arg.span.end))
       last = arg.span.end
     }
     while(words.length != last) {
-      out += (None -> Span(last,last+1))
+      out += (Some(outside) -> Span(last,last+1))
       last += 1
     }
 

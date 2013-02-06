@@ -35,8 +35,10 @@ object ChainNER {
     }
 
 
-    def evaluate(guess: FeaturizedSentence, gold: FeaturizedSentence): EvaluationResult = {
-      SegmentationEval.evaluateExample(Set(NERType.NotEntity, NERType.OutsideSentence), gold = gold.ner, guess = guess.ner)
+    def evaluate(guess: FeaturizedSentence, gold: FeaturizedSentence, logResults: Boolean): EvaluationResult = {
+      val stats = SegmentationEval.evaluateExample(Set(NERType.NotEntity, NERType.OutsideSentence), gold = gold.ner, guess = guess.ner)
+      if (logResults) println("Guess:\n" + guess.ner.render(badLabel=NERType.NotEntity) + "\n Gold:\n" + gold.ner.render(badLabel=NERType.NotEntity)+ "\n" + stats)
+      stats
     }
   }
 

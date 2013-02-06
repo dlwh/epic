@@ -204,6 +204,7 @@ object SemiCRF {
         val symbol = scorer.labelIndex(l)
         assert(symbol != -1, s"$l not in index: ${scorer.labelIndex}")
         score += scorer.scoreTransition(lastSymbol, symbol, span.start, span.end)
+        assert(!score.isInfinite, " " + segmentation + " " + l + " " + span)
         goldEnds(span.start) = span.end
         goldLabels(span.start) = symbol
         goldPrevLabels(span.start) = lastSymbol

@@ -72,7 +72,7 @@ object PropertyPropagation {
       def +(other: EvaluationResult): EvaluationResult = this
     }
 
-    def evaluate(guess: FeaturizedSentence, gold: FeaturizedSentence): EvaluationResult = {
+    def evaluate(guess: FeaturizedSentence, gold: FeaturizedSentence, logResults:Boolean): EvaluationResult = {
       EvaluationResult()
     }
   }

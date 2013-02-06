@@ -40,8 +40,8 @@ class DocumentModelAdaptor(factory: DocumentBeliefs.Factory, val sentenceModel: 
     sentenceModel.expectedCountsToObjective(ecounts)
   }
 
-  def evaluate(guess: FeaturizedDocument, gold: FeaturizedDocument): EvaluationResult = {
-    val results = for( (guessSent, goldSent) <- guess.sentences.zip(gold.sentences)) yield sentenceModel.evaluate(guessSent, goldSent)
+  def evaluate(guess: FeaturizedDocument, gold: FeaturizedDocument, logResults: Boolean): EvaluationResult = {
+    val results = for( (guessSent, goldSent) <- guess.sentences.zip(gold.sentences)) yield sentenceModel.evaluate(guessSent, goldSent, logResults)
     results.reduceLeft(_ + _)
   }
 
