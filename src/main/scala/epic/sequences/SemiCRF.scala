@@ -411,7 +411,7 @@ object SemiCRF {
 
 
   trait IndexedFeaturizer[L, W] {
-    def anchor(w: IndexedSeq[W]):AnchoredFeaturizer[L, W]
+    def anchor(w: IndexedSeq[W], spanCompressedCache: Option[CompressedFeatureCache] = None):AnchoredFeaturizer[L, W]
 
     def startSymbol: L
 

@@ -11,6 +11,7 @@ import collection.immutable
 import breeze.collection.mutable.TriangularArray
 import epic.trees.Span
 import epic.parser.features.StandardSpanFeatures.WordEdges
+import collection.mutable
 
 /**
  *
@@ -20,7 +21,8 @@ import epic.parser.features.StandardSpanFeatures.WordEdges
 class SemiCRFModel[L, W](val featureIndex: Index[Feature],
                          val featurizer: SemiCRFModel.BIEOFeaturizer[L, W],
                          maxSegmentLength: Int=>Int,
-                         initialWeights: Feature=>Double = {(_: Feature) => 0.0}) extends Model[Segmentation[L, W]] with StandardExpectedCounts.Model with Serializable {
+                         initialWeights: Feature=>Double = {(_: Feature) => 0.0},
+                         cacheFeatures: Boolean = false) extends Model[Segmentation[L, W]] with StandardExpectedCounts.Model with Serializable {
   def labelIndex: Index[L] = featurizer.labelIndex
 
   def extractCRF(weights: DenseVector[Double]) = {
@@ -33,13 +35,16 @@ class SemiCRFModel[L, W](val featureIndex: Index[Feature],
 
   def initialValueForFeature(f: Feature): Double = initialWeights(f)
 
-  def inferenceFromWeights(weights: DenseVector[Double]): Inference = new SemiCRFInference(weights, featureIndex, featurizer, maxSegmentLength)
+  val compressedFeatureCache = mutable.Map.empty[IndexedSeq[W], CompressedFeatureCache]
+
+  def inferenceFromWeights(weights: DenseVector[Double]): Inference =
+    new SemiCRFInference(weights, featureIndex, featurizer, maxSegmentLength, compressedFeatureCache, cacheFeatures)
 
 }
 
 object SemiCRFModel {
   trait BIEOFeaturizer[L, W] extends SemiCRF.IndexedFeaturizer[L, W] {
-    def anchor(w: IndexedSeq[W]): BIEOAnchoredFeaturizer[L, W]
+    def anchor(w: IndexedSeq[W], spanCompressedCache: Option[CompressedFeatureCache] = None): BIEOAnchoredFeaturizer[L, W]
   }
 
   trait BIEOAnchoredFeaturizer[L, W] extends SemiCRF.AnchoredFeaturizer[L, W] {
@@ -50,6 +55,8 @@ object SemiCRFModel {
     def featuresForEnd(cur: Int, pos: Int):SparseVector[Double]
     def featuresForInterior(cur: Int, pos: Int):SparseVector[Double]
     def featuresForSpan(prev: Int, cur: Int, beg: Int, end: Int):SparseVector[Double]
+    def indicatorFeaturesForSpan(prev: Int, cur: Int, beg: Int, end: Int):IndicatorFeatureVector
+    def indicatorFeatureCache:CompressedFeatureCache
 
     def featuresForTransition(prev: Int, cur: Int, start: Int, end: Int): SparseVector[Double] = {
       val acc = new ArrayBuffer[SparseVector[Double]]()
@@ -87,7 +94,9 @@ object SemiCRFModel {
 class SemiCRFInference[L, W](weights: DenseVector[Double],
                              featureIndex: Index[Feature],
                              featurizer: SemiCRFModel.BIEOFeaturizer[L, W],
-                             val maxLength: Int=>Int) extends AugmentableInference[Segmentation[L, W], SemiCRF.Anchoring[L, W]] with SemiCRF.Grammar[L, W] with Serializable {
+                             val maxLength: Int=>Int,
+                             compressedFeatureCache: mutable.Map[IndexedSeq[W], CompressedFeatureCache],
+                             cacheFeatures: Boolean = false) extends AugmentableInference[Segmentation[L, W], SemiCRF.Anchoring[L, W]] with SemiCRF.Grammar[L, W] with Serializable {
   def viterbi(sentence: IndexedSeq[W], anchoring: SemiCRF.Anchoring[L, W]): Segmentation[L, W] = {
     SemiCRF.viterbi(new Anchoring(sentence, anchoring))
   }
@@ -162,7 +171,9 @@ class SemiCRFInference[L, W](weights: DenseVector[Double],
   }
 
   class Anchoring(val words: IndexedSeq[W], augment: SemiCRF.Anchoring[L, W]) extends SemiCRF.Anchoring[L, W] {
-    val localization = featurizer.anchor(words)
+    var compressedCache = compressedFeatureCache.get(words)
+    val localization = featurizer.anchor(words, compressedCache)
+    if (cacheFeatures && compressedCache.isEmpty) compressedFeatureCache.put(words, localization.indicatorFeatureCache)
     def maxSegmentLength(l: Int): Int = SemiCRFInference.this.maxLength(l)
 
     val beginCache = Array.tabulate(labelIndex.size, labelIndex.size, length){ (p,c,w) =>
@@ -198,7 +209,8 @@ class SemiCRFInference[L, W](weights: DenseVector[Double],
       } else {
         var score = augment.scoreTransition(prev, cur, beg, end)
         if (score != Double.NegativeInfinity) {
-          score += cachedSpanScore(prev, cur, beg, end)
+          val spanScore: Double = cachedSpanScore(prev, cur, beg, end)
+          score += spanScore
           if (score != Double.NegativeInfinity) {
             score += beginCache(prev)(cur)(beg)
             score += endCache(cur)(end-1)
@@ -225,20 +237,38 @@ class SemiCRFInference[L, W](weights: DenseVector[Double],
 
       var xx = cc(cur)
       if(xx == null) {
-        val span = localization.featuresForSpan(prev, cur, beg, end)
-        if (span eq null) {
-          cc(cur) = negInfArray
-          Double.NegativeInfinity
+        if (cacheFeatures) {
+          val span = localization.indicatorFeaturesForSpan(prev, cur, beg, end)
+          if (span eq null) {
+            cc(cur) = negInfArray
+            Double.NegativeInfinity
+          } else {
+            xx = java.util.Arrays.copyOf(nanArray, nanArray.length)
+            xx(prev) = span dot weights
+            cc(cur) = xx
+            xx(prev)
+          }
         } else {
-          xx = java.util.Arrays.copyOf(nanArray, nanArray.length)
-          xx(prev) = weights dot span
-          cc(cur) = xx
-          xx(prev)
+          val span = localization.featuresForSpan(prev, cur, beg, end)
+          if (span eq null) {
+            cc(cur) = negInfArray
+            Double.NegativeInfinity
+          } else {
+            xx = java.util.Arrays.copyOf(nanArray, nanArray.length)
+            xx(prev) = weights dot span
+            cc(cur) = xx
+            xx(prev)
+          }
         }
       } else {
         if (java.lang.Double.isNaN(xx(prev))) {
-          val span = localization.featuresForSpan(prev, cur, beg, end)
-          xx(prev) = weights dot span
+          if (cacheFeatures) {
+            val span = localization.indicatorFeaturesForSpan(prev, cur, beg, end)
+            xx(prev) = span dot weights
+          } else {
+            val span = localization.featuresForSpan(prev, cur, beg, end)
+            xx(prev) = weights dot span
+          }
         }
         xx(prev)
       }
@@ -484,7 +514,7 @@ object SegmentationModelFactory {
     val featureIndex: IsomorphismIndex[(Int, Feature), Feature] = new IsomorphismIndex(compositeIndex)(featureIso)
     println("Number of features: " + featureIndex.size)
 
-    def anchor(w: IndexedSeq[String]): SemiCRFModel.BIEOAnchoredFeaturizer[L, String] = new SemiCRFModel.BIEOAnchoredFeaturizer[L, String] {
+    def anchor(w: IndexedSeq[String], spanCompressedCache: Option[CompressedFeatureCache] = None): SemiCRFModel.BIEOAnchoredFeaturizer[L, String] = new SemiCRFModel.BIEOAnchoredFeaturizer[L, String] {
       val constraints = pruningModel.map(_.constraints(w))
       val loc = f.localize(w)
 
@@ -605,7 +635,7 @@ object SegmentationModelFactory {
         }
       }
 
-      private val spanFeatures = Array.tabulate(labelIndex.size, labelIndex.size){ (prev, cur) =>
+      private lazy val spanFeatures = Array.tabulate(labelIndex.size, labelIndex.size){ (prev, cur) =>
         TriangularArray.tabulate(w.length+1) { (beg, end) =>
           if (justSpanFeatures(cur)(beg,end) == null) {
             null
@@ -628,11 +658,23 @@ object SegmentationModelFactory {
         }
       }
 
+      private lazy val spanIndicatorFeatures = if (spanCompressedCache.isDefined) spanCompressedCache.get else
+        new CompressedFeatureCache(Array.tabulate(labelIndex.size, labelIndex.size){ (prev, cur) =>
+          TriangularArray.tabulate(w.length+1) { (beg, end) =>
+            if (featuresForSpan(prev, cur, beg, end) == null) null else
+            IndicatorFeatureVector(featuresForSpan(prev, cur, beg, end))
+          }
+        })
 
       def featuresForSpan(prev: Int, cur: Int, beg: Int, end: Int): SparseVector[Double] = {
         spanFeatures(prev)(cur)(beg,end)
       }
 
+      def indicatorFeaturesForSpan(prev: Int, cur: Int, beg: Int, end: Int): IndicatorFeatureVector = {
+        spanIndicatorFeatures(prev)(cur)(beg,end)
+      }
+
+      def indicatorFeatureCache = spanIndicatorFeatures
     }
   }
 
