@@ -181,7 +181,7 @@ object ChainNER {
 
     def makeAnchoring(fs: FeaturizedSentence, weights: DenseVector[Double], beliefs: SentenceBeliefs) = new Anchoring(fs, weights, beliefs)
 
-    class Anchoring(fs: FeaturizedSentence, weights: DenseVector[Double], beliefs: SentenceBeliefs) extends SemiCRF.Anchoring[NERType.Value, String] {
+    class Anchoring(fs: FeaturizedSentence, weights: DenseVector[Double], messages: SentenceBeliefs) extends SemiCRF.Anchoring[NERType.Value, String] {
       def labelIndex: Index[NERType.Value] = IndexedFeaturizer.this.labelIndex
 
       def startSymbol = NERType.OutsideSentence
@@ -231,19 +231,19 @@ object ChainNER {
       // in the actual parse. So instead, we premultiply by \prod_{all spans} p(not span)
       // and then we divide out p(not span) for spans in the tree.
 
-      val normalizingPiece = beliefs.spans.data.filter(_ ne null).map { b =>
+      val normalizingPiece = messages.spans.data.filter(_ ne null).map { b =>
         val notNerScore = b.ner(notNER)
 
-        if (notNerScore < 1E-6) 0.0 else math.log(notNerScore)
+        if (notNerScore <= 0.0) 0.0 else math.log(notNerScore)
       }.sum
 
-      private def beliefPiece(prev: Int, cur: Int, beg: Int, end: Int): Double = {
+      private def messagePiece(prev: Int, cur: Int, beg: Int, end: Int): Double = {
         val score = if (cur == notNER) Double.NegativeInfinity
-        else if (beliefs.spanBeliefs(beg, end).eq(null) || beliefs.spanBeliefs(beg, end).ner(cur) == 0.0) Double.NegativeInfinity
-        else if (beliefs.spanBeliefs(beg, end).ner(notNER) < 1E-6) {
-          math.log(beliefs.spanBeliefs(beg,end).ner(cur))
+        else if (messages.spanBeliefs(beg, end).eq(null) || messages.spanBeliefs(beg, end).ner(cur) == 0.0) Double.NegativeInfinity
+        else if (messages.spanBeliefs(beg, end).ner(notNER) <= 0.0) {
+          math.log(messages.spanBeliefs(beg,end).ner(cur))
         } else {
-          math.log(beliefs.spanBeliefs(beg,end).ner(cur) / beliefs.spanBeliefs(beg,end).ner(notNER))
+          math.log(messages.spanBeliefs(beg,end).ner(cur) / messages.spanBeliefs(beg,end).ner(notNER))
         }
 
         if (beg == 0) score + normalizingPiece else score
@@ -251,7 +251,7 @@ object ChainNER {
 
 
       def scoreTransition(prev: Int, cur: Int, beg: Int, end: Int): Double = {
-        var score = beliefPiece(prev, cur, beg, end) + spanCache(beg, end)(cur)
+        var score = messagePiece(prev, cur, beg, end) + spanCache(beg, end)(cur)
         if (score == Double.NegativeInfinity) {
           score
         } else {

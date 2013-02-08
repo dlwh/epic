@@ -39,7 +39,7 @@ trait ParserTestHarness {
 
 
   def evalParser(testTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]], parser: Parser[AnnotatedLabel, String]) = {
-    ParseEval.evaluate(testTrees, parser, AnnotatedLabelChainReplacer, asString = {(_:AnnotatedLabel).baseLabel})
+    ParseEval.evaluate(testTrees, parser, AnnotatedLabelChainReplacer, asString = {(_:AnnotatedLabel).baseLabel}, nthreads= -1)
   }
 
   val transform = new StandardTreeProcessor(HeadFinder.left)
@@ -51,7 +51,7 @@ object ParserTestHarness extends ParserTestHarness {
     val trees = getTrainTrees()
     GenerativeParser.extractLexiconAndGrammar(trees.map(_.mapLabels(_.baseAnnotatedLabel)))
     } catch {
-      case e => e.printStackTrace(); throw e
+      case e:Exception => e.printStackTrace(); throw e
     }
   }
   val simpleParser: SimpleChartParser[AnnotatedLabel, String] = {

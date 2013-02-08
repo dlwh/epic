@@ -27,6 +27,7 @@ object SemiNERPipeline {
                     name: String = "eval/ner",
                     nfiles: Int = 100000,
                     iterPerEval: Int = 20,
+                    nthreads: Int = -1,
                     useCorefFeatures: Boolean = false,
                     useCorefSpans: Boolean = false,
                     opt: OptParams)
@@ -84,7 +85,7 @@ object SemiNERPipeline {
 
     // build feature Index
     val model = new SegmentationModelFactory(NERType.OutsideSentence, NERType.NotEntity, gazetteer = gazetteer).makeModel(train)
-    val obj = new ModelObjective(model, train)
+    val obj = new ModelObjective(model, train, params.nthreads)
     val cached = new CachedBatchDiffFunction(obj)
 
     val checking = new RandomizedGradientCheckingFunction[Int, DenseVector[Double]](cached, toString={ (i: Int) => model.featureIndex.get(i).toString})
@@ -152,6 +153,7 @@ object SemiConllNERPipeline {
                     test: File,
                     name: String = "eval/ner",
                     nfiles: Int = 100000,
+                    nthreads: Int = -1,
                     iterPerEval: Int = 20,
                     opt: OptParams)
 
@@ -169,7 +171,7 @@ object SemiConllNERPipeline {
 
     // build feature Index
     val model: SemiCRFModel[String, String] = new SegmentationModelFactory("##", "O", gazetteer = Gazetteer.ner("en")).makeModel(train)
-    val obj = new ModelObjective(model, train)
+    val obj = new ModelObjective(model, train, params.nthreads)
     val cached = new CachedBatchDiffFunction(obj)
 
     val checking = new RandomizedGradientCheckingFunction[Int, DenseVector[Double]](cached, toString={ (i: Int) => model.featureIndex.get(i).toString})

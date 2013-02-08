@@ -5,6 +5,8 @@ import breeze.optimize.BatchDiffFunction
 import breeze.linalg.DenseVector
 import breeze.util.Encoder
 import java.util.concurrent.atomic.AtomicInteger
+import collection.parallel.ForkJoinTaskSupport
+import concurrent.forkjoin.ForkJoinPool
 
 /**
  * The objective function for training a [[epic.framework.Model]]. Selects
@@ -16,7 +18,8 @@ import java.util.concurrent.atomic.AtomicInteger
 class ModelObjective[Datum](val model: Model[Datum],
                             batchSelector: IndexedSeq[Int]=>GenTraversable[Datum],
                             val fullRange: IndexedSeq[Int]) extends BatchDiffFunction[DenseVector[Double]] {
-  def this(model: Model[Datum], data: IndexedSeq[Datum]) = this(model,_.par.map(data), 0 until data.length)
+  def this(model: Model[Datum], data: IndexedSeq[Datum], numThreads: Int = -1) = this(model,ModelObjective.makePar(data, numThreads)(_), 0 until data.length)
+
   import model.{ExpectedCounts => _, _}
 
   type Builder = model.Inference
@@ -58,7 +61,15 @@ class ModelObjective[Datum](val model: Model[Datum],
     println(f"Inference took: ${(timeOut - timeIn) * 1.0/1000}%.3fs" )
 
     val (loss,grad) = expectedCountsToObjective(finalCounts)
-    val timeOut2 = System.currentTimeMillis()
     (loss/success.intValue() * fullRange.size,  grad * (fullRange.size * 1.0 / success.intValue))
+  }
+}
+
+object ModelObjective {
+  private def makePar[Datum](data: IndexedSeq[Datum], nThreads:Int)(indices: IndexedSeq[Int]) = {
+    val xx =  indices.par.map(data)
+    if (nThreads > 0)
+      xx.tasksupport = new ForkJoinTaskSupport(new ForkJoinPool(nThreads))
+    xx
   }
 }

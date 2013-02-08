@@ -125,6 +125,7 @@ object GenerativeTrainer extends ParserPipeline {
                     @Help(text=
                       "The kind of annotation to do on the refined grammar. Default uses v2h1 markovization and nothing else.")
                     annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = PipelineAnnotator(Seq(FilterAnnotations(), AddMarkovization(1,2))),
+                    threads: Int = -1,
                     @Help(text="Use max rule decoding instead of max constituent")
                     maxRule: Boolean = false)
   protected val paramManifest = manifest[Params]

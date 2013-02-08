@@ -87,7 +87,7 @@ trait ParserPipeline {
   /**
    * The type of the parameters to read in via dlwh.epic.config
    */
-  type Params
+  type Params <: { val threads: Int}
   /**
    * Required manifest for the params
    */
@@ -109,7 +109,7 @@ trait ParserPipeline {
 
     val validateTrees = devTrees.take(400)
     def validate(parser: Parser[AnnotatedLabel, String]) = {
-      ParseEval.evaluate[AnnotatedLabel](validateTrees, parser, AnnotatedLabelChainReplacer, asString={(l:AnnotatedLabel)=>l.label})
+      ParseEval.evaluate[AnnotatedLabel](validateTrees, parser, AnnotatedLabelChainReplacer, asString={(l:AnnotatedLabel)=>l.label}, nthreads=params.threads)
     }
     val parsers = trainParser(trainTrees, validate, params)
     parsers

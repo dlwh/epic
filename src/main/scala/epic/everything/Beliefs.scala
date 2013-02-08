@@ -42,8 +42,6 @@ final case class Beliefs[T](property: Property[T], beliefs: DenseVector[Double])
     maxChange
   }
 
-  def newBuilder = Beliefs.Builder(property)
-
   def updated(newBeliefs: DenseVector[Double]) = Beliefs(property, newBeliefs)
 
   def size = property.size
@@ -52,14 +50,6 @@ final case class Beliefs[T](property: Property[T], beliefs: DenseVector[Double])
 object Beliefs {
   def improperUninformed[T](name: String, index: Index[T]): Beliefs[T] = improperUninformed(Property(name, index))
   def improperUninformed[T](prop: Property[T]): Beliefs[T] = Beliefs(prop, DenseVector.ones(prop.index.size))
-
-  case class Builder[T](property: Property[T]) {
-    val counts = property.mkDenseVector()
-    def tallyCount(assignment: Int, count: Double) {
-      counts(assignment) += count
-    }
-    def result() = Beliefs(property, normalize(counts, 1.0))
-  }
 
   private def stripNaNs(beliefs: DenseVector[Double], a: DenseVector[Double], b: DenseVector[Double]) = {
     var i = 0
@@ -83,6 +73,7 @@ object Beliefs {
       val result =  if (a(i) == 0.0 && b(i) != 0.0) {
         0.0
       } else if (a(i) != 0.0 && b(i) == 0.0) {
+//        println("WTF?" + " " + a(i) + " " + b(i))
         a(i)
       } else if (a(i) == 0.0 && b(i) == 0.0) {
         0.0
