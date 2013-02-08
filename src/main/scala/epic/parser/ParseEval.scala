@@ -23,6 +23,8 @@ import java.io.FileOutputStream
 import java.io.PrintStream
 import java.util.concurrent.atomic.AtomicInteger
 import epic.framework.EvaluationResult
+import collection.parallel.ForkJoinTaskSupport
+import concurrent.forkjoin.ForkJoinPool
 
 
 /**
@@ -98,9 +100,14 @@ object ParseEval {
                   parser: Parser[L,String],
                   chainReplacer: UnaryChainReplacer[L],
                   asString: L=>String,
-                  logProgress: Boolean = true): Seq[ParseResult[L]] = {
+                  logProgress: Boolean = true,
+                  nthreads: Int = -1): Seq[ParseResult[L]] = {
     val acc = new AtomicInteger(0)
-    trees.par.flatMap { sent =>
+    val partrees = trees.par
+    if (nthreads > 0) {
+      partrees.tasksupport = new ForkJoinTaskSupport(new ForkJoinPool(nthreads))
+    }
+    partrees.flatMap { sent =>
       try {
         val TreeInstance(id,goldTree,words) = sent
         val startTime = System.currentTimeMillis
@@ -130,8 +137,8 @@ object ParseEval {
   def evaluate[L](trees: IndexedSeq[TreeInstance[L,String]],
                   parser: Parser[L,String],
                   chainReplacer: UnaryChainReplacer[L],
-                  asString: L=>String, logProgress: Boolean = true): Statistics = {
-    val results = parseAll(trees, parser, chainReplacer, asString, logProgress)
+                  asString: L=>String, logProgress: Boolean = true, nthreads: Int): Statistics = {
+    val results = parseAll(trees, parser, chainReplacer, asString, logProgress, nthreads)
     results.map(_.stats).reduceLeft(_ + _)
   }
 
@@ -139,13 +146,14 @@ object ParseEval {
                      parser: Parser[L,String],
                      evalDir: String,
                      chainReplacer: UnaryChainReplacer[L],
-                     asString: L=>String = (_:L).toString) = {
+                     asString: L=>String = (_:L).toString,
+                     nthreads: Int = -1) = {
 
     val parsedir = new File(evalDir)
     parsedir.exists() || parsedir.mkdirs() || sys.error("Couldn't make directory: " + parsedir)
     val goldOut = new PrintStream(new BufferedOutputStream(new FileOutputStream(new File(parsedir,"gold"))))
     val guessOut = new PrintStream(new BufferedOutputStream(new FileOutputStream(new File(parsedir,"guess"))))
-    val results = parseAll(trees, parser, chainReplacer, asString)
+    val results = parseAll(trees, parser, chainReplacer, asString, nthreads=nthreads)
     results foreach { res =>
       import res._
       val buf = new StringBuilder()

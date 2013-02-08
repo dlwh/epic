@@ -36,6 +36,7 @@ object AnnotatingPipeline {
                     treebank: ProcessedTreebank,
                     cache: IntermediateCache,
                     nfiles: Int = 100000,
+                    nthreads: Int = -1,
                     iterPerEval: Int = 20,
                     baseParser: ParserParams.XbarGrammar,
                     weightsCache: File = new File("everything.weights.gz"),
@@ -49,7 +50,9 @@ object AnnotatingPipeline {
   def main(args: Array[String]) {
 
     val params = CommandLineParser.readIn[Params](args)
+    println(params)
     require(params.corpus.exists(), params.corpus + " does not exist!")
+
 
     val corpus = params.corpus
     val nfiles = params.nfiles
@@ -67,8 +70,8 @@ object AnnotatingPipeline {
       buildProcessor(train, weightsCache, params)
     }
     val processedTest = params.cache.cached("test", test, docProcessor) {
-//      test.par.map(docProcessor(_)).seq.flatMap(_.sentences)
-      processedTrain.flatMap(_.sentences).take(10)
+      test.par.map(docProcessor(_)).seq.flatMap(_.sentences)
+//      processedTrain.flatMap(_.sentences).take(10)
     }.toIndexedSeq
 
     println(s"${processedTrain.length} training documents totalling ${processedTrain.flatMap(_.sentences).length} sentences.")
@@ -86,7 +89,7 @@ object AnnotatingPipeline {
       for(m <- IndexedSeq(srlModel, nerModel, lexModel)) {
 
         println("Checking " + m.getClass.getName)
-        val obj = new ModelObjective(m, processedTrain.flatMap(_.sentences).filter(_.words.filter(_(0).isLetterOrDigit).length <= 40))
+        val obj = new ModelObjective(m, processedTrain.flatMap(_.sentences).filter(_.words.filter(_(0).isLetterOrDigit).length <= 40), params.nthreads)
         val cachedObj = new CachedBatchDiffFunction(obj)
               val w = obj.initialWeightVector(true)
       val (v, grad) = obj.calculate(w)
@@ -108,7 +111,7 @@ object AnnotatingPipeline {
       println("Training base models")
       for(m <- IndexedSeq( srlModel, nerModel, lexModel)) {
         println("Training " + m.getClass.getName)
-        val obj = new ModelObjective(m, processedTrain.flatMap(_.sentences).filter(_.words.filter(_(0).isLetterOrDigit).length <= 40))
+        val obj = new ModelObjective(m, processedTrain.flatMap(_.sentences).filter(_.words.filter(_(0).isLetterOrDigit).length <= 40), params.nthreads)
         val cachedObj = new CachedBatchDiffFunction(obj)
         val weights = params.baseOpt.minimize(cachedObj, obj.initialWeightVector(randomize = false))
         updateWeights(params.weightsCache, weightsCache, Encoder.fromIndex(m.featureIndex).decode(weights))
@@ -137,7 +140,7 @@ object AnnotatingPipeline {
     )
 
 
-    val obj = new ModelObjective(epModel, processedTrain.flatMap(_.sentences).filter(_.words.filter(_(0).isLetterOrDigit).length <= 40))
+    val obj = new ModelObjective(epModel, processedTrain.flatMap(_.sentences).filter(_.words.filter(_(0).isLetterOrDigit).length <= 40), params.nthreads)
     val cachedObj = new CachedBatchDiffFunction(obj)
 
     if (params.checkGradient) {
@@ -166,7 +169,7 @@ object AnnotatingPipeline {
       //      bump(unregularized, deriv, s, featureICareAbout)
       //      bump(unregularized, deriv, s, featureICareAbout + 1)
 
-      if( s.iter % 5 == 0) {
+      if( s.iter % params.iterPerEval == 0) {
         val inf = epModel.inferenceFromWeights(s.x)
         val results = {for (d <- processedTest.par) yield {
           val epMarg = inf.marginal(d)
@@ -215,7 +218,7 @@ object AnnotatingPipeline {
           (f: Feature) => weightsCache(f.toString)
         }).makeModel(nerSegments)
 
-        val obj = new ModelObjective(model, nerSegments)
+        val obj = new ModelObjective(model, nerSegments, params.nthreads)
         val cached = new CachedBatchDiffFunction(obj)
 
         val weights = params.opt.minimize(cached, obj.initialWeightVector(randomize = false))
@@ -261,7 +264,7 @@ object AnnotatingPipeline {
                          docProcessor: FeaturizedDocument.Factory,
                          train: IndexedSeq[FeaturizedDocument],
                          weightsCache: Counter[String, Double]): SentLexParser.Model = {
-    val trainTrees = train.flatMap(_.sentences).map(_.treeInstance).take(10)
+    val trainTrees = train.flatMap(_.sentences).map(_.treeInstance)
     val trees = trainTrees.map(StripAnnotations())
     val (initLexicon, initBinaries, initUnaries) = GenerativeParser.extractCounts(trees)
 

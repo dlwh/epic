@@ -59,7 +59,7 @@ object ParserTrainer extends epic.parser.ParserPipeline {
 
     val model = modelFactory.make(trainTrees)
 
-    val obj = new ModelObjective(model, trainTrees)
+    val obj = new ModelObjective(model, trainTrees, params.threads)
     val cachedObj = new CachedBatchDiffFunction(obj)
     val checking = new RandomizedGradientCheckingFunction(cachedObj, 0.1, toString = {
       (i: Int) => model.featureIndex.get(i).toString
