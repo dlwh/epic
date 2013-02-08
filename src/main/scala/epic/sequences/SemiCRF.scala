@@ -317,9 +317,10 @@ object SemiCRF {
               val prevScore = backwardScores(end)(label)
               if (scorer.maxSegmentLength(label) >= end - start && prevScore != Double.NegativeInfinity) {
                 val score = scorer.scoreTransition(prevLabel, label, start, end) + prevScore
-                if(score != Double.NegativeInfinity)
+                if(score != Double.NegativeInfinity) {
                   accumArray(acc) = score
-                acc += 1
+                  acc += 1
+                }
               }
 
               label += 1
