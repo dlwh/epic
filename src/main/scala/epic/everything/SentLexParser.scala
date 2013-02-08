@@ -193,11 +193,10 @@ object SentLexParser {
       val notCon1 = b.label(notConstituent)
       val notCon2 = b.governor(length + 1)
 
-      val score1 = if(notCon1 < 1E-6) 0.0 else math.log(notCon1)
-      val score2 = if(notCon2 < 1E-6) 0.0 else math.log(notCon2)
+      val score1 = if(notCon1 <= 0.0) 0.0 else math.log(notCon1)
+      val score2 = if(notCon2 <= 0.0) 0.0 else math.log(notCon2)
 
-//      score1 + score2
-      score2
+      score1 + score2
     }.sum
 
 
@@ -209,25 +208,25 @@ object SentLexParser {
 
       val score = if (lexGrammar.isRightRule(rule)) {
         val sGovScore = beliefs.spans(begin, split).governor(head)
-        var notASpan = 1.0//beliefs.spanBeliefs(begin, split).governor(length + 1)
-        if(notASpan < 1E-6) notASpan = 1.0
+        var notASpan = beliefs.spanBeliefs(begin, split).governor(length + 1)
+        if(notASpan <= 0.0) notASpan = 1.0
         val sMax = beliefs.wordBeliefs(dep).maximalLabel(grammar.leftChild(rule))
         if(depScore <= 0.0 || sGovScore <= 0.0 || sMax <= 0.0) {
           Double.NegativeInfinity
         } else (
-         anchoring.scoreBinaryRule(begin, split, end, rule, ref) + math.log(sMax) + math.log(depScore)
-//             + math.log(depScore * sGovScore / notASpan  *   sMax)
+         anchoring.scoreBinaryRule(begin, split, end, rule, ref)
+             + math.log(depScore * sGovScore / notASpan  *   sMax)
         )
       } else {// head on the right
-        val sGovScore = 1.0//beliefs.spans(split, end).governor(head)
-        var notASpan = 1.0//beliefs.spanBeliefs(split, end).governor(length + 1)
-        if(notASpan < 1E-6) notASpan = 1.0
+        val sGovScore = beliefs.spans(split, end).governor(head)
+        var notASpan = beliefs.spanBeliefs(split, end).governor(length + 1)
+        if(notASpan <= 0.0) notASpan = 1.0
         val sMax = beliefs.wordBeliefs(dep).maximalLabel(grammar.rightChild(rule))
         if(depScore <= 0.0 || sGovScore <= 0.0 || sMax <= 0.0) {
           Double.NegativeInfinity
         } else (
-          anchoring.scoreBinaryRule(begin, split, end, rule, ref) + math.log(sMax) + math.log(depScore)
-//            + math.log(depScore * sGovScore / notASpan  *   sMax)
+          anchoring.scoreBinaryRule(begin, split, end, rule, ref)
+            + math.log(depScore * sGovScore / notASpan  *   sMax)
         )
       }
       assert(!score.isNaN)
@@ -236,31 +235,32 @@ object SentLexParser {
 
     def scoreUnaryRule(begin: Int, end: Int, rule: Int, ref: Int): Double = {
       val parent = grammar.parent(rule)
-      val sLabel = 1.0 //beliefs.spanBeliefs(begin, end).label(parent)
-      var notASpan = 1.0 // beliefs.spanBeliefs(begin, end).label(notConstituent)
+      val sLabel = beliefs.spanBeliefs(begin, end).label(parent)
+      var notASpan =  beliefs.spanBeliefs(begin, end).label(notConstituent)
 //      if(sLabel <= 1E-6) {
 //        Double.NegativeInfinity
 //      } else {
-        if(notASpan < 1E-6) notASpan = 1.0
+        if(notASpan <= 0.0) notASpan = 1.0
         var baseScore = anchoring.scoreUnaryRule(begin, end, rule, ref)
-//        baseScore += math.log(sLabel /*/ notASpan*/)
+        baseScore += math.log(sLabel / notASpan)
         if (begin == 0 && end == length) { // root, get the length
           val wordGovScore = beliefs.wordBeliefs(ref).governor(length)
-          val sSpanGov =  1.0//beliefs.spanBeliefs(begin, end).governor(length)
-          var sNotSpan2 = 1.0//beliefs.spanBeliefs(begin, end).governor(length + 1)
-          if (sNotSpan2 < 1E-6) sNotSpan2 = 1.0
+          val sSpanGov =  beliefs.spanBeliefs(begin, end).governor(length)
+          var sNotSpan2 = beliefs.spanBeliefs(begin, end).governor(length + 1)
+          if (sNotSpan2 <= 0.0) sNotSpan2 = 1.0
 
           val sMax = beliefs.wordBeliefs(ref).maximalLabel(parent)
 //          baseScore += math.log(wordGovScore * sMax)
           baseScore += math.log(wordGovScore)
-          baseScore += math.log(sMax)
-//          baseScore += math.log(sSpanGov / sNotSpan2)
+          baseScore += math.log(math.max(sMax, 1E-8))
+          baseScore += math.log(sSpanGov / sNotSpan2)
+          assert(!baseScore.isNaN, s"norma: $normalizingPiece slabel: $sLabel notaspan: $notASpan ${anchoring.scoreUnaryRule(begin, end, rule, ref)}")
+          assert(!baseScore.isInfinite, s"norma: $normalizingPiece  notASpan2: $sNotSpan2 smax: $sMax slabel: $sLabel notaspan: $notASpan ${anchoring.scoreUnaryRule(begin, end, rule, ref)} $begin $end $ref ${(begin until end).map(words)} ${grammar.index.get(rule)}")
         }
 
-//        if(begin == 0 && end == length) {
-//          baseScore += normalizingPiece
-//        }
-        assert(!baseScore.isNaN, s"norma: $normalizingPiece slabel: $sLabel notaspan: $notASpan ${anchoring.scoreUnaryRule(begin, end, rule, ref)}")
+        if(begin == 0 && end == length) {
+          baseScore += normalizingPiece
+        }
         baseScore
 //      }
     }

@@ -67,8 +67,8 @@ object AnnotatingPipeline {
       buildProcessor(train, weightsCache, params)
     }
     val processedTest = params.cache.cached("test", test, docProcessor) {
-      test.par.map(docProcessor(_)).seq.flatMap(_.sentences)
-//      processedTrain.flatMap(_.sentences).take(10)
+//      test.par.map(docProcessor(_)).seq.flatMap(_.sentences)
+      processedTrain.flatMap(_.sentences).take(10)
     }.toIndexedSeq
 
     println(s"${processedTrain.length} training documents totalling ${processedTrain.flatMap(_.sentences).length} sentences.")
@@ -94,7 +94,7 @@ object AnnotatingPipeline {
     // initial models
     if(params.trainBaseModels) {
       println("Training base models")
-      for(m <- IndexedSeq(srlModel, nerModel, lexModel)) {
+      for(m <- IndexedSeq( srlModel, nerModel, lexModel)) {
         println("Training " + m.getClass.getName)
         val obj = new ModelObjective(m, processedTrain.flatMap(_.sentences).filter(_.words.filter(_(0).isLetterOrDigit).length <= 40))
         val cachedObj = new CachedBatchDiffFunction(obj)
@@ -116,15 +116,16 @@ object AnnotatingPipeline {
       beliefsFactory.optionLabelProp, symLens)
 
     // the big model!
-    val epModel = new EPModel[FeaturizedSentence, SentenceBeliefs](10, epInGold = true, initFeatureValue = {f => Some(weightsCache(f.toString)).filter(_ != 0.0)})(
+    val epModel = new EPModel[FeaturizedSentence, SentenceBeliefs](4, epInGold = true, initFeatureValue = {f => Some(weightsCache(f.toString)).filter(_ != 0.0)})(
       lexModel,
-    lexModel
 //      srlModel,
-//      nerModel,
-//      assocSynNer
+      nerModel,
+//      nerModel
+      assocSynNer
     )
 
-    val obj = new ModelObjective(epModel, processedTrain.flatMap(_.sentences).filter(_.words.filter(_(0).isLetterOrDigit).length <= 40).take(10))
+
+    val obj = new ModelObjective(epModel, processedTrain.flatMap(_.sentences).filter(_.words.filter(_(0).isLetterOrDigit).length <= 40))
     val cachedObj = new CachedBatchDiffFunction(obj)
 
     if (params.checkGradient) {

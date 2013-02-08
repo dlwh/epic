@@ -260,13 +260,13 @@ object SRL {
     val normalizingPiece = sentenceBeliefs.spans.data.filter(_ ne null).map { b =>
       val notNerScore = b.frames(frameIndex).beliefs(iNone)
 
-      if (notNerScore < 1E-6) 0.0 else math.log(notNerScore)
+      if (notNerScore <= 0.0) 0.0 else math.log(notNerScore)
     }.sum
 
     private def beliefPiece(beg:Int, end:Int, cur: Int): Double = {
       val score = if (cur == iNone) Double.NegativeInfinity
-      else if (sentenceBeliefs.spanBeliefs(beg, end).eq(null) || sentenceBeliefs.spanBeliefs(beg, end).frames(frameIndex)(cur) == 0.0) Double.NegativeInfinity
-      else if (sentenceBeliefs.spanBeliefs(beg, end).frames(frameIndex)(iNone) < 1E-6) {
+      else if (sentenceBeliefs.spanBeliefs(beg, end).eq(null) || sentenceBeliefs.spanBeliefs(beg, end).frames(frameIndex)(cur) <= 0.0) Double.NegativeInfinity
+      else if (sentenceBeliefs.spanBeliefs(beg, end).frames(frameIndex)(iNone) <=  0.0) {
         math.log(sentenceBeliefs.spanBeliefs(beg,end).frames(frameIndex)(cur))
       } else {
         math.log(sentenceBeliefs.spanBeliefs(beg,end).frames(frameIndex)(cur) / sentenceBeliefs.spanBeliefs(beg,end).frames(frameIndex)(iNone))
@@ -339,7 +339,7 @@ object SRL {
                                 baseWordFeatureIndex: Index[Feature],
                                 baseSpanFeatureIndex: Index[Feature]) extends IndexedFeaturizer { outer =>
 
-    val kinds = Array('Begin, 'Interior, 'End)
+    val kinds = Array('Begin, 'Interior)
     val propKinds = Array('PassiveProp, 'ActiveProp)
     val leftRight = Array('Left, 'Right)
 
@@ -380,7 +380,15 @@ object SRL {
     }
 
     println("SRL features: " + featureIndex.size)
+    val featuresByType = Counter[String, Int]()
+    for(f <- featureIndex) {
+      f match {
+        case Label1Feature(_, f, _) => featuresByType(f.getClass.getName) += 1
+        case _ => featuresByType(f.getClass.getName) += 1
+      }
+    }
 
+    featuresByType.iterator foreach println
 
     def anchor(fs: FeaturizedSentence, lemma: String, pos: Int): FeatureAnchoring = {
       new Anchoring(fs, lemma, pos)
@@ -415,14 +423,6 @@ object SRL {
         }
       }
 
-      val endCache = Array.tabulate(labelIndex.size, fs.words.length){ (label,w) =>
-        val feats = fs.wordFeatures(w)
-        val builder = Array.newBuilder[Int]
-        builder.sizeHint(if(lemmaInd == -1) feats.length else 2 * feats.length)
-        appendFeatures(builder, feats, wordFeatures(label)(2))
-        builder.result()
-      }
-
       val interiorCache = Array.tabulate(labelIndex.size, fs.words.length){ (label,w) =>
         val feats = fs.wordFeatures(w)
         val builder = Array.newBuilder[Int]
@@ -436,9 +436,6 @@ object SRL {
         beginCache(cur)(pos)
       }
 
-      def featuresForEnd(cur: Int, pos: Int): Array[Int] = {
-        endCache(cur)(pos-1)
-      }
 
       def featuresForInterior(cur: Int, pos: Int): Array[Int] = {
         interiorCache(cur)(pos)
@@ -453,8 +450,6 @@ object SRL {
             val acc = new ArrayBuffer[Array[Int]]()
             val _begin = featuresForBegin(label, beg)
             acc += _begin
-            val _end = featuresForEnd(label, end)
-            acc += _end
 
             var p = beg+1
             while(p < end) {
@@ -463,26 +458,35 @@ object SRL {
               p += 1
             }
 
-            val builder = Array.newBuilder[Int]
-            builder.sizeHint(acc.map(_.size).sum)
+            val forSpan = fs.featuresForSpan(beg, end)
+            val builder = new Array[Int](acc.map(_.size).sum + forSpan.length + {if(pos >= beg && pos < end && lemmaInd >= 0) 1 else 2})
+            var off = 0
             var i = 0
             while(i < acc.size) {
-              builder ++= acc(i)
+              System.arraycopy(acc(i), 0, builder, off, acc(i).length)
+              off += acc(i).length
               i += 1
             }
-            val forSpan = fs.featuresForSpan(beg, end)
-            appendFeatures(builder, forSpan, outer.spanFeatures(label))
+
+            i = 0
+            while (i < forSpan.length) {
+              builder(off) = outer.spanFeatures(label)(forSpan(i))
+              off += 1
+              i += 1
+            }
 
             val dir = if(pos < beg) 0 else 1
 
             if (pos >= beg && pos < end) {
-              builder += lemmaContainedFeature
+              builder(off) = lemmaContainedFeature
+              off += 1
             } else {
-              builder += distanceToLemmaFeatures(label)(lemmaIndex.size)(voiceIndex)(dir)(binDistance(beg - pos))
+              builder(off) = distanceToLemmaFeatures(label)(lemmaIndex.size)(voiceIndex)(dir)(binDistance(beg - pos))
+              off += 1
               if(lemmaInd >= 0)
-                builder += distanceToLemmaFeatures(label)(lemmaInd)(voiceIndex)(dir)(binDistance(beg - pos))
+                builder(off) += distanceToLemmaFeatures(label)(lemmaInd)(voiceIndex)(dir)(binDistance(beg - pos))
             }
-            builder.result()
+            builder
           }
         }
       }

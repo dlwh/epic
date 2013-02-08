@@ -117,7 +117,7 @@ case class SentenceBeliefs(spans: TriangularArray[SpanBeliefs],
         if(spans(i,j).ne(null) && !spans(i,j).isConvergedTo(f.spans(i,j), diff) ) return false
         j += 1
       }
-//      if(!wordBeliefs(i).isConvergedTo(f.wordBeliefs(i), diff) ) return false
+      if(!wordBeliefs(i).isConvergedTo(f.wordBeliefs(i), diff) ) return false
       i += 1
     }
     true

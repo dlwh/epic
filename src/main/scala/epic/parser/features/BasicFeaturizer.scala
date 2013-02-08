@@ -18,11 +18,11 @@ import breeze.util.Interner
  * @author dlwh
  */
 @SerialVersionUID(1L)
-class BasicFeaturizer(tagWordCounts: Counter2[_, String, Double], wordCounts: Counter[String, Double], noShapeThreshold: Int = 100, minCountThreshold: Int = 5) extends Serializable {
+class BasicFeaturizer(tagWordCounts: Counter2[_, String, Double], wordCounts: Counter[String, Double], noShapeThreshold: Int = 100, minCountThreshold: Int = 20) extends Serializable {
   def anchor(words: IndexedSeq[String]): Anchoring = new Anchoring(words)
 
   val interner = new Interner[Feature]
-  val inner = new WordShapeFeaturizer(wordCounts)
+  val inner = new WordShapeFeaturizer(wordCounts, minCountThreshold)
 
   class Anchoring(words: IndexedSeq[String]) {
 
@@ -33,8 +33,9 @@ class BasicFeaturizer(tagWordCounts: Counter2[_, String, Double], wordCounts: Co
       if (start < end - 1) {
         feats += WordEdges('Inside, basicFeatures(start)(0), basicFeatures(end-1)(0))
         feats += WordEdges('Outside, basicFeatures(start-1)(0), basicFeatures(end)(0))
-        feats += WordEdges('Begin, basicFeatures(start-1)(0), basicFeatures(start)(0))
-        feats += WordEdges('End, basicFeatures(end-1)(0), basicFeatures(end)(0))
+        // these two are covered more by the words.
+//        feats += WordEdges('Begin, basicFeatures(start-1)(0), basicFeatures(start)(0))
+//        feats += WordEdges('End, basicFeatures(end-1)(0), basicFeatures(end)(0))
         feats += SpanShapeFeature(SpanShapeGenerator.apply(words, Span(start,end)))
       }
 
@@ -60,20 +61,21 @@ class BasicFeaturizer(tagWordCounts: Counter2[_, String, Double], wordCounts: Co
 
     private val _basicFeatures = (0 until words.length) map { i =>
       val w = words(i)
-      if(wordCounts(w) > 10) IndexedSeq(w)
-      else if (wordCounts(w) > minCountThreshold) IndexedSeq(w, classes(i), shapes(i), ("T-" + tagWordCounts(::, w).argmax).intern)
-      else if (wordCounts(w) > 1) IndexedSeq(("T-" + tagWordCounts(::, w).argmax).intern, classes(i), shapes(i))
-      else IndexedSeq(shapes(i), classes(i))
+      if(wordCounts(w) > noShapeThreshold) IndexedSeq(w)
+      else if (wordCounts(w) > minCountThreshold) IndexedSeq(w, shapes(i), ("T-" + tagWordCounts(::, w).argmax).intern)
+      else if (wordCounts(w) > 1) IndexedSeq(("T-" + tagWordCounts(::, w).argmax).intern, shapes(i))
+      else IndexedSeq(shapes(i))
     } map {_.map(_.intern)}
 
 
     val _featuresForWord: immutable.IndexedSeq[Array[Feature]] = 0 until words.length map { pos =>
       val feats = new ArrayBuffer[Feature]()
-      val basic = basicFeatures(pos).map(WordFeature(_, 'Cur))
-      val basicLeft = basicFeatures(pos - 1).map(WordFeature(_, 'Prev))
-      val basicRight = basicFeatures(pos + 1).map(WordFeature(_, 'Next))
+      val basic = basicFeatures(pos).map(WordFeature(_, 'Cur)).map(interner.intern _)
+      val basicLeft = basicFeatures(pos - 1).map(WordFeature(_, 'Prev)).map(interner.intern _)
+      val basicRight = basicFeatures(pos + 1).map(WordFeature(_, 'Next)).map(interner.intern _)
       feats ++= basicLeft
       feats ++= basicRight
+//      feats ++= basic <-- covered by  the next line
       feats ++= inner.featuresFor(words, pos)
       for (a <- basicLeft; b <- basic) feats += BigramFeature(a,b)
       for (a <- basic; b <- basicRight) feats += BigramFeature(a,b)
