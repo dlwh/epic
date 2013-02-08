@@ -182,7 +182,7 @@ object FeaturizedDocument {
          s.srl,
          words, spans,
          s.speaker,
-         s.id)
+         s.id +"-featurized")
      }
 
      FeaturizedDocument(newSentences, /*corefFeaturizer.featurizeDocument(d),*/ d.id)

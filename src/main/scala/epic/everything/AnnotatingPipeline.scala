@@ -84,9 +84,21 @@ object AnnotatingPipeline {
     if (params.trainBaseModels && params.checkGradient) {
        println("Checking gradients...")
       for(m <- IndexedSeq(srlModel, nerModel, lexModel)) {
+
         println("Checking " + m.getClass.getName)
         val obj = new ModelObjective(m, processedTrain.flatMap(_.sentences).filter(_.words.filter(_(0).isLetterOrDigit).length <= 40))
         val cachedObj = new CachedBatchDiffFunction(obj)
+              val w = obj.initialWeightVector(true)
+      val (v, grad) = obj.calculate(w)
+      for (i <- (m.featureIndex.size-1 to m.featureIndex.size-200) by -3) {
+        w(i) += 1E-8
+        val v2 = obj.valueAt(w)
+        w(i) -= 1E-8
+        val emp = (v2-v)/1E-8
+        val rel = ((grad(i) - emp)/math.max(emp.abs, grad(i).abs).max(1E-6)).abs
+        println(i + " " + m.featureIndex.get(i) + " " + grad(i) + " " + emp + " " + rel + " " + w(i))
+
+      }
         GradientTester.test(cachedObj, obj.initialWeightVector(randomize = true), randFraction = 1E-4, toString={(x:Int) => m.featureIndex.get(x).toString})
       }
     }

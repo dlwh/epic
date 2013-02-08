@@ -272,13 +272,15 @@ object SRL {
         math.log(sentenceBeliefs.spanBeliefs(beg,end).frames(frameIndex)(cur) / sentenceBeliefs.spanBeliefs(beg,end).frames(frameIndex)(iNone))
       }
 
-      if (beg == 0) score + normalizingPiece else score
+//      if (beg == 0) score + normalizingPiece else score
+      assert(score == 0.0 || score == Double.NegativeInfinity)
+      score
     }
 
 
     def score(begin: Int, end: Int, label: Int):Double = {
       if(scoreCache(begin,end)(label).isNaN) {
-        val init = beliefPiece(begin, end, label)
+        val init = 0.0//beliefPiece(begin, end, label)
         val score = {
           if (init == Double.NegativeInfinity) Double.NegativeInfinity
           else {
@@ -356,19 +358,26 @@ object SRL {
 
     private def numDistBins = 5
 
+    private val lNone = labelIndex(None)
+
 
     val (featureIndex: Index[Feature], wordFeatures, spanFeatures, distanceToLemmaFeatures, lemmaContainedFeature) = {
       val featureIndex = Index[Feature]()
       val labelFeatures = Array.tabulate(labelIndex.size, kinds.length, baseWordFeatureIndex.size) { (l, k, f) =>
+        if (l != lNone)
           featureIndex.index(Label1Feature(labelIndex.get(l), baseWordFeatureIndex.get(f), kinds(k)))
+        else -1
       }
 
       val spanFeatures = Array.tabulate(labelIndex.size, baseSpanFeatureIndex.size) { (l, f) =>
+        if (l != lNone)
           featureIndex.index(Label1Feature(labelIndex.get(l), baseSpanFeatureIndex.get(f), 'Span))
+        else -1
       }
 
       val distanceToLemmaFeatures = Array.tabulate(labelIndex.size, lemmaIndex.size + 1, propKinds.length, 2, numDistBins) { (l, lem, kind, dir, dist) =>
-        if(lem == lemmaIndex.size)
+        if (l == lNone) -1
+        else if(lem == lemmaIndex.size)
           featureIndex.index(DistanceToPredFeature(leftRight(dir), labelIndex.get(l), propKinds(kind), dist))
         else
           featureIndex.index(DistanceToPredFeature(leftRight(dir), (labelIndex.get(l) + " " + lemmaIndex.get(lem)).intern, propKinds(kind), dist))
@@ -444,7 +453,7 @@ object SRL {
 
       private val spanFeatures: Array[TriangularArray[Array[Int]]] = Array.tabulate(labelIndex.size){ label =>
         TriangularArray.tabulate(fs.words.length+1) { (beg, end) =>
-          if(!fs.isPossibleMaximalSpan(beg, end) || beg == end ) {
+          if(!fs.isPossibleMaximalSpan(beg, end) || beg == end || label == lNone ) {
             null
           } else {
             val acc = new ArrayBuffer[Array[Int]]()
@@ -459,7 +468,7 @@ object SRL {
             }
 
             val forSpan = fs.featuresForSpan(beg, end)
-            val builder = new Array[Int](acc.map(_.size).sum + forSpan.length + {if(pos >= beg && pos < end && lemmaInd >= 0) 1 else 2})
+            val builder = new Array[Int](acc.map(_.size).sum  + forSpan.length + {if(pos >= beg && pos < end) 1 else if (lemmaInd < 0) 1 else 2})
             var off = 0
             var i = 0
             while(i < acc.size) {
@@ -483,9 +492,12 @@ object SRL {
             } else {
               builder(off) = distanceToLemmaFeatures(label)(lemmaIndex.size)(voiceIndex)(dir)(binDistance(beg - pos))
               off += 1
-              if(lemmaInd >= 0)
-                builder(off) += distanceToLemmaFeatures(label)(lemmaInd)(voiceIndex)(dir)(binDistance(beg - pos))
+              if(lemmaInd >= 0) {
+                builder(off) = distanceToLemmaFeatures(label)(lemmaInd)(voiceIndex)(dir)(binDistance(beg - pos))
+                off += 1
+              }
             }
+            assert(builder.length == off)
             builder
           }
         }
