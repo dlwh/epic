@@ -1,6 +1,7 @@
 package epic.everything
 
-import breeze.linalg.{DenseMatrix, DenseVector}
+import breeze.linalg._
+import breeze.numerics._
 import epic.framework._
 import breeze.util.{Index, Lens}
 import breeze.collection.mutable.TriangularArray
@@ -30,20 +31,22 @@ object PropertyPropagation {
 
 
     val assoc = new AssociationFeaturizer[T, U] {
-      def lens1: Lens[SpanBeliefs, Beliefs[T]] = l1
-      def lens2: Lens[SpanBeliefs, Beliefs[U]] = l2
+      def centralLens: Lens[SpanBeliefs, Beliefs[T]] = l1
+      def satelliteLenses = IndexedSeq(l2)
 
       val featureIndex: Index[Feature] =  fi
 
       val grounding = new AssociationAnchoring[T, U] {
-        def featuresFor(p1: Int, p2: Int): Array[Int] = features(p1)(p2)
+        def featuresFor(p1: Int, satIndex: Int, p2: Int): Array[Int] = features(p1)(p2)
       }
 
-      def anchor(sent: FeaturizedSentence, begin: Int, end: Int): AssociationAnchoring[T, U] = grounding
+      override def anchor(sent: FeaturizedSentence, spanBeliefs: SpanBeliefs, begin: Int, end: Int): AssociationAnchoring[T, U] = grounding
     }
 
     new Model(beliefsFactory, assoc)
   }
+
+
 
   case class AssociationFeature[T, U](a: T, b: U) extends Feature
 
@@ -93,11 +96,11 @@ object PropertyPropagation {
       beliefsFactory(sent)
     }
 
-    def score(grounding: AssociationAnchoring[T, U], ass1: Int, ass2: Int) = {
-      dot(weights, grounding.featuresFor(ass1, ass2))
+    def score(grounding: AssociationAnchoring[T, U], ass1: Int, satIndex: Int, ass2: Int) = {
+      dot(weights, grounding.featuresFor(satIndex: Int, ass1, ass2))
     }
 
-    def scores(grounding: AssociationAnchoring[T, U], b1: Beliefs[_], b2: Beliefs[_]) = {
+    def scores(grounding: AssociationAnchoring[T, U], b1: Beliefs[_], index: Int, b2: Beliefs[_]) = {
       val result = DenseMatrix.zeros[Double](b1.size, b2.size)
       result := Double.NegativeInfinity
       var p1 = 0
@@ -106,7 +109,7 @@ object PropertyPropagation {
         if (b1.beliefs(p1) > 1E-6)
           while (p2 < result.cols) {
             if(b2.beliefs(p2) > 1E-6)
-              result(p1, p2) = score(grounding, p1, p2) + math.log(b1.beliefs(p1) * b2.beliefs(p2))
+              result(p1, p2) = score(grounding, p1, index, p2) + math.log(b2.beliefs(p2))
             p2 += 1
           }
         p1 += 1
@@ -119,20 +122,28 @@ object PropertyPropagation {
     def marginal(sentence: FeaturizedSentence, sentenceBeliefs: SentenceBeliefs): (Marginal) = {
       var logPartition = 0.0
       val spans = TriangularArray.tabulate(sentence.length + 1) { (begin, end) =>
-        val grounding = scorer.anchor(sentence, begin, end)
         val current = sentenceBeliefs.spanBeliefs(begin, end)
         if (begin == end || (current eq null))  {
           null
         } else {
-          val b1 = scorer.lens1(current)
-          val b2 = scorer.lens2(current)
-          val r = scores(grounding, b1, b2)
-          val partition = breeze.linalg.softmax(r)
+          val grounding = scorer.anchor(sentence, current, begin, end)
+          val b1 = scorer.centralLens(current)
+          val potentials = for ( (lens2, index) <- scorer.satelliteLenses.zipWithIndex) yield {
+            val b2 = lens2(current)
+            scores(grounding, b1, index, b2)
+          }
+
+          // unnormalized marginal for central a
+          val centralMarginal = potentials.map(softmax(_, Axis._1)).reduceLeft(_ += _)
+          centralMarginal += log(b1.beliefs)
+          val partition = softmax(centralMarginal)
           logPartition += partition
-          breeze.numerics.exp.inPlace(r -= partition)
-          assert(!partition.isInfinite, f"$partition%.3E $b1 $b2")
-          assert(!partition.isNaN, f"$partition%.3E $b1 $b2")
-          r
+          assert(!partition.isInfinite, f"$partition%.3E $b1 $potentials")
+          assert(!partition.isNaN, f"$partition%.3E $b1 $potentials")
+          potentials.foreach(m => edgeMarginal(m, centralMarginal, partition))
+          val edgeMarginals:IndexedSeq[DenseMatrix[Double]] = potentials
+          exp.inPlace(centralMarginal -= partition)
+          SpanMarginal(grounding, centralMarginal, edgeMarginals)
         }
       }
 
@@ -140,6 +151,23 @@ object PropertyPropagation {
       assert(!marginal.logPartition.isNaN)
       assert(!marginal.logPartition.isInfinite)
       marginal
+    }
+
+    private def edgeMarginal(m: DenseMatrix[Double], marginal: DenseVector[Double], otherPartition: Double) {
+      var p1 = 0
+      while (p1 < m.rows) {
+        val ascore = marginal(p1)
+        var p2 = 0
+        while (p2 < m.cols) {
+          m(p1,p2) += ascore
+          p2 += 1
+        }
+        p1 += 1
+      }
+      val partition = softmax(m)
+      assert( math.abs(partition - otherPartition) < 1E-4, partition + " " + otherPartition)
+      m -= partition
+      exp.inPlace(m)
     }
 
     def goldMarginal(v: FeaturizedSentence, aug: SentenceBeliefs): (Marginal) = marginal(v, aug)
@@ -152,24 +180,22 @@ object PropertyPropagation {
         begin <- 0 until sentence.length
         end <- (begin+1) to sentence.length
       } {
-        val anchoring = scorer.anchor(sentence, begin, end)
-        val current = sentenceMarginal.spans(begin, end)
-        if(current != null) {
-          if (begin == end || (current eq null))  {
-            null
-          } else {
-            var p1 = 0
-            while (p1 < current.rows) {
-              var p2 = 0
-              while (p2 < current.cols) {
-                val features = anchoring.featuresFor(p1, p2)
-                for(f <- features) {
-                  accum.counts(f) += scale * current(p1,p2)
-                }
-                p2 += 1
+        val spanMarginal = sentenceMarginal.spans(begin, end)
+        val anchoring = spanMarginal.anchoring
+        if (spanMarginal == null || begin == end)  {
+          null
+        } else for( (current, index) <- sentenceMarginal.spans(begin, end).satellites.zipWithIndex ) {
+          var p1 = 0
+          while (p1 < current.rows) {
+            var p2 = 0
+            while (p2 < current.cols) {
+              val features = anchoring.featuresFor(p1, index, p2)
+              for(f <- features) {
+                accum.counts(f) += scale * current(p1,p2)
               }
-              p1 += 1
+              p2 += 1
             }
+            p1 += 1
           }
         }
       }
@@ -184,30 +210,15 @@ object PropertyPropagation {
         if(current eq null) null
         else {
           val old: SpanBeliefs = oldBeliefs.spanBeliefs(begin, end)
-          val old1: Beliefs[T] = scorer.lens1.get(old)
-          val old2: Beliefs[U] = scorer.lens2.get(old)
-          val marg1 = DenseVector.zeros[Double](current.rows)
-          val marg2 = DenseVector.zeros[Double](current.cols)
-          var p1 = 0
-          while( p1 < current.rows) {
-            var p2 = 0
-            var rsum = 0.0
-            if (old1(p1) != 0.0) {
-              while(p2 < current.cols) {
-                rsum += current(p1,p2)
-                marg2(p2) += current(p1, p2)
-                p2 += 1
-              }
-            }
-            marg1(p1) = rsum
-            p1 += 1
+          val old1: Beliefs[T] = scorer.centralLens.get(old)
+          var newBeliefs = scorer.centralLens.set(old, old1.updated(current.centralMarginal))
+          for ( (lens2, index) <- scorer.satelliteLenses.zipWithIndex) {
+            val old2: Beliefs[U] = lens2.get(newBeliefs)
+            val marginalizedSat: DenseVector[Double] = sum(current.satellites(index), Axis._1)
+            assert((sum(marginalizedSat) - 1.0).abs < 1E-6, marginalizedSat.toString + " " + old2)
+            newBeliefs = lens2.set(newBeliefs, old2.updated(marginalizedSat))
           }
-          val partition = breeze.linalg.sum(marg1)
-          marg1 /= partition
-          marg2 /= partition
-
-          val half = scorer.lens1.set(old, old1.copy(beliefs=marg1))
-          scorer.lens2.set(half, old2.copy(beliefs=marg2))
+          newBeliefs
         }
       }
 
@@ -216,16 +227,24 @@ object PropertyPropagation {
   }
 
 
+  trait Featurizer[T, U] {
+    def anchor(sent: FeaturizedSentence, spanBeliefs: SpanBeliefs, begin: Int, end: Int):FeatureAnchoring[T, U]
+  }
+
+  trait FeatureAnchoring[T, U] {
+    def featuresFor(p1: Int, satIndex: Int, p2: Int):Array[Feature]
+  }
+
 
   trait AssociationFeaturizer[T, U] {
-    def lens1: Lens[SpanBeliefs, Beliefs[T]]
-    def lens2: Lens[SpanBeliefs, Beliefs[U]]
+    def centralLens: Lens[SpanBeliefs, Beliefs[T]]
+    def satelliteLenses: IndexedSeq[Lens[SpanBeliefs, Beliefs[U]]]
     def featureIndex: Index[Feature]
-    def anchor(sent: FeaturizedSentence, begin: Int, end: Int):AssociationAnchoring[T, U]
+    def anchor(sent: FeaturizedSentence, spanBeliefs: SpanBeliefs, begin: Int, end: Int):AssociationAnchoring[T, U]
   }
 
   trait AssociationAnchoring[T, U] {
-    def featuresFor(p1: Int, p2: Int):Array[Int]
+    def featuresFor(p1: Int, satIndex: Int, p2: Int):Array[Int]
   }
 
 
@@ -243,12 +262,17 @@ object PropertyPropagation {
   }
 
 
-  case class Marginal(logPartition: Double, spans: TriangularArray[DenseMatrix[Double]]) extends epic.framework.Marginal {
+  case class Marginal(logPartition: Double, spans: TriangularArray[SpanMarginal]) extends epic.framework.Marginal {
 //    val logPartition = {
 //      val part = spans.map(s => if (s eq null) 0.0 else math.log(breeze.linalg.sum(s))).data.sum
 //      assert(!part.isNaN, spans.data.mkString("{", ",", "}"))
 //      part
 //    }
   }
+
+  case class SpanMarginal(anchoring: AssociationAnchoring[_, _], centralMarginal: DenseVector[Double], satellites: IndexedSeq[DenseMatrix[Double]])
+
+
 }
+
 
