@@ -5,6 +5,7 @@ import breeze.numerics._
 import epic.framework._
 import breeze.util.{Index, Lens}
 import breeze.collection.mutable.TriangularArray
+import com.sun.deploy.panel.ITreeNode
 
 
 /**
@@ -49,6 +50,10 @@ object PropertyPropagation {
 
 
   case class AssociationFeature[T, U](a: T, b: U) extends Feature
+
+
+  case class AssociationPacket[T](lens: Lens[SpanBeliefs, Beliefs[T]], featureIndex: Index[Feature], featurizer: (FeaturizedSentence,SpanBeliefs, Int, Int)=>Array[Int])
+
 
   /**
    *
@@ -135,7 +140,13 @@ object PropertyPropagation {
 
           // unnormalized marginal for central a
           val centralMarginal = potentials.map(softmax(_, Axis._1)).reduceLeft(_ += _)
-          centralMarginal += log(b1.beliefs)
+          var i = 0
+          while(i < b1.beliefs.length) {
+            val score = b1.beliefs(i)
+            if (score >= 0)
+              centralMarginal(i) += log(score)
+            i += 1
+          }
           val partition = softmax(centralMarginal)
           logPartition += partition
           assert(!partition.isInfinite, f"$partition%.3E $b1 $potentials")
@@ -181,10 +192,10 @@ object PropertyPropagation {
         end <- (begin+1) to sentence.length
       } {
         val spanMarginal = sentenceMarginal.spans(begin, end)
-        val anchoring = spanMarginal.anchoring
         if (spanMarginal == null || begin == end)  {
           null
         } else for( (current, index) <- sentenceMarginal.spans(begin, end).satellites.zipWithIndex ) {
+          val anchoring = spanMarginal.anchoring
           var p1 = 0
           while (p1 < current.rows) {
             var p2 = 0

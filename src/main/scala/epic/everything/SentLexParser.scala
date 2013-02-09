@@ -254,8 +254,8 @@ object SentLexParser {
           baseScore += math.log(wordGovScore)
           baseScore += math.log(math.max(sMax, 1E-8))
           baseScore += math.log(sSpanGov / sNotSpan2)
-          assert(!baseScore.isNaN, s"norma: $normalizingPiece slabel: $sLabel notaspan: $notASpan ${anchoring.scoreUnaryRule(begin, end, rule, ref)}")
-          assert(!baseScore.isInfinite, s"norma: $normalizingPiece  notASpan2: $sNotSpan2 smax: $sMax slabel: $sLabel notaspan: $notASpan ${anchoring.scoreUnaryRule(begin, end, rule, ref)} $begin $end $ref ${(begin until end).map(words)} ${grammar.index.get(rule)}")
+//          assert(!baseScore.isNaN, s"norma: $normalizingPiece slabel: $sLabel notaspan: $notASpan ${anchoring.scoreUnaryRule(begin, end, rule, ref)}")
+//          assert(!baseScore.isInfinite, s"norma: $normalizingPiece  notASpan2: $sNotSpan2 smax: $sMax slabel: $sLabel notaspan: $notASpan ${anchoring.scoreUnaryRule(begin, end, rule, ref)} $begin $end $ref ${(begin until end).map(words)} ${grammar.index.get(rule)}")
         }
 
         if(begin == 0 && end == length) {
