@@ -142,7 +142,7 @@ object AnnotatingPipeline {
     val allModels = ArrayBuffer[EPModel.CompatibleModel[FeaturizedSentence, SentenceBeliefs]](models:_*)
 
     if(params.includeNER && params.includeParsing) {
-      allModels += PropertyModels.nerSyntaxModel(beliefsFactory, processedTrain.flatMap(_.sentences))
+      allModels += PropertyModels.nerSyntaxModel(docProcessor, beliefsFactory)
       //      val nerLens: Lens[SpanBeliefs,Beliefs[NERType.Value]] = Lens({_.ner}, {(a,b) => a.copy(ner=b)})
       //    val symLens: Lens[SpanBeliefs,Beliefs[Option[AnnotatedLabel]]] = Lens({_.label}, {(a,b) => a.copy(label=b)})
       //
@@ -198,9 +198,12 @@ object AnnotatingPipeline {
           for ( i <- 0 until epMarg.marginals.length) yield {
             val casted =  inf.inferences(i).asInstanceOf[AnnotatingInference[FeaturizedSentence]]
             val newDoc = casted.annotate(d, epMarg.marginals(i).asInstanceOf[casted.Marginal])
-            epModel.models(i).asInstanceOf[EvaluableModel[FeaturizedSentence]].evaluate(newDoc, d, true)
+            epModel.models(i) match {
+              case m: EvaluableModel[FeaturizedSentence] => Some(m.evaluate(newDoc, d, true))
+              case _ => None
+            }
           }}
-        }.seq
+        }.seq.flatMap(_.iterator)
 
         val hacketyHack = results.toIndexedSeq.transpose.map(_.reduce{ (a: Object, b: Object) =>
           val aa = a.asInstanceOf[{def +(other: EvaluationResult[_]):EvaluationResult[_]}]
@@ -208,7 +211,7 @@ object AnnotatingPipeline {
         })
 
         println("Joint results:")
-        for ( (result, model) <- hacketyHack zip epModel.models) {
+        for ( (result, model) <- hacketyHack zip epModel.models.filter(_.isInstanceOf[EvaluableModel[FeaturizedSentence]])) {
           println(model.getClass.getName + ": " + result )
         }
       }

@@ -5,7 +5,6 @@ import breeze.numerics._
 import epic.framework._
 import breeze.util.{Index, Lens}
 import breeze.collection.mutable.TriangularArray
-import com.sun.deploy.panel.ITreeNode
 
 
 /**
@@ -13,6 +12,13 @@ import com.sun.deploy.panel.ITreeNode
  * instance the label of the span and the ner type.
  */
 object PropertyPropagation {
+
+  trait AssociationPacket[T] {
+    def lens: Lens[SpanBeliefs, Beliefs[T]]
+    def featureIndex: Index[_]
+    def featuresFor(fs: FeaturizedSentence, b: SpanBeliefs, begin: Int, end: Int, assignment: Int): Array[Int]
+  }
+
 
   /**
    * For properties that do not depend on the sentence, this is a model
@@ -51,15 +57,57 @@ object PropertyPropagation {
 
   case class AssociationFeature[T, U](a: T, b: U) extends Feature
 
+  def packetModel[T](beliefsFactory: SentenceBeliefs.Factory, packet1: AssociationPacket[T], otherPackets: IndexedSeq[AssociationPacket[_]]) = {
 
-  case class AssociationPacket[T](lens: Lens[SpanBeliefs, Beliefs[T]], featureIndex: Index[Feature], featurizer: (FeaturizedSentence,SpanBeliefs, Int, Int)=>Array[Int])
+    val fi = Index[Feature]()
+    val featureMatrices = for(packet2 <- otherPackets) yield {
+      Array.tabulate(packet1.featureIndex.size, packet2.featureIndex.size) {(p1, p2) =>
+       fi.index(AssociationFeature(packet1.featureIndex.get(p1), packet2.featureIndex.get(p2)))
+      }
+    }
+
+    val assoc = new AssociationFeaturizer[T, Any] {
+      def centralLens: Lens[SpanBeliefs, Beliefs[T]] = packet1.lens
+      val satelliteLenses = otherPackets.map(_.lens).asInstanceOf[IndexedSeq[Lens[SpanBeliefs, Beliefs[Any]]]]
+
+      val featureIndex: Index[Feature] =  fi
+
+
+      def anchor(sent: FeaturizedSentence, spanBeliefs: SpanBeliefs, begin: Int, end: Int): AssociationAnchoring[T, Any] = new AssociationAnchoring[T, Any] {
+        def featuresFor(p1: Int, satIndex: Int, p2: Int):Array[Int] = {
+          val feats1 = packet1.featuresFor(sent, spanBeliefs, begin, end, p1)
+          val feats2 = otherPackets(satIndex).featuresFor(sent, spanBeliefs, begin, end, p2)
+          val arr = new Array[Int](feats1.length * feats2.length)
+          var off = 0
+          var i = 0
+          while(i < feats1.length) {
+            var j = 0
+            val featureRow = featureMatrices(satIndex)(feats1(i))
+            while(j < feats2.length) {
+              arr(off) = featureRow(feats2(j))
+              off += 1
+              j += 1
+            }
+            i += 1
+          }
+          arr
+        }
+
+      }
+
+    }
+
+    new Model(beliefsFactory, assoc)
+  }
+
+
 
 
   /**
    *
    * @author dlwh
    */
-  class Model[T, U](beliefsFactory: SentenceBeliefs.Factory, assoc: AssociationFeaturizer[T, U]) extends EvaluableModel[FeaturizedSentence] {
+  class Model[T, U](beliefsFactory: SentenceBeliefs.Factory, assoc: AssociationFeaturizer[T, U]) extends epic.framework.Model[FeaturizedSentence] {
     type ExpectedCounts = StandardExpectedCounts[Feature]
     type Inference = PropertyPropagation.Inference[T, U]
     type Marginal = PropertyPropagation.Marginal
@@ -76,24 +124,15 @@ object PropertyPropagation {
       ecounts.loss -> ecounts.counts
     }
 
-    case class EvaluationResult() extends epic.framework.EvaluationResult[EvaluationResult] {
-      def +(other: EvaluationResult): EvaluationResult = this
-    }
-
-    def evaluate(guess: FeaturizedSentence, gold: FeaturizedSentence, logResults:Boolean): EvaluationResult = {
-      EvaluationResult()
-    }
   }
 
 
   class Inference[T, U](beliefsFactory: SentenceBeliefs.Factory,
                         weights: DenseVector[Double],
-                        scorer: AssociationFeaturizer[T, U]) extends AnnotatingInference[FeaturizedSentence] with ProjectableInference[FeaturizedSentence, SentenceBeliefs] {
+                        scorer: AssociationFeaturizer[T, U]) extends ProjectableInference[FeaturizedSentence, SentenceBeliefs] {
     type ExpectedCounts = StandardExpectedCounts[Feature]
     type Marginal = PropertyPropagation.Marginal
 
-
-    def annotate(sent: FeaturizedSentence, m: Marginal): FeaturizedSentence = sent
 
     def apply(v1: FeaturizedSentence, v2: SentenceBeliefs): FeaturizedSentence = v1
 

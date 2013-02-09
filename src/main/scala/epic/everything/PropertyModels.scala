@@ -5,6 +5,7 @@ import epic.ontonotes.NERType
 import epic.trees.AnnotatedLabel
 import epic.everything.PropertyPropagation._
 import epic.framework.Feature
+import epic.parser.features.IndicatorFeature
 
 /**
  * 
@@ -17,51 +18,49 @@ object PropertyModels {
   val syntaxLens: Lens[SpanBeliefs,Beliefs[Option[AnnotatedLabel]]] = Lens({_.label}, {(a,b) => a.copy(label=b)})
   val governorLens: Lens[SpanBeliefs,Beliefs[Int]] = Lens({_.governor}, {(a,b) => a.copy(governor=b)})
 
-  private val emptyArray = Array.empty[Feature]
+  def nerPacket(nerIndex: Index[NERType.Value]):AssociationPacket[NERType.Value] = new AssociationPacket[NERType.Value] {
+    def lens: Lens[SpanBeliefs, Beliefs[NERType.Value]] = nerLens
 
-  def nerSyntaxModel(beliefsFactory: SentenceBeliefs.Factory, data: IndexedSeq[FeaturizedSentence]):PropertyPropagation.Model[_, _] = {
-    val lenses = IndexedSeq(syntaxLens, governorLens).asInstanceOf[IndexedSeq[Lens[SpanBeliefs, Beliefs[Any]]]]
+    val featureIndex: Index[_] = nerIndex
 
-    val fi = Index[Feature]
+    val cachedFeatures = Array.tabulate(featureIndex.size)(i => Array(i))
 
-    val nerSynFeatures = Array.tabulate(beliefsFactory.nerProp.size, beliefsFactory.optionLabelProp.size){ (ner, syn) =>
-      fi.index(AssociationFeature(beliefsFactory.nerProp.index.get(ner), beliefsFactory.optionLabelProp.index.get(syn)))
+    def featuresFor(fs: FeaturizedSentence, b: SpanBeliefs, begin: Int, end: Int, assignment: Int): Array[Int] = {
+      cachedFeatures(assignment)
     }
+  }
 
-    for (fs<- data) {
-      val beliefs = beliefsFactory(fs)
-      for (begin <- 0 until fs.length; end <- (begin+1) until fs.length) {
-        val spanBeliefs = beliefs.spanBeliefs(begin, end)
-        if (spanBeliefs ne null) {
-          for (i <- 0 until lenses2.length) {
-            val p2 = lenses2(i).get(spanBeliefs)
-            for (a1 <- 0 until p1.property.size; a2 <- 0 until p2.property.size; f <- anchoring.featuresFor(a1, i, a2)) {
-              fi.index(f)
-            }
-          }
-        }
-      }
+  def syntaxPacket(labelIndex: Index[Option[AnnotatedLabel]]):AssociationPacket[Option[AnnotatedLabel]] = new AssociationPacket[Option[AnnotatedLabel]] {
+    def lens: Lens[SpanBeliefs, Beliefs[Option[AnnotatedLabel]]] = syntaxLens
+
+    val featureIndex: Index[_] = labelIndex
+
+    val cachedFeatures = Array.tabulate(featureIndex.size)(i => Array(i))
+
+    def featuresFor(fs: FeaturizedSentence, b: SpanBeliefs, begin: Int, end: Int, assignment: Int): Array[Int] = {
+      cachedFeatures(assignment)
     }
+  }
+
+  def governorPacket(wordFeatures: Index[Feature]):AssociationPacket[Int] = new AssociationPacket[Int] {
+    def lens: Lens[SpanBeliefs, Beliefs[Int]] = governorLens
+
+    val featureIndex: Index[_] = wordFeatures
 
 
-    val assoc = new AssociationFeaturizer[NERType.Value, Any] {
-      def centralLens: Lens[SpanBeliefs, Beliefs[NERType.Value]] = nerLens
-      def satelliteLenses = lenses
-
-      val featureIndex: Index[Feature] =  fi
-
-
-      def anchor(sent: FeaturizedSentence, spanBeliefs: SpanBeliefs, begin: Int, end: Int): AssociationAnchoring[T, U] = new AssociationAnchoring[T, U] {
-        val unindexed = featurizer.anchor(sent, spanBeliefs, begin, end)
-        def featuresFor(p1: Int, satIndex: Int, p2: Int):Array[Int] = {
-          unindexed.featuresFor(p1, satIndex, p2).map(featureIndex).filter(_ != -1)
-        }
-
-      }
-
+    def featuresFor(fs: FeaturizedSentence, b: SpanBeliefs, begin: Int, end: Int, assignment: Int): Array[Int] = {
+      fs.featuresForWord(assignment)
     }
+  }
 
-    new Model(beliefsFactory, assoc)
+
+
+  def nerSyntaxModel(fs: FeaturizedDocument.Factory, beliefsFactory: SentenceBeliefs.Factory):PropertyPropagation.Model[_, _] = {
+    val nerp = nerPacket(beliefsFactory.nerLabelIndex)
+    val synp = syntaxPacket(beliefsFactory.optionLabelProp.index)
+    val govp = governorPacket(fs.wordFeatureIndex)
+
+    PropertyPropagation.packetModel(beliefsFactory, nerp, IndexedSeq(synp, govp))
   }
 
 }
