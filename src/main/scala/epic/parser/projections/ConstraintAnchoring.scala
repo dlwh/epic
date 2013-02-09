@@ -64,7 +64,9 @@ object ConstraintAnchoring {
  * Creates labeled span scorers for a set of trees from some parser.
  * @author dlwh
  */
-class ConstraintCoreGrammar[L, W](augmentedGrammar: AugmentedGrammar[L, W], isIntermediate: L=>Boolean, threshold: Double) extends CoreGrammar[L, W] {
+@SerialVersionUID(8620602232218134084L)
+class ConstraintCoreGrammar[L, W](val augmentedGrammar: AugmentedGrammar[L, W], isIntermediate: L=>Boolean, threshold: Double) extends CoreGrammar[L, W] {
+
   def grammar = augmentedGrammar.grammar
   def lexicon = augmentedGrammar.lexicon
 
