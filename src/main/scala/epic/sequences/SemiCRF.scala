@@ -270,8 +270,10 @@ object SemiCRF {
               val prevScore = forwardScores(start)(prevLabel)
               if (prevScore != Double.NegativeInfinity) {
                 val score = scorer.scoreTransition(prevLabel, label, start, end) + prevScore
-                accumArray(acc) = score
-                acc += 1
+                if(score != Double.NegativeInfinity) {
+                  accumArray(acc) = score
+                  acc += 1
+                }
               }
 
               prevLabel += 1
