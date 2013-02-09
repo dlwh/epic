@@ -2,7 +2,7 @@ package epic.everything
 
 import java.io.File
 import epic.trees._
-import epic.parser.{Lexicon, GenerativeParser, ParserParams}
+import epic.parser.{SimpleRefinedGrammar, Lexicon, GenerativeParser, ParserParams}
 import epic.parser.ParserParams.XbarGrammar
 import breeze.config.{Help, CommandLineParser}
 import epic.ontonotes.{NERType, ConllOntoReader}
@@ -25,6 +25,7 @@ import breeze.optimize.FirstOrderMinimizer.OptParams
 import epic.ontonotes.Document
 import epic.parser.models.LexGrammarBundle
 import com.google.common.io.Files
+import collection.mutable.ArrayBuffer
 
 
 /**
@@ -42,6 +43,9 @@ object AnnotatingPipeline {
                     weightsCache: File = new File("everything.weights.gz"),
                     trainBaseModels: Boolean = true,
                     checkGradient: Boolean = false,
+                    includeSRL: Boolean = false,
+                    includeParsing: Boolean = true,
+                    includeNER: Boolean = true,
                     @Help(text="For optimizing the base models")
                     baseOpt: OptParams,
                     @Help(text="For optimizing the joint model")
@@ -69,6 +73,9 @@ object AnnotatingPipeline {
     val (docProcessor, processedTrain) = params.cache.cached("processorAndTrain", train){
       buildProcessor(train, weightsCache, params)
     }
+
+
+//    println(docProcessor.parseConstrainer.augmentedGrammar.refined.asInstanceOf[SimpleRefinedGrammar[_,_,_]].refinements)
     val processedTest = params.cache.cached("test", test, docProcessor) {
       test.par.map(docProcessor(_)).seq.flatMap(_.sentences)
 //      processedTrain.flatMap(_.sentences).take(10)
@@ -80,13 +87,21 @@ object AnnotatingPipeline {
     val beliefsFactory = new SentenceBeliefs.Factory(docProcessor.grammar, docProcessor.nerLabelIndex, docProcessor.srlLabelIndex, docProcessor.outsideSrlLabel)
 
     // now build the individual models
-    val nerModel = makeNERModel(beliefsFactory, docProcessor, processedTrain, weightsCache)
-    val lexModel = makeLexParserModel(beliefsFactory, docProcessor, processedTrain, weightsCache)
-    val srlModel = makeSRLModel(beliefsFactory, docProcessor, processedTrain, weightsCache)
+    type Datum = FeaturizedSentence
+    type Augment = SentenceBeliefs
+    type CompatibleModel = EvaluableModel[Datum] { type Inference <: ProjectableInference[Datum, Augment] with AnnotatingInference[Datum]}
+    val models = ArrayBuffer[CompatibleModel]()
+    if (params.includeParsing)
+     models += makeLexParserModel(beliefsFactory, docProcessor, processedTrain, weightsCache)
+    if (params.includeNER)
+       models += makeNERModel(beliefsFactory, docProcessor, processedTrain, weightsCache)
+    if (params.includeSRL)
+      models += makeSRLModel(beliefsFactory, docProcessor, processedTrain, weightsCache)
+
 
     if (params.trainBaseModels && params.checkGradient) {
        println("Checking gradients...")
-      for(m <- IndexedSeq(srlModel, nerModel, lexModel)) {
+      for(m <- models) {
 
         println("Checking " + m.getClass.getName)
         val obj = new ModelObjective(m, processedTrain.flatMap(_.sentences).filter(_.words.filter(_(0).isLetterOrDigit).length <= 40), params.nthreads)
@@ -109,7 +124,7 @@ object AnnotatingPipeline {
     // initial models
     if(params.trainBaseModels) {
       println("Training base models")
-      for(m <- IndexedSeq( srlModel, nerModel, lexModel)) {
+      for(m <- models) {
         println("Training " + m.getClass.getName)
         val obj = new ModelObjective(m, processedTrain.flatMap(_.sentences).filter(_.words.filter(_(0).isLetterOrDigit).length <= 40), params.nthreads)
         val cachedObj = new CachedBatchDiffFunction(obj)
@@ -123,20 +138,27 @@ object AnnotatingPipeline {
     // propagation
 
     // lenses
-    val nerLens: Lens[SpanBeliefs,Beliefs[NERType.Value]] = Lens({_.ner}, {(a,b) => a.copy(ner=b)})
-    val symLens: Lens[SpanBeliefs,Beliefs[Option[AnnotatedLabel]]] = Lens({_.label}, {(a,b) => a.copy(label=b)})
 
-    val assocSynNer = PropertyPropagation.simpleModel(beliefsFactory,
-      beliefsFactory.nerProp, nerLens,
-      beliefsFactory.optionLabelProp, symLens)
+    val allModels = ArrayBuffer[EPModel.CompatibleModel[FeaturizedSentence, SentenceBeliefs]](models:_*)
+
+    if(params.includeNER && params.includeParsing) {
+      allModels += PropertyModels.nerSyntaxModel(beliefsFactory, processedTrain.flatMap(_.sentences))
+      //      val nerLens: Lens[SpanBeliefs,Beliefs[NERType.Value]] = Lens({_.ner}, {(a,b) => a.copy(ner=b)})
+      //    val symLens: Lens[SpanBeliefs,Beliefs[Option[AnnotatedLabel]]] = Lens({_.label}, {(a,b) => a.copy(label=b)})
+      //
+      //    val assocSynNer = PropertyPropagation.simpleModel(beliefsFactory,
+      //      beliefsFactory.nerProp, nerLens,
+      //      beliefsFactory.optionLabelProp, symLens)
+    }
+
+
+
+
+
 
     // the big model!
     val epModel = new EPModel[FeaturizedSentence, SentenceBeliefs](4, epInGold = true, initFeatureValue = {f => Some(weightsCache(f.toString)).filter(_ != 0.0)})(
-      lexModel,
-//      srlModel,
-      nerModel,
-//      nerModel
-      assocSynNer
+      allModels: _*
     )
 
 
@@ -236,14 +258,15 @@ object AnnotatingPipeline {
       params.treebank.makeTreeInstance(s.id, s.tree.map(_.label), s.words, removeUnaries = true)
     }
 
-    if(params.treebank.path.exists) {
-      trainTrees ++= params.treebank.trainTrees
-    }
+//    if(params.treebank.path.exists) {
+//      trainTrees ++= params.treebank.trainTrees
+//    }
 
     val baseParser = params.cache.cached("baseParser", trainTrees.toSet) {
-      val annotator = new PipelineAnnotator[AnnotatedLabel, String](Seq(StripAnnotations(), AddMarkovization(horizontal = 1, vertical = 2)))
+      val annotator = new PipelineAnnotator[AnnotatedLabel, String](Seq(StripAnnotations()))
       GenerativeParser.annotated(new XbarGrammar(), annotator, trainTrees)
     }
+
 
     FeaturizedDocument.makeFactory(params.treebank.process,
       new ConstraintCoreGrammar(baseParser.augmentedGrammar, {(_:AnnotatedLabel).isIntermediate}, -8),
