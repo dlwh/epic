@@ -97,7 +97,7 @@ object PropertyPropagation {
     }
 
     def score(grounding: AssociationAnchoring[T, U], ass1: Int, satIndex: Int, ass2: Int) = {
-      dot(weights, grounding.featuresFor(satIndex: Int, ass1, ass2))
+      dot(weights, grounding.featuresFor(ass1, satIndex: Int, ass2))
     }
 
     def scores(grounding: AssociationAnchoring[T, U], b1: Beliefs[_], index: Int, b2: Beliefs[_]) = {
@@ -140,7 +140,7 @@ object PropertyPropagation {
           logPartition += partition
           assert(!partition.isInfinite, f"$partition%.3E $b1 $potentials")
           assert(!partition.isNaN, f"$partition%.3E $b1 $potentials")
-          potentials.foreach(m => edgeMarginal(m, centralMarginal, partition))
+          potentials.foreach(m => edgeMarginal(m, centralMarginal))
           val edgeMarginals:IndexedSeq[DenseMatrix[Double]] = potentials
           exp.inPlace(centralMarginal -= partition)
           SpanMarginal(grounding, centralMarginal, edgeMarginals)
@@ -153,7 +153,7 @@ object PropertyPropagation {
       marginal
     }
 
-    private def edgeMarginal(m: DenseMatrix[Double], marginal: DenseVector[Double], otherPartition: Double) {
+    private def edgeMarginal(m: DenseMatrix[Double], marginal: DenseVector[Double]) {
       var p1 = 0
       while (p1 < m.rows) {
         val ascore = marginal(p1)
@@ -165,7 +165,7 @@ object PropertyPropagation {
         p1 += 1
       }
       val partition = softmax(m)
-      assert( math.abs(partition - otherPartition) < 1E-4, partition + " " + otherPartition)
+//      assert( math.abs(partition - otherPartition) < 1E-4, partition + " " + otherPartition)
       m -= partition
       exp.inPlace(m)
     }
@@ -214,7 +214,8 @@ object PropertyPropagation {
           var newBeliefs = scorer.centralLens.set(old, old1.updated(current.centralMarginal))
           for ( (lens2, index) <- scorer.satelliteLenses.zipWithIndex) {
             val old2: Beliefs[U] = lens2.get(newBeliefs)
-            val marginalizedSat: DenseVector[Double] = sum(current.satellites(index), Axis._1)
+            val marginalizedSat: DenseVector[Double] = sum(current.satellites(index).t, Axis._1)
+            assert(marginalizedSat.length == old2.property.size)
             assert((sum(marginalizedSat) - 1.0).abs < 1E-6, marginalizedSat.toString + " " + old2)
             newBeliefs = lens2.set(newBeliefs, old2.updated(marginalizedSat))
           }
