@@ -304,7 +304,7 @@ object ChartMarginal {
                 r,
                 inside)
 
-              val validA = refined.validParentRefinementsGivenRule(begin, end, r)
+              val validA = refined.validParentRefinementsGivenRule(begin, coarseSplitBegin, coarseSplitEnd, end, r)
               var ai = 0
               while(ai < validA.length) {
                 val refA = validA(ai)
@@ -407,14 +407,14 @@ object ChartMarginal {
       val coarseWideLeft = inside.top.coarseWideLeft(end)
 
       updateOutsideUnaries(outside, inside, anchoring, begin, end)
-      if(span > 1)
-      // a ->  bc  [begin, split, end)
-        for ( a <- inside.bot.enteredLabelIndexes(begin, end);
-              refA <- inside.bot.enteredLabelRefinements(begin, end, a) ) {
-          val coreScore = core.scoreSpan(begin, end, a)
-          val aScore:Double = outside.bot.labelScore(begin, end, a, refA) + refined.scoreSpan(begin, end, a, refA) + coreScore
-          if (!aScore.isInfinite) {
-            val rules = anchoring.refined.validCoarseRulesGivenParentRefinement(a, refA)
+      if(span > 1) {
+        val enteredBot = inside.bot.enteredLabelIndexes(begin, end)
+        var a = 0
+        while(a < grammar.labelIndex.size) {
+          if (enteredBot.contains(a)) {
+            // a ->  bc  [begin, split, end)
+            val rules = anchoring.grammar.indexedBinaryRulesWithParent(a)
+
             var br = 0
             while(br < rules.length) {
               val r = rules(br)
@@ -438,41 +438,58 @@ object ChartMarginal {
                   r,
                   inside)
 
-                val ruleRefinements = refined.validRuleRefinementsGivenParent(begin, end, r, refA)
-                var rfI = 0
-                while(rfI < ruleRefinements.length) {
-                  val refR = ruleRefinements(rfI)
-                  rfI += 1
-                  val refB = refined.leftChildRefinement(r, refR)
-                  val refC = refined.rightChildRefinement(r, refR)
+                val enteredRefBot = inside.bot.enteredLabelRefinements(begin, end, a)
+                val compatibleRefinements = refined.validParentRefinementsGivenRule(begin, coarseSplitBegin, coarseSplitEnd, end, r)
 
-                  val narrowR = narrowRight(b)(refB)
-                  val narrowL = narrowLeft(c)(refC)
-                  var split = math.max(narrowR, wideLeft(c)(refC))
-                  val endSplit = math.min(wideRight(b)(refB), narrowL) + 1
-                  val canBuildThisRule = narrowR < end && narrowL >= narrowR && split <= narrowL && split < endSplit
-                  if(!canBuildThisRule)
-                    split = endSplit
+                var refai = 0
+                while (refai < compatibleRefinements.length) {
+                  val refA = compatibleRefinements(refai)
+                  if (enteredRefBot.contains(refA)) {
+                    val coreScore = core.scoreSpan(begin, end, a)
+                    val aScore:Double = outside.bot.labelScore(begin, end, a, refA) + refined.scoreSpan(begin, end, a, refA) + coreScore
+                    if (!aScore.isInfinite) {
+                      val ruleRefinements = refined.validRuleRefinementsGivenParent(begin, end, r, refA)
+                      var rfI = 0
+                      while(rfI < ruleRefinements.length) {
+                        val refR = ruleRefinements(rfI)
+                        rfI += 1
+                        val refB = refined.leftChildRefinement(r, refR)
+                        val refC = refined.rightChildRefinement(r, refR)
 
-                  while(split < endSplit) {
-                    val bInside = itop.labelScore(begin, split, b, refB)
-                    val cInside = itop.labelScore(split, end, c, refC)
-                    if (bInside != Double.NegativeInfinity && cInside != Double.NegativeInfinity && aScore != Double.NegativeInfinity) {
-                      val ruleScore = refined.scoreBinaryRule(begin, split, end, r, refR) + coreScoreArray(split)
-                      val score = aScore + ruleScore
-                      val bOutside = score + cInside
-                      val cOutside = score + bInside
-                      outside.top.rawEnter(begin, split, b, refB, bOutside)
-                      outside.top.rawEnter(split, end, c, refC, cOutside)
+                        val narrowR = narrowRight(b)(refB)
+                        val narrowL = narrowLeft(c)(refC)
+                        var split = math.max(narrowR, wideLeft(c)(refC))
+                        val endSplit = math.min(wideRight(b)(refB), narrowL) + 1
+                        val canBuildThisRule = narrowR < end && narrowL >= narrowR && split <= narrowL && split < endSplit
+                        if(!canBuildThisRule)
+                          split = endSplit
+
+                        while(split < endSplit) {
+                          val bInside = itop.labelScore(begin, split, b, refB)
+                          val cInside = itop.labelScore(split, end, c, refC)
+                          if (bInside != Double.NegativeInfinity && cInside != Double.NegativeInfinity && aScore != Double.NegativeInfinity) {
+                            val ruleScore = refined.scoreBinaryRule(begin, split, end, r, refR) + coreScoreArray(split)
+                            val score = aScore + ruleScore
+                            val bOutside = score + cInside
+                            val cOutside = score + bInside
+                            outside.top.rawEnter(begin, split, b, refB, bOutside)
+                            outside.top.rawEnter(split, end, c, refC, cOutside)
+                          }
+
+                          split += 1
+                        }
+                      }
                     }
-
-                    split += 1
                   }
+                  refai += 1
                 }
               }
             }
           }
+
+          a += 1
         }
+      }
     }
     outside
   }
@@ -527,14 +544,14 @@ object ChartMarginal {
         if(coreScore != Double.NegativeInfinity) {
           val b = grammar.child(r)
           if(inside.bot.isLabelEntered(begin, end, b))
-          for(refR <- refined.validRuleRefinementsGivenParent(begin, end, rules(j), refA)) {
-            val refB = refined.childRefinement(rules(j), refR)
-            val ruleScore: Double = refined.scoreUnaryRule(begin, end, rules(j), refR) + coreScore
-            val prob: Double = bScore + ruleScore
-            if(prob != Double.NegativeInfinity) {
-              chart.bot.rawEnter(begin, end, b, refB, prob)
+            for(refR <- refined.validRuleRefinementsGivenParent(begin, end, rules(j), refA)) {
+              val refB = refined.childRefinement(rules(j), refR)
+              val ruleScore: Double = refined.scoreUnaryRule(begin, end, rules(j), refR) + coreScore
+              val prob: Double = bScore + ruleScore
+              if(prob != Double.NegativeInfinity) {
+                chart.bot.rawEnter(begin, end, b, refB, prob)
+              }
             }
-          }
         }
         j += 1
       }
@@ -543,11 +560,11 @@ object ChartMarginal {
   }
 
   private def fillCoreScores[L, W](coreScores: Array[Double],
-                           begin: Int, end: Int,
-                           anchoring: CoreAnchoring[L, W],
-                           splitBegin: Int, splitEnd: Int,
-                           rule: Int,
-                           chart: ParseChart[L]) = {
+                                   begin: Int, end: Int,
+                                   anchoring: CoreAnchoring[L, W],
+                                   splitBegin: Int, splitEnd: Int,
+                                   rule: Int,
+                                   chart: ParseChart[L]) = {
     var split = splitBegin
     while (split < splitEnd) {
       coreScores(split) = anchoring.scoreBinaryRule(begin, split, end, rule)

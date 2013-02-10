@@ -22,7 +22,7 @@ import collection.mutable.ArrayBuffer
  *
  * @author dlwh
  */
-@SerialVersionUID(1)
+@SerialVersionUID(2)
 class SimpleRefinedGrammar[L, L2, W](val grammar: BaseGrammar[L],
                                      val lexicon: Lexicon[L, W],
                                      val refinements: GrammarRefinements[L, L2],
@@ -140,7 +140,7 @@ class SimpleRefinedGrammar[L, L2, W](val grammar: BaseGrammar[L],
 
     def validCoarseRulesGivenParentRefinement(a: Int, refA: Int) = coarseRulesGivenParentRefinement(a)(refA)
 
-    def validParentRefinementsGivenRule(begin: Int, end: Int, rule: Int): Array[Int] = {
+    def validParentRefinementsGivenRule(begin: Int, splitBegin: Int, splitEnd: Int, end: Int, rule: Int): Array[Int] = {
       parentRefinementsGivenCoarseRule(rule)
     }
   }

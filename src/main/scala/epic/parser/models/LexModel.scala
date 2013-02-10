@@ -402,7 +402,7 @@ final class LexGrammar[L, W](val grammar: BaseGrammar[L],
                              binaries: Array[Boolean],
                              leftRules: Array[Boolean],
                              rightRules: Array[Boolean]) extends RefinedGrammar[L, W] {
-  def isLeftRule(r: Int) = leftRules(r)
+  def isHeadOnLeftForRule(r: Int) = leftRules(r)
 
   def isRightRule(r: Int) = rightRules(r)
 
@@ -490,7 +490,7 @@ final class LexGrammar[L, W](val grammar: BaseGrammar[L],
     def validRuleRefinementsGivenParent(begin: Int, end: Int, rule: Int, parentRef: Int) = {
       if(!binaries(rule)) {
         Array(parentRef:Int)
-      } else if(isLeftRule(rule)) {
+      } else if(isHeadOnLeftForRule(rule)) {
         val result = new Array[Int](end - (parentRef+1))
         var ref = parentRef * words.length + parentRef + 1
         var i = 0
@@ -523,7 +523,7 @@ final class LexGrammar[L, W](val grammar: BaseGrammar[L],
 
 
     def leftChildRefinement(rule: Int, ruleRef: Int) = {
-      if(isLeftRule(rule)) headIndex(ruleRef)
+      if(isHeadOnLeftForRule(rule)) headIndex(ruleRef)
       else depIndex(ruleRef)
     }
 
@@ -547,7 +547,7 @@ final class LexGrammar[L, W](val grammar: BaseGrammar[L],
     }
 
     def ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int, refC: Int) = {
-      if(isLeftRule(r)) {
+      if(isHeadOnLeftForRule(r)) {
         require(refA == refB)
         refA * words.length + refC
       } else {
@@ -558,7 +558,10 @@ final class LexGrammar[L, W](val grammar: BaseGrammar[L],
 
     def validCoarseRulesGivenParentRefinement(a: Int, refA: Int) = grammar.indexedBinaryRulesWithParent(a)
 
-    def validParentRefinementsGivenRule(begin: Int, end: Int, rule: Int): Array[Int] = validLabelRefinements(begin, end, grammar.parent(rule))
+    def validParentRefinementsGivenRule(begin: Int, splitBegin: Int, splitEnd: Int, end: Int, rule: Int): Array[Int] = {
+      if (isHeadOnLeftForRule(rule)) Array.range(begin, splitEnd)
+      else Array.range(splitBegin, end)
+    }
   }
 
 }

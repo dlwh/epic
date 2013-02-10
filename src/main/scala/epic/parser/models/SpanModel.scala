@@ -219,7 +219,7 @@ class DotProductGrammar[L, L2, W, Feature](val grammar: BaseGrammar[L],
 
     def validCoarseRulesGivenParentRefinement(a: Int, refA: Int) = coarseRulesGivenParentRefinement(a)(refA)
 
-    def validParentRefinementsGivenRule(begin: Int, end: Int, rule: Int): Array[Int] = parentRefinementsGivenCoarseRule(rule)
+    def validParentRefinementsGivenRule(begin: Int, splitBegin: Int, splitEnd: Int, end: Int, rule: Int): Array[Int] = parentRefinementsGivenCoarseRule(rule)
   }
 }
 

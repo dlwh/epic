@@ -178,11 +178,12 @@ final case class ProductRefinedAnchoring[L,W](s1: RefinedAnchoring[L, W],
     }
   }
 
-  def validParentRefinementsGivenRule(begin: Int, end: Int, rule: Int): Array[Int] = {
-    if(refinementController ne null) refinementController.validParentRefinementsGivenRule(begin, end, rule)
+
+  def validParentRefinementsGivenRule(begin: Int, splitBegin: Int, splitEnd: Int, end: Int, rule: Int): Array[Int] = {
+    if(refinementController ne null) refinementController.validParentRefinementsGivenRule(begin, splitBegin, splitEnd, end, rule)
     else {
-      val r1arr = s1.validParentRefinementsGivenRule(begin, end, rule)
-      val r2arr = s2.validParentRefinementsGivenRule(begin, end, rule)
+      val r1arr = s1.validParentRefinementsGivenRule(begin, splitBegin, splitEnd, end, rule)
+      val r2arr = s2.validParentRefinementsGivenRule(begin, splitBegin, splitEnd, end, rule)
       val num2 = s2.numValidRefinements(grammar.parent(rule))
       for (r1 <- r1arr; r2 <- r2arr) yield r1 * num2 + r2
     }

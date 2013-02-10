@@ -220,7 +220,7 @@ trait RefinedAnchoring[L, W] extends Factor[RefinedAnchoring[L, W]] {
 
   def validCoarseRulesGivenParentRefinement(a: Int, refA: Int): Array[Int]
 
-  def validParentRefinementsGivenRule(begin: Int, end: Int, rule: Int): Array[Int]
+  def validParentRefinementsGivenRule(begin: Int, splitBegin: Int, splitEnd: Int, end: Int, rule: Int): Array[Int]
 }
 
 object RefinedAnchoring {
@@ -233,6 +233,6 @@ object RefinedAnchoring {
 
 
 trait BinaryRuleRefinements {
-  val leftChildRefinements: Array[Int]
-  val rightChildRefinements: Array[Int]
+  val numChildRefinements: Int
+  def leftChildForChildRefinement: Int
 }

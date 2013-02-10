@@ -92,8 +92,8 @@ class ParseChart[L](val index: Index[L],
       labelScore(begin, end, index(parent), ref)
     }
 
-    def enteredLabelIndexes(begin: Int, end: Int): Iterator[Int] = {
-      enteredLabels(TriangularArray.index(begin, end)).iterator
+    def enteredLabelIndexes(begin: Int, end: Int) = {
+      enteredLabels(TriangularArray.index(begin, end))
     }
 
     def isLabelEntered(begin: Int, end: Int, l: Int): Boolean = {
@@ -101,7 +101,7 @@ class ParseChart[L](val index: Index[L],
     }
 
     def enteredLabelRefinements(begin: Int, end: Int, label: Int) = {
-      enteredRefinements(TriangularArray.index(begin, end))(label).iterator
+      enteredRefinements(TriangularArray.index(begin, end))(label)
     }
 
     def enteredLabelScores(begin: Int, end: Int) = {
