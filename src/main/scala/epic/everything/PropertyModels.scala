@@ -45,11 +45,16 @@ object PropertyModels {
   def governorPacket(wordFeatures: Index[Feature]):AssociationPacket[Int] = new AssociationPacket[Int] {
     def lens: Lens[SpanBeliefs, Beliefs[Int]] = governorLens
 
-    val featureIndex: Index[_] = wordFeatures
+    val featureIndex: Index[_] = Index(wordFeatures.iterator ++ Iterator(IndicatorFeature("-ROOT-"), IndicatorFeature("-NOTGOVERNED-")))
+
+    val notGovernedArray = Array(featureIndex.size - 1)
+    val rootArray = Array(featureIndex.size - 2)
 
 
     def featuresFor(fs: FeaturizedSentence, b: SpanBeliefs, begin: Int, end: Int, assignment: Int): Array[Int] = {
-      fs.featuresForWord(assignment)
+      if (assignment > fs.length) notGovernedArray
+      else if (assignment == fs.length) rootArray
+      else fs.featuresForWord(assignment)
     }
   }
 
