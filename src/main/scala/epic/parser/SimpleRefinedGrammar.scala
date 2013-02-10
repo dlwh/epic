@@ -33,7 +33,6 @@ class SimpleRefinedGrammar[L, L2, W](val grammar: BaseGrammar[L],
                                      childCompatibleRefinements: Array[Array[Array[Int]]],
                                      tagScorer: TagScorer[L2, W]) extends RefinedGrammar[L, W] with Serializable {
 
-  //
   private val coarseRulesGivenParentRefinement = Array.tabulate(grammar.labelIndex.size) { p =>
     // refinement -> rules
     val result = Array.fill(refinements.labels.refinementsOf(p).size)(ArrayBuffer[Int]())
@@ -44,6 +43,12 @@ class SimpleRefinedGrammar[L, L2, W](val grammar: BaseGrammar[L],
     }
 
     result.map(_.toArray)
+  }
+
+
+  private val parentRefinementsGivenCoarseRule:Array[Array[Int]] = Array.tabulate(grammar.index.size) { r =>
+  // rules -> parent refinements
+    refinements.rules.refinementsOf(r).map(refinedGrammar.parent(_)).toSet.toArray.map(refinements.labels.localize(_)).sorted
   }
 
   def anchor(w: Seq[W]) = new RefinedAnchoring[L, W] {
@@ -102,7 +107,7 @@ class SimpleRefinedGrammar[L, L2, W](val grammar: BaseGrammar[L],
       refinements.labels.localize(refinedGrammar.child(refinedRuleId))
     }
 
-    // TODO: make this not terminally slow!
+    // TODO: make this not so slow! Doesn't really matter, but still..
     def ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int) = {
       val a = grammar.parent(r)
       val b = grammar.child(r)
@@ -134,5 +139,9 @@ class SimpleRefinedGrammar[L, L2, W](val grammar: BaseGrammar[L],
     def numValidRuleRefinements(rule: Int) = refinements.rules.refinementsOf(rule).length
 
     def validCoarseRulesGivenParentRefinement(a: Int, refA: Int) = coarseRulesGivenParentRefinement(a)(refA)
+
+    def validParentRefinementsGivenRule(begin: Int, end: Int, rule: Int): Array[Int] = {
+      parentRefinementsGivenCoarseRule(rule)
+    }
   }
 }

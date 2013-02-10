@@ -1,6 +1,8 @@
 package epic.parser
 
 import epic.trees.{UnaryTree, BinarizedTree}
+import reflect.ClassTag
+import epic.util.Arrays
 
 /*
  Copyright 2012 David Hall
@@ -245,9 +247,6 @@ object ChartMarginal {
     }
 
 
-    // buffer. Set to 1000. If we ever fill it up, accumulate everything into
-    // elem 0 and try again
-    val scoreArray = new Array[Double](1000)
     // cache for coreScores
     val coreScoreArray = new Array[Double](words.length)
 
@@ -271,45 +270,47 @@ object ChartMarginal {
       val coarseWideRight = top.coarseWideRight(begin)
       val coarseWideLeft = top.coarseWideLeft(end)
 
+
       for ( a <- 0 until grammar.labelIndex.size ) {
+        val numValidLabelRefs = anchoring.refined.numValidRefinements(a)
+        val scoreArray = Arrays.newArray(numValidLabelRefs,  100)
+        val offsets = new Array[Int](numValidLabelRefs)
+
         val coreSpan = core.scoreSpan(begin, end, a)
         if (coreSpan != Double.NegativeInfinity) {
-          val validA = refined.validLabelRefinements(begin, end, a)
-          var ai = 0
-          while(ai < validA.length) {
-            val refA = validA(ai)
-            ai += 1
-            val passScore = refined.scoreSpan(begin, end, a, refA) + coreSpan
-            var offset = 0 // into scoreArray
-            if(!passScore.isInfinite) {
-              var ruleIndex = 0
-              // into rules
-              val rules = anchoring.refined.validCoarseRulesGivenParentRefinement(a, refA)
-              while(ruleIndex < rules.length) {
-                val r = rules(ruleIndex)
-                val b = g.leftChild(r)
-                val c = g.rightChild(r)
-                ruleIndex += 1
+          val rules = anchoring.grammar.indexedBinaryRulesWithParent(a)
+          var ruleIndex = 0
+          // into rules
+          while(ruleIndex < rules.length) {
+            val r = rules(ruleIndex)
+            val b = g.leftChild(r)
+            val c = g.rightChild(r)
+            ruleIndex += 1
 
-                // Check: can we build any refinement of this rule?
-                // basically, we can if TODO
-                val narrowR = coarseNarrowRight(b)
-                val narrowL = coarseNarrowLeft(c)
-                val coarseSplitBegin = math.max(narrowR, coarseWideLeft(c))
-                val coarseSplitEnd = math.min(coarseWideRight(b), narrowL) + 1
-                val canBuildThisRule = narrowR < end && narrowL >= narrowR && coarseSplitBegin <= narrowL && coarseSplitBegin < coarseSplitEnd
+            // Check: can we build any refinement of this rule?
+            // basically, we can if TODO
+            val narrowR = coarseNarrowRight(b)
+            val narrowL = coarseNarrowLeft(c)
+            val coarseSplitBegin = math.max(narrowR, coarseWideLeft(c))
+            val coarseSplitEnd = math.min(coarseWideRight(b), narrowL) + 1
+            val canBuildThisRule = narrowR < end && narrowL >= narrowR && coarseSplitBegin <= narrowL && coarseSplitBegin < coarseSplitEnd
 
-                if(canBuildThisRule) {
+            if(canBuildThisRule) {
+              // initialize core scores
+              ChartMarginal.fillCoreScores(coreScoreArray,
+                begin, end,
+                anchoring.core,
+                coarseSplitBegin, coarseSplitEnd,
+                r,
+                inside)
 
-                  // initialize core scores
-                  ChartMarginal.fillCoreScores(coreScoreArray,
-                    begin, end,
-                    anchoring.core,
-                    coarseSplitBegin, coarseSplitEnd,
-                    r,
-                    inside)
-
-
+              val validA = refined.validParentRefinementsGivenRule(begin, end, r)
+              var ai = 0
+              while(ai < validA.length) {
+                val refA = validA(ai)
+                ai += 1
+                val passScore = refined.scoreSpan(begin, end, a, refA) + coreSpan
+                if(!passScore.isInfinite) {
                   val refinements = refined.validRuleRefinementsGivenParent(begin, end, r, refA)
                   var ruleRefIndex = 0
                   while(ruleRefIndex < refinements.length) {
@@ -334,25 +335,35 @@ object ChartMarginal {
 
                         val prob = withoutRule + refined.scoreBinaryRule(begin, split, end, r, refR)
 
-                        scoreArray(offset) = prob
-                        offset += 1
+                        scoreArray(refA)(offsets(refA)) = prob
+                        offsets(refA) += 1
                         // buffer full
-                        if(offset == scoreArray.length) {
-                          scoreArray(0) = inside.sum(scoreArray, offset)
-                          offset = 1
+                        if(offsets(refA) == scoreArray(refA).length) {
+                          scoreArray(refA)(0) = inside.sum(scoreArray(refA), offsets(refA))
+                          offsets(refA) = 1
                         }
                       }
                       split += 1
                     }
                   }
                 }
-              }
-            }
+
+              } // end a refinement
+
+
+
+            } // end canBuildThisRule
+          } // end rules
+
+          var ai = 0
+          while(ai < numValidLabelRefs) {
             // done updating vector, do an enter:
-            if(offset > 0) {
-              inside.bot.enterSum(begin, end, a, refA, scoreArray, offset)
+            if(offsets(ai) > 0) {
+              inside.bot.enterSum(begin, end, a, ai, scoreArray(ai), offsets(ai))
             }
+            ai += 1
           }
+
         }
       }
       updateInsideUnaries(inside, anchoring, begin, end)

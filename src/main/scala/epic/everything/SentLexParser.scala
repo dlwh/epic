@@ -320,5 +320,6 @@ object SentLexParser {
       anchoring.validCoarseRulesGivenParentRefinement(a, refA)
     }
 
+    def validParentRefinementsGivenRule(begin: Int, end: Int, rule: Int): Array[Int] = anchoring.validParentRefinementsGivenRule(begin, end, rule)
   }
 }

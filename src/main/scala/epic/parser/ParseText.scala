@@ -23,7 +23,7 @@ object ParseText {
     val params = try {
       config.readIn[Params]("test")
     } catch {
-      case e =>
+      case e:Exception =>
         e.printStackTrace()
         println(breeze.config.GenerateHelp[Params](config))
         sys.exit(1)

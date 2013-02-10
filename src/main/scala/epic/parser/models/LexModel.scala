@@ -557,6 +557,8 @@ final class LexGrammar[L, W](val grammar: BaseGrammar[L],
     }
 
     def validCoarseRulesGivenParentRefinement(a: Int, refA: Int) = grammar.indexedBinaryRulesWithParent(a)
+
+    def validParentRefinementsGivenRule(begin: Int, end: Int, rule: Int): Array[Int] = validLabelRefinements(begin, end, grammar.parent(rule))
   }
 
 }

@@ -14,7 +14,6 @@ package epic.parser
  limitations under the License.
 */
 
-
 import math._
 import java.util.Arrays
 import breeze.util.Index

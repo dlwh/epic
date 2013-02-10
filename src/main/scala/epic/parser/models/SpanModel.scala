@@ -116,6 +116,11 @@ class DotProductGrammar[L, L2, W, Feature](val grammar: BaseGrammar[L],
     result.map(_.toArray)
   }
 
+  private val parentRefinementsGivenCoarseRule:Array[Array[Int]] = Array.tabulate(grammar.index.size) { r =>
+  // rules -> parent refinements
+    refinements.rules.refinementsOf(r).map(refinedGrammar.parent(_)).toSet.toArray.map(refinements.labels.localize(_)).sorted
+  }
+
 
   def anchor(w: Seq[W]):RefinedAnchoring[L, W] = new RefinedAnchoring[L, W] {
 
@@ -214,6 +219,7 @@ class DotProductGrammar[L, L2, W, Feature](val grammar: BaseGrammar[L],
 
     def validCoarseRulesGivenParentRefinement(a: Int, refA: Int) = coarseRulesGivenParentRefinement(a)(refA)
 
+    def validParentRefinementsGivenRule(begin: Int, end: Int, rule: Int): Array[Int] = parentRefinementsGivenCoarseRule(rule)
   }
 }
 
