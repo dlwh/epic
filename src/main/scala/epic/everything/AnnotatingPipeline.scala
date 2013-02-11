@@ -196,10 +196,11 @@ object AnnotatingPipeline {
         val results = {for (d <- processedTest.par) yield {
           val epMarg = inf.marginal(d)
           for ( i <- 0 until epMarg.marginals.length) yield {
-            val casted =  inf.inferences(i).asInstanceOf[AnnotatingInference[FeaturizedSentence]]
-            val newDoc = casted.annotate(d, epMarg.marginals(i).asInstanceOf[casted.Marginal])
             epModel.models(i) match {
-              case m: EvaluableModel[FeaturizedSentence] => Some(m.evaluate(newDoc, d, true))
+              case m: EvaluableModel[FeaturizedSentence] =>
+                val casted =  inf.inferences(i).asInstanceOf[AnnotatingInference[FeaturizedSentence]]
+                val newDoc = casted.annotate(d, epMarg.marginals(i).asInstanceOf[casted.Marginal])
+                Some(m.evaluate(newDoc, d, true))
               case _ => None
             }
           }}
