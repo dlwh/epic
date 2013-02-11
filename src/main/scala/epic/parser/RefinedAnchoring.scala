@@ -177,9 +177,13 @@ trait RefinedAnchoring[L, W] extends Factor[RefinedAnchoring[L, W]] {
    */
   def validLabelRefinements(begin: Int, end: Int, label: Int):Array[Int]
 
+  def maxLabelRefinements: Int = (0 until grammar.labelIndex.size).map(numValidRefinements _).max
+
   def numValidRefinements(label: Int):Int
 
   def numValidRuleRefinements(rule: Int):Int
+
+
 
   /**
    * For a given span and the parent's refinement, what refinements to the rule are allowed?

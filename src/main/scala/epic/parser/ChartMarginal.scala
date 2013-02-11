@@ -269,12 +269,12 @@ object ChartMarginal {
       val coarseNarrowLeft = top.coarseNarrowLeft(end)
       val coarseWideRight = top.coarseWideRight(begin)
       val coarseWideLeft = top.coarseWideLeft(end)
-
+      val scoreArray = Arrays.newArray(anchoring.refined.maxLabelRefinements,  20)
+      val offsets = new Array[Int](anchoring.refined.maxLabelRefinements)
 
       for ( a <- 0 until grammar.labelIndex.size ) {
         val numValidLabelRefs = anchoring.refined.numValidRefinements(a)
-        val scoreArray = Arrays.newArray(numValidLabelRefs,  100)
-        val offsets = new Array[Int](numValidLabelRefs)
+        java.util.Arrays.fill(offsets, 0)
 
         val coreSpan = core.scoreSpan(begin, end, a)
         if (coreSpan != Double.NegativeInfinity) {
