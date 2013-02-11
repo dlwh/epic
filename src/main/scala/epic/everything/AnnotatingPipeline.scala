@@ -26,6 +26,7 @@ import epic.ontonotes.Document
 import epic.parser.models.LexGrammarBundle
 import com.google.common.io.Files
 import collection.mutable.ArrayBuffer
+import collection.immutable
 
 
 /**
@@ -193,7 +194,7 @@ object AnnotatingPipeline {
 
       if( s.iter % params.iterPerEval == 0) {
         val inf = epModel.inferenceFromWeights(s.x)
-        val results = {for (d <- processedTest.par) yield {
+        val results: immutable.Seq[immutable.IndexedSeq[EvaluationResult[_]]] = {for (d <- processedTest.par) yield {
           val epMarg = inf.marginal(d)
           for ( i <- 0 until epMarg.marginals.length) yield {
             epModel.models(i) match {
@@ -203,8 +204,8 @@ object AnnotatingPipeline {
                 Some(m.evaluate(newDoc, d, true))
               case _ => None
             }
-          }}
-        }.seq.flatMap(_.iterator)
+          }}.flatMap(_.iterator)
+        }.seq
 
         val hacketyHack = results.toIndexedSeq.transpose.map(_.reduce{ (a: Object, b: Object) =>
           val aa = a.asInstanceOf[{def +(other: EvaluationResult[_]):EvaluationResult[_]}]
