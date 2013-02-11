@@ -225,7 +225,7 @@ object AnnotatingPipeline {
   def readTrainTestSplit(corpus: File, nfiles: Int): (IndexedSeq[Document], IndexedSeq[Document]) = {
 
     val instances = for {
-      file <- corpus.listFiles take nfiles
+      file <- corpus.listFiles.sortBy(_.getName) take nfiles
       doc <- ConllOntoReader.readDocuments(file)
     } yield doc
     val train = instances.take(instances.length * 9 / 10)
