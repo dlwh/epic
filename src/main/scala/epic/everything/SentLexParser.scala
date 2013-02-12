@@ -199,38 +199,47 @@ object SentLexParser {
       score1 + score2
     }.sum
 
+    private val attachCache = epic.util.Arrays.fillArray(length, length, Double.NaN)
+
 
     def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int): Double = {
       val head = anchoring.headIndex(ref)
       val dep = anchoring.depIndex(ref)
-      val depScore = beliefs.wordBeliefs(dep).governor(head)
-      if(beliefs.spans(begin, split) == null || beliefs.spans(split, end) == null) return Double.NegativeInfinity
 
-      val score = if (lexGrammar.isRightRule(rule)) {
-        val sGovScore = beliefs.spans(begin, split).governor(head)
-        var notASpan = beliefs.spanBeliefs(begin, split).governor(length + 1)
+      // will swap these if rule types are different.
+      // trying to avoid code duplication/branching.
+      var headCell: SpanBeliefs = beliefs.spans(split, end)
+      var depCell: SpanBeliefs = beliefs.spans(begin, split)
+      if(headCell == null || depCell == null) return Double.NegativeInfinity
+
+      if (!lexGrammar.isRightRule(rule)) {
+        val cc = headCell
+        headCell = depCell
+        depCell = cc
+      }
+
+      var cached = attachCache(dep)(head)
+      if (java.lang.Double.isNaN(cached)) {
+        val depScore = beliefs.wordBeliefs(dep).governor(head)
+        val sGovScore = depCell.governor(head)
+        var notASpan = depCell.governor(length + 1)
         if(notASpan <= 0.0) notASpan = 1.0
         val sMax = beliefs.wordBeliefs(dep).maximalLabel(grammar.leftChild(rule))
-        if(depScore <= 0.0 || sGovScore <= 0.0 || sMax <= 0.0) {
+
+        cached = if(depScore <= 0.0 || sGovScore <= 0.0 || sMax <= 0.0) {
           Double.NegativeInfinity
-        } else (
-         anchoring.scoreBinaryRule(begin, split, end, rule, ref)
-             + math.log(depScore * sGovScore / notASpan  *   sMax)
-        )
-      } else {// head on the right
-        val sGovScore = beliefs.spans(split, end).governor(head)
-        var notASpan = beliefs.spanBeliefs(split, end).governor(length + 1)
-        if(notASpan <= 0.0) notASpan = 1.0
-        val sMax = beliefs.wordBeliefs(dep).maximalLabel(grammar.rightChild(rule))
-        if(depScore <= 0.0 || sGovScore <= 0.0 || sMax <= 0.0) {
-          Double.NegativeInfinity
-        } else (
-          anchoring.scoreBinaryRule(begin, split, end, rule, ref)
-            + math.log(depScore * sGovScore / notASpan  *   sMax)
-        )
+        } else {
+          math.log(depScore * sGovScore / notASpan  *   sMax)
+        }
+        assert(!java.lang.Double.isNaN(cached))
+        attachCache(dep)(head) = cached
       }
-      assert(!score.isNaN)
-      score
+
+      if (cached == Double.NegativeInfinity) {
+        cached
+      } else {
+        cached + anchoring.scoreBinaryRule(begin, split, end, rule, ref)
+      }
     }
 
     def scoreUnaryRule(begin: Int, end: Int, rule: Int, ref: Int): Double = {

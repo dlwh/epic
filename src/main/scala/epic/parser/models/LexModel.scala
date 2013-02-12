@@ -443,7 +443,8 @@ final class LexGrammar[L, W](val grammar: BaseGrammar[L],
       else dot(f.featuresForSpan(begin, end, label, ref))
     }
 
-    val bCache = new OpenAddressHashArray[Double](words.size * words.size * index.size, Double.NaN)
+//    val bCache = new OpenAddressHashArray[Double](words.size * words.size * index.size, Double.NaN)
+    val bCache = Array.fill(words.size)(new OpenAddressHashArray[Double](words.size * index.size, Double.NaN))
     val uCache = new OpenAddressHashArray[Double](words.size * index.size, Double.NaN)
 
     def scoreUnaryRule(begin: Int, end: Int, rule: Int, ref: Int) = {
@@ -463,14 +464,14 @@ final class LexGrammar[L, W](val grammar: BaseGrammar[L],
     def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int) = {
       val head = headIndex(ref)
       val dep = depIndex(ref)
-      val cacheIndex = head + words.size * (dep + words.size * rule)
-      val score = bCache(cacheIndex)
+      val cacheIndex = head + words.size * rule
+      val score = bCache(dep)(cacheIndex)
 
       if (!score.isNaN)
         score
       else {
         val score = dot(f.featuresForBinaryRule(begin, split, end, rule, ref))
-        bCache(cacheIndex) = score
+        bCache(dep)(cacheIndex) = score
         score
       }
 
