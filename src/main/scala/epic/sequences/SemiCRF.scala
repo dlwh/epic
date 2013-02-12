@@ -357,8 +357,33 @@ object SemiCRF {
     }
   }
 
+  trait ConstraintGrammar[L, W] extends Grammar[L, W] {
+    def constraints(w: IndexedSeq[W]): SpanConstraints
+    def constraints(seg: Segmentation[L,W], keepGold: Boolean = true): SpanConstraints
+  }
+
   @SerialVersionUID(1L)
-  class ConstraintGrammar[L, W](val crf: SemiCRF[L, W], val threshold: Double = 1E-5) extends Grammar[L, W] with Serializable {
+  class IdentityConstraintGrammar[L, W](val labelIndex: Index[L], val startSymbol: L) extends ConstraintGrammar[L, W] with Serializable {
+    def anchor(w: IndexedSeq[W]) = new Anchoring[L,W]() {
+      def words = w
+      def maxSegmentLength(label: Int) = w.size
+      def scoreTransition(prev: Int, cur: Int, beg: Int, end: Int) = 0.0
+      def labelIndex = labelIndex
+      def startSymbol = startSymbol
+    }
+
+    private val allLabels = BitSet.fromBitMask((0L to labelIndex.size).toArray)
+
+    private def emptyConstraint(length: Int) = new SpanConstraints(Array.fill(labelIndex.size)(length),
+      Array.fill(length)(allLabels), TriangularArray.fill(length+1)(allLabels))
+
+    def constraints(w: IndexedSeq[W]) = emptyConstraint(w.length)
+
+    def constraints(seg: Segmentation[L, W], keepGold: Boolean) = emptyConstraint(seg.length)
+  }
+
+  @SerialVersionUID(1L)
+  class BaseModelConstraintGrammar[L, W](val crf: SemiCRF[L, W], val threshold: Double = 1E-5) extends ConstraintGrammar[L, W] with Serializable {
     def startSymbol: L = crf.model.startSymbol
     def labelIndex: Index[L] = crf.model.labelIndex
 
