@@ -22,6 +22,7 @@ import epic.trees.{Span, AnnotatedLabel, Tree}
 import collection.mutable.{Stack, ArrayBuffer}
 import java.io.File
 import epic.everything._
+import java.nio.charset.MalformedInputException
 
 /**
  * Reads the Conll 2011 shared task format. See http://conll.cemantix.org/2011/data.html
@@ -30,7 +31,7 @@ import epic.everything._
 
 object ConllOntoReader {
 
-  def readDocuments(file: File):IndexedSeq[Document] = {
+  def readDocuments(file: File):IndexedSeq[Document] = try {
     val docIterator = new RawDocumentIterator(Source.fromFile(file).getLines())
     for ( (rawSentences_ :IndexedSeq[IndexedSeq[String]], docIndex: Int) <- docIterator.zipWithIndex.toIndexedSeq) yield {
       val rawSentences = rawSentences_.collect { case seq if seq.nonEmpty =>
@@ -140,6 +141,9 @@ object ConllOntoReader {
     }
 
 
+  } catch {
+    case ex: MalformedInputException =>
+      throw new RuntimeException("Error while processing " + file, ex)
   }
 
   private val mentionCache = Array.tabulate(100)(i => Mention(i))

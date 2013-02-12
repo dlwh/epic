@@ -47,6 +47,7 @@ object AnnotatingPipeline {
                     includeSRL: Boolean = false,
                     includeParsing: Boolean = true,
                     includeNER: Boolean = true,
+                    lexHashFeatures: Double = 100.0,
                     @Help(text="For optimizing the base models")
                     baseOpt: OptParams,
                     @Help(text="For optimizing the joint model")
@@ -93,7 +94,7 @@ object AnnotatingPipeline {
     type CompatibleModel = EvaluableModel[Datum] { type Inference <: ProjectableInference[Datum, Augment] with AnnotatingInference[Datum]}
     val models = ArrayBuffer[CompatibleModel]()
     if (params.includeParsing)
-     models += makeLexParserModel(beliefsFactory, docProcessor, processedTrain, weightsCache)
+     models += makeLexParserModel(beliefsFactory, docProcessor, processedTrain, weightsCache, params.lexHashFeatures)
     if (params.includeNER)
        models += makeNERModel(beliefsFactory, docProcessor, processedTrain, weightsCache)
     if (params.includeSRL)
@@ -138,18 +139,18 @@ object AnnotatingPipeline {
 
     // propagation
 
-    // lenses
-
     val allModels = ArrayBuffer[EPModel.CompatibleModel[FeaturizedSentence, SentenceBeliefs]](models:_*)
 
     if(params.includeNER && params.includeParsing) {
       allModels += PropertyModels.nerSyntaxModel(docProcessor, beliefsFactory)
-      //      val nerLens: Lens[SpanBeliefs,Beliefs[NERType.Value]] = Lens({_.ner}, {(a,b) => a.copy(ner=b)})
-      //    val symLens: Lens[SpanBeliefs,Beliefs[Option[AnnotatedLabel]]] = Lens({_.label}, {(a,b) => a.copy(label=b)})
-      //
-      //    val assocSynNer = PropertyPropagation.simpleModel(beliefsFactory,
-      //      beliefsFactory.nerProp, nerLens,
-      //      beliefsFactory.optionLabelProp, symLens)
+    }
+
+    if(params.includeSRL && params.includeParsing) {
+      allModels += PropertyModels.srlSyntaxModel(docProcessor, beliefsFactory)
+    }
+
+    if(params.includeSRL && params.includeNER) {
+      allModels += PropertyModels.srlNerModel(docProcessor, beliefsFactory)
     }
 
 
@@ -291,7 +292,8 @@ object AnnotatingPipeline {
   def makeLexParserModel(beliefsFactory: SentenceBeliefs.Factory,
                          docProcessor: FeaturizedDocument.Factory,
                          train: IndexedSeq[FeaturizedDocument],
-                         weightsCache: Counter[String, Double]): SentLexParser.Model = {
+                         weightsCache: Counter[String, Double],
+                         lexHashFeatures: Double): SentLexParser.Model = {
     val trainTrees = train.flatMap(_.sentences).map(_.treeInstance)
     val trees = trainTrees.map(StripAnnotations())
     val (initLexicon, initBinaries, initUnaries) = GenerativeParser.extractCounts(trees)
@@ -319,8 +321,8 @@ object AnnotatingPipeline {
       headFinder,
       docProcessor.grammar.index,
       docProcessor.grammar.labelIndex,
-    2,
-//      100,
+//    2,
+      lexHashFeatures,
       -1,
       trees)
 

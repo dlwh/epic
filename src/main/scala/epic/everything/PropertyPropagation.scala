@@ -19,6 +19,11 @@ object PropertyPropagation {
     def featuresFor(fs: FeaturizedSentence, b: SpanBeliefs, begin: Int, end: Int, assignment: Int): Array[Int]
   }
 
+  trait SequencePacket[T] {
+    def lens: Lens[SpanBeliefs, IndexedSeq[Beliefs[T]]]
+    def featureIndex: Index[_]
+    def featuresFor(fs: FeaturizedSentence, b: SpanBeliefs, begin: Int, end: Int, component: Int, assignment: Int): Array[Int]
+  }
 
   /**
    * For properties that do not depend on the sentence, this is a model
@@ -39,7 +44,7 @@ object PropertyPropagation {
 
     val assoc = new AssociationFeaturizer[T, U] {
       def centralLens: Lens[SpanBeliefs, Beliefs[T]] = l1
-      def satelliteLenses = IndexedSeq(l2)
+      def satelliteLenses = lift(l2)
 
       val featureIndex: Index[Feature] =  fi
 
@@ -68,7 +73,7 @@ object PropertyPropagation {
 
     val assoc = new AssociationFeaturizer[T, Any] {
       def centralLens: Lens[SpanBeliefs, Beliefs[T]] = packet1.lens
-      val satelliteLenses = otherPackets.map(_.lens).asInstanceOf[IndexedSeq[Lens[SpanBeliefs, Beliefs[Any]]]]
+      override val satelliteLenses = lift(otherPackets.map(_.lens):_*).asInstanceOf[Lens[SpanBeliefs, IndexedSeq[Beliefs[Any]]]]
 
       val featureIndex: Index[Feature] =  fi
 
@@ -83,6 +88,47 @@ object PropertyPropagation {
           while(i < feats1.length) {
             var j = 0
             val featureRow = featureMatrices(satIndex)(feats1(i))
+            while(j < feats2.length) {
+              arr(off) = featureRow(feats2(j))
+              off += 1
+              j += 1
+            }
+            i += 1
+          }
+          arr
+        }
+
+      }
+
+    }
+
+    new Model(beliefsFactory, assoc)
+  }
+
+  def sequencePacketModel[T, U](beliefsFactory: SentenceBeliefs.Factory, packet1: AssociationPacket[T], packet2: SequencePacket[U]) = {
+    val fi = Index[Feature]()
+    val featureMatrices =
+      Array.tabulate(packet1.featureIndex.size, packet2.featureIndex.size) {(p1, p2) =>
+       fi.index(AssociationFeature(packet1.featureIndex.get(p1), packet2.featureIndex.get(p2)))
+      }
+
+    val assoc = new AssociationFeaturizer[T, U] {
+      def centralLens: Lens[SpanBeliefs, Beliefs[T]] = packet1.lens
+      override val satelliteLenses = packet2.lens
+
+      val featureIndex: Index[Feature] =  fi
+
+
+      def anchor(sent: FeaturizedSentence, spanBeliefs: SpanBeliefs, begin: Int, end: Int): AssociationAnchoring[T, U] = new AssociationAnchoring[T, U] {
+        def featuresFor(p1: Int, satIndex: Int, p2: Int):Array[Int] = {
+          val feats1 = packet1.featuresFor(sent, spanBeliefs, begin, end, p1)
+          val feats2 = packet2.featuresFor(sent, spanBeliefs, begin, end, satIndex, p2)
+          val arr = new Array[Int](feats1.length * feats2.length)
+          var off = 0
+          var i = 0
+          while(i < feats1.length) {
+            var j = 0
+            val featureRow = featureMatrices(feats1(i))
             while(j < feats2.length) {
               arr(off) = featureRow(feats2(j))
               off += 1
@@ -172,8 +218,7 @@ object PropertyPropagation {
         } else {
           val grounding = scorer.anchor(sentence, current, begin, end)
           val b1 = scorer.centralLens(current)
-          val potentials = for ( (lens2, index) <- scorer.satelliteLenses.zipWithIndex) yield {
-            val b2 = lens2(current)
+          val potentials = for ( (b2, index) <- scorer.satelliteLenses(current).zipWithIndex) yield {
             scores(grounding, b1, index, b2)
           }
 
@@ -262,13 +307,13 @@ object PropertyPropagation {
           val old: SpanBeliefs = oldBeliefs.spanBeliefs(begin, end)
           val old1: Beliefs[T] = scorer.centralLens.get(old)
           var newBeliefs = scorer.centralLens.set(old, old1.updated(current.centralMarginal))
-          for ( (lens2, index) <- scorer.satelliteLenses.zipWithIndex) {
-            val old2: Beliefs[U] = lens2.get(newBeliefs)
+          val newSets:IndexedSeq[Beliefs[U]] = for ( (old2, index) <- scorer.satelliteLenses(newBeliefs).zipWithIndex) yield {
             val marginalizedSat: DenseVector[Double] = sum(current.satellites(index).t, Axis._1)
             assert(marginalizedSat.length == old2.property.size)
             assert((sum(marginalizedSat) - 1.0).abs < 1E-6, marginalizedSat.toString + " " + old2)
-            newBeliefs = lens2.set(newBeliefs, old2.updated(marginalizedSat))
+            old2.copy(beliefs=marginalizedSat)
           }
+          newBeliefs = scorer.satelliteLenses.set(newBeliefs, newSets)
           newBeliefs
         }
       }
@@ -289,7 +334,7 @@ object PropertyPropagation {
 
   trait AssociationFeaturizer[T, U] {
     def centralLens: Lens[SpanBeliefs, Beliefs[T]]
-    def satelliteLenses: IndexedSeq[Lens[SpanBeliefs, Beliefs[U]]]
+    def satelliteLenses: Lens[SpanBeliefs, IndexedSeq[Beliefs[U]]]
     def featureIndex: Index[Feature]
     def anchor(sent: FeaturizedSentence, spanBeliefs: SpanBeliefs, begin: Int, end: Int):AssociationAnchoring[T, U]
   }
@@ -324,6 +369,11 @@ object PropertyPropagation {
   case class SpanMarginal(anchoring: AssociationAnchoring[_, _], centralMarginal: DenseVector[Double], satellites: IndexedSeq[DenseMatrix[Double]])
 
 
+  private def lift[T, U](lens: Lens[T, U]*):Lens[T, IndexedSeq[U]] = new Lens[T, IndexedSeq[U]] {
+    def get(t: T): IndexedSeq[U] = lens.toIndexedSeq.map(_.get(t))
+
+    def set(t: T, u: IndexedSeq[U]): T = (lens zip u).foldLeft(t)( (b, lensu) => lensu._1.set(b, lensu._2))
+  }
 }
 
 
