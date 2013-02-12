@@ -138,6 +138,17 @@ class SemiCRFInference[L, W](weights: DenseVector[Double],
 
       }
 
+      def daxpy(d: Double, vector: IndicatorFeatureVector, counts: DenseVector[Double]) {
+        var i = 0
+        val incr = d * scale
+        while (i < vector.size) {
+          //          if (vector.isActive(i))
+          counts(vector(i)) += incr
+          i += 1
+        }
+
+      }
+
       def apply(prev: Int, cur: Int, start: Int, end: Int, count: Double) {
         import localization._
         daxpy(count, featuresForBegin(prev, cur, start), counts.counts)
@@ -148,7 +159,8 @@ class SemiCRFInference[L, W](weights: DenseVector[Double],
           p += 1
         }
 
-        daxpy(count, featuresForSpan(prev, cur, start, end), counts.counts)
+        if (cacheFeatures) daxpy(count, indicatorFeaturesForSpan(prev, cur, start, end), counts.counts)
+        else daxpy(count, featuresForSpan(prev, cur, start, end), counts.counts)
 
       }
     }
@@ -614,7 +626,7 @@ object SegmentationModelFactory {
         else null
       }
 
-      private val justSpanFeatures = Array.tabulate(labelIndex.size){ cur =>
+      private lazy val justSpanFeatures = Array.tabulate(labelIndex.size){ cur =>
         TriangularArray.tabulate(w.length+1) { (beg, end) =>
           if (beg == end || maxLength(cur) < (end-beg) || !okSpan(beg,end)  || !(constraints == None || constraints.get.allowedLabels(beg, end).contains(cur))) {
             null

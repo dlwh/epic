@@ -26,6 +26,9 @@ class IndicatorFeatureVector(data: Array[Int]) {
     sum
   }
 
+  def size = data.size
+  def apply(v: Int) = data(v)
+
   override def toString = {
     "IndicatorFeatureVector:" + data.deep.mkString("(", ",", ")")
   }
