@@ -185,7 +185,6 @@ object AnnotatingPipeline {
     type OptState = FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State
     val opt = params.opt
     for( s:OptState <- opt.iterations(cachedObj, obj.initialWeightVector(randomize = false))) {
-      updateWeights(params.weightsCache, weightsCache, Encoder.fromIndex(epModel.featureIndex).decode(s.x))
       //      val (unregularized, deriv) = obj.calculate(s.x)
       //      bump(unregularized, deriv, s, 1000)
       //      bump(unregularized, deriv, s, 12000)
@@ -193,6 +192,7 @@ object AnnotatingPipeline {
       //      bump(unregularized, deriv, s, featureICareAbout + 1)
 
       if( s.iter % params.iterPerEval == 0) {
+        updateWeights(params.weightsCache, weightsCache, Encoder.fromIndex(epModel.featureIndex).decode(s.x))
         val inf = epModel.inferenceFromWeights(s.x)
         val results: immutable.Seq[immutable.IndexedSeq[EvaluationResult[_]]] = {for (d <- processedTest.par) yield {
           val epMarg = inf.marginal(d)
