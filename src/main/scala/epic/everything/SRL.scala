@@ -247,6 +247,9 @@ object SRL {
                   val outsideLabel: String,
                   weights: DenseVector[Double],  val sentenceBeliefs: SentenceBeliefs, val frameIndex: Int) extends SemiCRF.Anchoring[Option[String], String] {
 
+
+    override def ignoreTransitionModel: Boolean = true
+
     def startSymbol: Option[String] = Some(outsideLabel)
 
     val iNone = labelIndex(None)
@@ -460,7 +463,7 @@ object SRL {
       }
 
       def isAllowed(begin: Int, end: Int, label: Int):Boolean = {
-        !fs.isPossibleMaximalSpan(begin, end) || begin == end || label == lNone
+        fs.isPossibleMaximalSpan(begin, end) && begin != end && label != lNone
       }
 
 

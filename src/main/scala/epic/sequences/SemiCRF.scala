@@ -80,6 +80,9 @@ object SemiCRF {
     def scoreTransition(prev: Int, cur: Int, beg: Int, end: Int):Double
     def labelIndex: Index[L]
     def startSymbol: L
+
+    def ignoreTransitionModel: Boolean = false
+
   }
 
   trait TransitionVisitor[L, W] {
@@ -188,6 +191,7 @@ object SemiCRF {
 
 
         def logPartition: Double = partition
+//        println(words + " " + partition)
       }
 
     }
@@ -266,8 +270,9 @@ object SemiCRF {
           var start = math.max(end - scorer.maxSegmentLength(label), 0)
           while (start < end) {
             var prevLabel = 0
-            while (prevLabel < numLabels) {
-              val prevScore = forwardScores(start)(prevLabel)
+            if (scorer.ignoreTransitionModel) {
+              prevLabel = -1 // ensure that you don't actually need the transition model
+              val prevScore = numerics.logSum(forwardScores(start), forwardScores(start).length)
               if (prevScore != Double.NegativeInfinity) {
                 val score = scorer.scoreTransition(prevLabel, label, start, end) + prevScore
                 if(score != Double.NegativeInfinity) {
@@ -275,9 +280,21 @@ object SemiCRF {
                   acc += 1
                 }
               }
+            } else {
+              while (prevLabel < numLabels) {
+                val prevScore = forwardScores(start)(prevLabel)
+                if (prevScore != Double.NegativeInfinity) {
+                  val score = scorer.scoreTransition(prevLabel, label, start, end) + prevScore
+                  if(score != Double.NegativeInfinity) {
+                    accumArray(acc) = score
+                    acc += 1
+                  }
+                }
 
-              prevLabel += 1
+                prevLabel += 1
+              }
             }
+
             start += 1
           }
           forwardScores(end)(label) = numerics.logSum(accumArray, acc)
