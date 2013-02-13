@@ -36,7 +36,7 @@ final case class Beliefs[T](property: Property[T], beliefs: DenseVector[Double])
     var i = 0
     var maxChange = 0.0
     while(i < beliefs.size) {
-      maxChange = (math.abs(f.beliefs(i) - beliefs(i)) )
+      maxChange = math.max(math.abs(f.beliefs(i) - beliefs(i)), maxChange)
       i += 1
     }
     maxChange

@@ -129,8 +129,8 @@ object SentLexParser {
         val oldW = old.wordBeliefs(w)
         oldW.copy(governor=oldW.governor.updated(info.wordGovernor(w)),
           //            span=oldW.span.copy(beliefs=info.governedSpan(w)),
-          tag=oldW.tag.updated(info.wordTag(w)),
-          maximalLabel=oldW.maximalLabel.updated(info.maximalLabelType(w))
+          tag=oldW.tag.updated(info.wordTag(w)) //),
+//          maximalLabel=oldW.maximalLabel.updated(info.maximalLabelType(w))
         )
 
       }
@@ -220,11 +220,12 @@ object SentLexParser {
 
       var cached = attachCache(dep)(head)
       if (java.lang.Double.isNaN(cached)) {
-        val sMax = if(lexGrammar.isRightRule(rule)) {
-          beliefs.wordBeliefs(dep).maximalLabel(grammar.leftChild(rule))
-        } else {
-          beliefs.wordBeliefs(dep).maximalLabel(grammar.rightChild(rule))
-        }
+        val sMax = 1.0
+//        val sMax = if(lexGrammar.isRightRule(rule)) {
+//          beliefs.wordBeliefs(dep).maximalLabel(grammar.leftChild(rule))
+//        } else {
+//          beliefs.wordBeliefs(dep).maximalLabel(grammar.rightChild(rule))
+//        }
         val depScore = beliefs.wordBeliefs(dep).governor(head)
         val sGovScore = depCell.governor(head)
         var notASpan = depCell.governor(length + 1)
@@ -262,10 +263,10 @@ object SentLexParser {
           var sNotSpan2 = beliefs.spanBeliefs(begin, end).governor(length + 1)
           if (sNotSpan2 <= 0.0) sNotSpan2 = 1.0
 
-          val sMax = beliefs.wordBeliefs(ref).maximalLabel(parent)
+//          val sMax = beliefs.wordBeliefs(ref).maximalLabel(parent)
 //          baseScore += math.log(wordGovScore * sMax)
           baseScore += math.log(wordGovScore)
-          baseScore += math.log(math.max(sMax, 1E-8))
+//          baseScore += math.log(math.max(sMax, 1E-8))
           baseScore += math.log(sSpanGov / sNotSpan2)
 //          assert(!baseScore.isNaN, s"norma: $normalizingPiece slabel: $sLabel notaspan: $notASpan ${anchoring.scoreUnaryRule(begin, end, rule, ref)}")
 //          assert(!baseScore.isInfinite, s"norma: $normalizingPiece  notASpan2: $sNotSpan2 smax: $sMax slabel: $sLabel notaspan: $notASpan ${anchoring.scoreUnaryRule(begin, end, rule, ref)} $begin $end $ref ${(begin until end).map(words)} ${grammar.index.get(rule)}")

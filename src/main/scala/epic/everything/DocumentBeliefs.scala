@@ -134,7 +134,9 @@ case class SentenceBeliefs(spans: TriangularArray[SpanBeliefs],
         }
         j += 1
       }
-//      max = max max wordBeliefs(i).maxChange(f.wordBeliefs(i))
+      val wordChange = wordBeliefs(i).maxChange(f.wordBeliefs(i))
+      max = max max wordChange
+      if(math.abs(wordChange - 1.0) < 1E-4) println(f.length + " " + i)
       i += 1
     }
     max
@@ -169,7 +171,7 @@ object SentenceBeliefs {
         WordBeliefs(DPos(s.id,s.index,pos),
           wordGovernorBeliefs,
           //            governedSpanBeliefs,
-          labelBeliefs,
+//          labelBeliefs,
           labelBeliefs)
       }
 
@@ -227,21 +229,21 @@ case class SpanBeliefs(span: DSpan,
 case class WordBeliefs(pos: DPos,
                        governor: Beliefs[Int],
                        //                       span: Beliefs[Span],
-                       tag: Beliefs[AnnotatedLabel],
-                       maximalLabel: Beliefs[AnnotatedLabel]
+                       tag: Beliefs[AnnotatedLabel]
+//                       maximalLabel: Beliefs[AnnotatedLabel]
                        //,
                        //                       anaphoric: Beliefs[Boolean],
                        //                       anaphor: Beliefs[DPos],
                        //                       coref: Array[Beliefs[Int]]
                         ) extends Factor[WordBeliefs] {
-  def *(f: WordBeliefs): WordBeliefs = WordBeliefs(pos, governor * f.governor, /*span * f.span,*/ tag * f.tag, maximalLabel * f.maximalLabel)//, f.anaphoric * f.anaphoric, f.anaphor * f.anaphor, Array.tabulate(coref.length)(i => coref(i) * f.coref(i)))
+  def *(f: WordBeliefs): WordBeliefs = WordBeliefs(pos, governor * f.governor, /*span * f.span,*/ tag * f.tag)//, maximalLabel * f.maximalLabel)//, f.anaphoric * f.anaphoric, f.anaphor * f.anaphor, Array.tabulate(coref.length)(i => coref(i) * f.coref(i)))
 
   def /(f: WordBeliefs): WordBeliefs = {
     WordBeliefs(pos,
       governor / f.governor,
       /*span / f.span,*/
-      tag / f.tag,
-      maximalLabel / f.maximalLabel)
+      tag / f.tag)//,
+//      maximalLabel / f.maximalLabel)
   }//, f.anaphoric / f.anaphoric, f.anaphor / f.anaphor, Array.tabulate(coref.length)(i => coref(i) / f.coref(i)))
   //*/
 
@@ -250,7 +252,7 @@ case class WordBeliefs(pos: DPos,
       + governor.logPartition
       //      + span.logPartition
       + tag.logPartition
-      + maximalLabel.logPartition
+//      + maximalLabel.logPartition
     //      + anaphoric.logPartition
     //      + anaphor.logPartition
     //      + coref.foldLeft(0.0)(_ + _.logPartition)
@@ -262,9 +264,20 @@ case class WordBeliefs(pos: DPos,
       && tag.isConvergedTo(f.tag, diff)
       //      && anaphoric.isConvergedTo(f.anaphoric, diff)
       //      && anaphor.isConvergedTo(f.anaphor, diff)
-      && maximalLabel.isConvergedTo(f.tag, diff)
+//      && maximalLabel.isConvergedTo(f.tag, diff)
     //      && (0 until coref.length).forall(i => coref(i).isConvergedTo(f.coref(i), diff))
     )
+
+
+  def maxChange(f: WordBeliefs): Double = Seq(
+     governor.maxChange(f.governor)
+       //      && span.maxChange(f.span, diff)
+       , tag.maxChange(f.tag)
+       //      && anaphoric.maxChange(f.anaphoric, diff)
+       //      && anaphor.maxChange(f.anaphor, diff)
+//        , maximalLabel.maxChange(f.tag)
+     //      && (0 until coref.length).forall(i => coref(i).maxChange(f.coref(i), diff))
+     ).max
 }
 
 
