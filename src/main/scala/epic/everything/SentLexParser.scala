@@ -220,11 +220,15 @@ object SentLexParser {
 
       var cached = attachCache(dep)(head)
       if (java.lang.Double.isNaN(cached)) {
+        val sMax = if(lexGrammar.isRightRule(rule)) {
+          beliefs.wordBeliefs(dep).maximalLabel(grammar.leftChild(rule))
+        } else {
+          beliefs.wordBeliefs(dep).maximalLabel(grammar.rightChild(rule))
+        }
         val depScore = beliefs.wordBeliefs(dep).governor(head)
         val sGovScore = depCell.governor(head)
         var notASpan = depCell.governor(length + 1)
         if(notASpan <= 0.0) notASpan = 1.0
-        val sMax = beliefs.wordBeliefs(dep).maximalLabel(grammar.leftChild(rule))
 
         cached = if(depScore <= 0.0 || sGovScore <= 0.0 || sMax <= 0.0) {
           Double.NegativeInfinity
