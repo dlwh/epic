@@ -155,25 +155,34 @@ object SRL {
             arr(cur) += count
           }
         }
-        for (b <- 0 until s.length; e <- (b+1) to s.length) {
-          val arr = labelMarginals(b,e)
-          if (arr ne null) {
-            var label = 0
-            while(label < arr.length) {
-              val count = arr(label)
-              if (count != 0.0) {
-                val feats = localization.featuresFor(b, e, label)
-                var f = 0
-                while(f < feats.length) {
-                  counts.counts(feats(f)) += count * scale
-                  f += 1
-                }
-              }
-              label += 1
-            }
-          }
 
+        val countData = counts.counts.data
+
+        var b = 0
+        while(b < s.length) {
+          var e = b + 1
+          while(e < s.length) {
+            val arr = labelMarginals(b,e)
+            if (arr ne null) {
+              var label = 0
+              while(label < arr.length) {
+                val count = arr(label)
+                if (count != 0.0) {
+                  val feats = localization.featuresFor(b, e, label)
+                  var f = 0
+                  while(f < feats.length) {
+                    countData(feats(f)) += count * scale
+                    f += 1
+                  }
+                }
+                label += 1
+              }
+            }
+            e += 1
+          }
+          b += 1
         }
+
 //        f visit new TransitionVisitor[Option[String], String] {
 //          def apply(prev: Int, cur: Int, beg: Int, end: Int, count: Double) {
 //            if (count != 0.0) {
@@ -238,6 +247,9 @@ object SRL {
                   val outsideLabel: String,
                   weights: DenseVector[Double],  val sentenceBeliefs: SentenceBeliefs, val frameIndex: Int) extends SemiCRF.Anchoring[Option[String], String] {
 
+
+    override def ignoreTransitionModel: Boolean = true
+
     def startSymbol: Option[String] = Some(outsideLabel)
 
     val iNone = labelIndex(None)
@@ -280,7 +292,7 @@ object SRL {
 
     def score(begin: Int, end: Int, label: Int):Double = {
       if(scoreCache(begin,end)(label).isNaN) {
-        val init = 0.0//beliefPiece(begin, end, label)
+        val init = beliefPiece(begin, end, label)
         val score = {
           if (init == Double.NegativeInfinity) Double.NegativeInfinity
           else {
@@ -450,10 +462,14 @@ object SRL {
         interiorCache(cur)(pos)
       }
 
+      def isAllowed(begin: Int, end: Int, label: Int):Boolean = {
+        fs.isPossibleMaximalSpan(begin, end) && begin != end && label != lNone
+      }
+
 
       private val spanFeatures: Array[TriangularArray[Array[Int]]] = Array.tabulate(labelIndex.size){ label =>
         TriangularArray.tabulate(fs.words.length+1) { (beg, end) =>
-          if(!fs.isPossibleMaximalSpan(beg, end) || beg == end || label == lNone ) {
+          if(!isAllowed(beg, end, label)) {
             null
           } else {
             val acc = new ArrayBuffer[Array[Int]]()
