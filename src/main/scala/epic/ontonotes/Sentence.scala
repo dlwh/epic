@@ -4,7 +4,6 @@ import epic.trees.{Span, AnnotatedLabel, Tree}
 import breeze.data.Example
 import epic.sequences.Segmentation
 import collection.mutable.ArrayBuffer
-import epic.srl.SRLInstance
 import collection.mutable
 
 /**
@@ -57,8 +56,6 @@ case class Sentence(docId: String, index: Int,
     copy(annotations=OntoAnnotations(tree, ner, coref, srl, speaker))
   }
 
-
-  def srlInstances = srl.map(frame => new SRLInstance(words, frame, s"$id-srl-${frame.pos}"))
 
   def dspans = for(begin <- 0 until length; end <- (begin+1) to length) yield DSpan(docId, index, begin, end)
 
