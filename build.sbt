@@ -2,16 +2,17 @@ name := "chalk"
 
 version := "1.1.1-SNAPSHOT"
 
-organization := "com.jasonbaldridge"
+organization := "org.scalanlp"
 
-scalaVersion := "2.9.2"
+scalaVersion := "2.10.0"
 
 crossPaths := false
 
 retrieveManaged := true
 
 resolvers ++= Seq(
-  "opennlp sourceforge repo" at "http://opennlp.sourceforge.net/maven2"
+  "opennlp sourceforge repo" at "http://opennlp.sourceforge.net/maven2",
+   "Sonatype Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots/"
 )
 
 // Original OpenNLP dependencies
@@ -25,7 +26,7 @@ libraryDependencies ++= Seq(
 
 // New dependencies
 libraryDependencies ++= Seq(
-  "com.jasonbaldridge" % "nak" % "1.0"
+  "org.scalanlp" % "nak" % "1.1.0-SNAPSHOT"
 )
 
 publishTo <<= version { v: String =>
@@ -43,7 +44,7 @@ publishArtifact in Test := false
 pomIncludeRepository := { _ => false }
 
 pomExtra := (
-  <url>https://github.com/jasonbaldridge/chalk</url>
+  <url>http://scalanlp.org/</url>
   <licenses>
     <license>
       <name>Apache License 2.0</name>
@@ -52,8 +53,8 @@ pomExtra := (
     </license>
   </licenses>
   <scm>
-    <url>git@github.com:jasonbaldridge/chalk.git</url>
-    <connection>scm:git:git@github.com:jasonbaldridge/chalk.git</connection>
+    <url>git@github.com:scalanlp/chalk.git</url>
+    <connection>scm:git:git@github.com:scalanlp/chalk.git</connection>
   </scm>
   <developers>
     <developer>
