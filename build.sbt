@@ -11,8 +11,7 @@ crossPaths := false
 retrieveManaged := true
 
 resolvers ++= Seq(
-  "opennlp sourceforge repo" at "http://opennlp.sourceforge.net/maven2",
-  "Sonatype Releases" at "https://oss.sonatype.org/content/repositories/releases/"
+  "opennlp sourceforge repo" at "http://opennlp.sourceforge.net/maven2"
 )
 
 // Original OpenNLP dependencies
@@ -25,9 +24,7 @@ libraryDependencies ++= Seq(
 )
 
 // New dependencies
-libraryDependencies ++= Seq(
-  "org.scalanlp" % "nak" % "1.1.0"
-)
+libraryDependencies += "org.scalanlp" % "nak" % "1.1.0"
 
 publishTo <<= version { v: String =>
   val nexus = "https://oss.sonatype.org/"
