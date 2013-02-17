@@ -1,6 +1,6 @@
 name := "chalk"
 
-version := "1.1.1-SNAPSHOT"
+version := "1.1.1"
 
 organization := "org.scalanlp"
 
@@ -12,7 +12,7 @@ retrieveManaged := true
 
 resolvers ++= Seq(
   "opennlp sourceforge repo" at "http://opennlp.sourceforge.net/maven2",
-   "Sonatype Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots/"
+  "Sonatype Releases" at "https://oss.sonatype.org/content/repositories/releases/"
 )
 
 // Original OpenNLP dependencies
@@ -26,7 +26,7 @@ libraryDependencies ++= Seq(
 
 // New dependencies
 libraryDependencies ++= Seq(
-  "org.scalanlp" % "nak" % "1.1.0-SNAPSHOT"
+  "org.scalanlp" % "nak" % "1.1.0"
 )
 
 publishTo <<= version { v: String =>
