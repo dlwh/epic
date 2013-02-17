@@ -6,22 +6,30 @@ Author: **Jason Baldridge** (jasonbaldridge@gmail.com)
 
 Chalk is a library for natural language processing (NLP). It is based on the [OpenNLP](http://opennlp.apache.org/) library, but will be transitioning to more use of Scala (rather than Java) as new capabilities are added.
 
-The name Chalk comes from my son's stuffed elephant. "Chalk" obviously has a great connection to writing (and thus text processing). Of course, it also follows the what-your-kid-called-his-elephant naming convention precedent established with Hadoop. :)
+The name Chalk comes from the name given to one of Jason's son's stuffed elephants. "Chalk" obviously has a great connection to writing (and thus text processing). Of course, it also follows the what-your-kid-called-his-elephant naming convention precedent established with Hadoop. :)
+
+
+### What's inside
+
+The latest stable release is 1.1.1. It includes:
+
+* All the code from the OpenNLP library (apart from that in [Nak](https://github.com/scalanlp/nak)), slightly reorganized.
+* Code (still preliminary) for working with [the MASC corpus](http://www.americannationalcorpus.org/MASC/About.html) to enable training of models on the annotations it provides. See [the tutorial](wiki/Tutorial) for details.
+
+Note that the domain has changed from **com.jasonbaldridge** (v1.0) to **org.scalanlp** now.
 
 ## Using Chalk
 
-The latest stable release is 1.1.0. 
-
 In SBT:
 
-    libraryDependencies += "com.jasonbaldridge" % "chalk" % "1.1.0"
+    libraryDependencies += "org.scalanlp" % "chalk" % "1.1.1"
 
 In Maven:
 
     <dependency>
-       <groupId>com.jasonbaldridge</groupId>
+       <groupId>org.scalanlp</groupId>
        <artifactId>chalk</artifactId>
-       <version>1.1.0</version>
+       <version>1.1.1</version>
     </dependency>
 
 ## Requirements
@@ -128,6 +136,6 @@ Hurrah.
 
 Email Jason Baldridge: <jasonbaldridge@gmail.com>
 
-Or, create an issue: <https://github.com/jasonbaldridge/chalk/issues>
+Or, create an issue: <https://github.com/scalanlp/chalk/issues>
 
 
