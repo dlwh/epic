@@ -514,6 +514,55 @@ final class LexGrammar[L, W](val grammar: BaseGrammar[L],
       }
     }
 
+    def validRuleRefinementsGivenLeftChild(begin: Int, split: Int, completionBegin:Int, completionEnd: Int, rule: Int, lc: Int) = {
+      if(isHeadOnLeftForRule(rule)) {
+        val result = new Array[Int](completionEnd - completionBegin)
+        var ref = lc * words.length + completionBegin
+        var i = 0
+        while(i < result.length) {
+          result(i) = ref
+          ref += 1
+          i += 1
+        }
+        result
+      } else {
+        val result = new Array[Int](completionEnd - completionBegin)
+        var ref = completionBegin * words.length +lc
+        var i = 0
+        while(i < result.length) {
+          result(i) = ref
+          i += 1
+          ref += words.length
+        }
+        result
+      }
+    }
+
+
+    def validRuleRefinementsGivenRightChild(completionBegin: Int, completionEnd: Int, split: Int, end: Int, rule: Int, childRef: Int): Array[Int] = {
+      if(!isHeadOnLeftForRule(rule)) {
+        val result = new Array[Int](completionEnd - completionBegin)
+        var ref = childRef * words.length + completionBegin
+        var i = 0
+        while(i < result.length) {
+          result(i) = ref
+          ref += 1
+          i += 1
+        }
+        result
+      } else {
+        val result = new Array[Int](completionEnd - completionBegin)
+        var ref = completionBegin * words.length + childRef
+        var i = 0
+        while(i < result.length) {
+          result(i) = ref
+          i += 1
+          ref += words.length
+        }
+        result
+      }
+    }
+
     def validUnaryRuleRefinementsGivenChild(begin: Int, end: Int, rule: Int, childRef: Int) = {
       Array(childRef)
     }
@@ -562,6 +611,15 @@ final class LexGrammar[L, W](val grammar: BaseGrammar[L],
     def validParentRefinementsGivenRule(begin: Int, splitBegin: Int, splitEnd: Int, end: Int, rule: Int): Array[Int] = {
       if (isHeadOnLeftForRule(rule)) Array.range(begin, splitEnd)
       else Array.range(splitBegin, end)
+    }
+
+
+    def validLeftChildRefinementsGivenRule(begin: Int, splitBegin: Int, splitEnd: Int, end: Int, rule: Int): Array[Int] = {
+      Array.range(begin, splitEnd)
+    }
+
+    def validRightChildRefinementsGivenRule(begin: Int, splitBegin: Int, splitEnd: Int, end: Int, rule: Int): Array[Int] = {
+      Array.range(splitBegin, end)
     }
   }
 

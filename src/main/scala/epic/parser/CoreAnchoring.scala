@@ -188,6 +188,22 @@ case class LiftedCoreAnchoring[L, W](core: CoreAnchoring[L, W]) extends RefinedA
   def validCoarseRulesGivenParentRefinement(a: Int, refA: Int) = grammar.indexedBinaryRulesWithParent(a)
 
   def validParentRefinementsGivenRule(begin: Int, splitBegin: Int, splitEnd: Int, end: Int, rule: Int): Array[Int] = validLabelRefinements(begin, end, grammar.parent(rule))
+
+  def validRuleRefinementsGivenLeftChild(begin: Int, split: Int, completionBegin: Int, completionEnd: Int, rule: Int, childRef: Int): Array[Int] = {
+    zeroArray
+  }
+
+  def validRuleRefinementsGivenRightChild(completionBegin: Int, completionEnd: Int, split: Int, end: Int, rule: Int, childRef: Int): Array[Int] =  {
+    zeroArray
+  }
+
+  def validLeftChildRefinementsGivenRule(begin: Int, end: Int, completionBegin: Int, completionEnd: Int, rule: Int): Array[Int] =  {
+    zeroArray
+  }
+
+  def validRightChildRefinementsGivenRule(completionBegin: Int, completionEnd: Int, begin: Int, end: Int, rule: Int): Array[Int] =  {
+    zeroArray
+  }
 }
 
 

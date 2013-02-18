@@ -141,64 +141,59 @@ class ParseChart[L](val index: Index[L],
       enteredLabels(index) += parent
       enteredRefinements(index)(parent) += ref
 
-      val narrowLeftEndParent = narrowLeft(end)(parent)
-      val wideLeftEnd = wideLeft(end)
-      narrowLeftEndParent(ref) = math.max(begin, narrowLeftEndParent(ref))
-      wideLeftEnd(parent)(ref) = math.min(begin, wideLeftEnd(parent)(ref))
+      rightMostBeginForEnd(end)(parent)(ref) = math.max(begin, rightMostBeginForEnd(end)(parent)(ref))
+      leftMostBeginForEnd(end)(parent)(ref) = math.min(begin, leftMostBeginForEnd(end)(parent)(ref))
+      rightMostEndForBegin(begin)(parent)(ref) = math.max(end, rightMostEndForBegin(begin)(parent)(ref))
+      leftMostEndForBegin(begin)(parent)(ref) = math.min(end, leftMostEndForBegin(begin)(parent)(ref))
 
-      val wideRightBegin = wideRight(begin)
-      val narrowRightBegin = narrowRight(begin)
-      wideRightBegin(parent)(ref) = math.max(end, wideRightBegin(parent)(ref))
-      narrowRightBegin(parent)(ref) = math.min(end, narrowRightBegin(parent)(ref))
-
-      coarseNarrowLeft(end)(parent) = math.max(begin, coarseNarrowLeft(end)(parent))
-      coarseWideLeft(end)(parent) = math.min(begin, coarseWideLeft(end)(parent))
-      coarseWideRight(begin)(parent) = math.max(end, coarseWideRight(begin)(parent))
-      coarseNarrowRight(begin)(parent) = math.min(end, coarseNarrowRight(begin)(parent))
+      coarseRightMostBeginForEnd(end)(parent) = math.max(begin, coarseRightMostBeginForEnd(end)(parent))
+      coarseLeftMostBeginForEnd(end)(parent) = math.min(begin, coarseLeftMostBeginForEnd(end)(parent))
+      coarseRightMostEndForBegin(begin)(parent) = math.max(end, coarseRightMostEndForBegin(begin)(parent))
+      coarseLeftMostEndForBegin(begin)(parent) = math.min(end, coarseLeftMostEndForBegin(begin)(parent))
     }
 
-    /** right most place a left constituent with label l can start and end at position i. (start)(sym)(ref) */
-    val narrowLeft: Array[Array[Array[Int]]] = Array.tabulate(length+1, grammarSize){ (i, l) =>
+    /** right most place a constituent with label l can start and end at position i, for right > i. (start)(sym)(ref) */
+    val rightMostBeginForEnd: Array[Array[Array[Int]]] = Array.tabulate(length+1, grammarSize){ (i, l) =>
       val arr = new Array[Int](refinementsFor(l))
       Arrays.fill(arr, -1)
       arr
     }
-    /** left most place a left constituent with label l can start and end at position i. (start)(sym)(ref) */
-    val wideLeft = Array.tabulate[Array[Int]](length+1, grammarSize){ (i, l) =>
+    /** left most place a constituent with label l can start and end at position i, for left < i. (start)(sym)(ref) */
+    val leftMostBeginForEnd = Array.tabulate[Array[Int]](length+1, grammarSize){ (i, l) =>
       val arr = new Array[Int](refinementsFor(l))
       Arrays.fill(arr, length + 1)
       arr
     }
-    /** left most place a right constituent with label l--which starts at position i--can end. (end)(sym)(ref) */
-    val narrowRight = Array.tabulate[Array[Int]](length+1, grammarSize){ (i, l) =>
+    /** left most place a constituent with label l--which starts at position i--can end. (end)(sym)(ref) */
+    val leftMostEndForBegin = Array.tabulate[Array[Int]](length+1, grammarSize){ (i, l) =>
       val arr = new Array[Int](refinementsFor(l))
       Arrays.fill(arr, length + 1)
       arr
     }
-    /** right-most place a right constituent with label l--which starts at position i--can end. (end)(sym)(ref) */
-    val wideRight = Array.tabulate[Array[Int]](length+1, grammarSize) { (i, l) =>
+    /** right-most place a constituent with label l--which starts at position i--can end. (end)(sym)(ref) */
+    val rightMostEndForBegin = Array.tabulate[Array[Int]](length+1, grammarSize) { (i, l) =>
       val arr = new Array[Int](refinementsFor(l))
       Arrays.fill(arr, -1)
       arr
     }
 
     /** right most place a left constituent with label l can start and end at position i. (start)(sym) */
-    val coarseNarrowLeft = makeCoarseExtentArray(-1)
+    val coarseRightMostBeginForEnd = makeCoarseExtentArray(-1)
     /** left most place a left constituent with label l can start and end at position i  (start)(sym) */
-    val coarseWideLeft = makeCoarseExtentArray(length+1)
+    val coarseLeftMostBeginForEnd = makeCoarseExtentArray(length+1)
     /** left most place a right constituent with label l--which starts at position i--can end. (end)(sym) */
-    val coarseNarrowRight = makeCoarseExtentArray(length+1)
+    val coarseLeftMostEndForBegin = makeCoarseExtentArray(length+1)
     /** right-most place a right constituent with label l--which starts at position i--can end. (end)(sym)*/
-    val coarseWideRight = makeCoarseExtentArray(-1)
+    val coarseRightMostEndForBegin = makeCoarseExtentArray(-1)
 
     def feasibleSpan(begin: Int, end: Int, b: Int, refB: Int, c: Int, refC: Int) = {
-      if(narrowRight(begin)(b) == null || narrowLeft(end)(c) == null) {
+      if(leftMostEndForBegin(begin)(b) == null || rightMostBeginForEnd(end)(c) == null) {
         Range(0,0)
       } else {
-        val narrowR = narrowRight(begin)(b)(refB)
-        val narrowL = narrowLeft(end)(c)(refC)
-        var split = math.max(narrowR, wideLeft(end)(c)(refC))
-        val endSplit = math.min(wideRight(begin)(b)(refB), narrowL) + 1
+        val narrowR = leftMostEndForBegin(begin)(b)(refB)
+        val narrowL = rightMostBeginForEnd(end)(c)(refC)
+        var split = math.max(narrowR, leftMostBeginForEnd(end)(c)(refC))
+        val endSplit = math.min(rightMostEndForBegin(begin)(b)(refB), narrowL) + 1
         val canBuildThisRule = narrowR < end && narrowL >= narrowR && split <= narrowL && split < endSplit
         if(!canBuildThisRule)
           split = endSplit

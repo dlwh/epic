@@ -339,5 +339,20 @@ object SentLexParser {
       anchoring.validParentRefinementsGivenRule(begin, splitBegin, splitEnd, end, rule)
     }
 
+    def validRuleRefinementsGivenLeftChild(begin: Int, split: Int, completionBegin: Int, completionEnd: Int, rule: Int, childRef: Int): Array[Int] = {
+      anchoring.validRuleRefinementsGivenLeftChild(begin, split, completionBegin, completionEnd, rule, childRef)
+    }
+
+    def validRuleRefinementsGivenRightChild(completionBegin: Int, completionEnd: Int, split: Int, end: Int, rule: Int, childRef: Int): Array[Int] = {
+      anchoring.validRuleRefinementsGivenRightChild(completionBegin, completionEnd, split, end, rule, childRef)
+    }
+
+    def validLeftChildRefinementsGivenRule(begin: Int, end: Int, completionBegin: Int, completionEnd: Int, rule: Int): Array[Int] = {
+      anchoring.validLeftChildRefinementsGivenRule(begin, end, completionBegin, completionEnd, rule)
+    }
+
+    def validRightChildRefinementsGivenRule(completionBegin: Int, completionEnd: Int, begin: Int, end: Int, rule: Int): Array[Int] = {
+      anchoring.validRightChildRefinementsGivenRule(completionBegin, completionEnd, begin, end, rule)
+    }
   }
 }

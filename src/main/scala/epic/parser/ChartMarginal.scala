@@ -85,15 +85,15 @@ case class ChartMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
       val end = begin + span
 
       // I get a 20% speedup if I inline these arrays. so be it.
-      val narrowRight = inside.top.narrowRight(begin)
-      val narrowLeft = inside.top.narrowLeft(end)
-      val wideRight = inside.top.wideRight(begin)
-      val wideLeft = inside.top.wideLeft(end)
+      val narrowRight = inside.top.leftMostEndForBegin(begin)
+      val narrowLeft = inside.top.rightMostBeginForEnd(end)
+      val wideRight = inside.top.rightMostEndForBegin(begin)
+      val wideLeft = inside.top.leftMostBeginForEnd(end)
 
-      val coarseNarrowRight = inside.top.coarseNarrowRight(begin)
-      val coarseNarrowLeft = inside.top.coarseNarrowLeft(end)
-      val coarseWideRight = inside.top.coarseWideRight(begin)
-      val coarseWideLeft = inside.top.coarseWideLeft(end)
+      val coarseNarrowRight = inside.top.coarseLeftMostEndForBegin(begin)
+      val coarseNarrowLeft = inside.top.coarseRightMostBeginForEnd(end)
+      val coarseWideRight = inside.top.coarseRightMostEndForBegin(begin)
+      val coarseWideLeft = inside.top.coarseLeftMostBeginForEnd(end)
 
       for (a <- inside.bot.enteredLabelIndexes(begin, end); refA <- inside.bot.enteredLabelRefinements(begin, end, a)) {
         var i = 0
@@ -122,8 +122,7 @@ case class ChartMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
                 begin, end,
                 anchoring.core,
                 coarseSplitBegin, coarseSplitEnd,
-                r,
-                inside)
+                r)
 
               val refinements = anchoring.refined.validRuleRefinementsGivenParent(begin, end, r, refA)
               var ruleRefIndex = 0
@@ -260,15 +259,15 @@ object ChartMarginal {
     } {
       val end = begin + span
       // I get a 20% speedup by inlining code dealing with these arrays. sigh.
-      val narrowRight = top.narrowRight(begin)
-      val narrowLeft = top.narrowLeft(end)
-      val wideRight = top.wideRight(begin)
-      val wideLeft = top.wideLeft(end)
+      val narrowRight = top.leftMostEndForBegin(begin)
+      val narrowLeft = top.rightMostBeginForEnd(end)
+      val wideRight = top.rightMostEndForBegin(begin)
+      val wideLeft = top.leftMostBeginForEnd(end)
 
-      val coarseNarrowRight = top.coarseNarrowRight(begin)
-      val coarseNarrowLeft = top.coarseNarrowLeft(end)
-      val coarseWideRight = top.coarseWideRight(begin)
-      val coarseWideLeft = top.coarseWideLeft(end)
+      val coarseNarrowRight = top.coarseLeftMostEndForBegin(begin)
+      val coarseNarrowLeft = top.coarseRightMostBeginForEnd(end)
+      val coarseWideRight = top.coarseRightMostEndForBegin(begin)
+      val coarseWideLeft = top.coarseLeftMostBeginForEnd(end)
       val scoreArray = Arrays.newArray(anchoring.refined.maxLabelRefinements,  20)
       val offsets = new Array[Int](anchoring.refined.maxLabelRefinements)
 
@@ -301,8 +300,7 @@ object ChartMarginal {
                 begin, end,
                 anchoring.core,
                 coarseSplitBegin, coarseSplitEnd,
-                r,
-                inside)
+                r)
 
               val validA = refined.validParentRefinementsGivenRule(begin, coarseSplitBegin, coarseSplitEnd, end, r)
               var ai = 0
@@ -380,7 +378,7 @@ object ChartMarginal {
     val rootIndex = grammar.labelIndex(grammar.root)
 
     // cache for coreScores
-    val coreScoreArray = new Array[Double](inside.length)
+    val coreScoreArray = new Array[Double](inside.length + 1)
 
     val length = inside.length
     val outside = ParseChart.logProb.apply(grammar.labelIndex,
@@ -390,110 +388,224 @@ object ChartMarginal {
     for(refRoot <- refined.validLabelRefinements(0, inside.length, rootIndex)) {
       outside.top.enter(0, inside.length, rootIndex, refRoot, 0.0)
     }
-    val itop = inside.top
+    updateOutsideUnaries(outside, inside, anchoring, 0, inside.length)
+
+    val scoreArray = Arrays.newArray(anchoring.refined.maxLabelRefinements,  20)
+    val offsets = new Array[Int](anchoring.refined.maxLabelRefinements)
+
     for {
-      span <- length until 0 by (-1)
+      span <- (length-1) until 0 by (-1)
       begin <- 0 to (length-span)
     } {
       val end = begin + span
-      val narrowRight = itop.narrowRight(begin)
-      val narrowLeft = itop.narrowLeft(end)
-      val wideRight = itop.wideRight(begin)
-      val wideLeft = itop.wideLeft(end)
 
-      val coarseNarrowRight = inside.top.coarseNarrowRight(begin)
-      val coarseNarrowLeft = inside.top.coarseNarrowLeft(end)
-      val coarseWideRight = inside.top.coarseWideRight(begin)
-      val coarseWideLeft = inside.top.coarseWideLeft(end)
+      val enteredTop = inside.top.enteredLabelIndexes(begin, end)
+      var a = 0
+      while(a < grammar.labelIndex.size) {
+        // we're going to populate a by looking at rules p -> a rc, p -> lc a
+        if (enteredTop.contains(a)) {
+          java.util.Arrays.fill(offsets, 0)
+          doOutsideLeftCompletionUpdates(inside, outside, anchoring, begin, end, a, coreScoreArray, scoreArray, offsets)
+          doOutsideRightCompletionUpdates(inside, outside, anchoring, begin, end, a, coreScoreArray, scoreArray, offsets)
 
-      updateOutsideUnaries(outside, inside, anchoring, begin, end)
-      if(span > 1) {
-        val enteredBot = inside.bot.enteredLabelIndexes(begin, end)
-        var a = 0
-        while(a < grammar.labelIndex.size) {
-          if (enteredBot.contains(a)) {
-            // a ->  bc  [begin, split, end)
-            val rules = anchoring.grammar.indexedBinaryRulesWithParent(a)
-
-            var br = 0
-            while(br < rules.length) {
-              val r = rules(br)
-              val b = grammar.leftChild(r)
-              val c = grammar.rightChild(r)
-              br += 1
-
-              // can I possibly build any refinement of this rule?
-              val narrowR = coarseNarrowRight(b)
-              val narrowL = coarseNarrowLeft(c)
-              val coarseSplitBegin = math.max(narrowR, coarseWideLeft(c))
-              val coarseSplitEnd = math.min(coarseWideRight(b), narrowL) + 1
-              val canBuildThisRule = narrowR < end && narrowL >= narrowR && coarseSplitBegin <= narrowL && coarseSplitBegin < coarseSplitEnd
-
-              if(canBuildThisRule) {
-                // initialize core scores
-                ChartMarginal.fillCoreScores(coreScoreArray,
-                  begin, end,
-                  anchoring.core,
-                  coarseSplitBegin, coarseSplitEnd,
-                  r,
-                  inside)
-
-                val enteredRefBot = inside.bot.enteredLabelRefinements(begin, end, a)
-                val compatibleRefinements = refined.validParentRefinementsGivenRule(begin, coarseSplitBegin, coarseSplitEnd, end, r)
-
-                var refai = 0
-                while (refai < compatibleRefinements.length) {
-                  val refA = compatibleRefinements(refai)
-                  if (enteredRefBot.contains(refA)) {
-                    val coreScore = core.scoreSpan(begin, end, a)
-                    val aScore:Double = outside.bot.labelScore(begin, end, a, refA) + refined.scoreSpan(begin, end, a, refA) + coreScore
-                    if (!aScore.isInfinite) {
-                      val ruleRefinements = refined.validRuleRefinementsGivenParent(begin, end, r, refA)
-                      var rfI = 0
-                      while(rfI < ruleRefinements.length) {
-                        val refR = ruleRefinements(rfI)
-                        rfI += 1
-                        val refB = refined.leftChildRefinement(r, refR)
-                        val refC = refined.rightChildRefinement(r, refR)
-
-                        val narrowR = narrowRight(b)(refB)
-                        val narrowL = narrowLeft(c)(refC)
-                        var split = math.max(narrowR, wideLeft(c)(refC))
-                        val endSplit = math.min(wideRight(b)(refB), narrowL) + 1
-                        val canBuildThisRule = narrowR < end && narrowL >= narrowR && split <= narrowL && split < endSplit
-                        if(!canBuildThisRule)
-                          split = endSplit
-
-                        while(split < endSplit) {
-                          val bInside = itop.labelScore(begin, split, b, refB)
-                          val cInside = itop.labelScore(split, end, c, refC)
-                          if (bInside != Double.NegativeInfinity && cInside != Double.NegativeInfinity && aScore != Double.NegativeInfinity) {
-                            val ruleScore = refined.scoreBinaryRule(begin, split, end, r, refR) + coreScoreArray(split)
-                            val score = aScore + ruleScore
-                            val bOutside = score + cInside
-                            val cOutside = score + bInside
-                            outside.top.rawEnter(begin, split, b, refB, bOutside)
-                            outside.top.rawEnter(split, end, c, refC, cOutside)
-                          }
-
-                          split += 1
-                        }
-                      }
-                    }
-                  }
-                  refai += 1
-                }
-              }
+          val numValidLabelRefs = anchoring.refined.numValidRefinements(a)
+          var ai = 0
+          while(ai < numValidLabelRefs) {
+            // done updating vector, do an enter:
+            if(offsets(ai) > 0) {
+//              println(s"$begin, $end) ${grammar.labelIndex.get(a)} $ai ${offsets(ai)}")
+              outside.top.enterSum(begin, end, a, ai, scoreArray(ai), offsets(ai))
             }
+            ai += 1
           }
-
-          a += 1
         }
+
+        a += 1
       }
+      updateOutsideUnaries(outside, inside, anchoring, begin, end)
     }
     outside
   }
 
+
+  private def doOutsideLeftCompletionUpdates[W, L](inside: ParseChart[L], outside: ParseChart[L],
+                                                   anchoring: AugmentedAnchoring[L, W],
+                                                   begin: Int, end: Int,
+                                                   label: Int,
+                                                   coreScoreArray: Array[Double],
+                                                   scoreArray: Array[Array[Double]], offsets: Array[Int]) {
+    val refined = anchoring.refined
+    val itop = inside.top
+    val grammar = refined.grammar
+    val rules = anchoring.grammar.indexedBinaryRulesWithLeftChild(label)
+    val length = inside.length
+
+//    println(grammar.labelIndex.get(label) + " " + rules.mkString(", "))
+
+    var br = 0
+    while (br < rules.length) {
+      val r = rules(br)
+      val p = grammar.parent(r)
+      val rc = grammar.rightChild(r)
+      br += 1
+
+      // can I possibly build any refinement of this rule?
+      val parentMinCompletion = inside.bot.coarseLeftMostEndForBegin(begin)(p)
+      val rcMinCompletion = inside.top.coarseLeftMostEndForBegin(end)(rc)
+      val parentMaxCompletion = inside.bot.coarseRightMostEndForBegin(begin)(p)
+      val rcMaxCompletion = inside.top.coarseRightMostEndForBegin(end)(rc)
+      val coarseCompletionBegin = math.max(math.max(parentMinCompletion, rcMinCompletion), end + 1)
+      val coarseCompletionEnd = math.min(parentMaxCompletion, rcMaxCompletion)
+      val canBuildThisRule = coarseCompletionBegin <= coarseCompletionEnd
+      assert(coarseCompletionBegin > end)
+      assert(coarseCompletionEnd <= length, coarseCompletionEnd + " " + length)
+
+//      println(coarseCompletionBegin + " " + coarseCompletionEnd)
+
+      if (canBuildThisRule) {
+        // initialize core scores
+        ChartMarginal.fillCoreScoresForLeftCompletion(coreScoreArray,
+          begin, end,
+          anchoring.core,
+          coarseCompletionBegin, coarseCompletionEnd,
+          r)
+//        println(s"building left ${grammar.index.get(r)} on [$coarseCompletionBegin, $coarseCompletionEnd) $begin $end" )
+
+        val enteredRefTop = inside.top.enteredLabelRefinements(begin, end, label)
+        val compatibleRefinements = refined.validLeftChildRefinementsGivenRule(begin, end, coarseCompletionBegin, coarseCompletionEnd, r)
+
+        var refai = 0
+        while (refai < compatibleRefinements.length) {
+          val refA = compatibleRefinements(refai)
+          if (enteredRefTop.contains(refA)) {
+            val ruleRefinements = refined.validRuleRefinementsGivenLeftChild(begin, end, coarseCompletionBegin, coarseCompletionEnd, r, refA)
+            var rfI = 0
+            while (rfI < ruleRefinements.length) {
+              val refR = ruleRefinements(rfI)
+              rfI += 1
+              val refP = refined.parentRefinement(r, refR)
+              val refC = refined.rightChildRefinement(r, refR)
+
+              val parentMinCompletion = inside.bot.leftMostEndForBegin(begin)(p)(refP)
+              val rcMinCompletion = inside.top.leftMostEndForBegin(end)(rc)(refC)
+              val parentMaxCompletion = inside.bot.rightMostEndForBegin(begin)(p)(refP)
+              val rcMaxCompletion = inside.top.rightMostEndForBegin(end)(rc)(refC)
+              val completionBegin = math.max(math.max(parentMinCompletion, rcMinCompletion), end + 1)
+              val completionEnd = math.min(parentMaxCompletion, rcMaxCompletion)
+
+              var completion = completionBegin
+
+              while (completion <= completionEnd) {
+                val pOutside = outside.bot.labelScore(begin, completion, p, refP) + anchoring.scoreSpan(begin, completion, p, refP)
+                val cInside = itop.labelScore(end, completion, rc, refC)
+                if (cInside != Double.NegativeInfinity && pOutside != Double.NegativeInfinity) {
+                  val ruleScore = refined.scoreBinaryRule(begin, end, completion, r, refR) + coreScoreArray(completion)
+                  val score = cInside + ruleScore + pOutside
+                  scoreArray(refA)(offsets(refA)) = score
+                  offsets(refA) += 1
+                  // buffer full
+                  if (offsets(refA) == scoreArray(refA).length) {
+                    scoreArray(refA)(0) = inside.sum(scoreArray(refA), offsets(refA))
+                    offsets(refA) = 1
+                  }
+                }
+
+                completion += 1
+              }
+            }
+          }
+          refai += 1
+        }
+      }
+    }
+  }
+
+  private def doOutsideRightCompletionUpdates[W, L](inside: ParseChart[L], outside: ParseChart[L],
+                                                    anchoring: AugmentedAnchoring[L, W],
+                                                    begin: Int, end: Int,
+                                                    label: Int,
+                                                    coreScoreArray: Array[Double],
+                                                    scoreArray: Array[Array[Double]], offsets: Array[Int]) {
+    val refined = anchoring.refined
+    val itop = inside.top
+    val grammar = refined.grammar
+    val rules = anchoring.grammar.indexedBinaryRulesWithRightChild(label)
+
+    var br = 0
+    while (br < rules.length) {
+      val r = rules(br)
+      val p = grammar.parent(r)
+      val lc = grammar.leftChild(r)
+      br += 1
+
+      // can I possibly build any refinement of this rule?
+      val parentMinCompletion = inside.bot.coarseLeftMostBeginForEnd(end)(p)
+      val rcMinCompletion = inside.top.coarseLeftMostBeginForEnd(begin)(lc)
+      val parentMaxCompletion = inside.bot.coarseRightMostBeginForEnd(end)(p)
+      val rcMaxCompletion = inside.top.coarseRightMostBeginForEnd(begin)(lc)
+      val coarseCompletionBegin = math.max(parentMinCompletion, rcMinCompletion)
+      val coarseCompletionEnd = math.min(begin, math.min(parentMaxCompletion, rcMaxCompletion))
+      val canBuildThisRule = coarseCompletionBegin <= coarseCompletionEnd
+
+      if (canBuildThisRule) {
+        // initialize core scores
+        ChartMarginal.fillCoreScoresForRightCompletion(coreScoreArray,
+          begin, end,
+          anchoring.core,
+          coarseCompletionBegin, coarseCompletionEnd,
+          r)
+
+//        println(s"building right ${grammar.index.get(r)} on [$coarseCompletionBegin, $coarseCompletionEnd) $begin $end" )
+
+        val enteredRefTop = inside.top.enteredLabelRefinements(begin, end, label)
+        val compatibleRefinements = refined.validRightChildRefinementsGivenRule(coarseCompletionBegin, coarseCompletionEnd, begin, end, r)
+
+        var refai = 0
+        while (refai < compatibleRefinements.length) {
+          val refA = compatibleRefinements(refai)
+          if (enteredRefTop.contains(refA)) {
+            val ruleRefinements = refined.validRuleRefinementsGivenRightChild(coarseCompletionBegin, coarseCompletionEnd, begin, end, r, refA)
+            var rfI = 0
+            while (rfI < ruleRefinements.length) {
+              val refR = ruleRefinements(rfI)
+              rfI += 1
+              val refP = refined.parentRefinement(r, refR)
+              val refB = refined.leftChildRefinement(r, refR)
+
+              val parentMinCompletion = inside.bot.leftMostBeginForEnd(end)(p)(refP)
+              val rcMinCompletion = inside.top.leftMostBeginForEnd(begin)(lc)(refB)
+              val parentMaxCompletion = inside.bot.rightMostBeginForEnd(end)(p)(refP)
+              val rcMaxCompletion = inside.top.rightMostBeginForEnd(begin)(lc)(refB)
+              val completionBegin = math.max(parentMinCompletion, rcMinCompletion)
+              val completionEnd = math.min(begin,math.min(parentMaxCompletion, rcMaxCompletion))
+
+              var completion = completionBegin
+
+              while (completion <= completionEnd) {
+//                println("?!?!?")
+                val pOutside = outside.bot.labelScore(completion, end, p, refP) + anchoring.scoreSpan(completion, end, p, refP)
+                val bInside = itop.labelScore(completion, begin, lc, refB)
+                if (bInside != Double.NegativeInfinity && pOutside != Double.NegativeInfinity) {
+                  val ruleScore = refined.scoreBinaryRule(completion, begin, end, r, refR) + coreScoreArray(completion)
+                  val score = bInside + ruleScore + pOutside
+                  scoreArray(refA)(offsets(refA)) = score
+                  offsets(refA) += 1
+                  // buffer full
+                  if (offsets(refA) == scoreArray(refA).length) {
+                    scoreArray(refA)(0) = inside.sum(scoreArray(refA), offsets(refA))
+                    offsets(refA) = 1
+                  }
+                }
+
+                completion += 1
+              }
+            }
+          }
+          refai += 1
+        }
+      }
+    }
+  }
 
   private def updateInsideUnaries[L, W](chart: ParseChart[L],
                                         anchoring: AugmentedAnchoring[L, W],
@@ -563,13 +675,38 @@ object ChartMarginal {
                                    begin: Int, end: Int,
                                    anchoring: CoreAnchoring[L, W],
                                    splitBegin: Int, splitEnd: Int,
-                                   rule: Int,
-                                   chart: ParseChart[L]) = {
+                                   rule: Int) {
     var split = splitBegin
     while (split < splitEnd) {
       coreScores(split) = anchoring.scoreBinaryRule(begin, split, end, rule)
 
       split += 1
+    }
+  }
+
+  private def fillCoreScoresForLeftCompletion[L, W](coreScores: Array[Double],
+                                                    begin: Int, end: Int,
+                                                    anchoring: CoreAnchoring[L, W],
+                                                    completionBegin: Int, completionEnd: Int,
+                                                    rule: Int) {
+    var completion = completionBegin
+    while (completion <= completionEnd) {
+      coreScores(completion) = anchoring.scoreBinaryRule(begin, end, completion, rule)
+
+      completion += 1
+    }
+  }
+
+  private def fillCoreScoresForRightCompletion[L, W](coreScores: Array[Double],
+                                                     begin: Int, end: Int,
+                                                     anchoring: CoreAnchoring[L, W],
+                                                     completionBegin: Int, completionEnd: Int,
+                                                     rule: Int) {
+    var completion = completionBegin
+    while (completion <= completionEnd) {
+      coreScores(completion) = anchoring.scoreBinaryRule(completion, begin, end, rule)
+
+      completion += 1
     }
   }
 }

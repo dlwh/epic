@@ -194,6 +194,8 @@ trait RefinedAnchoring[L, W] extends Factor[RefinedAnchoring[L, W]] {
    */
   def validRuleRefinementsGivenParent(begin: Int, end: Int, rule: Int, parentRef: Int):Array[Int]
 
+  def validRuleRefinementsGivenLeftChild(begin: Int, split: Int, completionBegin: Int, completionEnd: Int, rule: Int, childRef: Int):Array[Int]
+  def validRuleRefinementsGivenRightChild(completionBegin: Int, completionEnd: Int, split: Int, end: Int, rule: Int, childRef: Int):Array[Int]
   def validUnaryRuleRefinementsGivenChild(begin: Int, end: Int, rule: Int, childRef: Int):Array[Int]
 
   def leftChildRefinement(rule: Int, ruleRef: Int):Int
@@ -225,6 +227,8 @@ trait RefinedAnchoring[L, W] extends Factor[RefinedAnchoring[L, W]] {
   def validCoarseRulesGivenParentRefinement(a: Int, refA: Int): Array[Int]
 
   def validParentRefinementsGivenRule(begin: Int, splitBegin: Int, splitEnd: Int, end: Int, rule: Int): Array[Int]
+  def validLeftChildRefinementsGivenRule(begin: Int, end: Int, completionBegin: Int, completionEnd: Int, rule: Int): Array[Int]
+  def validRightChildRefinementsGivenRule(completionBegin: Int, completionEnd: Int, begin: Int, end: Int, rule: Int): Array[Int]
 }
 
 object RefinedAnchoring {
