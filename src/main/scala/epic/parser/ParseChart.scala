@@ -81,7 +81,7 @@ class ParseChart[L](val index: Index[L],
      * Returns the score of this (label,refinement) pair over the span (begin,end)
      * @return
      */
-    def labelScore(begin: Int, end: Int, label: Int, ref: Int):Double = {
+    @inline def labelScore(begin: Int, end: Int, label: Int, ref: Int):Double = {
       val ind = TriangularArray.index(begin, end)
       if (score(ind) eq null) Double.NegativeInfinity
       else if (score(ind)(label) eq null) Double.NegativeInfinity

@@ -185,6 +185,7 @@ case class ChartMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
 }
 
 object ChartMarginal {
+
   def apply[L, W, Chart[X] <: ParseChart[X]](grammar: AugmentedGrammar[L, W],
                                              sent: Seq[W]): ChartMarginal[L, W] = {
     apply(grammar.anchor(sent), sent)
@@ -192,8 +193,8 @@ object ChartMarginal {
 
   def apply[L, W, Chart[X] <: ParseChart[X]](anchoring: AugmentedAnchoring[L, W],
                                              sent: Seq[W]): ChartMarginal[L, W] = {
-    val inside = buildInsideChart(anchoring, sent)
-    val outside = buildOutsideChart(anchoring, inside)
+    val (inside, spanScores) = buildInsideChart(anchoring, sent)
+    val outside = buildOutsideChart(anchoring, inside, spanScores)
     val logPartition = rootScore(anchoring, inside)
     ChartMarginal(anchoring, inside, outside, logPartition)
   }
@@ -215,8 +216,9 @@ object ChartMarginal {
     score
   }
 
+  // first parse chart is the inside scores, second parse chart is span scores for spans that were computed.
   private def buildInsideChart[L, W, Chart[X] <: ParseChart[X]](anchoring: AugmentedAnchoring[L, W],
-                                                                words: Seq[W]): ParseChart[L] = {
+                                                                words: Seq[W]): (ParseChart[L], ParseChart[L]) = {
     val refined = anchoring.refined
     val core = anchoring.core
 
@@ -224,6 +226,10 @@ object ChartMarginal {
     val lexicon = anchoring.lexicon
 
     val inside = ParseChart.logProb.apply(grammar.labelIndex,
+      Array.tabulate(grammar.labelIndex.size)(refined.numValidRefinements),
+      words.length,
+      core.sparsityPattern)
+    val spanScores = ParseChart.logProb.apply(grammar.labelIndex,
       Array.tabulate(grammar.labelIndex.size)(refined.numValidRefinements),
       words.length,
       core.sparsityPattern)
@@ -237,6 +243,7 @@ object ChartMarginal {
       } {
         val score:Double = refined.scoreSpan(i, i+1, a, ref) + coreScore
         if (score != Double.NegativeInfinity) {
+          spanScores.bot.enter(i, i+1, a, ref, score)
           inside.bot.enter(i, i+1, a, ref, score)
           foundSomething = true
         }
@@ -268,12 +275,14 @@ object ChartMarginal {
       val coarseNarrowLeft = top.coarseRightMostBeginForEnd(end)
       val coarseWideRight = top.coarseRightMostEndForBegin(begin)
       val coarseWideLeft = top.coarseLeftMostBeginForEnd(end)
-      val scoreArray = Arrays.newArray(anchoring.refined.maxLabelRefinements,  20)
+      val scoreArray = Arrays.newArray(anchoring.refined.maxLabelRefinements,  40)
       val offsets = new Array[Int](anchoring.refined.maxLabelRefinements)
+      val spanScoresEntered = new Array[Boolean](anchoring.refined.maxLabelRefinements)
 
       for ( a <- 0 until grammar.labelIndex.size ) {
         val numValidLabelRefs = anchoring.refined.numValidRefinements(a)
         java.util.Arrays.fill(offsets, 0)
+        java.util.Arrays.fill(spanScoresEntered, false)
 
         val coreSpan = core.scoreSpan(begin, end, a)
         if (coreSpan != Double.NegativeInfinity) {
@@ -307,8 +316,13 @@ object ChartMarginal {
               while(ai < validA.length) {
                 val refA = validA(ai)
                 ai += 1
-                val passScore = refined.scoreSpan(begin, end, a, refA) + coreSpan
-                if(!passScore.isInfinite) {
+                val spanScore = refined.scoreSpan(begin, end, a, refA) + coreSpan
+                if(!spanScore.isInfinite) {
+                  if(!spanScoresEntered(refA)) {
+                    spanScores.bot.enter(begin, end, a, refA, spanScore)
+                    spanScoresEntered(refA) = true
+                  }
+
                   val refinements = refined.validRuleRefinementsGivenParent(begin, end, r, refA)
                   var ruleRefIndex = 0
                   while(ruleRefIndex < refinements.length) {
@@ -328,7 +342,7 @@ object ChartMarginal {
                     while(split < endSplit) {
                       val bScore = inside.top.labelScore(begin, split, b, refB)
                       val cScore = inside.top.labelScore(split, end, c, refC)
-                      val withoutRule = bScore + cScore + passScore + coreScoreArray(split)
+                      val withoutRule = bScore + cScore + spanScore + coreScoreArray(split)
                       if(withoutRule != Double.NegativeInfinity) {
 
                         val prob = withoutRule + refined.scoreBinaryRule(begin, split, end, r, refR)
@@ -366,11 +380,11 @@ object ChartMarginal {
       }
       updateInsideUnaries(inside, anchoring, begin, end)
     }
-    inside
+    inside -> spanScores
   }
 
   private def buildOutsideChart[L, W](anchoring: AugmentedAnchoring[L, W],
-                                      inside: ParseChart[L]):ParseChart[L] = {
+                                      inside: ParseChart[L], spanScores: ParseChart[L]):ParseChart[L] = {
     val refined = anchoring.refined
     val core = anchoring.core
 
@@ -390,7 +404,7 @@ object ChartMarginal {
     }
     updateOutsideUnaries(outside, inside, anchoring, 0, inside.length)
 
-    val scoreArray = Arrays.newArray(anchoring.refined.maxLabelRefinements,  20)
+    val scoreArray = Arrays.newArray(anchoring.refined.maxLabelRefinements,  80)
     val offsets = new Array[Int](anchoring.refined.maxLabelRefinements)
 
     for {
@@ -405,8 +419,8 @@ object ChartMarginal {
         // we're going to populate a by looking at rules p -> a rc, p -> lc a
         if (enteredTop.contains(a)) {
           java.util.Arrays.fill(offsets, 0)
-          doOutsideLeftCompletionUpdates(inside, outside, anchoring, begin, end, a, coreScoreArray, scoreArray, offsets)
-          doOutsideRightCompletionUpdates(inside, outside, anchoring, begin, end, a, coreScoreArray, scoreArray, offsets)
+          doOutsideLeftCompletionUpdates(inside, outside, spanScores, anchoring, begin, end, a, coreScoreArray, scoreArray, offsets)
+          doOutsideRightCompletionUpdates(inside, outside, spanScores, anchoring, begin, end, a, coreScoreArray, scoreArray, offsets)
 
           val numValidLabelRefs = anchoring.refined.numValidRefinements(a)
           var ai = 0
@@ -429,6 +443,7 @@ object ChartMarginal {
 
 
   private def doOutsideLeftCompletionUpdates[W, L](inside: ParseChart[L], outside: ParseChart[L],
+                                                   spanScores: ParseChart[L],
                                                    anchoring: AugmentedAnchoring[L, W],
                                                    begin: Int, end: Int,
                                                    label: Int,
@@ -469,7 +484,7 @@ object ChartMarginal {
           anchoring.core,
           coarseCompletionBegin, coarseCompletionEnd,
           r)
-//        println(s"building left ${grammar.index.get(r)} on [$coarseCompletionBegin, $coarseCompletionEnd) $begin $end" )
+
 
         val enteredRefTop = inside.top.enteredLabelRefinements(begin, end, label)
         val compatibleRefinements = refined.validLeftChildRefinementsGivenRule(begin, end, coarseCompletionBegin, coarseCompletionEnd, r)
@@ -496,7 +511,7 @@ object ChartMarginal {
               var completion = completionBegin
 
               while (completion <= completionEnd) {
-                val pOutside = outside.bot.labelScore(begin, completion, p, refP) + anchoring.scoreSpan(begin, completion, p, refP)
+                val pOutside = outside.bot.labelScore(begin, completion, p, refP) + spanScores.bot.labelScore(begin, completion, p, refP)
                 val cInside = itop.labelScore(end, completion, rc, refC)
                 if (cInside != Double.NegativeInfinity && pOutside != Double.NegativeInfinity) {
                   val ruleScore = refined.scoreBinaryRule(begin, end, completion, r, refR) + coreScoreArray(completion)
@@ -521,11 +536,13 @@ object ChartMarginal {
   }
 
   private def doOutsideRightCompletionUpdates[W, L](inside: ParseChart[L], outside: ParseChart[L],
+                                                    spanScores: ParseChart[L],
                                                     anchoring: AugmentedAnchoring[L, W],
                                                     begin: Int, end: Int,
                                                     label: Int,
                                                     coreScoreArray: Array[Double],
-                                                    scoreArray: Array[Array[Double]], offsets: Array[Int]) {
+                                                    scoreArray: Array[Array[Double]],
+                                                    offsets: Array[Int]) {
     val refined = anchoring.refined
     val itop = inside.top
     val grammar = refined.grammar
@@ -583,7 +600,7 @@ object ChartMarginal {
 
               while (completion <= completionEnd) {
 //                println("?!?!?")
-                val pOutside = outside.bot.labelScore(completion, end, p, refP) + anchoring.scoreSpan(completion, end, p, refP)
+                val pOutside = outside.bot.labelScore(completion, end, p, refP) + spanScores.bot.labelScore(completion, end, p, refP)
                 val bInside = itop.labelScore(completion, begin, lc, refB)
                 if (bInside != Double.NegativeInfinity && pOutside != Double.NegativeInfinity) {
                   val ruleScore = refined.scoreBinaryRule(completion, begin, end, r, refR) + coreScoreArray(completion)
@@ -661,7 +678,7 @@ object ChartMarginal {
               val ruleScore: Double = refined.scoreUnaryRule(begin, end, rules(j), refR) + coreScore
               val prob: Double = bScore + ruleScore
               if(prob != Double.NegativeInfinity) {
-                chart.bot.rawEnter(begin, end, b, refB, prob)
+                chart.bot.enter(begin, end, b, refB, prob)
               }
             }
         }
@@ -709,4 +726,8 @@ object ChartMarginal {
       completion += 1
     }
   }
+
+
+
 }
+
