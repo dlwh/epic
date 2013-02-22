@@ -102,6 +102,8 @@ object ParseEval {
                   asString: L=>String,
                   logProgress: Boolean = true,
                   nthreads: Int = -1): Seq[ParseResult[L]] = {
+    val timeIn = System.currentTimeMillis()
+    def elapsed = s"${(System.currentTimeMillis() - timeIn).toDouble / 1000.0} seconds elapsed."
     val acc = new AtomicInteger(0)
     val partrees = trees.par
     if (nthreads > 0) {
@@ -116,9 +118,9 @@ object ParseEval {
         val deBgold = Trees.debinarize(Trees.deannotate(goldTree.map(asString)))
         val endTime = System.currentTimeMillis
         if(logProgress) {
-          val i = acc.incrementAndGet()
-          if(i % 1000 == 0) {
-            println("Parsed %d/%d sentences.".format(i, trees.length))
+          val i = acc.incrementAndGet
+          if(i % 200 == 0) {
+            println(s"Parsed $i/${trees.length} sentences. $elapsed")
           }
         }
         Some(ParseResult(sent, deBgold, guessTree, (endTime-startTime) / 1000.0))
