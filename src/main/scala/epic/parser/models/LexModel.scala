@@ -29,6 +29,7 @@ import features.RuleFeature
 import breeze.util._
 import collection.mutable.ArrayBuffer
 import breeze.config.Help
+import collection.mutable
 
 class LexModel[L, W](bundle: LexGrammarBundle[L, W],
                      reannotate: (BinarizedTree[L], Seq[W])=>BinarizedTree[L],
@@ -106,7 +107,8 @@ class IndexedLexFeaturizer[L, W](f: LexFeaturizer[L, W],
                                  ruleIndex: Index[Rule[L]],
                                  val trueFeatureIndex: Index[Feature],
                                  lowCountFeatures: Set[Feature],
-                                 dummyFeatures: Int) extends RefinedFeaturizer[L, W, Feature] with Serializable {
+                                 dummyFeatures: Int,
+                                 useGlobalBinaryFeatureCache: Boolean = false) extends RefinedFeaturizer[L, W, Feature] with Serializable {
   def anchor(words: Seq[W]):Anchoring = new Spec(words)
 
   val (index:Index[Feature], lowCountFeature) = {
@@ -117,6 +119,7 @@ class IndexedLexFeaturizer[L, W](f: LexFeaturizer[L, W],
     r -> lowCount
   }
 
+  val globalBinaryFeatureCache = mutable.Map.empty[Seq[W], Array[OpenAddressHashArray[Array[Int]]]]
 
   case class Spec(words: Seq[W]) extends super.Anchoring {
 
@@ -204,7 +207,11 @@ class IndexedLexFeaturizer[L, W](f: LexFeaturizer[L, W],
     val depCache = new Array[OpenAddressHashArray[Array[Int]]](words.length)
     // headIndex -> (depIndex x ruleIndex) -> Array[Int]
     // holds all features for attachment, uses other caches for faster computation
-    val binaryCache = new Array[OpenAddressHashArray[Array[Int]]](words.length)
+    val binaryCache = globalBinaryFeatureCache.getOrElse(words, {
+        val empty = new Array[OpenAddressHashArray[Array[Int]]](words.length)
+        if (useGlobalBinaryFeatureCache) globalBinaryFeatureCache.put(words, empty)
+        empty
+      })
     // for tags. word -> tag -> Array[Int]
     val wordCache = new Array[OpenAddressHashArray[Array[Int]]](words.length)
 
