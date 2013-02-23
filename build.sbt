@@ -39,7 +39,7 @@ libraryDependencies <<= (scalaVersion, libraryDependencies) { (sv, deps) =>
 credentials += Credentials(Path.userHome / ".ivy2" / ".credentials")
 
 
-scalacOptions ++= Seq("-deprecation", "-language:_")
+scalacOptions ++= Seq("-deprecation", "-language:_", "-optimize")
 
 javaOptions += "-Xmx2g"
 
