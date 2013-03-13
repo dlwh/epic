@@ -84,58 +84,11 @@ also just call it directly with "sbt" in `CHALK_DIR`.
 
 ## Trying it out
 
-Assuming you have completed all of the above steps, including running the "compile" action in SBT, you should now be able to try out some examples. There is no documentation specific to Chalk at this time, but you should be able to follow the OpenNLP documentation:
+Assuming you have completed all of the above steps, including running the "compile" action in SBT, you should now be able to try out some examples. Check out the [Chalk tutorials](Tutorial) for examples.
 
-<http://opennlp.apache.org/documentation/1.5.2-incubating/manual/opennlp.html>
-
-However, you'll need to substitute 'chalk cli' for 'opennlp' in that manual. Here's an example to do sentence detection.
-
-        $ echo "Pierre Vinken, 61 years old, will join the board as a nonexecutive director Nov. 29. Mr. Vinken is chairman of Elsevier N.V., the Dutch publishing group. Rudolph Agnew, 55 years old and former chairman of Consolidated Gold Fields PLC, was named a director of this British industrial conglomerate." > input.txt
- 
-        $ wget http://opennlp.sourceforge.net/models-1.5/en-sent.bin
-
-        $ chalk cli SentenceDetector en-sent.bin < input.txt 
-        Loading Sentence Detector model ... done (0.099s)
-        Pierre Vinken, 61 years old, will join the board as a nonexecutive director Nov. 29.
-        Mr. Vinken is chairman of Elsevier N.V., the Dutch publishing group.
-        Rudolph Agnew, 55 years old and former chairman of Consolidated Gold Fields PLC, was named a director of this British industrial conglomerate.
-
-
-
-        Average: 1500.0 sent/s 
-        Total: 3 sent
-        Runtime: 0.0020s
-
-Here's an example of doing sentence detection via the API by using the Scala console in SBT.
-
-```
-$ cd /tmp
-$ wget http://opennlp.sourceforge.net/models-1.5/en-sent.bin
-$ cd $CHALK_DIR
-$ ./build
-> console
-scala> import java.io.FileInputStream
-import java.io.FileInputStream
-
-scala> import chalk.tools.sentdetect._
-import chalk.tools.sentdetect._
-
-scala> val sdetector = new SentenceDetectorME(new SentenceModel(new FileInputStream("/tmp/en-sent.bin")))
-sdetector: chalk.tools.sentdetect.SentenceDetectorME = chalk.tools.sentdetect.SentenceDetectorME@74dd590f
-
-scala> val sentences = sdetector.sentDetect("Here is a sentence. Here is another with Mr. Brown in it. Hurrah.")
-sentences: Array[java.lang.String] = Array(Here is a sentence., Here is another with Mr. Brown in it., Hurrah.)
-
-scala> sentences.foreach(println)
-Here is a sentence.
-Here is another with Mr. Brown in it.
-Hurrah.
-```
 
 # Questions or suggestions?
 
 Email Jason Baldridge: <jasonbaldridge@gmail.com>
 
 Or, create an issue: <https://github.com/scalanlp/chalk/issues>
-
-
