@@ -25,10 +25,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import nak.model.AbstractModel;
-import nak.model.MaxentModel;
-import nak.model.TrainUtil;
-import nak.model.TwoPassDataIndexer;
+import nak.core.AbstractModel;
+import nak.core.LinearModel;
+import nak.core.TrainUtil;
+import nak.data.TwoPassDataIndexer;
 import chalk.tools.chunker.Chunker;
 import chalk.tools.chunker.ChunkerME;
 import chalk.tools.chunker.ChunkerModel;
@@ -76,9 +76,9 @@ public class Parser extends AbstractBottomUpParser {
 
   /** Label used to distinguish build nodes from non-built nodes. */
   public static final String BUILT = "built";
-  private MaxentModel buildModel;
-  private MaxentModel attachModel;
-  private MaxentModel checkModel;
+  private LinearModel buildModel;
+  private LinearModel attachModel;
+  private LinearModel checkModel;
 
   static boolean checkComplete = false;
 
@@ -463,7 +463,7 @@ public class Parser extends AbstractBottomUpParser {
     
     // build
     System.err.println("Training builder");
-    nak.model.EventStream bes = new ParserEventStream(parseSamples, rules,
+    nak.data.EventStream bes = new ParserEventStream(parseSamples, rules,
         ParserEventTypeEnum.BUILD, mdict);
     Map<String, String> buildReportMap = new HashMap<String, String>();
     AbstractModel buildModel = TrainUtil.train(bes, mlParams.getSettings("build"), buildReportMap);
@@ -473,7 +473,7 @@ public class Parser extends AbstractBottomUpParser {
     
     // check
     System.err.println("Training checker");
-    nak.model.EventStream kes = new ParserEventStream(parseSamples, rules,
+    nak.data.EventStream kes = new ParserEventStream(parseSamples, rules,
         ParserEventTypeEnum.CHECK);
     Map<String, String> checkReportMap = new HashMap<String, String>();
     AbstractModel checkModel = TrainUtil.train(kes, mlParams.getSettings("check"), checkReportMap);
@@ -483,7 +483,7 @@ public class Parser extends AbstractBottomUpParser {
     
     // attach 
     System.err.println("Training attacher");
-    nak.model.EventStream attachEvents = new ParserEventStream(parseSamples, rules,
+    nak.data.EventStream attachEvents = new ParserEventStream(parseSamples, rules,
         ParserEventTypeEnum.ATTACH);
     Map<String, String> attachReportMap = new HashMap<String, String>();
     AbstractModel attachModel = TrainUtil.train(attachEvents, mlParams.getSettings("attach"), attachReportMap);
@@ -514,8 +514,4 @@ public class Parser extends AbstractBottomUpParser {
     return train(languageCode, parseSamples, rules, params);
   }
   
-  @Deprecated
-  public static AbstractModel train(nak.model.EventStream es, int iterations, int cut) throws java.io.IOException {
-    return nak.maxent.GIS.trainModel(iterations, new TwoPassDataIndexer(es, cut));
-  }
 }

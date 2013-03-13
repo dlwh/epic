@@ -25,7 +25,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
 
-import nak.model.Event;
+import nak.core.Event;
 import chalk.tools.tokenize.lang.Factory;
 import chalk.tools.util.AbstractEventStream;
 import chalk.tools.util.ObjectStream;

@@ -23,8 +23,8 @@ import java.math.BigInteger;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
-import nak.model.Event;
-import nak.model.EventStream;
+import nak.core.Event;
+import nak.data.EventStream;
 
 
 @Deprecated

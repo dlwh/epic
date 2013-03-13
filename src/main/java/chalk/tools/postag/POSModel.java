@@ -24,7 +24,7 @@ import java.io.InputStream;
 import java.net.URL;
 import java.util.Map;
 
-import nak.model.AbstractModel;
+import nak.core.AbstractModel;
 import chalk.tools.dictionary.Dictionary;
 import chalk.tools.util.BaseToolFactory;
 import chalk.tools.util.InvalidFormatException;

@@ -28,7 +28,7 @@ import java.io.IOException;
 import java.util.zip.GZIPInputStream;
 
 import nak.io.BinaryGISModelReader;
-import nak.model.AbstractModel;
+import nak.core.AbstractModel;
 import chalk.tools.dictionary.Dictionary;
 import chalk.tools.util.StringList;
 import chalk.tools.util.model.BaseModel;

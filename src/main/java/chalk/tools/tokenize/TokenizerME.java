@@ -27,10 +27,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-import nak.model.AbstractModel;
-import nak.model.EventStream;
-import nak.model.MaxentModel;
-import nak.model.TrainUtil;
+import nak.core.AbstractModel;
+import nak.data.EventStream;
+import nak.core.LinearModel;
+import nak.core.TrainUtil;
 import chalk.tools.dictionary.Dictionary;
 import chalk.tools.tokenize.lang.Factory;
 import chalk.tools.util.ObjectStream;
@@ -100,7 +100,7 @@ public class TokenizerME extends AbstractTokenizer {
   /**
    * The maximum entropy model to use to evaluate contexts.
    */
-  private MaxentModel model;
+  private LinearModel model;
 
   /**
    * The context generator.
@@ -125,7 +125,7 @@ public class TokenizerME extends AbstractTokenizer {
     TokenizerFactory factory = model.getFactory();
     this.alphanumeric = factory.getAlphaNumericPattern();
     this.cg = factory.getContextGenerator();
-    this.model = model.getMaxentModel();
+    this.model = model.getLinearModel();
     this.useAlphaNumericOptimization = factory.isUseAlphaNumericOptmization();
 
     newTokens = new ArrayList<Span>();
@@ -143,7 +143,7 @@ public class TokenizerME extends AbstractTokenizer {
     this.cg = factory.createTokenContextGenerator(languageCode,
         getAbbreviations(model.getAbbreviations()));
 
-    this.model = model.getMaxentModel();
+    this.model = model.getLinearModel();
     useAlphaNumericOptimization = model.useAlphaNumericOptimization();
 
     newTokens = new ArrayList<Span>();

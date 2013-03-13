@@ -26,10 +26,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import nak.model.AbstractModel;
-import nak.model.EventStream;
-import nak.model.MaxentModel;
-import nak.model.TrainUtil;
+import nak.core.AbstractModel;
+import nak.data.EventStream;
+import nak.core.LinearModel;
+import nak.core.TrainUtil;
 import chalk.tools.dictionary.Dictionary;
 import chalk.tools.sentdetect.lang.Factory;
 import chalk.tools.util.ObjectStream;
@@ -63,7 +63,7 @@ public class SentenceDetectorME implements SentenceDetector {
   /**
    * The maximum entropy model to use to evaluate contexts.
    */
-  private MaxentModel model;
+  private LinearModel model;
 
   /**
    * The feature context generator.
@@ -89,7 +89,7 @@ public class SentenceDetectorME implements SentenceDetector {
    */
   public SentenceDetectorME(SentenceModel model) {
     SentenceDetectorFactory sdFactory = model.getFactory();
-    this.model = model.getMaxentModel();
+    this.model = model.getLinearModel();
     cgen = sdFactory.getSDContextGenerator();
     scanner = sdFactory.getEndOfSentenceScanner();
     useTokenEnd = sdFactory.isUseTokenEnd();
@@ -100,7 +100,7 @@ public class SentenceDetectorME implements SentenceDetector {
    *             SentenceDetector functionality.
    */
   public SentenceDetectorME(SentenceModel model, Factory factory) {
-    this.model = model.getMaxentModel();
+    this.model = model.getLinearModel();
     // if the model has custom EOS characters set, use this to get the context
     // generator and the EOS scanner; otherwise use language-specific defaults
     char[] customEOSCharacters = model.getEosCharacters();
@@ -276,7 +276,7 @@ public class SentenceDetectorME implements SentenceDetector {
    * on some boolean determination of a break's acceptability.
    *
    * <p>The implementation here always returns true, which means
-   * that the MaxentModel's outcome is taken as is.</p>
+   * that the LinearModel's outcome is taken as is.</p>
    *
    * @param s the string in which the break occurred.
    * @param fromIndex the start of the segment currently being evaluated

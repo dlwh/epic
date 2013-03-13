@@ -19,14 +19,14 @@ package chalk.tools.chunker;
 
 import java.io.IOException;
 
-import nak.model.Event;
+import nak.core.Event;
 import chalk.tools.util.ObjectStream;
 
 
 /**
  * Class for creating an event stream out of data files for training a chunker.
  */
-public class ChunkerEventStream extends nak.model.AbstractEventStream {
+public class ChunkerEventStream extends nak.data.AbstractEventStream {
 
   private ChunkerContextGenerator cg;
   private ObjectStream<ChunkSample> data;

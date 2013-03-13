@@ -22,10 +22,10 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
-import nak.model.AbstractModel;
-import nak.model.Event;
-import nak.model.Sequence;
-import nak.model.SequenceStream;
+import nak.core.AbstractModel;
+import nak.core.Event;
+import nak.core.Sequence;
+import nak.data.SequenceStream;
 import chalk.tools.util.ObjectStream;
 
 

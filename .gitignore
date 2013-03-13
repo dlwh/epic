@@ -5,3 +5,4 @@ target/
 .cache
 .ensime*
 *~
+TAGS

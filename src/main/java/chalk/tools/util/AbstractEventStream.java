@@ -22,8 +22,8 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.Iterator;
 
-import nak.model.Event;
-import nak.model.EventStream;
+import nak.core.Event;
+import nak.data.EventStream;
 
 
 /**
@@ -31,7 +31,7 @@ import nak.model.EventStream;
  * It takes an {@link Iterator} of sample objects as input and
  * outputs the events creates by a subclass.
  */
-public abstract class AbstractEventStream<T> extends nak.model.AbstractEventStream {
+public abstract class AbstractEventStream<T> extends nak.data.AbstractEventStream {
 
   private ObjectStream<T> samples;
 

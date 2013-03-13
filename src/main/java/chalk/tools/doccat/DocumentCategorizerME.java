@@ -24,10 +24,10 @@ import java.util.HashMap;
 import java.util.Map;
 
 import nak.maxent.GIS;
-import nak.model.AbstractModel;
-import nak.model.MaxentModel;
-import nak.model.TrainUtil;
-import nak.model.TwoPassDataIndexer;
+import nak.core.AbstractModel;
+import nak.core.LinearModel;
+import nak.core.TrainUtil;
+import nak.data.TwoPassDataIndexer;
 import chalk.tools.tokenize.SimpleTokenizer;
 import chalk.tools.tokenize.Tokenizer;
 import chalk.tools.util.ObjectStream;
@@ -45,7 +45,7 @@ public class DocumentCategorizerME implements DocumentCategorizer {
    */
   private static FeatureGenerator defaultFeatureGenerator = new BagOfWordsFeatureGenerator();
   
-  private MaxentModel model;
+  private LinearModel model;
   private DocumentCategorizerContextGenerator mContextGenerator;
 
   /**
@@ -70,19 +70,19 @@ public class DocumentCategorizerME implements DocumentCategorizer {
   }
   
   /**
-   * Initializes the current instance with the given {@link MaxentModel}.
+   * Initializes the current instance with the given {@link LinearModel}.
    *
    * @param model
    * 
    * @deprecated Use {@link DocumentCategorizerME#DocumentCategorizerME(DoccatModel)} instead.
    */
   @Deprecated
-  public DocumentCategorizerME(MaxentModel model) {
+  public DocumentCategorizerME(LinearModel model) {
     this(model, new FeatureGenerator[]{new BagOfWordsFeatureGenerator()});
   }
 
   /**
-   * Initializes the current instance with a the given {@link MaxentModel}
+   * Initializes the current instance with a the given {@link LinearModel}
    * and {@link FeatureGenerator}s.
    *
    * @param model
@@ -91,7 +91,7 @@ public class DocumentCategorizerME implements DocumentCategorizer {
    * @deprecated Use {@link DocumentCategorizerME#DocumentCategorizerME(DoccatModel, FeatureGenerator...)} instead.
    */
   @Deprecated
-  public DocumentCategorizerME(MaxentModel model,
+  public DocumentCategorizerME(LinearModel model,
       FeatureGenerator... featureGenerators) {
 
     this.model = model;

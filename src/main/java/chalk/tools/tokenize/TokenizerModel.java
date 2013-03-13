@@ -29,8 +29,8 @@ import java.net.URL;
 import java.util.Map;
 
 import nak.io.BinaryGISModelReader;
-import nak.model.AbstractModel;
-import nak.model.MaxentModel;
+import nak.core.AbstractModel;
+import nak.core.LinearModel;
 import chalk.tools.dictionary.Dictionary;
 import chalk.tools.util.BaseToolFactory;
 import chalk.tools.util.InvalidFormatException;
@@ -67,17 +67,17 @@ public final class TokenizerModel extends BaseModel {
   /**
    * Initializes the current instance.
    *
-   * @param tokenizerMaxentModel
+   * @param tokenizerLinearModel
    * @param useAlphaNumericOptimization
    * 
    * @deprecated Use
    *             {@link TokenizerModel#TokenizerModel(String, AbstractModel, Map, TokenizerFactory)}
    *             instead and pass in a {@link TokenizerFactory}.
    */
-  public TokenizerModel(String language, AbstractModel tokenizerMaxentModel,
+  public TokenizerModel(String language, AbstractModel tokenizerLinearModel,
       Dictionary abbreviations, boolean useAlphaNumericOptimization,
       Map<String, String> manifestInfoEntries) {
-    this(tokenizerMaxentModel, manifestInfoEntries, 
+    this(tokenizerLinearModel, manifestInfoEntries, 
         new TokenizerFactory(language, abbreviations, useAlphaNumericOptimization, null));
   }
 
@@ -85,7 +85,7 @@ public final class TokenizerModel extends BaseModel {
    * Initializes the current instance.
    *
    * @param language
-   * @param tokenizerMaxentModel
+   * @param tokenizerLinearModel
    * @param useAlphaNumericOptimization
    * @param manifestInfoEntries
    * 
@@ -93,25 +93,25 @@ public final class TokenizerModel extends BaseModel {
    *             {@link TokenizerModel#TokenizerModel(String, AbstractModel, Map, TokenizerFactory)}
    *             instead and pass in a {@link TokenizerFactory}.
    */
-  public TokenizerModel(String language, AbstractModel tokenizerMaxentModel,
+  public TokenizerModel(String language, AbstractModel tokenizerLinearModel,
       boolean useAlphaNumericOptimization, Map<String, String> manifestInfoEntries) {
-    this(language, tokenizerMaxentModel, null, useAlphaNumericOptimization, manifestInfoEntries);
+    this(language, tokenizerLinearModel, null, useAlphaNumericOptimization, manifestInfoEntries);
   }
 
   /**
    * Initializes the current instance.
    *
    * @param language
-   * @param tokenizerMaxentModel
+   * @param tokenizerLinearModel
    * @param useAlphaNumericOptimization
    * 
    * @deprecated Use
    *             {@link TokenizerModel#TokenizerModel(String, AbstractModel, Map, TokenizerFactory)}
    *             instead and pass in a {@link TokenizerFactory}.
    */
-  public TokenizerModel(String language, AbstractModel tokenizerMaxentModel,
+  public TokenizerModel(String language, AbstractModel tokenizerLinearModel,
       boolean useAlphaNumericOptimization) {
-    this(language, tokenizerMaxentModel, useAlphaNumericOptimization, null);
+    this(language, tokenizerLinearModel, useAlphaNumericOptimization, null);
   }
   
   /**
@@ -140,7 +140,7 @@ public final class TokenizerModel extends BaseModel {
    * @param model
    * @return
    */
-  private static boolean isModelCompatible(MaxentModel model) {
+  private static boolean isModelCompatible(LinearModel model) {
     return ModelUtil.validateOutcomes(model, TokenizerME.SPLIT, TokenizerME.NO_SPLIT);
   }
 
@@ -152,7 +152,7 @@ public final class TokenizerModel extends BaseModel {
       throw new InvalidFormatException("Token model is incomplete!");
     }
 
-    if (!isModelCompatible(getMaxentModel())) {
+    if (!isModelCompatible(getLinearModel())) {
       throw new InvalidFormatException("The maxent model is not compatible with the tokenizer!");
     }
   }
@@ -166,7 +166,7 @@ public final class TokenizerModel extends BaseModel {
     return TokenizerFactory.class;
   }
 
-  public AbstractModel getMaxentModel() {
+  public AbstractModel getLinearModel() {
     return (AbstractModel) artifactMap.get(TOKENIZER_MODEL_ENTRY);
   }
   

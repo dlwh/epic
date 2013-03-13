@@ -27,8 +27,8 @@ import java.io.InputStream;
 import java.net.URL;
 import java.util.Map;
 
-import nak.model.AbstractModel;
-import nak.model.GenericModelReader;
+import nak.core.AbstractModel;
+import nak.io.GenericModelReader;
 import chalk.tools.dictionary.Dictionary;
 import chalk.tools.util.BaseToolFactory;
 import chalk.tools.util.InvalidFormatException;
@@ -113,7 +113,7 @@ public class SentenceModel extends BaseModel {
           " maxent model!");
     }
 
-    if (!ModelUtil.validateOutcomes(getMaxentModel(), SentenceDetectorME.SPLIT,
+    if (!ModelUtil.validateOutcomes(getLinearModel(), SentenceDetectorME.SPLIT,
         SentenceDetectorME.NO_SPLIT)) {
       throw new InvalidFormatException("The maxent model is not compatible " +
       		"with the sentence detector!");
@@ -129,7 +129,7 @@ public class SentenceModel extends BaseModel {
     return SentenceDetectorFactory.class;
   }
 
-  public AbstractModel getMaxentModel() {
+  public AbstractModel getLinearModel() {
     return (AbstractModel) artifactMap.get(MAXENT_MODEL_ENTRY_NAME);
   }
 

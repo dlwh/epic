@@ -20,7 +20,7 @@ package chalk.tools.parser.chunking;
 import java.io.FileInputStream;
 import java.util.List;
 
-import nak.model.Event;
+import nak.core.Event;
 import chalk.tools.dictionary.Dictionary;
 import chalk.tools.parser.AbstractBottomUpParser;
 import chalk.tools.parser.AbstractParserEventStream;
@@ -205,7 +205,7 @@ public class ParserEventStream extends AbstractParserEventStream {
     if (fun) {
       Parse.useFunctionTags(true);
     }
-    nak.model.EventStream es = new ParserEventStream(new ParseSampleStream(new PlainTextByLineStream(new java.io.InputStreamReader(System.in))), rules, etype, dict);
+    nak.data.EventStream es = new ParserEventStream(new ParseSampleStream(new PlainTextByLineStream(new java.io.InputStreamReader(System.in))), rules, etype, dict);
     while (es.hasNext()) {
       System.out.println(es.next());
     }

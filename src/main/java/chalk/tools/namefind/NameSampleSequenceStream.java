@@ -23,10 +23,10 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 
-import nak.model.AbstractModel;
-import nak.model.Event;
-import nak.model.Sequence;
-import nak.model.SequenceStream;
+import nak.core.AbstractModel;
+import nak.core.Event;
+import nak.core.Sequence;
+import nak.data.SequenceStream;
 import chalk.tools.util.ObjectStream;
 import chalk.tools.util.featuregen.AdaptiveFeatureGenerator;
 
@@ -87,7 +87,7 @@ class NameSampleSequenceIterator implements Iterator<Sequence> {
   
   public NameSampleSequenceIterator(Iterator<NameSample> psi) {
     this.psi = psi;
-    cg = new DefaultNameContextGenerator(null);
+    cg = new DefaultNameContextGenerator((AdaptiveFeatureGenerator)null);
   }
   
   public boolean hasNext() {

@@ -26,14 +26,14 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 
 import nak.io.SuffixSensitiveGISModelWriter;
-import nak.maxent.DataStream;
+import nak.data.DataStream;
 import nak.maxent.GISModel;
-import nak.model.AbstractModel;
-import nak.model.EventStream;
-import nak.model.SequenceStream;
-import nak.model.TwoPassDataIndexer;
+import nak.core.AbstractModel;
+import nak.data.EventStream;
+import nak.data.SequenceStream;
+import nak.data.TwoPassDataIndexer;
 import nak.perceptron.SimplePerceptronSequenceTrainer;
-import nak.perceptron.SuffixSensitivePerceptronModelWriter;
+import nak.io.SuffixSensitivePerceptronModelWriter;
 import chalk.tools.dictionary.Dictionary;
 import chalk.tools.ngram.NGramModel;
 import chalk.tools.util.ObjectStream;
@@ -280,7 +280,7 @@ public class POSTaggerTrainer {
 
     NGramModel ngramModel = new NGramModel();
 
-    DataStream data = new nak.maxent.PlainTextByLineDataStream(new java.io.FileReader(inFile));
+    DataStream data = new nak.data.PlainTextByLineDataStream(new java.io.FileReader(inFile));
     while(data.hasNext()) {
       String tagStr = (String) data.nextToken();
       String[] tt = tagStr.split(" ");

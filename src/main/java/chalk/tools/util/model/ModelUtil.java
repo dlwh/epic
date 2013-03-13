@@ -28,15 +28,15 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-import nak.model.AbstractModel;
-import nak.model.GenericModelWriter;
-import nak.model.MaxentModel;
-import nak.model.TrainUtil;
+import nak.core.AbstractModel;
+import nak.io.GenericModelWriter;
+import nak.core.LinearModel;
+import nak.core.TrainUtil;
 import chalk.tools.util.TrainingParameters;
 
 
 /**
- * Utility class for handling of {@link MaxentModel}s.
+ * Utility class for handling of {@link LinearModel}s.
  */
 public final class ModelUtil {
 
@@ -80,7 +80,7 @@ public final class ModelUtil {
    *
    * @return true if all expected outcomes are the only outcomes of the model.
    */
-  public static boolean validateOutcomes(MaxentModel model, String... expectedOutcomes) {
+  public static boolean validateOutcomes(LinearModel model, String... expectedOutcomes) {
 
     boolean result = true;
 

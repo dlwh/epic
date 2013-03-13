@@ -20,7 +20,7 @@ package chalk.tools.doccat;
 
 import java.util.Iterator;
 
-import nak.model.Event;
+import nak.core.Event;
 import chalk.tools.util.AbstractEventStream;
 import chalk.tools.util.ObjectStream;
 

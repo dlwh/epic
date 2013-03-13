@@ -24,10 +24,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import nak.model.AbstractModel;
-import nak.model.MaxentModel;
-import nak.model.TrainUtil;
-import nak.model.TwoPassDataIndexer;
+import nak.core.AbstractModel;
+import nak.core.LinearModel;
+import nak.core.TrainUtil;
+import nak.data.TwoPassDataIndexer;
 import chalk.tools.chunker.Chunker;
 import chalk.tools.chunker.ChunkerME;
 import chalk.tools.chunker.ChunkerModel;
@@ -56,8 +56,8 @@ import chalk.tools.util.TrainingParameters;
  */
 public class Parser extends AbstractBottomUpParser {
 
-  private MaxentModel buildModel;
-  private MaxentModel checkModel;
+  private LinearModel buildModel;
+  private LinearModel checkModel;
 
   private BuildContextGenerator buildContextGenerator;
   private CheckContextGenerator checkContextGenerator;
@@ -96,7 +96,7 @@ public class Parser extends AbstractBottomUpParser {
    * @param headRules The head rules for head word perculation.
    */
   @Deprecated
-  public Parser(MaxentModel buildModel, MaxentModel checkModel, POSTagger tagger, Chunker chunker, HeadRules headRules) {
+  public Parser(LinearModel buildModel, LinearModel checkModel, POSTagger tagger, Chunker chunker, HeadRules headRules) {
   	this(buildModel,checkModel,tagger,chunker,headRules,defaultBeamSize,defaultAdvancePercentage);
   }
 
@@ -112,7 +112,7 @@ public class Parser extends AbstractBottomUpParser {
    * Only outcomes which contribute to the top "advancePercentage" will be explored.
    */
   @Deprecated
-  public Parser(MaxentModel buildModel, MaxentModel checkModel, POSTagger tagger, Chunker chunker, HeadRules headRules, int beamSize, double advancePercentage) {
+  public Parser(LinearModel buildModel, LinearModel checkModel, POSTagger tagger, Chunker chunker, HeadRules headRules, int beamSize, double advancePercentage) {
     super(tagger, chunker, headRules, beamSize, advancePercentage);
     this.buildModel = buildModel;
     this.checkModel = checkModel;
@@ -269,7 +269,7 @@ public class Parser extends AbstractBottomUpParser {
    * will be removed soon.
    */
   @Deprecated
-  public static AbstractModel train(nak.model.EventStream es, int iterations, int cut) throws java.io.IOException {
+  public static AbstractModel train(nak.data.EventStream es, int iterations, int cut) throws java.io.IOException {
     return nak.maxent.GIS.trainModel(iterations, new TwoPassDataIndexer(es, cut));
   }
 
@@ -294,7 +294,7 @@ public class Parser extends AbstractBottomUpParser {
     
     // build
     System.err.println("Training builder");
-    nak.model.EventStream bes = new ParserEventStream(parseSamples, rules, ParserEventTypeEnum.BUILD, mdict);
+    nak.data.EventStream bes = new ParserEventStream(parseSamples, rules, ParserEventTypeEnum.BUILD, mdict);
     Map<String, String> buildReportMap = new HashMap<String, String>();
     AbstractModel buildModel = TrainUtil.train(bes, mlParams.getSettings("build"), buildReportMap);
     mergeReportIntoManifest(manifestInfoEntries, buildReportMap, "build");
@@ -316,7 +316,7 @@ public class Parser extends AbstractBottomUpParser {
     
     // check
     System.err.println("Training checker");
-    nak.model.EventStream kes = new ParserEventStream(parseSamples, rules, ParserEventTypeEnum.CHECK);
+    nak.data.EventStream kes = new ParserEventStream(parseSamples, rules, ParserEventTypeEnum.CHECK);
     Map<String, String> checkReportMap = new HashMap<String, String>();
     AbstractModel checkModel = TrainUtil.train(kes, mlParams.getSettings("check"), checkReportMap);
     mergeReportIntoManifest(manifestInfoEntries, checkReportMap, "check");

@@ -29,8 +29,8 @@ import nak.io.BinaryGISModelReader;
 import nak.io.SuffixSensitiveGISModelReader;
 import nak.io.SuffixSensitiveGISModelWriter;
 import nak.maxent.GIS;
-import nak.model.Event;
-import nak.model.MaxentModel;
+import nak.core.Event;
+import nak.core.LinearModel;
 import chalk.tools.coref.mention.MentionContext;
 import chalk.tools.coref.mention.Parse;
 import chalk.tools.util.CollectionEventStream;
@@ -41,7 +41,7 @@ import chalk.tools.util.CollectionEventStream;
  */
 public class DefaultNonReferentialResolver implements NonReferentialResolver {
 
-  private MaxentModel model;
+  private LinearModel model;
   private List<Event> events;
   private boolean loadAsResource;
   private boolean debugOn = false;

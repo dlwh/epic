@@ -23,9 +23,9 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Map;
 
-import nak.model.AbstractModel;
-import nak.model.BinaryFileDataReader;
-import nak.model.GenericModelReader;
+import nak.core.AbstractModel;
+import nak.io.BinaryFileDataReader;
+import nak.io.GenericModelReader;
 import chalk.tools.util.InvalidFormatException;
 
 

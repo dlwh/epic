@@ -27,8 +27,8 @@ import java.util.List;
 import nak.io.SuffixSensitiveGISModelReader;
 import nak.io.SuffixSensitiveGISModelWriter;
 import nak.maxent.GIS;
-import nak.model.Event;
-import nak.model.MaxentModel;
+import nak.core.Event;
+import nak.core.LinearModel;
 import chalk.tools.coref.DiscourseEntity;
 import chalk.tools.coref.DiscourseModel;
 import chalk.tools.coref.mention.MentionContext;
@@ -52,7 +52,7 @@ public abstract class MaxentResolver extends AbstractResolver {
   private static boolean debugOn=false;
 
   private String modelName;
-  private MaxentModel model;
+  private LinearModel model;
   private double[] candProbs;
   private int sameIndex;
   private ResolverMode mode;

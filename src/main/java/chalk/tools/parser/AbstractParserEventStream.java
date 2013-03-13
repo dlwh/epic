@@ -23,7 +23,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
-import nak.model.Event;
+import nak.core.Event;
 import chalk.tools.chunker.ChunkerContextGenerator;
 import chalk.tools.dictionary.Dictionary;
 import chalk.tools.parser.chunking.Parser;

@@ -22,7 +22,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
-import nak.model.Event;
+import nak.core.Event;
 import chalk.tools.util.AbstractEventStream;
 import chalk.tools.util.ObjectStream;
 

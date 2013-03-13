@@ -30,7 +30,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 
-import nak.model.TrainUtil;
+import nak.core.TrainUtil;
 import chalk.tools.util.TrainingParameters;
 import chalk.tools.util.model.BaseModel;
 

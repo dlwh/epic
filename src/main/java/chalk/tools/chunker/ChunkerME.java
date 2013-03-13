@@ -23,10 +23,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import nak.model.AbstractModel;
-import nak.model.EventStream;
-import nak.model.MaxentModel;
-import nak.model.TrainUtil;
+import nak.core.AbstractModel;
+import nak.data.EventStream;
+import nak.core.LinearModel;
+import nak.core.TrainUtil;
 import chalk.tools.util.BeamSearch;
 import chalk.tools.util.ObjectStream;
 import chalk.tools.util.Sequence;
@@ -54,7 +54,7 @@ public class ChunkerME implements Chunker {
   /**
    * The model used to assign chunk tags to a sequence of tokens.
    */
-  protected MaxentModel model;
+  protected LinearModel model;
 
   /**
    * Initializes the current instance with the specified model and
@@ -122,7 +122,7 @@ public class ChunkerME implements Chunker {
    * @param mod The maximum entropy model for this chunker.
    */
   @Deprecated
-  public ChunkerME(MaxentModel mod) {
+  public ChunkerME(LinearModel mod) {
     this(mod, new DefaultChunkerContextGenerator(), DEFAULT_BEAM_SIZE);
   }
 
@@ -133,7 +133,7 @@ public class ChunkerME implements Chunker {
    * @param cg The context generator to be used by the specified model.
    */
   @Deprecated
-  public ChunkerME(MaxentModel mod, ChunkerContextGenerator cg) {
+  public ChunkerME(LinearModel mod, ChunkerContextGenerator cg) {
     this(mod, cg, DEFAULT_BEAM_SIZE);
   }
 
@@ -146,7 +146,7 @@ public class ChunkerME implements Chunker {
    * @param beamSize The size of the beam that should be used when decoding sequences.
    */
   @Deprecated
-  public ChunkerME(MaxentModel mod, ChunkerContextGenerator cg, int beamSize) {
+  public ChunkerME(LinearModel mod, ChunkerContextGenerator cg, int beamSize) {
     beam = new BeamSearch<String>(beamSize, cg, mod);
     this.model = mod;
   }

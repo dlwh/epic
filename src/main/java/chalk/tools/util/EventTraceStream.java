@@ -20,8 +20,8 @@ package chalk.tools.util;
 import java.io.IOException;
 import java.io.Writer;
 
-import nak.model.Event;
-import nak.model.EventStream;
+import nak.core.Event;
+import nak.data.EventStream;
 
 
 public class EventTraceStream implements EventStream {

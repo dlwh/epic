@@ -20,7 +20,7 @@ package chalk.tools.util;
 import java.util.Arrays;
 import java.util.List;
 
-import nak.model.MaxentModel;
+import nak.core.LinearModel;
 
 
 /**
@@ -37,7 +37,7 @@ public class BeamSearch<T> {
 
   protected int size;
   protected BeamSearchContextGenerator<T> cg;
-  protected MaxentModel model;
+  protected LinearModel model;
   private SequenceValidator<T> validator;
 
   private double[] probs;
@@ -51,16 +51,16 @@ public class BeamSearch<T> {
    * @param cg the context generator for the model.
    * @param model the model for assigning probabilities to the sequence outcomes.
    */
-  public BeamSearch(int size, BeamSearchContextGenerator<T> cg, MaxentModel model) {
+  public BeamSearch(int size, BeamSearchContextGenerator<T> cg, LinearModel model) {
     this(size, cg, model, null, 0);
   }
 
-  public BeamSearch(int size, BeamSearchContextGenerator<T> cg, MaxentModel model,
+  public BeamSearch(int size, BeamSearchContextGenerator<T> cg, LinearModel model,
       int cacheSize) {
     this (size, cg, model, null, cacheSize);
   }
 
-  public BeamSearch(int size, BeamSearchContextGenerator<T> cg, MaxentModel model,
+  public BeamSearch(int size, BeamSearchContextGenerator<T> cg, LinearModel model,
       SequenceValidator<T> validator, int cacheSize) {
 
     this.size = size;

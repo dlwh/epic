@@ -33,8 +33,8 @@ import java.util.Set;
 import nak.io.SuffixSensitiveGISModelReader;
 import nak.io.SuffixSensitiveGISModelWriter;
 import nak.maxent.GIS;
-import nak.model.Event;
-import nak.model.MaxentModel;
+import nak.core.Event;
+import nak.core.LinearModel;
 import chalk.tools.coref.resolver.ResolverUtils;
 import chalk.tools.util.CollectionEventStream;
 import chalk.tools.util.HashList;
@@ -48,7 +48,7 @@ public class SimilarityModel implements TestSimilarityModel, TrainSimilarityMode
 
   private String modelName;
   private String modelExtension = ".bin.gz";
-  private MaxentModel testModel;
+  private LinearModel testModel;
   private List<Event> events;
   private int SAME_INDEX;
   private static final String SAME = "same";

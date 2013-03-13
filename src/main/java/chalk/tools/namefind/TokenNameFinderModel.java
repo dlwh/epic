@@ -29,8 +29,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
-import nak.model.AbstractModel;
-import nak.model.MaxentModel;
+import nak.core.AbstractModel;
+import nak.core.LinearModel;
 import chalk.tools.util.InvalidFormatException;
 import chalk.tools.util.featuregen.AdaptiveFeatureGenerator;
 import chalk.tools.util.featuregen.AggregatedFeatureGenerator;
@@ -211,7 +211,7 @@ public class TokenNameFinderModel extends BaseModel {
   }
   
   // TODO: Write test for this method
-  public static boolean isModelValid(MaxentModel model) {
+  public static boolean isModelValid(LinearModel model) {
     
     // We should have *optionally* one outcome named "other", some named xyz-start and sometimes 
     // they have a pair xyz-cont. We should not have any other outcome

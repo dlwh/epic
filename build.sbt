@@ -24,7 +24,10 @@ libraryDependencies ++= Seq(
 )
 
 // New dependencies
-libraryDependencies += "org.scalanlp" % "nak" % "1.1.0"
+
+//libraryDependencies += "org.scalanlp" % "nak" % "1.1.0"
+
+libraryDependencies += "org.scalanlp" % "nak" % "1.1.1-SNAPSHOT"
 
 publishTo <<= version { v: String =>
   val nexus = "https://oss.sonatype.org/"

@@ -22,7 +22,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 
-import nak.model.TrainUtil;
+import nak.core.TrainUtil;
 import chalk.tools.cmdline.AbstractTrainerTool;
 import chalk.tools.cmdline.CmdLineUtil;
 import chalk.tools.cmdline.TerminateToolException;

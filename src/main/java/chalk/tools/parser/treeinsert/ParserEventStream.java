@@ -26,8 +26,8 @@ import java.util.List;
 import java.util.Map;
 
 import nak.io.SuffixSensitiveGISModelReader;
-import nak.model.AbstractModel;
-import nak.model.Event;
+import nak.core.AbstractModel;
+import nak.core.Event;
 import chalk.tools.dictionary.Dictionary;
 import chalk.tools.parser.AbstractBottomUpParser;
 import chalk.tools.parser.AbstractParserEventStream;
@@ -380,7 +380,7 @@ public class ParserEventStream extends AbstractParserEventStream {
     if (fun) {
       Parse.useFunctionTags(true);
     }
-    nak.model.EventStream es = new ParserEventStream(new ParseSampleStream(new PlainTextByLineStream(new java.io.InputStreamReader(System.in))), rules, etype, dict);
+    nak.data.EventStream es = new ParserEventStream(new ParseSampleStream(new PlainTextByLineStream(new java.io.InputStreamReader(System.in))), rules, etype, dict);
     while (es.hasNext()) {
       Event e = es.next();
       if (model != null) {

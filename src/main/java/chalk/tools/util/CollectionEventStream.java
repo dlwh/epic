@@ -21,13 +21,13 @@ package chalk.tools.util;
 import java.util.Collection;
 import java.util.Iterator;
 
-import nak.model.Event;
+import nak.core.Event;
 
 
 /**
  * Creates an event stream out of a collection of events.
  */
-public class CollectionEventStream extends nak.model.AbstractEventStream {
+public class CollectionEventStream extends nak.data.AbstractEventStream {
 
   private Iterator<Event> ci;
 

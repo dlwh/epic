@@ -32,11 +32,11 @@ import java.util.regex.Pattern;
 
 import nak.maxent.GIS;
 import nak.maxent.GISModel;
-import nak.model.AbstractModel;
-import nak.model.EventStream;
-import nak.model.MaxentModel;
-import nak.model.TrainUtil;
-import nak.model.TwoPassDataIndexer;
+import nak.core.AbstractModel;
+import nak.data.EventStream;
+import nak.core.LinearModel;
+import nak.core.TrainUtil;
+import nak.data.TwoPassDataIndexer;
 import chalk.tools.util.BeamSearch;
 import chalk.tools.util.ObjectStream;
 import chalk.tools.util.Sequence;
@@ -73,7 +73,7 @@ public class NameFinderME implements TokenNameFinder {
   public static final String CONTINUE = "cont";
   public static final String OTHER = "other";
 
-  protected MaxentModel model;
+  protected LinearModel model;
   protected NameContextGenerator contextGenerator;
   private Sequence bestSequence;
   private BeamSearch<String> beam;
@@ -136,7 +136,7 @@ public class NameFinderME implements TokenNameFinder {
    * @deprecated Use the new model API!
    */
   @Deprecated
-  public NameFinderME(MaxentModel mod) {
+  public NameFinderME(LinearModel mod) {
     this(mod, new DefaultNameContextGenerator(), DEFAULT_BEAM_SIZE);
   }
 
@@ -147,7 +147,7 @@ public class NameFinderME implements TokenNameFinder {
    * @param cg The context generator to be used with this name finder.
    */
   @Deprecated
-  public NameFinderME(MaxentModel mod, NameContextGenerator cg) {
+  public NameFinderME(LinearModel mod, NameContextGenerator cg) {
     this(mod, cg, DEFAULT_BEAM_SIZE);
   }
 
@@ -159,7 +159,7 @@ public class NameFinderME implements TokenNameFinder {
    * @param beamSize The size of the beam to be used in decoding this model.
    */
   @Deprecated
-  public NameFinderME(MaxentModel mod, NameContextGenerator cg, int beamSize) {
+  public NameFinderME(LinearModel mod, NameContextGenerator cg, int beamSize) {
     model = mod;
     contextGenerator = cg;
 

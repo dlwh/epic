@@ -19,7 +19,7 @@ package chalk.tools.cmdline.parser;
 
 import java.io.IOException;
 
-import nak.model.AbstractModel;
+import nak.core.AbstractModel;
 import chalk.tools.dictionary.Dictionary;
 import chalk.tools.parser.Parse;
 import chalk.tools.parser.ParserEventTypeEnum;
@@ -47,7 +47,7 @@ public final class CheckModelUpdaterTool extends ModelUpdaterTool {
       // TODO: Maybe that should be part of the ChunkingParser ...
       // Training build
       System.out.println("Training check model");
-      nak.model.EventStream bes = new ParserEventStream(parseSamples, 
+      nak.data.EventStream bes = new ParserEventStream(parseSamples, 
           originalModel.getHeadRules(), ParserEventTypeEnum.CHECK, mdict);
       AbstractModel checkModel = Parser.train(bes, 
           parameters.getIterations(), parameters.getCutoff());
