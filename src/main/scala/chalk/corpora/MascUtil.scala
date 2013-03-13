@@ -199,27 +199,34 @@ object MascFile {
 
     // Insert the "missing" sentences. (Content not marked as a sentence,
     // but containing tokens.)
-    val paddedSentenceRegionBuffer =
-      collection.mutable.ListBuffer[MRegion](sentenceRegions.head)
-
-    sentenceRegions.sliding(2).foreach {
-      case Seq(prev, curr) => {
-        if (prev.end + 1 < curr.start)
-          paddedSentenceRegionBuffer.append(MRegion("", prev.end + 1, curr.start - 1))
-        paddedSentenceRegionBuffer.append(curr)
-      }
-    }
     
-    val paddedSentenceRegions = paddedSentenceRegionBuffer.toSeq
+    //val paddedSentenceRegionBuffer =
+    //  collection.mutable.ListBuffer[MRegion](sentenceRegions.head)
+    //
+    //sentenceRegions.sliding(2).foreach {
+    //  case Seq(prev, curr) => {
+    //    if (prev.end + 1 < curr.start)
+    //      paddedSentenceRegionBuffer.append(MRegion("", prev.end + 1, curr.start - 1))
+    //    paddedSentenceRegionBuffer.append(curr)
+    //  }
+    //}
+    //
+    //val paddedSentenceRegions = paddedSentenceRegionBuffer.toSeq
+    val paddedSentenceRegions = sentenceRegions
 
     // Pull out the sequence of token, pos, and NE for each sentence.
     val allOrderedTokRegions = tokenRegions.values.toIndexedSeq.sorted
     var index = 0
     val allDataBySentence = paddedSentenceRegions.flatMap { region => {
-      val endIndex = allOrderedTokRegions.indexWhere(t=>t.end>region.end,index)
-      if (index == endIndex) None
+      //val startIndex = math.max(index, region.start)
+      val startIndex = math.max(index, allOrderedTokRegions.indexWhere(t=>t.start>=region.start,index))
+      //val startIndex = index
+      val endIndex = allOrderedTokRegions.indexWhere(t=>t.end>region.end,startIndex)
+      //println(region.start + " -- " + region.end)
+      //println(index + ": " + startIndex + " , " + endIndex)
+      if (startIndex == endIndex) None
       else {
-        val sentence = allOrderedTokRegions.slice(index,endIndex)
+        val sentence = allOrderedTokRegions.slice(startIndex,endIndex)
         index = endIndex
         orderedTokPosNer(sentence)
       }
