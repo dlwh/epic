@@ -54,6 +54,8 @@ public final class TokenNameFinderTrainerTool
   public String getShortDescription() {
     return "trainer for the learnable name finder";
   }
+
+  public static byte[] openFeatureGeneratorBytes() { return null; }
   
   static byte[] openFeatureGeneratorBytes(String featureGenDescriptorFile) {
     if(featureGenDescriptorFile != null) {
@@ -169,6 +171,8 @@ public final class TokenNameFinderTrainerTool
     Map<String, Object> resources = loadResources(params.getResources());
         
     CmdLineUtil.checkOutputFile("name finder model", modelOutFile);
+
+    System.out.println("******** " + params.getType());
 
     if (params.getNameTypes() != null) {
       String nameTypes[] = params.getNameTypes().split(",");

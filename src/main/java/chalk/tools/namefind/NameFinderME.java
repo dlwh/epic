@@ -168,7 +168,7 @@ public class NameFinderME implements TokenNameFinder {
         new NameFinderSequenceValidator(), beamSize);
   }
 
-  private static AdaptiveFeatureGenerator createFeatureGenerator() {
+  public static AdaptiveFeatureGenerator createFeatureGenerator() {
    return new CachedFeatureGenerator(
          new AdaptiveFeatureGenerator[]{
            new WindowFeatureGenerator(new TokenFeatureGenerator(), 2, 2),

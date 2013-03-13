@@ -11,6 +11,89 @@ case class MRegion(id: String, start: Int, end: Int) extends Ordered[MRegion] {
   def compare(that: MRegion) = this.start - that.start
 }
 
+object MascEval {
+  import chalk.tools.sentdetect._
+  import chalk.tools.tokenize._
+  import chalk.tools.namefind._
+  import chalk.tools.util.model.ModelUtil
+  import chalk.tools.util._
+  import chalk.tools.cmdline.CmdLineUtil
+  import chalk.tools.cmdline.sentdetect._
+  import chalk.tools.cmdline.namefind._
+  
+  def main(args: Array[String]) {
+
+    val mascDir = new File(args(0))
+
+    val mlParams = TrainingParameters.defaultParams
+
+    val eos = Array[Char]()
+    
+    val sentenceTraining = sentenceSampleStream(new File(mascDir, "train/train-sent.txt"))
+    val sdFactory = SentenceDetectorFactory.create(null, "en", true, null, eos);
+    val sentModel = SentenceDetectorME.train("en", sentenceTraining, sdFactory, mlParams)
+    sentenceTraining.close
+    
+    val sentenceEvaluator = new SentenceDetectorEvaluator(new SentenceDetectorME(sentModel))
+    val sentenceDev = sentenceSampleStream(new File(mascDir, "dev/dev-sent.txt"))
+    sentenceEvaluator.evaluate(sentenceDev)
+    sentenceDev.close
+
+    val tokTraining = tokenSampleStream(new File(mascDir, "train/train-tok.txt"))
+    val tokFactory = TokenizerFactory.create(null, "en", null, false, null)
+    val tokModel = TokenizerME.train(tokTraining, tokFactory, mlParams)
+    tokTraining.close
+    
+    val tokEvaluator = new TokenizerEvaluator(new TokenizerME(tokModel))
+    val tokDev = tokenSampleStream(new File(mascDir, "dev/dev-tok.txt"))
+    tokEvaluator.evaluate(tokDev)
+    tokDev.close
+
+    val featureGeneratorBytes = TokenNameFinderTrainerTool.openFeatureGeneratorBytes()
+    val resources = new java.util.HashMap[String, Object]()
+    
+    val nerTraining = nerSampleStream(new File(mascDir, "train/train-ner-opennlp.txt"))
+
+    val nerModel = NameFinderME.train("en", "default", nerTraining, mlParams, featureGeneratorBytes, resources)
+    nerTraining.close
+
+    val nerEvaluator = new TokenNameFinderEvaluator(new NameFinderME(nerModel))
+    val nerDev = nerSampleStream(new File(mascDir, "dev/dev-ner-opennlp.txt"))
+    nerEvaluator.evaluate(nerDev)
+    nerDev.close
+
+    println("Sentence detection")
+    println(sentenceEvaluator.getFMeasure)
+    println
+
+    println("Tokenization")
+    println(tokEvaluator.getFMeasure)
+    println
+
+    println("NER")
+    println(nerEvaluator.getFMeasure)
+    println    
+  }
+
+  private def nerSampleStream(file: File) = {
+    val sampleDataIn = CmdLineUtil.openInFile(file)
+    val lineStream = new PlainTextByLineStream(sampleDataIn.getChannel(), "UTF-8")
+    new NameSampleDataStream(lineStream)
+  }
+
+  private def tokenSampleStream(file: File) = {
+    val sampleDataIn = CmdLineUtil.openInFile(file)
+    val lineStream = new PlainTextByLineStream(sampleDataIn.getChannel(), "UTF-8")
+    new TokenSampleStream(lineStream)
+  }
+
+  private def sentenceSampleStream(file: File) = {
+    val sampleDataIn = CmdLineUtil.openInFile(file)
+    val lineStream = new PlainTextByLineStream(sampleDataIn.getChannel(), "UTF-8")
+    new SentenceSampleStream(lineStream)
+  }
+
+}
 
 /**
 * Convert native MASC xml into CONLL format for named entity recognition.
