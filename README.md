@@ -14,7 +14,7 @@ The name Chalk comes from the name given to one of Jason's son's stuffed elephan
 The latest stable release is 1.1.1. It includes:
 
 * All the code from the OpenNLP library (apart from that in [Nak](https://github.com/scalanlp/nak)), slightly reorganized.
-* Code (still preliminary) for working with [the MASC corpus](http://www.americannationalcorpus.org/MASC/About.html) to enable training of models on the annotations it provides. See [the tutorial](https://github.com/scalanlp/chalk/wiki/Tutorial) for details.
+* Code (still prelimary) for working with [the MASC corpus](http://www.anc.org/data/masc/) to enable training of models on the annotations it provides. See [the tutorial](https://github.com/scalanlp/chalk/wiki/Tutorial) for details.
 
 Note that the domain has changed from **com.jasonbaldridge** (v1.0) to **org.scalanlp** now.
 
