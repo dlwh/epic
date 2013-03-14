@@ -72,7 +72,6 @@ public class BeamSearch<T> {
       contextsCache = new Cache(cacheSize);
     }
 
-    this.probs = new double[model.getNumOutcomes()];
   }
 
   /**
@@ -128,12 +127,12 @@ public class BeamSearch<T> {
         if (contextsCache != null) {
           scores = (double[]) contextsCache.get(contexts);
           if (scores == null) {
-            scores = model.eval(contexts, probs);
+            scores = model.eval(contexts);
             contextsCache.put(contexts,scores);
           }
         }
         else {
-          scores = model.eval(contexts, probs);
+          scores = model.eval(contexts);
         }
 
         double[] temp_scores = new double[scores.length];

@@ -31,6 +31,7 @@ import nak.core.AbstractModel;
 import nak.data.EventStream;
 import nak.core.LinearModel;
 import nak.core.TrainUtil;
+import nak.classify.ClassifierUtil;
 import chalk.tools.dictionary.Dictionary;
 import chalk.tools.tokenize.lang.Factory;
 import chalk.tools.util.ObjectStream;
@@ -204,7 +205,7 @@ public class TokenizerME extends AbstractTokenizer {
         for (int j = origStart + 1; j < end; j++) {
           double[] probs =
             model.eval(cg.getContext(tok, j - origStart));
-          String best = model.getBestOutcome(probs);
+          String best = ClassifierUtil.getBestOutcome(model, probs);
           tokenProb *= probs[model.getIndex(best)];
           if (best.equals(TokenizerME.SPLIT)) {
             newTokens.add(new Span(start, j));

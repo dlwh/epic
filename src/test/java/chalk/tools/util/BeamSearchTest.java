@@ -27,7 +27,7 @@ import java.util.Map;
 
 import org.junit.Test;
 
-import nak.model.MaxentModel;
+import nak.core.LinearModel;
 import chalk.tools.util.BeamSearch;
 import chalk.tools.util.BeamSearchContextGenerator;
 import chalk.tools.util.Sequence;
@@ -50,7 +50,7 @@ public class BeamSearchTest {
   }
   
   
-  static class IdentityModel implements MaxentModel {
+  static class IdentityModel implements LinearModel {
 
     private String[] outcomes;
     
@@ -128,7 +128,7 @@ public class BeamSearchTest {
     BeamSearchContextGenerator<String> cg = new IdentityFeatureGenerator(sequence);
     
     String outcomes[] = new String[] {"1", "2", "3"};
-    MaxentModel model = new IdentityModel(outcomes);
+    LinearModel model = new IdentityModel(outcomes);
     
     BeamSearch<String> bs = new BeamSearch<String>(3, cg, model);
     
@@ -146,7 +146,7 @@ public class BeamSearchTest {
     BeamSearchContextGenerator<String> cg = new IdentityFeatureGenerator(sequence);
     
     String outcomes[] = new String[] {"1", "2", "3"};
-    MaxentModel model = new IdentityModel(outcomes);
+    LinearModel model = new IdentityModel(outcomes);
     
     BeamSearch<String> bs = new BeamSearch<String>(3, cg, model);
     
@@ -165,7 +165,7 @@ public class BeamSearchTest {
     BeamSearchContextGenerator<String> cg = new IdentityFeatureGenerator(sequence);
     
     String outcomes[] = new String[] {"1", "2", "3"};
-    MaxentModel model = new IdentityModel(outcomes);
+    LinearModel model = new IdentityModel(outcomes);
     
     BeamSearch<String> bs = new BeamSearch<String>(2, cg, model);
     
@@ -188,7 +188,7 @@ public class BeamSearchTest {
     BeamSearchContextGenerator<String> cg = new IdentityFeatureGenerator(sequence);
     
     String outcomes[] = new String[] {"1", "2", "3"};
-    MaxentModel model = new IdentityModel(outcomes);
+    LinearModel model = new IdentityModel(outcomes);
     
     BeamSearch<String> bs = new BeamSearch<String>(2, cg, model, new SequenceValidator<String>(){
 

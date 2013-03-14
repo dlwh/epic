@@ -28,7 +28,7 @@ import java.util.Collections;
 
 import org.junit.Test;
 
-import nak.model.AbstractModel;
+import nak.core.AbstractModel;
 import chalk.tools.namefind.NameFinderME;
 import chalk.tools.namefind.NameSample;
 import chalk.tools.namefind.NameSampleDataStream;

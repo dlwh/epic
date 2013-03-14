@@ -30,6 +30,7 @@ import nak.core.AbstractModel;
 import nak.data.EventStream;
 import nak.core.LinearModel;
 import nak.core.TrainUtil;
+import nak.classify.ClassifierUtil;
 import chalk.tools.dictionary.Dictionary;
 import chalk.tools.sentdetect.lang.Factory;
 import chalk.tools.util.ObjectStream;
@@ -183,7 +184,7 @@ public class SentenceDetectorME implements SentenceDetector {
       }
 
       double[] probs = model.eval(cgen.getContext(sb, cint));
-      String bestOutcome = model.getBestOutcome(probs);
+      String bestOutcome = ClassifierUtil.getBestOutcome(model, probs);
 
       if (bestOutcome.equals(SPLIT) && isAcceptableBreak(s, index, cint)) {
         if (index != cint) {

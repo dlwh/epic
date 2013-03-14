@@ -28,6 +28,7 @@ import nak.core.AbstractModel;
 import nak.core.LinearModel;
 import nak.core.TrainUtil;
 import nak.data.TwoPassDataIndexer;
+import nak.classify.ClassifierUtil;
 import chalk.tools.tokenize.SimpleTokenizer;
 import chalk.tools.tokenize.Tokenizer;
 import chalk.tools.util.ObjectStream;
@@ -118,7 +119,7 @@ public class DocumentCategorizerME implements DocumentCategorizer {
   }
 
   public String getBestCategory(double[] outcome) {
-    return model.getBestOutcome(outcome);
+    return ClassifierUtil.getBestOutcome(model,outcome);
   }
 
   public int getIndex(String category) {
@@ -134,7 +135,7 @@ public class DocumentCategorizerME implements DocumentCategorizer {
   }
 
   public String getAllResults(double results[]) {
-    return model.getAllOutcomes(results);
+    return ClassifierUtil.getAllOutcomes(model, results);
   }
 
   /**

@@ -30,9 +30,6 @@ import chalk.tools.cmdline.chunker.ChunkerCrossValidatorTool;
 import chalk.tools.cmdline.chunker.ChunkerEvaluatorTool;
 import chalk.tools.cmdline.chunker.ChunkerMETool;
 import chalk.tools.cmdline.chunker.ChunkerTrainerTool;
-import chalk.tools.cmdline.coref.CoreferenceConverterTool;
-import chalk.tools.cmdline.coref.CoreferencerTool;
-import chalk.tools.cmdline.coref.CoreferencerTrainerTool;
 import chalk.tools.cmdline.dictionary.DictionaryBuilderTool;
 import chalk.tools.cmdline.doccat.DoccatConverterTool;
 import chalk.tools.cmdline.doccat.DoccatTool;
@@ -43,12 +40,6 @@ import chalk.tools.cmdline.namefind.TokenNameFinderCrossValidatorTool;
 import chalk.tools.cmdline.namefind.TokenNameFinderEvaluatorTool;
 import chalk.tools.cmdline.namefind.TokenNameFinderTool;
 import chalk.tools.cmdline.namefind.TokenNameFinderTrainerTool;
-import chalk.tools.cmdline.parser.BuildModelUpdaterTool;
-import chalk.tools.cmdline.parser.CheckModelUpdaterTool;
-import chalk.tools.cmdline.parser.ParserConverterTool;
-import chalk.tools.cmdline.parser.ParserTool;
-import chalk.tools.cmdline.parser.ParserTrainerTool;
-import chalk.tools.cmdline.parser.TaggerModelReplacerTool;
 import chalk.tools.cmdline.postag.POSTaggerConverterTool;
 import chalk.tools.cmdline.postag.POSTaggerCrossValidatorTool;
 import chalk.tools.cmdline.postag.POSTaggerEvaluatorTool;
@@ -125,19 +116,6 @@ public final class CLI {
     tools.add(new ChunkerEvaluatorTool());
     tools.add(new ChunkerCrossValidatorTool());
     tools.add(new ChunkerConverterTool());
-    
-    // Parser
-    tools.add(new ParserTool());
-    tools.add(new ParserTrainerTool()); // trains everything
-    tools.add(new ParserConverterTool()); // trains everything
-    tools.add(new BuildModelUpdaterTool()); // re-trains  build model
-    tools.add(new CheckModelUpdaterTool()); // re-trains  build model
-    tools.add(new TaggerModelReplacerTool());
-    
-    // Coreferencer
-    tools.add(new CoreferencerTool());
-    tools.add(new CoreferencerTrainerTool());
-    tools.add(new CoreferenceConverterTool());
     
     for (CmdLineTool tool : tools) {
       toolLookupMap.put(tool.getName(), tool);

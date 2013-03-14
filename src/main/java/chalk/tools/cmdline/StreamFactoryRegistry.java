@@ -27,11 +27,9 @@ import chalk.tools.formats.Conll03NameSampleStreamFactory;
 import chalk.tools.formats.ConllXPOSSampleStreamFactory;
 import chalk.tools.formats.ConllXSentenceSampleStreamFactory;
 import chalk.tools.formats.ConllXTokenSampleStreamFactory;
-import chalk.tools.formats.CorefSampleStreamFactory;
 import chalk.tools.formats.DocumentSampleStreamFactory;
 import chalk.tools.formats.LeipzigDocumentSampleStreamFactory;
 import chalk.tools.formats.NameSampleDataStreamFactory;
-import chalk.tools.formats.ParseSampleStreamFactory;
 import chalk.tools.formats.SentenceSampleStreamFactory;
 import chalk.tools.formats.TokenSampleStreamFactory;
 import chalk.tools.formats.WordTagSampleStreamFactory;
@@ -44,12 +42,6 @@ import chalk.tools.formats.convert.NameToSentenceSampleStreamFactory;
 import chalk.tools.formats.convert.NameToTokenSampleStreamFactory;
 import chalk.tools.formats.convert.POSToSentenceSampleStreamFactory;
 import chalk.tools.formats.convert.POSToTokenSampleStreamFactory;
-import chalk.tools.formats.convert.ParseToPOSSampleStreamFactory;
-import chalk.tools.formats.convert.ParseToSentenceSampleStreamFactory;
-import chalk.tools.formats.convert.ParseToTokenSampleStreamFactory;
-import chalk.tools.formats.frenchtreebank.ConstitParseSampleStreamFactory;
-import chalk.tools.formats.muc.Muc6FullParseCorefSampleStreamFactory;
-import chalk.tools.formats.muc.Muc6NameSampleStreamFactory;
 
 
 /**
@@ -64,11 +56,9 @@ public final class StreamFactoryRegistry {
     ChunkerSampleStreamFactory.registerFactory();
     DocumentSampleStreamFactory.registerFactory();
     NameSampleDataStreamFactory.registerFactory();
-    ParseSampleStreamFactory.registerFactory();
     SentenceSampleStreamFactory.registerFactory();
     TokenSampleStreamFactory.registerFactory();
     WordTagSampleStreamFactory.registerFactory();
-    CorefSampleStreamFactory.registerFactory();
     
     NameToSentenceSampleStreamFactory.registerFactory();
     NameToTokenSampleStreamFactory.registerFactory();
@@ -76,10 +66,6 @@ public final class StreamFactoryRegistry {
     POSToSentenceSampleStreamFactory.registerFactory();
     POSToTokenSampleStreamFactory.registerFactory();
 
-    ParseToPOSSampleStreamFactory.registerFactory();
-    ParseToSentenceSampleStreamFactory.registerFactory();
-    ParseToTokenSampleStreamFactory.registerFactory();
-    
     BioNLP2004NameSampleStreamFactory.registerFactory();
     Conll02NameSampleStreamFactory.registerFactory();
     Conll03NameSampleStreamFactory.registerFactory();
@@ -93,10 +79,6 @@ public final class StreamFactoryRegistry {
     ADPOSSampleStreamFactory.registerFactory();
     ADTokenSampleStreamFactory.registerFactory();
     
-    Muc6NameSampleStreamFactory.registerFactory();
-    Muc6FullParseCorefSampleStreamFactory.registerFactory();
-    
-    ConstitParseSampleStreamFactory.registerFactory();
   }
 
   public static final String DEFAULT_FORMAT = "opennlp";

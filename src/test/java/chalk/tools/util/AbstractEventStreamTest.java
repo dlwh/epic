@@ -29,7 +29,7 @@ import java.util.List;
 
 import org.junit.Test;
 
-import nak.model.Event;
+import nak.core.Event;
 import chalk.tools.util.AbstractEventStream;
 import chalk.tools.util.CollectionObjectStream;
 import chalk.tools.util.ObjectStream;
