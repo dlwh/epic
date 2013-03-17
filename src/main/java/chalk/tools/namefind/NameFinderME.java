@@ -32,7 +32,6 @@ import java.util.regex.Pattern;
 
 import nak.maxent.GIS;
 import nak.maxent.GISModel;
-import nak.core.AbstractModel;
 import nak.data.EventStream;
 import nak.core.LinearModel;
 import nak.core.TrainUtil;
@@ -358,7 +357,7 @@ public class NameFinderME implements TokenNameFinder {
      else
        featureGenerator = createFeatureGenerator();
 
-     AbstractModel nameFinderModel;
+     LinearModel nameFinderModel;
 
      if (!TrainUtil.isSequenceTraining(trainParams.getSettings())) {
        EventStream eventStream = new NameFinderEventStream(samples, type,

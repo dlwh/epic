@@ -30,7 +30,7 @@ import nak.core.AbstractModel;
 import nak.data.EventStream;
 import nak.core.LinearModel;
 import nak.core.TrainUtil;
-import nak.classify.ClassifierUtil;
+import nak.core.ClassifierUtil;
 import chalk.tools.dictionary.Dictionary;
 import chalk.tools.sentdetect.lang.Factory;
 import chalk.tools.util.ObjectStream;
@@ -311,7 +311,7 @@ public class SentenceDetectorME implements SentenceDetector {
     EventStream eventStream = new SDEventStream(samples,
         sdFactory.getSDContextGenerator(), sdFactory.getEndOfSentenceScanner());
 
-    AbstractModel sentModel = TrainUtil.train(eventStream,
+    LinearModel sentModel = TrainUtil.train(eventStream,
         mlParams.getSettings(), manifestInfoEntries);
 
     return new SentenceModel(languageCode, sentModel, manifestInfoEntries,

@@ -23,7 +23,7 @@ import java.io.InputStream;
 import java.net.URL;
 import java.util.Map;
 
-import nak.core.AbstractModel;
+import nak.core.LinearModel;
 import chalk.tools.util.InvalidFormatException;
 import chalk.tools.util.model.BaseModel;
 
@@ -33,7 +33,7 @@ public class DoccatModel extends BaseModel {
   private static final String COMPONENT_NAME = "DocumentCategorizerME";
   private static final String DOCCAT_MODEL_ENTRY_NAME = "doccat.model";
   
-  protected DoccatModel(String languageCode, AbstractModel doccatModel,
+  protected DoccatModel(String languageCode, LinearModel doccatModel,
       Map<String, String> manifestInfoEntries) {
     super(COMPONENT_NAME, languageCode, manifestInfoEntries);
     
@@ -41,7 +41,7 @@ public class DoccatModel extends BaseModel {
     checkArtifactMap();
   }
   
-  public DoccatModel(String languageCode, AbstractModel doccatModel) {
+  public DoccatModel(String languageCode, LinearModel doccatModel) {
     this(languageCode, doccatModel, null);
   }
   
@@ -61,12 +61,12 @@ public class DoccatModel extends BaseModel {
   protected void validateArtifactMap() throws InvalidFormatException {
     super.validateArtifactMap();
 
-    if (!(artifactMap.get(DOCCAT_MODEL_ENTRY_NAME) instanceof AbstractModel)) {
+    if (!(artifactMap.get(DOCCAT_MODEL_ENTRY_NAME) instanceof LinearModel)) {
       throw new InvalidFormatException("Doccat model is incomplete!");
     }
   }
 
-  public AbstractModel getChunkerModel() {
-    return (AbstractModel) artifactMap.get(DOCCAT_MODEL_ENTRY_NAME);
+  public LinearModel getChunkerModel() {
+    return (LinearModel) artifactMap.get(DOCCAT_MODEL_ENTRY_NAME);
   }
 }

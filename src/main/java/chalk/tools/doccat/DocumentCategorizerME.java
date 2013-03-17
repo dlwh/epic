@@ -24,11 +24,10 @@ import java.util.HashMap;
 import java.util.Map;
 
 import nak.maxent.GIS;
-import nak.core.AbstractModel;
+import nak.core.ClassifierUtil;
 import nak.core.LinearModel;
 import nak.core.TrainUtil;
 import nak.data.TwoPassDataIndexer;
-import nak.classify.ClassifierUtil;
 import chalk.tools.tokenize.SimpleTokenizer;
 import chalk.tools.tokenize.Tokenizer;
 import chalk.tools.util.ObjectStream;
@@ -146,7 +145,7 @@ public class DocumentCategorizerME implements DocumentCategorizer {
    * @return the new model
    */
    @Deprecated
-  public static AbstractModel train(DocumentCategorizerEventStream eventStream) throws IOException {
+  public static LinearModel train(DocumentCategorizerEventStream eventStream) throws IOException {
     return GIS.trainModel(100, new TwoPassDataIndexer(eventStream, 5));
   }
   
@@ -161,7 +160,7 @@ public class DocumentCategorizerME implements DocumentCategorizer {
      
      Map<String, String> manifestInfoEntries = new HashMap<String, String>();
      
-     AbstractModel model = TrainUtil.train(
+     LinearModel model = TrainUtil.train(
          new DocumentCategorizerEventStream(samples, featureGenerators),
          mlParams.getSettings(), manifestInfoEntries);
        

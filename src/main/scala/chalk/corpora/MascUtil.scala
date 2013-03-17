@@ -49,18 +49,18 @@ object MascEval {
     tokEvaluator.evaluate(tokDev)
     tokDev.close
 
-    val featureGeneratorBytes = TokenNameFinderTrainerTool.openFeatureGeneratorBytes()
-    val resources = new java.util.HashMap[String, Object]()
-    
-    val nerTraining = nerSampleStream(new File(mascDir, "train/train-ner-opennlp.txt"))
-
-    val nerModel = NameFinderME.train("en", "default", nerTraining, mlParams, featureGeneratorBytes, resources)
-    nerTraining.close
-
-    val nerEvaluator = new TokenNameFinderEvaluator(new NameFinderME(nerModel))
-    val nerDev = nerSampleStream(new File(mascDir, "dev/dev-ner-opennlp.txt"))
-    nerEvaluator.evaluate(nerDev)
-    nerDev.close
+    //val featureGeneratorBytes = TokenNameFinderTrainerTool.openFeatureGeneratorBytes()
+    //val resources = new java.util.HashMap[String, Object]()
+    //
+    //val nerTraining = nerSampleStream(new File(mascDir, "train/train-ner-opennlp.txt"))
+    //
+    //val nerModel = NameFinderME.train("en", "default", nerTraining, mlParams, featureGeneratorBytes, resources)
+    //nerTraining.close
+    //
+    //val nerEvaluator = new TokenNameFinderEvaluator(new NameFinderME(nerModel))
+    //val nerDev = nerSampleStream(new File(mascDir, "dev/dev-ner-opennlp.txt"))
+    //nerEvaluator.evaluate(nerDev)
+    //nerDev.close
 
     println("Sentence detection")
     println(sentenceEvaluator.getFMeasure)
@@ -70,15 +70,15 @@ object MascEval {
     println(tokEvaluator.getFMeasure)
     println
 
-    println("NER")
-    println(nerEvaluator.getFMeasure)
-    println    
+    //println("NER")
+    //println(nerEvaluator.getFMeasure)
+    //println    
   }
 
-  private def nerSampleStream(file: File) = {
+  private def sentenceSampleStream(file: File) = {
     val sampleDataIn = CmdLineUtil.openInFile(file)
     val lineStream = new PlainTextByLineStream(sampleDataIn.getChannel(), "UTF-8")
-    new NameSampleDataStream(lineStream)
+    new SentenceSampleStream(lineStream)
   }
 
   private def tokenSampleStream(file: File) = {
@@ -87,10 +87,10 @@ object MascEval {
     new TokenSampleStream(lineStream)
   }
 
-  private def sentenceSampleStream(file: File) = {
+  private def nerSampleStream(file: File) = {
     val sampleDataIn = CmdLineUtil.openInFile(file)
     val lineStream = new PlainTextByLineStream(sampleDataIn.getChannel(), "UTF-8")
-    new SentenceSampleStream(lineStream)
+    new NameSampleDataStream(lineStream)
   }
 
 }

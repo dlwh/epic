@@ -27,11 +27,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-import nak.core.AbstractModel;
 import nak.data.EventStream;
 import nak.core.LinearModel;
 import nak.core.TrainUtil;
-import nak.classify.ClassifierUtil;
+import nak.core.ClassifierUtil;
 import chalk.tools.dictionary.Dictionary;
 import chalk.tools.tokenize.lang.Factory;
 import chalk.tools.util.ObjectStream;
@@ -249,7 +248,7 @@ public class TokenizerME extends AbstractTokenizer {
         factory.isUseAlphaNumericOptmization(),
         factory.getAlphaNumericPattern(), factory.getContextGenerator());
 
-    AbstractModel maxentModel = TrainUtil.train(eventStream,
+    LinearModel maxentModel = TrainUtil.train(eventStream,
         mlParams.getSettings(), manifestInfoEntries);
 
     return new TokenizerModel(maxentModel, manifestInfoEntries,
@@ -312,7 +311,7 @@ public class TokenizerME extends AbstractTokenizer {
         factory.createTokenContextGenerator(languageCode,
             getAbbreviations(abbreviations)));
 
-    AbstractModel maxentModel = TrainUtil.train(eventStream,
+    LinearModel maxentModel = TrainUtil.train(eventStream,
         mlParams.getSettings(), manifestInfoEntries);
 
     return new TokenizerModel(languageCode, maxentModel, abbreviations,

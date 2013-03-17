@@ -28,7 +28,6 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-import nak.core.AbstractModel;
 import nak.io.GenericModelWriter;
 import nak.core.LinearModel;
 import nak.core.TrainUtil;
@@ -55,7 +54,7 @@ public final class ModelUtil {
    * @throws IOException
    * @throws {@link IllegalArgumentException} in case one of the parameters is null
    */
-  public static void writeModel(AbstractModel model, final OutputStream out) throws IOException {
+  public static void writeModel(LinearModel model, final OutputStream out) throws IOException {
     
     if (model == null)
       throw new IllegalArgumentException("model parameter must not be null!");

@@ -24,7 +24,7 @@ import java.io.InputStream;
 import java.net.URL;
 import java.util.Map;
 
-import nak.core.AbstractModel;
+import nak.core.LinearModel;
 import chalk.tools.dictionary.Dictionary;
 import chalk.tools.util.BaseToolFactory;
 import chalk.tools.util.InvalidFormatException;
@@ -46,10 +46,10 @@ public final class POSModel extends BaseModel {
 
   /**
    * @deprecated Use
-   *             {@link #POSModel(String, AbstractModel, Map, POSTaggerFactory)}
+   *             {@link #POSModel(String, LinearModel, Map, POSTaggerFactory)}
    *             instead.
    */
-  public POSModel(String languageCode, AbstractModel posModel,
+  public POSModel(String languageCode, LinearModel posModel,
       POSDictionary tagDictionary, Dictionary ngramDict, Map<String, String> manifestInfoEntries) {
 
     this(languageCode, posModel, manifestInfoEntries, new POSTaggerFactory(
@@ -58,16 +58,16 @@ public final class POSModel extends BaseModel {
 
   /**
    * @deprecated Use
-   *             {@link #POSModel(String, AbstractModel, Map, POSTaggerFactory)}
+   *             {@link #POSModel(String, LinearModel, Map, POSTaggerFactory)}
    *             instead.
    */
-  public POSModel(String languageCode, AbstractModel posModel,
+  public POSModel(String languageCode, LinearModel posModel,
       POSDictionary tagDictionary, Dictionary ngramDict) {
     this(languageCode, posModel, null, new POSTaggerFactory(ngramDict,
         tagDictionary));
   }
   
-  public POSModel(String languageCode, AbstractModel posModel,
+  public POSModel(String languageCode, LinearModel posModel,
       Map<String, String> manifestInfoEntries, POSTaggerFactory posFactory) {
 
     super(COMPONENT_NAME, languageCode, manifestInfoEntries, posFactory);
@@ -108,13 +108,13 @@ public final class POSModel extends BaseModel {
   protected void validateArtifactMap() throws InvalidFormatException {
     super.validateArtifactMap();
 
-    if (!(artifactMap.get(POS_MODEL_ENTRY_NAME) instanceof AbstractModel)) {
+    if (!(artifactMap.get(POS_MODEL_ENTRY_NAME) instanceof LinearModel)) {
       throw new InvalidFormatException("POS model is incomplete!");
     }
   }
 
-  public AbstractModel getPosModel() {
-    return (AbstractModel) artifactMap.get(POS_MODEL_ENTRY_NAME);
+  public LinearModel getPosModel() {
+    return (LinearModel) artifactMap.get(POS_MODEL_ENTRY_NAME);
   }
 
   /**

@@ -29,7 +29,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
-import nak.core.AbstractModel;
 import nak.core.LinearModel;
 import chalk.tools.util.InvalidFormatException;
 import chalk.tools.util.featuregen.AdaptiveFeatureGenerator;
@@ -73,7 +72,7 @@ public class TokenNameFinderModel extends BaseModel {
  
   private static final String GENERATOR_DESCRIPTOR_ENTRY_NAME = "generator.featuregen";
  
-  public TokenNameFinderModel(String languageCode, AbstractModel nameFinderModel,
+  public TokenNameFinderModel(String languageCode, LinearModel nameFinderModel,
       byte[] generatorDescriptor, Map<String, Object> resources, Map<String, String> manifestInfoEntries) {
     
     super(COMPONENT_NAME, languageCode, manifestInfoEntries);
@@ -102,7 +101,7 @@ public class TokenNameFinderModel extends BaseModel {
     checkArtifactMap();
   }
 
-  public TokenNameFinderModel(String languageCode, AbstractModel nameFinderModel,
+  public TokenNameFinderModel(String languageCode, LinearModel nameFinderModel,
       Map<String, Object> resources, Map<String, String> manifestInfoEntries) {
     this(languageCode, nameFinderModel, null, resources, manifestInfoEntries);
   }
@@ -125,8 +124,8 @@ public class TokenNameFinderModel extends BaseModel {
    *
    * @return the classification model
    */
-  public AbstractModel getNameFinderModel() {
-    return (AbstractModel) artifactMap.get(MAXENT_MODEL_ENTRY_NAME);
+  public LinearModel getNameFinderModel() {
+    return (LinearModel) artifactMap.get(MAXENT_MODEL_ENTRY_NAME);
   }
 
   /**
@@ -254,8 +253,8 @@ public class TokenNameFinderModel extends BaseModel {
   protected void validateArtifactMap() throws InvalidFormatException {
     super.validateArtifactMap();
     
-    if (artifactMap.get(MAXENT_MODEL_ENTRY_NAME) instanceof AbstractModel) {
-      AbstractModel model = (AbstractModel) artifactMap.get(MAXENT_MODEL_ENTRY_NAME);
+    if (artifactMap.get(MAXENT_MODEL_ENTRY_NAME) instanceof LinearModel) {
+      LinearModel model = (LinearModel) artifactMap.get(MAXENT_MODEL_ENTRY_NAME);
       isModelValid(model);
     }
     else {

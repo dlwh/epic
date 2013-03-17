@@ -27,7 +27,7 @@ import java.io.InputStream;
 import java.net.URL;
 import java.util.Map;
 
-import nak.core.AbstractModel;
+import nak.core.LinearModel;
 import nak.io.BinaryFileDataReader;
 import nak.io.GenericModelReader;
 import chalk.tools.util.BaseToolFactory;
@@ -48,14 +48,14 @@ public class ChunkerModel extends BaseModel {
 
   /**
    * @deprecated Use
-   *             {@link #ChunkerModel(String, AbstractModel, Map, ChunkerFactory)}
+   *             {@link #ChunkerModel(String, LinearModel, Map, ChunkerFactory)}
    *             instead.
    */
-  public ChunkerModel(String languageCode, AbstractModel chunkerModel, Map<String, String> manifestInfoEntries) {
+  public ChunkerModel(String languageCode, LinearModel chunkerModel, Map<String, String> manifestInfoEntries) {
     this(languageCode, chunkerModel, manifestInfoEntries, new ChunkerFactory());
   }
   
-  public ChunkerModel(String languageCode, AbstractModel chunkerModel,
+  public ChunkerModel(String languageCode, LinearModel chunkerModel,
       Map<String, String> manifestInfoEntries, ChunkerFactory factory) {
     super(COMPONENT_NAME, languageCode, manifestInfoEntries, factory);
     artifactMap.put(CHUNKER_MODEL_ENTRY_NAME, chunkerModel);
@@ -64,14 +64,14 @@ public class ChunkerModel extends BaseModel {
   
   /**
    * @deprecated Use
-   *             {@link #ChunkerModel(String, AbstractModel, ChunkerFactory)
+   *             {@link #ChunkerModel(String, LinearModel, ChunkerFactory)
    *             instead.}
    */
-  public ChunkerModel(String languageCode, AbstractModel chunkerModel) {
+  public ChunkerModel(String languageCode, LinearModel chunkerModel) {
     this(languageCode, chunkerModel, null, new ChunkerFactory());
   }
 
-  public ChunkerModel(String languageCode, AbstractModel chunkerModel, ChunkerFactory factory) {
+  public ChunkerModel(String languageCode, LinearModel chunkerModel, ChunkerFactory factory) {
     this(languageCode, chunkerModel, null, factory);
   }
   
@@ -91,13 +91,13 @@ public class ChunkerModel extends BaseModel {
   protected void validateArtifactMap() throws InvalidFormatException {
     super.validateArtifactMap();
 
-    if (!(artifactMap.get(CHUNKER_MODEL_ENTRY_NAME) instanceof AbstractModel)) {
+    if (!(artifactMap.get(CHUNKER_MODEL_ENTRY_NAME) instanceof LinearModel)) {
       throw new InvalidFormatException("Chunker model is incomplete!");
     }
   }
 
-  public AbstractModel getChunkerModel() {
-    return (AbstractModel) artifactMap.get(CHUNKER_MODEL_ENTRY_NAME);
+  public LinearModel getChunkerModel() {
+    return (LinearModel) artifactMap.get(CHUNKER_MODEL_ENTRY_NAME);
   }
   
   @Override
@@ -121,7 +121,7 @@ public class ChunkerModel extends BaseModel {
     String packageName = args[2];
     String modelName = args[3];
 
-    AbstractModel chunkerModel = new GenericModelReader(
+    LinearModel chunkerModel = new GenericModelReader(
         new BinaryFileDataReader(new FileInputStream(modelName))).getModel();
 
     ChunkerModel packageModel = new ChunkerModel(lang, chunkerModel);

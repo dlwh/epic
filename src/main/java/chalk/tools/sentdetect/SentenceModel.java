@@ -27,7 +27,7 @@ import java.io.InputStream;
 import java.net.URL;
 import java.util.Map;
 
-import nak.core.AbstractModel;
+import nak.core.LinearModel;
 import nak.io.GenericModelReader;
 import chalk.tools.dictionary.Dictionary;
 import chalk.tools.util.BaseToolFactory;
@@ -48,7 +48,7 @@ public class SentenceModel extends BaseModel {
   
   private static final String MAXENT_MODEL_ENTRY_NAME = "sent.model";
 
-  public SentenceModel(String languageCode, AbstractModel sentModel,
+  public SentenceModel(String languageCode, LinearModel sentModel,
       Map<String, String> manifestInfoEntries, SentenceDetectorFactory sdFactory) {
     super(COMPONENT_NAME, languageCode, manifestInfoEntries, sdFactory);
     artifactMap.put(MAXENT_MODEL_ENTRY_NAME, sentModel);
@@ -58,10 +58,10 @@ public class SentenceModel extends BaseModel {
   /**
    * TODO: was added in 1.5.3 -> remove
    * @deprecated Use
-   *             {@link #SentenceModel(String, AbstractModel, Map, SentenceDetectorFactory)}
+   *             {@link #SentenceModel(String, LinearModel, Map, SentenceDetectorFactory)}
    *             instead and pass in a {@link SentenceDetectorFactory}
    */
-  public SentenceModel(String languageCode, AbstractModel sentModel,
+  public SentenceModel(String languageCode, LinearModel sentModel,
       boolean useTokenEnd, Dictionary abbreviations, char[] eosCharacters, Map<String, String> manifestInfoEntries) {
     this(languageCode, sentModel, manifestInfoEntries,
         new SentenceDetectorFactory(languageCode, useTokenEnd, abbreviations,
@@ -72,22 +72,22 @@ public class SentenceModel extends BaseModel {
    * TODO: was added in 1.5.3 -> remove
    * 
    * @deprecated Use
-   *             {@link #SentenceModel(String, AbstractModel, Map, SentenceDetectorFactory)}
+   *             {@link #SentenceModel(String, LinearModel, Map, SentenceDetectorFactory)}
    *             instead and pass in a {@link SentenceDetectorFactory}
    */
-  public SentenceModel(String languageCode, AbstractModel sentModel,
+  public SentenceModel(String languageCode, LinearModel sentModel,
       boolean useTokenEnd, Dictionary abbreviations, char[] eosCharacters) {
     this(languageCode, sentModel, useTokenEnd, abbreviations, eosCharacters,
         null);
   }
   
-  public SentenceModel(String languageCode, AbstractModel sentModel,
+  public SentenceModel(String languageCode, LinearModel sentModel,
       boolean useTokenEnd, Dictionary abbreviations, Map<String, String> manifestInfoEntries) {
     this(languageCode, sentModel, useTokenEnd, abbreviations, null,
         manifestInfoEntries);
   }
 
-  public SentenceModel(String languageCode, AbstractModel sentModel,
+  public SentenceModel(String languageCode, LinearModel sentModel,
       boolean useTokenEnd, Dictionary abbreviations) {
     this (languageCode, sentModel, useTokenEnd, abbreviations, null, null);
   }
@@ -108,7 +108,7 @@ public class SentenceModel extends BaseModel {
   protected void validateArtifactMap() throws InvalidFormatException {
     super.validateArtifactMap();
 
-    if (!(artifactMap.get(MAXENT_MODEL_ENTRY_NAME) instanceof AbstractModel)) {
+    if (!(artifactMap.get(MAXENT_MODEL_ENTRY_NAME) instanceof LinearModel)) {
       throw new InvalidFormatException("Unable to find " + MAXENT_MODEL_ENTRY_NAME +
           " maxent model!");
     }
@@ -129,8 +129,8 @@ public class SentenceModel extends BaseModel {
     return SentenceDetectorFactory.class;
   }
 
-  public AbstractModel getLinearModel() {
-    return (AbstractModel) artifactMap.get(MAXENT_MODEL_ENTRY_NAME);
+  public LinearModel getLinearModel() {
+    return (LinearModel) artifactMap.get(MAXENT_MODEL_ENTRY_NAME);
   }
 
   public Dictionary getAbbreviations() {
@@ -178,7 +178,7 @@ public class SentenceModel extends BaseModel {
     String packageName = args[ai++];
     String modelName = args[ai];
 
-    AbstractModel model = new GenericModelReader(new File(modelName)).getModel();
+    LinearModel model = new GenericModelReader(new File(modelName)).getModel();
     SentenceModel packageModel = new SentenceModel(languageCode, model,
         useTokenEnd, abbreviations, (char[]) null);
     packageModel.serialize(new FileOutputStream(packageName));

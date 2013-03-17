@@ -29,7 +29,7 @@ import java.net.URL;
 import java.util.Map;
 
 import nak.io.BinaryGISModelReader;
-import nak.core.AbstractModel;
+import nak.core.LinearModel;
 import nak.core.LinearModel;
 import chalk.tools.dictionary.Dictionary;
 import chalk.tools.util.BaseToolFactory;
@@ -57,7 +57,7 @@ public final class TokenizerModel extends BaseModel {
    * @param manifestInfoEntries the manifest
    * @param tokenizerFactory the factory
    */
-  public TokenizerModel(AbstractModel tokenizerModel,
+  public TokenizerModel(LinearModel tokenizerModel,
       Map<String, String> manifestInfoEntries, TokenizerFactory tokenizerFactory) {
     super(COMPONENT_NAME, tokenizerFactory.getLanguageCode(), manifestInfoEntries, tokenizerFactory);
     artifactMap.put(TOKENIZER_MODEL_ENTRY, tokenizerModel);
@@ -71,10 +71,10 @@ public final class TokenizerModel extends BaseModel {
    * @param useAlphaNumericOptimization
    * 
    * @deprecated Use
-   *             {@link TokenizerModel#TokenizerModel(String, AbstractModel, Map, TokenizerFactory)}
+   *             {@link TokenizerModel#TokenizerModel(String, LinearModel, Map, TokenizerFactory)}
    *             instead and pass in a {@link TokenizerFactory}.
    */
-  public TokenizerModel(String language, AbstractModel tokenizerLinearModel,
+  public TokenizerModel(String language, LinearModel tokenizerLinearModel,
       Dictionary abbreviations, boolean useAlphaNumericOptimization,
       Map<String, String> manifestInfoEntries) {
     this(tokenizerLinearModel, manifestInfoEntries, 
@@ -90,10 +90,10 @@ public final class TokenizerModel extends BaseModel {
    * @param manifestInfoEntries
    * 
    * @deprecated Use
-   *             {@link TokenizerModel#TokenizerModel(String, AbstractModel, Map, TokenizerFactory)}
+   *             {@link TokenizerModel#TokenizerModel(String, LinearModel, Map, TokenizerFactory)}
    *             instead and pass in a {@link TokenizerFactory}.
    */
-  public TokenizerModel(String language, AbstractModel tokenizerLinearModel,
+  public TokenizerModel(String language, LinearModel tokenizerLinearModel,
       boolean useAlphaNumericOptimization, Map<String, String> manifestInfoEntries) {
     this(language, tokenizerLinearModel, null, useAlphaNumericOptimization, manifestInfoEntries);
   }
@@ -106,10 +106,10 @@ public final class TokenizerModel extends BaseModel {
    * @param useAlphaNumericOptimization
    * 
    * @deprecated Use
-   *             {@link TokenizerModel#TokenizerModel(String, AbstractModel, Map, TokenizerFactory)}
+   *             {@link TokenizerModel#TokenizerModel(String, LinearModel, Map, TokenizerFactory)}
    *             instead and pass in a {@link TokenizerFactory}.
    */
-  public TokenizerModel(String language, AbstractModel tokenizerLinearModel,
+  public TokenizerModel(String language, LinearModel tokenizerLinearModel,
       boolean useAlphaNumericOptimization) {
     this(language, tokenizerLinearModel, useAlphaNumericOptimization, null);
   }
@@ -148,7 +148,7 @@ public final class TokenizerModel extends BaseModel {
   protected void validateArtifactMap() throws InvalidFormatException {
     super.validateArtifactMap();
 
-    if (!(artifactMap.get(TOKENIZER_MODEL_ENTRY) instanceof AbstractModel)) {
+    if (!(artifactMap.get(TOKENIZER_MODEL_ENTRY) instanceof LinearModel)) {
       throw new InvalidFormatException("Token model is incomplete!");
     }
 
@@ -166,8 +166,8 @@ public final class TokenizerModel extends BaseModel {
     return TokenizerFactory.class;
   }
 
-  public AbstractModel getLinearModel() {
-    return (AbstractModel) artifactMap.get(TOKENIZER_MODEL_ENTRY);
+  public LinearModel getLinearModel() {
+    return (LinearModel) artifactMap.get(TOKENIZER_MODEL_ENTRY);
   }
   
   public Dictionary getAbbreviations() {
@@ -203,7 +203,7 @@ public final class TokenizerModel extends BaseModel {
     String packageName = args[ai++];
     String modelName = args[ai];
 
-    AbstractModel model = new BinaryGISModelReader(new DataInputStream(
+    LinearModel model = new BinaryGISModelReader(new DataInputStream(
         new FileInputStream(modelName))).getModel();
 
     TokenizerModel packageModel = new TokenizerModel(languageCode, model,

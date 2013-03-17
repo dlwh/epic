@@ -23,7 +23,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import nak.core.AbstractModel;
+import nak.core.LinearModel;
 import nak.data.EventStream;
 import nak.core.LinearModel;
 import nak.core.TrainUtil;
@@ -212,7 +212,7 @@ public class ChunkerME implements Chunker {
 
     EventStream es = new ChunkerEventStream(in, factory.getContextGenerator());
 
-    AbstractModel maxentModel = TrainUtil.train(es, mlParams.getSettings(),
+    LinearModel maxentModel = TrainUtil.train(es, mlParams.getSettings(),
         manifestInfoEntries);
 
     return new ChunkerModel(lang, maxentModel, manifestInfoEntries, factory);
@@ -231,7 +231,7 @@ public class ChunkerME implements Chunker {
     
     EventStream es = new ChunkerEventStream(in, contextGenerator);
     
-    AbstractModel maxentModel = TrainUtil.train(es, mlParams.getSettings(), manifestInfoEntries);
+    LinearModel maxentModel = TrainUtil.train(es, mlParams.getSettings(), manifestInfoEntries);
     
     return new ChunkerModel(lang, maxentModel, manifestInfoEntries);
   }

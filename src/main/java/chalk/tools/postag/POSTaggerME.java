@@ -27,7 +27,7 @@ import java.util.Map.Entry;
 import java.util.StringTokenizer;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import nak.core.AbstractModel;
+import nak.core.LinearModel;
 import nak.data.EventStream;
 import nak.core.TrainUtil;
 import chalk.tools.dictionary.Dictionary;
@@ -53,7 +53,7 @@ public class POSTaggerME implements POSTagger {
   /**
    * The maximum entropy model to use to evaluate contexts.
    */
-  protected AbstractModel posModel;
+  protected LinearModel posModel;
 
   /**
    * The feature context generator.
@@ -138,7 +138,7 @@ public class POSTaggerME implements POSTagger {
    * @param tagdict The tag dictionary used for specifying a set of valid tags.
    */
   @Deprecated
-  public POSTaggerME(AbstractModel model, TagDictionary tagdict) {
+  public POSTaggerME(LinearModel model, TagDictionary tagdict) {
     this(model, new DefaultPOSContextGenerator(null),tagdict);
   }
 
@@ -149,7 +149,7 @@ public class POSTaggerME implements POSTagger {
    * @param dict The n-gram dictionary used for feature generation.
    */
   @Deprecated
-  public POSTaggerME(AbstractModel model, Dictionary dict) {
+  public POSTaggerME(LinearModel model, Dictionary dict) {
     this(model, new DefaultPOSContextGenerator(dict));
   }
 
@@ -161,7 +161,7 @@ public class POSTaggerME implements POSTagger {
    * @param tagdict The dictionary which specifies the valid set of tags for some words.
    */
   @Deprecated
-  public POSTaggerME(AbstractModel model, Dictionary dict, TagDictionary tagdict) {
+  public POSTaggerME(LinearModel model, Dictionary dict, TagDictionary tagdict) {
       this(DEFAULT_BEAM_SIZE,model, new DefaultPOSContextGenerator(dict),tagdict);
     }
 
@@ -172,7 +172,7 @@ public class POSTaggerME implements POSTagger {
    * @param cg The context generator used for feature creation.
    */
   @Deprecated
-  public POSTaggerME(AbstractModel model, POSContextGenerator cg) {
+  public POSTaggerME(LinearModel model, POSContextGenerator cg) {
     this(DEFAULT_BEAM_SIZE, model, cg, null);
   }
 
@@ -184,7 +184,7 @@ public class POSTaggerME implements POSTagger {
    * @param tagdict The dictionary which specifies the valid set of tags for some words.
    */
   @Deprecated
-  public POSTaggerME(AbstractModel model, POSContextGenerator cg, TagDictionary tagdict) {
+  public POSTaggerME(LinearModel model, POSContextGenerator cg, TagDictionary tagdict) {
       this(DEFAULT_BEAM_SIZE, model, cg, tagdict);
     }
 
@@ -197,7 +197,7 @@ public class POSTaggerME implements POSTagger {
    * @param tagdict The dictionary which specifies the valid set of tags for some words.
    */
   @Deprecated
-  public POSTaggerME(int beamSize, AbstractModel model, POSContextGenerator cg, TagDictionary tagdict) {
+  public POSTaggerME(int beamSize, LinearModel model, POSContextGenerator cg, TagDictionary tagdict) {
     size = beamSize;
     posModel = model;
     contextGen = cg;
@@ -328,7 +328,7 @@ public class POSTaggerME implements POSTagger {
     
     Map<String, String> manifestInfoEntries = new HashMap<String, String>();
     
-    AbstractModel posModel;
+    LinearModel posModel;
     
     if (!TrainUtil.isSequenceTraining(trainParams.getSettings())) {
       

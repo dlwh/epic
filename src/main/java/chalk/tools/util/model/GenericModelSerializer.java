@@ -23,20 +23,20 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Map;
 
-import nak.core.AbstractModel;
+import nak.core.LinearModel;
 import nak.io.BinaryFileDataReader;
 import nak.io.GenericModelReader;
 import chalk.tools.util.InvalidFormatException;
 
 
-public class GenericModelSerializer implements ArtifactSerializer<AbstractModel> {
+public class GenericModelSerializer implements ArtifactSerializer<LinearModel> {
 
-  public AbstractModel create(InputStream in) throws IOException,
+  public LinearModel create(InputStream in) throws IOException,
       InvalidFormatException {
     return new GenericModelReader(new BinaryFileDataReader(in)).getModel();
   }
 
-  public void serialize(AbstractModel artifact, OutputStream out) throws IOException {
+  public void serialize(LinearModel artifact, OutputStream out) throws IOException {
     ModelUtil.writeModel(artifact, out);
   }
 
