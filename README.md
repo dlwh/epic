@@ -11,25 +11,26 @@ The name Chalk comes from the name given to one of Jason's son's stuffed elephan
 
 ### What's inside
 
-The latest stable release is 1.1.1. It includes:
+The latest stable release is 1.1.2. What's new for this version?
 
-* All the code from the OpenNLP library (apart from that in [Nak](https://github.com/scalanlp/nak)), slightly reorganized.
-* Code (still prelimary) for working with [the MASC corpus](http://www.anc.org/data/masc/) to enable training of models on the annotations it provides. See [the tutorial](https://github.com/scalanlp/chalk/wiki/Tutorial) for details.
+* Updated Chalk to reflect reorganization in Nak v1.1.1.
+* Rounded out the MASC corpus processing and added tool for training and evaluating sentence detection, tokenization, and NER on the corpus.
+* Added Scala version of the PorterStemmer.
 
-Note that the domain has changed from **com.jasonbaldridge** (v1.0) to **org.scalanlp** now.
+See the [CHANGELOG](https://github.com/scalanlp/chalk/wiki/CHANGELOG) for changes in previous versions.
 
 ## Using Chalk
 
 In SBT:
 
-    libraryDependencies += "org.scalanlp" % "chalk" % "1.1.1"
+    libraryDependencies += "org.scalanlp" % "chalk" % "1.1.2"
 
 In Maven:
 
     <dependency>
        <groupId>org.scalanlp</groupId>
        <artifactId>chalk</artifactId>
-       <version>1.1.1</version>
+       <version>1.1.2</version>
     </dependency>
 
 ## Requirements

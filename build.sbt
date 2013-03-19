@@ -1,18 +1,18 @@
 name := "chalk"
 
-version := "1.1.2-SNAPSHOT"
+version := "1.1.2"
 
 organization := "org.scalanlp"
 
-scalaVersion := "2.10.0"
+scalaVersion := "2.10.1"
 
 crossPaths := false
 
 retrieveManaged := true
 
 resolvers ++= Seq(
-  "opennlp sourceforge repo" at "http://opennlp.sourceforge.net/maven2",
-  "sonatype snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"
+  "sonatype snapshots" at "https://oss.sonatype.org/content/repositories/snapshots",
+  "sonatype releases" at "https://oss.sonatype.org/content/repositories/releases"
 )
 
 // Original OpenNLP dependencies
@@ -21,7 +21,7 @@ libraryDependencies ++= Seq(
   "org.osgi" % "org.osgi.core" % "4.2.0" % "provided",
   "org.osgi" % "org.osgi.compendium" % "4.2.0" % "provided",
   "org.apache.uima" % "uimaj-core" % "2.3.1" % "provided",
-  "org.scalanlp" % "nak" % "1.1.1-SNAPSHOT"
+  "org.scalanlp" % "nak" % "1.1.1"
 )
 
 publishTo <<= version { v: String =>

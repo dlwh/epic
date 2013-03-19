@@ -15,7 +15,7 @@ fi
 #JARS="`find $HOME/.ivy2/ -name '*.jar' -print | tr '\n' ':'`"
 MANAGED_JARS="`find $CHALK_DIR/lib_managed -name '*.jar' -print | tr '\n' ':'`"
 
-SCALA_LIB="$HOME/.sbt/boot/scala-2.10.0/lib/scala-library.jar"
+SCALA_LIB="$HOME/.sbt/boot/scala-2.10.1/lib/scala-library.jar"
 
 CP="$CHALK_DIR/target/classes:$SCALA_LIB:$CHALK_DIR/src/main/resources:$MANAGED_JARS"
 
@@ -28,7 +28,7 @@ shift
 help()
 {
 cat <<EOF
-chalk 1.1.0 commands: 
+chalk 1.1.x commands: 
 
   cli           run the chalk command-line interface
   run           run the main method of a given class
