@@ -58,7 +58,7 @@ public class BeamSearchTest {
     
     private double bestOutcomeProb = 0.8d;
     private double otherOutcomeProb;
-    
+
     IdentityModel(String outcomes[]) {
       this.outcomes = outcomes;
       
@@ -115,6 +115,10 @@ public class BeamSearchTest {
 
     public String getOutcome(int i) {
       return outcomes[i];
+    }
+
+    public nak.core.AbstractModel.ModelType getModelType() {
+      return null;
     }
   }
   

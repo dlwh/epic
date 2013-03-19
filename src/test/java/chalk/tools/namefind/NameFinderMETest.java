@@ -28,7 +28,7 @@ import java.util.Collections;
 
 import org.junit.Test;
 
-import nak.core.AbstractModel;
+import nak.core.LinearModel;
 import chalk.tools.namefind.NameFinderME;
 import chalk.tools.namefind.NameSample;
 import chalk.tools.namefind.NameSampleDataStream;
@@ -268,7 +268,7 @@ public class NameFinderMETest {
   }
 
   private boolean hasOtherAsOutcome(TokenNameFinderModel nameFinderModel) {
-	  AbstractModel model = nameFinderModel.getNameFinderModel();
+	  LinearModel model = nameFinderModel.getNameFinderModel();
 	  for (int i = 0; i < model.getNumOutcomes(); i++) {
 	      String outcome = model.getOutcome(i);
 	      if (outcome.equals(NameFinderME.OTHER)) {
