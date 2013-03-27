@@ -10,17 +10,17 @@ which will compile everything, run tests, and build a jar.
 
 To build a discriminative parser, several steps are needed. First, you need to build a baseline generative parser.
 <pre>
-$ java -Xmx4g -cp target/epicparser-assembly-0.1.jar epic.parser.GenerativeTrainer --treebank.path /path/to/treebank --baseParser.path xbar.gr
+$ java -Xmx4g -cp target/epic-assembly-0.1-SNAPSHOT.jarepic.parser.GenerativeTrainer --treebank.path /path/to/treebank --baseParser.path xbar.gr
 </pre>
 
 Second, you need to generate pruning masks for all trees in the treebank using this parser:
 <pre>
-$ java -Xmx6g -cp target/epicparser-assembly-0.1.jar epic.parser.projections.ProjectTreebankToConstraints  --treebank.path /path/to/treebank --parser parsers/Gen.parser
+$ java -Xmx6g -cp target/epic-assembly-0.1-SNAPSHOT.jar epic.parser.projections.ProjectTreebankToConstraints  --treebank.path /path/to/treebank --parser parsers/Gen.parser
 </pre>
 
 Now you can actually train a parser! You have many options. To get a sense of them, run the following command:
 <pre>
-$ java -cp target/epicparser-assembly-0.1.jar epic.parser.models.ParserPipeline --help
+$ java -cp target/epic-assembly-0.1-SNAPSHOT.jar epic.parser.models.ParserTrainer --help
 </pre>
 
 You'll get a list of all the available options (so many!) The important ones are:
