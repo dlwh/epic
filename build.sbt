@@ -20,7 +20,8 @@ libraryDependencies ++= Seq(
   "org.scalanlp" %% "breeze-math" % "0.2-SNAPSHOT",
   "org.scalanlp" %% "breeze-process" % "0.2-SNAPSHOT",
   "org.scalanlp" %% "breeze-learn" % "0.2-SNAPSHOT",
-  "com.nativelibs4java" % "javacl" % "1.0-SNAPSHOT"
+  "com.nativelibs4java" % "javacl" % "1.0-SNAPSHOT",
+   "com.google.guava" % "guava"  % "14.0-rc1"
 )
 
 libraryDependencies <<= (scalaVersion, libraryDependencies) { (sv, deps) =>
