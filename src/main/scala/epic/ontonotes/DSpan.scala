@@ -1,19 +1,32 @@
-package epic.everything
+package epic.ontonotes
 
 import epic.trees.Span
 
+/**
+ * Represents a Span in a particular sentence in a particular Document
+ */
 case class DSpan(doc: String, sentence: Int, begin: Int, end: Int) {
   def length = end - begin
 
   def span = Span(begin, end)
 
+  /**
+   * Returns the words associated with this dspan as a string.
+   * @param doc
+   * @return
+   */
   def render(doc: Document):String = render(doc.sentences.map(_.words))
-  def render(doc: IndexedSeq[IndexedSeq[String]]):String = (begin until end).map(doc(sentence)).mkString("["," ","]")
+  def render(doc: IndexedSeq[IndexedSeq[String]]):String = getYield(doc).mkString("[",", ", "]")
 
+  /**
+   * Gets the words associated with this document.
+   * @param doc
+   * @return
+   */
   def getYield(doc: Document):IndexedSeq[String] = getYield(doc.sentences.map(_.words))
   def getYield(doc: IndexedSeq[IndexedSeq[String]]):IndexedSeq[String] = (begin until end).map(doc(sentence))
 
-  override def toString = doc + ":" + sentence + ":" + begin + "-" + end
+  override def toString = s"$doc:$sentence:$begin-$end"
 }
 
 object DSpan {
@@ -32,7 +45,13 @@ object DSpan {
   }
 }
 
-case class DPos(doc: String, sentence: Int, pos: Int)
+/**
+ * Represents a discrete word position in a sentence in a document
+ */
+case class DPos(doc: String, sentence: Int, pos: Int) {
+  /** Returns DSpan(doc, sentence, pos, pos + 1) */
+  def asDSpan = DSpan(doc, sentence, pos, pos + 1)
+}
 
 
 object DPos {

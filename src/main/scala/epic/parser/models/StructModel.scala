@@ -79,7 +79,7 @@ class StructModel[L, L2, W](indexedFeatures: IndexedFeaturizer[L, L2, W],
 }
 
 case class StructModelFactory(baseParser: ParserParams.XbarGrammar,
-                              constraints: ParserParams.Constraints[AnnotatedLabel, String],
+                              constraints: ParserParams.Constraints[String],
                               @Help(text= "The kind of annotation to do on the refined grammar. Defaults to ~KM2003")
                               annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = KMAnnotator(),
                               @Help(text="Old weights to initialize with. Optional")

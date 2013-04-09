@@ -56,15 +56,15 @@ object ParserParams {
   }
 
   @Help(text="Stores/saves a baseline xbar grammar needed to extracting trees.")
-  case class Constraints[L, W](path: File = null) {
-    def cachedFactory(baseFactory: AugmentedGrammar[L, W], threshold: Double = -7):CoreGrammar[L, W] = {
+  case class Constraints[W](path: File = null) {
+    def cachedFactory(baseFactory: AugmentedGrammar[AnnotatedLabel, W], threshold: Double = -7):CoreGrammar[AnnotatedLabel, W] = {
       if(path != null && constraintsCache.contains(path)) {
-        constraintsCache.get(path).asInstanceOf[CoreGrammar[L, W]]
+        constraintsCache.get(path).asInstanceOf[CoreGrammar[AnnotatedLabel, W]]
       } else {
-        val uncached: CoreGrammar[L, W] = if(path eq null) {
-          new ConstraintCoreGrammar[L,W](baseFactory, threshold)
+        val uncached: CoreGrammar[AnnotatedLabel, W] = if(path eq null) {
+          new ConstraintCoreGrammar[AnnotatedLabel,W](baseFactory, {(_:AnnotatedLabel).isIntermediate}, threshold)
         } else {
-          val constraint = new ConstraintCoreGrammar[L,W](baseFactory, threshold)
+          val constraint = new ConstraintCoreGrammar[AnnotatedLabel,W](baseFactory, {(_:AnnotatedLabel).isIntermediate}, threshold)
           new FileCachedCoreGrammar(constraint, path)
         }
 
@@ -87,7 +87,7 @@ trait ParserPipeline {
   /**
    * The type of the parameters to read in via dlwh.epic.config
    */
-  type Params
+  type Params <: { val threads: Int}
   /**
    * Required manifest for the params
    */
@@ -109,7 +109,7 @@ trait ParserPipeline {
 
     val validateTrees = devTrees.take(400)
     def validate(parser: Parser[AnnotatedLabel, String]) = {
-      ParseEval.evaluate[AnnotatedLabel](validateTrees, parser, AnnotatedLabelChainReplacer, asString={(l:AnnotatedLabel)=>l.label})
+      ParseEval.evaluate[AnnotatedLabel](validateTrees, parser, AnnotatedLabelChainReplacer, asString={(l:AnnotatedLabel)=>l.label}, nthreads=params.threads)
     }
     val parsers = trainParser(trainTrees, validate, params)
     parsers
@@ -137,20 +137,20 @@ trait ParserPipeline {
       writeObject(out, parser)
 
       var parl = -1
-      if(params.threads >= 1) {
-        parl = collection.parallel.ForkJoinTasks.defaultForkJoinPool.getParallelism
-        collection.parallel.ForkJoinTasks.defaultForkJoinPool.setParallelism(params.threads)
-      }
+//      if(params.threads >= 1) {
+//        parl = collection.parallel.ForkJoinTasks.defaultForkJoinPool.getParallelism
+//        collection.parallel.ForkJoinTasks.defaultForkJoinPool.setParallelism(params.threads)
+//      }
 
       println("Evaluating Parser...")
       val stats = evalParser(devTrees.filter(_.words.length <= 40), parser, name+"-len40-dev")
       import stats._
       println("Eval finished. Results:")
-      println( "P: " + precision + " R:" + recall + " F1: " + f1 +  " Ex:" + exact + " Tag Accuracy: " + tagAccuracy)
+      println( s"P: $precision  R:$recall F1: $f1 Ex:$exact  Tag Accuracy: $tagAccuracy")
 
-      if(params.threads >= 1) {
-        collection.parallel.ForkJoinTasks.defaultForkJoinPool.setParallelism(parl)
-      }
+//      if(params.threads >= 1) {
+//        collection.parallel.ForkJoinTasks.defaultForkJoinPool.setParallelism(parl)
+//      }
     }
   }
 

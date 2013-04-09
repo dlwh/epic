@@ -5,7 +5,7 @@ import breeze.util.Index
 
 /**
  * This is a standard expected counts class that most models will use...
- * Loss is the log-loss (or, whatever), and
+ * Loss is the log-loss (or, whatever), and counts are for the derivative
  * @param loss
  * @param counts
  */

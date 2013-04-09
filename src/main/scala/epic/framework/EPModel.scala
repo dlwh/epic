@@ -25,7 +25,7 @@ import breeze.util._
  * @author dlwh
  */
 class EPModel[Datum, Augment](maxEPIter: Int, initFeatureValue: Feature => Option[Double] = {(_:Feature) => None}, epInGold: Boolean = false)(
-                              models: EPModel.CompatibleModel[Datum, Augment]*)(implicit aIsFactor: Augment <:< Factor[Augment]) extends Model[Datum] {
+                              val models: EPModel.CompatibleModel[Datum, Augment]*)(implicit aIsFactor: Augment <:< Factor[Augment]) extends Model[Datum] {
   type ExpectedCounts = EPExpectedCounts
   type Inference = EPInference[Datum, Augment]
   type Marginal = EPMarginal[Augment, ProjectableInference[Datum, Augment]#Marginal]
@@ -76,7 +76,7 @@ class EPModel[Datum, Augment](maxEPIter: Int, initFeatureValue: Feature => Optio
   override def cacheFeatureWeights(weights: DenseVector[Double], prefix: String) {
     super.cacheFeatureWeights(weights, prefix)
     for (((w, m), i) <- (partitionWeights(weights) zip models).zipWithIndex) {
-      m.cacheFeatureWeights(w, prefix + "-model-" + i)
+      m.cacheFeatureWeights(w, s"$prefix-model-$i")
     }
   }
 }

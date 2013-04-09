@@ -74,6 +74,7 @@ trait CoreAnchoring[L, W] extends Factor[CoreAnchoring[L, W]] {
   def /(other: CoreAnchoring[L, W]) = {
     // hacky multimethod dispatch is hacky
     if (other eq null) this // ugh
+    else if(this eq other) new CoreAnchoring.Identity[L, W](grammar, lexicon, words)
     else if(other.isInstanceOf[CoreAnchoring.Identity[L, W]]) this
     else new ProductCoreAnchoring(this, other, -1)
   }
@@ -185,6 +186,24 @@ case class LiftedCoreAnchoring[L, W](core: CoreAnchoring[L, W]) extends RefinedA
   final def ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int, refC: Int) = 0
 
   def validCoarseRulesGivenParentRefinement(a: Int, refA: Int) = grammar.indexedBinaryRulesWithParent(a)
+
+  def validParentRefinementsGivenRule(begin: Int, splitBegin: Int, splitEnd: Int, end: Int, rule: Int): Array[Int] = validLabelRefinements(begin, end, grammar.parent(rule))
+
+  def validRuleRefinementsGivenLeftChild(begin: Int, split: Int, completionBegin: Int, completionEnd: Int, rule: Int, childRef: Int): Array[Int] = {
+    zeroArray
+  }
+
+  def validRuleRefinementsGivenRightChild(completionBegin: Int, completionEnd: Int, split: Int, end: Int, rule: Int, childRef: Int): Array[Int] =  {
+    zeroArray
+  }
+
+  def validLeftChildRefinementsGivenRule(begin: Int, end: Int, completionBegin: Int, completionEnd: Int, rule: Int): Array[Int] =  {
+    zeroArray
+  }
+
+  def validRightChildRefinementsGivenRule(completionBegin: Int, completionEnd: Int, begin: Int, end: Int, rule: Int): Array[Int] =  {
+    zeroArray
+  }
 }
 
 

@@ -53,16 +53,16 @@ trait ParserInference[L, W] extends ProjectableInference[TreeInstance[L, W], Cor
     val charts = try {
       fullGrammar.marginal
     } catch {
-      case e =>
+      case e: Exception =>
       try {
         e.printStackTrace()
         AugmentedAnchoring.fromRefined(grammar.anchor(v.words)).marginal
       } catch {
-        case e2 =>
+        case e2: Exception =>
           throw e
       }
     }
-    charts -> charts.logPartition
+    charts
   }
 
   def countsFromMarginal(v: TreeInstance[L, W], marg: Marginal, accum: ExpectedCounts, scale: Double) = {

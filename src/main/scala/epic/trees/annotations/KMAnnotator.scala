@@ -16,7 +16,7 @@ package annotations
  limitations under the License.
 */
 /**
- *
+ * More or less the annotator that does Klein&Manning 2003 annotations.
  * @author dlwh
  */
 

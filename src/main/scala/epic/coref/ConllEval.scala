@@ -3,7 +3,7 @@ package epic.coref
 import java.io.{PrintStream, FileOutputStream, File}
 import io.{Codec, Source}
 import collection.mutable.ArrayBuffer
-import epic.everything.{DSpan, Document}
+import epic.ontonotes.{DSpan, Document}
 
 /**
  *
@@ -50,8 +50,7 @@ object ConllEval {
           for((set,clusterId) <- mentions.zipWithIndex; mc <- set) {
             if(mc.span.start == mc.span.end - 1) {
               assert(mentionMapForDoc(mc.sentence)(mc.span.start).oneWordMention == None,
-                "Two one-word mentions on same pos?!?!" + mentionMapForDoc(mc.sentence)(mc.span.start)
-                 + " " + mc + " " + doc.id)
+                s"Two one-word mentions on same pos?!?! ${mentionMapForDoc(mc.sentence)(mc.span.start)} $mc ${doc.id}")
               mentionMapForDoc(mc.sentence)(mc.span.start).oneWordMention = Some(clusterId)
             } else {
               mentionMapForDoc(mc.sentence)(mc.span.start).starts += clusterId

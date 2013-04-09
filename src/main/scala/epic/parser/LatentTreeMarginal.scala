@@ -41,7 +41,7 @@ case class LatentTreeMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
     // normalizer
     val rootScale = stree.label.iscale
     if (logPartition.isInfinite || logPartition.isNaN)
-      sys.error("NAn or infinite" + logPartition + " " + stree.label.inside.mkString(", "))
+      sys.error(s"NaN or infinite $logPartition ${stree.label.inside.mkString(", ")}")
 
     stree.postorder foreach {
       case t@NullaryTree(Beliefs(label, labels, iScores, iScale, oScores, oScale), span) =>
@@ -121,7 +121,7 @@ case class LatentTreeMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
           foundOne = true
         }
         if(!foundOne) {
-          sys.error("Trouble with lexical " + words(t.span.start))
+          sys.error(s"Trouble with lexical  $words(t.span.start)")
         }
         t.label.scaleInside(0)
       case t@UnaryTree(Beliefs(a, aLabels, aScores, _, _, _), Tree(Beliefs(c, cLabels, cScores, cScale, _,  _), _, _), chain, span) =>
@@ -155,7 +155,7 @@ case class LatentTreeMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
         }
 
         if(!foundOne) {
-          sys.error("Trouble with unary " + t.render(words) + " " + grammar.labelIndex.get(a) + " "+  grammar.labelIndex.get(c) + " " + rule + " " + anchoring.scoreUnaryRule(t.span.start, t.span.end, rule, 0))
+          sys.error(s"Trouble with unary $t.render(words)}  ${grammar.labelIndex.get(a)}  ${grammar.labelIndex.get(c)}  $rule  ${anchoring.scoreUnaryRule(t.span.start, t.span.end, rule, 0)}")
         }
         t.label.scaleInside(cScale)
       case t@BinaryTree(Beliefs(a, aLabels, aScores, _, _, _),
@@ -197,7 +197,7 @@ case class LatentTreeMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
           val r = (BinaryRule(grammar.labelIndex.get(a),
                     grammar.labelIndex.get(b),
                     grammar.labelIndex.get(c)))
-          sys.error("Trouble with binary " + t.render(words) + "\n\n" + r + " " + rule + " " + ai)
+          sys.error(s"Trouble with binary ${t.render(words)}\n\n$r $rule $ai")
         }
         t.label.scaleInside(cScale + bScale)
       case _ => sys.error("bad tree!")
@@ -296,7 +296,7 @@ object LatentTreeMarginal {
                    outside: Array[Double],
                    var oscale: Int) {
     override def toString = {
-      "Beliefs(" + label +" "  + candidates + ", " + inside.mkString("{", ", ", " }") +", " + outside.mkString("{", ", ", "}")+")"
+      s"Beliefs($label, $candidates, ${inside.mkString("{", ", ", " }")}, ${outside.mkString("{", ", ", "}")})"
     }
 
     def scaleInside(currentScale: Int) {

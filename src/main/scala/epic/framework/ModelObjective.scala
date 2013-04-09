@@ -4,16 +4,22 @@ import collection.GenTraversable
 import breeze.optimize.BatchDiffFunction
 import breeze.linalg.DenseVector
 import breeze.util.Encoder
-import actors.threadpool.AtomicInteger
+import java.util.concurrent.atomic.AtomicInteger
+import collection.parallel.ForkJoinTaskSupport
+import concurrent.forkjoin.ForkJoinPool
 
 /**
- *
+ * The objective function for training a [[epic.framework.Model]]. Selects
+ * a batch, creates an [[epic.framework.Inference]] object using the model,
+ * computes expected counts using the inference, and then turns them into
+ * the objective value.
  * @author dlwh
  */
 class ModelObjective[Datum](val model: Model[Datum],
                             batchSelector: IndexedSeq[Int]=>GenTraversable[Datum],
                             val fullRange: IndexedSeq[Int]) extends BatchDiffFunction[DenseVector[Double]] {
-  def this(model: Model[Datum], data: IndexedSeq[Datum]) = this(model,_.par.map(data), 0 until data.length)
+  def this(model: Model[Datum], data: IndexedSeq[Datum], numThreads: Int = -1) = this(model,ModelObjective.makePar(data, numThreads)(_), 0 until data.length)
+
   import model.{ExpectedCounts => _, _}
 
   type Builder = model.Inference
@@ -45,18 +51,25 @@ class ModelObjective[Datum](val model: Model[Datum],
         success.incrementAndGet()
         countsSoFar
       } catch {
-        case e =>
+        case e: Exception =>
           e.printStackTrace()
 //          new Exception("While processing " + datum, e).printStackTrace()
           _countsSoFar
       }
-    },{ (a,b) => b += a})
+    },{ (a,b) => if(a eq null) b else if (b eq null) a else b += a})
     val timeOut = System.currentTimeMillis()
-    println("Inference took: " + (timeOut - timeIn) * 1.0/1000 + "s" )
+    println(f"Inference took: ${(timeOut - timeIn) * 1.0/1000}%.3fs" )
 
     val (loss,grad) = expectedCountsToObjective(finalCounts)
-    val timeOut2 = System.currentTimeMillis()
-    println("Finishing took: " + (timeOut2 - timeOut) * 1.0/1000 + "s" )
     (loss/success.intValue() * fullRange.size,  grad * (fullRange.size * 1.0 / success.intValue))
+  }
+}
+
+object ModelObjective {
+  private def makePar[Datum](data: IndexedSeq[Datum], nThreads:Int)(indices: IndexedSeq[Int]) = {
+    val xx =  indices.par.map(data)
+    if (nThreads > 0)
+      xx.tasksupport = new ForkJoinTaskSupport(new ForkJoinPool(nThreads))
+    xx
   }
 }

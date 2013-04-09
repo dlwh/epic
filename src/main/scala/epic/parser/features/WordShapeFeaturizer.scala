@@ -87,7 +87,7 @@ class WordShapeFeaturizer(wordCounts: Counter[String, Double], minCountUnknown: 
       if(hasAcronymShape  && !knownLowerCase && wordCounts(w(0).toUpper + w.substring(1).toLowerCase) == 0) {
         features += isProbablyAcronymFeature
       } else if(wlen == 4 && !hasNonDigit) {
-        val year = try{w.toInt} catch {case e => 0}
+        val year = try{w.toInt} catch {case e: NumberFormatException => 0}
         if(year >= 1400 && year < 2300) {
           features += isProbablyYearFeature
         }

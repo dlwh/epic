@@ -54,14 +54,14 @@ object ParserTrainer extends epic.parser.ParserPipeline {
                   validate: (Parser[AnnotatedLabel, String]) => Statistics, params: Params) = {
     import params._
 
-    if(threads >= 1)
-      collection.parallel.ForkJoinTasks.defaultForkJoinPool.setParallelism(params.threads)
+//    if(threads >= 1)
+//      collection.parallel.ForkJoinTasks.defaultForkJoinPool.setParallelism(params.threads)
 
     val model = modelFactory.make(trainTrees)
 
-    val obj = new ModelObjective(model, trainTrees)
+    val obj = new ModelObjective(model, trainTrees, params.threads)
     val cachedObj = new CachedBatchDiffFunction(obj)
-    val checking = new RandomizedGradientCheckingFunction(cachedObj, 1E-4, toString = {
+    val checking = new RandomizedGradientCheckingFunction(cachedObj, 0.1, toString = {
       (i: Int) => model.featureIndex.get(i).toString
     })
     val init = obj.initialWeightVector(randomize)
@@ -80,9 +80,9 @@ object ParserTrainer extends epic.parser.ParserPipeline {
     for ((state, iter) <- params.opt.iterations(cachedObj, init).take(maxIterations).zipWithIndex.tee(evalAndCache _);
          if iter != 0 && iter % iterationsPerEval == 0) yield try {
       val parser = model.extractParser(state.x)
-      ("LatentDiscrim-" + iter.toString, parser)
+      (s"LatentDiscrim-$iter", parser)
     } catch {
-      case e => println(e); e.printStackTrace(); throw e
+      case e: Exception => e.printStackTrace(); throw e
     }
   }
 }

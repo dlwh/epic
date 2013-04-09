@@ -125,8 +125,7 @@ object GenerativeTrainer extends ParserPipeline {
                     @Help(text=
                       "The kind of annotation to do on the refined grammar. Default uses v2h1 markovization and nothing else.")
                     annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = PipelineAnnotator(Seq(FilterAnnotations(), AddMarkovization(1,2))),
-                    @Help(text="Use viterbi parse charts")
-                    viterbi: Boolean= true,
+                    threads: Int = -1,
                     @Help(text="Use max rule decoding instead of max constituent")
                     maxRule: Boolean = false)
   protected val paramManifest = manifest[Params]
@@ -151,7 +150,7 @@ object GenerativeTrainer extends ParserPipeline {
     val (words, binary, unary) = GenerativeParser.extractCounts(transformed)
     val refinedGrammar = RefinedGrammar.generative(xbar, xbarLexicon, indexedRefinements, binary, unary, words)
     val decoder = if (params.maxRule) new MaxRuleProductDecoder(xbar, xbarLexicon) else new ViterbiDecoder[AnnotatedLabel, String]
-    val parser = new SimpleChartParser(AugmentedGrammar.fromRefined(refinedGrammar), decoder, maxMarginals = params.viterbi)
+    val parser = new SimpleChartParser(AugmentedGrammar.fromRefined(refinedGrammar), decoder)
     Iterator.single(("Gen", parser))
   }
 }

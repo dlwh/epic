@@ -23,7 +23,7 @@ object ParseText {
     val params = try {
       config.readIn[Params]("test")
     } catch {
-      case e =>
+      case e:Exception =>
         e.printStackTrace()
         println(breeze.config.GenerateHelp[Params](config))
         sys.exit(1)
@@ -31,7 +31,7 @@ object ParseText {
 
     val parser = readObject[Parser[AnnotatedLabel,String]](params.parser)
     if(params.threads >= 1) {
-      collection.parallel.ForkJoinTasks.defaultForkJoinPool.setParallelism(params.threads)
+//      collection.parallel.ForkJoinTasks.defaultForkJoinPool.setParallelism(params.threads)
     }
 
     val sentenceSegmenter = LanguagePack.English.sentenceSegmenter

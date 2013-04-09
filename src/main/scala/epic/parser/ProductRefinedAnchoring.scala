@@ -1,4 +1,7 @@
 package epic.parser
+
+import collection.immutable.BitSet
+
 /*
  Copyright 2012 David Hall
 
@@ -62,7 +65,7 @@ final case class ProductRefinedAnchoring[L,W](s1: RefinedAnchoring[L, W],
     if(refinementController ne null) refinementController.validLabelRefinements(begin, end, label)
     else for(a <- s1.validLabelRefinements(begin, end, label);
              b <- s2.validLabelRefinements(begin, end, label))
-            yield a * s1.numValidRefinements(label) + b
+            yield a * s2.numValidRefinements(label) + b
   }
 
   def numValidRefinements(label: Int) = {
@@ -79,21 +82,44 @@ final case class ProductRefinedAnchoring[L,W](s1: RefinedAnchoring[L, W],
     if(refinementController ne null) refinementController.validRuleRefinementsGivenParent(begin, end, rule, parentRef)
     else {
       val parent = grammar.parent(rule)
-      val bRefinements = s2.validRuleRefinementsGivenParent(begin, end, rule, label2Ref(parent, parentRef));
+      val bRefinements = s2.validRuleRefinementsGivenParent(begin, end, rule, label2Ref(parent, parentRef))
       for(a <- s1.validRuleRefinementsGivenParent(begin, end, rule, label1Ref(parent, parentRef));
           b <- bRefinements)
-      yield a * s1.numValidRuleRefinements(rule) + b
+      yield a * s2.numValidRuleRefinements(rule) + b
     }
   }
+
+  def validRuleRefinementsGivenLeftChild(begin: Int, split: Int, completionBegin: Int, completionEnd: Int, rule: Int, leftChildRef: Int): Array[Int] = {
+    if(refinementController ne null) refinementController.validRuleRefinementsGivenLeftChild(begin, split, completionBegin, completionEnd, rule, leftChildRef)
+    else {
+      val leftChild = grammar.leftChild(rule)
+      val bRefinements = s2.validRuleRefinementsGivenLeftChild(begin, split, completionBegin, completionEnd, rule, label2Ref(leftChild, leftChildRef))
+      for(a <- s1.validRuleRefinementsGivenLeftChild(begin, split, completionBegin, completionEnd, rule, label1Ref(leftChild, leftChildRef));
+          b <- bRefinements)
+      yield a * s2.numValidRuleRefinements(rule) + b
+    }
+  }
+
+  def validRuleRefinementsGivenRightChild(completionBegin: Int, completionEnd: Int, split: Int, end: Int, rule: Int, rightChildRef: Int): Array[Int] = {
+    if(refinementController ne null) refinementController.validRuleRefinementsGivenRightChild(completionBegin, completionEnd, split, end, rule, rightChildRef)
+    else {
+      val rightChild = grammar.rightChild(rule)
+      val bRefinements = s2.validRuleRefinementsGivenRightChild(completionBegin, completionEnd, split, end, rule, label2Ref(rightChild, rightChildRef))
+      for(a <- s1.validRuleRefinementsGivenRightChild(completionBegin, completionEnd, split, end, rule, label1Ref(rightChild, rightChildRef));
+          b <- bRefinements)
+      yield a * s2.numValidRuleRefinements(rule) + b
+    }
+  }
+
 
   def validUnaryRuleRefinementsGivenChild(begin: Int, end: Int, rule: Int, childRef: Int) = {
     if(refinementController ne null) refinementController.validUnaryRuleRefinementsGivenChild(begin, end, rule, childRef)
     else {
       val child = grammar.child(rule)
-      val bRefinements = s2.validUnaryRuleRefinementsGivenChild(begin, end, rule, label2Ref(child, childRef));
+      val bRefinements = s2.validUnaryRuleRefinementsGivenChild(begin, end, rule, label2Ref(child, childRef))
       for(a <- s1.validUnaryRuleRefinementsGivenChild(begin, end, rule, label1Ref(child, childRef));
           b <- bRefinements)
-      yield a * s1.numValidRuleRefinements(rule) + b
+      yield a * s2.numValidRuleRefinements(rule) + b
     }
   }
 
@@ -102,7 +128,7 @@ final case class ProductRefinedAnchoring[L,W](s1: RefinedAnchoring[L, W],
     else {
       val l1 = s1.leftChildRefinement(rule, rule1Ref(rule, ruleRef))
       val l2 = s2.leftChildRefinement(rule, rule2Ref(rule, ruleRef))
-      l1 * s1.numValidRefinements(grammar.leftChild(rule)) + l2
+      l1 * s2.numValidRefinements(grammar.leftChild(rule)) + l2
     }
   }
 
@@ -112,7 +138,7 @@ final case class ProductRefinedAnchoring[L,W](s1: RefinedAnchoring[L, W],
     else {
       val l1 = s1.rightChildRefinement(rule, rule1Ref(rule, ruleRef))
       val l2 = s2.rightChildRefinement(rule, rule2Ref(rule, ruleRef))
-      l1 * s1.numValidRefinements(grammar.rightChild(rule)) + l2
+      l1 * s2.numValidRefinements(grammar.rightChild(rule)) + l2
     }
   }
 
@@ -122,7 +148,7 @@ final case class ProductRefinedAnchoring[L,W](s1: RefinedAnchoring[L, W],
     else {
       val l1 = s1.parentRefinement(rule, rule1Ref(rule, ruleRef))
       val l2 = s2.parentRefinement(rule, rule2Ref(rule, ruleRef))
-      l1 * s1.numValidRefinements(grammar.parent(rule)) + l2
+      l1 * s2.numValidRefinements(grammar.parent(rule)) + l2
     }
   }
 
@@ -131,7 +157,7 @@ final case class ProductRefinedAnchoring[L,W](s1: RefinedAnchoring[L, W],
     else {
       val l1 = s1.childRefinement(rule, rule1Ref(rule, ruleRef))
       val l2 = s2.childRefinement(rule, rule2Ref(rule, ruleRef))
-      l1 * s1.numValidRefinements(grammar.child(rule)) + l2
+      l1 * s2.numValidRefinements(grammar.child(rule)) + l2
     }
   }
 
@@ -145,7 +171,7 @@ final case class ProductRefinedAnchoring[L,W](s1: RefinedAnchoring[L, W],
       val l1 = s1.ruleRefinementFromRefinements(r, a1, b1)
       val l2 = s2.ruleRefinementFromRefinements(r, a2, b2)
       if(l1 < 0 || l2 < 0) -1
-      else l1 * s1.numValidRuleRefinements(r) + l2
+      else l1 * s2.numValidRuleRefinements(r) + l2
     }
   }
 
@@ -161,12 +187,52 @@ final case class ProductRefinedAnchoring[L,W](s1: RefinedAnchoring[L, W],
       val l1 = s1.ruleRefinementFromRefinements(r, a1, b1, c1)
       val l2 = s2.ruleRefinementFromRefinements(r, a2, b2, c2)
       if(l1 < 0 || l2 < 0) -1
-      else l1 * s1.numValidRuleRefinements(r) + l2
+      else l1 * s2.numValidRuleRefinements(r) + l2
     }
 
   }
 
-  def validCoarseRulesGivenParentRefinement(a: Int, refA: Int) = refinementController.validCoarseRulesGivenParentRefinement(a, refA)
+  def validCoarseRulesGivenParentRefinement(a: Int, refA: Int) = {
+    if (refinementController ne null) refinementController.validCoarseRulesGivenParentRefinement(a, refA)
+    else {
+      val a1 = label1Ref(a, refA)
+      val a2 = label2Ref(a, refA)
+      s1.validCoarseRulesGivenParentRefinement(a, a1).filter(BitSet.empty ++ s2.validCoarseRulesGivenParentRefinement(a, a2))
+    }
+  }
+
+
+  def validParentRefinementsGivenRule(begin: Int, splitBegin: Int, splitEnd: Int, end: Int, rule: Int): Array[Int] = {
+    if(refinementController ne null) refinementController.validParentRefinementsGivenRule(begin, splitBegin, splitEnd, end, rule)
+    else {
+      val r1arr = s1.validParentRefinementsGivenRule(begin, splitBegin, splitEnd, end, rule)
+      val r2arr = s2.validParentRefinementsGivenRule(begin, splitBegin, splitEnd, end, rule)
+      val num2 = s2.numValidRefinements(grammar.parent(rule))
+      for (r1 <- r1arr; r2 <- r2arr) yield r1 * num2 + r2
+    }
+
+  }
+
+
+  def validLeftChildRefinementsGivenRule(begin: Int, end: Int, completionBegin: Int, completionEnd: Int, rule: Int): Array[Int] = {
+    if(refinementController ne null) refinementController.validLeftChildRefinementsGivenRule(begin, end, completionBegin, completionEnd, rule)
+    else {
+      val r1arr = s1.validLeftChildRefinementsGivenRule(begin, end, completionBegin, completionEnd, rule)
+      val r2arr = s2.validLeftChildRefinementsGivenRule(begin, end, completionBegin, completionEnd, rule)
+      val num2 = s2.numValidRefinements(grammar.parent(rule))
+      for (r1 <- r1arr; r2 <- r2arr) yield r1 * num2 + r2
+    }
+  }
+
+  def validRightChildRefinementsGivenRule(completionBegin: Int, completionEnd: Int, begin: Int, end: Int, rule: Int): Array[Int] = {
+    if(refinementController ne null) refinementController.validRightChildRefinementsGivenRule(completionBegin, completionEnd, begin, end, rule)
+    else {
+      val r1arr = s1.validRightChildRefinementsGivenRule(completionBegin, completionEnd, begin, end, rule)
+      val r2arr = s2.validRightChildRefinementsGivenRule(completionBegin, completionEnd, begin, end, rule)
+      val num2 = s2.numValidRefinements(grammar.parent(rule))
+      for (r1 <- r1arr; r2 <- r2arr) yield r1 * num2 + r2
+    }
+  }
 }
 
 abstract class ProductRefinementsHandler[L, W](s1: RefinedAnchoring[L, W], s2: RefinedAnchoring[L, W]) {

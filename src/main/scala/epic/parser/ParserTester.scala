@@ -58,30 +58,26 @@ object ParserTester {
 
     println("Parser " + name)
 
-    if(params.threads >= 1) {
-      collection.parallel.ForkJoinTasks.defaultForkJoinPool.setParallelism(params.threads)
-    }
-
     {
       println("Evaluating Parser on dev...")
-      val stats = evalParser(devTrees,parser,name+ "-dev")
+      val stats = evalParser(devTrees,parser,name+ "-dev", params.threads)
       import stats._
       println("Eval finished. Results:")
-      println( "P: " + precision + " R:" + recall + " F1: " + f1 +  " Ex:" + exact + " Tag Accuracy: " + tagAccuracy)
+      println(stats)
     }
 
     if (params.evalOnTest) {
       println("Evaluating Parser on test...")
-      val stats = evalParser(testTrees,parser,name+ "-test")
+      val stats = evalParser(testTrees,parser,name+ "-test", params.threads)
       import stats._
       println("Eval finished. Results:")
-      println( "P: " + precision + " R:" + recall + " F1: " + f1 +  " Ex:" + exact + " Tag Accuracy: " + tagAccuracy)
+      println(stats)
     }
   }
 
   def evalParser(testTrees: IndexedSeq[TreeInstance[AnnotatedLabel,String]],
-                 parser: Parser[AnnotatedLabel,String], name: String):ParseEval.Statistics = {
-    ParseEval.evaluateAndLog(testTrees, parser, name, AnnotatedLabelChainReplacer)
+                 parser: Parser[AnnotatedLabel,String], name: String, nthreads: Int):ParseEval.Statistics = {
+    ParseEval.evaluateAndLog(testTrees, parser, name, AnnotatedLabelChainReplacer, nthreads = nthreads)
   }
 
 }

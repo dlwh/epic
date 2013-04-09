@@ -177,9 +177,13 @@ trait RefinedAnchoring[L, W] extends Factor[RefinedAnchoring[L, W]] {
    */
   def validLabelRefinements(begin: Int, end: Int, label: Int):Array[Int]
 
+  def maxLabelRefinements: Int = (0 until grammar.labelIndex.size).map(numValidRefinements _).max
+
   def numValidRefinements(label: Int):Int
 
   def numValidRuleRefinements(rule: Int):Int
+
+
 
   /**
    * For a given span and the parent's refinement, what refinements to the rule are allowed?
@@ -190,6 +194,8 @@ trait RefinedAnchoring[L, W] extends Factor[RefinedAnchoring[L, W]] {
    */
   def validRuleRefinementsGivenParent(begin: Int, end: Int, rule: Int, parentRef: Int):Array[Int]
 
+  def validRuleRefinementsGivenLeftChild(begin: Int, split: Int, completionBegin: Int, completionEnd: Int, rule: Int, childRef: Int):Array[Int]
+  def validRuleRefinementsGivenRightChild(completionBegin: Int, completionEnd: Int, split: Int, end: Int, rule: Int, childRef: Int):Array[Int]
   def validUnaryRuleRefinementsGivenChild(begin: Int, end: Int, rule: Int, childRef: Int):Array[Int]
 
   def leftChildRefinement(rule: Int, ruleRef: Int):Int
@@ -219,6 +225,10 @@ trait RefinedAnchoring[L, W] extends Factor[RefinedAnchoring[L, W]] {
   def ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int, refC: Int):Int
 
   def validCoarseRulesGivenParentRefinement(a: Int, refA: Int): Array[Int]
+
+  def validParentRefinementsGivenRule(begin: Int, splitBegin: Int, splitEnd: Int, end: Int, rule: Int): Array[Int]
+  def validLeftChildRefinementsGivenRule(begin: Int, end: Int, completionBegin: Int, completionEnd: Int, rule: Int): Array[Int]
+  def validRightChildRefinementsGivenRule(completionBegin: Int, completionEnd: Int, begin: Int, end: Int, rule: Int): Array[Int]
 }
 
 object RefinedAnchoring {
@@ -227,4 +237,10 @@ object RefinedAnchoring {
                      words: Seq[W]): RefinedAnchoring[L, W] = {
     LiftedCoreAnchoring(CoreAnchoring.identity[L, W](grammar, lexicon, words))
   }
+}
+
+
+trait BinaryRuleRefinements {
+  val numChildRefinements: Int
+  def leftChildForChildRefinement: Int
 }

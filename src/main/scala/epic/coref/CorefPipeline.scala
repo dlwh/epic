@@ -2,8 +2,7 @@ package epic.coref
 
 import java.io.File
 import breeze.config.{Configuration, CommandLineParser}
-import epic.everything.{DSpan, Document}
-import epic.ontonotes.ConllOntoReader
+import epic.ontonotes.{DSpan, Document, ConllOntoReader}
 import breeze.linalg.DenseVector
 import epic.framework.{ModelObjective, Feature}
 import breeze.optimize.FirstOrderMinimizer.OptParams
@@ -73,13 +72,13 @@ object CorefPipeline extends App {
   println("=================")
 
   println("Weights: ")
-  for( (f,v) <- Encoder.fromIndex(model.featureIndex).decode(optimum).iterator.toIndexedSeq[(Feature, Double)].sortBy(_._2)) {
-    println(v + " " + f)
+  for( (f,v) <- Encoder.fromIndex(model.featureIndex).decode(optimum).iterator.toIndexedSeq.sortBy(_._2)) {
+    println(s"$f $v")
   }
   println("=================")
   println(allResults)
 
-  println("Copying output results to " + params.name + " for use in official evaluation")
+  println(s"Copying output results to ${params.name} for use in official evaluation")
   ConllEval.evaluate(params.name, output)
 
   case class Stats(numInter: Int, numGold: Int, numGuess: Int) {
@@ -90,7 +89,7 @@ object CorefPipeline extends App {
     def f1 = 2.0 / (1.0/precision + 1.0/recall)
 
     override def toString() = {
-      "Stats( f1 = " + f1 + ", precision = " + precision + ", recall = "  + recall +")"
+      s"Stats( f1 = $f1, precision = $precision, recall = $recall)"
     }
   }
 
@@ -110,11 +109,11 @@ object CorefPipeline extends App {
   }
 
   def sortClusters(clusters: Iterable[Set[DSpan]]):IndexedSeq[Set[DSpan]] = {
-    clusters.toIndexedSeq[Set[DSpan]].sortBy(_.min)
+    clusters.toIndexedSeq.sortBy(_.min)
   }
 
   def formatCluster(set: Set[DSpan]) = {
-    set.toIndexedSeq[DSpan].sorted.mkString(", ")
+    set.toIndexedSeq.sorted.mkString(", ")
   }
 
   def getCoreferentPairs(clusters: IndexedSeq[Set[DSpan]]): IndexedSeq[(DSpan, DSpan)] = {

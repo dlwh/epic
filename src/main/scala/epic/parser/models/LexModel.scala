@@ -19,7 +19,7 @@ package models
 import epic.framework._
 import breeze.collection.mutable.OpenAddressHashArray
 import breeze.linalg._
-import breeze.text.analyze.EnglishWordClassGenerator
+import breeze.text.analyze.{WordShapeGenerator, EnglishWordClassGenerator}
 import epic.trees._
 import annotations.{StripAnnotations, TreeAnnotator}
 import java.io.File
@@ -29,6 +29,7 @@ import features.RuleFeature
 import breeze.util._
 import collection.mutable.ArrayBuffer
 import breeze.config.Help
+import collection.mutable
 
 class LexModel[L, W](bundle: LexGrammarBundle[L, W],
                      reannotate: (BinarizedTree[L], Seq[W])=>BinarizedTree[L],
@@ -106,7 +107,8 @@ class IndexedLexFeaturizer[L, W](f: LexFeaturizer[L, W],
                                  ruleIndex: Index[Rule[L]],
                                  val trueFeatureIndex: Index[Feature],
                                  lowCountFeatures: Set[Feature],
-                                 dummyFeatures: Int) extends RefinedFeaturizer[L, W, Feature] with Serializable {
+                                 dummyFeatures: Int,
+                                 useGlobalBinaryFeatureCache: Boolean = false) extends RefinedFeaturizer[L, W, Feature] with Serializable {
   def anchor(words: Seq[W]):Anchoring = new Spec(words)
 
   val (index:Index[Feature], lowCountFeature) = {
@@ -117,6 +119,7 @@ class IndexedLexFeaturizer[L, W](f: LexFeaturizer[L, W],
     r -> lowCount
   }
 
+  val globalBinaryFeatureCache = mutable.Map.empty[Seq[W], Array[OpenAddressHashArray[Array[Int]]]]
 
   case class Spec(words: Seq[W]) extends super.Anchoring {
 
@@ -204,7 +207,11 @@ class IndexedLexFeaturizer[L, W](f: LexFeaturizer[L, W],
     val depCache = new Array[OpenAddressHashArray[Array[Int]]](words.length)
     // headIndex -> (depIndex x ruleIndex) -> Array[Int]
     // holds all features for attachment, uses other caches for faster computation
-    val binaryCache = new Array[OpenAddressHashArray[Array[Int]]](words.length)
+    val binaryCache = globalBinaryFeatureCache.getOrElse(words, {
+        val empty = new Array[OpenAddressHashArray[Array[Int]]](words.length)
+        if (useGlobalBinaryFeatureCache) globalBinaryFeatureCache.put(words, empty)
+        empty
+      })
     // for tags. word -> tag -> Array[Int]
     val wordCache = new Array[OpenAddressHashArray[Array[Int]]](words.length)
 
@@ -402,7 +409,7 @@ final class LexGrammar[L, W](val grammar: BaseGrammar[L],
                              binaries: Array[Boolean],
                              leftRules: Array[Boolean],
                              rightRules: Array[Boolean]) extends RefinedGrammar[L, W] {
-  def isLeftRule(r: Int) = leftRules(r)
+  def isHeadOnLeftForRule(r: Int) = leftRules(r)
 
   def isRightRule(r: Int) = rightRules(r)
 
@@ -436,7 +443,8 @@ final class LexGrammar[L, W](val grammar: BaseGrammar[L],
       else dot(f.featuresForSpan(begin, end, label, ref))
     }
 
-    val bCache = new OpenAddressHashArray[Double](words.size * words.size * index.size, Double.NaN)
+//    val bCache = new OpenAddressHashArray[Double](words.size * words.size * index.size, Double.NaN)
+    val bCache = Array.fill(words.size)(new OpenAddressHashArray[Double](words.size * index.size, Double.NaN))
     val uCache = new OpenAddressHashArray[Double](words.size * index.size, Double.NaN)
 
     def scoreUnaryRule(begin: Int, end: Int, rule: Int, ref: Int) = {
@@ -456,14 +464,14 @@ final class LexGrammar[L, W](val grammar: BaseGrammar[L],
     def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int) = {
       val head = headIndex(ref)
       val dep = depIndex(ref)
-      val cacheIndex = head + words.size * (dep + words.size * rule)
-      val score = bCache(cacheIndex)
+      val cacheIndex = head + words.size * rule
+      val score = bCache(dep)(cacheIndex)
 
       if (!score.isNaN)
         score
       else {
         val score = dot(f.featuresForBinaryRule(begin, split, end, rule, ref))
-        bCache(cacheIndex) = score
+        bCache(dep)(cacheIndex) = score
         score
       }
 
@@ -490,7 +498,7 @@ final class LexGrammar[L, W](val grammar: BaseGrammar[L],
     def validRuleRefinementsGivenParent(begin: Int, end: Int, rule: Int, parentRef: Int) = {
       if(!binaries(rule)) {
         Array(parentRef:Int)
-      } else if(isLeftRule(rule)) {
+      } else if(isHeadOnLeftForRule(rule)) {
         val result = new Array[Int](end - (parentRef+1))
         var ref = parentRef * words.length + parentRef + 1
         var i = 0
@@ -513,6 +521,55 @@ final class LexGrammar[L, W](val grammar: BaseGrammar[L],
       }
     }
 
+    def validRuleRefinementsGivenLeftChild(begin: Int, split: Int, completionBegin:Int, completionEnd: Int, rule: Int, lc: Int) = {
+      if(isHeadOnLeftForRule(rule)) {
+        val result = new Array[Int](completionEnd - completionBegin)
+        var ref = lc * words.length + completionBegin
+        var i = 0
+        while(i < result.length) {
+          result(i) = ref
+          ref += 1
+          i += 1
+        }
+        result
+      } else {
+        val result = new Array[Int](completionEnd - completionBegin)
+        var ref = completionBegin * words.length +lc
+        var i = 0
+        while(i < result.length) {
+          result(i) = ref
+          i += 1
+          ref += words.length
+        }
+        result
+      }
+    }
+
+
+    def validRuleRefinementsGivenRightChild(completionBegin: Int, completionEnd: Int, split: Int, end: Int, rule: Int, childRef: Int): Array[Int] = {
+      if(!isHeadOnLeftForRule(rule)) {
+        val result = new Array[Int](completionEnd - completionBegin)
+        var ref = childRef * words.length + completionBegin
+        var i = 0
+        while(i < result.length) {
+          result(i) = ref
+          ref += 1
+          i += 1
+        }
+        result
+      } else {
+        val result = new Array[Int](completionEnd - completionBegin)
+        var ref = completionBegin * words.length + childRef
+        var i = 0
+        while(i < result.length) {
+          result(i) = ref
+          i += 1
+          ref += words.length
+        }
+        result
+      }
+    }
+
     def validUnaryRuleRefinementsGivenChild(begin: Int, end: Int, rule: Int, childRef: Int) = {
       Array(childRef)
     }
@@ -523,7 +580,7 @@ final class LexGrammar[L, W](val grammar: BaseGrammar[L],
 
 
     def leftChildRefinement(rule: Int, ruleRef: Int) = {
-      if(isLeftRule(rule)) headIndex(ruleRef)
+      if(isHeadOnLeftForRule(rule)) headIndex(ruleRef)
       else depIndex(ruleRef)
     }
 
@@ -542,12 +599,12 @@ final class LexGrammar[L, W](val grammar: BaseGrammar[L],
     }
 
     def ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int) = {
-      require(refA == refB)
+      require(refA == refB, s"Parent head for rule ${grammar.index.get(r)} was '${words(refA)}' and child head was '${words(refB)}', but should be the same!" + words)
       refA
     }
 
     def ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int, refC: Int) = {
-      if(isLeftRule(r)) {
+      if(isHeadOnLeftForRule(r)) {
         require(refA == refB)
         refA * words.length + refC
       } else {
@@ -557,6 +614,20 @@ final class LexGrammar[L, W](val grammar: BaseGrammar[L],
     }
 
     def validCoarseRulesGivenParentRefinement(a: Int, refA: Int) = grammar.indexedBinaryRulesWithParent(a)
+
+    def validParentRefinementsGivenRule(begin: Int, splitBegin: Int, splitEnd: Int, end: Int, rule: Int): Array[Int] = {
+      if (isHeadOnLeftForRule(rule)) Array.range(begin, splitEnd)
+      else Array.range(splitBegin, end)
+    }
+
+
+    def validLeftChildRefinementsGivenRule(begin: Int, splitBegin: Int, splitEnd: Int, end: Int, rule: Int): Array[Int] = {
+      Array.range(begin, splitEnd)
+    }
+
+    def validRightChildRefinementsGivenRule(begin: Int, splitBegin: Int, splitEnd: Int, end: Int, rule: Int): Array[Int] = {
+      Array.range(splitBegin, end)
+    }
   }
 
 }
@@ -652,7 +723,7 @@ class SimpleWordShapeGen[L](tagWordCounts: Counter2[L, String, Double],
     } else {
       val buf = ArrayBuffer[String](//IndicatorFeature(w),
         EnglishWordClassGenerator(w),
-        makeShapeFeature(w)
+        WordShapeGenerator(w)
       )
       if(counts(w) > minCountThreshold) {
         buf += w
@@ -670,27 +741,11 @@ class SimpleWordShapeGen[L](tagWordCounts: Counter2[L, String, Double],
 
   }
 
-  def makeShapeFeature(word: String) = {
-    val result = new StringBuilder(word.length);
-    var i = 0;
-    while(i < word.length) {
-      val c = word(i);
-      val x = if(c.isLetter && c.isUpper) 'X' else if(c.isLetter) 'x' else if(c.isDigit) 'd' else c;
-      if(result.length > 1 && (result.last == x) && result(result.length - 2) == x) {
-        result += 'e'
-      } else if (result.length > 1 && result.last == 'e' && result(result.length - 2) == x) {
-        () // nothing
-      }else {
-        result += x;
-      }
-      i +=1;
-    }
-    result.toString
-  }
+
 }
 
 case class LexModelFactory(baseParser: ParserParams.XbarGrammar,
-                           constraints: ParserParams.Constraints[AnnotatedLabel, String],
+                           constraints: ParserParams.Constraints[String],
                            @Help(text= "The kind of annotation to do on the refined grammar. Defaults to ~KM2003")
                            annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = StripAnnotations(),
                            @Help(text="Old weights to initialize with. Optional")

@@ -1,9 +1,9 @@
 package epic.coref
 
-import epic.everything.DSpan
 import breeze.linalg.Counter
 import epic.framework.Feature
 import breeze.text.analyze.PorterStemmer
+import epic.ontonotes.DSpan
 
 /**
  *

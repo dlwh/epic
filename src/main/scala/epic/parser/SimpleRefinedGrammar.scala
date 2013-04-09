@@ -22,7 +22,7 @@ import collection.mutable.ArrayBuffer
  *
  * @author dlwh
  */
-@SerialVersionUID(1)
+@SerialVersionUID(2)
 class SimpleRefinedGrammar[L, L2, W](val grammar: BaseGrammar[L],
                                      val lexicon: Lexicon[L, W],
                                      val refinements: GrammarRefinements[L, L2],
@@ -33,6 +33,7 @@ class SimpleRefinedGrammar[L, L2, W](val grammar: BaseGrammar[L],
                                      childCompatibleRefinements: Array[Array[Array[Int]]],
                                      tagScorer: TagScorer[L2, W]) extends RefinedGrammar[L, W] with Serializable {
 
+<<<<<<< HEAD
   def ruleScore(r: Int, ruleRef: Int):Double = ruleScoreArray(r)(ruleRef)
   def spanScore(l: Int, ref: Int):Double = spanScoreArray(l)(ref)
 
@@ -43,6 +44,8 @@ class SimpleRefinedGrammar[L, L2, W](val grammar: BaseGrammar[L],
   }
 
   //
+=======
+>>>>>>> master
   private val coarseRulesGivenParentRefinement = Array.tabulate(grammar.labelIndex.size) { p =>
     // refinement -> rules
     val result = Array.fill(refinements.labels.refinementsOf(p).size)(ArrayBuffer[Int]())
@@ -53,6 +56,52 @@ class SimpleRefinedGrammar[L, L2, W](val grammar: BaseGrammar[L],
     }
 
     result.map(_.toArray)
+  }
+
+
+  private val parentRefinementsGivenCoarseRule:Array[Array[Int]] = Array.tabulate(grammar.index.size) { r =>
+  // rules -> parent refinements
+    refinements.rules.refinementsOf(r).map(refinedGrammar.parent(_)).toSet.toArray.map(refinements.labels.localize(_)).sorted
+  }
+
+  private val leftChildRefinementsGivenCoarseRule:Array[Array[Int]] = Array.tabulate(grammar.index.size) { r =>
+    if(grammar.index.get(r).isInstanceOf[UnaryRule[_]]) Array.empty
+    else  refinements.rules.refinementsOf(r).map(r => refinedGrammar.leftChild(r)).toSet.toArray.map(refinements.labels.localize(_)).sorted
+  }
+
+  private val rightChildRefinementsGivenCoarseRule:Array[Array[Int]] = Array.tabulate(grammar.index.size) { r =>
+    if(grammar.index.get(r).isInstanceOf[UnaryRule[_]]) Array.empty
+    else  refinements.rules.refinementsOf(r).map(r => refinedGrammar.rightChild(r)).toSet.toArray.map(refinements.labels.localize(_)).sorted
+  }
+
+  private val leftChildCompatibleRefinements: Array[Array[Array[Int]]] = Array.tabulate(grammar.index.size) { r =>
+    if(grammar.index.get(r).isInstanceOf[UnaryRule[L]]) {
+      null
+    } else {
+
+      val leftChild = grammar.leftChild(r)
+      val leftChildRefs = Array.fill(refinements.labels.refinementsOf(leftChild).length){ArrayBuffer[Int]()}
+      for(ruleRef <- refinements.rules.refinementsOf(r)) {
+        val refParent = refinements.labels.localize(refinements.rules.fineIndex.get(ruleRef).asInstanceOf[BinaryRule[L2]].left)
+        leftChildRefs(refParent) += refinements.rules.localize(ruleRef)
+      }
+      leftChildRefs.map(_.toArray)
+    }
+  }
+
+  private val rightChildCompatibleRefinements: Array[Array[Array[Int]]] = Array.tabulate(grammar.index.size) { r =>
+    if(grammar.index.get(r).isInstanceOf[UnaryRule[L]]) {
+      null
+    } else {
+
+      val rightChild = grammar.rightChild(r)
+      val rightChildRefs = Array.fill(refinements.labels.refinementsOf(rightChild).length){ArrayBuffer[Int]()}
+      for(ruleRef <- refinements.rules.refinementsOf(r)) {
+        val refParent = refinements.labels.localize(refinements.rules.fineIndex.get(ruleRef).asInstanceOf[BinaryRule[L2]].right)
+        rightChildRefs(refParent) += refinements.rules.localize(ruleRef)
+      }
+      rightChildRefs.map(_.toArray)
+    }
   }
 
   def anchor(w: Seq[W]) = new RefinedAnchoring[L, W] {
@@ -87,6 +136,14 @@ class SimpleRefinedGrammar[L, L2, W](val grammar: BaseGrammar[L],
       parentCompatibleRefinements(rule)(parentRef)
     }
 
+    def validRuleRefinementsGivenLeftChild(begin: Int, split: Int, completionBegin: Int, completionEnd: Int, rule: Int, childRef: Int): Array[Int] = {
+      leftChildCompatibleRefinements(rule)(childRef)
+    }
+
+    def validRuleRefinementsGivenRightChild(completionBegin: Int, completionEnd: Int, split: Int, end: Int, rule: Int, childRef: Int): Array[Int] = {
+      rightChildCompatibleRefinements(rule)(childRef)
+    }
+
     def validUnaryRuleRefinementsGivenChild(begin: Int, end: Int, rule: Int, childRef: Int) = {
       childCompatibleRefinements(rule)(childRef)
     }
@@ -111,7 +168,7 @@ class SimpleRefinedGrammar[L, L2, W](val grammar: BaseGrammar[L],
       refinements.labels.localize(refinedGrammar.child(refinedRuleId))
     }
 
-    // TODO: make this not terminally slow!
+    // TODO: make this not so slow! Doesn't really matter, but still..
     def ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int) = {
       val a = grammar.parent(r)
       val b = grammar.child(r)
@@ -143,5 +200,17 @@ class SimpleRefinedGrammar[L, L2, W](val grammar: BaseGrammar[L],
     def numValidRuleRefinements(rule: Int) = refinements.rules.refinementsOf(rule).length
 
     def validCoarseRulesGivenParentRefinement(a: Int, refA: Int) = coarseRulesGivenParentRefinement(a)(refA)
+
+    def validParentRefinementsGivenRule(begin: Int, splitBegin: Int, splitEnd: Int, end: Int, rule: Int): Array[Int] = {
+      parentRefinementsGivenCoarseRule(rule)
+    }
+
+    def validLeftChildRefinementsGivenRule(begin: Int, end: Int, completionBegin: Int, completionEnd: Int, rule: Int): Array[Int] = {
+      leftChildRefinementsGivenCoarseRule(rule)
+    }
+
+    def validRightChildRefinementsGivenRule(completionBegin: Int, completionEnd: Int, begin: Int, end: Int, rule: Int): Array[Int] = {
+      rightChildRefinementsGivenCoarseRule(rule)
+    }
   }
 }

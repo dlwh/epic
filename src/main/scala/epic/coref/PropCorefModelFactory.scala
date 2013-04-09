@@ -4,7 +4,7 @@ import breeze.util.{MutableIndex, Index}
 import epic.framework.Feature
 import breeze.collection.mutable.TriangularArray
 import breeze.linalg.VectorBuilder
-import epic.everything.Document
+import epic.ontonotes.Document
 
 
 trait CorefInstanceFeaturizer {

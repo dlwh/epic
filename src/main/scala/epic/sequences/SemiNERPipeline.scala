@@ -2,8 +2,7 @@ package epic.sequences
 
 import java.io._
 import breeze.config.{Configuration, CommandLineParser}
-import epic.ontonotes.ConllOntoReader
-import epic.everything.{Mention, DSpan, NERType}
+import epic.ontonotes.{NERType, ConllOntoReader}
 import collection.mutable.ArrayBuffer
 import breeze.linalg.DenseVector
 import epic.framework.ModelObjective
@@ -24,9 +23,11 @@ import breeze.util.Implicits._
 object SemiNERPipeline {
 
   case class Params(path: File,
+                    modelOut: File = new File("ner.model.gz"),
                     name: String = "eval/ner",
                     nfiles: Int = 100000,
                     iterPerEval: Int = 20,
+                    nthreads: Int = -1,
                     useCorefFeatures: Boolean = false,
                     useCorefSpans: Boolean = false,
                     opt: OptParams)
@@ -50,7 +51,7 @@ object SemiNERPipeline {
       val corefHints: Map[IndexedSeq[String], NERType.Value] =  {for {
         file <- params.path.listFiles take params.nfiles
         doc <- ConllOntoReader.readDocuments(file)
-        corefClusters: Map[Int, Set[NERType.Value]] = doc.coref.toIndexedSeq[(DSpan, Mention)].groupBy(_._2.id).mapValues(_.map(_._1).flatMap(span => doc.ner.get(span).iterator).toSet)
+        corefClusters: Map[Int, Set[NERType.Value]] = doc.coref.toIndexedSeq.groupBy(_._2.id).mapValues(_.map(_._1).flatMap(span => doc.ner.get(span).iterator).toSet)
         (span, m) <- doc.coref; yd = span.getYield(doc)
         if yd.length != 1 || !pronouns.contains(yd.head)
         nertpe <- corefClusters(m.id).headOption.iterator
@@ -65,7 +66,7 @@ object SemiNERPipeline {
       val corefHints: Set[IndexedSeq[String]] =  {for {
         file <- params.path.listFiles take params.nfiles
         doc <- ConllOntoReader.readDocuments(file)
-        corefClusters: Map[Int, Set[NERType.Value]] = doc.coref.toIndexedSeq[(DSpan, Mention)].groupBy(_._2.id).mapValues(_.map(_._1).flatMap(span => doc.ner.get(span).iterator).toSet)
+        corefClusters: Map[Int, Set[NERType.Value]] = doc.coref.toIndexedSeq.groupBy(_._2.id).mapValues(_.map(_._1).flatMap(span => doc.ner.get(span).iterator).toSet)
         (span, m) <- doc.coref; yd = span.getYield(doc)
         if yd.length != 1 || !pronouns.contains(yd.head)
         if corefClusters(m.id).nonEmpty
@@ -81,9 +82,10 @@ object SemiNERPipeline {
     }
 
 
+
     // build feature Index
-    val model = new SegmentationModelFactory(NERType.OutsideSentence, gazetteer = gazetteer).makeModel(train)
-    val obj = new ModelObjective(model, train)
+    val model = new SegmentationModelFactory(NERType.OutsideSentence, NERType.NotEntity, gazetteer = gazetteer).makeModel(train)
+    val obj = new ModelObjective(model, train, params.nthreads)
     val cached = new CachedBatchDiffFunction(obj)
 
     val checking = new RandomizedGradientCheckingFunction[Int, DenseVector[Double]](cached, toString={ (i: Int) => model.featureIndex.get(i).toString})
@@ -93,11 +95,10 @@ object SemiNERPipeline {
       println("Eval + " + (state.iter+1) + " " + SegmentationEval.eval(crf, test, NERType.NotEntity))
     }
 
-    val weights = params.opt.iterations(cached, obj.initialWeightVector(randomize=true)).tee(state => if((state.iter +1) % params.iterPerEval == 0) eval(state)).take(params.opt.maxIterations).last
-    eval(weights)
+    val finalState = params.opt.iterations(cached, obj.initialWeightVector(randomize=true)).tee(state => if((state.iter +1) % params.iterPerEval == 0) eval(state)).take(params.opt.maxIterations).last
+    eval(finalState)
 
-
-
+    breeze.util.writeObject(params.modelOut, model.extractCRF(finalState.x))
 
   }
 
@@ -152,6 +153,7 @@ object SemiConllNERPipeline {
                     test: File,
                     name: String = "eval/ner",
                     nfiles: Int = 100000,
+                    nthreads: Int = -1,
                     iterPerEval: Int = 20,
                     opt: OptParams)
 
@@ -168,8 +170,8 @@ object SemiConllNERPipeline {
 
 
     // build feature Index
-    val model = new SegmentationModelFactory("##", gazetteer = Gazetteer.ner("en")).makeModel(train)
-    val obj = new ModelObjective(model, train)
+    val model: SemiCRFModel[String, String] = new SegmentationModelFactory("##", "O", gazetteer = Gazetteer.ner("en")).makeModel(train)
+    val obj = new ModelObjective(model, train, params.nthreads)
     val cached = new CachedBatchDiffFunction(obj)
 
     val checking = new RandomizedGradientCheckingFunction[Int, DenseVector[Double]](cached, toString={ (i: Int) => model.featureIndex.get(i).toString})

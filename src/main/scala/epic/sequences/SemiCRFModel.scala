@@ -3,7 +3,7 @@ package epic.sequences
 import epic.framework._
 import breeze.util._
 import breeze.linalg.{VectorBuilder, Counter, SparseVector, DenseVector}
-import epic.sequences.SemiCRF.{TransitionVisitor}
+import epic.sequences.SemiCRF.TransitionVisitor
 import collection.mutable.ArrayBuffer
 import epic.parser.features.{PairFeature, SpanShapeGenerator, WordShapeFeaturizer}
 import breeze.text.analyze.{WordShapeGenerator, EnglishWordClassGenerator}
@@ -11,14 +11,18 @@ import collection.immutable
 import breeze.collection.mutable.TriangularArray
 import epic.trees.Span
 import epic.parser.features.StandardSpanFeatures.WordEdges
+import collection.mutable
 
 /**
  *
  * @author dlwh
  */
+@SerialVersionUID(1L)
 class SemiCRFModel[L, W](val featureIndex: Index[Feature],
                          val featurizer: SemiCRFModel.BIEOFeaturizer[L, W],
-                         maxSegmentLength: Int=>Int) extends Model[Segmentation[L, W]] with StandardExpectedCounts.Model {
+                         maxSegmentLength: Int=>Int,
+                         initialWeights: Feature=>Double = {(_: Feature) => 0.0},
+                         cacheFeatures: Boolean = false) extends Model[Segmentation[L, W]] with StandardExpectedCounts.Model with Serializable {
   def labelIndex: Index[L] = featurizer.labelIndex
 
   def extractCRF(weights: DenseVector[Double]) = {
@@ -29,23 +33,30 @@ class SemiCRFModel[L, W](val featureIndex: Index[Feature],
   type Inference = SemiCRFInference[L, W]
   type Marginal = SemiCRF.Marginal[L, W]
 
-  def initialValueForFeature(f: Feature): Double = 0.0
+  def initialValueForFeature(f: Feature): Double = initialWeights(f)
 
-  def inferenceFromWeights(weights: DenseVector[Double]): Inference = new SemiCRFInference(weights, featureIndex, featurizer, maxSegmentLength)
+  val compressedFeatureCache = mutable.Map.empty[IndexedSeq[W], CompressedFeatureCache]
+
+  def inferenceFromWeights(weights: DenseVector[Double]): Inference =
+    new SemiCRFInference(weights, featureIndex, featurizer, maxSegmentLength, compressedFeatureCache, cacheFeatures)
 
 }
 
 object SemiCRFModel {
   trait BIEOFeaturizer[L, W] extends SemiCRF.IndexedFeaturizer[L, W] {
-    def anchor(w: IndexedSeq[W]): BIEOAnchoredFeaturizer[L, W]
+    def anchor(w: IndexedSeq[W], spanCompressedCache: Option[CompressedFeatureCache] = None): BIEOAnchoredFeaturizer[L, W]
   }
 
   trait BIEOAnchoredFeaturizer[L, W] extends SemiCRF.AnchoredFeaturizer[L, W] {
 
+    def canStartRealSpan(beg: Int):Boolean
+    def canBeInterior(pos: Int):Boolean
     def featuresForBegin(prev: Int, cur: Int, pos: Int):SparseVector[Double]
     def featuresForEnd(cur: Int, pos: Int):SparseVector[Double]
     def featuresForInterior(cur: Int, pos: Int):SparseVector[Double]
     def featuresForSpan(prev: Int, cur: Int, beg: Int, end: Int):SparseVector[Double]
+    def indicatorFeaturesForSpan(prev: Int, cur: Int, beg: Int, end: Int):IndicatorFeatureVector
+    def indicatorFeatureCache:CompressedFeatureCache
 
     def featuresForTransition(prev: Int, cur: Int, start: Int, end: Int): SparseVector[Double] = {
       val acc = new ArrayBuffer[SparseVector[Double]]()
@@ -57,7 +68,7 @@ object SemiCRFModel {
       acc += _end
       nnz += _end.activeSize
       var p = start+1
-      while(p < end) {
+      while (p < end) {
         val w = featuresForInterior(cur, p)
         acc += w
         nnz += w.activeSize
@@ -70,7 +81,7 @@ object SemiCRFModel {
 
       val result = SparseVector.zeros[Double](featureIndex.size)
       var i = 0
-      while(i < acc.size) {
+      while (i < acc.size) {
         result += acc(i)
         i += 1
       }
@@ -79,13 +90,17 @@ object SemiCRFModel {
   }
 }
 
+@SerialVersionUID(1)
 class SemiCRFInference[L, W](weights: DenseVector[Double],
                              featureIndex: Index[Feature],
                              featurizer: SemiCRFModel.BIEOFeaturizer[L, W],
-                             val maxLength: Int=>Int) extends AugmentableInference[Segmentation[L, W], SemiCRF.Anchoring[L, W]] with SemiCRF.Grammar[L, W] {
-  def viterbi(sentence: IndexedSeq[W], anchoring: SemiCRF.Anchoring[L, W]) = {
+                             val maxLength: Int=>Int,
+                             compressedFeatureCache: mutable.Map[IndexedSeq[W], CompressedFeatureCache],
+                             cacheFeatures: Boolean = false) extends AugmentableInference[Segmentation[L, W], SemiCRF.Anchoring[L, W]] with SemiCRF.Grammar[L, W] with Serializable {
+  def viterbi(sentence: IndexedSeq[W], anchoring: SemiCRF.Anchoring[L, W]): Segmentation[L, W] = {
     SemiCRF.viterbi(new Anchoring(sentence, anchoring))
   }
+
 
   type Marginal = SemiCRF.Marginal[L, W]
   type ExpectedCounts = StandardExpectedCounts[Feature]
@@ -98,14 +113,12 @@ class SemiCRFInference[L, W](weights: DenseVector[Double],
   def labelIndex = featurizer.labelIndex
   def startSymbol = featurizer.startSymbol
 
-  def marginal(v: Segmentation[L, W], aug: SemiCRF.Anchoring[L, W]): (Marginal, Double) = {
-    val m = SemiCRF.Marginal(new Anchoring(v.words, aug))
-    m -> m.logPartition
+  def marginal(v: Segmentation[L, W], aug: SemiCRF.Anchoring[L, W]): Marginal = {
+    SemiCRF.Marginal(new Anchoring(v.words, aug))
   }
 
-  def goldMarginal(v: Segmentation[L, W], augment: SemiCRF.Anchoring[L, W]) = {
-    val m = SemiCRF.Marginal.goldMarginal[L, W](new Anchoring(v.words, augment), v.segments)
-    m -> m.logPartition
+  def goldMarginal(v: Segmentation[L, W], augment: SemiCRF.Anchoring[L, W]): SemiCRF.Marginal[L, W] = {
+    SemiCRF.Marginal.goldMarginal[L, W](new Anchoring(v.words, augment), v.segments)
   }
 
   def countsFromMarginal(v: Segmentation[L, W], marg: Marginal, counts: ExpectedCounts, scale: Double): ExpectedCounts = {
@@ -117,9 +130,20 @@ class SemiCRFInference[L, W](weights: DenseVector[Double],
         var i = 0
         val index = vector.index
         val data = vector.data
-        while(i < vector.iterableSize) {
-//          if(vector.isActive(i))
+        while (i < vector.iterableSize) {
+//          if (vector.isActive(i))
             counts(index(i)) += d * data(i) * scale
+          i += 1
+        }
+
+      }
+
+      def daxpy(d: Double, vector: IndicatorFeatureVector, counts: DenseVector[Double]) {
+        var i = 0
+        val incr = d * scale
+        while (i < vector.size) {
+          //          if (vector.isActive(i))
+          counts(vector(i)) += incr
           i += 1
         }
 
@@ -130,12 +154,13 @@ class SemiCRFInference[L, W](weights: DenseVector[Double],
         daxpy(count, featuresForBegin(prev, cur, start), counts.counts)
         daxpy(count, featuresForEnd(cur, end), counts.counts)
         var p = start+1
-        while(p < end) {
+        while (p < end) {
           daxpy(count, featuresForInterior(cur, p), counts.counts)
           p += 1
         }
 
-        daxpy(count, featuresForSpan(prev, cur, start, end), counts.counts)
+        if (cacheFeatures) daxpy(count, indicatorFeaturesForSpan(prev, cur, start, end), counts.counts)
+        else daxpy(count, featuresForSpan(prev, cur, start, end), counts.counts)
 
       }
     }
@@ -158,34 +183,107 @@ class SemiCRFInference[L, W](weights: DenseVector[Double],
   }
 
   class Anchoring(val words: IndexedSeq[W], augment: SemiCRF.Anchoring[L, W]) extends SemiCRF.Anchoring[L, W] {
-    val localization = featurizer.anchor(words)
+    var compressedCache = compressedFeatureCache.get(words)
+    val localization = featurizer.anchor(words, compressedCache)
+    if (cacheFeatures && compressedCache.isEmpty) compressedFeatureCache.put(words, localization.indicatorFeatureCache)
     def maxSegmentLength(l: Int): Int = SemiCRFInference.this.maxLength(l)
 
     val beginCache = Array.tabulate(labelIndex.size, labelIndex.size, length){ (p,c,w) =>
-      weights dot localization.featuresForBegin(p,c,w)
+      val f = localization.featuresForBegin(p, c, w)
+      if (f eq null) Double.NegativeInfinity
+      else weights dot f
     }
     val endCache = Array.tabulate(labelIndex.size, length){ (l, w) =>
-      weights dot localization.featuresForEnd(l, w+1)
+      val f = localization.featuresForEnd(l, w + 1)
+      if (f eq null) Double.NegativeInfinity
+      else weights dot f
     }
     val wordCache = Array.tabulate(labelIndex.size, length){ (l, w) =>
-      weights dot localization.featuresForInterior(l, w)
+      val f = localization.featuresForInterior(l, w)
+      if (f eq null) Double.NegativeInfinity
+      else weights dot f
     }
 
 
-    def scoreTransition(prev: Int, cur: Int, beg: Int, end: Int): Double = {
-      var score = augment.scoreTransition(prev, cur, beg, end)
-      if(score != Double.NegativeInfinity) {
-        score += beginCache(prev)(cur)(beg)
-        score += endCache(cur)(end-1)
-        var pos = beg + 1
-        while(pos < end) {
-          score += wordCache(cur)(pos)
-          pos += 1
-        }
-
-        score += (weights dot localization.featuresForSpan(prev, cur, beg, end))
+    private def okSpan(beg: Int, end: Int) = {
+      var ok = localization.canStartRealSpan(beg)
+      var pos = beg + 1
+      while(pos < end && ok) {
+        ok = localization.canBeInterior(pos)
+        pos += 1
       }
-      score
+      ok
+    }
+
+    def scoreTransition(prev: Int, cur: Int, beg: Int, end: Int): Double = {
+      if (beg + 1 != end && !okSpan(beg, end)) {
+        Double.NegativeInfinity
+      } else {
+        var score = augment.scoreTransition(prev, cur, beg, end)
+        if (score != Double.NegativeInfinity) {
+          val spanScore: Double = cachedSpanScore(prev, cur, beg, end)
+          score += spanScore
+          if (score != Double.NegativeInfinity) {
+            score += beginCache(prev)(cur)(beg)
+            score += endCache(cur)(end-1)
+            var pos = beg + 1
+            while (pos < end) {
+              score += wordCache(cur)(pos)
+              pos += 1
+            }
+          }
+        }
+        score
+      }
+    }
+
+    private val spanCache = new Array[Array[Array[Double]]](TriangularArray.arraySize(length+1))
+
+    private def cachedSpanScore(prev: Int, cur: Int, beg: Int, end: Int):Double = {
+      val tind: Int = TriangularArray.index(beg, end)
+      var cc = spanCache(tind)
+      if(spanCache(tind) == null) {
+        cc = new Array[Array[Double]](labelIndex.size)
+        spanCache(tind) = cc
+      }
+
+      var xx = cc(cur)
+      if(xx == null) {
+        if (cacheFeatures) {
+          val span = localization.indicatorFeaturesForSpan(prev, cur, beg, end)
+          if (span eq null) {
+            cc(cur) = negInfArray
+            Double.NegativeInfinity
+          } else {
+            xx = java.util.Arrays.copyOf(nanArray, nanArray.length)
+            xx(prev) = span dot weights
+            cc(cur) = xx
+            xx(prev)
+          }
+        } else {
+          val span = localization.featuresForSpan(prev, cur, beg, end)
+          if (span eq null) {
+            cc(cur) = negInfArray
+            Double.NegativeInfinity
+          } else {
+            xx = java.util.Arrays.copyOf(nanArray, nanArray.length)
+            xx(prev) = weights dot span
+            cc(cur) = xx
+            xx(prev)
+          }
+        }
+      } else {
+        if (java.lang.Double.isNaN(xx(prev))) {
+          if (cacheFeatures) {
+            val span = localization.indicatorFeaturesForSpan(prev, cur, beg, end)
+            xx(prev) = span dot weights
+          } else {
+            val span = localization.featuresForSpan(prev, cur, beg, end)
+            xx(prev) = weights dot span
+          }
+        }
+        xx(prev)
+      }
     }
 
     def labelIndex: Index[L] = featurizer.labelIndex
@@ -193,9 +291,77 @@ class SemiCRFInference[L, W](weights: DenseVector[Double],
     def startSymbol = featurizer.startSymbol
   }
 
+  private val negInfArray = Array.fill(labelIndex.size)(Double.NegativeInfinity)
+  private val nanArray = Array.fill(labelIndex.size)(Double.NaN)
 
+
+
+  def posteriorDecode(m: Marginal):Segmentation[L, W] = {
+    SemiCRF.posteriorDecode(m)
+  }
 }
 
+class SegmentationModelFactory[L](val startSymbol: L,
+                                  val outsideSymbol: L,
+                                  pruningModel: Option[SemiCRF.ConstraintGrammar[L, String]] = None,
+                                  gazetteer: Gazetteer[Any, String] = Gazetteer.empty[String, String],
+                                  weights: Feature=>Double = { (f:Feature) => 0.0}) {
+
+  import SegmentationModelFactory._
+
+  def makeModel(train: IndexedSeq[Segmentation[L, String]]): SemiCRFModel[L, String] = {
+    val maxLengthMap = train.flatMap(_.segments.iterator).groupBy(_._1).mapValues(arr => arr.map(_._2.length).max)
+    val labelIndex: Index[L] = Index[L](Iterator(startSymbol) ++ train.iterator.flatMap(_.label.map(_._1)))
+    val maxLengthArray = Encoder.fromIndex(labelIndex).tabulateArray(maxLengthMap.getOrElse(_, 0))
+    println(maxLengthMap)
+
+    val starters = collection.mutable.Set[String]()
+    val interiors = collection.mutable.Set[String]()
+    for (t <- train; seg <- t.segments if seg._1 != outsideSymbol) {
+      starters += t.words(seg._2.start)
+      interiors ++= seg._2.map(t.words)
+    }
+
+
+    val wordCounts:Counter[String, Double] = Counter.count(train.flatMap(_.words):_*).mapValues(_.toDouble)
+    val nonStarters = wordCounts.activeIterator.filter(_._2 > 5).map(_._1).toSet -- starters
+    println(nonStarters)
+    val nonInteriors = wordCounts.activeIterator.filter(_._2 > 8).map(_._1).toSet -- interiors
+    println(nonInteriors)
+    val f = new StandardFeaturizer[L](gazetteer, wordCounts)
+    val basicFeatureIndex = Index[Feature]()
+    val spanFeatureIndex = Index[Feature]()
+    val transFeatureIndex = Index[Feature]()
+
+    val maxMaxLength = (0 until labelIndex.size).map(maxLengthArray).max
+    var i = 0
+    for(s <- train) {
+      val loc = f.localize(s.words)
+      val possibleInteriors = s.words.map(!nonInteriors(_))
+
+      for(b <- 0 until s.length) {
+        loc.featuresForWord(b) foreach {basicFeatureIndex.index _}
+        for(e <- (b+1) to math.min(s.length,b+maxMaxLength)) {
+          if (b < e - 1 || (!nonStarters(s.words(b)) && (b until e).forall(possibleInteriors))) {
+            loc.featuresForSpan(b, e) foreach {spanFeatureIndex.index _}
+            loc.featuresForTransition(b, e) foreach {transFeatureIndex.index _}
+          }
+        }
+
+      }
+      i += 1
+    }
+
+    for(f <- pruningModel) {
+      assert(f.labelIndex == labelIndex, f.labelIndex + " " + labelIndex)
+    }
+    val indexed = new IndexedStandardFeaturizer[L](f, startSymbol, nonStarters, nonInteriors, labelIndex, basicFeatureIndex, spanFeatureIndex, transFeatureIndex, maxLengthArray(_), pruningModel)
+    val model = new SemiCRFModel(indexed.featureIndex, indexed, maxLengthArray, weights(_))
+
+    model
+  }
+
+}
 
 object SegmentationModelFactory {
   case class SFeature(w: Any, kind: Symbol) extends Feature
@@ -209,75 +375,36 @@ object SegmentationModelFactory {
   case object TransitionFeature extends Feature
   case object SpanStartsSentence extends Feature
   case object SpansWholeSentence extends Feature
-}
-
-class SegmentationModelFactory[L](val startSymbol: L,
-                                  gazetteer: Gazetteer[Any, String] = Gazetteer.empty[String, String]) {
-
-  import SegmentationModelFactory._
-
-  def makeModel(train: IndexedSeq[Segmentation[L, String]], labelIndex: Option[Index[L]] = None): SemiCRFModel[L, String] = {
-    val maxLengthMap = train.flatMap(_.segments.iterator).groupBy(_._1).mapValues(arr => arr.map(_._2.length).max)
-    val labelIndex: Index[L] = Index[L](Iterator(startSymbol) ++ train.iterator.flatMap(_.label.map(_._1)))
-    val maxLengthArray = Encoder.fromIndex(labelIndex).tabulateArray(maxLengthMap.getOrElse(_, 0))
-
-    val wordCounts:Counter[String, Double] = Counter.count(train.flatMap(_.words):_*).mapValues(_.toDouble)
-    val f = new StandardFeaturizer(wordCounts)
-    val basicFeatureIndex = Index[Feature]()
-    val spanFeatureIndex = Index[Feature]()
-    val transFeatureIndex = Index[Feature]()
-
-    val maxMaxLength = (0 until labelIndex.size).map(maxLengthArray).max
-    var i = 0
-    for(s <- train) {
-      if(i % 250 == 0)
-        println(i + "/" + train.length)
-      val loc = f.localize(s.words)
-
-      for(b <- 0 until s.length) {
-        loc.featuresForWord(b) foreach {basicFeatureIndex.index _}
-        for(e <- (b+1) until math.min(s.length,b+maxMaxLength)) {
-          loc.featuresForSpan(b, e) foreach {spanFeatureIndex.index _}
-          loc.featuresForTransition(b, e) foreach {transFeatureIndex.index _}
-        }
-
-      }
-      i += 1
-    }
-    println(train.length + "/" + train.length)
-    val indexed = new IndexedStandardFeaturizer(f, labelIndex, basicFeatureIndex, spanFeatureIndex, transFeatureIndex)
-    val model = new SemiCRFModel(indexed.featureIndex, indexed, maxLengthArray)
-
-    model
-  }
-
 
   /**
    * Computes basic features from word counts
    * @param wordCounts
    */
-  class StandardFeaturizer(wordCounts: Counter[String, Double] ) {
+  @SerialVersionUID(1L)
+  class StandardFeaturizer[L](gazetteer: Gazetteer[Any, String], wordCounts: Counter[String, Double] ) extends Serializable {
     val inner = new WordShapeFeaturizer(wordCounts)
 
     def localize(words: IndexedSeq[String])= new Localization(words)
 
     val interner = new Interner[Feature]
 
+    val noShapeThreshold = 100
     class Localization(words: IndexedSeq[String]) {
-      val classes = words.map(EnglishWordClassGenerator)
-      val shapes = words.map(WordShapeGenerator)
+      private val classes = words.map(w => if (wordCounts(w) > noShapeThreshold) w else EnglishWordClassGenerator(w))
+      private val shapes = words.map(w => if (wordCounts(w) > noShapeThreshold) w else WordShapeGenerator(w))
 
       val basicFeatures = (0 until words.length) map { i =>
         val w = words(i)
-        if(wordCounts(w) > 10) IndexedSeq(w)
+        if (wordCounts(w) > 10) IndexedSeq(w)
         else if (wordCounts(w) > 5) IndexedSeq(w, classes(i), shapes(i))
         else IndexedSeq(classes(i), shapes(i))
       } map {_.map(_.intern)}
 
       def basicFeature(pos: Int) = {
-         if(pos < 0 || pos >= words.length) IndexedSeq("#")
+        if (pos < 0 || pos >= words.length) IndexedSeq("#")
         else basicFeatures(pos)
       }
+
 
       val featuresForWord: immutable.IndexedSeq[Array[Feature]] = 0 until words.length map { pos =>
         val feats = new ArrayBuffer[Feature]()
@@ -289,9 +416,9 @@ class SegmentationModelFactory[L](val startSymbol: L,
         feats ++= inner.featuresFor(words, pos)
         for (a <- basicLeft; b <- basic) feats += PairFeature(a,b)
         for (a <- basic; b <- basicRight) feats += PairFeature(a,b)
-//        for (a <- basicLeft; b <- basicRight) feats += PairFeature(a,b)
+        //        for (a <- basicLeft; b <- basicRight) feats += PairFeature(a,b)
         feats += TrigramFeature(basicLeft(0), basic(0), basicRight(0))
-        if(pos > 0 && pos < words.length - 1) {
+        if (pos > 0 && pos < words.length - 1) {
           feats += TrigramFeature(shapes(pos-1), shapes(pos), shapes(pos+1))
           feats += TrigramFeature(classes(pos-1), classes(pos), classes(pos+1))
         }
@@ -307,19 +434,18 @@ class SegmentationModelFactory[L](val startSymbol: L,
       def featuresForSpan(start: Int, end: Int):Array[Feature] = {
         val feats = ArrayBuffer[Feature]()
         feats ++= gazetteer.lookupSpan(Span(start, end).map(words).toIndexedSeq).map(SFeature(_, 'SegmentKnown))
-        if(start < end - 1) {
+        if (start < end - 1) {
           feats += WordEdges('Inside, basicFeature(start)(0), basicFeature(end-1)(0))
           feats += WordEdges('Outside, basicFeature(start-1)(0), basicFeature(end)(0))
           feats += WordEdges('Begin, basicFeature(start-1)(0), basicFeature(start)(0))
           feats += WordEdges('End, basicFeature(end-1)(0), basicFeature(end)(0))
-          if(start == 0)
-            feats += SpanStartsSentence
-          if(start == 0 && end == words.length)
-            feats += SpansWholeSentence
-
+          feats += SFeature(SpanShapeGenerator.apply(words, Span(start,end)), 'SpanShape)
         }
+        if (start == 0)
+          feats += SpanStartsSentence
+        if (start == 0 && end == words.length)
+          feats += SpansWholeSentence
 
-        feats += SFeature(SpanShapeGenerator.apply(words, Span(start,end)), 'SpanShape)
         feats.toArray
       }
 
@@ -334,19 +460,23 @@ class SegmentationModelFactory[L](val startSymbol: L,
 
   }
 
-
-
-  class IndexedStandardFeaturizer(f: StandardFeaturizer,
+  @SerialVersionUID(1L)
+  class IndexedStandardFeaturizer[L](
+                                  f: StandardFeaturizer[L],
+                                  val startSymbol: L,
+                                  val nonStarters: Set[String],
+                                  val nonInteriors: Set[String],
                                   val labelIndex: Index[L],
                                   val basicFeatureIndex: Index[Feature],
                                   val basicSpanFeatureIndex: Index[Feature],
-                                  val basicTransFeatureIndex: Index[Feature]) extends SemiCRFModel.BIEOFeaturizer[L,String] {
-
-    val startSymbol = SegmentationModelFactory.this.startSymbol
-
+                                  val basicTransFeatureIndex: Index[Feature],
+                                  val maxLength: Int=>Int,
+                                  val pruningModel: Option[SemiCRF.ConstraintGrammar[L, String]] = None) extends SemiCRFModel.BIEOFeaturizer[L,String] with Serializable {
+    // feature mappings... sigh
+    // basically we want to build a big index for all features
+    // (beginFeatures ++ endFeatures ++ unigramFeatures ++ spanFeatures ++ transitionFeatures)
     private val label2Index = new PairIndex(labelIndex, labelIndex)
     private val labeledFeatureIndex = new PairIndex(labelIndex, basicFeatureIndex)
-    // feature mappings... sigh
     private implicit val beginIso = Isomorphism[(L, Feature), BeginFeature[L]](
       tu={pair => BeginFeature(pair._2, pair._1)},
       ut={f => (f.cur, f.w) }
@@ -376,14 +506,14 @@ class SegmentationModelFactory[L](val startSymbol: L,
     private val transFeatureIndex = new PairIndex(label2Index, basicTransFeatureIndex)
 
     val compositeIndex = new CompositeIndex[Feature](new IsomorphismIndex(labeledFeatureIndex)(beginIso),
-//      new IsomorphismIndex(labeledFeatureIndex)(endIso),
+      //      new IsomorphismIndex(labeledFeatureIndex)(endIso),
       new IsomorphismIndex(labeledFeatureIndex)(uniIso),
       new IsomorphismIndex(spanFeatureIndex)(spanIso),
       new IsomorphismIndex(transFeatureIndex)(transIso)
     )
 
     val BEGIN_COMP = 0
-//    val END_COMP = 1
+    //    val END_COMP = 1
     val UNI_COMP = 1
     val SPAN_COMP = 2
     val TRANS_COMP = 3
@@ -396,28 +526,52 @@ class SegmentationModelFactory[L](val startSymbol: L,
     val featureIndex: IsomorphismIndex[(Int, Feature), Feature] = new IsomorphismIndex(compositeIndex)(featureIso)
     println("Number of features: " + featureIndex.size)
 
-    def anchor(w: IndexedSeq[String]): SemiCRFModel.BIEOAnchoredFeaturizer[L, String] = new SemiCRFModel.BIEOAnchoredFeaturizer[L, String] {
+    def anchor(w: IndexedSeq[String], spanCompressedCache: Option[CompressedFeatureCache] = None): SemiCRFModel.BIEOAnchoredFeaturizer[L, String] = new SemiCRFModel.BIEOAnchoredFeaturizer[L, String] {
+      val constraints = pruningModel.map(_.constraints(w))
       val loc = f.localize(w)
+
+      val starters = Array.tabulate(w.length)(i => !nonStarters(w(i)))
+      val interiors = Array.tabulate(w.length)(i => !nonInteriors(w(i)))
+
+      def canStartRealSpan(beg: Int): Boolean = starters(beg)
+      def canBeInterior(i: Int): Boolean = interiors(i)
+
+
+      private def okSpan(beg: Int, end: Int) = (beg + 1 == end) || {
+        var ok = canStartRealSpan(beg)
+        var pos = beg + 1
+        while(pos < end && ok) {
+          ok = canBeInterior(pos)
+          pos += 1
+        }
+        ok
+      }
 
       val basicFeatureCache = Array.tabulate(w.length){ pos =>
         val feats =  loc.featuresForWord(pos)
         feats.map(basicFeatureIndex).filter(_ >= 0)
       }
 
-      val beginCache = Array.tabulate(labelIndex.size, labelIndex.size, w.length){ (p,c,w) =>
-        val builder = new VectorBuilder[Double](featureIndex.size)
-        val feats = basicFeatureCache(w)
-        builder.reserve(feats.length)
-        var i = 0
-        while(i < feats.length) {
-          val index = compositeIndex.mapIndex(BEGIN_COMP, labeledFeatureIndex.mapIndex(c, feats(i)))
-          if(index != -1) {
-            builder.add(index, 1.0)
-          }
 
-          i += 1
+      val beginCache = Array.tabulate(labelIndex.size, labelIndex.size, w.length){ (p,c,w) =>
+        val ok = constraints.forall(_.allowedStarts(w)(c))
+        if (!ok) {
+          null
+        }  else {
+          val builder = new VectorBuilder[Double](featureIndex.size)
+          val feats = basicFeatureCache(w)
+          builder.reserve(feats.length)
+          var i = 0
+          while (i < feats.length) {
+            val index = compositeIndex.mapIndex(BEGIN_COMP, labeledFeatureIndex.mapIndex(c, feats(i)))
+            if (index != -1) {
+              builder.add(index, 1.0)
+            }
+
+            i += 1
+          }
+          builder.toSparseVector
         }
-        builder.toSparseVector
       }
       val endCache = Array.tabulate(labelIndex.size, w.length){ (l, w) =>
         val builder = new VectorBuilder[Double](featureIndex.size)
@@ -425,9 +579,9 @@ class SegmentationModelFactory[L](val startSymbol: L,
         val feats = basicFeatureCache(w)
         builder.sizeHint(feats.length)
         var i = 0
-        while(i < feats.length) {
+        while (i < feats.length) {
           val index = compositeIndex.mapIndex(END_COMP, labeledFeatureIndex.mapIndex(l, feats(i)))
-          if(index != -1) {
+          if (index != -1) {
             builder.add(index, 1.0)
           }
 
@@ -441,9 +595,9 @@ class SegmentationModelFactory[L](val startSymbol: L,
         val feats = basicFeatureCache(w)
         builder.reserve(feats.length)
         var i = 0
-        while(i < feats.length) {
+        while (i < feats.length) {
           val index = compositeIndex.mapIndex(UNI_COMP, labeledFeatureIndex.mapIndex(l, feats(i)))
-          if(index != -1) {
+          if (index != -1) {
             builder.add(index, 1.0)
           }
 
@@ -467,45 +621,72 @@ class SegmentationModelFactory[L](val startSymbol: L,
       }
 
       private val spanCache = TriangularArray.tabulate(w.length+1){ (beg,end) =>
-        if(beg < end)
+        if (beg < end)
           loc.featuresForSpan(beg, end).map(basicSpanFeatureIndex).filter(_ >= 0)
         else null
       }
-      private val spanFeatures = Array.tabulate(labelIndex.size, labelIndex.size){ (prev, cur) =>
+
+      private lazy val justSpanFeatures = Array.tabulate(labelIndex.size){ cur =>
         TriangularArray.tabulate(w.length+1) { (beg, end) =>
-          val builder = new VectorBuilder[Double](featureIndex.size)
-          if(beg < end) {
+          if (beg == end || maxLength(cur) < (end-beg) || !okSpan(beg,end)  || !(constraints == None || constraints.get.allowedLabels(beg, end).contains(cur))) {
+            null
+          } else {
+            val builder = new VectorBuilder[Double](featureIndex.size)
             val feats = spanCache(beg, end)
-            val tfeats = loc.featuresForTransition(beg, end).map(basicTransFeatureIndex)
-            builder.reserve(feats.length + tfeats.length)
+            builder.reserve(feats.length)
             var i = 0
-            while(i < feats.length) {
+            while (i < feats.length) {
               val index = compositeIndex.mapIndex(SPAN_COMP, spanFeatureIndex.mapIndex(cur, feats(i)))
-              if(index != -1) {
+              if (index != -1) {
                 builder.add(index, 1.0)
               }
               i += 1
             }
-            i = 0
-            while(i < tfeats.length) {
-              val index = compositeIndex.mapIndex(TRANS_COMP, transFeatureIndex.mapIndex(label2Index.mapIndex(prev, cur), tfeats(i)))
-              if(index != -1) {
-                builder.add(index, 1.0)
-              }
-              i += 1
-            }
+            builder.toSparseVector
           }
-          builder.toSparseVector
         }
       }
 
+      private lazy val spanFeatures = Array.tabulate(labelIndex.size, labelIndex.size){ (prev, cur) =>
+        TriangularArray.tabulate(w.length+1) { (beg, end) =>
+          if (justSpanFeatures(cur)(beg,end) == null) {
+            null
+          } else {
+            val builder = new VectorBuilder[Double](featureIndex.size)
+            val tfeats = loc.featuresForTransition(beg, end).map(basicTransFeatureIndex)
+            builder.reserve(tfeats.length)
+            var i = 0
+            while (i < tfeats.length) {
+              val index = compositeIndex.mapIndex(TRANS_COMP, transFeatureIndex.mapIndex(label2Index.mapIndex(prev, cur), tfeats(i)))
+              if (index != -1) {
+                builder.add(index, 1.0)
+              }
+              i += 1
+            }
+            val v = builder.toSparseVector
+            v += justSpanFeatures(cur)(beg, end)
+            v
+          }
+        }
+      }
+
+      private lazy val spanIndicatorFeatures = if (spanCompressedCache.isDefined) spanCompressedCache.get else
+        new CompressedFeatureCache(Array.tabulate(labelIndex.size, labelIndex.size){ (prev, cur) =>
+          TriangularArray.tabulate(w.length+1) { (beg, end) =>
+            if (featuresForSpan(prev, cur, beg, end) == null) null else
+            IndicatorFeatureVector(featuresForSpan(prev, cur, beg, end))
+          }
+        })
 
       def featuresForSpan(prev: Int, cur: Int, beg: Int, end: Int): SparseVector[Double] = {
         spanFeatures(prev)(cur)(beg,end)
       }
 
+      def indicatorFeaturesForSpan(prev: Int, cur: Int, beg: Int, end: Int): IndicatorFeatureVector = {
+        spanIndicatorFeatures(prev)(cur)(beg,end)
+      }
 
-
+      def indicatorFeatureCache = spanIndicatorFeatures
     }
   }
 

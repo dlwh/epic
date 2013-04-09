@@ -13,7 +13,7 @@ case class Segmentation[L, W](segments: IndexedSeq[(L, Span)],
 
 
   def render(badLabel: L) = {
-    segments.filter(_._1 != badLabel).map(l => l._2.map(words).mkString(l._1.toString+": [", " ","]")).mkString("\n")
+    segments.map(l => if (l._1 == badLabel) l._2.map(words).mkString(" ") else l._2.map(words).mkString(s"[${l._1.toString}:", " ","]")).mkString(" ")
   }
 
 

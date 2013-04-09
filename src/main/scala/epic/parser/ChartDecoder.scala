@@ -76,7 +76,7 @@ class ViterbiDecoder[L, W] extends ChartDecoder[L, W] with Serializable {
 
       if(maxScore == Double.NegativeInfinity) {
         println("entered things: " + inside.bot.enteredLabelScores(begin, end).map { case (i, v) => (grammar.labelIndex.get(i), v)}.toList)
-        sys.error("Couldn't find a tree!" + begin + " " + end + " " + grammar.labelIndex.get(root))
+        sys.error(s"Couldn't find a tree! [$begin,$end) $grammar.labelIndex.get(root)")
       }
       val child = buildTree(begin, end, maxChild, maxChildRef)
       UnaryTree(labelIndex.get(root), child, grammar.chain(maxRule), Span(begin, end))
@@ -124,7 +124,7 @@ class ViterbiDecoder[L, W] extends ChartDecoder[L, W] with Serializable {
 
       if(maxScore == Double.NegativeInfinity) {
         println("entered things: " + inside.bot.enteredLabelScores(begin, end).map { case (i, v) => (grammar.labelIndex.get(i), v)}.toList)
-        sys.error("Couldn't find a tree!" + begin + " " + end + " " + grammar.labelIndex.get(root))
+        sys.error(s"Couldn't find a tree! [$begin,$end) $grammar.labelIndex.get(root)")
       } else {
         val lchild = buildTreeUnary(begin, maxSplit, maxLeft, maxLeftRef)
         val rchild = buildTreeUnary(maxSplit, end, maxRight, maxRightRef)
@@ -187,11 +187,11 @@ class MaxConstituentDecoder[L, W] extends ChartDecoder[L, W] {
 
     val labelIndex = marginal.grammar.labelIndex
 
-    val maxSplit = TriangularArray.fill[Int](inside.length+1)(0)
-    val maxBotLabel = TriangularArray.fill[Int](inside.length+1)(-1)
-    val maxBotScore = TriangularArray.fill[Double](inside.length+1)(Double.NegativeInfinity)
-    val maxTopLabel = TriangularArray.fill[Int](inside.length+1)(-1)
-    val maxTopScore = TriangularArray.fill[Double](inside.length+1)(Double.NegativeInfinity)
+    val maxSplit = TriangularArray.fill[Int](length+1)(0)
+    val maxBotLabel = TriangularArray.fill[Int](length+1)(-1)
+    val maxBotScore = TriangularArray.fill[Double](length+1)(Double.NegativeInfinity)
+    val maxTopLabel = TriangularArray.fill[Int](length+1)(-1)
+    val maxTopScore = TriangularArray.fill[Double](length+1)(Double.NegativeInfinity)
 
     val scores = marginal.grammar.labelEncoder.fillArray(Double.NegativeInfinity)
     val buffer = Array.fill(1000)(Double.NegativeInfinity)
@@ -268,8 +268,8 @@ class MaxConstituentDecoder[L, W] extends ChartDecoder[L, W] {
           val bRefinements = inside.bot.enteredLabelRefinements(begin, end, bestBot).toArray
           val arr = new Array[Double](aRefinements.length * bRefinements.length)
           var i = 0
-          for (aRef <- aRefinements; bRef <- bRefinements) {
-            val ref = anchoring.refined.ruleRefinementFromRefinements(r, aRef, bRef)
+          for (bRef <- bRefinements; ref <- anchoring.refined.validUnaryRuleRefinementsGivenChild(begin, end, r, bRef)) {
+            val aRef = anchoring.refined.parentRefinement(r, ref)
             arr(i) = (anchoring.scoreUnaryRule(begin, end, r, ref)
               + outside.top.labelScore(begin, end, bestTop, aRef)
               + inside.bot.labelScore(begin, end, bestBot, bRef)
@@ -293,7 +293,7 @@ class MaxConstituentDecoder[L, W] extends ChartDecoder[L, W] {
       val bestBot = maxBotLabel(begin, end)
       val lower = if(begin + 1== end) {
         if(maxBotScore(begin, end) == Double.NegativeInfinity)
-          throw new RuntimeException("Couldn't make a good score for " + (begin, end) + ". InsideIndices: " + inside.bot.enteredLabelIndexes(begin, end).toIndexedSeq + " outside: " + outside.bot.enteredLabelIndexes(begin, end).toIndexedSeq)
+          throw new RuntimeException(s"Couldn't make a good score for ${(begin, end)}. InsideIndices:  ${inside.bot.enteredLabelIndexes(begin, end).toIndexedSeq}\noutside: ${outside.bot.enteredLabelIndexes(begin, end).toIndexedSeq}")
         NullaryTree(labelIndex.get(bestBot), Span(begin, end))
       } else {
         val split = maxSplit(begin, end)
