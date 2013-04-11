@@ -6,7 +6,7 @@ version := "0.1-SNAPSHOT"
 
 organization := "org.scalanlp"
 
-scalaVersion := "2.10.0"
+scalaVersion := "2.10.1"
 
 resolvers ++= Seq(
   "ScalaNLP Maven2" at "http://repo.scalanlp.org/repo",
@@ -16,11 +16,10 @@ resolvers ++= Seq(
 
 libraryDependencies ++= Seq(
   "junit" % "junit" % "4.5" % "test",
-  "org.scalanlp" %% "breeze-core" % "0.2-SNAPSHOT",
-  "org.scalanlp" %% "breeze-math" % "0.2-SNAPSHOT",
-  "org.scalanlp" %% "breeze-process" % "0.2-SNAPSHOT",
-  "org.scalanlp" %% "breeze-learn" % "0.2-SNAPSHOT",
-  "com.google.guava" % "guava"  % "14.0-rc1"
+  "org.scalanlp" %% "breeze-core" % "0.3-SNAPSHOT",
+  "org.scalanlp" %% "breeze-math" % "0.3-SNAPSHOT",
+  "org.scalanlp" %% "breeze-process" % "0.3-SNAPSHOT",
+  "org.scalanlp" %% "breeze-learn" % "0.3-SNAPSHOT"
 )
 
 libraryDependencies <<= (scalaVersion, libraryDependencies) { (sv, deps) =>

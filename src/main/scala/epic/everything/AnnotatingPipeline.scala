@@ -24,7 +24,6 @@ import epic.parser.models.StandardFeaturizer
 import breeze.optimize.FirstOrderMinimizer.OptParams
 import epic.ontonotes.Document
 import epic.parser.models.LexGrammarBundle
-import com.google.common.io.Files
 import collection.mutable.ArrayBuffer
 import collection.immutable
 
@@ -341,9 +340,9 @@ object AnnotatingPipeline {
     for ( (f,w) <- newWeights.activeIterator) {
       weightsCache(f.toString) = w
     }
-    if(out.exists()) {
-      Files.copy(out, new File(out.toString +".backup"))
-    }
+//    if(out.exists()) {
+//     .copy(out, new File(out.toString +".backup"))
+//    }
     breeze.util.writeObject(out, weightsCache)
   }
 
