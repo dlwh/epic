@@ -17,6 +17,7 @@ package epic.parser
 import projections.GrammarRefinements
 import epic.trees.{BinaryRule, UnaryRule}
 import collection.mutable.ArrayBuffer
+import java.io.{PrintWriter, Writer}
 
 /**
  *
@@ -32,6 +33,8 @@ class SimpleRefinedGrammar[L, L2, W](val grammar: BaseGrammar[L],
                                      parentCompatibleRefinements: Array[Array[Array[Int]]],
                                      childCompatibleRefinements: Array[Array[Array[Int]]],
                                      tagScorer: TagScorer[L2, W]) extends RefinedGrammar[L, W] with Serializable {
+
+
 
   private val coarseRulesGivenParentRefinement = Array.tabulate(grammar.labelIndex.size) { p =>
     // refinement -> rules
@@ -198,6 +201,29 @@ class SimpleRefinedGrammar[L, L2, W](val grammar: BaseGrammar[L],
 
     def validRightChildRefinementsGivenRule(completionBegin: Int, completionEnd: Int, begin: Int, end: Int, rule: Int): Array[Int] = {
       rightChildRefinementsGivenCoarseRule(rule)
+    }
+  }
+
+
+  /**
+   * Writes a text representation of the grammar to the output.
+   * @param out
+   * @param includeSpanScores
+   */
+  def prettyPrint(out: Writer = new PrintWriter(System.out), includeSpanScores: Boolean = false) = {
+    val printout = new PrintWriter(out)
+    import printout._
+
+    for( (cr,index) <- refinements.rules.coarseIndex.zipWithIndex; ref <- refinements.rules.refinementsOf(index)) {
+      refinements.rules.fineIndex.get(ref) match {
+        case BinaryRule(a,b,c) =>
+          println(s"$a -> $b $c ${ruleScoreArray(ref)}")
+        case UnaryRule(a,b,chain) if chain.isEmpty =>
+          println(s"$a -> $b ${ruleScoreArray(ref)}")
+        case UnaryRule(a,b,chain) =>
+          println(s"$a --${chain.mkString("[","-","]")}--> $b ${ruleScoreArray(ref)}")
+      }
+
     }
   }
 }
