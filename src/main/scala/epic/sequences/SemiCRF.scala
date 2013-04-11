@@ -61,7 +61,7 @@ object SemiCRF {
                       gazetteer: Gazetteer[Any, String] = Gazetteer.empty[Any, String],
                       opt: OptParams = OptParams()): SemiCRF[Boolean, String] = {
     val fixedData: IndexedSeq[Segmentation[Boolean, String]] = data.map{s =>
-      s.copy(segments=s.segments.map{case (l,span) => (l == outsideSymbol, span)})
+      s.copy(segments=s.segments.map{case (l,span) => (l != outsideSymbol, span)})
     }
     buildSimple(fixedData, false, false, gazetteer, opt)
   }
@@ -380,13 +380,13 @@ object SemiCRF {
   }
 
   @SerialVersionUID(1L)
-  class IdentityConstraintGrammar[L, W](val labelIndex: Index[L], val startSymbol: L) extends ConstraintGrammar[L, W] with Serializable {
+  class IdentityConstraintGrammar[L, W](val labelIndex: Index[L], val startSymbol: L) extends ConstraintGrammar[L, W] with Serializable { outer =>
     def anchor(w: IndexedSeq[W]) = new Anchoring[L,W]() {
       def words = w
       def maxSegmentLength(label: Int) = w.size
       def scoreTransition(prev: Int, cur: Int, beg: Int, end: Int) = 0.0
-      def labelIndex = labelIndex
-      def startSymbol = startSymbol
+      def labelIndex = outer.labelIndex
+      def startSymbol = outer.startSymbol
     }
 
     private val allLabels = BitSet.fromBitMask((0L to labelIndex.size).toArray)
