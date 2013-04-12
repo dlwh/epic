@@ -15,13 +15,12 @@ resolvers ++= Seq(
   "sonatype releases" at "https://oss.sonatype.org/content/repositories/releases"
 )
 
-// Original OpenNLP dependencies
 libraryDependencies ++= Seq(
   "com.novocode" % "junit-interface" % "0.8" % "test->default",
   "org.osgi" % "org.osgi.core" % "4.2.0" % "provided",
   "org.osgi" % "org.osgi.compendium" % "4.2.0" % "provided",
   "org.apache.uima" % "uimaj-core" % "2.3.1" % "provided",
-  "org.scalanlp" % "nak" % "1.1.1"
+  "org.scalanlp" % "nak" % "1.1.2-SNAPSHOT"
 )
 
 publishTo <<= version { v: String =>
