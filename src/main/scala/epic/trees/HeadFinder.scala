@@ -88,9 +88,18 @@ class HeadFinder[L](defaultDirection: Dir = Left,
       val rec = children.map(annotateHeadWords(_, words))
       Tree(l -> rec(headChild).label._2, rec, t.span)
   }
+
+  def annotateHeadIndices[W](t: Tree[L]): Tree[(L, Int)] = t match {
+    case t:BinarizedTree[L] => annotateHeadIndices(t)
+    case Tree(l, children, span) if children.length == 0 => Tree(l -> t.span.start, IndexedSeq.empty, t.span)
+    case Tree(l, children, span) =>
+      val headChild = findHeadChild(t)
+      val rec = children.map(annotateHeadIndices(_))
+      Tree(l -> rec(headChild).label._2, rec, t.span)
+  }
   
   
-  def annotateHeadIndices[W](t: BinarizedTree[L]): BinarizedTree[(L, Int)] = t match {
+  def annotateHeadIndices(t: BinarizedTree[L]): BinarizedTree[(L, Int)] = t match {
     case NullaryTree(l, span) =>  NullaryTree(l -> t.span.start, t.span)
     case u@UnaryTree(a, b, chain, span) =>
       val rec = annotateHeadIndices(b)
