@@ -68,7 +68,7 @@ object GenerativeParser {
    * @tparam W
    * @return
    */
-  def extractGrammar[L, W](root: L, data: TraversableOnce[TreeInstance[L, W]]): RefinedGrammar[L, W] = {
+  def extractGrammar[L, W](root: L, data: TraversableOnce[TreeInstance[L, W]]): SimpleRefinedGrammar[L, L, W] = {
     val (wordCounts, binaryProductions, unaryProductions) = extractCounts(data)
     RefinedGrammar.generative(root, binaryProductions, unaryProductions, wordCounts)
   }
