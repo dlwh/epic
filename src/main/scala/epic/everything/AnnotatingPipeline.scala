@@ -349,7 +349,7 @@ object AnnotatingPipeline {
   private def loadWeights(in: File) = {
     val ctr = Counter[String, Double]()
     breeze.util.readObject[AnyRef](in) match {
-      case seq: IndexedSeq[(String, Double)] =>
+      case seq:IndexedSeq[(String, Double)] =>
         for ( (k, v) <- seq) {
           ctr(k) = v
         }

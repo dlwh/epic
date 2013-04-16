@@ -47,7 +47,7 @@ object ParseText {
 
           tree.render(tokens, newline = false)
         } catch {
-          case e =>
+          case e: Exception =>
           e.printStackTrace()
           "(())"
         }

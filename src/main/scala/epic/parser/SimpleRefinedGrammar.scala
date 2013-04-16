@@ -33,7 +33,14 @@ class SimpleRefinedGrammar[L, L2, W](val grammar: BaseGrammar[L],
                                      parentCompatibleRefinements: Array[Array[Array[Int]]],
                                      childCompatibleRefinements: Array[Array[Array[Int]]],
                                      tagScorer: TagScorer[L2, W]) extends RefinedGrammar[L, W] with Serializable {
+  def ruleScore(r: Int, ruleRef: Int):Double = ruleScoreArray(r)(ruleRef)
+  def spanScore(l: Int, ref: Int):Double = spanScoreArray(l)(ref)
 
+  def ruleScore(refinedRule: Int): Double = {
+    val ref = refinements.rules.localize(refinedRule)
+    val parent = refinements.rules.project(refinedRule)
+    ruleScoreArray(parent)(ref)
+  }
 
 
   private val coarseRulesGivenParentRefinement = Array.tabulate(grammar.labelIndex.size) { p =>
