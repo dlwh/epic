@@ -25,6 +25,8 @@ import epic.trees.LexicalProduction
 trait Lexicon[L, W] extends Serializable {
   def tagsForWord(w: W):Iterator[L]
   def knownLexicalProductions: Iterator[LexicalProduction[L, W]]
+
+  def flatMap[L2](f: L=>Traversable[L2]) = new FlatMappedLexicon[L, L2, W](this, f)
 }
 
 object Lexicon {
@@ -42,6 +44,7 @@ class UnsmoothedLexicon[L, W](knownProductions: Set[LexicalProduction[L, W]]) ex
   def knownLexicalProductions = knownProductions.iterator
 
   def tagsForWord(w: W) = byWord(w).iterator
+
 }
 
 /**
@@ -74,6 +77,7 @@ class SimpleLexicon[L, W](wordTagCounts: Counter2[L, W, Double],
   def knownLexicalProductions = for( (w,set) <- byWord.iterator; l <- set.iterator) yield LexicalProduction(l, w)
 
   def tagsForWord(w: W) = byWord.getOrElse(w,openTags).iterator
+
 }
 
 /**
@@ -138,3 +142,11 @@ object SignatureLexicon {
   }
 }
 
+
+case class FlatMappedLexicon[L, L2, W](inner: Lexicon[L, W], map: L=>Traversable[L2]) extends Lexicon[L2, W] {
+  def tagsForWord(w: W): Iterator[L2] = inner.tagsForWord(w).flatMap(map)
+
+  def knownLexicalProductions: Iterator[LexicalProduction[L2, W]] = {
+    inner.knownLexicalProductions.flatMap{case LexicalProduction(l, w) => map(l).map(LexicalProduction(_, w))}
+  }
+}
