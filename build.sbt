@@ -20,7 +20,7 @@ libraryDependencies ++= Seq(
   "org.osgi" % "org.osgi.core" % "4.2.0" % "provided",
   "org.osgi" % "org.osgi.compendium" % "4.2.0" % "provided",
   "org.apache.uima" % "uimaj-core" % "2.3.1" % "provided",
-  "org.scalanlp" % "nak" % "1.1.2-SNAPSHOT"
+  "org.scalanlp" % "nak" % "1.1.2"
 )
 
 publishTo <<= version { v: String =>
