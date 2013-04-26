@@ -143,7 +143,7 @@ object CRF {
               while (prevLabel < numLabels) {
                 val score = transitionMarginal(pos, prevLabel, label)
                 if(score != 0.0)
-                  f(prevLabel, label, pos, score)
+                  f(pos, prevLabel, label,  score)
                 prevLabel += 1
               }
               label += 1
@@ -190,7 +190,7 @@ object CRF {
           var lastSymbol = scorer.labelIndex(scorer.startSymbol)
           for( (l,pos) <- tags.zipWithIndex) {
             val symbol = scorer.labelIndex(l)
-            f.apply(lastSymbol, symbol, pos, 1.0)
+            f.apply(pos, lastSymbol, symbol, 1.0)
             lastSymbol = symbol
           }
 
