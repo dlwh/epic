@@ -7,13 +7,13 @@ import breeze.data.Example
  *
  * @author dlwh
  */
-case class TaggedSequence[L, W](tags: IndexedSeq[L],
+case class TaggedSequence[+L, +W](tags: IndexedSeq[L],
                                 words: IndexedSeq[W],
                                 id: String = "") extends Example[IndexedSeq[L], IndexedSeq[W]] {
 
   require(tags.length == words.length)
 
-  def render(badLabel: L) = {
+  def render = {
     (tags zip words map { case (t, w) => w +"/" + t}).mkString(" ")
   }
 

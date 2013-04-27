@@ -40,7 +40,6 @@ class HMMTest extends FunSuite {
     val cal: Marginal[Symbol, Symbol] = hmm.marginal(IndexedSeq('U,'U,'N,'U,'U))
 //    val cal: Marginal[Symbol, Symbol] = hmm.marginal(IndexedSeq('U))
     val marginals = (0 until cal.length).map(cal.positionMarginal(_)).map(Encoder.fromIndex(hmm.labelIndex).decode(_))
-    println("???" + marginals)
     assert( (marginals(0)('Rainy) - 0.8673).abs < 1E-4)
     assert( (marginals(1)('Rainy) - 0.8204).abs < 1E-4)
     assert( (marginals(2)('Rainy) - 0.3075).abs < 1E-4)

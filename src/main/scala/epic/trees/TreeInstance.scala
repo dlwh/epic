@@ -15,13 +15,19 @@ package epic.trees
  limitations under the License.
 */
 import breeze.data.Example
+import epic.sequences.TaggedSequence
 
 case class TreeInstance[L, +W](id: String,
                                tree: BinarizedTree[L],
                                words: Seq[W]) extends Example[Tree[L], Seq[W]] {
+
   def mapLabels[U](f: L => U) = copy(tree = tree.map(f))
 
   def label = tree;
 
   def features = words
+
+  def toTaggedSequence: TaggedSequence[L, W] = {
+    new TaggedSequence(tree.leaves.map(_.label).toIndexedSeq, words.toIndexedSeq, id)
+  }
 }

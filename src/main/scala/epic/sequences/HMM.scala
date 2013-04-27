@@ -20,8 +20,6 @@ object HMM {
     val indexedLabelCounts = enc.encode(labelCounts)
 
     val encodedTransitions = logAndNormalize(enc.encode(transitions), Axis._1)
-    println(encodedTransitions)
-
     val totalCount = sum(labelCounts)
 
     new CRF.Grammar[L, W] {

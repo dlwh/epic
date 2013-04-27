@@ -68,22 +68,8 @@ class CRFInference[L, W](weights: DenseVector[Double],
     val localization = marg.anchoring.asInstanceOf[Anchoring].localization
     val visitor = new TransitionVisitor[L, W] {
 
-      def daxpy(d: Double, vector: SparseVector[Double], counts: DenseVector[Double]) {
-        var i = 0
-        val index = vector.index
-        val data = vector.data
-        while (i < vector.iterableSize) {
-//          if (vector.isActive(i))
-            counts(index(i)) += d * data(i) * scale
-          i += 1
-        }
-
-      }
-
-      def apply(prev: Int, cur: Int, pos: Int, count: Double) {
-        import localization._
-        daxpy(count, localization.featuresForTransition(prev, cur, pos), counts.counts)
-
+      def apply(pos: Int, prev: Int, cur: Int, count: Double) {
+        axpy(scale * count, localization.featuresForTransition(pos, prev, cur), counts.counts)
       }
     }
     marg.visit(visitor)
@@ -101,14 +87,14 @@ class CRFInference[L, W](weights: DenseVector[Double],
 
     def validSymbols(pos: Int): Set[Int] = (0 until labelIndex.size).toSet
 
-    def scoreTransition(prev: Int, cur: Int, pos: Int): Double = 0.0
+    def scoreTransition(pos: Int, prev: Int, cur: Int): Double = 0.0
   }
 
   class Anchoring(val words: IndexedSeq[W], augment: CRF.Anchoring[L, W]) extends CRF.Anchoring[L, W] {
     val localization = featurizer.anchor(words)
 
     val transCache = Array.tabulate(labelIndex.size, labelIndex.size, length){ (p,c,w) =>
-      val f = localization.featuresForTransition(p, c, w)
+      val f = localization.featuresForTransition(w, p, c)
       if (f eq null) Double.NegativeInfinity
       else weights dot f
     }
@@ -116,8 +102,8 @@ class CRFInference[L, W](weights: DenseVector[Double],
 
     def validSymbols(pos: Int): Set[Int] = localization.validSymbols(pos)
 
-    def scoreTransition(prev: Int, cur: Int, beg: Int): Double = {
-      augment.scoreTransition(prev, cur, beg) + transCache(prev)(cur)(beg)
+    def scoreTransition(pos: Int, prev: Int, cur: Int): Double = {
+      augment.scoreTransition(pos, prev, cur) + transCache(prev)(cur)(pos)
     }
 
     def labelIndex: Index[L] = featurizer.labelIndex
@@ -132,9 +118,8 @@ class CRFInference[L, W](weights: DenseVector[Double],
 }
 
 class TaggedSequenceModelFactory[L](val startSymbol: L,
-                                  val outsideSymbol: L,
-                                  gazetteer: Gazetteer[Any, String] = Gazetteer.empty[String, String],
-                                  weights: Feature=>Double = { (f:Feature) => 0.0}) {
+                                    gazetteer: Gazetteer[Any, String] = Gazetteer.empty[String, String],
+                                    weights: Feature=>Double = { (f:Feature) => 0.0}) {
 
   import TaggedSequenceModelFactory._
 
@@ -195,7 +180,7 @@ object TaggedSequenceModelFactory {
     val wordCounts : Counter[String, Double] = sum(wordTagCounts, Axis._1)
     val inner = new WordShapeFeaturizer(wordCounts)
 
-    val closedWords =  wordCounts.findAll(_ > 10).toSet
+    val closedWords: Set[String] =  wordCounts.findAll(_ > 10).toSet
 
     def localize(words: IndexedSeq[String])= new Localization(words)
 
@@ -266,9 +251,13 @@ object TaggedSequenceModelFactory {
         if(allowedTags(b+1)(l) && allowedTags(b)(prevTag)) {
           val vb = new VectorBuilder[Double](featureIndex.size)
           loc.featuresForWord(b) foreach {f =>
-            val fi = featureIndex(f)
-            if(fi >= 0)
-              vb.add(fi, 1.0)
+            val fi1 = featureIndex(PairFeature(LabelFeature(labelIndex.get(l)), f) )
+            if(fi1 >= 0) {
+              vb.add(fi1, 1.0)
+              val fi2 = featureIndex(PairFeature(LabelFeature(labelIndex.get(prevTag) -> labelIndex.get(l)), f) )
+              if(fi2 >= 0)
+                vb.add(fi2, 1.0)
+            }
           }
           vb.toSparseVector
         } else {
@@ -276,7 +265,7 @@ object TaggedSequenceModelFactory {
         }
       }
 
-      def featuresForTransition(prev: Int, cur: Int, pos: Int): SparseVector[Double] = {
+      def featuresForTransition(pos: Int, prev: Int, cur: Int): SparseVector[Double] = {
         featureArray(pos)(prev)(cur)
       }
 

@@ -44,10 +44,10 @@ class CRF[L, W](val model: CRF.Grammar[L, W]) extends Serializable {
 object CRF {
 
   def buildSimple[L](data: IndexedSeq[TaggedSequence[L, String]],
-                     startSymbol: L, outsideSymbol: L,
+                     startSymbol: L,
                      gazetteer: Gazetteer[Any, String] = Gazetteer.empty[Any, String],
                      opt: OptParams = OptParams()):CRF[L, String] = {
-    val model: CRFModel[L, String] = new TaggedSequenceModelFactory[L](startSymbol, outsideSymbol, gazetteer = gazetteer).makeModel(data)
+    val model: CRFModel[L, String] = new TaggedSequenceModelFactory[L](startSymbol,  gazetteer = gazetteer).makeModel(data)
 
     val obj = new ModelObjective(model, data)
     val cached = new CachedBatchDiffFunction(obj)
@@ -64,7 +64,7 @@ object CRF {
     val fixedData: IndexedSeq[TaggedSequence[Boolean, String]] = data.map{s =>
       s.copy(tags=s.tags.map{l => (l != outsideSymbol)})
     }
-    buildSimple(fixedData, false, false, gazetteer, opt)
+    buildSimple(fixedData, false, gazetteer, opt)
   }
 
 
@@ -77,7 +77,7 @@ object CRF {
   trait Anchoring[L, W] {
     def words : IndexedSeq[W]
     def length: Int = words.length
-    def scoreTransition(prev: Int, cur: Int, pos: Int):Double
+    def scoreTransition(pos: Int, prev: Int, cur: Int):Double
     def labelIndex: Index[L]
     def startSymbol: L
     def validSymbols(pos: Int): Set[Int]
@@ -120,11 +120,8 @@ object CRF {
     def apply[L, W](scorer: Anchoring[L, W]):Marginal[L, W] = {
 
       val forwardScores: Array[Array[Double]] = this.forwardScores(scorer)
-      println(breeze.numerics.exp(DenseMatrix.tabulate(forwardScores.length, forwardScores(0).length)(forwardScores(_)(_))))
       val backwardScore: Array[Array[Double]] = this.backwardScores(scorer)
-      println(breeze.numerics.exp(DenseMatrix.tabulate(backwardScore.length, backwardScore(0).length)(backwardScore(_)(_))))
       val partition = numerics.logSum(forwardScores.last)
-      println(partition + " " + math.exp(partition))
       val _s = scorer
 
 
@@ -158,7 +155,7 @@ object CRF {
         def transitionMarginal(pos: Int, prev: Int, cur: Int): Double = {
           val withoutTrans = forwardScores(pos)(prev) + backwardScore(pos+1)(cur)
           if(withoutTrans.isInfinite) 0.0
-          else math.exp(withoutTrans + anchoring.scoreTransition(prev, cur, pos) - logPartition)
+          else math.exp(withoutTrans + anchoring.scoreTransition(pos, prev, cur) - logPartition)
         }
 
 
@@ -175,7 +172,7 @@ object CRF {
       for( (l, pos) <- tags.zipWithIndex) {
         val symbol = scorer.labelIndex(l)
         assert(symbol != -1, s"$l not in index: ${scorer.labelIndex}")
-        score += scorer.scoreTransition(lastSymbol, symbol, pos)
+        score += scorer.scoreTransition(pos, lastSymbol, symbol)
         lastSymbol = symbol
       }
 
@@ -230,7 +227,7 @@ object CRF {
         for ( next <- scorer.validSymbols(i)) {
           var offset = 0
           for ( previous <- if(i == 0) Seq(scorer.labelIndex(scorer.startSymbol)) else scorer.validSymbols(i-1)) {
-            val score = scorer.scoreTransition(previous, next, i) + forwardScores(i)(previous)
+            val score = scorer.scoreTransition(i, previous, next) + forwardScores(i)(previous)
             if(score != Double.NegativeInfinity) {
               cache(offset) = score
               offset += 1
@@ -265,11 +262,11 @@ object CRF {
 
       for(i <- (length-1) to 0 by -1) {
         val cur = backwardScores(i)
-        for ( curLabel <- scorer.validSymbols(i)) {
+        for ( curLabel <- scorer.validSymbols(i-1)) {
           var offset = 0
           for( next <- scorer.validSymbols(i)) {
             val nextScore = backwardScores(i+1)(next)
-            val score = scorer.scoreTransition(curLabel, next, i) + nextScore
+            val score = scorer.scoreTransition(i, curLabel, next) + nextScore
             if(score != Double.NegativeInfinity) {
               accumArray(offset) = score
               offset += 1
@@ -298,7 +295,7 @@ object CRF {
 
   trait AnchoredFeaturizer[L, W] {
     def featureIndex: Index[Feature]
-    def featuresForTransition(prev: Int, cur: Int, pos: Int):SparseVector[Double]
+    def featuresForTransition(pos: Int, prev: Int, cur: Int):SparseVector[Double]
     def validSymbols(pos: Int):Set[Int]
   }
 
@@ -321,12 +318,14 @@ object CRF {
         var currentArgMax = -1
 
         for ( previous <- if(i == 0) Seq(scorer.labelIndex(scorer.startSymbol)) else scorer.validSymbols(i-1)) {
-          val score = scorer.scoreTransition(previous, next, i)
+          val score = scorer.scoreTransition(i, previous, next)
           if(score > currentMax) {
             currentMax = score
             currentArgMax = previous
           }
         }
+        assert(!currentMax.isNaN)
+        assert(!currentMax.isInfinite)
         cur(next) = currentMax
         backPointer(i)(next) = currentArgMax
       }
