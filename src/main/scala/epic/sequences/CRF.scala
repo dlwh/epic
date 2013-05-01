@@ -3,7 +3,7 @@ package epic.sequences
 import breeze.util.Index
 import epic.trees.Span
 import breeze.numerics
-import breeze.linalg.{DenseMatrix, DenseVector, SparseVector}
+import breeze.linalg.{DenseMatrix, DenseVector}
 import epic.framework.{ModelObjective, Feature}
 import java.util
 import collection.mutable.ArrayBuffer
@@ -13,6 +13,7 @@ import breeze.collection.mutable.TriangularArray
 import java.io.{ObjectInputStream, IOException}
 import breeze.optimize.FirstOrderMinimizer.OptParams
 import breeze.optimize.CachedBatchDiffFunction
+import breeze.features.FeatureVector
 
 /**
  * A -Markov Linear Chain Conditional Random Field, that is, the length
@@ -295,7 +296,7 @@ object CRF {
 
   trait AnchoredFeaturizer[L, W] {
     def featureIndex: Index[Feature]
-    def featuresForTransition(pos: Int, prev: Int, cur: Int):SparseVector[Double]
+    def featuresForTransition(pos: Int, prev: Int, cur: Int):FeatureVector
     def validSymbols(pos: Int):Set[Int]
   }
 

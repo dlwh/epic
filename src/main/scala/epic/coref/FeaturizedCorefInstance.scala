@@ -1,7 +1,7 @@
 package epic.coref
 
 import breeze.collection.mutable.TriangularArray
-import breeze.linalg.{SparseVector, VectorBuilder}
+import breeze.linalg.SparseVector
 
 /**
  * 

@@ -4,7 +4,7 @@ import breeze.util.Index
 import epic.trees.Span
 import breeze.numerics
 import epic.sequences.SemiCRF.Marginal
-import breeze.linalg.SparseVector
+import breeze.features.FeatureVector
 import epic.framework.{ModelObjective, Feature}
 import java.util
 import collection.mutable.ArrayBuffer
@@ -457,7 +457,7 @@ object SemiCRF {
 
 
   trait IndexedFeaturizer[L, W] {
-    def anchor(w: IndexedSeq[W], spanCompressedCache: Option[CompressedFeatureCache] = None):AnchoredFeaturizer[L, W]
+    def anchor(w: IndexedSeq[W]):AnchoredFeaturizer[L, W]
 
     def startSymbol: L
 
@@ -467,7 +467,7 @@ object SemiCRF {
 
   trait AnchoredFeaturizer[L, W] {
     def featureIndex: Index[Feature]
-    def featuresForTransition(prev: Int, cur: Int, start: Int, end: Int):SparseVector[Double]
+    def featuresForTransition(prev: Int, cur: Int, start: Int, end: Int):FeatureVector
   }
 
 

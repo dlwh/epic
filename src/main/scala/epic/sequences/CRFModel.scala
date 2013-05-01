@@ -8,6 +8,9 @@ import epic.sequences.CRF.{AnchoredFeaturizer, TransitionVisitor}
 import epic.parser.features.{LabelFeature, WordShapeFeaturizer, PairFeature}
 import breeze.text.analyze.{WordShapeGenerator, EnglishWordClassGenerator}
 import scala.collection
+import java.io.{BufferedWriter, FileWriter, PrintWriter}
+import scala.collection.immutable
+import breeze.features.FeatureVector
 
 /**
  *
@@ -69,7 +72,9 @@ class CRFInference[L, W](weights: DenseVector[Double],
     val visitor = new TransitionVisitor[L, W] {
 
       def apply(pos: Int, prev: Int, cur: Int, count: Double) {
-        axpy(scale * count, localization.featuresForTransition(pos, prev, cur), counts.counts)
+        val feats = localization.featuresForTransition(pos, prev, cur)
+        if(count != 0) assert(feats ne null, (pos, prev, cur, marg.length, marg.anchoring.validSymbols(pos), marg.anchoring.validSymbols(pos-1)))
+        axpy(scale * count, feats, counts.counts)
       }
     }
     marg.visit(visitor)
@@ -131,19 +136,30 @@ class TaggedSequenceModelFactory[L](val startSymbol: L,
     val f = new StandardFeaturizer[L](gazetteer, labelIndex, counts.mapValues(_.toDouble))
     val featureIndex = Index[Feature]()
 
+    val labelFeatures = (0 until labelIndex.size).map(l => LabelFeature(labelIndex.get(l)))
+    val label2Features = for(l1 <- 0 until labelIndex.size) yield for(l2 <- 0 until labelIndex.size) yield LabelFeature(labelIndex.get(l1) -> labelIndex.get(l2))
+
     var i = 0
     for(s <- train) {
       val loc = f.localize(s.words)
 
       for {
         b <- 0 until s.length
-        prevTag <- if(b == 0) Set(labelIndex(startSymbol)) else loc.allowedTags(b-1)
         l <- loc.allowedTags(b)
       } {
         loc.featuresForWord(b) foreach {f =>
-          featureIndex.index(PairFeature(LabelFeature(labelIndex.get(l)), f) )
-          featureIndex.index(PairFeature(LabelFeature(labelIndex.get(prevTag) -> labelIndex.get(l)), f) )
+          featureIndex.index(PairFeature(labelFeatures(l), f) )
         }
+        if(loc.allowedTags.size > 1) {
+          for(prevTag <- if(b == 0) Set(labelIndex(startSymbol)) else loc.allowedTags(b-1)) {
+            loc.featuresForWord(b) foreach {f =>
+              featureIndex.index(PairFeature(label2Features(prevTag)(l), f) )
+            }
+          }
+        }
+      }
+      if(i % 500 == 0) {
+        println(s"$i/${train.length} ${featureIndex.size}")
       }
       i += 1
     }
@@ -181,51 +197,60 @@ object TaggedSequenceModelFactory {
     val inner = new WordShapeFeaturizer(wordCounts)
 
     val closedWords: Set[String] =  wordCounts.findAll(_ > 10).toSet
+    val openTags = (0 until labelIndex.size).filter(l => wordTagCounts(::, labelIndex.get(l)).findAll(_ > 0).size > 50).toSet
 
     def localize(words: IndexedSeq[String])= new Localization(words)
 
     val interner = new Interner[Feature]
 
-    val labelSet = collection.immutable.BitSet.empty ++ (0 until labelIndex.size)
+    val labelSet = openTags
+    println(labelSet)
+    println(labelIndex.zipWithIndex)
 
     val noShapeThreshold = 100
     class Localization(words: IndexedSeq[String]) {
-      val allowedTags: IndexedSeq[Set[Int]] = words.map(w => if(closedWords(w)) Set.empty ++ wordTagCounts(w, ::).keySet.map(labelIndex(_)) else labelSet)
+      val allowedTags: IndexedSeq[Set[Int]] = words.map(w => (if(closedWords(w)) Set.empty else labelSet) ++ wordTagCounts(w, ::).keySet.map(labelIndex(_)))
 
       private val classes = words.map(w => if (wordCounts(w) > noShapeThreshold) w else EnglishWordClassGenerator(w))
       private val shapes = words.map(w => if (wordCounts(w) > noShapeThreshold) w else WordShapeGenerator(w))
 
-      val basicFeatures = (0 until words.length) map { i =>
+      val basicFeatures: IndexedSeq[Array[String]] = (0 until words.length) map { i =>
         val w = words(i)
-        if (wordCounts(w) > 10) IndexedSeq(w)
-        else if (wordCounts(w) > 5) IndexedSeq(w, classes(i), shapes(i))
+        val wc = wordCounts(w)
+        if (wc > 10) IndexedSeq(w)
+        else if (wc > 5) IndexedSeq(w, classes(i), shapes(i))
         else IndexedSeq(classes(i), shapes(i))
-      } map {_.map(_.intern)}
+      } map {_.map(_.intern).toArray[String]}
 
       def basicFeature(pos: Int) = {
-        if (pos < 0 || pos >= words.length) IndexedSeq("#")
+        if (pos < 0 || pos >= words.length) Array("#")
         else basicFeatures(pos)
       }
 
 
       val featuresForWord: IndexedSeq[Array[Feature]] = 0 until words.length map { pos =>
         val feats = new ArrayBuffer[Feature]()
-        val basic = basicFeature(pos).map(SFeature(_, 'Cur))
-        val basicLeft = basicFeature(pos - 1).map(SFeature(_, 'Prev))
-        val basicRight = basicFeature(pos + 1).map(SFeature(_, 'Next))
-        feats ++= basicLeft
-        feats ++= basicRight
-        feats ++= inner.featuresFor(words, pos)
-        for (a <- basicLeft; b <- basic) feats += PairFeature(a,b)
-        for (a <- basic; b <- basicRight) feats += PairFeature(a,b)
-        //        for (a <- basicLeft; b <- basicRight) feats += PairFeature(a,b)
-        feats += TrigramFeature(basicLeft(0), basic(0), basicRight(0))
-        if (pos > 0 && pos < words.length - 1) {
-          feats += TrigramFeature(shapes(pos-1), shapes(pos), shapes(pos+1))
-          feats += TrigramFeature(classes(pos-1), classes(pos), classes(pos+1))
+        val wc = wordCounts(words(pos))
+        val basic = basicFeature(pos).map(SFeature(_, 'Cur):Feature)
+        if(wc > 10 && wordTagCounts(words(pos), ::).findAll(_ > 0).size == 1) {
+          basic
+        } else {
+          val basicLeft = basicFeature(pos - 1).map(SFeature(_, 'Prev))
+          val basicRight = basicFeature(pos + 1).map(SFeature(_, 'Next))
+          feats ++= basicLeft
+          feats ++= basicRight
+          feats ++= inner.featuresFor(words, pos)
+          for (a <- basicLeft; b <- basic) feats += PairFeature(a,b)
+          for (a <- basic; b <- basicRight) feats += PairFeature(a,b)
+          //        for (a <- basicLeft; b <- basicRight) feats += PairFeature(a,b)
+//          feats += TrigramFeature(basicLeft(0), basic(0), basicRight(0))
+//          if (pos > 0 && pos < words.length - 1) {
+//            feats += TrigramFeature(shapes(pos-1), shapes(pos), shapes(pos+1))
+//            feats += TrigramFeature(classes(pos-1), classes(pos), classes(pos+1))
+//          }
+          feats ++= gazetteer.lookupWord(words(pos)).map(SFeature(_, 'WordSeenInSegment))
+          feats.map(interner.intern _).toArray
         }
-        feats ++= gazetteer.lookupWord(words(pos)).map(SFeature(_, 'WordSeenInSegment))
-        feats.map(interner.intern _).toArray
       }
 
     }
@@ -249,23 +274,25 @@ object TaggedSequenceModelFactory {
 
       val featureArray = Array.tabulate(w.length, labelIndex.size, labelIndex.size) { (b, prevTag, l) =>
         if(allowedTags(b+1)(l) && allowedTags(b)(prevTag)) {
-          val vb = new VectorBuilder[Double](featureIndex.size)
+          val vb = collection.mutable.ArrayBuilder.make[Int]
           loc.featuresForWord(b) foreach {f =>
             val fi1 = featureIndex(PairFeature(LabelFeature(labelIndex.get(l)), f) )
             if(fi1 >= 0) {
-              vb.add(fi1, 1.0)
-              val fi2 = featureIndex(PairFeature(LabelFeature(labelIndex.get(prevTag) -> labelIndex.get(l)), f) )
-              if(fi2 >= 0)
-                vb.add(fi2, 1.0)
+              vb += fi1
+              if(allowedTags(b+1).size > 1) {
+                val fi2 = featureIndex(PairFeature(LabelFeature(labelIndex.get(prevTag) -> labelIndex.get(l)), f) )
+                if(fi2 >= 0)
+                  vb += fi2
+              }
             }
           }
-          vb.toSparseVector
+          new FeatureVector(vb.result)
         } else {
           null
         }
       }
 
-      def featuresForTransition(pos: Int, prev: Int, cur: Int): SparseVector[Double] = {
+      def featuresForTransition(pos: Int, prev: Int, cur: Int): FeatureVector = {
         featureArray(pos)(prev)(cur)
       }
 
