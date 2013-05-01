@@ -17,6 +17,7 @@ package epic.parser
 
 import breeze.linalg._
 import epic.trees.LexicalProduction
+import java.io.ObjectStreamException
 
 /**
  * Just knows what tags are appropriate for a given word
@@ -78,6 +79,20 @@ class SimpleLexicon[L, W](wordTagCounts: Counter2[L, W, Double],
 
   def tagsForWord(w: W) = byWord.getOrElse(w,openTags).iterator
 
+  @throws(classOf[ObjectStreamException])
+  private def writeReplace():Object = {
+    new SimpleLexicon.SerializedForm(wordTagCounts, openTagThreshold, closedWordThreshold)
+  }
+}
+
+object SimpleLexicon {
+  @SerialVersionUID(1L)
+  class SerializedForm[L, W](wordTagCounts: Counter2[L, W, Double], openTagThreshold: Int = 50, closedWordThreshold: Int= 10) extends Serializable {
+    @throws(classOf[ObjectStreamException])
+    protected def readResolve():Object = {
+      new SimpleLexicon(wordTagCounts, openTagThreshold, closedWordThreshold)
+    }
+  }
 }
 
 /**

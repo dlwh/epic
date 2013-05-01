@@ -18,6 +18,7 @@ import collection.mutable.ArrayBuffer
 import breeze.util.{Index, Encoder}
 import breeze.linalg.Counter2
 import epic.trees._
+import java.io.ObjectStreamException
 
 
 /**
@@ -27,7 +28,7 @@ import epic.trees._
  *
  * @author dlwh
  */
-@SerialVersionUID(1)
+@SerialVersionUID(2L)
 final class BaseGrammar[L] private (
                                    /** The "start" symbol. Usually "TOP" in this parser. */
                                      val root: L,
@@ -110,6 +111,11 @@ final class BaseGrammar[L] private (
     }
     builder.toString()
   }
+
+  @throws(classOf[ObjectStreamException])
+  private def writeReplace():Object  = {
+    new BaseGrammar.SerializedForm(root, labelIndex, index)
+  }
 }
 
 object BaseGrammar {
@@ -181,6 +187,18 @@ object BaseGrammar {
       binaryRulesByRightChild.map(_.toArray),
       unaryRulesByChild.map(_.toArray))
   }
+
+
+
+  @SerialVersionUID(1)
+  private class SerializedForm[L](var root: L, var labelIndex: Index[L], var ri: Index[Rule[L]]) extends Serializable {
+    @throws(classOf[ObjectStreamException])
+    protected def readResolve():Object = {
+      apply(root, labelIndex, ri)
+    }
+  }
+
 }
+
 
 
