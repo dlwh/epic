@@ -152,7 +152,7 @@ class TaggedSequenceModelFactory[L](val startSymbol: L,
         }
         if(loc.allowedTags.size > 1) {
           for(prevTag <- if(b == 0) Set(labelIndex(startSymbol)) else loc.allowedTags(b-1)) {
-            loc.featuresForWord(b) foreach {f =>
+            loc.basicFeature(b) foreach {f =>
               featureIndex.index(PairFeature(label2Features(prevTag)(l), f) )
             }
           }
@@ -214,16 +214,16 @@ object TaggedSequenceModelFactory {
       private val classes = words.map(w => if (wordCounts(w) > noShapeThreshold) w else EnglishWordClassGenerator(w))
       private val shapes = words.map(w => if (wordCounts(w) > noShapeThreshold) w else WordShapeGenerator(w))
 
-      val basicFeatures: IndexedSeq[Array[String]] = (0 until words.length) map { i =>
+      val basicFeatures: IndexedSeq[Array[Feature]] = (0 until words.length) map { i =>
         val w = words(i)
         val wc = wordCounts(w)
         if (wc > 10) IndexedSeq(w)
         else if (wc > 5) IndexedSeq(w, classes(i), shapes(i))
         else IndexedSeq(classes(i), shapes(i))
-      } map {_.map(_.intern).toArray[String]}
+      } map {_.map(_.intern).map(SFeature(_, 'Basic)).toArray[Feature]}
 
       def basicFeature(pos: Int) = {
-        if (pos < 0 || pos >= words.length) Array("#")
+        if (pos < 0 || pos >= words.length) Array[Feature](SFeature("#", 'Basic))
         else basicFeatures(pos)
       }
 
@@ -281,6 +281,12 @@ object TaggedSequenceModelFactory {
               vb += fi1
               if(allowedTags(b+1).size > 1) {
                 val fi2 = featureIndex(PairFeature(LabelFeature(labelIndex.get(prevTag) -> labelIndex.get(l)), f) )
+              }
+            }
+
+            if(loc.allowedTags.size > 1) {
+              loc.basicFeature(b) foreach {f =>
+                val fi2 = featureIndex(PairFeature(LabelFeature(prevTag -> l), f) )
                 if(fi2 >= 0)
                   vb += fi2
               }
