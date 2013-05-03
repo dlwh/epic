@@ -156,7 +156,7 @@ class ConstraintCoreGrammar[L, W](val augmentedGrammar: AugmentedGrammar[L, W], 
     val thresholds = ArrayBuffer[Double]()
     var nGoldConstructed = 0
     val gThresholds = ArrayBuffer[Double]()
-    for(i <-  0 until marg.length; j <- (i+2) to marg.length) {
+    for(i <-  0 until marg.length; j <- (i+1) to marg.length) {
       {
       val arr = scores(TriangularArray.index(i, j))
       if (arr ne null)
@@ -166,10 +166,14 @@ class ConstraintCoreGrammar[L, W](val augmentedGrammar: AugmentedGrammar[L, W], 
           if(gold.isGoldBotTag(i, j, c)) {
             if(arr(c) != 0)
               nGoldConstructed += 1
-            else counts(c) += 1
+            else {
+              throw new RuntimeException("Can't construct gold tree for " + " " + marg.words)
+              counts(c) += 1
+            }
             gThresholds += arr(c)
           }
-       } }
+       }
+      }
       /*{
       val arr = topScores(TriangularArray.index(i, j))
       if (arr ne null)
@@ -343,7 +347,7 @@ object ComputePruningThresholds {
     val parser = loadParser[Any](params.parser)
 
     val factory = new ConstraintCoreGrammar[AnnotatedLabel, String](parser.augmentedGrammar, {(_:AnnotatedLabel).isIntermediate}, params.threshold)
-    val (all, gold) = mapTrees(factory, treebank.devTrees, parser.grammar.labelIndex)
+    val (all, gold) = mapTrees(factory, treebank.trainTrees.take(1000), parser.grammar.labelIndex)
     util.Arrays.sort(all.data)
     util.Arrays.sort(gold.data)
     val goldOut = new PrintStream(new BufferedOutputStream(new FileOutputStream("gold.txt")))
@@ -371,7 +375,8 @@ object ComputePruningThresholds {
         val (ra, rb) = factory.computePruningStatistics(words, policy)
         (s._1.merge(ra, 100000), s._2.merge(rb, 100000))
       } catch {
-        case e: Exception => e.printStackTrace()
+        case e: Exception =>
+          throw new Exception(s"??? ${tree.render(words)}", e)
         s
       }
     }, { (statsA, statsB) =>
