@@ -261,7 +261,7 @@ object CRF {
 
       val accumArray = new Array[Double](numLabels)
 
-      for(i <- (length-1) to 0 by -1) {
+      for(i <- (length-1) until 0 by -1) {
         val cur = backwardScores(i)
         for ( curLabel <- scorer.validSymbols(i-1)) {
           var offset = 0

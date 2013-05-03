@@ -28,7 +28,7 @@ object HMM {
         val wcs = w.map(wordCounts(_))
         val validSyms = w.map { w =>
           if(wordCounts(w) >= 10) {
-            emissions(::, w).activeIterator.collect { case (l,v) if v > 0 => li(l)}.toSet
+            emissions(::, w).findAll( _ > 0).map(labelIndex(_)).toSet
           } else {
             allSyms
           }
@@ -40,7 +40,7 @@ object HMM {
 
         def startSymbol: L = startLabel
 
-        def scoreTransition(prev: Int, cur: Int, pos: Int): Double = {
+        def scoreTransition(pos: Int, prev: Int, cur: Int): Double = {
           val emitScore = scoreEmission(cur, pos)
           assert(!emitScore.isNaN)
           emitScore + encodedTransitions(prev, cur)
