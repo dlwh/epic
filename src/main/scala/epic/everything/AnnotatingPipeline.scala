@@ -107,7 +107,7 @@ object AnnotatingPipeline {
         println("Checking " + m.getClass.getName)
         val obj = new ModelObjective(m, processedTrain.flatMap(_.sentences).filter(_.words.filter(_(0).isLetterOrDigit).length <= 40), params.nthreads)
         val cachedObj = new CachedBatchDiffFunction(obj)
-              val w = obj.initialWeightVector(true)
+              val w = obj.initialWeightVector(randomize = true)
       val (v, grad) = obj.calculate(w)
       for (i <- (m.featureIndex.size-1 to m.featureIndex.size-200) by -3) {
         w(i) += 1E-8
