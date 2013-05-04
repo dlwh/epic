@@ -167,8 +167,6 @@ object SemiConllNERPipeline {
     }
 
 
-
-
     // build feature Index
     val model: SemiCRFModel[String, String] = new SegmentationModelFactory("##", "O", gazetteer = Gazetteer.ner("en")).makeModel(train)
     val obj = new ModelObjective(model, train, params.nthreads)

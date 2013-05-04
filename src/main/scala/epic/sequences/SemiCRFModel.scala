@@ -11,7 +11,7 @@ import epic.trees.Span
 import epic.parser.features.StandardSpanFeatures.WordEdges
 import collection.mutable
 import breeze.features.FeatureVector
-import epic.features.{ContextualSurfaceFeaturizer}
+import epic.features.{IndexedWordFeaturizer}
 
 /**
  *
@@ -270,8 +270,7 @@ class SegmentationModelFactory[L](val startSymbol: L,
     println(nonStarters)
     val nonInteriors = wordCounts.activeIterator.filter(_._2 > 8).map(_._1).toSet -- interiors
     println(nonInteriors)
-    val f = new StandardFeaturizer[L](ContextualSurfaceFeaturizer.forTrainingSet(train.map(_.words), gazetteer), gazetteer, wordCounts)
-    val basicFeatureIndex = Index[Feature]()
+    val f = new StandardFeaturizer[L](IndexedWordFeaturizer.forTrainingSet(train.map(_.asBIOSequence(outsideSymbol)).map(t => t.label zip t.words), gazetteer), gazetteer, wordCounts)
     val spanFeatureIndex = Index[Feature]()
     val transFeatureIndex = Index[Feature]()
 
@@ -322,7 +321,7 @@ object SegmentationModelFactory {
    * @param wordCounts
    */
   @SerialVersionUID(1L)
-  class StandardFeaturizer[L](wordFeaturizer: ContextualSurfaceFeaturizer, gazetteer: Gazetteer[Any, String], wordCounts: Counter[String, Double] ) extends Serializable {
+  class StandardFeaturizer[L](wordFeaturizer: IndexedWordFeaturizer, gazetteer: Gazetteer[Any, String], wordCounts: Counter[String, Double] ) extends Serializable {
     def basicFeatureIndex = wordFeaturizer.featureIndex
 
     def localize(words: IndexedSeq[String])= new Localization(words)

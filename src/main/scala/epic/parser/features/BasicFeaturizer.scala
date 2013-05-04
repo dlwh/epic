@@ -75,7 +75,7 @@ class BasicFeaturizer(tagWordCounts: Counter2[_, String, Double], wordCounts: Co
       val basicLeft = basicFeatures(pos - 1).map(WordFeature(_, 'Prev)).map(interner.intern _)
       val basicRight = basicFeatures(pos + 1).map(WordFeature(_, 'Next)).map(interner.intern _)
       //      feats ++= basic <-- covered by  the next line
-      feats ++= inner.featuresFor(words, pos)
+      feats ++= inner.featuresFor(words(pos))
       feats ++= basicLeft
       feats ++= basicRight
       for (a <- basicLeft; b <- basic) feats += BigramFeature(a,b)

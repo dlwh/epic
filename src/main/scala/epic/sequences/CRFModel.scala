@@ -11,7 +11,7 @@ import scala.collection
 import java.io.{BufferedWriter, FileWriter, PrintWriter}
 import scala.collection.immutable
 import breeze.features.FeatureVector
-import epic.features.{ContextualSurfaceFeaturizer, WordShapeFeaturizer}
+import epic.features.{IndexedWordFeaturizer, WordShapeFeaturizer}
 import epic.lexicon.{Lexicon, SimpleLexicon}
 
 /**
@@ -135,7 +135,7 @@ class TaggedSequenceModelFactory[L](val startSymbol: L,
     val counts: Counter2[L, String, Int] = Counter2.count(train.flatMap(p => p.label zip p.words))
 
 
-    val f = ContextualSurfaceFeaturizer.forTrainingSet(train.map(_.words), gazetteer, needsContextFeatures = {(w, wc) =>  wc < 10 || counts(::, w).findAll(_ > 0).size != 1})
+    val f = IndexedWordFeaturizer.forTrainingSet(train.map(t => t.label zip t.words), gazetteer, needsContextFeatures = {(w, wc) =>  wc < 10 || counts(::, w).findAll(_ > 0).size != 1})
     val lexicon = new SimpleLexicon[L, String](labelIndex, counts.mapValues(_.toDouble))
     val featureIndex = Index[Feature]()
 
@@ -183,7 +183,7 @@ object TaggedSequenceModelFactory {
 
 
   @SerialVersionUID(1L)
-  class IndexedStandardFeaturizer[L](wordFeaturizer: ContextualSurfaceFeaturizer,
+  class IndexedStandardFeaturizer[L](wordFeaturizer: IndexedWordFeaturizer,
                                      val lexicon: Lexicon[L, String],
                                      val startSymbol: L,
                                      val labelIndex: Index[L],

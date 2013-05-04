@@ -32,19 +32,18 @@ final case class RightWordFeature(str: Any) extends Feature
 
 
 
-class WordShapeFeaturizer(wordCounts: Counter[String, Double], minCountUnknown: Int = 5) extends ((Seq[String],Int)=>IndexedSeq[Feature]) with Serializable {
+class WordShapeFeaturizer(wordCounts: Counter[String, Double], minCountUnknown: Int = 5) extends (String=>IndexedSeq[Feature]) with Serializable {
   import WordShapeFeaturizer._
-  val signatureGenerator = EnglishWordClassGenerator
-  def featuresFor(words: Seq[String], pos: Int): IndexedSeq[Feature] = {
-    val w = words(pos)
+//  val signatureGenerator = EnglishWordClassGenerator
+  def featuresFor(w: String): IndexedSeq[Feature] = {
     val wc = wordCounts(w)
     val features = ArrayBuffer[Feature]()
     if(wc > minCountUnknown) {
       ArrayBuffer(IndicatorFeature(w))
     } else {
       features += IndicatorFeature(w)
-      features += ShapeFeature(WordShapeGenerator(w))
-      features += SignatureFeature(signatureGenerator.signatureFor(w))
+//      features += ShapeFeature(WordShapeGenerator(w))
+//      features += SignatureFeature(signatureGenerator.signatureFor(w))
 
       val wlen = w.length
       val numCaps = (w:Seq[Char]).count{_.isUpper}
@@ -62,14 +61,10 @@ class WordShapeFeaturizer(wordCounts: Counter[String, Double], minCountUnknown: 
       if(isAllCaps) features += isAllCapsFeature
       var knownLowerCase = false
       if(w(0).isUpper || w(0).isTitleCase) {
-        if(pos == 0) {
-          features += startOfSentenceFeature
-        } else {
-          features += hasInitCapFeature
-          if(wordCounts(w.toLowerCase) > 3) {
-            features += hasKnownLCFeature
-            knownLowerCase = true
-          }
+        features += hasInitCapFeature
+        if(wordCounts(w.toLowerCase) > 3) {
+          features += hasKnownLCFeature
+          knownLowerCase = true
         }
       }
 
@@ -115,7 +110,7 @@ class WordShapeFeaturizer(wordCounts: Counter[String, Double], minCountUnknown: 
     }
   }
 
-  def apply(v1: Seq[String], v2: Int) = featuresFor(v1,v2)
+  def apply(w: String) = featuresFor(w)
 
 
 }
@@ -161,7 +156,7 @@ class TagAwareWordShapeFeaturizer[L](tagWordCounts: Counter2[L, String, Double],
     val w = words(pos)
     val wc = wordCounts(w)
     val features = ArrayBuffer[Feature]()
-    features ++= featurizer.featuresFor(words, pos)
+    features ++= featurizer.featuresFor(words(pos))
     val basicFeatures = if(wc > minCountUnknown) {
       ArrayBuffer(IndicatorFeature(w):Feature)
     } else {
