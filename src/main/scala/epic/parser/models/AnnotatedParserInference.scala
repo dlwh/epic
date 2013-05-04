@@ -32,7 +32,7 @@ import epic.parser._
  * @author dlwh
  */
 case class AnnotatedParserInference[L, W](featurizer: RefinedFeaturizer[L, W, Feature],
-                                          ann: (BinarizedTree[L], Seq[W]) => BinarizedTree[(L, Int)],
+                                          ann: (BinarizedTree[L], IndexedSeq[W]) => BinarizedTree[(L, Int)],
                                           grammar: RefinedGrammar[L, W],
                                           baseMeasure: CoreGrammar[L, W]) extends ParserInference[L, W] {
 

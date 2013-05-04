@@ -19,6 +19,7 @@ import java.io._
 import projections.AnchoredRuleProjector.AnchoredData
 import breeze.collection.mutable.{OpenAddressHashArray, TriangularArray}
 import epic.parser.ParseChart.SparsityPattern
+import epic.lexicon.Lexicon
 
 /**
  * Creates a locally-normalized anchored PCFG from some refined forest.
@@ -104,7 +105,7 @@ case class AnchoredRuleMarginalProjector[L, W](threshold: Double = Double.Negati
 @SerialVersionUID(3)
 class SimpleAnchoring[L, W](val grammar: BaseGrammar[L],
                             val lexicon: Lexicon[L, W],
-                            val words: Seq[W],
+                            val words: IndexedSeq[W],
                             spanScores: Array[OpenAddressHashArray[Double]], // triangular index -> label -> score
                             // (begin, end) -> rule -> score
                             unaryScores: Array[OpenAddressHashArray[Double]],

@@ -26,10 +26,10 @@ import breeze.util.Index
 trait RefinedFeaturizer[L, W, Feat] {
   def index: Index[Feat]
   
-  def anchor(words: Seq[W]):Anchoring
+  def anchor(words: IndexedSeq[W]):Anchoring
   
   trait Anchoring {
-    def words: Seq[W]
+    def words: IndexedSeq[W]
 
     def featuresForBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int):Array[Int]
     def featuresForUnaryRule(begin: Int, end: Int, rule: Int, ref: Int):Array[Int]

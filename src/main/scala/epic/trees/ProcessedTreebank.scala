@@ -35,8 +35,7 @@ case class ProcessedTreebank(@Help(text="Location of the treebank directory")
                              binarization: String = "head") {
 
   lazy val treebank = {
-    if (path.isDirectory) Treebank.fromPennTreebankDir(path)
-    else DenseTreebank.fromZipFile(path);
+    Treebank.fromPennTreebankDir(path)
   }
 
   lazy val trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]] = transformTrees(treebank.train, maxLength, removeUnaries = true)
@@ -56,7 +55,7 @@ case class ProcessedTreebank(@Help(text="Location of the treebank directory")
   }
 
 
-  def makeTreeInstance(name: String, tree: Tree[String], words: Seq[String], removeUnaries: Boolean): TreeInstance[AnnotatedLabel, String] = {
+  def makeTreeInstance(name: String, tree: Tree[String], words: IndexedSeq[String], removeUnaries: Boolean): TreeInstance[AnnotatedLabel, String] = {
     var transformed = process(tree)
     if (removeUnaries)
       transformed = UnaryChainRemover.removeUnaryChains(transformed)

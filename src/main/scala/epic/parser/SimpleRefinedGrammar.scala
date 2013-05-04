@@ -18,6 +18,7 @@ import projections.GrammarRefinements
 import epic.trees.{BinaryRule, UnaryRule}
 import collection.mutable.ArrayBuffer
 import java.io.{PrintWriter, Writer}
+import epic.lexicon.Lexicon
 
 /**
  *
@@ -101,7 +102,7 @@ class SimpleRefinedGrammar[L, L2, W](val grammar: BaseGrammar[L],
     }
   }
 
-  def anchor(w: Seq[W]) = new RefinedAnchoring[L, W] {
+  def anchor(w: IndexedSeq[W]) = new RefinedAnchoring[L, W] {
     override def toString() = "SimpleAnchoring(...)"
     val grammar = SimpleRefinedGrammar.this.grammar
     val lexicon = SimpleRefinedGrammar.this.lexicon

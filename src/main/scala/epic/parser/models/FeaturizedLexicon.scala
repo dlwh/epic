@@ -16,8 +16,7 @@ package epic.parser.models
  limitations under the License.
 */
 import breeze.linalg._
-import epic.parser.{TagScorer, Lexicon}
-import epic.trees.LexicalProduction
+import epic.parser.TagScorer
 
 /**
  *
@@ -28,7 +27,7 @@ class FeaturizedLexicon[L, L2, W](val weights: DenseVector[Double],
                                   val featureIndexer: IndexedFeaturizer[L, L2, W]) extends TagScorer[L2, W] {
 
 
-  def scoreTag(l: L2, words: Seq[W], pos: Int) = {
+  def scoreTag(l: L2, words: IndexedSeq[W], pos: Int) = {
     featureIndexer.computeWeight(featureIndexer.labelIndex(l), words, pos, weights)
   }
 

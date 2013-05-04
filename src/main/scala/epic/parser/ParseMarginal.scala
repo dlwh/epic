@@ -28,7 +28,7 @@ trait ParseMarginal[L, W] extends Marginal {
   def grammar:BaseGrammar[L] = anchoring.grammar
   def lexicon = anchoring.lexicon
   def logPartition: Double
-  def words:Seq[W] = anchoring.words
+  def words:IndexedSeq[W] = anchoring.words
   def length = words.length
 
 

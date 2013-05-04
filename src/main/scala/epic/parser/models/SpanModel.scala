@@ -28,6 +28,7 @@ import breeze.util._
 import epic.framework.Feature
 import projections.GrammarRefinements
 import breeze.config.Help
+import epic.lexicon.Lexicon
 
 /**
  * A rather more sophisticated discriminative parser. Uses features on
@@ -37,7 +38,7 @@ import breeze.config.Help
 @SerialVersionUID(1L)
 class SpanModel[L, L2, W](featurizer: RefinedFeaturizer[L, W, Feature],
                       val featureIndex: Index[Feature],
-                      ann: (BinarizedTree[L], Seq[W]) => BinarizedTree[L2],
+                      ann: (BinarizedTree[L], IndexedSeq[W]) => BinarizedTree[L2],
                       baseFactory: CoreGrammar[L, W],
                       grammar: BaseGrammar[L],
                       lexicon: Lexicon[L, W],
@@ -52,7 +53,7 @@ class SpanModel[L, L2, W](featurizer: RefinedFeaturizer[L, W, Feature],
 
   def inferenceFromWeights(weights: DenseVector[Double]) = {
     val factory = new DotProductGrammar(grammar, lexicon, refinedGrammar, refinements, weights, featurizer)
-    def reannotate(bt: BinarizedTree[L], words: Seq[W]) = {
+    def reannotate(bt: BinarizedTree[L], words: IndexedSeq[W]) = {
       val annotated = ann(bt, words)
 
       val localized = annotated.map { l =>
@@ -162,7 +163,7 @@ class DotProductGrammar[L, L2, W, Feature](val grammar: BaseGrammar[L],
   }
 
 
-  def anchor(w: Seq[W]):RefinedAnchoring[L, W] = new RefinedAnchoring[L, W] {
+  def anchor(w: IndexedSeq[W]):RefinedAnchoring[L, W] = new RefinedAnchoring[L, W] {
 
 
     val grammar = DotProductGrammar.this.grammar
@@ -278,13 +279,13 @@ class DotProductGrammar[L, L2, W, Feature](val grammar: BaseGrammar[L],
 }
 
 trait SpanFeaturizer[L, W] extends Serializable {
-  def anchor(words: Seq[W]): Anchoring
+  def anchor(words: IndexedSeq[W]): Anchoring
 
   /**
    * Specialization assumes that features are of several kinds, so that we can efficiently cache them.
    */
   trait Anchoring {
-    def words: Seq[W]
+    def words: IndexedSeq[W]
     def featuresForSpan(begin: Int, end: Int, label: Int): Array[Feature]
     def featuresForRule(begin: Int, end: Int, rule: Int): Array[Feature]
     def featuresForBinaryRule(begin: Int, split: Int, end: Int, rule: Int): Array[Feature]
@@ -305,9 +306,9 @@ class IndexedSpanFeaturizer[L, L2, W](f: SpanFeaturizer[L2, W],
     r
   }
 
-  def anchor(words: Seq[W]):Anchoring = new Spec(words)
+  def anchor(words: IndexedSeq[W]):Anchoring = new Spec(words)
 
-  case class Spec(words: Seq[W]) extends super.Anchoring {
+  case class Spec(words: IndexedSeq[W]) extends super.Anchoring {
     def length = words.length
     private val fspec = f.anchor(words)
 
@@ -398,7 +399,7 @@ class IndexedSpanFeaturizer[L, L2, W](f: SpanFeaturizer[L2, W],
 
 object IndexedSpanFeaturizer {
   def extract[L, L2, W](featurizer: SpanFeaturizer[L2, W],
-                    ann: (BinarizedTree[L], Seq[W]) => BinarizedTree[L2],
+                    ann: (BinarizedTree[L], IndexedSeq[W]) => BinarizedTree[L2],
                     refinements: GrammarRefinements[L, L2],
                     grammar: BaseGrammar[L],
                     dummyFeatScale: Double,
@@ -450,7 +451,7 @@ class StandardSpanFeaturizer[L, W](grammar: BaseGrammar[L],
                                    wordGen: W=>Traversable[String],
                                    labelFeatures: Array[Array[Feature]],
                                    ruleFeatures: Array[Array[Feature]]) extends SpanFeaturizer[L, W] {
-  def anchor(w: Seq[W]):Anchoring = new Anchoring {
+  def anchor(w: IndexedSeq[W]):Anchoring = new Anchoring {
     def words = w
     val length = w.length
     val wordFeats = w.toIndexedSeq.map(wordGen).map(_.map(IndicatorFeature(_)))

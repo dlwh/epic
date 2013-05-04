@@ -19,6 +19,7 @@ package projections
 import projections.AnchoredRuleProjector.AnchoredData
 import breeze.collection.mutable.{TriangularArray, OpenAddressHashArray}
 import epic.parser.ParseChart.SparsityPattern
+import epic.lexicon.Lexicon
 
 /**
  * Creates a grammar using only span marginals and unary rule marginals
@@ -87,7 +88,7 @@ case class LabeledSpanProjector[L, W](grammar: BaseGrammar[L], threshold: Double
 @SerialVersionUID(1L)
 case class SpanAnchoring[L, W](grammar: BaseGrammar[L],
                                lexicon: Lexicon[L, W],
-                               words: Seq[W],
+                               words: IndexedSeq[W],
                                spanScores: Array[OpenAddressHashArray[Double]],
                                unaryScores: Array[OpenAddressHashArray[Double]],
                                override val sparsityPattern: SparsityPattern)  extends CoreAnchoring[L, W] {

@@ -19,10 +19,10 @@ import breeze.config._
 import java.io._
 import epic.trees._
 import breeze.util._
-import breeze.text.analyze._
 import java.util.concurrent.ConcurrentHashMap
 import epic.parser
 import collection.mutable
+import epic.lexicon.{Lexicon, SimpleLexicon}
 
 
 /**
@@ -43,7 +43,7 @@ object ParserParams {
         val (words, xbarBinaries, xbarUnaries) = GenerativeParser.extractCounts(trees.map(_.mapLabels(_.baseAnnotatedLabel)))
 
         val g = BaseGrammar(AnnotatedLabel.TOP, xbarBinaries.keysIterator.map(_._2) ++ xbarUnaries.keysIterator.map(_._2))
-        val lex = new SignatureLexicon(words, EnglishWordClassGenerator)
+        val lex = new SimpleLexicon(g.labelIndex, words)
         if(path ne null)
           writeObject(path, g -> lex)
         g -> lex

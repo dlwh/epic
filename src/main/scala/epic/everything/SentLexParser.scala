@@ -9,6 +9,7 @@ import models.LexGrammarBundle
 import breeze.util.{Encoder, OptionIndex, Index}
 import projections.LexGovernorProjector
 import breeze.collection.mutable.TriangularArray
+import epic.lexicon.Lexicon
 
 /**
  * Sentence Lexicalized Parser

@@ -31,7 +31,7 @@ trait Treebank[L] { outer =>
   /**
    * Class for a split of a training set.
    */
-  case class Portion(name: String, sections: Seq[String]) {
+  case class Portion(name: String, sections: IndexedSeq[String]) {
     def trees = treesFromSections(sections)
   }
 
@@ -55,14 +55,14 @@ trait Treebank[L] { outer =>
   /**
    * Every section in the treebank
    */
-  def sections: Seq[String]
+  def sections: IndexedSeq[String]
 
   /**
    * Read the trees from a section
    */
-  def treesFromSection(sec: String): Iterator[(Tree[L],Seq[String])]
+  def treesFromSection(sec: String): Iterator[(Tree[L],IndexedSeq[String])]
 
-  def treesFromSections(secs: Seq[String]) = {
+  def treesFromSections(secs: IndexedSeq[String]) = {
     for(sec <- secs.iterator; tree <- treesFromSection(sec))
       yield tree
   }
@@ -70,7 +70,7 @@ trait Treebank[L] { outer =>
   /**
    * All trees
    */
-  def trees: Iterator[(Tree[L],Seq[String])] = treesFromSections(sections)
+  def trees: Iterator[(Tree[L],IndexedSeq[String])] = treesFromSections(sections)
 }
 
 object Treebank {
@@ -82,11 +82,11 @@ object Treebank {
   */
   def fromPennTreebankDir(dir: File):Treebank[String] = new Treebank[String] {
     def sections = dir.listFiles.filter(_.isDirectory).map(_.getName)
-    val train = Portion("train", Seq.range(2,10).map("0" + _) ++ Seq.range(10,22).map(""+_))
+    val train = Portion("train", IndexedSeq.range(2,10).map("0" + _) ++ IndexedSeq.range(10,22).map(""+_))
 
-    val test = Portion("test",Seq("23"))
+    val test = Portion("test",IndexedSeq("23"))
 
-    val dev = Portion("dev",Seq("22"))
+    val dev = Portion("dev",IndexedSeq("22"))
 
     def treesFromSection(sec: String) = {
       for(file <- new File(dir,sec).listFiles.iterator;

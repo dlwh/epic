@@ -21,6 +21,7 @@ import epic.trees._
 import breeze.collection.mutable.TriangularArray
 import breeze.util._
 import breeze.numerics._
+import epic.lexicon.Lexicon
 
 
 /**

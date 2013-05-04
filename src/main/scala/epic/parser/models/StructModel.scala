@@ -27,6 +27,7 @@ import features.IndicatorFeature
 import epic.trees.TreeInstance
 import breeze.config.Help
 import epic.features.TagAwareWordShapeFeaturizer
+import epic.lexicon.Lexicon
 
 /**
  * Model for structural annotations, a la Klein and Manning 2003.

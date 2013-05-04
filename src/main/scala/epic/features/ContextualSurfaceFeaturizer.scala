@@ -11,6 +11,7 @@ import scala.collection.mutable.ArrayBuffer
  *
  * @author dlwh
  */
+@SerialVersionUID(1L)
 class ContextualSurfaceFeaturizer private (val wordIndex: Index[String],
                                            val featureIndex: Index[Feature],
                                            wordCounts: Counter[String, Int],
@@ -20,7 +21,7 @@ class ContextualSurfaceFeaturizer private (val wordIndex: Index[String],
                                            prevNextFeature: (Int,Int)=>Int,
                                            boundaryFeatures: Array[Int],
                                            gazetteer: Gazetteer[Any, String] = Gazetteer.empty,
-                                           needsContextFeatures: (String,Double)=>Boolean = {(w,c) => true}) {
+                                           needsContextFeatures: (String,Double)=>Boolean = {(w,c) => true}) extends Serializable {
 
   def anchor(words: Seq[String]) = new Localization(words)
 
@@ -108,7 +109,7 @@ object ContextualSurfaceFeaturizer {
       else IndexedSeq(classes(i), shapes(i))
     } map {_.map(f => basicFeatureIndex.index(WordFeature(f, 'Basic))).toArray}
 
-    val boundaryFeatures = Array(basicFeatureIndex.index(WordFeature("#", 'Basic)))
+    val boundaryFeatures = Array(basicFeatureIndex.index(WordFeature("###", 'Basic)))
 
     basicFeatureIndex foreach {featureIndex.index(_)}
 

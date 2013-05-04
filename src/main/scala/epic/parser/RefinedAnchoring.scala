@@ -16,6 +16,7 @@ package epic.parser
 */
 import breeze.inference.Factor
 import epic.parser.ParseChart.SparsityPattern
+import epic.lexicon.Lexicon
 
 /**
  * A RefinedAnchoring is a refined grammar that has been tuned to a particular sentence (if applicable).
@@ -27,11 +28,9 @@ import epic.parser.ParseChart.SparsityPattern
  * @author dlwh
  */
 trait RefinedAnchoring[L, W] extends Factor[RefinedAnchoring[L, W]] {
-
-
   def grammar: BaseGrammar[L]
   def lexicon: Lexicon[L, W]
-  def words: Seq[W]
+  def words: IndexedSeq[W]
 
 
   def logPartition: Double = marginal.logPartition
@@ -234,7 +233,7 @@ trait RefinedAnchoring[L, W] extends Factor[RefinedAnchoring[L, W]] {
 object RefinedAnchoring {
   def identity[L, W](grammar: BaseGrammar[L],
                      lexicon: Lexicon[L, W],
-                     words: Seq[W]): RefinedAnchoring[L, W] = {
+                     words: IndexedSeq[W]): RefinedAnchoring[L, W] = {
     LiftedCoreAnchoring(CoreAnchoring.identity[L, W](grammar, lexicon, words))
   }
 }

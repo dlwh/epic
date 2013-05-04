@@ -227,7 +227,7 @@ object CRF {
         val cur = forwardScores(i+1)
         for ( next <- scorer.validSymbols(i)) {
           var offset = 0
-          for ( previous <- if(i == 0) Seq(scorer.labelIndex(scorer.startSymbol)) else scorer.validSymbols(i-1)) {
+          for ( previous <- if(i == 0) IndexedSeq(scorer.labelIndex(scorer.startSymbol)) else scorer.validSymbols(i-1)) {
             val score = scorer.scoreTransition(i, previous, next) + forwardScores(i)(previous)
             if(score != Double.NegativeInfinity) {
               cache(offset) = score
@@ -318,7 +318,7 @@ object CRF {
         var currentMax = Double.NegativeInfinity
         var currentArgMax = -1
 
-        for ( previous <- if(i == 0) Seq(scorer.labelIndex(scorer.startSymbol)) else scorer.validSymbols(i-1)) {
+        for ( previous <- if(i == 0) IndexedSeq(scorer.labelIndex(scorer.startSymbol)) else scorer.validSymbols(i-1)) {
           val score = scorer.scoreTransition(i, previous, next)
           if(score > currentMax) {
             currentMax = score

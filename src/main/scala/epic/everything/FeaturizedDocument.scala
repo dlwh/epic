@@ -16,6 +16,7 @@ import epic.sequences.Segmentation
 import scala.Some
 import epic.parser._
 import java.util.concurrent.atomic.AtomicInteger
+import epic.lexicon.Lexicon
 
 /**
  * 

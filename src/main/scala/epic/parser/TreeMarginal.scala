@@ -86,7 +86,7 @@ case class TreeMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
 
 object TreeMarginal {
   def apply[L, W](grammar: AugmentedGrammar[L, W],
-                  words: Seq[W],
+                  words: IndexedSeq[W],
                   tree: BinarizedTree[(L,Int)]):TreeMarginal[L, W] = {
     TreeMarginal(grammar.anchor(words), tree)
   }

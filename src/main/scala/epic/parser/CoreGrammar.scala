@@ -1,4 +1,7 @@
 package epic.parser
+
+import epic.lexicon.Lexicon
+
 /*
  Copyright 2012 David Hall
 
@@ -40,7 +43,7 @@ trait CoreGrammar[L, W] extends Serializable {
    * @param words
    * @return
    */
-  def anchor(words: Seq[W]):CoreAnchoring[L, W]
+  def anchor(words: IndexedSeq[W]):CoreAnchoring[L, W]
 }
 
 object CoreGrammar {
@@ -51,7 +54,7 @@ object CoreGrammar {
       def grammar =  g
       def lexicon = l
 
-      def anchor(words: Seq[W]) = CoreAnchoring.identity(grammar, lexicon, words)
+      def anchor(words: IndexedSeq[W]) = CoreAnchoring.identity(grammar, lexicon, words)
     }
   }
 }

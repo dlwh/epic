@@ -31,9 +31,10 @@ import collection.mutable.ArrayBuffer
 import breeze.config.Help
 import collection.mutable
 import epic.features.TagAwareWordShapeFeaturizer
+import epic.lexicon.Lexicon
 
 class LexModel[L, W](bundle: LexGrammarBundle[L, W],
-                     reannotate: (BinarizedTree[L], Seq[W])=>BinarizedTree[L],
+                     reannotate: (BinarizedTree[L], IndexedSeq[W])=>BinarizedTree[L],
                      indexed: IndexedLexFeaturizer[L, W],
                      baseFactory: CoreGrammar[L, W],
                      coarse: BaseGrammar[L],
@@ -46,7 +47,7 @@ class LexModel[L, W](bundle: LexGrammarBundle[L, W],
 
   def inferenceFromWeights(weights: DenseVector[Double]) = {
     val gram = bundle.makeGrammar(indexed, weights)
-    def ann(tree: BinarizedTree[L], words: Seq[W]):BinarizedTree[(L, Int)] = {
+    def ann(tree: BinarizedTree[L], words: IndexedSeq[W]):BinarizedTree[(L, Int)] = {
       val reannotated = reannotate(tree, words)
       val headed = bundle.headFinder.annotateHeadIndices(reannotated)
       headed
@@ -66,7 +67,7 @@ class LexModel[L, W](bundle: LexGrammarBundle[L, W],
 }
 
 trait LexFeaturizer[L, W] extends Serializable {
-  def anchor(words: Seq[W]): Anchoring
+  def anchor(words: IndexedSeq[W]): Anchoring
 
   /**
    * Specialization assumes that features are of several kinds, so that we can efficiently cache them.
@@ -110,7 +111,7 @@ class IndexedLexFeaturizer[L, W](f: LexFeaturizer[L, W],
                                  lowCountFeatures: Set[Feature],
                                  dummyFeatures: Int,
                                  useGlobalBinaryFeatureCache: Boolean = false) extends RefinedFeaturizer[L, W, Feature] with Serializable {
-  def anchor(words: Seq[W]):Anchoring = new Spec(words)
+  def anchor(words: IndexedSeq[W]):Anchoring = new Spec(words)
 
   val (index:Index[Feature], lowCountFeature) = {
     val r: MutableIndex[Feature] = Index[Feature]()
@@ -120,9 +121,9 @@ class IndexedLexFeaturizer[L, W](f: LexFeaturizer[L, W],
     r -> lowCount
   }
 
-  val globalBinaryFeatureCache = mutable.Map.empty[Seq[W], Array[OpenAddressHashArray[Array[Int]]]]
+  val globalBinaryFeatureCache = mutable.Map.empty[IndexedSeq[W], Array[OpenAddressHashArray[Array[Int]]]]
 
-  case class Spec(words: Seq[W]) extends super.Anchoring {
+  case class Spec(words: IndexedSeq[W]) extends super.Anchoring {
 
     def length = words.length
 
@@ -285,9 +286,9 @@ case class StandardFeaturizer[L, W>:Null, P](wordIndex: Index[W],
                                              ruleIndex: Index[Rule[L]],
                                              ruleFeatGen: Rule[L]=>IndexedSeq[Feature],
                                              featGen: (W) => IndexedSeq[P],
-                                             tagFeatGen: ((Seq[W],Int)=>IndexedSeq[P])) extends LexFeaturizer[L, W] {
+                                             tagFeatGen: ((IndexedSeq[W],Int)=>IndexedSeq[P])) extends LexFeaturizer[L, W] {
 
-  def anchor(words: Seq[W]) = new Spec(words)
+  def anchor(words: IndexedSeq[W]) = new Spec(words)
 
 
   // word parts are things like suffixes, etc.
@@ -318,7 +319,7 @@ case class StandardFeaturizer[L, W>:Null, P](wordIndex: Index[W],
     }
   }
 
-  final class Spec(words: Seq[W]) extends Anchoring {
+  final class Spec(words: IndexedSeq[W]) extends Anchoring {
     val indexed = words.map(wordIndex).toArray
 
     def featuresForHead(rule: Int, head: Int) = {
@@ -414,20 +415,21 @@ final class LexGrammar[L, W](val grammar: BaseGrammar[L],
 
   def isRightRule(r: Int) = rightRules(r)
 
-  def anchor(sent: Seq[W]) = new Spec(sent)
+  def anchor(sent: IndexedSeq[W]) = new Spec(sent)
 
   // refinement scheme:
   // binaryRule is (head * words.length + dep)
   // unaryRule is (head)
   // parent/leftchild/rightchild is (head)
-  final class Spec(val words: Seq[W]) extends RefinedAnchoring[L, W] {
+  final class Spec(val words: IndexedSeq[W]) extends RefinedAnchoring[L, W] {
     override def annotationTag: Int = 1
 
     val grammar = LexGrammar.this.grammar
     val lexicon = LexGrammar.this.lexicon
     val indexed = words.map(wordIndex)
     private val f = fi.anchor(words)
-    val indexedValidTags: Seq[Array[Int]] = words.map(lexicon.tagsForWord(_)).map(_.map(labelIndex).toArray)
+    private val lexLoc = lexicon.anchor(words)
+    val indexedValidTags: IndexedSeq[Array[Int]] = (0 until words.length).map(lexLoc.tagsForWord(_)).map(_.toArray)
 
     private def dot(features: Array[Int]) = {
       var i = 0
@@ -767,14 +769,11 @@ case class LexModelFactory(baseParser: ParserParams.XbarGrammar,
     val shapeGen = new SimpleWordShapeGen(initLexicon, summedCounts)
     val tagShapeGen = new TagAwareWordShapeFeaturizer(initLexicon)
 
-    val lexicon:Lexicon[AnnotatedLabel, String] = initLexicon
-
     val baseFactory = RefinedGrammar.generative(xbarGrammar,
       xbarLexicon, initBinaries, initUnaries, initLexicon)
     val cFactory = constraints.cachedFactory(AugmentedGrammar.fromRefined(baseFactory))
 
     def ruleGen(r: Rule[AnnotatedLabel]) = IndexedSeq(RuleFeature(r))
-    def validTag(w: String) = lexicon.tagsForWord(w).toArray
 
     val headFinder = HeadFinder.collins
     val feat = new StandardFeaturizer(wordIndex,
@@ -782,7 +781,7 @@ case class LexModelFactory(baseParser: ParserParams.XbarGrammar,
     xbarGrammar.index,
     ruleGen,
     shapeGen,
-    { (w:Seq[String], pos: Int) => tagShapeGen.featuresFor(w, pos)})
+    { (w:IndexedSeq[String], pos: Int) => tagShapeGen.featuresFor(w, pos)})
 
     val indexed =  IndexedLexFeaturizer.extract[AnnotatedLabel, String](feat,
       headFinder,
@@ -800,7 +799,7 @@ case class LexModelFactory(baseParser: ParserParams.XbarGrammar,
 
     val featureCounter = readWeights(oldWeights)
 
-    def reannotate(tree: BinarizedTree[AnnotatedLabel], words: Seq[String]) = tree.map(_.baseAnnotatedLabel)
+    def reannotate(tree: BinarizedTree[AnnotatedLabel], words: IndexedSeq[String]) = tree.map(_.baseAnnotatedLabel)
     val model = new LexModel[AnnotatedLabel, String](bundle, reannotate, indexed, cFactory, xbarGrammar, xbarLexicon, {featureCounter.get(_)})
 
     model

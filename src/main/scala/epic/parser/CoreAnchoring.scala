@@ -16,6 +16,7 @@ package epic.parser
 */
 
 import breeze.inference.Factor
+import epic.lexicon.Lexicon
 
 /**
  * [[epic.parser.CoreAnchoring]] score rules and labels in a particular context
@@ -28,7 +29,7 @@ import breeze.inference.Factor
 trait CoreAnchoring[L, W] extends Factor[CoreAnchoring[L, W]] {
   def grammar: BaseGrammar[L]
   def lexicon: Lexicon[L, W]
-  def words: Seq[W]
+  def words: IndexedSeq[W]
 
   def sparsityPattern = ParseChart.SparsityPattern.noSparsity(grammar.labelIndex, words.length)
 
@@ -109,7 +110,7 @@ object CoreAnchoring {
    */
   def identity[L, W](grammar: BaseGrammar[L],
                      lexicon: Lexicon[L, W],
-                     words: Seq[W]):CoreAnchoring[L, W] = {
+                     words: IndexedSeq[W]):CoreAnchoring[L, W] = {
     new Identity(grammar, lexicon, words)
   }
 
@@ -123,7 +124,7 @@ object CoreAnchoring {
    * @return
    */
   @SerialVersionUID(1L)
-  case class Identity[L, W](grammar: BaseGrammar[L], lexicon: Lexicon[L, W], words: Seq[W]) extends CoreAnchoring[L, W] {
+  case class Identity[L, W](grammar: BaseGrammar[L], lexicon: Lexicon[L, W], words: IndexedSeq[W]) extends CoreAnchoring[L, W] {
 
     def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = 0.0
 

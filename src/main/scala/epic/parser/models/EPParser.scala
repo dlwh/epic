@@ -19,6 +19,7 @@ package models
 import breeze.linalg._
 import epic.framework.{EPModel, EPInference}
 import epic.trees.{TreeInstance, BinarizedTree}
+import epic.lexicon.Lexicon
 
 /**
  * Parser that runs EP using the EPInference object and extracts a parse
@@ -28,7 +29,7 @@ import epic.trees.{TreeInstance, BinarizedTree}
 class EPParser[L, W](grammar: BaseGrammar[L],
                      lexicon: Lexicon[L, W],
                      inference: EPInference[TreeInstance[L, W], CoreAnchoring[L, W]]) extends Parser[L, W] with Serializable {
-  def bestParse(s: Seq[W]) = {
+  def bestParse(s: IndexedSeq[W]) = {
     val inst = new TreeInstance[L, W]("", null, s)
     val augment = inference.marginal(inst, inference.baseAugment(inst))
     val marg = augment
@@ -61,7 +62,7 @@ object EPParser {
     val infs = grammars.map {
       p =>
         new AnnotatedParserInference(null, {
-          (a: BinarizedTree[L], b: Seq[W]) => a.map(_ -> 0)
+          (a: BinarizedTree[L], b: IndexedSeq[W]) => a.map(_ -> 0)
         },
         p,
         base)

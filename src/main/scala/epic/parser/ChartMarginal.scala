@@ -60,11 +60,12 @@ case class ChartMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
     if(logPartition.isInfinite) throw new RuntimeException("No parse for " + words)
     val itop = inside.top
 
+    val lexLoc = lexicon.anchor(words)
+
     // handle lexical
     for (i <- 0 until words.length) {
       for {
-        aa <- lexicon.tagsForWord(words(i))
-        a = grammar.labelIndex(aa)
+        a <- lexLoc.tagsForWord(i)
         ref <- anchoring.refined.validLabelRefinements(i, i+ 1, a)
       } {
         val score:Double = anchoring.scoreSpan(i, i+1, a, ref) + outside.bot(i, i+1, a, ref) - logPartition
@@ -187,12 +188,12 @@ case class ChartMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
 object ChartMarginal {
 
   def apply[L, W, Chart[X] <: ParseChart[X]](grammar: AugmentedGrammar[L, W],
-                                             sent: Seq[W]): ChartMarginal[L, W] = {
+                                             sent: IndexedSeq[W]): ChartMarginal[L, W] = {
     apply(grammar.anchor(sent), sent)
   }
 
   def apply[L, W, Chart[X] <: ParseChart[X]](anchoring: AugmentedAnchoring[L, W],
-                                             sent: Seq[W]): ChartMarginal[L, W] = {
+                                             sent: IndexedSeq[W]): ChartMarginal[L, W] = {
     val (inside, spanScores) = buildInsideChart(anchoring, sent)
     val outside = buildOutsideChart(anchoring, inside, spanScores)
     val logPartition = rootScore(anchoring, inside)
@@ -218,7 +219,7 @@ object ChartMarginal {
 
   // first parse chart is the inside scores, second parse chart is span scores for spans that were computed.
   private def buildInsideChart[L, W, Chart[X] <: ParseChart[X]](anchoring: AugmentedAnchoring[L, W],
-                                                                words: Seq[W]): (ParseChart[L], ParseChart[L]) = {
+                                                                words: IndexedSeq[W]): (ParseChart[L], ParseChart[L]) = {
     val refined = anchoring.refined
     val core = anchoring.core
 
@@ -233,11 +234,13 @@ object ChartMarginal {
       Array.tabulate(grammar.labelIndex.size)(refined.numValidRefinements),
       words.length,
       core.sparsityPattern)
+    val lexLoc = lexicon.anchor(words)
+
+    // handle lexical
     for{i <- 0 until words.length} {
       var foundSomething = false
       for {
-        aa <- lexicon.tagsForWord(words(i))
-        a = grammar.labelIndex(aa)
+        a <- lexLoc.tagsForWord(i)
         coreScore = core.scoreSpan(i, i+1, a) if coreScore != Double.NegativeInfinity
         ref <- refined.validLabelRefinements(i, i+1, a)
       } {

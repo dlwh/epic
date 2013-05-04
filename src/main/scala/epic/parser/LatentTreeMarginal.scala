@@ -29,7 +29,7 @@ import java.util
  */
 
 case class LatentTreeMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
-                                    tree: BinarizedTree[(L, Seq[Int])]) extends ParseMarginal[L, W] {
+                                    tree: BinarizedTree[(L, IndexedSeq[Int])]) extends ParseMarginal[L, W] {
 
   private val stree = insideScores()
   outsideScores(stree)
@@ -238,7 +238,7 @@ case class LatentTreeMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
         }
         lchild.label.scaleOutside(t.label.oscale + rchild.label.iscale)
         rchild.label.scaleOutside(t.label.oscale + lchild.label.iscale)
-      case tree: NullaryTree[Seq[Int]] => () // do nothing
+      case tree: NullaryTree[IndexedSeq[Int]] => () // do nothing
       case t @ UnaryTree(_, child, chain, span) =>
         val a = t.label.label
         val c = child.label.label
@@ -276,21 +276,21 @@ object LatentTreeMarginal {
   }
 
   def apply[L, W](grammar: AugmentedGrammar[L, W],
-                  words: Seq[W],
-                  tree: BinarizedTree[(L,Seq[Int])]):LatentTreeMarginal[L, W] = {
+                  words: IndexedSeq[W],
+                  tree: BinarizedTree[(L,IndexedSeq[Int])]):LatentTreeMarginal[L, W] = {
     LatentTreeMarginal(grammar.anchor(words), tree)
   }
 
   def apply[L, L2, W](grammar: AugmentedGrammar[L, W],
                       ref: ProjectionIndexer[L, L2],
-                      words: Seq[W],
+                      words: IndexedSeq[W],
                       tree: BinarizedTree[L]):LatentTreeMarginal[L, W] = {
     apply(grammar.anchor(words), ref, tree)
   }
 
 
   case class Beliefs[L](label: Int,
-                   candidates: Seq[Int],
+                   candidates: IndexedSeq[Int],
                    inside: Array[Double],
                    var iscale: Int,
                    outside: Array[Double],
@@ -309,7 +309,7 @@ object LatentTreeMarginal {
   }
 
   object Beliefs {
-    def apply[L](label: Int, candidates: Seq[Int]):Beliefs[L] = {
+    def apply[L](label: Int, candidates: IndexedSeq[Int]):Beliefs[L] = {
       val r = new Beliefs[L](label, candidates, new Array[Double](candidates.length), 0, new Array[Double](candidates.length), 0)
 //      Arrays.fill(r.inside, Double.NegativeInfinity)
 //      Arrays.fill(r.outside, Double.NegativeInfinity)

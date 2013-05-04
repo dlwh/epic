@@ -17,7 +17,8 @@ package epic.parser.repl
 */
 import breeze.linalg._
 import epic.trees.{LexicalProduction, Rule, BinaryRule, UnaryRule}
-import epic.parser.{RefinedGrammar, UnsmoothedLexicon, BaseGrammar, AugmentedGrammar}
+import epic.parser.{RefinedGrammar, BaseGrammar, AugmentedGrammar}
+import epic.lexicon.UnsmoothedLexicon
 
 /**
  * A DSL Grammar allows us to define simple weighted PCFG's quickly.
@@ -40,7 +41,7 @@ object DSLGrammar {
 
 
     val grammar = BaseGrammar("S", binaryProductions, unaryProductions)
-    val unsmoothed = new UnsmoothedLexicon(lexicon.keysIterator.map{ case (k,v) => LexicalProduction(k,v)}.toSet)
+    val unsmoothed = new UnsmoothedLexicon(grammar.labelIndex, lexicon.keySet.toSet)
     AugmentedGrammar.fromRefined(RefinedGrammar.generative(grammar, unsmoothed, binaryProductions, unaryProductions, lexicon))
   }
 

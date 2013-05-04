@@ -2,6 +2,7 @@ package epic.parser
 
 import epic.parser.ParseChart.SparsityPattern
 import projections.ConstraintAnchoring
+import epic.lexicon.Lexicon
 
 /*
  Copyright 2012 David Hall
@@ -33,7 +34,7 @@ final case class AugmentedGrammar[L, W](refined: RefinedGrammar[L, W], core: Cor
   assert(grammar.eq(core.grammar) || grammar == core.grammar, "Grammars of core and refined do not match!")
   assert(lexicon.eq(core.lexicon) || lexicon == core.lexicon, "Lexicons of core and refined do not match!")
 
-  def anchor(words: Seq[W]): AugmentedAnchoring[L, W] = {
+  def anchor(words: IndexedSeq[W]): AugmentedAnchoring[L, W] = {
     AugmentedAnchoring[L, W](refined.anchor(words), core.anchor(words))
   }
 

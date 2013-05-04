@@ -16,12 +16,13 @@ package epic.parser.projections
  limitations under the License.
 */
 import java.io.File
-import epic.parser.{CoreAnchoring, Lexicon, BaseGrammar, CoreGrammar}
+import epic.parser.{BaseGrammar, CoreGrammar}
 import epic.parser.projections.ConstraintAnchoring.RawConstraints
+import epic.lexicon.Lexicon
 
 /**
  * A CoreGrammar that relies on a file cache, which stores
- * a Map[Seq[W], CoreAnchoring] and a backoff grammar.
+ * a Map[IndexedSeq[W], CoreAnchoring] and a backoff grammar.
  * Currently, only [[epic.parser.projections.ProjectTreebankToConstraints]]
  * creates these.
  *
@@ -36,9 +37,9 @@ class FileCachedCoreGrammar[L, W](backoff: CoreGrammar[L, W], file: File) extend
   val grammar = backoff.grammar
   val lexicon = backoff.lexicon
 
-  private val cache = breeze.util.readObject[Map[Seq[W], RawConstraints]](file)
+  private val cache = breeze.util.readObject[Map[IndexedSeq[W], RawConstraints]](file)
 
-  def anchor(words: Seq[W]) = {
+  def anchor(words: IndexedSeq[W]) = {
     cache.get(words).map(_.toAnchoring(grammar, lexicon, words)).getOrElse(backoff.anchor(words))
   }
 }

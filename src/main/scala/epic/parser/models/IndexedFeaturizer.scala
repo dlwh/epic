@@ -24,6 +24,7 @@ import breeze.collection.mutable.{ArrayMap, OpenAddressHashArray}
 import epic.trees.{TreeInstance, LexicalProduction}
 import breeze.linalg.DenseVector
 import collection.mutable.ArrayBuilder
+import epic.lexicon.Lexicon
 
 /**
  * [[epic.parser.models.IndexedFeaturizer]] are featurizers for "normal" unanchored grammars.
@@ -52,12 +53,12 @@ trait IndexedFeaturizer[L, L2, W] extends RefinedFeaturizer[L, W, Feature] with 
     ruleCache(r)
   }
 
-  def featuresFor(a: Int, w: Seq[W], pos: Int) = {
+  def featuresFor(a: Int, w: IndexedSeq[W], pos: Int) = {
     stripEncode(featurizer.featuresFor(labelIndex.get(a), w, pos))
   }
 
   def computeWeight(r: Int, weights: DenseVector[Double]): Double = dot(featuresFor(r),weights)
-  def computeWeight(l: Int, w: Seq[W], pos: Int, weights: DenseVector[Double]) = dot(featuresFor(l, w, pos), weights)
+  def computeWeight(l: Int, w: IndexedSeq[W], pos: Int, weights: DenseVector[Double]) = dot(featuresFor(l, w, pos), weights)
 
   private def dot(features: Array[Int], weights: DenseVector[Double]) = {
     var i = 0
@@ -69,7 +70,7 @@ trait IndexedFeaturizer[L, L2, W] extends RefinedFeaturizer[L, W, Feature] with 
     score
   }
 
-  def anchor(words: Seq[W]) = new Spec(words)
+  def anchor(words: IndexedSeq[W]) = new Spec(words)
 
   def initialValueFor(f: Feature): Double = featurizer.initialValueForFeature(f)
 
@@ -88,7 +89,7 @@ trait IndexedFeaturizer[L, L2, W] extends RefinedFeaturizer[L, W, Feature] with 
     result.result
   }
 
-  case class Spec private[IndexedFeaturizer](words: Seq[W]) extends super.Anchoring {
+  case class Spec private[IndexedFeaturizer](words: IndexedSeq[W]) extends super.Anchoring {
     def featuresForBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int) = {
       val globalRule = proj.rules.globalize(rule, ref)
       featuresFor(globalRule)
@@ -136,11 +137,12 @@ object IndexedFeaturizer {
     // lex
     for {
       ex <- trees
+      lexLoc = lexicon.anchor(ex.words)
       i <- 0 until ex.words.length
-      l <- lexicon.tagsForWord(ex.words(i))
+      l <- lexLoc.tagsForWord(i)
       lSplit <- indexedProjections.labels.refinementsOf(l)
     } {
-      val feats = f.featuresFor(lSplit, ex.words, i)
+      val feats = f.featuresFor(indexedProjections.labels.fineIndex.get(lSplit), ex.words, i)
       feats.foreach {featureIndex.index _ }
     }
 

@@ -22,9 +22,8 @@ import epic.trees._
  * This class just provides some objects I commonly want on the REPL.
  * @author dlwh
  */
-class ReplGrammar(treebankPath: String, isDenseTreebank:Boolean=true, binarizationKind: String = "xbar") {
-  lazy val treebank = if(isDenseTreebank) DenseTreebank.fromZipFile(new java.io.File(treebankPath))
-  else Treebank.fromPennTreebankDir(new java.io.File(treebankPath))
+class ReplGrammar(treebankPath: String, binarizationKind: String = "xbar") {
+  lazy val treebank = Treebank.fromPennTreebankDir(new java.io.File(treebankPath))
 
   val binarize = {
     val headRules = binarizationKind match {
@@ -41,8 +40,8 @@ class ReplGrammar(treebankPath: String, isDenseTreebank:Boolean=true, binarizati
   val xform = Trees.Transforms.StandardStringTransform
 
   lazy val trainTrees = IndexedSeq.empty ++ (for( (tree,words) <- treebank.train.trees.filter(_._2.length <= maxLength))
-    yield TreeInstance(words.toString(),binarize(xform(tree)),words)).toSeq
+    yield TreeInstance(words.toString(),binarize(xform(tree)),words)).toIndexedSeq
 
   lazy val devTrees = IndexedSeq.empty ++ (for( (tree,words) <- treebank.dev.trees.filter(_._2.length <= maxLength))
-    yield TreeInstance(words.toString(),binarize(xform(tree)),words)).toSeq
+    yield TreeInstance(words.toString(),binarize(xform(tree)),words)).toIndexedSeq
 }

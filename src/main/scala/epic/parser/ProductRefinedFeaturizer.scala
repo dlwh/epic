@@ -27,7 +27,7 @@ class ProductRefinedFeaturizer[L, W, Feat1, Feat2](sf1: RefinedGrammar[L, W],
                                         feat2: RefinedFeaturizer[L, W, Feat2]) extends RefinedFeaturizer[L, W, Either[Feat1, Feat2]] {
   def index: EitherIndex[Feat1, Feat2] = feat1.index | feat2.index
 
-  def anchor(w: Seq[W]):Anchoring = {
+  def anchor(w: IndexedSeq[W]):Anchoring = {
     val s1 = sf1.anchor(w)
     val s2 = sf2.anchor(w)
     val f1 = feat1.anchor(w)

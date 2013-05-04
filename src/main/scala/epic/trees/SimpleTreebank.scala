@@ -2,7 +2,7 @@ package epic.trees
 /*
  Copyright 2012 David Hall
 
- Licensed under the Apache License, Version 2.0 (the "License");
+ Licensed under the Apache License, Version 2.0 (the "License")
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
 
@@ -29,38 +29,38 @@ class SimpleTreebank(trainUrls: Map[String,URL],
     this(Map(train.getName -> train.toURI.toURL),
       Map(dev.getName -> dev.toURI.toURL),
       Map(test.getName -> test.toURI.toURL))
-  };
+  }
 
   def treesFromSection(sec: String) = {
-    val url = (trainUrls orElse devUrls orElse testUrls)(sec) ;
-    val stream = url.openStream();
-    val pennReader = new PennTreeReader(new InputStreamReader(stream));
+    val url = (trainUrls orElse devUrls orElse testUrls)(sec)
+    val stream = url.openStream()
+    val pennReader = new PennTreeReader(new InputStreamReader(stream))
     pennReader
   }
 
-  val train = Portion("train", trainUrls.keys.toSeq)
-  val test =  Portion("test", testUrls.keys.toSeq);
-  val dev =  Portion("dev", devUrls.keys.toSeq);
+  val train = Portion("train", trainUrls.keys.toIndexedSeq)
+  val test =  Portion("test", testUrls.keys.toIndexedSeq)
+  val dev =  Portion("dev", devUrls.keys.toIndexedSeq)
 
-  val sections = train.sections ++ test.sections ++ dev.sections;
+  val sections = train.sections ++ test.sections ++ dev.sections
 }
 
 object SimpleTreebank {
   def writeSimpleTreebank(trees: Treebank[String], dir: File) = {
-    dir.mkdirs();
-    def writeToFile(file: File, trees: Iterator[(Tree[String],Seq[String])]) = {
-      val outTrain = new PrintStream(new BufferedOutputStream(new FileOutputStream(file)));
+    dir.mkdirs()
+    def writeToFile(file: File, trees: Iterator[(Tree[String],IndexedSeq[String])]) = {
+      val outTrain = new PrintStream(new BufferedOutputStream(new FileOutputStream(file)))
       for( (tree,words) <- trees) {
-        outTrain.println(Trees.Transforms.StandardStringTransform(tree).render(words,false));
+        outTrain.println(Trees.Transforms.StandardStringTransform(tree).render(words,false))
       }
 
-      outTrain.close();
+      outTrain.close()
     }
-    writeToFile(new File(dir,"train"),trees.train.trees);
-    writeToFile(new File(dir,"dev"),trees.dev.trees);
-    writeToFile(new File(dir,"test"),trees.test.trees);
+    writeToFile(new File(dir,"train"),trees.train.trees)
+    writeToFile(new File(dir,"dev"),trees.dev.trees)
+    writeToFile(new File(dir,"test"),trees.test.trees)
 
-    new SimpleTreebank(new File(dir,"train"),new File(dir,"dev"), new File(dir,"test"));
+    new SimpleTreebank(new File(dir,"train"),new File(dir,"dev"), new File(dir,"test"))
 
   }
 }

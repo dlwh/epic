@@ -19,7 +19,7 @@ import epic.sequences.TaggedSequence
 
 case class TreeInstance[L, +W](id: String,
                                tree: BinarizedTree[L],
-                               words: Seq[W]) extends Example[Tree[L], Seq[W]] {
+                               words: IndexedSeq[W]) extends Example[Tree[L], Seq[W]] {
 
   def mapLabels[U](f: L => U) = copy(tree = tree.map(f))
 

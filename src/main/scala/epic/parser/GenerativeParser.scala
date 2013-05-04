@@ -23,6 +23,7 @@ import breeze.linalg.Counter2
 import breeze.text.analyze.EnglishWordClassGenerator
 import breeze.config.Help
 import epic.parser.ParserParams.XbarGrammar
+import epic.lexicon.{Lexicon, SimpleLexicon}
 
 /**
  * Contains codes to read off parsers and grammars from
@@ -30,19 +31,19 @@ import epic.parser.ParserParams.XbarGrammar
  */
 object GenerativeParser {
   /**
-   * Extracts a [[epic.parser.BaseGrammar]] and [[epic.parser.Lexicon]]
+   * Extracts a [[epic.parser.BaseGrammar]] and [[epic.lexicon.Lexicon]]
    * from a treebank
    * @param data the treebank
    * @return
    */
-  def extractLexiconAndGrammar(data: Traversable[TreeInstance[AnnotatedLabel, String]]): (SignatureLexicon[AnnotatedLabel, String], BaseGrammar[AnnotatedLabel]) = {
+  def extractLexiconAndGrammar(data: Traversable[TreeInstance[AnnotatedLabel, String]]): (Lexicon[AnnotatedLabel, String], BaseGrammar[AnnotatedLabel]) = {
     val root = data.head.tree.label
     val (words, binary, unary) = extractCounts(data)
     val grammar = BaseGrammar(root,
       binary.keysIterator.map(_._2) ++ unary.keysIterator.map(_._2)
     )
 
-    val lexicon = new SignatureLexicon(words, EnglishWordClassGenerator)
+    val lexicon = new SimpleLexicon(grammar.labelIndex, words)
     (lexicon, grammar)
   }
 

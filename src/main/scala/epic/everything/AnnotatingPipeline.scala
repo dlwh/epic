@@ -2,7 +2,7 @@ package epic.everything
 
 import java.io.File
 import epic.trees._
-import epic.parser.{SimpleRefinedGrammar, Lexicon, GenerativeParser, ParserParams}
+import epic.parser.{SimpleRefinedGrammar, GenerativeParser, ParserParams}
 import epic.parser.ParserParams.XbarGrammar
 import breeze.config.{Help, CommandLineParser}
 import epic.ontonotes.{NERType, ConllOntoReader}
@@ -26,6 +26,7 @@ import epic.parser.models.LexGrammarBundle
 import collection.mutable.ArrayBuffer
 import collection.immutable
 import epic.features.TagAwareWordShapeFeaturizer
+import epic.lexicon.{SimpleLexicon, Lexicon}
 
 
 /**
@@ -302,10 +303,7 @@ object AnnotatingPipeline {
     val shapeGen = new SimpleWordShapeGen(initLexicon, summedCounts)
     val tagShapeGen = new TagAwareWordShapeFeaturizer(initLexicon)
 
-    val lexicon: Lexicon[AnnotatedLabel, String] = initLexicon
-
     def ruleGen(r: Rule[AnnotatedLabel]) = IndexedSeq(RuleFeature(r))
-    def validTag(w: String) = lexicon.tagsForWord(w).toArray
 
     val headFinder = HeadFinder.collins
     val feat = new StandardFeaturizer(wordIndex,

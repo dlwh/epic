@@ -19,6 +19,7 @@ import projections.GrammarRefinements
 import epic.trees._
 import breeze.linalg._
 import collection.mutable.ArrayBuffer
+import epic.lexicon.{SimpleLexicon, Lexicon}
 
 /**
  * TODO docs
@@ -36,7 +37,7 @@ trait RefinedGrammar[L, W] extends Serializable {
   def labelIndex = grammar.labelIndex
   def labelEncoder = grammar.labelEncoder
 
-  def anchor(words: Seq[W]):RefinedAnchoring[L, W]
+  def anchor(words: IndexedSeq[W]):RefinedAnchoring[L, W]
 }
 
 object RefinedGrammar {
@@ -44,7 +45,7 @@ object RefinedGrammar {
     def grammar = f1.grammar
     def lexicon = f1.lexicon
 
-    def anchor(words: Seq[W]) = new ProductRefinedAnchoring(f1.anchor(words), f2.anchor(words))
+    def anchor(words: IndexedSeq[W]) = new ProductRefinedAnchoring(f1.anchor(words), f2.anchor(words))
   }
 
   def identity[L, W](grammar: BaseGrammar[L], lexicon: Lexicon[L, W]): RefinedGrammar[L, W] = {
@@ -55,7 +56,7 @@ object RefinedGrammar {
 
       def lexicon = l
 
-      def anchor(words: Seq[W]) = {
+      def anchor(words: IndexedSeq[W]) = {
         RefinedAnchoring.identity(grammar, lexicon, words)
       }
     }
@@ -66,7 +67,7 @@ object RefinedGrammar {
                        unaryProductions: Counter2[L, UnaryRule[L], Double],
                        wordCounts: Counter2[L, W, Double]):SimpleRefinedGrammar[L, L, W] = {
     val grammar = BaseGrammar(root, binaryProductions.keysIterator.map(_._2) ++ unaryProductions.keysIterator.map(_._2))
-    val lexicon = new SimpleLexicon[L, W](wordCounts)
+    val lexicon = new SimpleLexicon[L, W](grammar.labelIndex, wordCounts)
 
     generative(grammar, lexicon,  binaryProductions, unaryProductions, wordCounts)
   }

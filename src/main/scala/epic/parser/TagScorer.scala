@@ -22,11 +22,11 @@ import breeze.linalg._
  * @author dlwh
  */
 trait TagScorer[L, W] extends Serializable {
-  def scoreTag(l: L, words: Seq[W], pos: Int):Double
+  def scoreTag(l: L, words: IndexedSeq[W], pos: Int):Double
 }
 
 class SimpleTagScorer[L, W](counts: Counter2[L, W, Double]) extends TagScorer[L, W] {
-  def scoreTag(l: L, words: Seq[W], pos: Int) = {
+  def scoreTag(l: L, words: IndexedSeq[W], pos: Int) = {
     val w = words(pos)
     var cWord = wordCounts(w)
     var cTagWord = counts(l, w)

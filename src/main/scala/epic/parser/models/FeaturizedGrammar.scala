@@ -16,9 +16,9 @@ package epic.parser.models
  limitations under the License.
 */
 import breeze.linalg._
-import epic.trees.{BinaryRule, UnaryRule}
 import epic.parser.projections.GrammarRefinements
-import epic.parser.{TagScorer, Lexicon, RefinedGrammar, BaseGrammar}
+import epic.parser.{TagScorer, RefinedGrammar, BaseGrammar}
+import epic.lexicon.Lexicon
 
 object FeaturizedGrammar {
   def apply[L, L2, W](xbar: BaseGrammar[L],

@@ -27,11 +27,11 @@ case class ProjectingCoreGrammar[L, W](parser: AugmentedGrammar[L, W],
 
   def lexicon = parser.lexicon
 
-  def anchor(words: Seq[W]) = {
+  def anchor(words: IndexedSeq[W]) = {
     project(words)
   }
 
-  def project(s: Seq[W], goldTagPolicy: GoldTagPolicy[L] = GoldTagPolicy.noGoldTags) = {
+  def project(s: IndexedSeq[W], goldTagPolicy: GoldTagPolicy[L] = GoldTagPolicy.noGoldTags) = {
     val charts = ChartMarginal(parser, s)
 
     projector.project(charts, goldTagPolicy)

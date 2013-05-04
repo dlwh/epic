@@ -29,6 +29,7 @@ import projections.ConstraintCoreGrammar.PruningStatistics
 import breeze.linalg.DenseVector
 import epic.parser.ParseChart.SparsityPattern
 import java.util
+import epic.lexicon.Lexicon
 
 /**
  * 
@@ -37,7 +38,7 @@ import java.util
 @SerialVersionUID(2L)
 class ConstraintAnchoring[L, W](val grammar: BaseGrammar[L],
                              val lexicon: Lexicon[L, W],
-                             val words: Seq[W],
+                             val words: IndexedSeq[W],
                              override val sparsityPattern: SparsityPattern) extends CoreAnchoring[L, W] with Serializable {
   def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = 0.0
 
@@ -54,7 +55,7 @@ class ConstraintAnchoring[L, W](val grammar: BaseGrammar[L],
 object ConstraintAnchoring {
   @SerialVersionUID(2)
   case class RawConstraints(sparsity: ParseChart.SparsityPattern) {
-    def toAnchoring[L, W](grammar: BaseGrammar[L], lexicon: Lexicon[L, W], words: Seq[W]) = {
+    def toAnchoring[L, W](grammar: BaseGrammar[L], lexicon: Lexicon[L, W], words: IndexedSeq[W]) = {
       new ConstraintAnchoring(grammar, lexicon, words, sparsity)
     }
   }
@@ -73,7 +74,7 @@ class ConstraintCoreGrammar[L, W](val augmentedGrammar: AugmentedGrammar[L, W], 
   private val synthetics = BitSet.empty ++ (0 until grammar.labelIndex.size).filter(l => isIntermediate(labelIndex.get(l)))
 
 
-  def anchor(words: Seq[W]): ConstraintAnchoring[L, W] = {
+  def anchor(words: IndexedSeq[W]): ConstraintAnchoring[L, W] = {
     val chartScorer = this.buildConstraints(words, GoldTagPolicy.noGoldTags[L])
     chartScorer
   }
@@ -86,14 +87,14 @@ class ConstraintCoreGrammar[L, W](val augmentedGrammar: AugmentedGrammar[L, W], 
     new ConstraintAnchoring[L, W](charts.anchoring.grammar, charts.anchoring.lexicon, charts.anchoring.words, sparsity)
   }
 
-  def buildConstraints(words: Seq[W],
+  def buildConstraints(words: IndexedSeq[W],
                        goldTags: GoldTagPolicy[L]):ConstraintAnchoring[L, W] = {
 
     val charts = ChartMarginal(augmentedGrammar, words)
     buildConstraints(charts, goldTags)
   }
 
-  def rawConstraints(words: Seq[W], gold: GoldTagPolicy[L] = GoldTagPolicy.noGoldTags):RawConstraints = {
+  def rawConstraints(words: IndexedSeq[W], gold: GoldTagPolicy[L] = GoldTagPolicy.noGoldTags):RawConstraints = {
     val charts = ChartMarginal(augmentedGrammar, words)
     rawConstraints(charts, gold)
   }
@@ -144,7 +145,7 @@ class ConstraintCoreGrammar[L, W](val augmentedGrammar: AugmentedGrammar[L, W], 
     }.data
   }
 
-  def computePruningStatistics(words: Seq[W], gold: GoldTagPolicy[L]): (PruningStatistics, PruningStatistics) = {
+  def computePruningStatistics(words: IndexedSeq[W], gold: GoldTagPolicy[L]): (PruningStatistics, PruningStatistics) = {
     val charts = ChartMarginal(augmentedGrammar, words)
     computePruningStatistics(charts, gold)
   }
@@ -296,7 +297,7 @@ object ProjectTreebankToConstraints {
     val train = mapTrees(factory, treebank.trainTrees, parser.grammar.labelIndex, useTree = true, maxL = params.maxParseLength)
     val test = mapTrees(factory, treebank.testTrees, parser.grammar.labelIndex, useTree = false, maxL = 10000)
     val dev = mapTrees(factory, treebank.devTrees, parser.grammar.labelIndex, useTree = false, maxL = 10000)
-    val map: Map[Seq[String], RawConstraints] = Map.empty ++ train ++ test ++ dev
+    val map: Map[IndexedSeq[String], RawConstraints] = Map.empty ++ train ++ test ++ dev
     breeze.util.writeObject(out, map)
   }
 
@@ -308,12 +309,12 @@ object ProjectTreebankToConstraints {
   def mapTrees(factory: ConstraintCoreGrammar[AnnotatedLabel, String],
                trees: IndexedSeq[TreeInstance[AnnotatedLabel, String]],
                index: Index[AnnotatedLabel],
-               useTree: Boolean, maxL: Int): Seq[(Seq[String], RawConstraints)] = {
-    trees.toIndexedSeq.par.flatMap { (ti:TreeInstance[AnnotatedLabel, String]) =>
+               useTree: Boolean, maxL: Int): IndexedSeq[(IndexedSeq[String], RawConstraints)] = {
+    trees.par.flatMap { (ti:TreeInstance[AnnotatedLabel, String]) =>
       val TreeInstance(id, tree, words) = ti
       println(id, words)
       if(words.length > maxL) {
-        Seq.empty
+        IndexedSeq.empty
       } else  try {
         val policy = if(useTree) {
           GoldTagPolicy.goldTreeForcing[AnnotatedLabel](tree.map(_.baseAnnotatedLabel).map(index))
@@ -321,12 +322,12 @@ object ProjectTreebankToConstraints {
           GoldTagPolicy.noGoldTags[AnnotatedLabel]
         }
         val scorer = factory.rawConstraints(words, policy)
-        Seq(words -> scorer)
+        IndexedSeq(words -> scorer)
       } catch {
         case e: Exception => e.printStackTrace()
-        Seq.empty[(Seq[String],RawConstraints)]
+        IndexedSeq.empty[(IndexedSeq[String],RawConstraints)]
       }
-    }.seq
+    }.seq.toIndexedSeq
   }
 
 
