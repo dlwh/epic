@@ -41,7 +41,8 @@ class WordShapeFeaturizer(wordCounts: Counter[String, Double], minCountUnknown: 
     if(wc > minCountUnknown) {
       ArrayBuffer(IndicatorFeature(w))
     } else {
-      features += IndicatorFeature(w)
+      if(wc > 2)
+        features += IndicatorFeature(w)
 //      features += ShapeFeature(WordShapeGenerator(w))
 //      features += SignatureFeature(signatureGenerator.signatureFor(w))
 

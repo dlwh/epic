@@ -1,16 +1,11 @@
 package epic.sequences
 
 import breeze.util.Index
-import epic.trees.Span
 import breeze.numerics
-import breeze.linalg.{DenseMatrix, DenseVector}
+import breeze.linalg.DenseVector
 import epic.framework.{ModelObjective, Feature}
 import java.util
 import collection.mutable.ArrayBuffer
-import util.concurrent.ConcurrentHashMap
-import collection.immutable.BitSet
-import breeze.collection.mutable.TriangularArray
-import java.io.{ObjectInputStream, IOException}
 import breeze.optimize.FirstOrderMinimizer.OptParams
 import breeze.optimize.CachedBatchDiffFunction
 import breeze.features.FeatureVector
@@ -49,6 +44,7 @@ object CRF {
                      gazetteer: Gazetteer[Any, String] = Gazetteer.empty[Any, String],
                      opt: OptParams = OptParams()):CRF[L, String] = {
     val model: CRFModel[L, String] = new TaggedSequenceModelFactory[L](startSymbol,  gazetteer = gazetteer).makeModel(data)
+    println(opt.maxIterations)
 
     val obj = new ModelObjective(model, data)
     val cached = new CachedBatchDiffFunction(obj)
@@ -318,8 +314,8 @@ object CRF {
         var currentMax = Double.NegativeInfinity
         var currentArgMax = -1
 
-        for ( previous <- if(i == 0) IndexedSeq(scorer.labelIndex(scorer.startSymbol)) else scorer.validSymbols(i-1)) {
-          val score = scorer.scoreTransition(i, previous, next)
+        for ( previous <- scorer.validSymbols(i-1)) {
+          val score = scorer.scoreTransition(i, previous, next) + forwardScores(i)(previous)
           if(score > currentMax) {
             currentMax = score
             currentArgMax = previous

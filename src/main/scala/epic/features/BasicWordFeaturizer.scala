@@ -6,6 +6,7 @@ import epic.framework.Feature
 import scala.collection.mutable.ArrayBuffer
 import breeze.text.analyze.{WordShapeGenerator, EnglishWordClassGenerator}
 import epic.sequences.Gazetteer
+import epic.parser.features.IndicatorFeature
 
 
 /**
@@ -16,7 +17,7 @@ class BasicWordFeaturizer(tagWordCounts: Counter2[_, String, Double],
                           wordCounts: Counter[String, Double],
                           gazetteer: Gazetteer[Any, String] = Gazetteer.empty,
                           noShapeThreshold: Int = 100,
-                          minCountThreshold: Int = 2)  {
+                          minCountThreshold: Int = 5)  {
   def anchor(words: IndexedSeq[String]): Anchoring = new Anchoring(words)
   def featureIndex:Index[Feature] = _featureIndex
 
@@ -28,7 +29,7 @@ class BasicWordFeaturizer(tagWordCounts: Counter2[_, String, Double],
   private val boundaryFeatures = Array[Int](_featureIndex.index(BoundaryFeature))
   private def addToIndex(s: String, kind: Symbol) = _featureIndex.index(WordFeature(s, kind))
 
-  private val wordFeatures = Encoder.fromIndex(wordIndex).tabulateArray(addToIndex(_, 'Word))
+  private val wordFeatures = Encoder.fromIndex(wordIndex).tabulateArray(s => if(wordCounts(s) > minCountThreshold) _featureIndex.index(IndicatorFeature(s)) else LowCountFeature)
   private val classes = Encoder.fromIndex(wordIndex).tabulateArray(w => if(wordCounts(w) > noShapeThreshold) wordFeatures(wordIndex(w)) else addToIndex(EnglishWordClassGenerator(w), 'Class))
   private val shapes =  Encoder.fromIndex(wordIndex).tabulateArray(w => if(wordCounts(w) > noShapeThreshold) wordFeatures(wordIndex(w)) else addToIndex(WordShapeGenerator(w), 'Shape))
 
@@ -43,14 +44,13 @@ class BasicWordFeaturizer(tagWordCounts: Counter2[_, String, Double],
     else Array(shape, classe, LowCountFeature)
   }
 
-  private val inner = new WordShapeFeaturizer(wordCounts, minCountThreshold)
+  private val inner = new WordShapeFeaturizer(wordCounts)
   private val fullFeatures = Array.tabulate(wordIndex.size) {i =>
     inner.apply(wordIndex.get(i)).map(_featureIndex.index(_)) ++ gazetteer.lookupWord(wordIndex.get(i)).map(f => _featureIndex.index(WordFeature(f, 'WordSeenInSegment)))
   }
 
   class Anchoring(words: IndexedSeq[String]) {
     private val indices = words.map(wordIndex(_))
-    private val counts = words.map(wordCounts(_))
 
     def basicFeatures(pos: Int): Array[Int] = {
       if(pos < 0 || pos >= words.length) boundaryFeatures

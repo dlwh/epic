@@ -251,6 +251,7 @@ object ChartMarginal {
           foundSomething = true
         }
       }
+      if(!foundSomething) error(s"$i $words ${lexLoc.tagsForWord(i)}")
 
       updateInsideUnaries(inside, anchoring,  i, i+1)
     }

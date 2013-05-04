@@ -17,10 +17,10 @@ object POSTagger {
     val params = CommandLineParser.readIn[Params](args)
     import params._
     val train = treebank.trainTrees.map(_.toTaggedSequence)
-    val test = treebank.testTrees.map(_.toTaggedSequence)
+    val test = treebank.devTrees.map(_.toTaggedSequence)
 
     val crf = CRF.buildSimple(train, AnnotatedLabel("TOP"), opt = opt)
-    for(ex <- test) {
+    for(ex <- train) {
       println(ex.words)
       println("Gold: " + ex.tags)
       println("Guess: " + crf.bestSequence(ex.words, ex.id).label)

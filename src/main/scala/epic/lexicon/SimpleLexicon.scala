@@ -4,6 +4,8 @@ import breeze.linalg._
 import java.io.ObjectStreamException
 import breeze.util.Index
 import epic.trees.LexicalProduction
+import scala.collection.immutable.BitSet
+import scala.collection.mutable
 
 /**
  * A simple lexicon that thresholds to decide when to open up the rare word to all (open) tags
@@ -18,21 +20,26 @@ class SimpleLexicon[L, W](val labelIndex: Index[L],
   private val wordCounts:Counter[W, Double] = sum(wordTagCounts, Axis._0)
   private val labelCounts:Counter[L, Double] = sum(wordTagCounts, Axis._1)
 
-  private val byWord = collection.mutable.Map.empty[W, Set[Int]] ++ wordTagCounts.keySet.groupBy(_._2).mapValues(_.map(pair => labelIndex(pair._1)))
+  private val byWord: mutable.Map[W, Set[Int]] = mutable.Map.empty[W, Set[Int]] ++ wordTagCounts.keySet.groupBy(_._2).mapValues(_.map(pair => labelIndex(pair._1)).toSet)
 
-  private val openTags = labelCounts.keysIterator.filter(l => wordTagCounts(l, ::).size > openTagThreshold).toSet.map((l:L) => labelIndex(l))
+  private val openTags: Set[Int] = {
+    val set = labelCounts.keysIterator.filter(l => wordTagCounts(l, ::).size > openTagThreshold).toSet.map((l:L) => labelIndex(l))
+    if(set.isEmpty) BitSet.empty ++ (0 until labelIndex.size)
+    else set
+  }
 
   for( (w,v) <- wordCounts.iterator if v < closedWordThreshold) {
     byWord.get(w) match {
-      case None => byWord(w) = collection.mutable.Set() ++= openTags
+      case None => byWord(w) = openTags
       case Some(set) => byWord(w) = set ++ openTags
     }
   }
 
   def knownLexicalProductions = for( (w,set) <- byWord.iterator; l <- set.iterator) yield LexicalProduction(labelIndex.get(l), w)
 
-  def anchor(w: IndexedSeq[W]) = new Localization {
-    def tagsForWord(pos: Int): Set[Int] = byWord.getOrElse(w(pos), Set.empty).toSet
+  def anchor(w: IndexedSeq[W]):Localization = new Localization {
+    val x = Array.tabulate(w.length)(pos =>byWord.getOrElse(w(pos), openTags))
+    def tagsForWord(pos: Int): Set[Int] = x(pos)
   }
 
 

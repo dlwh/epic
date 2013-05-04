@@ -6,6 +6,10 @@ import breeze.linalg._
 import breeze.text.analyze.{WordShapeGenerator, EnglishWordClassGenerator}
 import epic.sequences.Gazetteer
 import scala.collection.mutable.ArrayBuffer
+import breeze.io.TextWriter.PrintStreamWriter
+import java.io.{FileWriter, PrintWriter}
+import com.sun.xml.internal.ws.wsdl.writer.document.OpenAtts
+import breeze.collection.mutable.OpenAddressHashArray
 
 /**
  *
@@ -81,6 +85,9 @@ object IndexedWordFeaturizer {
 
     val feat = new BasicWordFeaturizer(tagWordCounts, wordCounts, gazetteer)
     val basicFeatureIndex = feat.featureIndex
+    val out = new PrintWriter(new FileWriter("index.txt"))
+    basicFeatureIndex foreach {out.println _}
+    out.close()
 
     // for left and right
     val asLeftFeatures = new Array[Int](basicFeatureIndex.size)
@@ -91,9 +98,10 @@ object IndexedWordFeaturizer {
       asRightFeatures(fi) = featureIndex.index(NextWordFeature(f))
     }
 
-    val prevCurBigramFeatures = Array.fill(basicFeatureIndex.size, basicFeatureIndex.size)(-1)
-    val curNextBigramFeatures = Array.fill(basicFeatureIndex.size, basicFeatureIndex.size)(-1)
-    val prevNextBigramFeatures = Array.fill(basicFeatureIndex.size, basicFeatureIndex.size)(-1)
+    println(basicFeatureIndex.size -> (basicFeatureIndex.size * basicFeatureIndex.size))
+    val prevCurBigramFeatures = Array.fill(basicFeatureIndex.size)(new OpenAddressHashArray[Int](basicFeatureIndex.size, default= -1))
+    val curNextBigramFeatures = Array.fill(basicFeatureIndex.size)(new OpenAddressHashArray[Int](basicFeatureIndex.size, default= -1))
+    val prevNextBigramFeatures = Array.fill(basicFeatureIndex.size)(new OpenAddressHashArray[Int](basicFeatureIndex.size, default= -1))
 
     for(words <- corpus) {
       val anch = feat.anchor(words.map(_._2))

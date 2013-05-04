@@ -13,6 +13,8 @@ import scala.collection.immutable
 import breeze.features.FeatureVector
 import epic.features.{IndexedWordFeaturizer, WordShapeFeaturizer}
 import epic.lexicon.{Lexicon, SimpleLexicon}
+import breeze.collection.mutable.OpenAddressHashArray
+import java.util
 
 /**
  *
@@ -100,11 +102,15 @@ class CRFInference[L, W](weights: DenseVector[Double],
   class Anchoring(val words: IndexedSeq[W], augment: CRF.Anchoring[L, W]) extends CRF.Anchoring[L, W] {
     val localization = featurizer.anchor(words)
 
-    val transCache = Array.tabulate(labelIndex.size, labelIndex.size, length){ (p,c,w) =>
-      val f = localization.featuresForTransition(w, p, c)
-      if (f eq null) Double.NegativeInfinity
-      else weights dot f
+    val transCache = Array.ofDim[Double](labelIndex.size, labelIndex.size, length)
+    for(a <- transCache; b <- a) util.Arrays.fill(b, Double.NegativeInfinity)
+    for(i <- 0 until length; c <- validSymbols(i); p <- validSymbols(i-1)) {
+      val feats = localization.featuresForTransition(i, p, c)
+      if(feats ne null)
+        transCache(p)(c)(i) = weights dot feats
+      else transCache(p)(c)(i) = Double.NegativeInfinity
     }
+
 
 
     def validSymbols(pos: Int): Set[Int] = localization.validSymbols(pos)
@@ -135,19 +141,19 @@ class TaggedSequenceModelFactory[L](val startSymbol: L,
     val counts: Counter2[L, String, Int] = Counter2.count(train.flatMap(p => p.label zip p.words))
 
 
-    val f = IndexedWordFeaturizer.forTrainingSet(train.map(t => t.label zip t.words), gazetteer, needsContextFeatures = {(w, wc) =>  wc < 10 || counts(::, w).findAll(_ > 0).size != 1})
+    val featurizer = IndexedWordFeaturizer.forTrainingSet(train.map(t => t.label zip t.words), gazetteer, needsContextFeatures = {(w, wc) =>  wc < 10 || counts(::, w).findAll(_ > 0).size != 1})
     val lexicon = new SimpleLexicon[L, String](labelIndex, counts.mapValues(_.toDouble))
     val featureIndex = Index[Feature]()
 
     val labelFeatures = (0 until labelIndex.size).map(l => LabelFeature(labelIndex.get(l)))
     val label2Features = for(l1 <- 0 until labelIndex.size) yield for(l2 <- 0 until labelIndex.size) yield LabelFeature(labelIndex.get(l1) -> labelIndex.get(l2))
 
-    val labelWordFeatures = Array.fill(labelIndex.size, f.featureIndex.size)(-1)
-    val label2WordFeatures = Array.fill(labelIndex.size, labelIndex.size, f.featureIndex.size)(-1)
+    val labelWordFeatures = Array.fill(labelIndex.size, featurizer.featureIndex.size)(-1)
+    val label2WordFeatures = Array.fill(labelIndex.size, labelIndex.size)(new OpenAddressHashArray[Int](featurizer.featureIndex.size,-1))
 
     var i = 0
     for(s <- train) {
-      val loc = f.anchor(s.words)
+      val loc = featurizer.anchor(s.words)
       val lexLoc = lexicon.anchor(s.words)
 
       for {
@@ -155,12 +161,12 @@ class TaggedSequenceModelFactory[L](val startSymbol: L,
         l <- lexLoc.tagsForWord(b)
       } {
         loc.featuresForWord(b) foreach {f =>
-          labelWordFeatures(l)(f) = featureIndex.index(PairFeature(labelFeatures(l), featureIndex.get(f)) )
+          labelWordFeatures(l)(f) = featureIndex.index(PairFeature(labelFeatures(l), featurizer.featureIndex.get(f)) )
         }
         if(lexLoc.tagsForWord(b).size > 1) {
           for(prevTag <- if(b == 0) Set(labelIndex(startSymbol)) else lexLoc.tagsForWord(b-1)) {
             loc.basicFeatures(b) foreach {f =>
-              label2WordFeatures(l)(prevTag)(f) = featureIndex.index(PairFeature(label2Features(prevTag)(l), featureIndex.get(f)) )
+              label2WordFeatures(l)(prevTag)(f) = featureIndex.index(PairFeature(label2Features(prevTag)(l), featurizer.featureIndex.get(f)) )
             }
           }
         }
@@ -171,7 +177,7 @@ class TaggedSequenceModelFactory[L](val startSymbol: L,
       i += 1
     }
 
-    val indexed = new IndexedStandardFeaturizer[L](f, lexicon, startSymbol, labelIndex, featureIndex, labelWordFeatures, label2WordFeatures)
+    val indexed = new IndexedStandardFeaturizer[L](featurizer, lexicon, startSymbol, labelIndex, featureIndex, labelWordFeatures, label2WordFeatures)
     val model = new CRFModel(indexed.featureIndex, indexed, weights(_))
 
     model
@@ -189,43 +195,44 @@ object TaggedSequenceModelFactory {
                                      val labelIndex: Index[L],
                                      val featureIndex: Index[Feature],
                                      labelFeatures: Array[Array[Int]],
-                                     label2Features: Array[Array[Array[Int]]]) extends CRF.IndexedFeaturizer[L,String] with Serializable { outer =>
+                                     label2Features: Array[Array[OpenAddressHashArray[Int]]]) extends CRF.IndexedFeaturizer[L,String] with Serializable { outer =>
 
 
+    private val startSymbolSet = Set(labelIndex(startSymbol))
 
     def anchor(w: IndexedSeq[String]): AnchoredFeaturizer[L, String] = new AnchoredFeaturizer[L, String] {
       val loc = wordFeaturizer.anchor(w)
       val lexLoc = lexicon.anchor(w)
       def featureIndex: Index[Feature] =  outer.featureIndex
 
-      def allowedTags(pos: Int): Set[Int] = if(pos < 0 || pos > w.length) Set(labelIndex(startSymbol)) else  lexLoc.tagsForWord(pos)
+      def validSymbols(pos: Int): Set[Int] = if(pos < 0 || pos >= w.length) startSymbolSet else  lexLoc.tagsForWord(pos)
 
-      val featureArray = Array.tabulate(w.length, labelIndex.size, labelIndex.size) { (pos, prevTag, l) =>
-        if(allowedTags(pos)(l) && allowedTags(pos-1)(prevTag)) {
-          val vb = collection.mutable.ArrayBuilder.make[Int]
-          loc.featuresForWord(pos) foreach {f =>
-            val fi1 = labelFeatures(l)(f)
-            if(fi1 >= 0) {
-              vb += fi1
+      def length = w.length
 
-              if(lexLoc.tagsForWord(pos).size > 1) {
-                val fi2 = label2Features(prevTag)(l)(f)
-                if(fi2 >= 0)
-                  vb += fi2
-              }
+
+
+      val featureArray = Array.ofDim[FeatureVector](length, labelIndex.size, labelIndex.size)
+      for(pos <- 0 until length; curTag <- validSymbols(pos); prevTag <- validSymbols(pos-1)) {
+        val vb = collection.mutable.ArrayBuilder.make[Int]
+        loc.featuresForWord(pos) foreach {f =>
+          val fi1 = labelFeatures(curTag)(f)
+          if(fi1 >= 0) {
+            vb += fi1
+
+            if(lexLoc.tagsForWord(pos).size > 1) {
+              val fi2 = label2Features(prevTag)(curTag)(f)
+              if(fi2 >= 0)
+                vb += fi2
             }
           }
-          new FeatureVector(vb.result())
-        } else {
-          null
         }
+        featureArray(pos)(prevTag)(curTag) = new FeatureVector(vb.result())
       }
 
       def featuresForTransition(pos: Int, prev: Int, cur: Int): FeatureVector = {
         featureArray(pos)(prev)(cur)
       }
 
-      def validSymbols(pos: Int): Set[Int] = allowedTags(pos+1)
     }
   }
 
