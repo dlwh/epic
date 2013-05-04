@@ -113,8 +113,8 @@ object ContextualSurfaceFeaturizer {
     basicFeatureIndex foreach {featureIndex.index(_)}
 
     // for left and right
-    val initialLeftFeature = featureIndex.size
-    for(WordFeature(f,'Basic) <- featureIndex) {
+    val initialLeftFeature = basicFeatureIndex.size
+    for(WordFeature(f,'Basic) <- basicFeatureIndex) {
       featureIndex.index(WordFeature(f,'Left))
     }
     def asLeftFeatures(f: Array[Int]) = f.map(_ + initialLeftFeature)
@@ -128,9 +128,9 @@ object ContextualSurfaceFeaturizer {
     }
     def asRightFeatures(f: Array[Int]) = f.map(_ + initialRightFeature)
 
-    val prevCurBigramFeatures = Array.fill(initialLeftFeature, initialLeftFeature)(-1)
-    val curNextBigramFeatures = Array.fill(initialLeftFeature, initialLeftFeature)(-1)
-    val prevNextBigramFeatures = Array.fill(initialLeftFeature, initialLeftFeature)(-1)
+    val prevCurBigramFeatures = Array.fill(basicFeatureIndex.size, basicFeatureIndex.size)(-1)
+    val curNextBigramFeatures = Array.fill(basicFeatureIndex.size, basicFeatureIndex.size)(-1)
+    val prevNextBigramFeatures = Array.fill(basicFeatureIndex.size, basicFeatureIndex.size)(-1)
 
     for(words <- corpus) {
       val indices = words.map(wordIndex(_))
