@@ -1,11 +1,11 @@
 package epic.features
 
 import breeze.linalg.{Counter, Counter2}
-import breeze.util.{Encoder, Index, Interner}
+import breeze.util.{Encoder, Index}
 import epic.framework.Feature
 import scala.collection.mutable.ArrayBuffer
 import breeze.text.analyze.{WordShapeGenerator, EnglishWordClassGenerator}
-import scala.collection.Set
+import epic.sequences.Gazetteer
 
 
 /**
@@ -14,6 +14,7 @@ import scala.collection.Set
  */
 class BasicWordFeaturizer(tagWordCounts: Counter2[_, String, Double],
                           wordCounts: Counter[String, Double],
+                          gazetteer: Gazetteer[Any, String] = Gazetteer.empty,
                           noShapeThreshold: Int = 100,
                           minCountThreshold: Int = 2)  {
   def anchor(words: IndexedSeq[String]): Anchoring = new Anchoring(words)
@@ -44,12 +45,12 @@ class BasicWordFeaturizer(tagWordCounts: Counter2[_, String, Double],
 
   private val inner = new WordShapeFeaturizer(wordCounts, minCountThreshold)
   private val fullFeatures = Array.tabulate(wordIndex.size) {i =>
-    inner.apply(wordIndex.get(i)).map(featureIndex(_))
+    inner.apply(wordIndex.get(i)).map(_featureIndex.index(_)) ++ gazetteer.lookupWord(wordIndex.get(i)).map(f => _featureIndex.index(WordFeature(f, 'WordSeenInSegment)))
   }
 
   class Anchoring(words: IndexedSeq[String]) {
-    val indices = words.map(wordIndex(_))
-    val counts = words.map(wordCounts(_))
+    private val indices = words.map(wordIndex(_))
+    private val counts = words.map(wordCounts(_))
 
     def basicFeatures(pos: Int): Array[Int] = {
       if(pos < 0 || pos >= words.length) boundaryFeatures
@@ -82,9 +83,9 @@ class BasicWordFeaturizer(tagWordCounts: Counter2[_, String, Double],
       val index = indices(i)
       if(index >= 0) {
          BasicWordFeaturizer.this.fullFeatures(index).toArray
-      } else {
-        inner.apply(wordIndex.get(i)).map(featureIndex(_)).toArray
-      }
+      } else (
+        inner.apply(wordIndex.get(i)).map(featureIndex(_)).toArray ++ gazetteer.lookupWord(wordIndex.get(i)).map(f => featureIndex(WordFeature(f, 'WordSeenInSegment)))
+      ).filter(_ != -1)
     }
 
   }
