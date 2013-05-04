@@ -428,7 +428,7 @@ object SRL {
       }
 
       val beginCache = Array.tabulate(labelIndex.size, fs.words.length){ (label,w) =>
-              val feats = fs.wordFeatures(w)
+              val feats = fs.featuresForWord(w)
         val builder = Array.newBuilder[Int]
         builder.sizeHint(if(lemmaInd == -1) feats.length else 2 * feats.length)
         appendFeatures(builder, feats, wordFeatures(label)(0))
@@ -445,7 +445,7 @@ object SRL {
       }
 
       val interiorCache = Array.tabulate(labelIndex.size, fs.words.length){ (label,w) =>
-        val feats = fs.wordFeatures(w)
+        val feats = fs.featuresForWord(w)
         val builder = Array.newBuilder[Int]
         builder.sizeHint(if(lemmaInd == -1) feats.length else 2 * feats.length)
         appendFeatures(builder, feats, wordFeatures(label)(1))

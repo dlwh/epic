@@ -3,20 +3,19 @@ package epic.everything
 import breeze.collection.mutable.TriangularArray
 import epic.trees._
 import epic.parser.ParseChart.SparsityPattern
-import epic.sequences.{SemiCRF, Segmentation}
+import epic.sequences.{Gazetteer, SemiCRF, Segmentation}
 import epic.ontonotes.{Frame, Document, NERType}
 import epic.parser.projections.{GoldTagPolicy, ConstraintCoreGrammar}
 import epic.coref.CorefInstanceFeaturizer
 import breeze.util.Index
 import epic.framework.Feature
 import breeze.linalg.{Axis, Counter2}
-import epic.parser.features.BasicFeaturizer
 import epic.trees.StandardTreeProcessor
-import epic.sequences.Segmentation
 import scala.Some
 import epic.parser._
 import java.util.concurrent.atomic.AtomicInteger
 import epic.lexicon.Lexicon
+import epic.features.IndexedSpanFeaturizer
 
 /**
  * 
@@ -30,13 +29,12 @@ case class FeaturizedSentence(index: Int, words: IndexedSeq[String],
                               nerOpt: Option[Segmentation[NERType.Value, String]],
                               nerConstraints: SemiCRF.SpanConstraints,
                               frames: IndexedSeq[Frame],
-                              wordFeatures: IndexedSeq[Array[Int]],
-                              spanFeatures: TriangularArray[Array[Int]],
+                              featureAnchoring: IndexedSpanFeaturizer#Localization,
                               speaker: Option[String] = None,
                               id: String = "")  {
-  def featuresForSpan(begin: Int, end: Int) = spanFeatures(begin, end)
+  def featuresForSpan(begin: Int, end: Int) = featureAnchoring.featuresForSpan(begin, end)
 
-  def featuresForWord(w: Int) = wordFeatures(w)
+  def featuresForWord(w: Int) = featureAnchoring.featuresForWord(w)
 
   def withTree(tree: BinarizedTree[AnnotatedLabel]) = copy(treeOpt = Some(tree))
 
@@ -75,7 +73,6 @@ object FeaturizedDocument {
                   corefFeaturizer: CorefInstanceFeaturizer)(docs: IndexedSeq[Document]): (Factory, IndexedSeq[FeaturizedDocument]) = {
     val wordFeatureIndex, spanFeatureIndex = Index[Feature]()
 
-    val featurizer = new BasicFeaturizer(tagWordCounts, breeze.linalg.sum(tagWordCounts, Axis._0))
 
     val srlLabels = Index[String](Iterator("O") ++ docs.iterator.flatMap(_.sentences).flatMap(_.srl).flatMap(_.args).map(_.arg))
 
@@ -96,6 +93,17 @@ object FeaturizedDocument {
       r.seq
     }
 
+    val docsWithValidSpans = for( (d,other) <- docs zip constraints; (s, (tree, seg, constituentSparsity, nerConstraints)) <- d.sentences zip other) yield {
+      def isPossibleSpan(begin: Int, end: Int) = (
+          constituentSparsity.activeTriangularIndices.contains(TriangularArray.index(begin,end))
+            || (nerConstraints.allowedLabels(begin,end).ne(null) && nerConstraints.allowedLabels(begin,end).nonEmpty)
+          )
+
+      s.words -> (isPossibleSpan _)
+    }
+
+    val featurizer = IndexedSpanFeaturizer.forTrainingSet(docsWithValidSpans, tagWordCounts, Gazetteer.ner())
+
     val featurized = for( ((d, other)) <- docs zip constraints.seq) yield {
       val newSentences = for( (s, (tree, seg, constituentSparsity, nerConstraints)) <- d.sentences zip other) yield {
         def isPossibleSpan(begin: Int, end: Int) = (
@@ -104,14 +112,6 @@ object FeaturizedDocument {
           )
 
         val loc = featurizer.anchor(s.words)
-        val words = Array.tabulate(s.words.length)(loc.featuresForWord(_).map(wordFeatureIndex.index(_)))
-        val spans = TriangularArray.tabulate(s.words.length+1){ (beg, end) =>
-          if(isPossibleSpan(beg, end)) {
-            loc.featuresForSpan(beg, end).map(spanFeatureIndex.index(_))
-          } else {
-            null
-          }
-        }
 
 
         FeaturizedSentence(s.index, s.words,
@@ -120,7 +120,7 @@ object FeaturizedDocument {
           Some(seg),
           nerConstraints,
           s.srl,
-          words, spans,
+          loc,
           s.speaker,
           s.id)
       }
@@ -136,7 +136,7 @@ object FeaturizedDocument {
 //                     graphFeaturizer: PropertyPropagation.GraphBuilder,
                     nerConstrainer: SemiCRF.ConstraintGrammar[NERType.Value, String],
                     srlLabelIndex: Index[String],
-                    featurizer: BasicFeaturizer,
+                    featurizer: IndexedSpanFeaturizer,
                     corefFeaturizer: CorefInstanceFeaturizer,
                     wordFeatureIndex: Index[Feature],
                     spanFeatureIndex: Index[Feature]) extends (Document=>FeaturizedDocument) {
@@ -165,15 +165,7 @@ object FeaturizedDocument {
            || (nerConstraints.allowedLabels(begin,end).ne(null) && nerConstraints.allowedLabels(begin,end).nonEmpty)
          )
 
-       val loc = featurizer.anchor(s.words)
-       val words = Array.tabulate(s.words.length)(loc.featuresForWord(_).map(wordFeatureIndex(_)).filter(_ != -1))
-       val spans = TriangularArray.tabulate(s.words.length+1){ (beg, end) =>
-         if(isPossibleSpan(beg, end)) {
-           loc.featuresForSpan(beg, end).map(spanFeatureIndex(_)).filter(_ != -1)
-         } else {
-           null
-         }
-       }
+       val loc = featurizer.anchor(s.words, isPossibleSpan)
 
        FeaturizedSentence(s.index, s.words,
          Some(tree),
@@ -181,7 +173,7 @@ object FeaturizedDocument {
          Some(seg),
          nerConstraints,
          s.srl,
-         words, spans,
+         loc,
          s.speaker,
          s.id +"-featurized")
      }

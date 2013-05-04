@@ -20,7 +20,6 @@ class IndexedSpanFeaturizer(val featurizer: BasicSpanFeaturizer,
                             prevNextFeature: (Int,Int)=>Int,
                             asLeftFeature: Array[Int],
                             asRightFeature: Array[Int],
-                            gazetteer: Gazetteer[Any, String] = Gazetteer.empty,
                             needsContextFeatures: (String,Double)=>Boolean = {(w,c) => true}){
   def anchor(words: IndexedSeq[String], validSpan: (Int,Int)=>Boolean = {(_, _) => true}) = new Localization(words, validSpan)
 
@@ -66,7 +65,6 @@ class IndexedSpanFeaturizer(val featurizer: BasicSpanFeaturizer,
         //            feats += TrigramFeature(shapes(pos-1), shapes(pos), shapes(pos+1))
         //            feats += TrigramFeature(classes(pos-1), classes(pos), classes(pos+1))
         //          }
-        feats ++= gazetteer.lookupWord(words(pos)).map(f =>wordFeatureIndex(WordFeature(f, 'WordSeenInSegment))).filter(_ != -1)
         feats.toArray
       }
     }
@@ -145,6 +143,6 @@ object IndexedSpanFeaturizer {
     {(c,r) =>curNextBigramFeatures(c)(r)},
     {(p,r) =>prevNextBigramFeatures(p)(r)},
     asLeftFeatures, asRightFeatures,
-    gazetteer, needsContextFeatures)
+    needsContextFeatures)
   }
 }

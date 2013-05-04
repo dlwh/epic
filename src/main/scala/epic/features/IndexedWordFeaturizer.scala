@@ -20,12 +20,9 @@ class IndexedWordFeaturizer private (val featurizer: BasicWordFeaturizer,
                                      prevNextFeature: (Int,Int)=>Int,
                                      asLeftFeature: Array[Int],
                                      asRightFeature: Array[Int],
-                                     gazetteer: Gazetteer[Any, String] = Gazetteer.empty,
                                      needsContextFeatures: (String,Double)=>Boolean = {(w,c) => true}) extends Serializable {
 
-
   def anchor(words: IndexedSeq[String]) = new Localization(words)
-
 
   class Localization(words: IndexedSeq[String]) {
     def basicFeatures(pos: Int): Array[Int] = wordFeaturizer.basicFeatures(pos)
@@ -66,7 +63,6 @@ class IndexedWordFeaturizer private (val featurizer: BasicWordFeaturizer,
         //            feats += TrigramFeature(shapes(pos-1), shapes(pos), shapes(pos+1))
         //            feats += TrigramFeature(classes(pos-1), classes(pos), classes(pos+1))
         //          }
-        feats ++= gazetteer.lookupWord(words(pos)).map(f =>featureIndex(WordFeature(f, 'WordSeenInSegment))).filter(_ != -1)
         feats.toArray
       }
     }
@@ -81,10 +77,9 @@ object IndexedWordFeaturizer {
                      needsContextFeatures: (String,Double)=>Boolean = {(w,c) => true}):IndexedWordFeaturizer = {
     val tagWordCounts: Counter2[L, String, Double] = Counter2.count(corpus.iterator.flatten).mapValues(_.toDouble)
     val wordCounts = sum(tagWordCounts, Axis._0)
-    val wordIndex = Index[String](wordCounts.keySet)
     val featureIndex = Index[Feature]()
 
-    val feat = new BasicWordFeaturizer(tagWordCounts, wordCounts)
+    val feat = new BasicWordFeaturizer(tagWordCounts, wordCounts, gazetteer)
     val basicFeatureIndex = feat.featureIndex
 
     // for left and right
@@ -121,7 +116,6 @@ object IndexedWordFeaturizer {
           //            feats += TrigramFeature(shapes(pos-1), shapes(pos), shapes(pos+1))
           //            feats += TrigramFeature(classes(pos-1), classes(pos), classes(pos+1))
           //          }
-          gazetteer.lookupWord(words(pos)._2).foreach(f => featureIndex.index(WordFeature(f, 'WordSeenInSegment)))
         }
       }
 
@@ -133,7 +127,7 @@ object IndexedWordFeaturizer {
     {(c,r) =>curNextBigramFeatures(c)(r)},
     {(p,r) =>prevNextBigramFeatures(p)(r)},
     asLeftFeatures, asRightFeatures,
-    gazetteer, needsContextFeatures)
+    needsContextFeatures)
 
   }
 }
