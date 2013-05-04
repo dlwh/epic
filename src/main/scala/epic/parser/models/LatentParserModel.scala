@@ -26,6 +26,7 @@ import epic.framework.Feature
 import epic.trees.annotations.{FilterAnnotations, TreeAnnotator}
 import epic.trees._
 import breeze.config.Help
+import epic.features.TagAwareWordShapeFeaturizer
 
 class LatentParserModel[L, L3, W](indexedFeatures: IndexedFeaturizer[L, L3, W],
                                   reannotate: (BinarizedTree[L], Seq[W]) => BinarizedTree[L],

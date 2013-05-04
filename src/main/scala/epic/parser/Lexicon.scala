@@ -102,7 +102,8 @@ object SimpleLexicon {
 @SerialVersionUID(1L)
 class SignatureLexicon[L,W](initCounts: Counter2[L,W,Double],
                             sigGen: W=>W,
-                            signatureThreshold: Double = 2) extends Lexicon[L,W] {
+                            signatureThreshold: Double = 2,
+                            openTagThreshold: Int = 10) extends Lexicon[L,W] {
   val (wordCounts, lexicon, sigCounts) = SignatureLexicon.makeSignatureCounts(sigGen, initCounts, signatureThreshold)
 
   import collection.mutable._
@@ -114,9 +115,14 @@ class SignatureLexicon[L,W](initCounts: Counter2[L,W,Double],
 
   def tagsForWord(w: W) = {
     val sig = asSignature(w)
-    byWord.get(sig).map(_.iterator).getOrElse(initCounts.keysIterator.map(_._1))
+    if (sigCounts(sig) < 10) {
+        openTags.iterator
+      } else {
+      byWord.get(sig).map(_.iterator).getOrElse(initCounts.keysIterator.map(_._1))
+      }
   }
 
+  private val openTags = lexicon.keysIterator.map(_._1).toSet.filter(l => initCounts(l, ::).size > openTagThreshold)
   def knownLexicalProductions = wordCounts.keysIterator.flatMap(w => tagsForWord(w).map(LexicalProduction(_,w)))
 
   private def asSignature(w: W): W = {

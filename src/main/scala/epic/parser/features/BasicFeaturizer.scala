@@ -9,6 +9,7 @@ import breeze.linalg.{Counter, Counter2}
 import breeze.text.analyze.{WordShapeGenerator, EnglishWordClassGenerator}
 import collection.immutable
 import breeze.util.Interner
+import epic.features.{WordShapeFeaturizer, TrigramFeature, BigramFeature, WordFeature}
 
 
 /**

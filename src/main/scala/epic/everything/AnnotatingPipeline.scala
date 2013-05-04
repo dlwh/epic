@@ -16,7 +16,6 @@ import epic.trees.annotations.StripAnnotations
 import epic.trees.annotations.AddMarkovization
 import epic.trees.annotations.PipelineAnnotator
 import epic.parser.models.{IndexedLexFeaturizer, SimpleWordShapeGen}
-import epic.parser.features.TagAwareWordShapeFeaturizer
 import epic.trees.ProcessedTreebank
 import epic.parser.features.RuleFeature
 import scala.Some
@@ -26,6 +25,7 @@ import epic.ontonotes.Document
 import epic.parser.models.LexGrammarBundle
 import collection.mutable.ArrayBuffer
 import collection.immutable
+import epic.features.TagAwareWordShapeFeaturizer
 
 
 /**

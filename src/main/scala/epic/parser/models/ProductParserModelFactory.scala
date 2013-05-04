@@ -21,11 +21,12 @@ import epic.trees.annotations.FilterAnnotations
 import epic.trees.annotations.TreeAnnotator
 import io.Source
 import breeze.linalg._
-import epic.parser.features.{GenFeaturizer, IndicatorFeature, TagAwareWordShapeFeaturizer}
+import epic.parser.features.{GenFeaturizer, IndicatorFeature}
 import epic.parser.projections.GrammarRefinements
 import epic.framework.{ComponentFeature, Feature}
 import epic.parser.{AugmentedGrammar, BaseGrammar, RefinedGrammar, ParserParams}
 import epic.trees._
+import epic.features.TagAwareWordShapeFeaturizer
 
 /**
  *

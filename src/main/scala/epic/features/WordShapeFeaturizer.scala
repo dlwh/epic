@@ -1,4 +1,4 @@
-package epic.parser.features
+package epic.features
 
 /*
  Copyright 2012 David Hall
@@ -19,6 +19,7 @@ import epic.framework.Feature
 import breeze.linalg._
 import collection.mutable.ArrayBuffer
 import breeze.text.analyze.{WordShapeGenerator, EnglishWordClassGenerator}
+import epic.parser.features.IndicatorFeature
 
 final case class IndicatorWSFeature(name: Symbol) extends Feature
 final case class SuffixFeature(str: String) extends Feature

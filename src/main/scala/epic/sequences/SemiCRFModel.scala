@@ -5,7 +5,7 @@ import breeze.util._
 import breeze.linalg.{VectorBuilder, Counter, DenseVector, axpy}
 import epic.sequences.SemiCRF.TransitionVisitor
 import collection.mutable.ArrayBuffer
-import epic.parser.features.{PairFeature, SpanShapeGenerator, WordShapeFeaturizer}
+import epic.parser.features.{PairFeature, SpanShapeGenerator}
 import breeze.text.analyze.{WordShapeGenerator, EnglishWordClassGenerator}
 import collection.immutable
 import breeze.collection.mutable.TriangularArray
@@ -13,6 +13,7 @@ import epic.trees.Span
 import epic.parser.features.StandardSpanFeatures.WordEdges
 import collection.mutable
 import breeze.features.FeatureVector
+import epic.features.WordShapeFeaturizer
 
 /**
  *
