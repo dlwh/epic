@@ -20,12 +20,8 @@ object POSTagger {
     val test = treebank.devTrees.map(_.toTaggedSequence)
 
     val crf = CRF.buildSimple(train, AnnotatedLabel("TOP"), opt = opt)
-    for(ex <- train) {
-      println(ex.words)
-      println("Gold: " + ex.tags)
-      println("Guess: " + crf.bestSequence(ex.words, ex.id).label)
-    }
-
+    val stats = TaggedSequenceEval.eval(crf, test)
+    println("Final Stats: " + stats)
 
   }
 

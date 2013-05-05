@@ -212,19 +212,24 @@ object TaggedSequenceModelFactory {
 
 
       val featureArray = Array.ofDim[FeatureVector](length, labelIndex.size, labelIndex.size)
+      private val posNeedsAmbiguity = Array.tabulate(length)(i => validSymbols(i).size > 1)
       for(pos <- 0 until length; curTag <- validSymbols(pos); prevTag <- validSymbols(pos-1)) {
         val vb = collection.mutable.ArrayBuilder.make[Int]
-        loc.featuresForWord(pos) foreach {f =>
+        val features = loc.featuresForWord(pos)
+        var i = 0
+        while(i < features.length) {
+          val f = features(i)
           val fi1 = labelFeatures(curTag)(f)
           if(fi1 >= 0) {
             vb += fi1
 
-            if(lexLoc.tagsForWord(pos).size > 1) {
+            if(posNeedsAmbiguity(pos)) {
               val fi2 = label2Features(prevTag)(curTag)(f)
               if(fi2 >= 0)
                 vb += fi2
             }
           }
+          i += 1
         }
         featureArray(pos)(prevTag)(curTag) = new FeatureVector(vb.result())
       }

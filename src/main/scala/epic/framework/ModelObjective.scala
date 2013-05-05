@@ -7,6 +7,7 @@ import breeze.util.Encoder
 import java.util.concurrent.atomic.AtomicInteger
 import collection.parallel.ForkJoinTaskSupport
 import concurrent.forkjoin.ForkJoinPool
+import com.typesafe.scalalogging.log4j.{Logging, Logger}
 
 /**
  * The objective function for training a [[epic.framework.Model]]. Selects
@@ -17,7 +18,8 @@ import concurrent.forkjoin.ForkJoinPool
  */
 class ModelObjective[Datum](val model: Model[Datum],
                             batchSelector: IndexedSeq[Int]=>GenTraversable[Datum],
-                            val fullRange: IndexedSeq[Int]) extends BatchDiffFunction[DenseVector[Double]] {
+                            val fullRange: IndexedSeq[Int],
+                            weightCachePrefix: String="weights") extends BatchDiffFunction[DenseVector[Double]] with Logging {
   def this(model: Model[Datum], data: IndexedSeq[Datum], numThreads: Int = -1) = this(model,ModelObjective.makePar(data, numThreads)(_), 0 until data.length)
 
   import model.{ExpectedCounts => _, _}
@@ -28,19 +30,26 @@ class ModelObjective[Datum](val model: Model[Datum],
   protected def select(batch: IndexedSeq[Int]):GenTraversable[Datum] = batchSelector(batch)
 
   def initialWeightVector(randomize: Boolean): DenseVector[Double] = {
-   val v = Encoder.fromIndex(featureIndex).tabulateDenseVector(f => model.initialValueForFeature(f))
+   val v = model.readCachedFeatureWeights(weightCachePrefix) match {
+     case Some(vector) => vector
+     case None => Encoder.fromIndex(featureIndex).tabulateDenseVector(f => model.initialValueForFeature(f))
+   }
     if(randomize) {
       v += DenseVector.rand(numFeatures) * 1E-6
     }
     v
   }
 
-  var iter = 0
+  var timeSinceLastWrite = 0L
+  var writeLength = 5L * 1000 // assume it takes 5 seconds to write.
   def calculate(x: DenseVector[Double], batch: IndexedSeq[Int]) = {
-    if(iter % 30 == 0) {
-      model.cacheFeatureWeights(x, "weights")
+    if(timeSinceLastWrite / 100 > writeLength) { // don't spend more than 1% of our time caching weights
+      logger.info("Saving feature weights...")
+      val timeIn = System.currentTimeMillis()
+      model.cacheFeatureWeights(x, weightCachePrefix)
+      writeLength = System.currentTimeMillis() - timeIn
+      timeSinceLastWrite = 0
     }
-    iter += 1
     val inference = inferenceFromWeights(x)
     val timeIn = System.currentTimeMillis()
     val success = new AtomicInteger(0)
@@ -58,8 +67,8 @@ class ModelObjective[Datum](val model: Model[Datum],
       }
     },{ (a,b) => if(a eq null) b else if (b eq null) a else b += a})
     val timeOut = System.currentTimeMillis()
-    println(f"Inference took: ${(timeOut - timeIn) * 1.0/1000}%.3fs" )
-
+    timeSinceLastWrite += timeOut - timeIn
+    logger.info(f"Inference took: ${(timeOut - timeIn) * 1.0/1000}%.3fs" )
     val (loss,grad) = expectedCountsToObjective(finalCounts)
     (loss/success.intValue() * fullRange.size,  grad * (fullRange.size * 1.0 / success.intValue))
   }

@@ -53,6 +53,28 @@ trait Model[Datum] { self =>
     breeze.util.writeObject(out, (featureIndex, weights))
   }
 
+  /**
+   * just saves feature weights to disk as a serialized counter. The file is prefix.ser.gz
+   */
+  def readCachedFeatureWeights(prefix: String = "weights"):Option[DenseVector[Double]] = {
+    val in = new File(prefix + ".ser.gz")
+    if(in.exists()) {
+      try {
+        val (index, oldWeights) = breeze.util.readObject[(Index[Feature], DenseVector[Double])](in)
+        val ret = DenseVector.tabulate(featureIndex.size) { i =>
+          val oldIndex = index(featureIndex.get(i))
+          if(oldIndex >= 0) oldWeights(i)
+          else 0.0
+        }
+        Some(ret)
+      } catch {
+        case e: Exception => None
+      }
+    } else {
+      None
+    }
+  }
+
   def initialValueForFeature(f: Feature): Double // = 0
 
   def inferenceFromWeights(weights: DenseVector[Double]): Inference
