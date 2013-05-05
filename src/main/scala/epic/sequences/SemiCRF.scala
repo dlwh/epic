@@ -372,6 +372,8 @@ object SemiCRF {
         TriangularArray.tabulate(allowedStarts.length+1)((b,e) => allowedLabels(b,e) | constraints.allowedLabels(b, e))
       )
     }
+
+    def spanAllowed(b: Int, e:Int) = allowedStarts(b).nonEmpty && allowedLabels(b,e).nonEmpty
   }
 
   trait ConstraintGrammar[L, W] extends Grammar[L, W] {
