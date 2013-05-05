@@ -43,11 +43,12 @@ class ModelObjective[Datum](val model: Model[Datum],
   var timeSinceLastWrite = 0L
   var writeLength = 5L * 1000 // assume it takes 5 seconds to write.
   def calculate(x: DenseVector[Double], batch: IndexedSeq[Int]) = {
-    if(timeSinceLastWrite / 100 > writeLength) { // don't spend more than 1% of our time caching weights
+    if(timeSinceLastWrite > writeLength * 20) { // don't spend more than 1% of our time caching weights
       logger.info("Saving feature weights...")
       val timeIn = System.currentTimeMillis()
       model.cacheFeatureWeights(x, weightCachePrefix)
       writeLength = System.currentTimeMillis() - timeIn
+      logger.info(f"Saving took ${writeLength/1000.0}%.2fs. Will write again in ${writeLength / 1000.0 * 20.0}%fs")
       timeSinceLastWrite = 0
     }
     val inference = inferenceFromWeights(x)

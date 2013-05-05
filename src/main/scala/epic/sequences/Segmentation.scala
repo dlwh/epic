@@ -23,10 +23,10 @@ case class Segmentation[L, W](segments: IndexedSeq[(L, Span)],
       else
         outLabels += BIOETag.Begin(l)
       for(i <- (span.start+1) until (span.end) ) {
-        outLabels += {if(l == outsideLabel) BIOETag.Inside(l) else BIOETag.Outside}
+        outLabels += {if(l != outsideLabel) BIOETag.Inside(l) else BIOETag.Outside}
       }
     }
-    while(outLabels.length < segments.length) {
+    while(outLabels.length < words.length) {
       outLabels += BIOETag.Outside
     }
     assert(outLabels.length == words.length)
@@ -44,4 +44,51 @@ case class Segmentation[L, W](segments: IndexedSeq[(L, Span)],
   def length: Int = words.length
 
   def label: IndexedSeq[(L, Span)] = segments
+}
+
+object Segmentation {
+  def fromBIOSequence[L, W](seq: TaggedSequence[BIOETag[L], W], outsideLabel: L):Segmentation[L, W] = {
+    import BIOETag._
+    val spans = ArrayBuffer[(L, Span)]()
+    var currentStart = 0
+    var currentLabel = outsideLabel
+    for(i <- 0 until seq.length) {
+      seq.label(i) match {
+        case Begin(l) =>
+          if(currentStart < i)
+           spans += (currentLabel -> Span(currentStart, i))
+          currentStart = i
+          currentLabel = l
+        case Inside(l) =>
+          if(currentLabel != l) {
+            if(currentStart < i)
+              spans += (currentLabel -> Span(currentStart, i))
+            currentStart = i
+            currentLabel = l
+          }
+        case End(l) =>
+          if(currentLabel != l) {
+            if(currentStart < i)
+              spans += (currentLabel -> Span(currentStart, i))
+            currentStart = i
+            currentLabel = l
+          }
+          spans += (currentLabel -> Span(currentStart, i+1))
+          currentStart = i + 1
+        case Outside =>
+          if(currentLabel != outsideLabel) {
+            if(currentStart < i)
+              spans += (currentLabel -> Span(currentStart, i))
+            currentStart = i
+            currentLabel = outsideLabel
+          }
+          spans += (currentLabel -> Span(currentStart, i+1))
+          currentStart = i + 1
+
+      }
+    }
+    if(currentStart < seq.length)
+      spans += (currentLabel -> Span(currentStart, seq.length))
+    Segmentation(spans, seq.words, seq.id.replaceAll("-bio","-seg"))
+  }
 }

@@ -8,7 +8,9 @@ object TaggedSequenceEval {
     examples.par.aggregate(new Stats()) ({ (stats, gold )=>
       val guess = crf.bestSequence(gold.words, gold.id +"-guess")
       val myStats = evaluateExample(guess, gold)
-      println("Guess:\n" + guess.render + "\n Gold:\n" + gold.render+ "\n" + myStats)
+
+      val sent = for( ((p,g),w) <- guess.label zip gold.label zip guess.words) yield if (g == p) s"$w/$g" else s"$w/[G:$g,P:$p]"
+      println(sent.mkString(" ") + "\n" + myStats)
       stats + myStats
     }, {_ + _})
 
