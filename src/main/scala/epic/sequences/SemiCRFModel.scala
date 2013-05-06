@@ -284,7 +284,7 @@ class SegmentationModelFactory[L](val startSymbol: L,
     val allowedSpanClassifier = pruningModel.map(cg => {(seg: Segmentation[L, String]) =>
       val cons:SpanConstraints = cg.constraints(seg);
       {(b:Int,e:Int) => cons.spanAllowed(b, e)}
-    }).getOrElse{(seg: Segmentation[L, String]) =>(beg:Int,end:Int)=> (end - beg < maxMaxLength) && (
+    }).getOrElse{(seg: Segmentation[L, String]) =>(beg:Int,end:Int)=> (end - beg <= maxMaxLength) && (
       (beg + 1 == end) || {
         var ok = true
         var pos = beg
@@ -330,6 +330,7 @@ object SegmentationModelFactory {
 
     val kinds = Array('Begin, 'Interior, 'End)
     println(baseWordFeatureIndex.size + " " + baseSpanFeatureIndex.size)
+    println(baseSpanFeatureIndex)
 
     val (featureIndex: Index[Feature], wordFeatures, spanFeatures, transitionFeatures) = {
       val featureIndex = Index[Feature]()
