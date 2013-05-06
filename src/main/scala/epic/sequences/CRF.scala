@@ -14,6 +14,9 @@ import breeze.features.FeatureVector
  * A -Markov Linear Chain Conditional Random Field. Useful for POS tagging, etc.
  *
  * As usual in Epic, all the heavy lifting is done in the companion object and Marginals.
+ *
+ * CRFs can produce [[epic.sequences.TaggedSequence]] from an input sequence of words.
+ * They can also produce marginals, etc.
  * @author dlwh
  */
 @SerialVersionUID(1L)
@@ -28,8 +31,8 @@ trait CRF[L, W] extends Serializable {
      CRF.Marginal(anchor(w))
   }
 
-  def goldMarginal(segmentation: IndexedSeq[L], w: IndexedSeq[W]):CRF.Marginal[L, W] = {
-    CRF.Marginal.goldMarginal(anchor(w), segmentation)
+  def goldMarginal(tags: IndexedSeq[L], w: IndexedSeq[W]):CRF.Marginal[L, W] = {
+    CRF.Marginal.goldMarginal(anchor(w), tags)
   }
 
   def bestSequence(w: IndexedSeq[W], id: String = "") = {
@@ -41,6 +44,15 @@ trait CRF[L, W] extends Serializable {
 
 object CRF {
 
+  /**
+   * Builds a CRF from a corpus of TaggedSequences using reasonable defaults.
+   * @param data
+   * @param startSymbol
+   * @param gazetteer
+   * @param opt
+   * @tparam L
+   * @return
+   */
   def buildSimple[L](data: IndexedSeq[TaggedSequence[L, String]],
                      startSymbol: L,
                      gazetteer: Gazetteer[Any, String] = Gazetteer.empty[Any, String],
@@ -76,9 +88,6 @@ object CRF {
     def validSymbols(pos: Int): Set[Int]
   }
 
-  trait TransitionVisitor[L, W] {
-    def apply(pos: Int, prev: Int, cur: Int, count: Double)
-  }
 
   trait Marginal[L, W] extends epic.framework.Marginal {
 
@@ -107,6 +116,7 @@ object CRF {
       sum
     }
   }
+
 
   object Marginal {
 
@@ -159,6 +169,8 @@ object CRF {
 
     }
 
+
+
     def goldMarginal[L, W](scorer: Anchoring[L, W], tags: IndexedSeq[L]):Marginal[L, W] = {
       var lastSymbol = scorer.labelIndex(scorer.startSymbol)
       var score = 0.0
@@ -197,6 +209,7 @@ object CRF {
         def logPartition: Double = score
       }
     }
+
 
 
 
@@ -275,6 +288,11 @@ object CRF {
 
 
 
+  }
+
+
+  trait TransitionVisitor[L, W] {
+    def apply(pos: Int, prev: Int, cur: Int, count: Double)
   }
 
   trait IndexedFeaturizer[L, W] {

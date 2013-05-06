@@ -239,7 +239,7 @@ object AnnotatingPipeline {
 
   def buildProcessor(train: IndexedSeq[Document], weightsCache: Counter[String, Double], params: AnnotatingPipeline.Params): (FeaturizedDocument.Factory, IndexedSeq[FeaturizedDocument]) = {
     val nerSegments = for (d <- train; s <- d.sentences) yield s.nerSegmentation
-    val nerPruningModel : SemiCRF.ConstraintGrammar[NERType.Value, String] = if(params.includeNER) params.cache.cached("baseNER", nerSegments.toSet) {
+    val nerPruningModel : SemiCRF.ConstraintSemiCRF[NERType.Value, String] = if(params.includeNER) params.cache.cached("baseNER", nerSegments.toSet) {
       println("Building basic NER model...")
       val baseNER = {
         val model: SemiCRFModel[NERType.Value, String] = new SegmentationModelFactory(NERType.OutsideSentence, NERType.NotEntity, gazetteer = Gazetteer.ner("en"), weights = {
@@ -255,8 +255,8 @@ object AnnotatingPipeline {
         updateWeights(params.weightsCache, weightsCache, decoded)
         crf
       }
-      new SemiCRF.BaseModelConstraintGrammar(baseNER)
-    } else new SemiCRF.IdentityConstraintGrammar(Index(NERType.values), NERType.OutsideSentence)
+      new SemiCRF.BaseModelConstraintSemiCRF(baseNER)
+    } else new SemiCRF.IdentityConstraintSemiCRF(Index(NERType.values), NERType.OutsideSentence)
 
 
     println("Building basic parsing model...")

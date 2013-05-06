@@ -267,8 +267,6 @@ object SemiCRF {
       }
     }
 
-
-
     /**
      *
      * @param scorer

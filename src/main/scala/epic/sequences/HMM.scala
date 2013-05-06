@@ -4,6 +4,11 @@ import breeze.util.{Encoder, Index}
 import epic.sequences.CRF.Anchoring
 import breeze.linalg._
 
+/**
+ * HiddenMarkovModel, which is the generative special case of a [[epic.sequences.CRF]].
+ *
+ * @author dlwh
+ */
 object HMM {
   def apply[L, W](startLabel: L, transitions: Counter2[L, L, Double], emissions: Counter2[L, W, Double], smoothEmissions: Boolean = false):CRF[L, W] = {
     val li = Index[L]()

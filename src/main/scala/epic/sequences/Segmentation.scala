@@ -8,10 +8,10 @@ import scala.collection.mutable.ArrayBuffer
  *
  * @author dlwh
  */
-case class Segmentation[L, W](segments: IndexedSeq[(L, Span)],
+case class Segmentation[+L, +W](segments: IndexedSeq[(L, Span)],
                               words: IndexedSeq[W],
                               id: String = "") extends Example[IndexedSeq[(L, Span)], IndexedSeq[W]] {
-  def asBIOSequence(outsideLabel: L): TaggedSequence[BIOETag[L], W] = {
+  def asBIOSequence[LL>:L](outsideLabel: LL): TaggedSequence[BIOETag[L], W] = {
     val outLabels = new ArrayBuffer[BIOETag[L]]()
     for((l,span) <- segments if !span.isEmpty) {
       while(outLabels.length < span.start) {
@@ -34,7 +34,7 @@ case class Segmentation[L, W](segments: IndexedSeq[(L, Span)],
   }
 
 
-  def render(badLabel: L) = {
+  def render[LL>:L](badLabel: LL) = {
     segments.map(l => if (l._1 == badLabel) l._2.map(words).mkString(" ") else l._2.map(words).mkString(s"[${l._1.toString}:", " ","]")).mkString(" ")
   }
 

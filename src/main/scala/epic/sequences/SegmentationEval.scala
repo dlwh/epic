@@ -4,6 +4,12 @@ import breeze.stats.ContingencyStats
 import epic.framework.EvaluationResult
 
 
+/**
+ * Object for evaluating [[epic.sequences.Segmentation]]s. Returned metrics
+ * are precision, recall, and f1
+ *
+ * @author dlwh
+ */
 object SegmentationEval {
   def eval[L ,W](crf: SemiCRF[L, W], examples: IndexedSeq[Segmentation[L, W]], outsideLabel: L):Stats = {
     examples.par.aggregate(new Stats(0,0,0)) ({ (stats, gold )=>

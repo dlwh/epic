@@ -3,6 +3,12 @@ package epic.sequences
 import epic.framework.EvaluationResult
 
 
+/**
+ * Object for evaluating [[epic.sequences.TaggedSequence]]s. Returned metrics
+ * are accuracy and exact match.
+ *
+ * @author dlwh
+ */
 object TaggedSequenceEval {
   def eval[L ,W](crf: CRF[L, W], examples: IndexedSeq[TaggedSequence[L, W]]):Stats = {
     examples.par.aggregate(new Stats()) ({ (stats, gold )=>

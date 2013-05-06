@@ -4,7 +4,8 @@ import epic.trees.Span
 import breeze.data.Example
 
 /**
- *
+ * A tagged sequence has a sequence of tags and a sequence of words that are in
+ * one-to-one correspondence. think POS tags etc.
  * @author dlwh
  */
 case class TaggedSequence[+L, +W](tags: IndexedSeq[L],
@@ -22,4 +23,6 @@ case class TaggedSequence[+L, +W](tags: IndexedSeq[L],
   def length: Int = words.length
 
   def label: IndexedSeq[L] = tags
+
+  def asSegmentation = Segmentation(tags.zipWithIndex.map{case (l, i) => (l -> Span(i, i+1))}, words, id+"-seg")
 }

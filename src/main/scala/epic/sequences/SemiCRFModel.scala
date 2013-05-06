@@ -34,8 +34,6 @@ class SemiCRFModel[L, W](val featureIndex: Index[Feature],
 
   def initialValueForFeature(f: Feature): Double = initialWeights(f)
 
-  val compressedFeatureCache = mutable.Map.empty[IndexedSeq[W], CompressedFeatureCache]
-
   def inferenceFromWeights(weights: DenseVector[Double]): Inference =
     new SemiCRFInference(weights, featureIndex, featurizer, maxSegmentLength)
 
@@ -81,7 +79,7 @@ object SemiCRFModel {
 class SemiCRFInference[L, W](weights: DenseVector[Double],
                              featureIndex: Index[Feature],
                              featurizer: SemiCRFModel.BIEOFeaturizer[L, W],
-                             val maxLength: Int=>Int) extends AugmentableInference[Segmentation[L, W], SemiCRF.Anchoring[L, W]] with SemiCRF.Grammar[L, W] with Serializable {
+                             val maxLength: Int=>Int) extends AugmentableInference[Segmentation[L, W], SemiCRF.Anchoring[L, W]] with SemiCRF[L, W] with Serializable {
   def viterbi(sentence: IndexedSeq[W], anchoring: SemiCRF.Anchoring[L, W]): Segmentation[L, W] = {
     SemiCRF.viterbi(new Anchoring(sentence, anchoring))
   }
@@ -244,7 +242,7 @@ class SemiCRFInference[L, W](weights: DenseVector[Double],
 
 class SegmentationModelFactory[L](val startSymbol: L,
                                   val outsideSymbol: L,
-                                  pruningModel: Option[SemiCRF.ConstraintGrammar[L, String]] = None,
+                                  pruningModel: Option[SemiCRF.ConstraintSemiCRF[L, String]] = None,
                                   gazetteer: Gazetteer[Any, String] = Gazetteer.empty[String, String],
                                   weights: Feature=>Double = { (f:Feature) => 0.0}) {
 
@@ -255,6 +253,7 @@ class SegmentationModelFactory[L](val startSymbol: L,
     val labelIndex: Index[L] = Index[L](Iterator(startSymbol) ++ train.iterator.flatMap(_.label.map(_._1)))
     val maxLengthArray = Encoder.fromIndex(labelIndex).tabulateArray(maxLengthMap.getOrElse(_, 0))
     println(maxLengthMap)
+    val maxMaxLength = maxLengthArray.max
 
     val interiors = collection.mutable.Set[String]()
     for (t <- train; seg <- t.segments if seg._1 != outsideSymbol) {
@@ -271,7 +270,7 @@ class SegmentationModelFactory[L](val startSymbol: L,
     val allowedSpanClassifier = pruningModel.map(cg => {(seg: Segmentation[L, String]) =>
       val cons:SpanConstraints = cg.constraints(seg);
       {(b:Int,e:Int) => cons.spanAllowed(b, e)}
-    }).getOrElse{(seg: Segmentation[L, String]) =>(beg:Int,end:Int)=>
+    }).getOrElse{(seg: Segmentation[L, String]) =>(beg:Int,end:Int)=> (end - beg < maxMaxLength) && (
       (beg + 1 == end) || {
         var ok = true
         var pos = beg
@@ -280,7 +279,7 @@ class SegmentationModelFactory[L](val startSymbol: L,
           pos += 1
         }
         ok
-      }
+      })
 
     }
     val trainWithAllowedSpans = train.map(seg => seg.words -> allowedSpanClassifier(seg))
@@ -308,7 +307,7 @@ object SegmentationModelFactory {
                                      val nonInteriors: Set[String],
                                      val labelIndex: Index[L],
                                      val maxLength: Int=>Int,
-                                     val pruningModel: Option[SemiCRF.ConstraintGrammar[L, String]] = None) extends SemiCRFModel.BIEOFeaturizer[L,String] with Serializable {
+                                     val pruningModel: Option[SemiCRF.ConstraintSemiCRF[L, String]] = None) extends SemiCRFModel.BIEOFeaturizer[L,String] with Serializable {
 
     def baseWordFeatureIndex = f.wordFeatureIndex
     def baseSpanFeatureIndex = f.spanFeatureIndex

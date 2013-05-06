@@ -68,7 +68,7 @@ object FeaturizedDocument {
 
   def makeFactory(treeProcessor: StandardTreeProcessor,
                   parseConstrainer: ConstraintCoreGrammar[AnnotatedLabel, String],
-                  nerConstrainer: SemiCRF.ConstraintGrammar[NERType.Value, String],
+                  nerConstrainer: SemiCRF.ConstraintSemiCRF[NERType.Value, String],
                   tagWordCounts: Counter2[AnnotatedLabel, String, Double],
                   corefFeaturizer: CorefInstanceFeaturizer)(docs: IndexedSeq[Document]): (Factory, IndexedSeq[FeaturizedDocument]) = {
     val wordFeatureIndex, spanFeatureIndex = Index[Feature]()
@@ -134,7 +134,7 @@ object FeaturizedDocument {
   case class Factory(treeProcessor: StandardTreeProcessor,
                     parseConstrainer: ConstraintCoreGrammar[AnnotatedLabel, String],
 //                     graphFeaturizer: PropertyPropagation.GraphBuilder,
-                    nerConstrainer: SemiCRF.ConstraintGrammar[NERType.Value, String],
+                    nerConstrainer: SemiCRF.ConstraintSemiCRF[NERType.Value, String],
                     srlLabelIndex: Index[String],
                     featurizer: IndexedSpanFeaturizer,
                     corefFeaturizer: CorefInstanceFeaturizer,

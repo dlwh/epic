@@ -5,7 +5,7 @@ import breeze.util.Index
 import epic.framework.Feature
 import breeze.linalg._
 import scala.collection.mutable.ArrayBuffer
-import breeze.collection.mutable.TriangularArray
+import breeze.collection.mutable.{OpenAddressHashArray, TriangularArray}
 
 /**
  *
@@ -101,9 +101,9 @@ object IndexedSpanFeaturizer {
       asRightFeatures(fi) = featureIndex.index(NextWordFeature(f))
     }
 
-    val prevCurBigramFeatures = Array.fill(basicFeatureIndex.size, basicFeatureIndex.size)(-1)
-    val curNextBigramFeatures = Array.fill(basicFeatureIndex.size, basicFeatureIndex.size)(-1)
-    val prevNextBigramFeatures = Array.fill(basicFeatureIndex.size, basicFeatureIndex.size)(-1)
+    val prevCurBigramFeatures = Array.fill(basicFeatureIndex.size)(new OpenAddressHashArray[Int](basicFeatureIndex.size, default= -1))
+    val curNextBigramFeatures = Array.fill(basicFeatureIndex.size)(new OpenAddressHashArray[Int](basicFeatureIndex.size, default= -1))
+    val prevNextBigramFeatures = Array.fill(basicFeatureIndex.size)(new OpenAddressHashArray[Int](basicFeatureIndex.size, default= -1))
 
     for( (words, validSpan) <- corpus) {
       val anch = feat.anchor(words)

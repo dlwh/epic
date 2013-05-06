@@ -4,7 +4,9 @@ import io.{Codec, Source}
 
 /**
  *
- * A Gazeteer is a map from IndexedSeq[W]->L, where the second string is NER type.
+ * A Gazeteer is a map from IndexedSeq[W]->L. That is, it maps strings of words
+ * to a label that we've seen before. For example, you might use a list of countries.
+ * These are very useful for named entity recognition.
  * @author dlwh
  */
 trait Gazetteer[+L, -W] {
