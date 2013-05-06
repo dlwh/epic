@@ -36,7 +36,7 @@ class HMMTest extends FunSuite {
       ('Start,'N,0.0)
     )
 
-    val hmm = new CRF(HMM[Symbol,Symbol]('Start,transitions,emissions, smoothEmissions=false))
+    val hmm = HMM[Symbol,Symbol]('Start,transitions,emissions, smoothEmissions=false)
     val cal: Marginal[Symbol, Symbol] = hmm.marginal(IndexedSeq('U,'U,'N,'U,'U))
 //    val cal: Marginal[Symbol, Symbol] = hmm.marginal(IndexedSeq('U))
     val marginals = (0 until cal.length).map(cal.positionMarginal(_)).map(Encoder.fromIndex(hmm.labelIndex).decode(_))

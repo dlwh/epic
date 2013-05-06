@@ -200,6 +200,12 @@ object ChainNER {
         score
       }
 
+
+      def canStartLongSegment(pos: Int): Boolean = true
+
+
+      def isValidSegment(begin: Int, end: Int): Boolean = messages.spanBeliefs(begin, end) != null
+
       val beginCache = Array.tabulate(labelIndex.size, length){ (l, w) =>
         val f = fs.featuresForWord(w)
         if (f eq null) Double.NegativeInfinity

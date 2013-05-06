@@ -36,7 +36,7 @@ class SemiCRFTest extends FunSuite {
       ('Start,'N,0.0)
     )
 
-    val hmm = SemiCRF.fromCRF(new CRF(HMM[Symbol,Symbol]('Start,transitions,emissions, smoothEmissions=false)))
+    val hmm = SemiCRF.fromCRF(HMM[Symbol,Symbol]('Start,transitions,emissions, smoothEmissions=false))
     val cal: Marginal[Symbol, Symbol] = hmm.marginal(IndexedSeq('U,'U,'N,'U,'U))
 //    val cal: Marginal[Symbol, Symbol] = hmm.marginal(IndexedSeq('U))
     val marginals = (0 until cal.length).map(pos => cal.spanMarginal(pos, pos+1)).map(Encoder.fromIndex(hmm.labelIndex).decode(_))

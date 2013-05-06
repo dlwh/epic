@@ -53,20 +53,20 @@ object SemiCRFModel {
     def featuresForInterior(cur: Int, pos: Int):FeatureVector
     def featuresForSpan(prev: Int, cur: Int, beg: Int, end: Int):FeatureVector
 
-    def featuresForTransition(prev: Int, cur: Int, start: Int, end: Int): FeatureVector = {
+    def featuresForTransition(prev: Int, cur: Int, begin: Int, end: Int): FeatureVector = {
       val acc = new ArrayBuffer[FeatureVector]()
-      val _begin = featuresForBegin(prev, cur, start)
+      val _begin = featuresForBegin(prev, cur, begin)
       acc += _begin
       val _end = featuresForEnd(cur, end)
       acc += _end
-      var p = start+1
+      var p = begin+1
       while (p < end) {
         val w = featuresForInterior(cur, p)
         acc += w
         p += 1
       }
 
-      val forSpan = featuresForSpan(prev, cur, start, end)
+      val forSpan = featuresForSpan(prev, cur, begin, end)
       acc += forSpan
 
       val result = acc.foldLeft(Array.empty[Int])(_ ++ _.data)
@@ -83,6 +83,8 @@ class SemiCRFInference[L, W](weights: DenseVector[Double],
   def viterbi(sentence: IndexedSeq[W], anchoring: SemiCRF.Anchoring[L, W]): Segmentation[L, W] = {
     SemiCRF.viterbi(new Anchoring(sentence, anchoring))
   }
+
+  private val maxMaxLength = (0 until labelIndex.size map (maxLength)).max
 
 
   type Marginal = SemiCRF.Marginal[L, W]
@@ -109,17 +111,17 @@ class SemiCRFInference[L, W](weights: DenseVector[Double],
     val localization = marg.anchoring.asInstanceOf[Anchoring].localization
     val visitor = new TransitionVisitor[L, W] {
 
-      def apply(prev: Int, cur: Int, start: Int, end: Int, count: Double) {
+      def apply(prev: Int, cur: Int, begin: Int, end: Int, count: Double) {
         import localization._
-        axpy(count, featuresForBegin(prev, cur, start), counts.counts)
+        axpy(count, featuresForBegin(prev, cur, begin), counts.counts)
         axpy(count, featuresForEnd(cur, end), counts.counts)
-        var p = start+1
+        var p = begin+1
         while (p < end) {
           axpy(count, featuresForInterior(cur, p), counts.counts)
           p += 1
         }
 
-        axpy(count, featuresForSpan(prev, cur, start, end), counts.counts)
+        axpy(count, featuresForSpan(prev, cur, begin, end), counts.counts)
       }
     }
     marg.visit(visitor)
@@ -138,6 +140,10 @@ class SemiCRFInference[L, W](weights: DenseVector[Double],
     def labelIndex: Index[L] = featurizer.labelIndex
 
     def startSymbol: L = featurizer.startSymbol
+
+    def canStartLongSegment(pos: Int): Boolean = true
+
+    def isValidSegment(begin: Int, end: Int): Boolean = (end - begin) < maxMaxLength
   }
 
   class Anchoring(val words: IndexedSeq[W], augment: SemiCRF.Anchoring[L, W]) extends SemiCRF.Anchoring[L, W] {
@@ -160,15 +166,21 @@ class SemiCRFInference[L, W](weights: DenseVector[Double],
       else weights dot f
     }
 
-    private def okSpan(beg: Int, end: Int, cur: Int) = (end - beg <= maxLength(cur)) && {
+
+    def canStartLongSegment(pos: Int): Boolean = augment.canStartLongSegment(pos) && localization.canStartRealSpan(pos)
+
+    def isValidSegment(beg: Int, end: Int): Boolean = {
       var ok = localization.canStartRealSpan(beg)
       var pos = beg + 1
-      while(pos < end && ok) {
+      while (pos < end && ok) {
         ok = localization.canBeInterior(pos)
         pos += 1
       }
       ok
+
     }
+
+    private def okSpan(beg: Int, end: Int, cur: Int) = (end - beg <= maxLength(cur)) && isValidSegment(beg, end)
 
     def scoreTransition(prev: Int, cur: Int, beg: Int, end: Int): Double = {
       val score = if (beg + 1 != end && !okSpan(beg, end, cur)) {
@@ -229,6 +241,8 @@ class SemiCRFInference[L, W](weights: DenseVector[Double],
 
     def startSymbol = featurizer.startSymbol
   }
+
+
 
   private val negInfArray = Array.fill(labelIndex.size)(Double.NegativeInfinity)
   private val nanArray = Array.fill(labelIndex.size)(Double.NaN)

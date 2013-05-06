@@ -258,6 +258,7 @@ object SRL {
     def maxSegmentLength(label: Int): Int = if(label == iNone) 0 else if(label == iOutside) 1 else 50
 
 
+
     def scoreTransition(prev: Int, cur: Int, beg: Int, end: Int): Double = {
       score(beg, end, cur)
     }
@@ -289,6 +290,9 @@ object SRL {
       score
     }
 
+
+    def canStartLongSegment(pos: Int): Boolean = true
+    def isValidSegment(begin: Int, end: Int): Boolean = true
 
     def score(begin: Int, end: Int, label: Int):Double = {
       if(scoreCache(begin,end)(label).isNaN) {
