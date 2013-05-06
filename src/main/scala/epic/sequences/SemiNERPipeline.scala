@@ -152,7 +152,7 @@ object SemiConllNERPipeline {
   case class Params(path: File,
                     test: File,
                     name: String = "eval/ner",
-                    nfiles: Int = 100000,
+                    nsents: Int = 100000,
                     nthreads: Int = -1,
                     iterPerEval: Int = 20,
                     opt: OptParams)
@@ -163,7 +163,7 @@ object SemiConllNERPipeline {
           val standardTrain = CONLLSequenceReader.readTrain(new FileInputStream(params.path), params.path.getName).toIndexedSeq
           val standardTest = CONLLSequenceReader.readTrain(new FileInputStream(params.test), params.path.getName).toIndexedSeq
 
-          standardTrain.map(makeSegmentation) -> standardTest.map(makeSegmentation)
+          standardTrain.take(params.nsents).map(makeSegmentation) -> standardTrain.take(params.nsents).map(makeSegmentation)
     }
 
 
@@ -172,7 +172,8 @@ object SemiConllNERPipeline {
     val obj = new ModelObjective(model, train, params.nthreads)
     val cached = new CachedBatchDiffFunction(obj)
 
-    val checking = new RandomizedGradientCheckingFunction[Int, DenseVector[Double]](cached, toString={ (i: Int) => model.featureIndex.get(i).toString})
+    GradientTester.test(cached, obj.initialWeightVector(true), toString={(i: Int) => model.featureIndex.get(i).toString})
+
 //
     def eval(state: FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State) {
       val out = new PrintWriter(new BufferedOutputStream(new FileOutputStream("weights.txt")))

@@ -34,7 +34,7 @@ class SemiCRF[L, W](val model: SemiCRF.Grammar[L, W]) extends Serializable {
   }
 
   def bestSequence(w: IndexedSeq[W], id: String = "") = {
-    SemiCRF.viterbi(model.anchor(w), id)
+    SemiCRF.posteriorDecode(marginal(w), id)
   }
 
 

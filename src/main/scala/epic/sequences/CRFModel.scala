@@ -43,8 +43,8 @@ class CRFModel[L, W](val featureIndex: Index[Feature],
 
 
 @SerialVersionUID(1)
-class CRFInference[L, W](weights: DenseVector[Double],
-                         featureIndex: Index[Feature],
+class CRFInference[L, W](val weights: DenseVector[Double],
+                         val featureIndex: Index[Feature],
                          featurizer: CRF.IndexedFeaturizer[L, W]) extends AugmentableInference[TaggedSequence[L, W], CRF.Anchoring[L, W]] with CRF.Grammar[L, W] with Serializable {
   def viterbi(sentence: IndexedSeq[W], anchoring: CRF.Anchoring[L, W]): TaggedSequence[L, W] = {
     CRF.viterbi(new Anchoring(sentence, anchoring))

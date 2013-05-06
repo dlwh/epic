@@ -1,10 +1,10 @@
 package epic.sequences
 
 import breeze.optimize.FirstOrderMinimizer.OptParams
+import java.io._
 import epic.trees.{AnnotatedLabel, ProcessedTreebank}
 import breeze.config.CommandLineParser
-import epic.framework.ModelObjective
-import breeze.optimize.CachedBatchDiffFunction
+import breeze.util.Encoder
 
 /**
  *
