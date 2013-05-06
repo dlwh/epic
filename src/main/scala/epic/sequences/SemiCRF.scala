@@ -24,21 +24,22 @@ import breeze.linalg.DenseVector
  * @author dlwh
  */
 @SerialVersionUID(1L)
-class SemiCRF[L, W](val model: SemiCRF.Grammar[L, W]) extends Serializable {
+trait SemiCRF[L, W] extends Serializable {
+  def anchor(w: IndexedSeq[W]): SemiCRF.Anchoring[L, W]
+  def labelIndex: Index[L]
+  def startSymbol: L
 
   def marginal(w: IndexedSeq[W]) = {
-     SemiCRF.Marginal(model.anchor(w))
+     SemiCRF.Marginal(anchor(w))
   }
 
   def goldMarginal(segmentation: IndexedSeq[(L,Span)], w: IndexedSeq[W]):Marginal[L, W] = {
-    SemiCRF.Marginal.goldMarginal(model.anchor(w), segmentation)
+    SemiCRF.Marginal.goldMarginal(anchor(w), segmentation)
   }
 
   def bestSequence(w: IndexedSeq[W], id: String = "") = {
     SemiCRF.posteriorDecode(marginal(w), id)
   }
-
-  def labelIndex = model.labelIndex
 
 
 }
@@ -69,40 +70,31 @@ object SemiCRF {
     buildSimple(fixedData, false, false, gazetteer, opt)
   }
 
-  def fromCRF[L, W](crf: CRF[L, W]):SemiCRF[L, W] = {
-    val model = new Grammar[L, W] {
-      def startSymbol: L = crf.startSymbol
+  def fromCRF[L, W](crf: CRF[L, W]):SemiCRF[L, W] = new SemiCRF[L, W] {
+    def startSymbol: L = crf.startSymbol
 
-      def anchor(w: IndexedSeq[W]): Anchoring[L, W] = new Anchoring[L, W] {
-        val anch = crf.anchor(w)
-        def words: IndexedSeq[W] = w
+    def anchor(w: IndexedSeq[W]): Anchoring[L, W] = new Anchoring[L, W] {
+      val anch = crf.anchor(w)
+      def words: IndexedSeq[W] = w
 
-        def maxSegmentLength(label: Int): Int = 1
+      def maxSegmentLength(label: Int): Int = 1
 
-        def scoreTransition(prev: Int, cur: Int, begin: Int, end: Int): Double = {
-          if(end - begin != 1) {
-            Double.NegativeInfinity
-          } else {
-            anch.scoreTransition(begin, prev, cur)
-          }
+      def scoreTransition(prev: Int, cur: Int, begin: Int, end: Int): Double = {
+        if(end - begin != 1) {
+          Double.NegativeInfinity
+        } else {
+          anch.scoreTransition(begin, prev, cur)
         }
-
-        def labelIndex: Index[L] = crf.labelIndex
-
-        def startSymbol: L = crf.startSymbol
       }
 
       def labelIndex: Index[L] = crf.labelIndex
+
+      def startSymbol: L = crf.startSymbol
     }
-    new SemiCRF(model)
+
+    def labelIndex: Index[L] = crf.labelIndex
   }
 
-
-  trait Grammar[L, W] {
-    def anchor(w: IndexedSeq[W]): Anchoring[L, W]
-    def labelIndex: Index[L]
-    def startSymbol: L
-  }
 
   trait Anchoring[L, W] {
     def words : IndexedSeq[W]
@@ -220,10 +212,7 @@ object SemiCRF {
           else math.exp(withoutTrans + anchoring.scoreTransition(prev, cur, begin, end) - logPartition)
         }
 
-
-
         def logPartition: Double = partition
-//        println(words + " " + partition)
       }
 
     }
@@ -341,9 +330,9 @@ object SemiCRF {
     /**
      * computes the sum of all derivations, starting from a label that ends at pos, and ending
      * at the end of the sequence
-     * @param scorer
-     * @tparam L
-     * @tparam W
+     * @param scorer anchoring to score spans
+     * @tparam L label type
+     * @tparam W word type
      * @return backwardScore(pos)(label)
      */
     private def backwardScores[L, W](scorer: SemiCRF.Anchoring[L, W]): Array[Array[Double]] = {
@@ -408,13 +397,13 @@ object SemiCRF {
     def spanAllowed(b: Int, e:Int) = allowedStarts(b).nonEmpty && allowedLabels(b,e).nonEmpty
   }
 
-  trait ConstraintGrammar[L, W] extends Grammar[L, W] {
+  trait ConstraintSemiCRF[L, W] extends SemiCRF[L, W] {
     def constraints(w: IndexedSeq[W]): SpanConstraints
     def constraints(seg: Segmentation[L,W], keepGold: Boolean = true): SpanConstraints
   }
 
   @SerialVersionUID(1L)
-  class IdentityConstraintGrammar[L, W](val labelIndex: Index[L], val startSymbol: L) extends ConstraintGrammar[L, W] with Serializable { outer =>
+  class IdentityConstraintSemiCRF[L, W](val labelIndex: Index[L], val startSymbol: L) extends ConstraintSemiCRF[L, W] with Serializable { outer =>
     def anchor(w: IndexedSeq[W]) = new Anchoring[L,W]() {
       def words = w
       def maxSegmentLength(label: Int) = w.size
@@ -434,9 +423,9 @@ object SemiCRF {
   }
 
   @SerialVersionUID(1L)
-  class BaseModelConstraintGrammar[L, W](val crf: SemiCRF[L, W], val threshold: Double = 1E-5) extends ConstraintGrammar[L, W] with Serializable {
-    def startSymbol: L = crf.model.startSymbol
-    def labelIndex: Index[L] = crf.model.labelIndex
+  class BaseModelConstraintSemiCRF[L, W](val crf: SemiCRF[L, W], val threshold: Double = 1E-5) extends ConstraintSemiCRF[L, W] with Serializable {
+    def startSymbol: L = crf.startSymbol
+    def labelIndex: Index[L] = crf.labelIndex
 
     // TODO: make weak
     @transient
@@ -478,8 +467,8 @@ object SemiCRF {
 
         def maxSegmentLength(label: Int): Int = c.maxLengths(label)
 
-        def startSymbol: L = crf.model.startSymbol
-        def labelIndex: Index[L] = crf.model.labelIndex
+        def startSymbol: L = crf.startSymbol
+        def labelIndex: Index[L] = crf.labelIndex
 
         def scoreTransition(prev: Int, cur: Int, begin: Int, end: Int): Double =
           numerics.logI(c.allowedLabels(begin, end).contains(cur))

@@ -11,8 +11,7 @@ import breeze.optimize.CachedBatchDiffFunction
 import breeze.features.FeatureVector
 
 /**
- * A -Markov Linear Chain Conditional Random Field, that is, the length
- * of time spent in a state may be longer than 1 tick. Useful for field segmentation or NER.
+ * A -Markov Linear Chain Conditional Random Field. Useful for POS tagging, etc.
  *
  * As usual in Epic, all the heavy lifting is done in the companion object and Marginals.
  * @author dlwh

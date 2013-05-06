@@ -26,8 +26,7 @@ class SemiCRFModel[L, W](val featureIndex: Index[Feature],
   def labelIndex: Index[L] = featurizer.labelIndex
 
   def extractCRF(weights: DenseVector[Double]) = {
-    val grammar = inferenceFromWeights(weights)
-    new SemiCRF(grammar)
+    inferenceFromWeights(weights)
   }
 
   type Inference = SemiCRFInference[L, W]
