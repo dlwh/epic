@@ -368,11 +368,12 @@ object SegmentationModelFactory {
       def featuresForEnd(cur: Int, pos: Int): FeatureVector = new FeatureVector(loc.featuresForWord(pos - 1).map(wordFeatures(cur)(2)(_)))
 
       def featuresForSpan(prev: Int, cur: Int, beg: Int, end: Int): FeatureVector = {
-        if(!okSpan(beg, end) && beg != end - 1) null
-        else {
-          val f = loc.featuresForSpan(beg, end)
-          new FeatureVector(f.map(spanFeatures(cur)) :+ transitionFeatures(prev)(cur))
-        }
+        new FeatureVector(Array.empty)
+//        if(!okSpan(beg, end) && beg != end - 1) null
+//        else {
+//          val f = loc.featuresForSpan(beg, end)
+//          new FeatureVector(f.map(spanFeatures(cur)) :+ transitionFeatures(prev)(cur))
+//        }
       }
     }
   }

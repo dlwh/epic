@@ -14,6 +14,7 @@ import breeze.collection.mutable.TriangularArray
 import java.io.{ObjectInputStream, IOException}
 import breeze.optimize.FirstOrderMinimizer.OptParams
 import breeze.optimize.CachedBatchDiffFunction
+import breeze.linalg.DenseVector
 
 /**
  * A Semi-Markov Linear Chain Conditional Random Field, that is, the length
@@ -36,6 +37,8 @@ class SemiCRF[L, W](val model: SemiCRF.Grammar[L, W]) extends Serializable {
   def bestSequence(w: IndexedSeq[W], id: String = "") = {
     SemiCRF.posteriorDecode(marginal(w), id)
   }
+
+  def labelIndex = model.labelIndex
 
 
 }
@@ -66,6 +69,35 @@ object SemiCRF {
     buildSimple(fixedData, false, false, gazetteer, opt)
   }
 
+  def fromCRF[L, W](crf: CRF[L, W]):SemiCRF[L, W] = {
+    val model = new Grammar[L, W] {
+      def startSymbol: L = crf.model.startSymbol
+
+
+      def anchor(w: IndexedSeq[W]): Anchoring[L, W] = new Anchoring[L, W] {
+        val anch = crf.model.anchor(w)
+        def words: IndexedSeq[W] = w
+
+        def maxSegmentLength(label: Int): Int = 1
+
+        def scoreTransition(prev: Int, cur: Int, begin: Int, end: Int): Double = {
+          if(end - begin != 1) {
+            Double.NegativeInfinity
+          } else {
+            anch.scoreTransition(begin, prev, cur)
+          }
+        }
+
+        def labelIndex: Index[L] = crf.labelIndex
+
+        def startSymbol: L = crf.model.startSymbol
+      }
+
+      def labelIndex: Index[L] = crf.model.labelIndex
+    }
+    new SemiCRF(model)
+  }
+
 
   trait Grammar[L, W] {
     def anchor(w: IndexedSeq[W]): Anchoring[L, W]
@@ -77,7 +109,7 @@ object SemiCRF {
     def words : IndexedSeq[W]
     def length: Int = words.length
     def maxSegmentLength(label: Int): Int
-    def scoreTransition(prev: Int, cur: Int, beg: Int, end: Int):Double
+    def scoreTransition(prev: Int, cur: Int, begin: Int, end: Int):Double
     def labelIndex: Index[L]
     def startSymbol: L
 
@@ -86,7 +118,7 @@ object SemiCRF {
   }
 
   trait TransitionVisitor[L, W] {
-    def apply(prev: Int, cur: Int, beg: Int, end: Int, count: Double)
+    def apply(prev: Int, cur: Int, begin: Int, end: Int, count: Double)
   }
 
   trait Marginal[L, W] extends epic.framework.Marginal {
@@ -98,10 +130,10 @@ object SemiCRF {
     def visit( f: TransitionVisitor[L, W])
 
     /** normalized probability of seeing segment with transition */
-    def transitionMarginal(prev:Int, cur: Int, beg: Int, end: Int):Double
+    def transitionMarginal(prev:Int, cur: Int, begin: Int, end: Int):Double
     def logPartition: Double
 
-    def spanMarginal(cur: Int, begin: Int, end: Int) = {
+    def spanMarginal(cur: Int, begin: Int, end: Int): Double = {
       var prev = 0
       val numLabels: Int = anchoring.labelIndex.size
       var sum = 0.0
@@ -111,13 +143,14 @@ object SemiCRF {
       }
       sum
     }
+    def spanMarginal(begin: Int, end: Int):DenseVector[Double] = DenseVector.tabulate(anchoring.labelIndex.size)(spanMarginal(_, begin, end))
 
     def computeSpanConstraints(threshold: Double = 1E-5):SpanConstraints = {
       val spanMarginals = TriangularArray.fill(length+1)(new Array[Double](anchoring.labelIndex.size))
 
       this visit new TransitionVisitor[L, W] {
-        def apply(prev: Int, cur: Int, beg: Int, end: Int, count: Double)  {
-          spanMarginals(beg, end)(cur) += count
+        def apply(prev: Int, cur: Int, begin: Int, end: Int, count: Double)  {
+          spanMarginals(begin, end)(cur) += count
         }
       }
 
@@ -182,10 +215,10 @@ object SemiCRF {
 
 
         /** Log-normalized probability of seing segment with transition */
-        def transitionMarginal(prev: Int, cur: Int, beg: Int, end: Int): Double = {
-          val withoutTrans = forwardScores(beg)(prev) + backwardScore(end)(cur)
+        def transitionMarginal(prev: Int, cur: Int, begin: Int, end: Int): Double = {
+          val withoutTrans = forwardScores(begin)(prev) + backwardScore(end)(cur)
           if(withoutTrans.isInfinite) 0.0
-          else math.exp(withoutTrans + anchoring.scoreTransition(prev, cur, beg, end) - logPartition)
+          else math.exp(withoutTrans + anchoring.scoreTransition(prev, cur, begin, end) - logPartition)
         }
 
 
@@ -237,8 +270,8 @@ object SemiCRF {
         }
 
         /** normalized probability of seeing segment with transition */
-        def transitionMarginal(prev: Int, cur: Int, beg: Int, end: Int): Double = {
-          numerics.I(goldEnds(beg) == end && goldLabels(beg) == cur && goldPrevLabels(beg) == prev)
+        def transitionMarginal(prev: Int, cur: Int, begin: Int, end: Int): Double = {
+          numerics.I(goldEnds(begin) == end && goldLabels(begin) == cur && goldPrevLabels(begin) == prev)
         }
 
 
@@ -386,7 +419,7 @@ object SemiCRF {
     def anchor(w: IndexedSeq[W]) = new Anchoring[L,W]() {
       def words = w
       def maxSegmentLength(label: Int) = w.size
-      def scoreTransition(prev: Int, cur: Int, beg: Int, end: Int) = 0.0
+      def scoreTransition(prev: Int, cur: Int, begin: Int, end: Int) = 0.0
       def labelIndex = outer.labelIndex
       def startSymbol = outer.startSymbol
     }
@@ -449,8 +482,8 @@ object SemiCRF {
         def startSymbol: L = crf.model.startSymbol
         def labelIndex: Index[L] = crf.model.labelIndex
 
-        def scoreTransition(prev: Int, cur: Int, beg: Int, end: Int): Double =
-          numerics.logI(c.allowedLabels(beg, end).contains(cur))
+        def scoreTransition(prev: Int, cur: Int, begin: Int, end: Int): Double =
+          numerics.logI(c.allowedLabels(begin, end).contains(cur))
 
       }
 
