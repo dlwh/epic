@@ -18,20 +18,23 @@ import breeze.features.FeatureVector
  * @author dlwh
  */
 @SerialVersionUID(1L)
-class CRF[L, W](val model: CRF.Grammar[L, W]) extends Serializable {
+trait CRF[L, W] extends Serializable {
 
-  def labelIndex = model.labelIndex
+  def labelIndex : Index[L]
+  def startSymbol: L
+
+  def anchor(w: IndexedSeq[W]):CRF.Anchoring[L, W]
 
   def marginal(w: IndexedSeq[W]) = {
-     CRF.Marginal(model.anchor(w))
+     CRF.Marginal(anchor(w))
   }
 
   def goldMarginal(segmentation: IndexedSeq[L], w: IndexedSeq[W]):CRF.Marginal[L, W] = {
-    CRF.Marginal.goldMarginal(model.anchor(w), segmentation)
+    CRF.Marginal.goldMarginal(anchor(w), segmentation)
   }
 
   def bestSequence(w: IndexedSeq[W], id: String = "") = {
-    CRF.viterbi(model.anchor(w), id)
+    CRF.viterbi(anchor(w), id)
   }
 
 
@@ -64,12 +67,6 @@ object CRF {
     buildSimple(fixedData, false, gazetteer, opt)
   }
 
-
-  trait Grammar[L, W] {
-    def anchor(w: IndexedSeq[W]): Anchoring[L, W]
-    def labelIndex: Index[L]
-    def startSymbol: L
-  }
 
   trait Anchoring[L, W] {
     def words : IndexedSeq[W]

@@ -71,11 +71,10 @@ object SemiCRF {
 
   def fromCRF[L, W](crf: CRF[L, W]):SemiCRF[L, W] = {
     val model = new Grammar[L, W] {
-      def startSymbol: L = crf.model.startSymbol
-
+      def startSymbol: L = crf.startSymbol
 
       def anchor(w: IndexedSeq[W]): Anchoring[L, W] = new Anchoring[L, W] {
-        val anch = crf.model.anchor(w)
+        val anch = crf.anchor(w)
         def words: IndexedSeq[W] = w
 
         def maxSegmentLength(label: Int): Int = 1
@@ -90,10 +89,10 @@ object SemiCRF {
 
         def labelIndex: Index[L] = crf.labelIndex
 
-        def startSymbol: L = crf.model.startSymbol
+        def startSymbol: L = crf.startSymbol
       }
 
-      def labelIndex: Index[L] = crf.model.labelIndex
+      def labelIndex: Index[L] = crf.labelIndex
     }
     new SemiCRF(model)
   }

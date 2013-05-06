@@ -5,7 +5,7 @@ import epic.sequences.CRF.Anchoring
 import breeze.linalg._
 
 object HMM {
-  def apply[L, W](startLabel: L, transitions: Counter2[L, L, Double], emissions: Counter2[L, W, Double], smoothEmissions: Boolean = false):CRF.Grammar[L, W] = {
+  def apply[L, W](startLabel: L, transitions: Counter2[L, L, Double], emissions: Counter2[L, W, Double], smoothEmissions: Boolean = false):CRF[L, W] = {
     val li = Index[L]()
     li.index(startLabel)
     for( (l1, l2) <- transitions.keysIterator) {
@@ -22,7 +22,7 @@ object HMM {
     val encodedTransitions = logAndNormalize(enc.encode(transitions), Axis._1)
     val totalCount = sum(labelCounts)
 
-    new CRF.Grammar[L, W] {
+    new CRF[L, W] {
       def anchor(w: IndexedSeq[W]): Anchoring[L, W] = new Anchoring[L, W] {
 
         val wcs = w.map(wordCounts(_))
