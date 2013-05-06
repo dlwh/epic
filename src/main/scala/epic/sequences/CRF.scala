@@ -62,7 +62,7 @@ object CRF {
 
     val obj = new ModelObjective(model, data)
     val cached = new CachedBatchDiffFunction(obj)
-    val weights = opt.minimize(cached, obj.initialWeightVector(randomize = true))
+    val weights = opt.minimize(cached, obj.initialWeightVector(randomize = false))
     val crf = model.extractCRF(weights)
 
     crf

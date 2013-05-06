@@ -111,17 +111,17 @@ class SemiCRFInference[L, W](weights: DenseVector[Double],
     val localization = marg.anchoring.asInstanceOf[Anchoring].localization
     val visitor = new TransitionVisitor[L, W] {
 
-      def apply(prev: Int, cur: Int, begin: Int, end: Int, count: Double) {
+      def visitTransition(prev: Int, cur: Int, begin: Int, end: Int, count: Double) {
         import localization._
-        axpy(count, featuresForBegin(prev, cur, begin), counts.counts)
-        axpy(count, featuresForEnd(cur, end), counts.counts)
+        axpy(count * scale, featuresForBegin(prev, cur, begin), counts.counts)
+        axpy(count * scale, featuresForEnd(cur, end), counts.counts)
         var p = begin+1
         while (p < end) {
-          axpy(count, featuresForInterior(cur, p), counts.counts)
+          axpy(count * scale, featuresForInterior(cur, p), counts.counts)
           p += 1
         }
 
-        axpy(count, featuresForSpan(prev, cur, begin, end), counts.counts)
+        axpy(count * scale, featuresForSpan(prev, cur, begin, end), counts.counts)
       }
     }
     marg.visit(visitor)
@@ -373,19 +373,18 @@ object SegmentationModelFactory {
 
       def featureIndex: Index[Feature] = IndexedStandardFeaturizer.this.featureIndex
 
-
       def featuresForBegin(prev: Int, l: Int, w: Int): FeatureVector = new FeatureVector(loc.featuresForWord(w).map(wordFeatures(l)(0)(_)))
       def featuresForInterior(cur: Int, pos: Int): FeatureVector = new FeatureVector(loc.featuresForWord(pos).map(wordFeatures(cur)(1)(_)))
 
       def featuresForEnd(cur: Int, pos: Int): FeatureVector = new FeatureVector(loc.featuresForWord(pos - 1).map(wordFeatures(cur)(2)(_)))
 
       def featuresForSpan(prev: Int, cur: Int, beg: Int, end: Int): FeatureVector = {
-        new FeatureVector(Array.empty)
-//        if(!okSpan(beg, end) && beg != end - 1) null
-//        else {
-//          val f = loc.featuresForSpan(beg, end)
-//          new FeatureVector(f.map(spanFeatures(cur)) :+ transitionFeatures(prev)(cur))
-//        }
+//        new FeatureVector(Array.empty)
+        if(!okSpan(beg, end) && beg != end - 1) null
+        else {
+          val f = loc.featuresForSpan(beg, end)
+          new FeatureVector(f.map(spanFeatures(cur)) :+ transitionFeatures(prev)(cur))
+        }
       }
     }
   }

@@ -146,7 +146,7 @@ object SRL {
         val labelMarginals = TriangularArray.fill(s.length+1)(null:Array[Double])
         val localization = f.anchoring.asInstanceOf[Anchoring].featurizer
         f visit new TransitionVisitor[Option[String], String] {
-          def apply(prev: Int, cur: Int, beg: Int, end: Int, count: Double) {
+          def visitTransition(prev: Int, cur: Int, beg: Int, end: Int, count: Double) {
             var arr = labelMarginals(beg,end)
             if (arr eq null) {
               arr = new Array[Double](labelIndex.size)

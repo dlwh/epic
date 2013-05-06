@@ -285,7 +285,7 @@ object ChainNER {
 
           }
 
-          def apply(prev: Int, cur: Int, start: Int, end: Int, count: Double) {
+          def visitTransition(prev: Int, cur: Int, start: Int, end: Int, count: Double) {
             daxpy(count, fs.featuresForWord(start), wordFeatures(cur)(0), counts)
             daxpy(count, fs.featuresForWord(end-1), wordFeatures(cur)(2), counts)
             var p = start+1

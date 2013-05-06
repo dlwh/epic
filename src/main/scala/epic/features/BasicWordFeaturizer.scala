@@ -84,7 +84,7 @@ class BasicWordFeaturizer(tagWordCounts: Counter2[_, String, Double],
       if(index >= 0) {
          BasicWordFeaturizer.this.fullFeatures(index).toArray
       } else (
-        inner.apply(wordIndex.get(i)).map(featureIndex(_)).toArray ++ gazetteer.lookupWord(wordIndex.get(i)).map(f => featureIndex(WordFeature(f, 'WordSeenInSegment)))
+        inner.apply(words(i)).map(featureIndex(_)).toArray ++ gazetteer.lookupWord(words(i)).map(f => featureIndex(WordFeature(f, 'WordSeenInSegment)))
       ).filter(_ != -1)
     }
 

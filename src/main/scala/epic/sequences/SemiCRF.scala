@@ -13,7 +13,7 @@ import collection.immutable.BitSet
 import breeze.collection.mutable.TriangularArray
 import java.io.{ObjectInputStream, IOException}
 import breeze.optimize.FirstOrderMinimizer.OptParams
-import breeze.optimize.CachedBatchDiffFunction
+import breeze.optimize.{GradientTester, CachedBatchDiffFunction}
 import breeze.linalg.DenseVector
 
 /**
@@ -41,7 +41,6 @@ trait SemiCRF[L, W] extends Serializable {
     SemiCRF.posteriorDecode(marginal(w), id)
   }
 
-
 }
 
 object SemiCRF {
@@ -54,7 +53,8 @@ object SemiCRF {
 
     val obj = new ModelObjective(model, data)
     val cached = new CachedBatchDiffFunction(obj)
-    val weights = opt.minimize(cached, obj.initialWeightVector(randomize = true))
+//    GradientTester.test(cached, obj.initialWeightVector(true), randFraction = 1.0, toString={(i: Int) => model.featureIndex.get(i).toString})
+    val weights = opt.minimize(cached, obj.initialWeightVector(false))
     val crf = model.extractCRF(weights)
 
     crf
@@ -115,7 +115,7 @@ object SemiCRF {
   }
 
   trait TransitionVisitor[L, W] {
-    def apply(prev: Int, cur: Int, begin: Int, end: Int, count: Double)
+    def visitTransition(prev: Int, cur: Int, begin: Int, end: Int, count: Double)
   }
 
   trait Marginal[L, W] extends epic.framework.Marginal {
@@ -146,7 +146,7 @@ object SemiCRF {
       val spanMarginals = TriangularArray.fill(length+1)(new Array[Double](anchoring.labelIndex.size))
 
       this visit new TransitionVisitor[L, W] {
-        def apply(prev: Int, cur: Int, begin: Int, end: Int, count: Double)  {
+        def visitTransition(prev: Int, cur: Int, begin: Int, end: Int, count: Double)  {
           spanMarginals(begin, end)(cur) += count
         }
       }
@@ -199,7 +199,7 @@ object SemiCRF {
                   while (prevLabel < numLabels) {
                     val score = transitionMarginal(prevLabel, label, begin, end)
                     if(score != 0.0)
-                      f(prevLabel, label, begin, end, score)
+                      f.visitTransition(prevLabel, label, begin, end, score)
                     prevLabel += 1
                   }
                 }
@@ -258,7 +258,7 @@ object SemiCRF {
           for( (l,span) <- segmentation) {
             assert(span.start == lastEnd)
             val symbol = scorer.labelIndex(l)
-            f.apply(lastSymbol, symbol, span.start, span.end, 1.0)
+            f.visitTransition(lastSymbol, symbol, span.start, span.end, 1.0)
             lastEnd = span.end
             lastSymbol = symbol
           }
