@@ -17,7 +17,7 @@ package projections
  limitations under the License.
 */
 import breeze.collection.mutable.TriangularArray
-import breeze.config.{CommandLineParser, Help, Configuration}
+import breeze.config.{CommandLineParser, Help}
 import breeze.util.Index
 import collection.immutable.BitSet
 import java.io._
@@ -25,9 +25,8 @@ import ConstraintAnchoring.RawConstraints
 import epic.trees._
 import collection.mutable.ArrayBuffer
 import breeze.stats.distributions.{Rand, Binomial}
-import projections.ConstraintCoreGrammar.PruningStatistics
+import epic.parser.projections.ConstraintCoreGrammar.PruningStatistics
 import breeze.linalg.DenseVector
-import epic.parser.ParseChart.SparsityPattern
 import java.util
 import epic.lexicon.Lexicon
 
@@ -39,23 +38,23 @@ import epic.lexicon.Lexicon
 class ConstraintAnchoring[L, W](val grammar: BaseGrammar[L],
                              val lexicon: Lexicon[L, W],
                              val words: IndexedSeq[W],
-                             override val sparsityPattern: SparsityPattern) extends CoreAnchoring[L, W] with Serializable {
+                             override val sparsityPattern: ChartConstraints[L]) extends CoreAnchoring[L, W] with Serializable {
   def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = 0.0
 
 
   def scoreUnaryRule(begin: Int, end: Int, rule: Int) = {
-    breeze.numerics.logI(sparsityPattern.activeLabelsTop(begin, end).contains(grammar.parent(rule)))
+    breeze.numerics.logI(sparsityPattern.top.isAllowedLabeledSpan(begin, end, grammar.parent(rule)))
   }
 
   def scoreSpan(begin: Int, end: Int, tag: Int) = {
-    breeze.numerics.logI(sparsityPattern.activeLabelsBot(begin, end).contains(tag))
+    breeze.numerics.logI(sparsityPattern.bot.isAllowedLabeledSpan(begin, end, tag))
   }
 }
 
 object ConstraintAnchoring {
   @SerialVersionUID(2)
-  case class RawConstraints(sparsity: ParseChart.SparsityPattern) {
-    def toAnchoring[L, W](grammar: BaseGrammar[L], lexicon: Lexicon[L, W], words: IndexedSeq[W]) = {
+  case class RawConstraints[L](sparsity: ChartConstraints[L]) {
+    def toAnchoring[W](grammar: BaseGrammar[L], lexicon: Lexicon[L, W], words: IndexedSeq[W]) = {
       new ConstraintAnchoring(grammar, lexicon, words, sparsity)
     }
   }
@@ -94,12 +93,12 @@ class ConstraintCoreGrammar[L, W](val augmentedGrammar: AugmentedGrammar[L, W], 
     buildConstraints(charts, goldTags)
   }
 
-  def rawConstraints(words: IndexedSeq[W], gold: GoldTagPolicy[L] = GoldTagPolicy.noGoldTags):RawConstraints = {
+  def rawConstraints(words: IndexedSeq[W], gold: GoldTagPolicy[L] = GoldTagPolicy.noGoldTags):RawConstraints[L] = {
     val charts = ChartMarginal(augmentedGrammar, words)
     rawConstraints(charts, gold)
   }
 
-  def rawConstraints(marg: ParseMarginal[L, W], gold: GoldTagPolicy[L]): RawConstraints = {
+  def rawConstraints(marg: ParseMarginal[L, W], gold: GoldTagPolicy[L]): RawConstraints[L] = {
     val length = marg.length
     val (botLabelScores, unaryScores) = computeScores(length, marg)
 
@@ -112,11 +111,12 @@ class ConstraintCoreGrammar[L, W](val augmentedGrammar: AugmentedGrammar[L, W], 
                                                     unaryScores,grammar.labelIndex,
                                                     gold.isGoldTopTag(_, _, _))
 
-    val hasMaximalProjection: BitSet = BitSet.empty ++ (0 until labelThresholds.length).filter{ i =>
-      ((labelThresholds(i) ne null) && (topLabelThresholds(i) ne null)) && ((labelThresholds(i)|topLabelThresholds(i)) -- synthetics).nonEmpty
-    }
+//    val hasMaximalProjection: BitSet = BitSet.empty ++ (0 to length).filter{ i =>
+//      ((labelThresholds(i) ne null) && (topLabelThresholds(i) ne null)) && ((labelThresholds(i)|topLabelThresholds(i)) -- synthetics).nonEmpty
+//    }
 
-    val pattern = ConstraintCoreGrammar.ConstraintSparsity(labelThresholds, topLabelThresholds, hasMaximalProjection)
+    //TODO: maximal projections
+    val pattern = ChartConstraints(labelThresholds, topLabelThresholds)//, hasMaximalProjection)
 
     RawConstraints(pattern)
   }
@@ -125,7 +125,7 @@ class ConstraintCoreGrammar[L, W](val augmentedGrammar: AugmentedGrammar[L, W], 
   private def extractLabelThresholds(length: Int, numLabels: Int,
                                      scores: Array[Array[Double]],
                                      index: Index[_],
-                                     isGold: (Int, Int, Int)=>Boolean): Array[BitSet] = {
+                                     isGold: (Int, Int, Int)=>Boolean): TriangularArray[BitSet] = {
     TriangularArray.tabulate[BitSet](length + 1) { (i, j) =>
         val arr = scores(TriangularArray.index(i, j))
         val thresholdedTags = if (arr eq null) {
@@ -142,7 +142,7 @@ class ConstraintCoreGrammar[L, W](val augmentedGrammar: AugmentedGrammar[L, W], 
         val result = thresholdedTags ++ goldTags
         if (result.nonEmpty) result
         else null
-    }.data
+    }
   }
 
   def computePruningStatistics(words: IndexedSeq[W], gold: GoldTagPolicy[L]): (PruningStatistics, PruningStatistics) = {
@@ -247,28 +247,6 @@ object ConstraintCoreGrammar {
     def empty(nsyms: Int) = PruningStatistics(Array.empty, 0, DenseVector.zeros(nsyms))
   }
 
-  @SerialVersionUID(1L)
-  private case class ConstraintSparsity(bot: Array[BitSet], top: Array[BitSet], maximalProjectionIndices: BitSet) extends SparsityPattern with Serializable {
-    val activeTriangularIndices: BitSet = BitSet.empty ++ (0 until bot.length).filter{ i =>
-      (bot(i) != null && bot(i).nonEmpty) || (top(i) != null && top(i).nonEmpty)
-    }
-
-
-
-    def activeLabelsTop(begin: Int, end: Int): BitSet = {
-      val r = top(TriangularArray.index(begin, end))
-      if(r == null) BitSet.empty
-      else r
-    }
-    def activeLabelsBot(begin: Int, end: Int): BitSet = {
-      val r = bot(TriangularArray.index(begin, end))
-      if(r == null) BitSet.empty
-      else r
-    }
-
-    def hasMaximalLabel(begin: Int, end: Int): Boolean = maximalProjectionIndices(TriangularArray.index(begin, end))
-  }
-
 }
 
 
@@ -297,7 +275,7 @@ object ProjectTreebankToConstraints {
     val train = mapTrees(factory, treebank.trainTrees, parser.grammar.labelIndex, useTree = true, maxL = params.maxParseLength)
     val test = mapTrees(factory, treebank.testTrees, parser.grammar.labelIndex, useTree = false, maxL = 10000)
     val dev = mapTrees(factory, treebank.devTrees, parser.grammar.labelIndex, useTree = false, maxL = 10000)
-    val map: Map[IndexedSeq[String], RawConstraints] = Map.empty ++ train ++ test ++ dev
+    val map: Map[IndexedSeq[String], RawConstraints[AnnotatedLabel]] = Map.empty ++ train ++ test ++ dev
     breeze.util.writeObject(out, map)
   }
 
@@ -309,7 +287,7 @@ object ProjectTreebankToConstraints {
   def mapTrees(factory: ConstraintCoreGrammar[AnnotatedLabel, String],
                trees: IndexedSeq[TreeInstance[AnnotatedLabel, String]],
                index: Index[AnnotatedLabel],
-               useTree: Boolean, maxL: Int): IndexedSeq[(IndexedSeq[String], RawConstraints)] = {
+               useTree: Boolean, maxL: Int): IndexedSeq[(IndexedSeq[String], RawConstraints[AnnotatedLabel])] = {
     trees.par.flatMap { (ti:TreeInstance[AnnotatedLabel, String]) =>
       val TreeInstance(id, tree, words) = ti
       println(id, words)
@@ -325,7 +303,7 @@ object ProjectTreebankToConstraints {
         IndexedSeq(words -> scorer)
       } catch {
         case e: Exception => e.printStackTrace()
-        IndexedSeq.empty[(IndexedSeq[String],RawConstraints)]
+        IndexedSeq.empty[(IndexedSeq[String],RawConstraints[AnnotatedLabel])]
       }
     }.seq.toIndexedSeq
   }

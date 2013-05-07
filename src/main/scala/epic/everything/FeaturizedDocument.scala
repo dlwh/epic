@@ -1,15 +1,13 @@
 package epic.everything
 
-import breeze.collection.mutable.TriangularArray
 import epic.trees._
-import epic.parser.ParseChart.SparsityPattern
 import epic.sequences.{Gazetteer, SemiCRF, Segmentation}
 import epic.ontonotes.{Frame, Document, NERType}
 import epic.parser.projections.{GoldTagPolicy, ConstraintCoreGrammar}
 import epic.coref.CorefInstanceFeaturizer
 import breeze.util.Index
 import epic.framework.Feature
-import breeze.linalg.{Axis, Counter2}
+import breeze.linalg.Counter2
 import epic.trees.StandardTreeProcessor
 import scala.Some
 import epic.parser._
@@ -25,7 +23,7 @@ case class FeaturizedDocument(sentences: IndexedSeq[FeaturizedSentence], id: Str
 
 case class FeaturizedSentence(index: Int, words: IndexedSeq[String],
                               treeOpt: Option[BinarizedTree[AnnotatedLabel]],
-                              constituentSparsity: SparsityPattern,
+                              constituentSparsity: ChartConstraints[AnnotatedLabel],
                               nerOpt: Option[Segmentation[NERType.Value, String]],
                               nerConstraints: SemiCRF.SpanConstraints,
                               frames: IndexedSeq[Frame],
@@ -47,7 +45,7 @@ case class FeaturizedSentence(index: Int, words: IndexedSeq[String],
 
   def isPossibleSpan(begin: Int, end: Int) = (
 //    true
-    constituentSparsity.activeTriangularIndices.contains(TriangularArray.index(begin,end))
+    constituentSparsity.isActiveSpan(begin, end)
       || (nerConstraints.allowedLabels(begin,end).ne(null) && nerConstraints.allowedLabels(begin,end).nonEmpty)
   )
 
@@ -55,10 +53,8 @@ case class FeaturizedSentence(index: Int, words: IndexedSeq[String],
     (end-begin) == 1 || constituentSparsity.hasMaximalLabel(begin, end)
     )
 
-  def validConstituents: collection.immutable.BitSet = constituentSparsity.activeTriangularIndices
-
   def isPossibleConstituent(begin: Int, end: Int) = {
-    (end - begin) > 0 && constituentSparsity.activeTriangularIndices.contains(TriangularArray.index(begin, end))
+    (end - begin) > 0 && constituentSparsity.isActiveSpan(begin, end)
   }
 }
 
@@ -95,7 +91,7 @@ object FeaturizedDocument {
 
     val docsWithValidSpans = for( (d,other) <- docs zip constraints; (s, (tree, seg, constituentSparsity, nerConstraints)) <- d.sentences zip other) yield {
       def isPossibleSpan(begin: Int, end: Int) = (
-          constituentSparsity.activeTriangularIndices.contains(TriangularArray.index(begin,end))
+          constituentSparsity.isActiveSpan(begin,end)
             || (nerConstraints.allowedLabels(begin,end).ne(null) && nerConstraints.allowedLabels(begin,end).nonEmpty)
           )
 
@@ -107,11 +103,11 @@ object FeaturizedDocument {
     val featurized = for( ((d, other)) <- docs zip constraints.seq) yield {
       val newSentences = for( (s, (tree, seg, constituentSparsity, nerConstraints)) <- d.sentences zip other) yield {
         def isPossibleSpan(begin: Int, end: Int) = (
-          constituentSparsity.activeTriangularIndices.contains(TriangularArray.index(begin,end))
+          constituentSparsity.isActiveSpan(begin,end)
             || (nerConstraints.allowedLabels(begin,end).ne(null) && nerConstraints.allowedLabels(begin,end).nonEmpty)
           )
 
-        val loc = featurizer.anchor(s.words)
+        val loc = featurizer.anchor(s.words, isPossibleSpan)
 
 
         FeaturizedSentence(s.index, s.words,
@@ -161,7 +157,7 @@ object FeaturizedDocument {
        val nerConstraints = nerConstrainer.constraints(s.nerSegmentation, keepGold = keepGoldTree)
 
        def isPossibleSpan(begin: Int, end: Int) = begin != end && (
-         constituentSparsity.activeTriangularIndices.contains(TriangularArray.index(begin,end))
+         constituentSparsity.isActiveSpan(begin,end)
            || (nerConstraints.allowedLabels(begin,end).ne(null) && nerConstraints.allowedLabels(begin,end).nonEmpty)
          )
 

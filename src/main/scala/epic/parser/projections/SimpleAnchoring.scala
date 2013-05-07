@@ -18,7 +18,6 @@ package projections
 import java.io._
 import projections.AnchoredRuleProjector.AnchoredData
 import breeze.collection.mutable.{OpenAddressHashArray, TriangularArray}
-import epic.parser.ParseChart.SparsityPattern
 import epic.lexicon.Lexicon
 
 /**
@@ -111,7 +110,7 @@ class SimpleAnchoring[L, W](val grammar: BaseGrammar[L],
                             unaryScores: Array[OpenAddressHashArray[Double]],
                             // (begin, end) -> (split-begin) -> rule -> score
                             binaryScores: Array[Array[OpenAddressHashArray[Double]]],
-                            override val sparsityPattern: SparsityPattern) extends CoreAnchoring[L, W] with Serializable {
+                            override val sparsityPattern: ChartConstraints[L]) extends CoreAnchoring[L, W] with Serializable {
 
   def scoreUnaryRule(begin: Int, end: Int, rule: Int) = {
     val forSpan = unaryScores(TriangularArray.index(begin, end))

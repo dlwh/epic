@@ -15,7 +15,6 @@ package epic.parser
  limitations under the License.
 */
 import breeze.inference.Factor
-import epic.parser.ParseChart.SparsityPattern
 import epic.lexicon.Lexicon
 
 /**

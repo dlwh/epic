@@ -1,6 +1,5 @@
 package epic.parser
 
-import epic.parser.ParseChart.SparsityPattern
 import projections.ConstraintAnchoring
 import epic.lexicon.Lexicon
 
@@ -125,7 +124,7 @@ object AugmentedAnchoring {
     AugmentedAnchoring(refined, CoreAnchoring.identity(refined.grammar, refined.lexicon, refined.words), viterbi)
   }
 
-  def apply[L, W](refined: RefinedAnchoring[L, W], sparsity: SparsityPattern) = {
+  def apply[L, W](refined: RefinedAnchoring[L, W], sparsity: ChartConstraints[L]) = {
     new AugmentedAnchoring(refined, new ConstraintAnchoring(refined.grammar, refined.lexicon, refined.words, sparsity))
   }
 

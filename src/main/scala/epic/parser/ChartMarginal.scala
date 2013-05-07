@@ -1,7 +1,6 @@
 package epic.parser
 
 import epic.trees.{UnaryTree, BinarizedTree}
-import reflect.ClassTag
 import epic.util.Arrays
 
 /*
@@ -238,7 +237,6 @@ object ChartMarginal {
 
     // handle lexical
     for{i <- 0 until words.length} {
-      var foundSomething = false
       for {
         a <- lexLoc.tagsForWord(i)
         coreScore = core.scoreSpan(i, i+1, a) if coreScore != Double.NegativeInfinity
@@ -248,10 +246,8 @@ object ChartMarginal {
         if (score != Double.NegativeInfinity) {
           spanScores.bot.enter(i, i+1, a, ref, score)
           inside.bot.enter(i, i+1, a, ref, score)
-          foundSomething = true
         }
       }
-      if(!foundSomething) error(s"$i $words ${lexLoc.tagsForWord(i)}")
 
       updateInsideUnaries(inside, anchoring,  i, i+1)
     }

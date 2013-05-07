@@ -23,31 +23,32 @@ import collection.mutable.BitSet
 import collection.immutable
 import collection.immutable.BitSet.BitSetN
 import java.util
+import epic.pruning.SpanConstraints
 
 @SerialVersionUID(4)
 class ParseChart[L](val index: Index[L],
                              // label => number of refinements
                              refinementsFor: Array[Int],
                              val length: Int,
-                             sparsity: ParseChart.SparsityPattern) extends Serializable {
+                             sparsity: ChartConstraints[L]) extends Serializable {
   private val grammarSize = index.size
 
-  final val top = new ChartScores(sparsity.activeLabelsTop _)
-  final val bot = new ChartScores(sparsity.activeLabelsBot _)
+  final val top = new ChartScores(sparsity.top)
+  final val bot = new ChartScores(sparsity.bot)
 
   /**
    * A ChartScores is just a triangular array whose entries are arrays. Admits efficient
    * iteration over "on" elements in an (i, j) index.
    * @author dlwh
    */
-  final class ChartScores private[ParseChart](sparsityLabel: (Int,Int)=>immutable.BitSet) {
+  final class ChartScores private[ParseChart](constraints: SpanConstraints[L]) {
 
     import ParseChart._
 
     /** (begin,end) -> label ->  refinement -> score */
     // fill in arrays for spans we might touch
-    val score: Array[Array[Array[Double]]] = Array.tabulate(TriangularArray.arraySize(length+1)){i =>
-      if(sparsity.activeTriangularIndices.contains(i)) {
+    val score: TriangularArray[Array[Array[Double]]] = TriangularArray.tabulate(length+1){(begin, end) =>
+      if(sparsity.isActiveSpan(begin, end)) {
         new Array[Array[Double]](index.size)
       } else {
         null
@@ -56,12 +57,11 @@ class ParseChart[L](val index: Index[L],
 
     // now fill in components of touch spans
     for(b <- 0 until length; e <- b to length) {
-      val ind = TriangularArray.index(b, e)
-      val arr = score(ind)
+      val arr = score(b, e)
       if(arr != null) {
         var l = 0
         while(l < grammarSize) {
-          if(sparsityLabel(b, e).contains(l))
+          if(constraints.isAllowedLabeledSpan(b, e, l))
             arr(l) = mkGrammarVector(refinementsFor(l), zero)
           l += 1
         }
@@ -82,17 +82,17 @@ class ParseChart[L](val index: Index[L],
      * @return
      */
     @inline def labelScore(begin: Int, end: Int, label: Int, ref: Int):Double = {
-      val ind = TriangularArray.index(begin, end)
-      if (score(ind) eq null) Double.NegativeInfinity
-      else if (score(ind)(label) eq null) Double.NegativeInfinity
-      else score(ind)(label)(ref)
+      val forSpan = score(begin, end)
+      if (forSpan eq null) Double.NegativeInfinity
+      else if (forSpan(label) eq null) Double.NegativeInfinity
+      else forSpan(label)(ref)
     }
 
     @inline def labelScore(begin: Int, end: Int, parent: L, ref: Int):Double = {
       labelScore(begin, end, index(parent), ref)
     }
 
-    def enteredLabelIndexes(begin: Int, end: Int) = {
+    def enteredLabelIndexes(begin: Int, end: Int): BitSet = {
       enteredLabels(TriangularArray.index(begin, end))
     }
 
@@ -112,7 +112,7 @@ class ParseChart[L](val index: Index[L],
 
 
     def rawEnter(begin: Int, end: Int, parent: Int, ref: Int, w: Double) = {
-      val arrx = score(TriangularArray.index(begin, end))
+      val arrx = score(begin, end)
       val arr = arrx(parent)
       val oldScore = arr(ref)
       val newScore = sum(oldScore, w)
@@ -130,7 +130,7 @@ class ParseChart[L](val index: Index[L],
       }
     }
 
-    def enterSum(begin: Int, end: Int, parent: Int, ref: Int, w: Array[Double], length: Int) = {
+    def enterSum(begin: Int, end: Int, parent: Int, ref: Int, w: Array[Double], length: Int) {
       enter(begin, end, parent, ref, sum(w,length))
     }
 
@@ -228,50 +228,21 @@ class ParseChart[L](val index: Index[L],
 
 object ParseChart {
 
-  @SerialVersionUID(1L)
-  trait SparsityPattern extends Serializable {
-    def activeTriangularIndices: immutable.BitSet
-    def isActiveSpan(begin: Int, end: Int)  = activeTriangularIndices.contains(TriangularArray.index(begin, end))
-    def activeLabelsTop(begin: Int, end: Int): immutable.BitSet
-    def activeLabelsBot(begin: Int, end: Int): immutable.BitSet
 
-    def hasMaximalLabel(begin: Int, end: Int):Boolean
-  }
-
-  object SparsityPattern {
-    def noSparsity[L](labels: Index[L], length: Int):SparsityPattern = new SparsityPattern {
-      val activeTriangularIndices: immutable.BitSet = {
-        val arr = new Array[Long]((TriangularArray.arraySize(length+1)+63)/64)
-        util.Arrays.fill(arr, -1L)
-        new BitSetN(arr)
-      }
-
-      val allLabels = {
-        val arr = new Array[Long]((labels.size + 63)/64)
-        util.Arrays.fill(arr, -1L)
-        new BitSetN(arr)
-      }
-
-      def activeLabelsTop(begin: Int, end: Int) = allLabels
-      def activeLabelsBot(begin: Int, end: Int) = allLabels
-
-      def hasMaximalLabel(begin: Int, end: Int): Boolean = true
-    }
-  }
 
   def apply[L](g: Index[L], refinements: Array[Int], length: Int) = logProb(g, refinements, length)
 
   @SerialVersionUID(1)
   trait Factory[+Chart[X]<:ParseChart[X]] extends Serializable {
     def apply[L](g: Index[L], refinements: Array[Int], length: Int):Chart[L] = {
-      apply(g, refinements, length, SparsityPattern.noSparsity(g, length))
+      apply[L](g, refinements, length, ChartConstraints.noSparsity)
     }
 
-    def apply[L](g: Index[L], refinements: Array[Int], length: Int, sparsity: SparsityPattern):Chart[L]
+    def apply[L](g: Index[L], refinements: Array[Int], length: Int, sparsity: ChartConstraints[L]):Chart[L]
   }
 
   object logProb extends Factory[ParseChart] {
-    def apply[L](g: Index[L], refinements: Array[Int], length: Int, sparsity: SparsityPattern) = {
+    def apply[L](g: Index[L], refinements: Array[Int], length: Int, sparsity: ChartConstraints[L]) = {
       new ParseChart(g, refinements, length, sparsity)
     }
   }

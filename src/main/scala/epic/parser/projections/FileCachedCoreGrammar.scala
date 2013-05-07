@@ -37,7 +37,7 @@ class FileCachedCoreGrammar[L, W](backoff: CoreGrammar[L, W], file: File) extend
   val grammar = backoff.grammar
   val lexicon = backoff.lexicon
 
-  private val cache = breeze.util.readObject[Map[IndexedSeq[W], RawConstraints]](file)
+  private val cache = breeze.util.readObject[Map[IndexedSeq[W], RawConstraints[L]]](file)
 
   def anchor(words: IndexedSeq[W]) = {
     cache.get(words).map(_.toAnchoring(grammar, lexicon, words)).getOrElse(backoff.anchor(words))
