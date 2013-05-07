@@ -15,6 +15,8 @@ import java.io.{ObjectInputStream, IOException}
 import breeze.optimize.FirstOrderMinimizer.OptParams
 import breeze.optimize.{GradientTester, CachedBatchDiffFunction}
 import breeze.linalg.DenseVector
+import epic.pruning.LabeledSpanConstraints
+import epic.pruning.LabeledSpanConstraints.NoConstraints
 
 /**
  * A Semi-Markov Linear Chain Conditional Random Field, that is, the length
@@ -142,7 +144,7 @@ object SemiCRF {
     }
     def spanMarginal(begin: Int, end: Int):DenseVector[Double] = DenseVector.tabulate(anchoring.labelIndex.size)(spanMarginal(_, begin, end))
 
-    def computeSpanConstraints(threshold: Double = 1E-5):SpanConstraints = {
+    def computeSpanConstraints(threshold: Double = 1E-5):LabeledSpanConstraints[L] = {
       val spanMarginals = TriangularArray.fill(length+1)(new Array[Double](anchoring.labelIndex.size))
 
       this visit new TransitionVisitor[L, W] {
@@ -156,17 +158,7 @@ object SemiCRF {
 //           BitSet.empty ++ (0 until arr.length)
       }
 
-      val maxLengths = new Array[Int](anchoring.labelIndex.size)
-      val allowedStarts = Array.fill(length)(collection.mutable.BitSet.empty)
-      for(begin <- 0 until length; end <- (begin+1) to length) {
-        for(l <- allowedLabels(begin, end)) {
-          maxLengths(l) = math.max(maxLengths(l), end - begin)
-          allowedStarts(begin) += l
-        }
-      }
-
-
-      new SpanConstraints(maxLengths, allowedStarts.map(BitSet.empty ++ _), allowedLabels)
+      LabeledSpanConstraints(allowedLabels)
     }
   }
 
@@ -393,23 +385,9 @@ object SemiCRF {
 
   }
 
-  @SerialVersionUID(1L)
-  case class SpanConstraints(maxLengths: Array[Int],
-                             allowedStarts: Array[BitSet],
-                             allowedLabels: TriangularArray[BitSet]) {
-    def +(constraints: SpanConstraints) = {
-      SpanConstraints(Array.tabulate(maxLengths.length)(i => maxLengths(i) max constraints.maxLengths(i)),
-        allowedStarts zip constraints.allowedStarts map {case (a,b) => a | b},
-        TriangularArray.tabulate(allowedStarts.length+1)((b,e) => allowedLabels(b,e) | constraints.allowedLabels(b, e))
-      )
-    }
-
-    def spanAllowed(b: Int, e:Int) = allowedStarts(b).nonEmpty && allowedLabels(b,e).nonEmpty
-  }
-
   trait ConstraintSemiCRF[L, W] extends SemiCRF[L, W] {
-    def constraints(w: IndexedSeq[W]): SpanConstraints
-    def constraints(seg: Segmentation[L,W], keepGold: Boolean = true): SpanConstraints
+    def constraints(w: IndexedSeq[W]): LabeledSpanConstraints[L]
+    def constraints(seg: Segmentation[L,W], keepGold: Boolean = true): LabeledSpanConstraints[L]
   }
 
   @SerialVersionUID(1L)
@@ -426,14 +404,10 @@ object SemiCRF {
       def isValidSegment(begin: Int, end: Int): Boolean = true
     }
 
-    private val allLabels = BitSet.fromBitMask((0L to labelIndex.size).toArray)
 
-    private def emptyConstraint(length: Int) = new SpanConstraints(Array.fill(labelIndex.size)(length),
-      Array.fill(length)(allLabels), TriangularArray.fill(length+1)(allLabels))
+    def constraints(w: IndexedSeq[W]) = NoConstraints
 
-    def constraints(w: IndexedSeq[W]) = emptyConstraint(w.length)
-
-    def constraints(seg: Segmentation[L, W], keepGold: Boolean) = emptyConstraint(seg.length)
+    def constraints(seg: Segmentation[L, W], keepGold: Boolean) = NoConstraints
   }
 
   @SerialVersionUID(1L)
@@ -443,17 +417,17 @@ object SemiCRF {
 
     // TODO: make weak
     @transient
-    private var cache = new ConcurrentHashMap[IndexedSeq[W], SpanConstraints]()
+    private var cache = new ConcurrentHashMap[IndexedSeq[W], LabeledSpanConstraints[L]]()
 
     // Don't delete.
     @throws(classOf[IOException])
     @throws(classOf[ClassNotFoundException])
     private def readObject(oin: ObjectInputStream) {
       oin.defaultReadObject()
-      cache = new ConcurrentHashMap[IndexedSeq[W], SpanConstraints]()
+      cache = new ConcurrentHashMap[IndexedSeq[W], LabeledSpanConstraints[L]]()
     }
 
-    def constraints(w: IndexedSeq[W]): SpanConstraints = {
+    def constraints(w: IndexedSeq[W]): LabeledSpanConstraints[L] = {
       var c = cache.get(w)
       if(c eq null) {
         c = crf.marginal(w).computeSpanConstraints(threshold)
@@ -463,10 +437,10 @@ object SemiCRF {
       c
     }
 
-    def constraints(seg: Segmentation[L,W], keepGold: Boolean = true): SpanConstraints = {
-      val orig: SpanConstraints = constraints(seg.words)
+    def constraints(seg: Segmentation[L,W], keepGold: Boolean = true): LabeledSpanConstraints[L] = {
+      val orig: LabeledSpanConstraints[L]= constraints(seg.words)
       if(keepGold) {
-        orig + crf.goldMarginal(seg.segments, seg.words).computeSpanConstraints()
+        orig | crf.goldMarginal(seg.segments, seg.words).computeSpanConstraints()
       } else {
         orig
       }
@@ -479,17 +453,17 @@ object SemiCRF {
       new Anchoring[L, W] {
         def words: IndexedSeq[W] = w
 
-        def maxSegmentLength(label: Int): Int = c.maxLengths(label)
+        def maxSegmentLength(label: Int): Int = c.maxSpanLengthForLabel(label)
 
         def startSymbol: L = crf.startSymbol
         def labelIndex: Index[L] = crf.labelIndex
 
         def scoreTransition(prev: Int, cur: Int, begin: Int, end: Int): Double =
-          numerics.logI(c.allowedLabels(begin, end).contains(cur))
+          numerics.logI(c.isAllowedLabeledSpan(begin, end, cur))
 
-        def canStartLongSegment(pos: Int): Boolean = c.allowedStarts(pos).nonEmpty
+        def canStartLongSegment(pos: Int): Boolean = c.maxSpanLengthStartingAt(pos) > 1
 
-        def isValidSegment(begin: Int, end: Int): Boolean = c.allowedLabels(begin, end).nonEmpty
+        def isValidSegment(begin: Int, end: Int): Boolean = c.isAllowedSpan(begin, end)
       }
 
     }

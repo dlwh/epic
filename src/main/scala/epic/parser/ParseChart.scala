@@ -23,7 +23,7 @@ import collection.mutable.BitSet
 import collection.immutable
 import collection.immutable.BitSet.BitSetN
 import java.util
-import epic.pruning.SpanConstraints
+import epic.pruning.LabeledSpanConstraints
 
 @SerialVersionUID(4)
 class ParseChart[L](val index: Index[L],
@@ -41,7 +41,7 @@ class ParseChart[L](val index: Index[L],
    * iteration over "on" elements in an (i, j) index.
    * @author dlwh
    */
-  final class ChartScores private[ParseChart](constraints: SpanConstraints[L]) {
+  final class ChartScores private[ParseChart](constraints: LabeledSpanConstraints[L]) {
 
     import ParseChart._
 
@@ -105,7 +105,7 @@ class ParseChart[L](val index: Index[L],
     }
 
     def enteredLabelScores(begin: Int, end: Int) = {
-      val scoreArray = score(TriangularArray.index(begin, end))
+      val scoreArray = score(begin, end)
       if(scoreArray eq null) Iterator.empty
       else enteredLabels(TriangularArray.index(begin, end)).iterator.map { i => (i, scoreArray(i))}
     }

@@ -14,6 +14,7 @@ import epic.parser._
 import java.util.concurrent.atomic.AtomicInteger
 import epic.lexicon.Lexicon
 import epic.features.IndexedSpanFeaturizer
+import epic.pruning.LabeledSpanConstraints
 
 /**
  * 
@@ -25,7 +26,7 @@ case class FeaturizedSentence(index: Int, words: IndexedSeq[String],
                               treeOpt: Option[BinarizedTree[AnnotatedLabel]],
                               constituentSparsity: ChartConstraints[AnnotatedLabel],
                               nerOpt: Option[Segmentation[NERType.Value, String]],
-                              nerConstraints: SemiCRF.SpanConstraints,
+                              nerConstraints: LabeledSpanConstraints[NERType.Value],
                               frames: IndexedSeq[Frame],
                               featureAnchoring: IndexedSpanFeaturizer#Localization,
                               speaker: Option[String] = None,
@@ -46,7 +47,7 @@ case class FeaturizedSentence(index: Int, words: IndexedSeq[String],
   def isPossibleSpan(begin: Int, end: Int) = (
 //    true
     constituentSparsity.isActiveSpan(begin, end)
-      || (nerConstraints.allowedLabels(begin,end).ne(null) && nerConstraints.allowedLabels(begin,end).nonEmpty)
+      || nerConstraints.isAllowedSpan(begin,end)
   )
 
   def isPossibleMaximalSpan(begin: Int, end: Int) = (
@@ -90,12 +91,7 @@ object FeaturizedDocument {
     }
 
     val docsWithValidSpans = for( (d,other) <- docs zip constraints; (s, (tree, seg, constituentSparsity, nerConstraints)) <- d.sentences zip other) yield {
-      def isPossibleSpan(begin: Int, end: Int) = (
-          constituentSparsity.isActiveSpan(begin,end)
-            || (nerConstraints.allowedLabels(begin,end).ne(null) && nerConstraints.allowedLabels(begin,end).nonEmpty)
-          )
-
-      s.words -> (isPossibleSpan _)
+      s.words -> (constituentSparsity.flatten | nerConstraints)
     }
 
     val featurizer = IndexedSpanFeaturizer.forTrainingSet(docsWithValidSpans, tagWordCounts, Gazetteer.ner())
@@ -104,7 +100,7 @@ object FeaturizedDocument {
       val newSentences = for( (s, (tree, seg, constituentSparsity, nerConstraints)) <- d.sentences zip other) yield {
         def isPossibleSpan(begin: Int, end: Int) = (
           constituentSparsity.isActiveSpan(begin,end)
-            || (nerConstraints.allowedLabels(begin,end).ne(null) && nerConstraints.allowedLabels(begin,end).nonEmpty)
+            || nerConstraints.isAllowedSpan(begin,end)
           )
 
         val loc = featurizer.anchor(s.words, isPossibleSpan)
@@ -158,7 +154,7 @@ object FeaturizedDocument {
 
        def isPossibleSpan(begin: Int, end: Int) = begin != end && (
          constituentSparsity.isActiveSpan(begin,end)
-           || (nerConstraints.allowedLabels(begin,end).ne(null) && nerConstraints.allowedLabels(begin,end).nonEmpty)
+           || nerConstraints.isAllowedSpan(begin,end)
          )
 
        val loc = featurizer.anchor(s.words, isPossibleSpan)

@@ -6,6 +6,7 @@ import epic.framework.Feature
 import breeze.linalg._
 import scala.collection.mutable.ArrayBuffer
 import breeze.collection.mutable.{OpenAddressHashArray, TriangularArray}
+import epic.pruning.{SpanConstraints, LabeledSpanConstraints}
 
 /**
  *
@@ -80,7 +81,7 @@ class IndexedSpanFeaturizer(val featurizer: BasicSpanFeaturizer,
 }
 
 object IndexedSpanFeaturizer {
-  def forTrainingSet[L](corpus: Iterable[(IndexedSeq[String], (Int,Int)=>Boolean)],
+  def forTrainingSet[L](corpus: Iterable[(IndexedSeq[String], SpanConstraints)],
                         tagWordCounts: Counter2[L, String, Double],
                         gazetteer: Gazetteer[Any, String] = Gazetteer.empty,
                         noShapeThreshold: Int = 100,
@@ -131,7 +132,7 @@ object IndexedSpanFeaturizer {
       }
 
       // spans
-      for( begin <- 0 until words.length; end <- (begin+1) to words.length if validSpan(begin, end)) {
+      for( begin <- 0 until words.length; end <- (begin+1) to words.length if validSpan.isAllowedSpan(begin, end)) {
         anch.featuresForSpan(begin, end).foreach(spanFeatureIndex.index(_))
       }
 

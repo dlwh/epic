@@ -3,15 +3,13 @@ package epic.sequences
 import epic.framework._
 import breeze.util._
 import breeze.linalg._
-import epic.sequences.SemiCRF.{SpanConstraints, TransitionVisitor}
+import epic.sequences.SemiCRF.TransitionVisitor
 import collection.mutable.ArrayBuffer
-import epic.parser.features.{SpanShapeGenerator}
 import breeze.collection.mutable.TriangularArray
-import epic.trees.Span
-import epic.parser.features.StandardSpanFeatures.WordEdges
-import collection.mutable
 import breeze.features.FeatureVector
-import epic.features.{IndexedSpanFeaturizer, IndexedWordFeaturizer}
+import epic.features.IndexedSpanFeaturizer
+import epic.pruning.LabeledSpanConstraints
+import epic.pruning.LabeledSpanConstraints.NoConstraints
 
 /**
  *
@@ -275,27 +273,15 @@ class SegmentationModelFactory[L](val startSymbol: L,
     }
 
 
-    val counts: Counter2[BIOETag[L], String, Double] = Counter2.count(train.map(_.asBIOSequence(outsideSymbol)).map{seg => seg.label zip seg.words}.flatten).mapValues(_.toDouble)
+    val counts: Counter2[L, String, Double] = Counter2.count(train.map(_.asFlatTaggedSequence(outsideSymbol)).map{seg => seg.label zip seg.words}.flatten).mapValues(_.toDouble)
     val wordCounts:Counter[String, Double] = sum(counts,Axis._0)
     val nonInteriors = wordCounts.activeIterator.filter(_._2 > 8).map(_._1).toSet -- interiors
     println(nonInteriors)
 
     // TODO: max maxlength
-    val allowedSpanClassifier = pruningModel.map(cg => {(seg: Segmentation[L, String]) =>
-      val cons:SpanConstraints = cg.constraints(seg);
-      {(b:Int,e:Int) => cons.spanAllowed(b, e)}
-    }).getOrElse{(seg: Segmentation[L, String]) =>(beg:Int,end:Int)=> (end - beg <= maxMaxLength) && (
-      (beg + 1 == end) || {
-        var ok = true
-        var pos = beg
-        while(pos < end && ok) {
-          ok = !nonInteriors.contains(seg.words(pos))
-          pos += 1
-        }
-        ok
-      })
-
-    }
+    val allowedSpanClassifier = pruningModel
+      .map(cg => {(seg: Segmentation[L, String]) => cg.constraints(seg) })
+      .getOrElse{(seg: Segmentation[L, String]) => NoConstraints }
     val trainWithAllowedSpans = train.map(seg => seg.words -> allowedSpanClassifier(seg))
     val f = IndexedSpanFeaturizer.forTrainingSet(trainWithAllowedSpans, counts, gazetteer)
 
@@ -355,7 +341,7 @@ object SegmentationModelFactory {
       val interiors = Array.tabulate(w.length)(i => !nonInteriors(w(i)))
       val constraints = pruningModel.map(_.constraints(w))
 
-      private def okSpan(beg: Int, end: Int) =  (end - beg <= maxMaxLength) && constraints.forall(_.spanAllowed(beg, end)) && {
+      private def okSpan(beg: Int, end: Int) =  (end - beg <= maxMaxLength) && constraints.forall(_.isAllowedSpan(beg, end)) && {
         var ok = canStartRealSpan(beg)
         var pos = beg + 1
         while(pos < end && ok) {

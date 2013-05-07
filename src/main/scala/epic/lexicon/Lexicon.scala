@@ -2,6 +2,7 @@ package epic.lexicon
 
 import breeze.util.Index
 import epic.trees.LexicalProduction
+import epic.pruning.TagConstraints
 
 /**
  *
@@ -13,8 +14,13 @@ trait Lexicon[L, W] {
 
   def knownLexicalProductions : TraversableOnce[LexicalProduction[L, W]]
 
-  trait Localization {
+  // TODO, should i make TagConstraints be a case class instead of an interface?
+  trait Localization{
     def tagsForWord(pos: Int):Set[Int]
+
+    def asTagConstraints:TagConstraints[L] = new TagConstraints[L] {
+      def allowedTags(pos: Int): Set[Int] = tagsForWord(pos)
+    }
   }
 
 }

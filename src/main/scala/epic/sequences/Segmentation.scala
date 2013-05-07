@@ -11,6 +11,20 @@ import scala.collection.mutable.ArrayBuffer
 case class Segmentation[+L, +W](segments: IndexedSeq[(L, Span)],
                               words: IndexedSeq[W],
                               id: String = "") extends Example[IndexedSeq[(L, Span)], IndexedSeq[W]] {
+
+
+
+  def render[LL>:L](badLabel: LL) = {
+    segments.map(l => if (l._1 == badLabel) l._2.map(words).mkString(" ") else l._2.map(words).mkString(s"[${l._1.toString}:", " ","]")).mkString(" ")
+  }
+
+
+  def features = words
+
+  def length: Int = words.length
+
+  def label: IndexedSeq[(L, Span)] = segments
+
   def asBIOSequence[LL>:L](outsideLabel: LL): TaggedSequence[BIOETag[L], W] = {
     val outLabels = new ArrayBuffer[BIOETag[L]]()
     for((l,span) <- segments if !span.isEmpty) {
@@ -33,17 +47,23 @@ case class Segmentation[+L, +W](segments: IndexedSeq[(L, Span)],
     TaggedSequence(outLabels, words, id +"-bio")
   }
 
+  def asFlatTaggedSequence[LL>:L](outsideLabel: LL): TaggedSequence[LL, W] = {
+    val outLabels = new ArrayBuffer[LL]()
+    for((l,span) <- segments if !span.isEmpty) {
+      while(outLabels.length < span.start) {
+        outLabels += outsideLabel
+      }
 
-  def render[LL>:L](badLabel: LL) = {
-    segments.map(l => if (l._1 == badLabel) l._2.map(words).mkString(" ") else l._2.map(words).mkString(s"[${l._1.toString}:", " ","]")).mkString(" ")
+      for(i <- (span.start) until (span.end) ) {
+        outLabels += l
+      }
+    }
+    while(outLabels.length < words.length) {
+      outLabels += outsideLabel
+    }
+    assert(outLabels.length == words.length)
+    TaggedSequence(outLabels, words, id +"-flattened")
   }
-
-
-  def features = words
-
-  def length: Int = words.length
-
-  def label: IndexedSeq[(L, Span)] = segments
 }
 
 object Segmentation {
