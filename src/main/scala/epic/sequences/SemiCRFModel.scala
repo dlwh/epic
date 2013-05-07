@@ -374,17 +374,34 @@ object SegmentationModelFactory {
 
       def featureIndex: Index[Feature] = IndexedStandardFeaturizer.this.featureIndex
 
-      def featuresForBegin(prev: Int, l: Int, w: Int): FeatureVector = new FeatureVector(loc.featuresForWord(w).map(wordFeatures(l)(0)(_)))
-      def featuresForInterior(cur: Int, pos: Int): FeatureVector = new FeatureVector(loc.featuresForWord(pos).map(wordFeatures(cur)(1)(_)))
+      def featuresForBegin(prev: Int, l: Int, w: Int): FeatureVector = smartMap(loc.featuresForWord(w), wordFeatures(l)(0))
+      def featuresForInterior(cur: Int, pos: Int): FeatureVector = smartMap(loc.featuresForWord(pos), wordFeatures(cur)(1))
+      def featuresForEnd(cur: Int, pos: Int): FeatureVector = smartMap(loc.featuresForWord(pos - 1), wordFeatures(cur)(2))
 
-      def featuresForEnd(cur: Int, pos: Int): FeatureVector = new FeatureVector(loc.featuresForWord(pos - 1).map(wordFeatures(cur)(2)(_)))
+
+      private def smartMap(rawFeats: Array[Int], mapArr: Array[Int]):FeatureVector = {
+        val ret = new Array[Int](rawFeats.length)
+        var i = 0
+        while(i < rawFeats.length) {
+          ret(i) = mapArr(rawFeats(i))
+          i += 1
+        }
+        new FeatureVector(ret)
+      }
 
       def featuresForSpan(prev: Int, cur: Int, beg: Int, end: Int): FeatureVector = {
 //        new FeatureVector(Array.empty)
         if(!okSpan(beg, end) && beg != end - 1) null
         else {
           val f = loc.featuresForSpan(beg, end)
-          new FeatureVector(f.map(spanFeatures(cur)) :+ transitionFeatures(prev)(cur))
+          val ret = new Array[Int](f.length+ 1)
+          var i = 0
+          while(i < f.length) {
+            ret(i) = spanFeatures(cur)(f(i))
+            i += 1
+          }
+          ret(i) = transitionFeatures(prev)(cur)
+          new FeatureVector(ret)
         }
       }
     }
