@@ -44,6 +44,7 @@ case class FeaturizedSentence(index: Int, words: IndexedSeq[String],
 
   def length = words.length
 
+
   def isPossibleSpan(begin: Int, end: Int) = (
 //    true
     constituentSparsity.isActiveSpan(begin, end)

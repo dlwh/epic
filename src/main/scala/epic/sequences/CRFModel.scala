@@ -22,8 +22,9 @@ import java.util
  */
 @SerialVersionUID(1L)
 class CRFModel[L, W](val featureIndex: Index[Feature],
-                         val featurizer: CRF.IndexedFeaturizer[L, W],
-                         initialWeights: Feature=>Double = {(_: Feature) => 0.0}) extends Model[TaggedSequence[L, W]] with StandardExpectedCounts.Model with Serializable {
+                     val lexicon: Lexicon[L, W],
+                     val featurizer: CRF.IndexedFeaturizer[L, W],
+                     initialWeights: Feature=>Double = {(_: Feature) => 0.0}) extends Model[TaggedSequence[L, W]] with StandardExpectedCounts.Model with Serializable {
   def labelIndex: Index[L] = featurizer.labelIndex
 
   def extractCRF(weights: DenseVector[Double]) = {
@@ -36,7 +37,7 @@ class CRFModel[L, W](val featureIndex: Index[Feature],
   def initialValueForFeature(f: Feature): Double = initialWeights(f)
 
   def inferenceFromWeights(weights: DenseVector[Double]): Inference =
-    new CRFInference(weights, featureIndex, featurizer)
+    new CRFInference(weights, featureIndex, lexicon, featurizer)
 
 }
 
@@ -44,6 +45,7 @@ class CRFModel[L, W](val featureIndex: Index[Feature],
 @SerialVersionUID(1)
 class CRFInference[L, W](val weights: DenseVector[Double],
                          val featureIndex: Index[Feature],
+                         val lexicon: Lexicon[L, W],
                          featurizer: CRF.IndexedFeaturizer[L, W]) extends AugmentableInference[TaggedSequence[L, W], CRF.Anchoring[L, W]] with CRF[L, W] with Serializable {
   def viterbi(sentence: IndexedSeq[W], anchoring: CRF.Anchoring[L, W]): TaggedSequence[L, W] = {
     CRF.viterbi(new Anchoring(sentence, anchoring))
@@ -157,13 +159,13 @@ class TaggedSequenceModelFactory[L](val startSymbol: L,
 
       for {
         b <- 0 until s.length
-        l <- lexLoc.tagsForWord(b)
+        l <- lexLoc.allowedTags(b)
       } {
         loc.featuresForWord(b) foreach {f =>
           labelWordFeatures(l)(f) = featureIndex.index(PairFeature(labelFeatures(l), featurizer.featureIndex.get(f)) )
         }
-        if(lexLoc.tagsForWord(b).size > 1) {
-          for(prevTag <- if(b == 0) Set(labelIndex(startSymbol)) else lexLoc.tagsForWord(b-1)) {
+        if(lexLoc.allowedTags(b).size > 1) {
+          for(prevTag <- if(b == 0) Set(labelIndex(startSymbol)) else lexLoc.allowedTags(b-1)) {
             loc.basicFeatures(b) foreach {f =>
               label2WordFeatures(l)(prevTag)(f) = featureIndex.index(PairFeature(label2Features(prevTag)(l), featurizer.featureIndex.get(f)) )
             }
@@ -177,7 +179,7 @@ class TaggedSequenceModelFactory[L](val startSymbol: L,
     }
 
     val indexed = new IndexedStandardFeaturizer[L](featurizer, lexicon, startSymbol, labelIndex, featureIndex, labelWordFeatures, label2WordFeatures)
-    val model = new CRFModel(indexed.featureIndex, indexed, weights(_))
+    val model = new CRFModel(indexed.featureIndex, lexicon, indexed, weights(_))
 
     model
   }
@@ -204,7 +206,7 @@ object TaggedSequenceModelFactory {
       val lexLoc = lexicon.anchor(w)
       def featureIndex: Index[Feature] =  outer.featureIndex
 
-      def validSymbols(pos: Int): Set[Int] = if(pos < 0 || pos >= w.length) startSymbolSet else  lexLoc.tagsForWord(pos)
+      def validSymbols(pos: Int): Set[Int] = if(pos < 0 || pos >= w.length) startSymbolSet else  lexLoc.allowedTags(pos)
 
       def length = w.length
 

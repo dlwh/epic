@@ -15,12 +15,9 @@ trait Lexicon[L, W] {
   def knownLexicalProductions : TraversableOnce[LexicalProduction[L, W]]
 
   // TODO, should i make TagConstraints be a case class instead of an interface?
-  trait Localization{
-    def tagsForWord(pos: Int):Set[Int]
-
-    def asTagConstraints:TagConstraints[L] = new TagConstraints[L] {
-      def allowedTags(pos: Int): Set[Int] = tagsForWord(pos)
-    }
+  trait Localization extends TagConstraints[L] {
+    def length: Int
+    def allowedTags(pos: Int):Set[Int]
   }
 
 }

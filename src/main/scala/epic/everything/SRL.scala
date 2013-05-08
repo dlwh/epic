@@ -16,6 +16,7 @@ import epic.ontonotes.Argument
 import epic.sequences.Segmentation
 import epic.everything.ChainNER.Label1Feature
 import epic.trees.Span
+import epic.pruning.LabeledSpanConstraints
 
 /**
  *
@@ -255,13 +256,13 @@ object SRL {
     val iNone = labelIndex(None)
     val iOutside = labelIndex(Some(outsideLabel))
 
-    def maxSegmentLength(label: Int): Int = if(label == iNone) 0 else if(label == iOutside) 1 else 50
-
-
 
     def scoreTransition(prev: Int, cur: Int, beg: Int, end: Int): Double = {
       score(beg, end, cur)
     }
+
+    def constraints: LabeledSpanConstraints[Option[String]] = ???
+
 
     // (same trick as in parser:)
     // we employ the trick in Klein's thesis and in the Smith & Eisner BP paper
@@ -269,7 +270,6 @@ object SRL {
     // but the dynamic program does not visit all spans for all parses, only those
     // in the actual parse. So instead, we premultiply by \prod_{all spans} p(not span)
     // and then we divide out p(not span) for spans in the tree.
-
     val normalizingPiece = sentenceBeliefs.spans.data.filter(_ ne null).map { b =>
       val notNerScore = b.frames(frameIndex).beliefs(iNone)
 
@@ -290,9 +290,6 @@ object SRL {
       score
     }
 
-
-    def canStartLongSegment(pos: Int): Boolean = true
-    def isValidSegment(begin: Int, end: Int): Boolean = true
 
     def score(begin: Int, end: Int, label: Int):Double = {
       if(scoreCache(begin,end)(label).isNaN) {

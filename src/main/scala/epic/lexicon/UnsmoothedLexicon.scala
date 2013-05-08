@@ -9,6 +9,7 @@ class UnsmoothedLexicon[L, W](val labelIndex: Index[L], knownProductions: Set[(L
   def knownLexicalProductions = for( (w,set) <- byWord.iterator; l <- set.iterator) yield LexicalProduction(labelIndex.get(l), w)
 
   def anchor(w: IndexedSeq[W]) = new Localization {
-    def tagsForWord(pos: Int): Set[Int] = byWord.getOrElse(w(pos), Set.empty)
+    def length = w.length
+    def allowedTags(pos: Int): Set[Int] = byWord.getOrElse(w(pos), Set.empty)
   }
 }

@@ -7,6 +7,7 @@ import breeze.linalg._
 import breeze.util._
 import breeze.collection.mutable.TriangularArray
 import epic.sequences.SemiCRF.{TransitionVisitor, Anchoring}
+import epic.pruning.LabeledSpanConstraints
 
 /**
  *
@@ -182,13 +183,15 @@ object ChainNER {
     def makeAnchoring(fs: FeaturizedSentence, weights: DenseVector[Double], beliefs: SentenceBeliefs) = new Anchoring(fs, weights, beliefs)
 
     class Anchoring(fs: FeaturizedSentence, weights: DenseVector[Double], messages: SentenceBeliefs) extends SemiCRF.Anchoring[NERType.Value, String] {
+
+
+      def constraints: LabeledSpanConstraints[NERType.Value] = fs.nerConstraints
+
       def labelIndex: Index[NERType.Value] = IndexedFeaturizer.this.labelIndex
 
       def startSymbol = NERType.OutsideSentence
 
       def words: IndexedSeq[String] = fs.words
-
-      def maxSegmentLength(label: Int): Int = maxLength(label)
 
       def dot(weights: DenseVector[Double], features: Array[Int], featureMap: Array[Int]) = {
         var i = 0
@@ -203,8 +206,6 @@ object ChainNER {
 
       def canStartLongSegment(pos: Int): Boolean = true
 
-
-      def isValidSegment(begin: Int, end: Int): Boolean = messages.spanBeliefs(begin, end) != null
 
       val beginCache = Array.tabulate(labelIndex.size, length){ (l, w) =>
         val f = fs.featuresForWord(w)

@@ -76,14 +76,10 @@ object SemiCRF {
     def startSymbol: L = crf.startSymbol
 
     def anchor(w: IndexedSeq[W]): Anchoring[L, W] = new Anchoring[L, W] {
-      def canStartLongSegment(pos: Int): Boolean = false
-
-      def isValidSegment(begin: Int, end: Int): Boolean = begin == end - 1
+      val constraints: LabeledSpanConstraints[L] = LabeledSpanConstraints.fromTagConstraints(crf.lexicon.anchor(w))
 
       val anch = crf.anchor(w)
       def words: IndexedSeq[W] = w
-
-      def maxSegmentLength(label: Int): Int = 1
 
       def scoreTransition(prev: Int, cur: Int, begin: Int, end: Int): Double = {
         if(end - begin != 1) {
@@ -105,15 +101,15 @@ object SemiCRF {
   trait Anchoring[L, W] {
     def words : IndexedSeq[W]
     def length: Int = words.length
-    def maxSegmentLength(label: Int): Int
+    def constraints: LabeledSpanConstraints[L]
+    def maxSegmentLength(label: Int): Int = constraints.maxSpanLengthForLabel(label)
     def scoreTransition(prev: Int, cur: Int, begin: Int, end: Int):Double
     def labelIndex: Index[L]
     def startSymbol: L
 
     def ignoreTransitionModel: Boolean = false
 
-    def canStartLongSegment(pos: Int):Boolean
-    def isValidSegment(begin: Int, end: Int):Boolean
+    def isValidSegment(begin: Int, end: Int):Boolean = constraints.isAllowedSpan(begin, end)
   }
 
   trait TransitionVisitor[L, W] {
@@ -186,7 +182,7 @@ object SemiCRF {
 
               var begin = math.max(end - anchoring.maxSegmentLength(label), 0)
               while (begin < end) {
-                if((anchoring.canStartLongSegment(begin) || begin == end - 1) && anchoring.isValidSegment(begin, end)) {
+                if(anchoring.isValidSegment(begin, end)) {
                   var prevLabel = 0
                   while (prevLabel < numLabels) {
                     val score = transitionMarginal(prevLabel, label, begin, end)
@@ -288,7 +284,7 @@ object SemiCRF {
           var acc = 0
           var begin = math.max(end - anchoring.maxSegmentLength(label), 0)
           while (begin < end) {
-            if((anchoring.canStartLongSegment(begin) || begin == end - 1) && anchoring.isValidSegment(begin, end)) {
+            if(anchoring.constraints.isAllowedLabeledSpan(begin, end, label)) {
               var prevLabel = 0
               if (anchoring.ignoreTransitionModel) {
                 prevLabel = -1 // ensure that you don't actually need the transition model
@@ -350,7 +346,7 @@ object SemiCRF {
         var prevLabel = 0
         while(prevLabel < numLabels) {
           var acc = 0
-          var end = if (!anchoring.canStartLongSegment(begin)) begin + 1 else math.min(length, begin + maxOfSegmentLengths)
+          var end = anchoring.constraints.maxSpanLengthStartingAt(begin) + begin
           while(end > begin) {
             if(anchoring.isValidSegment(begin, end)) {
               var label = 0
@@ -394,14 +390,11 @@ object SemiCRF {
   class IdentityConstraintSemiCRF[L, W](val labelIndex: Index[L], val startSymbol: L) extends ConstraintSemiCRF[L, W] with Serializable { outer =>
     def anchor(w: IndexedSeq[W]) = new Anchoring[L,W]() {
       def words = w
-      def maxSegmentLength(label: Int) = w.size
       def scoreTransition(prev: Int, cur: Int, begin: Int, end: Int) = 0.0
       def labelIndex = outer.labelIndex
       def startSymbol = outer.startSymbol
 
-      def canStartLongSegment(pos: Int): Boolean = true
-
-      def isValidSegment(begin: Int, end: Int): Boolean = true
+      def constraints: LabeledSpanConstraints[L] = NoConstraints
     }
 
 
@@ -453,7 +446,8 @@ object SemiCRF {
       new Anchoring[L, W] {
         def words: IndexedSeq[W] = w
 
-        def maxSegmentLength(label: Int): Int = c.maxSpanLengthForLabel(label)
+
+        def constraints: LabeledSpanConstraints[L] = c
 
         def startSymbol: L = crf.startSymbol
         def labelIndex: Index[L] = crf.labelIndex
@@ -461,9 +455,6 @@ object SemiCRF {
         def scoreTransition(prev: Int, cur: Int, begin: Int, end: Int): Double =
           numerics.logI(c.isAllowedLabeledSpan(begin, end, cur))
 
-        def canStartLongSegment(pos: Int): Boolean = c.maxSpanLengthStartingAt(pos) > 1
-
-        def isValidSegment(begin: Int, end: Int): Boolean = c.isAllowedSpan(begin, end)
       }
 
     }
@@ -500,7 +491,7 @@ object SemiCRF {
       while (label < numLabels) {
         var begin = math.max(end - anchoring.maxSegmentLength(label), 0)
         while (begin < end) {
-          if((anchoring.canStartLongSegment(begin) || begin == end - 1) && anchoring.isValidSegment(begin, end)) {
+          if(anchoring.constraints.isAllowedLabeledSpan(begin, end, label)) {
             var prevLabel = 0
             while (prevLabel < numLabels) {
               val prevScore = forwardScores(begin)(prevLabel)

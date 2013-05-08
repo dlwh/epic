@@ -3,6 +3,7 @@ package epic.sequences
 import breeze.util.{Encoder, Index}
 import epic.sequences.CRF.Anchoring
 import breeze.linalg._
+import epic.lexicon.{Lexicon, SimpleLexicon}
 
 /**
  * HiddenMarkovModel, which is the generative special case of a [[epic.sequences.CRF]].
@@ -27,7 +28,12 @@ object HMM {
     val encodedTransitions = logAndNormalize(enc.encode(transitions), Axis._1)
     val totalCount = sum(labelCounts)
 
+    val lex = new SimpleLexicon[L, W](li, emissions)
+
     new CRF[L, W] {
+
+      def lexicon: Lexicon[L, W] = lex
+
       def anchor(w: IndexedSeq[W]): Anchoring[L, W] = new Anchoring[L, W] {
 
         val wcs = w.map(wordCounts(_))

@@ -64,7 +64,7 @@ case class ChartMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
     // handle lexical
     for (i <- 0 until words.length) {
       for {
-        a <- lexLoc.tagsForWord(i)
+        a <- lexLoc.allowedTags(i)
         ref <- anchoring.refined.validLabelRefinements(i, i+ 1, a)
       } {
         val score:Double = anchoring.scoreSpan(i, i+1, a, ref) + outside.bot(i, i+1, a, ref) - logPartition
@@ -238,7 +238,7 @@ object ChartMarginal {
     // handle lexical
     for{i <- 0 until words.length} {
       for {
-        a <- lexLoc.tagsForWord(i)
+        a <- lexLoc.allowedTags(i)
         coreScore = core.scoreSpan(i, i+1, a) if coreScore != Double.NegativeInfinity
         ref <- refined.validLabelRefinements(i, i+1, a)
       } {

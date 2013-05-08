@@ -9,6 +9,7 @@ import collection.mutable.ArrayBuffer
 import breeze.optimize.FirstOrderMinimizer.OptParams
 import breeze.optimize.CachedBatchDiffFunction
 import breeze.features.FeatureVector
+import epic.lexicon.Lexicon
 
 /**
  * A -Markov Linear Chain Conditional Random Field. Useful for POS tagging, etc.
@@ -39,6 +40,7 @@ trait CRF[L, W] extends Serializable {
     CRF.viterbi(anchor(w), id)
   }
 
+  def lexicon: Lexicon[L, W]
 
 }
 

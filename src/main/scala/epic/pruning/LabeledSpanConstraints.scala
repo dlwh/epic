@@ -53,10 +53,12 @@ sealed trait LabeledSpanConstraints[-L] extends SpanConstraints {
 }
 
 object LabeledSpanConstraints {
+
+
   def noConstraints[L]:LabeledSpanConstraints[L] = NoConstraints
   def apply[L](spans: TriangularArray[_ <: BitSet]):LabeledSpanConstraints[L] = {
-    val maxLengthPos = Array.tabulate(spans.dimension) { begin =>
-      val maxEnd = (spans.dimension until begin by -1).find(spans(begin,_).nonEmpty).getOrElse(begin)
+    val maxLengthPos = Array.tabulate(spans.dimension-1) { begin =>
+      val maxEnd = ((spans.dimension-1) until begin by -1).find(end => spans(begin,end) != null && spans(begin,end).nonEmpty).getOrElse(begin)
       maxEnd - begin
     }
     val maxLengthLabel = ArrayBuffer[Int]()
@@ -78,6 +80,54 @@ object LabeledSpanConstraints {
   def apply[L](maxLengthPos: Array[Int], maxLengthLabel: Array[Int], spans: TriangularArray[_ <: BitSet]):LabeledSpanConstraints[L] = {
     SimpleConstraints(maxLengthPos, maxLengthLabel, spans)
   }
+
+  def fromTagConstraints[L](constraints: TagConstraints[L]): LabeledSpanConstraints[L] = {
+    val arr = TriangularArray.tabulate(constraints.length+1) { (b,e) =>
+      if(b +1 == e) {
+        ensureBitSet(constraints.allowedTags(b))
+      } else {
+        null
+      }
+    }
+    apply(arr)
+  }
+
+
+  private def ensureBitSet[L](tags: Set[Int]): BitSet = {
+    tags match {
+      case x: BitSet => x
+      case x => BitSet.empty ++ x
+    }
+  }
+
+  def layeredFromTagConstraints[L](localization: TagConstraints[L], maxLengthForLabel: Array[Int]): LabeledSpanConstraints[L] = {
+    val arr = new TriangularArray[BitSet](localization.length + 1)
+    val maxMaxLength = maxLengthForLabel.max
+    for(i <- 0 until localization.length) {
+       arr(i, i+1) = ensureBitSet(localization.allowedTags(i))
+    }
+
+    val maxLengthPos = Array.fill(localization.length)(1)
+    val maxLengthLabel = Array.fill(localization.length)(1)
+
+    var acceptableTags = BitSet.empty ++ (0 until maxLengthForLabel.length)
+    for(length <- 2 to maxMaxLength) {
+      acceptableTags = acceptableTags.filter(i => maxLengthForLabel(i) <= length)
+      for (begin <- 0 until (localization.length - length)) {
+        val end = begin + length
+        arr(begin, end) = (arr(begin, begin+1) & arr(begin+1, end)) & acceptableTags
+        if(arr(begin,end).isEmpty) {
+          arr(begin, end) = null
+        } else {
+          maxLengthPos(begin) = length
+          for(t <- arr(begin, end))
+            maxLengthLabel(t) = length
+        }
+      }
+    }
+    apply(maxLengthPos, maxLengthLabel, arr)
+  }
+
 
   @SerialVersionUID(1L)
   object NoConstraints extends LabeledSpanConstraints[Any] with Serializable {

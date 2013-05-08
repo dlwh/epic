@@ -139,7 +139,7 @@ object IndexedFeaturizer {
       ex <- trees
       lexLoc = lexicon.anchor(ex.words)
       i <- 0 until ex.words.length
-      l <- lexLoc.tagsForWord(i)
+      l <- lexLoc.allowedTags(i)
       lSplit <- indexedProjections.labels.refinementsOf(l)
     } {
       val feats = f.featuresFor(indexedProjections.labels.fineIndex.get(lSplit), ex.words, i)

@@ -429,7 +429,7 @@ final class LexGrammar[L, W](val grammar: BaseGrammar[L],
     val indexed = words.map(wordIndex)
     private val f = fi.anchor(words)
     private val lexLoc = lexicon.anchor(words)
-    val indexedValidTags: IndexedSeq[Array[Int]] = (0 until words.length).map(lexLoc.tagsForWord(_)).map(_.toArray)
+    val indexedValidTags: IndexedSeq[Array[Int]] = (0 until words.length).map(lexLoc.allowedTags(_)).map(_.toArray)
 
     private def dot(features: Array[Int]) = {
       var i = 0

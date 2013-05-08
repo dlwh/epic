@@ -38,8 +38,9 @@ class SimpleLexicon[L, W](val labelIndex: Index[L],
   def knownLexicalProductions = for( (w,set) <- byWord.iterator; l <- set.iterator) yield LexicalProduction(labelIndex.get(l), w)
 
   def anchor(w: IndexedSeq[W]):Localization = new Localization {
+    def length = w.length
     val x = Array.tabulate(w.length)(pos =>byWord.getOrElse(w(pos), openTags))
-    def tagsForWord(pos: Int): Set[Int] = x(pos)
+    def allowedTags(pos: Int): Set[Int] = x(pos)
   }
 
 
