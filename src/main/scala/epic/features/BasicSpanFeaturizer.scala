@@ -27,8 +27,8 @@ class BasicSpanFeaturizer(val wordFeaturizer: BasicWordFeaturizer) {
     def featuresForSpan(start: Int, end: Int): Array[Feature] = {
        val feats = ArrayBuffer[Feature]()
        if (start < end - 1) {
-         feats += WordEdges('Inside, basicFeatures(start)(0), basicFeatures(end-1)(0))
-         feats += WordEdges('Outside, basicFeatures(start-1)(0), basicFeatures(end)(0))
+         feats += WordEdges('Inside, wordFeatureIndex.get(basicFeatures(start)(0)), wordFeatureIndex.get(basicFeatures(end-1)(0)))
+         feats += WordEdges('Outside, wordFeatureIndex.get(basicFeatures(start-1)(0)), wordFeatureIndex.get(basicFeatures(end)(0)))
          feats += SpanShapeFeature(SpanShapeGenerator.apply(words, Span(start,end)))
        }
 
