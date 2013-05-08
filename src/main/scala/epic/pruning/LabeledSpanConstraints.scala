@@ -103,13 +103,12 @@ object LabeledSpanConstraints {
   def layeredFromTagConstraints[L](localization: TagConstraints[L], maxLengthForLabel: Array[Int]): LabeledSpanConstraints[L] = {
     val arr = new TriangularArray[BitSet](localization.length + 1)
     val maxMaxLength = maxLengthForLabel.max
-    println(maxMaxLength)
     for(i <- 0 until localization.length) {
        arr(i, i+1) = ensureBitSet(localization.allowedTags(i))
     }
 
     val maxLengthPos = Array.fill(localization.length)(1)
-    val maxLengthLabel = Array.fill(localization.length)(1)
+    val maxLengthLabel = maxLengthForLabel.clone()
 
     var acceptableTags = BitSet.empty ++ (0 until maxLengthForLabel.length)
     for(length <- 2 to maxMaxLength if acceptableTags.nonEmpty) {
@@ -117,38 +116,19 @@ object LabeledSpanConstraints {
       if(acceptableTags.nonEmpty)
         for (begin <- 0 until (localization.length - length) ) {
           val end = begin + length
-          arr(begin, end) = (arr(begin, begin+1) & arr(begin+1, end)) & acceptableTags
-          if(arr(begin,end).isEmpty) {
-            arr(begin, end) = null
-          } else {
-            maxLengthPos(begin) = length
-            for(t <- arr(begin, end))
-              maxLengthLabel(t) = length
+          if(arr(begin,begin+1) != null && arr(begin+1,end) != null) {
+            arr(begin, end) = (arr(begin, begin+1) & arr(begin+1, end)) & acceptableTags
+            if(arr(begin,end).isEmpty) {
+              arr(begin, end) = null
+            } else {
+              maxLengthPos(begin) = length
+              for(t <- arr(begin, end))
+                maxLengthLabel(t) = length
+            }
           }
         }
     }
     apply(maxLengthPos, maxLengthLabel, arr)
-  }
-
-  def maxLengthConstraints(length: Int, maxLengthForLabel: Array[Int]):SpanConstraints = {
-    val arr = new TriangularArray[BitSet](length + 1)
-    val maxMaxLength = maxLengthForLabel.max
-    val maxLengthPos = Array.fill(length)(1)
-
-    var acceptableTags = BitSet.empty ++ (0 until maxLengthForLabel.length)
-    for(len <- 1 to maxMaxLength if acceptableTags.nonEmpty) {
-      acceptableTags = acceptableTags.filter(i => maxLengthForLabel(i) >= length)
-      if(acceptableTags.nonEmpty)
-        for (begin <- 0 until (length - len)) {
-          val end = begin + len
-          arr(begin, end) = acceptableTags
-          println(acceptableTags)
-          maxLengthPos(begin) = length
-        }
-    }
-
-    println(maxMaxLength + " " + maxLengthPos.mkString(":"))
-    apply(maxLengthPos, maxLengthForLabel, arr)
   }
 
 

@@ -55,8 +55,8 @@ object SemiCRF {
 
     val obj = new ModelObjective(model, data)
     val cached = new CachedBatchDiffFunction(obj)
-//    GradientTester.test(cached, obj.initialWeightVector(true), randFraction = 1.0, toString={(i: Int) => model.featureIndex.get(i).toString})
     val weights = opt.minimize(cached, obj.initialWeightVector(false))
+//    GradientTester.test(cached, weights, randFraction = 1.0, toString={(i: Int) => model.featureIndex.get(i).toString}, tolerance=0.0)
     val crf = model.extractCRF(weights)
 
     crf
@@ -156,6 +156,34 @@ object SemiCRF {
 
       LabeledSpanConstraints(allowedLabels)
     }
+
+    def hasSupportOver(m: Marginal[L, W]):Boolean = {
+      object FailureException extends Exception
+      try {
+        m visit new TransitionVisitor[L, W] {
+          def visitTransition(prev: Int, cur: Int, begin: Int, end: Int, count: Double) {
+            if(count >= 0.0 && transitionMarginal(prev, cur, begin, end)  <= 0.0) {
+              throw FailureException
+            }
+          }
+        }
+        true
+      } catch {
+        case FailureException => false
+      }
+    }
+
+    def decode:String = {
+      val buf = new StringBuilder()
+      this visit new TransitionVisitor[L, W] {
+        def visitTransition(prev: Int, cur: Int, begin: Int, end: Int, count: Double) {
+          if(count != 0) {
+            buf ++= s"${anchoring.labelIndex.get(prev)} ${anchoring.labelIndex.get(cur)} ($begin,$end) $count\n"
+          }
+        }
+      }
+      buf.result()
+    }
   }
 
   object Marginal {
@@ -182,12 +210,13 @@ object SemiCRF {
 
               var begin = math.max(end - anchoring.maxSegmentLength(label), 0)
               while (begin < end) {
-                if(anchoring.isValidSegment(begin, end)) {
+                if(anchoring.constraints.isAllowedLabeledSpan(begin, end, label)) {
                   var prevLabel = 0
                   while (prevLabel < numLabels) {
                     val score = transitionMarginal(prevLabel, label, begin, end)
-                    if(score != 0.0)
+                    if(score != 0.0) {
                       f.visitTransition(prevLabel, label, begin, end, score)
+                    }
                     prevLabel += 1
                   }
                 }
@@ -224,6 +253,7 @@ object SemiCRF {
         assert(span.start == lastEnd)
         val symbol = scorer.labelIndex(l)
         assert(symbol != -1, s"$l not in index: ${scorer.labelIndex}")
+        assert(scorer.constraints.isAllowedLabeledSpan(span.start, span.end, symbol))
         score += scorer.scoreTransition(lastSymbol, symbol, span.start, span.end)
         assert(!score.isInfinite, " " + segmentation + " " + l + " " + span)
         goldEnds(span.start) = span.end

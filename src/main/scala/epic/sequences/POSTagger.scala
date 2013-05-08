@@ -16,7 +16,7 @@ object POSTagger {
   def main(args: Array[String]) {
     val params = CommandLineParser.readIn[Params](args)
     import params._
-    val train = treebank.trainTrees.map(_.toTaggedSequence).take(1)
+    val train = treebank.trainTrees.map(_.toTaggedSequence)
     val test = treebank.devTrees.map(_.toTaggedSequence)
 
     val crf = CRF.buildSimple(train, AnnotatedLabel("TOP"), opt = opt)

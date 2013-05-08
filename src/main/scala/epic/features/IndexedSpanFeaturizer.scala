@@ -132,6 +132,7 @@ object IndexedSpanFeaturizer {
       }
 
       // spans
+      assert(validSpan.isAllowedSpan(0, 1), words + " " + validSpan)
       for( begin <- 0 until words.length; end <- (begin+1) to words.length if validSpan.isAllowedSpan(begin, end)) {
         anch.featuresForSpan(begin, end).foreach(spanFeatureIndex.index(_))
       }
