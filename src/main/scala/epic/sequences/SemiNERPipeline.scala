@@ -160,10 +160,10 @@ object SemiConllNERPipeline {
   def main(args: Array[String]) {
     val params = CommandLineParser.readIn[Params](args)
     val (train,test) = {
-          val standardTrain = CONLLSequenceReader.readTrain(new FileInputStream(params.path), params.path.getName).toIndexedSeq
-          val standardTest = CONLLSequenceReader.readTrain(new FileInputStream(params.test), params.path.getName).toIndexedSeq
+      val standardTrain = CONLLSequenceReader.readTrain(new FileInputStream(params.path), params.path.getName).toIndexedSeq
+      val standardTest = CONLLSequenceReader.readTrain(new FileInputStream(params.test), params.path.getName).toIndexedSeq
 
-          standardTrain.take(params.nsents).map(makeSegmentation) -> standardTrain.take(params.nsents).map(makeSegmentation)
+      standardTrain.take(params.nsents).map(makeSegmentation) -> standardTest.map(makeSegmentation)
     }
 
 

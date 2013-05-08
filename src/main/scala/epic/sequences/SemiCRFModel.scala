@@ -261,7 +261,13 @@ class SegmentationModelFactory[L](val startSymbol: L,
     // TODO: max maxlength
     val allowedSpanClassifier = pruningModel
       .map(cg => {(seg: Segmentation[L, String]) => cg.constraints(seg) })
-      .getOrElse{(seg: Segmentation[L, String]) => LabeledSpanConstraints.layeredFromTagConstraints(lexicon.anchor(seg.words), maxLengthArray)}
+      .getOrElse{(seg: Segmentation[L, String]) =>
+      val cons = LabeledSpanConstraints.layeredFromTagConstraints(lexicon.anchor(seg.words), maxLengthArray)
+      for( (l,span) <- seg.label) {
+        assert(cons.isAllowedLabeledSpan(span.start, span.end, labelIndex(l)), cons.decode(labelIndex) + " " + seg)
+      }
+      cons
+    }
     val trainWithAllowedSpans = train.map(seg => seg.words -> allowedSpanClassifier(seg))
     val f = IndexedSpanFeaturizer.forTrainingSet(trainWithAllowedSpans, counts, gazetteer)
 

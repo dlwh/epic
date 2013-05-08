@@ -6,6 +6,7 @@ import epic.pruning.LabeledSpanConstraints._
 import java.util
 import scala.collection.mutable.ArrayBuffer
 import scala.annotation.unchecked.uncheckedVariance
+import breeze.util.{Encoder, Index}
 
 /**
  * Represents
@@ -48,6 +49,8 @@ sealed trait LabeledSpanConstraints[-L] extends SpanConstraints {
         })
     }
   }
+
+  def decode(labelIndex: Index[L@uncheckedVariance ]):String
 
 
 }
@@ -102,7 +105,7 @@ object LabeledSpanConstraints {
 
   def layeredFromTagConstraints[L](localization: TagConstraints[L], maxLengthForLabel: Array[Int]): LabeledSpanConstraints[L] = {
     val arr = new TriangularArray[BitSet](localization.length + 1)
-    val maxMaxLength = maxLengthForLabel.max
+    val maxMaxLength = maxLengthForLabel.max min localization.length
     for(i <- 0 until localization.length) {
        arr(i, i+1) = ensureBitSet(localization.allowedTags(i))
     }
@@ -114,7 +117,7 @@ object LabeledSpanConstraints {
     for(length <- 2 to maxMaxLength if acceptableTags.nonEmpty) {
       acceptableTags = acceptableTags.filter(i => maxLengthForLabel(i) >= length)
       if(acceptableTags.nonEmpty)
-        for (begin <- 0 until (localization.length - length) ) {
+        for (begin <- 0 to (localization.length - length) ) {
           val end = begin + length
           if(arr(begin,begin+1) != null && arr(begin+1,end) != null) {
             arr(begin, end) = (arr(begin, begin+1) & arr(begin+1, end)) & acceptableTags
@@ -141,6 +144,9 @@ object LabeledSpanConstraints {
     def isAllowedLabeledSpan(begin: Int, end: Int, label: Int): Boolean = true
 
     def maxSpanLengthForLabel(label: Int):Int = Int.MaxValue / 2
+
+
+    def decode(labelIndex: Index[Any]):String = toString
   }
 
   @SerialVersionUID(1L)
@@ -154,6 +160,23 @@ object LabeledSpanConstraints {
     def maxSpanLengthStartingAt(begin: Int): Int = maxLengthsForPosition(begin)
 
     def maxSpanLengthForLabel(label: Int) = if(maxLengthsForLabel.length <= label) 0 else maxLengthsForLabel(label)
+
+    def decode(labelIndex: Index[L]):String = {
+      val ret = new StringBuilder()
+      val enc = Encoder.fromIndex(labelIndex)
+      ret ++= "SimpleConstraints(positionMaxLengths="
+      ret ++= util.Arrays.toString(maxLengthsForPosition)
+      ret ++= ", labelMaxLengths="
+      ret ++=  enc.decode(maxLengthsForLabel).toString
+      ret ++= ")\n"
+      for(i <- 0 until maxLengthsForPosition.length; j <- (i+1) to maxLengthsForPosition.length) {
+        val s = spans(i, j)
+        if(s ne null) {
+          ret ++= s"  ($i,$j) " + enc.decode(Array.tabulate(labelIndex.size)(x => spans(i, j).contains(x))).toString + "\n"
+        }
+      }
+      ret.result()
+    }
   }
 
 
