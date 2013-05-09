@@ -8,7 +8,7 @@ import collection.mutable.ArrayBuffer
 import breeze.collection.mutable.TriangularArray
 import breeze.features.FeatureVector
 import epic.features.IndexedSpanFeaturizer
-import epic.pruning.LabeledSpanConstraints
+import epic.pruning.{TagConstraints, LabeledSpanConstraints}
 import epic.pruning.LabeledSpanConstraints.NoConstraints
 import epic.lexicon.{SimpleLexicon, Lexicon}
 import epic.trees.AnnotatedLabel
@@ -47,8 +47,6 @@ object SemiCRFModel {
 
   trait BIEOAnchoredFeaturizer[L, W] extends SemiCRF.AnchoredFeaturizer[L, W] {
 
-    def canStartRealSpan(beg: Int):Boolean
-    def canBeInterior(pos: Int):Boolean
     def featuresForBegin(prev: Int, cur: Int, pos: Int):FeatureVector
     def featuresForInterior(cur: Int, pos: Int):FeatureVector
     def featuresForSpan(prev: Int, cur: Int, beg: Int, end: Int):FeatureVector
@@ -144,8 +142,9 @@ class SemiCRFInference[L, W](weights: DenseVector[Double],
 
   class Anchoring(val words: IndexedSeq[W],
                   val constraints: LabeledSpanConstraints[L],
+                  val tagsConstraints: TagConstraints[L],
                   augment: SemiCRF.Anchoring[L, W]) extends SemiCRF.Anchoring[L, W] {
-    def this(words: IndexedSeq[W], aug: SemiCRF.Anchoring[L, W]) = this(words, LabeledSpanConstraints.layeredFromTagConstraints(lexicon.anchor(words), maxLength), aug)
+    def this(words: IndexedSeq[W], aug: SemiCRF.Anchoring[L, W]) = this(words, LabeledSpanConstraints.layeredFromTagConstraints(lexicon.anchor(words), maxLength), lexicon.anchor(words), aug)
     val localization = featurizer.anchor(words)
 
     val beginCache = Array.tabulate(labelIndex.size, labelIndex.size, length){ (p,c,w) =>
@@ -247,18 +246,10 @@ class SegmentationModelFactory[L](val startSymbol: L,
     val maxLengthArray = Encoder.fromIndex(labelIndex).tabulateArray(maxLengthMap.getOrElse(_, 0))
     println(maxLengthMap)
 
-    val interiors = collection.mutable.Set[String]()
-    for (t <- train; seg <- t.segments if seg._1 != outsideSymbol) {
-      interiors ++= seg._2.map(t.words)
-    }
 
     val counts: Counter2[L, String, Double] = Counter2.count(train.map(_.asFlatTaggedSequence(outsideSymbol)).map{seg => seg.label zip seg.words}.flatten).mapValues(_.toDouble)
-    val wordCounts:Counter[String, Double] = sum(counts,Axis._0)
     val lexicon = new SimpleLexicon(labelIndex, counts, openTagThreshold = 10, closedWordThreshold = 20)
-    val nonInteriors = wordCounts.activeIterator.filter(_._2 > 8).map(_._1).toSet -- interiors
-    println(nonInteriors)
 
-    // TODO: max maxlength
     val allowedSpanClassifier = pruningModel
       .map(cg => {(seg: Segmentation[L, String]) => cg.constraints(seg) })
       .getOrElse{(seg: Segmentation[L, String]) =>
@@ -274,7 +265,7 @@ class SegmentationModelFactory[L](val startSymbol: L,
     for(f <- pruningModel) {
       assert(f.labelIndex == labelIndex, f.labelIndex + " " + labelIndex)
     }
-    val indexed = new IndexedStandardFeaturizer[L](f, startSymbol, lexicon, nonInteriors, labelIndex, maxLengthArray, pruningModel)
+    val indexed = new IndexedStandardFeaturizer[L](f, startSymbol, lexicon, labelIndex, maxLengthArray, pruningModel)
     val model = new SemiCRFModel(indexed.featureIndex, indexed, lexicon, maxLengthArray, weights(_))
 
     model
@@ -291,7 +282,6 @@ object SegmentationModelFactory {
   class IndexedStandardFeaturizer[L](f: IndexedSpanFeaturizer,
                                      val startSymbol: L,
                                      val lexicon: Lexicon[L, String],
-                                     val nonInteriors: Set[String],
                                      val labelIndex: Index[L],
                                      val maxLength: Array[Int],
                                      val pruningModel: Option[SemiCRF.ConstraintSemiCRF[L, String]] = None) extends SemiCRFModel.BIEOFeaturizer[L,String] with Serializable {
@@ -299,7 +289,6 @@ object SegmentationModelFactory {
     def baseWordFeatureIndex = f.wordFeatureIndex
     def baseSpanFeatureIndex = f.spanFeatureIndex
 
-    private val maxMaxLength = (0 until labelIndex.size).map(maxLength).max
 
     val kinds = Array('Begin, 'Interior)
     println(baseWordFeatureIndex.size + " " + baseSpanFeatureIndex.size)
@@ -325,15 +314,11 @@ object SegmentationModelFactory {
 
 
     def anchor(w: IndexedSeq[String]): SemiCRFModel.BIEOAnchoredFeaturizer[L, String] = new SemiCRFModel.BIEOAnchoredFeaturizer[L, String] {
-      val interiors = Array.tabulate(w.length)(i => !nonInteriors(w(i)))
       val constraints = pruningModel.map(_.constraints(w)).getOrElse{LabeledSpanConstraints.layeredFromTagConstraints(lexicon.anchor(w), maxLength)}
 
       val loc = f.anchor(w, constraints.isAllowedSpan(_, _))
       def length = w.length
 
-
-      def canStartRealSpan(beg: Int): Boolean = canBeInterior(beg)
-      def canBeInterior(i: Int): Boolean = interiors(i)
 
       def featureIndex: Index[Feature] = IndexedStandardFeaturizer.this.featureIndex
 

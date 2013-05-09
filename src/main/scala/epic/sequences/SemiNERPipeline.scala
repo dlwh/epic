@@ -89,7 +89,7 @@ object SemiNERPipeline {
     val cached = new CachedBatchDiffFunction(obj)
 
     val checking = new RandomizedGradientCheckingFunction[Int, DenseVector[Double]](cached, toString={ (i: Int) => model.featureIndex.get(i).toString})
-//
+    //
     def eval(state: FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State) {
       val crf = model.extractCRF(state.x)
       println("Eval + " + (state.iter+1) + " " + SegmentationEval.eval(crf, test, NERType.NotEntity))
@@ -135,7 +135,7 @@ object SemiConllNERPipeline {
             start = i
           } // else, still in a field, do nothing.
         case _  =>
-         sys.error("weird label?!?" + l)
+          sys.error("weird label?!?" + l)
       }
 
       i += 1
@@ -172,20 +172,23 @@ object SemiConllNERPipeline {
     val obj = new ModelObjective(model, train, params.nthreads)
     val cached = new CachedBatchDiffFunction(obj)
 
-//    GradientTester.test(cached, obj.initialWeightVector(true), toString={(i: Int) => model.featureIndex.get(i).toString})
+    //    GradientTester.test(cached, obj.initialWeightVector(true), toString={(i: Int) => model.featureIndex.get(i).toString})
 
-//
-    def eval(state: FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State) {
+    //
+    def eval(state: FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State) = {
       val out = new PrintWriter(new BufferedOutputStream(new FileOutputStream("weights.txt")))
       Encoder.fromIndex(model.featureIndex).decode(state.x).iterator foreach {case (x, v) if v.abs > 1E-6 => out.println(x -> v) case _ => }
       val crf: SemiCRF[String, String] = model.extractCRF(state.x)
-      println("Eval + " + (state.iter+1) + " " + SegmentationEval.eval(crf, test, "O"))
+      println("Eval + " + (state.iter+1))
+      val stats = SegmentationEval.eval(crf, test, "O")
+      println("Final: " + stats)
       out.close()
+      stats
     }
 
     val weights = params.opt.iterations(cached, obj.initialWeightVector(randomize=true)).tee(state => if((state.iter +1) % params.iterPerEval == 0) eval(state)).take(params.opt.maxIterations).last
-    eval(weights)
-
+    val stats = eval(weights)
+    println("?????????" + stats)
 
 
   }
