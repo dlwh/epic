@@ -47,49 +47,13 @@ object SemiNERPipeline {
 
     val pronouns = Phrases.pronouns
 
-    val gazetteer = if(params.useCorefFeatures) {
-      val corefHints: Map[IndexedSeq[String], NERType.Value] =  {for {
-        file <- params.path.listFiles take params.nfiles
-        doc <- ConllOntoReader.readDocuments(file)
-        corefClusters: Map[Int, Set[NERType.Value]] = doc.coref.toIndexedSeq.groupBy(_._2.id).mapValues(_.map(_._1).flatMap(span => doc.ner.get(span).iterator).toSet)
-        (span, m) <- doc.coref; yd = span.getYield(doc)
-        if yd.length != 1 || !pronouns.contains(yd.head)
-        nertpe <- corefClusters(m.id).headOption.iterator
-      } yield span.getYield(doc) -> nertpe}.toMap
-      new Gazetteer[NERType.Value, String] {
-        def lookupWord(w: String): IndexedSeq[NERType.Value] = IndexedSeq.empty
-
-        def lookupSpan(w: IndexedSeq[String]): Option[NERType.Value] = corefHints.get(w)
-      }
-
-    } else if(params.useCorefSpans) {
-      val corefHints: Set[IndexedSeq[String]] =  {for {
-        file <- params.path.listFiles take params.nfiles
-        doc <- ConllOntoReader.readDocuments(file)
-        corefClusters: Map[Int, Set[NERType.Value]] = doc.coref.toIndexedSeq.groupBy(_._2.id).mapValues(_.map(_._1).flatMap(span => doc.ner.get(span).iterator).toSet)
-        (span, m) <- doc.coref; yd = span.getYield(doc)
-        if yd.length != 1 || !pronouns.contains(yd.head)
-        if corefClusters(m.id).nonEmpty
-      } yield span.getYield(doc)}.toSet
-      new Gazetteer[Boolean, String] {
-        def lookupWord(w: String): IndexedSeq[Boolean] = IndexedSeq.empty
-
-        def lookupSpan(w: IndexedSeq[String]): Option[Boolean] = Some(corefHints(w))
-      }
-
-    } else {
-      Gazetteer.ner("en")
-    }
-
-
+    val gazetteer =  Gazetteer.ner("en")
 
     // build feature Index
     val model = new SegmentationModelFactory(NERType.OutsideSentence, NERType.NotEntity, gazetteer = gazetteer).makeModel(train)
     val obj = new ModelObjective(model, train, params.nthreads)
     val cached = new CachedBatchDiffFunction(obj)
 
-    val checking = new RandomizedGradientCheckingFunction[Int, DenseVector[Double]](cached, toString={ (i: Int) => model.featureIndex.get(i).toString})
-    //
     def eval(state: FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State) {
       val crf = model.extractCRF(state.x)
       println("Eval + " + (state.iter+1) + " " + SegmentationEval.eval(crf, test, NERType.NotEntity))

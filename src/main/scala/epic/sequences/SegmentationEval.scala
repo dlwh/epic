@@ -14,6 +14,11 @@ object SegmentationEval {
   def eval[L ,W](crf: SemiCRF[L, W], examples: IndexedSeq[Segmentation[L, W]], outsideLabel: L):Stats = {
     examples.par.aggregate(new Stats(0,0,0)) ({ (stats, gold )=>
       val guess = crf.bestSequence(gold.words, gold.id +"-guess")
+    try {
+      println(gold, crf.goldMarginal(guess.segments, guess.words).logPartition, crf.goldMarginal(gold.segments, gold.words).logPartition)
+    } catch {
+      case _ => println("Can't recover gold for " + gold)
+    }
       val myStats = evaluateExample(Set(outsideLabel), guess, gold)
       println("Guess:\n" + guess.render(badLabel=outsideLabel) + "\n Gold:\n" + gold.render(badLabel=outsideLabel)+ "\n" + myStats)
       stats + myStats
