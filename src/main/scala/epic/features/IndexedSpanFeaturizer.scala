@@ -1,4 +1,5 @@
-package epic.features
+package epic
+package features
 
 import epic.sequences.Gazetteer
 import breeze.util.Index
@@ -6,36 +7,46 @@ import epic.framework.Feature
 import breeze.linalg._
 import scala.collection.mutable.ArrayBuffer
 import breeze.collection.mutable.{OpenAddressHashArray, TriangularArray}
-import epic.pruning.{SpanConstraints, LabeledSpanConstraints}
+import epic.constraints.{SpanConstraints, LabeledSpanConstraints}
+import epic.lexicon.Lexicon
+import epic.util.{Has2, Has}
 
 /**
  *
  * @author dlwh
  */
-class IndexedSpanFeaturizer(val featurizer: BasicSpanFeaturizer,
-                            val wordFeatureIndex: Index[Feature],
-                            val spanFeatureIndex: Index[Feature],
-                            wordCounts: Counter[String, Double],
-                            prevCurFeature: (Int,Int)=>Int,
-                            curNextFeature: (Int,Int)=>Int,
-                            prevNextFeature: (Int,Int)=>Int,
-                            asLeftFeature: Array[Int],
-                            asRightFeature: Array[Int],
-                            needsContextFeatures: (String,Double)=>Boolean = {(w,c) => true}){
-  def anchor(words: IndexedSeq[String], validSpan: (Int,Int)=>Boolean = {(_, _) => true}) = new Localization(words, validSpan)
+class IndexedSpanFeaturizer[-Datum:Has[SpanConstraints]#R:Has[IndexedSeq[String]]#R](val featurizer: BasicSpanFeaturizer,
+                                   val lexicon: Lexicon[_, String],
+                                   val wordFeatureIndex: Index[Feature],
+                                   val spanFeatureIndex: Index[Feature],
+                                   prevCurFeature: (Int,Int)=>Int,
+                                   curNextFeature: (Int,Int)=>Int,
+                                   prevNextFeature: (Int,Int)=>Int,
+                                   asLeftFeature: Array[Int],
+                                   asRightFeature: Array[Int]) {
+
+  def anchor(words: Datum) = new Localization(words)
+  val getWords = iCanHas[IndexedSeq[String]]
+  val spanConstraints = iCanHas[SpanConstraints]
 
   private val emptyArray = Array.empty[Int]
 
-  class Localization(words: IndexedSeq[String], validSpan: (Int,Int)=>Boolean = {(_, _) => true}) {
+  class Localization(datum: Datum) extends SurfaceFeatureAnchoring[String] {
+    val words = getWords(datum)
+    val validSpan = spanConstraints(datum)
+
+    def wordFeatureIndex = IndexedSpanFeaturizer.this.wordFeatureIndex
+    def spanFeatureIndex = IndexedSpanFeaturizer.this.spanFeatureIndex
+
     def basicFeatures(pos: Int): Array[Int] = spanFeaturizer.basicFeaturesForWord(pos)
     def featuresForWord(pos: Int): Array[Int] = _featuresForWord(pos)
     def featuresForSpan(beg: Int, end: Int): Array[Int] = _featuresForSpan(beg, end)
     val spanFeaturizer = featurizer.anchor(words)
+    val lexAnch = lexicon.anchor(words)
 
     private val _featuresForWord: IndexedSeq[Array[Int]] = 0 until words.length map { pos =>
-      val wc = wordCounts(words(pos))
       val basic = basicFeatures(pos)
-      if(!needsContextFeatures(words(pos), wc)) {
+      if(lexAnch.allowedTags(pos).size == 1) {
         basic
       } else {
         val feats = new ArrayBuffer[Int]()
@@ -81,17 +92,20 @@ class IndexedSpanFeaturizer(val featurizer: BasicSpanFeaturizer,
 }
 
 object IndexedSpanFeaturizer {
-  def forTrainingSet[L](corpus: Iterable[(IndexedSeq[String], SpanConstraints)],
-                        tagWordCounts: Counter2[L, String, Double],
+  def forTrainingSet[Datum:Has[SpanConstraints]#R:Has[IndexedSeq[String]]#R, L](corpus: Iterable[Datum],
+                        lexicon: Lexicon[L, String],
                         gazetteer: Gazetteer[Any, String] = Gazetteer.empty,
-                        noShapeThreshold: Int = 100,
-                        needsContextFeatures: (String,Double)=>Boolean = {(w,c) => true}):IndexedSpanFeaturizer = {
-    val wordCounts = sum(tagWordCounts, Axis._0)
+                        noShapeThreshold: Int = 100):IndexedSpanFeaturizer[Datum] = {
+    val getWords = iCanHas[IndexedSeq[String]]
+    val spanConstraints = iCanHas[SpanConstraints]
+
+    val wordCounts = Counter.countTraversable(corpus.iterator.flatMap(getWords(_))).mapValues(_.toDouble)
     val featureIndex = Index[Feature]()
     val spanFeatureIndex = Index[Feature]()
 
-    val feat = new BasicSpanFeaturizer(new BasicWordFeaturizer(tagWordCounts, wordCounts, gazetteer, noShapeThreshold))
+    val feat = new BasicSpanFeaturizer(new BasicWordFeaturizer(wordCounts, gazetteer, noShapeThreshold))
     val basicFeatureIndex = feat.wordFeatureIndex
+    basicFeatureIndex.foreach(featureIndex.index _)
 
     // for left and right
     val asLeftFeatures = new Array[Int](basicFeatureIndex.size)
@@ -106,16 +120,18 @@ object IndexedSpanFeaturizer {
     val curNextBigramFeatures = Array.fill(basicFeatureIndex.size)(new OpenAddressHashArray[Int](basicFeatureIndex.size, default= -1))
     val prevNextBigramFeatures = Array.fill(basicFeatureIndex.size)(new OpenAddressHashArray[Int](basicFeatureIndex.size, default= -1))
 
-    for( (words, validSpan) <- corpus) {
+    for( datum <- corpus) {
+      val words = getWords(datum)
+      val validSpan = spanConstraints(datum)
       val anch = feat.anchor(words)
+      val lexAnch = lexicon.anchor(words)
 
       def bf(pos: Int) =  anch.basicFeaturesForWord(pos)
 
       // words
       for(pos <- 0 until words.length) {
-        val wc = wordCounts(words(pos))
         val basic = bf(pos)
-        if(!needsContextFeatures(words(pos), wc)) {
+        if(lexAnch.allowedTags(pos) == 1) {
           basic
         } else {
           val basicLeft = bf(pos - 1)
@@ -139,11 +155,12 @@ object IndexedSpanFeaturizer {
     }
 
     new IndexedSpanFeaturizer(feat,
-    featureIndex, spanFeatureIndex, wordCounts,
+    lexicon,
+    featureIndex, spanFeatureIndex,
     {(p,c) =>prevCurBigramFeatures(p)(c)},
     {(c,r) =>curNextBigramFeatures(c)(r)},
     {(p,r) =>prevNextBigramFeatures(p)(r)},
-    asLeftFeatures, asRightFeatures,
-    needsContextFeatures)
+    asLeftFeatures, asRightFeatures)
+
   }
 }

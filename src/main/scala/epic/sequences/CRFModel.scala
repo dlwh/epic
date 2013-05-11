@@ -142,8 +142,8 @@ class TaggedSequenceModelFactory[L](val startSymbol: L,
     val counts: Counter2[L, String, Int] = Counter2.count(train.flatMap(p => p.label zip p.words))
 
 
-    val featurizer = IndexedWordFeaturizer.forTrainingSet(train.map(t => t.label zip t.words), gazetteer, needsContextFeatures = {(w, wc) =>  wc < 10 || counts(::, w).findAll(_ > 0).size != 1})
     val lexicon = new SimpleLexicon[L, String](labelIndex, counts.mapValues(_.toDouble))
+    val featurizer = IndexedWordFeaturizer.forTrainingSet(train.map(_.words), lexicon, gazetteer)
     val featureIndex = Index[Feature]()
 
     val labelFeatures = (0 until labelIndex.size).map(l => LabelFeature(labelIndex.get(l)))

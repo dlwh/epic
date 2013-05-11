@@ -23,7 +23,7 @@ import collection.mutable.BitSet
 import collection.immutable
 import collection.immutable.BitSet.BitSetN
 import java.util
-import epic.pruning.LabeledSpanConstraints
+import epic.constraints.LabeledSpanConstraints
 
 @SerialVersionUID(4)
 class ParseChart[L](val index: Index[L],

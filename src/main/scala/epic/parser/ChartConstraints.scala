@@ -1,6 +1,6 @@
 package epic.parser
 
-import epic.pruning.LabeledSpanConstraints
+import epic.constraints.LabeledSpanConstraints
 import scala.collection.BitSet
 import breeze.collection.mutable.TriangularArray
 

@@ -7,7 +7,7 @@ import breeze.linalg._
 import breeze.util._
 import breeze.collection.mutable.TriangularArray
 import epic.sequences.SemiCRF.{TransitionVisitor, Anchoring}
-import epic.pruning.LabeledSpanConstraints
+import epic.constraints.LabeledSpanConstraints
 
 /**
  *

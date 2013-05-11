@@ -2,7 +2,7 @@ package epic.lexicon
 
 import breeze.util.Index
 import epic.trees.LexicalProduction
-import epic.pruning.TagConstraints
+import epic.constraints.TagConstraints
 
 /**
  *

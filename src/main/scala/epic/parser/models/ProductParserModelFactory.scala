@@ -26,7 +26,7 @@ import epic.parser.projections.GrammarRefinements
 import epic.framework.{ComponentFeature, Feature}
 import epic.parser.{AugmentedGrammar, BaseGrammar, RefinedGrammar, ParserParams}
 import epic.trees._
-import epic.features.TagAwareWordShapeFeaturizer
+import epic.features.{IndexedWordFeaturizer, TagAwareWordShapeFeaturizer}
 
 /**
  *
@@ -85,12 +85,12 @@ case class ProductParserModelFactory(baseParser: ParserParams.XbarGrammar,
       Map(xbarGrammar.root -> 1)
     }
 
-    val gen = new TagAwareWordShapeFeaturizer(annWords)
+    val wordFeaturizer = IndexedWordFeaturizer.forTrainingSet(annTrees.map{_.words}, xbarLexicon)
     def labelFlattener(l: (AnnotatedLabel, Seq[Int])) = {
       val basic = for( (ref,m) <- l._2.zipWithIndex) yield ComponentFeature(m, IndicatorFeature(l._1, ref))
       basic
     }
-    val feat = new GenFeaturizer[(AnnotatedLabel, Seq[Int]), String](gen, labelFlattener _)
+    val feat = new GenFeaturizer[(AnnotatedLabel, Seq[Int])](wordFeaturizer, labelFlattener _)
 
     val annGrammar = BaseGrammar(annTrees.head.tree.label, annBinaries, annUnaries)
     val firstLevelRefinements = GrammarRefinements(xbarGrammar, annGrammar, {(_: AnnotatedLabel).baseAnnotatedLabel})

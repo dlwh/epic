@@ -103,6 +103,7 @@ class SimpleRefinedGrammar[L, L2, W](val grammar: BaseGrammar[L],
   }
 
   def anchor(w: IndexedSeq[W]) = new RefinedAnchoring[L, W] {
+    val tagAnchoring = tagScorer.anchor(w)
     override def toString() = "SimpleAnchoring(...)"
     val grammar = SimpleRefinedGrammar.this.grammar
     val lexicon = SimpleRefinedGrammar.this.lexicon
@@ -111,7 +112,7 @@ class SimpleRefinedGrammar[L, L2, W](val grammar: BaseGrammar[L],
     def scoreSpan(begin: Int, end: Int, label: Int, ref: Int) = {
       val baseScore = if(begin + 1 == end) {
         val fullId = refinements.labels.globalize(label, ref)
-        tagScorer.scoreTag(refinements.labels.fineIndex.get(fullId), words, begin)
+        tagAnchoring.scoreTag(begin, refinements.labels.fineIndex.get(fullId))
       } else {
         0.0
       }

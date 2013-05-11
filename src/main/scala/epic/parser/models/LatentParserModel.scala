@@ -26,7 +26,7 @@ import epic.framework.Feature
 import epic.trees.annotations.{FilterAnnotations, TreeAnnotator}
 import epic.trees._
 import breeze.config.Help
-import epic.features.TagAwareWordShapeFeaturizer
+import epic.features.{IndexedWordFeaturizer, BasicWordFeaturizer, TagAwareWordShapeFeaturizer}
 import epic.lexicon.Lexicon
 
 class LatentParserModel[L, L3, W](indexedFeatures: IndexedFeaturizer[L, L3, W],
@@ -136,12 +136,8 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
       case UnaryRule(a, b, chain) => for(aa <- split(a); bb <- split(b)) yield UnaryRule(aa, bb, chain)
     }
 
-    val gen = new TagAwareWordShapeFeaturizer(annWords)
-    def labelFlattener(l: (AnnotatedLabel, Int)) = {
-      val basic = Seq(l)
-      basic map (IndicatorFeature)
-    }
-    val feat = new GenFeaturizer[(AnnotatedLabel, Int), String](gen, labelFlattener _)
+    val wordFeaturizer = IndexedWordFeaturizer.forTrainingSet(annTrees.map{_.words}, xbarLexicon)
+    val feat = new GenFeaturizer[(AnnotatedLabel, Int)](wordFeaturizer)
 
     val annGrammar: BaseGrammar[AnnotatedLabel] = BaseGrammar(annTrees.head.tree.label, annBinaries, annUnaries)
     val firstLevelRefinements = GrammarRefinements(xbarGrammar, annGrammar, {(_: AnnotatedLabel).baseAnnotatedLabel})

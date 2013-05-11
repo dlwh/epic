@@ -276,7 +276,7 @@ object AnnotatingPipeline {
 
     FeaturizedDocument.makeFactory(params.treebank.process,
       new ConstraintCoreGrammar(baseParser.augmentedGrammar, {(_:AnnotatedLabel).isIntermediate}, -8),
-      nerPruningModel, GenerativeParser.extractCounts(trainTrees)._1, null)(train)
+      nerPruningModel, null)(train)
   }
 
 

@@ -1,8 +1,8 @@
-package epic.pruning
+package epic.constraints
 
 import scala.collection.BitSet
 import breeze.collection.mutable.TriangularArray
-import epic.pruning.LabeledSpanConstraints._
+import epic.constraints.LabeledSpanConstraints._
 import java.util
 import scala.collection.mutable.ArrayBuffer
 import scala.annotation.unchecked.uncheckedVariance
@@ -56,6 +56,9 @@ sealed trait LabeledSpanConstraints[-L] extends SpanConstraints {
 }
 
 object LabeledSpanConstraints {
+
+
+
 
   def noConstraints[L]:LabeledSpanConstraints[L] = NoConstraints
 

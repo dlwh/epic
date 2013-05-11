@@ -27,8 +27,14 @@ class FeaturizedLexicon[L, L2, W](val weights: DenseVector[Double],
                                   val featureIndexer: IndexedFeaturizer[L, L2, W]) extends TagScorer[L2, W] {
 
 
-  def scoreTag(l: L2, words: IndexedSeq[W], pos: Int) = {
-    featureIndexer.computeWeight(featureIndexer.labelIndex(l), words, pos, weights)
+  def anchor(w: IndexedSeq[W]): Anchoring = new Anchoring {
+    val fi = featureIndexer.anchor(w)
+    def words: IndexedSeq[W] = w
+
+    def scoreTag(pos: Int, l: L2): Double = {
+      fi.computeWeight(pos, featureIndexer.labelIndex(l), weights)
+
+    }
   }
 
 }

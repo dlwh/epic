@@ -15,18 +15,12 @@ package epic.parser.features
  See the License for the specific language governing permissions and
  limitations under the License.
 */
-import breeze.linalg.Counter
-import epic.trees.{UnaryRule, BinaryRule, Rule}
+import epic.trees.Rule
 import epic.framework.Feature
-import collection.mutable.{ArrayBuilder, ArrayBuffer}
-import breeze.util.Interner
+import epic.features.{IndexedWordFeaturizer, BasicWordFeaturizer}
 
 /**
- * A Featurizer turns decisions in a grammar into a set of features, possibly weighted
- *
- * This featurizes unanchored "simple annotated grammars, " which is to say not
- * lexicalized and not span.
- *
+ * A Featurizer turns decisions in a grammar into a set of features
  *
  * @author dlwh
  *
@@ -34,43 +28,37 @@ import breeze.util.Interner
 // TODO: unify with other kinds of featurizers somehow.
 @SerialVersionUID(1)
 trait Featurizer[L, W] extends Serializable {
-  def featuresFor(r: Rule[L]): Array[Feature]
+  def anchor(words: IndexedSeq[W]):Anchoring
 
-  def featuresFor(l: L, w: Seq[W], pos: Int): Array[Feature]
+  trait Anchoring {
+    def featuresFor(begin: Int, split: Int, end: Int, r: Rule[L]): Array[Feature]
+    def featuresFor(pos: Int, label: L): Array[Feature]
+  }
 
   /**should return 0.0 if we don't care about this feature. */
   def initialValueForFeature(f: Feature): Double
 }
 
-/**
- * Just returns features on the input rules
- */
-class SimpleFeaturizer[L, W] extends Featurizer[L, W] {
-  def featuresFor(r: Rule[L]) = Array(RuleFeature(r):Feature)
-  def featuresFor(l: L, w: Seq[W], pos: Int) = Array(LexicalFeature(l, w):Feature)
-
-  def initialValueForFeature(f: Feature) = -1.0
+trait SimpleFeaturizer[L, W] extends Featurizer[L, W] {
+  def featuresFor(r: Rule[L]):Array[Feature]
 }
 
-class GenFeaturizer[L, W](wGen: (Seq[W], Int)=>IndexedSeq[Feature],
-                          lGen: L=>Seq[Feature] = {(x:L)=>Seq(IndicatorFeature(x))},
-                          rGen: Rule[L] => Seq[Feature] = {(x: Rule[L]) => Seq(IndicatorFeature(x))}
-                           ) extends Featurizer[L, W] {
 
-  val featureInterner = Interner[Feature]
 
-  def featuresFor(l: L, w: Seq[W], pos: Int) = {
-    val result = ArrayBuilder.make[Feature]
-    val wfFeats = wGen(w, pos).map(featureInterner)
-    val lfFeats = lGen(l).map(featureInterner)
-    result.sizeHint(wfFeats.size * lfFeats.size)
-    for ( wf <- wfFeats; lf <- lfFeats) {
-      result += featureInterner.intern(PairFeature(lf, wf))
+class GenFeaturizer[L](wGen: IndexedWordFeaturizer,
+                       lGen: L=>Seq[Feature] = {(x:L)=>Seq(IndicatorFeature(x))},
+                       rGen: Rule[L] => Seq[Feature] = {(x: Rule[L]) => Seq(IndicatorFeature(x) )} ) extends SimpleFeaturizer[L, String] { outer =>
+
+  def anchor(words: IndexedSeq[String]): Anchoring = new Anchoring {
+    val lexAnch = wGen.anchor(words)
+    def featuresFor(begin: Int, split: Int, end: Int, r: Rule[L]): Array[Feature] = outer.featuresFor(r)
+
+    def featuresFor(pos: Int, label: L): Array[Feature] = {
+      lexAnch.featuresForWord(pos).map(i => LexicalFeature(label, wGen.featureIndex.get(i)))
     }
-    result.result()
   }
 
-  def featuresFor(r: Rule[L]) =  rGen(r).map(featureInterner).toArray
+  def featuresFor(r: Rule[L]) =  rGen(r).toArray
 
   def initialValueForFeature(f: Feature) = 0.0
 }

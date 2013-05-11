@@ -13,8 +13,8 @@ import scala.Some
 import epic.parser._
 import java.util.concurrent.atomic.AtomicInteger
 import epic.lexicon.Lexicon
-import epic.features.IndexedSpanFeaturizer
-import epic.pruning.LabeledSpanConstraints
+import epic.features.{SurfaceFeatureAnchoring, IndexedSpanFeaturizer}
+import epic.constraints.{SpanConstraints, LabeledSpanConstraints}
 
 /**
  * 
@@ -28,7 +28,7 @@ case class FeaturizedSentence(index: Int, words: IndexedSeq[String],
                               nerOpt: Option[Segmentation[NERType.Value, String]],
                               nerConstraints: LabeledSpanConstraints[NERType.Value],
                               frames: IndexedSeq[Frame],
-                              featureAnchoring: IndexedSpanFeaturizer#Localization,
+                              featureAnchoring: SurfaceFeatureAnchoring[String],
                               speaker: Option[String] = None,
                               id: String = "")  {
   def featuresForSpan(begin: Int, end: Int) = featureAnchoring.featuresForSpan(begin, end)
@@ -67,7 +67,6 @@ object FeaturizedDocument {
   def makeFactory(treeProcessor: StandardTreeProcessor,
                   parseConstrainer: ConstraintCoreGrammar[AnnotatedLabel, String],
                   nerConstrainer: SemiCRF.ConstraintSemiCRF[NERType.Value, String],
-                  tagWordCounts: Counter2[AnnotatedLabel, String, Double],
                   corefFeaturizer: CorefInstanceFeaturizer)(docs: IndexedSeq[Document]): (Factory, IndexedSeq[FeaturizedDocument]) = {
     val wordFeatureIndex, spanFeatureIndex = Index[Feature]()
 
@@ -95,16 +94,13 @@ object FeaturizedDocument {
       s.words -> (constituentSparsity.flatten | nerConstraints)
     }
 
-    val featurizer = IndexedSpanFeaturizer.forTrainingSet(docsWithValidSpans, tagWordCounts, Gazetteer.ner())
+    val featurizer = IndexedSpanFeaturizer.forTrainingSet(docsWithValidSpans, parseConstrainer.lexicon, Gazetteer.ner())
 
     val featurized = for( ((d, other)) <- docs zip constraints.seq) yield {
       val newSentences = for( (s, (tree, seg, constituentSparsity, nerConstraints)) <- d.sentences zip other) yield {
-        def isPossibleSpan(begin: Int, end: Int) = (
-          constituentSparsity.isActiveSpan(begin,end)
-            || nerConstraints.isAllowedSpan(begin,end)
-          )
+        val validSpan = (constituentSparsity.flatten | nerConstraints)
 
-        val loc = featurizer.anchor(s.words, isPossibleSpan)
+        val loc = featurizer.anchor(s.words -> validSpan)
 
 
         FeaturizedSentence(s.index, s.words,
@@ -129,7 +125,7 @@ object FeaturizedDocument {
 //                     graphFeaturizer: PropertyPropagation.GraphBuilder,
                     nerConstrainer: SemiCRF.ConstraintSemiCRF[NERType.Value, String],
                     srlLabelIndex: Index[String],
-                    featurizer: IndexedSpanFeaturizer,
+                    featurizer: IndexedSpanFeaturizer[(IndexedSeq[String], SpanConstraints)],
                     corefFeaturizer: CorefInstanceFeaturizer,
                     wordFeatureIndex: Index[Feature],
                     spanFeatureIndex: Index[Feature]) extends (Document=>FeaturizedDocument) {
@@ -152,13 +148,9 @@ object FeaturizedDocument {
        val policy: GoldTagPolicy[AnnotatedLabel] = if (keepGoldTree) GoldTagPolicy.goldTreeForcing(tree.map(parseConstrainer.grammar.labelIndex)) else GoldTagPolicy.noGoldTags
        val constituentSparsity = parseConstrainer.rawConstraints(s.words, policy).sparsity
        val nerConstraints = nerConstrainer.constraints(s.nerSegmentation, keepGold = keepGoldTree)
+       val validSpan = (constituentSparsity.flatten | nerConstraints)
 
-       def isPossibleSpan(begin: Int, end: Int) = begin != end && (
-         constituentSparsity.isActiveSpan(begin,end)
-           || nerConstraints.isAllowedSpan(begin,end)
-         )
-
-       val loc = featurizer.anchor(s.words, isPossibleSpan)
+       val loc = featurizer.anchor(s.words -> validSpan)
 
        FeaturizedSentence(s.index, s.words,
          Some(tree),

@@ -19,7 +19,7 @@ package models
 import epic.framework._
 import breeze.util._
 import projections._
-import features.Featurizer
+import epic.parser.features.{SimpleFeaturizer, Featurizer}
 import breeze.collection.mutable.{ArrayMap, OpenAddressHashArray}
 import epic.trees.{TreeInstance, LexicalProduction}
 import breeze.linalg.DenseVector
@@ -34,9 +34,9 @@ import epic.lexicon.Lexicon
  * @author dlwh
  */
 @SerialVersionUID(1)
-trait IndexedFeaturizer[L, L2, W] extends RefinedFeaturizer[L, W, Feature] with Encoder[Feature] with Serializable {
+trait IndexedFeaturizer[L, L2, W] extends RefinedFeaturizer[L, W, Feature] with Encoder[Feature] with Serializable { outer =>
   val index: Index[Feature]
-  val featurizer: Featurizer[L2, W]
+  val featurizer: SimpleFeaturizer[L2, W]
   val grammar: BaseGrammar[L]
   val lexicon: Lexicon[L, W]
   val proj: GrammarRefinements[L, L2]
@@ -53,12 +53,7 @@ trait IndexedFeaturizer[L, L2, W] extends RefinedFeaturizer[L, W, Feature] with 
     ruleCache(r)
   }
 
-  def featuresFor(a: Int, w: IndexedSeq[W], pos: Int) = {
-    stripEncode(featurizer.featuresFor(labelIndex.get(a), w, pos))
-  }
-
   def computeWeight(r: Int, weights: DenseVector[Double]): Double = dot(featuresFor(r),weights)
-  def computeWeight(l: Int, w: IndexedSeq[W], pos: Int, weights: DenseVector[Double]) = dot(featuresFor(l, w, pos), weights)
 
   private def dot(features: Array[Int], weights: DenseVector[Double]) = {
     var i = 0
@@ -92,20 +87,29 @@ trait IndexedFeaturizer[L, L2, W] extends RefinedFeaturizer[L, W, Feature] with 
   case class Spec private[IndexedFeaturizer](words: IndexedSeq[W]) extends super.Anchoring {
     def featuresForBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int) = {
       val globalRule = proj.rules.globalize(rule, ref)
-      featuresFor(globalRule)
+      outer.featuresFor(globalRule)
     }
 
     def featuresForUnaryRule(begin: Int, end: Int, rule: Int, ref: Int) = {
       val globalRule = proj.rules.globalize(rule, ref)
-      featuresFor(globalRule)
+      outer.featuresFor(globalRule)
     }
 
     def featuresForSpan(begin: Int, end: Int, tag: Int, ref: Int) = {
       if (begin + 1 == end) {
         val globalTag = proj.labels.globalize(tag, ref)
-        featuresFor(globalTag, words, begin)
+        featuresFor(begin, globalTag)
       } else Array.empty[Int]
     }
+
+    val innerAnch = featurizer.anchor(words)
+
+    def featuresFor(pos: Int, a: Int) = {
+      stripEncode(innerAnch.featuresFor(pos, labelIndex.get(a)))
+    }
+
+
+    def computeWeight(pos: Int, l: Int, weights: DenseVector[Double]) = dot(featuresFor(pos, l), weights)
   }
 
 }
@@ -118,7 +122,7 @@ object IndexedFeaturizer {
   def apply[L, L2, W](grammar: BaseGrammar[L],
                       lexicon: Lexicon[L, W],
                       trees: IndexedSeq[TreeInstance[L, W]],
-                      f: Featurizer[L2, W],
+                      f: SimpleFeaturizer[L2, W],
                       indexedProjections: GrammarRefinements[L, L2]): IndexedFeaturizer[L, L2, W] = {
     val featureIndex = Index[Feature]()
     val ruleIndex = indexedProjections.rules.fineIndex
@@ -137,12 +141,13 @@ object IndexedFeaturizer {
     // lex
     for {
       ex <- trees
+      featAnch = f.anchor(ex.words)
       lexLoc = lexicon.anchor(ex.words)
       i <- 0 until ex.words.length
       l <- lexLoc.allowedTags(i)
       lSplit <- indexedProjections.labels.refinementsOf(l)
     } {
-      val feats = f.featuresFor(indexedProjections.labels.fineIndex.get(lSplit), ex.words, i)
+      val feats = featAnch.featuresFor(i, indexedProjections.labels.fineIndex.get(lSplit))
       feats.foreach {featureIndex.index _ }
     }
 
@@ -151,7 +156,7 @@ object IndexedFeaturizer {
 
   private def cachedFeaturesToIndexedFeatures[L, L2, W](grammar: BaseGrammar[L], lexicon: Lexicon[L, W],
                                                         refinements: GrammarRefinements[L, L2],
-                                                        f: Featurizer[L2, W],
+                                                        f: SimpleFeaturizer[L2, W],
                                                         featureIndex: Index[Feature],
                                                         ruleCache: OpenAddressHashArray[Array[Feature]]): IndexedFeaturizer[L, L2, W]  = {
     val brc =  Array.tabulate(refinements.rules.fineIndex.size){ r =>

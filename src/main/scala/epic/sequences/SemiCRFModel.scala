@@ -8,8 +8,8 @@ import collection.mutable.ArrayBuffer
 import breeze.collection.mutable.TriangularArray
 import breeze.features.FeatureVector
 import epic.features.IndexedSpanFeaturizer
-import epic.pruning.{TagConstraints, LabeledSpanConstraints}
-import epic.pruning.LabeledSpanConstraints.NoConstraints
+import epic.constraints.{SpanConstraints, TagConstraints, LabeledSpanConstraints}
+import epic.constraints.LabeledSpanConstraints.NoConstraints
 import epic.lexicon.{SimpleLexicon, Lexicon}
 import epic.trees.AnnotatedLabel
 
@@ -260,7 +260,7 @@ class SegmentationModelFactory[L](val startSymbol: L,
       cons
     }
     val trainWithAllowedSpans = train.map(seg => seg.words -> allowedSpanClassifier(seg))
-    val f = IndexedSpanFeaturizer.forTrainingSet(trainWithAllowedSpans, counts, gazetteer)
+    val f = IndexedSpanFeaturizer.forTrainingSet(trainWithAllowedSpans, lexicon, gazetteer)
 
     for(f <- pruningModel) {
       assert(f.labelIndex == labelIndex, f.labelIndex + " " + labelIndex)
@@ -279,7 +279,7 @@ object SegmentationModelFactory {
 
 
   @SerialVersionUID(1L)
-  class IndexedStandardFeaturizer[L](f: IndexedSpanFeaturizer,
+  class IndexedStandardFeaturizer[L](f: IndexedSpanFeaturizer[(IndexedSeq[String], LabeledSpanConstraints[L])],
                                      val startSymbol: L,
                                      val lexicon: Lexicon[L, String],
                                      val labelIndex: Index[L],
@@ -316,7 +316,7 @@ object SegmentationModelFactory {
     def anchor(w: IndexedSeq[String]): SemiCRFModel.BIEOAnchoredFeaturizer[L, String] = new SemiCRFModel.BIEOAnchoredFeaturizer[L, String] {
       val constraints = pruningModel.map(_.constraints(w)).getOrElse{LabeledSpanConstraints.layeredFromTagConstraints(lexicon.anchor(w), maxLength)}
 
-      val loc = f.anchor(w, constraints.isAllowedSpan(_, _))
+      val loc = f.anchor(w -> constraints)
       def length = w.length
 
 

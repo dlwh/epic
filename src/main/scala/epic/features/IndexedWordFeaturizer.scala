@@ -10,6 +10,7 @@ import breeze.io.TextWriter.PrintStreamWriter
 import java.io.{FileWriter, PrintWriter}
 import com.sun.xml.internal.ws.wsdl.writer.document.OpenAtts
 import breeze.collection.mutable.OpenAddressHashArray
+import epic.lexicon.Lexicon
 
 /**
  *
@@ -18,25 +19,24 @@ import breeze.collection.mutable.OpenAddressHashArray
 @SerialVersionUID(1L)
 class IndexedWordFeaturizer private (val featurizer: BasicWordFeaturizer,
                                      val featureIndex: Index[Feature],
-                                     wordCounts: Counter[String, Double],
+                                     lexicon: Lexicon[_, String],
                                      prevCurFeature: (Int,Int)=>Int,
                                      curNextFeature: (Int,Int)=>Int,
                                      prevNextFeature: (Int,Int)=>Int,
                                      asLeftFeature: Array[Int],
-                                     asRightFeature: Array[Int],
-                                     needsContextFeatures: (String,Double)=>Boolean = {(w,c) => true}) extends Serializable {
+                                     asRightFeature: Array[Int]) extends Serializable {
 
   def anchor(words: IndexedSeq[String]) = new Localization(words)
 
   class Localization(words: IndexedSeq[String]) {
     def basicFeatures(pos: Int): Array[Int] = wordFeaturizer.basicFeatures(pos)
     def featuresForWord(pos: Int): Array[Int] = _featuresForWord(pos)
-    val wordFeaturizer = featurizer.anchor(words)
+    private val wordFeaturizer = featurizer.anchor(words)
+    private val lexAnch = lexicon.anchor(words)
 
     private val _featuresForWord: IndexedSeq[Array[Int]] = 0 until words.length map { pos =>
-      val wc = wordCounts(words(pos))
       val basic = basicFeatures(pos)
-      if(!needsContextFeatures(words(pos), wc)) {
+      if(lexAnch.allowedTags(pos).size == 1) {
         basic
       } else {
         val feats = new ArrayBuffer[Int]()
@@ -75,19 +75,16 @@ class IndexedWordFeaturizer private (val featurizer: BasicWordFeaturizer,
 }
 
 object IndexedWordFeaturizer {
-  def forTrainingSet[L](corpus: Iterable[IndexedSeq[(L, String)]],
-                     gazetteer: Gazetteer[Any, String] = Gazetteer.empty,
-                     noShapeThreshold: Int = 100,
-                     needsContextFeatures: (String,Double)=>Boolean = {(w,c) => true}):IndexedWordFeaturizer = {
-    val tagWordCounts: Counter2[L, String, Double] = Counter2.count(corpus.iterator.flatten).mapValues(_.toDouble)
-    val wordCounts = sum(tagWordCounts, Axis._0)
+  def forTrainingSet[L](corpus: Iterable[IndexedSeq[String]],
+                        lexicon: Lexicon[L, String],
+                        gazetteer: Gazetteer[Any, String] = Gazetteer.empty,
+                        noShapeThreshold: Int = 100) = {
+    val wordCounts = Counter.countTraversable(corpus.iterator.flatten).mapValues(_.toDouble)
     val featureIndex = Index[Feature]()
 
-    val feat = new BasicWordFeaturizer(tagWordCounts, wordCounts, gazetteer)
+    val feat = new BasicWordFeaturizer(wordCounts, gazetteer, noShapeThreshold)
     val basicFeatureIndex = feat.featureIndex
-    val out = new PrintWriter(new FileWriter("index.txt"))
-    basicFeatureIndex foreach {out.println _}
-    out.close()
+    basicFeatureIndex.foreach(featureIndex.index)
 
     // for left and right
     val asLeftFeatures = new Array[Int](basicFeatureIndex.size)
@@ -103,17 +100,17 @@ object IndexedWordFeaturizer {
     val curNextBigramFeatures = Array.fill(basicFeatureIndex.size)(new OpenAddressHashArray[Int](basicFeatureIndex.size, default= -1))
     val prevNextBigramFeatures = Array.fill(basicFeatureIndex.size)(new OpenAddressHashArray[Int](basicFeatureIndex.size, default= -1))
 
+    def isAmbiguous(pos: Int, anch: lexicon.Localization) = anch.allowedTags(pos).size != 1
+
     for(words <- corpus) {
-      val anch = feat.anchor(words.map(_._2))
+      val anch = feat.anchor(words)
+      val lexAnch = lexicon.anchor(words)
 
       def bf(pos: Int) =  anch.basicFeatures(pos)
 
       for(pos <- 0 until words.length) {
-        val wc = wordCounts(words(pos)._2)
         val basic = bf(pos)
-        if(!needsContextFeatures(words(pos)._2, wc)) {
-          basic
-        } else {
+        if(isAmbiguous(pos, lexAnch)) {
           val basicLeft = bf(pos - 1)
           val basicRight = bf(pos + 1)
           for (a <- basicLeft; b <- basic)  prevCurBigramFeatures(a)(b) = featureIndex.index(BigramFeature(featureIndex.get(asLeftFeatures(a)),featureIndex.get(b)))
@@ -130,12 +127,11 @@ object IndexedWordFeaturizer {
     }
 
     new IndexedWordFeaturizer(feat,
-    featureIndex, wordCounts,
+    featureIndex, lexicon,
     {(p,c) =>prevCurBigramFeatures(p)(c)},
     {(c,r) =>curNextBigramFeatures(c)(r)},
     {(p,r) =>prevNextBigramFeatures(p)(r)},
-    asLeftFeatures, asRightFeatures,
-    needsContextFeatures)
+    asLeftFeatures, asRightFeatures)
 
   }
 }

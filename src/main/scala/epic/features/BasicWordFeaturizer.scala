@@ -13,8 +13,7 @@ import epic.parser.features.IndicatorFeature
  *
  * @author dlwh
  */
-class BasicWordFeaturizer(tagWordCounts: Counter2[_, String, Double],
-                          wordCounts: Counter[String, Double],
+class BasicWordFeaturizer(wordCounts: Counter[String, Double],
                           gazetteer: Gazetteer[Any, String] = Gazetteer.empty,
                           noShapeThreshold: Int = 100,
                           minCountThreshold: Int = 5)  {
@@ -40,7 +39,7 @@ class BasicWordFeaturizer(tagWordCounts: Counter2[_, String, Double],
     val wc = wordCounts(wordIndex.get(i))
     val w = wordFeatures(i)
     if(wc > noShapeThreshold) Array(w)
-    else if (wc > minCountThreshold) Array(w, shape, classe, addToIndex("T-" + tagWordCounts(::, wordIndex.get(i)).argmax, 'MaxTag))
+    else if (wc > minCountThreshold) Array(w, shape, classe)
     else Array(shape, classe, LowCountFeature)
   }
 

@@ -313,7 +313,7 @@ object ProjectTreebankToConstraints {
 
 
 /**
- * Computes a CDF for how many labels are pruned at different levels of pruning.
+ * Computes a CDF for how many labels are pruned at different levels of constraints.
  *
  * @author dlwh
  */

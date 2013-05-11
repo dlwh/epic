@@ -16,7 +16,7 @@ import epic.ontonotes.Argument
 import epic.sequences.Segmentation
 import epic.everything.ChainNER.Label1Feature
 import epic.trees.Span
-import epic.pruning.LabeledSpanConstraints
+import epic.constraints.LabeledSpanConstraints
 
 /**
  *

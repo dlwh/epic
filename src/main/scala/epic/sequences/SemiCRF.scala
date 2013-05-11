@@ -15,8 +15,8 @@ import java.io.{ObjectInputStream, IOException}
 import breeze.optimize.FirstOrderMinimizer.OptParams
 import breeze.optimize.{GradientTester, CachedBatchDiffFunction}
 import breeze.linalg.DenseVector
-import epic.pruning.LabeledSpanConstraints
-import epic.pruning.LabeledSpanConstraints.NoConstraints
+import epic.constraints.LabeledSpanConstraints
+import epic.constraints.LabeledSpanConstraints.NoConstraints
 
 /**
  * A Semi-Markov Linear Chain Conditional Random Field, that is, the length

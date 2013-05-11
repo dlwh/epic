@@ -22,27 +22,35 @@ import breeze.linalg._
  * @author dlwh
  */
 trait TagScorer[L, W] extends Serializable {
-  def scoreTag(l: L, words: IndexedSeq[W], pos: Int):Double
+  def anchor(words: IndexedSeq[W]):Anchoring
+  trait Anchoring {
+    def words: IndexedSeq[W]
+    def scoreTag(pos: Int, l: L):Double
+  }
 }
 
 class SimpleTagScorer[L, W](counts: Counter2[L, W, Double]) extends TagScorer[L, W] {
-  def scoreTag(l: L, words: IndexedSeq[W], pos: Int) = {
-    val w = words(pos)
-    var cWord = wordCounts(w)
-    var cTagWord = counts(l, w)
-    assert(cWord >= cTagWord)
-    if(cWord < 10) {
-      cWord += 1.0
-      cTagWord += counts(l, ::).size.toDouble / wordCounts.size
+  def anchor(w: IndexedSeq[W]):Anchoring = new Anchoring {
+    def words: IndexedSeq[W] = w
+
+    def scoreTag(pos: Int, l: L) = {
+      val w = words(pos)
+      var cWord = wordCounts(w)
+      var cTagWord = counts(l, w)
+      assert(cWord >= cTagWord)
+      if(cWord < 10) {
+        cWord += 1.0
+        cTagWord += counts(l, ::).size.toDouble / wordCounts.size
+      }
+
+      val pW = cWord / (totalCount + 1.0)
+      val pTgW = cTagWord / cWord
+      val pTag = labelCounts(l) / totalCount
+      val result = log(pW) + log(pTgW) - log(pTag)
+      assert(cTagWord == 0 || result > Double.NegativeInfinity)
+      result
+
     }
-
-    val pW = cWord / (totalCount + 1.0)
-    val pTgW = cTagWord / cWord
-    val pTag = labelCounts(l) / totalCount
-    val result = log(pW) + log(pTgW) - log(pTag)
-    assert(cTagWord == 0 || result > Double.NegativeInfinity)
-    result
-
   }
 
   private val wordCounts:Counter[W, Double] = sum(counts, Axis._0)
