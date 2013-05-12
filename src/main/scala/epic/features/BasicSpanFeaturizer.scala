@@ -2,10 +2,10 @@ package epic.features
 
 import epic.framework.Feature
 import epic.parser.features.StandardSpanFeatures._
-import epic.parser.features.SpanShapeGenerator
 import epic.trees.Span
 import breeze.util.Index
 import scala.collection.mutable.ArrayBuffer
+import epic.newfeatures.SpanShapeGenerator
 
 /**
  *
@@ -29,7 +29,7 @@ class BasicSpanFeaturizer(val wordFeaturizer: BasicWordFeaturizer) {
        if (start < end - 1) {
          feats += WordEdges('Inside, wordFeatureIndex.get(basicFeatures(start)(0)), wordFeatureIndex.get(basicFeatures(end-1)(0)))
          feats += WordEdges('Outside, wordFeatureIndex.get(basicFeatures(start-1)(0)), wordFeatureIndex.get(basicFeatures(end)(0)))
-         feats += SpanShapeFeature(SpanShapeGenerator.apply(words, Span(start,end)))
+         feats += SpanShapeFeature(SpanShapeGenerator.apply(words, start,end))
        }
 
        if (start == 0)

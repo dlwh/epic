@@ -1,27 +1,25 @@
-package epic.parser.features
-
-import epic.trees.Span
+package epic.newfeatures
 
 /**
  *
  * @author dlwh
  */
-object SpanShapeGenerator extends ((IndexedSeq[String],Span)=>String) with Serializable {
+object SpanShapeGenerator extends Serializable {
 
 
-  def apply(v1: IndexedSeq[String], v2: Span): String = signatureFor(v1,v2)
+  def apply(v1: IndexedSeq[String], begin: Int, end: Int): String = signatureFor(v1,begin, end)
 
-  def signatureFor(words: IndexedSeq[String], span: Span) = {
-    val result = new StringBuilder(span.length)
-    var i = 0
-    if(span.head == 0) {
+  def signatureFor(words: IndexedSeq[String], begin: Int, end: Int) = {
+    val result = new StringBuilder(end-begin)
+    if(begin == 0) {
       result += '#'
     } else {
-      result += binCharacter(words(span.head-1).head)
+      result += binCharacter(words(begin-1).head)
       result += '['
     }
-    while (i < span.length) {
-      val w = words(span(i))
+    var i = begin
+    while (i < end) {
+      val w = words(i)
       if(w.isEmpty) {
         // probably won't happen.
         result += 'ε'
@@ -41,11 +39,11 @@ object SpanShapeGenerator extends ((IndexedSeq[String],Span)=>String) with Seria
       }
       i += 1
     }
-    if(span.last == words.length - 1) {
+    if(end == words.length) {
       result += '#'
     } else {
       result += ']'
-      result += binCharacter(words(span.last+1).head)
+      result += binCharacter(words(end).head)
     }
     result.toString
   }

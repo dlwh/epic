@@ -32,16 +32,20 @@ final case class RightWordFeature(str: Any) extends Feature
 
 
 
-class WordShapeFeaturizer(wordCounts: Counter[String, Double], minCountUnknown: Int = 5) extends (String=>IndexedSeq[Feature]) with Serializable {
+class WordShapeFeaturizer(wordCounts: Counter[String, Double],
+                          commonWordThreshold: Int = 20,
+                          unknownWordThreshold: Int = 2,
+                          prefixOrder: Int = 3,
+                          suffixOrder: Int = 4) extends (String=>IndexedSeq[Feature]) with Serializable {
   import WordShapeFeaturizer._
 //  val signatureGenerator = EnglishWordClassGenerator
   def featuresFor(w: String): IndexedSeq[Feature] = {
     val wc = wordCounts(w)
     val features = ArrayBuffer[Feature]()
-    if(wc > minCountUnknown) {
+    if(wc > commonWordThreshold) {
       ArrayBuffer(IndicatorFeature(w))
     } else {
-      if(wc > 2)
+      if(wc > unknownWordThreshold)
         features += IndicatorFeature(w)
 //      features += ShapeFeature(WordShapeGenerator(w))
 //      features += SignatureFeature(signatureGenerator.signatureFor(w))
@@ -69,7 +73,7 @@ class WordShapeFeaturizer(wordCounts: Counter[String, Double], minCountUnknown: 
         }
       }
 
-      if(!hasLower) features += hasNoLower
+      if(!hasLower && hasLetter) features += hasNoLower
       if(hasDash) features += hasDashFeature
       if(hasDigit)  features += hasDigitFeature
       if(!hasLetter)  features += hasNoLetterFeature
@@ -83,7 +87,10 @@ class WordShapeFeaturizer(wordCounts: Counter[String, Double], minCountUnknown: 
       // make sure it doesn't have a lwoer case or title case variant, common for titles and place names...
       if(hasAcronymShape  && !knownLowerCase && wordCounts(w(0).toUpper + w.substring(1).toLowerCase) == 0) {
         features += isProbablyAcronymFeature
-      } else if(wlen == 4 && !hasNonDigit) {
+      }
+
+      // year!
+      if(wlen == 4 && !hasNonDigit) {
         val year = try{w.toInt} catch {case e: NumberFormatException => 0}
         if(year >= 1400 && year < 2300) {
           features += isProbablyYearFeature
@@ -92,14 +99,17 @@ class WordShapeFeaturizer(wordCounts: Counter[String, Double], minCountUnknown: 
 
       if(wlen > 3 && w.endsWith("s") && !w.endsWith("ss") && !w.endsWith("us") && !w.endsWith("is"))
         features += endsWithSFeature
-      else if(wlen >= 5 && !(hasDigit && numCaps > 0) && !hasDash)  {
-        features += (SuffixFeature(w.substring(wlen-3)))
-        features += (SuffixFeature(w.substring(wlen-2)))
-        features += (SuffixFeature(w.substring(wlen-1)))
-        features += PrefixFeature(w.substring(0,1))
-        features += PrefixFeature(w.substring(0,2))
-        features += PrefixFeature(w.substring(0,3))
 
+      if(wlen >= suffixOrder + 1) {
+        for(i <- 1 to suffixOrder) {
+          features += (SuffixFeature(w.substring(wlen-i)))
+        }
+      }
+
+      if(wlen >= prefixOrder + 2) {
+        for(i <- 1 to prefixOrder) {
+          features += PrefixFeature(w.substring(0,prefixOrder))
+        }
       }
 
       if(wlen > 10) {
