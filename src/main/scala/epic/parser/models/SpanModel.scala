@@ -29,6 +29,7 @@ import epic.framework.Feature
 import projections.GrammarRefinements
 import breeze.config.Help
 import epic.lexicon.Lexicon
+import epic.newfeatures.HashFeature
 
 /**
  * A rather more sophisticated discriminative parser. Uses features on

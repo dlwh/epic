@@ -3,7 +3,7 @@ package epic.sequences
 import breeze.util.Index
 import breeze.numerics
 import breeze.linalg.DenseVector
-import epic.framework.{ModelObjective, Feature}
+import epic.framework.{VisitableMarginal, ModelObjective, Feature}
 import java.util
 import collection.mutable.ArrayBuffer
 import breeze.optimize.FirstOrderMinimizer.OptParams
@@ -91,7 +91,7 @@ object CRF {
   }
 
 
-  trait Marginal[L, W] extends epic.framework.Marginal {
+  trait Marginal[L, W] extends VisitableMarginal[TransitionVisitor[L, W]] {
 
     def anchoring: Anchoring[L, W]
     def words: IndexedSeq[W] = anchoring.words

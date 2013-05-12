@@ -12,3 +12,7 @@ package epic.framework
 trait Marginal {
   def logPartition: Double
 }
+
+trait VisitableMarginal[Visitor] extends Marginal {
+  def visit(visitor: Visitor)
+}

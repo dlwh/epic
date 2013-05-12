@@ -5,7 +5,7 @@ import epic.trees.Span
 import breeze.numerics
 import epic.sequences.SemiCRF.Marginal
 import breeze.features.FeatureVector
-import epic.framework.{ModelObjective, Feature}
+import epic.framework.{VisitableMarginal, ModelObjective, Feature}
 import java.util
 import collection.mutable.ArrayBuffer
 import util.concurrent.ConcurrentHashMap
@@ -116,7 +116,7 @@ object SemiCRF {
     def visitTransition(prev: Int, cur: Int, begin: Int, end: Int, count: Double)
   }
 
-  trait Marginal[L, W] extends epic.framework.Marginal {
+  trait Marginal[L, W] extends VisitableMarginal[TransitionVisitor[L, W]] {
 
     def anchoring: Anchoring[L, W]
     def words: IndexedSeq[W] = anchoring.words

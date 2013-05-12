@@ -29,6 +29,6 @@ case class TagFeature[L, W](tag: L, dep: W) extends LexFeature
 case class DistFeature(dist: Int, f: Feature) extends LexFeature
 case class PartFeature[P](feature: Feature, part: P) extends LexFeature
 
-case class HashFeature(hashBucket: Int) extends LexFeature
+
 case object LowCount extends LexFeature
 

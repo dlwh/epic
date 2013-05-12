@@ -1,6 +1,5 @@
 package epic.newfeatures
 
-import epic.newfeatures.SurfaceFeaturizer.{FullFeatures, BasicFeatures, MinimalFeatures, FeaturizationLevel}
 import epic.framework.Feature
 import breeze.linalg.Counter
 import breeze.util.{Encoder, Interner, Index}
@@ -11,9 +10,7 @@ import breeze.text.analyze.{WordShapeGenerator, EnglishWordClassGenerator}
 import scala.collection.mutable.ArrayBuffer
 import epic.parser.features.StandardSpanFeatures._
 import epic.features.WordFeature
-import epic.parser.features.StandardSpanFeatures.WordEdges
-import epic.parser.features.StandardSpanFeatures.SpanLengthFeature
-import epic.parser.features.StandardSpanFeatures.SpanShapeFeature
+import epic.newfeatures.FeaturizationLevel.{FullFeatures, BasicFeatures, MinimalFeatures}
 
 /**
  *
@@ -24,9 +21,9 @@ class StandardSurfaceFeaturizer(wordCounts: Counter[String, Double],
                                 commonWordThreshold: Int = 20,
                                 unknownWordThreshold: Int = 2) extends SurfaceFeaturizer[String] {
 
-  def anchor(words: IndexedSeq[String]):Anchoring = {
+  def anchor(words: IndexedSeq[String]):SurfaceFeatureAnchoring[String] = {
     val w = words
-    new Anchoring {
+    new SurfaceFeatureAnchoring[String] {
       val indices = words.map(wordIndex)
       def words = w
 

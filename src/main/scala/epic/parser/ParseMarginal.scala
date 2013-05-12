@@ -1,6 +1,6 @@
 package epic.parser
 
-import epic.framework.{Marginal, StandardExpectedCounts}
+import epic.framework.{VisitableMarginal, Marginal, StandardExpectedCounts}
 import epic.trees.Production
 
 /*
@@ -23,7 +23,7 @@ import epic.trees.Production
  * Represents marginals over trees. Can also extract expected counts
  * @author dlwh
  */
-trait ParseMarginal[L, W] extends Marginal {
+trait ParseMarginal[L, W] extends VisitableMarginal[AnchoredVisitor[L]] {
   def anchoring: AugmentedAnchoring[L, W]
   def grammar:BaseGrammar[L] = anchoring.grammar
   def lexicon = anchoring.lexicon
