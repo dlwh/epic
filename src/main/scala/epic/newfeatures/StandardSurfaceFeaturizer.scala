@@ -33,7 +33,8 @@ class StandardSurfaceFeaturizer(wordCounts: Counter[String, Double],
         } else {
           level match {
             case MinimalFeatures => _minimalFeatures(pos)
-            case BasicFeatures | FullFeatures => _basicFeatures(pos)
+            case BasicFeatures   => _minimalFeatures(pos)
+            case FullFeatures    =>  _fullFeatures(pos)
           }
         }
       }
@@ -87,19 +88,36 @@ class StandardSurfaceFeaturizer(wordCounts: Counter[String, Double],
         }
       }
 
-      private val _basicFeatures = (0 until words.length) map {  i =>
+      def wordIsReasonablyRare(i: Int): Boolean = _minimalFeatures.length > 1
+
+      private val _fullFeatures = (0 until words.length) map {  i =>
         val index = indices(i)
-        if(index >= 0) {
+        val base = if(index >= 0) {
           StandardSurfaceFeaturizer.this.basicFeatures(index).toArray
         } else {
           wordShapeFeaturizer.apply(words(i)).map(interner(_)).toArray
         }
+
+        // initial words nee special treatment
+        if( (words(i).charAt(0).isUpper || words(i).charAt(0).isTitleCase) && wordIsReasonablyRare(i)) {
+          val isInitialWord = (i == 0 || words(i-1) == "``")
+          if(isInitialWord) {
+            base ++ base.map(FirstWordCapsAnd)
+          } else {
+            base ++ base.map(NthWordCapsAnd)
+          }
+        } else {
+          base
+        }
       }
+
     }
 
   }
 
+
   private val wordShapeFeaturizer = new WordShapeFeaturizer(wordCounts, commonWordThreshold, unknownWordThreshold)
+  // more positional shapes to add
 
   private val wordIndex = Index(wordCounts.keySet)
   private val interner = new Interner[Feature]
@@ -130,3 +148,6 @@ class StandardSurfaceFeaturizer(wordCounts: Counter[String, Double],
   val distanceBinner = DistanceBinner()
 
 }
+
+case class FirstWordCapsAnd(f: Feature) extends Feature
+case class NthWordCapsAnd(f: Feature) extends Feature

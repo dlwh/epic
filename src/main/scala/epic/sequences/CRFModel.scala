@@ -143,7 +143,7 @@ class TaggedSequenceModelFactory[L](val startSymbol: L,
     val lexicon = new SimpleLexicon[L, String](labelIndex, counts)
 
     val standardFeaturizer = new StandardSurfaceFeaturizer(sum(counts, Axis._0))
-    val featurizers = gazetteer.foldLeft(IndexedSeq[SurfaceFeaturizer[String]](new NGramSurfaceFeaturizer[String](standardFeaturizer)))(_ :+ _)
+    val featurizers = gazetteer.foldLeft(IndexedSeq[SurfaceFeaturizer[String]](new ContextSurfaceFeaturizer[String](standardFeaturizer)))(_ :+ _)
     val cachedFeaturizer = new CachedSurfaceFeaturizer(new MultiSurfaceFeaturizer[String](featurizers))
     val featurizer = IndexedWordFeaturizer.fromData(cachedFeaturizer, train.map(_.words))
 
@@ -152,8 +152,8 @@ class TaggedSequenceModelFactory[L](val startSymbol: L,
     val labelFeatures = (0 until labelIndex.size).map(l => LabelFeature(labelIndex.get(l)))
     val label2Features = for(l1 <- 0 until labelIndex.size) yield for(l2 <- 0 until labelIndex.size) yield LabelFeature(labelIndex.get(l1) -> labelIndex.get(l2))
 
-    val labelWordFeatures = Array.fill(labelIndex.size)(new OpenAddressHashArray[Int](featurizer.wordFeatureIndex.size,-1))
-    val label2WordFeatures = Array.fill(labelIndex.size, labelIndex.size)(new OpenAddressHashArray[Int](featurizer.wordFeatureIndex.size,-1))
+    val labelWordFeatures = Array.fill(featurizer.wordFeatureIndex.size)(new OpenAddressHashArray[Int](labelIndex.size,-1,4))
+    val label2WordFeatures = Array.fill(featurizer.wordFeatureIndex.size)(new OpenAddressHashArray[Int](labelIndex.size * labelIndex.size,-1,4))
 
     var i = 0
     for(s <- train) {
@@ -165,12 +165,12 @@ class TaggedSequenceModelFactory[L](val startSymbol: L,
         l <- lexLoc.allowedTags(b)
       } {
         loc.featuresForWord(b) foreach {f =>
-          labelWordFeatures(l)(f) = featureIndex.index(PairFeature(labelFeatures(l), featurizer.wordFeatureIndex.get(f)) )
+          labelWordFeatures(f)(l) = featureIndex.index(PairFeature(labelFeatures(l), featurizer.wordFeatureIndex.get(f)) )
         }
         if(lexLoc.allowedTags(b).size > 1) {
           for(prevTag <- if(b == 0) Set(labelIndex(startSymbol)) else lexLoc.allowedTags(b-1)) {
             loc.featuresForWord(b, FeaturizationLevel.MinimalFeatures) foreach {f =>
-              label2WordFeatures(l)(prevTag)(f) = featureIndex.index(PairFeature(label2Features(prevTag)(l), featurizer.wordFeatureIndex.get(f)) )
+              label2WordFeatures(f)(prevTag * labelIndex.size + l) = featureIndex.index(PairFeature(label2Features(prevTag)(l), featurizer.wordFeatureIndex.get(f)) )
             }
           }
         }
@@ -199,7 +199,7 @@ object TaggedSequenceModelFactory {
                                      val labelIndex: Index[L],
                                      val featureIndex: Index[Feature],
                                      labelFeatures: Array[OpenAddressHashArray[Int]],
-                                     label2Features: Array[Array[OpenAddressHashArray[Int]]]) extends CRF.IndexedFeaturizer[L,String] with Serializable { outer =>
+                                     label2Features: Array[OpenAddressHashArray[Int]]) extends CRF.IndexedFeaturizer[L,String] with Serializable { outer =>
 
 
     private val startSymbolSet = Set(labelIndex(startSymbol))
@@ -220,15 +220,16 @@ object TaggedSequenceModelFactory {
       for(pos <- 0 until length; curTag <- validSymbols(pos); prevTag <- validSymbols(pos-1)) {
         val vb = collection.mutable.ArrayBuilder.make[Int]
         val features = loc.featuresForWord(pos)
+        vb.sizeHint(if (posNeedsAmbiguity(pos)) 2 * features.length else features.length)
         var i = 0
         while(i < features.length) {
           val f = features(i)
-          val fi1 = labelFeatures(curTag)(f)
+          val fi1 = labelFeatures(f)(curTag)
           if(fi1 >= 0) {
             vb += fi1
 
             if(posNeedsAmbiguity(pos)) {
-              val fi2 = label2Features(prevTag)(curTag)(f)
+              val fi2 = label2Features(f)(prevTag * labelIndex.size + curTag)
               if(fi2 >= 0)
                 vb += fi2
             }

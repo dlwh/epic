@@ -20,6 +20,8 @@ import breeze.linalg._
 import collection.mutable.ArrayBuffer
 import breeze.text.analyze.{WordShapeGenerator, EnglishWordClassGenerator}
 import epic.parser.features.IndicatorFeature
+import java.text.NumberFormat
+import java.util.Locale
 
 final case class IndicatorWSFeature(name: Symbol) extends Feature
 final case class SuffixFeature(str: String) extends Feature
@@ -67,7 +69,7 @@ class WordShapeFeaturizer(wordCounts: Counter[String, Double],
       var knownLowerCase = false
       if(w(0).isUpper || w(0).isTitleCase) {
         features += hasInitCapFeature
-        if(wordCounts(w.toLowerCase) > 3) {
+        if(wordCounts(w.toLowerCase) > 0) {
           features += hasKnownLCFeature
           knownLowerCase = true
         }
@@ -95,6 +97,16 @@ class WordShapeFeaturizer(wordCounts: Counter[String, Double],
         if(year >= 1400 && year < 2300) {
           features += isProbablyYearFeature
         }
+      }
+
+      if(hasDigit && !hasLetter) {
+        try {
+          val n = w.replaceAll(",","").toDouble
+          if(!hasPeriod)
+            features += integerFeature
+          else
+            features += floatFeature
+        } catch {case e: NumberFormatException =>}
       }
 
       if(wlen > 3 && w.endsWith("s") && !w.endsWith("ss") && !w.endsWith("us") && !w.endsWith("is"))
@@ -145,6 +157,8 @@ object WordShapeFeaturizer {
   val isProbablyAcronymFeature = IndicatorWSFeature('ProbablyAcronym)
   val isProbablyYearFeature = IndicatorWSFeature('ProbablyYear)
   val startOfSentenceFeature = IndicatorWSFeature('StartOfSentence)
+  val integerFeature = IndicatorWSFeature('Integer)
+  val floatFeature = IndicatorWSFeature('Float)
 }
 
 /**
