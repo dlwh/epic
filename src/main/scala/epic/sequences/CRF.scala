@@ -134,7 +134,6 @@ object CRF {
 
         def anchoring: Anchoring[L, W] = _s
 
-        /** Visits spans with non-zero score, useful for expected counts */
         def visit(f: TransitionVisitor[L, W]) {
           val numLabels = scorer.labelIndex.size
           var pos = 0
@@ -189,7 +188,6 @@ object CRF {
 
         def anchoring: Anchoring[L, W] = s
 
-        /** Visits spans with non-zero score, useful for expected counts */
         def visit(f: TransitionVisitor[L, W]) {
           var lastSymbol = scorer.labelIndex(scorer.startSymbol)
           for( (l,pos) <- tags.zipWithIndex) {
@@ -200,11 +198,10 @@ object CRF {
 
         }
 
-        val symbols = scorer.labelIndex(scorer.startSymbol) +: tags.map(scorer.labelIndex(_))
+        val indexedSymbols = scorer.labelIndex(scorer.startSymbol) +: tags.map(scorer.labelIndex(_))
 
-        /** normalized probability of seeing previous state prev, and the tag for pos is cur with transition */
         def transitionMarginal(pos: Int, prev: Int, cur: Int): Double = {
-          numerics.I(prev == symbols(pos) && cur == symbols(pos + 1))
+          numerics.I(prev == indexedSymbols(pos) && cur == indexedSymbols(pos + 1))
         }
 
 

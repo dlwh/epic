@@ -3,18 +3,16 @@ package epic.sequences
 import epic.framework._
 import breeze.util._
 import breeze.linalg._
-import scala.collection.mutable.ArrayBuffer
 import epic.sequences.CRF.{AnchoredFeaturizer, TransitionVisitor}
-import epic.parser.features.{LabelFeature, PairFeature}
-import breeze.text.analyze.{WordShapeGenerator, EnglishWordClassGenerator}
 import scala.collection
-import java.io.{BufferedWriter, FileWriter, PrintWriter}
-import scala.collection.immutable
 import breeze.features.FeatureVector
-import epic.features.{IndexedWordFeaturizer, WordShapeFeaturizer}
+import epic.newfeatures._
 import epic.lexicon.{Lexicon, SimpleLexicon}
 import breeze.collection.mutable.OpenAddressHashArray
 import java.util
+import epic.util.{NotProvided, Optional}
+import epic.parser.features.PairFeature
+import epic.parser.features.LabelFeature
 
 /**
  *
@@ -132,25 +130,30 @@ class CRFInference[L, W](val weights: DenseVector[Double],
 }
 
 class TaggedSequenceModelFactory[L](val startSymbol: L,
-                                    gazetteer: Gazetteer[Any, String] = Gazetteer.empty[String, String],
+                                    gazetteer: Optional[Gazetteer[Any, String]] = NotProvided,
                                     weights: Feature=>Double = { (f:Feature) => 0.0}) {
 
   import TaggedSequenceModelFactory._
 
   def makeModel(train: IndexedSeq[TaggedSequence[L, String]]): CRFModel[L, String] = {
     val labelIndex: Index[L] = Index[L](Iterator(startSymbol) ++ train.iterator.flatMap(_.label))
-    val counts: Counter2[L, String, Int] = Counter2.count(train.flatMap(p => p.label zip p.words))
+    val counts: Counter2[L, String, Double] = Counter2.count(train.flatMap(p => p.label zip p.words)).mapValues(_.toDouble)
 
 
-    val lexicon = new SimpleLexicon[L, String](labelIndex, counts.mapValues(_.toDouble))
-    val featurizer = IndexedWordFeaturizer.forTrainingSet(train.map(_.words), lexicon, gazetteer)
+    val lexicon = new SimpleLexicon[L, String](labelIndex, counts)
+
+    val standardFeaturizer = new StandardSurfaceFeaturizer(sum(counts, Axis._0))
+    val featurizers = gazetteer.foldLeft(IndexedSeq[SurfaceFeaturizer[String]](new NGramSurfaceFeaturizer[String](standardFeaturizer)))(_ :+ _)
+    val cachedFeaturizer = new CachedSurfaceFeaturizer(new MultiSurfaceFeaturizer[String](featurizers))
+    val featurizer = IndexedWordFeaturizer.fromData(cachedFeaturizer, train.map(_.words))
+
     val featureIndex = Index[Feature]()
 
     val labelFeatures = (0 until labelIndex.size).map(l => LabelFeature(labelIndex.get(l)))
     val label2Features = for(l1 <- 0 until labelIndex.size) yield for(l2 <- 0 until labelIndex.size) yield LabelFeature(labelIndex.get(l1) -> labelIndex.get(l2))
 
-    val labelWordFeatures = Array.fill(labelIndex.size, featurizer.featureIndex.size)(-1)
-    val label2WordFeatures = Array.fill(labelIndex.size, labelIndex.size)(new OpenAddressHashArray[Int](featurizer.featureIndex.size,-1))
+    val labelWordFeatures = Array.fill(labelIndex.size)(new OpenAddressHashArray[Int](featurizer.wordFeatureIndex.size,-1))
+    val label2WordFeatures = Array.fill(labelIndex.size, labelIndex.size)(new OpenAddressHashArray[Int](featurizer.wordFeatureIndex.size,-1))
 
     var i = 0
     for(s <- train) {
@@ -162,12 +165,12 @@ class TaggedSequenceModelFactory[L](val startSymbol: L,
         l <- lexLoc.allowedTags(b)
       } {
         loc.featuresForWord(b) foreach {f =>
-          labelWordFeatures(l)(f) = featureIndex.index(PairFeature(labelFeatures(l), featurizer.featureIndex.get(f)) )
+          labelWordFeatures(l)(f) = featureIndex.index(PairFeature(labelFeatures(l), featurizer.wordFeatureIndex.get(f)) )
         }
         if(lexLoc.allowedTags(b).size > 1) {
           for(prevTag <- if(b == 0) Set(labelIndex(startSymbol)) else lexLoc.allowedTags(b-1)) {
-            loc.basicFeatures(b) foreach {f =>
-              label2WordFeatures(l)(prevTag)(f) = featureIndex.index(PairFeature(label2Features(prevTag)(l), featurizer.featureIndex.get(f)) )
+            loc.featuresForWord(b, FeaturizationLevel.MinimalFeatures) foreach {f =>
+              label2WordFeatures(l)(prevTag)(f) = featureIndex.index(PairFeature(label2Features(prevTag)(l), featurizer.wordFeatureIndex.get(f)) )
             }
           }
         }
@@ -178,7 +181,7 @@ class TaggedSequenceModelFactory[L](val startSymbol: L,
       i += 1
     }
 
-    val indexed = new IndexedStandardFeaturizer[L](featurizer, lexicon, startSymbol, labelIndex, featureIndex, labelWordFeatures, label2WordFeatures)
+    val indexed = new IndexedStandardFeaturizer[L, String](featurizer, lexicon, startSymbol, labelIndex, featureIndex, labelWordFeatures, label2WordFeatures)
     val model = new CRFModel(indexed.featureIndex, lexicon, indexed, weights(_))
 
     model
@@ -190,12 +193,12 @@ object TaggedSequenceModelFactory {
 
 
   @SerialVersionUID(1L)
-  class IndexedStandardFeaturizer[L](wordFeaturizer: IndexedWordFeaturizer,
+  class IndexedStandardFeaturizer[L, String](wordFeaturizer: IndexedWordFeaturizer[IndexedSeq[String], String],
                                      val lexicon: Lexicon[L, String],
                                      val startSymbol: L,
                                      val labelIndex: Index[L],
                                      val featureIndex: Index[Feature],
-                                     labelFeatures: Array[Array[Int]],
+                                     labelFeatures: Array[OpenAddressHashArray[Int]],
                                      label2Features: Array[Array[OpenAddressHashArray[Int]]]) extends CRF.IndexedFeaturizer[L,String] with Serializable { outer =>
 
 

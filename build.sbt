@@ -19,7 +19,8 @@ libraryDependencies ++= Seq(
   "org.scalanlp" %% "breeze-core" % "0.3-SNAPSHOT",
   "org.scalanlp" %% "breeze-math" % "0.3-SNAPSHOT",
   "org.scalanlp" %% "breeze-process" % "0.3-SNAPSHOT",
-  "org.scalanlp" %% "breeze-learn" % "0.3-SNAPSHOT"
+  "org.scalanlp" %% "breeze-learn" % "0.3-SNAPSHOT",
+  "com.twitter"  %% "util-collection"  % "6.3.0"
 )
 
 libraryDependencies <<= (scalaVersion, libraryDependencies) { (sv, deps) =>

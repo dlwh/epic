@@ -15,7 +15,8 @@ object FeaturizationLevel {
   case object MinimalFeatures extends FeaturizationLevel(0)
   case object BasicFeatures extends FeaturizationLevel(1)
   case object FullFeatures extends FeaturizationLevel(2)
-  def apply(level: Int) = level match {
+  val numLevels = 3
+  implicit def apply(level: Int) = level match {
     case x if x < 0 => MinimalFeatures
     case 0 => MinimalFeatures
     case 1 => BasicFeatures

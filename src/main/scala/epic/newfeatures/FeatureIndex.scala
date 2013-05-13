@@ -2,6 +2,7 @@ package epic.newfeatures
 
 import breeze.util.Index
 import epic.framework.{VisitableMarginal, Feature}
+import scala.collection.mutable
 
 /**
  *
@@ -22,6 +23,9 @@ class FeatureIndex(val trueIndex: Index[Feature], numHashFeatures: Int=0) extend
     }
   }
 
+
+  override def size: Int = trueIndex.size + numHashFeatures
+
   def unapply(i: Int): Option[Feature] = if(i >= size || i < 0)  None else Some(get(i))
 
   override def get(i: Int): Feature = {
@@ -37,6 +41,27 @@ class FeatureIndex(val trueIndex: Index[Feature], numHashFeatures: Int=0) extend
   def pairs: Iterator[(Feature, Int)] = trueIndex.pairs ++ Iterator.range(trueIndex.size,size).map{i => HashFeature(i) -> i}
 
   def iterator: Iterator[Feature] = pairs.map(_._1)
+
+  def stripEncode(features: Array[Feature]) = if(numHashFeatures > 0) {
+    val result = new Array[Int](features.length)
+    var i = 0
+    while(i < features.length) {
+      result(i) = apply(features(i))
+      i += 1
+    }
+    result
+  } else {
+    val result = mutable.ArrayBuilder.make[Int]()
+    result.sizeHint(features)
+    var i = 0
+    while(i < features.length) {
+      val fi = apply(features(i))
+      if(fi >= 0)
+        result += fi
+      i += 1
+    }
+    result.result()
+  }
 }
 
 object FeatureIndex {
