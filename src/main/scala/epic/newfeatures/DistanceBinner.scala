@@ -21,7 +21,6 @@ class DistanceBinner private (val binThresholds: Array[Int], preserveDirection: 
 
   def binnedDistance(a: Int, b: Int) = {
     val bin = distanceBin(a, b)
-    println(a,b,bin)
     if(a == b) 0
     else if(bin < 0) {
       if(-bin-1 >= binThresholds.length)

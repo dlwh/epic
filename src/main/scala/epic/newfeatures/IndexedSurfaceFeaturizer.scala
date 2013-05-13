@@ -1,11 +1,14 @@
 package epic
 package newfeatures
 
+import breeze.collection.mutable.TriangularArray
 import breeze.util.Index
+import com.google.common.collect.MapMaker
 import epic.framework.Feature
 import epic.newfeatures.FeaturizationLevel.FullFeatures
 import epic.util.Has2
-import breeze.collection.mutable.TriangularArray
+import java.io.IOException
+import java.util.Collections
 
 /**
  *
@@ -25,7 +28,8 @@ object IndexedSurfaceFeaturizer {
   def fromData[Datum, W](feat: SurfaceFeaturizer[W],
                          data: IndexedSeq[Datum],
                          wordHashFeatures: Int = 0,
-                         spanHashFeatures: Int = 0)
+                         spanHashFeatures: Int = 0,
+                         cache: Boolean = true)
                         (implicit hasWords: Has2[Datum, IndexedSeq[W]],
                          hasConstraints: HasSpanConstraints[Datum]): IndexedSurfaceFeaturizer[Datum, W]  = {
     val spanIndex = Index[Feature]()
@@ -45,7 +49,38 @@ object IndexedSurfaceFeaturizer {
     val ww = new FeatureIndex(wordIndex, wordHashFeatures)
     val ss = new FeatureIndex(spanIndex, spanHashFeatures)
 
-    new MySurfaceFeaturizer[Datum, W](feat, ww, ss)
+    val f = new MySurfaceFeaturizer[Datum, W](feat, ww, ss)
+    if(cache) new CachedFeaturizer(f)
+    else f
+  }
+
+  @SerialVersionUID(1L)
+  class CachedFeaturizer[Datum, W](val base: IndexedSurfaceFeaturizer[Datum, W]) extends IndexedSurfaceFeaturizer[Datum, W] with Serializable {
+    def spanFeatureIndex: Index[Feature] = base.spanFeatureIndex
+
+    def featurizer: SurfaceFeaturizer[W] = base.featurizer
+
+    def wordFeatureIndex: Index[Feature] = base.wordFeatureIndex
+
+
+    @transient
+    private var cache = Collections.synchronizedMap(new MapMaker().softValues().makeMap[Datum, IndexedSurfaceAnchoring[W]]())
+    def anchor(words: Datum): IndexedSurfaceAnchoring[W] = {
+      val cached = cache.get(words)
+      if(cached ne null) cached
+      else {
+        val x = base.anchor(words)
+        cache.put(words, x)
+        x
+      }
+    }
+
+    @throws[IOException]
+    @throws[ClassNotFoundException]
+    private def readObject(stream: java.io.ObjectInputStream) {
+      stream.defaultReadObject()
+      cache = Collections.synchronizedMap(new MapMaker().softValues().makeMap[Datum, IndexedSurfaceAnchoring[W]]())
+    }
   }
 
   @SerialVersionUID(1L)

@@ -15,9 +15,19 @@ sealed trait Optional[+A] {
     case NotProvided => NotProvided
   }
 
+
+  def foreach[B](f: A=>B) {
+    this match {
+      case Provided(x) => f(x)
+      case _ =>
+    }
+  }
+
   def foldLeft[B](b:B)(f: (B,A) => B) = if(isEmpty) b else f(b, get)
 
   def fold[B](ifSome: A => B , ifNone: => B) = if(isEmpty) ifNone else ifSome(get)
+
+  def getOrElse[B>:A](ifNone: => B) = if(isEmpty) ifNone else get
 }
 
 case class Provided[+A](get: A) extends Optional[A] {
