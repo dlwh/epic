@@ -15,7 +15,8 @@ object SegmentationEval {
     examples.par.aggregate(new Stats(0,0,0)) ({ (stats, gold )=>
       val guess = crf.bestSequence(gold.words, gold.id +"-guess")
     try {
-      println(gold, crf.goldMarginal(guess.segments, guess.words).logPartition, crf.goldMarginal(gold.segments, gold.words).logPartition)
+      if(guess.label != gold.label)
+        println(gold, crf.goldMarginal(guess.segments, guess.words).logPartition, crf.goldMarginal(gold.segments, gold.words).logPartition)
     } catch {
       case _ => println("Can't recover gold for " + gold)
     }

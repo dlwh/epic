@@ -7,6 +7,8 @@ import java.util
 import scala.collection.mutable.ArrayBuffer
 import scala.annotation.unchecked.uncheckedVariance
 import breeze.util.{Encoder, Index}
+import epic.lexicon.SimpleLexicon
+import epic.util.Has2
 
 /**
  * Represents
@@ -59,7 +61,6 @@ object LabeledSpanConstraints {
 
 
 
-
   def noConstraints[L]:LabeledSpanConstraints[L] = NoConstraints
 
   def apply[L](spans: TriangularArray[_ <: BitSet]):LabeledSpanConstraints[L] = {
@@ -104,6 +105,12 @@ object LabeledSpanConstraints {
       case x: BitSet => x
       case x => BitSet.empty ++ x
     }
+  }
+
+  class LayeredTagConstraintsFactory[L, W](lexicon: SimpleLexicon[L, W], maxLengthForLabel: Array[Int]) extends Has2[IndexedSeq[W], LabeledSpanConstraints[L]] {
+    def get(h: IndexedSeq[W]): LabeledSpanConstraints[L] = apply(h)
+
+    def apply(words: IndexedSeq[W]) = layeredFromTagConstraints(lexicon.anchor(words), maxLengthForLabel)
   }
 
   def layeredFromTagConstraints[L](localization: TagConstraints[L], maxLengthForLabel: Array[Int]): LabeledSpanConstraints[L] = {

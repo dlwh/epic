@@ -132,7 +132,7 @@ object SemiConllNERPipeline {
 
 
     // build feature Index
-    val model: SemiCRFModel[String, String] = new SegmentationModelFactory("##", "O", gazetteer = Gazetteer.ner("en")).makeModel(train)
+    val model: SemiCRFModel[String, String] = new SegmentationModelFactory("##", "O"/*, gazetteer = Gazetteer.ner("en" )*/).makeModel(train)
     val obj = new ModelObjective(model, train, params.nthreads)
     val cached = new CachedBatchDiffFunction(obj)
 
@@ -141,7 +141,7 @@ object SemiConllNERPipeline {
     //
     def eval(state: FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State) = {
       val out = new PrintWriter(new BufferedOutputStream(new FileOutputStream("weights.txt")))
-      Encoder.fromIndex(model.featureIndex).decode(state.x).iterator foreach {case (x, v) if v.abs > 1E-6 => out.println(x -> v) case _ => }
+      Encoder.fromIndex(model.featureIndex).decode(state.x).iterator.toIndexedSeq.sortBy(_._2.abs).takeWhile(_._2.abs > 1E-4) foreach {case (x, v) => out.println(v + "\t" + x)}
       val crf: SemiCRF[String, String] = model.extractCRF(state.x)
       println("Eval + " + (state.iter+1))
       val stats = SegmentationEval.eval(crf, test, "O")

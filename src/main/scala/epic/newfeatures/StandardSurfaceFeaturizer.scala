@@ -26,6 +26,7 @@ class StandardSurfaceFeaturizer(wordCounts: Counter[String, Double],
     new SurfaceFeatureAnchoring[String] {
       val indices = words.map(wordIndex)
       def words = w
+      val sentenceLengthFeature = SentenceLengthFeature(distanceBinner.binnedDistance(0,words.length))
 
       def featuresForWord(pos: Int, level: FeaturizationLevel): Array[Feature] = {
         if(pos < 0 || pos >= words.length) {
@@ -49,7 +50,10 @@ class StandardSurfaceFeaturizer(wordCounts: Counter[String, Double],
           }
         }
 
-        if(level.level >= BasicFeatures.level)
+        if(level.level >= FeaturizationLevel.BasicFeatures.level) {
+          feats += sentenceLengthFeature
+        }
+
 
         if (begin == 0)
           feats += BeginSentFeature
@@ -60,6 +64,7 @@ class StandardSurfaceFeaturizer(wordCounts: Counter[String, Double],
 
         if(level.level >= BasicFeatures.level) {
           feats += SpanShapeFeature(SpanShapeGenerator.apply(words, begin,end))
+          feats += SpanShapeFeature(SpanShapeGenerator.signatureFor(words, begin, end, false))
         }
 
         if(level == FullFeatures) {
@@ -151,3 +156,4 @@ class StandardSurfaceFeaturizer(wordCounts: Counter[String, Double],
 
 case class FirstWordCapsAnd(f: Feature) extends Feature
 case class NthWordCapsAnd(f: Feature) extends Feature
+case class SentenceLengthFeature(length: Int) extends Feature

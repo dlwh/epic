@@ -9,17 +9,19 @@ object SpanShapeGenerator extends Serializable {
 
   def apply(v1: IndexedSeq[String], begin: Int, end: Int): String = signatureFor(v1,begin, end)
 
-  def signatureFor(words: IndexedSeq[String], begin: Int, end: Int) = {
+  def signatureFor(words: IndexedSeq[String], begin: Int, end: Int, includeContext: Boolean = true) = {
     val result = new StringBuilder(end-begin)
-    if(begin == 0) {
-      result += '#'
-    } else {
-      result += binCharacter(words(begin-1).head)
-      result += '['
+    if(includeContext) {
+      if(begin <= 0) {
+        result += '#'
+      } else {
+        result += binCharacter(words(begin-1).head)
+        result += '['
+      }
     }
     var i = begin
     while (i < end) {
-      val w = words(i)
+      val w = if(i < 0 || i >= words.length) "#" else words(i)
       if(w.isEmpty) {
         // probably won't happen.
         result += 'ε'
@@ -39,11 +41,13 @@ object SpanShapeGenerator extends Serializable {
       }
       i += 1
     }
-    if(end == words.length) {
-      result += '#'
-    } else {
-      result += ']'
-      result += binCharacter(words(end).head)
+    if(includeContext) {
+      if(end >= words.length) {
+        result += '#'
+      } else {
+        result += ']'
+        result += binCharacter(words(end).head)
+      }
     }
     result.toString
   }

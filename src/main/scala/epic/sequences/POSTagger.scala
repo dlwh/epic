@@ -26,6 +26,7 @@ object POSTagger {
     out.close()
     val stats = TaggedSequenceEval.eval(crf, test)
     println("Final Stats: " + stats)
+    println("Confusion Matrix:\n" + stats.confusion)
 
   }
 
@@ -52,7 +53,6 @@ object SemiPOSTagger {
 //    out.close()
     val stats = SegmentationEval.eval(crf, test, AnnotatedLabel("TOP"))
     println("Final Stats: " + stats)
-
   }
 
 }

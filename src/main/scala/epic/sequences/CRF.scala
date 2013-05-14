@@ -140,12 +140,14 @@ object CRF {
           while (pos < length) {
             var label = 0
             while (label < numLabels) {
-              var prevLabel = 0
-              while (prevLabel < numLabels) {
-                val score = transitionMarginal(pos, prevLabel, label)
-                if(score != 0.0)
-                  f(pos, prevLabel, label,  score)
-                prevLabel += 1
+              if(!backwardScore(pos+1)(label).isInfinite) {
+                var prevLabel = 0
+                while (prevLabel < numLabels) {
+                  val score = transitionMarginal(pos, prevLabel, label)
+                  if(score != 0.0)
+                    f(pos, prevLabel, label,  score)
+                  prevLabel += 1
+                }
               }
               label += 1
             }

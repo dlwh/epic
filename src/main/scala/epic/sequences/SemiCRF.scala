@@ -17,6 +17,7 @@ import breeze.optimize.{GradientTester, CachedBatchDiffFunction}
 import breeze.linalg.DenseVector
 import epic.constraints.LabeledSpanConstraints
 import epic.constraints.LabeledSpanConstraints.NoConstraints
+import epic.util.Has2
 
 /**
  * A Semi-Markov Linear Chain Conditional Random Field, that is, the length
@@ -203,30 +204,37 @@ object SemiCRF {
         /** Visits spans with non-zero score, useful for expected counts */
         def visit(f: TransitionVisitor[L, W]) {
           val numLabels = scorer.labelIndex.size
-          var end = 1
-          while (end <= length) {
-            var label = 0
-            while (label < numLabels) {
 
-              var begin = math.max(end - anchoring.maxSegmentLength(label), 0)
-              while (begin < end) {
-                if(anchoring.constraints.isAllowedLabeledSpan(begin, end, label)) {
-                  var prevLabel = 0
-                  while (prevLabel < numLabels) {
-                    val score = transitionMarginal(prevLabel, label, begin, end)
-                    if(score != 0.0) {
-                      f.visitTransition(prevLabel, label, begin, end, score)
+          var begin = length - 1
+          while(begin >= 0) {
+            var prevLabel = 0
+            while(prevLabel < numLabels) {
+              var end = anchoring.constraints.maxSpanLengthStartingAt(begin) + begin
+              while(end > begin) {
+                if(anchoring.isValidSegment(begin, end)) {
+                  var label = 0
+                  while(label < numLabels) {
+                    val prevScore = backwardScore(end)(label)
+                    if (anchoring.maxSegmentLength(label) >= end - begin && prevScore != Double.NegativeInfinity) {
+                      val score = transitionMarginal(prevLabel, label, begin, end)
+                      if(score != 0.0) {
+                        f.visitTransition(prevLabel, label, begin, end, score)
+                      }
                     }
-                    prevLabel += 1
+
+                    label += 1
                   }
                 }
-                begin += 1
+                end -= 1
               }
-              label += 1
+
+              prevLabel += 1
             }
 
-            end += 1
+            begin -= 1
+
           }
+
         }
 
 
@@ -411,7 +419,10 @@ object SemiCRF {
 
   }
 
-  trait ConstraintSemiCRF[L, W] extends SemiCRF[L, W] {
+  trait ConstraintSemiCRF[L, W] extends SemiCRF[L, W] with Has2[IndexedSeq[W], LabeledSpanConstraints[L]] {
+
+    def get(h: IndexedSeq[W]): LabeledSpanConstraints[L] = constraints(h)
+
     def constraints(w: IndexedSeq[W]): LabeledSpanConstraints[L]
     def constraints(seg: Segmentation[L,W], keepGold: Boolean = true): LabeledSpanConstraints[L]
   }

@@ -64,11 +64,12 @@ object IndexedSurfaceFeaturizer {
 
 
     @transient
-    private var cache = Collections.synchronizedMap(new MapMaker().softValues().makeMap[Datum, IndexedSurfaceAnchoring[W]]())
+    private var cache = Collections.synchronizedMap(new MapMaker().softValues.makeMap[Datum, IndexedSurfaceAnchoring[W]]())
     def anchor(words: Datum): IndexedSurfaceAnchoring[W] = {
       val cached = cache.get(words)
-      if(cached ne null) cached
-      else {
+      if(cached ne null) {
+        cached
+      } else {
         val x = base.anchor(words)
         cache.put(words, x)
         x
