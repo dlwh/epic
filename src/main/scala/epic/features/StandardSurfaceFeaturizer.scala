@@ -1,16 +1,14 @@
-package epic.newfeatures
+package epic.features
 
 import epic.framework.Feature
 import breeze.linalg.Counter
 import breeze.util.{Encoder, Interner, Index}
-import epic.features.{WordShapeFeaturizer, BoundaryFeature}
 import scala.Array
 import epic.parser.features.{PairFeature, IndicatorFeature}
 import breeze.text.analyze.{WordShapeGenerator, EnglishWordClassGenerator}
 import scala.collection.mutable.ArrayBuffer
 import epic.parser.features.StandardSpanFeatures._
-import epic.features.WordFeature
-import epic.newfeatures.FeaturizationLevel.{FullFeatures, BasicFeatures, MinimalFeatures}
+import epic.features.FeaturizationLevel.{FullFeatures, BasicFeatures, MinimalFeatures}
 
 /**
  *
@@ -157,3 +155,6 @@ class StandardSurfaceFeaturizer(wordCounts: Counter[String, Double],
 case class FirstWordCapsAnd(f: Feature) extends Feature
 case class NthWordCapsAnd(f: Feature) extends Feature
 case class SentenceLengthFeature(length: Int) extends Feature
+case class WordFeature(word: Any, kind: Symbol) extends Feature
+
+case object BoundaryFeature extends Feature

@@ -1,4 +1,4 @@
-package epic.newfeatures
+package epic.features
 
 import breeze.util.Index
 import epic.framework.{VisitableMarginal, Feature}

@@ -30,9 +30,8 @@ import breeze.util._
 import collection.mutable.ArrayBuffer
 import breeze.config.Help
 import collection.mutable
-import epic.features.TagAwareWordShapeFeaturizer
 import epic.lexicon.Lexicon
-import epic.newfeatures.HashFeature
+import epic.features.{TagAwareWordShapeFeaturizer, HashFeature}
 
 class LexModel[L, W](bundle: LexGrammarBundle[L, W],
                      reannotate: (BinarizedTree[L], IndexedSeq[W])=>BinarizedTree[L],

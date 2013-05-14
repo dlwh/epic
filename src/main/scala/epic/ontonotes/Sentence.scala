@@ -14,7 +14,7 @@ import collection.mutable
 @SerialVersionUID(1L)
 case class Sentence(docId: String, index: Int,
                    words: IndexedSeq[String],
-                   annotations: OntoAnnotations) extends Example[OntoAnnotations,Seq[String]] {
+                   annotations: OntoAnnotations) extends Example[OntoAnnotations,IndexedSeq[String]] {
 
   def id = docId +":"+index
   def features = words

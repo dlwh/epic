@@ -26,7 +26,7 @@ import epic.trees.annotations.{KMAnnotator, TreeAnnotator}
 import features.IndicatorFeature
 import epic.trees.TreeInstance
 import breeze.config.Help
-import epic.features.{IndexedWordFeaturizer, TagAwareWordShapeFeaturizer}
+import epic.features.{StandardSurfaceFeaturizer, IndexedWordFeaturizer}
 import epic.lexicon.Lexicon
 
 /**
@@ -103,13 +103,14 @@ case class StructModelFactory(baseParser: ParserParams.XbarGrammar,
     val baseFactory = RefinedGrammar.generative(xbarGrammar, xbarLexicon, xbarBinaries, xbarUnaries, xbarWords)
     val cFactory = constraints.cachedFactory(AugmentedGrammar.fromRefined(baseFactory))
 
-    val wordFeaturizer = IndexedWordFeaturizer.forTrainingSet(transformed.map{_.words}, xbarLexicon)
+    val surfaceFeaturizer = new StandardSurfaceFeaturizer(sum(initLexicon, Axis._0))
+    val wordFeaturizer = IndexedWordFeaturizer.fromData(surfaceFeaturizer, trainTrees.map{_.words})
     def labelFlattener(l: AnnotatedLabel) = {
       val basic = Seq(l)
       basic map { IndicatorFeature(_) }
     }
     def ruleFlattener(r: Rule[AnnotatedLabel]) = IndexedSeq(r).map(IndicatorFeature)
-    val feat = new GenFeaturizer[AnnotatedLabel](wordFeaturizer, labelFlattener _, ruleFlattener _)
+    val feat = new GenFeaturizer[AnnotatedLabel, String](wordFeaturizer, labelFlattener _, ruleFlattener _)
 
     val featureCounter = readWeights(oldWeights)
     val indexedFeaturizer = IndexedFeaturizer(xbarGrammar, xbarLexicon, trainTrees, feat, indexedRefinements)

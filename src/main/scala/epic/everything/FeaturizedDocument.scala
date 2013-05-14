@@ -1,20 +1,18 @@
 package epic.everything
 
 import epic.trees._
-import epic.sequences.{Gazetteer, SemiCRF, Segmentation}
-import epic.ontonotes.{Frame, Document, NERType}
+import epic.sequences.Segmentation
+import epic.ontonotes.{Sentence, Frame, Document, NERType}
 import epic.parser.projections.{GoldTagPolicy, ConstraintCoreGrammar}
 import epic.coref.CorefInstanceFeaturizer
 import breeze.util.Index
-import epic.framework.Feature
-import breeze.linalg.Counter2
 import epic.trees.StandardTreeProcessor
 import scala.Some
 import epic.parser._
-import java.util.concurrent.atomic.AtomicInteger
 import epic.lexicon.Lexicon
-import epic.features.{SurfaceFeatureAnchoring, IndexedSpanFeaturizer}
 import epic.constraints.{SpanConstraints, LabeledSpanConstraints}
+import epic.features.{SurfaceFeaturizer, IndexedSurfaceAnchoring, IndexedSurfaceFeaturizer}
+import epic.util.{Cache, Has2}
 
 /**
  * 
@@ -28,7 +26,7 @@ case class FeaturizedSentence(index: Int, words: IndexedSeq[String],
                               nerOpt: Option[Segmentation[NERType.Value, String]],
                               nerConstraints: LabeledSpanConstraints[NERType.Value],
                               frames: IndexedSeq[Frame],
-                              featureAnchoring: SurfaceFeatureAnchoring[String],
+                              featureAnchoring: IndexedSurfaceAnchoring[String],
                               speaker: Option[String] = None,
                               id: String = "")  {
   def featuresForSpan(begin: Int, end: Int) = featureAnchoring.featuresForSpan(begin, end)
@@ -65,48 +63,41 @@ object FeaturizedDocument {
 
 
   def makeFactory(treeProcessor: StandardTreeProcessor,
+                  feat: SurfaceFeaturizer[String],
                   parseConstrainer: ConstraintCoreGrammar[AnnotatedLabel, String],
-                  nerConstrainer: SemiCRF.ConstraintSemiCRF[NERType.Value, String],
-                  corefFeaturizer: CorefInstanceFeaturizer)(docs: IndexedSeq[Document]): (Factory, IndexedSeq[FeaturizedDocument]) = {
-    val wordFeatureIndex, spanFeatureIndex = Index[Feature]()
+                  nerLabelIndex: Index[NERType.Value],
+                  nerConstrainer: LabeledSpanConstraints.Factory[IndexedSeq[String], NERType.Value],
+                  corefFeaturizer: CorefInstanceFeaturizer = null)(docs: IndexedSeq[Document]): (Factory, IndexedSeq[FeaturizedDocument]) = {
 
 
     val srlLabels = Index[String](Iterator("O") ++ docs.iterator.flatMap(_.sentences).flatMap(_.srl).flatMap(_.args).map(_.arg))
 
-    val count = new AtomicInteger(0)
-    val constraints = for(d <- docs.par) yield {
-      println(s"in ${d.id}")
-      val r = for(s <- d.sentences.par) yield {
-        val seg = s.nerSegmentation
+    implicit val sentenceConstrainer = new Has2[Sentence, SpanConstraints] {
+      val cache = new Cache[Sentence, SpanConstraints]
+      private val caching = cache.forFunction{ s =>
+        val constituentSparsity = parseConstrainer.rawConstraints(s.words).sparsity
+        val nerConstraints = nerConstrainer.get(s.words)
+        (constituentSparsity.flatten | nerConstraints)
+      }
+      def get(h: Sentence): SpanConstraints = caching(h)
+    }
+
+    val featurizer = IndexedSurfaceFeaturizer.fromData(feat, docs.flatMap(_.sentences))
+
+    val featurized = for( d <- docs) yield {
+      val newSentences = for( s <- d.sentences) yield {
         var tree = treeProcessor(s.tree.map(_.treebankString))
         tree = UnaryChainRemover.removeUnaryChains(tree)
-        val policy: GoldTagPolicy[AnnotatedLabel] = GoldTagPolicy.goldTreeForcing(tree.map(parseConstrainer.grammar.labelIndex))
-        val constituentSparsity = parseConstrainer.rawConstraints(s.words, policy).sparsity
-        val nerConstraints = nerConstrainer.constraints(s.nerSegmentation, keepGold = true)
+        val constituentSparsity = parseConstrainer.rawConstraints(s.words).sparsity
+        val nerConstraints = nerConstrainer.get(s.words)
 
-        (tree, seg, constituentSparsity, nerConstraints)
-      }
-      println(s"done: ${d.id} ${count.getAndIncrement}/${docs.length}")
-      r.seq
-    }
-
-    val docsWithValidSpans = for( (d,other) <- docs zip constraints; (s, (tree, seg, constituentSparsity, nerConstraints)) <- d.sentences zip other) yield {
-      s.words -> (constituentSparsity.flatten | nerConstraints)
-    }
-
-    val featurizer = IndexedSpanFeaturizer.forTrainingSet(docsWithValidSpans, parseConstrainer.lexicon, Gazetteer.ner())
-
-    val featurized = for( ((d, other)) <- docs zip constraints.seq) yield {
-      val newSentences = for( (s, (tree, seg, constituentSparsity, nerConstraints)) <- d.sentences zip other) yield {
-        val validSpan = (constituentSparsity.flatten | nerConstraints)
-
-        val loc = featurizer.anchor(s.words -> validSpan)
+        val loc = featurizer.anchor(s)
 
 
         FeaturizedSentence(s.index, s.words,
           Some(tree),
           constituentSparsity,
-          Some(seg),
+          Some(s.nerSegmentation),
           nerConstraints,
           s.srl,
           loc,
@@ -117,24 +108,24 @@ object FeaturizedDocument {
       FeaturizedDocument(newSentences, d.id+"-featurized")
     }
 
-    new Factory(treeProcessor, parseConstrainer, nerConstrainer, srlLabels, featurizer, corefFeaturizer, wordFeatureIndex, spanFeatureIndex) -> featurized
+    new Factory(treeProcessor, parseConstrainer, nerLabelIndex, nerConstrainer, srlLabels, featurizer, corefFeaturizer) -> featurized
   }
 
   case class Factory(treeProcessor: StandardTreeProcessor,
                     parseConstrainer: ConstraintCoreGrammar[AnnotatedLabel, String],
-//                     graphFeaturizer: PropertyPropagation.GraphBuilder,
-                    nerConstrainer: SemiCRF.ConstraintSemiCRF[NERType.Value, String],
+                    nerLabelIndex: Index[NERType.Value],
+                    nerConstrainer: LabeledSpanConstraints.Factory[IndexedSeq[String], NERType.Value],
                     srlLabelIndex: Index[String],
-                    featurizer: IndexedSpanFeaturizer[(IndexedSeq[String], SpanConstraints)],
-                    corefFeaturizer: CorefInstanceFeaturizer,
-                    wordFeatureIndex: Index[Feature],
-                    spanFeatureIndex: Index[Feature]) extends (Document=>FeaturizedDocument) {
+                    featurizer: IndexedSurfaceFeaturizer[Sentence, String],
+                    corefFeaturizer: CorefInstanceFeaturizer) extends (Document=>FeaturizedDocument) {
     def outsideSrlLabel: String = "O"
+
+    def wordFeatureIndex = featurizer.wordFeatureIndex
+    def spanFeatureIndex = featurizer.spanFeatureIndex
 
 
     def grammar: BaseGrammar[AnnotatedLabel] = parseConstrainer.grammar
     def lexicon: Lexicon[AnnotatedLabel, String] = parseConstrainer.lexicon
-    def nerLabelIndex = nerConstrainer.labelIndex
 
 
     def apply(d: Document):FeaturizedDocument = apply(d, keepGoldTree = false)
@@ -147,10 +138,9 @@ object FeaturizedDocument {
        tree = UnaryChainRemover.removeUnaryChains(tree)
        val policy: GoldTagPolicy[AnnotatedLabel] = if (keepGoldTree) GoldTagPolicy.goldTreeForcing(tree.map(parseConstrainer.grammar.labelIndex)) else GoldTagPolicy.noGoldTags
        val constituentSparsity = parseConstrainer.rawConstraints(s.words, policy).sparsity
-       val nerConstraints = nerConstrainer.constraints(s.nerSegmentation, keepGold = keepGoldTree)
-       val validSpan = (constituentSparsity.flatten | nerConstraints)
+       val nerConstraints = nerConstrainer.get(s.words)
 
-       val loc = featurizer.anchor(s.words -> validSpan)
+       val loc = featurizer.anchor(s)
 
        FeaturizedSentence(s.index, s.words,
          Some(tree),

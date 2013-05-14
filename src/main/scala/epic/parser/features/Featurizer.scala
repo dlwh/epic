@@ -17,7 +17,7 @@ package epic.parser.features
 */
 import epic.trees.Rule
 import epic.framework.Feature
-import epic.features.{IndexedWordFeaturizer, BasicWordFeaturizer}
+import epic.features.IndexedWordFeaturizer
 
 /**
  * A Featurizer turns decisions in a grammar into a set of features
@@ -45,16 +45,16 @@ trait SimpleFeaturizer[L, W] extends Featurizer[L, W] {
 
 
 
-class GenFeaturizer[L](wGen: IndexedWordFeaturizer,
+class GenFeaturizer[L, W](wGen: IndexedWordFeaturizer[IndexedSeq[W], W],
                        lGen: L=>Seq[Feature] = {(x:L)=>Seq(IndicatorFeature(x))},
-                       rGen: Rule[L] => Seq[Feature] = {(x: Rule[L]) => Seq(IndicatorFeature(x) )} ) extends SimpleFeaturizer[L, String] { outer =>
+                       rGen: Rule[L] => Seq[Feature] = {(x: Rule[L]) => Seq(IndicatorFeature(x) )} ) extends SimpleFeaturizer[L, W] { outer =>
 
-  def anchor(words: IndexedSeq[String]): Anchoring = new Anchoring {
+  def anchor(words: IndexedSeq[W]): Anchoring = new Anchoring {
     val lexAnch = wGen.anchor(words)
     def featuresFor(begin: Int, split: Int, end: Int, r: Rule[L]): Array[Feature] = outer.featuresFor(r)
 
     def featuresFor(pos: Int, label: L): Array[Feature] = {
-      lexAnch.featuresForWord(pos).map(i => LexicalFeature(label, wGen.featureIndex.get(i)))
+      lexAnch.featuresForWord(pos).map(i => LexicalFeature(label, wGen.wordFeatureIndex.get(i)))
     }
   }
 

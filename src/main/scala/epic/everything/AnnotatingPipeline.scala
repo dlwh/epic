@@ -1,4 +1,5 @@
-package epic.everything
+package epic
+package everything
 
 import java.io.File
 import epic.trees._
@@ -25,8 +26,9 @@ import epic.ontonotes.Document
 import epic.parser.models.LexGrammarBundle
 import collection.mutable.ArrayBuffer
 import collection.immutable
-import epic.features.TagAwareWordShapeFeaturizer
 import epic.lexicon.{SimpleLexicon, Lexicon}
+import epic.features.{TagAwareWordShapeFeaturizer, MultiSurfaceFeaturizer, ContextSurfaceFeaturizer, StandardSurfaceFeaturizer}
+import epic.constraints.LabeledSpanConstraints
 
 
 /**
@@ -237,30 +239,18 @@ object AnnotatingPipeline {
   }
 
 
-  def buildProcessor(train: IndexedSeq[Document], weightsCache: Counter[String, Double], params: AnnotatingPipeline.Params): (FeaturizedDocument.Factory, IndexedSeq[FeaturizedDocument]) = {
-    val nerSegments = for (d <- train; s <- d.sentences) yield s.nerSegmentation
-    val nerPruningModel : SemiCRF.ConstraintSemiCRF[NERType.Value, String] = if(params.includeNER) params.cache.cached("baseNER", nerSegments.toSet) {
-      println("Building basic NER model...")
-      val baseNER = {
-        val model: SemiCRFModel[NERType.Value, String] = new SegmentationModelFactory(NERType.OutsideSentence, NERType.NotEntity, gazetteer = Gazetteer.ner("en"), weights = {
-          (f: Feature) => weightsCache(f.toString)
-        }).makeModel(nerSegments)
-
-        val obj = new ModelObjective(model, nerSegments, params.nthreads)
-        val cached = new CachedBatchDiffFunction(obj)
-
-        val weights = params.opt.minimize(cached, obj.initialWeightVector(randomize = false))
-        val crf = model.extractCRF(weights)
-        val decoded: Counter[Feature, Double] = Encoder.fromIndex(model.featureIndex).decode(weights)
-        updateWeights(params.weightsCache, weightsCache, decoded)
-        crf
-      }
-      new SemiCRF.BaseModelConstraintSemiCRF(baseNER)
-    } else new SemiCRF.IdentityConstraintSemiCRF(Index(NERType.values), NERType.OutsideSentence)
-
+  def buildProcessor(docs: IndexedSeq[Document], weightsCache: Counter[String, Double], params: AnnotatingPipeline.Params): (FeaturizedDocument.Factory, IndexedSeq[FeaturizedDocument]) = {
+    val train = docs.flatMap(_.sentences.map(_.nerSegmentation))
+    val maxLengthMap = train.flatMap(_.segments.iterator).groupBy(_._1).mapValues(arr => arr.map(_._2.length).max)
+    val labelIndex = Index(Iterator(NERType.OutsideSentence, NERType.NotEntity) ++ train.iterator.flatMap(_.label.map(_._1)))
+    val maxLengthArray: Array[Int] = Encoder.fromIndex(labelIndex).tabulateArray(maxLengthMap.getOrElse(_, 0))
+    println(maxLengthMap)
+    val nerCounts: Counter2[NERType.Value, String, Double] = Counter2.count(train.map(_.asFlatTaggedSequence(NERType.NotEntity)).map{seg => seg.label zip seg.words}.flatten).mapValues(_.toDouble)
+    val nerLexicon = new SimpleLexicon(labelIndex, nerCounts, openTagThreshold = 10, closedWordThreshold = 20)
+    val allowedNerClassifier = new LabeledSpanConstraints.LayeredTagConstraintsFactory(nerLexicon, maxLengthArray)
 
     println("Building basic parsing model...")
-    var trainTrees = for (d <- train; s <- d.sentences) yield {
+    var trainTrees = for (d <- docs; s <- d.sentences) yield {
       params.treebank.makeTreeInstance(s.id, s.tree.map(_.label), s.words, removeUnaries = true)
     }
 
@@ -274,9 +264,15 @@ object AnnotatingPipeline {
     }
 
 
+    val standardFeaturizer = new StandardSurfaceFeaturizer(sum(nerCounts, Axis._0))
+    val featurizers =new ContextSurfaceFeaturizer[String](standardFeaturizer, 3, 3)
+    val featurizer = new MultiSurfaceFeaturizer[String](featurizers)
+
     FeaturizedDocument.makeFactory(params.treebank.process,
+    featurizer,
       new ConstraintCoreGrammar(baseParser.augmentedGrammar, {(_:AnnotatedLabel).isIntermediate}, -8),
-      nerPruningModel, null)(train)
+      labelIndex,
+      allowedNerClassifier, null)(docs)
   }
 
 

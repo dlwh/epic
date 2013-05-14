@@ -1,4 +1,4 @@
-package epic.newfeatures
+package epic.features
 
 import org.scalatest.FunSuite
 

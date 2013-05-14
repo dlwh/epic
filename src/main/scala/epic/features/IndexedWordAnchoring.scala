@@ -1,6 +1,6 @@
-package epic.newfeatures
+package epic.features
 
-import epic.newfeatures.FeaturizationLevel.FullFeatures
+import epic.features.FeaturizationLevel.FullFeatures
 
 trait IndexedWordAnchoring[W] {
   def words: IndexedSeq[W]

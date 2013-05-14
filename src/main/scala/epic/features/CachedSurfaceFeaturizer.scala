@@ -1,4 +1,4 @@
-package epic.newfeatures
+package epic.features
 
 import com.google.common.collect.MapMaker
 import java.util.Collections

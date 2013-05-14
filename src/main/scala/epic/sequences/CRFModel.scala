@@ -6,7 +6,7 @@ import breeze.linalg._
 import epic.sequences.CRF.{AnchoredFeaturizer, TransitionVisitor}
 import scala.collection
 import breeze.features.FeatureVector
-import epic.newfeatures._
+import epic.features._
 import epic.lexicon.{Lexicon, SimpleLexicon}
 import breeze.collection.mutable.OpenAddressHashArray
 import java.util

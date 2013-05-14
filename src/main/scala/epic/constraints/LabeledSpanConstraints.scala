@@ -107,8 +107,11 @@ object LabeledSpanConstraints {
     }
   }
 
-  class LayeredTagConstraintsFactory[L, W](lexicon: SimpleLexicon[L, W], maxLengthForLabel: Array[Int]) extends Has2[IndexedSeq[W], LabeledSpanConstraints[L]] {
+  trait Factory[K, L] extends Has2[K, LabeledSpanConstraints[L]]
+
+  class LayeredTagConstraintsFactory[L, W](lexicon: SimpleLexicon[L, W], maxLengthForLabel: Array[Int]) extends Factory[IndexedSeq[W],L] {
     def get(h: IndexedSeq[W]): LabeledSpanConstraints[L] = apply(h)
+
 
     def apply(words: IndexedSeq[W]) = layeredFromTagConstraints(lexicon.anchor(words), maxLengthForLabel)
   }

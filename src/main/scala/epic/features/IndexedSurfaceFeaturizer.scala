@@ -1,11 +1,11 @@
 package epic
-package newfeatures
+package features
 
 import breeze.collection.mutable.TriangularArray
 import breeze.util.Index
 import com.google.common.collect.MapMaker
 import epic.framework.Feature
-import epic.newfeatures.FeaturizationLevel.FullFeatures
+import epic.features.FeaturizationLevel.FullFeatures
 import epic.util.Has2
 import java.io.IOException
 import java.util.Collections
