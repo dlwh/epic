@@ -66,14 +66,24 @@ class WordShapeFeaturizer(wordCounts: Counter[String, Double],
       if(numCaps > 1)  features += hasManyCapFeature
       val isAllCaps = numCaps > 1 && !hasLower && !hasNotLetter
       if(isAllCaps) features += isAllCapsFeature
+
       var knownLowerCase = false
+      var hasTitleCaseVariant = false
+
       if(w(0).isUpper || w(0).isTitleCase) {
         features += hasInitCapFeature
         if(wordCounts(w.toLowerCase) > 0) {
           features += hasKnownLCFeature
           knownLowerCase = true
+        } else {
+          hasTitleCaseVariant = wordCounts(w(0).toTitleCase + w.substring(1).toLowerCase) > 0
+          if (isAllCaps && hasTitleCaseVariant) {
+            features += hasKnownTitleCaseFeature
+          }
         }
       }
+
+
 
       if(!hasLower && hasLetter) features += hasNoLower
       if(hasDash) features += hasDashFeature
@@ -87,7 +97,7 @@ class WordShapeFeaturizer(wordCounts: Counter[String, Double],
         || wlen >= 2 && hasPeriod && !hasLower && numCaps > 0 && !hasDigit && w.forall(c => c.isLetter || c == '.')
         )
       // make sure it doesn't have a lwoer case or title case variant, common for titles and place names...
-      if(hasAcronymShape  && !knownLowerCase && wordCounts(w(0).toUpper + w.substring(1).toLowerCase) == 0) {
+      if(hasAcronymShape  && !knownLowerCase && !hasTitleCaseVariant) {
         features += isProbablyAcronymFeature
       }
 
@@ -150,6 +160,7 @@ object WordShapeFeaturizer {
   val longWordFeature = IndicatorWSFeature('LongWord)
   val shortWordFeature = IndicatorWSFeature('ShortWord)
   val hasKnownLCFeature = IndicatorWSFeature('HasKnownLC)
+  val hasKnownTitleCaseFeature = IndicatorWSFeature('HasKnownTC)
   val hasInitCapFeature = IndicatorWSFeature('HasInitCap)
   val hasCapFeature = IndicatorWSFeature('HasCap)
   val hasManyCapFeature = IndicatorWSFeature('HasManyCap)
