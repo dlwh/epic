@@ -1,6 +1,6 @@
 package epic.util
 
-import breeze.data.Observation
+import breeze.data.{Example, Observation}
 
 /**
  *
@@ -31,6 +31,10 @@ object Has2 {
 
   implicit def featuresOfObservation[X,F](implicit xx: X<:<Observation[F]): Has2[X, F] = new Has2[X, F] {
     def get(h: X): F = h.features
+  }
+
+  implicit def labelOfExample[X,L,L2,F](implicit xx: X<:<Example[L2, F], hh: Has2[L2, L]): Has2[X, L] = new Has2[X, L] {
+    def get(h: X): L = hh.get(h.label)
   }
 }
 

@@ -72,17 +72,17 @@ object FeaturizedDocument {
 
     val srlLabels = Index[String](Iterator("O") ++ docs.iterator.flatMap(_.sentences).flatMap(_.srl).flatMap(_.args).map(_.arg))
 
-    implicit val sentenceConstrainer = new Has2[Sentence, SpanConstraints] {
-      val cache = new Cache[Sentence, SpanConstraints]
+    implicit val sentenceConstrainer = new Has2[IndexedSeq[String], SpanConstraints] {
+      val cache = new Cache[IndexedSeq[String], SpanConstraints]
       private val caching = cache.forFunction{ s =>
-        val constituentSparsity = parseConstrainer.rawConstraints(s.words).sparsity
-        val nerConstraints = nerConstrainer.get(s.words)
+        val constituentSparsity = parseConstrainer.rawConstraints(s).sparsity
+        val nerConstraints = nerConstrainer.get(s)
         (constituentSparsity.flatten | nerConstraints)
       }
-      def get(h: Sentence): SpanConstraints = caching(h)
+      def get(s: IndexedSeq[String]): SpanConstraints = caching(s)
     }
 
-    val featurizer = IndexedSurfaceFeaturizer.fromData(feat, docs.flatMap(_.sentences))
+    val featurizer = IndexedSurfaceFeaturizer.fromData(feat, docs.flatMap(_.sentences.map(_.words)))
 
     val featurized = for( d <- docs) yield {
       val newSentences = for( s <- d.sentences) yield {
@@ -91,7 +91,7 @@ object FeaturizedDocument {
         val constituentSparsity = parseConstrainer.rawConstraints(s.words).sparsity
         val nerConstraints = nerConstrainer.get(s.words)
 
-        val loc = featurizer.anchor(s)
+        val loc = featurizer.anchor(s.words)
 
 
         FeaturizedSentence(s.index, s.words,
@@ -116,7 +116,7 @@ object FeaturizedDocument {
                     nerLabelIndex: Index[NERType.Value],
                     nerConstrainer: LabeledSpanConstraints.Factory[IndexedSeq[String], NERType.Value],
                     srlLabelIndex: Index[String],
-                    featurizer: IndexedSurfaceFeaturizer[Sentence, String],
+                    featurizer: IndexedSurfaceFeaturizer[IndexedSeq[String], String],
                     corefFeaturizer: CorefInstanceFeaturizer) extends (Document=>FeaturizedDocument) {
     def outsideSrlLabel: String = "O"
 
@@ -140,7 +140,7 @@ object FeaturizedDocument {
        val constituentSparsity = parseConstrainer.rawConstraints(s.words, policy).sparsity
        val nerConstraints = nerConstrainer.get(s.words)
 
-       val loc = featurizer.anchor(s)
+       val loc = featurizer.anchor(s.words)
 
        FeaturizedSentence(s.index, s.words,
          Some(tree),

@@ -3,6 +3,7 @@ package epic.features
 import epic.util.Has2
 import breeze.util.Index
 import epic.framework.Feature
+import scala.collection.mutable
 
 trait IndexedWordFeaturizer[Datum, W] {
   def wordFeatureIndex: Index[Feature]
@@ -28,23 +29,35 @@ object IndexedWordFeaturizer {
       }
     }
 
-    val ww = new FeatureIndex(wordIndex, wordHashFeatures)
 
-    new MyWordFeaturizer[Datum, W](feat, ww)
+    new MyWordFeaturizer[Datum, W](feat, wordIndex)
   }
 
   @SerialVersionUID(1L)
   private class MyWordFeaturizer[Datum, W](val featurizer: WordFeaturizer[W],
-                                           val wordFeatureIndex: FeatureIndex)
+                                           val wordFeatureIndex: Index[Feature])
                                           (implicit hasWords: Has2[Datum, IndexedSeq[W]]) extends IndexedWordFeaturizer[Datum, W] with Serializable {
     def anchor(d: Datum):IndexedWordAnchoring[W]  = {
       val words = hasWords.get(d)
       val anch = featurizer.anchor(words)
-      val wordFeatures = Array.tabulate(words.length, FeaturizationLevel.numLevels) { (i,l) => wordFeatureIndex.stripEncode(anch.featuresForWord(i, l))}
+      val wordFeatures = Array.tabulate(words.length, FeaturizationLevel.numLevels) { (i,l) => stripEncode(wordFeatureIndex, anch.featuresForWord(i, l))}
 
       new TabulatedIndexedSurfaceAnchoring[W](words, wordFeatures, null)
 
     }
+  }
+
+  def stripEncode(ind: Index[Feature], features: Array[Feature]) = {
+    val result = mutable.ArrayBuilder.make[Int]()
+    result.sizeHint(features)
+    var i = 0
+    while(i < features.length) {
+      val fi = ind(features(i))
+      if(fi >= 0)
+        result += fi
+      i += 1
+    }
+    result.result()
   }
 }
 

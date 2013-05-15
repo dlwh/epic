@@ -31,6 +31,8 @@ class DistanceBinner private (val binThresholds: Array[Int], preserveDirection: 
     } else binThresholds(bin-1)
   }
 
+  def binIds = binThresholds.toIndexedSeq :+ (binThresholds.last + 1)
+
 }
 
 

@@ -468,22 +468,11 @@ class StandardSpanFeaturizer[L, W](grammar: BaseGrammar[L],
     val length = w.length
     import features.StandardSpanFeatures._
 
-    private def binDistance(dist2:Int) = {
-      val dist = dist2.abs - 1
-      if (dist >= 20) 4
-      else if (dist >= 10) 3
-      else if (dist >= 5) 2
-      else if (dist >= 2) 1
-      else 0
-    }
-
     def featuresForSpan(begin: Int, end: Int, label: Int) = {
       val builder = ArrayBuilder.make[Feature]
       builder ++=  labelFeatures(label)
 
       val lf = LabelFeature(label)
-      val lengthFeature = SpanLengthFeature(binDistance(end - begin))
-      builder += PairFeature(lf, lengthFeature)
       if(begin + 1 == end) {
         for(w <- wordAnch.featuresForWord(begin))
           builder += PairFeature(lf, w)
@@ -591,7 +580,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     val labelFeatures = refGrammar.labelEncoder.tabulateArray(l => Array(LabelFeature(l):Feature))
     val ruleFeatures = refGrammar.tabulateArray(l => Array(RuleFeature(l):Feature))
 
-    val surfaceFeaturizer = new StandardSurfaceFeaturizer(sum(annWords, Axis._0))
+    val surfaceFeaturizer = new StandardSurfaceFeaturizer(summedCounts)
 //    val wordFeaturizer = IndexedWordFeaturizer.fromData(surfaceFeaturizer, annTrees.map{_.words})
     val feat = new StandardSpanFeaturizer[AnnotatedLabel, String](
       refGrammar,

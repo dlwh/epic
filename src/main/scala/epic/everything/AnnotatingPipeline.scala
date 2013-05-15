@@ -3,31 +3,27 @@ package everything
 
 import java.io.File
 import epic.trees._
-import epic.parser.{SimpleRefinedGrammar, GenerativeParser, ParserParams}
+import epic.parser.{GenerativeParser, ParserParams}
 import epic.parser.ParserParams.XbarGrammar
 import breeze.config.{Help, CommandLineParser}
-import epic.ontonotes.{NERType, ConllOntoReader}
+import epic.ontonotes.{Sentence, NERType, ConllOntoReader, Document}
 import breeze.linalg._
 import epic.framework._
-import epic.sequences.{Gazetteer, SegmentationModelFactory, SemiCRFModel, SemiCRF}
 import breeze.optimize._
-import breeze.util.{Lens, Index, Encoder}
+import breeze.util.{Index, Encoder}
 import epic.parser.projections.ConstraintCoreGrammar
 import epic.trees.annotations.StripAnnotations
-import epic.trees.annotations.AddMarkovization
 import epic.trees.annotations.PipelineAnnotator
-import epic.parser.models.{IndexedLexFeaturizer, SimpleWordShapeGen}
+import epic.parser.models.IndexedLexFeaturizer
 import epic.trees.ProcessedTreebank
 import epic.parser.features.RuleFeature
-import scala.Some
 import epic.parser.models.StandardFeaturizer
 import breeze.optimize.FirstOrderMinimizer.OptParams
-import epic.ontonotes.Document
 import epic.parser.models.LexGrammarBundle
 import collection.mutable.ArrayBuffer
 import collection.immutable
-import epic.lexicon.{SimpleLexicon, Lexicon}
-import epic.features.{TagAwareWordShapeFeaturizer, MultiSurfaceFeaturizer, ContextSurfaceFeaturizer, StandardSurfaceFeaturizer}
+import epic.lexicon.SimpleLexicon
+import epic.features.{MultiSurfaceFeaturizer, ContextSurfaceFeaturizer, StandardSurfaceFeaturizer}
 import epic.constraints.LabeledSpanConstraints
 
 
@@ -296,27 +292,23 @@ object AnnotatingPipeline {
 
     val wordIndex: Index[String] = Index(trainTrees.iterator.flatMap(_.words))
     val summedCounts = sum(initLexicon, Axis._0)
-    val shapeGen = new SimpleWordShapeGen(initLexicon, summedCounts)
-    val tagShapeGen = new TagAwareWordShapeFeaturizer(initLexicon)
 
     def ruleGen(r: Rule[AnnotatedLabel]) = IndexedSeq(RuleFeature(r))
 
     val headFinder = HeadFinder.collins
-    val feat = new StandardFeaturizer(wordIndex,
+    val feat = new StandardFeaturizer(
     docProcessor.grammar.labelIndex,
     docProcessor.grammar.index,
-    ruleGen,
-    shapeGen, {
-      (w: Seq[String], pos: Int) => tagShapeGen.featuresFor(w, pos)
-    })
+    ruleGen
+   )
 
-    val indexed = IndexedLexFeaturizer.extract[AnnotatedLabel, String](feat,
+    val indexed = IndexedLexFeaturizer.extract[AnnotatedLabel, IndexedSeq[String], TreeInstance[AnnotatedLabel, String], String](feat,
+      docProcessor.featurizer,
       headFinder,
       docProcessor.grammar.index,
       docProcessor.grammar.labelIndex,
 //    2,
       lexHashFeatures,
-      -1,
       trees)
 
     val bundle = new LexGrammarBundle[AnnotatedLabel, String](docProcessor.grammar,

@@ -9,6 +9,7 @@ import epic.features.FeaturizationLevel.FullFeatures
 import epic.util.Has2
 import java.io.IOException
 import java.util.Collections
+import scala.collection.mutable
 
 /**
  *
@@ -27,8 +28,6 @@ trait IndexedSurfaceAnchoring[W] extends IndexedWordAnchoring[W] {
 object IndexedSurfaceFeaturizer {
   def fromData[Datum, W](feat: SurfaceFeaturizer[W],
                          data: IndexedSeq[Datum],
-                         wordHashFeatures: Int = 0,
-                         spanHashFeatures: Int = 0,
                          cache: Boolean = true)
                         (implicit hasWords: Has2[Datum, IndexedSeq[W]],
                          hasConstraints: HasSpanConstraints[Datum]): IndexedSurfaceFeaturizer[Datum, W]  = {
@@ -46,8 +45,8 @@ object IndexedSurfaceFeaturizer {
       }
     }
 
-    val ww = new FeatureIndex(wordIndex, wordHashFeatures)
-    val ss = new FeatureIndex(spanIndex, spanHashFeatures)
+    val ww = wordIndex
+    val ss = spanIndex
 
     val f = new MySurfaceFeaturizer[Datum, W](feat, ww, ss)
     if(cache) new CachedFeaturizer(f)
@@ -86,18 +85,20 @@ object IndexedSurfaceFeaturizer {
 
   @SerialVersionUID(1L)
   private class MySurfaceFeaturizer[Datum, W](val featurizer: SurfaceFeaturizer[W],
-                                              val wordFeatureIndex: FeatureIndex,
-                                              val spanFeatureIndex: FeatureIndex)
+                                              val wordFeatureIndex: Index[Feature],
+                                              val spanFeatureIndex: Index[Feature])
                                              (implicit hasWords: Has2[Datum, IndexedSeq[W]],
                                               hasConstraints: HasSpanConstraints[Datum]) extends IndexedSurfaceFeaturizer[Datum, W] with Serializable {
     def anchor(d: Datum):IndexedSurfaceAnchoring[W]  = {
       val words = hasWords.get(d)
       val cons = hasConstraints.get(d)
       val anch = featurizer.anchor(words)
-      val wordFeatures = Array.tabulate(words.length, FeaturizationLevel.numLevels) { (i,l) => wordFeatureIndex.stripEncode(anch.featuresForWord(i, l))}
+      val wordFeatures = Array.tabulate(words.length, FeaturizationLevel.numLevels) { (i,l) =>
+        stripEncode(wordFeatureIndex, anch.featuresForWord(i, l))
+      }
       val spanFeatures = TriangularArray.tabulate(words.length+1){ (i, j) =>
         if(cons(i,j) && i < j) {
-         Array.tabulate(FeaturizationLevel.numLevels){l => spanFeatureIndex.stripEncode(anch.featuresForSpan(i, j, l))}
+         Array.tabulate(FeaturizationLevel.numLevels){l => stripEncode(spanFeatureIndex, anch.featuresForSpan(i, j, l))}
         } else {
           null
         }
@@ -106,6 +107,19 @@ object IndexedSurfaceFeaturizer {
       new TabulatedIndexedSurfaceAnchoring[W](words, wordFeatures, spanFeatures)
 
     }
+  }
+
+  def stripEncode(ind: Index[Feature], features: Array[Feature]) = {
+    val result = mutable.ArrayBuilder.make[Int]()
+    result.sizeHint(features)
+    var i = 0
+    while(i < features.length) {
+      val fi = ind(features(i))
+      if(fi >= 0)
+        result += fi
+      i += 1
+    }
+    result.result()
   }
 }
 
