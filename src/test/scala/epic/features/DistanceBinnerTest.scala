@@ -9,7 +9,6 @@ import org.scalatest.FunSuite
 class DistanceBinnerTest extends FunSuite {
   test("Distance Bin") {
     val binner = new DistanceBinner(preserveDirection = true)
-    println(binner.binThresholds.mkString(", "))
     val dists = Array.tabulate(20,20) { (i, j) =>
       val dist = binner.binnedDistance(i, j)
       if(i < j)
@@ -33,7 +32,6 @@ class DistanceBinnerTest extends FunSuite {
 
   test("Distance Bin, no direction") {
     val binner = new DistanceBinner(preserveDirection = false)
-    println(binner.binThresholds.mkString(", "))
     val dists = Array.tabulate(20,20) { (i, j) =>
       val dist = binner.binnedDistance(i, j)
       if(i != j)

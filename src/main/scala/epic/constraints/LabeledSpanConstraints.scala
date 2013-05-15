@@ -47,7 +47,6 @@ sealed trait LabeledSpanConstraints[-L] extends SpanConstraints {
             if(x(b,e) == null) y(b,e)
             else if (y(b,e) == null) x(b, e)
             else  x(b,e) | y(b,e)
-          x(b,e) | y(b,e)
         })
     }
   }
