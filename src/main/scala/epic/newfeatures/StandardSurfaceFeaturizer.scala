@@ -25,6 +25,7 @@ class StandardSurfaceFeaturizer(wordCounts: Counter[String, Double],
     val w = words
     new SurfaceFeatureAnchoring[String] {
       val indices = words.map(wordIndex)
+      val wholeSentenceIsUpperCase = words.forall(_.forall(c => !c.isLetter || c.isUpper))
       def words = w
       val sentenceLengthFeature = SentenceLengthFeature(distanceBinner.binnedDistance(0,words.length))
 
@@ -52,6 +53,8 @@ class StandardSurfaceFeaturizer(wordCounts: Counter[String, Double],
 
         if(level.level >= FeaturizationLevel.BasicFeatures.level) {
           feats += sentenceLengthFeature
+          if(wholeSentenceIsUpperCase)
+            feats += WholeSentenceIsUpperCaseFeature
         }
 
 
@@ -157,3 +160,4 @@ class StandardSurfaceFeaturizer(wordCounts: Counter[String, Double],
 case class FirstWordCapsAnd(f: Feature) extends Feature
 case class NthWordCapsAnd(f: Feature) extends Feature
 case class SentenceLengthFeature(length: Int) extends Feature
+case object WholeSentenceIsUpperCaseFeature extends Feature

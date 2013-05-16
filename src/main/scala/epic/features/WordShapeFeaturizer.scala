@@ -60,12 +60,22 @@ class WordShapeFeaturizer(wordCounts: Counter[String, Double],
       val hasNonDigit = hasLetter || w.exists(!_.isDigit)
       val hasLower = w.exists(_.isLower)
       val hasDash = w.contains('-')
-      val hasPeriod = w.contains('.')
+      val numPeriods = w.count('.' ==)
+      val hasPeriod = numPeriods > 0
 
       if(numCaps > 0)  features += hasCapFeature
       if(numCaps > 1)  features += hasManyCapFeature
       val isAllCaps = numCaps > 1 && !hasLower && !hasNotLetter
       if(isAllCaps) features += isAllCapsFeature
+
+      if(w.length == 2 && w(0).isLetter && w(0).isUpper && w(1) == '.') {
+        features += isAnInitialFeature
+      }
+
+      if(w.length > 1 && w.last == ('.')) {
+        features += endsWithPeriodFeature
+
+      }
 
       var knownLowerCase = false
       var hasTitleCaseVariant = false
@@ -170,6 +180,8 @@ object WordShapeFeaturizer {
   val startOfSentenceFeature = IndicatorWSFeature('StartOfSentence)
   val integerFeature = IndicatorWSFeature('Integer)
   val floatFeature = IndicatorWSFeature('Float)
+  val isAnInitialFeature = IndicatorWSFeature('IsAnInitial)
+  val endsWithPeriodFeature = IndicatorWSFeature('EndsWithPeriod)
 }
 
 /**

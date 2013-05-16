@@ -141,7 +141,7 @@ object SemiConllNERPipeline {
     //
     def eval(state: FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State) = {
       val out = new PrintWriter(new BufferedOutputStream(new FileOutputStream("weights.txt")))
-      Encoder.fromIndex(model.featureIndex).decode(state.x).iterator.toIndexedSeq.sortBy(_._2.abs).takeWhile(_._2.abs > 1E-4) foreach {case (x, v) => out.println(v + "\t" + x)}
+      Encoder.fromIndex(model.featureIndex).decode(state.x).iterator.toIndexedSeq.sortBy(-_._2.abs).takeWhile(_._2.abs > 1E-4) foreach {case (x, v) => out.println(v + "\t" + x)}
       val crf: SemiCRF[String, String] = model.extractCRF(state.x)
       println("Eval + " + (state.iter+1))
       val stats = SegmentationEval.eval(crf, test, "O")
@@ -160,3 +160,92 @@ object SemiConllNERPipeline {
 }
 
 
+
+
+object SemiConllStats {
+
+  def makeSegmentation(ex: Example[IndexedSeq[String],IndexedSeq[IndexedSeq[String]]]): Segmentation[String, String]  = {
+    val labels = ex.label
+    val words = ex.features.map(_ apply 0)
+    assert(labels.length == words.length)
+    val out = new ArrayBuffer[(String, Span)]()
+    var start = labels.length
+    var i = 0
+    while(i < labels.length) {
+      val l = labels(i)
+      l(0) match {
+        case 'O' =>
+          if(start < i)
+            out += (labels(start).replaceAll(".-","").intern -> Span(start, i))
+          out += ("O".intern -> Span(i, i+1))
+          start = i + 1
+        case 'B' =>
+          if(start < i)
+            out += (labels(start).replaceAll(".-","").intern -> Span(start, i))
+          start = i
+        case 'I' =>
+          if(start >= i) {
+            start = i
+          } else if(labels(start) != l){
+            out += (labels(start).replaceAll(".-","").intern -> Span(start, i))
+            start = i
+          } // else, still in a field, do nothing.
+        case _  =>
+          sys.error("weird label?!?" + l)
+      }
+
+      i += 1
+    }
+    if(start < i)
+      out += (labels(start).replaceAll(".-","").intern -> Span(start, i))
+
+    assert(out.nonEmpty && out.last._2.end == words.length, out + " " + words + " " + labels)
+    Segmentation(out, words, ex.id)
+  }
+
+
+
+  case class Params(path: File,
+                    test: File,
+                    name: String = "eval/ner",
+                    nsents: Int = 100000,
+                    nthreads: Int = -1,
+                    iterPerEval: Int = 20,
+                    opt: OptParams)
+
+  def main(args: Array[String]) {
+    val params = CommandLineParser.readIn[Params](args)
+    val (train,test) = {
+      val standardTrain = CONLLSequenceReader.readTrain(new FileInputStream(params.path), params.path.getName).toIndexedSeq
+      val standardTest = CONLLSequenceReader.readTrain(new FileInputStream(params.test), params.path.getName).toIndexedSeq
+
+      standardTrain.take(params.nsents).map(makeSegmentation) -> standardTest.map(makeSegmentation)
+    }
+
+    val gaz = Gazetteer.ner()
+    def gazStats(data: IndexedSeq[Segmentation[String, String]]) = {
+      var inGaz = 0.0
+      var notInGaz = 0.0
+
+      for(d <- data; (l,span) <- d.segments if l != "O") {
+        val words = span.map(d.words)
+        for(w <- words)
+          if(gaz.lookupWord(w).nonEmpty) {
+            inGaz += 1
+          } else {
+            notInGaz += 1
+          }
+
+      }
+      (inGaz,notInGaz,(inGaz)/(notInGaz + inGaz))
+    }
+
+    println("train: " + gazStats(train))
+    println("test: " + gazStats(test))
+
+
+
+
+  }
+
+}
