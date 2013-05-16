@@ -18,12 +18,13 @@ import projections.GrammarRefinements
 import epic.trees.{LexicalProduction, Production, Rule}
 import breeze.util.Index
 
+
 /**
  *
  * @author dlwh
  */
 
-trait RefinedFeaturizer[L, W, Feat] {
+trait RefinedFeaturizer[L, W, Feat]  {
   def index: Index[Feat]
   
   def anchor(words: IndexedSeq[W]):Anchoring

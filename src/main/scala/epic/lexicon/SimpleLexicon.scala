@@ -13,10 +13,11 @@ import scala.collection.mutable
  * @param openTagThreshold how many different word types does a tag have to be seen with to be considered open.
  * @param closedWordThreshold How many
  */
+@SerialVersionUID(1L)
 class SimpleLexicon[L, W](val labelIndex: Index[L],
                           wordTagCounts: Counter2[L, W, Double],
                           openTagThreshold: Int = 50,
-                          closedWordThreshold: Int= 10) extends Lexicon[L, W] {
+                          closedWordThreshold: Int= 10) extends Lexicon[L, W] with Serializable {
   private val wordCounts:Counter[W, Double] = sum(wordTagCounts, Axis._0)
   private val labelCounts:Counter[L, Double] = sum(wordTagCounts, Axis._1)
 

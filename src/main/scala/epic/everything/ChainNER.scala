@@ -126,26 +126,8 @@ object ChainNER {
       val maxLengthMap = train.flatMap(_.segments.iterator).groupBy(_._1).mapValues(arr => arr.map(_._2.length).max)
       val labelIndex = beliefsFactory.nerLabelIndex
       val maxLengthArray = Encoder.fromIndex(labelIndex).tabulateArray(maxLengthMap.getOrElse(_, 0))
-      println(maxLengthMap)
-
-      val gazetteerFeatures = Index[Feature]()
-
-      val maxMaxLength = (0 until labelIndex.size).map(maxLengthArray).max
-//      var i = 0
-//      for(s <- sentences) {
-//
-//        TODO: gazetteer
-//        for(b <- 0 until s.length; e <- (b+1) until math.min(s.length,b+maxMaxLength) if s.isPossibleSpan(b, e)) {
-//
-//
-//        }
-//        i += 1
-//      }
-
 
       val featurizer = new IndexedFeaturizer(maxLengthArray, labelIndex, processor.wordFeatureIndex, processor.spanFeatureIndex)
-
-
 
       new Model(beliefsFactory, featurizer, weights)
     }

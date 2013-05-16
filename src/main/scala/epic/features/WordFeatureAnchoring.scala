@@ -1,8 +1,8 @@
-package epic.newfeatures
+package epic.features
 
 import epic.framework.Feature
 import breeze.util.Index
-import epic.newfeatures.FeaturizationLevel.FullFeatures
+import epic.features.FeaturizationLevel.FullFeatures
 
 /**
  *

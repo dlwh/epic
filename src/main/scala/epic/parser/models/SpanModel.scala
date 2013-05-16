@@ -17,11 +17,10 @@ package models
  limitations under the License.
 */
 
-import features._
 import breeze.collection.mutable.{TriangularArray, OpenAddressHashArray}
 import breeze.linalg._
 import epic.trees._
-import annotations.{FilterAnnotations, TreeAnnotator}
+import annotations.TreeAnnotator
 import collection.mutable.{ArrayBuffer, ArrayBuilder}
 import java.io.File
 import breeze.util._
@@ -29,7 +28,18 @@ import epic.framework.Feature
 import projections.GrammarRefinements
 import breeze.config.Help
 import epic.lexicon.Lexicon
-import epic.newfeatures.HashFeature
+import epic.features._
+import epic.trees.UnaryTree
+import epic.parser.features.RuleFeature
+import epic.trees.TreeInstance
+import epic.trees.NullaryTree
+import epic.parser.features.PairFeature
+import epic.parser.features.LabelFeature
+import epic.trees.BinaryTree
+import epic.parser.features.TaggedFeature
+import epic.features.HashFeature
+import epic.parser.features.LexicalFeature
+import epic.trees.annotations.FilterAnnotations
 
 /**
  * A rather more sophisticated discriminative parser. Uses features on
@@ -449,70 +459,47 @@ object IndexedSpanFeaturizer {
 }
 
 class StandardSpanFeaturizer[L, W](grammar: BaseGrammar[L],
-                                   wordGen: W=>Traversable[String],
+                                   surfaceFeaturizer: SurfaceFeaturizer[W],
                                    labelFeatures: Array[Array[Feature]],
                                    ruleFeatures: Array[Array[Feature]]) extends SpanFeaturizer[L, W] {
   def anchor(w: IndexedSeq[W]):Anchoring = new Anchoring {
+    val wordAnch = surfaceFeaturizer.anchor(w)
     def words = w
     val length = w.length
-    val wordFeats = w.toIndexedSeq.map(wordGen).map(_.map(IndicatorFeature(_)))
     import features.StandardSpanFeatures._
-
-    private def binDistance(dist2:Int) = {
-      val dist = dist2.abs - 1
-      if (dist >= 20) 4
-      else if (dist >= 10) 3
-      else if (dist >= 5) 2
-      else if (dist >= 2) 1
-      else 0
-    }
 
     def featuresForSpan(begin: Int, end: Int, label: Int) = {
       val builder = ArrayBuilder.make[Feature]
       builder ++=  labelFeatures(label)
 
       val lf = LabelFeature(label)
-      val lengthFeature = SpanLengthFeature(binDistance(end - begin))
-      builder += PairFeature(lf, lengthFeature)
       if(begin + 1 == end) {
-        for(w <- wordFeats(begin))
+        for(w <- wordAnch.featuresForWord(begin))
           builder += PairFeature(lf, w)
       } else {
-        if(end == length)
-          builder += PairFeature(EndSentFeature,lf)
-        else for(w <- wordFeats(end)) {
+        builder ++= wordAnch.featuresForSpan(begin, end).map(PairFeature(lf, _))
+        for(w <- wordAnch.featuresForWord(end, FeaturizationLevel.MinimalFeatures)) {
           val tf = TaggedFeature(w, 'NextWord)
           builder += tf
           builder += PairFeature(lf, tf)
         }
 
-        if(begin == 0)
-          builder += PairFeature(BeginSentFeature, lf)
-        else for(w <- wordFeats(begin - 1)) {
+        for(w <- wordAnch.featuresForWord(begin - 1, FeaturizationLevel.MinimalFeatures)) {
           val tf = TaggedFeature(w, 'PrevWord)
           builder += tf
           builder += PairFeature(lf, tf)
         }
 
-        for(w <- wordFeats(begin)) {
+        for(w <- wordAnch.featuresForWord(begin, FeaturizationLevel.MinimalFeatures)) {
           val tf = TaggedFeature(w, 'FirstWord)
           builder += tf
           builder += PairFeature(lf, tf)
         }
 
-        for(w <- wordFeats(end-1)) {
+        for(w <- wordAnch.featuresForWord(end-1, FeaturizationLevel.MinimalFeatures)) {
           val tf = TaggedFeature(w, 'LastWord)
           builder += tf
           builder += PairFeature(lf, tf)
-        }
-
-        if(begin > 0 && end < length) {
-          for(wA <- wordFeats(begin-1);
-              wB <- wordFeats(end)) {
-            val edge = PairFeature(lf, WordEdges('Outside, label, wB))
-            builder += edge
-            builder += PairFeature(edge, lengthFeature)
-          }
         }
 
       }
@@ -526,15 +513,15 @@ class StandardSpanFeaturizer[L, W](grammar: BaseGrammar[L],
 
       val rf = RuleFeature(grammar.index.get(rule))
       if(begin+1 == end) {
-        for(w <- wordFeats(begin))
+        for(w <- wordAnch.featuresForWord(begin))
           builder += LexicalFeature(rf, w)
       }
 
-      for(w <- wordFeats(begin)) {
+      for(w <- wordAnch.featuresForWord(begin, FeaturizationLevel.BasicFeatures)) {
         builder += TaggedFeature(PairFeature(rf, w), 'BeginWord)
       }
 
-      for(w <- wordFeats(end-1)) {
+      for(w <- wordAnch.featuresForWord(end-1, FeaturizationLevel.BasicFeatures)) {
         builder += TaggedFeature(PairFeature(rf, w), 'EndWord)
       }
 
@@ -545,7 +532,7 @@ class StandardSpanFeaturizer[L, W](grammar: BaseGrammar[L],
       val builder = ArrayBuilder.make[Feature]
 
       val rf = RuleFeature(grammar.index.get(rule))
-      for(w <- wordFeats(split)) {
+      for(w <- wordAnch.featuresForWord(split, FeaturizationLevel.BasicFeatures)) {
         builder += TaggedFeature(PairFeature(rf, w), 'SplitWord)
         builder += TaggedFeature(w, 'SplitWord)
       }
@@ -580,7 +567,6 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
 
     val (xbarGrammar, xbarLexicon) = baseParser.xbarGrammar(trees)
     val summedCounts = sum(initLexicon, Axis._0)
-    val shapeGen = new SimpleWordShapeGen(initLexicon, summedCounts)
 
     val indexedRefinements = GrammarRefinements(xbarGrammar, refGrammar, {
       (_: AnnotatedLabel).baseAnnotatedLabel
@@ -594,9 +580,11 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     val labelFeatures = refGrammar.labelEncoder.tabulateArray(l => Array(LabelFeature(l):Feature))
     val ruleFeatures = refGrammar.tabulateArray(l => Array(RuleFeature(l):Feature))
 
+    val surfaceFeaturizer = new StandardSurfaceFeaturizer(summedCounts)
+//    val wordFeaturizer = IndexedWordFeaturizer.fromData(surfaceFeaturizer, annTrees.map{_.words})
     val feat = new StandardSpanFeaturizer[AnnotatedLabel, String](
       refGrammar,
-      shapeGen,
+      surfaceFeaturizer,
       labelFeatures, ruleFeatures)
 
 

@@ -32,13 +32,14 @@ case class ProcessedTreebank(@Help(text="Location of the treebank directory")
                              @Help(text="Should we add the dev set for training, do this only for final test.")
                              includeDevInTrain: Boolean = false,
                              @Help(text="What kind of binarization to do. Options: left, right, head. Head is best.")
-                             binarization: String = "head") {
+                             binarization: String = "head",
+                             numSentences: Int = Int.MaxValue) {
 
   lazy val treebank = {
     Treebank.fromPennTreebankDir(path)
   }
 
-  lazy val trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]] = transformTrees(treebank.train, maxLength, removeUnaries = true)
+  lazy val trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]] = transformTrees(treebank.train, maxLength, removeUnaries = true).take(numSentences)
   lazy val devTrees = transformTrees(treebank.dev, 100000);
   lazy val testTrees = transformTrees(treebank.test, 1000000);
 

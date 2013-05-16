@@ -8,12 +8,9 @@ import epic.sequences.SemiCRF.TransitionVisitor
 import collection.mutable.ArrayBuffer
 import breeze.collection.mutable.TriangularArray
 import breeze.features.FeatureVector
-import epic.features.IndexedSpanFeaturizer
-import epic.constraints.{SpanConstraints, TagConstraints, LabeledSpanConstraints}
-import epic.constraints.LabeledSpanConstraints.NoConstraints
+import epic.constraints.{TagConstraints, LabeledSpanConstraints}
 import epic.lexicon.{SimpleLexicon, Lexicon}
-import epic.trees.AnnotatedLabel
-import epic.newfeatures._
+import epic.features._
 import epic.util.{NotProvided, Optional}
 
 /**

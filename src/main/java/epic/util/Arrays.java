@@ -19,5 +19,20 @@ public final class Arrays {
         return arr;
     }
 
+    public static int[] concatenate(int[]... args) {
+        int totalLength = 0;
+        for(int[] a: args)
+            totalLength += a.length;
+
+        int[] ret = new int[totalLength];
+        int destPos = 0;
+        for(int[] a: args) {
+            System.arraycopy(a, 0, ret, destPos, a.length);
+            destPos += a.length;
+        }
+
+        return ret;
+    }
+
 
 }

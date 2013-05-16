@@ -1,4 +1,4 @@
-package epic.newfeatures
+package epic.features
 
 import java.util
 
@@ -30,6 +30,8 @@ class DistanceBinner private (val binThresholds: Array[Int], preserveDirection: 
         (binThresholds.last + 1)
     } else binThresholds(bin-1)
   }
+
+  def binIds = binThresholds.toIndexedSeq :+ (binThresholds.last + 1)
 
 }
 

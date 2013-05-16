@@ -1,7 +1,7 @@
 package epic.sequences
 
 import io.{Codec, Source}
-import epic.newfeatures.{FeaturizationLevel, SurfaceFeatureAnchoring, SurfaceFeaturizer}
+import epic.features.{FeaturizationLevel, SurfaceFeatureAnchoring, SurfaceFeaturizer}
 import epic.framework.Feature
 import epic.trees.Span
 

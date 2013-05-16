@@ -1,32 +1,30 @@
-package epic.everything
+package epic
+package everything
 
 import java.io.File
 import epic.trees._
-import epic.parser.{SimpleRefinedGrammar, GenerativeParser, ParserParams}
+import epic.parser.{GenerativeParser, ParserParams}
 import epic.parser.ParserParams.XbarGrammar
 import breeze.config.{Help, CommandLineParser}
-import epic.ontonotes.{NERType, ConllOntoReader}
+import epic.ontonotes.{Sentence, NERType, ConllOntoReader, Document}
 import breeze.linalg._
 import epic.framework._
-import epic.sequences.{Gazetteer, SegmentationModelFactory, SemiCRFModel, SemiCRF}
 import breeze.optimize._
-import breeze.util.{Lens, Index, Encoder}
+import breeze.util.{Index, Encoder}
 import epic.parser.projections.ConstraintCoreGrammar
 import epic.trees.annotations.StripAnnotations
-import epic.trees.annotations.AddMarkovization
 import epic.trees.annotations.PipelineAnnotator
-import epic.parser.models.{IndexedLexFeaturizer, SimpleWordShapeGen}
+import epic.parser.models.IndexedLexFeaturizer
 import epic.trees.ProcessedTreebank
 import epic.parser.features.RuleFeature
-import scala.Some
 import epic.parser.models.StandardFeaturizer
 import breeze.optimize.FirstOrderMinimizer.OptParams
-import epic.ontonotes.Document
 import epic.parser.models.LexGrammarBundle
 import collection.mutable.ArrayBuffer
 import collection.immutable
-import epic.features.TagAwareWordShapeFeaturizer
-import epic.lexicon.{SimpleLexicon, Lexicon}
+import epic.lexicon.SimpleLexicon
+import epic.features.{MultiSurfaceFeaturizer, ContextSurfaceFeaturizer, StandardSurfaceFeaturizer}
+import epic.constraints.LabeledSpanConstraints
 
 
 /**
@@ -237,30 +235,18 @@ object AnnotatingPipeline {
   }
 
 
-  def buildProcessor(train: IndexedSeq[Document], weightsCache: Counter[String, Double], params: AnnotatingPipeline.Params): (FeaturizedDocument.Factory, IndexedSeq[FeaturizedDocument]) = {
-    val nerSegments = for (d <- train; s <- d.sentences) yield s.nerSegmentation
-    val nerPruningModel : SemiCRF.ConstraintSemiCRF[NERType.Value, String] = if(params.includeNER) params.cache.cached("baseNER", nerSegments.toSet) {
-      println("Building basic NER model...")
-      val baseNER = {
-        val model: SemiCRFModel[NERType.Value, String] = new SegmentationModelFactory(NERType.OutsideSentence, NERType.NotEntity, gazetteer = Gazetteer.ner("en"), weights = {
-          (f: Feature) => weightsCache(f.toString)
-        }).makeModel(nerSegments)
-
-        val obj = new ModelObjective(model, nerSegments, params.nthreads)
-        val cached = new CachedBatchDiffFunction(obj)
-
-        val weights = params.opt.minimize(cached, obj.initialWeightVector(randomize = false))
-        val crf = model.extractCRF(weights)
-        val decoded: Counter[Feature, Double] = Encoder.fromIndex(model.featureIndex).decode(weights)
-        updateWeights(params.weightsCache, weightsCache, decoded)
-        crf
-      }
-      new SemiCRF.BaseModelConstraintSemiCRF(baseNER)
-    } else new SemiCRF.IdentityConstraintSemiCRF(Index(NERType.values), NERType.OutsideSentence)
-
+  def buildProcessor(docs: IndexedSeq[Document], weightsCache: Counter[String, Double], params: AnnotatingPipeline.Params): (FeaturizedDocument.Factory, IndexedSeq[FeaturizedDocument]) = {
+    val train = docs.flatMap(_.sentences.map(_.nerSegmentation))
+    val maxLengthMap = train.flatMap(_.segments.iterator).groupBy(_._1).mapValues(arr => arr.map(_._2.length).max)
+    val labelIndex = Index(Iterator(NERType.OutsideSentence, NERType.NotEntity) ++ train.iterator.flatMap(_.label.map(_._1)))
+    val maxLengthArray: Array[Int] = Encoder.fromIndex(labelIndex).tabulateArray(maxLengthMap.getOrElse(_, 0))
+    println(maxLengthMap)
+    val nerCounts: Counter2[NERType.Value, String, Double] = Counter2.count(train.map(_.asFlatTaggedSequence(NERType.NotEntity)).map{seg => seg.label zip seg.words}.flatten).mapValues(_.toDouble)
+    val nerLexicon = new SimpleLexicon(labelIndex, nerCounts, openTagThreshold = 10, closedWordThreshold = 20)
+    val allowedNerClassifier = new LabeledSpanConstraints.LayeredTagConstraintsFactory(nerLexicon, maxLengthArray)
 
     println("Building basic parsing model...")
-    var trainTrees = for (d <- train; s <- d.sentences) yield {
+    var trainTrees = for (d <- docs; s <- d.sentences) yield {
       params.treebank.makeTreeInstance(s.id, s.tree.map(_.label), s.words, removeUnaries = true)
     }
 
@@ -274,9 +260,15 @@ object AnnotatingPipeline {
     }
 
 
+    val standardFeaturizer = new StandardSurfaceFeaturizer(sum(nerCounts, Axis._0))
+    val featurizers =new ContextSurfaceFeaturizer[String](standardFeaturizer, 3, 3)
+    val featurizer = new MultiSurfaceFeaturizer[String](featurizers)
+
     FeaturizedDocument.makeFactory(params.treebank.process,
+    featurizer,
       new ConstraintCoreGrammar(baseParser.augmentedGrammar, {(_:AnnotatedLabel).isIntermediate}, -8),
-      nerPruningModel, null)(train)
+      labelIndex,
+      allowedNerClassifier, null)(docs)
   }
 
 
@@ -300,27 +292,23 @@ object AnnotatingPipeline {
 
     val wordIndex: Index[String] = Index(trainTrees.iterator.flatMap(_.words))
     val summedCounts = sum(initLexicon, Axis._0)
-    val shapeGen = new SimpleWordShapeGen(initLexicon, summedCounts)
-    val tagShapeGen = new TagAwareWordShapeFeaturizer(initLexicon)
 
     def ruleGen(r: Rule[AnnotatedLabel]) = IndexedSeq(RuleFeature(r))
 
     val headFinder = HeadFinder.collins
-    val feat = new StandardFeaturizer(wordIndex,
+    val feat = new StandardFeaturizer(
     docProcessor.grammar.labelIndex,
     docProcessor.grammar.index,
-    ruleGen,
-    shapeGen, {
-      (w: Seq[String], pos: Int) => tagShapeGen.featuresFor(w, pos)
-    })
+    ruleGen
+   )
 
-    val indexed = IndexedLexFeaturizer.extract[AnnotatedLabel, String](feat,
+    val indexed = IndexedLexFeaturizer.extract[AnnotatedLabel, IndexedSeq[String], TreeInstance[AnnotatedLabel, String], String](feat,
+      docProcessor.featurizer,
       headFinder,
       docProcessor.grammar.index,
       docProcessor.grammar.labelIndex,
 //    2,
       lexHashFeatures,
-      -1,
       trees)
 
     val bundle = new LexGrammarBundle[AnnotatedLabel, String](docProcessor.grammar,
