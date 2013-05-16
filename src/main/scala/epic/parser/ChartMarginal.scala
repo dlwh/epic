@@ -2,6 +2,11 @@ package epic.parser
 
 import epic.trees.{UnaryTree, BinarizedTree}
 import epic.util.Arrays
+import scala.tools.nsc.interpreter.{SimpleReader, ILoop}
+import scala.tools.nsc.Settings
+import breeze.numerics
+import breeze.linalg.DenseVector
+import breeze.collection.mutable.TriangularArray
 
 /*
  Copyright 2012 David Hall
@@ -42,7 +47,7 @@ case class ChartMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
         if (labelScore.isInfinite) {
           println("problem with unary: " + (label, ref) + " " + span)
         }
-      case _ =>
+      case tree =>
         val labelScore = inside.bot(tree.span.start, tree.span.end, anchoring.grammar.labelIndex(tree.label._1), tree.label._2)
         if (labelScore.isInfinite) {
           println("problem with other: " + t.label + " " + tree.span)
@@ -50,6 +55,64 @@ case class ChartMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
     }
     this
   }
+
+
+  def checkForTreeOutside(tree: BinarizedTree[(L, Int)]) {
+    for (t <- tree.allChildren) t match {
+      case tree@UnaryTree( (label, ref), _, _, span) =>
+        val ai: Int = anchoring.grammar.labelIndex(label)
+        val labelScore = outside.top(span.start, span.end, ai, ref)
+        if (labelScore.isInfinite) {
+          ChartMarginal.synchronized {
+          println("problem with top: " + (label, ref) + " " + span)
+            println(s"problem with outside other: ${t.label} ${tree.span} ${outside.top.enteredLabelIndexes(tree.span.start, tree.span.end)(ai)} $words ${outside.top.decodedLabelScores(tree.span.start,tree.span.end)}")
+            println(ai + " " + outside.top.enteredLabels(TriangularArray.index(tree.span.start, tree.span.end)))
+            println("Constraint: " + anchoring.core.sparsityPattern.top.isAllowedLabeledSpan(tree.start, tree.end, ai))
+            println("checking for inside starting from here...")
+            checkForTree(t.asInstanceOf[BinarizedTree[(L, Int)]])
+            println("done.")
+          }
+          return
+        }
+      case tree =>
+        val ai: Int = anchoring.grammar.labelIndex(tree.label._1)
+        val labelScore = outside.bot(tree.span.start, tree.span.end, ai, tree.label._2)
+        if (labelScore.isInfinite) {
+          ChartMarginal.synchronized {
+          println(s"problem with outside other: ${t.label} ${tree.span} ${outside.bot.enteredLabelIndexes(tree.span.start, tree.span.end)(ai)} $words ${outside.bot.decodedLabelScores(tree.span.start,tree.span.end)}")
+            println(ai + " " + outside.bot.enteredLabels(TriangularArray.index(tree.span.start, tree.span.end)))
+            println("Constraint: " + anchoring.core.sparsityPattern.bot.isAllowedLabeledSpan(tree.start, tree.end, ai))
+            println("checking for inside starting from here...")
+            checkForTree(t.asInstanceOf[BinarizedTree[(L, Int)]])
+          }
+          return
+        }
+    }
+  }
+
+  def verify() {
+    assert(!logPartition.isInfinite, anchoring.words)
+
+     val ins = inside.bot.enteredLabelScores(0, length).toMap
+      var score = Double.NegativeInfinity
+      import breeze.linalg._
+      for((sym,scores) <- outside.bot.enteredLabelScores(0, length)) {
+        score = numerics.logSum(score, softmax(new DenseVector(scores) + new DenseVector(ins(sym))))
+      }
+      assert( (score - logPartition).abs/math.max(logPartition.abs,score.abs).max(1E-4) < 1E-4, logPartition + " " + 0 + "Z" + score)
+    for(i <- 0 until length) {
+      val ins = inside.bot.enteredLabelScores(i, i+1).toMap
+      var score = Double.NegativeInfinity
+      import breeze.linalg._
+      for((sym,scores) <- outside.bot.enteredLabelScores(i, i+1)) {
+        score = numerics.logSum(score, softmax(new DenseVector(scores) + new DenseVector(ins(sym))))
+      }
+      assert( (score - logPartition).abs/math.max(logPartition.abs,score.abs).max(1E-4) < 1E-4, logPartition + " " + i + " " + score)
+    }
+
+
+  }
+//  verify()
 
 
   /**
@@ -194,8 +257,8 @@ object ChartMarginal {
   def apply[L, W, Chart[X] <: ParseChart[X]](anchoring: AugmentedAnchoring[L, W],
                                              sent: IndexedSeq[W]): ChartMarginal[L, W] = {
     val (inside, spanScores) = buildInsideChart(anchoring, sent)
-    val outside = buildOutsideChart(anchoring, inside, spanScores)
     val logPartition = rootScore(anchoring, inside)
+    val outside = buildOutsideChart(anchoring, inside, spanScores)
     ChartMarginal(anchoring, inside, outside, logPartition)
   }
 
@@ -212,7 +275,7 @@ object ChartMarginal {
       }
     }
     val score = inside.sum(rootScores, offset)
-    assert(!score.isNaN)
+    assert(!score.isNaN, rootScores.mkString(", "))
     score
   }
 
@@ -237,6 +300,9 @@ object ChartMarginal {
 
     // handle lexical
     for{i <- 0 until words.length} {
+      assert(core.sparsityPattern.isActiveSpan(i,i+1))
+      assert(core.sparsityPattern.bot.isAllowedSpan(i,i+1))
+      var foundSomething = false
       for {
         a <- lexLoc.allowedTags(i)
         coreScore = core.scoreSpan(i, i+1, a) if coreScore != Double.NegativeInfinity
@@ -246,7 +312,26 @@ object ChartMarginal {
         if (score != Double.NegativeInfinity) {
           spanScores.bot.enter(i, i+1, a, ref, score)
           inside.bot.enter(i, i+1, a, ref, score)
+          foundSomething = true
         }
+      }
+      if(!foundSomething) {
+//        synchronized {
+//          println("...")
+//          println(i)
+//          println(words)
+//          println(lexLoc.allowedTags(i).toIndexedSeq.map(i => i -> grammar.labelIndex.get(i)))
+//          println(lexLoc.allowedTags(i).toIndexedSeq.map(a => a -> core.scoreSpan(i,i+1,a)))
+//          println(grammar.labelIndex.toIndexedSeq.map(a => a -> core.scoreSpan(i,i+1,grammar.labelIndex(a))))
+//          println(core.getClass + " " + core.sparsityPattern.getClass)
+//          println(grammar.labelIndex.toIndexedSeq.map(a => a -> core.sparsityPattern.bot.isAllowedLabeledSpan(i,i+1,grammar.labelIndex(a))))
+//          println(lexLoc.allowedTags(i).toIndexedSeq.map(a => a -> refined.validLabelRefinements(i,i+1,a).toIndexedSeq))
+//          println(lexLoc.allowedTags(1).toIndexedSeq.map(a => a -> refined.validLabelRefinements(1,1+1,a).toIndexedSeq))
+//
+//          assert(lexicon.labelIndex == grammar.labelIndex)
+//          assert(false,"......")
+//          sys.exit(1)
+//        }
       }
 
       updateInsideUnaries(inside, anchoring,  i, i+1)
@@ -367,14 +452,20 @@ object ChartMarginal {
             } // end canBuildThisRule
           } // end rules
 
+          var foundSomething = false
           var ai = 0
           while(ai < numValidLabelRefs) {
             // done updating vector, do an enter:
             if(offsets(ai) > 0) {
               inside.bot.enterSum(begin, end, a, ai, scoreArray(ai), offsets(ai))
+              foundSomething = true
             }
             ai += 1
           }
+//          if(!foundSomething && anchoring.core.sparsityPattern != ChartConstraints.noSparsity) {
+//            println(s"Failed to replicate a span in ($begin, $end) of ${anchoring.words}. Label is ${anchoring.grammar.labelIndex.get(a)}")
+//
+//          }
 
         }
       }

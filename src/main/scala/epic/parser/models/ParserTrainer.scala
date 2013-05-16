@@ -47,7 +47,9 @@ object ParserTrainer extends epic.parser.ParserPipeline {
                     @Help(text="How many threads to use, default is to use whatever Scala thinks is best.")
                     threads: Int = -1,
                     @Help(text="Should we randomize weights? Some models will force randomization.")
-                    randomize: Boolean = false);
+                    randomize: Boolean = false,
+                    @Help(text="Should we check the gradient to maek sure it's coded correctly?")
+                    checkGradient: Boolean = false)
   protected val paramManifest = manifest[Params]
 
   def trainParser(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]],
@@ -61,10 +63,9 @@ object ParserTrainer extends epic.parser.ParserPipeline {
 
     val obj = new ModelObjective(model, trainTrees, params.threads)
     val cachedObj = new CachedBatchDiffFunction(obj)
-    val checking = new RandomizedGradientCheckingFunction(cachedObj, 0.1, toString = {
-      (i: Int) => model.featureIndex.get(i).toString
-    })
     val init = obj.initialWeightVector(randomize)
+    if(checkGradient)
+      GradientTester.test(cachedObj, obj.initialWeightVector(true), toString={(i: Int) => model.featureIndex.get(i).toString})
 
     type OptState = FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State
     def evalAndCache(pair: (OptState, Int)) {

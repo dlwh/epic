@@ -24,6 +24,7 @@ import collection.immutable
 import collection.immutable.BitSet.BitSetN
 import java.util
 import epic.constraints.LabeledSpanConstraints
+import breeze.linalg.Counter2
 
 @SerialVersionUID(4)
 class ParseChart[L](val index: Index[L],
@@ -107,7 +108,24 @@ class ParseChart[L](val index: Index[L],
     def enteredLabelScores(begin: Int, end: Int) = {
       val scoreArray = score(begin, end)
       if(scoreArray eq null) Iterator.empty
-      else enteredLabels(TriangularArray.index(begin, end)).iterator.map { i => (i, scoreArray(i))}
+      else enteredLabels(TriangularArray.index(begin, end)).iterator.map { i => (index.get(i), scoreArray(i))}
+    }
+
+    def decodedLabelScores(begin: Int, end: Int):Counter2[L,Int,Double] = {
+      val scoreArray = score(begin, end)
+      if(scoreArray eq null) Counter2()
+      else {
+        val ret = Counter2[L, Int, Double]()
+        for(i <- enteredLabels(TriangularArray.index(begin, end))) {
+          val l = index.get(i)
+          println(i + " " + l)
+          for((v,s) <- scoreArray(i).zipWithIndex) {
+            if(v != zero)
+              ret(l,s) = v
+          }
+        }
+        ret
+      }
     }
 
 

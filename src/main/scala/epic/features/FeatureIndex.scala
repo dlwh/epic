@@ -19,7 +19,7 @@ class FeatureIndex[A, B](val labelFeatureIndex: Index[A],
                          mapping: Array[OpenAddressHashArray[Int]],
                          labelPartOfFeature: Array[Int],
                          surfacePartOfFeature: Array[Int],
-                         numHashFeatures: Int=0) extends Index[Feature] with Serializable {
+                         val numHashFeatures: Int=0) extends Index[Feature] with Serializable {
   assert(labelPartOfFeature.length <= labelFeatureIndex.size * surfaceFeatureIndex.size)
   assert(surfacePartOfFeature.length == labelPartOfFeature.length)
 

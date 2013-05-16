@@ -15,7 +15,7 @@ package epic.framework
  See the License for the specific language governing permissions and
  limitations under the License.
 */
-import breeze.util.Index
+import breeze.util.{Encoder, Index}
 import breeze.linalg._
 import java.io.File
 
@@ -50,7 +50,7 @@ trait Model[Datum] { self =>
    */
   def cacheFeatureWeights(weights: DenseVector[Double], prefix: String = "weights") {
     val out = new File(prefix + ".ser.gz")
-    breeze.util.writeObject(out, (featureIndex, weights))
+    breeze.util.writeObject(out, Encoder.fromIndex(featureIndex).decode(weights.mapValues(v => if(v.abs < 1E-5) 0.0 else v)))
   }
 
   /**
@@ -60,13 +60,8 @@ trait Model[Datum] { self =>
     val in = new File(prefix + ".ser.gz")
     if(in.exists()) {
       try {
-        val (index, oldWeights) = breeze.util.readObject[(Index[Feature], DenseVector[Double])](in)
-        val ret = DenseVector.tabulate(featureIndex.size) { i =>
-          val oldIndex = index(featureIndex.get(i))
-          if(oldIndex >= 0) oldWeights(i)
-          else 0.0
-        }
-        Some(ret)
+        val ctr = breeze.util.readObject[Counter[Feature, Double]](in)
+        Some(Encoder.fromIndex(featureIndex).encodeDense(ctr, ignoreOutOfIndex = true))
       } catch {
         case e: Exception => None
       }

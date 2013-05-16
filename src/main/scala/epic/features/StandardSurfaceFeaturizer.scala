@@ -102,7 +102,7 @@ class StandardSurfaceFeaturizer(wordCounts: Counter[String, Double],
           StandardSurfaceFeaturizer.this.basicFeatures(index).toArray
         } else {
           wordShapeFeaturizer.apply(words(i)).map(interner(_)).toArray
-        }
+        } ++ _minimalFeatures(i)
 
         // initial words nee special treatment
         if( (words(i).charAt(0).isUpper || words(i).charAt(0).isTitleCase) && wordIsReasonablyRare(i)) {

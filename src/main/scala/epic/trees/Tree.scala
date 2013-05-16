@@ -29,6 +29,9 @@ trait Tree[+L] extends Serializable {
   def children: IndexedSeq[Tree[L]]
   def span: Span
 
+  def start = span.start
+  def end = span.end
+
   def isLeaf = children.size == 0
   /**
   * A tree is valid if this' span contains all children's spans 

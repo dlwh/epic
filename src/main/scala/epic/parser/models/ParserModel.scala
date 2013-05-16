@@ -51,7 +51,7 @@ trait ParserInference[L, W] extends ProjectableInference[TreeInstance[L, W], Cor
   def marginal(v: TreeInstance[L, W], aug: CoreAnchoring[L, W]) = {
     val fullGrammar = AugmentedAnchoring(grammar.anchor(v.words), aug)
     val charts = try {
-      fullGrammar.marginal
+       fullGrammar.marginal
     } catch {
       case e: Exception =>
       try {

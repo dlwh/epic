@@ -6,7 +6,7 @@ version := "0.1-SNAPSHOT"
 
 organization := "org.scalanlp"
 
-scalaVersion := "2.10.0"
+scalaVersion := "2.10.1"
 
 resolvers ++= Seq(
   "ScalaNLP Maven2" at "http://repo.scalanlp.org/repo",

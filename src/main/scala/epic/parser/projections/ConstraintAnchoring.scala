@@ -110,13 +110,14 @@ class ConstraintCoreGrammar[L, W](val augmentedGrammar: AugmentedGrammar[L, W], 
                                                     grammar.labelIndex.size,
                                                     unaryScores,grammar.labelIndex,
                                                     gold.isGoldTopTag(_, _, _))
+    assert(topLabelThresholds(0,length).contains(marg.grammar.rootIndex))
 
 //    val hasMaximalProjection: BitSet = BitSet.empty ++ (0 to length).filter{ i =>
 //      ((labelThresholds(i) ne null) && (topLabelThresholds(i) ne null)) && ((labelThresholds(i)|topLabelThresholds(i)) -- synthetics).nonEmpty
 //    }
 
     //TODO: maximal projections
-    val pattern = ChartConstraints(labelThresholds, topLabelThresholds)//, hasMaximalProjection)
+    val pattern = ChartConstraints(topLabelThresholds, labelThresholds)//, hasMaximalProjection)
 
     RawConstraints(pattern)
   }
