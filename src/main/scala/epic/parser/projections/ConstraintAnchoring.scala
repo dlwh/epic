@@ -30,6 +30,8 @@ import java.util
 import epic.lexicon.Lexicon
 import epic.constraints.{CachedChartConstraintsFactory, ChartConstraints}
 import epic.util.CacheBroker
+import scala.collection.GenTraversable
+import com.typesafe.scalalogging.log4j.{Logging, Logger}
 
 /**
  * 
@@ -79,7 +81,7 @@ class ParserChartConstraintsFactory[L, W](val augmentedGrammar: AugmentedGrammar
 
   def constraints(w: IndexedSeq[W]):ChartConstraints[L] = constraints(w, GoldTagPolicy.noGoldTags[L])
   def constraints(words: IndexedSeq[W], gold: GoldTagPolicy[L]):ChartConstraints[L] = {
-    val charts = ChartMarginal(augmentedGrammar, words)
+    val charts = ChartMarginal(augmentedGrammar.anchor(words), words, maxMarginal = true)
     constraints(charts, gold)
   }
 
@@ -131,7 +133,7 @@ class ParserChartConstraintsFactory[L, W](val augmentedGrammar: AugmentedGrammar
   }
 
   def computePruningStatistics(words: IndexedSeq[W], gold: GoldTagPolicy[L]): (PruningStatistics, PruningStatistics) = {
-    val charts = ChartMarginal(augmentedGrammar, words)
+    val charts = ChartMarginal(augmentedGrammar.anchor(words), words, maxMarginal = true)
     computePruningStatistics(charts, gold)
   }
 
@@ -185,6 +187,9 @@ class ParserChartConstraintsFactory[L, W](val augmentedGrammar: AugmentedGrammar
     val topScores = TriangularArray.raw(length + 1, null: Array[Double])
     val visitor = new AnchoredVisitor[L] {
       def visitBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int, score: Double) {}
+
+
+      override def skipBinaryRules: Boolean = true
 
       def visitUnaryRule(begin: Int, end: Int, rule: Int, ref: Int, score: Double) {
         val index = TriangularArray.index(begin, end)
@@ -247,10 +252,50 @@ case class ProjectionParams(treebank: ProcessedTreebank,
                             threshold: Double = -5) {
 }
 
-object ProjectTreebankToConstraints {
+object PrecacheConstraints extends Logging {
+
+
+
+  def forTrainingSet[L, W](constrainer: ParserChartConstraintsFactory[L, W],
+                           train: GenTraversable[TreeInstance[L, W]],
+                           tableName: String = "parseConstraints",
+                           verifyNoGoldPruning: Boolean = true)(implicit broker: CacheBroker) = {
+    val cache = broker.make[IndexedSeq[W], ChartConstraints[L]](tableName)
+    for(ti <- train) try {
+      var located = true
+      val constraints = cache.getOrElseUpdate(ti.words, {
+        located = false
+        logger.info(s"Building constraints for ${ti.id} ${ti.words}")
+        constrainer.constraints(ti.words)
+      })
+      if(located) {
+        logger.info(s"Already had constraints for ${ti.id} ${ti.words}.")
+      }
+      if(verifyNoGoldPruning) {
+        ti.tree.allChildren.foreach {
+          case t @ UnaryTree(_,_,_,_)=>
+            if(!constraints.top.isAllowedLabeledSpan(t.start,t.end, constrainer.labelIndex(t.label))) {
+              val allowedSpans = (0 until constrainer.labelIndex.size).filter(constraints.top.isAllowedLabeledSpan(t.start, t.end, _)).map(constrainer.labelIndex.get(_)).toSet
+              logger.error(s"Pruned gold top label ${t.label} over span ${t.span} in $ti. Allowed: $allowedSpans")
+            }
+          case t =>
+            if(!constraints.bot.isAllowedLabeledSpan(t.start,t.end, constrainer.labelIndex(t.label))) {
+              val allowedSpans = (0 until constrainer.labelIndex.size).filter(constraints.bot.isAllowedLabeledSpan(t.start, t.end, _)).map(constrainer.labelIndex.get(_)).toSet
+              logger.error(s"Pruned gold label ${t.label} over span ${t.span} in $ti. Allowed: $allowedSpans")
+            }
+        }
+      }
+    } catch {
+      case e: Exception =>
+        logger.error(s"Error while parsing ${ti.words}.", e)
+    }
+
+    broker.commit()
+    new CachedChartConstraintsFactory(constrainer, cache)
+  }
 
   def main(args: Array[String]) {
-    val params = CommandLineParser.readIn[ProjectionParams](args)
+    val params:ProjectionParams = CommandLineParser.readIn[ProjectionParams](args)
     val treebank = params.treebank.copy(maxLength = 1000000)
     println(params)
     val parser = loadParser[Any](params.parser)
@@ -260,11 +305,12 @@ object ProjectTreebankToConstraints {
 
     val factory = new ParserChartConstraintsFactory[AnnotatedLabel, String](parser.augmentedGrammar, {(_:AnnotatedLabel).isIntermediate}, params.threshold)
     implicit val broker = new CacheBroker(params.out)
-    val constrainer = new CachedChartConstraintsFactory(factory, params.name)
+    val constrainer = forTrainingSet(factory, treebank.trainTrees.par)
+    (treebank.testTrees ++ treebank.testTrees).par.foreach { ti =>
+      logger.info(s"Ensuring existing constraint for dev/test tree ${ti.id} ${ti.words}")
+      constrainer.constraints(ti.words)
+    }
 
-    makeTreeConstraints(factory, treebank.trainTrees, parser.grammar.labelIndex, useTree = true, maxL = params.maxParseLength)
-    makeTreeConstraints(factory, treebank.testTrees, parser.grammar.labelIndex, useTree = false, maxL = 10000)
-    makeTreeConstraints(factory, treebank.devTrees, parser.grammar.labelIndex, useTree = false, maxL = 10000)
     broker.commit()
     broker.close()
   }
@@ -273,29 +319,6 @@ object ProjectTreebankToConstraints {
     val parser = breeze.util.readObject[SimpleChartParser[AnnotatedLabel, String]](loc)
     parser
   }
-
-  def makeTreeConstraints(factory: ChartConstraints.Factory[AnnotatedLabel, String],
-               trees: IndexedSeq[TreeInstance[AnnotatedLabel, String]],
-               index: Index[AnnotatedLabel],
-               useTree: Boolean, maxL: Int) = {
-    trees.par.foreach { (ti:TreeInstance[AnnotatedLabel, String]) =>
-      val TreeInstance(id, tree, words) = ti
-      println(id, words)
-      if(words.length > maxL) {
-        IndexedSeq.empty
-      } else  try {
-        val policy = if(useTree) {
-          GoldTagPolicy.goldTreeForcing[AnnotatedLabel](tree.map(_.baseAnnotatedLabel).map(index))
-        } else {
-          GoldTagPolicy.noGoldTags[AnnotatedLabel]
-        }
-        factory.constraints(words)//, policy)
-      } catch {
-        case e: Exception => e.printStackTrace()
-      }
-    }
-  }
-
 
 }
 

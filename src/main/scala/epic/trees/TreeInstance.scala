@@ -23,11 +23,13 @@ case class TreeInstance[L, +W](id: String,
 
   def mapLabels[U](f: L => U) = copy(tree = tree.map(f))
 
-  def label = tree;
+  def label = tree
 
   def features = words
 
   def toTaggedSequence: TaggedSequence[L, W] = {
     new TaggedSequence(tree.leaves.map(_.label).toIndexedSeq, words.toIndexedSeq, id)
   }
+
+  override def toString(): String = s"TreeInstance(id = $id, tree=${tree.render(words, newline = false)}\n}"
 }

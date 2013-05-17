@@ -20,13 +20,13 @@ import epic.util.CacheBroker
 /**
  * A CoreGrammar that relies on a file cache, which stores
  * a Map[IndexedSeq[W], CoreAnchoring] and a backoff grammar.
- * Currently, only [[epic.parser.projections.ProjectTreebankToConstraints]]
+ * Currently, only [[epic.parser.projections.PrecacheConstraints]]
  * creates these.
  *
  * @author dlwh
  */
 @SerialVersionUID(1L)
-class CachedChartConstraintsFactory[L, W](backoff: ChartConstraints.Factory[L, W],  name: String = "parseConstraints")(implicit broker: CacheBroker) extends ChartConstraints.Factory[L, W] with Serializable {
-  private val cache = broker.make[IndexedSeq[W], ChartConstraints[L]](name)
+class CachedChartConstraintsFactory[L, W](backoff: ChartConstraints.Factory[L, W], cache: collection.mutable.Map[IndexedSeq[W], ChartConstraints[L]]) extends ChartConstraints.Factory[L, W] with Serializable {
+  def this(backoff: ChartConstraints.Factory[L, W], name: String = "parseConstraints")(implicit broker: CacheBroker)  = this(backoff, cache = broker.make(name))
   def constraints(w: IndexedSeq[W]): ChartConstraints[L] = cache.getOrElseUpdate(w, backoff.constraints(w))
 }
