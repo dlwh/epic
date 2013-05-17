@@ -2,10 +2,7 @@ package epic.parser
 
 import epic.trees.{UnaryTree, BinarizedTree}
 import epic.util.Arrays
-import scala.tools.nsc.interpreter.{SimpleReader, ILoop}
-import scala.tools.nsc.Settings
 import breeze.numerics
-import breeze.linalg.DenseVector
 import breeze.collection.mutable.TriangularArray
 
 /*

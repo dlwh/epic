@@ -14,3 +14,9 @@ tmp/
 .*.swp
 *.jar
 .idea*
+.scratch/
+java.hprof.txt
+
+*.bbl
+*.blg
+*.aux

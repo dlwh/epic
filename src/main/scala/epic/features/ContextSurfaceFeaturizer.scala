@@ -11,7 +11,8 @@ case class BigramFeature(offset: Int, prev: Feature, next: Feature) extends Feat
  *
  * @author dlwh
  */
-class ContextSurfaceFeaturizer[W](val base: SurfaceFeaturizer[W], wordOffsetOrder:Int =1, spanOffsetOrder: Int = 1) extends SurfaceFeaturizer[W] {
+@SerialVersionUID(1L)
+class ContextSurfaceFeaturizer[W](val base: SurfaceFeaturizer[W], wordOffsetOrder:Int =1, spanOffsetOrder: Int = 1) extends SurfaceFeaturizer[W] with Serializable {
   def anchor(w: IndexedSeq[W]): SurfaceFeatureAnchoring[W] = new SurfaceFeatureAnchoring[W] {
     val b = base.anchor(w)
     def featuresForWord(pos: Int, level: FeaturizationLevel): Array[Feature] = {

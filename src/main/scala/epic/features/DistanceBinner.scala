@@ -6,7 +6,8 @@ import java.util
  *
  * @author dlwh
  */
-class DistanceBinner private (val binThresholds: Array[Int], preserveDirection: Boolean) {
+@SerialVersionUID(1L)
+class DistanceBinner private (val binThresholds: Array[Int], preserveDirection: Boolean) extends  Serializable{
   def numBins = binThresholds.length + 1
 
   def this(numBins: Int, numExactBins: Int, preserveDirection: Boolean) = this(DistanceBinner.mkBinArray(numBins, numExactBins), preserveDirection)

@@ -315,7 +315,7 @@ final class LexGrammar[L, W](val grammar: BaseGrammar[L],
                              rightRules: Array[Boolean]) extends RefinedGrammar[L, W] {
   def isHeadOnLeftForRule(r: Int) = leftRules(r)
 
-  def isRightRule(r: Int) = rightRules(r)
+  def isHeadOnRightForRule(r: Int) = rightRules(r)
 
   def anchor(sent: IndexedSeq[W]) = new Spec(sent)
 
@@ -427,7 +427,7 @@ final class LexGrammar[L, W](val grammar: BaseGrammar[L],
     }
 
     def validRuleRefinementsGivenLeftChild(begin: Int, split: Int, completionBegin:Int, completionEnd: Int, rule: Int, lc: Int) = {
-      val x = Array.range(0,numValidRuleRefinements(rule)).filter(x => leftChildRefinement(rule,x) == lc && rightChildRefinement(rule, x) >= split && rightChildRefinement(rule, x) < completionEnd)
+//      val x = Array.range(0,numValidRuleRefinements(rule)).filter(x => leftChildRefinement(rule,x) == lc && rightChildRefinement(rule, x) >= split && rightChildRefinement(rule, x) < completionEnd)
       if(isHeadOnLeftForRule(rule)) {
         val result = new Array[Int](completionEnd - split)
         var ref = lc * words.length + split
@@ -437,7 +437,7 @@ final class LexGrammar[L, W](val grammar: BaseGrammar[L],
           ref += 1
           i += 1
         }
-        assert(result.toSet == x.toSet)
+//        assert(result.toSet == x.toSet)
         result
       } else {
         val result = new Array[Int](completionEnd - split)
@@ -448,14 +448,14 @@ final class LexGrammar[L, W](val grammar: BaseGrammar[L],
           i += 1
           ref += words.length
         }
-        assert(result.toSet == x.toSet)
+//        assert(result.toSet == x.toSet)
         result
       }
     }
 
 
     def validRuleRefinementsGivenRightChild(completionBegin: Int, completionEnd: Int, split: Int, end: Int, rule: Int, childRef: Int): Array[Int] = {
-      val x = Array.range(0,numValidRuleRefinements(rule)).filter(x => rightChildRefinement(rule,x) == childRef && leftChildRefinement(rule, x) >= completionBegin && leftChildRefinement(rule, x) < split)
+//      val x = Array.range(0,numValidRuleRefinements(rule)).filter(x => rightChildRefinement(rule,x) == childRef && leftChildRefinement(rule, x) >= completionBegin && leftChildRefinement(rule, x) < split)
       if(!isHeadOnLeftForRule(rule)) {
         val result = new Array[Int](split - completionBegin)
         var ref = childRef * words.length + completionBegin
@@ -465,7 +465,7 @@ final class LexGrammar[L, W](val grammar: BaseGrammar[L],
           ref += 1
           i += 1
         }
-        assert(result.toSet == x.toSet)
+//        assert(result.toSet == x.toSet)
         result
       } else {
         val result = new Array[Int](split - completionBegin)
@@ -476,7 +476,7 @@ final class LexGrammar[L, W](val grammar: BaseGrammar[L],
           i += 1
           ref += words.length
         }
-        assert(result.toSet == x.toSet)
+//        assert(result.toSet == x.toSet)
         result
       }
     }
@@ -496,7 +496,7 @@ final class LexGrammar[L, W](val grammar: BaseGrammar[L],
     }
 
     def rightChildRefinement(rule: Int, ruleRef: Int) = {
-      if(isRightRule(rule)) headIndex(ruleRef)
+      if(isHeadOnRightForRule(rule)) headIndex(ruleRef)
       else depIndex(ruleRef)
     }
 
@@ -673,9 +673,10 @@ case class LexModelFactory(baseParser: ParserParams.XbarGrammar,
       xbarLexicon, initBinaries, initUnaries, initLexicon)
     val cFactory: CoreGrammar[AnnotatedLabel, String] = constraints.cachedFactory(AugmentedGrammar.fromRefined(baseFactory))
 
-    implicit val hasConstraints = new Has2[IndexedSeq[String], SpanConstraints] {
+    implicit val hasConstraints = new Has2[IndexedSeq[String], SpanConstraints] with Serializable {
       def get(h: IndexedSeq[String]): SpanConstraints = cFactory.anchor(h).sparsityPattern.flatten
     }
+
     val surfaceFeaturizer = new ContextSurfaceFeaturizer(new StandardSurfaceFeaturizer(summedCounts))
     val indexedSurfaceFeaturizer = IndexedSurfaceFeaturizer.fromData(surfaceFeaturizer, trees.map{_.words})
 

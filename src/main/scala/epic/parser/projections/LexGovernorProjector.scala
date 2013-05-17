@@ -36,7 +36,7 @@ class LexGovernorProjector[L, W](grammar: LexGrammar[L, W]) {
       val head = otherAnch.headIndex(ref)
       val dep = otherAnch.depIndex(ref)
       wordGovernorCounts(dep)(head) += score
-      if (grammar.isRightRule(rule)) { // head on the right
+      if (grammar.isHeadOnRightForRule(rule)) { // head on the right
         spanGovernorCounts(begin, split)(head) += score
         spanGovernorCounts(begin, split)(notASpan) -= score
         if(spanGovernorCounts(begin, split)(notASpan) < 0) {

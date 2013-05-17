@@ -14,10 +14,11 @@ import epic.features.FeaturizationLevel.{FullFeatures, BasicFeatures, MinimalFea
  *
  * @author dlwh
  */
+@SerialVersionUID(1L)
 class StandardSurfaceFeaturizer(wordCounts: Counter[String, Double],
                                 functionWordThreshold: Int = 100,
                                 commonWordThreshold: Int = 20,
-                                unknownWordThreshold: Int = 2) extends SurfaceFeaturizer[String] {
+                                unknownWordThreshold: Int = 2) extends SurfaceFeaturizer[String] with Serializable {
 
   def anchor(words: IndexedSeq[String]):SurfaceFeatureAnchoring[String] = {
     val w = words

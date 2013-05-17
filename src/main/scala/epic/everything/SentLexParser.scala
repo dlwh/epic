@@ -213,7 +213,7 @@ object SentLexParser {
       var depCell: SpanBeliefs = beliefs.spans(begin, split)
       if(headCell == null || depCell == null) return Double.NegativeInfinity
 
-      if (!lexGrammar.isRightRule(rule)) {
+      if (!lexGrammar.isHeadOnRightForRule(rule)) {
         val cc = headCell
         headCell = depCell
         depCell = cc
@@ -222,7 +222,7 @@ object SentLexParser {
       var cached = attachCache(dep)(head)
       if (java.lang.Double.isNaN(cached)) {
         val sMax = 1.0
-//        val sMax = if(lexGrammar.isRightRule(rule)) {
+//        val sMax = if(lexGrammar.isHeadOnRightForRule(rule)) {
 //          beliefs.wordBeliefs(dep).maximalLabel(grammar.leftChild(rule))
 //        } else {
 //          beliefs.wordBeliefs(dep).maximalLabel(grammar.rightChild(rule))
