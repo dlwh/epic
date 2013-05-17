@@ -8,7 +8,7 @@ import epic.sequences.SemiCRF.TransitionVisitor
 import collection.mutable.ArrayBuffer
 import breeze.collection.mutable.TriangularArray
 import breeze.features.FeatureVector
-import epic.constraints.{TagConstraints, LabeledSpanConstraints}
+import epic.constraints.{SpanConstraints, TagConstraints, LabeledSpanConstraints}
 import epic.lexicon.{SimpleLexicon, Lexicon}
 import epic.features._
 import epic.util.{NotProvided, Optional}
@@ -250,16 +250,16 @@ class SegmentationModelFactory[L](val startSymbol: L,
     val counts: Counter2[L, String, Double] = Counter2.count(train.map(_.asFlatTaggedSequence(outsideSymbol)).map{seg => seg.label zip seg.words}.flatten).mapValues(_.toDouble)
     val lexicon = new SimpleLexicon(labelIndex, counts, openTagThreshold = 10, closedWordThreshold = 20)
 
-    implicit val allowedSpanClassifier: HasSpanConstraints[IndexedSeq[String]] = pruningModel.getOrElse(new LabeledSpanConstraints.LayeredTagConstraintsFactory(lexicon, maxLengthArray))
+    val allowedSpanClassifier: LabeledSpanConstraints.Factory[L, String] = pruningModel.getOrElse(new LabeledSpanConstraints.LayeredTagConstraintsFactory(lexicon, maxLengthArray))
     val standardFeaturizer = new StandardSurfaceFeaturizer(sum(counts, Axis._0))
     val featurizers = gazetteer.foldLeft(IndexedSeq[SurfaceFeaturizer[String]](new ContextSurfaceFeaturizer[String](standardFeaturizer, 3, 3)))(_ :+ _)
     val featurizer = new MultiSurfaceFeaturizer[String](featurizers)
-    val f = IndexedSurfaceFeaturizer.fromData(featurizer, train.map(_.words))
+    val f = IndexedSurfaceFeaturizer.fromData(featurizer, train.map(_.words), allowedSpanClassifier)
 
     for(f <- pruningModel) {
       assert(f.labelIndex == labelIndex, f.labelIndex + " " + labelIndex)
     }
-    val indexed = new IndexedStandardFeaturizer[L](f, startSymbol, lexicon, labelIndex, maxLengthArray, pruningModel)
+    val indexed = new IndexedStandardFeaturizer[L](f, startSymbol, lexicon, labelIndex, maxLengthArray, allowedSpanClassifier)
     val model = new SemiCRFModel(indexed.featureIndex, indexed, lexicon, maxLengthArray, weights(_))
 
     model
@@ -273,12 +273,12 @@ object SegmentationModelFactory {
 
 
   @SerialVersionUID(1L)
-  class IndexedStandardFeaturizer[L](f: IndexedSurfaceFeaturizer[IndexedSeq[String], String],
+  class IndexedStandardFeaturizer[L](f: IndexedSurfaceFeaturizer[String],
                                      val startSymbol: L,
                                      val lexicon: Lexicon[L, String],
                                      val labelIndex: Index[L],
                                      val maxLength: Array[Int],
-                                     val pruningModel: Optional[SemiCRF.ConstraintSemiCRF[L, String]] = NotProvided) extends SemiCRFModel.BIEOFeaturizer[L,String] with Serializable {
+                                     val constraintFactory: LabeledSpanConstraints.Factory[L, String]) extends SemiCRFModel.BIEOFeaturizer[L,String] with Serializable {
 
     def baseWordFeatureIndex = f.wordFeatureIndex
     def baseSpanFeatureIndex = f.spanFeatureIndex
@@ -309,7 +309,7 @@ object SegmentationModelFactory {
 
 
     def anchor(w: IndexedSeq[String]): SemiCRFModel.BIEOAnchoredFeaturizer[L, String] = new SemiCRFModel.BIEOAnchoredFeaturizer[L, String] {
-      val constraints = pruningModel.map(_.constraints(w)).getOrElse{LabeledSpanConstraints.layeredFromTagConstraints(lexicon.anchor(w), maxLength)}
+      val constraints = constraintFactory.constraints(w)
 
       val loc = f.anchor(w)
       def length = w.length

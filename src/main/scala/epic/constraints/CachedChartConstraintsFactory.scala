@@ -1,4 +1,4 @@
-package epic.parser.projections
+package epic.constraints
 
 /*
  Copyright 2012 David Hall
@@ -15,10 +15,7 @@ package epic.parser.projections
  See the License for the specific language governing permissions and
  limitations under the License.
 */
-import java.io.File
-import epic.parser.{BaseGrammar, CoreGrammar}
-import epic.parser.projections.ConstraintAnchoring.RawConstraints
-import epic.lexicon.Lexicon
+import epic.util.Cache
 
 /**
  * A CoreGrammar that relies on a file cache, which stores
@@ -29,20 +26,6 @@ import epic.lexicon.Lexicon
  * @author dlwh
  */
 @SerialVersionUID(1L)
-class FileCachedCoreGrammar[L, W](backoff: CoreGrammar[L, W], file: File) extends CoreGrammar[L, W] with Serializable {
-  def this(grammar: BaseGrammar[L], lexicon: Lexicon[L, W], file: File) = {
-    this(CoreGrammar.identity(grammar, lexicon), file)
-  }
-
-  val grammar = backoff.grammar
-  val lexicon = backoff.lexicon
-
-  private val cache = {
-    if(file.exists) breeze.util.readObject[Map[IndexedSeq[W], RawConstraints[L]]](file)
-    else Map.empty[IndexedSeq[W], RawConstraints[L]]
-  }
-
-  def anchor(words: IndexedSeq[W]) = {
-    cache.get(words).map(_.toAnchoring(grammar, lexicon, words)).getOrElse(backoff.anchor(words))
-  }
+class CachedChartConstraintsFactory[L, W](backoff: ChartConstraints.Factory[L, W], cache: Cache[IndexedSeq[W], ChartConstraints[L]]) extends ChartConstraints.Factory[L, W] with Serializable {
+  def constraints(w: IndexedSeq[W]): ChartConstraints[L] = cache.getOrElseUpdate(w, backoff.constraints(w))
 }

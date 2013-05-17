@@ -57,8 +57,10 @@ sealed trait LabeledSpanConstraints[-L] extends SpanConstraints {
 }
 
 object LabeledSpanConstraints {
-
-
+  trait Factory[L, W] extends SpanConstraints.Factory[W] with Has2[IndexedSeq[W], LabeledSpanConstraints[L]] {
+    def constraints(w: IndexedSeq[W]):LabeledSpanConstraints[L]
+    override def get(h: IndexedSeq[W]): LabeledSpanConstraints[L] = constraints(h)
+  }
 
   def noConstraints[L]:LabeledSpanConstraints[L] = NoConstraints
 
@@ -106,12 +108,8 @@ object LabeledSpanConstraints {
     }
   }
 
-  trait Factory[K, L] extends Has2[K, LabeledSpanConstraints[L]]
-
-  class LayeredTagConstraintsFactory[L, W](lexicon: SimpleLexicon[L, W], maxLengthForLabel: Array[Int]) extends Factory[IndexedSeq[W],L] {
-    def get(h: IndexedSeq[W]): LabeledSpanConstraints[L] = apply(h)
-
-
+  class LayeredTagConstraintsFactory[L, W](lexicon: SimpleLexicon[L, W], maxLengthForLabel: Array[Int]) extends Factory[L, W] {
+    def constraints(h: IndexedSeq[W]): LabeledSpanConstraints[L] = apply(h)
     def apply(words: IndexedSeq[W]) = layeredFromTagConstraints(lexicon.anchor(words), maxLengthForLabel)
   }
 

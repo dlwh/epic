@@ -10,7 +10,7 @@ import epic.trees.StandardTreeProcessor
 import scala.Some
 import epic.parser._
 import epic.lexicon.Lexicon
-import epic.constraints.{SpanConstraints, LabeledSpanConstraints}
+import epic.constraints.{ChartConstraints, SpanConstraints, LabeledSpanConstraints}
 import epic.features.{SurfaceFeaturizer, IndexedSurfaceAnchoring, IndexedSurfaceFeaturizer}
 import epic.util.{Cache, Has2}
 
@@ -45,7 +45,7 @@ case class FeaturizedSentence(index: Int, words: IndexedSeq[String],
 
   def isPossibleSpan(begin: Int, end: Int) = (
 //    true
-    constituentSparsity.isActiveSpan(begin, end)
+    constituentSparsity.isAllowedSpan(begin, end)
       || nerConstraints.isAllowedSpan(begin,end)
   )
 
@@ -54,7 +54,7 @@ case class FeaturizedSentence(index: Int, words: IndexedSeq[String],
     )
 
   def isPossibleConstituent(begin: Int, end: Int) = {
-    (end - begin) > 0 && constituentSparsity.isActiveSpan(begin, end)
+    (end - begin) > 0 && constituentSparsity.isAllowedSpan(begin, end)
   }
 }
 
@@ -66,23 +66,15 @@ object FeaturizedDocument {
                   feat: SurfaceFeaturizer[String],
                   parseConstrainer: ConstraintCoreGrammar[AnnotatedLabel, String],
                   nerLabelIndex: Index[NERType.Value],
-                  nerConstrainer: LabeledSpanConstraints.Factory[IndexedSeq[String], NERType.Value],
+                  nerConstrainer: LabeledSpanConstraints.Factory[NERType.Value, String],
                   corefFeaturizer: CorefInstanceFeaturizer = null)(docs: IndexedSeq[Document]): (Factory, IndexedSeq[FeaturizedDocument]) = {
 
 
     val srlLabels = Index[String](Iterator("O") ++ docs.iterator.flatMap(_.sentences).flatMap(_.srl).flatMap(_.args).map(_.arg))
 
-    implicit val sentenceConstrainer = new Has2[IndexedSeq[String], SpanConstraints] {
-      val cache = new Cache[IndexedSeq[String], SpanConstraints]
-      private val caching = cache.forFunction{ s =>
-        val constituentSparsity = parseConstrainer.rawConstraints(s).sparsity
-        val nerConstraints = nerConstrainer.get(s)
-        (constituentSparsity.flatten | nerConstraints)
-      }
-      def get(s: IndexedSeq[String]): SpanConstraints = caching(s)
-    }
+    val sentenceConstrainer = parseConstrainer | nerConstrainer
 
-    val featurizer = IndexedSurfaceFeaturizer.fromData(feat, docs.flatMap(_.sentences.map(_.words)))
+    val featurizer = IndexedSurfaceFeaturizer.fromData(feat, docs.flatMap(_.sentences.map(_.words)), sentenceConstrainer)
 
     val featurized = for( d <- docs) yield {
       val newSentences = for( s <- d.sentences) yield {
@@ -114,9 +106,9 @@ object FeaturizedDocument {
   case class Factory(treeProcessor: StandardTreeProcessor,
                     parseConstrainer: ConstraintCoreGrammar[AnnotatedLabel, String],
                     nerLabelIndex: Index[NERType.Value],
-                    nerConstrainer: LabeledSpanConstraints.Factory[IndexedSeq[String], NERType.Value],
+                    nerConstrainer: LabeledSpanConstraints.Factory[NERType.Value, String],
                     srlLabelIndex: Index[String],
-                    featurizer: IndexedSurfaceFeaturizer[IndexedSeq[String], String],
+                    featurizer: IndexedSurfaceFeaturizer[String],
                     corefFeaturizer: CorefInstanceFeaturizer) extends (Document=>FeaturizedDocument) {
     def outsideSrlLabel: String = "O"
 

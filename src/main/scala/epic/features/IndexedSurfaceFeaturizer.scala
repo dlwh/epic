@@ -6,19 +6,20 @@ import breeze.util.Index
 import com.google.common.collect.MapMaker
 import epic.framework.Feature
 import epic.features.FeaturizationLevel.FullFeatures
-import epic.util.Has2
 import java.io.IOException
 import java.util.Collections
 import scala.collection.mutable
+import epic.constraints.SpanConstraints
+import epic.util.Cache
 
 /**
  *
  * @author dlwh
  */
-trait IndexedSurfaceFeaturizer[Datum, W] extends IndexedWordFeaturizer[Datum, W] {
+trait IndexedSurfaceFeaturizer[W] extends IndexedWordFeaturizer[W] {
   def spanFeatureIndex: Index[Feature]
   def featurizer: SurfaceFeaturizer[W]
-  def anchor(datum: Datum):IndexedSurfaceAnchoring[W]
+  def anchor(datum: IndexedSeq[W]):IndexedSurfaceAnchoring[W]
 }
 
 trait IndexedSurfaceAnchoring[W] extends IndexedWordAnchoring[W] {
@@ -26,16 +27,14 @@ trait IndexedSurfaceAnchoring[W] extends IndexedWordAnchoring[W] {
 }
 
 object IndexedSurfaceFeaturizer {
-  def fromData[Datum, W](feat: SurfaceFeaturizer[W],
-                         data: IndexedSeq[Datum],
-                         cache: Boolean = true)
-                        (implicit hasWords: Has2[Datum, IndexedSeq[W]],
-                         hasConstraints: HasSpanConstraints[Datum]): IndexedSurfaceFeaturizer[Datum, W]  = {
+  def fromData[W](feat: SurfaceFeaturizer[W],
+                  data: IndexedSeq[IndexedSeq[W]],
+                  constraintFactory: SpanConstraints.Factory[W],
+                  cache: Boolean = true): IndexedSurfaceFeaturizer[W]  = {
     val spanIndex = Index[Feature]()
     val wordIndex = Index[Feature]()
-    for(d <- data) {
-      val words = hasWords.get(d)
-      val cons = hasConstraints.get(d)
+    for(words <- data) {
+      val cons = constraintFactory.get(words)
       val anch = feat.anchor(words)
       for(i <- 0 until words.length) {
         anch.featuresForWord(i) foreach {wordIndex.index _}
@@ -48,13 +47,13 @@ object IndexedSurfaceFeaturizer {
     val ww = wordIndex
     val ss = spanIndex
 
-    val f = new MySurfaceFeaturizer[Datum, W](feat, ww, ss)
+    val f = new MySurfaceFeaturizer[W](feat, constraintFactory, ww, ss)
     if(cache) new CachedFeaturizer(f)
     else f
   }
 
   @SerialVersionUID(1L)
-  class CachedFeaturizer[Datum, W](val base: IndexedSurfaceFeaturizer[Datum, W]) extends IndexedSurfaceFeaturizer[Datum, W] with Serializable {
+  class CachedFeaturizer[W](val base: IndexedSurfaceFeaturizer[W]) extends IndexedSurfaceFeaturizer[W] with Serializable {
     def spanFeatureIndex: Index[Feature] = base.spanFeatureIndex
 
     def featurizer: SurfaceFeaturizer[W] = base.featurizer
@@ -62,36 +61,21 @@ object IndexedSurfaceFeaturizer {
     def wordFeatureIndex: Index[Feature] = base.wordFeatureIndex
 
 
-    @transient
-    private var cache = Collections.synchronizedMap(new MapMaker().softValues.makeMap[Datum, IndexedSurfaceAnchoring[W]]())
-    def anchor(words: Datum): IndexedSurfaceAnchoring[W] = {
-      val cached = cache.get(words)
-      if(cached ne null) {
-        cached
-      } else {
-        val x = base.anchor(words)
-        cache.put(words, x)
-        x
-      }
+    val cache = new Cache[IndexedSeq[W], IndexedSurfaceAnchoring[W]]
+    def anchor(words: IndexedSeq[W]): IndexedSurfaceAnchoring[W] = {
+      cache.getOrElseUpdate(words, base.anchor(words))
     }
 
-    @throws[IOException]
-    @throws[ClassNotFoundException]
-    private def readObject(stream: java.io.ObjectInputStream) {
-      stream.defaultReadObject()
-      cache = Collections.synchronizedMap(new MapMaker().softValues().makeMap[Datum, IndexedSurfaceAnchoring[W]]())
-    }
   }
 
-  @SerialVersionUID(1L)
-  private class MySurfaceFeaturizer[Datum, W](val featurizer: SurfaceFeaturizer[W],
-                                              val wordFeatureIndex: Index[Feature],
-                                              val spanFeatureIndex: Index[Feature])
-                                             (implicit hasWords: Has2[Datum, IndexedSeq[W]],
-                                              hasConstraints: HasSpanConstraints[Datum]) extends IndexedSurfaceFeaturizer[Datum, W] with Serializable {
-    def anchor(d: Datum):IndexedSurfaceAnchoring[W]  = {
-      val words = hasWords.get(d)
-      val cons = hasConstraints.get(d)
+  @SerialVersionUID(2L)
+  private class MySurfaceFeaturizer[W](val featurizer: SurfaceFeaturizer[W],
+                                       constraintsFactory: SpanConstraints.Factory[W],
+                                       val wordFeatureIndex: Index[Feature],
+                                       val spanFeatureIndex: Index[Feature])
+                                              extends IndexedSurfaceFeaturizer[W] with Serializable {
+    def anchor(words: IndexedSeq[W]):IndexedSurfaceAnchoring[W]  = {
+      val cons = constraintsFactory.constraints(words)
       val anch = featurizer.anchor(words)
       val wordFeatures = Array.tabulate(words.length, FeaturizationLevel.numLevels) { (i,l) =>
         stripEncode(wordFeatureIndex, anch.featuresForWord(i, l))

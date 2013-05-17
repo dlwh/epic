@@ -297,7 +297,7 @@ object ChartMarginal {
 
     // handle lexical
     for{i <- 0 until words.length} {
-      assert(core.sparsityPattern.isActiveSpan(i,i+1))
+      assert(core.sparsityPattern.isAllowedSpan(i,i+1))
       assert(core.sparsityPattern.bot.isAllowedSpan(i,i+1))
       var foundSomething = false
       for {

@@ -29,6 +29,7 @@ import epic.parser.projections.ConstraintCoreGrammar.PruningStatistics
 import breeze.linalg.DenseVector
 import java.util
 import epic.lexicon.Lexicon
+import epic.constraints.{SpanConstraints, ChartConstraints, LabeledSpanConstraints}
 
 /**
  * 
@@ -60,15 +61,28 @@ object ConstraintAnchoring {
   }
 }
 
+@SerialVersionUID(1L)
+class ConstraintCoreGrammarAdaptor[L, W](val grammar: BaseGrammar[L], val lexicon: Lexicon[L, W],
+                                         val constraintsFactory: ChartConstraints.Factory[L, W]) extends CoreGrammar[L, W] with Serializable {
+  /**
+   * Returns a [[epic.parser.CoreAnchoring]] for this particular sentence.
+   * @param words
+   * @return
+   */
+  def anchor(words: IndexedSeq[W]): CoreAnchoring[L, W] = new ConstraintAnchoring[L, W](grammar, lexicon, words, constraintsFactory.constraints(words))
+}
+
 /**
  * Creates labeled span scorers for a set of trees from some parser.
  * @author dlwh
  */
 @SerialVersionUID(8620602232218134084L)
-class ConstraintCoreGrammar[L, W](val augmentedGrammar: AugmentedGrammar[L, W], isIntermediate: L=>Boolean, threshold: Double) extends CoreGrammar[L, W] {
-
+class ConstraintCoreGrammar[L, W](val augmentedGrammar: AugmentedGrammar[L, W], isIntermediate: L=>Boolean, threshold: Double) extends CoreGrammar[L, W] with ChartConstraints.Factory[L, W] {
   def grammar = augmentedGrammar.grammar
   def lexicon = augmentedGrammar.lexicon
+
+
+  def constraints(w: IndexedSeq[W]) = rawConstraints(w).sparsity
 
   private val synthetics = BitSet.empty ++ (0 until grammar.labelIndex.size).filter(l => isIntermediate(labelIndex.get(l)))
 
@@ -254,9 +268,9 @@ object ConstraintCoreGrammar {
 case class ProjectionParams(treebank: ProcessedTreebank,
                             @Help(text="Location of the parser")
                             parser: File,
-                            @Help(text="Where to save constraints")
+                            @Help(text="Where to save constraintFactory")
                             out: File = new File("constraints.ser.gz"),
-                            @Help(text="Longest train sentence to build constraints for.")
+                            @Help(text="Longest train sentence to build constraintFactory for.")
                             maxParseLength: Int = 80,
                             threshold: Double = -5) {
 }
@@ -314,7 +328,7 @@ object ProjectTreebankToConstraints {
 
 
 /**
- * Computes a CDF for how many labels are pruned at different levels of constraints.
+ * Computes a CDF for how many labels are pruned at different levels of constraintFactory.
  *
  * @author dlwh
  */

@@ -18,7 +18,7 @@ package models
 */
 
 import features._
-import projections.GrammarRefinements
+import epic.parser.projections.{ConstraintCoreGrammarAdaptor, GrammarRefinements}
 import breeze.linalg._
 import java.io.File
 import io.Source
@@ -28,11 +28,12 @@ import epic.trees._
 import breeze.config.Help
 import epic.features.{StandardSurfaceFeaturizer, IndexedWordFeaturizer}
 import epic.lexicon.Lexicon
+import epic.constraints.ChartConstraints
 
 class LatentParserModel[L, L3, W](indexedFeatures: IndexedFeaturizer[L, L3, W],
                                   reannotate: (BinarizedTree[L], Seq[W]) => BinarizedTree[L],
                                   val projections: GrammarRefinements[L, L3],
-                                  baseFactory: CoreGrammar[L, W],
+                                  baseFactory: ChartConstraints.Factory[L, W],
                                   grammar: BaseGrammar[L],
                                   lexicon: Lexicon[L, W],
                                   initialFeatureVal: (Feature => Option[Double]) = {
@@ -53,7 +54,7 @@ class LatentParserModel[L, L3, W](indexedFeatures: IndexedFeaturizer[L, L3, W],
     val lexicon = new FeaturizedLexicon(weights, indexedFeatures)
     val grammar = FeaturizedGrammar(this.grammar, this.lexicon, projections, weights, indexedFeatures, lexicon)
 
-    new LatentParserInference(indexedFeatures, reannotate, grammar, baseFactory, projections)
+    new LatentParserInference(indexedFeatures, reannotate, grammar, new ConstraintCoreGrammarAdaptor(grammar.grammar, grammar.lexicon, baseFactory), projections)
   }
 
   def expectedCountsToObjective(ecounts: ExpectedCounts) = {

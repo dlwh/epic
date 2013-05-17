@@ -17,6 +17,7 @@ package epic.parser
 
 import breeze.inference.Factor
 import epic.lexicon.Lexicon
+import epic.constraints.ChartConstraints
 
 /**
  * [[epic.parser.CoreAnchoring]] score rules and labels in a particular context

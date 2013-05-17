@@ -193,13 +193,13 @@ object TaggedSequenceModelFactory {
 
 
   @SerialVersionUID(1L)
-  class IndexedStandardFeaturizer[L, String](wordFeaturizer: IndexedWordFeaturizer[IndexedSeq[String], String],
-                                     val lexicon: Lexicon[L, String],
-                                     val startSymbol: L,
-                                     val labelIndex: Index[L],
-                                     val featureIndex: Index[Feature],
-                                     labelFeatures: Array[OpenAddressHashArray[Int]],
-                                     label2Features: Array[OpenAddressHashArray[Int]]) extends CRF.IndexedFeaturizer[L,String] with Serializable { outer =>
+  class IndexedStandardFeaturizer[L, String](wordFeaturizer: IndexedWordFeaturizer[String],
+                                             val lexicon: Lexicon[L, String],
+                                             val startSymbol: L,
+                                             val labelIndex: Index[L],
+                                             val featureIndex: Index[Feature],
+                                             labelFeatures: Array[OpenAddressHashArray[Int]],
+                                             label2Features: Array[OpenAddressHashArray[Int]]) extends CRF.IndexedFeaturizer[L,String] with Serializable { outer =>
 
 
     private val startSymbolSet = Set(labelIndex(startSymbol))

@@ -23,6 +23,13 @@ object SpanConstraints {
   trait Factory[W] extends Has2[IndexedSeq[W], SpanConstraints] {
     def constraints(w: IndexedSeq[W]):SpanConstraints
     def get(h: IndexedSeq[W]): SpanConstraints = constraints(h)
+
+    def |(other: SpanConstraints.Factory[W]) = new UnionFactory(this, other)
+  }
+
+  @SerialVersionUID(1L)
+  class UnionFactory[W](factories: Factory[W]*) extends Factory[W] with Serializable {
+    def constraints(w: IndexedSeq[W]): SpanConstraints = factories.map(_.constraints(w)).reduce(_ | _)
   }
 
   object Factory {

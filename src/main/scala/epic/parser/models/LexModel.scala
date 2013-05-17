@@ -29,7 +29,7 @@ import breeze.config.Help
 import epic.lexicon.Lexicon
 import epic.features._
 import epic.parser.features._
-import epic.constraints.SpanConstraints
+import epic.constraints.{ChartConstraints, SpanConstraints}
 import epic.util.{Arrays, Has2}
 import epic.trees.UnaryTree
 import epic.parser.features.RuleFeature
@@ -39,11 +39,12 @@ import epic.trees.annotations.StripAnnotations
 import epic.parser.features.HeadFeature
 import epic.trees.BinaryTree
 import epic.parser.features.DepFeature
+import epic.parser.projections.ConstraintCoreGrammarAdaptor
 
 class LexModel[L, W](bundle: LexGrammarBundle[L, W],
                      reannotate: (BinarizedTree[L], IndexedSeq[W])=>BinarizedTree[L],
                      indexed: IndexedLexFeaturizer[L, W],
-                     baseFactory: CoreGrammar[L, W],
+                     baseFactory: ChartConstraints.Factory[L, W],
                      coarse: BaseGrammar[L],
                      coarseLex: Lexicon[L, W],
                      initFeatureValue: Feature=>Option[Double]) extends ParserModel[L, W] with Serializable with ParserExtractable[L, W] {
@@ -60,7 +61,7 @@ class LexModel[L, W](bundle: LexGrammarBundle[L, W],
       headed
 
     }
-    new AnnotatedParserInference(indexed, ann _, gram, baseFactory)
+    new AnnotatedParserInference(indexed, ann _, gram, new ConstraintCoreGrammarAdaptor(bundle.baseGrammar, bundle.baseLexicon, baseFactory))
   }
 
   type Inference = AnnotatedParserInference[L, W]
@@ -106,7 +107,7 @@ trait LexFeaturizer[L] extends Serializable {
  * @tparam W Word
  */
 class IndexedLexFeaturizer[L, W](f: LexFeaturizer[L],
-                                 surface: IndexedSurfaceFeaturizer[IndexedSeq[W], W],
+                                 surface: IndexedSurfaceFeaturizer[W],
                                  labelIndex: Index[L],
                                  ruleIndex: Index[Rule[L]],
                                  val index: FeatureIndex[Feature, Feature],
@@ -568,13 +569,13 @@ case class LexGrammarBundle[L, W](baseGrammar: BaseGrammar[L],
 }
 
 object IndexedLexFeaturizer {
-  def extract[L, Words, Datum, W](lexFeaturizer: LexFeaturizer[L],
-                    surfaceFeaturizer: IndexedSurfaceFeaturizer[IndexedSeq[W], W],
-                    headFinder: HeadFinder[L],
-                    ruleIndex: Index[Rule[L]],
-                    labelIndex: Index[L],
-                    dummyFeatScale: Double,
-                    trees: Traversable[Datum])(implicit hasWords: Has2[Datum, IndexedSeq[W]], hasTree: Has2[Datum, BinarizedTree[L]]) : IndexedLexFeaturizer[L, W] = {
+  def extract[L, Datum, W](lexFeaturizer: LexFeaturizer[L],
+                           surfaceFeaturizer: IndexedSurfaceFeaturizer[W],
+                           headFinder: HeadFinder[L],
+                           ruleIndex: Index[Rule[L]],
+                           labelIndex: Index[L],
+                           dummyFeatScale: Double,
+                           trees: Traversable[Datum])(implicit hasWords: Has2[Datum, IndexedSeq[W]], hasTree: Has2[Datum, BinarizedTree[L]]) : IndexedLexFeaturizer[L, W] = {
 
     val wordFeatureIndex = new OptionIndex(surfaceFeaturizer.wordFeatureIndex)
     // two passes through the trees, one to build the Word x Word feature Index
@@ -671,14 +672,10 @@ case class LexModelFactory(baseParser: ParserParams.XbarGrammar,
 
     val baseFactory = RefinedGrammar.generative(xbarGrammar,
       xbarLexicon, initBinaries, initUnaries, initLexicon)
-    val cFactory: CoreGrammar[AnnotatedLabel, String] = constraints.cachedFactory(AugmentedGrammar.fromRefined(baseFactory))
-
-    implicit val hasConstraints = new Has2[IndexedSeq[String], SpanConstraints] with Serializable {
-      def get(h: IndexedSeq[String]): SpanConstraints = cFactory.anchor(h).sparsityPattern.flatten
-    }
+    val cFactory = constraints.cachedFactory(AugmentedGrammar.fromRefined(baseFactory))
 
     val surfaceFeaturizer = new ContextSurfaceFeaturizer(new StandardSurfaceFeaturizer(summedCounts))
-    val indexedSurfaceFeaturizer = IndexedSurfaceFeaturizer.fromData(surfaceFeaturizer, trees.map{_.words})
+    val indexedSurfaceFeaturizer = IndexedSurfaceFeaturizer.fromData(surfaceFeaturizer, trees.map{_.words}, cFactory)
 
     def ruleGen(r: Rule[AnnotatedLabel]) = IndexedSeq(RuleFeature(r))
 
@@ -687,7 +684,7 @@ case class LexModelFactory(baseParser: ParserParams.XbarGrammar,
 
     type W = String
     type L = AnnotatedLabel
-    val indexed =  IndexedLexFeaturizer.extract[AnnotatedLabel, IndexedSeq[W], TreeInstance[L, W], W](feat,
+    val indexed =  IndexedLexFeaturizer.extract[AnnotatedLabel, TreeInstance[L, W], W](feat,
       indexedSurfaceFeaturizer,
       headFinder,
       xbarGrammar.index,

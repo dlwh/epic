@@ -19,6 +19,7 @@ package projections
 import projections.AnchoredRuleProjector.AnchoredData
 import breeze.collection.mutable.{TriangularArray, OpenAddressHashArray}
 import epic.lexicon.Lexicon
+import epic.constraints.ChartConstraints
 
 /**
  * Creates a grammar using only span marginals and unary rule marginals

@@ -2,6 +2,7 @@ package epic.parser
 
 import projections.ConstraintAnchoring
 import epic.lexicon.Lexicon
+import epic.constraints.ChartConstraints
 
 /*
  Copyright 2012 David Hall

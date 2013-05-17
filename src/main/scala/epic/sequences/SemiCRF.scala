@@ -419,10 +419,7 @@ object SemiCRF {
 
   }
 
-  trait ConstraintSemiCRF[L, W] extends SemiCRF[L, W] with Has2[IndexedSeq[W], LabeledSpanConstraints[L]] {
-
-    def get(h: IndexedSeq[W]): LabeledSpanConstraints[L] = constraints(h)
-
+  trait ConstraintSemiCRF[L, W] extends SemiCRF[L, W] with LabeledSpanConstraints.Factory[L, W] {
     def constraints(w: IndexedSeq[W]): LabeledSpanConstraints[L]
     def constraints(seg: Segmentation[L,W], keepGold: Boolean = true): LabeledSpanConstraints[L]
   }

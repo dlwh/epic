@@ -45,7 +45,7 @@ trait SimpleFeaturizer[L, W] extends Featurizer[L, W] {
 
 
 
-class GenFeaturizer[L, W](wGen: IndexedWordFeaturizer[IndexedSeq[W], W],
+class GenFeaturizer[L, W](wGen: IndexedWordFeaturizer[W],
                        lGen: L=>Seq[Feature] = {(x:L)=>Seq(IndicatorFeature(x))},
                        rGen: Rule[L] => Seq[Feature] = {(x: Rule[L]) => Seq(IndicatorFeature(x) )} ) extends SimpleFeaturizer[L, W] { outer =>
 

@@ -19,6 +19,7 @@ import java.io._
 import projections.AnchoredRuleProjector.AnchoredData
 import breeze.collection.mutable.{OpenAddressHashArray, TriangularArray}
 import epic.lexicon.Lexicon
+import epic.constraints.ChartConstraints
 
 /**
  * Creates a locally-normalized anchored PCFG from some refined forest.

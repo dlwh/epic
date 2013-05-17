@@ -16,7 +16,7 @@ package models
  See the License for the specific language governing permissions and
  limitations under the License.
 */
-import projections.GrammarRefinements
+import epic.parser.projections.{ConstraintCoreGrammarAdaptor, ConstraintCoreGrammar, GrammarRefinements}
 import epic.framework.Feature
 import java.io.File
 import features._
@@ -28,6 +28,7 @@ import epic.trees.TreeInstance
 import breeze.config.Help
 import epic.features.{StandardSurfaceFeaturizer, IndexedWordFeaturizer}
 import epic.lexicon.Lexicon
+import epic.constraints.ChartConstraints
 
 /**
  * Model for structural annotations, a la Klein and Manning 2003.
@@ -46,7 +47,7 @@ import epic.lexicon.Lexicon
 class StructModel[L, L2, W](indexedFeatures: IndexedFeaturizer[L, L2, W],
                         ann: TreeAnnotator[L, W, L2],
                         val projections: GrammarRefinements[L, L2],
-                        baseFactory: CoreGrammar[L, W],
+                        baseFactory: ChartConstraints.Factory[L, W],
                         grammar: BaseGrammar[L],
                         lexicon: Lexicon[L, W],
                         initialFeatureVal: (Feature => Option[Double]) = {
@@ -71,7 +72,7 @@ class StructModel[L, L2, W](indexedFeatures: IndexedFeaturizer[L, L2, W],
       localized
     }
 
-    new AnnotatedParserInference(indexedFeatures, reannotate, grammar, baseFactory)
+    new AnnotatedParserInference(indexedFeatures, reannotate, grammar, new ConstraintCoreGrammarAdaptor(this.grammar, this.lexicon, baseFactory))
   }
 
   def expectedCountsToObjective(ecounts: ExpectedCounts) = {

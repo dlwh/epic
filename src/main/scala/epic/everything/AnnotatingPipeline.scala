@@ -302,7 +302,7 @@ object AnnotatingPipeline {
     ruleGen
    )
 
-    val indexed = IndexedLexFeaturizer.extract[AnnotatedLabel, IndexedSeq[String], TreeInstance[AnnotatedLabel, String], String](feat,
+    val indexed = IndexedLexFeaturizer.extract[AnnotatedLabel, TreeInstance[AnnotatedLabel, String], String](feat,
       docProcessor.featurizer,
       headFinder,
       docProcessor.grammar.index,
@@ -333,15 +333,6 @@ object AnnotatingPipeline {
   }
 
   private def loadWeights(in: File) = {
-    val ctr = Counter[String, Double]()
-    breeze.util.readObject[AnyRef](in) match {
-      case seq:IndexedSeq[(String, Double)] =>
-        for ( (k, v) <- seq) {
-          ctr(k) = v
-        }
-      case ctr2: Counter[String, Double] =>
-        ctr += ctr2
-    }
-    ctr
+    breeze.util.readObject[Counter[String,Double]](in)
   }
 }

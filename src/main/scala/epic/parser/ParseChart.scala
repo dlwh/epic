@@ -23,7 +23,7 @@ import collection.mutable.BitSet
 import collection.immutable
 import collection.immutable.BitSet.BitSetN
 import java.util
-import epic.constraints.LabeledSpanConstraints
+import epic.constraints.{ChartConstraints, LabeledSpanConstraints}
 import breeze.linalg.Counter2
 
 @SerialVersionUID(4)
@@ -49,7 +49,7 @@ class ParseChart[L](val index: Index[L],
     /** (begin,end) -> label ->  refinement -> score */
     // fill in arrays for spans we might touch
     val score: TriangularArray[Array[Array[Double]]] = TriangularArray.tabulate(length+1){(begin, end) =>
-      if(sparsity.isActiveSpan(begin, end)) {
+      if(sparsity.isAllowedSpan(begin, end)) {
         new Array[Array[Double]](index.size)
       } else {
         null

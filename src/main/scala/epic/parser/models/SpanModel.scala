@@ -25,7 +25,7 @@ import collection.mutable.{ArrayBuffer, ArrayBuilder}
 import java.io.File
 import breeze.util._
 import epic.framework.Feature
-import projections.GrammarRefinements
+import epic.parser.projections.{ConstraintCoreGrammarAdaptor, GrammarRefinements}
 import breeze.config.Help
 import epic.lexicon.Lexicon
 import epic.features._
@@ -40,6 +40,7 @@ import epic.parser.features.TaggedFeature
 import epic.features.HashFeature
 import epic.parser.features.LexicalFeature
 import epic.trees.annotations.FilterAnnotations
+import epic.constraints.ChartConstraints
 
 /**
  * A rather more sophisticated discriminative parser. Uses features on
@@ -50,7 +51,7 @@ import epic.trees.annotations.FilterAnnotations
 class SpanModel[L, L2, W](featurizer: RefinedFeaturizer[L, W, Feature],
                       val featureIndex: Index[Feature],
                       ann: (BinarizedTree[L], IndexedSeq[W]) => BinarizedTree[L2],
-                      baseFactory: CoreGrammar[L, W],
+                      baseFactory: ChartConstraints.Factory[L, W],
                       grammar: BaseGrammar[L],
                       lexicon: Lexicon[L, W],
                       val refinedGrammar: BaseGrammar[L2],
@@ -73,7 +74,7 @@ class SpanModel[L, L2, W](featurizer: RefinedFeaturizer[L, W, Feature],
 
       localized
     }
-    new AnnotatedParserInference(featurizer, reannotate, factory, baseFactory)
+    new AnnotatedParserInference(featurizer, reannotate, factory, new ConstraintCoreGrammarAdaptor(grammar, lexicon, baseFactory))
   }
 
   def expectedCountsToObjective(ecounts: ExpectedCounts) = {

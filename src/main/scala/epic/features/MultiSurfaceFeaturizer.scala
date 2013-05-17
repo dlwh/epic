@@ -6,7 +6,8 @@ import epic.framework.Feature
  *
  * @author dlwh
  */
-class MultiSurfaceFeaturizer[W](feats: IndexedSeq[SurfaceFeaturizer[W]]) extends SurfaceFeaturizer[W] {
+@SerialVersionUID(1L)
+class MultiSurfaceFeaturizer[W](feats: IndexedSeq[SurfaceFeaturizer[W]]) extends SurfaceFeaturizer[W] with Serializable {
   def this(feats: SurfaceFeaturizer[W]*) = this(feats.toArray)
 
   def anchor(w: IndexedSeq[W]): SurfaceFeatureAnchoring[W] = new SurfaceFeatureAnchoring[W] {

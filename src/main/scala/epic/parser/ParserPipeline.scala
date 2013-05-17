@@ -14,7 +14,7 @@ package epic.parser
  See the License for the specific language governing permissions and
  limitations under the License.
 */
-import projections.{FileCachedCoreGrammar, ConstraintCoreGrammar}
+import projections.{ConstraintCoreGrammar}
 import breeze.config._
 import java.io._
 import epic.trees._
@@ -23,6 +23,8 @@ import java.util.concurrent.ConcurrentHashMap
 import epic.parser
 import collection.mutable
 import epic.lexicon.{Lexicon, SimpleLexicon}
+import epic.constraints.{CachedChartConstraintsFactory, ChartConstraints, LabeledSpanConstraints}
+import epic.util.Cache
 
 
 /**
@@ -57,15 +59,15 @@ object ParserParams {
 
   @Help(text="Stores/saves a baseline xbar grammar needed to extracting trees.")
   case class Constraints[W](path: File = null) {
-    def cachedFactory(baseFactory: AugmentedGrammar[AnnotatedLabel, W], threshold: Double = -7):CoreGrammar[AnnotatedLabel, W] = {
+    def cachedFactory(baseFactory: AugmentedGrammar[AnnotatedLabel, W], threshold: Double = -7):ChartConstraints.Factory[AnnotatedLabel, W] = {
       if(path != null && constraintsCache.contains(path)) {
-        constraintsCache.get(path).asInstanceOf[CoreGrammar[AnnotatedLabel, W]]
+        constraintsCache.get(path).asInstanceOf[ChartConstraints.Factory[AnnotatedLabel, W]]
       } else {
-        val uncached: CoreGrammar[AnnotatedLabel, W] = if(path eq null) {
+        val uncached = if(path eq null) {
           new ConstraintCoreGrammar[AnnotatedLabel,W](baseFactory, {(_:AnnotatedLabel).isIntermediate}, threshold)
         } else {
           val constraint = new ConstraintCoreGrammar[AnnotatedLabel,W](baseFactory, {(_:AnnotatedLabel).isIntermediate}, threshold)
-          new FileCachedCoreGrammar(constraint, path)
+          new CachedChartConstraintsFactory(constraint, new Cache[IndexedSeq[W], ChartConstraints[AnnotatedLabel]])
         }
 
         if(path != null)
@@ -76,7 +78,7 @@ object ParserParams {
     }
   }
   
-  private val constraintsCache = new ConcurrentHashMap[File, CoreGrammar[_, _]]
+  private val constraintsCache = new ConcurrentHashMap[File, ChartConstraints.Factory[AnnotatedLabel, _]]
 }
 
 /**
