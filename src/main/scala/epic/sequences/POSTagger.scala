@@ -5,6 +5,7 @@ import java.io._
 import epic.trees.{AnnotatedLabel, ProcessedTreebank}
 import breeze.config.CommandLineParser
 import breeze.util.Encoder
+import epic.util.CacheBroker
 
 /**
  *
@@ -38,7 +39,7 @@ object POSTagger {
  * @author dlwh
  */
 object SemiPOSTagger {
-  case class Params(opt: OptParams, treebank: ProcessedTreebank)
+  case class Params(opt: OptParams, treebank: ProcessedTreebank, cache: CacheBroker)
 
   def main(args: Array[String]) {
     val params = CommandLineParser.readIn[Params](args)
@@ -46,7 +47,7 @@ object SemiPOSTagger {
     val train = treebank.trainTrees.map(_.toTaggedSequence.asSegmentation)
     val test = treebank.devTrees.map(_.toTaggedSequence.asSegmentation)
 
-    val crf = SemiCRF.buildSimple(train, AnnotatedLabel("TOP"), AnnotatedLabel("TOP"), opt = opt)
+    val crf = SemiCRF.buildSimple(train, AnnotatedLabel("TOP"), AnnotatedLabel("TOP"), opt = opt)(cache)
     val inf = crf.asInstanceOf[SemiCRFInference[_, _]]
 //    val out = new PrintWriter(new BufferedOutputStream(new FileOutputStream("weights.txt")))
 //    Encoder.fromIndex(inf.featureIndex).decode(inf.weights).iterator foreach {case (x, v) if v.abs > 1E-6 => out.println(x -> v) case _ => }

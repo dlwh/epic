@@ -1,6 +1,6 @@
 package epic.constraints
 
-import epic.util.Cache
+import epic.util.CacheBroker
 
 /**
   *
@@ -8,8 +8,8 @@ import epic.util.Cache
   * @author dlwh
   */
 @SerialVersionUID(1L)
-class CachedSpanConstraintsFactory[W](factory: SpanConstraints.Factory[W]) extends SpanConstraints.Factory[W] {
-   private val cache = new Cache[IndexedSeq[W], SpanConstraints]
+class CachedSpanConstraintsFactory[W](factory: SpanConstraints.Factory[W], name: String)(implicit broker: CacheBroker) extends SpanConstraints.Factory[W] {
+   private val cache = broker.make[IndexedSeq[W], SpanConstraints](name)
    def constraints(w: IndexedSeq[W]): SpanConstraints = {
      cache.getOrElseUpdate(w, factory.constraints(w))
    }

@@ -15,7 +15,7 @@ package epic.constraints
  See the License for the specific language governing permissions and
  limitations under the License.
 */
-import epic.util.Cache
+import epic.util.CacheBroker
 
 /**
  * A CoreGrammar that relies on a file cache, which stores
@@ -26,6 +26,7 @@ import epic.util.Cache
  * @author dlwh
  */
 @SerialVersionUID(1L)
-class CachedChartConstraintsFactory[L, W](backoff: ChartConstraints.Factory[L, W], cache: Cache[IndexedSeq[W], ChartConstraints[L]]) extends ChartConstraints.Factory[L, W] with Serializable {
+class CachedChartConstraintsFactory[L, W](backoff: ChartConstraints.Factory[L, W],  name: String = "parseConstraints")(implicit broker: CacheBroker) extends ChartConstraints.Factory[L, W] with Serializable {
+  private val cache = broker.make[IndexedSeq[W], ChartConstraints[L]](name)
   def constraints(w: IndexedSeq[W]): ChartConstraints[L] = cache.getOrElseUpdate(w, backoff.constraints(w))
 }

@@ -30,7 +30,7 @@ import epic.lexicon.Lexicon
 import epic.features._
 import epic.parser.features._
 import epic.constraints.{ChartConstraints, SpanConstraints}
-import epic.util.{Arrays, Has2}
+import epic.util.{CacheBroker, Arrays, Has2}
 import epic.trees.UnaryTree
 import epic.parser.features.RuleFeature
 import epic.trees.TreeInstance
@@ -652,6 +652,7 @@ object IndexedLexFeaturizer {
 
 case class LexModelFactory(baseParser: ParserParams.XbarGrammar,
                            constraints: ParserParams.Constraints[String],
+                           cache: CacheBroker,
                            @Help(text= "The kind of annotation to do on the refined grammar. Defaults to ~KM2003")
                            annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = StripAnnotations(),
                            @Help(text="Old weights to initialize with. Optional")
@@ -672,6 +673,7 @@ case class LexModelFactory(baseParser: ParserParams.XbarGrammar,
 
     val baseFactory = RefinedGrammar.generative(xbarGrammar,
       xbarLexicon, initBinaries, initUnaries, initLexicon)
+    implicit val broker = cache
     val cFactory = constraints.cachedFactory(AugmentedGrammar.fromRefined(baseFactory))
 
     val surfaceFeaturizer = new ContextSurfaceFeaturizer(new StandardSurfaceFeaturizer(summedCounts))

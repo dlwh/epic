@@ -22,6 +22,7 @@ import breeze.collection.mutable.TriangularArray
 import breeze.util._
 import breeze.numerics._
 import epic.lexicon.Lexicon
+import breeze.numerics
 
 
 /**
@@ -204,12 +205,12 @@ class MaxConstituentDecoder[L, W] extends ChartDecoder[L, W] {
         val myScore = ichart.labelScore(begin, end, l, lRef) + ochart.labelScore(begin, end, l, lRef) - logPartition
         buffer(bufOff) = myScore
         bufOff += 1
-        if(bufOff == 1000) {
-          buffer(0) = inside.sum(buffer, buffer.length)
+        if(bufOff == buffer.length) {
+          buffer(0) = breeze.numerics.logSum(buffer, buffer.length)
           bufOff = 1
         }
       }
-      inside.sum(buffer, bufOff)
+      numerics.logSum(buffer, bufOff)
     }
 
     for(i <- 0 until inside.length) {

@@ -44,7 +44,7 @@ case class TreeMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
         if(ruleRef < 0) throw new Exception(s"Bad refined rule in gold tree!: ${UnaryRule(a, b, chain)} aRef: $refA  bRef: $refB")
 
         score += anchoring.scoreUnaryRule(t.span.start, t.span.end, r, ruleRef)
-        if(score.isInfinite) throw new Exception("Could not score gold tree!\n" + t.render(words))
+        if(score.isInfinite) throw new Exception(s"Could not score gold tree!\n Partial Tree: ${t.render(words)}\n Full Tree: ${tree.render(words)}\n span ok? ${anchoring.core.sparsityPattern.isAllowedSpan(t.start, t.end)} okLabels: ${(0 until grammar.labelIndex.size).filter(anchoring.core.sparsityPattern.top.isAllowedLabeledSpan(t.start, t.end, _)).toSet[Int].map(grammar.labelIndex.get(_))}.toIndexedSeq}")
         rec(child)
       case t@BinaryTree( (a, refA), bt@Tree( (b, refB), _, _), ct@Tree((c, refC), _, _), span) =>
         val aI = grammar.labelIndex(a)

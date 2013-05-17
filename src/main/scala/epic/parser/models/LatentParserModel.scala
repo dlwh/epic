@@ -29,6 +29,7 @@ import breeze.config.Help
 import epic.features.{StandardSurfaceFeaturizer, IndexedWordFeaturizer}
 import epic.lexicon.Lexicon
 import epic.constraints.ChartConstraints
+import epic.util.CacheBroker
 
 class LatentParserModel[L, L3, W](indexedFeatures: IndexedFeaturizer[L, L3, W],
                                   reannotate: (BinarizedTree[L], Seq[W]) => BinarizedTree[L],
@@ -88,6 +89,7 @@ case class LatentParserInference[L, L2, W](featurizer: RefinedFeaturizer[L, W, F
  */
 case class LatentModelFactory(baseParser: ParserParams.XbarGrammar,
                               constraints: ParserParams.Constraints[String],
+                              cache: CacheBroker,
                               @Help(text=
                                 """The kind of annotation to do on the refined grammar. Default uses no annotations.
 You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Manning 2003.
@@ -109,6 +111,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     val (xbarGrammar, xbarLexicon) = baseParser.xbarGrammar(trainTrees)
 
     val baseFactory = RefinedGrammar.generative(xbarGrammar, xbarLexicon, annBinaries, annUnaries, annWords)
+    implicit val broker = cache
     val cFactory = constraints.cachedFactory(AugmentedGrammar.fromRefined(baseFactory))
 
     val substateMap = if (substates != null && substates.exists) {

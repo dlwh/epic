@@ -14,6 +14,7 @@ import epic.trees.Span
 import breeze.optimize.FirstOrderMinimizer.OptParams
 import epic.coref.Phrases
 import breeze.util.Implicits._
+import epic.util.CacheBroker
 
 
 /**
@@ -24,6 +25,7 @@ object SemiNERPipeline {
 
   case class Params(path: File,
                     modelOut: File = new File("ner.model.gz"),
+                    cache: CacheBroker,
                     name: String = "eval/ner",
                     nfiles: Int = 100000,
                     iterPerEval: Int = 20,
@@ -50,7 +52,7 @@ object SemiNERPipeline {
     val gazetteer =  Gazetteer.ner("en")
 
     // build feature Index
-    val model = new SegmentationModelFactory(NERType.OutsideSentence, NERType.NotEntity, gazetteer = gazetteer).makeModel(train)
+    val model = new SegmentationModelFactory(NERType.OutsideSentence, NERType.NotEntity, gazetteer = gazetteer)(params.cache).makeModel(train)
     val obj = new ModelObjective(model, train, params.nthreads)
     val cached = new CachedBatchDiffFunction(obj)
 
@@ -115,6 +117,7 @@ object SemiConllNERPipeline {
 
   case class Params(path: File,
                     test: File,
+                    cache: CacheBroker,
                     name: String = "eval/ner",
                     nsents: Int = 100000,
                     nthreads: Int = -1,
@@ -132,6 +135,7 @@ object SemiConllNERPipeline {
 
 
     // build feature Index
+    implicit val broker = params.cache
     val model: SemiCRFModel[String, String] = new SegmentationModelFactory("##", "O"/*, gazetteer = Gazetteer.ner("en" )*/).makeModel(train)
     val obj = new ModelObjective(model, train, params.nthreads)
     val cached = new CachedBatchDiffFunction(obj)

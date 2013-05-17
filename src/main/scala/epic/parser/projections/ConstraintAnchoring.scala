@@ -21,15 +21,15 @@ import breeze.config.{CommandLineParser, Help}
 import breeze.util.Index
 import collection.immutable.BitSet
 import java.io._
-import ConstraintAnchoring.RawConstraints
 import epic.trees._
 import collection.mutable.ArrayBuffer
 import breeze.stats.distributions.{Rand, Binomial}
-import epic.parser.projections.ConstraintCoreGrammar.PruningStatistics
+import epic.parser.projections.ParserChartConstraintsFactory.PruningStatistics
 import breeze.linalg.DenseVector
 import java.util
 import epic.lexicon.Lexicon
-import epic.constraints.{SpanConstraints, ChartConstraints, LabeledSpanConstraints}
+import epic.constraints.{CachedChartConstraintsFactory, ChartConstraints}
+import epic.util.CacheBroker
 
 /**
  * 
@@ -52,14 +52,7 @@ class ConstraintAnchoring[L, W](val grammar: BaseGrammar[L],
   }
 }
 
-object ConstraintAnchoring {
-  @SerialVersionUID(2)
-  case class RawConstraints[L](sparsity: ChartConstraints[L]) {
-    def toAnchoring[W](grammar: BaseGrammar[L], lexicon: Lexicon[L, W], words: IndexedSeq[W]) = {
-      new ConstraintAnchoring(grammar, lexicon, words, sparsity)
-    }
-  }
-}
+
 
 @SerialVersionUID(1L)
 class ConstraintCoreGrammarAdaptor[L, W](val grammar: BaseGrammar[L], val lexicon: Lexicon[L, W],
@@ -77,42 +70,20 @@ class ConstraintCoreGrammarAdaptor[L, W](val grammar: BaseGrammar[L], val lexico
  * @author dlwh
  */
 @SerialVersionUID(8620602232218134084L)
-class ConstraintCoreGrammar[L, W](val augmentedGrammar: AugmentedGrammar[L, W], isIntermediate: L=>Boolean, threshold: Double) extends CoreGrammar[L, W] with ChartConstraints.Factory[L, W] {
-  def grammar = augmentedGrammar.grammar
-  def lexicon = augmentedGrammar.lexicon
+class ParserChartConstraintsFactory[L, W](val augmentedGrammar: AugmentedGrammar[L, W], isIntermediate: L=>Boolean, threshold: Double) extends ChartConstraints.Factory[L, W] {
+  import augmentedGrammar._
+  def labelIndex = grammar.labelIndex
 
-
-  def constraints(w: IndexedSeq[W]) = rawConstraints(w).sparsity
 
   private val synthetics = BitSet.empty ++ (0 until grammar.labelIndex.size).filter(l => isIntermediate(labelIndex.get(l)))
 
-
-  def anchor(words: IndexedSeq[W]): ConstraintAnchoring[L, W] = {
-    val chartScorer = this.buildConstraints(words, GoldTagPolicy.noGoldTags[L])
-    chartScorer
-  }
-
-  def buildConstraints(charts: ParseMarginal[L, W],
-                  goldTags: GoldTagPolicy[L] = GoldTagPolicy.noGoldTags[L]):ConstraintAnchoring[L, W] = {
-
-    val RawConstraints(sparsity) = rawConstraints(charts, goldTags)
-
-    new ConstraintAnchoring[L, W](charts.anchoring.grammar, charts.anchoring.lexicon, charts.anchoring.words, sparsity)
-  }
-
-  def buildConstraints(words: IndexedSeq[W],
-                       goldTags: GoldTagPolicy[L]):ConstraintAnchoring[L, W] = {
-
+  def constraints(w: IndexedSeq[W]):ChartConstraints[L] = constraints(w, GoldTagPolicy.noGoldTags[L])
+  def constraints(words: IndexedSeq[W], gold: GoldTagPolicy[L]):ChartConstraints[L] = {
     val charts = ChartMarginal(augmentedGrammar, words)
-    buildConstraints(charts, goldTags)
+    constraints(charts, gold)
   }
 
-  def rawConstraints(words: IndexedSeq[W], gold: GoldTagPolicy[L] = GoldTagPolicy.noGoldTags):RawConstraints[L] = {
-    val charts = ChartMarginal(augmentedGrammar, words)
-    rawConstraints(charts, gold)
-  }
-
-  def rawConstraints(marg: ParseMarginal[L, W], gold: GoldTagPolicy[L]): RawConstraints[L] = {
+  def constraints(marg: ParseMarginal[L, W], gold: GoldTagPolicy[L]): ChartConstraints[L] = {
     val length = marg.length
     val (botLabelScores, unaryScores) = computeScores(length, marg)
 
@@ -132,8 +103,7 @@ class ConstraintCoreGrammar[L, W](val augmentedGrammar: AugmentedGrammar[L, W], 
 
     //TODO: maximal projections
     val pattern = ChartConstraints(topLabelThresholds, labelThresholds)//, hasMaximalProjection)
-
-    RawConstraints(pattern)
+    pattern
   }
 
 
@@ -205,7 +175,7 @@ class ConstraintCoreGrammar[L, W](val augmentedGrammar: AugmentedGrammar[L, W], 
        } }*/
     }
 
-    import ConstraintCoreGrammar._
+    import ParserChartConstraintsFactory._
     PruningStatistics(thresholds.toArray, nConstructed, counts) -> PruningStatistics(gThresholds.toArray, nGoldConstructed, counts)
   }
 
@@ -243,7 +213,7 @@ class ConstraintCoreGrammar[L, W](val augmentedGrammar: AugmentedGrammar[L, W], 
   }
 }
 
-object ConstraintCoreGrammar {
+object ParserChartConstraintsFactory {
 
   case class PruningStatistics(data: Array[Double], nConstructed: Double, pruningCounts: DenseVector[Double]) {
     def merge(other: PruningStatistics, nAllowed:Int = data.length): PruningStatistics = {
@@ -268,8 +238,10 @@ object ConstraintCoreGrammar {
 case class ProjectionParams(treebank: ProcessedTreebank,
                             @Help(text="Location of the parser")
                             parser: File,
-                            @Help(text="Where to save constraintFactory")
-                            out: File = new File("constraints.ser.gz"),
+                            @Help(text="path to cache database for constraints")
+                            out: File = new File("constraints.cache"),
+                            @Help(text="name of the table for the cache database")
+                            name: String = "parseConstraints",
                             @Help(text="Longest train sentence to build constraintFactory for.")
                             maxParseLength: Int = 80,
                             threshold: Double = -5) {
@@ -286,12 +258,15 @@ object ProjectTreebankToConstraints {
     val out = params.out
     out.getAbsoluteFile.getParentFile.mkdirs()
 
-    val factory = new ConstraintCoreGrammar[AnnotatedLabel, String](parser.augmentedGrammar, {(_:AnnotatedLabel).isIntermediate}, params.threshold)
-    val train = mapTrees(factory, treebank.trainTrees, parser.grammar.labelIndex, useTree = true, maxL = params.maxParseLength)
-    val test = mapTrees(factory, treebank.testTrees, parser.grammar.labelIndex, useTree = false, maxL = 10000)
-    val dev = mapTrees(factory, treebank.devTrees, parser.grammar.labelIndex, useTree = false, maxL = 10000)
-    val map: Map[IndexedSeq[String], RawConstraints[AnnotatedLabel]] = Map.empty ++ train ++ test ++ dev
-    breeze.util.writeObject(out, map)
+    val factory = new ParserChartConstraintsFactory[AnnotatedLabel, String](parser.augmentedGrammar, {(_:AnnotatedLabel).isIntermediate}, params.threshold)
+    implicit val broker = new CacheBroker(params.out)
+    val constrainer = new CachedChartConstraintsFactory(factory, params.name)
+
+    makeTreeConstraints(factory, treebank.trainTrees, parser.grammar.labelIndex, useTree = true, maxL = params.maxParseLength)
+    makeTreeConstraints(factory, treebank.testTrees, parser.grammar.labelIndex, useTree = false, maxL = 10000)
+    makeTreeConstraints(factory, treebank.devTrees, parser.grammar.labelIndex, useTree = false, maxL = 10000)
+    broker.commit()
+    broker.close()
   }
 
   def loadParser[T](loc: File): SimpleChartParser[AnnotatedLabel, String] = {
@@ -299,11 +274,11 @@ object ProjectTreebankToConstraints {
     parser
   }
 
-  def mapTrees(factory: ConstraintCoreGrammar[AnnotatedLabel, String],
+  def makeTreeConstraints(factory: ChartConstraints.Factory[AnnotatedLabel, String],
                trees: IndexedSeq[TreeInstance[AnnotatedLabel, String]],
                index: Index[AnnotatedLabel],
-               useTree: Boolean, maxL: Int): IndexedSeq[(IndexedSeq[String], RawConstraints[AnnotatedLabel])] = {
-    trees.par.flatMap { (ti:TreeInstance[AnnotatedLabel, String]) =>
+               useTree: Boolean, maxL: Int) = {
+    trees.par.foreach { (ti:TreeInstance[AnnotatedLabel, String]) =>
       val TreeInstance(id, tree, words) = ti
       println(id, words)
       if(words.length > maxL) {
@@ -314,13 +289,11 @@ object ProjectTreebankToConstraints {
         } else {
           GoldTagPolicy.noGoldTags[AnnotatedLabel]
         }
-        val scorer = factory.rawConstraints(words, policy)
-        IndexedSeq(words -> scorer)
+        factory.constraints(words)//, policy)
       } catch {
         case e: Exception => e.printStackTrace()
-        IndexedSeq.empty[(IndexedSeq[String],RawConstraints[AnnotatedLabel])]
       }
-    }.seq.toIndexedSeq
+    }
   }
 
 
@@ -340,7 +313,7 @@ object ComputePruningThresholds {
     println(params)
     val parser = loadParser[Any](params.parser)
 
-    val factory = new ConstraintCoreGrammar[AnnotatedLabel, String](parser.augmentedGrammar, {(_:AnnotatedLabel).isIntermediate}, params.threshold)
+    val factory = new ParserChartConstraintsFactory[AnnotatedLabel, String](parser.augmentedGrammar, {(_:AnnotatedLabel).isIntermediate}, params.threshold)
     val (all, gold) = mapTrees(factory, treebank.trainTrees.take(1000), parser.grammar.labelIndex)
     util.Arrays.sort(all.data)
     util.Arrays.sort(gold.data)
@@ -358,10 +331,10 @@ object ComputePruningThresholds {
     parser
   }
 
-  def mapTrees(factory: ConstraintCoreGrammar[AnnotatedLabel, String],
+  def mapTrees(factory: ParserChartConstraintsFactory[AnnotatedLabel, String],
                trees: IndexedSeq[TreeInstance[AnnotatedLabel, String]],
                index: Index[AnnotatedLabel]): (PruningStatistics, PruningStatistics) = {
-    trees.toIndexedSeq.par.aggregate((PruningStatistics.empty(factory.grammar.labelIndex.size), PruningStatistics.empty(factory.grammar.labelIndex.size)))({ (s: (PruningStatistics,PruningStatistics), ti:TreeInstance[AnnotatedLabel, String]) =>
+    trees.toIndexedSeq.par.aggregate((PruningStatistics.empty(factory.labelIndex.size), PruningStatistics.empty(factory.labelIndex.size)))({ (s: (PruningStatistics,PruningStatistics), ti:TreeInstance[AnnotatedLabel, String]) =>
       val TreeInstance(id, tree, words) = ti
       println(id, words)
       try {

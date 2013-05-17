@@ -144,8 +144,7 @@ class TaggedSequenceModelFactory[L](val startSymbol: L,
 
     val standardFeaturizer = new StandardSurfaceFeaturizer(sum(counts, Axis._0))
     val featurizers = gazetteer.foldLeft(IndexedSeq[SurfaceFeaturizer[String]](new ContextSurfaceFeaturizer[String](standardFeaturizer)))(_ :+ _)
-    val cachedFeaturizer = new CachedSurfaceFeaturizer(new MultiSurfaceFeaturizer[String](featurizers))
-    val featurizer = IndexedWordFeaturizer.fromData(cachedFeaturizer, train.map(_.words))
+    val featurizer = IndexedWordFeaturizer.fromData(new MultiSurfaceFeaturizer(featurizers), train.map(_.words))
 
     val featureIndex = Index[Feature]()
 

@@ -6,12 +6,12 @@ import epic.trees._
 import epic.parser.{GenerativeParser, ParserParams}
 import epic.parser.ParserParams.XbarGrammar
 import breeze.config.{Help, CommandLineParser}
-import epic.ontonotes.{Sentence, NERType, ConllOntoReader, Document}
+import epic.ontonotes.{NERType, ConllOntoReader, Document}
 import breeze.linalg._
 import epic.framework._
 import breeze.optimize._
 import breeze.util.{Index, Encoder}
-import epic.parser.projections.ConstraintCoreGrammar
+import epic.parser.projections.ParserChartConstraintsFactory
 import epic.trees.annotations.StripAnnotations
 import epic.trees.annotations.PipelineAnnotator
 import epic.parser.models.IndexedLexFeaturizer
@@ -24,7 +24,9 @@ import collection.mutable.ArrayBuffer
 import collection.immutable
 import epic.lexicon.SimpleLexicon
 import epic.features.{MultiSurfaceFeaturizer, ContextSurfaceFeaturizer, StandardSurfaceFeaturizer}
-import epic.constraints.LabeledSpanConstraints
+import epic.constraints.{CachedChartConstraintsFactory, LabeledSpanConstraints}
+import epic.util.CacheBroker
+import java.util.concurrent.atomic.AtomicInteger
 
 
 /**
@@ -34,7 +36,7 @@ import epic.constraints.LabeledSpanConstraints
 object AnnotatingPipeline {
   case class Params(corpus: File,
                     treebank: ProcessedTreebank,
-                    cache: IntermediateCache,
+                    cache: CacheBroker,
                     nfiles: Int = 100000,
                     nthreads: Int = -1,
                     iterPerEval: Int = 20,
@@ -70,16 +72,12 @@ object AnnotatingPipeline {
       Counter[String, Double]()
     }
 
-    val (docProcessor, processedTrain) = params.cache.cached("processorAndTrain", train){
-      buildProcessor(train, weightsCache, params)
-    }
+    implicit val broker = params.cache
+    val (docProcessor, processedTrain) =  buildProcessor(train, params.baseParser, weightsCache, params)
 
 
 //    println(docProcessor.parseConstrainer.augmentedGrammar.refined.asInstanceOf[SimpleRefinedGrammar[_,_,_]].refinements)
-    val processedTest = params.cache.cached("test", test, docProcessor) {
-      test.par.map(docProcessor(_)).seq.flatMap(_.sentences)
-//      processedTrain.flatMap(_.sentences).take(10)
-    }.toIndexedSeq
+    val processedTest =  test.par.map(docProcessor(_)).seq.flatMap(_.sentences).toIndexedSeq
 
     println(s"${processedTrain.length} training documents totalling ${processedTrain.flatMap(_.sentences).length} sentences.")
     println(s"${processedTest.length} test sentences.")
@@ -150,11 +148,6 @@ object AnnotatingPipeline {
     if(params.includeSRL && params.includeNER) {
       allModels += PropertyModels.srlNerModel(docProcessor, beliefsFactory)
     }
-
-
-
-
-
 
     // the big model!
     val epModel = new EPModel[FeaturizedSentence, SentenceBeliefs](4, epInGold = true, initFeatureValue = {f => Some(weightsCache(f.toString)).filter(_ != 0.0)})(
@@ -235,7 +228,7 @@ object AnnotatingPipeline {
   }
 
 
-  def buildProcessor(docs: IndexedSeq[Document], weightsCache: Counter[String, Double], params: AnnotatingPipeline.Params): (FeaturizedDocument.Factory, IndexedSeq[FeaturizedDocument]) = {
+  def buildProcessor(docs: IndexedSeq[Document], xbar: XbarGrammar, weightsCache: Counter[String, Double], params: AnnotatingPipeline.Params)(implicit broker: CacheBroker): (FeaturizedDocument.Factory, IndexedSeq[FeaturizedDocument]) = {
     val train = docs.flatMap(_.sentences.map(_.nerSegmentation))
     val maxLengthMap = train.flatMap(_.segments.iterator).groupBy(_._1).mapValues(arr => arr.map(_._2.length).max)
     val labelIndex = Index(Iterator(NERType.OutsideSentence, NERType.NotEntity) ++ train.iterator.flatMap(_.label.map(_._1)))
@@ -246,18 +239,22 @@ object AnnotatingPipeline {
     val allowedNerClassifier = new LabeledSpanConstraints.LayeredTagConstraintsFactory(nerLexicon, maxLengthArray)
 
     println("Building basic parsing model...")
-    var trainTrees = for (d <- docs; s <- d.sentences) yield {
+    val trainTrees = for (d <- docs; s <- d.sentences) yield {
       params.treebank.makeTreeInstance(s.id, s.tree.map(_.label), s.words, removeUnaries = true)
     }
 
-//    if(params.treebank.path.exists) {
-//      trainTrees ++= params.treebank.trainTrees
-//    }
-
-    val baseParser = params.cache.cached("baseParser", trainTrees.toSet) {
-      val annotator = new PipelineAnnotator[AnnotatedLabel, String](Seq(StripAnnotations()))
-      GenerativeParser.annotated(new XbarGrammar(), annotator, trainTrees)
+    val annotator = new PipelineAnnotator[AnnotatedLabel, String](Seq(StripAnnotations()))
+    val pruningParser =  GenerativeParser.annotated(xbar, annotator, trainTrees)
+    val parseConstrainer = new CachedChartConstraintsFactory(new ParserChartConstraintsFactory(pruningParser.augmentedGrammar, {(_:AnnotatedLabel).isIntermediate}, -10))
+    println("Building constraints")
+    val count = new AtomicInteger(0)
+    trainTrees.par.foreach{t =>
+      parseConstrainer.constraints(t.words)
+      val c = count.getAndIncrement
+      if(c % 100 == 0)
+        println(s"$c/${trainTrees.length} sentences parsed.")
     }
+    broker.commit()
 
 
     val standardFeaturizer = new StandardSurfaceFeaturizer(sum(nerCounts, Axis._0))
@@ -266,7 +263,8 @@ object AnnotatingPipeline {
 
     FeaturizedDocument.makeFactory(params.treebank.process,
     featurizer,
-      new ConstraintCoreGrammar(baseParser.augmentedGrammar, {(_:AnnotatedLabel).isIntermediate}, -8),
+     pruningParser.grammar, pruningParser.lexicon,
+      parseConstrainer,
       labelIndex,
       allowedNerClassifier, null)(docs)
   }

@@ -28,6 +28,7 @@ import epic.parser.{AugmentedGrammar, BaseGrammar, RefinedGrammar, ParserParams}
 import epic.trees._
 import epic.features.IndexedWordFeaturizer
 import epic.features.StandardSurfaceFeaturizer
+import epic.util.CacheBroker
 
 /**
  *
@@ -36,6 +37,7 @@ import epic.features.StandardSurfaceFeaturizer
 
 case class ProductParserModelFactory(baseParser: ParserParams.XbarGrammar,
                                      constraints: ParserParams.Constraints[String],
+                                     cache: CacheBroker,
                                      annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = FilterAnnotations(),
                                      substates: File = null,
                                      numStates: Int = 2,
@@ -73,6 +75,7 @@ case class ProductParserModelFactory(baseParser: ParserParams.XbarGrammar,
     val (xbarGrammar, xbarLexicon) = baseParser.xbarGrammar(trainTrees)
 
     val baseFactory = RefinedGrammar.generative(xbarGrammar, xbarLexicon, annBinaries, annUnaries, annWords)
+    implicit val broker = cache
     val cFactory = constraints.cachedFactory(AugmentedGrammar.fromRefined(baseFactory))
 
     val substateMap = if (substates != null && substates.exists) {

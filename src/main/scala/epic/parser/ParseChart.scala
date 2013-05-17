@@ -129,12 +129,11 @@ class ParseChart[L](val index: Index[L],
     }
 
 
-    def rawEnter(begin: Int, end: Int, parent: Int, ref: Int, w: Double) = {
+    private def rawEnter(begin: Int, end: Int, parent: Int, ref: Int, w: Double) = {
       val arrx = score(begin, end)
       val arr = arrx(parent)
       val oldScore = arr(ref)
-      val newScore = sum(oldScore, w)
-      arr(ref) = newScore
+      arr(ref) = w
       oldScore
     }
 
@@ -148,11 +147,7 @@ class ParseChart[L](val index: Index[L],
       }
     }
 
-    def enterSum(begin: Int, end: Int, parent: Int, ref: Int, w: Array[Double], length: Int) {
-      enter(begin, end, parent, ref, sum(w,length))
-    }
-
-    /**
+   /**
      * Updates the extent arrays for a given set of refinements
      */
     private def updateExtents(index: Int, parent: Int, ref: Int, begin: Int, end: Int) {
@@ -231,22 +226,11 @@ class ParseChart[L](val index: Index[L],
   }
 
   protected final def zero = Double.NegativeInfinity
-  final def sum(a: Double, b: Double) = {
-    // log1p isn't optimized, and I don't really care about accuracy that much
-    // scalala.library.Numerics.logSum(a, b)
-    if (a == Double.NegativeInfinity) b
-    else if (b == Double.NegativeInfinity) a
-    else if (a < b) b + log(1+exp(a - b))
-    else a + log(1+exp(b - a))
-  }
-  final def sum(arr: Array[Double], length: Int) = logSum(arr, length)
 }
 
 
 
 object ParseChart {
-
-
 
   def apply[L](g: Index[L], refinements: Array[Int], length: Int) = logProb(g, refinements, length)
 

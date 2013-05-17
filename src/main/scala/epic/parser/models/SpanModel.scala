@@ -41,6 +41,7 @@ import epic.features.HashFeature
 import epic.parser.features.LexicalFeature
 import epic.trees.annotations.FilterAnnotations
 import epic.constraints.ChartConstraints
+import epic.util.CacheBroker
 
 /**
  * A rather more sophisticated discriminative parser. Uses features on
@@ -550,6 +551,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
                               """)
                             annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = FilterAnnotations(),
                             constraints: ParserParams.Constraints[String],
+                            cache: CacheBroker,
                             @Help(text="Old weights to initialize with. Optional")
                             oldWeights: File = null,
                             @Help(text="For features not seen in gold trees, we bin them into dummyFeats * numGoldFeatures bins using hashing.")
@@ -573,6 +575,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
       (_: AnnotatedLabel).baseAnnotatedLabel
     })
 
+    implicit val broker = cache
     val baseFactory = RefinedGrammar.generative[AnnotatedLabel, String](xbarGrammar,
       xbarLexicon,
       initBinaries, initUnaries, initLexicon)

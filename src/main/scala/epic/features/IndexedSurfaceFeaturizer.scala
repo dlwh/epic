@@ -3,14 +3,11 @@ package features
 
 import breeze.collection.mutable.TriangularArray
 import breeze.util.Index
-import com.google.common.collect.MapMaker
 import epic.framework.Feature
 import epic.features.FeaturizationLevel.FullFeatures
-import java.io.IOException
-import java.util.Collections
 import scala.collection.mutable
 import epic.constraints.SpanConstraints
-import epic.util.Cache
+import epic.util.CacheBroker
 
 /**
  *
@@ -30,7 +27,8 @@ object IndexedSurfaceFeaturizer {
   def fromData[W](feat: SurfaceFeaturizer[W],
                   data: IndexedSeq[IndexedSeq[W]],
                   constraintFactory: SpanConstraints.Factory[W],
-                  cache: Boolean = true): IndexedSurfaceFeaturizer[W]  = {
+                  cacheName: String = "surfaceFeatureCache")
+                 (implicit broker: CacheBroker): IndexedSurfaceFeaturizer[W]  = {
     val spanIndex = Index[Feature]()
     val wordIndex = Index[Feature]()
     for(words <- data) {
@@ -48,24 +46,20 @@ object IndexedSurfaceFeaturizer {
     val ss = spanIndex
 
     val f = new MySurfaceFeaturizer[W](feat, constraintFactory, ww, ss)
-    if(cache) new CachedFeaturizer(f)
-    else f
+    new CachedFeaturizer(f, cacheName)
   }
 
   @SerialVersionUID(1L)
-  class CachedFeaturizer[W](val base: IndexedSurfaceFeaturizer[W]) extends IndexedSurfaceFeaturizer[W] with Serializable {
+  class CachedFeaturizer[W](val base: IndexedSurfaceFeaturizer[W], name: String)(implicit broker: CacheBroker) extends IndexedSurfaceFeaturizer[W] with Serializable {
     def spanFeatureIndex: Index[Feature] = base.spanFeatureIndex
 
     def featurizer: SurfaceFeaturizer[W] = base.featurizer
 
     def wordFeatureIndex: Index[Feature] = base.wordFeatureIndex
 
+    private val cache = broker.make[IndexedSeq[W], IndexedSurfaceAnchoring[W]](name)
 
-    val cache = new Cache[IndexedSeq[W], IndexedSurfaceAnchoring[W]]
-    def anchor(words: IndexedSeq[W]): IndexedSurfaceAnchoring[W] = {
-      cache.getOrElseUpdate(words, base.anchor(words))
-    }
-
+    def anchor(datum: IndexedSeq[W]): IndexedSurfaceAnchoring[W] = cache.getOrElseUpdate(datum, base.anchor(datum))
   }
 
   @SerialVersionUID(2L)
@@ -107,9 +101,10 @@ object IndexedSurfaceFeaturizer {
   }
 }
 
+@SerialVersionUID(1L)
 class TabulatedIndexedSurfaceAnchoring[W](val words: IndexedSeq[W],
                                           wordFeatures: Array[Array[Array[Int]]],
-                                          spanFeatures: TriangularArray[Array[Array[Int]]]) extends IndexedSurfaceAnchoring[W] {
+                                          spanFeatures: TriangularArray[Array[Array[Int]]]) extends IndexedSurfaceAnchoring[W] with Serializable {
   def featuresForSpan(begin: Int, end: Int, level: FeaturizationLevel = FullFeatures):Array[Int] = {
     val f = spanFeatures(begin, end)
     if(f eq null) null

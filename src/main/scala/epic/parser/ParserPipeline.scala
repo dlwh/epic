@@ -14,17 +14,16 @@ package epic.parser
  See the License for the specific language governing permissions and
  limitations under the License.
 */
-import projections.{ConstraintCoreGrammar}
+import projections.ParserChartConstraintsFactory
 import breeze.config._
 import java.io._
 import epic.trees._
 import breeze.util._
-import java.util.concurrent.ConcurrentHashMap
 import epic.parser
 import collection.mutable
 import epic.lexicon.{Lexicon, SimpleLexicon}
-import epic.constraints.{CachedChartConstraintsFactory, ChartConstraints, LabeledSpanConstraints}
-import epic.util.Cache
+import epic.constraints.{CachedChartConstraintsFactory, ChartConstraints}
+import epic.util.CacheBroker
 
 
 /**
@@ -57,28 +56,14 @@ object ParserParams {
     private val cache = new mutable.HashMap[File, (parser.BaseGrammar[AnnotatedLabel],Lexicon[AnnotatedLabel, String])]() with mutable.SynchronizedMap[File, (parser.BaseGrammar[AnnotatedLabel],Lexicon[AnnotatedLabel, String])]
   }
 
-  @Help(text="Stores/saves a baseline xbar grammar needed to extracting trees.")
-  case class Constraints[W](path: File = null) {
-    def cachedFactory(baseFactory: AugmentedGrammar[AnnotatedLabel, W], threshold: Double = -7):ChartConstraints.Factory[AnnotatedLabel, W] = {
-      if(path != null && constraintsCache.contains(path)) {
-        constraintsCache.get(path).asInstanceOf[ChartConstraints.Factory[AnnotatedLabel, W]]
-      } else {
-        val uncached = if(path eq null) {
-          new ConstraintCoreGrammar[AnnotatedLabel,W](baseFactory, {(_:AnnotatedLabel).isIntermediate}, threshold)
-        } else {
-          val constraint = new ConstraintCoreGrammar[AnnotatedLabel,W](baseFactory, {(_:AnnotatedLabel).isIntermediate}, threshold)
-          new CachedChartConstraintsFactory(constraint, new Cache[IndexedSeq[W], ChartConstraints[AnnotatedLabel]])
-        }
-
-        if(path != null)
-          constraintsCache.putIfAbsent(path, uncached)
-        uncached
-      }
-
+  @Help(text="Factory for chart constraints")
+  case class Constraints[W](name: String = "parseConstraints") {
+    def cachedFactory(baseFactory: AugmentedGrammar[AnnotatedLabel, W], threshold: Double = -7)(implicit broker: CacheBroker):ChartConstraints.Factory[AnnotatedLabel, W] = {
+      val uncached = new ParserChartConstraintsFactory[AnnotatedLabel,W](baseFactory, {(_:AnnotatedLabel).isIntermediate}, threshold)
+      new CachedChartConstraintsFactory(uncached, name)
     }
   }
   
-  private val constraintsCache = new ConcurrentHashMap[File, ChartConstraints.Factory[AnnotatedLabel, _]]
 }
 
 /**

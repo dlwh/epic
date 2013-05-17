@@ -20,12 +20,10 @@ class FeatureIndex[A, B](val labelFeatureIndex: Index[A],
                          labelPartOfFeature: Array[Int],
                          surfacePartOfFeature: Array[Int],
                          val numHashFeatures: Int=0) extends Index[Feature] with Serializable {
-  assert(labelPartOfFeature.length <= labelFeatureIndex.size * surfaceFeatureIndex.size)
-  assert(surfacePartOfFeature.length == labelPartOfFeature.length)
 
   def apply(t: Feature): Int = t match {
-    case LabeledFeature(a:A,b:B) =>
-      mapped(labelFeatureIndex(a), surfaceFeatureIndex(b))
+    case LabeledFeature(a,b) =>
+      mapped(labelFeatureIndex(a.asInstanceOf[A]), surfaceFeatureIndex(b.asInstanceOf[B]))
     case HashFeature(x) =>
       x + trueSize
     case _ => -1
@@ -122,11 +120,16 @@ object FeatureIndex {
     val labelPart, surfacePart = new ArrayBuffer[Int]()
     pairEnumerator {(lParts, sParts) =>
       for(lPart <- lParts; sPart <- sParts) yield {
-        val next = labelPart.size
-        mapping(sPart)(lPart) = next
-        labelPart += lPart
-        surfacePart += sPart
-        next
+        val currentIndex: Int = mapping(sPart)(lPart)
+        if(currentIndex == -1) {
+          val next = labelPart.size
+          mapping(sPart)(lPart) = next
+          labelPart += lPart
+          surfacePart += sPart
+          next
+        } else {
+          currentIndex
+        }
       }
     }
     new FeatureIndex(labelFeatureIndex, surfaceFeatureIndex, mapping, labelPart.toArray, surfacePart.toArray, numHashFeatures)

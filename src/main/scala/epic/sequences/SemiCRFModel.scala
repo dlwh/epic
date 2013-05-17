@@ -11,7 +11,7 @@ import breeze.features.FeatureVector
 import epic.constraints.{SpanConstraints, TagConstraints, LabeledSpanConstraints}
 import epic.lexicon.{SimpleLexicon, Lexicon}
 import epic.features._
-import epic.util.{NotProvided, Optional}
+import epic.util.{CacheBroker, NotProvided, Optional}
 
 /**
  *
@@ -236,7 +236,7 @@ class SegmentationModelFactory[L](val startSymbol: L,
                                   val outsideSymbol: L,
                                   pruningModel: Optional[SemiCRF.ConstraintSemiCRF[L, String]] = NotProvided,
                                   gazetteer: Optional[Gazetteer[Any, String]] = NotProvided,
-                                  weights: Feature=>Double = { (f:Feature) => 0.0}) {
+                                  weights: Feature=>Double = { (f:Feature) => 0.0})(implicit broker: CacheBroker) {
 
   import SegmentationModelFactory._
 

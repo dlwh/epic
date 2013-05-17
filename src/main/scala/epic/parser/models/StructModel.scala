@@ -16,7 +16,7 @@ package models
  See the License for the specific language governing permissions and
  limitations under the License.
 */
-import epic.parser.projections.{ConstraintCoreGrammarAdaptor, ConstraintCoreGrammar, GrammarRefinements}
+import epic.parser.projections.{ConstraintCoreGrammarAdaptor, ParserChartConstraintsFactory, GrammarRefinements}
 import epic.framework.Feature
 import java.io.File
 import features._
@@ -29,6 +29,7 @@ import breeze.config.Help
 import epic.features.{StandardSurfaceFeaturizer, IndexedWordFeaturizer}
 import epic.lexicon.Lexicon
 import epic.constraints.ChartConstraints
+import epic.util.CacheBroker
 
 /**
  * Model for structural annotations, a la Klein and Manning 2003.
@@ -83,6 +84,7 @@ class StructModel[L, L2, W](indexedFeatures: IndexedFeaturizer[L, L2, W],
 
 case class StructModelFactory(baseParser: ParserParams.XbarGrammar,
                               constraints: ParserParams.Constraints[String],
+                              cache: CacheBroker,
                               @Help(text= "The kind of annotation to do on the refined grammar. Defaults to ~KM2003")
                               annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = KMAnnotator(),
                               @Help(text="Old weights to initialize with. Optional")
@@ -100,6 +102,7 @@ case class StructModelFactory(baseParser: ParserParams.XbarGrammar,
       (_: AnnotatedLabel).baseAnnotatedLabel
     })
 
+    implicit val broker = cache
     val (xbarWords, xbarBinaries, xbarUnaries) = this.extractBasicCounts(trainTrees.map(_.mapLabels(_.baseAnnotatedLabel)))
     val baseFactory = RefinedGrammar.generative(xbarGrammar, xbarLexicon, xbarBinaries, xbarUnaries, xbarWords)
     val cFactory = constraints.cachedFactory(AugmentedGrammar.fromRefined(baseFactory))
