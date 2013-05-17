@@ -254,12 +254,20 @@ case class ProjectionParams(treebank: ProcessedTreebank,
 
 object PrecacheConstraints extends Logging {
 
+  def forTreebank[L, W](constrainer: ParserChartConstraintsFactory[L, W], treebank: ProcessedTreebank, tableName: String = "parseConstraints", verifyNoGoldPruningInTrain: Boolean = true)(implicit broker: CacheBroker) = {
+    val cached = forTrainingSet(constrainer, treebank.trainTrees.par, tableName, verifyNoGoldPruning = verifyNoGoldPruningInTrain)
+    (treebank.testTrees ++ treebank.testTrees).par.foreach { ti =>
+      logger.info(s"Ensuring existing constraint for dev/test tree ${ti.id} ${ti.words}")
+      cached.constraints(ti.words)
+    }
+    cached
+  }
 
 
   def forTrainingSet[L, W](constrainer: ParserChartConstraintsFactory[L, W],
                            train: GenTraversable[TreeInstance[L, W]],
                            tableName: String = "parseConstraints",
-                           verifyNoGoldPruning: Boolean = true)(implicit broker: CacheBroker) = {
+                           verifyNoGoldPruning: Boolean = true)(implicit broker: CacheBroker): CachedChartConstraintsFactory[L, W] = {
     val cache = broker.make[IndexedSeq[W], ChartConstraints[L]](tableName)
     for(ti <- train) try {
       var located = true
@@ -305,12 +313,7 @@ object PrecacheConstraints extends Logging {
 
     val factory = new ParserChartConstraintsFactory[AnnotatedLabel, String](parser.augmentedGrammar, {(_:AnnotatedLabel).isIntermediate}, params.threshold)
     implicit val broker = new CacheBroker(params.out)
-    val constrainer = forTrainingSet(factory, treebank.trainTrees.par)
-    (treebank.testTrees ++ treebank.testTrees).par.foreach { ti =>
-      logger.info(s"Ensuring existing constraint for dev/test tree ${ti.id} ${ti.words}")
-      constrainer.constraints(ti.words)
-    }
-
+    forTreebank(factory, treebank, params.name)
     broker.commit()
     broker.close()
   }
