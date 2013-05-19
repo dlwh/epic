@@ -83,10 +83,8 @@ object MaxEntTagScorer {
     val (obj, logProbFeature) = makeObjective(lexicon, featurizer, featureIndex, basescorer, data)
     val cachedObj = new CachedBatchDiffFunction(obj)
     val initialWeights = DenseVector.zeros[Double](featureIndex.size+1)
-    initialWeights(0 until (initialWeights.size - 20001)) := new DenseVector(featureCounts.toArray)
-    initialWeights((initialWeights.size - 20000 -1) until (initialWeights.size-1)) := -1.0
-    initialWeights /= initialWeights.norm(2)
-    initialWeights(initialWeights.size-1) = 1.0
+    initialWeights(logProbFeature) = 1.0
+    initialWeights := params.copy(useStochastic=true, maxIterations=data.length / 100, batchSize=300).minimize(cachedObj, initialWeights)
     val weights = params.minimize(cachedObj, initialWeights)
 
 
@@ -105,7 +103,7 @@ object MaxEntTagScorer {
       def fullRange: IndexedSeq[Int] = (0 until data.length)
 
       def calculate(weights: DenseVector[Double], batch: IndexedSeq[Int]): (Double, DenseVector[Double]) = {
-        val finalCounts = fullRange.map(data).par.map(_.asTaggedSequence).aggregate(null: StandardExpectedCounts[Option[Feature]])({
+        val finalCounts = batch.map(data).par.map(_.asTaggedSequence).aggregate(null: StandardExpectedCounts[Option[Feature]])({
           (_ec, ti) =>
             val countsSoFar = if (_ec ne null) _ec else StandardExpectedCounts.zero(actualFeatureIndex)
 
@@ -145,6 +143,7 @@ object MaxEntTagScorer {
           (x, y) => if (x eq null) y else if (y eq null) x else x += y
         })
 
+        finalCounts *= (fullRange.size * 1.0 / batch.size)
         finalCounts.toObjective
       }
     } -> logProbFeature

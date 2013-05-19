@@ -22,6 +22,12 @@ case class StandardExpectedCounts[F](var loss: Double,
     this.loss -= that.loss; this.counts -= that.counts; this
   }
 
+  def *=(scale: Double) = {
+    loss *= scale
+    counts *= scale
+    this
+  }
+
   def apply(f: F) = counts(index(f))
 }
 
