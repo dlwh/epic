@@ -5,17 +5,18 @@ import epic.trees.LexicalProduction
 import epic.constraints.TagConstraints
 
 /**
- *
+ * A Lexicon tells you which tags are allowed at a particular point in a sentence.
+ * See [[epic.lexicon.SimpleLexicon]].
  * @author dlwh
  */
 trait Lexicon[L, W] {
   def labelIndex: Index[L]
-  def anchor(w: IndexedSeq[W]):Localization
+  def anchor(w: IndexedSeq[W]):Anchoring
 
   def knownLexicalProductions : TraversableOnce[LexicalProduction[L, W]]
 
   // TODO, should i make TagConstraints be a case class instead of an interface?
-  trait Localization extends TagConstraints[L] {
+  trait Anchoring extends TagConstraints[L] {
     def length: Int
     def allowedTags(pos: Int):Set[Int]
   }

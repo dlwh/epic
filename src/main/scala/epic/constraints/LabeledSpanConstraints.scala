@@ -11,17 +11,26 @@ import epic.lexicon.SimpleLexicon
 import epic.util.Has2
 
 /**
- * Represents
+ * Tells us wehther a given (labeled) span is allowed in a given sentence. Can
+ * be calculated either using rules/heuristics or via some kind
+ * of ML algorithm. We use a combination in Epic.
  *
  * @author dlwh
  */
 sealed trait LabeledSpanConstraints[-L] extends SpanConstraints {
   def isAllowedLabeledSpan(begin: Int, end: Int, label: Int): Boolean
   def isAllowedSpan(begin: Int, end: Int): Boolean
+  /** How long can a span be if it starts at begin*/
   def maxSpanLengthStartingAt(begin: Int):Int
+  /** How long can a span be if it has label label in this sentence? */
   def maxSpanLengthForLabel(label: Int):Int
 
   // TODO... what's the right thing here?
+  /**
+   * Computes the intersection of the constraints
+   * @param other
+   * @return
+   */
   def &(other: LabeledSpanConstraints[L @uncheckedVariance ]): LabeledSpanConstraints[L] = this match {
     case NoConstraints => this
     case SimpleConstraints(maxPosX, maxLx, x) => other match {
@@ -36,6 +45,11 @@ sealed trait LabeledSpanConstraints[-L] extends SpanConstraints {
     }
   }
 
+  /**
+   * Computes the  union of the constraints
+   * @param other
+   * @return
+   */
   def |(other: LabeledSpanConstraints[L @uncheckedVariance ]): LabeledSpanConstraints[L] = this match {
     case NoConstraints => other
     case SimpleConstraints(maxPosX, maxLx, x) => other match {

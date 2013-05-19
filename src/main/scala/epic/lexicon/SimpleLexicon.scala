@@ -11,7 +11,9 @@ import scala.collection.mutable
  * A simple lexicon that thresholds to decide when to open up the rare word to all (open) tags
  * @param wordTagCounts (tag -> word -> count)
  * @param openTagThreshold how many different word types does a tag have to be seen with to be considered open.
- * @param closedWordThreshold How many
+ * @param closedWordThreshold How many times do we have to see a word before we decide we know its tag set?
+ *                            Words with counts below this will be allowed to be any open tag in addition to their
+ *                            observed tag set.
  */
 @SerialVersionUID(1L)
 class SimpleLexicon[L, W](val labelIndex: Index[L],
@@ -41,7 +43,7 @@ class SimpleLexicon[L, W](val labelIndex: Index[L],
 
   def knownLexicalProductions = for( (w,set) <- byWord.iterator; l <- set.iterator) yield LexicalProduction(labelIndex.get(l), w)
 
-  def anchor(w: IndexedSeq[W]):Localization = new Localization {
+  def anchor(w: IndexedSeq[W]):Anchoring = new Anchoring {
     def length = w.length
     val x = Array.tabulate(w.length)(pos =>byWord.getOrElse(w(pos), openTags))
     def allowedTags(pos: Int): Set[Int] = x(pos)

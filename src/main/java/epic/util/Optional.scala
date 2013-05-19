@@ -30,9 +30,18 @@ sealed trait Optional[+A] {
   def getOrElse[B>:A](ifNone: => B) = if(isEmpty) ifNone else get
 }
 
+/**
+ * Equivalent to Some, but with an implicit conversion
+ * from A to Provided(aA
+ * @param get
+ * @tparam A
+ */
 case class Provided[+A](get: A) extends Optional[A] {
 }
 
+/**
+ * Equivalent to None
+ */
 case object NotProvided extends Optional[Nothing] {
   def get = throw new NoSuchElementException("NotProvided.get")
 }

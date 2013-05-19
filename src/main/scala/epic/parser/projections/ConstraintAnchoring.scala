@@ -279,11 +279,20 @@ case class ProjectionParams(treebank: ProcessedTreebank,
                             alpha: Double = 0.8) {
 }
 
+/**
+  * Object for creating  [[epic.constraints.CachedChartConstraintsFactory]]
+ * from a parser and prepopulating it with the contents of a treebank.
+  */
 object PrecacheConstraints extends Logging {
 
-  def forTreebank(constrainer: ParserChartConstraintsFactory[AnnotatedLabel, String], treebank: ProcessedTreebank, tableName: String = "parseConstraints", verifyNoGoldPruningInTrain: Boolean = true)(implicit broker: CacheBroker) = {
+  /**
+   * Method for creating  [[epic.constraints.CachedChartConstraintsFactory]]
+   * from a parser and prepopulating it with the contents of a [[epic.trees.ProcessedTreebank]].
+   * Optionally can do checks on whether or not you prune from the training set.
+   **/
+   def forTreebank(constrainer: ParserChartConstraintsFactory[AnnotatedLabel, String], treebank: ProcessedTreebank, tableName: String = "parseConstraints", verifyNoGoldPruningInTrain: Boolean = true)(implicit broker: CacheBroker) = {
     val cached = forTrainingSet(constrainer, treebank.trainTrees.par.map(ti => ti.copy(tree = ti.tree.map(_.baseAnnotatedLabel))), tableName, verifyNoGoldPruning = verifyNoGoldPruningInTrain)
-    (treebank.testTrees ++ treebank.testTrees).par.foreach { ti =>
+    (treebank.testTrees ++ treebank.devTrees).par.foreach { ti =>
       logger.info(s"Ensuring existing constraint for dev/test tree ${ti.id} ${ti.words}")
       cached.constraints(ti.words)
     }
@@ -291,6 +300,11 @@ object PrecacheConstraints extends Logging {
   }
 
 
+  /**
+   * Method for creating  [[epic.constraints.CachedChartConstraintsFactory]]
+   * from a parser and prepopulating it with constraints for a training set.
+   * Optionally can do checks on whether or not you prune from the training set.
+   **/
   def forTrainingSet[L, W](constrainer: ParserChartConstraintsFactory[L, W],
                            train: GenTraversable[TreeInstance[L, W]],
                            tableName: String = "parseConstraints",
@@ -311,7 +325,7 @@ object PrecacheConstraints extends Logging {
         marg.checkForSimpleTree(ti.tree)
         def logError(pos: String, t: Tree[L], allowedSpans: Set[L]) {
           val predicted = new ViterbiDecoder().extractBestParse(marg)
-          logger.error(s"Pruned gold $pos label ${t.label} over span ${t.span}:${t.span.map(ti.words)} \n\tAllowed: $allowedSpans.\n\tSentence is ${ti.words.length} words long.\n\tin ${ti.tree.render(ti.words, newline = true)}. decoded tree is ${predicted.render(ti.words)}")
+          logger.warn(s"Pruned gold $pos label ${t.label} over span ${t.span}:${t.span.map(ti.words)} \n\tAllowed: $allowedSpans.\n\tSentence is ${ti.words.length} words long.\n\tin ${ti.tree.render(ti.words, newline = true)}. decoded tree is ${predicted.render(ti.words)}")
         }
         ti.tree.allChildren.foreach {
           case t @ UnaryTree(_,_,_,_)=>

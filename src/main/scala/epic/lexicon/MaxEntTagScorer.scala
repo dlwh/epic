@@ -11,9 +11,11 @@ import breeze.optimize.FirstOrderMinimizer.OptParams
 import breeze.optimize.{CachedBatchDiffFunction, BatchDiffFunction}
 import scala.collection.mutable.ArrayBuffer
 import breeze.util.OptionIndex
+import com.typesafe.scalalogging.log4j.Logging
 
 /**
- *
+ * The MaxEnt assigns tag scores using a maximum entropy (aka logistic) classifier.
+ * Scores are log p(t|w). You will want to use MaxEntTagScorer.train to train one of these.
  * @author dlwh
  */
 @SerialVersionUID(1L)
@@ -50,7 +52,17 @@ class MaxEntTagScorer[L, W](feat: IndexedWordFeaturizer[W],
   }
 }
 
-object MaxEntTagScorer {
+object MaxEntTagScorer extends Logging {
+  /**
+   * Creatse a MaxEntTagScroer using the featurizer and data.
+   * @param feat Featurizer for picking out relevant surface features
+   * @param lexicon the Lexicon type
+   * @param data training data
+   * @param params optimization parameters
+   * @tparam L label type
+   * @tparam W word type
+   * @return a MaxEntTagScorer
+   */
   def make[L, W](feat: WordFeaturizer[W],
                  lexicon: Lexicon[L, W],
                  data: IndexedSeq[TreeInstance[L, W]],
@@ -78,7 +90,7 @@ object MaxEntTagScorer {
     val basescorer = new SimpleTagScorer(Counter2.count(data.flatMap(ti => (ti.tree.leaves.map(_.label) zip ti.words))).mapValues(_.toDouble))
 
 
-    println("Number of features: " + featureIndex.size)
+    logger.info("Number of features: " + featureIndex.size)
 
     val (obj, logProbFeature) = makeObjective(lexicon, featurizer, featureIndex, basescorer, data)
     val cachedObj = new CachedBatchDiffFunction(obj)

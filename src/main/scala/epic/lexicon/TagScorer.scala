@@ -19,7 +19,9 @@ import math.log
 import breeze.linalg._
 
 /**
- * TODO
+ * A TagScorer is just something that assigns scores to a particular
+ * POS tag (or whatever) at a particular position in a sentence.
+ * Uses the anchoring pattern, like most of Epic.
  * @author dlwh
  */
 trait TagScorer[L, W] extends Serializable {
@@ -60,12 +62,17 @@ object TagScorer {
       }
 
     }
-
-
-
   }
 }
 
+
+/**
+ * A fairly dumb tag scorer that does some simple smoothing to estimate
+ * p(t|w).
+ * @param counts
+ * @tparam L
+ * @tparam W
+ */
 class SimpleTagScorer[L, W](counts: Counter2[L, W, Double]) extends TagScorer[L, W] {
   def anchor(w: IndexedSeq[W]):Anchoring = new Anchoring {
     def words: IndexedSeq[W] = w
