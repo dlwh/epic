@@ -361,7 +361,7 @@ object ChartMarginal {
     // a -> bc over [begin, split, end)
     for {
       span <- 2 to words.length
-      begin <- 0 to (words.length - span)
+      begin:Int <- 0 to (words.length - span)
     } {
       val end = begin + span
       // I get a 20% speedup by inlining code dealing with these arrays. sigh.

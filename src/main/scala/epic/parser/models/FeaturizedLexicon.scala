@@ -16,7 +16,7 @@ package epic.parser.models
  limitations under the License.
 */
 import breeze.linalg._
-import epic.parser.TagScorer
+import epic.lexicon.TagScorer
 
 /**
  *

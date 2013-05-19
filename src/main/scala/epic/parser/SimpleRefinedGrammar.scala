@@ -18,7 +18,7 @@ import projections.GrammarRefinements
 import epic.trees.{BinaryRule, UnaryRule}
 import collection.mutable.ArrayBuffer
 import java.io.{PrintWriter, Writer}
-import epic.lexicon.Lexicon
+import epic.lexicon.{TagScorer, Lexicon}
 
 /**
  *

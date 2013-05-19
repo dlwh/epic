@@ -17,8 +17,8 @@ object POSTagger {
   def main(args: Array[String]) {
     val params = CommandLineParser.readIn[Params](args)
     import params._
-    val train = treebank.trainTrees.map(_.toTaggedSequence)
-    val test = treebank.devTrees.map(_.toTaggedSequence)
+    val train = treebank.trainTrees.map(_.asTaggedSequence)
+    val test = treebank.devTrees.map(_.asTaggedSequence)
 
     val crf = CRF.buildSimple(train, AnnotatedLabel("TOP"), opt = opt)
     val inf = crf.asInstanceOf[CRFInference[_, _]]
@@ -44,8 +44,8 @@ object SemiPOSTagger {
   def main(args: Array[String]) {
     val params = CommandLineParser.readIn[Params](args)
     import params._
-    val train = treebank.trainTrees.map(_.toTaggedSequence.asSegmentation)
-    val test = treebank.devTrees.map(_.toTaggedSequence.asSegmentation)
+    val train = treebank.trainTrees.map(_.asTaggedSequence.asSegmentation)
+    val test = treebank.devTrees.map(_.asTaggedSequence.asSegmentation)
 
     val crf = SemiCRF.buildSimple(train, AnnotatedLabel("TOP"), AnnotatedLabel("TOP"), opt = opt)(cache)
     val inf = crf.asInstanceOf[SemiCRFInference[_, _]]

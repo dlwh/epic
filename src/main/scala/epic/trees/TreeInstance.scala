@@ -27,7 +27,7 @@ case class TreeInstance[L, +W](id: String,
 
   def features = words
 
-  def toTaggedSequence: TaggedSequence[L, W] = {
+  def asTaggedSequence: TaggedSequence[L, W] = {
     new TaggedSequence(tree.leaves.map(_.label).toIndexedSeq, words.toIndexedSeq, id)
   }
 

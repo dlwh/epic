@@ -17,8 +17,8 @@ package epic.parser.models
 */
 import breeze.linalg._
 import epic.parser.projections.GrammarRefinements
-import epic.parser.{TagScorer, RefinedGrammar, BaseGrammar}
-import epic.lexicon.Lexicon
+import epic.parser.{RefinedGrammar, BaseGrammar}
+import epic.lexicon.{TagScorer, Lexicon}
 
 object FeaturizedGrammar {
   def apply[L, L2, W](xbar: BaseGrammar[L],

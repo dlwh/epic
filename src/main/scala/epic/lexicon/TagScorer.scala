@@ -1,4 +1,5 @@
-package epic.parser
+package epic.lexicon
+
 /*
  Copyright 2012 David Hall
 
@@ -26,6 +27,42 @@ trait TagScorer[L, W] extends Serializable {
   trait Anchoring {
     def words: IndexedSeq[W]
     def scoreTag(pos: Int, l: L):Double
+  }
+}
+
+object TagScorer {
+  /** (ab)uses Bayes' rule to go from p(t|w) to p(w|t)  via p(w) and p(t) */
+  def fakeGenerativeFromDiscriminative[L, W](discriminativeTagScorer: TagScorer[L, W], counts: Counter2[L, W, Double]):TagScorer[L, W] = {
+    new FakeGenerativeTagScorer(discriminativeTagScorer, counts)
+  }
+
+  @SerialVersionUID(1L)
+  private class FakeGenerativeTagScorer[L, W](discriminativeTagScorer: TagScorer[L, W], counts: Counter2[L, W, Double])  extends TagScorer[L, W] with Serializable {
+    val wordCounts:Counter[W, Double] = sum(counts, Axis._0)
+    val total = math.log(sum(wordCounts))
+    val labelCounts:Counter[L, Double] = sum(counts, Axis._1)
+    breeze.numerics.log.inPlace(labelCounts)
+    breeze.numerics.log.inPlace(wordCounts)
+    labelCounts -= total
+    wordCounts -= total
+
+    def anchor(words: IndexedSeq[W]):Anchoring = {
+      val ts = discriminativeTagScorer.anchor(words)
+      // smooth at "we've seen this word once"
+      val myWordCounts = words.map(w => wordCounts(w) max (-total))
+      val w = words
+      new Anchoring {
+        def words: IndexedSeq[W] = w
+
+        def scoreTag(pos: Int, l: L): Double = {
+          (ts.scoreTag(pos, l)  + myWordCounts(pos)) - labelCounts(l)
+        }
+      }
+
+    }
+
+
+
   }
 }
 

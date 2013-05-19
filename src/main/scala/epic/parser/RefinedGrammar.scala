@@ -19,7 +19,7 @@ import projections.GrammarRefinements
 import epic.trees._
 import breeze.linalg._
 import collection.mutable.ArrayBuffer
-import epic.lexicon.{SimpleLexicon, Lexicon}
+import epic.lexicon.{SimpleTagScorer, TagScorer, SimpleLexicon, Lexicon}
 
 /**
  * TODO docs
@@ -85,6 +85,14 @@ object RefinedGrammar {
                            binaryProductions: Counter2[L2, BinaryRule[L2], Double],
                            unaryProductions: Counter2[L2, UnaryRule[L2], Double],
                            wordCounts: Counter2[L2, W, Double]): SimpleRefinedGrammar[L, L2, W] = {
+    generative(grammar, lexicon, refinements, binaryProductions, unaryProductions, new SimpleTagScorer(wordCounts))
+  }
+
+  def generative[L, L2, W](grammar: BaseGrammar[L], lexicon: Lexicon[L, W],
+                           refinements: GrammarRefinements[L, L2],
+                           binaryProductions: Counter2[L2, BinaryRule[L2], Double],
+                           unaryProductions: Counter2[L2, UnaryRule[L2], Double],
+                           ts: TagScorer[L2, W]): SimpleRefinedGrammar[L, L2, W] = {
     val loggedB:Counter2[L2, BinaryRule[L2], Double] = logAndNormalize(binaryProductions, Axis._1)
     val loggedU:Counter2[L2, UnaryRule[L2], Double] = logAndNormalize(unaryProductions, Axis._1)
 
@@ -92,10 +100,10 @@ object RefinedGrammar {
       case r@BinaryRule(a, _, _) => loggedB(a, r)
       case r@UnaryRule(a, _, _) => loggedU(a, r)
     }
-    
+
     val spanScoreArray = new Array[Double](refinements.labels.fineIndex.size)
 
-    unanchored[L, L2, W](grammar, lexicon, refinements, ruleScoreArray, spanScoreArray, new SimpleTagScorer(wordCounts))
+    unanchored[L, L2, W](grammar, lexicon, refinements, ruleScoreArray, spanScoreArray, ts)
   }
 
   def unanchored[L, L2, W](grammar: BaseGrammar[L], lexicon: Lexicon[L, W],
