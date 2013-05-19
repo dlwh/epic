@@ -10,6 +10,7 @@ import epic.trees.TreeInstance
 import breeze.optimize.FirstOrderMinimizer.OptParams
 import breeze.optimize.{CachedBatchDiffFunction, BatchDiffFunction}
 import scala.collection.mutable.ArrayBuffer
+import breeze.util.OptionIndex
 
 /**
  *
@@ -19,6 +20,8 @@ import scala.collection.mutable.ArrayBuffer
 class MaxEntTagScorer[L, W](feat: IndexedWordFeaturizer[W],
                             lexicon: Lexicon[L, W],
                             index: FeatureIndex[L, Feature],
+                            ts: TagScorer[L, W],
+                            logProbFeature: Int,
                             weights: DenseVector[Double]) extends TagScorer[L, W] with Serializable {
   def labelIndex = lexicon.labelIndex
 
@@ -27,6 +30,7 @@ class MaxEntTagScorer[L, W](feat: IndexedWordFeaturizer[W],
 
     val features = feat.anchor(w)
     val allowedTags = lexicon.anchor(w)
+    val baseAnch = ts.anchor(w)
 
     // p(tag|w)
     val scores = Array.tabulate(w.length) { i =>
@@ -35,13 +39,13 @@ class MaxEntTagScorer[L, W](feat: IndexedWordFeaturizer[W],
       for(l <- allowedTags.allowedTags(i)) {
         val myfeats = index.crossProduct(Array(l), wfeats)
         val score = weights dot new FeatureVector(myfeats)
-        scores(labelIndex.get(l)) = score
+        scores(labelIndex.get(l)) = score + weights(logProbFeature) * baseAnch.scoreTag(i,labelIndex.get(l))
       }
       logNormalize(scores)
     }
 
     def scoreTag(pos: Int, l: L): Double = {
-      scores(pos)(l)
+      scores(pos).get(l).getOrElse(Double.NegativeInfinity)
     }
   }
 }
@@ -55,7 +59,6 @@ object MaxEntTagScorer {
     val featureCounts = ArrayBuffer[Double]()
     val featureIndex = FeatureIndex.build(lexicon.labelIndex, featurizer.wordFeatureIndex, 20000) { addToIndex =>
       for(ti <- data.map(_.asTaggedSequence)) {
-        val lexanch = lexicon.anchor(ti.words)
         val featanch = featurizer.anchor(ti.words)
         for (i <- 0 until ti.words.length) {
           val features = featanch.featuresForWord(i)
@@ -72,50 +75,68 @@ object MaxEntTagScorer {
     }
 
 
+    val basescorer = new SimpleTagScorer(Counter2.count(data.flatMap(ti => (ti.tree.leaves.map(_.label) zip ti.words))).mapValues(_.toDouble))
+
+
     println("Number of features: " + featureIndex.size)
 
-    val obj = makeObjective(lexicon, featurizer, featureIndex, data)
+    val (obj, logProbFeature) = makeObjective(lexicon, featurizer, featureIndex, basescorer, data)
     val cachedObj = new CachedBatchDiffFunction(obj)
-    val initialWeights = DenseVector.zeros[Double](featureIndex.size)
-    initialWeights(0 until (initialWeights.size - 20000)) := new DenseVector(featureCounts.toArray)
-    initialWeights((initialWeights.size - 20000) until initialWeights.size) := -3.0
+    val initialWeights = DenseVector.zeros[Double](featureIndex.size+1)
+    initialWeights(0 until (initialWeights.size - 20001)) := new DenseVector(featureCounts.toArray)
+    initialWeights((initialWeights.size - 20000 -1) until (initialWeights.size-1)) := -1.0
     initialWeights /= initialWeights.norm(2)
+    initialWeights(initialWeights.size-1) = 1.0
     val weights = params.minimize(cachedObj, initialWeights)
 
 
-    new MaxEntTagScorer(featurizer, lexicon, featureIndex, weights)
+    new MaxEntTagScorer(featurizer, lexicon, featureIndex, basescorer, logProbFeature, weights)
   }
 
-  private def makeObjective[W, L](lexicon: Lexicon[L, W], featurizer: IndexedWordFeaturizer[W], featureIndex: FeatureIndex[L, Feature], data: IndexedSeq[TreeInstance[L, W]]): BatchDiffFunction[DenseVector[Double]] with Object {def fullRange: IndexedSeq[Int]; def calculate(weights: DenseVector[Double], batch: IndexedSeq[Int]): (Double, DenseVector[Double])} = {
+  private def makeObjective[L, W](lexicon: Lexicon[L, W],
+                                  featurizer: IndexedWordFeaturizer[W],
+                                  featureIndex: FeatureIndex[L, Feature],
+                                  baseScorer: TagScorer[L, W],
+                                  data: IndexedSeq[TreeInstance[L, W]]) = {
+    // the None feature is for the log probability. TODO hack
+    val actualFeatureIndex = new OptionIndex(featureIndex)
+    val logProbFeature = actualFeatureIndex(None)
     new BatchDiffFunction[DenseVector[Double]] {
       def fullRange: IndexedSeq[Int] = (0 until data.length)
 
       def calculate(weights: DenseVector[Double], batch: IndexedSeq[Int]): (Double, DenseVector[Double]) = {
-        val finalCounts = fullRange.map(data).par.map(_.asTaggedSequence).aggregate(null: StandardExpectedCounts[Feature])({
+        val finalCounts = fullRange.map(data).par.map(_.asTaggedSequence).aggregate(null: StandardExpectedCounts[Option[Feature]])({
           (_ec, ti) =>
-            val countsSoFar = if (_ec ne null) _ec else StandardExpectedCounts.zero(featureIndex)
+            val countsSoFar = if (_ec ne null) _ec else StandardExpectedCounts.zero(actualFeatureIndex)
 
             val w = ti.words
             val features = featurizer.anchor(w)
             val allowedTags = lexicon.anchor(w)
+            val baseAnch = baseScorer.anchor(w)
 
-            for (i <- 0 until ti.length) {
-              val wfeats = features.featuresForWord(i)
-              val myTags = allowedTags.allowedTags(i).toArray
+            for (pos <- 0 until ti.length) {
+              val wfeats = features.featuresForWord(pos)
+              val myTags = allowedTags.allowedTags(pos).toArray
               val myFeatures = myTags.map(l => new FeatureVector(featureIndex.crossProduct(Array(l), wfeats)))
-              val goldLabel = lexicon.labelIndex(ti.label(i))
+              val goldLabel = lexicon.labelIndex(ti.label(pos))
+              val baseTagScores = myTags.map(l => weights(logProbFeature) * baseAnch.scoreTag(pos, lexicon.labelIndex.get(l)))
 
               val scores = myFeatures.map(weights dot _)
+              for(ii <- 0 until myTags.length) {
+                scores(ii) += baseTagScores(ii)
+              }
               val logNormalizer = softmax(scores)
 
               countsSoFar.loss += (logNormalizer - scores(myTags.indexOf(goldLabel)))
               // normalize and exp
               exp.inPlace(scores -= logNormalizer)
-              for (ii <- 0 until myTags.length) {
-                val label = myTags(ii)
-                val myfeats = myFeatures(ii)
-                val prob = scores(ii)
-                axpy(prob - I(label == goldLabel), myfeats, countsSoFar.counts)
+              for (iTag <- 0 until myTags.length) {
+                val label = myTags(iTag)
+                val myfeats = myFeatures(iTag)
+                val prob = scores(iTag)
+                val margin = prob - I(label == goldLabel)
+                axpy(margin, myfeats, countsSoFar.counts)
+                countsSoFar.counts(logProbFeature) += margin * baseTagScores(iTag)
               }
             }
 
@@ -126,6 +147,6 @@ object MaxEntTagScorer {
 
         finalCounts.toObjective
       }
-    }
+    } -> logProbFeature
   }
 }
