@@ -54,6 +54,22 @@ final case class ChartMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
     this
   }
 
+  def checkForSimpleTree(tree: BinarizedTree[L]) = {
+    for (t <- tree.allChildren) t match {
+      case UnaryTree( label, _, _, span) =>
+        val labelScore = breeze.linalg.softmax(inside.top.decodedLabelScores(span.start, span.end, anchoring.grammar.labelIndex(label)))
+        if (labelScore.isInfinite) {
+          println("problem with unary: " + (label) + " " + span)
+        }
+      case tree =>
+        val labelScore = breeze.linalg.softmax(inside.bot.decodedLabelScores(tree.start, tree.end, anchoring.grammar.labelIndex(tree.label)))
+        if (labelScore.isInfinite) {
+          println("problem with other: " + t.label + " " + tree.span)
+        }
+    }
+    this
+  }
+
 
   def checkForTreeOutside(tree: BinarizedTree[(L, Int)]) {
     for (t <- tree.allChildren) t match {

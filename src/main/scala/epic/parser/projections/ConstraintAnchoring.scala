@@ -18,14 +18,15 @@ package projections
 */
 import breeze.collection.mutable.TriangularArray
 import breeze.config.{CommandLineParser, Help}
-import breeze.util.Index
+import breeze.util.{Encoder, Index}
 import collection.immutable.BitSet
 import java.io._
 import epic.trees._
 import collection.mutable.ArrayBuffer
 import breeze.stats.distributions.{Rand, Binomial}
 import epic.parser.projections.ParserChartConstraintsFactory.PruningStatistics
-import breeze.linalg.DenseVector
+import breeze.linalg._
+import breeze.numerics._
 import java.util
 import epic.lexicon.Lexicon
 import epic.constraints.{CachedChartConstraintsFactory, ChartConstraints}
@@ -72,7 +73,9 @@ class ConstraintCoreGrammarAdaptor[L, W](val grammar: BaseGrammar[L], val lexico
  * @author dlwh
  */
 @SerialVersionUID(8620602232218134084L)
-class ParserChartConstraintsFactory[L, W](val augmentedGrammar: AugmentedGrammar[L, W], isIntermediate: L=>Boolean, threshold: Double) extends ChartConstraints.Factory[L, W] {
+class ParserChartConstraintsFactory[L, W](val augmentedGrammar: AugmentedGrammar[L, W],
+                                          val isIntermediate: L=>Boolean,
+                                          alpha: Double) extends ChartConstraints.Factory[L, W] {
   import augmentedGrammar._
   def labelIndex = grammar.labelIndex
 
@@ -90,13 +93,13 @@ class ParserChartConstraintsFactory[L, W](val augmentedGrammar: AugmentedGrammar
     val (botLabelScores, unaryScores) = computeScores(length, marg)
 
     val labelThresholds = extractLabelThresholds(length,
-                                                 grammar.labelIndex.size,
-                                                 botLabelScores, grammar.labelIndex,
-                                                 gold.isGoldBotTag(_, _, _))
+      grammar.labelIndex.size,
+      botLabelScores, grammar.labelIndex,
+      gold.isGoldBotTag(_, _, _))
     val topLabelThresholds = extractLabelThresholds(length,
-                                                    grammar.labelIndex.size,
-                                                    unaryScores,grammar.labelIndex,
-                                                    gold.isGoldTopTag(_, _, _))
+      grammar.labelIndex.size,
+      unaryScores,grammar.labelIndex,
+      gold.isGoldTopTag(_, _, _))
     assert(topLabelThresholds(0,length).contains(marg.grammar.rootIndex))
 
 //    val hasMaximalProjection: BitSet = BitSet.empty ++ (0 to length).filter{ i =>
@@ -114,21 +117,45 @@ class ParserChartConstraintsFactory[L, W](val augmentedGrammar: AugmentedGrammar
                                      index: Index[_],
                                      isGold: (Int, Int, Int)=>Boolean): TriangularArray[BitSet] = {
     TriangularArray.tabulate[BitSet](length + 1) { (i, j) =>
-        val arr = scores(TriangularArray.index(i, j))
-        val thresholdedTags = if (arr eq null) {
-          BitSet.empty
-        } else BitSet.empty ++ (0 until arr.length filter { s =>
-          math.log(arr(s)) > threshold
-        })
-        val goldTags = (0 until numLabels).filter { isGold(i, j, _) }
-        for(t <- goldTags if arr(t) < math.exp(threshold)) {
-          println(s"Got a below threshold for a goldTag! ${arr(t)} ${math.exp(threshold)} ${labelIndex.get(t)} "
-            + s"\n($i,$j) best symbol: ${labelIndex.get((0 until labelIndex.size).maxBy(arr(_)))} ${arr.max}"
-          )
+      val arr = scores(TriangularArray.index(i, j))
+      val threshold = if(arr eq null) {
+        1.0
+      } else {
+        val nonZeroCounts = arr.filterNot(_ == 0.0)
+        // threshold in log space is alpha * Vmax + (1-alpha) * 1/numSyms * sum_{!V(sym).isInfinite} V(sym)
+        // Vmax = score of root
+        // our v's are exp(V(sym) - Vmax), so the average above is 1/numSyms * sum_{!V(sym) == 0.0) (log V(sym) + Vmax)
+        // so the vmax comes out: Vmax + (1-alpha) * avg_{V(sym) != 0.0} logV(sym)
+        // then we put threshold back in normal space, giving exp(Vmax + (1-alpha) ... whatever)
+        // so we compare V(sym) to exp(Vmax + (1-alpha) ...)
+        // but we've divided out by exp(Vmax) on the lhs, so that gives
+        // Vsym > exp( (1-alpha) * ...)
+        if(nonZeroCounts.exists(x => (x- 1.0).abs < 1E-4)) {
+          // probably viterbi path is through here
+          exp((1-alpha)/nonZeroCounts.length * sum(log(nonZeroCounts)))
+        } else {
+          // viterbi path isn't here, factor the symbol "not in the tree" into the average
+          exp((1-alpha) * (sum(log(nonZeroCounts)))/(nonZeroCounts.length + 1.0))
         }
-        val result = thresholdedTags ++ goldTags
-        if (result.nonEmpty) result
-        else null
+      }* .99
+      val thresholdedTags = if (arr eq null) {
+        BitSet.empty
+      } else {
+        BitSet.empty ++ (0 until arr.length filter { s =>
+          arr(s) > threshold // lower a little due to floating point
+        })
+      }
+      if(i == 0 && j == length)
+        assert(!thresholdedTags.isEmpty, threshold + " " + Encoder.fromIndex(labelIndex).decode(arr))
+      val goldTags = (0 until numLabels).filter { isGold(i, j, _) }
+      for(t <- goldTags if arr(t) < threshold) {
+        println(s"Got a below threshold for a goldTag! ${arr(t)} ${threshold} ${labelIndex.get(t)} "
+          + s"\n($i,$j) best symbol: ${labelIndex.get((0 until labelIndex.size).maxBy(arr(_)))} ${arr.max}"
+        )
+      }
+      val result = thresholdedTags //++ goldTags
+      if (result.nonEmpty) result
+      else null
     }
   }
 
@@ -197,7 +224,7 @@ class ParserChartConstraintsFactory[L, W](val augmentedGrammar: AugmentedGrammar
           if (topScores(index) eq null) {
             topScores(index) = new Array[Double](grammar.labelIndex.size)
           }
-          topScores(index)(grammar.parent(rule)) += score
+          topScores(index)(grammar.parent(rule)) = topScores(index)(grammar.parent(rule)) max score
         }
       }
 
@@ -208,7 +235,7 @@ class ParserChartConstraintsFactory[L, W](val augmentedGrammar: AugmentedGrammar
           if (scores(index) eq null) {
             scores(index) = new Array[Double](grammar.labelIndex.size)
           }
-          scores(index)(tag) += score
+          scores(index)(tag) = scores(index)(tag) max score
         }
       }
     }
@@ -249,13 +276,13 @@ case class ProjectionParams(treebank: ProcessedTreebank,
                             name: String = "parseConstraints",
                             @Help(text="Longest train sentence to build constraintFactory for.")
                             maxParseLength: Int = 80,
-                            threshold: Double = -5) {
+                            alpha: Double = 0.8) {
 }
 
 object PrecacheConstraints extends Logging {
 
-  def forTreebank[L, W](constrainer: ParserChartConstraintsFactory[L, W], treebank: ProcessedTreebank, tableName: String = "parseConstraints", verifyNoGoldPruningInTrain: Boolean = true)(implicit broker: CacheBroker) = {
-    val cached = forTrainingSet(constrainer, treebank.trainTrees.par, tableName, verifyNoGoldPruning = verifyNoGoldPruningInTrain)
+  def forTreebank(constrainer: ParserChartConstraintsFactory[AnnotatedLabel, String], treebank: ProcessedTreebank, tableName: String = "parseConstraints", verifyNoGoldPruningInTrain: Boolean = true)(implicit broker: CacheBroker) = {
+    val cached = forTrainingSet(constrainer, treebank.trainTrees.par.map(ti => ti.copy(tree = ti.tree.map(_.baseAnnotatedLabel))), tableName, verifyNoGoldPruning = verifyNoGoldPruningInTrain)
     (treebank.testTrees ++ treebank.testTrees).par.foreach { ti =>
       logger.info(s"Ensuring existing constraint for dev/test tree ${ti.id} ${ti.words}")
       cached.constraints(ti.words)
@@ -271,26 +298,33 @@ object PrecacheConstraints extends Logging {
     val cache = broker.make[IndexedSeq[W], ChartConstraints[L]](tableName)
     for(ti <- train) try {
       var located = true
+      lazy val marg = ChartMarginal(constrainer.augmentedGrammar.anchor(ti.words), ti.words, maxMarginal = true)
       val constraints = cache.getOrElseUpdate(ti.words, {
         located = false
         logger.info(s"Building constraints for ${ti.id} ${ti.words}")
-        constrainer.constraints(ti.words)
+        constrainer.constraints(marg, GoldTagPolicy.goldTreeForcing[L](ti.tree.map(constrainer.labelIndex)))
       })
       if(located) {
         logger.info(s"Already had constraints for ${ti.id} ${ti.words}.")
       }
       if(verifyNoGoldPruning) {
+        marg.checkForSimpleTree(ti.tree)
+        def logError(pos: String, t: Tree[L], allowedSpans: Set[L]) {
+          val predicted = new ViterbiDecoder().extractBestParse(marg)
+          logger.error(s"Pruned gold $pos label ${t.label} over span ${t.span}:${t.span.map(ti.words)} \n\tAllowed: $allowedSpans.\n\tSentence is ${ti.words.length} words long.\n\tin ${ti.tree.render(ti.words, newline = true)}. decoded tree is ${predicted.render(ti.words)}")
+        }
         ti.tree.allChildren.foreach {
           case t @ UnaryTree(_,_,_,_)=>
             if(!constraints.top.isAllowedLabeledSpan(t.start,t.end, constrainer.labelIndex(t.label))) {
               val allowedSpans = (0 until constrainer.labelIndex.size).filter(constraints.top.isAllowedLabeledSpan(t.start, t.end, _)).map(constrainer.labelIndex.get(_)).toSet
-              logger.error(s"Pruned gold top label ${t.label} over span ${t.span} in $ti. Allowed: $allowedSpans")
+              logError("top", t, allowedSpans)
             }
-          case t =>
+          case t@BinaryTree(_,_,_,_) =>
             if(!constraints.bot.isAllowedLabeledSpan(t.start,t.end, constrainer.labelIndex(t.label))) {
               val allowedSpans = (0 until constrainer.labelIndex.size).filter(constraints.bot.isAllowedLabeledSpan(t.start, t.end, _)).map(constrainer.labelIndex.get(_)).toSet
-              logger.error(s"Pruned gold label ${t.label} over span ${t.span} in $ti. Allowed: $allowedSpans")
+              logError("bot", t, allowedSpans)
             }
+          case _ =>
         }
       }
     } catch {
@@ -311,7 +345,7 @@ object PrecacheConstraints extends Logging {
     val out = params.out
     out.getAbsoluteFile.getParentFile.mkdirs()
 
-    val factory = new ParserChartConstraintsFactory[AnnotatedLabel, String](parser.augmentedGrammar, {(_:AnnotatedLabel).isIntermediate}, params.threshold)
+    val factory = new ParserChartConstraintsFactory[AnnotatedLabel, String](parser.augmentedGrammar, {(_:AnnotatedLabel).isIntermediate}, params.alpha)
     implicit val broker = new CacheBroker(params.out)
     forTreebank(factory, treebank, params.name)
     broker.commit()
@@ -326,56 +360,3 @@ object PrecacheConstraints extends Logging {
 }
 
 
-/**
- * Computes a CDF for how many labels are pruned at different levels of constraintFactory.
- *
- * @author dlwh
- */
-object ComputePruningThresholds {
-
-  def main(args: Array[String]) {
-    val params = CommandLineParser.readIn[ProjectionParams](args)
-    val treebank = params.treebank.copy(maxLength = 1000000)
-    println(params)
-    val parser = loadParser[Any](params.parser)
-
-    val factory = new ParserChartConstraintsFactory[AnnotatedLabel, String](parser.augmentedGrammar, {(_:AnnotatedLabel).isIntermediate}, params.threshold)
-    val (all, gold) = mapTrees(factory, treebank.trainTrees.take(1000), parser.grammar.labelIndex)
-    util.Arrays.sort(all.data)
-    util.Arrays.sort(gold.data)
-    val goldOut = new PrintStream(new BufferedOutputStream(new FileOutputStream("gold.txt")))
-    gold.data foreach goldOut.println _
-    goldOut.close()
-    val allOut = new PrintStream(new BufferedOutputStream(new FileOutputStream("all.txt")))
-    all.data foreach allOut.println _
-    allOut.close()
-    println(parser.grammar.labelEncoder.decode(gold.pruningCounts))
-  }
-
-  def loadParser[T](loc: File): SimpleChartParser[AnnotatedLabel, String] = {
-    val parser = breeze.util.readObject[SimpleChartParser[AnnotatedLabel, String]](loc)
-    parser
-  }
-
-  def mapTrees(factory: ParserChartConstraintsFactory[AnnotatedLabel, String],
-               trees: IndexedSeq[TreeInstance[AnnotatedLabel, String]],
-               index: Index[AnnotatedLabel]): (PruningStatistics, PruningStatistics) = {
-    trees.toIndexedSeq.par.aggregate((PruningStatistics.empty(factory.labelIndex.size), PruningStatistics.empty(factory.labelIndex.size)))({ (s: (PruningStatistics,PruningStatistics), ti:TreeInstance[AnnotatedLabel, String]) =>
-      val TreeInstance(id, tree, words) = ti
-      println(id, words)
-      try {
-        val policy = GoldTagPolicy.goldTreeForcing[AnnotatedLabel](tree.map(_.baseAnnotatedLabel).map(index))
-        val (ra, rb) = factory.computePruningStatistics(words, policy)
-        (s._1.merge(ra, 100000), s._2.merge(rb, 100000))
-      } catch {
-        case e: Exception =>
-          throw new Exception(s"??? ${tree.render(words)}", e)
-        s
-      }
-    }, { (statsA, statsB) =>
-      (statsA._1.merge(statsB._1, 100000) -> statsA._2.merge(statsB._1,  100000))
-    })
-  }
-
-
-}

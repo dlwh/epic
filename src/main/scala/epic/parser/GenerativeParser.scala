@@ -143,6 +143,9 @@ object GenerativeTrainer extends ParserPipeline {
     val (initLexicon, initBinaries, initUnaries) = GenerativeParser.extractCounts(transformed)
 
     val (grammar, lexicon) = baseParser.xbarGrammar(trainTrees)
+    val cg = lexicon.asInstanceOf[SimpleLexicon[AnnotatedLabel, String]].allowedTags("capital-gains").map(x => grammar.labelIndex.get(x).toString)
+    assert(cg.contains("JJ"), cg)
+    assert(cg.contains("NNS"), cg)
     val refGrammar = BaseGrammar(AnnotatedLabel.TOP, initBinaries, initUnaries)
     val indexedRefinements = GrammarRefinements(grammar, refGrammar, {
       (_: AnnotatedLabel).baseAnnotatedLabel
