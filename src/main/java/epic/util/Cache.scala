@@ -41,7 +41,36 @@ case class CacheBroker(path: File = null, autocommit: Boolean = true, disableWri
   def commit() { db.commit()}
   def close() {db.close()}
 
-  def make[K,V](name: String): Map[K, V] = new Map[K, V] {
+  def make[K,V](name: String): Map[K, V] = new CacheMap[K, V](name, this)
+
+}
+
+object CacheBroker {
+  private class ActualCache private[CacheBroker] (val path: File, val dbMaker: DBMaker, val autocommit: Boolean) {
+    lazy val db = {if(autocommit) cacheThread.start(); dbMaker.make()}
+    private lazy val cacheThread: Thread = new Thread(new Runnable {
+      def run() {
+        while(true) {
+          Thread.sleep(1000 * 60 * 5)
+          db.commit()
+        }
+      }
+    }) {
+      setDaemon(true)
+    }
+  }
+
+  private val cacheCache = Collections.synchronizedMap(new util.HashMap[File, ActualCache]()).asScala
+
+  private def getCacheBroker(path: File, dbMaker: =>DBMaker, autocommit: Boolean) = {
+    if(path eq null) new ActualCache(path, dbMaker, autocommit)
+    else cacheCache.getOrElseUpdate(path, new ActualCache(path, dbMaker, autocommit))
+  }
+
+
+  @SerialVersionUID(1L)
+  private class CacheMap[K, V](name: String, cache: CacheBroker) extends Map[K, V] with Serializable {
+    import cache._
     @transient
     private var _theMap : Map[K, V] = null
     def theMap = synchronized {
@@ -107,29 +136,4 @@ case class CacheBroker(path: File = null, autocommit: Boolean = true, disableWri
     override def --(xs: GenTraversableOnce[K]): mutable.Map[K, V] = theMap.--(xs)
 
   }
-
-}
-
-object CacheBroker {
-  private class ActualCache private[CacheBroker] (val path: File, val dbMaker: DBMaker, val autocommit: Boolean) {
-    lazy val db = {if(autocommit) cacheThread.start(); dbMaker.make()}
-    private lazy val cacheThread: Thread = new Thread(new Runnable {
-      def run() {
-        while(true) {
-          Thread.sleep(1000 * 60 * 5)
-          db.commit()
-        }
-      }
-    }) {
-      setDaemon(true)
-    }
-  }
-
-  private val cacheCache = Collections.synchronizedMap(new util.HashMap[File, ActualCache]()).asScala
-
-  private def getCacheBroker(path: File, dbMaker: =>DBMaker, autocommit: Boolean) = {
-    if(path eq null) new ActualCache(path, dbMaker, autocommit)
-    else cacheCache.getOrElseUpdate(path, new ActualCache(path, dbMaker, autocommit))
-  }
-
 }

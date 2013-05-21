@@ -18,10 +18,11 @@ package epic.framework
 
 import collection.mutable.ArrayBuffer
 import breeze.inference.{ExpectationPropagation, Factor}
+import com.typesafe.scalalogging.log4j.Logging
 
 class EPInference[Datum, Augment](val inferences: IndexedSeq[ProjectableInference[Datum, Augment]],
                                   val maxEPIter: Int,
-                                  val epInGold: Boolean = false)(implicit aIsFactor: Augment <:< Factor[Augment]) extends ProjectableInference[Datum, Augment] with Serializable {
+                                  val epInGold: Boolean = false)(implicit aIsFactor: Augment <:< Factor[Augment]) extends ProjectableInference[Datum, Augment] with Logging with Serializable {
   type Marginal = EPMarginal[Augment, ProjectableInference[Datum, Augment]#Marginal]
   type ExpectedCounts = EPExpectedCounts
 
@@ -99,7 +100,7 @@ class EPInference[Datum, Augment](val inferences: IndexedSeq[ProjectableInferenc
       var marg = inf.marginal(datum, q)
       var contributionToLikelihood = marg.logPartition
       if (contributionToLikelihood.isInfinite || contributionToLikelihood.isNaN) {
-        println(s"Model $i is misbehaving ($contributionToLikelihood) on iter $iter!" )
+        logger.error(s"Model $i is misbehaving ($contributionToLikelihood) on iter $iter!" )
         retries += 1
         if (retries > 3) {
           throw new RuntimeException("EP is being sad!")

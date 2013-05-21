@@ -136,7 +136,6 @@ case class SentenceBeliefs(spans: TriangularArray[SpanBeliefs],
       }
       val wordChange = wordBeliefs(i).maxChange(f.wordBeliefs(i))
       max = max max wordChange
-      if(math.abs(wordChange - 1.0) < 1E-4) println(f.length + " " + i)
       i += 1
     }
     max
