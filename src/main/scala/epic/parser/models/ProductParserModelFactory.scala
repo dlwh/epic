@@ -29,6 +29,7 @@ import epic.trees._
 import epic.features.IndexedWordFeaturizer
 import epic.features.StandardSurfaceFeaturizer
 import epic.util.CacheBroker
+import com.typesafe.scalalogging.log4j.Logging
 
 /**
  *
@@ -43,7 +44,7 @@ case class ProductParserModelFactory(baseParser: ParserParams.XbarGrammar,
                                      numStates: Int = 2,
                                      numModels: Int = 2,
                                      oldWeights: File = null,
-                                     splitFactor: Int = 1)  extends ParserModelFactory[AnnotatedLabel, String]  {
+                                     splitFactor: Int = 1)  extends ParserModelFactory[AnnotatedLabel, String] with Logging {
 
 
   type MyModel = LatentParserModel[AnnotatedLabel, (AnnotatedLabel, Seq[Int]), String]
@@ -101,7 +102,7 @@ case class ProductParserModelFactory(baseParser: ParserParams.XbarGrammar,
     val firstLevelRefinements = GrammarRefinements(xbarGrammar, annGrammar, {(_: AnnotatedLabel).baseAnnotatedLabel})
     val secondLevel = GrammarRefinements(annGrammar, {split(_:AnnotatedLabel,substateMap)}, {splitRule(_ :Rule[AnnotatedLabel], {split(_:AnnotatedLabel,substateMap)})}, unsplit)
     val finalRefinements = firstLevelRefinements compose secondLevel
-    println(finalRefinements.labels)
+    logger.info("Will learn with these label refinements: " + finalRefinements.labels)
 
     val featureCounter = if (oldWeights ne null) {
       val baseCounter = breeze.util.readObject[Counter[Feature, Double]](oldWeights)

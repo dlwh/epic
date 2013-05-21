@@ -25,7 +25,7 @@ object ParseText {
     } catch {
       case e:Exception =>
         e.printStackTrace()
-        println(breeze.config.GenerateHelp[Params](config))
+        System.err.println(breeze.config.GenerateHelp[Params](config))
         sys.exit(1)
     }
 

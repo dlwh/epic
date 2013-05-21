@@ -13,6 +13,7 @@ import java.util
 import epic.util.{NotProvided, Optional}
 import epic.parser.features.PairFeature
 import epic.parser.features.LabelFeature
+import com.typesafe.scalalogging.log4j.Logging
 
 /**
  *
@@ -131,7 +132,7 @@ class CRFInference[L, W](val weights: DenseVector[Double],
 
 class TaggedSequenceModelFactory[L](val startSymbol: L,
                                     gazetteer: Optional[Gazetteer[Any, String]] = NotProvided,
-                                    weights: Feature=>Double = { (f:Feature) => 0.0}) {
+                                    weights: Feature=>Double = { (f:Feature) => 0.0}) extends Logging {
 
   import TaggedSequenceModelFactory._
 
@@ -175,7 +176,7 @@ class TaggedSequenceModelFactory[L](val startSymbol: L,
         }
       }
       if(i % 500 == 0) {
-        println(s"$i/${train.length} ${featureIndex.size}")
+        logger.info(s"$i/${train.length} ${featureIndex.size}")
       }
       i += 1
     }

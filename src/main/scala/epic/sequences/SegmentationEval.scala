@@ -2,6 +2,7 @@ package epic.sequences
 
 import breeze.stats.ContingencyStats
 import epic.framework.EvaluationResult
+import com.typesafe.scalalogging.log4j.Logging
 
 
 /**
@@ -10,18 +11,20 @@ import epic.framework.EvaluationResult
  *
  * @author dlwh
  */
-object SegmentationEval {
+object SegmentationEval extends Logging {
   def eval[L ,W](crf: SemiCRF[L, W], examples: IndexedSeq[Segmentation[L, W]], outsideLabel: L):Stats = {
     examples.par.aggregate(new Stats(0,0,0)) ({ (stats, gold )=>
       val guess = crf.bestSequence(gold.words, gold.id +"-guess")
     try {
       if(guess.label != gold.label)
-        println(gold, crf.goldMarginal(guess.segments, guess.words).logPartition, crf.goldMarginal(gold.segments, gold.words).logPartition)
+        logger.trace(s"gold = $gold guess = $guess " +
+          s"guess logPartition = ${crf.goldMarginal(guess.segments, guess.words).logPartition} " +
+          s"gold logPartition =${crf.goldMarginal(gold.segments, gold.words).logPartition}")
     } catch {
-      case _ => println("Can't recover gold for " + gold)
+      case _ => logger.debug("Can't recover gold for " + gold)
     }
       val myStats = evaluateExample(Set(outsideLabel), guess, gold)
-      println("Guess:\n" + guess.render(badLabel=outsideLabel) + "\n Gold:\n" + gold.render(badLabel=outsideLabel)+ "\n" + myStats)
+      logger.info("Guess:\n" + guess.render(badLabel=outsideLabel) + "\n Gold:\n" + gold.render(badLabel=outsideLabel)+ "\n" + myStats)
       stats + myStats
     }, {_ + _})
 

@@ -27,13 +27,14 @@ import epic.features.{MultiSurfaceFeaturizer, ContextSurfaceFeaturizer, Standard
 import epic.constraints.{CachedChartConstraintsFactory, LabeledSpanConstraints}
 import epic.util.CacheBroker
 import java.util.concurrent.atomic.AtomicInteger
+import com.typesafe.scalalogging.log4j.Logging
 
 
 /**
  * 
  * @author dlwh
  */
-object AnnotatingPipeline {
+object AnnotatingPipeline extends Logging {
   case class Params(corpus: File,
                     treebank: ProcessedTreebank,
                     cache: CacheBroker,
@@ -79,8 +80,8 @@ object AnnotatingPipeline {
 //    println(docProcessor.parseConstrainer.augmentedGrammar.refined.asInstanceOf[SimpleRefinedGrammar[_,_,_]].refinements)
     val processedTest =  test.par.map(docProcessor(_)).seq.flatMap(_.sentences).toIndexedSeq
 
-    println(s"${processedTrain.length} training documents totalling ${processedTrain.flatMap(_.sentences).length} sentences.")
-    println(s"${processedTest.length} test sentences.")
+    logger.info(s"${processedTrain.length} training documents totalling ${processedTrain.flatMap(_.sentences).length} sentences.")
+    logger.info(s"${processedTest.length} test sentences.")
 
     val beliefsFactory = new SentenceBeliefs.Factory(docProcessor.grammar, docProcessor.nerLabelIndex, docProcessor.srlLabelIndex, docProcessor.outsideSrlLabel)
 
@@ -98,7 +99,7 @@ object AnnotatingPipeline {
 
 
     if (params.trainBaseModels && params.checkGradient) {
-       println("Checking gradients...")
+       logger.info("Checking gradients...")
       for(m <- models) {
 
         println("Checking " + m.getClass.getName)

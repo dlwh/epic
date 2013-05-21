@@ -30,6 +30,7 @@ import epic.features.{StandardSurfaceFeaturizer, IndexedWordFeaturizer}
 import epic.lexicon.Lexicon
 import epic.constraints.ChartConstraints
 import epic.util.CacheBroker
+import com.typesafe.scalalogging.log4j.Logging
 
 class LatentParserModel[L, L3, W](indexedFeatures: IndexedFeaturizer[L, L3, W],
                                   reannotate: (BinarizedTree[L], Seq[W]) => BinarizedTree[L],
@@ -100,7 +101,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
                               @Help(text="Number of states to use. Overridden by substates file")
                               numStates: Int = 2,
                               @Help(text="Old weights to initialize with. Optional.")
-                              oldWeights: File = null) extends ParserModelFactory[AnnotatedLabel, String] {
+                              oldWeights: File = null) extends ParserModelFactory[AnnotatedLabel, String] with Logging {
   type MyModel = LatentParserModel[AnnotatedLabel, (AnnotatedLabel, Int), String]
 
   def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]]):MyModel = {
@@ -148,7 +149,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     val firstLevelRefinements = GrammarRefinements(xbarGrammar, annGrammar, {(_: AnnotatedLabel).baseAnnotatedLabel})
     val secondLevel = GrammarRefinements(annGrammar, split _, {splitRule(_ :Rule[AnnotatedLabel], presplit)}, unsplit)
     val finalRefinements = firstLevelRefinements compose secondLevel
-    println(finalRefinements.labels)
+    logger.info("Label refinements:" + finalRefinements.labels)
 
     val featureCounter = readWeights(oldWeights)
 

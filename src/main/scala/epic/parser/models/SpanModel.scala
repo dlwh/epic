@@ -454,7 +454,6 @@ object IndexedSpanFeaturizer {
     for( (f, v) <- goldFeatures.activeIterator) {
        goldFeatureIndex.index(f)
     }
-    println(goldFeatureIndex.size)
 
     new IndexedSpanFeaturizer(featurizer, refinements, grammar, goldFeatureIndex, (goldFeatureIndex.size * dummyFeatScale).toInt)
   }

@@ -12,6 +12,7 @@ import epic.constraints.{SpanConstraints, TagConstraints, LabeledSpanConstraints
 import epic.lexicon.{SimpleLexicon, Lexicon}
 import epic.features._
 import epic.util.{CacheBroker, NotProvided, Optional}
+import com.typesafe.scalalogging.log4j.Logging
 
 /**
  *
@@ -236,7 +237,7 @@ class SegmentationModelFactory[L](val startSymbol: L,
                                   val outsideSymbol: L,
                                   pruningModel: Optional[SemiCRF.ConstraintSemiCRF[L, String]] = NotProvided,
                                   gazetteer: Optional[Gazetteer[Any, String]] = NotProvided,
-                                  weights: Feature=>Double = { (f:Feature) => 0.0})(implicit broker: CacheBroker) {
+                                  weights: Feature=>Double = { (f:Feature) => 0.0})(implicit broker: CacheBroker) extends Logging {
 
   import SegmentationModelFactory._
 
@@ -244,7 +245,7 @@ class SegmentationModelFactory[L](val startSymbol: L,
     val maxLengthMap = train.flatMap(_.segments.iterator).groupBy(_._1).mapValues(arr => arr.map(_._2.length).max)
     val labelIndex: Index[L] = Index[L](Iterator(startSymbol, outsideSymbol) ++ train.iterator.flatMap(_.label.map(_._1)))
     val maxLengthArray = Encoder.fromIndex(labelIndex).tabulateArray(maxLengthMap.getOrElse(_, 0))
-    println(maxLengthMap)
+    logger.info("Maximum lengths for segments: " + maxLengthMap)
 
 
     val counts: Counter2[L, String, Double] = Counter2.count(train.map(_.asFlatTaggedSequence(outsideSymbol)).map{seg => seg.label zip seg.words}.flatten).mapValues(_.toDouble)
@@ -278,7 +279,7 @@ object SegmentationModelFactory {
                                      val lexicon: Lexicon[L, String],
                                      val labelIndex: Index[L],
                                      val maxLength: Array[Int],
-                                     val constraintFactory: LabeledSpanConstraints.Factory[L, String]) extends SemiCRFModel.BIEOFeaturizer[L,String] with Serializable {
+                                     val constraintFactory: LabeledSpanConstraints.Factory[L, String]) extends SemiCRFModel.BIEOFeaturizer[L,String] with Serializable with Logging {
 
     def baseWordFeatureIndex = f.wordFeatureIndex
     def baseSpanFeatureIndex = f.spanFeatureIndex
@@ -286,8 +287,7 @@ object SegmentationModelFactory {
 
 
     val kinds = Array('Begin, 'Interior)
-    println(baseWordFeatureIndex.size + " " + baseSpanFeatureIndex.size)
-//    println(baseSpanFeatureIndex)
+    logger.debug(s"Surface Feature Index sizes: Words: ${baseWordFeatureIndex.size} Spans: ${baseSpanFeatureIndex.size}")
 
     val (featureIndex: Index[Feature], wordFeatures, spanFeatures, transitionFeatures) = {
       val featureIndex = Index[Feature]()
@@ -305,7 +305,7 @@ object SegmentationModelFactory {
 
       (featureIndex, labelFeatures, spanFeatures, transitionFeatures)
     }
-    println(featureIndex.size)
+    logger.debug(s"Label Feature Index sizes: ${featureIndex.size}")
 
 
     def anchor(w: IndexedSeq[String]): SemiCRFModel.BIEOAnchoredFeaturizer[L, String] = new SemiCRFModel.BIEOAnchoredFeaturizer[L, String] {

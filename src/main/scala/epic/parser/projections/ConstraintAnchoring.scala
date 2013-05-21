@@ -75,7 +75,7 @@ class ConstraintCoreGrammarAdaptor[L, W](val grammar: BaseGrammar[L], val lexico
 @SerialVersionUID(8620602232218134084L)
 class ParserChartConstraintsFactory[L, W](val augmentedGrammar: AugmentedGrammar[L, W],
                                           val isIntermediate: L=>Boolean,
-                                          alpha: Double) extends ChartConstraints.Factory[L, W] {
+                                          alpha: Double) extends ChartConstraints.Factory[L, W] with Logging {
   import augmentedGrammar._
   def labelIndex = grammar.labelIndex
 
@@ -149,7 +149,7 @@ class ParserChartConstraintsFactory[L, W](val augmentedGrammar: AugmentedGrammar
         assert(!thresholdedTags.isEmpty, threshold + " " + Encoder.fromIndex(labelIndex).decode(arr))
       val goldTags = (0 until numLabels).filter { isGold(i, j, _) }
       for(t <- goldTags if arr(t) < threshold) {
-        println(s"Got a below threshold for a goldTag! ${arr(t)} ${threshold} ${labelIndex.get(t)} "
+        logger.warn(s"Got a below threshold for a goldTag! ${arr(t)} ${threshold} ${labelIndex.get(t)} "
           + s"\n($i,$j) best symbol: ${labelIndex.get((0 until labelIndex.size).maxBy(arr(_)))} ${arr.max}"
         )
       }
@@ -292,14 +292,12 @@ object PrecacheConstraints extends Logging {
    **/
    def forTreebank(constrainer: ParserChartConstraintsFactory[AnnotatedLabel, String], treebank: ProcessedTreebank, tableName: String = "parseConstraints", verifyNoGoldPruningInTrain: Boolean = true)(implicit broker: CacheBroker) = {
     val cached = forTrainingSet(constrainer, treebank.trainTrees.par.map(ti => ti.copy(tree = ti.tree.map(_.baseAnnotatedLabel))), tableName, verifyNoGoldPruning = verifyNoGoldPruningInTrain)
-    (treebank.testTrees ++ treebank.devTrees).par.foreach { ti =>
-      logger.info(s"Ensuring existing constraint for dev/test tree ${ti.id} ${ti.words}")
-      cached.constraints(ti.words)
+    (treebank.devTrees).par.foreach { ti =>
+      logger.info(s"Ensuring existing constraint for dev tree ${ti.id} ${ti.words}")
+      val constraints = cached.constraints(ti.words)
+      if(verifyNoGoldPruningInTrain)
+        checkConstraints(ti, constraints, constrainer)
     }
-    if(verifyNoGoldPruningInTrain)
-      for(t <- treebank.devTrees) {
-
-      }
     cached
   }
 
@@ -327,28 +325,7 @@ object PrecacheConstraints extends Logging {
       }
       if(verifyNoGoldPruning) {
         marg.checkForSimpleTree(ti.tree)
-        var printTree = true
-        def logError(pos: String, t: Tree[L], allowedSpans: Set[L]) {
-          logger.warn(s"Pruned gold $pos label ${t.label} over span ${t.span}:${t.span.map(ti.words)} \n\tAllowed: $allowedSpans.\n\tSentence is ${ti.words.length} words long.\n\tin ${ti.tree.render(ti.words, newline = true)}. decoded tree is ${predicted.render(ti.words)}")
-          printTree = false
-        }
-        ti.tree.allChildren.foreach {
-          case t @ UnaryTree(_,_,_,_) if t.span.length > 1 =>
-            if(!constraints.top.isAllowedLabeledSpan(t.start,t.end, constrainer.labelIndex(t.label))) {
-              val allowedSpans = (0 until constrainer.labelIndex.size).filter(constraints.top.isAllowedLabeledSpan(t.start, t.end, _)).map(constrainer.labelIndex.get(_)).toSet
-              logError("top", t, allowedSpans)
-            }
-          case t@BinaryTree(_,_,_,_) =>
-            if(!constraints.bot.isAllowedLabeledSpan(t.start,t.end, constrainer.labelIndex(t.label))) {
-              val allowedSpans = (0 until constrainer.labelIndex.size).filter(constraints.bot.isAllowedLabeledSpan(t.start, t.end, _)).map(constrainer.labelIndex.get(_)).toSet
-              logError("bot", t, allowedSpans)
-            }
-          case t =>
-            if(!constraints.bot.isAllowedLabeledSpan(t.start,t.end, constrainer.labelIndex(t.label))) {
-              val allowedSpans = (0 until constrainer.labelIndex.size).filter(constraints.bot.isAllowedLabeledSpan(t.start, t.end, _)).map(constrainer.labelIndex.get(_)).toSet
-              logError(if(t.isInstanceOf[UnaryTree[_]]) "length one unary" else "tag", t, allowedSpans)
-            }
-        }
+        checkConstraints(ti, constraints, constrainer)
       }
     } catch {
       case e: Exception =>
@@ -357,6 +334,41 @@ object PrecacheConstraints extends Logging {
 
     broker.commit()
     new CachedChartConstraintsFactory(constrainer, cache)
+  }
+
+
+  def checkConstraints[W, L](ti: TreeInstance[L, W], constraints: ChartConstraints[L], constrainer: ParserChartConstraintsFactory[L, W]) {
+    //        val decoded = new ViterbiDecoder[L, W].extractBestParse(marg)
+    var printTree = true
+    var nerrors = 0
+    var all = 0
+    def logError(pos: String, t: Tree[L], allowedSpans: Set[L]) {
+      logger.warn(s"Pruned gold $pos label ${t.label} over span ${t.span}:${t.span.map(ti.words)} \n\tAllowed: $allowedSpans.\n\tSentence is ${ti.words.length} words long.\n\tin ${ti.tree.render(ti.words, newline = true)}.")
+      printTree = false
+      nerrors += 1
+    }
+    ti.tree.allChildren.foreach {
+      case t@UnaryTree(_, _, _, _) =>
+        all += 1
+        if (!constraints.top.isAllowedLabeledSpan(t.start, t.end, constrainer.labelIndex(t.label))) {
+          val allowedSpans = (0 until constrainer.labelIndex.size).filter(constraints.top.isAllowedLabeledSpan(t.start, t.end, _)).map(constrainer.labelIndex.get(_)).toSet
+          logError(if (t.span.length == 1) "length one unary" else "top", t, allowedSpans)
+        }
+      case t@BinaryTree(_, _, _, _) =>
+        all += 1
+        if (!constraints.bot.isAllowedLabeledSpan(t.start, t.end, constrainer.labelIndex(t.label))) {
+          val allowedSpans = (0 until constrainer.labelIndex.size).filter(constraints.bot.isAllowedLabeledSpan(t.start, t.end, _)).map(constrainer.labelIndex.get(_)).toSet
+          logError("bot", t, allowedSpans)
+        }
+      case t =>
+        all += 1
+        if (!constraints.bot.isAllowedLabeledSpan(t.start, t.end, constrainer.labelIndex(t.label))) {
+          val allowedSpans = (0 until constrainer.labelIndex.size).filter(constraints.bot.isAllowedLabeledSpan(t.start, t.end, _)).map(constrainer.labelIndex.get(_)).toSet
+          logError("tag", t, allowedSpans)
+        }
+    }
+
+    logger.info(s"${ti.id} pruning errors: $nerrors/$all = ${nerrors * 1.0 / all}")
   }
 
   def main(args: Array[String]) {

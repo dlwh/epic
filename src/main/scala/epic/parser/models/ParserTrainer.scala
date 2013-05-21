@@ -24,6 +24,7 @@ import breeze.optimize._
 import epic.trees.{TreeInstance, AnnotatedLabel}
 import breeze.config.Help
 import breeze.util.Implicits._
+import com.typesafe.scalalogging.log4j.Logging
 
 
 /**
@@ -33,7 +34,7 @@ import breeze.util.Implicits._
  *
  *
  */
-object ParserTrainer extends epic.parser.ParserPipeline {
+object ParserTrainer extends epic.parser.ParserPipeline with Logging {
 
   case class Params(@Help(text="What parser to build. LatentModelFactory,StructModelFactory,LexModelFactory,SpanModelFactory")
                     modelFactory: ParserExtractableModelFactory[AnnotatedLabel, String],
@@ -72,9 +73,10 @@ object ParserTrainer extends epic.parser.ParserPipeline {
       val (state, iter) = pair
       val weights = state.x
       if (iter % iterPerValidate == 0) {
-        println("Validating...")
+        logger.info("Validating...")
         val parser = model.extractParser(weights)
-        println(validate(parser))
+        val stats = validate(parser)
+        logger.info("Overall statistics for validation: " + stats)
       }
     }
 

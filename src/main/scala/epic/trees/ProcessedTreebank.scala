@@ -15,7 +15,6 @@ package epic.trees
  limitations under the License.
 */
 import java.io.File
-import breeze.data.Example
 import breeze.config.Help
 
 /**
@@ -33,10 +32,15 @@ case class ProcessedTreebank(@Help(text="Location of the treebank directory")
                              includeDevInTrain: Boolean = false,
                              @Help(text="What kind of binarization to do. Options: left, right, head. Head is best.")
                              binarization: String = "head",
+                             treebankType: String = "penn",
                              numSentences: Int = Int.MaxValue) {
 
-  lazy val treebank = {
-    Treebank.fromPennTreebankDir(path)
+  lazy val treebank = treebankType.toLowerCase() match {
+    case "penn" => Treebank.fromPennTreebankDir(path)
+    case "chinese" => Treebank.fromChineseTreebankDir(path)
+    case "negra" => Treebank.fromGermanTreebank(path)
+    case "conllonto" => Treebank.fromOntonotesDirectory(path)
+    case _ => throw new RuntimeException("Unknown Treebank type")
   }
 
   lazy val trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]] = transformTrees(treebank.train, maxLength, removeUnaries = true).take(numSentences)

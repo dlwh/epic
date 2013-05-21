@@ -19,6 +19,7 @@ package epic.trees
 
 import java.io.{FileReader, File, FileInputStream, InputStreamReader}
 import java.io.File
+import epic.ontonotes.ConllOntoReader
 
 /**
  * A Treebank contains a train set, a test set, and a dev set, which are "Portions". Portions
@@ -74,6 +75,33 @@ trait Treebank[L] { outer =>
 }
 
 object Treebank {
+  def fromOntonotesDirectory(path: File, trainDevSplit: Double = 0.9):Treebank[String] = {
+    val trainFiles = path.listFiles().filter(_.getName.contains("train")).flatMap(_.listFiles())
+    val testFiles = path.listFiles().filter(_.getName.contains("test")).flatMap(_.listFiles())
+    val trainTrees = trainFiles.flatMap(ConllOntoReader.readDocuments _).flatMap(d => d.trees.map(_.map(_.toString)) zip d.words)
+    val testTrees = testFiles.flatMap(ConllOntoReader.readDocuments _).flatMap(d => d.trees.map(_.map(_.toString)) zip d.words)
+    val (realTrain, realDev) = trainTrees.splitAt(trainTrees.length * 9 / 10)
+    new Treebank[String] {
+      val train = Portion("train", IndexedSeq("train"))
+      val dev = Portion("dev", IndexedSeq("dev"))
+      val test = Portion("test", IndexedSeq("test"))
+
+      /**
+       * Every section in the treebank
+       */
+      def sections: IndexedSeq[String] = IndexedSeq("train", "dev", "test")
+
+      /**
+       * Read the trees from a section
+       */
+      def treesFromSection(sec: String): Iterator[(Tree[String], IndexedSeq[String])] = sec match {
+        case "train" => realTrain.iterator
+        case "dev" => realDev.iterator
+        case "test" => testTrees.iterator
+      }
+    }
+  }
+
 
   import scala.io.Source
   /**
@@ -112,7 +140,6 @@ object Treebank {
 
     def treesFromSection(sec: String) = {
       val file = new File(dir,sec)
-      println(file)
       val pennReader = new PennTreeReader(new InputStreamReader(new FileInputStream(file),"UTF-8"))
       for(tree <- pennReader)
         yield tree

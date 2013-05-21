@@ -26,17 +26,9 @@ class SegmentationTest extends FunSuite with Checkers {
 
     check(Prop.forAll { (seg: Segmentation[Int, Int]) =>
       (seg.words.length == 0 ) || {
-
         val toBIO = seg.asBIOSequence(0)
         val fromBIO = Segmentation.fromBIOSequence(toBIO, 0)
-        if(fromBIO.segments != seg.segments) {
-          println(seg)
-          println(fromBIO)
-          println(toBIO)
-          false
-        } else {
-          true
-        }
+        fromBIO.segments == seg.segments
       }
     })
   }

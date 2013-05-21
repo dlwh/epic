@@ -23,7 +23,9 @@ import breeze.util._
 import breeze.numerics._
 import epic.lexicon.Lexicon
 import breeze.numerics
+import com.typesafe.scalalogging.log4j.Logging
 
+case class ParseExtractionException(msg: String, sentence: IndexedSeq[Any]) extends RuntimeException
 
 /**
  * A ChartDecoder converts marginals into a binarized tree. Post-processing
@@ -47,7 +49,7 @@ object ChartDecoder extends Serializable {
  * @author dlwh
  */
 @SerialVersionUID(2)
-class ViterbiDecoder[L, W] extends ChartDecoder[L, W] with Serializable {
+class ViterbiDecoder[L, W] extends ChartDecoder[L, W] with Serializable with Logging {
 
   override def extractBestParse(marginal: ChartMarginal[L, W]): BinarizedTree[L] = {
     import marginal._
@@ -77,8 +79,8 @@ class ViterbiDecoder[L, W] extends ChartDecoder[L, W] with Serializable {
       }
 
       if(maxScore == Double.NegativeInfinity) {
-        println("entered things: " + inside.bot.enteredLabelScores(begin, end).map { case (i, v) => (i, v)}.toList)
-        sys.error(s"Couldn't find a tree! [$begin,$end) $grammar.labelIndex.get(root)")
+        throw new ParseExtractionException(s"Couldn't find a tree! [$begin,$end) $grammar.labelIndex.get(root)\n" +
+          s"entered things: " + inside.bot.enteredLabelScores(begin, end).map { case (i, v) => (i, v)}.toList, marginal.words)
       }
       val child = buildTree(begin, end, maxChild, maxChildRef)
       UnaryTree(labelIndex.get(root), child, grammar.chain(maxRule), Span(begin, end))
@@ -125,8 +127,8 @@ class ViterbiDecoder[L, W] extends ChartDecoder[L, W] with Serializable {
       }
 
       if(maxScore == Double.NegativeInfinity) {
-        println("entered things: " + inside.bot.enteredLabelScores(begin, end).map { case (i, v) => (i, v)}.toList)
-        sys.error(s"Couldn't find a tree! [$begin,$end) $grammar.labelIndex.get(root)")
+        throw new ParseExtractionException(s"Couldn't find a tree! [$begin,$end) $grammar.labelIndex.get(root)\n" +
+          s"entered things: " + inside.bot.enteredLabelScores(begin, end).map { case (i, v) => (i, v)}.toList, marginal.words)
       } else {
         val lchild = buildTreeUnary(begin, maxSplit, maxLeft, maxLeftRef)
         val rchild = buildTreeUnary(maxSplit, end, maxRight, maxRightRef)

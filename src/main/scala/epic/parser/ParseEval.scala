@@ -25,6 +25,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import epic.framework.EvaluationResult
 import collection.parallel.ForkJoinTaskSupport
 import concurrent.forkjoin.ForkJoinPool
+import com.typesafe.scalalogging.log4j.Logging
 
 
 /**
@@ -66,7 +67,7 @@ class ParseEval[L](ignoredLabels: Set[L]) {
   }
 }
 
-object ParseEval {
+object ParseEval extends Logging {
 
   case class Statistics(guess: Int, gold: Int, right: Int, numExact: Int,
                         tagsRight: Int, numWords: Int,
@@ -120,7 +121,7 @@ object ParseEval {
         if(logProgress) {
           val i = acc.incrementAndGet
           if(i % 200 == 0) {
-            println(s"Parsed $i/${trees.length} sentences. $elapsed")
+            logger.info(s"Parsed $i/${trees.length} sentences. $elapsed")
           }
         }
         Some(ParseResult(sent, deBgold, guessTree, (endTime-startTime) / 1000.0))
@@ -169,7 +170,7 @@ object ParseEval {
       buf ++= (time +" Seconds")
       buf ++= "\n======"
       goldOut.println(gold.render(sent.words, newline=false)); guessOut.println(guess.render(sent.words, newline=false))
-      println(buf.toString)
+      logger.info(buf.toString)
     }
 
     guessOut.close()

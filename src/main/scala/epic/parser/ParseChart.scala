@@ -118,7 +118,6 @@ class ParseChart[L](val index: Index[L],
         val ret = Counter2[L, Int, Double]()
         for(i <- enteredLabels(TriangularArray.index(begin, end))) {
           val l = index.get(i)
-          println(i + " " + l)
           for((v,s) <- scoreArray(i).zipWithIndex) {
             if(v != zero)
               ret(l,s) = v

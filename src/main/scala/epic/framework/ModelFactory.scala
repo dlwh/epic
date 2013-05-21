@@ -29,14 +29,13 @@ trait ModelFactory[Datum] {
   def make(train: IndexedSeq[Datum]): MyModel
 
   def readWeights(in: File):Counter[Feature, Double] = if(in != null && in.exists) {
-     try {
-       val ctr = breeze.util.readObject[Counter[Feature, Double]](in)
-       ctr
-     } catch {
-       case e: Exception => Counter[Feature, Double]()
-     }
-   } else {
+    try {
+      val ctr = breeze.util.readObject[Counter[Feature, Double]](in)
+      ctr
+    } catch {
+      case e: Exception => Counter[Feature, Double]()
+    }
+  } else {
     Counter[Feature, Double]()
-   }
   }
 }

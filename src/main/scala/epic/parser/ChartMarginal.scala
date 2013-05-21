@@ -4,6 +4,7 @@ import epic.trees.{UnaryTree, BinarizedTree}
 import epic.util.Arrays
 import breeze.numerics
 import breeze.collection.mutable.TriangularArray
+import com.typesafe.scalalogging.log4j.Logging
 
 /*
  Copyright 2012 David Hall
@@ -36,19 +37,19 @@ import breeze.collection.mutable.TriangularArray
 final case class ChartMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
                                      inside: ParseChart[L], outside: ParseChart[L],
                                      logPartition: Double,
-                                     isMaxMarginal: Boolean) extends ParseMarginal[L, W] {
+                                     isMaxMarginal: Boolean) extends ParseMarginal[L, W] with Logging {
 
   def checkForTree(tree: BinarizedTree[(L, Int)]) = {
     for (t <- tree.allChildren) t match {
       case UnaryTree( (label, ref), _, _, span) =>
         val labelScore = inside.top(span.start, span.end, anchoring.grammar.labelIndex(label), ref)
         if (labelScore.isInfinite) {
-          println("problem with unary: " + (label, ref) + " " + span)
+          logger.warn("problem with unary: " + (label, ref) + " " + span)
         }
       case tree =>
         val labelScore = inside.bot(tree.span.start, tree.span.end, anchoring.grammar.labelIndex(tree.label._1), tree.label._2)
         if (labelScore.isInfinite) {
-          println("problem with other: " + t.label + " " + tree.span)
+          logger.warn("problem with other: " + t.label + " " + tree.span)
         }
     }
     this
@@ -59,12 +60,12 @@ final case class ChartMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
       case UnaryTree( label, _, _, span) =>
         val labelScore = breeze.linalg.softmax(inside.top.decodedLabelScores(span.start, span.end, anchoring.grammar.labelIndex(label)))
         if (labelScore.isInfinite) {
-          println("problem with unary: " + (label) + " " + span)
+          logger.warn("problem with unary: " + (label) + " " + span)
         }
       case tree =>
         val labelScore = breeze.linalg.softmax(inside.bot.decodedLabelScores(tree.start, tree.end, anchoring.grammar.labelIndex(tree.label)))
         if (labelScore.isInfinite) {
-          println("problem with other: " + t.label + " " + tree.span)
+          logger.warn("problem with other: " + t.label + " " + tree.span)
         }
     }
     this
@@ -78,13 +79,13 @@ final case class ChartMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
         val labelScore = outside.top(span.start, span.end, ai, ref)
         if (labelScore.isInfinite) {
           ChartMarginal.synchronized {
-            println("problem with top: " + (label, ref) + " " + span)
-            println(s"problem with outside other: ${t.label} ${tree.span} ${outside.top.enteredLabelIndexes(tree.span.start, tree.span.end)(ai)} $words ${outside.top.decodedLabelScores(tree.span.start,tree.span.end)}")
-            println(ai + " " + outside.top.enteredLabels(TriangularArray.index(tree.span.start, tree.span.end)))
-            println("Constraint: " + anchoring.core.sparsityPattern.top.isAllowedLabeledSpan(tree.start, tree.end, ai))
-            println("checking for inside starting from here...")
+            logger.warn("problem with top: " + (label, ref) + " " + span)
+            logger.warn(s"problem with outside other: ${t.label} ${tree.span} ${outside.top.enteredLabelIndexes(tree.span.start, tree.span.end)(ai)} $words ${outside.top.decodedLabelScores(tree.span.start,tree.span.end)}")
+            logger.warn(ai + " " + outside.top.enteredLabels(TriangularArray.index(tree.span.start, tree.span.end)))
+            logger.warn("Constraint: " + anchoring.core.sparsityPattern.top.isAllowedLabeledSpan(tree.start, tree.end, ai))
+            logger.warn("checking for inside starting from here...")
             checkForTree(t.asInstanceOf[BinarizedTree[(L, Int)]])
-            println("done.")
+            logger.warn("done.")
           }
           return
         }
@@ -93,10 +94,10 @@ final case class ChartMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
         val labelScore = outside.bot(tree.span.start, tree.span.end, ai, tree.label._2)
         if (labelScore.isInfinite) {
           ChartMarginal.synchronized {
-            println(s"problem with outside other: ${t.label} ${tree.span} ${outside.bot.enteredLabelIndexes(tree.span.start, tree.span.end)(ai)} $words ${outside.bot.decodedLabelScores(tree.span.start,tree.span.end)}")
-            println(ai + " " + outside.bot.enteredLabels(TriangularArray.index(tree.span.start, tree.span.end)))
-            println("Constraint: " + anchoring.core.sparsityPattern.bot.isAllowedLabeledSpan(tree.start, tree.end, ai))
-            println("checking for inside starting from here...")
+            logger.warn(s"problem with outside other: ${t.label} ${tree.span} ${outside.bot.enteredLabelIndexes(tree.span.start, tree.span.end)(ai)} $words ${outside.bot.decodedLabelScores(tree.span.start,tree.span.end)}")
+            logger.warn(ai + " " + outside.bot.enteredLabels(TriangularArray.index(tree.span.start, tree.span.end)))
+            logger.warn("Constraint: " + anchoring.core.sparsityPattern.bot.isAllowedLabeledSpan(tree.start, tree.end, ai))
+            logger.warn("checking for inside starting from here...")
             checkForTree(t.asInstanceOf[BinarizedTree[(L, Int)]])
           }
           return
@@ -477,7 +478,7 @@ object ChartMarginal {
             ai += 1
           }
 //          if(!foundSomething && anchoring.core.sparsityPattern != ChartConstraints.noSparsity) {
-//            println(s"Failed to replicate a span in ($begin, $end) of ${anchoring.words}. Label is ${anchoring.grammar.labelIndex.get(a)}")
+//            logger.warn(s"Failed to replicate a span in ($begin, $end) of ${anchoring.words}. Label is ${anchoring.grammar.labelIndex.get(a)}")
 //
 //          }
 
@@ -532,7 +533,6 @@ object ChartMarginal {
           while(ai < numValidLabelRefs) {
             // done updating vector, do an enter:
             if(offsets(ai) > 0) {
-//              println(s"$begin, $end) ${grammar.labelIndex.get(a)} $ai ${offsets(ai)}")
               outside.top.enter(begin, end, a, ai, sum(scoreArray(ai), offsets(ai)))
             }
             ai += 1
@@ -560,7 +560,6 @@ object ChartMarginal {
     val rules = anchoring.grammar.indexedBinaryRulesWithLeftChild(label)
     val length = inside.length
 
-//    println(grammar.labelIndex.get(label) + " " + rules.mkString(", "))
 
     var br = 0
     while (br < rules.length) {
@@ -580,7 +579,6 @@ object ChartMarginal {
       assert(coarseCompletionBegin > end)
       assert(coarseCompletionEnd <= length, coarseCompletionEnd + " " + length)
 
-//      println(coarseCompletionBegin + " " + coarseCompletionEnd)
 
       if (canBuildThisRule) {
         // initialize core scores
@@ -677,8 +675,6 @@ object ChartMarginal {
           coarseCompletionBegin, coarseCompletionEnd,
           r)
 
-//        println(s"building right ${grammar.index.get(r)} on [$coarseCompletionBegin, $coarseCompletionEnd) $begin $end" )
-
         val enteredRefTop = inside.top.enteredLabelRefinements(begin, end, label)
         val compatibleRefinements = refined.validRightChildRefinementsGivenRule(coarseCompletionBegin, coarseCompletionEnd, begin, end, r)
 
@@ -704,7 +700,6 @@ object ChartMarginal {
               var completion = completionBegin
 
               while (completion <= completionEnd) {
-//                println("?!?!?")
                 val pOutside = outside.bot.labelScore(completion, end, p, refP) + spanScores.bot.labelScore(completion, end, p, refP)
                 val bInside = itop.labelScore(completion, begin, lc, refB)
                 if (bInside != Double.NegativeInfinity && pOutside != Double.NegativeInfinity) {

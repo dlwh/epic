@@ -40,6 +40,7 @@ import epic.parser.features.HeadFeature
 import epic.trees.BinaryTree
 import epic.parser.features.DepFeature
 import epic.parser.projections.ConstraintCoreGrammarAdaptor
+import com.typesafe.scalalogging.log4j.Logging
 
 class LexModel[L, W](bundle: LexGrammarBundle[L, W],
                      reannotate: (BinarizedTree[L], IndexedSeq[W])=>BinarizedTree[L],
@@ -660,7 +661,7 @@ case class LexModelFactory(baseParser: ParserParams.XbarGrammar,
                            @Help(text="For features not seen in gold trees, we bin them into dummyFeats * numGoldFeatures bins using hashing.")
                            dummyFeats: Double = 0.5,
                            @Help(text="How common must a feature be before we remember it?")
-                           minFeatCutoff: Int = 1) extends ParserExtractableModelFactory[AnnotatedLabel, String] {
+                           minFeatCutoff: Int = 1) extends ParserExtractableModelFactory[AnnotatedLabel, String] with Logging {
   type MyModel = LexModel[AnnotatedLabel, String]
 
   def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]]) = {
@@ -694,7 +695,7 @@ case class LexModelFactory(baseParser: ParserParams.XbarGrammar,
       dummyFeats,
       trees)
 
-    println("Num features: " + indexed.index.size + " " + indexed.index.labelFeatureIndex.size + " " + indexed.index.surfaceFeatureIndex.size + " " + indexed.index.numHashFeatures)
+    logger.info("Num features: " + indexed.index.size + " " + indexed.index.labelFeatureIndex.size + " " + indexed.index.surfaceFeatureIndex.size + " " + indexed.index.numHashFeatures)
 
     val bundle = new LexGrammarBundle[AnnotatedLabel, String](xbarGrammar,
       xbarLexicon,

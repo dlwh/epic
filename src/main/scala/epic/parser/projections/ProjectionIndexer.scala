@@ -99,7 +99,7 @@ object ProjectionIndexer {
       try {
         indexedProjections(fineIndex(f)) = cf
       } catch {
-        case e: Throwable => println("Grrr... " + f + "\n" + fineIndex); throw e
+        case e: Throwable => throw e
       }
     }
     new ProjectionIndexer(coarseIndex, fineIndex, indexedProjections)

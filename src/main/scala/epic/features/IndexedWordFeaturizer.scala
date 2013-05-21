@@ -1,6 +1,6 @@
 package epic.features
 
-import epic.util.Has2
+import epic.util.{CacheBroker, Has2}
 import breeze.util.Index
 import epic.framework.Feature
 import scala.collection.mutable
@@ -17,8 +17,8 @@ trait IndexedWordFeaturizer[W] {
  */
 object IndexedWordFeaturizer {
   def fromData[W](feat: WordFeaturizer[W],
-                         data: IndexedSeq[IndexedSeq[W]],
-                         wordHashFeatures: Int = 0): IndexedWordFeaturizer[W]  = {
+                  data: IndexedSeq[IndexedSeq[W]],
+                  wordHashFeatures: Int = 0)(implicit cache: CacheBroker = CacheBroker()): IndexedWordFeaturizer[W]  = {
     val wordIndex = Index[Feature]()
     for(words <- data) {
       val anch = feat.anchor(words)
@@ -28,18 +28,19 @@ object IndexedWordFeaturizer {
     }
 
 
-    new MyWordFeaturizer[W](feat, wordIndex)
+    new MyWordFeaturizer[W](feat, wordIndex, cache.make("epic.features.indexed_word_features"))
   }
 
   @SerialVersionUID(1L)
   private class MyWordFeaturizer[W](val featurizer: WordFeaturizer[W],
-                                    val wordFeatureIndex: Index[Feature]) extends IndexedWordFeaturizer[W] with Serializable {
-    def anchor(words: IndexedSeq[W]):IndexedWordAnchoring[W]  = {
+                                    val wordFeatureIndex: Index[Feature],
+                                    cache: mutable.Map[IndexedSeq[W], IndexedWordAnchoring[W]]) extends IndexedWordFeaturizer[W] with Serializable {
+    def anchor(words: IndexedSeq[W]):IndexedWordAnchoring[W]  = cache.getOrElseUpdate(words, {
       val anch = featurizer.anchor(words)
       val wordFeatures = Array.tabulate(words.length, FeaturizationLevel.numLevels) { (i,l) => stripEncode(wordFeatureIndex, anch.featuresForWord(i, l))}
 
       new TabulatedIndexedSurfaceAnchoring[W](words, wordFeatures, null)
-    }
+    })
   }
 
   def stripEncode(ind: Index[Feature], features: Array[Feature]) = {

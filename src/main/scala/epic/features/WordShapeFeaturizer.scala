@@ -80,7 +80,8 @@ class WordShapeFeaturizer(wordCounts: Counter[String, Double],
       var knownLowerCase = false
       var hasTitleCaseVariant = false
 
-      if(w(0).isUpper || w(0).isTitleCase) {
+      val hasInitialUpper: Boolean = w(0).isUpper || w(0).isTitleCase
+      if(hasInitialUpper) {
         features += hasInitCapFeature
         if(wordCounts(w.toLowerCase) > 0) {
           features += hasKnownLCFeature
@@ -129,8 +130,11 @@ class WordShapeFeaturizer(wordCounts: Counter[String, Double],
         } catch {case e: NumberFormatException =>}
       }
 
-      if(wlen > 3 && w.endsWith("s") && !w.endsWith("ss") && !w.endsWith("us") && !w.endsWith("is"))
+      if(wlen > 3 && w.endsWith("s") && !w.endsWith("ss") && !w.endsWith("us") && !w.endsWith("is")) {
         features += endsWithSFeature
+        if(hasInitialUpper)
+          features += hasInitialCapsAndEndsWithSFeature // we mess up NNP and NNPS
+      }
 
       if(wlen >= suffixOrder + 1) {
         for(i <- 1 to suffixOrder) {
@@ -172,6 +176,7 @@ object WordShapeFeaturizer {
   val hasKnownLCFeature = IndicatorWSFeature('HasKnownLC)
   val hasKnownTitleCaseFeature = IndicatorWSFeature('HasKnownTC)
   val hasInitCapFeature = IndicatorWSFeature('HasInitCap)
+  val hasInitialCapsAndEndsWithSFeature = IndicatorWSFeature('HasInitCapAndEndsWithS)
   val hasCapFeature = IndicatorWSFeature('HasCap)
   val hasManyCapFeature = IndicatorWSFeature('HasManyCap)
   val isAllCapsFeature = IndicatorWSFeature('AllCaps)

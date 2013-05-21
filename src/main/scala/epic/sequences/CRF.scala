@@ -60,7 +60,6 @@ object CRF {
                      gazetteer: Gazetteer[Any, String] = Gazetteer.empty[Any, String],
                      opt: OptParams = OptParams()):CRF[L, String] = {
     val model: CRFModel[L, String] = new TaggedSequenceModelFactory[L](startSymbol,  gazetteer = gazetteer).makeModel(data)
-    println(opt.maxIterations)
 
     val obj = new ModelObjective(model, data)
     val cached = new CachedBatchDiffFunction(obj)
