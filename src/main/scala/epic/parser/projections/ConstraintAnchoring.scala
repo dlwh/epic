@@ -296,6 +296,10 @@ object PrecacheConstraints extends Logging {
       logger.info(s"Ensuring existing constraint for dev/test tree ${ti.id} ${ti.words}")
       cached.constraints(ti.words)
     }
+    if(verifyNoGoldPruningInTrain)
+      for(t <- treebank.devTrees) {
+
+      }
     cached
   }
 
@@ -323,12 +327,13 @@ object PrecacheConstraints extends Logging {
       }
       if(verifyNoGoldPruning) {
         marg.checkForSimpleTree(ti.tree)
+        var printTree = true
         def logError(pos: String, t: Tree[L], allowedSpans: Set[L]) {
-          val predicted = new ViterbiDecoder().extractBestParse(marg)
           logger.warn(s"Pruned gold $pos label ${t.label} over span ${t.span}:${t.span.map(ti.words)} \n\tAllowed: $allowedSpans.\n\tSentence is ${ti.words.length} words long.\n\tin ${ti.tree.render(ti.words, newline = true)}. decoded tree is ${predicted.render(ti.words)}")
+          printTree = false
         }
         ti.tree.allChildren.foreach {
-          case t @ UnaryTree(_,_,_,_)=>
+          case t @ UnaryTree(_,_,_,_) if t.span.length > 1 =>
             if(!constraints.top.isAllowedLabeledSpan(t.start,t.end, constrainer.labelIndex(t.label))) {
               val allowedSpans = (0 until constrainer.labelIndex.size).filter(constraints.top.isAllowedLabeledSpan(t.start, t.end, _)).map(constrainer.labelIndex.get(_)).toSet
               logError("top", t, allowedSpans)
@@ -338,7 +343,11 @@ object PrecacheConstraints extends Logging {
               val allowedSpans = (0 until constrainer.labelIndex.size).filter(constraints.bot.isAllowedLabeledSpan(t.start, t.end, _)).map(constrainer.labelIndex.get(_)).toSet
               logError("bot", t, allowedSpans)
             }
-          case _ =>
+          case t =>
+            if(!constraints.bot.isAllowedLabeledSpan(t.start,t.end, constrainer.labelIndex(t.label))) {
+              val allowedSpans = (0 until constrainer.labelIndex.size).filter(constraints.bot.isAllowedLabeledSpan(t.start, t.end, _)).map(constrainer.labelIndex.get(_)).toSet
+              logError(if(t.isInstanceOf[UnaryTree[_]]) "length one unary" else "tag", t, allowedSpans)
+            }
         }
       }
     } catch {
