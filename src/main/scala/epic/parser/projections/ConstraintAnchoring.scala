@@ -33,6 +33,7 @@ import epic.constraints.{CachedChartConstraintsFactory, ChartConstraints}
 import epic.util.CacheBroker
 import scala.collection.GenTraversable
 import com.typesafe.scalalogging.log4j.{Logging, Logger}
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * 
@@ -75,9 +76,23 @@ class ConstraintCoreGrammarAdaptor[L, W](val grammar: BaseGrammar[L], val lexico
 @SerialVersionUID(8620602232218134084L)
 class ParserChartConstraintsFactory[L, W](val augmentedGrammar: AugmentedGrammar[L, W],
                                           val isIntermediate: L=>Boolean,
-                                          alpha: Double) extends ChartConstraints.Factory[L, W] with Logging {
+                                          threshold: Double = -7) extends ChartConstraints.Factory[L, W] with Logging {
   import augmentedGrammar._
   def labelIndex = grammar.labelIndex
+
+  def overallStatistics = {
+    val xp = pruned.get()
+    val xpt = prunedtags.get()
+    val xnp = notpruned.get()
+    val xnpt = notprunedtags.get()
+
+    s"Pruned Non-Unit Labels: ${xp * 1.0 / (xp + xnp)}; Pruned Labels ${xpt * 1.0 / {xpt + xnpt}}"
+  }
+
+  val pruned = new AtomicInteger(0)
+  val notpruned = new AtomicInteger(0)
+  val prunedtags = new AtomicInteger(0)
+  val notprunedtags = new AtomicInteger(0)
 
 
   private val synthetics = BitSet.empty ++ (0 until grammar.labelIndex.size).filter(l => isIntermediate(labelIndex.get(l)))
@@ -118,38 +133,28 @@ class ParserChartConstraintsFactory[L, W](val augmentedGrammar: AugmentedGrammar
                                      isGold: (Int, Int, Int)=>Boolean): TriangularArray[BitSet] = {
     TriangularArray.tabulate[BitSet](length + 1) { (i, j) =>
       val arr = scores(TriangularArray.index(i, j))
-      val threshold = if(arr eq null) {
-        1.0
-      } else {
-        val nonZeroCounts = arr.filterNot(_ == 0.0)
-        // threshold in log space is alpha * Vmax + (1-alpha) * 1/numSyms * sum_{!V(sym).isInfinite} V(sym)
-        // Vmax = score of root
-        // our v's are exp(V(sym) - Vmax), so the average above is 1/numSyms * sum_{!V(sym) == 0.0) (log V(sym) + Vmax)
-        // so the vmax comes out: Vmax + (1-alpha) * avg_{V(sym) != 0.0} logV(sym)
-        // then we put threshold back in normal space, giving exp(Vmax + (1-alpha) ... whatever)
-        // so we compare V(sym) to exp(Vmax + (1-alpha) ...)
-        // but we've divided out by exp(Vmax) on the lhs, so that gives
-        // Vsym > exp( (1-alpha) * ...)
-        if(nonZeroCounts.exists(x => (x- 1.0).abs < 1E-4)) {
-          // probably viterbi path is through here
-          exp((1-alpha)/nonZeroCounts.length * sum(log(nonZeroCounts)))
-        } else {
-          // viterbi path isn't here, factor the symbol "not in the tree" into the average
-          exp((1-alpha) * (sum(log(nonZeroCounts)))/(nonZeroCounts.length + 1.0))
-        }
-      }* .99
       val thresholdedTags = if (arr eq null) {
         BitSet.empty
       } else {
         BitSet.empty ++ (0 until arr.length filter { s =>
-          arr(s) > threshold // lower a little due to floating point
+          arr(s) > threshold
         })
       }
+
+      if(arr ne null)
+        if(j - i > 1) {
+          this.notpruned.addAndGet(thresholdedTags.size)
+          this.pruned.addAndGet(arr.count(_ != 0.0) - thresholdedTags.size)
+        } else {
+          this.notprunedtags.addAndGet(thresholdedTags.size)
+          this.prunedtags.addAndGet(arr.count(_ != 0.0) - thresholdedTags.size)
+        }
+
       if(i == 0 && j == length)
         assert(!thresholdedTags.isEmpty, threshold + " " + Encoder.fromIndex(labelIndex).decode(arr))
       val goldTags = (0 until numLabels).filter { isGold(i, j, _) }
       for(t <- goldTags if arr(t) < threshold) {
-        logger.warn(s"Got a below threshold for a goldTag! ${arr(t)} ${threshold} ${labelIndex.get(t)} "
+        logger.warn(s"Got a below threshold for a goldTag! ${arr(t)} $threshold ${labelIndex.get(t)} "
           + s"\n($i,$j) best symbol: ${labelIndex.get((0 until labelIndex.size).maxBy(arr(_)))} ${arr.max}"
         )
       }
@@ -160,7 +165,7 @@ class ParserChartConstraintsFactory[L, W](val augmentedGrammar: AugmentedGrammar
   }
 
   def computePruningStatistics(words: IndexedSeq[W], gold: GoldTagPolicy[L]): (PruningStatistics, PruningStatistics) = {
-    val charts = ChartMarginal(augmentedGrammar.anchor(words), words, maxMarginal = true)
+    val charts = ChartMarginal(augmentedGrammar.anchor(words), words)
     computePruningStatistics(charts, gold)
   }
 
@@ -296,7 +301,11 @@ object PrecacheConstraints extends Logging {
       logger.info(s"Ensuring existing constraint for dev tree ${ti.id} ${ti.words}")
       val constraints = cached.constraints(ti.words)
       if(verifyNoGoldPruningInTrain)
-        checkConstraints(ti, constraints, constrainer)
+        checkConstraints(ti.copy(tree = ti.tree.map(_.baseAnnotatedLabel)), constraints, constrainer)
+    }
+    (treebank.testTrees).par.foreach { ti =>
+      logger.info(s"Ensuring existing constraint for test sentence ${ti.id} ${ti.words}")
+       cached.constraints(ti.words)
     }
     cached
   }
@@ -311,10 +320,11 @@ object PrecacheConstraints extends Logging {
                            train: GenTraversable[TreeInstance[L, W]],
                            tableName: String = "parseConstraints",
                            verifyNoGoldPruning: Boolean = true)(implicit broker: CacheBroker): CachedChartConstraintsFactory[L, W] = {
+    val parsed = new AtomicInteger(0)
     val cache = broker.make[IndexedSeq[W], ChartConstraints[L]](tableName)
     for(ti <- train) try {
       var located = true
-      lazy val marg = ChartMarginal(constrainer.augmentedGrammar.anchor(ti.words), ti.words, maxMarginal = true)
+      lazy val marg = ChartMarginal(constrainer.augmentedGrammar.anchor(ti.words), ti.words)
       val constraints = cache.getOrElseUpdate(ti.words, {
         located = false
         logger.info(s"Building constraints for ${ti.id} ${ti.words}")
@@ -326,6 +336,9 @@ object PrecacheConstraints extends Logging {
       if(verifyNoGoldPruning) {
         marg.checkForSimpleTree(ti.tree)
         checkConstraints(ti, constraints, constrainer)
+      }
+      if(parsed.incrementAndGet() % 100 == 0) {
+        logger.info("Pruning statistics so far: " + constrainer.overallStatistics)
       }
     } catch {
       case e: Exception =>

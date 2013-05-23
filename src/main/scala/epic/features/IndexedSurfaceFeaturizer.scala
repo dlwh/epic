@@ -27,7 +27,7 @@ object IndexedSurfaceFeaturizer {
   def fromData[W](feat: SurfaceFeaturizer[W],
                   data: IndexedSeq[IndexedSeq[W]],
                   constraintFactory: SpanConstraints.Factory[W],
-                  cacheName: String = "surfaceFeatureCache")
+                  cacheNamePrefix: String = "surfaceFeatureCache")
                  (implicit broker: CacheBroker): IndexedSurfaceFeaturizer[W]  = {
     val spanIndex = Index[Feature]()
     val wordIndex = Index[Feature]()
@@ -46,7 +46,7 @@ object IndexedSurfaceFeaturizer {
     val ss = spanIndex
 
     val f = new MySurfaceFeaturizer[W](feat, constraintFactory, ww, ss)
-    new CachedFeaturizer(f, cacheName)
+    new CachedFeaturizer(f, cacheNamePrefix+(wordIndex.hashCode() * 37 + spanIndex.hashCode()))
   }
 
   @SerialVersionUID(1L)

@@ -8,13 +8,10 @@ import scala.collection.concurrent.Map
 import java.util
 
 import CacheBroker._
-import scala.annotation.migration
 import scala.collection.{mutable, GenTraversableOnce}
-import scala.collection.parallel.Combiner
-import scala.collection.parallel.mutable.ParMap
 
 @SerialVersionUID(1L)
-case class CacheBroker(path: File = null, autocommit: Boolean = true, disableWriteAheadLog: Boolean = false) extends Serializable {
+case class CacheBroker(path: File = null, clearCaches: String = "", autocommit: Boolean = true, disableWriteAheadLog: Boolean = false) extends Serializable {
   // this is how one makes a transient lazy val, sadly.
   @transient
   private var _actualCache:ActualCache = null
@@ -29,6 +26,10 @@ case class CacheBroker(path: File = null, autocommit: Boolean = true, disableWri
       _actualCache = getCacheBroker(path, dbMaker, autocommit)
     }
     if(disableWriteAheadLog) _actualCache.dbMaker.writeAheadLogDisable()
+    if(clearCaches.nonEmpty)
+      for(toDisable <- clearCaches.split(",")) {
+        _actualCache.db.getHashMap(toDisable).clear()
+      }
 
     _actualCache
   }

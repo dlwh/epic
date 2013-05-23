@@ -9,6 +9,9 @@ import scala.annotation.unchecked.uncheckedVariance
 import breeze.util.{Encoder, Index}
 import epic.lexicon.SimpleLexicon
 import epic.util.Has2
+import java.io.{ObjectInputStream, ObjectOutputStream, IOException, ObjectStreamException}
+import epic.constraints.LabeledSpanConstraints.SimpleConstraints.SerializedForm
+import sun.java2d.x11.X11SurfaceDataProxy.Bitmask
 
 /**
  * Tells us wehther a given (labeled) span is allowed in a given sentence. Can
@@ -117,7 +120,7 @@ object LabeledSpanConstraints {
   }
 
   def apply[L](maxLengthPos: Array[Int], maxLengthLabel: Array[Int], spans: TriangularArray[_ <: BitSet]):LabeledSpanConstraints[L] = {
-    SimpleConstraints(maxLengthPos, maxLengthLabel, spans)
+    SimpleConstraints(maxLengthPos, maxLengthLabel, spans.map(bs => if(bs eq null) null else java.util.BitSet.valueOf(bs.toBitMask)))
   }
 
   def fromTagConstraints[L](constraints: TagConstraints[L]): LabeledSpanConstraints[L] = {
@@ -190,13 +193,15 @@ object LabeledSpanConstraints {
     def decode(labelIndex: Index[Any]):String = toString
   }
 
-  @SerialVersionUID(1L)
-  case class SimpleConstraints[L](private val maxLengthsForPosition: Array[Int],  // maximum length for position
-                                  private val maxLengthsForLabel: Array[Int],
-                                  private val spans: TriangularArray[_ <:BitSet]) extends LabeledSpanConstraints[L] with Serializable {
-    def isAllowedSpan(begin: Int, end: Int): Boolean = (spans(begin,end) ne null) && spans(begin,end).nonEmpty
 
-    def isAllowedLabeledSpan(begin: Int, end: Int, label: Int): Boolean = (spans(begin,end) ne null) && spans(begin, end).contains(label)
+  // private vars for serialization.
+  @SerialVersionUID(2L)
+  case class SimpleConstraints[L](private var maxLengthsForPosition: Array[Int],  // maximum length for position
+                                  private var maxLengthsForLabel: Array[Int],
+                                  private var spans: TriangularArray[java.util.BitSet]) extends LabeledSpanConstraints[L] with Serializable {
+    def isAllowedSpan(begin: Int, end: Int): Boolean = (spans(begin,end) ne null) && spans(begin,end).cardinality() > 0
+
+    def isAllowedLabeledSpan(begin: Int, end: Int, label: Int): Boolean = (spans(begin,end) ne null) && spans(begin, end).get(label)
 
     def maxSpanLengthStartingAt(begin: Int): Int = maxLengthsForPosition(begin)
 
@@ -213,12 +218,83 @@ object LabeledSpanConstraints {
       for(i <- 0 until maxLengthsForPosition.length; j <- (i+1) to maxLengthsForPosition.length) {
         val s = spans(i, j)
         if(s ne null) {
-          ret ++= s"  ($i,$j) " + enc.decode(Array.tabulate(labelIndex.size)(x => spans(i, j).contains(x))).toString + "\n"
+          ret ++= s"  ($i,$j) " + enc.decode(Array.tabulate(labelIndex.size)(x => spans(i, j).get(x))).toString + "\n"
         }
       }
       ret.result()
     }
+
+    @throws(classOf[IOException])
+    private def writeObject(out: ObjectOutputStream) {
+      val length: Int = maxLengthsForPosition.length
+      out.writeInt(length)
+      if(length < Byte.MaxValue) {
+        for(i <- 0 until length) {
+          out.writeByte( (maxLengthsForPosition(i) min length).toByte)
+        }
+      } else {
+        for(i <- 0 until length) {
+          out.writeInt(maxLengthsForPosition(i))
+        }
+      }
+      out.writeObject(maxLengthsForLabel)
+      for(i <- 0 until length; j <- (i+1) to length if isAllowedSpan(i, j)) {
+        val cardinality: Int = spans(i, j).cardinality
+        if(cardinality != 0) {
+          out.writeInt(TriangularArray.index(i, j))
+          if(cardinality == 1) {
+            // have to deal with 0 length mask
+            out.writeInt(~(spans(i, j).nextSetBit(0)))
+          } else {
+            val bitmask: Array[Byte] = spans(i, j).toByteArray
+            out.writeInt(bitmask.length)
+            out.write(bitmask)
+          }
+        }
+      }
+      out.writeInt(-1)
+    }
+
+    @throws(classOf[IOException])
+    private def readObject(in: ObjectInputStream) {
+      import in._
+      val length = readInt()
+      maxLengthsForPosition = new Array[Int](length)
+      if(length < Byte.MaxValue) {
+        for(i <- 0 until length) {
+          maxLengthsForPosition(i) = readByte()
+        }
+      } else {
+        for(i <- 0 until length) {
+          maxLengthsForPosition(i) = readInt()
+        }
+      }
+      maxLengthsForLabel = in.readObject().asInstanceOf[Array[Int]]
+      spans = new TriangularArray[util.BitSet](length+1)
+      var ok = true
+      while(ok) {
+        ok = false
+        val ti = readInt()
+        if(ti >= 0) {
+          ok = true
+          val bitmaskSize = readInt()
+          if(bitmaskSize < 0) {
+            val index = ~bitmaskSize
+            spans.data(ti) = new util.BitSet()
+            spans.data(ti).set(index)
+          } else {
+            val bytes = new Array[Byte](bitmaskSize)
+            in.read(bytes)
+            spans.data(ti) = util.BitSet.valueOf(bytes)
+          }
+        }
+      }
+
+    }
   }
+
+
+
 
 
 
