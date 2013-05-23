@@ -121,11 +121,13 @@ final case class AugmentedAnchoring[L, W](refined: RefinedAnchoring[L, W], core:
 }
 
 object AugmentedAnchoring {
-  def fromRefined[L, W](refined: RefinedAnchoring[L, W], viterbi: Boolean = false) = {
+  def fromRefined[L, W](refined: RefinedAnchoring[L, W], viterbi: Boolean = false): AugmentedAnchoring[L, W] = {
     AugmentedAnchoring(refined, CoreAnchoring.identity(refined.grammar, refined.lexicon, refined.words), viterbi)
   }
 
-  def apply[L, W](refined: RefinedAnchoring[L, W], sparsity: ChartConstraints[L]) = {
+  def apply[L, W](refined: RefinedAnchoring[L, W]): AugmentedAnchoring[L, W] = fromRefined(refined)
+
+  def apply[L, W](refined: RefinedAnchoring[L, W], sparsity: ChartConstraints[L]): AugmentedAnchoring[L, W] = {
     new AugmentedAnchoring(refined, new ConstraintAnchoring(refined.grammar, refined.lexicon, refined.words, sparsity))
   }
 

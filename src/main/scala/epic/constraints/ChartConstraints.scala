@@ -2,6 +2,8 @@ package epic.constraints
 
 import scala.collection.BitSet
 import breeze.collection.mutable.TriangularArray
+import epic.trees.{UnaryTree, BinarizedTree}
+import breeze.util.Index
 
 /**
  * Has constraints relevant to building an [[epic.parser.ParseChart]],
@@ -34,5 +36,18 @@ object ChartConstraints {
 
   trait Factory[L, W] extends SpanConstraints.Factory[W] {
     def constraints(w: IndexedSeq[W]): ChartConstraints[L]
+  }
+
+  def fromTree[L](labelIndex: Index[L], tree: BinarizedTree[L]): ChartConstraints[L] = {
+    val top = TriangularArray.fill(tree.end+1){ null: BitSet }
+    val bot = TriangularArray.fill(tree.end+1){ null: BitSet }
+    for(t <- tree.allChildren) t match {
+      case UnaryTree(p,_,_,span) =>
+        top(span.start,span.end) = BitSet(labelIndex(p))
+      case _ =>
+        bot(t.start,t.end) = BitSet(labelIndex(t.label))
+    }
+
+    ChartConstraints(LabeledSpanConstraints(top), LabeledSpanConstraints(bot))
   }
 }

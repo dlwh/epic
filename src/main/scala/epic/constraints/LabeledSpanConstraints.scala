@@ -18,6 +18,7 @@ import epic.util.Has2
  * @author dlwh
  */
 sealed trait LabeledSpanConstraints[-L] extends SpanConstraints {
+
   def isAllowedLabeledSpan(begin: Int, end: Int, label: Int): Boolean
   def isAllowedSpan(begin: Int, end: Int): Boolean
   /** How long can a span be if it starts at begin*/
@@ -43,6 +44,22 @@ sealed trait LabeledSpanConstraints[-L] extends SpanConstraints {
           else  x(b,e) & y(b,e)
         })
     }
+  }
+
+  def containsAll(other: LabeledSpanConstraints[L @uncheckedVariance]):Boolean = this match {
+    case NoConstraints => true
+    case SimpleConstraints(maxPosX, maxLx, x) => other match {
+      case NoConstraints => throw new UnsupportedOperationException("Can't check Simple.containsAll(noconstraints)")
+      case SimpleConstraints(maxPosY, maxLy, y) =>
+        (maxPosX.zip(maxPosY).forall{case (x,y) => x >= y }
+        && maxLx.zip(maxLy).forall{case (x,y) => x >= y }
+        && {
+          for(i <- (0 until x.dimension).iterator;
+              j <- ((i + 1) until y.dimension).iterator)
+          yield (y(i,j) eq null) || ((x(i,j) ne null) && (y(i,j).subsetOf(x(i,j))))
+        }.forall(identity))
+    }
+
   }
 
   /**

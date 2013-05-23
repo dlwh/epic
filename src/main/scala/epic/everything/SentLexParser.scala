@@ -81,8 +81,7 @@ object SentLexParser {
 
 
     def marginal(sent: FeaturizedSentence, aug: SentenceBeliefs): Marginal = {
-//      checkForTree(aug, sent.tree)
-      val anchoring = adapt(sent.words, aug)
+       val anchoring =  new Anchoring(grammar, sent.words, aug)
        AugmentedAnchoring(anchoring, sent.constituentSparsity).marginal
     }
 
@@ -105,8 +104,8 @@ object SentLexParser {
 
 
     def goldMarginal(sent: FeaturizedSentence, aug: SentenceBeliefs): Marginal = {
-      val anchoring = adapt(sent.words, aug)
-      new TreeMarginal(AugmentedAnchoring(anchoring, sent.constituentSparsity), reannotate(sent.tree, sent.words))
+      val anchoring =  new Anchoring(grammar, sent.words, aug)
+      new TreeMarginal(AugmentedAnchoring(anchoring), reannotate(sent.tree, sent.words))
     }
 
     def countsFromMarginal(sent: FeaturizedSentence,
@@ -115,11 +114,6 @@ object SentLexParser {
                            scale: Double): ExpectedCounts = {
       marg.expectedCounts(featurizer, counts, scale)
       counts
-    }
-
-
-    def adapt(words: IndexedSeq[String], t: SentenceBeliefs): Anchoring[AnnotatedLabel, String] = {
-      new Anchoring(grammar, words, t)
     }
 
     def project(s: FeaturizedSentence, marg: Marginal, oldAugment: SentenceBeliefs): SentenceBeliefs = {
