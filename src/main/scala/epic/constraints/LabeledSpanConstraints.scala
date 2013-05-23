@@ -1,4 +1,5 @@
-package epic.constraints
+package epic
+package constraints
 
 import scala.collection.BitSet
 import breeze.collection.mutable.TriangularArray
@@ -10,8 +11,6 @@ import breeze.util.{Encoder, Index}
 import epic.lexicon.SimpleLexicon
 import epic.util.Has2
 import java.io.{ObjectInputStream, ObjectOutputStream, IOException, ObjectStreamException}
-import epic.constraints.LabeledSpanConstraints.SimpleConstraints.SerializedForm
-import sun.java2d.x11.X11SurfaceDataProxy.Bitmask
 
 /**
  * Tells us wehther a given (labeled) span is allowed in a given sentence. Can
@@ -59,7 +58,7 @@ sealed trait LabeledSpanConstraints[-L] extends SpanConstraints {
         && {
           for(i <- (0 until x.dimension).iterator;
               j <- ((i + 1) until y.dimension).iterator)
-          yield (y(i,j) eq null) || ((x(i,j) ne null) && (y(i,j).subsetOf(x(i,j))))
+          yield (y(i,j) eq null) || ((x(i,j) ne null) && (y(i,j) &~ x(i,j )).isEmpty)
         }.forall(identity))
     }
 

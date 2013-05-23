@@ -26,9 +26,7 @@ trait IndexedSurfaceAnchoring[W] extends IndexedWordAnchoring[W] {
 object IndexedSurfaceFeaturizer {
   def fromData[W](feat: SurfaceFeaturizer[W],
                   data: IndexedSeq[IndexedSeq[W]],
-                  constraintFactory: SpanConstraints.Factory[W],
-                  cacheNamePrefix: String = "surfaceFeatureCache")
-                 (implicit broker: CacheBroker): IndexedSurfaceFeaturizer[W]  = {
+                  constraintFactory: SpanConstraints.Factory[W]) : IndexedSurfaceFeaturizer[W]  = {
     val spanIndex = Index[Feature]()
     val wordIndex = Index[Feature]()
     for(words <- data) {
@@ -46,18 +44,16 @@ object IndexedSurfaceFeaturizer {
     val ss = spanIndex
 
     val f = new MySurfaceFeaturizer[W](feat, constraintFactory, ww, ss)
-    new CachedFeaturizer(f, cacheNamePrefix+(wordIndex.hashCode() * 37 + spanIndex.hashCode()))
+    new CachedFeaturizer(f, CacheBroker().make(f.toString))
   }
 
   @SerialVersionUID(1L)
-  class CachedFeaturizer[W](val base: IndexedSurfaceFeaturizer[W], name: String)(implicit broker: CacheBroker) extends IndexedSurfaceFeaturizer[W] with Serializable {
+  class CachedFeaturizer[W](val base: IndexedSurfaceFeaturizer[W], cache: collection.mutable.Map[IndexedSeq[W], IndexedSurfaceAnchoring[W]]) extends IndexedSurfaceFeaturizer[W] with Serializable {
     def spanFeatureIndex: Index[Feature] = base.spanFeatureIndex
 
     def featurizer: SurfaceFeaturizer[W] = base.featurizer
 
     def wordFeatureIndex: Index[Feature] = base.wordFeatureIndex
-
-    private val cache = broker.make[IndexedSeq[W], IndexedSurfaceAnchoring[W]](name)
 
     def anchor(datum: IndexedSeq[W]): IndexedSurfaceAnchoring[W] = cache.getOrElseUpdate(datum, base.anchor(datum))
   }

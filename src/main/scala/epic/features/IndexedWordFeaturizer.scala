@@ -18,7 +18,7 @@ trait IndexedWordFeaturizer[W] {
 object IndexedWordFeaturizer {
   def fromData[W](feat: WordFeaturizer[W],
                   data: IndexedSeq[IndexedSeq[W]],
-                  wordHashFeatures: Int = 0)(implicit cache: CacheBroker = CacheBroker()): IndexedWordFeaturizer[W]  = {
+                  wordHashFeatures: Int = 0): IndexedWordFeaturizer[W]  = {
     val wordIndex = Index[Feature]()
     for(words <- data) {
       val anch = feat.anchor(words)
@@ -26,6 +26,8 @@ object IndexedWordFeaturizer {
         anch.featuresForWord(i) foreach {wordIndex.index _}
       }
     }
+
+    val cache : CacheBroker = CacheBroker()
 
 
     new MyWordFeaturizer[W](feat, wordIndex, cache.make("epic.features.indexed_word_features"))

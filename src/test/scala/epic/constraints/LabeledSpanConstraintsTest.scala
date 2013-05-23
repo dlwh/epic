@@ -15,8 +15,7 @@ class LabeledSpanConstraintsTest extends FunSuite {
     val x = LabeledSpanConstraints[Int](TriangularArray.tabulate(10) { (i,j) =>
       if(i == j || i > 5) null
       else {
-        if(i < j)
-          BitSet(1,2,3,4)
+        if(i < j) BitSet(1,2,3,4)
         else BitSet(1)
       }
 
@@ -29,6 +28,25 @@ class LabeledSpanConstraintsTest extends FunSuite {
     val y = ooin.readObject().asInstanceOf[LabeledSpanConstraints[Int]]
     assert(x.containsAll(y) && y.containsAll(x))
 
+
+  }
+
+  test("containsAll") {
+
+    val x = LabeledSpanConstraints[Int](TriangularArray.tabulate(10) { (i,j) =>
+      if(i == j || i > 5) null
+      else {
+        if(i < j) BitSet(1,2,3,4)
+        else BitSet(1)
+      }
+
+    })
+    val z = LabeledSpanConstraints[Int](TriangularArray.tabulate(10) { (i,j) =>
+      if(i < j) BitSet(1,2,3,4)
+      else BitSet(1)
+    })
+
+    assert(!x.containsAll(z))
   }
 
 }
