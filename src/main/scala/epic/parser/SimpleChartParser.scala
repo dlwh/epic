@@ -35,7 +35,7 @@ trait ChartParser[L, W] extends Parser[L, W] with Serializable {
  */
 @SerialVersionUID(1)
 class SimpleChartParser[L, W](val augmentedGrammar: AugmentedGrammar[L, W],
-                              val decoder: ChartDecoder[L, W]) extends ChartParser[L, W] with Serializable {
+                              val decoder: ChartDecoder[L, W] = ChartDecoder[L, W]()) extends ChartParser[L, W] with Serializable {
 
   def charts(w: IndexedSeq[W]) = {
    try {
