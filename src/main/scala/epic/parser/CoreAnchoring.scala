@@ -95,6 +95,9 @@ trait CoreAnchoring[L, W] extends Factor[CoreAnchoring[L, W]] {
   /** The posterior parse forest for this anchoring */
   def marginal = AugmentedAnchoring.fromCore(this).marginal
 
+  /** The posterior parse forest for this anchoring */
+  def maxMarginal = AugmentedAnchoring.fromCore(this).maxMarginal
+
   def lift:RefinedAnchoring[L, W] = LiftedCoreAnchoring(this)
 }
 
