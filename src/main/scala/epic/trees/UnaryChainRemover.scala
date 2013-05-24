@@ -25,7 +25,7 @@ package epic.trees
  */
 object UnaryChainRemover {
 
-  def removeUnaryChains(tree: BinarizedTree[AnnotatedLabel]) = {
+  def removeUnaryChains(tree: BinarizedTree[AnnotatedLabel]): BinarizedTree[AnnotatedLabel] = {
 
     def transform(t: BinarizedTree[AnnotatedLabel],parentWasUnary:Boolean):BinarizedTree[AnnotatedLabel] = t match {
       case UnaryTree(l,c, chain, span) =>

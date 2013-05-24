@@ -35,9 +35,9 @@ object GoldTagPolicy {
     if(tree != null) {
       for( t <- tree.allChildren) {
         if(t.children.size == 1)
-          goldTop(TriangularArray.index(t.span.start,t.span.end)) ++= t.label
+          goldTop(TriangularArray.index(t.span.begin,t.span.end)) ++= t.label
         else
-          goldBot(TriangularArray.index(t.span.start,t.span.end)) ++= t.label
+          goldBot(TriangularArray.index(t.span.begin,t.span.end)) ++= t.label
       }
     }
     new GoldTagPolicy[L] {
@@ -61,9 +61,9 @@ object GoldTagPolicy {
       if(tree != null) {
         for( t <- tree.allChildren) {
           if(t.children.size == 1)
-            goldTop(TriangularArray.index(t.span.start,t.span.end)) += t.label
+            goldTop(TriangularArray.index(t.span.begin,t.span.end)) += t.label
           else
-            goldBot(TriangularArray.index(t.span.start,t.span.end)) += t.label
+            goldBot(TriangularArray.index(t.span.begin,t.span.end)) += t.label
         }
       }
     }

@@ -65,12 +65,14 @@ object AugmentedGrammar {
  */
 @SerialVersionUID(2L)
 final case class AugmentedAnchoring[L, W](refined: RefinedAnchoring[L, W], core: CoreAnchoring[L, W], viterbi: Boolean = false) {
+
   def grammar: BaseGrammar[L] = refined.grammar
   def lexicon: Lexicon[L, W] = refined.lexicon
   def words = refined.words
 
   /** The marginal associated with this anchoring (i.e. inside and outside scores) */
   def marginal = ChartMarginal(this, words)
+  def maxMarginal = ChartMarginal(this, words, maxMarginal = true)
 
   /**
    * Scores the [[epic.trees.BinaryRule]] with its refinement in this context.

@@ -16,7 +16,7 @@ package epic.parser
 */
 
 import java.util.Arrays
-import projections.{AnchoredPCFGProjector, AnchoredRuleMarginalProjector}
+import epic.parser.projections.{ChartProjector, AnchoredPCFGProjector, AnchoredRuleMarginalProjector}
 import epic.trees._
 import breeze.collection.mutable.TriangularArray
 import breeze.util._
@@ -35,11 +35,12 @@ case class ParseExtractionException(msg: String, sentence: IndexedSeq[Any]) exte
  */
 trait ChartDecoder[L, W] extends Serializable{
   def extractBestParse(marginal: ChartMarginal[L, W]):BinarizedTree[L]
+  def wantsMaxMarginal: Boolean = false
 }
 
-object ChartDecoder extends Serializable {
-  def apply[L,W](grammar: BaseGrammar[L], lexicon: Lexicon[L, W]):ChartDecoder[L, W] = {
-    new MaxRuleProductDecoder(grammar, lexicon)
+object ChartDecoder {
+  def apply[L,W]():ChartDecoder[L, W] = {
+    new MaxRuleProductDecoder()
   }
 }
 
@@ -51,7 +52,10 @@ object ChartDecoder extends Serializable {
 @SerialVersionUID(2)
 class ViterbiDecoder[L, W] extends ChartDecoder[L, W] with Serializable with Logging {
 
+  override def wantsMaxMarginal: Boolean = true
+
   override def extractBestParse(marginal: ChartMarginal[L, W]): BinarizedTree[L] = {
+    assert(marginal.isMaxMarginal)
     import marginal._
     val labelIndex = grammar.labelIndex
     val rootIndex = (grammar.labelIndex(grammar.root))
@@ -144,22 +148,22 @@ class ViterbiDecoder[L, W] extends ChartDecoder[L, W] with Serializable with Log
   }
 }
 
+abstract class ProjectingChartDecoder[L, W](proj: ChartProjector[L, W]) extends ChartDecoder[L, W] {
+  def extractBestParse(marginal: ChartMarginal[L, W]): BinarizedTree[L] = {
+    val anchoring = proj.project(marginal)
+    val newMarg = AugmentedAnchoring.fromCore(anchoring).maxMarginal
+    assert(!newMarg.logPartition.isInfinite, marginal.logPartition + " " + newMarg.logPartition)
+    new ViterbiDecoder[L, W].extractBestParse(newMarg)
+  }
+}
+
 /**
  * Tries to extract a tree that maximizes rule product in the coarse grammar.
  * This is Slav's Max-Rule-Product
  *
  * @author dlwh
  */
-case class MaxRuleProductDecoder[L, W](grammar: BaseGrammar[L], lexicon: Lexicon[L, W]) extends ChartDecoder[L, W] {
-  private val p = new AnchoredRuleMarginalProjector[L,W](-7)
-
-  def extractBestParse(marginal: ChartMarginal[L, W]): BinarizedTree[L] = {
-    val anchoring = p.project(marginal)
-    val newMarg = anchoring.marginal
-    assert(!newMarg.logPartition.isInfinite, marginal.logPartition + " " + newMarg.logPartition)
-    new MaxConstituentDecoder[L, W].extractBestParse(newMarg)
-  }
-}
+case class MaxRuleProductDecoder[L, W]() extends ProjectingChartDecoder[L, W](new AnchoredRuleMarginalProjector())
 
 /**
  * Projects a tree to an anchored PCFG and then does viterbi on that tree.
@@ -167,15 +171,7 @@ case class MaxRuleProductDecoder[L, W](grammar: BaseGrammar[L], lexicon: Lexicon
  *
  * @author dlwh
  */
-class MaxVariationalDecoder[L, W](grammar: BaseGrammar[L], lexicon: Lexicon[L, W]) extends ChartDecoder[L, W] {
-  private val p = new AnchoredPCFGProjector[L,W](grammar)
-
-  def extractBestParse(marginal: ChartMarginal[L, W]): BinarizedTree[L] = {
-    val anchoring = p.project(marginal)
-    val newMarg = anchoring.marginal
-    new MaxConstituentDecoder[L, W].extractBestParse(newMarg)
-  }
-}
+case class MaxVariationalDecoder[L, W]() extends ProjectingChartDecoder[L, W](new AnchoredPCFGProjector())
 
 /**
  * Attempts to find a parse that maximizes the expected number

@@ -48,12 +48,12 @@ object ConllEval {
         for( (doc,mentions) <- docs) yield {
           val mentionMapForDoc =  doc.sentences.map(s => s.words.map(w => MentionMapEntry(s.id, w)))
           for((set,clusterId) <- mentions.zipWithIndex; mc <- set) {
-            if(mc.span.start == mc.span.end - 1) {
-              assert(mentionMapForDoc(mc.sentence)(mc.span.start).oneWordMention == None,
-                s"Two one-word mentions on same pos?!?! ${mentionMapForDoc(mc.sentence)(mc.span.start)} $mc ${doc.id}")
-              mentionMapForDoc(mc.sentence)(mc.span.start).oneWordMention = Some(clusterId)
+            if(mc.span.begin == mc.span.end - 1) {
+              assert(mentionMapForDoc(mc.sentence)(mc.span.begin).oneWordMention == None,
+                s"Two one-word mentions on same pos?!?! ${mentionMapForDoc(mc.sentence)(mc.span.begin)} $mc ${doc.id}")
+              mentionMapForDoc(mc.sentence)(mc.span.begin).oneWordMention = Some(clusterId)
             } else {
-              mentionMapForDoc(mc.sentence)(mc.span.start).starts += clusterId
+              mentionMapForDoc(mc.sentence)(mc.span.begin).starts += clusterId
               mentionMapForDoc(mc.sentence)(mc.span.end-1).ends += clusterId
             }
           }

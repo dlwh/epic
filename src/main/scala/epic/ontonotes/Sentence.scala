@@ -91,11 +91,11 @@ case class Frame(lemma: String, pos: Int, sense: Int, args: IndexedSeq[Argument]
    */
   def stripEmbedded = {
     val newArgs = mutable.Stack[Argument]()
-    val sorted = args.sortBy(a => (a.span.start, -a.span.length))(Ordering.Tuple2)
+    val sorted = args.sortBy(a => (a.span.begin, -a.span.length))(Ordering.Tuple2)
     for(arg <- sorted) {
       if(newArgs.isEmpty || !(newArgs.top.span.contains(arg.span))// don't overlap at all
         ) {
-        while(newArgs.nonEmpty && arg.span.contains(newArgs.top)) {
+        while(newArgs.nonEmpty && arg.span.contains(newArgs.top.span)) {
           newArgs.pop()
         }
         assert(newArgs.isEmpty || !arg.span.crosses(newArgs.top.span))
@@ -106,16 +106,16 @@ case class Frame(lemma: String, pos: Int, sense: Int, args: IndexedSeq[Argument]
   }
 
   def asSegments(words: IndexedSeq[String], outside: String = "O"):IndexedSeq[(Option[String], Span)] = {
-    val sorted = args.sortBy(_.span.start)
+    val sorted = args.sortBy(_.span.begin)
     var out = new ArrayBuffer[(Option[String], Span)]()
     var last = 0
     for( arg <- sorted ) {
-      assert(last <= arg.span.start)
-      while(arg.span.start != last) {
+      assert(last <= arg.span.begin)
+      while(arg.span.begin != last) {
         out += (Some(outside) -> Span(last,last+1))
         last += 1
       }
-      out += (Some(arg.arg) -> Span(arg.span.start, arg.span.end))
+      out += (Some(arg.arg) -> Span(arg.span.begin, arg.span.end))
       last = arg.span.end
     }
     while(words.length != last) {

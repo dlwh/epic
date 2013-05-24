@@ -432,19 +432,19 @@ object IndexedSpanFeaturizer {
       def rec(t: BinarizedTree[L2]):Unit = t match {
         case NullaryTree(a, span) =>
           val aI = labelIndex(a)
-          add(set, spec.featuresForSpan(span.start, span.end, aI))
+          add(set, spec.featuresForSpan(span.begin, span.end, aI))
         case UnaryTree(a, b, chain, span) =>
           val r = ruleIndex(UnaryRule(a, b.label, chain))
           rec(b)
-          add(set, spec.featuresForRule(span.start, span.end, r))
+          add(set, spec.featuresForRule(span.begin, span.end, r))
         case BinaryTree(a, b, c, span) =>
           rec(b)
           rec(c)
           val r = ruleIndex(BinaryRule(a, b.label, c.label))
           val aI = labelIndex(a)
-          add(set, spec.featuresForSpan(span.start, span.end, aI))
-          add(set, spec.featuresForRule(span.start, span.end, r))
-          add(set, spec.featuresForBinaryRule(span.start, b.span.end, span.end, r))
+          add(set, spec.featuresForSpan(span.begin, span.end, aI))
+          add(set, spec.featuresForRule(span.begin, span.end, r))
+          add(set, spec.featuresForBinaryRule(span.begin, b.span.end, span.end, r))
       }
       rec(ann(ti.tree, ti.words))
       set

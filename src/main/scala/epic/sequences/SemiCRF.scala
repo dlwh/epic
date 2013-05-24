@@ -258,15 +258,15 @@ object SemiCRF {
       val goldLabels = Array.fill(segmentation.last._2.end)(-1)
       val goldPrevLabels = Array.fill(segmentation.last._2.end)(-1)
       for( (l,span) <- segmentation) {
-        assert(span.start == lastEnd)
+        assert(span.begin == lastEnd)
         val symbol = scorer.labelIndex(l)
         assert(symbol != -1, s"$l not in index: ${scorer.labelIndex}")
-        assert(scorer.constraints.isAllowedLabeledSpan(span.start, span.end, symbol))
-        score += scorer.scoreTransition(lastSymbol, symbol, span.start, span.end)
+        assert(scorer.constraints.isAllowedLabeledSpan(span.begin, span.end, symbol))
+        score += scorer.scoreTransition(lastSymbol, symbol, span.begin, span.end)
         assert(!score.isInfinite, " " + segmentation + " " + l + " " + span)
-        goldEnds(span.start) = span.end
-        goldLabels(span.start) = symbol
-        goldPrevLabels(span.start) = lastSymbol
+        goldEnds(span.begin) = span.end
+        goldLabels(span.begin) = symbol
+        goldPrevLabels(span.begin) = lastSymbol
         lastSymbol = symbol
         lastEnd = span.end
       }
@@ -282,9 +282,9 @@ object SemiCRF {
           var lastSymbol = scorer.labelIndex(scorer.startSymbol)
           var lastEnd = 0
           for( (l,span) <- segmentation) {
-            assert(span.start == lastEnd)
+            assert(span.begin == lastEnd)
             val symbol = scorer.labelIndex(l)
-            f.visitTransition(lastSymbol, symbol, span.start, span.end, 1.0)
+            f.visitTransition(lastSymbol, symbol, span.begin, span.end, 1.0)
             lastEnd = span.end
             lastSymbol = symbol
           }

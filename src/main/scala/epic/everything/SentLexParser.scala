@@ -88,10 +88,10 @@ object SentLexParser {
     def checkForTree(aug: SentenceBeliefs, tree: BinarizedTree[L]) = {
       for (t <- tree.allChildren) t match {
         case UnaryTree( label, _, _, span) =>
-          val labelScore = aug.spanBeliefs(t.span.start, t.span.end).label(grammar.labelIndex(label))
+          val labelScore = aug.spanBeliefs(t.span.begin, t.span.end).label(grammar.labelIndex(label))
           if (labelScore <= 0) {
             println("problem with unary: " + label + " " + span + " "
-              + " " + Encoder.fromIndex(new OptionIndex(grammar.labelIndex)).decode(aug.spanBeliefs(t.span.start, t.span.end).label.beliefs))
+              + " " + Encoder.fromIndex(new OptionIndex(grammar.labelIndex)).decode(aug.spanBeliefs(t.span.begin, t.span.end).label.beliefs))
           }
         case _ =>
       }

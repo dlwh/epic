@@ -31,8 +31,7 @@ class SimpleAnchoringTest  extends ParserTestHarness with FunSuite {
 
   test("We can parse using simple anchoring") {
     val gen = ParserTestHarness.simpleParser
-    val genFactory = gen.augmentedGrammar
-    val f = new AnchoredPCFGProjector[AnnotatedLabel, String](genFactory.grammar, Double.NegativeInfinity)
+    val f = new AnchoredPCFGProjector[AnnotatedLabel, String](Double.NegativeInfinity)
 
     val grammar = new ProjectingCoreGrammar(gen.augmentedGrammar, f)
     val chartParser = SimpleChartParser(AugmentedGrammar.fromCore(grammar))
@@ -53,7 +52,7 @@ class SimpleAnchoringTest  extends ParserTestHarness with FunSuite {
 
   test("Parsing kind of works using it") {
     val gen = ParserTestHarness.simpleParser
-    val f = new AnchoredPCFGProjector[AnnotatedLabel, String](gen.grammar, Double.NegativeInfinity)
+    val f = new AnchoredPCFGProjector[AnnotatedLabel, String](Double.NegativeInfinity)
     val grammar = new ProjectingCoreGrammar(gen.augmentedGrammar, f)
 
     val chartParser = SimpleChartParser(AugmentedGrammar.fromCore(grammar))

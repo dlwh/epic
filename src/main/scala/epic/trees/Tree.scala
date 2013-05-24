@@ -22,6 +22,7 @@ import breeze.serialization.DataSerialization
 import breeze.serialization.DataSerialization._
 import java.io.{StringReader, DataInput, DataOutput}
 import breeze.util.Lens
+import scala.annotation.tailrec
 
 @SerialVersionUID(1L)
 trait Tree[+L] extends Serializable {
@@ -29,7 +30,7 @@ trait Tree[+L] extends Serializable {
   def children: IndexedSeq[Tree[L]]
   def span: Span
 
-  def start = span.start
+  def begin = span.begin
   def end = span.end
 
   def isLeaf = children.size == 0
@@ -40,9 +41,9 @@ trait Tree[+L] extends Serializable {
   def isValid = isLeaf || {
     children.map(_.span).forall(this.span contains _) &&
     children.iterator.drop(1).zip(children.iterator).forall { case (next,prev) =>
-      prev.span.end == next.span.start
+      prev.span.end == next.span.begin
     } &&
-    children(0).span.start == this.span.start && 
+    children(0).span.begin == this.span.begin &&
     children.last.span.end == this.span.end
   }
 
@@ -96,7 +97,7 @@ object Tree {
 
   private def recursiveToString[L](tree: Tree[L], depth: Int, sb: StringBuilder):StringBuilder = {
     import tree._
-    sb append "( " append tree.label append " [" append span.start append "," append span.end append "] "
+    sb append "( " append tree.label append " [" append span.begin append "," append span.end append "] "
     for( c <- tree.children ) {
       recursiveToString(c,depth+1,sb) append " "
     }
@@ -126,7 +127,7 @@ object Tree {
     def write(data: DataOutput, t: Tree[L]) = {
       implicitly[ReadWritable[L]].write(data,t.label)
       DataSerialization.write(data,t.children)
-      data.writeInt(t.span.start)
+      data.writeInt(t.span.begin)
       data.writeInt(t.span.end)
     }
     def read(data: DataInput) = {
@@ -193,11 +194,11 @@ object Trees {
       // fold in right arguments
       // newArg is hthe next right child
       val right = binarized.drop(headChildIndex+1).foldLeft(headChild){ (tree,newArg) =>
-        BinaryTree(intermediate,tree,newArg, Span(tree.span.start,newArg.span.end))
+        BinaryTree(intermediate,tree,newArg, Span(tree.span.begin,newArg.span.end))
       }
       // now fold in left args
       val fullyBinarized = binarized.take(headChildIndex).foldRight(right){(newArg,tree) =>
-        BinaryTree(intermediate,newArg,tree, Span(newArg.span.start,tree.span.end))
+        BinaryTree(intermediate,newArg,tree, Span(newArg.span.begin,tree.span.end))
       }
       fullyBinarized.relabelRoot(_ => l)
   }
@@ -315,7 +316,7 @@ object Trees {
     class EmptyNodeStripper[T](implicit lens: Lens[T,String]) extends (Tree[T]=>Option[Tree[T]]) with Serializable {
       def apply(tree: Tree[T]):Option[Tree[T]] = {
         if(lens.get(tree.label) == "-NONE-") None
-        else if(tree.span.start == tree.span.end) None // screw stupid spans
+        else if(tree.span.begin == tree.span.end) None // screw stupid spans
         else {
           val newC = tree.children map this filter (None!=)
           if(newC.length == 0 && !tree.isLeaf) None
@@ -339,6 +340,7 @@ object Trees {
         tree.map{ label =>
           lens.get(label) match {
           case "-RCB-" | "-RRB-" | "-LRB-" | "-LCB-" => label
+          case "PRT|ADVP" => lens.set(label, "PRT")
           case x =>
             if(x.startsWith("--")) lens.set(label,x.replaceAll("---.*","--"))
             else lens.set(label,x.replaceAll("[-|=].*",""))
@@ -386,6 +388,109 @@ object Trees {
 
   }
 
+  import Zipper._
+
+  final case class Zipper[+L](tree: BinarizedTree[L], location: Location[L] = Zipper.Root) {
+    @tailrec
+    def upToRoot: Zipper[L] = up match {
+      case Some(next) => next.upToRoot
+      case None => this
+    }
+
+    def label = tree.label
+    def begin = tree.begin
+    def end = tree.end
+
+
+    /*
+     * assertion
+     *
+     */
+    location match {
+      case RightChild(_, _, ls) => assert(ls.end == tree.begin)
+      case LeftChild(_, _, rs) => assert(tree.end == rs.begin)
+      case _ =>
+    }
+
+
+    def up: Option[Zipper[L]] =  location match {
+      case Root => None
+      case LeftChild(pl, p, rightSibling) =>
+        val parentTree = BinaryTree(pl, tree, rightSibling, Span(tree.begin, rightSibling.end))
+        Some(Zipper(parentTree, p))
+      case RightChild(pl, p, leftSibling) =>
+        val parentTree = BinaryTree(pl, leftSibling, tree, Span(leftSibling.begin, tree.end))
+        Some(Zipper(parentTree, p))
+      case UnaryChild(pl, chain, p) =>
+        val parentTree = UnaryTree(pl, tree, chain, tree.span)
+        Some(Zipper(parentTree, p))
+    }
+
+    def left: Option[Zipper[L]] = location match {
+      case RightChild(pl, parent, leftSibling) => Some(Zipper(leftSibling, LeftChild(pl, parent, tree)))
+      case _ => None
+    }
+
+    def right = location match {
+      case LeftChild(pl, parent, rightSibling) => Some(Zipper(rightSibling, RightChild(pl, parent, tree)))
+      case _ => None
+    }
+
+    /**
+     * goes to the left child
+     * @return
+     */
+    def down: Option[Zipper[L]] = tree match {
+      case BinaryTree(l,lc,rc,span) => Some(Zipper(lc, LeftChild(tree.label, location, rc)))
+      case NullaryTree(_,_) => None
+      case UnaryTree(parent,child,chain,span) =>
+        Some(Zipper(child, UnaryChild(tree.label, chain, location)))
+      case _ => sys.error("Shouldn't be here!")
+    }
+
+    /**
+     * Goes to right child
+     * @return
+     */
+    def downRight: Option[Zipper[L]] = tree match {
+      case BinaryTree(l,lc,rc,span) => Some(Zipper(rc, RightChild(tree.label, location, lc)))
+      case _ => None
+    }
+
+    def iterator:Iterator[Zipper[L]] = Iterator.iterate(Some(this):Option[Zipper[L]]){
+      case None => None
+      case Some(x) => x.next
+    }.takeWhile(_.nonEmpty).flatten
+
+    def next: Option[Zipper[L]] = tree match {
+      case NullaryTree(l, span) =>
+        // go up until we find a LeftChild, then go to its right child.
+        // if we hit the root (that is, we only go up right children), there is no next.
+        var cur:Option[Zipper[L]] = Some(this)
+        while(true) {
+          cur match {
+            case None => return None
+            case Some(loc@Zipper(_, LeftChild(_, _, _))) =>
+              return loc.right
+            case Some(y) =>
+              cur = y.up
+          }
+
+        }
+        sys.error("Shouldn't be here!")
+      case _ =>
+        down
+    }
+  }
+
+  object Zipper {
+    sealed trait Location[+L]
+    case object Root extends Location[Nothing]
+    sealed trait NotRoot[+L] extends Location[L] { def parent: Location[L]; def parentLabel: L}
+    case class LeftChild[+L](parentLabel: L, parent: Location[L], rightSibling: BinarizedTree[L]) extends NotRoot[L]
+    case class RightChild[+L](parentLabel: L, parent: Location[L], leftSibling: BinarizedTree[L]) extends NotRoot[L]
+    case class UnaryChild[+L](parentLabel: L, chain: Seq[String], parent: Location[L]) extends NotRoot[L]
+  }
 
 
 }

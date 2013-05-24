@@ -48,7 +48,7 @@ class ReachabilityProjection[L, W](grammar: BaseGrammar[L], lexicon: Lexicon[L, 
         def scoreSpan(begin: Int, end: Int, tag: Int): Double = {
           20 * I(treeconstraints.bot.isAllowedLabeledSpan(begin, end, tag))
         }
-      }).marginal
+      }).maxMarginal
 
       val closest = new ViterbiDecoder[L,W]().extractBestParse(marg)
       logger.warn {
@@ -56,7 +56,7 @@ class ReachabilityProjection[L, W](grammar: BaseGrammar[L], lexicon: Lexicon[L, 
         s"Gold tree for $words not reachable. Best has score: $stats"
       }
 
-      tree
+      closest
     }
   }
 

@@ -43,9 +43,9 @@ object ChartConstraints {
     val bot = TriangularArray.fill(tree.end+1){ null: BitSet }
     for(t <- tree.allChildren) t match {
       case UnaryTree(p,_,_,span) =>
-        top(span.start,span.end) = BitSet(labelIndex(p))
+        top(span.begin,span.end) = BitSet(labelIndex(p))
       case _ =>
-        bot(t.start,t.end) = BitSet(labelIndex(t.label))
+        bot(t.begin,t.end) = BitSet(labelIndex(t.label))
     }
 
     ChartConstraints(LabeledSpanConstraints(top), LabeledSpanConstraints(bot))

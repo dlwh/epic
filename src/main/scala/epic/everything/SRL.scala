@@ -66,16 +66,16 @@ object SRL {
     }
 
     private def asSegments(words: IndexedSeq[String], frame: IndexedSeq[Argument]): Segmentation[String, String] = {
-      val sorted = frame.sortBy(_.span.start)
+      val sorted = frame.sortBy(_.span.begin)
       var out = new ArrayBuffer[(String, Span)]()
       var last = 0
       for( arg <- sorted ) {
-        assert(last <= arg.span.start)
-        while(arg.span.start != last) {
+        assert(last <= arg.span.begin)
+        while(arg.span.begin != last) {
           out += (outsideLabel -> Span(last,last+1))
           last += 1
         }
-        out += (arg.arg -> Span(arg.span.start, arg.span.end))
+        out += (arg.arg -> Span(arg.span.begin, arg.span.end))
         last = arg.span.end
       }
       while(words.length != last) {

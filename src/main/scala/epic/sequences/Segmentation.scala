@@ -28,7 +28,7 @@ case class Segmentation[+L, +W](segments: IndexedSeq[(L, Span)],
   def asBIOSequence[LL>:L](outsideLabel: LL): TaggedSequence[BIOETag[L], W] = {
     val outLabels = new ArrayBuffer[BIOETag[L]]()
     for((l,span) <- segments if !span.isEmpty) {
-      while(outLabels.length < span.start) {
+      while(outLabels.length < span.begin) {
         outLabels += BIOETag.Outside
       }
 
@@ -36,7 +36,7 @@ case class Segmentation[+L, +W](segments: IndexedSeq[(L, Span)],
         outLabels += BIOETag.Outside
       else
         outLabels += BIOETag.Begin(l)
-      for(i <- (span.start+1) until (span.end) ) {
+      for(i <- (span.begin+1) until (span.end) ) {
         outLabels += {if(l != outsideLabel) BIOETag.Inside(l) else BIOETag.Outside}
       }
     }
@@ -50,11 +50,11 @@ case class Segmentation[+L, +W](segments: IndexedSeq[(L, Span)],
   def asFlatTaggedSequence[LL>:L](outsideLabel: LL): TaggedSequence[LL, W] = {
     val outLabels = new ArrayBuffer[LL]()
     for((l,span) <- segments if !span.isEmpty) {
-      while(outLabels.length < span.start) {
+      while(outLabels.length < span.begin) {
         outLabels += outsideLabel
       }
 
-      for(i <- (span.start) until (span.end) ) {
+      for(i <- (span.begin) until (span.end) ) {
         outLabels += l
       }
     }

@@ -33,7 +33,7 @@ class EPParser[L, W](grammar: BaseGrammar[L],
     val inst = new TreeInstance[L, W]("", null, s)
     val augment = inference.marginal(inst, inference.baseAugment(inst))
     val marg = augment
-    ChartDecoder(grammar, lexicon).extractBestParse(marg.marginals.head.asInstanceOf[ChartMarginal[L, W]])
+    ChartDecoder().extractBestParse(marg.marginals.head.asInstanceOf[ChartMarginal[L, W]])
   }
 
 }

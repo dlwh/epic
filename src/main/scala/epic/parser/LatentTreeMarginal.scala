@@ -52,7 +52,7 @@ case class LatentTreeMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
           val ruleScore = Scaling.unscaleValue(iS / z * oS, iScale + oScale - rootScale)
           assert(!ruleScore.isNaN)
           // assert(exp(ruleScore) > 0, " " + ruleScore)
-          spanVisitor.visitSpan(t.span.start, t.span.end, label, l, ruleScore)
+          spanVisitor.visitSpan(t.span.begin, t.span.end, label, l, ruleScore)
         }
       case t@UnaryTree(Beliefs(a, aLabels, _, _, aScores, aScale), Tree(Beliefs(c, cLabels, cScores,cScale, _,  _), _, _), chain, span) =>
         val rule = grammar.index(UnaryRule(grammar.labelIndex.get(a), grammar.labelIndex.get(c), chain))
@@ -68,17 +68,17 @@ case class LatentTreeMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
             ci += 1
             val ruleRef = anchoring.refined.ruleRefinementFromRefinements(rule, aRef, cRef)
             if(ruleRef != -1 ) {
-              val rs = math.exp(anchoring.scoreUnaryRule(t.span.start, t.span.end, rule, ruleRef)) // exp!
+              val rs = math.exp(anchoring.scoreUnaryRule(t.span.begin, t.span.end, rule, ruleRef)) // exp!
               val ruleScore = Scaling.unscaleValue(opScore / z * rs * icScore, aScale + cScale - rootScale)
               assert(!ruleScore.isNaN)
               // assert(exp(ruleScore) > 0, " " + ruleScore)
-              spanVisitor.visitUnaryRule(t.span.start, t.span.end, rule, ruleRef, ruleScore)
+              spanVisitor.visitUnaryRule(t.span.begin, t.span.end, rule, ruleRef, ruleScore)
             }
           }
         }
       case t@BinaryTree(Beliefs(a, aLabels, _, _, aScores, aScale), Tree(Beliefs(b, bLabels, bScores, bScale, _, _), _, _), Tree(Beliefs(c, cLabels, cScores, cScale, _,  _), _, _), span) =>
-        val begin = span.start
-        val split = t.rightChild.span.start
+        val begin = span.begin
+        val split = t.rightChild.span.begin
         val end = t.span.end
         val rule = grammar.index(BinaryRule(grammar.labelIndex.get(a),
           grammar.labelIndex.get(b),
@@ -112,7 +112,7 @@ case class LatentTreeMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
         for {
            i <- 0 until scores.length
            ref = refs(i)
-           wScore =  anchoring.scoreSpan(t.span.start, t.span.end, label, ref)
+           wScore =  anchoring.scoreSpan(t.span.begin, t.span.end, label, ref)
            if !wScore.isInfinite
         } {
           scores(i) = math.exp(wScore) // exp!
@@ -121,7 +121,7 @@ case class LatentTreeMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
           foundOne = true
         }
         if(!foundOne) {
-          sys.error(s"Trouble with lexical  $words(t.span.start)")
+          sys.error(s"Trouble with lexical  $words(t.span.begin)")
         }
         t.label.scaleInside(0)
       case t@UnaryTree(Beliefs(a, aLabels, aScores, _, _, _), Tree(Beliefs(c, cLabels, cScores, cScale, _,  _), _, _), chain, span) =>
@@ -138,7 +138,7 @@ case class LatentTreeMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
             val cRef = cLabels(ci)
             val ruleRef = anchoring.refined.ruleRefinementFromRefinements(rule, aRef, cRef)
             if (ruleRef != -1) {
-              val score = anchoring.scoreUnaryRule(t.span.start, t.span.end, rule, ruleRef)
+              val score = anchoring.scoreUnaryRule(t.span.begin, t.span.end, rule, ruleRef)
               val ruleScore =  cScores(ci) * math.exp(score) // exp!
               sum += ruleScore
               assert(!ruleScore.isNaN)
@@ -155,7 +155,7 @@ case class LatentTreeMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
         }
 
         if(!foundOne) {
-          sys.error(s"Trouble with unary $t.render(words)}  ${grammar.labelIndex.get(a)}  ${grammar.labelIndex.get(c)}  $rule  ${anchoring.scoreUnaryRule(t.span.start, t.span.end, rule, 0)}")
+          sys.error(s"Trouble with unary $t.render(words)}  ${grammar.labelIndex.get(a)}  ${grammar.labelIndex.get(c)}  $rule  ${anchoring.scoreUnaryRule(t.span.begin, t.span.end, rule, 0)}")
         }
         t.label.scaleInside(cScale)
       case t@BinaryTree(Beliefs(a, aLabels, aScores, _, _, _),
@@ -165,7 +165,7 @@ case class LatentTreeMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
           grammar.labelIndex.get(b),
           grammar.labelIndex.get(c)))
         var foundOne = false
-        val begin = span.start
+        val begin = span.begin
         val split = t.leftChild.span.end
         val end = span.end
         var ai = 0
@@ -230,8 +230,8 @@ case class LatentTreeMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
         } {
           val ruleRef = anchoring.refined.ruleRefinementFromRefinements(rule, aRef, bRef, cRef)
           val spanScore = math.exp(
-            anchoring.scoreBinaryRule(span.start, lchild.span.end, span.end, rule, ruleRef)
-              + anchoring.scoreSpan(t.span.start, t.span.end, a, aRef)
+            anchoring.scoreBinaryRule(span.begin, lchild.span.end, span.end, rule, ruleRef)
+              + anchoring.scoreSpan(t.span.begin, t.span.end, a, aRef)
             ) // exp!
           lchild.label.outside(bi) += aScore * cScore * spanScore
           rchild.label.outside(ci) += aScore * bScore * spanScore
@@ -250,7 +250,7 @@ case class LatentTreeMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
           } {
             val ruleRef = anchoring.refined.ruleRefinementFromRefinements(rule, aRef, cRef)
             if(ruleRef != -1) {
-              val ruleScore = anchoring.scoreUnaryRule(span.start, span.end, rule, ruleRef)
+              val ruleScore = anchoring.scoreUnaryRule(span.begin, span.end, rule, ruleRef)
               sum += aScore * math.exp(ruleScore) // exp!
             }
           }

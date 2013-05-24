@@ -350,20 +350,20 @@ object PrecacheConstraints extends Logging {
     ti.tree.allChildren.foreach {
       case t@UnaryTree(_, _, _, _) =>
         all += 1
-        if (!constraints.top.isAllowedLabeledSpan(t.start, t.end, constrainer.labelIndex(t.label))) {
-          val allowedSpans = (0 until constrainer.labelIndex.size).filter(constraints.top.isAllowedLabeledSpan(t.start, t.end, _)).map(constrainer.labelIndex.get(_)).toSet
+        if (!constraints.top.isAllowedLabeledSpan(t.begin, t.end, constrainer.labelIndex(t.label))) {
+          val allowedSpans = (0 until constrainer.labelIndex.size).filter(constraints.top.isAllowedLabeledSpan(t.begin, t.end, _)).map(constrainer.labelIndex.get(_)).toSet
           logError(if (t.span.length == 1) "length one unary" else "top", t, allowedSpans)
         }
       case t@BinaryTree(_, _, _, _) =>
         all += 1
-        if (!constraints.bot.isAllowedLabeledSpan(t.start, t.end, constrainer.labelIndex(t.label))) {
-          val allowedSpans = (0 until constrainer.labelIndex.size).filter(constraints.bot.isAllowedLabeledSpan(t.start, t.end, _)).map(constrainer.labelIndex.get(_)).toSet
+        if (!constraints.bot.isAllowedLabeledSpan(t.begin, t.end, constrainer.labelIndex(t.label))) {
+          val allowedSpans = (0 until constrainer.labelIndex.size).filter(constraints.bot.isAllowedLabeledSpan(t.begin, t.end, _)).map(constrainer.labelIndex.get(_)).toSet
           logError("bot", t, allowedSpans)
         }
       case t =>
         all += 1
-        if (!constraints.bot.isAllowedLabeledSpan(t.start, t.end, constrainer.labelIndex(t.label))) {
-          val allowedSpans = (0 until constrainer.labelIndex.size).filter(constraints.bot.isAllowedLabeledSpan(t.start, t.end, _)).map(constrainer.labelIndex.get(_)).toSet
+        if (!constraints.bot.isAllowedLabeledSpan(t.begin, t.end, constrainer.labelIndex(t.label))) {
+          val allowedSpans = (0 until constrainer.labelIndex.size).filter(constraints.bot.isAllowedLabeledSpan(t.begin, t.end, _)).map(constrainer.labelIndex.get(_)).toSet
           logError("tag", t, allowedSpans)
         }
     }

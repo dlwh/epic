@@ -82,7 +82,7 @@ object GenerativeParser {
 
     for( ti <- data) {
       val TreeInstance(_, tree, words) = ti
-      val leaves = tree.leaves map (l => (l, words(l.span.start)))
+      val leaves = tree.leaves map (l => (l, words(l.span.begin)))
       tree.allChildren foreach { 
         case BinaryTree(a, bc, cc, span) =>
           binaryProductions(a, BinaryRule(a, bc.label, cc.label)) += 1.0
@@ -156,7 +156,7 @@ object GenerativeTrainer extends ParserPipeline {
     }
 
     val refinedGrammar = RefinedGrammar.generative(xbar, xbarLexicon, indexedRefinements, binaryCounts, initUnaries, scorer)
-    val decoder = if (params.maxRule) new MaxRuleProductDecoder(xbar, xbarLexicon) else new ViterbiDecoder[AnnotatedLabel, String]
+    val decoder = if (params.maxRule) new MaxRuleProductDecoder[AnnotatedLabel, String]() else new ViterbiDecoder[AnnotatedLabel, String]
     val parser = new SimpleChartParser(AugmentedGrammar.fromRefined(refinedGrammar), decoder)
     Iterator.single(("Gen", parser))
   }

@@ -599,7 +599,7 @@ object IndexedLexFeaturizer {
             enumerator(surfaceSpec.featuresForWord(head, FeaturizationLevel.BasicFeatures), surfaceSpec.featuresForWord(dep, FeaturizationLevel.BasicFeatures))
             head
           case t =>
-            t.span.start
+            t.span.begin
         }
         rec(tree)
       }
@@ -618,8 +618,8 @@ object IndexedLexFeaturizer {
         def rec(t: BinarizedTree[L]):Int= t match {
           case NullaryTree(a, span) =>
             val aI = labelIndex(a)
-            enumerator(lexSpec.featuresForTag(aI), surfaceSpec.featuresForWord(span.start).map(justHeadFeatures))
-            span.start
+            enumerator(lexSpec.featuresForTag(aI), surfaceSpec.featuresForWord(span.begin).map(justHeadFeatures))
+            span.begin
           case UnaryTree(a, b, chain, _) =>
             val h = rec(b)
             val r = ruleIndex(UnaryRule(a, b.label, chain))

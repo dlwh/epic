@@ -42,12 +42,12 @@ final case class ChartMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
   def checkForTree(tree: BinarizedTree[(L, Int)]) = {
     for (t <- tree.allChildren) t match {
       case UnaryTree( (label, ref), _, _, span) =>
-        val labelScore = inside.top(span.start, span.end, anchoring.grammar.labelIndex(label), ref)
+        val labelScore = inside.top(span.begin, span.end, anchoring.grammar.labelIndex(label), ref)
         if (labelScore.isInfinite) {
           logger.warn("problem with unary: " + (label, ref) + " " + span)
         }
       case tree =>
-        val labelScore = inside.bot(tree.span.start, tree.span.end, anchoring.grammar.labelIndex(tree.label._1), tree.label._2)
+        val labelScore = inside.bot(tree.span.begin, tree.span.end, anchoring.grammar.labelIndex(tree.label._1), tree.label._2)
         if (labelScore.isInfinite) {
           logger.warn("problem with other: " + t.label + " " + tree.span)
         }
@@ -58,12 +58,12 @@ final case class ChartMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
   def checkForSimpleTree(tree: BinarizedTree[L]) = {
     for (t <- tree.allChildren) t match {
       case UnaryTree( label, _, _, span) =>
-        val labelScore = breeze.linalg.softmax(inside.top.decodedLabelScores(span.start, span.end, anchoring.grammar.labelIndex(label)))
+        val labelScore = breeze.linalg.softmax(inside.top.decodedLabelScores(span.begin, span.end, anchoring.grammar.labelIndex(label)))
         if (labelScore.isInfinite) {
           logger.warn("problem with unary: " + (label) + " " + span)
         }
       case tree =>
-        val labelScore = breeze.linalg.softmax(inside.bot.decodedLabelScores(tree.start, tree.end, anchoring.grammar.labelIndex(tree.label)))
+        val labelScore = breeze.linalg.softmax(inside.bot.decodedLabelScores(tree.begin, tree.end, anchoring.grammar.labelIndex(tree.label)))
         if (labelScore.isInfinite) {
           logger.warn("problem with other: " + t.label + " " + tree.span)
         }
@@ -76,13 +76,13 @@ final case class ChartMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
     for (t <- tree.allChildren) t match {
       case tree@UnaryTree( (label, ref), _, _, span) =>
         val ai: Int = anchoring.grammar.labelIndex(label)
-        val labelScore = outside.top(span.start, span.end, ai, ref)
+        val labelScore = outside.top(span.begin, span.end, ai, ref)
         if (labelScore.isInfinite) {
           ChartMarginal.synchronized {
             logger.warn("problem with top: " + (label, ref) + " " + span)
-            logger.warn(s"problem with outside other: ${t.label} ${tree.span} ${outside.top.enteredLabelIndexes(tree.span.start, tree.span.end)(ai)} $words ${outside.top.decodedLabelScores(tree.span.start,tree.span.end)}")
-            logger.warn(ai + " " + outside.top.enteredLabels(TriangularArray.index(tree.span.start, tree.span.end)))
-            logger.warn("Constraint: " + anchoring.core.sparsityPattern.top.isAllowedLabeledSpan(tree.start, tree.end, ai))
+            logger.warn(s"problem with outside other: ${t.label} ${tree.span} ${outside.top.enteredLabelIndexes(tree.span.begin, tree.span.end)(ai)} $words ${outside.top.decodedLabelScores(tree.span.begin,tree.span.end)}")
+            logger.warn(ai + " " + outside.top.enteredLabels(TriangularArray.index(tree.span.begin, tree.span.end)))
+            logger.warn("Constraint: " + anchoring.core.sparsityPattern.top.isAllowedLabeledSpan(tree.begin, tree.end, ai))
             logger.warn("checking for inside starting from here...")
             checkForTree(t.asInstanceOf[BinarizedTree[(L, Int)]])
             logger.warn("done.")
@@ -91,12 +91,12 @@ final case class ChartMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
         }
       case tree =>
         val ai: Int = anchoring.grammar.labelIndex(tree.label._1)
-        val labelScore = outside.bot(tree.span.start, tree.span.end, ai, tree.label._2)
+        val labelScore = outside.bot(tree.span.begin, tree.span.end, ai, tree.label._2)
         if (labelScore.isInfinite) {
           ChartMarginal.synchronized {
-            logger.warn(s"problem with outside other: ${t.label} ${tree.span} ${outside.bot.enteredLabelIndexes(tree.span.start, tree.span.end)(ai)} $words ${outside.bot.decodedLabelScores(tree.span.start,tree.span.end)}")
-            logger.warn(ai + " " + outside.bot.enteredLabels(TriangularArray.index(tree.span.start, tree.span.end)))
-            logger.warn("Constraint: " + anchoring.core.sparsityPattern.bot.isAllowedLabeledSpan(tree.start, tree.end, ai))
+            logger.warn(s"problem with outside other: ${t.label} ${tree.span} ${outside.bot.enteredLabelIndexes(tree.span.begin, tree.span.end)(ai)} $words ${outside.bot.decodedLabelScores(tree.span.begin,tree.span.end)}")
+            logger.warn(ai + " " + outside.bot.enteredLabels(TriangularArray.index(tree.span.begin, tree.span.end)))
+            logger.warn("Constraint: " + anchoring.core.sparsityPattern.bot.isAllowedLabeledSpan(tree.begin, tree.end, ai))
             logger.warn("checking for inside starting from here...")
             checkForTree(t.asInstanceOf[BinarizedTree[(L, Int)]])
           }

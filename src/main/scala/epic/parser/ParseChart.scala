@@ -177,13 +177,13 @@ class ParseChart[L](val index: Index[L],
       coarseLeftMostEndForBegin(begin)(parent) = math.min(end, coarseLeftMostEndForBegin(begin)(parent))
     }
 
-    /** right most place a constituent with label l can start and end at position i, for right > i. (start)(sym)(ref) */
+    /** right most place a constituent with label l can begin and end at position i, for right > i. (begin)(sym)(ref) */
     val rightMostBeginForEnd: Array[Array[Array[Int]]] = Array.tabulate(length+1, grammarSize){ (i, l) =>
       val arr = new Array[Int](refinementsFor(l))
       Arrays.fill(arr, -1)
       arr
     }
-    /** left most place a constituent with label l can start and end at position i, for left < i. (start)(sym)(ref) */
+    /** left most place a constituent with label l can begin and end at position i, for left < i. (begin)(sym)(ref) */
     val leftMostBeginForEnd = Array.tabulate[Array[Int]](length+1, grammarSize){ (i, l) =>
       val arr = new Array[Int](refinementsFor(l))
       Arrays.fill(arr, length + 1)
@@ -202,9 +202,9 @@ class ParseChart[L](val index: Index[L],
       arr
     }
 
-    /** right most place a left constituent with label l can start and end at position i. (start)(sym) */
+    /** right most place a left constituent with label l can begin and end at position i. (begin)(sym) */
     val coarseRightMostBeginForEnd = makeCoarseExtentArray(-1)
-    /** left most place a left constituent with label l can start and end at position i  (start)(sym) */
+    /** left most place a left constituent with label l can begin and end at position i  (begin)(sym) */
     val coarseLeftMostBeginForEnd = makeCoarseExtentArray(length+1)
     /** left most place a right constituent with label l--which starts at position i--can end. (end)(sym) */
     val coarseLeftMostEndForBegin = makeCoarseExtentArray(length+1)

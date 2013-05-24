@@ -25,10 +25,10 @@ import epic.constraints.ChartConstraints
  * Creates a locally-normalized anchored PCFG from some refined forest.
  * @author dlwh
  */
-case class AnchoredPCFGProjector[L, W](grammar: BaseGrammar[L], threshold: Double = Double.NegativeInfinity) extends ChartProjector[L, W] {
+case class AnchoredPCFGProjector[L, W](threshold: Double = Double.NegativeInfinity) extends ChartProjector[L, W] {
 
   type MyAnchoring = SimpleAnchoring[L, W]
-  private def normalize(ruleScores: OpenAddressHashArray[Double], totals: OpenAddressHashArray[Double]):OpenAddressHashArray[Double] = {
+  private def normalize(grammar: BaseGrammar[L], ruleScores: OpenAddressHashArray[Double], totals: OpenAddressHashArray[Double]):OpenAddressHashArray[Double] = {
     if(ruleScores eq null) null
     else {
       val r = new OpenAddressHashArray[Double](ruleScores.length, Double.NegativeInfinity, ruleScores.activeSize)
@@ -55,12 +55,12 @@ case class AnchoredPCFGProjector[L, W](grammar: BaseGrammar[L], threshold: Doubl
   protected def createAnchoring(charts: ParseMarginal[L, W], ruleData: AnchoredData, sentProb: Double) = {
     val AnchoredRuleProjector.AnchoredData(lexicalScores, unaryScores, totalsUnaries, binaryScores, totalsBinaries) = ruleData
     val normUnaries:Array[OpenAddressHashArray[Double]] = for((ruleScores, totals) <- unaryScores zip totalsUnaries) yield {
-      normalize(ruleScores, totals)
+      normalize(charts.grammar, ruleScores, totals)
     }
 
     val normBinaries:Array[Array[OpenAddressHashArray[Double]]] = for ((splits, totals) <- binaryScores zip totalsBinaries) yield {
       if(splits eq null) null
-      else for(ruleScores <- splits) yield normalize(ruleScores, totals)
+      else for(ruleScores <- splits) yield normalize(charts.grammar, ruleScores, totals)
     }
     val sparsity = charts.anchoring.core.sparsityPattern
     new SimpleAnchoring(charts.grammar, charts.lexicon, charts.words, lexicalScores.map(logify), normUnaries, normBinaries, sparsity)

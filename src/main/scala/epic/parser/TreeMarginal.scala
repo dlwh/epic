@@ -35,7 +35,7 @@ case class TreeMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
     def rec(t: BinarizedTree[(L,Int) ]):Unit = t match {
       case n@NullaryTree( (a, ref), span ) =>
         val aI = grammar.labelIndex(a)
-        score += anchoring.scoreSpan(span.start, span.end, aI, ref)
+        score += anchoring.scoreSpan(span.begin, span.end, aI, ref)
         if(score.isInfinite) throw new Exception("Could not score gold tree!")
       case UnaryTree( (a, refA), child@Tree((b, refB), _, _), chain,  span) =>
         val r = grammar.index(UnaryRule(a, b, chain))
@@ -43,15 +43,15 @@ case class TreeMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
         val ruleRef = anchoring.refined.ruleRefinementFromRefinements(r, refA, refB)
         if(ruleRef < 0) throw new Exception(s"Bad refined rule in gold tree!: ${UnaryRule(a, b, chain)} aRef: $refA  bRef: $refB")
 
-        score += anchoring.scoreUnaryRule(t.span.start, t.span.end, r, ruleRef)
-        if(score.isInfinite) throw new Exception(s"Could not score gold tree!\n Partial Tree: ${t.render(words)}\n Full Tree: ${tree.render(words)}\n span ok? ${anchoring.core.sparsityPattern.isAllowedSpan(t.start, t.end)} okLabels: ${(0 until grammar.labelIndex.size).filter(anchoring.core.sparsityPattern.top.isAllowedLabeledSpan(t.start, t.end, _)).toSet[Int].map(grammar.labelIndex.get(_))}.toIndexedSeq}")
+        score += anchoring.scoreUnaryRule(t.span.begin, t.span.end, r, ruleRef)
+        if(score.isInfinite) throw new Exception(s"Could not score gold tree!\n Partial Tree: ${t.render(words)}\n Full Tree: ${tree.render(words)}\n span ok? ${anchoring.core.sparsityPattern.isAllowedSpan(t.begin, t.end)} okLabels: ${(0 until grammar.labelIndex.size).filter(anchoring.core.sparsityPattern.top.isAllowedLabeledSpan(t.begin, t.end, _)).toSet[Int].map(grammar.labelIndex.get(_))}.toIndexedSeq}")
         rec(child)
       case t@BinaryTree( (a, refA), bt@Tree( (b, refB), _, _), ct@Tree((c, refC), _, _), span) =>
         val aI = grammar.labelIndex(a)
         val rule = grammar.index(BinaryRule(a, b, c))
         val ruleRef = anchoring.refined.ruleRefinementFromRefinements(rule, refA, refB, refC)
-        score += anchoring.scoreSpan(t.span.start, t.span.end, aI, refA)
-        score += anchoring.scoreBinaryRule(t.span.start, bt.span.end, t.span.end, rule, ruleRef)
+        score += anchoring.scoreSpan(t.span.begin, t.span.end, aI, refA)
+        score += anchoring.scoreBinaryRule(t.span.begin, bt.span.end, t.span.end, rule, ruleRef)
         if(score.isInfinite) throw new Exception("Could not score gold tree!" + t.render(words))
         rec(bt)
         rec(ct)
@@ -66,18 +66,18 @@ case class TreeMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
     tree.postorder foreach {
       case n@NullaryTree( (a, ref), span ) =>
         val aI = grammar.labelIndex(a)
-        visitor.visitSpan(n.span.start, n.span.end, aI, ref, 1.0)
+        visitor.visitSpan(n.span.begin, n.span.end, aI, ref, 1.0)
       case t@UnaryTree( (a, refA), Tree((b, refB), _, _), chain, span) =>
         val r = grammar.index(UnaryRule(a, b, chain))
         val ruleRef = anchoring.refined.ruleRefinementFromRefinements(r, refA, refB)
         if(ruleRef < 0) throw new Exception("Bad refined rule in gold tree!: ${UnaryRule(a, b, chain)}  aRef: $refA  bRef: $refB")
-        visitor.visitUnaryRule(t.span.start, t.span.end, r, ruleRef, 1.0)
+        visitor.visitUnaryRule(t.span.begin, t.span.end, r, ruleRef, 1.0)
       case t@BinaryTree( (a, refA), bt@Tree( (b, refB), _, _), Tree((c, refC), _, _), span) =>
         val aI = grammar.labelIndex(a)
         val rule = grammar.index(BinaryRule(a, b, c))
         val ruleRef = anchoring.refined.ruleRefinementFromRefinements(rule, refA, refB, refC)
-        visitor.visitSpan(t.span.start, t.span.end, aI, refA, 1.0)
-        visitor.visitBinaryRule(t.span.start, bt.span.end, t.span.end, rule, ruleRef, 1.0)
+        visitor.visitSpan(t.span.begin, t.span.end, aI, refA, 1.0)
+        visitor.visitBinaryRule(t.span.begin, bt.span.end, t.span.end, rule, ruleRef, 1.0)
     }
   }
 

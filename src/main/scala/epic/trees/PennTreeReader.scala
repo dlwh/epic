@@ -107,9 +107,9 @@ class PennTreeReader(val reader : Reader,
           words += readLeaf()
           currPos += 1
         } else {
-          val (tree,w) = readTree(false, currPos)
+          val (tree,w) = readTree(isRoot = false, pos = currPos)
           if(!dropLabels(tree.label)) {
-            currPos = tree.span.e
+            currPos = tree.end
             words ++= w
             children.add(tree);
           }
