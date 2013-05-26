@@ -281,7 +281,7 @@ case class ProjectionParams(treebank: ProcessedTreebank,
                             name: String = "parseConstraints",
                             @Help(text="Longest train sentence to build constraintFactory for.")
                             maxParseLength: Int = 80,
-                            alpha: Double = 0.8) {
+                            threshold: Double = -7) {
 }
 
 /**
@@ -337,7 +337,7 @@ object PrecacheConstraints extends Logging {
         marg.checkForSimpleTree(ti.tree)
         checkConstraints(ti, constraints, constrainer)
       }
-      if(parsed.incrementAndGet() % 100 == 0) {
+      if(parsed.incrementAndGet() % 10 == 0) {
         logger.info("Pruning statistics so far: " + constrainer.overallStatistics)
       }
     } catch {
@@ -393,7 +393,7 @@ object PrecacheConstraints extends Logging {
     val out = params.out
     out.getAbsoluteFile.getParentFile.mkdirs()
 
-    val factory = new ParserChartConstraintsFactory[AnnotatedLabel, String](parser.augmentedGrammar, {(_:AnnotatedLabel).isIntermediate}, params.alpha)
+    val factory = new ParserChartConstraintsFactory[AnnotatedLabel, String](parser.augmentedGrammar, {(_:AnnotatedLabel).isIntermediate}, exp(params.threshold))
     implicit val broker = new CacheBroker(params.out)
     forTreebank(factory, treebank, params.name)
     broker.commit()

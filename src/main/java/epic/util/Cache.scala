@@ -2,7 +2,7 @@ package epic.util
 
 import java.io.{File, IOException}
 import java.util.Collections
-import org.mapdb.DBMaker
+import org.mapdb.{Serializer, DBMaker}
 import scala.collection.JavaConverters._
 import scala.collection.concurrent.Map
 import java.util
@@ -26,7 +26,7 @@ case class CacheBroker(path: File = null, clearCaches: String = "", autocommit: 
       _actualCache = getCacheBroker(path, dbMaker, autocommit)
     }
     if(disableWriteAheadLog) _actualCache.dbMaker.writeAheadLogDisable()
-    if(clearCaches.nonEmpty)
+    if(clearCaches != null && clearCaches.nonEmpty)
       for(toDisable <- clearCaches.split(",")) {
         _actualCache.db.getHashMap(toDisable).clear()
       }
@@ -42,7 +42,7 @@ case class CacheBroker(path: File = null, clearCaches: String = "", autocommit: 
   def commit() { db.commit()}
   def close() {db.close()}
 
-  def make[K,V](name: String): Map[K, V] = new CacheMap[K, V](name, this)
+  def make[K,V](name: String)(implicit kser: Serializer[K] = null, vser: Serializer[V] = null): Map[K, V] = new CacheMap[K, V](name, this)
 
 }
 
@@ -70,13 +70,13 @@ object CacheBroker {
 
 
   @SerialVersionUID(1L)
-  private class CacheMap[K, V](name: String, cache: CacheBroker) extends Map[K, V] with Serializable {
+  private class CacheMap[K, V](name: String, cache: CacheBroker)(implicit kser: Serializer[K], vser: Serializer[V]) extends Map[K, V] with Serializable {
     import cache._
     @transient
     private var _theMap : Map[K, V] = null
     def theMap = synchronized {
       if(_theMap eq null) {
-        _theMap = db.getHashMap[K, V](name).asScala
+        _theMap = db.createHashMap[K, V](name, true, kser, vser).asScala
       }
       _theMap
     }

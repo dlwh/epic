@@ -4,6 +4,8 @@ import scala.collection.BitSet
 import breeze.collection.mutable.TriangularArray
 import epic.trees.{UnaryTree, BinarizedTree}
 import breeze.util.Index
+import org.mapdb.Serializer
+import java.io.{DataOutput, DataInput}
 
 /**
  * Has constraints relevant to building an [[epic.parser.ParseChart]],
@@ -49,5 +51,20 @@ object ChartConstraints {
     }
 
     ChartConstraints(LabeledSpanConstraints(top), LabeledSpanConstraints(bot))
+  }
+
+
+  implicit def serializerChartConstraints[L]:Serializer[ChartConstraints[L]] = new Serializer[ChartConstraints[L]] with Serializable {
+    def serialize(out: DataOutput, value: ChartConstraints[L]) {
+       implicitly[Serializer[LabeledSpanConstraints[L]]].serialize(out, value.top)
+       implicitly[Serializer[LabeledSpanConstraints[L]]].serialize(out, value.bot)
+    }
+
+    def deserialize(in: DataInput, available: Int): ChartConstraints[L] = {
+      val top = implicitly[Serializer[LabeledSpanConstraints[L]]].deserialize(in, available)
+      val bot = implicitly[Serializer[LabeledSpanConstraints[L]]].deserialize(in, available)
+      ChartConstraints(top, bot)
+    }
+
   }
 }

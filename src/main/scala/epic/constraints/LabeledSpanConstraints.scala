@@ -10,7 +10,10 @@ import scala.annotation.unchecked.uncheckedVariance
 import breeze.util.{Encoder, Index}
 import epic.lexicon.SimpleLexicon
 import epic.util.Has2
-import java.io.{ObjectInputStream, ObjectOutputStream, IOException, ObjectStreamException}
+import java.io._
+import org.mapdb.Serializer
+import scala.Serializable
+import epic.constraints.LabeledSpanConstraints.SimpleConstraints
 
 /**
  * Tells us wehther a given (labeled) span is allowed in a given sentence. Can
@@ -90,6 +93,94 @@ sealed trait LabeledSpanConstraints[-L] extends SpanConstraints {
 }
 
 object LabeledSpanConstraints {
+
+  implicit def serializerLabeledSpanConstraints[L]:Serializer[LabeledSpanConstraints[L]] = new Serializer[LabeledSpanConstraints[L]] with Serializable {
+    def serialize(out: DataOutput, value: LabeledSpanConstraints[L]) {
+      // it really shouldn't need to be unchecked. TODO
+      (value: @unchecked) match {
+        case NoConstraints =>
+          out.writeBoolean(false)
+        case SimpleConstraints(maxLengthsForPosition, maxLengthsForLabel, spans) =>
+          out.writeBoolean(true)
+          val length: Int = maxLengthsForPosition.length
+          out.writeInt(length)
+          if(length < Byte.MaxValue) {
+            for(i <- 0 until length) {
+              out.writeByte( (maxLengthsForPosition(i) min length).toByte)
+            }
+          } else {
+            for(i <- 0 until length) {
+              out.writeInt(maxLengthsForPosition(i))
+            }
+          }
+          out.writeInt(maxLengthsForLabel.length)
+          for(i <- 0 until maxLengthsForLabel.length) {
+            out.writeInt(maxLengthsForLabel(i))
+          }
+          for(i <- 0 until length; j <- (i+1) to length if value.isAllowedSpan(i, j)) {
+            val cardinality: Int = spans(i, j).cardinality
+            if(cardinality != 0) {
+              out.writeInt(TriangularArray.index(i, j))
+              if(cardinality == 1) {
+                // have to deal with 0 length mask
+                out.writeInt(~(spans(i, j).nextSetBit(0)))
+              } else {
+                val bitmask: Array[Byte] = spans(i, j).toByteArray
+                out.writeInt(bitmask.length)
+                out.write(bitmask)
+              }
+            }
+          }
+          out.writeInt(-1)
+      }
+    }
+
+    def deserialize(in: DataInput, available: Int): LabeledSpanConstraints[L] = {
+      in.readBoolean() match {
+        case false => NoConstraints
+        case true =>
+          import in._
+          val length = readInt()
+          val maxLengthsForPosition = new Array[Int](length)
+          if(length < Byte.MaxValue) {
+            for(i <- 0 until length) {
+              maxLengthsForPosition(i) = readByte()
+            }
+          } else {
+            for(i <- 0 until length) {
+              maxLengthsForPosition(i) = readInt()
+            }
+          }
+          val labelLen = in.readInt()
+          val maxLengthsForLabel = new Array[Int](labelLen)
+          for(i <- 0 until maxLengthsForLabel.length) {
+            maxLengthsForLabel(i) = in.readInt()
+          }
+          val spans = new TriangularArray[util.BitSet](length+1)
+          var ok = true
+          while(ok) {
+            ok = false
+            val ti = readInt()
+            if(ti >= 0) {
+              ok = true
+              val bitmaskSize = readInt()
+              if(bitmaskSize < 0) {
+                val index = ~bitmaskSize
+                spans.data(ti) = new util.BitSet()
+                spans.data(ti).set(index)
+              } else {
+                val bytes = new Array[Byte](bitmaskSize)
+                in.readFully(bytes)
+                spans.data(ti) = util.BitSet.valueOf(bytes)
+              }
+            }
+          }
+          new SimpleConstraints[L](maxLengthsForPosition, maxLengthsForLabel, spans)
+      }
+
+    }
+  }
+
   trait Factory[L, W] extends SpanConstraints.Factory[W] with Has2[IndexedSeq[W], LabeledSpanConstraints[L]] {
     def constraints(w: IndexedSeq[W]):LabeledSpanConstraints[L]
     override def get(h: IndexedSeq[W]): LabeledSpanConstraints[L] = constraints(h)
@@ -225,72 +316,18 @@ object LabeledSpanConstraints {
 
     @throws(classOf[IOException])
     private def writeObject(out: ObjectOutputStream) {
-      val length: Int = maxLengthsForPosition.length
-      out.writeInt(length)
-      if(length < Byte.MaxValue) {
-        for(i <- 0 until length) {
-          out.writeByte( (maxLengthsForPosition(i) min length).toByte)
-        }
-      } else {
-        for(i <- 0 until length) {
-          out.writeInt(maxLengthsForPosition(i))
-        }
-      }
-      out.writeObject(maxLengthsForLabel)
-      for(i <- 0 until length; j <- (i+1) to length if isAllowedSpan(i, j)) {
-        val cardinality: Int = spans(i, j).cardinality
-        if(cardinality != 0) {
-          out.writeInt(TriangularArray.index(i, j))
-          if(cardinality == 1) {
-            // have to deal with 0 length mask
-            out.writeInt(~(spans(i, j).nextSetBit(0)))
-          } else {
-            val bitmask: Array[Byte] = spans(i, j).toByteArray
-            out.writeInt(bitmask.length)
-            out.write(bitmask)
-          }
-        }
-      }
-      out.writeInt(-1)
+      serializerLabeledSpanConstraints[L].serialize(out, this)
     }
 
     @throws(classOf[IOException])
     private def readObject(in: ObjectInputStream) {
-      import in._
-      val length = readInt()
-      maxLengthsForPosition = new Array[Int](length)
-      if(length < Byte.MaxValue) {
-        for(i <- 0 until length) {
-          maxLengthsForPosition(i) = readByte()
-        }
-      } else {
-        for(i <- 0 until length) {
-          maxLengthsForPosition(i) = readInt()
-        }
-      }
-      maxLengthsForLabel = in.readObject().asInstanceOf[Array[Int]]
-      spans = new TriangularArray[util.BitSet](length+1)
-      var ok = true
-      while(ok) {
-        ok = false
-        val ti = readInt()
-        if(ti >= 0) {
-          ok = true
-          val bitmaskSize = readInt()
-          if(bitmaskSize < 0) {
-            val index = ~bitmaskSize
-            spans.data(ti) = new util.BitSet()
-            spans.data(ti).set(index)
-          } else {
-            val bytes = new Array[Byte](bitmaskSize)
-            in.read(bytes)
-            spans.data(ti) = util.BitSet.valueOf(bytes)
-          }
-        }
-      }
-
+      val SimpleConstraints(x,y,z) = serializerLabeledSpanConstraints[L].deserialize(in, -1)
+      this.maxLengthsForPosition = x
+      this.maxLengthsForLabel = y
+      this.spans = z
     }
   }
+
 
 
 
