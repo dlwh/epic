@@ -80,6 +80,9 @@ trait ParserPipeline {
    */
   protected implicit val paramManifest: Manifest[Params]
 
+  // TODO HACK
+  var makeTreeInstance: (Tree[String], IndexedSeq[String])=>TreeInstance[AnnotatedLabel, String] = null
+
 
   /**
    * The main point of entry for implementors. Should return a sequence
@@ -96,7 +99,6 @@ trait ParserPipeline {
 
     val validateTrees = devTrees.take(400)
     def validate(parser: Parser[AnnotatedLabel, String]) = {
-
       ParseEval.evaluate[AnnotatedLabel](validateTrees, parser, AnnotatedLabelChainReplacer, asString={(l:AnnotatedLabel)=>l.label}, nthreads=params.threads)
     }
     val parsers = trainParser(trainTrees, validate, params)
@@ -113,6 +115,7 @@ trait ParserPipeline {
     println("Training Parser...")
     println(params)
 
+    makeTreeInstance = params.treebank.makeTreeInstance("", _ ,_, true)
     val parsers = trainParser(params.treebank, params.trainer)
 
     import params.treebank._

@@ -10,7 +10,7 @@ import epic.trees.AnnotatedLabel
  */
 class TopDownKBestAStarTest extends ParserTestHarness with FunSuite {
   test("KBest recovers viterbi tree") {
-    val kbestParser = new KBestParser(ParserTestHarness.simpleParser.augmentedGrammar)
+    val kbestParser = new AStarKBestParser(ParserTestHarness.simpleParser.augmentedGrammar)
     val parser = new SimpleChartParser(ParserTestHarness.simpleParser.augmentedGrammar)
     val trees = getTestTrees()
     trees.foreach { ti =>
