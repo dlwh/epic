@@ -137,7 +137,7 @@ final case class ChartMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
     if(logPartition.isInfinite) throw new RuntimeException("No parse for " + words)
     val itop = inside.top
 
-    val lexLoc = lexicon.anchor(words)
+    val lexLoc = anchoring.core.tagConstraints
 
     // handle lexical
     for (i <- 0 until words.length) {
@@ -319,7 +319,6 @@ object ChartMarginal {
     val core = anchoring.core
 
     val grammar = anchoring.grammar
-    val lexicon = anchoring.lexicon
 
     val inside = ParseChart.logProb.apply(grammar.labelIndex,
       Array.tabulate(grammar.labelIndex.size)(refined.numValidRefinements),
@@ -329,7 +328,7 @@ object ChartMarginal {
       Array.tabulate(grammar.labelIndex.size)(refined.numValidRefinements),
       words.length,
       core.sparsityPattern)
-    val lexLoc = lexicon.anchor(words)
+    val tagConstraints = core.tagConstraints
 
     // handle lexical
     for{i <- 0 until words.length} {
@@ -337,7 +336,7 @@ object ChartMarginal {
       assert(core.sparsityPattern.bot.isAllowedSpan(i,i+1))
       var foundSomething = false
       for {
-        a <- lexLoc.allowedTags(i)
+        a <- tagConstraints.allowedTags(i)
         coreScore = core.scoreSpan(i, i+1, a) if coreScore != Double.NegativeInfinity
         ref <- refined.validLabelRefinements(i, i+1, a)
       } {

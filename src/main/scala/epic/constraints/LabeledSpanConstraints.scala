@@ -8,7 +8,6 @@ import java.util
 import scala.collection.mutable.ArrayBuffer
 import scala.annotation.unchecked.uncheckedVariance
 import breeze.util.{Encoder, Index}
-import epic.lexicon.SimpleLexicon
 import epic.util.Has2
 import java.io._
 import org.mapdb.Serializer
@@ -232,7 +231,7 @@ object LabeledSpanConstraints {
     }
   }
 
-  class LayeredTagConstraintsFactory[L, W](lexicon: SimpleLexicon[L, W], maxLengthForLabel: Array[Int]) extends Factory[L, W] {
+  class LayeredTagConstraintsFactory[L, W](lexicon: TagConstraints.Factory[L, W], maxLengthForLabel: Array[Int]) extends Factory[L, W] {
     def constraints(h: IndexedSeq[W]): LabeledSpanConstraints[L] = apply(h)
     def apply(words: IndexedSeq[W]) = layeredFromTagConstraints(lexicon.anchor(words), maxLengthForLabel)
   }

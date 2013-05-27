@@ -9,11 +9,9 @@ import epic.constraints.TagConstraints
  * See [[epic.lexicon.SimpleLexicon]].
  * @author dlwh
  */
-trait Lexicon[L, W] {
+trait Lexicon[L, W] extends TagConstraints.Factory[L, W] {
   def labelIndex: Index[L]
   def anchor(w: IndexedSeq[W]):Anchoring
-
-  def knownLexicalProductions : TraversableOnce[LexicalProduction[L, W]]
 
   // TODO, should i make TagConstraints be a case class instead of an interface?
   trait Anchoring extends TagConstraints[L] {

@@ -26,7 +26,7 @@ import epic.lexicon.Lexicon
  *
  * @author dlwh
  */
-trait RefinedAnchoring[L, W] extends Factor[RefinedAnchoring[L, W]] {
+trait RefinedAnchoring[L, W]  {
   def grammar: BaseGrammar[L]
   def lexicon: Lexicon[L, W]
   def words: IndexedSeq[W]

@@ -17,7 +17,7 @@ package epic.parser
 
 import breeze.inference.Factor
 import epic.lexicon.Lexicon
-import epic.constraints.ChartConstraints
+import epic.constraints.{TagConstraints, ChartConstraints}
 
 /**
  * [[epic.parser.CoreAnchoring]] score rules and labels in a particular context
@@ -32,6 +32,9 @@ trait CoreAnchoring[L, W] extends Factor[CoreAnchoring[L, W]] {
   def lexicon: Lexicon[L, W]
   def words: IndexedSeq[W]
 
+  private lazy val lexLoc = lexicon.anchor(words)
+
+  def tagConstraints: TagConstraints[L] = lexLoc
   def sparsityPattern = ChartConstraints.noSparsity[L]
 
   /**

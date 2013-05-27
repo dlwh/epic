@@ -15,21 +15,15 @@ package epic.parser
  limitations under the License.
 */
 import breeze.util.Index
-import epic.trees.{Production, LexicalProduction}
+import epic.trees.{Rule, Production, LexicalProduction}
 
 
 /**
  * A simple Featurizer that just counts lexical and rule productions that are used.
  * @author dlwh
  */
-class ProductionFeaturizer[L, W](grammar: BaseGrammar[L],
-                                 lexicalProductions: Iterable[LexicalProduction[L, W]]) extends RefinedFeaturizer[L, W, Production[L,W]] {
-  val index = {
-    val index = Index[Production[L, W]]()
-    grammar.index foreach {index.index(_)}
-    lexicalProductions foreach {index.index(_)}
-    index
-  }
+class RuleFeaturizer[L, W](grammar: BaseGrammar[L]) extends RefinedFeaturizer[L, W, Rule[L]] {
+  val index = grammar.index
 
   def anchor(w: IndexedSeq[W]) = new Anchoring {
     val words = w
@@ -43,8 +37,7 @@ class ProductionFeaturizer[L, W](grammar: BaseGrammar[L],
     }
 
     def featuresForSpan(begin: Int, end: Int, tag: Int, ref: Int) = {
-      if(begin + 1 != end)  Array.empty
-      else Array(index(LexicalProduction(grammar.labelIndex.get(tag), words(begin))))
+      Array.empty[Int]
     }
   }
 }

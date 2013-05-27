@@ -1,7 +1,7 @@
 package epic.parser
 
 import epic.framework.{VisitableMarginal, Marginal, StandardExpectedCounts}
-import epic.trees.Production
+import epic.trees.{Rule, Production}
 
 /*
  Copyright 2012 David Hall
@@ -32,8 +32,8 @@ trait ParseMarginal[L, W] extends VisitableMarginal[AnchoredVisitor[L]] {
   def length = words.length
 
 
-  def expectedProductionCounts: StandardExpectedCounts[Production[L, W]] = {
-    val featurizer = new ProductionFeaturizer[L, W](grammar, lexicon.knownLexicalProductions.toIndexedSeq)
+  def expectedRuleCounts: StandardExpectedCounts[Rule[L]] = {
+    val featurizer = new RuleFeaturizer[L, W](grammar)
     val counts = StandardExpectedCounts.zero(featurizer.index)
     expectedCounts(featurizer, counts, 1.0)
   }

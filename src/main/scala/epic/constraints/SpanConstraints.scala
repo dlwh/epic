@@ -33,10 +33,6 @@ object SpanConstraints {
   }
 
   object Factory {
-    def fromLexicon[L,W](lexicon: Lexicon[L, W]):Factory[W] = new Factory[W] {
-      def constraints(w: IndexedSeq[W]): SpanConstraints = LabeledSpanConstraints.fromTagConstraints(lexicon.anchor(w))
-    }
-
     def noConstraints[W]:Factory[W] = new Factory[W] {
       def constraints(w: IndexedSeq[W]): SpanConstraints = LabeledSpanConstraints.noConstraints
     }

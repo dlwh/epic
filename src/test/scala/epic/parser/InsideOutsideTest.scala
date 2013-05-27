@@ -36,16 +36,16 @@ class InsideOutsideTest extends FunSuite {
     val grammar = DSLGrammar.simpleGrammar
     val sent = "She eats pizza without anchovies" split " "
     val io = ChartMarginal(grammar, sent)
-    val counts = io.expectedCounts(new ProductionFeaturizer(grammar.grammar, DSLGrammar.lexicon))
+    val counts = io.expectedCounts(new RuleFeaturizer(grammar.grammar))
     assert(counts(BinaryRule("Sb","NPu","VPu")) near 1.0)
     assert(counts(BinaryRule("NPb","Nu","PPu")) near 1.0)
     assert(counts(BinaryRule("PPb","Pu","Nu")) near 1.0)
     assert(counts(BinaryRule("VPb","Vu","NPu")) near 1.0)
-    assert(counts(LexicalProduction("P","without")) near 1.0)
-    assert(counts(LexicalProduction("N","pizza")) near 1.0)
-    assert(counts(LexicalProduction("N","She")) near 1.0)
-    assert(counts(LexicalProduction("N","anchovies")) near 1.0)
-    assert(counts(LexicalProduction("V","eats")) near 1.0)
+    //assert(counts(LexicalProduction("P","without")) near 1.0)
+    //assert(counts(LexicalProduction("N","pizza")) near 1.0)
+    //assert(counts(LexicalProduction("N","She")) near 1.0)
+    //assert(counts(LexicalProduction("N","anchovies")) near 1.0)
+    //assert(counts(LexicalProduction("V","eats")) near 1.0)
   }
 
   test("complex example") {
@@ -53,7 +53,7 @@ class InsideOutsideTest extends FunSuite {
     val lexicon = lexiconForComplexExample
     val sent = "He has good control" split " "
     val io = ChartMarginal(grammar, sent)
-    val counts = io.expectedCounts(new ProductionFeaturizer(grammar.grammar, lexicon))
+    val counts = io.expectedCounts(new RuleFeaturizer(grammar.grammar))
     assert(counts(BinaryRule("Sb","NPu","VPu")) near  1.0)
     assert(counts(BinaryRule("VPb","VBZu","NPu")) near  0.5)
     assert(counts(BinaryRule("VPb","VBZu","ADJPu"))near 0.5)
@@ -61,10 +61,10 @@ class InsideOutsideTest extends FunSuite {
     assert(counts(UnaryRule("NPu","NN", Seq.empty))near 0.5)
     assert(counts(UnaryRule("NPu","PRP", Seq.empty))near 1.0)
     assert(counts(BinaryRule("ADJPb","JJu","NPu")) near  0.5)
-    assert(counts(LexicalProduction("JJ","good")) near  1.0)
-    assert(counts(LexicalProduction("NN","control")) near  1.0)
-    assert(counts(LexicalProduction("VBZ","has")) near  1.0)
-    assert(counts(LexicalProduction("PRP","He")) near  1.0)
+    //assert(counts(LexicalProduction("JJ","good")) near  1.0)
+    //assert(counts(LexicalProduction("NN","control")) near  1.0)
+    //assert(counts(LexicalProduction("VBZ","has")) near  1.0)
+    //assert(counts(LexicalProduction("PRP","He")) near  1.0)
   }
 
 

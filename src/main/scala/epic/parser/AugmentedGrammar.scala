@@ -64,7 +64,7 @@ object AugmentedGrammar {
  * the refined and core anchorings it contains.
  */
 @SerialVersionUID(2L)
-final case class AugmentedAnchoring[L, W](refined: RefinedAnchoring[L, W], core: CoreAnchoring[L, W], viterbi: Boolean = false) {
+final case class AugmentedAnchoring[L, W](refined: RefinedAnchoring[L, W], core: CoreAnchoring[L, W]) {
 
   def grammar: BaseGrammar[L] = refined.grammar
   def lexicon: Lexicon[L, W] = refined.lexicon
@@ -123,8 +123,8 @@ final case class AugmentedAnchoring[L, W](refined: RefinedAnchoring[L, W], core:
 }
 
 object AugmentedAnchoring {
-  def fromRefined[L, W](refined: RefinedAnchoring[L, W], viterbi: Boolean = false): AugmentedAnchoring[L, W] = {
-    AugmentedAnchoring(refined, CoreAnchoring.identity(refined.grammar, refined.lexicon, refined.words), viterbi)
+  def fromRefined[L, W](refined: RefinedAnchoring[L, W]): AugmentedAnchoring[L, W] = {
+    AugmentedAnchoring(refined, CoreAnchoring.identity(refined.grammar, refined.lexicon, refined.words))
   }
 
   def apply[L, W](refined: RefinedAnchoring[L, W]): AugmentedAnchoring[L, W] = fromRefined(refined)
@@ -134,8 +134,8 @@ object AugmentedAnchoring {
   }
 
 
-  def fromCore[L, W](core: CoreAnchoring[L, W], viterbi: Boolean = false) = {
-    AugmentedAnchoring(RefinedAnchoring.identity(core.grammar, core.lexicon, core.words), core, viterbi)
+  def fromCore[L, W](core: CoreAnchoring[L, W]) = {
+    AugmentedAnchoring(RefinedAnchoring.identity(core.grammar, core.lexicon, core.words), core)
   }
 }
 

@@ -336,8 +336,6 @@ final class LexGrammar[L, W](val grammar: BaseGrammar[L],
     val lexicon = LexGrammar.this.lexicon
     val indexed = words.map(wordIndex)
     private val f = fi.anchor(words)
-    private val lexLoc = lexicon.anchor(words)
-    val indexedValidTags: IndexedSeq[Array[Int]] = (0 until words.length).map(lexLoc.allowedTags(_)).map(_.toArray)
 
     private def dot(features: Array[Int]) = {
       var i = 0
@@ -489,10 +487,6 @@ final class LexGrammar[L, W](val grammar: BaseGrammar[L],
 
     def validUnaryRuleRefinementsGivenChild(begin: Int, end: Int, rule: Int, childRef: Int) = {
       Array(childRef)
-    }
-
-    def validTagsFor(pos: Int) = {
-      indexedValidTags(pos)
     }
 
 

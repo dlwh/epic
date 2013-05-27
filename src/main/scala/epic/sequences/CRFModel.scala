@@ -14,6 +14,7 @@ import epic.util.{NotProvided, Optional}
 import epic.parser.features.PairFeature
 import epic.parser.features.LabelFeature
 import com.typesafe.scalalogging.log4j.Logging
+import epic.constraints.TagConstraints
 
 /**
  *
@@ -21,7 +22,7 @@ import com.typesafe.scalalogging.log4j.Logging
  */
 @SerialVersionUID(1L)
 class CRFModel[L, W](val featureIndex: Index[Feature],
-                     val lexicon: Lexicon[L, W],
+                     val lexicon: TagConstraints.Factory[L, W],
                      val featurizer: CRF.IndexedFeaturizer[L, W],
                      initialWeights: Feature=>Double = {(_: Feature) => 0.0}) extends Model[TaggedSequence[L, W]] with StandardExpectedCounts.Model with Serializable {
   def labelIndex: Index[L] = featurizer.labelIndex
@@ -44,7 +45,7 @@ class CRFModel[L, W](val featureIndex: Index[Feature],
 @SerialVersionUID(1)
 class CRFInference[L, W](val weights: DenseVector[Double],
                          val featureIndex: Index[Feature],
-                         val lexicon: Lexicon[L, W],
+                         val lexicon: TagConstraints.Factory[L, W],
                          featurizer: CRF.IndexedFeaturizer[L, W]) extends AugmentableInference[TaggedSequence[L, W], CRF.Anchoring[L, W]] with CRF[L, W] with Serializable {
   def viterbi(sentence: IndexedSeq[W], anchoring: CRF.Anchoring[L, W]): TaggedSequence[L, W] = {
     CRF.viterbi(new Anchoring(sentence, anchoring))
@@ -141,7 +142,7 @@ class TaggedSequenceModelFactory[L](val startSymbol: L,
     val counts: Counter2[L, String, Double] = Counter2.count(train.flatMap(p => p.label zip p.words)).mapValues(_.toDouble)
 
 
-    val lexicon = new SimpleLexicon[L, String](labelIndex, counts)
+    val lexicon:TagConstraints.Factory[L, String] = new SimpleLexicon[L, String](labelIndex, counts)
 
     val standardFeaturizer = new StandardSurfaceFeaturizer(sum(counts, Axis._0))
     val featurizers = gazetteer.foldLeft(IndexedSeq[SurfaceFeaturizer[String]](new ContextSurfaceFeaturizer[String](standardFeaturizer)))(_ :+ _)
@@ -194,7 +195,7 @@ object TaggedSequenceModelFactory {
 
   @SerialVersionUID(1L)
   class IndexedStandardFeaturizer[L, String](wordFeaturizer: IndexedWordFeaturizer[String],
-                                             val lexicon: Lexicon[L, String],
+                                             val lexicon: TagConstraints.Factory[L, String],
                                              val startSymbol: L,
                                              val labelIndex: Index[L],
                                              val featureIndex: Index[Feature],

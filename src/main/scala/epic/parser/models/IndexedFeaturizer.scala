@@ -25,6 +25,7 @@ import epic.trees.{TreeInstance, LexicalProduction}
 import breeze.linalg.DenseVector
 import collection.mutable.ArrayBuilder
 import epic.lexicon.Lexicon
+import epic.constraints.TagConstraints
 
 /**
  * [[epic.parser.models.IndexedFeaturizer]] are featurizers for "normal" unanchored grammars.
@@ -38,7 +39,6 @@ trait IndexedFeaturizer[L, L2, W] extends RefinedFeaturizer[L, W, Feature] with 
   val index: Index[Feature]
   val featurizer: SimpleFeaturizer[L2, W]
   val grammar: BaseGrammar[L]
-  val lexicon: Lexicon[L, W]
   val proj: GrammarRefinements[L, L2]
 
   def labelIndex = proj.labels.fineIndex
@@ -120,7 +120,7 @@ object IndexedFeaturizer {
    * Creates a FeatureIndexer by featurizing all rules/words and indexing them
    */
   def apply[L, L2, W](grammar: BaseGrammar[L],
-                      lexicon: Lexicon[L, W],
+                      lexicon: TagConstraints.Factory[L, W],
                       trees: IndexedSeq[TreeInstance[L, W]],
                       f: SimpleFeaturizer[L2, W],
                       indexedProjections: GrammarRefinements[L, L2]): IndexedFeaturizer[L, L2, W] = {
@@ -154,7 +154,7 @@ object IndexedFeaturizer {
     cachedFeaturesToIndexedFeatures[L, L2, W](grammar, lexicon, indexedProjections, f, featureIndex, ruleCache)
   }
 
-  private def cachedFeaturesToIndexedFeatures[L, L2, W](grammar: BaseGrammar[L], lexicon: Lexicon[L, W],
+  private def cachedFeaturesToIndexedFeatures[L, L2, W](grammar: BaseGrammar[L], lexicon: TagConstraints.Factory[L, W],
                                                         refinements: GrammarRefinements[L, L2],
                                                         f: SimpleFeaturizer[L2, W],
                                                         featureIndex: Index[Feature],

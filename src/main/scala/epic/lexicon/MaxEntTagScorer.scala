@@ -12,6 +12,7 @@ import breeze.optimize.{CachedBatchDiffFunction, BatchDiffFunction}
 import scala.collection.mutable.ArrayBuffer
 import breeze.util.OptionIndex
 import com.typesafe.scalalogging.log4j.Logging
+import epic.constraints.TagConstraints
 
 /**
  * The MaxEnt assigns tag scores using a maximum entropy (aka logistic) classifier.
@@ -20,7 +21,7 @@ import com.typesafe.scalalogging.log4j.Logging
  */
 @SerialVersionUID(1L)
 class MaxEntTagScorer[L, W](feat: IndexedWordFeaturizer[W],
-                            lexicon: Lexicon[L, W],
+                            lexicon: TagConstraints.Factory[L, W],
                             index: FeatureIndex[L, Feature],
                             ts: TagScorer[L, W],
                             logProbFeature: Int,
