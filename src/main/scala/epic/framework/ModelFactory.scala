@@ -24,18 +24,7 @@ import breeze.util._
  * @author dlwh
  */
 trait ModelFactory[Datum] {
-  type MyModel <: Model[Datum]
 
-  def make(train: IndexedSeq[Datum]): MyModel
 
-  def readWeights(in: File):Counter[Feature, Double] = if(in != null && in.exists) {
-    try {
-      val ctr = breeze.util.readObject[Counter[Feature, Double]](in)
-      ctr
-    } catch {
-      case e: Exception => Counter[Feature, Double]()
-    }
-  } else {
-    Counter[Feature, Double]()
-  }
+
 }

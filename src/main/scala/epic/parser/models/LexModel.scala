@@ -41,6 +41,7 @@ import epic.trees.BinaryTree
 import epic.parser.features.DepFeature
 import epic.parser.projections.ConstraintCoreGrammarAdaptor
 import com.typesafe.scalalogging.log4j.Logging
+import epic.constraints.ChartConstraints.Factory
 
 class LexModel[L, W](bundle: LexGrammarBundle[L, W],
                      reannotate: (BinarizedTree[L], IndexedSeq[W])=>BinarizedTree[L],
@@ -650,8 +651,6 @@ object IndexedLexFeaturizer {
 }
 
 case class LexModelFactory(baseParser: ParserParams.XbarGrammar,
-                           constraints: ParserParams.Constraints[String],
-                           cache: CacheBroker,
                            @Help(text= "The kind of annotation to do on the refined grammar. Defaults to ~KM2003")
                            annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = StripAnnotations(),
                            @Help(text="Old weights to initialize with. Optional")
@@ -662,7 +661,7 @@ case class LexModelFactory(baseParser: ParserParams.XbarGrammar,
                            minFeatCutoff: Int = 1) extends ParserExtractableModelFactory[AnnotatedLabel, String] with Logging {
   type MyModel = LexModel[AnnotatedLabel, String]
 
-  def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]]) = {
+  def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]], constrainer: Factory[AnnotatedLabel, String])(implicit broker: CacheBroker) ={
     val trees = trainTrees.map(annotator)
     val (initLexicon, initBinaries, initUnaries) = GenerativeParser.extractCounts(trees)
 
@@ -670,10 +669,7 @@ case class LexModelFactory(baseParser: ParserParams.XbarGrammar,
     val wordIndex = Index(trainTrees.iterator.flatMap(_.words))
     val summedCounts = sum(initLexicon, Axis._0)
 
-    val baseFactory = RefinedGrammar.generative(xbarGrammar,
-      xbarLexicon, initBinaries, initUnaries, initLexicon)
-    implicit val broker = cache
-    val cFactory = constraints.cachedFactory(AugmentedGrammar.fromRefined(baseFactory))
+    val cFactory = constrainer
 
     val surfaceFeaturizer = new ContextSurfaceFeaturizer(new StandardSurfaceFeaturizer(summedCounts))
     val indexedSurfaceFeaturizer = IndexedSurfaceFeaturizer.fromData(surfaceFeaturizer, trees.map{_.words}, cFactory)

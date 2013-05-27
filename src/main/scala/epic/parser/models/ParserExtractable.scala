@@ -15,11 +15,14 @@ package epic.parser.models
  See the License for the specific language governing permissions and
  limitations under the License.
 */
-import epic.framework.{Model, ModelFactory}
+import epic.framework.{Feature, Model, ModelFactory}
 import breeze.linalg._
 import epic.parser.{BaseGrammar, Parser}
 import epic.trees.TreeInstance
 import epic.lexicon.Lexicon
+import java.io.File
+import epic.constraints.ChartConstraints
+import epic.util.CacheBroker
 
 /**
  *
@@ -33,6 +36,19 @@ trait ParserExtractable[L, W] {
 }
 
 
-trait ParserExtractableModelFactory[L,W] extends ModelFactory[TreeInstance[L,W]] {
+trait ParserExtractableModelFactory[L,W] {
+  def make(train: IndexedSeq[TreeInstance[L, W]], constrainer: ChartConstraints.Factory[L, W])(implicit broker: CacheBroker): MyModel
+
+  def readWeights(in: File):Counter[Feature, Double] = if(in != null && in.exists) {
+    try {
+      val ctr = breeze.util.readObject[Counter[Feature, Double]](in)
+      ctr
+    } catch {
+      case e: Exception => Counter[Feature, Double]()
+    }
+  } else {
+    Counter[Feature, Double]()
+  }
+
   type MyModel <: Model[TreeInstance[L,W]] with ParserExtractable[L,W]
 }

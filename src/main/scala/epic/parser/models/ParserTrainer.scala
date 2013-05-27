@@ -17,7 +17,7 @@ package epic.parser.models
 */
 import epic.framework._
 import breeze.optimize.FirstOrderMinimizer.OptParams
-import epic.parser.Parser
+import epic.parser.{SimpleChartParser, GenerativeParser, Parser}
 import epic.parser.ParseEval.Statistics
 import breeze.linalg._
 import breeze.optimize._
@@ -26,6 +26,15 @@ import breeze.config.Help
 import breeze.util.Implicits._
 import com.typesafe.scalalogging.log4j.Logging
 import epic.parser.projections.ReachabilityProjection
+import epic.util.CacheBroker
+import epic.parser.ParserParams.{Constraints, XbarGrammar}
+import epic.trees.annotations.StripAnnotations
+import breeze.util._
+import epic.trees.annotations.StripAnnotations
+import epic.trees.TreeInstance
+import breeze.optimize.FirstOrderMinimizer.OptParams
+import epic.parser.ParseEval.Statistics
+import java.io.File
 
 
 /**
@@ -39,6 +48,8 @@ object ParserTrainer extends epic.parser.ParserPipeline with Logging {
 
   case class Params(@Help(text="What parser to build. LatentModelFactory,StructModelFactory,LexModelFactory,SpanModelFactory")
                     modelFactory: ParserExtractableModelFactory[AnnotatedLabel, String],
+                    implicit val cache: CacheBroker,
+                    parser: File = null,
                     opt: OptParams,
                     @Help(text="How often to run on the dev set.")
                     iterationsPerEval: Int = 100,
@@ -63,7 +74,15 @@ object ParserTrainer extends epic.parser.ParserPipeline with Logging {
 //    if(threads >= 1)
 //      collection.parallel.ForkJoinTasks.defaultForkJoinPool.setParallelism(params.threads)
 
-    val model = modelFactory.make(trainTrees)
+    val initialParser = params.parser match {
+      case null =>
+        GenerativeParser.annotated(XbarGrammar(), new StripAnnotations[String](), trainTrees)
+      case f =>
+        readObject[SimpleChartParser[AnnotatedLabel, String]](f)
+    }
+    val constraints = Constraints().cachedFactory(initialParser.augmentedGrammar)
+
+    val model = modelFactory.make(trainTrees, constraints)
 
     val obj = new ModelObjective(model, trainTrees, params.threads)
     val cachedObj = new CachedBatchDiffFunction(obj)

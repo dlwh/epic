@@ -30,6 +30,7 @@ import epic.features.IndexedWordFeaturizer
 import epic.features.StandardSurfaceFeaturizer
 import epic.util.CacheBroker
 import com.typesafe.scalalogging.log4j.Logging
+import epic.constraints.ChartConstraints.Factory
 
 /**
  *
@@ -38,7 +39,6 @@ import com.typesafe.scalalogging.log4j.Logging
 
 case class ProductParserModelFactory(baseParser: ParserParams.XbarGrammar,
                                      constraints: ParserParams.Constraints[String],
-                                     cache: CacheBroker,
                                      annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = FilterAnnotations(),
                                      substates: File = null,
                                      numStates: Int = 2,
@@ -68,16 +68,15 @@ case class ProductParserModelFactory(baseParser: ParserParams.XbarGrammar,
     case UnaryRule(a, b, chain) => for(aa <- split(a); bb <- split(b)) yield UnaryRule(aa, bb, chain)
   }
 
-  def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]]) = {
+
+  def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]], constrainer: Factory[AnnotatedLabel, String])(implicit broker: CacheBroker) = {
     val annTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]] = trainTrees.map(annotator(_))
     val (annWords, annBinaries, annUnaries) = this.extractBasicCounts(annTrees)
 
 
     val (xbarGrammar, xbarLexicon) = baseParser.xbarGrammar(trainTrees)
 
-    val baseFactory = RefinedGrammar.generative(xbarGrammar, xbarLexicon, annBinaries, annUnaries, annWords)
-    implicit val broker = cache
-    val cFactory = constraints.cachedFactory(AugmentedGrammar.fromRefined(baseFactory))
+    val cFactory = constrainer
 
     val substateMap = if (substates != null && substates.exists) {
       val in = Source.fromFile(substates).getLines()

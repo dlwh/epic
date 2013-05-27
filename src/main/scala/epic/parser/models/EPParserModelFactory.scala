@@ -23,11 +23,13 @@ import epic.framework._
 import breeze.util._
 import epic.trees.{TreeInstance, AnnotatedLabel}
 import breeze.config.Help
+import epic.constraints.ChartConstraints.Factory
+import epic.util.CacheBroker
 
 case class EPParams(maxIterations: Int = 5, pruningThreshold: Double = -15)
 
 object EPParserModelFactory {
-  type CompatibleFactory = ModelFactory[TreeInstance[AnnotatedLabel, String]] {
+  type CompatibleFactory = ParserModelFactory[AnnotatedLabel, String] {
     type MyModel <: EPModel.CompatibleModel[TreeInstance[AnnotatedLabel, String], CoreAnchoring[AnnotatedLabel, String]]
   }
 }
@@ -43,13 +45,14 @@ case class EPParserModelFactory(ep: EPParams,
       with EPParser.Extractor[AnnotatedLabel, String]
     )
 
-  def make(train: IndexedSeq[TreeInstance[AnnotatedLabel, String]]) = {
+
+  def make(train: IndexedSeq[TreeInstance[AnnotatedLabel, String]], constrainer: Factory[AnnotatedLabel, String])(implicit broker: CacheBroker): MyModel = {
     val (xbarGrammar, xbarLexicon) = baseParser.xbarGrammar(train)
 
     type ModelType = EPModel.CompatibleModel[TreeInstance[AnnotatedLabel, String], CoreAnchoring[AnnotatedLabel, String]]
     val models = model.filterNot(_ eq null) map {
       model =>
-        model.make(train): ModelType
+        model.make(train, constrainer): ModelType
     }
 
     val featureCounter = readWeights(oldWeights)

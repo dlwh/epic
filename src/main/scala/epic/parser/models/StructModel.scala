@@ -30,6 +30,7 @@ import epic.features.{StandardSurfaceFeaturizer, IndexedWordFeaturizer}
 import epic.lexicon.Lexicon
 import epic.constraints.ChartConstraints
 import epic.util.CacheBroker
+import epic.constraints.ChartConstraints.Factory
 
 /**
  * Model for structural annotations, a la Klein and Manning 2003.
@@ -81,15 +82,14 @@ class StructModel[L, L2, W](indexedFeatures: IndexedFeaturizer[L, L2, W],
 }
 
 case class StructModelFactory(baseParser: ParserParams.XbarGrammar,
-                              constraints: ParserParams.Constraints[String],
-                              cache: CacheBroker,
                               @Help(text= "The kind of annotation to do on the refined grammar. Defaults to ~KM2003")
                               annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = KMAnnotator(),
                               @Help(text="Old weights to initialize with. Optional")
                               oldWeights: File = null) extends ParserModelFactory[AnnotatedLabel, String] {
   type MyModel = StructModel[AnnotatedLabel, AnnotatedLabel, String]
 
-  def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]]): MyModel = {
+
+  def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]], constrainer: Factory[AnnotatedLabel, String])(implicit broker: CacheBroker) = {
     val transformed = trainTrees.par.map(annotator).seq.toIndexedSeq
 
     val (initLexicon, initBinaries, initUnaries) = this.extractBasicCounts(transformed)
@@ -100,10 +100,7 @@ case class StructModelFactory(baseParser: ParserParams.XbarGrammar,
       (_: AnnotatedLabel).baseAnnotatedLabel
     })
 
-    implicit val broker = cache
-    val (xbarWords, xbarBinaries, xbarUnaries) = this.extractBasicCounts(trainTrees.map(_.mapLabels(_.baseAnnotatedLabel)))
-    val baseFactory = RefinedGrammar.generative(xbarGrammar, xbarLexicon, xbarBinaries, xbarUnaries, xbarWords)
-    val cFactory = constraints.cachedFactory(AugmentedGrammar.fromRefined(baseFactory))
+    val cFactory = constrainer
 
     val surfaceFeaturizer = new StandardSurfaceFeaturizer(sum(initLexicon, Axis._0))
     val wordFeaturizer = IndexedWordFeaturizer.fromData(surfaceFeaturizer, trainTrees.map{_.words})

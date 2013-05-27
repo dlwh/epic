@@ -45,7 +45,7 @@ object KBestTrainer extends epic.parser.ParserPipeline with Logging {
 
   case class Params(@Help(text="What parser to build. LatentModelFactory,StructModelFactory,LexModelFactory,SpanModelFactory")
                     modelFactory: ParserModelFactory[AnnotatedLabel, String],
-                    cache: CacheBroker,
+                    implicit val cache: CacheBroker,
                     k: Int = 200,
                     parser: File = null,
                     opt: OptParams,
@@ -71,6 +71,7 @@ object KBestTrainer extends epic.parser.ParserPipeline with Logging {
 //      collection.parallel.ForkJoinTasks.defaultForkJoinPool.setParallelism(params.threads)
 
 
+<<<<<<< HEAD
     val model = modelFactory.make(trainTrees)
     val kbest = {
       val parser = params.parser match {
@@ -79,10 +80,24 @@ object KBestTrainer extends epic.parser.ParserPipeline with Logging {
         case f =>
           readObject[SimpleChartParser[AnnotatedLabel, String]](f)
       }
-
-      val constraints = new ConstraintCoreGrammarAdaptor(parser.grammar, parser.lexicon, Constraints().cachedFactory(parser.augmentedGrammar)(cache))
-      KBestParser.cached(KBestParser(AugmentedGrammar(parser.augmentedGrammar.refined, constraints)))(cache)
+=======
+    val initialParser = params.parser match {
+      case null =>
+        GenerativeParser.annotated(XbarGrammar(), new StripAnnotations[String](), trainTrees)
+      case f =>
+        readObject[SimpleChartParser[AnnotatedLabel, String]](f)
     }
+    val constraints = Constraints().cachedFactory(initialParser.augmentedGrammar)
+>>>>>>> moving constriants into a central location, as much as possible.
+
+    val kbest = {
+      val constrainer = new ConstraintCoreGrammarAdaptor(initialParser.grammar, initialParser.lexicon,  constraints)
+      KBestParser.cached(KBestParser(AugmentedGrammar(initialParser.augmentedGrammar.refined, constrainer)))(cache)
+    }
+
+
+    val model = modelFactory.make(trainTrees, constraints)
+
     val rerankingModel = new LocalRerankingModel(model, kbest, params.k)
 
     val obj = new ModelObjective(rerankingModel, trainTrees, params.threads)

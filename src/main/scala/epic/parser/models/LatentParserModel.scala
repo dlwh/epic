@@ -28,7 +28,7 @@ import epic.trees._
 import breeze.config.Help
 import epic.features.{StandardSurfaceFeaturizer, IndexedWordFeaturizer}
 import epic.lexicon.Lexicon
-import epic.constraints.ChartConstraints
+import epic.constraints.{TagConstraints, ChartConstraints}
 import epic.util.CacheBroker
 import com.typesafe.scalalogging.log4j.Logging
 
@@ -88,7 +88,6 @@ case class LatentParserInference[L, L2, W](featurizer: RefinedFeaturizer[L, W, F
  */
 case class LatentModelFactory(baseParser: ParserParams.XbarGrammar,
                               constraints: ParserParams.Constraints[String],
-                              cache: CacheBroker,
                               @Help(text=
                                 """The kind of annotation to do on the refined grammar. Default uses no annotations.
 You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Manning 2003.
@@ -102,7 +101,8 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
                               oldWeights: File = null) extends ParserModelFactory[AnnotatedLabel, String] with Logging {
   type MyModel = LatentParserModel[AnnotatedLabel, (AnnotatedLabel, Int), String]
 
-  def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]]):MyModel = {
+  def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]],
+           constrainer: ChartConstraints.Factory[AnnotatedLabel, String])(implicit cache: CacheBroker):MyModel = {
     val annTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]] = trainTrees.map(annotator(_))
 
     val (annWords, annBinaries, annUnaries) = this.extractBasicCounts(annTrees)
@@ -110,8 +110,6 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     val (xbarGrammar, xbarLexicon) = baseParser.xbarGrammar(trainTrees)
 
     val baseFactory = RefinedGrammar.generative(xbarGrammar, xbarLexicon, annBinaries, annUnaries, annWords)
-    implicit val broker = cache
-    val cFactory = constraints.cachedFactory(AugmentedGrammar.fromRefined(baseFactory))
 
     val substateMap = if (substates != null && substates.exists) {
       val in = Source.fromFile(substates).getLines()
@@ -156,11 +154,10 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     new LatentParserModel[AnnotatedLabel, (AnnotatedLabel, Int), String](indexedFeaturizer,
     annotator,
     finalRefinements,
-    cFactory,
+    constrainer,
     xbarGrammar,
-    xbarLexicon, {
-      featureCounter.get(_)
-    })
+    xbarLexicon,
+    { featureCounter.get(_) })
   }
 }
 

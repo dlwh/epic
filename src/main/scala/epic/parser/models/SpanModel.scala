@@ -42,6 +42,7 @@ import epic.parser.features.LexicalFeature
 import epic.trees.annotations.FilterAnnotations
 import epic.constraints.ChartConstraints
 import epic.util.CacheBroker
+import epic.constraints.ChartConstraints.Factory
 
 /**
  * A rather more sophisticated discriminative parser. Uses features on
@@ -50,16 +51,16 @@ import epic.util.CacheBroker
  */
 @SerialVersionUID(1L)
 class SpanModel[L, L2, W](featurizer: RefinedFeaturizer[L, W, Feature],
-                      val featureIndex: Index[Feature],
-                      ann: (BinarizedTree[L], IndexedSeq[W]) => BinarizedTree[L2],
-                      baseFactory: ChartConstraints.Factory[L, W],
-                      val baseGrammar: BaseGrammar[L],
-                      val lexicon: Lexicon[L, W],
-                      val refinedGrammar: BaseGrammar[L2],
-                      val refinements: GrammarRefinements[L, L2],
-                      initialFeatureVal: (Feature => Option[Double]) = {
-                        _ => None
-                      }) extends ParserModel[L, W] with Serializable {
+                          val featureIndex: Index[Feature],
+                          ann: (BinarizedTree[L], IndexedSeq[W]) => BinarizedTree[L2],
+                          baseFactory: ChartConstraints.Factory[L, W],
+                          val baseGrammar: BaseGrammar[L],
+                          val lexicon: Lexicon[L, W],
+                          val refinedGrammar: BaseGrammar[L2],
+                          val refinements: GrammarRefinements[L, L2],
+                          initialFeatureVal: (Feature => Option[Double]) = {
+                            _ => None
+                          }) extends ParserModel[L, W] with Serializable {
   type Inference = AnnotatedParserInference[L, W]
 
   override def initialValueForFeature(f: Feature) = initialFeatureVal(f) getOrElse 0.0
@@ -550,7 +551,6 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
                               """)
                             annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = FilterAnnotations(),
                             constraints: ParserParams.Constraints[String],
-                            cache: CacheBroker,
                             @Help(text="Old weights to initialize with. Optional")
                             oldWeights: File = null,
                             @Help(text="For features not seen in gold trees, we bin them into dummyFeats * numGoldFeatures bins using hashing.")
@@ -559,7 +559,8 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
                             minFeatCutoff: Int = 1) extends ParserModelFactory[AnnotatedLabel, String] {
   type MyModel = SpanModel[AnnotatedLabel, AnnotatedLabel, String]
 
-  def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]]) = {
+
+  def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]], constrainer: Factory[AnnotatedLabel, String])(implicit broker: CacheBroker) = {
     val annTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]] = trainTrees.map(annotator(_))
     val (annWords, annBinaries, annUnaries) = this.extractBasicCounts(annTrees)
     val refGrammar = BaseGrammar(AnnotatedLabel.TOP, annBinaries, annUnaries)
@@ -574,7 +575,6 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
       (_: AnnotatedLabel).baseAnnotatedLabel
     })
 
-    implicit val broker = cache
     val baseFactory = RefinedGrammar.generative[AnnotatedLabel, String](xbarGrammar,
       xbarLexicon,
       initBinaries, initUnaries, initLexicon)
