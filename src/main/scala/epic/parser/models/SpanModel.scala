@@ -550,7 +550,6 @@ case class SpanModelFactory(baseParser: ParserParams.XbarGrammar,
 You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Manning 2003.
                               """)
                             annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = FilterAnnotations(),
-                            constraints: ParserParams.Constraints[String],
                             @Help(text="Old weights to initialize with. Optional")
                             oldWeights: File = null,
                             @Help(text="For features not seen in gold trees, we bin them into dummyFeats * numGoldFeatures bins using hashing.")
@@ -578,7 +577,6 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     val baseFactory = RefinedGrammar.generative[AnnotatedLabel, String](xbarGrammar,
       xbarLexicon,
       initBinaries, initUnaries, initLexicon)
-    val cFactory = constraints.cachedFactory(AugmentedGrammar.fromRefined(baseFactory))
 
     val labelFeatures = refGrammar.labelEncoder.tabulateArray(l => Array(LabelFeature(l):Feature))
     val ruleFeatures = refGrammar.tabulateArray(l => Array(RuleFeature(l):Feature))
@@ -600,7 +598,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
 
     val featureCounter = readWeights(oldWeights)
 
-    new SpanModel[AnnotatedLabel, AnnotatedLabel, String](indexed, indexed.index, annotator, cFactory, xbarGrammar, xbarLexicon, refGrammar, indexedRefinements, {
+    new SpanModel[AnnotatedLabel, AnnotatedLabel, String](indexed, indexed.index, annotator, constrainer, xbarGrammar, xbarLexicon, refGrammar, indexedRefinements, {
       featureCounter.get(_)
     })
   }

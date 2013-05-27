@@ -16,25 +16,23 @@ package epic.parser.models
  limitations under the License.
 */
 import epic.framework._
-import breeze.optimize.FirstOrderMinimizer.OptParams
 import epic.parser.{SimpleChartParser, GenerativeParser, Parser}
-import epic.parser.ParseEval.Statistics
 import breeze.linalg._
 import breeze.optimize._
-import epic.trees.{TreeInstance, AnnotatedLabel}
+import epic.trees.AnnotatedLabel
 import breeze.config.Help
-import breeze.util.Implicits._
 import com.typesafe.scalalogging.log4j.Logging
-import epic.parser.projections.ReachabilityProjection
+import epic.parser.projections.ParserChartConstraintsFactory
 import epic.util.CacheBroker
-import epic.parser.ParserParams.{Constraints, XbarGrammar}
-import epic.trees.annotations.StripAnnotations
+import epic.parser.ParserParams.XbarGrammar
 import breeze.util._
 import epic.trees.annotations.StripAnnotations
 import epic.trees.TreeInstance
 import breeze.optimize.FirstOrderMinimizer.OptParams
 import epic.parser.ParseEval.Statistics
 import java.io.File
+import epic.constraints.CachedChartConstraintsFactory
+import breeze.util.Implicits._
 
 
 /**
@@ -80,7 +78,9 @@ object ParserTrainer extends epic.parser.ParserPipeline with Logging {
       case f =>
         readObject[SimpleChartParser[AnnotatedLabel, String]](f)
     }
-    val constraints = Constraints().cachedFactory(initialParser.augmentedGrammar)
+
+    val uncached = new ParserChartConstraintsFactory[AnnotatedLabel, String](initialParser.augmentedGrammar, {(_:AnnotatedLabel).isIntermediate}, 0.4)
+    val constraints = new CachedChartConstraintsFactory(uncached)
 
     val model = modelFactory.make(trainTrees, constraints)
 

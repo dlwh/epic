@@ -56,14 +56,6 @@ object ParserParams {
     private val cache = new mutable.HashMap[File, (parser.BaseGrammar[AnnotatedLabel],Lexicon[AnnotatedLabel, String])]() with mutable.SynchronizedMap[File, (parser.BaseGrammar[AnnotatedLabel],Lexicon[AnnotatedLabel, String])]
   }
 
-  @Help(text="Factory for chart constraints")
-  case class Constraints[W](name: String = "parseConstraints") {
-    def cachedFactory(baseFactory: AugmentedGrammar[AnnotatedLabel, W], threshold: Double = -7)(implicit broker: CacheBroker):ChartConstraints.Factory[AnnotatedLabel, W] = {
-      val uncached = new ParserChartConstraintsFactory[AnnotatedLabel,W](baseFactory, {(_:AnnotatedLabel).isIntermediate}, threshold)
-      new CachedChartConstraintsFactory(uncached, name)
-    }
-  }
-  
 }
 
 /**
