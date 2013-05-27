@@ -22,7 +22,7 @@ import breeze.optimize._
 import epic.trees.AnnotatedLabel
 import breeze.config.Help
 import com.typesafe.scalalogging.log4j.Logging
-import epic.parser.projections.ParserChartConstraintsFactory
+import epic.parser.projections.{ReachabilityProjection, ParserChartConstraintsFactory}
 import epic.util.CacheBroker
 import epic.parser.ParserParams.XbarGrammar
 import breeze.util._
@@ -80,11 +80,16 @@ object ParserTrainer extends epic.parser.ParserPipeline with Logging {
     }
 
     val uncached = new ParserChartConstraintsFactory[AnnotatedLabel, String](initialParser.augmentedGrammar, {(_:AnnotatedLabel).isIntermediate}, 0.4)
-    val constraints = new CachedChartConstraintsFactory(uncached)
+    val constraints = new CachedChartConstraintsFactory[AnnotatedLabel, String](uncached)
 
-    val model = modelFactory.make(trainTrees, constraints)
+    val fixedTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]] = if(!bestReachable) {
+      trainTrees
+    } else {
+      new ReachabilityProjection(uncached.augmentedGrammar.grammar, uncached.augmentedGrammar.lexicon).projectCorpus(constraints, trainTrees)
+    }
+    val model = modelFactory.make(fixedTrees, constraints)
 
-    val obj = new ModelObjective(model, trainTrees, params.threads)
+    val obj = new ModelObjective(model, fixedTrees, params.threads)
     val cachedObj = new CachedBatchDiffFunction(obj)
     val init = obj.initialWeightVector(randomize)
     if(checkGradient)

@@ -6,6 +6,8 @@ import epic.parser._
 import epic.lexicon.Lexicon
 import breeze.numerics.I
 import com.typesafe.scalalogging.log4j.Logging
+import scala.collection.{GenTraversableLike, GenTraversable, GenTraversableOnce}
+import scala.collection.generic.CanBuildFrom
 
 /**
  * Finds the best tree (relative to the gold tree) s.t. it's reacheable given the current anchoring.
@@ -24,7 +26,6 @@ class ReachabilityProjection[L, W](grammar: BaseGrammar[L], lexicon: Lexicon[L, 
 
         def grammar: BaseGrammar[L] = ReachabilityProjection.this.grammar
         def lexicon = ReachabilityProjection.this.lexicon
-
 
         override def sparsityPattern: ChartConstraints[L] = constraints
 
@@ -54,8 +55,8 @@ class ReachabilityProjection[L, W](grammar: BaseGrammar[L], lexicon: Lexicon[L, 
     }
   }
 
-  def projectCorpus(constrainer: ChartConstraints.Factory[L, W], data: TraversableOnce[TreeInstance[L, W]]) = {
-    data.map(ti => forTree(ti.tree, ti.words, constrainer.constraints(ti.words)))
+  def projectCorpus[CC, CCR](constrainer: ChartConstraints.Factory[L, W], data: CC)(implicit ccview: CC<:<GenTraversableLike[TreeInstance[L, W], CC], cbf: CanBuildFrom[CC, TreeInstance[L, W], CCR]) = {
+    data.map(ti => ti.copy(tree=forTree(ti.tree, ti.words, constrainer.constraints(ti.words))))(cbf)
   }
 
 }
