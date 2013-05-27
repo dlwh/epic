@@ -76,7 +76,13 @@ object CacheBroker {
     private var _theMap : Map[K, V] = null
     def theMap = synchronized {
       if(_theMap eq null) {
-        _theMap = db.createHashMap[K, V](name, true, kser, vser).asScala
+        _theMap = try {
+          // this throws if the hash map exists, and there's no "does it exist" method
+          // that takes the serializers...
+          db.createHashMap[K, V](name, true, kser, vser).asScala
+        } catch {
+          case ex: IllegalArgumentException => db.getHashMap[K, V](name).asScala
+        }
       }
       _theMap
     }

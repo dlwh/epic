@@ -14,7 +14,8 @@ package epic.trees
  See the License for the specific language governing permissions and
  limitations under the License.
 */
-import breeze.util.{Interner, Lens}
+import breeze.util.{CachedHashCode, Interner, Lens}
+import collection.JavaConverters._
 import collection.mutable.ArrayBuffer
 
 /**
@@ -36,7 +37,7 @@ case class FunctionalTag(tag: String) extends Annotation
 case class AnnotatedLabel(label: String,
                           parents: Seq[String] = Seq.empty,
                           siblings: Seq[Either[String, String]] = Seq.empty,
-                          features: Set[Annotation] = Set.empty) {
+                          features: Set[Annotation] = Set.empty) extends CachedHashCode {
 
   def annotate(sym: Annotation) = copy(features = features + sym)
 
@@ -76,8 +77,9 @@ case class AnnotatedLabel(label: String,
 
 object AnnotatedLabel {
 
-  def apply(lbl: String):AnnotatedLabel = interner.intern(new AnnotatedLabel(lbl))
+  def apply(label: String):AnnotatedLabel = lblCache.getOrElseUpdate(label, interner.intern(new AnnotatedLabel(label)))
 
+  private val lblCache = new java.util.concurrent.ConcurrentHashMap[String, AnnotatedLabel]().asScala
   private val interner: Interner[AnnotatedLabel] = new Interner[AnnotatedLabel]()
 
   val TOP = AnnotatedLabel("TOP")

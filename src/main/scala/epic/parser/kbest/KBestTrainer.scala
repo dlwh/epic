@@ -19,12 +19,11 @@ import epic.framework._
 import epic.parser._
 import breeze.linalg._
 import breeze.optimize._
-import epic.trees.AnnotatedLabel
+import epic.trees.{BinarizedTree, AnnotatedLabel, TreeInstance}
 import breeze.config.Help
 import com.typesafe.scalalogging.log4j.Logging
 import epic.parser.models._
 import breeze.numerics._
-import epic.trees.TreeInstance
 import breeze.optimize.FirstOrderMinimizer.OptParams
 import epic.parser.ParseEval.Statistics
 import breeze.util._
@@ -32,7 +31,7 @@ import breeze.util.Implicits._
 import java.io.File
 import epic.util.CacheBroker
 import epic.parser.ParserParams.XbarGrammar
-import epic.trees.annotations.StripAnnotations
+import epic.trees.annotations.{AddMarkovization, PipelineAnnotator, FilterAnnotations, StripAnnotations}
 
 
 /**
@@ -76,7 +75,7 @@ object KBestTrainer extends epic.parser.ParserPipeline with Logging {
     val kbest = {
       val parser = params.parser match {
         case null =>
-          GenerativeParser.annotated(XbarGrammar(), new StripAnnotations[String](), trainTrees)
+          GenerativeParser.annotated(XbarGrammar(), new PipelineAnnotator[AnnotatedLabel, String](IndexedSeq(FilterAnnotations(), AddMarkovization(1, 2))), trainTrees)
         case f =>
           readObject[SimpleChartParser[AnnotatedLabel, String]](f)
       }
@@ -142,7 +141,7 @@ class LocalRerankingModel[L, W](val model: ParserModel[L, W],
 
 }
 
-class LocalRerankingInference[L, W](val inf: ParserInference[L, W], val kbest: KBestParser[L, W], val k: Int) extends Inference[TreeInstance[L, W]] {
+class LocalRerankingInference[L, W](val inf: ParserInference[L, W], val kbest: KBestParser[L, W], val k: Int) extends Inference[TreeInstance[L, W]] with Logging {
   type Marginal = KBestListMarginal[L, W]
   type ExpectedCounts= inf.ExpectedCounts
   def emptyCounts: ExpectedCounts = inf.emptyCounts
@@ -162,12 +161,19 @@ class LocalRerankingInference[L, W](val inf: ParserInference[L, W], val kbest: K
    * @return gold marginal
    */
   def marginal(v: TreeInstance[L, W]):Marginal = {
-    val marg = kbest.bestKParses(v.words, k).map{ case (t,_ ) => inf.goldMarginal(TreeInstance("",t, v.words))}
+    val kbestList: IndexedSeq[(BinarizedTree[L], Double)] = kbest.bestKParses(v.words, k)
+    val contained = kbestList.map(_._1).contains(FilterAnnotations().apply (v.tree.asInstanceOf[BinarizedTree[AnnotatedLabel]], v.words.asInstanceOf[IndexedSeq[String]]))
+    if(!contained) {
+      logger.warn(s"KBest list for $v of length ${kbestList.length} does not contains gold tree!")
+    } else {
+      logger.info(s"Gold tree in kbest list for $v")
+    }
+    val marg = kbestList.map{ case (t,_ ) => inf.goldMarginal(TreeInstance("",t, v.words))}
     KBestListMarginal(marg.head.anchoring, marg)
   }
 
   def countsFromMarginal(v: TreeInstance[L, W], marg: Marginal, accum: ExpectedCounts, scale: Double):ExpectedCounts = {
-    marg.expectedCounts(inf.featurizer, accum.asInstanceOf[StandardExpectedCounts[Feature]], scale)
+    marg.expectedCounts[Feature](inf.featurizer, accum.asInstanceOf[StandardExpectedCounts[Feature]], scale)
     accum
   }
 
