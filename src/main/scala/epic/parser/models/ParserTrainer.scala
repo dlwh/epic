@@ -59,8 +59,6 @@ object ParserTrainer extends epic.parser.ParserPipeline with Logging {
                     threads: Int = -1,
                     @Help(text="Should we randomize weights? Some models will force randomization.")
                     randomize: Boolean = false,
-                    @Help(text="Instead of updating torward gold tree, update towards the best reachable tree.")
-                    bestReachable: Boolean = true,
                     @Help(text="Should we check the gradient to maek sure it's coded correctly?")
                     checkGradient: Boolean = false)
   protected val paramManifest = manifest[Params]
@@ -82,14 +80,10 @@ object ParserTrainer extends epic.parser.ParserPipeline with Logging {
     val uncached = new ParserChartConstraintsFactory[AnnotatedLabel, String](initialParser.augmentedGrammar, {(_:AnnotatedLabel).isIntermediate}, 0.4)
     val constraints = new CachedChartConstraintsFactory[AnnotatedLabel, String](uncached)
 
-    val fixedTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]] = if(!bestReachable) {
-      trainTrees
-    } else {
-      new ReachabilityProjection(uncached.augmentedGrammar.grammar, uncached.augmentedGrammar.lexicon).projectCorpus(constraints, trainTrees)
-    }
-    val model = modelFactory.make(fixedTrees, constraints)
 
-    val obj = new ModelObjective(model, fixedTrees, params.threads)
+    val model = modelFactory.make(trainTrees, constraints)
+
+    val obj = new ModelObjective(model, trainTrees, params.threads)
     val cachedObj = new CachedBatchDiffFunction(obj)
     val init = obj.initialWeightVector(randomize)
     if(checkGradient)
