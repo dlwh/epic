@@ -34,7 +34,7 @@ import epic.util.CacheBroker
 /**
  * Model for structural annotations, a la Klein and Manning 2003.
  * @param featurizer
- * @param ann
+ * @param annotator
  * @param projections
  * @param baseFactory
  * @param baseGrammar
@@ -46,7 +46,7 @@ import epic.util.CacheBroker
  */
 @SerialVersionUID(1L)
 class StructModel[L, L2, W](indexedFeatures: IndexedFeaturizer[L, L2, W],
-                        ann: TreeAnnotator[L, W, L2],
+                        annotator: TreeAnnotator[L, W, L2],
                         val projections: GrammarRefinements[L, L2],
                         baseFactory: ChartConstraints.Factory[L, W],
                         val baseGrammar: BaseGrammar[L],
@@ -62,7 +62,7 @@ class StructModel[L, L2, W](indexedFeatures: IndexedFeaturizer[L, L2, W],
     val lexicon = new FeaturizedLexicon(weights, indexedFeatures)
     val grammar = FeaturizedGrammar(this.baseGrammar, this.lexicon, projections, weights, indexedFeatures, lexicon)
     def reannotate(tree: BinarizedTree[L], words: Seq[W]) = {
-      val annotated = ann(tree, words)
+      val annotated = annotator(tree, words)
 
       val localized = annotated.map { l =>
           projections.labels.project(l) -> projections.labels.localize(l)
