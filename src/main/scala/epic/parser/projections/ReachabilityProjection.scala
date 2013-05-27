@@ -28,14 +28,8 @@ class ReachabilityProjection[L, W](grammar: BaseGrammar[L], lexicon: Lexicon[L, 
 
         override def sparsityPattern: ChartConstraints[L] = constraints
 
-        /**
-         * Scores the indexed [[epic.trees.BinaryRule]] rule when it occurs at (begin,split,end)
-         */
         def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int): Double = 0.0
 
-        /**
-         * Scores the indexed [[epic.trees.UnaryRule]] rule when it occurs at (begin,end)
-         */
         def scoreUnaryRule(begin: Int, end: Int, rule: Int): Double = {
           val top = grammar.parent(rule)
           20 * I(treeconstraints.top.isAllowedLabeledSpan(begin, end, top))

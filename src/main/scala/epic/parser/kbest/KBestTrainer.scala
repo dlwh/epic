@@ -80,7 +80,8 @@ object KBestTrainer extends epic.parser.ParserPipeline with Logging {
           readObject[SimpleChartParser[AnnotatedLabel, String]](f)
       }
 
-      KBestParser.cached(KBestParser(parser.augmentedGrammar))(cache)
+      val constraints = new ConstraintCoreGrammarAdaptor(parser.grammar, parser.lexicon, Constraints().cachedFactory(parser.augmentedGrammar)(cache))
+      KBestParser.cached(KBestParser(AugmentedGrammar(parser.augmentedGrammar.refined, constraints)))(cache)
     }
     val rerankingModel = new LocalRerankingModel(model, kbest, params.k)
 
@@ -118,6 +119,10 @@ class LocalRerankingModel[L, W](val model: ParserModel[L, W],
   type Marginal = KBestListMarginal[L, W]
   type Inference = LocalRerankingInference[L, W]
 
+
+  def baseGrammar: BaseGrammar[L] = model.baseGrammar
+
+  def lexicon: Lexicon[L, W] = model.lexicon
 
   def extractParser(weights: DenseVector[Double]): Parser[L, W] = model.extractParser(weights)
 
@@ -176,9 +181,6 @@ class LocalRerankingInference[L, W](val inf: ParserInference[L, W], val kbest: K
     marg.expectedCounts[Feature](inf.featurizer, accum.asInstanceOf[StandardExpectedCounts[Feature]], scale)
     accum
   }
-
-
-
 
 }
 

@@ -4,11 +4,14 @@ import epic.trees._
 import breeze.config.{CommandLineParser, Help}
 import java.io.{PrintWriter, File}
 import breeze.util._
-import epic.parser.SimpleChartParser
+import epic.parser.{AugmentedGrammar, SimpleChartParser}
 import scala.collection.parallel.ForkJoinTaskSupport
 import scala.concurrent.forkjoin.ForkJoinPool
 import epic.trees.ProcessedTreebank
 import epic.trees.TreeInstance
+import epic.util.CacheBroker
+import epic.parser.ParserParams.Constraints
+import epic.parser.projections.ConstraintCoreGrammarAdaptor
 
 object KBestParseTreebank {
   /**
@@ -19,6 +22,8 @@ object KBestParseTreebank {
                     dir: File,
                     @Help(text="Size of kbest list. Default: 200")
                     k: Int = 200,
+                    @Help(text="Cache information")
+                    cache: CacheBroker,
                     @Help(text="Path to the parser file. Look in parsers/")
                     parser: File,
                     @Help(text="Should we evaluate on the test set? Or just the dev set?")
@@ -33,9 +38,11 @@ object KBestParseTreebank {
     println("Evaluating Parser...")
     println(params)
 
+    implicit def cache = params.cache
 
     val parser = readObject[SimpleChartParser[AnnotatedLabel,String]](params.parser)
-    val kbest = new AStarKBestParser(parser.augmentedGrammar)
+    val constraints = new ConstraintCoreGrammarAdaptor(parser.grammar, parser.lexicon, Constraints().cachedFactory(parser.augmentedGrammar)(cache))
+    val kbest = KBestParser.cached(new AStarKBestParser(AugmentedGrammar(parser.augmentedGrammar.refined, constraints)))(cache)
     params.dir.mkdirs()
 
     def fullyUnannotate(binarized: BinarizedTree[AnnotatedLabel]) = {

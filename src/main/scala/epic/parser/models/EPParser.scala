@@ -46,12 +46,12 @@ object EPParser {
    * @tparam W
    */
   trait Extractor[L, W] extends EPModel[TreeInstance[L, W], CoreAnchoring[L, W]] with ParserExtractable[L, W] {
-    def grammar: BaseGrammar[L]
+    def baseGrammar: BaseGrammar[L]
 
     def lexicon: Lexicon[L, W]
 
     def extractParser(weights: DenseVector[Double]) = {
-      new EPParser(grammar, lexicon, inferenceFromWeights(weights))
+      new EPParser(baseGrammar, lexicon, inferenceFromWeights(weights))
     }
   }
 

@@ -53,8 +53,8 @@ class SpanModel[L, L2, W](featurizer: RefinedFeaturizer[L, W, Feature],
                       val featureIndex: Index[Feature],
                       ann: (BinarizedTree[L], IndexedSeq[W]) => BinarizedTree[L2],
                       baseFactory: ChartConstraints.Factory[L, W],
-                      grammar: BaseGrammar[L],
-                      lexicon: Lexicon[L, W],
+                      val baseGrammar: BaseGrammar[L],
+                      val lexicon: Lexicon[L, W],
                       val refinedGrammar: BaseGrammar[L2],
                       val refinements: GrammarRefinements[L, L2],
                       initialFeatureVal: (Feature => Option[Double]) = {
@@ -65,7 +65,7 @@ class SpanModel[L, L2, W](featurizer: RefinedFeaturizer[L, W, Feature],
   override def initialValueForFeature(f: Feature) = initialFeatureVal(f) getOrElse 0.0
 
   def inferenceFromWeights(weights: DenseVector[Double]) = {
-    val factory = new DotProductGrammar(grammar, lexicon, refinedGrammar, refinements, weights, featurizer)
+    val factory = new DotProductGrammar(baseGrammar, lexicon, refinedGrammar, refinements, weights, featurizer)
     def reannotate(bt: BinarizedTree[L], words: IndexedSeq[W]) = {
       val annotated = ann(bt, words)
 
@@ -75,7 +75,7 @@ class SpanModel[L, L2, W](featurizer: RefinedFeaturizer[L, W, Feature],
 
       localized
     }
-    new AnnotatedParserInference(featurizer, reannotate, factory, new ConstraintCoreGrammarAdaptor(grammar, lexicon, baseFactory))
+    new AnnotatedParserInference(featurizer, reannotate, factory, new ConstraintCoreGrammarAdaptor(baseGrammar, lexicon, baseFactory))
   }
 
   def expectedCountsToObjective(ecounts: ExpectedCounts) = {

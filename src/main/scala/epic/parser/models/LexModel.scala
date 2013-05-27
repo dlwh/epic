@@ -50,6 +50,10 @@ class LexModel[L, W](bundle: LexGrammarBundle[L, W],
                      coarseLex: Lexicon[L, W],
                      initFeatureValue: Feature=>Option[Double]) extends ParserModel[L, W] with Serializable with ParserExtractable[L, W] {
 
+
+  def baseGrammar: BaseGrammar[L] = bundle.baseGrammar
+  def lexicon = bundle.baseLexicon
+
   val featureIndex = indexed.index
 
   def initialValueForFeature(f: Feature) = initFeatureValue(f).getOrElse(0)

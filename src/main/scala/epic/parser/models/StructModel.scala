@@ -37,7 +37,7 @@ import epic.util.CacheBroker
  * @param ann
  * @param projections
  * @param baseFactory
- * @param grammar
+ * @param baseGrammar
  * @param lexicon
  * @param initialFeatureVal
  * @tparam L
@@ -49,11 +49,9 @@ class StructModel[L, L2, W](indexedFeatures: IndexedFeaturizer[L, L2, W],
                         ann: TreeAnnotator[L, W, L2],
                         val projections: GrammarRefinements[L, L2],
                         baseFactory: ChartConstraints.Factory[L, W],
-                        grammar: BaseGrammar[L],
-                        lexicon: Lexicon[L, W],
-                        initialFeatureVal: (Feature => Option[Double]) = {
-                          _ => None
-                        }) extends ParserModel[L, W] with Serializable {
+                        val baseGrammar: BaseGrammar[L],
+                        val lexicon: Lexicon[L, W],
+                        initialFeatureVal: (Feature => Option[Double]) = { _ => None }) extends ParserModel[L, W] with Serializable {
   type Inference = AnnotatedParserInference[L, W]
 
   def featureIndex = indexedFeatures.index
@@ -62,7 +60,7 @@ class StructModel[L, L2, W](indexedFeatures: IndexedFeaturizer[L, L2, W],
 
   def inferenceFromWeights(weights: DenseVector[Double]) = {
     val lexicon = new FeaturizedLexicon(weights, indexedFeatures)
-    val grammar = FeaturizedGrammar(this.grammar, this.lexicon, projections, weights, indexedFeatures, lexicon)
+    val grammar = FeaturizedGrammar(this.baseGrammar, this.lexicon, projections, weights, indexedFeatures, lexicon)
     def reannotate(tree: BinarizedTree[L], words: Seq[W]) = {
       val annotated = ann(tree, words)
 
@@ -73,7 +71,7 @@ class StructModel[L, L2, W](indexedFeatures: IndexedFeaturizer[L, L2, W],
       localized
     }
 
-    new AnnotatedParserInference(indexedFeatures, reannotate, grammar, new ConstraintCoreGrammarAdaptor(this.grammar, this.lexicon, baseFactory))
+    new AnnotatedParserInference(indexedFeatures, reannotate, grammar, new ConstraintCoreGrammarAdaptor(this.baseGrammar, this.lexicon, baseFactory))
   }
 
   def expectedCountsToObjective(ecounts: ExpectedCounts) = {

@@ -6,7 +6,8 @@ import epic.trees.BinarizedTree
 
 
 /**
- *
+ * Uses Top Down KBest A* (as implemented in [[epic.parser.kbest.TopDownKBestAStar]]) to generate
+ * kbest lists.
  * @author dlwh
  */
 class AStarKBestParser[L, W](val augmentedGrammar: AugmentedGrammar[L, W],

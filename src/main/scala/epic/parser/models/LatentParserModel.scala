@@ -36,11 +36,9 @@ class LatentParserModel[L, L3, W](indexedFeatures: IndexedFeaturizer[L, L3, W],
                                   reannotate: (BinarizedTree[L], Seq[W]) => BinarizedTree[L],
                                   val projections: GrammarRefinements[L, L3],
                                   baseFactory: ChartConstraints.Factory[L, W],
-                                  grammar: BaseGrammar[L],
-                                  lexicon: Lexicon[L, W],
-                                  initialFeatureVal: (Feature => Option[Double]) = {
-                                    _ => None
-                                  }) extends ParserModel[L, W] {
+                                  val baseGrammar: BaseGrammar[L],
+                                  val lexicon: Lexicon[L, W],
+                                  initialFeatureVal: (Feature => Option[Double]) = { _ => None }) extends ParserModel[L, W] {
   type L2 = L3
   type Inference = LatentParserInference[L, L2, W]
 
@@ -54,7 +52,7 @@ class LatentParserModel[L, L3, W](indexedFeatures: IndexedFeaturizer[L, L3, W],
 
   def inferenceFromWeights(weights: DenseVector[Double]) = {
     val lexicon = new FeaturizedLexicon(weights, indexedFeatures)
-    val grammar = FeaturizedGrammar(this.grammar, this.lexicon, projections, weights, indexedFeatures, lexicon)
+    val grammar = FeaturizedGrammar(this.baseGrammar, this.lexicon, projections, weights, indexedFeatures, lexicon)
 
     new LatentParserInference(indexedFeatures, reannotate, grammar, new ConstraintCoreGrammarAdaptor(grammar.grammar, grammar.lexicon, baseFactory), projections)
   }

@@ -17,8 +17,9 @@ package epic.parser.models
 */
 import epic.framework.{Model, ModelFactory}
 import breeze.linalg._
-import epic.parser.Parser
+import epic.parser.{BaseGrammar, Parser}
 import epic.trees.TreeInstance
+import epic.lexicon.Lexicon
 
 /**
  *
@@ -26,6 +27,8 @@ import epic.trees.TreeInstance
  */
 
 trait ParserExtractable[L, W] {
+  def baseGrammar: BaseGrammar[L]
+  def lexicon: Lexicon[L, W]
   def extractParser(weights: DenseVector[Double]): Parser[L, W]
 }
 

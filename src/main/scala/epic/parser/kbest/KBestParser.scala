@@ -4,9 +4,10 @@ package kbest
 import epic.trees.BinarizedTree
 import epic.parser.projections.{AnchoredRuleMarginalProjector, ChartProjector}
 import epic.util.CacheBroker
+import com.typesafe.scalalogging.log4j.Logging
 
 /**
- * TODO
+ * Produces a kbest list of parses, along with scores.
  * @author dlwh
  * @tparam L
  * @tparam W
@@ -15,7 +16,7 @@ trait KBestParser[L, W] {
   def bestKParses(words: IndexedSeq[W], k: Int): IndexedSeq[(BinarizedTree[L], Double)]
 }
 
-object KBestParser {
+object KBestParser extends Logging {
   def fromParser[L, W](parser: SimpleChartParser[L, W], proj: ChartProjector[L, W] = AnchoredRuleMarginalProjector[L, W]()): KBestParser[L, W] = {
     apply(parser.augmentedGrammar, proj)
   }
@@ -29,8 +30,11 @@ object KBestParser {
 
     def bestKParses(words: IndexedSeq[W], k: Int): IndexedSeq[(BinarizedTree[L], Double)] = {
       cache.get(words) match {
-        case Some(list) if list.length >= k => list.take(k)
+        case Some(list) if list.length >= k =>
+          logger.debug(s"KBest cache for $words")
+          list.take(k)
         case _ =>
+          logger.info(s"Caching kbest list for $words")
           val list = kbest.bestKParses(words, k)
           cache(words) = list
           list

@@ -25,6 +25,7 @@ import epic.trees.{TreeInstance, AnnotatedLabel}
 import breeze.config.Help
 import breeze.util.Implicits._
 import com.typesafe.scalalogging.log4j.Logging
+import epic.parser.projections.ReachabilityProjection
 
 
 /**
@@ -49,6 +50,8 @@ object ParserTrainer extends epic.parser.ParserPipeline with Logging {
                     threads: Int = -1,
                     @Help(text="Should we randomize weights? Some models will force randomization.")
                     randomize: Boolean = false,
+                    @Help(text="Instead of updating torward gold tree, update towards the best reachable tree.")
+                    bestReachable: Boolean = true,
                     @Help(text="Should we check the gradient to maek sure it's coded correctly?")
                     checkGradient: Boolean = false)
   protected val paramManifest = manifest[Params]
