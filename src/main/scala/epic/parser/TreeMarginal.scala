@@ -70,7 +70,7 @@ case class TreeMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
       case t@UnaryTree( (a, refA), Tree((b, refB), _, _), chain, span) =>
         val r = grammar.index(UnaryRule(a, b, chain))
         val ruleRef = anchoring.refined.ruleRefinementFromRefinements(r, refA, refB)
-        if(ruleRef < 0) throw new Exception("Bad refined rule in gold tree!: ${UnaryRule(a, b, chain)}  aRef: $refA  bRef: $refB")
+        if(ruleRef < 0) throw new Exception(s"Bad refined rule in gold tree!: ${UnaryRule(a, b, chain)}  aRef: $refA  bRef: $refB")
         visitor.visitUnaryRule(t.span.begin, t.span.end, r, ruleRef, 1.0)
       case t@BinaryTree( (a, refA), bt@Tree( (b, refB), _, _), Tree((c, refC), _, _), span) =>
         val aI = grammar.labelIndex(a)

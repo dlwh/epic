@@ -76,7 +76,8 @@ class ConstraintCoreGrammarAdaptor[L, W](val grammar: BaseGrammar[L], val lexico
 @SerialVersionUID(8620602232218134084L)
 class ParserChartConstraintsFactory[L, W](val augmentedGrammar: AugmentedGrammar[L, W],
                                           val isIntermediate: L=>Boolean,
-                                          threshold: Double = -7) extends ChartConstraints.Factory[L, W] with Serializable with Logging {
+                                          threshold: Double = math.exp(-7)) extends ChartConstraints.Factory[L, W] with Serializable with Logging {
+  assert(threshold >= 0 && threshold <= 1, s"Threshold must be between 0 and 1, but whas $threshold")
   import augmentedGrammar._
   def labelIndex = grammar.labelIndex
 

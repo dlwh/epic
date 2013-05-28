@@ -7,7 +7,7 @@ import epic.parser.models._
 import epic.framework._
 import models.LexGrammarBundle
 import breeze.util.{Encoder, OptionIndex, Index}
-import projections.LexGovernorProjector
+import epic.parser.projections.{ReachabilityProjection, LexGovernorProjector}
 import breeze.collection.mutable.TriangularArray
 import epic.lexicon.Lexicon
 
@@ -37,11 +37,15 @@ object SentLexParser {
       (ecounts.loss, ecounts.counts)
     }
 
+    private val reachable = new ReachabilityProjection(bundle.baseGrammar, bundle.baseLexicon)
+
     def inferenceFromWeights(weights: DenseVector[Double]) = {
       val gram = bundle.makeGrammar(indexed, weights)
-      def ann(tree: BinarizedTree[L], words: Seq[W]):BinarizedTree[(L, Int)] = {
-        val reannotated = reannotate(tree, words)
-        val headed = bundle.headFinder.annotateHeadIndices(reannotated)
+      def ann(fs: FeaturizedSentence):BinarizedTree[(L, Int)] = {
+        val reannotated = reannotate(fs.tree, fs.words)
+
+        val patched = reachable.forTree(reannotated, fs.words, fs.constituentSparsity)
+        val headed = bundle.headFinder.annotateHeadIndices(patched)
         headed
 
       }
@@ -68,7 +72,7 @@ object SentLexParser {
 
   class Inference(beliefsFactory: SentenceBeliefs.Factory,
                   grammar: LexGrammar[AnnotatedLabel, String],
-                  reannotate: (BinarizedTree[AnnotatedLabel], Seq[String])=>BinarizedTree[(AnnotatedLabel, Int)],
+                  reannotate: (FeaturizedSentence)=>BinarizedTree[(AnnotatedLabel, Int)],
                   featurizer: IndexedLexFeaturizer[AnnotatedLabel, String]) extends AnnotatingInference[FeaturizedSentence] with ProjectableInference[FeaturizedSentence, SentenceBeliefs] {
 
     type Marginal = ParseMarginal[AnnotatedLabel, String]
@@ -105,7 +109,7 @@ object SentLexParser {
 
     def goldMarginal(sent: FeaturizedSentence, aug: SentenceBeliefs): Marginal = {
       val anchoring =  new Anchoring(grammar, sent.words, aug)
-      new TreeMarginal(AugmentedAnchoring(anchoring), reannotate(sent.tree, sent.words))
+      new TreeMarginal(AugmentedAnchoring(anchoring), reannotate(sent))
     }
 
     def countsFromMarginal(sent: FeaturizedSentence,

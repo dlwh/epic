@@ -26,6 +26,7 @@ import breeze.numerics
 import com.typesafe.scalalogging.log4j.Logging
 
 case class ParseExtractionException(msg: String, sentence: IndexedSeq[Any]) extends RuntimeException
+case class NoParseException(msg: String, sentence: IndexedSeq[Any]) extends RuntimeException(s"No parse for $sentence: $msg")
 
 /**
  * A ChartDecoder converts marginals into a binarized tree. Post-processing

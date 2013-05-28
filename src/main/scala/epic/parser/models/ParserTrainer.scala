@@ -77,7 +77,7 @@ object ParserTrainer extends epic.parser.ParserPipeline with Logging {
         readObject[SimpleChartParser[AnnotatedLabel, String]](f)
     }
 
-    val uncached = new ParserChartConstraintsFactory[AnnotatedLabel, String](initialParser.augmentedGrammar, {(_:AnnotatedLabel).isIntermediate}, 0.4)
+    val uncached = new ParserChartConstraintsFactory[AnnotatedLabel, String](initialParser.augmentedGrammar, {(_:AnnotatedLabel).isIntermediate})
     val constraints = new CachedChartConstraintsFactory[AnnotatedLabel, String](uncached)
 
 

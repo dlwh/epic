@@ -33,7 +33,7 @@ trait ChartProjector[L, W] {
   def project(charts: ParseMarginal[L, W],
               goldTagPolicy: GoldTagPolicy[L] = GoldTagPolicy.noGoldTags[L]):MyAnchoring = {
 
-    assert(!charts.logPartition.isInfinite)
+    if(charts.logPartition.isInfinite) throw new NoParseException("infinite partition", charts.words)
     val ruleData = proj.projectRulePosteriors(charts, goldTagPolicy)
     createAnchoring(charts, ruleData, charts.logPartition)
   }

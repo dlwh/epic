@@ -80,7 +80,6 @@ case class LatentParserInference[L, L2, W](featurizer: RefinedFeaturizer[L, W, F
 /**
  * Model for latent annotated grammars (Petrov and Klein, 2008).
  * @param baseParser
- * @param constraints
  * @param annotator
  * @param substates
  * @param numStates

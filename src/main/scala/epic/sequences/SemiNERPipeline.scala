@@ -30,8 +30,6 @@ object SemiNERPipeline {
                     nfiles: Int = 100000,
                     iterPerEval: Int = 20,
                     nthreads: Int = -1,
-                    useCorefFeatures: Boolean = false,
-                    useCorefSpans: Boolean = false,
                     opt: OptParams)
 
   def main(args: Array[String]) {

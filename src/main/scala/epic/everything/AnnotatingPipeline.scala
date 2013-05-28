@@ -37,7 +37,7 @@ import com.typesafe.scalalogging.log4j.Logging
 object AnnotatingPipeline extends Logging {
   case class Params(corpus: File,
                     treebank: ProcessedTreebank,
-                    cache: CacheBroker,
+                    implicit val cache: CacheBroker,
                     nfiles: Int = 100000,
                     nthreads: Int = -1,
                     iterPerEval: Int = 20,
@@ -59,6 +59,7 @@ object AnnotatingPipeline extends Logging {
     val params = CommandLineParser.readIn[Params](args)
     println(params)
     require(params.corpus.exists(), params.corpus + " does not exist!")
+    import params.cache
 
 
     val corpus = params.corpus
@@ -73,7 +74,6 @@ object AnnotatingPipeline extends Logging {
       Counter[String, Double]()
     }
 
-    implicit val broker = params.cache
     val (docProcessor, processedTrain) =  buildProcessor(train, params.baseParser, weightsCache, params)
 
 
@@ -102,35 +102,24 @@ object AnnotatingPipeline extends Logging {
        logger.info("Checking gradients...")
       for(m <- models) {
 
-        println("Checking " + m.getClass.getName)
+        logger.info("Checking " + m.getClass.getName)
         val obj = new ModelObjective(m, processedTrain.flatMap(_.sentences).filter(_.words.filter(_(0).isLetterOrDigit).length <= 40), params.nthreads)
         val cachedObj = new CachedBatchDiffFunction(obj)
-              val w = obj.initialWeightVector(randomize = true)
-      val (v, grad) = obj.calculate(w)
-      for (i <- (m.featureIndex.size-1 to m.featureIndex.size-200) by -3) {
-        w(i) += 1E-8
-        val v2 = obj.valueAt(w)
-        w(i) -= 1E-8
-        val emp = (v2-v)/1E-8
-        val rel = ((grad(i) - emp)/math.max(emp.abs, grad(i).abs).max(1E-6)).abs
-        println(i + " " + m.featureIndex.get(i) + " " + grad(i) + " " + emp + " " + rel + " " + w(i))
-
-      }
         GradientTester.test(cachedObj, obj.initialWeightVector(randomize = true), randFraction = 1E-4, toString={(x:Int) => m.featureIndex.get(x).toString})
       }
     }
 
     // initial models
     if(params.trainBaseModels) {
-      println("Training base models")
+      logger.info("Training base models")
       for(m <- models) {
-        println("Training " + m.getClass.getName)
+        logger.info("Training " + m.getClass.getName)
         val obj = new ModelObjective(m, processedTrain.flatMap(_.sentences).filter(_.words.filter(_(0).isLetterOrDigit).length <= 40), params.nthreads)
         val cachedObj = new CachedBatchDiffFunction(obj)
         val weights = params.baseOpt.minimize(cachedObj, obj.initialWeightVector(randomize = false))
         updateWeights(params.weightsCache, weightsCache, Encoder.fromIndex(m.featureIndex).decode(weights))
-        println(s"Decoding $m...")
-        println(s"Evaluation result for $m: " + m.evaluate(processedTest, weights))
+        logger.info(s"Decoding $m...")
+        logger.info(s"Evaluation result for $m: " + m.evaluate(processedTest, weights))
       }
     }
 
@@ -160,18 +149,7 @@ object AnnotatingPipeline extends Logging {
     val cachedObj = new CachedBatchDiffFunction(obj)
 
     if (params.checkGradient) {
-      println("Checking gradients...")
-//      val w = obj.initialWeightVector(true)
-//      val (v, grad) = obj.calculate(w)
-//      for (i <- (epModel.featureIndex.size-1 to epModel.featureIndex.size-2000) by -10) {
-//        w(i) += 1E-8
-//        val v2 = obj.valueAt(w)
-//        w(i) -= 1E-8
-//        val emp = (v2-v)/1E-8
-//        val rel = ((grad(i) - emp)/math.max(emp.abs, grad(i).abs).max(1E-6)).abs
-//        println(i + " " + epModel.featureIndex.get(i) + " " + grad(i) + " " + emp + " " + rel)
-//
-//      }
+      logger.info("Checking gradients...")
       GradientTester.test(cachedObj, obj.initialWeightVector(randomize = true), randFraction = 1E-1, toString={(x:Int) => epModel.featureIndex.get(x).toString})
     }
 
@@ -246,7 +224,7 @@ object AnnotatingPipeline extends Logging {
 
     val annotator = new PipelineAnnotator[AnnotatedLabel, String](Seq(StripAnnotations()))
     val pruningParser =  GenerativeParser.annotated(xbar, annotator, trainTrees)
-    val parseConstrainer = new CachedChartConstraintsFactory(new ParserChartConstraintsFactory(pruningParser.augmentedGrammar, {(_:AnnotatedLabel).isIntermediate}, -10))
+    val parseConstrainer = new CachedChartConstraintsFactory(new ParserChartConstraintsFactory(pruningParser.augmentedGrammar, {(_:AnnotatedLabel).isIntermediate}))
     println("Building constraints")
     val count = new AtomicInteger(0)
     trainTrees.par.foreach{t =>

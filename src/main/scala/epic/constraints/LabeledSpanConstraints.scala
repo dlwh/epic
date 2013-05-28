@@ -231,7 +231,8 @@ object LabeledSpanConstraints {
     }
   }
 
-  class LayeredTagConstraintsFactory[L, W](lexicon: TagConstraints.Factory[L, W], maxLengthForLabel: Array[Int]) extends Factory[L, W] {
+  @SerialVersionUID(1L)
+  class LayeredTagConstraintsFactory[L, W](lexicon: TagConstraints.Factory[L, W], maxLengthForLabel: Array[Int]) extends Factory[L, W]  with Serializable {
     def constraints(h: IndexedSeq[W]): LabeledSpanConstraints[L] = apply(h)
     def apply(words: IndexedSeq[W]) = layeredFromTagConstraints(lexicon.anchor(words), maxLengthForLabel)
   }

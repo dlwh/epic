@@ -336,7 +336,7 @@ object ChartMarginal {
       assert(core.sparsityPattern.bot.isAllowedSpan(i,i+1))
       var foundSomething = false
       for {
-        a <- tagConstraints.allowedTags(i)
+        a <- tagConstraints.allowedTags(i) if core.sparsityPattern.bot.isAllowedLabeledSpan(i, i+1, a)
         coreScore = core.scoreSpan(i, i+1, a) if coreScore != Double.NegativeInfinity
         ref <- refined.validLabelRefinements(i, i+1, a)
       } {
@@ -378,7 +378,7 @@ object ChartMarginal {
       val offsets = new Array[Int](anchoring.refined.maxLabelRefinements)
       val spanScoresEntered = new Array[Boolean](anchoring.refined.maxLabelRefinements)
 
-      for ( a <- 0 until grammar.labelIndex.size ) {
+      for ( a <- 0 until grammar.labelIndex.size if core.sparsityPattern.bot.isAllowedLabeledSpan(begin, end, a)) {
         val numValidLabelRefs = anchoring.refined.numValidRefinements(a)
         java.util.Arrays.fill(offsets, 0)
         java.util.Arrays.fill(spanScoresEntered, false)
@@ -737,8 +737,8 @@ object ChartMarginal {
       while(j < rules.length) {
         val r = rules(j)
         val coreScore = core.scoreUnaryRule(begin, end, r)
-        if(coreScore != Double.NegativeInfinity) {
-          val a = grammar.parent(r)
+        val a = grammar.parent(r)
+        if(coreScore != Double.NegativeInfinity && core.sparsityPattern.top.isAllowedLabeledSpan(begin, end, a)) {
           for(refR <- refined.validUnaryRuleRefinementsGivenChild(begin, end, r, refB)) {
             val refA = refined.parentRefinement(r, refR)
             val ruleScore: Double = refined.scoreUnaryRule(begin, end, r, refR) + coreScore
