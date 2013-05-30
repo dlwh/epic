@@ -26,6 +26,7 @@ import epic.framework.EvaluationResult
 import collection.parallel.ForkJoinTaskSupport
 import concurrent.forkjoin.ForkJoinPool
 import com.typesafe.scalalogging.log4j.Logging
+import java.text.DecimalFormat
 
 
 /**
@@ -89,7 +90,7 @@ object ParseEval extends Logging {
     def f1 = (2 * precision * recall)/(precision + recall)
 
     override def toString() = {
-      f"Statistics(precision=$precision%.5f, recall=$recall%.5f, f1=$f1%.5f, exact=$exact%.5f, tagAccuracy=$tagAccuracy%.5f)"
+      s"Statistics(precision=${format.format(precision)}, recall=${format.format(recall)}, f1=${format.format(f1)}, exact=${format.format(exact)}, tagAccuracy=${format.format(tagAccuracy)})"
     }
   }
 
@@ -166,7 +167,7 @@ object ParseEval extends Logging {
       buf ++= gold.render(sent.words)
       buf ++= "\nGuess:\n"
       buf ++= guess.render(sent.words)
-      buf ++= ("\nLocal Accuracy:" + (stats.precision,stats.recall,stats.f1,stats.exact,stats.tagAccuracy) + "\n")
+      buf ++= ("\nLocal Accuracy:" + (format.format(stats.precision),format.format(stats.recall),format.format(stats.f1),format.format(stats.exact), format.format(stats.tagAccuracy)) + "\n")
       buf ++= (time +" Seconds")
       buf ++= "\n======"
       goldOut.println(gold.render(sent.words, newline=false)); guessOut.println(guess.render(sent.words, newline=false))
@@ -180,4 +181,6 @@ object ParseEval extends Logging {
 
     allStats
   }
+
+  private val format = new DecimalFormat("###.####")
 }
