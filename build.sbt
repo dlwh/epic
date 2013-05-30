@@ -15,13 +15,6 @@ resolvers ++= Seq(
   "sonatype releases" at "https://oss.sonatype.org/content/repositories/releases"
 )
 
-libraryDependencies ++= Seq(
-  "com.novocode" % "junit-interface" % "0.8" % "test->default",
-  "org.osgi" % "org.osgi.core" % "4.2.0" % "provided",
-  "org.osgi" % "org.osgi.compendium" % "4.2.0" % "provided",
-  "org.scalanlp" % "nak" % "1.1.2"
-)
-
 publishTo <<= version { v: String =>
   val nexus = "https://oss.sonatype.org/"
   if (v.trim.endsWith("SNAPSHOT"))
