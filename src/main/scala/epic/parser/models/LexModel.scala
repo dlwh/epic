@@ -176,14 +176,14 @@ class IndexedLexFeaturizer[L, W](f: LexFeaturizer[L],
       val head = headIndex(ref)
       val dep = depIndex(ref)
 
-      var rcache = binaryCache(head)
-      if(rcache eq null) {
-        rcache = new OpenAddressHashArray[Array[Int]](ruleIndex.size * words.size)
-        binaryCache(head) = rcache
-      }
-      val i = rule * words.size + dep
-      var cache = rcache(i)
-      if(cache == null)  {
+//      var rcache = binaryCache(head)
+//      if(rcache eq null) {
+//        rcache = new OpenAddressHashArray[Array[Int]](ruleIndex.size * words.size)
+//        binaryCache(head) = rcache
+//      }
+//      val i = rule * words.size + dep
+//      var cache = rcache(i)
+//      if(cache == null)  {
         val ruleHead = indexedFeaturesForRuleHead(rule, head)
         val ruleDep = indexedFeaturesForRuleDep(rule, dep)
         val bilex = indexedFeaturesForBilex(head, dep)
@@ -192,10 +192,11 @@ class IndexedLexFeaturizer[L, W](f: LexFeaturizer[L],
 //            surfaceSpec.featuresForWord(dep, FeaturizationLevel.MinimalFeatures)))
         val justRule = ruleOnlyFeaturesToRealFeatures(fspec.featuresForRule(rule))
 
-        cache = Arrays.concatenate(ruleHead, ruleDep, bilex, justRule)
-        rcache(i) = cache
-      }
-      cache
+//        cache = Arrays.concatenate(ruleHead, ruleDep, bilex, justRule)
+      Arrays.concatenate(ruleHead, ruleDep, bilex, justRule)
+//        rcache(i) = cache
+//      }
+//      cache
     }
 
     // caches:
@@ -431,6 +432,54 @@ final class LexGrammar[L, W](val grammar: BaseGrammar[L],
       }
     }
 
+
+    override def validRuleRefinementsGivenParent(begin: Int, splitBegin: Int, splitEnd: Int, end: Int, rule: Int, parentRef: Int): Array[Int] = {
+      if(!binaries(rule)) {
+        Array(parentRef:Int)
+      } else if(isHeadOnLeftForRule(rule)) {
+        // if the head is on the left, then the dependent
+        // can be in Span(math.max(splitBegin, parentRef+1), end).
+        // Further, if the parentRef is <= splitEnd, then
+        // we can't even build this rule with this parent.
+        // [begin....splitBegin....splitEnd...end)
+        //  ^------parentRef------^
+        // max:      ^------^----dep---------^
+        //
+        if(splitEnd <= parentRef) return Array.empty
+        val firstPossibleStart = math.max(parentRef +1, splitBegin)
+        val result = new Array[Int](end - firstPossibleStart)
+        var ref = parentRef * words.length + firstPossibleStart
+        var i = 0
+        while(i < result.length) {
+          result(i) = ref
+          ref += 1
+          i += 1
+        }
+        result
+      } else {
+        // if the head is on the right, then the dependent
+        // can be in (begin until math.min(splitEnd,parentRef))
+        // Further, if the parentRef is <= splitBegin, then
+        // we can't even build this rule with this parent.
+        // [begin....splitBegin....splitEnd...end)
+        //           ^--------parentRef------^
+        //  ^-----------dep---^-----^ : min
+        //
+        if(splitBegin >= parentRef) return Array.empty
+        val lastPossibleEnd = math.min(parentRef, splitEnd)
+        val result = new Array[Int](lastPossibleEnd - begin)
+        var ref = parentRef * words.length + begin
+        var i = 0
+        while(i < result.length) {
+          result(i) = ref
+          i += 1
+          ref += 1
+        }
+        result
+      }
+
+    }
+
     def validRuleRefinementsGivenLeftChild(begin: Int, split: Int, completionBegin:Int, completionEnd: Int, rule: Int, lc: Int) = {
 //      val x = Array.range(0,numValidRuleRefinements(rule)).filter(x => leftChildRefinement(rule,x) == lc && rightChildRefinement(rule, x) >= split && rightChildRefinement(rule, x) < completionEnd)
       if(isHeadOnLeftForRule(rule)) {
@@ -574,17 +623,17 @@ object IndexedLexFeaturizer {
                            headFinder: HeadFinder[L],
                            ruleIndex: Index[Rule[L]],
                            labelIndex: Index[L],
-                           dummyFeatScale: Double,
+                           dummyFeatScale: HashFeature.Scale = HashFeature.Absolute(0),
                            trees: Traversable[Datum])(implicit hasWords: Has2[Datum, IndexedSeq[W]], hasTree: Has2[Datum, BinarizedTree[L]]) : IndexedLexFeaturizer[L, W] = {
 
-    val wordFeatureIndex = new OptionIndex(surfaceFeaturizer.wordFeatureIndex)
+    val wordFeatureIndex = new OptionIndex(surfaceFeaturizer.featureIndex)
     // two passes through the trees, one to build the Word x Word feature Index
     // and the other to build the (Label|Rule) x (Word|(Word, Word)) index
     var justHeadFeatures, justDepFeatures : Array[Int] = null
     val none = Array(wordFeatureIndex(None))
-    val word2FeatureIndex = FeatureIndex.build(wordFeatureIndex, wordFeatureIndex, dummyFeatScale * wordFeatureIndex.size toInt) { enumerator =>
-      justHeadFeatures = enumerator(Array.range(0, surfaceFeaturizer.wordFeatureIndex.size), none)
-      justDepFeatures = enumerator(none, Array.range(0, surfaceFeaturizer.wordFeatureIndex.size))
+    val word2FeatureIndex = FeatureIndex.build(wordFeatureIndex, wordFeatureIndex, dummyFeatScale) { enumerator =>
+      justHeadFeatures = enumerator(Array.range(0, surfaceFeaturizer.featureIndex.size), none)
+      justDepFeatures = enumerator(none, Array.range(0, surfaceFeaturizer.featureIndex.size))
 
       for(ti <- trees) {
         val tree = hasTree.get(ti)
@@ -608,7 +657,7 @@ object IndexedLexFeaturizer {
     val doubleNone = Array(word2FeatureIndex.mapped(wordFeatureIndex(None), wordFeatureIndex(None)))
 
     val lexFeatureIndex = lexFeaturizer.featureIndex
-    val fi = FeatureIndex.build(lexFeatureIndex, word2FeatureIndex, dummyFeatScale * wordFeatureIndex.size toInt) { enumerator =>
+    val fi = FeatureIndex.build(lexFeatureIndex, word2FeatureIndex, dummyFeatScale) { enumerator =>
       for(ti <- trees) {
         val lexSpec = lexFeaturizer
         val surfaceSpec = surfaceFeaturizer.anchor(hasWords.get(ti))
@@ -686,7 +735,7 @@ case class LexModelFactory(baseParser: ParserParams.XbarGrammar,
       headFinder,
       xbarGrammar.index,
       xbarGrammar.labelIndex,
-      dummyFeats,
+      HashFeature.Relative(dummyFeats),
       trees)
 
     logger.info("Num features: " + indexed.index.size + " " + indexed.index.labelFeatureIndex.size + " " + indexed.index.surfaceFeatureIndex.size + " " + indexed.index.numHashFeatures)

@@ -160,7 +160,7 @@ final case class ChartMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
       span <- 2 to inside.length
       begin <- 0 to (inside.length - span)
     } {
-      val end = begin + span
+      val end:Int = begin + span
 
       // I get a 20% speedup if I inline these arrays. so be it.
       val narrowRight = inside.top.leftMostEndForBegin(begin)

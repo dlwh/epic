@@ -33,9 +33,9 @@ class FeatureIndex[A, B](val labelFeatureIndex: Index[A],
     if(labelFeature < 0 || surfaceFeature < 0) {
       -1
     } else {
-      val arr = mapping(surfaceFeature)
+      val arr = mapping(labelFeature)
       val f = if(arr ne null) {
-        arr(labelFeature)
+        arr(surfaceFeature)
       } else {
         -1
       }
@@ -115,15 +115,15 @@ class FeatureIndex[A, B](val labelFeatureIndex: Index[A],
 object FeatureIndex {
   def build[A, B](labelFeatureIndex: Index[A],
                   surfaceFeatureIndex: Index[B],
-                  numHashFeatures: Int = 0)(pairEnumerator: ((Array[Int],Array[Int])=>Array[Int])=>Unit) = {
-    val mapping = Array.fill(surfaceFeatureIndex.size)(new OpenAddressHashArray[Int](labelFeatureIndex.size, -1, 4))
+                  hashFeatures: HashFeature.Scale = HashFeature.Absolute(0))(pairEnumerator: ((Array[Int],Array[Int])=>Array[Int])=>Unit) = {
+    val mapping = Array.fill(labelFeatureIndex.size)(new OpenAddressHashArray[Int](surfaceFeatureIndex.size, -1, 4))
     val labelPart, surfacePart = new ArrayBuffer[Int]()
     pairEnumerator {(lParts, sParts) =>
       for(lPart <- lParts; sPart <- sParts) yield {
-        val currentIndex: Int = mapping(sPart)(lPart)
+        val currentIndex: Int = mapping(lPart)(sPart)
         if(currentIndex == -1) {
           val next = labelPart.size
-          mapping(sPart)(lPart) = next
+          mapping(lPart)(sPart) = next
           labelPart += lPart
           surfacePart += sPart
           next
@@ -132,6 +132,10 @@ object FeatureIndex {
         }
       }
     }
-    new FeatureIndex(labelFeatureIndex, surfaceFeatureIndex, mapping, labelPart.toArray, surfacePart.toArray, numHashFeatures)
+    new FeatureIndex(labelFeatureIndex,
+      surfaceFeatureIndex,
+      mapping,
+      labelPart.toArray, surfacePart.toArray,
+      hashFeatures.numFeatures(mapping.length))
   }
 }

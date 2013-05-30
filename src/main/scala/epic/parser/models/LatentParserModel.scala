@@ -107,8 +107,6 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
 
     val (xbarGrammar, xbarLexicon) = baseParser.xbarGrammar(trainTrees)
 
-    val baseFactory = RefinedGrammar.generative(xbarGrammar, xbarLexicon, annBinaries, annUnaries, annWords)
-
     val substateMap = if (substates != null && substates.exists) {
       val in = Source.fromFile(substates).getLines()
       val pairs = for (line <- in) yield {

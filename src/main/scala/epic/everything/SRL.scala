@@ -14,9 +14,9 @@ import epic.sequences.SemiCRF.TransitionVisitor
 import scala.Some
 import epic.ontonotes.Argument
 import epic.sequences.Segmentation
-import epic.everything.ChainNER.Label1Feature
 import epic.trees.Span
 import epic.constraints.LabeledSpanConstraints
+import epic.sequences.SegmentationModelFactory.Label1Feature
 
 /**
  *

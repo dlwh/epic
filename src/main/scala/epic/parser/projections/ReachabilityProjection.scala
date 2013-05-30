@@ -8,6 +8,7 @@ import breeze.numerics.I
 import com.typesafe.scalalogging.log4j.Logging
 import scala.collection.{GenTraversableLike, GenTraversable, GenTraversableOnce}
 import scala.collection.generic.CanBuildFrom
+import epic.util.CacheBroker
 
 /**
  * Finds the best tree (relative to the gold tree) s.t. it's reacheable given the current anchoring.
@@ -15,9 +16,15 @@ import scala.collection.generic.CanBuildFrom
  * @author dlwh
  */
 class ReachabilityProjection[L, W](grammar: BaseGrammar[L], lexicon: Lexicon[L, W]) extends Logging {
-  def forTree(tree: BinarizedTree[L], words: IndexedSeq[W], constraints: ChartConstraints[L]) = {
+  private val cache = CacheBroker().make[IndexedSeq[W], BinarizedTree[L]]("ReachabilityProjection")
+
+  private var problems  = 0
+  private var total = 0
+
+  def forTree(tree: BinarizedTree[L], words: IndexedSeq[W], constraints: ChartConstraints[L]) = cache.getOrElseUpdate(words, {
     val treeconstraints = ChartConstraints.fromTree(grammar.labelIndex, tree)
     if(constraints.top.containsAll(treeconstraints.top) && constraints.bot.containsAll(treeconstraints.bot)) {
+      synchronized(total += 1)
       tree
     } else {
       val w = words
@@ -48,12 +55,13 @@ class ReachabilityProjection[L, W](grammar: BaseGrammar[L], lexicon: Lexicon[L, 
       val closest = new ViterbiDecoder[L,W]().extractBestParse(marg)
       logger.warn {
         val stats = new ParseEval(Set.empty).apply(closest, tree)
-        s"Gold tree for $words not reachable. Best has score: $stats"
+        val ratio =  synchronized{problems += 1; total += 1; problems * 1.0 / total}
+        f"Gold tree for $words not reachable. $ratio%.2f are bad so far. Best has score: $stats."
       }
 
       closest
     }
-  }
+  })
 
   def projectCorpus[CC, CCR](constrainer: ChartConstraints.Factory[L, W], data: CC)(implicit ccview: CC<:<GenTraversableLike[TreeInstance[L, W], CC], cbf: CanBuildFrom[CC, TreeInstance[L, W], CCR]) = {
     data.map(ti => ti.copy(tree=forTree(ti.tree, ti.words, constrainer.constraints(ti.words))))(cbf)

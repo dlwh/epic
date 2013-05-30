@@ -6,7 +6,7 @@ import epic.framework.Feature
 import scala.collection.mutable
 
 trait IndexedWordFeaturizer[W] {
-  def wordFeatureIndex: Index[Feature]
+  def featureIndex: Index[Feature]
   def featurizer: WordFeaturizer[W]
   def anchor(datum: IndexedSeq[W]):IndexedWordAnchoring[W]
 }
@@ -35,11 +35,11 @@ object IndexedWordFeaturizer {
 
   @SerialVersionUID(1L)
   private class MyWordFeaturizer[W](val featurizer: WordFeaturizer[W],
-                                    val wordFeatureIndex: Index[Feature],
+                                    val featureIndex: Index[Feature],
                                     cache: mutable.Map[IndexedSeq[W], IndexedWordAnchoring[W]]) extends IndexedWordFeaturizer[W] with Serializable {
     def anchor(words: IndexedSeq[W]):IndexedWordAnchoring[W]  = cache.getOrElseUpdate(words, {
       val anch = featurizer.anchor(words)
-      val wordFeatures = Array.tabulate(words.length, FeaturizationLevel.numLevels) { (i,l) => stripEncode(wordFeatureIndex, anch.featuresForWord(i, l))}
+      val wordFeatures = Array.tabulate(words.length, FeaturizationLevel.numLevels) { (i,l) => stripEncode(featureIndex, anch.featuresForWord(i, l))}
 
       new TabulatedIndexedSurfaceAnchoring[W](words, wordFeatures, null)
     })

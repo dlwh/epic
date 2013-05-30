@@ -2,7 +2,7 @@ package epic.lexicon
 
 import breeze.linalg._
 import breeze.numerics._
-import epic.features.{WordFeaturizer, FeatureIndex, IndexedWordFeaturizer}
+import epic.features.{HashFeature, WordFeaturizer, FeatureIndex, IndexedWordFeaturizer}
 import epic.framework.{StandardExpectedCounts, Feature}
 import breeze.linalg.NumericOps.Arrays._
 import breeze.features.FeatureVector
@@ -70,7 +70,7 @@ object MaxEntTagScorer extends Logging {
                  params: OptParams = OptParams()) = {
     val featurizer = IndexedWordFeaturizer.fromData(feat, data.map(_.words))
     val featureCounts = ArrayBuffer[Double]()
-    val featureIndex = FeatureIndex.build(lexicon.labelIndex, featurizer.wordFeatureIndex, 20000) { addToIndex =>
+    val featureIndex = FeatureIndex.build(lexicon.labelIndex, featurizer.featureIndex, HashFeature.Relative(1)) { addToIndex =>
       for(ti <- data.map(_.asTaggedSequence)) {
         val featanch = featurizer.anchor(ti.words)
         for (i <- 0 until ti.words.length) {

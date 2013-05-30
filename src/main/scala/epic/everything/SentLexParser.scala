@@ -334,6 +334,10 @@ object SentLexParser {
     }
 
 
+    override def validRuleRefinementsGivenParent(begin: Int, splitBegin: Int, splitEnd: Int, end: Int, rule: Int, parentRef: Int): Array[Int] = {
+      anchoring.validRuleRefinementsGivenParent(begin, splitBegin, splitEnd, end, rule, parentRef)
+    }
+
     def validParentRefinementsGivenRule(begin: Int, splitBegin: Int, splitEnd: Int, end: Int, rule: Int): Array[Int] =  {
       anchoring.validParentRefinementsGivenRule(begin, splitBegin, splitEnd, end, rule)
     }

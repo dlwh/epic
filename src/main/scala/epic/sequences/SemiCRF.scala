@@ -109,8 +109,6 @@ object SemiCRF {
     def startSymbol: L
 
     def ignoreTransitionModel: Boolean = false
-
-    def isValidSegment(begin: Int, end: Int):Boolean = constraints.isAllowedSpan(begin, end)
   }
 
   trait TransitionVisitor[L, W] {
@@ -211,7 +209,7 @@ object SemiCRF {
             while(prevLabel < numLabels) {
               var end = anchoring.constraints.maxSpanLengthStartingAt(begin) + begin
               while(end > begin) {
-                if(anchoring.isValidSegment(begin, end)) {
+                if(anchoring.constraints.isAllowedSpan(begin, end)) {
                   var label = 0
                   while(label < numLabels) {
                     val prevScore = backwardScore(end)(label)
@@ -386,7 +384,7 @@ object SemiCRF {
           var acc = 0
           var end = anchoring.constraints.maxSpanLengthStartingAt(begin) + begin
           while(end > begin) {
-            if(anchoring.isValidSegment(begin, end)) {
+            if(anchoring.constraints.isAllowedSpan(begin, end)) {
               var label = 0
               while(label < numLabels) {
                 val prevScore = backwardScores(end)(label)
@@ -615,5 +613,6 @@ object SemiCRF {
 
     Segmentation(segments.reverse, m.words, id)
   }
+
 }
 

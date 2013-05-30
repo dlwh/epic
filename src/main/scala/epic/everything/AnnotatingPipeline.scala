@@ -23,7 +23,7 @@ import epic.parser.models.LexGrammarBundle
 import collection.mutable.ArrayBuffer
 import collection.immutable
 import epic.lexicon.SimpleLexicon
-import epic.features.{MultiSurfaceFeaturizer, ContextSurfaceFeaturizer, StandardSurfaceFeaturizer}
+import epic.features.{HashFeature, MultiSurfaceFeaturizer, ContextSurfaceFeaturizer, StandardSurfaceFeaturizer}
 import epic.constraints.{CachedChartConstraintsFactory, LabeledSpanConstraints}
 import epic.util.CacheBroker
 import java.util.concurrent.atomic.AtomicInteger
@@ -48,7 +48,7 @@ object AnnotatingPipeline extends Logging {
                     includeSRL: Boolean = false,
                     includeParsing: Boolean = true,
                     includeNER: Boolean = true,
-                    lexHashFeatures: Double = 100.0,
+                    lexHashFeatures: Double = 2.0,
                     @Help(text="For optimizing the base models")
                     baseOpt: OptParams,
                     @Help(text="For optimizing the joint model")
@@ -285,7 +285,7 @@ object AnnotatingPipeline extends Logging {
       docProcessor.grammar.index,
       docProcessor.grammar.labelIndex,
 //    2,
-      lexHashFeatures,
+      HashFeature.Relative(lexHashFeatures),
       trees)
 
     val bundle = new LexGrammarBundle[AnnotatedLabel, String](docProcessor.grammar,

@@ -30,7 +30,8 @@ object SemiNERPipeline {
                     nfiles: Int = 100000,
                     iterPerEval: Int = 20,
                     nthreads: Int = -1,
-                    opt: OptParams)
+                    opt: OptParams,
+                    checkGradient: Boolean = false)
 
   def main(args: Array[String]) {
     val params = CommandLineParser.readIn[Params](args)
@@ -45,14 +46,15 @@ object SemiNERPipeline {
       (train,test)
     }
 
-    val pronouns = Phrases.pronouns
-
     val gazetteer =  Gazetteer.ner("en")
 
     // build feature Index
     val model = new SegmentationModelFactory(NERType.OutsideSentence, NERType.NotEntity, gazetteer = gazetteer)(params.cache).makeModel(train)
     val obj = new ModelObjective(model, train, params.nthreads)
     val cached = new CachedBatchDiffFunction(obj)
+    if(params.checkGradient) {
+      GradientTester.test(cached, obj.initialWeightVector(true), toString = {(x: Int) => model.featureIndex.get(x).toString})
+    }
 
     def eval(state: FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State) {
       val crf = model.extractCRF(state.x)

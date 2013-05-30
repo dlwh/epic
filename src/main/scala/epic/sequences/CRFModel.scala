@@ -153,8 +153,8 @@ class TaggedSequenceModelFactory[L](val startSymbol: L,
     val labelFeatures = (0 until labelIndex.size).map(l => LabelFeature(labelIndex.get(l)))
     val label2Features = for(l1 <- 0 until labelIndex.size) yield for(l2 <- 0 until labelIndex.size) yield LabelFeature(labelIndex.get(l1) -> labelIndex.get(l2))
 
-    val labelWordFeatures = Array.fill(featurizer.wordFeatureIndex.size)(new OpenAddressHashArray[Int](labelIndex.size,-1,4))
-    val label2WordFeatures = Array.fill(featurizer.wordFeatureIndex.size)(new OpenAddressHashArray[Int](labelIndex.size * labelIndex.size,-1,4))
+    val labelWordFeatures = Array.fill(featurizer.featureIndex.size)(new OpenAddressHashArray[Int](labelIndex.size,-1,4))
+    val label2WordFeatures = Array.fill(featurizer.featureIndex.size)(new OpenAddressHashArray[Int](labelIndex.size * labelIndex.size,-1,4))
 
     var i = 0
     for(s <- train) {
@@ -166,12 +166,12 @@ class TaggedSequenceModelFactory[L](val startSymbol: L,
         l <- lexLoc.allowedTags(b)
       } {
         loc.featuresForWord(b) foreach {f =>
-          labelWordFeatures(f)(l) = featureIndex.index(PairFeature(labelFeatures(l), featurizer.wordFeatureIndex.get(f)) )
+          labelWordFeatures(f)(l) = featureIndex.index(PairFeature(labelFeatures(l), featurizer.featureIndex.get(f)) )
         }
         if(lexLoc.allowedTags(b).size > 1) {
           for(prevTag <- if(b == 0) Set(labelIndex(startSymbol)) else lexLoc.allowedTags(b-1)) {
             loc.featuresForWord(b, FeaturizationLevel.MinimalFeatures) foreach {f =>
-              label2WordFeatures(f)(prevTag * labelIndex.size + l) = featureIndex.index(PairFeature(label2Features(prevTag)(l), featurizer.wordFeatureIndex.get(f)) )
+              label2WordFeatures(f)(prevTag * labelIndex.size + l) = featureIndex.index(PairFeature(label2Features(prevTag)(l), featurizer.featureIndex.get(f)) )
             }
           }
         }

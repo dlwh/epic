@@ -114,8 +114,8 @@ object FeaturizedDocument {
                     corefFeaturizer: CorefInstanceFeaturizer) extends (Document=>FeaturizedDocument) {
     def outsideSrlLabel: String = "O"
 
-    def wordFeatureIndex = featurizer.wordFeatureIndex
-    def spanFeatureIndex = featurizer.spanFeatureIndex
+    def wordFeatureIndex = featurizer.featureIndex
+    def spanFeatureIndex = featurizer.featureIndex
 
 
    def apply(d: Document):FeaturizedDocument = {

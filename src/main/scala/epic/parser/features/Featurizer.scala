@@ -54,7 +54,7 @@ class GenFeaturizer[L, W](wGen: IndexedWordFeaturizer[W],
     def featuresFor(begin: Int, split: Int, end: Int, r: Rule[L]): Array[Feature] = outer.featuresFor(r)
 
     def featuresFor(pos: Int, label: L): Array[Feature] = {
-      lexAnch.featuresForWord(pos).map(i => LexicalFeature(label, wGen.wordFeatureIndex.get(i)))
+      lexAnch.featuresForWord(pos).map(i => LexicalFeature(label, wGen.featureIndex.get(i)))
     }
   }
 
