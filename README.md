@@ -1,25 +1,23 @@
 # Chalk
 
-Author: **Jason Baldridge** (jasonbaldridge@gmail.com)
-
 ## Introduction
 
-Chalk is a library for natural language processing (NLP). It is based on the [OpenNLP](http://opennlp.apache.org/) library, but will be transitioning to more use of Scala (rather than Java) as new capabilities are added.
+Chalk is a library for natural language processing (NLP). It was based on the [OpenNLP](http://opennlp.apache.org/) library, but is now transitioning to incorporate breeze.process instead. In fact, this version (1.1.3) is just a shell that is ready to receive code from breeze.process. There won't even be a Maven dependency published.
 
 The name Chalk comes from the name given to one of Jason's son's stuffed elephants. "Chalk" obviously has a great connection to writing (and thus text processing). Of course, it also follows the what-your-kid-called-his-elephant naming convention precedent established with Hadoop. :)
 
-
 ### What's inside
 
-The latest stable release is 1.1.2. What's new for this version?
+The latest stable release is 1.1.3. What's new for this version?
 
-* Updated Chalk to reflect reorganization in Nak v1.1.1.
-* Rounded out the MASC corpus processing and added tool for training and evaluating sentence detection, tokenization, and NER on the corpus.
-* Added Scala version of the PorterStemmer.
+* All OpenNLP Tools code removed.
+* Add Twokenize (from Scalabha).
 
 See the [CHANGELOG](https://github.com/scalanlp/chalk/wiki/CHANGELOG) for changes in previous versions.
 
 ## Using Chalk
+
+As no dependency is being made for 1.1.3, you are welcome to try out 1.1.2 and check back later for a completely different library.
 
 In SBT:
 
