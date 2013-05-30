@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Chalk is a library for natural language processing (NLP). It was based on the [OpenNLP](http://opennlp.apache.org/) library, but is now transitioning to incorporate breeze.process instead. In fact, this version (1.1.3) is just a shell that is ready to receive code from breeze.process. There won't even be a Maven dependency published.
+Chalk is a library for natural language processing (NLP). It was based on the [OpenNLP](http://opennlp.apache.org/) library, but is now transitioning to incorporate breeze.process instead. In fact, this last version (1.1.3) is just a shell that is ready to receive code from breeze.process. There won't even be a Maven dependency published.
 
 The name Chalk comes from the name given to one of Jason's son's stuffed elephants. "Chalk" obviously has a great connection to writing (and thus text processing). Of course, it also follows the what-your-kid-called-his-elephant naming convention precedent established with Hadoop. :)
 
@@ -17,7 +17,7 @@ See the [CHANGELOG](https://github.com/scalanlp/chalk/wiki/CHANGELOG) for change
 
 ## Using Chalk
 
-As no dependency is being made for 1.1.3, you are welcome to try out 1.1.2 and check back later for a completely different library.
+As no dependency is being made for 1.1.3, you are welcome to try out 1.1.2 and check back later for a completely different library in the 1.2 series.
 
 In SBT:
 
