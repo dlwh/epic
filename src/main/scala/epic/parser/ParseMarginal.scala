@@ -1,7 +1,10 @@
 package epic.parser
 
+
 import epic.framework.{VisitableMarginal, Marginal, StandardExpectedCounts}
 import epic.trees.{Rule, Production}
+import breeze.linalg.axpy
+import breeze.features.FeatureVector
 
 /*
  Copyright 2012 David Hall
@@ -70,28 +73,18 @@ object ParseMarginal {
                                     scale: Double):AnchoredVisitor[L] = {
     new AnchoredVisitor[L] {
       def visitBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int, score: Double) {
-        addScale(counts, spec.featuresForBinaryRule(begin, split, end, rule, ref), score * scale)
+        axpy(score * scale,  new FeatureVector(spec.featuresForBinaryRule(begin, split, end, rule, ref)), counts.counts)
       }
 
       def visitUnaryRule(begin: Int, end: Int, rule: Int, ref: Int, score: Double) {
-        addScale(counts, spec.featuresForUnaryRule(begin, end, rule, ref), score * scale)
+        axpy(score * scale, new FeatureVector(spec.featuresForUnaryRule(begin, end, rule, ref)), counts.counts)
       }
 
       def visitSpan(begin: Int, end: Int, tag: Int, ref: Int, score: Double) {
-       // if(begin+1 == end)
-         // println(begin,end,tag,ref,score)
-        addScale(counts, spec.featuresForSpan(begin, end, tag, ref), score * scale)
+        axpy(score * scale,  new FeatureVector(spec.featuresForSpan(begin, end, tag, ref)), counts.counts)
       }
     }
 
   }
 
-  private def addScale[Feat](counts: StandardExpectedCounts[Feat], features: Array[Int], score: Double) {
-    val data = counts.counts.data
-    var i = 0
-    while(i < features.length) {
-      data(features(i)) += score
-      i += 1
-    }
-  }
 }
