@@ -322,25 +322,31 @@ object PrecacheConstraints extends Logging {
                            tableName: String = "parseConstraints",
                            verifyNoGoldPruning: Boolean = true)(implicit broker: CacheBroker): CachedChartConstraintsFactory[L, W] = {
     val parsed = new AtomicInteger(0)
+    val len = train.size
     val cache = broker.make[IndexedSeq[W], ChartConstraints[L]](tableName)
-    for(ti <- train) try {
+    for(ti <- train.par) try {
       var located = true
-      lazy val marg = ChartMarginal(constrainer.augmentedGrammar.anchor(ti.words), ti.words)
+      var marg:ChartMarginal[L, W] = null
       val constraints = cache.getOrElseUpdate(ti.words, {
         located = false
         logger.info(s"Building constraints for ${ti.id} ${ti.words}")
+        marg = ChartMarginal(constrainer.augmentedGrammar.anchor(ti.words), ti.words)
         constrainer.constraints(marg, GoldTagPolicy.goldTreeForcing[L](ti.tree.map(constrainer.labelIndex)))
       })
       if(located) {
         logger.info(s"Already had constraints for ${ti.id} ${ti.words}.")
-      }
-      if(verifyNoGoldPruning) {
+      } else if(verifyNoGoldPruning) {
         marg.checkForSimpleTree(ti.tree)
         checkConstraints(ti, constraints, constrainer)
       }
-      if(parsed.incrementAndGet() % 10 == 0) {
+      val count: Int = parsed.incrementAndGet()
+      if(count % 10 == 0) {
         logger.info("Pruning statistics so far: " + constrainer.overallStatistics)
       }
+      if(count % 100 == 0) {
+        logger.info(s"Parsed $count/$len.")
+      }
+
     } catch {
       case e: Exception =>
         logger.error(s"Error while parsing ${ti.words}.", e)
