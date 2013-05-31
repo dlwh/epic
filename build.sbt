@@ -16,6 +16,9 @@ resolvers ++= Seq(
 )
 
 libraryDependencies ++= Seq(
+  "org.scalatest" % "scalatest_2.10" % "1.9.1" % "test",
+  "com.novocode" % "junit-interface" % "0.8" % "test->default",
+  "org.scalacheck" %% "scalacheck" % "1.10.0" % "test",
   "org.scalanlp" % "breeze-core_2.10" % "0.3",
   "org.scalanlp" % "breeze-math_2.10" % "0.3"
 )
