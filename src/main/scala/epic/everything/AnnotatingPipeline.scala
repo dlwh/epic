@@ -12,8 +12,7 @@ import epic.framework._
 import breeze.optimize._
 import breeze.util.{Index, Encoder}
 import epic.parser.projections.ParserChartConstraintsFactory
-import epic.trees.annotations.StripAnnotations
-import epic.trees.annotations.PipelineAnnotator
+import epic.trees.annotations.{AddMarkovization, StripAnnotations, PipelineAnnotator}
 import epic.parser.models.IndexedLexFeaturizer
 import epic.trees.ProcessedTreebank
 import epic.parser.features.RuleFeature
@@ -221,7 +220,7 @@ object AnnotatingPipeline extends Logging {
       params.treebank.makeTreeInstance(s.id, s.tree.map(_.label), s.words, removeUnaries = true)
     }
 
-    val annotator = new PipelineAnnotator[AnnotatedLabel, String](Seq(StripAnnotations()))
+    val annotator = new PipelineAnnotator[AnnotatedLabel, String](Seq(StripAnnotations(), AddMarkovization()))
     val pruningParser =  GenerativeParser.annotated(xbar, annotator, trainTrees)
     val parseConstrainer = new CachedChartConstraintsFactory(new ParserChartConstraintsFactory(pruningParser.augmentedGrammar, {(_:AnnotatedLabel).isIntermediate}))
     logger.info("Building constraints")
