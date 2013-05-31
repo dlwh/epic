@@ -18,14 +18,15 @@ class LexGovernorProjector[L, W](grammar: LexGrammar[L, W]) {
     assert(anch.annotationTag == 1)
     val v = new Visitor(anch, chart.length)
     chart.visit(v)
-
-    LexGovernorInfo(v.spanType, v.spanGovernorCounts, v.governedSpan, v.wordGovernorCounts, v.wordTagType, v.maximalLabelType)
+    import v._
+    LexGovernorInfo(v.spanType, v.spanHeadCounts, v.governedSpan, v.wordGovernorCounts, v.wordTagType, v.maximalLabelType)
   }
 
   /** WHENEVER you change this, be sure to change [[epic.everything.SentLexParser.Anchoring]] */
   private class Visitor(spec: RefinedAnchoring[L, W], length: Int) extends AnchoredVisitor[L] {
     val spanType = TriangularArray.fill(length+1)(optionalLabelBeliefs)
-    val spanGovernorCounts = TriangularArray.fill(length+1)(baseDV)
+    // which word is the head of which span
+    val spanHeadCounts = TriangularArray.fill(length+1)(optionalGovernorCounts)
     val wordGovernorCounts = Array.fill(length)(DenseVector.zeros[Double](length+1))
     val governedSpan = Array.fill(length)(DenseVector.zeros[Double](TriangularArray.arraySize(length+1)))
     val maximalLabelType = Array.fill(length)(labelBeliefs)
@@ -36,47 +37,44 @@ class LexGovernorProjector[L, W](grammar: LexGrammar[L, W]) {
       val head = otherAnch.headIndex(ref)
       val dep = otherAnch.depIndex(ref)
       wordGovernorCounts(dep)(head) += score
+      siphonMass(spanHeadCounts(begin, split), head, notASpan, score)
+      siphonMass(spanHeadCounts(split, end), head, notASpan, score)
       if (grammar.isHeadOnRightForRule(rule)) { // head on the right
-        spanGovernorCounts(begin, split)(head) += score
-        spanGovernorCounts(begin, split)(notASpan) -= score
-        if(spanGovernorCounts(begin, split)(notASpan) < 0) {
-          assert(spanGovernorCounts(begin, split)(notASpan) > -1E-6)
-          spanGovernorCounts(begin, split)(notASpan) = 0.0
-        }
+        assert(head >= split)
         val label = grammar.grammar.leftChild(rule)
         maximalLabelType(dep)(label) += score
         governedSpan(dep)(TriangularArray.index(begin,split)) += score
       } else {
-        spanGovernorCounts(split, end)(head) += score
-        spanGovernorCounts(split, end)(notASpan) -= score
-        if(spanGovernorCounts(split, end)(notASpan) < 0) {
-          assert(spanGovernorCounts(split, end)(notASpan) > -1E-6)
-          spanGovernorCounts(split, end)(notASpan) = 0.0
-        }
+        assert(head < split)
         val label = grammar.grammar.rightChild(rule)
         maximalLabelType(dep)(label) += score
         governedSpan(dep)(TriangularArray.index(split,end)) += score
       }
     }
 
+
+    /**
+     * subtracts score from counts(from) and adds it to counts(to). ensures
+     * that counts(from) does not go negative (a little negative is sent to 0, a
+     * lot throws.)
+     */
+    private def siphonMass(counts: DenseVector[Double], to: Int, from: Int, score: Double) {
+      counts(to) += score
+      counts(from) -= score
+      if (counts(from) < 0) {
+        assert(counts(from) > -1E-6)
+        counts(from) = 0.0
+      }
+    }
+
     def visitUnaryRule(begin: Int, end: Int, rule: Int, ref: Int, score: Double) {
       val parent = grammar.grammar.parent(rule)
-      spanType(begin,end)(parent) += score
-      spanType(begin,end)(notAConstituent) -= score
-      if(spanType(begin, end)(notAConstituent) < 0) {
-        assert(spanType(begin, end)(notAConstituent) > -1E-6)
-        spanType(begin, end)(notAConstituent) = 0.0
-      }
+      siphonMass(spanType(begin,end), parent, notAConstituent, score)
       val head = otherAnch.spanHeadIndex(ref)
 
       if (begin == 0 && end == length) { // root, get the length
         wordGovernorCounts(head)(length) += score
-        spanGovernorCounts(begin, end)(length) += score
-        spanGovernorCounts(begin, end)(notASpan) -= score
-        if(spanGovernorCounts(begin, end)(notASpan) < 0) {
-          assert(spanGovernorCounts(begin, end)(notASpan) > -1E-6)
-          spanGovernorCounts(begin, end)(notASpan) = 0.0
-        }
+        siphonMass(spanHeadCounts(begin,end), length, notASpan, score)
         maximalLabelType(head)(parent) += score
         governedSpan(head)(TriangularArray.index(begin,end)) += score
       }
@@ -84,15 +82,14 @@ class LexGovernorProjector[L, W](grammar: LexGrammar[L, W]) {
 
     def visitSpan(begin: Int, end: Int, tag: Int, ref: Int, score: Double) {
 
-
       if(begin + 1 == end) {
         wordTagType(begin)(tag) += score
       }
     }
 
-    def baseDV = {
+    def optionalGovernorCounts = {
       val r = DenseVector.zeros[Double](length+2)
-      // length is root, length + 1 is "span is off"
+      // length is root, length + 1
       // start with all mass in "is off", and subtract
       r(notASpan) = 1.0
       r

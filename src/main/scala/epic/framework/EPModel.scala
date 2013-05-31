@@ -30,6 +30,10 @@ class EPModel[Datum, Augment](maxEPIter: Int, initFeatureValue: Feature => Optio
   type Inference = EPInference[Datum, Augment]
   type Marginal = EPMarginal[Augment, ProjectableInference[Datum, Augment]#Marginal]
 
+  private val offsets = models.map(_.numFeatures).unfold(0)(_ + _)
+  for(i <- 0 until models.length) { println(models(i) + " " + models(i).featureIndex.size)}
+
+
   val featureIndex: Index[Feature] = {
     val index = Index[Feature]()
     for ((m, i) <- models.zipWithIndex; f <- m.featureIndex) index.index(ComponentFeature(i, f))
@@ -43,7 +47,6 @@ class EPModel[Datum, Augment](maxEPIter: Int, initFeatureValue: Feature => Optio
     }
   }
 
-  private val offsets = models.map(_.numFeatures).unfold(0)(_ + _)
 
 
 

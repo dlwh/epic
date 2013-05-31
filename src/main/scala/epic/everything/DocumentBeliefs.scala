@@ -80,7 +80,7 @@ case class SentenceBeliefs(spans: TriangularArray[SpanBeliefs],
   def length = wordBeliefs.length
   def apply(p: Int) = spans(p)
 
-  def spanBeliefs(beg: Int, end: Int) = spans(beg,end)
+  def spanBeliefs(begin: Int, end: Int) = spans(begin,end)
 
   def *(f: SentenceBeliefs): SentenceBeliefs = {
     if (f eq null) {
@@ -126,15 +126,26 @@ case class SentenceBeliefs(spans: TriangularArray[SpanBeliefs],
   def maxChange(f: SentenceBeliefs): Double = {
     var i = 0
     var max = 0.0
+    var argmax_i = -1
+    var argmax_j = -1
     while(i < length) {
       var j = i + 1
       while(j <= length) {
         if(spans(i,j).ne(null) && !spans(i,j).isConvergedTo(f.spans(i,j))) {
-          max = max max spans(i,j).maxChange(f.spans(i, j))
+          val spanChange: Double = spans(i, j).maxChange(f.spans(i, j))
+          if(spanChange > max) {
+            argmax_i = i
+            argmax_j = j
+          }
+          max = max max spanChange
         }
         j += 1
       }
       val wordChange = wordBeliefs(i).maxChange(f.wordBeliefs(i))
+      if(wordChange > max) {
+        argmax_i = i
+        argmax_j = -1
+      }
       max = max max wordChange
       i += 1
     }
@@ -183,7 +194,7 @@ object SentenceBeliefs {
 /**
  * Represents distributions over certain span properties
  * @param span which span I'm talking about
- * @param governor which word governs my span. not my head. my head's head. length = root (i.e. whole setnence), length+1 == off
+ * @param governor my parent constituent's head.
  * @param label my syntactic label type
  * @param ner my ner type,
  * @param observedNer whether or not the NER is emitted.
@@ -235,6 +246,8 @@ case class WordBeliefs(pos: DPos,
                        //                       anaphor: Beliefs[DPos],
                        //                       coref: Array[Beliefs[Int]]
                         ) extends Factor[WordBeliefs] {
+
+
   def *(f: WordBeliefs): WordBeliefs = WordBeliefs(pos, governor * f.governor, /*span * f.span,*/ tag * f.tag)//, maximalLabel * f.maximalLabel)//, f.anaphoric * f.anaphoric, f.anaphor * f.anaphor, Array.tabulate(coref.length)(i => coref(i) * f.coref(i)))
 
   def /(f: WordBeliefs): WordBeliefs = {
@@ -266,6 +279,14 @@ case class WordBeliefs(pos: DPos,
 //      && maximalLabel.isConvergedTo(f.tag, diff)
     //      && (0 until coref.length).forall(i => coref(i).isConvergedTo(f.coref(i), diff))
     )
+
+  def argmaxChange(beliefs: WordBeliefs): String = {
+    val mx = governor.maxChange(beliefs.governor)
+    val mtag = tag.maxChange(beliefs.tag)
+    if(mx > mtag) s"governor ${governor.argmaxChange(beliefs.governor)}"
+    else s"tag ${tag.argmaxChange(beliefs.tag)}"
+
+  }
 
 
   def maxChange(f: WordBeliefs): Double = Seq(

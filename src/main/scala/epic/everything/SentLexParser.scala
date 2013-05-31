@@ -1,6 +1,7 @@
 package epic.everything
 
 import breeze.linalg._
+import breeze.numerics._
 import epic.trees._
 import epic.parser._
 import epic.parser.models._
@@ -126,7 +127,10 @@ object SentLexParser {
       val info = new LexGovernorProjector(grammar).apply(m.anchoring.refined, m)
       val words = Array.tabulate(s.length) { w =>
         val oldW = old.wordBeliefs(w)
-        oldW.copy(governor=oldW.governor.updated(info.wordGovernor(w)),
+        val newGov = info.wordGovernor(w)
+        axpy(1E-6, signum(oldW.governor.beliefs), newGov)
+        newGov := normalize(newGov, 1)
+        oldW.copy(governor=oldW.governor.updated(newGov),
           //            span=oldW.span.copy(beliefs=info.governedSpan(w)),
           tag=oldW.tag.updated(info.wordTag(w)) //),
 //          maximalLabel=oldW.maximalLabel.updated(info.maximalLabelType(w))
@@ -140,7 +144,13 @@ object SentLexParser {
           val span: SpanBeliefs = old.spanBeliefs(r, c)
           assert(!info.spanType(r,c).valuesIterator.exists(_.isInfinite), info.spanType(r,c))
           assert(info.spanType(r,c).sum != 0.0, info.spanType(r,c))
-          span.copy(governor=span.governor.updated(info.spanGovernor(r, c)),
+          assert((info.spanGovernor(r,c).sum - 1.0 abs) < 1E-4 || info.spanGovernor(r,c).sum == info.spanGovernor(r,c).length, info.spanGovernor + " " + (r,c))
+
+          val newGov = info.spanGovernor(r,c)
+          axpy(1E-6, signum(span.governor.beliefs), newGov)
+          newGov := normalize(newGov, 1)
+
+          span.copy(governor=span.governor.updated(newGov),
             label=span.label.updated(info.spanType(r,c))
           )
         }
@@ -171,6 +181,19 @@ object SentLexParser {
     // but the dynamic program does not visit all spans for all parses, only those
     // in the actual parse. So instead, we premultiply by \prod_{all spans} p(not span)
     // and then we divide out p(not span) for spans in the tree.
+
+    for(i <- 0 until words.length){
+      val indices = beliefs.wordBeliefs(i).governor.beliefs.findAll(x => x * (1-x) > 1E-5)
+      if(indices.nonEmpty) println(i +" " + beliefs.wordBeliefs(i).governor + " " + indices)
+      else {
+        val indices =  beliefs.wordBeliefs(i).governor.beliefs.findAll(x => x != 0.0 && x != 1.0)
+        if(indices.nonEmpty) println(indices)
+      }
+      for(j <- (i+1) to words.length if beliefs.spanBeliefs(i, j) ne null) {
+        val indices = beliefs.spanBeliefs(i,j).governor.beliefs.findAll(x => x * (1-x) > 1E-5)
+        if(indices.nonEmpty) println((i,j) + "  " + beliefs.spanBeliefs(i,j).governor + " " + indices)
+      }
+    }
 
     // Also note that this code and the Visitor in LexGovernorProjector are basically
     // duals of one another. IF you change one you should change the other.
@@ -206,15 +229,15 @@ object SentLexParser {
       val dep = anchoring.depIndex(ref)
 
       // will swap these if rule types are different.
-      // trying to avoid code duplication/branching.
+      // trying to avoid code duplication
       var headCell: SpanBeliefs = beliefs.spans(split, end)
-      var depCell: SpanBeliefs = beliefs.spans(begin, split)
-      if(headCell == null || depCell == null) return Double.NegativeInfinity
+      var depSpanCell: SpanBeliefs = beliefs.spans(begin, split)
+      if(headCell == null || depSpanCell == null) return Double.NegativeInfinity
 
       if (!lexGrammar.isHeadOnRightForRule(rule)) {
         val cc = headCell
-        headCell = depCell
-        depCell = cc
+        headCell = depSpanCell
+        depSpanCell = cc
       }
 
       var cached = attachCache(dep)(head)
@@ -226,15 +249,19 @@ object SentLexParser {
 //          beliefs.wordBeliefs(dep).maximalLabel(grammar.rightChild(rule))
 //        }
         val depScore = beliefs.wordBeliefs(dep).governor(head)
-        val sGovScore = depCell.governor(head)
-        var notASpan = depCell.governor(length + 1)
+        val sGovScore = depSpanCell.governor(head)
+        var notASpan = depSpanCell.governor(length + 1)
         if(notASpan <= 0.0) notASpan = 1.0
+        val sSelfHeadScore = headCell.governor(head)
+        var headSpanNotSpan = headCell.governor(length+1)
+        if(headSpanNotSpan <= 0.0) headSpanNotSpan = 1.0
 
-        cached = if(depScore <= 0.0 || sGovScore <= 0.0 || sMax <= 0.0) {
+        cached = if(depScore <= 0.0 || sGovScore <= 0.0 || sMax <= 0.0 || sSelfHeadScore <= 0.0) {
           Double.NegativeInfinity
         } else {
-          math.log(depScore * sGovScore / notASpan  *   sMax)
+          math.log(depScore * sGovScore / notASpan  *   sMax) + math.log(sSelfHeadScore/headSpanNotSpan)
         }
+        assert(cached.abs < 1E-4 || cached == Double.NegativeInfinity, cached)
         assert(!java.lang.Double.isNaN(cached))
         attachCache(dep)(head) = cached
       }
@@ -250,9 +277,6 @@ object SentLexParser {
       val parent = grammar.parent(rule)
       val sLabel = beliefs.spanBeliefs(begin, end).label(parent)
       var notASpan =  beliefs.spanBeliefs(begin, end).label(notConstituent)
-//      if(sLabel <= 1E-6) {
-//        Double.NegativeInfinity
-//      } else {
         if(notASpan <= 0.0) notASpan = 1.0
         var baseScore = anchoring.scoreUnaryRule(begin, end, rule, ref)
         baseScore += math.log(sLabel / notASpan)
@@ -262,8 +286,6 @@ object SentLexParser {
           var sNotSpan2 = beliefs.spanBeliefs(begin, end).governor(length + 1)
           if (sNotSpan2 <= 0.0) sNotSpan2 = 1.0
 
-//          val sMax = beliefs.wordBeliefs(ref).maximalLabel(parent)
-//          baseScore += math.log(wordGovScore * sMax)
           baseScore += math.log(wordGovScore)
 //          baseScore += math.log(math.max(sMax, 1E-8))
           baseScore += math.log(sSpanGov / sNotSpan2)

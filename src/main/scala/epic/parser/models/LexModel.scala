@@ -262,7 +262,7 @@ class IndexedLexFeaturizer[L, W](f: LexFeaturizer[L],
   }
 }
 
-case class StandardFeaturizer[L](labelIndex: Index[L],
+case class StandardLexFeaturizer[L](labelIndex: Index[L],
                                  ruleIndex: Index[Rule[L]],
                                  ruleFeatGen: Rule[L]=>IndexedSeq[Feature]) extends LexFeaturizer[L] {
 
@@ -726,7 +726,7 @@ case class LexModelFactory(baseParser: ParserParams.XbarGrammar,
     def ruleGen(r: Rule[AnnotatedLabel]) = IndexedSeq(RuleFeature(r))
 
     val headFinder = HeadFinder.collins
-    val feat = new StandardFeaturizer(xbarGrammar.labelIndex, xbarGrammar.index, ruleGen)
+    val feat = new StandardLexFeaturizer(xbarGrammar.labelIndex, xbarGrammar.index, ruleGen)
 
     type W = String
     type L = AnnotatedLabel

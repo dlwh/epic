@@ -91,7 +91,8 @@ object ChainNER {
             null
           } else {
             val copy = spanBeliefs.copy(ner = spanBeliefs.ner.updated(DenseVector.tabulate(labels.size){marg.spanMarginal(_, b, e)}))
-            assert(copy.ner.beliefs(notNER) == 0.0, copy.ner.beliefs)
+            copy.ner.beliefs(notNER) = 0.0
+//            assert(copy.ner.beliefs(notNER) == 0.0, copy.ner.beliefs)
             // dealing with some stupid rounding issues...
             if (spanBeliefs.ner.beliefs(notNER) == 0.0) {
               copy.ner.beliefs(notNER) = 0.0

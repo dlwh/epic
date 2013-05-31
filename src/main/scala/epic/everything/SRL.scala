@@ -185,10 +185,10 @@ object SRL {
         }
 
 //        f visit new TransitionVisitor[Option[String], String] {
-//          def apply(prev: Int, cur: Int, beg: Int, end: Int, count: Double) {
+//          def apply(prev: Int, cur: Int, begin: Int, end: Int, count: Double) {
 //            if (count != 0.0) {
 //              var f = 0
-//              val feats = localization.featuresFor(beg, end, cur)
+//              val feats = localization.featuresFor(begin, end, cur)
 //              while(f < feats.length) {
 //                counts.counts(feats(f)) += count * scale
 //                f += 1
@@ -220,7 +220,7 @@ object SRL {
               }
               val normalizer: Double = breeze.linalg.sum(beliefs)
               beliefs /= normalizer
-              Beliefs(spanBeliefs.frames(i).property, beliefs)
+              spanBeliefs.frames(i).updated(beliefs)
             }
             spanBeliefs.copy(frames = newFrames)
           }
@@ -285,7 +285,7 @@ object SRL {
         math.log(sentenceBeliefs.spanBeliefs(beg,end).frames(frameIndex)(cur) / sentenceBeliefs.spanBeliefs(beg,end).frames(frameIndex)(iNone))
       }
 
-//      if (beg == 0) score + normalizingPiece else score
+//      if (begin == 0) score + normalizingPiece else score
       assert(score == 0.0 || score == Double.NegativeInfinity)
       score
     }

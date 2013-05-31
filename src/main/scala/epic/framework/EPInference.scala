@@ -100,7 +100,7 @@ class EPInference[Datum, Augment](val inferences: IndexedSeq[ProjectableInferenc
       var marg = inf.marginal(datum, q)
       var contributionToLikelihood = marg.logPartition
       if (contributionToLikelihood.isInfinite || contributionToLikelihood.isNaN) {
-        logger.error(s"Model $i is misbehaving ($contributionToLikelihood) on iter $iter!" )
+        logger.error(s"Model $i is misbehaving ($contributionToLikelihood) on iter $iter! Datum: $datum" )
         retries += 1
         if (retries > 3) {
           throw new RuntimeException("EP is being sad!")
@@ -120,18 +120,21 @@ class EPInference[Datum, Augment](val inferences: IndexedSeq[ProjectableInferenc
     val ep = new ExpectationPropagation(project _, 1E-5)
 
     var state: ep.State = null
-    val iterates = ep.inference(augment, 0 until inferences.length, IndexedSeq.fill[Augment](inferences.length)(null.asInstanceOf[Augment]))
+    val iterates = ep.inference(augment, 0 until inferences.length, IndexedSeq.tabulate[Augment](inferences.length)(i => inferences(i).baseAugment(datum)))
     var converged = false
     while (!converged && iter < maxEPIter && iterates.hasNext) {
       val s = iterates.next()
-//      if (state != null) {
-//        converged = (s.logPartition - state.logPartition).abs / math.max(s.logPartition, state.logPartition) < 1E-5
-//        println(iter + " guess " + s.q.isConvergedTo(state.q) + " " + s.logPartition + " " + state.logPartition)
-//        import epic.everything._
-//        if (s.q.isInstanceOf[SentenceBeliefs]) {
-//          println(iter + " guess " + s.q.asInstanceOf[SentenceBeliefs].maxChange(state.q.asInstanceOf[SentenceBeliefs]) + " " + s.logPartition + " " + state.logPartition)
-//        }
-//      }
+      if (state != null) {
+        logger.trace {
+          //          converged = (s.logPartition - state.logPartition).abs / math.max(s.logPartition, state.logPartition) < 1E-5
+          import epic.everything._
+          if (s.q.isInstanceOf[SentenceBeliefs]) {
+            (iter + " guess " + s.q.asInstanceOf[SentenceBeliefs].maxChange(state.q.asInstanceOf[SentenceBeliefs]) + " " + s.logPartition + " " + state.logPartition)
+          } else {
+            (iter + " guess " + s.q.isConvergedTo(state.q) + " " + s.logPartition + " " + state.logPartition)
+          }
+        }
+      }
 
       iter += 1
       state = s

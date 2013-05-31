@@ -382,11 +382,11 @@ class IndexedSpanFeaturizer[L, L2, W](f: SpanFeaturizer[L2, W],
     }
 
     // caches:
-    // (beg,end) -> label ->  Array[Int]
+    // (begin,end) -> label ->  Array[Int]
     val spanCache = TriangularArray.raw[OpenAddressHashArray[Array[Int]]](length + 1, null)
-    // (beg,end) -> rule -> Array[Int]
+    // (begin,end) -> rule -> Array[Int]
     val unaryCache = TriangularArray.raw[OpenAddressHashArray[Array[Int]]](length + 1, null)
-    // (beg, end) -> (split - beg) -> Array[Int]
+    // (begin, end) -> (split - begin) -> Array[Int]
     val binaryCache = TriangularArray.raw[Array[OpenAddressHashArray[Array[Int]]]](length + 1, null)
 
 

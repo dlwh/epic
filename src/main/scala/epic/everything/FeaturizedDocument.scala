@@ -10,7 +10,7 @@ import scala.Some
 import epic.parser._
 import epic.lexicon.Lexicon
 import epic.constraints.{ChartConstraints, LabeledSpanConstraints}
-import epic.features.{SurfaceFeaturizer, IndexedSurfaceAnchoring, IndexedSurfaceFeaturizer}
+import epic.features.{FeaturizationLevel, SurfaceFeaturizer, IndexedSurfaceAnchoring, IndexedSurfaceFeaturizer}
 import epic.util.CacheBroker
 
 /**
@@ -28,9 +28,16 @@ case class FeaturizedSentence(index: Int, words: IndexedSeq[String],
                               featureAnchoring: IndexedSurfaceAnchoring[String],
                               speaker: Option[String] = None,
                               id: String = "")  {
-  def featuresForSpan(begin: Int, end: Int) = featureAnchoring.featuresForSpan(begin, end)
+  def featuresForSpan(begin: Int, end: Int, level: FeaturizationLevel = FeaturizationLevel.MinimalFeatures) = {
+    featureAnchoring.featuresForSpan(begin, end, level)
+  }
 
-  def featuresForWord(w: Int) = featureAnchoring.featuresForWord(w)
+  def featuresForWord(w: Int, level: FeaturizationLevel = FeaturizationLevel.MinimalFeatures) = {
+    featureAnchoring.featuresForWord(w, level)
+  }
+
+
+  override def toString: String = s"FeaturizedSentence($index, $words, $treeOpt, $nerOpt, ..., $speaker, $id)"
 
   def withTree(tree: BinarizedTree[AnnotatedLabel]) = copy(treeOpt = Some(tree))
 

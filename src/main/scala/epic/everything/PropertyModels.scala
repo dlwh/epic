@@ -6,6 +6,7 @@ import epic.trees.AnnotatedLabel
 import epic.everything.PropertyPropagation._
 import epic.framework.Feature
 import epic.parser.features.IndicatorFeature
+import epic.features.FeaturizationLevel
 
 /**
  * 
@@ -55,7 +56,7 @@ object PropertyModels {
     def featuresFor(fs: FeaturizedSentence, b: SpanBeliefs, begin: Int, end: Int, assignment: Int): Array[Int] = {
       if (assignment > fs.length) notGovernedArray
       else if (assignment == fs.length) rootArray
-      else fs.featuresForWord(assignment)
+      else fs.featuresForWord(assignment, FeaturizationLevel.MinimalFeatures)
     }
   }
 
@@ -68,7 +69,7 @@ object PropertyModels {
 
 
     def featuresFor(fs: FeaturizedSentence, b: SpanBeliefs, begin: Int, end: Int, component: Int, assignment: Int): Array[Int] = {
-      val fi = fs.featuresForWord(fs.frames(component).pos)
+      val fi = fs.featuresForWord(fs.frames(component).pos, FeaturizationLevel.MinimalFeatures)
       fi :+ (assignment + srlOffset)
     }
   }
@@ -79,9 +80,9 @@ object PropertyModels {
   def nerSyntaxModel(fs: FeaturizedDocument.Factory, beliefsFactory: SentenceBeliefs.Factory):PropertyPropagation.Model[_, _] = {
     val nerp = nerPacket(beliefsFactory.nerLabelIndex)
     val synp = syntaxPacket(beliefsFactory.optionLabelProp.index)
-    val govp = governorPacket(fs.wordFeatureIndex)
+ //   val govp = governorPacket(fs.wordFeatureIndex)
 
-    PropertyPropagation.packetModel(beliefsFactory, nerp, IndexedSeq(synp, govp))
+    PropertyPropagation.packetModel(beliefsFactory, nerp, IndexedSeq(synp))//IndexedSeq(synp, govp))
   }
 
   def srlSyntaxModel(fs: FeaturizedDocument.Factory, beliefsFactory: SentenceBeliefs.Factory):PropertyPropagation.Model[_, _] = {

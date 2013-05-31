@@ -17,7 +17,7 @@ import epic.trees.annotations.PipelineAnnotator
 import epic.parser.models.IndexedLexFeaturizer
 import epic.trees.ProcessedTreebank
 import epic.parser.features.RuleFeature
-import epic.parser.models.StandardFeaturizer
+import epic.parser.models.StandardLexFeaturizer
 import breeze.optimize.FirstOrderMinimizer.OptParams
 import epic.parser.models.LexGrammarBundle
 import collection.mutable.ArrayBuffer
@@ -57,7 +57,7 @@ object AnnotatingPipeline extends Logging {
   def main(args: Array[String]) {
 
     val params = CommandLineParser.readIn[Params](args)
-    println(params)
+    logger.info("Parameters: " + params)
     require(params.corpus.exists(), params.corpus + " does not exist!")
     import params.cache
 
@@ -77,7 +77,6 @@ object AnnotatingPipeline extends Logging {
     val (docProcessor, processedTrain) =  buildProcessor(train, params.baseParser, weightsCache, params)
 
 
-//    println(docProcessor.parseConstrainer.augmentedGrammar.refined.asInstanceOf[SimpleRefinedGrammar[_,_,_]].refinements)
     val processedTest =  test.par.map(docProcessor(_)).seq.flatMap(_.sentences).toIndexedSeq
 
     logger.info(s"${processedTrain.length} training documents totalling ${processedTrain.flatMap(_.sentences).length} sentences.")
@@ -183,9 +182,9 @@ object AnnotatingPipeline extends Logging {
           (aa + b.asInstanceOf[EvaluationResult[_]]).asInstanceOf[Object]
         })
 
-        println("Joint results:")
+        logger.info("Joint results:")
         for ( (result, model) <- hacketyHack zip epModel.models.filter(_.isInstanceOf[EvaluableModel[FeaturizedSentence]])) {
-          println(model.getClass.getName + ": " + result )
+          logger.info(model.getClass.getName + ": " + result )
         }
       }
 
@@ -212,12 +211,12 @@ object AnnotatingPipeline extends Logging {
     val maxLengthMap = train.flatMap(_.segments.iterator).groupBy(_._1).mapValues(arr => arr.map(_._2.length).max)
     val labelIndex = Index(Iterator(NERType.OutsideSentence, NERType.NotEntity) ++ train.iterator.flatMap(_.label.map(_._1)))
     val maxLengthArray: Array[Int] = Encoder.fromIndex(labelIndex).tabulateArray(maxLengthMap.getOrElse(_, 0))
-    println(maxLengthMap)
+    logger.info("Max lengths for NER segments: " + maxLengthMap)
     val nerCounts: Counter2[NERType.Value, String, Double] = Counter2.count(train.map(_.asFlatTaggedSequence(NERType.NotEntity)).map{seg => seg.label zip seg.words}.flatten).mapValues(_.toDouble)
     val nerLexicon = new SimpleLexicon(labelIndex, nerCounts, openTagThreshold = 10, closedWordThreshold = 20)
     val allowedNerClassifier = new LabeledSpanConstraints.LayeredTagConstraintsFactory(nerLexicon, maxLengthArray)
 
-    println("Building basic parsing model...")
+    logger.info("Building basic parsing model...")
     val trainTrees = for (d <- docs; s <- d.sentences) yield {
       params.treebank.makeTreeInstance(s.id, s.tree.map(_.label), s.words, removeUnaries = true)
     }
@@ -225,13 +224,13 @@ object AnnotatingPipeline extends Logging {
     val annotator = new PipelineAnnotator[AnnotatedLabel, String](Seq(StripAnnotations()))
     val pruningParser =  GenerativeParser.annotated(xbar, annotator, trainTrees)
     val parseConstrainer = new CachedChartConstraintsFactory(new ParserChartConstraintsFactory(pruningParser.augmentedGrammar, {(_:AnnotatedLabel).isIntermediate}))
-    println("Building constraints")
+    logger.info("Building constraints")
     val count = new AtomicInteger(0)
     trainTrees.par.foreach{t =>
       parseConstrainer.constraints(t.words)
-      val c = count.getAndIncrement
-      if(c % 100 == 0)
-        println(s"$c/${trainTrees.length} sentences parsed.")
+      val c = count.incrementAndGet()
+      if(c % 100 == 0 || c == trainTrees.length)
+        logger.info(s"$c/${trainTrees.length} sentences parsed.")
     }
     broker.commit()
 
@@ -268,16 +267,15 @@ object AnnotatingPipeline extends Logging {
     val (initLexicon, initBinaries, initUnaries) = GenerativeParser.extractCounts(trees)
 
     val wordIndex: Index[String] = Index(trainTrees.iterator.flatMap(_.words))
-    val summedCounts = sum(initLexicon, Axis._0)
 
     def ruleGen(r: Rule[AnnotatedLabel]) = IndexedSeq(RuleFeature(r))
 
     val headFinder = HeadFinder.collins
-    val feat = new StandardFeaturizer(
-    docProcessor.grammar.labelIndex,
-    docProcessor.grammar.index,
-    ruleGen
-   )
+    val feat = new StandardLexFeaturizer(
+      docProcessor.grammar.labelIndex,
+      docProcessor.grammar.index,
+      ruleGen
+    )
 
     val indexed = IndexedLexFeaturizer.extract[AnnotatedLabel, TreeInstance[AnnotatedLabel, String], String](feat,
       docProcessor.featurizer,
