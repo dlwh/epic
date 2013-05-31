@@ -1,6 +1,6 @@
 name := "chalk"
 
-version := "1.2.0-SNAPSHOT"
+version := "1.2.0"
 
 organization := "org.scalanlp"
 
