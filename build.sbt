@@ -15,6 +15,11 @@ resolvers ++= Seq(
   "sonatype releases" at "https://oss.sonatype.org/content/repositories/releases"
 )
 
+libraryDependencies ++= Seq(
+  "org.scalanlp" % "breeze-core_2.10" % "0.3",
+  "org.scalanlp" % "breeze-math_2.10" % "0.3"
+)
+
 publishTo <<= version { v: String =>
   val nexus = "https://oss.sonatype.org/"
   if (v.trim.endsWith("SNAPSHOT"))
