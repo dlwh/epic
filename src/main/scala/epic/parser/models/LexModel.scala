@@ -30,7 +30,7 @@ import epic.lexicon.Lexicon
 import epic.features._
 import epic.parser.features._
 import epic.constraints.{ChartConstraints, SpanConstraints}
-import epic.util.{CacheBroker, Arrays, Has2}
+import epic.util.{SafeLogging, CacheBroker, Arrays, Has2}
 import epic.trees.UnaryTree
 import epic.parser.features.RuleFeature
 import epic.trees.TreeInstance
@@ -707,7 +707,7 @@ case class LexModelFactory(baseParser: ParserParams.XbarGrammar,
                            @Help(text="For features not seen in gold trees, we bin them into dummyFeats * numGoldFeatures bins using hashing.")
                            dummyFeats: Double = 0.5,
                            @Help(text="How common must a feature be before we remember it?")
-                           minFeatCutoff: Int = 1) extends ParserExtractableModelFactory[AnnotatedLabel, String] with Logging {
+                           minFeatCutoff: Int = 1) extends ParserExtractableModelFactory[AnnotatedLabel, String] with SafeLogging {
   type MyModel = LexModel[AnnotatedLabel, String]
 
   def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]], constrainer: Factory[AnnotatedLabel, String])(implicit broker: CacheBroker) ={

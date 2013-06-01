@@ -7,8 +7,8 @@ import breeze.util.Encoder
 import java.util.concurrent.atomic.AtomicInteger
 import collection.parallel.ForkJoinTaskSupport
 import concurrent.forkjoin.ForkJoinPool
-import com.typesafe.scalalogging.log4j.{Logging, Logger}
-import epic.util.CacheBroker
+import com.typesafe.scalalogging.log4j.Logging
+import epic.util.{SafeLogging, CacheBroker}
 
 /**
  * The objective function for training a [[epic.framework.Model]]. Selects
@@ -19,7 +19,7 @@ import epic.util.CacheBroker
  */
 class ModelObjective[Datum](val model: Model[Datum],
                             batchSelector: IndexedSeq[Int]=>GenTraversable[Datum],
-                            val fullRange: IndexedSeq[Int])(implicit cache: CacheBroker) extends BatchDiffFunction[DenseVector[Double]] with Logging {
+                            val fullRange: IndexedSeq[Int])(implicit cache: CacheBroker) extends BatchDiffFunction[DenseVector[Double]] with SafeLogging {
   def this(model: Model[Datum], data: IndexedSeq[Datum], numThreads: Int = -1)(implicit cache: CacheBroker) = this(model,ModelObjective.makePar(data, numThreads)(_), 0 until data.length)
 
   import model.{ExpectedCounts => _, _}

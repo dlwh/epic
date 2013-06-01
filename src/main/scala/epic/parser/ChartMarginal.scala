@@ -1,7 +1,7 @@
 package epic.parser
 
 import epic.trees.{UnaryTree, BinarizedTree}
-import epic.util.Arrays
+import epic.util.{SafeLogging, Arrays}
 import breeze.numerics
 import breeze.collection.mutable.TriangularArray
 import com.typesafe.scalalogging.log4j.Logging
@@ -37,7 +37,7 @@ import com.typesafe.scalalogging.log4j.Logging
 final case class ChartMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
                                      inside: ParseChart[L], outside: ParseChart[L],
                                      logPartition: Double,
-                                     isMaxMarginal: Boolean) extends ParseMarginal[L, W] with Logging {
+                                     isMaxMarginal: Boolean) extends ParseMarginal[L, W] with SafeLogging {
 
   def checkForTree(tree: BinarizedTree[(L, Int)]) = {
     for (t <- tree.allChildren) t match {

@@ -24,6 +24,7 @@ import breeze.numerics._
 import epic.lexicon.Lexicon
 import breeze.numerics
 import com.typesafe.scalalogging.log4j.Logging
+import epic.util.SafeLogging
 
 case class ParseExtractionException(msg: String, sentence: IndexedSeq[Any]) extends RuntimeException
 case class NoParseException(msg: String, sentence: IndexedSeq[Any]) extends RuntimeException(s"No parse for $sentence: $msg")
@@ -51,7 +52,7 @@ object ChartDecoder {
  * @author dlwh
  */
 @SerialVersionUID(2)
-class ViterbiDecoder[L, W] extends ChartDecoder[L, W] with Serializable with Logging {
+class ViterbiDecoder[L, W] extends ChartDecoder[L, W] with Serializable with SafeLogging {
 
   override def wantsMaxMarginal: Boolean = true
 

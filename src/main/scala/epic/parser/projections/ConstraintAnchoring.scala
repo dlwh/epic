@@ -30,7 +30,7 @@ import breeze.numerics._
 import java.util
 import epic.lexicon.Lexicon
 import epic.constraints.{CachedChartConstraintsFactory, ChartConstraints}
-import epic.util.CacheBroker
+import epic.util.{SafeLogging, CacheBroker}
 import scala.collection.GenTraversable
 import com.typesafe.scalalogging.log4j.{Logging, Logger}
 import java.util.concurrent.atomic.AtomicInteger
@@ -76,7 +76,7 @@ class ConstraintCoreGrammarAdaptor[L, W](val grammar: BaseGrammar[L], val lexico
 @SerialVersionUID(8620602232218134084L)
 class ParserChartConstraintsFactory[L, W](val augmentedGrammar: AugmentedGrammar[L, W],
                                           val isIntermediate: L=>Boolean,
-                                          threshold: Double = math.exp(-7)) extends ChartConstraints.Factory[L, W] with Serializable with Logging {
+                                          threshold: Double = math.exp(-7)) extends ChartConstraints.Factory[L, W] with Serializable with SafeLogging {
   assert(threshold >= 0 && threshold <= 1, s"Threshold must be between 0 and 1, but whas $threshold")
   import augmentedGrammar._
   def labelIndex = grammar.labelIndex

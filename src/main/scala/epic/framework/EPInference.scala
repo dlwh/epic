@@ -18,11 +18,11 @@ package epic.framework
 
 import collection.mutable.ArrayBuffer
 import breeze.inference.{ExpectationPropagation, Factor}
-import com.typesafe.scalalogging.log4j.Logging
+import epic.util.SafeLogging
 
 class EPInference[Datum, Augment](val inferences: IndexedSeq[ProjectableInference[Datum, Augment]],
                                   val maxEPIter: Int,
-                                  val epInGold: Boolean = false)(implicit aIsFactor: Augment <:< Factor[Augment]) extends ProjectableInference[Datum, Augment] with Logging with Serializable {
+                                  val epInGold: Boolean = false)(implicit aIsFactor: Augment <:< Factor[Augment]) extends ProjectableInference[Datum, Augment] with SafeLogging with Serializable {
   type Marginal = EPMarginal[Augment, ProjectableInference[Datum, Augment]#Marginal]
   type ExpectedCounts = EPExpectedCounts
 

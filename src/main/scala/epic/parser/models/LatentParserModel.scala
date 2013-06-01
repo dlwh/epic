@@ -28,9 +28,8 @@ import epic.trees._
 import breeze.config.Help
 import epic.features.{StandardSurfaceFeaturizer, IndexedWordFeaturizer}
 import epic.lexicon.Lexicon
-import epic.constraints.{TagConstraints, ChartConstraints}
-import epic.util.CacheBroker
-import com.typesafe.scalalogging.log4j.Logging
+import epic.constraints.ChartConstraints
+import epic.util.{SafeLogging, CacheBroker}
 
 class LatentParserModel[L, L3, W](indexedFeatures: IndexedFeaturizer[L, L3, W],
                                   reannotate: (BinarizedTree[L], Seq[W]) => BinarizedTree[L],
@@ -96,7 +95,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
                               @Help(text="Number of states to use. Overridden by substates file")
                               numStates: Int = 2,
                               @Help(text="Old weights to initialize with. Optional.")
-                              oldWeights: File = null) extends ParserModelFactory[AnnotatedLabel, String] with Logging {
+                              oldWeights: File = null) extends ParserModelFactory[AnnotatedLabel, String] with SafeLogging {
   type MyModel = LatentParserModel[AnnotatedLabel, (AnnotatedLabel, Int), String]
 
   def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]],

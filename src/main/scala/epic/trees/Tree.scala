@@ -210,16 +210,16 @@ object Trees {
    */
   def addHorizontalMarkovization[T](tree: BinarizedTree[T],
                                     order: Int,
-                                    join: (T,Seq[Either[T,T]])=>T,
+                                    join: (T,IndexedSeq[Either[T,T]])=>T,
                                     isIntermediate: T=>Boolean):BinarizedTree[T] = {
-    def rec(tree: BinarizedTree[T],history: List[Either[T,T]] = List.empty):BinarizedTree[T] = {
+    def rec(tree: BinarizedTree[T],history: IndexedSeq[Either[T,T]] = IndexedSeq.empty):BinarizedTree[T] = {
       val newLabel = if(isIntermediate(tree.label)) join(tree.label,history.take(order-1)) else tree.label
       tree match {
         case BinaryTree(_, t1, t2, span) =>
-          val newHistory = if(isIntermediate(tree.label)) history.take(order-1) else List.empty
-          BinaryTree(newLabel, rec(t1,Right(t2.label) :: newHistory), rec(t2,Left(t1.label)::newHistory), tree.span)
+          val newHistory = if(isIntermediate(tree.label)) history.take(order-1) else IndexedSeq.empty
+          BinaryTree(newLabel, rec(t1,Right(t2.label) +: newHistory), rec(t2,Left(t1.label) +:newHistory), tree.span)
         case UnaryTree(label, child, chain, span) =>
-          UnaryTree(newLabel,rec(child,if(child.label == label) history else List.empty), chain, tree.span)
+          UnaryTree(newLabel,rec(child,if(child.label == label) history else IndexedSeq.empty), chain, tree.span)
         case NullaryTree(_, span) =>
           NullaryTree(newLabel, span)
       }
@@ -230,7 +230,7 @@ object Trees {
   }
 
   def addHorizontalMarkovization(tree: BinarizedTree[String], order: Int):BinarizedTree[String] = {
-    def join(t: String, chain: Seq[Either[String,String]]) = chain.map{ case Left(l) => "\\" + l case Right(r) => "/" + r}.mkString(t +">","_","")
+    def join(t: String, chain: IndexedSeq[Either[String,String]]) = chain.map{ case Left(l) => "\\" + l case Right(r) => "/" + r}.mkString(t +">","_","")
     addHorizontalMarkovization(tree,order,join,(_:String).startsWith("@"))
   }
 

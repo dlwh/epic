@@ -83,7 +83,7 @@ case class AddMarkovization[W](horizontal: Int=1, vertical: Int=2) extends TreeA
   }
 
   private def annHorz(tree: BinarizedTree[AnnotatedLabel]):BinarizedTree[AnnotatedLabel] = {
-    def join(base: AnnotatedLabel, siblings: Seq[Either[AnnotatedLabel, AnnotatedLabel]]) = {
+    def join(base: AnnotatedLabel, siblings: IndexedSeq[Either[AnnotatedLabel, AnnotatedLabel]]) = {
       val news = siblings.map {
         case Left(x) => Left(x.label)
         case Right(x) => Right(x.label)

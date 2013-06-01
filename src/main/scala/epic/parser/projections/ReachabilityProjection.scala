@@ -8,14 +8,14 @@ import breeze.numerics.I
 import com.typesafe.scalalogging.log4j.Logging
 import scala.collection.{GenTraversableLike, GenTraversable, GenTraversableOnce}
 import scala.collection.generic.CanBuildFrom
-import epic.util.CacheBroker
+import epic.util.{SafeLogging, CacheBroker}
 
 /**
  * Finds the best tree (relative to the gold tree) s.t. it's reacheable given the current anchoring.
  * Best is measured as number of correct labeled spans, as usual.
  * @author dlwh
  */
-class ReachabilityProjection[L, W](grammar: BaseGrammar[L], lexicon: Lexicon[L, W]) extends Logging {
+class ReachabilityProjection[L, W](grammar: BaseGrammar[L], lexicon: Lexicon[L, W]) extends SafeLogging {
   private val cache = CacheBroker().make[IndexedSeq[W], BinarizedTree[L]]("ReachabilityProjection")
 
   private var problems  = 0

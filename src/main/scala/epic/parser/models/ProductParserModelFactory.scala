@@ -28,7 +28,7 @@ import epic.parser.{AugmentedGrammar, BaseGrammar, RefinedGrammar, ParserParams}
 import epic.trees._
 import epic.features.IndexedWordFeaturizer
 import epic.features.StandardSurfaceFeaturizer
-import epic.util.CacheBroker
+import epic.util.{SafeLogging, CacheBroker}
 import com.typesafe.scalalogging.log4j.Logging
 import epic.constraints.ChartConstraints.Factory
 
@@ -43,7 +43,7 @@ case class ProductParserModelFactory(baseParser: ParserParams.XbarGrammar,
                                      numStates: Int = 2,
                                      numModels: Int = 2,
                                      oldWeights: File = null,
-                                     splitFactor: Int = 1)  extends ParserModelFactory[AnnotatedLabel, String] with Logging {
+                                     splitFactor: Int = 1)  extends ParserModelFactory[AnnotatedLabel, String] with SafeLogging {
 
 
   type MyModel = LatentParserModel[AnnotatedLabel, (AnnotatedLabel, Seq[Int]), String]

@@ -35,8 +35,8 @@ case class FunctionalTag(tag: String) extends Annotation
  */
 @SerialVersionUID(1L)
 case class AnnotatedLabel(label: String,
-                          parents: Seq[String] = Seq.empty,
-                          siblings: Seq[Either[String, String]] = Seq.empty,
+                          parents: IndexedSeq[String] = IndexedSeq.empty,
+                          siblings: IndexedSeq[Either[String, String]] = IndexedSeq.empty,
                           features: Set[Annotation] = Set.empty) extends CachedHashCode {
 
   def annotate(sym: Annotation) = copy(features = features + sym)

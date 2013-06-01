@@ -11,7 +11,7 @@ import breeze.features.FeatureVector
 import epic.constraints.LabeledSpanConstraints
 import epic.lexicon.SimpleLexicon
 import epic.features._
-import epic.util.{CacheBroker, NotProvided, Optional}
+import epic.util.{SafeLogging, CacheBroker, NotProvided, Optional}
 import com.typesafe.scalalogging.log4j.Logging
 import epic.sequences.SemiCRFModel.BIEOFeatureAnchoring
 
@@ -285,7 +285,7 @@ object SegmentationModelFactory {
                                      transitionFeatures: Array[Array[Array[Int]]], // prev -> cur -> indexes into f.labelFeatureIndex
                                      val startSymbol: L,
                                      val labelIndex: Index[L],
-                                     val constraintFactory: LabeledSpanConstraints.Factory[L, String]) extends SemiCRFModel.BIEOFeaturizer[L,String] with Serializable with Logging {
+                                     val constraintFactory: LabeledSpanConstraints.Factory[L, String]) extends SemiCRFModel.BIEOFeaturizer[L,String] with Serializable with SafeLogging {
 
 
     def anchor(w: IndexedSeq[String]): SemiCRFModel.BIEOFeatureAnchoring[L, String] = new SemiCRFModel.BIEOFeatureAnchoring[L, String] {

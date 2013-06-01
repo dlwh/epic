@@ -10,7 +10,7 @@ import epic.features._
 import epic.lexicon.{Lexicon, SimpleLexicon}
 import breeze.collection.mutable.OpenAddressHashArray
 import java.util
-import epic.util.{NotProvided, Optional}
+import epic.util.{SafeLogging, NotProvided, Optional}
 import epic.parser.features.PairFeature
 import epic.parser.features.LabelFeature
 import com.typesafe.scalalogging.log4j.Logging
@@ -133,7 +133,7 @@ class CRFInference[L, W](val weights: DenseVector[Double],
 
 class TaggedSequenceModelFactory[L](val startSymbol: L,
                                     gazetteer: Optional[Gazetteer[Any, String]] = NotProvided,
-                                    weights: Feature=>Double = { (f:Feature) => 0.0}) extends Logging {
+                                    weights: Feature=>Double = { (f:Feature) => 0.0}) extends SafeLogging {
 
   import TaggedSequenceModelFactory._
 

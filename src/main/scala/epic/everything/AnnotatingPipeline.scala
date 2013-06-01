@@ -27,6 +27,8 @@ import epic.constraints.{CachedChartConstraintsFactory, LabeledSpanConstraints}
 import epic.util.CacheBroker
 import java.util.concurrent.atomic.AtomicInteger
 import com.typesafe.scalalogging.log4j.Logging
+import breeze.stats.distributions.{RandBasis, Rand}
+import breeze.stats.random.MersenneTwister
 
 
 /**
@@ -198,10 +200,7 @@ object AnnotatingPipeline extends Logging {
       file <- corpus.listFiles.sortBy(_.getName) take nfiles
       doc <- ConllOntoReader.readDocuments(file)
     } yield doc
-    val train = instances.take(instances.length * 9 / 10)
-    val test = instances.drop(instances.length * 9 / 10)
-    (train.toIndexedSeq, test.toIndexedSeq)
-
+    new RandBasis(new MersenneTwister(1)).permutation(instances.length).draw().map(instances).toIndexedSeq.splitAt(instances.length * 9 / 10)
   }
 
 
