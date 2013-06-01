@@ -40,6 +40,7 @@ object AnnotatingPipeline extends Logging {
                     treebank: ProcessedTreebank,
                     implicit val cache: CacheBroker,
                     nfiles: Int = 100000,
+                    maxLength: Int = 50,
                     nthreads: Int = -1,
                     iterPerEval: Int = 20,
                     baseParser: ParserParams.XbarGrammar,
@@ -66,8 +67,8 @@ object AnnotatingPipeline extends Logging {
     val corpus = params.corpus
     val nfiles = params.nfiles
     val traintest = readTrainTestSplit(corpus, nfiles)
-    val train = traintest._1
-    val test = traintest._2
+    val train = traintest._1.map(d => d.copy(sentences=d.sentences.filter(_.length <= params.maxLength)))
+    val test = traintest._2.map(d => d.copy(sentences=d.sentences.filter(_.length <= params.maxLength)))
 
     val weightsCache = if (params.weightsCache.exists()) {
       loadWeights(params.weightsCache)
