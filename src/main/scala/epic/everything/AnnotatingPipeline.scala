@@ -3,7 +3,7 @@ package everything
 
 import java.io.File
 import epic.trees._
-import epic.parser.{GenerativeParser, ParserParams}
+import epic.parser.{ParseEval, GenerativeParser, ParserParams}
 import epic.parser.ParserParams.XbarGrammar
 import breeze.config.{Help, CommandLineParser}
 import epic.ontonotes.{NERType, ConllOntoReader, Document}
@@ -73,7 +73,7 @@ object AnnotatingPipeline extends Logging {
       Counter[String, Double]()
     }
 
-    val (docProcessor, processedTrain) =  buildProcessor(train, params.baseParser, weightsCache, params)
+    val (docProcessor, processedTrain) =  buildProcessor(train, test, params.baseParser, weightsCache, params)
 
 
     val processedTest =  test.par.map(docProcessor(_)).seq.flatMap(_.sentences).toIndexedSeq
@@ -205,7 +205,7 @@ object AnnotatingPipeline extends Logging {
   }
 
 
-  def buildProcessor(docs: IndexedSeq[Document], xbar: XbarGrammar, weightsCache: Counter[String, Double], params: AnnotatingPipeline.Params)(implicit broker: CacheBroker): (FeaturizedDocument.Factory, IndexedSeq[FeaturizedDocument]) = {
+  def buildProcessor(docs: IndexedSeq[Document], devDocs: IndexedSeq[Document], xbar: XbarGrammar, weightsCache: Counter[String, Double], params: AnnotatingPipeline.Params)(implicit broker: CacheBroker): (FeaturizedDocument.Factory, IndexedSeq[FeaturizedDocument]) = {
     val train = docs.flatMap(_.sentences.map(_.nerSegmentation))
     val maxLengthMap = train.flatMap(_.segments.iterator).groupBy(_._1).mapValues(arr => arr.map(_._2.length).max)
     val labelIndex = Index(Iterator(NERType.OutsideSentence, NERType.NotEntity) ++ train.iterator.flatMap(_.label.map(_._1)))
@@ -220,8 +220,17 @@ object AnnotatingPipeline extends Logging {
       params.treebank.makeTreeInstance(s.id, s.tree.map(_.label), s.words, removeUnaries = true)
     }
 
+
     val annotator = new PipelineAnnotator[AnnotatedLabel, String](Seq(StripAnnotations(), AddMarkovization()))
     val pruningParser =  GenerativeParser.annotated(xbar, annotator, trainTrees)
+
+    logger.info{
+      val devTrees = for (d <- devDocs; s <- d.sentences) yield {
+        params.treebank.makeTreeInstance(s.id, s.tree.map(_.label), s.words, removeUnaries = true)
+      }
+      "Baseline Parser gets " + ParseEval.evaluate(devTrees, pruningParser, AnnotatedLabelChainReplacer, {(_:AnnotatedLabel).baseLabel})
+    }
+
     val parseConstrainer = new CachedChartConstraintsFactory(new ParserChartConstraintsFactory(pruningParser.augmentedGrammar, {(_:AnnotatedLabel).isIntermediate}))
     logger.info("Building constraints")
     val count = new AtomicInteger(0)

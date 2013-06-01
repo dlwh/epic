@@ -87,7 +87,7 @@ trait Tree[+L] extends Serializable {
 
   import Tree._
   override def toString = recursiveToString(this,0,new StringBuilder).toString
-  def render[W](words: Seq[W], newline: Boolean = true) = recursiveRender(this,0,words, newline, new StringBuilder).toString
+  def render[W](words: Seq[W], newline: Boolean = true) = recursiveRender(this,1,words, newline, new StringBuilder).toString
 }
 
 object Tree {
@@ -108,35 +108,23 @@ object Tree {
 
   private def recursiveRender[L,W](tree: Tree[L], depth: Int, words: Seq[W], newline: Boolean, sb: StringBuilder): StringBuilder =  {
     import tree._
-    if(newline) sb append "\n" append "  " * depth
-    else sb.append(" ")
     sb append "(" append tree.label
     if(isLeaf) {
       sb append span.map(words).mkString(" "," ","")
     } else {
       //sb append "\n"
+      var _lastWasNonTerminal = false
       for( c <- children ) {
-        recursiveRender(c,depth+1,words,newline, sb)
+        if(newline && (c.span.length != words.length) && (c.children.nonEmpty || _lastWasNonTerminal)) sb append "\n" append "  " * depth
+        else sb.append(' ')
+        recursiveRender(c,depth+1,words, newline, sb)
+        _lastWasNonTerminal = c.children.nonEmpty
       }
     }
-    sb append ")"
+    sb append ')'
+    if(sb.length > 1 && sb(sb.length-2) != ')'  && sb(sb.length-2) != ' ')
+      sb append ' '
     sb
-  }
-
-  implicit def treeSerializationReadWritable[L:ReadWritable]: ReadWritable[Tree[L]] = new ReadWritable[Tree[L]] {
-    def write(data: DataOutput, t: Tree[L]) = {
-      implicitly[ReadWritable[L]].write(data,t.label)
-      DataSerialization.write(data,t.children)
-      data.writeInt(t.span.begin)
-      data.writeInt(t.span.end)
-    }
-    def read(data: DataInput) = {
-      val label = implicitly[ReadWritable[L]].read(data)
-      val children = indexedSeqReadWritable(this).read(data)
-      val begin = data.readInt()
-      val end = data.readInt()
-      Tree(label, children, Span(begin,end))
-    }
   }
 
 }
@@ -162,7 +150,7 @@ case class BinaryTree[+L](label: L,
   def splitPoint = leftChild.span.end
 }
 
-case class UnaryTree[+L](label: L, child: BinarizedTree[L], chain: Seq[String], span: Span) extends BinarizedTree[L] {
+case class UnaryTree[+L](label: L, child: BinarizedTree[L], chain: IndexedSeq[String], span: Span) extends BinarizedTree[L] {
   def children = IndexedSeq(child)
   override def map[M](f: L=>M): UnaryTree[M] = UnaryTree( f(label), child map f, chain, span)
   override def extend[B](f: Tree[L]=>B) = UnaryTree( f(this), child extend f, chain, span)
@@ -183,7 +171,7 @@ object Trees {
                   makeIntermediate: L=>L,
                   headFinder: HeadFinder[L]):BinarizedTree[L] = tree match {
     case Tree(l, Seq(), span) => NullaryTree(l, span)
-    case Tree(l, Seq(oneChild), span) => UnaryTree(l,binarize(oneChild, makeIntermediate, headFinder), Seq.empty, tree.span)
+    case Tree(l, Seq(oneChild), span) => UnaryTree(l,binarize(oneChild, makeIntermediate, headFinder), IndexedSeq.empty, tree.span)
     case Tree(l, Seq(leftChild,rightChild), span) =>
       BinaryTree(l,binarize(leftChild, makeIntermediate, headFinder),binarize(rightChild, makeIntermediate, headFinder), tree.span)
     case Tree(l, children, span) =>
@@ -489,7 +477,7 @@ object Trees {
     sealed trait NotRoot[+L] extends Location[L] { def parent: Location[L]; def parentLabel: L}
     case class LeftChild[+L](parentLabel: L, parent: Location[L], rightSibling: BinarizedTree[L]) extends NotRoot[L]
     case class RightChild[+L](parentLabel: L, parent: Location[L], leftSibling: BinarizedTree[L]) extends NotRoot[L]
-    case class UnaryChild[+L](parentLabel: L, chain: Seq[String], parent: Location[L]) extends NotRoot[L]
+    case class UnaryChild[+L](parentLabel: L, chain: IndexedSeq[String], parent: Location[L]) extends NotRoot[L]
   }
 
 

@@ -1,20 +1,20 @@
 package epic.util
 
-import java.io.{File, IOException}
+import java.io.File
 import java.util.Collections
-import org.mapdb.{Serializer, DBMaker}
+import org.mapdb.{Pump, Serializer, DBMaker}
 import scala.collection.JavaConverters._
 import scala.collection.concurrent.Map
 import java.util
 
-import CacheBroker._
 import scala.collection.{mutable, GenTraversableOnce}
+import com.typesafe.scalalogging.log4j.Logging
 
 @SerialVersionUID(1L)
-case class CacheBroker(path: File = null, clearCaches: String = "", autocommit: Boolean = true, disableWriteAheadLog: Boolean = false) extends Serializable {
+case class CacheBroker(path: File = null, copyFrom: File = null, clearCaches: String = "", autocommit: Boolean = true, disableWriteAheadLog: Boolean = false) extends Serializable {
   // this is how one makes a transient lazy val, sadly.
   @transient
-  private var _actualCache:ActualCache = null
+  private var _actualCache:CacheBroker.ActualCache = null
   private def actualCache = synchronized {
     lazy val dbMaker = if(path eq null) {
       DBMaker.newMemoryDB()
@@ -23,7 +23,7 @@ case class CacheBroker(path: File = null, clearCaches: String = "", autocommit: 
     }.closeOnJvmShutdown().cacheSoftRefEnable()
 
     if(_actualCache eq null) {
-      _actualCache = getCacheBroker(path, dbMaker, autocommit)
+      _actualCache = CacheBroker.getCacheBroker(path, dbMaker, autocommit, copyFrom)
     }
     if(disableWriteAheadLog) _actualCache.dbMaker.writeAheadLogDisable()
     if(clearCaches != null && clearCaches.nonEmpty)
@@ -40,32 +40,56 @@ case class CacheBroker(path: File = null, clearCaches: String = "", autocommit: 
 
 
   def commit() { db.commit()}
-  def close() {db.close()}
+  def close() {actualCache.close()}
 
-  def make[K,V](name: String)(implicit kser: Serializer[K] = null, vser: Serializer[V] = null): Map[K, V] = new CacheMap[K, V](name, this)
+  def make[K,V](name: String)(implicit kser: Serializer[K] = null, vser: Serializer[V] = null): Map[K, V] = new CacheBroker.CacheMap[K, V](name, this)
 
 }
 
-object CacheBroker {
-  private class ActualCache private[CacheBroker] (val path: File, val dbMaker: DBMaker, val autocommit: Boolean) {
-    lazy val db = {if(autocommit) cacheThread.start(); dbMaker.make()}
+object CacheBroker extends Logging {
+  private class ActualCache private[CacheBroker] (val path: File, val dbMaker: DBMaker, val autocommit: Boolean, copyFrom: File = null) {
+    lazy val db = {
+      val db = dbMaker.make()
+      if(copyFrom != null) {
+        logger.info(s"Copying database from $copyFrom to ${if (path ne null) path else "in memory database"}")
+        val from = DBMaker.newFileDB(copyFrom).make()
+        Pump.copy(from, db)
+        from.close()
+      }
+      if(autocommit) cacheThread.start()
+
+      db
+    }
     private lazy val cacheThread: Thread = new Thread(new Runnable {
       def run() {
-        while(true) {
-          Thread.sleep(1000 * 60 * 5)
-          db.commit()
+        try {
+          while(!db.isClosed && !Thread.interrupted()) {
+            Thread.sleep(1000 * 60)
+            if(!db.isClosed)
+              db.commit()
+          }
+        } catch {
+          case ex: InterruptedException =>
+          case ex: IllegalAccessError =>
         }
       }
     }) {
       setDaemon(true)
     }
+
+    def close() {
+      db.close()
+      cacheThread.interrupt()
+      if (path ne null)
+        cacheCache -= path
+    }
   }
 
   private val cacheCache = Collections.synchronizedMap(new util.HashMap[File, ActualCache]()).asScala
 
-  private def getCacheBroker(path: File, dbMaker: =>DBMaker, autocommit: Boolean) = {
+  private def getCacheBroker(path: File, dbMaker: =>DBMaker, autocommit: Boolean, copyFrom: File) = {
     if(path eq null) new ActualCache(path, dbMaker, autocommit)
-    else cacheCache.getOrElseUpdate(path, new ActualCache(path, dbMaker, autocommit))
+    else cacheCache.getOrElseUpdate(path, new ActualCache(path, dbMaker, autocommit, copyFrom))
   }
 
 

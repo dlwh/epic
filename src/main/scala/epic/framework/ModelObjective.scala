@@ -8,6 +8,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import collection.parallel.ForkJoinTaskSupport
 import concurrent.forkjoin.ForkJoinPool
 import com.typesafe.scalalogging.log4j.{Logging, Logger}
+import epic.util.CacheBroker
 
 /**
  * The objective function for training a [[epic.framework.Model]]. Selects
@@ -18,9 +19,8 @@ import com.typesafe.scalalogging.log4j.{Logging, Logger}
  */
 class ModelObjective[Datum](val model: Model[Datum],
                             batchSelector: IndexedSeq[Int]=>GenTraversable[Datum],
-                            val fullRange: IndexedSeq[Int],
-                            weightCachePrefix: String="weights") extends BatchDiffFunction[DenseVector[Double]] with Logging {
-  def this(model: Model[Datum], data: IndexedSeq[Datum], numThreads: Int = -1) = this(model,ModelObjective.makePar(data, numThreads)(_), 0 until data.length)
+                            val fullRange: IndexedSeq[Int])(implicit cache: CacheBroker) extends BatchDiffFunction[DenseVector[Double]] with Logging {
+  def this(model: Model[Datum], data: IndexedSeq[Datum], numThreads: Int = -1)(implicit cache: CacheBroker) = this(model,ModelObjective.makePar(data, numThreads)(_), 0 until data.length)
 
   import model.{ExpectedCounts => _, _}
 
@@ -30,7 +30,7 @@ class ModelObjective[Datum](val model: Model[Datum],
   protected def select(batch: IndexedSeq[Int]):GenTraversable[Datum] = batchSelector(batch)
 
   def initialWeightVector(randomize: Boolean): DenseVector[Double] = {
-   val v = model.readCachedFeatureWeights(weightCachePrefix) match {
+   val v = model.readCachedFeatureWeights() match {
      case Some(vector) => vector
      case None => Encoder.fromIndex(featureIndex).tabulateDenseVector(f => model.initialValueForFeature(f))
    }
@@ -46,7 +46,7 @@ class ModelObjective[Datum](val model: Model[Datum],
     if(timeSinceLastWrite > nextSave) {
       logger.info("Saving feature weights...")
       val timeIn = System.currentTimeMillis()
-      model.cacheFeatureWeights(x, weightCachePrefix)
+      model.cacheFeatureWeights(x)
       val writeLength = System.currentTimeMillis() - timeIn
       nextSave = math.max(writeLength * 20, 5L * 20 * 1000)// don't spend more than 5% of our time caching weights
       logger.info(f"Saving took ${writeLength/1000.0}%.2fs. Will write again in ${nextSave/1000.0}%fs")

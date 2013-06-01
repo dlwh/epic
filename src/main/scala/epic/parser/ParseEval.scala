@@ -141,7 +141,7 @@ object ParseEval extends Logging {
   def evaluate[L](trees: IndexedSeq[TreeInstance[L,String]],
                   parser: Parser[L,String],
                   chainReplacer: UnaryChainReplacer[L],
-                  asString: L=>String, logProgress: Boolean = true, nthreads: Int): Statistics = {
+                  asString: L=>String, logProgress: Boolean = true, nthreads: Int = -1): Statistics = {
     val results = parseAll(trees, parser, chainReplacer, asString, logProgress, nthreads)
     results.map(_.stats).reduceLeft(_ + _)
   }

@@ -25,7 +25,7 @@ object SemiNERPipeline {
 
   case class Params(path: File,
                     modelOut: File = new File("ner.model.gz"),
-                    cache: CacheBroker,
+                    implicit val cache: CacheBroker,
                     name: String = "eval/ner",
                     nfiles: Int = 100000,
                     iterPerEval: Int = 20,
@@ -41,16 +41,14 @@ object SemiNERPipeline {
         doc <- ConllOntoReader.readDocuments(file)
         s <- doc.sentences
       } yield s.nerSegmentation
-      val train = instances.take(instances.length * 9 / 10)
-      val test = instances.drop(instances.length * 9 / 10)
-      (train,test)
+      instances.splitAt(instances.length * 9 / 10)
     }
 
     val gazetteer =  Gazetteer.ner("en")
 
     // build feature Index
     val model = new SegmentationModelFactory(NERType.OutsideSentence, NERType.NotEntity, gazetteer = gazetteer)(params.cache).makeModel(train)
-    val obj = new ModelObjective(model, train, params.nthreads)
+    val obj = new ModelObjective(model, train, params.nthreads)(params.cache)
     val cached = new CachedBatchDiffFunction(obj)
     if(params.checkGradient) {
       GradientTester.test(cached, obj.initialWeightVector(true), toString = {(x: Int) => model.featureIndex.get(x).toString})

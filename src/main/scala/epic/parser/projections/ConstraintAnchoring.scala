@@ -105,6 +105,7 @@ class ParserChartConstraintsFactory[L, W](val augmentedGrammar: AugmentedGrammar
   }
 
   def constraints(marg: ParseMarginal[L, W], gold: GoldTagPolicy[L]): ChartConstraints[L] = {
+    logger.debug(s"Building Constraints for ${marg.words}")
     val length = marg.length
     val (botLabelScores, unaryScores) = computeScores(length, marg)
 
@@ -152,12 +153,16 @@ class ParserChartConstraintsFactory[L, W](val augmentedGrammar: AugmentedGrammar
         }
 
       if(i == 0 && j == length)
-        assert(!thresholdedTags.isEmpty, threshold + " " + Encoder.fromIndex(labelIndex).decode(arr))
+        assert(!thresholdedTags.isEmpty, threshold + " " + Option(arr).map(Encoder.fromIndex(labelIndex).decode(_)))
       val goldTags = (0 until numLabels).filter { isGold(i, j, _) }
-      for(t <- goldTags if arr(t) < threshold) {
-        logger.warn(s"Got a below threshold for a goldTag! ${arr(t)} $threshold ${labelIndex.get(t)} "
-          + s"\n($i,$j) best symbol: ${labelIndex.get((0 until labelIndex.size).maxBy(arr(_)))} ${arr.max}"
-        )
+      for(t <- goldTags if arr == null || arr(t) < threshold) {
+        if(arr == null) {
+          logger.warn(s"Can't even construct span that has gold tag ${labelIndex.get(t)}!")
+        } else {
+          logger.warn(s"Got a below threshold for a goldTag! ${arr(t)} $threshold ${labelIndex.get(t)} "
+            + s"\n($i,$j) best symbol: ${labelIndex.get((0 until labelIndex.size).maxBy(arr(_)))} ${arr.max}"
+          )
+        }
       }
       val result = thresholdedTags //++ goldTags
       if (result.nonEmpty) result
@@ -331,7 +336,15 @@ object PrecacheConstraints extends Logging {
         located = false
         logger.info(s"Building constraints for ${ti.id} ${ti.words}")
         marg = ChartMarginal(constrainer.augmentedGrammar.anchor(ti.words), ti.words)
-        constrainer.constraints(marg, GoldTagPolicy.goldTreeForcing[L](ti.tree.map(constrainer.labelIndex)))
+        constrainer.constraints(marg, GoldTagPolicy.goldTreeForcing[L](ti.tree.map{ l =>
+          val i = constrainer.labelIndex(l)
+          if (i < 0) {
+            logger.warn("Not in index?!?!?!?" + l + ti)
+            0
+          } else {
+            i
+          }
+        }))
       })
       if(located) {
         logger.info(s"Already had constraints for ${ti.id} ${ti.words}.")

@@ -19,6 +19,7 @@ import breeze.linalg._
 import collection.mutable.ArrayBuffer
 import breeze.inference.Factor
 import breeze.util._
+import epic.util.CacheBroker
 
 /**
  *
@@ -34,6 +35,8 @@ class EPModel[Datum, Augment](maxEPIter: Int, initFeatureValue: Feature => Optio
   for(i <- 0 until models.length) { println(models(i) + " " + models(i).featureIndex.size)}
 
 
+  def numModels = models.length
+
   val featureIndex: Index[Feature] = {
     val index = Index[Feature]()
     for ((m, i) <- models.zipWithIndex; f <- m.featureIndex) index.index(ComponentFeature(i, f))
@@ -48,7 +51,37 @@ class EPModel[Datum, Augment](maxEPIter: Int, initFeatureValue: Feature => Optio
   }
 
 
+  /**
+   * just saves feature weights to disk as a serialized counter. The file is prefix.ser.gz
+   */
+  override def readCachedFeatureWeights()(implicit cacheBroker: CacheBroker): Option[DenseVector[Double]] = {
+    var any = false
+    val initWeights = DenseVector.zeros[Double](featureIndex.size)
+    for(cachedWeights <- super.readCachedFeatureWeights()) {
+      any = true
+      initWeights := cachedWeights
+    }
+    for(i <- 0 until numModels) {
+      val mySlice = initWeights.slice(offsets(i), offsets(i+1))
+      if(mySlice.valuesIterator.exists(_ == 0)) {
+        for(cw <- models(i).readCachedFeatureWeights()) {
+          any = true
+          var j = 0
+          while(j < cw.length) {
+            if(mySlice(j) == 0.0) {
+              mySlice(j) = cw(j)
+            }
+            j += 1
+          }
+        }
+      }
+    }
+    if(any)
+      Some(initWeights)
+    else
+      None
 
+  }
 
   def expectedCountsToObjective(ecounts: EPModel[Datum, Augment]#ExpectedCounts) = {
     val vectors = for ((m, e) <- models zip ecounts.counts) yield m.expectedCountsToObjective(e.asInstanceOf[m.ExpectedCounts])._2
@@ -76,12 +109,6 @@ class EPModel[Datum, Augment](maxEPIter: Int, initFeatureValue: Feature => Optio
     result
   }
 
-  override def cacheFeatureWeights(weights: DenseVector[Double], prefix: String) {
-    super.cacheFeatureWeights(weights, prefix)
-    for (((w, m), i) <- (partitionWeights(weights) zip models).zipWithIndex) {
-      m.cacheFeatureWeights(w, s"$prefix-model-$i")
-    }
-  }
 }
 
 object EPModel {

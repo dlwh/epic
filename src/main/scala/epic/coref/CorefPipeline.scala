@@ -9,6 +9,7 @@ import breeze.optimize.FirstOrderMinimizer.OptParams
 import breeze.optimize.CachedBatchDiffFunction
 import breeze.util.Encoder
 import collection.mutable.ArrayBuffer
+import epic.util.CacheBroker
 
 /**
  *
@@ -16,9 +17,10 @@ import collection.mutable.ArrayBuffer
  */
 
 object CorefPipeline extends App {
-  case class Params(path: File, name: String = "eval/coref", nfiles: Int = 100000)
+  case class Params(path: File, name: String = "eval/coref", nfiles: Int = 100000, implicit val cache: CacheBroker)
 
   val params = CommandLineParser.readIn[Params](args)
+  import params.cache
 
   val docs = for {
     file <- params.path.listFiles take params.nfiles

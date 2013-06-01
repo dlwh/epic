@@ -256,10 +256,10 @@ class MaxConstituentDecoder[L, W] extends ChartDecoder[L, W] {
       maxTopScore(begin, end) = logSum(maxTopScore(begin, end), splitScore)
     }
 
-    def bestUnaryChain(begin: Int, end: Int, bestBot: Int, bestTop: Int): Seq[String] = {
+    def bestUnaryChain(begin: Int, end: Int, bestBot: Int, bestTop: Int): IndexedSeq[String] = {
       val candidateUnaries = grammar.indexedUnaryRulesWithChild(bestBot).filter(r => grammar.parent(r) == bestTop)
       val bestChain = if (candidateUnaries.isEmpty) {
-        Seq.empty
+        IndexedSeq.empty
       } else if (candidateUnaries.length == 1) {
         grammar.chain(candidateUnaries(0))
       } else {

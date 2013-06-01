@@ -57,7 +57,7 @@ final class BaseGrammar[L] private (
   def rightChild(r: Int): Int = indexedRules(r).asInstanceOf[BinaryRule[Int]].right
   /** Returns the child label index from the (unary) rule index */
   def child(r: Int): Int = indexedRules(r).asInstanceOf[UnaryRule[Int]].child
-  def chain(r: Int): Seq[String] = indexedRules(r).asInstanceOf[UnaryRule[Int]].chain
+  def chain(r: Int): IndexedSeq[String] = indexedRules(r).asInstanceOf[UnaryRule[Int]].chain
   def isBinary(r: Int) = indexedRules(r).isInstanceOf[BinaryRule[_]]
 
   def indexedRule(r: Int) = indexedRules(r)

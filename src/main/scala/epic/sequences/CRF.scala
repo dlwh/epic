@@ -11,6 +11,7 @@ import breeze.optimize.CachedBatchDiffFunction
 import breeze.features.FeatureVector
 import epic.lexicon.Lexicon
 import epic.constraints.TagConstraints
+import epic.util.CacheBroker
 
 /**
  * A -Markov Linear Chain Conditional Random Field. Useful for POS tagging, etc.
@@ -59,7 +60,7 @@ object CRF {
   def buildSimple[L](data: IndexedSeq[TaggedSequence[L, String]],
                      startSymbol: L,
                      gazetteer: Gazetteer[Any, String] = Gazetteer.empty[Any, String],
-                     opt: OptParams = OptParams()):CRF[L, String] = {
+                     opt: OptParams = OptParams())(implicit cache: CacheBroker = CacheBroker()):CRF[L, String] = {
     val model: CRFModel[L, String] = new TaggedSequenceModelFactory[L](startSymbol,  gazetteer = gazetteer).makeModel(data)
 
     val obj = new ModelObjective(model, data)

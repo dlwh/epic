@@ -102,7 +102,7 @@ object DSLGrammarPart {
   }
 
   implicit def unaryRule(r: ((Symbol, Symbol), Double)):DSLGrammarPart = r match {
-    case ((a, b), w) => DSLURule(UnaryRule(a.name, b.name, Seq.empty), w)
+    case ((a, b), w) => DSLURule(UnaryRule(a.name, b.name, IndexedSeq.empty), w)
   }
 
   implicit def lex(r: ((Symbol, String), Double)):DSLGrammarPart = r match {

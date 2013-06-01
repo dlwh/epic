@@ -20,7 +20,7 @@ libraryDependencies ++= Seq(
   "org.scalanlp" %% "breeze-math" % "0.3-SNAPSHOT",
   "org.scalanlp" %% "breeze-process" % "0.3-SNAPSHOT",
   "org.scalanlp" %% "breeze-learn" % "0.3-SNAPSHOT",
-  "org.mapdb" % "mapdb" % "0.9.1"
+  "org.mapdb" % "mapdb" % "0.9.2"
 )
 
 libraryDependencies <<= (scalaVersion, libraryDependencies) { (sv, deps) =>
