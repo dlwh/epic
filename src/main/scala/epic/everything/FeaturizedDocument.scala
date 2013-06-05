@@ -12,6 +12,7 @@ import epic.lexicon.Lexicon
 import epic.constraints.{ChartConstraints, LabeledSpanConstraints}
 import epic.features.{FeaturizationLevel, SurfaceFeaturizer, IndexedSurfaceAnchoring, IndexedSurfaceFeaturizer}
 import epic.util.CacheBroker
+import scala.util.Try
 
 /**
  * 
@@ -130,7 +131,7 @@ object FeaturizedDocument {
        val seg = s.nerSegmentation
        var tree = treeProcessor(s.tree.map(_.treebankString))
        tree = UnaryChainRemover.removeUnaryChains(tree)
-       val constituentSparsity = parseConstrainer.constraints(s.words)
+       val constituentSparsity = Try{parseConstrainer.constraints(s.words)}.getOrElse(ChartConstraints.noSparsity[AnnotatedLabel])
        val nerConstraints = nerConstrainer.get(s.words)
 
        val loc = featurizer.anchor(s.words)

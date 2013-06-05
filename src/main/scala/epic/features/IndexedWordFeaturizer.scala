@@ -30,7 +30,7 @@ object IndexedWordFeaturizer {
     val cache : CacheBroker = CacheBroker()
 
 
-    new MyWordFeaturizer[W](feat, wordIndex, cache.make("epic.features.indexed_word_features"))
+    new MyWordFeaturizer[W](feat, wordIndex, cache.make("epic.features.indexed_word_features"+feat.hashCode()))
   }
 
   @SerialVersionUID(1L)
@@ -55,7 +55,9 @@ object IndexedWordFeaturizer {
         result += fi
       i += 1
     }
-    result.result()
+    val r = result.result()
+    assert(!r.isEmpty, features.toIndexedSeq + " " + ind)
+    r
   }
 }
 

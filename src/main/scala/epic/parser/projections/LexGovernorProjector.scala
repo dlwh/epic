@@ -70,7 +70,7 @@ class LexGovernorProjector[L, W](grammar: LexGrammar[L, W]) {
     def visitUnaryRule(begin: Int, end: Int, rule: Int, ref: Int, score: Double) {
       val parent = grammar.grammar.parent(rule)
       siphonMass(spanType(begin,end), parent, notAConstituent, score)
-      val head = otherAnch.spanHeadIndex(ref)
+      val head = otherAnch.unaryHeadIndex(ref)
 
       if (begin == 0 && end == length) { // root, get the length
         wordGovernorCounts(head)(length) += score

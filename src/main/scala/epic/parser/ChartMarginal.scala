@@ -374,7 +374,7 @@ object ChartMarginal {
       val coarseNarrowLeft = top.coarseRightMostBeginForEnd(end)
       val coarseWideRight = top.coarseRightMostEndForBegin(begin)
       val coarseWideLeft = top.coarseLeftMostBeginForEnd(end)
-      val scoreArray = Arrays.newArray(anchoring.refined.maxLabelRefinements,  40)
+      val scoreArray = Array.ofDim[Double](anchoring.refined.maxLabelRefinements,  40)
       val offsets = new Array[Int](anchoring.refined.maxLabelRefinements)
       val spanScoresEntered = new Array[Boolean](anchoring.refined.maxLabelRefinements)
 
@@ -509,7 +509,7 @@ object ChartMarginal {
     }
     updateOutsideUnaries(outside, inside, anchoring, 0, inside.length, sum)
 
-    val scoreArray = Arrays.newArray(anchoring.refined.maxLabelRefinements,  80)
+    val scoreArray = Array.ofDim[Double](anchoring.refined.maxLabelRefinements,  80)
     val offsets = new Array[Int](anchoring.refined.maxLabelRefinements)
 
     for {

@@ -22,13 +22,24 @@ import epic.parser.models.LexGrammarBundle
 import collection.mutable.ArrayBuffer
 import collection.immutable
 import epic.lexicon.SimpleLexicon
-import epic.features.{HashFeature, MultiSurfaceFeaturizer, ContextSurfaceFeaturizer, StandardSurfaceFeaturizer}
+import epic.features._
 import epic.constraints.{CachedChartConstraintsFactory, LabeledSpanConstraints}
 import epic.util.CacheBroker
 import java.util.concurrent.atomic.AtomicInteger
 import com.typesafe.scalalogging.log4j.Logging
 import breeze.stats.distributions.{RandBasis, Rand}
 import breeze.stats.random.MersenneTwister
+import epic.parser.models.StandardLexFeaturizer
+import epic.trees.ProcessedTreebank
+import epic.trees.annotations.StripAnnotations
+import epic.parser.features.RuleFeature
+import epic.trees.TreeInstance
+import scala.Some
+import breeze.optimize.FirstOrderMinimizer.OptParams
+import epic.trees.annotations.AddMarkovization
+import epic.ontonotes.Document
+import epic.parser.models.LexGrammarBundle
+import epic.trees.annotations.PipelineAnnotator
 
 
 /**
@@ -68,7 +79,13 @@ object AnnotatingPipeline extends Logging {
     val nfiles = params.nfiles
     val traintest = readTrainTestSplit(corpus, nfiles)
     val train = traintest._1.map(d => d.copy(sentences=d.sentences.filter(_.length <= params.maxLength)))
+    val numAllTrainSentences = traintest._1.view.par.map(_.sentences.length).sum
+    val numTrainSentences = train.view.par.map(_.sentences.length).sum
+    logger.info(s"Training set of $numTrainSentences sentences out of a possible $numAllTrainSentences.")
     val test = traintest._2.map(d => d.copy(sentences=d.sentences.filter(_.length <= params.maxLength)))
+    val numAllTestSentences = traintest._2.view.par.map(_.sentences.length).sum
+    val numTestSentences = test.view.par.map(_.sentences.length).sum
+    logger.info(s"Test set of $numTestSentences out of a possible $numAllTestSentences...")
 
     val weightsCache = if (params.weightsCache.exists()) {
       loadWeights(params.weightsCache)
@@ -285,8 +302,10 @@ object AnnotatingPipeline extends Logging {
       ruleGen
     )
 
+    val bilex = IndexedBilexicalFeaturizer.fromData(docProcessor.featurizer, trainTrees.map(DependencyTree.fromTreeInstance[AnnotatedLabel, String](_, HeadFinder.collins)))
+
     val indexed = IndexedLexFeaturizer.extract[AnnotatedLabel, TreeInstance[AnnotatedLabel, String], String](feat,
-      docProcessor.featurizer,
+      bilex,
       headFinder,
       docProcessor.grammar.index,
       docProcessor.grammar.labelIndex,

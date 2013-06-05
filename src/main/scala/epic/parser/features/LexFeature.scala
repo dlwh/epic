@@ -22,7 +22,7 @@ trait LexFeature extends Feature
 case class HeadFeature[P](r: Feature) extends LexFeature
 
 case class DepFeature[P](r: Feature) extends LexFeature
-case class HeadDepFeature[P](r: Feature) extends LexFeature
+case class HeadDepFeature[P](head: Feature, dep: Feature) extends LexFeature
 case class DistFeature(distance: Int, f: Feature) extends LexFeature
 
 case class AttachRight(distance: Int) extends LexFeature

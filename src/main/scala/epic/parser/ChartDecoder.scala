@@ -26,8 +26,9 @@ import breeze.numerics
 import com.typesafe.scalalogging.log4j.Logging
 import epic.util.SafeLogging
 
-case class ParseExtractionException(msg: String, sentence: IndexedSeq[Any]) extends RuntimeException
-case class NoParseException(msg: String, sentence: IndexedSeq[Any]) extends RuntimeException(s"No parse for $sentence: $msg")
+trait ParserException extends Exception
+case class ParseExtractionException(msg: String, sentence: IndexedSeq[Any]) extends RuntimeException with ParserException
+case class NoParseException(msg: String, sentence: IndexedSeq[Any], cause: Throwable = null) extends RuntimeException(s"No parse for $sentence: $msg") with ParserException
 
 /**
  * A ChartDecoder converts marginals into a binarized tree. Post-processing

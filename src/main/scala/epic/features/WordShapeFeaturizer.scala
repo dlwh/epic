@@ -22,6 +22,7 @@ import breeze.text.analyze.{WordShapeGenerator, EnglishWordClassGenerator}
 import epic.parser.features.IndicatorFeature
 import java.text.NumberFormat
 import java.util.Locale
+import breeze.util.{Encoder, Index}
 
 final case class IndicatorWSFeature(name: Symbol) extends Feature
 final case class SuffixFeature(str: String) extends Feature
@@ -38,9 +39,21 @@ class WordShapeFeaturizer(wordCounts: Counter[String, Double],
                           commonWordThreshold: Int = 20,
                           unknownWordThreshold: Int = 2,
                           prefixOrder: Int = 3,
-                          suffixOrder: Int = 4) extends (String=>IndexedSeq[Feature]) with Serializable {
+                          suffixOrder: Int = 4) extends WordFeaturizer[String] with Serializable {
   import WordShapeFeaturizer._
-//  val signatureGenerator = EnglishWordClassGenerator
+
+  private val wordIndex = Index(wordCounts.keysIterator)
+  private val knownWordFeatures = Encoder.fromIndex(wordIndex).tabulateArray(s => featuresFor(s).toArray)
+
+  def anchor(words: IndexedSeq[String]): WordFeatureAnchoring[String] = new WordFeatureAnchoring[String] {
+    val indices = words.map(wordIndex)
+    val myFeatures = (0 until words.length).map(i => if (indices(i) < 0) featuresFor(words(i)).toArray else knownWordFeatures(indices(i)))
+    def featuresForWord(pos: Int, level: FeaturizationLevel): Array[Feature] = myFeatures(pos)
+
+    def words: IndexedSeq[String] = ???
+  }
+
+  //  val signatureGenerator = EnglishWordClassGenerator
   def featuresFor(w: String): IndexedSeq[Feature] = {
     val wc = wordCounts(w)
     val features = ArrayBuffer[Feature]()
@@ -188,66 +201,3 @@ object WordShapeFeaturizer {
   val isAnInitialFeature = IndicatorWSFeature('IsAnInitial)
   val endsWithPeriodFeature = IndicatorWSFeature('EndsWithPeriod)
 }
-
-/**
- * 
- * @author dlwh
- */
-class TagAwareWordShapeFeaturizer[L](tagWordCounts: Counter2[L, String, Double], minCountUnknown: Int = 5) extends ((Seq[String], Int)=>IndexedSeq[Feature]) with Serializable {
-
-  val wordCounts = sum(tagWordCounts, Axis._0)
-
-  val tagDiversity: Counter[String, Int] = {
-     Counter(tagWordCounts.keySet.groupBy(_._2).mapValues(_.size))
-  }
-
-  private val featurizer = new WordShapeFeaturizer(wordCounts, minCountUnknown)
-
-  def apply(w: Seq[String], pos: Int) = featuresFor(w, pos)
-
-  def featuresFor(words: Seq[String], pos: Int):ArrayBuffer[Feature] = {
-    val w = words(pos)
-    val wc = wordCounts(w)
-    val features = ArrayBuffer[Feature]()
-    features ++= featurizer.featuresFor(words(pos))
-    val basicFeatures = if(wc > minCountUnknown) {
-      ArrayBuffer(IndicatorFeature(w):Feature)
-    } else {
-
-      for( (l,v) <- tagWordCounts(::, w).iterator) {
-        if(v > 1) {
-          features += SeenWithTagFeature(l)
-        }
-
-      }
-
-      features
-    }
-
-    // if tag is not super common, or if it's ambiguous, add context features of left and right word
-    // contexts are the word itself if it's common, and the word shape otherwise.
-    if(wc < 30 || tagDiversity(w) > 1) {
-      if (pos > 0) {
-        val prevWord: String = words(pos - 1)
-        if(wordCounts(prevWord) > 30)
-          basicFeatures  += LeftWordFeature(prevWord)
-        else
-          basicFeatures  += LeftWordFeature(WordShapeGenerator(prevWord))
-      }
-
-      if(pos < words.length - 1 && wordCounts(words(pos+1)) > 30) {
-        val rightWord: String = words(pos + 1)
-        if(wordCounts(rightWord) > 30)
-          basicFeatures  += RightWordFeature(rightWord)
-        else
-          basicFeatures  += RightWordFeature(WordShapeGenerator(rightWord))
-      }
-    }
-
-    basicFeatures
-
-  }
-
-}
-
-

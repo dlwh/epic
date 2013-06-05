@@ -77,7 +77,7 @@ class ConstraintCoreGrammarAdaptor[L, W](val grammar: BaseGrammar[L], val lexico
 class ParserChartConstraintsFactory[L, W](val augmentedGrammar: AugmentedGrammar[L, W],
                                           val isIntermediate: L=>Boolean,
                                           threshold: Double = math.exp(-7)) extends ChartConstraints.Factory[L, W] with Serializable with SafeLogging {
-  assert(threshold >= 0 && threshold <= 1, s"Threshold must be between 0 and 1, but whas $threshold")
+  require(threshold >= 0 && threshold <= 1, s"Threshold must be between 0 and 1, but whas $threshold")
   import augmentedGrammar._
   def labelIndex = grammar.labelIndex
 
@@ -107,6 +107,8 @@ class ParserChartConstraintsFactory[L, W](val augmentedGrammar: AugmentedGrammar
   def constraints(marg: ParseMarginal[L, W], gold: GoldTagPolicy[L]): ChartConstraints[L] = {
     logger.debug(s"Building Constraints for ${marg.words}")
     val length = marg.length
+    if(marg.logPartition.isInfinite)
+      throw new NoParseException("No parse for sentence we're trying to constrain!", marg.words)
     val (botLabelScores, unaryScores) = computeScores(length, marg)
 
     val labelThresholds = extractLabelThresholds(length,
@@ -117,7 +119,8 @@ class ParserChartConstraintsFactory[L, W](val augmentedGrammar: AugmentedGrammar
       grammar.labelIndex.size,
       unaryScores,grammar.labelIndex,
       gold.isGoldTopTag(_, _, _))
-    assert(topLabelThresholds(0,length).contains(marg.grammar.rootIndex))
+    if(topLabelThresholds(0,length) == null || !topLabelThresholds(0,length).contains(marg.grammar.rootIndex))
+      throw new NoParseException("No score at the root!", marg.words)
 
 //    val hasMaximalProjection: BitSet = BitSet.empty ++ (0 to length).filter{ i =>
 //      ((labelThresholds(i) ne null) && (topLabelThresholds(i) ne null)) && ((labelThresholds(i)|topLabelThresholds(i)) -- synthetics).nonEmpty
@@ -152,8 +155,6 @@ class ParserChartConstraintsFactory[L, W](val augmentedGrammar: AugmentedGrammar
           this.prunedtags.addAndGet(arr.count(_ != 0.0) - thresholdedTags.size)
         }
 
-      if(i == 0 && j == length)
-        assert(!thresholdedTags.isEmpty, threshold + " " + Option(arr).map(Encoder.fromIndex(labelIndex).decode(_)))
       val goldTags = (0 until numLabels).filter { isGold(i, j, _) }
       for(t <- goldTags if arr == null || arr(t) < threshold) {
         if(arr == null) {

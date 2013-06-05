@@ -6,6 +6,7 @@ import scala.collection.mutable
 import breeze.collection.mutable.OpenAddressHashArray
 import scala.util.hashing.MurmurHash3
 import scala.collection.mutable.ArrayBuffer
+import epic.util.Arrays
 
 case class LabeledFeature[A, B](labelPart: A, surfacePart: B) extends Feature
 
@@ -119,7 +120,7 @@ object FeatureIndex {
     val mapping = Array.fill(labelFeatureIndex.size)(new OpenAddressHashArray[Int](surfaceFeatureIndex.size, -1, 4))
     val labelPart, surfacePart = new ArrayBuffer[Int]()
     pairEnumerator {(lParts, sParts) =>
-      for(lPart <- lParts; sPart <- sParts) yield {
+      Arrays.crossProduct(lParts, sParts) { (lPart, sPart) =>
         val currentIndex: Int = mapping(lPart)(sPart)
         if(currentIndex == -1) {
           val next = labelPart.size
@@ -136,6 +137,6 @@ object FeatureIndex {
       surfaceFeatureIndex,
       mapping,
       labelPart.toArray, surfacePart.toArray,
-      hashFeatures.numFeatures(mapping.length))
+      hashFeatures.numFeatures(labelPart.length))
   }
 }

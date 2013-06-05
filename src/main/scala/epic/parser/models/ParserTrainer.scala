@@ -46,7 +46,10 @@ object ParserTrainer extends epic.parser.ParserPipeline with Logging {
 
   case class Params(@Help(text="What parser to build. LatentModelFactory,StructModelFactory,LexModelFactory,SpanModelFactory")
                     modelFactory: ParserExtractableModelFactory[AnnotatedLabel, String],
+                    @Help(text="Name for the parser for saving and logging. will be inferrred if not provided.")
+                    name: String = null,
                     implicit val cache: CacheBroker,
+                    @Help(text="path for a baseline parser for computing constraints. will be built automatically if not provided.")
                     parser: File = null,
                     opt: OptParams,
                     @Help(text="How often to run on the dev set.")
@@ -59,7 +62,7 @@ object ParserTrainer extends epic.parser.ParserPipeline with Logging {
                     threads: Int = -1,
                     @Help(text="Should we randomize weights? Some models will force randomization.")
                     randomize: Boolean = false,
-                    @Help(text="Should we check the gradient to maek sure it's coded correctly?")
+                    @Help(text="Should we check the gradient to make sure it's coded correctly?")
                     checkGradient: Boolean = false)
   protected val paramManifest = manifest[Params]
 
@@ -87,7 +90,7 @@ object ParserTrainer extends epic.parser.ParserPipeline with Logging {
     val cachedObj = new CachedBatchDiffFunction(obj)
     val init = obj.initialWeightVector(randomize)
     if(checkGradient)
-      GradientTester.test(cachedObj, obj.initialWeightVector(true), toString={(i: Int) => model.featureIndex.get(i).toString})
+      GradientTester.test(cachedObj, obj.initialWeightVector(randomize = true), toString={(i: Int) => model.featureIndex.get(i).toString})
 
     type OptState = FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State
     def evalAndCache(pair: (OptState, Int)) {
@@ -101,10 +104,12 @@ object ParserTrainer extends epic.parser.ParserPipeline with Logging {
       }
     }
 
-    for ((state, iter) <- params.opt.iterations(cachedObj, init).take(maxIterations).zipWithIndex.tee(evalAndCache _);
+    val name = Option(params.name).orElse(Some(model.getClass.getSimpleName).filter(_.nonEmpty)).getOrElse("DiscrimParser")
+
+    for ((state, iter) <- params.opt.iterations(cachedObj, init).take(maxIterations).zipWithIndex.tee(evalAndCache _)
          if iter != 0 && iter % iterationsPerEval == 0) yield try {
       val parser = model.extractParser(state.x)
-      (s"LatentDiscrim-$iter", parser)
+      (s"$name-$iter", parser)
     } catch {
       case e: Exception => e.printStackTrace(); throw e
     }

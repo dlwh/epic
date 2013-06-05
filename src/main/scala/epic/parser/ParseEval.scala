@@ -128,9 +128,8 @@ object ParseEval extends Logging {
         Some(ParseResult(sent, deBgold, guessTree, (endTime-startTime) / 1000.0))
       } catch {
         case e: Exception =>
-          new RuntimeException("Error while parsing " + sent.words, e).printStackTrace()
+          logger.error(s"While parsing ${sent.words}", e)
           None
-
       }
     }.seq
   }

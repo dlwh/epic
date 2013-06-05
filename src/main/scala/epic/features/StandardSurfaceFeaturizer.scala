@@ -43,11 +43,21 @@ class StandardSurfaceFeaturizer(wordCounts: Counter[String, Double],
 
       def featuresForSpan(begin: Int, end: Int, level: FeaturizationLevel): Array[Feature] = {
         val feats = ArrayBuffer[Feature]()
-        if (begin < end - 1 && level.level >= BasicFeatures.level) {
-          for(f1 <- featuresForWord(begin, level.less); f2 <- featuresForWord(end-1, level.less)) {
-            feats += WordEdges('Inside, f1, f2)
-            feats += WordEdges('Outside, f1, f2)
+        if (begin < end - 1) {
+          for(f1 <- featuresForWord(begin, level.less); f2 <- featuresForWord(end, level.less)) {
+            feats += WordEdges('BeginEnd, f1, f2)
           }
+          if(level.level >= FeaturizationLevel.BasicFeatures.level) {
+            for(f1 <- featuresForWord(begin, level.less); f2 <- featuresForWord(end-1, level.less)) {
+              feats += WordEdges('Inside, f1, f2)
+            }
+
+            for(f1 <- featuresForWord(begin-1, level.less); f2 <- featuresForWord(end, level.less)) {
+              feats += WordEdges('Outside, f1, f2)
+            }
+
+          }
+
         }
 
         if(level.level >= FeaturizationLevel.BasicFeatures.level) {
@@ -65,8 +75,8 @@ class StandardSurfaceFeaturizer(wordCounts: Counter[String, Double],
           feats += WholeSentFeature
 
         if(level.level >= BasicFeatures.level) {
-          feats += SpanShapeFeature(SpanShapeGenerator.apply(words, begin,end))
-          feats += SpanShapeFeature(SpanShapeGenerator.signatureFor(words, begin, end, false))
+          feats += SpanShapeFeature(SpanShapeGenerator.signatureFor(words, begin, end, includeContext = true))
+          feats += SpanShapeFeature(SpanShapeGenerator.signatureFor(words, begin, end, includeContext = false))
         }
 
         if(level == FullFeatures) {
@@ -75,10 +85,9 @@ class StandardSurfaceFeaturizer(wordCounts: Counter[String, Double],
             feats += PairFeature(f, spanLength)
           }
           feats += spanLength
-        } else if(level == BasicFeatures) {
+        } else {
           feats += SpanLengthFeature(distanceBinner.binnedDistance(begin, end))
         }
-
 
         feats.toArray
       }
@@ -99,11 +108,13 @@ class StandardSurfaceFeaturizer(wordCounts: Counter[String, Double],
 
       private val _fullFeatures = (0 until words.length) map {  i =>
         val index = indices(i)
-        val base = if(index >= 0) {
-          StandardSurfaceFeaturizer.this.basicFeatures(index).toArray
-        } else {
-          wordShapeFeaturizer.apply(words(i)).map(interner(_)).toArray
-        } ++ _minimalFeatures(i)
+        val base: Array[Feature] = Array.concat(_minimalFeatures(i), {
+          if(index >= 0) {
+            StandardSurfaceFeaturizer.this.basicFeatures(index).toArray[Feature]
+          } else {
+            wordShapeFeaturizer.apply(words(i)).map(interner(_)).toArray[Feature]
+          }
+        })
 
         // initial words nee special treatment
         if( (words(i).charAt(0).isUpper || words(i).charAt(0).isTitleCase) && wordIsReasonablyRare(i)) {
