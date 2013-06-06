@@ -75,7 +75,7 @@ class EPInference[Datum, Augment](val inferences: IndexedSeq[ProjectableInferenc
     while (!converged && iter < maxEPIter && iterates.hasNext) {
       val s = iterates.next()
       if (state != null) {
-        //        converged = (s.logPartition - state.logPartition).abs / math.max(s.logPartition, state.logPartition) < 1E-4
+        converged = (s.logPartition - state.logPartition).abs / math.max(s.logPartition, state.logPartition) < 1E-4
 //        if (s.q.isInstanceOf[SentenceBeliefs]) {
 //          println(iter + " gold " + s.q.asInstanceOf[SentenceBeliefs].maxChange(state.q.asInstanceOf[SentenceBeliefs]) + " " + s.logPartition + " " + state.logPartition)
 //        }
@@ -125,8 +125,8 @@ class EPInference[Datum, Augment](val inferences: IndexedSeq[ProjectableInferenc
     while (!converged && iter < maxEPIter && iterates.hasNext) {
       val s = iterates.next()
       if (state != null) {
+        converged = (s.logPartition - state.logPartition).abs / math.max(s.logPartition, state.logPartition) < 1E-5
         logger.trace {
-          //          converged = (s.logPartition - state.logPartition).abs / math.max(s.logPartition, state.logPartition) < 1E-5
           import epic.everything._
           if (s.q.isInstanceOf[SentenceBeliefs]) {
             (iter + " guess " + s.q.asInstanceOf[SentenceBeliefs].maxChange(state.q.asInstanceOf[SentenceBeliefs]) + " " + s.logPartition + " " + state.logPartition)
@@ -139,7 +139,7 @@ class EPInference[Datum, Augment](val inferences: IndexedSeq[ProjectableInferenc
       iter += 1
       state = s
     }
-//    print(f"guess($iter%d:${state.logPartition%.1f})")
+    logger.debug(f"guess($iter%d:${state.logPartition%.1f})")
 
     EPMarginal(state.logPartition, state.q, marginals)
   }
