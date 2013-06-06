@@ -42,13 +42,9 @@ class ProductBilexicalFeaturizer[W](wf: IndexedWordFeaturizer[W],
       }
 
       if (ret(level.level) eq null) {
-        val f1 = anc.featuresForWord(head, level)
-        val f2 = anc.featuresForWord(dep, level)
-        ret(level.level) = featureIndex.crossProduct(f1, f2)
-        if(ret(level.level).isEmpty) {
-          println(featureIndex.numHashFeatures + " " + words(head) + " " + words(dep))
-          throw new RuntimeException(f1.toIndexedSeq.map(featureIndex.get(_)) + " " + f2.toIndexedSeq.map(featureIndex.get(_)))
-        }
+        val f1 = featureIndex.crossProduct(anc.featuresForWord(head, level), anc.featuresForWord(dep, FeaturizationLevel.MinimalFeatures))
+        val f2 = featureIndex.crossProduct(anc.featuresForWord(head, FeaturizationLevel.MinimalFeatures), anc.featuresForWord(dep, level))
+        ret(level.level) = f1 ++ f2
       }
 
       ret(level.level)
@@ -79,8 +75,10 @@ object IndexedBilexicalFeaturizer {
       for (tree <- depTrees) {
         val wanch = wfeat.anchor(tree.words)
         for( (head, dep) <- tree.arcs if head < tree.words.length) {
-          adder(wanch.featuresForWord(head, FeaturizationLevel.FullFeatures),
+          adder(wanch.featuresForWord(head, FeaturizationLevel.MinimalFeatures),
             wanch.featuresForWord(dep, FeaturizationLevel.FullFeatures))
+          adder(wanch.featuresForWord(head, FeaturizationLevel.FullFeatures),
+            wanch.featuresForWord(dep, FeaturizationLevel.MinimalFeatures))
         }
       }
     }

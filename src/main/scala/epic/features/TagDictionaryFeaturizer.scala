@@ -12,7 +12,8 @@ import epic.features.FeaturizationLevel.MinimalFeatures
  *
  * @author dlwh
  **/
-class TagDictionaryFeaturizer[L](counts: Counter2[L, String, Double], commonWordThreshold: Int = 80) extends WordFeaturizer[String] {
+@SerialVersionUID(1L)
+class TagDictionaryFeaturizer[L](counts: Counter2[L, String, Double], commonWordThreshold: Int = 80) extends WordFeaturizer[String] with Serializable {
   private val wordIndex = Index(counts.keysIterator.map(_._2))
   private val labelIndices = counts.keysIterator.map(_._1).map(l => l -> MostCommonTagFeature(l)).toMap
   private val emptyArray = Array.empty[Feature]

@@ -27,22 +27,19 @@ object IndexedWordFeaturizer {
       }
     }
 
-    val cache : CacheBroker = CacheBroker()
 
-
-    new MyWordFeaturizer[W](feat, wordIndex, cache.make("epic.features.indexed_word_features"+feat.hashCode()))
+    new MyWordFeaturizer[W](feat, wordIndex)
   }
 
   @SerialVersionUID(1L)
   private class MyWordFeaturizer[W](val featurizer: WordFeaturizer[W],
-                                    val featureIndex: Index[Feature],
-                                    cache: mutable.Map[IndexedSeq[W], IndexedWordAnchoring[W]]) extends IndexedWordFeaturizer[W] with Serializable {
-    def anchor(words: IndexedSeq[W]):IndexedWordAnchoring[W]  = cache.getOrElseUpdate(words, {
+                                    val featureIndex: Index[Feature]) extends IndexedWordFeaturizer[W] with Serializable {
+    def anchor(words: IndexedSeq[W]):IndexedWordAnchoring[W]  = {
       val anch = featurizer.anchor(words)
       val wordFeatures = Array.tabulate(words.length, FeaturizationLevel.numLevels) { (i,l) => stripEncode(featureIndex, anch.featuresForWord(i, l))}
 
       new TabulatedIndexedSurfaceAnchoring[W](words, wordFeatures, null)
-    })
+    }
   }
 
   def stripEncode(ind: Index[Feature], features: Array[Feature]) = {
