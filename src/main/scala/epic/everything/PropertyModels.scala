@@ -6,7 +6,7 @@ import epic.trees.AnnotatedLabel
 import epic.everything.PropertyPropagation._
 import epic.framework.Feature
 import epic.parser.features.IndicatorFeature
-import epic.features.FeaturizationLevel
+import epic.features.{HashFeature, FeaturizationLevel}
 
 /**
  * 
@@ -44,10 +44,10 @@ object PropertyModels {
     }
   }
 
-  def governorPacket(wordFeatures: Index[Feature]):AssociationPacket[Int] = new AssociationPacket[Int] {
+  def governorPacket(hashFeatures: Int = 30000):AssociationPacket[Int] = new AssociationPacket[Int] {
     def lens = governorLens
 
-    val featureIndex: Index[_] = Index(wordFeatures.iterator ++ Iterator(IndicatorFeature("-ROOT-"), IndicatorFeature("-NOTGOVERNED-")))
+    val featureIndex: Index[_] = Index( (0 until hashFeatures).map(HashFeature(_)))
 
     val notGovernedArray = Array(featureIndex.size - 1)
     val rootArray = Array(featureIndex.size - 2)
@@ -56,17 +56,16 @@ object PropertyModels {
     def featuresFor(fs: FeaturizedSentence, b: SpanBeliefs, begin: Int, end: Int, assignment: Int): Array[Int] = {
       if (assignment > fs.length) notGovernedArray
       else if (assignment == fs.length) rootArray
-      else fs.featuresForWord(assignment, FeaturizationLevel.MinimalFeatures)
+      else fs.featuresForWord(assignment, FeaturizationLevel.MinimalFeatures).map(_ % hashFeatures)
     }
   }
 
-  def srlPacket(wordFeatures: Index[Feature], srlComponents: Index[Option[String]]):SequencePacket[Option[String]] = new SequencePacket[Option[String]] {
+  def srlPacket(srlComponents: Index[Option[String]], hashFeatures: Int = 30000):SequencePacket[Option[String]] = new SequencePacket[Option[String]] {
     def lens = srlLens
 
-    val featureIndex: Index[_] = Index(wordFeatures ++ srlComponents)
+    val featureIndex: Index[_] = Index( (0 until hashFeatures).map(HashFeature(_)) ++ srlComponents)
 
-    val srlOffset = wordFeatures.size
-
+    val srlOffset = hashFeatures
 
     def featuresFor(fs: FeaturizedSentence, b: SpanBeliefs, begin: Int, end: Int, component: Int, assignment: Int): Array[Int] = {
       val fi = fs.featuresForWord(fs.frames(component).pos, FeaturizationLevel.MinimalFeatures)
@@ -80,14 +79,14 @@ object PropertyModels {
   def nerSyntaxModel(fs: FeaturizedDocument.Factory, beliefsFactory: SentenceBeliefs.Factory):PropertyPropagation.Model[_, _] = {
     val nerp = nerPacket(beliefsFactory.nerLabelIndex)
     val synp = syntaxPacket(beliefsFactory.optionLabelProp.index)
- //   val govp = governorPacket(fs.wordFeatureIndex)
+    val govp = governorPacket()
 
-    PropertyPropagation.packetModel(beliefsFactory, nerp, IndexedSeq(synp))//IndexedSeq(synp, govp))
+    PropertyPropagation.packetModel(beliefsFactory, nerp, IndexedSeq(synp, govp))
   }
 
   def srlSyntaxModel(fs: FeaturizedDocument.Factory, beliefsFactory: SentenceBeliefs.Factory):PropertyPropagation.Model[_, _] = {
     val synp = syntaxPacket(beliefsFactory.optionLabelProp.index)
-    val srlp = srlPacket(fs.wordFeatureIndex, beliefsFactory.srlProp.index)
+    val srlp = srlPacket(beliefsFactory.srlProp.index)
 
     PropertyPropagation.sequencePacketModel(beliefsFactory, synp, srlp)
   }
@@ -95,14 +94,14 @@ object PropertyModels {
 
   def srlNerModel(fs: FeaturizedDocument.Factory, beliefsFactory: SentenceBeliefs.Factory):PropertyPropagation.Model[_, _] = {
     val nerp = nerPacket(beliefsFactory.nerLabelIndex)
-    val srlp = srlPacket(fs.wordFeatureIndex, beliefsFactory.srlProp.index)
+    val srlp = srlPacket(beliefsFactory.srlProp.index)
 
     PropertyPropagation.sequencePacketModel(beliefsFactory, nerp, srlp)
   }
 
   def srlGovernorModel(fs: FeaturizedDocument.Factory, beliefsFactory: SentenceBeliefs.Factory):PropertyPropagation.Model[_, _] = {
-    val synp = governorPacket(fs.wordFeatureIndex)
-    val srlp = srlPacket(fs.wordFeatureIndex, beliefsFactory.srlProp.index)
+    val synp = governorPacket()
+    val srlp = srlPacket(beliefsFactory.srlProp.index)
     val packet1 = synp
     val packet2 = srlp
     val fi = Index[Feature]()
