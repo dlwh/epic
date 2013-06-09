@@ -11,6 +11,7 @@ import java.io.{ByteArrayInputStream, ObjectInputStream, ObjectOutputStream, Byt
  * @author dlwh
  */
 class LabeledSpanConstraintsTest extends FunSuite {
+  /*
   test("serialization") {
     val x = LabeledSpanConstraints[Int](TriangularArray.tabulate(10) { (i,j) =>
       if(i == j || i > 5) null
@@ -31,6 +32,7 @@ class LabeledSpanConstraintsTest extends FunSuite {
 
 
   }
+  */
 
   test("containsAll") {
 

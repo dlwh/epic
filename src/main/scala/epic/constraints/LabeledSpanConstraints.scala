@@ -314,6 +314,7 @@ object LabeledSpanConstraints {
       ret.result()
     }
 
+    /*
     @throws(classOf[IOException])
     private def writeObject(out: ObjectOutputStream) {
       serializerLabeledSpanConstraints[L].serialize(out, this)
@@ -326,6 +327,7 @@ object LabeledSpanConstraints {
       this.maxLengthsForLabel = y
       this.spans = z
     }
+    */
   }
 
 

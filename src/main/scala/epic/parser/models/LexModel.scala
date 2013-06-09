@@ -183,13 +183,12 @@ class IndexedLexFeaturizer[L, W](f: LexFeaturizer[L],
       //      if(cache == null)  {
       val ruleHead = indexedFeaturesForRuleHead(rule, head)
       val ruleDep = indexedFeaturesForRuleDep(rule, dep)
-      val bilex = indexedFeaturesForBilex(head, dep)
       val spanFeatures: Array[Int] = surfaceSpec.featuresForAttachment(head, dep, FeaturizationLevel.MinimalFeatures)
+      val bilex = indexedFeaturesForBilex(head, dep)
       val attach = index.crossProduct(fspec.featuresForAttach(rule, head, dep), spanFeatures)
-      val justRule = index.crossProduct(fspec.featuresForRule(rule), noneFeatures)
 
       //        cache = Arrays.concatenate(ruleHead, ruleDep, bilex, justRule)
-      Arrays.concatenate(ruleHead, ruleDep, bilex, attach, justRule)
+      Arrays.concatenate(ruleHead, ruleDep, bilex, attach)
       //        rcache(i) = cache
       //      }
 //      cache
@@ -247,7 +246,7 @@ class IndexedLexFeaturizer[L, W](f: LexFeaturizer[L],
       var cache = bilexCache(i)
       if(cache == null) {
         val feats = fspec.featuresForBilex(hw, dw)
-        val attFeats = surfaceSpec.featuresForAttachment(hw, dw, FeaturizationLevel.BasicFeatures)
+        val attFeats = surfaceSpec.featuresForAttachment(hw, dw, FeaturizationLevel.MinimalFeatures)
         cache = if (attFeats ne null) {
           index.crossProduct(feats, attFeats)
         } else {
@@ -268,17 +267,15 @@ case class StandardLexFeaturizer[L](labelIndex: Index[L],
   private val _featureIndex= Index[Feature]()
   def featureIndex : Index[Feature] = _featureIndex
 
-  private val distanceBinner = new DistanceBinner(preserveDirection = false)
+  private val distanceBinner = DistanceBinner(Array(1,2,5,10),preserveDirection = false)
 
   private val ruleCache = Encoder.fromIndex(ruleIndex).tabulateArray(r => ruleFeatGen(r).map(_featureIndex.index(_)).toArray)
-  private val attachCache = Encoder.fromIndex(ruleIndex).tabulateArray(r => distanceBinner.binIds.toArray.map(df => ruleFeatGen(r).toArray.map(f =>_featureIndex.index( DistFeature(df, f)))))
+  private val attachCache = Encoder.fromIndex(ruleIndex).tabulateArray(r => distanceBinner.binIds.toArray.map(df => Array(_featureIndex.index(LabelFeature(r.parent)), _featureIndex.index( DistFeature(df, r.parent)))))
   private val ruleHeadCache = Encoder.fromIndex(ruleIndex).tabulateArray(r => ruleFeatGen(r).toArray.map(f => _featureIndex.index(HeadFeature(f))))
   private val ruleDepCache = Encoder.fromIndex(ruleIndex).tabulateArray(r => ruleFeatGen(r).toArray.map(f => _featureIndex.index(DepFeature(f))))
   private val leftAttachFeatures = distanceBinner.binIds.map(new AttachLeft(_)).map(f => Array(f, AttachLeft).map(_featureIndex.index _))
   private val rightAttachFeatures = distanceBinner.binIds.map(new AttachRight(_)).map(f => Array(f, AttachRight).map(_featureIndex.index _))
   private val labelFeatures: Array[Array[Int]] = Encoder.fromIndex(labelIndex).tabulateArray(l => Array[Int](_featureIndex.index(LabelFeature(l))))
-
-
 
   def featuresForHead(rule: Int) = {
     ruleHeadCache(rule)
@@ -655,13 +652,14 @@ object IndexedLexFeaturizer extends Logging {
             val r = ruleIndex(BinaryRule(a, b, c))
             enumerator(lexSpec.featuresForHead(r), surfaceSpec.featuresForWord(head, FeaturizationLevel.BasicFeatures))
             enumerator(lexSpec.featuresForDep(r), surfaceSpec.featuresForWord(dep, FeaturizationLevel.BasicFeatures))
-            val surfaceFeatures = surfaceSpec.featuresForAttachment(head, dep, FeaturizationLevel.BasicFeatures)
+            val surfaceFeatures = surfaceSpec.featuresForAttachment(head, dep, FeaturizationLevel.MinimalFeatures)
             assert(surfaceFeatures.nonEmpty, BinaryRule(a,b,c) + " " + words(head) + " " + words(dep))
             if(log) {
               logger.debug(BinaryRule(a,b,c) + " " + words(head) + " " + words(dep) + " " + Arrays.crossProduct(lexSpec.featuresForBilex(head, dep).map(lexFeatureIndex.get(_)), surfaceFeatures.map(surfaceFeatureIndex.get _))( _ -> _).toIndexedSeq)
             }
               enumerator(lexSpec.featuresForBilex(head, dep), surfaceFeatures)
               enumerator(lexSpec.featuresForAttach(r, head, dep), surfaceSpec.featuresForAttachment(head, dep, FeaturizationLevel.MinimalFeatures))
+//            enumerator(lexSpec.featuresForAttach(r, head, dep), none)
 //            }
             enumerator(lexSpec.featuresForRule(r), none)
             head

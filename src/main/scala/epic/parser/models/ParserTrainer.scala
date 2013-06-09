@@ -57,11 +57,13 @@ object ParserTrainer extends epic.parser.ParserPipeline with Logging {
                     @Help(text="How many iterations to run.")
                     maxIterations: Int = 1002,
                     @Help(text="How often to look at a small set of the dev set.")
-                    iterPerValidate: Int = 10,
+                    iterPerValidate: Int = 30,
                     @Help(text="How many threads to use, default is to use whatever Scala thinks is best.")
                     threads: Int = -1,
                     @Help(text="Should we randomize weights? Some models will force randomization.")
                     randomize: Boolean = false,
+                    @Help(text="Should we enforce reachability? Can be useful if we're pruning the gold tree.")
+                    enforceReachability: Boolean = true,
                     @Help(text="Should we check the gradient to make sure it's coded correctly?")
                     checkGradient: Boolean = false)
   protected val paramManifest = manifest[Params]
@@ -83,10 +85,16 @@ object ParserTrainer extends epic.parser.ParserPipeline with Logging {
     val uncached = new ParserChartConstraintsFactory[AnnotatedLabel, String](initialParser.augmentedGrammar, {(_:AnnotatedLabel).isIntermediate})
     val constraints = new CachedChartConstraintsFactory[AnnotatedLabel, String](uncached)
 
+    val proj = new ReachabilityProjection(initialParser.grammar, initialParser.lexicon)
+    val theTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]] = if(!enforceReachability)  {
+      trainTrees
+    } else {
+      trainTrees.par.map(new StripAnnotations).map(ti => ti.copy(tree=proj.forTree(ti.tree, ti.words, constraints.constraints(ti.words)))).seq.toIndexedSeq
+    }
 
-    val model = modelFactory.make(trainTrees, constraints)
+    val model = modelFactory.make(theTrees, constraints)
 
-    val obj = new ModelObjective(model, trainTrees, params.threads)
+    val obj = new ModelObjective(model, theTrees, params.threads)
     val cachedObj = new CachedBatchDiffFunction(obj)
     val init = obj.initialWeightVector(randomize)
     if(checkGradient)

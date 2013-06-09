@@ -50,9 +50,9 @@ trait Model[Datum] { self =>
    * Caches the weights using the cache broker.
    */
   def cacheFeatureWeights(weights: DenseVector[Double])(implicit cacheBroker: CacheBroker) = {
-    val cache = cacheBroker.make[Feature, Double](weightCacheTableName)
+    val cache = cacheBroker.make[String, Double](weightCacheTableName)
     for( (i,v)  <- weights.pairs.iterator if v.abs > 1E-5) {
-      cache(featureIndex.get(i)) = v
+      cache(featureIndex.get(i).toString) = v
     }
   }
 
@@ -62,9 +62,9 @@ trait Model[Datum] { self =>
    * just saves feature weights to disk as a serialized counter. The file is prefix.ser.gz
    */
   def readCachedFeatureWeights()(implicit cacheBroker:CacheBroker):Option[DenseVector[Double]] = {
-    val cache = cacheBroker.make[Feature, Double](weightCacheTableName)
+    val cache = cacheBroker.make[String, Double](weightCacheTableName)
     if(cache.nonEmpty)  {
-      Some(DenseVector.tabulate(featureIndex.size)(i => cache.getOrElse(featureIndex.get(i), 0.0)))
+      Some(DenseVector.tabulate(featureIndex.size)(i => cache.getOrElse(featureIndex.get(i).toString, 0.0)))
     } else {
       None
     }

@@ -2,9 +2,9 @@ package epic.features
 
 import epic.framework.Feature
 import epic.trees.DependencyTree
-import breeze.util.{OptionIndex, Index}
-import breeze.collection.mutable.TriangularArray
+import breeze.util.OptionIndex
 import java.util
+
 
 /**
  * TODO
