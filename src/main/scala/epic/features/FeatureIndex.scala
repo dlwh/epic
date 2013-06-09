@@ -46,7 +46,8 @@ class FeatureIndex[A, B](val labelFeatureIndex: Index[A],
       } else if(numHashFeatures == 1) {
         trueSize
       } else {
-        MurmurHash3.mixLast(MurmurHash3.mix(10891, labelFeature.##), surfaceFeature.##).abs % numHashFeatures
+        val hf = MurmurHash3.mixLast(MurmurHash3.mix(10891, labelFeature.##), surfaceFeature.##).abs % numHashFeatures
+        hf + trueSize
       }
     }
 
