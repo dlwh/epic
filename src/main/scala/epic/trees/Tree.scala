@@ -148,6 +148,12 @@ case class BinaryTree[+L](label: L,
   override def extend[B](f: Tree[L]=>B) = BinaryTree( f(this), leftChild extend f, rightChild extend f, span)
   def relabelRoot[B>:L](f: L=>B):BinarizedTree[B] = BinaryTree(f(label), leftChild, rightChild, span)
   def splitPoint = leftChild.span.end
+
+  override def allChildren: Iterator[BinaryTree[L]] = super.allChildren.asInstanceOf[Iterator[BinaryTree[L]]]
+
+  override def preorder: Iterator[BinaryTree[L]] = super.preorder.asInstanceOf[Iterator[BinaryTree[L]]]
+
+  override def postorder: Iterator[BinaryTree[L]] = super.postorder.asInstanceOf[Iterator[BinaryTree[L]]]
 }
 
 case class UnaryTree[+L](label: L, child: BinarizedTree[L], chain: IndexedSeq[String], span: Span) extends BinarizedTree[L] {
