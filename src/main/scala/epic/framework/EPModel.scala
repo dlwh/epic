@@ -54,17 +54,17 @@ class EPModel[Datum, Augment](maxEPIter: Int, initFeatureValue: Feature => Optio
   /**
    * just saves feature weights to disk as a serialized counter. The file is prefix.ser.gz
    */
-  override def readCachedFeatureWeights()(implicit cacheBroker: CacheBroker): Option[DenseVector[Double]] = {
+  override def readCachedFeatureWeights(suffix:String=""):Option[DenseVector[Double]] = {
     var any = false
     val initWeights = DenseVector.zeros[Double](featureIndex.size)
-    for(cachedWeights <- super.readCachedFeatureWeights()) {
+    for(cachedWeights <- super.readCachedFeatureWeights(suffix)) {
       any = true
       initWeights := cachedWeights
     }
     for(i <- 0 until numModels) {
       val mySlice = initWeights.slice(offsets(i), offsets(i+1))
       if(mySlice.valuesIterator.exists(_ == 0)) {
-        for(cw <- models(i).readCachedFeatureWeights()) {
+        for(cw <- models(i).readCachedFeatureWeights(suffix+"-"+i)) {
           any = true
           var j = 0
           while(j < cw.length) {
@@ -81,6 +81,15 @@ class EPModel[Datum, Augment](maxEPIter: Int, initFeatureValue: Feature => Optio
     else
       None
 
+  }
+
+
+  /**
+   * Caches the weights using the cache broker.
+   */
+  override def cacheFeatureWeights(weights: DenseVector[Double], suffix: String) {
+    super.cacheFeatureWeights(weights, suffix)
+    for( (m, i) <- models.zipWithIndex) m.cacheFeatureWeights(weights.slice(offsets(i), offsets(i+1)), suffix+"-"+i)
   }
 
   def expectedCountsToObjective(ecounts: EPModel[Datum, Augment]#ExpectedCounts) = {

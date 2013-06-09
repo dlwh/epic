@@ -18,7 +18,7 @@ package epic.framework
 import breeze.util.{Encoder, Index}
 import breeze.linalg._
 import java.io.File
-import epic.util.CacheBroker
+import epic.util.{WeightsCache, CacheBroker}
 
 
 /**
@@ -49,22 +49,19 @@ trait Model[Datum] { self =>
   /**
    * Caches the weights using the cache broker.
    */
-  def cacheFeatureWeights(weights: DenseVector[Double])(implicit cacheBroker: CacheBroker) = {
-    val cache = cacheBroker.make[String, Double](weightCacheTableName)
-    for( (i,v)  <- weights.pairs.iterator if v.abs > 1E-5) {
-      cache(featureIndex.get(i).toString) = v
-    }
+  def cacheFeatureWeights(weights: DenseVector[Double], suffix: String="") {
+    WeightsCache.write(new File(weightsCacheName+suffix+".txt.gz"), featureIndex, weights)
   }
 
-  protected def weightCacheTableName = getClass.getName+"-weights"
+  protected def weightsCacheName = getClass.getName+".weights"
 
   /**
    * just saves feature weights to disk as a serialized counter. The file is prefix.ser.gz
    */
-  def readCachedFeatureWeights()(implicit cacheBroker:CacheBroker):Option[DenseVector[Double]] = {
-    val cache = cacheBroker.make[String, Double](weightCacheTableName)
-    if(cache.nonEmpty)  {
-      Some(DenseVector.tabulate(featureIndex.size)(i => cache.getOrElse(featureIndex.get(i).toString, 0.0)))
+  def readCachedFeatureWeights(suffix:String=""):Option[DenseVector[Double]] = {
+    val file = new File(weightsCacheName+suffix+".txt.gz")
+    if(file.exists)  {
+      Some(WeightsCache.read(file, featureIndex))
     } else {
       None
     }
