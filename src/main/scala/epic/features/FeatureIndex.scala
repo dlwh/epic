@@ -92,15 +92,7 @@ class FeatureIndex[A, B](val labelFeatureIndex: Index[A],
     builder.result()
   }
 
-  def stripEncode(features: Array[Feature]) = if(numHashFeatures > 0) {
-    val result = new Array[Int](features.length)
-    var i = 0
-    while(i < features.length) {
-      result(i) = apply(features(i))
-      i += 1
-    }
-    result
-  } else {
+  def stripEncode(features: Array[Feature]) = {
     val result = mutable.ArrayBuilder.make[Int]()
     result.sizeHint(features)
     var i = 0
