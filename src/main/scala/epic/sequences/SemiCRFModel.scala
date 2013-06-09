@@ -280,7 +280,7 @@ object SegmentationModelFactory {
 
   @SerialVersionUID(1L)
   class IndexedStandardFeaturizer[L] private (f: IndexedSurfaceFeaturizer[String],
-                                     val featureIndex: FeatureIndex[Feature, Feature],
+                                     val featureIndex: FeatureIndex[Feature],
                                      bioeFeatures: Array[Array[Array[Int]]], // label -> kind -> indexes into f.labelFeatureIndex
                                      transitionFeatures: Array[Array[Array[Int]]], // prev -> cur -> indexes into f.labelFeatureIndex
                                      val startSymbol: L,

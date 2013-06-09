@@ -10,9 +10,10 @@ import epic.trees.TreeInstance
 import breeze.optimize.FirstOrderMinimizer.OptParams
 import breeze.optimize.{CachedBatchDiffFunction, BatchDiffFunction}
 import scala.collection.mutable.ArrayBuffer
-import breeze.util.OptionIndex
+import breeze.util.{Index, OptionIndex}
 import com.typesafe.scalalogging.log4j.Logging
 import epic.constraints.TagConstraints
+import epic.parser.features.LabelFeature
 
 /**
  * The MaxEnt assigns tag scores using a maximum entropy (aka logistic) classifier.
@@ -22,7 +23,7 @@ import epic.constraints.TagConstraints
 @SerialVersionUID(1L)
 class MaxEntTagScorer[L, W](feat: IndexedWordFeaturizer[W],
                             lexicon: TagConstraints.Factory[L, W],
-                            index: FeatureIndex[L, Feature],
+                            index: FeatureIndex[Feature],
                             ts: TagScorer[L, W],
                             logProbFeature: Int,
                             weights: DenseVector[Double]) extends TagScorer[L, W] with Serializable {
@@ -70,7 +71,8 @@ object MaxEntTagScorer extends Logging {
                  params: OptParams = OptParams()) = {
     val featurizer = IndexedWordFeaturizer.fromData(feat, data.map(_.words))
     val featureCounts = ArrayBuffer[Double]()
-    val featureIndex = FeatureIndex.build(lexicon.labelIndex, featurizer.featureIndex, HashFeature.Relative(1)) { addToIndex =>
+    val labelFeatureIndex = Index(lexicon.labelIndex.map(LabelFeature(_)):Iterable[Feature])
+    val featureIndex = FeatureIndex.build(labelFeatureIndex, featurizer.featureIndex, HashFeature.Relative(1), includeLabelOnlyFeatures = false) { addToIndex =>
       for(ti <- data.map(_.asTaggedSequence)) {
         val featanch = featurizer.anchor(ti.words)
         for (i <- 0 until ti.words.length) {
@@ -106,7 +108,7 @@ object MaxEntTagScorer extends Logging {
 
   private def makeObjective[L, W](lexicon: Lexicon[L, W],
                                   featurizer: IndexedWordFeaturizer[W],
-                                  featureIndex: FeatureIndex[L, Feature],
+                                  featureIndex: FeatureIndex[Feature],
                                   baseScorer: TagScorer[L, W],
                                   data: IndexedSeq[TreeInstance[L, W]]) = {
     // the None feature is for the log probability. TODO hack

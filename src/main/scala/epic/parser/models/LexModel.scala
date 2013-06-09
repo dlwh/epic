@@ -116,8 +116,7 @@ class IndexedLexFeaturizer[L, W](f: LexFeaturizer[L],
                                  surface: IndexedBilexicalFeaturizer[W],
                                  labelIndex: Index[L],
                                  ruleIndex: Index[Rule[L]],
-                                 val index: FeatureIndex[Feature, Option[Feature]],
-                                 noneFeatures: Array[Int]) extends RefinedFeaturizer[L, W, Feature] with Serializable {
+                                 val index: FeatureIndex[Feature]) extends RefinedFeaturizer[L, W, Feature] with Serializable {
   def anchor(datum: IndexedSeq[W]):Spec = new Spec(datum)
 
   class Spec(val words: IndexedSeq[W]) extends Anchoring {
@@ -149,7 +148,7 @@ class IndexedLexFeaturizer[L, W](f: LexFeaturizer[L],
       }
       var cache = rcache(tag)
       if(cache == null) {
-        cache = index.crossProduct(fspec.featuresForTag(tag), surfaceSpec.featuresForWord(head))
+        cache = index.crossProduct(fspec.featuresForTag(tag), surfaceSpec.featuresForWord(head), usePlainLabelFeatures = false)
         rcache(tag) = cache
       }
       cache
@@ -216,7 +215,7 @@ class IndexedLexFeaturizer[L, W](f: LexFeaturizer[L],
       var cache = rcache(r)
       if(cache == null)  {
         val surfFeatures = surfaceSpec.featuresForWord(w, FeaturizationLevel.BasicFeatures)
-        cache = index.crossProduct(fspec.featuresForHead(r), surfFeatures) ++ index.crossProduct(fspec.featuresForRule(r), noneFeatures)
+        cache = index.crossProduct(fspec.featuresForHead(r), surfFeatures)
         rcache(r) = cache
       }
       cache
@@ -231,7 +230,7 @@ class IndexedLexFeaturizer[L, W](f: LexFeaturizer[L],
       var cache = rcache(r)
       if(cache == null)  {
         val surfFeatures = surfaceSpec.featuresForWord(w, FeaturizationLevel.BasicFeatures)
-        cache = index.crossProduct(fspec.featuresForDep(r), surfFeatures)
+        cache = index.crossProduct(fspec.featuresForDep(r), surfFeatures, usePlainLabelFeatures = false)
         rcache(r) = cache
       }
       cache
@@ -248,7 +247,7 @@ class IndexedLexFeaturizer[L, W](f: LexFeaturizer[L],
         val feats = fspec.featuresForBilex(hw, dw)
         val attFeats = surfaceSpec.featuresForAttachment(hw, dw, FeaturizationLevel.MinimalFeatures)
         cache = if (attFeats ne null) {
-          index.crossProduct(feats, attFeats)
+          index.crossProduct(feats, attFeats, usePlainLabelFeatures = true)
         } else {
           Array.empty
         }
@@ -622,11 +621,10 @@ object IndexedLexFeaturizer extends Logging {
                            dummyFeatScale: HashFeature.Scale = HashFeature.Absolute(0),
                            trees: Traversable[Datum])(implicit hasWords: Has2[Datum, IndexedSeq[W]], hasTree: Has2[Datum, BinarizedTree[L]]) : IndexedLexFeaturizer[L, W] = {
 
-    val surfaceFeatureIndex = new OptionIndex(surfaceFeaturizer.featureIndex)
-    val none = Array(surfaceFeatureIndex(None))
+    val surfaceFeatureIndex = surfaceFeaturizer.featureIndex
 
     val lexFeatureIndex = lexFeaturizer.featureIndex
-    val fi = FeatureIndex.build(lexFeatureIndex, surfaceFeatureIndex, dummyFeatScale) { enumerator =>
+    val fi = FeatureIndex.build(lexFeatureIndex, surfaceFeatureIndex, dummyFeatScale, "Lex") { enumerator =>
       for(ti <- trees) {
         val lexSpec = lexFeaturizer
         val surfaceSpec = surfaceFeaturizer.anchor(hasWords.get(ti))
@@ -642,7 +640,7 @@ object IndexedLexFeaturizer extends Logging {
             val h = rec(b)
             val r = ruleIndex(UnaryRule(a, b.label, chain))
             enumerator(lexSpec.featuresForHead(r), surfaceSpec.featuresForWord(h, FeaturizationLevel.BasicFeatures))
-            enumerator(lexSpec.featuresForRule(r), none)
+            enumerator(lexSpec.featuresForRule(r), Array.empty)
             h
           case t@BinaryTree(a, bt@Tree(b, _, _), Tree(c, _, _), span) =>
             val log = math.random < 1E-4
@@ -657,11 +655,9 @@ object IndexedLexFeaturizer extends Logging {
             if(log) {
               logger.debug(BinaryRule(a,b,c) + " " + words(head) + " " + words(dep) + " " + Arrays.crossProduct(lexSpec.featuresForBilex(head, dep).map(lexFeatureIndex.get(_)), surfaceFeatures.map(surfaceFeatureIndex.get _))( _ -> _).toIndexedSeq)
             }
-              enumerator(lexSpec.featuresForBilex(head, dep), surfaceFeatures)
-              enumerator(lexSpec.featuresForAttach(r, head, dep), surfaceSpec.featuresForAttachment(head, dep, FeaturizationLevel.MinimalFeatures))
-//            enumerator(lexSpec.featuresForAttach(r, head, dep), none)
-//            }
-            enumerator(lexSpec.featuresForRule(r), none)
+            enumerator(lexSpec.featuresForBilex(head, dep), surfaceFeatures)
+            enumerator(lexSpec.featuresForAttach(r, head, dep), surfaceSpec.featuresForAttachment(head, dep, FeaturizationLevel.MinimalFeatures))
+            enumerator(lexSpec.featuresForRule(r), Array.empty)
             head
         }
         rec(tree)
@@ -671,7 +667,7 @@ object IndexedLexFeaturizer extends Logging {
     new IndexedLexFeaturizer(lexFeaturizer, surfaceFeaturizer,
       labelIndex,
       ruleIndex,
-      fi, none)
+      fi)
   }
 }
 

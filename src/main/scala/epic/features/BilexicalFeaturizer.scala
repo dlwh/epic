@@ -22,7 +22,7 @@ trait BilexicalFeatureAnchoring[W] {
 
 @SerialVersionUID(1L)
 class ProductBilexicalFeaturizer[W](wf: IndexedWordFeaturizer[W],
-                                    val featureIndex: FeatureIndex[Option[Feature], Feature]) extends IndexedBilexicalFeaturizer[W] with Serializable {
+                                    val featureIndex: FeatureIndex[Feature]) extends IndexedBilexicalFeaturizer[W] with Serializable {
 
   def featurizer: WordFeaturizer[W] = wf.featurizer
 
@@ -42,8 +42,8 @@ class ProductBilexicalFeaturizer[W](wf: IndexedWordFeaturizer[W],
       }
 
       if (ret(level.level) eq null) {
-        val f1 = featureIndex.crossProduct(anc.featuresForWord(head, level), anc.featuresForWord(dep, FeaturizationLevel.MinimalFeatures))
-        val f2 = featureIndex.crossProduct(anc.featuresForWord(head, FeaturizationLevel.MinimalFeatures), anc.featuresForWord(dep, level))
+        val f1 = featureIndex.crossProduct(anc.featuresForWord(head, level), anc.featuresForWord(dep, FeaturizationLevel.MinimalFeatures), false)
+        val f2 = featureIndex.crossProduct(anc.featuresForWord(head, FeaturizationLevel.MinimalFeatures), anc.featuresForWord(dep, level), false)
         ret(level.level) = f1 ++ f2
       }
 
@@ -67,11 +67,7 @@ object IndexedBilexicalFeaturizer {
   def fromData[L, W](wfeat: IndexedWordFeaturizer[W],
                   depTrees: IndexedSeq[DependencyTree[L, W]],
                   hashFeatures: HashFeature.Scale = HashFeature.Relative(1.0)):IndexedBilexicalFeaturizer[W] =  {
-    val index = FeatureIndex.build(new OptionIndex(wfeat.featureIndex), wfeat.featureIndex, hashFeatures) { adder =>
-      val range: Array[Int] = Array.range(0, wfeat.featureIndex.size)
-      val indexed = adder(Array(wfeat.featureIndex.size), range)
-      assert(util.Arrays.equals(range, indexed))
-
+    val index = FeatureIndex.build(wfeat.featureIndex, wfeat.featureIndex, hashFeatures, "Bilexical") { adder =>
       for (tree <- depTrees) {
         val wanch = wfeat.anchor(tree.words)
         for( (head, dep) <- tree.arcs if head < tree.words.length) {
