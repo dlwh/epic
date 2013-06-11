@@ -112,7 +112,7 @@ object ParserTrainer extends epic.parser.ParserPipeline with Logging {
       }
     }
 
-    val name = Option(params.name).orElse(Some(model.getClass.getSimpleName).filter(_.nonEmpty)).getOrElse("DiscrimParser")
+    val name = Option(params.name).orElse(Option(model.getClass.getSimpleName).filter(_.nonEmpty)).getOrElse("DiscrimParser")
 
     for ((state, iter) <- params.opt.iterations(cachedObj, init).take(maxIterations).zipWithIndex.tee(evalAndCache _)
          if iter != 0 && iter % iterationsPerEval == 0) yield try {
