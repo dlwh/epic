@@ -1,6 +1,5 @@
 package epic.parser
 
-import projections.ConstraintAnchoring
 import epic.lexicon.Lexicon
 import epic.constraints.ChartConstraints
 
@@ -124,13 +123,13 @@ final case class AugmentedAnchoring[L, W](refined: RefinedAnchoring[L, W], core:
 
 object AugmentedAnchoring {
   def fromRefined[L, W](refined: RefinedAnchoring[L, W]): AugmentedAnchoring[L, W] = {
-    AugmentedAnchoring(refined, CoreAnchoring.identity(refined.grammar, refined.lexicon, refined.words))
+    apply(refined, ChartConstraints.noSparsity[L])
   }
 
   def apply[L, W](refined: RefinedAnchoring[L, W]): AugmentedAnchoring[L, W] = fromRefined(refined)
 
   def apply[L, W](refined: RefinedAnchoring[L, W], sparsity: ChartConstraints[L]): AugmentedAnchoring[L, W] = {
-    new AugmentedAnchoring(refined, new ConstraintAnchoring(refined.grammar, refined.lexicon, refined.words, sparsity))
+    new AugmentedAnchoring(refined, CoreAnchoring.identity(refined.grammar, refined.lexicon, refined.words, sparsity))
   }
 
 

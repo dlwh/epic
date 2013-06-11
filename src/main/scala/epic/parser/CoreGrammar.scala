@@ -1,6 +1,7 @@
 package epic.parser
 
 import epic.lexicon.Lexicon
+import epic.constraints.ChartConstraints
 
 /*
  Copyright 2012 David Hall
@@ -54,7 +55,7 @@ object CoreGrammar {
       def grammar =  g
       def lexicon = l
 
-      def anchor(words: IndexedSeq[W]) = CoreAnchoring.identity(grammar, lexicon, words)
+      def anchor(words: IndexedSeq[W]) = CoreAnchoring.identity(grammar, lexicon, words, ChartConstraints.noSparsity[L])
     }
   }
 }

@@ -1,4 +1,7 @@
 package epic.parser
+
+import epic.constraints.ChartConstraints
+
 /*
  Copyright 2012 David Hall
 
@@ -28,6 +31,9 @@ final case class ProductCoreAnchoring[L, W](s1: CoreAnchoring[L, W],
   def lexicon = s1.lexicon
 
   def words = s1.words
+
+
+  override def sparsityPattern: ChartConstraints[L] = s1.sparsityPattern & s2.sparsityPattern
 
   def scoreSpan(begin: Int, end: Int, label: Int) = {
     val r1 = s1.scoreSpan(begin, end, label)

@@ -249,7 +249,7 @@ object ParseChart {
   @SerialVersionUID(1)
   trait Factory[+Chart[X]<:ParseChart[X]] extends Serializable {
     def apply[L](g: Index[L], refinements: Array[Int], length: Int):Chart[L] = {
-      apply[L](g, refinements, length, ChartConstraints.noSparsity)
+      apply[L](g, refinements, length, ChartConstraints.noSparsity[L])
     }
 
     def apply[L](g: Index[L], refinements: Array[Int], length: Int, sparsity: ChartConstraints[L]):Chart[L]

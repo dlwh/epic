@@ -36,17 +36,20 @@ sealed trait LabeledSpanConstraints[-L] extends SpanConstraints {
    * @param other
    * @return
    */
-  def &(other: LabeledSpanConstraints[L @uncheckedVariance ]): LabeledSpanConstraints[L] = this match {
-    case NoConstraints => this
-    case SimpleConstraints(maxPosX, maxLx, x) => other match {
-      case NoConstraints => other
-      case SimpleConstraints(maxPosY, maxLy, y) =>
-        require(x.dimension == y.dimension, "Dimensions of constrained spans must match!")
-        SimpleConstraints( elementwiseMin(maxPosX, maxPosY), elementwiseMin(maxLx, maxLy),
-          TriangularArray.tabulate(x.dimension) { (b,e) =>
-          if(x(b,e) == null || y(b,e) == null) null
-          else  x(b,e) & y(b,e)
-        })
+  def &(other: LabeledSpanConstraints[L @uncheckedVariance ]): LabeledSpanConstraints[L] = {
+    if(this eq other) this
+    else this match {
+      case NoConstraints => this
+      case SimpleConstraints(maxPosX, maxLx, x) => other match {
+        case NoConstraints => this
+        case SimpleConstraints(maxPosY, maxLy, y) =>
+          require(x.dimension == y.dimension, "Dimensions of constrained spans must match!")
+          SimpleConstraints( elementwiseMin(maxPosX, maxPosY), elementwiseMin(maxLx, maxLy),
+            TriangularArray.tabulate(x.dimension) { (b,e) =>
+              if(x(b,e) == null || y(b,e) == null) null
+              else  x(b,e) & y(b,e)
+            })
+      }
     }
   }
 
@@ -329,12 +332,6 @@ object LabeledSpanConstraints {
     }
     */
   }
-
-
-
-
-
-
 
   private def elementwiseMax(a: Array[Int], b: Array[Int]):Array[Int] = {
     // could avoid the allocation, but whatever.

@@ -138,11 +138,12 @@ final case class ChartMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
     val itop = inside.top
 
     val lexLoc = anchoring.core.tagConstraints
+    val core = anchoring.core
 
     // handle lexical
     for (i <- 0 until words.length) {
       for {
-        a <- lexLoc.allowedTags(i)
+        a <- lexLoc.allowedTags(i) if  core.sparsityPattern.bot.isAllowedLabeledSpan(i, i+1, a)
         ref <- anchoring.refined.validLabelRefinements(i, i+ 1, a)
       } {
         val score:Double = anchoring.scoreSpan(i, i+1, a, ref) + outside.bot(i, i+1, a, ref) - logPartition
@@ -732,23 +733,26 @@ object ChartMarginal {
     for(bi <- chart.bot.enteredLabelIndexes(begin, end); refB <- chart.bot.enteredLabelRefinements(begin, end, bi)) {
       val b = bi
       val bScore = chart.bot.labelScore(begin, end, b, refB)
-      val rules = grammar.indexedUnaryRulesWithChild(b)
-      var j = 0
-      while(j < rules.length) {
-        val r = rules(j)
-        val coreScore = core.scoreUnaryRule(begin, end, r)
-        val a = grammar.parent(r)
-        if(coreScore != Double.NegativeInfinity && core.sparsityPattern.top.isAllowedLabeledSpan(begin, end, a)) {
-          for(refR <- refined.validUnaryRuleRefinementsGivenChild(begin, end, r, refB)) {
-            val refA = refined.parentRefinement(r, refR)
-            val ruleScore: Double = refined.scoreUnaryRule(begin, end, r, refR) + coreScore
-            val prob: Double = bScore + ruleScore
-            if(prob != Double.NegativeInfinity) {
-              chart.top.enter(begin, end, a, refA, sum(chart.top.labelScore(begin, end, a, refA), prob))
-            }
+      if(bScore != Double.NegativeInfinity) {
+        val rules = grammar.indexedUnaryRulesWithChild(b)
+        var j = 0
+        while(j < rules.length) {
+          val r = rules(j)
+          val a = grammar.parent(r)
+          if(core.sparsityPattern.top.isAllowedLabeledSpan(begin, end, a)) {
+            val coreScore = core.scoreUnaryRule(begin, end, r)
+            if(coreScore != Double.NegativeInfinity)
+              for(refR <- refined.validUnaryRuleRefinementsGivenChild(begin, end, r, refB)) {
+                val refA = refined.parentRefinement(r, refR)
+                val ruleScore: Double = refined.scoreUnaryRule(begin, end, r, refR) + coreScore
+                val prob: Double = bScore + ruleScore
+                if(prob != Double.NegativeInfinity) {
+                  chart.top.enter(begin, end, a, refA, sum(chart.top.labelScore(begin, end, a, refA), prob))
+                }
+              }
           }
+          j += 1
         }
-        j += 1
       }
     }
 

@@ -16,6 +16,7 @@ package epic.parser
 */
 import breeze.inference.Factor
 import epic.lexicon.Lexicon
+import epic.constraints.ChartConstraints
 
 /**
  * A RefinedAnchoring is a refined grammar that has been tuned to a particular sentence (if applicable).
@@ -235,7 +236,7 @@ object RefinedAnchoring {
   def identity[L, W](grammar: BaseGrammar[L],
                      lexicon: Lexicon[L, W],
                      words: IndexedSeq[W]): RefinedAnchoring[L, W] = {
-    LiftedCoreAnchoring(CoreAnchoring.identity[L, W](grammar, lexicon, words))
+    LiftedCoreAnchoring(CoreAnchoring.identity[L, W](grammar, lexicon, words, ChartConstraints.noSparsity[L]))
   }
 }
 

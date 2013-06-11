@@ -16,8 +16,9 @@ import java.io.{DataOutput, DataInput}
  * @tparam L
  */
 @SerialVersionUID(1L)
-case class ChartConstraints[-L](top: LabeledSpanConstraints[L],
+case class ChartConstraints[L](top: LabeledSpanConstraints[L],
                                 bot: LabeledSpanConstraints[L]) extends SpanConstraints with Serializable {
+
 
   def isAllowedSpan(begin: Int, end: Int):Boolean = top.isAllowedSpan(begin, end) || bot.isAllowedSpan(begin, end)
   /** TODO */ // TODO
@@ -27,12 +28,14 @@ case class ChartConstraints[-L](top: LabeledSpanConstraints[L],
   def maxSpanLengthStartingAt(begin: Int): Int = top.maxSpanLengthStartingAt(begin) max bot.maxSpanLengthStartingAt(begin)
 
   def flatten = top | bot
+  def &(other: ChartConstraints[L]) = if(this eq other) this else ChartConstraints(top & other.top, bot & other.bot)
+  def |(other: ChartConstraints[L]) = ChartConstraints(top | other.top, bot | other.bot)
 
 
 }
 
 object ChartConstraints {
-  def noSparsity[L] = ChartConstraints(LabeledSpanConstraints.noConstraints[L], LabeledSpanConstraints.noConstraints[L])
+  def noSparsity[L]: ChartConstraints[L] = ChartConstraints[L](LabeledSpanConstraints.noConstraints[L], LabeledSpanConstraints.noConstraints[L])
 
   def apply[L](top: TriangularArray[_ <: BitSet], bot: TriangularArray[_ <: BitSet]): ChartConstraints[L] = ChartConstraints(LabeledSpanConstraints(top), LabeledSpanConstraints(bot))
 

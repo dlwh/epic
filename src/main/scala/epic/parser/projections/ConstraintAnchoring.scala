@@ -35,29 +35,6 @@ import scala.collection.GenTraversable
 import com.typesafe.scalalogging.log4j.{Logging, Logger}
 import java.util.concurrent.atomic.AtomicInteger
 
-/**
- * 
- * @author dlwh
- */
-@SerialVersionUID(2L)
-class ConstraintAnchoring[L, W](val grammar: BaseGrammar[L],
-                             val lexicon: Lexicon[L, W],
-                             val words: IndexedSeq[W],
-                             override val sparsityPattern: ChartConstraints[L]) extends CoreAnchoring[L, W] with Serializable {
-  def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = 0.0
-
-
-  def scoreUnaryRule(begin: Int, end: Int, rule: Int) = {
-    breeze.numerics.logI(sparsityPattern.top.isAllowedLabeledSpan(begin, end, grammar.parent(rule)))
-  }
-
-  def scoreSpan(begin: Int, end: Int, tag: Int) = {
-    breeze.numerics.logI(sparsityPattern.bot.isAllowedLabeledSpan(begin, end, tag))
-  }
-}
-
-
-
 @SerialVersionUID(1L)
 class ConstraintCoreGrammarAdaptor[L, W](val grammar: BaseGrammar[L], val lexicon: Lexicon[L, W],
                                          val constraintsFactory: ChartConstraints.Factory[L, W]) extends CoreGrammar[L, W] with Serializable {
@@ -66,7 +43,7 @@ class ConstraintCoreGrammarAdaptor[L, W](val grammar: BaseGrammar[L], val lexico
    * @param words
    * @return
    */
-  def anchor(words: IndexedSeq[W]): CoreAnchoring[L, W] = new ConstraintAnchoring[L, W](grammar, lexicon, words, constraintsFactory.constraints(words))
+  def anchor(words: IndexedSeq[W]): CoreAnchoring[L, W] = CoreAnchoring.identity[L, W](grammar, lexicon, words, constraintsFactory.constraints(words))
 }
 
 /**
@@ -126,9 +103,8 @@ class ParserChartConstraintsFactory[L, W](val augmentedGrammar: AugmentedGrammar
 //      ((labelThresholds(i) ne null) && (topLabelThresholds(i) ne null)) && ((labelThresholds(i)|topLabelThresholds(i)) -- synthetics).nonEmpty
 //    }
 
-    //TODO: maximal projections
-    val pattern = ChartConstraints(topLabelThresholds, labelThresholds)//, hasMaximalProjection)
-    pattern
+    //, hasMaximalProjection)
+    ChartConstraints[L](topLabelThresholds, labelThresholds)
   }
 
 
