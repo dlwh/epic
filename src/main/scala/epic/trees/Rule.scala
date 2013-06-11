@@ -51,6 +51,8 @@ final case class UnaryRule[@specialized(Int) +L](parent: L, child: L, chain: Ind
   def map[A](f: L => A) = UnaryRule(f(parent), f(child), chain)
 
   def mapChildren[A >: L](f: L => A) = UnaryRule(parent, f(child), chain)
+
+  def isIdentity = chain.isEmpty && parent == child
 }
 
 final case class LexicalProduction[@specialized(Int) +L, +W](parent: L, word: W) extends Production[L, W] {
