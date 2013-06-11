@@ -92,11 +92,56 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
                               annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = FilterAnnotations(),
                               @Help(text="Path to substates to use for each symbol. Uses numStates for missing states.")
                               substates: File = null,
+                              @Help(text="Split states that the Berkeley Parser doesn't want to split.")
+                              splitUselessStates: Boolean = false,
                               @Help(text="Number of states to use. Overridden by substates file")
                               numStates: Int = 2,
                               @Help(text="Old weights to initialize with. Optional.")
                               oldWeights: File = null) extends ParserModelFactory[AnnotatedLabel, String] with SafeLogging {
   type MyModel = LatentParserModel[AnnotatedLabel, (AnnotatedLabel, Int), String]
+
+  val statesToNotSplit = Set("""#
+                               |$
+                               |''
+                               |,
+                               |-LRB-
+                               |-RRB-
+                               |@CONJP
+                               |@INTJ
+                               |@LST
+                               |@RRC
+                               |@SBARQ
+                               |@WHADJP
+                               |@WHADVP
+                               |@WHNP
+                               |@X
+                               |CONJP
+                               |EX
+                               |FRAG
+                               |FW
+                               |INTJ
+                               |LS
+                               |LST
+                               |NAC
+                               |PRT
+                               |RBS
+                               |ROOT
+                               |RP
+                               |RRC
+                               |SBARQ
+                               |SINV
+                               |SYM
+                               |TO
+                               |UCP
+                               |UH
+                               |WDT
+                               |WHADJP
+                               |WHADVP
+                               |WHPP
+                               |WP
+                               |WP$
+                               |WRB
+                               |X""".stripMargin.split("\\s+"):_*)
 
   def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]],
            constrainer: ChartConstraints.Factory[AnnotatedLabel, String])(implicit cache: CacheBroker):MyModel = {
@@ -113,8 +158,10 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
         AnnotatedLabel(split(0)) -> split(1).toInt
       }
       pairs.toMap + (xbarGrammar.root -> 1)
-    } else {
+    } else if(splitUselessStates) {
       Map(xbarGrammar.root -> 1)
+    } else {
+      statesToNotSplit.iterator.map(s => AnnotatedLabel(s) -> 1).toMap  + (xbarGrammar.root -> 1)
     }
 
     def split(x: AnnotatedLabel): Seq[(AnnotatedLabel, Int)] = {
