@@ -68,8 +68,10 @@ class FeatureIndex[B](val labelFeatureIndex: Index[Feature],
   override def get(i: Int): Feature = {
     if(i >= size || i < 0) {
       throw new NoSuchElementException(s"index $i is not in FeatureIndex of size $size")
+    } else if(i < labelOnlySize) {
+      labelFeatureIndex.get(i)
     } else if (i < trueSize) {
-      LabeledFeature(labelFeatureIndex.get(labelPartOfFeature(i)), surfaceFeatureIndex.get(surfacePartOfFeature(i)), id)
+      LabeledFeature(labelFeatureIndex.get(labelPartOfFeature(i-labelOnlySize)), surfaceFeatureIndex.get(surfacePartOfFeature(i-labelOnlySize)), id)
     } else {
       HashFeature(i - trueSize)
     }

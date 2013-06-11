@@ -25,6 +25,7 @@ import epic.trees.{TreeInstance, AnnotatedLabel}
 import breeze.config.Help
 import epic.constraints.ChartConstraints.Factory
 import epic.util.CacheBroker
+import epic.lexicon.Lexicon
 
 case class EPParams(maxIterations: Int = 5, pruningThreshold: Double = -15)
 
@@ -40,10 +41,7 @@ case class EPParserModelFactory(ep: EPParams,
                                 model: Seq[EPParserModelFactory.CompatibleFactory],
                                 @Help(text="Path to old weights used for initialization")
                                 oldWeights: File = null) extends ParserExtractableModelFactory[AnnotatedLabel, String] {
-  type MyModel = (
-    EPModel[TreeInstance[AnnotatedLabel, String], CoreAnchoring[AnnotatedLabel, String]]
-      with EPParser.Extractor[AnnotatedLabel, String]
-    )
+  type MyModel = EPParserModel[AnnotatedLabel, String]
 
 
   def make(train: IndexedSeq[TreeInstance[AnnotatedLabel, String]], constrainer: Factory[AnnotatedLabel, String])(implicit broker: CacheBroker): MyModel = {
@@ -57,11 +55,16 @@ case class EPParserModelFactory(ep: EPParams,
 
     val featureCounter = readWeights(oldWeights)
 
-    new EPModel(ep.maxIterations, { featureCounter.get(_) }, epInGold = false)(models: _*) with EPParser.Extractor[AnnotatedLabel, String] with Serializable {
-      def baseGrammar = xbarGrammar
-
-      def lexicon = xbarLexicon
-    }
+    new EPParserModel[AnnotatedLabel, String](xbarGrammar, xbarLexicon, ep.maxIterations, {featureCounter.get(_)}, false)(models:_*)
   }
 }
 
+@SerialVersionUID(1L)
+class EPParserModel[L, W](val baseGrammar: BaseGrammar[L],
+                          val lexicon: Lexicon[L, W],
+                          maxEPIter: Int,
+                          initFeatureValue: Feature => Option[Double] = {(_:Feature) => None},
+                          epInGold: Boolean = false)(models:EPModel.CompatibleModel[TreeInstance[L, W], CoreAnchoring[L, W]]*) extends EPModel[TreeInstance[L, W], CoreAnchoring[L, W]](maxEPIter, initFeatureValue, epInGold)(models:_*) with EPParser.Extractor[L, W] with Serializable {
+
+
+}
