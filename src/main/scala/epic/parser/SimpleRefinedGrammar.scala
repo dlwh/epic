@@ -29,11 +29,11 @@ class SimpleRefinedGrammar[L, L2, W](val grammar: BaseGrammar[L],
                                      val lexicon: Lexicon[L, W],
                                      val refinements: GrammarRefinements[L, L2],
                                      val refinedGrammar: BaseGrammar[L2],
-                                     ruleScoreArray: Array[Array[Double]],
+                                     val ruleScoreArray: Array[Array[Double]],
                                      spanScoreArray: Array[Array[Double]],
                                      parentCompatibleRefinements: Array[Array[Array[Int]]],
                                      childCompatibleRefinements: Array[Array[Array[Int]]],
-                                     tagScorer: TagScorer[L2, W]) extends RefinedGrammar[L, W] with Serializable {
+                                     val tagScorer: TagScorer[L2, W]) extends RefinedGrammar[L, W] with Serializable {
   def ruleScore(r: Int, ruleRef: Int):Double = ruleScoreArray(r)(ruleRef)
   def spanScore(l: Int, ref: Int):Double = spanScoreArray(l)(ref)
 
