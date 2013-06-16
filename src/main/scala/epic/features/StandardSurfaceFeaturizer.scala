@@ -47,7 +47,16 @@ class StandardSurfaceFeaturizer(wordFeaturizer: WordFeaturizer[String]) extends 
               feats += WordEdges('Outside, f1, f2)
             }
 
+
+            for(f1 <- featuresForWord(begin, level.less)) {
+              feats += WordBoundary('Begin, f1)
+            }
+
+            for(f1 <- featuresForWord(end-1, level.less)) {
+              feats += WordBoundary('Outside, f1)
+            }
           }
+
 
         }
 

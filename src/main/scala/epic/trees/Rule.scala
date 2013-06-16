@@ -45,6 +45,7 @@ final case class BinaryRule[@specialized(Int) +L](parent: L, left: L, right: L) 
   def mapChildren[A >: L](f: L => A) = BinaryRule(parent, f(left), f(right))
 }
 
+@SerialVersionUID(8559479322874082992L)
 final case class UnaryRule[@specialized(Int) +L](parent: L, child: L, chain: IndexedSeq[String]) extends Rule[L] {
   def children = Seq(child)
 

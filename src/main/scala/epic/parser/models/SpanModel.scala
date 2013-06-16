@@ -412,9 +412,12 @@ object IndexedSpanFeaturizer {
           case t@BinaryTree(a, b, c, span) =>
             val aI = labelIndex(a)
             val r = ruleIndex(BinaryRule(a, b.label, c.label))
-            enumerator(spec.featuresForBinaryRule(span.begin, t.splitPoint, span.end, r), wspec.featuresForSpan(span.begin, span.end))
-            enumerator(spec.featuresForSpan(span.begin, span.end, aI), wspec.featuresForSpan(span.begin, span.end))
-            enumerator(spec.featuresForSplit(span.begin, t.splitPoint, span.end, r), wspec.featuresForWord(t.splitPoint,FeaturizationLevel.BasicFeatures))
+            enumerator(spec.featuresForBinaryRule(span.begin, t.splitPoint, span.end, r),
+              wspec.featuresForSpan(span.begin, span.end))
+            enumerator(spec.featuresForSpan(span.begin, span.end, aI),
+              wspec.featuresForSpan(span.begin, span.end))
+            enumerator(spec.featuresForSplit(span.begin, t.splitPoint, span.end, r),
+              wspec.featuresForWord(t.splitPoint,FeaturizationLevel.BasicFeatures))
         }
 
       }
@@ -425,6 +428,8 @@ object IndexedSpanFeaturizer {
 }
 
 case object SplitPointFeature extends Feature
+case class SplitPointFeature[L](label: L) extends Feature
+case object ASpan extends Feature
 
 class StandardSpanFeaturizer[L, W](grammar: BaseGrammar[L],
                                    labelFeatures: L => Array[Feature],
@@ -436,8 +441,15 @@ class StandardSpanFeaturizer[L, W](grammar: BaseGrammar[L],
   def ruleIndex = index
 
   private val ruleCache = Encoder.fromIndex(ruleIndex).tabulateArray(r => ruleFeatures(r).map(_featureIndex.index(_)).toArray)
-  private val labelCache: Array[Array[Int]] = Encoder.fromIndex(labelIndex).tabulateArray(l => labelFeatures(l).map(_featureIndex.index(_)).toArray)
-  private val splitFeatures = Array(_featureIndex.index(SplitPointFeature))
+  private val aSpanFeature = _featureIndex.index(ASpan)
+  private val labelCache: Array[Array[Int]] = {
+    Encoder.fromIndex(labelIndex).tabulateArray(l => labelFeatures(l).map(_featureIndex.index(_)).toArray)
+  }
+  private val longSpanCache: Array[Array[Int]] = labelCache.map { feats =>
+    feats :+ aSpanFeature
+  }
+  private val splitFeature = _featureIndex.index(SplitPointFeature)
+  private val splitFeatureCache = Encoder.fromIndex(ruleIndex).tabulateArray(r => splitFeature +: ruleFeatures(r).map(SplitPointFeature(_)).map(_featureIndex.index(_)))
 
 
   def anchor(w: IndexedSeq[W]):Anchoring = new Anchoring {
@@ -445,7 +457,9 @@ class StandardSpanFeaturizer[L, W](grammar: BaseGrammar[L],
     val length = w.length
 
     def featuresForSpan(begin: Int, end: Int, label: Int) = {
-      labelCache(label)
+      if(begin+1 == end)
+        labelCache(label)
+      else longSpanCache(label)
     }
 
     def featuresForRule(begin: Int, end: Int, rule: Int) = {
@@ -457,7 +471,7 @@ class StandardSpanFeaturizer[L, W](grammar: BaseGrammar[L],
     }
 
     def featuresForSplit(begin: Int, split: Int, end: Int, rule: Int):Array[Int] = {
-      splitFeatures
+      splitFeatureCache(rule)
     }
   }
 }
