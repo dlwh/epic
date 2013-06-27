@@ -46,7 +46,7 @@ object HTML {
           new String(Character.toChars(codepoint));
         }
       } catch {
-        case _ =>
+        case _:Exception =>
           // exception while processing .. append raw input
           txt;
       }

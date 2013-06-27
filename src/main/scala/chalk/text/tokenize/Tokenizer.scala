@@ -15,7 +15,7 @@
 */
 package chalk.text.tokenize
 
-import chalk.serialization.TextSerialization
+import nak.serialization.TextSerialization
 import chalk.text.transform.Transformer
 
 

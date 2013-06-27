@@ -18,6 +18,7 @@ package chalk.data;
 
 
 import chalk.text.tokenize.WhitespaceTokenizer;
+import nak.data.{Observation,Example}
 
 
 /**

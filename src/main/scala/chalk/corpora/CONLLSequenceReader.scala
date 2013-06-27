@@ -2,7 +2,7 @@ package chalk.corpora
 
 import io.Source
 import collection.mutable.ArrayBuffer
-import chalk.data.{Observation, Example}
+import nak.data.{Observation, Example}
 import java.io.{File, FileInputStream, InputStream}
 
 /**
@@ -62,7 +62,7 @@ object CONLLSequenceReader {
         }
         val id = name + "-" + index
         index += 1
-        Observation(id, inputs)
+        Observation(inputs,id)
       }
     }
   }
@@ -70,8 +70,6 @@ object CONLLSequenceReader {
   def main(args: Array[String]) {
     println(readTrain(new FileInputStream(new File(args(0)))).length)
     println(readTest(new FileInputStream(new File(args(1)))).length)
-
-
   }
 
 }

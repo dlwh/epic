@@ -133,7 +133,7 @@ class Corpora(val repositories: Seq[URL]) {
       try {
         s1.toInt > s2.toInt
       } catch {
-        case _ => s1 > s2
+        case _:Exception => s1 > s2
       }
     }) f1 else f2
   }

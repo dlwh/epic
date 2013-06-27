@@ -18,9 +18,9 @@ package chalk.data;
 
 import scala.collection.mutable.StringBuilder;
 import scala.io.Source;
-
 import java.io.File;
 
+import nak.data.{Observation,Example}
 
 /**
 * Represents a sequence of text. This is just a string with an id, and a nice map method.

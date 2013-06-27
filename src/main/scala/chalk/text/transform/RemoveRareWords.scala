@@ -1,6 +1,6 @@
 package chalk.text.transform
 
-import chalk.data._
+import nak.data._
 import breeze.linalg.Counter
 
 /**
