@@ -1,7 +1,7 @@
 package epic.sequences
 
 import epic.trees.Span
-import breeze.data.Example
+import nak.data.Example
 
 /**
  * A tagged sequence has a sequence of tags and a sequence of words that are in

@@ -1,6 +1,6 @@
 package epic.util
 
-import breeze.data.{Example, Observation}
+import nak.data.{Example, Observation}
 
 /**
  *

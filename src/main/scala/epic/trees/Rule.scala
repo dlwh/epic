@@ -1,7 +1,5 @@
 package epic.trees
 
-import breeze.serialization.DataSerialization
-import java.io.DataOutput
 import epic.framework.Feature
 
 /*

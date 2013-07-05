@@ -1,7 +1,7 @@
 package epic.parser
 
 import java.io.File
-import breeze.config.{Help, Configuration, CommandLineParser}
+import breeze.config.{Help, CommandLineParser}
 import breeze.util._
 import epic.trees.AnnotatedLabel
 import io.{Codec, Source}

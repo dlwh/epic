@@ -18,8 +18,8 @@ package epic.trees
 
 
 import scala.collection.mutable.ArrayBuffer
-import breeze.serialization.DataSerialization
-import breeze.serialization.DataSerialization._
+import nak.serialization.DataSerialization
+import nak.serialization.DataSerialization._
 import java.io.{StringReader, DataInput, DataOutput}
 import breeze.util.Lens
 import scala.annotation.tailrec

@@ -17,8 +17,8 @@ package epic.framework
 */
 
 import collection.mutable.ArrayBuffer
-import breeze.inference.{ExpectationPropagation, Factor}
 import epic.util.SafeLogging
+import nak.inference.{ExpectationPropagation, Factor}
 
 class EPInference[Datum, Augment](val inferences: IndexedSeq[ProjectableInference[Datum, Augment]],
                                   val maxEPIter: Int,

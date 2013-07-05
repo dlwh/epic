@@ -2,7 +2,7 @@ package epic.coref
 
 import breeze.linalg.Counter
 import epic.framework.Feature
-import breeze.text.analyze.PorterStemmer
+import chalk.text.analyze.PorterStemmer
 import epic.ontonotes.DSpan
 
 /**

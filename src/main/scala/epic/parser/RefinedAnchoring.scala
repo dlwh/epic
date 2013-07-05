@@ -14,7 +14,7 @@ package epic.parser
  See the License for the specific language governing permissions and
  limitations under the License.
 */
-import breeze.inference.Factor
+import nak.inference.Factor
 import epic.lexicon.Lexicon
 import epic.constraints.ChartConstraints
 

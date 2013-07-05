@@ -1,7 +1,7 @@
 package epic.everything
 
 import breeze.util.{Encoder, Index}
-import breeze.inference.bp.Variable
+import nak.inference.bp.Variable
 
 /**
  * Basically just a multinomial valued property. Entities

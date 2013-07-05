@@ -2,7 +2,7 @@ package epic.coref
 import epic.framework._
 import breeze.util.Index
 import breeze.linalg._
-import breeze.inference.bp.{BeliefPropagation, Factor, Variable}
+import nak.inference.bp.{BeliefPropagation, Factor, Variable}
 import collection.mutable.ArrayBuffer
 import collection.immutable.BitSet
 
@@ -79,7 +79,7 @@ class PropCorefInference(index: Index[Feature],
 
     val flattenedProp = propertyVariables.flatten.filter(_ ne null)
 
-    val model = new breeze.inference.bp.Model(assignmentVariables ++ flattenedProp, assignmentFactors ++ agreementFactors)
+    val model = new nak.inference.bp.Model(assignmentVariables ++ flattenedProp, assignmentFactors ++ agreementFactors)
     val bp = BeliefPropagation.infer(model)
 
     new PropCoref.Marginal(bp, agreementFactors, assignmentFactors, bp.logPartition)
@@ -112,7 +112,7 @@ class PropCorefInference(index: Index[Feature],
 
     val flattenedProp = propertyVariables.flatten.filter( _ ne null)
 
-    val model = new breeze.inference.bp.Model(assignmentVariables ++ flattenedProp, assignmentFactors ++ agreementFactors)
+    val model = new nak.inference.bp.Model(assignmentVariables ++ flattenedProp, assignmentFactors ++ agreementFactors)
     val bp = BeliefPropagation.infer(model)
 
     new Marginal(bp, agreementFactors, assignmentFactors, bp.logPartition)

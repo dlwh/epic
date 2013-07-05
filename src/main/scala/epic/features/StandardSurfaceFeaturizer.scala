@@ -5,7 +5,7 @@ import breeze.linalg.Counter
 import breeze.util.{Encoder, Interner, Index}
 import scala.Array
 import epic.parser.features.{PairFeature, IndicatorFeature}
-import breeze.text.analyze.{WordShapeGenerator, EnglishWordClassGenerator}
+import chalk.text.analyze.{WordShapeGenerator, EnglishWordClassGenerator}
 import scala.collection.mutable.ArrayBuffer
 import epic.parser.features.StandardSpanFeatures._
 import epic.features.FeaturizationLevel.{FullFeatures, BasicFeatures, MinimalFeatures}

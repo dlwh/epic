@@ -1,6 +1,6 @@
 package epic.ontonotes
 
-import breeze.data.Example
+import nak.data.Example
 import epic.trees.{AnnotatedLabel, Tree}
 
 

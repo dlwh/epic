@@ -18,7 +18,7 @@ package epic.features
 import epic.framework.Feature
 import breeze.linalg._
 import collection.mutable.ArrayBuffer
-import breeze.text.analyze.{WordShapeGenerator, EnglishWordClassGenerator}
+import chalk.text.analyze.{WordShapeGenerator, EnglishWordClassGenerator}
 import epic.parser.features.IndicatorFeature
 import java.text.NumberFormat
 import java.util.Locale

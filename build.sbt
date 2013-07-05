@@ -16,10 +16,12 @@ resolvers ++= Seq(
 
 libraryDependencies ++= Seq(
   "junit" % "junit" % "4.5" % "test",
-  "org.scalanlp" %% "breeze-core" % "0.3-SNAPSHOT",
-  "org.scalanlp" %% "breeze-math" % "0.3-SNAPSHOT",
-  "org.scalanlp" %% "breeze-process" % "0.3-SNAPSHOT",
-  "org.scalanlp" %% "breeze-learn" % "0.3-SNAPSHOT",
+  "org.scalanlp" %% "breeze-core" % "0.4-SNAPSHOT",
+  "org.scalanlp" %% "breeze-math" % "0.4-SNAPSHOT",
+  "org.scalanlp" % "chalk" % "1.2.1-SNAPSHOT",
+  "org.scalanlp" % "nak" % "1.2.0-SNAPSHOT",
+  //"org.scalanlp" %% "breeze-process" % "0.3-SNAPSHOT",
+  //"org.scalanlp" %% "breeze-learn" % "0.3-SNAPSHOT",
   "org.mapdb" % "mapdb" % "0.9.2"
 )
 

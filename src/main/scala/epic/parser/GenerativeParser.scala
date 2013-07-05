@@ -20,7 +20,7 @@ import epic.trees._
 
 import annotations.{AddMarkovization, PipelineAnnotator, FilterAnnotations, TreeAnnotator}
 import breeze.linalg.{Axis, Counter2}
-import breeze.text.analyze.EnglishWordClassGenerator
+import chalk.text.analyze.EnglishWordClassGenerator
 import breeze.config.Help
 import epic.parser.ParserParams.XbarGrammar
 import epic.lexicon.{SimpleTagScorer, MaxEntTagScorer, Lexicon, SimpleLexicon}

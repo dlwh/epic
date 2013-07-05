@@ -14,8 +14,9 @@ package epic.trees
  See the License for the specific language governing permissions and
  limitations under the License.
 */
-import breeze.data.Example
+
 import epic.sequences.TaggedSequence
+import nak.data.Example
 
 case class TreeInstance[L, +W](id: String,
                                tree: BinarizedTree[L],

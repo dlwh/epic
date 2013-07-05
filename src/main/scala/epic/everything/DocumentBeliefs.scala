@@ -2,7 +2,7 @@ package epic.everything
 
 import breeze.util.{OptionIndex, DenseIntIndex, Encoder, Index}
 import breeze.collection.mutable.TriangularArray
-import breeze.inference.Factor
+import nak.inference.Factor
 import breeze.linalg._
 import breeze.linalg.NumericOps.Arrays._
 import epic.trees.{Span, AnnotatedLabel}

@@ -7,8 +7,8 @@ import collection.mutable.ArrayBuffer
 import breeze.linalg.DenseVector
 import epic.framework.ModelObjective
 import breeze.optimize._
-import breeze.corpora.CONLLSequenceReader
-import breeze.data.Example
+import chalk.corpora.CONLLSequenceReader
+import nak.data.Example
 import breeze.util.Encoder
 import epic.trees.Span
 import breeze.optimize.FirstOrderMinimizer.OptParams

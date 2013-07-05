@@ -17,7 +17,7 @@ package epic.framework
 */
 import breeze.linalg._
 import collection.mutable.ArrayBuffer
-import breeze.inference.Factor
+import nak.inference.Factor
 import breeze.util._
 import epic.util.CacheBroker
 

@@ -5,7 +5,7 @@ import epic.framework.Feature
 import epic.features.FeaturizationLevel.{FullFeatures, BasicFeatures, MinimalFeatures}
 import breeze.util.{Encoder, Interner, Index}
 import epic.parser.features.IndicatorFeature
-import breeze.text.analyze.{WordShapeGenerator, EnglishWordClassGenerator}
+import chalk.text.analyze.{WordShapeGenerator, EnglishWordClassGenerator}
 
 /**
  * TODO

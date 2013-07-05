@@ -1,7 +1,7 @@
 package epic.everything
 
 import breeze.linalg._
-import breeze.inference.Factor
+import nak.inference.Factor
 import breeze.util.Index
 
 /**
