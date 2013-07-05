@@ -1,4 +1,4 @@
-package breeze.cluster
+package chalk.topics
 
 import breeze.linalg._
 import breeze.numerics._

@@ -1,4 +1,4 @@
-package breeze.config;
+package chalk.config;
 
 import java.lang.annotation.Retention;
 

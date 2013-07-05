@@ -1,4 +1,4 @@
-package breeze.text
+package chalk.text
 
 import chalk.text.analyze.{EnglishWordClassGenerator, Analyzer, PorterStemmer, Stemmer}
 import chalk.text.segment.{JavaSentenceSegmenter, SentenceSegmenter}
