@@ -9,10 +9,6 @@ import scala.collection.mutable
  * @author dlwh
  */
 package object epic {
-  type HasSpanConstraints[T] = Has[SpanConstraints]#R[T]
-  type HasWords[T] = Has[IndexedSeq[String]]#R[T]
-  def iCanHas[WhatIHave]:Has[WhatIHave] = new Has[WhatIHave]{}
-
 
 
   implicit class AwesomeBitSet(val bs: java.util.BitSet) extends AnyVal {
