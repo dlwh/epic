@@ -49,7 +49,7 @@ class ModelObjective[Datum](val model: Model[Datum],
       model.cacheFeatureWeights(x)
       val writeLength = System.currentTimeMillis() - timeIn
       nextSave = math.max(writeLength * 20, 5L * 20 * 1000)// don't spend more than 5% of our time caching weights
-      logger.info(f"Saving took ${writeLength/1000.0}%.2fs. Will write again in ${nextSave/1000.0}%fs")
+      logger.info(f"Saving took ${writeLength/1000.0}%.2fs. Will write again in ${nextSave/1000.0}%.0fs")
       timeSinceLastWrite = 0
     }
     val inference = inferenceFromWeights(x)

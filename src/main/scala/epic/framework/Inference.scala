@@ -97,9 +97,7 @@ trait Inference[Datum] extends Serializable {
    */
   def expectedCounts(datum: Datum, accum: ExpectedCounts, scale: Double) = {
     val result1 = guessCounts(datum, accum, scale)
-    result1
     goldCounts(datum, result1, -scale)
-//    goldCounts(datum, accum, -scale)
   }
 }
 

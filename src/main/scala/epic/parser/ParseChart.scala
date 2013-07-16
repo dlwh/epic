@@ -50,24 +50,12 @@ class ParseChart[L](val index: Index[L],
     // fill in arrays for spans we might touch
     val score: TriangularArray[Array[Array[Double]]] = TriangularArray.tabulate(length+1){(begin, end) =>
       if(sparsity.isAllowedSpan(begin, end)) {
-        new Array[Array[Double]](index.size)
+        makeGrammarScoreArray(begin, end)
       } else {
         null
       }
     }
 
-    // now fill in components of touch spans
-    for(b <- 0 until length; e <- b to length) {
-      val arr = score(b, e)
-      if(arr != null) {
-        var l = 0
-        while(l < grammarSize) {
-          if(constraints.isAllowedLabeledSpan(b, e, l))
-            arr(l) = mkGrammarVector(refinementsFor(l), zero)
-          l += 1
-        }
-      }
-    }
 
 
     /** (begin,end) -> which labels are on */
@@ -150,7 +138,7 @@ class ParseChart[L](val index: Index[L],
     }
 
 
-    def enter(begin: Int, end: Int, parent: Int, ref: Int, w: Double) {
+    def enter(begin: Int, end: Int, parent: Int, ref: Int, w: Double): Unit = {
       val oldScore =  rawEnter(begin, end, parent, ref, w)
 
       if(oldScore == zero) {
@@ -162,7 +150,7 @@ class ParseChart[L](val index: Index[L],
    /**
      * Updates the extent arrays for a given set of refinements
      */
-    private def updateExtents(index: Int, parent: Int, ref: Int, begin: Int, end: Int) {
+    private def updateExtents(index: Int, parent: Int, ref: Int, begin: Int, end: Int): Unit = {
       enteredLabels(index) += parent
       enteredRefinements(index)(parent) += ref
 
@@ -178,29 +166,16 @@ class ParseChart[L](val index: Index[L],
     }
 
     /** right most place a constituent with label l can begin and end at position i, for right > i. (begin)(sym)(ref) */
-    val rightMostBeginForEnd: Array[Array[Array[Int]]] = Array.tabulate(length+1, grammarSize){ (i, l) =>
-      val arr = new Array[Int](refinementsFor(l))
-      Arrays.fill(arr, -1)
-      arr
-    }
+    val rightMostBeginForEnd: Array[Array[Array[Int]]] = ParseChart.makeRefinedExtentArray(length+1, refinementsFor, -1)
+
     /** left most place a constituent with label l can begin and end at position i, for left < i. (begin)(sym)(ref) */
-    val leftMostBeginForEnd = Array.tabulate[Array[Int]](length+1, grammarSize){ (i, l) =>
-      val arr = new Array[Int](refinementsFor(l))
-      Arrays.fill(arr, length + 1)
-      arr
-    }
+    val leftMostBeginForEnd = ParseChart.makeRefinedExtentArray(length+1, refinementsFor, length+1)
+
     /** left most place a constituent with label l--which starts at position i--can end. (end)(sym)(ref) */
-    val leftMostEndForBegin = Array.tabulate[Array[Int]](length+1, grammarSize){ (i, l) =>
-      val arr = new Array[Int](refinementsFor(l))
-      Arrays.fill(arr, length + 1)
-      arr
-    }
+    val leftMostEndForBegin = ParseChart.makeRefinedExtentArray(length+1, refinementsFor, length+1)
+
     /** right-most place a constituent with label l--which starts at position i--can end. (end)(sym)(ref) */
-    val rightMostEndForBegin = Array.tabulate[Array[Int]](length+1, grammarSize) { (i, l) =>
-      val arr = new Array[Int](refinementsFor(l))
-      Arrays.fill(arr, -1)
-      arr
-    }
+    val rightMostEndForBegin = ParseChart.makeRefinedExtentArray(length+1, refinementsFor, -1)
 
     /** right most place a left constituent with label l can begin and end at position i. (begin)(sym) */
     val coarseRightMostBeginForEnd = makeCoarseExtentArray(-1)
@@ -230,7 +205,19 @@ class ParseChart[L](val index: Index[L],
     private def makeCoarseExtentArray(value: Int) = {
       val arr = Array.ofDim[Int](length + 1, grammarSize)
       for(arr1 <- arr) {
-        Arrays.fill(arr1, value)
+        util.Arrays.fill(arr1, value)
+      }
+      arr
+    }
+
+
+    private def makeGrammarScoreArray(begin: Int, end: Int): Array[Array[Double]] = {
+      val arr = new Array[Array[Double]](index.size)
+      var l = 0
+      while (l < grammarSize) {
+        if (constraints.isAllowedLabeledSpan(begin, end, l))
+          arr(l) = mkGrammarVector(refinementsFor(l), zero)
+        l += 1
       }
       arr
     }
@@ -243,6 +230,8 @@ class ParseChart[L](val index: Index[L],
 
 
 object ParseChart {
+
+
 
   def apply[L](g: Index[L], refinements: Array[Int], length: Int) = logProb(g, refinements, length)
 
@@ -288,7 +277,24 @@ object ParseChart {
   }
 
 
+  private def makeRefinedExtentArray(len: Int, refinementsFor: Array[Int], fillValue: Int): Array[Array[Array[Int]]] = {
+    val arr = Array.ofDim[Array[Int]](len, refinementsFor.length)
+    var pos = 0
+    while (pos < len) {
+      var l = 0
+      while(l < refinementsFor.length) {
+        val myArr = new Array[Int](refinementsFor(l))
+        util.Arrays.fill(myArr, fillValue)
+        arr(pos)(l) = myArr
+        l += 1
+      }
 
+      pos += 1
+    }
+
+
+    arr
+  }
 }
 
 
