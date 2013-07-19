@@ -81,7 +81,7 @@ object PropertyModels {
     val synp = syntaxPacket(beliefsFactory.optionLabelProp.index)
     val govp = governorPacket()
 
-    PropertyPropagation.packetModel(beliefsFactory, nerp, IndexedSeq(synp, govp))
+    PropertyPropagation.packetModel(beliefsFactory, nerp, IndexedSeq(synp)) //, IndexedSeq(synp, govp))
   }
 
   def srlSyntaxModel(fs: FeaturizedDocument.Factory, beliefsFactory: SentenceBeliefs.Factory):PropertyPropagation.Model[_, _] = {

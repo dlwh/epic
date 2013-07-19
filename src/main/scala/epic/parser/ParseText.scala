@@ -5,7 +5,7 @@ import breeze.config.{Help, CommandLineParser}
 import breeze.util._
 import epic.trees.AnnotatedLabel
 import io.{Codec, Source}
-import breeze.text.LanguagePack
+import chalk.text.LanguagePack
 
 /**
  * Simple class that reads in a bunch of files and parses them. Output is dumped to standard out.

@@ -20,7 +20,10 @@ final case class Beliefs[T](property: Property[T], beliefs: DenseVector[Double])
    * @param newBeliefs
    * @return
    */
-  def updated(newBeliefs: DenseVector[Double]) = Beliefs(property, Beliefs.ensureZeroConsistency(beliefs, newBeliefs))
+  def updated(newBeliefs: DenseVector[Double]) = {
+    assert(newBeliefs.length == beliefs.length, "Length of beliefs changes!")
+    Beliefs(property, Beliefs.ensureZeroConsistency(beliefs, newBeliefs))
+  }
 
   def *(f: Beliefs[T]): Beliefs[T] = {
     if (beliefs eq null) f
@@ -100,12 +103,7 @@ object Beliefs {
     var i = 0
     val beliefs = DenseVector.zeros[Double](a.length)
     while(i < beliefs.length) {
-      val result =  if (a(i) == 0.0 && b(i) != 0.0) {
-        0.0
-      } else if (a(i) != 0.0 && b(i) == 0.0) {
-//        println("WTF?" + " " + a(i) + " " + b(i))
-        a(i)
-      } else if (a(i) == 0.0 && b(i) == 0.0) {
+      val result =  if (a(i) == 0.0 || b(i) == 0.0) {
         0.0
       } else {
         a(i) / b(i)
@@ -118,6 +116,8 @@ object Beliefs {
   }
 
   private def ensureZeroConsistency(oldBeliefs: DenseVector[Double], newBeliefs: DenseVector[Double]) = {
+    newBeliefs
+    /*
     var i = 0
     var changed = false
     while(i < newBeliefs.length) {
@@ -129,5 +129,6 @@ object Beliefs {
     }
     if(changed) normalize(newBeliefs, 1)
     else newBeliefs
+    */
   }
 }

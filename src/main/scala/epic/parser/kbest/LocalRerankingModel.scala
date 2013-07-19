@@ -15,96 +15,10 @@ package epic.parser.kbest
  See the License for the specific language governing permissions and
  limitations under the License.
 */
-import epic.framework._
 import epic.parser._
 import breeze.linalg._
-import epic.trees.AnnotatedLabel
-import epic.parser.models._
 import breeze.numerics._
-import breeze.util._
-import java.io.File
-import epic.util.CacheBroker
-import epic.trees.annotations._
-import epic.parser.projections.ConstraintCoreGrammarAdaptor
-import epic.lexicon.Lexicon
-import epic.constraints.ChartConstraints.Factory
-import epic.trees.TreeInstance
-import epic.trees.annotations.FilterAnnotations
-import epic.trees.annotations.PipelineAnnotator
 
-case class LocalRerankingParserModelFactory(modelFactory: ParserModelFactory[AnnotatedLabel, String],
-                                            k: Int = 200,
-                                            baseAnnotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = PipelineAnnotator(Seq(FilterAnnotations(),AddMarkovization())),
-                                            parser: File = null) extends ParserModelFactory[AnnotatedLabel, String] {
-  type MyModel = LocalRerankingModel[AnnotatedLabel, String]
-  def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]], constrainer: Factory[AnnotatedLabel, String])(implicit broker: CacheBroker):MyModel = {
-    val initialParser = parser match {
-      case null =>
-        GenerativeParser.fromTrees(trainTrees)
-      case f =>
-        readObject[SimpleChartParser[AnnotatedLabel, String]](f)
-    }
-
-    val kbest = {
-      val constraints = new ConstraintCoreGrammarAdaptor(initialParser.grammar, initialParser.lexicon,  constrainer)
-      KBestParser.cached(KBestParser(AugmentedGrammar(initialParser.augmentedGrammar.refined, constraints)))
-    }
-
-    new LocalRerankingModel(modelFactory.make(trainTrees, constrainer), kbest, k)
-  }
-}
-
-class LocalRerankingModel[L, W](val model: ParserModel[L, W],
-                                kbest: KBestParser[L, W], k: Int = 200) extends ParserModel[L, W] {
-  type Inference = LocalRerankingInference[L, W]
-
-
-  def baseGrammar: BaseGrammar[L] = model.baseGrammar
-
-  def lexicon: Lexicon[L, W] = model.lexicon
-
-
-
-  /**
-   * Models have features, and this defines the mapping from indices in the weight vector to features.
-   * @return
-   */
-  def featureIndex: Index[Feature] = model.featureIndex
-
-  def initialValueForFeature(f: Feature): Double = model.initialValueForFeature(f)
-
-  def inferenceFromWeights(weights: DenseVector[Double]): Inference =  {
-    val inf = model.inferenceFromWeights(weights)
-    new LocalRerankingInference[L, W](inf, kbest, k)
-  }
-
-  def expectedCountsToObjective(ecounts: ExpectedCounts): (Double, DenseVector[Double]) = {
-    model.expectedCountsToObjective(ecounts)
-  }
-
-
-}
-
-class LocalRerankingInference[L, W](val inf: ParserInference[L, W], val kbest: KBestParser[L, W], val k: Int) extends ParserInference[L, W] {
-
-
-  def baseMeasure: CoreGrammar[L, W] = inf.baseMeasure
-
-  def grammar: RefinedGrammar[L, W] = inf.grammar
-  def featurizer: RefinedFeaturizer[L, W, Feature] = inf.featurizer
-
-
-  def goldMarginal(v: TreeInstance[L, W], aug: CoreAnchoring[L, W]) = {
-    inf.goldMarginal(v, aug)
-  }
-
-
-  override def marginal(v: TreeInstance[L, W], aug: CoreAnchoring[L, W]): ParseMarginal[L, W] = {
-    val marg = kbest.bestKParses(v.words, k).map{ case (t,_ ) => inf.goldMarginal(TreeInstance("",t, v.words))}
-    KBestListMarginal(marg.head.anchoring, marg)
-  }
-
-}
 
 case class KBestListMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
                                    marginals: IndexedSeq[ParseMarginal[L, W]]) extends ParseMarginal[L, W] {

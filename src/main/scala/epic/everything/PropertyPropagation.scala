@@ -233,7 +233,7 @@ object PropertyPropagation {
           }
           val partition = softmax(centralMarginal)
           logPartition += partition
-          assert(!partition.isInfinite, f"$partition%.3E $b1 $potentials")
+          assert(!partition.isInfinite, f"$partition%.3E $b1 $potentials ($begin, $end, ${sentence.length}) $sentence")
           assert(!partition.isNaN, f"$partition%.3E $b1 $potentials")
           potentials.foreach(m => edgeMarginal(m, centralMarginal))
           val edgeMarginals:IndexedSeq[DenseMatrix[Double]] = potentials

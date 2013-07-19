@@ -8,7 +8,7 @@ import epic.parser.models._
 import epic.framework._
 import models.LexGrammarBundle
 import breeze.util.{Encoder, OptionIndex, Index}
-import epic.parser.projections.{ReachabilityProjection, LexGovernorProjector}
+import epic.parser.projections.LexGovernorProjector
 import breeze.collection.mutable.TriangularArray
 import epic.lexicon.Lexicon
 
@@ -38,15 +38,13 @@ object SentLexParser {
       (ecounts.loss, ecounts.counts)
     }
 
-    private val reachable = new ReachabilityProjection(bundle.baseGrammar, bundle.baseLexicon)
 
     def inferenceFromWeights(weights: DenseVector[Double]) = {
       val gram = bundle.makeGrammar(indexed, weights)
       def ann(fs: FeaturizedSentence):BinarizedTree[(L, Int)] = {
         val reannotated = reannotate(fs.tree, fs.words)
 
-        val patched = reachable.forTree(reannotated, fs.words, fs.constituentSparsity)
-        val headed = bundle.headFinder.annotateHeadIndices(patched)
+        val headed = bundle.headFinder.annotateHeadIndices(fs.tree)
         headed
 
       }
@@ -182,6 +180,7 @@ object SentLexParser {
     // in the actual parse. So instead, we premultiply by \prod_{all spans} p(not span)
     // and then we divide out p(not span) for spans in the tree.
 
+    /*
     for(i <- 0 until words.length){
       val indices = beliefs.wordBeliefs(i).governor.beliefs.findAll(x => x * (1-x) > 1E-5)
       if(indices.nonEmpty) println(i +" " + beliefs.wordBeliefs(i).governor + " " + indices)
@@ -194,6 +193,7 @@ object SentLexParser {
         if(indices.nonEmpty) println((i,j) + "  " + beliefs.spanBeliefs(i,j).governor + " " + indices)
       }
     }
+    */
 
     // Also note that this code and the Visitor in LexGovernorProjector are basically
     // duals of one another. IF you change one you should change the other.
@@ -261,7 +261,7 @@ object SentLexParser {
         } else {
           math.log(depScore * sGovScore / notASpan  *   sMax) + math.log(sSelfHeadScore/headSpanNotSpan)
         }
-        assert(cached.abs < 1E-4 || cached == Double.NegativeInfinity, cached)
+       // assert(cached.abs < 1E-4 || cached == Double.NegativeInfinity, cached)
         assert(!java.lang.Double.isNaN(cached))
         attachCache(dep)(head) = cached
       }

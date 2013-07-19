@@ -3,7 +3,7 @@ package everything
 
 import java.io.File
 import epic.trees._
-import epic.parser.{ParseEval, GenerativeParser, ParserParams}
+import epic.parser.{BaseGrammar, ParseEval, GenerativeParser, ParserParams}
 import epic.parser.ParserParams.XbarGrammar
 import breeze.config.{Help, CommandLineParser}
 import epic.ontonotes.{NERType, ConllOntoReader, Document}
@@ -11,14 +11,11 @@ import breeze.linalg._
 import epic.framework._
 import breeze.optimize._
 import breeze.util.{Index, Encoder}
-import epic.parser.projections.ParserChartConstraintsFactory
-import epic.trees.annotations.{AddMarkovization, StripAnnotations, PipelineAnnotator}
-import epic.parser.models.IndexedLexFeaturizer
+import epic.parser.projections.{GrammarRefinements, ParserChartConstraintsFactory}
+import epic.parser.models._
 import epic.trees.ProcessedTreebank
-import epic.parser.features.RuleFeature
-import epic.parser.models.StandardLexFeaturizer
+import epic.parser.features.{LabelFeature, RuleFeature}
 import breeze.optimize.FirstOrderMinimizer.OptParams
-import epic.parser.models.LexGrammarBundle
 import collection.mutable.ArrayBuffer
 import collection.immutable
 import epic.lexicon.SimpleLexicon
@@ -29,14 +26,19 @@ import java.util.concurrent.atomic.AtomicInteger
 import com.typesafe.scalalogging.log4j.Logging
 import breeze.stats.distributions.{RandBasis, Rand}
 import breeze.stats.random.MersenneTwister
-import epic.parser.models.StandardLexFeaturizer
 import epic.trees.ProcessedTreebank
-import epic.trees.annotations.StripAnnotations
+import epic.trees.TreeInstance
+import breeze.optimize.FirstOrderMinimizer.OptParams
+import epic.trees.annotations.AddMarkovization
+import epic.trees.annotations.PipelineAnnotator
+import epic.parser.models.StandardLexFeaturizer
 import epic.parser.features.RuleFeature
 import epic.trees.TreeInstance
 import scala.Some
+import epic.parser.features.LabelFeature
+import epic.trees.ProcessedTreebank
 import breeze.optimize.FirstOrderMinimizer.OptParams
-import epic.trees.annotations.AddMarkovization
+import epic.trees.annotations._
 import epic.ontonotes.Document
 import epic.parser.models.LexGrammarBundle
 import epic.trees.annotations.PipelineAnnotator
@@ -62,6 +64,7 @@ object AnnotatingPipeline extends Logging {
                     includeParsing: Boolean = true,
                     includeNER: Boolean = true,
                     lexHashFeatures: Double = 2.0,
+                    actuallyTieModels: Boolean = true,
                     @Help(text="For optimizing the base models")
                     baseOpt: OptParams,
                     @Help(text="For optimizing the joint model")
@@ -108,8 +111,10 @@ object AnnotatingPipeline extends Logging {
     type Augment = SentenceBeliefs
     type CompatibleModel = EvaluableModel[Datum] { type Inference <: ProjectableInference[Datum, Augment] with AnnotatingInference[Datum]}
     val models = ArrayBuffer[CompatibleModel]()
+    //if (params.includeParsing)
+     //models += makeLexParserModel(beliefsFactory, docProcessor, processedTrain, weightsCache, params.lexHashFeatures)
     if (params.includeParsing)
-     models += makeLexParserModel(beliefsFactory, docProcessor, processedTrain, weightsCache, params.lexHashFeatures)
+      models += makeSimpleParserModel(beliefsFactory, docProcessor, processedTrain, weightsCache)
     if (params.includeNER)
        models += makeNERModel(beliefsFactory, docProcessor, processedTrain, weightsCache)
     if (params.includeSRL)
@@ -132,7 +137,7 @@ object AnnotatingPipeline extends Logging {
       logger.info("Training base models")
       for(m <- models) {
         logger.info("Training " + m.getClass.getName)
-        val obj = new ModelObjective(m, processedTrain.flatMap(_.sentences).filter(_.words.filter(_(0).isLetterOrDigit).length <= 40), params.nthreads)
+        val obj = new ModelObjective(m, processedTrain.flatMap(_.sentences).filter(_.words.count(_(0).isLetterOrDigit) <= 40), params.nthreads)
         val cachedObj = new CachedBatchDiffFunction(obj)
         val weights = params.baseOpt.minimize(cachedObj, obj.initialWeightVector(randomize = false))
         updateWeights(params.weightsCache, weightsCache, Encoder.fromIndex(m.featureIndex).decode(weights))
@@ -145,25 +150,28 @@ object AnnotatingPipeline extends Logging {
 
     val allModels = ArrayBuffer[EPModel.CompatibleModel[FeaturizedSentence, SentenceBeliefs]](models:_*)
 
-    if(params.includeNER && params.includeParsing) {
-      allModels += PropertyModels.nerSyntaxModel(docProcessor, beliefsFactory)
-    }
+    if(params.actuallyTieModels) {
 
-    if(params.includeSRL && params.includeParsing) {
-      allModels += PropertyModels.srlSyntaxModel(docProcessor, beliefsFactory)
-    }
+      if(params.includeNER && params.includeParsing) {
+        allModels += PropertyModels.nerSyntaxModel(docProcessor, beliefsFactory)
+      }
 
-    if(params.includeSRL && params.includeNER) {
-      allModels += PropertyModels.srlNerModel(docProcessor, beliefsFactory)
+      if(params.includeSRL && params.includeParsing) {
+        allModels += PropertyModels.srlSyntaxModel(docProcessor, beliefsFactory)
+      }
+
+      if(params.includeSRL && params.includeNER) {
+        allModels += PropertyModels.srlNerModel(docProcessor, beliefsFactory)
+      }
     }
 
     // the big model!
     val epModel = new EPModel[FeaturizedSentence, SentenceBeliefs](4, epInGold = true, initFeatureValue = {f => Some(weightsCache(f.toString)).filter(_ != 0.0)})(
-      allModels: _*
+      (models ++ allModels): _*
     )
 
 
-    val obj = new ModelObjective(epModel, processedTrain.flatMap(_.sentences).filter(_.words.filter(_(0).isLetterOrDigit).length <= 40), params.nthreads)
+    val obj = new ModelObjective(epModel, processedTrain.flatMap(_.sentences).filter(_.words.count(_(0).isLetterOrDigit) <= 40), params.nthreads)
     val cachedObj = new CachedBatchDiffFunction(obj)
 
     if (params.checkGradient) {
@@ -252,12 +260,15 @@ object AnnotatingPipeline extends Logging {
     logger.info("Building constraints")
     val count = new AtomicInteger(0)
     trainTrees.par.foreach{t =>
-      parseConstrainer.constraints(t.words)
+      val cons = parseConstrainer.constraints(t.words)
+      assert(cons.top.isAllowedLabeledSpan(0, t.words.length, pruningParser.grammar.rootIndex), s"No parse for $t??? ")
       val c = count.incrementAndGet()
       if(c % 100 == 0 || c == trainTrees.length)
         logger.info(s"$c/${trainTrees.length} sentences parsed.")
     }
     broker.commit()
+
+
 
 
     val standardFeaturizer = new StandardSurfaceFeaturizer(sum(nerCounts, Axis._0))
@@ -323,14 +334,53 @@ object AnnotatingPipeline extends Logging {
     new SentLexParser.Model(beliefsFactory, bundle, reannotate, indexed, {(f: Feature) => Some(weightsCache(f.toString))})
   }
 
+  def makeSimpleParserModel(beliefsFactory: SentenceBeliefs.Factory,
+                         docProcessor: FeaturizedDocument.Factory,
+                         train: IndexedSeq[FeaturizedDocument],
+                         weightsCache: Counter[String, Double]): LiftedParser.Model = {
+    val trainTrees = train.flatMap(_.sentences).map(_.treeInstance)
+    val trees = trainTrees.map(StripAnnotations())
+    val (initLexicon, initBinaries, initUnaries) = GenerativeParser.extractCounts(trees)
+
+    val annTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]] = trees
+    val (annLexicon, annBinaries, annUnaries) = GenerativeParser.extractCounts(annTrees)
+    val refGrammar = BaseGrammar(AnnotatedLabel.TOP, annBinaries, annUnaries)
+
+    val (xbarGrammar, xbarLexicon) = docProcessor.grammar -> docProcessor.lexicon
+    val summedCounts = sum(initLexicon, Axis._0)
+
+    val indexedRefinements = GrammarRefinements(xbarGrammar, refGrammar, (_: AnnotatedLabel).baseAnnotatedLabel)
+
+    def labelFeatures(ann: AnnotatedLabel) = Array[Feature](LabelFeature(ann))
+    def ruleFeatures(ann: Rule[AnnotatedLabel]) = Array[Feature](RuleFeature(ann))
+
+
+    val surface = docProcessor.featurizer
+    val feat = new StandardSpanFeaturizer[AnnotatedLabel, String](
+      refGrammar,
+      labelFeatures _, ruleFeatures _)
+
+
+    val indexed =  IndexedSpanFeaturizer.extract[AnnotatedLabel, AnnotatedLabel, String](feat,
+      surface,
+      StripAnnotations(),
+      indexedRefinements,
+      xbarGrammar,
+      HashFeature.Relative(1.0),
+      trees)
+
+    val constrainer = docProcessor.parseConstrainer
+
+
+    val spanModel = new SpanModel[AnnotatedLabel, AnnotatedLabel, String](indexed, indexed.index, StripAnnotations(), constrainer, xbarGrammar, xbarLexicon, refGrammar, indexedRefinements, {(x: Feature) => weightsCache.get(x.toString)})
+    new LiftedParser.Model(beliefsFactory, spanModel)
+  }
+
 
   private def updateWeights(out: File, weightsCache: Counter[String, Double], newWeights: Counter[Feature, Double]) {
     for ( (f,w) <- newWeights.activeIterator) {
       weightsCache(f.toString) = w
     }
-//    if(out.exists()) {
-//     .copy(out, new File(out.toString +".backup"))
-//    }
     breeze.util.writeObject(out, weightsCache)
   }
 

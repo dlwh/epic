@@ -13,6 +13,7 @@ import epic.constraints.{ChartConstraints, LabeledSpanConstraints}
 import epic.features.{FeaturizationLevel, SurfaceFeaturizer, IndexedSurfaceAnchoring, IndexedSurfaceFeaturizer}
 import epic.util.CacheBroker
 import scala.util.Try
+import epic.parser.projections.ReachabilityProjection
 
 /**
  * 
@@ -83,6 +84,7 @@ object FeaturizedDocument {
     val sentenceConstrainer = parseConstrainer | nerConstrainer
 
     val featurizer = IndexedSurfaceFeaturizer.fromData(feat, docs.flatMap(_.sentences.map(_.words)), sentenceConstrainer)
+    val reachable = new ReachabilityProjection(grammar, lexicon)
 
     val featurized = for( d <- docs) yield {
       val newSentences = for( s <- d.sentences) yield {
@@ -92,6 +94,8 @@ object FeaturizedDocument {
         val nerConstraints = nerConstrainer.get(s.words)
 
         val loc = featurizer.anchor(s.words)
+
+        tree = reachable.forTree(tree, s.words, constituentSparsity)
 
 
         FeaturizedSentence(s.index, s.words,

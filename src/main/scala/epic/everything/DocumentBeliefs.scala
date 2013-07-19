@@ -41,14 +41,14 @@ case class DocumentBeliefs(sentences: Array[SentenceBeliefs]) extends Factor[Doc
   def isConvergedTo(f: DocumentBeliefs, diff: Double): Boolean = {
     if (f eq null) false
     else {
-      (0 until numSentences) forall { i => sentences(i).isConvergedTo(f.sentences(i), diff)}
+      (0 until numSentences).forall( i => sentences(i).isConvergedTo(f.sentences(i), diff) )
     }
   }
 
   def maxChange(f: DocumentBeliefs): Double = {
     if (f eq null) 0.0
     else {
-      (0 until numSentences) map { i => sentences(i).maxChange(f.sentences(i))} max
+      (0 until numSentences).map(i => sentences(i).maxChange(f.sentences(i))).max
     }
   }
 

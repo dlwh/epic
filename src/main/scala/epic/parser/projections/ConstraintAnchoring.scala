@@ -91,11 +91,11 @@ class ParserChartConstraintsFactory[L, W](val augmentedGrammar: AugmentedGrammar
     val labelThresholds = extractLabelThresholds(length,
       grammar.labelIndex.size,
       botLabelScores, grammar.labelIndex,
-      gold.isGoldBotTag(_, _, _))
+      gold.isGoldBotTag)
     val topLabelThresholds = extractLabelThresholds(length,
       grammar.labelIndex.size,
       unaryScores,grammar.labelIndex,
-      gold.isGoldTopTag(_, _, _))
+      gold.isGoldTopTag)
     if(topLabelThresholds(0,length) == null || !topLabelThresholds(0,length).contains(marg.grammar.rootIndex))
       throw new NoParseException("No score at the root!", marg.words)
 
