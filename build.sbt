@@ -4,7 +4,7 @@ version := "1.2.1-SNAPSHOT"
 
 organization := "org.scalanlp"
 
-scalaVersion := "2.10.1"
+scalaVersion := "2.10.2"
 
 crossPaths := false
 
