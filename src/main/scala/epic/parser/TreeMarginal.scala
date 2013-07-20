@@ -81,7 +81,7 @@ case class TreeMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
     }
   }
 
-
+  def isMaxMarginal: Boolean = true
 }
 
 object TreeMarginal {

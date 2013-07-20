@@ -77,7 +77,7 @@ class ParserChartConstraintsFactory[L, W](val augmentedGrammar: AugmentedGrammar
 
   def constraints(w: IndexedSeq[W]):ChartConstraints[L] = constraints(w, GoldTagPolicy.noGoldTags[L])
   def constraints(words: IndexedSeq[W], gold: GoldTagPolicy[L]):ChartConstraints[L] = {
-    val charts = ChartMarginal(augmentedGrammar.anchor(words), words, maxMarginal = true)
+    val charts = ChartMarginal(augmentedGrammar.anchor(words), maxMarginal = true)
     constraints(charts, gold)
   }
 
@@ -148,7 +148,7 @@ class ParserChartConstraintsFactory[L, W](val augmentedGrammar: AugmentedGrammar
   }
 
   def computePruningStatistics(words: IndexedSeq[W], gold: GoldTagPolicy[L]): (PruningStatistics, PruningStatistics) = {
-    val charts = ChartMarginal(augmentedGrammar.anchor(words), words)
+    val charts = ChartMarginal(augmentedGrammar.anchor(words))
     computePruningStatistics(charts, gold)
   }
 
@@ -312,7 +312,7 @@ object PrecacheConstraints extends Logging {
       val constraints = cache.getOrElseUpdate(ti.words, {
         located = false
         logger.info(s"Building constraints for ${ti.id} ${ti.words}")
-        marg = ChartMarginal(constrainer.augmentedGrammar.anchor(ti.words), ti.words)
+        marg = ChartMarginal(constrainer.augmentedGrammar.anchor(ti.words))
         constrainer.constraints(marg, GoldTagPolicy.goldTreeForcing[L](ti.tree.map{ l =>
           val i = constrainer.labelIndex(l)
           if (i < 0) {

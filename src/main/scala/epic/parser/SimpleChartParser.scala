@@ -39,7 +39,7 @@ class SimpleChartParser[L, W](val augmentedGrammar: AugmentedGrammar[L, W],
 
   def charts(w: IndexedSeq[W]) = {
    try {
-      val mm = ChartMarginal(augmentedGrammar.anchor(w), w, decoder.wantsMaxMarginal)
+      val mm = ChartMarginal(augmentedGrammar.anchor(w), decoder.wantsMaxMarginal)
       if (mm.logPartition.isInfinite)
         throw new Exception("infinite partition")
       mm

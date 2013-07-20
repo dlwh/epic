@@ -37,7 +37,7 @@ import com.typesafe.scalalogging.log4j.Logging
 final case class ChartMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
                                      inside: ParseChart[L], outside: ParseChart[L],
                                      logPartition: Double,
-                                     isMaxMarginal: Boolean) extends ParseMarginal[L, W] with SafeLogging {
+                                     override val isMaxMarginal: Boolean) extends ParseMarginal[L, W] with SafeLogging {
 
   def checkForTree(tree: BinarizedTree[(L, Int)]) = {
     for (t <- tree.allChildren) t match {
@@ -270,11 +270,11 @@ object ChartMarginal {
 
   def apply[L, W, Chart[X] <: ParseChart[X]](grammar: AugmentedGrammar[L, W],
                                              sent: IndexedSeq[W]): ChartMarginal[L, W] = {
-    apply(grammar.anchor(sent), sent)
+    apply(grammar.anchor(sent))
   }
 
-  def apply[L, W, Chart[X] <: ParseChart[X]](anchoring: AugmentedAnchoring[L, W],
-                                             sent: IndexedSeq[W], maxMarginal: Boolean = false): ChartMarginal[L, W] = {
+  def apply[L, W, Chart[X] <: ParseChart[X]](anchoring: AugmentedAnchoring[L, W], maxMarginal: Boolean = false): ChartMarginal[L, W] = {
+    val sent = anchoring.words
     val sum = if(maxMarginal) MaxSummer else LogSummer
     val (inside, spanScores) = buildInsideChart(anchoring, sent, sum)
     val logPartition = rootScore(anchoring, inside, sum)

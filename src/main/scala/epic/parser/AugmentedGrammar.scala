@@ -70,8 +70,8 @@ final case class AugmentedAnchoring[L, W](refined: RefinedAnchoring[L, W], core:
   def words = refined.words
 
   /** The marginal associated with this anchoring (i.e. inside and outside scores) */
-  def marginal = ChartMarginal(this, words)
-  def maxMarginal = ChartMarginal(this, words, maxMarginal = true)
+  def marginal = ChartMarginal.apply(this)
+  def maxMarginal = ChartMarginal.apply(this, maxMarginal = true)
 
   /**
    * Scores the [[epic.trees.BinaryRule]] with its refinement in this context.
@@ -133,7 +133,7 @@ object AugmentedAnchoring {
   }
 
 
-  def fromCore[L, W](core: CoreAnchoring[L, W]) = {
+  def fromCore[L, W](core: CoreAnchoring[L, W]): AugmentedAnchoring[L, W] = {
     AugmentedAnchoring(RefinedAnchoring.identity(core.grammar, core.lexicon, core.words), core)
   }
 }

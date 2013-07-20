@@ -58,13 +58,17 @@ class ViterbiDecoder[L, W] extends ChartDecoder[L, W] with Serializable with Saf
   override def wantsMaxMarginal: Boolean = true
 
   override def extractBestParse(marginal: ChartMarginal[L, W]): BinarizedTree[L] = {
-    assert(marginal.isMaxMarginal)
+    extractMaxDerivationParse(marginal).map(_._1)
+  }
+
+  def extractMaxDerivationParse(marginal: ChartMarginal[L, W]): BinarizedTree[(L, Int)] = {
+    assert(marginal.isMaxMarginal, "Viterbi only makes sense for max marginal marginals!")
     import marginal._
     val labelIndex = grammar.labelIndex
-    val rootIndex = (grammar.labelIndex(grammar.root))
+    val rootIndex = grammar.rootIndex
     val refined = anchoring.refined
 
-    def buildTreeUnary(begin: Int, end:Int, root: Int, rootRef: Int):BinarizedTree[L] = {
+    def buildTreeUnary(begin: Int, end:Int, root: Int, rootRef: Int):BinarizedTree[(L, Int)] = {
       var maxScore = Double.NegativeInfinity
       var maxChild = -1
       var maxChildRef = -1
@@ -90,10 +94,10 @@ class ViterbiDecoder[L, W] extends ChartDecoder[L, W] with Serializable with Saf
           s"entered things: " + inside.bot.enteredLabelScores(begin, end).map { case (i, v) => (i, v)}.toList, marginal.words)
       }
       val child = buildTree(begin, end, maxChild, maxChildRef)
-      UnaryTree(labelIndex.get(root), child, grammar.chain(maxRule), Span(begin, end))
+      UnaryTree(labelIndex.get(root) ->rootRef, child, grammar.chain(maxRule), Span(begin, end))
     }
 
-    def buildTree(begin: Int, end: Int, root: Int, rootRef: Int):BinarizedTree[L] = {
+    def buildTree(begin: Int, end: Int, root: Int, rootRef: Int):BinarizedTree[(L, Int)] = {
       var maxScore = Double.NegativeInfinity
       var maxLeft = -1
       var maxRight = -1
@@ -102,7 +106,7 @@ class ViterbiDecoder[L, W] extends ChartDecoder[L, W] with Serializable with Saf
       var maxSplit = -1
       var maxRule = -1
       if(begin +1 == end) {
-        return NullaryTree(labelIndex.get(root), Span(begin, end))
+        return NullaryTree(labelIndex.get(root) -> rootRef, Span(begin, end))
       }
 
       val spanScore = anchoring.scoreSpan(begin, end, root, rootRef)
@@ -139,7 +143,7 @@ class ViterbiDecoder[L, W] extends ChartDecoder[L, W] with Serializable with Saf
       } else {
         val lchild = buildTreeUnary(begin, maxSplit, maxLeft, maxLeftRef)
         val rchild = buildTreeUnary(maxSplit, end, maxRight, maxRightRef)
-        BinaryTree(labelIndex.get(root), lchild, rchild, Span(begin, end))
+        BinaryTree(labelIndex.get(root) -> rootRef, lchild, rchild, Span(begin, end))
       }
 
 

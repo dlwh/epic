@@ -23,6 +23,8 @@ import breeze.numerics._
 case class KBestListMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
                                    marginals: IndexedSeq[ParseMarginal[L, W]]) extends ParseMarginal[L, W] {
 
+  def isMaxMarginal: Boolean = false
+
   def this(marg: ParseMarginal[L, W]) = this(marg.anchoring, IndexedSeq(marg))
 
   val probsPerTree = DenseVector(marginals.map(_.logPartition):_*)

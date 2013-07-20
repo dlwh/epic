@@ -187,6 +187,11 @@ object SemiCRF {
 
   object Marginal {
 
+    def maxDerivationMarginal[L, W](scorer: Anchoring[L, W]):Marginal[L, W] = {
+      val maxDerivation: Segmentation[L, W] = viterbi(scorer)
+      goldMarginal(scorer,maxDerivation.label)
+    }
+
     def apply[L, W](scorer: Anchoring[L, W]):Marginal[L, W] = {
 
       val forwardScores: Array[Array[Double]] = this.forwardScores(scorer)

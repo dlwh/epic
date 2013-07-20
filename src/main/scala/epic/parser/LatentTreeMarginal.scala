@@ -34,6 +34,9 @@ case class LatentTreeMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
   private val stree = insideScores()
   outsideScores(stree)
 
+
+  def isMaxMarginal: Boolean = false
+
   private val z = stree.label.inside.sum
   val logPartition = Scaling.toLogSpace(z, stree.label.iscale)
 

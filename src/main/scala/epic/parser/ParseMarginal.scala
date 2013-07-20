@@ -34,6 +34,8 @@ trait ParseMarginal[L, W] extends VisitableMarginal[AnchoredVisitor[L]] {
   def words:IndexedSeq[W] = anchoring.words
   def length = words.length
 
+  def isMaxMarginal: Boolean
+
 
   def expectedRuleCounts: StandardExpectedCounts[Rule[L]] = {
     val featurizer = new RuleFeaturizer[L, W](grammar)
@@ -85,6 +87,12 @@ object ParseMarginal {
       }
     }
 
+  }
+
+  def maxDerivationMarginal[L, W](anch: AugmentedAnchoring[L, W]):ParseMarginal[L, W] = {
+    val maxM = ChartMarginal(anch, maxMarginal = true)
+    val parse = new ViterbiDecoder().extractMaxDerivationParse(maxM)
+    TreeMarginal(anch, parse)
   }
 
 }
