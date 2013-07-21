@@ -42,7 +42,7 @@ object AnalysisPipeline {
     val sentenceSegmenter = new SentenceSegmenter{}
     val tokenizer = new Tokenizer {}
     val pipeline = StringIdentityAnalyzer andThen sentenceSegmenter andThen tokenizer
-    val slab = pipeline(Slab(AnalysisEngine.text))
+    val slab = pipeline(Slab(AnalysisEngine.text1))
     // Notice that the last sentence (lacking EOS char) is missing.
     val sentences = slab.iterator[Sentence].toList
     println("\nSENTENCES\n\n" + sentences.map(_.in(slab).content).mkString("\n"))
