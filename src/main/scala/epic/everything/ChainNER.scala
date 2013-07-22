@@ -17,6 +17,7 @@ import epic.sequences.SegmentationModelFactory.IndexedStandardFeaturizer
 object ChainNER {
   class Model(factory: SentenceBeliefs.Factory,
               val baseModel: SemiCRFModel[NERType.Value, String],
+              maxMarginal: Boolean,
               weights: Feature=>Option[Double] = { (f:Feature) => None}) extends EvaluableModel[FeaturizedSentence] {
     type ExpectedCounts = StandardExpectedCounts[Feature]
     type Marginal = SemiCRF.Marginal[NERType.Value, String]
@@ -27,7 +28,7 @@ object ChainNER {
     def initialValueForFeature(f: Feature): Double = weights(f).getOrElse(0.0)
 
     def inferenceFromWeights(weights: DenseVector[Double]): Inference = {
-      new ChainNER.Inference(factory, weights, baseModel.inferenceFromWeights(weights))
+      new ChainNER.Inference(factory, weights, baseModel.inferenceFromWeights(weights), maxMarginal)
     }
 
     def emptyCounts: ExpectedCounts = StandardExpectedCounts.zero(featureIndex)
@@ -46,7 +47,8 @@ object ChainNER {
 
   case class Inference(beliefsFactory: SentenceBeliefs.Factory,
                        weights: DenseVector[Double],
-                       baseInference: SemiCRFInference[NERType.Value, String]) extends AnnotatingInference[FeaturizedSentence] with ProjectableInference[FeaturizedSentence, SentenceBeliefs] {
+                       baseInference: SemiCRFInference[NERType.Value, String],
+                       maxMarginal: Boolean) extends AnnotatingInference[FeaturizedSentence] with ProjectableInference[FeaturizedSentence, SentenceBeliefs] {
 
     val labels: Index[NERType.Value] = baseInference.labelIndex
 
@@ -68,7 +70,11 @@ object ChainNER {
     }
 
     def marginal(sent: FeaturizedSentence, aug: SentenceBeliefs): Marginal = {
-      baseInference.marginal(sent.ner, new BeliefsComponentAnchoring(sent.words, sent.nerConstraints, labels, aug))
+      if(maxMarginal) {
+        SemiCRF.Marginal.maxDerivationMarginal(baseInference.anchor(sent.words, new BeliefsComponentAnchoring(sent.words, sent.nerConstraints, labels, aug)))
+      } else {
+        baseInference.marginal(sent.ner)
+      }
     }
 
 
@@ -121,7 +127,8 @@ object ChainNER {
   class ModelFactory(beliefsFactory: SentenceBeliefs.Factory,
                      processor: FeaturizedDocument.Factory,
                      gazetteer: Gazetteer[Any, String] = Gazetteer.empty[String, String],
-                     weights: Feature=>Option[Double] = { (f:Feature) => None}) {
+                     weights: Feature=>Option[Double] = { (f:Feature) => None},
+                     maxMarginals: Boolean = false) {
     def makeModel(sentences: IndexedSeq[FeaturizedSentence]):Model = {
       val train = sentences.map(_.ner)
       val labelIndex = beliefsFactory.nerLabelIndex
@@ -133,7 +140,7 @@ object ChainNER {
 
       val model = new SemiCRFModel(featurizer, processor.nerConstrainer, weights(_).getOrElse(0.0))
 
-      new Model(beliefsFactory, model, weights)
+      new Model(beliefsFactory, model, maxMarginals, weights)
     }
 
   }

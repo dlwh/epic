@@ -68,7 +68,8 @@ object AnnotatingPipeline extends Logging {
                     @Help(text="For optimizing the base models")
                     baseOpt: OptParams,
                     @Help(text="For optimizing the joint model")
-                    opt: OptParams)
+                    opt: OptParams,
+                    viterbi: Boolean = true)
 
   def main(args: Array[String]) {
     val params = CommandLineParser.readIn[Params](args)
@@ -113,9 +114,9 @@ object AnnotatingPipeline extends Logging {
     //if (params.includeParsing)
      //models += makeLexParserModel(beliefsFactory, docProcessor, processedTrain, weightsCache, params.lexHashFeatures)
     if (params.includeParsing)
-      models += makeSimpleParserModel(beliefsFactory, docProcessor, processedTrain, weightsCache)
+      models += makeSimpleParserModel(beliefsFactory, docProcessor, processedTrain, weightsCache, params.viterbi)
     if (params.includeNER)
-       models += makeNERModel(beliefsFactory, docProcessor, processedTrain, weightsCache)
+       models += makeNERModel(beliefsFactory, docProcessor, processedTrain, weightsCache, params.viterbi)
     if (params.includeSRL)
       models += makeSRLModel(beliefsFactory, docProcessor, processedTrain, weightsCache)
 
@@ -283,8 +284,8 @@ object AnnotatingPipeline extends Logging {
   }
 
 
-  private def makeNERModel(beliefsFactory: SentenceBeliefs.Factory, processor: FeaturizedDocument.Factory, docs: IndexedSeq[FeaturizedDocument], weightsCache: Counter[String, Double]) = {
-    new ChainNER.ModelFactory(beliefsFactory, processor, weights={(f: Feature)=>Some(weightsCache(f.toString)).filter(_ != 0)}).makeModel(docs.flatMap(_.sentences))
+  private def makeNERModel(beliefsFactory: SentenceBeliefs.Factory, processor: FeaturizedDocument.Factory, docs: IndexedSeq[FeaturizedDocument], weightsCache: Counter[String, Double], viterbi: Boolean) = {
+    new ChainNER.ModelFactory(beliefsFactory, processor, weights={(f: Feature)=>Some(weightsCache(f.toString)).filter(_ != 0)}, maxMarginals = viterbi).makeModel(docs.flatMap(_.sentences))
   }
 
 
@@ -336,7 +337,8 @@ object AnnotatingPipeline extends Logging {
   def makeSimpleParserModel(beliefsFactory: SentenceBeliefs.Factory,
                          docProcessor: FeaturizedDocument.Factory,
                          train: IndexedSeq[FeaturizedDocument],
-                         weightsCache: Counter[String, Double]): LiftedParser.Model = {
+                         weightsCache: Counter[String, Double],
+                         viterbi: Boolean): LiftedParser.Model = {
     val trainTrees = train.flatMap(_.sentences).map(_.treeInstance)
     val trees = trainTrees.map(StripAnnotations())
     val (initLexicon, initBinaries, initUnaries) = GenerativeParser.extractCounts(trees)
@@ -372,7 +374,7 @@ object AnnotatingPipeline extends Logging {
 
 
     val spanModel = new SpanModel[AnnotatedLabel, AnnotatedLabel, String](indexed, indexed.index, StripAnnotations(), constrainer, xbarGrammar, xbarLexicon, refGrammar, indexedRefinements, {(x: Feature) => weightsCache.get(x.toString)})
-    new LiftedParser.Model(beliefsFactory, spanModel)
+    new LiftedParser.Model(beliefsFactory, spanModel, viterbi)
   }
 
 

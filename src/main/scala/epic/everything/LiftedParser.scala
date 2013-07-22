@@ -19,7 +19,7 @@ object LiftedParser {
   type L = AnnotatedLabel
   type W = String
 
-  class Model(factory: SentenceBeliefs.Factory, model: ParserModel[L, W]) extends EvaluableModel[FeaturizedSentence] {
+  class Model(factory: SentenceBeliefs.Factory, model: ParserModel[L, W], viterbi: Boolean = false) extends EvaluableModel[FeaturizedSentence] {
     type ExpectedCounts = StandardExpectedCounts[Feature]
     type Marginal = ParseMarginal[AnnotatedLabel, String]
     type Inference = LiftedParser.Inference
@@ -35,9 +35,8 @@ object LiftedParser {
 
     def inferenceFromWeights(weights: DenseVector[Double]) = {
       val gram = model.inferenceFromWeights(weights)
-      new Inference(factory, gram)
+      new Inference(factory, gram, viterbi)
     }
-
 
     // evaluation
     type EvaluationResult = ParseEval.Statistics
@@ -57,7 +56,7 @@ object LiftedParser {
   }
 
   class Inference(beliefsFactory: SentenceBeliefs.Factory,
-                  inf: ParserInference[L, W]) extends AnnotatingInference[FeaturizedSentence] with ProjectableInference[FeaturizedSentence, SentenceBeliefs] {
+                  inf: ParserInference[L, W], viterbi: Boolean) extends AnnotatingInference[FeaturizedSentence] with ProjectableInference[FeaturizedSentence, SentenceBeliefs] {
 
     type Marginal = ParseMarginal[AnnotatedLabel, String]
     type ExpectedCounts = StandardExpectedCounts[Feature]
@@ -69,7 +68,11 @@ object LiftedParser {
 
     def marginal(sent: FeaturizedSentence, aug: SentenceBeliefs): Marginal = {
        val anchoring =  new Anchoring(inf.grammar.grammar, inf.grammar.lexicon, sent.words, aug, sent.constituentSparsity)
-      inf.marginal(sent.treeInstance, anchoring)
+      if(viterbi) {
+        ParseMarginal.maxDerivationMarginal(AugmentedAnchoring(inf.grammar.anchor(sent.words), anchoring))
+      } else {
+        inf.marginal(sent.treeInstance, anchoring)
+      }
     }
 
     def projectGold(v: FeaturizedSentence, m: Marginal, oldAugment: SentenceBeliefs): SentenceBeliefs = {

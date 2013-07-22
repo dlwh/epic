@@ -90,11 +90,13 @@ class SemiCRFInference[L, W](weights: DenseVector[Double],
 
   def emptyCounts = StandardExpectedCounts.zero(this.featureIndex)
 
-  def anchor(w: IndexedSeq[W]) = {
-    val constraints = constraintsFactory.constraints(w)
-    new Anchoring(featurizer.anchor(w), constraints, new IdentityAnchoring(w, constraints))
+  def anchor(w: IndexedSeq[W]): Anchoring = {
+    anchor(w, new IdentityAnchoring(w, constraintsFactory.constraints(w)))
   }
 
+  def anchor(w: IndexedSeq[W], aug: SemiCRF.Anchoring[L, W]): Anchoring  = {
+    new Anchoring(featurizer.anchor(w), aug.constraints, aug)
+  }
 
   def labelIndex = featurizer.labelIndex
   def startSymbol = featurizer.startSymbol
