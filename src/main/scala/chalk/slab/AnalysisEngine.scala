@@ -25,16 +25,19 @@ object AnalysisComponent {
   case class Process[C,B,I<:B](slab: Slab[C,B,I])
 }
 
+trait StringAnalysisComponent[I<:StringAnnotation,O<:StringAnnotation]
+    extends AnalysisComponent[String,StringAnnotation,I,O]
+
 /**
   * An actor that uses SentenceSegmenter.
   */
 class SentenceSegmenterActor extends SentenceSegmenter[StringAnnotation]
-    with AnalysisComponent[String,StringAnnotation,StringAnnotation,Sentence]
+    with StringAnalysisComponent[StringAnnotation,Sentence]
 
 /**
   * An actor that uses Tokenizer.
   */
-class TokenizerActor extends AnalysisComponent[String, StringAnnotation, Sentence, Token] with Tokenizer[Sentence]
+class TokenizerActor extends Tokenizer[Sentence] with StringAnalysisComponent[Sentence, Token]
 
 
 /**

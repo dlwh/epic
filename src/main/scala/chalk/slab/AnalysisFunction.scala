@@ -12,14 +12,16 @@ package chalk.slab
   */ 
 trait AnalysisFunction[C,B,I<:B,O<:B] extends (Slab[C,B,I] => Slab[C,B,B with I with O])
 
-object StringIdentityAnalyzer extends AnalysisFunction[String, StringAnnotation, StringAnnotation, StringAnnotation] {
+trait StringAnalysisFunction[I<:StringAnnotation,O<:StringAnnotation] extends (Slab[String,StringAnnotation,I] => Slab[String,StringAnnotation,StringAnnotation with I with O])
+
+object StringIdentityAnalyzer extends StringAnalysisFunction[StringAnnotation, StringAnnotation] {
   def apply(slab: Slab[String, StringAnnotation, StringAnnotation]) = slab
 }
 
 /**
   * A simple regex sentence segmenter.
   */
-trait SentenceSegmenter[I <: StringAnnotation] extends AnalysisFunction[String, StringAnnotation, I, Sentence] {
+trait SentenceSegmenter[I <: StringAnnotation] extends StringAnalysisFunction[I, Sentence] {
   def apply(slab: Slab[String, StringAnnotation, I]) =
     // the [Sentence] is required because of https://issues.scala-lang.org/browse/SI-7647
     slab.++[Sentence]("[^\\s.!?]+[^.!?]+[.!?]".r.findAllMatchIn(slab.content).map(m => Sentence(m.start, m.end)))
@@ -28,7 +30,7 @@ trait SentenceSegmenter[I <: StringAnnotation] extends AnalysisFunction[String, 
 /**
   * A simple regex tokenizer.
   */
-trait Tokenizer[I <: Sentence] extends AnalysisFunction[String, StringAnnotation, I, Token] {
+trait Tokenizer[I <: Sentence] extends StringAnalysisFunction[I, Token] {
   def apply(slab: Slab[String, StringAnnotation, I]) =
     // the [Token] is required because of https://issues.scala-lang.org/browse/SI-7647
     slab.++[Token](slab.iterator[Sentence].flatMap(sentence =>
