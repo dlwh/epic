@@ -19,30 +19,41 @@ object StringIdentityAnalyzer extends AnalysisFunction[String, StringAnnotation,
 /**
   * A simple regex sentence segmenter.
   */
-trait SentenceSegmenter extends AnalysisFunction[String, StringAnnotation, StringAnnotation, Sentence] {
-  def apply(slab: Slab[String, StringAnnotation, StringAnnotation]) =
-    slab ++ "[^\\s.!?]+[^.!?]+[.!?]".r.findAllMatchIn(slab.content).map(m => Sentence(m.start, m.end))
+trait SentenceSegmenter[I <: StringAnnotation] extends AnalysisFunction[String, StringAnnotation, I, Sentence] {
+  def apply(slab: Slab[String, StringAnnotation, I]) =
+    // the [Sentence] is required because of https://issues.scala-lang.org/browse/SI-7647
+    slab.++[Sentence]("[^\\s.!?]+[^.!?]+[.!?]".r.findAllMatchIn(slab.content).map(m => Sentence(m.start, m.end)))
 }
 
 /**
   * A simple regex tokenizer.
   */
-trait Tokenizer extends AnalysisFunction[String, StringAnnotation, Sentence, Token] {
-  def apply(slab: Slab[String, StringAnnotation, Sentence]) =
-    slab ++ slab.iterator[Sentence].flatMap(sentence =>
+trait Tokenizer[I <: Sentence] extends AnalysisFunction[String, StringAnnotation, I, Token] {
+  def apply(slab: Slab[String, StringAnnotation, I]) =
+    // the [Token] is required because of https://issues.scala-lang.org/browse/SI-7647
+    slab.++[Token](slab.iterator[Sentence].flatMap(sentence =>
       "\\p{L}+|\\p{P}+|\\p{N}+".r.findAllMatchIn(sentence.in(slab).content).map(m =>
-        Token(sentence.begin + m.start, sentence.begin + m.end)))
+        Token(sentence.begin + m.start, sentence.begin + m.end))))
 }
 
 
 object AnalysisPipeline {
   import StringAnnotation._
 
+  // added only to demonstrate necesssity of [I] parameter on analyzers
+  private[AnalysisPipeline] case class Document(val begin: Int, val end: Int) extends StringAnnotation
+  private[AnalysisPipeline] def documentAdder(slab: Slab[String, StringAnnotation, StringAnnotation]) =
+    slab ++ Iterator(Document(0, slab.content.length))
+
   def main (args: Array[String]) {
-    val sentenceSegmenter = new SentenceSegmenter{}
-    val tokenizer = new Tokenizer {}
-    val pipeline = StringIdentityAnalyzer andThen sentenceSegmenter andThen tokenizer
+    def sentenceSegmenter[I <: StringAnnotation] = new SentenceSegmenter[I]{}
+    def tokenizer[I <: Sentence] = new Tokenizer[I]{}
+    val pipeline = StringIdentityAnalyzer andThen documentAdder andThen sentenceSegmenter andThen tokenizer
     val slab = pipeline(Slab(AnalysisEngine.text1))
+
+    // added only to demonstrate necesssity of [I] parameter on analyzers
+    val paragraphs = slab.iterator[Document].toList
+
     // Notice that the last sentence (lacking EOS char) is missing.
     val sentences = slab.iterator[Sentence].toList
     println("\nSENTENCES\n\n" + sentences.map(_.in(slab).content).mkString("\n"))

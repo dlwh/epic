@@ -28,13 +28,13 @@ object AnalysisComponent {
 /**
   * An actor that uses SentenceSegmenter.
   */
-class SentenceSegmenterActor extends SentenceSegmenter
+class SentenceSegmenterActor extends SentenceSegmenter[StringAnnotation]
     with AnalysisComponent[String,StringAnnotation,StringAnnotation,Sentence]
 
 /**
   * An actor that uses Tokenizer.
   */
-class TokenizerActor extends AnalysisComponent[String, StringAnnotation, Sentence, Token] with Tokenizer
+class TokenizerActor extends AnalysisComponent[String, StringAnnotation, Sentence, Token] with Tokenizer[Sentence]
 
 
 /**
