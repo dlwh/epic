@@ -25,14 +25,14 @@ object AnalysisComponent {
   case class Process[C,B,I<:B](slab: Slab[C,B,I])
 }
 
-trait StringAnalysisComponent[I<:StringAnnotation,O<:StringAnnotation]
-    extends AnalysisComponent[String,StringAnnotation,I,O]
+trait StringAnalysisComponent[I<:Span,O<:Span]
+    extends AnalysisComponent[String,Span,I,O]
 
 /**
   * An actor that uses SentenceSegmenter.
   */
-class SentenceSegmenterActor extends SentenceSegmenter[StringAnnotation]
-    with StringAnalysisComponent[StringAnnotation,Sentence]
+class SentenceSegmenterActor extends SentenceSegmenter[Span]
+    with StringAnalysisComponent[Span,Sentence]
 
 /**
   * An actor that uses Tokenizer.
@@ -51,7 +51,7 @@ class AnalysisEngine extends Actor with ActorLogging {
 
   import AnalysisComponent._
   import AnalysisEngine._
-  import StringAnnotation._
+  import Span._
   implicit val ec = context.dispatcher
   implicit val timeout = Timeout(10 seconds)
   
@@ -62,8 +62,8 @@ class AnalysisEngine extends Actor with ActorLogging {
     case Process(slab) =>
       log.info("Processing slab:\n " + slab.content)
       (for {
-        slab1 <- (sentenceSegmenter ? Process(slab)).mapTo[Slab[String,StringAnnotation,Sentence]]
-        slab2 <- (tokenizer ? Process(slab1)).mapTo[Slab[String,StringAnnotation,Sentence with Token]]
+        slab1 <- (sentenceSegmenter ? Process(slab)).mapTo[Slab[String,Span,Sentence]]
+        slab2 <- (tokenizer ? Process(slab1)).mapTo[Slab[String,Span,Sentence with Token]]
       } yield {
         slab2
       }) pipeTo sender
@@ -81,7 +81,7 @@ object AnalysisEngine {
   case class ProcessCorpus(corpus: Iterator[String])
   
   import AnalysisComponent._
-  import StringAnnotation._
+  import Span._
 
   val text1 = "Here is an example text. It has four sentences and it mentions Jimi Hendrix and Austin, Texas! In this third sentence, it also brings up Led Zeppelin and Radiohead, but does it ask a question? It also has a straggler sentence that doesn't end with punctuation"
 
@@ -99,7 +99,7 @@ object AnalysisEngine {
     val corpus = Iterator(text1,text2,text3)
     
     for {
-      slabs <- (engine ? ProcessCorpus(corpus)).mapTo[Iterator[Slab[String,StringAnnotation,Sentence with Token]]]
+      slabs <- (engine ? ProcessCorpus(corpus)).mapTo[Iterator[Slab[String,Span,Sentence with Token]]]
       slab <- slabs
     } {
       // Notice that the last sentence (lacking EOS char) is missing.
