@@ -3,19 +3,21 @@ package epic.sequences
 import breeze.optimize.FirstOrderMinimizer.OptParams
 import java.io._
 import epic.trees.{AnnotatedLabel, ProcessedTreebank}
-import breeze.config.CommandLineParser
+import breeze.config.{Configuration, CommandLineParser}
 import breeze.util.Encoder
 import epic.util.CacheBroker
+import com.typesafe.scalalogging.log4j.Logging
 
 /**
  *
  * @author dlwh
  */
-object POSTagger {
+object POSTagger extends Logging {
   case class Params(opt: OptParams, treebank: ProcessedTreebank)
 
   def main(args: Array[String]) {
     val params = CommandLineParser.readIn[Params](args)
+    logger.info("Command line arguments for recovery:\n" + Configuration.fromObject(params).toCommandLineString)
     import params._
     val train = treebank.trainTrees.map(_.asTaggedSequence)
     val test = treebank.devTrees.map(_.asTaggedSequence)
@@ -38,11 +40,12 @@ object POSTagger {
  * Mostly for debugging SemiCRFs. Just uses a SemiCRF as a CRF.
  * @author dlwh
  */
-object SemiPOSTagger {
+object SemiPOSTagger extends Logging {
   case class Params(opt: OptParams, treebank: ProcessedTreebank, cache: CacheBroker)
 
   def main(args: Array[String]) {
     val params = CommandLineParser.readIn[Params](args)
+    logger.info("Command line arguments for recovery:\n" + Configuration.fromObject(params).toCommandLineString)
     import params._
     val train = treebank.trainTrees.map(_.asTaggedSequence.asSegmentation)
     val test = treebank.devTrees.map(_.asTaggedSequence.asSegmentation)

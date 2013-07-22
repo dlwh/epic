@@ -24,6 +24,7 @@ import collection.mutable
 import epic.lexicon.{Lexicon, SimpleLexicon}
 import epic.constraints.{CachedChartConstraintsFactory, ChartConstraints}
 import epic.util.CacheBroker
+import com.typesafe.scalalogging.log4j.Logging
 
 
 /**
@@ -62,7 +63,7 @@ object ParserParams {
  * ParserPipeline is a base-trait for the parser training pipeline. Handles
  * reading in the treebank and params and such
  */
-trait ParserPipeline {
+trait ParserPipeline extends Logging {
   /**
    * The type of the parameters to read in via dlwh.epic.config
    */
@@ -71,10 +72,6 @@ trait ParserPipeline {
    * Required manifest for the params
    */
   protected implicit val paramManifest: Manifest[Params]
-
-  // TODO HACK
-  var makeTreeInstance: (Tree[String], IndexedSeq[String])=>TreeInstance[AnnotatedLabel, String] = null
-
 
   /**
    * The main point of entry for implementors. Should return a sequence
@@ -104,36 +101,23 @@ trait ParserPipeline {
     import ParserParams.JointParams
 
     val params = CommandLineParser.readIn[JointParams[Params]](args)
-    println("Training Parser...")
-    println(params)
+    logger.info("Command line arguments for recovery:\n" + Configuration.fromObject(params).toCommandLineString)
+    logger.info("Training Parser...")
 
-    makeTreeInstance = params.treebank.makeTreeInstance("", _ ,_, true)
     val parsers = trainParser(params.treebank, params.trainer)
 
     import params.treebank._
 
     for((name, parser) <- parsers) {
-      println("Parser " + name)
+      logger.info("Parser " + name)
       val outDir = new File("parsers/")
       outDir.mkdirs()
       val out = new File(outDir, name +".parser")
       writeObject(out, parser)
 
-      var parl = -1
-//      if(params.threads >= 1) {
-//        parl = collection.parallel.ForkJoinTasks.defaultForkJoinPool.getParallelism
-//        collection.parallel.ForkJoinTasks.defaultForkJoinPool.setParallelism(params.threads)
-//      }
-
-      println("Evaluating Parser...")
+      logger.info("Evaluating Parser...")
       val stats = evalParser(devTrees.filter(_.words.length <= 40), parser, name+"-len40-dev")
-      import stats._
-      println("Eval finished. Results:")
-      println( s"P: $precision  R:$recall F1: $f1 Ex:$exact  Tag Accuracy: $tagAccuracy")
-
-//      if(params.threads >= 1) {
-//        collection.parallel.ForkJoinTasks.defaultForkJoinPool.setParallelism(parl)
-//      }
+      logger.info(s"Eval finished. Results:\n$stats")
     }
   }
 

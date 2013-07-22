@@ -17,7 +17,7 @@ package projections
  limitations under the License.
 */
 import breeze.collection.mutable.TriangularArray
-import breeze.config.{CommandLineParser, Help}
+import breeze.config.{Configuration, CommandLineParser, Help}
 import breeze.util.{Encoder, Index}
 import collection.immutable.BitSet
 import java.io._
@@ -383,8 +383,8 @@ object PrecacheConstraints extends Logging {
 
   def main(args: Array[String]) {
     val params:ProjectionParams = CommandLineParser.readIn[ProjectionParams](args)
+    logger.info("Command line arguments for recovery:\n" + Configuration.fromObject(params).toCommandLineString)
     val treebank = params.treebank.copy(maxLength = 1000000)
-    println(params)
     val parser = loadParser[Any](params.parser)
 
     val out = params.out

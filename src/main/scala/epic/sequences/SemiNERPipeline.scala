@@ -15,13 +15,14 @@ import breeze.optimize.FirstOrderMinimizer.OptParams
 import epic.coref.Phrases
 import breeze.util.Implicits._
 import epic.util.CacheBroker
+import com.typesafe.scalalogging.log4j.Logging
 
 
 /**
  *
  * @author dlwh
  */
-object SemiNERPipeline {
+object SemiNERPipeline extends Logging {
 
   case class Params(path: File,
                     modelOut: File = new File("ner.model.gz"),
@@ -35,6 +36,7 @@ object SemiNERPipeline {
 
   def main(args: Array[String]) {
     val params = CommandLineParser.readIn[Params](args)
+    logger.info("Command line arguments for recovery:\n" + Configuration.fromObject(params).toCommandLineString)
     val (train, test) = {
       val instances =  for {
         file <- params.path.listFiles take params.nfiles
@@ -70,7 +72,7 @@ object SemiNERPipeline {
 
 
 
-object SemiConllNERPipeline {
+object SemiConllNERPipeline extends Logging {
 
   def makeSegmentation(ex: Example[IndexedSeq[String],IndexedSeq[IndexedSeq[String]]]): Segmentation[String, String]  = {
     val labels = ex.label
@@ -124,6 +126,7 @@ object SemiConllNERPipeline {
 
   def main(args: Array[String]) {
     val params = CommandLineParser.readIn[Params](args)
+    logger.info("Command line arguments for recovery:\n" + Configuration.fromObject(params).toCommandLineString)
     val (train,test) = {
       val standardTrain = CONLLSequenceReader.readTrain(new FileInputStream(params.path), params.path.getName).toIndexedSeq
       val standardTest = CONLLSequenceReader.readTrain(new FileInputStream(params.test), params.path.getName).toIndexedSeq
@@ -164,7 +167,7 @@ object SemiConllNERPipeline {
 
 
 
-object SemiConllStats {
+object SemiConllStats extends Logging {
 
   def makeSegmentation(ex: Example[IndexedSeq[String],IndexedSeq[IndexedSeq[String]]]): Segmentation[String, String]  = {
     val labels = ex.label
@@ -217,6 +220,7 @@ object SemiConllStats {
 
   def main(args: Array[String]) {
     val params = CommandLineParser.readIn[Params](args)
+    logger.info("Command line arguments for recovery:\n" + Configuration.fromObject(params).toCommandLineString)
     val (train,test) = {
       val standardTrain = CONLLSequenceReader.readTrain(new FileInputStream(params.path), params.path.getName).toIndexedSeq
       val standardTest = CONLLSequenceReader.readTrain(new FileInputStream(params.test), params.path.getName).toIndexedSeq
@@ -239,7 +243,7 @@ object SemiConllStats {
           }
 
       }
-      (inGaz,notInGaz,(inGaz)/(notInGaz + inGaz))
+      (inGaz,notInGaz,inGaz/(notInGaz + inGaz))
     }
 
     println("train: " + gazStats(train))

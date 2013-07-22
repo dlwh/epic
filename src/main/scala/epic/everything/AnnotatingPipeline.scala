@@ -5,7 +5,7 @@ import java.io.File
 import epic.trees._
 import epic.parser.{BaseGrammar, ParseEval, GenerativeParser, ParserParams}
 import epic.parser.ParserParams.XbarGrammar
-import breeze.config.{Help, CommandLineParser}
+import breeze.config.{Configuration, Help, CommandLineParser}
 import epic.ontonotes.{NERType, ConllOntoReader, Document}
 import breeze.linalg._
 import epic.framework._
@@ -71,9 +71,8 @@ object AnnotatingPipeline extends Logging {
                     opt: OptParams)
 
   def main(args: Array[String]) {
-
     val params = CommandLineParser.readIn[Params](args)
-    logger.info("Parameters: " + params)
+    logger.info("Command line arguments for recovery:\n" + Configuration.fromObject(params).toCommandLineString)
     require(params.corpus.exists(), params.corpus + " does not exist!")
     import params.cache
 

@@ -1,7 +1,7 @@
 package epic.parser.kbest
 
 import epic.trees._
-import breeze.config.{CommandLineParser, Help}
+import breeze.config.{Configuration, CommandLineParser, Help}
 import java.io.{PrintWriter, File}
 import breeze.util._
 import epic.parser.SimpleChartParser
@@ -33,8 +33,8 @@ object KBestParseTreebank {
 
   def main(args: Array[String]) = {
     val params = CommandLineParser.readIn[Params](args)
+    println("Command line arguments for recovery:\n" + Configuration.fromObject(params).toCommandLineString)
     println("Evaluating Parser...")
-    println(params)
 
     implicit def cache = params.cache
 

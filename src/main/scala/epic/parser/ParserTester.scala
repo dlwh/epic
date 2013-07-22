@@ -44,8 +44,8 @@ object ParserTester {
    */
   def main(args: Array[String]) {
     val params = CommandLineParser.readIn[Params](args)
+    println("Command line arguments for recovery:\n" + Configuration.fromObject(params).toCommandLineString)
     println("Evaluating Parser...")
-    println(params)
     import params._
 
     import params.treebank._

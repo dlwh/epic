@@ -20,6 +20,8 @@ object CorefPipeline extends App {
   case class Params(path: File, name: String = "eval/coref", nfiles: Int = 100000, implicit val cache: CacheBroker)
 
   val params = CommandLineParser.readIn[Params](args)
+
+  println("Command line arguments for recovery:\n" + Configuration.fromObject(params).toCommandLineString)
   import params.cache
 
   val docs = for {
