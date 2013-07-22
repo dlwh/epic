@@ -38,22 +38,30 @@ abstract class SlabAnnotationOps[ContentType, BaseAnnotationType, AnnotationType
 // =========================
 // Annotation infrastructure
 // =========================
-trait StringAnnotation {
+trait Span {
   val begin: Int
   val end: Int
-  def in[AnnotationTypes <: StringAnnotation](slab: Slab[String, StringAnnotation, AnnotationTypes]) =
-    new SlabAnnotationOps(this, slab) {
-      def content = this.slab.content.substring(this.annotation.begin, this.annotation.end)
-    }
 }
 
-object StringAnnotation {
-  implicit object StringAnnotationHasBounds extends Slab.HasBounds[StringAnnotation] {
-    def covers(annotation1: StringAnnotation, annotation2: StringAnnotation): Boolean =
+object Span {
+  implicit class SpanInStringSlab(val span: Span) extends AnyVal {
+    def in[AnnotationTypes <: Span](slab: Slab.StringSlab[AnnotationTypes]) =
+      new StringSpanAnnotationOps(this.span, slab)
+  }
+
+  class StringSpanAnnotationOps[AnnotationType >: AnnotationTypes <: Span: ClassTag, AnnotationTypes <: Span](
+    annotation: AnnotationType,
+    slab: Slab.StringSlab[AnnotationTypes])
+    extends SlabAnnotationOps[String, Span, AnnotationType, AnnotationTypes](annotation, slab) {
+    def content = this.slab.content.substring(this.annotation.begin, this.annotation.end)
+  }
+  
+  implicit object StringAnnotationHasBounds extends Slab.HasBounds[Span] {
+    def covers(annotation1: Span, annotation2: Span): Boolean =
       annotation1.begin <= annotation2.begin && annotation2.end <= annotation1.end
-    def follows(annotation1: StringAnnotation, annotation2: StringAnnotation): Boolean =
+    def follows(annotation1: Span, annotation2: Span): Boolean =
       annotation2.end <= annotation1.begin
-    def precedes(annotation1: StringAnnotation, annotation2: StringAnnotation): Boolean =
+    def precedes(annotation1: Span, annotation2: Span): Boolean =
       annotation1.end <= annotation2.begin
   }
 }
@@ -61,11 +69,13 @@ object StringAnnotation {
 // ===========
 // Annotations
 // ===========
-case class Sentence(val begin: Int, val end: Int) extends StringAnnotation
-case class Token(val begin: Int, val end: Int) extends StringAnnotation
+case class Sentence(val begin: Int, val end: Int) extends Span
+case class Token(val begin: Int, val end: Int) extends Span
 
 
 object Slab {
+  type StringSlab[+AnnotationTypes <: Span] = Slab[String, Span, AnnotationTypes]
+  
   def apply[ContentType, BaseAnnotationType: HasBounds](content: ContentType): Slab[ContentType, BaseAnnotationType, BaseAnnotationType] =
     new HorribleInefficientSlab(content)
 
