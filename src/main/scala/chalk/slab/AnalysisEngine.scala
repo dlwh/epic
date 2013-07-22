@@ -52,6 +52,7 @@ class AnalysisEngine extends Actor with ActorLogging {
   import AnalysisComponent._
   import AnalysisEngine._
   import Span._
+  import Slab.StringSlab
   implicit val ec = context.dispatcher
   implicit val timeout = Timeout(10 seconds)
   
@@ -62,8 +63,8 @@ class AnalysisEngine extends Actor with ActorLogging {
     case Process(slab) =>
       log.info("Processing slab:\n " + slab.content)
       (for {
-        slab1 <- (sentenceSegmenter ? Process(slab)).mapTo[Slab[String,Span,Sentence]]
-        slab2 <- (tokenizer ? Process(slab1)).mapTo[Slab[String,Span,Sentence with Token]]
+        slab1 <- (sentenceSegmenter ? Process(slab)).mapTo[StringSlab[Sentence]]
+        slab2 <- (tokenizer ? Process(slab1)).mapTo[StringSlab[Sentence with Token]]
       } yield {
         slab2
       }) pipeTo sender
@@ -82,6 +83,7 @@ object AnalysisEngine {
   
   import AnalysisComponent._
   import Span._
+  import Slab.StringSlab
 
   val text1 = "Here is an example text. It has four sentences and it mentions Jimi Hendrix and Austin, Texas! In this third sentence, it also brings up Led Zeppelin and Radiohead, but does it ask a question? It also has a straggler sentence that doesn't end with punctuation"
 
@@ -99,7 +101,7 @@ object AnalysisEngine {
     val corpus = Iterator(text1,text2,text3)
     
     for {
-      slabs <- (engine ? ProcessCorpus(corpus)).mapTo[Iterator[Slab[String,Span,Sentence with Token]]]
+      slabs <- (engine ? ProcessCorpus(corpus)).mapTo[Iterator[StringSlab[Sentence with Token]]]
       slab <- slabs
     } {
       // Notice that the last sentence (lacking EOS char) is missing.

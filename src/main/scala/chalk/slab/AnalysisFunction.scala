@@ -1,5 +1,7 @@
 package chalk.slab
 
+import Slab.StringSlab
+
 /**
   * An analysis function that takes a Slab with declared annotation types in it and outputs
   * a new Slab with additional annotations of a new type.
@@ -12,17 +14,17 @@ package chalk.slab
   */ 
 trait AnalysisFunction[C,B,I<:B,O<:B] extends (Slab[C,B,I] => Slab[C,B,B with I with O])
 
-trait StringAnalysisFunction[I<:Span,O<:Span] extends (Slab[String,Span,I] => Slab[String,Span,Span with I with O])
+trait StringAnalysisFunction[I<:Span,O<:Span] extends (StringSlab[I] => StringSlab[Span with I with O])
 
 object StringIdentityAnalyzer extends StringAnalysisFunction[Span, Span] {
-  def apply(slab: Slab[String, Span, Span]) = slab
+  def apply(slab: StringSlab[Span]) = slab
 }
 
 /**
   * A simple regex sentence segmenter.
   */
 trait SentenceSegmenter[I <: Span] extends StringAnalysisFunction[I, Sentence] {
-  def apply(slab: Slab[String, Span, I]) =
+  def apply(slab: StringSlab[I]) =
     // the [Sentence] is required because of https://issues.scala-lang.org/browse/SI-7647
     slab.++[Sentence]("[^\\s.!?]+[^.!?]+[.!?]".r.findAllMatchIn(slab.content).map(m => Sentence(m.start, m.end)))
 }
@@ -31,7 +33,7 @@ trait SentenceSegmenter[I <: Span] extends StringAnalysisFunction[I, Sentence] {
   * A simple regex tokenizer.
   */
 trait Tokenizer[I <: Sentence] extends StringAnalysisFunction[I, Token] {
-  def apply(slab: Slab[String, Span, I]) =
+  def apply(slab: StringSlab[I]) =
     // the [Token] is required because of https://issues.scala-lang.org/browse/SI-7647
     slab.++[Token](slab.iterator[Sentence].flatMap(sentence =>
       "\\p{L}+|\\p{P}+|\\p{N}+".r.findAllMatchIn(sentence.in(slab).content).map(m =>
@@ -44,7 +46,7 @@ object AnalysisPipeline {
 
   // added only to demonstrate necesssity of [I] parameter on analyzers
   private[AnalysisPipeline] case class Document(val begin: Int, val end: Int) extends Span
-  private[AnalysisPipeline] def documentAdder(slab: Slab[String, Span, Span]) =
+  private[AnalysisPipeline] def documentAdder(slab: StringSlab[Span]) =
     slab ++ Iterator(Document(0, slab.content.length))
 
   def main (args: Array[String]) {

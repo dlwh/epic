@@ -45,13 +45,13 @@ trait Span {
 
 object Span {
   implicit class SpanInStringSlab(val span: Span) extends AnyVal {
-    def in[AnnotationTypes <: Span](slab: Slab[String, Span, AnnotationTypes]) =
+    def in[AnnotationTypes <: Span](slab: Slab.StringSlab[AnnotationTypes]) =
       new StringSpanAnnotationOps(this.span, slab)
   }
 
   class StringSpanAnnotationOps[AnnotationType >: AnnotationTypes <: Span: ClassTag, AnnotationTypes <: Span](
     annotation: AnnotationType,
-    slab: Slab[String, Span, AnnotationTypes])
+    slab: Slab.StringSlab[AnnotationTypes])
     extends SlabAnnotationOps[String, Span, AnnotationType, AnnotationTypes](annotation, slab) {
     def content = this.slab.content.substring(this.annotation.begin, this.annotation.end)
   }
@@ -74,6 +74,8 @@ case class Token(val begin: Int, val end: Int) extends Span
 
 
 object Slab {
+  type StringSlab[+AnnotationTypes <: Span] = Slab[String, Span, AnnotationTypes]
+  
   def apply[ContentType, BaseAnnotationType: HasBounds](content: ContentType): Slab[ContentType, BaseAnnotationType, BaseAnnotationType] =
     new HorribleInefficientSlab(content)
 

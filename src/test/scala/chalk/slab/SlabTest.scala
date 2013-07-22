@@ -10,12 +10,14 @@ class SlabTest extends FunSuite {
   // =========
   // Analyzers
   // =========
-  val stringBegin = (slab: Slab[String, Span, Span]) => slab
+  import Slab.StringSlab
 
-  def sentenceSegmenter[AnnotationTypes <: Span](slab: Slab[String, Span, AnnotationTypes]) =
+  val stringBegin = (slab: StringSlab[Span]) => slab
+
+  def sentenceSegmenter[AnnotationTypes <: Span](slab: StringSlab[AnnotationTypes]) =
     slab ++ "[^\\s.!?]+[^.!?]+[.!?]".r.findAllMatchIn(slab.content).map(m => Sentence(m.start, m.end))
 
-  def tokenizer[AnnotationTypes <: Sentence](slab: Slab[String, Span, AnnotationTypes]) =
+  def tokenizer[AnnotationTypes <: Sentence](slab: StringSlab[AnnotationTypes]) =
     slab ++ slab.iterator[Sentence].flatMap(sentence =>
       "\\p{L}+|\\p{P}+|\\p{N}+".r.findAllMatchIn(sentence.in(slab).content).map(m =>
         Token(sentence.begin + m.start, sentence.begin + m.end)))
