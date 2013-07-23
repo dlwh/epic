@@ -5,6 +5,7 @@ import breeze.numerics._
 import epic.framework._
 import breeze.util.{Index, Lens}
 import breeze.collection.mutable.TriangularArray
+import breeze.features.FeatureVector
 
 
 /**
@@ -285,9 +286,7 @@ object PropertyPropagation {
             var p2 = 0
             while (p2 < current.cols) {
               val features = anchoring.featuresFor(p1, index, p2)
-              for(f <- features) {
-                accum.counts(f) += scale * current(p1,p2)
-              }
+              axpy(scale * current(p1, p2), new FeatureVector(features), accum.counts)
               p2 += 1
             }
             p1 += 1

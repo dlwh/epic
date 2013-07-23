@@ -25,6 +25,7 @@ object SentLexParser {
               bundle: LexGrammarBundle[L, W],
               reannotate: (BinarizedTree[L], Seq[W])=>BinarizedTree[L],
               indexed: IndexedLexFeaturizer[L, W],
+              viterbi: Boolean = false,
               initFeatureValue: Feature=>Option[Double] = {(f: Feature) => None}) extends EvaluableModel[FeaturizedSentence] {
     type ExpectedCounts = StandardExpectedCounts[Feature]
     type Marginal = ParseMarginal[AnnotatedLabel, String]
@@ -48,7 +49,7 @@ object SentLexParser {
         headed
 
       }
-      new Inference(factory, gram, ann _, indexed)
+      new Inference(factory, gram, ann _, indexed, viterbi)
     }
 
 
@@ -72,7 +73,8 @@ object SentLexParser {
   class Inference(beliefsFactory: SentenceBeliefs.Factory,
                   grammar: LexGrammar[AnnotatedLabel, String],
                   reannotate: (FeaturizedSentence)=>BinarizedTree[(AnnotatedLabel, Int)],
-                  featurizer: IndexedLexFeaturizer[AnnotatedLabel, String]) extends AnnotatingInference[FeaturizedSentence] with ProjectableInference[FeaturizedSentence, SentenceBeliefs] {
+                  featurizer: IndexedLexFeaturizer[AnnotatedLabel, String],
+                  viterbi: Boolean) extends AnnotatingInference[FeaturizedSentence] with ProjectableInference[FeaturizedSentence, SentenceBeliefs] {
 
     type Marginal = ParseMarginal[AnnotatedLabel, String]
     type ExpectedCounts = StandardExpectedCounts[Feature]
@@ -85,7 +87,11 @@ object SentLexParser {
 
     def marginal(sent: FeaturizedSentence, aug: SentenceBeliefs): Marginal = {
        val anchoring =  new Anchoring(grammar, sent.words, aug)
-       AugmentedAnchoring(anchoring, sent.constituentSparsity).marginal
+      if(viterbi) {
+        ParseMarginal.maxDerivationMarginal(AugmentedAnchoring(anchoring, sent.constituentSparsity))
+      } else {
+        AugmentedAnchoring(anchoring, sent.constituentSparsity).marginal
+      }
     }
 
     def checkForTree(aug: SentenceBeliefs, tree: BinarizedTree[L]) = {

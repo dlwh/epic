@@ -112,7 +112,7 @@ object AnnotatingPipeline extends Logging {
     type CompatibleModel = EvaluableModel[Datum] { type Inference <: ProjectableInference[Datum, Augment] with AnnotatingInference[Datum]}
     val models = ArrayBuffer[CompatibleModel]()
     //if (params.includeParsing)
-     //models += makeLexParserModel(beliefsFactory, docProcessor, processedTrain, weightsCache, params.lexHashFeatures)
+     //models += makeLexParserModel(beliefsFactory, docProcessor, processedTrain, params.viterbi,weightsCache, params.lexHashFeatures)
     if (params.includeParsing)
       models += makeSimpleParserModel(beliefsFactory, docProcessor, processedTrain, weightsCache, params.viterbi)
     if (params.includeNER)
@@ -163,11 +163,12 @@ object AnnotatingPipeline extends Logging {
       if(params.includeSRL && params.includeNER) {
         allModels += PropertyModels.srlNerModel(docProcessor, beliefsFactory)
       }
+
     }
 
     // the big model!
     val epModel = new EPModel[FeaturizedSentence, SentenceBeliefs](4, epInGold = true, initFeatureValue = {f => Some(weightsCache(f.toString)).filter(_ != 0.0)})(
-      (models ++ allModels): _*
+      (allModels): _*
     )
 
 
@@ -246,8 +247,7 @@ object AnnotatingPipeline extends Logging {
     }
 
 
-    val annotator = new PipelineAnnotator[AnnotatedLabel, String](Seq(StripAnnotations(), AddMarkovization()))
-    val pruningParser =  GenerativeParser.annotated(xbar, annotator, trainTrees)
+    val pruningParser =  GenerativeParser.annotated(xbar, StripAnnotations() andThen AddMarkovization(), trainTrees)
 
     logger.info{
       val devTrees = for (d <- devDocs; s <- d.sentences) yield {
@@ -296,6 +296,7 @@ object AnnotatingPipeline extends Logging {
   def makeLexParserModel(beliefsFactory: SentenceBeliefs.Factory,
                          docProcessor: FeaturizedDocument.Factory,
                          train: IndexedSeq[FeaturizedDocument],
+                         viterbi: Boolean,
                          weightsCache: Counter[String, Double],
                          lexHashFeatures: Double): SentLexParser.Model = {
     val trainTrees = train.flatMap(_.sentences).map(_.treeInstance)
@@ -331,7 +332,7 @@ object AnnotatingPipeline extends Logging {
     )
 
     def reannotate(tree: BinarizedTree[AnnotatedLabel], words: Seq[String]) = tree.map(_.baseAnnotatedLabel)
-    new SentLexParser.Model(beliefsFactory, bundle, reannotate, indexed, {(f: Feature) => Some(weightsCache(f.toString))})
+    new SentLexParser.Model(beliefsFactory, bundle, reannotate, indexed, viterbi, {(f: Feature) => Some(weightsCache(f.toString))})
   }
 
   def makeSimpleParserModel(beliefsFactory: SentenceBeliefs.Factory,
