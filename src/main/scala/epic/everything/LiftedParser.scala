@@ -112,10 +112,12 @@ object LiftedParser {
       oldAugment.copy(spans=spans, wordBeliefs=words)
     }
 
-
     // annotation methods
     def annotate(sent: FeaturizedSentence, m: Marginal): FeaturizedSentence = {
-      val newTree = new MaxConstituentDecoder[AnnotatedLabel, String]().extractBestParse(m.asInstanceOf[ChartMarginal[AnnotatedLabel, String]])
+      val newTree: BinarizedTree[AnnotatedLabel] = m match {
+        case m:ChartMarginal[AnnotatedLabel, String] => new MaxConstituentDecoder[AnnotatedLabel, String]().extractBestParse(m)
+        case m:TreeMarginal[AnnotatedLabel, String] => m.tree.map(_._1)
+      }
       sent.withTree(newTree)
     }
   }
