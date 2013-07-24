@@ -49,7 +49,7 @@ import epic.constraints.ChartConstraints.Factory
 class StructModel[L, L2, W](indexedFeatures: IndexedFeaturizer[L, L2, W],
                         annotator: TreeAnnotator[L, W, L2],
                         val projections: GrammarRefinements[L, L2],
-                        baseFactory: ChartConstraints.Factory[L, W],
+                        baseFactory: CoreGrammar[L, W],
                         val baseGrammar: BaseGrammar[L],
                         val lexicon: Lexicon[L, W],
                         initialFeatureVal: (Feature => Option[Double]) = { _ => None }) extends ParserModel[L, W] with Serializable {
@@ -72,7 +72,7 @@ class StructModel[L, L2, W](indexedFeatures: IndexedFeaturizer[L, L2, W],
       localized
     }
 
-    new AnnotatedParserInference(indexedFeatures, reannotate, grammar, new ConstraintCoreGrammarAdaptor(this.baseGrammar, this.lexicon, baseFactory))
+    new AnnotatedParserInference(indexedFeatures, reannotate, grammar, baseFactory)
   }
 
   def expectedCountsToObjective(ecounts: ExpectedCounts) = {
@@ -89,7 +89,7 @@ case class StructModelFactory(baseParser: ParserParams.XbarGrammar,
   type MyModel = StructModel[AnnotatedLabel, AnnotatedLabel, String]
 
 
-  def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]], constrainer: Factory[AnnotatedLabel, String])(implicit broker: CacheBroker) = {
+  def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]], constrainer: CoreGrammar[AnnotatedLabel, String])(implicit broker: CacheBroker) = {
     val transformed = trainTrees.par.map(annotator).seq.toIndexedSeq
 
     val (initLexicon, initBinaries, initUnaries) = this.extractBasicCounts(transformed)

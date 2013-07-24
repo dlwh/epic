@@ -24,13 +24,19 @@ import breeze.linalg._
 import epic.parser.features.{GenFeaturizer, IndicatorFeature}
 import epic.parser.projections.GrammarRefinements
 import epic.framework.{ComponentFeature, Feature}
-import epic.parser.{AugmentedGrammar, BaseGrammar, RefinedGrammar, ParserParams}
+import epic.parser._
 import epic.trees._
 import epic.features.IndexedWordFeaturizer
 import epic.features.StandardSurfaceFeaturizer
 import epic.util.{SafeLogging, CacheBroker}
 import com.typesafe.scalalogging.log4j.Logging
 import epic.constraints.ChartConstraints.Factory
+import epic.framework.ComponentFeature
+import epic.trees.BinaryRule
+import epic.trees.UnaryRule
+import epic.trees.TreeInstance
+import epic.parser.features.IndicatorFeature
+import epic.trees.annotations.FilterAnnotations
 
 /**
  *
@@ -68,7 +74,7 @@ case class ProductParserModelFactory(baseParser: ParserParams.XbarGrammar,
   }
 
 
-  def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]], constrainer: Factory[AnnotatedLabel, String])(implicit broker: CacheBroker) = {
+  def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]], constrainer: CoreGrammar[AnnotatedLabel, String])(implicit broker: CacheBroker) = {
     val annTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]] = trainTrees.map(annotator(_))
     val (annWords, annBinaries, annUnaries) = this.extractBasicCounts(annTrees)
 

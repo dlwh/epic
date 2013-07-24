@@ -58,7 +58,7 @@ class IdentityAnnotator[L, W] extends TreeAnnotator[L, W, L] {
 }
 
 case class FilterAnnotations[W](toKeep: Set[Annotation]=Set.empty) extends TreeAnnotator[AnnotatedLabel, W, AnnotatedLabel] {
-  def this(keep: String*) = this(keep.map(FunctionalTag).toSet[Annotation])
+//  def this(keep: String*) = this(keep.map(FunctionalTag).toSet[Annotation])
   def apply(tree: BinarizedTree[AnnotatedLabel], words: Seq[W]) = {
     tree.map(l => l.copy(features = l.features.filter(toKeep)))
   }
