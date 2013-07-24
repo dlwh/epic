@@ -11,7 +11,7 @@ import breeze.linalg._
 import epic.framework._
 import breeze.optimize._
 import breeze.util.{Index, Encoder}
-import epic.parser.projections.{GrammarRefinements, ParserChartConstraintsFactory}
+import epic.parser.projections.{ConstraintCoreGrammarAdaptor, GrammarRefinements, ParserChartConstraintsFactory}
 import epic.parser.models._
 import epic.trees.ProcessedTreebank
 import epic.parser.features.{LabelFeature, RuleFeature}
@@ -374,7 +374,7 @@ object AnnotatingPipeline extends Logging {
     val constrainer = docProcessor.parseConstrainer
 
 
-    val spanModel = new SpanModel[AnnotatedLabel, AnnotatedLabel, String](indexed, indexed.index, StripAnnotations(), constrainer, xbarGrammar, xbarLexicon, refGrammar, indexedRefinements, {(x: Feature) => weightsCache.get(x.toString)})
+    val spanModel = new SpanModel[AnnotatedLabel, AnnotatedLabel, String](indexed, indexed.index, StripAnnotations(), new ConstraintCoreGrammarAdaptor(xbarGrammar, xbarLexicon, constrainer), xbarGrammar, xbarLexicon, refGrammar, indexedRefinements, {(x: Feature) => weightsCache.get(x.toString)})
     new LiftedParser.Model(beliefsFactory, spanModel, viterbi)
   }
 

@@ -17,7 +17,7 @@ package epic.parser.models
 */
 import epic.framework.{Feature, Model, ModelFactory}
 import breeze.linalg._
-import epic.parser.{BaseGrammar, Parser}
+import epic.parser.{CoreGrammar, BaseGrammar, Parser}
 import epic.trees.TreeInstance
 import epic.lexicon.Lexicon
 import java.io.File
@@ -37,7 +37,7 @@ trait ParserExtractable[L, W] {
 
 
 trait ParserExtractableModelFactory[L,W] {
-  def make(train: IndexedSeq[TreeInstance[L, W]], constrainer: ChartConstraints.Factory[L, W])(implicit broker: CacheBroker): MyModel
+  def make(train: IndexedSeq[TreeInstance[L, W]], baseMeasure: CoreGrammar[L, W])(implicit broker: CacheBroker): MyModel
 
   def readWeights(in: File):Counter[Feature, Double] = if(in != null && in.exists) {
     try {

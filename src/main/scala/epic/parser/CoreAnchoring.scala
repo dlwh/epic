@@ -122,7 +122,7 @@ object CoreAnchoring {
   def identity[L, W](grammar: BaseGrammar[L],
                      lexicon: Lexicon[L, W],
                      words: IndexedSeq[W],
-                     constraints: ChartConstraints[L]):CoreAnchoring[L, W] = {
+                     constraints: ChartConstraints[L] = ChartConstraints.noSparsity[L]):CoreAnchoring[L, W] = {
     new Identity(grammar, lexicon, words, constraints)
   }
 

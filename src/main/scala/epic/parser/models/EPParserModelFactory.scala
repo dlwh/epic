@@ -44,7 +44,7 @@ case class EPParserModelFactory(ep: EPParams,
   type MyModel = EPParserModel[AnnotatedLabel, String]
 
 
-  def make(train: IndexedSeq[TreeInstance[AnnotatedLabel, String]], constrainer: Factory[AnnotatedLabel, String])(implicit broker: CacheBroker): MyModel = {
+  def make(train: IndexedSeq[TreeInstance[AnnotatedLabel, String]], constrainer: CoreGrammar[AnnotatedLabel, String])(implicit broker: CacheBroker): MyModel = {
     val (xbarGrammar, xbarLexicon) = baseParser.xbarGrammar(train)
 
     type ModelType = EPModel.CompatibleModel[TreeInstance[AnnotatedLabel, String], CoreAnchoring[AnnotatedLabel, String]]

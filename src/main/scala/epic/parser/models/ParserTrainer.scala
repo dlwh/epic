@@ -16,13 +16,13 @@ package epic.parser.models
  limitations under the License.
 */
 import epic.framework._
-import epic.parser.{SimpleChartParser, GenerativeParser, Parser}
+import epic.parser.{HammingLossAugmentation, SimpleChartParser, GenerativeParser, Parser}
 import breeze.linalg._
 import breeze.optimize._
 import epic.trees.AnnotatedLabel
 import breeze.config.Help
 import com.typesafe.scalalogging.log4j.Logging
-import epic.parser.projections.{ReachabilityProjection, ParserChartConstraintsFactory}
+import epic.parser.projections.{ConstraintCoreGrammarAdaptor, ReachabilityProjection, ParserChartConstraintsFactory}
 import epic.util.CacheBroker
 import epic.parser.ParserParams.XbarGrammar
 import breeze.util._
@@ -64,6 +64,8 @@ object ParserTrainer extends epic.parser.ParserPipeline with Logging {
                     randomize: Boolean = false,
                     @Help(text="Should we enforce reachability? Can be useful if we're pruning the gold tree.")
                     enforceReachability: Boolean = true,
+                    @Help(text="Should we do loss augmentation?")
+                    lossAugment: Boolean = false,
                     @Help(text="Should we check the gradient to make sure it's coded correctly?")
                     checkGradient: Boolean = false)
   protected val paramManifest = manifest[Params]
@@ -82,17 +84,25 @@ object ParserTrainer extends epic.parser.ParserPipeline with Logging {
         readObject[SimpleChartParser[AnnotatedLabel, String]](f)
     }
 
-    val uncached = new ParserChartConstraintsFactory[AnnotatedLabel, String](initialParser.augmentedGrammar, {(_:AnnotatedLabel).isIntermediate})
-    val constraints = new CachedChartConstraintsFactory[AnnotatedLabel, String](uncached)
+    val constraints = {
+      val uncached = new ParserChartConstraintsFactory[AnnotatedLabel, String](initialParser.augmentedGrammar, {(_:AnnotatedLabel).isIntermediate})
+      new CachedChartConstraintsFactory[AnnotatedLabel, String](uncached)
+    }
 
-    val proj = new ReachabilityProjection(initialParser.grammar, initialParser.lexicon)
     val theTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]] = if(!enforceReachability)  {
-      trainTrees
+      trainTrees.par.map(new StripAnnotations).seq.toIndexedSeq
     } else {
+      val proj = new ReachabilityProjection(initialParser.grammar, initialParser.lexicon)
       trainTrees.par.map(new StripAnnotations).map(ti => ti.copy(tree=proj.forTree(ti.tree, ti.words, constraints.constraints(ti.words)))).seq.toIndexedSeq
     }
 
-    val model = modelFactory.make(theTrees, constraints)
+    val baseMeasure = if(lossAugment) {
+      new ConstraintCoreGrammarAdaptor(initialParser.grammar, initialParser.lexicon, constraints) * new HammingLossAugmentation(initialParser.grammar, initialParser.lexicon).asCoreGrammar(theTrees)
+    } else {
+      new ConstraintCoreGrammarAdaptor(initialParser.grammar, initialParser.lexicon, constraints)
+    }
+
+    val model = modelFactory.make(theTrees, baseMeasure)
 
     val obj = new ModelObjective(model, theTrees, params.threads)
     val cachedObj = new CachedBatchDiffFunction(obj)

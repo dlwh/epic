@@ -30,7 +30,6 @@ sealed trait LabeledSpanConstraints[-L] extends SpanConstraints {
   /** How long can a span be if it has label label in this sentence? */
   def maxSpanLengthForLabel(label: Int):Int
 
-  // TODO... what's the right thing here?
   /**
    * Computes the intersection of the constraints
    * @param other

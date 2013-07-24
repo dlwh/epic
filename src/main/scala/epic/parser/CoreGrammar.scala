@@ -2,6 +2,7 @@ package epic.parser
 
 import epic.lexicon.Lexicon
 import epic.constraints.ChartConstraints
+import epic.constraints.ChartConstraints.Factory
 
 /*
  Copyright 2012 David Hall
@@ -45,6 +46,12 @@ trait CoreGrammar[L, W] extends Serializable {
    * @return
    */
   def anchor(words: IndexedSeq[W]):CoreAnchoring[L, W]
+
+  def asConstraintFactory:ChartConstraints.Factory[L, W] = new Factory[L, W] {
+    def constraints(w: IndexedSeq[W]): ChartConstraints[L] = anchor(w).sparsityPattern
+  }
+
+  def *(other: CoreGrammar[L, W]):CoreGrammar[L, W] = new CoreGrammar.ProductGrammar(this, other)
 }
 
 object CoreGrammar {
@@ -57,5 +64,12 @@ object CoreGrammar {
 
       def anchor(words: IndexedSeq[W]) = CoreAnchoring.identity(grammar, lexicon, words, ChartConstraints.noSparsity[L])
     }
+  }
+
+  case class ProductGrammar[L, W](g1: CoreGrammar[L, W], g2: CoreGrammar[L, W]) extends CoreGrammar[L, W] {
+    def grammar: BaseGrammar[L] = g1.grammar
+    def lexicon: Lexicon[L, W] = g1.lexicon
+
+    def anchor(words: IndexedSeq[W]): CoreAnchoring[L, W] = g1.anchor(words) * g2.anchor(words)
   }
 }

@@ -34,7 +34,7 @@ import epic.util.{SafeLogging, CacheBroker}
 class LatentParserModel[L, L3, W](indexedFeatures: IndexedFeaturizer[L, L3, W],
                                   reannotate: (BinarizedTree[L], Seq[W]) => BinarizedTree[L],
                                   val projections: GrammarRefinements[L, L3],
-                                  baseFactory: ChartConstraints.Factory[L, W],
+                                  baseFactory: CoreGrammar[L, W],
                                   val baseGrammar: BaseGrammar[L],
                                   val lexicon: Lexicon[L, W],
                                   initialFeatureVal: (Feature => Option[Double]) = { _ => None }) extends ParserModel[L, W] {
@@ -53,7 +53,7 @@ class LatentParserModel[L, L3, W](indexedFeatures: IndexedFeaturizer[L, L3, W],
     val lexicon = new FeaturizedLexicon(weights, indexedFeatures)
     val grammar = FeaturizedGrammar(this.baseGrammar, this.lexicon, projections, weights, indexedFeatures, lexicon)
 
-    new LatentParserInference(indexedFeatures, reannotate, grammar, new ConstraintCoreGrammarAdaptor(grammar.grammar, grammar.lexicon, baseFactory), projections)
+    new LatentParserInference(indexedFeatures, reannotate, grammar, baseFactory, projections)
   }
 
   def expectedCountsToObjective(ecounts: ExpectedCounts) = {
@@ -144,7 +144,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
                                |X""".stripMargin.split("\\s+"):_*)
 
   def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]],
-           constrainer: ChartConstraints.Factory[AnnotatedLabel, String])(implicit cache: CacheBroker):MyModel = {
+           constrainer: CoreGrammar[AnnotatedLabel, String])(implicit cache: CacheBroker):MyModel = {
     val annTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]] = trainTrees.map(annotator(_))
 
     val (annWords, annBinaries, annUnaries) = this.extractBasicCounts(annTrees)

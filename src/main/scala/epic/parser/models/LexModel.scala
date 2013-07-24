@@ -46,7 +46,7 @@ import epic.constraints.ChartConstraints.Factory
 class LexModel[L, W](bundle: LexGrammarBundle[L, W],
                      reannotate: (BinarizedTree[L], IndexedSeq[W])=>BinarizedTree[L],
                      indexed: IndexedLexFeaturizer[L, W],
-                     baseFactory: ChartConstraints.Factory[L, W],
+                     baseFactory: CoreGrammar[L, W],
                      coarse: BaseGrammar[L],
                      coarseLex: Lexicon[L, W],
                      initFeatureValue: Feature=>Option[Double]) extends ParserModel[L, W] with Serializable with ParserExtractable[L, W] {
@@ -67,7 +67,7 @@ class LexModel[L, W](bundle: LexGrammarBundle[L, W],
       headed
 
     }
-    new AnnotatedParserInference(indexed, ann _, gram, new ConstraintCoreGrammarAdaptor(bundle.baseGrammar, bundle.baseLexicon, baseFactory))
+    new AnnotatedParserInference(indexed, ann _, gram, baseFactory)
   }
 
   type Inference = AnnotatedParserInference[L, W]
@@ -682,7 +682,7 @@ case class LexModelFactory(baseParser: ParserParams.XbarGrammar,
                            minFeatCutoff: Int = 1) extends ParserExtractableModelFactory[AnnotatedLabel, String] with SafeLogging {
   type MyModel = LexModel[AnnotatedLabel, String]
 
-  def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]], constrainer: Factory[AnnotatedLabel, String])(implicit broker: CacheBroker) ={
+  def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]], constrainer: CoreGrammar[AnnotatedLabel, String])(implicit broker: CacheBroker) ={
     val trees = trainTrees.map(annotator)
     val (initLexicon, initBinaries, initUnaries) = GenerativeParser.extractCounts(trees)
 
@@ -723,7 +723,7 @@ case class LexModelFactory(baseParser: ParserParams.XbarGrammar,
     val featureCounter = readWeights(oldWeights)
 
     def reannotate(tree: BinarizedTree[AnnotatedLabel], words: IndexedSeq[String]) = tree.map(_.baseAnnotatedLabel)
-    val model = new LexModel[AnnotatedLabel, String](bundle, reannotate, indexed, cFactory, xbarGrammar, xbarLexicon, {featureCounter.get(_)})
+    val model = new LexModel[AnnotatedLabel, String](bundle, reannotate, indexed, cFactory, xbarGrammar, xbarLexicon, featureCounter.get)
 
     model
 
