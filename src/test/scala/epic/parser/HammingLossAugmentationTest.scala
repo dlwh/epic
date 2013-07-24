@@ -21,6 +21,4 @@ class HammingLossAugmentationTest  extends ParserTestHarness with FunSuite {
       assert(marg.logPartition < marg2.logPartition || t2 == ti.tree, marg.logPartition + " " + ti + " " + t2)
     }
 
-  }
-
 }
