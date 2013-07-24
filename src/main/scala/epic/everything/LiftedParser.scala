@@ -128,10 +128,10 @@ object LiftedParser {
    * along with the LexGrammar's information.
    * @author dlwh
    */
-  final class Anchoring[L, W](val grammar: BaseGrammar[L],
-                              val lexicon: Lexicon[L, W],
-                              val words: IndexedSeq[W],
-                              val beliefs: SentenceBeliefs,
+  final case class Anchoring[L, W](grammar: BaseGrammar[L],
+                              lexicon: Lexicon[L, W],
+                              words: IndexedSeq[W],
+                              beliefs: SentenceBeliefs,
                               override val sparsityPattern: ChartConstraints[L]) extends CoreAnchoring[L, W] {
     // we employ the trick in Klein's thesis and in the Smith & Eisner BP paper
     // which is as follows: we want to multiply \prod_(all spans) p(span type of span or not a span)
@@ -145,6 +145,9 @@ object LiftedParser {
     private val notConstituent = grammar.labelIndex.size
 
     def length = words.length
+
+
+    def addConstraints(cs: ChartConstraints[L]): CoreAnchoring[L, W] = copy(sparsityPattern = sparsityPattern & cs)
 
     /**
      * The premultiplication constant.

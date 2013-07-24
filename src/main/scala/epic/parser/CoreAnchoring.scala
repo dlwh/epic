@@ -37,6 +37,7 @@ trait CoreAnchoring[L, W] extends Factor[CoreAnchoring[L, W]] {
 
   def tagConstraints: TagConstraints[L] = lexLoc
   def sparsityPattern = ChartConstraints.noSparsity[L]
+  def addConstraints(cs: ChartConstraints[L]):CoreAnchoring[L, W]
 
   /**
    * Scores the indexed [[epic.trees.BinaryRule]] rule when it occurs at (begin,split,end)
@@ -67,8 +68,8 @@ trait CoreAnchoring[L, W] extends Factor[CoreAnchoring[L, W]] {
     if (other eq null) this // ugh
     else if(other.isInstanceOf[CoreAnchoring.Identity[L, W]] && this.isInstanceOf[CoreAnchoring.Identity[L, W]])
       CoreAnchoring.identity(grammar, lexicon, words, sparsityPattern & other.sparsityPattern)
-    else if(other.isInstanceOf[CoreAnchoring.Identity[L, W]]) this
-    else if(this.isInstanceOf[CoreAnchoring.Identity[L, W]]) other
+    else if(other.isInstanceOf[CoreAnchoring.Identity[L, W]]) this.addConstraints(other.sparsityPattern)
+    else if(this.isInstanceOf[CoreAnchoring.Identity[L, W]]) other.addConstraints(this.sparsityPattern)
     else new ProductCoreAnchoring(this,other)
   }
 
@@ -83,7 +84,7 @@ trait CoreAnchoring[L, W] extends Factor[CoreAnchoring[L, W]] {
     // hacky multimethod dispatch is hacky
     if (other eq null) this // ugh
     else if(this eq other) new CoreAnchoring.Identity[L, W](grammar, lexicon, words, sparsityPattern)
-    else if(other.isInstanceOf[CoreAnchoring.Identity[L, W]]) this
+    else if(other.isInstanceOf[CoreAnchoring.Identity[L, W]]) this.addConstraints(other.sparsityPattern)
     else new ProductCoreAnchoring(this, other, -1)
   }
 
@@ -137,6 +138,8 @@ object CoreAnchoring {
   @SerialVersionUID(1L)
   case class Identity[L, W](grammar: BaseGrammar[L], lexicon: Lexicon[L, W], words: IndexedSeq[W],
                             override val sparsityPattern: ChartConstraints[L]) extends CoreAnchoring[L, W] {
+
+    def addConstraints(cs: ChartConstraints[L]): CoreAnchoring[L, W] = copy(sparsityPattern = sparsityPattern & cs)
 
     def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = 0.0
 

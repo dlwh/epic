@@ -92,6 +92,7 @@ case class SpanAnchoring[L, W](grammar: BaseGrammar[L],
                                spanScores: Array[OpenAddressHashArray[Double]],
                                unaryScores: Array[OpenAddressHashArray[Double]],
                                override val sparsityPattern: ChartConstraints[L])  extends CoreAnchoring[L, W] {
+  def addConstraints(cs: ChartConstraints[L]): CoreAnchoring[L, W] = copy(sparsityPattern = sparsityPattern & cs)
   def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = 0.0
 
   def scoreUnaryRule(begin: Int, end: Int, rule: Int) = {

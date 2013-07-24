@@ -103,15 +103,16 @@ case class AnchoredRuleMarginalProjector[L, W](threshold: Double = Double.Negati
 }
 
 @SerialVersionUID(3)
-class SimpleAnchoring[L, W](val grammar: BaseGrammar[L],
-                            val lexicon: Lexicon[L, W],
-                            val words: IndexedSeq[W],
+case class SimpleAnchoring[L, W](grammar: BaseGrammar[L],
+                            lexicon: Lexicon[L, W],
+                            words: IndexedSeq[W],
                             spanScores: Array[OpenAddressHashArray[Double]], // triangular index -> label -> score
                             // (begin, end) -> rule -> score
                             unaryScores: Array[OpenAddressHashArray[Double]],
                             // (begin, end) -> (split-begin) -> rule -> score
                             binaryScores: Array[Array[OpenAddressHashArray[Double]]],
                             override val sparsityPattern: ChartConstraints[L]) extends CoreAnchoring[L, W] with Serializable {
+  def addConstraints(cs: ChartConstraints[L]): CoreAnchoring[L, W] = copy(sparsityPattern = sparsityPattern & cs)
 
   def scoreUnaryRule(begin: Int, end: Int, rule: Int) = {
     val forSpan = unaryScores(TriangularArray.index(begin, end))

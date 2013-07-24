@@ -32,6 +32,8 @@ class ReachabilityProjection[L, W](grammar: BaseGrammar[L], lexicon: Lexicon[L, 
         val marg = AugmentedAnchoring.fromCore(new CoreAnchoring[L, W] {
           def words: IndexedSeq[W] = w
 
+          def addConstraints(cs: ChartConstraints[L]): CoreAnchoring[L, W] = this
+
           def grammar: BaseGrammar[L] = ReachabilityProjection.this.grammar
           def lexicon = ReachabilityProjection.this.lexicon
 
