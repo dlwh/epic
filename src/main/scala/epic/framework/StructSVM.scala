@@ -12,6 +12,7 @@ class StructSVM[Datum](model: Model[Datum],
 
   import model._
 
+
   def train(initWeights: DenseVector[Double])(data: IndexedSeq[Datum]) = {
     val weights = initWeights.copy
     var alphas = DenseVector.zeros[Double](0)
@@ -32,7 +33,7 @@ class StructSVM[Datum](model: Model[Datum],
         alphas = newAlphas
       }
 
-      converged = (weights - newWeights).norm(Double.PositiveInfinity) < 1E-6
+      converged = constraints.size == 0 || (weights - newWeights).norm(Double.PositiveInfinity) < 1E-6
       weights := newWeights
     }
   }

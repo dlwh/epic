@@ -50,7 +50,7 @@ object SemiNERPipeline extends Logging {
 
     // build feature Index
     val model = new SegmentationModelFactory(NERType.OutsideSentence, NERType.NotEntity, gazetteer = gazetteer)(params.cache).makeModel(train)
-    val obj = new ModelObjective(model, train, params.nthreads)(params.cache)
+    val obj = new ModelObjective(model, train, params.nthreads)
     val cached = new CachedBatchDiffFunction(obj)
     if(params.checkGradient) {
       GradientTester.test(cached, obj.initialWeightVector(true), toString = {(x: Int) => model.featureIndex.get(x).toString})

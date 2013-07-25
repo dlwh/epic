@@ -19,8 +19,8 @@ import epic.util.{SafeLogging, CacheBroker}
  */
 class ModelObjective[Datum](val model: Model[Datum],
                             batchSelector: IndexedSeq[Int]=>GenTraversable[Datum],
-                            val fullRange: IndexedSeq[Int])(implicit cache: CacheBroker) extends BatchDiffFunction[DenseVector[Double]] with SafeLogging {
-  def this(model: Model[Datum], data: IndexedSeq[Datum], numThreads: Int = -1)(implicit cache: CacheBroker) = this(model,ModelObjective.makePar(data, numThreads)(_), 0 until data.length)
+                            val fullRange: IndexedSeq[Int]) extends BatchDiffFunction[DenseVector[Double]] with SafeLogging {
+  def this(model: Model[Datum], data: IndexedSeq[Datum], numThreads: Int = -1) = this(model,ModelObjective.makePar(data, numThreads)(_), 0 until data.length)
 
   import model.{ExpectedCounts => _, _}
 
