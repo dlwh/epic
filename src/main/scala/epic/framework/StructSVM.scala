@@ -2,30 +2,83 @@ package epic.framework
 
 import breeze.linalg._
 import breeze.stats.distributions.Rand
-import breeze.util.Encoder
+import scala.collection.mutable.ArrayBuffer
+import scala.collection.GenTraversableOnce
 
-class StructSVM[Datum](model: Model[Datum], maxIter: Int = 100, batchSize: Int = 100, maxSMOIterations: Int = 100) {
+class StructSVM[Datum](model: Model[Datum],
+                       maxIter: Int = 100,
+                       batchSize: Int = 100,
+                       maxSMOIterations: Int = 100) {
 
-  def train(initWeights: DenseVector[Double]) = {
+  import model._
+
+  def train(initWeights: DenseVector[Double])(data: IndexedSeq[Datum]) = {
     val weights = initWeights.copy
-    for(i <- 0 until maxIter) {
+    var alphas = DenseVector.zeros[Double](0)
+    var constraints = IndexedSeq.empty[Constraint]
+    var converged = false
+    val numBatches = (data.length + batchSize - 1)/batchSize
+    for(i <- 0 until maxIter if !converged) {
+      val newWeights = weights.copy
+      for(i <- 0 until  numBatches) {
+        val smoTol = if(i < 5) math.pow(10, -(i + 1)) else 1E-6
+        val inf = model.inferenceFromWeights(newWeights)
+        val batch = Rand.subsetsOfSize(data, batchSize).draw()
+        constraints ++= findNewConstraints(inf, batch)
 
+        smo(inf, newWeights, alphas, constraints, smoTol)
+        val (newAlphas, newConstraints) = removeOldConstraints(alphas, constraints)
+        constraints = newConstraints
+        alphas = newAlphas
+      }
 
+      converged = (weights - newWeights).norm(Double.PositiveInfinity) < 1E-6
+      weights := newWeights
     }
   }
 
-  private case class Constraint(guess: Datum, gold: Datum, feats: DenseVector[Double], loss: Double) {
+
+  private case class Constraint(ec: ExpectedCounts) {
+    lazy val (loss, feats) = model.expectedCountsToObjective(ec)
     lazy val ftf = feats dot feats
+    var age = 0
   }
 
+
+  private def findNewConstraints(inf: model.Inference, data: IndexedSeq[Datum]): GenTraversableOnce[Constraint] = {
+    for {
+      d <- data.par
+      ec = inf.expectedCounts(d, inf.emptyCounts, 1.0) if ec.loss > 0
+    } yield Constraint(ec)
+
+  }
+
+  private def removeOldConstraints(alphas: DenseVector[Double],
+                                   constraints: IndexedSeq[Constraint]):(DenseVector[Double], IndexedSeq[Constraint]) = {
+    val newAlphas = Array.newBuilder[Double]
+    val newConstraints = new ArrayBuffer[Constraint]()
+    for( i <- 0 until alphas.length) {
+      if(alphas(i).abs < 1E-5) constraints(i).age += 1
+      else constraints(i).age = 0
+
+      if(constraints(i).age < MAX_CONSTRAINT_AGE) {
+        newConstraints += constraints(i)
+        newAlphas += alphas(i)
+      }
+    }
+
+    new DenseVector(newAlphas.result()) -> newConstraints
+  }
+
+  val MAX_CONSTRAINT_AGE = 50
+
   private def smo(inf: model.Inference,
-                  lastWeights: DenseVector[Double],
-                  lastAlphas: DenseVector[Double],
-                  constraints: IndexedSeq[Constraint]):(DenseVector[Double], DenseVector[Double]) = {
-    val alphas = lastAlphas.copy
-    val weights  = lastWeights.copy
+                  weights: DenseVector[Double],
+                  alphas: DenseVector[Double],
+                  constraints: IndexedSeq[Constraint],
+                  smoTol: Double): Unit = {
     var largestChange = 10000.0
-    for(iter <- 0 until maxSMOIterations if largestChange > 1E-4) {
+    for(iter <- 0 until maxSMOIterations if largestChange > smoTol) {
       largestChange = 0.0
       val perm = Rand.permutation(constraints.length).draw()
       for( i <- perm) {
@@ -52,7 +105,6 @@ class StructSVM[Datum](model: Model[Datum], maxIter: Int = 100, batchSize: Int =
 
     }
 
-    lastWeights -> alphas
   }
 
 }
