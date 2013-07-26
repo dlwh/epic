@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?><graph xmlns="http://www.xces.org/ns/GrAF/1.0/" xmlns:graf="http://www.xces.org/ns/GrAF/1.0/">
+    <graphHeader>
+        <labelsDecl>
+            <labelUsage label="Non-Committed Belief" occurs="2"/>
+            <labelUsage label="Not Applicable" occurs="2"/>
+            <labelUsage label="Committed Belief" occurs="3"/>
+        </labelsDecl>
+        <annotationSpaces>
+            <annotationSpace as.id="cb"/>
+        </annotationSpaces>
+    </graphHeader>
+    <region xml:id="cb-r0" anchors="62 67"/>
+    <node xml:id="cb-n0">
+        <link targets="cb-r0"/>
+    </node>
+    <a xml:id="cb-N65577" label="Committed Belief" ref="cb-n0" as="cb"/>
+    <region xml:id="cb-r1" anchors="87 95"/>
+    <node xml:id="cb-n1">
+        <link targets="cb-r1"/>
+    </node>
+    <a xml:id="cb-N65593" label="Not Applicable" ref="cb-n1" as="cb"/>
+    <region xml:id="cb-r2" anchors="104 108"/>
+    <node xml:id="cb-n2">
+        <link targets="cb-r2"/>
+    </node>
+    <a xml:id="cb-N65609" label="Not Applicable" ref="cb-n2" as="cb"/>
+    <region xml:id="cb-r3" anchors="164 172"/>
+    <node xml:id="cb-n3">
+        <link targets="cb-r3"/>
+    </node>
+    <a xml:id="cb-N65625" label="Committed Belief" ref="cb-n3" as="cb"/>
+    <region xml:id="cb-r4" anchors="198 202"/>
+    <node xml:id="cb-n4">
+        <link targets="cb-r4"/>
+    </node>
+    <a xml:id="cb-N65641" label="Committed Belief" ref="cb-n4" as="cb"/>
+    <region xml:id="cb-r5" anchors="208 226"/>
+    <node xml:id="cb-n5">
+        <link targets="cb-r5"/>
+    </node>
+    <a xml:id="cb-N65657" label="Non-Committed Belief" ref="cb-n5" as="cb"/>
+    <region xml:id="cb-r6" anchors="232 236"/>
+    <node xml:id="cb-n6">
+        <link targets="cb-r6"/>
+    </node>
+    <a xml:id="cb-N65673" label="Non-Committed Belief" ref="cb-n6" as="cb"/>
+</graph>

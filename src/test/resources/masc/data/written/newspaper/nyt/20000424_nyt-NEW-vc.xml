@@ -1,0 +1,60 @@
+<graph xmlns="http://www.xces.org/ns/GrAF/1.0/" xmlns:graf="http://www.xces.org/ns/GrAF/1.0/">
+  <graphHeader>
+    <labelsDecl>
+      <labelUsage label="vchunk" occurs="5"/>
+    </labelsDecl>
+    <dependencies>
+      <dependsOn f.id="f.penn"/>
+    </dependencies>
+    <annotationSpaces>
+      <annotationSpace as.id="anc"/>
+    </annotationSpaces>
+  </graphHeader>
+  <node xml:id="vc-n0"/>
+  <a xml:id="vc-N65567" label="vchunk" ref="vc-n0" as="anc">
+    <fs>
+      <f name="type" value="FVG"/>
+      <f name="tense" value="SimPre"/>
+      <f name="voice" value="active"/>
+    </fs>
+  </a>
+  <node xml:id="vc-n1"/>
+  <a xml:id="vc-N65591" label="vchunk" ref="vc-n1" as="anc">
+    <fs>
+      <f name="type" value="NFVG"/>
+      <f name="tense" value="Inf"/>
+      <f name="voice" value="active"/>
+    </fs>
+  </a>
+  <node xml:id="vc-n2"/>
+  <a xml:id="vc-N65615" label="vchunk" ref="vc-n2" as="anc">
+    <fs>
+      <f name="type" value="FVG"/>
+      <f name="tense" value="SimPas"/>
+      <f name="voice" value="active"/>
+    </fs>
+  </a>
+  <node xml:id="vc-n3"/>
+  <a xml:id="vc-N65639" label="vchunk" ref="vc-n3" as="anc">
+    <fs>
+      <f name="type" value="FVG"/>
+      <f name="tense" value="SimPas"/>
+      <f name="voice" value="active"/>
+    </fs>
+  </a>
+  <node xml:id="vc-n4"/>
+  <a xml:id="vc-N65663" label="vchunk" ref="vc-n4" as="anc">
+    <fs>
+      <f name="type" value="FVG"/>
+      <f name="tense" value="PrePer"/>
+      <f name="voice" value="active"/>
+    </fs>
+  </a>
+  <edge xml:id="vc-lnk6" from="vc-n4" to="penn-n42"/>
+  <edge xml:id="vc-lnk5" from="vc-n4" to="penn-n41"/>
+  <edge xml:id="vc-lnk4" from="vc-n3" to="penn-n37"/>
+  <edge xml:id="vc-lnk3" from="vc-n2" to="penn-n30"/>
+  <edge xml:id="vc-lnk2" from="vc-n1" to="penn-n15"/>
+  <edge xml:id="vc-lnk1" from="vc-n1" to="penn-n14"/>
+  <edge xml:id="vc-lnk0" from="vc-n0" to="penn-n10"/>
+</graph>

@@ -3,6 +3,10 @@ package chalk.corpora
 import scala.xml._
 import java.io._
 import io.Codec
+import java.net.URL
+import chalk.slab.Slab
+import chalk.slab.Span
+import scala.io.Source
 
 case class MNode(id: String, targets: Seq[String])
 case class MAnnotation(id: String, label: String, ref: String, features: Map[String,String])
@@ -284,4 +288,9 @@ object MascUtil {
     else "UNK"
   }
 
+}
+
+object MascSlab {
+  def apply(textFileUrl: URL): Slab.StringSlab[Span] =
+    Slab.apply(Source.fromURL(textFileUrl)(Codec.UTF8).mkString)
 }
