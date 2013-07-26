@@ -6,6 +6,7 @@ import org.junit.runner.RunWith
 import chalk.slab.Source
 import chalk.slab.Sentence
 import chalk.slab.Segment
+import chalk.slab.PartOfSpeech
 
 @RunWith(classOf[JUnitRunner])
 class MascTest extends FunSuite {
@@ -23,7 +24,7 @@ class MascTest extends FunSuite {
       "Rep. Tony Hall, D-Ohio, urges the United Nations to allow a freer flow\n\t\t\t\tof food and medicine into Iraq.",
       "Hall, who recently returned from a trip\n\t\t\t\tto Iraq, said U.N. economic sanctions have hurt millions of civilians\n\t\t\t\tthere.",
       "By AUSTIN ZALKIN."))
-    
+
     val segSlab = MascSlab.seg(sentSlab)
     assert(segSlab.iterator[Segment].map(_.in(segSlab).content).toList === List(
       "IRAQ", "-", "POVERTY", "(", "Washington", ")",
@@ -33,5 +34,23 @@ class MascTest extends FunSuite {
       "U.", "N.", "economic", "sanctions", "have", "hurt", "millions", "of", "civilians",
       "there", ".",
       "By", "AUSTIN", "ZALKIN", "."))
+
+    val posSlab = MascSlab.penn(segSlab)
+    assert(posSlab.iterator[PartOfSpeech].map(_.in(posSlab).content).toList === List(
+      "IRAQ-POVERTY", "(", "Washington", ")",
+      "Rep.", "Tony", "Hall", ",", "D-Ohio", ",", "urges", "the", "United", "Nations",
+      "to", "allow", "a", "freer", "flow", "of", "food", "and", "medicine", "into", "Iraq", ".",
+      "Hall", ",", "who", "recently", "returned", "from", "a", "trip", "to", "Iraq", ",", "said",
+      "U.N.", "economic", "sanctions", "have", "hurt", "millions", "of", "civilians",
+      "there", ".",
+      "By", "AUSTIN", "ZALKIN", "."))
+
+    assert(posSlab.iterator[PartOfSpeech].map(_.tag).toList === List(
+      "NNP", "(", "NNP", ")",
+      "NN", "NNP", "NNP", ",", "NNP", ",", "VBZ", "DT", "NNP", "NNPS",
+      "TO", "VB", "DT", "JJR", "NN", "IN", "NN", "CC", "NN", "IN", "NNP", ".",
+      "NNP", ",", "WP", "RB", "VBD", "IN", "DT", "NN", "TO", "NNP", ",", "VBD",
+      "NN", "JJ", "NNS", "VBP", "VBN", "NNS", "IN", "NNS", "RB", ".",
+      "IN", "NNP", "NNP", "."))
   }
 }
