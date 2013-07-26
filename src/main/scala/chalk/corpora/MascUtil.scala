@@ -10,6 +10,7 @@ import chalk.slab.Source
 import chalk.slab.Sentence
 import chalk.slab.Segment
 import chalk.slab.PartOfSpeech
+import chalk.slab.EntityMention
 
 case class MNode(id: String, targets: Seq[String])
 case class MAnnotation(id: String, label: String, ref: String, features: Map[String,String])
@@ -357,7 +358,7 @@ object MascSlab {
     val List(source) = slab.iterator[Source].toList
     val pennXml = XML.load(source.url.toString().replaceAll("[.]txt$", "-penn.xml"))
 
-    val idToSegment = (for (s <- slab.iterator[Segment]; id <- s.id) yield id -> s).toMap
+    val idToSegment = (for (s <- slab.iterator[Segment]; id <- s.id.iterator) yield id -> s).toMap
     val idToPosRegion = MascUtil.getNodes(pennXml).map(node => {
       val segments = node.targets.map(idToSegment).sortBy(s => (s.begin, -s.end))
       node.id -> MRegion(node.id, segments.head.begin, segments.last.end)
@@ -372,5 +373,31 @@ object MascSlab {
     
     // FIXME: should not be necesssary to sort, but Slab needs better implementation
     slab ++ partOfSpeechTags.sortBy(p => p.begin -> -p.end).iterator
+  }
+  
+  /**
+   * Adds EntityMention annotations using the MASC -ne.xml file.
+   * 
+   * Assumes there will be exactly one Source annotation, providing the URL of the MASC .txt file.
+   * 
+   * @param slab The Slab containing the text, the source URL and PartOfSpeech annotations.
+   * @return The Slab with added EntityMention annotations as read from the MASC -ne.xml file.
+   */
+  def ne[I <: Source with PartOfSpeech](slab: Slab.StringSlab[I]) = {
+    val List(source) = slab.iterator[Source].toList
+    val neXml = XML.load(source.url.toString().replaceAll("[.]txt$", "-ne.xml"))
+    
+    val idToPos = (for (p <- slab.iterator[PartOfSpeech]; id <- p.id.iterator) yield id -> p).toMap
+    val neIdPosIdTuples = MascUtil.getEdges(neXml).map(e => (e.from -> e.to))
+    val neIdToPosIds = neIdPosIdTuples.groupBy(_._1).mapValues(_.map(_._2))
+    
+    val entityMentions = for (annotation <- MascUtil.getAnnotations(neXml)) yield {
+      val posTags = neIdToPosIds(annotation.ref).map(idToPos).sortBy(p => p.begin -> -p.end)
+      val begin = posTags.head.begin
+      val end = posTags.last.end
+      EntityMention(begin, end, annotation.label, Some(annotation.ref))
+    }
+    
+    slab ++ entityMentions.iterator
   }
 }

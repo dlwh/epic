@@ -7,6 +7,7 @@ import chalk.slab.Source
 import chalk.slab.Sentence
 import chalk.slab.Segment
 import chalk.slab.PartOfSpeech
+import chalk.slab.EntityMention
 
 @RunWith(classOf[JUnitRunner])
 class MascTest extends FunSuite {
@@ -52,5 +53,16 @@ class MascTest extends FunSuite {
       "NNP", ",", "WP", "RB", "VBD", "IN", "DT", "NN", "TO", "NNP", ",", "VBD",
       "NN", "JJ", "NNS", "VBP", "VBN", "NNS", "IN", "NNS", "RB", ".",
       "IN", "NNP", "NNP", "."))
+
+    val neSlab = MascSlab.ne(posSlab)
+    // error in MASC data: "," as "location" instead of "D-Ohio", and "Hall" missed
+    assert(neSlab.iterator[EntityMention].map(_.in(neSlab).content).toList === List(
+      "IRAQ-POVERTY", "Washington", "Tony Hall", "," /*"D-Ohio"*/, "United Nations", "Iraq",
+      /*"Hall", */"Iraq", "U.N.",
+      "AUSTIN ZALKIN"))
+    assert(neSlab.iterator[EntityMention].map(_.entityType).toList === List(
+      "location", "location", "person", "location", "org", "location",
+      /*"person", */"location", "org",
+      "person"))
   }
 }
