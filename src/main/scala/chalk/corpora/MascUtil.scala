@@ -8,6 +8,7 @@ import chalk.slab.Slab
 import chalk.slab.Span
 import chalk.slab.Source
 import chalk.slab.Sentence
+import chalk.slab.Segment
 
 case class MNode(id: String, targets: Seq[String])
 case class MAnnotation(id: String, label: String, ref: String, features: Map[String,String])
@@ -320,5 +321,22 @@ object MascSlab {
       Sentence(region.start, region.end)
     }
     slab ++ sentences.iterator
+  }
+  
+  /**
+   * Add sentences to a MASC Slab using the MASC -seg.xml file.
+   * 
+   * Assumes there will be exactly one Source annotation, providing the URL of the MASC .txt file.
+   * 
+   * @param slab The Slab containing the text and source URL
+   * @return The Slab with added Segment annotations as read from the MASC -seg.xml file.
+   */
+  def seg[I <: Source](slab: Slab.StringSlab[I]) = {
+    val List(source) = slab.iterator[Source].toList
+    val segmentXml = XML.load(source.url.toString().replaceAll("[.]txt$", "-seg.xml"))
+    val segments = for (region <- MascUtil.getRegions(segmentXml)) yield {
+      Segment(region.start, region.end)
+    }
+    slab ++ segments.iterator
   }
 }

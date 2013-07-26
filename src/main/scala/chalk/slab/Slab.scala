@@ -72,6 +72,7 @@ object Span {
 // ===========
 case class Source(begin: Int, end: Int, url: URL) extends Span
 case class Sentence(val begin: Int, val end: Int) extends Span
+case class Segment(begin: Int, end: Int) extends Span
 case class Token(val begin: Int, val end: Int) extends Span
 
 
