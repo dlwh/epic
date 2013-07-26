@@ -7,6 +7,7 @@ import java.net.URL
 import chalk.slab.Slab
 import chalk.slab.Span
 import chalk.slab.Source
+import chalk.slab.Sentence
 
 case class MNode(id: String, targets: Seq[String])
 case class MAnnotation(id: String, label: String, ref: String, features: Map[String,String])
@@ -291,9 +292,33 @@ object MascUtil {
 }
 
 object MascSlab {
+
+  /**
+   * Create a Slab from a MASC .txt file
+   * 
+   * @param textFileUrl The URL of the MASC .txt (plain text) file.
+   * @return A Slab of the text, with the URL saved as a Source annotation.
+   */
   def apply(textFileUrl: URL): Slab.StringSlab[Source] = {
     val text = io.Source.fromURL(textFileUrl)(Codec.UTF8).mkString
     val slab = Slab[String, Span](text)
     slab ++ Iterator(Source(0, text.length, textFileUrl))
+  }
+
+  /**
+   * Add sentences to a MASC Slab using the MASC -s.xml file.
+   * 
+   * Assumes there will be exactly one Source annotation, providing the URL of the MASC .txt file.
+   * 
+   * @param slab The Slab containing the text and source URL
+   * @return The Slab with added Sentence annotations as read from the MASC -s.xml file.
+   */
+  def s[I <: Source](slab: Slab.StringSlab[I]) = {
+    val List(source) = slab.iterator[Source].toList
+    val sentenceXml = XML.load(source.url.toString().replaceAll("[.]txt$", "-s.xml"))
+    val sentences = for (region <- MascUtil.getRegions(sentenceXml)) yield {
+      Sentence(region.start, region.end)
+    }
+    slab ++ sentences.iterator
   }
 }
