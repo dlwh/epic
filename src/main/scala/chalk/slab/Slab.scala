@@ -1,6 +1,7 @@
 package chalk.slab
 
 import scala.reflect.ClassTag
+import java.net.URL
 
 trait Slab[ContentType, BaseAnnotationType, +AnnotationTypes <: BaseAnnotationType] {
 
@@ -69,6 +70,7 @@ object Span {
 // ===========
 // Annotations
 // ===========
+case class Source(begin: Int, end: Int, url: URL) extends Span
 case class Sentence(val begin: Int, val end: Int) extends Span
 case class Token(val begin: Int, val end: Int) extends Span
 

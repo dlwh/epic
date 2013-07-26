@@ -6,7 +6,7 @@ import io.Codec
 import java.net.URL
 import chalk.slab.Slab
 import chalk.slab.Span
-import scala.io.Source
+import chalk.slab.Source
 
 case class MNode(id: String, targets: Seq[String])
 case class MAnnotation(id: String, label: String, ref: String, features: Map[String,String])
@@ -291,6 +291,9 @@ object MascUtil {
 }
 
 object MascSlab {
-  def apply(textFileUrl: URL): Slab.StringSlab[Span] =
-    Slab.apply(Source.fromURL(textFileUrl)(Codec.UTF8).mkString)
+  def apply(textFileUrl: URL): Slab.StringSlab[Source] = {
+    val text = io.Source.fromURL(textFileUrl)(Codec.UTF8).mkString
+    val slab = Slab[String, Span](text)
+    slab ++ Iterator(Source(0, text.length, textFileUrl))
+  }
 }
