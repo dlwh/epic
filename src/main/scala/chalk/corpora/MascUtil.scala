@@ -3,6 +3,14 @@ package chalk.corpora
 import scala.xml._
 import java.io._
 import io.Codec
+import java.net.URL
+import chalk.slab.Slab
+import chalk.slab.Span
+import chalk.slab.Source
+import chalk.slab.Sentence
+import chalk.slab.Segment
+import chalk.slab.PartOfSpeech
+import chalk.slab.EntityMention
 
 case class MNode(id: String, targets: Seq[String])
 case class MAnnotation(id: String, label: String, ref: String, features: Map[String,String])
@@ -271,8 +279,12 @@ object MascUtil {
     .map(exml => MEdge(xmlId(exml), (exml \ "@from").toString, (exml \ "@to").toString))
   
   def getAnnotations(doc: Elem) = (doc \\ "a").toSeq.map { axml =>
-    val features = (axml \\ "f").toSeq
-      .map(fnode => ((fnode \ "@name").toString -> fnode.child.toString)).toMap
+    val fs = (axml \\ "f").toSeq
+    val features = fs .map(fnode => {
+      val name = (fnode \ "@name").toString
+      val value = (fnode \ "@value").toString
+      name -> (if (!value.isEmpty) value else fnode.child.toString) 
+    }).toMap
     MAnnotation(xmlId(axml), (axml \ "@label").toString, (axml \ "@ref").toString, features)
   }
 
@@ -284,4 +296,108 @@ object MascUtil {
     else "UNK"
   }
 
+}
+
+object MascSlab {
+
+  /**
+   * Create a Slab from a MASC .txt file
+   * 
+   * @param textFileUrl The URL of the MASC .txt (plain text) file.
+   * @return A Slab of the text, with the URL saved as a Source annotation.
+   */
+  def apply(textFileUrl: URL): Slab.StringSlab[Source] = {
+    val text = io.Source.fromURL(textFileUrl)(Codec.UTF8).mkString
+    val slab = Slab[String, Span](text)
+    slab ++ Iterator(Source(0, text.length, textFileUrl))
+  }
+
+  /**
+   * Add sentences to a MASC Slab using the MASC -s.xml file.
+   * 
+   * Assumes there will be exactly one Source annotation, providing the URL of the MASC .txt file.
+   * 
+   * @param slab The Slab containing the text and source URL
+   * @return The Slab with added Sentence annotations as read from the MASC -s.xml file.
+   */
+  def s[I <: Source](slab: Slab.StringSlab[I]) = {
+    val List(source) = slab.iterator[Source].toList
+    val sentenceXml = XML.load(source.url.toString().replaceAll("[.]txt$", "-s.xml"))
+    val sentences = for (region <- MascUtil.getRegions(sentenceXml)) yield {
+      Sentence(region.start, region.end, Some(region.id))
+    }
+    slab ++ sentences.iterator
+  }
+  
+  /**
+   * Add sentences to a MASC Slab using the MASC -seg.xml file.
+   * 
+   * Assumes there will be exactly one Source annotation, providing the URL of the MASC .txt file.
+   * 
+   * @param slab The Slab containing the text and source URL
+   * @return The Slab with added Segment annotations as read from the MASC -seg.xml file.
+   */
+  def seg[I <: Source](slab: Slab.StringSlab[I]) = {
+    val List(source) = slab.iterator[Source].toList
+    val segmentXml = XML.load(source.url.toString().replaceAll("[.]txt$", "-seg.xml"))
+    val segments = for (region <- MascUtil.getRegions(segmentXml)) yield {
+      Segment(region.start, region.end, Some(region.id))
+    }
+    slab ++ segments.iterator
+  }
+
+  /**
+   * Adds Penn PartOfSpeech tags using the MASC -penn.xml file.
+   * 
+   * Assumes there will be exactly one Source annotation, providing the URL of the MASC .txt file.
+   * 
+   * @param slab The Slab containing the text, the source URL and the Segment annotations.
+   * @return The Slab with added PartOfSpeech annotations as read from the MASC -penn.xml file.
+   */
+  def penn[I <: Source with Segment](slab: Slab.StringSlab[I]) = {
+    val List(source) = slab.iterator[Source].toList
+    val pennXml = XML.load(source.url.toString().replaceAll("[.]txt$", "-penn.xml"))
+
+    val idToSegment = (for (s <- slab.iterator[Segment]; id <- s.id.iterator) yield id -> s).toMap
+    val idToPosRegion = MascUtil.getNodes(pennXml).map(node => {
+      val segments = node.targets.map(idToSegment).sortBy(s => (s.begin, -s.end))
+      node.id -> MRegion(node.id, segments.head.begin, segments.last.end)
+    }).toMap
+    
+    val partOfSpeechTags = for (annotation <- MascUtil.getAnnotations(pennXml)) yield {
+      val region = idToPosRegion(annotation.ref)
+      val tag = MascUtil.getPos(annotation)
+      PartOfSpeech(region.start, region.end, tag, Some(region.id))
+    }
+    // TODO: should probably create Stem annotations too, available as the MASC "base" feature
+    
+    // FIXME: should not be necesssary to sort, but Slab needs better implementation
+    slab ++ partOfSpeechTags.sortBy(p => p.begin -> -p.end).iterator
+  }
+  
+  /**
+   * Adds EntityMention annotations using the MASC -ne.xml file.
+   * 
+   * Assumes there will be exactly one Source annotation, providing the URL of the MASC .txt file.
+   * 
+   * @param slab The Slab containing the text, the source URL and PartOfSpeech annotations.
+   * @return The Slab with added EntityMention annotations as read from the MASC -ne.xml file.
+   */
+  def ne[I <: Source with PartOfSpeech](slab: Slab.StringSlab[I]) = {
+    val List(source) = slab.iterator[Source].toList
+    val neXml = XML.load(source.url.toString().replaceAll("[.]txt$", "-ne.xml"))
+    
+    val idToPos = (for (p <- slab.iterator[PartOfSpeech]; id <- p.id.iterator) yield id -> p).toMap
+    val neIdPosIdTuples = MascUtil.getEdges(neXml).map(e => (e.from -> e.to))
+    val neIdToPosIds = neIdPosIdTuples.groupBy(_._1).mapValues(_.map(_._2))
+    
+    val entityMentions = for (annotation <- MascUtil.getAnnotations(neXml)) yield {
+      val posTags = neIdToPosIds(annotation.ref).map(idToPos).sortBy(p => p.begin -> -p.end)
+      val begin = posTags.head.begin
+      val end = posTags.last.end
+      EntityMention(begin, end, annotation.label, Some(annotation.ref))
+    }
+    
+    slab ++ entityMentions.iterator
+  }
 }

@@ -1,6 +1,7 @@
 package chalk.slab
 
 import scala.reflect.ClassTag
+import java.net.URL
 
 trait Slab[ContentType, BaseAnnotationType, +AnnotationTypes <: BaseAnnotationType] {
 
@@ -69,8 +70,12 @@ object Span {
 // ===========
 // Annotations
 // ===========
-case class Sentence(val begin: Int, val end: Int) extends Span
-case class Token(val begin: Int, val end: Int) extends Span
+case class Source(begin: Int, end: Int, url: URL) extends Span
+case class Sentence(begin: Int, end: Int, id: Option[String] = None) extends Span
+case class Segment(begin: Int, end: Int, id: Option[String] = None) extends Span
+case class Token(begin: Int, end: Int, id: Option[String] = None) extends Span
+case class PartOfSpeech(begin: Int, end: Int, tag: String, id: Option[String] = None) extends Span
+case class EntityMention(begin: Int, end: Int, entityType: String, id: Option[String] = None) extends Span
 
 
 object Slab {
@@ -97,6 +102,7 @@ object Slab {
     extends Slab[ContentType, BaseAnnotationType, AnnotationTypes] {
 
     def ++[AnnotationType](annotations: Iterator[AnnotationType]): Slab[ContentType, BaseAnnotationType, AnnotationTypes with AnnotationType] =
+      // FIXME: this should keep the annotations sorted by offset
       new HorribleInefficientSlab(this.content, this._annotations ++ annotations)
 
     def iterator[A >: AnnotationTypes <: BaseAnnotationType: ClassTag]: Iterator[A] =
