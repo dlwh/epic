@@ -4,17 +4,19 @@ import breeze.linalg._
 import breeze.stats.distributions.Rand
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.GenTraversableOnce
+import com.typesafe.scalalogging.log4j.Logging
 
 class StructSVM[Datum](model: Model[Datum],
                        maxIter: Int = 100,
                        batchSize: Int = 100,
-                       maxSMOIterations: Int = 100) {
+                       maxSMOIterations: Int = 100,
+                       C: Double = 100) extends Logging {
 
   import model._
 
 
-  def train(initWeights: DenseVector[Double])(data: IndexedSeq[Datum]) = {
-    val weights = initWeights.copy
+  def train(data: IndexedSeq[Datum]) = {
+    val weights = new ModelObjective(model, data).initialWeightVector(randomize = true)
     var alphas = DenseVector.zeros[Double](0)
     var constraints = IndexedSeq.empty[Constraint]
     var converged = false
@@ -26,6 +28,7 @@ class StructSVM[Datum](model: Model[Datum],
         val inf = model.inferenceFromWeights(newWeights)
         val batch = Rand.subsetsOfSize(data, batchSize).draw()
         constraints ++= findNewConstraints(inf, batch)
+        alphas = DenseVector.vertcat(alphas, DenseVector.zeros[Double](constraints.size - alphas.size))
 
         smo(inf, newWeights, alphas, constraints, smoTol)
         val (newAlphas, newConstraints) = removeOldConstraints(alphas, constraints)
@@ -33,9 +36,12 @@ class StructSVM[Datum](model: Model[Datum],
         alphas = newAlphas
       }
 
+      logger.info(s"${constraints.size} total constraints. ${alphas.findAll(_.abs > 1E-5).size} active.")
+
       converged = constraints.size == 0 || (weights - newWeights).norm(Double.PositiveInfinity) < 1E-6
       weights := newWeights
     }
+    weights
   }
 
 
@@ -79,6 +85,13 @@ class StructSVM[Datum](model: Model[Datum],
                   alphas: DenseVector[Double],
                   constraints: IndexedSeq[Constraint],
                   smoTol: Double): Unit = {
+    if(alphas.sum < C) {
+      alphas += (C-alphas.sum)/alphas.length
+    }
+    weights := 0.0
+    for(i <- 0 until alphas.length) {
+      axpy(alphas(i), constraints(i).feats, weights)
+    }
     var largestChange = 10000.0
     for(iter <- 0 until maxSMOIterations if largestChange > smoTol) {
       largestChange = 0.0
@@ -88,15 +101,17 @@ class StructSVM[Datum](model: Model[Datum],
         val oldA1 = alphas(i)
         val j = perm(i)
         val oldA2 = alphas(j)
-        if(oldA1 != 0 && oldA2 != 0) {
+        if( (oldA1 != 0 && oldA2 != 0)) {
           val con2 = constraints(j)
-          var t = (con1.loss - con2.loss) - ( (weights dot con1.feats) - (weights dot con2.feats))/(con1.ftf + con2.ftf)
+          var t = ((con1.loss - con2.loss) - ( (weights dot con2.feats) - (weights dot con1.feats)))/(con1.ftf + con2.ftf)
+          val tt = t
           if(!t.isNaN && t != 0.0) {
             t = t max (-oldA1)
             val newA1 = (oldA1 + t) min (oldA1 + oldA2)
             val newA2 = (oldA2 - t) max 0
             alphas(i) = newA1
             alphas(j) = newA2
+            println(newA1,newA2, tt, t, oldA1, oldA2)
             axpy(oldA1 - newA1, con1.feats, weights)
             axpy(oldA2 - newA2, con2.feats, weights)
             largestChange = largestChange max (oldA1 - newA1).abs

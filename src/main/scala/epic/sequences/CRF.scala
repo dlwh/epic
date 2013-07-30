@@ -69,7 +69,7 @@ object CRF {
     val weights = opt.minimize(cached, obj.initialWeightVector(randomize = false))
     */
 
-    val percep = new StructuredPerceptron(new OneBestModelAdaptor(model))
+    val percep = new StructSVM(new OneBestModelAdaptor(model))
     val weights = percep.train(data)
     val crf = model.extractCRF(weights)
 
