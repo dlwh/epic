@@ -3,15 +3,13 @@ package epic.sequences
 import breeze.util.Index
 import breeze.numerics
 import breeze.linalg.DenseVector
-import epic.framework.{VisitableMarginal, ModelObjective, Feature}
+import epic.framework._
 import java.util
 import collection.mutable.ArrayBuffer
-import breeze.optimize.FirstOrderMinimizer.OptParams
-import breeze.optimize.CachedBatchDiffFunction
 import breeze.features.FeatureVector
-import epic.lexicon.Lexicon
 import epic.constraints.TagConstraints
 import epic.util.CacheBroker
+import breeze.optimize.FirstOrderMinimizer.OptParams
 
 /**
  * A -Markov Linear Chain Conditional Random Field. Useful for POS tagging, etc.
@@ -63,9 +61,16 @@ object CRF {
                      opt: OptParams = OptParams())(implicit cache: CacheBroker = CacheBroker()):CRF[L, String] = {
     val model: CRFModel[L, String] = new TaggedSequenceModelFactory[L](startSymbol,  gazetteer = gazetteer).makeModel(data)
 
+
+    /*
     val obj = new ModelObjective(model, data)
+
     val cached = new CachedBatchDiffFunction(obj)
     val weights = opt.minimize(cached, obj.initialWeightVector(randomize = false))
+    */
+
+    val percep = new StructuredPerceptron(new OneBestModelAdaptor(model))
+    val weights = percep.train(data)
     val crf = model.extractCRF(weights)
 
     crf
@@ -360,9 +365,9 @@ object CRF {
 
   def posteriorDecode[L, W](m: Marginal[L, W], id: String = "") = {
     val length = m.length
-    val labels = (0 until length).map(pos => DenseVector.tabulate(m.anchoring.labelIndex.size)(m.positionMarginal(_, pos)).argmax)
+    val labels = (0 until length).map(pos => DenseVector.tabulate(m.anchoring.labelIndex.size)(m.positionMarginal(pos, _)).argmax)
 
-    TaggedSequence(labels.map(m.anchoring.labelIndex.get(_)), m.words, id)
+    TaggedSequence(labels.map(m.anchoring.labelIndex.get), m.words, id)
   }
 }
 

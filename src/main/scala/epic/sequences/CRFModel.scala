@@ -46,11 +46,15 @@ class CRFModel[L, W](val featureIndex: Index[Feature],
 class CRFInference[L, W](val weights: DenseVector[Double],
                          val featureIndex: Index[Feature],
                          val lexicon: TagConstraints.Factory[L, W],
-                         featurizer: CRF.IndexedFeaturizer[L, W]) extends AugmentableInference[TaggedSequence[L, W], CRF.Anchoring[L, W]] with CRF[L, W] with Serializable {
+                         featurizer: CRF.IndexedFeaturizer[L, W]) extends AugmentableInference[TaggedSequence[L, W], CRF.Anchoring[L, W]] with CRF[L, W] with AnnotatingInference[TaggedSequence[L, W]] with Serializable {
   def viterbi(sentence: IndexedSeq[W], anchoring: CRF.Anchoring[L, W]): TaggedSequence[L, W] = {
     CRF.viterbi(new Anchoring(sentence, anchoring))
   }
 
+
+  def annotate(datum: TaggedSequence[L, W], m: Marginal): TaggedSequence[L, W] = {
+    CRF.posteriorDecode(m)
+  }
 
   type Marginal = CRF.Marginal[L, W]
   type ExpectedCounts = StandardExpectedCounts[Feature]

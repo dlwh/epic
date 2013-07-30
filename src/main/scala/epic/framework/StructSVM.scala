@@ -49,7 +49,8 @@ class StructSVM[Datum](model: Model[Datum],
   private def findNewConstraints(inf: model.Inference, data: IndexedSeq[Datum]): GenTraversableOnce[Constraint] = {
     for {
       d <- data.par
-      ec = inf.expectedCounts(d, inf.emptyCounts, 1.0) if ec.loss > 0
+      ec = inf.expectedCounts(d, inf.emptyCounts, 1.0)
+      if ec.loss > 0
     } yield Constraint(ec)
 
   }

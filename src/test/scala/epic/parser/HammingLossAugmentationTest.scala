@@ -20,5 +20,7 @@ class HammingLossAugmentationTest  extends ParserTestHarness with FunSuite {
       val marg2 = new TreeMarginal(AugmentedAnchoring.fromCore(aug), t2.map(x => x -> 0))
       assert(marg.logPartition < marg2.logPartition || t2 == ti.tree, marg.logPartition + " " + ti + " " + t2)
     }
+  }
 
 }
+
