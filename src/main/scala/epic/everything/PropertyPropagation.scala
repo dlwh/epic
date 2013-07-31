@@ -59,8 +59,6 @@ object PropertyPropagation {
     new Model(beliefsFactory, assoc)
   }
 
-
-
   case class AssociationFeature[T, U](a: T, b: U) extends Feature
 
   def packetModel[T](beliefsFactory: SentenceBeliefs.Factory, packet1: AssociationPacket[T], otherPackets: IndexedSeq[AssociationPacket[_]]) = {
@@ -154,8 +152,7 @@ object PropertyPropagation {
    *
    * @author dlwh
    */
-  class Model[T, U](beliefsFactory: SentenceBeliefs.Factory, assoc: AssociationFeaturizer[T, U]) extends epic.framework.Model[FeaturizedSentence] {
-    type ExpectedCounts = StandardExpectedCounts[Feature]
+  class Model[T, U](beliefsFactory: SentenceBeliefs.Factory, assoc: AssociationFeaturizer[T, U]) extends epic.framework.StandardExpectedCounts.Model[FeaturizedSentence] {
     type Inference = PropertyPropagation.Inference[T, U]
     type Marginal = PropertyPropagation.Marginal
 
@@ -167,17 +164,37 @@ object PropertyPropagation {
       new Inference(beliefsFactory, weights, assoc)
     }
 
-    def expectedCountsToObjective(ecounts: ExpectedCounts): (Double, DenseVector[Double]) = {
-      ecounts.loss -> ecounts.counts
-    }
+    def accumulateCounts (sentence: FeaturizedSentence, sentenceMarginal: Marginal, accum: ExpectedCounts, scale: Double): Unit = {
+      accum.loss += sentenceMarginal.logPartition * scale
+      for {
+        begin <- 0 until sentence.length
+        end <- (begin+1) to sentence.length
+      } {
+        val spanMarginal = sentenceMarginal.spans(begin, end)
+        if (spanMarginal == null || begin == end)  {
+          null
+        } else for( (current, index) <- sentenceMarginal.spans(begin, end).satellites.zipWithIndex ) {
+          val anchoring = spanMarginal.anchoring
+          var p1 = 0
+          while (p1 < current.rows) {
+            var p2 = 0
+            while (p2 < current.cols) {
+              val features = anchoring.featuresFor(p1, index, p2)
+              axpy(scale * current(p1, p2), new FeatureVector(features), accum.counts)
+              p2 += 1
+            }
+            p1 += 1
+          }
+        }
+      }
 
+    }
   }
 
 
   class Inference[T, U](beliefsFactory: SentenceBeliefs.Factory,
                         weights: DenseVector[Double],
                         scorer: AssociationFeaturizer[T, U]) extends ProjectableInference[FeaturizedSentence, SentenceBeliefs] {
-    type ExpectedCounts = StandardExpectedCounts[Feature]
     type Marginal = PropertyPropagation.Marginal
 
 
@@ -268,34 +285,7 @@ object PropertyPropagation {
 
     def goldMarginal(v: FeaturizedSentence, aug: SentenceBeliefs): (Marginal) = marginal(v, aug)
 
-    def emptyCounts = StandardExpectedCounts.zero(scorer.featureIndex)
 
-    def countsFromMarginal(sentence: FeaturizedSentence, sentenceMarginal: Marginal, accum: ExpectedCounts, scale: Double): ExpectedCounts = {
-      accum.loss += sentenceMarginal.logPartition * scale
-      for {
-        begin <- 0 until sentence.length
-        end <- (begin+1) to sentence.length
-      } {
-        val spanMarginal = sentenceMarginal.spans(begin, end)
-        if (spanMarginal == null || begin == end)  {
-          null
-        } else for( (current, index) <- sentenceMarginal.spans(begin, end).satellites.zipWithIndex ) {
-          val anchoring = spanMarginal.anchoring
-          var p1 = 0
-          while (p1 < current.rows) {
-            var p2 = 0
-            while (p2 < current.cols) {
-              val features = anchoring.featuresFor(p1, index, p2)
-              axpy(scale * current(p1, p2), new FeatureVector(features), accum.counts)
-              p2 += 1
-            }
-            p1 += 1
-          }
-        }
-      }
-
-      accum
-    }
 
     // turns the marginal p(var1,var2) => q(var1)q(var2)
     def project(sent: FeaturizedSentence, myBeliefs: Marginal, oldBeliefs: SentenceBeliefs): SentenceBeliefs = {

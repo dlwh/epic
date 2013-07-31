@@ -38,8 +38,6 @@ package epic.framework
  */
 trait Inference[Datum] extends Serializable {
   type Marginal <: epic.framework.Marginal
-  type ExpectedCounts <: epic.framework.ExpectedCounts[ExpectedCounts]
-  def emptyCounts: ExpectedCounts
 
   /**
    * Produces the "gold marginal" which is the marginal conditioned on the output label/structure itself.
@@ -54,51 +52,6 @@ trait Inference[Datum] extends Serializable {
    * @return gold marginal
    */
   def marginal(v: Datum):Marginal
-
-  /**
-   * Accumulates expected counts from the marginal into accum, scaling all counts by the scale factor.
-   * Typically scale is ±1.0. +1 is for "guess" portions of the objective, and -1 for gold parts.
-   *
-   * This operation is destructive to prevent thrashing in the GC. (ExpectedCounts is usually quite big!)
-   *
-   * @param v
-   * @param marg
-   * @param accum
-   * @param scale
-   * @return
-   */
-  def countsFromMarginal(v: Datum, marg: Marginal, accum: ExpectedCounts, scale: Double):ExpectedCounts
-
-
-  /**
-   * Compute the marginal and tally guess expected counts
-   * @return
-   */
-  def guessCounts(value: Datum, accum: ExpectedCounts, scale: Double):ExpectedCounts = {
-    val marg = marginal(value)
-    countsFromMarginal(value, marg, accum, scale)
-  }
-
-  /**
-   * Compute the gold marginal and tally gold expected counts
-   * @return
-   */
-  def goldCounts(value: Datum, accum: ExpectedCounts, scale: Double):ExpectedCounts = {
-    val marg = goldMarginal(value)
-    countsFromMarginal(value, marg, accum, scale)
-  }
-
-  /**
-   * compute both marginals and tally guess counts - gold counts
-   * @param datum
-   * @param accum
-   * @param scale
-   * @return
-   */
-  def expectedCounts(datum: Datum, accum: ExpectedCounts, scale: Double) = {
-    val result1 = guessCounts(datum, accum, scale)
-    goldCounts(datum, result1, -scale)
-  }
 }
 
 
@@ -123,29 +76,11 @@ trait AugmentableInference[Datum,Augment] extends Inference[Datum] {
    * @param v the example
    * @return gold marginal
    */
-  def marginal(v: Datum):Marginal = marginal(v, baseAugment(v))
+  final def marginal(v: Datum):Marginal = marginal(v, baseAugment(v))
   def marginal(v: Datum, aug: Augment):Marginal
 
-  def goldMarginal(v: Datum):Marginal  = goldMarginal(v, baseAugment(v))
+  final def goldMarginal(v: Datum):Marginal  = goldMarginal(v, baseAugment(v))
   def goldMarginal(v: Datum, aug: Augment):Marginal
-
-  def guessCounts(datum: Datum,  augment: Augment, accum: ExpectedCounts, scale: Double) = {
-    val m = marginal(datum,augment)
-    countsFromMarginal(datum, m, accum, scale)
-  }
-
-  def goldCounts(value: Datum, augment: Augment, accum: ExpectedCounts, scale: Double): ExpectedCounts = {
-    val m = goldMarginal(value, augment)
-    countsFromMarginal(value, m, accum, scale)
-  }
-
-  override def goldCounts(value: Datum, accum: ExpectedCounts, scale: Double): ExpectedCounts = {
-    goldCounts(value, baseAugment(value), accum, scale)
-  }
-
-  override def guessCounts(value: Datum, accum: ExpectedCounts, scale: Double): ExpectedCounts = {
-    guessCounts(value, baseAugment(value), accum, scale)
-  }
 }
 
 /**

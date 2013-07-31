@@ -10,9 +10,6 @@ import breeze.linalg.DenseVector
  **/
 class OneBestInferenceAdaptor[Datum](val inference: AnnotatingInference[Datum]) extends Inference[Datum] {
   type Marginal = inference.Marginal
-  type ExpectedCounts = inference.ExpectedCounts
-
-  def emptyCounts: ExpectedCounts = inference.emptyCounts
 
   def goldMarginal(v: Datum): Marginal = inference.goldMarginal(v)
 
@@ -21,16 +18,19 @@ class OneBestInferenceAdaptor[Datum](val inference: AnnotatingInference[Datum]) 
     goldMarginal(inference.annotate(v, m))
   }
 
-  def countsFromMarginal(v: Datum, marg: Marginal, accum: ExpectedCounts, scale: Double): ExpectedCounts = {
-    inference.countsFromMarginal(v, marg, accum, scale)
-  }
 }
 
 
 class OneBestModelAdaptor[Datum](val model: Model[Datum] { type Inference <: AnnotatingInference[Datum]}) extends Model[Datum] {
   type ExpectedCounts = model.ExpectedCounts
   type Marginal = model.Marginal
-  type Inference = OneBestInferenceAdaptor[Datum] { type Marginal = model.Marginal; type ExpectedCounts = model.ExpectedCounts}
+  type Inference = OneBestInferenceAdaptor[Datum] { type Marginal = model.Marginal}
+  def emptyCounts: ExpectedCounts = model.emptyCounts
+
+
+  def accumulateCounts(d: Datum, m: Marginal, accum: ExpectedCounts, scale: Double) {
+    model.accumulateCounts(d, m, accum, scale)
+  }
 
   def featureIndex: Index[Feature] = model.featureIndex
 

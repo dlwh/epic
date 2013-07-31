@@ -26,7 +26,8 @@ import epic.util.CacheBroker
  * @author dlwh
  */
 class EPModel[Datum, Augment](maxEPIter: Int, initFeatureValue: Feature => Option[Double] = {(_:Feature) => None}, epInGold: Boolean = false)(
-                              val models: EPModel.CompatibleModel[Datum, Augment]*)(implicit aIsFactor: Augment <:< Factor[Augment]) extends Model[Datum] {
+                              _models: EPModel.CompatibleModel[Datum, Augment]*)(implicit aIsFactor: Augment <:< Factor[Augment]) extends Model[Datum] {
+  def models = _models
   type ExpectedCounts = EPExpectedCounts
   type Inference = EPInference[Datum, Augment]
   type Marginal = EPMarginal[Augment, ProjectableInference[Datum, Augment]#Marginal]
@@ -35,6 +36,20 @@ class EPModel[Datum, Augment](maxEPIter: Int, initFeatureValue: Feature => Optio
   for(i <- 0 until models.length) { println(models(i) + " " + models(i).featureIndex.size)}
 
 
+  def emptyCounts = {
+    val counts = for (m <- models) yield m.emptyCounts
+    EPExpectedCounts(0.0, counts.toIndexedSeq)
+  }
+
+
+  override def accumulateCounts(datum: Datum, marg: Marginal, accum: EPExpectedCounts, scale: Double) = {
+    import marg._
+    for ( (inf, i) <- models.zipWithIndex) yield {
+      val marg = marginals(i)
+      inf.accumulateCounts(datum, marg.asInstanceOf[inf.Marginal], accum.counts(i).asInstanceOf[inf.ExpectedCounts], scale)
+    }
+    accum.loss += scale * marg.logPartition
+  }
   def numModels = models.length
 
   val featureIndex: Index[Feature] = {

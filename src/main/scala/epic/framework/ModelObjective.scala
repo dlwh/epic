@@ -55,10 +55,10 @@ class ModelObjective[Datum](val model: Model[Datum],
     val inference = inferenceFromWeights(x)
     val timeIn = System.currentTimeMillis()
     val success = new AtomicInteger(0)
-    val finalCounts = select(batch).aggregate(null:inference.ExpectedCounts)({ ( _countsSoFar,datum) =>
+    val finalCounts = select(batch).aggregate(null:model.ExpectedCounts)({ ( _countsSoFar,datum) =>
       try {
-        val countsSoFar:inference.ExpectedCounts = if (_countsSoFar ne null) _countsSoFar else inference.emptyCounts
-        inference.expectedCounts(datum, countsSoFar, 1.0)
+        val countsSoFar:model.ExpectedCounts = if (_countsSoFar ne null) _countsSoFar else emptyCounts
+        model.accumulateCounts(inference, datum, countsSoFar, 1.0)
         success.incrementAndGet()
         countsSoFar
       } catch {

@@ -23,7 +23,7 @@ import epic.sequences.SemiCRFModel.BIEOFeatureAnchoring
 class SemiCRFModel[L, W](val featurizer: SemiCRFModel.BIEOFeaturizer[L, W],
                          val constraintsFactory: LabeledSpanConstraints.Factory[L, W],
                          initialWeights: Feature=>Double = {(_: Feature) => 0.0},
-                         cacheFeatures: Boolean = false) extends Model[Segmentation[L, W]] with StandardExpectedCounts.Model with Serializable {
+                         cacheFeatures: Boolean = false) extends StandardExpectedCounts.Model[Segmentation[L, W]] with Serializable {
   def labelIndex: Index[L] = featurizer.labelIndex
 
   def featureIndex = featurizer.featureIndex
@@ -39,6 +39,27 @@ class SemiCRFModel[L, W](val featurizer: SemiCRFModel.BIEOFeaturizer[L, W],
 
   def inferenceFromWeights(weights: DenseVector[Double]): Inference =
     new SemiCRFInference(weights, featureIndex, featurizer, constraintsFactory)
+
+
+  def accumulateCounts(v: Segmentation[L, W], marg: Marginal, counts: ExpectedCounts, scale: Double) {
+    counts.loss += marg.logPartition * scale
+    val localization = marg.anchoring.asInstanceOf[Inference#Anchoring].localization
+    val visitor = new TransitionVisitor[L, W] {
+
+      def visitTransition(prev: Int, cur: Int, begin: Int, end: Int, count: Double) {
+        import localization._
+        axpy(count * scale, featuresForBegin(prev, cur, begin), counts.counts)
+        var p = begin+1
+        while (p < end) {
+          axpy(count * scale, featuresForInterior(cur, p), counts.counts)
+          p += 1
+        }
+
+        axpy(count * scale, featuresForSpan(prev, cur, begin, end), counts.counts)
+      }
+    }
+    marg.visit(visitor)
+  }
 
 }
 
@@ -71,6 +92,8 @@ object SemiCRFModel {
       new FeatureVector(result)
     }
   }
+
+
 }
 
 @SerialVersionUID(1)
@@ -86,9 +109,6 @@ class SemiCRFInference[L, W](weights: DenseVector[Double],
 
 
   type Marginal = SemiCRF.Marginal[L, W]
-  type ExpectedCounts = StandardExpectedCounts[Feature]
-
-  def emptyCounts = StandardExpectedCounts.zero(this.featureIndex)
 
   def anchor(w: IndexedSeq[W]): Anchoring = {
     anchor(w, new IdentityAnchoring(w, constraintsFactory.constraints(w)))
@@ -110,27 +130,6 @@ class SemiCRFInference[L, W](weights: DenseVector[Double],
     SemiCRF.Marginal.goldMarginal[L, W](new Anchoring(featurizer.anchor(v.words), constraintsFactory.constraints(v.words), augment), v.segments)
   }
 
-  def countsFromMarginal(v: Segmentation[L, W], marg: Marginal, counts: ExpectedCounts, scale: Double): ExpectedCounts = {
-    counts.loss += marg.logPartition * scale
-    val localization = marg.anchoring.asInstanceOf[Anchoring].localization
-    val visitor = new TransitionVisitor[L, W] {
-
-      def visitTransition(prev: Int, cur: Int, begin: Int, end: Int, count: Double) {
-        import localization._
-        axpy(count * scale, featuresForBegin(prev, cur, begin), counts.counts)
-        var p = begin+1
-        while (p < end) {
-          axpy(count * scale, featuresForInterior(cur, p), counts.counts)
-          p += 1
-        }
-
-        axpy(count * scale, featuresForSpan(prev, cur, begin, end), counts.counts)
-      }
-    }
-    marg.visit(visitor)
-    counts
-
-  }
 
 
   def baseAugment(v: Segmentation[L, W]): SemiCRF.Anchoring[L, W] = new IdentityAnchoring(v.words, constraintsFactory.constraints(v.words))

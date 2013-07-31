@@ -26,66 +26,55 @@ class EPInference[Datum, Augment](val inferences: IndexedSeq[ProjectableInferenc
   type Marginal = EPMarginal[Augment, ProjectableInference[Datum, Augment]#Marginal]
   type ExpectedCounts = EPExpectedCounts
 
-  def emptyCounts = {
-    val counts = for (m <- inferences) yield m.emptyCounts
-    EPExpectedCounts(0.0, counts)
-  }
+
 
   def baseAugment(v: Datum) = inferences(0).baseAugment(v)
 
   def project(v: Datum, m: Marginal, oldAugment: Augment): Augment = m.q
 
-  // assume we don't need gold  to do EP, at least for now
-  override def goldCounts(value: Datum, augment: Augment, accum: ExpectedCounts, scale: Double) = {
-    if(!epInGold) {
-      var totalDelta = 0.0
-      for( (inf, acc) <- inferences zip accum.counts) {
-        val oldPart = acc.loss
-        inf.goldCounts(value, augment, acc.asInstanceOf[inf.ExpectedCounts], scale)
-        val newPart = acc.loss
-        totalDelta += (newPart - oldPart)
-      }
-      accum.loss += totalDelta
-      accum
-    } else {
-      super.goldCounts(value, augment, accum, scale)
-    }
-  }
-
   // ugh code duplication...
   def goldMarginal(datum: Datum, augment: Augment) = {
-    val marginals = ArrayBuffer.fill(inferences.length)(null.asInstanceOf[ProjectableInference[Datum, Augment]#Marginal])
-    var iter = 0
-    def project(q: Augment, i: Int) = {
-      val inf = inferences(i)
-      marginals(i) = null.asInstanceOf[ProjectableInference[Datum, Augment]#Marginal]
-      val marg = inf.goldMarginal(datum, q)
-      val contributionToLikelihood = marg.logPartition
-      assert(!contributionToLikelihood.isInfinite, s"Model $i is misbehaving ($contributionToLikelihood) on iter $iter! Datum: " + datum )
-      assert(!contributionToLikelihood.isNaN, s"Model $i is misbehaving (NaN) on iter $iter!")
-      val newAugment = inf.project(datum, marg, q)
-      marginals(i) = marg
-      newAugment -> contributionToLikelihood
-    }
-    val ep = new ExpectationPropagation(project _, 1E-3)
-
-    var state: ep.State = null
-    val iterates = ep.inference(augment, 0 until inferences.length, IndexedSeq.fill[Augment](inferences.length)(null.asInstanceOf[Augment]))
-    var converged = false
-    while (!converged && iter < maxEPIter && iterates.hasNext) {
-      val s = iterates.next()
-      if (state != null) {
-        converged = (s.logPartition - state.logPartition).abs / math.max(s.logPartition, state.logPartition) < 1E-4
-//        if (s.q.isInstanceOf[SentenceBeliefs]) {
-//          println(iter + " gold " + s.q.asInstanceOf[SentenceBeliefs].maxChange(state.q.asInstanceOf[SentenceBeliefs]) + " " + s.logPartition + " " + state.logPartition)
-//        }
+    if(!epInGold) {
+      val marginals = for(inf <- inferences) yield {
+        inf.goldMarginal(datum)
       }
-      iter += 1
-      state = s
-    }
-    //    print(f"gold($iter%d:${state.logPartition%.1f})")
+      val inf = inferences.head
+      EPMarginal(marginals.map(_.logPartition).sum, inf.project(datum, marginals.head.asInstanceOf[inf.Marginal], augment), marginals)
+    } else {
 
-    EPMarginal(state.logPartition, state.q, marginals)
+      val marginals = ArrayBuffer.fill(inferences.length)(null.asInstanceOf[ProjectableInference[Datum, Augment]#Marginal])
+      var iter = 0
+      def project(q: Augment, i: Int) = {
+        val inf = inferences(i)
+        marginals(i) = null.asInstanceOf[ProjectableInference[Datum, Augment]#Marginal]
+        val marg = inf.goldMarginal(datum, q)
+        val contributionToLikelihood = marg.logPartition
+        assert(!contributionToLikelihood.isInfinite, s"Model $i is misbehaving ($contributionToLikelihood) on iter $iter! Datum: " + datum )
+        assert(!contributionToLikelihood.isNaN, s"Model $i is misbehaving (NaN) on iter $iter!")
+        val newAugment = inf.project(datum, marg, q)
+        marginals(i) = marg
+        newAugment -> contributionToLikelihood
+      }
+      val ep = new ExpectationPropagation(project _, 1E-3)
+
+      var state: ep.State = null
+      val iterates = ep.inference(augment, 0 until inferences.length, IndexedSeq.fill[Augment](inferences.length)(null.asInstanceOf[Augment]))
+      var converged = false
+      while (!converged && iter < maxEPIter && iterates.hasNext) {
+        val s = iterates.next()
+        if (state != null) {
+          converged = (s.logPartition - state.logPartition).abs / math.max(s.logPartition, state.logPartition) < 1E-4
+          //        if (s.q.isInstanceOf[SentenceBeliefs]) {
+          //          println(iter + " gold " + s.q.asInstanceOf[SentenceBeliefs].maxChange(state.q.asInstanceOf[SentenceBeliefs]) + " " + s.logPartition + " " + state.logPartition)
+          //        }
+        }
+        iter += 1
+        state = s
+      }
+      //    print(f"gold($iter%d:${state.logPartition%.1f})")
+
+      EPMarginal(state.logPartition, state.q, marginals)
+    }
   }
 
 
@@ -145,15 +134,7 @@ class EPInference[Datum, Augment](val inferences: IndexedSeq[ProjectableInferenc
   }
 
 
-  def countsFromMarginal(datum: Datum, marg: Marginal, accum: EPExpectedCounts, scale: Double) = {
-    import marg._
-    for ( (inf, i) <- inferences.zipWithIndex) yield {
-      val marg = marginals(i)
-      inf.countsFromMarginal(datum, marg.asInstanceOf[inf.Marginal], accum.counts(i).asInstanceOf[inf.ExpectedCounts], scale)
-    }
-    accum.loss += scale * marg.logPartition
-    accum
-  }
+
 }
 
 

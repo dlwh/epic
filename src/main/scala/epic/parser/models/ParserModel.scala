@@ -25,8 +25,7 @@ import epic.trees.{TreeInstance, UnaryRule, BinaryRule}
  * Base trait for "normal" Parser-type models
  * @author dlwh
  */
-trait ParserModel[L, W] extends Model[TreeInstance[L, W]] with ParserExtractable[L, W] {
-  type ExpectedCounts = StandardExpectedCounts[Feature]
+trait ParserModel[L, W] extends epic.framework.StandardExpectedCounts.Model[TreeInstance[L, W]] with ParserExtractable[L, W] {
   type Inference <: ParserInference[L, W]
   type Marginal = epic.parser.ParseMarginal[L, W]
 
@@ -34,6 +33,9 @@ trait ParserModel[L, W] extends Model[TreeInstance[L, W]] with ParserExtractable
     val inf = inferenceFromWeights(weights)
     SimpleChartParser(AugmentedGrammar(inf.grammar, inf.baseMeasure))
   }
+
+
+
 }
 
 
@@ -65,9 +67,6 @@ trait ParserInference[L, W] extends ProjectableInference[TreeInstance[L, W], Cor
     charts
   }
 
-  def countsFromMarginal(v: TreeInstance[L, W], marg: Marginal, accum: ExpectedCounts, scale: Double) = {
-    marg.expectedCounts(featurizer, accum, scale)
-  }
 
   def baseAugment(v: TreeInstance[L, W])  = baseMeasure.anchor(v.words)
 

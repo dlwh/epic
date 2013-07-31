@@ -25,7 +25,7 @@ import epic.util.{WeightsCache, CacheBroker}
  * A Model represents a class for turning weight vectors into [[epic.framework.Inference]]s.
  * It's main job is to hook up with a [[epic.framework.ModelObjective]] and mediate
  * computation of ExpectedCounts and conversion to the objective that's
- * needed for optimzation.
+ * needed for optimization.
  *
  * @tparam Datum the kind of
  */
@@ -34,9 +34,30 @@ trait Model[Datum] { self =>
   type Marginal <: epic.framework.Marginal
 
   type Inference <: epic.framework.Inference[Datum] {
-    type ExpectedCounts = self.ExpectedCounts
     type Marginal = self.Marginal
   }
+
+  def emptyCounts: ExpectedCounts
+  def accumulateCounts(d: Datum, m: Marginal, accum: ExpectedCounts, scale: Double):Unit
+  final def countsFromMarginal(d: Datum, m: Marginal):ExpectedCounts = {
+    val ec = emptyCounts
+    accumulateCounts(d, m, ec, scale = 1.0)
+    ec
+  }
+
+  final def expectedCounts(inf: Inference, d: Datum, scale: Double = 1.0):ExpectedCounts = {
+    val ec = emptyCounts
+    accumulateCounts(inf, d, ec, scale)
+    ec
+  }
+
+  final def accumulateCounts(inf: Inference, d: Datum, accum: ExpectedCounts, scale: Double):Unit = {
+    val m = inf.marginal(d)
+    val gm = inf.goldMarginal(d)
+    accumulateCounts(d, m, accum, scale)
+    accumulateCounts(d, gm, accum, -scale)
+  }
+
 
   /**
    * Models have features, and this defines the mapping from indices in the weight vector to features.

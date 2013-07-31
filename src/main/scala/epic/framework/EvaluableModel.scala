@@ -9,7 +9,7 @@ import breeze.linalg.DenseVector
  * @author dlwh
  */
 trait EvaluableModel[Datum] extends Model[Datum] { self =>
-  type Inference <: AnnotatingInference[Datum] {type ExpectedCounts = self.ExpectedCounts; type Marginal = self.Marginal }
+  type Inference <: AnnotatingInference[Datum] { type Marginal = self.Marginal }
   type EvaluationResult <: epic.framework.EvaluationResult[self.EvaluationResult]
   def evaluate(guess: Datum, gold: Datum, logResults: Boolean):EvaluationResult
 

@@ -19,11 +19,17 @@ object ChainNER {
               val baseModel: SemiCRFModel[NERType.Value, String],
               maxMarginal: Boolean,
               weights: Feature=>Option[Double] = { (f:Feature) => None}) extends EvaluableModel[FeaturizedSentence] {
-    type ExpectedCounts = StandardExpectedCounts[Feature]
+    type ExpectedCounts = baseModel.ExpectedCounts
     type Marginal = SemiCRF.Marginal[NERType.Value, String]
     type Inference = ChainNER.Inference
     type EvaluationResult = SegmentationEval.Stats
     def featureIndex = baseModel.featureIndex
+
+
+    def accumulateCounts(d: FeaturizedSentence, m: Marginal, accum: ExpectedCounts, scale: Double) {
+      baseModel.accumulateCounts(d.ner, m, accum, scale)
+
+    }
 
     def initialValueForFeature(f: Feature): Double = weights(f).getOrElse(0.0)
 
@@ -31,7 +37,7 @@ object ChainNER {
       new ChainNER.Inference(factory, weights, baseModel.inferenceFromWeights(weights), maxMarginal)
     }
 
-    def emptyCounts: ExpectedCounts = StandardExpectedCounts.zero(featureIndex)
+    def emptyCounts: ExpectedCounts = baseModel.emptyCounts
 
     def expectedCountsToObjective(ecounts: ExpectedCounts): (Double, DenseVector[Double]) = {
       ecounts.toObjective
@@ -57,7 +63,6 @@ object ChainNER {
     private val notNER = labels(NERType.OutsideSentence)
     assert(notNER != -1)
 
-    def emptyCounts = baseInference.emptyCounts
 
     def annotate(sent: FeaturizedSentence, m: Marginal): FeaturizedSentence = {
       val decodedNer = SemiCRF.posteriorDecode(m)
@@ -76,13 +81,6 @@ object ChainNER {
         baseInference.marginal(sent.ner)
       }
     }
-
-
-    def countsFromMarginal(sent: FeaturizedSentence, marg: Marginal, accum: ExpectedCounts, scale: Double): ExpectedCounts = {
-      baseInference.countsFromMarginal(sent.ner, marg, accum, scale)
-      accum
-    }
-
 
     def baseAugment(sent: FeaturizedSentence): SentenceBeliefs = {
       beliefsFactory(sent)

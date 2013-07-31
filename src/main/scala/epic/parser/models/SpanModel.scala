@@ -72,8 +72,8 @@ class SpanModel[L, L2, W](featurizer: RefinedFeaturizer[L, W, Feature],
     new AnnotatedParserInference(featurizer, reannotate, factory, baseFactory)
   }
 
-  def expectedCountsToObjective(ecounts: ExpectedCounts) = {
-    ecounts.loss -> ecounts.counts
+  def accumulateCounts(d: TreeInstance[L, W], m: Marginal, accum: ExpectedCounts, scale: Double) {
+    m.expectedCounts(featurizer, accum, scale)
   }
 }
 

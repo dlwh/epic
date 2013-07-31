@@ -27,7 +27,7 @@ object SRL {
               val labelIndex: Index[Option[String]],
               outsideLabel: String,
               val featurizer: IndexedFeaturizer,
-              initialWeights: Feature=>Option[Double] = {(_: Feature) => None}) extends EvaluableModel[FeaturizedSentence] with StandardExpectedCounts.Model with Serializable {
+              initialWeights: Feature=>Option[Double] = {(_: Feature) => None}) extends EvaluableModel[FeaturizedSentence] with StandardExpectedCounts.Model[FeaturizedSentence] with Serializable {
     assert(labelIndex(Some(outsideLabel)) != -1)
 
     def featureIndex = featurizer.featureIndex
@@ -85,63 +85,8 @@ object SRL {
 
       Segmentation(out, words)
     }
-  }
 
-  case class Marginal(frames: IndexedSeq[SemiCRF.Marginal[Option[String], String]]) extends epic.framework.Marginal {
-    def logPartition: Double = frames.map(_.logPartition).sum
-    assert(!logPartition.isNaN)
-    assert(!logPartition.isInfinite)
-  }
-
-  class Inference(beliefsFactory: SentenceBeliefs.Factory,
-                  labelIndex: Index[Option[String]],
-                  outsideLabel: String,
-                  weights: DenseVector[Double],
-                  featurizer: IndexedFeaturizer) extends ProjectableInference[FeaturizedSentence, SentenceBeliefs] with AnnotatingInference[FeaturizedSentence] {
-    type Marginal = SRL.Marginal
-    type ExpectedCounts = StandardExpectedCounts[Feature]
-
-    val notSRL = labelIndex(None)
-
-
-    def emptyCounts = StandardExpectedCounts.zero(featurizer.featureIndex)
-
-    def numLabels = labelIndex.size
-
-    def baseAugment(doc: FeaturizedSentence): SentenceBeliefs = {
-      beliefsFactory(doc)
-    }
-
-
-    def annotate(s: FeaturizedSentence, m: Marginal): FeaturizedSentence = {
-      val pieces =  for ((margf, fi) <- m.frames.zipWithIndex) yield {
-        val segments: Segmentation[Option[String], String] = SemiCRF.posteriorDecode(margf)
-        s.frames(fi).copy(args=segments.label.collect { case (Some(l),span) => Argument(l,span)})
-      }
-
-      s.copy(frames=pieces)
-    }
-
-    def marginal(s: FeaturizedSentence, aug: SentenceBeliefs): Marginal = {
-      val pieces =  for ((f, fi) <- s.frames.zipWithIndex) yield {
-        SemiCRF.Marginal(new Anchoring(featurizer.anchor(s, f.lemma, f.pos), s.words, labelIndex, outsideLabel, weights, aug, fi))
-      }
-      new Marginal(pieces)
-    }
-
-
-
-    def goldMarginal(s: FeaturizedSentence, augment: SentenceBeliefs): Marginal = {
-      val pieces = for ((f, fi) <- s.frames.zipWithIndex) yield {
-        val seg = f.stripEmbedded.asSegments(s.words)
-        val anchoring = new Anchoring(featurizer.anchor(s, f.lemma, f.pos), s.words, labelIndex, outsideLabel, weights, augment, fi)
-        SemiCRF.Marginal.goldMarginal(anchoring, seg)
-      }
-
-      new Marginal(pieces)
-    }
-
-    def countsFromMarginal(s: FeaturizedSentence, marg: Marginal, counts: ExpectedCounts, scale: Double): ExpectedCounts = {
+    def accumulateCounts(s: FeaturizedSentence, marg: Marginal, counts: ExpectedCounts, scale: Double): Unit = {
       counts.loss += marg.logPartition * scale
       for ( f <- marg.frames) {
         val labelMarginals = TriangularArray.fill(s.length+1)(null:Array[Double])
@@ -197,8 +142,63 @@ object SRL {
 //          }
 //        }
       }
-      counts
     }
+  }
+
+  case class Marginal(frames: IndexedSeq[SemiCRF.Marginal[Option[String], String]]) extends epic.framework.Marginal {
+    def logPartition: Double = frames.map(_.logPartition).sum
+    assert(!logPartition.isNaN)
+    assert(!logPartition.isInfinite)
+  }
+
+  class Inference(beliefsFactory: SentenceBeliefs.Factory,
+                  labelIndex: Index[Option[String]],
+                  outsideLabel: String,
+                  weights: DenseVector[Double],
+                  featurizer: IndexedFeaturizer) extends ProjectableInference[FeaturizedSentence, SentenceBeliefs] with AnnotatingInference[FeaturizedSentence] {
+    type Marginal = SRL.Marginal
+
+    val notSRL = labelIndex(None)
+
+
+    def emptyCounts = StandardExpectedCounts.zero(featurizer.featureIndex)
+
+    def numLabels = labelIndex.size
+
+    def baseAugment(doc: FeaturizedSentence): SentenceBeliefs = {
+      beliefsFactory(doc)
+    }
+
+
+    def annotate(s: FeaturizedSentence, m: Marginal): FeaturizedSentence = {
+      val pieces =  for ((margf, fi) <- m.frames.zipWithIndex) yield {
+        val segments: Segmentation[Option[String], String] = SemiCRF.posteriorDecode(margf)
+        s.frames(fi).copy(args=segments.label.collect { case (Some(l),span) => Argument(l,span)})
+      }
+
+      s.copy(frames=pieces)
+    }
+
+    def marginal(s: FeaturizedSentence, aug: SentenceBeliefs): Marginal = {
+      val pieces =  for ((f, fi) <- s.frames.zipWithIndex) yield {
+        SemiCRF.Marginal(new Anchoring(featurizer.anchor(s, f.lemma, f.pos), s.words, labelIndex, outsideLabel, weights, aug, fi))
+      }
+      new Marginal(pieces)
+    }
+
+
+
+    def goldMarginal(s: FeaturizedSentence, augment: SentenceBeliefs): Marginal = {
+      val pieces = for ((f, fi) <- s.frames.zipWithIndex) yield {
+        val seg = f.stripEmbedded.asSegments(s.words)
+        val anchoring = new Anchoring(featurizer.anchor(s, f.lemma, f.pos), s.words, labelIndex, outsideLabel, weights, augment, fi)
+        SemiCRF.Marginal.goldMarginal(anchoring, seg)
+      }
+
+      new Marginal(pieces)
+    }
+
+    
 
     def project(sent: FeaturizedSentence, marg: Marginal, sentenceBeliefs: SentenceBeliefs): SentenceBeliefs = {
       assert(!marg.logPartition.isInfinite, "Infinite partition! " + sent)

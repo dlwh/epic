@@ -26,19 +26,13 @@ object SentLexParser {
               reannotate: (BinarizedTree[L], Seq[W])=>BinarizedTree[L],
               indexed: IndexedLexFeaturizer[L, W],
               viterbi: Boolean = false,
-              initFeatureValue: Feature=>Option[Double] = {(f: Feature) => None}) extends EvaluableModel[FeaturizedSentence] {
-    type ExpectedCounts = StandardExpectedCounts[Feature]
+              initFeatureValue: Feature=>Option[Double] = {(f: Feature) => None}) extends EvaluableModel[FeaturizedSentence] with epic.framework.StandardExpectedCounts.Model[FeaturizedSentence] {
     type Marginal = ParseMarginal[AnnotatedLabel, String]
     type Inference = SentLexParser.Inference
 
     def featureIndex: Index[Feature] = indexed.index
 
     def initialValueForFeature(f: Feature): Double = initFeatureValue(f).getOrElse(0.0)
-
-    def expectedCountsToObjective(ecounts: ExpectedCounts): (Double, DenseVector[Double]) = {
-      (ecounts.loss, ecounts.counts)
-    }
-
 
     def inferenceFromWeights(weights: DenseVector[Double]) = {
       val gram = bundle.makeGrammar(indexed, weights)
@@ -68,6 +62,14 @@ object SentLexParser {
       val chains = AnnotatedLabelChainReplacer
       Trees.debinarize(chains.replaceUnaries(tree).map(_.label))
     }
+
+    def accumulateCounts(sent: FeaturizedSentence,
+                         marg: Marginal,
+                         counts: ExpectedCounts,
+                         scale: Double): Unit = {
+      marg.expectedCounts(indexed, counts, scale)
+    }
+
   }
 
   class Inference(beliefsFactory: SentenceBeliefs.Factory,
@@ -117,14 +119,7 @@ object SentLexParser {
       new TreeMarginal(AugmentedAnchoring(anchoring), reannotate(sent))
     }
 
-    def countsFromMarginal(sent: FeaturizedSentence,
-                           marg: Marginal,
-                           counts: ExpectedCounts,
-                           scale: Double): ExpectedCounts = {
-      marg.expectedCounts(featurizer, counts, scale)
-      counts
-    }
-
+   
     def project(s: FeaturizedSentence, marg: Marginal, oldAugment: SentenceBeliefs): SentenceBeliefs = {
       val m = marg
       val old = oldAugment

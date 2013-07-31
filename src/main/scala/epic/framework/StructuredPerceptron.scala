@@ -26,7 +26,12 @@ class StructuredPerceptron[Datum](model: Model[Datum], maxPasses: Int = 100, bat
         val numBad = new AtomicInteger(0)
         numTotal += batch.size
 
-        val totalCounts = (for(d <- batch.par; ec = inf.expectedCounts(d, inf.emptyCounts, 1.0) if ec.loss > 0.0) yield {
+        val totalCounts = (
+          for {
+            d <- batch.par
+            ec = model.expectedCounts(inf, d)
+            if ec.loss > 0.0
+          } yield {
           assert(ec.loss > 0)
           numBad.incrementAndGet()
           ec

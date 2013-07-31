@@ -75,10 +75,10 @@ class StructModel[L, L2, W](indexedFeatures: IndexedFeaturizer[L, L2, W],
     new AnnotatedParserInference(indexedFeatures, reannotate, grammar, baseFactory)
   }
 
-  def expectedCountsToObjective(ecounts: ExpectedCounts) = {
-    (ecounts.loss, ecounts.counts)
-  }
 
+  def accumulateCounts(d: TreeInstance[L, W], m: Marginal, accum: ExpectedCounts, scale: Double) {
+    m.expectedCounts(indexedFeatures, accum, scale)
+  }
 }
 
 case class StructModelFactory(baseParser: ParserParams.XbarGrammar,

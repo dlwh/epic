@@ -6,7 +6,7 @@ import scala.collection.mutable.ArrayBuffer
 import scala.collection.GenTraversableOnce
 import com.typesafe.scalalogging.log4j.Logging
 
-class StructSVM[Datum](model: Model[Datum],
+class StructSVM[Datum](val model: Model[Datum],
                        maxIter: Int = 100,
                        batchSize: Int = 100,
                        maxSMOIterations: Int = 100,
@@ -55,7 +55,9 @@ class StructSVM[Datum](model: Model[Datum],
   private def findNewConstraints(inf: model.Inference, data: IndexedSeq[Datum]): GenTraversableOnce[Constraint] = {
     for {
       d <- data.par
-      ec = inf.expectedCounts(d, inf.emptyCounts, 1.0)
+      m = inf.marginal(d)
+      gm = inf.goldMarginal(d)
+      ec = model.expectedCounts(inf, d)
       if ec.loss > 0
     } yield Constraint(ec)
 

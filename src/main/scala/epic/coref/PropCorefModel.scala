@@ -10,32 +10,15 @@ import PropCoref._
 import epic.ontonotes.DSpan
 import epic.everything.{DocumentBeliefs, Property}
 
-class PropCorefModel(properties: IndexedSeq[PropertyFeatures[_]], val featureIndex: Index[Feature]) extends Model[FeaturizedCorefInstance] with StandardExpectedCounts.Model {
+class PropCorefModel(properties: IndexedSeq[PropertyFeatures[_]], val featureIndex: Index[Feature]) extends StandardExpectedCounts.Model[FeaturizedCorefInstance] {
   type Inference = PropCorefInference
   type Marginal = PropCoref.Marginal
 
   def initialValueForFeature(f: Feature) = 0.0
 
   def inferenceFromWeights(weights: DenseVector[Double]) = new PropCorefInference(featureIndex, properties, weights)
-}
 
-case class PropertyFeatures[T](prop: Property[T],
-                               agree: Int,
-                               mismatch: Int,
-                               pairs: Array[Array[Int]]) {
-  def arity = prop.arity
-}
-
-class PropCorefInference(index: Index[Feature],
-                         properties: IndexedSeq[PropertyFeatures[_]],
-                         weights: DenseVector[Double]) extends ProjectableInference[FeaturizedCorefInstance, DocumentBeliefs] {
-  type ExpectedCounts = StandardExpectedCounts[Feature]
-  type Marginal = PropCoref.Marginal
-
-  def emptyCounts = StandardExpectedCounts.zero(index)
-
-
-  override def countsFromMarginal(inst: FeaturizedCorefInstance, marg: Marginal, expCounts: ExpectedCounts, scale: Double): ExpectedCounts = {
+  override def accumulateCounts(inst: FeaturizedCorefInstance, marg: Marginal, expCounts: ExpectedCounts, scale: Double): Unit = {
     import marg._
     expCounts.loss += marginals.logPartition * scale
 
@@ -55,8 +38,26 @@ class PropCorefInference(index: Index[Feature],
       f.tallyAgreeExpectedCounts(marginals, expCounts.counts)
     }
 
-    expCounts
   }
+}
+
+case class PropertyFeatures[T](prop: Property[T],
+                               agree: Int,
+                               mismatch: Int,
+                               pairs: Array[Array[Int]]) {
+  def arity = prop.arity
+}
+
+class PropCorefInference(index: Index[Feature],
+                         properties: IndexedSeq[PropertyFeatures[_]],
+                         weights: DenseVector[Double]) extends ProjectableInference[FeaturizedCorefInstance, DocumentBeliefs] {
+  type ExpectedCounts = StandardExpectedCounts[Feature]
+  type Marginal = PropCoref.Marginal
+
+  def emptyCounts = StandardExpectedCounts.zero(index)
+
+
+ 
 
   def goldMarginal(inst: FeaturizedCorefInstance, aug: DocumentBeliefs) = {
     val (assignmentVariables: Array[Variable[Int]], propertyVariables: Array[Array[Variable[Int]]]) = makeVariables(inst)

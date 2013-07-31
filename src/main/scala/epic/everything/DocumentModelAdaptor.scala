@@ -12,7 +12,7 @@ object DocumentModelAdaptor {
     val sentenceModel: CompatibleModel
     type ExpectedCounts = sentenceModel.ExpectedCounts
     type Marginal = DocumentModelAdaptor.Marginal[sentenceModel.Marginal]
-    type Inference = DocumentInferenceAdaptor[sentenceModel.Inference] {type ExpectedCounts = TypeHack.this.ExpectedCounts; type Marginal = DocumentModelAdaptor.Marginal[sentenceModel.Marginal]}
+    type Inference = DocumentInferenceAdaptor[sentenceModel.Inference] { type Marginal = DocumentModelAdaptor.Marginal[sentenceModel.Marginal]}
   }
   case class Marginal[M<:epic.framework.Marginal](sentences: IndexedSeq[M]) extends epic.framework.Marginal {
     def logPartition: Double = sentences.map(_.logPartition).sum
@@ -45,6 +45,15 @@ class DocumentModelAdaptor(factory: DocumentBeliefs.Factory, val sentenceModel: 
     results.reduceLeft(_ + _)
   }
 
+
+  def emptyCounts: ExpectedCounts = sentenceModel.emptyCounts
+
+  def accumulateCounts(d: FeaturizedDocument, m: Marginal, accum: ExpectedCounts, scale: Double):Unit = {
+    for(i <- 0 until d.sentences.length)
+      sentenceModel.accumulateCounts(d.sentences(i), m.sentences(i), accum, scale)
+  }
+
+
 }
 
 class DocumentInferenceAdaptor[Inf<:DocumentInferenceAdaptor.SentenceInference]
@@ -54,7 +63,6 @@ class DocumentInferenceAdaptor[Inf<:DocumentInferenceAdaptor.SentenceInference]
                                   with AnnotatingInference[FeaturizedDocument] {
   def baseAugment(v: FeaturizedDocument): DocumentBeliefs = factory(v)
 
-  type ExpectedCounts = sentenceInference.ExpectedCounts
   type Marginal = DocumentModelAdaptor.Marginal[sentenceInference.Marginal]
 
   def marginal(doc: FeaturizedDocument, aug: DocumentBeliefs): Marginal = {
@@ -63,7 +71,6 @@ class DocumentInferenceAdaptor[Inf<:DocumentInferenceAdaptor.SentenceInference]
     })
   }
 
-  def emptyCounts: ExpectedCounts = sentenceInference.emptyCounts
 
   def goldMarginal(doc: FeaturizedDocument, aug: DocumentBeliefs): Marginal = {
     DocumentModelAdaptor.Marginal(for( (sent, beliefs) <- doc.sentences.zip(aug.sentences)) yield {
@@ -76,13 +83,6 @@ class DocumentInferenceAdaptor[Inf<:DocumentInferenceAdaptor.SentenceInference]
       sentenceInference.annotate(sent, marg)
     }
     datum.copy(newSents)
-  }
-
-  def countsFromMarginal(v: FeaturizedDocument, marg: Marginal, accum: ExpectedCounts, scale: Double): ExpectedCounts = {
-    for( (s,m) <- v.sentences zip marg.sentences) {
-      sentenceInference.countsFromMarginal(s, m, accum, scale)
-    }
-    accum
   }
 
   def project(v: FeaturizedDocument, m: Marginal, oldAugment: DocumentBeliefs): DocumentBeliefs = {

@@ -19,19 +19,13 @@ object LiftedParser {
   type L = AnnotatedLabel
   type W = String
 
-  class Model(factory: SentenceBeliefs.Factory, model: ParserModel[L, W], viterbi: Boolean = false) extends EvaluableModel[FeaturizedSentence] {
-    type ExpectedCounts = StandardExpectedCounts[Feature]
+  class Model(factory: SentenceBeliefs.Factory, val model: ParserModel[L, W], viterbi: Boolean = false) extends StandardExpectedCounts.Model[FeaturizedSentence] with EvaluableModel[FeaturizedSentence] {
     type Marginal = ParseMarginal[AnnotatedLabel, String]
     type Inference = LiftedParser.Inference
 
     def featureIndex: Index[Feature] = model.featureIndex
 
     def initialValueForFeature(f: Feature): Double = model.initialValueForFeature(f)
-
-    def expectedCountsToObjective(ecounts: ExpectedCounts): (Double, DenseVector[Double]) = {
-      (ecounts.loss, ecounts.counts)
-    }
-
 
     def inferenceFromWeights(weights: DenseVector[Double]) = {
       val gram = model.inferenceFromWeights(weights)
@@ -52,6 +46,10 @@ object LiftedParser {
     private def makeNormalTree(tree: BinarizedTree[AnnotatedLabel]):Tree[String] = {
       val chains = AnnotatedLabelChainReplacer
       Trees.debinarize(chains.replaceUnaries(tree).map(_.label))
+    }
+
+    def accumulateCounts(d: FeaturizedSentence, m: Marginal, accum: ExpectedCounts, scale: Double) {
+      model.accumulateCounts(d.treeInstance, m, accum, scale)
     }
   }
 
@@ -82,14 +80,6 @@ object LiftedParser {
     def goldMarginal(sent: FeaturizedSentence, aug: SentenceBeliefs): Marginal = {
       val anchoring =  new Anchoring(inf.grammar.grammar, inf.grammar.lexicon, sent.words, aug, sent.constituentSparsity)
       inf.goldMarginal(sent.treeInstance, anchoring)
-    }
-
-    def countsFromMarginal(sent: FeaturizedSentence,
-                           marg: Marginal,
-                           counts: ExpectedCounts,
-                           scale: Double): ExpectedCounts = {
-      inf.countsFromMarginal(sent.treeInstance, marg, counts, scale)
-      counts
     }
 
     def project(s: FeaturizedSentence, marg: Marginal, oldAugment: SentenceBeliefs): SentenceBeliefs = {

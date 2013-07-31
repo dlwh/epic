@@ -47,7 +47,10 @@ class LatentParserModel[L, L3, W](indexedFeatures: IndexedFeaturizer[L, L3, W],
     initialFeatureVal(f) getOrElse (math.random * 1E-5)
   }
 
-  def emptyCounts = new epic.parser.ExpectedCounts(featureIndex)
+
+  def accumulateCounts(d: TreeInstance[L, W], m: Marginal, accum: ExpectedCounts, scale: Double) {
+    m.expectedCounts(indexedFeatures, accum, scale)
+  }
 
   def inferenceFromWeights(weights: DenseVector[Double]) = {
     val lexicon = new FeaturizedLexicon(weights, indexedFeatures)
@@ -56,9 +59,6 @@ class LatentParserModel[L, L3, W](indexedFeatures: IndexedFeaturizer[L, L3, W],
     new LatentParserInference(indexedFeatures, reannotate, grammar, baseFactory, projections)
   }
 
-  def expectedCountsToObjective(ecounts: ExpectedCounts) = {
-    (ecounts.loss, ecounts.counts)
-  }
 
 }
 

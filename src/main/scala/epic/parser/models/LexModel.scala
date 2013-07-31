@@ -52,6 +52,10 @@ class LexModel[L, W](bundle: LexGrammarBundle[L, W],
                      initFeatureValue: Feature=>Option[Double]) extends ParserModel[L, W] with Serializable with ParserExtractable[L, W] {
 
 
+  def accumulateCounts(d: TreeInstance[L, W], m: Marginal, accum: ExpectedCounts, scale: Double) {
+    m.expectedCounts(indexed, accum, scale)
+  }
+
   def baseGrammar: BaseGrammar[L] = bundle.baseGrammar
   def lexicon = bundle.baseLexicon
 
@@ -71,12 +75,6 @@ class LexModel[L, W](bundle: LexGrammarBundle[L, W],
   }
 
   type Inference = AnnotatedParserInference[L, W]
-
-  def emptyCounts = new epic.parser.ExpectedCounts(indexed.index)
-
-  def expectedCountsToObjective(ecounts: ExpectedCounts) = {
-    (ecounts.loss, ecounts.counts)
-  }
 
 }
 

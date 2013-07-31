@@ -24,7 +24,7 @@ import epic.constraints.TagConstraints
 class CRFModel[L, W](val featureIndex: Index[Feature],
                      val lexicon: TagConstraints.Factory[L, W],
                      val featurizer: CRF.IndexedFeaturizer[L, W],
-                     initialWeights: Feature=>Double = {(_: Feature) => 0.0}) extends Model[TaggedSequence[L, W]] with StandardExpectedCounts.Model with Serializable {
+                     initialWeights: Feature=>Double = {(_: Feature) => 0.0}) extends Model[TaggedSequence[L, W]] with StandardExpectedCounts.Model[TaggedSequence[L, W]] with Serializable {
   def labelIndex: Index[L] = featurizer.labelIndex
 
   def extractCRF(weights: DenseVector[Double]) = {
@@ -38,6 +38,20 @@ class CRFModel[L, W](val featureIndex: Index[Feature],
 
   def inferenceFromWeights(weights: DenseVector[Double]): Inference =
     new CRFInference(weights, featureIndex, lexicon, featurizer)
+
+  def accumulateCounts(v: TaggedSequence[L, W], marg: Marginal, counts: ExpectedCounts, scale: Double): Unit = {
+    counts.loss += marg.logPartition * scale
+    val localization = marg.anchoring.asInstanceOf[Inference#Anchoring].localization
+    val visitor = new TransitionVisitor[L, W] {
+
+      def apply(pos: Int, prev: Int, cur: Int, count: Double) {
+        val feats = localization.featuresForTransition(pos, prev, cur)
+        if(count != 0) assert(feats ne null, (pos, prev, cur, marg.length, marg.anchoring.validSymbols(pos), marg.anchoring.validSymbols(pos-1)))
+        axpy(scale * count, feats, counts.counts)
+      }
+    }
+    marg.visit(visitor)
+  }
 
 }
 
@@ -75,20 +89,7 @@ class CRFInference[L, W](val weights: DenseVector[Double],
     CRF.Marginal.goldMarginal[L, W](new Anchoring(v.words, augment), v.label)
   }
 
-  def countsFromMarginal(v: TaggedSequence[L, W], marg: Marginal, counts: ExpectedCounts, scale: Double): ExpectedCounts = {
-    counts.loss += marg.logPartition * scale
-    val localization = marg.anchoring.asInstanceOf[Anchoring].localization
-    val visitor = new TransitionVisitor[L, W] {
 
-      def apply(pos: Int, prev: Int, cur: Int, count: Double) {
-        val feats = localization.featuresForTransition(pos, prev, cur)
-        if(count != 0) assert(feats ne null, (pos, prev, cur, marg.length, marg.anchoring.validSymbols(pos), marg.anchoring.validSymbols(pos-1)))
-        axpy(scale * count, feats, counts.counts)
-      }
-    }
-    marg.visit(visitor)
-    counts
-  }
 
 
   def baseAugment(v: TaggedSequence[L, W]): CRF.Anchoring[L, W] = new IdentityAnchoring(v.words)
