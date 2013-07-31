@@ -45,21 +45,40 @@ class StructSVM[Datum](val model: Model[Datum],
   }
 
 
-  private case class Constraint(ec: ExpectedCounts) {
-    lazy val (loss, feats) = model.expectedCountsToObjective(ec)
-    lazy val ftf = feats dot feats
+  private case class Constraint(loss: Double, gold: Datum, guess: Datum, ftf: Double) {
+    def dot(w: DenseVector[Double]) = {
+      val counts =  model.countsFromMarginal(d, guessMarginal)
+      model.accumulateCounts(d, goldMarginal, counts, -1)
+      val feats = model.expectedCountsToObjective(counts)._2
+      feats dot w
+    }
+
+    lazy val ftf = {
+    }
     var age = 0
+
+    def axpy(scale: Double, weights: DenseVector[Double]) = {
+      val ec = model.emptyCounts
+      model.accumulateCounts(d, guessMarginal, ec, scale)
+      model.accumulateCounts(d, goldMarginal, ec, -scale)
+      weights += model.expectedCountsToObjective(ec)._2
+    }
   }
 
 
   private def findNewConstraints(inf: model.Inference, data: IndexedSeq[Datum]): GenTraversableOnce[Constraint] = {
     for {
       d <- data.par
-      m = inf.marginal(d)
-      gm = inf.goldMarginal(d)
-      ec = model.expectedCounts(inf, d)
-      if ec.loss > 0
-    } yield Constraint(ec)
+      guessMarginal = inf.marginal(d)
+      goldMarginal = inf.goldMarginal(d)
+      if guessMarginal.logPartition > goldMarginal.logPartition
+    } yield {
+      val counts = model.countsFromMarginal(d, guessMarginal)
+      model.accumulateCounts(d, goldMarginal, counts, -1)
+      val feats = model.expectedCountsToObjective(counts)._2
+      val ftf = feats dot feats
+      Constraint(d, gm, m, ftf)
+    }
 
   }
 
@@ -90,9 +109,10 @@ class StructSVM[Datum](val model: Model[Datum],
     if(alphas.sum < C) {
       alphas += (C-alphas.sum)/alphas.length
     }
-    weights := 0.0
     for(i <- 0 until alphas.length) {
-      axpy(alphas(i), constraints(i).feats, weights)
+      if(alphas(i) != 0.0) {
+        constraints(i).axpy(alphas(i), weights)
+      }
     }
     var largestChange = 10000.0
     for(iter <- 0 until maxSMOIterations if largestChange > smoTol) {
@@ -105,7 +125,7 @@ class StructSVM[Datum](val model: Model[Datum],
         val oldA2 = alphas(j)
         if( (oldA1 != 0 && oldA2 != 0)) {
           val con2 = constraints(j)
-          var t = ((con1.loss - con2.loss) - ( (weights dot con2.feats) - (weights dot con1.feats)))/(con1.ftf + con2.ftf)
+          var t = ((con1.loss - con2.loss) - ( (con2.dot(weights)) - (con1.dot(weights))))/(con1.ftf + con2.ftf)
           val tt = t
           if(!t.isNaN && t != 0.0) {
             t = t max (-oldA1)
@@ -114,8 +134,8 @@ class StructSVM[Datum](val model: Model[Datum],
             alphas(i) = newA1
             alphas(j) = newA2
             println(newA1,newA2, tt, t, oldA1, oldA2)
-            axpy(oldA1 - newA1, con1.feats, weights)
-            axpy(oldA2 - newA2, con2.feats, weights)
+            con1.axpy(oldA1 - newA1, weights)
+            con2.axpy(oldA2 - newA2, weights)
             largestChange = largestChange max (oldA1 - newA1).abs
             largestChange = largestChange max (oldA2 - newA2).abs
           }
