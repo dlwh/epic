@@ -10,6 +10,7 @@ import breeze.features.FeatureVector
 import epic.constraints.TagConstraints
 import epic.util.CacheBroker
 import breeze.optimize.FirstOrderMinimizer.OptParams
+import breeze.optimize.CachedBatchDiffFunction
 
 /**
  * A -Markov Linear Chain Conditional Random Field. Useful for POS tagging, etc.
@@ -67,7 +68,7 @@ object CRF {
     val cached = new CachedBatchDiffFunction(obj)
     val weights = opt.minimize(cached, obj.initialWeightVector(randomize = false))
 
-    crf
+    model.extractCRF(weights)
   }
 
   def buildIOModel[L](data: IndexedSeq[TaggedSequence[L, String]],
