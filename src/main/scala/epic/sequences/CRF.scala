@@ -62,16 +62,10 @@ object CRF {
     val model: CRFModel[L, String] = new TaggedSequenceModelFactory[L](startSymbol,  gazetteer = gazetteer).makeModel(data)
 
 
-    /*
     val obj = new ModelObjective(model, data)
 
     val cached = new CachedBatchDiffFunction(obj)
     val weights = opt.minimize(cached, obj.initialWeightVector(randomize = false))
-    */
-
-    val percep = new StructSVM(new OneBestModelAdaptor(model))
-    val weights = percep.train(data)
-    val crf = model.extractCRF(weights)
 
     crf
   }

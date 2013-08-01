@@ -6,6 +6,7 @@ import scala.collection.mutable.ArrayBuffer
 import scala.collection.GenTraversableOnce
 import com.typesafe.scalalogging.log4j.Logging
 
+/*
 class StructSVM[Datum](val model: Model[Datum],
                        maxIter: Int = 100,
                        batchSize: Int = 100,
@@ -147,3 +148,4 @@ class StructSVM[Datum](val model: Model[Datum],
   }
 
 }
+*/
