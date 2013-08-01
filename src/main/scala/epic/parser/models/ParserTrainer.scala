@@ -26,7 +26,7 @@ import epic.parser.projections.{ConstraintCoreGrammarAdaptor, ReachabilityProjec
 import epic.util.CacheBroker
 import epic.parser.ParserParams.XbarGrammar
 import breeze.util._
-import epic.trees.annotations.StripAnnotations
+import epic.trees.annotations.{AddMarkovization, StripAnnotations}
 import epic.trees.TreeInstance
 import breeze.optimize.FirstOrderMinimizer.OptParams
 import epic.parser.ParseEval.Statistics
@@ -79,7 +79,7 @@ object ParserTrainer extends epic.parser.ParserPipeline with Logging {
 
     val initialParser = params.parser match {
       case null =>
-        GenerativeParser.annotated(XbarGrammar(), new StripAnnotations[String](), trainTrees)
+        GenerativeParser.annotated(XbarGrammar(), (new StripAnnotations[String]()).andThen(AddMarkovization()), trainTrees)
       case f =>
         readObject[SimpleChartParser[AnnotatedLabel, String]](f)
     }
