@@ -677,7 +677,7 @@ case class LexModelFactory(baseParser: ParserParams.XbarGrammar,
                            @Help(text="For features not seen in gold trees, we bin them into dummyFeats * numGoldFeatures bins using hashing.")
                            dummyFeats: Double = 1.0,
                            @Help(text="How common must a feature be before we remember it?")
-                           minFeatCutoff: Int = 1) extends ParserExtractableModelFactory[AnnotatedLabel, String] with SafeLogging {
+                           minFeatCutoff: Int = 1) extends ParserModelFactory[AnnotatedLabel, String] with SafeLogging {
   type MyModel = LexModel[AnnotatedLabel, String]
 
   def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]], constrainer: CoreGrammar[AnnotatedLabel, String])(implicit broker: CacheBroker) ={

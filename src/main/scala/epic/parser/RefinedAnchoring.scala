@@ -99,7 +99,7 @@ trait RefinedAnchoring[L, W]  {
                 ok = true
                 break()
               }
-            val df = (myScore - theirScore).abs / math.max(myScore,theirScore).abs
+            val df = (myScore - theirScore).abs / math.max(math.max(myScore,theirScore).abs,1E-4)
             if(df > diff) {
               ok = true
               break()
@@ -119,7 +119,7 @@ trait RefinedAnchoring[L, W]  {
               ok = true
               break()
             }
-            val df = (myScore - theirScore).abs / math.max(myScore,theirScore).abs
+            val df = (myScore - theirScore).abs / math.max(math.max(myScore,theirScore).abs, 1E-4)
             if(df > diff) {
               ok = true
               break()
@@ -138,7 +138,7 @@ trait RefinedAnchoring[L, W]  {
               ok = true
               break()
             }
-            val df = (myScore - theirScore).abs / math.max(myScore,theirScore).abs
+            val df = (myScore - theirScore).abs / math.max(math.max(myScore,theirScore).abs, 1E-4)
             if(df > diff) {
               ok = true
               break()

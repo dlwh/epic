@@ -55,6 +55,7 @@ class EPInference[Datum, Augment](val inferences: IndexedSeq[ProjectableInferenc
         marginals(i) = marg
         newAugment -> contributionToLikelihood
       }
+
       val ep = new ExpectationPropagation(project _, 1E-3)
 
       var state: ep.State = null

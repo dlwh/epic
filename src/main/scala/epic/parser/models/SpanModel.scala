@@ -408,16 +408,16 @@ object IndexedSpanFeaturizer {
             enumerator(spec.featuresForSpan(span.begin, span.end, aI), wspec.featuresForWord(span.begin))
           case UnaryTree(a, b, chain, span) =>
             val r = ruleIndex(UnaryRule(a, b.label, chain))
-            enumerator(spec.featuresForRule(span.begin, span.end, r), wspec.featuresForSpan(span.begin, span.end))
+            enumerator(spec.featuresForRule(span.begin, span.end, r), wspec.featuresForSpan(span.begin, span.end, FeaturizationLevel.BasicFeatures))
           case t@BinaryTree(a, b, c, span) =>
             val aI = labelIndex(a)
             val r = ruleIndex(BinaryRule(a, b.label, c.label))
             enumerator(spec.featuresForBinaryRule(span.begin, t.splitPoint, span.end, r),
-              wspec.featuresForSpan(span.begin, span.end))
+              wspec.featuresForSpan(span.begin, span.end, FeaturizationLevel.MinimalFeatures))
             enumerator(spec.featuresForSpan(span.begin, span.end, aI),
-              wspec.featuresForSpan(span.begin, span.end))
+              wspec.featuresForSpan(span.begin, span.end, FeaturizationLevel.MinimalFeatures))
             enumerator(spec.featuresForSplit(span.begin, t.splitPoint, span.end, r),
-              wspec.featuresForWord(t.splitPoint,FeaturizationLevel.BasicFeatures))
+              wspec.featuresForWord(t.splitPoint,FeaturizationLevel.MinimalFeatures))
         }
 
       }

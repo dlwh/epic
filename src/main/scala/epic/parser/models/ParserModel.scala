@@ -83,6 +83,6 @@ trait ParserModelFactory[L, W] extends ParserExtractableModelFactory[L, W] {
   protected def extractBasicCounts[L, W](trees: IndexedSeq[TreeInstance[L, W]]): (Counter2[L, W, Double], Counter2[L, BinaryRule[L], Double], Counter2[L, UnaryRule[L], Double]) = {
     GenerativeParser.extractCounts(trees)
   }
-
-
 }
+
+
