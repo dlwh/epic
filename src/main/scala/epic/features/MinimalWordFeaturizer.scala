@@ -38,8 +38,7 @@ class MinimalWordFeaturizer(wordCounts: Counter[String, Double],
         } else {
           val ww = words(i)
           val classe = interner(WordFeature(EnglishWordClassGenerator(ww), 'Class))
-          val shape = interner(WordFeature(WordShapeGenerator(ww), 'Shape))
-          Array(Unk, classe, shape)
+          Array(/*shape,*/ classe, Unk)
         }
       }
     }
@@ -55,17 +54,15 @@ class MinimalWordFeaturizer(wordCounts: Counter[String, Double],
 
   private val wordFeatures = Encoder.fromIndex(wordIndex).tabulateArray(s => if(wordCounts(s) > unknownWordThreshold) interner(IndicatorFeature(s)) else Unk)
   private val classes = Encoder.fromIndex(wordIndex).tabulateArray(w => if(wordCounts(w) > functionWordThreshold) wordFeatures(wordIndex(w)) else interner(WordFeature(EnglishWordClassGenerator(w), 'Class)))
-  private val shapes =  Encoder.fromIndex(wordIndex).tabulateArray(w => if(wordCounts(w) > functionWordThreshold) wordFeatures(wordIndex(w)) else interner(WordFeature(WordShapeGenerator(w), 'Shape)))
 
   // caches
   private val minimalFeatures = Array.tabulate(wordIndex.size){ i =>
     val wc = wordCounts(wordIndex.get(i))
     val w = wordFeatures(i)
-    val shape =  shapes(i)
     val classe =  classes(i)
     if(wc > functionWordThreshold) Array(w)
-    else if (wc > unknownWordThreshold) Array(w, shape, classe)
-    else Array(shape, classe, Unk)
+    else if (wc > unknownWordThreshold) Array(w, /*shape,*/ classe)
+    else Array(/*shape,*/ classe, Unk)
   }
 
 }
