@@ -10,7 +10,7 @@ import epic.features._
 import epic.lexicon.{Lexicon, SimpleLexicon}
 import breeze.collection.mutable.OpenAddressHashArray
 import java.util
-import epic.util.{SafeLogging, NotProvided, Optional}
+import epic.util.{ProgressLog, SafeLogging, NotProvided, Optional}
 import epic.parser.features.PairFeature
 import epic.parser.features.LabelFeature
 import com.typesafe.scalalogging.log4j.Logging
@@ -151,7 +151,7 @@ class TaggedSequenceModelFactory[L](val startSymbol: L,
 
     val wordCounts: Counter[String, Double] = sum(counts, Axis._0)
     val minimalWordFeaturizer = new MinimalWordFeaturizer(wordCounts)
-    val surfaceFeaturizer = new ContextWordFeaturizer(minimalWordFeaturizer) + minimalWordFeaturizer//+ new WordShapeFeaturizer(wordCounts)
+    val surfaceFeaturizer = new ContextWordFeaturizer(minimalWordFeaturizer, 1) + minimalWordFeaturizer + new WordShapeFeaturizer(wordCounts)
     val featurizer = IndexedWordFeaturizer.fromData(surfaceFeaturizer, train.map{_.words})
     val l2featurizer = IndexedWordFeaturizer.fromData(minimalWordFeaturizer, train.map{_.words})
 
@@ -162,7 +162,7 @@ class TaggedSequenceModelFactory[L](val startSymbol: L,
     }
     val l2Builder = new CrossProductIndex.Builder(label2Index, l2featurizer.featureIndex, includeLabelOnlyFeatures = true)
 
-    var i = 0
+    val progress = new ProgressLog(logger,train.length, frequency=1000, name= "NumFeatures")
     for(s <- train) {
       val loc = featurizer.anchor(s.words)
       val l2loc = l2featurizer.anchor(s.words)
@@ -179,10 +179,7 @@ class TaggedSequenceModelFactory[L](val startSymbol: L,
           }
         }
       }
-      if(i % 500 == 0) {
-        logger.info(s"$i/${train.length} ${lfBuilder.size + l2Builder.size}")
-      }
-      i += 1
+      progress.info(s"${lfBuilder.size + l2Builder.size}")
     }
 
     val indexed = new IndexedStandardFeaturizer[L, String](featurizer, l2featurizer, lexicon, startSymbol, labelIndex, label2Features, lfBuilder.result(), l2Builder.result())
