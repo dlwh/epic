@@ -151,19 +151,21 @@ class TaggedSequenceModelFactory[L](val startSymbol: L,
 
     val wordCounts: Counter[String, Double] = sum(counts, Axis._0)
     val minimalWordFeaturizer = new MinimalWordFeaturizer(wordCounts)
-    val surfaceFeaturizer = minimalWordFeaturizer//new ContextWordFeaturizer(minimalWordFeaturizer) + new WordShapeFeaturizer(wordCounts)
+    val surfaceFeaturizer = new ContextWordFeaturizer(minimalWordFeaturizer) + minimalWordFeaturizer//+ new WordShapeFeaturizer(wordCounts)
     val featurizer = IndexedWordFeaturizer.fromData(surfaceFeaturizer, train.map{_.words})
+    val l2featurizer = IndexedWordFeaturizer.fromData(minimalWordFeaturizer, train.map{_.words})
 
     val lfBuilder = new CrossProductIndex.Builder(labelIndex, featurizer.featureIndex, includeLabelOnlyFeatures = false)
     val label2Index = Index[(L, L)]()
     val label2Features = Array.tabulate(labelIndex.size, labelIndex.size) { (l1, l2) =>
       label2Index.index(labelIndex.get(l1) -> labelIndex.get(l2))
     }
-    val l2Builder = new CrossProductIndex.Builder(label2Index, featurizer.featureIndex, includeLabelOnlyFeatures = true)
+    val l2Builder = new CrossProductIndex.Builder(label2Index, l2featurizer.featureIndex, includeLabelOnlyFeatures = true)
 
     var i = 0
     for(s <- train) {
       val loc = featurizer.anchor(s.words)
+      val l2loc = l2featurizer.anchor(s.words)
       val lexLoc = lexicon.anchor(s.words)
 
       for {
@@ -173,7 +175,7 @@ class TaggedSequenceModelFactory[L](val startSymbol: L,
         lfBuilder.add(l, loc.featuresForWord(b))
         if(lexLoc.allowedTags(b).size > 1) {
           for(prevTag <- if(b == 0) Set(labelIndex(startSymbol)) else lexLoc.allowedTags(b-1)) {
-            l2Builder.add(label2Features(prevTag)(l), loc.featuresForWord(b))
+            l2Builder.add(label2Features(prevTag)(l), l2loc.featuresForWord(b))
           }
         }
       }
@@ -183,8 +185,8 @@ class TaggedSequenceModelFactory[L](val startSymbol: L,
       i += 1
     }
 
-    val indexed = new IndexedStandardFeaturizer[L, String](featurizer, lexicon, startSymbol, labelIndex, label2Features, lfBuilder.result(), l2Builder.result())
-    val model = new CRFModel(indexed.featureIndex, lexicon, indexed, weights(_))
+    val indexed = new IndexedStandardFeaturizer[L, String](featurizer, l2featurizer, lexicon, startSymbol, labelIndex, label2Features, lfBuilder.result(), l2Builder.result())
+    val model = new CRFModel(indexed.featureIndex, lexicon, indexed, weights)
 
     model
   }
@@ -196,6 +198,7 @@ object TaggedSequenceModelFactory {
 
   @SerialVersionUID(1L)
   class IndexedStandardFeaturizer[L, String](wordFeaturizer: IndexedWordFeaturizer[String],
+                                             l2WordFeaturizer: IndexedWordFeaturizer[String],
                                              val lexicon: TagConstraints.Factory[L, String],
                                              val startSymbol: L,
                                              val labelIndex: Index[L],
@@ -213,6 +216,7 @@ object TaggedSequenceModelFactory {
 
     def anchor(w: IndexedSeq[String]): AnchoredFeaturizer[L, String] = new AnchoredFeaturizer[L, String] {
       val loc = wordFeaturizer.anchor(w)
+      val l2loc = l2WordFeaturizer.anchor(w)
       val lexLoc = lexicon.anchor(w)
       def featureIndex: Index[Feature] =  outer.featureIndex
 
@@ -231,8 +235,9 @@ object TaggedSequenceModelFactory {
         justLabel = labelFeatureIndex.crossProduct(Array(curTag), features, offset = loff, usePlainLabelFeatures = false)
         prevTag <- validSymbols(pos-1)
       } {
+        val l2feats = l2loc.featuresForWord(pos)
         val feats = if(posNeedsAmbiguity(pos)) {
-          justLabel++ label2FeatureIndex.crossProduct(Array(label2Features(prevTag)(curTag)), features, offset = l2off, usePlainLabelFeatures = false)
+          justLabel++ label2FeatureIndex.crossProduct(Array(label2Features(prevTag)(curTag)), l2feats, offset = l2off, usePlainLabelFeatures = true)
         } else {
           justLabel
         }

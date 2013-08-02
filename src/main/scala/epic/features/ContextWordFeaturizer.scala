@@ -20,9 +20,11 @@ class ContextWordFeaturizer[W](offsetFeaturizer: WordFeaturizer[W], wordOffsetOr
         result ++= offsetAnchoring.featuresForWord(pos + off).map(f => OffsetFeature(off, f):Feature)
       }
 
+      /*
       val myFeats = offsetAnchoring.featuresForWord(pos)
       result ++= Arrays.crossProduct(Array(myFeats.head), offsetAnchoring.featuresForWord(pos+1)){BigramFeature(0, _, _)}
       result ++= Arrays.crossProduct(offsetAnchoring.featuresForWord(pos-1), Array(myFeats.head)){BigramFeature(-1, _, _)}
+      */
       result.toArray
     }
 
