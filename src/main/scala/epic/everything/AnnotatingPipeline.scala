@@ -268,14 +268,15 @@ object AnnotatingPipeline extends Logging {
     }
     broker.commit()
 
+    val c = sum(nerCounts, Axis._0)
 
-
-
-    val standardFeaturizer = new StandardSurfaceFeaturizer(sum(nerCounts, Axis._0))
-    val featurizers =new ContextSurfaceFeaturizer[String](standardFeaturizer, 3, 3)
-    val featurizer = new MultiSurfaceFeaturizer[String](featurizers)
+    val wFeaturizer = new MinimalWordFeaturizer(c)
+    val standardFeaturizer = new StandardSurfaceFeaturizer(c)
+    val contextual = new ContextSurfaceFeaturizer[String](wFeaturizer, 3)
+    val featurizer = new MultiSurfaceFeaturizer[String](contextual, standardFeaturizer)
 
     FeaturizedDocument.makeFactory(params.treebank.process,
+      wFeaturizer,
     featurizer,
      pruningParser.grammar, pruningParser.lexicon,
       parseConstrainer,
@@ -314,10 +315,11 @@ object AnnotatingPipeline extends Logging {
       ruleGen
     )
 
-    val bilex = IndexedBilexicalFeaturizer.fromData(docProcessor.featurizer, trainTrees.map(DependencyTree.fromTreeInstance[AnnotatedLabel, String](_, HeadFinder.collins)))
+    val bilex = IndexedBilexicalFeaturizer.fromData(docProcessor.wordFeaturizer, docProcessor.wordFeaturizer, trainTrees.map(DependencyTree.fromTreeInstance[AnnotatedLabel, String](_, HeadFinder.collins)))
 
     val indexed = IndexedLexFeaturizer.extract[AnnotatedLabel, TreeInstance[AnnotatedLabel, String], String](feat,
       bilex,
+      docProcessor.wordFeaturizer,
       headFinder,
       docProcessor.grammar.index,
       docProcessor.grammar.labelIndex,
@@ -349,7 +351,6 @@ object AnnotatingPipeline extends Logging {
     val refGrammar = BaseGrammar(AnnotatedLabel.TOP, annBinaries, annUnaries)
 
     val (xbarGrammar, xbarLexicon) = docProcessor.grammar -> docProcessor.lexicon
-    val summedCounts = sum(initLexicon, Axis._0)
 
     val indexedRefinements = GrammarRefinements(xbarGrammar, refGrammar, (_: AnnotatedLabel).baseAnnotatedLabel)
 
@@ -357,14 +358,14 @@ object AnnotatingPipeline extends Logging {
     def ruleFeatures(ann: Rule[AnnotatedLabel]) = Array[Feature](RuleFeature(ann))
 
 
-    val surface = docProcessor.featurizer
     val feat = new StandardSpanFeaturizer[AnnotatedLabel, String](
       refGrammar,
       labelFeatures _, ruleFeatures _)
 
 
     val indexed =  IndexedSpanFeaturizer.extract[AnnotatedLabel, AnnotatedLabel, String](feat,
-      surface,
+      docProcessor.wordFeaturizer,
+      docProcessor.featurizer,
       StripAnnotations(),
       indexedRefinements,
       xbarGrammar,

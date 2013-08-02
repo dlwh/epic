@@ -149,9 +149,10 @@ class TaggedSequenceModelFactory[L](val startSymbol: L,
 
     val lexicon:TagConstraints.Factory[L, String] = new SimpleLexicon[L, String](labelIndex, counts)
 
-    val standardFeaturizer = new StandardSurfaceFeaturizer(sum(counts, Axis._0))
-    val featurizers = gazetteer.foldLeft(IndexedSeq[SurfaceFeaturizer[String]](new ContextSurfaceFeaturizer[String](standardFeaturizer)))(_ :+ _)
-    val featurizer = IndexedWordFeaturizer.fromData(new MultiSurfaceFeaturizer(featurizers), train.map(_.words))
+    val wordCounts: Counter[String, Double] = sum(counts, Axis._0)
+    val minimalWordFeaturizer = new MinimalWordFeaturizer(wordCounts)
+    val surfaceFeaturizer = minimalWordFeaturizer//new ContextWordFeaturizer(minimalWordFeaturizer) + new WordShapeFeaturizer(wordCounts)
+    val featurizer = IndexedWordFeaturizer.fromData(surfaceFeaturizer, train.map{_.words})
 
     val featureIndex = Index[Feature]()
 
@@ -175,7 +176,7 @@ class TaggedSequenceModelFactory[L](val startSymbol: L,
         }
         if(lexLoc.allowedTags(b).size > 1) {
           for(prevTag <- if(b == 0) Set(labelIndex(startSymbol)) else lexLoc.allowedTags(b-1)) {
-            loc.featuresForWord(b, FeaturizationLevel.MinimalFeatures) foreach {f =>
+            loc.featuresForWord(b) foreach {f =>
               label2WordFeatures(f)(prevTag * labelIndex.size + l) = featureIndex.index(PairFeature(label2Features(prevTag)(l), featurizer.featureIndex.get(f)) )
             }
           }

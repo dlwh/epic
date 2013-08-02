@@ -111,17 +111,25 @@ trait LexFeaturizer[L] extends Serializable {
  * @tparam W Word
  */
 class IndexedLexFeaturizer[L, W](f: LexFeaturizer[L],
-                                 surface: IndexedBilexicalFeaturizer[W],
+                                 wordFeaturizer: IndexedWordFeaturizer[W],
+                                 bilexFeaturizer: IndexedBilexicalFeaturizer[W],
                                  labelIndex: Index[L],
                                  ruleIndex: Index[Rule[L]],
-                                 val index: FeatureIndex[Feature]) extends RefinedFeaturizer[L, W, Feature] with Serializable {
+                                 wordFeatureIndex: CrossProductIndex[Feature, Feature],
+                                 bilexFeatureIndex: CrossProductIndex[Feature, Feature]) extends RefinedFeaturizer[L, W, Feature] with Serializable {
+
+  val index = SegmentedIndex(wordFeatureIndex, bilexFeatureIndex)
+  private val wordOffset = index.componentOffset(0)
+  private val bilexOffset = index.componentOffset(1)
+
   def anchor(datum: IndexedSeq[W]):Spec = new Spec(datum)
 
   class Spec(val words: IndexedSeq[W]) extends Anchoring {
 
 
     private val fspec = f
-    private val surfaceSpec = surface.anchor(words)
+    private val bilexSpec = bilexFeaturizer.anchor(words)
+    private val wordSpec = wordFeaturizer.anchor(words)
 
     def length = words.length
 
@@ -146,7 +154,7 @@ class IndexedLexFeaturizer[L, W](f: LexFeaturizer[L],
       }
       var cache = rcache(tag)
       if(cache == null) {
-        cache = index.crossProduct(fspec.featuresForTag(tag), surfaceSpec.featuresForWord(head), usePlainLabelFeatures = false)
+        cache = wordFeatureIndex.crossProduct(fspec.featuresForTag(tag), wordSpec.featuresForWord(head), offset = wordOffset, usePlainLabelFeatures = false)
         rcache(tag) = cache
       }
       cache
@@ -180,9 +188,9 @@ class IndexedLexFeaturizer[L, W](f: LexFeaturizer[L],
       //      if(cache == null)  {
       val ruleHead = indexedFeaturesForRuleHead(rule, head)
       val ruleDep = indexedFeaturesForRuleDep(rule, dep)
-      val spanFeatures: Array[Int] = surfaceSpec.featuresForAttachment(head, dep, FeaturizationLevel.MinimalFeatures)
+      val spanFeatures: Array[Int] = bilexSpec.featuresForAttachment(head, dep)
       val bilex = indexedFeaturesForBilex(head, dep)
-      val attach = index.crossProduct(fspec.featuresForAttach(rule, head, dep), spanFeatures)
+      val attach = bilexFeatureIndex.crossProduct(fspec.featuresForAttach(rule, head, dep), spanFeatures, offset = bilexOffset)
 
       //        cache = Arrays.concatenate(ruleHead, ruleDep, bilex, justRule)
       Arrays.concatenate(ruleHead, ruleDep, bilex, attach)
@@ -212,8 +220,8 @@ class IndexedLexFeaturizer[L, W](f: LexFeaturizer[L],
       }
       var cache = rcache(r)
       if(cache == null)  {
-        val surfFeatures = surfaceSpec.featuresForWord(w, FeaturizationLevel.BasicFeatures)
-        cache = index.crossProduct(fspec.featuresForHead(r), surfFeatures)
+        val surfFeatures = wordSpec.featuresForWord(w)
+        cache = wordFeatureIndex.crossProduct(fspec.featuresForHead(r), surfFeatures, wordOffset)
         rcache(r) = cache
       }
       cache
@@ -227,8 +235,8 @@ class IndexedLexFeaturizer[L, W](f: LexFeaturizer[L],
       }
       var cache = rcache(r)
       if(cache == null)  {
-        val surfFeatures = surfaceSpec.featuresForWord(w, FeaturizationLevel.BasicFeatures)
-        cache = index.crossProduct(fspec.featuresForDep(r), surfFeatures, usePlainLabelFeatures = false)
+        val surfFeatures = wordSpec.featuresForWord(w)
+        cache = wordFeatureIndex.crossProduct(fspec.featuresForDep(r), surfFeatures, wordOffset, usePlainLabelFeatures = false)
         rcache(r) = cache
       }
       cache
@@ -243,9 +251,9 @@ class IndexedLexFeaturizer[L, W](f: LexFeaturizer[L],
       var cache = bilexCache(i)
       if(cache == null) {
         val feats = fspec.featuresForBilex(hw, dw)
-        val attFeats = surfaceSpec.featuresForAttachment(hw, dw, FeaturizationLevel.MinimalFeatures)
+        val attFeats = bilexSpec.featuresForAttachment(hw, dw)
         cache = if (attFeats ne null) {
-          index.crossProduct(feats, attFeats, usePlainLabelFeatures = true)
+          bilexFeatureIndex.crossProduct(feats, attFeats, offset = bilexOffset, usePlainLabelFeatures = true)
         } else {
           Array.empty
         }
@@ -612,60 +620,66 @@ case class LexGrammarBundle[L, W](baseGrammar: BaseGrammar[L],
 
 object IndexedLexFeaturizer extends Logging {
   def extract[L, Datum, W](lexFeaturizer: LexFeaturizer[L],
-                           surfaceFeaturizer: IndexedBilexicalFeaturizer[W],
+                           bilexFeaturizer: IndexedBilexicalFeaturizer[W],
+                           wordFeaturizer: IndexedWordFeaturizer[W],
                            headFinder: HeadFinder[L],
                            ruleIndex: Index[Rule[L]],
                            labelIndex: Index[L],
                            dummyFeatScale: HashFeature.Scale = HashFeature.Absolute(0),
                            trees: Traversable[Datum])(implicit hasWords: Has2[Datum, IndexedSeq[W]], hasTree: Has2[Datum, BinarizedTree[L]]) : IndexedLexFeaturizer[L, W] = {
 
-    val surfaceFeatureIndex = surfaceFeaturizer.featureIndex
+    val bilexFeatureIndex = bilexFeaturizer.featureIndex
+    val wordFeatureIndex = wordFeaturizer.featureIndex
 
     val lexFeatureIndex = lexFeaturizer.featureIndex
-    val fi = FeatureIndex.build(lexFeatureIndex, surfaceFeatureIndex, dummyFeatScale, "Lex") { enumerator =>
-      for(ti <- trees) {
-        val lexSpec = lexFeaturizer
-        val surfaceSpec = surfaceFeaturizer.anchor(hasWords.get(ti))
-        val words = hasWords.get(ti)
-        val tree = hasTree.get(ti)
-        // returns head
-        def rec(t: BinarizedTree[L]):Int= t match {
-          case NullaryTree(a, span) =>
-            val aI = labelIndex(a)
-            enumerator(lexSpec.featuresForTag(aI), surfaceSpec.featuresForWord(span.begin))
-            span.begin
-          case UnaryTree(a, b, chain, _) =>
-            val h = rec(b)
-            val r = ruleIndex(UnaryRule(a, b.label, chain))
-            enumerator(lexSpec.featuresForHead(r), surfaceSpec.featuresForWord(h, FeaturizationLevel.BasicFeatures))
-            enumerator(lexSpec.featuresForRule(r), Array.empty)
-            h
-          case t@BinaryTree(a, bt@Tree(b, _, _), Tree(c, _, _), span) =>
-            val log = math.random < 1E-4
-            val (leftHead,rightHead) = (rec(t.leftChild), rec(t.rightChild))
-            val headIsLeft = headFinder.findHeadChild(t) == 0
-            val (head, dep) = if(headIsLeft) leftHead -> rightHead else rightHead -> leftHead
-            val r = ruleIndex(BinaryRule(a, b, c))
-            enumerator(lexSpec.featuresForHead(r), surfaceSpec.featuresForWord(head, FeaturizationLevel.BasicFeatures))
-            enumerator(lexSpec.featuresForDep(r), surfaceSpec.featuresForWord(dep, FeaturizationLevel.BasicFeatures))
-            val surfaceFeatures = surfaceSpec.featuresForAttachment(head, dep, FeaturizationLevel.MinimalFeatures)
-            assert(surfaceFeatures.nonEmpty, BinaryRule(a,b,c) + " " + words(head) + " " + words(dep))
-            if(log) {
-              logger.debug(BinaryRule(a,b,c) + " " + words(head) + " " + words(dep) + " " + Arrays.crossProduct(lexSpec.featuresForBilex(head, dep).map(lexFeatureIndex.get(_)), surfaceFeatures.map(surfaceFeatureIndex.get _))( _ -> _).toIndexedSeq)
-            }
-            enumerator(lexSpec.featuresForBilex(head, dep), surfaceFeatures)
-            enumerator(lexSpec.featuresForAttach(r, head, dep), surfaceSpec.featuresForAttachment(head, dep, FeaturizationLevel.MinimalFeatures))
-            enumerator(lexSpec.featuresForRule(r), Array.empty)
-            head
-        }
-        rec(tree)
+    val bilexBuilder = new CrossProductIndex.Builder(lexFeatureIndex, bilexFeatureIndex, dummyFeatScale, "Bilex", includeLabelOnlyFeatures = false)
+    val wordBuilder = new CrossProductIndex.Builder(lexFeatureIndex, wordFeatureIndex, dummyFeatScale, "Monolex", includeLabelOnlyFeatures = true)
+    for(ti <- trees) {
+      val lexSpec = lexFeaturizer
+      val bilexSpec = bilexFeaturizer.anchor(hasWords.get(ti))
+      val wordSpec = wordFeaturizer.anchor(hasWords.get(ti))
+      val words = hasWords.get(ti)
+      val tree = hasTree.get(ti)
+      // returns head
+      def rec(t: BinarizedTree[L]):Int= t match {
+        case NullaryTree(a, span) =>
+          val aI = labelIndex(a)
+          wordBuilder.add(lexSpec.featuresForTag(aI), wordSpec.featuresForWord(span.begin))
+          span.begin
+        case UnaryTree(a, b, chain, _) =>
+          val h = rec(b)
+          val r = ruleIndex(UnaryRule(a, b.label, chain))
+          wordBuilder.add(lexSpec.featuresForHead(r), wordSpec.featuresForWord(h))
+          h
+        case t@BinaryTree(a, bt@Tree(b, _, _), Tree(c, _, _), span) =>
+          val log = math.random < 1E-4
+          val (leftHead,rightHead) = (rec(t.leftChild), rec(t.rightChild))
+          val headIsLeft = headFinder.findHeadChild(t) == 0
+          val (head, dep) = if(headIsLeft) leftHead -> rightHead else rightHead -> leftHead
+          val r = ruleIndex(BinaryRule(a, b, c))
+          wordBuilder.add(lexSpec.featuresForHead(r), wordSpec.featuresForWord(head))
+          wordBuilder.add(lexSpec.featuresForDep(r), wordSpec.featuresForWord(dep))
+          val bilexFeatures = bilexSpec.featuresForAttachment(head, dep)
+          assert(bilexFeatures.nonEmpty, BinaryRule(a,b,c) + " " + words(head) + " " + words(dep))
+          if(log) {
+            logger.debug(BinaryRule(a,b,c) + " " + words(head) + " " + words(dep) + " " + Arrays.crossProduct(lexSpec.featuresForBilex(head, dep).map(lexFeatureIndex.get(_)), bilexFeatures.map(bilexFeatureIndex.get _))( _ -> _).toIndexedSeq)
+          }
+          bilexBuilder.add(lexSpec.featuresForBilex(head, dep), bilexFeatures)
+          bilexBuilder.add(lexSpec.featuresForAttach(r, head, dep), bilexSpec.featuresForAttachment(head, dep))
+          head
       }
+      rec(tree)
     }
 
-    new IndexedLexFeaturizer(lexFeaturizer, surfaceFeaturizer,
+    val wfi = wordBuilder.result()
+    val bfi = bilexBuilder.result()
+
+    new IndexedLexFeaturizer(lexFeaturizer,
+      wordFeaturizer,
+      bilexFeaturizer,
       labelIndex,
       ruleIndex,
-      fi)
+      wfi, bfi)
   }
 }
 
@@ -691,9 +705,11 @@ case class LexModelFactory(baseParser: ParserParams.XbarGrammar,
 
     val cFactory = constrainer
 
-    val surfaceFeaturizer = new ContextSurfaceFeaturizer(new StandardSurfaceFeaturizer(summedCounts))
-    val indexedWordFeaturizer = IndexedWordFeaturizer.fromData(surfaceFeaturizer + new TagDictionaryFeaturizer(initLexicon), trees.map(_.words))
-    val indexedBilexicalFeaturizer = IndexedBilexicalFeaturizer.fromData(indexedWordFeaturizer, trees.map{DependencyTree.fromTreeInstance[AnnotatedLabel, String](_, HeadFinder.collins)})
+    val minimalWordFeauturizer = new MinimalWordFeaturizer(summedCounts) + new TagDictionaryFeaturizer(initLexicon)
+    val surfaceFeaturizer = new ContextWordFeaturizer(minimalWordFeauturizer) + new WordShapeFeaturizer(summedCounts)
+    val indexedWordFeaturizer = IndexedWordFeaturizer.fromData(surfaceFeaturizer, trees.map(_.words))
+    val indexedMinimalWordFeauturizer = IndexedWordFeaturizer.fromData(minimalWordFeauturizer, trees.map(_.words))
+    val indexedBilexicalFeaturizer = IndexedBilexicalFeaturizer.fromData(indexedMinimalWordFeauturizer, indexedMinimalWordFeauturizer, trees.map{DependencyTree.fromTreeInstance[AnnotatedLabel, String](_, HeadFinder.collins)})
 
     def ruleGen(r: Rule[AnnotatedLabel]) = IndexedSeq(RuleFeature(r))
 
@@ -704,13 +720,14 @@ case class LexModelFactory(baseParser: ParserParams.XbarGrammar,
     type L = AnnotatedLabel
     val indexed =  IndexedLexFeaturizer.extract[AnnotatedLabel, TreeInstance[L, W], W](feat,
       indexedBilexicalFeaturizer,
+      indexedWordFeaturizer,
       headFinder,
       xbarGrammar.index,
       xbarGrammar.labelIndex,
       HashFeature.Relative(dummyFeats),
       trees)
 
-    logger.info(s"Num features: Indexed Features: ${indexed.index.size} Label features: ${indexed.index.labelFeatureIndex.size} Surface: ${indexed.index.surfaceFeatureIndex.size} HashFeatures: ${indexed.index.numHashFeatures}")
+     // logger.info(s"Num features: Indexed Features: ${indexed.index.size} Label features: ${indexed.index.labelFeatureIndex.size} Surface: ${indexed.index.surfaceFeatureIndex.size} HashFeatures: ${indexed.index.numHashFeatures}")
 
     val bundle = new LexGrammarBundle[AnnotatedLabel, String](xbarGrammar,
       xbarLexicon,

@@ -2,18 +2,20 @@ package epic.everything
 
 import epic.trees._
 import epic.sequences.Segmentation
-import epic.ontonotes.{Frame, Document, NERType}
+import epic.ontonotes.NERType
 import epic.coref.CorefInstanceFeaturizer
 import breeze.util.Index
-import epic.trees.StandardTreeProcessor
-import scala.Some
 import epic.parser._
 import epic.lexicon.Lexicon
 import epic.constraints.{ChartConstraints, LabeledSpanConstraints}
-import epic.features.{FeaturizationLevel, SurfaceFeaturizer, IndexedSurfaceAnchoring, IndexedSurfaceFeaturizer}
+import epic.features._
 import epic.util.CacheBroker
 import scala.util.Try
 import epic.parser.projections.ReachabilityProjection
+import epic.trees.StandardTreeProcessor
+import epic.trees.TreeInstance
+import epic.ontonotes.Frame
+import epic.ontonotes.Document
 
 /**
  * 
@@ -28,14 +30,15 @@ case class FeaturizedSentence(index: Int, words: IndexedSeq[String],
                               nerConstraints: LabeledSpanConstraints[NERType.Value],
                               frames: IndexedSeq[Frame],
                               featureAnchoring: IndexedSurfaceAnchoring[String],
+                              wordFeatureAnchoring: IndexedWordAnchoring[String],
                               speaker: Option[String] = None,
-                              id: String = "")  {
-  def featuresForSpan(begin: Int, end: Int, level: FeaturizationLevel = FeaturizationLevel.MinimalFeatures) = {
-    featureAnchoring.featuresForSpan(begin, end, level)
+                              id: String = "")  extends IndexedSurfaceAnchoring[String] with IndexedWordAnchoring[String] {
+  def featuresForSpan(begin: Int, end: Int) = {
+    featureAnchoring.featuresForSpan(begin, end)
   }
 
-  def featuresForWord(w: Int, level: FeaturizationLevel = FeaturizationLevel.MinimalFeatures) = {
-    featureAnchoring.featuresForWord(w, level)
+  def featuresForWord(w: Int) = {
+    wordFeatureAnchoring.featuresForWord(w)
   }
 
 
@@ -71,6 +74,7 @@ object FeaturizedDocument {
 
 
   def makeFactory(treeProcessor: StandardTreeProcessor,
+                  wordFeaturizer: WordFeaturizer[String],
                   feat: SurfaceFeaturizer[String],
                   grammar: BaseGrammar[AnnotatedLabel], lexicon: Lexicon[AnnotatedLabel, String],
                   parseConstrainer: ChartConstraints.Factory[AnnotatedLabel, String],
@@ -83,6 +87,7 @@ object FeaturizedDocument {
 
     val sentenceConstrainer = parseConstrainer | nerConstrainer
 
+    val wfeaturizer = IndexedWordFeaturizer.fromData(wordFeaturizer, docs.flatMap(_.sentences.map(_.words)))
     val featurizer = IndexedSurfaceFeaturizer.fromData(feat, docs.flatMap(_.sentences.map(_.words)), sentenceConstrainer)
     val reachable = new ReachabilityProjection(grammar, lexicon)
 
@@ -94,6 +99,7 @@ object FeaturizedDocument {
         val nerConstraints = nerConstrainer.get(s.words)
 
         val loc = featurizer.anchor(s.words)
+        val wloc = wfeaturizer.anchor(s.words)
 
         tree = reachable.forTree(tree, s.words, constituentSparsity)
 
@@ -105,6 +111,7 @@ object FeaturizedDocument {
           nerConstraints,
           s.srl,
           loc,
+          wloc,
           s.speaker,
           s.id)
       }
@@ -112,7 +119,7 @@ object FeaturizedDocument {
       FeaturizedDocument(newSentences, d.id+"-featurized")
     }
 
-    new Factory(treeProcessor, grammar, lexicon, parseConstrainer, nerLabelIndex, nerConstrainer, srlLabels, featurizer, corefFeaturizer) -> featurized
+    new Factory(treeProcessor, grammar, lexicon, parseConstrainer, nerLabelIndex, nerConstrainer, srlLabels, featurizer, wfeaturizer, corefFeaturizer) -> featurized
   }
 
   case class Factory(treeProcessor: StandardTreeProcessor,
@@ -123,10 +130,11 @@ object FeaturizedDocument {
                     nerConstrainer: LabeledSpanConstraints.Factory[NERType.Value, String],
                     srlLabelIndex: Index[String],
                     featurizer: IndexedSurfaceFeaturizer[String],
+                    wordFeaturizer: IndexedWordFeaturizer[String],
                     corefFeaturizer: CorefInstanceFeaturizer) extends (Document=>FeaturizedDocument) {
     def outsideSrlLabel: String = "O"
 
-    def wordFeatureIndex = featurizer.featureIndex
+    def wordFeatureIndex = wordFeaturizer.featureIndex
     def spanFeatureIndex = featurizer.featureIndex
 
 
@@ -139,6 +147,7 @@ object FeaturizedDocument {
        val nerConstraints = nerConstrainer.get(s.words)
 
        val loc = featurizer.anchor(s.words)
+       val wloc = wordFeaturizer.anchor(s.words)
 
        FeaturizedSentence(s.index, s.words,
          Some(tree),
@@ -147,6 +156,7 @@ object FeaturizedDocument {
          nerConstraints,
          s.srl,
          loc,
+         wloc,
          s.speaker,
          s.id +"-featurized")
      }

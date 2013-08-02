@@ -131,7 +131,7 @@ object ChainNER {
       val train = sentences.map(_.ner)
       val labelIndex = beliefsFactory.nerLabelIndex
 
-      val featurizer = IndexedStandardFeaturizer.make(processor.featurizer,
+      val featurizer = IndexedStandardFeaturizer.make(processor.wordFeaturizer, processor.featurizer,
         NERType.OutsideSentence,
         labelIndex,
         processor.nerConstrainer)(train)

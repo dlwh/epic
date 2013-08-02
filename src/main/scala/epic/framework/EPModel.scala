@@ -60,7 +60,7 @@ class EPModel[Datum, Augment](maxEPIter: Int, initFeatureValue: Feature => Optio
 
   override def initialValueForFeature(f: Feature) = initFeatureValue(f) getOrElse {
     f match {
-      case ComponentFeature(m, ff) => models(m).initialValueForFeature(ff)
+      case ComponentFeature(m, ff) => models(m).initialValueForFeature(ff.asInstanceOf[Feature])
       case _ => 0.0
     }
   }
@@ -158,4 +158,4 @@ case class EPExpectedCounts(var loss: Double, counts: IndexedSeq[ExpectedCounts[
 
 }
 
-case class ComponentFeature(index: Int, feature: Feature) extends Feature
+case class ComponentFeature[T](index: Int, feature: T) extends Feature

@@ -36,13 +36,13 @@ object IndexedWordFeaturizer {
                                     val featureIndex: Index[Feature]) extends IndexedWordFeaturizer[W] with Serializable {
     def anchor(words: IndexedSeq[W]):IndexedWordAnchoring[W]  = {
       val anch = featurizer.anchor(words)
-      val wordFeatures = Array.tabulate(words.length, FeaturizationLevel.numLevels) { (i,l) => stripEncode(featureIndex, anch.featuresForWord(i, l))}
+      val wordFeatures = Array.tabulate(words.length) { i => stripEncode(featureIndex, anch.featuresForWord(i))}
 
-      new TabulatedIndexedSurfaceAnchoring[W](words, wordFeatures, null)
+      new TabulatedIndexedWordAnchoring[W](words, wordFeatures)
     }
   }
 
-  def stripEncode(ind: Index[Feature], features: Array[Feature]) = {
+  private def stripEncode(ind: Index[Feature], features: Array[Feature]) = {
     val result = mutable.ArrayBuilder.make[Int]()
     result.sizeHint(features)
     var i = 0
@@ -59,3 +59,11 @@ object IndexedWordFeaturizer {
 }
 
 
+@SerialVersionUID(1L)
+class TabulatedIndexedWordAnchoring[W](val words: IndexedSeq[W],
+                                       spanFeatures: Array[Array[Int]]) extends IndexedWordAnchoring[W] with Serializable {
+  def featuresForWord(begin: Int):Array[Int] = {
+    spanFeatures(begin)
+  }
+
+}

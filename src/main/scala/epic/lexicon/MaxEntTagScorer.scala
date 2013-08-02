@@ -2,7 +2,7 @@ package epic.lexicon
 
 import breeze.linalg._
 import breeze.numerics._
-import epic.features.{HashFeature, WordFeaturizer, FeatureIndex, IndexedWordFeaturizer}
+import epic.features.{HashFeature, WordFeaturizer, CrossProductIndex, IndexedWordFeaturizer}
 import epic.framework.{StandardExpectedCounts, Feature}
 import breeze.linalg.NumericOps.Arrays._
 import breeze.features.FeatureVector
@@ -23,7 +23,7 @@ import epic.parser.features.LabelFeature
 @SerialVersionUID(1L)
 class MaxEntTagScorer[L, W](feat: IndexedWordFeaturizer[W],
                             lexicon: TagConstraints.Factory[L, W],
-                            index: FeatureIndex[Feature],
+                            index: CrossProductIndex[L, Feature],
                             ts: TagScorer[L, W],
                             logProbFeature: Int,
                             weights: DenseVector[Double]) extends TagScorer[L, W] with Serializable {
@@ -71,26 +71,26 @@ object MaxEntTagScorer extends Logging {
                  params: OptParams = OptParams()) = {
     val featurizer = IndexedWordFeaturizer.fromData(feat, data.map(_.words))
     val featureCounts = ArrayBuffer[Double]()
-    val labelFeatureIndex = Index(lexicon.labelIndex.map(LabelFeature(_)):Iterable[Feature])
-    val featureIndex = FeatureIndex.build(labelFeatureIndex, featurizer.featureIndex, HashFeature.Relative(1), includeLabelOnlyFeatures = false) { addToIndex =>
-      for(ti <- data.map(_.asTaggedSequence)) {
-        val featanch = featurizer.anchor(ti.words)
-        for (i <- 0 until ti.words.length) {
-          val features = featanch.featuresForWord(i)
-          val indexed = addToIndex(Array(lexicon.labelIndex(ti.label(i))),features)
-          for(x <- indexed.view.reverse) {
-            if(x >= featureCounts.length) {
-              featureCounts ++= Array.fill(x-featureCounts.length + 1)(0.0)
-            }
-            featureCounts(x) += 1
-          }
-        }
+    val cpBuilder = new CrossProductIndex.Builder(lexicon.labelIndex, featurizer.featureIndex, HashFeature.Relative(1), includeLabelOnlyFeatures = false)
 
+    for(ti <- data.map(_.asTaggedSequence)) {
+      val featanch = featurizer.anchor(ti.words)
+      for (i <- 0 until ti.words.length) {
+        val features = featanch.featuresForWord(i)
+        val indexed = cpBuilder.add(Array(lexicon.labelIndex(ti.label(i))),features)
+        for(x <- indexed.view.reverse) {
+          if(x >= featureCounts.length) {
+            featureCounts ++= Array.fill(x-featureCounts.length + 1)(0.0)
+          }
+          featureCounts(x) += 1
+        }
       }
     }
 
+    val featureIndex = cpBuilder.result()
 
-    val basescorer = new SimpleTagScorer(Counter2.count(data.flatMap(ti => (ti.tree.leaves.map(_.label) zip ti.words))).mapValues(_.toDouble))
+
+    val basescorer = new SimpleTagScorer(Counter2.count(data.flatMap(ti => ti.tree.leaves.map(_.label) zip ti.words)).mapValues(_.toDouble))
 
 
     logger.info("Number of features: " + featureIndex.size)
@@ -108,7 +108,7 @@ object MaxEntTagScorer extends Logging {
 
   private def makeObjective[L, W](lexicon: Lexicon[L, W],
                                   featurizer: IndexedWordFeaturizer[W],
-                                  featureIndex: FeatureIndex[Feature],
+                                  featureIndex: CrossProductIndex[L, Feature],
                                   baseScorer: TagScorer[L, W],
                                   data: IndexedSeq[TreeInstance[L, W]]) = {
     // the None feature is for the log probability. TODO hack

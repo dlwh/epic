@@ -26,7 +26,7 @@ import epic.framework.Feature
 import epic.trees.annotations.{FilterAnnotations, TreeAnnotator}
 import epic.trees._
 import breeze.config.Help
-import epic.features.{StandardSurfaceFeaturizer, IndexedWordFeaturizer}
+import epic.features.{WordShapeFeaturizer, MinimalWordFeaturizer, StandardSurfaceFeaturizer, IndexedWordFeaturizer}
 import epic.lexicon.Lexicon
 import epic.constraints.ChartConstraints
 import epic.util.{SafeLogging, CacheBroker}
@@ -179,7 +179,8 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
       case UnaryRule(a, b, chain) => for(aa <- split(a); bb <- split(b)) yield UnaryRule(aa, bb, chain)
     }
 
-    val surfaceFeaturizer = new StandardSurfaceFeaturizer(sum(annWords, Axis._0))
+    val wordCounts: Counter[String, Double] = sum(annWords, Axis._0)
+    val surfaceFeaturizer = new MinimalWordFeaturizer(wordCounts) + new WordShapeFeaturizer(wordCounts)
     val wordFeaturizer = IndexedWordFeaturizer.fromData(surfaceFeaturizer, annTrees.map{_.words})
     val feat = new GenFeaturizer[(AnnotatedLabel, Int), String](wordFeaturizer)
 

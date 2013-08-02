@@ -2,7 +2,7 @@ package epic.features
 
 import epic.framework.Feature
 import epic.trees.DependencyTree
-import breeze.util.OptionIndex
+import breeze.util.{Index, OptionIndex}
 import java.util
 
 
@@ -16,70 +16,67 @@ trait BilexicalFeaturizer[W] {
 }
 
 trait BilexicalFeatureAnchoring[W] {
-  def featuresForAttachment(head: Int, dep: Int, level: FeaturizationLevel = FeaturizationLevel.FullFeatures):Array[Feature]
+  def featuresForAttachment(head: Int, dep: Int):Array[Feature]
 }
 
 
 @SerialVersionUID(1L)
-class ProductBilexicalFeaturizer[W](wf: IndexedWordFeaturizer[W],
-                                    val featureIndex: FeatureIndex[Feature]) extends IndexedBilexicalFeaturizer[W] with Serializable {
-
-  def featurizer: WordFeaturizer[W] = wf.featurizer
+class ProductBilexicalFeaturizer[W](headFeaturizer: IndexedWordFeaturizer[W],
+                                    depFeaturizer: IndexedWordFeaturizer[W],
+                                    val featureIndex: CrossProductIndex[Feature, Feature]) extends IndexedBilexicalFeaturizer[W] with Serializable {
 
   def anchor(w: IndexedSeq[W]): IndexedBilexicalFeatureAnchoring[W] = new IndexedBilexicalFeatureAnchoring[W] {
-    val anc = wf.anchor(w)
-    val arr = Array.ofDim[Array[Array[Int]]](anc.words.length, anc.words.length)
+    val headAnchoring = headFeaturizer.anchor(w)
+    val depAnchoring = depFeaturizer.anchor(w)
+    val cache = Array.ofDim[Array[Int]](words.length, words.length)
 
-    def words: IndexedSeq[W] = anc.words
+    def words: IndexedSeq[W] = w
 
-    def featuresForWord(pos: Int, level: FeaturizationLevel): Array[Int] = anc.featuresForWord(pos, level)
-
-    def featuresForAttachment(head: Int, dep: Int, level: FeaturizationLevel): Array[Int] = {
-      var ret = arr(head)(dep)
+    def featuresForAttachment(head: Int, dep: Int): Array[Int] = {
+      var ret = cache(head)(dep)
       if (ret eq null) {
-        ret = new Array[Array[Int]](FeaturizationLevel.numLevels)
-        arr(head)(dep) = ret
+        val f1 = featureIndex.crossProduct(headAnchoring.featuresForWord(head), depAnchoring.featuresForWord(dep), usePlainLabelFeatures = false)
+        ret = f1
+        cache(head)(dep) = f1
       }
 
-      if (ret(level.level) eq null) {
-        val f1 = featureIndex.crossProduct(anc.featuresForWord(head, level), anc.featuresForWord(dep, FeaturizationLevel.MinimalFeatures), false)
-        val f2 = featureIndex.crossProduct(anc.featuresForWord(head, FeaturizationLevel.MinimalFeatures), anc.featuresForWord(dep, level), false)
-        ret(level.level) = f1 ++ f2
-      }
-
-      ret(level.level)
+      ret
     }
   }
 }
 
 case class BilexicalFeature(head: Any, dep: Any) extends Feature
 
-trait IndexedBilexicalFeaturizer[W] extends IndexedWordFeaturizer[W] {
+trait IndexedBilexicalFeaturizer[W] {
   def anchor(w: IndexedSeq[W]):IndexedBilexicalFeatureAnchoring[W]
-  def featurizer: WordFeaturizer[W]
+  def featureIndex: CrossProductIndex[Feature, Feature]
 }
 
-trait IndexedBilexicalFeatureAnchoring[W] extends IndexedWordAnchoring[W] {
-  def featuresForAttachment(head: Int, dep: Int, level: FeaturizationLevel = FeaturizationLevel.FullFeatures):Array[Int]
+trait IndexedBilexicalFeatureAnchoring[W]  {
+  def featuresForAttachment(head: Int, dep: Int):Array[Int]
 }
 
 object IndexedBilexicalFeaturizer {
-  def fromData[L, W](wfeat: IndexedWordFeaturizer[W],
+  def fromData[L, W](headFeaturizer: IndexedWordFeaturizer[W],
+                     depFeaturizer: IndexedWordFeaturizer[W],
                   depTrees: IndexedSeq[DependencyTree[L, W]],
                   hashFeatures: HashFeature.Scale = HashFeature.Relative(1.0)):IndexedBilexicalFeaturizer[W] =  {
-    val index = FeatureIndex.build(wfeat.featureIndex, wfeat.featureIndex, hashFeatures, "Bilexical") { adder =>
-      for (tree <- depTrees) {
-        val wanch = wfeat.anchor(tree.words)
-        for( (head, dep) <- tree.arcs if head < tree.words.length) {
-          adder(wanch.featuresForWord(head, FeaturizationLevel.MinimalFeatures),
-            wanch.featuresForWord(dep, FeaturizationLevel.FullFeatures))
-          adder(wanch.featuresForWord(head, FeaturizationLevel.FullFeatures),
-            wanch.featuresForWord(dep, FeaturizationLevel.MinimalFeatures))
-        }
+    val builder = new CrossProductIndex.Builder(headFeaturizer.featureIndex, depFeaturizer.featureIndex, hashFeatures, "Bilexical")
+    for (tree <- depTrees) {
+      val hanch = headFeaturizer.anchor(tree.words)
+      val danch = headFeaturizer.anchor(tree.words)
+      for( (head, dep) <- tree.arcs if head < tree.words.length) {
+        builder.add(hanch.featuresForWord(head),
+          danch.featuresForWord(dep))
+        error("Want both directions?")
+        builder.add(danch.featuresForWord(head),
+          hanch.featuresForWord(dep))
       }
     }
 
-    new ProductBilexicalFeaturizer[W](wfeat, index)
+    val index = builder.result()
+
+    new ProductBilexicalFeaturizer[W](headFeaturizer, depFeaturizer, index)
   }
 
 }

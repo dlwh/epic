@@ -14,7 +14,6 @@ class MultiSurfaceFeaturizer[W](feats: IndexedSeq[SurfaceFeaturizer[W]]) extends
     val anchs = feats.map(_.anchor(w)).toArray
     def words: IndexedSeq[W] = w
 
-    def featuresForWord(pos: Int, level: FeaturizationLevel): Array[Feature] = anchs.flatMap(_.featuresForWord(pos, level))
-    def featuresForSpan(beg: Int, end: Int, level: FeaturizationLevel): Array[Feature] = anchs.flatMap(_.featuresForSpan(beg, end, level))
+    def featuresForSpan(beg: Int, end: Int): Array[Feature] = anchs.flatMap(_.featuresForSpan(beg, end))
   }
 }

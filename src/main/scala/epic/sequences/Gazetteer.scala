@@ -1,7 +1,7 @@
 package epic.sequences
 
 import io.{Codec, Source}
-import epic.features.{FeaturizationLevel, SurfaceFeatureAnchoring, SurfaceFeaturizer}
+import epic.features.{WordFeatureAnchoring, WordFeaturizer, SurfaceFeatureAnchoring, SurfaceFeaturizer}
 import epic.framework.Feature
 import epic.trees.Span
 
@@ -12,13 +12,13 @@ import epic.trees.Span
  * These are very useful for named entity recognition.
  * @author dlwh
  */
-trait Gazetteer[+L, W] extends SurfaceFeaturizer[W] {
+trait Gazetteer[+L, W] extends SurfaceFeaturizer[W] with WordFeaturizer[W] {
 
-  def anchor(w: IndexedSeq[W]): SurfaceFeatureAnchoring[W] = new SurfaceFeatureAnchoring[W] {
+  def anchor(w: IndexedSeq[W]): SurfaceFeatureAnchoring[W] with WordFeatureAnchoring[W] = new SurfaceFeatureAnchoring[W] with WordFeatureAnchoring[W] {
     def words: IndexedSeq[W] = w
 
-    def featuresForWord(pos: Int, level: FeaturizationLevel): Array[Feature] = lookupWord(words(pos)).map(GazetteerWordFeature(_)).toArray
-    def featuresForSpan(beg: Int, end: Int, level: FeaturizationLevel): Array[Feature] = lookupSpan(Span(beg,end).map(words)).map(GazetteerSpanFeature(_)).toArray
+    def featuresForWord(pos: Int): Array[Feature] = lookupWord(words(pos)).map(GazetteerWordFeature(_)).toArray
+    def featuresForSpan(beg: Int, end: Int): Array[Feature] = lookupSpan(Span(beg,end).map(words)).map(GazetteerSpanFeature(_)).toArray
   }
 
   def lookupWord(w: W):IndexedSeq[L]

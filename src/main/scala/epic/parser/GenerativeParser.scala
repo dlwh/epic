@@ -24,7 +24,15 @@ import chalk.text.analyze.EnglishWordClassGenerator
 import breeze.config.Help
 import epic.parser.ParserParams.XbarGrammar
 import epic.lexicon.{SimpleTagScorer, MaxEntTagScorer, Lexicon, SimpleLexicon}
-import epic.features.{StandardSurfaceFeaturizer, ContextSurfaceFeaturizer}
+import epic.features._
+import epic.trees.BinaryRule
+import epic.trees.UnaryTree
+import epic.trees.UnaryRule
+import epic.trees.BinaryTree
+import epic.trees.TreeInstance
+import epic.trees.annotations.FilterAnnotations
+import epic.trees.annotations.AddMarkovization
+import epic.trees.annotations.PipelineAnnotator
 
 /**
  * Contains codes to read off parsers and grammars from
@@ -150,7 +158,8 @@ object GenerativeTrainer extends ParserPipeline {
     val scorer = if(params.awesomeLexicon) {
       val wc = breeze.linalg.sum(wordCounts, Axis._0)
       val refLexicon = new SimpleLexicon(refGrammar.labelIndex, wordCounts)
-      MaxEntTagScorer.make(new ContextSurfaceFeaturizer(new StandardSurfaceFeaturizer(wc), wordOffsetOrder=1), refLexicon, transformed)
+      val minimalWordFeaturizer: MinimalWordFeaturizer = new MinimalWordFeaturizer(wc)
+      MaxEntTagScorer.make(new ContextWordFeaturizer(minimalWordFeaturizer, wordOffsetOrder=1) + new WordShapeFeaturizer(wc), refLexicon, transformed)
     } else {
       new SimpleTagScorer(wordCounts)
     }

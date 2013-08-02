@@ -16,35 +16,23 @@ case class OrientedNGramFeature(offset: Int, features: IndexedSeq[Feature]) exte
  *
  * @author dlwh
  */
-class NGramSurfaceFeaturizer[W](base: SurfaceFeaturizer[W],
-                                wordNgramOrder: Int = 2,
-                                spanNGramOrder: Int = 0) extends SurfaceFeaturizer[W] {
-  def anchor(w: IndexedSeq[W]): SurfaceFeatureAnchoring[W] = {
-    new SurfaceFeatureAnchoring[W] {
+class NGramWordFeaturizer[W](base: WordFeaturizer[W], wordNgramOrder: Int = 2) extends WordFeaturizer[W] {
+  def anchor(w: IndexedSeq[W]): WordFeatureAnchoring[W] = {
+    new WordFeatureAnchoring[W] {
       val baseAnch = base.anchor(w)
       def words: IndexedSeq[W] = w
 
 
-      def featuresForWord(pos: Int, level: FeaturizationLevel): Array[Feature] = {
-        if(level == FeaturizationLevel.MinimalFeatures || wordNgramOrder <= 1) baseAnch.featuresForWord(pos, level)
-        else {
-          val result = ArrayBuffer[Feature]() ++= baseAnch.featuresForWord(pos, level)
-          for(order <- 2 to wordNgramOrder)
-            addNgramFeatures(result, pos, order, FeaturizationLevel.MinimalFeatures)
-          result.toArray
-        }
+      def featuresForWord(pos: Int): Array[Feature] = {
+        val result = ArrayBuffer[Feature]() ++= baseAnch.featuresForWord(pos)
+        for(order <- 2 to wordNgramOrder)
+          addNgramFeatures(result, pos, order)
+        result.toArray
       }
 
-      def featuresForSpan(begin: Int, end: Int, level: FeaturizationLevel): Array[Feature] = {
-        val forSpan = baseAnch.featuresForSpan(begin, end, level)
-
-
-        forSpan
-      }
-
-      def addNgramFeatures(buffer: ArrayBuffer[Feature], pos: Int, order: Int, level: FeaturizationLevel) {
+      def addNgramFeatures(buffer: ArrayBuffer[Feature], pos: Int, order: Int) {
         for (offset <- (-order+1) to 0) {
-          val features = for( pos2 <- (pos + offset) to (pos + offset + order) ) yield baseAnch.featuresForWord(pos, if (pos == pos2) level else FeaturizationLevel.MinimalFeatures)
+          val features = for( pos2 <- (pos + offset) to (pos + offset + order) ) yield baseAnch.featuresForWord(pos)
           val configs = allConfigurations(features).map(OrientedNGramFeature(offset, _))
           buffer ++= configs
         }

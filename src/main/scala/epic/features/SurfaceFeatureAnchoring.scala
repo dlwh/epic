@@ -1,13 +1,11 @@
 package epic.features
 
 import epic.framework.Feature
-import breeze.util.Index
-import epic.features.FeaturizationLevel.FullFeatures
 
 /**
   *
   * @author dlwh
   */
-trait SurfaceFeatureAnchoring[W] extends WordFeatureAnchoring[W] {
-  def featuresForSpan(begin: Int, end: Int, level: FeaturizationLevel = FullFeatures):Array[Feature]
+trait SurfaceFeatureAnchoring[W]  {
+  def featuresForSpan(begin: Int, end: Int):Array[Feature]
 }

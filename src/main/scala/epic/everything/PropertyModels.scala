@@ -6,7 +6,7 @@ import epic.trees.AnnotatedLabel
 import epic.everything.PropertyPropagation._
 import epic.framework.Feature
 import epic.parser.features.IndicatorFeature
-import epic.features.{HashFeature, FeaturizationLevel}
+import epic.features.HashFeature
 
 /**
  * 
@@ -56,7 +56,7 @@ object PropertyModels {
     def featuresFor(fs: FeaturizedSentence, b: SpanBeliefs, begin: Int, end: Int, assignment: Int): Array[Int] = {
       if (assignment > fs.length) notGovernedArray
       else if (assignment == fs.length) rootArray
-      else fs.featuresForWord(assignment, FeaturizationLevel.MinimalFeatures).map(_ % hashFeatures)
+      else fs.featuresForWord(assignment).map(_ % hashFeatures)
     }
   }
 
@@ -68,7 +68,7 @@ object PropertyModels {
     val srlOffset = hashFeatures
 
     def featuresFor(fs: FeaturizedSentence, b: SpanBeliefs, begin: Int, end: Int, component: Int, assignment: Int): Array[Int] = {
-      val fi = fs.featuresForWord(fs.frames(component).pos, FeaturizationLevel.MinimalFeatures)
+      val fi = fs.featuresForWord(fs.frames(component).pos)
       fi :+ (assignment + srlOffset)
     }
   }

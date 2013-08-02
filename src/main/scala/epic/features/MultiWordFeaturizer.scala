@@ -14,6 +14,6 @@ class MultiWordFeaturizer[W](feats: IndexedSeq[WordFeaturizer[W]]) extends WordF
     val anchs = feats.map(_.anchor(w)).toArray
     def words: IndexedSeq[W] = w
 
-    def featuresForWord(pos: Int, level: FeaturizationLevel): Array[Feature] = anchs.flatMap(_.featuresForWord(pos, level))
+    def featuresForWord(pos: Int): Array[Feature] = anchs.flatMap(_.featuresForWord(pos))
   }
 }

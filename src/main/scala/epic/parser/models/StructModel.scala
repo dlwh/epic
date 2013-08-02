@@ -26,7 +26,7 @@ import epic.trees.annotations.{KMAnnotator, TreeAnnotator}
 import features.IndicatorFeature
 import epic.trees.TreeInstance
 import breeze.config.Help
-import epic.features.{StandardSurfaceFeaturizer, IndexedWordFeaturizer}
+import epic.features.{WordShapeFeaturizer, MinimalWordFeaturizer, StandardSurfaceFeaturizer, IndexedWordFeaturizer}
 import epic.lexicon.Lexicon
 import epic.constraints.ChartConstraints
 import epic.util.CacheBroker
@@ -102,8 +102,9 @@ case class StructModelFactory(baseParser: ParserParams.XbarGrammar,
 
     val cFactory = constrainer
 
-    val surfaceFeaturizer = new StandardSurfaceFeaturizer(sum(initLexicon, Axis._0))
-    val wordFeaturizer = IndexedWordFeaturizer.fromData(surfaceFeaturizer, trainTrees.map{_.words})
+    val wordCounts: Counter[String, Double] = sum(initLexicon, Axis._0)
+    val surfaceFeaturizer = new MinimalWordFeaturizer(wordCounts) + new WordShapeFeaturizer(wordCounts)
+    val wordFeaturizer = IndexedWordFeaturizer.fromData(surfaceFeaturizer, transformed.map{_.words})
     def labelFlattener(l: AnnotatedLabel) = {
       val basic = Seq(l)
       basic map { IndicatorFeature(_) }

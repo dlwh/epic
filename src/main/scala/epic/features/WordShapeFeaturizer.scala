@@ -45,12 +45,26 @@ class WordShapeFeaturizer(wordCounts: Counter[String, Double],
   private val wordIndex = Index(wordCounts.keysIterator)
   private val knownWordFeatures = Encoder.fromIndex(wordIndex).tabulateArray(s => featuresFor(s).toArray)
 
-  def anchor(words: IndexedSeq[String]): WordFeatureAnchoring[String] = new WordFeatureAnchoring[String] {
+  def anchor(w: IndexedSeq[String]): WordFeatureAnchoring[String] = new WordFeatureAnchoring[String] {
+    def words: IndexedSeq[String] = w
     val indices = words.map(wordIndex)
     val myFeatures = (0 until words.length).map(i => if (indices(i) < 0) featuresFor(words(i)).toArray else knownWordFeatures(indices(i)))
-    def featuresForWord(pos: Int, level: FeaturizationLevel): Array[Feature] = myFeatures(pos)
+    def featuresForWord(pos: Int): Array[Feature] = {
+      val base = myFeatures(pos)
 
-    def words: IndexedSeq[String] = ???
+      // initial words nee special treatment
+      if( (words(pos).charAt(0).isUpper || words(pos).charAt(0).isTitleCase) && base.length > 1) {
+        val isInitialWord = (pos == 0 || words(pos -1) == "``")
+        if(isInitialWord) {
+          base ++ base.map(FirstWordCapsAnd)
+        } else {
+          base ++ base.map(NthWordCapsAnd)
+        }
+      } else {
+        base
+      }
+    }
+
   }
 
   //  val signatureGenerator = EnglishWordClassGenerator

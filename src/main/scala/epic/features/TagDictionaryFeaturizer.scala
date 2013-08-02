@@ -5,7 +5,6 @@ import breeze.linalg._
 import breeze.util.{Encoder, Index}
 import epic.features.TagDictionaryFeaturizer._
 import scala.collection.mutable
-import epic.features.FeaturizationLevel.MinimalFeatures
 
 /**
  * TODO
@@ -72,9 +71,9 @@ class TagDictionaryFeaturizer[L](counts: Counter2[L, String, Double], commonWord
       }
     }
 
-    def featuresForWord(pos: Int, level: FeaturizationLevel): Array[Feature] = {
+    def featuresForWord(pos: Int): Array[Feature] = {
       val am = myArgmaxes(pos)
-      if(level != MinimalFeatures && variants(pos).length != 0) {
+      if(variants(pos).length != 0) {
         am ++ variants(pos)
       } else {
         am
