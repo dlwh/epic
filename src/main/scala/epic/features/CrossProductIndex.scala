@@ -114,16 +114,21 @@ object CrossProductIndex {
     private val mapping = Array.fill(firstIndex.size)(new OpenAddressHashArray[Int](secondIndex.size, -1, 4))
     private val labelPart, surfacePart = new ArrayBuffer[Int]()
     private val labelOnlySize: Int = if(includeLabelOnlyFeatures) firstIndex.size else 0
-    private def next = labelPart.size + labelOnlySize
+
+    def size = labelPart.size + labelOnlySize
 
     def add(firstArray: Array[Int], secondArray: Array[Int]):Array[Int] = {
       Arrays.crossProduct(firstArray, secondArray)(add)
     }
 
+    def add(first: Int, secondArray: Array[Int]):Array[Int] = {
+      secondArray.map(add(first, _))
+    }
+
     def add(first: Int, second: Int):Int = {
       val currentIndex: Int = mapping(first)(second)
       if(currentIndex == -1) {
-        val x = next
+        val x = size
         mapping(first)(second) = x
         labelPart += first
         surfacePart += second

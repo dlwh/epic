@@ -20,10 +20,11 @@ class SegmentedIndex[T,IndexType](val indices: IndexedSeq[IndexType])(implicit v
   override def size = offsets.last
 
   def unapply(i: Int): Option[Feature] = {
-    if(i < 0 || i >= offsets.size) {
+    if(i < 0 || i >= size) {
       None
     } else {
-      val component = util.Arrays.binarySearch(offsets, i)
+      var component = util.Arrays.binarySearch(offsets, i)
+      if(component < 0) component = ~component - 1
       indices(component).unapply(i - offsets(component)).map(ComponentFeature(component, _))
     }
   }

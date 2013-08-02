@@ -154,13 +154,12 @@ class TaggedSequenceModelFactory[L](val startSymbol: L,
     val surfaceFeaturizer = minimalWordFeaturizer//new ContextWordFeaturizer(minimalWordFeaturizer) + new WordShapeFeaturizer(wordCounts)
     val featurizer = IndexedWordFeaturizer.fromData(surfaceFeaturizer, train.map{_.words})
 
-    val featureIndex = Index[Feature]()
-
-    val labelFeatures = (0 until labelIndex.size).map(l => LabelFeature(labelIndex.get(l)))
-    val label2Features = for(l1 <- 0 until labelIndex.size) yield for(l2 <- 0 until labelIndex.size) yield LabelFeature(labelIndex.get(l1) -> labelIndex.get(l2))
-
-    val labelWordFeatures = Array.fill(featurizer.featureIndex.size)(new OpenAddressHashArray[Int](labelIndex.size,-1,4))
-    val label2WordFeatures = Array.fill(featurizer.featureIndex.size)(new OpenAddressHashArray[Int](labelIndex.size * labelIndex.size,-1,4))
+    val lfBuilder = new CrossProductIndex.Builder(labelIndex, featurizer.featureIndex, includeLabelOnlyFeatures = false)
+    val label2Index = Index[(L, L)]()
+    val label2Features = Array.tabulate(labelIndex.size, labelIndex.size) { (l1, l2) =>
+      label2Index.index(labelIndex.get(l1) -> labelIndex.get(l2))
+    }
+    val l2Builder = new CrossProductIndex.Builder(label2Index, featurizer.featureIndex, includeLabelOnlyFeatures = true)
 
     var i = 0
     for(s <- train) {
@@ -171,24 +170,20 @@ class TaggedSequenceModelFactory[L](val startSymbol: L,
         b <- 0 until s.length
         l <- lexLoc.allowedTags(b)
       } {
-        loc.featuresForWord(b) foreach {f =>
-          labelWordFeatures(f)(l) = featureIndex.index(PairFeature(labelFeatures(l), featurizer.featureIndex.get(f)) )
-        }
+        lfBuilder.add(l, loc.featuresForWord(b))
         if(lexLoc.allowedTags(b).size > 1) {
           for(prevTag <- if(b == 0) Set(labelIndex(startSymbol)) else lexLoc.allowedTags(b-1)) {
-            loc.featuresForWord(b) foreach {f =>
-              label2WordFeatures(f)(prevTag * labelIndex.size + l) = featureIndex.index(PairFeature(label2Features(prevTag)(l), featurizer.featureIndex.get(f)) )
-            }
+            l2Builder.add(label2Features(prevTag)(l), loc.featuresForWord(b))
           }
         }
       }
       if(i % 500 == 0) {
-        logger.info(s"$i/${train.length} ${featureIndex.size}")
+        logger.info(s"$i/${train.length} ${lfBuilder.size + l2Builder.size}")
       }
       i += 1
     }
 
-    val indexed = new IndexedStandardFeaturizer[L, String](featurizer, lexicon, startSymbol, labelIndex, featureIndex, labelWordFeatures, label2WordFeatures)
+    val indexed = new IndexedStandardFeaturizer[L, String](featurizer, lexicon, startSymbol, labelIndex, label2Features, lfBuilder.result(), l2Builder.result())
     val model = new CRFModel(indexed.featureIndex, lexicon, indexed, weights(_))
 
     model
@@ -204,9 +199,14 @@ object TaggedSequenceModelFactory {
                                              val lexicon: TagConstraints.Factory[L, String],
                                              val startSymbol: L,
                                              val labelIndex: Index[L],
-                                             val featureIndex: Index[Feature],
-                                             labelFeatures: Array[OpenAddressHashArray[Int]],
-                                             label2Features: Array[OpenAddressHashArray[Int]]) extends CRF.IndexedFeaturizer[L,String] with Serializable { outer =>
+                                             label2Features: Array[Array[Int]],
+                                             labelFeatureIndex: CrossProductIndex[L, Feature],
+                                             label2FeatureIndex: CrossProductIndex[(L, L), Feature]
+                                             ) extends CRF.IndexedFeaturizer[L,String] with Serializable { outer =>
+
+    val featureIndex = SegmentedIndex(labelFeatureIndex, label2FeatureIndex)
+    private val loff = featureIndex.componentOffset(0)
+    private val l2off = featureIndex.componentOffset(1)
 
 
     private val startSymbolSet = Set(labelIndex(startSymbol))
@@ -224,26 +224,20 @@ object TaggedSequenceModelFactory {
 
       val featureArray = Array.ofDim[FeatureVector](length, labelIndex.size, labelIndex.size)
       private val posNeedsAmbiguity = Array.tabulate(length)(i => validSymbols(i).size > 1)
-      for(pos <- 0 until length; curTag <- validSymbols(pos); prevTag <- validSymbols(pos-1)) {
-        val vb = collection.mutable.ArrayBuilder.make[Int]
-        val features = loc.featuresForWord(pos)
-        vb.sizeHint(if (posNeedsAmbiguity(pos)) 2 * features.length else features.length)
-        var i = 0
-        while(i < features.length) {
-          val f = features(i)
-          val fi1 = labelFeatures(f)(curTag)
-          if(fi1 >= 0) {
-            vb += fi1
-
-            if(posNeedsAmbiguity(pos)) {
-              val fi2 = label2Features(f)(prevTag * labelIndex.size + curTag)
-              if(fi2 >= 0)
-                vb += fi2
-            }
-          }
-          i += 1
+      for {
+        pos <- 0 until length
+        curTag <- validSymbols(pos)
+        features = loc.featuresForWord(pos)
+        justLabel = labelFeatureIndex.crossProduct(Array(curTag), features, offset = loff, usePlainLabelFeatures = false)
+        prevTag <- validSymbols(pos-1)
+      } {
+        val feats = if(posNeedsAmbiguity(pos)) {
+          justLabel++ label2FeatureIndex.crossProduct(Array(label2Features(prevTag)(curTag)), features, offset = l2off, usePlainLabelFeatures = false)
+        } else {
+          justLabel
         }
-        featureArray(pos)(prevTag)(curTag) = new FeatureVector(vb.result())
+
+        featureArray(pos)(prevTag)(curTag) = new FeatureVector(feats)
       }
 
       def featuresForTransition(pos: Int, prev: Int, cur: Int): FeatureVector = {
