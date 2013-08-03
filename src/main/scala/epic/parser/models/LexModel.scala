@@ -706,7 +706,7 @@ case class LexModelFactory(baseParser: ParserParams.XbarGrammar,
     val cFactory = constrainer
 
     val minimalWordFeauturizer = new MinimalWordFeaturizer(summedCounts) + new TagDictionaryFeaturizer(initLexicon)
-    val surfaceFeaturizer = new ContextWordFeaturizer(minimalWordFeauturizer) + new WordShapeFeaturizer(summedCounts)
+    val surfaceFeaturizer = new ContextWordFeaturizer(minimalWordFeauturizer) + new WordPropertyFeaturizer(summedCounts)
     val indexedWordFeaturizer = IndexedWordFeaturizer.fromData(surfaceFeaturizer, trees.map(_.words))
     val indexedMinimalWordFeauturizer = IndexedWordFeaturizer.fromData(minimalWordFeauturizer, trees.map(_.words))
     val indexedBilexicalFeaturizer = IndexedBilexicalFeaturizer.fromData(indexedMinimalWordFeauturizer, indexedMinimalWordFeauturizer, trees.map{DependencyTree.fromTreeInstance[AnnotatedLabel, String](_, HeadFinder.collins)})

@@ -151,7 +151,7 @@ class TaggedSequenceModelFactory[L](val startSymbol: L,
 
     val wordCounts: Counter[String, Double] = sum(counts, Axis._0)
     val minimalWordFeaturizer = new MinimalWordFeaturizer(wordCounts)
-    val surfaceFeaturizer = new ContextWordFeaturizer(minimalWordFeaturizer, 1) + minimalWordFeaturizer + new WordShapeFeaturizer(wordCounts)
+    val surfaceFeaturizer = new ContextWordFeaturizer(minimalWordFeaturizer, 1) + minimalWordFeaturizer + new WordPropertyFeaturizer(wordCounts)
     val featurizer = IndexedWordFeaturizer.fromData(surfaceFeaturizer, train.map{_.words})
     val l2featurizer = IndexedWordFeaturizer.fromData(minimalWordFeaturizer, train.map{_.words})
 

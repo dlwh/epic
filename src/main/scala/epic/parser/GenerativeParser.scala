@@ -159,7 +159,7 @@ object GenerativeTrainer extends ParserPipeline {
       val wc = breeze.linalg.sum(wordCounts, Axis._0)
       val refLexicon = new SimpleLexicon(refGrammar.labelIndex, wordCounts)
       val minimalWordFeaturizer: MinimalWordFeaturizer = new MinimalWordFeaturizer(wc)
-      MaxEntTagScorer.make(new ContextWordFeaturizer(minimalWordFeaturizer, wordOffsetOrder=1) + new WordShapeFeaturizer(wc), refLexicon, transformed)
+      MaxEntTagScorer.make(new ContextWordFeaturizer(minimalWordFeaturizer, wordOffsetOrder=1) + new WordPropertyFeaturizer(wc), refLexicon, transformed)
     } else {
       new SimpleTagScorer(wordCounts)
     }

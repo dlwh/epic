@@ -20,7 +20,6 @@ class MinimalWordFeaturizer(wordCounts: Counter[String, Double], includeWordShap
     val w = words
     new WordFeatureAnchoring[String] {
       val indices = words.map(wordIndex)
-      val wholeSentenceIsUpperCase = words.forall(_.forall(c => !c.isLetter || c.isUpper))
       def words = w
 
       def featuresForWord(pos: Int): Array[Feature] = {

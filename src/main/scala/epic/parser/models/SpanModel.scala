@@ -522,7 +522,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     def ruleFeatures(ann: Rule[AnnotatedLabel]) = Array[Feature](RuleFeature(ann))
 
     val minimalWordFeaturizer = new MinimalWordFeaturizer(summedCounts)
-    val standardWordFeaturizer = new WordShapeFeaturizer(summedCounts) + minimalWordFeaturizer + new ContextWordFeaturizer(minimalWordFeaturizer)
+    val standardWordFeaturizer = new WordPropertyFeaturizer(summedCounts) + minimalWordFeaturizer + new ContextWordFeaturizer(minimalWordFeaturizer)
     val word = IndexedWordFeaturizer.fromData(standardWordFeaturizer, annTrees.map{_.words})
     val surface = IndexedSurfaceFeaturizer.fromData(new ContextSurfaceFeaturizer(minimalWordFeaturizer) + new StandardSurfaceFeaturizer(minimalWordFeaturizer), annTrees.map{_.words}, constrainer.asConstraintFactory)
     val feat = new StandardSpanFeaturizer[AnnotatedLabel, String](

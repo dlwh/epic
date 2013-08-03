@@ -26,7 +26,7 @@ import epic.framework.Feature
 import epic.trees.annotations.{FilterAnnotations, TreeAnnotator}
 import epic.trees._
 import breeze.config.Help
-import epic.features.{WordShapeFeaturizer, MinimalWordFeaturizer, StandardSurfaceFeaturizer, IndexedWordFeaturizer}
+import epic.features.{WordPropertyFeaturizer, MinimalWordFeaturizer, StandardSurfaceFeaturizer, IndexedWordFeaturizer}
 import epic.lexicon.Lexicon
 import epic.constraints.ChartConstraints
 import epic.util.{SafeLogging, CacheBroker}
@@ -180,7 +180,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     }
 
     val wordCounts: Counter[String, Double] = sum(annWords, Axis._0)
-    val surfaceFeaturizer = new MinimalWordFeaturizer(wordCounts) + new WordShapeFeaturizer(wordCounts)
+    val surfaceFeaturizer = new MinimalWordFeaturizer(wordCounts) + new WordPropertyFeaturizer(wordCounts)
     val wordFeaturizer = IndexedWordFeaturizer.fromData(surfaceFeaturizer, annTrees.map{_.words})
     val feat = new GenFeaturizer[(AnnotatedLabel, Int), String](wordFeaturizer)
 

@@ -26,7 +26,7 @@ import epic.parser.projections.GrammarRefinements
 import epic.framework.{ComponentFeature, Feature}
 import epic.parser._
 import epic.trees._
-import epic.features.{WordShapeFeaturizer, MinimalWordFeaturizer, IndexedWordFeaturizer, StandardSurfaceFeaturizer}
+import epic.features.{WordPropertyFeaturizer, MinimalWordFeaturizer, IndexedWordFeaturizer, StandardSurfaceFeaturizer}
 import epic.util.{SafeLogging, CacheBroker}
 import com.typesafe.scalalogging.log4j.Logging
 import epic.constraints.ChartConstraints.Factory
@@ -94,7 +94,7 @@ case class ProductParserModelFactory(baseParser: ParserParams.XbarGrammar,
     }
 
     val wordCounts: Counter[String, Double] = sum(annWords, Axis._0)
-    val surfaceFeaturizer = new MinimalWordFeaturizer(wordCounts) + new WordShapeFeaturizer(wordCounts)
+    val surfaceFeaturizer = new MinimalWordFeaturizer(wordCounts) + new WordPropertyFeaturizer(wordCounts)
     val wordFeaturizer = IndexedWordFeaturizer.fromData(surfaceFeaturizer, annTrees.map{_.words})
     def labelFlattener(l: (AnnotatedLabel, Seq[Int])) = {
       val basic = for( (ref,m) <- l._2.zipWithIndex) yield ComponentFeature(m, IndicatorFeature(l._1, ref))

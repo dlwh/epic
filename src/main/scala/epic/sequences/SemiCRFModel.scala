@@ -256,12 +256,17 @@ class SegmentationModelFactory[L](val startSymbol: L,
 
     val allowedSpanClassifier: LabeledSpanConstraints.Factory[L, String] = pruningModel.getOrElse(new LabeledSpanConstraints.LayeredTagConstraintsFactory(lexicon, maxLengthArray))
     val wordCounts = sum(counts, Axis._0)
+    val ws = new WordShapeFeaturizer(wordCounts)
+    val shapeNGrams = IndexedSeq[WordFeaturizer[String]]( (ws offset -1) * ws, ws * (ws offset 1), (ws offset -1) * (ws offset 1)).reduceLeft(_ + _)
     val minimalWordFeaturizer = new MinimalWordFeaturizer(wordCounts, includeWordShapeFeatures = true)
     val standardFeaturizer = new StandardSurfaceFeaturizer(minimalWordFeaturizer)
     val featurizers = gazetteer.foldLeft(IndexedSeq[SurfaceFeaturizer[String]](standardFeaturizer, new ContextSurfaceFeaturizer[String](minimalWordFeaturizer, 3)))(_ :+ _)
     val featurizer = new MultiSurfaceFeaturizer[String](featurizers)
-    //val contextWordFeaturizer = new ContextWordFeaturizer(minimalWordFeaturizer) + new WordShapeFeaturizer(wordCounts) + minimalWordFeaturizer
-    val wf = IndexedWordFeaturizer.fromData(minimalWordFeaturizer + new WordShapeFeaturizer(wordCounts) + new ContextWordFeaturizer[String](minimalWordFeaturizer, 3), train.map{_.words})
+    //val contextWordFeaturizer = new ContextWordFeaturizer(minimalWordFeaturizer) + new WordPropertyFeaturizer(wordCounts) + minimalWordFeaturizer
+    val wf = IndexedWordFeaturizer.fromData(minimalWordFeaturizer
+      + new WordPropertyFeaturizer(wordCounts)
+      + new ContextWordFeaturizer[String](minimalWordFeaturizer, 3)
+      + shapeNGrams, train.map{_.words})
     val sf = IndexedSurfaceFeaturizer.fromData(standardFeaturizer, train.map(_.words), allowedSpanClassifier)
 
     for(f <- pruningModel) {
@@ -309,7 +314,7 @@ object SegmentationModelFactory {
       def featureIndex = IndexedStandardFeaturizer.this.featureIndex
 
       def featuresForBegin(prev: Int, l: Int, w: Int): FeatureVector = {
-        val features = wordFeatureIndex.crossProduct(bioeFeatures(l)(0), wloc.featuresForWord(w), wordOffset)
+        val features = wordFeatureIndex.crossProduct(bioeFeatures(l)(0) ++  transitionFeatures(prev)(l), wloc.featuresForWord(w), wordOffset)
         new FeatureVector(features)
       }
       def featuresForInterior(cur: Int, pos: Int): FeatureVector = {
@@ -322,8 +327,8 @@ object SegmentationModelFactory {
           null
         } else {
           val features = spanFeatureIndex.crossProduct(bioeFeatures(cur)(2), loc.featuresForSpan(begin, end), spanOffset)
-          val features2 = spanFeatureIndex.crossProduct(transitionFeatures(prev)(cur), loc.featuresForSpan(begin, end), spanOffset)
-          new FeatureVector(epic.util.Arrays.concatenate(features, features2))
+          //val features2 = spanFeatureIndex.crossProduct(transitionFeatures(prev)(cur), loc.featuresForSpan(begin, end), spanOffset)
+          new FeatureVector(features)
         }
       }
     }
@@ -358,14 +363,13 @@ object SegmentationModelFactory {
             wordBuilder.add(bioeFeatures(li)(1), wordFeats.featuresForWord(i))
           }
           // span
-          spanBuilder.add(bioeFeatures(li)(2) ++ transitionFeatures(last)(li), feats.featuresForSpan(span.begin, span.end))
+          spanBuilder.add(bioeFeatures(li)(2), feats.featuresForSpan(span.begin, span.end))
           last = li
         }
       }
 
       val spanFeatures = spanBuilder.result()
       val wordFeatures = wordBuilder.result()
-      val featureIndex = SegmentedIndex(wordFeatures, spanFeatures)
 
       new IndexedStandardFeaturizer(wordFeaturizer, spanFeaturizer, wordFeatures, spanFeatures, bioeFeatures, transitionFeatures, startSymbol, labelIndex, constraintFactory)
 
