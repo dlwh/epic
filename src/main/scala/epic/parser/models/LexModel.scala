@@ -705,11 +705,11 @@ case class LexModelFactory(baseParser: ParserParams.XbarGrammar,
 
     val cFactory = constrainer
 
-    val minimalWordFeauturizer = new MinimalWordFeaturizer(summedCounts) + new TagDictionaryFeaturizer(initLexicon)
-    val surfaceFeaturizer = new ContextWordFeaturizer(minimalWordFeauturizer) + new WordPropertyFeaturizer(summedCounts)
+    val minimalWordFeaturizer = new MinimalWordFeaturizer(summedCounts)
+    val surfaceFeaturizer = new ContextWordFeaturizer(minimalWordFeaturizer) + new WordPropertyFeaturizer(summedCounts)
     val indexedWordFeaturizer = IndexedWordFeaturizer.fromData(surfaceFeaturizer, trees.map(_.words))
-    val indexedMinimalWordFeauturizer = IndexedWordFeaturizer.fromData(minimalWordFeauturizer, trees.map(_.words))
-    val indexedBilexicalFeaturizer = IndexedBilexicalFeaturizer.fromData(indexedMinimalWordFeauturizer, indexedMinimalWordFeauturizer, trees.map{DependencyTree.fromTreeInstance[AnnotatedLabel, String](_, HeadFinder.collins)})
+    val indexedMinimalWordFeaturizer = IndexedWordFeaturizer.fromData(minimalWordFeaturizer + new TagDictionaryFeaturizer(initLexicon), trees.map(_.words))
+    val indexedBilexicalFeaturizer = IndexedBilexicalFeaturizer.fromData(indexedMinimalWordFeaturizer, indexedMinimalWordFeaturizer, trees.map{DependencyTree.fromTreeInstance[AnnotatedLabel, String](_, HeadFinder.collins)})
 
     def ruleGen(r: Rule[AnnotatedLabel]) = IndexedSeq(RuleFeature(r))
 

@@ -68,9 +68,8 @@ object IndexedBilexicalFeaturizer {
       for( (head, dep) <- tree.arcs if head < tree.words.length) {
         builder.add(hanch.featuresForWord(head),
           danch.featuresForWord(dep))
-        error("Want both directions?")
-        builder.add(danch.featuresForWord(head),
-          hanch.featuresForWord(dep))
+ //       builder.add(danch.featuresForWord(head),
+ //         hanch.featuresForWord(dep))
       }
     }
 

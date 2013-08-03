@@ -72,11 +72,15 @@ class TagDictionaryFeaturizer[L](counts: Counter2[L, String, Double], commonWord
     }
 
     def featuresForWord(pos: Int): Array[Feature] = {
-      val am = myArgmaxes(pos)
-      if(variants(pos).length != 0) {
-        am ++ variants(pos)
+      if(pos < 0 || pos >= w.length) {
+        Array(IndicatorWSFeature('OutOfBounds))
       } else {
-        am
+        val am = myArgmaxes(pos)
+        if(variants(pos).length != 0) {
+          am ++ variants(pos)
+        } else {
+          am
+        }
       }
     }
 
