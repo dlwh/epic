@@ -260,9 +260,9 @@ class SegmentationModelFactory[L](val startSymbol: L,
     val standardFeaturizer = new StandardSurfaceFeaturizer(minimalWordFeaturizer)
     val featurizers = gazetteer.foldLeft(IndexedSeq[SurfaceFeaturizer[String]](standardFeaturizer, new ContextSurfaceFeaturizer[String](minimalWordFeaturizer, 3)))(_ :+ _)
     val featurizer = new MultiSurfaceFeaturizer[String](featurizers)
-    val contextWordFeaturizer = new ContextWordFeaturizer(minimalWordFeaturizer) + new WordShapeFeaturizer(wordCounts) + minimalWordFeaturizer
-    val wf = IndexedWordFeaturizer.fromData(contextWordFeaturizer, train.map{_.words})
-    val sf = IndexedSurfaceFeaturizer.fromData(featurizer, train.map(_.words), allowedSpanClassifier)
+    //val contextWordFeaturizer = new ContextWordFeaturizer(minimalWordFeaturizer) + new WordShapeFeaturizer(wordCounts) + minimalWordFeaturizer
+    val wf = IndexedWordFeaturizer.fromData(minimalWordFeaturizer + new WordShapeFeaturizer(wordCounts) + new ContextWordFeaturizer[String](minimalWordFeaturizer, 3), train.map{_.words})
+    val sf = IndexedSurfaceFeaturizer.fromData(standardFeaturizer, train.map(_.words), allowedSpanClassifier)
 
     for(f <- pruningModel) {
       assert(f.labelIndex == labelIndex, f.labelIndex + " " + labelIndex)
