@@ -13,9 +13,9 @@ import epic.parser.features.StandardSpanFeatures._
  */
 @SerialVersionUID(1L)
 class StandardSurfaceFeaturizer(wordFeaturizer: WordFeaturizer[String]) extends SurfaceFeaturizer[String] with Serializable {
-  def this(wordCounts: Counter[String, Double],
+  def this(wordCounts: Counter[String, Double], includeWordShapes: Boolean = true,
            functionWordThreshold: Int = 100,
-           unknownWordThreshold: Int = 2)  = this(new MinimalWordFeaturizer(wordCounts, functionWordThreshold, unknownWordThreshold))
+           unknownWordThreshold: Int = 2)  = this(new MinimalWordFeaturizer(wordCounts, includeWordShapes, functionWordThreshold, unknownWordThreshold))
 
   def anchor(words: IndexedSeq[String]):SurfaceFeatureAnchoring[String] = {
     val w = words

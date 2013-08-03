@@ -46,7 +46,7 @@ object SemiNERPipeline extends Logging {
       instances.splitAt(instances.length * 9 / 10)
     }
 
-    val gazetteer =  Gazetteer.ner("en")
+    val gazetteer =  None//Gazetteer.ner("en")
 
     // build feature Index
     val model = new SegmentationModelFactory(NERType.OutsideSentence, NERType.NotEntity, gazetteer = gazetteer)(params.cache).makeModel(train)
@@ -157,99 +157,7 @@ object SemiConllNERPipeline extends Logging {
 
     val weights = params.opt.iterations(cached, obj.initialWeightVector(randomize=false)).tee(state => if((state.iter +1) % params.iterPerEval == 0) eval(state)).take(params.opt.maxIterations).last
     val stats = eval(weights)
-    println("?????????" + stats)
-
-
-  }
-
-}
-
-
-
-
-object SemiConllStats extends Logging {
-
-  def makeSegmentation(ex: Example[IndexedSeq[String],IndexedSeq[IndexedSeq[String]]]): Segmentation[String, String]  = {
-    val labels = ex.label
-    val words = ex.features.map(_ apply 0)
-    assert(labels.length == words.length)
-    val out = new ArrayBuffer[(String, Span)]()
-    var start = labels.length
-    var i = 0
-    while(i < labels.length) {
-      val l = labels(i)
-      l(0) match {
-        case 'O' =>
-          if(start < i)
-            out += (labels(start).replaceAll(".-","").intern -> Span(start, i))
-          out += ("O".intern -> Span(i, i+1))
-          start = i + 1
-        case 'B' =>
-          if(start < i)
-            out += (labels(start).replaceAll(".-","").intern -> Span(start, i))
-          start = i
-        case 'I' =>
-          if(start >= i) {
-            start = i
-          } else if(labels(start) != l){
-            out += (labels(start).replaceAll(".-","").intern -> Span(start, i))
-            start = i
-          } // else, still in a field, do nothing.
-        case _  =>
-          sys.error("weird label?!?" + l)
-      }
-
-      i += 1
-    }
-    if(start < i)
-      out += (labels(start).replaceAll(".-","").intern -> Span(start, i))
-
-    assert(out.nonEmpty && out.last._2.end == words.length, out + " " + words + " " + labels)
-    Segmentation(out, words, ex.id)
-  }
-
-
-
-  case class Params(path: File,
-                    test: File,
-                    name: String = "eval/ner",
-                    nsents: Int = 100000,
-                    nthreads: Int = -1,
-                    iterPerEval: Int = 20,
-                    opt: OptParams)
-
-  def main(args: Array[String]) {
-    val params = CommandLineParser.readIn[Params](args)
-    logger.info("Command line arguments for recovery:\n" + Configuration.fromObject(params).toCommandLineString)
-    val (train,test) = {
-      val standardTrain = CONLLSequenceReader.readTrain(new FileInputStream(params.path), params.path.getName).toIndexedSeq
-      val standardTest = CONLLSequenceReader.readTrain(new FileInputStream(params.test), params.path.getName).toIndexedSeq
-
-      standardTrain.take(params.nsents).map(makeSegmentation) -> standardTest.map(makeSegmentation)
-    }
-
-    val gaz = Gazetteer.ner()
-    def gazStats(data: IndexedSeq[Segmentation[String, String]]) = {
-      var inGaz = 0.0
-      var notInGaz = 0.0
-
-      for(d <- data; (l,span) <- d.segments if l != "O") {
-        val words = span.map(d.words)
-        for(w <- words)
-          if(gaz.lookupWord(w).nonEmpty) {
-            inGaz += 1
-          } else {
-            notInGaz += 1
-          }
-
-      }
-      (inGaz,notInGaz,inGaz/(notInGaz + inGaz))
-    }
-
-    println("train: " + gazStats(train))
-    println("test: " + gazStats(test))
-
-
+    println(stats)
 
 
   }

@@ -8,11 +8,11 @@ import chalk.text.analyze.{WordShapeGenerator, EnglishWordClassGenerator}
 import scala.collection.immutable
 
 /**
- * TODO: extract minimal features into their own class!
+ *
  *
  * @author dlwh
  **/
-class MinimalWordFeaturizer(wordCounts: Counter[String, Double],
+class MinimalWordFeaturizer(wordCounts: Counter[String, Double], includeWordShapeFeatures: Boolean = false,
                              functionWordThreshold: Int = 100,
                              unknownWordThreshold: Int = 2) extends WordFeaturizer[String] with Serializable {
 
@@ -38,7 +38,12 @@ class MinimalWordFeaturizer(wordCounts: Counter[String, Double],
         } else {
           val ww = words(i)
           val classe = interner(WordFeature(EnglishWordClassGenerator(ww), 'Class))
-          Array(/*shape,*/ classe, Unk)
+          val shape = interner(WordFeature(WordShapeGenerator(ww), 'Shape))
+          if(includeWordShapeFeatures) {
+            Array(shape, classe, Unk)
+          } else{
+            Array(classe, Unk)
+          }
         }
       }
     }
@@ -54,6 +59,7 @@ class MinimalWordFeaturizer(wordCounts: Counter[String, Double],
 
   private val wordFeatures = Encoder.fromIndex(wordIndex).tabulateArray(s => if(wordCounts(s) > unknownWordThreshold) interner(IndicatorFeature(s)) else Unk)
   private val classes = Encoder.fromIndex(wordIndex).tabulateArray(w => if(wordCounts(w) > functionWordThreshold) wordFeatures(wordIndex(w)) else interner(WordFeature(EnglishWordClassGenerator(w), 'Class)))
+  private val shapes = if(includeWordShapeFeatures) Encoder.fromIndex(wordIndex).tabulateArray(w => if(wordCounts(w) > functionWordThreshold) wordFeatures(wordIndex(w)) else interner(WordFeature(WordShapeGenerator(w), 'Shape))) else null
 
   // caches
   private val minimalFeatures = Array.tabulate(wordIndex.size){ i =>
@@ -61,8 +67,15 @@ class MinimalWordFeaturizer(wordCounts: Counter[String, Double],
     val w = wordFeatures(i)
     val classe =  classes(i)
     if(wc > functionWordThreshold) Array(w)
-    else if (wc > unknownWordThreshold) Array(w, /*shape,*/ classe)
-    else Array(/*shape,*/ classe, Unk)
+    else if (includeWordShapeFeatures) {
+      val shape = shapes(i)
+      if(wc > unknownWordThreshold) Array(w, shape, classe)
+      else Array(shape, classe, Unk)
+    } else if(wc > unknownWordThreshold) {
+      Array(w, classe)
+    } else {
+      Array(classe, Unk)
+    }
   }
 
 }

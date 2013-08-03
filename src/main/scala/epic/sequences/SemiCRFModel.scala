@@ -256,11 +256,11 @@ class SegmentationModelFactory[L](val startSymbol: L,
 
     val allowedSpanClassifier: LabeledSpanConstraints.Factory[L, String] = pruningModel.getOrElse(new LabeledSpanConstraints.LayeredTagConstraintsFactory(lexicon, maxLengthArray))
     val wordCounts = sum(counts, Axis._0)
-    val minimalWordFeaturizer = new MinimalWordFeaturizer(wordCounts)
+    val minimalWordFeaturizer = new MinimalWordFeaturizer(wordCounts, includeWordShapeFeatures = true)
     val standardFeaturizer = new StandardSurfaceFeaturizer(minimalWordFeaturizer)
     val featurizers = gazetteer.foldLeft(IndexedSeq[SurfaceFeaturizer[String]](standardFeaturizer, new ContextSurfaceFeaturizer[String](minimalWordFeaturizer, 3)))(_ :+ _)
     val featurizer = new MultiSurfaceFeaturizer[String](featurizers)
-    val contextWordFeaturizer = new ContextWordFeaturizer(minimalWordFeaturizer) + new WordShapeFeaturizer(wordCounts)
+    val contextWordFeaturizer = new ContextWordFeaturizer(minimalWordFeaturizer) + new WordShapeFeaturizer(wordCounts) + minimalWordFeaturizer
     val wf = IndexedWordFeaturizer.fromData(contextWordFeaturizer, train.map{_.words})
     val sf = IndexedSurfaceFeaturizer.fromData(featurizer, train.map(_.words), allowedSpanClassifier)
 
