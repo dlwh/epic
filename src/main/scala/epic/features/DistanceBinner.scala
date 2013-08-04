@@ -51,3 +51,4 @@ object DistanceBinner {
   def apply(numBins: Int = 8, preserveDirection: Boolean = true): DistanceBinner = apply(numBins, numBins/2 + 1, preserveDirection)
 
 }
+

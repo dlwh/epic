@@ -4,10 +4,7 @@ import breeze.util.Index
 import epic.framework._
 import breeze.linalg._
 import breeze.collection.mutable.TriangularArray
-import collection.immutable.BitSet
-import epic.ontonotes.Argument
-import epic.trees.Span
-import epic.sequences.{SemiCRFInference, SemiCRF, Segmentation, SegmentationEval}
+import epic.sequences.{SemiCRF, SegmentationEval}
 import collection.mutable.ArrayBuffer
 import collection.mutable
 import epic.sequences.SemiCRF.TransitionVisitor
@@ -16,7 +13,6 @@ import epic.ontonotes.Argument
 import epic.sequences.Segmentation
 import epic.trees.Span
 import epic.constraints.LabeledSpanConstraints
-import epic.sequences.SegmentationModelFactory.Label1Feature
 
 /**
  *
@@ -346,6 +342,7 @@ object SRL {
   object Features {
     case class DistanceToPredFeature(dir: Symbol, label: Any, voice: Symbol, dist: Int) extends Feature
     case object LemmaContainedFeature extends Feature
+    case class Label1Feature[L](label: L, f: Feature, kind: Symbol) extends Feature
   }
   import Features._
 

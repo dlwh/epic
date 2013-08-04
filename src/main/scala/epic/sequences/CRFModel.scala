@@ -149,23 +149,24 @@ class TaggedSequenceModelFactory[L](val startSymbol: L,
 
     val lexicon:TagConstraints.Factory[L, String] = new SimpleLexicon[L, String](labelIndex, counts)
 
-    val wordCounts: Counter[String, Double] = sum(counts, Axis._0)
-    val minimalWordFeaturizer = new MinimalWordFeaturizer(wordCounts)
-    val surfaceFeaturizer = new ContextWordFeaturizer(minimalWordFeaturizer, 1) + minimalWordFeaturizer + new WordPropertyFeaturizer(wordCounts)
-    val featurizer = IndexedWordFeaturizer.fromData(surfaceFeaturizer, train.map{_.words})
-    val l2featurizer = IndexedWordFeaturizer.fromData(minimalWordFeaturizer, train.map{_.words})
 
-    val lfBuilder = new CrossProductIndex.Builder(labelIndex, featurizer.featureIndex, includeLabelOnlyFeatures = false)
+    val featurizer = WordFeaturizer.goodPOSTagFeaturizer(counts)
+    val l2featurizer = WordFeaturizer.goodPOSTagTransitionFeaturizer(counts)
+
+    val indexedFeaturizer = IndexedWordFeaturizer.fromData(featurizer, train.map{_.words})
+    val indexedL2featurizer = IndexedWordFeaturizer.fromData(l2featurizer, train.map{_.words})
+
+    val lfBuilder = new CrossProductIndex.Builder(labelIndex, indexedFeaturizer.featureIndex, includeLabelOnlyFeatures = false)
     val label2Index = Index[(L, L)]()
     val label2Features = Array.tabulate(labelIndex.size, labelIndex.size) { (l1, l2) =>
       label2Index.index(labelIndex.get(l1) -> labelIndex.get(l2))
     }
-    val l2Builder = new CrossProductIndex.Builder(label2Index, l2featurizer.featureIndex, includeLabelOnlyFeatures = true)
+    val l2Builder = new CrossProductIndex.Builder(label2Index, indexedL2featurizer.featureIndex, includeLabelOnlyFeatures = true)
 
     val progress = new ProgressLog(logger,train.length, frequency=1000, name= "NumFeatures")
     for(s <- train) {
-      val loc = featurizer.anchor(s.words)
-      val l2loc = l2featurizer.anchor(s.words)
+      val loc = indexedFeaturizer.anchor(s.words)
+      val l2loc = indexedL2featurizer.anchor(s.words)
       val lexLoc = lexicon.anchor(s.words)
 
       for {
@@ -182,7 +183,8 @@ class TaggedSequenceModelFactory[L](val startSymbol: L,
       progress.info(s"${lfBuilder.size + l2Builder.size}")
     }
 
-    val indexed = new IndexedStandardFeaturizer[L, String](featurizer, l2featurizer, lexicon, startSymbol, labelIndex, label2Features, lfBuilder.result(), l2Builder.result())
+    val indexed = new IndexedStandardFeaturizer[L, String](indexedFeaturizer,
+      indexedL2featurizer, lexicon, startSymbol, labelIndex, label2Features, lfBuilder.result(), l2Builder.result())
     val model = new CRFModel(indexed.featureIndex, lexicon, indexed, weights)
 
     model

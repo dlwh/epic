@@ -4,7 +4,7 @@ import breeze.linalg.Counter
 import epic.framework.Feature
 import breeze.util.{Encoder, Interner, Index}
 import epic.parser.features.IndicatorFeature
-import chalk.text.analyze.{WordShapeGenerator, EnglishWordClassGenerator}
+import chalk.text.analyze.EnglishWordClassGenerator
 import scala.collection.immutable
 
 /**
@@ -12,7 +12,7 @@ import scala.collection.immutable
  *
  * @author dlwh
  **/
-class WordShapeFeaturizer(wordCounts: Counter[String, Double],
+class WordClassFeaturizer(wordCounts: Counter[String, Double],
                           functionWordThreshold: Int = 100) extends WordFeaturizer[String] with Serializable {
 
   def anchor(words: IndexedSeq[String]):WordFeatureAnchoring[String] = {
@@ -32,28 +32,28 @@ class WordShapeFeaturizer(wordCounts: Counter[String, Double],
       private val _minimalFeatures: immutable.IndexedSeq[Array[Feature]] = (0 until words.length) map { i =>
         val index = indices(i)
         if(index >= 0) {
-          WordShapeFeaturizer.this.minimalFeatures(index)
+          WordClassFeaturizer.this.minimalFeatures(index)
         } else {
           val ww = words(i)
-          val shape = interner(WordFeature(WordShapeGenerator(ww), 'Shape))
-          Array[Feature](shape)
+          val classe = interner(WordFeature(EnglishWordClassGenerator(ww), 'Class))
+          Array[Feature](classe)
         }
       }
     }
   }
 
-  // more positional shapes to add
+  // more positional classes to add
 
   private val wordIndex = Index(wordCounts.keySet)
   private val interner = new Interner[Feature]
 
   private val boundaryFeatures = Array[Feature](BoundaryFeature)
 
-  private val shapes =  Encoder.fromIndex(wordIndex).tabulateArray(w => if(wordCounts(w) > functionWordThreshold) interner(IndicatorFeature(w)) else interner(WordFeature(WordShapeGenerator(w), 'Shape)))
+  private val classes =  Encoder.fromIndex(wordIndex).tabulateArray(w => if(wordCounts(w) > functionWordThreshold) interner(IndicatorFeature(w)) else interner(WordFeature(EnglishWordClassGenerator(w), 'Class)))
 
   // caches
   private val minimalFeatures = Array.tabulate(wordIndex.size){ i =>
-    Array(shapes(i))
+    Array(classes(i))
   }
 
 }

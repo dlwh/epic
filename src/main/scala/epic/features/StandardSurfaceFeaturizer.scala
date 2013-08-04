@@ -47,7 +47,7 @@ class StandardSurfaceFeaturizer(wordFeaturizer: WordFeaturizer[String]) extends 
           }
 
           for(f1 <- featuresForWord(end-1)) {
-            feats += WordBoundary('Outside, f1)
+            feats += WordBoundary('End, f1)
           }
         }
 

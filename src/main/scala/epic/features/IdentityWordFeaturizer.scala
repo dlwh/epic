@@ -12,12 +12,11 @@ import scala.collection.immutable
  *
  * @author dlwh
  **/
-class WordShapeFeaturizer(wordCounts: Counter[String, Double],
-                          functionWordThreshold: Int = 100) extends WordFeaturizer[String] with Serializable {
+class IdentityWordFeaturizer[W](wordCounts: Counter[W, Double], unknownWordThreshold: Int = 2) extends WordFeaturizer[W] with Serializable {
 
-  def anchor(words: IndexedSeq[String]):WordFeatureAnchoring[String] = {
+  def anchor(words: IndexedSeq[W]):WordFeatureAnchoring[W] = {
     val w = words
-    new WordFeatureAnchoring[String] {
+    new WordFeatureAnchoring[W] {
       val indices = words.map(wordIndex)
       def words = w
 
@@ -32,11 +31,9 @@ class WordShapeFeaturizer(wordCounts: Counter[String, Double],
       private val _minimalFeatures: immutable.IndexedSeq[Array[Feature]] = (0 until words.length) map { i =>
         val index = indices(i)
         if(index >= 0) {
-          WordShapeFeaturizer.this.minimalFeatures(index)
+          IdentityWordFeaturizer.this.minimalFeatures(index)
         } else {
-          val ww = words(i)
-          val shape = interner(WordFeature(WordShapeGenerator(ww), 'Shape))
-          Array[Feature](shape)
+          Array[Feature](Unk)
         }
       }
     }
@@ -45,15 +42,20 @@ class WordShapeFeaturizer(wordCounts: Counter[String, Double],
   // more positional shapes to add
 
   private val wordIndex = Index(wordCounts.keySet)
-  private val interner = new Interner[Feature]
-
+  private val Unk = WordFeature("#UNK#", 'LowCount)
   private val boundaryFeatures = Array[Feature](BoundaryFeature)
 
-  private val shapes =  Encoder.fromIndex(wordIndex).tabulateArray(w => if(wordCounts(w) > functionWordThreshold) interner(IndicatorFeature(w)) else interner(WordFeature(WordShapeGenerator(w), 'Shape)))
+  private val wordFeatures = Encoder.fromIndex(wordIndex).tabulateArray(s => if(wordCounts(s) > unknownWordThreshold) IndicatorFeature(s) else Unk)
 
   // caches
-  private val minimalFeatures = Array.tabulate(wordIndex.size){ i =>
-    Array(shapes(i))
+  private val minimalFeatures = Array.tabulate[Array[Feature]](wordIndex.size){ i =>
+    val wc = wordCounts(wordIndex.get(i))
+    val w = wordFeatures(i)
+    if(wc > unknownWordThreshold) {
+      Array(w)
+    } else {
+      Array(Unk)
+    }
   }
 
 }

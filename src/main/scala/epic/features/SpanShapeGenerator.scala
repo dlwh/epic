@@ -1,5 +1,21 @@
 package epic.features
 
+import epic.framework.Feature
+import epic.parser.features.StandardSpanFeatures.SpanShapeFeature
+
+@SerialVersionUID(1L)
+class SpanShapeFeaturizer extends SurfaceFeaturizer[String] with Serializable {
+  def anchor(words: IndexedSeq[String]): SurfaceFeatureAnchoring[String] = {
+    new SurfaceFeatureAnchoring[String] {
+      def featuresForSpan(begin: Int, end: Int): Array[Feature] = {
+        val sig = SpanShapeGenerator.signatureFor(words, begin, end, includeContext = true)
+        val sig2 = SpanShapeGenerator.signatureFor(words, begin, end, includeContext = false)
+        Array(SpanShapeFeature(sig), SpanShapeFeature(sig2))
+      }
+    }
+  }
+}
+
 /**
  *
  * @author dlwh

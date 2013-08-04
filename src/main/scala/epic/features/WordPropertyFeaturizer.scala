@@ -36,10 +36,7 @@ final case class RightWordFeature(str: Any) extends Feature
 
 
 class WordPropertyFeaturizer(wordCounts: Counter[String, Double],
-                          commonWordThreshold: Int = 20,
-                          unknownWordThreshold: Int = 2,
-                          prefixOrder: Int = 5,
-                          suffixOrder: Int = 5) extends WordFeaturizer[String] with Serializable {
+                             commonWordThreshold: Int = 20) extends WordFeaturizer[String] with Serializable {
   import WordPropertyFeaturizer._
 
   private val wordIndex = Index(wordCounts.keysIterator)
@@ -71,14 +68,7 @@ class WordPropertyFeaturizer(wordCounts: Counter[String, Double],
   def featuresFor(w: String): IndexedSeq[Feature] = {
     val wc = wordCounts(w)
     val features = ArrayBuffer[Feature]()
-    if(wc > commonWordThreshold) {
-      ArrayBuffer(IndicatorFeature(w))
-    } else {
-      if(wc > unknownWordThreshold)
-        features += IndicatorFeature(w)
-//      features += ShapeFeature(WordShapeGenerator(w))
-//      features += SignatureFeature(signatureGenerator.signatureFor(w))
-
+    if(wc <= commonWordThreshold) {
       val wlen = w.length
       val numCaps = (w:Seq[Char]).count{_.isUpper}
       val hasLetter = w.exists(_.isLetter)
@@ -163,25 +153,13 @@ class WordPropertyFeaturizer(wordCounts: Counter[String, Double],
           features += hasInitialCapsAndEndsWithSFeature // we mess up NNP and NNPS
       }
 
-      if(wlen >= suffixOrder + 1) {
-        for(i <- 1 to suffixOrder) {
-          features += (SuffixFeature(w.substring(wlen-i)))
-        }
-      }
-
-      if(wlen >= prefixOrder + 2) {
-        for(i <- 1 to prefixOrder) {
-          features += PrefixFeature(w.substring(0,prefixOrder))
-        }
-      }
-
       if(wlen > 10) {
         features += longWordFeature
       } else if(wlen < 5) {
         features += shortWordFeature
       }
-      features
     }
+    features
   }
 
   def apply(w: String) = featuresFor(w)

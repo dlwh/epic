@@ -255,20 +255,34 @@ class SegmentationModelFactory[L](val startSymbol: L,
     val lexicon = new SimpleLexicon(labelIndex, counts, openTagThreshold = 10, closedWordThreshold = 20)
 
     val allowedSpanClassifier: LabeledSpanConstraints.Factory[L, String] = pruningModel.getOrElse(new LabeledSpanConstraints.LayeredTagConstraintsFactory(lexicon, maxLengthArray))
-    val wordCounts = sum(counts, Axis._0)
-    val ws = new WordShapeFeaturizer(wordCounts)
-    val shapeNGrams = IndexedSeq[WordFeaturizer[String]]( (ws offset -1) * ws,
-      ws * (ws offset 1), (ws offset -1) * ws * (ws offset 1)).reduceLeft(_ + _)
-    val minimalWordFeaturizer = new MinimalWordFeaturizer(wordCounts, includeWordShapeFeatures = true)
-    val standardFeaturizer = new StandardSurfaceFeaturizer(minimalWordFeaturizer)
-    val featurizers = gazetteer.foldLeft(IndexedSeq[SurfaceFeaturizer[String]](standardFeaturizer, new ContextSurfaceFeaturizer[String](minimalWordFeaturizer, 3)))(_ :+ _)
-    val featurizer = new MultiSurfaceFeaturizer[String](featurizers)
-    //val contextWordFeaturizer = new ContextWordFeaturizer(minimalWordFeaturizer) + new WordPropertyFeaturizer(wordCounts) + minimalWordFeaturizer
-    val wf = IndexedWordFeaturizer.fromData(minimalWordFeaturizer
-      + new WordPropertyFeaturizer(wordCounts)
-      + new ContextWordFeaturizer[String](minimalWordFeaturizer, 3)
-      + shapeNGrams, train.map{_.words})
-    val sf = IndexedSurfaceFeaturizer.fromData(standardFeaturizer, train.map(_.words), allowedSpanClassifier)
+
+    val (featurizer, l2featurizer) = {
+      val dsl = new WordFeaturizer.DSL[L](counts)
+      val dsl2 = new SurfaceFeaturizer.DSL()
+      import dsl._
+      import dsl2._
+
+      val featurizer = (
+        word
+          + unigrams(clss, 1)
+          + unigrams(shape, 1)
+         // + bigrams(clss, 1)
+         // + bigrams(tagDict, 2)
+         // + bigrams(shape, 1)
+          // + shape(-1) * shape * shape(1)
+          + prefixes()
+          + suffixes()
+          + props
+        )
+
+
+      val spanFeatures = length + spanShape// + length + sent  + (sent + spanShape) * length
+
+      featurizer -> spanFeatures
+    }
+
+    val wf = IndexedWordFeaturizer.fromData(featurizer, train.map{_.words})
+    val sf = IndexedSurfaceFeaturizer.fromData(l2featurizer, train.map(_.words), allowedSpanClassifier)
 
     for(f <- pruningModel) {
       assert(f.labelIndex == labelIndex, f.labelIndex + " " + labelIndex)
@@ -282,7 +296,7 @@ class SegmentationModelFactory[L](val startSymbol: L,
 }
 
 object SegmentationModelFactory {
-  case class Label1Feature[L](label: L, f: Feature, kind: Symbol) extends Feature
+  case class Label1Feature[L](label: L, kind: Symbol) extends Feature
   case class TransitionFeature[L](label: L, label2: L) extends Feature
 
   val kinds = Array('Begin, 'Interior, 'Span)
@@ -344,7 +358,7 @@ object SegmentationModelFactory {
                 hashFeatures: HashFeature.Scale = HashFeature.Absolute(0))
                (data: IndexedSeq[Segmentation[L, String]]):IndexedStandardFeaturizer[L] = {
       val labelPartIndex = Index[Feature]()
-      val bioeFeatures = Array.tabulate(labelIndex.size, kinds.length)((i,j) => Array(labelPartIndex.index(Label1Feature(labelIndex.get(i), null, kinds(j)))))
+      val bioeFeatures = Array.tabulate(labelIndex.size, kinds.length)((i,j) => Array(labelPartIndex.index(Label1Feature(labelIndex.get(i), kinds(j)))))
       val transitionFeatures = Array.tabulate(labelIndex.size, labelIndex.size)((i,j) => Array(labelPartIndex.index(TransitionFeature(labelIndex.get(i), labelIndex.get(j)))))
 
       val spanBuilder = new CrossProductIndex.Builder(labelPartIndex, spanFeaturizer.featureIndex, hashFeatures, includeLabelOnlyFeatures = true)
