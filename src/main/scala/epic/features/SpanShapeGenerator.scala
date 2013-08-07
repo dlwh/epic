@@ -9,8 +9,9 @@ class SpanShapeFeaturizer extends SurfaceFeaturizer[String] with Serializable {
     new SurfaceFeatureAnchoring[String] {
       def featuresForSpan(begin: Int, end: Int): Array[Feature] = {
         val sig = SpanShapeGenerator.signatureFor(words, begin, end, includeContext = true)
-        val sig2 = SpanShapeGenerator.signatureFor(words, begin, end, includeContext = false)
-        Array(SpanShapeFeature(sig), SpanShapeFeature(sig2))
+//        val sig2 = SpanShapeGenerator.signatureFor(words, begin, end, includeContext = false)
+//        Array(SpanShapeFeature(sig), SpanShapeFeature(sig2))
+        Array(SpanShapeFeature(sig))
       }
     }
   }

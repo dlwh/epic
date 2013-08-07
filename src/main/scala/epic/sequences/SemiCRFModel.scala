@@ -265,18 +265,18 @@ class SegmentationModelFactory[L](val startSymbol: L,
       val featurizer = (
         word
           + unigrams(clss, 1)
-          + unigrams(shape, 1)
-         // + bigrams(clss, 1)
+          + unigrams(shape, 2)
+          + bigrams(clss, 1)
          // + bigrams(tagDict, 2)
          // + bigrams(shape, 1)
-          // + shape(-1) * shape * shape(1)
+          + shape(-1) * shape * shape(1)
           + prefixes()
           + suffixes()
           + props
         )
 
 
-      val spanFeatures = length + spanShape// + length + sent  + (sent + spanShape) * length
+      val spanFeatures = length + spanShape + sent //+ (sent + spanShape) * length
 
       featurizer -> spanFeatures
     }
