@@ -70,20 +70,13 @@ object MaxEntTagScorer extends Logging {
                  data: IndexedSeq[TreeInstance[L, W]],
                  params: OptParams = OptParams()) = {
     val featurizer = IndexedWordFeaturizer.fromData(feat, data.map(_.words))
-    val featureCounts = ArrayBuffer[Double]()
     val cpBuilder = new CrossProductIndex.Builder(lexicon.labelIndex, featurizer.featureIndex, HashFeature.Relative(1), includeLabelOnlyFeatures = false)
 
     for(ti <- data.map(_.asTaggedSequence)) {
       val featanch = featurizer.anchor(ti.words)
       for (i <- 0 until ti.words.length) {
         val features = featanch.featuresForWord(i)
-        val indexed = cpBuilder.add(Array(lexicon.labelIndex(ti.label(i))),features)
-        for(x <- indexed.view.reverse) {
-          if(x >= featureCounts.length) {
-            featureCounts ++= Array.fill(x-featureCounts.length + 1)(0.0)
-          }
-          featureCounts(x) += 1
-        }
+         cpBuilder.add(Array(lexicon.labelIndex(ti.label(i))),features)
       }
     }
 
