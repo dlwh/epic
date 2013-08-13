@@ -52,7 +52,7 @@ class LexModel[L, W](bundle: LexGrammarBundle[L, W],
                      initFeatureValue: Feature=>Option[Double]) extends ParserModel[L, W] with Serializable with ParserExtractable[L, W] {
 
 
-  def accumulateCounts(d: TreeInstance[L, W], m: Marginal, accum: ExpectedCounts, scale: Double) {
+  def accumulateCounts(d: TreeInstance[L, W], m: Marginal, accum: ExpectedCounts, scale: Double): Unit = {
     m.expectedCounts(indexed, accum, scale)
   }
 
@@ -705,11 +705,25 @@ case class LexModelFactory(baseParser: ParserParams.XbarGrammar,
 
     val cFactory = constrainer
 
-    val minimalWordFeaturizer = new MinimalWordFeaturizer(summedCounts)
-    val surfaceFeaturizer = new ContextWordFeaturizer(minimalWordFeaturizer) + new WordPropertyFeaturizer(summedCounts)
-    val indexedWordFeaturizer = IndexedWordFeaturizer.fromData(surfaceFeaturizer, trees.map(_.words))
-    val indexedMinimalWordFeaturizer = IndexedWordFeaturizer.fromData(minimalWordFeaturizer + new TagDictionaryFeaturizer(initLexicon), trees.map(_.words))
-    val indexedBilexicalFeaturizer = IndexedBilexicalFeaturizer.fromData(indexedMinimalWordFeaturizer, indexedMinimalWordFeaturizer, trees.map{DependencyTree.fromTreeInstance[AnnotatedLabel, String](_, HeadFinder.collins)})
+    val (wordFeaturizer, bilexFeaturizer) = {
+      val dsl = new WordFeaturizer.DSL(initLexicon) with BilexicalFeaturizer.DSL
+      import dsl._
+
+      val wf = word + clss + shape + bigrams(word, 1) + bigrams(clss, 1) + props
+      var bilex:BilexicalFeaturizer[String] = (
+        word(head) * word(dep)
+        + shape(head) * shape(dep)
+        + clss(head) * clss(dep)
+        + tagDict(head) * tagDict(dep)
+        )
+
+      bilex = bilex * distance + bilex + distance
+
+      wf -> bilex
+    }
+
+    val indexedWordFeaturizer = IndexedWordFeaturizer.fromData(wordFeaturizer, trees.map(_.words))
+    val indexedBilexicalFeaturizer = IndexedBilexicalFeaturizer.fromData(bilexFeaturizer, trees.map{DependencyTree.fromTreeInstance[AnnotatedLabel, String](_, HeadFinder.collins)})
 
     def ruleGen(r: Rule[AnnotatedLabel]) = IndexedSeq(RuleFeature(r))
 

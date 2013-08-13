@@ -36,7 +36,7 @@ trait BilexicalFeaturizer[W] {
 }
 
 object BilexicalFeaturizer {
-  object DSL {
+  trait DSL {
     object head
     object dep
 
