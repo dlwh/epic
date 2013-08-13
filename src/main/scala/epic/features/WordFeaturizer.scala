@@ -76,10 +76,22 @@ object WordFeaturizer {
     })
 
     implicit class RichFeaturizer[String](f: WordFeaturizer[String]) {
-      def apply(i: Int) = f offset i
+      def apply[T, R](i: T)(implicit wfChanger: WordFeaturizer.Modifier[String, T, R]):R = wfChanger(f, i)
       def apply(mp: MarkerPos) = new MarkedWordFeaturizer(f, mp)
-      def apply(r: Range) = r.map(i => f.offset(i):WordFeaturizer[String]).reduceLeft(_ * _)
     }
+  }
+
+  /** Used in the DSL for turning a WordFeaturizer into something else */
+  trait Modifier[W, T, R] {
+    def apply(f: WordFeaturizer[W], t: T):R
+  }
+
+  implicit def offsetModifier[W]: Modifier[W, Int, WordFeaturizer[W]] = new Modifier[W, Int, WordFeaturizer[W]] {
+    def apply(f: WordFeaturizer[W], t: Int): WordFeaturizer[W] = f offset t
+  }
+
+  implicit def rangeModifier[W]: Modifier[W, Range, WordFeaturizer[W]] = new Modifier[W, Range, WordFeaturizer[W]] {
+    def apply(f: WordFeaturizer[W], r: Range): WordFeaturizer[W] = r.map(i => f.offset(i):WordFeaturizer[W]).reduceLeft(_ * _)
   }
 }
 

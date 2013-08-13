@@ -3,6 +3,7 @@ package epic.features
 import epic.framework.Feature
 import epic.features.SurfaceFeaturizer.MarkerPos
 import epic.parser.features.StandardSpanFeatures.SpanLengthFeature
+import epic.features.WordFeaturizer.Modifier
 
 /**
  * TODO
@@ -33,9 +34,12 @@ object SurfaceFeaturizer {
     val length = new SpanLengthFeaturizer()
     val sent = new SentencePropertiesFeaturizer()
 
-    implicit class LiftWordFeaturizer[W](wf: WordFeaturizer[W]) {
+    implicit def _markerPosModifier[W]: WordFeaturizer.Modifier[W, MarkerPos, MarkedWordFeaturizer[W]] = new Modifier[W, MarkerPos, MarkedWordFeaturizer[W]] {
+      def apply(f: WordFeaturizer[W], t: MarkerPos): MarkedWordFeaturizer[W] = new MarkedWordFeaturizer[W](f, t)
     }
+
   }
+
 
   case class MarkedWordFeaturizer[W](wf: WordFeaturizer[W], mp: MarkerPos) extends SurfaceFeaturizer[W] {
     def anchor(w: IndexedSeq[W]): SurfaceFeatureAnchoring[W] = {

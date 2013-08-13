@@ -24,6 +24,7 @@ case class HeadFeature[P](r: Feature) extends LexFeature
 case class DepFeature[P](r: Feature) extends LexFeature
 case class HeadDepFeature[P](head: Feature, dep: Feature) extends LexFeature
 case class DistFeature(distance: Int, f: Any) extends LexFeature
+case class DistanceFeature(distance: Int) extends LexFeature
 
 case class AttachRight(distance: Int) extends LexFeature
 case object AttachRight extends LexFeature

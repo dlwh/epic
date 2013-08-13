@@ -52,7 +52,7 @@ class LexModel[L, W](bundle: LexGrammarBundle[L, W],
                      initFeatureValue: Feature=>Option[Double]) extends ParserModel[L, W] with Serializable with ParserExtractable[L, W] {
 
 
-  def accumulateCounts(d: TreeInstance[L, W], m: Marginal, accum: ExpectedCounts, scale: Double) {
+  def accumulateCounts(d: TreeInstance[L, W], m: Marginal, accum: ExpectedCounts, scale: Double): Unit = {
     m.expectedCounts(indexed, accum, scale)
   }
 
@@ -274,12 +274,12 @@ case class StandardLexFeaturizer[L](labelIndex: Index[L],
 
   private val distanceBinner = DistanceBinner(Array(1,2,5,10),preserveDirection = false)
 
-  private val ruleCache = Encoder.fromIndex(ruleIndex).tabulateArray(r => ruleFeatGen(r).map(_featureIndex.index(_)).toArray)
+  private val ruleCache = Encoder.fromIndex(ruleIndex).tabulateArray(r => ruleFeatGen(r).map(_featureIndex.index).toArray)
   private val attachCache = Encoder.fromIndex(ruleIndex).tabulateArray(r => distanceBinner.binIds.toArray.map(df => Array(_featureIndex.index(LabelFeature(r.parent)), _featureIndex.index( DistFeature(df, r.parent)))))
   private val ruleHeadCache = Encoder.fromIndex(ruleIndex).tabulateArray(r => ruleFeatGen(r).toArray.map(f => _featureIndex.index(HeadFeature(f))))
   private val ruleDepCache = Encoder.fromIndex(ruleIndex).tabulateArray(r => ruleFeatGen(r).toArray.map(f => _featureIndex.index(DepFeature(f))))
-  private val leftAttachFeatures = distanceBinner.binIds.map(new AttachLeft(_)).map(f => Array(f, AttachLeft).map(_featureIndex.index _))
-  private val rightAttachFeatures = distanceBinner.binIds.map(new AttachRight(_)).map(f => Array(f, AttachRight).map(_featureIndex.index _))
+  private val leftAttachFeatures = distanceBinner.binIds.map(new AttachLeft(_)).map(f => Array(f, AttachLeft).map(_featureIndex.index))
+  private val rightAttachFeatures = distanceBinner.binIds.map(new AttachRight(_)).map(f => Array(f, AttachRight).map(_featureIndex.index))
   private val labelFeatures: Array[Array[Int]] = Encoder.fromIndex(labelIndex).tabulateArray(l => Array[Int](_featureIndex.index(LabelFeature(l))))
 
   def featuresForHead(rule: Int) = {
@@ -705,11 +705,25 @@ case class LexModelFactory(baseParser: ParserParams.XbarGrammar,
 
     val cFactory = constrainer
 
-    val minimalWordFeaturizer = new MinimalWordFeaturizer(summedCounts)
-    val surfaceFeaturizer = new ContextWordFeaturizer(minimalWordFeaturizer) + new WordPropertyFeaturizer(summedCounts)
-    val indexedWordFeaturizer = IndexedWordFeaturizer.fromData(surfaceFeaturizer, trees.map(_.words))
-    val indexedMinimalWordFeaturizer = IndexedWordFeaturizer.fromData(minimalWordFeaturizer + new TagDictionaryFeaturizer(initLexicon), trees.map(_.words))
-    val indexedBilexicalFeaturizer = IndexedBilexicalFeaturizer.fromData(indexedMinimalWordFeaturizer, indexedMinimalWordFeaturizer, trees.map{DependencyTree.fromTreeInstance[AnnotatedLabel, String](_, HeadFinder.collins)})
+    val (wordFeaturizer, bilexFeaturizer) = {
+      val dsl = new WordFeaturizer.DSL(initLexicon) with BilexicalFeaturizer.DSL
+      import dsl._
+
+      val wf = word + clss + shape + bigrams(word, 1) + bigrams(clss, 1) + props
+      var bilex:BilexicalFeaturizer[String] = (
+        word(head) * word(dep)
+        + shape(head) * shape(dep)
+        + clss(head) * clss(dep)
+        + tagDict(head) * tagDict(dep)
+        )
+
+      bilex = bilex * distance + bilex + distance
+
+      wf -> bilex
+    }
+
+    val indexedWordFeaturizer = IndexedWordFeaturizer.fromData(wordFeaturizer, trees.map(_.words))
+    val indexedBilexicalFeaturizer = IndexedBilexicalFeaturizer.fromData(bilexFeaturizer, trees.map{DependencyTree.fromTreeInstance[AnnotatedLabel, String](_, HeadFinder.collins)})
 
     def ruleGen(r: Rule[AnnotatedLabel]) = IndexedSeq(RuleFeature(r))
 
