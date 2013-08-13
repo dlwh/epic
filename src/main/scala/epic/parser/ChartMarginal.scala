@@ -114,7 +114,7 @@ final case class ChartMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
     for((sym,scores) <- outside.bot.enteredLabelScores(0, length)) {
       score = numerics.logSum(score, softmax(new DenseVector(scores) + new DenseVector(ins(sym))))
     }
-    assert( (score - logPartition).abs/math.max(logPartition.abs,score.abs).max(1E-4) < 1E-4, logPartition + " " + 0 + "Z" + score)
+    assert( (score - logPartition).abs/math.max(logPartition.abs, score.abs).max(1E-4) < 1E-4, logPartition + " " + 0 + "Z" + score)
     for(i <- 0 until length) {
       val ins = inside.bot.enteredLabelScores(i, i+1).toMap
       var score = Double.NegativeInfinity
@@ -136,6 +136,8 @@ final case class ChartMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
   def visitPostorder(spanVisitor: AnchoredVisitor[L], spanThreshold: Double = Double.NegativeInfinity) {
     if(logPartition.isInfinite) throw new RuntimeException("No parse for " + words)
     val itop = inside.top
+
+    val grammar = this.grammar
 
     val lexLoc = anchoring.core.tagConstraints
     val core = anchoring.core

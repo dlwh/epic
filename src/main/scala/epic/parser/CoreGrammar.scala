@@ -47,7 +47,7 @@ trait CoreGrammar[L, W] extends Serializable {
    */
   def anchor(words: IndexedSeq[W]):CoreAnchoring[L, W]
 
-  def asConstraintFactory:ChartConstraints.Factory[L, W] = new Factory[L, W] {
+  def asConstraintFactory:ChartConstraints.Factory[L, W] = new Factory[L, W] with Serializable {
     def constraints(w: IndexedSeq[W]): ChartConstraints[L] = anchor(w).sparsityPattern
   }
 

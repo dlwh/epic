@@ -21,7 +21,7 @@ trait SurfaceFeaturizer[W] {
 }
 
 object SurfaceFeaturizer {
-  class DSL() {
+  trait DSL {
 
     /** begin of span */
     object b extends MarkerPos(0)

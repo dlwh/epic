@@ -411,7 +411,7 @@ object IndexedSpanFeaturizer {
     val ruleIndex = refinements.rules.fineIndex
 
     val spanBuilder = new CrossProductIndex.Builder(featurizer.featureIndex, surfaceFeaturizer.featureIndex, dummyFeatScale)
-    val wordBuilder = new CrossProductIndex.Builder(featurizer.featureIndex, wordFeaturizer.featureIndex, dummyFeatScale)
+    val wordBuilder = new CrossProductIndex.Builder(featurizer.featureIndex, wordFeaturizer.featureIndex, dummyFeatScale, includeLabelOnlyFeatures = false)
 
     for(ti <- trees) {
       val spec = featurizer.anchor(ti.words)
@@ -432,7 +432,7 @@ object IndexedSpanFeaturizer {
           spanBuilder.add(spec.featuresForSpan(span.begin, span.end, aI),
             sspec.featuresForSpan(span.begin, span.end))
           wordBuilder.add(spec.featuresForSplit(span.begin, t.splitPoint, span.end, r),
-            wspec.featuresForWord(t.splitPoint))
+           wspec.featuresForWord(t.splitPoint))
       }
 
     }
@@ -511,10 +511,8 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     val refGrammar = BaseGrammar(AnnotatedLabel.TOP, annBinaries, annUnaries)
 
     val trees = trainTrees.map(_.mapLabels(_.baseAnnotatedLabel))
-    val (initLexicon, initBinaries, initUnaries) = GenerativeParser.extractCounts(trees)
-
     val (xbarGrammar, xbarLexicon) = baseParser.xbarGrammar(trees)
-    val summedCounts = sum(initLexicon, Axis._0)
+    val summedCounts = sum(annWords, Axis._0)
 
     val indexedRefinements = GrammarRefinements(xbarGrammar, refGrammar, (_: AnnotatedLabel).baseAnnotatedLabel)
 
@@ -524,7 +522,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     val minimalWordFeaturizer = new MinimalWordFeaturizer(summedCounts)
     val standardWordFeaturizer = new WordPropertyFeaturizer(summedCounts) + minimalWordFeaturizer + new ContextWordFeaturizer(minimalWordFeaturizer)
     val word = IndexedWordFeaturizer.fromData(standardWordFeaturizer, annTrees.map{_.words})
-    val surface = IndexedSurfaceFeaturizer.fromData(new ContextSurfaceFeaturizer(minimalWordFeaturizer) + new StandardSurfaceFeaturizer(minimalWordFeaturizer), annTrees.map{_.words}, constrainer.asConstraintFactory)
+    val surface = IndexedSurfaceFeaturizer.fromData(new StandardSurfaceFeaturizer(minimalWordFeaturizer), annTrees.map{_.words}, constrainer.asConstraintFactory)
     val feat = new StandardSpanFeaturizer[AnnotatedLabel, String](
       refGrammar,
       labelFeatures _, ruleFeatures _)

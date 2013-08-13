@@ -257,10 +257,8 @@ class SegmentationModelFactory[L](val startSymbol: L,
     val allowedSpanClassifier: LabeledSpanConstraints.Factory[L, String] = pruningModel.getOrElse(new LabeledSpanConstraints.LayeredTagConstraintsFactory(lexicon, maxLengthArray))
 
     val (featurizer, l2featurizer) = {
-      val dsl = new WordFeaturizer.DSL[L](counts)
-      val dsl2 = new SurfaceFeaturizer.DSL()
+      val dsl = new WordFeaturizer.DSL[L](counts) with SurfaceFeaturizer.DSL
       import dsl._
-      import dsl2._
 
       val featurizer = (
         word
