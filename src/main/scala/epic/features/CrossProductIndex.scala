@@ -24,7 +24,7 @@ class CrossProductIndex[A, B] private (val firstIndex: Index[A],
                                        labelPartOfFeature: Array[Int],
                                        surfacePartOfFeature: Array[Int],
                                        id: String= "CrossProductIndex",
-                                       includePlainLabelFeatures: Boolean = true,
+                                       val includePlainLabelFeatures: Boolean = true,
                                        val numHashFeatures: Int=0) extends Index[Feature] with Serializable {
 
   def apply(t: Feature): Int = t match {
@@ -60,8 +60,8 @@ class CrossProductIndex[A, B] private (val firstIndex: Index[A],
   }
 
 
-  private def labelOnlySize: Int = if(includePlainLabelFeatures) firstIndex.size else 0
-  private def trueSize = labelOnlySize + labelPartOfFeature.length
+  private val labelOnlySize: Int = if(includePlainLabelFeatures) firstIndex.size else 0
+  private val trueSize = labelOnlySize + labelPartOfFeature.length
   override def size: Int = trueSize + numHashFeatures
 
   def unapply(i: Int): Option[Feature] = if(i >= size || i < 0)  None else Some(get(i))
@@ -88,7 +88,7 @@ class CrossProductIndex[A, B] private (val firstIndex: Index[A],
     var i = 0
     while(i < lFeatures.length) {
       if(usePlainLabelFeatures && includePlainLabelFeatures && lFeatures(i) >= 0)
-        builder += lFeatures(i)
+        builder += (lFeatures(i) + offset)
       var j = 0
       while(j < sFeatures.length) {
         val m = mapped(lFeatures(i),sFeatures(j)) + offset
@@ -110,7 +110,7 @@ object CrossProductIndex {
                       secondIndex: Index[B],
                       hashFeatures: HashFeature.Scale = HashFeature.Absolute(0),
                       id: String = "CrossProductIndex",
-                      includeLabelOnlyFeatures: Boolean = true) {
+                      val includeLabelOnlyFeatures: Boolean = true) {
     private val mapping = Array.fill(firstIndex.size)(new OpenAddressHashArray[Int](secondIndex.size, -1, 4))
     private val labelPart, surfacePart = new ArrayBuffer[Int]()
     private val labelOnlySize: Int = if(includeLabelOnlyFeatures) firstIndex.size else 0

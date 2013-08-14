@@ -312,6 +312,7 @@ object AnnotatingPipeline extends Logging {
     val feat = new StandardLexFeaturizer(
       docProcessor.grammar.labelIndex,
       docProcessor.grammar.index,
+     (_:Rule[AnnotatedLabel]).children.head.isIntermediate,
       ruleGen
     )
 
@@ -319,6 +320,7 @@ object AnnotatingPipeline extends Logging {
 
     val indexed = IndexedLexFeaturizer.extract[AnnotatedLabel, TreeInstance[AnnotatedLabel, String], String](feat,
       bilex,
+      docProcessor.wordFeaturizer,
       docProcessor.wordFeaturizer,
       headFinder,
       docProcessor.grammar.index,

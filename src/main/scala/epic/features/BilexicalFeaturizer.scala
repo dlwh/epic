@@ -96,7 +96,7 @@ object BilexicalFeaturizer {
   }
 
   case class DistanceFeaturizer[W](db: DistanceBinner = DistanceBinner()) extends BilexicalFeaturizer[W] {
-    private val theAnchoring = new BilexicalFeatureAnchoring[W] {
+    private val theAnchoring = new BilexicalFeatureAnchoring[W] with Serializable {
       def featuresForAttachment(head: Int, dep: Int): Array[Feature] = Array(DistanceFeature(db.binnedDistance(head, dep)))
     }
     def anchor(w: IndexedSeq[W]): BilexicalFeatureAnchoring[W] = theAnchoring
@@ -159,7 +159,7 @@ object IndexedBilexicalFeaturizer {
     new BasicIndexedBilexicalFeaturizer(f, new HashExtendingIndex(index, HashFeature(_), hashFeatures))
   }
 
-  class BasicIndexedBilexicalFeaturizer[W](f: BilexicalFeaturizer[W], val featureIndex: Index[Feature]) extends IndexedBilexicalFeaturizer[W] {
+  class BasicIndexedBilexicalFeaturizer[W](f: BilexicalFeaturizer[W], val featureIndex: Index[Feature]) extends IndexedBilexicalFeaturizer[W] with Serializable {
 
     def anchor(w: IndexedSeq[W]): IndexedBilexicalFeatureAnchoring[W] = {
       val anc = f.anchor(w)

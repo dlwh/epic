@@ -16,7 +16,7 @@ class ProgressLog(log: Logger, items: Int, frequency: Int = 100, name: String = 
     val x = item.incrementAndGet()
     if(x % frequency == 0 || x == items) {
       val m = msg
-      log.info(s"$name $x/$items: $m(${(System.currentTimeMillis() - initialTime)/1000.0}s elapsed.)")
+      log.info(s"$name $x/$items: $m (${(System.currentTimeMillis() - initialTime)/1000.0}s elapsed.)")
     }
   }
 
