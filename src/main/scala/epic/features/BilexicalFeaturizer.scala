@@ -45,6 +45,8 @@ object BilexicalFeaturizer {
 
     lazy val distance = new BilexicalFeaturizer.DistanceFeaturizer[String]()
 
+    def withDistance[W](f: BilexicalFeaturizer[W], db: DistanceBinner = new DistanceBinner()) = new BinomialFeaturizer(f, new DistanceFeaturizer(db))
+
     implicit def headWFModifier[W]: WordFeaturizer.Modifier[W, head.type, HeadFeaturizer[W]] = new Modifier[W, head.type, HeadFeaturizer[W]] {
       def apply(f: WordFeaturizer[W], t: head.type): HeadFeaturizer[W] = new HeadFeaturizer(f)
     }
@@ -72,6 +74,19 @@ object BilexicalFeaturizer {
     def anchor(w: IndexedSeq[W]): BilexicalFeatureAnchoring[W] = new BilexicalFeatureAnchoring[W] {
       val ba = base.anchor(w)
       def featuresForAttachment(head: Int, dep: Int): Array[Feature] = ba.featuresForWord(dep).map(f => DepFeature(f):Feature)
+    }
+  }
+
+  case class BinomialFeaturizer[W](headBase: BilexicalFeaturizer[W], depBase: BilexicalFeaturizer[W]) extends BilexicalFeaturizer[W] {
+    def anchor(w: IndexedSeq[W]): BilexicalFeatureAnchoring[W] = new BilexicalFeatureAnchoring[W] {
+      val hb = headBase.anchor(w)
+      val db = if(headBase eq depBase) hb else depBase.anchor(w)
+      def featuresForAttachment(head: Int, dep: Int): Array[Feature] = {
+        val hf = hb.featuresForAttachment(head, dep)
+        val df = db.featuresForAttachment(head, dep)
+        val cross = Arrays.crossProduct(hf, df)((a, b) => CrossProductFeature(a,b):Feature)
+        Arrays.concatenate(hf, df, cross)
+      }
     }
   }
 

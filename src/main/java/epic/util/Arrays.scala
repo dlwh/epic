@@ -31,6 +31,18 @@ object Arrays {
     ret
   }
 
+  def concatenate[T:Manifest](args: Array[T]*): Array[T] = {
+    var totalLength: Int = 0
+    for (a <- args) totalLength += a.length
+    val ret: Array[T] = new Array[T](totalLength)
+    var destPos: Int = 0
+    for (a <- args) {
+      System.arraycopy(a, 0, ret, destPos, a.length)
+      destPos += a.length
+    }
+    ret
+  }
+
 
   def crossProduct[A,B,C](arr1: Array[A], arr2: Array[B])(f: (A,B) => C)(implicit man:ClassTag[C]): Array[C] = {
     val ret = new Array[C](arr1.length * arr2.length)

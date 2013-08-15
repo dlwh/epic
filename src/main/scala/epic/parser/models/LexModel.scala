@@ -657,16 +657,18 @@ case class LexModelFactory(baseParser: ParserParams.XbarGrammar,
       import dsl._
 
       val wf = word + clss + shape + bigrams(word, 1) + bigrams(clss, 1)
+      val offsets = (clss(-1) + clss(1))
+      val hdoffsets = offsets(head)  + offsets(dep)
       var bilexF:BilexicalFeaturizer[String] = (
         bilex(word)
       //  + bilex(shape)
-        + bilex(clss)
-        + bilex(tagDict)
+          + withDistance(bilex(clss))// + hdoffsets)
+          + bilex(tagDict)
         )
 
       val monolex = IndexedSeq(word, shape, clss)
 
-      bilexF = bilexF + distance + monolex.map(_(head)).reduceLeft[BilexicalFeaturizer[String]](_ + _) + monolex.map(_(dep)).reduceLeft[BilexicalFeaturizer[String]](_ + _)
+      bilexF = bilexF + monolex.map(_(head)).reduceLeft[BilexicalFeaturizer[String]](_ + _) + monolex.map(_(dep)).reduceLeft[BilexicalFeaturizer[String]](_ + _)
 
       (wf, word + shape + clss, bilexF)
     }
