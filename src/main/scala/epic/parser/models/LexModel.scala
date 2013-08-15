@@ -653,17 +653,18 @@ case class LexModelFactory(baseParser: ParserParams.XbarGrammar,
     val cFactory = constrainer
 
     val (wordFeaturizer, unaryFeaturizer, bilexFeaturizer) = {
-      val dsl = new WordFeaturizer.DSL(initLexicon) with BilexicalFeaturizer.DSL
+      val dsl = new WordFeaturizer.DSL(initLexicon) with BilexicalFeaturizer.DSL with BrownClusters.DSL
       import dsl._
 
       val wf = word + clss + shape + bigrams(word, 1) + bigrams(clss, 1)
       val offsets = (clss(-1) + clss(1))
-      val hdoffsets = offsets(head)  + offsets(dep)
       var bilexF:BilexicalFeaturizer[String] = (
         bilex(word)
       //  + bilex(shape)
-          + withDistance(bilex(clss))// + hdoffsets)
+          + withDistance(bilex(clss))
           + bilex(tagDict)
+        + offsets(head)
+        + offsets(dep)
         )
 
       val monolex = IndexedSeq(word, shape, clss)
