@@ -118,9 +118,15 @@ class EPModel[Datum, Augment](maxEPIter: Int, initFeatureValue: Feature => Optio
 
   def inferenceFromWeights(weights: DenseVector[Double], dropOutFraction: Double) = {
     val allWeights = partitionWeights(weights)
-    val builders = ArrayBuffer.tabulate(models.length) { i => models(i).inferenceFromWeights(allWeights(i)) }
+    val builders = ArrayBuffer.tabulate(models.length) { i => 
+      // hack, for now.
+      if(dropOutFraction > 0 && Rand.uniform.get < dropOutFraction)
+        null:ProjectableInference[Datum, Augment]
+      else 
+        models(i).inferenceFromWeights(allWeights(i))
+    }
 
-    new EPInference(builders, maxEPIter, epInGold = epInGold, dropOutFraction = dropOutFraction)
+    new EPInference(builders, maxEPIter, epInGold = epInGold)
   }
 
   private def partitionWeights(weights: DenseVector[Double]): Array[DenseVector[Double]] = {
@@ -140,7 +146,7 @@ object EPModel {
 // null for dropout!
 case class EPExpectedCounts(var loss: Double, counts: IndexedSeq[ExpectedCounts[_]]) extends epic.framework.ExpectedCounts[EPExpectedCounts] {
   def +=(other: EPExpectedCounts) = {
-    for( (t, u) <- counts zip other.counts if t != null && u != null) {
+    for( (t, u) <- counts zip other.counts) {
       t.asInstanceOf[{ def +=(e: ExpectedCounts[_]):ExpectedCounts[_]}] += u
     }
     this.loss += other.loss
@@ -148,7 +154,7 @@ case class EPExpectedCounts(var loss: Double, counts: IndexedSeq[ExpectedCounts[
   }
 
   def -=(other: EPExpectedCounts) = {
-    for( (t, u) <- counts zip other.counts if t != null && u != null) {
+    for( (t, u) <- counts zip other.counts) {
       t.asInstanceOf[{ def -=(e: ExpectedCounts[_]):ExpectedCounts[_]}] -= u
     }
     this.loss -= other.loss

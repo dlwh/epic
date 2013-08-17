@@ -36,7 +36,10 @@ class EPInference[Datum, Augment](val inferences: IndexedSeq[ProjectableInferenc
   def goldMarginal(datum: Datum, augment: Augment) = {
     if(!epInGold) {
       val marginals = for(inf <- inferences) yield {
-        inf.goldMarginal(datum)
+        if(inf eq null)
+          null.asInstanceOf[ProjectableInference[Datum, Augment]#Marginal]
+        else 
+          inf.goldMarginal(datum)
       }
       val inf = inferences.head
       EPMarginal(marginals.map(_.logPartition).sum, inf.project(datum, marginals.head.asInstanceOf[inf.Marginal], augment), marginals)
@@ -46,6 +49,7 @@ class EPInference[Datum, Augment](val inferences: IndexedSeq[ProjectableInferenc
       var iter = 0
       def project(q: Augment, i: Int) = {
         val inf = inferences(i)
+        assert(inf != null)
         marginals(i) = null.asInstanceOf[ProjectableInference[Datum, Augment]#Marginal]
         val marg = inf.goldMarginal(datum, q)
         val contributionToLikelihood = marg.logPartition
@@ -58,8 +62,10 @@ class EPInference[Datum, Augment](val inferences: IndexedSeq[ProjectableInferenc
 
       val ep = new ExpectationPropagation(project _, 1E-3)
 
+      val inferencesToUse = (0 until inferences.length).filter(inferences(_) ne null)
+
       var state: ep.State = null
-      val iterates = ep.inference(augment, 0 until inferences.length, IndexedSeq.fill[Augment](inferences.length)(null.asInstanceOf[Augment]))
+      val iterates = ep.inference(augment, inferencesToUse, IndexedSeq.fill[Augment](inferencesToUse.length)(null.asInstanceOf[Augment]))
       var converged = false
       while (!converged && iter < maxEPIter && iterates.hasNext) {
         val s = iterates.next()
@@ -83,7 +89,6 @@ class EPInference[Datum, Augment](val inferences: IndexedSeq[ProjectableInferenc
     var iter = 0
     val marginals = ArrayBuffer.fill(inferences.length)(null.asInstanceOf[ProjectableInference[Datum, Augment]#Marginal])
 
-    var retries = 0
     def project(q: Augment, i: Int) = {
       val inf = inferences(i)
       marginals(i) = null.asInstanceOf[ProjectableInference[Datum, Augment]#Marginal]
@@ -91,15 +96,14 @@ class EPInference[Datum, Augment](val inferences: IndexedSeq[ProjectableInferenc
       var contributionToLikelihood = marg.logPartition
       if (contributionToLikelihood.isInfinite || contributionToLikelihood.isNaN) {
         logger.error(s"Model $i is misbehaving ($contributionToLikelihood) on iter $iter! Datum: $datum" )
-        retries += 1
-        if (retries > 3) {
-          throw new RuntimeException("EP is being sad!")
-        }
+        throw new RuntimeException("EP is being sad!")
+        /*
         marg = inf.marginal(datum)
         contributionToLikelihood = marg.logPartition
         if (contributionToLikelihood.isInfinite || contributionToLikelihood.isNaN) {
           throw new RuntimeException(s"Model $i is misbehaving ($contributionToLikelihood) on iter $iter! Datum: " + datum )
         }
+        */
       }
       val newAugment = inf.project(datum, marg, q)
       marginals(i) = marg
@@ -108,9 +112,10 @@ class EPInference[Datum, Augment](val inferences: IndexedSeq[ProjectableInferenc
     }
 
     val ep = new ExpectationPropagation(project _, 1E-5)
+    val inferencesToUse = (0 until inferences.length).filter(inferences(_) ne null)
 
     var state: ep.State = null
-    val iterates = ep.inference(augment, 0 until inferences.length, IndexedSeq.tabulate[Augment](inferences.length)(i => inferences(i).baseAugment(datum)))
+    val iterates = ep.inference(augment, inferencesToUse, IndexedSeq.tabulate[Augment](inferences.length)(i => inferences(i).baseAugment(datum)))
     var converged = false
     while (!converged && iter < maxEPIter && iterates.hasNext) {
       val s = iterates.next()

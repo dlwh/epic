@@ -55,7 +55,7 @@ case class EPParserModelFactory(ep: EPParams,
 
     val featureCounter = readWeights(oldWeights)
 
-    new EPParserModel[AnnotatedLabel, String](xbarGrammar, xbarLexicon, ep.maxIterations, {featureCounter.get(_)}, false, ep.dropOutFraction)(models:_*)
+    new EPParserModel[AnnotatedLabel, String](xbarGrammar, xbarLexicon, ep.maxIterations, featureCounter.get, false, ep.dropOutFraction)(models:_*)
   }
 }
 
