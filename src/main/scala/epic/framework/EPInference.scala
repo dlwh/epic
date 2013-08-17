@@ -28,7 +28,7 @@ class EPInference[Datum, Augment](val inferences: IndexedSeq[ProjectableInferenc
 
 
 
-  def baseAugment(v: Datum) = inferences(0).baseAugment(v)
+  def baseAugment(v: Datum) = inferences.filter(_ ne null).head.baseAugment(v)
 
   def project(v: Datum, m: Marginal, oldAugment: Augment): Augment = m.q
 
@@ -41,8 +41,8 @@ class EPInference[Datum, Augment](val inferences: IndexedSeq[ProjectableInferenc
         else 
           inf.goldMarginal(datum)
       }
-      val inf = inferences.head
-      EPMarginal(marginals.map(_.logPartition).sum, inf.project(datum, marginals.head.asInstanceOf[inf.Marginal], augment), marginals)
+      val (inf, m) = (inferences zip marginals).filter(_._2 != null).head
+      EPMarginal(marginals.filter(_ ne null).map(_.logPartition).sum, inf.project(datum, m.asInstanceOf[inf.Marginal], augment), marginals)
     } else {
 
       val marginals = ArrayBuffer.fill(inferences.length)(null.asInstanceOf[ProjectableInference[Datum, Augment]#Marginal])
@@ -115,7 +115,7 @@ class EPInference[Datum, Augment](val inferences: IndexedSeq[ProjectableInferenc
     val inferencesToUse = (0 until inferences.length).filter(inferences(_) ne null)
 
     var state: ep.State = null
-    val iterates = ep.inference(augment, inferencesToUse, IndexedSeq.tabulate[Augment](inferences.length)(i => inferences(i).baseAugment(datum)))
+    val iterates = ep.inference(augment, inferencesToUse, inferencesToUse.map(i => inferences(i).baseAugment(datum)))
     var converged = false
     while (!converged && iter < maxEPIter && iterates.hasNext) {
       val s = iterates.next()

@@ -118,7 +118,7 @@ class EPModel[Datum, Augment](maxEPIter: Int, initFeatureValue: Feature => Optio
 
   def inferenceFromWeights(weights: DenseVector[Double], dropOutFraction: Double) = {
     val allWeights = partitionWeights(weights)
-    val builders = ArrayBuffer.tabulate(models.length) { i => 
+    var inferences = ArrayBuffer.tabulate(models.length) { i => 
       // hack, for now.
       if(dropOutFraction > 0 && Rand.uniform.get < dropOutFraction)
         null:ProjectableInference[Datum, Augment]
@@ -126,7 +126,17 @@ class EPModel[Datum, Augment](maxEPIter: Int, initFeatureValue: Feature => Optio
         models(i).inferenceFromWeights(allWeights(i))
     }
 
-    new EPInference(builders, maxEPIter, epInGold = epInGold)
+    if(!inferences.exists(_ ne null)) 
+      inferences = ArrayBuffer.tabulate(models.length) { i => 
+        // hack, for now.
+        if(dropOutFraction > 0 && Rand.uniform.get < dropOutFraction)
+          null:ProjectableInference[Datum, Augment]
+        else 
+          models(i).inferenceFromWeights(allWeights(i))
+      }
+
+
+    new EPInference(inferences, maxEPIter, epInGold = epInGold)
   }
 
   private def partitionWeights(weights: DenseVector[Double]): Array[DenseVector[Double]] = {
