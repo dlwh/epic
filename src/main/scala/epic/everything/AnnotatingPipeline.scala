@@ -191,7 +191,7 @@ object AnnotatingPipeline extends Logging {
 
       if( s.iter % params.iterPerEval == 0) {
         updateWeights(params.weightsCache, weightsCache, Encoder.fromIndex(epModel.featureIndex).decode(s.x))
-        val inf = epModel.inferenceFromWeights(s.x)
+        val inf = epModel.inferenceFromWeights(s.x, 0.0)
         val results: immutable.Seq[immutable.IndexedSeq[EvaluationResult[_]]] = {for (d <- processedTest.par) yield {
           val epMarg = inf.marginal(d)
           for ( i <- 0 until epMarg.marginals.length) yield {

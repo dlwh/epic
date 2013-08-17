@@ -20,12 +20,13 @@ import collection.mutable.ArrayBuffer
 import nak.inference.Factor
 import breeze.util._
 import epic.util.CacheBroker
+import breeze.stats.distributions.Rand
 
 /**
  *
  * @author dlwh
  */
-class EPModel[Datum, Augment](maxEPIter: Int, initFeatureValue: Feature => Option[Double] = {(_:Feature) => None}, epInGold: Boolean = false)(
+class EPModel[Datum, Augment](maxEPIter: Int, initFeatureValue: Feature => Option[Double] = {(_:Feature) => None}, epInGold: Boolean = false, dropOutFraction: Double = 0.0)(
                               _models: EPModel.CompatibleModel[Datum, Augment]*)(implicit aIsFactor: Augment <:< Factor[Augment]) extends Model[Datum] {
   def models = _models
   type ExpectedCounts = EPExpectedCounts
@@ -44,9 +45,10 @@ class EPModel[Datum, Augment](maxEPIter: Int, initFeatureValue: Feature => Optio
 
   override def accumulateCounts(datum: Datum, marg: Marginal, accum: EPExpectedCounts, scale: Double) = {
     import marg._
-    for ( (inf, i) <- models.zipWithIndex) yield {
+    for ( (inf, i) <- models.zipWithIndex) {
       val marg = marginals(i)
-      inf.accumulateCounts(datum, marg.asInstanceOf[inf.Marginal], accum.counts(i).asInstanceOf[inf.ExpectedCounts], scale)
+      if(marg != null)
+        inf.accumulateCounts(datum, marg.asInstanceOf[inf.Marginal], accum.counts(i).asInstanceOf[inf.ExpectedCounts], scale)
     }
     accum.loss += scale * marg.logPartition
   }
@@ -112,13 +114,13 @@ class EPModel[Datum, Augment](maxEPIter: Int, initFeatureValue: Feature => Optio
     ecounts.loss -> DenseVector.vertcat(vectors: _*)
   }
 
-  def inferenceFromWeights(weights: DenseVector[Double]) = {
+  def inferenceFromWeights(weights: DenseVector[Double]):EPInference[Datum, Augment] = inferenceFromWeights(weights, dropOutFraction)
+
+  def inferenceFromWeights(weights: DenseVector[Double], dropOutFraction: Double) = {
     val allWeights = partitionWeights(weights)
-    val builders = ArrayBuffer.tabulate(models.length) {
-      i =>
-        models(i).inferenceFromWeights(allWeights(i))
-    }
-    new EPInference(builders, maxEPIter, epInGold = epInGold)
+    val builders = ArrayBuffer.tabulate(models.length) { i => models(i).inferenceFromWeights(allWeights(i)) }
+
+    new EPInference(builders, maxEPIter, epInGold = epInGold, dropOutFraction = dropOutFraction)
   }
 
   private def partitionWeights(weights: DenseVector[Double]): Array[DenseVector[Double]] = {
@@ -126,11 +128,7 @@ class EPModel[Datum, Augment](maxEPIter: Int, initFeatureValue: Feature => Optio
   }
 
   private def projectWeights(weights: DenseVector[Double], modelIndex: Int) = {
-    val result = DenseVector.zeros[Double](models(modelIndex).numFeatures)
-    for (i <- 0 until result.size) {
-      result(i) = weights(i + offsets(modelIndex))
-    }
-    result
+    weights(offsets(modelIndex) until offsets(modelIndex + 1)).copy
   }
 
 }
@@ -139,9 +137,10 @@ object EPModel {
   type CompatibleModel[Datum, Augment] = Model[Datum] { type Inference <: ProjectableInference[Datum, Augment]}
 }
 
+// null for dropout!
 case class EPExpectedCounts(var loss: Double, counts: IndexedSeq[ExpectedCounts[_]]) extends epic.framework.ExpectedCounts[EPExpectedCounts] {
   def +=(other: EPExpectedCounts) = {
-    for( (t, u) <- counts zip other.counts) {
+    for( (t, u) <- counts zip other.counts if t != null && u != null) {
       t.asInstanceOf[{ def +=(e: ExpectedCounts[_]):ExpectedCounts[_]}] += u
     }
     this.loss += other.loss
@@ -149,7 +148,7 @@ case class EPExpectedCounts(var loss: Double, counts: IndexedSeq[ExpectedCounts[
   }
 
   def -=(other: EPExpectedCounts) = {
-    for( (t, u) <- counts zip other.counts) {
+    for( (t, u) <- counts zip other.counts if t != null && u != null) {
       t.asInstanceOf[{ def -=(e: ExpectedCounts[_]):ExpectedCounts[_]}] -= u
     }
     this.loss -= other.loss

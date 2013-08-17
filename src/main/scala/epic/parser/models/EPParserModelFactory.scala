@@ -27,7 +27,7 @@ import epic.constraints.ChartConstraints.Factory
 import epic.util.CacheBroker
 import epic.lexicon.Lexicon
 
-case class EPParams(maxIterations: Int = 5, pruningThreshold: Double = -15)
+case class EPParams(maxIterations: Int = 5, pruningThreshold: Double = -15, dropOutFraction: Double = 0.0)
 
 object EPParserModelFactory {
   type CompatibleFactory = ParserModelFactory[AnnotatedLabel, String] {
@@ -55,7 +55,7 @@ case class EPParserModelFactory(ep: EPParams,
 
     val featureCounter = readWeights(oldWeights)
 
-    new EPParserModel[AnnotatedLabel, String](xbarGrammar, xbarLexicon, ep.maxIterations, {featureCounter.get(_)}, false)(models:_*)
+    new EPParserModel[AnnotatedLabel, String](xbarGrammar, xbarLexicon, ep.maxIterations, {featureCounter.get(_)}, false, ep.dropOutFraction)(models:_*)
   }
 }
 
@@ -64,7 +64,7 @@ class EPParserModel[L, W](val baseGrammar: BaseGrammar[L],
                           val lexicon: Lexicon[L, W],
                           maxEPIter: Int,
                           initFeatureValue: Feature => Option[Double] = {(_:Feature) => None},
-                          epInGold: Boolean = false)(models:EPModel.CompatibleModel[TreeInstance[L, W], CoreAnchoring[L, W]]*) extends EPModel[TreeInstance[L, W], CoreAnchoring[L, W]](maxEPIter, initFeatureValue, epInGold)(models:_*) with EPParser.Extractor[L, W] with Serializable {
+                          epInGold: Boolean = false, dropOutFraction: Double = 0.0)(models:EPModel.CompatibleModel[TreeInstance[L, W], CoreAnchoring[L, W]]*) extends EPModel[TreeInstance[L, W], CoreAnchoring[L, W]](maxEPIter, initFeatureValue, epInGold, dropOutFraction)(models:_*) with EPParser.Extractor[L, W] with Serializable {
 
 
 }

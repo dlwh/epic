@@ -51,7 +51,7 @@ object EPParser {
     def lexicon: Lexicon[L, W]
 
     def extractParser(weights: DenseVector[Double]) = {
-      new EPParser(baseGrammar, lexicon, inferenceFromWeights(weights))
+      new EPParser(baseGrammar, lexicon, inferenceFromWeights(weights, dropOutFraction = 0.0))
     }
   }
 
