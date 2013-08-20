@@ -11,7 +11,7 @@ import epic.constraints.{ChartConstraints, LabeledSpanConstraints}
 import epic.features._
 import epic.util.CacheBroker
 import scala.util.Try
-import epic.parser.projections.ReachabilityProjection
+import epic.parser.projections.{GrammarRefinements, ReachabilityProjection}
 import epic.trees.StandardTreeProcessor
 import epic.trees.TreeInstance
 import epic.ontonotes.Frame
@@ -87,22 +87,26 @@ object FeaturizedDocument {
 
     val sentenceConstrainer = parseConstrainer | nerConstrainer
 
-    val wfeaturizer = IndexedWordFeaturizer.fromData(wordFeaturizer, docs.flatMap(_.sentences.map(_.words)))
-    val featurizer = IndexedSurfaceFeaturizer.fromData(feat, docs.flatMap(_.sentences.map(_.words)), sentenceConstrainer)
-    val reachable = new ReachabilityProjection(grammar, lexicon)
+    val reachable = {
+      val treeInstances = docs.flatMap(_.sentences.map(_.treeInstance(treeProcessor)))
+      val refGrammar = GenerativeParser.extractGrammar(AnnotatedLabel.TOP, treeInstances)
+      new ReachabilityProjection(grammar, lexicon, refGrammar)
+    }
+
+    val words: IndexedSeq[IndexedSeq[String]] = docs.flatMap(_.sentences.map(_.words))
+    val wfeaturizer = IndexedWordFeaturizer.fromData(wordFeaturizer, words)
+    val featurizer = IndexedSurfaceFeaturizer.fromData(feat, words, sentenceConstrainer)
 
     val featurized = for( d <- docs) yield {
       val newSentences = for( s <- d.sentences) yield {
+        val constituentSparsity = parseConstrainer.constraints(s.words)
         var tree = treeProcessor(s.tree.map(_.treebankString))
         tree = UnaryChainRemover.removeUnaryChains(tree)
-        val constituentSparsity = parseConstrainer.constraints(s.words)
+        tree = reachable.forTree(tree, s.words, constituentSparsity)
         val nerConstraints = nerConstrainer.get(s.words)
 
         val loc = featurizer.anchor(s.words)
         val wloc = wfeaturizer.anchor(s.words)
-
-        tree = reachable.forTree(tree, s.words, constituentSparsity)
-
 
         FeaturizedSentence(s.index, s.words,
           Some(tree),
