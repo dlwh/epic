@@ -16,13 +16,13 @@ package epic.parser.models
  limitations under the License.
 */
 import epic.framework._
-import epic.parser.{HammingLossAugmentation, SimpleChartParser, GenerativeParser, Parser}
+import epic.parser._
 import breeze.linalg._
 import breeze.optimize._
 import epic.trees.AnnotatedLabel
 import breeze.config.Help
 import com.typesafe.scalalogging.log4j.Logging
-import epic.parser.projections.{ConstraintCoreGrammarAdaptor, ReachabilityProjection, ParserChartConstraintsFactory}
+import epic.parser.projections.{GrammarRefinements, ConstraintCoreGrammarAdaptor, ReachabilityProjection, ParserChartConstraintsFactory}
 import epic.util.CacheBroker
 import epic.parser.ParserParams.XbarGrammar
 import breeze.util._
@@ -33,6 +33,12 @@ import epic.parser.ParseEval.Statistics
 import java.io.File
 import epic.constraints.CachedChartConstraintsFactory
 import breeze.util.Implicits._
+import epic.trees.annotations.StripAnnotations
+import epic.trees.TreeInstance
+import breeze.optimize.FirstOrderMinimizer.OptParams
+import epic.trees.annotations.AddMarkovization
+import epic.parser.HammingLossAugmentation
+import epic.parser.ParseEval.Statistics
 
 
 /**
@@ -90,10 +96,11 @@ object ParserTrainer extends epic.parser.ParserPipeline with Logging {
     }
 
     val theTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]] = if(!enforceReachability)  {
-      trainTrees.par.map(new StripAnnotations).seq.toIndexedSeq
+      trainTrees.toIndexedSeq
     } else {
-      val proj = new ReachabilityProjection(initialParser.grammar, initialParser.lexicon)
-      trainTrees.par.map(new StripAnnotations).map(ti => ti.copy(tree=proj.forTree(ti.tree, ti.words, constraints.constraints(ti.words)))).seq.toIndexedSeq
+      val refGrammar = GenerativeParser.extractGrammar(AnnotatedLabel.TOP, trainTrees)
+      val proj = new ReachabilityProjection(initialParser.grammar, initialParser.lexicon, refGrammar)
+      trainTrees.par.map(ti => ti.copy(tree=proj.forTree(ti.tree, ti.words, constraints.constraints(ti.words)))).seq.toIndexedSeq
     }
 
     val baseMeasure = if(lossAugment) {

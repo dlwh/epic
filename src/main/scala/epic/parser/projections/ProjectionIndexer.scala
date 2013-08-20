@@ -41,6 +41,7 @@ final class ProjectionIndexer[C, F] private (val coarseIndex: Index[C],
 
   def localize(f: Int):Int =  localizationArray(f)
   def globalize(c: Int, f: Int):Int = globalRefinements(c)(f)
+  def globalize(c: C, f: Int):F = fineIndex.get(globalRefinements(coarseIndex(c))(f))
 
   def localize(f: F):Int =  localizationArray(fineIndex(f))
 

@@ -1,10 +1,17 @@
 package epic.ontonotes
 
-import epic.trees.{Span, AnnotatedLabel, Tree}
+import epic.trees._
 import nak.data.Example
 import epic.sequences.Segmentation
 import collection.mutable.ArrayBuffer
 import collection.mutable
+import epic.trees.StandardTreeProcessor
+import scala.Some
+import epic.ontonotes.OntoAnnotations
+import epic.ontonotes.Argument
+import epic.trees.Span
+import epic.ontonotes.Mention
+import epic.ontonotes.Frame
 
 /**
  * represents an annotation ontonotes sentence. Doesn't include raw sentence, for now.
@@ -25,6 +32,8 @@ case class Sentence(docId: String, index: Int,
   def ner = annotations.ner
   def speaker = annotations.speaker
   def srl = annotations.srl
+
+  def treeInstance(processor: StandardTreeProcessor) = TreeInstance(docId+"-treeInstance", processor(tree.map(_.treebankString)), words )
 
   lazy val nerSegmentation: Segmentation[NERType.Value, String]  = {
     val sorted = ner.toIndexedSeq.sortBy((_: (DSpan, NERType.Value))._1.begin)
