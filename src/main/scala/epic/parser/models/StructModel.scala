@@ -92,6 +92,14 @@ case class StructModelFactory(baseParser: ParserParams.XbarGrammar,
   def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]], constrainer: CoreGrammar[AnnotatedLabel, String])(implicit broker: CacheBroker) = {
     val transformed = trainTrees.par.map(annotator).seq.toIndexedSeq
 
+
+    for( (xi, ti) <- transformed zip trainTrees) {
+      println(s"Base:${ti.tree render ti.words}Transformed:${xi.tree render xi.words}")
+    }
+    System.exit(1)
+
+
+
     val (initLexicon, initBinaries, initUnaries) = this.extractBasicCounts(transformed)
 
     val (xbarGrammar, xbarLexicon) = baseParser.xbarGrammar(trainTrees)

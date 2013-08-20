@@ -46,11 +46,16 @@ class ReachabilityProjection[L, L2, W](grammar: BaseGrammar[L], lexicon: Lexicon
         }
 
         val globalizedClosest: BinarizedTree[L2] = closest.map({refinements.labels.globalize(_:L, _:Int)}.tupled)
+        logger.trace {
+          s"Reachable: ${globalizedClosest.render(words, newline = true)}\nGold:${tree.render(words, newline = true)}"
+        }
         globalizedClosest
       }
     })
   } catch {
-    case ex: Exception => throw new RuntimeException(s"while handling projectability for $tree $words", ex)
+    case ex: Exception =>
+      logger.fatal(s"while handling projectability for $tree $words: " + ex.getMessage, ex)
+      throw ex
   }
 
 
@@ -87,18 +92,18 @@ class ReachabilityProjection[L, L2, W](grammar: BaseGrammar[L], lexicon: Lexicon
           I(correctRefinedSpans.isGoldBotTag(begin, end, globalized))
       }
 
-      def validLabelRefinements(begin: Int, end: Int, label: Int): Array[Int] = refinements.labels.refinementsOf(label)
+      def validLabelRefinements(begin: Int, end: Int, label: Int): Array[Int] = basic.validLabelRefinements(begin, end, label)
 
-      def numValidRefinements(label: Int): Int = refinements.labels.refinementsOf(label).length
+      def numValidRefinements(label: Int): Int = basic.numValidRefinements(label)
 
-      def numValidRuleRefinements(rule: Int): Int = refinements.rules.refinementsOf(rule).length
+      def numValidRuleRefinements(rule: Int): Int = basic.numValidRuleRefinements(rule)
 
       def validRuleRefinementsGivenParent(begin: Int, end: Int, rule: Int, parentRef: Int): Array[Int] = {
         basic.validRuleRefinementsGivenParent(begin, end, rule, parentRef)
       }
 
       def validRuleRefinementsGivenLeftChild(begin: Int, split: Int, completionBegin: Int, completionEnd: Int, rule: Int, childRef: Int): Array[Int] = {
-        basic.validRuleRefinementsGivenRightChild(begin, split, completionBegin, completionEnd, rule, childRef)
+        basic.validRuleRefinementsGivenLeftChild(begin, split, completionBegin, completionEnd, rule, childRef)
       }
 
       def validRuleRefinementsGivenRightChild(completionBegin: Int, completionEnd: Int, split: Int, end: Int, rule: Int, childRef: Int): Array[Int] = {

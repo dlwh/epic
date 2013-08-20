@@ -106,21 +106,30 @@ object GenerativeParser {
     (lexicon, binaryProductions, unaryProductions)
   }
 
-  def annotated(baseParser: XbarGrammar, annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel],
-                trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]]) = {
-    val (xbar,xbarLexicon) = baseParser.xbarGrammar(trainTrees)
+  def annotatedParser(baseGrammar: BaseGrammar[AnnotatedLabel], baseLexicon: Lexicon[AnnotatedLabel, String],
+                      annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel],
+                      trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]]): SimpleChartParser[AnnotatedLabel, String] = {
 
-    val transformed = trainTrees.par.map { ti => annotator(ti) }.seq.toIndexedSeq
+    val refinedGrammar = annotated(baseGrammar, baseLexicon, annotator, trainTrees)
+    val parser = SimpleChartParser(AugmentedGrammar.fromRefined(refinedGrammar))
+
+    parser
+  }
+
+  def annotated(baseGrammar: BaseGrammar[AnnotatedLabel], baseLexicon: Lexicon[AnnotatedLabel, String], annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel], trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]]): SimpleRefinedGrammar[AnnotatedLabel, AnnotatedLabel, String] = {
+    val transformed = trainTrees.par.map {
+      ti => annotator(ti)
+    }.seq.toIndexedSeq
 
     val (words, binary, unary) = GenerativeParser.extractCounts(transformed)
 
     val refGrammar = BaseGrammar(AnnotatedLabel.TOP, binary, unary)
-    val indexedRefinements = GrammarRefinements(xbar, refGrammar, { (_: AnnotatedLabel).baseAnnotatedLabel })
+    val indexedRefinements = GrammarRefinements(baseGrammar, refGrammar, {
+      (_: AnnotatedLabel).baseAnnotatedLabel
+    })
 
-    val refinedGrammar = RefinedGrammar.generative(xbar, xbarLexicon, indexedRefinements, binary, unary, words)
-    val parser = SimpleChartParser(AugmentedGrammar.fromRefined(refinedGrammar))
-
-    parser
+    val refinedGrammar = RefinedGrammar.generative(baseGrammar, baseLexicon, indexedRefinements, binary, unary, words)
+    refinedGrammar
   }
 }
 

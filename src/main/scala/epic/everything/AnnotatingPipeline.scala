@@ -242,12 +242,13 @@ object AnnotatingPipeline extends Logging {
     val allowedNerClassifier = new LabeledSpanConstraints.LayeredTagConstraintsFactory(nerLexicon, maxLengthArray)
 
     logger.info("Building basic parsing model...")
-    val trainTrees = for (d <- docs; s <- d.sentences) yield {
+    val trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]] = for (d <- docs; s <- d.sentences) yield {
       params.treebank.makeTreeInstance(s.id, s.tree.map(_.label), s.words, removeUnaries = true)
     }
 
+    val (grammar, lexicon) = xbar.xbarGrammar(trainTrees)
 
-    val pruningParser =  GenerativeParser.annotated(xbar, StripAnnotations() andThen AddMarkovization(), trainTrees)
+    val pruningParser =  GenerativeParser.annotatedParser(grammar, lexicon, StripAnnotations() andThen AddMarkovization(), trainTrees)
 
     logger.info{
       val devTrees = for (d <- devDocs; s <- d.sentences) yield {

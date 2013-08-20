@@ -25,6 +25,7 @@ import epic.lexicon.{Lexicon, SimpleLexicon}
 import epic.constraints.{CachedChartConstraintsFactory, ChartConstraints}
 import epic.util.CacheBroker
 import com.typesafe.scalalogging.log4j.Logging
+import breeze.linalg.Counter2
 
 
 /**
@@ -38,11 +39,11 @@ object ParserParams {
 
   @Help(text="Stores/loads a baseline xbar grammar needed to extracting trees.")
   case class XbarGrammar(path: File = new File("xbar.gr")) {
-    def xbarGrammar(trees: IndexedSeq[TreeInstance[AnnotatedLabel, String]]) = Option(path) match {
+    def xbarGrammar(trees: IndexedSeq[TreeInstance[AnnotatedLabel, String]]): (BaseGrammar[AnnotatedLabel], Lexicon[AnnotatedLabel, String]) = Option(path) match {
       case Some(f) if f.exists =>
         XbarGrammar.cache.getOrElseUpdate(f, readObject[(parser.BaseGrammar[AnnotatedLabel],Lexicon[AnnotatedLabel, String])](f))
       case _ =>
-        val (words, xbarBinaries, xbarUnaries) = GenerativeParser.extractCounts(trees.map(_.mapLabels(_.baseAnnotatedLabel)))
+        val (words: Counter2[AnnotatedLabel, String, Double], xbarBinaries, xbarUnaries) = GenerativeParser.extractCounts(trees.map(_.mapLabels(_.baseAnnotatedLabel)))
 
         val g = BaseGrammar(AnnotatedLabel.TOP, xbarBinaries.keysIterator.map(_._2) ++ xbarUnaries.keysIterator.map(_._2))
         val lex = new SimpleLexicon(g.labelIndex, words)

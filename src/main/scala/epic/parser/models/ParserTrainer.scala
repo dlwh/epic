@@ -26,13 +26,17 @@ import epic.parser.projections.{GrammarRefinements, ConstraintCoreGrammarAdaptor
 import epic.util.CacheBroker
 import epic.parser.ParserParams.XbarGrammar
 import breeze.util._
-import epic.trees.annotations.{AddMarkovization, StripAnnotations}
+import epic.trees.annotations._
 import epic.trees.TreeInstance
 import breeze.optimize.FirstOrderMinimizer.OptParams
 import epic.parser.ParseEval.Statistics
 import java.io.File
 import epic.constraints.CachedChartConstraintsFactory
 import breeze.util.Implicits._
+import epic.trees.TreeInstance
+import breeze.optimize.FirstOrderMinimizer.OptParams
+import epic.parser.HammingLossAugmentation
+import epic.parser.ParseEval.Statistics
 import epic.trees.annotations.StripAnnotations
 import epic.trees.TreeInstance
 import breeze.optimize.FirstOrderMinimizer.OptParams
@@ -85,7 +89,8 @@ object ParserTrainer extends epic.parser.ParserPipeline with Logging {
 
     val initialParser = params.parser match {
       case null =>
-        GenerativeParser.annotated(XbarGrammar(), (new StripAnnotations[String]()).andThen(AddMarkovization()), trainTrees)
+        val (grammar, lexicon) = XbarGrammar().xbarGrammar(trainTrees)
+        GenerativeParser.annotatedParser(grammar, lexicon, (new StripAnnotations[String]()).andThen(AddMarkovization()), trainTrees)
       case f =>
         readObject[SimpleChartParser[AnnotatedLabel, String]](f)
     }
@@ -98,7 +103,7 @@ object ParserTrainer extends epic.parser.ParserPipeline with Logging {
     val theTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]] = if(!enforceReachability)  {
       trainTrees.toIndexedSeq
     } else {
-      val refGrammar = GenerativeParser.extractGrammar(AnnotatedLabel.TOP, trainTrees)
+      val refGrammar = GenerativeParser.annotated(initialParser.grammar, initialParser.lexicon, TreeAnnotator.identity, trainTrees)
       val proj = new ReachabilityProjection(initialParser.grammar, initialParser.lexicon, refGrammar)
       trainTrees.par.map(ti => ti.copy(tree=proj.forTree(ti.tree, ti.words, constraints.constraints(ti.words)))).seq.toIndexedSeq
     }
