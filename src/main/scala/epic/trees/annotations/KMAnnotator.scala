@@ -22,7 +22,7 @@ package annotations
 
 case class KMAnnotator( horizontal: Int = 2, vertical: Int = 2) extends TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] {
   val pipeline = (
-    StripAnnotations[String]() andThen
+    FilterAnnotations[String](Set(FunctionalTag("TMP"))) andThen
     AddMarkovization[String](horizontal,vertical) andThen
     SplitAuxiliary() andThen
     SplitVP() andThen

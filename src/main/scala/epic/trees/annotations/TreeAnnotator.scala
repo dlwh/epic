@@ -30,6 +30,10 @@ trait TreeAnnotator[L, W, M] extends ((BinarizedTree[L], Seq[W])=>BinarizedTree[
 
 }
 
+object TreeAnnotator {
+  def identity[L, W]:TreeAnnotator[L, W, L] = PipelineAnnotator(Seq.empty)
+}
+
 case class ComposedAnnotator[L, W, M, N](a: TreeAnnotator[L, W, M],
                                          b: TreeAnnotator[M, W, N]) extends TreeAnnotator[L, W, N] {
 
@@ -42,10 +46,8 @@ case class ComposedAnnotator[L, W, M, N](a: TreeAnnotator[L, W, M],
 /** to be used with the config stuff, because I haven't figured out how to handle seqs yet... */
 case class PipelineAnnotator[L, W](ann: Seq[TreeAnnotator[L, W, L]]) extends TreeAnnotator[L, W, L] {
 
-  val pipeline = ann.filterNot(null eq).reduceLeft(_ andThen _)
-
   def apply(tree: BinarizedTree[L], words: Seq[W]):BinarizedTree[L] = {
-    pipeline(tree, words)
+    ann.foldLeft(tree)((b,a) => a(b, words))
   }
 
 }
@@ -232,40 +234,49 @@ case class AnnotateBaseNP[W]() extends TreeAnnotator[AnnotatedLabel, W, Annotate
   }
 }
 
+/**
+ * An NP or an @NP is Right Recursive if
+ *    1) its right child is an NP
+ * or 2) if its right child is @NP and it is RRNP
+ * or 3) it is a unary and its child is RRNP
+ * @tparam W
+ */
 case class AnnotateRightRecNP[W]() extends TreeAnnotator[AnnotatedLabel, W, AnnotatedLabel] {
 
   def apply(tree: BinarizedTree[AnnotatedLabel], words: Seq[W]) = {
-    // boolean is whether or not it's a "base"
-    def rec(tree: BinarizedTree[AnnotatedLabel]):(BinarizedTree[AnnotatedLabel], Boolean) = tree match {
+    // boolean is whether or not that child is either an NP, or an @NP[RightRecNP]
+    def rec(tree: BinarizedTree[AnnotatedLabel]):BinarizedTree[AnnotatedLabel] = tree match {
       case t@UnaryTree(lbl1, child, chain, span) =>
-        val (newchild, ok) = rec(child)
-        if(ok && lbl1.baseLabel == "NP") {
-          UnaryTree(lbl1.annotate(RRNP), newchild, chain, span) -> true
+        val newchild = rec(child)
+        if(lbl1.baseLabel == "NP" && newchild.label.hasAnnotation(RightRecNP)) {
+          UnaryTree(lbl1.annotate(RightRecNP), newchild, chain, span)
         } else {
-          UnaryTree(lbl1, newchild, chain, span) -> (ok || lbl1.label == "NP")
+          UnaryTree(lbl1, newchild, chain, span)
         }
       case t@BinaryTree(lbl, lc, rc, span) =>
-        val (newrc, rok) = rec(rc)
-        if(rok && lbl.baseLabel == "NP") {
-          val (newlc, _) = rec(lc)
+        val newrc = rec(rc)
+        val isRightRec = lbl.baseLabel == "NP" && (newrc.label.label == "NP" || (newrc.label.label == "@NP" && newrc.label.hasAnnotation(RightRecNP)))
+        val newlc = rec(lc)
+        if(isRightRec) {
           val lclc = annotateDownwards(newlc)
-          BinaryTree(lbl.annotate(RRNP), lclc, newrc, span) -> true
+          BinaryTree(lbl.annotate(RightRecNP), lclc, newrc, span)
         } else {
-          val (newlc, _) = rec(lc)
-          BinaryTree(lbl, newlc, newrc, span) -> (rok || (lbl.label == "NP"))
+          BinaryTree(lbl, newlc, newrc, span)
         }
-      case _ => tree -> false
-    }
-
-    def annotateDownwards(tree: BinarizedTree[AnnotatedLabel]):BinarizedTree[AnnotatedLabel] = tree match {
-      case t:NullaryTree[AnnotatedLabel] => t
-      case UnaryTree(lbl, child, chain, span) if lbl.baseLabel == "NP" =>
-        UnaryTree(lbl.annotate(RRNP), annotateDownwards(child), chain, span)
-      case BinaryTree(lbl, lc, rc, span) if lbl.baseLabel == "NP" =>
-        BinaryTree(lbl.annotate(RRNP), annotateDownwards(lc), annotateDownwards(rc), span)
       case _ => tree
     }
-    rec(tree)._1
+
+    // annotate all intermediate @NPs as RightRecNP
+    def annotateDownwards(tree: BinarizedTree[AnnotatedLabel]):BinarizedTree[AnnotatedLabel] = tree match {
+      case _ if !tree.label.isIntermediate => tree
+      case t:NullaryTree[AnnotatedLabel] => t
+      case UnaryTree(lbl, child, chain, span) if lbl.label == "@NP" =>
+        UnaryTree(lbl.annotate(RightRecNP), annotateDownwards(child), chain, span)
+      case BinaryTree(lbl, lc, rc, span) if  lbl.label == "@NP" =>
+        BinaryTree(lbl.annotate(RightRecNP), if(lc.label.isIntermediate) annotateDownwards(lc) else lc, if(rc.label.isIntermediate) annotateDownwards(rc) else rc, span)
+      case _ => tree
+    }
+    rec(tree)
   }
 }
 

@@ -17,6 +17,7 @@ package epic.trees
 import breeze.util.{CachedHashCode, Interner, Lens}
 import collection.JavaConverters._
 import collection.mutable.ArrayBuffer
+import epic.trees.annotations.TreeAnnotations.RightRecNP
 
 /**
  * Something we can throw in an AnnotatedLabel
@@ -38,6 +39,8 @@ case class AnnotatedLabel(label: String,
                           parents: IndexedSeq[String] = IndexedSeq.empty,
                           siblings: IndexedSeq[Either[String, String]] = IndexedSeq.empty,
                           features: Set[Annotation] = Set.empty) extends CachedHashCode {
+  def hasAnnotation(f: Annotation): Boolean = features.contains(f)
+
 
   def annotate(sym: Annotation) = copy(features = features + sym)
 

@@ -42,7 +42,7 @@ object TreeAnnotations {
 
   case object NP_Possessive extends KMAnnotation
   case object BaseNP extends KMAnnotation
-  case object RRNP extends KMAnnotation
+  case object RightRecNP extends KMAnnotation
 
   case object RealUnary extends KMAnnotation
   case object ExternalUnary extends KMAnnotation

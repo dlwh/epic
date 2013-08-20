@@ -17,7 +17,7 @@ package epic.trees.annotations
 import org.junit.runner.RunWith
 import org.scalatest._
 import org.scalatest.junit._
-import epic.trees.{StandardTreeProcessor, Tree}
+import epic.trees.{Span, StandardTreeProcessor, Tree}
 
 
 /**
@@ -34,13 +34,22 @@ class KMPipelineTest extends FunSuite {
     val pipelined = pipeline(processed, words)
     import TreeAnnotations._
     // make sure we have a VPisVBF annotation
-    assert(pipelined.allChildren.exists(t => t.label.baseLabel == "VP" && t.label.features.contains(VPisVBF)),"VPisVBF")
+    assert(pipelined.allChildren.exists(t => t.label.baseLabel == "VP" && t.label.hasAnnotation(VPisVBF)),"VPisVBF")
     // make sure the VP dominates a V
-    assert(pipelined.allChildren.exists(t => t.label.baseLabel == "VP" && t.label.features.contains(Dom("V"))), "DomV")
+    assert(pipelined.allChildren.exists(t => t.label.baseLabel == "VP" && t.label.hasAnnotation(Dom("V"))), "DomV")
     // make sure the S dominates a V
-    assert(pipelined.allChildren.exists(t => t.label.label == "S" && t.label.features.contains(Dom("V"))), "DomV2")
+    assert(pipelined.allChildren.exists(t => t.label.label == "S" && t.label.hasAnnotation(Dom("V"))), "DomV2")
     // make sure the @S dominates a V and has an NP to its left
-    assert(pipelined.allChildren.exists(t => t.label.label == "@S" && t.label.features.contains(Dom("V")) && t.label.siblings(0) == Left("NP")), "DomV && NP left")
+    assert(pipelined.allChildren.exists(t => t.label.label == "@S" && t.label.hasAnnotation(Dom("V")) && t.label.siblings(0) == Left("NP")), "DomV && NP left")
+  }
+
+  test("KLMA other") {
+    val (tree, words) = Tree.fromString("(TOP (S (NP (DT This)) (VP (VBZ is) (NP (NN panic) (NP (NN buying)))) (. .)))")
+    val processed = processor(tree)
+    val pipelined = pipeline(processed, words)
+    import TreeAnnotations._
+    assert(pipelined.allChildren.exists(t => t.label.label == "NP" && t.span == Span(2,4) && t.label.hasAnnotation(RightRecNP)), pipelined render words)
+    // make sure the VP dominates a V
   }
 
 }
