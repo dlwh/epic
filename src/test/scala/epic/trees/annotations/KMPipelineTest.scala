@@ -43,12 +43,12 @@ class KMPipelineTest extends FunSuite {
     assert(pipelined.allChildren.exists(t => t.label.label == "@S" && t.label.hasAnnotation(Dom("V")) && t.label.siblings(0) == Left("NP")), "DomV && NP left")
   }
 
-  test("KLMA other") {
+  test("KLMA NPs") {
     val (tree, words) = Tree.fromString("(TOP (S (NP (DT This)) (VP (VBZ is) (NP (NN panic) (NP (NN buying)))) (. .)))")
     val processed = processor(tree)
     val pipelined = pipeline(processed, words)
     import TreeAnnotations._
-    assert(pipelined.allChildren.exists(t => t.label.label == "NP" && t.span == Span(2,4) && t.label.hasAnnotation(RightRecNP)), pipelined render words)
+    assert(pipelined.allChildren.exists(t => t.label.label == "NP" && t.span == Span(2,4) && t.label.hasAnnotation(RightRecNP) && !t.label.hasAnnotation(BaseNP)), pipelined render words)
     // make sure the VP dominates a V
   }
 

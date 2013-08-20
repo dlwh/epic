@@ -204,7 +204,6 @@ case class SplitPossNP[W]() extends TreeAnnotator[AnnotatedLabel, W, AnnotatedLa
 case class AnnotateBaseNP[W]() extends TreeAnnotator[AnnotatedLabel, W, AnnotatedLabel] {
 
   def apply(tree: BinarizedTree[AnnotatedLabel], words: Seq[W]) = {
-    val root = tree.label.label
     // boolean is whether or not it's a "base"
     def rec(tree: BinarizedTree[AnnotatedLabel]):(BinarizedTree[AnnotatedLabel], Boolean) = tree match {
       case t:NullaryTree[AnnotatedLabel] => t -> true
@@ -212,10 +211,8 @@ case class AnnotateBaseNP[W]() extends TreeAnnotator[AnnotatedLabel, W, Annotate
         t -> true
       case t@UnaryTree(lbl1, child, chain, span) =>
         val (newchild, ok) = rec(child)
-        if(ok && lbl1.baseLabel == "NP") {
-          UnaryTree(lbl1.annotate(BaseNP), newchild, chain, span) -> true
-        } else if(lbl1.label == root) {
-          UnaryTree(lbl1, newchild, chain, span) -> false
+        if(lbl1.baseLabel == "NP" && (ok || newchild.label.hasAnnotation(BaseNP))) {
+          UnaryTree(lbl1.annotate(BaseNP), newchild, chain, span) -> lbl1.isIntermediate
         } else {
           UnaryTree(lbl1, newchild, chain, span) -> false
         }
@@ -223,7 +220,7 @@ case class AnnotateBaseNP[W]() extends TreeAnnotator[AnnotatedLabel, W, Annotate
         val (newlc, lok) = rec(lc)
         val (newrc, rok) = rec(rc)
         if(lok && rok && lbl.baseLabel == "NP") {
-          BinaryTree(lbl.annotate(BaseNP), newlc, newrc, span) -> true
+          BinaryTree(lbl.annotate(BaseNP), newlc, newrc, span) -> lbl.isIntermediate
         } else {
           BinaryTree(lbl, newlc, newrc, span) -> false
         }
