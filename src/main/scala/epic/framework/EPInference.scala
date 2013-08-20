@@ -66,15 +66,8 @@ class EPInference[Datum, Augment](val inferences: IndexedSeq[ProjectableInferenc
 
       var state: ep.State = null
       val iterates = ep.inference(augment, inferencesToUse, IndexedSeq.fill[Augment](inferencesToUse.length)(null.asInstanceOf[Augment]))
-      var converged = false
-      while (!converged && iter < maxEPIter && iterates.hasNext) {
+      while (iter < maxEPIter && iterates.hasNext) {
         val s = iterates.next()
-        if (state != null) {
-          converged = (s.logPartition - state.logPartition).abs / math.max(s.logPartition, state.logPartition) < 1E-4
-          //        if (s.q.isInstanceOf[SentenceBeliefs]) {
-          //          println(iter + " gold " + s.q.asInstanceOf[SentenceBeliefs].maxChange(state.q.asInstanceOf[SentenceBeliefs]) + " " + s.logPartition + " " + state.logPartition)
-          //        }
-        }
         iter += 1
         state = s
       }

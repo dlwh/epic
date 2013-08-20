@@ -19,7 +19,7 @@ import breeze.linalg._
 import collection.mutable.ArrayBuffer
 import nak.inference.Factor
 import breeze.util._
-import epic.util.CacheBroker
+import epic.util.{SafeLogging, CacheBroker}
 import breeze.stats.distributions.Rand
 
 /**
@@ -27,7 +27,7 @@ import breeze.stats.distributions.Rand
  * @author dlwh
  */
 class EPModel[Datum, Augment](maxEPIter: Int, initFeatureValue: Feature => Option[Double] = {(_:Feature) => None}, epInGold: Boolean = false, dropOutFraction: Double = 0.0)(
-                              _models: EPModel.CompatibleModel[Datum, Augment]*)(implicit aIsFactor: Augment <:< Factor[Augment]) extends Model[Datum] {
+                              _models: EPModel.CompatibleModel[Datum, Augment]*)(implicit aIsFactor: Augment <:< Factor[Augment]) extends Model[Datum] with SafeLogging {
   def models = _models
   type ExpectedCounts = EPExpectedCounts
   type Inference = EPInference[Datum, Augment]
@@ -118,22 +118,28 @@ class EPModel[Datum, Augment](maxEPIter: Int, initFeatureValue: Feature => Optio
 
   def inferenceFromWeights(weights: DenseVector[Double], dropOutFraction: Double) = {
     val allWeights = partitionWeights(weights)
+    val toUse = new ArrayBuffer[Int]()
     var inferences = ArrayBuffer.tabulate(models.length) { i => 
       // hack, for now.
       if(dropOutFraction > 0 && Rand.uniform.get < dropOutFraction)
         null:ProjectableInference[Datum, Augment]
-      else 
+      else {
+        toUse += i
         models(i).inferenceFromWeights(allWeights(i))
+      }
     }
 
-    if(!inferences.exists(_ ne null)) 
-      inferences = ArrayBuffer.tabulate(models.length) { i => 
-        // hack, for now.
-        if(dropOutFraction > 0 && Rand.uniform.get < dropOutFraction)
-          null:ProjectableInference[Datum, Augment]
-        else 
-          models(i).inferenceFromWeights(allWeights(i))
+    if(!inferences.exists(_ ne null)) {
+      toUse.clear()
+      inferences = ArrayBuffer.tabulate(models.length) { i =>
+        toUse += i
+        models(i).inferenceFromWeights(allWeights(i))
       }
+    }
+
+    if (dropOutFraction != 0.0) 
+      logger.info("Using inferences for models " + toUse.mkString(", "))
+     
 
 
     new EPInference(inferences, maxEPIter, epInGold = epInGold)
