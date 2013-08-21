@@ -285,7 +285,7 @@ class IndexedSpanFeaturizer[L, L2, W](wordFeatureIndex: CrossProductIndex[Featur
                                       spanFeatureIndex: CrossProductIndex[Feature, Feature],
                                       labelFeaturizer: RefinedFeaturizer[L, W, Feature],
                                       wordFeaturizer: IndexedWordFeaturizer[W],
-                                      surfaceFeaturizer: IndexedSurfaceFeaturizer[W],
+                                      surfaceFeaturizer: IndexedSplitSpanFeaturizer[W],
                                       refinements: GrammarRefinements[L, L2],
                                       grammar: BaseGrammar[L]) extends RefinedFeaturizer[L, W, Feature] with Serializable {
 
@@ -376,7 +376,7 @@ class IndexedSpanFeaturizer[L, L2, W](wordFeatureIndex: CrossProductIndex[Featur
 
 object IndexedSpanFeaturizer {
   def extract[L, L2, W](wordFeaturizer: IndexedWordFeaturizer[W],
-                        surfaceFeaturizer: IndexedSurfaceFeaturizer[W],
+                        surfaceFeaturizer: IndexedSplitSpanFeaturizer[W],
                         ann: (BinarizedTree[L], IndexedSeq[W]) => BinarizedTree[L2],
                         refinements: GrammarRefinements[L, L2],
                         grammar: BaseGrammar[L],
@@ -415,10 +415,6 @@ object IndexedSpanFeaturizer {
   }
 }
 
-case object SplitPointFeature extends Feature
-case class SplitPointFeature[L](label: L) extends Feature
-case object ASpan extends Feature
-
 case class SpanModelFactory(baseParser: ParserParams.XbarGrammar,
                             @Help(text=
                               """The kind of annotation to do on the refined grammar. Default uses no annotations.
@@ -443,14 +439,14 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     val indexedRefinements = GrammarRefinements(xbarGrammar, refGrammar, (_: AnnotatedLabel).baseAnnotatedLabel)
 
     val wf = WordFeaturizer.goodPOSTagFeaturizer(annWords)
-    val span:SurfaceFeaturizer[String] = {
-      val dsl = new WordFeaturizer.DSL(annWords) with SurfaceFeaturizer.DSL
+    val span = {
+      val dsl = new WordFeaturizer.DSL(annWords) with SurfaceFeaturizer.DSL with SplitSpanFeaturizer.DSL
       import dsl._
 
-      clss(b) + clss(e) + spanShape + clss(b-1) + clss(e-1) + length + sent
+     clss(split) + distance[String](begin, split) + clss(begin) + clss(end) + spanShape + clss(begin-1) + clss(end-1) + length + sent
     }
     val indexedWord = IndexedWordFeaturizer.fromData(wf, annTrees.map{_.words})
-    val surface = IndexedSurfaceFeaturizer.fromData(span, annTrees.map{_.words}, constrainer.asConstraintFactory)
+    val surface = IndexedSplitSpanFeaturizer.fromData(span, annTrees)
 
     val indexed =  IndexedSpanFeaturizer.extract[AnnotatedLabel, AnnotatedLabel, String](indexedWord,
       surface,

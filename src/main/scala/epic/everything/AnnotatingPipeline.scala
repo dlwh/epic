@@ -94,10 +94,8 @@ object AnnotatingPipeline extends Logging {
     type Augment = SentenceBeliefs
     type CompatibleModel = EvaluableModel[Datum] { type Inference <: ProjectableInference[Datum, Augment] with AnnotatingInference[Datum]}
     val models = ArrayBuffer[CompatibleModel]()
-    //if (params.includeParsing)
-     //models += makeLexParserModel(beliefsFactory, docProcessor, processedTrain, params.viterbi,weightsCache, params.lexHashFeatures)
     if (params.includeParsing)
-      models += makeSimpleParserModel(beliefsFactory, docProcessor, processedTrain, weightsCache, params.viterbi)
+     models += makeLexParserModel(beliefsFactory, docProcessor, processedTrain, params.viterbi,weightsCache, params.lexHashFeatures)
     if (params.includeNER)
        models += makeNERModel(beliefsFactory, docProcessor, processedTrain, weightsCache, params.viterbi)
     if (params.includeSRL)
@@ -322,40 +320,6 @@ object AnnotatingPipeline extends Logging {
     def reannotate(tree: BinarizedTree[AnnotatedLabel], words: Seq[String]) = tree.map(_.baseAnnotatedLabel)
     new SentLexParser.Model(beliefsFactory, bundle, reannotate, indexed, viterbi, {(f: Feature) => Some(weightsCache(f.toString))})
   }
-
-  def makeSimpleParserModel(beliefsFactory: SentenceBeliefs.Factory,
-                         docProcessor: FeaturizedDocument.Factory,
-                         train: IndexedSeq[FeaturizedDocument],
-                         weightsCache: Counter[String, Double],
-                         viterbi: Boolean): LiftedParser.Model = {
-    val trainTrees = train.flatMap(_.sentences).map(_.treeInstance)
-    val trees = trainTrees.map(StripAnnotations())
-    val (initLexicon, initBinaries, initUnaries) = GenerativeParser.extractCounts(trees)
-
-    val annTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]] = trees
-    val (annLexicon, annBinaries, annUnaries) = GenerativeParser.extractCounts(annTrees)
-    val refGrammar = BaseGrammar(AnnotatedLabel.TOP, annBinaries, annUnaries)
-
-    val (xbarGrammar, xbarLexicon) = docProcessor.grammar -> docProcessor.lexicon
-
-    val indexedRefinements = GrammarRefinements(xbarGrammar, refGrammar, (_: AnnotatedLabel).baseAnnotatedLabel)
-
-    val indexed =  IndexedSpanFeaturizer.extract[AnnotatedLabel, AnnotatedLabel, String](
-      docProcessor.wordFeaturizer,
-      docProcessor.featurizer,
-      StripAnnotations(),
-      indexedRefinements,
-      xbarGrammar,
-      HashFeature.Relative(1.0),
-      trees)
-
-    val constrainer = docProcessor.parseConstrainer
-
-
-    val spanModel = new SpanModel[AnnotatedLabel, AnnotatedLabel, String](indexed, indexed.index, StripAnnotations(), new ConstraintCoreGrammarAdaptor(xbarGrammar, xbarLexicon, constrainer), xbarGrammar, xbarLexicon, refGrammar, indexedRefinements, {(x: Feature) => weightsCache.get(x.toString)})
-    new LiftedParser.Model(beliefsFactory, spanModel, viterbi)
-  }
-
 
   private def updateWeights(out: File, weightsCache: Counter[String, Double], newWeights: Counter[Feature, Double]) {
     for ( (f,w) <- newWeights.activeIterator) {

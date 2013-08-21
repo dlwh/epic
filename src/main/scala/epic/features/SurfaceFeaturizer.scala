@@ -8,10 +8,10 @@ import epic.features.WordFeaturizer.Modifier
  * TODO
  * @author dlwh
  */
-trait SurfaceFeaturizer[W] {
+trait SurfaceFeaturizer[W] extends Serializable {
   def anchor(words: IndexedSeq[W]):SurfaceFeatureAnchoring[W]
 
-  def +(other: SurfaceFeaturizer[W]) = (this,other) match {
+  def +(other: SurfaceFeaturizer[W]): SurfaceFeaturizer[W] = (this,other) match {
     case (MultiSurfaceFeaturizer(feats),MultiSurfaceFeaturizer(feats2)) => new MultiSurfaceFeaturizer(feats ++ feats2)
     case (MultiSurfaceFeaturizer(feats),_) => new MultiSurfaceFeaturizer(feats :+ other)
     case (_,MultiSurfaceFeaturizer(feats2)) => new MultiSurfaceFeaturizer(this +: feats2)
@@ -24,9 +24,9 @@ object SurfaceFeaturizer {
   trait DSL {
 
     /** begin of span */
-    object b extends MarkerPos(0)
+    object begin extends MarkerPos(0)
     /** end of span */
-    object e extends MarkerPos(0, false)
+    object end extends MarkerPos(0, false)
 
     def edges[W](first: MarkedWordFeaturizer[W], last: MarkedWordFeaturizer[W]):SurfaceFeaturizer[W] = new SpanEdgesFeaturizer(first, last)
     val spanShape = new SpanShapeFeaturizer()
