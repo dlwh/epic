@@ -16,32 +16,26 @@ package models
  See the License for the specific language governing permissions and
  limitations under the License.
 */
-import epic.parser.projections.{ConstraintCoreGrammarAdaptor, ParserChartConstraintsFactory, GrammarRefinements}
+import epic.parser.projections.GrammarRefinements
 import epic.framework.Feature
 import java.io.File
 import features._
 import breeze.linalg._
 import epic.trees._
-import epic.trees.annotations.{KMAnnotator, TreeAnnotator}
-import features.IndicatorFeature
-import epic.trees.TreeInstance
+import epic.trees.annotations.TreeAnnotator
 import breeze.config.Help
 import epic.features._
 import epic.lexicon.Lexicon
-import epic.constraints.ChartConstraints
 import epic.util.CacheBroker
-import epic.constraints.ChartConstraints.Factory
 import epic.trees.BinaryRule
-import epic.parser.ExpectedCounts
 import epic.trees.UnaryRule
 import epic.trees.TreeInstance
 import epic.parser.features.IndicatorFeature
-import epic.parser.models.AnnotatedParserInference
 import epic.trees.annotations.KMAnnotator
 
 /**
  * Model for structural annotations, a la Klein and Manning 2003.
- * @param featurizer
+ * @param indexedFeatures
  * @param annotator
  * @param projections
  * @param baseFactory
@@ -133,7 +127,7 @@ case class StructModelFactory(baseParser: ParserParams.XbarGrammar,
     def ruleFlattener(r: Rule[AnnotatedLabel]) = {
       (IndexedSeq(r, r.map(_.clearFeatures), r.map(_.baseAnnotatedLabel)) ++ selectOneFeature(r)).map(IndicatorFeature)
     }
-    val feat = new GenFeaturizer[AnnotatedLabel, String](wordFeaturizer, labelFlattener _, ruleFlattener _)
+    val feat = new GenFeaturizer[AnnotatedLabel, String](wordFeaturizer, labelFlattener, ruleFlattener)
 
     val featureCounter = readWeights(oldWeights)
     val indexedFeaturizer = IndexedFeaturizer(xbarGrammar, xbarLexicon, trainTrees, feat, indexedRefinements)
@@ -144,7 +138,7 @@ case class StructModelFactory(baseParser: ParserParams.XbarGrammar,
     cFactory,
     xbarGrammar,
     xbarLexicon,
-    { featureCounter.get(_) })
+    featureCounter.get)
   }
 
 }
