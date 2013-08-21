@@ -1,7 +1,6 @@
 package epic.features
 
 import epic.framework.Feature
-import epic.parser.features.StandardSpanFeatures.{WholeSentFeature, EndSentFeature, BeginSentFeature, SpanLengthFeature}
 import scala.collection.mutable.ArrayBuffer
 
 /**
@@ -41,3 +40,8 @@ class SentencePropertiesFeaturizer(db: DistanceBinner = new DistanceBinner()) ex
     }
   }
 }
+
+
+case object BeginSentFeature extends Feature
+case object EndSentFeature extends Feature
+case object WholeSentFeature extends Feature

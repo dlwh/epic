@@ -67,9 +67,9 @@ class CrossProductIndex[A, B] private (val firstIndex: Index[A],
   def unapply(i: Int): Option[Feature] = if(i >= size || i < 0)  None else Some(get(i))
 
   override def get(i: Int): Feature = {
-    if(i >= size || i < 0) {
+    if (i >= size || i < 0) {
       throw new NoSuchElementException(s"index $i is not in CrossProductIndex of size $size")
-    } else if(i < labelOnlySize) {
+    } else if (i < labelOnlySize) {
       LabelFeature(firstIndex.get(i))
     } else if (i < trueSize) {
       CrossProductFeature(firstIndex.get(labelPartOfFeature(i-labelOnlySize)), secondIndex.get(surfacePartOfFeature(i-labelOnlySize)), id)

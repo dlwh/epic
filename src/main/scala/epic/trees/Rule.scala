@@ -23,6 +23,8 @@ sealed trait Production[@specialized(Int) +L, +W] extends Feature {
   def map[A](f: L => A): Production[A, W]
 }
 
+
+
 sealed trait Rule[@specialized(Int) +L] extends Production[L, Nothing] {
   def parent: L
 
@@ -58,4 +60,6 @@ final case class LexicalProduction[@specialized(Int) +L, +W](parent: L, word: W)
   def map[A](f: L => A) = LexicalProduction(f(parent), word)
 }
 
-
+case class NullRule[@specialized(Int) +L](parent: L) extends Production[L, Nothing] {
+  def map[A](f: (L) => A): NullRule[A] = NullRule(f(parent))
+}

@@ -1,47 +1,30 @@
 package epic
 package everything
 
-import java.io.File
-import epic.trees._
-import epic.parser.{BaseGrammar, ParseEval, GenerativeParser, ParserParams}
-import epic.parser.ParserParams.XbarGrammar
 import breeze.config.{Configuration, Help, CommandLineParser}
-import epic.ontonotes.{NERType, ConllOntoReader, Document}
 import breeze.linalg._
-import epic.framework._
-import breeze.optimize._
-import breeze.util.{Index, Encoder}
-import epic.parser.projections.{ConstraintCoreGrammarAdaptor, GrammarRefinements, ParserChartConstraintsFactory}
-import epic.parser.models._
-import epic.trees.ProcessedTreebank
-import epic.parser.features.{LabelFeature, RuleFeature}
 import breeze.optimize.FirstOrderMinimizer.OptParams
-import collection.mutable.ArrayBuffer
-import collection.immutable
-import epic.lexicon.SimpleLexicon
-import epic.features._
-import epic.constraints.{CachedChartConstraintsFactory, LabeledSpanConstraints}
-import epic.util.CacheBroker
-import java.util.concurrent.atomic.AtomicInteger
-import com.typesafe.scalalogging.log4j.Logging
+import breeze.optimize._
 import breeze.stats.distributions.{RandBasis, Rand}
 import breeze.stats.random.MersenneTwister
-import epic.trees.ProcessedTreebank
-import epic.trees.TreeInstance
-import breeze.optimize.FirstOrderMinimizer.OptParams
-import epic.trees.annotations.AddMarkovization
-import epic.trees.annotations.PipelineAnnotator
-import epic.parser.models.StandardLexFeaturizer
-import epic.parser.features.RuleFeature
-import epic.trees.TreeInstance
-import scala.Some
-import epic.parser.features.LabelFeature
-import epic.trees.ProcessedTreebank
-import breeze.optimize.FirstOrderMinimizer.OptParams
+import breeze.util.{Index, Encoder}
+import collection.immutable
+import collection.mutable.ArrayBuffer
+import com.typesafe.scalalogging.log4j.Logging
+import epic.constraints.{CachedChartConstraintsFactory, LabeledSpanConstraints}
+import epic.features._
+import epic.framework._
+import epic.lexicon.SimpleLexicon
+import epic.ontonotes._
+import epic.parser.ParserParams.XbarGrammar
+import epic.parser.models._
+import epic.parser.projections.{ConstraintCoreGrammarAdaptor, GrammarRefinements, ParserChartConstraintsFactory}
+import epic.parser.{BaseGrammar, ParseEval, GenerativeParser, ParserParams}
+import epic.trees._
 import epic.trees.annotations._
-import epic.ontonotes.Document
-import epic.parser.models.LexGrammarBundle
-import epic.trees.annotations.PipelineAnnotator
+import epic.util.CacheBroker
+import java.io.File
+import java.util.concurrent.atomic.AtomicInteger
 
 
 /**
@@ -307,7 +290,7 @@ object AnnotatingPipeline extends Logging {
 
     val wordIndex: Index[String] = Index(trainTrees.iterator.flatMap(_.words))
 
-    def ruleGen(r: Rule[AnnotatedLabel]) = IndexedSeq(RuleFeature(r))
+    def ruleGen(r: Rule[AnnotatedLabel]) = IndexedSeq(r)
 
     val headFinder = HeadFinder.collins
     val feat = new StandardLexFeaturizer(
@@ -357,16 +340,7 @@ object AnnotatingPipeline extends Logging {
 
     val indexedRefinements = GrammarRefinements(xbarGrammar, refGrammar, (_: AnnotatedLabel).baseAnnotatedLabel)
 
-    def labelFeatures(ann: AnnotatedLabel) = Array[Feature](LabelFeature(ann))
-    def ruleFeatures(ann: Rule[AnnotatedLabel]) = Array[Feature](RuleFeature(ann))
-
-
-    val feat = new StandardSpanFeaturizer[AnnotatedLabel, String](
-      refGrammar,
-      labelFeatures _, ruleFeatures _)
-
-
-    val indexed =  IndexedSpanFeaturizer.extract[AnnotatedLabel, AnnotatedLabel, String](feat,
+    val indexed =  IndexedSpanFeaturizer.extract[AnnotatedLabel, AnnotatedLabel, String](
       docProcessor.wordFeaturizer,
       docProcessor.featurizer,
       StripAnnotations(),

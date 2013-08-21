@@ -18,7 +18,7 @@ package models
 */
 
 import features._
-import epic.parser.projections.{ConstraintCoreGrammarAdaptor, GrammarRefinements}
+import epic.parser.projections.GrammarRefinements
 import breeze.linalg._
 import java.io.File
 import io.Source
@@ -26,9 +26,8 @@ import epic.framework.Feature
 import epic.trees.annotations.{FilterAnnotations, TreeAnnotator}
 import epic.trees._
 import breeze.config.Help
-import epic.features.{WordPropertyFeaturizer, MinimalWordFeaturizer, StandardSurfaceFeaturizer, IndexedWordFeaturizer}
+import epic.features.{WordPropertyFeaturizer, MinimalWordFeaturizer, IndexedWordFeaturizer}
 import epic.lexicon.Lexicon
-import epic.constraints.ChartConstraints
 import epic.util.{SafeLogging, CacheBroker}
 
 class LatentParserModel[L, L3, W](indexedFeatures: IndexedFeaturizer[L, L3, W],

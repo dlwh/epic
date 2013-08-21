@@ -9,11 +9,9 @@ import breeze.features.FeatureVector
 import epic.trees.TreeInstance
 import breeze.optimize.FirstOrderMinimizer.OptParams
 import breeze.optimize.{CachedBatchDiffFunction, BatchDiffFunction}
-import scala.collection.mutable.ArrayBuffer
-import breeze.util.{Index, OptionIndex}
+import breeze.util.OptionIndex
 import com.typesafe.scalalogging.log4j.Logging
 import epic.constraints.TagConstraints
-import epic.parser.features.LabelFeature
 
 /**
  * The MaxEnt assigns tag scores using a maximum entropy (aka logistic) classifier.

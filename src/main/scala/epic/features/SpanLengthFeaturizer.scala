@@ -1,8 +1,6 @@
 package epic.features
 
 import epic.framework.Feature
-import epic.parser.features.StandardSpanFeatures.{WholeSentFeature, EndSentFeature, BeginSentFeature, SpanLengthFeature}
-import scala.collection.mutable.ArrayBuffer
 
 /**
  *
@@ -19,3 +17,4 @@ class SpanLengthFeaturizer(db: DistanceBinner = new DistanceBinner()) extends Su
     }
   }
 }
+case class SpanLengthFeature(dist: Int) extends Feature

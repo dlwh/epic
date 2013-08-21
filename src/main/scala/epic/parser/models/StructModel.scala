@@ -30,7 +30,6 @@ import epic.util.CacheBroker
 import epic.trees.BinaryRule
 import epic.trees.UnaryRule
 import epic.trees.TreeInstance
-import epic.parser.features.IndicatorFeature
 import epic.trees.annotations.KMAnnotator
 
 /**
@@ -105,9 +104,9 @@ case class StructModelFactory(baseParser: ParserParams.XbarGrammar,
 
     val surfaceFeaturizer = WordFeaturizer.goodPOSTagFeaturizer(initLexicon)
     val wordFeaturizer = IndexedWordFeaturizer.fromData(surfaceFeaturizer, transformed.map{_.words})
-    def labelFlattener(l: AnnotatedLabel) = {
+    def labelFlattener(l: AnnotatedLabel): Seq[AnnotatedLabel] = {
       val basic = Seq(l, l.baseAnnotatedLabel, l.clearFeatures)
-      basic map { IndicatorFeature(_) }
+      basic
     }
 
     def selectOneFeature(r: Rule[AnnotatedLabel]):IndexedSeq[Rule[AnnotatedLabel]] = {
@@ -125,7 +124,7 @@ case class StructModelFactory(baseParser: ParserParams.XbarGrammar,
     }
 
     def ruleFlattener(r: Rule[AnnotatedLabel]) = {
-      (IndexedSeq(r, r.map(_.clearFeatures), r.map(_.baseAnnotatedLabel)) ++ selectOneFeature(r)).map(IndicatorFeature)
+      IndexedSeq(r, r.map(_.clearFeatures), r.map(_.baseAnnotatedLabel)) ++ selectOneFeature(r)
     }
     val feat = new GenFeaturizer[AnnotatedLabel, String](wordFeaturizer, labelFlattener, ruleFlattener)
 

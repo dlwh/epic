@@ -18,6 +18,7 @@ import breeze.util.{CachedHashCode, Interner, Lens}
 import collection.JavaConverters._
 import collection.mutable.ArrayBuffer
 import epic.trees.annotations.TreeAnnotations.RightRecNP
+import epic.framework.Feature
 
 /**
  * Something we can throw in an AnnotatedLabel
@@ -38,7 +39,7 @@ case class FunctionalTag(tag: String) extends Annotation
 case class AnnotatedLabel(label: String,
                           parents: IndexedSeq[String] = IndexedSeq.empty,
                           siblings: IndexedSeq[Either[String, String]] = IndexedSeq.empty,
-                          features: Set[Annotation] = Set.empty) extends CachedHashCode {
+                          features: Set[Annotation] = Set.empty) extends Feature with CachedHashCode {
   def hasAnnotation(f: Annotation): Boolean = features.contains(f)
 
 

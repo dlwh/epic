@@ -678,7 +678,7 @@ case class LexModelFactory(baseParser: ParserParams.XbarGrammar,
     val indexedUnaryFeaturizer = IndexedWordFeaturizer.fromData(unaryFeaturizer, trees.map(_.words))
     val indexedBilexicalFeaturizer = IndexedBilexicalFeaturizer.fromData(bilexFeaturizer, trees.map{DependencyTree.fromTreeInstance[AnnotatedLabel, String](_, HeadFinder.collins)})
 
-    def ruleGen(r: Rule[AnnotatedLabel]) = IndexedSeq(RuleFeature(r))
+    def ruleGen(r: Rule[AnnotatedLabel]) = IndexedSeq(r)
 
     val headFinder = HeadFinder.collins
     val feat = new StandardLexFeaturizer(xbarGrammar.labelIndex, xbarGrammar.index, (_:Rule[AnnotatedLabel]).children.head.isIntermediate, ruleGen)

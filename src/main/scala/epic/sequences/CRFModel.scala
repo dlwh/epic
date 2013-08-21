@@ -4,16 +4,11 @@ import epic.framework._
 import breeze.util._
 import breeze.linalg._
 import epic.sequences.CRF.{AnchoredFeaturizer, TransitionVisitor}
-import scala.collection
 import breeze.features.FeatureVector
 import epic.features._
-import epic.lexicon.{Lexicon, SimpleLexicon}
-import breeze.collection.mutable.OpenAddressHashArray
+import epic.lexicon.SimpleLexicon
 import java.util
 import epic.util.{ProgressLog, SafeLogging, NotProvided, Optional}
-import epic.parser.features.PairFeature
-import epic.parser.features.LabelFeature
-import com.typesafe.scalalogging.log4j.Logging
 import epic.constraints.TagConstraints
 
 /**

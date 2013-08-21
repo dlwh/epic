@@ -17,19 +17,16 @@ package epic.parser.models
 */
 
 import java.io.File
-import epic.trees.annotations.FilterAnnotations
 import epic.trees.annotations.TreeAnnotator
 import io.Source
 import breeze.linalg._
-import epic.parser.features.{GenFeaturizer, IndicatorFeature}
+import epic.parser.features.GenFeaturizer
 import epic.parser.projections.GrammarRefinements
-import epic.framework.{ComponentFeature, Feature}
+import epic.framework.Feature
 import epic.parser._
 import epic.trees._
-import epic.features.{WordPropertyFeaturizer, MinimalWordFeaturizer, IndexedWordFeaturizer, StandardSurfaceFeaturizer}
+import epic.features.{WordPropertyFeaturizer, MinimalWordFeaturizer, IndexedWordFeaturizer}
 import epic.util.{SafeLogging, CacheBroker}
-import com.typesafe.scalalogging.log4j.Logging
-import epic.constraints.ChartConstraints.Factory
 import epic.framework.ComponentFeature
 import epic.trees.BinaryRule
 import epic.trees.UnaryRule

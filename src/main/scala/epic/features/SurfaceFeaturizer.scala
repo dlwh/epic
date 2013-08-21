@@ -2,7 +2,6 @@ package epic.features
 
 import epic.framework.Feature
 import epic.features.SurfaceFeaturizer.MarkerPos
-import epic.parser.features.StandardSpanFeatures.SpanLengthFeature
 import epic.features.WordFeaturizer.Modifier
 
 /**
