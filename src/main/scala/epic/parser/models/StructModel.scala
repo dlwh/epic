@@ -26,11 +26,18 @@ import epic.trees.annotations.{KMAnnotator, TreeAnnotator}
 import features.IndicatorFeature
 import epic.trees.TreeInstance
 import breeze.config.Help
-import epic.features.{WordPropertyFeaturizer, MinimalWordFeaturizer, StandardSurfaceFeaturizer, IndexedWordFeaturizer}
+import epic.features._
 import epic.lexicon.Lexicon
 import epic.constraints.ChartConstraints
 import epic.util.CacheBroker
 import epic.constraints.ChartConstraints.Factory
+import epic.trees.BinaryRule
+import epic.parser.ExpectedCounts
+import epic.trees.UnaryRule
+import epic.trees.TreeInstance
+import epic.parser.features.IndicatorFeature
+import epic.parser.models.AnnotatedParserInference
+import epic.trees.annotations.KMAnnotator
 
 /**
  * Model for structural annotations, a la Klein and Manning 2003.
@@ -92,14 +99,6 @@ case class StructModelFactory(baseParser: ParserParams.XbarGrammar,
   def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]], constrainer: CoreGrammar[AnnotatedLabel, String])(implicit broker: CacheBroker) = {
     val transformed = trainTrees.par.map(annotator).seq.toIndexedSeq
 
-
-    for( (xi, ti) <- transformed zip trainTrees) {
-      println(s"Base:${ti.tree render ti.words}Transformed:${xi.tree render xi.words}")
-    }
-    System.exit(1)
-
-
-
     val (initLexicon, initBinaries, initUnaries) = this.extractBasicCounts(transformed)
 
     val (xbarGrammar, xbarLexicon) = baseParser.xbarGrammar(trainTrees)
@@ -110,14 +109,30 @@ case class StructModelFactory(baseParser: ParserParams.XbarGrammar,
 
     val cFactory = constrainer
 
-    val wordCounts: Counter[String, Double] = sum(initLexicon, Axis._0)
-    val surfaceFeaturizer = new MinimalWordFeaturizer(wordCounts) + new WordPropertyFeaturizer(wordCounts)
+    val surfaceFeaturizer = WordFeaturizer.goodPOSTagFeaturizer(initLexicon)
     val wordFeaturizer = IndexedWordFeaturizer.fromData(surfaceFeaturizer, transformed.map{_.words})
     def labelFlattener(l: AnnotatedLabel) = {
-      val basic = Seq(l)
+      val basic = Seq(l, l.baseAnnotatedLabel, l.clearFeatures)
       basic map { IndicatorFeature(_) }
     }
-    def ruleFlattener(r: Rule[AnnotatedLabel]) = IndexedSeq(r).map(IndicatorFeature)
+
+    def selectOneFeature(r: Rule[AnnotatedLabel]):IndexedSeq[Rule[AnnotatedLabel]] = {
+      r match {
+        case r@BinaryRule(a,b,c) =>
+          val base = r.map(_.baseAnnotatedLabel)
+          (( for(af <- a.features.iterator) yield base.copy(parent = base.parent.annotate(af))) ++
+            ( for(af <- b.features.iterator) yield base.copy(left = base.left.annotate(af))) ++
+            ( for(af <- c.features.iterator) yield base.copy(right = base.right.annotate(af)))).toIndexedSeq
+        case r@UnaryRule(a,b,chain) =>
+          val base = r.map(_.baseAnnotatedLabel)
+          (( for(af <- a.features.iterator) yield base.copy(parent = base.parent.annotate(af))) ++
+            ( for(af <- b.features.iterator) yield base.copy(child = base.child.annotate(af)))).toIndexedSeq
+      }
+    }
+
+    def ruleFlattener(r: Rule[AnnotatedLabel]) = {
+      (IndexedSeq(r, r.map(_.clearFeatures), r.map(_.baseAnnotatedLabel)) ++ selectOneFeature(r)).map(IndicatorFeature)
+    }
     val feat = new GenFeaturizer[AnnotatedLabel, String](wordFeaturizer, labelFlattener _, ruleFlattener _)
 
     val featureCounter = readWeights(oldWeights)
