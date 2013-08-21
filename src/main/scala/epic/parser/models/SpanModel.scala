@@ -507,7 +507,6 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
 
     val trees = trainTrees.map(_.mapLabels(_.baseAnnotatedLabel))
     val (xbarGrammar, xbarLexicon) = baseParser.xbarGrammar(trees)
-    val summedCounts = sum(annWords, Axis._0)
 
     val indexedRefinements = GrammarRefinements(xbarGrammar, refGrammar, (_: AnnotatedLabel).baseAnnotatedLabel)
 
@@ -515,8 +514,13 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     def ruleFeatures(ann: Rule[AnnotatedLabel]) = Array[Feature](RuleFeature(ann))
 
     val wf = WordFeaturizer.goodPOSTagFeaturizer(annWords)
-    val span = new StandardSurfaceFeaturizer(summedCounts, false)
-    val word = IndexedWordFeaturizer.fromData(wf, annTrees.map{_.words})
+    val span:SurfaceFeaturizer[String] = {
+      val dsl = new WordFeaturizer.DSL(annWords) with SurfaceFeaturizer.DSL
+      import dsl._
+
+      clss(b) + clss(e) + spanShape + clss(b-1) + clss(e-1) + length + sent
+    }
+    val indexedWord = IndexedWordFeaturizer.fromData(wf, annTrees.map{_.words})
     val surface = IndexedSurfaceFeaturizer.fromData(span, annTrees.map{_.words}, constrainer.asConstraintFactory)
     val feat = new StandardSpanFeaturizer[AnnotatedLabel, String](
       refGrammar,
@@ -524,7 +528,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
 
 
     val indexed =  IndexedSpanFeaturizer.extract[AnnotatedLabel, AnnotatedLabel, String](feat,
-      word,
+      indexedWord,
       surface,
       annotator,
       indexedRefinements,
