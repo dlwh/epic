@@ -95,7 +95,7 @@ object WordFeaturizer {
   }
 }
 
-class ZeroFeaturizer[W] extends WordFeaturizer[W] with SurfaceFeaturizer[W] {
+class ZeroFeaturizer[W] extends WordFeaturizer[W] with SurfaceFeaturizer[W] with Serializable {
   private val emptyArray = Array[Feature]()
   def anchor(words: IndexedSeq[W]): SurfaceFeatureAnchoring[W] with WordFeatureAnchoring[W] = {
     val w = words
