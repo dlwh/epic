@@ -109,7 +109,17 @@ case class StructModelFactory(baseParser: ParserParams.XbarGrammar,
 
     val cFactory = constrainer
 
-    val surfaceFeaturizer = WordFeaturizer.goodPOSTagFeaturizer(initLexicon)
+    val surfaceFeaturizer = {
+      val dsl = new WordFeaturizer.DSL(initLexicon)
+      import dsl._
+
+      (
+        unigrams(word + clss, 1)
+          + suffixes()
+          + prefixes()
+          + props
+        )
+    }
     val wordFeaturizer = IndexedWordFeaturizer.fromData(surfaceFeaturizer, transformed.map{_.words})
     def labelFlattener(l: AnnotatedLabel) = {
       val basic = Seq(l, l.baseAnnotatedLabel, l.clearFeatures)
