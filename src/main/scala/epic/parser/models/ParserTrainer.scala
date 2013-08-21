@@ -109,7 +109,7 @@ object ParserTrainer extends epic.parser.ParserPipeline with Logging {
     }
 
     val baseMeasure = if(lossAugment) {
-      new ConstraintCoreGrammarAdaptor(initialParser.grammar, initialParser.lexicon, constraints) * new HammingLossAugmentation(initialParser.grammar, initialParser.lexicon).asCoreGrammar(theTrees)
+      new ConstraintCoreGrammarAdaptor(initialParser.grammar, initialParser.lexicon, constraints) * new HammingLossAugmentation(initialParser.grammar, initialParser.lexicon, (_:AnnotatedLabel).baseAnnotatedLabel).asCoreGrammar(theTrees)
     } else {
       new ConstraintCoreGrammarAdaptor(initialParser.grammar, initialParser.lexicon, constraints)
     }

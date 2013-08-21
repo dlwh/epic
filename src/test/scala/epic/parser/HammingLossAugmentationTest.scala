@@ -1,6 +1,7 @@
 package epic.parser
 
 import org.scalatest.FunSuite
+import epic.trees.AnnotatedLabel
 
 /**
  * TODO
@@ -10,7 +11,7 @@ import org.scalatest.FunSuite
 class HammingLossAugmentationTest  extends ParserTestHarness with FunSuite {
 
   test("training set trees, gold has 0 loss, max tree has loss at least as big.") {
-    val hla = new HammingLossAugmentation(ParserTestHarness.simpleGrammar, ParserTestHarness.simpleLexicon).asCoreGrammar(ParserTestHarness.getTrainTrees())
+    val hla = new HammingLossAugmentation(ParserTestHarness.simpleGrammar, ParserTestHarness.simpleLexicon, (_:AnnotatedLabel).baseAnnotatedLabel).asCoreGrammar(ParserTestHarness.getTrainTrees())
     val parser = ParserTestHarness.simpleParser
     for(ti <- ParserTestHarness.getTrainTrees()) {
       val aug = hla.anchor(ti.words)

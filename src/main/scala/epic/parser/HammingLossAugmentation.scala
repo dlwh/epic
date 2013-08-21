@@ -15,11 +15,12 @@ import breeze.numerics.I
  **/
 case class HammingLossAugmentation[L, W](grammar: BaseGrammar[L],
                                     lexicon: Lexicon[L, W],
-                                    recallScale: Double = 1.0) extends LossAugmentation[TreeInstance[L, W], CoreAnchoring[L, W]] {
+                                    proj: L=>L,
+                                    labelScale: Double = 1.0) extends LossAugmentation[TreeInstance[L, W], CoreAnchoring[L, W]] {
   def lossAugmentation(datum: TreeInstance[L, W]): CoreAnchoring[L, W] = {
-    val gt = GoldTagPolicy.goldTreeForcing[L](datum.tree.map(grammar.labelIndex))
+    val gt = GoldTagPolicy.goldTreeForcing[L](datum.tree.map(proj) map (grammar.labelIndex))
 
-    new HammingLossAugmentationCoreAnchoring(grammar, lexicon, datum.words, gt, recallScale)
+    new HammingLossAugmentationCoreAnchoring(grammar, lexicon, datum.words, gt, labelScale)
   }
 
   def asCoreGrammar(training: IndexedSeq[TreeInstance[L, W]]):CoreGrammar[L, W] = new CoreGrammar[L, W] with Serializable {
@@ -42,7 +43,7 @@ case class HammingLossAugmentationCoreAnchoring[L, W](grammar: BaseGrammar[L],
                                  lexicon: Lexicon[L, W],
                                  words: IndexedSeq[W],
                                  gt: GoldTagPolicy[L],
-                                 recallScale: Double,
+                                 labelScale: Double,
                                  override val sparsityPattern: ChartConstraints[L] = ChartConstraints.noSparsity[L])  extends epic.parser.CoreAnchoring[L, W]{
     def addConstraints(cs: ChartConstraints[L]): parser.CoreAnchoring[L, W] = copy(sparsityPattern = cs & sparsityPattern)
 
@@ -56,7 +57,7 @@ case class HammingLossAugmentationCoreAnchoring[L, W](grammar: BaseGrammar[L],
      */
     def scoreUnaryRule(begin: Int, end: Int, rule: Int): Double = {
       val p = grammar.parent(rule)
-      I(!gt.isGoldTopTag(begin, end, p))*recallScale
+      I(!gt.isGoldTopTag(begin, end, p))*labelScale + I(!gt.isGoldSpan(begin, end))
     }
 
     /**
@@ -64,7 +65,7 @@ case class HammingLossAugmentationCoreAnchoring[L, W](grammar: BaseGrammar[L],
      * "bottom" label. Typically it is used to filter out impossible rules (using Double.NegativeInfinity)
      */
     def scoreSpan(begin: Int, end: Int, tag: Int): Double = {
-      I(!gt.isGoldBotTag(begin, end, tag))*recallScale
+      I(!gt.isGoldBotTag(begin, end, tag))*labelScale
     }
   }
 

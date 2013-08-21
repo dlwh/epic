@@ -19,6 +19,7 @@ import epic.trees.BinarizedTree
 import breeze.collection.mutable.TriangularArray
 
 trait GoldTagPolicy[L] {
+  def isGoldSpan(start: Int, end: Int):Boolean
   def isGoldTopTag(start: Int, end: Int, tag: Int): Boolean
   def isGoldBotTag(start: Int, end: Int, tag: Int): Boolean
 }
@@ -27,32 +28,8 @@ object GoldTagPolicy {
   def noGoldTags[L]:GoldTagPolicy[L] = new GoldTagPolicy[L] {
     def isGoldTopTag(start: Int, end: Int, tag: Int): Boolean = false
     def isGoldBotTag(start: Int, end: Int, tag: Int): Boolean = false
+    def isGoldSpan(start: Int, end: Int):Boolean = false
   }
-
-  def candidateTreeForcing[L](tree: BinarizedTree[Seq[Int]]):GoldTagPolicy[L] ={
-    val goldTop = TriangularArray.raw(tree.span.end+1,collection.mutable.BitSet())
-    val goldBot = TriangularArray.raw(tree.span.end+1,collection.mutable.BitSet())
-    if(tree != null) {
-      for( t <- tree.allChildren) {
-        if(t.children.size == 1)
-          goldTop(TriangularArray.index(t.span.begin,t.span.end)) ++= t.label
-        else
-          goldBot(TriangularArray.index(t.span.begin,t.span.end)) ++= t.label
-      }
-    }
-    new GoldTagPolicy[L] {
-      def isGoldTopTag(start: Int, end: Int, tag: Int) = {
-        val set = goldTop(TriangularArray.index(start,end))
-        set != null && set.contains(tag)
-      }
-
-      def isGoldBotTag(start: Int, end: Int, tag: Int): Boolean = {
-        val set = goldBot(TriangularArray.index(start,end))
-        set != null && set.contains(tag)
-      }
-    }
-  }
-
 
   def goldTreeForcing[L](trees: BinarizedTree[Int]*):GoldTagPolicy[L] ={
     val goldTop = TriangularArray.raw(trees.head.span.end+1,collection.mutable.BitSet())
@@ -68,6 +45,10 @@ object GoldTagPolicy {
       }
     }
     new GoldTagPolicy[L] {
+      def isGoldSpan(start: Int, end: Int):Boolean = {
+        val set = goldTop(TriangularArray.index(start,end))
+        set != null && set.nonEmpty
+      }
       def isGoldTopTag(start: Int, end: Int, tag: Int) = {
         val set = goldTop(TriangularArray.index(start,end))
         set != null && set.contains(tag)
