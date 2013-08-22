@@ -62,17 +62,18 @@ object SplitSpanFeaturizer {
 
 
   class SplitSpanDistanceFeaturizer[W] private[SplitSpanFeaturizer](a: Any, b: Any, db: DistanceBinner = DistanceBinner()) extends SplitSpanFeaturizer[W] {
+    val label = s"$a <-> $b"
     private val theAnchoring = new SplitSpanFeatureAnchoring[W] with Serializable {
       def featuresForSplit(begin: Int, split: Int, end: Int): Array[Feature] = {
         val lhs = markerToPos(a, begin, end, split)
         val rhs = markerToPos(b, begin, end, split)
-        Array(DistanceFeature(db.binnedDistance(lhs, rhs)))
+        Array(DistanceFeature(db.binnedDistance(lhs, rhs), label))
       }
 
       def featuresForSpan(begin: Int, end: Int): Array[Feature] = emptyArray
     }
 
-    def markerToPos(a: Any, begin: Int, end: Int, split: Int): Int = {
+    private def markerToPos(a: Any, begin: Int, end: Int, split: Int): Int = {
       a match {
         case MarkerPos(i, true) => begin + i
         case MarkerPos(i, false) => end + i
@@ -126,7 +127,7 @@ object SplitSpanFeaturizer {
       }
     }
   }
-  sealed trait SplitPointMarker
+  sealed trait SplitPointMarker { override def toString = "split"}
   private val emptyArray = Array.empty[Feature]
 }
 

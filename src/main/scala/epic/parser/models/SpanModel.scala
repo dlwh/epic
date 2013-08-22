@@ -359,7 +359,7 @@ class IndexedSpanFeaturizer[L, L2, W](wordFeatureIndex: CrossProductIndex[Featur
         cache = spanFeatureIndex.crossProduct(fspec.featuresForBinaryRule(begin, split, end, rule, ref), sspec.featuresForSpan(begin, end), spanOffset, true)
         scache(globalized) = cache
       }
-      cache
+      cache ++ spanFeatureIndex.crossProduct(fspec.featuresForBinaryRule(begin, split, end, rule, ref), sspec.featuresForSplit(begin, split, end), spanOffset, true)
 
     }
 
@@ -405,6 +405,8 @@ object IndexedSpanFeaturizer {
           val (ri, rref) = refinements.rules.indexAndLocalize(r)
           spanBuilder.add(spec.featuresForBinaryRule(span.begin, t.splitPoint, span.end, ri, rref),
             sspec.featuresForSpan(span.begin, span.end))
+          spanBuilder.add(spec.featuresForBinaryRule(span.begin, t.splitPoint, span.end, ri, rref),
+            sspec.featuresForSplit(span.begin, t.splitPoint, span.end))
           spanBuilder.add(spec.featuresForSpan(span.begin, span.end, ai, aref),
             sspec.featuresForSpan(span.begin, span.end))
       }
@@ -443,7 +445,9 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
       val dsl = new WordFeaturizer.DSL(annWords) with SurfaceFeaturizer.DSL with SplitSpanFeaturizer.DSL
       import dsl._
 
-     clss(split) + distance[String](begin, split) + clss(begin) + clss(end) + spanShape + clss(begin-1) + clss(end-1) + length + sent
+     clss(split) + distance[String](begin, split) +
+      distance[String](split, end) +
+       clss(begin) + clss(end) + spanShape + clss(begin-1) + clss(end-1) + length + sent
     }
     val indexedWord = IndexedWordFeaturizer.fromData(wf, annTrees.map{_.words})
     val surface = IndexedSplitSpanFeaturizer.fromData(span, annTrees)
