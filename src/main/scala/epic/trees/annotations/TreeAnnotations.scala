@@ -44,6 +44,9 @@ object TreeAnnotations {
   case object BaseNP extends KMAnnotation
   case object RightRecNP extends KMAnnotation
 
+  case object DomCCRight extends KMAnnotation
+  case object DomCCLeft extends KMAnnotation
+
   case object RealUnary extends KMAnnotation
   case object ExternalUnary extends KMAnnotation
 
