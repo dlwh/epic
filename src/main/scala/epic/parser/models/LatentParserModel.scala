@@ -77,13 +77,12 @@ case class LatentParserInference[L, L2, W](featurizer: RefinedFeaturizer[L, W, F
 
 /**
  * Model for latent annotated grammars (Petrov and Klein, 2008).
- * @param baseParser
  * @param annotator
  * @param substates
  * @param numStates
  * @param oldWeights
  */
-case class LatentModelFactory(baseParser: ParserParams.XbarGrammar,
+case class LatentModelFactory(
                               @Help(text=
                                 """The kind of annotation to do on the refined grammar. Default uses no annotations.
 You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Manning 2003.
@@ -148,7 +147,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
 
     val (annWords, annBinaries, annUnaries) = this.extractBasicCounts(annTrees)
 
-    val (xbarGrammar, xbarLexicon) = baseParser.xbarGrammar(trainTrees)
+    val (xbarGrammar, xbarLexicon) = (constrainer.grammar, constrainer.lexicon)
 
     val substateMap = if (substates != null && substates.exists) {
       val in = Source.fromFile(substates).getLines()
