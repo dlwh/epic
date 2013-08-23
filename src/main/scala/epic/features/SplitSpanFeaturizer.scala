@@ -51,19 +51,23 @@ object SplitSpanFeaturizer {
 
   }
 
-  implicit def liftSurfaceFeaturizerToSplitSpan[W](surface: SurfaceFeaturizer[W]):SplitSpanFeaturizer[W] = new SplitSpanFeaturizer[W] {
-    def anchor(w: IndexedSeq[W]): SplitSpanFeatureAnchoring[W] = new SplitSpanFeatureAnchoring[W] {
-      val anch = surface.anchor(w)
-      def featuresForSplit(begin: Int, split: Int, end: Int): Array[Feature] = emptyArray
+  implicit def liftSurfaceFeaturizerToSplitSpan[W](surface: SurfaceFeaturizer[W]):SplitSpanFeaturizer[W] = surface match {
+    case x: SplitSpanFeaturizer[W] => x
+    case _ =>
+      new SplitSpanFeaturizer[W] {
+        def anchor(w: IndexedSeq[W]): SplitSpanFeatureAnchoring[W] = new SplitSpanFeatureAnchoring[W] {
+          val anch = surface.anchor(w)
+          def featuresForSplit(begin: Int, split: Int, end: Int): Array[Feature] = emptyArray
 
-      def featuresForSpan(begin: Int, end: Int): Array[Feature] = anch.featuresForSpan(begin, end)
-    }
+          def featuresForSpan(begin: Int, end: Int): Array[Feature] = anch.featuresForSpan(begin, end)
+        }
+      }
   }
 
 
   class SplitSpanDistanceFeaturizer[W] private[SplitSpanFeaturizer](a: Any, b: Any, db: DistanceBinner = DistanceBinner()) extends SplitSpanFeaturizer[W] {
     val label = s"$a <-> $b"
-    private val theAnchoring = new SplitSpanFeatureAnchoring[W] with Serializable {
+    private val theSplitNeedingAnchoring = new SplitSpanFeatureAnchoring[W] with Serializable {
       def featuresForSplit(begin: Int, split: Int, end: Int): Array[Feature] = {
         val lhs = markerToPos(a, begin, end, split)
         val rhs = markerToPos(b, begin, end, split)
@@ -71,6 +75,18 @@ object SplitSpanFeaturizer {
       }
 
       def featuresForSpan(begin: Int, end: Int): Array[Feature] = emptyArray
+    }
+
+    private val theNotSplitNeedingAnchoring = new SplitSpanFeatureAnchoring[W] with Serializable {
+      def featuresForSplit(begin: Int, split: Int, end: Int): Array[Feature] = {
+        emptyArray
+      }
+
+      def featuresForSpan(begin: Int, end: Int): Array[Feature] = {
+        val lhs = markerToPos(a, begin, end, -1)
+        val rhs = markerToPos(b, begin, end, -1)
+        Array(DistanceFeature(db.binnedDistance(lhs, rhs), label))
+      }
     }
 
     private def markerToPos(a: Any, begin: Int, end: Int, split: Int): Int = {
@@ -82,13 +98,20 @@ object SplitSpanFeaturizer {
       }
     }
 
-    def anchor(w: IndexedSeq[W]): SplitSpanFeatureAnchoring[W] = theAnchoring
+    def anchor(w: IndexedSeq[W]): SplitSpanFeatureAnchoring[W] = {
+      if(a.isInstanceOf[SplitPointMarker] || b.isInstanceOf[SplitPointMarker])
+        theSplitNeedingAnchoring
+      else
+        theNotSplitNeedingAnchoring
+    }
   }
 
   case class SplitFeaturizer[W](f: WordFeaturizer[W]) extends SplitSpanFeaturizer[W] {
     def anchor(w: IndexedSeq[W]): SplitSpanFeatureAnchoring[W] = new SplitSpanFeatureAnchoring[W] {
       val wf = f.anchor(w)
-      def featuresForSplit(begin: Int, split: Int, end: Int): Array[Feature] = wf.featuresForWord(split)
+      def featuresForSplit(begin: Int, split: Int, end: Int): Array[Feature] = {
+        wf.featuresForWord(split).map(SplitFeature)
+      }
 
       def featuresForSpan(begin: Int, end: Int): Array[Feature] = emptyArray
     }
@@ -127,7 +150,7 @@ object SplitSpanFeaturizer {
       }
     }
   }
-  sealed trait SplitPointMarker { override def toString = "split"}
+  sealed trait SplitPointMarker extends  Serializable { override def toString = "split"}
   private val emptyArray = Array.empty[Feature]
 }
 
@@ -177,3 +200,5 @@ object IndexedSplitSpanFeaturizer {
     }
   }
 }
+
+case class SplitFeature(x: Feature) extends Feature

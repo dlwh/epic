@@ -30,7 +30,7 @@ import breeze.config.Help
 import epic.lexicon.Lexicon
 import epic.features._
 import epic.features.HashFeature
-import epic.util.CacheBroker
+import epic.util.{Arrays, CacheBroker}
 import epic.trees.annotations.FilterAnnotations
 
 /**
@@ -341,7 +341,7 @@ class IndexedSpanFeaturizer[L, L2, W](wordFeatureIndex: CrossProductIndex[Featur
       cache
     }
 
-    def featuresForBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int) = {
+    def featuresForBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int): Array[Int] = {
       val globalized = refinements.rules.globalize(rule, ref)
       val ind = TriangularArray.index(begin, end)
       var rcache = binaryCache(ind)
@@ -359,8 +359,12 @@ class IndexedSpanFeaturizer[L, L2, W](wordFeatureIndex: CrossProductIndex[Featur
         cache = spanFeatureIndex.crossProduct(fspec.featuresForBinaryRule(begin, split, end, rule, ref), sspec.featuresForSpan(begin, end), spanOffset, true)
         scache(globalized) = cache
       }
-      cache ++ spanFeatureIndex.crossProduct(fspec.featuresForBinaryRule(begin, split, end, rule, ref), sspec.featuresForSplit(begin, split, end), spanOffset, true)
 
+      val forSplit = spanFeatureIndex.crossProduct(fspec.featuresForBinaryRule(begin, split, end, rule, ref), sspec.featuresForSplit(begin, split, end), spanOffset, true)
+      if(forSplit.nonEmpty)
+        Arrays.concatenate(cache, forSplit)
+      else
+        cache
     }
 
     // caches:
@@ -417,8 +421,7 @@ object IndexedSpanFeaturizer {
   }
 }
 
-case class SpanModelFactory(baseParser: ParserParams.XbarGrammar,
-                            @Help(text=
+case class SpanModelFactory(@Help(text=
                               """The kind of annotation to do on the refined grammar. Default uses no annotations.
 You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Manning 2003.
                               """)
@@ -436,12 +439,12 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     val refGrammar = BaseGrammar(AnnotatedLabel.TOP, annBinaries, annUnaries)
 
     val trees = trainTrees.map(_.mapLabels(_.baseAnnotatedLabel))
-    val (xbarGrammar, xbarLexicon) = baseParser.xbarGrammar(trees)
-
+    val xbarGrammar = constrainer.grammar
+    val xbarLexicon = constrainer.lexicon
     val indexedRefinements = GrammarRefinements(xbarGrammar, refGrammar, (_: AnnotatedLabel).baseAnnotatedLabel)
 
     val wf = WordFeaturizer.goodPOSTagFeaturizer(annWords)
-    val span = {
+    val span:SplitSpanFeaturizer[String] = {
       val dsl = new WordFeaturizer.DSL(annWords) with SurfaceFeaturizer.DSL with SplitSpanFeaturizer.DSL
       import dsl._
 
