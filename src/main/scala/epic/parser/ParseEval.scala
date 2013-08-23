@@ -27,6 +27,7 @@ import collection.parallel.ForkJoinTaskSupport
 import concurrent.forkjoin.ForkJoinPool
 import com.typesafe.scalalogging.log4j.Logging
 import java.text.DecimalFormat
+import epic.util.ProgressLog
 
 
 /**
@@ -102,29 +103,22 @@ object ParseEval extends Logging {
                   parser: Parser[L,String],
                   chainReplacer: UnaryChainReplacer[L],
                   asString: L=>String,
-                  logProgress: Boolean = true,
                   nthreads: Int = -1): Seq[ParseResult[L]] = {
-    val timeIn = System.currentTimeMillis()
-    def elapsed = s"${(System.currentTimeMillis() - timeIn).toDouble / 1000.0} seconds elapsed."
-    val acc = new AtomicInteger(0)
     val partrees = trees.par
     if (nthreads > 0) {
       partrees.tasksupport = new ForkJoinTaskSupport(new ForkJoinPool(nthreads))
     }
+
+    val progress = new ProgressLog(logger, trees.length, name = "Sentences parsed")
     partrees.flatMap { sent =>
       try {
-        val TreeInstance(id,goldTree,words) = sent
+        val TreeInstance(_,goldTree,words) = sent
         val startTime = System.currentTimeMillis
         val tree: Tree[String] = chainReplacer.replaceUnaries(parser.bestParse(words)).map(asString)
         val guessTree = Trees.debinarize(Trees.deannotate(tree))
         val deBgold = Trees.debinarize(Trees.deannotate(goldTree.map(asString)))
         val endTime = System.currentTimeMillis
-        if(logProgress) {
-          val i = acc.incrementAndGet
-          if(i % 200 == 0) {
-            logger.info(s"Parsed $i/${trees.length} sentences. $elapsed")
-          }
-        }
+        progress.reportProgress()
         Some(ParseResult(sent, deBgold, guessTree, (endTime-startTime) / 1000.0))
       } catch {
         case e: Exception =>
@@ -140,8 +134,8 @@ object ParseEval extends Logging {
   def evaluate[L](trees: IndexedSeq[TreeInstance[L,String]],
                   parser: Parser[L,String],
                   chainReplacer: UnaryChainReplacer[L],
-                  asString: L=>String, logProgress: Boolean = true, nthreads: Int = -1): Statistics = {
-    val results = parseAll(trees, parser, chainReplacer, asString, logProgress, nthreads)
+                  asString: L=>String, nthreads: Int = -1): Statistics = {
+    val results = parseAll(trees, parser, chainReplacer, asString, nthreads)
     results.map(_.stats).reduceLeft(_ + _)
   }
 
