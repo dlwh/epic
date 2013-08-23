@@ -448,9 +448,17 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
       val dsl = new WordFeaturizer.DSL(annWords) with SurfaceFeaturizer.DSL with SplitSpanFeaturizer.DSL
       import dsl._
 
-     clss(split) + distance[String](begin, split) +
-      distance[String](split, end) +
-       clss(begin) + clss(end) + spanShape + clss(begin-1) + clss(end-1) + length + sent
+      ( clss(split)
+        + distance[String](begin, split)
+        + distance[String](split, end)
+//        + distance[String](begin, split) * distance[String](split,end)
+        + clss(begin) + clss(end)
+        + spanShape + clss(begin-1) + clss(end-1)
+        + length
+        + sent
+//        + clss(begin-1) * clss(end) // word edges
+//        +  clss(begin-1) * clss(end) * length
+        )
     }
     val indexedWord = IndexedWordFeaturizer.fromData(wf, annTrees.map{_.words})
     val surface = IndexedSplitSpanFeaturizer.fromData(span, annTrees)
