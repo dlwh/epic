@@ -27,10 +27,10 @@ You'll get a list of all the available options (so many!) The important ones are
 
 <pre>
 --treebank.path "path/to/treebank"
---constraints.path "path/to/constraints.ser.gz"
---baseParser.path "path/to/xbar.gr"
---modelFactory                                   # the kind of parser to train. See below.
+--cache.path "constraint.cache"
+--modelFactory  XXX                              # the kind of parser to train. See below.
 --opt.useStochastic true                         # turn on stochastic gradient
+--opt.regularization 1.0                         # regularization constant. you need to regularize, badly.
 </pre>
 
 
@@ -48,5 +48,5 @@ $ java -cp target/epicparser-assembly-0.1.jar epic.parser.models.ParserPipeline 
 
 None of these models are good by themselves: you need to train them jointly. To do that, use epic.models.EPParserModelFactory:
 <pre>
-$ java -cp target/epicparser-assembly-0.1.jar epic.parser.models.ParserPipeline --modelFactory epic.models.EPParserModelFactory --model.0 "model the first" --model.1 "model the second" // etc.
+$ java -cp target/epicparser-assembly-0.1.jar epic.parser.models.ParserTrainer --modelFactory epic.models.EPParserModelFactory --model.0 "model the first" --model.1 "model the second" // etc.
 </pre>
