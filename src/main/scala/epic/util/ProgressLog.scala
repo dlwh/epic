@@ -12,6 +12,14 @@ class ProgressLog(log: Logger, items: Int, frequency: Int = 100, name: String = 
   val initialTime = System.currentTimeMillis()
   val item = new AtomicInteger()
 
+
+  def reportProgress() = {
+    val x = item.incrementAndGet()
+    if(x % frequency == 0 || x == items) {
+      log.info(s"$name $x/$items (${(System.currentTimeMillis() - initialTime)/1000.0}s elapsed.)")
+    }
+  }
+
   def info(msg: =>String) = {
     val x = item.incrementAndGet()
     if(x % frequency == 0 || x == items) {

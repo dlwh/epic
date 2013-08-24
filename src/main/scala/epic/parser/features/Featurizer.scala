@@ -15,7 +15,7 @@ package epic.parser.features
  See the License for the specific language governing permissions and
  limitations under the License.
 */
-import epic.trees.Rule
+import epic.trees.{LexicalProduction, Rule}
 import epic.framework.Feature
 import epic.features.IndexedWordFeaturizer
 
@@ -46,15 +46,15 @@ trait SimpleFeaturizer[L, W] extends Featurizer[L, W] {
 
 
 class GenFeaturizer[L, W](wGen: IndexedWordFeaturizer[W],
-                       lGen: L=>Seq[Feature] = {(x:L)=>Seq(IndicatorFeature(x))},
-                       rGen: Rule[L] => Seq[Feature] = {(x: Rule[L]) => Seq(IndicatorFeature(x) )} ) extends SimpleFeaturizer[L, W] { outer =>
+                       lGen: L=>Seq[Feature] = {(x:L)=>if(x.isInstanceOf[Feature]) Seq(x.asInstanceOf[Feature]) else Seq(IndicatorFeature(x))},
+                       rGen: Rule[L] => Seq[Feature] = {(x: Rule[L]) => Seq(x)} ) extends SimpleFeaturizer[L, W] { outer =>
 
   def anchor(words: IndexedSeq[W]): Anchoring = new Anchoring {
     val lexAnch = wGen.anchor(words)
     def featuresFor(begin: Int, split: Int, end: Int, r: Rule[L]): Array[Feature] = outer.featuresFor(r)
 
     def featuresFor(pos: Int, label: L): Array[Feature] = {
-      lexAnch.featuresForWord(pos).map(i => LexicalFeature(label, wGen.featureIndex.get(i)))
+      lexAnch.featuresForWord(pos).map(i => LexicalProduction(label, wGen.featureIndex.get(i)))
     }
   }
 

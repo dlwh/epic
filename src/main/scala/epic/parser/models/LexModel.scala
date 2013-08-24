@@ -631,8 +631,7 @@ object IndexedLexFeaturizer extends Logging {
   }
 }
 
-case class LexModelFactory(baseParser: ParserParams.XbarGrammar,
-                           @Help(text= "The kind of annotation to do on the refined grammar. Defaults to xbar.")
+case class LexModelFactory(@Help(text= "The kind of annotation to do on the refined grammar. Defaults to xbar.")
                            annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = StripAnnotations(),
                            @Help(text="Old weights to initialize with. Optional")
                            oldWeights: File = null,
@@ -647,17 +646,18 @@ case class LexModelFactory(baseParser: ParserParams.XbarGrammar,
     val (initLexicon, initBinaries, initUnaries) = GenerativeParser.extractCounts(trees)
 
 
-    val (xbarGrammar, xbarLexicon) = baseParser.xbarGrammar(trainTrees)
     val wordIndex = Index(trainTrees.iterator.flatMap(_.words))
 
     val cFactory = constrainer
+
+    val (xbarGrammar, xbarLexicon) = constrainer.grammar -> constrainer.lexicon
 
     val (wordFeaturizer, unaryFeaturizer, bilexFeaturizer) = {
       val dsl = new WordFeaturizer.DSL(initLexicon) with BilexicalFeaturizer.DSL with BrownClusters.DSL
       import dsl._
 
       val wf = word + clss + shape + bigrams(word, 1) + bigrams(clss, 1)
-      val offsets = (clss(-1) + clss(1))
+      val offsets = clss(-1) + clss(1)
       var bilexF:BilexicalFeaturizer[String] = (
         bilex(word)
       //  + bilex(shape)
@@ -678,7 +678,7 @@ case class LexModelFactory(baseParser: ParserParams.XbarGrammar,
     val indexedUnaryFeaturizer = IndexedWordFeaturizer.fromData(unaryFeaturizer, trees.map(_.words))
     val indexedBilexicalFeaturizer = IndexedBilexicalFeaturizer.fromData(bilexFeaturizer, trees.map{DependencyTree.fromTreeInstance[AnnotatedLabel, String](_, HeadFinder.collins)})
 
-    def ruleGen(r: Rule[AnnotatedLabel]) = IndexedSeq(RuleFeature(r))
+    def ruleGen(r: Rule[AnnotatedLabel]) = IndexedSeq(r)
 
     val headFinder = HeadFinder.collins
     val feat = new StandardLexFeaturizer(xbarGrammar.labelIndex, xbarGrammar.index, (_:Rule[AnnotatedLabel]).children.head.isIntermediate, ruleGen)

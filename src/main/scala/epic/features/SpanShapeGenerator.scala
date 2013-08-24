@@ -1,7 +1,6 @@
 package epic.features
 
 import epic.framework.Feature
-import epic.parser.features.StandardSpanFeatures.SpanShapeFeature
 
 @SerialVersionUID(1L)
 class SpanShapeFeaturizer extends SurfaceFeaturizer[String] with Serializable {
@@ -47,13 +46,17 @@ object SpanShapeGenerator extends Serializable {
         val x = binCharacter(c)
         if (result.length > 1 && (result.last == x)) {
           result += 'e'
+          ()
         } else if (result.length > 2 && result.last == 'e' && result(result.length - 2) == x) {
           () // nothing, already have our e
         } else  if(x.isLetterOrDigit) {
           result += x
+          ()
         } else {
           // keep all punctuation
           result ++= w
+
+          ()
         }
       }
       i += 1
@@ -73,3 +76,5 @@ object SpanShapeGenerator extends Serializable {
     if (c.isLetter && c.isUpper) 'X' else if (c.isLetter) 'x' else if (c.isDigit) 'd' else c
   }
 }
+
+case class SpanShapeFeature(shape: String) extends SpanFeature

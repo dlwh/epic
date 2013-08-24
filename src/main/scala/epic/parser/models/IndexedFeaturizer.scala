@@ -135,7 +135,7 @@ object IndexedFeaturizer {
       val feats = f.featuresFor(rule)
       val ri = ruleIndex(rule)
       ruleCache(ri) = feats
-      feats.foreach {featureIndex.index _ }
+      feats.foreach {featureIndex.index }
     }
 
     // lex

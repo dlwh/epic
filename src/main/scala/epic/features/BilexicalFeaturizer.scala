@@ -4,7 +4,6 @@ import epic.framework.Feature
 import epic.trees.DependencyTree
 import epic.features.BilexicalFeaturizer._
 import epic.features.WordFeaturizer.Modifier
-import epic.parser.features._
 import epic.util.Arrays
 import epic.features.BilexicalFeaturizer.HeadFeaturizer
 import epic.features.BilexicalFeaturizer.DepFeaturizer
@@ -207,3 +206,17 @@ object IndexedBilexicalFeaturizer {
   }
 
 }
+
+trait LexFeature extends Feature
+
+case class HeadFeature[P](r: Feature) extends LexFeature
+
+case class DepFeature[P](r: Feature) extends LexFeature
+case class HeadDepFeature[P](head: Feature, dep: Feature) extends LexFeature
+case class DistFeature(distance: Int, f: Any) extends LexFeature
+case class DistanceFeature(distance: Int, label: String = "Span")extends LexFeature
+
+case class AttachRight(distance: Int) extends LexFeature
+case object AttachRight extends LexFeature
+case class AttachLeft(distance: Int) extends LexFeature
+case object AttachLeft extends LexFeature

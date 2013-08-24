@@ -5,13 +5,6 @@ import nak.data.Example
 import epic.sequences.Segmentation
 import collection.mutable.ArrayBuffer
 import collection.mutable
-import epic.trees.StandardTreeProcessor
-import scala.Some
-import epic.ontonotes.OntoAnnotations
-import epic.ontonotes.Argument
-import epic.trees.Span
-import epic.ontonotes.Mention
-import epic.ontonotes.Frame
 
 /**
  * represents an annotation ontonotes sentence. Doesn't include raw sentence, for now.
@@ -102,13 +95,14 @@ case class Frame(lemma: String, pos: Int, sense: Int, args: IndexedSeq[Argument]
     val newArgs = mutable.Stack[Argument]()
     val sorted = args.sortBy(a => (a.span.begin, -a.span.length))(Ordering.Tuple2)
     for(arg <- sorted) {
-      if(newArgs.isEmpty || !(newArgs.top.span.contains(arg.span))// don't overlap at all
-        ) {
+      if(newArgs.isEmpty || !newArgs.top.span.contains(arg.span)) { // don't overlap at all
         while(newArgs.nonEmpty && arg.span.contains(newArgs.top.span)) {
           newArgs.pop()
         }
         assert(newArgs.isEmpty || !arg.span.crosses(newArgs.top.span))
         newArgs push arg
+
+        ()
       }
     }
     copy(args=newArgs.toIndexedSeq)

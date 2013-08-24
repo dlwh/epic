@@ -31,7 +31,7 @@ trait TreeAnnotator[L, W, M] extends ((BinarizedTree[L], Seq[W])=>BinarizedTree[
 }
 
 object TreeAnnotator {
-  def identity[L, W]:TreeAnnotator[L, W, L] = PipelineAnnotator(Seq.empty)
+  def identity[L, W]:TreeAnnotator[L, W, L] = new IdentityAnnotator[L, W]
 }
 
 case class ComposedAnnotator[L, W, M, N](a: TreeAnnotator[L, W, M],
@@ -43,7 +43,6 @@ case class ComposedAnnotator[L, W, M, N](a: TreeAnnotator[L, W, M],
 
 }
 
-/** to be used with the config stuff, because I haven't figured out how to handle seqs yet... */
 case class PipelineAnnotator[L, W](ann: Seq[TreeAnnotator[L, W, L]]) extends TreeAnnotator[L, W, L] {
 
   def apply(tree: BinarizedTree[L], words: Seq[W]):BinarizedTree[L] = {
@@ -54,18 +53,25 @@ case class PipelineAnnotator[L, W](ann: Seq[TreeAnnotator[L, W, L]]) extends Tre
 
 import TreeAnnotations._
 
-class IdentityAnnotator[L, W] extends TreeAnnotator[L, W, L] {
+class IdentityAnnotator[L, W] extends TreeAnnotator[L, W, L] with Serializable {
   def apply(tree: BinarizedTree[L], words: Seq[W]) = tree
   override def toString() = "IdentityTransformation"
 }
 
+/**
+ * @param toKeep the annotations we want to keep
+ * @tparam W
+ */
 case class FilterAnnotations[W](toKeep: Set[Annotation]=Set.empty) extends TreeAnnotator[AnnotatedLabel, W, AnnotatedLabel] {
-//  def this(keep: String*) = this(keep.map(FunctionalTag).toSet[Annotation])
   def apply(tree: BinarizedTree[AnnotatedLabel], words: Seq[W]) = {
     tree.map(l => l.copy(features = l.features.filter(toKeep)))
   }
 }
 
+/**
+ * Removes all features from the [[epic.trees.AnnotatedLabel]]
+ * @tparam W
+ */
 case class StripAnnotations[W]() extends TreeAnnotator[AnnotatedLabel, W, AnnotatedLabel] {
   def apply(tree: BinarizedTree[AnnotatedLabel], words: Seq[W]) = {
     tree.map(l => l.copy(features = Set.empty))
@@ -99,6 +105,9 @@ case class AddMarkovization[W](horizontal: Int=1, vertical: Int=2) extends TreeA
 }
 
 
+/**
+ * Marks verb tags based on the auxiliary
+ */
 case class SplitAuxiliary() extends TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] {
   val beVerbs = Set("be", "is", "are", "were", "am", "was", "been", "being" )
   val hasVerbs = Set("has", "have", "had")
@@ -124,6 +133,9 @@ case class SplitAuxiliary() extends TreeAnnotator[AnnotatedLabel, String, Annota
 
 }
 
+/**
+ * Marks VPs based on the kind of verb that it has.
+ */
 case class SplitVP() extends TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] {
   val activeVerbs = Set("VBZ", "VBD", "VBP", "MD")
   def apply(tree: BinarizedTree[AnnotatedLabel], words: Seq[String]) = tree.extend { t =>
@@ -201,6 +213,10 @@ case class SplitPossNP[W]() extends TreeAnnotator[AnnotatedLabel, W, AnnotatedLa
 
 }
 
+/**
+ * A BaseNP dominates only preterminals, or @NPs that are also base nps.
+ * @tparam W
+ */
 case class AnnotateBaseNP[W]() extends TreeAnnotator[AnnotatedLabel, W, AnnotatedLabel] {
 
   def apply(tree: BinarizedTree[AnnotatedLabel], words: Seq[W]) = {
@@ -271,6 +287,37 @@ case class AnnotateRightRecNP[W]() extends TreeAnnotator[AnnotatedLabel, W, Anno
         UnaryTree(lbl.annotate(RightRecNP), annotateDownwards(child), chain, span)
       case BinaryTree(lbl, lc, rc, span) if  lbl.label == "@NP" =>
         BinaryTree(lbl.annotate(RightRecNP), if(lc.label.isIntermediate) annotateDownwards(lc) else lc, if(rc.label.isIntermediate) annotateDownwards(rc) else rc, span)
+      case _ => tree
+    }
+    rec(tree)
+  }
+}
+
+/**
+ * Marks if an XP immediately dominates a CC, or an @XP that recursively dominates a CC.
+ * @tparam W
+ */
+case class AnnotateDomCC[W]() extends TreeAnnotator[AnnotatedLabel, W, AnnotatedLabel] {
+
+  def apply(tree: BinarizedTree[AnnotatedLabel], words: Seq[W]) = {
+    // boolean is whether or not that child is either an NP, or an @NP[RightRecNP]
+    def rec(tree: BinarizedTree[AnnotatedLabel]):BinarizedTree[AnnotatedLabel] = tree match {
+      case t@UnaryTree(lbl1, child, chain, span) =>
+        val newchild = rec(child)
+        if(newchild.label.hasAnnotation(DomCCLeft)) {
+          UnaryTree(lbl1.annotate(DomCCLeft), newchild, chain, span)
+        } else if(newchild.label.hasAnnotation(DomCCRight)) {
+          UnaryTree(lbl1.annotate(DomCCRight), newchild, chain, span)
+        } else {
+          UnaryTree(lbl1, newchild, chain, span)
+        }
+      case t@BinaryTree(lbl, lc, rc, span) =>
+        val newrc = rec(rc)
+        val newlc = rec(lc)
+        val domsCCR = newrc.label.label == "CC" || (newrc.label.isIntermediate && newrc.label.hasAnnotation(DomCCRight))
+        val domsCCL = newlc.label.label == "CC" || (newlc.label.isIntermediate && newlc.label.hasAnnotation(DomCCLeft))
+        val sym = if(domsCCL) lbl.annotate(DomCCLeft) else if(domsCCR) lbl.annotate(DomCCRight) else lbl
+        BinaryTree(sym, newlc, newrc, span)
       case _ => tree
     }
     rec(tree)

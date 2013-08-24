@@ -1,5 +1,3 @@
-import epic.constraints.SpanConstraints
-import epic.util.Has
 import java.util.BitSet
 import scala.collection.generic.CanBuildFrom
 import scala.collection.mutable
