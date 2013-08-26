@@ -165,7 +165,6 @@ object GenerativeTrainer extends ParserPipeline {
 
 
     val scorer = if(params.awesomeLexicon) {
-      val wc = breeze.linalg.sum(wordCounts, Axis._0)
       val refLexicon = new SimpleLexicon(refGrammar.labelIndex, wordCounts)
       MaxEntTagScorer.make(WordFeaturizer.goodPOSTagFeaturizer(wordCounts), refLexicon, transformed)
     } else {

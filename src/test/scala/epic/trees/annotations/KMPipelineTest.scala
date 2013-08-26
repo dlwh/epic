@@ -24,6 +24,7 @@ import epic.trees.{Span, StandardTreeProcessor, Tree}
  *
  * @author dlwh
  */
+/*
 @RunWith(classOf[JUnitRunner])
 class KMPipelineTest extends FunSuite {
   val processor = new StandardTreeProcessor()
@@ -53,3 +54,4 @@ class KMPipelineTest extends FunSuite {
   }
 
 }
+*/

@@ -92,13 +92,15 @@ case class StructModelFactory(baseParser: ParserParams.XbarGrammar,
   def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]], constrainer: CoreGrammar[AnnotatedLabel, String])(implicit broker: CacheBroker) = {
     val transformed = trainTrees.par.map(annotator).seq.toIndexedSeq
 
+//    for( (x,y) <- trainTrees zip transformed) {
+//      println(x.render() + " " + y.render())
+//    }
+
     val (initLexicon, initBinaries, initUnaries) = this.extractBasicCounts(transformed)
 
     val (xbarGrammar, xbarLexicon) = baseParser.xbarGrammar(trainTrees)
     val refGrammar = BaseGrammar(AnnotatedLabel.TOP, initBinaries, initUnaries)
-    val indexedRefinements = GrammarRefinements(xbarGrammar, refGrammar, {
-      (_: AnnotatedLabel).baseAnnotatedLabel
-    })
+    val indexedRefinements = GrammarRefinements(xbarGrammar, refGrammar, (_: AnnotatedLabel).baseAnnotatedLabel)
 
     val cFactory = constrainer
 
@@ -115,7 +117,7 @@ case class StructModelFactory(baseParser: ParserParams.XbarGrammar,
     }
     val wordFeaturizer = IndexedWordFeaturizer.fromData(surfaceFeaturizer, transformed.map{_.words})
     def labelFlattener(l: AnnotatedLabel): Seq[AnnotatedLabel] = {
-      val basic = Seq(l, l.baseAnnotatedLabel, l.clearFeatures)
+      val basic = Seq(l, l.baseAnnotatedLabel, l.clearFeatures).toSet.toIndexedSeq
       basic
     }
 
@@ -134,7 +136,7 @@ case class StructModelFactory(baseParser: ParserParams.XbarGrammar,
     }
 
     def ruleFlattener(r: Rule[AnnotatedLabel]) = {
-      IndexedSeq(r, r.map(_.clearFeatures), r.map(_.baseAnnotatedLabel)) ++ selectOneFeature(r)
+      (IndexedSeq(r, r.map(_.clearFeatures), r.map(_.baseAnnotatedLabel)) ++ selectOneFeature(r)).toSet.toIndexedSeq
     }
     val feat = new GenFeaturizer[AnnotatedLabel, String](wordFeaturizer, labelFlattener, ruleFlattener)
 

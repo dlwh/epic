@@ -24,15 +24,15 @@ case class KMAnnotator( horizontal: Int = 2, vertical: Int = 2) extends TreeAnno
   val pipeline = (
     FilterAnnotations[String](Set(FunctionalTag("TMP"))) andThen
     AddMarkovization[String](horizontal,vertical) andThen
-    SplitAuxiliary() andThen
-    SplitVP() andThen
-    SplitIN[String]() andThen
-    SplitPossNP[String]() andThen
-    AnnotateBaseNP[String]() andThen
-    AnnotateRightRecNP[String]() andThen
-    MarkNonIdentityUnaries[String]() andThen
-    MarkExternalUnaries[String]() andThen
-    DominatesV[String]()
+//    SplitAuxiliary() andThen
+//    SplitVP() andThen
+//    SplitIN[String]() andThen
+//    SplitPossNP[String]() andThen
+    AnnotateBaseNP[String]() //andThen
+//    AnnotateRightRecNP[String]() andThen
+//    MarkNonIdentityUnaries[String]() andThen
+//    MarkExternalUnaries[String]() andThen
+//    DominatesV[String]()
     )
 
 

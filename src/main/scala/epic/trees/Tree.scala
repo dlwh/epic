@@ -212,18 +212,28 @@ object Trees {
   def deannotateLabel(l: String) = l.takeWhile(c => c != '^' && c != '>')
 
   /**
-   * Adds horizontal markovization to an already binarized tree with no markovization
+   * Adds horizontal markovization to an already binarized tree with no markovization.
+   *
+   * The sibling history of a node is:
+   * If it's not an intermediate: nothing
+   * If it's the bottom of an identity unary: its parent's horizontal annotation
+   * If it's the child of a binary rule: its sibling + its parent's markovization
+   *
    */
   def addHorizontalMarkovization[T](tree: BinarizedTree[T],
                                     order: Int,
                                     join: (T,IndexedSeq[Either[T,T]])=>T,
                                     isIntermediate: T=>Boolean):BinarizedTree[T] = {
     def rec(tree: BinarizedTree[T],history: IndexedSeq[Either[T,T]] = IndexedSeq.empty):BinarizedTree[T] = {
-      val newLabel = if(isIntermediate(tree.label)) join(tree.label,history.take(order-1)) else tree.label
+      val newHistory = if(isIntermediate(tree.label)) history.take(order-1) else IndexedSeq.empty
+      val newLabel = if(newHistory.nonEmpty) join(tree.label, newHistory) else tree.label
       tree match {
+        case BinaryTree(_, t1, t2, span) if isIntermediate(t1.label) =>
+          BinaryTree(newLabel, rec(t1,Right(t2.label) +: newHistory), rec(t2, IndexedSeq.empty), span)
+        case BinaryTree(_, t1, t2, span) if isIntermediate(t2.label) =>
+          BinaryTree(newLabel, rec(t1,IndexedSeq.empty), rec(t2,Left(t1.label) +:newHistory), tree.span)
         case BinaryTree(_, t1, t2, span) =>
-          val newHistory = if(isIntermediate(tree.label)) history.take(order-1) else IndexedSeq.empty
-          BinaryTree(newLabel, rec(t1,Right(t2.label) +: newHistory), rec(t2,Left(t1.label) +:newHistory), tree.span)
+          BinaryTree(newLabel, rec(t1), rec(t2), tree.span)
         case UnaryTree(label, child, chain, span) =>
           UnaryTree(newLabel,rec(child,if(child.label == label) history else IndexedSeq.empty), chain, tree.span)
         case NullaryTree(_, span) =>

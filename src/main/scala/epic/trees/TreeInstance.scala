@@ -33,4 +33,6 @@ case class TreeInstance[L, +W](id: String,
   }
 
   override def toString(): String = s"TreeInstance(id = $id, tree=${tree.render(words, newline = false)}\n}"
+
+  def render(newline:Boolean = true) = tree.render(words, newline)
 }
