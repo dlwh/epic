@@ -43,6 +43,7 @@ object BilexicalFeaturizer {
     def bilex[W](head: WordFeaturizer[W], dep: WordFeaturizer[W]):BilexicalFeaturizer[W] = HeadDepFeaturizer(head, dep)
 
     lazy val distance = new BilexicalFeaturizer.DistanceFeaturizer[String]()
+    def adaptSpanFeaturizer[W](f: SurfaceFeaturizer[W]) = new BilexicalFeaturizer.AdaptedSurfaceFeaturizer[W](f)
 
     def withDistance[W](f: BilexicalFeaturizer[W], db: DistanceBinner = new DistanceBinner()) = new BinomialFeaturizer(f, new DistanceFeaturizer(db))
 
@@ -59,6 +60,17 @@ object BilexicalFeaturizer {
     def anchor(w: IndexedSeq[W]): BilexicalFeatureAnchoring[W] = new BilexicalFeatureAnchoring[W] {
       val anchs = prods.map(_.anchor(w)).toArray
       def featuresForAttachment(head: Int, dep: Int): Array[Feature] = anchs.flatMap(_.featuresForAttachment(head, dep))
+    }
+  }
+
+
+  case class AdaptedSurfaceFeaturizer[W](base: SurfaceFeaturizer[W]) extends BilexicalFeaturizer[W] {
+    def anchor(w: IndexedSeq[W]): BilexicalFeatureAnchoring[W] = new BilexicalFeatureAnchoring[W] {
+      val ba = base.anchor(w)
+      def featuresForAttachment(head: Int, dep: Int): Array[Feature] = {
+        if(head < dep) ba.featuresForSpan(head, dep)
+        else ba.featuresForSpan(dep, head)
+      }
     }
   }
 

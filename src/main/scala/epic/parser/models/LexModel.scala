@@ -653,21 +653,21 @@ case class LexModelFactory(@Help(text= "The kind of annotation to do on the refi
     val (xbarGrammar, xbarLexicon) = constrainer.grammar -> constrainer.lexicon
 
     val (wordFeaturizer, unaryFeaturizer, bilexFeaturizer) = {
-      val dsl = new WordFeaturizer.DSL(initLexicon) with BilexicalFeaturizer.DSL with BrownClusters.DSL
+      val dsl = new WordFeaturizer.DSL(initLexicon) with BilexicalFeaturizer.DSL with SurfaceFeaturizer.DSL
       import dsl._
 
       val wf = word + clss + shape + bigrams(word, 1) + bigrams(clss, 1)
       val offsets = clss(-1) + clss(1)
       var bilexF:BilexicalFeaturizer[String] = (
-        bilex(word)
-      //  + bilex(shape)
-          + withDistance(bilex(clss))
+        withDistance(bilex(clss))
+          + adaptSpanFeaturizer(spanShape)
+        //+ bilex(word)
           + bilex(tagDict)
         + offsets(head)
         + offsets(dep)
         )
 
-      val monolex = IndexedSeq(word, shape, clss)
+      val monolex = IndexedSeq(word, clss)
 
       bilexF = bilexF + monolex.map(_(head)).reduceLeft[BilexicalFeaturizer[String]](_ + _) + monolex.map(_(dep)).reduceLeft[BilexicalFeaturizer[String]](_ + _)
 
