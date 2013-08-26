@@ -180,7 +180,6 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     val wordCounts: Counter[String, Double] = sum(annWords, Axis._0)
     val surfaceFeaturizer = new MinimalWordFeaturizer(wordCounts) + new WordPropertyFeaturizer(wordCounts)
     val wordFeaturizer = IndexedWordFeaturizer.fromData(surfaceFeaturizer, annTrees.map{_.words})
-    val feat = new GenFeaturizer[(AnnotatedLabel, Int), String](wordFeaturizer)
 
     val annGrammar: BaseGrammar[AnnotatedLabel] = BaseGrammar(annTrees.head.tree.label, annBinaries, annUnaries)
     val firstLevelRefinements = GrammarRefinements(xbarGrammar, annGrammar, {(_: AnnotatedLabel).baseAnnotatedLabel})
@@ -190,7 +189,8 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
 
     val featureCounter = readWeights(oldWeights)
 
-    val indexedFeaturizer = IndexedFeaturizer(xbarGrammar, xbarLexicon, trainTrees, feat, finalRefinements)
+    val feat = new ProductionFeaturizer[AnnotatedLabel, (AnnotatedLabel, Int), String](xbarGrammar, finalRefinements)
+    val indexedFeaturizer = IndexedFeaturizer(feat, wordFeaturizer, trainTrees, annotator andThen (_.tree.map(finalRefinements.labels.refinementsOf)), finalRefinements)
 
     new LatentParserModel[AnnotatedLabel, (AnnotatedLabel, Int), String](indexedFeaturizer,
     annotator,
@@ -198,7 +198,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     constrainer,
     xbarGrammar,
     xbarLexicon,
-    { featureCounter.get(_) })
+    featureCounter.get)
   }
 }
 

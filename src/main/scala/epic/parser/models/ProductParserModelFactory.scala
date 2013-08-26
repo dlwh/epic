@@ -20,7 +20,6 @@ import java.io.File
 import epic.trees.annotations.TreeAnnotator
 import io.Source
 import breeze.linalg._
-import epic.parser.features.GenFeaturizer
 import epic.parser.projections.GrammarRefinements
 import epic.framework.Feature
 import epic.parser._
@@ -63,11 +62,11 @@ case class ProductParserModelFactory(baseParser: ParserParams.XbarGrammar,
 
 
   def splitRule[L, L2](r: Rule[L], split: L=>Seq[L2]):Seq[Rule[L2]] = r match {
-    case BinaryRule(a, b, c) => for(aa <- split(a); bb <- split(b); cc <- split(c)) yield BinaryRule(aa, bb, cc)
-      // don't allow ref
-    case UnaryRule(a, b, chain) if a == b => for(aa <- split(a)) yield UnaryRule(aa, aa, chain)
-    case UnaryRule(a, b, chain) => for(aa <- split(a); bb <- split(b)) yield UnaryRule(aa, bb, chain)
-  }
+      case BinaryRule(a, b, c) => for(aa <- split(a); bb <- split(b); cc <- split(c)) yield BinaryRule(aa, bb, cc)
+        // don't allow non-identity rule refinements for identity rewrites
+      case UnaryRule(a, b, chain) if a == b => for(aa <- split(a)) yield UnaryRule(aa, aa, chain)
+      case UnaryRule(a, b, chain) => for(aa <- split(a); bb <- split(b)) yield UnaryRule(aa, bb, chain)
+    }
 
 
   def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]], constrainer: CoreGrammar[AnnotatedLabel, String])(implicit broker: CacheBroker) = {
@@ -94,16 +93,18 @@ case class ProductParserModelFactory(baseParser: ParserParams.XbarGrammar,
     val surfaceFeaturizer = new MinimalWordFeaturizer(wordCounts) + new WordPropertyFeaturizer(wordCounts)
     val wordFeaturizer = IndexedWordFeaturizer.fromData(surfaceFeaturizer, annTrees.map{_.words})
     def labelFlattener(l: (AnnotatedLabel, Seq[Int])) = {
-      val basic = for( (ref,m) <- l._2.zipWithIndex) yield ComponentFeature(m, IndicatorFeature(l._1, ref))
-      basic
+      for( (ref,m) <- l._2.zipWithIndex) yield ComponentFeature(m, IndicatorFeature(l._1, ref))
     }
-    val feat = new GenFeaturizer[(AnnotatedLabel, Seq[Int]), String](wordFeaturizer, labelFlattener _)
+    def ruleFlattener(r: Rule[(AnnotatedLabel, Seq[Int])]) = {
+      for( (ref,m) <- r.parent._2.zipWithIndex) yield ComponentFeature(m, r.map( pair => pair._1  -> pair._2(m)))
+    }
 
     val annGrammar = BaseGrammar(annTrees.head.tree.label, annBinaries, annUnaries)
     val firstLevelRefinements = GrammarRefinements(xbarGrammar, annGrammar, {(_: AnnotatedLabel).baseAnnotatedLabel})
     val secondLevel = GrammarRefinements(annGrammar, {split(_:AnnotatedLabel,substateMap)}, {splitRule(_ :Rule[AnnotatedLabel], {split(_:AnnotatedLabel,substateMap)})}, unsplit)
     val finalRefinements = firstLevelRefinements compose secondLevel
     logger.info("Will learn with these label refinements: " + finalRefinements.labels)
+    val feat = new ProductionFeaturizer[AnnotatedLabel, (AnnotatedLabel, Seq[Int]), String](xbarGrammar, finalRefinements, labelFlattener, ruleFlattener)
 
     val featureCounter = if (oldWeights ne null) {
       val baseCounter = breeze.util.readObject[Counter[Feature, Double]](oldWeights)
@@ -112,16 +113,15 @@ case class ProductParserModelFactory(baseParser: ParserParams.XbarGrammar,
       Counter[Feature, Double]()
     }
 
-    val indexedFeaturizer = IndexedFeaturizer(xbarGrammar, xbarLexicon, trainTrees, feat, finalRefinements)
+    val indexedFeaturizer = IndexedFeaturizer[AnnotatedLabel, (AnnotatedLabel, Seq[Int]), String](feat, wordFeaturizer, trainTrees, annotator andThen (_.tree.map(finalRefinements.labels.refinementsOf)), finalRefinements)
 
     new LatentParserModel[AnnotatedLabel, (AnnotatedLabel, Seq[Int]), String](indexedFeaturizer,
-    annotator,
-    finalRefinements,
-    cFactory,
-    xbarGrammar,
-    xbarLexicon, {
-      featureCounter.get(_)
-    })
+      annotator,
+      finalRefinements,
+      cFactory,
+      xbarGrammar,
+      xbarLexicon,
+      featureCounter.get)
   }
 
 }

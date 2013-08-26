@@ -15,10 +15,11 @@ package epic.parser
  See the License for the specific language governing permissions and
  limitations under the License.
 */
-import breeze.util.Index
+import breeze.util.{Encoder, Index}
 import epic.framework.Feature
 import epic.parser.projections.GrammarRefinements
-import epic.trees.NullRule
+import epic.trees.Rule
+import epic.parser.features.IndicatorFeature
 
 
 /**
@@ -26,32 +27,40 @@ import epic.trees.NullRule
  * @author dlwh
  */
 @SerialVersionUID(1L)
-class ProductionFeaturizer[L, L2, W](grammar: BaseGrammar[L], refinements: GrammarRefinements[L, L2]) extends RefinedFeaturizer[L, W, Feature] with Serializable {
-  val index = {
-    val index = Index[Feature]()
-    for (r <- refinements.rules.fineIndex) {
-      index.index(r)
-    }
-    for (r <- refinements.labels.fineIndex) {
-      index.index(NullRule(r))
-    }
+class ProductionFeaturizer[L, L2, W](grammar: BaseGrammar[L], refinements: GrammarRefinements[L, L2],
+                                     lGen: L2=>Seq[Feature] = {(x:L2)=>if(x.isInstanceOf[Feature]) Seq(x.asInstanceOf[Feature]) else Seq(IndicatorFeature(x))},
+                                     rGen: Rule[L2] => Seq[Feature] = {(x: Rule[L2]) => Seq(x)}  ) extends RefinedFeaturizer[L, W, Feature] with Serializable{
 
-    index: Index[Feature]
+  private val (index_ :Index[Feature], ruleFeatures: Array[Array[Int]], labelFeatures: Array[Array[Int]]) = {
+    val index = Index[Feature]()
+    val rules = Encoder.fromIndex(refinements.rules.fineIndex).tabulateArray(r => rGen(r).map(index.index).toArray)
+    val labels = Encoder.fromIndex(refinements.labels.fineIndex).tabulateArray(l => lGen(l).map(index.index).toArray)
+    (index: Index[Feature], rules, labels)
   }
+
+  def index = index_
+
+  def featuresFor(rule: Rule[L2]) = featuresForRule(refinements.rules.fineIndex(rule))
+  def featuresFor(label: L2) = featuresForLabel(refinements.labels.fineIndex(label))
+
+  def featuresForRule(r: Int): Array[Int] = ruleFeatures(r)
+
+  def featuresForLabel(l: Int): Array[Int] = labelFeatures(l)
+
 
   def anchor(w: IndexedSeq[W]) = new Anchoring {
     val words = w
 
     def featuresForBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int) = {
-      Array(refinements.rules.globalize(rule, ref))
+      featuresForRule(refinements.rules.globalize(rule, ref))
     }
 
     def featuresForUnaryRule(begin: Int, end: Int, rule: Int, ref: Int) = {
-      Array(refinements.rules.globalize(rule, ref))
+      featuresForRule(refinements.rules.globalize(rule, ref))
     }
 
     def featuresForSpan(begin: Int, end: Int, tag: Int, ref: Int) = {
-      Array(refinements.labels.globalize(tag, ref) + refinements.rules.fineIndex.size)
+      featuresForLabel(refinements.labels.globalize(tag, ref))
     }
   }
 }

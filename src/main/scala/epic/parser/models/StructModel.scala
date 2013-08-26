@@ -138,10 +138,10 @@ case class StructModelFactory(baseParser: ParserParams.XbarGrammar,
     def ruleFlattener(r: Rule[AnnotatedLabel]) = {
       (IndexedSeq(r, r.map(_.clearFeatures), r.map(_.baseAnnotatedLabel)) ++ selectOneFeature(r)).toSet.toIndexedSeq
     }
-    val feat = new GenFeaturizer[AnnotatedLabel, String](wordFeaturizer, labelFlattener, ruleFlattener)
+    val feat = new ProductionFeaturizer[AnnotatedLabel, AnnotatedLabel, String](xbarGrammar, indexedRefinements, labelFlattener, ruleFlattener)
 
     val featureCounter = readWeights(oldWeights)
-    val indexedFeaturizer = IndexedFeaturizer(xbarGrammar, xbarLexicon, trainTrees, feat, indexedRefinements)
+    val indexedFeaturizer = IndexedFeaturizer(feat, wordFeaturizer, trainTrees, annotator andThen (_.tree.map(IndexedSeq(_))), indexedRefinements)
 
     new StructModel[AnnotatedLabel, AnnotatedLabel, String](indexedFeaturizer,
     annotator,
