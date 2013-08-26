@@ -285,7 +285,7 @@ case class AnnotateRightRecNP[W]() extends TreeAnnotator[AnnotatedLabel, W, Anno
       case t:NullaryTree[AnnotatedLabel] => t
       case UnaryTree(lbl, child, chain, span) if lbl.label == "@NP" =>
         UnaryTree(lbl.annotate(RightRecNP), annotateDownwards(child), chain, span)
-      case BinaryTree(lbl, lc, rc, span) if  lbl.label == "@NP" =>
+      case BinaryTree(lbl, lc, rc, span) if lbl.label == "@NP" =>
         BinaryTree(lbl.annotate(RightRecNP), if(lc.label.isIntermediate) annotateDownwards(lc) else lc, if(rc.label.isIntermediate) annotateDownwards(rc) else rc, span)
       case _ => tree
     }
@@ -294,7 +294,7 @@ case class AnnotateRightRecNP[W]() extends TreeAnnotator[AnnotatedLabel, W, Anno
 }
 
 /**
- * Marks if an XP immediately dominates a CC, or an @XP that recursively dominates a CC.
+ * Marks if an XP immediately dominates a CC or if an @XP that recursively dominates a CC.
  * @tparam W
  */
 case class AnnotateDomCC[W]() extends TreeAnnotator[AnnotatedLabel, W, AnnotatedLabel] {

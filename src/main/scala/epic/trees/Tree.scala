@@ -203,7 +203,7 @@ object Trees {
       else "@" + currentLabel
     }
 
-    binarize[String](tree, stringBinarizer _, headFinder)
+    binarize[String](tree, stringBinarizer, headFinder)
   }
 
 
