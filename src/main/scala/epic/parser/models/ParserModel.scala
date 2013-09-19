@@ -43,11 +43,7 @@ trait ParserInference[L, W] extends ProjectableInference[TreeInstance[L, W], Cor
   type ExpectedCounts = StandardExpectedCounts[Feature]
   type Marginal = epic.parser.ParseMarginal[L, W]
 
-
-  def emptyCounts = StandardExpectedCounts.zero(featurizer.index)
-
   def grammar: RefinedGrammar[L, W]
-  def featurizer: RefinedFeaturizer[L, W, Feature]
   def baseMeasure: CoreGrammar[L, W]
 
   def marginal(v: TreeInstance[L, W], aug: CoreAnchoring[L, W]): ParseMarginal[L, W] = {

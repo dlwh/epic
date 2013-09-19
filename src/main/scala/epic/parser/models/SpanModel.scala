@@ -39,17 +39,15 @@ import epic.trees.annotations.FilterAnnotations
  * @author dlwh
  */
 @SerialVersionUID(1L)
-class SpanModel[L, L2, W](featurizer: RefinedFeaturizer[L, W, Feature],
+class SpanModel[L, L2, W](val featurizer: RefinedFeaturizer[L, W, Feature],
                           val featureIndex: Index[Feature],
-                          ann: (BinarizedTree[L], IndexedSeq[W]) => BinarizedTree[L2],
-                          baseFactory: CoreGrammar[L, W],
+                          val annotator: (BinarizedTree[L], IndexedSeq[W]) => BinarizedTree[L2],
+                          val baseFactory: CoreGrammar[L, W],
                           val baseGrammar: BaseGrammar[L],
                           val lexicon: Lexicon[L, W],
                           val refinedGrammar: BaseGrammar[L2],
                           val refinements: GrammarRefinements[L, L2],
-                          initialFeatureVal: (Feature => Option[Double]) = {
-                            _ => None
-                          }) extends ParserModel[L, W] with Serializable {
+                          initialFeatureVal: (Feature => Option[Double]) = { _ => None }) extends ParserModel[L, W] with Serializable {
   type Inference = AnnotatedParserInference[L, W]
 
   override def initialValueForFeature(f: Feature) = initialFeatureVal(f) getOrElse 0.0
@@ -57,7 +55,7 @@ class SpanModel[L, L2, W](featurizer: RefinedFeaturizer[L, W, Feature],
   def inferenceFromWeights(weights: DenseVector[Double]) = {
     val factory = new DotProductGrammar(baseGrammar, lexicon, refinedGrammar, refinements, weights, featurizer)
     def reannotate(bt: BinarizedTree[L], words: IndexedSeq[W]) = {
-      val annotated = ann(bt, words)
+      val annotated = annotator(bt, words)
 
       val localized = annotated.map { l =>
         refinements.labels.project(l) -> refinements.labels.localize(l)

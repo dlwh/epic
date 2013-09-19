@@ -336,11 +336,11 @@ object PropertyPropagation {
   private def dot(weights: DenseVector[Double], features: Array[Int]) = {
     var i = 0
     var score = 0.0
-    val w = weights.data
+    val w = weights
     while(i < features.length) {
       val f = features(i)
       if (f != -1)
-        score += w(weights.offset + weights.stride * f)
+        score += w(f)
       i += 1
     }
     score

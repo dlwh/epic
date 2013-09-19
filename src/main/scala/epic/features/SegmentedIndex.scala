@@ -3,6 +3,8 @@ package epic.features
 import breeze.util.Index
 import epic.framework.{ComponentFeature, Feature}
 import java.util
+import breeze.linalg.DenseVector
+import scala.collection.immutable
 
 /**
  *
@@ -35,6 +37,8 @@ class SegmentedIndex[T,IndexType](val indices: IndexedSeq[IndexType])(implicit v
 
   def addComponentOffset(component: Int, feature: Int) = feature + offsets(component)
   def componentOffset(component: Int) = offsets(component)
+
+  def shardWeights(dv: DenseVector[Double]): immutable.IndexedSeq[DenseVector[Double]] = (0 until indices.size).map(c => dv(componentOffset(c) until componentOffset(c+1)))
 }
 
 object SegmentedIndex {

@@ -50,7 +50,7 @@ trait ParseMarginal[L, W] extends VisitableMarginal[AnchoredVisitor[L]] {
 
   def expectedCounts[Feat](featurizer: RefinedFeaturizer[L, W, Feat], counts: StandardExpectedCounts[Feat], scale: Double): StandardExpectedCounts[Feat] = {
     val spec = featurizer.anchor(words)
-    val visitor = ParseMarginal.mkVisitor(counts, spec, scale)
+    val visitor = ParseMarginal.mkVisitorFromFeaturizer(counts, spec, scale)
     visit(visitor)
     counts.loss += logPartition * scale
     counts
@@ -70,7 +70,7 @@ trait ParseMarginal[L, W] extends VisitableMarginal[AnchoredVisitor[L]] {
 }
 
 object ParseMarginal {
-  private def mkVisitor[L, W, Feat](counts: StandardExpectedCounts[Feat],
+  private def mkVisitorFromFeaturizer[L, W, Feat](counts: StandardExpectedCounts[Feat],
                                     spec: RefinedFeaturizer[L, W, Feat]#Anchoring,
                                     scale: Double):AnchoredVisitor[L] = {
     new AnchoredVisitor[L] {

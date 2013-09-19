@@ -238,10 +238,55 @@ object RefinedAnchoring {
                      words: IndexedSeq[W]): RefinedAnchoring[L, W] = {
     LiftedCoreAnchoring(CoreAnchoring.identity[L, W](grammar, lexicon, words, ChartConstraints.noSparsity[L]))
   }
-}
+
+  trait StructureDelegatingAnchoring[L, W] extends RefinedAnchoring[L, W] {
+    protected def baseAnchoring: RefinedAnchoring[L, W]
+
+    def grammar: BaseGrammar[L] = baseAnchoring.grammar
+    def lexicon: Lexicon[L, W] = baseAnchoring.lexicon
+
+    def words: IndexedSeq[W] = baseAnchoring.words
+
+    def scoreSpan(begin: Int, end: Int, label: Int, ref: Int): Double = baseAnchoring.scoreSpan(begin: Int, end: Int, label: Int, ref: Int)
+
+    def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int): Double = baseAnchoring.scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int)
+
+    def scoreUnaryRule(begin: Int, end: Int, rule: Int, ref: Int): Double = baseAnchoring.scoreUnaryRule(begin: Int, end: Int, rule: Int, ref: Int)
+
+    def validLabelRefinements(begin: Int, end: Int, label: Int): Array[Int] = baseAnchoring.validLabelRefinements(begin: Int, end: Int, label: Int)
+
+    def numValidRefinements(label: Int): Int = baseAnchoring.numValidRefinements(label: Int)
+
+    def numValidRuleRefinements(rule: Int): Int = baseAnchoring.numValidRuleRefinements(rule: Int)
+
+    def validRuleRefinementsGivenParent(begin: Int, end: Int, rule: Int, parentRef: Int): Array[Int] = baseAnchoring.validRuleRefinementsGivenParent(begin: Int, end: Int, rule: Int, parentRef: Int)
+
+    def validRuleRefinementsGivenLeftChild(begin: Int, split: Int, completionBegin: Int, completionEnd: Int, rule: Int, childRef: Int): Array[Int] = baseAnchoring.validRuleRefinementsGivenLeftChild(begin: Int, split: Int, completionBegin: Int, completionEnd: Int, rule: Int, childRef: Int)
+
+    def validRuleRefinementsGivenRightChild(completionBegin: Int, completionEnd: Int, split: Int, end: Int, rule: Int, childRef: Int): Array[Int] = baseAnchoring.validRuleRefinementsGivenRightChild(completionBegin: Int, completionEnd: Int, split: Int, end: Int, rule: Int, childRef: Int)
+
+    def validUnaryRuleRefinementsGivenChild(begin: Int, end: Int, rule: Int, childRef: Int): Array[Int] = baseAnchoring.validUnaryRuleRefinementsGivenChild(begin: Int, end: Int, rule: Int, childRef: Int)
+
+    def leftChildRefinement(rule: Int, ruleRef: Int): Int = baseAnchoring.leftChildRefinement(rule: Int, ruleRef: Int)
+
+    def rightChildRefinement(rule: Int, ruleRef: Int): Int = baseAnchoring.rightChildRefinement(rule: Int, ruleRef: Int)
+
+    def parentRefinement(rule: Int, ruleRef: Int): Int = baseAnchoring.parentRefinement(rule: Int, ruleRef: Int)
+
+    def childRefinement(rule: Int, ruleRef: Int): Int = baseAnchoring.childRefinement(rule: Int, ruleRef: Int)
 
 
-trait BinaryRuleRefinements {
-  val numChildRefinements: Int
-  def leftChildForChildRefinement: Int
+    def ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int): Int = baseAnchoring.ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int)
+
+    def ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int, refC: Int): Int = baseAnchoring.ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int, refC: Int)
+
+    def validCoarseRulesGivenParentRefinement(a: Int, refA: Int): Array[Int] = baseAnchoring.validCoarseRulesGivenParentRefinement(a: Int, refA: Int)
+
+    def validParentRefinementsGivenRule(begin: Int, splitBegin: Int, splitEnd: Int, end: Int, rule: Int): Array[Int] = baseAnchoring.validParentRefinementsGivenRule(begin: Int, splitBegin: Int, splitEnd: Int, end: Int, rule: Int)
+
+    def validLeftChildRefinementsGivenRule(begin: Int, end: Int, completionBegin: Int, completionEnd: Int, rule: Int): Array[Int] = baseAnchoring.validLeftChildRefinementsGivenRule(begin: Int, end: Int, completionBegin: Int, completionEnd: Int, rule: Int)
+
+    def validRightChildRefinementsGivenRule(completionBegin: Int, completionEnd: Int, begin: Int, end: Int, rule: Int): Array[Int] = baseAnchoring.validRightChildRefinementsGivenRule(completionBegin: Int, completionEnd: Int, begin: Int, end: Int, rule: Int)
+  }
+
 }
