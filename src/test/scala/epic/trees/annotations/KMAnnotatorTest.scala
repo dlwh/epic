@@ -24,9 +24,8 @@ import epic.trees.{Span, StandardTreeProcessor, Tree}
  *
  * @author dlwh
  */
-/*
 @RunWith(classOf[JUnitRunner])
-class KMPipelineTest extends FunSuite {
+class KMAnnotatorTest extends FunSuite {
   val processor = new StandardTreeProcessor()
   val pipeline = KMAnnotator()
   test("KLMA fig 7") {
@@ -41,8 +40,13 @@ class KMPipelineTest extends FunSuite {
     // make sure the S dominates a V
     assert(pipelined.allChildren.exists(t => t.label.label == "S" && t.label.hasAnnotation(Dom("V"))), "DomV2")
     // make sure the @S dominates a V and has an NP to its left
-    assert(pipelined.allChildren.exists(t => t.label.label == "@S" && t.label.hasAnnotation(Dom("V")) && t.label.siblings(0) == Left("NP")), "DomV && NP left")
+    if(pipelined.allChildren.exists(t => t.label.label == "@S" && t.label.hasAnnotation(Dom("V")) && t.label.siblings(0) == Right("."))) {
+
+    } else {
+      fail(pipelined.toString + " " + pipelined.map(label => label -> ( label.label == "@S" , label.hasAnnotation(Dom("V")) , label.siblings.map(_ == Right(".")))))
+    }
   }
+
 
   test("KLMA NPs") {
     val (tree, words) = Tree.fromString("(TOP (S (NP (DT This)) (VP (VBZ is) (NP (NN panic) (NP (NN buying)))) (. .)))")
@@ -54,4 +58,3 @@ class KMPipelineTest extends FunSuite {
   }
 
 }
-*/

@@ -57,7 +57,7 @@ case class AnnotatedLabel(label: String,
   override def toString = {
     val components = new ArrayBuffer[String]()
     if(parents.nonEmpty) {
-      components += parents.mkString("^")
+      components += parents.mkString("^","^","")
     }
     if(siblings.nonEmpty) {
       val b = new StringBuilder()

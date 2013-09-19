@@ -49,14 +49,8 @@ object SpanShapeGenerator extends Serializable {
           ()
         } else if (result.length > 2 && result.last == 'e' && result(result.length - 2) == x) {
           () // nothing, already have our e
-        } else  if(x.isLetterOrDigit) {
-          result += x
-          ()
         } else {
-          // keep all punctuation
-          result ++= w
-
-          ()
+          result += x
         }
       }
       i += 1
