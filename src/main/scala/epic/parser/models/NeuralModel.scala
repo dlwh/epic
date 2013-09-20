@@ -2,14 +2,26 @@ package epic.parser.models
 
 import epic.framework.{StandardExpectedCounts, Feature}
 import breeze.util.Index
-import epic.features.SegmentedIndex
+import epic.features._
 import epic.parser.models.NeuralModel._
 import breeze.linalg._
 import epic.parser._
 import epic.lexicon.Lexicon
-import epic.trees.TreeInstance
+import epic.trees.{AnnotatedLabel, TreeInstance}
 import breeze.numerics.sigmoid
 import breeze.features.FeatureVector
+import breeze.config.Help
+import epic.trees.annotations.{FilterAnnotations, TreeAnnotator}
+import java.io.File
+import epic.util.CacheBroker
+import epic.parser.projections.GrammarRefinements
+import epic.trees.TreeInstance
+import scala.Some
+import epic.parser.models.NeuralModel.NeuralFeature
+import epic.parser.ExpectedCounts
+import epic.parser.models.AnnotatedParserInference
+import epic.trees.annotations.FilterAnnotations
+import epic.parser.models.NeuralInference
 
 /**
  * The neural model is really just a
@@ -179,5 +191,63 @@ object NeuralModel {
       act :*= -1.0
     }
 
+  }
+}
+
+
+case class NeuralModelFactory(@Help(text=
+                              """The kind of annotation to do on the refined grammar. Default uses no annotations.
+You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Manning 2003.
+                              """)
+                            annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = FilterAnnotations(),
+                            @Help(text="Old weights to initialize with. Optional")
+                            oldWeights: File = null,
+                            @Help(text="For features not seen in gold trees, we bin them into dummyFeats * numGoldFeatures bins using hashing.")
+                            dummyFeats: Double = 0.5) extends ParserModelFactory[AnnotatedLabel, String] {
+  type MyModel = NeuralModel[AnnotatedLabel, AnnotatedLabel, String]
+
+
+  def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]], constrainer: CoreGrammar[AnnotatedLabel, String])(implicit broker: CacheBroker) = {
+    val annTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]] = trainTrees.map(annotator(_))
+    val (annWords, annBinaries, annUnaries) = this.extractBasicCounts(annTrees)
+    val refGrammar = BaseGrammar(AnnotatedLabel.TOP, annBinaries, annUnaries)
+
+    val trees = trainTrees.map(_.mapLabels(_.baseAnnotatedLabel))
+    val xbarGrammar = constrainer.grammar
+    val xbarLexicon = constrainer.lexicon
+    val indexedRefinements = GrammarRefinements(xbarGrammar, refGrammar, (_: AnnotatedLabel).baseAnnotatedLabel)
+
+    val wf = WordFeaturizer.goodPOSTagFeaturizer(annWords)
+    val span:SplitSpanFeaturizer[String] = {
+      val dsl = new WordFeaturizer.DSL(annWords) with SurfaceFeaturizer.DSL with SplitSpanFeaturizer.DSL
+      import dsl._
+
+      ( clss(split)
+        + distance[String](begin, split)
+        + distance[String](split, end)
+//        + distance[String](begin, split) * distance[String](split,end)
+        + clss(begin) + clss(end)
+        + spanShape + clss(begin-1) + clss(end-1)
+        + length
+        + sent
+//        + clss(begin-1) * clss(end) // word edges
+//        +  clss(begin-1) * clss(end) * length
+        )
+    }
+    val indexedWord = IndexedWordFeaturizer.fromData(wf, annTrees.map{_.words})
+    val surface = IndexedSplitSpanFeaturizer.fromData(span, annTrees)
+
+    val indexed =  IndexedSpanFeaturizer.extract[AnnotatedLabel, AnnotatedLabel, String](indexedWord,
+      surface,
+      annotator,
+      indexedRefinements,
+      xbarGrammar,
+      HashFeature.Relative(dummyFeats),
+      trees)
+
+    val featureCounter = readWeights(oldWeights)
+
+    val base = new SpanModel[AnnotatedLabel, AnnotatedLabel, String](indexed, indexed.index, annotator, constrainer, xbarGrammar, xbarLexicon, refGrammar, indexedRefinements,featureCounter.get(_))
+    new NeuralModel(base, 20)
   }
 }
