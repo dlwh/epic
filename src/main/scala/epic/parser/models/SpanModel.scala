@@ -39,17 +39,15 @@ import epic.trees.annotations.FilterAnnotations
  * @author dlwh
  */
 @SerialVersionUID(1L)
-class SpanModel[L, L2, W](featurizer: RefinedFeaturizer[L, W, Feature],
+class SpanModel[L, L2, W](val featurizer: RefinedFeaturizer[L, W, Feature],
                           val featureIndex: Index[Feature],
-                          ann: (BinarizedTree[L], IndexedSeq[W]) => BinarizedTree[L2],
-                          baseFactory: CoreGrammar[L, W],
+                          val annotator: (BinarizedTree[L], IndexedSeq[W]) => BinarizedTree[L2],
+                          val baseFactory: CoreGrammar[L, W],
                           val baseGrammar: BaseGrammar[L],
                           val lexicon: Lexicon[L, W],
                           val refinedGrammar: BaseGrammar[L2],
                           val refinements: GrammarRefinements[L, L2],
-                          initialFeatureVal: (Feature => Option[Double]) = {
-                            _ => None
-                          }) extends ParserModel[L, W] with Serializable {
+                          initialFeatureVal: (Feature => Option[Double]) = { _ => None }) extends ParserModel[L, W] with Serializable {
   type Inference = AnnotatedParserInference[L, W]
 
   override def initialValueForFeature(f: Feature) = initialFeatureVal(f) getOrElse 0.0
@@ -57,7 +55,7 @@ class SpanModel[L, L2, W](featurizer: RefinedFeaturizer[L, W, Feature],
   def inferenceFromWeights(weights: DenseVector[Double]) = {
     val factory = new DotProductGrammar(baseGrammar, lexicon, refinedGrammar, refinements, weights, featurizer)
     def reannotate(bt: BinarizedTree[L], words: IndexedSeq[W]) = {
-      val annotated = ann(bt, words)
+      val annotated = annotator(bt, words)
 
       val localized = annotated.map { l =>
         refinements.labels.project(l) -> refinements.labels.localize(l)
@@ -317,7 +315,7 @@ class IndexedSpanFeaturizer[L, L2, W](wordFeatureIndex: CrossProductIndex[Featur
         cache = if(begin + 1 == end) {
           wordFeatureIndex.crossProduct(spanFeats, wspec.featuresForWord(begin), wordOffset)
         } else {
-          spanFeatureIndex.crossProduct(spanFeats, sspec.featuresForSpan(begin, end), spanOffset, true)
+          spanFeatureIndex.crossProduct(spanFeats, getSpanFeatures(begin, end), spanOffset, true)
         }
         rcache(globalized) = cache
       }
@@ -335,7 +333,7 @@ class IndexedSpanFeaturizer[L, L2, W](wordFeatureIndex: CrossProductIndex[Featur
       var cache = rcache(globalized)
       if(cache == null)  {
         cache = spanFeatureIndex.crossProduct(fspec.featuresForUnaryRule(begin, end, rule, ref),
-          sspec.featuresForSpan(begin, end), spanOffset, true)
+          getSpanFeatures(begin, end), spanOffset, true)
         rcache(globalized) = cache
       }
       cache
@@ -356,20 +354,32 @@ class IndexedSpanFeaturizer[L, L2, W](wordFeatureIndex: CrossProductIndex[Featur
       }
       var cache = scache(globalized)
       if(cache == null)  {
-        cache = spanFeatureIndex.crossProduct(fspec.featuresForBinaryRule(begin, split, end, rule, ref), sspec.featuresForSpan(begin, end), spanOffset, true)
+        val spanFeatures = getSpanFeatures(begin, end)
+        cache = spanFeatureIndex.crossProduct(fspec.featuresForBinaryRule(begin, split, end, rule, ref),spanFeatures, spanOffset, true)
+        val forSplit = spanFeatureIndex.crossProduct(fspec.featuresForBinaryRule(begin, split, end, rule, ref), sspec.featuresForSplit(begin, split, end), spanOffset, false)
+        if(forSplit.length > 0)
+          cache = Arrays.concatenate(cache, forSplit)
         scache(globalized) = cache
       }
 
-      val forSplit = spanFeatureIndex.crossProduct(fspec.featuresForBinaryRule(begin, split, end, rule, ref), sspec.featuresForSplit(begin, split, end), spanOffset, true)
-      if(forSplit.nonEmpty)
-        Arrays.concatenate(cache, forSplit)
-      else
-        cache
+      cache
+    }
+
+    private def getSpanFeatures(begin: Int, end: Int):Array[Int] = {
+      val ind = TriangularArray.index(begin, end)
+      var cache = rawSpanCache(ind)
+      if(cache eq null) {
+        cache = sspec.featuresForSpan(begin, end)
+        rawSpanCache(ind) = cache
+      }
+      cache
     }
 
     // caches:
     // (begin,end) -> label ->  Array[Int]
     val spanCache = TriangularArray.raw[OpenAddressHashArray[Array[Int]]](length + 1, null)
+    // (begin,end) ->  Array[Int]
+    val rawSpanCache = TriangularArray.raw[Array[Int]](length + 1, null)
     // (begin,end) -> rule -> Array[Int]
     val unaryCache = TriangularArray.raw[OpenAddressHashArray[Array[Int]]](length + 1, null)
     // (begin, end) -> (split - begin) -> Array[Int]

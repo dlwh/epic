@@ -124,7 +124,7 @@ object SplitSpanFeaturizer {
       def featuresForSpan(begin: Int, end: Int): Array[Feature] = anchs.flatMap(_.featuresForSpan(begin, end))
 
       def featuresForSplit(begin: Int, split: Int, end: Int): Array[Feature] = {
-        anchs.flatMap(_.featuresForSplit(begin, split, end))
+        Arrays.concatenate(anchs.map(_.featuresForSplit(begin, split, end)):_*)
       }
     }
   }

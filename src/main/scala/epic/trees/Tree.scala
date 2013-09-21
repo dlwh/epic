@@ -215,34 +215,46 @@ object Trees {
    * Adds horizontal markovization to an already binarized tree with no markovization.
    *
    * The sibling history of a node is:
-   * If it's not an intermediate: nothing
-   * If it's the bottom of an identity unary: its parent's horizontal annotation
-   * If it's the child of a binary rule: its sibling + its parent's markovization
+   * If one of its children is an intermediate, then its history concatenated with its sibling (if it exists), markovizing.
+   * if neither is an intermediate, and it is an intermediate, then the right child.
+   * Otherwise it is empty
    *
    */
   def addHorizontalMarkovization[T](tree: BinarizedTree[T],
                                     order: Int,
                                     join: (T,IndexedSeq[Either[T,T]])=>T,
                                     isIntermediate: T=>Boolean):BinarizedTree[T] = {
-    def rec(tree: BinarizedTree[T],history: IndexedSeq[Either[T,T]] = IndexedSeq.empty):BinarizedTree[T] = {
-      val newHistory = if(isIntermediate(tree.label)) history.take(order-1) else IndexedSeq.empty
-      val newLabel = if(newHistory.nonEmpty) join(tree.label, newHistory) else tree.label
+    def rec(tree: BinarizedTree[T]):(BinarizedTree[T], IndexedSeq[Either[T,T]]) = {
       tree match {
-        case BinaryTree(_, t1, t2, span) if isIntermediate(t1.label) =>
-          BinaryTree(newLabel, rec(t1,Right(t2.label) +: newHistory), rec(t2, IndexedSeq.empty), span)
-        case BinaryTree(_, t1, t2, span) if isIntermediate(t2.label) =>
-          BinaryTree(newLabel, rec(t1,IndexedSeq.empty), rec(t2,Left(t1.label) +:newHistory), tree.span)
-        case BinaryTree(_, t1, t2, span) =>
-          BinaryTree(newLabel, rec(t1), rec(t2), tree.span)
+        case BinaryTree(label, t1, t2, span) if isIntermediate(t1.label) =>
+          val (newt1, newhist) = rec(t1)
+          val (newt2, _) = rec(t2)
+          val newHistory = (Right(t2.label) +: newhist).take(order)
+          val newLabel = join(label, newHistory)
+          BinaryTree(newLabel, newt1, newt2, span) -> newHistory
+        case BinaryTree(label, t1, t2, span) if isIntermediate(t2.label) =>
+          val (newt1, _) = rec(t1)
+          val (newt2, newhist) = rec(t2)
+          val newHistory = (Left(t1.label) +: newhist).take(order)
+          val newLabel = join(label, newHistory)
+          BinaryTree(newLabel, newt1, newt2, span) -> newHistory
+        case BinaryTree(label, t1, t2, span) =>
+          val (newt1, _) = rec(t1)
+          val (newt2, _) = rec(t2)
+          val newHistory = if(isIntermediate(label) && order > 0) IndexedSeq(Right(t2.label)) else IndexedSeq.empty
+          val newLabel = if(isIntermediate(label)) join(label, newHistory) else  label
+          BinaryTree(newLabel, newt1, newt2, tree.span) -> newHistory
         case UnaryTree(label, child, chain, span) =>
-          UnaryTree(newLabel,rec(child,if(child.label == label) history else IndexedSeq.empty), chain, tree.span)
-        case NullaryTree(_, span) =>
-          NullaryTree(newLabel, span)
+          val (newt1, hist) = rec(child)
+          val newHistory = if(isIntermediate(label)) hist else IndexedSeq.empty
+          val newLabel = if(isIntermediate(label)) join(label, newHistory) else  label
+          UnaryTree(newLabel, newt1, chain, tree.span) -> newHistory
+        case tree@NullaryTree(_, span) => tree -> IndexedSeq.empty
       }
 
     }
 
-    rec(tree)
+    rec(tree)._1
   }
 
   def addHorizontalMarkovization(tree: BinarizedTree[String], order: Int):BinarizedTree[String] = {

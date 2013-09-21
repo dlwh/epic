@@ -361,6 +361,8 @@ object ChartMarginal {
     val top = inside.top
     val g = grammar
 
+    val scoreArray = Array.ofDim[Double](anchoring.refined.maxLabelRefinements,  40)
+
     // a -> bc over [begin, split, end)
     for {
       span <- 2 to words.length
@@ -377,7 +379,6 @@ object ChartMarginal {
       val coarseNarrowLeft = top.coarseRightMostBeginForEnd(end)
       val coarseWideRight = top.coarseRightMostEndForBegin(begin)
       val coarseWideLeft = top.coarseLeftMostBeginForEnd(end)
-      val scoreArray = Array.ofDim[Double](anchoring.refined.maxLabelRefinements,  40)
       val offsets = new Array[Int](anchoring.refined.maxLabelRefinements)
       val spanScoresEntered = new Array[Boolean](anchoring.refined.maxLabelRefinements)
 

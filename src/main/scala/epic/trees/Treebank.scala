@@ -17,8 +17,7 @@ package epic.trees
 */
 
 
-import java.io.{FileReader, File, FileInputStream, InputStreamReader}
-import java.io.File
+import java.io._
 import epic.ontonotes.ConllOntoReader
 
 /**
@@ -109,6 +108,7 @@ object Treebank {
   * of the parsed Treebank.
   */
   def fromPennTreebankDir(dir: File):Treebank[String] = new Treebank[String] {
+    if(!dir.exists) throw new FileNotFoundException(dir.toString)
     def sections = dir.listFiles.filter(_.isDirectory).map(_.getName)
     val train = Portion("train", IndexedSeq.range(2,10).map("0" + _) ++ IndexedSeq.range(10,22).map(""+_))
 

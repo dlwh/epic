@@ -23,7 +23,7 @@ import epic.parser._
  * Parser inference for parses that have only observed annotations. Handles Structured, Span, and Lexicalized
  * annotations.
  * @param featurizer
- * @param ann
+ * @param annotator
  * @param grammar
  * @param baseMeasure
  * @tparam L
@@ -32,14 +32,14 @@ import epic.parser._
  * @author dlwh
  */
 case class AnnotatedParserInference[L, W](featurizer: RefinedFeaturizer[L, W, Feature],
-                                          ann: (BinarizedTree[L], IndexedSeq[W]) => BinarizedTree[(L, Int)],
+                                          annotator: (BinarizedTree[L], IndexedSeq[W]) => BinarizedTree[(L, Int)],
                                           grammar: RefinedGrammar[L, W],
                                           baseMeasure: CoreGrammar[L, W]) extends ParserInference[L, W] {
 
 
   def goldMarginal(ti: TreeInstance[L, W], aug: CoreAnchoring[L, W]): Marginal = {
     import ti._
-    val annotated = ann(tree, words)
+    val annotated = annotator(tree, words)
     TreeMarginal(AugmentedGrammar.fromRefined(grammar), words, annotated)
   }
 }

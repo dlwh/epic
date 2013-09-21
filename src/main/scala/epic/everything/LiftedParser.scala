@@ -58,7 +58,6 @@ object LiftedParser {
 
     type Marginal = ParseMarginal[AnnotatedLabel, String]
     type ExpectedCounts = StandardExpectedCounts[Feature]
-    def emptyCounts = inf.emptyCounts
 
     def baseAugment(sent: FeaturizedSentence): SentenceBeliefs = {
       beliefsFactory(sent)

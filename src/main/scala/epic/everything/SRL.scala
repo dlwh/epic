@@ -98,7 +98,7 @@ object SRL {
           }
         }
 
-        val countData = counts.counts.data
+        val countData = counts.counts
 
         var b = 0
         while(b < s.length) {

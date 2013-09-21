@@ -33,7 +33,7 @@ class ReachabilityProjection[L, L2, W](grammar: BaseGrammar[L], lexicon: Lexicon
       if(constraints.top.containsAll(treeconstraints.top) && constraints.bot.containsAll(treeconstraints.bot)) {
         synchronized(total += 1)
         tree
-      } else {
+      } else try {
         val w = words
         val marg = AugmentedAnchoring(makeGoldPromotingAnchoring(w, tree, treeconstraints), constraints).maxMarginal
 
@@ -50,6 +50,10 @@ class ReachabilityProjection[L, L2, W](grammar: BaseGrammar[L], lexicon: Lexicon
           s"Reachable: ${globalizedClosest.render(words, newline = true)}\nGold:${tree.render(words, newline = true)}"
         }
         globalizedClosest
+      } catch {
+        case ex:ParseExtractionException =>
+          logger.error("Couldn't find a parse for " + words, ex)
+          tree
       }
     })
   } catch {

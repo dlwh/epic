@@ -18,7 +18,7 @@ package models
 */
 import epic.parser.projections.GrammarRefinements
 import epic.framework.Feature
-import java.io.File
+import java.io.{PrintStream, FileOutputStream, File}
 import features._
 import breeze.linalg._
 import epic.trees._
@@ -85,16 +85,20 @@ case class StructModelFactory(baseParser: ParserParams.XbarGrammar,
                               @Help(text= "The kind of annotation to do on the refined grammar. Defaults to ~KM2003")
                               annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = KMAnnotator(),
                               @Help(text="Old weights to initialize with. Optional")
-                              oldWeights: File = null) extends ParserModelFactory[AnnotatedLabel, String] {
+                              oldWeights: File = null,
+                              annotatedTreesDumpPath: File = null) extends ParserModelFactory[AnnotatedLabel, String] {
   type MyModel = StructModel[AnnotatedLabel, AnnotatedLabel, String]
 
 
   def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]], constrainer: CoreGrammar[AnnotatedLabel, String])(implicit broker: CacheBroker) = {
     val transformed = trainTrees.par.map(annotator).seq.toIndexedSeq
 
-//    for( (x,y) <- trainTrees zip transformed) {
-//      println(x.render() + " " + y.render())
-//    }
+    if(annotatedTreesDumpPath != null) {
+      val ps = new PrintStream(new FileOutputStream(annotatedTreesDumpPath))
+      for( (x,y) <- trainTrees zip transformed) {
+        ps.println("Treebank:\n" + x.render() + "\nAnnotated:\n" + y.render() + "\n==========\n")
+      }
+    }
 
     val (initLexicon, initBinaries, initUnaries) = this.extractBasicCounts(transformed)
 
