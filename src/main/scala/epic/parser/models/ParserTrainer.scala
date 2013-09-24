@@ -119,8 +119,10 @@ object ParserTrainer extends epic.parser.ParserPipeline with Logging {
     val obj = new ModelObjective(model, theTrees, params.threads)
     val cachedObj = new CachedBatchDiffFunction(obj)
     val init = obj.initialWeightVector(randomize)
-    if(checkGradient)
-      GradientTester.test(cachedObj, obj.initialWeightVector(randomize = true), toString={(i: Int) => model.featureIndex.get(i).toString})
+    if(checkGradient) {
+      val cachedObj2 = new CachedBatchDiffFunction(new ModelObjective(model, theTrees.take(opt.batchSize), params.threads))
+      GradientTester.test(cachedObj2, obj.initialWeightVector(randomize = true), toString={(i: Int) => model.featureIndex.get(i).toString}, skipZeros = true)
+    }
 
     type OptState = FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State
     def evalAndCache(pair: (OptState, Int)) {
