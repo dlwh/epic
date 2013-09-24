@@ -7,21 +7,16 @@ import epic.parser.models.NeuralModel._
 import breeze.linalg._
 import epic.parser._
 import epic.lexicon.Lexicon
-import epic.trees.{AnnotatedLabel, TreeInstance}
+import epic.trees.AnnotatedLabel
 import breeze.numerics.sigmoid
 import breeze.features.FeatureVector
 import breeze.config.Help
-import epic.trees.annotations.{FilterAnnotations, TreeAnnotator}
+import epic.trees.annotations.TreeAnnotator
 import java.io.File
 import epic.util.CacheBroker
 import epic.parser.projections.GrammarRefinements
 import epic.trees.TreeInstance
-import scala.Some
-import epic.parser.models.NeuralModel.NeuralFeature
-import epic.parser.ExpectedCounts
-import epic.parser.models.AnnotatedParserInference
 import epic.trees.annotations.FilterAnnotations
-import epic.parser.models.NeuralInference
 
 /**
  * The neural model is really just a
@@ -29,6 +24,8 @@ import epic.parser.models.NeuralInference
  * @author dlwh
  */
 class NeuralModel[L, L2, W](baseModel: SpanModel[L, L2, W],
+                            labelFeaturizer: RefinedFeaturizer[L, W, Feature],
+                            surfaceFeaturizer: IndexedSplitSpanFeaturizer[W],
                             numOutputs: Int = 50,
                             initialFeatureVal: (Feature => Option[Double]) = { _ => None })  extends ParserModel[L, W] {
 
@@ -37,14 +34,21 @@ class NeuralModel[L, L2, W](baseModel: SpanModel[L, L2, W],
 
   type Inference = NeuralInference[L, W]
 
-  val featureIndex = SegmentedIndex(baseModel.featureIndex, new NeuralLayerFeatureIndex(1, numOutputs), new NeuralLayerFeatureIndex(numOutputs, baseModel.featureIndex.size))
+  val featureIndex = SegmentedIndex(
+    baseModel.featureIndex,
+    new NeuralLayerFeatureIndex(labelFeaturizer.index.size, numOutputs),
+    new NeuralLayerFeatureIndex(numOutputs, surfaceFeaturizer.featureIndex.size))
+
+  println(featureIndex.indices.map(_.size))
 
   def initialValueForFeature(f: Feature): Double = initialFeatureVal(f).getOrElse(baseModel.initialValueForFeature(f) + math.random * 1E-5)
 
   def inferenceFromWeights(weights: DenseVector[Double]): Inference = {
-    val Seq(baseWeights, outputWeights, inputWeights: DenseVector[Double]) = featureIndex.shardWeights(weights)
+    val Seq(baseWeights: DenseVector[Double], outputWeights: DenseVector[Double], inputWeights: DenseVector[Double]) = featureIndex.shardWeights(weights)
     val baseInf = baseModel.inferenceFromWeights(baseWeights)
-    new NeuralInference(baseInf, outputWeights, inputWeights.asDenseMatrix.reshape(numOutputs, baseModel.featureIndex.size))
+    val input = inputWeights.asDenseMatrix.reshape(numOutputs, surfaceFeaturizer.featureIndex.size)
+    val output = outputWeights.asDenseMatrix.reshape(labelFeaturizer.index.size, numOutputs)
+    new NeuralInference(baseInf, labelFeaturizer, surfaceFeaturizer, output, input)
 
   }
 
@@ -55,7 +59,11 @@ class NeuralModel[L, L2, W](baseModel: SpanModel[L, L2, W],
   }
 }
 
-case class NeuralInference[L, W](baseInference: AnnotatedParserInference[L, W], outputWeights: DenseVector[Double], inputWeights: DenseMatrix[Double]) extends ParserInference[L, W] {
+case class NeuralInference[L, W](baseInference: AnnotatedParserInference[L, W],
+                                 labelFeaturizer: RefinedFeaturizer[L, W, Feature],
+                                 surfaceFeaturizer: IndexedSplitSpanFeaturizer[W],
+                                 outputWeights: DenseMatrix[Double],
+                                 inputWeights: DenseMatrix[Double]) extends ParserInference[L, W] {
   def goldMarginal(ti: TreeInstance[L, W], aug: CoreAnchoring[L, W]): Marginal = {
     import ti._
     val annotated = baseInference.annotator(tree, words)
@@ -64,7 +72,7 @@ case class NeuralInference[L, W](baseInference: AnnotatedParserInference[L, W], 
 
   def baseMeasure: CoreGrammar[L, W] = baseInference.baseMeasure
 
-  val grammar = new NeuralModel.Grammar(baseInference.grammar, baseInference.featurizer, outputWeights, inputWeights)
+  val grammar = new NeuralModel.Grammar(baseInference.grammar, baseInference.featurizer, labelFeaturizer, surfaceFeaturizer, outputWeights, inputWeights)
 }
 
 object NeuralModel {
@@ -92,47 +100,61 @@ object NeuralModel {
 
   }
 
-  class Grammar[L, W](base: RefinedGrammar[L, W], baseFeaturizer: RefinedFeaturizer[L, W, Feature], outputWeights: DenseVector[Double], inputWeights: DenseMatrix[Double]) extends RefinedGrammar[L, W] {
+  class Grammar[L, W](base: RefinedGrammar[L, W], baseFeaturizer: RefinedFeaturizer[L, W, Feature], labelFeaturizer: RefinedFeaturizer[L, W, Feature], surfaceFeaturizer: IndexedSplitSpanFeaturizer[W], outputWeights: DenseMatrix[Double], inputWeights: DenseMatrix[Double]) extends RefinedGrammar[L, W] {
     def grammar: BaseGrammar[L] = base.grammar
 
     def lexicon: Lexicon[L, W] = base.lexicon
 
-    def anchor(words: IndexedSeq[W]) = new Anchoring(base.anchor(words), baseFeaturizer.anchor(words), outputWeights, inputWeights)
+    def anchor(words: IndexedSeq[W]) = {
+      new Anchoring(base.anchor(words),
+      baseFeaturizer.anchor(words),
+      labelFeaturizer.anchor(words),
+      surfaceFeaturizer.anchor(words),
+      outputWeights, inputWeights)
+    }
   }
 
 
   class Anchoring[L, W](val baseAnchoring: RefinedAnchoring[L, W],
                         val baseFeaturizer: RefinedFeaturizer[L, W, Feature]#Anchoring,
-                        val output: DenseVector[Double],
+                        val labelFeaturizer: RefinedFeaturizer[L, W, Feature]#Anchoring,
+                        val surfaceFeaturizer: IndexedSplitSpanFeatureAnchoring[W],
+                        val output: DenseMatrix[Double],
                         val input: DenseMatrix[Double]) extends RefinedAnchoring.StructureDelegatingAnchoring[L, W] {
     override def scoreSpan(begin: Int, end: Int, label: Int, ref: Int): Double = {
-      var base = super.scoreSpan(begin, end, label, ref)
+      var base = baseAnchoring.scoreSpan(begin, end, label, ref)
       if(base != Double.NegativeInfinity) {
-        base += score(baseFeaturizer.featuresForSpan(begin, end, label, ref))
+        base += score(labelFeaturizer.featuresForSpan(begin, end, label, ref), surfaceFeaturizer.featuresForSpan(begin, end))
       }
       base
     }
 
     override def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int): Double = {
-      var base = super.scoreBinaryRule(begin, split, end, rule, ref)
+      var base = baseAnchoring.scoreBinaryRule(begin, split, end, rule, ref)
       if(base != Double.NegativeInfinity) {
-        base += score(baseFeaturizer.featuresForBinaryRule(begin, split, end, rule, ref))
+        base += score(labelFeaturizer.featuresForBinaryRule(begin, split, end, rule, ref), surfaceFeaturizer.featuresForSplit(begin, split, end))
       }
       base
     }
 
     override def scoreUnaryRule(begin: Int, end: Int, rule: Int, ref: Int): Double = {
-      var base = super.scoreUnaryRule(begin, end, rule, ref)
+      var base = baseAnchoring.scoreUnaryRule(begin, end, rule, ref)
       if(base != Double.NegativeInfinity) {
-        base += score(baseFeaturizer.featuresForUnaryRule(begin, end, rule, ref))
+        base += score(labelFeaturizer.featuresForUnaryRule(begin, end, rule, ref), surfaceFeaturizer.featuresForSpan(begin, end))
       }
       base
     }
 
-    def score(features: Array[Int]):Double = {
-      val act = input * new FeatureVector(features)
+    def score(labelFeatures: Array[Int], surfaceFeatures: Array[Int]):Double = {
+      val act = input * new FeatureVector(surfaceFeatures)
       sigmoid.inPlace(act)
-      output dot act
+      var score = 0.0
+      var i = 0
+      while(i < labelFeatures.length) {
+        score += output.t(::, labelFeatures(i)) dot act
+        i += 1
+      }
+      score
     }
   }
 
@@ -143,45 +165,60 @@ object NeuralModel {
                                             inputOffset: Int) extends AnchoredVisitor[L] {
     import anchoring._
 
-    val rowsOfInputDerivative = Array.tabulate(output.size){ i =>
-      val startOffset = inputOffset + input.cols * i
-      val endOffset = startOffset + input.cols
-      accum.counts(startOffset until endOffset)
+    val inputDerivatives = {
+      accum.counts(inputOffset until (inputOffset + input.size))
+        .asDenseMatrix
+        .reshape(input.rows, input.cols, view = View.Require)
     }
 
-    val outputDerivative = accum.counts(outputOffset until (outputOffset + output.size))
+    val outputDerivatives = {
+      accum.counts(outputOffset until (outputOffset + output.size))
+        .asDenseMatrix
+        .reshape(output.rows, output.cols, view = View.Require)
+    }
 
     def visitBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int, score: Double) {
-      val feats: Array[Int] = baseFeaturizer.featuresForBinaryRule(begin, split, end, rule, ref)
-      tallyDerivative(feats, score)
+      val labelFeatures: Array[Int] = labelFeaturizer.featuresForBinaryRule(begin, split, end, rule, ref)
+      val surfFeats: Array[Int] = surfaceFeaturizer.featuresForSplit(begin, split, end)
+      val baseFeatures = baseFeaturizer.featuresForBinaryRule(begin, split, end, rule, ref)
+      axpy(score * scale, new FeatureVector(baseFeatures), accum.counts)
+      tallyDerivative(labelFeatures, surfFeats, score)
     }
 
     def visitUnaryRule(begin: Int, end: Int, rule: Int, ref: Int, score: Double) {
-      val feats: Array[Int] = anchoring.baseFeaturizer.featuresForUnaryRule(begin, end, rule, ref)
-      tallyDerivative(feats, score)
+      val labelFeatures: Array[Int] = labelFeaturizer.featuresForUnaryRule(begin, end, rule, ref)
+      val surfFeats: Array[Int] = surfaceFeaturizer.featuresForSpan(begin, end)
+      val baseFeatures = baseFeaturizer.featuresForUnaryRule(begin, end, rule, ref)
+      axpy(score * scale, new FeatureVector(baseFeatures), accum.counts)
+      tallyDerivative(labelFeatures, surfFeats, score)
     }
 
     def visitSpan(begin: Int, end: Int, tag: Int, ref: Int, score: Double) {
-      val feats: Array[Int] = anchoring.baseFeaturizer.featuresForSpan(begin, end, tag, ref)
-      tallyDerivative(feats, score)
+      val labelFeatures: Array[Int] = labelFeaturizer.featuresForSpan(begin, end, tag, ref)
+      val surfFeats: Array[Int] = surfaceFeaturizer.featuresForSpan(begin, end)
+      val baseFeatures = baseFeaturizer.featuresForSpan(begin, end, tag, ref)
+      axpy(score * scale, new FeatureVector(baseFeatures), accum.counts)
+      tallyDerivative(labelFeatures, surfFeats, score)
     }
 
 
     // for the neural features, the neural part of the activation is given by
-    // output dot sigmoid(input * features)
-    // nabla output = sigmoid'(input * features) = sigmoid(input * features) :* (1-sigmoid(input * features))
-    // d/d input(i, j) = (output(i) * sigmoid'(input * features)(i)) * features(j)
-    // d/d input(i, ::) = (output(i) * sigmoid'(input * features)(i)) * features
-    // d/d input = (output :* sigmoid'(input * features)) * features.t
-    def tallyDerivative(feats: Array[Int], score: Double) {
-      val features = new FeatureVector(feats)
-      axpy(score * scale, features, accum.counts)
-      val act: DenseVector[Double] = input * features
+    // (output * labelFeatures) dot sigmoid(input * surfaceFeatures)
+    // nabla output(::, lf) = sigmoid'(input * features) = sigmoid(input * features) :* (1-sigmoid(input * features))
+    // d/d input(i, j) = (output(i) dot y) :* sigmoid'(input * features)(i)) * features(j)
+    // d/d input(i, ::) = (\sum_lf output(i, lf)) dot (sigmoid'(input * features)(i)) * features)
+    def tallyDerivative(labelFeats: Array[Int], surfFeats: Array[Int], score: Double) {
+      val surfaceFeatures = new FeatureVector(surfFeats)
+      val act: DenseVector[Double] = input * surfaceFeatures
       dsigmoidInPlace(act)
       // act is currently sigmoid'(input * features)
-      axpy(score * scale, act, outputDerivative)
-      for (i <- 0 until output.size) {
-        axpy(score * scale * (output(i) * act(i)), features, rowsOfInputDerivative(i))
+      val outputSum = DenseVector.zeros[Double](act.size)
+      for(lf <- labelFeats) {
+        axpy(score * scale, act, outputDerivatives.t(::, lf))
+        outputSum += output.t(::, lf)
+      }
+      for (i <- 0 until input.rows) {
+        axpy(score * scale * (outputSum(i) * act(i)), surfaceFeatures, inputDerivatives.t(::, i))
       }
     }
 
@@ -225,7 +262,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
       ( clss(split)
         + distance[String](begin, split)
         + distance[String](split, end)
-//        + distance[String](begin, split) * distance[String](split,end)
+        + distance[String](begin, split) * distance[String](split,end)
         + clss(begin) + clss(end)
         + spanShape + clss(begin-1) + clss(end-1)
         + length
@@ -244,10 +281,11 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
       xbarGrammar,
       HashFeature.Relative(dummyFeats),
       trees)
+    val labelFeaturizer = new ProductionFeaturizer[AnnotatedLabel, AnnotatedLabel, String](xbarGrammar, indexedRefinements):RefinedFeaturizer[AnnotatedLabel, String, Feature]
 
     val featureCounter = readWeights(oldWeights)
 
-    val base = new SpanModel[AnnotatedLabel, AnnotatedLabel, String](indexed, indexed.index, annotator, constrainer, xbarGrammar, xbarLexicon, refGrammar, indexedRefinements,featureCounter.get(_))
-    new NeuralModel(base, 20)
+    val base = new SpanModel[AnnotatedLabel, AnnotatedLabel, String](indexed, indexed.index, annotator, constrainer, xbarGrammar, xbarLexicon, refGrammar, indexedRefinements,featureCounter.get)
+    new NeuralModel(base, labelFeaturizer, surface, 10)
   }
 }
