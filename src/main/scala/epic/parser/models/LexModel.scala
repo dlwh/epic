@@ -21,7 +21,7 @@ import epic.framework._
 import breeze.collection.mutable.OpenAddressHashArray
 import breeze.linalg._
 import epic.trees._
-import annotations.TreeAnnotator
+import epic.trees.annotations.{Xbarize, TreeAnnotator, StripAnnotations}
 import java.io.File
 import epic.parser._
 import breeze.util._
@@ -32,7 +32,6 @@ import epic.parser.features._
 import epic.util._
 import com.typesafe.scalalogging.log4j.Logging
 import epic.parser.features._
-import epic.trees.annotations.StripAnnotations
 import epic.trees._
 
 class LexModel[L, W](bundle: LexGrammarBundle[L, W],
@@ -632,7 +631,7 @@ object IndexedLexFeaturizer extends Logging {
 }
 
 case class LexModelFactory(@Help(text= "The kind of annotation to do on the refined grammar. Defaults to xbar.")
-                           annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = StripAnnotations(),
+                           annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = Xbarize(),
                            @Help(text="Old weights to initialize with. Optional")
                            oldWeights: File = null,
                            @Help(text="For features not seen in gold trees, we bin them into dummyFeats * numGoldFeatures bins using hashing.")

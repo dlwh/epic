@@ -229,7 +229,7 @@ object AnnotatingPipeline extends Logging {
 
     val (grammar, lexicon) = xbar.xbarGrammar(trainTrees)
 
-    val pruningParser =  GenerativeParser.annotatedParser(grammar, lexicon, StripAnnotations() andThen AddMarkovization(), trainTrees)
+    val pruningParser =  GenerativeParser.annotatedParser(grammar, lexicon, StripAnnotations() andThen Markovize(), trainTrees)
 
     logger.info{
       val devTrees = for (d <- devDocs; s <- d.sentences) yield {
@@ -283,7 +283,7 @@ object AnnotatingPipeline extends Logging {
                          weightsCache: Counter[String, Double],
                          lexHashFeatures: Double): SentLexParser.Model = {
     val trainTrees = train.flatMap(_.sentences).map(_.treeInstance)
-    val trees = trainTrees.map(StripAnnotations())
+    val trees = trainTrees.map(Xbarize())
     val (initLexicon, initBinaries, initUnaries) = GenerativeParser.extractCounts(trees)
 
     val wordIndex: Index[String] = Index(trainTrees.iterator.flatMap(_.words))

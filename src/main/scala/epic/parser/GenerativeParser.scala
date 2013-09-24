@@ -18,9 +18,8 @@ package epic.parser
 import projections.GrammarRefinements
 import epic.trees._
 
-import annotations.{AddMarkovization, PipelineAnnotator, FilterAnnotations, TreeAnnotator}
-import breeze.linalg.{Axis, Counter2}
-import chalk.text.analyze.EnglishWordClassGenerator
+import annotations.{Markovize, TreeAnnotator}
+import breeze.linalg.Counter2
 import breeze.config.Help
 import epic.parser.ParserParams.XbarGrammar
 import epic.lexicon.{SimpleTagScorer, MaxEntTagScorer, Lexicon, SimpleLexicon}
@@ -31,8 +30,8 @@ import epic.trees.UnaryRule
 import epic.trees.BinaryTree
 import epic.trees.TreeInstance
 import epic.trees.annotations.FilterAnnotations
-import epic.trees.annotations.AddMarkovization
 import epic.trees.annotations.PipelineAnnotator
+import java.io.{FileWriter, BufferedWriter, File}
 
 /**
  * Contains codes to read off parsers and grammars from
@@ -138,12 +137,14 @@ object GenerativeTrainer extends ParserPipeline {
   case class Params(@Help(text="Location to read/write the baseParser") baseParser: XbarGrammar,
                     @Help(text=
                       "The kind of annotation to do on the refined grammar. Default uses v2h1 markovization and nothing else.")
-                    annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = PipelineAnnotator(Seq(FilterAnnotations(), AddMarkovization(0,2))),
+                    annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = PipelineAnnotator(Seq(FilterAnnotations(), Markovize(1,2))),
                     threads: Int = -1,
                     @Help(text="Use max rule decoding instead of max constituent")
                     maxRule: Boolean = false,
                     @Help(text="Use the awesome cheating lexicon (slower to train)")
-                    awesomeLexicon: Boolean = true
+                    awesomeLexicon: Boolean = false,
+                    @Help(text="dump the grammar to a text file")
+                    grammarDumpPath: File = null
                      )
   protected val paramManifest = manifest[Params]
 
@@ -159,9 +160,13 @@ object GenerativeTrainer extends ParserPipeline {
     val (wordCounts, binaryCounts, initUnaries) = GenerativeParser.extractCounts(transformed)
 
     val refGrammar = BaseGrammar(AnnotatedLabel.TOP, binaryCounts, initUnaries)
-    val indexedRefinements = GrammarRefinements(xbar, refGrammar, {
-      (_: AnnotatedLabel).baseAnnotatedLabel
-    })
+    val indexedRefinements = GrammarRefinements(xbar, refGrammar, { (_: AnnotatedLabel).baseAnnotatedLabel })
+
+    logger.info("Num coarse rules:" + xbar.index.size)
+    logger.info("Num coarse symbols:" + xbar.labelIndex.size)
+
+    logger.info("Num refined rules:" + refGrammar.index.size)
+    logger.info("Num refined symbols:" + refGrammar.labelIndex.size)
 
 
     val scorer = if(params.awesomeLexicon) {
@@ -172,6 +177,12 @@ object GenerativeTrainer extends ParserPipeline {
     }
 
     val refinedGrammar = RefinedGrammar.generative(xbar, xbarLexicon, indexedRefinements, binaryCounts, initUnaries, scorer)
+
+    if(params.grammarDumpPath != null) {
+      val out = new BufferedWriter(new FileWriter(params.grammarDumpPath))
+      refinedGrammar.prettyPrint(out)
+    }
+
     val decoder = if (params.maxRule) new MaxRuleProductDecoder[AnnotatedLabel, String]() else new ViterbiDecoder[AnnotatedLabel, String]
     val parser = new SimpleChartParser(AugmentedGrammar.fromRefined(refinedGrammar), decoder)
     Iterator.single(("Gen", parser))

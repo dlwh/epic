@@ -86,7 +86,10 @@ trait Tree[+L] extends Serializable {
   def leftHeight:Int = if(isLeaf) 0 else 1 + children(0).leftHeight
 
   import Tree._
-  override def toString = recursiveToString(this,0,new StringBuilder).toString
+  override def toString = toString(false)
+
+  def toString(newline: Boolean) = recursiveToString(this,0, newline, new StringBuilder).toString
+
   def render[W](words: Seq[W], newline: Boolean = true) = recursiveRender(this,1,words, newline, new StringBuilder).toString
 }
 
@@ -95,11 +98,13 @@ object Tree {
   def unapply[L](t: Tree[L]): Option[(L,IndexedSeq[Tree[L]], Span)] = Some((t.label,t.children, t.span))
   def fromString(input: String):(Tree[String],Seq[String]) = new PennTreeReader(new StringReader(input)).next
 
-  private def recursiveToString[L](tree: Tree[L], depth: Int, sb: StringBuilder):StringBuilder = {
+  private def recursiveToString[L](tree: Tree[L], depth: Int, newline: Boolean, sb: StringBuilder):StringBuilder = {
     import tree._
     sb append "( " append tree.label append " [" append span.begin append "," append span.end append "] "
     for( c <- tree.children ) {
-      recursiveToString(c,depth+1,sb) append " "
+      if(newline && (c.children.nonEmpty)) sb append "\n" append "  " * depth
+      else sb.append(' ')
+      recursiveToString(c,depth+1,newline, sb)
     }
     sb append ")"
     sb
@@ -174,36 +179,62 @@ case class NullaryTree[+L](label: L, span: Span) extends BinarizedTree[L] {
 object Trees {
 
   def binarize[L](tree: Tree[L],
-                  makeIntermediate: L=>L,
+                  makeIntermediate: (L, L)=>L,
+                  extendIntermediate: (L, Either[L,L])=>L,
                   headFinder: HeadFinder[L]):BinarizedTree[L] = tree match {
     case Tree(l, Seq(), span) => NullaryTree(l, span)
-    case Tree(l, Seq(oneChild), span) => UnaryTree(l,binarize(oneChild, makeIntermediate, headFinder), IndexedSeq.empty, tree.span)
+    case Tree(l, Seq(oneChild), span) => UnaryTree(l,binarize(oneChild, makeIntermediate, extendIntermediate, headFinder), IndexedSeq.empty, tree.span)
     case Tree(l, Seq(leftChild,rightChild), span) =>
-      BinaryTree(l,binarize(leftChild, makeIntermediate, headFinder),binarize(rightChild, makeIntermediate, headFinder), tree.span)
+      BinaryTree(l,binarize(leftChild, makeIntermediate, extendIntermediate, headFinder),binarize(rightChild, makeIntermediate, extendIntermediate, headFinder), tree.span)
     case Tree(l, children, span) =>
       val headChildIndex = headFinder.findHeadChild(tree)
-      val binarized = children.map(binarize(_, makeIntermediate, headFinder))
+      val binarized = children.map(binarize(_, makeIntermediate, extendIntermediate, headFinder))
       val headChild = binarized(headChildIndex)
-      val intermediate = makeIntermediate(l)
       // fold in right arguments
       // newArg is hthe next right child
+      // for a rule A -> B C [D] E F, we want A -> @A[D]>E F, @A[D]>E -> D E
       val right = binarized.drop(headChildIndex+1).foldLeft(headChild){ (tree,newArg) =>
-        BinaryTree(intermediate,tree,newArg, Span(tree.span.begin,newArg.span.end))
+        // TODO ugh
+        val intermediate =  {
+          if(tree eq headChild)
+            makeIntermediate(l, headChild.label)
+          else
+            tree.label
+        }
+        val newIntermediate = extendIntermediate(intermediate, Right(newArg.label))
+        BinaryTree(newIntermediate,tree,newArg, Span(tree.span.begin,newArg.span.end))
       }
       // now fold in left args
       val fullyBinarized = binarized.take(headChildIndex).foldRight(right){(newArg,tree) =>
-        BinaryTree(intermediate,newArg,tree, Span(newArg.span.begin,tree.span.end))
+        val intermediate =  {
+          if(tree eq headChild)
+            makeIntermediate(l, headChild.label)
+          else
+            tree.label
+        }
+        val newIntermediate = extendIntermediate(intermediate, Left(newArg.label))
+        BinaryTree(newIntermediate, newArg,tree, Span(newArg.span.begin,tree.span.end))
       }
-      fullyBinarized.relabelRoot(_ => l)
+      UnaryTree(l, fullyBinarized, IndexedSeq.empty, tree.span)
   }
 
   def binarize(tree: Tree[String], headFinder: HeadFinder[String] = HeadFinder.collins):BinarizedTree[String] = {
-    def stringBinarizer(currentLabel: String) = {
+    def stringBinarizer(currentLabel: String, headTag: String) = {
       if(currentLabel.startsWith("@")) currentLabel
-      else "@" + currentLabel
+      else s"@$currentLabel[$headTag]"
     }
 
-    binarize[String](tree, stringBinarizer _, headFinder)
+    def extendIntermediate(currentLabel: String, sib:Either[String, String]) = {
+      sib match {
+        case Left(s) =>
+          s"$currentLabel<$s"
+        case Right(s) =>
+          s"$currentLabel>$s"
+
+      }
+    }
+
+    binarize[String](tree, stringBinarizer, extendIntermediate, headFinder)
   }
 
 

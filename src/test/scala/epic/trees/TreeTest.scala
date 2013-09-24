@@ -27,9 +27,9 @@ class TreeTest extends FunSuite {
     val zippers = zip.iterator.toIndexedSeq
     val trees = zippers.map(_.tree)
     assert(trees.head.label.label === "TOP")
-    assert(trees(1).label.label === "S")
+    assert(trees(1).label.label === "@S", trees.head)
     assert(trees(2).label.label === "NP")
-    assert(trees(3).label.label === "NP")
+    assert(trees(3).label.label === "@NP", trees.head)
     assert(trees(trees.length-1).label.label === ".")
     assert(trees.last.label.label === ".")
     assert(zippers.forall(_.upToRoot == zippers.head))

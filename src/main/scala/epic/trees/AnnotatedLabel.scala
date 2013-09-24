@@ -37,6 +37,7 @@ case class FunctionalTag(tag: String) extends Annotation
  */
 @SerialVersionUID(1L)
 case class AnnotatedLabel(label: String,
+                          headTag: Option[String] = None,
                           parents: IndexedSeq[String] = IndexedSeq.empty,
                           siblings: IndexedSeq[Either[String, String]] = IndexedSeq.empty,
                           features: Set[Annotation] = Set.empty) extends Feature with CachedHashCode {
@@ -56,6 +57,7 @@ case class AnnotatedLabel(label: String,
 
   override def toString = {
     val components = new ArrayBuffer[String]()
+    headTag.foreach(components += _)
     if(parents.nonEmpty) {
       components += parents.mkString("^","^","")
     }
