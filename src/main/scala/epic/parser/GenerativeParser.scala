@@ -181,6 +181,7 @@ object GenerativeTrainer extends ParserPipeline {
     if(params.grammarDumpPath != null) {
       val out = new BufferedWriter(new FileWriter(params.grammarDumpPath))
       refinedGrammar.prettyPrint(out)
+      out.close()
     }
 
     val decoder = if (params.maxRule) new MaxRuleProductDecoder[AnnotatedLabel, String]() else new ViterbiDecoder[AnnotatedLabel, String]

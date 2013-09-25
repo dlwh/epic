@@ -99,7 +99,7 @@ case class Markovize[W](horizontal: Int=0, vertical: Int=2) extends TreeAnnotato
 }
 
 
-case class ParentAnnotate[W](order: Int = 0) extends TreeAnnotator[AnnotatedLabel, W, AnnotatedLabel] {
+case class ParentAnnotate[W](order: Int = 0, skipPunctTags: Boolean = true) extends TreeAnnotator[AnnotatedLabel, W, AnnotatedLabel] {
   def apply(tree: BinarizedTree[AnnotatedLabel], words: Seq[W]) = {
     if(order == 0) {
       tree
@@ -107,7 +107,7 @@ case class ParentAnnotate[W](order: Int = 0) extends TreeAnnotator[AnnotatedLabe
       def join(base: AnnotatedLabel, parent: AnnotatedLabel) = {
         base.copy(parents = base.parents :+ parent.label)
       }
-      Trees.annotateParentsBinarized(tree, join, {(_:AnnotatedLabel).isIntermediate}, order)
+      Trees.annotateParentsBinarized(tree, join, {(_:AnnotatedLabel).isIntermediate}, {(l:AnnotatedLabel)=> l.label.isEmpty || !l.label.head.isLetterOrDigit}, order)
     }
   }
 
