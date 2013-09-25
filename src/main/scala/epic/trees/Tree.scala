@@ -215,7 +215,8 @@ object Trees {
         val newIntermediate = extendIntermediate(intermediate, Left(newArg.label))
         BinaryTree(newIntermediate, newArg,tree, Span(newArg.span.begin,tree.span.end))
       }
-      UnaryTree(l, fullyBinarized, IndexedSeq.empty, tree.span)
+//      UnaryTree(l, fullyBinarized, IndexedSeq.empty, tree.span)
+      fullyBinarized.relabelRoot(_ => l)
   }
 
   def binarize(tree: Tree[String], headFinder: HeadFinder[String] = HeadFinder.collins):BinarizedTree[String] = {
