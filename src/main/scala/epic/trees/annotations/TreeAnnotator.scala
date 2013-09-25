@@ -113,11 +113,18 @@ case class ParentAnnotate[W](order: Int = 0, skipPunctTags: Boolean = true) exte
 
 }
 
+case class ForgetHeadTag[W]() extends TreeAnnotator[AnnotatedLabel, W, AnnotatedLabel] {
+  def apply(tree: BinarizedTree[AnnotatedLabel], words: Seq[W]) = {
+    tree.map(_.copy(headTag=None))
+  }
+
+}
+
 
 case class MarkovizeSiblings[W](order: Int=0) extends TreeAnnotator[AnnotatedLabel, W, AnnotatedLabel] {
   def apply(tree: BinarizedTree[AnnotatedLabel], words: Seq[W]) = {
-    if(order == 0) tree.map {l => l.copy(headTag=None, siblings = IndexedSeq.empty)}
-    else tree.map { l => l.copy(siblings = l.siblings.takeRight(order-1)) }
+    if(order == 0) tree.map {l => l.copy(siblings = IndexedSeq.empty)}
+    else tree.map { l => l.copy(siblings = l.siblings.takeRight(order)) }
   }
 
   /*

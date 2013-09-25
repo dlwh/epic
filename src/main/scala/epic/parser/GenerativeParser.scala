@@ -18,20 +18,14 @@ package epic.parser
 import projections.GrammarRefinements
 import epic.trees._
 
-import annotations.{Markovize, TreeAnnotator}
+import epic.trees.annotations._
 import breeze.linalg.Counter2
 import breeze.config.Help
 import epic.parser.ParserParams.XbarGrammar
 import epic.lexicon.{SimpleTagScorer, MaxEntTagScorer, Lexicon, SimpleLexicon}
 import epic.features._
-import epic.trees.BinaryRule
-import epic.trees.UnaryTree
-import epic.trees.UnaryRule
-import epic.trees.BinaryTree
-import epic.trees.TreeInstance
-import epic.trees.annotations.FilterAnnotations
-import epic.trees.annotations.PipelineAnnotator
 import java.io.{FileWriter, BufferedWriter, File}
+import epic.trees._
 
 /**
  * Contains codes to read off parsers and grammars from
@@ -137,7 +131,7 @@ object GenerativeTrainer extends ParserPipeline {
   case class Params(@Help(text="Location to read/write the baseParser") baseParser: XbarGrammar,
                     @Help(text=
                       "The kind of annotation to do on the refined grammar. Default uses v2h1 markovization and nothing else.")
-                    annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = PipelineAnnotator(Seq(FilterAnnotations(), Markovize(2,2))),
+                    annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = PipelineAnnotator(Seq(FilterAnnotations(), ForgetHeadTag(), Markovize(0,2))),
                     threads: Int = -1,
                     @Help(text="Use max rule decoding instead of max constituent")
                     maxRule: Boolean = false,
