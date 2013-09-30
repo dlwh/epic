@@ -466,8 +466,28 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
         + spanShape + clss(begin-1) + clss(end-1)
         + length
         + sent
-//        + clss(begin-1) * clss(end) // word edges
+        // don't seem to help?!?
+//        + clss(begin-1) * clss(end) // word edges, huang
 //        +  clss(begin-1) * clss(end) * length
+        // to try:
+//        + distance(begin,end)
+//        + distance(begin,end) * clss(begin-1) * clss(end)
+        // Charniak & Johnson:
+        // CoLenPar: binned difference in length between two conjuncts
+        // should be catchable with:
+        // bin(unbinnedLen(begin,split) - unbinnedLen(split,end)) * (clss(-1))(split)
+        // Heavy:
+        // clss(end) * distance(begin,end)
+        // neighbors
+        // clss(-2 until 0) * clss(end) * distance(begin,end)
+        // clss(-1 until 0) * clss(end) * distance(begin,end)
+        // jenny used distsim...
+        // <b(p(rp)),ds(ws−1,dsws)>:(clss(-1) * clss)(split)
+        // slav:
+        // clss(-1 to 0) apply begin // if this works?
+        // clss(-1 to 0) apply end
+        // span shape feature: remove middle if it's long!
+        // feature for constituents: is sym synthetic
         )
     }
     val indexedWord = IndexedWordFeaturizer.fromData(wf, annTrees.map{_.words})
