@@ -435,7 +435,7 @@ case class SpanModelFactory(@Help(text=
                               """The kind of annotation to do on the refined grammar. Default uses no annotations.
 You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Manning 2003.
                               """)
-                            annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = FilterAnnotations(),
+                            annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = GenerativeParser.defaultAnnotator(),
                             @Help(text="Old weights to initialize with. Optional")
                             oldWeights: File = null,
                             @Help(text="For features not seen in gold trees, we bin them into dummyFeats * numGoldFeatures bins using hashing.")
@@ -458,9 +458,11 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
       val dsl = new WordFeaturizer.DSL(annWords) with SurfaceFeaturizer.DSL with SplitSpanFeaturizer.DSL
       import dsl._
 
-      ( clss(split)
-        + distance[String](begin, split)
+      val leftOfSplit =  (clss(-1)apply (split))
+      ( distance[String](begin, split)
         + distance[String](split, end)
+//        + (relativeLength + unit) * (leftOfSplit + clss(split) + unit)
+        + relativeLength[String]
 //        + distance[String](begin, split) * distance[String](split,end)
         + clss(begin) + clss(end)
         + spanShape + clss(begin-1) + clss(end-1)

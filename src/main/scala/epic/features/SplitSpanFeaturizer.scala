@@ -8,6 +8,7 @@ import epic.features.WordFeaturizer.Modifier
 import epic.features.SplitSpanFeaturizer.{ProductSplitSpanFeaturizer, SumSplitSpanFeaturizer}
 import epic.util.Arrays
 import epic.features.SurfaceFeaturizer.MarkerPos
+import scala.collection.mutable.ArrayBuffer
 
 /**
  * TODO
@@ -18,15 +19,20 @@ trait SplitSpanFeaturizer[W] extends SurfaceFeaturizer[W] {
   def anchor(w: IndexedSeq[W]):SplitSpanFeatureAnchoring[W]
 
   def *(other: SplitSpanFeaturizer[W]) = (this,other) match {
-    case _ => new ProductSplitSpanFeaturizer(this, other)
+    case (a@SumSplitSpanFeaturizer(as, x),b@SumSplitSpanFeaturizer(bs, y)) => ProductSplitSpanFeaturizer(a, b, y, x)
+    case (a,b@SumSplitSpanFeaturizer(bs, x)) => ProductSplitSpanFeaturizer(a, b, x, false)
+    case (a@SumSplitSpanFeaturizer(as, x),b) => ProductSplitSpanFeaturizer(a, b, false, x)
+    case _ => ProductSplitSpanFeaturizer(this, other)
   }
 
   override def +(other: SurfaceFeaturizer[W]):SplitSpanFeaturizer[W] = (this,other) match {
-    case (SumSplitSpanFeaturizer(as),SumSplitSpanFeaturizer(bs)) => SumSplitSpanFeaturizer(as ++ bs)
-    case (a,SumSplitSpanFeaturizer(bs)) => SumSplitSpanFeaturizer(a +: bs)
-    case (SumSplitSpanFeaturizer(as),b) => SumSplitSpanFeaturizer(as :+ SplitSpanFeaturizer.liftSurfaceFeaturizerToSplitSpan(b))
+    case (SumSplitSpanFeaturizer(as, x),SumSplitSpanFeaturizer(bs, y)) => SumSplitSpanFeaturizer(as ++ bs, x || y)
+    case (SumSplitSpanFeaturizer(as, x),b) => SumSplitSpanFeaturizer(as :+ SplitSpanFeaturizer.liftSurfaceFeaturizerToSplitSpan(b), x)
+    case (a,SumSplitSpanFeaturizer(bs, x)) => SumSplitSpanFeaturizer(a +: bs, x)
     case _ => SumSplitSpanFeaturizer(IndexedSeq(this, other))
   }
+
+  def +(unit: SplitSpanFeaturizer.unit.type) = new SumSplitSpanFeaturizer(IndexedSeq(this), true)
 }
 
 
@@ -49,7 +55,15 @@ object SplitSpanFeaturizer {
       new SplitSpanDistanceFeaturizer[W](m, n, DistanceBinner())
     }
 
+    def relativeLength[W]:SplitSpanFeaturizer[W] = {
+      new RelativeLengthFeaturizer[W]()
+    }
+
+
+    val unit: SplitSpanFeaturizer.unit.type = SplitSpanFeaturizer.unit
   }
+
+  case object unit
 
   implicit def liftSurfaceFeaturizerToSplitSpan[W](surface: SurfaceFeaturizer[W]):SplitSpanFeaturizer[W] = surface match {
     case x: SplitSpanFeaturizer[W] => x
@@ -106,6 +120,26 @@ object SplitSpanFeaturizer {
     }
   }
 
+  /**
+   * Returns the binned difference between the [begin,split) and [split,end) spans.
+   * @param db
+   * @tparam W
+   */
+  class RelativeLengthFeaturizer[W] private[SplitSpanFeaturizer](db: DistanceBinner = DistanceBinner()) extends SplitSpanFeaturizer[W] {
+    val label = s"RelativeDifference"
+    private val theSplitNeedingAnchoring = new SplitSpanFeatureAnchoring[W] with Serializable {
+      def featuresForSplit(begin: Int, split: Int, end: Int): Array[Feature] = {
+        Array(DistanceFeature(db.binnedDistance((end-split) - (split-begin)), label))
+      }
+
+      def featuresForSpan(begin: Int, end: Int): Array[Feature] = emptyArray
+    }
+
+    def anchor(w: IndexedSeq[W]): SplitSpanFeatureAnchoring[W] = {
+        theSplitNeedingAnchoring
+    }
+  }
+
   case class SplitFeaturizer[W](f: WordFeaturizer[W]) extends SplitSpanFeaturizer[W] {
     def anchor(w: IndexedSeq[W]): SplitSpanFeatureAnchoring[W] = new SplitSpanFeatureAnchoring[W] {
       val wf = f.anchor(w)
@@ -118,7 +152,7 @@ object SplitSpanFeaturizer {
 
   }
 
-  case class SumSplitSpanFeaturizer[W](prods: IndexedSeq[SplitSpanFeaturizer[W]]) extends SplitSpanFeaturizer[W] {
+  case class SumSplitSpanFeaturizer[W](prods: IndexedSeq[SplitSpanFeaturizer[W]], unitized: Boolean = false) extends SplitSpanFeaturizer[W] {
     def anchor(w: IndexedSeq[W]): SplitSpanFeatureAnchoring[W] = new SplitSpanFeatureAnchoring[W] {
       val anchs = prods.map(_.anchor(w)).toArray
       def featuresForSpan(begin: Int, end: Int): Array[Feature] = anchs.flatMap(_.featuresForSpan(begin, end))
@@ -127,14 +161,28 @@ object SplitSpanFeaturizer {
         Arrays.concatenate(anchs.map(_.featuresForSplit(begin, split, end)):_*)
       }
     }
+
+    override def +(unit: SplitSpanFeaturizer.unit.type) = copy(unitized = true)
   }
 
-  case class ProductSplitSpanFeaturizer[W](a: SplitSpanFeaturizer[W], b: SplitSpanFeaturizer[W]) extends SplitSpanFeaturizer[W] {
+  case class ProductSplitSpanFeaturizer[W](a: SplitSpanFeaturizer[W], b: SplitSpanFeaturizer[W], keepJustA: Boolean = false, keepJustB: Boolean = false) extends SplitSpanFeaturizer[W] {
     def anchor(w: IndexedSeq[W]): SplitSpanFeatureAnchoring[W] = new SplitSpanFeatureAnchoring[W] {
       val aa = a.anchor(w)
       val ba = b.anchor(w)
       def featuresForSpan(begin: Int, end: Int): Array[Feature] = {
-        Arrays.crossProduct(aa.featuresForSpan(begin, end), ba.featuresForSpan(begin, end))(CrossProductFeature(_, _))
+        val afeats: Array[Feature] = aa.featuresForSpan(begin, end)
+        val bfeats: Array[Feature] = ba.featuresForSpan(begin, end)
+        val cross:Array[Feature] = Arrays.crossProduct(afeats, bfeats)(CrossProductFeature(_, _))
+        if(keepJustA && keepJustB) {
+          Arrays.concatenate[Feature](cross, afeats, bfeats)
+        } else if (keepJustA) {
+          Arrays.concatenate[Feature](cross, afeats)
+        } else if(keepJustB) {
+          Arrays.concatenate[Feature](cross, bfeats)
+        } else {
+          cross
+        }
+
       }
 
       def featuresForSplit(begin: Int, split: Int, end: Int): Array[Feature] = {
@@ -142,11 +190,20 @@ object SplitSpanFeaturizer {
         val bSplit: Array[Feature] = ba.featuresForSplit(begin, split, end)
         val aSpan: Array[Feature] = aa.featuresForSpan(begin, end)
         val bSpan: Array[Feature] = ba.featuresForSpan(begin, end)
-        Arrays.concatenate[Feature](
+        val results = ArrayBuffer[Array[Feature]](
           Arrays.crossProduct(aSplit, bSpan)(CrossProductFeature(_, _, "Split")),
           Arrays.crossProduct(aSplit, bSplit)(CrossProductFeature(_, _, "Split")),
           Arrays.crossProduct(aSpan, bSplit)(CrossProductFeature(_, _, "Split"))
         )
+
+        if(keepJustA) {
+          results += aSplit
+        }
+        if(keepJustB) {
+          results += bSplit
+        }
+
+        Arrays.concatenate(results:_*)
       }
     }
   }

@@ -11,12 +11,11 @@ import epic.trees.AnnotatedLabel
 import breeze.numerics.sigmoid
 import breeze.features.FeatureVector
 import breeze.config.Help
-import epic.trees.annotations.TreeAnnotator
+import epic.trees.annotations.{Xbarize, TreeAnnotator, FilterAnnotations}
 import java.io.File
 import epic.util.CacheBroker
 import epic.parser.projections.GrammarRefinements
 import epic.trees.TreeInstance
-import epic.trees.annotations.FilterAnnotations
 
 /**
  * The neural model is really just a
@@ -236,7 +235,7 @@ case class NeuralModelFactory(@Help(text=
                               """The kind of annotation to do on the refined grammar. Default uses no annotations.
 You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Manning 2003.
                               """)
-                            annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = FilterAnnotations(),
+                            annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = Xbarize(),
                             @Help(text="Old weights to initialize with. Optional")
                             oldWeights: File = null,
                             @Help(text="For features not seen in gold trees, we bin them into dummyFeats * numGoldFeatures bins using hashing.")
@@ -260,6 +259,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
       import dsl._
 
       ( clss(split)
+        + distance[String](begin, end)
         + distance[String](begin, split)
         + distance[String](split, end)
         + distance[String](begin, split) * distance[String](split,end)

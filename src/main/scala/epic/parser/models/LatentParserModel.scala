@@ -23,7 +23,7 @@ import breeze.linalg._
 import java.io.File
 import io.Source
 import epic.framework.Feature
-import epic.trees.annotations.{FilterAnnotations, TreeAnnotator}
+import epic.trees.annotations.{Xbarize, FilterAnnotations, TreeAnnotator}
 import epic.trees._
 import breeze.config.Help
 import epic.features.{WordPropertyFeaturizer, MinimalWordFeaturizer, IndexedWordFeaturizer}
@@ -87,7 +87,7 @@ case class LatentModelFactory(
                                 """The kind of annotation to do on the refined grammar. Default uses no annotations.
 You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Manning 2003.
                                 """)
-                              annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = FilterAnnotations(),
+                              annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = Xbarize(),
                               @Help(text="Path to substates to use for each symbol. Uses numStates for missing states.")
                               substates: File = null,
                               @Help(text="Split states that the Berkeley Parser doesn't want to split.")

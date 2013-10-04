@@ -124,6 +124,8 @@ object GenerativeParser {
     val refinedGrammar = RefinedGrammar.generative(baseGrammar, baseLexicon, indexedRefinements, binary, unary, words)
     refinedGrammar
   }
+
+  def defaultAnnotator(): PipelineAnnotator[AnnotatedLabel, String] =  PipelineAnnotator(Seq(FilterAnnotations(), ForgetHeadTag(), Markovize(0,2)))
 }
 
 object GenerativeTrainer extends ParserPipeline {
@@ -131,7 +133,7 @@ object GenerativeTrainer extends ParserPipeline {
   case class Params(@Help(text="Location to read/write the baseParser") baseParser: XbarGrammar,
                     @Help(text=
                       "The kind of annotation to do on the refined grammar. Default uses v2h1 markovization and nothing else.")
-                    annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = PipelineAnnotator(Seq(FilterAnnotations(), ForgetHeadTag(), Markovize(0,2))),
+                    annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = GenerativeParser.defaultAnnotator(),
                     threads: Int = -1,
                     @Help(text="Use max rule decoding instead of max constituent")
                     maxRule: Boolean = false,

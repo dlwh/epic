@@ -27,20 +27,11 @@ import epic.util.CacheBroker
 import epic.parser.ParserParams.XbarGrammar
 import breeze.util._
 import epic.trees.annotations._
-import epic.trees.TreeInstance
-import breeze.optimize.FirstOrderMinimizer.OptParams
-import epic.parser.ParseEval.Statistics
 import java.io.File
 import epic.constraints.CachedChartConstraintsFactory
 import breeze.util.Implicits._
 import epic.trees.TreeInstance
 import breeze.optimize.FirstOrderMinimizer.OptParams
-import epic.parser.HammingLossAugmentation
-import epic.parser.ParseEval.Statistics
-import epic.trees.annotations.StripAnnotations
-import epic.trees.TreeInstance
-import breeze.optimize.FirstOrderMinimizer.OptParams
-import epic.trees.annotations.Markovize
 import epic.parser.HammingLossAugmentation
 import epic.parser.ParseEval.Statistics
 
@@ -90,7 +81,7 @@ object ParserTrainer extends epic.parser.ParserPipeline with Logging {
     val initialParser = params.parser match {
       case null =>
         val (grammar, lexicon) = XbarGrammar().xbarGrammar(trainTrees)
-        GenerativeParser.annotatedParser(grammar, lexicon, (new StripAnnotations[String]()).andThen(Markovize()), trainTrees)
+        GenerativeParser.annotatedParser(grammar, lexicon, GenerativeParser.defaultAnnotator(), trainTrees)
       case f =>
         readObject[SimpleChartParser[AnnotatedLabel, String]](f)
     }
