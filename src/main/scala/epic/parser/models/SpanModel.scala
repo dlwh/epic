@@ -391,12 +391,12 @@ class IndexedSpanFeaturizer[L, L2, W](wordFeatureIndex: CrossProductIndex[Featur
 object IndexedSpanFeaturizer {
   def extract[L, L2, W](wordFeaturizer: IndexedWordFeaturizer[W],
                         surfaceFeaturizer: IndexedSplitSpanFeaturizer[W],
+                        featurizer: RefinedFeaturizer[L,W, Feature] ,
                         ann: (BinarizedTree[L], IndexedSeq[W]) => BinarizedTree[L2],
                         refinements: GrammarRefinements[L, L2],
                         grammar: BaseGrammar[L],
                         dummyFeatScale: HashFeature.Scale,
                         trees: Traversable[TreeInstance[L, W]]): IndexedSpanFeaturizer[L, L2, W] = {
-    val featurizer = new ProductionFeaturizer[L, L2, W](grammar, refinements)
 
     val spanBuilder = new CrossProductIndex.Builder(featurizer.index, surfaceFeaturizer.featureIndex, dummyFeatScale)
     val wordBuilder = new CrossProductIndex.Builder(featurizer.index, wordFeaturizer.featureIndex, dummyFeatScale, includeLabelOnlyFeatures = false)
@@ -474,9 +474,11 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     }
     val indexedWord = IndexedWordFeaturizer.fromData(wf, annTrees.map{_.words})
     val surface = IndexedSplitSpanFeaturizer.fromData(span, annTrees)
+    val featurizer = new ProductionFeaturizer[AnnotatedLabel, AnnotatedLabel, String](xbarGrammar, indexedRefinements, lGen={(x: AnnotatedLabel) => if(x.isIntermediate) Seq(x, SyntheticFeature) else Seq(x)})
 
     val indexed =  IndexedSpanFeaturizer.extract[AnnotatedLabel, AnnotatedLabel, String](indexedWord,
       surface,
+      featurizer,
       annotator,
       indexedRefinements,
       xbarGrammar,
@@ -488,3 +490,5 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     new SpanModel[AnnotatedLabel, AnnotatedLabel, String](indexed, indexed.index, annotator, constrainer, xbarGrammar, xbarLexicon, refGrammar, indexedRefinements,featureCounter.get(_))
   }
 }
+
+object SyntheticFeature extends Feature with Serializable
