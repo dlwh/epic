@@ -16,6 +16,9 @@ import java.io.File
 import epic.util.CacheBroker
 import epic.parser.projections.GrammarRefinements
 import epic.trees.TreeInstance
+import scala.runtime.ScalaRunTime
+import breeze.linalg.operators.{CanAxpy, BinaryOp, OpMulMatrix}
+import epic.dense.NeuralLayerFeatureIndex
 
 /**
  * The neural model is really just a
@@ -97,29 +100,9 @@ case class NeuralInference[L, W](baseInference: AnnotatedParserInference[L, W],
 }
 
 object NeuralModel {
-  case class NeuralFeature(output: Int, input: Int) extends Feature
-  class NeuralLayerFeatureIndex(numOutputs: Int, numInputs: Int) extends Index[Feature] {
-    def apply(t: Feature): Int = t match {
-      case NeuralFeature(output, input) if output < numOutputs && input < numInputs && output > 0 && input > 0 =>
-        output * numInputs + input
-      case _ => -1
-    }
 
-    def unapply(i: Int): Option[Feature] = {
-      if (i < 0 || i >= size) {
-        None
-      } else {
-        Some(NeuralFeature(i/numInputs, i % numInputs))
-      }
-    }
 
-    def pairs: Iterator[(Feature, Int)] = iterator zipWithIndex
 
-    def iterator: Iterator[Feature] = Iterator.range(0, size) map (unapply) map (_.get)
-
-    override def size: Int = numOutputs * numInputs
-
-  }
 
   class Grammar[L, W](base: RefinedGrammar[L, W], baseFeaturizer: RefinedFeaturizer[L, W, Feature],
                       labelFeaturizer: RefinedFeaturizer[L, W, Feature], surfaceFeaturizer: IndexedSplitSpanFeaturizer[W],
