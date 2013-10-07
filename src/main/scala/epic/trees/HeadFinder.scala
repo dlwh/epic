@@ -58,11 +58,14 @@ class HeadFinder[L](defaultDirection: Dir = Left,
   def findHeadChild(t: Tree[L]): Int = findHeadChild(t.label, t.children.map(c => c.label): _*)
 
   def findHeadChild(l: L, children: L*) = {
-    rules.findMatchIndex(l, children: _*) match {
+    val result = rules.findMatchIndex(l, children: _*) match {
       case None if defaultDirection == Left => 0
       case None => children.size - 1
       case Some(i) => i
     }
+    if(!children(result).toString.head.isLetter)
+      assert(!l.toString.head.isLetter || children(result).toString == "$", l + " " + children + " " + result)
+    result
   }
 
   def findHeadWordIndex(t: Tree[L]): Int = {
@@ -178,8 +181,11 @@ trait HeadRules[L] extends Serializable { outer =>
   def findMatchIndex(parent: L, children: L*): Option[Int] = {
     val myRules: Seq[HeadRule[InnerLabel]] = findRules(proj(parent))
     val mapped = children.map(proj)
-    val answers = myRules.iterator.map(_.findMatchIndex(mapped: _*)).filterNot(_ == -1)
-    if (answers.hasNext) Some(answers.next)
+    val answers = myRules.view.map(_.findMatchIndex(mapped: _*)).filterNot(_ == -1)
+    if (answers.nonEmpty) {
+      assert(children(answers.head).toString.head.isLetterOrDigit || !parent.toString.head.isLetterOrDigit || children(answers.head).toString == "$", parent + " " + children + " " + answers.head)
+      Some(answers.head)
+    }
     else None
   }
 
@@ -219,7 +225,9 @@ object HeadRules {
 
   private def shr[L](dir: Dir, dis: Boolean, heads: L*) = HeadRule(dir, dis, heads);
 
-  val collinsHeadRules = fromMap {
+  val collinsHeadRules = fromMap[String] {
+    val allNonTerms = shr(Right, false, "ROOT", "TOP", "ADJP", "ADVP", "CONJP", "FRAG", "S", "INTJ", "LST", "NAC", "NX", "PP", "PRN", "PRT", "QP", "RRC", "S", "SBAR", "SBARQ", "SINV", "SQ", "UCP", "VP", "WHADJP", "WHADVP", "WHNP", "WHPP", "X", "NML", "NP", "NN", "NNP", "NNPS", "NNS", "VB", "VBZ", "VBG", "VBD", "JJ", "JJR", "JJS", "CC", "VBP", "PRP", "PRP$", "PRPS", "CD", "IN", "TO", "WDT", "WP", "WP$", "WRB", "RB", "SYM", "RB", "UH", "RP", "RBR", "RBS")
+    val allNonLeft = allNonTerms.copy(Left)
     val basic = Map[String, Seq[HeadRule[String]]](
       "" -> Seq(shr(Left, false, "S", "SINV")),
       "ROOT" -> Seq(shr(Left, false, "S", "SINV")),
@@ -231,15 +239,16 @@ object HeadRules {
         "RB", "RBR", "RBS", "FW", "ADVP", "TO", "CD",
         "JJR", "JJ", "IN", "NP", "JJS", "NN")),
       "CONJP" -> Seq(shr(Right, false, "CC", "RB", "IN")),
-      "FRAG" -> Seq(shr(Right, false)),
-      "INTJ" -> Seq(shr(Left, false)),
+        "FRAG" -> Seq(shr(Right, false, "ROOT", "TOP", "ADJP", "ADVP", "CONJP", "FRAG", "S", "INTJ", "LST", "NAC", "NX", "PP", "PRN", "PRT", "QP", "RRC", "S", "SBAR", "SBARQ", "SINV", "SQ", "UCP", "VP", "WHADJP", "WHADVP", "WHNP", "WHPP", "X", "NML", "NP")),
+      "S" -> Seq(shr(Left, false, "TO", "IN", "VP", "S", "SBAR", "ADJP", "UCP", "NP")),
+      "INTJ" -> Seq(allNonLeft),
       "LST" -> Seq(shr(Right, false, "LS", ":")),
       "NAC" -> Seq(shr(Left, false,
         "NN", "NNS", "NNP", "NNPS", "NAC", "EX", "$", "CD", "QP",
         "PRP", "VBG", "JJ", "JJS", "JJR", "ADJP", "FW")),
-      "NX" -> Seq(shr(Left, false)),
+      "NX" -> Seq(allNonLeft),
       "PP" -> Seq(shr(Right, false, "IN", "TO", "VBG", "VBN", "RP", "FW")),
-      "PRN" -> Seq(shr(Left, false)),
+      "PRN" -> Seq(allNonLeft),
       "PRT" -> Seq(shr(Right, false, "RP")),
       "QP" -> Seq(shr(Left, false,
         "$", "IN", "NNS", "NN", "JJ", "RB", "DT", "CD", "NCD", "QP", "JJR", "JJS")),
@@ -250,7 +259,7 @@ object HeadRules {
       "SBARQ" -> Seq(shr(Left, false, "SQ", "S", "SINV", "SBARQ", "FRAG")),
       "SINV" -> Seq(shr(Left, false, "VBZ", "VBD", "VBP", "VB", "MD", "VP", "S", "SINV", "ADJP", "NP")),
       "SQ" -> Seq(shr(Left, false, "VBZ", "VBD", "VBP", "VB", "MD", "VP", "SQ")),
-      "UCP" -> Seq(shr(Right, false)),
+      "UCP" -> Seq(allNonTerms),
       "VP" -> Seq(shr(Left, false,
         "TO", "VBD", "VBN", "MD", "VBZ", "VB", "VBG", "VBP", "AUX",
         "AUXG", "VP", "ADJP", "NN", "NNS", "NP")),
@@ -258,7 +267,7 @@ object HeadRules {
       "WHADVP" -> Seq(shr(Right, false, "CC", "WRB")),
       "WHNP" -> Seq(shr(Left, false, "WDT", "WP", "WP$", "WHADJP", "WHPP", "WHNP")),
       "WHPP" -> Seq(shr(Right, false, "IN", "TO", "FW")),
-      "X" -> Seq(shr(Right, false)),
+      "X" -> Seq(allNonTerms),
       "NML" -> Seq(shr(Right, true, "NN", "NNP", "NNPS", "NNS", "NX", "POS", "JJR"),
         shr(Left, false, "NP"),
         shr(Right, false, "CD"),
@@ -268,6 +277,8 @@ object HeadRules {
         shr(Right, false, "CD"),
         shr(Right, true, "JJ", "JJS", "RB", "QP"))
     )
+
+
     //add in binarized symbols, and look for the binarized symbol first
     (basic ++ basic.map {
       case (k, v) => ("@" + k, v)
@@ -275,10 +286,10 @@ object HeadRules {
       case (lbl, rules) =>
         // add defaults for binarized rules
         if (!lbl.startsWith("@"))
-          lbl -> (shr(Left, false, '@' + lbl) +: rules)
+          lbl -> (shr(Left, false, '@' + lbl) +: rules :+ allNonTerms)
         else
-          lbl -> (shr(Left, false, lbl) +: rules)
-    }
+          lbl -> (shr(Left, false, lbl) +: rules :+ allNonTerms)
+    } : Map[String, Seq[HeadRule[String]]]
   }
 
 }

@@ -16,6 +16,7 @@ package epic.parser
 */
 import collection.mutable.ArrayBuffer
 import epic.trees._
+import epic.trees.annotations.{Xbarize, StripAnnotations}
 
 /**
  *
@@ -32,7 +33,7 @@ trait ParserTestHarness {
 
   def massageTrees(trees: Iterator[(Tree[String], IndexedSeq[String])], maxLength:Int=15): IndexedSeq[TreeInstance[AnnotatedLabel, String]] = {
     val trainTrees = ArrayBuffer() ++= (for( (tree, words) <- trees.filter(_._2.length <= maxLength))
-    yield TreeInstance("", transform(tree), words.toIndexedSeq))
+    yield TreeInstance("", Xbarize() apply (transform(tree), words), words))
 
     trainTrees
   }
@@ -42,7 +43,7 @@ trait ParserTestHarness {
     ParseEval.evaluate(testTrees, parser, AnnotatedLabelChainReplacer, asString = {(_:AnnotatedLabel).baseLabel}, nthreads= -1)
   }
 
-  val transform = new StandardTreeProcessor(HeadFinder.left)
+  val transform = new StandardTreeProcessor()
 }
 
 object ParserTestHarness extends ParserTestHarness {

@@ -40,7 +40,7 @@ import epic.parser.ParseEval.Statistics
 import epic.trees.annotations.StripAnnotations
 import epic.trees.TreeInstance
 import breeze.optimize.FirstOrderMinimizer.OptParams
-import epic.trees.annotations.AddMarkovization
+import epic.trees.annotations.Markovize
 import epic.parser.HammingLossAugmentation
 import epic.parser.ParseEval.Statistics
 
@@ -90,7 +90,7 @@ object ParserTrainer extends epic.parser.ParserPipeline with Logging {
     val initialParser = params.parser match {
       case null =>
         val (grammar, lexicon) = XbarGrammar().xbarGrammar(trainTrees)
-        GenerativeParser.annotatedParser(grammar, lexicon, (new StripAnnotations[String]()).andThen(AddMarkovization()), trainTrees)
+        GenerativeParser.annotatedParser(grammar, lexicon, (new StripAnnotations[String]()).andThen(Markovize()), trainTrees)
       case f =>
         readObject[SimpleChartParser[AnnotatedLabel, String]](f)
     }
@@ -119,8 +119,10 @@ object ParserTrainer extends epic.parser.ParserPipeline with Logging {
     val obj = new ModelObjective(model, theTrees, params.threads)
     val cachedObj = new CachedBatchDiffFunction(obj)
     val init = obj.initialWeightVector(randomize)
-    if(checkGradient)
-      GradientTester.test(cachedObj, obj.initialWeightVector(randomize = true), toString={(i: Int) => model.featureIndex.get(i).toString})
+    if(checkGradient) {
+      val cachedObj2 = new CachedBatchDiffFunction(new ModelObjective(model, theTrees.take(opt.batchSize), params.threads))
+      GradientTester.test(cachedObj2, obj.initialWeightVector(randomize = true), toString={(i: Int) => model.featureIndex.get(i).toString}, skipZeros = true)
+    }
 
     type OptState = FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State
     def evalAndCache(pair: (OptState, Int)) {

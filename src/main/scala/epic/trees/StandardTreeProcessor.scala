@@ -30,6 +30,8 @@ case class StandardTreeProcessor(headFinder: HeadFinder[AnnotatedLabel] = HeadFi
   private def xox = new XOverXRemover[String]
   @transient
   private var interner = new Interner[AnnotatedLabel]
+  @transient
+  private var functionalTagInterner = new Interner[FunctionalTag]
 
 
   // Don't delete.
@@ -37,7 +39,8 @@ case class StandardTreeProcessor(headFinder: HeadFinder[AnnotatedLabel] = HeadFi
   @throws(classOf[ClassNotFoundException])
   private def readObject(oin: ObjectInputStream) {
     oin.defaultReadObject()
-    interner = new Interner[AnnotatedLabel]
+    interner = new Interner
+    functionalTagInterner = new Interner
   }
 
 
@@ -47,10 +50,22 @@ case class StandardTreeProcessor(headFinder: HeadFinder[AnnotatedLabel] = HeadFi
       val fields = if(label.startsWith("-")) Array(label) else label.split("[-=]")
       val split = fields.filterNot(s => s.nonEmpty && s.charAt(0).isDigit)
       interner.intern(AnnotatedLabel(split(0).intern,
-        features= split.iterator.drop(1).map(_.intern).map(FunctionalTag(_)).toSet
+        features= split.iterator.drop(1).map(tag => functionalTagInterner.intern(FunctionalTag(tag))).toSet
       ))
     }
-    val r = Trees.binarize(ann, {(l:AnnotatedLabel) => l.copy("@"+l.label)}, headFinder)
-    r.relabelRoot(_ => AnnotatedLabel.TOP)
+
+    def makeIntermediate(l: AnnotatedLabel, tag: AnnotatedLabel) = {
+       l.copy("@"+l.label, headTag = Some(tag.baseLabel))
+    }
+
+    def extend(a: AnnotatedLabel, sib: Either[AnnotatedLabel, AnnotatedLabel]) = sib match {
+      case Left(s) => a.copy(siblings = a.siblings :+ Left(s.baseLabel))
+      case Right(s) => a.copy(siblings = a.siblings :+ Right(s.baseLabel))
+    }
+
+    val r = Trees.binarize(ann, makeIntermediate, extend, headFinder)
+    val x = r.relabelRoot(_ => AnnotatedLabel.TOP)
+//    println(tree.toString(newline = true) + "\n" + x.toString(newline = true) +"\n============================================================")
+    x
   }
 }

@@ -226,11 +226,11 @@ class SimpleRefinedGrammar[L, L2, W](val grammar: BaseGrammar[L],
     for( (cr,index) <- refinements.rules.coarseIndex.zipWithIndex; ref <- refinements.rules.refinementsOf(index)) {
       refinements.rules.fineIndex.get(ref) match {
         case BinaryRule(a,b,c) =>
-          println(s"$a -> $b $c ${ruleScoreArray(ref)}")
+          println(s"$a -> $b $c ${ruleScore(ref)}")
         case UnaryRule(a,b,chain) if chain.isEmpty =>
-          println(s"$a -> $b ${ruleScoreArray(ref)}")
+          println(s"$a -> $b ${ruleScore(ref)}")
         case UnaryRule(a,b,chain) =>
-          println(s"$a --${chain.mkString("[","-","]")}--> $b ${ruleScoreArray(ref)}")
+          println(s"$a --${chain.mkString("[","-","]")}--> $b ${ruleScore(ref)}")
       }
 
     }

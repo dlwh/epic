@@ -247,11 +247,11 @@ object RefinedAnchoring {
 
     def words: IndexedSeq[W] = baseAnchoring.words
 
-    def scoreSpan(begin: Int, end: Int, label: Int, ref: Int): Double = baseAnchoring.scoreSpan(begin: Int, end: Int, label: Int, ref: Int)
+//    def scoreSpan(begin: Int, end: Int, label: Int, ref: Int): Double = baseAnchoring.scoreSpan(begin: Int, end: Int, label: Int, ref: Int)
 
-    def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int): Double = baseAnchoring.scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int)
+//    def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int): Double = baseAnchoring.scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int)
 
-    def scoreUnaryRule(begin: Int, end: Int, rule: Int, ref: Int): Double = baseAnchoring.scoreUnaryRule(begin: Int, end: Int, rule: Int, ref: Int)
+//    def scoreUnaryRule(begin: Int, end: Int, rule: Int, ref: Int): Double = baseAnchoring.scoreUnaryRule(begin: Int, end: Int, rule: Int, ref: Int)
 
     def validLabelRefinements(begin: Int, end: Int, label: Int): Array[Int] = baseAnchoring.validLabelRefinements(begin: Int, end: Int, label: Int)
 

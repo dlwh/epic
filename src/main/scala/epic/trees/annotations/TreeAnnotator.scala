@@ -74,23 +74,60 @@ case class FilterAnnotations[W](toKeep: Set[Annotation]=Set.empty) extends TreeA
  */
 case class StripAnnotations[W]() extends TreeAnnotator[AnnotatedLabel, W, AnnotatedLabel] {
   def apply(tree: BinarizedTree[AnnotatedLabel], words: Seq[W]) = {
-    tree.map(l => l.copy(features = Set.empty))
+    tree.map(l => l.clearFeatures)
   }
 }
 
-case class AddMarkovization[W](horizontal: Int=0, vertical: Int=2) extends TreeAnnotator[AnnotatedLabel, W, AnnotatedLabel] {
+
+
+/**
+ * Removes all features from the [[epic.trees.AnnotatedLabel]]
+ * @tparam W
+ */
+case class Xbarize[W]() extends TreeAnnotator[AnnotatedLabel, W, AnnotatedLabel] {
   def apply(tree: BinarizedTree[AnnotatedLabel], words: Seq[W]) = {
-    annHorz(annVert(tree))
+    tree.map(l => l.baseAnnotatedLabel)
   }
+}
 
-  private def annVert(tree: BinarizedTree[AnnotatedLabel]):BinarizedTree[AnnotatedLabel] = {
-    def join(base: AnnotatedLabel, parent: AnnotatedLabel) = {
-      base.copy(parents = base.parents :+ parent.label)
+case class Markovize[W](horizontal: Int=0, vertical: Int=2) extends TreeAnnotator[AnnotatedLabel, W, AnnotatedLabel] {
+  val vert = new ParentAnnotate[W](vertical)
+  val horz = new MarkovizeSiblings[W](horizontal)
+  def apply(tree: BinarizedTree[AnnotatedLabel], words: Seq[W]) = {
+    horz(vert(tree, words), words)
+  }
+}
+
+
+case class ParentAnnotate[W](order: Int = 0, skipPunctTags: Boolean = true) extends TreeAnnotator[AnnotatedLabel, W, AnnotatedLabel] {
+  def apply(tree: BinarizedTree[AnnotatedLabel], words: Seq[W]) = {
+    if(order == 0) {
+      tree
+    } else {
+      def join(base: AnnotatedLabel, parent: AnnotatedLabel) = {
+        base.copy(parents = base.parents :+ parent.label)
+      }
+      Trees.annotateParentsBinarized(tree, join, {(_:AnnotatedLabel).isIntermediate}, {(l:AnnotatedLabel)=> l.label.isEmpty || !l.label.head.isLetterOrDigit}, order)
     }
-    Trees.annotateParentsBinarized(tree, join, {(_:AnnotatedLabel).isIntermediate}, vertical)
   }
 
-  private def annHorz(tree: BinarizedTree[AnnotatedLabel]):BinarizedTree[AnnotatedLabel] = {
+}
+
+case class ForgetHeadTag[W]() extends TreeAnnotator[AnnotatedLabel, W, AnnotatedLabel] {
+  def apply(tree: BinarizedTree[AnnotatedLabel], words: Seq[W]) = {
+    tree.map(_.copy(headTag=None))
+  }
+
+}
+
+
+case class MarkovizeSiblings[W](order: Int=0) extends TreeAnnotator[AnnotatedLabel, W, AnnotatedLabel] {
+  def apply(tree: BinarizedTree[AnnotatedLabel], words: Seq[W]) = {
+    if(order == 0) tree.map {l => l.copy(siblings = IndexedSeq.empty)}
+    else tree.map { l => l.copy(siblings = l.siblings.takeRight(order)) }
+  }
+
+  /*
     def join(base: AnnotatedLabel, siblings: IndexedSeq[Either[AnnotatedLabel, AnnotatedLabel]]) = {
       val news = siblings.map {
         case Left(x) => Left(x.label)
@@ -101,10 +138,10 @@ case class AddMarkovization[W](horizontal: Int=0, vertical: Int=2) extends TreeA
     }
     Trees.addHorizontalMarkovization(tree, horizontal, join, {(_:AnnotatedLabel).isIntermediate})
   }
+  */
+
 
 }
-
-
 /**
  * Marks verb tags based on the auxiliary
  */
@@ -334,7 +371,7 @@ case class MarkNonIdentityUnaries[W]() extends TreeAnnotator[AnnotatedLabel, W, 
         BinaryTree(label, rec(lc), rec(rc), span)
       case NullaryTree(label, span) => tree
       case u@UnaryTree(label, c, chain, span) =>
-        if (label.label != root && label.label != c.label.label)
+        if (label.label != root && label.baseLabel != c.label.baseLabel)
         UnaryTree(label.annotate(RealUnary), rec(c), chain, span)
         else
           u.copy(child = rec(c))

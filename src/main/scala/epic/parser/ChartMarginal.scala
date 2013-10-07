@@ -799,11 +799,16 @@ object ChartMarginal {
                                    anchoring: CoreAnchoring[L, W],
                                    splitBegin: Int, splitEnd: Int,
                                    rule: Int) {
-    var split = splitBegin
-    while (split < splitEnd) {
-      coreScores(split) = anchoring.scoreBinaryRule(begin, split, end, rule)
 
-      split += 1
+    if(anchoring.isInstanceOf[CoreAnchoring.Identity[_, _]]) {
+      java.util.Arrays.fill(coreScores, 0.0)
+    } else {
+      var split = splitBegin
+      while (split < splitEnd) {
+        coreScores(split) = anchoring.scoreBinaryRule(begin, split, end, rule)
+
+        split += 1
+      }
     }
   }
 
@@ -812,11 +817,15 @@ object ChartMarginal {
                                                     anchoring: CoreAnchoring[L, W],
                                                     completionBegin: Int, completionEnd: Int,
                                                     rule: Int) {
-    var completion = completionBegin
-    while (completion <= completionEnd) {
-      coreScores(completion) = anchoring.scoreBinaryRule(begin, end, completion, rule)
+    if(anchoring.isInstanceOf[CoreAnchoring.Identity[_, _]]) {
+      java.util.Arrays.fill(coreScores, 0.0)
+    } else {
+      var completion = completionBegin
+      while (completion <= completionEnd) {
+        coreScores(completion) = anchoring.scoreBinaryRule(begin, end, completion, rule)
 
-      completion += 1
+        completion += 1
+      }
     }
   }
 
@@ -825,11 +834,16 @@ object ChartMarginal {
                                                      anchoring: CoreAnchoring[L, W],
                                                      completionBegin: Int, completionEnd: Int,
                                                      rule: Int) {
-    var completion = completionBegin
-    while (completion <= completionEnd) {
-      coreScores(completion) = anchoring.scoreBinaryRule(completion, begin, end, rule)
 
-      completion += 1
+    if(anchoring.isInstanceOf[CoreAnchoring.Identity[_, _]]) {
+      java.util.Arrays.fill(coreScores, 0.0)
+    } else {
+      var completion = completionBegin
+      while (completion <= completionEnd) {
+        coreScores(completion) = anchoring.scoreBinaryRule(completion, begin, end, rule)
+
+        completion += 1
+      }
     }
   }
 
