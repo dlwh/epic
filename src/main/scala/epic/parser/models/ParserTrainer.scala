@@ -68,7 +68,10 @@ object ParserTrainer extends epic.parser.ParserPipeline with Logging {
                     @Help(text="Should we do loss augmentation?")
                     lossAugment: Boolean = false,
                     @Help(text="Should we check the gradient to make sure it's coded correctly?")
-                    checkGradient: Boolean = false)
+                    checkGradient: Boolean = false,
+                    @Help(text="check specific indices, in addition to doing a full search.")
+                    checkGradientsAt: String = null
+                     )
   protected val paramManifest = manifest[Params]
 
   def trainParser(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]],
@@ -112,6 +115,8 @@ object ParserTrainer extends epic.parser.ParserPipeline with Logging {
     val init = obj.initialWeightVector(randomize)
     if(checkGradient) {
       val cachedObj2 = new CachedBatchDiffFunction(new ModelObjective(model, theTrees.take(opt.batchSize), params.threads))
+        val indices = (-10 until 0).map(i => if(i < 0) model.featureIndex.size + i else i)
+      GradientTester.testIndices(cachedObj2, obj.initialWeightVector(randomize = true), indices, toString={(i: Int) => model.featureIndex.get(i).toString}, skipZeros = true)
       GradientTester.test(cachedObj2, obj.initialWeightVector(randomize = true), toString={(i: Int) => model.featureIndex.get(i).toString}, skipZeros = true)
     }
 
