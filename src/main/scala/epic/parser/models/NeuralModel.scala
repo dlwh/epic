@@ -18,7 +18,7 @@ import epic.parser.projections.GrammarRefinements
 import epic.trees.TreeInstance
 import scala.runtime.ScalaRunTime
 import breeze.linalg.operators.{CanAxpy, BinaryOp, OpMulMatrix}
-import epic.dense.NeuralLayerFeatureIndex
+import epic.dense.SigmoidTransform
 
 /**
  * The neural model is really just a
@@ -38,9 +38,9 @@ class NeuralModel[L, L2, W](baseModel: SpanModel[L, L2, W],
 
   val featureIndex = SegmentedIndex(
     baseModel.featureIndex,
-    new NeuralLayerFeatureIndex(labelFeaturizer.index.size, numOutputs),
-    new NeuralLayerFeatureIndex(numOutputs, surfaceFeaturizer.featureIndex.size),
-    new NeuralLayerFeatureIndex(numOutputs, 1))
+    new SigmoidTransform(labelFeaturizer.index.size, numOutputs),
+    new SigmoidTransform(numOutputs, surfaceFeaturizer.featureIndex.size),
+    new SigmoidTransform(numOutputs, 1))
 
   println(featureIndex.indices.map(_.size))
 

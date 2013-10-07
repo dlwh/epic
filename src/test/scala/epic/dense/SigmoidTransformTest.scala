@@ -9,10 +9,10 @@ import breeze.linalg.DenseVector
  *
  * @author dlwh
  */
-class NeuralLayerTest extends FunSuite {
+class SigmoidTransformTest extends FunSuite {
 
   test("chain rule") {
-    val index = new NeuralLayerFeatureIndex(12, 10, true)
+    val index = new SigmoidTransform(12, 10, true)
     val dv = DenseVector.rand(10)
     val objective = new DiffFunction[DenseVector[Double]] {
       def calculate(x: DenseVector[Double]): (Double, DenseVector[Double]) = {

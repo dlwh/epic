@@ -15,7 +15,7 @@ import breeze.numerics._
 case class NeuralFeature(output: Int, input: Int) extends Feature
 case class NeuralBias(input: Int) extends Feature
 
-case class NeuralLayerFeatureIndex(numOutputs: Int, numInputs: Int, includeBias: Boolean = true) extends Index[Feature] {
+case class SigmoidTransform(numOutputs: Int, numInputs: Int, includeBias: Boolean = true) extends Index[Feature] {
   def apply(t: Feature): Int = t match {
     case NeuralFeature(output, input) if output < numOutputs && input < numInputs && output > 0 && input > 0 =>
       output * numInputs + input
@@ -52,7 +52,7 @@ case class NeuralLayerFeatureIndex(numOutputs: Int, numInputs: Int, includeBias:
   }
 
   case class NeuralLayer(weights: DenseMatrix[Double], bias: Option[DenseVector[Double]]) {
-    val index = NeuralLayerFeatureIndex.this
+    val index = SigmoidTransform.this
 
     def activations[FV](fv: FV)(implicit mult: BinaryOp[DenseMatrix[Double], FV, OpMulMatrix, DenseVector[Double]]) = {
       val out = weights * fv
