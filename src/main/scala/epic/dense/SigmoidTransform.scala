@@ -6,6 +6,7 @@ import scala.runtime.ScalaRunTime
 import breeze.linalg._
 import breeze.linalg.operators.{CanAxpy, OpMulMatrix, BinaryOp}
 import breeze.numerics._
+import breeze.generic.CanMapValues
 
 /**
  *
@@ -15,73 +16,34 @@ import breeze.numerics._
 case class NeuralFeature(output: Int, input: Int) extends Feature
 case class NeuralBias(input: Int) extends Feature
 
-case class SigmoidTransform(numOutputs: Int, numInputs: Int, includeBias: Boolean = true) extends Index[Feature] {
-  def apply(t: Feature): Int = t match {
-    case NeuralFeature(output, input) if output < numOutputs && input < numInputs && output > 0 && input > 0 =>
-      output * numInputs + input
-    case NeuralBias(output) if output <= numOutputs => output + numOutputs * numInputs
-    case _ => -1
-  }
+case class SigmoidTransform(inner: Transform[DenseVector[Double], DenseVector[Double]])(implicit canMapValues: CanMapValues[DenseVector[Double], Double, Double, DenseVector[Double]]) extends Transform[DenseVector[Double], DenseVector[Double]] {
+  def this(numOutputs: Int, numInputs: Int,
+           includeBias: Boolean = true)
+          (implicit mult: BinaryOp[DenseMatrix[Double], DenseVector[Double], OpMulMatrix, DenseVector[Double]],
+           canaxpy: CanAxpy[Double, DenseVector[Double], DenseVector[Double]])  = this(new AffineTransform[DenseVector[Double]](numOutputs, numInputs, includeBias))
 
-  def unapply(i: Int): Option[Feature] = {
-    if (i < 0 || i >= size) {
-      None
-    } else if (includeBias && i >= numInputs * numOutputs) {
-      Some(NeuralBias(i - numInputs * numOutputs))
-    } else  {
-      Some(NeuralFeature(i/numInputs, i % numInputs))
-    }
-  }
+  val index: inner.index.type = inner.index
 
-  def pairs: Iterator[(Feature, Int)] = iterator zipWithIndex
 
-  def iterator: Iterator[Feature] = Iterator.range(0, size) map (unapply) map (_.get)
+  def extractLayer(dv: DenseVector[Double]) = new Layer(inner.extractLayer(dv))
 
-  override val size: Int = if(includeBias) numOutputs * numInputs + numOutputs else numOutputs * numInputs
-
-  override def toString() = ScalaRunTime._toString(this)
-
-  def extractLayer(weights: DenseVector[Double]) = {
-    val mat = weights(0 until (numOutputs * numInputs)).asDenseMatrix.reshape(numOutputs, numInputs, view = View.Require)
-    val bias = if(includeBias) {
-      Some(weights(numOutputs * numInputs until (size)))
-    } else {
-      None
-    }
-    new NeuralLayer(mat, bias)
-  }
-
-  case class NeuralLayer(weights: DenseMatrix[Double], bias: Option[DenseVector[Double]]) {
+  case class Layer(innerLayer: inner.Layer) extends _Layer {
     val index = SigmoidTransform.this
 
-    def activations[FV](fv: FV)(implicit mult: BinaryOp[DenseMatrix[Double], FV, OpMulMatrix, DenseVector[Double]]) = {
-      val out = weights * fv
-      bias foreach { out += _}
-      sigmoid.inPlace(out)
-      out
-    }
+    def activations(fv: DenseVector[Double]): DenseVector[Double] = sigmoid(innerLayer.activations(fv))
 
-    def tallyDerivative[FV](deriv: DenseVector[Double],
-                            scale: DenseVector[Double],
-                            fv: FV)
-                           (implicit mult: BinaryOp[DenseMatrix[Double], FV, OpMulMatrix, DenseVector[Double]],
-                            canaxpy: CanAxpy[Double, FV, DenseVector[Double]]) = {
-      val NeuralLayer(matDeriv, biasDeriv) = extractLayer(deriv)
-      val act: DenseVector[Double] = activations(fv)
+    def tallyDerivative(deriv: DenseVector[Double], scale: DenseVector[Double], fv: DenseVector[Double]) = {
+      val act = activations(fv)
       act :*= (act - 1.0)
       act :*= -1.0
+      // whole function is f(sigmoid(transform(features)))
+      // scale(i) pushes in  (f'(sigmoid(transform(features)))(i) so just need to finish the chain rule.
+      // activations(...) computes sigmoid(transform(features))
+      // act is currently sigmoid'(transform(...))
+      act :*= scale
 
-      // whole function is f(sigmoid(mat * features + bias))
-      // scale(i) pushes in  (f'(sigmoid(mat * features + bias)))(i) so just need to finish the chain rule.
-      // activations(...) computes sigmoid(mat * features + bias)
-      // act is currently sigmoid'(mat * features + bias)
-      // so d/dbias(i) = act(i) * scale(i)
-      // d/d(weights(output, ::)) = act(i) * scale(i) * fv
-      for (i <- 0 until weights.rows) {
-        val a: Double = scale(i) * act(i)
-        axpy(a, fv, matDeriv.t(::, i))
-        biasDeriv.foreach(_(i) += a)
-      }
+      innerLayer.tallyDerivative(deriv, act, fv)
+
     }
 
   }

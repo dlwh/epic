@@ -8,56 +8,35 @@ import breeze.linalg.operators.{CanAxpy, OpMulMatrix, BinaryOp}
 import breeze.numerics._
 
 
-case class AffineTransform(numOutputs: Int, numInputs: Int, includeBias: Boolean = true) extends Index[Feature] {
-  def apply(t: Feature): Int = t match {
-    case NeuralFeature(output, input) if output < numOutputs && input < numInputs && output > 0 && input > 0 =>
-      output * numInputs + input
-    case NeuralBias(output) if output <= numOutputs => output + numOutputs * numInputs
-    case _ => -1
-  }
+case class AffineTransform[FV](numOutputs: Int, numInputs: Int, includeBias: Boolean = true)
+                              (implicit mult: BinaryOp[DenseMatrix[Double], FV, OpMulMatrix, DenseVector[Double]],
+                               canaxpy: CanAxpy[Double, FV, DenseVector[Double]]) extends Transform[FV, DenseVector[Double]] {
 
-  def unapply(i: Int): Option[Feature] = {
-    if (i < 0 || i >= size) {
-      None
-    } else if (includeBias && i >= numInputs * numOutputs) {
-      Some(NeuralBias(i - numInputs * numOutputs))
-    } else  {
-      Some(NeuralFeature(i/numInputs, i % numInputs))
-    }
-  }
+  val index = new AffineTransform.Index(numOutputs, numInputs, includeBias)
 
-  def pairs: Iterator[(Feature, Int)] = iterator zipWithIndex
+  import index._
 
-  def iterator: Iterator[Feature] = Iterator.range(0, size) map (unapply) map (_.get)
-
-  override val size: Int = if(includeBias) numOutputs * numInputs + numOutputs else numOutputs * numInputs
-
-  override def toString() = ScalaRunTime._toString(this)
 
   def extractLayer(weights: DenseVector[Double]) = {
     val mat = weights(0 until (numOutputs * numInputs)).asDenseMatrix.reshape(numOutputs, numInputs, view = View.Require)
     val bias = if(includeBias) {
-      Some(weights(numOutputs * numInputs until (size)))
+      Some(weights(numOutputs * numInputs until size))
     } else {
       None
     }
     new Layer(mat, bias)
   }
 
-  case class Layer(weights: DenseMatrix[Double], bias: Option[DenseVector[Double]]) {
+  case class Layer(weights: DenseMatrix[Double], bias: Option[DenseVector[Double]]) extends _Layer {
     val index = AffineTransform.this
 
-    def activations[FV](fv: FV)(implicit mult: BinaryOp[DenseMatrix[Double], FV, OpMulMatrix, DenseVector[Double]]) = {
+    def activations(fv: FV) = {
       val out = weights * fv
       bias foreach { out += _}
       out
     }
 
-    def tallyDerivative[FV](deriv: DenseVector[Double],
-                            scale: DenseVector[Double],
-                            fv: FV)
-                           (implicit mult: BinaryOp[DenseMatrix[Double], FV, OpMulMatrix, DenseVector[Double]],
-                            canaxpy: CanAxpy[Double, FV, DenseVector[Double]]) = {
+    def tallyDerivative(deriv: DenseVector[Double], scale: DenseVector[Double], fv: FV) = {
       val Layer(matDeriv, biasDeriv) = extractLayer(deriv)
 
       // whole function is f(mat * features + bias)
@@ -75,4 +54,33 @@ case class AffineTransform(numOutputs: Int, numInputs: Int, includeBias: Boolean
 
   }
 
+}
+
+object AffineTransform {
+  case class Index(numOutputs: Int, numInputs: Int, includeBias: Boolean = true) extends breeze.util.Index[Feature] {
+    def apply(t: Feature): Int = t match {
+      case NeuralFeature(output, input) if output < numOutputs && input < numInputs && output > 0 && input > 0 =>
+        output * numInputs + input
+      case NeuralBias(output) if output <= numOutputs => output + numOutputs * numInputs
+      case _ => -1
+    }
+
+    def unapply(i: Int): Option[Feature] = {
+      if (i < 0 || i >= size) {
+        None
+      } else if (includeBias && i >= numInputs * numOutputs) {
+        Some(NeuralBias(i - numInputs * numOutputs))
+      } else  {
+        Some(NeuralFeature(i/numInputs, i % numInputs))
+      }
+    }
+
+    def pairs: Iterator[(Feature, Int)] = iterator zipWithIndex
+
+    def iterator: Iterator[Feature] = Iterator.range(0, size) map (unapply) map (_.get)
+
+    override val size: Int = if(includeBias) numOutputs * numInputs + numOutputs else numOutputs * numInputs
+
+    override def toString() = ScalaRunTime._toString(this)
+  }
 }

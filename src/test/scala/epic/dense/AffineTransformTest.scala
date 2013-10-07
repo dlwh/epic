@@ -20,12 +20,12 @@ class AffineTransformTest extends FunSuite {
          val acts = layer.activations(dv)
          val obj = acts.sum
          val deriv = DenseVector.zeros[Double](x.length)
-         layer.tallyDerivative(deriv, DenseVector.ones[Double](x.length), dv)
+         layer.tallyDerivative(deriv, DenseVector.ones[Double](acts.length), dv)
          obj -> deriv
        }
      }
 
-     val weights: DenseVector[Double] = DenseVector.rand[Double](index.size) - 0.5
+     val weights: DenseVector[Double] = DenseVector.rand[Double](index.index.size) - 0.5
      val diffs = GradientTester.test[Int, DenseVector[Double]](objective, weights, randFraction = 1.0)
      assert(diffs.max < 1E-3, s"${diffs.max} was bigger than expected!!")
    }

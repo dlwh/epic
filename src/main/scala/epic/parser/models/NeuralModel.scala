@@ -38,9 +38,9 @@ class NeuralModel[L, L2, W](baseModel: SpanModel[L, L2, W],
 
   val featureIndex = SegmentedIndex(
     baseModel.featureIndex,
-    new SigmoidTransform(labelFeaturizer.index.size, numOutputs),
-    new SigmoidTransform(numOutputs, surfaceFeaturizer.featureIndex.size),
-    new SigmoidTransform(numOutputs, 1))
+    new SigmoidTransform(labelFeaturizer.index.size, numOutputs).index,
+    new SigmoidTransform(numOutputs, surfaceFeaturizer.featureIndex.size).index,
+    new SigmoidTransform(numOutputs, 1).index)
 
   println(featureIndex.indices.map(_.size))
 
