@@ -276,7 +276,7 @@ class SegmentationModelFactory[L](val startSymbol: L,
 
       val spanFeatures = length + spanShape + sent //+ (sent + spanShape) * length
 
-      featurizer -> spanFeatures
+      gazetteer.foldLeft(featurizer)(_ + _) -> gazetteer.foldLeft(spanFeatures)(_ + _)
     }
 
     val wf = IndexedWordFeaturizer.fromData(featurizer, train.map{_.words})

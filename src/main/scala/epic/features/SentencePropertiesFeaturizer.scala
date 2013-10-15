@@ -28,10 +28,10 @@ class SentencePropertiesFeaturizer(db: DistanceBinner = new DistanceBinner()) ex
           feats += WholeSentenceIsUpperCaseFeature
 
 
-        if (begin == 0)
-          feats += BeginSentFeature
-        if(end == words.length)
-          feats += EndSentFeature
+//        if (begin == 0)
+//          feats += BeginSentFeature
+//        if(end == words.length)
+//          feats += EndSentFeature
         if (begin == 0 && end == words.length)
           feats += WholeSentFeature
 

@@ -458,6 +458,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
       val dsl = new WordFeaturizer.DSL(annWords) with SurfaceFeaturizer.DSL with SplitSpanFeaturizer.DSL
       import dsl._
 
+      // class(split + 1)
       ( clss(split)
         + distance[String](begin, split)
         + distance[String](split, end)
