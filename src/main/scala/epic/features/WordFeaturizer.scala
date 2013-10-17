@@ -51,12 +51,13 @@ object WordFeaturizer {
   case class DSL[L](counts: Counter2[L, String, Double],
                     commonWordThreshold: Int = 100,
                     unknownWordThreshold: Int = 2) {
-    private val summedCounts = sum(counts, Axis._0)
+    val summedCounts = sum(counts, Axis._0)
     val word = new IdentityWordFeaturizer[String](summedCounts, unknownWordThreshold)
     val shape = new WordShapeFeaturizer(summedCounts, commonWordThreshold)
     val clss = new WordClassFeaturizer(summedCounts, commonWordThreshold)
     val tagDict = new TagDictionaryFeaturizer[L](counts, commonWordThreshold)
     val props = new WordPropertyFeaturizer(summedCounts)
+    val lfsuf = LongestFrequentSuffixFeaturizer(summedCounts, commonWordThreshold)
 
     def suffixes(order: Int = 5) = new WordSuffixFeaturizer(summedCounts, suffixOrder = order, commonWordThreshold = commonWordThreshold)
     def prefixes(order: Int = 5) = new WordPrefixFeaturizer(summedCounts, prefixOrder = order, commonWordThreshold = commonWordThreshold)

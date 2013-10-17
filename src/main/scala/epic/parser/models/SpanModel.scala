@@ -459,34 +459,38 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
       import dsl._
 
       // class(split + 1)
-      ( clss(split)
+      val baseCat = lfsuf
+      val commonWordsOnly = new IdentityWordFeaturizer(summedCounts, 100)
+      ( baseCat(split)
         + distance[String](begin, split)
         + distance[String](split, end)
 //        + distance[String](begin, split) * distance[String](split,end)
-        + clss(begin) + clss(end)
-        + spanShape + clss(begin-1) + clss(end-1)
+        + baseCat(begin) + baseCat(end)
+        + spanShape + baseCat(begin-1) + baseCat(end-1)
         + length
         + sent
+        // to add to colenpar:
+        //
         // don't seem to help?!?
-//        + clss(begin-1) * clss(end) // word edges, huang
-//        +  clss(begin-1) * clss(end) * length
+//        + baseCat(begin-1) * baseCat(end) // word edges, huang
+//        +  baseCat(begin-1) * baseCat(end) * length
         // to try:
 //        + distance(begin,end)
-//        + distance(begin,end) * clss(begin-1) * clss(end)
+//        + distance(begin,end) * baseCat(begin-1) * baseCat(end)
         // Charniak & Johnson:
         // CoLenPar: binned difference in length between two conjuncts
         // should be catchable with:
-        // bin(unbinnedLen(begin,split) - unbinnedLen(split,end)) * (clss(-1))(split)
+        // bin(unbinnedLen(begin,split) - unbinnedLen(split,end)) * (baseCat(-1))(split)
         // Heavy:
-        // clss(end) * distance(begin,end)
+        // baseCat(end) * distance(begin,end)
         // neighbors
-        // clss(-2 until 0) * clss(end) * distance(begin,end)
-        // clss(-1 until 0) * clss(end) * distance(begin,end)
+        // baseCat(-2 until 0) * baseCat(end) * distance(begin,end)
+        // baseCat(-1 until 0) * baseCat(end) * distance(begin,end)
         // jenny used distsim...
-        // <b(p(rp)),ds(ws−1,dsws)>:(clss(-1) * clss)(split)
+        // <b(p(rp)),ds(ws−1,dsws)>:(baseCat(-1) * baseCat)(split)
         // slav:
-        // clss(-1 to 0) apply begin // if this works?
-        // clss(-1 to 0) apply end
+        // baseCat(-1 to 0) apply begin // if this works?
+        // baseCat(-1 to 0) apply end
         // span shape feature: remove middle if it's long!
         // feature for constituents: is sym synthetic
         )
