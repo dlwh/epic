@@ -391,12 +391,12 @@ class IndexedSpanFeaturizer[L, L2, W](wordFeatureIndex: CrossProductIndex[Featur
 object IndexedSpanFeaturizer {
   def extract[L, L2, W](wordFeaturizer: IndexedWordFeaturizer[W],
                         surfaceFeaturizer: IndexedSplitSpanFeaturizer[W],
+                        featurizer: RefinedFeaturizer[L,W, Feature] ,
                         ann: (BinarizedTree[L], IndexedSeq[W]) => BinarizedTree[L2],
                         refinements: GrammarRefinements[L, L2],
                         grammar: BaseGrammar[L],
                         dummyFeatScale: HashFeature.Scale,
                         trees: Traversable[TreeInstance[L, W]]): IndexedSpanFeaturizer[L, L2, W] = {
-    val featurizer = new ProductionFeaturizer[L, L2, W](grammar, refinements)
 
     val spanBuilder = new CrossProductIndex.Builder(featurizer.index, surfaceFeaturizer.featureIndex, dummyFeatScale)
     val wordBuilder = new CrossProductIndex.Builder(featurizer.index, wordFeaturizer.featureIndex, dummyFeatScale, includeLabelOnlyFeatures = false)
@@ -435,7 +435,7 @@ case class SpanModelFactory(@Help(text=
                               """The kind of annotation to do on the refined grammar. Default uses no annotations.
 You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Manning 2003.
                               """)
-                            annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = FilterAnnotations(),
+                            annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = GenerativeParser.defaultAnnotator(),
                             @Help(text="Old weights to initialize with. Optional")
                             oldWeights: File = null,
                             @Help(text="For features not seen in gold trees, we bin them into dummyFeats * numGoldFeatures bins using hashing.")
@@ -458,12 +458,15 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
       val dsl = new WordFeaturizer.DSL(annWords) with SurfaceFeaturizer.DSL with SplitSpanFeaturizer.DSL
       import dsl._
 
+      val leftOfSplit =  (clss(-1)apply (split))
       // class(split + 1)
       val baseCat = lfsuf
       val commonWordsOnly = new IdentityWordFeaturizer(summedCounts, 100)
       ( baseCat(split)
         + distance[String](begin, split)
         + distance[String](split, end)
+//        + (relativeLength + unit) * (leftOfSplit + clss(split) + unit)
+        + relativeLength[String]
 //        + distance[String](begin, split) * distance[String](split,end)
         + baseCat(begin) + baseCat(end)
         + spanShape + baseCat(begin-1) + baseCat(end-1)
@@ -497,9 +500,11 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     }
     val indexedWord = IndexedWordFeaturizer.fromData(wf, annTrees.map{_.words})
     val surface = IndexedSplitSpanFeaturizer.fromData(span, annTrees)
+    val featurizer = new ProductionFeaturizer[AnnotatedLabel, AnnotatedLabel, String](xbarGrammar, indexedRefinements, lGen={(x: AnnotatedLabel) => if(x.isIntermediate) Seq(x, SyntheticFeature) else Seq(x)})
 
     val indexed =  IndexedSpanFeaturizer.extract[AnnotatedLabel, AnnotatedLabel, String](indexedWord,
       surface,
+      featurizer,
       annotator,
       indexedRefinements,
       xbarGrammar,
@@ -511,3 +516,5 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     new SpanModel[AnnotatedLabel, AnnotatedLabel, String](indexed, indexed.index, annotator, constrainer, xbarGrammar, xbarLexicon, refGrammar, indexedRefinements,featureCounter.get(_))
   }
 }
+
+object SyntheticFeature extends Feature with Serializable

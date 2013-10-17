@@ -33,7 +33,7 @@ final class ProjectionIndexer[C, F] private (val coarseIndex: Index[C],
   val localizationArray = new Array[Int](indexedProjections.length)
   // just coarseSymbolIndex -> (0 until numGlobalRefinements(coarseSymbolIndex))
   val perSymbolRefinements = globalRefinements.map { arr =>
-    for( (global,local) <- (arr.asInstanceOf[Array[Int]]).zipWithIndex) {
+    for( (global,local) <- arr.zipWithIndex) {
       localizationArray(global) = local
     }
     Array.range(0, arr.length)
@@ -44,6 +44,7 @@ final class ProjectionIndexer[C, F] private (val coarseIndex: Index[C],
   def globalize(c: C, f: Int):F = fineIndex.get(globalRefinements(coarseIndex(c))(f))
   def indexAndLocalize(f: F):(Int, Int) = {
     val glob = fineIndex(f)
+    if(glob < 0) throw new RuntimeException("Not in index: " + f + " Index: " + fineIndex)
     project(glob) -> localize(glob)
   }
 
@@ -55,7 +56,7 @@ final class ProjectionIndexer[C, F] private (val coarseIndex: Index[C],
   def refinementsOf(c: C):IndexedSeq[F] = {
     val ci = coarseIndex(c)
     if(ci < 0) throw new RuntimeException("Not a coarse symbol: " + c)
-    globalRefinements(ci).asInstanceOf[Array[Int]].map(fineIndex.get _)
+    globalRefinements(ci).map(fineIndex.get _)
   }
 
   /**

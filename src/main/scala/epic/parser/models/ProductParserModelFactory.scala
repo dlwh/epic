@@ -17,7 +17,7 @@ package epic.parser.models
 */
 
 import java.io.File
-import epic.trees.annotations.TreeAnnotator
+import epic.trees.annotations.{Xbarize, TreeAnnotator, FilterAnnotations}
 import io.Source
 import breeze.linalg._
 import epic.parser.projections.GrammarRefinements
@@ -31,7 +31,6 @@ import epic.trees.BinaryRule
 import epic.trees.UnaryRule
 import epic.trees.TreeInstance
 import epic.parser.features.IndicatorFeature
-import epic.trees.annotations.FilterAnnotations
 
 /**
  *
@@ -39,7 +38,7 @@ import epic.trees.annotations.FilterAnnotations
  */
 
 case class ProductParserModelFactory(baseParser: ParserParams.XbarGrammar,
-                                     annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = FilterAnnotations(),
+                                     annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = Xbarize(),
                                      substates: File = null,
                                      numStates: Int = 2,
                                      numModels: Int = 2,
