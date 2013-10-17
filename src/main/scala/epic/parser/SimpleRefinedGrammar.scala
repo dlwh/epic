@@ -15,10 +15,20 @@ package epic.parser
  limitations under the License.
 */
 import projections.GrammarRefinements
-import epic.trees.{BinaryRule, UnaryRule}
+import epic.trees._
 import collection.mutable.ArrayBuffer
-import java.io.{PrintWriter, Writer}
-import epic.lexicon.{TagScorer, Lexicon}
+import java.io.{FileInputStream, PrintWriter, Writer}
+import epic.lexicon._
+import scala.io.Source
+import breeze.util.Index
+import epic.trees.BinaryRule
+import epic.trees.UnaryRule
+import breeze.linalg.Counter2
+import chalk.text.analyze.EnglishWordClassGenerator
+import epic.trees.BinaryRule
+import epic.trees.UnaryRule
+import java.security.MessageDigest
+import java.math.BigInteger
 
 /**
  *
@@ -234,5 +244,109 @@ class SimpleRefinedGrammar[L, L2, W](val grammar: BaseGrammar[L],
       }
 
     }
+  }
+
+  def signature = {
+    val md5 = MessageDigest.getInstance("MD5")
+    md5.update(index.toString.getBytes("UTF-8"))
+    md5.update(labelIndex.toString.getBytes("UTF-8"))
+    md5.update(ruleScoreArray.map(_.mkString("{", ", ", "}")).mkString("{", ",", "}").getBytes("UTF-8"))
+    val digest = md5.digest()
+    val bigInt = new BigInteger(1,digest);
+    val hashtext = bigInt.toString(16);
+    hashtext
+  }
+}
+
+object SimpleRefinedGrammar {
+
+
+  def parseBerkeleyText(prefix: String, threshold: Double = -10): SimpleRefinedGrammar[AnnotatedLabel, AnnotatedLabel, String] = {
+    val syms = Index[AnnotatedLabel]()
+    val symsIn = Source.fromInputStream(new FileInputStream(prefix+".numstates"))
+    for( line <- symsIn.getLines) {
+      val Array(_sym, numStatesS) = line.split("\\s+")
+      val sym = if(_sym == "ROOT") "TOP" else _sym
+      if(sym != "PRT|ADVP")
+        for( sub <- 0 until numStatesS.toInt) {
+          syms.index(AnnotatedLabel(s"${sym}_$sub"))
+        }
+    }
+    symsIn.close()
+
+    val rules = Index[Rule[AnnotatedLabel]]()
+    val ruleScores = new ArrayBuffer[Double]()
+
+    val binaryIn = Source.fromInputStream(new FileInputStream(prefix+".binary"))
+    for ( line <- binaryIn.getLines()) {
+      val Array(a,b,c, score) = line.split("\\s+")
+      val logScore = math.log(score.toDouble)
+      if(logScore >= threshold) {
+        ruleScores += logScore
+        syms.index(AnnotatedLabel(a))
+        syms.index(AnnotatedLabel(b))
+        syms.index(AnnotatedLabel(c))
+        rules.index(BinaryRule(a,b,c).map(AnnotatedLabel(_)))
+        assert(rules.size == ruleScores.length)
+      }
+    }
+    binaryIn.close()
+
+    val unaryIn = Source.fromInputStream(new FileInputStream(prefix+".unary"))
+    for ( line <- unaryIn.getLines()) {
+      val Array(_a,b,score) = line.split("\\s+")
+      val a = if(_a.startsWith("ROOT")) "TOP_0" else _a
+      val logScore = math.log(score.toDouble)
+      if(logScore >= threshold) {
+        ruleScores += logScore
+        syms.index(AnnotatedLabel(a))
+        syms.index(AnnotatedLabel(b))
+        rules.index(UnaryRule(a, b, IndexedSeq.empty).map(AnnotatedLabel(_)))
+        assert(rules.size == ruleScores.length)
+      }
+    }
+    unaryIn.close()
+
+    val lexIn = Source.fromInputStream(new FileInputStream(prefix+".lexicon"))
+    val lexCounts = Counter2[AnnotatedLabel, String, Double]()
+    for(line <- lexIn.getLines()) {
+      val Array(tag, w, scores) = line.split("\\s", 3)
+
+      for((scoreString, index) <- scores.dropRight(1).drop(1).split(", ").zipWithIndex) {
+        val sym = AnnotatedLabel(s"${tag}_$index")
+        lexCounts(sym, w) = math.log(scoreString.toDouble)
+      }
+
+    }
+    lexIn.close()
+
+    def project(l: AnnotatedLabel): AnnotatedLabel = l.copy(label = l.label.takeWhile(_ != '_'))
+
+    val coarseRules = Index(rules.map(_.map(project)))
+    val coarseSyms = Index(syms.map(project))
+
+    val coarseGrammar = BaseGrammar(AnnotatedLabel.TOP, coarseSyms, coarseRules)
+    val fineGrammar = BaseGrammar(AnnotatedLabel.TOP, syms, rules)
+
+    val refinements = GrammarRefinements(coarseGrammar, fineGrammar, project _)
+    val lexicon = new SignatureLexicon(coarseGrammar.labelIndex, makeAllowedTags(coarseGrammar.labelIndex, lexCounts), {(w:String) => "UNK-"+EnglishWordClassGenerator(w)})
+
+    val scorer = new SignatureTagScorer[AnnotatedLabel, String](lexCounts, { (w:String) => "UNK-"+EnglishWordClassGenerator(w)})
+
+    RefinedGrammar.unanchored[AnnotatedLabel, AnnotatedLabel, String](coarseGrammar, lexicon,
+      refinements,
+      ruleScores.toArray,
+      new Array(fineGrammar.labelIndex.size),
+      scorer)
+  }
+
+
+  private def makeAllowedTags(coarseLabelIndex: Index[AnnotatedLabel], counter: Counter2[AnnotatedLabel, String, Double]): Map[String, Set[Int]] = {
+    val map = collection.mutable.Map[String, Set[Int]]().withDefaultValue(Set.empty[Int])
+    for ( (l, w) <- counter.keysIterator; proj = coarseLabelIndex(l.copy(l.label.takeWhile(_ != '_')))) {
+      assert(proj != -1, l)
+      map(w) += proj
+    }
+    map.toMap
   }
 }

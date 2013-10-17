@@ -3,6 +3,7 @@ package projections
 
 import breeze.util.{Encoder, Index}
 import collection.mutable.ArrayBuffer
+import scala.reflect.ClassTag
 
 /**
  * For computing projections from a fine grammar to a coarse grammar.
@@ -82,7 +83,15 @@ final class ProjectionIndexer[C, F] private (val coarseIndex: Index[C],
 
   override def toString() = {
     coarseIndex.map(x => x -> refinementsOf(x)).mkString("ProjectionIndexer(", ", ", ")")
+  }
 
+
+  def localizeArray[T:ClassTag](array: Array[T]):Array[Array[T]] = {
+    require(array.length == fineIndex.size)
+    Array.tabulate(coarseIndex.size) { c =>
+      val refs = refinementsOf(c)
+      Array.tabulate(refs.length)(r => array(r))
+    }
   }
 }
 
@@ -122,4 +131,5 @@ object ProjectionIndexer {
     new ProjectionIndexer(coarseIndex, fineIndex, indexedProjections.toArray)
 
   }
+
 }
