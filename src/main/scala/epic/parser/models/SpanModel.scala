@@ -468,8 +468,8 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
         + baseCat(split)
         + baseCat(end-1)
         + baseCat(end)
-        + distance[String](begin, split)
-        + distance[String](split, end)
+      //  + distance[String](begin, split)
+      //  + distance[String](split, end)
         //+ (relativeLength) * (commonWordsOnly(split) + (commonWordsOnly(-1)).apply (split))
 //        + relativeLength[String]
 //        + distance[String](begin, split) * distance[String](split,end)
