@@ -20,15 +20,16 @@ import collection.mutable.ArrayBuffer
 import java.io.{FileInputStream, PrintWriter, Writer}
 import epic.lexicon._
 import scala.io.Source
-import breeze.util.Index
+import breeze.util.{MutableIndex, Index}
 import epic.trees.BinaryRule
 import epic.trees.UnaryRule
-import breeze.linalg.Counter2
+import breeze.linalg.{DenseMatrix, Counter2}
 import chalk.text.analyze.EnglishWordClassGenerator
 import epic.trees.BinaryRule
 import epic.trees.UnaryRule
 import java.security.MessageDigest
 import java.math.BigInteger
+import scala.collection.immutable
 
 /**
  *
@@ -260,17 +261,59 @@ class SimpleRefinedGrammar[L, L2, W](val grammar: BaseGrammar[L],
 
 object SimpleRefinedGrammar {
 
+  object CloseUnaries extends Enumeration {
+    val None, Sum, Viterbi = Value
 
-  def parseBerkeleyText(prefix: String, threshold: Double = -10): SimpleRefinedGrammar[AnnotatedLabel, AnnotatedLabel, String] = {
+  }
+
+
+  private def doCloseUnaries(matrix: DenseMatrix[Double], closureType: CloseUnaries.Value, syms: Index[AnnotatedLabel]): immutable.IndexedSeq[(UnaryRule[AnnotatedLabel], Double)] = {
+    val probs = breeze.numerics.log(matrix)
+    val numsyms = matrix.rows
+    val next = DenseMatrix.fill(numsyms, numsyms)(-1)
+    closureType match {
+      case CloseUnaries.None => // do nothing
+      case CloseUnaries.Sum => ???
+      case CloseUnaries.Viterbi =>
+        for {
+          k <- 0 until numsyms
+          i <- 0 until numsyms
+          if probs(i,k) != Double.NegativeInfinity
+          j <- 0 until numsyms
+          if probs(i, j) < probs(i,k) + probs(k,j)
+        } {
+          probs(i,j) = probs(i,k) + probs(k,j)
+          next(i, j) = k
+        }
+    }
+
+    def reconstruct(i: Int, j: Int):Vector[Int] = {
+      assert(probs(i, j) != Double.NegativeInfinity)
+      next(i, j) match {
+        case -1 => Vector.empty
+        case k => reconstruct(i,k) ++ (k +: reconstruct(k, j))
+      }
+    }
+
+    for(i <- 0 until numsyms; j <- 0 until numsyms if probs(i,j) != Double.NegativeInfinity) yield {
+      UnaryRule(syms.get(i), syms.get(j), reconstruct(i,j).map(syms.get).map(_.label)) -> probs(i, j)
+    }
+
+  }
+
+  def parseBerkeleyText(prefix: String,
+                        threshold: Double = -10,
+                        closeUnaries: CloseUnaries.Value = CloseUnaries.Viterbi): SimpleRefinedGrammar[AnnotatedLabel, AnnotatedLabel, String] = {
     val syms = Index[AnnotatedLabel]()
     val symsIn = Source.fromInputStream(new FileInputStream(prefix+".numstates"))
     for( line <- symsIn.getLines) {
       val Array(_sym, numStatesS) = line.split("\\s+")
       val sym = if(_sym == "ROOT") "TOP" else _sym
-      if(sym != "PRT|ADVP")
+      if(!sym.startsWith("PRT|ADVP")) {
         for( sub <- 0 until numStatesS.toInt) {
           syms.index(AnnotatedLabel(s"${sym}_$sub"))
         }
+      }
     }
     symsIn.close()
 
@@ -280,30 +323,41 @@ object SimpleRefinedGrammar {
     val binaryIn = Source.fromInputStream(new FileInputStream(prefix+".binary"))
     for ( line <- binaryIn.getLines()) {
       val Array(a,b,c, score) = line.split("\\s+")
-      val logScore = math.log(score.toDouble)
-      if(logScore >= threshold) {
-        ruleScores += logScore
-        syms.index(AnnotatedLabel(a))
-        syms.index(AnnotatedLabel(b))
-        syms.index(AnnotatedLabel(c))
-        rules.index(BinaryRule(a,b,c).map(AnnotatedLabel(_)))
-        assert(rules.size == ruleScores.length)
+      if(!Array(a,b,c).exists(_.startsWith("PRT|ADVP"))) {
+        val logScore = math.log(score.toDouble)
+        if(logScore >= threshold) {
+          ruleScores += logScore
+          syms.index(AnnotatedLabel(a))
+          syms.index(AnnotatedLabel(b))
+          syms.index(AnnotatedLabel(c))
+          rules.index(BinaryRule(a,b,c).map(AnnotatedLabel(_)))
+          assert(rules.size == ruleScores.length)
+        }
       }
+
     }
     binaryIn.close()
 
     val unaryIn = Source.fromInputStream(new FileInputStream(prefix+".unary"))
+    val unclosedUnaries: DenseMatrix[Double] = DenseMatrix.eye[Double](syms.size)
     for ( line <- unaryIn.getLines()) {
-      val Array(_a,b,score) = line.split("\\s+")
+      val Array(_a, _b,score) = line.split("\\s+")
       val a = if(_a.startsWith("ROOT")) "TOP_0" else _a
-      val logScore = math.log(score.toDouble)
-      if(logScore >= threshold) {
-        ruleScores += logScore
-        syms.index(AnnotatedLabel(a))
-        syms.index(AnnotatedLabel(b))
-        rules.index(UnaryRule(a, b, IndexedSeq.empty).map(AnnotatedLabel(_)))
-        assert(rules.size == ruleScores.length)
+      val b = if(_b.startsWith("ROOT")) "TOP_0" else _b
+      if(!Array(a,b).exists(_.startsWith("PRT|ADVP"))) {
+        val logScore = math.log(score.toDouble)
+        if(logScore >= threshold) {
+          val ai = syms(AnnotatedLabel(a))
+          val bi = syms(AnnotatedLabel(b))
+          require(ai >= 0 && bi >= 0, a + " " + b + " " + syms)
+          unclosedUnaries(ai, bi) = score.toDouble
+          assert(rules.size == ruleScores.length)
+        }
       }
+    }
+    for ((unary, unaryScore) <- doCloseUnaries(unclosedUnaries, closeUnaries, syms)) {
+      rules.index(unary)
+      ruleScores += unaryScore
     }
     unaryIn.close()
 
