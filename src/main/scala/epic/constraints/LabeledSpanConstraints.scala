@@ -39,8 +39,18 @@ sealed trait LabeledSpanConstraints[-L] extends SpanConstraints {
     if(this eq other) this
     else this match {
       case NoConstraints => this
+      case PromotedSpanConstraints(inner) => other match {
+        case NoConstraints => this
+        case PromotedSpanConstraints(otherinner) => PromotedSpanConstraints(inner & otherinner)
+        case SimpleConstraints(maxPosX, maxLx, x) => SimpleConstraints(maxPosX, maxLx,
+          TriangularArray.tabulate(x.dimension){(b, e) =>
+            if(x(b,e) == null || !inner.isAllowedSpan(b,e)) null
+            else x(b,e)
+        })
+      }
       case SimpleConstraints(maxPosX, maxLx, x) => other match {
         case NoConstraints => this
+        case x: PromotedSpanConstraints => (x:LabeledSpanConstraints[L]) & this
         case SimpleConstraints(maxPosY, maxLy, y) =>
           require(x.dimension == y.dimension, "Dimensions of constrained spans must match!")
           SimpleConstraints( elementwiseMin(maxPosX, maxPosY), elementwiseMin(maxLx, maxLy),
@@ -75,8 +85,15 @@ sealed trait LabeledSpanConstraints[-L] extends SpanConstraints {
    */
   def |(other: LabeledSpanConstraints[L @uncheckedVariance ]): LabeledSpanConstraints[L] = this match {
     case NoConstraints => other
+    case PromotedSpanConstraints(inner) => other match {
+      case NoConstraints => this
+      case PromotedSpanConstraints(otherinner) => PromotedSpanConstraints(inner | otherinner)
+      case SimpleConstraints(maxPosX, maxLx, x) => ???
+
+    }
     case SimpleConstraints(maxPosX, maxLx, x) => other match {
       case NoConstraints => this
+      case x: PromotedSpanConstraints => (x:LabeledSpanConstraints[L]) | this
       case SimpleConstraints(maxPosY, maxLy, y) =>
         require(x.dimension == y.dimension, "Dimensions of constrained spans must match!")
         SimpleConstraints( elementwiseMax(maxPosX, maxPosY), elementwiseMax(maxLx, maxLy),
@@ -283,6 +300,20 @@ object LabeledSpanConstraints {
 
 
     def decode(labelIndex: Index[Any]):String = toString
+  }
+
+
+  @SerialVersionUID(1L)
+  case class PromotedSpanConstraints(inner: SpanConstraints) extends LabeledSpanConstraints[Any] with Serializable {
+
+    def maxSpanLengthStartingAt(begin: Int): Int = Int.MaxValue/2 // /2 because i get worried about wrap around.
+
+    def isAllowedSpan(begin: Int, end: Int): Boolean = inner.isAllowedSpan(begin, end)
+    def isAllowedLabeledSpan(begin: Int, end: Int, label: Int): Boolean = isAllowedSpan(begin, end)
+
+    def maxSpanLengthForLabel(label: Int):Int = Int.MaxValue / 2
+
+    def decode(labelIndex: Index[Any]):String = inner.toString
   }
 
 

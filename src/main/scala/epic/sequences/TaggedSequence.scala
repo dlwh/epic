@@ -18,6 +18,8 @@ case class TaggedSequence[+L, +W](tags: IndexedSeq[L],
     (tags zip words map { case (t, w) => w +"/" + t}).mkString(" ")
   }
 
+  def pairs = tags zip words
+
   def features = words
 
   def length: Int = words.length

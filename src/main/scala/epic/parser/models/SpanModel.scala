@@ -462,20 +462,23 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
       val baseCat = lfsuf
       val leftOfSplit =  (baseCat(-1)apply (split))
       val commonWordsOnly = new IdentityWordFeaturizer(summedCounts, 300)
-      ( baseCat(begin-1)
+      val pointsOfInterest = (
+        baseCat(begin-1)
         + baseCat(begin)
         + leftOfSplit
         + baseCat(split)
         + baseCat(end-1)
         + baseCat(end)
-      //  + distance[String](begin, split)
-      //  + distance[String](split, end)
+      )
+      (  pointsOfInterest
+        + distance[String](begin, split)
+        + distance[String](split, end)
         //+ (relativeLength) * (commonWordsOnly(split) + (commonWordsOnly(-1)).apply (split))
 //        + relativeLength[String]
 //        + distance[String](begin, split) * distance[String](split,end)
         + spanShape
-        + length
-        + sent
+        + (length * pointsOfInterest)
+        //+ sent
         // to add to colenpar:
         //
         // don't seem to help?!?

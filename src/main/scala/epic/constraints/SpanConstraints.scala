@@ -17,6 +17,11 @@ trait SpanConstraints { outer =>
     def isAllowedSpan(begin: Int, end: Int): Boolean = outer.isAllowedSpan(begin, end) || other.isAllowedSpan(begin, end)
     def maxSpanLengthStartingAt(begin: Int):Int = outer.maxSpanLengthStartingAt(begin) max other.maxSpanLengthStartingAt(begin)
   }
+
+  def &(other: SpanConstraints):SpanConstraints = new SpanConstraints {
+    def isAllowedSpan(begin: Int, end: Int): Boolean = outer.isAllowedSpan(begin, end) && other.isAllowedSpan(begin, end)
+    def maxSpanLengthStartingAt(begin: Int):Int = outer.maxSpanLengthStartingAt(begin) min other.maxSpanLengthStartingAt(begin)
+  }
 }
 
 object SpanConstraints {

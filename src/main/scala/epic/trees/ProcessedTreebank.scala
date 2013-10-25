@@ -27,7 +27,7 @@ import breeze.config.Help
 case class ProcessedTreebank(@Help(text="Location of the treebank directory")
                              path: File,
                              @Help(text="Max length for training sentences")
-                             maxLength: Int = 50,
+                             maxLength: Int = 10000,
                              @Help(text="Should we add the dev set for training, do this only for final test.")
                              includeDevInTrain: Boolean = false,
                              @Help(text="What kind of binarization to do. Options: left, right, head. Head is best.")

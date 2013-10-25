@@ -15,7 +15,7 @@ package epic.parser
  limitations under the License.
 */
 
-import projections.GrammarRefinements
+import epic.parser.projections.{ConstraintCoreGrammarAdaptor, GrammarRefinements}
 import epic.trees._
 
 import epic.trees.annotations._
@@ -26,6 +26,7 @@ import epic.lexicon.{SimpleTagScorer, MaxEntTagScorer, Lexicon, SimpleLexicon}
 import epic.features._
 import java.io.{FileWriter, BufferedWriter, File}
 import epic.trees._
+import epic.constraints.LongSpanConstraints
 
 /**
  * Contains codes to read off parsers and grammars from
@@ -140,7 +141,8 @@ object GenerativeTrainer extends ParserPipeline {
                     @Help(text="Use the awesome cheating lexicon (slower to train)")
                     awesomeLexicon: Boolean = false,
                     @Help(text="dump the grammar to a text file")
-                    grammarDumpPath: File = null
+                    grammarDumpPath: File = null,
+                    pruneUnlikelyLongSpans: Boolean  = true
                      )
   protected val paramManifest = manifest[Params]
 
@@ -180,8 +182,16 @@ object GenerativeTrainer extends ParserPipeline {
       out.close()
     }
 
+    val finalGrammar = if(params.pruneUnlikelyLongSpans) {
+      val ccs = trainTrees.flatMap(_.asTaggedSequence.pairs.collect{ case (tag, word) if tag.label == "CC" || tag.label == "C" || tag.label == "KON" => word}).toSet
+      val constraints = new ConstraintCoreGrammarAdaptor(refinedGrammar.grammar, refinedGrammar.lexicon, new LongSpanConstraints.Factory[AnnotatedLabel](30, ccs))
+      AugmentedGrammar(refinedGrammar, constraints)
+    } else {
+      AugmentedGrammar.fromRefined(refinedGrammar)
+    }
+
     val decoder = if (params.maxRule) new MaxRuleProductDecoder[AnnotatedLabel, String]() else new ViterbiDecoder[AnnotatedLabel, String]
-    val parser = new SimpleChartParser(AugmentedGrammar.fromRefined(refinedGrammar), decoder)
+    val parser = new SimpleChartParser(finalGrammar, decoder)
     Iterator.single(("Gen", parser))
   }
 }

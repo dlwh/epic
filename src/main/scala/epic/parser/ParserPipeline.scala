@@ -89,7 +89,7 @@ trait ParserPipeline extends Logging {
     import treebank._
 
 
-    val validateTrees = devTrees.take(400)
+    val validateTrees = devTrees.filter(_.words.length <= 40).take(400)
     def validate(parser: Parser[AnnotatedLabel, String]) = {
       ParseEval.evaluate[AnnotatedLabel](validateTrees, parser, AnnotatedLabelChainReplacer, asString={(l:AnnotatedLabel)=>l.label}, nthreads=params.threads)
     }
@@ -119,7 +119,7 @@ trait ParserPipeline extends Logging {
       writeObject(out, parser)
 
       logger.info("Evaluating Parser...")
-      val stats = evalParser(devTrees.filter(_.words.length <= 40), parser, name+"-len40-dev")
+      val stats = evalParser(devTrees, parser, name+"-len40-dev")
       logger.info(s"Eval finished. Results:\n$stats")
     }
   }

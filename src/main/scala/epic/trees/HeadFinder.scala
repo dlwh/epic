@@ -226,7 +226,7 @@ object HeadRules {
   private def shr[L](dir: Dir, dis: Boolean, heads: L*) = HeadRule(dir, dis, heads);
 
   val collinsHeadRules = fromMap[String] {
-    val allNonTerms = shr(Right, false, "ROOT", "TOP", "ADJP", "ADVP", "CONJP", "FRAG", "S", "INTJ", "LST", "NAC", "NX", "PP", "PRN", "PRT", "QP", "RRC", "S", "SBAR", "SBARQ", "SINV", "SQ", "UCP", "VP", "WHADJP", "WHADVP", "WHNP", "WHPP", "X", "NML", "NP", "NN", "NNP", "NNPS", "NNS", "VB", "VBZ", "VBG", "VBD", "JJ", "JJR", "JJS", "CC", "VBP", "PRP", "PRP$", "PRPS", "CD", "IN", "TO", "WDT", "WP", "WP$", "WRB", "RB", "SYM", "RB", "UH", "RP", "RBR", "RBS")
+    val allNonTerms = shr(Right, false, "ROOT", "TOP", "ADJP", "ADVP", "CONJP", "FRAG", "S", "INTJ", "LST", "NAC", "NX", "PP", "PRN", "PRT", "QP", "RRC", "S", "SBAR", "SBARQ", "SINV", "SQ", "UCP", "VP", "WHADJP", "WHADVP", "WHNP", "WHPP", "X", "NML", "NP", "NN", "NNP", "NNPS", "NNS", "VB", "VBZ", "VBG", "VBD", "JJ", "JJR", "JJS", "CC", "VBP", "PRP", "PRP$", "PRPS", "CD", "IN", "TO", "WDT", "WP", "WP$", "WRB", "RB", "SYM", "RB", "UH", "RP", "RBR", "RBS", "DT")
     val allNonLeft = allNonTerms.copy(Left)
     val basic = Map[String, Seq[HeadRule[String]]](
       "" -> Seq(shr(Left, false, "S", "SINV")),
@@ -242,7 +242,7 @@ object HeadRules {
         "FRAG" -> Seq(shr(Right, false, "ROOT", "TOP", "ADJP", "ADVP", "CONJP", "FRAG", "S", "INTJ", "LST", "NAC", "NX", "PP", "PRN", "PRT", "QP", "RRC", "S", "SBAR", "SBARQ", "SINV", "SQ", "UCP", "VP", "WHADJP", "WHADVP", "WHNP", "WHPP", "X", "NML", "NP")),
       "S" -> Seq(shr(Left, false, "TO", "IN", "VP", "S", "SBAR", "ADJP", "UCP", "NP")),
       "INTJ" -> Seq(allNonLeft),
-      "LST" -> Seq(shr(Right, false, "LS", ":")),
+      "LST" -> Seq(shr(Right, false, "LS", ":"), allNonTerms),
       "NAC" -> Seq(shr(Left, false,
         "NN", "NNS", "NNP", "NNPS", "NAC", "EX", "$", "CD", "QP",
         "PRP", "VBG", "JJ", "JJS", "JJR", "ADJP", "FW")),

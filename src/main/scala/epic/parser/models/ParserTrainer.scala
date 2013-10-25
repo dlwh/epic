@@ -70,11 +70,12 @@ object ParserTrainer extends epic.parser.ParserPipeline with Logging {
                     @Help(text="Should we check the gradient to make sure it's coded correctly?")
                     checkGradient: Boolean = false,
                     @Help(text="check specific indices, in addition to doing a full search.")
-                    checkGradientsAt: String = null
-                     )
+                    checkGradientsAt: String = null,
+                    @Help(text="check specific indices, in addition to doing a full search.")
+                    maxParseLength: Int = 70)
   protected val paramManifest = manifest[Params]
 
-  def trainParser(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]],
+  def trainParser( trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]],
                   validate: (Parser[AnnotatedLabel, String]) => Statistics, params: Params) = {
     import params._
 
@@ -110,7 +111,7 @@ object ParserTrainer extends epic.parser.ParserPipeline with Logging {
 
     val model = modelFactory.make(theTrees, baseMeasure)
 
-    val obj = new ModelObjective(model, theTrees, params.threads)
+    val obj = new ModelObjective(model, theTrees.filter(_.words.filter(x => x == "'s" || x(0).isLetterOrDigit).length <= params.maxParseLength), params.threads)
     val cachedObj = new CachedBatchDiffFunction(obj)
     val init = obj.initialWeightVector(randomize)
     if(checkGradient) {
@@ -131,6 +132,7 @@ object ParserTrainer extends epic.parser.ParserPipeline with Logging {
         logger.info("Overall statistics for validation: " + stats)
       }
     }
+
 
     val name = Option(params.name).orElse(Option(model.getClass.getSimpleName).filter(_.nonEmpty)).getOrElse("DiscrimParser")
 
