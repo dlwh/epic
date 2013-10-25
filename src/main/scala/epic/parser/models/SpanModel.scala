@@ -300,7 +300,7 @@ class IndexedSpanFeaturizer[L, L2, W](wordFeatureIndex: CrossProductIndex[Featur
     private val sspec = surfaceFeaturizer.anchor(words)
     private val wspec = wordFeaturizer.anchor(words)
 
-    def featuresForSpan(begin: Int, end: Int, tag: Int, ref: Int) = {
+    def featuresForSpan(begin: Int, end: Int, tag: Int, ref: Int): Array[Int] = {
       val globalized = refinements.labels.globalize(tag, ref)
 
       val ind = TriangularArray.index(begin, end)
@@ -432,7 +432,7 @@ object IndexedSpanFeaturizer {
 }
 
 case class SpanModelFactory(@Help(text=
-                              """The kind of annotation to do on the refined grammar. Default uses no annotations.
+                              """The kind of annotation to do on the refined grammar. Default uses just parent annotation.
 You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Manning 2003.
                               """)
                             annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = GenerativeParser.defaultAnnotator(),
