@@ -15,6 +15,11 @@ sealed trait Optional[+A] {
     case NotProvided => NotProvided
   }
 
+  def flatMap[B](f: A=>Optional[B]) = this match {
+    case Provided(x) => f(x)
+    case NotProvided => NotProvided
+  }
+
 
   def foreach[B](f: A=>B) {
     this match {
