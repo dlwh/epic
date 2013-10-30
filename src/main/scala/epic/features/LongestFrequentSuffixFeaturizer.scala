@@ -4,6 +4,7 @@ import breeze.linalg.Counter
 import epic.framework.Feature
 import epic.features.LongestFrequentSuffixFeaturizer.LongestFrequentSuffix
 import breeze.numerics.I
+import epic.parser.features.IndicatorFeature
 
 /**
  * TODO
@@ -15,31 +16,36 @@ class LongestFrequentSuffixFeaturizer private (fixedMap: Map[String, Feature],
   def anchor(w: IndexedSeq[String]): WordFeatureAnchoring[String] = new WordFeatureAnchoring[String] {
     val feats = words.map(w => Array(fixedMap.getOrElse(w, LongestFrequentSuffix(lookup(w)))))
 
-    def featuresForWord(pos: Int): Array[Feature] = feats(pos)
+    def featuresForWord(pos: Int): Array[Feature] = if(pos < 0 || pos >= w.length) Array(BeginSentFeature) else feats(pos)
 
     def words: IndexedSeq[String] = w
   }
 
 
   private def lookup(x: String):String = {
-    x.tails.find(suffixCounts(_) >= commonWordThreshold).getOrElse("-UNK-")
+    (x).tails.find(suffixCounts(_) >= commonWordThreshold).getOrElse("-UNK-")
   }
 }
 
 object LongestFrequentSuffixFeaturizer {
   def apply(counts: Counter[String, Double], commonWordThreshold: Int = 100) = {
     var suffixCounts = Counter[String, Double]()
-    for( (k, v) <- counts.iterator; tail <- k.tails) {
+    for( (k, v) <- counts.iterator; if v <= commonWordThreshold; tail <- k.tails) {
       suffixCounts(tail) += v
     }
 
-    suffixCounts = suffixCounts.mapValues(v => v * I(v < commonWordThreshold))
+    suffixCounts = suffixCounts.mapValues(v => v * I(v >= commonWordThreshold))
 
     def lookup(x: String):String = {
-      x.tails.find(suffixCounts(_) >= commonWordThreshold).getOrElse("-UNK-")
+      (x).tails.find(suffixCounts(_) >= commonWordThreshold).getOrElse("-UNK-")
     }
 
-    val map = Map.empty ++ (for( w <- counts.keysIterator) yield w -> LongestFrequentSuffix(lookup(w)))
+    val map = Map.empty ++ (for( (w,v) <- counts.iterator) yield {
+      if(v > commonWordThreshold)
+        w -> IndicatorFeature(w)
+      else
+        w -> LongestFrequentSuffix(lookup(w))
+    })
 
     new LongestFrequentSuffixFeaturizer(map, suffixCounts, commonWordThreshold)
   }

@@ -458,18 +458,22 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
       val dsl = new WordFeaturizer.DSL(annWords) with SurfaceFeaturizer.DSL with SplitSpanFeaturizer.DSL
       import dsl._
 
-      val leftOfSplit =  (clss(-1)apply (split))
       // class(split + 1)
       val baseCat = lfsuf
-      val commonWordsOnly = new IdentityWordFeaturizer(summedCounts, 100)
-      ( baseCat(split)
-        + distance[String](begin, split)
-        + distance[String](split, end)
-//        + (relativeLength + unit) * (leftOfSplit + clss(split) + unit)
-        + relativeLength[String]
+      val leftOfSplit =  (baseCat(-1)apply (split))
+      val commonWordsOnly = new IdentityWordFeaturizer(summedCounts, 300)
+      ( baseCat(begin-1)
+        + baseCat(begin)
+        + leftOfSplit
+        + baseCat(split)
+        + baseCat(end-1)
+        + baseCat(end)
+      //  + distance[String](begin, split)
+      //  + distance[String](split, end)
+        //+ (relativeLength) * (commonWordsOnly(split) + (commonWordsOnly(-1)).apply (split))
+//        + relativeLength[String]
 //        + distance[String](begin, split) * distance[String](split,end)
-        + baseCat(begin) + baseCat(end)
-        + spanShape + baseCat(begin-1) + baseCat(end-1)
+        + spanShape
         + length
         + sent
         // to add to colenpar:
@@ -500,7 +504,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     }
     val indexedWord = IndexedWordFeaturizer.fromData(wf, annTrees.map{_.words})
     val surface = IndexedSplitSpanFeaturizer.fromData(span, annTrees)
-    val featurizer = new ProductionFeaturizer[AnnotatedLabel, AnnotatedLabel, String](xbarGrammar, indexedRefinements, lGen={(x: AnnotatedLabel) => if(x.isIntermediate) Seq(x, SyntheticFeature) else Seq(x)})
+    val featurizer = new ProductionFeaturizer[AnnotatedLabel, AnnotatedLabel, String](xbarGrammar, indexedRefinements, lGen={(x: AnnotatedLabel) => if(x.isIntermediate) Set(x, x.baseAnnotatedLabel, SyntheticFeature).toSeq else Set(x, x.baseAnnotatedLabel).toSeq}, rGen={r => Set(r, r.map(_.baseAnnotatedLabel)).toSeq})
 
     val indexed =  IndexedSpanFeaturizer.extract[AnnotatedLabel, AnnotatedLabel, String](indexedWord,
       surface,

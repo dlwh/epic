@@ -43,8 +43,9 @@ object SpanShapeGenerator extends Serializable {
       i += 1
     }
     if(begin < end) {
-      val remainingLength = distanceBinner.binnedDistance(begin, end - MAX_LEN)
-      result ++= "~"  * remainingLength
+      //val remainingLength = distanceBinner.binnedDistance(begin, end - MAX_LEN)
+      //result ++= "~"  * remainingLength
+      result += '~'
       i = end - MAX_LEN/2
     }
     while (i < end) {
