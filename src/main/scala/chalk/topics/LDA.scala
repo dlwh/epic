@@ -136,15 +136,13 @@ object LDA {
     // Feature map
     val fmap = Index[String]()
 
-
-    val removeStopWords = new StopWordFilter("en")
     // Read in the training data and index it.
     val almostTrainingData = for {
       f <- dir.listFiles
     } yield {
       val text = Source.fromFile(f)("UTF-8").mkString
       val builder = new VectorBuilder[Double](Int.MaxValue, text.length / 20)
-      for(tok <- JavaWordTokenizer(text) if tok(0).isLetter && removeStopWords(tok)) {
+      for(tok <- JavaWordTokenizer(text) if tok(0).isLetter) {
         builder.add(fmap.index(tok), 1.0)
       }
 
