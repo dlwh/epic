@@ -7,7 +7,9 @@ Chalk is a library for natural language processing (NLP).
 
 ### What's inside
 
-The latest stable version is 1.2.0. This version is essentially the code based that was in breeze.process, with "breeze" renamed to "chalk", plus some simple Scala utilities that were in Chalk already.
+The latest stable version is 1.3.0. Changes from the previous release include:
+
+* Initial implementation of functional pipelines for NLP applications, and actor-based pipelines based on those components.
 
 See the [CHANGELOG](https://github.com/scalanlp/chalk/wiki/CHANGELOG) for changes in previous versions.
 
@@ -16,14 +18,14 @@ See the [CHANGELOG](https://github.com/scalanlp/chalk/wiki/CHANGELOG) for change
 
 In SBT:
 
-    libraryDependencies += "org.scalanlp" % "chalk" % "1.2.0"
+    libraryDependencies += "org.scalanlp" % "chalk" % "1.3.0"
 
 In Maven:
 
     <dependency>
        <groupId>org.scalanlp</groupId>
        <artifactId>chalk</artifactId>
-       <version>1.2.0</version>
+       <version>1.3.0</version>
     </dependency>
 
 ## Requirements
