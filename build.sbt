@@ -4,7 +4,7 @@ version := "1.3-SNAPSHOT"
 
 organization := "org.scalanlp"
 
-scalaVersion := "2.10.2"
+scalaVersion := "2.10.3"
 
 crossPaths := false
 
@@ -16,14 +16,12 @@ resolvers ++= Seq(
 )
 
 libraryDependencies ++= Seq(
-  "com.typesafe.akka" %% "akka-actor" % "2.2.0",
-  "com.typesafe.akka" %% "akka-agent" % "2.2.0",
-  "org.scalatest" % "scalatest_2.10" % "1.9.1" % "test",
-  "com.novocode" % "junit-interface" % "0.8" % "test->default",
+  "org.scalanlp" % "nak" % "1.2.0",
+  "org.scalanlp" % "breeze_2.10" % "0.5.2",
+  "com.typesafe.akka" %% "akka-actor" % "2.2.3",
+  "com.typesafe.akka" %% "akka-agent" % "2.2.3",
   "org.scalacheck" %% "scalacheck" % "1.10.0" % "test",
-  "org.scalanlp" % "breeze-core_2.10" % "0.4-SNAPSHOT",
-  "org.scalanlp" % "breeze-math_2.10" % "0.4-SNAPSHOT",
-  "org.scalanlp" % "nak" % "1.2.0-SNAPSHOT"
+  "org.scalatest" %% "scalatest" % "2.0.M5b" % "test"
 )
 
 publishTo <<= version { v: String =>
