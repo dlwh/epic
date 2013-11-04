@@ -76,7 +76,9 @@ class ReachabilityProjection[L, L2, W](grammar: BaseGrammar[L], lexicon: Lexicon
 
       def lexicon = ReachabilityProjection.this.lexicon
 
-      def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int): Double = 0.0
+      def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int): Double = {
+        0.1 * basic.scoreBinaryRule(begin, split, end, rule, ref)
+      }
 
       def scoreUnaryRule(begin: Int, end: Int, rule: Int, ref: Int): Double = {
         val top = grammar.parent(rule)
@@ -87,13 +89,13 @@ class ReachabilityProjection[L, L2, W](grammar: BaseGrammar[L], lexicon: Lexicon
           val refTop = refinements.labels.fineIndex(theRefinedRule.parent)
           correctRefinedSpans.isGoldTopTag(begin, end, refTop)
         }
-        20 * I(isAllowed) + I(isRightRefined)
+        20 * I(isAllowed) + I(isRightRefined) + 0.1 * basic.scoreUnaryRule(begin, end, rule, ref)
       }
 
       def scoreSpan(begin: Int, end: Int, tag: Int, ref: Int): Double = {
         val globalized = refinements.labels.globalize(tag, ref)
         20 * I(treeconstraints.bot.isAllowedLabeledSpan(begin, end, tag)) +
-          I(correctRefinedSpans.isGoldBotTag(begin, end, globalized))
+          I(correctRefinedSpans.isGoldBotTag(begin, end, globalized)) + 0.1 * basic.scoreSpan(begin, end, tag, ref)
       }
 
       def validLabelRefinements(begin: Int, end: Int, label: Int): Array[Int] = basic.validLabelRefinements(begin, end, label)

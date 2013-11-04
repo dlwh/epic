@@ -64,7 +64,7 @@ class HeadFinder[L](defaultDirection: Dir = Left,
       case Some(i) => i
     }
     if(!children(result).toString.head.isLetter)
-      assert(!l.toString.head.isLetter || children(result).toString == "$", l + " " + children + " " + result)
+      assert(!l.toString.head.isLetter || children(result).toString.startsWith("@") || children(result).toString == "$", l + " " + children + " " + result)
     result
   }
 
@@ -183,7 +183,7 @@ trait HeadRules[L] extends Serializable { outer =>
     val mapped = children.map(proj)
     val answers = myRules.view.map(_.findMatchIndex(mapped: _*)).filterNot(_ == -1)
     if (answers.nonEmpty) {
-      assert(children(answers.head).toString.head.isLetterOrDigit || !parent.toString.head.isLetterOrDigit || children(answers.head).toString == "$", parent + " " + children + " " + answers.head)
+      assert(children(answers.head).toString.head.isLetterOrDigit || !parent.toString.head.isLetterOrDigit || children(answers.head).toString.startsWith("@") || children(answers.head).toString == "$", parent + " " + children + " " + answers.head)
       Some(answers.head)
     }
     else None

@@ -86,6 +86,7 @@ object ParserTrainer extends epic.parser.ParserPipeline with Logging {
       case null =>
         val (grammar, lexicon) = XbarGrammar().xbarGrammar(trainTrees)
         GenerativeParser.annotatedParser(grammar, lexicon, GenerativeParser.defaultAnnotator(), trainTrees)
+//        GenerativeParser.annotatedParser(grammar, lexicon, Xbarize(), trainTrees)
       case f =>
         readObject[SimpleChartParser[AnnotatedLabel, String]](f)
     }

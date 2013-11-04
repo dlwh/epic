@@ -448,7 +448,6 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     val (annWords, annBinaries, annUnaries) = this.extractBasicCounts(annTrees)
     val refGrammar = BaseGrammar(AnnotatedLabel.TOP, annBinaries, annUnaries)
 
-    val trees = trainTrees.map(_.mapLabels(_.baseAnnotatedLabel))
     val xbarGrammar = constrainer.grammar
     val xbarLexicon = constrainer.lexicon
     val indexedRefinements = GrammarRefinements(xbarGrammar, refGrammar, (_: AnnotatedLabel).baseAnnotatedLabel)
@@ -477,7 +476,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
 //        + relativeLength[String]
 //        + distance[String](begin, split) * distance[String](split,end)
         + spanShape
-        + (length * pointsOfInterest)
+        + length
         //+ sent
         // to add to colenpar:
         //
@@ -516,7 +515,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
       indexedRefinements,
       xbarGrammar,
       HashFeature.Relative(dummyFeats),
-      trees)
+      trainTrees)
 
     val featureCounter = readWeights(oldWeights)
 
