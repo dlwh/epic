@@ -30,8 +30,8 @@ class ProductParserTest extends ParserTestHarness with FunSuite {
 
 
   test("two parsers test") {
-    val parser = ParserTestHarness.simpleParser
-    val product = Parser(CoreGrammar.identity(parser.grammar, parser.lexicon), parser.grammars ++ parser.grammars, algorithm = Parser.SimpleProduct)
+    val grammar = ParserTestHarness.refinedGrammar
+    val product = Parser(ParserTestHarness.simpleParser.coreGrammar, new ProductChartFactory(IndexedSeq(grammar, grammar)))
 
     val rprod = evalParser(getTestTrees(), product)
     assert(rprod.f1 > 0.6, rprod)

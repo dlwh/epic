@@ -189,7 +189,7 @@ object GenerativeTrainer extends ParserPipeline {
     }
 
     val decoder = if (params.maxRule) new MaxRuleProductDecoder[AnnotatedLabel, String]() else new ViterbiDecoder[AnnotatedLabel, String]
-    val parser = Parser(finalGrammar, decoder)
+    val parser = Parser(finalGrammar.core, finalGrammar.refined, decoder)
     Iterator.single(("Gen", parser))
   }
 }

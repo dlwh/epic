@@ -55,9 +55,12 @@ object ParserTestHarness extends ParserTestHarness {
       case e:Exception => e.printStackTrace(); throw e
     }
   }
-  val simpleParser: Parser[AnnotatedLabel, String] = {
+  val refinedGrammar = {
     val trees = getTrainTrees()
-    val grammar = GenerativeParser.extractGrammar[AnnotatedLabel, String](trees.head.label.label, trees.map(_.mapLabels(_.baseAnnotatedLabel)))
-    Parser(grammar, ViterbiDecoder[AnnotatedLabel, String]())
+    GenerativeParser.extractGrammar[AnnotatedLabel, String](trees.head.label.label, trees.map(_.mapLabels(_.baseAnnotatedLabel)))
   }
+  val simpleParser: Parser[AnnotatedLabel, String] = {
+    Parser(refinedGrammar, ViterbiDecoder[AnnotatedLabel, String]())
+  }
+  val viterbiParser = Parser(refinedGrammar, new ViterbiDecoder[AnnotatedLabel, String])
 }

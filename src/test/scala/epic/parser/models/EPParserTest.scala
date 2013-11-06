@@ -18,7 +18,6 @@ package models
 import org.junit.runner.RunWith
 import org.scalatest._
 import org.scalatest.junit._
-import epic.parser.Parser.ExpectationPropagation
 
 
 /**
@@ -29,8 +28,8 @@ import epic.parser.Parser.ExpectationPropagation
 class EPParserTest extends ParserTestHarness with FunSuite {
 
   test("two parsers test") {
-    val parser = ParserTestHarness.simpleParser
-    val product = Parser(CoreGrammar.identity(parser.grammar, parser.lexicon), parser.grammars ++ parser.grammars, algorithm = ExpectationPropagation())
+    val grammar = ParserTestHarness.refinedGrammar
+    val product = Parser(ParserTestHarness.simpleParser.coreGrammar, EPChartFactory(IndexedSeq(grammar, grammar)))
 
     val rprod = evalParser(getTestTrees(), product)
     assert(rprod.f1 > 0.6, rprod)

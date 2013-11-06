@@ -19,7 +19,6 @@ import org.junit.runner.RunWith
 import org.scalatest._
 import org.scalatest.junit._
 import epic.trees.AnnotatedLabel
-import epic.parser.Parser.MaxMarginal
 
 
 /**
@@ -30,27 +29,27 @@ import epic.parser.Parser.MaxMarginal
 class ChartDecoderTest extends ParserTestHarness with FunSuite {
 
   test("ViterbiDecoder") {
-    val gen = ParserTestHarness.simpleParser.copy(decoder = new ViterbiDecoder, algorithm = MaxMarginal)
+    val gen = Parser(ParserTestHarness.refinedGrammar, new ViterbiDecoder[AnnotatedLabel, String])
 
     val res = evalParser(getTestTrees(), gen)
     assert(res.f1 > 0.6, res.f1)
   }
 
   test("MaxRuleProductDecoder") {
-    val gen = ParserTestHarness.simpleParser.copy(decoder = new MaxRuleProductDecoder, algorithm = MaxMarginal)
+    val gen = ParserTestHarness.simpleParser.copy(decoder = new MaxRuleProductDecoder)
     val res = evalParser(getTestTrees(), gen)
     assert(res.f1 > 0.6, res.f1)
   }
 
   test("MaxVariationalDecoder") {
-    val gen = ParserTestHarness.simpleParser.copy(decoder = new MaxVariationalDecoder, algorithm = MaxMarginal)
+    val gen = ParserTestHarness.simpleParser.copy(decoder = new MaxVariationalDecoder)
     val res = evalParser(getTestTrees(), gen)
     assert(res.f1 > 0.6, res.f1)
   }
 
 
   test("MaxConstituentDecoder") {
-    val gen = ParserTestHarness.simpleParser.copy(decoder = new MaxConstituentDecoder, algorithm = MaxMarginal)
+    val gen = ParserTestHarness.simpleParser.copy(decoder = new MaxConstituentDecoder)
     val res = evalParser(getTestTrees(), gen)
     assert(res.f1 > 0.6, res.f1)
   }

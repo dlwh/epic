@@ -30,11 +30,10 @@ class SpanAnchoringTest extends ParserTestHarness with FunSuite {
 
   test("We can parse using span anchoring") {
     val gen = ParserTestHarness.simpleParser
-    val genFactory = gen.augmentedGrammar
-    val f = new LabeledSpanProjector[AnnotatedLabel, String](genFactory.grammar, Double.NegativeInfinity)
+    val f = new LabeledSpanProjector[AnnotatedLabel, String](gen.grammar, Double.NegativeInfinity)
 
-    val grammar = new ProjectingCoreGrammar(gen.augmentedGrammar, f)
-    val chartParser = SimpleChartParser(AugmentedGrammar.fromCore(grammar))
+    val grammar = new ProjectingCoreGrammar(gen, f)
+    val chartParser = Parser(AugmentedGrammar.fromCore(grammar))
 
     for (TreeInstance(_, t, w) <- getTestTrees()) try {
       chartParser(w)
@@ -48,9 +47,9 @@ class SpanAnchoringTest extends ParserTestHarness with FunSuite {
   test("Parsing kind of works using it") {
     val gen = ParserTestHarness.simpleParser
     val f = new LabeledSpanProjector[AnnotatedLabel, String](gen.grammar, Double.NegativeInfinity)
-    val grammar = new ProjectingCoreGrammar(gen.augmentedGrammar, f)
+    val grammar = new ProjectingCoreGrammar(gen, f)
+    val chartParser = Parser(AugmentedGrammar.fromCore(grammar))
 
-    val chartParser = SimpleChartParser(AugmentedGrammar.fromCore(grammar))
 
     val res = evalParser(getTestTrees(), chartParser)
     assert(res.f1 > 0.5, res.f1)

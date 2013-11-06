@@ -2,7 +2,6 @@ package epic.parser.kbest
 
 import epic.parser.{ViterbiDecoder, ParserTestHarness}
 import org.scalatest.FunSuite
-import epic.parser.Parser.MaxMarginal
 
 /**
  *
@@ -10,7 +9,7 @@ import epic.parser.Parser.MaxMarginal
  */
 class TopDownKBestAStarTest extends ParserTestHarness with FunSuite {
   test("KBest recovers viterbi tree") {
-    val parser = ParserTestHarness.simpleParser.copy(decoder=new ViterbiDecoder, algorithm = MaxMarginal)
+    val parser = ParserTestHarness.viterbiParser
     val kbestParser = new AStarKBestParser(parser)
     val trees = getTestTrees()
     trees.foreach { ti =>

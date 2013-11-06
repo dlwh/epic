@@ -55,6 +55,10 @@ final case class Parser[L,W](coreGrammar: CoreGrammar[L, W],
 }
 
 object Parser {
+  def apply[L, W](grammar: AugmentedGrammar[L, W]): Parser[L, W] = {
+    Parser(grammar.core, grammar.refined)
+
+  }
 
 
   def apply[L, W](ref: RefinedGrammar[L, W]): Parser[L, W]= {
@@ -67,6 +71,11 @@ object Parser {
 
 
   def apply[L, W](core: CoreGrammar[L, W], refinedGrammar: RefinedGrammar[L, W], decoder: ChartDecoder[L, W]): Parser[L, W] = {
-    Parser(CoreGrammar.identity(refinedGrammar.grammar, refinedGrammar.lexicon), SimpleChartFactory(refinedGrammar, decoder.wantsMaxMarginal), decoder)
+    Parser(core, SimpleChartFactory(refinedGrammar, decoder.wantsMaxMarginal), decoder)
+  }
+
+
+  def apply[L, W](core: CoreGrammar[L, W], refinedGrammar: RefinedGrammar[L, W]): Parser[L, W] = {
+    Parser(core, refinedGrammar, ChartDecoder[L, W]())
   }
 }
