@@ -26,7 +26,7 @@ import epic.util.CacheBroker
  * @author dlwh
  */
 @SerialVersionUID(1L)
-class CachedChartConstraintsFactory[L, W](backoff: ChartConstraints.Factory[L, W], cache: collection.mutable.Map[IndexedSeq[W], ChartConstraints[L]]) extends ChartConstraints.Factory[L, W] with Serializable {
+class CachedChartConstraintsFactory[L, W](val backoff: ChartConstraints.Factory[L, W], cache: collection.mutable.Map[IndexedSeq[W], ChartConstraints[L]]) extends ChartConstraints.Factory[L, W] with Serializable {
   def this(backoff: ChartConstraints.Factory[L, W], name: String = "parseConstraints")(implicit broker: CacheBroker)  = this(backoff, cache = broker.make[IndexedSeq[W], ChartConstraints[L]](name)(null, ChartConstraints.serializerChartConstraints[L]))
   def constraints(w: IndexedSeq[W]): ChartConstraints[L] = cache.getOrElseUpdate(w, backoff.constraints(w))
 }

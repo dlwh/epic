@@ -25,7 +25,14 @@ import epic.trees._
  *
  * @author dlwh
  */
-trait Parser[L,W] extends (IndexedSeq[W]=>Tree[L]) {
+@SerialVersionUID(1L)
+final case class Parser[L,W](coreGrammar: CoreGrammar[L, W],
+                             marginalFactory: ChartMarginal.Factory[L, W],
+                             decoder: ChartDecoder[L, W] = ChartDecoder[L, W]()) extends (IndexedSeq[W]=>Tree[L]) {
+
+  def grammar = coreGrammar.grammar
+  def lexicon = coreGrammar.lexicon
+
   /**
    * Returns the best parse (calls bestParse) for the sentence
    *
@@ -40,5 +47,26 @@ trait Parser[L,W] extends (IndexedSeq[W]=>Tree[L]) {
    *
    * @param s sentence
    */
-  def bestParse(s: IndexedSeq[W]):Tree[L]
+  def bestParse(s: IndexedSeq[W]):BinarizedTree[L] = {
+    decoder.extractBestParse(marginal(s))
+  }
+
+  def marginal(w: IndexedSeq[W]) = marginalFactory.apply(w, coreGrammar.anchor(w))
+}
+
+object Parser {
+
+
+  def apply[L, W](ref: RefinedGrammar[L, W]): Parser[L, W]= {
+    Parser(CoreGrammar.identity(ref.grammar, ref.lexicon), SimpleChartFactory(ref))
+  }
+
+  def apply[L, W](refined: RefinedGrammar[L, W], decoder: ChartDecoder[L, W]): Parser[L, W] = {
+    Parser(CoreGrammar.identity(refined.grammar, refined.lexicon), SimpleChartFactory(refined, decoder.wantsMaxMarginal), decoder)
+  }
+
+
+  def apply[L, W](core: CoreGrammar[L, W], refinedGrammar: RefinedGrammar[L, W], decoder: ChartDecoder[L, W]): Parser[L, W] = {
+    Parser(CoreGrammar.identity(refinedGrammar.grammar, refinedGrammar.lexicon), SimpleChartFactory(refinedGrammar, decoder.wantsMaxMarginal), decoder)
+  }
 }

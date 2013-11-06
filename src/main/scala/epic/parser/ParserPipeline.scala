@@ -14,7 +14,7 @@ package epic.parser
  See the License for the specific language governing permissions and
  limitations under the License.
 */
-import projections.ParserChartConstraintsFactory
+import epic.parser.projections.{ConstraintCoreGrammarAdaptor, ParserChartConstraintsFactory}
 import breeze.config._
 import java.io._
 import epic.trees._
@@ -116,7 +116,7 @@ trait ParserPipeline extends Logging {
       val outDir = new File("parsers/")
       outDir.mkdirs()
       val out = new File(outDir, name +".parser")
-      writeObject(out, parser)
+      writeObject(out, parser.copy(decachify(parser.coreGrammar)))
 
       logger.info("Evaluating Parser...")
       val stats = evalParser(devTrees.filter(_.words.length <= 40), parser, name+"-len40-dev")
@@ -124,10 +124,20 @@ trait ParserPipeline extends Logging {
     }
   }
 
+
   def evalParser(testTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]],
                  parser: Parser[AnnotatedLabel, String],
                  name: String):ParseEval.Statistics = {
     ParseEval.evaluateAndLog(testTrees, parser, name, AnnotatedLabelChainReplacer, { (_: AnnotatedLabel).label })
   }
 
+  private def decachify[L, W](grammar: CoreGrammar[L, W]) = grammar match {
+    case p: ConstraintCoreGrammarAdaptor[L, W] =>
+      val constraintsFactory = p.constraintsFactory match {
+        case cached: CachedChartConstraintsFactory[L, W] => cached.backoff
+        case x => x
+      }
+      new ConstraintCoreGrammarAdaptor(p.grammar, p.lexicon, constraintsFactory)
+    case _ => grammar
+  }
 }

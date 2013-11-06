@@ -86,11 +86,17 @@ object ParserTrainer extends epic.parser.ParserPipeline with Logging {
         val (grammar, lexicon) = XbarGrammar().xbarGrammar(trainTrees)
         GenerativeParser.annotatedParser(grammar, lexicon, GenerativeParser.defaultAnnotator(), trainTrees)
       case f =>
-        readObject[SimpleChartParser[AnnotatedLabel, String]](f)
+        readObject[Parser[AnnotatedLabel, String]](f)
     }
 
     val constraints = {
-      val uncached = new ParserChartConstraintsFactory[AnnotatedLabel, String](initialParser.augmentedGrammar, {(_:AnnotatedLabel).isIntermediate})
+
+      val maxMarginalized = initialParser.copy(marginalFactory=initialParser.marginalFactory match {
+        case SimpleChartFactory(ref, mm) => SimpleChartFactory(ref, maxMarginal = true)
+        case x => x
+      })
+
+      val uncached = new ParserChartConstraintsFactory[AnnotatedLabel, String](maxMarginalized, {(_:AnnotatedLabel).isIntermediate})
       new CachedChartConstraintsFactory[AnnotatedLabel, String](uncached)
     }
 

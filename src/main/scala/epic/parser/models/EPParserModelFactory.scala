@@ -26,6 +26,7 @@ import breeze.config.Help
 import epic.constraints.ChartConstraints.Factory
 import epic.util.CacheBroker
 import epic.lexicon.Lexicon
+import breeze.linalg.DenseVector
 
 case class EPParams(maxIterations: Int = 5, pruningThreshold: Double = -15, dropOutFraction: Double = 0.0)
 
@@ -36,7 +37,6 @@ object EPParserModelFactory {
 }
 
 case class EPParserModelFactory(ep: EPParams,
-                                baseParser: ParserParams.XbarGrammar,
                                 @Help(text="ModelFactories to use. use --model.0, --model.1, etc.")
                                 model: Seq[EPParserModelFactory.CompatibleFactory],
                                 @Help(text="Path to old weights used for initialization")
@@ -45,8 +45,6 @@ case class EPParserModelFactory(ep: EPParams,
 
 
   def make(train: IndexedSeq[TreeInstance[AnnotatedLabel, String]], constrainer: CoreGrammar[AnnotatedLabel, String])(implicit broker: CacheBroker): MyModel = {
-    val (xbarGrammar, xbarLexicon) = baseParser.xbarGrammar(train)
-
     type ModelType = EPModel.CompatibleModel[TreeInstance[AnnotatedLabel, String], CoreAnchoring[AnnotatedLabel, String]]
     val models = model.filterNot(_ eq null) map {
       model =>
@@ -55,16 +53,21 @@ case class EPParserModelFactory(ep: EPParams,
 
     val featureCounter = readWeights(oldWeights)
 
-    new EPParserModel[AnnotatedLabel, String](xbarGrammar, xbarLexicon, ep.maxIterations, featureCounter.get, false, ep.dropOutFraction)(models:_*)
+    new EPParserModel[AnnotatedLabel, String](constrainer, ep.maxIterations, featureCounter.get, false, ep.dropOutFraction)(models:_*)
   }
 }
 
 @SerialVersionUID(1L)
-class EPParserModel[L, W](val baseGrammar: BaseGrammar[L],
-                          val lexicon: Lexicon[L, W],
+class EPParserModel[L, W](val constrainer: CoreGrammar[L, W],
                           maxEPIter: Int,
                           initFeatureValue: Feature => Option[Double] = {(_:Feature) => None},
-                          epInGold: Boolean = false, dropOutFraction: Double = 0.0)(models:EPModel.CompatibleModel[TreeInstance[L, W], CoreAnchoring[L, W]]*) extends EPModel[TreeInstance[L, W], CoreAnchoring[L, W]](maxEPIter, initFeatureValue, epInGold, dropOutFraction)(models:_*) with EPParser.Extractor[L, W] with Serializable {
+                          epInGold: Boolean = false, dropOutFraction: Double = 0.0)(models:EPModel.CompatibleModel[TreeInstance[L, W], CoreAnchoring[L, W]]*) extends EPModel[TreeInstance[L, W], CoreAnchoring[L, W]](maxEPIter, initFeatureValue, epInGold, dropOutFraction)(models:_*) with ParserExtractable[L, W] with Serializable {
+  def baseGrammar = constrainer.grammar
+  def lexicon = constrainer.lexicon
 
-
+  def extractParser(weights: DenseVector[Double]): Parser[L, W] = {
+    val inf = inferenceFromWeights(weights)
+    val refineds = inf.inferences.map(_.asInstanceOf[ParserInference[L, W]].grammar)
+    Parser(constrainer, new EPChartFactory(refineds, maxEPIter))
+  }
 }

@@ -31,7 +31,7 @@ trait ParserModel[L, W] extends epic.framework.StandardExpectedCounts.Model[Tree
 
   def extractParser(weights: DenseVector[Double]) = {
     val inf = inferenceFromWeights(weights)
-    SimpleChartParser(AugmentedGrammar(inf.grammar, inf.baseMeasure))
+    Parser(inf.baseMeasure, inf.grammar, ChartDecoder[L, W]())
   }
 
 

@@ -53,7 +53,7 @@ object ChartDecoder {
  * @author dlwh
  */
 @SerialVersionUID(2)
-class ViterbiDecoder[L, W] extends ChartDecoder[L, W] with Serializable with SafeLogging {
+case class ViterbiDecoder[L, W]() extends ChartDecoder[L, W] with Serializable with SafeLogging {
 
   override def wantsMaxMarginal: Boolean = true
 

@@ -270,12 +270,19 @@ final case class ChartMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
 
 object ChartMarginal {
 
-  def apply[L, W, Chart[X] <: ParseChart[X]](grammar: AugmentedGrammar[L, W],
-                                             sent: IndexedSeq[W]): ChartMarginal[L, W] = {
+  trait Factory[L, W] {
+    def apply(w: IndexedSeq[W], constraints: CoreAnchoring[L, W]):ChartMarginal[L, W]
+  }
+
+  object Factory {
+    def apply[L, W](grammar: RefinedGrammar[L, W]):SimpleChartFactory[L, W] = new SimpleChartFactory(grammar)
+  }
+
+  def apply[L, W](grammar: AugmentedGrammar[L, W], sent: IndexedSeq[W]): ChartMarginal[L, W] = {
     apply(grammar.anchor(sent))
   }
 
-  def apply[L, W, Chart[X] <: ParseChart[X]](anchoring: AugmentedAnchoring[L, W], maxMarginal: Boolean = false): ChartMarginal[L, W] = {
+  def apply[L, W](anchoring: AugmentedAnchoring[L, W], maxMarginal: Boolean = false): ChartMarginal[L, W] = {
     val sent = anchoring.words
     val sum = if(maxMarginal) MaxSummer else LogSummer
     val (inside, spanScores) = buildInsideChart(anchoring, sent, sum)
@@ -851,3 +858,8 @@ object ChartMarginal {
 
 }
 
+case class SimpleChartFactory[L, W](refinedGrammar: RefinedGrammar[L, W], maxMarginal: Boolean = false) extends ChartMarginal.Factory[L, W] {
+  def apply(w: IndexedSeq[W], constraints: CoreAnchoring[L, W]):ChartMarginal[L, W] = {
+    ChartMarginal(AugmentedAnchoring(refinedGrammar.anchor(w), constraints), maxMarginal = maxMarginal)
+  }
+}

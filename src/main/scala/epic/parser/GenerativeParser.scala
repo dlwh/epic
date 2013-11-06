@@ -56,9 +56,9 @@ object GenerativeParser {
    * @tparam W
    * @return
    */
-  def fromTrees[L, W](data: Traversable[TreeInstance[L, W]]):SimpleChartParser[L, W] = {
+  def fromTrees[L, W](data: Traversable[TreeInstance[L, W]]):Parser[L, W] = {
     val grammar = extractGrammar(data.head.tree.label, data)
-    SimpleChartParser(AugmentedGrammar.fromRefined(grammar))
+    Parser(grammar)
   }
 
   /**
@@ -101,12 +101,10 @@ object GenerativeParser {
 
   def annotatedParser(baseGrammar: BaseGrammar[AnnotatedLabel], baseLexicon: Lexicon[AnnotatedLabel, String],
                       annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel],
-                      trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]]): SimpleChartParser[AnnotatedLabel, String] = {
+                      trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]]): Parser[AnnotatedLabel, String] = {
 
     val refinedGrammar = annotated(baseGrammar, baseLexicon, annotator, trainTrees)
-    val parser = SimpleChartParser(AugmentedGrammar.fromRefined(refinedGrammar))
-
-    parser
+    Parser(refinedGrammar)
   }
 
   def annotated(baseGrammar: BaseGrammar[AnnotatedLabel], baseLexicon: Lexicon[AnnotatedLabel, String], annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel], trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]]): SimpleRefinedGrammar[AnnotatedLabel, AnnotatedLabel, String] = {
@@ -181,7 +179,7 @@ object GenerativeTrainer extends ParserPipeline {
     }
 
     val decoder = if (params.maxRule) new MaxRuleProductDecoder[AnnotatedLabel, String]() else new ViterbiDecoder[AnnotatedLabel, String]
-    val parser = new SimpleChartParser(AugmentedGrammar.fromRefined(refinedGrammar), decoder)
+    val parser = Parser(refinedGrammar, decoder)
     Iterator.single(("Gen", parser))
   }
 }
