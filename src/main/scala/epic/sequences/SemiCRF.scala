@@ -99,6 +99,14 @@ object SemiCRF {
   }
 
 
+  /**
+   * An Anchoring encodes all the information needed to score Semimarkov models.
+   *
+   * In particular, it can score transitions between a previous label (prev)
+   * and the next label, which spans from begin to end.
+   * @tparam L
+   * @tparam W
+   */
   trait Anchoring[L, W] {
     def words : IndexedSeq[W]
     def length: Int = words.length
@@ -111,6 +119,12 @@ object SemiCRF {
     def ignoreTransitionModel: Boolean = false
   }
 
+  /**
+   * A visitor used by [[epic.sequences.SemiCRF.Marginal]] for giving
+   * marginal probabilities over labeled spans.
+   * @tparam L
+   * @tparam W
+   */
   trait TransitionVisitor[L, W] {
     def visitTransition(prev: Int, cur: Int, begin: Int, end: Int, count: Double)
   }
@@ -530,7 +544,9 @@ object SemiCRF {
     while (end <= length) {
       var label = 0
       while (label < numLabels) {
+
         var begin = math.max(end - anchoring.maxSegmentLength(label), 0)
+
         while (begin < end) {
           if(anchoring.constraints.isAllowedLabeledSpan(begin, end, label)) {
             var prevLabel = 0

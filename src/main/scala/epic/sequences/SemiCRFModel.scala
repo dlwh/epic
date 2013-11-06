@@ -236,8 +236,21 @@ class SemiCRFInference[L, W](weights: DenseVector[Double],
   }
 }
 
+/**
+ * Factory class for making a [[epic.sequences.SemiCRFModel]] based
+ * on some data and an optional gazetteer.
+ * @param startSymbol
+ * @param outsideSymbol
+ * @param pruningModel
+ * @param gazetteer
+ * @param weights
+ * @param broker
+ * @tparam L
+ */
 class SegmentationModelFactory[L](val startSymbol: L,
                                   val outsideSymbol: L,
+                                  wordFeaturizer: Optional[WordFeaturizer[String]] = NotProvided,
+                                  spanFeaturizer: Optional[SurfaceFeaturizer[String]] = NotProvided,
                                   pruningModel: Optional[SemiCRF.ConstraintSemiCRF[L, String]] = NotProvided,
                                   gazetteer: Optional[Gazetteer[Any, String]] = NotProvided,
                                   weights: Feature=>Double = { (f:Feature) => 0.0})(implicit broker: CacheBroker) extends Logging {
@@ -250,37 +263,19 @@ class SegmentationModelFactory[L](val startSymbol: L,
     val maxLengthArray = Encoder.fromIndex(labelIndex).tabulateArray(maxLengthMap.getOrElse(_, 0))
     logger.info("Maximum lengths for segments: " + maxLengthMap)
 
-
     val counts: Counter2[L, String, Double] = Counter2.count(train.map(_.asFlatTaggedSequence(outsideSymbol)).map{seg => seg.label zip seg.words}.flatten).mapValues(_.toDouble)
     val lexicon = new SimpleLexicon(labelIndex, counts, openTagThreshold = 10, closedWordThreshold = 20)
 
     val allowedSpanClassifier: LabeledSpanConstraints.Factory[L, String] = pruningModel.getOrElse(new LabeledSpanConstraints.LayeredTagConstraintsFactory(lexicon, maxLengthArray))
 
-    val (featurizer, l2featurizer) = {
-      val dsl = new WordFeaturizer.DSL[L](counts) with SurfaceFeaturizer.DSL
-      import dsl._
+    lazy val featurizerPair = goodNERFeaturizers(counts)
+    var wfeat = wordFeaturizer.getOrElse(featurizerPair._1)
+    var sfeat = spanFeaturizer.getOrElse(featurizerPair._2)
+    wfeat = gazetteer.foldLeft(wfeat)(_ + _)
+    sfeat = gazetteer.foldLeft(sfeat)(_ + _)
 
-      val featurizer = (
-        word
-          + unigrams(clss, 1)
-          + unigrams(shape, 2)
-          + bigrams(clss, 1)
-         // + bigrams(tagDict, 2)
-         // + bigrams(shape, 1)
-          + shape(-1) * shape * shape(1)
-          + prefixes()
-          + suffixes()
-          + props
-        )
-
-
-      val spanFeatures = length + spanShape + sent //+ (sent + spanShape) * length
-
-      gazetteer.foldLeft(featurizer)(_ + _) -> gazetteer.foldLeft(spanFeatures)(_ + _)
-    }
-
-    val wf = IndexedWordFeaturizer.fromData(featurizer, train.map{_.words})
-    val sf = IndexedSurfaceFeaturizer.fromData(l2featurizer, train.map(_.words), allowedSpanClassifier)
+    val wf = IndexedWordFeaturizer.fromData(wfeat, train.map(_.words))
+    val sf = IndexedSurfaceFeaturizer.fromData(sfeat, train.map(_.words), allowedSpanClassifier)
 
     for(f <- pruningModel) {
       assert(f.labelIndex == labelIndex, f.labelIndex + " " + labelIndex)
@@ -291,9 +286,33 @@ class SegmentationModelFactory[L](val startSymbol: L,
     model
   }
 
+
+
 }
 
 object SegmentationModelFactory {
+
+  def goodNERFeaturizers[L](counts: Counter2[L, String, Double]) = {
+    val dsl = new WordFeaturizer.DSL[L](counts) with SurfaceFeaturizer.DSL
+    import dsl._
+
+    val featurizer = (
+      word
+        + unigrams(clss, 1)
+        + unigrams(shape, 2)
+        + bigrams(clss, 1)
+        // + bigrams(tagDict, 2)
+        // + bigrams(shape, 1)
+        + shape(-1) * shape * shape(1)
+        + prefixes()
+        + suffixes()
+        + props
+      )
+    val spanFeatures = length + spanShape + sent //+ (sent + spanShape) * length
+    featurizer -> spanFeatures
+  }
+
+
   case class Label1Feature[L](label: L, kind: Symbol) extends Feature
   case class TransitionFeature[L](label: L, label2: L) extends Feature
 

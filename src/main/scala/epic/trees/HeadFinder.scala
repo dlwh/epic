@@ -29,25 +29,18 @@ import breeze.util.Lens
  * @author dlwh
  */
 object HeadFinder {
-  def left[L]: HeadFinder[L] = new HeadFinder[L](Left, HeadRules.empty)
+  def left[L]: HeadFinder[L] = new RuleBasedHeadFinder[L](Left, HeadRules.empty)
 
-  def right[L]: HeadFinder[L] = new HeadFinder[L](Right, HeadRules.empty)
+  def right[L]: HeadFinder[L] = new RuleBasedHeadFinder[L](Right, HeadRules.empty)
 
-  val collins = new HeadFinder(Left, rules = HeadRules.collinsHeadRules);
+  val collins = new RuleBasedHeadFinder(Left, rules = HeadRules.collinsHeadRules);
 
   implicit def lensed[L, U](hf: HeadFinder[L])(implicit lens: Lens[U, L]) = hf.projected(lens.get(_: U))
 }
 
+trait HeadFinder[L] {
 
-/**
- * Can annotate a tree with the head word. Usually
- * you should just use HeadFinder.collinsHeadFinder
- *
- * @author dlwh
- */
-class HeadFinder[L](defaultDirection: Dir = Left,
-                    rules: HeadRules[L]) extends Serializable {
-
+  def findHeadChild(l: L, children: L*):Int
 
   def findHeadChild(r: Rule[L]): Int = r match {
     case UnaryRule(_, _, _) => 0
@@ -57,16 +50,7 @@ class HeadFinder[L](defaultDirection: Dir = Left,
 
   def findHeadChild(t: Tree[L]): Int = findHeadChild(t.label, t.children.map(c => c.label): _*)
 
-  def findHeadChild(l: L, children: L*) = {
-    val result = rules.findMatchIndex(l, children: _*) match {
-      case None if defaultDirection == Left => 0
-      case None => children.size - 1
-      case Some(i) => i
-    }
-    if(!children(result).toString.head.isLetter)
-      assert(!l.toString.head.isLetter || children(result).toString.startsWith("@") || children(result).toString == "$", l + " " + children + " " + result)
-    result
-  }
+  def findHeadWord[W](t: Tree[L], words: Seq[W]) = words(findHeadWordIndex(t));
 
   def findHeadWordIndex(t: Tree[L]): Int = {
     if (t.isLeaf) t.span.begin;
@@ -82,15 +66,6 @@ class HeadFinder[L](defaultDirection: Dir = Left,
     }
   }
 
-  def findHeadWord[W](t: Tree[L], words: Seq[W]) = words(findHeadWordIndex(t));
-
-  def annotateHeadWords[W](t: Tree[L], words: Seq[W]): Tree[(L, W)] = t match {
-    case Tree(l, children, span) if children.length == 0 => Tree(l -> words(t.span.begin), IndexedSeq.empty, t.span)
-    case Tree(l, children, span) =>
-      val headChild = findHeadChild(t)
-      val rec = children.map(annotateHeadWords(_, words))
-      Tree(l -> rec(headChild).label._2, rec, t.span)
-  }
 
   def annotateHeadIndices[W](t: Tree[L]): Tree[(L, Int)] = t match {
     case t:BinarizedTree[L] => annotateHeadIndices(t)
@@ -100,8 +75,8 @@ class HeadFinder[L](defaultDirection: Dir = Left,
       val rec = children.map(annotateHeadIndices(_))
       Tree(l -> rec(headChild).label._2, rec, t.span)
   }
-  
-  
+
+
   def annotateHeadIndices(t: BinarizedTree[L]): BinarizedTree[(L, Int)] = t match {
     case NullaryTree(l, span) =>  NullaryTree(l -> t.span.begin, t.span)
     case u@UnaryTree(a, b, chain, span) =>
@@ -130,8 +105,38 @@ class HeadFinder[L](defaultDirection: Dir = Left,
   }
 
 
+  def projected[U](f: U => L): HeadFinder[U]
+}
 
-  def projected[U](f: U => L): HeadFinder[U] = new HeadFinder[U](defaultDirection, rules.projected(f))
+
+/**
+ * Can annotate a tree with the head word. Usually
+ * you should just use HeadFinder.collinsHeadFinder
+ *
+ * @author dlwh
+ */
+class RuleBasedHeadFinder[L](defaultDirection: Dir = Left, rules: HeadRules[L]) extends HeadFinder[L] {
+  override def findHeadChild(l: L, children: L*): Int = {
+    val result = rules.findMatchIndex(l, children: _*) match {
+      case None if defaultDirection == Left => 0
+      case None => children.size - 1
+      case Some(i) => i
+    }
+    if(!children(result).toString.head.isLetter)
+      assert(!l.toString.head.isLetter || children(result).toString.startsWith("@") || children(result).toString == "$", l + " " + children + " " + result)
+    result
+  }
+
+  def annotateHeadWords[W](t: Tree[L], words: Seq[W]): Tree[(L, W)] = t match {
+    case Tree(l, children, span) if children.length == 0 => Tree(l -> words(t.span.begin), IndexedSeq.empty, t.span)
+    case Tree(l, children, span) =>
+      val headChild = findHeadChild(t)
+      val rec = children.map(annotateHeadWords(_, words))
+      Tree(l -> rec(headChild).label._2, rec, t.span)
+  }
+
+
+  def projected[U](f: U => L): HeadFinder[U] = new RuleBasedHeadFinder[U](defaultDirection, rules.projected(f))
 
   def lensed[U](implicit lens: Lens[U, L]) = HeadFinder.lensed(this)
 }
@@ -148,8 +153,7 @@ class HeadFinder[L](defaultDirection: Dir = Left,
  * of the first category, then the second, etc. etc.
  *
  */
-case class HeadRule[L](dir: Dir, dis: Boolean, heads: Seq[L]) {
-  rule =>
+case class HeadRule[L](dir: Dir, dis: Boolean, heads: Seq[L]) { rule =>
   val headSet = heads.toSet
 
   /**
@@ -171,7 +175,7 @@ case class HeadRule[L](dir: Dir, dis: Boolean, heads: Seq[L]) {
   }
 }
 
-trait HeadRules[L] extends Serializable { outer =>
+trait HeadRules[L] { outer =>
   protected type InnerLabel
 
   protected def findRules(l: InnerLabel): Seq[HeadRule[InnerLabel]]
@@ -202,6 +206,7 @@ trait HeadRules[L] extends Serializable { outer =>
 }
 
 object HeadRules {
+
 
   /**
    * Search direction for the match.
@@ -292,7 +297,36 @@ object HeadRules {
     } : Map[String, Seq[HeadRule[String]]]
   }
 
+
+
 }
 
+/*
 
 
+object NegraHeadFinder extends HeadFinder[AnnotatedLabel] {
+  def findHeadChild(l: AnnotatedLabel, children: AnnotatedLabel*): Int = l.label match {
+    case "ISU" =>
+      var index = children.indexWhere(a => a.hasAnnotation(FunctionalTag("UC")))
+      if(index < 0) {
+        children.length - 1
+      } else {
+        index
+      }
+    case "DL" =>
+      var index = children.indexWhere(a => a.hasAnnotation(FunctionalTag("HD")) || a.hasAnnotation(FunctionalTag("DH")))
+      if(index < 0) {
+        children.length - 1
+      } else {
+        index
+      }
+    case _ =>
+      var index = children.indexWhere(a => a.hasAnnotation(FunctionalTag("HD")) || a.hasAnnotation(FunctionalTag("PH")))
+      if(index < 0) {
+        index = children.length - 1
+      }
+      index
+
+  }
+}
+*/
