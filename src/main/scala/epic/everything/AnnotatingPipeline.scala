@@ -238,7 +238,7 @@ object AnnotatingPipeline extends Logging {
       "Baseline Parser gets " + ParseEval.evaluate(devTrees, pruningParser, AnnotatedLabelChainReplacer, {(_:AnnotatedLabel).baseLabel})
     }
 
-    val parseConstrainer = new CachedChartConstraintsFactory(new ParserChartConstraintsFactory(pruningParser.augmentedGrammar, {(_:AnnotatedLabel).isIntermediate}))
+    val parseConstrainer = new CachedChartConstraintsFactory(new ParserChartConstraintsFactory(pruningParser, {(_:AnnotatedLabel).isIntermediate}))
     logger.info("Building constraints")
     val count = new AtomicInteger(0)
     trainTrees.par.foreach{t =>

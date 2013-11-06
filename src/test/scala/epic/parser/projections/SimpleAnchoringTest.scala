@@ -33,11 +33,11 @@ class SimpleAnchoringTest  extends ParserTestHarness with FunSuite {
     val gen = ParserTestHarness.simpleParser
     val f = new AnchoredPCFGProjector[AnnotatedLabel, String](Double.NegativeInfinity)
 
-    val grammar = new ProjectingCoreGrammar(gen.augmentedGrammar, f)
-    val chartParser = SimpleChartParser(AugmentedGrammar.fromCore(grammar))
+    val grammar = new ProjectingCoreGrammar(gen, f)
+    val chartParser = Parser(grammar)
 
-    val grammarNext = new ProjectingCoreGrammar(chartParser.augmentedGrammar, f)
-    val chartNext = SimpleChartParser(AugmentedGrammar.fromCore(grammarNext))
+    val grammarNext = new ProjectingCoreGrammar(chartParser, f)
+    val chartNext = Parser(grammarNext)
 
     for( TreeInstance(_, t, w) <- getTestTrees()) try {
       val tree1 = chartParser(w)
@@ -53,9 +53,9 @@ class SimpleAnchoringTest  extends ParserTestHarness with FunSuite {
   test("Parsing kind of works using it") {
     val gen = ParserTestHarness.simpleParser
     val f = new AnchoredPCFGProjector[AnnotatedLabel, String](Double.NegativeInfinity)
-    val grammar = new ProjectingCoreGrammar(gen.augmentedGrammar, f)
+    val grammar = new ProjectingCoreGrammar(gen, f)
 
-    val chartParser = SimpleChartParser(AugmentedGrammar.fromCore(grammar))
+    val chartParser = Parser(grammar)
 
     val res = evalParser(getTestTrees(), chartParser)
     assert(res.f1 > 0.5, res.f1)

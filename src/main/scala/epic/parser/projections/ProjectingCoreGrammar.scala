@@ -19,7 +19,7 @@ package projections
  * 
  * @author dlwh
  */
-case class ProjectingCoreGrammar[L, W](parser: AugmentedGrammar[L, W],
+case class ProjectingCoreGrammar[L, W](parser: Parser[L, W],
                                        projector: ChartProjector[L, W]) extends CoreGrammar[L, W] {
 
 
@@ -32,7 +32,7 @@ case class ProjectingCoreGrammar[L, W](parser: AugmentedGrammar[L, W],
   }
 
   def project(s: IndexedSeq[W], goldTagPolicy: GoldTagPolicy[L] = GoldTagPolicy.noGoldTags) = {
-    val charts = ChartMarginal(parser, s)
+    val charts = parser.marginal(s)
 
     projector.project(charts, goldTagPolicy)
   }

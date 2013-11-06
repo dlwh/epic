@@ -10,10 +10,10 @@ import epic.trees.BinarizedTree
  * kbest lists.
  * @author dlwh
  */
-class AStarKBestParser[L, W](val augmentedGrammar: AugmentedGrammar[L, W],
+class AStarKBestParser[L, W](val parser: Parser[L, W],
                         val decoder: ChartProjector[L, W] = new AnchoredRuleMarginalProjector[L, W]()) extends KBestParser[L, W] {
   def bestKParses(words: IndexedSeq[W], k: Int): IndexedSeq[(BinarizedTree[L], Double)] = {
-    val maxMarginal = decoder.project(augmentedGrammar.anchor(words).marginal).maxMarginal
+    val maxMarginal = decoder.project(parser.marginal(words)).maxMarginal
     TopDownKBestAStar.apply(maxMarginal, k)
   }
 

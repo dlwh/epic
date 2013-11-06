@@ -17,12 +17,8 @@ trait KBestParser[L, W] {
 }
 
 object KBestParser extends Logging {
-  def fromParser[L, W](parser: SimpleChartParser[L, W], proj: ChartProjector[L, W] = AnchoredRuleMarginalProjector[L, W]()): KBestParser[L, W] = {
-    apply(parser.augmentedGrammar, proj)
-  }
-
-  def apply[L, W](augmentedGrammar: AugmentedGrammar[L, W], proj: ChartProjector[L, W] = new AnchoredRuleMarginalProjector[L, W]()) = {
-    new AStarKBestParser(augmentedGrammar, proj)
+  def apply[L, W](parser: Parser[L, W], proj: ChartProjector[L, W] = new AnchoredRuleMarginalProjector[L, W]()) = {
+    new AStarKBestParser(parser, proj)
   }
 
   def cached[L, W](kbest: KBestParser[L, W])(implicit broker: CacheBroker):KBestParser[L, W] = new KBestParser[L, W] {

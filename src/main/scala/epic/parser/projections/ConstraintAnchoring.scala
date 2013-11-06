@@ -50,12 +50,12 @@ class ConstraintCoreGrammarAdaptor[L, W](val grammar: BaseGrammar[L], val lexico
  * Creates labeled span scorers for a set of trees from some parser.
  * @author dlwh
  */
-@SerialVersionUID(8620602232218134084L)
-class ParserChartConstraintsFactory[L, W](val augmentedGrammar: AugmentedGrammar[L, W],
+@SerialVersionUID(1L)
+class ParserChartConstraintsFactory[L, W](val parser: Parser[L, W],
                                           val isIntermediate: L=>Boolean,
                                           threshold: Double = math.exp(-9)) extends ChartConstraints.Factory[L, W] with Serializable with SafeLogging {
   require(threshold >= 0 && threshold <= 1, s"Threshold must be between 0 and 1, but whas $threshold")
-  import augmentedGrammar._
+  import parser._
   def labelIndex = grammar.labelIndex
 
   def overallStatistics = {
@@ -77,7 +77,7 @@ class ParserChartConstraintsFactory[L, W](val augmentedGrammar: AugmentedGrammar
 
   def constraints(w: IndexedSeq[W]):ChartConstraints[L] = constraints(w, GoldTagPolicy.noGoldTags[L])
   def constraints(words: IndexedSeq[W], gold: GoldTagPolicy[L]):ChartConstraints[L] = {
-    val charts = ChartMarginal(augmentedGrammar.anchor(words), maxMarginal = true)
+    val charts = parser.marginal(words)
     constraints(charts, gold)
   }
 
@@ -148,7 +148,7 @@ class ParserChartConstraintsFactory[L, W](val augmentedGrammar: AugmentedGrammar
   }
 
   def computePruningStatistics(words: IndexedSeq[W], gold: GoldTagPolicy[L]): (PruningStatistics, PruningStatistics) = {
-    val charts = ChartMarginal(augmentedGrammar.anchor(words), maxMarginal = true)
+    val charts = parser.marginal(words)
     computePruningStatistics(charts, gold)
   }
 
@@ -312,7 +312,7 @@ object PrecacheConstraints extends Logging {
       val constraints = cache.getOrElseUpdate(ti.words, {
         located = false
         logger.info(s"Building constraints for ${ti.id} ${ti.words}")
-        marg = ChartMarginal(constrainer.augmentedGrammar.anchor(ti.words), maxMarginal = true)
+        marg = constrainer.parser.marginal(ti.words)
         constrainer.constraints(marg, GoldTagPolicy.goldTreeForcing[L](ti.tree.map{ l =>
           val i = constrainer.labelIndex(l)
           if (i < 0) {
@@ -390,15 +390,15 @@ object PrecacheConstraints extends Logging {
     val out = params.out
     out.getAbsoluteFile.getParentFile.mkdirs()
 
-    val factory = new ParserChartConstraintsFactory[AnnotatedLabel, String](parser.augmentedGrammar, {(_:AnnotatedLabel).isIntermediate}, exp(params.threshold))
+    val factory = new ParserChartConstraintsFactory[AnnotatedLabel, String](parser, {(_:AnnotatedLabel).isIntermediate}, exp(params.threshold))
     implicit val broker = new CacheBroker(params.out)
     forTreebank(factory, treebank, params.name)
     broker.commit()
     broker.close()
   }
 
-  def loadParser[T](loc: File): SimpleChartParser[AnnotatedLabel, String] = {
-    val parser = breeze.util.readObject[SimpleChartParser[AnnotatedLabel, String]](loc)
+  def loadParser[T](loc: File): Parser[AnnotatedLabel, String] = {
+    val parser = breeze.util.readObject[Parser[AnnotatedLabel, String]](loc)
     parser
   }
 
