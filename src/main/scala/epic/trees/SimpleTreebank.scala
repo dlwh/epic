@@ -31,6 +31,13 @@ class SimpleTreebank(trainUrls: Map[String,URL],
       Map(test.getName -> test.toURI.toURL))
   }
 
+  def this(train:IndexedSeq[File], dev: IndexedSeq[File], test: IndexedSeq[File]) = {
+    this(train.map(t => t.getName -> t.toURI.toURL).toMap,
+      dev.map(t => t.getName -> t.toURI.toURL).toMap,
+      test.map(t => t.getName -> t.toURI.toURL).toMap)
+
+  }
+
   def treesFromSection(sec: String) = {
     val url = (trainUrls orElse devUrls orElse testUrls)(sec)
     val stream = url.openStream()

@@ -40,6 +40,19 @@ case class ProcessedTreebank(@Help(text="Location of the treebank directory")
     case "chinese" => Treebank.fromChineseTreebankDir(path)
     case "negra" => Treebank.fromGermanTreebank(path)
     case "conllonto" => Treebank.fromOntonotesDirectory(path)
+    case "spmrl" =>
+      var trainPath: File = new File(path, "train")
+      if(!trainPath.exists)
+        trainPath = new File(path, "train5k")
+      val train = trainPath.listFiles().filter(_.getName.endsWith("ptb"))
+      val dev = new File(path, "dev").listFiles().filter(_.getName.endsWith("ptb"))
+      val test = new File(path, "test").listFiles().filter(_.getName.endsWith("ptb"))
+      new SimpleTreebank(train, dev, test)
+    case "spmrl5k" =>
+      val train = new File(path, "train5k").listFiles().filter(_.getName.endsWith("ptb"))
+      val dev = new File(path, "dev").listFiles().filter(_.getName.endsWith("ptb"))
+      val test = new File(path, "test").listFiles().filter(_.getName.endsWith("ptb"))
+      new SimpleTreebank(train, dev, test)
     case _ => throw new RuntimeException("Unknown Treebank type")
   }
 

@@ -122,8 +122,6 @@ class RuleBasedHeadFinder[L](defaultDirection: Dir = Left, rules: HeadRules[L]) 
       case None => children.size - 1
       case Some(i) => i
     }
-    if(!children(result).toString.head.isLetter)
-      assert(!l.toString.head.isLetter || children(result).toString.startsWith("@") || children(result).toString == "$", l + " " + children + " " + result)
     result
   }
 
@@ -187,7 +185,6 @@ trait HeadRules[L] { outer =>
     val mapped = children.map(proj)
     val answers = myRules.view.map(_.findMatchIndex(mapped: _*)).filterNot(_ == -1)
     if (answers.nonEmpty) {
-      assert(children(answers.head).toString.head.isLetterOrDigit || !parent.toString.head.isLetterOrDigit || children(answers.head).toString.startsWith("@") || children(answers.head).toString == "$", parent + " " + children + " " + answers.head)
       Some(answers.head)
     }
     else None
