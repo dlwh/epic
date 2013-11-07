@@ -72,6 +72,7 @@ trait Tree[+L] extends Serializable {
 
   def map[M](f: L=>M):Tree[M] = Tree( f(label), children map { _ map f}, span)
   def extend[B](f: Tree[L]=>B):Tree[B] = Tree(f(this),children map { _ extend f}, span)
+  def relabelRoot[B>:L](f: L=>B):Tree[B]
 
   def allChildren = preorder
 
@@ -132,9 +133,12 @@ object Tree {
     sb
   }
 
+
 }
 
-case class NaryTree[L](label: L, children: IndexedSeq[Tree[L]], span: Span) extends Tree[L]
+case class NaryTree[L](label: L, children: IndexedSeq[Tree[L]], span: Span) extends Tree[L] {
+  def relabelRoot[B >: L](f: (L) => B): Tree[B] = copy(f(label))
+}
 
 sealed trait BinarizedTree[+L] extends Tree[L] {
   override def map[M](f: L=>M): BinarizedTree[M] = null
@@ -356,7 +360,7 @@ object Trees {
           val newHistory = if(!isIntermediate(label) && label != child.label) (label :: history) take depth else history
           UnaryTree(newLabel,rec(child,newHistory), chain, span)
         case NullaryTree(label, span) =>
-          val newLabel = if(dontAnnotate(label)) label else if(history.head == label) history.reduceLeft(join) else history.take(depth-1).foldLeft(label)(join)
+          val newLabel = if(dontAnnotate(label) || history.isEmpty) label else if(history.head == label) history.reduceLeft(join) else history.take(depth-1).foldLeft(label)(join)
           NullaryTree(newLabel, span)
       }
     }
