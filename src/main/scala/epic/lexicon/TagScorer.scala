@@ -77,21 +77,29 @@ class SimpleTagScorer[L, W](counts: Counter2[L, W, Double]) extends TagScorer[L,
   def anchor(w: IndexedSeq[W]):Anchoring = new Anchoring {
     def words: IndexedSeq[W] = w
 
-    def scoreTag(pos: Int, l: L) = {
+    def scoreTag(pos: Int, l: L): Double = {
       val w = words(pos)
       var cWord = wordCounts(w)
       var cTagWord = counts(l, w)
+      var pTag = labelCounts(l) / totalCount
+      if(pTag == 0.0) {
+        pTag = 1.0
+      }
       assert(cWord >= cTagWord)
-      if(cWord < 10) {
+      if(cWord < 10 || cTagWord == 0.0) {
         cWord += 1.0
         cTagWord += counts(l, ::).size.toDouble / wordCounts.size
+        if(cTagWord == 0.0) {
+          cTagWord = 1.0
+        }
       }
 
       val pW = cWord / (totalCount + 1.0)
       val pTgW = cTagWord / cWord
-      val pTag = labelCounts(l) / totalCount
       val result = log(pW) + log(pTgW) - log(pTag)
       assert(cTagWord == 0 || result > Double.NegativeInfinity)
+      assert(!result.isNaN, pW + " "+  pTgW + " "+ pTag)
+      assert(!result.isInfinite, pW + " "+  pTgW + " "+ pTag)
       result
 
     }

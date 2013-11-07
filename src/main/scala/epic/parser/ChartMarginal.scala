@@ -144,15 +144,19 @@ final case class ChartMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
 
     // handle lexical
     for (i <- 0 until words.length) {
+      var visitedSomething  = false
       for {
         a <- lexLoc.allowedTags(i) if  core.sparsityPattern.bot.isAllowedLabeledSpan(i, i+1, a)
         ref <- anchoring.refined.validLabelRefinements(i, i+ 1, a)
       } {
         val score:Double = anchoring.scoreSpan(i, i+1, a, ref) + outside.bot(i, i+1, a, ref) - logPartition
+        assert(!score.isNaN, anchoring.scoreSpan(i, i+1, a, ref) + " " + outside.bot(i, i+1, a, ref) + " "+ logPartition)
         if (score != Double.NegativeInfinity) {
           spanVisitor.visitSpan(i, i+1, a, ref, math.exp(score))
+          visitedSomething = true
         }
       }
+      assert(visitedSomething, lexLoc.allowedTags(i).toIndexedSeq)
     }
 
     // cache to hold core scores for binary rules
@@ -342,8 +346,8 @@ object ChartMarginal {
 
     // handle lexical
     for{i <- 0 until words.length} {
-      assert(core.sparsityPattern.isAllowedSpan(i,i+1))
-      assert(core.sparsityPattern.bot.isAllowedSpan(i,i+1))
+      assert(core.sparsityPattern.isAllowedSpan(i,i+1), "a pos tag isn't allowed? " + core.sparsityPattern)
+      assert(core.sparsityPattern.bot.isAllowedSpan(i,i+1), "a top of a length 1 span isn't allowed?")
       var foundSomething = false
       for {
         a <- tagConstraints.allowedTags(i) if core.sparsityPattern.bot.isAllowedLabeledSpan(i, i+1, a)

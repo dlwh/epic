@@ -83,6 +83,7 @@ class ParserChartConstraintsFactory[L, W](val parser: Parser[L, W],
 
   def constraints(marg: ParseMarginal[L, W], gold: GoldTagPolicy[L]): ChartConstraints[L] = {
     logger.debug(s"Building Constraints for ${marg.words}")
+    assert(marg.isMaxMarginal)
     val length = marg.length
     if(marg.logPartition.isInfinite)
       throw new NoParseException("No parse for sentence we're trying to constrain!", marg.words)
@@ -96,6 +97,10 @@ class ParserChartConstraintsFactory[L, W](val parser: Parser[L, W],
       grammar.labelIndex.size,
       unaryScores,grammar.labelIndex,
       gold.isGoldTopTag)
+    for(i <- 0 until length) {
+      assert(labelThresholds(i, i+1) != null && labelThresholds(i,i+1).nonEmpty, "label thresholds" + labelThresholds(i, i+1))
+      assert(topLabelThresholds(i, i+1) != null && topLabelThresholds(0,length).nonEmpty, "top label thresholds" + topLabelThresholds(i, i+1))
+    }
     if(topLabelThresholds(0,length) == null || !topLabelThresholds(0,length).contains(marg.grammar.rootIndex))
       throw new NoParseException("No score at the root!", marg.words)
 
@@ -118,15 +123,17 @@ class ParserChartConstraintsFactory[L, W](val parser: Parser[L, W],
         BitSet.empty
       } else {
         BitSet.empty ++ (0 until arr.length filter { s =>
-          arr(s) > threshold
+          arr(s) >= threshold
         })
       }
 
       if(arr ne null)
-        if(j - i > 1) {
+        if(j == i) {
+        } else if(j - i > 1) {
           this.notpruned.addAndGet(thresholdedTags.size)
           this.pruned.addAndGet(arr.count(_ != 0.0) - thresholdedTags.size)
         } else {
+          if(thresholdedTags.isEmpty) assert(false, arr.toIndexedSeq)
           this.notprunedtags.addAndGet(thresholdedTags.size)
           this.prunedtags.addAndGet(arr.count(_ != 0.0) - thresholdedTags.size)
         }
@@ -229,6 +236,9 @@ class ParserChartConstraintsFactory[L, W](val parser: Parser[L, W],
     }
 
     marg.visit(visitor)
+    for(i <- 0 until length) {
+      assert(scores(TriangularArray.index(i, i + 1)).exists(_ > 0.01), scores(TriangularArray.index(i, i+ 1)).toIndexedSeq + " " + i + marg.words + " " + marg.logPartition)
+    }
     (scores,topScores)
   }
 }

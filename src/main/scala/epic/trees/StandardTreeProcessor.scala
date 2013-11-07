@@ -45,7 +45,12 @@ case class StandardTreeProcessor(headFinder: HeadFinder[AnnotatedLabel] = HeadFi
 
 
   def apply(tree: Tree[String]):BinarizedTree[AnnotatedLabel] = {
-    val transformed = xox(ens(tree).get)
+    var transformed = xox(ens(tree).get)
+    transformed = if(transformed.children.length != 1) {
+      Tree("", IndexedSeq(transformed), transformed.span)
+    } else {
+      transformed
+    }
     val ann = transformed.map { label =>
       val fields = splitLabel(label)
       val split = fields.filterNot(s => s.nonEmpty && s.charAt(0).isDigit)
@@ -53,6 +58,7 @@ case class StandardTreeProcessor(headFinder: HeadFinder[AnnotatedLabel] = HeadFi
         features= split.iterator.drop(1).map(tag => functionalTagInterner.intern(FunctionalTag(tag))).toSet
       ))
     }
+
 
     def makeIntermediate(l: AnnotatedLabel, tag: AnnotatedLabel) = {
        l.copy("@"+l.label, headTag = Some(tag.baseLabel))
@@ -63,10 +69,9 @@ case class StandardTreeProcessor(headFinder: HeadFinder[AnnotatedLabel] = HeadFi
       case Right(s) => a.copy(siblings = a.siblings :+ Right(s.baseLabel))
     }
 
-    val r = Trees.binarize(ann, makeIntermediate, extend, headFinder)
-    val x = r.relabelRoot(_ => AnnotatedLabel.TOP)
-//    println(tree.toString(newline = true) + "\n" + x.toString(newline = true) +"\n============================================================")
-    x
+
+
+    Trees.binarize(ann, makeIntermediate, extend, headFinder).relabelRoot(_ => AnnotatedLabel.TOP)
   }
 
   def splitLabel(label: String): Array[String] = {
