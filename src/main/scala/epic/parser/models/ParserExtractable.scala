@@ -37,7 +37,7 @@ trait ParserExtractable[L, W] {
 
 
 trait ParserExtractableModelFactory[L,W] {
-  def make(train: IndexedSeq[TreeInstance[L, W]], baseMeasure: CoreGrammar[L, W])(implicit broker: CacheBroker): MyModel
+  def make(train: IndexedSeq[TreeInstance[L, W]], baseMeasure: CoreGrammar[L, W]): MyModel
 
   def readWeights(in: File):Counter[Feature, Double] = if(in != null && in.exists) {
     try {

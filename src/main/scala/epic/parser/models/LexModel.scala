@@ -717,7 +717,7 @@ case class LexModelFactory(@Help(text= "The kind of annotation to do on the refi
                            minFeatCutoff: Int = 1) extends ParserModelFactory[AnnotatedLabel, String] with SafeLogging {
   type MyModel = LexModel[AnnotatedLabel, AnnotatedLabel, String]
 
-  def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]], constrainer: CoreGrammar[AnnotatedLabel, String])(implicit broker: CacheBroker) ={
+  def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]], constrainer: CoreGrammar[AnnotatedLabel, String]) ={
     val trees = trainTrees.map(annotator)
     val (initLexicon, annBinaries, annUnaries) = GenerativeParser.extractCounts(trees)
     val refGrammar = BaseGrammar(AnnotatedLabel.TOP, annBinaries, annUnaries)

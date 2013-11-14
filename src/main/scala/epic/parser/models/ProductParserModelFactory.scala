@@ -68,7 +68,7 @@ case class ProductParserModelFactory(baseParser: ParserParams.XbarGrammar,
     }
 
 
-  def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]], constrainer: CoreGrammar[AnnotatedLabel, String])(implicit broker: CacheBroker) = {
+  def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]], constrainer: CoreGrammar[AnnotatedLabel, String]) = {
     val annTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]] = trainTrees.map(annotator(_))
     val (annWords, annBinaries, annUnaries) = this.extractBasicCounts(annTrees)
 

@@ -12,7 +12,7 @@ class LatentTreeMarginalTest extends FunSuite {
     val trees = ParserTestHarness.getTrainTrees()
     for(t <- trees) {
       val augmented = AugmentedGrammar.fromRefined(ParserTestHarness.refinedGrammar)
-      val lmarg = LatentTreeMarginal(augmented, t.words, t.tree.map(_ -> IndexedSeq(0)))
+      val lmarg = LatentTreeMarginal(augmented, t.words, t.tree.map(l => IndexedSeq(l -> 0)))
       val marg = TreeMarginal(augmented, t.words, t.tree.map(_ -> 0))
       assert(lmarg.logPartition closeTo marg.logPartition, lmarg.logPartition + " " +marg.logPartition)
       val lcounts = lmarg.expectedRuleCounts

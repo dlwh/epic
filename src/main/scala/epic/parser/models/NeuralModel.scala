@@ -260,7 +260,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
   type MyModel = NeuralModel[AnnotatedLabel, AnnotatedLabel, String]
 
 
-  def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]], constrainer: CoreGrammar[AnnotatedLabel, String])(implicit broker: CacheBroker) = {
+  def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]], constrainer: CoreGrammar[AnnotatedLabel, String]) = {
     val annTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]] = trainTrees.map(annotator(_))
     val (annWords, annBinaries, annUnaries) = this.extractBasicCounts(annTrees)
     val refGrammar = BaseGrammar(AnnotatedLabel.TOP, annBinaries, annUnaries)

@@ -37,6 +37,8 @@ object SurfaceFeaturizer {
       def apply(f: WordFeaturizer[W], t: MarkerPos): MarkedWordFeaturizer[W] = new MarkedWordFeaturizer[W](f, t)
     }
 
+    def spanBigrams[W](featurizer: WordFeaturizer[W], begin: MarkerPos, end: MarkerPos): SurfaceFeaturizer[W] = new BigramSurfaceFeaturizer[W](featurizer, begin, end)
+
   }
 
 
@@ -61,6 +63,26 @@ object SurfaceFeaturizer {
           val ffs1 = loc1.featuresForWord(f1.mp.toPos(begin, end))
           val ffs2 = loc2.featuresForWord(f2.mp.toPos(begin, end))
           epic.util.Arrays.crossProduct(ffs1, ffs2)(SpanEdgeFeature(f1.mp, f2.mp, _, _))
+        }
+      }
+
+    }
+  }
+
+  case class BigramSurfaceFeaturizer[W](f1: WordFeaturizer[W], b: MarkerPos, e: MarkerPos) extends SurfaceFeaturizer[W] {
+    def anchor(w: IndexedSeq[W]): SurfaceFeatureAnchoring[W] = {
+      val loc1 = f1.anchor(w)
+      new SurfaceFeatureAnchoring[W] {
+        def featuresForSpan(begin: Int, end: Int): Array[Feature] = {
+          val bb = b.toPos(begin, end)
+          val ee = e.toPos(begin, end)
+          val res = for(i <- bb until ee - 1) yield {
+            val ffs1 = loc1.featuresForWord(i)
+            val ffs2 = loc1.featuresForWord(i+1)
+            epic.util.Arrays.crossProduct(ffs1, ffs2)(BigramFeature(0, _ ,_).asInstanceOf[Feature])
+          }
+
+          epic.util.Arrays.concatenate(res:_*)
         }
       }
 

@@ -2,6 +2,10 @@ package epic.constraints
 
 import epic.lexicon.Lexicon
 import epic.util.Has2
+import epic.trees.{AnnotatedLabel, BinarizedTree}
+import breeze.util.Index
+import breeze.collection.mutable.TriangularArray
+import epic.constraints.LabeledSpanConstraints.PromotedSpanConstraints
 
 /**
  *
@@ -25,6 +29,22 @@ trait SpanConstraints { outer =>
 }
 
 object SpanConstraints {
+
+  def fromTree[L](tree: BinarizedTree[L]): SpanConstraints = {
+    val allowedSpans = new java.util.BitSet()
+    for(t <- tree.allChildren) {
+        allowedSpans.set(TriangularArray.index(t.begin, t.end))
+    }
+
+    val constraints = new SpanConstraints {
+      def maxSpanLengthStartingAt(begin: Int): Int =  tree.end-tree.begin
+
+      def isAllowedSpan(begin: Int, end: Int): Boolean = allowedSpans.get(TriangularArray.index(begin, end))
+    }
+
+    constraints
+  }
+
   trait Factory[W] extends Has2[IndexedSeq[W], SpanConstraints] {
     def constraints(w: IndexedSeq[W]):SpanConstraints
     def get(h: IndexedSeq[W]): SpanConstraints = constraints(h)

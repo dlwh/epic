@@ -90,7 +90,7 @@ case class StructModelFactory(baseParser: ParserParams.XbarGrammar,
   type MyModel = StructModel[AnnotatedLabel, AnnotatedLabel, String]
 
 
-  def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]], constrainer: CoreGrammar[AnnotatedLabel, String])(implicit broker: CacheBroker) = {
+  def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]], constrainer: CoreGrammar[AnnotatedLabel, String]) = {
     val transformed = trainTrees.par.map(annotator).seq.toIndexedSeq
 
     if(annotatedTreesDumpPath != null) {

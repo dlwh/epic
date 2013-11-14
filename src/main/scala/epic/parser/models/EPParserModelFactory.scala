@@ -44,7 +44,7 @@ case class EPParserModelFactory(ep: EPParams,
   type MyModel = EPParserModel[AnnotatedLabel, String]
 
 
-  def make(train: IndexedSeq[TreeInstance[AnnotatedLabel, String]], constrainer: CoreGrammar[AnnotatedLabel, String])(implicit broker: CacheBroker): MyModel = {
+  def make(train: IndexedSeq[TreeInstance[AnnotatedLabel, String]], constrainer: CoreGrammar[AnnotatedLabel, String]): MyModel = {
     type ModelType = EPModel.CompatibleModel[TreeInstance[AnnotatedLabel, String], CoreAnchoring[AnnotatedLabel, String]]
     val models = model.filterNot(_ eq null) map {
       model =>

@@ -142,7 +142,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
                                |X""".stripMargin.split("\\s+"):_*)
 
   def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]],
-           constrainer: CoreGrammar[AnnotatedLabel, String])(implicit cache: CacheBroker):MyModel = {
+           constrainer: CoreGrammar[AnnotatedLabel, String]):MyModel = {
     val annTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]] = trainTrees.map(annotator(_))
 
     val (annWords, annBinaries, annUnaries) = this.extractBasicCounts(annTrees)

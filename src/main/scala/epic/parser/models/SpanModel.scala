@@ -287,7 +287,8 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
   type MyModel = SpanModel[AnnotatedLabel, AnnotatedLabel, String]
 
 
-  def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]], constrainer: CoreGrammar[AnnotatedLabel, String])(implicit broker: CacheBroker) = {
+
+  def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]], constrainer: CoreGrammar[AnnotatedLabel, String]) = {
     val annTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]] = trainTrees.map(annotator(_))
     val (annWords, annBinaries, annUnaries) = this.extractBasicCounts(annTrees)
     val refGrammar = BaseGrammar(AnnotatedLabel.TOP, annBinaries, annUnaries)
@@ -343,30 +344,6 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
         featurizer += distance[String](split, end)
       }
       
-        //
-        // don't seem to help?!?
-//        + baseCat(begin-1) * baseCat(end) // word edges, huang
-//        +  baseCat(begin-1) * baseCat(end) * length
-        // to try:
-//        + distance(begin,end)
-//        + distance(begin,end) * baseCat(begin-1) * baseCat(end)
-        // Charniak & Johnson:
-        // CoLenPar: binned difference in length between two conjuncts
-        // should be catchable with:
-        // bin(unbinnedLen(begin,split) - unbinnedLen(split,end)) * (baseCat(-1))(split)
-        // Heavy:
-        // baseCat(end) * distance(begin,end)
-        // neighbors
-        // baseCat(-2 until 0) * baseCat(end) * distance(begin,end)
-        // baseCat(-1 until 0) * baseCat(end) * distance(begin,end)
-        // jenny used distsim...
-        // <b(p(rp)),ds(ws−1,dsws)>:(baseCat(-1) * baseCat)(split)
-        // slav:
-        // baseCat(-1 to 0) apply begin // if this works?
-        // baseCat(-1 to 0) apply end
-        // span shape feature: remove middle if it's long!
-        // feature for constituents: is sym synthetic
-
       featurizer
     }
     val indexedWord = IndexedWordFeaturizer.fromData(wf, annTrees.map{_.words})
