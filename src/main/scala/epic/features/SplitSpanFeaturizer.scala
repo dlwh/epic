@@ -59,6 +59,8 @@ object SplitSpanFeaturizer {
       new RelativeLengthFeaturizer[W]()
     }
 
+    def distanceToSentenceBoundaries[W] = new DistanceToSentenceBoundariesFeaturizer[W]
+
 
     val unit: SplitSpanFeaturizer.unit.type = SplitSpanFeaturizer.unit
   }
@@ -119,6 +121,16 @@ object SplitSpanFeaturizer {
         theNotSplitNeedingAnchoring
     }
   }
+
+  class DistanceToSentenceBoundariesFeaturizer[W] extends SurfaceFeaturizer[W] {
+    val db: DistanceBinner = DistanceBinner()
+    def anchor(words: IndexedSeq[W]): SurfaceFeatureAnchoring[W] = new SurfaceFeatureAnchoring[W] {
+      def featuresForSpan(begin: Int, end: Int): Array[Feature] = Array(DistToBOSFeature(db.binnedDistance(begin)), DistToEOSFeature(db.binnedDistance(end, words.length)))
+    }
+  }
+
+  case class DistToBOSFeature(dist: Int) extends Feature
+  case class DistToEOSFeature(dist: Int) extends Feature
 
   /**
    * Returns the binned difference between the [begin,split) and [split,end) spans.
