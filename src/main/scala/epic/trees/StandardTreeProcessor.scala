@@ -53,9 +53,9 @@ case class StandardTreeProcessor(headFinder: HeadFinder[AnnotatedLabel] = HeadFi
     }
     val ann = transformed.map { label =>
       val fields = splitLabel(label)
-      val split = fields.filterNot(s => s.nonEmpty && s.charAt(0).isDigit)
-      interner.intern(AnnotatedLabel(split(0).intern,
-        features= split.iterator.drop(1).map(tag => functionalTagInterner.intern(FunctionalTag(tag))).toSet
+      val anno = fields.drop(1).filterNot(s => s.nonEmpty && s.charAt(0).isDigit)
+      interner.intern(AnnotatedLabel(fields.head.intern,
+        features= anno.iterator.map(tag => functionalTagInterner.intern(FunctionalTag(tag))).toSet
       ))
     }
 
@@ -74,8 +74,8 @@ case class StandardTreeProcessor(headFinder: HeadFinder[AnnotatedLabel] = HeadFi
     Trees.binarize(ann, makeIntermediate, extend, headFinder).relabelRoot(_ => AnnotatedLabel.TOP)
   }
 
-  def splitLabel(label: String): Array[String] = {
-    if (label.startsWith("-"))
+  def splitLabel(label: String): Array[String] = try {
+    if (label.isEmpty || label.startsWith("-") || label == "#")
       Array(label)
     else if (label.contains("#")) {
       val splits = label.split("#").filter(_.nonEmpty)
@@ -85,5 +85,7 @@ case class StandardTreeProcessor(headFinder: HeadFinder[AnnotatedLabel] = HeadFi
     } else {
       label.split("[-=#]")
     }
+  } catch {
+    case ex: Exception => throw new RuntimeException("while dealing with the label " + label, ex)
   }
 }

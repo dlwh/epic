@@ -39,6 +39,7 @@ case class ProcessedTreebank(@Help(text="Location of the treebank directory")
     case "penn" => Treebank.fromPennTreebankDir(path)
     case "chinese" => Treebank.fromChineseTreebankDir(path)
     case "negra" => Treebank.fromGermanTreebank(path)
+    case "simple" => new SimpleTreebank(new File(path, "train.txt"), new File(path, "dev.txt"), new File(path, "test.txt"))
     case "conllonto" => Treebank.fromOntonotesDirectory(path)
     case "spmrl" =>
       var trainPath: File = new File(path, "train")
