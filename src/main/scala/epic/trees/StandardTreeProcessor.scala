@@ -75,7 +75,9 @@ case class StandardTreeProcessor(headFinder: HeadFinder[AnnotatedLabel] = HeadFi
   }
 
   def splitLabel(label: String): Array[String] = {
-    if (label.startsWith("-"))
+    // hack
+    if (label == "PRT|ADVP") return Array("PRT")
+    else if (label.startsWith("-") || label.isEmpty || label == "#")
       Array(label)
     else if (label.contains("#")) {
       val splits = label.split("#").filter(_.nonEmpty)

@@ -108,6 +108,11 @@ object GenerativeParser {
     Parser(refinedGrammar)
   }
 
+  def annotated(annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel], trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]]): SimpleRefinedGrammar[AnnotatedLabel, AnnotatedLabel, String] = {
+    val (baseLexicon, baseGrammar) = extractLexiconAndGrammar(trainTrees.map(Xbarize()))
+    annotated(baseGrammar, baseLexicon, annotator, trainTrees)
+  }
+
   def annotated(baseGrammar: BaseGrammar[AnnotatedLabel], baseLexicon: Lexicon[AnnotatedLabel, String], annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel], trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]]): SimpleRefinedGrammar[AnnotatedLabel, AnnotatedLabel, String] = {
     val transformed = trainTrees.par.map {
       ti => annotator(ti)
@@ -120,8 +125,7 @@ object GenerativeParser {
       (_: AnnotatedLabel).baseAnnotatedLabel
     })
 
-    val refinedGrammar = RefinedGrammar.generative(baseGrammar, baseLexicon, indexedRefinements, binary, unary, words)
-    refinedGrammar
+    RefinedGrammar.generative(baseGrammar, baseLexicon, indexedRefinements, binary, unary, words)
   }
 
   def defaultAnnotator(): PipelineAnnotator[AnnotatedLabel, String] =  PipelineAnnotator(Seq(FilterAnnotations(), ForgetHeadTag(), Markovize(0,2)))

@@ -58,7 +58,7 @@ class ReachabilityProjection[L, L2, W](grammar: BaseGrammar[L], lexicon: Lexicon
     })
   } catch {
     case ex: Exception =>
-      logger.fatal(s"while handling projectability for $tree $words: " + ex.getMessage, ex)
+      logger.error(s"while handling projectability for $tree $words: " + ex.getMessage, ex)
       throw ex
   }
 
