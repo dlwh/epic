@@ -21,7 +21,10 @@ libraryDependencies ++= Seq(
   "org.scalanlp" % "nak" % "1.2.0" intransitive(),
   //"org.scalanlp" %% "breeze-process" % "0.3-SNAPSHOT",
   //"org.scalanlp" %% "breeze-learn" % "0.3-SNAPSHOT",
-  "org.mapdb" % "mapdb" % "0.9.2"
+  "org.mapdb" % "mapdb" % "0.9.2",
+  "org.apache.logging.log4j" % "log4j-slf4j-impl" % "2.0-beta9",
+  "org.apache.logging.log4j" % "log4j-core" % "2.0-beta9",
+  "org.apache.logging.log4j" % "log4j-api" % "2.0-beta9"
 )
 
 libraryDependencies <<= (scalaVersion, libraryDependencies) { (sv, deps) =>
@@ -46,4 +49,45 @@ javaOptions += "-Xmx2g"
 
 
 seq(assemblySettings: _*)
+
+publishMavenStyle := true
+
+
+
+pomExtra := (
+  <url>http://scalanlp.org/</url>
+  <licenses>
+    <license>
+      <name>Apache 2</name>
+      <url>http://www.apache.org/licenses/LICENSE-2.0.html</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
+  <scm>
+    <url>git@github.com:dlwh/epic.git</url>
+    <connection>scm:git:git@github.com:dlwh/epic.git</connection>
+  </scm>
+  <developers>
+    <developer>
+      <id>dlwh</id>
+      <name>David Hall</name>
+      <url>http://cs.berkeley.edu/~dlwh/</url>
+    </developer>
+  </developers>)
+
+
+  
+publishTo <<= version { (v: String) =>
+  val nexus = "https://oss.sonatype.org/"
+  if (v.trim.endsWith("SNAPSHOT")) 
+    Some("snapshots" at nexus + "content/repositories/snapshots") 
+  else
+    Some("releases"  at nexus + "service/local/staging/deploy/maven2")
+}
+
+
+publishArtifact in Test := false
+
+pomIncludeRepository := { _ => false }
+
 

@@ -6,7 +6,6 @@ import breeze.linalg._
 import breeze.optimize.FirstOrderMinimizer.OptParams
 import breeze.optimize._
 import breeze.stats.distributions.{RandBasis, Rand}
-import breeze.stats.random.MersenneTwister
 import breeze.util.{Index, Encoder}
 import collection.immutable
 import collection.mutable.ArrayBuffer
@@ -208,7 +207,7 @@ object AnnotatingPipeline extends Logging {
       file <- corpus.listFiles.sortBy(_.getName) take nfiles
       doc <- ConllOntoReader.readDocuments(file)
     } yield doc
-    new RandBasis(new MersenneTwister(1)).permutation(instances.length).draw().map(instances).toIndexedSeq.splitAt(instances.length * 9 / 10)
+    Rand.permutation(instances.length).draw().map(instances).toIndexedSeq.splitAt(instances.length * 9 / 10)
   }
 
 

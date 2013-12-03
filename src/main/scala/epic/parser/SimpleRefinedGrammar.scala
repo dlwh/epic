@@ -302,17 +302,15 @@ object SimpleRefinedGrammar {
   }
 
   def parseBerkeleyText(prefix: String,
-                        threshold: Double = -10,
+                        threshold: Double = -12,
                         closeUnaries: CloseUnaries.Value = CloseUnaries.Viterbi): SimpleRefinedGrammar[AnnotatedLabel, AnnotatedLabel, String] = {
     val syms = Index[AnnotatedLabel]()
     val symsIn = Source.fromInputStream(new FileInputStream(prefix+".numstates"))
     for( line <- symsIn.getLines) {
       val Array(_sym, numStatesS) = line.split("\\s+")
-      val sym = if(_sym == "ROOT") "TOP" else _sym
-      if(!sym.startsWith("PRT|ADVP")) {
-        for( sub <- 0 until numStatesS.toInt) {
-          syms.index(AnnotatedLabel(s"${sym}_$sub"))
-        }
+      val sym: String = preprocessSymbol(_sym)
+      for( sub <- 0 until numStatesS.toInt) {
+        syms.index(AnnotatedLabel(s"${sym}_$sub"))
       }
     }
     symsIn.close()
@@ -322,17 +320,18 @@ object SimpleRefinedGrammar {
 
     val binaryIn = Source.fromInputStream(new FileInputStream(prefix+".binary"))
     for ( line <- binaryIn.getLines()) {
-      val Array(a,b,c, score) = line.split("\\s+")
-      if(!Array(a,b,c).exists(_.startsWith("PRT|ADVP"))) {
-        val logScore = math.log(score.toDouble)
-        if(logScore >= threshold) {
-          ruleScores += logScore
-          syms.index(AnnotatedLabel(a))
-          syms.index(AnnotatedLabel(b))
-          syms.index(AnnotatedLabel(c))
-          rules.index(BinaryRule(a,b,c).map(AnnotatedLabel(_)))
-          assert(rules.size == ruleScores.length)
-        }
+      val Array(_a,_b,_c, score) = line.split("\\s+")
+      val a = if(_a.startsWith("ROOT")) "TOP_0" else preprocessSymbol(_a)
+      val b = if(_b.startsWith("ROOT")) "TOP_0" else preprocessSymbol(_b)
+      val c = if(_c.startsWith("ROOT")) "TOP_0" else preprocessSymbol(_c)
+      val logScore = math.log(score.toDouble)
+      if(logScore >= threshold) {
+        ruleScores += logScore
+        syms.index(AnnotatedLabel(a))
+        syms.index(AnnotatedLabel(b))
+        syms.index(AnnotatedLabel(c))
+        rules.index(BinaryRule(a,b,c).map(AnnotatedLabel(_)))
+        assert(rules.size == ruleScores.length)
       }
 
     }
@@ -342,17 +341,15 @@ object SimpleRefinedGrammar {
     val unclosedUnaries: DenseMatrix[Double] = DenseMatrix.eye[Double](syms.size)
     for ( line <- unaryIn.getLines()) {
       val Array(_a, _b,score) = line.split("\\s+")
-      val a = if(_a.startsWith("ROOT")) "TOP_0" else _a
-      val b = if(_b.startsWith("ROOT")) "TOP_0" else _b
-      if(!Array(a,b).exists(_.startsWith("PRT|ADVP"))) {
-        val logScore = math.log(score.toDouble)
-        if(logScore >= threshold) {
-          val ai = syms(AnnotatedLabel(a))
-          val bi = syms(AnnotatedLabel(b))
-          require(ai >= 0 && bi >= 0, a + " " + b + " " + syms)
-          unclosedUnaries(ai, bi) = score.toDouble
-          assert(rules.size == ruleScores.length)
-        }
+      val a = if(_a.startsWith("ROOT")) "TOP_0" else preprocessSymbol(_a)
+      val b = if(_b.startsWith("ROOT")) "TOP_0" else preprocessSymbol(_b)
+      val logScore = math.log(score.toDouble)
+      if(logScore >= threshold) {
+        val ai = syms(AnnotatedLabel(a))
+        val bi = syms(AnnotatedLabel(b))
+        require(ai >= 0 && bi >= 0, a + " " + b + " " + syms)
+        unclosedUnaries(ai, bi) = score.toDouble
+        assert(rules.size == ruleScores.length)
       }
     }
     for ((unary, unaryScore) <- doCloseUnaries(unclosedUnaries, closeUnaries, syms)) {
@@ -394,6 +391,11 @@ object SimpleRefinedGrammar {
       scorer)
   }
 
+
+  def preprocessSymbol(_sym: String): String = {
+    val sym = if (_sym == "ROOT") "TOP" else if (_sym == "PRT|ADVP") "PRT" else _sym
+    sym.replaceAll("ROOT","TOP").replaceAll("PRT\\|ADVP_[0-9]*", "PRT_0")
+  }
 
   private def makeAllowedTags(coarseLabelIndex: Index[AnnotatedLabel], counter: Counter2[AnnotatedLabel, String, Double]): Map[String, Set[Int]] = {
     val map = collection.mutable.Map[String, Set[Int]]().withDefaultValue(Set.empty[Int])
