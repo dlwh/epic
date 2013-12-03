@@ -21,7 +21,10 @@ libraryDependencies ++= Seq(
   "org.scalanlp" % "nak" % "1.2.0" intransitive(),
   //"org.scalanlp" %% "breeze-process" % "0.3-SNAPSHOT",
   //"org.scalanlp" %% "breeze-learn" % "0.3-SNAPSHOT",
-  "org.mapdb" % "mapdb" % "0.9.2"
+  "org.mapdb" % "mapdb" % "0.9.2",
+  "org.apache.logging.log4j" % "log4j-slf4j-impl" % "2.0-beta9",
+  "org.apache.logging.log4j" % "log4j-core" % "2.0-beta9",
+  "org.apache.logging.log4j" % "log4j-api" % "2.0-beta9"
 )
 
 libraryDependencies <<= (scalaVersion, libraryDependencies) { (sv, deps) =>
