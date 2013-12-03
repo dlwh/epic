@@ -10,7 +10,7 @@ import epic.trees.TreeInstance
 import breeze.optimize.FirstOrderMinimizer.OptParams
 import breeze.optimize.{CachedBatchDiffFunction, BatchDiffFunction}
 import breeze.util.OptionIndex
-import com.typesafe.scalalogging.log4j.Logging
+import com.typesafe.scalalogging.slf4j.Logging
 import epic.constraints.TagConstraints
 
 /**

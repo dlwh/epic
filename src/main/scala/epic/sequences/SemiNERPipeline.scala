@@ -15,7 +15,7 @@ import breeze.optimize.FirstOrderMinimizer.OptParams
 import epic.coref.Phrases
 import breeze.util.Implicits._
 import epic.util.CacheBroker
-import com.typesafe.scalalogging.log4j.Logging
+import com.typesafe.scalalogging.slf4j.Logging
 
 
 /**

@@ -23,7 +23,7 @@ import breeze.util._
 import breeze.numerics._
 import epic.lexicon.Lexicon
 import breeze.numerics
-import com.typesafe.scalalogging.log4j.Logging
+import com.typesafe.scalalogging.slf4j.Logging
 import epic.util.SafeLogging
 
 trait ParserException extends Exception

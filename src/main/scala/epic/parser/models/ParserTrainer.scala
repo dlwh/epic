@@ -21,7 +21,7 @@ import breeze.linalg._
 import breeze.optimize._
 import epic.trees.AnnotatedLabel
 import breeze.config.Help
-import com.typesafe.scalalogging.log4j.Logging
+import com.typesafe.scalalogging.slf4j.Logging
 import epic.parser.projections.{GrammarRefinements, ConstraintCoreGrammarAdaptor, ReachabilityProjection, ParserChartConstraintsFactory}
 import epic.util.CacheBroker
 import epic.parser.ParserParams.XbarGrammar

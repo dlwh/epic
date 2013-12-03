@@ -6,7 +6,7 @@ import epic.trees.{AnnotatedLabel, ProcessedTreebank}
 import breeze.config.{Configuration, CommandLineParser}
 import breeze.util.Encoder
 import epic.util.CacheBroker
-import com.typesafe.scalalogging.log4j.Logging
+import com.typesafe.scalalogging.slf4j.Logging
 
 /**
  *

@@ -12,7 +12,7 @@ import epic.constraints.LabeledSpanConstraints
 import epic.lexicon.SimpleLexicon
 import epic.features._
 import epic.util.{SafeLogging, CacheBroker, NotProvided, Optional}
-import com.typesafe.scalalogging.log4j.Logging
+import com.typesafe.scalalogging.slf4j.Logging
 import epic.sequences.SemiCRFModel.BIEOFeatureAnchoring
 
 /**

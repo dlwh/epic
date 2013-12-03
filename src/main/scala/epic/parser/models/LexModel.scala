@@ -30,7 +30,7 @@ import epic.lexicon.Lexicon
 import epic.features._
 import epic.parser.features._
 import epic.util._
-import com.typesafe.scalalogging.log4j.Logging
+import com.typesafe.scalalogging.slf4j.Logging
 import epic.parser.features._
 import epic.trees._
 
