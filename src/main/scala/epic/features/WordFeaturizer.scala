@@ -3,6 +3,8 @@ package epic.features
 import breeze.linalg._
 import epic.features.SurfaceFeaturizer.{MarkedWordFeaturizer, MarkerPos}
 import epic.framework.Feature
+import scala.collection.mutable.ArrayBuffer
+import scala.collection.immutable
 
 /**
  *
@@ -62,6 +64,9 @@ object WordFeaturizer {
     def suffixes(order: Int = 5) = new WordSuffixFeaturizer(summedCounts, suffixOrder = order, commonWordThreshold = commonWordThreshold)
     def prefixes(order: Int = 5) = new WordPrefixFeaturizer(summedCounts, prefixOrder = order, commonWordThreshold = commonWordThreshold)
 
+    def nextWordToRight(f: WordFeaturizer[String]): NextActualWordFeaturizer = new NextActualWordFeaturizer(f, lookRight = true)
+    def nextWordToLeft(f: WordFeaturizer[String]): NextActualWordFeaturizer = new NextActualWordFeaturizer(f, lookRight = false)
+
     val zero = new ZeroFeaturizer[String]
 
     def bigrams(f: WordFeaturizer[String], offsetOrder:Int = 1) = new MultiWordFeaturizer[String]({
@@ -110,3 +115,43 @@ class ZeroFeaturizer[W] extends WordFeaturizer[W] with SurfaceFeaturizer[W] with
   }
 }
 
+
+class NextActualWordFeaturizer(f: WordFeaturizer[String], lookRight: Boolean, isPunct: (String=>Boolean) = (_.forall(!_.isLetterOrDigit))) extends WordFeaturizer[String] {
+  def anchor(words: IndexedSeq[String]): WordFeatureAnchoring[String] = {
+    val w = words
+    new WordFeatureAnchoring[String] {
+      val base = f.anchor(w)
+      // one for each position
+      val features: immutable.IndexedSeq[Array[Feature]] = (0 until w.length).map { _pos =>
+
+        var pos = _pos
+        val delta = if(lookRight) 1 else -1
+
+        val feats = new ArrayBuffer[Feature]()
+
+        var done = false
+        while(!done && pos >= 0 && pos < w.length) {
+          if(isPunct(w(pos)))  {
+            feats ++= base.featuresForWord(pos).map(PunctuationFeature)
+          } else {
+            feats ++= base.featuresForWord(pos)
+            done = true
+          }
+          pos += delta
+        }
+
+        if(pos < 0 || pos >= w.length)  feats ++= base.featuresForWord(pos)
+
+        feats.toArray
+      }
+      def words: IndexedSeq[String] = w
+
+      def featuresForWord(pos: Int): Array[Feature] = {
+        if(pos < 0 || pos >= w.length)  base.featuresForWord(pos)
+        else features(pos)
+      }
+    }
+  }
+}
+
+case class PunctuationFeature(f: Feature) extends Feature

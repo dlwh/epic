@@ -63,4 +63,7 @@ object ParserTestHarness extends ParserTestHarness {
     Parser(refinedGrammar, ViterbiDecoder[AnnotatedLabel, String]())
   }
   val viterbiParser = Parser(refinedGrammar, new ViterbiDecoder[AnnotatedLabel, String])
+
+  val wordCounts = GenerativeParser.extractCounts(getTrainTrees())
+
 }

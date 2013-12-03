@@ -459,15 +459,15 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
 
       // class(split + 1)
       val baseCat = (lfsuf + tagDict)
-      val leftOfSplit =  (baseCat(-1)apply (split))
+      val leftOfSplit =  (nextWordToLeft(baseCat)(-1)apply (split))
       val commonWordsOnly = new IdentityWordFeaturizer(summedCounts, 300)
       val pointsOfInterest = (
-        baseCat(begin-1)
-        + baseCat(begin)
+        nextWordToLeft(baseCat)(begin-1)
+        + nextWordToRight(baseCat)(begin)
         + leftOfSplit
-        + baseCat(split)
-        + baseCat(end-1)
-        + baseCat(end)
+        + nextWordToRight(baseCat)(split)
+        + nextWordToLeft(baseCat)(end-1)
+        + nextWordToRight(baseCat)(end)
       )
       (  pointsOfInterest
         + distance[String](begin, split)
