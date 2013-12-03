@@ -9,7 +9,7 @@ import breeze.stats.distributions.{RandBasis, Rand}
 import breeze.util.{Index, Encoder}
 import collection.immutable
 import collection.mutable.ArrayBuffer
-import com.typesafe.scalalogging.log4j.Logging
+import com.typesafe.scalalogging.slf4j.Logging
 import epic.constraints.{CachedChartConstraintsFactory, LabeledSpanConstraints}
 import epic.features._
 import epic.framework._

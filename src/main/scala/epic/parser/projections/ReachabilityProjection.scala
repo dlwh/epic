@@ -5,7 +5,7 @@ import epic.trees.{TreeInstance, BinarizedTree}
 import epic.parser._
 import epic.lexicon.{TagScorer, Lexicon}
 import breeze.numerics.I
-import com.typesafe.scalalogging.log4j.Logging
+import com.typesafe.scalalogging.slf4j.Logging
 import scala.collection.{GenTraversableLike, GenTraversable, GenTraversableOnce}
 import scala.collection.generic.CanBuildFrom
 import epic.util.{SafeLogging, CacheBroker}

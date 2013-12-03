@@ -4,7 +4,7 @@ import breeze.linalg._
 import breeze.stats.distributions.Rand
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.GenTraversableOnce
-import com.typesafe.scalalogging.log4j.Logging
+import com.typesafe.scalalogging.slf4j.Logging
 
 /*
 class StructSVM[Datum](val model: Model[Datum],

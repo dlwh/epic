@@ -4,7 +4,7 @@ import epic.trees.{UnaryTree, BinarizedTree}
 import epic.util.{SafeLogging, Arrays}
 import breeze.numerics
 import breeze.collection.mutable.TriangularArray
-import com.typesafe.scalalogging.log4j.Logging
+import com.typesafe.scalalogging.slf4j.Logging
 
 /*
  Copyright 2012 David Hall
