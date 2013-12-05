@@ -27,7 +27,7 @@ class SignatureTagScorer[L, String](counts: Counter2[L, String, Double], signatu
   def anchor(w: IndexedSeq[String]):Anchoring = new Anchoring {
     def words: IndexedSeq[String] = w
 
-    val sigs = w.map(x => if(counts(::, x).valuesIterator.exists(_  > 0)) x else signature(x))
+    val sigs = w.map(x => if(counts(::, x).valuesIterator.nonEmpty) x else signature(x))
 
     def scoreTag(pos: Int, l: L) = {
       counts(l, sigs(pos))

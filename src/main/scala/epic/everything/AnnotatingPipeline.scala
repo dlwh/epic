@@ -223,7 +223,7 @@ object AnnotatingPipeline extends Logging {
 
     logger.info("Building basic parsing model...")
     val trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]] = for (d <- docs; s <- d.sentences) yield {
-      params.treebank.makeTreeInstance(s.id, s.tree.map(_.label), s.words, removeUnaries = true)
+      params.treebank.makeTreeInstance(s.id, s.tree.map(_.label), s.words, collapseUnaries = true)
     }
 
     val (grammar, lexicon) = xbar.xbarGrammar(trainTrees)
@@ -232,7 +232,7 @@ object AnnotatingPipeline extends Logging {
 
     logger.info{
       val devTrees = for (d <- devDocs; s <- d.sentences) yield {
-        params.treebank.makeTreeInstance(s.id, s.tree.map(_.label), s.words, removeUnaries = true)
+        params.treebank.makeTreeInstance(s.id, s.tree.map(_.label), s.words, collapseUnaries = false)
       }
       "Baseline Parser gets " + ParseEval.evaluate(devTrees, pruningParser, AnnotatedLabelChainReplacer, {(_:AnnotatedLabel).baseLabel})
     }

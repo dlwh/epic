@@ -17,20 +17,20 @@ package epic.trees
 */
 
 /**
- * Removes unaries chains A -> B -> ... -> C, replacing them with A -> C and modifying C's AnnotatedLabel
- * to add in the unary chain
+ * Removes unaries chains A -> B -> ... -> C, replacing them with A -> C and modifying the tree
+ * to know about the unaries
  *
  *
  * @author dlwh
  */
-object UnaryChainRemover {
+object UnaryChainCollapser {
 
-  def removeUnaryChains(tree: BinarizedTree[AnnotatedLabel]): BinarizedTree[AnnotatedLabel] = {
+  def collapseUnaryChains(tree: BinarizedTree[AnnotatedLabel], keepChains: Boolean = true): BinarizedTree[AnnotatedLabel] = {
 
     def transform(t: BinarizedTree[AnnotatedLabel],parentWasUnary:Boolean):BinarizedTree[AnnotatedLabel] = t match {
-      case UnaryTree(l,c, chain, span) =>
+      case UnaryTree(l,c, _chain, span) =>
         val (chain,cn) = stripChain(c)
-        UnaryTree(l,transform(cn,true), chain.toIndexedSeq, t.span)
+        UnaryTree(l,transform(cn,true), if(keepChains) _chain ++ chain.toIndexedSeq else IndexedSeq.empty, t.span)
       case BinaryTree(l,lchild,rchild, span) =>
         if(parentWasUnary) BinaryTree(l,transform(lchild,false),transform(rchild,false), t.span)
         else UnaryTree(l,BinaryTree(l,transform(lchild,false),transform(rchild,false), t.span), IndexedSeq.empty, t.span)

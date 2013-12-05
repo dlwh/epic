@@ -33,7 +33,8 @@ case class ProcessedTreebank(@Help(text="Location of the treebank directory")
                              @Help(text="What kind of binarization to do. Options: left, right, head. Head is best.")
                              binarization: String = "head",
                              treebankType: String = "penn",
-                             numSentences: Int = Int.MaxValue) {
+                             numSentences: Int = Int.MaxValue,
+                             keepUnaryChainsFromTrain: Boolean = true) {
 
   lazy val treebank = treebankType.toLowerCase() match {
     case "penn" => Treebank.fromPennTreebankDir(path)
@@ -57,27 +58,28 @@ case class ProcessedTreebank(@Help(text="Location of the treebank directory")
     case _ => throw new RuntimeException("Unknown Treebank type")
   }
 
-  lazy val trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]] = transformTrees(treebank.train, maxLength, removeUnaries = true).take(numSentences)
-  lazy val devTrees = transformTrees(treebank.dev, 100000);
-  lazy val testTrees = transformTrees(treebank.test, 1000000);
+  lazy val trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]] = transformTrees(treebank.train, maxLength, collapseUnaries = true).take(numSentences)
+  lazy val devTrees = transformTrees(treebank.dev, 100000)
+  lazy val testTrees = transformTrees(treebank.test, 1000000)
 
 
-  def transformTrees(portion: treebank.Portion, maxL: Int, removeUnaries: Boolean = false): IndexedSeq[TreeInstance[AnnotatedLabel, String]] = {
+  def transformTrees(portion: treebank.Portion, maxL: Int, collapseUnaries: Boolean = false): IndexedSeq[TreeInstance[AnnotatedLabel, String]] = {
     val binarizedAndTransformed = for (
       ((tree, words), index) <- portion.trees.zipWithIndex if words.length <= maxL
     ) yield {
       val name = s"${portion.name}-$index"
-      makeTreeInstance(name, tree, words, removeUnaries)
+      makeTreeInstance(name, tree, words, collapseUnaries)
     }
 
     binarizedAndTransformed.toIndexedSeq
   }
 
 
-  def makeTreeInstance(name: String, tree: Tree[String], words: IndexedSeq[String], removeUnaries: Boolean): TreeInstance[AnnotatedLabel, String] = {
+  def makeTreeInstance(name: String, tree: Tree[String], words: IndexedSeq[String], collapseUnaries: Boolean): TreeInstance[AnnotatedLabel, String] = {
     var transformed = process(tree)
-    if (removeUnaries)
-      transformed = UnaryChainRemover.removeUnaryChains(transformed)
+    if (collapseUnaries) {
+      transformed = UnaryChainCollapser.collapseUnaryChains(transformed, keepChains = keepUnaryChainsFromTrain)
+    }
     TreeInstance(name, transformed, words)
   }
 

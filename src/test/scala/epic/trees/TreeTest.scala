@@ -22,7 +22,7 @@ class TreeTest extends FunSuite {
     """)
 
     val processed: BinarizedTree[AnnotatedLabel] = new StandardTreeProcessor().apply(tree)
-    val deunaried = UnaryChainRemover.removeUnaryChains(processed)
+    val deunaried = UnaryChainCollapser.collapseUnaryChains(processed)
     val zip = Trees.Zipper(deunaried)
     val zippers = zip.iterator.toIndexedSeq
     val trees = zippers.map(_.tree)
