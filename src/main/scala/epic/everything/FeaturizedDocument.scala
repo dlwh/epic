@@ -101,7 +101,7 @@ object FeaturizedDocument {
       val newSentences = for( s <- d.sentences) yield {
         val constituentSparsity = parseConstrainer.constraints(s.words)
         var tree = treeProcessor(s.tree.map(_.treebankString))
-        tree = UnaryChainRemover.removeUnaryChains(tree)
+        tree = UnaryChainCollapser.collapseUnaryChains(tree)
         tree = reachable.forTree(tree, s.words, constituentSparsity)
         val nerConstraints = nerConstrainer.get(s.words)
 
@@ -146,7 +146,7 @@ object FeaturizedDocument {
      val newSentences = for(s <- d.sentences) yield {
        val seg = s.nerSegmentation
        var tree = treeProcessor(s.tree.map(_.treebankString))
-       tree = UnaryChainRemover.removeUnaryChains(tree)
+       tree = UnaryChainCollapser.collapseUnaryChains(tree)
        val constituentSparsity = Try{parseConstrainer.constraints(s.words)}.getOrElse(ChartConstraints.noSparsity[AnnotatedLabel])
        val nerConstraints = nerConstrainer.get(s.words)
 
