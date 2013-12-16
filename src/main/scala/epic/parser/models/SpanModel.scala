@@ -452,7 +452,19 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     val xbarLexicon = constrainer.lexicon
     val indexedRefinements = GrammarRefinements(xbarGrammar, refGrammar, (_: AnnotatedLabel).baseAnnotatedLabel)
 
-    val wf = WordFeaturizer.goodPOSTagFeaturizer(annWords)
+    val wf = {//WordFeaturizer.goodPOSTagFeaturizer(annWords)
+    val dsl = new WordFeaturizer.DSL(annWords)
+      import dsl._
+
+      (
+        unigrams(word, 1)
+//          + bigrams(clss, 2)
+//          + bigrams(tagDict, 2)
+          + suffixes()
+          + prefixes()
+//          + props
+        )
+    }
     val span:SplitSpanFeaturizer[String] = {
       val dsl = new WordFeaturizer.DSL(annWords) with SurfaceFeaturizer.DSL with SplitSpanFeaturizer.DSL
       import dsl._
