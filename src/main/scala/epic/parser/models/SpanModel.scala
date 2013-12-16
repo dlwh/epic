@@ -484,7 +484,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
       (  pointsOfInterest
         + distance[String](begin, split)
         + distance[String](split, end)
-        + distanceToSentenceBoundaries[String]
+//        + distanceToSentenceBoundaries[String]
         //+ (relativeLength) * (commonWordsOnly(split) + (commonWordsOnly(-1)).apply (split))
 //        + relativeLength[String]
 //        + distance[String](begin, split) * distance[String](split,end)
