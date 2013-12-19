@@ -79,93 +79,10 @@ class DotProductGrammar[L, L2, W, Feature](val grammar: BaseGrammar[L],
                                            val weights: DenseVector[Double],
                                            val featurizer: RefinedFeaturizer[L, W, Feature]) extends RefinedGrammar[L, W] {
 
+  def anchor(w: IndexedSeq[W]):RefinedAnchoring[L, W] = new ProjectionsRefinedAnchoring[L, L2, W] {
 
-  // rule -> parentRef -> [ruleRef]
-  private val parentCompatibleRefinements: Array[Array[Array[Int]]] = Array.tabulate(grammar.index.size) { r =>
-    val parent = grammar.parent(r)
-    val parentRefs = Array.fill(refinements.labels.refinementsOf(parent).length){ArrayBuffer[Int]()}
-    for(ruleRef <- refinements.rules.refinementsOf(r)) {
-      val refParent = refinements.labels.localize(refinements.rules.fineIndex.get(ruleRef).parent)
-      parentRefs(refParent) += refinements.rules.localize(ruleRef)
-    }
-    parentRefs.map(_.toArray)
-  }
-
-  private val leftChildCompatibleRefinements: Array[Array[Array[Int]]] = Array.tabulate(grammar.index.size) { r =>
-    if(grammar.index.get(r).isInstanceOf[UnaryRule[L]]) {
-      null
-    } else {
-
-      val leftChild = grammar.leftChild(r)
-      val leftChildRefs = Array.fill(refinements.labels.refinementsOf(leftChild).length){ArrayBuffer[Int]()}
-      for(ruleRef <- refinements.rules.refinementsOf(r)) {
-        val refParent = refinements.labels.localize(refinements.rules.fineIndex.get(ruleRef).asInstanceOf[BinaryRule[L2]].left)
-        leftChildRefs(refParent) += refinements.rules.localize(ruleRef)
-      }
-      leftChildRefs.map(_.toArray)
-    }
-  }
-
-  private val rightChildCompatibleRefinements: Array[Array[Array[Int]]] = Array.tabulate(grammar.index.size) { r =>
-    if(grammar.index.get(r).isInstanceOf[UnaryRule[L]]) {
-      null
-    } else {
-
-      val rightChild = grammar.rightChild(r)
-      val rightChildRefs = Array.fill(refinements.labels.refinementsOf(rightChild).length){ArrayBuffer[Int]()}
-      for(ruleRef <- refinements.rules.refinementsOf(r)) {
-        val refParent = refinements.labels.localize(refinements.rules.fineIndex.get(ruleRef).asInstanceOf[BinaryRule[L2]].right)
-        rightChildRefs(refParent) += refinements.rules.localize(ruleRef)
-      }
-      rightChildRefs.map(_.toArray)
-    }
-  }
-
-  // rule -> parentRef -> [ruleRef]
-  private val childCompatibleRefinements: Array[Array[Array[Int]]] = Array.tabulate(grammar.index.size) { r =>
-    if(grammar.index.get(r).isInstanceOf[UnaryRule[L]]) {
-      val child = grammar.child(r)
-      val childRefs = Array.fill(refinements.labels.refinementsOf(child).length){ArrayBuffer[Int]()}
-      for(ruleRef <- refinements.rules.refinementsOf(r)) {
-        val refChild = refinements.labels.localize(refinements.rules.fineIndex.get(ruleRef).asInstanceOf[UnaryRule[L2]].child)
-        childRefs(refChild) += refinements.rules.localize(ruleRef)
-      }
-      childRefs.map(_.toArray)
-    } else {
-      null
-    }
-  }
-
-  private val coarseRulesGivenParentRefinement = Array.tabulate(grammar.labelIndex.size) { p =>
-  // refinement -> rules
-    val result = Array.fill(refinements.labels.refinementsOf(p).size)(ArrayBuffer[Int]())
-    for(r <- grammar.indexedBinaryRulesWithParent(p); ref <- 0 until result.length) {
-      if(parentCompatibleRefinements(r)(ref).nonEmpty) {
-        result(ref) += r
-      }
-    }
-
-    result.map(_.toArray)
-  }
-
-  private val parentRefinementsGivenCoarseRule:Array[Array[Int]] = Array.tabulate(grammar.index.size) { r =>
-  // rules -> parent refinements
-    refinements.rules.refinementsOf(r).map(refinedGrammar.parent).toSet.toArray.map(refinements.labels.localize).sorted
-  }
-
-  private val leftChildRefinementsGivenCoarseRule:Array[Array[Int]] = Array.tabulate(grammar.index.size) { r =>
-    if(grammar.index.get(r).isInstanceOf[UnaryRule[_]]) Array.empty
-    else  refinements.rules.refinementsOf(r).map(r => refinedGrammar.leftChild(r)).toSet.toArray.map(refinements.labels.localize).sorted
-  }
-
-  private val rightChildRefinementsGivenCoarseRule:Array[Array[Int]] = Array.tabulate(grammar.index.size) { r =>
-    if(grammar.index.get(r).isInstanceOf[UnaryRule[_]]) Array.empty
-    else  refinements.rules.refinementsOf(r).map(r => refinedGrammar.rightChild(r)).toSet.toArray.map(refinements.labels.localize).sorted
-  }
-
-
-  def anchor(w: IndexedSeq[W]):RefinedAnchoring[L, W] = new RefinedAnchoring[L, W] {
-
+    def refinements = DotProductGrammar.this.refinements
+    def refinedGrammar: BaseGrammar[L2] = DotProductGrammar.this.refinedGrammar
 
     val grammar = DotProductGrammar.this.grammar
     val lexicon = DotProductGrammar.this.lexicon
@@ -196,86 +113,7 @@ class DotProductGrammar[L, L2, W, Feature](val grammar: BaseGrammar[L],
       score
     }
 
-    def validLabelRefinements(begin: Int, end: Int, label: Int) = {
-      refinements.labels.localRefinements(label)
-    }
 
-    def validRuleRefinementsGivenParent(begin: Int, end: Int, rule: Int, parentRef: Int) = {
-      parentCompatibleRefinements(rule)(parentRef)
-    }
-
-    def validRuleRefinementsGivenLeftChild(begin: Int, split: Int, completionBegin: Int, completionEnd: Int, rule: Int, childRef: Int): Array[Int] = {
-      leftChildCompatibleRefinements(rule)(childRef)
-    }
-
-    def validRuleRefinementsGivenRightChild(completionBegin: Int, completionEnd: Int, split: Int, end: Int, rule: Int, childRef: Int): Array[Int] = {
-      rightChildCompatibleRefinements(rule)(childRef)
-    }
-
-    def validUnaryRuleRefinementsGivenChild(begin: Int, end: Int, rule: Int, childRef: Int) = {
-      childCompatibleRefinements(rule)(childRef)
-    }
-
-    def leftChildRefinement(rule: Int, ruleRef: Int) = {
-      val refinedRuleId = refinements.rules.globalize(rule, ruleRef)
-      refinements.labels.localize(refinedGrammar.leftChild(refinedRuleId))
-    }
-
-    def rightChildRefinement(rule: Int, ruleRef: Int) = {
-      val refinedRuleId = refinements.rules.globalize(rule, ruleRef)
-      refinements.labels.localize(refinedGrammar.rightChild(refinedRuleId))
-    }
-
-    def parentRefinement(rule: Int, ruleRef: Int) = {
-      val refinedRuleId = refinements.rules.globalize(rule, ruleRef)
-      refinements.labels.localize(refinedGrammar.parent(refinedRuleId))
-    }
-
-    def childRefinement(rule: Int, ruleRef: Int) = {
-      val refinedRuleId = refinements.rules.globalize(rule, ruleRef)
-      refinements.labels.localize(refinedGrammar.child(refinedRuleId))
-    }
-
-    // TODO: make this not terminally slow!
-    def ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int) = {
-      val a = grammar.parent(r)
-      val b = grammar.child(r)
-      val a2 = refinements.labels.globalize(a, refA)
-      val b2 = refinements.labels.globalize(b, refB)
-      val rule = UnaryRule(refinements.labels.fineIndex.get(a2), refinements.labels.fineIndex.get(b2), grammar.chain(r))
-      val refinedRuleIndex = refinements.rules.fineIndex(rule)
-      if(refinedRuleIndex < 0) {
-        -1
-      } else {
-        refinements.rules.localize(refinedRuleIndex)
-      }
-    }
-
-    def ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int, refC: Int) = {
-      val a = grammar.parent(r)
-      val b = grammar.leftChild(r)
-      val c = grammar.rightChild(r)
-      val a2 = refinements.labels.globalize(a, refA)
-      val b2 = refinements.labels.globalize(b, refB)
-      val c2 = refinements.labels.globalize(c, refC)
-      refinements.rules.localize(refinements.rules.fineIndex(BinaryRule(refinements.labels.fineIndex.get(a2),
-        refinements.labels.fineIndex.get(b2),
-        refinements.labels.fineIndex.get(c2)
-      ))  )
-    }
-
-    def numValidRefinements(label: Int) = refinements.labels.refinementsOf(label).length
-    def numValidRuleRefinements(rule: Int) = refinements.rules.refinementsOf(rule).length
-
-    def validCoarseRulesGivenParentRefinement(a: Int, refA: Int) = coarseRulesGivenParentRefinement(a)(refA)
-
-    def validParentRefinementsGivenRule(begin: Int, splitBegin: Int, splitEnd: Int, end: Int, rule: Int): Array[Int] = parentRefinementsGivenCoarseRule(rule)
-    def validLeftChildRefinementsGivenRule(begin: Int, end: Int, completionBegin: Int, completionEnd: Int, rule: Int): Array[Int] = {
-      leftChildRefinementsGivenCoarseRule(rule)
-    }
-    def validRightChildRefinementsGivenRule(completionBegin: Int, completionEnd: Int, begin: Int, end: Int, rule: Int): Array[Int] = {
-      rightChildRefinementsGivenCoarseRule(rule)
-    }
   }
 }
 
