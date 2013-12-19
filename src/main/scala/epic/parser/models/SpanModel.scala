@@ -529,7 +529,13 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     }
     val indexedWord = IndexedWordFeaturizer.fromData(wf, annTrees.map{_.words})
     val surface = IndexedSplitSpanFeaturizer.fromData(span, annTrees)
-    val featurizer = new ProductionFeaturizer[AnnotatedLabel, AnnotatedLabel, String](xbarGrammar, indexedRefinements, lGen={(x: AnnotatedLabel) => if(x.isIntermediate) Set(x, x.baseAnnotatedLabel, SyntheticFeature).toSeq else Set(x, x.baseAnnotatedLabel).toSeq}, rGen={r => Set(r, r.map(_.baseAnnotatedLabel)).toSeq})
+
+    def labelFeaturizer(l: AnnotatedLabel) = Set(l, l.baseAnnotatedLabel).toSeq
+    def ruleFeaturizer(r: Rule[AnnotatedLabel]) = Set(r, r.map(_.baseAnnotatedLabel)).toSeq
+
+    val featurizer = new ProductionFeaturizer[AnnotatedLabel, AnnotatedLabel, String](xbarGrammar, indexedRefinements,
+      lGen=labelFeaturizer,
+      rGen=ruleFeaturizer)
 
     val indexed =  IndexedSpanFeaturizer.extract[AnnotatedLabel, AnnotatedLabel, String](indexedWord,
       surface,
