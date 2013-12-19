@@ -439,7 +439,13 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
                             @Help(text="Old weights to initialize with. Optional")
                             oldWeights: File = null,
                             @Help(text="For features not seen in gold trees, we bin them into dummyFeats * numGoldFeatures bins using hashing.")
-                            dummyFeats: Double = 0.5) extends ParserModelFactory[AnnotatedLabel, String] {
+                            dummyFeats: Double = 0.5,
+                            useShape: Boolean = true,
+                            useSpanLength: Boolean = true,
+                            useBinaryLengths: Boolean = true,
+                            useFirstLast: Boolean = true,
+                            useSplits: Boolean = true,
+                            useBeforeAfter:Boolean = true) extends ParserModelFactory[AnnotatedLabel, String] {
   type MyModel = SpanModel[AnnotatedLabel, AnnotatedLabel, String]
 
 
@@ -458,11 +464,8 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
 
       (
         unigrams(word, 1)
-//          + bigrams(clss, 2)
-//          + bigrams(tagDict, 2)
           + suffixes()
           + prefixes()
-//          + props
         )
     }
     val span:SplitSpanFeaturizer[String] = {
@@ -471,27 +474,33 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
 
       // class(split + 1)
       val baseCat = (lfsuf)
+
       val leftOfSplit =  ((baseCat)(-1)apply (split))
-      val commonWordsOnly = new IdentityWordFeaturizer(summedCounts, 300)
-      val pointsOfInterest = (
-        (baseCat)(begin-1)
-        + (baseCat)(begin)
-        + leftOfSplit
-        + (baseCat)(split)
-        + (baseCat)(end-1)
-        + (baseCat)(end)
-      )
-      (  pointsOfInterest
-        + distance[String](begin, split)
-        + distance[String](split, end)
-//        + distanceToSentenceBoundaries[String]
-        //+ (relativeLength) * (commonWordsOnly(split) + (commonWordsOnly(-1)).apply (split))
-//        + relativeLength[String]
-//        + distance[String](begin, split) * distance[String](split,end)
-        + spanShape
-        + length
-        //+ sent
-        // to add to colenpar:
+
+      var featurizer: SurfaceFeaturizer[String] = baseCat(begin) + baseCat(end-1)
+      if (useBeforeAfter) {
+        featurizer += baseCat(begin-1)
+        featurizer += baseCat(end)
+      }
+
+      if(useSplits) {
+        featurizer += leftOfSplit
+        featurizer += baseCat(split)
+      }
+      
+      if(useSpanLength) {
+        featurizer += length
+      }
+
+      if(useShape) {
+        featurizer += spanShape
+      }
+
+      if(useBinaryLengths) {
+        featurizer += distance(begin, split)
+        featurizer += distance(split, end)
+      }
+      
         //
         // don't seem to help?!?
 //        + baseCat(begin-1) * baseCat(end) // word edges, huang
@@ -515,7 +524,8 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
         // baseCat(-1 to 0) apply end
         // span shape feature: remove middle if it's long!
         // feature for constituents: is sym synthetic
-        )
+
+      featurizer
     }
     val indexedWord = IndexedWordFeaturizer.fromData(wf, annTrees.map{_.words})
     val surface = IndexedSplitSpanFeaturizer.fromData(span, annTrees)
