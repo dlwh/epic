@@ -135,6 +135,8 @@ final case class ChartMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
    */
   def visitPostorder(spanVisitor: AnchoredVisitor[L], spanThreshold: Double = Double.NegativeInfinity) {
     if(logPartition.isInfinite) throw new RuntimeException("No parse for " + words)
+    if(logPartition.isNaN) throw new RuntimeException("NaN prob!")
+
     val itop = inside.top
 
     val grammar = this.grammar
@@ -156,7 +158,7 @@ final case class ChartMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
           visitedSomething = true
         }
       }
-      assert(visitedSomething, lexLoc.allowedTags(i).toIndexedSeq)
+      assert(visitedSomething, lexLoc.allowedTags(i).toIndexedSeq + " " + logPartition + " " + anchoring.words)
     }
 
     // cache to hold core scores for binary rules
@@ -307,7 +309,7 @@ object ChartMarginal {
 
   private object MaxSummer extends Summer {
     def apply(a: Double, b: Double): Double = math.max(a,b)
-    def apply(a: Array[Double], b: Int): Double = numerics.max(a,b)
+    def apply(a: Array[Double], b: Int): Double = if(b == 0) Double.NegativeInfinity else numerics.max(a,b)
   }
 
   private def rootScore[L, W](anchoring: AugmentedAnchoring[L, W], inside: ParseChart[L], sum: Summer): Double = {
@@ -322,6 +324,7 @@ object ChartMarginal {
       }
     }
     val score = sum(rootScores, offset)
+//    assert(score != 0.0, rootScores.mkString(", ") + anchoring.words)
     assert(!score.isNaN, rootScores.mkString(", "))
     score
   }
@@ -486,11 +489,13 @@ object ChartMarginal {
           while(ai < numValidLabelRefs) {
             // done updating vector, do an enter:
             if(offsets(ai) > 0) {
-              inside.bot.enter(begin, end, a, ai, sum(scoreArray(ai), offsets(ai)))
+              val score = sum(scoreArray(ai), offsets(ai))
+              inside.bot.enter(begin, end, a, ai, score)
               foundSomething = true
             }
             ai += 1
           }
+//          assert(rootScore(anchoring, inside, sum) != 0.0, (begin, end, a))
 //          if(!foundSomething && anchoring.core.sparsityPattern != ChartConstraints.noSparsity) {
 //            logger.warn(s"Failed to replicate a span in ($begin, $end) of ${anchoring.words}. Label is ${anchoring.grammar.labelIndex.get(a)}")
 //

@@ -33,14 +33,13 @@ import epic.util._
 import com.typesafe.scalalogging.slf4j.Logging
 import epic.parser.features._
 import epic.trees._
+import epic.parser.projections.GrammarRefinements
 
-class LexModel[L, W](bundle: LexGrammarBundle[L, W],
-                     reannotate: (BinarizedTree[L], IndexedSeq[W])=>BinarizedTree[L],
-                     indexed: IndexedLexFeaturizer[L, W],
-                     baseFactory: CoreGrammar[L, W],
-                     coarse: BaseGrammar[L],
-                     coarseLex: Lexicon[L, W],
-                     initFeatureValue: Feature=>Option[Double]) extends ParserModel[L, W] with Serializable with ParserExtractable[L, W] {
+class LexModel[L, L2, W](bundle: LexGrammarBundle[L, L2, W],
+                         reannotate: (BinarizedTree[L], IndexedSeq[W])=>BinarizedTree[L2],
+                         indexed: IndexedLexFeaturizer[L, L2, W],
+                         baseFactory: CoreGrammar[L, W],
+                         initFeatureValue: Feature=>Option[Double]) extends ParserModel[L, W] with Serializable with ParserExtractable[L, W] {
 
 
   def accumulateCounts(d: TreeInstance[L, W], m: Marginal, accum: ExpectedCounts, scale: Double): Unit = {
@@ -58,29 +57,18 @@ class LexModel[L, W](bundle: LexGrammarBundle[L, W],
     val gram = bundle.makeGrammar(indexed, weights)
     def ann(tree: BinarizedTree[L], words: IndexedSeq[W]):BinarizedTree[(L, Int)] = {
       val reannotated = reannotate(tree, words)
-      val headed = bundle.headFinder.annotateHeadIndices(reannotated)
-      headed
+      val headed = bundle.headFinder.projected(indexed.refinements.labels.project(_:L2)).annotateHeadIndices(reannotated)
+      headed.map { case (l2, head) =>
+        indexed.refinements.labels.project(l2) -> indexed.joinTagRef(head, indexed.refinements.labels.localize(l2), words.length)
+      }
 
     }
     new AnnotatedParserInference(indexed, ann _, gram, baseFactory)
   }
 
   type Inference = AnnotatedParserInference[L, W]
-
 }
 
-trait LexFeaturizer[L] extends Serializable {
-
-  def featureIndex: Index[Feature]
-
-  // all features for this attachment not captured by the above.
-  def featuresForAttach(r: Int, head: Int, dep: Int): Array[Int]
-
-
-  def featuresForTag(tag: Int): Array[Int]
-
-  def featuresForRule(r: Int): Array[Int]
-}
 
 
 
@@ -88,16 +76,15 @@ trait LexFeaturizer[L] extends Serializable {
  * Indexes and caches features for more efficient access.
  * Two kinds of features: features we observed in a gold tree (true Features), and features
  * we haven't. The latter are binned by hashcode into the higher-end of the feature index
- * @param f base featureizer
+ * @param ruleFeaturizer base featurizer
  * @tparam L Label
  * @tparam W Word
  */
-class IndexedLexFeaturizer[L, W](f: LexFeaturizer[L],
+class IndexedLexFeaturizer[L, L2, W](ruleFeaturizer: RefinedFeaturizer[L, W, Feature],
                                  wordFeaturizer: IndexedWordFeaturizer[W],
                                  unaryFeaturizer: IndexedWordFeaturizer[W],
                                  bilexFeaturizer: IndexedBilexicalFeaturizer[W],
-                                 labelIndex: Index[L],
-                                 ruleIndex: Index[Rule[L]],
+                                 val refinements: GrammarRefinements[L, L2],
                                  wordFeatureIndex: CrossProductIndex[Feature, Feature],
                                  unaryFeatureIndex: CrossProductIndex[Feature, Feature],
                                  bilexFeatureIndex: CrossProductIndex[Feature, Feature]) extends RefinedFeaturizer[L, W, Feature] with Serializable {
@@ -107,12 +94,16 @@ class IndexedLexFeaturizer[L, W](f: LexFeaturizer[L],
   private val bilexOffset = index.componentOffset(1)
   private val unaryOffset = index.componentOffset(2)
 
+
+  def joinTagRef(head: Int, ref: Int, length: Int) : Int = {
+    head + ref * length
+  }
+
+
   def anchor(datum: IndexedSeq[W]):Spec = new Spec(datum)
 
   class Spec(val words: IndexedSeq[W]) extends Anchoring {
-
-
-    private val fspec = f
+    private val fspec = ruleFeaturizer.anchor(words)
     private val bilexSpec = bilexFeaturizer.anchor(words)
     private val wordSpec = wordFeaturizer.anchor(words)
     private val unarySpec = unaryFeaturizer.anchor(words)
@@ -120,48 +111,63 @@ class IndexedLexFeaturizer[L, W](f: LexFeaturizer[L],
     def length = words.length
 
     def featuresForUnaryRule(begin: Int, end: Int, rule: Int, ref: Int) = {
-      val w = ref
-      val r = rule
-      var rcache = headCache(w)
+      val head = unaryHeadIndex(ref)
+      if(head < begin || head >= end) throw new RuntimeException(s"Head $head not in bounds for rule $rule in span [$begin, $end)}")
+      val ruleRef = unaryRuleRefinement(ref)
+      val globalizedRule = refinements.rules.globalize(rule, ruleRef)
+      var rcache = headCache(head)
       if(rcache eq null) {
-        rcache = new OpenAddressHashArray[Array[Int]](ruleIndex.size)
-        headCache(w) = rcache
+        rcache = new OpenAddressHashArray[Array[Int]](refinements.rules.fineIndex.size)
+        headCache(head) = rcache
       }
-      var cache = rcache(r)
+      var cache = rcache(globalizedRule)
       if(cache == null)  {
-        val surfFeatures = unarySpec.featuresForWord(w)
-        cache = unaryFeatureIndex.crossProduct(fspec.featuresForRule(rule), surfFeatures, unaryOffset)
-        rcache(r) = cache
+        val surfFeatures = unarySpec.featuresForWord(head)
+        val rFeatures = fspec.featuresForUnaryRule(begin, end, rule, ruleRef)
+        cache = unaryFeatureIndex.crossProduct(rFeatures, surfFeatures, unaryOffset)
+        rcache(globalizedRule) = cache
       }
       cache
     }
 
     def featuresForSpan(begin: Int, end: Int, tag: Int, ref: Int) = {
-      if(begin +1 == end)
-        featuresForTag(tag, ref)
-      else
-        emptyArray
-    }
-
-    private val emptyArray = Array.empty[Int]
-
-    def featuresForTag(tag: Int, head: Int): Array[Int] = {
+      val localTagRef = tagRefinement(ref)
+      val refinedTag = refinements.labels.globalize(tag, localTagRef)
+      val head = headTagIndex(ref)
+      if(head < begin || head >= end) throw new RuntimeException(s"Head $head not in bounds for tag $tag in span [$begin, $end)}")
       var rcache = wordCache(head)
       if(rcache eq null) {
-        rcache = new OpenAddressHashArray[Array[Int]](labelIndex.size, null:Array[Int], 2)
+        rcache = new OpenAddressHashArray[Array[Int]](refinements.labels.fineIndex.size, null:Array[Int], 2)
         wordCache(head) = rcache
       }
-      var cache = rcache(tag)
+      var cache = rcache(refinedTag)
       if(cache == null) {
-        cache = wordFeatureIndex.crossProduct(fspec.featuresForTag(tag), wordSpec.featuresForWord(head), offset = wordOffset, usePlainLabelFeatures = false)
-        rcache(tag) = cache
+        cache = wordFeatureIndex.crossProduct(fspec.featuresForSpan(begin, end, tag, localTagRef),
+          wordSpec.featuresForWord(head), offset = wordOffset, usePlainLabelFeatures = false)
+        rcache(refinedTag) = cache
       }
       cache
     }
 
 
+    def featuresForBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int) =  {
+      val head = headIndex(ref)
+      val dep = depIndex(ref)
+      val r = binaryRuleRefinement(ref)
+
+      var bilexFeatures: Array[Int] = bilexCache(head)(dep)
+      if(bilexFeatures eq null) {
+        bilexFeatures = bilexSpec.featuresForAttachment(head, dep)
+        bilexCache(head)(dep) = bilexFeatures
+      }
+
+      val fi = fspec.featuresForBinaryRule(begin, split, end, rule, r)
+      bilexFeatureIndex.crossProduct(fi, bilexFeatures, offset = bilexOffset, usePlainLabelFeatures = true)
+    }
+
+
     def headIndex(ruleRef: Int) = {
-      ruleRef / words.length
+      (ruleRef / words.length) % words.length
     }
 
     def depIndex(ruleRef: Int) = {
@@ -169,97 +175,44 @@ class IndexedLexFeaturizer[L, W](f: LexFeaturizer[L],
     }
 
     def unaryHeadIndex(ref: Int) = {
-      ref
+      ref % words.length
     }
 
-
-    def featuresForBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int) =  {
-      val head = headIndex(ref)
-      val dep = depIndex(ref)
-
-      //      var rcache = binaryCache(head)
-      //      if(rcache eq null) {
-      //        rcache = new OpenAddressHashArray[Array[Int]](ruleIndex.size * words.size)
-      //        binaryCache(head) = rcache
-      //      }
-      //      val i = rule * words.size + dep
-      //      var cache = rcache(i)
-      //      if(cache == null)  {
-//      val ruleHead = indsxedFeaturesForRuleHead(rule, head)
-//      val ruleDep = indexedFeaturesForRuleDep(rule, dep)
-      var spanFeatures: Array[Int] = bilexCache(head)(dep)
-      if(spanFeatures eq null) {
-        spanFeatures = bilexSpec.featuresForAttachment(head, dep)
-        bilexCache(head)(dep) = spanFeatures
-      }
-
-      val fi = fspec.featuresForAttach(rule, head, dep)
-      val attach: Array[Int] = bilexFeatureIndex.crossProduct(fi, spanFeatures, offset = bilexOffset, usePlainLabelFeatures = true)
-
-      //        cache = Arrays.concatenate(ruleHead, ruleDep, bilex, justRule)
-//      Arrays.concatenate(ruleHead, ruleDep, bilex, attach)
-      attach
-      //        rcache(i) = cache
-      //      }
-//      cache
+    def headTagIndex(ref: Int) = {
+      ref % words.length
     }
+
+    def binaryRuleRefinement(ref: Int) = {
+      ref /(words.length * words.length)
+    }
+
+    def unaryRuleRefinement(ref: Int) = {
+      ref / words.length
+    }
+
+    def tagRefinement(ref: Int) = {
+      ref / words.length
+    }
+
+    def joinTagRef(head: Int, ref: Int) : Int = IndexedLexFeaturizer.this.joinTagRef(head, ref, words.length)
 
     // caches:
 
     // words
+    // headIndex -> depIndex -> Array[Int]
     val bilexCache = Array.ofDim[Array[Int]](words.length, words.length)
     // headIndex -> (ruleIndex) -> Array[Int]
     val headCache = new Array[OpenAddressHashArray[Array[Int]]](words.length)
-    // depIndex -> (ruleIndex) -> Array[Int]
-    val depCache = new Array[OpenAddressHashArray[Array[Int]]](words.length)
     // headIndex -> (depIndex x ruleIndex) -> Array[Int]
-    // holds all features for attachment, uses other caches for faster computation
-    val binaryCache = new Array[OpenAddressHashArray[Array[Int]]](words.length)
-    // for tags. word -> tag -> Array[Int]
     val wordCache = new Array[OpenAddressHashArray[Array[Int]]](words.length)
   }
 
 }
 
-case class StandardLexFeaturizer[L](labelIndex: Index[L],
-                                 ruleIndex: Index[Rule[L]],
-                                 headDirection: Rule[L]=>Boolean,
-                                 ruleFeatGen: Rule[L]=>IndexedSeq[Feature]) extends LexFeaturizer[L] {
-
-  private val _featureIndex= Index[Feature]()
-  def featureIndex : Index[Feature] = _featureIndex
-
-  private val ruleCache = Encoder.fromIndex(ruleIndex).tabulateArray(r => ruleFeatGen(r).map(_featureIndex.index).toArray)
-  private val attachCache = Encoder.fromIndex(ruleIndex).tabulateArray{ r =>
-    if(r.children.size == 2) {
-      val headOnLeft = if(headDirection(r)) AttachLeft else AttachRight
-      Array(_featureIndex.index(LabelFeature(r.parent)), _featureIndex.index(headOnLeft)) ++ ruleCache(ruleIndex(r))
-    } else {
-      Array(_featureIndex.index(LabelFeature(r.parent))) ++ ruleCache(ruleIndex(r))
-    }
-  }
-  private val labelFeatures: Array[Array[Int]] = Encoder.fromIndex(labelIndex).tabulateArray(l => Array[Int](_featureIndex.index(LabelFeature(l))))
-
-  val attachLeft = Array(_featureIndex.index(AttachLeft))
-  val attachRight = Array(_featureIndex.index(AttachRight))
-
-
-    def featuresForAttach(r: Int, head: Int, dep: Int): Array[Int] = {
-      attachCache(r)
-    }
-
-
-    def featuresForTag(tag: Int) = {
-      labelFeatures(tag)
-    }
-
-  def featuresForRule(r: Int): Array[Int] = ruleCache(r)
-}
-
-final class LexGrammar[L, W](val grammar: BaseGrammar[L],
+final class LexGrammar[L, L2, W](val grammar: BaseGrammar[L],
                              val lexicon: Lexicon[L, W],
-                             wordIndex: Index[W],
-                             fi: IndexedLexFeaturizer[L, W],
+                             refinedGrammar: BaseGrammar[L2],
+                             featurizer: IndexedLexFeaturizer[L, L2, W],
                              weights: DenseVector[Double],
                              binaries: Array[Boolean],
                              leftRules: Array[Boolean],
@@ -270,6 +223,8 @@ final class LexGrammar[L, W](val grammar: BaseGrammar[L],
 
   def anchor(sent: IndexedSeq[W]) = new Spec(sent)
 
+  def refinements = featurizer.refinements
+
   // refinement scheme:
   // binaryRule is (head * words.length + dep)
   // unaryRule is (head)
@@ -279,8 +234,7 @@ final class LexGrammar[L, W](val grammar: BaseGrammar[L],
 
     val grammar = LexGrammar.this.grammar
     val lexicon = LexGrammar.this.lexicon
-    val indexed = words.map(wordIndex)
-    private val f = fi.anchor(words)
+    private val f = featurizer.anchor(words)
 
     private def dot(features: Array[Int]) = {
       var i = 0
@@ -293,137 +247,164 @@ final class LexGrammar[L, W](val grammar: BaseGrammar[L],
     }
 
     def scoreSpan(begin: Int, end: Int, label: Int, ref: Int) = {
-      if(ref < begin || ref >= end) throw new Exception("Label refinement for lex parser (i.e. head word) must be in [begin,end)!")
-      else dot(f.featuresForSpan(begin, end, label, ref))
+      dot(f.featuresForSpan(begin, end, label, ref))
     }
 
-//    val bCache = new OpenAddressHashArray[Double](words.size * words.size * index.size, Double.NaN)
-    val bCache = Array.fill(words.size)(new OpenAddressHashArray[Double](words.size * index.size, Double.NaN))
-    val uCache = new OpenAddressHashArray[Double](words.size * index.size, Double.NaN)
-
     def scoreUnaryRule(begin: Int, end: Int, rule: Int, ref: Int) = {
-      val cacheIndex = ref + words.size * rule
-      val score = uCache(cacheIndex)
-
-      if (!score.isNaN)
-        score
-      else {
-        val score = dot(f.featuresForUnaryRule(begin, end, rule, ref))
-        uCache(cacheIndex) = score
-        score
-      }
+      dot(f.featuresForUnaryRule(begin, end, rule, ref))
     }
 
 
     def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int) = {
-      val head = headIndex(ref)
-      val dep = depIndex(ref)
-      val cacheIndex = head + words.size * rule
-      val score = bCache(dep)(cacheIndex)
-
-      if (!score.isNaN)
-        score
-      else {
-        val score = dot(f.featuresForBinaryRule(begin, split, end, rule, ref))
-        bCache(dep)(cacheIndex) = score
-        score
-      }
+      dot(f.featuresForBinaryRule(begin, split, end, rule, ref))
     }
 
     def headIndex(ruleRef: Int) = f.headIndex(ruleRef)
     def depIndex(ruleRef: Int) = f.depIndex(ruleRef)
+    def unaryHeadIndex(ref: Int) = f.unaryHeadIndex(ref)
+    def binaryRuleRef(ref: Int) = f.binaryRuleRefinement(ref)
+    def unaryRuleRef(ref: Int) = f.unaryRuleRefinement(ref)
+    def tagRef(ref: Int) = f.tagRefinement(ref)
+    def joinTagRef(head: Int, ref: Int) = f.joinTagRef(head, ref)
 
-    def unaryHeadIndex(ref: Int) = {
-      ref
+
+    def joinBinaryRuleRef(head: Int, ref: Int) : Int = {
+      head + ref * words.length * words.length
     }
 
-    def validLabelRefinements(begin: Int, end: Int, label: Int) = Array.range(begin,end)
 
-    def numValidRefinements(label: Int) = words.length
+    def joinUnaryRuleRef(head: Int, ref: Int) : Int = {
+      head + ref * words.length
+    }
 
-    def numValidRuleRefinements(rule: Int) = words.length * words.length
+    def joinUnaryRuleRefs(lexRefs: Array[Int], ruleRefs: Array[Int]) = {
+      epic.util.Arrays.crossProduct(lexRefs, ruleRefs)(_ + _ * words.length)
+    }
+
+    def joinBinaryRuleRefs(lexRefs: Array[Int], ruleRefs: Array[Int]) = {
+      epic.util.Arrays.crossProduct(lexRefs, ruleRefs)(_ + _ * words.length * words.length)
+    }
+
+    def joinTagRefs(lexRefs: Array[Int], ruleRefs: Array[Int]) = {
+      epic.util.Arrays.crossProduct(lexRefs, ruleRefs)(_ + _ * words.length)
+    }
+
+
+    def validLabelRefinements(begin: Int, end: Int, label: Int) = joinTagRefs(Array.range(begin,end), refinements.labels.localRefinements(label))
+
+    def numValidRefinements(label: Int) = joinTagRef(words.length, refinements.labels.numRefinements(label))
+
+    def numValidRuleRefinements(rule: Int): Int = {
+      if(binaries(rule)) {
+        joinBinaryRuleRef(words.length * words.length, refinements.rules.numRefinements(rule))
+      } else {
+        joinUnaryRuleRef(words.length, refinements.rules.numRefinements(rule))
+      }
+    }
 
     def validRuleRefinementsGivenParent(begin: Int, end: Int, rule: Int, parentRef: Int) = {
       if(!binaries(rule)) {
-        Array(parentRef:Int)
-      } else if(isHeadOnLeftForRule(rule)) {
-//        val x = Array.range(0,numValidRuleRefinements(rule)).filter(x => leftChildRefinement(rule,x) == parentRef && rightChildRefinement(rule, x) > parentRef && rightChildRefinement(rule, x) < end)
-        val result = new Array[Int](end - (parentRef+1))
-        var ref = parentRef * words.length + parentRef + 1
-        var i = 0
-        while(i < result.length) {
-          result(i) = ref
-          ref += 1
-          i += 1
-        }
-        result
+        val lexicalizedRefinements = Array(unaryHeadIndex(parentRef))
+        val ruleRefs = refinements.ruleRefinementsCompatibleWithParentRef(rule, tagRef(parentRef))
+        joinUnaryRuleRefs(lexicalizedRefinements, ruleRefs)
       } else {
-//        val x = Array.range(0,numValidRuleRefinements(rule)).filter(x => rightChildRefinement(rule,x) == parentRef && leftChildRefinement(rule, x) < parentRef && leftChildRefinement(rule, x) >= begin)
-        val result = new Array[Int](parentRef - begin)
-        var ref = parentRef * words.length + begin
-        var i = 0
-        while(i < result.length) {
-          result(i) = ref
-          i += 1
-          ref += 1
+       val lexicalizedRefinements = if(isHeadOnLeftForRule(rule)) {
+         val head = unaryHeadIndex(parentRef)
+          //        val x = Array.range(0,numValidRuleRefinements(rule)).filter(x => leftChildRefinement(rule,x) == parentRef && rightChildRefinement(rule, x) > parentRef && rightChildRefinement(rule, x) < end)
+          val result = new Array[Int](end - (head+1))
+          var ref = head * words.length + head + 1
+          var i = 0
+          while(i < result.length) {
+            result(i) = ref
+            ref += 1
+            i += 1
+          }
+          result
+        } else {
+         val head = unaryHeadIndex(parentRef)
+          //        val x = Array.range(0,numValidRuleRefinements(rule)).filter(x => rightChildRefinement(rule,x) == parentRef && leftChildRefinement(rule, x) < parentRef && leftChildRefinement(rule, x) >= begin)
+          val result = new Array[Int](head - begin)
+          var ref = head * words.length + begin
+          var i = 0
+          while(i < result.length) {
+            result(i) = ref
+            i += 1
+            ref += 1
+          }
+          //        assert(x.toSet == result.toSet)
+          result
         }
-//        assert(x.toSet == result.toSet)
-        result
+         val ruleRefs = refinements.ruleRefinementsCompatibleWithParentRef(rule, tagRef(parentRef))
+
+        joinBinaryRuleRefs(lexicalizedRefinements, ruleRefs)
       }
+
     }
 
 
     override def validRuleRefinementsGivenParent(begin: Int, splitBegin: Int, splitEnd: Int, end: Int, rule: Int, parentRef: Int): Array[Int] = {
       if(!binaries(rule)) {
-        Array(parentRef:Int)
-      } else if(isHeadOnLeftForRule(rule)) {
-        // if the head is on the left, then the dependent
-        // can be in Span(math.max(splitBegin, parentRef+1), end).
-        // Further, if the parentRef is <= splitEnd, then
-        // we can't even build this rule with this parent.
-        // [begin....splitBegin....splitEnd...end)
-        //  ^------parentRef------^
-        // max:      ^------^----dep---------^
-        //
-        if(splitEnd <= parentRef) return Array.empty
-        val firstPossibleStart = math.max(parentRef +1, splitBegin)
-        val result = new Array[Int](end - firstPossibleStart)
-        var ref = parentRef * words.length + firstPossibleStart
-        var i = 0
-        while(i < result.length) {
-          result(i) = ref
-          ref += 1
-          i += 1
-        }
-        result
+        val lexicalizedRefinements = Array(parentRef:Int)
+        val ruleRefs = refinements.ruleRefinementsCompatibleWithParentRef(rule, tagRef(parentRef))
+        joinUnaryRuleRefs(lexicalizedRefinements, ruleRefs)
       } else {
-        // if the head is on the right, then the dependent
-        // can be in (begin until math.min(splitEnd,parentRef))
-        // Further, if the parentRef is <= splitBegin, then
-        // we can't even build this rule with this parent.
-        // [begin....splitBegin....splitEnd...end)
-        //           ^--------parentRef------^
-        //  ^-----------dep---^-----^ : min
-        //
-        if(splitBegin >= parentRef) return Array.empty
-        val lastPossibleEnd = math.min(parentRef, splitEnd)
-        val result = new Array[Int](lastPossibleEnd - begin)
-        var ref = parentRef * words.length + begin
-        var i = 0
-        while(i < result.length) {
-          result(i) = ref
-          i += 1
-          ref += 1
+        val headIndex = unaryHeadIndex(parentRef)
+        val lexicalizedRefinements = if(isHeadOnLeftForRule(rule)) {
+          // if the head is on the left, then the dependent
+          // can be in Span(math.max(splitBegin, ref1+1), end).
+          // Further, if the ref1 is <= splitEnd, then
+          // we can't even build this rule with this parent.
+          // [begin....splitBegin....splitEnd...end)
+          //  ^------ref1------^
+          // max:      ^------^----dep---------^
+          //
+          if(splitEnd <= headIndex) return Array.empty
+          val firstPossibleStart = math.max(headIndex +1, splitBegin)
+          val result = new Array[Int](end - firstPossibleStart)
+          var ref = headIndex * words.length + firstPossibleStart
+          var i = 0
+          while(i < result.length) {
+            result(i) = ref
+            ref += 1
+            i += 1
+          }
+          result
+        } else {
+          // if the head is on the right, then the dependent
+          // can be in (begin until math.min(splitEnd,ref1))
+          // Further, if the ref1 is <= splitBegin, then
+          // we can't even build this rule with this parent.
+          // [begin....splitBegin....splitEnd...end)
+          //           ^--------ref1------^
+          //  ^-----------dep---^-----^ : min
+          //
+          if(splitBegin >= headIndex) return Array.empty
+          val lastPossibleEnd = math.min(headIndex, splitEnd)
+          val result = new Array[Int](lastPossibleEnd - begin)
+          var ref = headIndex * words.length + begin
+          var i = 0
+          while(i < result.length) {
+            result(i) = ref
+            i += 1
+            ref += 1
+          }
+          result
         }
-        result
+
+        if(lexicalizedRefinements.isEmpty) {
+          lexicalizedRefinements
+        } else {
+          val ruleRefs = refinements.ruleRefinementsCompatibleWithParentRef(rule, tagRef(parentRef))
+          joinBinaryRuleRefs(lexicalizedRefinements, ruleRefs)
+        }
       }
 
     }
 
-    def validRuleRefinementsGivenLeftChild(begin: Int, split: Int, completionBegin:Int, completionEnd: Int, rule: Int, lc: Int) = {
-//      val x = Array.range(0,numValidRuleRefinements(rule)).filter(x => leftChildRefinement(rule,x) == lc && rightChildRefinement(rule, x) >= split && rightChildRefinement(rule, x) < completionEnd)
-      if(isHeadOnLeftForRule(rule)) {
+    def validRuleRefinementsGivenLeftChild(begin: Int, split: Int, completionBegin:Int, completionEnd: Int, rule: Int, lcRef: Int) = {
+      val lexicalizedRefinements = if(isHeadOnLeftForRule(rule)) {
         val result = new Array[Int](completionEnd - split)
+        val lc = unaryHeadIndex(lcRef)
         var ref = lc * words.length + split
         var i = 0
         while(i < result.length) {
@@ -431,114 +412,193 @@ final class LexGrammar[L, W](val grammar: BaseGrammar[L],
           ref += 1
           i += 1
         }
-//        assert(result.toSet == x.toSet)
         result
       } else {
+        val lc = unaryHeadIndex(lcRef)
         val result = new Array[Int](completionEnd - split)
-        var ref = split * words.length +lc
+        var ref = split * words.length + lc
         var i = 0
         while(i < result.length) {
           result(i) = ref
           i += 1
           ref += words.length
         }
-//        assert(result.toSet == x.toSet)
         result
       }
+      val ruleRefs = refinements.ruleRefinementsCompatibleWithLeftRef(rule, tagRef(lcRef))
+      joinBinaryRuleRefs(lexicalizedRefinements, ruleRefs)
     }
 
 
-    def validRuleRefinementsGivenRightChild(completionBegin: Int, completionEnd: Int, split: Int, end: Int, rule: Int, childRef: Int): Array[Int] = {
-//      val x = Array.range(0,numValidRuleRefinements(rule)).filter(x => rightChildRefinement(rule,x) == childRef && leftChildRefinement(rule, x) >= completionBegin && leftChildRefinement(rule, x) < split)
-      if(!isHeadOnLeftForRule(rule)) {
+    def validRuleRefinementsGivenRightChild(completionBegin: Int, completionEnd: Int, split: Int, end: Int, rule: Int, rcRef: Int): Array[Int] = {
+      val rc = unaryHeadIndex(rcRef)
+      val lexicalizedRefinements = if(!isHeadOnLeftForRule(rule)) {
         val result = new Array[Int](split - completionBegin)
-        var ref = childRef * words.length + completionBegin
+        var ref = rc * words.length + completionBegin
         var i = 0
         while(i < result.length) {
           result(i) = ref
           ref += 1
           i += 1
         }
-//        assert(result.toSet == x.toSet)
         result
       } else {
         val result = new Array[Int](split - completionBegin)
-        var ref = completionBegin * words.length + childRef
+        var ref = completionBegin * words.length + rc
         var i = 0
         while(i < result.length) {
           result(i) = ref
           i += 1
           ref += words.length
         }
-//        assert(result.toSet == x.toSet)
         result
       }
+      val ruleRefs = refinements.ruleRefinementsCompatibleWithRightRef(rule, tagRef(rcRef))
+      joinBinaryRuleRefs(lexicalizedRefinements, ruleRefs)
     }
 
     def validUnaryRuleRefinementsGivenChild(begin: Int, end: Int, rule: Int, childRef: Int) = {
-      Array(childRef)
+      val lexicalizedRefinements = Array(unaryHeadIndex(childRef))
+      val ruleRefs = refinements.ruleRefinementsCompatibleWithChildRef(rule, tagRef(childRef))
+      joinUnaryRuleRefs(lexicalizedRefinements, ruleRefs)
     }
 
 
     def leftChildRefinement(rule: Int, ruleRef: Int) = {
-      if(isHeadOnLeftForRule(rule)) headIndex(ruleRef)
-      else depIndex(ruleRef)
+      val word = if(isHeadOnLeftForRule(rule)) {
+        headIndex(ruleRef)
+      }  else {
+        depIndex(ruleRef)
+      }
+
+      val refinedRuleId = refinements.rules.globalize(rule, binaryRuleRef(ruleRef))
+      val tagref = refinements.labels.localize(refinedGrammar.leftChild(refinedRuleId))
+
+      joinTagRef(word, tagref)
     }
 
     def rightChildRefinement(rule: Int, ruleRef: Int) = {
-      if(isHeadOnRightForRule(rule)) headIndex(ruleRef)
-      else depIndex(ruleRef)
+      val word = if(isHeadOnRightForRule(rule)) {
+        headIndex(ruleRef)
+      } else {
+        depIndex(ruleRef)
+      }
+
+      val refinedRuleId = refinements.rules.globalize(rule, binaryRuleRef(ruleRef))
+      val tagref = refinements.labels.localize(refinedGrammar.rightChild(refinedRuleId))
+      joinTagRef(word, tagref)
     }
 
     def parentRefinement(rule: Int, ruleRef: Int) = {
-      if(binaries(rule)) headIndex(ruleRef)
-      else ruleRef
+      val word = if(binaries(rule)) {
+        headIndex(ruleRef)
+      } else {
+        unaryHeadIndex(ruleRef)
+      }
+
+      val rr = if(binaries(rule)) {
+        binaryRuleRef(ruleRef)
+      } else {
+        unaryRuleRef(ruleRef)
+      }
+
+      val refinedRuleId = refinements.rules.globalize(rule, rr)
+      val tagref = refinements.labels.localize(refinedGrammar.parent(refinedRuleId))
+      joinTagRef(word, tagref)
     }
 
     def childRefinement(rule: Int, ruleRef: Int) = {
-      ruleRef
+      val word = unaryHeadIndex(ruleRef)
+
+      val refinedRuleId = refinements.rules.globalize(rule, unaryRuleRef(ruleRef))
+      val tagref = refinements.labels.localize(refinedGrammar.child(refinedRuleId))
+      joinTagRef(word, tagref)
     }
 
     def ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int) = {
-      require(refA == refB, s"Parent head for rule ${grammar.index.get(r)} was '${words(refA)}' and child head was '${words(refB)}', but should be the same!" + words)
-      refA
+      val labelA = tagRef(refA)
+      val labelB = tagRef(refB)
+      val hA = unaryHeadIndex(refA)
+      val hB = unaryHeadIndex(refB)
+      require(hA == hB, s"Parent head for rule ${grammar.index.get(r)} was '${words(hA)}' and child head was '${words(hB)}', but should be the same!" + words)
+      val a = grammar.parent(r)
+      val b = grammar.child(r)
+      val a2 = refinements.labels.globalize(a, labelA)
+      val b2 = refinements.labels.globalize(b, labelB)
+      val rule = UnaryRule(refinements.labels.fineIndex.get(a2), refinements.labels.fineIndex.get(b2), grammar.chain(r))
+      val refinedRuleIndex = refinements.rules.fineIndex(rule)
+      val refR = if(refinedRuleIndex < 0) {
+        -1
+      } else {
+        refinements.rules.localize(refinedRuleIndex)
+      }
+
+      joinUnaryRuleRef(hA, refR)
     }
 
     def ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int, refC: Int) = {
-      val ret = if(isHeadOnLeftForRule(r)) {
-        require(refA == refB)
-        refA * words.length + refC
+      val hA = unaryHeadIndex(refA)
+      val hB = unaryHeadIndex(refB)
+      val hC = unaryHeadIndex(refC)
+
+      val lexRef = if(isHeadOnLeftForRule(r)) {
+        require(hA == hB)
+        hA * words.length + hC
       } else {
-        require(refA == refC)
-        refA * words.length + refB
+        require(hA == hC)
+        hA * words.length + hB
       }
-      assert(headIndex(ret) == refA)
-      ret
+
+      val labelA = tagRef(refA)
+      val labelB = tagRef(refB)
+      val labelC = tagRef(refC)
+
+      val a = grammar.parent(r)
+      val b = grammar.leftChild(r)
+      val c = grammar.rightChild(r)
+      val a2 = refinements.labels.globalize(a, labelA)
+      val b2 = refinements.labels.globalize(b, labelB)
+      val c2 = refinements.labels.globalize(c, labelC)
+      val refR = refinements.rules.localize(refinements.rules.fineIndex(BinaryRule(refinements.labels.fineIndex.get(a2),
+        refinements.labels.fineIndex.get(b2),
+        refinements.labels.fineIndex.get(c2)
+      ))  )
+
+      assert(headIndex(lexRef) == hA)
+      joinBinaryRuleRef(lexRef, refR)
     }
 
-    def validCoarseRulesGivenParentRefinement(a: Int, refA: Int) = grammar.indexedBinaryRulesWithParent(a)
+    def validCoarseRulesGivenParentRefinement(a: Int, refA: Int) = {
+      refinements.coarseRulesGivenParentRef(a, tagRef(refA))
+    }
 
     def validParentRefinementsGivenRule(begin: Int, splitBegin: Int, splitEnd: Int, end: Int, rule: Int): Array[Int] = {
-      if (isHeadOnLeftForRule(rule)) Array.range(begin, splitEnd)
-      else Array.range(splitBegin, end)
+      val lexRefs = {
+        if (isHeadOnLeftForRule(rule)) Array.range(begin, splitEnd)
+        else Array.range(splitBegin, end)
+      }
+
+      joinTagRefs(lexRefs, refinements.parentRefinementsCompatibleWithRule(rule))
     }
 
 
     def validLeftChildRefinementsGivenRule(begin: Int, splitBegin: Int, splitEnd: Int, end: Int, rule: Int): Array[Int] = {
-      Array.range(begin, splitEnd)
+      val lexRefs = Array.range(begin, splitEnd)
+      joinTagRefs(lexRefs, refinements.leftChildRefinementsCompatibleWithRule(rule))
     }
 
     def validRightChildRefinementsGivenRule(begin: Int, splitBegin: Int, splitEnd: Int, end: Int, rule: Int): Array[Int] = {
-      Array.range(splitBegin, end)
+      val lexRefs = Array.range(splitBegin, end)
+      joinTagRefs(lexRefs, refinements.rightChildRefinementsCompatibleWithRule(rule))
     }
   }
 
 }
 
-case class LexGrammarBundle[L, W](baseGrammar: BaseGrammar[L],
+case class LexGrammarBundle[L, L2, W](baseGrammar: BaseGrammar[L],
                                   baseLexicon: Lexicon[L, W],
-                                  headFinder: HeadFinder[L],
-                                  wordIndex: Index[W]) { bundle =>
+                                  refinedGrammar: BaseGrammar[L2],
+                                  headFinder: HeadFinder[L]) { bundle =>
   val bg = baseGrammar
   val leftRules = new Array[Boolean](bg.index.size)
   val rightRules = new Array[Boolean](bg.index.size)
@@ -554,21 +614,21 @@ case class LexGrammarBundle[L, W](baseGrammar: BaseGrammar[L],
     }
   }
 
-  def makeGrammar(fi: IndexedLexFeaturizer[L, W], weights: DenseVector[Double]): LexGrammar[L, W] = {
-    new LexGrammar(baseGrammar, baseLexicon, wordIndex, fi, weights, binaries, leftRules, rightRules)
+  def makeGrammar(fi: IndexedLexFeaturizer[L, L2, W], weights: DenseVector[Double]): LexGrammar[L, L2, W] = {
+    new LexGrammar(baseGrammar, baseLexicon, refinedGrammar, fi, weights, binaries, leftRules, rightRules)
   }
 }
 
 object IndexedLexFeaturizer extends Logging {
-  def extract[L, Datum, W](lexFeaturizer: LexFeaturizer[L],
+  def extract[L, L2, Datum, W](ruleFeaturizer: RefinedFeaturizer[L, W, Feature],
                            bilexFeaturizer: IndexedBilexicalFeaturizer[W],
                            unaryFeaturizer: IndexedWordFeaturizer[W],
                            wordFeaturizer: IndexedWordFeaturizer[W],
-                           headFinder: HeadFinder[L],
-                           ruleIndex: Index[Rule[L]],
-                           labelIndex: Index[L],
+                           headFinder: HeadFinder[L2],
+                           ann: (BinarizedTree[L], IndexedSeq[W]) => BinarizedTree[L2],
+                           refinements: GrammarRefinements[L, L2],
                            dummyFeatScale: HashFeature.Scale = HashFeature.Absolute(0),
-                           trees: Traversable[Datum])(implicit hasWords: Has2[Datum, IndexedSeq[W]], hasTree: Has2[Datum, BinarizedTree[L]]) : IndexedLexFeaturizer[L, W] = {
+                           trees: Traversable[Datum])(implicit hasWords: Has2[Datum, IndexedSeq[W]], hasTree: Has2[Datum, BinarizedTree[L]]) : IndexedLexFeaturizer[L, L2, W] = {
 
     val bilexFeatureIndex = bilexFeaturizer.featureIndex
     val wordFeatureIndex = wordFeaturizer.featureIndex
@@ -576,39 +636,40 @@ object IndexedLexFeaturizer extends Logging {
 
     val progress = new ProgressLog(logger, trees.size, name="LexFeatures")
 
-    val lexFeatureIndex = lexFeaturizer.featureIndex
-    val bilexBuilder = new CrossProductIndex.Builder(lexFeatureIndex, bilexFeatureIndex, dummyFeatScale, "Bilex", includeLabelOnlyFeatures = true)
-    val wordBuilder = new CrossProductIndex.Builder(lexFeatureIndex, wordFeatureIndex, dummyFeatScale, "Monolex", includeLabelOnlyFeatures = false)
-    val unaryBuilder = new CrossProductIndex.Builder(lexFeatureIndex, unaryFeatureIndex, dummyFeatScale, "Unary", includeLabelOnlyFeatures = true)
+    val ruleFeatureIndex = ruleFeaturizer.index
+    val bilexBuilder = new CrossProductIndex.Builder(ruleFeatureIndex, bilexFeatureIndex, dummyFeatScale, "Bilex", includeLabelOnlyFeatures = true)
+    val wordBuilder = new CrossProductIndex.Builder(ruleFeatureIndex, wordFeatureIndex, dummyFeatScale, "Monolex", includeLabelOnlyFeatures = false)
+    val unaryBuilder = new CrossProductIndex.Builder(ruleFeatureIndex, unaryFeatureIndex, dummyFeatScale, "Unary", includeLabelOnlyFeatures = true)
     for(ti <- trees) {
-      val lexSpec = lexFeaturizer
+      val ruleSpec = ruleFeaturizer.anchor(hasWords.get(ti))
       val bilexSpec = bilexFeaturizer.anchor(hasWords.get(ti))
       val wordSpec = wordFeaturizer.anchor(hasWords.get(ti))
       val unarySpec = unaryFeaturizer.anchor(hasWords.get(ti))
       val words = hasWords.get(ti)
-      val tree = hasTree.get(ti)
+      val tree = ann(hasTree.get(ti), words)
       // returns head
-      def rec(t: BinarizedTree[L]):Int= t match {
+      def rec(t: BinarizedTree[L2]):Int= t match {
         case NullaryTree(a, span) =>
-          val aI = labelIndex(a)
-          wordBuilder.add(lexSpec.featuresForTag(aI), wordSpec.featuresForWord(span.begin))
+          val (ai, aref) = refinements.labels.indexAndLocalize(a)
+          wordBuilder.add(ruleSpec.featuresForSpan(span.begin, span.end, ai, aref),
+                          wordSpec.featuresForWord(span.begin))
           span.begin
-        case UnaryTree(a, b, chain, _) =>
-          val h = rec(b)
-          val r = ruleIndex(UnaryRule(a, b.label, chain))
-          unaryBuilder.add(lexSpec.featuresForRule(r), unarySpec.featuresForWord(h))
-          h
-        case t@BinaryTree(a, bt@Tree(b, _, _), Tree(c, _, _), span) =>
-          val log = math.random < 1E-4
+        case UnaryTree(a, b, chain, span) =>
+          val head = rec(b)
+          val r = UnaryRule(a, b.label, chain)
+          val (ri, rref) = refinements.rules.indexAndLocalize(r)
+          unaryBuilder.add(ruleSpec.featuresForUnaryRule(span.begin, span.end, ri, rref),
+                           unarySpec.featuresForWord(head))
+          head
+        case t@BinaryTree(a, b, c, span) =>
           val (leftHead,rightHead) = (rec(t.leftChild), rec(t.rightChild))
           val headIsLeft = headFinder.findHeadChild(t) == 0
           val (head, dep) = if(headIsLeft) leftHead -> rightHead else rightHead -> leftHead
-          val r = ruleIndex(BinaryRule(a, b, c))
-          //wordBuilder.add(lexSpec.featuresForHead(r), wordSpec.featuresForWord(head))
-          //wordBuilder.add(lexSpec.featuresForDep(r), wordSpec.featuresForWord(dep))
+          val r = BinaryRule[L2](a, b.label, c.label)
+          val (ri, rref) = refinements.rules.indexAndLocalize(r)
           val bilexFeatures = bilexSpec.featuresForAttachment(head, dep)
-          assert(bilexFeatures.nonEmpty, BinaryRule(a,b,c) + " " + words(head) + " " + words(dep))
-          bilexBuilder.add(lexSpec.featuresForAttach(r, head, dep), bilexSpec.featuresForAttachment(head, dep))
+          val split = t.splitPoint
+          bilexBuilder.add(ruleSpec.featuresForBinaryRule(span.begin, split, span.end, ri, rref), bilexFeatures)
           head
       }
       rec(tree)
@@ -620,12 +681,11 @@ object IndexedLexFeaturizer extends Logging {
     assert(bfi.includePlainLabelFeatures)
     val ufi = unaryBuilder.result()
 
-    new IndexedLexFeaturizer(lexFeaturizer,
+    new IndexedLexFeaturizer(ruleFeaturizer,
       wordFeaturizer,
       unaryFeaturizer,
       bilexFeaturizer,
-      labelIndex,
-      ruleIndex,
+      refinements,
       wfi, ufi, bfi)
   }
 }
@@ -638,18 +698,19 @@ case class LexModelFactory(@Help(text= "The kind of annotation to do on the refi
                            dummyFeats: Double = 1.0,
                            @Help(text="How common must a feature be before we remember it?")
                            minFeatCutoff: Int = 1) extends ParserModelFactory[AnnotatedLabel, String] with SafeLogging {
-  type MyModel = LexModel[AnnotatedLabel, String]
+  type MyModel = LexModel[AnnotatedLabel, AnnotatedLabel, String]
 
   def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]], constrainer: CoreGrammar[AnnotatedLabel, String])(implicit broker: CacheBroker) ={
     val trees = trainTrees.map(annotator)
-    val (initLexicon, initBinaries, initUnaries) = GenerativeParser.extractCounts(trees)
-
+    val (initLexicon, annBinaries, annUnaries) = GenerativeParser.extractCounts(trees)
+    val refGrammar = BaseGrammar(AnnotatedLabel.TOP, annBinaries, annUnaries)
 
     val wordIndex = Index(trainTrees.iterator.flatMap(_.words))
 
     val cFactory = constrainer
 
     val (xbarGrammar, xbarLexicon) = constrainer.grammar -> constrainer.lexicon
+    val indexedRefinements = GrammarRefinements(xbarGrammar, refGrammar, (_: AnnotatedLabel).baseAnnotatedLabel)
 
     val (wordFeaturizer, unaryFeaturizer, bilexFeaturizer) = {
       val dsl = new WordFeaturizer.DSL(initLexicon) with BilexicalFeaturizer.DSL with SurfaceFeaturizer.DSL
@@ -673,42 +734,53 @@ case class LexModelFactory(@Help(text= "The kind of annotation to do on the refi
       (wf, word + shape + clss, bilexF)
     }
 
+    val headFinder = HeadFinder.collins.lensed[AnnotatedLabel]
+
     val indexedWordFeaturizer = IndexedWordFeaturizer.fromData(wordFeaturizer, trees.map(_.words))
     val indexedUnaryFeaturizer = IndexedWordFeaturizer.fromData(unaryFeaturizer, trees.map(_.words))
-    val indexedBilexicalFeaturizer = IndexedBilexicalFeaturizer.fromData(bilexFeaturizer, trees.map{DependencyTree.fromTreeInstance[AnnotatedLabel, String](_, HeadFinder.collins)})
+    val indexedBilexicalFeaturizer = {
+      val dependencyTrees = trees.map ( DependencyTree.fromTreeInstance[AnnotatedLabel, String](_, headFinder) )
+      IndexedBilexicalFeaturizer.fromData(bilexFeaturizer, dependencyTrees)
+    }
 
-    def ruleGen(r: Rule[AnnotatedLabel]) = IndexedSeq(r)
 
-    val headFinder = HeadFinder.collins
-    val feat = new StandardLexFeaturizer(xbarGrammar.labelIndex, xbarGrammar.index, (_:Rule[AnnotatedLabel]).children.head.isIntermediate, ruleGen)
+    def labelFeaturizer(l: AnnotatedLabel) = Set(l, l.baseAnnotatedLabel).toSeq
+    def ruleFeaturizer(r: Rule[AnnotatedLabel]) = r match {
+      case r@BinaryRule(a,b,c) =>
+        val headIsLeft = headFinder.findHeadChild(r) == 0
+        val dir = if(headIsLeft) AttachLeft else AttachRight
+        Set(r, r.map(_.baseAnnotatedLabel), dir).toSeq
+      case r@UnaryRule(a,b,c) =>
+        Set(r, r.map(_.baseAnnotatedLabel)).toSeq
+    }
+
+    val featurizer = new ProductionFeaturizer[AnnotatedLabel, AnnotatedLabel, String](xbarGrammar, indexedRefinements,
+      lGen=labelFeaturizer,
+      rGen=ruleFeaturizer)
+
+    def reannotate(tree: BinarizedTree[AnnotatedLabel], words: IndexedSeq[String]) = annotator(tree, words)
 
     type W = String
     type L = AnnotatedLabel
-    val indexed =  IndexedLexFeaturizer.extract[AnnotatedLabel, TreeInstance[L, W], W](feat,
+    val indexed =  IndexedLexFeaturizer.extract(featurizer,
       indexedBilexicalFeaturizer,
       indexedUnaryFeaturizer,
       indexedWordFeaturizer,
       headFinder,
-      xbarGrammar.index,
-      xbarGrammar.labelIndex,
+      annotator,
+      indexedRefinements,
       HashFeature.Relative(dummyFeats),
-      trees)
+      trainTrees)
 
      logger.info(s"Num features: Indexed Features: ${indexed.index.size}")
 
-    val bundle = new LexGrammarBundle[AnnotatedLabel, String](xbarGrammar,
+    val bundle = new LexGrammarBundle(xbarGrammar,
       xbarLexicon,
-      headFinder,
-      wordIndex
-    )
+      refGrammar,
+      headFinder)
 
     val featureCounter = readWeights(oldWeights)
 
-    def reannotate(tree: BinarizedTree[AnnotatedLabel], words: IndexedSeq[String]) = tree.map(_.baseAnnotatedLabel)
-    val model = new LexModel[AnnotatedLabel, String](bundle, reannotate, indexed, cFactory, xbarGrammar, xbarLexicon, featureCounter.get)
-
-    model
-
-
+    new LexModel(bundle, reannotate, indexed, cFactory, featureCounter.get)
   }
 }

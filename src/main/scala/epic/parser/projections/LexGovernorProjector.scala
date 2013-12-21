@@ -11,7 +11,7 @@ import models.LexGrammar
  * in a lexicalized chart.
  * @author dlwh
  */
-class LexGovernorProjector[L, W](grammar: LexGrammar[L, W]) {
+class LexGovernorProjector[L, W](grammar: LexGrammar[L, _, W]) {
   val notAConstituent = grammar.labelIndex.size
 
   def apply(anch: RefinedAnchoring[L, W], chart: ParseMarginal[L, W]):LexGovernorInfo = {

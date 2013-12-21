@@ -19,6 +19,7 @@ import scala.reflect.ClassTag
 final class ProjectionIndexer[C, F] private (val coarseIndex: Index[C],
                                                  val fineIndex:Index[F],
                                                  indexedProjections: Array[Int]) extends (Int=>Int) with Serializable {
+
   val coarseEncoder = Encoder.fromIndex(coarseIndex)
 
   // coarseSymbolIndex -> localizedFineSymbol -> globalizedFineSymbolIndex
@@ -49,10 +50,13 @@ final class ProjectionIndexer[C, F] private (val coarseIndex: Index[C],
     project(glob) -> localize(glob)
   }
 
+
   def localize(f: F):Int =  localizationArray(fineIndex(f))
 
   def refinementsOf(c: Int):Array[Int] = globalRefinements(c)
   def localRefinements(c: Int):Array[Int] = perSymbolRefinements(c)
+
+  def numRefinements(c: Int): Int = perSymbolRefinements(c).length
 
   def refinementsOf(c: C):IndexedSeq[F] = {
     val ci = coarseIndex(c)

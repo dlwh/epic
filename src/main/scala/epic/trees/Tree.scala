@@ -335,17 +335,17 @@ object Trees {
    * @tparam L type of the tree
    * @return
    */
-  def annotateParentsBinarized[L](tree: BinarizedTree[L], join: (L,L)=>L, isIntermediate: L=>Boolean, dontAnnotate: L=>Boolean, depth: Int):BinarizedTree[L] = {
+  def annotateParentsBinarized[L](tree: BinarizedTree[L], join: (L,Seq[L])=>L, isIntermediate: L=>Boolean, dontAnnotate: L=>Boolean, depth: Int):BinarizedTree[L] = {
     val ot = tree
     def rec(tree: BinarizedTree[L], history: List[L] = List.empty):BinarizedTree[L] = {
       import tree._
       val newLabel = if(isIntermediate(label)) {
-        if(history.length > 1) history.drop(1).foldLeft(label)(join)
-        else history.foldLeft(label)(join)
+        if(history.length > 1) join(label, history.drop(1))
+        else join(label, history)
       } else if(dontAnnotate(label)) {
         label
       } else {
-        history.take(depth-1).foldLeft(label)(join)
+        join(label, history.take(depth-1))
       }
       tree match {
         //invariant: history is the (depth) non-intermediate symbols, where we remove unary-identity transitions
@@ -360,7 +360,11 @@ object Trees {
           val newHistory = if(!isIntermediate(label) && label != child.label) (label :: history) take depth else history
           UnaryTree(newLabel,rec(child,newHistory), chain, span)
         case NullaryTree(label, span) =>
-          val newLabel = if(dontAnnotate(label) || history.isEmpty) label else if(history.head == label) history.reduceLeft(join) else history.take(depth-1).foldLeft(label)(join)
+          val newLabel = {
+            if(dontAnnotate(label) || history.isEmpty) label
+            else if(history.head == label) join(label, history)
+            else join(label, history)
+          }
           NullaryTree(newLabel, span)
       }
     }
@@ -369,7 +373,7 @@ object Trees {
   }
 
   def annotateParentsBinarized(tree: BinarizedTree[String], depth: Int):BinarizedTree[String] = {
-    annotateParentsBinarized(tree,{(x:String,b:String)=>x + '^' + b},(_:String).startsWith("@"), {(l: String) => l.nonEmpty && l != "$" && !l.head.isLetterOrDigit && l != "."}, depth)
+    annotateParentsBinarized(tree,{(x:String,b:Seq[String])=>b.foldLeft(x)(_ + '^' + _)},(_:String).startsWith("@"), {(l: String) => l.nonEmpty && l != "$" && !l.head.isLetterOrDigit && l != "."}, depth)
   }
 
   object Transforms {

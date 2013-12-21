@@ -38,19 +38,19 @@ trait Treebank[L] { outer =>
   /**
    * Training set
    */
-  val train: Portion
+  def train: Portion
   /**
    * Test set
    */
-  val test: Portion
+  def test: Portion
   /**
    * Dev set
    */
-  val dev: Portion
+  def dev: Portion
   /**
    * All sentences
    */
-  val all:Portion = Portion("all",sections)
+  lazy val all:Portion = Portion("all",sections)
 
   /**
    * Every section in the treebank
