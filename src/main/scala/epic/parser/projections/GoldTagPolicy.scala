@@ -36,7 +36,7 @@ object GoldTagPolicy {
     val goldBot = TriangularArray.raw(trees.head.span.end+1,collection.mutable.BitSet())
     for(tree <- trees) {
       if(tree != null) {
-        for( t <- tree.allChildren) {
+        for( t <- tree.allChildren if t.label != -1) {
           if(t.children.size == 1)
             goldTop(TriangularArray.index(t.span.begin,t.span.end)) += t.label
           else
