@@ -32,4 +32,10 @@ class SegmentationTest extends FunSuite with Checkers {
       }
     })
   }
+
+  test("toTree doesn't crash") {
+    val segments = Vector( (0, Span(2, 4)))
+    val words = IndexedSeq.range(0, 8)
+    Segmentation(segments, words).toTree(-1)
+  }
 }

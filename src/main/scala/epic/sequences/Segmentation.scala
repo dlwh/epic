@@ -1,6 +1,6 @@
 package epic.sequences
 
-import epic.trees.Span
+import epic.trees.{Tree, Span}
 import scala.collection.mutable.ArrayBuffer
 import nak.data.Example
 
@@ -63,6 +63,27 @@ case class Segmentation[+L, +W](segments: IndexedSeq[(L, Span)],
     }
     assert(outLabels.length == words.length)
     TaggedSequence(outLabels, words, id +"-flattened")
+  }
+
+  def toTree[LL>:L](outsideLabel: LL):Tree[LL] = {
+    val outLabels = new ArrayBuffer[(LL, Span)]()
+    for((l,span) <- segments if !span.isEmpty) {
+      val lastEnd = outLabels.lastOption.map(_._2.end).getOrElse(0)
+      if(lastEnd < span.begin) {
+        outLabels += (outsideLabel -> Span(lastEnd, span.begin))
+      }
+
+      outLabels += (l -> span)
+    }
+
+    val lastEnd = outLabels.lastOption.map(_._2.end).getOrElse(0)
+    if(lastEnd < words.length) {
+      outLabels += (outsideLabel -> Span(lastEnd, words.length))
+    }
+
+    val t = Tree(outsideLabel, outLabels.map { case (l, span) => Tree(l, IndexedSeq.empty, span)}, Span(0, words.length))
+    assert(t.isValid, outLabels)
+    t
   }
 }
 
