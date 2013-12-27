@@ -92,6 +92,7 @@ trait Tree[+L] extends Serializable {
   def toString(newline: Boolean) = recursiveToString(this,0, newline, new StringBuilder).toString
 
   def render[W](words: Seq[W], newline: Boolean = true) = recursiveRender(this,1,words, newline, new StringBuilder).toString
+
 }
 
 object Tree {
@@ -132,6 +133,7 @@ object Tree {
       sb append ' '
     sb
   }
+
 
 
 }
@@ -339,32 +341,27 @@ object Trees {
     val ot = tree
     def rec(tree: BinarizedTree[L], history: List[L] = List.empty):BinarizedTree[L] = {
       import tree._
-      val newLabel = if(isIntermediate(label)) {
-        if(history.length > 1) join(label, history.drop(1))
-        else join(label, history)
-      } else if(dontAnnotate(label)) {
+      val newLabel = if(dontAnnotate(label)) {
         label
+      } else if(isIntermediate(label)) {
+        assert(history.length > 1, history + " " + tree)
+        join(label, history take depth)
       } else {
-        join(label, history.take(depth-1))
+        join(label, history take depth)
       }
       tree match {
         //invariant: history is the (depth) non-intermediate symbols, where we remove unary-identity transitions
         case BinaryTree(label, t1, t2, span) =>
-          val newHistory = if(!isIntermediate(label)) (label :: history) take depth else history
+          val newHistory = if(!isIntermediate(label)) (label :: history) else history
           val lchild = rec(t1,newHistory)
           val rchild = rec(t2,newHistory)
           BinaryTree(newLabel, lchild, rchild, span)
         case u@UnaryTree(label, child, chain, span) =>
           if(isIntermediate(label)) assert(history.nonEmpty, ot.toString(true) + "\n" + u.toString(true) )
           if(isIntermediate(label)) assert(label != newLabel, label + " " + newLabel + " " + u + " " + history)
-          val newHistory = if(!isIntermediate(label) && label != child.label) (label :: history) take depth else history
+          val newHistory = if(!isIntermediate(label) && label != child.label) (label :: history) else history
           UnaryTree(newLabel,rec(child,newHistory), chain, span)
         case NullaryTree(label, span) =>
-          val newLabel = {
-            if(dontAnnotate(label) || history.isEmpty) label
-            else if(history.head == label) join(label, history)
-            else join(label, history)
-          }
           NullaryTree(newLabel, span)
       }
     }
