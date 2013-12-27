@@ -155,14 +155,27 @@ class IndexedLexFeaturizer[L, L2, W](ruleFeaturizer: RefinedFeaturizer[L, W, Fea
       val dep = depIndex(ref)
       val r = binaryRuleRefinement(ref)
 
-      var bilexFeatures: Array[Int] = bilexCache(head)(dep)
-      if(bilexFeatures eq null) {
-        bilexFeatures = bilexSpec.featuresForAttachment(head, dep)
-        bilexCache(head)(dep) = bilexFeatures
+      var cache = ruleCache(head)(dep)
+      if (cache == null) {
+        cache = new OpenAddressHashArray[Array[Int]](refinements.rules.fineIndex.size)
+        ruleCache(head)(dep) = cache
       }
 
-      val fi = fspec.featuresForBinaryRule(begin, split, end, rule, r)
-      bilexFeatureIndex.crossProduct(fi, bilexFeatures, offset = bilexOffset, usePlainLabelFeatures = true)
+      var feats = cache(refinements.rules.globalize(rule, r))
+      if(feats == null) {
+        var bilexFeatures: Array[Int] = bilexCache(head)(dep)
+        if(bilexFeatures eq null) {
+          bilexFeatures = bilexSpec.featuresForAttachment(head, dep)
+          bilexCache(head)(dep) = bilexFeatures
+        }
+
+        val fi = fspec.featuresForBinaryRule(begin, split, end, rule, r)
+        feats = bilexFeatureIndex.crossProduct(fi, bilexFeatures, offset = bilexOffset, usePlainLabelFeatures = true)
+        cache(refinements.rules.globalize(rule, r)) = feats
+
+      }
+
+      feats
     }
 
 
@@ -201,6 +214,7 @@ class IndexedLexFeaturizer[L, L2, W](ruleFeaturizer: RefinedFeaturizer[L, W, Fea
     // words
     // headIndex -> depIndex -> Array[Int]
     val bilexCache = Array.ofDim[Array[Int]](words.length, words.length)
+    val ruleCache = Array.ofDim[OpenAddressHashArray[Array[Int]]](words.length, words.length)
     // headIndex -> (ruleIndex) -> Array[Int]
     val headCache = new Array[OpenAddressHashArray[Array[Int]]](words.length)
     // headIndex -> (depIndex x ruleIndex) -> Array[Int]
