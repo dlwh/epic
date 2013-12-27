@@ -345,10 +345,11 @@ object Trees {
         label
       } else if(isIntermediate(label)) {
         assert(history.length > 1, history + " " + tree)
-        join(label, history take depth)
+        join(label, history drop 1 take depth)
       } else {
         join(label, history take depth)
       }
+
       tree match {
         //invariant: history is the (depth) non-intermediate symbols, where we remove unary-identity transitions
         case BinaryTree(label, t1, t2, span) =>
