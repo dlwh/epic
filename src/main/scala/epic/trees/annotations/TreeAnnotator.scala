@@ -107,7 +107,7 @@ case class ParentAnnotate[W](order: Int = 0, skipPunctTags: Boolean = true) exte
       def join(base: AnnotatedLabel, parent: Seq[AnnotatedLabel]) = {
         base.copy(parents = parent.map(_.label).toIndexedSeq)
       }
-      Trees.annotateParentsBinarized(tree, join, {(_:AnnotatedLabel).isIntermediate}, {(l:AnnotatedLabel)=> l.label.isEmpty || !l.label.head.isLetterOrDigit}, order)
+      Trees.annotateParentsBinarized(tree, join, {(_:AnnotatedLabel).isIntermediate}, {(l:AnnotatedLabel)=> l.label.isEmpty || (l.label.head != '@' && !l.label.head.isLetterOrDigit)}, order)
     }
   }
 
