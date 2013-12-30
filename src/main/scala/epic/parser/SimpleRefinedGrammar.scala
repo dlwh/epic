@@ -185,11 +185,12 @@ object SimpleRefinedGrammar {
       val c = if(_c.startsWith("ROOT")) "TOP_0" else preprocessSymbol(_c)
       val logScore = math.log(score.toDouble)
       if(logScore >= threshold) {
-        ruleScores += logScore
+        val ruleId = rules.index(BinaryRule(a,b,c).map(AnnotatedLabel(_)))
+        if(ruleId == ruleScores.length)
+          ruleScores += logScore
         syms.index(AnnotatedLabel(a))
         syms.index(AnnotatedLabel(b))
         syms.index(AnnotatedLabel(c))
-        rules.index(BinaryRule(a,b,c).map(AnnotatedLabel(_)))
         assert(rules.size == ruleScores.length)
       }
 
