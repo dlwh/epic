@@ -43,6 +43,8 @@ object SplitSpanFeaturizer {
       def apply(f: WordFeaturizer[W], t: split.type): SplitFeaturizer[W] = new SplitFeaturizer(f)
     }
 
+    def zeroSplit[W] = new ZeroSplitSpanFeaturizer[W]
+
     def distance[W](b: MarkerPos, s: split.type, db: DistanceBinner = DistanceBinner()):SplitSpanFeaturizer[W] = {
       new SplitSpanDistanceFeaturizer[W](b, s, db)
     }
@@ -157,6 +159,17 @@ object SplitSpanFeaturizer {
       val wf = f.anchor(w)
       def featuresForSplit(begin: Int, split: Int, end: Int): Array[Feature] = {
         wf.featuresForWord(split).map(SplitFeature)
+      }
+
+      def featuresForSpan(begin: Int, end: Int): Array[Feature] = emptyArray
+    }
+
+  }
+
+  case class ZeroSplitSpanFeaturizer[W]() extends SplitSpanFeaturizer[W] {
+    def anchor(w: IndexedSeq[W]): SplitSpanFeatureAnchoring[W] = new SplitSpanFeatureAnchoring[W] {
+      def featuresForSplit(begin: Int, split: Int, end: Int): Array[Feature] = {
+        emptyArray
       }
 
       def featuresForSpan(begin: Int, end: Int): Array[Feature] = emptyArray

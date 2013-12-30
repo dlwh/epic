@@ -315,7 +315,11 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
 
       val leftOfSplit =  ((baseCat)(-1)apply (split))
 
-      var featurizer: SurfaceFeaturizer[String] = baseCat(begin) + baseCat(end-1)
+      var featurizer: SplitSpanFeaturizer[String] = zeroSplit[String]
+      if ( useFirstLast) {
+        featurizer += baseCat(begin)
+        featurizer += baseCat(end-1)
+      }
       if (useBeforeAfter) {
         featurizer += baseCat(begin-1)
         featurizer += baseCat(end)
@@ -335,8 +339,8 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
       }
 
       if(useBinaryLengths) {
-        featurizer += distance(begin, split)
-        featurizer += distance(split, end)
+        featurizer += distance[String](begin, split)
+        featurizer += distance[String](split, end)
       }
       
         //
