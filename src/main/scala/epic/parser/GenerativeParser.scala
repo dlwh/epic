@@ -128,7 +128,7 @@ object GenerativeParser {
     RefinedGrammar.generative(baseGrammar, baseLexicon, indexedRefinements, binary, unary, words)
   }
 
-  def defaultAnnotator(): PipelineAnnotator[AnnotatedLabel, String] =  PipelineAnnotator(Seq(FilterAnnotations(), ForgetHeadTag(), Markovize(0,2)))
+  def defaultAnnotator(): PipelineAnnotator[AnnotatedLabel, String] =  PipelineAnnotator(Seq(FilterAnnotations(), ForgetHeadTag(), Markovize(0,1)))
 }
 
 object GenerativeTrainer extends ParserPipeline {
