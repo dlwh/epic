@@ -153,6 +153,9 @@ class IndexedLexFeaturizer[L, L2, W](ruleFeaturizer: RefinedFeaturizer[L, W, Fea
     def featuresForBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int) =  {
       val head = headIndex(ref)
       val dep = depIndex(ref)
+      assert(head < end && head >= begin, (head, begin, end))
+      assert(dep < end && dep >= begin, (dep, begin, end))
+      assert( (head < split && end >= split) || (head >= split && dep < split))
       val r = binaryRuleRefinement(ref)
 
       var cache = ruleCache(head)(dep)

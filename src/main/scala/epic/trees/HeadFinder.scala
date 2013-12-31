@@ -115,7 +115,8 @@ trait HeadFinder[L] {
  *
  * @author dlwh
  */
-class RuleBasedHeadFinder[L](defaultDirection: Dir = Left, rules: HeadRules[L]) extends HeadFinder[L] {
+ @SerialVersionUID(1)
+class RuleBasedHeadFinder[L](defaultDirection: Dir = Left, rules: HeadRules[L]) extends HeadFinder[L]  with Serializable {
   override def findHeadChild(l: L, children: L*): Int = {
     val result = rules.findMatchIndex(l, children: _*) match {
       case None if defaultDirection == Left => 0
@@ -173,7 +174,8 @@ case class HeadRule[L](dir: Dir, dis: Boolean, heads: Seq[L]) { rule =>
   }
 }
 
-trait HeadRules[L] { outer =>
+@SerialVersionUID(1L)
+trait HeadRules[L] extends Serializable { outer =>
   protected type InnerLabel
 
   protected def findRules(l: InnerLabel): Seq[HeadRule[InnerLabel]]
