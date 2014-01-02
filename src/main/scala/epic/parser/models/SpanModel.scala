@@ -278,6 +278,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
                             oldWeights: File = null,
                             @Help(text="For features not seen in gold trees, we bin them into dummyFeats * numGoldFeatures bins using hashing.")
                             dummyFeats: Double = 0.5,
+                            commonWordThreshold: Int = 100,
                             useShape: Boolean = true,
                             useSpanLength: Boolean = true,
                             useBinaryLengths: Boolean = true,
@@ -308,7 +309,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
         )
     }
     val span:SplitSpanFeaturizer[String] = {
-      val dsl = new WordFeaturizer.DSL(annWords) with SurfaceFeaturizer.DSL with SplitSpanFeaturizer.DSL
+      val dsl = new WordFeaturizer.DSL(annWords, commonWordThreshold) with SurfaceFeaturizer.DSL with SplitSpanFeaturizer.DSL
       import dsl._
 
       // class(split + 1)
