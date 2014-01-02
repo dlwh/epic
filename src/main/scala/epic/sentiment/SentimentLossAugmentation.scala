@@ -29,7 +29,7 @@ case class SentimentLossAugmentation[W](trainTrees: IndexedSeq[TreeInstance[Anno
 
   def lossAugmentation(datum: TreeInstance[AnnotatedLabel, W]): CoreAnchoring[AnnotatedLabel, W] = {
     // drop the root
-    val goldMap = datum.tree.map(projectedLabel).preorder.drop(1).map{t => t.span -> t.label}.toMap
+    val goldMap = datum.tree.map(projectedLabel).preorder.filter(_.label != -1).map{t => t.span -> t.label}.toMap
 
     new SentimentLossAnchoring(grammar, lexicon, datum.words, goldMap, constraintFactory.constraints(datum.words))
   }
