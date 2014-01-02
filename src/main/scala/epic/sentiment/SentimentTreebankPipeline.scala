@@ -61,7 +61,11 @@ object SentimentTreebankPipeline extends Logging {
       }
     }
 
-    val constrainer = new ConstraintCoreGrammarAdaptor(gen.grammar, gen.lexicon, new GoldBracketingsConstraints)
+    val constrainer = new SentimentLossAugmentation(trainTrees,
+      gen.grammar,
+      gen.lexicon,
+      new GoldBracketingsConstraints,
+      loss = SentimentLossAugmentation.defaultLoss)
 
     val model = new SpanModelFactory(annotator = GenerativeParser.defaultAnnotator(), dummyFeats = 0.5).make(trainTrees, constrainer)
 
@@ -300,6 +304,7 @@ object SentimentTreebankPipeline extends Logging {
       assert(ps.children.length == 1)
       val guessTree = ps.children.head.map(_.label.toInt)
       val guessLabel = guessTree.label
+      assert(guessTree.preorder.map(_.span).toSet == goldTree.preorder.map(_.span).toSet)
       val guess = guessTree.preorder.drop(1).map(t => (t.label, t.span)).toSet
       val gold = goldTree.preorder.drop(1).map(t => (t.label, t.span)).toSet
       assert(guess.size == gold.size)
