@@ -1,34 +1,20 @@
 package epic.sentiment
 
-import java.io.{FileReader, File}
-import breeze.optimize.FirstOrderMinimizer.OptParams
+import java.io.File
 import breeze.config.CommandLineParser
 import epic.trees._
-import epic.parser.models.{ParserInference, ParserModel, SpanModelFactory}
+import epic.parser.models.{ParserInference, ParserModel}
 import epic.parser._
-import breeze.linalg.DenseVector
+import breeze.linalg.{Axis, DenseVector}
 import epic.framework._
-import breeze.util.Index
 import epic.constraints.{LabeledSpanConstraints, SpanConstraints, ChartConstraints}
-import epic.parser.projections.ConstraintCoreGrammarAdaptor
-import breeze.optimize.{BatchDiffFunction, FirstOrderMinimizer, CachedBatchDiffFunction}
+import breeze.optimize.CachedBatchDiffFunction
 import com.typesafe.scalalogging.slf4j.Logging
 import epic.parser.models.SpanModelFactory
 import epic.trees.ProcessedTreebank
 import epic.trees.TreeInstance
 import breeze.optimize.FirstOrderMinimizer.OptParams
-import epic.parser.models.SpanModelFactory
-import epic.trees.ProcessedTreebank
-import epic.trees.TreeInstance
-import breeze.optimize.FirstOrderMinimizer.OptParams
-import epic.framework.ExpectedCounts
 import epic.trees.Span
-import epic.constraints.ChartConstraints.Factory
-import epic.lexicon.Lexicon
-import breeze.collection.mutable.TriangularArray
-import breeze.numerics
-import numerics.logSum
-import java.util
 import breeze.util._
 
 /**
@@ -130,151 +116,6 @@ object SentimentTreebankPipeline extends Logging {
   }
 
 
-  /**
- * Attempts to find a parse that maximizes the expected number
- * of correct labels. This is Goodman's MaxRecall algorithm.
- *
- * @tparam L label type
- * @tparam W word type
- */
-@SerialVersionUID(2L)
-  class TabooDecoder[L, W](tabooSymbols: Set[Int]) extends ChartDecoder[L, W] {
-
-    def extractBestParse(marginal: ChartMarginal[L, W]): BinarizedTree[L] = {
-      import marginal._
-
-      val labelIndex = marginal.grammar.labelIndex
-
-      val maxSplit = TriangularArray.fill[Int](length+1)(0)
-      val maxBotLabel = TriangularArray.fill[Int](length+1)(-1)
-      val maxBotScore = TriangularArray.fill[Double](length+1)(Double.NegativeInfinity)
-      val maxTopLabel = TriangularArray.fill[Int](length+1)(-1)
-      val maxTopScore = TriangularArray.fill[Double](length+1)(Double.NegativeInfinity)
-
-      val scores = marginal.grammar.labelEncoder.fillArray(Double.NegativeInfinity)
-      val buffer = Array.fill(1000)(Double.NegativeInfinity)
-
-      def marginalizeRefinements(begin: Int, end: Int, l: Int, ichart: inside.ChartScores, ochart: outside.ChartScores): Double = {
-        var bufOff = 0
-        for (lRef <- ichart.enteredLabelRefinements(begin, end, l)) {
-          val myScore = ichart.labelScore(begin, end, l, lRef) + ochart.labelScore(begin, end, l, lRef) - logPartition
-          buffer(bufOff) = myScore
-          bufOff += 1
-          if(bufOff == buffer.length) {
-            buffer(0) = breeze.numerics.logSum(buffer, buffer.length)
-            bufOff = 1
-          }
-        }
-        val sum =numerics.logSum(buffer, bufOff)
-        if(tabooSymbols.contains(l)) {
-          sum - 100
-        } else {
-          sum
-        }
-      }
-
-      for(i <- 0 until inside.length) {
-        util.Arrays.fill(scores, Double.NegativeInfinity)
-        for(l <- inside.bot.enteredLabelIndexes(i, i + 1)) {
-          scores(l) = marginalizeRefinements(i, i + 1, l, inside.bot, outside.bot)
-        }
-        maxBotScore(i, i + 1) = scores.max
-        maxBotLabel(i, i + 1) = scores.argmax
-
-        util.Arrays.fill(scores, Double.NegativeInfinity)
-        for(l <- inside.top.enteredLabelIndexes(i, i + 1)) {
-          scores(l) = marginalizeRefinements(i, i + 1, l, inside.top, outside.top)
-        }
-        maxTopScore(i, i + 1) = logSum(scores.max, maxBotScore(i, i + 1))
-        maxTopLabel(i, i + 1) = scores.argmax
-      }
-
-      for {
-        span <- 2 to inside.length
-        begin <- 0 to (inside.length - span)
-        end = begin + span
-      } {
-        util.Arrays.fill(scores, Double.NegativeInfinity)
-        for(l <- inside.bot.enteredLabelIndexes(begin, end)) {
-          scores(l) = marginalizeRefinements(begin, end, l, inside.bot, outside.bot)
-        }
-        maxBotScore(begin, end) = scores.max
-        maxBotLabel(begin, end) = scores.argmax
-
-        util.Arrays.fill(scores, Double.NegativeInfinity)
-        for(l <- inside.top.enteredLabelIndexes(begin, end)) {
-          scores(l) = marginalizeRefinements(begin, end, l, inside.top, outside.top)
-        }
-        maxTopScore(begin, end) = logSum(scores.max, maxBotScore(begin, end))
-        maxTopLabel(begin, end) = scores.argmax
-
-        val (split, splitScore) = (for(split <- begin +1 until end) yield {
-          val score = logSum(maxTopScore(begin, split), maxTopScore(split, end))
-          (split, score)
-        }).maxBy(_._2)
-
-        maxSplit(begin, end) = split
-        maxTopScore(begin, end) = logSum(maxTopScore(begin, end), splitScore)
-      }
-
-      def bestUnaryChain(begin: Int, end: Int, bestBot: Int, bestTop: Int): IndexedSeq[String] = {
-        val candidateUnaries = grammar.indexedUnaryRulesWithChild(bestBot).filter(r => grammar.parent(r) == bestTop)
-        val bestChain = if (candidateUnaries.isEmpty) {
-          IndexedSeq.empty
-        } else if (candidateUnaries.length == 1) {
-          grammar.chain(candidateUnaries(0))
-        } else {
-          var bestRule = candidateUnaries(0)
-          var bestScore = Double.NegativeInfinity
-          for (r <- candidateUnaries) {
-            val aRefinements = inside.top.enteredLabelRefinements(begin, end, bestTop).toArray
-            val bRefinements = inside.bot.enteredLabelRefinements(begin, end, bestBot).toArray
-            val arr = new Array[Double](aRefinements.length * bRefinements.length)
-            var i = 0
-            for (bRef <- bRefinements; ref <- anchoring.refined.validUnaryRuleRefinementsGivenChild(begin, end, r, bRef)) {
-              val aRef = anchoring.refined.parentRefinement(r, ref)
-              arr(i) = (anchoring.scoreUnaryRule(begin, end, r, ref)
-                + outside.top.labelScore(begin, end, bestTop, aRef)
-                + inside.bot.labelScore(begin, end, bestBot, bRef)
-                - logPartition
-                )
-              i += 1
-            }
-            val score = logSum(arr, i)
-            if (score > bestScore) {
-              bestRule = r
-              bestScore = score
-            }
-
-          }
-          grammar.chain(bestRule)
-        }
-        bestChain
-      }
-
-      def extract(begin: Int, end: Int):BinarizedTree[L] = {
-        val bestBot = maxBotLabel(begin, end)
-        val lower = if(begin + 1== end) {
-          if(maxBotScore(begin, end) == Double.NegativeInfinity)
-            throw new RuntimeException(s"Couldn't make a good score for ${(begin, end)}. InsideIndices:  ${inside.bot.enteredLabelIndexes(begin, end).toIndexedSeq}\noutside: ${outside.bot.enteredLabelIndexes(begin, end).toIndexedSeq} logPartition: $logPartition")
-          NullaryTree(labelIndex.get(bestBot), Span(begin, end))
-        } else {
-          val split = maxSplit(begin, end)
-          val left = extract(begin, split)
-          val right = extract(split, end)
-          BinaryTree(labelIndex.get(bestBot), left, right, Span(begin, end))
-        }
-
-        val bestTop = maxTopLabel(begin, end)
-        val bestChain = bestUnaryChain(begin, end, bestBot, bestTop)
-
-        UnaryTree(labelIndex.get(bestTop), lower, bestChain, Span(begin, end))
-      }
-
-      extract(0, inside.length)
-    }
-  }
-
   case class Stats(coarseSpansRight: Int, coarseSpans: Int,
                    spansRight: Int, numSpans: Int,
                    coarseRootsRight: Int, numCoarseRoots: Int,
@@ -292,28 +133,27 @@ object SentimentTreebankPipeline extends Logging {
   def evaluate(name: String, parser: Parser[AnnotatedLabel, String], testTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]]) = {
     val two = parser.grammar.labelIndex(AnnotatedLabel("2"))
     assert(two >= 0)
-    val coarseLabelParser = parser.copy(decoder= new TabooDecoder[AnnotatedLabel, String](Set(two)))
-
     testTrees.par.map{ ti =>
       val goldTree = ti.tree.children.head.map(_.label.toInt)
       val goldLabel = goldTree.label
       val goldIsNeutral = goldLabel == 2
 
-      val ps = AnnotatedLabelChainReplacer.replaceUnaries(parser.bestParse(ti.words))
-      val coarseSent = AnnotatedLabelChainReplacer.replaceUnaries(coarseLabelParser.bestParse(ti.words))
-      assert(ps.children.length == 1)
-      val guessTree = ps.children.head.map(_.label.toInt)
+      val marg = parser.marginal(ti.words)
+
+      val guessTree = decode(ti.tree.map(_ => ()), marg, binary = false).map(_.label.toInt)
+      val coarseTree = decode(ti.tree.map(_ => ()), marg, binary = true).map(_.label.toInt)
+
       val guessLabel = guessTree.label
       assert(guessTree.preorder.map(_.span).toSet == goldTree.preorder.map(_.span).toSet)
-      val guess = guessTree.preorder.drop(1).map(t => (t.label, t.span)).toSet
-      val gold = goldTree.preorder.drop(1).map(t => (t.label, t.span)).toSet
-      assert(guess.size == gold.size)
+      val guess: Set[(Int, Span)] = guessTree.preorder.map(t => (t.label, t.span)).toSet
+//      assert(guessTree2 == guess, (guessTree2, guess))
+      val gold: Set[(Int, Span)] = goldTree.preorder.map(t => (t.label, t.span)).toSet
+      assert(guess.map(_._2) == gold.map(_._2), (guess, gold, (guess--gold), (gold -- guess)))
 
-      val coarseTree = coarseSent.children.head.map(_.label.toInt)
       val coarseLabel = coarseTree.label
-      val coarseGuess = coarseTree.preorder.drop(1).map(t => (t.label, t.span)).toSet
+      val coarseGuess: Set[(Int, Span)] = coarseTree.preorder.map(t => (t.label, t.span)).toSet
       val cGuess = coarseGuess.collect { case (label, span) => (label < 2) -> span}
-      val cGold = if(goldIsNeutral)
+      val cGold: Set[(Boolean, Span)] = if(goldIsNeutral)
         Set.empty[(Boolean, Span)]
       else
         gold.collect { case (label, span) if label != 2 => (label < 2) -> span}
@@ -336,6 +176,27 @@ object SentimentTreebankPipeline extends Logging {
       println(s"Guess\n ${guessTree.render(ti.words)}\nGold\n${goldTree.render(ti.words)}\n$stats")
       stats
     }.reduce(_ + _)
+  }
+
+  def decode(tree: BinarizedTree[Unit], marginal: ChartMarginal[AnnotatedLabel, String], binary: Boolean) = {
+    tree.extend { t =>
+      val counts = marginal.marginalAt(t.begin, t.end)
+      val summed = breeze.linalg.sum(counts, Axis._1)
+      if(binary) {
+        val neg = (summed(AnnotatedLabel("0")) + summed(AnnotatedLabel("1")) )
+        val pos = (summed(AnnotatedLabel("3")) + summed(AnnotatedLabel("4")) )
+
+        if(neg > pos) {
+          AnnotatedLabel("0")
+        } else  {
+          AnnotatedLabel("4")
+        }
+
+      } else {
+        summed.argmax
+      }
+
+    }
   }
 
 }
