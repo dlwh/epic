@@ -5,6 +5,7 @@ import epic.util.{SafeLogging, Arrays}
 import breeze.numerics
 import breeze.collection.mutable.TriangularArray
 import com.typesafe.scalalogging.slf4j.Logging
+import breeze.linalg.Counter2
 
 /*
  Copyright 2012 David Hall
@@ -129,6 +130,14 @@ final case class ChartMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
   }
   //  verify()
 
+
+  def marginalAt(begin: Int, end: Int):Counter2[L, Int, Double] = {
+    val in = inside.bot.decodedLabelScores(begin, end)
+    in += outside.bot.decodedLabelScores(begin, end)
+    in -= logPartition
+
+    breeze.numerics.exp(in)
+  }
 
   /**
    * Forest traversal that visits spans in a "bottom up" order.
