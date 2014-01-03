@@ -61,6 +61,18 @@ final case class GrammarRefinements[C, F](labels: ProjectionIndexer[C, F], rules
     rightChildRefinementsGivenCoarseRule(r)
   }
 
+  def parentRefinement(r: Int, ref: Int):Int = parentRefinements(r)(ref)
+
+  private val parentRefinements: Array[Array[Int]] = Array.tabulate(rules.coarseIndex.size) { r =>
+    val parent = labels.coarseIndex(rules.coarseIndex.get(r).parent)
+
+    rules.refinementsOf(r).map { ref =>
+      labels.localize(rules.fineIndex.get(ref).parent)
+    }
+
+
+  }
+
 
   // rule -> parentRef -> [ruleRef]
   private val parentCompatibleRefinements: Array[Array[Array[Int]]] = Array.tabulate(rules.coarseIndex.size) { r =>
