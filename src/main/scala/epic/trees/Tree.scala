@@ -418,7 +418,7 @@ object Trees {
       private val xox = new XOverXRemover[String]
 //      private val fns = new FunctionNodeStripper[String]
       def apply(tree: Tree[String]): Tree[String] = {
-        xox(ens(tree).get) map (_.intern)
+        xox(ens(tree).get)
       }
     }
 
@@ -428,7 +428,7 @@ object Trees {
       private val fns = new FunctionNodeStripper[T]
 
       def apply(tree: Tree[T]) = {
-        xox(fns(ens(tree).get)) map ( l => lens.set(l,lens.get(l).intern))
+        xox(fns(ens(tree).get)) map ( l => lens.set(l,lens.get(l)))
       }
     }
 

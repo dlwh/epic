@@ -72,7 +72,7 @@ class PennTreeReader(val reader : Reader,
     if (!lowercase || children.size > 0) {
       Tree[String](label, children, Span(pos, spanEnd)) -> words
     } else {
-      Tree[String](label.toLowerCase.intern, children, Span(pos, spanEnd)) -> words
+      Tree[String](label.toLowerCase, children, Span(pos, spanEnd)) -> words
     }
   }
 
@@ -92,7 +92,7 @@ class PennTreeReader(val reader : Reader,
     }
 
     in.unread(ch);
-    sb.toString().intern();
+    sb.toString();
   }
 
   private def readChildren(pos : Int) : (IndexedSeq[Tree[String]],IndexedSeq[String]) = {
@@ -150,7 +150,7 @@ class PennTreeReader(val reader : Reader,
   private def readLeaf() = {
     var label = readText(true, true);
     if (lowercase) label = label.toLowerCase;
-    label.intern()
+    label
   }
 
   private def readLeftParen() = {
