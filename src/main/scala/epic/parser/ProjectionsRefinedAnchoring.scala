@@ -44,8 +44,7 @@ trait ProjectionsRefinedAnchoring[L, L2, W] extends RefinedAnchoring[L, W] {
   }
 
   final def parentRefinement(rule: Int, ruleRef: Int) = {
-    val refinedRuleId = refinements.rules.globalize(rule, ruleRef)
-    refinements.labels.localize(refinedGrammar.parent(refinedRuleId))
+    refinements.parentRefinement(rule, ruleRef)
   }
 
   final def childRefinement(rule: Int, ruleRef: Int) = {
