@@ -27,7 +27,7 @@ import com.typesafe.scalalogging.slf4j.Logging
 import epic.util.SafeLogging
 
 trait ParserException extends Exception
-case class ParseExtractionException(msg: String, sentence: IndexedSeq[Any]) extends RuntimeException with ParserException
+case class ParseExtractionException(msg: String, sentence: IndexedSeq[Any]) extends RuntimeException(msg) with ParserException
 case class NoParseException(msg: String, sentence: IndexedSeq[Any], cause: Throwable = null) extends RuntimeException(s"No parse for $sentence: $msg") with ParserException
 
 /**
