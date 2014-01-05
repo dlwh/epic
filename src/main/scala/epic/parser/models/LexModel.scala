@@ -295,15 +295,15 @@ final class LexGrammar[L, L2, W](val grammar: BaseGrammar[L],
     }
 
     def joinUnaryRuleRefs(lexRefs: Array[Int], ruleRefs: Array[Int]) = {
-      epic.util.Arrays.crossProduct(lexRefs, ruleRefs)(_ + _ * words.length)
+      epic.util.Arrays.crossProduct(lexRefs, ruleRefs, words.length)
     }
 
     def joinBinaryRuleRefs(lexRefs: Array[Int], ruleRefs: Array[Int]) = {
-      epic.util.Arrays.crossProduct(lexRefs, ruleRefs)(_ + _ * words.length * words.length)
+      epic.util.Arrays.crossProduct(lexRefs, ruleRefs, words.length * words.length)
     }
 
     def joinTagRefs(lexRefs: Array[Int], ruleRefs: Array[Int]) = {
-      epic.util.Arrays.crossProduct(lexRefs, ruleRefs)(_ + _ * words.length)
+      epic.util.Arrays.crossProduct(lexRefs, ruleRefs, words.length)
     }
 
 

@@ -59,5 +59,22 @@ object Arrays {
     }
     ret
   }
+
+  /** Makes a arr1.length * arr2.length array, where entries are arr1(i) + arr2(j) * secondScale */
+  def crossProduct(arr1: Array[Int], arr2: Array[Int], secondScale: Int): Array[Int] = {
+    val ret = new Array[Int](arr1.length * arr2.length)
+    var off = 0
+    var i = 0
+    while(i < arr1.length) {
+      var j = 0
+      while(j < arr2.length) {
+        ret(off) = arr1(i) + arr2(j) * secondScale
+        off += 1
+        j += 1
+      }
+      i += 1
+    }
+    ret
+  }
 }
 
