@@ -170,9 +170,9 @@ object GrammarRefinements {
     apply(grammar, grammar, Predef.identity[C] _)
   }
 
-  def apply[C, F](coarse: BaseGrammar[C], fine: BaseGrammar[F], proj: F=>C): GrammarRefinements[C, F] = {
+  def apply[C, F](coarse: BaseGrammar[C], fine: BaseGrammar[F], proj: F=>C, skipMissingCoarseRules: Boolean = false): GrammarRefinements[C, F] = {
     def projRule(r: Rule[F]) = r map proj
-    val rules = ProjectionIndexer(coarse.index, fine.index, projRule)
+    val rules = ProjectionIndexer(coarse.index, fine.index, projRule, skipMissingCoarse = skipMissingCoarseRules)
     val labels = ProjectionIndexer(coarse.labelIndex, fine.labelIndex, proj)
 
     new GrammarRefinements(labels, rules)
@@ -183,7 +183,7 @@ object GrammarRefinements {
       case BinaryRule(a, b, c) => for(a_ <- split(a); b_ <- split(b); c_ <- split(c)) yield BinaryRule(a_, b_, c_)
       case UnaryRule(a, b, chain) => for(a_ <- split(a); b_ <- split(b)) yield UnaryRule(a_, b_, chain)
     }
-    apply(coarse, split, splitRule, proj)
+    apply(coarse, split, splitRule _, proj)
   }
 
   def apply[C, F](coarse: BaseGrammar[C], split: C=>Seq[F], splitRule: Rule[C]=>Seq[Rule[F]], proj: F=>C): GrammarRefinements[C, F] = {

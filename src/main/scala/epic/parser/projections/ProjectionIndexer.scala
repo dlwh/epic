@@ -25,7 +25,7 @@ final class ProjectionIndexer[C, F] private (val coarseIndex: Index[C],
   // coarseSymbolIndex -> localizedFineSymbol -> globalizedFineSymbolIndex
   val globalRefinements: Array[Array[Int]] = {
     val result = Encoder.fromIndex(coarseIndex).fillArray(new ArrayBuffer[Int])
-    for( (coarse, fine) <- (indexedProjections.asInstanceOf[Array[Int]]).zipWithIndex) {
+    for( (coarse, fine) <- indexedProjections.zipWithIndex if coarse != -1) {
       result(coarse) += fine
     }
     result.map(arr => (arr.toArray))
@@ -102,12 +102,16 @@ final class ProjectionIndexer[C, F] private (val coarseIndex: Index[C],
 object ProjectionIndexer {
   def simple[L](index: Index[L]) = ProjectionIndexer(index, index, identity[L] _)
 
-  def apply[C, F](coarseIndex: Index[C], fineIndex: Index[F], proj: F=>C) = {
+  def apply[C, F](coarseIndex: Index[C], fineIndex: Index[F], proj: F=>C, skipMissingCoarse: Boolean = false) = {
     val indexedProjections = Encoder.fromIndex(fineIndex).fillArray(-1)
     for( (l, idx) <- fineIndex.zipWithIndex) {
       val projectedIdx = coarseIndex(proj(l))
-      if(projectedIdx < 0) throw new RuntimeException("error while indexing" + l + " to " + proj(l) + fineIndex(l))
-      indexedProjections(idx) = projectedIdx
+      if(projectedIdx < 0) {
+        if(!skipMissingCoarse)
+        throw new RuntimeException("error while indexing" + l + " to " + proj(l) + fineIndex(l))
+      } else {
+        indexedProjections(idx) = projectedIdx
+      }
     }
     new ProjectionIndexer(coarseIndex, fineIndex, indexedProjections)
   }

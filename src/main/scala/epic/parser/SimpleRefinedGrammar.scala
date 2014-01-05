@@ -126,25 +126,28 @@ object SimpleRefinedGrammar {
   }
 
 
-  private def doCloseUnaries(matrix: DenseMatrix[Double], closureType: CloseUnaries.Value, syms: Index[AnnotatedLabel]): immutable.IndexedSeq[(UnaryRule[AnnotatedLabel], Double)] = {
-    val probs = breeze.numerics.log(matrix)
-    val numsyms = matrix.rows
-    val next = DenseMatrix.fill(numsyms, numsyms)(-1)
-    closureType match {
-      case CloseUnaries.None => // do nothing
-      case CloseUnaries.Sum => ???
-      case CloseUnaries.Viterbi =>
-        for {
-          k <- 0 until numsyms
-          i <- 0 until numsyms
-          if probs(i,k) != Double.NegativeInfinity
-          j <- 0 until numsyms
-          if probs(i, j) < probs(i,k) + probs(k,j)
-        } {
-          probs(i,j) = probs(i,k) + probs(k,j)
-          next(i, j) = k
-        }
-    }
+  private def doCloseUnaries(matrix: DenseMatrix[Double], closureType: CloseUnaries.Value, syms: Index[AnnotatedLabel]): immutable.IndexedSeq[(UnaryRule[AnnotatedLabel], Double)] = closureType match {
+    case CloseUnaries.None =>
+      val probs = breeze.numerics.log(matrix)
+      val numsyms = matrix.rows
+      for(i <- 0 until numsyms; j <- 0 until numsyms if probs(i,j) != Double.NegativeInfinity) yield {
+        UnaryRule(syms.get(i), syms.get(j), IndexedSeq.empty) -> probs(i, j)
+      }
+    case CloseUnaries.Sum => ???
+    case CloseUnaries.Viterbi =>
+      val probs = breeze.numerics.log(matrix)
+      val numsyms = matrix.rows
+      val next = DenseMatrix.fill(numsyms, numsyms)(-1)
+      for {
+        k <- 0 until numsyms
+        i <- 0 until numsyms
+        if probs(i,k) != Double.NegativeInfinity
+        j <- 0 until numsyms
+        if probs(i, j) < probs(i,k) + probs(k,j)
+      } {
+        probs(i,j) = probs(i,k) + probs(k,j)
+        next(i, j) = k
+      }
 
     def reconstruct(i: Int, j: Int):Vector[Int] = {
       assert(probs(i, j) != Double.NegativeInfinity)

@@ -183,7 +183,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
 
     val annGrammar: BaseGrammar[AnnotatedLabel] = BaseGrammar(annTrees.head.tree.label, annBinaries, annUnaries)
     val firstLevelRefinements = GrammarRefinements(xbarGrammar, annGrammar, {(_: AnnotatedLabel).baseAnnotatedLabel})
-    val secondLevel = GrammarRefinements(annGrammar, split _, {splitRule(_ :Rule[AnnotatedLabel], presplit)}, unsplit)
+    val secondLevel = GrammarRefinements(annGrammar, split _, {splitRule(_ :Rule[AnnotatedLabel], presplit)}, unsplit _)
     val finalRefinements = firstLevelRefinements compose secondLevel
     logger.info("Label refinements:" + finalRefinements.labels)
 

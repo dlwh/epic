@@ -722,8 +722,6 @@ case class LexModelFactory(@Help(text= "The kind of annotation to do on the refi
     val (initLexicon, annBinaries, annUnaries) = GenerativeParser.extractCounts(trees)
     val refGrammar = BaseGrammar(AnnotatedLabel.TOP, annBinaries, annUnaries)
 
-    val wordIndex = Index(trainTrees.iterator.flatMap(_.words))
-
     val cFactory = constrainer
 
     val (xbarGrammar, xbarLexicon) = constrainer.grammar -> constrainer.lexicon
