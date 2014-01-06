@@ -401,6 +401,47 @@ case class MarkExternalUnaries[W]() extends TreeAnnotator[AnnotatedLabel, W, Ann
   }
 }
 
+// For sentiment: we don't want to suffer from parent annotation at the root when all other
+// symbols are symmetric, so we'd rather have something generic like 3^3 rather than 3^TOP
+case class FixRootLabelVerticalAnnotation[W]() extends TreeAnnotator[AnnotatedLabel, W, AnnotatedLabel] {
+  def apply(tree: BinarizedTree[AnnotatedLabel], words: Seq[W]) = {
+    tree match {
+      case b@BinaryTree(label, lc, rc, span) => b
+      case n@NullaryTree(label, span) => n
+      case u@UnaryTree(label, c, chain, span)  =>
+      UnaryTree(label,
+       c.relabelRoot(rootLabel => new AnnotatedLabel(rootLabel.label, rootLabel.headTag, (0 until 1).map(i => rootLabel.label), rootLabel.siblings, rootLabel.features)),
+       chain,
+       span);
+    }
+  }
+}
+
+case class PreterminalAnnotation() extends Annotation
+case class TagAnnotation() extends Annotation
+
+// For sentiment: we don't want to suffer from parent annotation at the root when all other
+// symbols are symmetric, so we'd rather have something generic like 3^3 rather than 3^TOP
+case class MarkPreterminals[W]() extends TreeAnnotator[AnnotatedLabel, W, AnnotatedLabel] {
+  def apply(tree: BinarizedTree[AnnotatedLabel], words: Seq[W]) = {
+    def rec(tree: BinarizedTree[AnnotatedLabel]):BinarizedTree[AnnotatedLabel] = tree match {
+      case b@BinaryTree(label, lc, rc, span) => BinaryTree(label, rec(lc), rec(rc), span);
+      case n@NullaryTree(label, span) => NullaryTree(label, span);
+      case u@UnaryTree(label, c, chain, span)  => {
+        if (c.isLeaf) {
+          UnaryTree(new AnnotatedLabel(label.label, label.headTag, label.parents, label.siblings, label.features ++ Set(new PreterminalAnnotation())),
+                    c.relabelRoot(cLabel => new AnnotatedLabel(cLabel.label, cLabel.headTag, cLabel.parents, cLabel.siblings, cLabel.features ++ Set(new TagAnnotation()))),
+                    chain,
+                    span);
+        } else {
+          UnaryTree(label, rec(c), chain, span);
+        }
+      }
+    }
+    rec(tree);
+  }
+}
+
 trait MarkDominates[W] extends TreeAnnotator[AnnotatedLabel, W, AnnotatedLabel] {
   protected def dominates(x: Tree[AnnotatedLabel]):Boolean
   protected def sym: String

@@ -32,6 +32,9 @@ import epic.features._
 import epic.features.HashFeature
 import epic.util.{Arrays, CacheBroker}
 import epic.trees.annotations.FilterAnnotations
+import com.typesafe.scalalogging.slf4j.Logging
+import epic.trees.annotations.MarkPreterminals
+import epic.trees.annotations.FixRootLabelVerticalAnnotation
 
 /**
  * A rather more sophisticated discriminative parser. Uses features on
@@ -279,19 +282,31 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
                             @Help(text="For features not seen in gold trees, we bin them into dummyFeats * numGoldFeatures bins using hashing.")
                             dummyFeats: Double = 0.5,
                             commonWordThreshold: Int = 100,
+                            ngramCountThreshold: Int = 5,
                             useShape: Boolean = true,
                             useSpanLength: Boolean = true,
                             useBinaryLengths: Boolean = true,
                             useFirstLast: Boolean = true,
                             useSplits: Boolean = true,
                             useBeforeAfter:Boolean = true,
-                            useGoldPos: Boolean = false) extends ParserModelFactory[AnnotatedLabel, String] {
+                            useGoldPos: Boolean = false,
+                            numSpanContextWords:Int = 1,
+                            useRichSpanContext:Boolean = false,
+                            useNGrams:Boolean = false,
+                            maxNGramOrder:Int = 2,
+                            useNot:Boolean = false,
+                            useMorph:Boolean = false,
+                            pathsToMorph:String = "") extends ParserModelFactory[AnnotatedLabel, String] {
+
   type MyModel = SpanModel[AnnotatedLabel, AnnotatedLabel, String]
 
 
 
   def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]], constrainer: CoreGrammar[AnnotatedLabel, String]) = {
     val annTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]] = trainTrees.map(annotator(_))
+    println("Here's what the annotation looks like on the first few trees");
+    annTrees.slice(0, Math.min(3, annTrees.size)).foreach(tree => println(tree.render(false)));
+    
     val (annWords, annBinaries, annUnaries) = this.extractBasicCounts(annTrees)
     val refGrammar = BaseGrammar(AnnotatedLabel.TOP, annBinaries, annUnaries)
 
@@ -319,23 +334,35 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
 
     }
     val indexedRefinements = GrammarRefinements(xbarGrammar, refGrammar, (_: AnnotatedLabel).baseAnnotatedLabel)
+    
+    val mf: MorphFeaturizer = if (useMorph) {
+      MorphFeaturizer(pathsToMorph.split(","));
+    } else {
+      null;
+    }
+    
+    val ngramF = new NGramSpanFeaturizer(sum(annWords, Axis._0), NGramSpanFeaturizer.countBigrams(annTrees), annTrees.map(_.words), ngramCountThreshold, maxNGramOrder, useNot);
+    val spanShapeBetter = new SpanShapeFeaturizerBetter(numSpanContextWords, useRichSpanContext);
 
     val wf = {//WordFeaturizer.goodPOSTagFeaturizer(annWords)
     val dsl = new WordFeaturizer.DSL(annWords)
       import dsl._
-
-      (
-        unigrams(word, 1)
-          + suffixes()
-          + prefixes()
-        )
+      if (useMorph) {
+        unigrams(word, 1) + suffixes() + prefixes() + mf;
+      } else {
+        unigrams(word, 1) + suffixes() + prefixes()
+      }
     }
     val span:SplitSpanFeaturizer[String] = {
       val dsl = new WordFeaturizer.DSL(annWords, commonWordThreshold) with SurfaceFeaturizer.DSL with SplitSpanFeaturizer.DSL
       import dsl._
 
       // class(split + 1)
-      val baseCat = (lfsuf)
+      val baseCat = if (useMorph) {
+        (lfsuf + mf)
+      } else {
+        (lfsuf)
+      }
 
       val leftOfSplit =  ((baseCat)(-1)apply (split))
 
@@ -359,21 +386,33 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
       }
 
       if(useShape) {
-        featurizer += spanShape
+//        featurizer += spanShape
+        featurizer += spanShapeBetter
       }
 
       if(useBinaryLengths) {
         featurizer += distance[String](begin, split)
         featurizer += distance[String](split, end)
       }
-
+      if (useNGrams) {
+        featurizer += ngramF;
+      }
       featurizer
     }
     val indexedWord = IndexedWordFeaturizer.fromData(wf, annTrees.map{_.words})
     val surface = IndexedSplitSpanFeaturizer.fromData(span, annTrees)
-
+    
+    
     def labelFeaturizer(l: AnnotatedLabel) = Set(l, l.baseAnnotatedLabel).toSeq
     def ruleFeaturizer(r: Rule[AnnotatedLabel]) = Set(r, r.map(_.baseAnnotatedLabel)).toSeq
+    
+//    case class LC(x: Any) extends Feature
+//    case class RC(x: Any) extends Feature
+//    def ruleFeaturizer(r: Rule[AnnotatedLabel]) = (Set(r, r.map(_.baseAnnotatedLabel)) ++
+//        (r match {
+//          case BinaryRule(a,b,c) => Seq(LC(b), RC(c))
+//          case _ => Seq.empty
+//        })).toSeq
 
     val featurizer = new ProductionFeaturizer[AnnotatedLabel, AnnotatedLabel, String](xbarGrammar, indexedRefinements,
       lGen=labelFeaturizer,
