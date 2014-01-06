@@ -16,6 +16,7 @@ package epic.trees
 */
 import java.io.File
 import breeze.config.Help
+import epic.util.ArabicNormalization
 
 /**
  * Represents a treebank with attendant spans, binarization, etc. Used in all the parser trainers.
@@ -34,7 +35,8 @@ case class ProcessedTreebank(@Help(text="Location of the treebank directory")
                              binarization: String = "head",
                              treebankType: String = "penn",
                              numSentences: Int = Int.MaxValue,
-                             keepUnaryChainsFromTrain: Boolean = true) {
+                             keepUnaryChainsFromTrain: Boolean = true,
+                             debuckwalterize: Boolean = false) {
 
   lazy val treebank = treebankType.toLowerCase() match {
     case "penn" => Treebank.fromPennTreebankDir(path)
@@ -65,10 +67,11 @@ case class ProcessedTreebank(@Help(text="Location of the treebank directory")
 
   def transformTrees(portion: treebank.Portion, maxL: Int, collapseUnaries: Boolean = false): IndexedSeq[TreeInstance[AnnotatedLabel, String]] = {
     val binarizedAndTransformed = for (
-      ((tree, words), index) <- portion.trees.zipWithIndex if words.length <= maxL
+      ((tree, words), index) <- portion.trees.zipWithIndex if words.length <= maxL;
+      w2 = if(debuckwalterize) words.map(ArabicNormalization.buckwalterToUnicode) else words
     ) yield {
       val name = s"${portion.name}-$index"
-      makeTreeInstance(name, tree, words, collapseUnaries)
+      makeTreeInstance(name, tree, w2, collapseUnaries)
     }
 
     binarizedAndTransformed.toIndexedSeq

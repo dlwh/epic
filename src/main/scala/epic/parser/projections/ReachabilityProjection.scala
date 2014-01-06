@@ -52,7 +52,7 @@ class ReachabilityProjection[L, L2, W](grammar: BaseGrammar[L], lexicon: Lexicon
         globalizedClosest
       } catch {
         case ex:ParseExtractionException =>
-          logger.error("Couldn't find a parse for " + words, ex)
+          logger.error("Couldn't find a parse for " + words +": " + ex.getMessage, ex)
           tree
       }
     })
