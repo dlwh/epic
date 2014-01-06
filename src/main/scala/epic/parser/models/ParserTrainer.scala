@@ -102,12 +102,12 @@ object ParserTrainer extends epic.parser.ParserPipeline with Logging {
       new CachedChartConstraintsFactory[AnnotatedLabel, String](uncached)
     }
 
-    val theTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]] = if(!enforceReachability)  {
-      trainTrees.toIndexedSeq
-    } else {
+    var theTrees = trainTrees.toIndexedSeq.filterNot(sentTooLong(_, params.maxParseLength))
+
+      if(enforceReachability)  {
       val refGrammar = GenerativeParser.annotated(initialParser.grammar, initialParser.lexicon, TreeAnnotator.identity, trainTrees)
       val proj = new ReachabilityProjection(initialParser.grammar, initialParser.lexicon, refGrammar)
-      trainTrees.par.map(ti => ti.copy(tree=proj.forTree(ti.tree, ti.words, constraints.constraints(ti.words)))).seq.toIndexedSeq
+      theTrees = theTrees.par.map(ti => ti.copy(tree=proj.forTree(ti.tree, ti.words, constraints.constraints(ti.words)))).seq.toIndexedSeq
     }
 
     val baseMeasure = if(lossAugment) {
@@ -118,7 +118,7 @@ object ParserTrainer extends epic.parser.ParserPipeline with Logging {
 
     val model = modelFactory.make(theTrees, baseMeasure)
 
-    val obj = new ModelObjective(model, theTrees.filter(_.words.filter(x => x == "'s" || x(0).isLetterOrDigit).length <= params.maxParseLength), params.threads)
+    val obj = new ModelObjective(model, theTrees, params.threads)
     val cachedObj = new CachedBatchDiffFunction(obj)
     val init = obj.initialWeightVector(randomize)
     if(checkGradient) {
@@ -150,5 +150,9 @@ object ParserTrainer extends epic.parser.ParserPipeline with Logging {
     } catch {
       case e: Exception => e.printStackTrace(); throw e
     }
+  }
+
+  def sentTooLong(p: TreeInstance[AnnotatedLabel, String], maxLength: Int): Boolean = {
+    p.words.filter(x => x == "'s" || x(0).isLetterOrDigit).length > maxLength
   }
 }
