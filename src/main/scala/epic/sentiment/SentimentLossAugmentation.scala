@@ -18,7 +18,8 @@ case class SentimentLossAugmentation[W](trainTrees: IndexedSeq[TreeInstance[Anno
                                         grammar: BaseGrammar[AnnotatedLabel],
                                         lexicon: Lexicon[AnnotatedLabel, W],
                                         constraintFactory: ChartConstraints.Factory[AnnotatedLabel, W],
-                                        loss: (Int, Int)=>Double = SentimentLossAugmentation.defaultLoss) extends LossAugmentation[TreeInstance[AnnotatedLabel, W], CoreAnchoring[AnnotatedLabel, W]] with CoreGrammar[AnnotatedLabel, W] {
+                                        loss: (Int, Int)=>Double = SentimentLossAugmentation.defaultLoss,
+                                        rootLossScaling:Double = 1.0) extends LossAugmentation[TreeInstance[AnnotatedLabel, W], CoreAnchoring[AnnotatedLabel, W]] with CoreGrammar[AnnotatedLabel, W] {
 
   val losses = Array.tabulate(5,5)(loss)
 
@@ -65,7 +66,7 @@ case class SentimentLossAugmentation[W](trainTrees: IndexedSeq[TreeInstance[Anno
           if(guessLabel == -1) {
             breeze.numerics.I(goldLabel == guessLabel) * 10000
           } else {
-            losses(goldLabel)(guessLabel)
+            losses(goldLabel)(guessLabel) * (if (begin == 0 && end == words.size) rootLossScaling else 1.0);
           }
         case None =>
            0
@@ -79,5 +80,15 @@ case class SentimentLossAugmentation[W](trainTrees: IndexedSeq[TreeInstance[Anno
 
 object SentimentLossAugmentation {
   def defaultLoss(gold: Int, guess: Int) = (gold - guess).abs.toDouble
+  def posNegLoss(gold: Int, guess: Int) = {
+    if (gold > 2) {
+      if (guess > 2) 0 else 1
+    } else if (gold < 2) {
+      if (guess < 2) 0 else 1
+    } else {
+      if (guess == 2) 0 else 1
+    }
+  }
+  def hammingLoss(gold: Int, guess: Int) = if (gold != guess) 1 else 0;
   def noLoss(gold: Int, guess: Int) = 0
 }

@@ -52,7 +52,7 @@ case class StandardTreeProcessor(headFinder: HeadFinder[AnnotatedLabel] = HeadFi
       transformed
     }
     val ann = transformed.map { label =>
-      val fields = splitLabel(label)
+      val fields = StandardTreeProcessor.splitLabel(label)
       val anno = fields.drop(1).filterNot(s => s.nonEmpty && s.charAt(0).isDigit)
       interner.intern(AnnotatedLabel(fields.head.intern,
         features= anno.iterator.map(tag => functionalTagInterner.intern(FunctionalTag(tag))).toSet
@@ -73,6 +73,9 @@ case class StandardTreeProcessor(headFinder: HeadFinder[AnnotatedLabel] = HeadFi
 
     Trees.binarize(ann, makeIntermediate, extend, headFinder).relabelRoot(_ => AnnotatedLabel.TOP)
   }
+}
+
+object StandardTreeProcessor {
 
   def splitLabel(label: String): Array[String] = try {
     if (label == "PRT|ADVP") return Array("PRT")

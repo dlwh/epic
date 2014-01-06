@@ -36,7 +36,9 @@ case class ProcessedTreebank(@Help(text="Location of the treebank directory")
                              treebankType: String = "penn",
                              numSentences: Int = Int.MaxValue,
                              keepUnaryChainsFromTrain: Boolean = true,
-                             debuckwalterize: Boolean = false) {
+                             debuckwalterize: Boolean = false,
+                             supervisedHeadFinderPtbPath: String = "",
+                             supervisedHeadFinderConllPath: String = "") {
 
   lazy val treebank = treebankType.toLowerCase() match {
     case "penn" => Treebank.fromPennTreebankDir(path)
@@ -90,7 +92,11 @@ case class ProcessedTreebank(@Help(text="Location of the treebank directory")
     binarization match {
       case "xbar" | "right" => HeadFinder.right[String]
       case "leftXbar" | "left" => HeadFinder.left[String]
-      case "head" => HeadFinder.collins
+      case "head" => if (treebankType .startsWith("spmrl")) {
+        SupervisedHeadFinder.trainHeadFinderFromFiles(supervisedHeadFinderPtbPath, supervisedHeadFinderConllPath);
+      } else {
+        HeadFinder.collins
+      }
       case _ => HeadFinder.collins
     }
   }

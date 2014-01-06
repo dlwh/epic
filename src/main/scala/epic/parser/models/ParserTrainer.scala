@@ -115,9 +115,8 @@ object ParserTrainer extends epic.parser.ParserPipeline with Logging {
     } else {
       new ConstraintCoreGrammarAdaptor(initialParser.grammar, initialParser.lexicon, constraints)
     }
-
+    
     val model = modelFactory.make(theTrees, baseMeasure)
-
     val obj = new ModelObjective(model, theTrees, params.threads)
     val cachedObj = new CachedBatchDiffFunction(obj)
     val init = obj.initialWeightVector(randomize)
@@ -127,7 +126,6 @@ object ParserTrainer extends epic.parser.ParserPipeline with Logging {
       GradientTester.testIndices(cachedObj2, obj.initialWeightVector(randomize = true), indices, toString={(i: Int) => model.featureIndex.get(i).toString}, skipZeros = true)
       GradientTester.test(cachedObj2, obj.initialWeightVector(randomize = true), toString={(i: Int) => model.featureIndex.get(i).toString}, skipZeros = true)
     }
-
     type OptState = FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State
     def evalAndCache(pair: (OptState, Int)) {
       val (state, iter) = pair
@@ -142,7 +140,6 @@ object ParserTrainer extends epic.parser.ParserPipeline with Logging {
 
 
     val name = Option(params.name).orElse(Option(model.getClass.getSimpleName).filter(_.nonEmpty)).getOrElse("DiscrimParser")
-
     for ((state, iter) <- params.opt.iterations(cachedObj, init).take(maxIterations).zipWithIndex.tee(evalAndCache _)
          if iter != 0 && iter % iterationsPerEval == 0) yield try {
       val parser = model.extractParser(state.x)
