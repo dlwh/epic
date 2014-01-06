@@ -164,21 +164,22 @@ class IndexedLexFeaturizer[L, L2, W](ruleFeaturizer: RefinedFeaturizer[L, W, Fea
         ruleCache(head)(dep) = cache
       }
 
-      var feats = cache(refinements.rules.globalize(rule, r))
-      if(feats == null) {
+//      var feats = cache(refinements.rules.globalize(rule, r))
+//      if(feats == null) {
         var bilexFeatures: Array[Int] = bilexCache(head)(dep)
         if(bilexFeatures eq null) {
           bilexFeatures = bilexSpec.featuresForAttachment(head, dep)
           bilexCache(head)(dep) = bilexFeatures
         }
 
-        val fi = fspec.featuresForBinaryRule(begin, split, end, rule, r)
-        feats = bilexFeatureIndex.crossProduct(fi, bilexFeatures, offset = bilexOffset, usePlainLabelFeatures = true)
-        cache(refinements.rules.globalize(rule, r)) = feats
+//        feats = bilexFeatureIndex.crossProduct(fi, bilexFeatures, offset = bilexOffset, usePlainLabelFeatures = true)
+//        cache(refinements.rules.globalize(rule, r)) = feats
 
-      }
+//      }
 
-      feats
+//      feats
+       val fi = fspec.featuresForBinaryRule(begin, split, end, rule, r)
+       bilexFeatureIndex.crossProduct(fi, bilexFeatures, offset = bilexOffset, usePlainLabelFeatures = true)
     }
 
 
