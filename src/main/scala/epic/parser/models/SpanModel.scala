@@ -331,7 +331,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
         featurizer += leftOfSplit
         featurizer += baseCat(split)
       }
-      
+
       if(useSpanLength) {
         featurizer += length
       }
@@ -344,7 +344,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
         featurizer += distance[String](begin, split)
         featurizer += distance[String](split, end)
       }
-      
+
       featurizer
     }
     val indexedWord = IndexedWordFeaturizer.fromData(wf, annTrees.map{_.words})
@@ -370,6 +370,6 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
 
     new SpanModel[AnnotatedLabel, AnnotatedLabel, String](indexed, indexed.index, annotator, constrainer, xbarGrammar, xbarLexicon, refGrammar, indexedRefinements,featureCounter.get(_))
   }
+
 }
 
-object SyntheticFeature extends Feature with Serializable

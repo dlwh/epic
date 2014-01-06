@@ -111,7 +111,7 @@ object CrossProductIndex {
                       hashFeatures: HashFeature.Scale = HashFeature.Absolute(0),
                       id: String = "CrossProductIndex",
                       val includeLabelOnlyFeatures: Boolean = true) {
-    private val mapping = Array.fill(firstIndex.size)(new OpenAddressHashArray[Int](secondIndex.size, -1, 4))
+    private val mapping = Array.fill(firstIndex.size)(new OpenAddressHashArray[Int](secondIndex.size max 1, -1, 4))
     private val labelPart, surfacePart = new ArrayBuffer[Int]()
     private val labelOnlySize: Int = if(includeLabelOnlyFeatures) firstIndex.size else 0
 

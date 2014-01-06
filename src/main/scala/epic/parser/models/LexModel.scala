@@ -18,7 +18,7 @@ package models
  limitations under the License.
 */
 import epic.framework._
-import breeze.collection.mutable.OpenAddressHashArray
+import breeze.collection.mutable.{TriangularArray, OpenAddressHashArray}
 import breeze.linalg._
 import epic.trees._
 import epic.trees.annotations.{Xbarize, TreeAnnotator, StripAnnotations}
@@ -34,6 +34,7 @@ import com.typesafe.scalalogging.slf4j.Logging
 import epic.parser.features._
 import epic.trees._
 import epic.parser.projections.GrammarRefinements
+import epic.features.SplitSpanFeaturizer.ZeroSplitSpanFeaturizer
 
 class LexModel[L, L2, W](bundle: LexGrammarBundle[L, L2, W],
                          reannotate: (BinarizedTree[L], IndexedSeq[W])=>BinarizedTree[L2],
@@ -84,15 +85,18 @@ class IndexedLexFeaturizer[L, L2, W](ruleFeaturizer: RefinedFeaturizer[L, W, Fea
                                  wordFeaturizer: IndexedWordFeaturizer[W],
                                  unaryFeaturizer: IndexedWordFeaturizer[W],
                                  bilexFeaturizer: IndexedBilexicalFeaturizer[W],
+                                 splitSpanFeaturizer: Option[IndexedSplitSpanFeaturizer[W]],
                                  val refinements: GrammarRefinements[L, L2],
                                  wordFeatureIndex: CrossProductIndex[Feature, Feature],
                                  unaryFeatureIndex: CrossProductIndex[Feature, Feature],
-                                 bilexFeatureIndex: CrossProductIndex[Feature, Feature]) extends RefinedFeaturizer[L, W, Feature] with Serializable {
+                                 bilexFeatureIndex: CrossProductIndex[Feature, Feature],
+                                 splitSpanFeatureIndex: CrossProductIndex[Feature, Feature]) extends RefinedFeaturizer[L, W, Feature] with Serializable {
 
   val index = SegmentedIndex(wordFeatureIndex, bilexFeatureIndex, unaryFeatureIndex)
   private val wordOffset = index.componentOffset(0)
   private val bilexOffset = index.componentOffset(1)
   private val unaryOffset = index.componentOffset(2)
+  private val splitOffset = index.componentOffset(3)
 
 
   def joinTagRef(head: Int, ref: Int, length: Int) : Int = {
@@ -107,6 +111,7 @@ class IndexedLexFeaturizer[L, L2, W](ruleFeaturizer: RefinedFeaturizer[L, W, Fea
     private val bilexSpec = bilexFeaturizer.anchor(words)
     private val wordSpec = wordFeaturizer.anchor(words)
     private val unarySpec = unaryFeaturizer.anchor(words)
+    private val splitSpanSpec = splitSpanFeaturizer.map(_.anchor(words))
 
     def length = words.length
 
@@ -120,14 +125,33 @@ class IndexedLexFeaturizer[L, L2, W](ruleFeaturizer: RefinedFeaturizer[L, W, Fea
         rcache = new OpenAddressHashArray[Array[Int]](refinements.rules.fineIndex.size)
         headCache(head) = rcache
       }
-      var cache = rcache(globalizedRule)
-      if(cache == null)  {
+
+      var headCached = rcache(globalizedRule)
+      if(headCached == null)  {
         val surfFeatures = unarySpec.featuresForWord(head)
         val rFeatures = fspec.featuresForUnaryRule(begin, end, rule, ruleRef)
-        cache = unaryFeatureIndex.crossProduct(rFeatures, surfFeatures, unaryOffset)
-        rcache(globalizedRule) = cache
+        headCached = unaryFeatureIndex.crossProduct(rFeatures, surfFeatures, unaryOffset)
+        rcache(globalizedRule) = headCached
       }
-      cache
+
+      if(splitSpanSpec.isEmpty) {
+        headCached
+      } else {
+
+        var ucache = unarySpanCache(begin, end)
+        if(ucache eq null) {
+          ucache = new OpenAddressHashArray[Array[Int]](refinements.rules.fineIndex.size)
+          unarySpanCache(begin, end) = ucache
+        }
+        var surfCached = ucache(globalizedRule)
+        if(surfCached == null)  {
+          surfCached = splitSpanFeatureIndex.crossProduct(fspec.featuresForUnaryRule(begin, end, rule, ruleRef),
+            getSpanFeatures(begin, end), splitOffset, true)
+          ucache(globalizedRule) = surfCached
+        }
+        Arrays.concatenate(surfCached, headCached)
+      }
+
     }
 
     def featuresForSpan(begin: Int, end: Int, tag: Int, ref: Int) = {
@@ -146,6 +170,24 @@ class IndexedLexFeaturizer[L, L2, W](ruleFeaturizer: RefinedFeaturizer[L, W, Fea
           wordSpec.featuresForWord(head), offset = wordOffset, usePlainLabelFeatures = false)
         rcache(refinedTag) = cache
       }
+
+      if(splitSpanSpec.nonEmpty && begin < end - 1) {
+        var labelCache = spanCache(begin, end)
+        if(labelCache eq null) {
+          labelCache = new OpenAddressHashArray[Array[Int]](refinements.labels.fineIndex.size)
+          spanCache(begin, end) = labelCache
+        }
+        var lcached = labelCache(refinedTag)
+        if(lcached == null)  {
+          val spanFeats: Array[Int] = fspec.featuresForSpan(begin, end, tag, localTagRef)
+          lcached = splitSpanFeatureIndex.crossProduct(spanFeats, getSpanFeatures(begin, end), splitOffset, true)
+          labelCache(refinedTag) = lcached
+        }
+        lcached
+
+
+        cache = Arrays.concatenate(cache, lcached)
+      }
       cache
     }
 
@@ -156,32 +198,71 @@ class IndexedLexFeaturizer[L, L2, W](ruleFeaturizer: RefinedFeaturizer[L, W, Fea
       assert(head < end && head >= begin, (head, begin, end))
       assert(dep < end && dep >= begin, (dep, begin, end))
       assert( (head < split && end >= split) || (head >= split && dep < split))
-      val r = binaryRuleRefinement(ref)
+      val ruleRef = binaryRuleRefinement(ref)
 
+      val feats = featuresForHeadDepRule(begin, split, end, head, dep, rule, ruleRef)
+
+      if (splitSpanSpec.isEmpty) {
+        feats
+      } else {
+        val lcached = featuresForSplitRule(begin, split, end, rule, ruleRef)
+
+        Arrays.concatenate(feats, lcached)
+      }
+
+    }
+
+
+    def featuresForHeadDepRule(begin: Int, split: Int, end: Int, head: Int, dep: Int, rule: Int, ruleRef: Int): Array[Int] = {
       var cache = ruleCache(head)(dep)
       if (cache == null) {
         cache = new OpenAddressHashArray[Array[Int]](refinements.rules.fineIndex.size)
         ruleCache(head)(dep) = cache
       }
 
-//      var feats = cache(refinements.rules.globalize(rule, r))
-//      if(feats == null) {
+      var feats = cache(refinements.rules.globalize(rule, ruleRef))
+      if (feats == null) {
         var bilexFeatures: Array[Int] = bilexCache(head)(dep)
-        if(bilexFeatures eq null) {
+        if (bilexFeatures eq null) {
           bilexFeatures = bilexSpec.featuresForAttachment(head, dep)
           bilexCache(head)(dep) = bilexFeatures
         }
 
-//        feats = bilexFeatureIndex.crossProduct(fi, bilexFeatures, offset = bilexOffset, usePlainLabelFeatures = true)
-//        cache(refinements.rules.globalize(rule, r)) = feats
+        val fi = fspec.featuresForBinaryRule(begin, split, end, rule, ruleRef)
+        feats = bilexFeatureIndex.crossProduct(fi, bilexFeatures, offset = bilexOffset, usePlainLabelFeatures = true)
+        cache(refinements.rules.globalize(rule, ruleRef)) = feats
 
-//      }
-
-//      feats
-       val fi = fspec.featuresForBinaryRule(begin, split, end, rule, r)
-       bilexFeatureIndex.crossProduct(fi, bilexFeatures, offset = bilexOffset, usePlainLabelFeatures = true)
+      }
+      feats
     }
 
+    def featuresForSplitRule(begin: Int, split: Int, end: Int, rule: Int, ruleRef: Int): Array[Int] = {
+      val globalizedRule = refinements.rules.globalize(rule, ruleRef)
+      
+      var ucache = binaryCache(begin, end)
+      if (ucache eq null) {
+        ucache = new Array[OpenAddressHashArray[Array[Int]]](end - begin)
+        binaryCache(begin, end) = ucache
+      }
+
+      var scache = ucache(split - begin)
+      if (scache eq null) {
+        scache = new OpenAddressHashArray[Array[Int]](refinements.rules.fineIndex.size)
+        ucache(split - begin) = scache
+      }
+
+      var lcached = scache(globalizedRule)
+      if (lcached == null) {
+        val spanFeatures = getSpanFeatures(begin, end)
+        lcached = splitSpanFeatureIndex.crossProduct(fspec.featuresForBinaryRule(begin, split, end, rule, ruleRef), spanFeatures, splitOffset, true)
+        val forSplit = splitSpanFeatureIndex.crossProduct(fspec.featuresForBinaryRule(begin, split, end, rule, ruleRef),
+          splitSpanSpec.map(_.featuresForSplit(begin, split, end)).getOrElse(Array.empty), splitOffset, false)
+        if (forSplit.length > 0)
+          lcached = Arrays.concatenate(lcached, forSplit)
+        scache(ruleRef) = lcached
+      }
+      lcached
+    }
 
     def headIndex(ruleRef: Int) = {
       (ruleRef / words.length) % words.length
@@ -213,6 +294,15 @@ class IndexedLexFeaturizer[L, L2, W](ruleFeaturizer: RefinedFeaturizer[L, W, Fea
 
     def joinTagRef(head: Int, ref: Int) : Int = IndexedLexFeaturizer.this.joinTagRef(head, ref, words.length)
 
+    private def getSpanFeatures(begin: Int, end: Int):Array[Int] = {
+      var cache = rawSpanCache(begin, end)
+      if(cache eq null) {
+        cache = splitSpanSpec.get.featuresForSpan(begin, end)
+        rawSpanCache(begin, end) = cache
+      }
+      cache
+    }
+
     // caches:
 
     // words
@@ -223,6 +313,11 @@ class IndexedLexFeaturizer[L, L2, W](ruleFeaturizer: RefinedFeaturizer[L, W, Fea
     val headCache = new Array[OpenAddressHashArray[Array[Int]]](words.length)
     // headIndex -> (depIndex x ruleIndex) -> Array[Int]
     val wordCache = new Array[OpenAddressHashArray[Array[Int]]](words.length)
+    val rawSpanCache = new TriangularArray[Array[Int]](words.length + 1)
+    val unarySpanCache = new TriangularArray[OpenAddressHashArray[Array[Int]]](words.length + 1)
+    // (begin, end) -> (split - begin) -> Array[Int]
+    val binaryCache = new TriangularArray[Array[OpenAddressHashArray[Array[Int]]]](words.length + 1)
+    val spanCache = new TriangularArray[OpenAddressHashArray[Array[Int]]](words.length + 1)
   }
 
 }
@@ -640,6 +735,7 @@ case class LexGrammarBundle[L, L2, W](baseGrammar: BaseGrammar[L],
 object IndexedLexFeaturizer extends Logging {
   def extract[L, L2, Datum, W](ruleFeaturizer: RefinedFeaturizer[L, W, Feature],
                            bilexFeaturizer: IndexedBilexicalFeaturizer[W],
+                           splitSpanFeaturizer: Option[IndexedSplitSpanFeaturizer[W]],
                            unaryFeaturizer: IndexedWordFeaturizer[W],
                            wordFeaturizer: IndexedWordFeaturizer[W],
                            headFinder: HeadFinder[L2],
@@ -651,6 +747,7 @@ object IndexedLexFeaturizer extends Logging {
     val bilexFeatureIndex = bilexFeaturizer.featureIndex
     val wordFeatureIndex = wordFeaturizer.featureIndex
     val unaryFeatureIndex = unaryFeaturizer.featureIndex
+    val splitSpanFeatureIndex = splitSpanFeaturizer.map(_.featureIndex)
 
     val progress = new ProgressLog(logger, trees.size, name="LexFeatures")
 
@@ -658,11 +755,13 @@ object IndexedLexFeaturizer extends Logging {
     val bilexBuilder = new CrossProductIndex.Builder(ruleFeatureIndex, bilexFeatureIndex, dummyFeatScale, "Bilex", includeLabelOnlyFeatures = true)
     val wordBuilder = new CrossProductIndex.Builder(ruleFeatureIndex, wordFeatureIndex, dummyFeatScale, "Monolex", includeLabelOnlyFeatures = false)
     val unaryBuilder = new CrossProductIndex.Builder(ruleFeatureIndex, unaryFeatureIndex, dummyFeatScale, "Unary", includeLabelOnlyFeatures = true)
+    val splitBuilder = new CrossProductIndex.Builder(ruleFeatureIndex, splitSpanFeatureIndex.getOrElse(Index[Feature]()), dummyFeatScale, "Split", includeLabelOnlyFeatures = false)
     for(ti <- trees) {
       val ruleSpec = ruleFeaturizer.anchor(hasWords.get(ti))
       val bilexSpec = bilexFeaturizer.anchor(hasWords.get(ti))
       val wordSpec = wordFeaturizer.anchor(hasWords.get(ti))
       val unarySpec = unaryFeaturizer.anchor(hasWords.get(ti))
+      val splitSpanSpec = splitSpanFeaturizer.map(_.anchor(hasWords.get(ti)))
       val words = hasWords.get(ti)
       val tree = ann(hasTree.get(ti), words)
       // returns head
@@ -678,6 +777,9 @@ object IndexedLexFeaturizer extends Logging {
           val (ri, rref) = refinements.rules.indexAndLocalize(r)
           unaryBuilder.add(ruleSpec.featuresForUnaryRule(span.begin, span.end, ri, rref),
                            unarySpec.featuresForWord(head))
+          if(splitSpanSpec.nonEmpty)
+            splitBuilder.add(ruleSpec.featuresForUnaryRule(span.begin, span.end, ri, rref),
+              splitSpanSpec.get.featuresForSpan(span.begin, span.end))
           head
         case t@BinaryTree(a, b, c, span) =>
           val (leftHead,rightHead) = (rec(t.leftChild), rec(t.rightChild))
@@ -687,7 +789,20 @@ object IndexedLexFeaturizer extends Logging {
           val (ri, rref) = refinements.rules.indexAndLocalize(r)
           val bilexFeatures = bilexSpec.featuresForAttachment(head, dep)
           val split = t.splitPoint
+          val (ai, aref) = refinements.labels.indexAndLocalize(a)
+          wordBuilder.add(ruleSpec.featuresForSpan(span.begin, span.end, ai, aref),
+            wordSpec.featuresForWord(head))
+
           bilexBuilder.add(ruleSpec.featuresForBinaryRule(span.begin, split, span.end, ri, rref), bilexFeatures)
+
+          if(splitSpanFeaturizer.nonEmpty) splitBuilder.add(ruleSpec.featuresForBinaryRule(span.begin, t.splitPoint, span.end, ri, rref),
+            splitSpanSpec.get.featuresForSpan(span.begin, span.end))
+
+          if(splitSpanFeaturizer.nonEmpty) splitBuilder.add(ruleSpec.featuresForBinaryRule(span.begin, t.splitPoint, span.end, ri, rref),
+            splitSpanSpec.get.featuresForSplit(span.begin, t.splitPoint, span.end))
+
+          if(splitSpanFeaturizer.nonEmpty) splitBuilder.add(ruleSpec.featuresForSpan(span.begin, span.end, ai, aref),
+            splitSpanSpec.get.featuresForSpan(span.begin, span.end))
           head
       }
       rec(tree)
@@ -698,13 +813,15 @@ object IndexedLexFeaturizer extends Logging {
     val bfi = bilexBuilder.result()
     assert(bfi.includePlainLabelFeatures)
     val ufi = unaryBuilder.result()
+    val sfi = splitBuilder.result()
 
     new IndexedLexFeaturizer(ruleFeaturizer,
       wordFeaturizer,
       unaryFeaturizer,
       bilexFeaturizer,
+      splitSpanFeaturizer,
       refinements,
-      wfi, ufi, bfi)
+      wfi, ufi, bfi, sfi)
   }
 }
 
@@ -715,7 +832,8 @@ case class LexModelFactory(@Help(text= "The kind of annotation to do on the refi
                            @Help(text="For features not seen in gold trees, we bin them into dummyFeats * numGoldFeatures bins using hashing.")
                            dummyFeats: Double = 1.0,
                            @Help(text="How common must a feature be before we remember it?")
-                           minFeatCutoff: Int = 1) extends ParserModelFactory[AnnotatedLabel, String] with SafeLogging {
+                           minFeatCutoff: Int = 1,
+                           useSpanFeatures: Boolean = false) extends ParserModelFactory[AnnotatedLabel, String] with SafeLogging {
   type MyModel = LexModel[AnnotatedLabel, AnnotatedLabel, String]
 
   def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]], constrainer: CoreGrammar[AnnotatedLabel, String]) ={
@@ -750,6 +868,48 @@ case class LexModelFactory(@Help(text= "The kind of annotation to do on the refi
       (wf, word + shape + clss, bilexF)
     }
 
+    val spanFeaturizer = if(!useSpanFeatures) {
+      new ZeroSplitSpanFeaturizer[String]
+    } else {
+      val dsl = new WordFeaturizer.DSL(initLexicon) with SurfaceFeaturizer.DSL with SplitSpanFeaturizer.DSL
+      import dsl._
+
+      // class(split + 1)
+      val baseCat = (lfsuf)
+
+      val leftOfSplit =  ((baseCat)(-1)apply (split))
+
+      var featurizer: SplitSpanFeaturizer[String] = zeroSplit[String]
+//      if (useFirstLast) {
+        featurizer += baseCat(begin)
+        featurizer += baseCat(end-1)
+//      }
+//      if (useBeforeAfter) {
+        featurizer += baseCat(begin-1)
+        featurizer += baseCat(end)
+//      }
+
+//      if(useSplits) {
+        featurizer += leftOfSplit
+        featurizer += baseCat(split)
+//      }
+
+//      if(useSpanLength) {
+        featurizer += length
+//      }
+
+//      if(useShape) {
+        featurizer += spanShape
+//      }
+
+//      if(useBinaryLengths) {
+        featurizer += distance[String](begin, split)
+        featurizer += distance[String](split, end)
+//      }
+
+      featurizer
+    }
+
     val headFinder = HeadFinder.collins.lensed[AnnotatedLabel]
 
     val indexedWordFeaturizer = IndexedWordFeaturizer.fromData(wordFeaturizer, trees.map(_.words))
@@ -758,6 +918,14 @@ case class LexModelFactory(@Help(text= "The kind of annotation to do on the refi
       val dependencyTrees = trees.map ( DependencyTree.fromTreeInstance[AnnotatedLabel, String](_, headFinder) )
       IndexedBilexicalFeaturizer.fromData(bilexFeaturizer, dependencyTrees)
     }
+
+    val indexedSplitSpanFeaturizer = {
+      if(useSpanFeatures)
+        Some(IndexedSplitSpanFeaturizer.fromData(spanFeaturizer, trees))
+      else
+        None
+    }
+
 
 
     def labelFeaturizer(l: AnnotatedLabel) = Set(l, l.baseAnnotatedLabel).toSeq
@@ -780,6 +948,7 @@ case class LexModelFactory(@Help(text= "The kind of annotation to do on the refi
     type L = AnnotatedLabel
     val indexed =  IndexedLexFeaturizer.extract(featurizer,
       indexedBilexicalFeaturizer,
+      indexedSplitSpanFeaturizer,
       indexedUnaryFeaturizer,
       indexedWordFeaturizer,
       headFinder,
