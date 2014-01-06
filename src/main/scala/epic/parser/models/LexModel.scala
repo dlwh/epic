@@ -92,7 +92,7 @@ class IndexedLexFeaturizer[L, L2, W](ruleFeaturizer: RefinedFeaturizer[L, W, Fea
                                  bilexFeatureIndex: CrossProductIndex[Feature, Feature],
                                  splitSpanFeatureIndex: CrossProductIndex[Feature, Feature]) extends RefinedFeaturizer[L, W, Feature] with Serializable {
 
-  val index = SegmentedIndex(wordFeatureIndex, bilexFeatureIndex, unaryFeatureIndex)
+  val index = SegmentedIndex(wordFeatureIndex, bilexFeatureIndex, unaryFeatureIndex, splitSpanFeatureIndex)
   private val wordOffset = index.componentOffset(0)
   private val bilexOffset = index.componentOffset(1)
   private val unaryOffset = index.componentOffset(2)
