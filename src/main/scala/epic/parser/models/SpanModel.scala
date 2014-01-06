@@ -284,7 +284,8 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
                             useBinaryLengths: Boolean = true,
                             useFirstLast: Boolean = true,
                             useSplits: Boolean = true,
-                            useBeforeAfter:Boolean = true) extends ParserModelFactory[AnnotatedLabel, String] {
+                            useBeforeAfter:Boolean = true,
+                            useGoldPos: Boolean = false) extends ParserModelFactory[AnnotatedLabel, String] {
   type MyModel = SpanModel[AnnotatedLabel, AnnotatedLabel, String]
 
 
@@ -295,7 +296,28 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     val refGrammar = BaseGrammar(AnnotatedLabel.TOP, annBinaries, annUnaries)
 
     val xbarGrammar = constrainer.grammar
-    val xbarLexicon = constrainer.lexicon
+    var xbarLexicon = constrainer.lexicon
+    if(useGoldPos) {
+      val old = xbarLexicon
+      xbarLexicon = new Lexicon[AnnotatedLabel, String] {
+        def labelIndex: Index[AnnotatedLabel] = old.labelIndex
+        val tagSegs = trainTrees.map(_.asTaggedSequence).map(seq => seq.words -> seq.tags.map(_.baseAnnotatedLabel).map(labelIndex(_)).map(Set(_))).toMap
+
+        def anchor(w: IndexedSeq[String]): Anchoring = new Anchoring {
+          def length: Int = w.length
+
+          val oldAnch = old.anchor(w)
+
+          val preds = tagSegs.getOrElse(w, (0 until w.length).map(oldAnch.allowedTags(_)))
+
+          def allowedTags(pos: Int): Set[Int] = {
+            preds(pos)
+
+          }
+        }
+      }
+
+    }
     val indexedRefinements = GrammarRefinements(xbarGrammar, refGrammar, (_: AnnotatedLabel).baseAnnotatedLabel)
 
     val wf = {//WordFeaturizer.goodPOSTagFeaturizer(annWords)
