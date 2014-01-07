@@ -286,12 +286,12 @@ class IndexedLexFeaturizer[L, L2, W](grammar: BaseGrammar[L],
 
       var lcached = scache(globalizedRule)
       if (lcached == null) {
-        val spanFeatures = getSpanFeatures(begin, end)
-        lcached = splitSpanFeatureIndex.crossProduct(fspec.featuresForBinaryRule(begin, split, end, rule, ruleRef), spanFeatures, splitOffset, true)
-        val forSplit = splitSpanFeatureIndex.crossProduct(fspec.featuresForBinaryRule(begin, split, end, rule, ruleRef),
-          splitSpanSpec.map(_.featuresForSplit(begin, split, end)).getOrElse(Array.empty), splitOffset, false)
-        if (forSplit.length > 0)
-          lcached = Arrays.concatenate(lcached, forSplit)
+//        val spanFeatures = getSpanFeatures(begin, end)
+//        lcached = splitSpanFeatureIndex.crossProduct(fspec.featuresForBinaryRule(begin, split, end, rule, ruleRef), spanFeatures, splitOffset, true)
+        lcached = splitSpanFeatureIndex.crossProduct(fspec.featuresForBinaryRule(begin, split, end, rule, ruleRef),
+          getSplitFeatures(begin, split, end), splitOffset, false)
+//        if (forSplit.length > 0)
+//          lcached = Arrays.concatenate(lcached, forSplit)
         scache(ruleRef) = lcached
       }
       lcached
@@ -336,6 +336,25 @@ class IndexedLexFeaturizer[L, L2, W](grammar: BaseGrammar[L],
       cache
     }
 
+
+    private def getSplitFeatures(begin: Int, split: Int, end: Int):Array[Int] = {
+      var cache = rawSplitCache(begin, end)
+
+      if(cache eq null) {
+        cache = new Array[Array[Int]](end- begin)
+        rawSplitCache(begin, end) = cache
+      }
+
+      var scache = cache(split - begin)
+      if (scache eq null) {
+        val span = getSpanFeatures(begin, end)
+        scache = Arrays.concatenate(span, splitSpanSpec.get.featuresForSplit(begin, split, end))
+        cache(split - begin) = scache
+      }
+
+      scache
+    }
+
     // caches:
 
     // words
@@ -348,6 +367,7 @@ class IndexedLexFeaturizer[L, L2, W](grammar: BaseGrammar[L],
     // headIndex -> (depIndex x ruleIndex) -> Array[Int]
     val wordCache = new Array[OpenAddressHashArray[Array[Int]]](words.length)
     val rawSpanCache = new TriangularArray[Array[Int]](words.length + 1)
+    val rawSplitCache = new TriangularArray[Array[Array[Int]]](words.length + 1)
     val unarySpanCache = new TriangularArray[OpenAddressHashArray[Array[Int]]](words.length + 1)
     // (begin, end) -> (split - begin) -> Array[Int]
     val binaryCache = new TriangularArray[Array[OpenAddressHashArray[Array[Int]]]](words.length + 1)
