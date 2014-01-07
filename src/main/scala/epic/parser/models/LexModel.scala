@@ -20,21 +20,19 @@ package models
 import epic.framework._
 import breeze.collection.mutable.{TriangularArray, OpenAddressHashArray}
 import breeze.linalg._
-import epic.trees._
-import epic.trees.annotations.{Xbarize, TreeAnnotator, StripAnnotations}
+import epic.trees.annotations.{Xbarize, TreeAnnotator}
 import java.io.File
 import epic.parser._
 import breeze.util._
 import breeze.config.Help
 import epic.lexicon.Lexicon
 import epic.features._
-import epic.parser.features._
 import epic.util._
 import com.typesafe.scalalogging.slf4j.Logging
-import epic.parser.features._
 import epic.trees._
 import epic.parser.projections.GrammarRefinements
 import epic.features.SplitSpanFeaturizer.ZeroSplitSpanFeaturizer
+import scala.collection.mutable.ArrayBuffer
 
 class LexModel[L, L2, W](bundle: LexGrammarBundle[L, L2, W],
                          reannotate: (BinarizedTree[L], IndexedSeq[W])=>BinarizedTree[L2],
@@ -81,12 +79,16 @@ class LexModel[L, L2, W](bundle: LexGrammarBundle[L, L2, W],
  * @tparam L Label
  * @tparam W Word
  */
-class IndexedLexFeaturizer[L, L2, W](ruleFeaturizer: RefinedFeaturizer[L, W, Feature],
+class IndexedLexFeaturizer[L, L2, W](grammar: BaseGrammar[L],
+                                 rawLabelFeatures: Array[Array[Int]],
+                                 rawDirFeatures: Array[Array[Int]],
+                                 ruleFeaturizer: RefinedFeaturizer[L, W, Feature],
                                  wordFeaturizer: IndexedWordFeaturizer[W],
                                  unaryFeaturizer: IndexedWordFeaturizer[W],
                                  bilexFeaturizer: IndexedBilexicalFeaturizer[W],
                                  splitSpanFeaturizer: Option[IndexedSplitSpanFeaturizer[W]],
                                  val refinements: GrammarRefinements[L, L2],
+                                 val useBilexRuleFeatures: Boolean,
                                  wordFeatureIndex: CrossProductIndex[Feature, Feature],
                                  unaryFeatureIndex: CrossProductIndex[Feature, Feature],
                                  bilexFeatureIndex: CrossProductIndex[Feature, Feature],
@@ -111,7 +113,7 @@ class IndexedLexFeaturizer[L, L2, W](ruleFeaturizer: RefinedFeaturizer[L, W, Fea
     private val bilexSpec = bilexFeaturizer.anchor(words)
     private val wordSpec = wordFeaturizer.anchor(words)
     private val unarySpec = unaryFeaturizer.anchor(words)
-    private val splitSpanSpec = splitSpanFeaturizer.map(_.anchor(words))
+    val splitSpanSpec = splitSpanFeaturizer.map(_.anchor(words))
 
     def length = words.length
 
@@ -192,6 +194,8 @@ class IndexedLexFeaturizer[L, L2, W](ruleFeaturizer: RefinedFeaturizer[L, W, Fea
     }
 
 
+
+
     def featuresForBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int) =  {
       val head = headIndex(ref)
       val dep = depIndex(ref)
@@ -200,16 +204,45 @@ class IndexedLexFeaturizer[L, L2, W](ruleFeaturizer: RefinedFeaturizer[L, W, Fea
       assert( (head < split && end >= split) || (head >= split && dep < split))
       val ruleRef = binaryRuleRefinement(ref)
 
-      val feats = featuresForHeadDepRule(begin, split, end, head, dep, rule, ruleRef)
+      val arrays = new ArrayBuffer[Array[Int]]()
 
-      if (splitSpanSpec.isEmpty) {
-        feats
-      } else {
-        val lcached = featuresForSplitRule(begin, split, end, rule, ruleRef)
-
-        Arrays.concatenate(feats, lcached)
+      if(useBilexRuleFeatures) {
+        arrays += featuresForHeadDepRule(begin, split, end, head, dep, rule, ruleRef)
       }
 
+      if(splitSpanSpec.nonEmpty) {
+        arrays += featuresForSplitRule(begin, split, end, rule, ruleRef)
+      }
+
+      val tag = grammar.parent(rule)
+      val refinedTag = refinements.labels.globalize(tag, refinements.parentRefinement(rule, ruleRef))
+      arrays += featuresForAttach(head, dep, refinedTag)
+
+
+      Arrays.concatenate(arrays:_*)
+    }
+
+    def featuresForAttach(head: Int, dep: Int, refinedTag: Int) = {
+      var cache = attachCache(head)(dep)
+      if (cache == null) {
+        cache = new OpenAddressHashArray[Array[Int]](refinements.labels.fineIndex.size)
+        attachCache(head)(dep) = cache
+      }
+
+      var feats = cache(refinedTag)
+      if (feats == null) {
+        var bilexFeatures: Array[Int] = bilexCache(head)(dep)
+        if (bilexFeatures eq null) {
+          bilexFeatures = bilexSpec.featuresForAttachment(head, dep)
+          bilexCache(head)(dep) = bilexFeatures
+        }
+
+        val fi = Arrays.concatenate(rawLabelFeatures(refinedTag), if(head < dep) rawDirFeatures(0) else rawDirFeatures(1))
+        feats = bilexFeatureIndex.crossProduct(fi, bilexFeatures, offset = bilexOffset, usePlainLabelFeatures = true)
+        cache(refinedTag) = feats
+
+      }
+      feats
     }
 
 
@@ -309,6 +342,7 @@ class IndexedLexFeaturizer[L, L2, W](ruleFeaturizer: RefinedFeaturizer[L, W, Fea
     // headIndex -> depIndex -> Array[Int]
     val bilexCache = Array.ofDim[Array[Int]](words.length, words.length)
     val ruleCache = Array.ofDim[OpenAddressHashArray[Array[Int]]](words.length, words.length)
+    val attachCache = Array.ofDim[OpenAddressHashArray[Array[Int]]](words.length, words.length)
     // headIndex -> (ruleIndex) -> Array[Int]
     val headCache = new Array[OpenAddressHashArray[Array[Int]]](words.length)
     // headIndex -> (depIndex x ruleIndex) -> Array[Int]
@@ -368,8 +402,58 @@ final class LexGrammar[L, L2, W](val grammar: BaseGrammar[L],
     }
 
 
+    val attachCache = Array.ofDim[OpenAddressHashArray[Double]](words.length, words.length)
+    val ruleCache = new TriangularArray[Array[OpenAddressHashArray[Double]]](words.length + 1)
     def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int) = {
-      dot(f.featuresForBinaryRule(begin, split, end, rule, ref))
+      var score = 0.0
+      val head = headIndex(ref)
+      val dep = depIndex(ref)
+      assert(head < end && head >= begin, (head, begin, end))
+      var cache = attachCache(head)(dep)
+      if (cache == null) {
+        cache = new OpenAddressHashArray[Double](refinements.labels.fineIndex.size, Double.NaN)
+        attachCache(head)(dep) = cache
+      }
+
+      val tag = grammar.parent(rule)
+      val ruleRef = this.binaryRuleRef(ref)
+      val refinedTag = refinements.labels.globalize(tag, refinements.parentRefinement(rule, ruleRef))
+      var attachScore = cache(refinedTag)
+      if(java.lang.Double.isNaN(attachScore)) {
+        attachScore = dot(f.featuresForAttach(head, dep, refinedTag))
+        cache(refinedTag) = attachScore
+      }
+      score += attachScore
+
+      if(f.splitSpanSpec.nonEmpty) {
+        var ucache = ruleCache(begin, end)
+        if (ucache eq null) {
+          ucache = new Array[OpenAddressHashArray[Double]](end - begin)
+          ruleCache(begin, end) = ucache
+        }
+
+        var scache = ucache(split - begin)
+        if (scache eq null) {
+          scache = new OpenAddressHashArray[Double](refinements.rules.fineIndex.size, Double.NaN)
+          ucache(split - begin) = scache
+        }
+
+        val globalizedRule = refinements.rules.globalize(rule, ruleRef)
+
+        var lcached = scache(globalizedRule)
+        if (java.lang.Double.isNaN(lcached)) {
+          lcached = dot(f.featuresForSplitRule(begin, split, end, rule, ruleRef))
+          scache(ruleRef) = lcached
+        }
+
+        score += lcached
+      }
+
+      if(featurizer.useBilexRuleFeatures) {
+        score += dot(f.featuresForHeadDepRule(begin, split, end, head, dep, rule, ruleRef))
+      }
+
+      score
     }
 
     def headIndex(ruleRef: Int) = f.headIndex(ruleRef)
@@ -733,7 +817,7 @@ case class LexGrammarBundle[L, L2, W](baseGrammar: BaseGrammar[L],
 }
 
 object IndexedLexFeaturizer extends Logging {
-  def extract[L, L2, Datum, W](ruleFeaturizer: RefinedFeaturizer[L, W, Feature],
+  def extract[L, L2, Datum, W](ruleFeaturizer: ProductionFeaturizer[L, L2, W],
                            bilexFeaturizer: IndexedBilexicalFeaturizer[W],
                            splitSpanFeaturizer: Option[IndexedSplitSpanFeaturizer[W]],
                            unaryFeaturizer: IndexedWordFeaturizer[W],
@@ -741,6 +825,7 @@ object IndexedLexFeaturizer extends Logging {
                            headFinder: HeadFinder[L2],
                            ann: (BinarizedTree[L], IndexedSeq[W]) => BinarizedTree[L2],
                            refinements: GrammarRefinements[L, L2],
+                           useBilexRuleFeatures: Boolean,
                            dummyFeatScale: HashFeature.Scale = HashFeature.Absolute(0),
                            trees: Traversable[Datum])(implicit hasWords: Has2[Datum, IndexedSeq[W]], hasTree: Has2[Datum, BinarizedTree[L]]) : IndexedLexFeaturizer[L, L2, W] = {
 
@@ -749,6 +834,9 @@ object IndexedLexFeaturizer extends Logging {
     val unaryFeatureIndex = unaryFeaturizer.featureIndex
     val splitSpanFeatureIndex = splitSpanFeaturizer.map(_.featureIndex)
 
+    val labelFeatures = Array.tabulate(refinements.labels.fineIndex.size)(rf => ruleFeaturizer.featuresFor(refinements.labels.fineIndex.get(rf)))
+    val attachFeatures = Array(Array(ruleFeaturizer.index(AttachLeft)), Array(ruleFeaturizer.index(AttachRight)))
+
     val progress = new ProgressLog(logger, trees.size, name="LexFeatures")
 
     val ruleFeatureIndex = ruleFeaturizer.index
@@ -756,6 +844,7 @@ object IndexedLexFeaturizer extends Logging {
     val wordBuilder = new CrossProductIndex.Builder(ruleFeatureIndex, wordFeatureIndex, dummyFeatScale, "Monolex", includeLabelOnlyFeatures = false)
     val unaryBuilder = new CrossProductIndex.Builder(ruleFeatureIndex, unaryFeatureIndex, dummyFeatScale, "Unary", includeLabelOnlyFeatures = true)
     val splitBuilder = new CrossProductIndex.Builder(ruleFeatureIndex, splitSpanFeatureIndex.getOrElse(Index[Feature]()), dummyFeatScale, "Split", includeLabelOnlyFeatures = false)
+
     for(ti <- trees) {
       val ruleSpec = ruleFeaturizer.anchor(hasWords.get(ti))
       val bilexSpec = bilexFeaturizer.anchor(hasWords.get(ti))
@@ -792,8 +881,12 @@ object IndexedLexFeaturizer extends Logging {
           val (ai, aref) = refinements.labels.indexAndLocalize(a)
           wordBuilder.add(ruleSpec.featuresForSpan(span.begin, span.end, ai, aref),
             wordSpec.featuresForWord(head))
+          val aglob = refinements.labels.fineIndex(a)
 
-          bilexBuilder.add(ruleSpec.featuresForBinaryRule(span.begin, split, span.end, ri, rref), bilexFeatures)
+          if(useBilexRuleFeatures)
+            bilexBuilder.add(ruleSpec.featuresForBinaryRule(span.begin, split, span.end, ri, rref), bilexFeatures)
+          bilexBuilder.add(labelFeatures(aglob), bilexFeatures)
+          bilexBuilder.add(attachFeatures(if(headIsLeft) 0 else 1), bilexFeatures)
 
           if(splitSpanFeaturizer.nonEmpty) splitBuilder.add(ruleSpec.featuresForBinaryRule(span.begin, t.splitPoint, span.end, ri, rref),
             splitSpanSpec.get.featuresForSpan(span.begin, span.end))
@@ -815,12 +908,17 @@ object IndexedLexFeaturizer extends Logging {
     val ufi = unaryBuilder.result()
     val sfi = splitBuilder.result()
 
-    new IndexedLexFeaturizer(ruleFeaturizer,
+
+    new IndexedLexFeaturizer(ruleFeaturizer.grammar,
+      labelFeatures,
+      attachFeatures,
+      ruleFeaturizer,
       wordFeaturizer,
       unaryFeaturizer,
       bilexFeaturizer,
       splitSpanFeaturizer,
       refinements,
+      useBilexRuleFeatures,
       wfi, ufi, bfi, sfi)
   }
 }
@@ -833,7 +931,8 @@ case class LexModelFactory(@Help(text= "The kind of annotation to do on the refi
                            dummyFeats: Double = 1.0,
                            @Help(text="How common must a feature be before we remember it?")
                            minFeatCutoff: Int = 1,
-                           useSpanFeatures: Boolean = false) extends ParserModelFactory[AnnotatedLabel, String] with SafeLogging {
+                           useSpanFeatures: Boolean = false,
+                           useBilexRuleFeatures: Boolean = true) extends ParserModelFactory[AnnotatedLabel, String] with SafeLogging {
   type MyModel = LexModel[AnnotatedLabel, AnnotatedLabel, String]
 
   def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]], constrainer: CoreGrammar[AnnotatedLabel, String]) ={
@@ -850,22 +949,22 @@ case class LexModelFactory(@Help(text= "The kind of annotation to do on the refi
       val dsl = new WordFeaturizer.DSL(initLexicon) with BilexicalFeaturizer.DSL with SurfaceFeaturizer.DSL
       import dsl._
 
-      val wf = word + clss + shape + bigrams(word, 1) + bigrams(clss, 1)
-      val offsets = clss(-1) + clss(1)
+      val wf =  unigrams(word, 1) + suffixes() + prefixes()
+//      val offsets = lfsuf(-1) + lfsuf(1)
       var bilexF:BilexicalFeaturizer[String] = (
-        withDistance(bilex(clss))
+        withDistance(bilex(lfsuf))
           + adaptSpanFeaturizer(spanShape)
         //+ bilex(word)
-          + bilex(tagDict)
-        + offsets(head)
-        + offsets(dep)
+//          + bilex(lfsuf)
+//        + offsets(head)
+//        + offsets(dep)
         )
 
-      val monolex = IndexedSeq(word, clss)
+      val monolex = IndexedSeq(word, lfsuf)
 
       bilexF = bilexF + monolex.map(_(head)).reduceLeft[BilexicalFeaturizer[String]](_ + _) + monolex.map(_(dep)).reduceLeft[BilexicalFeaturizer[String]](_ + _)
 
-      (wf, word + shape + clss, bilexF)
+      (wf, word + lfsuf, bilexF)
     }
 
     val spanFeaturizer = if(!useSpanFeatures) {
@@ -954,6 +1053,7 @@ case class LexModelFactory(@Help(text= "The kind of annotation to do on the refi
       headFinder,
       annotator,
       indexedRefinements,
+      useBilexRuleFeatures,
       HashFeature.Relative(dummyFeats),
       trainTrees)
 
