@@ -296,6 +296,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
                             maxNGramOrder:Int = 2,
                             useNot:Boolean = false,
                             useMorph:Boolean = false,
+                            useGrammar: Boolean = true,
                             pathsToMorph:String = "") extends ParserModelFactory[AnnotatedLabel, String] {
 
   type MyModel = SpanModel[AnnotatedLabel, AnnotatedLabel, String]
@@ -404,7 +405,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     
     
     def labelFeaturizer(l: AnnotatedLabel) = Set(l, l.baseAnnotatedLabel).toSeq
-    def ruleFeaturizer(r: Rule[AnnotatedLabel]) = Set(r, r.map(_.baseAnnotatedLabel)).toSeq
+    def ruleFeaturizer(r: Rule[AnnotatedLabel]) = if(useGrammar) Set(r, r.map(_.baseAnnotatedLabel)).toSeq else if(r.isInstanceOf[UnaryRule[AnnotatedLabel]]) Set(r.parent, r.parent.baseAnnotatedLabel).toSeq else Seq.empty
     
 //    case class LC(x: Any) extends Feature
 //    case class RC(x: Any) extends Feature
