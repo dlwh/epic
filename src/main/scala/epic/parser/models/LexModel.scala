@@ -238,7 +238,7 @@ class IndexedLexFeaturizer[L, L2, W](grammar: BaseGrammar[L],
         }
 
         val fi = Arrays.concatenate(rawLabelFeatures(refinedTag), if(head < dep) rawDirFeatures(0) else rawDirFeatures(1))
-        feats = bilexFeatureIndex.crossProduct(fi, bilexFeatures, offset = bilexOffset, usePlainLabelFeatures = true)
+        feats = bilexFeatureIndex.crossProduct(fi, bilexFeatures, offset = bilexOffset, usePlainLabelFeatures = false)
         cache(refinedTag) = feats
 
       }
@@ -289,7 +289,7 @@ class IndexedLexFeaturizer[L, L2, W](grammar: BaseGrammar[L],
 //        val spanFeatures = getSpanFeatures(begin, end)
 //        lcached = splitSpanFeatureIndex.crossProduct(fspec.featuresForBinaryRule(begin, split, end, rule, ruleRef), spanFeatures, splitOffset, true)
         lcached = splitSpanFeatureIndex.crossProduct(fspec.featuresForBinaryRule(begin, split, end, rule, ruleRef),
-          getSplitFeatures(begin, split, end), splitOffset, false)
+          getSplitFeatures(begin, split, end), splitOffset, true)
 //        if (forSplit.length > 0)
 //          lcached = Arrays.concatenate(lcached, forSplit)
         scache(globalizedRule) = lcached
@@ -970,21 +970,18 @@ case class LexModelFactory(@Help(text= "The kind of annotation to do on the refi
       import dsl._
 
       val wf =  unigrams(word, 1) + suffixes() + prefixes()
-//      val offsets = lfsuf(-1) + lfsuf(1)
+      val offsets = lfsuf(-1) + lfsuf(1)
       var bilexF:BilexicalFeaturizer[String] = (
-        withDistance(bilex(lfsuf))
+        withDistance(bilex(lfsuf) + lfsuf(head) + lfsuf(dep))
           + adaptSpanFeaturizer(spanShape)
-        //+ bilex(word)
-//          + bilex(lfsuf)
-//        + offsets(head)
-//        + offsets(dep)
+        + offsets(head)
+        + offsets(dep)
         )
 
-      val monolex = IndexedSeq(word, lfsuf)
 
-      bilexF = bilexF + monolex.map(_(head)).reduceLeft[BilexicalFeaturizer[String]](_ + _) + monolex.map(_(dep)).reduceLeft[BilexicalFeaturizer[String]](_ + _)
+      bilexF = bilexF
 
-      (wf, word + lfsuf, bilexF)
+      (wf, lfsuf + offsets, bilexF)
     }
 
     val spanFeaturizer = if(!useSpanFeatures) {
