@@ -292,7 +292,7 @@ class IndexedLexFeaturizer[L, L2, W](grammar: BaseGrammar[L],
           getSplitFeatures(begin, split, end), splitOffset, false)
 //        if (forSplit.length > 0)
 //          lcached = Arrays.concatenate(lcached, forSplit)
-        scache(ruleRef) = lcached
+        scache(globalizedRule) = lcached
       }
       lcached
     }
@@ -463,7 +463,7 @@ final class LexGrammar[L, L2, W](val grammar: BaseGrammar[L],
         var lcached = scache(globalizedRule)
         if (java.lang.Double.isNaN(lcached)) {
           lcached = dot(f.featuresForSplitRule(begin, split, end, rule, ruleRef))
-          scache(ruleRef) = lcached
+          scache(globalizedRule) = lcached
         }
 
         score += lcached
