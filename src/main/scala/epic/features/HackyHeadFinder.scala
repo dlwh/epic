@@ -3,7 +3,7 @@ package epic.features
 import scala.collection.mutable.HashMap
 
 
-trait HackyHeadFinder[L,T] {
+trait HackyHeadFinder[L,T] extends Serializable {
   def findHead(label: L, preterminals: Seq[T]): Int;
 }
 
