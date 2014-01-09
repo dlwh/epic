@@ -119,7 +119,7 @@ trait ParserPipeline extends Logging {
       writeObject(out, parser.copy(decachify(parser.coreGrammar)))
 
       logger.info("Evaluating Parser...")
-      val stats = evalParser(devTrees, parser, name+"-len40-dev")
+      val stats = evalParser(devTrees, parser, name+"-dev")
       logger.info(s"Eval finished. Results:\n$stats")
     }
   }
