@@ -36,7 +36,8 @@ object ParserParams {
   case class JointParams[M](treebank: ProcessedTreebank,
                             trainer: M,
                             @Help(text="Print this and exit.") help: Boolean = false,
-                            @Help(text="Default number of threads to use. Default is as many as possible.") threads: Int = -1)
+                            @Help(text="Default number of threads to use. Default is as many as possible.") threads: Int = -1,
+                            evalOnTest: Boolean = false)
 
   @Help(text="Stores/loads a baseline xbar grammar needed to extracting trees.")
   case class XbarGrammar(path: File = new File("xbar.gr")) {
@@ -89,7 +90,7 @@ trait ParserPipeline extends Logging {
     import treebank._
 
 
-    val validateTrees = devTrees.take(400)
+    val validateTrees = devTrees.take(100)
     def validate(parser: Parser[AnnotatedLabel, String]) = {
       ParseEval.evaluate[AnnotatedLabel](validateTrees, parser, AnnotatedLabelChainReplacer, asString={(l:AnnotatedLabel)=>l.label}, nthreads=params.threads)
     }
@@ -119,7 +120,11 @@ trait ParserPipeline extends Logging {
       writeObject(out, parser.copy(decachify(parser.coreGrammar)))
 
       logger.info("Evaluating Parser...")
-      val stats = evalParser(devTrees, parser, name+"-len40-dev")
+      val stats = if (params.evalOnTest) {
+        evalParser(testTrees, parser, name+"-len40-test")
+      } else {
+        evalParser(devTrees, parser, name+"-len40-dev")
+      }
       logger.info(s"Eval finished. Results:\n$stats")
     }
   }
