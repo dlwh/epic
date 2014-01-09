@@ -31,6 +31,20 @@ class SpanShapeFeaturizerBetter(numContextWords: Int, useRichContext: Boolean) e
   }
 }
 
+class FullWordSpanShapeFeaturizer(commonWords: Set[String], numContextWords: Int, useRichContext: Boolean) extends SurfaceFeaturizer[String] with Serializable {
+  def anchor(words: IndexedSeq[String]): SurfaceFeatureAnchoring[String] = {
+    new SurfaceFeatureAnchoring[String] {
+      def featuresForSpan(begin: Int, end: Int): Array[Feature] = {
+        val sig = SpanShapeGenerator.signatureAndContextFor(words, begin, end, numContextWords, true, commonWords)
+        //        println("Features for span " + words.slice(begin, end) + ": " + sig);
+        //        val sig2 = SpanShapeGenerator.signatureFor(words, begin, end, includeContext = false)
+        //        Array(SpanShapeFeature(sig), SpanShapeFeature(sig2))
+        Array(SpanShapeFeature(sig))
+      }
+    }
+  }
+}
+
 /**
  *
  * @author dlwh
@@ -79,14 +93,16 @@ object SpanShapeGenerator extends Serializable {
   }
   
   // Similar, but has the capability to use more and richer context
-  def signatureAndContextFor(words: IndexedSeq[String], begin: Int, end: Int, numContextWords: Int = 1, richContext: Boolean = false) = {
+  def signatureAndContextFor(words: IndexedSeq[String], begin: Int, end: Int, numContextWords: Int = 1, richContext: Boolean = false, commonWords: Set[String] = Set.empty) = {
     val result = new StringBuilder(end-begin)
     var i = begin - numContextWords;
     while (i < begin) {
       if (i < 0) {
         result += '#'
       } else {
-        if (richContext) {
+        if(commonWords(words(i))) {
+          result ++= words(i)
+        } else if (richContext) {
           appendWordShape(i, words, result)
         } else {
           result += binCharacter(words(i).head)
@@ -114,7 +130,9 @@ object SpanShapeGenerator extends Serializable {
       if (i >= words.length) {
         result += '#';
       } else {
-        if (richContext) {
+        if(commonWords(words(i))) {
+          result ++= words(i)
+        } else if (richContext) {
           appendWordShape(i, words, result)
         } else {
           result += binCharacter(words(i).head)
@@ -161,6 +179,67 @@ object SpanShapeGenerator extends Serializable {
   }
 
   val distanceBinner = DistanceBinner()
+
+  // Similar, but has the capability to use more and richer context
+  def splitShapeFor(words: IndexedSeq[String], begin: Int, split : Int , end: Int, numContextWords: Int = 1, richContext: Boolean = false, commonWords: Set[String] = Set.empty) = {
+    val result = new StringBuilder(end-begin)
+    var i = begin - numContextWords;
+    while (i < begin) {
+      if (i < 0) {
+        result += '#'
+      } else {
+        if(commonWords(words(i))) {
+          result ++= words(i)
+        } else if (richContext) {
+          appendWordShape(i, words, result)
+        } else {
+          result += binCharacter(words(i).head)
+        }
+      }
+      i += 1;
+    }
+    result += '['
+    while (i < math.min(begin + MAX_LEN/2 + 1, end)) {
+      appendWordShape(i, words, result)
+      i += 1
+    }
+
+    if(i <= split) {
+      if(i < split) {
+        result += '~'
+      }
+      appendWordShape(split, words, result)
+      appendWordShape(split + 1, words, result)
+      i = split + 2
+    }
+
+    if(i < end) {
+      //val remainingLength = distanceBinner.binnedDistance(begin, end - MAX_LEN)
+      //result ++= "~"  * remainingLength
+      result += '~'
+      i = math.min(split, end - MAX_LEN/2)
+    }
+    while (i < end) {
+      appendWordShape(i, words, result)
+      i += 1
+    }
+    result += ']';
+    while (i < end + numContextWords) {
+      if (i >= words.length) {
+        result += '#';
+      } else {
+        if(commonWords(words(i))) {
+          result ++= words(i)
+        } else if (richContext) {
+          appendWordShape(i, words, result)
+        } else {
+          result += binCharacter(words(i).head)
+        }
+      }
+      i += 1;
+    }
+    result.toString
+  }
 }
 
 case class SpanShapeFeature(shape: String) extends SpanFeature

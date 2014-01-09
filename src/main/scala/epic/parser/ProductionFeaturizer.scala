@@ -27,7 +27,7 @@ import epic.parser.features.IndicatorFeature
  * @author dlwh
  */
 @SerialVersionUID(1L)
-class ProductionFeaturizer[L, L2, W](grammar: BaseGrammar[L], refinements: GrammarRefinements[L, L2],
+class ProductionFeaturizer[L, L2, W](val grammar: BaseGrammar[L], refinements: GrammarRefinements[L, L2],
                                      lGen: L2=>Seq[Feature] = {(x:L2)=>if(x.isInstanceOf[Feature]) Seq(x.asInstanceOf[Feature]) else Seq(IndicatorFeature(x))},
                                      rGen: Rule[L2] => Seq[Feature] = {(x: Rule[L2]) => Seq(x)}  ) extends RefinedFeaturizer[L, W, Feature] with Serializable{
 

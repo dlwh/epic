@@ -13,16 +13,29 @@ class DistanceBinner private (val binThresholds: Array[Int], preserveDirection: 
   def this(numBins: Int, numExactBins: Int, preserveDirection: Boolean) = this(DistanceBinner.mkBinArray(numBins, numExactBins), preserveDirection)
   def this(numBins: Int = 8, preserveDirection: Boolean = true) = this(numBins, numBins/2+1, preserveDirection)
   util.Arrays.sort(binThresholds)
+
+  val bins = Array.tabulate(binThresholds.last + 5){dist =>
+    var bin = util.Arrays.binarySearch(binThresholds, math.abs(dist))
+    if (bin < 0) bin = ~bin
+    if (preserveDirection) math.signum(dist) * (bin + 1)
+    else bin + 1
+  }
+  val negativeBins = Array.tabulate(binThresholds.last + 5){dist =>
+    var bin = util.Arrays.binarySearch(binThresholds, math.abs(dist))
+    if (bin < 0) bin = ~bin
+    if (preserveDirection) -(bin + 1)
+    else bin + 1
+  }
+
   def distanceBin(a: Int, b: Int):Int = {
     val dist: Int = b - a
     distanceBin(dist)
   }
 
   def distanceBin(dist: Int): Int = {
-    var bin = util.Arrays.binarySearch(binThresholds, math.abs(dist))
-    if (bin < 0) bin = ~bin
-    if (preserveDirection) math.signum(dist) * (bin + 1)
-    else bin + 1
+    val array = if(dist < 0) negativeBins else bins
+    val adist = math.min(math.abs(dist), array.length - 1)
+    array(adist)
   }
 
   def binnedDistance(a: Int, b: Int): Int = {

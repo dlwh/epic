@@ -17,6 +17,7 @@ package epic.parser
 import projections.GrammarRefinements
 import epic.trees.{LexicalProduction, Production, Rule}
 import breeze.util.Index
+import epic.framework.Feature
 
 
 /**
@@ -38,4 +39,3 @@ trait RefinedFeaturizer[L, W, Feat]  {
   }
 
 }
-

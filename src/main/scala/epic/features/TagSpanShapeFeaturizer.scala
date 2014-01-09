@@ -7,21 +7,29 @@ import breeze.linalg._
 import scala.collection.mutable.ArrayBuffer
 import epic.trees.TreeInstance
 import epic.trees.AnnotatedLabel
+import scala.collection.mutable.HashMap
 
 @SerialVersionUID(1L)
 class TagSpanShapeFeaturizer[L](wordTagCounts: Counter2[L, String, Double], commonWordThreshold: Int = 3) extends SurfaceFeaturizer[String] with Serializable {
   
   private val tagIndex = Index(wordTagCounts.keysIterator.map(_._1));
+  private val wordToTagIndexMap = new HashMap[String,Int];
+  for (word <- wordTagCounts.keysIterator.map(_._2)) {
+    if (!wordToTagIndexMap.contains(word)) {
+      wordToTagIndexMap.put(word, TagSpanShapeGenerator.labelIndexFor(word, wordTagCounts, commonWordThreshold, tagIndex));
+    }
+  }
+  private val wordTagger = (w: String) => TagSpanShapeGenerator.labelIndexFor(w, wordToTagIndexMap);
   
   def anchor(words: IndexedSeq[String]): SurfaceFeatureAnchoring[String] = {
     new SurfaceFeatureAnchoring[String] {
       def featuresForSpan(begin: Int, end: Int): Array[Feature] = {
-        val b11 = TagSpanShapeGenerator.featureFor(words, begin, end, wordTagCounts, commonWordThreshold, tagIndex, 1, 1, 0, 0);
-        val b21 = TagSpanShapeGenerator.featureFor(words, begin, end, wordTagCounts, commonWordThreshold, tagIndex, 2, 1, 0, 0);
-        val b12 = TagSpanShapeGenerator.featureFor(words, begin, end, wordTagCounts, commonWordThreshold, tagIndex, 1, 2, 0, 0);
-        val e11 = TagSpanShapeGenerator.featureFor(words, begin, end, wordTagCounts, commonWordThreshold, tagIndex, 0, 0, 1, 1);
-        val e12 = TagSpanShapeGenerator.featureFor(words, begin, end, wordTagCounts, commonWordThreshold, tagIndex, 0, 0, 1, 2);
-        val e21 = TagSpanShapeGenerator.featureFor(words, begin, end, wordTagCounts, commonWordThreshold, tagIndex, 0, 0, 2, 1);
+        val b11 = TagSpanShapeGenerator.featureFor(words, begin, end, wordTagger, commonWordThreshold, tagIndex, 1, 1, 0, 0);
+        val b21 = TagSpanShapeGenerator.featureFor(words, begin, end, wordTagger, commonWordThreshold, tagIndex, 2, 1, 0, 0);
+        val b12 = TagSpanShapeGenerator.featureFor(words, begin, end, wordTagger, commonWordThreshold, tagIndex, 1, 2, 0, 0);
+        val e11 = TagSpanShapeGenerator.featureFor(words, begin, end, wordTagger, commonWordThreshold, tagIndex, 0, 0, 1, 1);
+        val e12 = TagSpanShapeGenerator.featureFor(words, begin, end, wordTagger, commonWordThreshold, tagIndex, 0, 0, 1, 2);
+        val e21 = TagSpanShapeGenerator.featureFor(words, begin, end, wordTagger, commonWordThreshold, tagIndex, 0, 0, 2, 1);
         Array(b11, b21, b12, e11, e12, e21);
       }
     }
@@ -71,11 +79,15 @@ object TagSpanShapeGenerator extends Serializable {
     }
     bestTagIdx
   }
+  
+  def labelIndexFor[L](word: String, wordToTagIndexMap: HashMap[String,Int]) = {
+    if (wordToTagIndexMap.contains(word)) wordToTagIndexMap(word) else -1;
+  }
 
   def featureFor[L](words: IndexedSeq[String],
                     begin: Int,
                     end: Int,
-                    wordTagCounts: Counter2[L, String, Double],
+                    wordTagger: (String) => Int,
                     commonWordThreshold: Int,
                     tagIndex: Index[L],
                     beginContextAmount: Int,
@@ -88,7 +100,7 @@ object TagSpanShapeGenerator extends Serializable {
         if (i < 0 || i >= words.size) {
           result = result.append("-1,");
         } else {
-          result = result.append(labelIndexFor(words(i), wordTagCounts, commonWordThreshold, tagIndex)).append(",");
+          result = result.append(wordTagger(words(i))).append(",");
         }
       }
     }
