@@ -18,13 +18,13 @@ class NGramSpanFeaturizer(wordCounts: Counter[String,Double],
                           allSents: Seq[Seq[String]],
                           ngramCountThreshold: Int,
                           maxOrder: Int,
-                          useNot: Boolean) extends SurfaceFeaturizer[String] with Serializable with Logging {
+                          useNot: Boolean) extends SurfaceFeaturizer[String] with Serializable {
   private val higherOrderCounts = (3 to maxOrder).map(n => NGramSpanFeaturizer.countNgrams(allSents, n));
   
   private val wordIndex = Index(wordCounts.keysIterator)
   private val bigramIndex = Index(bigramCounts.keysIterator)
   private val higherOrderIndices = (3 to maxOrder).map(n => Index(higherOrderCounts(n-3).keysIterator));
-  logger.info(wordIndex.size + " unigrams, " + bigramIndex.size + " bigrams, " + (higherOrderIndices.map(_.size)) + " higher-order n-grams");
+  println(wordIndex.size + " unigrams, " + bigramIndex.size + " bigrams, " + (higherOrderIndices.map(_.size)) + " higher-order n-grams");
   
   def anchor(words: IndexedSeq[String]): SurfaceFeatureAnchoring[String] = {
     new SurfaceFeatureAnchoring[String] {

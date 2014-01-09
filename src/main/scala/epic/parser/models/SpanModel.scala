@@ -296,7 +296,9 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
                             maxNGramOrder:Int = 2,
                             useNot:Boolean = false,
                             useMorph:Boolean = false,
-                            pathsToMorph:String = "") extends ParserModelFactory[AnnotatedLabel, String] {
+                            pathsToMorph:String = "",
+                            useLeftRightRuleFeats:Boolean = false,
+                            useTagSpanShape:Boolean = false) extends ParserModelFactory[AnnotatedLabel, String] {
 
   type MyModel = SpanModel[AnnotatedLabel, AnnotatedLabel, String]
 
@@ -343,6 +345,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     
     val ngramF = new NGramSpanFeaturizer(sum(annWords, Axis._0), NGramSpanFeaturizer.countBigrams(annTrees), annTrees.map(_.words), ngramCountThreshold, maxNGramOrder, useNot);
     val spanShapeBetter = new SpanShapeFeaturizerBetter(numSpanContextWords, useRichSpanContext);
+    val tagSpanShape = new TagSpanShapeFeaturizer(TagSpanShapeGenerator.makeBaseLexicon(trainTrees));
 
     val wf = {//WordFeaturizer.goodPOSTagFeaturizer(annWords)
     val dsl = new WordFeaturizer.DSL(annWords)
@@ -397,6 +400,9 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
       if (useNGrams) {
         featurizer += ngramF;
       }
+      if (useTagSpanShape) {
+        featurizer += tagSpanShape;
+      }
       featurizer
     }
     val indexedWord = IndexedWordFeaturizer.fromData(wf, annTrees.map{_.words})
@@ -404,15 +410,17 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     
     
     def labelFeaturizer(l: AnnotatedLabel) = Set(l, l.baseAnnotatedLabel).toSeq
-    def ruleFeaturizer(r: Rule[AnnotatedLabel]) = Set(r, r.map(_.baseAnnotatedLabel)).toSeq
-    
-//    case class LC(x: Any) extends Feature
-//    case class RC(x: Any) extends Feature
-//    def ruleFeaturizer(r: Rule[AnnotatedLabel]) = (Set(r, r.map(_.baseAnnotatedLabel)) ++
-//        (r match {
-//          case BinaryRule(a,b,c) => Seq(LC(b), RC(c))
-//          case _ => Seq.empty
-//        })).toSeq
+    def ruleFeaturizer(r: Rule[AnnotatedLabel]) = if (useLeftRightRuleFeats) {
+      case class LC(x: Any) extends Feature
+      case class RC(x: Any) extends Feature
+      (Set(r, r.map(_.baseAnnotatedLabel)) ++
+        (r match {
+          case BinaryRule(a,b,c) => Seq(LC(b), RC(c))
+          case _ => Seq.empty
+        })).toSeq
+    } else {
+      Set(r, r.map(_.baseAnnotatedLabel)).toSeq
+    } 
 
     val featurizer = new ProductionFeaturizer[AnnotatedLabel, AnnotatedLabel, String](xbarGrammar, indexedRefinements,
       lGen=labelFeaturizer,
