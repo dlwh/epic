@@ -178,18 +178,17 @@ case class Punct(word: String) extends Annotation
 case class SplitPunct() extends TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] {
 
   def apply(tree: BinarizedTree[AnnotatedLabel], words: Seq[String]) = {
-    tree.extend { t =>
-      t match {
-        case UnaryTree(label, NullaryTree(lbl2, _), chain, span) if label.baseLabel == lbl2.baseLabel =>
-          val w = words(span.begin)
-          if(w.forall(!_.isLetterOrDigit) && label.baseLabel != w) label.annotate(Punct(w))
-          else label
-        case NullaryTree(label, span) =>
-          val w = words(span.begin)
-          if(w.forall(!_.isLetterOrDigit) && label.baseLabel != w) label.annotate(Punct(w))
-          else label
-        case _ => t.label
-      }
+    tree.extend {
+      case UnaryTree(label, NullaryTree(lbl2, _), chain, span) if label.baseLabel == lbl2.baseLabel =>
+        val w = words(span.begin)
+        if (w.forall(!_.isLetterOrDigit) && label.baseLabel != w) label.annotate(Punct(w))
+        else if(w.matches("-[LR].B-") && label.baseLabel != w) label.annotate(Punct(w))
+        else label
+      case NullaryTree(label, span) =>
+        val w = words(span.begin)
+        if (w.forall(!_.isLetterOrDigit) && label.baseLabel != w) label.annotate(Punct(w))
+        else label
+      case t => t.label
     }
 
   }
