@@ -297,6 +297,8 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
                             useNot:Boolean = false,
                             useMorph:Boolean = false,
                             useGrammar: Boolean = true,
+                            useFullShape: Boolean = false,
+                            useSplitShape: Boolean = false,
                             pathsToMorph:String = "") extends ParserModelFactory[AnnotatedLabel, String] {
 
   type MyModel = SpanModel[AnnotatedLabel, AnnotatedLabel, String]
@@ -341,9 +343,11 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     } else {
       null;
     }
-    
-    val ngramF = new NGramSpanFeaturizer(sum(annWords, Axis._0), NGramSpanFeaturizer.countBigrams(annTrees), annTrees.map(_.words), ngramCountThreshold, maxNGramOrder, useNot);
+
+    val summedWordCounts: Counter[String, Double] = sum(annWords, Axis._0)
+    val ngramF = new NGramSpanFeaturizer(summedWordCounts, NGramSpanFeaturizer.countBigrams(annTrees), annTrees.map(_.words), ngramCountThreshold, maxNGramOrder, useNot);
     val spanShapeBetter = new SpanShapeFeaturizerBetter(numSpanContextWords, useRichSpanContext);
+    val fullShape = new FullWordSpanShapeFeaturizer(summedWordCounts.iterator.filter(_._2 > commonWordThreshold * 10).map(_._1).toSet, numSpanContextWords, useRichSpanContext);
 
     val wf = {//WordFeaturizer.goodPOSTagFeaturizer(annWords)
     val dsl = new WordFeaturizer.DSL(annWords)
@@ -389,6 +393,14 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
       if(useShape) {
 //        featurizer += spanShape
         featurizer += spanShapeBetter
+      }
+
+      if(useFullShape) {
+        featurizer += fullShape
+      }
+
+      if(useSplitShape) {
+        featurizer += splitSpanShape
       }
 
       if(useBinaryLengths) {

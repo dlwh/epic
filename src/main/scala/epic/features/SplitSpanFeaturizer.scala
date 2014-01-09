@@ -61,6 +61,8 @@ object SplitSpanFeaturizer {
       new RelativeLengthFeaturizer[W]()
     }
 
+    val splitSpanShape = new SplitSpanShapeFeaturizer()
+
     def distanceToSentenceBoundaries[W] = new DistanceToSentenceBoundariesFeaturizer[W]
 
 
@@ -82,6 +84,17 @@ object SplitSpanFeaturizer {
       }
   }
 
+  class SplitSpanShapeFeaturizer extends SplitSpanFeaturizer[String] {
+    def anchor(w: IndexedSeq[String]): SplitSpanFeatureAnchoring[String] = new SplitSpanFeatureAnchoring[String] {
+      def featuresForSplit(begin: Int, split: Int, end: Int): Array[Feature] = {
+        Array(SplitShapeFeature(SpanShapeGenerator.splitShapeFor(w, begin, split, end)))
+      }
+
+      def featuresForSpan(begin: Int, end: Int): Array[Feature] = Array.empty
+    }
+  }
+
+  case class SplitShapeFeature(shape: String) extends Feature
 
   class SplitSpanDistanceFeaturizer[W] private[SplitSpanFeaturizer](a: Any, b: Any, db: DistanceBinner = DistanceBinner()) extends SplitSpanFeaturizer[W] {
     val label = s"$a <-> $b"
