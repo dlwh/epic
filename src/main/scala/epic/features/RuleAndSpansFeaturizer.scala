@@ -4,7 +4,7 @@ import epic.framework.Feature
 import breeze.util.Index
 import breeze.util.MutableIndex
 
-trait RuleAndSpansFeaturizer[W] {
+trait RuleAndSpansFeaturizer[W] extends Serializable {
   
   def anchor(words: IndexedSeq[W]):Anchoring
   
