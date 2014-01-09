@@ -91,7 +91,6 @@ object SupervisedHeadFinder {
     }
     val symbolArityHeadChildCounts = Counter2[(String,Int),Int,Int]();
     val ruleHeadChildCounts = Counter2[(String,Seq[String]),Int,Int]();
-    var numMatched = 0;
     
     
     def rec(tree: Tree[String], conllTree: Seq[Int]) {
@@ -117,12 +116,12 @@ object SupervisedHeadFinder {
       }
     }
     
+    var numMatched = 0;
     for (i <- 0 until conllTrees.size) {
       val conllTree = conllTrees(i);
       val constTree = processedTrees(i);
-      rec(constTree, conllTree);
-      if (conllTree.size != constTree.span.length) {
-      } else {
+      if (conllTree.size == constTree.span.length) {
+        rec(constTree, conllTree);
         numMatched += 1;
       }
     }

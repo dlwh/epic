@@ -49,8 +49,25 @@ object SentimentEvaluator {
          0       131        31       297        51
          0        36         8       255       100
 """);
+  
+  def socherNonneutralTestSpanMatrixNew = transpose(readStringMatrix("""
+        294     147      11       3       3   
+        1167    4639    1587     537     141  
+        250    2467   42469    2403     252   
+        89     498    1700    6208    2014   
+        0       0       7     215    1124    
+"""));
+  
+  def socherNonneutralTestRootMatrixNew = transpose(readStringMatrix("""
+        44      39       0       0       0    
+        193     451       0     131      36   
+        23      62       0      30       8    
+        19      81       0     299     255    
+        0       0       0      50     100    
+"""));
 
   def readStringMatrix(str: String) = str.split("\n").map(_.trim).filter(!_.isEmpty).map(_.split("\\s+").map(_.toInt));
+  def transpose(arr: Array[Array[Int]]) = Array.tabulate(arr(0).size, arr.size)((i, j) => arr(j)(i));
   
   def printFromConfusionMatrix(mat: Array[Array[Int]]) {
 //    println("Accuracy: " + accuracy(mat)); // agrees with the Stanford system's way of combining the matrix
@@ -121,6 +138,10 @@ object SentimentEvaluator {
     println("NONNEUTRAL TEST SPAN");
     printFromConfusionMatrix(socherNonneutralTestSpanMatrix);
     println("NONNEUTRAL TEST ROOT");
-    printFromConfusionMatrix(socherNonneutralTestRootMatrix);
+    printFromConfusionMatrix(socherNonneutralTestRootMatrix)
+    println("NONNEUTRAL TEST SPAN NEW");
+    printFromConfusionMatrix(socherNonneutralTestSpanMatrixNew);
+    println("NONNEUTRAL TEST ROOT NEW");
+    printFromConfusionMatrix(socherNonneutralTestRootMatrixNew);
   }
 }

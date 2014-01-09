@@ -13,10 +13,10 @@ import scala.collection.mutable.ArrayBuffer
 import epic.parser.features.IndicatorFeature
 import java.io.InputStreamReader
 
-class MorphFeaturizer private (morphLookupTable: MorphFeaturizer.MorphLookupTable) extends WordFeaturizer[String] with Serializable with Logging {
+class MorphFeaturizer private (morphLookupTable: MorphFeaturizer.MorphLookupTable) extends WordFeaturizer[String] with Serializable {
   def anchor(w: IndexedSeq[String]): WordFeatureAnchoring[String] = new WordFeatureAnchoring[String] {
     val morphFeats = if (!morphLookupTable.contains(w)) {
-      logger.warn("Sentence wasn't found in lookup table: " + w);
+      println("Sentence wasn't found in lookup table: " + w);
       (0 until w.size).map(i => Array[MorphFeat]());
     } else {
       morphLookupTable(w);
