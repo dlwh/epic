@@ -72,7 +72,8 @@ object ParserTrainer extends epic.parser.ParserPipeline with Logging {
                     @Help(text="check specific indices, in addition to doing a full search.")
                     checkGradientsAt: String = null,
                     @Help(text="check specific indices, in addition to doing a full search.")
-                    maxParseLength: Int = 70)
+                    maxParseLength: Int = 70,
+                    annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = GenerativeParser.defaultAnnotator())
   protected val paramManifest = manifest[Params]
 
   def trainParser( trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]],

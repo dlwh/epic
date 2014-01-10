@@ -90,7 +90,7 @@ object SentimentTreebankPipeline extends Logging {
 //      else
 //        println("Eval: " + evaluate(s"$name-$iter", parser, treebank.devTrees))
       if(params.evalOnTest) {
-        println("Eval: " + evaluateBetter(s"$name-$iter", parser, treebank.testTrees, DecodeType.Normal))
+        println("NORMAL DECODE: Eval: " + evaluateBetter(s"$name-$iter", parser, treebank.testTrees, DecodeType.Normal));
       } else {
         println("Span confusions");
         println(renderArr(evaluateSpanConfusions(s"$name-$iter", parser, treebank.devTrees, DecodeType.Normal)));
