@@ -142,7 +142,7 @@ object ParserTrainer extends epic.parser.ParserPipeline with Logging {
 
     val name = Option(params.name).orElse(Option(model.getClass.getSimpleName).filter(_.nonEmpty)).getOrElse("DiscrimParser")
     for ((state, iter) <- params.opt.iterations(cachedObj, init).take(maxIterations).zipWithIndex.tee(evalAndCache _)
-         if iter != 0 && iter % iterationsPerEval == 0) yield try {
+         if iter != 0 && iter % iterationsPerEval == 0 || evaluateNow) yield try {
       val parser = model.extractParser(state.x)
       (s"$name-$iter", parser)
     } catch {
@@ -152,5 +152,17 @@ object ParserTrainer extends epic.parser.ParserPipeline with Logging {
 
   def sentTooLong(p: TreeInstance[AnnotatedLabel, String], maxLength: Int): Boolean = {
     p.words.filter(x => x == "'s" || x(0).isLetterOrDigit).length > maxLength
+  }
+  
+  def evaluateNow = {
+    val sentinel = new File("EVALUATE_NOW")
+    if(sentinel.exists()) {
+      sentinel.delete()
+      logger.info("Evaluating now!!!!")
+      true
+    } else {
+      false
+    }
+    
   }
 }

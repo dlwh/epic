@@ -121,9 +121,9 @@ trait ParserPipeline extends Logging {
 
       logger.info("Evaluating Parser...")
       val stats = if (params.evalOnTest) {
-        evalParser(testTrees, parser, name+"-len40-test")
+        evalParser(testTrees, parser, name+"-test")
       } else {
-        evalParser(devTrees, parser, name+"-len40-dev")
+        evalParser(devTrees, parser, name+"-dev")
       }
       logger.info(s"Eval finished. Results:\n$stats")
     }
