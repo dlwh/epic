@@ -62,7 +62,11 @@ case class ProcessedTreebank(@Help(text="Location of the treebank directory")
     case _ => throw new RuntimeException("Unknown Treebank type")
   }
 
-  lazy val trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]] = transformTrees(treebank.train, maxLength, collapseUnaries = true).take(numSentences)
+  lazy val trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]] = {
+    var train = transformTrees(treebank.train, maxLength, collapseUnaries = true)
+    if(includeDevInTrain) train ++= transformTrees(treebank.dev, maxLength, collapseUnaries = true)
+    train.take(numSentences)
+  }
   lazy val devTrees = transformTrees(treebank.dev, 100000)
   lazy val testTrees = transformTrees(treebank.test, 1000000)
 
