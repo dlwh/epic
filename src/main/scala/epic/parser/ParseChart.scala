@@ -18,10 +18,7 @@ import math._
 import java.util.Arrays
 import breeze.util.Index
 import breeze.collection.mutable.TriangularArray
-import breeze.numerics.logSum
 import collection.mutable.BitSet
-import collection.immutable
-import collection.immutable.BitSet.BitSetN
 import java.util
 import epic.constraints.{ChartConstraints, LabeledSpanConstraints}
 import breeze.linalg.{Counter, Counter2}

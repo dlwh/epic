@@ -14,7 +14,7 @@ import breeze.collection.mutable.TriangularArray
 import java.io.{ObjectInputStream, IOException}
 import breeze.optimize.FirstOrderMinimizer.OptParams
 import breeze.optimize.{GradientTester, CachedBatchDiffFunction}
-import breeze.linalg.DenseVector
+import breeze.linalg.{softmax, DenseVector}
 import epic.constraints.LabeledSpanConstraints
 import epic.constraints.LabeledSpanConstraints.NoConstraints
 import epic.util.{CacheBroker, Has2}
@@ -210,7 +210,7 @@ object SemiCRF {
 
       val forwardScores: Array[Array[Double]] = this.forwardScores(scorer)
       val backwardScore: Array[Array[Double]] = this.backwardScores(scorer)
-      val partition = numerics.logSum(forwardScores.last)
+      val partition = softmax(forwardScores.last)
       val _s = scorer
 
 
@@ -343,7 +343,7 @@ object SemiCRF {
               var prevLabel = 0
               if (anchoring.ignoreTransitionModel) {
                 prevLabel = -1 // ensure that you don't actually need the transition model
-                val prevScore = numerics.logSum(forwardScores(begin), forwardScores(begin).length)
+                val prevScore = softmax.array(forwardScores(begin), forwardScores(begin).length)
                 if (prevScore != Double.NegativeInfinity) {
                   val score = anchoring.scoreTransition(prevLabel, label, begin, end) + prevScore
                   if(score != Double.NegativeInfinity) {
@@ -369,7 +369,7 @@ object SemiCRF {
 
             begin += 1
           }
-          forwardScores(end)(label) = numerics.logSum(accumArray, acc)
+          forwardScores(end)(label) = softmax.array(accumArray, acc)
           label += 1
         }
 
@@ -421,7 +421,7 @@ object SemiCRF {
             end -= 1
           }
 
-          backwardScores(begin)(prevLabel) = numerics.logSum(accumArray, acc)
+          backwardScores(begin)(prevLabel) = softmax(new DenseVector(accumArray, 0, 1, acc))
           prevLabel += 1
         }
 

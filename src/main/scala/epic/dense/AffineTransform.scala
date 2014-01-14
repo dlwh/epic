@@ -4,12 +4,13 @@ import epic.framework.Feature
 import breeze.util.Index
 import scala.runtime.ScalaRunTime
 import breeze.linalg._
-import breeze.linalg.operators.{CanAxpy, OpMulMatrix, BinaryOp}
+import breeze.linalg.operators.{OpMulMatrix}
 import breeze.numerics._
+import breeze.linalg.support.CanAxpy
 
 
 case class AffineTransform[FV](numOutputs: Int, numInputs: Int, includeBias: Boolean = true)
-                              (implicit mult: BinaryOp[DenseMatrix[Double], FV, OpMulMatrix, DenseVector[Double]],
+                              (implicit mult: OpMulMatrix.Impl2[DenseMatrix[Double], FV, DenseVector[Double]],
                                canaxpy: CanAxpy[Double, FV, DenseVector[Double]]) extends Transform[FV, DenseVector[Double]] {
 
   val index = new AffineTransform.Index(numOutputs, numInputs, includeBias)

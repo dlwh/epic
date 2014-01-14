@@ -25,6 +25,7 @@ import epic.lexicon.Lexicon
 import breeze.numerics
 import com.typesafe.scalalogging.slf4j.Logging
 import epic.util.SafeLogging
+import breeze.linalg.softmax
 
 trait ParserException extends Exception
 case class ParseExtractionException(msg: String, sentence: IndexedSeq[Any]) extends RuntimeException(msg) with ParserException
@@ -197,40 +198,34 @@ class MaxConstituentDecoder[L, W] extends ChartDecoder[L, W] {
 
     val maxSplit = TriangularArray.fill[Int](length+1)(0)
     val maxBotLabel = TriangularArray.fill[Int](length+1)(-1)
-    val maxBotScore = TriangularArray.fill[Double](length+1)(Double.NegativeInfinity)
+    val maxBotScore = TriangularArray.fill[Double](length+1)(0.0)
     val maxTopLabel = TriangularArray.fill[Int](length+1)(-1)
-    val maxTopScore = TriangularArray.fill[Double](length+1)(Double.NegativeInfinity)
+    val maxTopScore = TriangularArray.fill[Double](length+1)(0.0)
 
-    val scores = marginal.grammar.labelEncoder.fillArray(Double.NegativeInfinity)
-    val buffer = Array.fill(1000)(Double.NegativeInfinity)
+    val scores = marginal.grammar.labelEncoder.fillArray(0.0)
 
     def marginalizeRefinements(begin: Int, end: Int, l: Int, ichart: inside.ChartScores, ochart: outside.ChartScores): Double = {
-      var bufOff = 0
+      var score = 0.0
       for (lRef <- ichart.enteredLabelRefinements(begin, end, l)) {
-        val myScore = ichart.labelScore(begin, end, l, lRef) + ochart.labelScore(begin, end, l, lRef) - logPartition
-        buffer(bufOff) = myScore
-        bufOff += 1
-        if(bufOff == buffer.length) {
-          buffer(0) = breeze.numerics.logSum(buffer, buffer.length)
-          bufOff = 1
-        }
+        val myScore = math.exp(ichart.labelScore(begin, end, l, lRef) + ochart.labelScore(begin, end, l, lRef) - logPartition)
+        score  += myScore
       }
-      numerics.logSum(buffer, bufOff)
+      score
     }
 
     for(i <- 0 until inside.length) {
-      Arrays.fill(scores, Double.NegativeInfinity)
+      Arrays.fill(scores, 0.0)
       for(l <- inside.bot.enteredLabelIndexes(i, i + 1)) {
         scores(l) = marginalizeRefinements(i, i + 1, l, inside.bot, outside.bot)
       }
       maxBotScore(i, i + 1) = scores.max
       maxBotLabel(i, i + 1) = scores.argmax
 
-      Arrays.fill(scores, Double.NegativeInfinity)
+      Arrays.fill(scores, 0.0)
       for(l <- inside.top.enteredLabelIndexes(i, i + 1)) {
         scores(l) = marginalizeRefinements(i, i + 1, l, inside.top, outside.top)
       }
-      maxTopScore(i, i + 1) = logSum(scores.max, maxBotScore(i, i + 1))
+      maxTopScore(i, i + 1) = scores.max+ maxBotScore(i, i + 1)
       maxTopLabel(i, i + 1) = scores.argmax
     }
 
@@ -250,16 +245,16 @@ class MaxConstituentDecoder[L, W] extends ChartDecoder[L, W] {
       for(l <- inside.top.enteredLabelIndexes(begin, end)) {
         scores(l) = marginalizeRefinements(begin, end, l, inside.top, outside.top)
       }
-      maxTopScore(begin, end) = logSum(scores.max, maxBotScore(begin, end))
+      maxTopScore(begin, end) = scores.max + maxBotScore(begin, end)
       maxTopLabel(begin, end) = scores.argmax
 
       val (split, splitScore) = (for(split <- begin +1 until end) yield {
-        val score = logSum(maxTopScore(begin, split), maxTopScore(split, end))
+        val score = maxTopScore(begin, split) + maxTopScore(split, end)
         (split, score)
       }).maxBy(_._2)
 
       maxSplit(begin, end) = split
-      maxTopScore(begin, end) = logSum(maxTopScore(begin, end), splitScore)
+      maxTopScore(begin, end) = maxTopScore(begin, end) + splitScore
     }
 
     def bestUnaryChain(begin: Int, end: Int, bestBot: Int, bestTop: Int): IndexedSeq[String] = {
@@ -274,18 +269,15 @@ class MaxConstituentDecoder[L, W] extends ChartDecoder[L, W] {
         for (r <- candidateUnaries) {
           val aRefinements = inside.top.enteredLabelRefinements(begin, end, bestTop).toArray
           val bRefinements = inside.bot.enteredLabelRefinements(begin, end, bestBot).toArray
-          val arr = new Array[Double](aRefinements.length * bRefinements.length)
-          var i = 0
+          var score = 0.0
           for (bRef <- bRefinements; ref <- anchoring.refined.validUnaryRuleRefinementsGivenChild(begin, end, r, bRef)) {
             val aRef = anchoring.refined.parentRefinement(r, ref)
-            arr(i) = (anchoring.scoreUnaryRule(begin, end, r, ref)
+            score+= math.exp(anchoring.scoreUnaryRule(begin, end, r, ref)
               + outside.top.labelScore(begin, end, bestTop, aRef)
               + inside.bot.labelScore(begin, end, bestBot, bRef)
               - logPartition
               )
-            i += 1
           }
-          val score = logSum(arr, i)
           if (score > bestScore) {
             bestRule = r
             bestScore = score

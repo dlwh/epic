@@ -1,12 +1,10 @@
 package epic.dense
 
 import epic.framework.Feature
-import breeze.util.Index
-import scala.runtime.ScalaRunTime
 import breeze.linalg._
-import breeze.linalg.operators.{CanAxpy, OpMulMatrix, BinaryOp}
+import breeze.linalg.operators.OpMulMatrix
 import breeze.numerics._
-import breeze.generic.CanMapValues
+import breeze.linalg.support.{CanMapValues, CanAxpy}
 
 /**
  *
@@ -19,7 +17,7 @@ case class NeuralBias(input: Int) extends Feature
 case class SigmoidTransform(inner: Transform[DenseVector[Double], DenseVector[Double]])(implicit canMapValues: CanMapValues[DenseVector[Double], Double, Double, DenseVector[Double]]) extends Transform[DenseVector[Double], DenseVector[Double]] {
   def this(numOutputs: Int, numInputs: Int,
            includeBias: Boolean = true)
-          (implicit mult: BinaryOp[DenseMatrix[Double], DenseVector[Double], OpMulMatrix, DenseVector[Double]],
+          (implicit mult: OpMulMatrix.Impl2[DenseMatrix[Double], DenseVector[Double], DenseVector[Double]],
            canaxpy: CanAxpy[Double, DenseVector[Double], DenseVector[Double]])  = this(new AffineTransform[DenseVector[Double]](numOutputs, numInputs, includeBias))
 
   val index: inner.index.type = inner.index

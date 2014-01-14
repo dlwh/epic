@@ -2,7 +2,7 @@ package epic.sequences
 
 import breeze.util.Index
 import breeze.numerics
-import breeze.linalg.DenseVector
+import breeze.linalg.{softmax, DenseVector}
 import epic.framework._
 import java.util
 import collection.mutable.ArrayBuffer
@@ -127,7 +127,7 @@ object CRF {
 
       val forwardScores: Array[Array[Double]] = this.forwardScores(scorer)
       val backwardScore: Array[Array[Double]] = this.backwardScores(scorer)
-      val partition = numerics.logSum(forwardScores.last)
+      val partition = softmax(forwardScores.last)
       val _s = scorer
 
 
@@ -241,7 +241,7 @@ object CRF {
               offset += 1
             }
           }
-          cur(next) = numerics.logSum(cache,offset)
+          cur(next) = softmax.array(cache, offset)
         }
 
 
@@ -280,7 +280,7 @@ object CRF {
               offset += 1
             }
           }
-          cur(curLabel) = numerics.logSum(accumArray,offset)
+          cur(curLabel) = softmax(new DenseVector(accumArray, 0, 1, offset))
 
         }
       }

@@ -17,7 +17,6 @@ import epic.util.CacheBroker
 import epic.parser.projections.GrammarRefinements
 import epic.trees.TreeInstance
 import scala.runtime.ScalaRunTime
-import breeze.linalg.operators.{CanAxpy, BinaryOp, OpMulMatrix}
 import epic.dense.SigmoidTransform
 
 /**

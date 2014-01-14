@@ -5,7 +5,7 @@ import epic.util.{SafeLogging, Arrays}
 import breeze.numerics
 import breeze.collection.mutable.TriangularArray
 import com.typesafe.scalalogging.slf4j.Logging
-import breeze.linalg.Counter2
+import breeze.linalg.{max, DenseVector, softmax, Counter2}
 
 /*
  Copyright 2012 David Hall
@@ -113,7 +113,7 @@ final case class ChartMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
     var score = Double.NegativeInfinity
     import breeze.linalg._
     for((sym,scores) <- outside.bot.enteredLabelScores(0, length)) {
-      score = numerics.logSum(score, softmax(new DenseVector(scores) + new DenseVector(ins(sym))))
+      score = softmax(score, softmax(new DenseVector(scores) + new DenseVector(ins(sym))))
     }
     assert( (score - logPartition).abs/math.max(logPartition.abs, score.abs).max(1E-4) < 1E-4, logPartition + " " + 0 + "Z" + score)
     for(i <- 0 until length) {
@@ -121,7 +121,7 @@ final case class ChartMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
       var score = Double.NegativeInfinity
       import breeze.linalg._
       for((sym,scores) <- outside.bot.enteredLabelScores(i, i+1)) {
-        score = numerics.logSum(score, softmax(new DenseVector(scores) + new DenseVector(ins(sym))))
+        score = softmax(score, softmax(new DenseVector(scores) + new DenseVector(ins(sym))))
       }
       assert( (score - logPartition).abs/math.max(logPartition.abs,score.abs).max(1E-4) < 1E-4, logPartition + " " + i + " " + score)
     }
@@ -308,17 +308,17 @@ object ChartMarginal {
 
   private trait Summer {
     def apply(a: Double, b: Double):Double
-    def apply(a: Array[Double], b: Int):Double
+    def apply(a: Array[Double], length: Int):Double
   }
 
   private object LogSummer extends Summer {
-    def apply(a: Double, b: Double): Double = numerics.logSum(a,b)
-    def apply(a: Array[Double], b: Int): Double = numerics.logSum(a,b)
+    def apply(a: Double, b: Double): Double = softmax(a,b)
+    def apply(a: Array[Double], length: Int): Double = softmax.array(a, length)
   }
 
   private object MaxSummer extends Summer {
     def apply(a: Double, b: Double): Double = math.max(a,b)
-    def apply(a: Array[Double], b: Int): Double = if(b == 0) Double.NegativeInfinity else numerics.max(a,b)
+    def apply(a: Array[Double], length: Int): Double = if(length == 0) Double.NegativeInfinity else max.array(a, length)
   }
 
   private def rootScore[L, W](anchoring: AugmentedAnchoring[L, W], inside: ParseChart[L], sum: Summer): Double = {
