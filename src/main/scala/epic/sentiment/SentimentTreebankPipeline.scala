@@ -30,6 +30,7 @@ object SentimentTreebankPipeline extends Logging {
                      lossType: String = "",
                      iterPerEval: Int = 100,
                      evalOnTest: Boolean = false,
+                     includeDevInTrain: Boolean = false,
 //                     modelFactory: SpanModelFactory,
                      modelFactory: ParserExtractableModelFactory[AnnotatedLabel, String] = new SpanModelFactory,
                      rootLossScaling: Double = 1.0)
@@ -41,13 +42,15 @@ object SentimentTreebankPipeline extends Logging {
     val treebank = new ProcessedTreebank(params.path, treebankType = "simple")
 
     var trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]] = treebank.trainTrees
-//    if(params.evalOnTest)
-//      trainTrees ++= treebank.devTrees
+    if(params.evalOnTest && params.includeDevInTrain)
+      trainTrees ++= treebank.devTrees
+    println(trainTrees.size + " train trees, " + treebank.devTrees.size + " dev trees, " + treebank.testTrees.size + " test trees");
     val gen = GenerativeParser.fromTrees(trainTrees)
 
 
     class GoldBracketingsConstraints extends ChartConstraints.Factory[AnnotatedLabel, String] {
       val trees = (trainTrees ++ treebank.devTrees ++ treebank.testTrees).map(ti => ti.words -> ti.tree).toMap
+//      val trees = ((if (params.includeDevInTrain) trainTrees else trainTrees ++ treebank.devTrees) ++ treebank.testTrees).map(ti => ti.words -> ti.tree).toMap
 
       def constraints(w: IndexedSeq[String]): ChartConstraints[AnnotatedLabel] = {
         val constraints = SpanConstraints.fromTree(trees.getOrElse(w, gen.bestParse(w)))
@@ -239,6 +242,7 @@ object SentimentTreebankPipeline extends Logging {
   }
 
   def evaluateBetter(name: String, parser: Parser[AnnotatedLabel, String], testTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]], decodeType: DecodeType) = {
+    println("Evaluating at " + name);
     testTrees.par.map { ti =>
       val goldTree = ti.tree.children.head.map(_.label.toInt)
       val goldRoot = goldTree.label
