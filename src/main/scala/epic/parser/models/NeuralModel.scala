@@ -46,15 +46,7 @@ class NeuralModel[L, L2, W](baseModel: SpanModel[L, L2, W],
   def initialValueForFeature(f: Feature): Double = initialFeatureVal(f).getOrElse(baseModel.initialValueForFeature(f) + math.random * 1E-5)
 
   def inferenceFromWeights(weights: DenseVector[Double]): Inference = {
-    val Seq(_baseWeights: DenseVector[Double], outputWeights: DenseVector[Double], inputWeights: DenseVector[Double], inputBias: DenseVector[Double]) = featureIndex.shardWeights(weights)
-
-    var baseWeights = _baseWeights
-    if(iter >= 820) {
-      zeroOutBaseModel =false
-    } else {
-      baseWeights = DenseVector.zeros[Double](_baseWeights.length)
-    }
-    iter += 1
+    val Seq(baseWeights: DenseVector[Double], outputWeights: DenseVector[Double], inputWeights: DenseVector[Double], inputBias: DenseVector[Double]) = featureIndex.shardWeights(weights)
 
     val baseInf = baseModel.inferenceFromWeights(baseWeights)
     val input = inputWeights.asDenseMatrix.reshape(numOutputs, surfaceFeaturizer.featureIndex.size)
@@ -62,9 +54,7 @@ class NeuralModel[L, L2, W](baseModel: SpanModel[L, L2, W],
     new NeuralInference(baseInf, labelFeaturizer, surfaceFeaturizer, output, input, inputBias)
 
   }
-  var iter = 0
 
-  var zeroOutBaseModel = true
 
 
   def accumulateCounts(d: TreeInstance[L, W], m: Marginal, accum: ExpectedCounts, scale: Double) {
@@ -74,9 +64,6 @@ class NeuralModel[L, L2, W](baseModel: SpanModel[L, L2, W],
   }
 
   override def expectedCountsToObjective(ecounts: NeuralModel[L, L2, W]#ExpectedCounts): (Double, DenseVector[Double]) = {
-    if(zeroOutBaseModel)
-      ecounts.counts(0 until baseModel.featureIndex.size) := 0.0
-
     super.expectedCountsToObjective(ecounts)
   }
 }
@@ -255,7 +242,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
                             @Help(text="Old weights to initialize with. Optional")
                             oldWeights: File = null,
                             @Help(text="For features not seen in gold trees, we bin them into dummyFeats * numGoldFeatures bins using hashing.")
-                            dummyFeats: Double = 0.5) extends ParserModelFactory[AnnotatedLabel, String] {
+                            dummyFeats: Double = 0.0) extends ParserModelFactory[AnnotatedLabel, String] {
   type MyModel = NeuralModel[AnnotatedLabel, AnnotatedLabel, String]
 
 
@@ -269,23 +256,23 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     val xbarLexicon = constrainer.lexicon
     val indexedRefinements = GrammarRefinements(xbarGrammar, refGrammar, (_: AnnotatedLabel).baseAnnotatedLabel)
 
-    val wf = WordFeaturizer.goodPOSTagFeaturizer(annWords)
+
+    val wf = {//WordFeaturizer.goodPOSTagFeaturizer(annWords)
+      val dsl = new WordFeaturizer.DSL(annWords)
+      import dsl._
+      unigrams(word, 1) + suffixes() + prefixes()
+    }
+
+
     val span:SplitSpanFeaturizer[String] = {
       val dsl = new WordFeaturizer.DSL(annWords) with SurfaceFeaturizer.DSL with SplitSpanFeaturizer.DSL
       import dsl._
 
-      ( clss(split)
-        + distance[String](begin, end)
-        + distance[String](begin, split)
-        + distance[String](split, end)
-//        + distance[String](begin, split) * distance[String](split,end)
-        + clss(begin) + clss(end)
-        + spanShape + clss(begin-1) + clss(end-1)
-        + length
-        + sent
-//        + clss(begin-1) * clss(end) // word edges
-//        +  clss(begin-1) * clss(end) * length
-        )
+      val baseCat = lfsuf
+
+      val leftOfSplit = ((baseCat)(-1)apply (split))
+
+      (baseCat(begin-1) + baseCat(begin) + leftOfSplit + baseCat(split) + baseCat(end-1) + baseCat(end))
     }
     val indexedWord = IndexedWordFeaturizer.fromData(wf, annTrees.map{_.words})
     val surface = IndexedSplitSpanFeaturizer.fromData(span, annTrees)

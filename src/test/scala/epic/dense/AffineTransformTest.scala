@@ -12,7 +12,7 @@ import breeze.linalg.DenseVector
 class AffineTransformTest extends FunSuite {
 
    test("chain rule") {
-     val index = new AffineTransform(12, 10, true)
+     val index = AffineTransform(12, 10, true)
      val dv = DenseVector.rand(10)
      val objective = new DiffFunction[DenseVector[Double]] {
        def calculate(x: DenseVector[Double]): (Double, DenseVector[Double]) = {
