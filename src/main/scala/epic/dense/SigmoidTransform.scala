@@ -26,7 +26,6 @@ case class SigmoidTransform[FV](inner: Transform[FV, DenseVector[Double]]) exten
   def extractLayer(dv: DenseVector[Double]) = new Layer(inner.extractLayer(dv))
 
   case class Layer(innerLayer: inner.Layer) extends _Layer {
-    val index = SigmoidTransform.this
 
     def activations(fv: FV): DenseVector[Double] = sigmoid(innerLayer.activations(fv))
 

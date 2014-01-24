@@ -31,7 +31,7 @@ case class AffineTransform[FV, Mid](numOutputs: Int, numInputs: Int, innerTransf
   }
 
   case class Layer(weights: DenseMatrix[Double], bias: DenseVector[Double], innerLayer: innerTransform.Layer) extends _Layer {
-    val index = AffineTransform.this.index
+    override val index = AffineTransform.this.index
 
 
     def activations(fv: FV) = {
