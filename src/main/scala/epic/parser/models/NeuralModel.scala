@@ -17,6 +17,7 @@ import epic.util.CacheBroker
 import epic.parser.projections.GrammarRefinements
 import scala.runtime.ScalaRunTime
 import epic.dense.{AffineTransform, Transform, SigmoidTransform}
+import epic.features.SplitSpanFeaturizer.ZeroSplitSpanFeaturizer
 
 /**
  * The neural model is really just a
@@ -210,7 +211,8 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
                             @Help(text="For features not seen in gold trees, we bin them into dummyFeats * numGoldFeatures bins using hashing.")
                             dummyFeats: Double = 0.0,
                             numOutputs: Int = 100,
-                            numHidden: Int = 100) extends ParserModelFactory[AnnotatedLabel, String] {
+                            numHidden: Int = 100,
+                            useIdentitySurfaceFeatures: Boolean = false) extends ParserModelFactory[AnnotatedLabel, String] {
   type MyModel = NeuralModel[AnnotatedLabel, AnnotatedLabel, String]
 
 
@@ -248,21 +250,39 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     def labelFeatGen(l: AnnotatedLabel) = Set(l, l.baseAnnotatedLabel).toSeq
     def ruleFeatGen(r: Rule[AnnotatedLabel]) = Set(r, r.map(_.baseAnnotatedLabel)).toSeq
 
-    val featurizer = new ProductionFeaturizer[AnnotatedLabel, AnnotatedLabel, String](xbarGrammar, indexedRefinements, labelFeatGen, ruleFeatGen)
-    val indexed =  IndexedSpanFeaturizer.extract[AnnotatedLabel, AnnotatedLabel, String](indexedWord,
-      surface,
-      featurizer,
-      new ZeroRuleAndSpansFeaturizer,
-      annotator,
-      indexedRefinements,
-      xbarGrammar,
-      HashFeature.Relative(dummyFeats),
-      trees)
-    val labelFeaturizer = new ProductionFeaturizer[AnnotatedLabel, AnnotatedLabel, String](xbarGrammar, indexedRefinements):RefinedFeaturizer[AnnotatedLabel, String, Feature]
-
     val featureCounter = readWeights(oldWeights)
 
-    val base = new SpanModel[AnnotatedLabel, AnnotatedLabel, String](indexed, indexed.index, annotator, constrainer, xbarGrammar, xbarLexicon, refGrammar, indexedRefinements,featureCounter.get)
+    val base = if(useIdentitySurfaceFeatures) {
+      val featurizer = new ProductionFeaturizer[AnnotatedLabel, AnnotatedLabel, String](xbarGrammar, indexedRefinements, labelFeatGen, ruleFeatGen)
+      val indexed =  IndexedSpanFeaturizer.extract[AnnotatedLabel, AnnotatedLabel, String](indexedWord,
+        surface,
+        featurizer,
+        new ZeroRuleAndSpansFeaturizer,
+        annotator,
+        indexedRefinements,
+        xbarGrammar,
+        HashFeature.Relative(dummyFeats),
+        trees)
+      new SpanModel[AnnotatedLabel, AnnotatedLabel, String](indexed, indexed.index, annotator, constrainer, xbarGrammar, xbarLexicon, refGrammar, indexedRefinements,featureCounter.get)
+    } else {
+      val featurizer = new ProductionFeaturizer[AnnotatedLabel, AnnotatedLabel, String](xbarGrammar, indexedRefinements, labelFeatGen, ruleFeatGen)
+      val surf0 = IndexedSplitSpanFeaturizer.fromData(new ZeroSplitSpanFeaturizer, annTrees)
+      val indexed =  IndexedSpanFeaturizer.extract[AnnotatedLabel, AnnotatedLabel, String](indexedWord,
+        surf0,
+        featurizer,
+        new ZeroRuleAndSpansFeaturizer,
+        annotator,
+        indexedRefinements,
+        xbarGrammar,
+        HashFeature.Relative(dummyFeats),
+        trees)
+      new SpanModel[AnnotatedLabel, AnnotatedLabel, String](indexed, indexed.index, annotator, constrainer, xbarGrammar, xbarLexicon, refGrammar, indexedRefinements,featureCounter.get)
+
+    }
+
+    val labelFeaturizer = new ProductionFeaturizer[AnnotatedLabel, AnnotatedLabel, String](xbarGrammar, indexedRefinements):RefinedFeaturizer[AnnotatedLabel, String, Feature]
+
+
     val transform = new SigmoidTransform(new AffineTransform(numOutputs, numHidden, new SigmoidTransform[FeatureVector](numHidden, surface.featureIndex.size, true)))
     new NeuralModel(base, labelFeaturizer, surface, transform, numOutputs)
   }
