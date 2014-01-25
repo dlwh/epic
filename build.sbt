@@ -90,9 +90,10 @@ publishArtifact in Test := false
 
 pomIncludeRepository := { _ => false }
 
+/*
 excludedJars in assembly <<= (fullClasspath in assembly) map { cp =>
  cp filter {_.data.getName.matches(".native.")}
 }
-
+*/
 assemblyOption in assembly ~= { _.copy(cacheOutput = false) }
 
