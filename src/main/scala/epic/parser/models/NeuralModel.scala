@@ -61,7 +61,7 @@ class NeuralModel[L, L2, W](baseModel: SpanModel[L, L2, W],
   def accumulateCounts(d: TreeInstance[L, W], m: Marginal, accum: ExpectedCounts, scale: Double) {
     val anchoring: Anchoring[L, W] = m.anchoring.refined.asInstanceOf[Anchoring[L, W]]
     val Seq(baseDerivatives: DenseVector[Double], outputDerivatives: DenseVector[Double], inputDerivatives: DenseVector[Double]) = featureIndex.shardWeights(accum.counts)
-    m.visit(new NeuralModel.ExpectedCountsVisitor(anchoring, scale, accum.counts(0 until baseModel.featureIndex.size),
+    m.visit(new NeuralModel.ExpectedCountsVisitor(anchoring, scale, baseDerivatives,
       inputDerivatives, outputDerivatives.asDenseMatrix.reshape(labelFeaturizer.index.size, numOutputs)))
     accum.loss += scale * m.logPartition
   }
