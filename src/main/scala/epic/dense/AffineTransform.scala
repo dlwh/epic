@@ -45,9 +45,6 @@ case class AffineTransform[FV, Mid](numOutputs: Int, numInputs: Int, innerTransf
       // whole function is f(mat * inner(fv) + bias)
       // scale(i) pushes in  (f'(mat * inner(v) + bias))(i)
       val innerAct = innerLayer.activations(fv)
-      // act is currently mat * features + bias
-      val act = weights * innerAct
-
       // d/d(weights(::, i)) == scale(i) * innerAct
       for (i <- 0 until weights.rows) {
         val a: Double = scale(i)
