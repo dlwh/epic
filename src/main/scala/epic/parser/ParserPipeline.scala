@@ -114,10 +114,15 @@ trait ParserPipeline extends Logging {
 
     for((name, parser) <- parsers) {
       logger.info("Parser " + name)
-      val outDir = new File("parsers/")
-      outDir.mkdirs()
-      val out = new File(outDir, name +".parser")
-      writeObject(out, parser.copy(decachify(parser.coreGrammar)))
+      try {
+        val outDir = new File("parsers/")
+        outDir.mkdirs()
+        val out = new File(outDir, name +".parser")
+        writeObject(out, parser.copy(decachify(parser.coreGrammar)))
+      } catch {
+        case ex: Exception =>
+          logger.error(s"Could not serialize $name: " + ex.getMessage, ex)
+      }
 
       logger.info("Evaluating Parser...")
       val stats = if (params.evalOnTest) {
