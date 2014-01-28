@@ -18,6 +18,7 @@ import epic.parser.projections.GrammarRefinements
 import scala.runtime.ScalaRunTime
 import epic.dense.{AffineTransform, Transform, SigmoidTransform}
 import epic.features.SplitSpanFeaturizer.ZeroSplitSpanFeaturizer
+import breeze.collection.mutable.TriangularArray
 
 /**
  * The neural model is really just a
@@ -40,8 +41,6 @@ class NeuralModel[L, L2, W](baseModel: SpanModel[L, L2, W],
   val featureIndex = SegmentedIndex( baseModel.featureIndex,
     AffineTransform(labelFeaturizer.index.size, numOutputs, includeBias = false).index,
     transform.index)
-  private val layerOffset = featureIndex.componentOffset(2)
-  private val lastLayerOffset = featureIndex.componentOffset(1)
 
   println(featureIndex.indices.map(_.size))
 
@@ -107,6 +106,7 @@ object NeuralModel {
   }
 
 
+  /** Not thread safe; make a difference anchoring for each thread */
   class Anchoring[L, W](val baseAnchoring: RefinedAnchoring[L, W],
                         val baseFeaturizer: RefinedFeaturizer[L, W, Feature]#Anchoring,
                         val labelFeaturizer: RefinedFeaturizer[L, W, Feature]#Anchoring,
@@ -116,7 +116,9 @@ object NeuralModel {
     override def scoreSpan(begin: Int, end: Int, label: Int, ref: Int): Double = {
       var base = baseAnchoring.scoreSpan(begin, end, label, ref)
       if(base != Double.NegativeInfinity) {
-        base += score(labelFeaturizer.featuresForSpan(begin, end, label, ref), surfaceFeaturizer.featuresForSpan(begin, end))
+        base += score(labelFeaturizer.featuresForSpan(begin, end, label, ref),
+          surfaceFeaturizer.featuresForSpan(begin, end),
+          begin, begin, end)
       }
       base
     }
@@ -124,7 +126,9 @@ object NeuralModel {
     override def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int): Double = {
       var base = baseAnchoring.scoreBinaryRule(begin, split, end, rule, ref)
       if(base != Double.NegativeInfinity) {
-        base += score(labelFeaturizer.featuresForBinaryRule(begin, split, end, rule, ref), surfaceFeaturizer.featuresForSplit(begin, split, end))
+        base += score(labelFeaturizer.featuresForBinaryRule(begin, split, end, rule, ref),
+          surfaceFeaturizer.featuresForSplit(begin, split, end),
+          begin, split, end)
       }
       base
     }
@@ -132,16 +136,40 @@ object NeuralModel {
     override def scoreUnaryRule(begin: Int, end: Int, rule: Int, ref: Int): Double = {
       var base = baseAnchoring.scoreUnaryRule(begin, end, rule, ref)
       if(base != Double.NegativeInfinity) {
-        base += score(labelFeaturizer.featuresForUnaryRule(begin, end, rule, ref), surfaceFeaturizer.featuresForSpan(begin, end))
+        base += score(labelFeaturizer.featuresForUnaryRule(begin, end, rule, ref),
+          surfaceFeaturizer.featuresForSpan(begin, end),
+          begin, begin, end)
       }
       base
     }
 
-    def score(labelFeatures: Array[Int], surfaceFeatures: Array[Int]):Double = {
-      val activations = layer.activations(new FeatureVector(surfaceFeatures))
+    // if split == begin, then we're just scoring the span.
+    def score(labelFeatures: Array[Int], surfaceFeatures: Array[Int], begin: Int, split: Int, end: Int):Double = {
+      val activations = cachedActivations(surfaceFeatures, begin, split, end)
       val labelCombination = lastLayer.t * new FeatureVector(labelFeatures)
       activations dot labelCombination
     }
+
+    // if split == begin, then we're just scoring the span.
+    private[NeuralModel] def cachedActivations(surfaceFeatures: Array[Int], begin: Int, split: Int, end: Int) = {
+      if(TriangularArray.index(begin, end) != lastCell) {
+        java.util.Arrays.fill(_cachedActivations.asInstanceOf[Array[AnyRef]], null)
+        lastCell = TriangularArray.index(begin, end)
+      }
+
+
+      val off = split - begin
+      var res  = _cachedActivations(off)
+      if(res eq null) {
+        res = layer.activations(new FeatureVector(surfaceFeatures))
+        _cachedActivations(off) = res
+      }
+
+      res
+    }
+
+    private var lastCell = -1
+    private val _cachedActivations = new Array[DenseVector[Double]](words.length)
   }
 
   private class ExpectedCountsVisitor[L, W](anchoring: NeuralModel.Anchoring[L, W],
@@ -157,7 +185,7 @@ object NeuralModel {
       val surfFeats: Array[Int] = surfaceFeaturizer.featuresForSplit(begin, split, end)
       val baseFeatures = baseFeaturizer.featuresForBinaryRule(begin, split, end, rule, ref)
       axpy(score * scale, new FeatureVector(baseFeatures), baseDeriv)
-      tallyDerivative(labelFeatures, surfFeats, score)
+      tallyDerivative(labelFeatures, surfFeats, score, begin, split, end)
     }
 
     def visitUnaryRule(begin: Int, end: Int, rule: Int, ref: Int, score: Double) {
@@ -165,7 +193,7 @@ object NeuralModel {
       val surfFeats: Array[Int] = surfaceFeaturizer.featuresForSpan(begin, end)
       val baseFeatures = baseFeaturizer.featuresForUnaryRule(begin, end, rule, ref)
       axpy(score * scale, new FeatureVector(baseFeatures), baseDeriv)
-      tallyDerivative(labelFeatures, surfFeats, score)
+      tallyDerivative(labelFeatures, surfFeats, score, begin, begin, end)
     }
 
     def visitSpan(begin: Int, end: Int, tag: Int, ref: Int, score: Double) {
@@ -173,7 +201,7 @@ object NeuralModel {
       val surfFeats: Array[Int] = surfaceFeaturizer.featuresForSpan(begin, end)
       val baseFeatures = baseFeaturizer.featuresForSpan(begin, end, tag, ref)
       axpy(score * scale, new FeatureVector(baseFeatures), baseDeriv)
-      tallyDerivative(labelFeatures, surfFeats, score)
+      tallyDerivative(labelFeatures, surfFeats, score, begin, begin, end)
     }
 
 
@@ -183,8 +211,8 @@ object NeuralModel {
     // (\nabla output)(lf, ::) = labelFeatures(lf) * layer(surfaceFeatures)
     // (\nabla \theta) = (output.t * labelFeatures) * \nabla layer(surfaceFeatures)
     // everything is scaled by score * scale
-    def tallyDerivative(labelFeats: Array[Int], surfFeats: Array[Int], score: Double): Unit =  {
-      val activations = layer.activations(new FeatureVector(surfFeats))
+    def tallyDerivative(labelFeats: Array[Int], surfFeats: Array[Int], score: Double, begin: Int, split: Int, end: Int): Unit =  {
+      val activations = anchoring.cachedActivations(surfFeats, begin, split, end)
       val labelCombination = lastLayer.t * new FeatureVector(labelFeats)
 
       for(lf <- labelFeats) {

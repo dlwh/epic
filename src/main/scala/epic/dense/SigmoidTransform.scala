@@ -29,7 +29,8 @@ case class SigmoidTransform[FV](inner: Transform[FV, DenseVector[Double]]) exten
 
     def activations(fv: FV): DenseVector[Double] = sigmoid(innerLayer.activations(fv))
 
-    def tallyDerivative(deriv: DenseVector[Double], scale: DenseVector[Double], fv: FV) = {
+    def tallyDerivative(deriv: DenseVector[Double], _scale: =>DenseVector[Double], fv: FV) = {
+      val scale = _scale
       val act = activations(fv)
       act :*= (act - 1.0)
       act :*= -1.0

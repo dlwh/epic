@@ -24,7 +24,7 @@ trait Transform[In, Out] {
 
     def activations(fv: In):Out
 
-    def tallyDerivative(deriv: DenseVector[Double], scale: DenseVector[Double], fv: In)
+    def tallyDerivative(deriv: DenseVector[Double], scale: =>DenseVector[Double], fv: In)
 
   }
 

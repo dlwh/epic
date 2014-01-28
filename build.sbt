@@ -97,3 +97,8 @@ excludedJars in assembly <<= (fullClasspath in assembly) map { cp =>
 */
 assemblyOption in assembly ~= { _.copy(cacheOutput = false) }
 
+
+
+excludedJars in assembly <<= (fullClasspath in assembly) map { cp =>
+ cp filter {_.data.getName.matches("sbt.*")}
+}
