@@ -65,6 +65,8 @@ object ParserTrainer extends epic.parser.ParserPipeline with Logging {
                     randomize: Boolean = false,
                     @Help(text="Should we enforce reachability? Can be useful if we're pruning the gold tree.")
                     enforceReachability: Boolean = true,
+                    @Help(text="Whether or not we use constraints. Not using constraints is very slow.")
+                    useConstraints: Boolean = true,
                     @Help(text="Should we do loss augmentation?")
                     lossAugment: Boolean = false,
                     @Help(text="Should we check the gradient to make sure it's coded correctly?")
@@ -105,17 +107,20 @@ object ParserTrainer extends epic.parser.ParserPipeline with Logging {
 
     var theTrees = trainTrees.toIndexedSeq.filterNot(sentTooLong(_, params.maxParseLength))
 
-      if(enforceReachability)  {
+    if(useConstraints && enforceReachability)  {
       val refGrammar = GenerativeParser.annotated(initialParser.grammar, initialParser.lexicon, TreeAnnotator.identity, trainTrees)
       val proj = new OracleParser(refGrammar)
       theTrees = theTrees.par.map(ti => ti.copy(tree=proj.forTree(ti.tree, ti.words, constraints.constraints(ti.words)))).seq.toIndexedSeq
     }
 
-    val baseMeasure = if(lossAugment) {
-      new ConstraintCoreGrammarAdaptor(initialParser.grammar, initialParser.lexicon, constraints) * new HammingLossAugmentation(initialParser.grammar, initialParser.lexicon, (_:AnnotatedLabel).baseAnnotatedLabel,  (_:AnnotatedLabel).isIntermediate).asCoreGrammar(theTrees)
-    } else {
+    var baseMeasure = if(useConstraints) {
       new ConstraintCoreGrammarAdaptor(initialParser.grammar, initialParser.lexicon, constraints)
+    } else {
+      CoreGrammar.identity(initialParser.grammar, initialParser.lexicon)
     }
+
+    if(lossAugment)
+      baseMeasure *= new HammingLossAugmentation(initialParser.grammar, initialParser.lexicon, (_:AnnotatedLabel).baseAnnotatedLabel,  (_:AnnotatedLabel).isIntermediate).asCoreGrammar(theTrees)
     
     val model = modelFactory.make(theTrees, baseMeasure)
     val obj = new ModelObjective(model, theTrees, params.threads)
@@ -127,6 +132,7 @@ object ParserTrainer extends epic.parser.ParserPipeline with Logging {
       GradientTester.testIndices(cachedObj2, obj.initialWeightVector(randomize = true), indices, toString={(i: Int) => model.featureIndex.get(i).toString}, skipZeros = true)
       GradientTester.test(cachedObj2, obj.initialWeightVector(randomize = true), toString={(i: Int) => model.featureIndex.get(i).toString}, skipZeros = true)
     }
+
     type OptState = FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State
     def evalAndCache(pair: (OptState, Int)) {
       val (state, iter) = pair
@@ -151,7 +157,7 @@ object ParserTrainer extends epic.parser.ParserPipeline with Logging {
   }
 
   def sentTooLong(p: TreeInstance[AnnotatedLabel, String], maxLength: Int): Boolean = {
-    p.words.filter(x => x == "'s" || x(0).isLetterOrDigit).length > maxLength
+    p.words.count(x => x == "'s" || x(0).isLetterOrDigit) > maxLength
   }
   
   def evaluateNow = {
