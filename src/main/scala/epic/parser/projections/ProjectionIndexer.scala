@@ -47,7 +47,7 @@ final class ProjectionIndexer[C, F] private (val coarseIndex: Index[C],
   def indexAndLocalize(f: F):(Int, Int) = {
     val glob = fineIndex(f)
     if(glob < 0) (-1, -1)
-    project(glob) -> localize(glob)
+    else project(glob) -> localize(glob)
   }
 
 

@@ -26,7 +26,7 @@ case class AffineTransform[FV, Mid](numOutputs: Int, numInputs: Int, innerTransf
     } else {
       DenseVector.zeros[Double](numOutputs)
     }
-    val inner = innerTransform.extractLayer(weights(index.componentOffset(1) until ::))
+    val inner = innerTransform.extractLayer(weights(index.componentOffset(1) to -1))
     new Layer(mat, bias, inner)
   }
 
@@ -64,7 +64,7 @@ case class AffineTransform[FV, Mid](numOutputs: Int, numInputs: Int, innerTransf
       // scale is f'(mat * inner(v) + bias)
       // d/dv is mat.t * f'(mat * inner(v) + bias)
 
-      innerLayer.tallyDerivative(deriv(index.componentOffset(1) until ::), weightst * scale, fv)
+      innerLayer.tallyDerivative(deriv(index.componentOffset(1) to -1), weightst * scale, fv)
     }
 
   }
