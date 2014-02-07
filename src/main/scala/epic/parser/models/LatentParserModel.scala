@@ -31,7 +31,7 @@ import epic.lexicon.Lexicon
 import epic.util.{SafeLogging, CacheBroker}
 
 class LatentParserModel[L, L3, W](indexedFeatures: IndexedFeaturizer[L, L3, W],
-                                  reannotate: (BinarizedTree[L], Seq[W]) => BinarizedTree[L],
+                                  reannotate: (BinarizedTree[L], IndexedSeq[W]) => BinarizedTree[IndexedSeq[L3]],
                                   val projections: GrammarRefinements[L, L3],
                                   baseFactory: CoreGrammar[L, W],
                                   val baseGrammar: BaseGrammar[L],
@@ -62,16 +62,17 @@ class LatentParserModel[L, L3, W](indexedFeatures: IndexedFeaturizer[L, L3, W],
 }
 
 case class LatentParserInference[L, L2, W](featurizer: RefinedFeaturizer[L, W, Feature],
-                                           reannotate: (BinarizedTree[L], Seq[W]) => BinarizedTree[L],
+                                           annotator: (BinarizedTree[L], IndexedSeq[W]) => BinarizedTree[IndexedSeq[L2]],
                                            grammar: RefinedGrammar[L, W],
                                            baseMeasure: CoreGrammar[L, W],
                                            projections: GrammarRefinements[L, L2]) extends ParserInference[L, W] {
 
 
   def goldMarginal(ti: TreeInstance[L, W], aug: CoreAnchoring[L, W]) = {
-    val reannotated = reannotate(ti.tree, ti.words)
+    val annotated = annotator(ti.tree, ti.words).map(_.map(projections.labels.localize))
+
     val product = AugmentedAnchoring.fromRefined(grammar.anchor(ti.words))
-    LatentTreeMarginal(product, projections.labels, reannotated)
+    LatentTreeMarginal(product, annotated)
   }
 }
 
@@ -192,8 +193,12 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     val feat = new ProductionFeaturizer[AnnotatedLabel, (AnnotatedLabel, Int), String](xbarGrammar, finalRefinements)
     val indexedFeaturizer = IndexedFeaturizer(feat, wordFeaturizer, trainTrees, annotator andThen (_.tree.map(finalRefinements.labels.refinementsOf)), finalRefinements)
 
+    def latentAnnotator(t: BinarizedTree[AnnotatedLabel], w: IndexedSeq[String]): BinarizedTree[IndexedSeq[(AnnotatedLabel, Int)]] = {
+      annotator(t, w).map(finalRefinements.labels.refinementsOf)
+    }
+
     new LatentParserModel[AnnotatedLabel, (AnnotatedLabel, Int), String](indexedFeaturizer,
-    annotator,
+    latentAnnotator,
     finalRefinements,
     constrainer,
     xbarGrammar,

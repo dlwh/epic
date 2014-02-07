@@ -58,11 +58,11 @@ class LexModel[L, L2, W](bundle: LexGrammarBundle[L, L2, W],
       val reannotated = reannotate(tree, words)
       val headed = bundle.headFinder.projected(indexed.refinements.labels.project(_:L2)).annotateHeadIndices(reannotated)
       headed.map { case (l2, head) =>
-        indexed.refinements.labels.project(l2) -> indexed.joinTagRef(head, indexed.refinements.labels.localize(l2), words.length)
+        indexed.refinements.labels.project(l2) -> indexed.joinTagRef(head, indexed.refinements.labels.localize(l2)._2, words.length)
       }
 
     }
-    new AnnotatedParserInference(indexed, ann _, gram, baseFactory)
+    new AnnotatedParserInference(indexed, ann, gram, baseFactory)
   }
 
   type Inference = AnnotatedParserInference[L, W]
