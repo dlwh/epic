@@ -22,7 +22,7 @@ import breeze.optimize._
 import epic.trees.AnnotatedLabel
 import breeze.config.Help
 import com.typesafe.scalalogging.slf4j.Logging
-import epic.parser.projections.{GrammarRefinements, ConstraintCoreGrammarAdaptor, ReachabilityProjection, ParserChartConstraintsFactory}
+import epic.parser.projections.{GrammarRefinements, ConstraintCoreGrammarAdaptor, OracleParser, ParserChartConstraintsFactory}
 import epic.util.CacheBroker
 import epic.parser.ParserParams.XbarGrammar
 import breeze.util._
@@ -107,7 +107,7 @@ object ParserTrainer extends epic.parser.ParserPipeline with Logging {
 
       if(enforceReachability)  {
       val refGrammar = GenerativeParser.annotated(initialParser.grammar, initialParser.lexicon, TreeAnnotator.identity, trainTrees)
-      val proj = new ReachabilityProjection(initialParser.grammar, initialParser.lexicon, refGrammar)
+      val proj = new OracleParser(refGrammar)
       theTrees = theTrees.par.map(ti => ti.copy(tree=proj.forTree(ti.tree, ti.words, constraints.constraints(ti.words)))).seq.toIndexedSeq
     }
 

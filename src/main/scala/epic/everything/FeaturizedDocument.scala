@@ -11,7 +11,7 @@ import epic.constraints.{ChartConstraints, LabeledSpanConstraints}
 import epic.features._
 import epic.util.CacheBroker
 import scala.util.Try
-import epic.parser.projections.{GrammarRefinements, ReachabilityProjection}
+import epic.parser.projections.{GrammarRefinements, OracleParser}
 import epic.trees.StandardTreeProcessor
 import epic.trees.TreeInstance
 import epic.ontonotes.Frame
@@ -90,7 +90,7 @@ object FeaturizedDocument {
     val reachable = {
       val treeInstances = docs.flatMap(_.sentences.map(_.treeInstance(treeProcessor)))
       val refGrammar = GenerativeParser.extractGrammar(AnnotatedLabel.TOP, treeInstances)
-      new ReachabilityProjection(grammar, lexicon, refGrammar)
+      new OracleParser(refGrammar)
     }
 
     val words: IndexedSeq[IndexedSeq[String]] = docs.flatMap(_.sentences.map(_.words))
