@@ -55,6 +55,8 @@ trait Inference[Datum] extends Serializable {
    * @return gold marginal
    */
   def marginal(scorer: Scorer, v: Datum):Marginal
+
+  def marginal(v: Datum): Marginal = marginal(scorer(v), v)
 }
 
 
@@ -74,8 +76,25 @@ trait AugmentableInference[Datum,Augment] extends Inference[Datum] {
    * The "no prior information" augment. Used if nothing is passed in.
    */
   def baseAugment(v: Datum):Augment
-  def scorer(v: Datum):Scorer = scorer(v, baseAugment(v))
-  def scorer(v: Datum, augment: Augment):Scorer
+
+  def scorer(v: Datum):Scorer
+
+  /**
+   * Produces the "gold marginal" which is the marginal conditioned on the output label/structure itself.
+   * @param v the example
+   * @return gold marginal
+   */
+  def goldMarginal(scorer: Scorer, v: Datum): Marginal = goldMarginal(scorer, v, baseAugment(v))
+
+  /**
+   * Produces the "guess marginal" which is the marginal conditioned on only the input data
+   * @param v the example
+   * @return gold marginal
+   */
+  def marginal(scorer: Scorer, v: Datum): Marginal = marginal(scorer, v, baseAugment(v))
+
+  def marginal(scorer: Scorer, v: Datum, aug: Augment): Marginal
+  def goldMarginal(scorer: Scorer, v: Datum, aug: Augment): Marginal
 }
 
 /**

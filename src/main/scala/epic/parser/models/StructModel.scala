@@ -55,6 +55,7 @@ class StructModel[L, L2, W](indexedFeatures: IndexedFeaturizer[L, L2, W],
                         initialFeatureVal: (Feature => Option[Double]) = { _ => None }) extends ParserModel[L, W] with Serializable {
   type Inference = AnnotatedParserInference[L, W]
 
+
   def featureIndex = indexedFeatures.index
 
   override def initialValueForFeature(f: Feature) = initialFeatureVal(f) getOrElse 0.0
@@ -70,7 +71,7 @@ class StructModel[L, L2, W](indexedFeatures: IndexedFeaturizer[L, L2, W],
   }
 
 
-  def accumulateCounts(d: TreeInstance[L, W], m: Marginal, accum: ExpectedCounts, scale: Double) {
+  def accumulateCounts(s: Scorer, d: TreeInstance[L, W], m: Marginal, accum: ExpectedCounts, scale: Double): Unit = {
     m.expectedCounts(indexedFeatures, accum, scale)
   }
 }

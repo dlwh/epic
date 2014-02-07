@@ -13,12 +13,14 @@ import epic.everything.{DocumentBeliefs, Property}
 class PropCorefModel(properties: IndexedSeq[PropertyFeatures[_]], val featureIndex: Index[Feature]) extends StandardExpectedCounts.Model[FeaturizedCorefInstance] {
   type Inference = PropCorefInference
   type Marginal = PropCoref.Marginal
+  type Scorer = PropCorefFactors
 
   def initialValueForFeature(f: Feature) = 0.0
 
   def inferenceFromWeights(weights: DenseVector[Double]) = new PropCorefInference(featureIndex, properties, weights)
 
-  override def accumulateCounts(inst: FeaturizedCorefInstance, marg: Marginal, expCounts: ExpectedCounts, scale: Double): Unit = {
+
+  def accumulateCounts(s: Scorer, inst: FeaturizedCorefInstance, marg: Marginal, expCounts: ExpectedCounts, scale: Double): Unit = {
     import marg._
     expCounts.loss += marginals.logPartition * scale
 
@@ -48,34 +50,24 @@ case class PropertyFeatures[T](prop: Property[T],
   def arity = prop.arity
 }
 
+case class PropCorefFactors(assignmentVariables: Array[Variable[Int]], propertyVariables: Array[Array[Variable[Int]]], agreementFactors: Array[AgreementFactor])
+
 class PropCorefInference(index: Index[Feature],
                          properties: IndexedSeq[PropertyFeatures[_]],
                          weights: DenseVector[Double]) extends ProjectableInference[FeaturizedCorefInstance, DocumentBeliefs] {
   type ExpectedCounts = StandardExpectedCounts[Feature]
   type Marginal = PropCoref.Marginal
+  type Scorer = PropCorefFactors
 
   def emptyCounts = StandardExpectedCounts.zero(index)
 
 
- 
-
-  def goldMarginal(inst: FeaturizedCorefInstance, aug: DocumentBeliefs) = {
-    val (assignmentVariables: Array[Variable[Int]], propertyVariables: Array[Array[Variable[Int]]]) = makeVariables(inst)
+  def goldMarginal(scorer: Scorer, inst: FeaturizedCorefInstance, aug: DocumentBeliefs): Marginal = {
+    import scorer._
 
     // skip factor for 0, since it doesn't get assigned.
     val assignmentFactors = Array.tabulate[Factor](inst.numMentions) { i =>
       goldAssignmentFactor(assignmentVariables, i, inst, inst.clusterFor(i))
-    }
-
-    // this ends up being a little inefficient. We can actually
-    // have 1 big factor with all properties of a given type,
-    // and only visit certain assignments, but the bp framework
-    // doesn't support that yet.
-    // TODO: we can set contribution to exp(0) a prior and not need to sum over them... how to
-    // do this?
-    val agreementFactors = new ArrayBuffer[AgreementFactor]()
-    for(c <- inst.clusters; i <- c; j <- c if j < i && j != 0; p <- 0 until properties.length) {
-      agreementFactors += agreementFactor(propertyVariables, assignmentVariables, j, i, p)
     }
 
     val flattenedProp = propertyVariables.flatten.filter(_ ne null)
@@ -87,12 +79,23 @@ class PropCorefInference(index: Index[Feature],
   }
 
 
-  def project(v: FeaturizedCorefInstance, m: Marginal, oldAugment: DocumentBeliefs): DocumentBeliefs = error("TODO")
+  def project(v: FeaturizedCorefInstance, s: Scorer, m: Marginal, oldAugment: DocumentBeliefs): DocumentBeliefs = ???
 
   def baseAugment(v: FeaturizedCorefInstance): DocumentBeliefs = null
 
-  def marginal(inst: FeaturizedCorefInstance, aug: DocumentBeliefs): Marginal = {
+  def scorer(inst: FeaturizedCorefInstance):PropCorefFactors = {
     val (assignmentVariables: Array[Variable[Int]], propertyVariables: Array[Array[Variable[Int]]]) = makeVariables(inst)
+
+    val agreementFactors = new ArrayBuffer[AgreementFactor]()
+    for(i <- 0 until inst.numMentions; j <- 0 to i; p <- 0 until properties.length) {
+      agreementFactors += agreementFactor(propertyVariables, assignmentVariables, j, i, p)
+    }
+
+    new PropCorefFactors(assignmentVariables, propertyVariables, agreementFactors.toArray)
+  }
+
+  def marginal(scorer: Scorer, inst: FeaturizedCorefInstance, aug: DocumentBeliefs): Marginal = {
+    import scorer._
 
     // skip factor for 0, since it doesn't get assigned.
     val assignmentFactors = Array.tabulate[Factor](inst.numMentions) { i =>
@@ -106,10 +109,6 @@ class PropCorefInference(index: Index[Feature],
     // TODO: we can set contribution to exp(0) a prior and not need to sum over them... how to
     // do this?
 
-    val agreementFactors = new ArrayBuffer[AgreementFactor]()
-    for(i <- 0 until inst.numMentions; j <- 0 to i; p <- 0 until properties.length) {
-      agreementFactors += agreementFactor(propertyVariables, assignmentVariables, j, i, p)
-    }
 
     val flattenedProp = propertyVariables.flatten.filter( _ ne null)
 
@@ -136,7 +135,7 @@ class PropCorefInference(index: Index[Feature],
   }
 
   def decode(inst: FeaturizedCorefInstance, aug: DocumentBeliefs) : IndexedSeq[Set[DSpan]] = {
-    val marg: Marginal = marginal(inst, aug)
+    val marg: Marginal = marginal(scorer(inst), inst, aug)
     import marg._
 
     val links = Array.fill(inst.numMentions)(null: collection.mutable.BitSet)
@@ -198,10 +197,6 @@ class PropCorefInference(index: Index[Feature],
     }
   }
 
-
-  def projectGold(v: FeaturizedCorefInstance, m: Marginal, oldAugment: DocumentBeliefs): DocumentBeliefs = {
-    project(v, m, oldAugment)
-  }
 
 
   def agreementFactor(propertyVariables: Array[Array[Variable[Int]]], assignmentVariables: Array[Variable[Int]], j: Int, i: Int, p: Int) = {

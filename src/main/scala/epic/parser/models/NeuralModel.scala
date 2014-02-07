@@ -1,6 +1,6 @@
 package epic.parser.models
 
-import epic.framework.{StandardExpectedCounts, Feature}
+import epic.framework.{Inference, StandardExpectedCounts, Feature}
 import breeze.util.Index
 import epic.features._
 import epic.parser.models.NeuralModel._
@@ -46,12 +46,21 @@ class NeuralModel[L, L2, W](baseModel: SpanModel[L, L2, W],
                             surfaceFeaturizer: IndexedSplitSpanFeaturizer[W],
                             transform: Transform[FeatureVector, DenseVector[Double]],
                             numOutputs: Int,
-                            initialFeatureVal: (Feature => Option[Double]) = { _ => None })  extends ParserModel[L, W] {
+                            initialFeatureVal: (Feature => Option[Double]) = { _ => None })  extends StandardExpectedCounts.Model[TreeInstance[L, W]] with ParserExtractable[L, W] {
 
   def baseGrammar: BaseGrammar[L] = baseModel.baseGrammar
   def lexicon: Lexicon[L, W] = baseModel.lexicon
 
+
+  type Scorer = RefinedAnchoring[L, W]
+  type Marginal = ParseMarginal[L, W]
   type Inference = NeuralInference[L, L2, W]
+
+
+  def extractParser(weights: DenseVector[Double]) = {
+    val inf = inferenceFromWeights(weights)
+    Parser(inf.baseMeasure, inf.grammar, ChartDecoder[L, W]())
+  }
 
   val featureIndex = SegmentedIndex( baseModel.featureIndex,
     AffineTransform(labelFeaturizer.index.size, numOutputs, includeBias = false).index,
@@ -69,11 +78,9 @@ class NeuralModel[L, L2, W](baseModel: SpanModel[L, L2, W],
   }
 
 
-
-  def accumulateCounts(d: TreeInstance[L, W], m: Marginal, accum: ExpectedCounts, scale: Double) {
-    val anchoring: Anchoring[L, W] = m.anchoring.refined.asInstanceOf[Anchoring[L, W]]
+  def accumulateCounts(anchoring: Scorer, d: TreeInstance[L, W], m: Marginal, accum: ExpectedCounts, scale: Double): Unit = {
     val Seq(baseDerivatives: DenseVector[Double], outputDerivatives: DenseVector[Double], inputDerivatives: DenseVector[Double]) = featureIndex.shardWeights(accum.counts)
-    m.visit(new NeuralModel.ExpectedCountsVisitor(anchoring, scale, baseDerivatives,
+    m.visit(new NeuralModel.ExpectedCountsVisitor(anchoring.asInstanceOf[NeuralModel.Anchoring[L, W]], scale, baseDerivatives,
       inputDerivatives, outputDerivatives.asDenseMatrix.reshape(labelFeaturizer.index.size, numOutputs)))
     accum.loss += scale * m.logPartition
   }
@@ -88,7 +95,9 @@ case class NeuralInference[L, L2, W](baseInference: LatentParserInference[L, L2,
                                  surfaceFeaturizer: IndexedSplitSpanFeaturizer[W],
                                  lastLayerWeights: DenseMatrix[Double],
                                  layer: Transform[FeatureVector, DenseVector[Double]]#Layer) extends ParserInference[L, W] {
-  def goldMarginal(ti: TreeInstance[L, W], aug: CoreAnchoring[L, W]): Marginal = {
+
+
+  def goldMarginal(scorer: Scorer, ti: TreeInstance[L, W], aug: CoreAnchoring[L, W]): Marginal = {
     import ti._
 
     val annotated = baseInference.annotator(tree, words).map(_.map(baseInference.projections.labels.localize))
@@ -258,7 +267,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
                             dummyFeats: Double = 0.0,
                             numOutputs: Int = 100,
                             numHidden: Int = 100,
-                            useIdentitySurfaceFeatures: Boolean = false) extends ParserModelFactory[AnnotatedLabel, String] {
+                            useIdentitySurfaceFeatures: Boolean = false) extends ParserExtractableModelFactory[AnnotatedLabel, String] {
   type MyModel = NeuralModel[AnnotatedLabel, AnnotatedLabel, String]
 
 

@@ -31,7 +31,6 @@ object SentimentTreebankPipeline extends Logging {
                      iterPerEval: Int = 100,
                      evalOnTest: Boolean = false,
                      includeDevInTrain: Boolean = false,
-//                     modelFactory: SpanModelFactory,
                      modelFactory: ParserExtractableModelFactory[AnnotatedLabel, String] = new SpanModelFactory,
                      rootLossScaling: Double = 1.0)
 
@@ -117,11 +116,13 @@ object SentimentTreebankPipeline extends Logging {
     type ExpectedCounts = inner.ExpectedCounts
     type Marginal = inner.Marginal
     type Inference = SentimentTreebankPipeline.Inference[L, W]
+    type Scorer = inner.Scorer
 
     def emptyCounts = inner.emptyCounts
 
-    def accumulateCounts(d: TreeInstance[L, W], m: Marginal, accum: ExpectedCounts, scale: Double): Unit = {
-      inner.accumulateCounts(d, m, accum, scale)
+
+    def accumulateCounts(s: Scorer, d: TreeInstance[L, W], m: Marginal, accum: ExpectedCounts, scale: Double): Unit = {
+      inner.accumulateCounts(s, d, m, accum, scale)
     }
 
     /**
@@ -141,13 +142,19 @@ object SentimentTreebankPipeline extends Logging {
 
   class Inference[L, W](val pm: ParserInference[L, W]) extends epic.framework.Inference[TreeInstance[L, W]] {
     val labels = pm.baseMeasure.labelIndex.toIndexedSeq.map(_ -> 0)
+    type Scorer = pm.Scorer
     type Marginal = pm.Marginal
 
-    def goldMarginal(v: TreeInstance[L, W]): Marginal = pm.goldMarginal(v)
+    def scorer(v: TreeInstance[L, W]): Scorer = pm.scorer(v)
 
-    def marginal(v: TreeInstance[L, W]): Marginal = {
-      val anch = pm.grammar.anchor(v.words)
-      LatentTreeMarginal[L, W](AugmentedAnchoring.fromRefined(anch), v.tree.map(l => labels:scala.collection.IndexedSeq[(L, Int)]))
+    def goldMarginal(scorer: Scorer, v: TreeInstance[L, W]): Inference[L, W]#Marginal = {
+      pm.goldMarginal(scorer, v)
+    }
+
+
+    def marginal(anch: Scorer, v: TreeInstance[L, W]): Inference[L, W]#Marginal = {
+      val aug = AugmentedAnchoring.fromRefined(anch)
+      LatentTreeMarginal[L, W](aug, v.tree.map(l => labels:scala.collection.IndexedSeq[(L, Int)]))
     }
   }
 

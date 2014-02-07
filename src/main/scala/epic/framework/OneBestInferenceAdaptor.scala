@@ -10,13 +10,25 @@ import breeze.linalg.DenseVector
  **/
 class OneBestInferenceAdaptor[Datum](val inference: AnnotatingInference[Datum]) extends Inference[Datum] {
   type Marginal = inference.Marginal
+  type Scorer = inference.Scorer
 
-  def goldMarginal(v: Datum): Marginal = inference.goldMarginal(v)
 
-  def marginal(v: Datum): Marginal = {
-    val m = inference.marginal(v)
-    goldMarginal(inference.annotate(v, m))
+
+  def scorer(v: Datum): Scorer = inference.scorer(v)
+
+  def goldMarginal(scorer: Scorer, v: Datum): Marginal = inference.goldMarginal(scorer, v)
+
+
+  /**
+   * Produces the "guess marginal" which is the marginal conditioned on only the input data
+   * @param v the example
+   * @return gold marginal
+   */
+  def marginal(scorer: Scorer, v: Datum): Marginal = {
+    val m = inference.marginal(scorer, v)
+    goldMarginal(scorer, inference.annotate(v, m))
   }
+
 
 }
 
@@ -24,12 +36,13 @@ class OneBestInferenceAdaptor[Datum](val inference: AnnotatingInference[Datum]) 
 class OneBestModelAdaptor[Datum](val model: Model[Datum] { type Inference <: AnnotatingInference[Datum]}) extends Model[Datum] {
   type ExpectedCounts = model.ExpectedCounts
   type Marginal = model.Marginal
-  type Inference = OneBestInferenceAdaptor[Datum] { type Marginal = model.Marginal}
+  type Scorer = model.Scorer
+  type Inference = OneBestInferenceAdaptor[Datum] { type Marginal = model.Marginal; type Scorer = model.Scorer}
   def emptyCounts: ExpectedCounts = model.emptyCounts
 
 
-  def accumulateCounts(d: Datum, m: Marginal, accum: ExpectedCounts, scale: Double) {
-    model.accumulateCounts(d, m, accum, scale)
+  def accumulateCounts(s: Scorer, d: Datum, m: Marginal, accum: ExpectedCounts, scale: Double) {
+    model.accumulateCounts(s, d, m, accum, scale)
   }
 
   def featureIndex: Index[Feature] = model.featureIndex

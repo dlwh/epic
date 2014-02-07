@@ -56,6 +56,7 @@ class SpanModel[L, L2, W](val featurizer: RefinedFeaturizer[L, W, Feature],
                           initialFeatureVal: (Feature => Option[Double]) = { _ => None }) extends ParserModel[L, W] with Serializable {
   type Inference = LatentParserInference[L, L2, W]
 
+
   override def initialValueForFeature(f: Feature) = initialFeatureVal(f) getOrElse 0.0
 
   def inferenceFromWeights(weights: DenseVector[Double]) = {
@@ -63,7 +64,8 @@ class SpanModel[L, L2, W](val featurizer: RefinedFeaturizer[L, W, Feature],
     new LatentParserInference(featurizer, annotator, dpGrammar, coreGrammar, refinements)
   }
 
-  def accumulateCounts(d: TreeInstance[L, W], m: Marginal, accum: ExpectedCounts, scale: Double) {
+
+  def accumulateCounts(s: Scorer, d: TreeInstance[L, W], m: Marginal, accum: ExpectedCounts, scale: Double): Unit = {
     m.expectedCounts(featurizer, accum, scale)
   }
 }

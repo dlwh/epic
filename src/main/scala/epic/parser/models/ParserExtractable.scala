@@ -17,8 +17,8 @@ package epic.parser.models
 */
 import epic.framework.{Feature, Model, ModelFactory}
 import breeze.linalg._
-import epic.parser.{CoreGrammar, BaseGrammar, Parser}
-import epic.trees.TreeInstance
+import epic.parser.{GenerativeParser, CoreGrammar, BaseGrammar, Parser}
+import epic.trees.{UnaryRule, BinaryRule, TreeInstance}
 import epic.lexicon.Lexicon
 import java.io.File
 import epic.constraints.ChartConstraints
@@ -51,4 +51,9 @@ trait ParserExtractableModelFactory[L,W] {
   }
 
   type MyModel <: Model[TreeInstance[L,W]] with ParserExtractable[L,W]
+
+
+  protected def extractBasicCounts[L, W](trees: IndexedSeq[TreeInstance[L, W]]): (Counter2[L, W, Double], Counter2[L, BinaryRule[L], Double], Counter2[L, UnaryRule[L], Double]) = {
+    GenerativeParser.extractCounts(trees)
+  }
 }

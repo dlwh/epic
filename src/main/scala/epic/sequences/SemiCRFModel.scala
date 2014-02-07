@@ -4,7 +4,7 @@ package sequences
 import epic.framework._
 import breeze.util._
 import breeze.linalg._
-import epic.sequences.SemiCRF.TransitionVisitor
+import epic.sequences.SemiCRF.{IdentityAnchoring, TransitionVisitor}
 import collection.mutable.ArrayBuffer
 import breeze.collection.mutable.TriangularArray
 import breeze.features.FeatureVector
@@ -33,6 +33,7 @@ class SemiCRFModel[L, W](val featurizer: SemiCRFModel.BIEOFeaturizer[L, W],
   }
 
   type Inference = SemiCRFInference[L, W]
+  type Scorer = SemiCRF.Anchoring[L, W]
   type Marginal = SemiCRF.Marginal[L, W]
 
   def initialValueForFeature(f: Feature): Double = initialWeights(f)
@@ -41,7 +42,7 @@ class SemiCRFModel[L, W](val featurizer: SemiCRFModel.BIEOFeaturizer[L, W],
     new SemiCRFInference(weights, featureIndex, featurizer, constraintsFactory)
 
 
-  def accumulateCounts(v: Segmentation[L, W], marg: Marginal, counts: ExpectedCounts, scale: Double) {
+  def accumulateCounts(s: Scorer, d: Segmentation[L, W], marg: Marginal, counts: ExpectedCounts, scale: Double): Unit = {
     counts.loss += marg.logPartition * scale
     val localization = marg.anchoring.asInstanceOf[Inference#Anchoring].localization
     val visitor = new TransitionVisitor[L, W] {
@@ -69,6 +70,8 @@ object SemiCRFModel {
   }
 
   trait BIEOFeatureAnchoring[L, W] extends SemiCRF.AnchoredFeaturizer[L, W] {
+
+    def words: IndexedSeq[W]
 
     def featuresForBegin(prev: Int, cur: Int, pos: Int):FeatureVector
     def featuresForInterior(cur: Int, pos: Int):FeatureVector
@@ -102,56 +105,42 @@ class SemiCRFInference[L, W](weights: DenseVector[Double],
                              featurizer: SemiCRFModel.BIEOFeaturizer[L, W],
                              val constraintsFactory: LabeledSpanConstraints.Factory[L, W]) extends AugmentableInference[Segmentation[L, W], SemiCRF.Anchoring[L, W]] with SemiCRF[L, W] with Serializable {
   def viterbi(sentence: IndexedSeq[W], anchoring: SemiCRF.Anchoring[L, W]): Segmentation[L, W] = {
-    SemiCRF.viterbi(new Anchoring(featurizer.anchor(sentence),
-      constraintsFactory.constraints(sentence),
-      anchoring))
+    SemiCRF.viterbi(anchoring * new Anchoring(featurizer.anchor(sentence),
+      constraintsFactory.constraints(sentence)))
   }
-
 
   type Marginal = SemiCRF.Marginal[L, W]
+  type Scorer = SemiCRF.Anchoring[L, W]
 
-  def anchor(w: IndexedSeq[W]): Anchoring = {
-    anchor(w, new IdentityAnchoring(w, constraintsFactory.constraints(w)))
-  }
-
-  def anchor(w: IndexedSeq[W], aug: SemiCRF.Anchoring[L, W]): Anchoring  = {
-    new Anchoring(featurizer.anchor(w), aug.constraints, aug)
+  def scorer(w: IndexedSeq[W]): Anchoring = {
+    new Anchoring(featurizer.anchor(w), constraintsFactory.constraints(w))
   }
 
   def labelIndex = featurizer.labelIndex
   def startSymbol = featurizer.startSymbol
 
-  def marginal(v: Segmentation[L, W], aug: SemiCRF.Anchoring[L, W]): Marginal = {
-    val m = SemiCRF.Marginal(new Anchoring(featurizer.anchor(v.words), constraintsFactory.constraints(v.words), aug))
+  def scorer(v: Segmentation[L, W]): Scorer = scorer(v.words)
+
+
+  def marginal(scorer: Scorer, v: Segmentation[L, W], aug: SemiCRF.Anchoring[L, W]): Marginal = {
+    val m = SemiCRF.Marginal(aug * scorer)
     m
   }
 
-  def goldMarginal(v: Segmentation[L, W], augment: SemiCRF.Anchoring[L, W]): SemiCRF.Marginal[L, W] = {
-    SemiCRF.Marginal.goldMarginal[L, W](new Anchoring(featurizer.anchor(v.words), constraintsFactory.constraints(v.words), augment), v.segments)
+
+  def goldMarginal(scorer: Scorer, v: Segmentation[L, W], aug: SemiCRF.Anchoring[L, W]): Marginal = {
+    SemiCRF.Marginal.goldMarginal[L, W](scorer * aug, v.label)
   }
 
 
-
-  def baseAugment(v: Segmentation[L, W]): SemiCRF.Anchoring[L, W] = new IdentityAnchoring(v.words, constraintsFactory.constraints(v.words))
-
-  class IdentityAnchoring(val words: IndexedSeq[W], val constraints: LabeledSpanConstraints[L]) extends SemiCRF.Anchoring[L, W] {
-    def scoreTransition(prev: Int, cur: Int, beg: Int, end: Int): Double = 0.0
-
-    def labelIndex: Index[L] = featurizer.labelIndex
-
-    def startSymbol: L = featurizer.startSymbol
-
-    def canStartLongSegment(pos: Int): Boolean = true
-
+  def baseAugment(v: Segmentation[L, W]): SemiCRF.Anchoring[L, W] = {
+    new IdentityAnchoring(v.words, featurizer.labelIndex, featurizer.startSymbol, constraintsFactory.constraints(v.words))
   }
 
-  class Anchoring(val localization: BIEOFeatureAnchoring[L, W],
-                  _constraints: LabeledSpanConstraints[L],
-                  augment: SemiCRF.Anchoring[L, W]) extends SemiCRF.Anchoring[L, W] {
+  case class Anchoring(localization: BIEOFeatureAnchoring[L, W],
+                       constraints: LabeledSpanConstraints[L]) extends SemiCRF.Anchoring[L, W] {
 
-    val constraints: LabeledSpanConstraints[L] = _constraints & augment.constraints
-
-    def words: IndexedSeq[W] = augment.words
+    def words: IndexedSeq[W] = localization.words
 
     val beginCache = Array.tabulate(labelIndex.size, labelIndex.size, length){ (p,c,w) =>
       val f = localization.featuresForBegin(p, c, w)
@@ -166,25 +155,22 @@ class SemiCRFInference[L, W](weights: DenseVector[Double],
 
 
     def scoreTransition(prev: Int, cur: Int, beg: Int, end: Int): Double = {
-      val score = if (beg + 1 != end && !constraints.isAllowedLabeledSpan(beg, end, cur)) {
+      if (beg + 1 != end && !constraints.isAllowedLabeledSpan(beg, end, cur)) {
         Double.NegativeInfinity
       } else {
-        var score = augment.scoreTransition(prev, cur, beg, end)
+        var score = 0.0
+        val spanScore: Double = cachedSpanScore(prev, cur, beg, end)
+        score += spanScore
         if (score != Double.NegativeInfinity) {
-          val spanScore: Double = cachedSpanScore(prev, cur, beg, end)
-          score += spanScore
-          if (score != Double.NegativeInfinity) {
-            score += beginCache(prev)(cur)(beg)
-            var pos = beg + 1
-            while (pos < end) {
-              score += wordCache(cur)(pos)
-              pos += 1
-            }
+          score += beginCache(prev)(cur)(beg)
+          var pos = beg + 1
+          while (pos < end) {
+            score += wordCache(cur)(pos)
+            pos += 1
           }
         }
         score
       }
-      score
     }
 
     private val spanCache = new Array[Array[Array[Double]]](TriangularArray.arraySize(length+1))
@@ -224,12 +210,8 @@ class SemiCRFInference[L, W](weights: DenseVector[Double],
     def startSymbol = featurizer.startSymbol
   }
 
-
-
   private val negInfArray = Array.fill(labelIndex.size)(Double.NegativeInfinity)
   private val nanArray = Array.fill(labelIndex.size)(Double.NaN)
-
-
 
   def posteriorDecode(m: Marginal):Segmentation[L, W] = {
     SemiCRF.posteriorDecode(m)
@@ -338,10 +320,11 @@ object SegmentationModelFactory {
     def anchor(w: IndexedSeq[String]): SemiCRFModel.BIEOFeatureAnchoring[L, String] = new SemiCRFModel.BIEOFeatureAnchoring[L, String] {
       val constraints = constraintFactory.constraints(w)
 
+      def words: IndexedSeq[String] = w
+
       val loc = surfaceFeaturizer.anchor(w)
       val wloc = wordFeaturizer.anchor(w)
       def length = w.length
-
 
       def featureIndex = IndexedStandardFeaturizer.this.featureIndex
 

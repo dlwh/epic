@@ -47,7 +47,7 @@ class LatentParserModel[L, L3, W](indexedFeatures: IndexedFeaturizer[L, L3, W],
   }
 
 
-  def accumulateCounts(d: TreeInstance[L, W], m: Marginal, accum: ExpectedCounts, scale: Double) {
+  def accumulateCounts(s: Scorer, d: TreeInstance[L, W], m: Marginal, accum: ExpectedCounts, scale: Double): Unit = {
     m.expectedCounts(indexedFeatures, accum, scale)
   }
 
@@ -67,11 +67,10 @@ case class LatentParserInference[L, L2, W](featurizer: RefinedFeaturizer[L, W, F
                                            baseMeasure: CoreGrammar[L, W],
                                            projections: GrammarRefinements[L, L2]) extends ParserInference[L, W] {
 
-
-  def goldMarginal(ti: TreeInstance[L, W], aug: CoreAnchoring[L, W]) = {
+  def goldMarginal(scorer: Scorer, ti: TreeInstance[L, W], aug: CoreAnchoring[L, W]): Marginal = {
     val annotated = annotator(ti.tree, ti.words).map(_.map(projections.labels.localize))
 
-    val product = AugmentedAnchoring.fromRefined(grammar.anchor(ti.words))
+    val product = AugmentedAnchoring(scorer, aug)
     LatentTreeMarginal(product, annotated)
   }
 }

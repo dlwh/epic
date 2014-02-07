@@ -7,7 +7,7 @@ import epic.framework._
 import java.util
 import collection.mutable.ArrayBuffer
 import breeze.features.FeatureVector
-import epic.constraints.TagConstraints
+import epic.constraints.{LabeledSpanConstraints, TagConstraints}
 import epic.util.CacheBroker
 import breeze.optimize.FirstOrderMinimizer.OptParams
 import breeze.optimize.CachedBatchDiffFunction
@@ -89,6 +89,14 @@ object CRF {
     def labelIndex: Index[L]
     def startSymbol: L
     def validSymbols(pos: Int): Set[Int]
+
+    def *(other: Anchoring[L, W]):Anchoring[L, W] = {
+      (this, other) match {
+        case (x: IdentityAnchoring[L, W], _) => other
+        case (_, x: IdentityAnchoring[L, W]) => this
+        case (x, y) => new ProductAnchoring(this, other)
+      }
+    }
   }
 
 
@@ -363,6 +371,34 @@ object CRF {
     val labels = (0 until length).map(pos => DenseVector.tabulate(m.anchoring.labelIndex.size)(m.positionMarginal(pos, _)).argmax)
 
     TaggedSequence(labels.map(m.anchoring.labelIndex.get), m.words, id)
+  }
+
+  case class ProductAnchoring[L, W](a: Anchoring[L ,W], b: Anchoring[L, W]) extends Anchoring[L, W] {
+    if((a.labelIndex ne b.labelIndex) && (a.labelIndex != b.labelIndex)) throw new IllegalArgumentException("Elements of product anchoring must have the same labelIndex!")
+    if(a.startSymbol != b.startSymbol) throw new IllegalArgumentException("Elements of product anchoring must have the same startSymbol!")
+
+    def words: IndexedSeq[W] = a.words
+
+    def scoreTransition(i: Int, prev: Int, cur: Int): Double = {
+      var score = a.scoreTransition(i, prev, cur)
+      if (score != Double.NegativeInfinity) {
+        score += b.scoreTransition(i, prev, cur)
+      }
+      score
+    }
+    def validSymbols(pos: Int): Set[Int] = a.validSymbols(pos)
+
+    def labelIndex: Index[L] = a.labelIndex
+    def startSymbol: L = a.startSymbol
+  }
+
+  class IdentityAnchoring[L, W](val words: IndexedSeq[W], val validSyms: IndexedSeq[Set[Int]], val labelIndex: Index[L], val startSymbol: L) extends Anchoring[L, W] {
+    def scoreTransition(pos: Int, prev: Int, cur: Int): Double = 0.0
+
+
+    def validSymbols(pos: Int): Set[Int] = validSyms(pos)
+
+    def canStartLongSegment(pos: Int): Boolean = true
   }
 }
 

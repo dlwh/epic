@@ -13,11 +13,11 @@ import collection.immutable.BitSet
 import breeze.collection.mutable.TriangularArray
 import java.io.{ObjectInputStream, IOException}
 import breeze.optimize.FirstOrderMinimizer.OptParams
-import breeze.optimize.{GradientTester, CachedBatchDiffFunction}
+import breeze.optimize.CachedBatchDiffFunction
 import breeze.linalg.{softmax, DenseVector}
 import epic.constraints.LabeledSpanConstraints
 import epic.constraints.LabeledSpanConstraints.NoConstraints
-import epic.util.{CacheBroker, Has2}
+import epic.util.CacheBroker
 
 /**
  * A Semi-Markov Linear Chain Conditional Random Field, that is, the length
@@ -28,16 +28,16 @@ import epic.util.{CacheBroker, Has2}
  */
 @SerialVersionUID(1L)
 trait SemiCRF[L, W] extends Serializable {
-  def anchor(w: IndexedSeq[W]): SemiCRF.Anchoring[L, W]
+  def scorer(w: IndexedSeq[W]): SemiCRF.Anchoring[L, W]
   def labelIndex: Index[L]
   def startSymbol: L
 
   def marginal(w: IndexedSeq[W]) = {
-     SemiCRF.Marginal(anchor(w))
+     SemiCRF.Marginal(scorer(w))
   }
 
   def goldMarginal(segmentation: IndexedSeq[(L,Span)], w: IndexedSeq[W]):Marginal[L, W] = {
-    SemiCRF.Marginal.goldMarginal(anchor(w), segmentation)
+    SemiCRF.Marginal.goldMarginal(scorer(w), segmentation)
   }
 
   def bestSequence(w: IndexedSeq[W], id: String = "") = {
@@ -76,7 +76,7 @@ object SemiCRF {
   def fromCRF[L, W](crf: CRF[L, W]):SemiCRF[L, W] = new SemiCRF[L, W] {
     def startSymbol: L = crf.startSymbol
 
-    def anchor(w: IndexedSeq[W]): Anchoring[L, W] = new Anchoring[L, W] {
+    def scorer(w: IndexedSeq[W]): Anchoring[L, W] = new Anchoring[L, W] {
       val constraints: LabeledSpanConstraints[L] = LabeledSpanConstraints.fromTagConstraints(crf.lexicon.anchor(w))
 
       val anch = crf.anchor(w)
@@ -117,6 +117,14 @@ object SemiCRF {
     def startSymbol: L
 
     def ignoreTransitionModel: Boolean = false
+
+    def *(other: Anchoring[L, W]):Anchoring[L, W] = {
+      (this, other) match {
+        case (x: IdentityAnchoring[L, W], _) => other
+        case (_, x: IdentityAnchoring[L, W]) => this
+        case (x, y) => new ProductAnchoring(this, other)
+      }
+    }
   }
 
   /**
@@ -443,7 +451,7 @@ object SemiCRF {
 
   @SerialVersionUID(1L)
   class IdentityConstraintSemiCRF[L, W](val labelIndex: Index[L], val startSymbol: L) extends ConstraintSemiCRF[L, W] with Serializable { outer =>
-    def anchor(w: IndexedSeq[W]) = new Anchoring[L,W]() {
+    def scorer(w: IndexedSeq[W]) = new Anchoring[L,W]() {
       def words = w
       def scoreTransition(prev: Int, cur: Int, begin: Int, end: Int) = 0.0
       def labelIndex = outer.labelIndex
@@ -495,7 +503,7 @@ object SemiCRF {
     }
 
 
-    def anchor(w: IndexedSeq[W]): Anchoring[L, W] = {
+    def scorer(w: IndexedSeq[W]): Anchoring[L, W] = {
       val c = constraints(w)
 
       new Anchoring[L, W] {
@@ -633,6 +641,32 @@ object SemiCRF {
     rec(length, (0 until numLabels).maxBy(forwardScores(length)(_)))
 
     Segmentation(segments.reverse, m.words, id)
+  }
+
+  case class ProductAnchoring[L, W](a: Anchoring[L ,W], b: Anchoring[L, W]) extends Anchoring[L, W] {
+    if((a.labelIndex ne b.labelIndex) && (a.labelIndex != b.labelIndex)) throw new IllegalArgumentException("Elements of product anchoring must have the same labelIndex!")
+    if(a.startSymbol != b.startSymbol) throw new IllegalArgumentException("Elements of product anchoring must have the same startSymbol!")
+
+    def words: IndexedSeq[W] = a.words
+
+    val constraints: LabeledSpanConstraints[L] = a.constraints & b.constraints
+
+    def scoreTransition(prev: Int, cur: Int, begin: Int, end: Int): Double = {
+      var score = a.scoreTransition(prev, cur, begin, end)
+      if (score != Double.NegativeInfinity) {
+        score += b.scoreTransition(prev, cur, begin, end)
+      }
+      score
+    }
+
+    def labelIndex: Index[L] = a.labelIndex
+    def startSymbol: L = a.startSymbol
+  }
+
+  class IdentityAnchoring[L, W](val words: IndexedSeq[W], val labelIndex: Index[L], val startSymbol: L, val constraints: LabeledSpanConstraints[L]) extends Anchoring[L, W] {
+    def scoreTransition(prev: Int, cur: Int, beg: Int, end: Int): Double = 0.0
+
+    def canStartLongSegment(pos: Int): Boolean = true
   }
 
 }

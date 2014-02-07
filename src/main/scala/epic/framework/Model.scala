@@ -32,18 +32,16 @@ import epic.util.{WeightsCache, CacheBroker}
 trait Model[Datum] { self =>
   type ExpectedCounts >: Null <: epic.framework.ExpectedCounts[ExpectedCounts]
   type Marginal <: epic.framework.Marginal
+  type Scorer
 
   type Inference <: epic.framework.Inference[Datum] {
     type Marginal = self.Marginal
+    type Scorer = self.Scorer
   }
 
   def emptyCounts: ExpectedCounts
-  def accumulateCounts(d: Datum, m: Marginal, accum: ExpectedCounts, scale: Double):Unit
-  final def countsFromMarginal(d: Datum, m: Marginal):ExpectedCounts = {
-    val ec = emptyCounts
-    accumulateCounts(d, m, ec, scale = 1.0)
-    ec
-  }
+  def accumulateCounts(s: Scorer, d: Datum, m: Marginal, accum: ExpectedCounts, scale: Double):Unit
+
 
   final def expectedCounts(inf: Inference, d: Datum, scale: Double = 1.0):ExpectedCounts = {
     val ec = emptyCounts
@@ -52,10 +50,11 @@ trait Model[Datum] { self =>
   }
 
   final def accumulateCounts(inf: Inference, d: Datum, accum: ExpectedCounts, scale: Double):Unit = {
-    val m = inf.marginal(d)
-    val gm = inf.goldMarginal(d)
-    accumulateCounts(d, m, accum, scale)
-    accumulateCounts(d, gm, accum, -scale)
+    val s = inf.scorer(d)
+    val m = inf.marginal(s, d)
+    val gm = inf.goldMarginal(s, d)
+    accumulateCounts(s, d, m, accum, scale)
+    accumulateCounts(s, d, gm, accum, -scale)
   }
 
 

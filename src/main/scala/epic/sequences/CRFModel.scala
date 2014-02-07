@@ -10,6 +10,7 @@ import epic.lexicon.SimpleLexicon
 import java.util
 import epic.util.{ProgressLog, SafeLogging, NotProvided, Optional}
 import epic.constraints.TagConstraints
+import epic.sequences.CRF
 
 /**
  *
@@ -28,13 +29,15 @@ class CRFModel[L, W](val featureIndex: Index[Feature],
 
   type Inference = CRFInference[L, W]
   type Marginal = CRF.Marginal[L, W]
+  type Scorer = CRF.Anchoring[L, W]
 
   def initialValueForFeature(f: Feature): Double = initialWeights(f)
 
   def inferenceFromWeights(weights: DenseVector[Double]): Inference =
     new CRFInference(weights, featureIndex, lexicon, featurizer)
 
-  def accumulateCounts(v: TaggedSequence[L, W], marg: Marginal, counts: ExpectedCounts, scale: Double): Unit = {
+
+  def accumulateCounts(s: Scorer, d: TaggedSequence[L, W], marg: Marginal, counts: ExpectedCounts, scale: Double): Unit = {
     counts.loss += marg.logPartition * scale
     val localization = marg.anchoring.asInstanceOf[Inference#Anchoring].localization
     val visitor = new TransitionVisitor[L, W] {
@@ -56,8 +59,14 @@ class CRFInference[L, W](val weights: DenseVector[Double],
                          val featureIndex: Index[Feature],
                          val lexicon: TagConstraints.Factory[L, W],
                          featurizer: CRF.IndexedFeaturizer[L, W]) extends AugmentableInference[TaggedSequence[L, W], CRF.Anchoring[L, W]] with CRF[L, W] with AnnotatingInference[TaggedSequence[L, W]] with Serializable {
+
+
+
+
+  def scorer(v: TaggedSequence[L, W]): Scorer = new Anchoring(v.words)
+
   def viterbi(sentence: IndexedSeq[W], anchoring: CRF.Anchoring[L, W]): TaggedSequence[L, W] = {
-    CRF.viterbi(new Anchoring(sentence, anchoring))
+    CRF.viterbi(new Anchoring(sentence) * anchoring)
   }
 
 
@@ -67,24 +76,25 @@ class CRFInference[L, W](val weights: DenseVector[Double],
 
   type Marginal = CRF.Marginal[L, W]
   type ExpectedCounts = StandardExpectedCounts[Feature]
+  type Scorer = CRF.Anchoring[L, W]
 
   def emptyCounts = StandardExpectedCounts.zero(this.featureIndex)
 
-  def anchor(w: IndexedSeq[W]) = new Anchoring(w, new IdentityAnchoring(w))
+  def anchor(w: IndexedSeq[W]) = new Anchoring(w)
 
 
   def labelIndex = featurizer.labelIndex
   def startSymbol = featurizer.startSymbol
 
-  def marginal(v: TaggedSequence[L, W], aug: CRF.Anchoring[L, W]): Marginal = {
-    CRF.Marginal(new Anchoring(v.words, aug))
-  }
 
-  def goldMarginal(v: TaggedSequence[L, W], augment: CRF.Anchoring[L, W]): CRF.Marginal[L, W] = {
-    CRF.Marginal.goldMarginal[L, W](new Anchoring(v.words, augment), v.label)
+  def marginal(scorer: Scorer, v: TaggedSequence[L, W], aug: CRF.Anchoring[L, W]): CRFInference[L, W]#Marginal = {
+    CRF.Marginal(scorer * aug)
   }
 
 
+  def goldMarginal(scorer: Scorer, v: TaggedSequence[L, W], aug: CRF.Anchoring[L, W]): Marginal = {
+    CRF.Marginal.goldMarginal[L, W](new Anchoring(v.words) * aug, v.label)
+  }
 
 
   def baseAugment(v: TaggedSequence[L, W]): CRF.Anchoring[L, W] = new IdentityAnchoring(v.words)
@@ -100,7 +110,7 @@ class CRFInference[L, W](val weights: DenseVector[Double],
     def scoreTransition(pos: Int, prev: Int, cur: Int): Double = 0.0
   }
 
-  class Anchoring(val words: IndexedSeq[W], augment: CRF.Anchoring[L, W]) extends CRF.Anchoring[L, W] {
+  class Anchoring(val words: IndexedSeq[W]) extends CRF.Anchoring[L, W] {
     val localization = featurizer.anchor(words)
 
     val transCache = Array.ofDim[Double](labelIndex.size, labelIndex.size, length)
@@ -117,7 +127,7 @@ class CRFInference[L, W](val weights: DenseVector[Double],
     def validSymbols(pos: Int): Set[Int] = localization.validSymbols(pos)
 
     def scoreTransition(pos: Int, prev: Int, cur: Int): Double = {
-      augment.scoreTransition(pos, prev, cur) + transCache(prev)(cur)(pos)
+       transCache(prev)(cur)(pos)
     }
 
     def labelIndex: Index[L] = featurizer.labelIndex

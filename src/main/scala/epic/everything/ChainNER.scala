@@ -23,12 +23,12 @@ object ChainNER {
     type Marginal = SemiCRF.Marginal[NERType.Value, String]
     type Inference = ChainNER.Inference
     type EvaluationResult = SegmentationEval.Stats
+    type Scorer = SemiCRF.Anchoring[NERType.Value, String]
     def featureIndex = baseModel.featureIndex
 
 
-    def accumulateCounts(d: FeaturizedSentence, m: Marginal, accum: ExpectedCounts, scale: Double) {
-      baseModel.accumulateCounts(d.ner, m, accum, scale)
-
+    def accumulateCounts(s: Scorer, d: FeaturizedSentence, m: Marginal, accum: ExpectedCounts, scale: Double): Unit = {
+      baseModel.accumulateCounts(s, d.ner, m, accum, scale)
     }
 
     def initialValueForFeature(f: Feature): Double = weights(f).getOrElse(0.0)
@@ -60,9 +60,12 @@ object ChainNER {
 
     type ExpectedCounts = StandardExpectedCounts[Feature]
     type Marginal = SemiCRF.Marginal[NERType.Value, String]
+    type Scorer = SemiCRF.Anchoring[NERType.Value, String]
     private val notNER = labels(NERType.OutsideSentence)
     assert(notNER != -1)
 
+
+    def scorer(v: FeaturizedSentence): Scorer = baseInference.scorer(v.ner)
 
     def annotate(sent: FeaturizedSentence, m: Marginal): FeaturizedSentence = {
       val decodedNer = SemiCRF.posteriorDecode(m)
@@ -70,23 +73,28 @@ object ChainNER {
     }
 
     // inference methods
-    def goldMarginal(sent: FeaturizedSentence, aug: SentenceBeliefs): Marginal = {
-      baseInference.goldMarginal(sent.ner, new BeliefsComponentAnchoring(sent.words, sent.nerConstraints, labels, aug))
-    }
 
-    def marginal(sent: FeaturizedSentence, aug: SentenceBeliefs): Marginal = {
+    def marginal(scorer: Scorer, sent: FeaturizedSentence, aug: SentenceBeliefs): Marginal = {
       if(maxMarginal) {
-        SemiCRF.Marginal.maxDerivationMarginal(baseInference.anchor(sent.words, new BeliefsComponentAnchoring(sent.words, sent.nerConstraints, labels, aug)))
+        SemiCRF.Marginal.maxDerivationMarginal(scorer * new BeliefsComponentAnchoring(sent.words, sent.nerConstraints, labels, aug))
       } else {
         baseInference.marginal(sent.ner)
       }
     }
 
+
+    def goldMarginal(scorer: Scorer, sent: FeaturizedSentence, aug: SentenceBeliefs): Marginal = {
+      baseInference.goldMarginal(scorer, sent.ner, new BeliefsComponentAnchoring(sent.words, sent.nerConstraints, labels, aug))
+    }
+
+
+
     def baseAugment(sent: FeaturizedSentence): SentenceBeliefs = {
       beliefsFactory(sent)
     }
 
-    def project(sent: FeaturizedSentence, marg: Marginal, sentenceBeliefs: SentenceBeliefs): SentenceBeliefs = {
+
+    def project(sent: FeaturizedSentence, s: Scorer, marg: Marginal, sentenceBeliefs: SentenceBeliefs): SentenceBeliefs = {
       assert(!marg.logPartition.isInfinite, "Infinite partition! " + sent)
       val newSpans = TriangularArray.tabulate(sent.length+1){ (b,e) =>
         if (b < e) {
@@ -149,7 +157,6 @@ object ChainNER {
                                   messages: SentenceBeliefs) extends SemiCRF.Anchoring[NERType.Value, String] {
     def startSymbol: NERType.Value = NERType.OutsideSentence
     private val notNER = labelIndex(NERType.OutsideSentence)
-
 
     private val normalizingPiece = messages.spans.data.filter(_ ne null).map { b =>
       val notNerScore = b.ner(notNER)

@@ -28,6 +28,7 @@ import epic.trees.{TreeInstance, UnaryRule, BinaryRule}
 trait ParserModel[L, W] extends epic.framework.StandardExpectedCounts.Model[TreeInstance[L, W]] with ParserExtractable[L, W] {
   type Inference <: ParserInference[L, W]
   type Marginal = epic.parser.ParseMarginal[L, W]
+  type Scorer = RefinedAnchoring[L, W]
 
   def extractParser(weights: DenseVector[Double]) = {
     val inf = inferenceFromWeights(weights)
@@ -42,14 +43,25 @@ trait ParserModel[L, W] extends epic.framework.StandardExpectedCounts.Model[Tree
 trait ParserInference[L, W] extends ProjectableInference[TreeInstance[L, W], CoreAnchoring[L, W]] {
   type ExpectedCounts = StandardExpectedCounts[Feature]
   type Marginal = epic.parser.ParseMarginal[L, W]
+  type Scorer = RefinedAnchoring[L, W]
 
   def grammar: RefinedGrammar[L, W]
   def baseMeasure: CoreGrammar[L, W]
 
-  def marginal(v: TreeInstance[L, W], aug: CoreAnchoring[L, W]): ParseMarginal[L, W] = {
-    val fullGrammar = AugmentedAnchoring(grammar.anchor(v.words), aug)
+
+  def scorer(v: TreeInstance[L, W]): Scorer = {
+     grammar.anchor(v.words)
+  }
+
+
+  /**
+   * Produces the "guess marginal" which is the marginal conditioned on only the input data
+   * @param v the example
+   * @return gold marginal
+   */
+  def marginal(scorer: Scorer, v: TreeInstance[L, W], aug: CoreAnchoring[L, W]): Marginal = {
     val charts = try {
-       fullGrammar.marginal
+       AugmentedAnchoring(scorer, aug).marginal
     } catch {
       case e: Exception =>
       try {
@@ -63,22 +75,19 @@ trait ParserInference[L, W] extends ProjectableInference[TreeInstance[L, W], Cor
     charts
   }
 
-
   def baseAugment(v: TreeInstance[L, W])  = baseMeasure.anchor(v.words)
 
-  protected def projector: EPProjector[L, W] = new AnchoredRuleApproximator(-14)
 
-  def project(v: TreeInstance[L, W], m: Marginal, oldAugment: CoreAnchoring[L, W]) = {
+  def project(v: TreeInstance[L, W], s: Scorer, m: Marginal, oldAugment: CoreAnchoring[L, W]): CoreAnchoring[L, W] = {
     projector.project(this, v, m)
   }
+
+  protected def projector: EPProjector[L, W] = new AnchoredRuleApproximator(-14)
 }
 
 trait ParserModelFactory[L, W] extends ParserExtractableModelFactory[L, W] {
   type MyModel <: ParserModel[L, W]
 
-  protected def extractBasicCounts[L, W](trees: IndexedSeq[TreeInstance[L, W]]): (Counter2[L, W, Double], Counter2[L, BinaryRule[L], Double], Counter2[L, UnaryRule[L], Double]) = {
-    GenerativeParser.extractCounts(trees)
-  }
 }
 
 
