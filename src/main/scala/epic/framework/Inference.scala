@@ -38,21 +38,25 @@ package epic.framework
  */
 trait Inference[Datum] extends Serializable {
   type Marginal <: epic.framework.Marginal
+  type Scorer
+
+  def scorer(v: Datum):Scorer
 
   /**
    * Produces the "gold marginal" which is the marginal conditioned on the output label/structure itself.
    * @param v the example
    * @return gold marginal
    */
-  def goldMarginal(v: Datum):Marginal
+  def goldMarginal(scorer: Scorer, v: Datum):Marginal
 
   /**
    * Produces the "guess marginal" which is the marginal conditioned on only the input data
    * @param v the example
    * @return gold marginal
    */
-  def marginal(v: Datum):Marginal
+  def marginal(scorer: Scorer, v: Datum):Marginal
 }
+
 
 
 /**
@@ -70,17 +74,8 @@ trait AugmentableInference[Datum,Augment] extends Inference[Datum] {
    * The "no prior information" augment. Used if nothing is passed in.
    */
   def baseAugment(v: Datum):Augment
-
-  /**
-   * ```marginal(v, baseAugment(v))```
-   * @param v the example
-   * @return gold marginal
-   */
-  final def marginal(v: Datum):Marginal = marginal(v, baseAugment(v))
-  def marginal(v: Datum, aug: Augment):Marginal
-
-  final def goldMarginal(v: Datum):Marginal  = goldMarginal(v, baseAugment(v))
-  def goldMarginal(v: Datum, aug: Augment):Marginal
+  def scorer(v: Datum):Scorer = scorer(v, baseAugment(v))
+  def scorer(v: Datum, augment: Augment):Scorer
 }
 
 /**
@@ -93,5 +88,5 @@ trait AugmentableInference[Datum,Augment] extends Inference[Datum] {
  *
  */
 trait ProjectableInference[Datum,Augment] extends AugmentableInference[Datum,Augment] {
-  def project(v: Datum, m: Marginal, oldAugment: Augment):Augment
+  def project(v: Datum, s: Scorer, m: Marginal, oldAugment: Augment):Augment
 }
