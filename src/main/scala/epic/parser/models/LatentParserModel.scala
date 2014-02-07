@@ -99,6 +99,75 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
                               oldWeights: File = null) extends ParserModelFactory[AnnotatedLabel, String] with SafeLogging {
   type MyModel = LatentParserModel[AnnotatedLabel, (AnnotatedLabel, Int), String]
 
+
+
+  def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]],
+           constrainer: CoreGrammar[AnnotatedLabel, String]):MyModel = {
+    val annTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]] = trainTrees.map(annotator(_))
+
+    val (annWords, annBinaries, annUnaries) = this.extractBasicCounts(annTrees)
+
+    val (xbarGrammar, xbarLexicon) = (constrainer.grammar, constrainer.lexicon)
+
+    val substateMap = if (substates != null && substates.exists) {
+      val in = Source.fromFile(substates).getLines()
+      val pairs = for (line <- in) yield {
+        val split = line.split("\\s+")
+        AnnotatedLabel(split(0)) -> split(1).toInt
+      }
+      pairs.toMap + (xbarGrammar.root -> 1)
+    } else if(splitUselessStates) {
+      Map(xbarGrammar.root -> 1)
+    } else {
+      LatentModelFactory.statesToNotSplit.iterator.map(s => AnnotatedLabel(s) -> 1).toMap  + (xbarGrammar.root -> 1)
+    }
+
+    def split(x: AnnotatedLabel): Seq[(AnnotatedLabel, Int)] = {
+      for (i <- 0 until substateMap.getOrElse(x, numStates)) yield (x, i)
+    }
+
+    val splitLabels = xbarGrammar.labelIndex.map(l => l -> split(l)).toMap
+
+    def unsplit(x: (AnnotatedLabel, Int)): AnnotatedLabel = x._1
+
+    def splitRule[L, L2](r: Rule[L], split: L=>Seq[L2]):Seq[Rule[L2]] = r match {
+      case BinaryRule(a, b, c) => for(aa <- split(a); bb <- split(b); cc <- split(c)) yield BinaryRule(aa, bb, cc)
+        // don't allow non-identity rule refinements for identity rewrites
+      case UnaryRule(a, b, chain) if a == b => for(aa <- split(a)) yield UnaryRule(aa, aa, chain)
+      case UnaryRule(a, b, chain) => for(aa <- split(a); bb <- split(b)) yield UnaryRule(aa, bb, chain)
+    }
+
+    val wordCounts: Counter[String, Double] = sum(annWords, Axis._0)
+    val surfaceFeaturizer = new MinimalWordFeaturizer(wordCounts) + new WordPropertyFeaturizer(wordCounts)
+    val wordFeaturizer = IndexedWordFeaturizer.fromData(surfaceFeaturizer, annTrees.map{_.words})
+
+    val annGrammar: BaseGrammar[AnnotatedLabel] = BaseGrammar(annTrees.head.tree.label, annBinaries, annUnaries)
+    val firstLevelRefinements = GrammarRefinements(xbarGrammar, annGrammar, {(_: AnnotatedLabel).baseAnnotatedLabel})
+    val secondLevel = GrammarRefinements(annGrammar, split _, {splitRule(_ :Rule[AnnotatedLabel], splitLabels)}, unsplit _)
+    val finalRefinements = firstLevelRefinements compose secondLevel
+    logger.info("Label refinements:" + finalRefinements.labels)
+
+    val featureCounter = readWeights(oldWeights)
+
+    val feat = new ProductionFeaturizer[AnnotatedLabel, (AnnotatedLabel, Int), String](xbarGrammar, finalRefinements)
+    val indexedFeaturizer = IndexedFeaturizer(feat, wordFeaturizer, trainTrees, annotator andThen (_.tree.map(finalRefinements.labels.refinementsOf)), finalRefinements)
+
+    def latentAnnotator(t: BinarizedTree[AnnotatedLabel], w: IndexedSeq[String]): BinarizedTree[IndexedSeq[(AnnotatedLabel, Int)]] = {
+      annotator(t, w).map(finalRefinements.labels.refinementsOf)
+    }
+
+    new LatentParserModel[AnnotatedLabel, (AnnotatedLabel, Int), String](indexedFeaturizer,
+    latentAnnotator,
+    finalRefinements,
+    constrainer,
+    xbarGrammar,
+    xbarLexicon,
+    featureCounter.get)
+  }
+}
+
+
+object LatentModelFactory {
   val statesToNotSplit = Set("""#
                                |$
                                |''
@@ -141,69 +210,4 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
                                |WP$
                                |WRB
                                |X""".stripMargin.split("\\s+"):_*)
-
-  def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]],
-           constrainer: CoreGrammar[AnnotatedLabel, String]):MyModel = {
-    val annTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]] = trainTrees.map(annotator(_))
-
-    val (annWords, annBinaries, annUnaries) = this.extractBasicCounts(annTrees)
-
-    val (xbarGrammar, xbarLexicon) = (constrainer.grammar, constrainer.lexicon)
-
-    val substateMap = if (substates != null && substates.exists) {
-      val in = Source.fromFile(substates).getLines()
-      val pairs = for (line <- in) yield {
-        val split = line.split("\\s+")
-        AnnotatedLabel(split(0)) -> split(1).toInt
-      }
-      pairs.toMap + (xbarGrammar.root -> 1)
-    } else if(splitUselessStates) {
-      Map(xbarGrammar.root -> 1)
-    } else {
-      statesToNotSplit.iterator.map(s => AnnotatedLabel(s) -> 1).toMap  + (xbarGrammar.root -> 1)
-    }
-
-    def split(x: AnnotatedLabel): Seq[(AnnotatedLabel, Int)] = {
-      for (i <- 0 until substateMap.getOrElse(x, numStates)) yield (x, i)
-    }
-
-    val presplit = xbarGrammar.labelIndex.map(l => l -> split(l)).toMap
-
-    def unsplit(x: (AnnotatedLabel, Int)): AnnotatedLabel = x._1
-
-    def splitRule[L, L2](r: Rule[L], split: L=>Seq[L2]):Seq[Rule[L2]] = r match {
-      case BinaryRule(a, b, c) => for(aa <- split(a); bb <- split(b); cc <- split(c)) yield BinaryRule(aa, bb, cc)
-        // don't allow non-identity rule refinements for identity rewrites
-      case UnaryRule(a, b, chain) if a == b => for(aa <- split(a)) yield UnaryRule(aa, aa, chain)
-      case UnaryRule(a, b, chain) => for(aa <- split(a); bb <- split(b)) yield UnaryRule(aa, bb, chain)
-    }
-
-    val wordCounts: Counter[String, Double] = sum(annWords, Axis._0)
-    val surfaceFeaturizer = new MinimalWordFeaturizer(wordCounts) + new WordPropertyFeaturizer(wordCounts)
-    val wordFeaturizer = IndexedWordFeaturizer.fromData(surfaceFeaturizer, annTrees.map{_.words})
-
-    val annGrammar: BaseGrammar[AnnotatedLabel] = BaseGrammar(annTrees.head.tree.label, annBinaries, annUnaries)
-    val firstLevelRefinements = GrammarRefinements(xbarGrammar, annGrammar, {(_: AnnotatedLabel).baseAnnotatedLabel})
-    val secondLevel = GrammarRefinements(annGrammar, split _, {splitRule(_ :Rule[AnnotatedLabel], presplit)}, unsplit _)
-    val finalRefinements = firstLevelRefinements compose secondLevel
-    logger.info("Label refinements:" + finalRefinements.labels)
-
-    val featureCounter = readWeights(oldWeights)
-
-    val feat = new ProductionFeaturizer[AnnotatedLabel, (AnnotatedLabel, Int), String](xbarGrammar, finalRefinements)
-    val indexedFeaturizer = IndexedFeaturizer(feat, wordFeaturizer, trainTrees, annotator andThen (_.tree.map(finalRefinements.labels.refinementsOf)), finalRefinements)
-
-    def latentAnnotator(t: BinarizedTree[AnnotatedLabel], w: IndexedSeq[String]): BinarizedTree[IndexedSeq[(AnnotatedLabel, Int)]] = {
-      annotator(t, w).map(finalRefinements.labels.refinementsOf)
-    }
-
-    new LatentParserModel[AnnotatedLabel, (AnnotatedLabel, Int), String](indexedFeaturizer,
-    latentAnnotator,
-    finalRefinements,
-    constrainer,
-    xbarGrammar,
-    xbarLexicon,
-    featureCounter.get)
-  }
 }
-
