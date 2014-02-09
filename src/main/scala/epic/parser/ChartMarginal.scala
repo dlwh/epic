@@ -297,6 +297,11 @@ object ChartMarginal {
     apply(grammar.anchor(sent))
   }
 
+
+  def apply[L, W](anchoring: RefinedAnchoring[L, W]): ChartMarginal[L, W] = {
+    apply(AugmentedAnchoring.fromRefined(anchoring))
+  }
+
   def apply[L, W](anchoring: AugmentedAnchoring[L, W], maxMarginal: Boolean = false): ChartMarginal[L, W] = {
     val sent = anchoring.words
     val sum = if(maxMarginal) MaxSummer else LogSummer

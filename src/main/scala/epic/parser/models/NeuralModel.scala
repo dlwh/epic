@@ -7,7 +7,7 @@ import epic.parser.models.NeuralModel._
 import breeze.linalg._
 import epic.parser._
 import epic.lexicon.Lexicon
-import epic.trees.{Rule, AnnotatedLabel, TreeInstance}
+import epic.trees._
 import breeze.numerics.sigmoid
 import breeze.features.FeatureVector
 import breeze.config.Help
@@ -16,9 +16,24 @@ import java.io.File
 import epic.util.CacheBroker
 import epic.parser.projections.GrammarRefinements
 import scala.runtime.ScalaRunTime
-import epic.dense.{AffineTransform, Transform, SigmoidTransform}
+import epic.dense._
 import epic.features.SplitSpanFeaturizer.ZeroSplitSpanFeaturizer
 import breeze.collection.mutable.TriangularArray
+import epic.trees.BinaryRule
+import epic.trees.TreeInstance
+import epic.features.SplitSpanFeaturizer.ZeroSplitSpanFeaturizer
+import epic.parser.ExpectedCounts
+import epic.trees.annotations.Xbarize
+import epic.parser.models.AnnotatedParserInference
+import epic.parser.models.NeuralInference
+import epic.trees.BinaryRule
+import epic.trees.UnaryRule
+import epic.trees.TreeInstance
+import epic.features.SplitSpanFeaturizer.ZeroSplitSpanFeaturizer
+import epic.parser.ExpectedCounts
+import epic.trees.annotations.Xbarize
+import epic.parser.models.AnnotatedParserInference
+import epic.parser.models.NeuralInference
 
 /**
  * The neural model is really just a
@@ -116,7 +131,7 @@ object NeuralModel {
                         val layer: Transform[FeatureVector, DenseVector[Double]]#Layer) extends RefinedAnchoring.StructureDelegatingAnchoring[L, W] {
     override def scoreSpan(begin: Int, end: Int, label: Int, ref: Int): Double = {
       var base = baseAnchoring.scoreSpan(begin, end, label, ref)
-      if(base != Double.NegativeInfinity) {
+      if(lastLayer.size != 0 && base != Double.NegativeInfinity) {
         base += score(labelFeaturizer.featuresForSpan(begin, end, label, ref),
           surfaceFeaturizer.featuresForSpan(begin, end),
           begin, begin, end)
@@ -126,7 +141,7 @@ object NeuralModel {
 
     override def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int): Double = {
       var base = baseAnchoring.scoreBinaryRule(begin, split, end, rule, ref)
-      if(base != Double.NegativeInfinity) {
+      if(lastLayer.size != 0 && base != Double.NegativeInfinity) {
         base += score(labelFeaturizer.featuresForBinaryRule(begin, split, end, rule, ref),
           surfaceFeaturizer.featuresForSplit(begin, split, end),
           begin, split, end)
@@ -136,7 +151,7 @@ object NeuralModel {
 
     override def scoreUnaryRule(begin: Int, end: Int, rule: Int, ref: Int): Double = {
       var base = baseAnchoring.scoreUnaryRule(begin, end, rule, ref)
-      if(base != Double.NegativeInfinity) {
+      if(lastLayer.size != 0 && base != Double.NegativeInfinity) {
         base += score(labelFeaturizer.featuresForUnaryRule(begin, end, rule, ref),
           surfaceFeaturizer.featuresForSpan(begin, end),
           begin, begin, end)
@@ -186,6 +201,7 @@ object NeuralModel {
       val surfFeats: Array[Int] = surfaceFeaturizer.featuresForSplit(begin, split, end)
       val baseFeatures = baseFeaturizer.featuresForBinaryRule(begin, split, end, rule, ref)
       axpy(score * scale, new FeatureVector(baseFeatures), baseDeriv)
+      if(lastLayer.size != 0)
       tallyDerivative(labelFeatures, surfFeats, score, begin, split, end)
     }
 
@@ -194,6 +210,7 @@ object NeuralModel {
       val surfFeats: Array[Int] = surfaceFeaturizer.featuresForSpan(begin, end)
       val baseFeatures = baseFeaturizer.featuresForUnaryRule(begin, end, rule, ref)
       axpy(score * scale, new FeatureVector(baseFeatures), baseDeriv)
+      if(lastLayer.size != 0)
       tallyDerivative(labelFeatures, surfFeats, score, begin, begin, end)
     }
 
@@ -202,6 +219,7 @@ object NeuralModel {
       val surfFeats: Array[Int] = surfaceFeaturizer.featuresForSpan(begin, end)
       val baseFeatures = baseFeaturizer.featuresForSpan(begin, end, tag, ref)
       axpy(score * scale, new FeatureVector(baseFeatures), baseDeriv)
+      if(lastLayer.size != 0)
       tallyDerivative(labelFeatures, surfFeats, score, begin, begin, end)
     }
 
@@ -276,7 +294,11 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     val surface = IndexedSplitSpanFeaturizer.fromData(span, annTrees)
 
     def labelFeatGen(l: AnnotatedLabel) = Set(l, l.baseAnnotatedLabel).toSeq
-    def ruleFeatGen(r: Rule[AnnotatedLabel]) = Set(r, r.map(_.baseAnnotatedLabel)).toSeq
+        def ruleFeatGen(r: Rule[AnnotatedLabel]) = Set(r, r.map(_.baseAnnotatedLabel)).toSeq
+    def parentRuleFeatGen(r: Rule[AnnotatedLabel]) = r match {
+      case BinaryRule(a,b,c) => Set(a, a.baseAnnotatedLabel).toSeq
+      case UnaryRule(a, b, _) => Set(a, a.baseAnnotatedLabel).toSeq
+    }
 
     val featureCounter = readWeights(oldWeights)
 
@@ -311,7 +333,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     val labelFeaturizer = new ProductionFeaturizer[AnnotatedLabel, AnnotatedLabel, String](xbarGrammar, indexedRefinements):RefinedFeaturizer[AnnotatedLabel, String, Feature]
 
 
-    val transform = new SigmoidTransform(new AffineTransform(numOutputs, numHidden, new SigmoidTransform[FeatureVector](numHidden, surface.featureIndex.size, true)))
+    val transform = new TanhTransform(new AffineTransform(numOutputs, numHidden, new TanhTransform[FeatureVector](numHidden, surface.featureIndex.size, true)))
     new NeuralModel(base, labelFeaturizer, surface, transform, numOutputs)
   }
 }
