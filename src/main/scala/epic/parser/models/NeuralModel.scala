@@ -329,7 +329,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
 
     }
 
-    val labelFeaturizer = new ProductionFeaturizer[AnnotatedLabel, AnnotatedLabel, String](xbarGrammar, indexedRefinements, lGen = (_ => Seq.empty), rGen = parentRuleFeatGen):RefinedFeaturizer[AnnotatedLabel, String, Feature]
+    val labelFeaturizer = new ProductionFeaturizer[AnnotatedLabel, AnnotatedLabel, String](xbarGrammar, indexedRefinements):RefinedFeaturizer[AnnotatedLabel, String, Feature]
 
 
     val transform = new TanhTransform(new AffineTransform(numOutputs, numHidden, new TanhTransform[FeatureVector](numHidden, surface.featureIndex.size, true)))

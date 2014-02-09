@@ -35,7 +35,7 @@ class ModelObjective[Datum](val model: Model[Datum],
      case None => Encoder.fromIndex(featureIndex).tabulateDenseVector(f => model.initialValueForFeature(f))
    }
     if(randomize) {
-      v += DenseVector.rand(numFeatures) * 1E-6
+      v += (DenseVector.rand(numFeatures) * 2E-3 - 1E-3)
     }
     v
   }
