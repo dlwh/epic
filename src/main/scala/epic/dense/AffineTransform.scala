@@ -20,7 +20,7 @@ case class AffineTransform[FV, Mid](numOutputs: Int, numInputs: Int, innerTransf
 
 
   def extractLayer(weights: DenseVector[Double]) = {
-    val mat = weights(0 until (numOutputs * numInputs)).asDenseMatrix.reshape(numOutputs, numInputs, view = View.Require)
+    val mat = weights(0 until (numOutputs * numInputs)).asDenseMatrix.reshape(numInputs, numOutputs, view = View.Require)
     val bias = if(includeBias) {
       weights(numOutputs * numInputs until index.componentOffset(1))
     } else {
@@ -30,20 +30,23 @@ case class AffineTransform[FV, Mid](numOutputs: Int, numInputs: Int, innerTransf
     new Layer(mat, bias, inner)
   }
 
+  // weights is input by outputs, rather than the other way around, because the derivative addition is much faster
+  // (cache-friendly) if we can access a block of outputs at a time. since matrices are column major, this is just better.
   case class Layer(weights: DenseMatrix[Double], bias: DenseVector[Double], innerLayer: innerTransform.Layer) extends _Layer {
     override val index = AffineTransform.this.index
+
 
     val weightst = weights.t.copy
 
 
     def activations(fv: FV) = {
-      val out = weights * innerLayer.activations(fv) += bias
+      val out = weightst * innerLayer.activations(fv) += bias
       out
     }
 
     def tallyDerivative(deriv: DenseVector[Double], _scale: =>DenseVector[Double], fv: FV) = {
       val scale = _scale
-      val matDeriv = deriv(0 until (numOutputs * numInputs)).asDenseMatrix.reshape(numOutputs, numInputs, view = View.Require)
+      val matDeriv = deriv(0 until (numOutputs * numInputs)).asDenseMatrix.reshape(numInputs, numOutputs, view = View.Require)
       val biasDeriv = if(includeBias) {
         deriv(numOutputs * numInputs until index.componentOffset(1))
       } else {
@@ -54,9 +57,9 @@ case class AffineTransform[FV, Mid](numOutputs: Int, numInputs: Int, innerTransf
       // scale(i) pushes in  (f'(mat * inner(v) + bias))(i)
       val innerAct = innerLayer.activations(fv)
       // d/d(weights(::, i)) == scale(i) * innerAct
-      for (i <- 0 until weights.rows) {
+      for (i <- 0 until numOutputs) {
         val a: Double = scale(i)
-        axpy(a, innerAct, matDeriv.t(::, i))
+        axpy(a, innerAct, matDeriv(::, i))
         // so d/dbias(i) = scale(i)
         biasDeriv(i) += a
       }
@@ -64,7 +67,7 @@ case class AffineTransform[FV, Mid](numOutputs: Int, numInputs: Int, innerTransf
       // scale is f'(mat * inner(v) + bias)
       // d/dv is mat.t * f'(mat * inner(v) + bias)
 
-      innerLayer.tallyDerivative(deriv(index.componentOffset(1) to -1), weightst * scale, fv)
+      innerLayer.tallyDerivative(deriv(index.componentOffset(1) to -1), weights * scale, fv)
     }
 
   }
