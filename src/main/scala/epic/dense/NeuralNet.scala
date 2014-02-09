@@ -1,5 +1,5 @@
 package epic.dense
-import epic.framework.{Feature, StandardExpectedCounts}
+import epic.framework.{ModelObjective, Feature, StandardExpectedCounts}
 import breeze.util.Index
 import breeze.linalg._
 import breeze.stats.distributions.RandBasis
@@ -12,6 +12,7 @@ import scala.io.Source
 import java.util.zip.GZIPInputStream
 import epic.dense.NeuralNet.ClassificationInstance
 import breeze.features.FeatureVector
+import breeze.optimize.{GradientTester, CachedBatchDiffFunction}
 
 /**
  * TODO
@@ -73,7 +74,7 @@ object NeuralNet {
 
 
 object DevlinLM extends Logging {
-  case class Options(path: File, numTrain: Int = Int.MaxValue, opt: OptParams, numHidden: Int = 200, embedDim: Int = 100)
+  case class Options(path: File, numTrain: Int = Int.MaxValue, opt: OptParams, numHidden: Int = 200, embedDim: Int = 100, checkGradient: Boolean = false, threads: Int = -1)
 
   def main(args: Array[String]):Unit = {
     val params = CommandLineParser.readIn[Options](args)
@@ -92,7 +93,7 @@ object DevlinLM extends Logging {
     val numInputs = dev.head.inputs.data.length
     logger.info(s"There are $numInputs inputs to each instance.")
 
-    val transform = new AffineTransform(labelIndex.size, numHidden, new SigmoidTransform(new AffineTransform(numHidden, numInputs * embedDim, new SigmoidTransform(new DevlinTransform(inputIndex, embedDim)))))
+    val transform = new AffineTransform(labelIndex.size, numHidden, new TanhTransform(new AffineTransform(numHidden, numInputs * embedDim, new TanhTransform(new DevlinTransform(inputIndex, embedDim)))))
 
     val train = {
       val input = new GZIPInputStream(new FileInputStream(new File(path, "sample_ids.train.txt.gz")))
@@ -102,6 +103,18 @@ object DevlinLM extends Logging {
     val test = {
       val test = new FileInputStream(new File(path, "sample_ids.test.txt"))
       readInstances(Source.fromInputStream(test, "UTF-8")).toIndexedSeq
+    }
+
+
+    val model = new NeuralNet.Model(labelIndex, transform)
+    val obj = new ModelObjective(model, train)
+    val cachedObj = new CachedBatchDiffFunction(obj)
+    val init = obj.initialWeightVector(true)
+    if(checkGradient) {
+      val cachedObj2 = new CachedBatchDiffFunction(new ModelObjective(model, train.take(opt.batchSize), params.threads))
+      val indices = (-10 until 0).map(i => if(i < 0) model.featureIndex.size + i else i)
+      GradientTester.testIndices(cachedObj2, init, indices, toString={(i: Int) => model.featureIndex.get(i).toString}, skipZeros = true)
+      GradientTester.test(cachedObj2, init, toString={(i: Int) => model.featureIndex.get(i).toString}, skipZeros = true)
     }
 
 
