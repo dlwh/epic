@@ -61,13 +61,14 @@ final case class GrammarRefinements[C, F](labels: ProjectionIndexer[C, F], rules
     rightChildRefinementsGivenCoarseRule(r)
   }
 
+  /** Gives the localized refinement of each parent */
   def parentRefinement(r: Int, ref: Int):Int = parentRefinements(r)(ref)
 
   private val parentRefinements: Array[Array[Int]] = Array.tabulate(rules.coarseIndex.size) { r =>
     val parent = labels.coarseIndex(rules.coarseIndex.get(r).parent)
 
     rules.refinementsOf(r).map { ref =>
-      labels.localize(rules.fineIndex.get(ref).parent)
+      labels.localize(rules.fineIndex.get(ref).parent)._2
     }
 
 
@@ -79,7 +80,7 @@ final case class GrammarRefinements[C, F](labels: ProjectionIndexer[C, F], rules
     val parent = labels.coarseIndex(rules.coarseIndex.get(r).parent)
     val parentRefs = Array.fill(labels.refinementsOf(parent).length){ArrayBuffer[Int]()}
     for(ruleRef <- rules.refinementsOf(r)) {
-      val refParent = labels.localize(rules.fineIndex.get(ruleRef).parent)
+      val refParent = labels.localize(rules.fineIndex.get(ruleRef).parent)._2
       parentRefs(refParent) += rules.localize(ruleRef)
     }
     parentRefs.map(_.toArray)
@@ -92,7 +93,7 @@ final case class GrammarRefinements[C, F](labels: ProjectionIndexer[C, F], rules
       val leftChild = labels.coarseIndex(rules.coarseIndex.get(r).asInstanceOf[BinaryRule[C]].left)
       val leftChildRefs = Array.fill(labels.refinementsOf(leftChild).length){ArrayBuffer[Int]()}
       for(ruleRef <- rules.refinementsOf(r)) {
-        val refParent = labels.localize(rules.fineIndex.get(ruleRef).asInstanceOf[BinaryRule[F]].left)
+        val refParent = labels.localize(rules.fineIndex.get(ruleRef).asInstanceOf[BinaryRule[F]].left)._2
         leftChildRefs(refParent) += rules.localize(ruleRef)
       }
       leftChildRefs.map(_.toArray)
@@ -107,7 +108,7 @@ final case class GrammarRefinements[C, F](labels: ProjectionIndexer[C, F], rules
       val rightChild = labels.coarseIndex(rules.coarseIndex.get(r).asInstanceOf[BinaryRule[C]].right)
       val rightChildRefs = Array.fill(labels.refinementsOf(rightChild).length){ArrayBuffer[Int]()}
       for(ruleRef <- rules.refinementsOf(r)) {
-        val refParent = labels.localize(rules.fineIndex.get(ruleRef).asInstanceOf[BinaryRule[F]].right)
+        val refParent = labels.localize(rules.fineIndex.get(ruleRef).asInstanceOf[BinaryRule[F]].right)._2
         rightChildRefs(refParent) += rules.localize(ruleRef)
       }
       rightChildRefs.map(_.toArray)
@@ -120,7 +121,7 @@ final case class GrammarRefinements[C, F](labels: ProjectionIndexer[C, F], rules
       val child = labels.coarseIndex(rules.coarseIndex.get(r).asInstanceOf[UnaryRule[C]].child)
       val childRefs = Array.fill(labels.refinementsOf(child).length){ArrayBuffer[Int]()}
       for(ruleRef <- rules.refinementsOf(r)) {
-        val refChild = labels.localize(rules.fineIndex.get(ruleRef).asInstanceOf[UnaryRule[F]].child)
+        val refChild = labels.localize(rules.fineIndex.get(ruleRef).asInstanceOf[UnaryRule[F]].child)._2
         childRefs(refChild) += rules.localize(ruleRef)
       }
       childRefs.map(_.toArray)
@@ -143,7 +144,7 @@ final case class GrammarRefinements[C, F](labels: ProjectionIndexer[C, F], rules
 
   private val parentRefinementsGivenCoarseRule:Array[Array[Int]] = Array.tabulate(rules.coarseIndex.size) { r =>
   // rules -> parent refinements
-    def fineParent(r: Int) = labels.fineIndex(rules.fineIndex.get(r).parent)
+    def fineParent(r: Int): Int = labels.fineIndex(rules.fineIndex.get(r).parent)
     rules.refinementsOf(r).map(fineParent).toSet.toArray.map(labels.localize).sorted
   }
 

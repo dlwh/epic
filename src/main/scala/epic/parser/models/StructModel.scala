@@ -63,13 +63,7 @@ class StructModel[L, L2, W](indexedFeatures: IndexedFeaturizer[L, L2, W],
     val lexicon = new FeaturizedLexicon(weights, indexedFeatures)
     val grammar = FeaturizedGrammar(this.baseGrammar, this.lexicon, projections, weights, indexedFeatures, lexicon)
     def reannotate(tree: BinarizedTree[L], words: Seq[W]) = {
-      val annotated = annotator(tree, words)
-
-      val localized = annotated.map { l =>
-          projections.labels.project(l) -> projections.labels.localize(l)
-      }
-
-      localized
+      annotator(tree, words).map(projections.labels.localize)
     }
 
     new AnnotatedParserInference(indexedFeatures, reannotate, grammar, baseFactory)
