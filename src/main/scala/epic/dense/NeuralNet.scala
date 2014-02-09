@@ -11,6 +11,7 @@ import com.typesafe.scalalogging.slf4j.Logging
 import scala.io.Source
 import java.util.zip.GZIPInputStream
 import epic.dense.NeuralNet.ClassificationInstance
+import breeze.features.FeatureVector
 
 /**
  * TODO
@@ -88,10 +89,10 @@ object DevlinLM extends Logging {
       readInstances(Source.fromInputStream(source, "UTF-8")).toIndexedSeq
     }
 
-    val numInputs = dev.head.inputs.length
+    val numInputs = dev.head.inputs.data.length
     logger.info(s"There are $numInputs inputs to each instance.")
 
-    val transform = new AffineTransform(labelIndex.size, numHidden, new SigmoidTransform(new AffineTransform(numHidden, numInputs * embedDim, new SigmoidTransform(new DevlinTransform(numInputs, embedDim)))))
+    val transform = new AffineTransform(labelIndex.size, numHidden, new SigmoidTransform(new AffineTransform(numHidden, numInputs * embedDim, new SigmoidTransform(new DevlinTransform(inputIndex, embedDim)))))
 
     val train = {
       val input = new GZIPInputStream(new FileInputStream(new File(path, "sample_ids.train.txt.gz")))
@@ -107,10 +108,10 @@ object DevlinLM extends Logging {
 
   }
 
-  def readInstances(source: Source): Iterator[ClassificationInstance[Array[Int]]] = {
+  def readInstances(source: Source): Iterator[ClassificationInstance[FeatureVector]] = {
     for(Seq(inputs, label) <- source.getLines().grouped(2)) yield {
       val x = inputs.split("\\s+").map(_.toInt)
-      NeuralNet.ClassificationInstance(label.toInt, x)
+      NeuralNet.ClassificationInstance(label.toInt, new FeatureVector(x))
     }
   }
 }
