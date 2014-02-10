@@ -42,6 +42,11 @@ trait Inference[Datum] extends Serializable {
 
   def scorer(v: Datum):Scorer
 
+  def loss(v: Datum) = {
+    val s = scorer(v)
+    marginal(s,v).logPartition - goldMarginal(s, v).logPartition
+  }
+
   /**
    * Produces the "gold marginal" which is the marginal conditioned on the output label/structure itself.
    * @param v the example
