@@ -1,18 +1,18 @@
 package epic.dense
-import epic.framework.{ModelObjective, Feature, StandardExpectedCounts}
+import epic.framework.{Model, ModelObjective, Feature, StandardExpectedCounts}
 import breeze.util.Index
 import breeze.linalg._
 import breeze.stats.distributions.RandBasis
-import breeze.numerics.{exp, log}
+import breeze.numerics.{I, pow, exp}
 import java.io.{FileInputStream, File}
-import breeze.optimize.FirstOrderMinimizer.OptParams
 import breeze.config.{Configuration, CommandLineParser}
 import com.typesafe.scalalogging.slf4j.Logging
 import scala.io.Source
 import java.util.zip.GZIPInputStream
-import epic.dense.NeuralNet.ClassificationInstance
 import breeze.features.FeatureVector
-import breeze.optimize.{GradientTester, CachedBatchDiffFunction}
+import breeze.optimize._
+import epic.dense.NeuralNet.ClassificationInstance
+import breeze.optimize.FirstOrderMinimizer.OptParams
 
 /**
  * TODO
@@ -127,4 +127,32 @@ object DevlinLM extends Logging {
       NeuralNet.ClassificationInstance(label.toInt, new FeatureVector(x))
     }
   }
+
+  class DevlinOptimizer[Datum](model: Model[Datum], params: OptParams, validation: IndexedSeq[Datum], iterPerValidate: Int = 20000) extends StochasticGradientDescent[DenseVector[Double]](params.alpha, params.maxIterations, params.tolerance) {
+    case class History(learnScale: Double = 1.0, lastValid: Double = Double.MaxValue)
+
+    protected def initialHistory(f: StochasticDiffFunction[DenseVector[Double]], init: DenseVector[Double]): History = History()
+
+    protected def updateHistory(newX: DenseVector[Double], newGrad: DenseVector[Double], newVal: Double, f: StochasticDiffFunction[DenseVector[Double]], oldState: State): History = {
+      if((oldState.iter + 1) % iterPerValidate != 0) {
+        oldState.history
+      } else {
+        val inf = model.inferenceFromWeights(newX)
+        val newLL = validation.par.map (inf.loss).reduce(_ + _)
+        val newScale = oldState.history.learnScale * pow(0.5, I(newLL > oldState.history.lastValid))
+        logger.info(s"New loss is $newLL, old loss is ${oldState.history.lastValid}, learning rate is now $newScale")
+        History(newScale, newLL)
+      }
+    }
+
+    override def determineStepSize(state: State, f: StochasticDiffFunction[DenseVector[Double]], dir: DenseVector[Double]): Double = {
+      defaultStepSize * state.history.learnScale
+    }
+
+    override protected def takeStep(state: State, dir: DenseVector[Double], stepSize: Double): DenseVector[Double] = {
+       clip(dir * stepSize, -0.01, 0.01) += state.x
+    }
+  }
+
 }
+
