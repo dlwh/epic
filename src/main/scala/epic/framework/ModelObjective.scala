@@ -19,8 +19,9 @@ import epic.util.{SafeLogging, CacheBroker}
  */
 class ModelObjective[Datum](val model: Model[Datum],
                             batchSelector: IndexedSeq[Int]=>GenTraversable[Datum],
-                            val fullRange: IndexedSeq[Int]) extends BatchDiffFunction[DenseVector[Double]] with SafeLogging {
-  def this(model: Model[Datum], data: IndexedSeq[Datum], numThreads: Int = -1) = this(model,ModelObjective.makePar(data, numThreads)(_), 0 until data.length)
+                            val fullRange: IndexedSeq[Int],
+                            rescaleObjective: Boolean) extends BatchDiffFunction[DenseVector[Double]] with SafeLogging {
+  def this(model: Model[Datum], data: IndexedSeq[Datum], numThreads: Int = -1, rescaleObjective: Boolean = true) = this(model,ModelObjective.makePar(data, numThreads)(_), 0 until data.length, rescaleObjective)
 
   import model.{ExpectedCounts => _, _}
 
@@ -72,7 +73,10 @@ class ModelObjective[Datum](val model: Model[Datum],
     timeSinceLastWrite += timeOut - timeIn
     logger.info(f"Inference took: ${(timeOut - timeIn) * 1.0/1000}%.3fs" )
     val (loss,grad) = expectedCountsToObjective(finalCounts)
-    (loss/success.intValue() * fullRange.size,  grad * (fullRange.size * 1.0 / success.intValue))
+    if(rescaleObjective)
+      (loss/success.intValue() * fullRange.size,  grad * (fullRange.size * 1.0 / success.intValue))
+    else
+      (loss,  grad)
   }
 }
 

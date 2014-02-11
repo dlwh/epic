@@ -74,7 +74,8 @@ object NeuralNet {
 
 
 object DevlinLM extends Logging {
-  case class Options(path: File, numTrain: Int = Int.MaxValue, opt: OptParams, numHidden: Int = 200, embedDim: Int = 100, checkGradient: Boolean = false, threads: Int = -1)
+  case class Options(path: File, numTrain: Int = Int.MaxValue, opt: OptParams, numHidden: Int = 200,
+                     embedDim: Int = 100, checkGradient: Boolean = false, threads: Int = -1, iterPerValidate: Int = 20000)
 
   def main(args: Array[String]):Unit = {
     val params = CommandLineParser.readIn[Options](args)
@@ -107,9 +108,9 @@ object DevlinLM extends Logging {
 
 
     val model = new NeuralNet.Model(labelIndex, transform)
-    val obj = new ModelObjective(model, train)
+    val obj = new ModelObjective(model, train, rescaleObjective = false)
     val cachedObj = new CachedBatchDiffFunction(obj)
-    val init = obj.initialWeightVector(true)
+    val init = DenseVector.rand(model.featureIndex.size) * 0.1 - 0.05
     if(checkGradient) {
       val cachedObj2 = new CachedBatchDiffFunction(new ModelObjective(model, train.take(opt.batchSize), params.threads))
       val indices = (-10 until 0).map(i => if(i < 0) model.featureIndex.size + i else i)
@@ -117,7 +118,8 @@ object DevlinLM extends Logging {
       GradientTester.test(cachedObj2, init, toString={(i: Int) => model.featureIndex.get(i).toString}, skipZeros = true)
     }
 
-
+    val optimizer = new DevlinOptimizer(model, params.opt, dev, iterPerValidate)
+    val result = optimizer.minimize(cachedObj.withRandomBatches(opt.batchSize), init)
 
   }
 
