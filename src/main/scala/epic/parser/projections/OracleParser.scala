@@ -22,6 +22,7 @@ import epic.trees.TreeInstance
 import epic.parser.ViterbiDecoder
 import epic.parser.ParserParams.XbarGrammar
 import epic.trees.annotations.TreeAnnotator
+import breeze.collection.mutable.TriangularArray
 
 /**
  * Finds the best tree (relative to the gold tree) s.t. it's reacheable given the current anchoring.
@@ -80,6 +81,13 @@ class OracleParser[L, L2, W](val refinedGrammar: SimpleRefinedGrammar[L, L2, W])
                                  tree: BinarizedTree[L2],
                                  treeconstraints: ChartConstraints[L]): RefinedAnchoring[L, W] = {
     val correctRefinedSpans = GoldTagPolicy.goldTreeForcing(tree.map(refinements.labels.fineIndex))
+    val correctUnaryChains = {
+      val arr = TriangularArray.fill(w.length + 1)(IndexedSeq.empty[String])
+      for(UnaryTree(a, btree, chain, span) <- tree.allChildren) {
+        arr(span.begin, span.end) = chain
+      }
+      arr
+    }
     new StructureDelegatingAnchoring[L, W] {
       protected val baseAnchoring: RefinedAnchoring[L, W] = refinedGrammar.anchor(w)
 
@@ -92,12 +100,16 @@ class OracleParser[L, L2, W](val refinedGrammar: SimpleRefinedGrammar[L, L2, W])
         val top = grammar.parent(rule)
         val isAllowed = treeconstraints.top.isAllowedLabeledSpan(begin, end, top)
         val isRightRefined = isAllowed && {
-          val rr = refinements.rules.globalize(rule, ref)
-          val theRefinedRule = refinements.rules.fineIndex.get(rr)
-          val refTop = refinements.labels.fineIndex(theRefinedRule.parent)
+          val parentRef = baseAnchoring.parentRefinement(rule, ref)
+          val refTop = refinements.labels.globalize(top, parentRef)
           correctRefinedSpans.isGoldTopTag(begin, end, refTop)
         }
-        20 * I(isAllowed) + I(isRightRefined) + 0.1 * baseAnchoring.scoreUnaryRule(begin, end, rule, ref)
+
+        val isCorrectChain = {
+          isAllowed && grammar.chain(rule) == correctUnaryChains(begin, end)
+        }
+
+        20 * I(isAllowed) + I(isRightRefined) + 0.5 * I(isCorrectChain) + 0.1 * baseAnchoring.scoreUnaryRule(begin, end, rule, ref)
       }
 
       def scoreSpan(begin: Int, end: Int, tag: Int, ref: Int): Double = {
