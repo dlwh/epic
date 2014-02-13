@@ -30,7 +30,7 @@ object SentimentTreebankPipeline extends Logging {
                      lossType: String = "",
                      iterPerEval: Int = 100,
                      evalOnTest: Boolean = false,
-//                     modelFactory: SpanModelFactory,
+                     includeDevInTrain: Boolean = false,
                      modelFactory: ParserExtractableModelFactory[AnnotatedLabel, String] = new SpanModelFactory,
                      rootLossScaling: Double = 1.0)
 
@@ -41,13 +41,15 @@ object SentimentTreebankPipeline extends Logging {
     val treebank = new ProcessedTreebank(params.path, treebankType = "simple")
 
     var trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]] = treebank.trainTrees
-//    if(params.evalOnTest)
-//      trainTrees ++= treebank.devTrees
+    if(params.evalOnTest && params.includeDevInTrain)
+      trainTrees ++= treebank.devTrees
+    println(trainTrees.size + " train trees, " + treebank.devTrees.size + " dev trees, " + treebank.testTrees.size + " test trees");
     val gen = GenerativeParser.fromTrees(trainTrees)
 
 
     class GoldBracketingsConstraints extends ChartConstraints.Factory[AnnotatedLabel, String] {
       val trees = (trainTrees ++ treebank.devTrees ++ treebank.testTrees).map(ti => ti.words -> ti.tree).toMap
+//      val trees = ((if (params.includeDevInTrain) trainTrees else trainTrees ++ treebank.devTrees) ++ treebank.testTrees).map(ti => ti.words -> ti.tree).toMap
 
       def constraints(w: IndexedSeq[String]): ChartConstraints[AnnotatedLabel] = {
         val constraints = SpanConstraints.fromTree(trees.getOrElse(w, gen.bestParse(w)))
@@ -114,11 +116,13 @@ object SentimentTreebankPipeline extends Logging {
     type ExpectedCounts = inner.ExpectedCounts
     type Marginal = inner.Marginal
     type Inference = SentimentTreebankPipeline.Inference[L, W]
+    type Scorer = inner.Scorer
 
     def emptyCounts = inner.emptyCounts
 
-    def accumulateCounts(d: TreeInstance[L, W], m: Marginal, accum: ExpectedCounts, scale: Double): Unit = {
-      inner.accumulateCounts(d, m, accum, scale)
+
+    def accumulateCounts(s: Scorer, d: TreeInstance[L, W], m: Marginal, accum: ExpectedCounts, scale: Double): Unit = {
+      inner.accumulateCounts(s, d, m, accum, scale)
     }
 
     /**
@@ -138,13 +142,19 @@ object SentimentTreebankPipeline extends Logging {
 
   class Inference[L, W](val pm: ParserInference[L, W]) extends epic.framework.Inference[TreeInstance[L, W]] {
     val labels = pm.baseMeasure.labelIndex.toIndexedSeq.map(_ -> 0)
+    type Scorer = pm.Scorer
     type Marginal = pm.Marginal
 
-    def goldMarginal(v: TreeInstance[L, W]): Marginal = pm.goldMarginal(v)
+    def scorer(v: TreeInstance[L, W]): Scorer = pm.scorer(v)
 
-    def marginal(v: TreeInstance[L, W]): Marginal = {
-      val anch = pm.grammar.anchor(v.words)
-      LatentTreeMarginal[L, W](AugmentedAnchoring.fromRefined(anch), v.tree.map(l => labels:scala.collection.IndexedSeq[(L, Int)]))
+    def goldMarginal(scorer: Scorer, v: TreeInstance[L, W]): Inference[L, W]#Marginal = {
+      pm.goldMarginal(scorer, v)
+    }
+
+
+    def marginal(anch: Scorer, v: TreeInstance[L, W]): Inference[L, W]#Marginal = {
+      val aug = AugmentedAnchoring.fromRefined(anch)
+      LatentTreeMarginal[L, W](aug, v.tree.map(l => labels:scala.collection.IndexedSeq[(L, Int)]))
     }
   }
 
@@ -239,6 +249,7 @@ object SentimentTreebankPipeline extends Logging {
   }
 
   def evaluateBetter(name: String, parser: Parser[AnnotatedLabel, String], testTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]], decodeType: DecodeType) = {
+    println("Evaluating at " + name);
     testTrees.par.map { ti =>
       val goldTree = ti.tree.children.head.map(_.label.toInt)
       val goldRoot = goldTree.label

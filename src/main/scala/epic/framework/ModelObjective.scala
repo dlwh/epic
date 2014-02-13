@@ -35,7 +35,7 @@ class ModelObjective[Datum](val model: Model[Datum],
      case None => Encoder.fromIndex(featureIndex).tabulateDenseVector(f => model.initialValueForFeature(f))
    }
     if(randomize) {
-      v += DenseVector.rand(numFeatures) * 1E-6
+      v += (DenseVector.rand(numFeatures) * 2E-3 - 1E-3)
     }
     v
   }
@@ -48,7 +48,7 @@ class ModelObjective[Datum](val model: Model[Datum],
       val timeIn = System.currentTimeMillis()
       model.cacheFeatureWeights(x)
       val writeLength = System.currentTimeMillis() - timeIn
-      nextSave = math.max(writeLength * 20, 5L * 20 * 1000)// don't spend more than 5% of our time caching weights
+      nextSave = math.max(writeLength * 100, 5L * 20 * 1000)// don't spend more than 1% of our time caching weights
       logger.info(f"Saving took ${writeLength/1000.0}%.2fs. Will write again in ${nextSave/1000.0}%.0fs")
       timeSinceLastWrite = 0
     }

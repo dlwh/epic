@@ -112,10 +112,15 @@ case class ProductParserModelFactory(baseParser: ParserParams.XbarGrammar,
       Counter[Feature, Double]()
     }
 
+
+    def latentAnnotator(t: BinarizedTree[AnnotatedLabel], w: IndexedSeq[String]) = {
+      annotator(t, w).map(finalRefinements.labels.refinementsOf)
+    }
+
     val indexedFeaturizer = IndexedFeaturizer[AnnotatedLabel, (AnnotatedLabel, Seq[Int]), String](feat, wordFeaturizer, trainTrees, annotator andThen (_.tree.map(finalRefinements.labels.refinementsOf)), finalRefinements)
 
     new LatentParserModel[AnnotatedLabel, (AnnotatedLabel, Seq[Int]), String](indexedFeaturizer,
-      annotator,
+      latentAnnotator,
       finalRefinements,
       cFactory,
       xbarGrammar,

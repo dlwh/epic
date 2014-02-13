@@ -25,24 +25,29 @@ class EPInference[Datum, Augment](val inferences: IndexedSeq[ProjectableInferenc
                                   val epInGold: Boolean = false)(implicit aIsFactor: Augment <:< Factor[Augment]) extends ProjectableInference[Datum, Augment] with SafeLogging with Serializable {
   type Marginal = EPMarginal[Augment, ProjectableInference[Datum, Augment]#Marginal]
   type ExpectedCounts = EPExpectedCounts
-
-
+  type Scorer = EPScorer[ProjectableInference[Datum, Augment]#Scorer]
 
   def baseAugment(v: Datum) = inferences.filter(_ ne null).head.baseAugment(v)
 
-  def project(v: Datum, m: Marginal, oldAugment: Augment): Augment = m.q
+  def project(v: Datum, s: Scorer, m: Marginal, oldAugment: Augment): Augment = m.q
+
+  def scorer(v: Datum): Scorer = EPScorer(inferences.map(_.scorer(v)))
+
+
+
 
   // ugh code duplication...
-  def goldMarginal(datum: Datum, augment: Augment) = {
+  def goldMarginal(scorer: Scorer, datum: Datum, augment: Augment): Marginal = {
     if(!epInGold) {
-      val marginals = for(inf <- inferences) yield {
+      val marginals = for(i <- 0 until inferences.length) yield {
+        val inf = inferences(i)
         if(inf eq null)
           null.asInstanceOf[ProjectableInference[Datum, Augment]#Marginal]
         else 
-          inf.goldMarginal(datum)
+          inf.goldMarginal(scorer.scorers(i).asInstanceOf[inf.Scorer], datum)
       }
-      val (inf, m) = (inferences zip marginals).filter(_._2 != null).head
-      EPMarginal(marginals.filter(_ ne null).map(_.logPartition).sum, inf.project(datum, m.asInstanceOf[inf.Marginal], augment), marginals)
+      val ((inf, m), iScorer) = (inferences zip marginals zip scorer.scorers).filter(_._1._2 != null).head
+      EPMarginal(marginals.filter(_ ne null).map(_.logPartition).sum, inf.project(datum, iScorer.asInstanceOf[inf.Scorer], m.asInstanceOf[inf.Marginal], augment), marginals)
     } else {
 
       val marginals = ArrayBuffer.fill(inferences.length)(null.asInstanceOf[ProjectableInference[Datum, Augment]#Marginal])
@@ -51,16 +56,17 @@ class EPInference[Datum, Augment](val inferences: IndexedSeq[ProjectableInferenc
         val inf = inferences(i)
         assert(inf != null)
         marginals(i) = null.asInstanceOf[ProjectableInference[Datum, Augment]#Marginal]
-        val marg = inf.goldMarginal(datum, q)
+        val iScorer = scorer.scorers(i).asInstanceOf[inf.Scorer]
+        val marg = inf.goldMarginal(iScorer, datum, q)
         val contributionToLikelihood = marg.logPartition
         assert(!contributionToLikelihood.isInfinite, s"Model $i is misbehaving ($contributionToLikelihood) on iter $iter! Datum: " + datum )
         assert(!contributionToLikelihood.isNaN, s"Model $i is misbehaving (NaN) on iter $iter!")
-        val newAugment = inf.project(datum, marg, q)
+        val newAugment = inf.project(datum, iScorer, marg, q)
         marginals(i) = marg
         newAugment -> contributionToLikelihood
       }
 
-      val ep = new ExpectationPropagation(project _, 1E-3)
+      val ep = new ExpectationPropagation(project, 1E-3)
 
       val inferencesToUse = (0 until inferences.length).filter(inferences(_) ne null)
 
@@ -77,15 +83,15 @@ class EPInference[Datum, Augment](val inferences: IndexedSeq[ProjectableInferenc
     }
   }
 
-
-  def marginal(datum: Datum, augment: Augment) = {
+  def marginal(scorer: Scorer, datum: Datum, augment: Augment): Marginal = {
     var iter = 0
     val marginals = ArrayBuffer.fill(inferences.length)(null.asInstanceOf[ProjectableInference[Datum, Augment]#Marginal])
 
     def project(q: Augment, i: Int) = {
       val inf = inferences(i)
       marginals(i) = null.asInstanceOf[ProjectableInference[Datum, Augment]#Marginal]
-      var marg = inf.marginal(datum, q)
+      val iScorer = scorer.scorers(i).asInstanceOf[inf.Scorer]
+      var marg = inf.marginal(iScorer, datum, q)
       var contributionToLikelihood = marg.logPartition
       if (contributionToLikelihood.isInfinite || contributionToLikelihood.isNaN) {
         logger.error(s"Model $i is misbehaving ($contributionToLikelihood) on iter $iter! Datum: $datum" )
@@ -98,7 +104,7 @@ class EPInference[Datum, Augment](val inferences: IndexedSeq[ProjectableInferenc
         }
         */
       }
-      val newAugment = inf.project(datum, marg, q)
+      val newAugment = inf.project(datum, iScorer, marg, q)
       marginals(i) = marg
 //      println("Leaving " + i)
       newAugment -> contributionToLikelihood

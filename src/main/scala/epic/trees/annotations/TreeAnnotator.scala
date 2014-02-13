@@ -3,6 +3,7 @@ package annotations
 
 import epic.trees.BinarizedTree
 import runtime.ScalaRunTime
+import epic.parser.projections.ProjectionIndexer
 
 /**
  *
@@ -26,6 +27,14 @@ trait TreeAnnotator[L, W, M] extends ((BinarizedTree[L], Seq[W])=>BinarizedTree[
   override def toString() = this match {
     case x: Product =>  ScalaRunTime._toString(x)
     case _ => this.getClass.toString +"()"
+  }
+
+  def localized[C](proj: ProjectionIndexer[C, M]) = {(ti: BinarizedTree[L], w: IndexedSeq[W]) =>
+    this(ti, w).map(proj.localize)
+  }
+
+  def latent = {(ti: BinarizedTree[L], w: IndexedSeq[W]) =>
+    this(ti, w).map(IndexedSeq(_))
   }
 
 }

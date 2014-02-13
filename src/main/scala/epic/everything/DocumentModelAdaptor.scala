@@ -12,8 +12,10 @@ object DocumentModelAdaptor {
     val sentenceModel: CompatibleModel
     type ExpectedCounts = sentenceModel.ExpectedCounts
     type Marginal = DocumentModelAdaptor.Marginal[sentenceModel.Marginal]
-    type Inference = DocumentInferenceAdaptor[sentenceModel.Inference] { type Marginal = DocumentModelAdaptor.Marginal[sentenceModel.Marginal]}
+    type Inference = DocumentInferenceAdaptor[sentenceModel.Inference] { type Marginal = DocumentModelAdaptor.Marginal[sentenceModel.Marginal]; type Scorer = self.Scorer}
+    type Scorer = DocumentModelAdaptor.Scorer[sentenceModel.Scorer]
   }
+  case class Scorer[Scorer](scorers: IndexedSeq[Scorer])
   case class Marginal[M<:epic.framework.Marginal](sentences: IndexedSeq[M]) extends epic.framework.Marginal {
     def logPartition: Double = sentences.map(_.logPartition).sum
   }
@@ -48,9 +50,9 @@ class DocumentModelAdaptor(factory: DocumentBeliefs.Factory, val sentenceModel: 
 
   def emptyCounts: ExpectedCounts = sentenceModel.emptyCounts
 
-  def accumulateCounts(d: FeaturizedDocument, m: Marginal, accum: ExpectedCounts, scale: Double):Unit = {
+  def accumulateCounts(s: Scorer, d: FeaturizedDocument, m: Marginal, accum: ExpectedCounts, scale: Double):Unit = {
     for(i <- 0 until d.sentences.length)
-      sentenceModel.accumulateCounts(d.sentences(i), m.sentences(i), accum, scale)
+      sentenceModel.accumulateCounts(s.scorers(i), d.sentences(i), m.sentences(i), accum, scale)
   }
 
 
@@ -65,16 +67,23 @@ class DocumentInferenceAdaptor[Inf<:DocumentInferenceAdaptor.SentenceInference]
 
   type Marginal = DocumentModelAdaptor.Marginal[sentenceInference.Marginal]
 
-  def marginal(doc: FeaturizedDocument, aug: DocumentBeliefs): Marginal = {
-    DocumentModelAdaptor.Marginal(for( (sent, beliefs) <- doc.sentences.zip(aug.sentences)) yield {
-       sentenceInference.marginal(sent, beliefs)
+  type Scorer = DocumentModelAdaptor.Scorer[sentenceInference.Scorer]
+
+
+  def scorer(v: FeaturizedDocument): Scorer = {
+    new Scorer(v.sentences.map(sentenceInference.scorer _))
+  }
+
+  def marginal(scorer: Scorer, doc: FeaturizedDocument, aug: DocumentBeliefs): Marginal = {
+    DocumentModelAdaptor.Marginal(for( i <- 0 until doc.sentences.length) yield {
+       sentenceInference.marginal(scorer.scorers(i), doc.sentences(i), aug.beliefsForSentence(i)):sentenceInference.Marginal
     })
   }
 
 
-  def goldMarginal(doc: FeaturizedDocument, aug: DocumentBeliefs): Marginal = {
-    DocumentModelAdaptor.Marginal(for( (sent, beliefs) <- doc.sentences.zip(aug.sentences)) yield {
-      sentenceInference.goldMarginal(sent, beliefs)
+  def goldMarginal(scorer: Scorer, doc: FeaturizedDocument, aug: DocumentBeliefs): Marginal = {
+    DocumentModelAdaptor.Marginal(for( i <- 0 until doc.sentences.length) yield {
+      sentenceInference.goldMarginal(scorer.scorers(i), doc.sentences(i), aug.beliefsForSentence(i)):sentenceInference.Marginal
     })
   }
 
@@ -85,9 +94,9 @@ class DocumentInferenceAdaptor[Inf<:DocumentInferenceAdaptor.SentenceInference]
     datum.copy(newSents)
   }
 
-  def project(v: FeaturizedDocument, m: Marginal, oldAugment: DocumentBeliefs): DocumentBeliefs = {
-    val newSents = for ( (sent, (m,aug)) <- v.sentences zip (m.sentences zip oldAugment.sentences)) yield {
-      sentenceInference.project(sent, m, aug)
+  def project(v: FeaturizedDocument, scorer: Scorer, m: Marginal, oldAugment: DocumentBeliefs): DocumentBeliefs = {
+    val newSents = for ( i <- 0 until v.sentences.length) yield {
+      sentenceInference.project(v.sentences(i), scorer.scorers(i), m.sentences(i), oldAugment.beliefsForSentence(i))
     }
     oldAugment.copy(sentences=newSents.toArray)
   }

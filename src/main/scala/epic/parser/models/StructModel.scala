@@ -55,6 +55,7 @@ class StructModel[L, L2, W](indexedFeatures: IndexedFeaturizer[L, L2, W],
                         initialFeatureVal: (Feature => Option[Double]) = { _ => None }) extends ParserModel[L, W] with Serializable {
   type Inference = AnnotatedParserInference[L, W]
 
+
   def featureIndex = indexedFeatures.index
 
   override def initialValueForFeature(f: Feature) = initialFeatureVal(f) getOrElse 0.0
@@ -63,20 +64,14 @@ class StructModel[L, L2, W](indexedFeatures: IndexedFeaturizer[L, L2, W],
     val lexicon = new FeaturizedLexicon(weights, indexedFeatures)
     val grammar = FeaturizedGrammar(this.baseGrammar, this.lexicon, projections, weights, indexedFeatures, lexicon)
     def reannotate(tree: BinarizedTree[L], words: Seq[W]) = {
-      val annotated = annotator(tree, words)
-
-      val localized = annotated.map { l =>
-          projections.labels.project(l) -> projections.labels.localize(l)
-      }
-
-      localized
+      annotator(tree, words).map(projections.labels.localize)
     }
 
     new AnnotatedParserInference(indexedFeatures, reannotate, grammar, baseFactory)
   }
 
 
-  def accumulateCounts(d: TreeInstance[L, W], m: Marginal, accum: ExpectedCounts, scale: Double) {
+  def accumulateCounts(s: Scorer, d: TreeInstance[L, W], m: Marginal, accum: ExpectedCounts, scale: Double): Unit = {
     m.expectedCounts(indexedFeatures, accum, scale)
   }
 }

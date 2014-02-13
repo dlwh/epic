@@ -9,10 +9,10 @@ import breeze.linalg.DenseVector
  *
  * @author dlwh
  */
-class SigmoidTransformTest extends FunSuite {
+class TanhTransformTest extends FunSuite {
 
   test("chain rule") {
-    val index = new SigmoidTransform(12, 10, true)
+    val index = new TanhTransform(12, 10, true)
     val dv = DenseVector.rand(10)
     val objective = new DiffFunction[DenseVector[Double]] {
       def calculate(x: DenseVector[Double]): (Double, DenseVector[Double]) = {
@@ -31,7 +31,7 @@ class SigmoidTransformTest extends FunSuite {
   }
 
   test("layered chain rule") {
-    val index = new SigmoidTransform(new AffineTransform(20, 12, new SigmoidTransform(12, 10, true)))
+    val index = new TanhTransform(new AffineTransform(20, 12, new TanhTransform(12, 10, true)))
 
     val dv = DenseVector.rand(10)
     val objective = new DiffFunction[DenseVector[Double]] {

@@ -46,12 +46,15 @@ final class ProjectionIndexer[C, F] private (val coarseIndex: Index[C],
   def globalize(c: C, f: Int):F = fineIndex.get(globalRefinements(coarseIndex(c))(f))
   def indexAndLocalize(f: F):(Int, Int) = {
     val glob = fineIndex(f)
-    if(glob < 0) throw new RuntimeException("Not in index: " + f + " Index: " + fineIndex)
-    project(glob) -> localize(glob)
+    if(glob < 0) (-1, -1)
+    else project(glob) -> localize(glob)
   }
 
 
-  def localize(f: F):Int =  localizationArray(fineIndex(f))
+  def localize(f: F):(C, Int) = {
+    val i = fineIndex(f)
+    coarseIndex.get(indexedProjections(i)) -> localizationArray(i)
+  }
 
   def refinementsOf(c: Int):Array[Int] = globalRefinements(c)
   def localRefinements(c: Int):Array[Int] = perSymbolRefinements(c)

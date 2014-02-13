@@ -22,6 +22,7 @@ object LiftedParser {
   class Model(factory: SentenceBeliefs.Factory, val model: ParserModel[L, W], viterbi: Boolean = false) extends StandardExpectedCounts.Model[FeaturizedSentence] with EvaluableModel[FeaturizedSentence] {
     type Marginal = ParseMarginal[AnnotatedLabel, String]
     type Inference = LiftedParser.Inference
+    type Scorer = model.Scorer
 
     def featureIndex: Index[Feature] = model.featureIndex
 
@@ -48,44 +49,45 @@ object LiftedParser {
       Trees.debinarize(chains.replaceUnaries(tree).map(_.label))
     }
 
-    def accumulateCounts(d: FeaturizedSentence, m: Marginal, accum: ExpectedCounts, scale: Double) {
-      model.accumulateCounts(d.treeInstance, m, accum, scale)
+    def accumulateCounts(s: Scorer, d: FeaturizedSentence, m: Marginal, accum: ExpectedCounts, scale: Double): Unit = {
+      model.accumulateCounts(s, d.treeInstance, m, accum, scale)
     }
+
   }
 
   class Inference(beliefsFactory: SentenceBeliefs.Factory,
-                  inf: ParserInference[L, W], viterbi: Boolean) extends AnnotatingInference[FeaturizedSentence] with ProjectableInference[FeaturizedSentence, SentenceBeliefs] {
+                  val inf: ParserInference[L, W], viterbi: Boolean) extends AnnotatingInference[FeaturizedSentence] with ProjectableInference[FeaturizedSentence, SentenceBeliefs] {
 
     type Marginal = ParseMarginal[AnnotatedLabel, String]
     type ExpectedCounts = StandardExpectedCounts[Feature]
+    type Scorer = inf.Scorer
 
     def baseAugment(sent: FeaturizedSentence): SentenceBeliefs = {
       beliefsFactory(sent)
     }
 
-    def marginal(sent: FeaturizedSentence, aug: SentenceBeliefs): Marginal = {
-       val anchoring =  new Anchoring(inf.grammar.grammar, inf.grammar.lexicon, sent.words, aug, sent.constituentSparsity)
+    def marginal(scorer: Scorer, sent: FeaturizedSentence, aug: SentenceBeliefs): Marginal = {
+      val anchoring =  new Anchoring(inf.grammar.grammar, inf.grammar.lexicon, sent.words, aug, sent.constituentSparsity)
       if(viterbi) {
         ParseMarginal.maxDerivationMarginal(AugmentedAnchoring(inf.grammar.anchor(sent.words), anchoring))
       } else {
-        inf.marginal(sent.treeInstance, anchoring)
+        inf.marginal(scorer, sent.treeInstance, anchoring)
       }
     }
 
-    def projectGold(v: FeaturizedSentence, m: Marginal, oldAugment: SentenceBeliefs): SentenceBeliefs = {
-      project(v, m, oldAugment)
+
+    def scorer(v: FeaturizedSentence) = inf.scorer(v.treeInstance)
+
+    def goldMarginal(scorer: Scorer, sent: FeaturizedSentence, aug: SentenceBeliefs): Marginal = {
+      val anchoring =  new Anchoring(scorer.grammar, scorer.lexicon, sent.words, aug, sent.constituentSparsity)
+      inf.goldMarginal(scorer, sent.treeInstance, anchoring)
     }
 
-    def goldMarginal(sent: FeaturizedSentence, aug: SentenceBeliefs): Marginal = {
-      val anchoring =  new Anchoring(inf.grammar.grammar, inf.grammar.lexicon, sent.words, aug, sent.constituentSparsity)
-      inf.goldMarginal(sent.treeInstance, anchoring)
-    }
 
-    def project(s: FeaturizedSentence, marg: Marginal, oldAugment: SentenceBeliefs): SentenceBeliefs = {
-      val m = marg
+    def project(v: FeaturizedSentence, s: Scorer, m: Marginal, oldAugment: SentenceBeliefs): SentenceBeliefs = {
       val old = oldAugment
       val info = new AnchoredSpanProjector().projectSpanPosteriors(m)
-      val words = Array.tabulate(s.length) { w =>
+      val words = Array.tabulate(v.length) { w =>
         val oldW = old.wordBeliefs(w)
         oldW.copy(tag=oldW.tag.updated(info.botType(w, w + 1)(0 until inf.grammar.grammar.labelIndex.size)))
       }

@@ -32,6 +32,7 @@ class EPModel[Datum, Augment](maxEPIter: Int, initFeatureValue: Feature => Optio
   type ExpectedCounts = EPExpectedCounts
   type Inference = EPInference[Datum, Augment]
   type Marginal = EPMarginal[Augment, ProjectableInference[Datum, Augment]#Marginal]
+  type Scorer = EPScorer[ProjectableInference[Datum, Augment]#Scorer]
 
   private val offsets = models.map(_.numFeatures).unfold(0)(_ + _)
   for(i <- 0 until models.length) { println(models(i) + " " + models(i).featureIndex.size)}
@@ -43,12 +44,12 @@ class EPModel[Datum, Augment](maxEPIter: Int, initFeatureValue: Feature => Optio
   }
 
 
-  override def accumulateCounts(datum: Datum, marg: Marginal, accum: EPExpectedCounts, scale: Double) = {
+  def accumulateCounts(s: Scorer, datum: Datum, marg: Marginal, accum: ExpectedCounts, scale: Double):Unit = {
     import marg._
-    for ( (inf, i) <- models.zipWithIndex) {
+    for ( (model, i) <- models.zipWithIndex) {
       val marg = marginals(i)
       if(marg != null)
-        inf.accumulateCounts(datum, marg.asInstanceOf[inf.Marginal], accum.counts(i).asInstanceOf[inf.ExpectedCounts], scale)
+        model.accumulateCounts(s.scorers(i).asInstanceOf[model.Scorer], datum, marg.asInstanceOf[model.Marginal], accum.counts(i).asInstanceOf[model.ExpectedCounts], scale)
     }
     accum.loss += scale * marg.logPartition
   }
@@ -180,3 +181,5 @@ case class EPExpectedCounts(var loss: Double, counts: IndexedSeq[ExpectedCounts[
 }
 
 case class ComponentFeature[T](index: Int, feature: T) extends Feature
+
+case class EPScorer[Scorer](scorers: IndexedSeq[Scorer])

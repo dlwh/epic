@@ -37,9 +37,11 @@ case class AnnotatedParserInference[L, W](featurizer: RefinedFeaturizer[L, W, Fe
                                           baseMeasure: CoreGrammar[L, W]) extends ParserInference[L, W] {
 
 
-  def goldMarginal(ti: TreeInstance[L, W], aug: CoreAnchoring[L, W]): Marginal = {
+  def goldMarginal(scorer: Scorer, ti: TreeInstance[L, W], aug: CoreAnchoring[L, W]): Marginal = {
     import ti._
     val annotated = annotator(tree, words)
-    TreeMarginal(AugmentedGrammar.fromRefined(grammar), words, annotated)
+    TreeMarginal(AugmentedAnchoring.fromRefined(scorer), annotated)
   }
+
+
 }

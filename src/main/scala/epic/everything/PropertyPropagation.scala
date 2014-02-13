@@ -153,8 +153,12 @@ object PropertyPropagation {
    * @author dlwh
    */
   class Model[T, U](beliefsFactory: SentenceBeliefs.Factory, assoc: AssociationFeaturizer[T, U]) extends epic.framework.StandardExpectedCounts.Model[FeaturizedSentence] {
+
     type Inference = PropertyPropagation.Inference[T, U]
     type Marginal = PropertyPropagation.Marginal
+    type Scorer = Unit
+
+
 
     def featureIndex: Index[Feature] = assoc.featureIndex
 
@@ -164,7 +168,7 @@ object PropertyPropagation {
       new Inference(beliefsFactory, weights, assoc)
     }
 
-    def accumulateCounts (sentence: FeaturizedSentence, sentenceMarginal: Marginal, accum: ExpectedCounts, scale: Double): Unit = {
+    def accumulateCounts(s: Scorer, sentence: FeaturizedSentence, sentenceMarginal: Marginal, accum: ExpectedCounts, scale: Double): Unit = {
       accum.loss += sentenceMarginal.logPartition * scale
       for {
         begin <- 0 until sentence.length
@@ -196,6 +200,11 @@ object PropertyPropagation {
                         weights: DenseVector[Double],
                         scorer: AssociationFeaturizer[T, U]) extends ProjectableInference[FeaturizedSentence, SentenceBeliefs] {
     type Marginal = PropertyPropagation.Marginal
+    type Scorer = Unit
+
+
+    def scorer(v: FeaturizedSentence): Scorer = ()
+
 
 
     def apply(v1: FeaturizedSentence, v2: SentenceBeliefs): FeaturizedSentence = v1
@@ -227,7 +236,7 @@ object PropertyPropagation {
       result
     }
 
-    def marginal(sentence: FeaturizedSentence, sentenceBeliefs: SentenceBeliefs): (Marginal) = {
+    def marginal(x: Scorer, sentence: FeaturizedSentence, sentenceBeliefs: SentenceBeliefs): Marginal =  {
       var logPartition = 0.0
       val spans = TriangularArray.tabulate(sentence.length + 1) { (begin, end) =>
         val current = sentenceBeliefs.spanBeliefs(begin, end)
@@ -283,12 +292,12 @@ object PropertyPropagation {
       exp.inPlace(m)
     }
 
-    def goldMarginal(v: FeaturizedSentence, aug: SentenceBeliefs): (Marginal) = marginal(v, aug)
+    def goldMarginal(scorer: Scorer, v: FeaturizedSentence, aug: SentenceBeliefs): Marginal =  {
+      marginal(scorer, v, aug)
+    }
 
 
-
-    // turns the marginal p(var1,var2) => q(var1)q(var2)
-    def project(sent: FeaturizedSentence, myBeliefs: Marginal, oldBeliefs: SentenceBeliefs): SentenceBeliefs = {
+    def project(v: FeaturizedSentence, s: Scorer, myBeliefs: Marginal, oldBeliefs: SentenceBeliefs): SentenceBeliefs = {
       val newSpans = TriangularArray.tabulate(oldBeliefs.length+1) { (begin, end) =>
         val current = myBeliefs.spans(begin, end)
         if(current eq null) null

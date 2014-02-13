@@ -15,13 +15,10 @@ class IdentityTransform[T] extends Transform[T, T] {
   }
 
   class Layer extends _Layer {
-    val index = IdentityTransform.this
 
     def activations(fv: T) = fv
 
-    def tallyDerivative(deriv: DenseVector[Double], scale: DenseVector[Double], t: T) = {
-    }
-
+    def tallyDerivative(deriv: DenseVector[Double], scale: =>DenseVector[Double], t: T) = {}
   }
 
 }

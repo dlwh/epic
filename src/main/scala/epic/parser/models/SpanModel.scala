@@ -35,6 +35,9 @@ import epic.trees.annotations.FilterAnnotations
 import com.typesafe.scalalogging.slf4j.Logging
 import epic.trees.annotations.MarkPreterminals
 import epic.trees.annotations.FixRootLabelVerticalAnnotation
+import epic.parser.BaseGrammar
+import scala.io.Source
+import epic.parser.features.LabelFeature
 
 /**
  * A rather more sophisticated discriminative parser. Uses features on
@@ -44,32 +47,25 @@ import epic.trees.annotations.FixRootLabelVerticalAnnotation
 @SerialVersionUID(1L)
 class SpanModel[L, L2, W](val featurizer: RefinedFeaturizer[L, W, Feature],
                           val featureIndex: Index[Feature],
-                          val annotator: (BinarizedTree[L], IndexedSeq[W]) => BinarizedTree[L2],
-                          val baseFactory: CoreGrammar[L, W],
+                          val annotator: (BinarizedTree[L], IndexedSeq[W]) => BinarizedTree[IndexedSeq[L2]],
+                          val coreGrammar: CoreGrammar[L, W],
                           val baseGrammar: BaseGrammar[L],
                           val lexicon: Lexicon[L, W],
                           val refinedGrammar: BaseGrammar[L2],
                           val refinements: GrammarRefinements[L, L2],
                           initialFeatureVal: (Feature => Option[Double]) = { _ => None }) extends ParserModel[L, W] with Serializable {
-  type Inference = AnnotatedParserInference[L, W]
+  type Inference = LatentParserInference[L, L2, W]
+
 
   override def initialValueForFeature(f: Feature) = initialFeatureVal(f) getOrElse 0.0
 
   def inferenceFromWeights(weights: DenseVector[Double]) = {
-    val factory = new DotProductGrammar(baseGrammar, lexicon, refinedGrammar, refinements, weights, featurizer)
-    def reannotate(bt: BinarizedTree[L], words: IndexedSeq[W]) = {
-      val annotated = annotator(bt, words)
-
-      val localized = annotated.map { l =>
-        refinements.labels.project(l) -> refinements.labels.localize(l)
-      }
-
-      localized
-    }
-    new AnnotatedParserInference(featurizer, reannotate, factory, baseFactory)
+    val dpGrammar = new DotProductGrammar(baseGrammar, lexicon, refinedGrammar, refinements, weights, featurizer)
+    new LatentParserInference(featurizer, annotator, dpGrammar, coreGrammar, refinements)
   }
 
-  def accumulateCounts(d: TreeInstance[L, W], m: Marginal, accum: ExpectedCounts, scale: Double) {
+
+  def accumulateCounts(s: Scorer, d: TreeInstance[L, W], m: Marginal, accum: ExpectedCounts, scale: Double): Unit = {
     m.expectedCounts(featurizer, accum, scale)
   }
 }
@@ -245,7 +241,7 @@ object IndexedSpanFeaturizer {
                         surfaceFeaturizer: IndexedSplitSpanFeaturizer[W],
                         featurizer: RefinedFeaturizer[L,W, Feature] ,
                         ruleAndSpansFeaturizer: RuleAndSpansFeaturizer[W],
-                        ann: (BinarizedTree[L], IndexedSeq[W]) => BinarizedTree[L2],
+                        ann: (BinarizedTree[L], IndexedSeq[W]) => BinarizedTree[IndexedSeq[L2]],
                         refinements: GrammarRefinements[L, L2],
                         grammar: BaseGrammar[L],
                         dummyFeatScale: HashFeature.Scale,
@@ -261,26 +257,36 @@ object IndexedSpanFeaturizer {
       val sspec = surfaceFeaturizer.anchor(ti.words)
       val rspec = ruleAndSpansFeaturizer.anchor(ti.words);
       ann(ti.tree, ti.words).allChildren.foreach {
-        case NullaryTree(a, span) =>
-          val (ai, aref) = refinements.labels.indexAndLocalize(a)
-          wordBuilder.add(spec.featuresForSpan(span.begin, span.end, ai, aref), wspec.featuresForWord(span.begin))
-          RuleAndSpansFeaturizer.addToIndex(ruleAndSpansIndex, rspec.featuresForSpan(span.begin, span.end, ai, aref))
-        case UnaryTree(a, b, chain, span) =>
-          val r = UnaryRule(a, b.label, chain)
-          val (ri, rref) = refinements.rules.indexAndLocalize(r)
-          spanBuilder.add(spec.featuresForUnaryRule(span.begin, span.end, ri, rref), sspec.featuresForSpan(span.begin, span.end))
-          RuleAndSpansFeaturizer.addToIndex(ruleAndSpansIndex, rspec.featuresForUnaryRule(span.begin, span.end, ri, rref))
-        case t@BinaryTree(a, b, c, span) =>
-          val (ai, aref) = refinements.labels.indexAndLocalize(a)
-          val r = BinaryRule(a, b.label, c.label)
-          val (ri, rref) = refinements.rules.indexAndLocalize(r)
-          spanBuilder.add(spec.featuresForBinaryRule(span.begin, t.splitPoint, span.end, ri, rref),
-            sspec.featuresForSpan(span.begin, span.end))
-          spanBuilder.add(spec.featuresForBinaryRule(span.begin, t.splitPoint, span.end, ri, rref),
-            sspec.featuresForSplit(span.begin, t.splitPoint, span.end))
-          spanBuilder.add(spec.featuresForSpan(span.begin, span.end, ai, aref),
-            sspec.featuresForSpan(span.begin, span.end))
-          RuleAndSpansFeaturizer.addToIndex(ruleAndSpansIndex, rspec.featuresForBinaryRule(span.begin, t.splitPoint, span.end, ri, rref))
+        case NullaryTree(as, span) =>
+          for(a <- as) {
+            val (ai, aref) = refinements.labels.indexAndLocalize(a)
+            wordBuilder.add(spec.featuresForSpan(span.begin, span.end, ai, aref), wspec.featuresForWord(span.begin))
+            RuleAndSpansFeaturizer.addToIndex(ruleAndSpansIndex, rspec.featuresForSpan(span.begin, span.end, ai, aref))
+          }
+        case UnaryTree(as, bs, chain, span) =>
+          for(a <- as; b <- bs.label) {
+            val r = UnaryRule(a, b, chain)
+            val (ri, rref) = refinements.rules.indexAndLocalize(r)
+            if(rref != -1) {
+              spanBuilder.add(spec.featuresForUnaryRule(span.begin, span.end, ri, rref), sspec.featuresForSpan(span.begin, span.end))
+              RuleAndSpansFeaturizer.addToIndex(ruleAndSpansIndex, rspec.featuresForUnaryRule(span.begin, span.end, ri, rref))
+            }
+          }
+        case t@BinaryTree(as, bs, cs, span) =>
+          for(a <- as; b <- bs.label; c <- cs.label) {
+            val (ai, aref) = refinements.labels.indexAndLocalize(a)
+            val r = BinaryRule(a, b, c)
+            val (ri, rref) = refinements.rules.indexAndLocalize(r)
+            if(rref != -1) {
+              spanBuilder.add(spec.featuresForBinaryRule(span.begin, t.splitPoint, span.end, ri, rref),
+                sspec.featuresForSpan(span.begin, span.end))
+              spanBuilder.add(spec.featuresForBinaryRule(span.begin, t.splitPoint, span.end, ri, rref),
+                sspec.featuresForSplit(span.begin, t.splitPoint, span.end))
+              spanBuilder.add(spec.featuresForSpan(span.begin, span.end, ai, aref),
+                sspec.featuresForSpan(span.begin, span.end))
+              RuleAndSpansFeaturizer.addToIndex(ruleAndSpansIndex, rspec.featuresForBinaryRule(span.begin, t.splitPoint, span.end, ri, rref))
+            }
+          }
       }
 
     }
@@ -302,7 +308,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
                             annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = GenerativeParser.defaultAnnotator(),
                             @Help(text="Old weights to initialize with. Optional")
                             oldWeights: File = null,
-                            @Help(text="For features not seen in gold trees, we bin them into dummyFeats * numGoldFeatures bins using hashing.")
+                            @Help(text="For features not seen in gold trees, we bin them into dummyFeats * numGoldFeatures bins using hashing. If negative, use absolute value as number of hash features.")
                             dummyFeats: Double = 0.5,
                             commonWordThreshold: Int = 100,
                             ngramCountThreshold: Int = 5,
@@ -461,16 +467,219 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
       surface,
       featurizer,
       ruleAndSpansFeaturizer,
-      annotator,
+      annotator.latent,
       indexedRefinements,
       xbarGrammar,
-      HashFeature.Relative(dummyFeats),
+      if(dummyFeats < 0) HashFeature.Absolute(-dummyFeats.toInt) else HashFeature.Relative(dummyFeats),
       trainTrees)
 
     val featureCounter = readWeights(oldWeights)
 
-    new SpanModel[AnnotatedLabel, AnnotatedLabel, String](indexed, indexed.index, annotator, constrainer, xbarGrammar, xbarLexicon, refGrammar, indexedRefinements,featureCounter.get(_))
+    new SpanModel[AnnotatedLabel, AnnotatedLabel, String](indexed, indexed.index, annotator.latent, constrainer, xbarGrammar, xbarLexicon, refGrammar, indexedRefinements,featureCounter.get(_))
   }
 
 }
 
+
+
+
+case class LatentSpanModelFactory(inner: SpanModelFactory,
+                                  @Help(text="Path to substates to use for each symbol. Uses numStates for missing states.")
+                                  substates: File = null,
+                                  @Help(text="Split states that the Berkeley Parser doesn't want to split.")
+                                  splitUselessStates: Boolean = false,
+                                  @Help(text="Number of states to use. Overridden by substates file")
+                                  numStates: Int = 2) extends ParserModelFactory[AnnotatedLabel, String] with Logging {
+
+  type MyModel = SpanModel[AnnotatedLabel, (AnnotatedLabel, Int), String]
+
+
+  def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]], constrainer: CoreGrammar[AnnotatedLabel, String]) = {
+    import inner._
+    import extraParams._
+    val annTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]] = trainTrees.map(annotator(_))
+    logger.info("Here's what the annotation looks like on the first few trees")
+    annTrees.slice(0, Math.min(3, annTrees.size)).foreach(tree => logger.info(tree.render(false)));
+
+    val (annWords, annBinaries, annUnaries) = GenerativeParser.extractCounts(annTrees)
+
+    val xbarGrammar = constrainer.grammar
+    var xbarLexicon = constrainer.lexicon
+    if(useGoldPos) {
+      val old = xbarLexicon
+      xbarLexicon = new Lexicon[AnnotatedLabel, String] {
+        def labelIndex: Index[AnnotatedLabel] = old.labelIndex
+        val tagSegs = trainTrees.map(_.asTaggedSequence).map(seq => seq.words -> seq.tags.map(_.baseAnnotatedLabel).map(labelIndex(_)).map(Set(_))).toMap
+
+        def anchor(w: IndexedSeq[String]): Anchoring = new Anchoring {
+          def length: Int = w.length
+
+          val oldAnch = old.anchor(w)
+
+          val preds = tagSegs.getOrElse(w, (0 until w.length).map(oldAnch.allowedTags))
+
+          def allowedTags(pos: Int): Set[Int] = {
+            preds(pos)
+
+          }
+        }
+      }
+
+    }
+
+    val substateMap = if (substates != null && substates.exists) {
+      val in = Source.fromFile(substates).getLines()
+      val pairs = for (line <- in) yield {
+        val split = line.split("\\s+")
+        AnnotatedLabel(split(0)) -> split(1).toInt
+      }
+      pairs.toMap + (xbarGrammar.root -> 1)
+    } else if(splitUselessStates) {
+      Map(xbarGrammar.root -> 1)
+    } else {
+      LatentModelFactory.statesToNotSplit.iterator.map(s => AnnotatedLabel(s) -> 1).toMap  + (xbarGrammar.root -> 1)
+    }
+
+    def splitLabel(x: AnnotatedLabel): Seq[(AnnotatedLabel, Int)] = {
+      for (i <- 0 until substateMap.getOrElse(x, numStates)) yield (x, i)
+    }
+
+    val splitLabels = xbarGrammar.labelIndex.map(l => l -> splitLabel(l)).toMap
+
+    def unsplit(x: (AnnotatedLabel, Int)): AnnotatedLabel = x._1
+
+    def splitRule[L, L2](r: Rule[L], split: L=>Seq[L2]):Seq[Rule[L2]] = r match {
+      case BinaryRule(a, b, c) => for(aa <- split(a); bb <- split(b); cc <- split(c)) yield BinaryRule(aa, bb, cc)
+      // don't allow non-identity rule refinements for identity rewrites
+      case UnaryRule(a, b, chain) if a == b => for(aa <- split(a)) yield UnaryRule(aa, aa, chain)
+      case UnaryRule(a, b, chain) => for(aa <- split(a); bb <- split(b)) yield UnaryRule(aa, bb, chain)
+    }
+
+    val annGrammar: BaseGrammar[AnnotatedLabel] = BaseGrammar(annTrees.head.tree.label, annBinaries, annUnaries)
+    val firstLevelRefinements = GrammarRefinements(xbarGrammar, annGrammar, {(_: AnnotatedLabel).baseAnnotatedLabel})
+    val secondLevel = GrammarRefinements(annGrammar, splitLabel _, {splitRule(_ :Rule[AnnotatedLabel], splitLabels)}, unsplit _)
+    val finalRefinements = firstLevelRefinements compose secondLevel
+    logger.info("Label refinements:" + finalRefinements.labels)
+
+    val mf: MorphFeaturizer = if (useMorph) {
+      MorphFeaturizer(pathsToMorph.split(","));
+    } else {
+      null;
+    }
+    val summedWordCounts: Counter[String, Double] = sum(annWords, Axis._0)
+    val ngramF = new NGramSpanFeaturizer(summedWordCounts, NGramSpanFeaturizer.countBigrams(annTrees), annTrees.map(_.words), ngramCountThreshold, maxNGramOrder, useNot = false);
+    val spanShapeBetter = new SpanShapeFeaturizerBetter(numSpanContextWords, useRichSpanContext);
+    val tagSpanShape = new TagSpanShapeFeaturizer(TagSpanShapeGenerator.makeBaseLexicon(trainTrees));
+    val fullShape = new FullWordSpanShapeFeaturizer(summedWordCounts.iterator.filter(_._2 > commonWordThreshold * 10).map(_._1).toSet, numSpanContextWords, useRichSpanContext);
+
+    val wf = {//WordFeaturizer.goodPOSTagFeaturizer(annWords)
+    val dsl = new WordFeaturizer.DSL(annWords)
+      import dsl._
+      if (useMorph) {
+        unigrams(word, 1) + suffixes() + prefixes() + mf;
+      } else {
+        unigrams(word, 1) + suffixes() + prefixes()
+      }
+    }
+    val span:SplitSpanFeaturizer[String] = {
+      val dsl = new WordFeaturizer.DSL(annWords, commonWordThreshold) with SurfaceFeaturizer.DSL with SplitSpanFeaturizer.DSL
+      import dsl._
+
+      // class(split + 1)
+      val baseCat = if (useMorph) {
+        (lfsuf + mf)
+      } else {
+        (lfsuf)
+      }
+
+      val leftOfSplit =  ((baseCat)(-1)apply (split))
+
+      var featurizer: SplitSpanFeaturizer[String] = zeroSplit[String]
+      if ( useFirstLast) {
+        featurizer += baseCat(begin)
+        featurizer += baseCat(end-1)
+      }
+      if (useBeforeAfter) {
+        featurizer += baseCat(begin-1)
+        featurizer += baseCat(end)
+      }
+
+      if(useSplits) {
+        featurizer += leftOfSplit
+        featurizer += baseCat(split)
+      }
+
+      if(useSpanLength) {
+        featurizer += length
+      }
+
+      if(useShape) {
+//        featurizer += spanShape
+        featurizer += spanShapeBetter
+      }
+
+      if(useFullShape) {
+        featurizer += fullShape
+      }
+
+      if(useSplitShape) {
+        featurizer += splitSpanShape
+      }
+
+      if(useBinaryLengths) {
+        featurizer += distance[String](begin, split)
+        featurizer += distance[String](split, end)
+      }
+      if (useNGrams) {
+        featurizer += ngramF;
+      }
+      if (useTagSpanShape) {
+        featurizer += tagSpanShape;
+      }
+      featurizer
+    }
+    val indexedWord = IndexedWordFeaturizer.fromData(wf, annTrees.map{_.words})
+    val surface = IndexedSplitSpanFeaturizer.fromData(span, annTrees)
+
+
+    def labelFeaturizer(l: (AnnotatedLabel, Int)) = Set(LabelFeature(l), l._1, l._1.baseAnnotatedLabel).toSeq
+    def ruleFeaturizer(r: Rule[(AnnotatedLabel, Int)]) = if(useGrammar) Set(r, r.map(_._1)).toSeq else if(r.isInstanceOf[UnaryRule[(AnnotatedLabel, Int)]]) labelFeaturizer(r.parent) else Seq.empty
+
+    val featurizer = new ProductionFeaturizer[AnnotatedLabel, (AnnotatedLabel, Int), String](xbarGrammar, finalRefinements,
+      lGen=labelFeaturizer,
+      rGen=ruleFeaturizer)
+
+    // This is a catch-all for other features that must be instantiated over the entire rule
+    // and which are not synthesized on-the-fly from cross-products.
+    val ruleAndSpansFeaturizer: RuleAndSpansFeaturizer[String] = if (useHackyLexicalFeatures) {
+      new HackyLexicalProductionFeaturizer(TagSpanShapeGenerator.makeStandardLexicon(annTrees), xbarGrammar, hackyLexicalFeatureDesc);
+    } else {
+      new ZeroRuleAndSpansFeaturizer();
+    }
+
+    def latentAnnotator(t: BinarizedTree[AnnotatedLabel], w: IndexedSeq[String]): BinarizedTree[IndexedSeq[(AnnotatedLabel, Int)]] = {
+      annotator(t, w).map(finalRefinements.labels.refinementsOf)
+    }
+
+    val indexed =  IndexedSpanFeaturizer.extract[AnnotatedLabel, (AnnotatedLabel, Int), String](indexedWord,
+      surface,
+      featurizer,
+      ruleAndSpansFeaturizer,
+      latentAnnotator,
+      finalRefinements,
+      xbarGrammar,
+      if(dummyFeats < 0) HashFeature.Absolute(-dummyFeats.toInt) else HashFeature.Relative(dummyFeats),
+      trainTrees)
+
+    val featureCounter = this.readWeights(oldWeights)
+
+
+    val refGrammar = BaseGrammar(finalRefinements.labels.refinementsOf(xbarGrammar.root)(0),
+      finalRefinements.labels.fineIndex,
+      finalRefinements.rules.fineIndex)
+
+    new SpanModel[AnnotatedLabel, (AnnotatedLabel, Int), String](indexed, indexed.index, latentAnnotator,
+      constrainer, xbarGrammar, xbarLexicon, refGrammar, finalRefinements, featureCounter.get(_))
+  }
+
+}
