@@ -162,11 +162,13 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
       statesToNotSplit.iterator.map(s => AnnotatedLabel(s) -> 1).toMap  + (xbarGrammar.root -> 1)
     }
 
+    val annGrammar: BaseGrammar[AnnotatedLabel] = BaseGrammar(annTrees.head.tree.label, annBinaries, annUnaries)
+
     def split(x: AnnotatedLabel): Seq[(AnnotatedLabel, Int)] = {
       for (i <- 0 until substateMap.getOrElse(x, numStates)) yield (x, i)
     }
 
-    val presplit = xbarGrammar.labelIndex.map(l => l -> split(l)).toMap
+    val presplit = annGrammar.labelIndex.map(l => l -> split(l)).toMap
 
     def unsplit(x: (AnnotatedLabel, Int)): AnnotatedLabel = x._1
 
@@ -181,7 +183,6 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     val surfaceFeaturizer = new MinimalWordFeaturizer(wordCounts) + new WordPropertyFeaturizer(wordCounts)
     val wordFeaturizer = IndexedWordFeaturizer.fromData(surfaceFeaturizer, annTrees.map{_.words})
 
-    val annGrammar: BaseGrammar[AnnotatedLabel] = BaseGrammar(annTrees.head.tree.label, annBinaries, annUnaries)
     val firstLevelRefinements = GrammarRefinements(xbarGrammar, annGrammar, {(_: AnnotatedLabel).baseAnnotatedLabel})
     val secondLevel = GrammarRefinements(annGrammar, split _, {splitRule(_ :Rule[AnnotatedLabel], presplit)}, unsplit _)
     val finalRefinements = firstLevelRefinements compose secondLevel
