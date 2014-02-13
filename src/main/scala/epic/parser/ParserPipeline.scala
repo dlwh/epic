@@ -85,12 +85,16 @@ trait ParserPipeline extends Logging {
                   validate: Parser[AnnotatedLabel, String]=>ParseEval.Statistics,
                   params: Params):Iterator[(String, Parser[AnnotatedLabel, String])]
 
+  var dev: IndexedSeq[TreeInstance[AnnotatedLabel, String]] = null
+
 
   def trainParser(treebank: ProcessedTreebank, params: Params):Iterator[(String, Parser[AnnotatedLabel, String])] = {
     import treebank._
 
 
     val validateTrees = devTrees.take(100)
+    dev = devTrees
+
     def validate(parser: Parser[AnnotatedLabel, String]) = {
       ParseEval.evaluate[AnnotatedLabel](validateTrees, parser, AnnotatedLabelChainReplacer, asString={(l:AnnotatedLabel)=>l.label}, nthreads=params.threads)
     }

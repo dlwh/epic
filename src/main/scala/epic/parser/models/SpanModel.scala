@@ -331,8 +331,6 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
   
   type MyModel = SpanModel[AnnotatedLabel, AnnotatedLabel, String]
 
-
-
   def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]], constrainer: CoreGrammar[AnnotatedLabel, String]) = {
     import extraParams._
     val annTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]] = trainTrees.map(annotator(_))
@@ -445,7 +443,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
       featurizer
     }
     val indexedWord = IndexedWordFeaturizer.fromData(wf, annTrees.map{_.words})
-    val surface = IndexedSplitSpanFeaturizer.fromData(span, annTrees)
+    val surface = IndexedSplitSpanFeaturizer.fromData(span, annTrees ++ dev)
     
     
     def labelFeaturizer(l: AnnotatedLabel) = Set(l, l.baseAnnotatedLabel).toSeq
@@ -471,7 +469,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
       indexedRefinements,
       xbarGrammar,
       if(dummyFeats < 0) HashFeature.Absolute(-dummyFeats.toInt) else HashFeature.Relative(dummyFeats),
-      trainTrees)
+      trainTrees ++ dev)
 
     val featureCounter = readWeights(oldWeights)
 

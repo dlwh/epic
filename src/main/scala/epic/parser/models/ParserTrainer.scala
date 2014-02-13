@@ -123,6 +123,7 @@ object ParserTrainer extends epic.parser.ParserPipeline with Logging {
       baseMeasure *= new HammingLossAugmentation(initialParser.grammar, initialParser.lexicon, (_:AnnotatedLabel).baseAnnotatedLabel,  (_:AnnotatedLabel).isIntermediate).asCoreGrammar(theTrees)
     
     val model = modelFactory.make(theTrees, baseMeasure)
+    model.asInstanceOf[ParserModelFactory[AnnotatedLabel, String]].dev = dev
     val obj = new ModelObjective(model, theTrees, params.threads)
     val cachedObj = new CachedBatchDiffFunction(obj)
     val init = obj.initialWeightVector(randomize)

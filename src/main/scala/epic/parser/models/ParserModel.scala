@@ -19,7 +19,7 @@ package models
 import epic.framework._
 import breeze.linalg._
 import epic.parser.GenerativeParser
-import epic.trees.{TreeInstance, UnaryRule, BinaryRule}
+import epic.trees.{AnnotatedLabel, TreeInstance, UnaryRule, BinaryRule}
 
 /**
  * Base trait for "normal" Parser-type models
@@ -88,6 +88,7 @@ trait ParserInference[L, W] extends ProjectableInference[TreeInstance[L, W], Cor
 trait ParserModelFactory[L, W] extends ParserExtractableModelFactory[L, W] {
   type MyModel <: ParserModel[L, W]
 
+  var dev: IndexedSeq[TreeInstance[L, String]] = null
 }
 
 
