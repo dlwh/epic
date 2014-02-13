@@ -96,3 +96,6 @@ excludedJars in assembly <<= (fullClasspath in assembly) map { cp =>
 
 assemblyOption in assembly ~= { _.copy(cacheOutput = false) }
 
+mainClass in (Compile, run) := Some("epic.parser.BerkeleyTrainer")
+
+mainClass in assembly := Some("epic.parser.BerkeleyTrainer")
