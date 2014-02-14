@@ -26,9 +26,11 @@ object BerkeleyTrainer extends epic.parser.ParserPipeline with Logging {
 
     val initialModel = BerkeleyModel.makeInitial(trainTrees, params.annotator)
 
-    Iterator.single(("Berkeley-0", initialModel.parser))
+    // Iterator.single(("Berkeley-0", initialModel.parser))
 
-    //Iterable.iterate(initialModel, params.numSplits) {_.split}
+    Iterable.iterate(initialModel, params.numSplits){_.split}.zipWithIndex.map({
+      case (model, i) => (s"Berkeley-$i", model.parser)
+    }).iterator
 
   }
 
