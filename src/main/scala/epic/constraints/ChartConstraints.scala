@@ -2,7 +2,7 @@ package epic.constraints
 
 import scala.collection.BitSet
 import breeze.collection.mutable.TriangularArray
-import epic.trees.{UnaryTree, BinarizedTree}
+import epic.trees.{TreeInstance, UnaryTree, BinarizedTree}
 import breeze.util.Index
 import org.mapdb.Serializer
 import java.io.{DataOutput, DataInput}
@@ -41,6 +41,28 @@ object ChartConstraints {
 
   trait Factory[L, W] extends SpanConstraints.Factory[W] {
     def constraints(w: IndexedSeq[W]): ChartConstraints[L]
+
+    def |(cf: Factory[L, W]) = new OrFactory(this, cf)
+  }
+
+  class GoldConstraintsFactory[L, W](labelIndex: Index[L], insts: Traversable[TreeInstance[L, W]]) extends Factory[L, W] {
+    private val gold = insts.map(ti => ti.words -> fromTree(labelIndex, ti.tree)).toMap
+    def constraints(w: IndexedSeq[W]): ChartConstraints[L] = {
+      gold.getOrElse(w, noSparsity[L])
+    }
+  }
+
+  class UnifiedFactory[L, W](f: Factory[L, W]) extends Factory[L, W] {
+    def constraints(w: IndexedSeq[W]): ChartConstraints[L] = {
+      val cons = f.constraints(w)
+      ChartConstraints(cons.top | cons.bot, cons.top | cons.bot)
+    }
+  }
+
+  class OrFactory[L, W](f: Factory[L, W], f2: Factory[L, W]) extends Factory[L, W] {
+    def constraints(w: IndexedSeq[W]): ChartConstraints[L] = {
+      f.constraints(w) | f2.constraints(w)
+    }
   }
 
   def fromTree[L](labelIndex: Index[L], tree: BinarizedTree[L]): ChartConstraints[L] = {
