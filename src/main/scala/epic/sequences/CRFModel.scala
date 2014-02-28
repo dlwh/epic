@@ -39,7 +39,7 @@ class CRFModel[L, W](val featureIndex: Index[Feature],
 
   def accumulateCounts(s: Scorer, d: TaggedSequence[L, W], marg: Marginal, counts: ExpectedCounts, scale: Double): Unit = {
     counts.loss += marg.logPartition * scale
-    val localization = marg.anchoring.asInstanceOf[Inference#Anchoring].localization
+    val localization = s.asInstanceOf[Inference#Anchoring].localization
     val visitor = new TransitionVisitor[L, W] {
 
       def apply(pos: Int, prev: Int, cur: Int, count: Double) {
@@ -97,17 +97,10 @@ class CRFInference[L, W](val weights: DenseVector[Double],
   }
 
 
-  def baseAugment(v: TaggedSequence[L, W]): CRF.Anchoring[L, W] = new IdentityAnchoring(v.words)
+  private val allLabels =  (0 until labelIndex.size).toSet
 
-  class IdentityAnchoring(val words: IndexedSeq[W]) extends CRF.Anchoring[L, W] {
-
-    def labelIndex: Index[L] = featurizer.labelIndex
-
-    def startSymbol: L = featurizer.startSymbol
-
-    def validSymbols(pos: Int): Set[Int] = (0 until labelIndex.size).toSet
-
-    def scoreTransition(pos: Int, prev: Int, cur: Int): Double = 0.0
+  def baseAugment(v: TaggedSequence[L, W]): CRF.Anchoring[L, W] = {
+    new CRF.IdentityAnchoring(v.words, IndexedSeq.fill(v.words.length)(allLabels),labelIndex, featurizer.startSymbol)
   }
 
   class Anchoring(val words: IndexedSeq[W]) extends CRF.Anchoring[L, W] {
@@ -143,7 +136,8 @@ class CRFInference[L, W](val weights: DenseVector[Double],
 
 class TaggedSequenceModelFactory[L](val startSymbol: L,
                                     gazetteer: Optional[Gazetteer[Any, String]] = NotProvided,
-                                    weights: Feature=>Double = { (f:Feature) => 0.0}) extends SafeLogging {
+                                    weights: Feature=>Double = { (f:Feature) => 0.0},
+                                    hashFeatureScale: Double = 0.0) extends SafeLogging {
 
   import TaggedSequenceModelFactory._
 
@@ -161,12 +155,12 @@ class TaggedSequenceModelFactory[L](val startSymbol: L,
     val indexedFeaturizer = IndexedWordFeaturizer.fromData(featurizer, train.map{_.words})
     val indexedL2featurizer = IndexedWordFeaturizer.fromData(l2featurizer, train.map{_.words})
 
-    val lfBuilder = new CrossProductIndex.Builder(labelIndex, indexedFeaturizer.featureIndex, includeLabelOnlyFeatures = false)
+    val lfBuilder = new CrossProductIndex.Builder(labelIndex, indexedFeaturizer.featureIndex, includeLabelOnlyFeatures = false, hashFeatures = HashFeature.Relative(hashFeatureScale))
     val label2Index = Index[(L, L)]()
     val label2Features = Array.tabulate(labelIndex.size, labelIndex.size) { (l1, l2) =>
       label2Index.index(labelIndex.get(l1) -> labelIndex.get(l2))
     }
-    val l2Builder = new CrossProductIndex.Builder(label2Index, indexedL2featurizer.featureIndex, includeLabelOnlyFeatures = true)
+    val l2Builder = new CrossProductIndex.Builder(label2Index, indexedL2featurizer.featureIndex, includeLabelOnlyFeatures = true, hashFeatures = HashFeature.Relative(hashFeatureScale))
 
     val progress = new ProgressLog(logger,train.length, frequency=1000, name= "NumFeatures")
     for(s <- train) {
