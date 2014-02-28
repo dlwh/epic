@@ -21,7 +21,9 @@ import epic.trees.ProcessedTreebank
 import epic.trees.TreeInstance
 import epic.parser.ViterbiDecoder
 import epic.parser.ParserParams.XbarGrammar
-import epic.trees.annotations.TreeAnnotator
+import epic.trees.annotations.{Xbarize, TreeAnnotator}
+import breeze.collection.mutable.TriangularArray
+import epic.constraints.ChartConstraints.UnifiedFactory
 
 /**
  * Finds the best tree (relative to the gold tree) s.t. it's reacheable given the current anchoring.
@@ -80,9 +82,15 @@ class OracleParser[L, L2, W](val refinedGrammar: SimpleRefinedGrammar[L, L2, W])
                                  tree: BinarizedTree[L2],
                                  treeconstraints: ChartConstraints[L]): RefinedAnchoring[L, W] = {
     val correctRefinedSpans = GoldTagPolicy.goldTreeForcing(tree.map(refinements.labels.fineIndex))
+    val correctUnaryChains = {
+      val arr = TriangularArray.fill(w.length + 1)(IndexedSeq.empty[String])
+      for(UnaryTree(a, btree, chain, span) <- tree.allChildren) {
+        arr(span.begin, span.end) = chain
+      }
+      arr
+    }
     new StructureDelegatingAnchoring[L, W] {
       protected val baseAnchoring: RefinedAnchoring[L, W] = refinedGrammar.anchor(w)
-
 
       def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int): Double = {
         0.1 * baseAnchoring.scoreBinaryRule(begin, split, end, rule, ref)
@@ -92,18 +100,22 @@ class OracleParser[L, L2, W](val refinedGrammar: SimpleRefinedGrammar[L, L2, W])
         val top = grammar.parent(rule)
         val isAllowed = treeconstraints.top.isAllowedLabeledSpan(begin, end, top)
         val isRightRefined = isAllowed && {
-          val rr = refinements.rules.globalize(rule, ref)
-          val theRefinedRule = refinements.rules.fineIndex.get(rr)
-          val refTop = refinements.labels.fineIndex(theRefinedRule.parent)
+          val parentRef = baseAnchoring.parentRefinement(rule, ref)
+          val refTop = refinements.labels.globalize(top, parentRef)
           correctRefinedSpans.isGoldTopTag(begin, end, refTop)
         }
-        20 * I(isAllowed) + I(isRightRefined) + 0.1 * baseAnchoring.scoreUnaryRule(begin, end, rule, ref)
+
+        val isCorrectChain = {
+          isAllowed && grammar.chain(rule) == correctUnaryChains(begin, end)
+        }
+
+        200 * I(isAllowed) + 10 * I(isRightRefined) + 5 * I(isCorrectChain) + 0.1 * baseAnchoring.scoreUnaryRule(begin, end, rule, ref)
       }
 
       def scoreSpan(begin: Int, end: Int, tag: Int, ref: Int): Double = {
         val globalized = refinements.labels.globalize(tag, ref)
-        20 * I(treeconstraints.bot.isAllowedLabeledSpan(begin, end, tag)) +
-          I(correctRefinedSpans.isGoldBotTag(begin, end, globalized)) + 0.1 * baseAnchoring.scoreSpan(begin, end, tag, ref)
+        200 * I(treeconstraints.bot.isAllowedLabeledSpan(begin, end, tag)) +
+          10 * I(correctRefinedSpans.isGoldBotTag(begin, end, globalized)) + 0.1 * baseAnchoring.scoreSpan(begin, end, tag, ref)
       }
     }
 
@@ -145,30 +157,43 @@ object OracleParser {
 
     import params.treebank._
 
+    val ann = GenerativeParser.defaultAnnotator()
+
     val initialParser = params.parser match {
       case null =>
         val (grammar, lexicon) = XbarGrammar().xbarGrammar(trainTrees)
-        GenerativeParser.annotatedParser(grammar, lexicon, GenerativeParser.defaultAnnotator(), trainTrees)
+        GenerativeParser.annotatedParser(grammar, lexicon, ann, trainTrees)
       //        GenerativeParser.annotatedParser(grammar, lexicon, Xbarize(), trainTrees)
       case f =>
         readObject[Parser[AnnotatedLabel, String]](f)
     }
 
-    val constraints = {
+    val constraints: ChartConstraints.Factory[AnnotatedLabel, String] = new UnifiedFactory({
 
       val maxMarginalized = initialParser.copy(marginalFactory=initialParser.marginalFactory match {
         case SimpleChartFactory(ref, mm) => SimpleChartFactory(ref, maxMarginal = true)
         case x => x
       })
 
+
       val uncached = new ParserChartConstraintsFactory[AnnotatedLabel, String](maxMarginalized, {(_:AnnotatedLabel).isIntermediate})
       new CachedChartConstraintsFactory[AnnotatedLabel, String](uncached)
-    }
+    })
+
+    val refGrammar = GenerativeParser.annotated(initialParser.grammar, initialParser.lexicon, ann, trainTrees)
+    val coreGrammar = new ConstraintCoreGrammarAdaptor(initialParser.grammar, initialParser.lexicon, constraints)
+
+    val annDevTrees = devTrees.map(ann)
 
     val parser = {
-      val refGrammar = GenerativeParser.annotated(initialParser.grammar, initialParser.lexicon, TreeAnnotator.identity, trainTrees)
-      val coreGrammar = new ConstraintCoreGrammarAdaptor(initialParser.grammar, initialParser.lexicon, constraints)
-      new OracleParser(refGrammar).oracleParser(coreGrammar, devTrees)
+      new OracleParser(refGrammar).oracleParser(coreGrammar, annDevTrees)
+    }
+
+    for(ti <- devTrees.par) try {
+      val m = TreeMarginal(AugmentedGrammar(refGrammar, coreGrammar), ti.words, ann.localized(refGrammar.refinements.labels)(ti.tree, ti.words))
+      println(m.logPartition)
+    } catch {
+      case e: Exception => e.printStackTrace()
     }
 
 

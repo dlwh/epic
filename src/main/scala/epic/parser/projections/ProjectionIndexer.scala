@@ -53,6 +53,7 @@ final class ProjectionIndexer[C, F] private (val coarseIndex: Index[C],
 
   def localize(f: F):(C, Int) = {
     val i = fineIndex(f)
+    if(i < 0) throw new RuntimeException(s"Not in fine index: $f")
     coarseIndex.get(indexedProjections(i)) -> localizationArray(i)
   }
 

@@ -74,10 +74,13 @@ trait ProjectionsRefinedAnchoring[L, L2, W] extends RefinedAnchoring[L, W] {
     val a2 = refinements.labels.globalize(a, refA)
     val b2 = refinements.labels.globalize(b, refB)
     val c2 = refinements.labels.globalize(c, refC)
-    refinements.rules.localize(refinements.rules.fineIndex(BinaryRule(refinements.labels.fineIndex.get(a2),
+    val rule = BinaryRule(refinements.labels.fineIndex.get(a2),
       refinements.labels.fineIndex.get(b2),
       refinements.labels.fineIndex.get(c2)
-    ))  )
+    )
+    val fi = refinements.rules.fineIndex(rule)
+    if(fi < 0) throw new RuntimeException(s"No such rule: $rule")
+    refinements.rules.localize(fi)
   }
 
   final def numValidRefinements(label: Int) = refinements.labels.refinementsOf(label).length

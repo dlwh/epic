@@ -243,9 +243,9 @@ object SimpleRefinedGrammar {
     val fineGrammar = BaseGrammar(AnnotatedLabel.TOP, syms, rules)
 
     val refinements = GrammarRefinements(coarseGrammar, fineGrammar, project _)
-    val lexicon = new SignatureLexicon(coarseGrammar.labelIndex, makeAllowedTags(coarseGrammar.labelIndex, lexCounts), {(w:String) => "UNK-"+EnglishWordClassGenerator(w)})
+    val lexicon = new SignatureLexicon(coarseGrammar.labelIndex, makeAllowedTags(coarseGrammar.labelIndex, lexCounts), {(w:String) => "UNK"+EnglishWordClassGenerator(w)})
 
-    val scorer = new SignatureTagScorer[AnnotatedLabel, String](lexCounts, { (w:String) => "UNK-"+EnglishWordClassGenerator(w)})
+    val scorer = new SignatureTagScorer[AnnotatedLabel, String](lexCounts, { (w:String) => "UNK"+EnglishWordClassGenerator(w)})
 
     RefinedGrammar.unanchored[AnnotatedLabel, AnnotatedLabel, String](coarseGrammar, lexicon,
       refinements,
