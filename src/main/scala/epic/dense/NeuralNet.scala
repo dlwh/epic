@@ -94,7 +94,7 @@ object DevlinLM extends Logging {
     val numInputs = dev.head.inputs.data.length
     logger.info(s"There are $numInputs inputs to each instance.")
 
-    val transform = new AffineTransform(labelIndex.size, numHidden, new TanhTransform(new AffineTransform(numHidden, numInputs * embedDim, new TanhTransform(new DevlinTransform(inputIndex, embedDim)))))
+    val transform = new AffineTransform(labelIndex.size, numHidden, new TanhTransform(new AffineTransform(numHidden, numHidden, new TanhTransform(new AffineTransform(numHidden, numInputs * embedDim, new DevlinTransform(inputIndex, embedDim))))))
 
     val train = {
       val input = new GZIPInputStream(new FileInputStream(new File(path, "sample_ids.train.txt.gz")))
