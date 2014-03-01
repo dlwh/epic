@@ -61,7 +61,7 @@ object CRF {
                      gazetteer: Gazetteer[Any, String] = Gazetteer.empty[Any, String],
                      opt: OptParams = OptParams(),
                      hashFeatures: Double = 1.0)(implicit cache: CacheBroker = CacheBroker()):CRF[L, String] = {
-    val model: CRFModel[L, String] = new TaggedSequenceModelFactory[L](startSymbol,  gazetteer = gazetteer, hashFeatureScale = 0.0).makeModel(data)
+    val model: CRFModel[L, String] = new TaggedSequenceModelFactory[L](startSymbol,  gazetteer = gazetteer, hashFeatureScale = hashFeatures).makeModel(data)
 
 
     val obj = new ModelObjective(model, data)

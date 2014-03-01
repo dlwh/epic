@@ -182,8 +182,11 @@ class TaggedSequenceModelFactory[L](val startSymbol: L,
       progress.info(s"${lfBuilder.size + l2Builder.size}")
     }
 
+
     val indexed = new IndexedStandardFeaturizer[L, String](indexedFeaturizer,
       indexedL2featurizer, lexicon, startSymbol, labelIndex, label2Features, lfBuilder.result(), l2Builder.result())
+
+    logger.info(s"There are ${indexed.label2FeatureIndex.size} and ${indexed.labelFeatureIndex.size} features total.")
     val model = new CRFModel(indexed.featureIndex, lexicon, indexed, weights)
 
     model
@@ -201,8 +204,8 @@ object TaggedSequenceModelFactory {
                                              val startSymbol: L,
                                              val labelIndex: Index[L],
                                              label2Features: Array[Array[Int]],
-                                             labelFeatureIndex: CrossProductIndex[L, Feature],
-                                             label2FeatureIndex: CrossProductIndex[(L, L), Feature]
+                                             val labelFeatureIndex: CrossProductIndex[L, Feature],
+                                             val label2FeatureIndex: CrossProductIndex[(L, L), Feature]
                                              ) extends CRF.IndexedFeaturizer[L,String] with Serializable { outer =>
 
     val featureIndex = SegmentedIndex(labelFeatureIndex, label2FeatureIndex)
