@@ -36,7 +36,7 @@ case class TreeMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
       case n@NullaryTree( (a, ref), span ) =>
         val aI = grammar.labelIndex(a)
         score += anchoring.scoreSpan(span.begin, span.end, aI, ref)
-        if(score.isInfinite) throw new Exception("Could not score gold tree!")
+        if(score.isInfinite) throw new Exception(s"Could not score the terminal with tag ${a -> ref} at $span. $words")
       case UnaryTree( (a, refA), child@Tree((b, refB), _, _), chain,  span) =>
         val r = grammar.index(UnaryRule(a, b, chain))
         assert(r != -1, "Could not find rule " + UnaryRule(a, b, chain))
