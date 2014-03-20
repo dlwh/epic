@@ -26,7 +26,10 @@ import epic.framework.Feature
  */
 
 trait RefinedFeaturizer[L, W, Feat]  {
+
   def index: Index[Feat]
+
+  def forTesting = this
   
   def anchor(words: IndexedSeq[W]):Anchoring
   

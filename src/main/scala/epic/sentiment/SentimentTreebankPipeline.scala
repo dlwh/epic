@@ -5,7 +5,7 @@ import breeze.config.CommandLineParser
 import epic.trees._
 import epic.parser.models.{ParserInference, ParserModel}
 import epic.parser._
-import breeze.linalg.{Axis, DenseVector}
+import breeze.linalg._
 import epic.framework._
 import epic.constraints.{LabeledSpanConstraints, SpanConstraints, ChartConstraints}
 import breeze.optimize.CachedBatchDiffFunction

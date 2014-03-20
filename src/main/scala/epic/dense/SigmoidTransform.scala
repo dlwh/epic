@@ -4,7 +4,7 @@ import epic.framework.Feature
 import breeze.linalg._
 import breeze.linalg.operators.OpMulMatrix
 import breeze.numerics._
-import breeze.linalg.support.{CanMapValues, CanAxpy}
+import breeze.linalg.support.{CanMapValues}
 
 /**
  *
@@ -18,7 +18,7 @@ case class SigmoidTransform[FV](inner: Transform[FV, DenseVector[Double]]) exten
   def this(numOutputs: Int, numInputs: Int,
            includeBias: Boolean = true)
           (implicit mult: OpMulMatrix.Impl2[DenseMatrix[Double], FV, DenseVector[Double]],
-           canaxpy: CanAxpy[Double, FV, DenseVector[Double]])  = this(AffineTransform.typed(numOutputs, numInputs, includeBias))
+           canaxpy: scaleAdd.InPlaceImpl3[DenseVector[Double], Double, FV])  = this(AffineTransform.typed(numOutputs, numInputs, includeBias))
 
   val index: inner.index.type = inner.index
 

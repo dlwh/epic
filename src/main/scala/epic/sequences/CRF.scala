@@ -2,7 +2,7 @@ package epic.sequences
 
 import breeze.util.Index
 import breeze.numerics
-import breeze.linalg.{softmax, DenseVector}
+import breeze.linalg.{argmax, softmax, DenseVector}
 import epic.framework._
 import java.util
 import collection.mutable.ArrayBuffer
@@ -368,7 +368,7 @@ object CRF {
 
   def posteriorDecode[L, W](m: Marginal[L, W], id: String = "") = {
     val length = m.length
-    val labels = (0 until length).map(pos => DenseVector.tabulate(m.anchoring.labelIndex.size)(m.positionMarginal(pos, _)).argmax)
+    val labels = (0 until length).map(pos => (0 until m.anchoring.labelIndex.size).maxBy(m.positionMarginal(pos, _)))
 
     TaggedSequence(labels.map(m.anchoring.labelIndex.get), m.words, id)
   }

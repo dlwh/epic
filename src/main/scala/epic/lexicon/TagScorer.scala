@@ -107,5 +107,5 @@ class SimpleTagScorer[L, W](counts: Counter2[L, W, Double]) extends TagScorer[L,
 
   private val wordCounts:Counter[W, Double] = sum(counts, Axis._0)
   private val labelCounts:Counter[L, Double] = sum(counts, Axis._1)
-  private val totalCount = wordCounts.sum
+  private val totalCount = sum(wordCounts)
 }
