@@ -40,4 +40,7 @@ class RuleFeaturizer[L, W](grammar: BaseGrammar[L]) extends RefinedFeaturizer[L,
       Array.empty[Int]
     }
   }
+
+
+  override def lock = this
 }

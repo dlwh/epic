@@ -116,7 +116,8 @@ class DotProductGrammar[L, L2, W, Feature](val grammar: BaseGrammar[L],
   }
 }
 
-class IndexedSpanFeaturizer[L, L2, W](wordFeatureIndex: CrossProductIndex[Feature, Feature],
+@SerialVersionUID(1L)
+case class IndexedSpanFeaturizer[L, L2, W](wordFeatureIndex: CrossProductIndex[Feature, Feature],
                                       spanFeatureIndex: CrossProductIndex[Feature, Feature],
                                       ruleAndSpansFeatureIndex: Index[Feature],
                                       labelFeaturizer: RefinedFeaturizer[L, W, Feature],
@@ -126,6 +127,7 @@ class IndexedSpanFeaturizer[L, L2, W](wordFeatureIndex: CrossProductIndex[Featur
                                       refinements: GrammarRefinements[L, L2],
                                       grammar: BaseGrammar[L]) extends RefinedFeaturizer[L, W, Feature] with Serializable {
 
+  def lock = copy(wordFeatureIndex.lock, spanFeatureIndex.lock)
 
   val index = SegmentedIndex(wordFeatureIndex, spanFeatureIndex, ruleAndSpansFeatureIndex)
   println("Total index size: " + index.size + ", " + wordFeatureIndex.size + " word feats, " + spanFeatureIndex.size +

@@ -101,6 +101,9 @@ class IndexedLexFeaturizer[L, L2, W](grammar: BaseGrammar[L],
   private val splitOffset = index.componentOffset(3)
 
 
+  override def lock = this
+
+
   def joinTagRef(head: Int, ref: Int, length: Int) : Int = {
     head + ref * length
   }
