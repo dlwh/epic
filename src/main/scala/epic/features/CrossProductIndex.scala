@@ -6,7 +6,7 @@ import scala.collection.mutable
 import breeze.collection.mutable.OpenAddressHashArray
 import scala.util.hashing.MurmurHash3
 import scala.collection.mutable.ArrayBuffer
-import epic.util.Arrays
+import epic.util.{LockableSeenSet, Arrays}
 import epic.parser.features.LabelFeature
 
 case class CrossProductFeature[A, B](labelPart: A, surfacePart: B, id: String = "") extends Feature {
@@ -25,7 +25,12 @@ class CrossProductIndex[A, B] private (val firstIndex: Index[A],
                                        surfacePartOfFeature: Array[Int],
                                        id: String= "CrossProductIndex",
                                        val includePlainLabelFeatures: Boolean = true,
-                                       val numHashFeatures: Int=0) extends Index[Feature] with Serializable {
+                                       val numHashFeatures: Int=0,
+                                       seenSet: LockableSeenSet[Long] = LockableSeenSet.always) extends Index[Feature] with Serializable {
+
+  def lock = new CrossProductIndex(firstIndex, secondIndex, mapping, labelPartOfFeature,
+                                   surfacePartOfFeature, id, includePlainLabelFeatures,
+                                   numHashFeatures, seenSet.lock)
 
   def apply(t: Feature): Int = t match {
     case CrossProductFeature(a,b, `id`) =>
@@ -49,11 +54,13 @@ class CrossProductIndex[A, B] private (val firstIndex: Index[A],
 
       if(f >= 0 || numHashFeatures == 0) {
         f
-      } else if(numHashFeatures == 1) {
-        trueSize
       } else {
-        val hf = MurmurHash3.mixLast(MurmurHash3.mix(10891, labelFeature.##), surfaceFeature.##).abs % numHashFeatures
-        hf + trueSize
+        val hf = MurmurHash3.mixLast(MurmurHash3.mix(10891, labelFeature.##), surfaceFeature.##).abs
+        if(!seenSet.addOrSeen(hf)) {
+          -1
+        } else {
+          (hf % numHashFeatures) + trueSize
+        }
       }
     }
 

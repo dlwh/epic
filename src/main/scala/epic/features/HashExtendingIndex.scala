@@ -1,18 +1,31 @@
 package epic.features
 
 import breeze.util.Index
+import epic.util.{LockableSeenSet, ThreadLocalBloomFilter}
 
 /**
  * TODO
  *
  * @author dlwh
  **/
-class HashExtendingIndex[T](val baseIndex: Index[T], hashWrapper: Int=>T, hashScale: HashFeature.Scale = HashFeature.Relative(1)) extends Index[T] {
+class HashExtendingIndex[T](val baseIndex: Index[T],
+                            hashWrapper: Int=>T,
+                            hashScale: HashFeature.Scale = HashFeature.Relative(1),
+                            // we expect ~1 million features, 8MB gives about a 2% error rate
+                            //= new ThreadLocalBloomFilter(8 * 1024 * 1024, 6)
+                            cache: LockableSeenSet[Int] = LockableSeenSet.always) extends Index[T] {
   val numHashFeatures = hashScale.numFeatures(baseIndex.size)
   override def size: Int = baseIndex.size + numHashFeatures
 
+  def lock = new HashExtendingIndex(baseIndex, hashWrapper, hashScale, cache.lock)
+
   def apply(t: T): Int = baseIndex(t) match {
-    case -1 => t.##.abs % numHashFeatures + baseIndex.size
+    case -1 =>
+      val code = t.##.abs
+      if(!cache.addOrSeen(code))
+        -1
+      else
+        t.##.abs % numHashFeatures + baseIndex.size
     case x => x
   }
 
