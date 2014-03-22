@@ -10,6 +10,7 @@ import scala.collection.JavaConverters._
  *
  * @author dlwh
  **/
+@SerialVersionUID(1L)
 class ThreadLocalBloomFilter[@specialized(Int, Long) T](numBuckets: Int, numHashFunctions: Int) extends LockableSeenSet[T] {
   private val tl = new ThreadLocal[BloomFilter[T]]() {
     override def initialValue(): BloomFilter[T] = {
