@@ -11,7 +11,7 @@ import scala.collection.JavaConverters._
  * @author dlwh
  **/
 @SerialVersionUID(1L)
-class ThreadLocalBloomFilter[@specialized(Int, Long) T](numBuckets: Int, numHashFunctions: Int) extends LockableSeenSet[T] {
+class ThreadLocalBloomFilter[@specialized(Int, Long) T](numBuckets: Int, numHashFunctions: Int) extends LockableSeenSet[T] with SafeLogging {
   private val tl = new ThreadLocal[BloomFilter[T]]() {
     override def initialValue(): BloomFilter[T] = {
       val bf = new BloomFilter[T](numBuckets, numHashFunctions)
@@ -27,6 +27,10 @@ class ThreadLocalBloomFilter[@specialized(Int, Long) T](numBuckets: Int, numHash
 
   def union:BloomFilter[T] = queue.asScala.reduceLeft(_ | _)
 
-  def lock = new BloomFilterSeenSet[T](union)
+  def lock = {
+    val u = union
+    logger.debug(f"Bloom filter has load of ${u.load}%.3f")
+    new BloomFilterSeenSet[T](u)
+  }
 }
 
