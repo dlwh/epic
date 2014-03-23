@@ -302,6 +302,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
         indexedRefinements,
         xbarGrammar,
         HashFeature.Relative(dummyFeats),
+        false,
         trees)
       new SpanModel[AnnotatedLabel, AnnotatedLabel, String](indexed, indexed.index, annotator.latent, constrainer, xbarGrammar, xbarLexicon, refGrammar, indexedRefinements,featureCounter.get)
     } else {
@@ -315,6 +316,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
         indexedRefinements,
         xbarGrammar,
         HashFeature.Relative(dummyFeats),
+        false,
         trees)
       new SpanModel[AnnotatedLabel, AnnotatedLabel, String](indexed, indexed.index, annotator.latent, constrainer, xbarGrammar, xbarLexicon, refGrammar, indexedRefinements,featureCounter.get)
 
