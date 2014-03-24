@@ -29,7 +29,7 @@ class ThreadLocalBloomFilter[@specialized(Int, Long) T](numBuckets: Int, numHash
 
   def lock = {
     val u = union
-    logger.debug(f"Bloom filter has load of ${u.load}%.3f")
+    logger.info(f"Bloom filter has load of ${u.load}%.3f")
     new BloomFilterSeenSet[T](u)
   }
 }

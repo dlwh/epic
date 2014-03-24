@@ -8,6 +8,8 @@ import scala.util.hashing.MurmurHash3
 import scala.collection.mutable.ArrayBuffer
 import epic.util.{LockableSeenSet, Arrays}
 import epic.parser.features.LabelFeature
+import com.typesafe.scalalogging.slf4j.{Logging, Logger}
+import epic.util.SafeLogging
 
 case class CrossProductFeature[A, B](labelPart: A, surfacePart: B, id: String = "") extends Feature {
   override def toString = s"${if(id.nonEmpty) id else "CrossProduct"}Feature($labelPart, $surfacePart)"
@@ -118,7 +120,7 @@ object CrossProductIndex {
                       hashFeatures: HashFeature.Scale = HashFeature.Absolute(0),
                       id: String = "CrossProductIndex",
                       val includeLabelOnlyFeatures: Boolean = true,
-                      seenSet: LockableSeenSet[Int] = LockableSeenSet.always) {
+                      seenSet: LockableSeenSet[Long] = LockableSeenSet.always) extends SafeLogging {
     private val mapping = Array.fill(firstIndex.size)(new OpenAddressHashArray[Int](secondIndex.size max 1, -1, 4))
     private val labelPart, surfacePart = new ArrayBuffer[Int]()
     private val labelOnlySize: Int = if(includeLabelOnlyFeatures) firstIndex.size else 0
@@ -134,15 +136,19 @@ object CrossProductIndex {
     }
 
     def add(first: Int, second: Int):Int = {
-      val currentIndex: Int = mapping(first)(second)
-      if(currentIndex == -1) {
-        val x = size
-        mapping(first)(second) = x
-        labelPart += first
-        surfacePart += second
-        x
+      if(first < 0 || second < 0) {
+        -1
       } else {
-        currentIndex
+        val currentIndex: Int = mapping(first)(second)
+        if(currentIndex == -1) {
+          val x = size
+          mapping(first)(second) = x
+          labelPart += first
+          surfacePart += second
+          x
+        } else {
+          currentIndex
+        }
       }
     }
 
@@ -152,7 +158,7 @@ object CrossProductIndex {
         mapping,
         labelPart.toArray, surfacePart.toArray,
         id, includeLabelOnlyFeatures,
-        hashFeatures.numFeatures(labelPart.length))
+        hashFeatures.numFeatures(labelPart.length), seenSet)
     }
   }
 

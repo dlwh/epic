@@ -21,5 +21,7 @@ object HashFeature {
     def numFeatures(nonHashFeatures: Int): Int = (scale * nonHashFeatures).toInt
   }
 
+  val None = Absolute(0)
+
 }
 

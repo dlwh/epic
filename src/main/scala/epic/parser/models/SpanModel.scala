@@ -250,7 +250,7 @@ object IndexedSpanFeaturizer {
                         filterUnseenFeatures: Boolean,
                         trees: Traversable[TreeInstance[L, W]]): IndexedSpanFeaturizer[L, L2, W] = {
 
-    def seenSet =  if(filterUnseenFeatures) new ThreadLocalBloomFilter[Int](8 * 1024 * 1024, 5) else AlwaysSeenSet
+    def seenSet =  if(filterUnseenFeatures) new ThreadLocalBloomFilter[Long](8 * 1024 * 1024, 5) else AlwaysSeenSet
 
     val spanBuilder = new CrossProductIndex.Builder(featurizer.index, surfaceFeaturizer.featureIndex, dummyFeatScale, seenSet = seenSet)
     val wordBuilder = new CrossProductIndex.Builder(featurizer.index, wordFeaturizer.featureIndex, dummyFeatScale, seenSet = seenSet, includeLabelOnlyFeatures = false)

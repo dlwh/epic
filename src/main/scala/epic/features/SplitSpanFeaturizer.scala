@@ -125,7 +125,7 @@ object SplitSpanFeaturizer {
         case MarkerPos(i, true) => begin + i
         case MarkerPos(i, false) => end + i
         case _: SplitPointMarker => split
-        case _ => error("....")
+        case _ => ???
       }
     }
 
@@ -274,11 +274,12 @@ object IndexedSplitSpanFeaturizer {
         case t@BinaryTree(a, b, c, span) =>
           wspec.featuresForSpan(span.begin, span.end).foreach(index.index)
           wspec.featuresForSplit(span.begin, t.splitPoint, span.end).foreach(index.index)
-        case _ =>
+        case t =>
+          wspec.featuresForSpan(t.span.begin, t.span.end).foreach(index.index)
       }
     }
 
-    new BasicIndexedSplitSpanFeaturizer(f, new HashExtendingIndex(index, HashFeature(_), hashFeatures))
+    new BasicIndexedSplitSpanFeaturizer(f, if(hashFeatures.numFeatures(index.size) != 0) new HashExtendingIndex(index, HashFeature(_), hashFeatures) else index)
   }
 
   class BasicIndexedSplitSpanFeaturizer[W](f: SplitSpanFeaturizer[W], val featureIndex: Index[Feature]) extends IndexedSplitSpanFeaturizer[W] with Serializable {

@@ -98,5 +98,5 @@ assemblyOption in assembly ~= { _.copy(cacheOutput = false) }
 
 
 excludedJars in assembly <<= (fullClasspath in assembly) map { cp =>
- cp filter {_.data.getName.matches("sbt.*")}
+ cp filter {x => x.data.getName.matches("sbt.*") || x.data.getName.matches(".*macros.*")}
 }
