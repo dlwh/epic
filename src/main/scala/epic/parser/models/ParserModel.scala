@@ -31,7 +31,7 @@ trait ParserModel[L, W] extends epic.framework.StandardExpectedCounts.Model[Tree
   type Scorer = RefinedAnchoring[L, W]
 
   def extractParser(weights: DenseVector[Double]) = {
-    val inf = inferenceFromWeights(weights)
+    val inf = inferenceFromWeights(weights).forTesting
     Parser(inf.baseMeasure, inf.grammar, ChartDecoder[L, W]())
   }
 
@@ -47,6 +47,8 @@ trait ParserInference[L, W] extends ProjectableInference[TreeInstance[L, W], Cor
 
   def grammar: RefinedGrammar[L, W]
   def baseMeasure: CoreGrammar[L, W]
+
+  def forTesting: ParserInference[L, W] = this
 
 
   def scorer(v: TreeInstance[L, W]): Scorer = {

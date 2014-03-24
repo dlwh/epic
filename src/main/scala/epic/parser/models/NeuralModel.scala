@@ -1,39 +1,19 @@
 package epic.parser.models
 
-import epic.framework.{Inference, StandardExpectedCounts, Feature}
-import breeze.util.Index
-import epic.features._
-import epic.parser.models.NeuralModel._
-import breeze.linalg._
-import epic.parser._
-import epic.lexicon.Lexicon
-import epic.trees._
-import breeze.numerics.sigmoid
-import breeze.features.FeatureVector
+import breeze.collection.mutable.TriangularArray
 import breeze.config.Help
-import epic.trees.annotations.{Xbarize, TreeAnnotator, FilterAnnotations}
-import java.io.File
-import epic.util.CacheBroker
-import epic.parser.projections.GrammarRefinements
-import scala.runtime.ScalaRunTime
+import breeze.features.FeatureVector
+import breeze.linalg._
 import epic.dense._
 import epic.features.SplitSpanFeaturizer.ZeroSplitSpanFeaturizer
-import breeze.collection.mutable.TriangularArray
-import epic.trees.BinaryRule
-import epic.trees.TreeInstance
-import epic.features.SplitSpanFeaturizer.ZeroSplitSpanFeaturizer
-import epic.parser.ExpectedCounts
-import epic.trees.annotations.Xbarize
-import epic.parser.models.AnnotatedParserInference
-import epic.parser.models.NeuralInference
-import epic.trees.BinaryRule
-import epic.trees.UnaryRule
-import epic.trees.TreeInstance
-import epic.features.SplitSpanFeaturizer.ZeroSplitSpanFeaturizer
-import epic.parser.ExpectedCounts
-import epic.trees.annotations.Xbarize
-import epic.parser.models.AnnotatedParserInference
-import epic.parser.models.NeuralInference
+import epic.features._
+import epic.framework.{StandardExpectedCounts, Feature}
+import epic.lexicon.Lexicon
+import epic.parser._
+import epic.trees._
+import epic.trees.annotations.{Xbarize, TreeAnnotator}
+import java.io.File
+import epic.parser.projections.GrammarRefinements
 
 /**
  * The neural model is really just a
@@ -95,6 +75,7 @@ case class NeuralInference[L, L2, W](baseInference: LatentParserInference[L, L2,
                                  surfaceFeaturizer: IndexedSplitSpanFeaturizer[W],
                                  lastLayerWeights: DenseMatrix[Double],
                                  layer: Transform[FeatureVector, DenseVector[Double]]#Layer) extends ParserInference[L, W] {
+  override def forTesting = copy(baseInference.forTesting, labelFeaturizer.forTesting)
 
 
   def goldMarginal(scorer: Scorer, ti: TreeInstance[L, W], aug: CoreAnchoring[L, W]): Marginal = {
@@ -321,6 +302,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
         indexedRefinements,
         xbarGrammar,
         HashFeature.Relative(dummyFeats),
+        false,
         trees)
       new SpanModel[AnnotatedLabel, AnnotatedLabel, String](indexed, indexed.index, annotator.latent, constrainer, xbarGrammar, xbarLexicon, refGrammar, indexedRefinements,featureCounter.get)
     } else {
@@ -334,6 +316,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
         indexedRefinements,
         xbarGrammar,
         HashFeature.Relative(dummyFeats),
+        false,
         trees)
       new SpanModel[AnnotatedLabel, AnnotatedLabel, String](indexed, indexed.index, annotator.latent, constrainer, xbarGrammar, xbarLexicon, refGrammar, indexedRefinements,featureCounter.get)
 

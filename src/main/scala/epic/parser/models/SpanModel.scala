@@ -30,7 +30,7 @@ import breeze.config.Help
 import epic.lexicon.Lexicon
 import epic.features._
 import epic.features.HashFeature
-import epic.util.{Arrays, CacheBroker}
+import epic.util.{AlwaysSeenSet, ThreadLocalBloomFilter, Arrays, CacheBroker}
 import epic.trees.annotations.FilterAnnotations
 import com.typesafe.scalalogging.slf4j.Logging
 import epic.trees.annotations.MarkPreterminals
@@ -116,7 +116,8 @@ class DotProductGrammar[L, L2, W, Feature](val grammar: BaseGrammar[L],
   }
 }
 
-class IndexedSpanFeaturizer[L, L2, W](wordFeatureIndex: CrossProductIndex[Feature, Feature],
+@SerialVersionUID(1L)
+case class IndexedSpanFeaturizer[L, L2, W](wordFeatureIndex: CrossProductIndex[Feature, Feature],
                                       spanFeatureIndex: CrossProductIndex[Feature, Feature],
                                       ruleAndSpansFeatureIndex: Index[Feature],
                                       labelFeaturizer: RefinedFeaturizer[L, W, Feature],
@@ -126,6 +127,7 @@ class IndexedSpanFeaturizer[L, L2, W](wordFeatureIndex: CrossProductIndex[Featur
                                       refinements: GrammarRefinements[L, L2],
                                       grammar: BaseGrammar[L]) extends RefinedFeaturizer[L, W, Feature] with Serializable {
 
+  def lock = copy(wordFeatureIndex.lock, spanFeatureIndex.lock)
 
   val index = SegmentedIndex(wordFeatureIndex, spanFeatureIndex, ruleAndSpansFeatureIndex)
   println("Total index size: " + index.size + ", " + wordFeatureIndex.size + " word feats, " + spanFeatureIndex.size +
@@ -245,11 +247,14 @@ object IndexedSpanFeaturizer {
                         refinements: GrammarRefinements[L, L2],
                         grammar: BaseGrammar[L],
                         dummyFeatScale: HashFeature.Scale,
+                        filterUnseenFeatures: Boolean,
                         trees: Traversable[TreeInstance[L, W]]): IndexedSpanFeaturizer[L, L2, W] = {
 
-    val spanBuilder = new CrossProductIndex.Builder(featurizer.index, surfaceFeaturizer.featureIndex, dummyFeatScale)
-    val wordBuilder = new CrossProductIndex.Builder(featurizer.index, wordFeaturizer.featureIndex, dummyFeatScale, includeLabelOnlyFeatures = false)
-    val ruleAndSpansIndex = Index[Feature];
+    def seenSet =  if(filterUnseenFeatures) new ThreadLocalBloomFilter[Int](8 * 1024 * 1024, 5) else AlwaysSeenSet
+
+    val spanBuilder = new CrossProductIndex.Builder(featurizer.index, surfaceFeaturizer.featureIndex, dummyFeatScale, seenSet = seenSet)
+    val wordBuilder = new CrossProductIndex.Builder(featurizer.index, wordFeaturizer.featureIndex, dummyFeatScale, seenSet = seenSet, includeLabelOnlyFeatures = false)
+    val ruleAndSpansIndex = Index[Feature]
 
     for(ti <- trees) {
       val spec = featurizer.anchor(ti.words)
@@ -290,8 +295,8 @@ object IndexedSpanFeaturizer {
       }
 
     }
-    val ruleAndSpansIndexExtended = new HashExtendingIndex(ruleAndSpansIndex, HashFeature(_));
-    new IndexedSpanFeaturizer(wordBuilder.result, spanBuilder.result(), ruleAndSpansIndex, featurizer, wordFeaturizer, surfaceFeaturizer, ruleAndSpansFeaturizer, refinements, grammar)
+    val ruleAndSpansIndexExtended = new HashExtendingIndex(ruleAndSpansIndex, HashFeature(_), dummyFeatScale, seenSet)
+    new IndexedSpanFeaturizer(wordBuilder.result(), spanBuilder.result(), ruleAndSpansIndex, featurizer, wordFeaturizer, surfaceFeaturizer, ruleAndSpansFeaturizer, refinements, grammar)
   }
 }
 
@@ -471,6 +476,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
       indexedRefinements,
       xbarGrammar,
       if(dummyFeats < 0) HashFeature.Absolute(-dummyFeats.toInt) else HashFeature.Relative(dummyFeats),
+      true,
       trainTrees)
 
     val featureCounter = readWeights(oldWeights)
@@ -669,6 +675,7 @@ case class LatentSpanModelFactory(inner: SpanModelFactory,
       finalRefinements,
       xbarGrammar,
       if(dummyFeats < 0) HashFeature.Absolute(-dummyFeats.toInt) else HashFeature.Relative(dummyFeats),
+      true,
       trainTrees)
 
     val featureCounter = this.readWeights(oldWeights)

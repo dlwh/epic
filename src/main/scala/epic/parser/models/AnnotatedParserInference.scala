@@ -37,6 +37,8 @@ case class AnnotatedParserInference[L, W](featurizer: RefinedFeaturizer[L, W, Fe
                                           baseMeasure: CoreGrammar[L, W]) extends ParserInference[L, W] {
 
 
+  override def forTesting = copy(featurizer.forTesting)
+
   def goldMarginal(scorer: Scorer, ti: TreeInstance[L, W], aug: CoreAnchoring[L, W]): Marginal = {
     import ti._
     val annotated = annotator(tree, words)

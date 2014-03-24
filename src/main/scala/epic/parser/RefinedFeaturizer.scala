@@ -26,7 +26,10 @@ import epic.framework.Feature
  */
 
 trait RefinedFeaturizer[L, W, Feat]  {
+
   def index: Index[Feat]
+
+  def forTesting = lock
   
   def anchor(words: IndexedSeq[W]):Anchoring
   
@@ -37,5 +40,7 @@ trait RefinedFeaturizer[L, W, Feat]  {
     def featuresForUnaryRule(begin: Int, end: Int, rule: Int, ref: Int):Array[Int]
     def featuresForSpan(begin: Int, end: Int, tag: Int, ref: Int):Array[Int]
   }
+
+  def lock: RefinedFeaturizer[L, W, Feat]
 
 }

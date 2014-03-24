@@ -6,13 +6,12 @@ import scala.runtime.ScalaRunTime
 import breeze.linalg._
 import breeze.linalg.operators.OpMulMatrix
 import breeze.numerics._
-import breeze.linalg.support.CanAxpy
 import epic.features.SegmentedIndex
 
 
 case class AffineTransform[FV, Mid](numOutputs: Int, numInputs: Int, innerTransform: Transform[FV, Mid], includeBias: Boolean = true)
                               (implicit mult: OpMulMatrix.Impl2[DenseMatrix[Double], Mid, DenseVector[Double]],
-                               canaxpy: CanAxpy[Double, Mid, DenseVector[Double]]) extends Transform[FV, DenseVector[Double]] {
+                               canaxpy: scaleAdd.InPlaceImpl3[DenseVector[Double], Double, Mid]) extends Transform[FV, DenseVector[Double]] {
 
 
   val index = SegmentedIndex(new AffineTransform.Index(numOutputs, numInputs, includeBias), innerTransform.index)
@@ -73,7 +72,7 @@ case class AffineTransform[FV, Mid](numOutputs: Int, numInputs: Int, innerTransf
 
 object AffineTransform {
   def typed[FV](numOutputs: Int, numInputs: Int, includeBias: Boolean)(implicit mult: OpMulMatrix.Impl2[DenseMatrix[Double], FV, DenseVector[Double]],
-                                                                    canAxpy: CanAxpy[Double, FV, DenseVector[Double]]) = new AffineTransform(numOutputs, numInputs, new IdentityTransform[FV], includeBias)
+                                                                    canAxpy: scaleAdd.InPlaceImpl3[DenseVector[Double], Double, FV]) = new AffineTransform(numOutputs, numInputs, new IdentityTransform[FV], includeBias)
   def apply(numOutputs: Int, numInputs: Int, includeBias: Boolean):AffineTransform[DenseVector[Double], DenseVector[Double]] = apply(numOutputs, numInputs, new IdentityTransform[DenseVector[Double]], includeBias)
   def apply(numOutputs: Int, numInputs: Int):AffineTransform[DenseVector[Double], DenseVector[Double]]  = apply(numOutputs, numInputs, true)
   case class Index(numOutputs: Int, numInputs: Int, includeBias: Boolean = true) extends breeze.util.Index[Feature] {

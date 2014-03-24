@@ -3,14 +3,13 @@ package epic.dense
 import breeze.linalg._
 import breeze.linalg.operators.OpMulMatrix
 import breeze.numerics._
-import breeze.linalg.support.CanAxpy
 
 
 case class TanhTransform[FV](inner: Transform[FV, DenseVector[Double]]) extends Transform[FV, DenseVector[Double]] {
   def this(numOutputs: Int, numInputs: Int,
            includeBias: Boolean = true)
           (implicit mult: OpMulMatrix.Impl2[DenseMatrix[Double], FV, DenseVector[Double]],
-           canaxpy: CanAxpy[Double, FV, DenseVector[Double]])  = this(AffineTransform.typed(numOutputs, numInputs, includeBias))
+           canaxpy: scaleAdd.InPlaceImpl3[DenseVector[Double], Double, FV])  = this(AffineTransform.typed(numOutputs, numInputs, includeBias))
 
   val index: inner.index.type = inner.index
 

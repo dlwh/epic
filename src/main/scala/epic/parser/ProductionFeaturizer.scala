@@ -29,7 +29,7 @@ import epic.parser.features.IndicatorFeature
 @SerialVersionUID(1L)
 class ProductionFeaturizer[L, L2, W](val grammar: BaseGrammar[L], refinements: GrammarRefinements[L, L2],
                                      lGen: L2=>Seq[Feature] = {(x:L2)=>if(x.isInstanceOf[Feature]) Seq(x.asInstanceOf[Feature]) else Seq(IndicatorFeature(x))},
-                                     rGen: Rule[L2] => Seq[Feature] = {(x: Rule[L2]) => Seq(x)}  ) extends RefinedFeaturizer[L, W, Feature] with Serializable{
+                                     rGen: Rule[L2] => Seq[Feature] = {(x: Rule[L2]) => Seq(x)}  ) extends RefinedFeaturizer[L, W, Feature] with Serializable {
 
   private val (index_ :Index[Feature], ruleFeatures: Array[Array[Int]], labelFeatures: Array[Array[Int]]) = {
     val index = Index[Feature]()
@@ -47,6 +47,8 @@ class ProductionFeaturizer[L, L2, W](val grammar: BaseGrammar[L], refinements: G
 
   def featuresForLabel(l: Int): Array[Int] = labelFeatures(l)
 
+
+  override def lock: RefinedFeaturizer[L, W, Feature] = this
 
   def anchor(w: IndexedSeq[W]) = new Anchoring {
     val words = w
