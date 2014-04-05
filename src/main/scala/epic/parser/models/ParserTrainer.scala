@@ -19,8 +19,8 @@ import epic.framework._
 import epic.parser._
 import breeze.linalg._
 import breeze.optimize._
-import epic.trees.AnnotatedLabel
-import breeze.config.Help
+import epic.trees.{ProcessedTreebank, AnnotatedLabel, TreeInstance}
+import breeze.config.{CommandLineParser, Help}
 import com.typesafe.scalalogging.slf4j.Logging
 import epic.parser.projections.{GrammarRefinements, ConstraintCoreGrammarAdaptor, OracleParser, ParserChartConstraintsFactory}
 import epic.util.CacheBroker
@@ -30,10 +30,11 @@ import epic.trees.annotations._
 import java.io.File
 import epic.constraints.CachedChartConstraintsFactory
 import breeze.util.Implicits._
-import epic.trees.TreeInstance
 import breeze.optimize.FirstOrderMinimizer.OptParams
 import epic.parser.HammingLossAugmentation
 import epic.parser.ParseEval.Statistics
+import epic.features.LongestFrequentSuffixFeaturizer.LongestFrequentSuffix
+import epic.features.LongestFrequentSuffixFeaturizer
 
 
 /**
@@ -171,4 +172,27 @@ object ParserTrainer extends epic.parser.ParserPipeline with Logging {
     }
     
   }
+}
+
+
+object Suffixes extends Logging {
+  def main(args: Array[String]):Unit = {
+    val tb = CommandLineParser.readIn[ProcessedTreebank](args)
+
+    val counts = GenerativeParser.extractCounts(tb.trainTrees)._1
+
+    val marginalized: Counter[String, Double] = sum(counts(::, *))
+
+    val lfs = LongestFrequentSuffixFeaturizer(marginalized)
+
+    for(ti <- tb.trainTrees) {
+      val suffixes = lfs.lookupSentence(ti.words)
+      println("original: " +  ti.words.mkString(" "))
+      println("suffixes: " +  suffixes.mkString(" "))
+    }
+
+
+  }
+
+
 }

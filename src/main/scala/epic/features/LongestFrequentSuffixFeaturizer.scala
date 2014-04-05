@@ -22,6 +22,14 @@ class LongestFrequentSuffixFeaturizer private (fixedMap: Map[String, Feature],
   }
 
 
+
+  def lookupSentence(sent: IndexedSeq[String]) = {
+    sent.map(w => fixedMap.getOrElse(w, LongestFrequentSuffix(lookup(w))) match {
+      case LongestFrequentSuffix(s) => "-" + s
+      case IndicatorFeature(w) => w
+    })
+  }
+
   private def lookup(x: String):String = {
     (x).tails.find(suffixCounts(_) >= commonWordThreshold).getOrElse("-UNK-")
   }
