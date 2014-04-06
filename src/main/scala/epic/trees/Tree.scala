@@ -337,11 +337,11 @@ object Trees {
    * @tparam L type of the tree
    * @return
    */
-  def annotateParentsBinarized[L](tree: BinarizedTree[L], join: (L,Seq[L])=>L, isIntermediate: L=>Boolean, dontAnnotate: L=>Boolean, depth: Int):BinarizedTree[L] = {
+  def annotateParentsBinarized[L](tree: BinarizedTree[L], join: (L,Seq[L])=>L, isIntermediate: L=>Boolean, dontAnnotate: Tree[L]=>Boolean, depth: Int):BinarizedTree[L] = {
     val ot = tree
     def rec(tree: BinarizedTree[L], history: List[L] = List.empty):BinarizedTree[L] = {
       import tree._
-      val newLabel = if(dontAnnotate(label)) {
+      val newLabel = if(dontAnnotate(tree)) {
         label
       } else if(isIntermediate(label)) {
         assert(history.length > 1, history + " " + tree)
@@ -371,7 +371,7 @@ object Trees {
   }
 
   def annotateParentsBinarized(tree: BinarizedTree[String], depth: Int):BinarizedTree[String] = {
-    annotateParentsBinarized(tree,{(x:String,b:Seq[String])=>b.foldLeft(x)(_ + '^' + _)},(_:String).startsWith("@"), {(l: String) => l.nonEmpty && l != "$" && !l.head.isLetterOrDigit && l != "."}, depth)
+    annotateParentsBinarized(tree,{(x:String,b:Seq[String])=>b.foldLeft(x)(_ + '^' + _)},(_:String).startsWith("@"), {(l: Tree[String]) => l.label.nonEmpty && l != "$" && !l.label.head.isLetterOrDigit && l.label != "."}, depth)
   }
 
   object Transforms {
