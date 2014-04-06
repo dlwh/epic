@@ -250,7 +250,7 @@ object IndexedSpanFeaturizer {
                         filterUnseenFeatures: Boolean,
                         trees: Traversable[TreeInstance[L, W]]): IndexedSpanFeaturizer[L, L2, W] = {
 
-    def seenSet =  if(filterUnseenFeatures) new ThreadLocalBloomFilter[Long](8 * 1024 * 1024, 5) else AlwaysSeenSet
+    def seenSet =  if(filterUnseenFeatures) new ThreadLocalBloomFilter[Long](8 * 1024 * 1024 * 50, 3) else AlwaysSeenSet
 
     val spanBuilder = new CrossProductIndex.Builder(featurizer.index, surfaceFeaturizer.featureIndex, dummyFeatScale, seenSet = seenSet)
     val wordBuilder = new CrossProductIndex.Builder(featurizer.index, wordFeaturizer.featureIndex, dummyFeatScale, seenSet = seenSet, includeLabelOnlyFeatures = false)
@@ -450,7 +450,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
       featurizer
     }
     val indexedWord = IndexedWordFeaturizer.fromData(wf, annTrees.map{_.words})
-    val surface = IndexedSplitSpanFeaturizer.fromData(span, annTrees)
+    val surface = IndexedSplitSpanFeaturizer.fromData(span, annTrees, bloomFilter = false)
     
     
     def labelFeaturizer(l: AnnotatedLabel) = Set(l, l.baseAnnotatedLabel).toSeq
@@ -476,7 +476,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
       indexedRefinements,
       xbarGrammar,
       if(dummyFeats < 0) HashFeature.Absolute(-dummyFeats.toInt) else HashFeature.Relative(dummyFeats),
-      true,
+      filterUnseenFeatures = false,
       trainTrees)
 
     val featureCounter = readWeights(oldWeights)
@@ -675,7 +675,8 @@ case class LatentSpanModelFactory(inner: SpanModelFactory,
       finalRefinements,
       xbarGrammar,
       if(dummyFeats < 0) HashFeature.Absolute(-dummyFeats.toInt) else HashFeature.Relative(dummyFeats),
-      true,
+//      filterUnseenFeatures = true,
+      filterUnseenFeatures = false,
       trainTrees)
 
     val featureCounter = this.readWeights(oldWeights)

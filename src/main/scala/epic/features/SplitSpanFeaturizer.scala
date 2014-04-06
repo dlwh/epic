@@ -6,7 +6,7 @@ import epic.trees.BinaryTree
 import epic.trees.TreeInstance
 import epic.features.WordFeaturizer.Modifier
 import epic.features.SplitSpanFeaturizer.{ProductSplitSpanFeaturizer, SumSplitSpanFeaturizer}
-import epic.util.Arrays
+import epic.util.{AlwaysSeenSet, ThreadLocalBloomFilter, Arrays}
 import epic.features.SurfaceFeaturizer.MarkerPos
 import scala.collection.mutable.ArrayBuffer
 
@@ -266,7 +266,9 @@ trait IndexedSplitSpanFeatureAnchoring[W]  extends IndexedSurfaceAnchoring[W] {
 object IndexedSplitSpanFeaturizer {
   def fromData[L, W](f: SplitSpanFeaturizer[W],
                      trees: IndexedSeq[TreeInstance[L, W]],
-                     hashFeatures: HashFeature.Scale = HashFeature.Relative(1.0)):IndexedSplitSpanFeaturizer[W] =  {
+                     hashFeatures: HashFeature.Scale = HashFeature.Relative(1.0),
+                     bloomFilter: Boolean = false):IndexedSplitSpanFeaturizer[W] =  {
+    def seenSet =  if(bloomFilter) new ThreadLocalBloomFilter[Long](8 * 1024 * 1024 * 50, 3) else AlwaysSeenSet
     val index = Index[Feature]()
     for (ti <- trees) {
       val wspec = f.anchor(ti.words)
@@ -279,7 +281,7 @@ object IndexedSplitSpanFeaturizer {
       }
     }
 
-    new BasicIndexedSplitSpanFeaturizer(f, if(hashFeatures.numFeatures(index.size) != 0) new HashExtendingIndex(index, HashFeature(_), hashFeatures) else index)
+    new BasicIndexedSplitSpanFeaturizer(f, if(hashFeatures.numFeatures(index.size) != 0) new HashExtendingIndex(index, HashFeature(_), hashFeatures, seenSet) else index)
   }
 
   class BasicIndexedSplitSpanFeaturizer[W](f: SplitSpanFeaturizer[W], val featureIndex: Index[Feature]) extends IndexedSplitSpanFeaturizer[W] with Serializable {

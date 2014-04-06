@@ -30,9 +30,21 @@ class CrossProductIndex[A, B] private (val firstIndex: Index[A],
                                        val numHashFeatures: Int=0,
                                        seenSet: LockableSeenSet[Long] = LockableSeenSet.always) extends Index[Feature] with Serializable {
 
-  def lock = new CrossProductIndex(firstIndex, secondIndex, mapping, labelPartOfFeature,
+  def lock = {
+    val lockedFirst: Index[A] = firstIndex match {
+      case x: HashExtendingIndex[A] => x.lock
+      case _ => firstIndex
+    }
+
+    val lockedSecond: Index[B] = secondIndex match {
+      case x: HashExtendingIndex[B] => x.lock
+      case _ => secondIndex
+    }
+
+    new CrossProductIndex(lockedFirst, lockedSecond, mapping, labelPartOfFeature,
                                    surfacePartOfFeature, id, includePlainLabelFeatures,
                                    numHashFeatures, seenSet.lock)
+  }
 
   def apply(t: Feature): Int = t match {
     case CrossProductFeature(a,b, `id`) =>

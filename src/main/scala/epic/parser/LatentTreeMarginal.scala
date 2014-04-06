@@ -144,6 +144,9 @@ case class LatentTreeMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
                 val ruleScore =  cScores(ci) * math.exp(score) // exp!
                 sum += ruleScore
                 assert(!ruleScore.isNaN)
+                if(score != Double.NegativeInfinity && math.exp(score) == 0.0) {
+                  println("Underflow!!!")
+                }
                 if(ruleScore != 0.0) {
                   foundOne = true
                 }
