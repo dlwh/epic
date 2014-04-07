@@ -130,7 +130,7 @@ case class ParentAnnotatePosTags[W](order: Int = 1,  skipPunctTags: Boolean = tr
       def join(base: AnnotatedLabel, parent: Seq[AnnotatedLabel]) = {
         base.copy(parents = parent.map(_.label).toIndexedSeq)
       }
-      Trees.annotateParentsBinarized(tree, join, {(_:AnnotatedLabel).isIntermediate}, {(l:Tree[AnnotatedLabel])=> !(l.isLeaf || l.children.length == 1 && l.children.head.label.label == l.label.label)  || l.label.label.isEmpty || (l.label.label.head != '@' && !l.label.label.head.isLetterOrDigit)}, order)
+      Trees.annotateParentsBinarized(tree, join, {(_:AnnotatedLabel).isIntermediate}, {(l:Tree[AnnotatedLabel])=> !(l.isLeaf || l.children.length == 1 && l.children.head.label.label == l.label.label && l.span.length == 1)  || l.label.label.isEmpty || (l.label.label.head != '@' && !l.label.label.head.isLetterOrDigit)}, order)
     }
   }
 

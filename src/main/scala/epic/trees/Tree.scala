@@ -359,7 +359,7 @@ object Trees {
           BinaryTree(newLabel, lchild, rchild, span)
         case u@UnaryTree(label, child, chain, span) =>
           if(isIntermediate(label)) assert(history.nonEmpty, ot.toString(true) + "\n" + u.toString(true) )
-          if(isIntermediate(label)) assert(label != newLabel, label + " " + newLabel + " " + u + " " + history)
+          //if(isIntermediate(label)) assert(label != newLabel, label + " " + newLabel + " " + u + " " + history)
           val newHistory = if(!isIntermediate(label) && label != child.label) (label :: history) else history
           UnaryTree(newLabel,rec(child,newHistory), chain, span)
         case NullaryTree(label, span) =>
