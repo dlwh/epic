@@ -45,7 +45,7 @@ class CRFModel[L, W](val featureIndex: Index[Feature],
       def apply(pos: Int, prev: Int, cur: Int, count: Double) {
         val feats = localization.featuresForTransition(pos, prev, cur)
         if(count != 0) assert(feats ne null, (pos, prev, cur, marg.length, marg.anchoring.validSymbols(pos), marg.anchoring.validSymbols(pos-1)))
-        axpy(scale * count, feats, counts.counts)
+        axpy(scale * count, feats, counts)
       }
     }
     marg.visit(visitor)
