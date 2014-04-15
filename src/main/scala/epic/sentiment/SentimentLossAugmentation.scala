@@ -7,7 +7,6 @@ import epic.lexicon.Lexicon
 import scala.collection.immutable.BitSet
 import epic.parser.{CoreGrammar, CoreAnchoring, BaseGrammar}
 import epic.constraints.ChartConstraints
-import epic.everything.LiftedParser.L
 
 /**
  * TODO
