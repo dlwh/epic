@@ -120,14 +120,6 @@ class EPInference[Datum, Augment](val inferences: IndexedSeq[ProjectableInferenc
       val s = iterates.next()
       if (state != null) {
         converged = (s.logPartition - state.logPartition).abs / math.max(s.logPartition, state.logPartition) < 1E-5
-        logger.trace {
-          import epic.everything._
-          if (s.q.isInstanceOf[SentenceBeliefs]) {
-            (iter + " guess " + s.q.asInstanceOf[SentenceBeliefs].maxChange(state.q.asInstanceOf[SentenceBeliefs]) + " " + s.logPartition + " " + state.logPartition)
-          } else {
-            (iter + " guess " + s.q.isConvergedTo(state.q) + " " + s.logPartition + " " + state.logPartition)
-          }
-        }
       }
 
       iter += 1

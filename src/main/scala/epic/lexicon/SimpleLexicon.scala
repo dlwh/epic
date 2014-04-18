@@ -56,10 +56,18 @@ class SimpleLexicon[L, W](val labelIndex: Index[L],
 
 object SimpleLexicon {
   @SerialVersionUID(1L)
-  private class SerializedForm[L, W](labelIndex: Index[L], wordTagCounts: Counter2[L, W, Double], openTagThreshold: Int = 50, closedWordThreshold: Int= 10) extends Serializable {
+  private class SerializedForm[L, W](labelIndex: Index[L], wordTagCounts: Counter2[L, W, Double], openTagThreshold: Int, closedWordThreshold: Int) extends Serializable {
     @throws(classOf[ObjectStreamException])
-    protected def readResolve():Object = {
-      new SimpleLexicon(labelIndex, wordTagCounts, openTagThreshold, closedWordThreshold)
+    private def readResolve():Object = {
+      try {
+        Class.forName("breeze.linalg.Counter$Impl")
+        new SimpleLexicon(labelIndex, wordTagCounts, openTagThreshold, closedWordThreshold)
+      } catch {
+        case ex =>
+        ex.printStackTrace()
+        throw ex
+
+      }
     }
   }
 }

@@ -49,14 +49,14 @@ class SemiCRFModel[L, W](val featurizer: SemiCRFModel.BIEOFeaturizer[L, W],
 
       def visitTransition(prev: Int, cur: Int, begin: Int, end: Int, count: Double) {
         import localization._
-        axpy(count * scale, featuresForBegin(prev, cur, begin), counts.counts)
+        axpy(count * scale, featuresForBegin(prev, cur, begin), counts)
         var p = begin+1
         while (p < end) {
-          axpy(count * scale, featuresForInterior(cur, p), counts.counts)
+          axpy(count * scale, featuresForInterior(cur, p), counts)
           p += 1
         }
 
-        axpy(count * scale, featuresForSpan(prev, cur, begin, end), counts.counts)
+        axpy(count * scale, featuresForSpan(prev, cur, begin, end), counts)
       }
     }
     marg.visit(visitor)

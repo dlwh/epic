@@ -55,15 +55,11 @@ trait CoreGrammar[L, W] extends Serializable {
 }
 
 object CoreGrammar {
-  def identity[L, W](grammar: BaseGrammar[L], lexicon: Lexicon[L, W]):CoreGrammar[L, W] = {
-    val g = grammar
-    val l = lexicon
-    new CoreGrammar[L, W] {
-      def grammar =  g
-      def lexicon = l
+  def identity[L, W](grammar: BaseGrammar[L], lexicon: Lexicon[L, W]):CoreGrammar[L, W] = new IdentityCoreGrammar(grammar, lexicon)
 
-      def anchor(words: IndexedSeq[W]) = CoreAnchoring.identity(grammar, lexicon, words, ChartConstraints.noSparsity[L])
-    }
+  @SerialVersionUID(1L)
+  case class IdentityCoreGrammar[L, W](grammar: BaseGrammar[L], lexicon: Lexicon[L, W]) extends CoreGrammar[L, W] {
+    def anchor(words: IndexedSeq[W]) = CoreAnchoring.identity(grammar, lexicon, words, ChartConstraints.noSparsity[L])
   }
 
   case class ProductGrammar[L, W](g1: CoreGrammar[L, W], g2: CoreGrammar[L, W]) extends CoreGrammar[L, W] {

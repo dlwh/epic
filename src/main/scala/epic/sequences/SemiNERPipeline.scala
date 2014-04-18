@@ -12,7 +12,6 @@ import nak.data.Example
 import breeze.util.Encoder
 import epic.trees.Span
 import breeze.optimize.FirstOrderMinimizer.OptParams
-import epic.coref.Phrases
 import breeze.util.Implicits._
 import epic.util.CacheBroker
 import com.typesafe.scalalogging.slf4j.Logging

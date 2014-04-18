@@ -22,7 +22,7 @@ import epic.trees.annotations._
 import breeze.linalg.Counter2
 import breeze.config.Help
 import epic.parser.ParserParams.XbarGrammar
-import epic.lexicon.{SimpleTagScorer, MaxEntTagScorer, Lexicon, SimpleLexicon}
+import epic.lexicon.{SimpleTagScorer, Lexicon, SimpleLexicon}
 import epic.features._
 import java.io.{FileWriter, BufferedWriter, File}
 import epic.trees._
@@ -140,8 +140,6 @@ object GenerativeTrainer extends ParserPipeline {
                     threads: Int = -1,
                     @Help(text="Use max rule decoding instead of max constituent")
                     maxRule: Boolean = false,
-                    @Help(text="Use the awesome cheating lexicon (slower to train)")
-                    awesomeLexicon: Boolean = false,
                     @Help(text="dump the grammar to a text file")
                     grammarDumpPath: File = null,
                     pruneUnlikelyLongSpans: Boolean  = true
@@ -169,10 +167,7 @@ object GenerativeTrainer extends ParserPipeline {
     logger.info("Num refined symbols:" + refGrammar.labelIndex.size)
 
 
-    val scorer = if(params.awesomeLexicon) {
-      val refLexicon = new SimpleLexicon(refGrammar.labelIndex, wordCounts)
-      MaxEntTagScorer.make(WordFeaturizer.goodPOSTagFeaturizer(wordCounts), refLexicon, transformed)
-    } else {
+    val scorer = {
       new SimpleTagScorer(wordCounts)
     }
 

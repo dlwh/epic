@@ -75,15 +75,15 @@ object ParseMarginal {
                                     scale: Double):AnchoredVisitor[L] = {
     new AnchoredVisitor[L] {
       def visitBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int, score: Double) {
-        axpy(score * scale,  new FeatureVector(spec.featuresForBinaryRule(begin, split, end, rule, ref)), counts.counts)
+        axpy(score * scale,  new FeatureVector(spec.featuresForBinaryRule(begin, split, end, rule, ref)), counts)
       }
 
       def visitUnaryRule(begin: Int, end: Int, rule: Int, ref: Int, score: Double) {
-        axpy(score * scale, new FeatureVector(spec.featuresForUnaryRule(begin, end, rule, ref)), counts.counts)
+        axpy(score * scale, new FeatureVector(spec.featuresForUnaryRule(begin, end, rule, ref)), counts)
       }
 
       def visitSpan(begin: Int, end: Int, tag: Int, ref: Int, score: Double) {
-        axpy(score * scale,  new FeatureVector(spec.featuresForSpan(begin, end, tag, ref)), counts.counts)
+        axpy(score * scale,  new FeatureVector(spec.featuresForSpan(begin, end, tag, ref)), counts)
       }
     }
 

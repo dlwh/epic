@@ -21,7 +21,6 @@ import java.lang.String
 import epic.trees.{Span, AnnotatedLabel, Tree}
 import collection.mutable.{Stack, ArrayBuffer}
 import java.io.File
-import epic.everything._
 import java.nio.charset.MalformedInputException
 
 /**

@@ -17,7 +17,7 @@ class LatentTreeMarginalTest extends FunSuite {
       assert(lmarg.logPartition closeTo marg.logPartition, lmarg.logPartition + " " +marg.logPartition)
       val lcounts = lmarg.expectedRuleCounts
       val counts = lmarg.expectedRuleCounts
-      assert((lcounts.counts - counts.counts).norm(2) < 1E-4 * lcounts.counts.length)
+      assert((lcounts.counts - counts.counts).norm(2) < 1E-4 * lcounts.length)
     }
 
   }
