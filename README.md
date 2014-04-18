@@ -28,7 +28,7 @@ There are 4 kinds of base models you can train, and you can tie them together wi
 
   * epic.parser.models.LatentModelFactory: Latent annotation (like the Berkeley parser)
   * epic.parser.models.LexModelFactory: Lexical annotation (kind of like the Collins parser)
-  * epic.parser.models.StructModelFactory: Structural annotation (king of like the Stanford parser)
+  * epic.parser.models.StructModelFactory: Structural annotation (kind of like the Stanford parser)
   * epic.parser.models.SpanModelFactory: Span features (Petrov 2008 or Finkel 2008, etc.)
 
 These models all have their own options. You can see those by specifying the modelFactory and adding --help: 
