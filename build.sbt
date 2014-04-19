@@ -17,6 +17,7 @@ resolvers ++= Seq(
 libraryDependencies ++= Seq(
   "junit" % "junit" % "4.5" % "test",
   "org.scalanlp" %% "breeze" % "0.8-SNAPSHOT",
+  "org.scalanlp" %% "breeze-config" % "0.8-SNAPSHOT",
   "org.scalanlp" % "chalk" % "1.3.0" intransitive(),
   "org.scalanlp" % "nak" % "1.2.0" intransitive(),
   //"org.scalanlp" %% "breeze-process" % "0.3-SNAPSHOT",
