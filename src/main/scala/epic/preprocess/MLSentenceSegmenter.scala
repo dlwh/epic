@@ -32,6 +32,9 @@ class MLSentenceSegmenter(inf: MLSentenceSegmenter.ClassificationInference) exte
 
 object MLSentenceSegmenter {
 
+  def loadModel(file: File) = {
+    breeze.util.readObject[MLSentenceSegmenter](file)
+  }
 
   def nextPotentialSentenceBoundary(text: String, offset: Int):Int = {
     var start = offset + 1
@@ -243,7 +246,7 @@ object MLSentenceSegmenter {
     val sentenceBoundaryProblems = for(dir <- new File(new File(mascDir,"data"), "written").listFiles()
         if !dir.toString.contains("twitter") && dir.isDirectory;
         f <- dir.listFiles(new FilenameFilter {
-      override def accept(dir: File, name: String): Boolean = name.endsWith(".txt") && !name.startsWith("easy_money") && !name.startsWith("sucker")
+      override def accept(dir: File, name: String): Boolean = name.endsWith(".txt")
     })) yield {
       val slab = MascSlab(f.toURI.toURL)
       val slabWithSentences = MascSlab.s(slab)
@@ -253,9 +256,7 @@ object MLSentenceSegmenter {
       val text = slab.content
       val goldPoints = adjustGoldSentenceBoundaries(text, slabWithSentences.iterator[Sentence].map(_.end))
 
-      if(f.getName.startsWith("detroit")) {
-        printOutSentenceBoundaries(text, guessPoints.toSet, goldPoints)
-      }
+      printOutSentenceBoundaries(text, guessPoints.toSet, goldPoints)
 
       for(guess <- guessPoints) yield {
         SentenceDecisionInstance(goldPoints.contains(guess), featuresForEndPointDetection(slab.content, guess), s"${f.getName}:$guess")
