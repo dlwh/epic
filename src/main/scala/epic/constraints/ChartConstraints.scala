@@ -8,7 +8,7 @@ import org.mapdb.Serializer
 import java.io.{DataOutput, DataInput}
 
 /**
- * Has constraints relevant to building an [[epic.parser.ParseChart]],
+ * Has constraints relevant to building an [[epic.parser.RefinedParseChart]],
  * which is to say [[epic.constraints.LabeledSpanConstraints]] for
  * top and bot cells.
  * @param top constraints for the top symbols of the parsechart

@@ -24,7 +24,7 @@ import epic.constraints.{ChartConstraints, LabeledSpanConstraints}
 import breeze.linalg.{Counter, Counter2}
 
 @SerialVersionUID(4)
-class ParseChart[L](val index: Index[L],
+class RefinedParseChart[L](val index: Index[L],
                              // label => number of refinements
                              refinementsFor: Array[Int],
                              val length: Int,
@@ -39,9 +39,9 @@ class ParseChart[L](val index: Index[L],
    * iteration over "on" elements in an (i, j) index.
    * @author dlwh
    */
-  final class ChartScores private[ParseChart](constraints: LabeledSpanConstraints[L]) {
+  final class ChartScores private[RefinedParseChart](constraints: LabeledSpanConstraints[L]) {
 
-    import ParseChart._
+    import RefinedParseChart._
 
     /** (begin,end) -> label ->  refinement -> score */
     // fill in arrays for spans we might touch
@@ -163,16 +163,16 @@ class ParseChart[L](val index: Index[L],
     }
 
     /** right most place a constituent with label l can begin and end at position i, for right > i. (begin)(sym)(ref) */
-    val rightMostBeginForEnd: Array[Array[Array[Int]]] = ParseChart.makeRefinedExtentArray(length+1, refinementsFor, -1)
+    val rightMostBeginForEnd: Array[Array[Array[Int]]] = RefinedParseChart.makeRefinedExtentArray(length+1, refinementsFor, -1)
 
     /** left most place a constituent with label l can begin and end at position i, for left < i. (begin)(sym)(ref) */
-    val leftMostBeginForEnd = ParseChart.makeRefinedExtentArray(length+1, refinementsFor, length+1)
+    val leftMostBeginForEnd = RefinedParseChart.makeRefinedExtentArray(length+1, refinementsFor, length+1)
 
     /** left most place a constituent with label l--which starts at position i--can end. (end)(sym)(ref) */
-    val leftMostEndForBegin = ParseChart.makeRefinedExtentArray(length+1, refinementsFor, length+1)
+    val leftMostEndForBegin = RefinedParseChart.makeRefinedExtentArray(length+1, refinementsFor, length+1)
 
     /** right-most place a constituent with label l--which starts at position i--can end. (end)(sym)(ref) */
-    val rightMostEndForBegin = ParseChart.makeRefinedExtentArray(length+1, refinementsFor, -1)
+    val rightMostEndForBegin = RefinedParseChart.makeRefinedExtentArray(length+1, refinementsFor, -1)
 
     /** right most place a left constituent with label l can begin and end at position i. (begin)(sym) */
     val coarseRightMostBeginForEnd = makeCoarseExtentArray(-1)
@@ -226,14 +226,14 @@ class ParseChart[L](val index: Index[L],
 
 
 
-object ParseChart {
+object RefinedParseChart {
 
 
 
   def apply[L](g: Index[L], refinements: Array[Int], length: Int) = logProb(g, refinements, length)
 
   @SerialVersionUID(1)
-  trait Factory[+Chart[X]<:ParseChart[X]] extends Serializable {
+  trait Factory[+Chart[X]<:RefinedParseChart[X]] extends Serializable {
     def apply[L](g: Index[L], refinements: Array[Int], length: Int):Chart[L] = {
       apply[L](g, refinements, length, ChartConstraints.noSparsity[L])
     }
@@ -241,9 +241,9 @@ object ParseChart {
     def apply[L](g: Index[L], refinements: Array[Int], length: Int, sparsity: ChartConstraints[L]):Chart[L]
   }
 
-  object logProb extends Factory[ParseChart] {
+  object logProb extends Factory[RefinedParseChart] {
     def apply[L](g: Index[L], refinements: Array[Int], length: Int, sparsity: ChartConstraints[L]) = {
-      new ParseChart(g, refinements, length, sparsity)
+      new RefinedParseChart(g, refinements, length, sparsity)
     }
   }
 

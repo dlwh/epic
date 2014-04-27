@@ -38,7 +38,7 @@ case class NoParseException(msg: String, sentence: IndexedSeq[Any], cause: Throw
  * @author dlwh
  */
 trait ChartDecoder[L, W] extends Serializable{
-  def extractBestParse(marginal: ChartMarginal[L, W]):BinarizedTree[L]
+  def extractBestParse(marginal: RefinedChartMarginal[L, W]):BinarizedTree[L]
   def wantsMaxMarginal: Boolean = false
 }
 
@@ -58,11 +58,11 @@ case class ViterbiDecoder[L, W]() extends ChartDecoder[L, W] with Serializable w
 
   override def wantsMaxMarginal: Boolean = true
 
-  override def extractBestParse(marginal: ChartMarginal[L, W]): BinarizedTree[L] = {
+  override def extractBestParse(marginal: RefinedChartMarginal[L, W]): BinarizedTree[L] = {
     extractMaxDerivationParse(marginal).map(_._1)
   }
 
-  def extractMaxDerivationParse(marginal: ChartMarginal[L, W]): BinarizedTree[(L, Int)] = {
+  def extractMaxDerivationParse(marginal: RefinedChartMarginal[L, W]): BinarizedTree[(L, Int)] = {
     assert(marginal.isMaxMarginal, "Viterbi only makes sense for max marginal marginals!")
     import marginal._
     val labelIndex = grammar.labelIndex
@@ -91,9 +91,9 @@ case class ViterbiDecoder[L, W]() extends ChartDecoder[L, W] with Serializable w
       }
 
       if(maxScore == Double.NegativeInfinity) {
-        throw new ParseExtractionException(s"Couldn't find a tree! [$begin,$end) $grammar.labelIndex.get(root)\n" +
-          s"entered things: " + inside.bot.enteredLabelScores(begin, end).map { case (i, v) => (i, v)}.toList, marginal.words)
+        throw new ParseExtractionException(s"Couldn't find a tree! [$begin,$end) ${grammar.labelIndex.get(root)}", words)
       }
+
       val child = buildTree(begin, end, maxChild, maxChildRef)
       UnaryTree(labelIndex.get(root) ->rootRef, child, grammar.chain(maxRule), Span(begin, end))
     }
@@ -106,7 +106,8 @@ case class ViterbiDecoder[L, W]() extends ChartDecoder[L, W] with Serializable w
       var maxRightRef = -1
       var maxSplit = -1
       var maxRule = -1
-      if(begin +1 == end) {
+
+      if(begin + 1 == end) {
         return NullaryTree(labelIndex.get(root) -> rootRef, Span(begin, end))
       }
 
@@ -139,8 +140,7 @@ case class ViterbiDecoder[L, W]() extends ChartDecoder[L, W] with Serializable w
       }
 
       if(maxScore == Double.NegativeInfinity) {
-        throw new ParseExtractionException(s"Couldn't find a tree! [$begin,$end) $grammar.labelIndex.get(root)\n" +
-          s"entered things: " + inside.bot.enteredLabelScores(begin, end).map { case (i, v) => (i, v)}.toList, marginal.words)
+        throw new ParseExtractionException(s"Couldn't find a tree! [$begin,$end) ${grammar.labelIndex.get(root)}\n", marginal.words)
       } else {
         val lchild = buildTreeUnary(begin, maxSplit, maxLeft, maxLeftRef)
         val rchild = buildTreeUnary(maxSplit, end, maxRight, maxRightRef)
@@ -157,7 +157,7 @@ case class ViterbiDecoder[L, W]() extends ChartDecoder[L, W] with Serializable w
 }
 
 abstract class ProjectingChartDecoder[L, W](proj: ChartProjector[L, W]) extends ChartDecoder[L, W] {
-  def extractBestParse(marginal: ChartMarginal[L, W]): BinarizedTree[L] = {
+  def extractBestParse(marginal: RefinedChartMarginal[L, W]): BinarizedTree[L] = {
     val anchoring = proj.project(marginal)
     val newMarg = AugmentedAnchoring.fromCore(anchoring).maxMarginal
     assert(!newMarg.logPartition.isInfinite, marginal.logPartition + " " + newMarg.logPartition)
@@ -191,7 +191,7 @@ case class MaxVariationalDecoder[L, W]() extends ProjectingChartDecoder[L, W](ne
 @SerialVersionUID(2L)
 class MaxConstituentDecoder[L, W] extends ChartDecoder[L, W] {
 
-  def extractBestParse(marginal: ChartMarginal[L, W]): BinarizedTree[L] = {
+  def extractBestParse(marginal: RefinedChartMarginal[L, W]): BinarizedTree[L] = {
 
 
     val length = marginal.length

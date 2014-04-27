@@ -33,7 +33,7 @@ trait AnchoredVisitor[L] {
   def skipUnaryRules: Boolean = false
   /**
    * Should we bother to visit binary rules?
-   * Visiting is *much* faster if you don't for [[epic.parser.ChartMarginal]]
+   * Visiting is *much* faster if you don't for [[epic.parser.RefinedChartMarginal]]
    * @return
    */
   def skipBinaryRules: Boolean = false

@@ -8,17 +8,17 @@ import epic.util.SafeLogging
  *
  * @author dlwh
  **/
-case class EPChartFactory[L, W](grammars: IndexedSeq[RefinedGrammar[L, W]], maxIterations: Int = 5) extends ChartMarginal.Factory[L, W] with SafeLogging {
-  def apply(words: IndexedSeq[W], initialCore: CoreAnchoring[L, W]): ChartMarginal[L, W] = {
+case class EPChartFactory[L, W](grammars: IndexedSeq[RefinedGrammar[L, W]], maxIterations: Int = 5) extends RefinedChartMarginal.Factory[L, W] with SafeLogging {
+  def apply(words: IndexedSeq[W], initialCore: CoreAnchoring[L, W]): RefinedChartMarginal[L, W] = {
     val anchorings = grammars.map(_ anchor words)
 
     if(anchorings.length == 1) {
-      return ChartMarginal(AugmentedAnchoring(anchorings.head, initialCore))
+      return RefinedChartMarginal(AugmentedAnchoring(anchorings.head, initialCore))
     }
 
     val projector = new AnchoredPCFGProjector[L, W](-15)
     var iter = 0
-    var marginal: ChartMarginal[L, W] = null
+    var marginal: RefinedChartMarginal[L, W] = null
 
     def project(q: CoreAnchoring[L, W], i: Int): (CoreAnchoring[L, W], Double) = {
       val inf = anchorings(i)

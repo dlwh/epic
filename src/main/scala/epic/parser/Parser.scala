@@ -27,7 +27,7 @@ import epic.trees._
  */
 @SerialVersionUID(1L)
 final case class Parser[L,W](coreGrammar: CoreGrammar[L, W],
-                             marginalFactory: ChartMarginal.Factory[L, W],
+                             marginalFactory: RefinedChartMarginal.Factory[L, W],
                              decoder: ChartDecoder[L, W] = ChartDecoder[L, W]()) extends (IndexedSeq[W]=>Tree[L]) {
 
   def grammar = coreGrammar.grammar

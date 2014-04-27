@@ -10,7 +10,7 @@ import scala.collection.{GenTraversableLike, GenTraversable, GenTraversableOnce}
 import scala.collection.generic.CanBuildFrom
 import epic.util.{SafeLogging, CacheBroker}
 import epic.parser.RefinedAnchoring.StructureDelegatingAnchoring
-import epic.parser.ChartMarginal.Factory
+import epic.parser.RefinedChartMarginal.Factory
 import breeze.config.{Configuration, CommandLineParser, Help}
 import java.io.File
 import breeze.util._
@@ -122,13 +122,13 @@ class OracleParser[L, L2, W](val refinedGrammar: SimpleRefinedGrammar[L, L2, W])
 
   }
 
-  def oracleMarginalFactory(trees: IndexedSeq[TreeInstance[L2, W]]):ChartMarginal.Factory[L, W] = new Factory[L, W] {
+  def oracleMarginalFactory(trees: IndexedSeq[TreeInstance[L2, W]]):RefinedChartMarginal.Factory[L, W] = new Factory[L, W] {
     val knownTrees = trees.iterator.map(ti => ti.words -> ti.tree).toMap
 
-    def apply(w: IndexedSeq[W], constraints: CoreAnchoring[L, W]): ChartMarginal[L, W] = {
+    def apply(w: IndexedSeq[W], constraints: CoreAnchoring[L, W]): RefinedChartMarginal[L, W] = {
       val refAnchoring = knownTrees.get(w).map { t => makeGoldPromotingAnchoring(w, t, constraints.sparsityPattern)}.getOrElse(refinedGrammar.anchor(w))
 
-      ChartMarginal(AugmentedAnchoring(refAnchoring, constraints), true)
+      RefinedChartMarginal(AugmentedAnchoring(refAnchoring, constraints), true)
     }
   }
 

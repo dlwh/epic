@@ -92,14 +92,14 @@ object SentimentTreebankPipeline extends LazyLogging {
 //      else
 //        println("Eval: " + evaluate(s"$name-$iter", parser, treebank.devTrees))
       if(params.evalOnTest) {
-        println("NORMAL DECODE: Eval: " + evaluateBetter(s"$name-$iter", parser, treebank.testTrees, DecodeType.Normal));
+        println("NORMAL DECODE: Eval: " + evaluate(s"$name-$iter", parser, treebank.testTrees, DecodeType.Normal));
       } else {
         println("Span confusions");
         println(renderArr(evaluateSpanConfusions(s"$name-$iter", parser, treebank.devTrees, DecodeType.Normal)));
         println("Root confusions");
         println(renderArr(evaluateRootConfusions(s"$name-$iter", parser, treebank.devTrees, DecodeType.Normal)));
-        println("NORMAL DECODE: Eval: " + evaluateBetter(s"$name-$iter", parser, treebank.devTrees, DecodeType.Normal));
-        println("TERNARY DECODE: Eval: " + evaluateBetter(s"$name-$iter", parser, treebank.devTrees, DecodeType.Ternary));
+        println("NORMAL DECODE: Eval: " + evaluate(s"$name-$iter", parser, treebank.devTrees, DecodeType.Normal));
+        println("TERNARY DECODE: Eval: " + evaluate(s"$name-$iter", parser, treebank.devTrees, DecodeType.Ternary));
 //        println("BINARY DECODE: Eval: " + evaluateBetter(s"$name-$iter", parser, treebank.devTrees, DecodeType.Binary));
       }
     } catch {
@@ -158,21 +158,7 @@ object SentimentTreebankPipeline extends LazyLogging {
     }
   }
 
-
-  case class Stats(coarseSpansRight: Int, coarseSpans: Int,
-                   spansRight: Int, numSpans: Int,
-                   coarseRootsRight: Int, numCoarseRoots: Int,
-                   rootsRight: Int, numRoots: Int) {
-    def +(stats: Stats) = Stats(
-    coarseSpansRight + stats.coarseSpansRight, coarseSpans + stats.coarseSpans,
-      spansRight + stats.spansRight, numSpans + stats.numSpans,
-      coarseRootsRight + stats.coarseRootsRight, numCoarseRoots + stats.numCoarseRoots,
-      rootsRight + stats.rootsRight, numRoots + stats.numRoots )
-
-    override def toString = f"Stats(cspans=${coarseSpansRight.toDouble/coarseSpans}%.4f: $coarseSpansRight/$coarseSpans spans=${spansRight.toDouble/numSpans}%.4f: $spansRight/$numSpans, coarseRoots=${coarseRootsRight.toDouble/numCoarseRoots}: $coarseRootsRight/$numCoarseRoots , roots=${rootsRight.toDouble/numRoots}%.4f: $rootsRight/$numRoots)"
-  }
-  
-  case class StatsBetter(spansRight: Int,
+  case class Stats(spansRight: Int,
                          numSpans: Int,
                          spansRightTernary: Int, // denom is same as numSpans
                          spansRightBinary: Int,
@@ -184,7 +170,7 @@ object SentimentTreebankPipeline extends LazyLogging {
                          rootsRightBinary: Int,
                          numBinaryRoots: Int,
                          numBinaryRootsSocher: Int) {
-    def +(stats: StatsBetter) = StatsBetter(spansRight + stats.spansRight,
+    def +(stats: Stats) = Stats(spansRight + stats.spansRight,
                                             numSpans + stats.numSpans,
                                             spansRightTernary + stats.spansRightTernary,
                                             spansRightBinary + stats.spansRightBinary,
@@ -227,7 +213,7 @@ object SentimentTreebankPipeline extends LazyLogging {
       val marg = parser.marginal(ti.words)
       val guessTree = decode(ti.tree.map(_ => ()), marg, decodeType).map(_.label.toInt)
       val guess: Set[(Int, Span)] = guessTree.preorder.map(t => (t.label, t.span)).toSet
-      val guessMap: HashMap[Span,Int] = new HashMap[Span,Int]() ++ guess.map(pair => (pair._2, pair._1));
+      val guessMap: HashMap[Span,Int] = new HashMap[Span,Int]() ++ guess.map(_.swap)
       val gold: Set[(Int, Span)] = goldTree.preorder.map(t => (t.label, t.span)).toSet
       for ((gLabel, gSpan) <- gold) {
         val pLabel = guessMap(gSpan);
@@ -248,7 +234,7 @@ object SentimentTreebankPipeline extends LazyLogging {
     }.reduce((arr1, arr2) => Array.tabulate(5, 5)((i, j) => arr1(i)(j) + arr2(i)(j)));
   }
 
-  def evaluateBetter(name: String, parser: Parser[AnnotatedLabel, String], testTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]], decodeType: DecodeType) = {
+  def evaluate(name: String, parser: Parser[AnnotatedLabel, String], testTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]], decodeType: DecodeType) = {
     println("Evaluating at " + name);
     testTrees.par.map { ti =>
       val goldTree = ti.tree.children.head.map(_.label.toInt)
@@ -281,62 +267,12 @@ object SentimentTreebankPipeline extends LazyLogging {
       val rootsRightBinary = (if (SentimentEvaluator.isUsedBinaryCoarse(goldRoot, guessRoot) && SentimentEvaluator.isCorrectBinary(goldRoot, guessRoot)) 1 else 0);
       val numBinaryRoots = (if (SentimentEvaluator.isUsedBinaryCoarse(goldRoot, guessRoot)) 1 else 0);
       val numBinaryRootsSocher = (if (SentimentEvaluator.isUsedSocherCoarse(goldRoot, guessRoot)) 1 else 0);
-      StatsBetter(spansRight, numSpans, spansRightTernary, spansRightBinary, numBinarySpans, numBinarySpansSocher,
+      Stats(spansRight, numSpans, spansRightTernary, spansRightBinary, numBinarySpans, numBinarySpansSocher,
                   rootsRight, numRoots, rootsRightTernary, rootsRightBinary, numBinaryRoots, numBinaryRootsSocher)
     }.reduce(_+_);
   }
 
-  def evaluate(name: String, parser: Parser[AnnotatedLabel, String], testTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]]) = {
-    val two = parser.grammar.labelIndex(AnnotatedLabel("2"))
-    assert(two >= 0)
-    val suffStats = testTrees.par.map{ ti =>
-      val goldTree = ti.tree.children.head.map(_.label.toInt)
-      val goldLabel = goldTree.label
-      val goldIsNeutral = goldLabel == 2
-
-      val marg = parser.marginal(ti.words)
-
-      val guessTree = decode(ti.tree.map(_ => ()), marg, DecodeType.Normal).map(_.label.toInt)
-      val coarseTree = decode(ti.tree.map(_ => ()), marg, DecodeType.Binary).map(_.label.toInt)
-
-      val guessLabel = guessTree.label
-      assert(guessTree.preorder.map(_.span).toSet == goldTree.preorder.map(_.span).toSet)
-      val guess: Set[(Int, Span)] = guessTree.preorder.map(t => (t.label, t.span)).toSet
-//      assert(guessTree2 == guess, (guessTree2, guess))
-      val gold: Set[(Int, Span)] = goldTree.preorder.map(t => (t.label, t.span)).toSet
-      assert(guess.map(_._2) == gold.map(_._2), (guess, gold, (guess--gold), (gold -- guess)))
-
-      val coarseLabel = coarseTree.label
-      val coarseGuess: Set[(Int, Span)] = coarseTree.preorder.map(t => (t.label, t.span)).toSet
-      val cGuess = coarseGuess.collect { case (label, span) => (label < 2) -> span}
-      val cGold: Set[(Boolean, Span)] = if(goldIsNeutral)
-        Set.empty[(Boolean, Span)]
-      else
-        gold.collect { case (label, span) if label != 2 => (label < 2) -> span}
-
-      assert(coarseLabel != 2, coarseTree.render(ti.words))
-
-      val coarseRootRight = if (goldLabel match {
-        case 0 | 1 => coarseLabel < 2
-        case 2 => false
-        case 3 | 4 => coarseLabel >= 2
-      })
-        1
-      else
-        0
-
-      val stats = Stats(cGuess & cGold size, cGold.size,
-        guess & gold size, gold.size,
-        coarseRootRight, if(goldIsNeutral) 0 else 1,
-        if(guessLabel == goldLabel) 1 else 0, 1)
-      println(s"Guess\n ${guessTree.render(ti.words)}\nGold\n${goldTree.render(ti.words)}\n$stats")
-      stats
-    }.reduce(_ + _)
-    
-    suffStats;
-  }
-  
-  def decode(tree: BinarizedTree[Unit], marginal: ChartMarginal[AnnotatedLabel, String], decodeType: DecodeType) = {
+  def decode(tree: BinarizedTree[Unit], marginal: RefinedChartMarginal[AnnotatedLabel, String], decodeType: DecodeType) = {
     tree.extend { t =>
       val counts = marginal.marginalAt(t.begin, t.end)
       val summed = breeze.linalg.sum(counts, Axis._1)

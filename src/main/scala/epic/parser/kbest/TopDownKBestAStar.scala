@@ -10,7 +10,7 @@ import epic.trees.Trees.Zipper
 object TopDownKBestAStar {
   private implicit def ordTKAItem[L]: Ordering[TKAItem[L]] = Ordering[Double].on((_:TKAItem[L]).weight)
 
-  def apply[L, W](chart: ChartMarginal[L, W], k: Int):IndexedSeq[(BinarizedTree[L], Double)] = {
+  def apply[L, W](chart: RefinedChartMarginal[L, W], k: Int):IndexedSeq[(BinarizedTree[L], Double)] = {
     import chart._
     val root = chart.grammar.rootIndex
 
