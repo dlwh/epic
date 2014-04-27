@@ -36,6 +36,9 @@ trait ParseMarginal[L, W] extends VisitableMarginal[AnchoredVisitor[L]] {
 
   def isMaxMarginal: Boolean
 
+  def feasibleSplitPoints(begin: Int, end: Int, leftChild: Int, leftChildRef: Int, rightChild: Int, rightChildRef: Int):IndexedSeq[Int]
+
+
   def expectedRuleCounts: StandardExpectedCounts[Rule[L]] = {
     val featurizer = new RuleFeaturizer[L, W](grammar)
     val counts = StandardExpectedCounts.zero(featurizer.index)

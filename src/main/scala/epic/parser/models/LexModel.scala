@@ -430,11 +430,13 @@ final class LexGrammar[L, L2, W](val grammar: BaseGrammar[L],
 
     val attachCache = Array.ofDim[OpenAddressHashArray[Double]](words.length, words.length)
     val ruleCache = new TriangularArray[Array[OpenAddressHashArray[Double]]](words.length + 1)
-    def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int) = {
+    def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int): Double = {
       var score = 0.0
       val head = headIndex(ref)
       val dep = depIndex(ref)
-      assert(head < end && head >= begin, (head, begin, end))
+      if (head >= end || head < begin) return Double.NegativeInfinity
+      if (dep >= end || dep < begin) return Double.NegativeInfinity
+
       var cache = attachCache(head)(dep)
       if (cache == null) {
         cache = new OpenAddressHashArray[Double](refinements.labels.fineIndex.size, Double.NaN)

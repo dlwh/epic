@@ -15,17 +15,11 @@ package epic.parser
  limitations under the License.
 */
 
-import java.util.Arrays
 import epic.parser.projections.{AnchoredSpanProjector, ChartProjector, AnchoredPCFGProjector, AnchoredRuleMarginalProjector}
 import epic.trees._
 import breeze.collection.mutable.TriangularArray
-import breeze.util._
-import breeze.numerics._
-import epic.lexicon.Lexicon
-import breeze.numerics
-import com.typesafe.scalalogging.slf4j.LazyLogging
 import epic.util.SafeLogging
-import breeze.linalg.{argmax, softmax}
+import breeze.linalg.argmax
 
 trait ParserException extends Exception
 case class ParseExtractionException(msg: String, sentence: IndexedSeq[Any]) extends RuntimeException(msg) with ParserException
@@ -119,7 +113,7 @@ case class ViterbiDecoder[L, W]() extends ChartDecoder[L, W] with Serializable w
         refR <- refined.validRuleRefinementsGivenParent(begin, end, r, rootRef)
         refB = refined.leftChildRefinement(r, refR)
         refC = refined.rightChildRefinement(r, refR)
-        split <- inside.top.feasibleSpan(begin, end, b, refB, c, refC)
+        split <- marginal.feasibleSplitPoints(begin, end, b, refB, c, refC)
       } {
         val ruleScore = anchoring.scoreBinaryRule(begin, split, end, r, refR)
         val score = (
@@ -238,6 +232,7 @@ class MaxConstituentDecoder[L, W] extends ChartDecoder[L, W] {
         grammar.chain(candidateUnaries(0))
       } else {
         var bestRule = candidateUnaries(0)
+        // TODO: restore this!
 //        var bestScore = Double.NegativeInfinity
 //        for (r <- candidateUnaries) {
 //          val aRefinements = inside.top.enteredLabelRefinements(begin, end, bestTop).toArray

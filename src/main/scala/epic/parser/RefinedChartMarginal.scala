@@ -47,6 +47,11 @@ final case class RefinedChartMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
     breeze.numerics.exp(in)
   }
 
+
+  def feasibleSplitPoints(begin: Int, end: Int, leftChild: Int, leftChildRef: Int, rightChild: Int, rightChildRef: Int):IndexedSeq[Int] = {
+    inside.top.feasibleSpan(begin, end, leftChild, leftChildRef, rightChild, rightChildRef)
+  }
+
   /**
    * Forest traversal that visits spans in a "bottom up" order.
    */

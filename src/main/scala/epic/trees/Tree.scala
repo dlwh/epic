@@ -143,6 +143,14 @@ case class NaryTree[L](label: L, children: IndexedSeq[Tree[L]], span: Span) exte
 }
 
 sealed trait BinarizedTree[+L] extends Tree[L] {
+  def findSpan(begin: Int, end: Int): Option[Tree[L]] = this match {
+    case t if t.span == Span(begin, end) => Some(t)
+    case t@BinaryTree(a, b, c, span) if end <= t.splitPoint => if(t.begin <= begin) b.findSpan(begin, end) else None
+    case t@BinaryTree(a, b, c, span) if t.splitPoint <= begin => if(t.end <= end) c.findSpan(begin, end) else None
+    case t@UnaryTree(a, b, chain, span) => if(span.contains(Span(begin, end))) b.findSpan(begin, end) else None
+    case _ => None
+  }
+
   override def map[M](f: L=>M): BinarizedTree[M] = null
   // have to override to trick scala to refine the type
   override def extend[B](f: Tree[L]=>B):BinarizedTree[B] = {sys.error("...")}

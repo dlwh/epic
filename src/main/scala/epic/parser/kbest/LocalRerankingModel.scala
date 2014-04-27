@@ -55,4 +55,8 @@ case class KBestListMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
       }, spanThreshold - math.log(probsPerTree(i)))
     }
   }
+
+  override def feasibleSplitPoints(begin: Int, end: Int, leftChild: Int, leftChildRef: Int, rightChild: Int, rightChildRef: Int): IndexedSeq[Int] = {
+    marginals.flatMap(_.feasibleSplitPoints(begin, end, leftChild, leftChildRef, rightChild, rightChildRef)).toSet.toIndexedSeq.sorted
+  }
 }

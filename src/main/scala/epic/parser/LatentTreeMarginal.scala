@@ -270,6 +270,14 @@ case class LatentTreeMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
 
   }
 
+  override def feasibleSplitPoints(begin: Int, end: Int, leftChild: Int, leftChildRef: Int, rightChild: Int, rightChildRef: Int): IndexedSeq[Int] = {
+    tree.findSpan(begin, end) match {
+      case Some(UnaryTree(a, b@BinaryTree(_, _, _, _), chain, _)) => IndexedSeq(b.splitPoint)
+      case Some(b@BinaryTree(_, _, _, _)) => IndexedSeq(b.splitPoint)
+      case _ => IndexedSeq.empty
+    }
+  }
+
 }
 
 object LatentTreeMarginal {
