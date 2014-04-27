@@ -124,7 +124,7 @@ object SemiConllNERPipeline extends Logging {
                     opt: OptParams)
 
   def main(args: Array[String]) {
-    val params = CommandLineParser.readIn[Params](args)
+    val params:Params = CommandLineParser.readIn[Params](args)
     logger.info("Command line arguments for recovery:\n" + Configuration.fromObject(params).toCommandLineString)
     val (train,test) = {
       val standardTrain = CONLLSequenceReader.readTrain(new FileInputStream(params.path), params.path.getName).toIndexedSeq
