@@ -2,7 +2,7 @@ package epic.dense
 
 import org.scalatest.FunSuite
 import breeze.optimize.{GradientTester, DiffFunction}
-import breeze.linalg.DenseVector
+import breeze.linalg._
 
 /**
  *
@@ -27,7 +27,7 @@ class TanhTransformTest extends FunSuite {
 
     val weights: DenseVector[Double] = DenseVector.rand[Double](index.index.size) - 0.5
     val diffs = GradientTester.test[Int, DenseVector[Double]](objective, weights, randFraction = 1.0)
-    assert(diffs.max < 1E-3, s"${diffs.max} was bigger than expected!!")
+    assert(max(diffs) < 1E-3, s"${max(diffs)} was bigger than expected!!")
   }
 
   test("layered chain rule") {
@@ -47,7 +47,7 @@ class TanhTransformTest extends FunSuite {
 
     val weights: DenseVector[Double] = DenseVector.rand[Double](index.index.size)/2.0 - 0.25
     val diffs = GradientTester.test[Int, DenseVector[Double]](objective, weights, randFraction = 1.0)
-    assert(diffs.max < 1E-2, s"${diffs.max} was bigger than expected!! ${diffs.argmax} ${index.index.get(diffs.argmax)}")
+    assert(max(diffs) < 1E-2, s"${max(diffs)} was bigger than expected!! ${argmax(diffs)} ${index.index.get(argmax(diffs))}")
   }
 
 }
