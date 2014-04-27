@@ -43,7 +43,7 @@ object ParseText {
         val tokens = tokenizer(sent).toIndexedSeq
 
         try {
-          val tree = parser.bestParse(tokens)
+          val tree = parser.parse(tokens)
 
           tree.render(tokens, newline = false)
         } catch {

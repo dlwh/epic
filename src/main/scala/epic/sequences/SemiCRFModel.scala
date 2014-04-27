@@ -12,7 +12,7 @@ import epic.constraints.LabeledSpanConstraints
 import epic.lexicon.SimpleLexicon
 import epic.features._
 import epic.util.{SafeLogging, CacheBroker, NotProvided, Optional}
-import com.typesafe.scalalogging.slf4j.Logging
+import com.typesafe.scalalogging.slf4j.LazyLogging
 import epic.sequences.SemiCRFModel.BIEOFeatureAnchoring
 
 /**
@@ -235,7 +235,7 @@ class SegmentationModelFactory[L](val startSymbol: L,
                                   spanFeaturizer: Optional[SurfaceFeaturizer[String]] = NotProvided,
                                   pruningModel: Optional[SemiCRF.ConstraintSemiCRF[L, String]] = NotProvided,
                                   gazetteer: Optional[Gazetteer[Any, String]] = NotProvided,
-                                  weights: Feature=>Double = { (f:Feature) => 0.0})(implicit broker: CacheBroker) extends Logging {
+                                  weights: Feature=>Double = { (f:Feature) => 0.0})(implicit broker: CacheBroker) extends LazyLogging {
 
   import SegmentationModelFactory._
 

@@ -1,6 +1,6 @@
 package epic.util
 
-import com.typesafe.scalalogging.slf4j.Logging
+import com.typesafe.scalalogging.slf4j.LazyLogging
 import scala.annotation.switch
 
 /**
@@ -10,7 +10,7 @@ import scala.annotation.switch
  *
  * @author dlwh
  **/
-object ArabicNormalization extends Logging {
+object ArabicNormalization extends LazyLogging {
 
   def handleTreebankThings(s: String):Option[String] = {
     if(!s.startsWith("-")) {

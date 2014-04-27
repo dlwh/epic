@@ -32,7 +32,7 @@ import epic.features._
 import epic.features.HashFeature
 import epic.util.{AlwaysSeenSet, ThreadLocalBloomFilter, Arrays, CacheBroker}
 import epic.trees.annotations.FilterAnnotations
-import com.typesafe.scalalogging.slf4j.Logging
+import com.typesafe.scalalogging.slf4j.LazyLogging
 import epic.trees.annotations.MarkPreterminals
 import epic.trees.annotations.FixRootLabelVerticalAnnotation
 import epic.parser.BaseGrammar
@@ -495,7 +495,7 @@ case class LatentSpanModelFactory(inner: SpanModelFactory,
                                   @Help(text="Split states that the Berkeley Parser doesn't want to split.")
                                   splitUselessStates: Boolean = false,
                                   @Help(text="Number of states to use. Overridden by substates file")
-                                  numStates: Int = 2) extends ParserModelFactory[AnnotatedLabel, String] with Logging {
+                                  numStates: Int = 2) extends ParserModelFactory[AnnotatedLabel, String] with LazyLogging {
 
   type MyModel = SpanModel[AnnotatedLabel, (AnnotatedLabel, Int), String]
 

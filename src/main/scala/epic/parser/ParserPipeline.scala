@@ -24,7 +24,7 @@ import collection.mutable
 import epic.lexicon.{Lexicon, SimpleLexicon}
 import epic.constraints.{CachedChartConstraintsFactory, ChartConstraints}
 import epic.util.CacheBroker
-import com.typesafe.scalalogging.slf4j.Logging
+import com.typesafe.scalalogging.slf4j.LazyLogging
 import breeze.linalg.Counter2
 import epic.trees.annotations.Xbarize
 
@@ -67,7 +67,7 @@ object ParserParams {
  * ParserPipeline is a base-trait for the parser training pipeline. Handles
  * reading in the treebank and params and such
  */
-trait ParserPipeline extends Logging {
+trait ParserPipeline extends LazyLogging {
   /**
    * The type of the parameters to read in via dlwh.epic.config
    */

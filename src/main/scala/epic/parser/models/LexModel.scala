@@ -28,7 +28,7 @@ import breeze.config.Help
 import epic.lexicon.Lexicon
 import epic.features._
 import epic.util._
-import com.typesafe.scalalogging.slf4j.Logging
+import com.typesafe.scalalogging.slf4j.LazyLogging
 import epic.trees._
 import epic.parser.projections.GrammarRefinements
 import epic.features.SplitSpanFeaturizer.ZeroSplitSpanFeaturizer
@@ -252,10 +252,13 @@ class IndexedLexFeaturizer[L, L2, W](grammar: BaseGrammar[L],
     def featuresForHeadDepRule(begin: Int, split: Int, end: Int, head: Int, dep: Int, rule: Int, ruleRef: Int): Array[Int] = {
       var cache = ruleCache(head)(dep)
       if (cache == null) {
-        cache = new OpenAddressHashArray[Array[Int]](refinements.rules.fineIndex.size)
+        cache = new OpenAddressHashArray[Array[Int]](refinements.rules.fineIndex.size, null:Array[Int], 256)
         ruleCache(head)(dep) = cache
       }
 
+//      val x = cache.activeSize * 1.0/cache.size
+//      val y = cache.activeSize * 1.0/cache.data.length
+//      if(math.random < .01) println(x + " " + y + " " + cache.size)
       var feats = cache(refinements.rules.globalize(rule, ruleRef))
       if (feats == null) {
         var bilexFeatures: Array[Int] = bilexCache(head)(dep)
@@ -839,7 +842,7 @@ case class LexGrammarBundle[L, L2, W](baseGrammar: BaseGrammar[L],
   }
 }
 
-object IndexedLexFeaturizer extends Logging {
+object IndexedLexFeaturizer extends LazyLogging {
   def extract[L, L2, Datum, W](ruleFeaturizer: ProductionFeaturizer[L, L2, W],
                            bilexFeaturizer: IndexedBilexicalFeaturizer[W],
                            splitSpanFeaturizer: Option[IndexedSplitSpanFeaturizer[W]],

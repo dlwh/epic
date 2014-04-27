@@ -23,7 +23,7 @@ import breeze.util._
 import breeze.numerics._
 import epic.lexicon.Lexicon
 import breeze.numerics
-import com.typesafe.scalalogging.slf4j.Logging
+import com.typesafe.scalalogging.slf4j.LazyLogging
 import epic.util.SafeLogging
 import breeze.linalg.softmax
 
