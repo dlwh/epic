@@ -16,7 +16,7 @@ package epic.parser
 */
 
 import java.util.Arrays
-import epic.parser.projections.{ChartProjector, AnchoredPCFGProjector, AnchoredRuleMarginalProjector}
+import epic.parser.projections.{AnchoredSpanProjector, ChartProjector, AnchoredPCFGProjector, AnchoredRuleMarginalProjector}
 import epic.trees._
 import breeze.collection.mutable.TriangularArray
 import breeze.util._
@@ -25,7 +25,7 @@ import epic.lexicon.Lexicon
 import breeze.numerics
 import com.typesafe.scalalogging.slf4j.LazyLogging
 import epic.util.SafeLogging
-import breeze.linalg.softmax
+import breeze.linalg.{argmax, softmax}
 
 trait ParserException extends Exception
 case class ParseExtractionException(msg: String, sentence: IndexedSeq[Any]) extends RuntimeException(msg) with ParserException
@@ -192,69 +192,42 @@ case class MaxVariationalDecoder[L, W]() extends ProjectingChartDecoder[L, W](ne
 class MaxConstituentDecoder[L, W] extends ChartDecoder[L, W] {
 
   def extractBestParse(marginal: ChartMarginal[L, W]): BinarizedTree[L] = {
-    import marginal._
 
-    val labelIndex = marginal.grammar.labelIndex
 
+    val length = marginal.length
+    import marginal.grammar
+
+
+    val spanMarginals = new AnchoredSpanProjector().projectSpanPosteriors(marginal)
     val maxSplit = TriangularArray.fill[Int](length+1)(0)
     val maxBotLabel = TriangularArray.fill[Int](length+1)(-1)
     val maxBotScore = TriangularArray.fill[Double](length+1)(0.0)
     val maxTopLabel = TriangularArray.fill[Int](length+1)(-1)
     val maxTopScore = TriangularArray.fill[Double](length+1)(0.0)
 
-    val scores = marginal.grammar.labelEncoder.fillArray(0.0)
+    val numLabels = grammar.labelIndex.size
 
-    def marginalizeRefinements(begin: Int, end: Int, l: Int, ichart: inside.ChartScores, ochart: outside.ChartScores): Double = {
-      var score = 0.0
-      for (lRef <- ichart.enteredLabelRefinements(begin, end, l)) {
-        val myScore = math.exp(ichart.labelScore(begin, end, l, lRef) + ochart.labelScore(begin, end, l, lRef) - logPartition)
-        score  += myScore
-      }
-      score
-    }
-
-    for(i <- 0 until inside.length) {
-      Arrays.fill(scores, 0.0)
-      for(l <- inside.bot.enteredLabelIndexes(i, i + 1)) {
-        scores(l) = marginalizeRefinements(i, i + 1, l, inside.bot, outside.bot)
-      }
-      maxBotScore(i, i + 1) = scores.max
-      maxBotLabel(i, i + 1) = scores.argmax
-
-      Arrays.fill(scores, 0.0)
-      for(l <- inside.top.enteredLabelIndexes(i, i + 1)) {
-        scores(l) = marginalizeRefinements(i, i + 1, l, inside.top, outside.top)
-      }
-      maxTopScore(i, i + 1) = scores.max+ maxBotScore(i, i + 1)
-      maxTopLabel(i, i + 1) = scores.argmax
-    }
 
     for {
-      span <- 2 to inside.length
-      begin <- 0 to (inside.length - span)
+      span <- 1 to length
+      begin <- 0 to (length - span)
       end = begin + span
     } {
-      Arrays.fill(scores, Double.NegativeInfinity)
-      for(l <- inside.bot.enteredLabelIndexes(begin, end)) {
-        scores(l) = marginalizeRefinements(begin, end, l, inside.bot, outside.bot)
+      maxBotLabel(begin, end) = argmax(spanMarginals.botType(begin, end).slice(0, numLabels))
+      maxBotScore(begin, end) = spanMarginals.botType(begin, end)(maxBotLabel(begin, end))
+
+      maxTopLabel(begin, end) = argmax(spanMarginals.topType(begin, end).slice(0, numLabels))
+      maxTopScore(begin, end) = spanMarginals.botType(begin, end)(maxBotLabel(begin, end)) + maxBotScore(begin, end)
+
+      if(end - begin > 1) {
+        val (split, splitScore) = (for (split <- begin + 1 until end) yield {
+          val score = maxTopScore(begin, split) + maxTopScore(split, end)
+          (split, score)
+        }).maxBy(_._2)
+
+        maxSplit(begin, end) = split
+        maxTopScore(begin, end) = maxTopScore(begin, end) + splitScore
       }
-      maxBotScore(begin, end) = scores.max
-      maxBotLabel(begin, end) = scores.argmax
-
-      Arrays.fill(scores, Double.NegativeInfinity)
-      for(l <- inside.top.enteredLabelIndexes(begin, end)) {
-        scores(l) = marginalizeRefinements(begin, end, l, inside.top, outside.top)
-      }
-      maxTopScore(begin, end) = scores.max + maxBotScore(begin, end)
-      maxTopLabel(begin, end) = scores.argmax
-
-      val (split, splitScore) = (for(split <- begin +1 until end) yield {
-        val score = maxTopScore(begin, split) + maxTopScore(split, end)
-        (split, score)
-      }).maxBy(_._2)
-
-      maxSplit(begin, end) = split
-      maxTopScore(begin, end) = maxTopScore(begin, end) + splitScore
     }
 
     def bestUnaryChain(begin: Int, end: Int, bestBot: Int, bestTop: Int): IndexedSeq[String] = {
@@ -265,25 +238,25 @@ class MaxConstituentDecoder[L, W] extends ChartDecoder[L, W] {
         grammar.chain(candidateUnaries(0))
       } else {
         var bestRule = candidateUnaries(0)
-        var bestScore = Double.NegativeInfinity
-        for (r <- candidateUnaries) {
-          val aRefinements = inside.top.enteredLabelRefinements(begin, end, bestTop).toArray
-          val bRefinements = inside.bot.enteredLabelRefinements(begin, end, bestBot).toArray
-          var score = 0.0
-          for (bRef <- bRefinements; ref <- anchoring.refined.validUnaryRuleRefinementsGivenChild(begin, end, r, bRef)) {
-            val aRef = anchoring.refined.parentRefinement(r, ref)
-            score+= math.exp(anchoring.scoreUnaryRule(begin, end, r, ref)
-              + outside.top.labelScore(begin, end, bestTop, aRef)
-              + inside.bot.labelScore(begin, end, bestBot, bRef)
-              - logPartition
-              )
-          }
-          if (score > bestScore) {
-            bestRule = r
-            bestScore = score
-          }
-
-        }
+//        var bestScore = Double.NegativeInfinity
+//        for (r <- candidateUnaries) {
+//          val aRefinements = inside.top.enteredLabelRefinements(begin, end, bestTop).toArray
+//          val bRefinements = inside.bot.enteredLabelRefinements(begin, end, bestBot).toArray
+//          var score = 0.0
+//          for (bRef <- bRefinements; ref <- anchoring.refined.validUnaryRuleRefinementsGivenChild(begin, end, r, bRef)) {
+//            val aRef = anchoring.refined.parentRefinement(r, ref)
+//            score+= math.exp(anchoring.scoreUnaryRule(begin, end, r, ref)
+//              + outside.top.labelScore(begin, end, bestTop, aRef)
+//              + inside.bot.labelScore(begin, end, bestBot, bRef)
+//              - logPartition
+//              )
+//          }
+//          if (score > bestScore) {
+//            bestRule = r
+//            bestScore = score
+//          }
+//
+//        }
         grammar.chain(bestRule)
       }
       bestChain
@@ -292,22 +265,22 @@ class MaxConstituentDecoder[L, W] extends ChartDecoder[L, W] {
     def extract(begin: Int, end: Int):BinarizedTree[L] = {
       val bestBot = maxBotLabel(begin, end)
       val lower = if(begin + 1== end) {
-        if(maxBotScore(begin, end) == Double.NegativeInfinity)
-          throw new RuntimeException(s"Couldn't make a good score for ${(begin, end)}. InsideIndices:  ${inside.bot.enteredLabelIndexes(begin, end).toIndexedSeq}\noutside: ${outside.bot.enteredLabelIndexes(begin, end).toIndexedSeq} logPartition: $logPartition")
-        NullaryTree(labelIndex.get(bestBot), Span(begin, end))
+//        if(maxBotScore(begin, end) == Double.NegativeInfinity)
+//          throw new RuntimeException(s"Couldn't make a good score for ${(begin, end)}. InsideIndices:  ${inside.bot.enteredLabelIndexes(begin, end).toIndexedSeq}\noutside: ${outside.bot.enteredLabelIndexes(begin, end).toIndexedSeq} logPartition: $logPartition")
+        NullaryTree(grammar.labelIndex.get(bestBot), Span(begin, end))
       } else {
         val split = maxSplit(begin, end)
         val left = extract(begin, split)
         val right = extract(split, end)
-        BinaryTree(labelIndex.get(bestBot), left, right, Span(begin, end))
+        BinaryTree(grammar.labelIndex.get(bestBot), left, right, Span(begin, end))
       }
 
       val bestTop = maxTopLabel(begin, end)
       val bestChain = bestUnaryChain(begin, end, bestBot, bestTop)
 
-      UnaryTree(labelIndex.get(bestTop), lower, bestChain, Span(begin, end))
+      UnaryTree(grammar.labelIndex.get(bestTop), lower, bestChain, Span(begin, end))
     }
 
-    extract(0, inside.length)
+    extract(0, length)
   }
 }

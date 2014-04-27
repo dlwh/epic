@@ -20,7 +20,7 @@ import breeze.collection.mutable.TriangularArray
 import breeze.linalg.DenseVector
 
 /**
- * Used for computed the expected number of anchored rules that occur at each span/split.
+ * Used for computed the expected number of anchored labels that occur at each span
  * @author dlwh
  */
 @SerialVersionUID(2L)
@@ -37,62 +37,39 @@ class AnchoredSpanProjector(threshold: Double = Double.NegativeInfinity) extends
     import charts.grammar
     val notAConstituent = grammar.labelIndex.size
 
-    def optionalLabelBeliefs = {
-      val r = DenseVector.zeros[Double](grammar.labelIndex.size + 1)
-      r(notAConstituent) = 1.0
-      r
+    def labelBeliefs = {
+      DenseVector.zeros[Double](grammar.labelIndex.size)
     }
 
     // The data, and initialization. most things init'd to null
-    val totals = TriangularArray.fill[DenseVector[Double]](length+1)(optionalLabelBeliefs)
-    val totalsUnaries = TriangularArray.fill[DenseVector[Double]](length+1)(optionalLabelBeliefs)
+    val totals = TriangularArray.fill[DenseVector[Double]](length+1)(labelBeliefs)
+    val totalsUnaries = TriangularArray.fill[DenseVector[Double]](length+1)(labelBeliefs)
 
 
     val visitor = new AnchoredVisitor[L] {
-      def visitSpan(begin: Int, end: Int, tag: Int, ref: Int, score: Double) {
+      def visitSpan(begin: Int, end: Int, tag: Int, ref: Int, score: Double): Unit = {
         // fill in spans with 0 if they're active
         if(score > 0.0) {
-          siphonMass(totals(begin, end), tag, notAConstituent, score)
+          totals(begin, end)(tag) += score
         }
       }
 
 
       override def skipBinaryRules: Boolean = true
 
-      def visitBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int, count: Double) {
+      def visitBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int, count: Double): Unit = {
 
       }
 
-      def visitUnaryRule(begin: Int, end: Int, rule: Int, ref: Int, count: Double) {
+      def visitUnaryRule(begin: Int, end: Int, rule: Int, ref: Int, count: Double): Unit = {
         if (count > 0.0)
-          siphonMass(totalsUnaries(begin, end), charts.grammar.parent(rule), notAConstituent, count)
-      }
-
-
-      /**
-       * subtracts score from counts(from) and adds it to counts(to). ensures
-       * that counts(from) does not go negative (a little negative is sent to 0, a
-       * lot throws.)
-       */
-      private def siphonMass(counts: DenseVector[Double], to: Int, from: Int, score: Double) {
-        counts(to) += score
-        counts(from) -= score
-        if (counts(from) < 0) {
-          assert(counts(from) > -1E-6)
-          counts(from) = 0.0
-        }
+          totalsUnaries(begin, end)(charts.grammar.parent(rule)) += count
       }
 
     }
 
 
     charts.visitPostorder(visitor, threshold)
-
-    for(i <- 0 until length) {
-      val cell = totalsUnaries(i, i + 1)
-      assert(cell(notAConstituent).abs < 1E-8, i + " " + cell + " " + charts.words)
-      cell(notAConstituent) = 0.0
-    }
 
     new AnchoredSpanProjector.AnchoredData(totalsUnaries, totals)
   }
