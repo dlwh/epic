@@ -272,10 +272,10 @@ object SentimentTreebankPipeline extends LazyLogging {
     }.reduce(_+_);
   }
 
-  def decode(tree: BinarizedTree[Unit], marginal: RefinedChartMarginal[AnnotatedLabel, String], decodeType: DecodeType) = {
+  def decode(tree: BinarizedTree[Unit], marginal: ParseMarginal[AnnotatedLabel, String], decodeType: DecodeType) = {
+    val (topMarg, botMarg) = marginal.labelMarginals
     tree.extend { t =>
-      val counts = marginal.marginalAt(t.begin, t.end)
-      val summed = breeze.linalg.sum(counts, Axis._1)
+      val summed = topMarg(t.begin, t.end)
       if(decodeType == Binary) {
         val neg = (summed(AnnotatedLabel("0")) + summed(AnnotatedLabel("1")) )
         val pos = (summed(AnnotatedLabel("3")) + summed(AnnotatedLabel("4")) )

@@ -15,6 +15,8 @@ package epic.parser
  limitations under the License.
 */
 import epic.trees._
+import breeze.numerics.{logI, Scaling}
+import breeze.linalg.{Counter, Counter2}
 
 /**
  * This isn't really a marginal, except in a degenerate sense.
@@ -88,6 +90,29 @@ case class TreeMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
       case Some(UnaryTree(a, b@BinaryTree(_, _, _, _), chain, _)) => IndexedSeq(b.splitPoint)
       case Some(b@BinaryTree(_, _, _, _)) => IndexedSeq(b.splitPoint)
       case _ => IndexedSeq.empty
+    }
+  }
+
+  override def insideBotScore(begin: Int, end: Int, sym: Int, ref: Int): Double = {
+    tree.findSpan(begin, end) match {
+      case Some(UnaryTree(_, Tree(a, _, span2), chain, span)) => logI(a == (sym -> ref))
+      case _ => Double.NegativeInfinity
+    }
+
+  }
+
+  override def insideTopScore(begin: Int, end: Int, sym: Int, ref: Int): Double = {
+    tree.findSpan(begin, end) match {
+      case Some(UnaryTree(a, _, chain, span)) => logI(a == (sym -> ref))
+      case _ => Double.NegativeInfinity
+    }
+
+  }
+
+  def marginalAt(begin: Int, end: Int): Counter2[L, Int, Double] = {
+    tree.findSpan(begin, end) match {
+      case None => Counter2[L, Int, Double]()
+      case Some(Tree((a, ref), _, _)) => Counter2((a, ref, 1.0))
     }
   }
 }

@@ -39,6 +39,11 @@ final case class RefinedChartMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
                                      inside: RefinedParseChart[L], outside: RefinedParseChart[L],
                                      logPartition: Double,
                                      override val isMaxMarginal: Boolean) extends ParseMarginal[L, W] with SafeLogging {
+
+
+  override def insideTopScore(begin: Int, end: Int, sym: Int, ref: Int): Double = inside.top(begin, end, sym, ref)
+  override def insideBotScore(begin: Int, end: Int, sym: Int, ref: Int): Double = inside.bot(begin, end, sym, ref)
+
   def marginalAt(begin: Int, end: Int):Counter2[L, Int, Double] = {
     val in = inside.bot.decodedLabelScores(begin, end)
     in += outside.bot.decodedLabelScores(begin, end)
@@ -289,7 +294,7 @@ final case class RefinedChartMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
 object RefinedChartMarginal {
 
   trait Factory[L, W] {
-    def apply(w: IndexedSeq[W], constraints: CoreAnchoring[L, W]):RefinedChartMarginal[L, W]
+    def apply(w: IndexedSeq[W], constraints: CoreAnchoring[L, W]):ParseMarginal[L, W]
   }
 
   object Factory {

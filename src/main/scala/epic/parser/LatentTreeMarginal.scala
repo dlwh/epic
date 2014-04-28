@@ -22,6 +22,7 @@ import breeze.numerics._
 import LatentTreeMarginal._
 import scala._
 import java.util
+import breeze.linalg.Counter2
 
 /**
  *
@@ -278,6 +279,37 @@ case class LatentTreeMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
     }
   }
 
+  override def insideTopScore(begin: Int, end: Int, sym: Int, ref: Int): Double = {
+    stree.findSpan(begin, end) match {
+      case Some(UnaryTree(a, b, chain, span)) => a.labels.indexOf(sym -> ref) match {
+        case -1 =>
+          Double.NegativeInfinity
+        case pos =>
+          Scaling.toLogSpace(a.inside(pos), a.iscale)
+      }
+      case _ => Double.NegativeInfinity
+    }
+  }
+
+  override def insideBotScore(begin: Int, end: Int, sym: Int, ref: Int): Double = {
+    stree.findSpan(begin, end) match {
+      case Some(UnaryTree(_, BinaryTree(a, _, _, span2), chain, span)) => a.labels.indexOf(sym -> ref) match {
+        case -1 =>
+          Double.NegativeInfinity
+        case pos =>
+          Scaling.toLogSpace(a.inside(pos), a.iscale)
+      }
+      case _ => Double.NegativeInfinity
+    }
+
+  }
+
+//  override def marginalAt(begin: Int, end: Int): Counter2[L, Int, Double] = {
+//   stree.findSpan(begin, end) match {
+//      case None => Counter2[L, Int, Double]()
+//      case Some(Tree(a, _, _)) => Counter2( (0 until a.labels.length).map {i => (grammar.labelIndex.get(a.labels(i)._1), a.labels(i)._2, a.inside) })
+//    }
+//  }
 }
 
 object LatentTreeMarginal {

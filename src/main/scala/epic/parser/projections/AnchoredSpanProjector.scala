@@ -17,7 +17,7 @@ package projections
  limitations under the License.
 */
 import breeze.collection.mutable.TriangularArray
-import breeze.linalg.DenseVector
+import breeze.linalg.{Counter, DenseVector}
 
 /**
  * Used for computed the expected number of anchored labels that occur at each span
@@ -86,6 +86,10 @@ object AnchoredSpanProjector {
    * POJO for anchored rule counts. entries may be null.
    */
   case class AnchoredData(topType: TriangularArray[DenseVector[Double]],
-                          botType: TriangularArray[DenseVector[Double]])
+                          botType: TriangularArray[DenseVector[Double]]) {
+    def decode[L](grammar: BaseGrammar[L]): (TriangularArray[Counter[L, Double]], TriangularArray[Counter[L, Double]]) = {
+      topType.map(grammar.labelEncoder.decode(_)) -> botType.map(grammar.labelEncoder.decode(_))
+    }
+  }
 
 }

@@ -3,8 +3,10 @@ package epic.parser
 
 import epic.framework.{VisitableMarginal, Marginal, StandardExpectedCounts}
 import epic.trees.{Rule, Production}
-import breeze.linalg.axpy
+import breeze.linalg.{Counter, Counter2, axpy}
 import breeze.features.FeatureVector
+import epic.parser.projections.AnchoredSpanProjector
+import breeze.collection.mutable.TriangularArray
 
 /*
  Copyright 2012 David Hall
@@ -37,7 +39,12 @@ trait ParseMarginal[L, W] extends VisitableMarginal[AnchoredVisitor[L]] {
   def isMaxMarginal: Boolean
 
   def feasibleSplitPoints(begin: Int, end: Int, leftChild: Int, leftChildRef: Int, rightChild: Int, rightChildRef: Int):IndexedSeq[Int]
+  def insideTopScore(begin: Int, end: Int, sym: Int, ref: Int):Double
+  def insideBotScore(begin: Int, end: Int, sym: Int, ref: Int):Double
 
+  def labelMarginals: (TriangularArray[Counter[L, Double]], TriangularArray[Counter[L, Double]])  = {
+    new AnchoredSpanProjector().projectSpanPosteriors(this).decode(grammar)
+  }
 
   def expectedRuleCounts: StandardExpectedCounts[Rule[L]] = {
     val featurizer = new RuleFeaturizer[L, W](grammar)

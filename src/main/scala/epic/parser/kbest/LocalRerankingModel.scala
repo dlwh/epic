@@ -56,6 +56,12 @@ case class KBestListMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
     }
   }
 
+
+
+  override def insideBotScore(begin: Int, end: Int, sym: Int, ref: Int): Double = ???
+
+  override def insideTopScore(begin: Int, end: Int, sym: Int, ref: Int): Double = ???
+
   override def feasibleSplitPoints(begin: Int, end: Int, leftChild: Int, leftChildRef: Int, rightChild: Int, rightChildRef: Int): IndexedSeq[Int] = {
     marginals.flatMap(_.feasibleSplitPoints(begin, end, leftChild, leftChildRef, rightChild, rightChildRef)).toSet.toIndexedSeq.sorted
   }
