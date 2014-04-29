@@ -25,7 +25,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import epic.framework.EvaluationResult
 import collection.parallel.ForkJoinTaskSupport
 import concurrent.forkjoin.ForkJoinPool
-import com.typesafe.scalalogging.slf4j.Logging
+import com.typesafe.scalalogging.slf4j.LazyLogging
 import java.text.DecimalFormat
 import epic.util.ProgressLog
 
@@ -69,7 +69,7 @@ class ParseEval[L](ignoredLabels: Set[L]) {
   }
 }
 
-object ParseEval extends Logging {
+object ParseEval extends LazyLogging {
 
   case class Statistics(guess: Int, gold: Int, right: Int, numExact: Int,
                         tagsRight: Int, numWords: Int,
@@ -114,7 +114,7 @@ object ParseEval extends Logging {
       try {
         val TreeInstance(_,goldTree,words) = sent
         val startTime = System.currentTimeMillis
-        val tree: Tree[String] = chainReplacer.replaceUnaries(parser.bestParse(words)).map(asString)
+        val tree: Tree[String] = chainReplacer.replaceUnaries(parser.parse(words)).map(asString)
         val guessTree = Trees.debinarize(Trees.deannotate(tree))
         val deBgold = Trees.debinarize(Trees.deannotate(goldTree.map(asString)))
         val endTime = System.currentTimeMillis

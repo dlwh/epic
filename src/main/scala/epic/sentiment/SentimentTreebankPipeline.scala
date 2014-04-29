@@ -9,7 +9,7 @@ import breeze.linalg._
 import epic.framework._
 import epic.constraints.{LabeledSpanConstraints, SpanConstraints, ChartConstraints}
 import breeze.optimize.CachedBatchDiffFunction
-import com.typesafe.scalalogging.slf4j.Logging
+import com.typesafe.scalalogging.slf4j.LazyLogging
 import epic.parser.models.SpanModelFactory
 import epic.trees.ProcessedTreebank
 import epic.trees.TreeInstance
@@ -24,7 +24,7 @@ import epic.parser.models.ParserExtractableModelFactory
  *
  * @author dlwh
  */
-object SentimentTreebankPipeline extends Logging {
+object SentimentTreebankPipeline extends LazyLogging {
   case class Options(path: File,
                      opt: OptParams,
                      lossType: String = "",
@@ -52,7 +52,7 @@ object SentimentTreebankPipeline extends Logging {
 //      val trees = ((if (params.includeDevInTrain) trainTrees else trainTrees ++ treebank.devTrees) ++ treebank.testTrees).map(ti => ti.words -> ti.tree).toMap
 
       def constraints(w: IndexedSeq[String]): ChartConstraints[AnnotatedLabel] = {
-        val constraints = SpanConstraints.fromTree(trees.getOrElse(w, gen.bestParse(w)))
+        val constraints = SpanConstraints.fromTree(trees.getOrElse(w, gen.parse(w)))
         val cons = new LabeledSpanConstraints.PromotedSpanConstraints(constraints)
         ChartConstraints(cons, cons)
       }

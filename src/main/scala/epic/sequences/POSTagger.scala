@@ -6,13 +6,13 @@ import epic.trees.{AnnotatedLabel, ProcessedTreebank}
 import breeze.config.{Configuration, CommandLineParser}
 import breeze.util.Encoder
 import epic.util.CacheBroker
-import com.typesafe.scalalogging.slf4j.Logging
+import com.typesafe.scalalogging.slf4j.LazyLogging
 
 /**
  *
  * @author dlwh
  */
-object POSTagger extends Logging {
+object POSTagger extends LazyLogging {
   case class Params(opt: OptParams, treebank: ProcessedTreebank, hashFeatureScale: Double = 0.00)
 
   def main(args: Array[String]) {
@@ -40,7 +40,7 @@ object POSTagger extends Logging {
  * Mostly for debugging SemiCRFs. Just uses a SemiCRF as a CRF.
  * @author dlwh
  */
-object SemiPOSTagger extends Logging {
+object SemiPOSTagger extends LazyLogging {
   case class Params(opt: OptParams, treebank: ProcessedTreebank, cache: CacheBroker)
 
   def main(args: Array[String]) {

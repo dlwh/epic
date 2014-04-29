@@ -32,7 +32,7 @@ import epic.lexicon.Lexicon
 import epic.constraints.{CachedChartConstraintsFactory, ChartConstraints}
 import epic.util.{SafeLogging, CacheBroker}
 import scala.collection.GenTraversable
-import com.typesafe.scalalogging.slf4j.{Logging, Logger}
+import com.typesafe.scalalogging.slf4j.{LazyLogging, Logger}
 import java.util.concurrent.atomic.AtomicInteger
 
 @SerialVersionUID(1L)
@@ -89,6 +89,8 @@ class ParserChartConstraintsFactory[L, W](val parser: Parser[L, W],
       throw new NoParseException("No parse for sentence we're trying to constrain!", marg.words)
     val (botLabelScores, unaryScores) = computeScores(length, marg)
 
+    val vit = new ViterbiDecoder[L, W].extractBestParse(marg.asInstanceOf[ChartMarginal[L, W]])
+
     val labelThresholds = extractLabelThresholds(length,
       grammar.labelIndex.size,
       botLabelScores, grammar.labelIndex,
@@ -109,7 +111,9 @@ class ParserChartConstraintsFactory[L, W](val parser: Parser[L, W],
 //    }
 
     //, hasMaximalProjection)
-    ChartConstraints[L](topLabelThresholds, labelThresholds)
+    val con = ChartConstraints[L](topLabelThresholds, labelThresholds)
+    PrecacheConstraints.checkConstraints(TreeInstance("viterbi", vit, marg.words), con, this)
+    con
   }
 
 
@@ -281,7 +285,7 @@ case class ProjectionParams(treebank: ProcessedTreebank,
   * Object for creating  [[epic.constraints.CachedChartConstraintsFactory]]
  * from a parser and prepopulating it with the contents of a treebank.
   */
-object PrecacheConstraints extends Logging {
+object PrecacheConstraints extends LazyLogging {
 
   /**
    * Method for creating  [[epic.constraints.CachedChartConstraintsFactory]]
@@ -318,25 +322,14 @@ object PrecacheConstraints extends Logging {
     val cache = broker.make[IndexedSeq[W], ChartConstraints[L]](tableName)
     for(ti <- train.par) try {
       var located = true
-      var marg:ChartMarginal[L, W] = null
       val constraints = cache.getOrElseUpdate(ti.words, {
         located = false
         logger.info(s"Building constraints for ${ti.id} ${ti.words}")
-        marg = constrainer.parser.marginal(ti.words)
-        constrainer.constraints(marg, GoldTagPolicy.goldTreeForcing[L](ti.tree.map{ l =>
-          val i = constrainer.labelIndex(l)
-          if (i < 0) {
-            logger.warn("Not in index?!?!?!?" + l + ti)
-            0
-          } else {
-            i
-          }
-        }))
+        constrainer.constraints(ti.words)
       })
       if(located) {
         logger.info(s"Already had constraints for ${ti.id} ${ti.words}.")
       } else if(verifyNoGoldPruning) {
-        marg.checkForSimpleTree(ti.tree)
         checkConstraints(ti, constraints, constrainer)
       }
       val count: Int = parsed.incrementAndGet()

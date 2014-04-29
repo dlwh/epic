@@ -38,16 +38,13 @@ final case class Parser[L,W](coreGrammar: CoreGrammar[L, W],
    *
    * @param s the sentence
    */
-  def apply(s: IndexedSeq[W]) = bestParse(s)
+  def apply(s: IndexedSeq[W]) = parse(s)
 
   /**
-   * Returns the best parse for the sentence. Optionally takes a [[epic.parser.CoreAnchoring]], which
-   * can be used to provide additional information about the weight of particular spans or
-   * rules in a sentence.
-   *
+   * Returns the best parse for the sentence.
    * @param s sentence
    */
-  def bestParse(s: IndexedSeq[W]):BinarizedTree[L] = {
+  def parse(s: IndexedSeq[W]):BinarizedTree[L] = {
     decoder.extractBestParse(marginal(s))
   }
 

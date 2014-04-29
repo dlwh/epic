@@ -3,14 +3,14 @@ package epic.framework
 import breeze.linalg._
 import breeze.stats.distributions.Rand
 import java.util.concurrent.atomic.AtomicInteger
-import com.typesafe.scalalogging.slf4j.Logging
+import com.typesafe.scalalogging.slf4j.LazyLogging
 
 /**
  * TODO
  *
  * @author dlwh
  **/
-class StructuredPerceptron[Datum](model: Model[Datum], maxPasses: Int = 100, batchSize: Int = 1) extends Logging {
+class StructuredPerceptron[Datum](model: Model[Datum], maxPasses: Int = 100, batchSize: Int = 1) extends LazyLogging {
   def train(data: IndexedSeq[Datum]) = {
     val averageWeights = DenseVector.zeros[Double](model.featureIndex.size)
     val weights = new ModelObjective(model, data).initialWeightVector(randomize = true)

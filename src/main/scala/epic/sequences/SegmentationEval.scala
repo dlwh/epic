@@ -1,7 +1,7 @@
 package epic.sequences
 
 import epic.framework.EvaluationResult
-import com.typesafe.scalalogging.slf4j.Logging
+import com.typesafe.scalalogging.slf4j.LazyLogging
 
 
 /**
@@ -10,7 +10,7 @@ import com.typesafe.scalalogging.slf4j.Logging
  *
  * @author dlwh
  */
-object SegmentationEval extends Logging {
+object SegmentationEval extends LazyLogging {
   def eval[L ,W](crf: SemiCRF[L, W], examples: IndexedSeq[Segmentation[L, W]], outsideLabel: L):Stats = {
     examples.par.aggregate(new Stats(0,0,0)) ({ (stats, gold )=>
       val guess = crf.bestSequence(gold.words, gold.id +"-guess")

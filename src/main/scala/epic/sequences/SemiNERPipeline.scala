@@ -14,14 +14,14 @@ import epic.trees.Span
 import breeze.optimize.FirstOrderMinimizer.OptParams
 import breeze.util.Implicits._
 import epic.util.CacheBroker
-import com.typesafe.scalalogging.slf4j.Logging
+import com.typesafe.scalalogging.slf4j.LazyLogging
 
 
 /**
  *
  * @author dlwh
  */
-object SemiNERPipeline extends Logging {
+object SemiNERPipeline extends LazyLogging {
 
   case class Params(path: File,
                     modelOut: File = new File("ner.model.gz"),
@@ -71,7 +71,7 @@ object SemiNERPipeline extends Logging {
 
 
 
-object SemiConllNERPipeline extends Logging {
+object SemiConllNERPipeline extends LazyLogging {
 
   def makeSegmentation(ex: Example[IndexedSeq[String],IndexedSeq[IndexedSeq[String]]]): Segmentation[String, String]  = {
     val labels = ex.label
