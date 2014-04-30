@@ -279,13 +279,13 @@ object SegmentationModelFactory {
 
     val featurizer = (
       unigrams(word, 2)
-        + unigrams(brownClusters(9,10), 2)
+        + unigrams(brownClusters(9,15), 2)
         + unigrams(clss, 1)
-        + unigrams(shape, 2)
+//        + unigrams(shape, 2)
         + bigrams(clss, 1)
         // + bigrams(tagDict, 2)
         // + bigrams(shape, 1)
-        + shape(-1) * shape * shape(1)
+//        + shape(-1) * shape * shape(1)
         + prefixes()
         + suffixes()
 //        + unigrams(props, 2)
