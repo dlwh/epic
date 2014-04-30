@@ -7,7 +7,7 @@ import org.scalatest.FunSuite
  *
  * @author dlwh
  */
-class TopDownKBestAStarTest extends ParserTestHarness with FunSuite {
+class TopDownKBestAStarTest extends FunSuite with ParserTestHarness {
   test("KBest recovers viterbi tree") {
     val parser = ParserTestHarness.viterbiParser
     val kbestParser = new AStarKBestParser(parser)

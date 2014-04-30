@@ -226,7 +226,6 @@ class SemiCRFInference[L, W](weights: DenseVector[Double],
  * @param pruningModel
  * @param gazetteer
  * @param weights
- * @param broker
  * @tparam L
  */
 class SegmentationModelFactory[L](val startSymbol: L,
@@ -235,7 +234,7 @@ class SegmentationModelFactory[L](val startSymbol: L,
                                   spanFeaturizer: Optional[SurfaceFeaturizer[String]] = NotProvided,
                                   pruningModel: Optional[SemiCRF.ConstraintSemiCRF[L, String]] = NotProvided,
                                   gazetteer: Optional[Gazetteer[Any, String]] = NotProvided,
-                                  weights: Feature=>Double = { (f:Feature) => 0.0})(implicit broker: CacheBroker) extends LazyLogging {
+                                  weights: Feature=>Double = { (f:Feature) => 0.0}) extends LazyLogging {
 
   import SegmentationModelFactory._
 
@@ -275,11 +274,12 @@ class SegmentationModelFactory[L](val startSymbol: L,
 object SegmentationModelFactory {
 
   def goodNERFeaturizers[L](counts: Counter2[L, String, Double]) = {
-    val dsl = new WordFeaturizer.DSL[L](counts) with SurfaceFeaturizer.DSL
+    val dsl = new WordFeaturizer.DSL[L](counts) with SurfaceFeaturizer.DSL with BrownClusters.DSL
     import dsl._
 
     val featurizer = (
-      word
+      unigrams(word, 2)
+        + unigrams(brownClusters(9,10), 2)
         + unigrams(clss, 1)
         + unigrams(shape, 2)
         + bigrams(clss, 1)
@@ -288,7 +288,9 @@ object SegmentationModelFactory {
         + shape(-1) * shape * shape(1)
         + prefixes()
         + suffixes()
-        + props
+//        + unigrams(props, 2)
+//        + bigrams(props, 1)
+      + unigrams(props, 1)
       )
     val spanFeatures = length + spanShape + sent //+ (sent + spanShape) * length
     featurizer -> spanFeatures

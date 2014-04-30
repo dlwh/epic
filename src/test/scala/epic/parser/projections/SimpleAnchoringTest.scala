@@ -27,7 +27,7 @@ import epic.trees.{TreeInstance, AnnotatedLabel}
  * @author dlwh
  */
 @RunWith(classOf[JUnitRunner])
-class SimpleAnchoringTest  extends ParserTestHarness with FunSuite {
+class SimpleAnchoringTest  extends FunSuite with ParserTestHarness {
 
   test("We can parse using simple anchoring") {
     val gen = ParserTestHarness.simpleParser

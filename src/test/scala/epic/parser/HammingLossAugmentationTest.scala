@@ -8,7 +8,7 @@ import epic.trees.AnnotatedLabel
  *
  * @author dlwh
  **/
-class HammingLossAugmentationTest  extends ParserTestHarness with FunSuite {
+class HammingLossAugmentationTest  extends FunSuite with ParserTestHarness {
 
   test("training set trees, gold has 0 loss, max tree has loss at least as big.") {
     val hla = new HammingLossAugmentation(ParserTestHarness.simpleGrammar, ParserTestHarness.simpleLexicon, (_:AnnotatedLabel).baseAnnotatedLabel, (_:AnnotatedLabel).isIntermediate).asCoreGrammar(ParserTestHarness.getTrainTrees())

@@ -48,7 +48,7 @@ object SemiNERPipeline extends LazyLogging {
     val gazetteer =  None//Gazetteer.ner("en")
 
     // build feature Index
-    val model = new SegmentationModelFactory(NERType.OutsideSentence, NERType.NotEntity, gazetteer = gazetteer)(params.cache).makeModel(train)
+    val model = new SegmentationModelFactory(NERType.OutsideSentence, NERType.NotEntity, gazetteer = gazetteer).makeModel(train)
     val obj = new ModelObjective(model, train, params.nthreads)
     val cached = new CachedBatchDiffFunction(obj)
     if(params.checkGradient) {
@@ -135,7 +135,6 @@ object SemiConllNERPipeline extends LazyLogging {
 
 
     // build feature Index
-    implicit val broker = params.cache
     val model: SemiCRFModel[String, String] = new SegmentationModelFactory("##", "O"/*, gazetteer = Gazetteer.ner("en" )*/).makeModel(train)
     val obj = new ModelObjective(model, train, params.nthreads)
     val cached = new CachedBatchDiffFunction(obj)

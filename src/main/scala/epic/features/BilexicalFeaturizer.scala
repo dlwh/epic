@@ -196,6 +196,7 @@ object IndexedBilexicalFeaturizer {
     }
   }
 
+  /*
   def fromData[L, W](headFeaturizer: IndexedWordFeaturizer[W],
                      depFeaturizer: IndexedWordFeaturizer[W],
                   depTrees: IndexedSeq[DependencyTree[L, W]],
@@ -216,6 +217,7 @@ object IndexedBilexicalFeaturizer {
 
     new ProductIndexedBilexicalFeaturizer[W](headFeaturizer, depFeaturizer, index)
   }
+  */
 
 }
 

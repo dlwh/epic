@@ -26,7 +26,7 @@ import org.scalatest.junit._
  * @author dlwh
  */
 @RunWith(classOf[JUnitRunner])
-class ProductParserTest extends ParserTestHarness with FunSuite {
+class ProductParserTest extends FunSuite with ParserTestHarness {
 
 
   test("two parsers test") {

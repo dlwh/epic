@@ -47,18 +47,21 @@ class WordPropertyFeaturizer(wordCounts: Counter[String, Double],
     val indices = words.map(wordIndex)
     val myFeatures = (0 until words.length).map(i => if (indices(i) < 0) featuresFor(words(i)).toArray else knownWordFeatures(indices(i)))
     def featuresForWord(pos: Int): Array[Feature] = {
+      if(pos < 0) Array(BeginSentFeature)
+      else if(pos >= words.length) Array(EndSentFeature)
+      else {
       val base = myFeatures(pos)
-
-      // initial words nee special treatment
-      if( (words(pos).charAt(0).isUpper || words(pos).charAt(0).isTitleCase) && base.length > 1) {
-        val isInitialWord = (pos == 0 || words(pos -1) == "``")
-        if(isInitialWord) {
-          base ++ base.map(FirstWordCapsAnd)
+        // initial words nee special treatment
+        if( (words(pos).charAt(0).isUpper || words(pos).charAt(0).isTitleCase) && base.length > 1) {
+          val isInitialWord = (pos == 0 || words(pos -1) == "``")
+          if(isInitialWord) {
+            base ++ base.map(FirstWordCapsAnd)
+          } else {
+            base ++ base.map(NthWordCapsAnd)
+          }
         } else {
-          base ++ base.map(NthWordCapsAnd)
+          base
         }
-      } else {
-        base
       }
     }
 

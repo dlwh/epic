@@ -12,7 +12,7 @@ import epic.framework.Feature
 object BrownClusters {
   // word -> cluster, clusters
   lazy val theClusters: Map[String, String] = {
-    val in = new GZIPInputStream(this.getClass.getResourceAsStream("brown-turian-rcv1.txt.gz"))
+    val in = new GZIPInputStream(this.getClass.getResourceAsStream("bllip-clusters.gz"))
     val src = Source.fromInputStream(in)
     val pairs = for {
       line <- src.getLines
@@ -35,14 +35,14 @@ object BrownClusters {
 
   trait DSL {
     val brown = new BrownClusterFeaturizer()
-    def brownClusters(prefixBegin: Int = 5, prefixEnd: Int = 10) = new BrownClusterFeaturizer(prefixBegin, prefixEnd)
+    def brownClusters(prefixBegin: Int = 7, prefixEnd: Int = 10) = new BrownClusterFeaturizer(prefixBegin, prefixEnd)
   }
 }
 
 
 case class BrownClusterFeature(f: String) extends Feature
 
-case class BrownClusterFeaturizer(prefixBegin: Int = 5, prefixEnd: Int = 10) extends WordFeaturizer[String] with Serializable {
+case class BrownClusterFeaturizer(prefixBegin: Int = 7, prefixEnd: Int = 10) extends WordFeaturizer[String] with Serializable {
 
   def anchor(w: IndexedSeq[String]): WordFeatureAnchoring[String] = new WordFeatureAnchoring[String] {
     def featuresForWord(pos: Int): Array[Feature] = {
@@ -56,9 +56,11 @@ case class BrownClusterFeaturizer(prefixBegin: Int = 5, prefixEnd: Int = 10) ext
 
     val features = words.map { w =>
       val c = BrownClusters.clusterFor(w)
-      clusterFeatures.getOrElse(c, Array.empty[Feature])
+      clusterFeatures.getOrElse(c, Array[Feature](UnknownWordFeature))
     }
   }
+
+  case object UnknownWordFeature extends Feature
 
   // prefixes of lengths prefixBegin to prefixEnd
   private val clusterFeatures = {

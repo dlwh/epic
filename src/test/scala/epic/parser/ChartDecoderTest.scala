@@ -26,7 +26,7 @@ import epic.trees.AnnotatedLabel
  * @author dlwh
  */
 @RunWith(classOf[JUnitRunner])
-class ChartDecoderTest extends ParserTestHarness with FunSuite {
+class ChartDecoderTest extends FunSuite with ParserTestHarness {
 
   test("ViterbiDecoder") {
     val gen = Parser(ParserTestHarness.refinedGrammar, new ViterbiDecoder[AnnotatedLabel, String])

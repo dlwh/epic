@@ -25,7 +25,7 @@ import org.scalatest.junit._
  * @author dlwh
  */
 @RunWith(classOf[JUnitRunner])
-class EPParserTest extends ParserTestHarness with FunSuite {
+class EPParserTest extends FunSuite with ParserTestHarness {
 
   test("two parsers test") {
     val grammar = ParserTestHarness.refinedGrammar
