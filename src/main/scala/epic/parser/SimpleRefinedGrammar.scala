@@ -41,12 +41,10 @@ class SimpleRefinedGrammar[L, L2, W](val grammar: BaseGrammar[L],
                                      val refinements: GrammarRefinements[L, L2],
                                      val refinedGrammar: BaseGrammar[L2],
                                      val ruleScoreArray: Array[Array[Double]],
-                                     spanScoreArray: Array[Array[Double]],
                                      parentCompatibleRefinements: Array[Array[Array[Int]]],
                                      childCompatibleRefinements: Array[Array[Array[Int]]],
                                      val tagScorer: TagScorer[L2, W]) extends RefinedGrammar[L, W] with Serializable {
   def ruleScore(r: Int, ruleRef: Int):Double = ruleScoreArray(r)(ruleRef)
-  def spanScore(l: Int, ref: Int):Double = spanScoreArray(l)(ref)
 
   def ruleScore(refinedRule: Int): Double = {
     val ref = refinements.rules.localize(refinedRule)
@@ -71,7 +69,7 @@ class SimpleRefinedGrammar[L, L2, W](val grammar: BaseGrammar[L],
       } else {
         0.0
       }
-      baseScore + spanScoreArray(label)(ref)
+      baseScore
     }
 
     def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int) = {
@@ -87,9 +85,8 @@ class SimpleRefinedGrammar[L, L2, W](val grammar: BaseGrammar[L],
   /**
    * Writes a text representation of the grammar to the output.
    * @param out
-   * @param includeSpanScores
    */
-  def prettyPrint(out: Writer = new PrintWriter(System.out), includeSpanScores: Boolean = false) = {
+  def prettyPrint(out: Writer = new PrintWriter(System.out)) = {
     val printout = new PrintWriter(out)
     import printout._
 
