@@ -89,7 +89,7 @@ class ParserChartConstraintsFactory[L, W](val parser: Parser[L, W],
       throw new NoParseException("No parse for sentence we're trying to constrain!", marg.words)
     val (botLabelScores, unaryScores) = computeScores(length, marg)
 
-    val vit = new ViterbiDecoder[L, W].extractBestParse(marg.asInstanceOf[ChartMarginal[L, W]])
+    val vit = new ViterbiDecoder[L, W].extractBestParse(marg)
 
     val labelThresholds = extractLabelThresholds(length,
       grammar.labelIndex.size,
