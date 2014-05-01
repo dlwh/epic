@@ -6,6 +6,7 @@ import breeze.util._
 import epic.trees.AnnotatedLabel
 import io.{Codec, Source}
 import chalk.text.LanguagePack
+import epic.preprocess.TreebankTokenizer
 
 /**
  * Simple class that reads in a bunch of files and parses them. Output is dumped to standard out.
@@ -35,7 +36,7 @@ object ParseText {
     }
 
     val sentenceSegmenter = LanguagePack.English.sentenceSegmenter
-    val tokenizer = LanguagePack.English.treebankTokenizer.get
+    val tokenizer = new TreebankTokenizer
 
     for(f <- files) {
       val text = Source.fromFile(f)(Codec.UTF8).mkString
