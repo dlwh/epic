@@ -69,7 +69,7 @@ object SentimentTreebankPipeline extends LazyLogging {
       SentimentLossAugmentation.noLoss;
     }
     val constrainer = new SentimentLossAugmentation(trainTrees,
-      gen.grammar,
+      gen.topology,
       gen.lexicon,
       new GoldBracketingsConstraints,
       sentimentLoss,

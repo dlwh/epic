@@ -23,7 +23,7 @@ case class ProjectingCoreGrammar[L, W](parser: Parser[L, W],
                                        projector: ChartProjector[L, W]) extends CoreGrammar[L, W] {
 
 
-  def topology = parser.grammar
+  def topology = parser.topology
 
   def lexicon = parser.lexicon
 

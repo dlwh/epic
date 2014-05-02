@@ -49,7 +49,7 @@ class SpanModel[L, L2, W](val featurizer: RefinedFeaturizer[L, W, Feature],
                           val featureIndex: Index[Feature],
                           val annotator: (BinarizedTree[L], IndexedSeq[W]) => BinarizedTree[IndexedSeq[L2]],
                           val coreGrammar: CoreGrammar[L, W],
-                          val baseGrammar: RuleTopology[L],
+                          val topology: RuleTopology[L],
                           val lexicon: Lexicon[L, W],
                           val refinedGrammar: RuleTopology[L2],
                           val refinements: GrammarRefinements[L, L2],
@@ -60,7 +60,7 @@ class SpanModel[L, L2, W](val featurizer: RefinedFeaturizer[L, W, Feature],
   override def initialValueForFeature(f: Feature) = initialFeatureVal(f) getOrElse 0.0
 
   def inferenceFromWeights(weights: DenseVector[Double]) = {
-    val dpGrammar = new DotProductGrammar(baseGrammar, lexicon, refinedGrammar, refinements, weights, featurizer)
+    val dpGrammar = new DotProductGrammar(topology, lexicon, refinedGrammar, refinements, weights, featurizer)
     new LatentParserInference(featurizer, annotator, dpGrammar, coreGrammar, refinements)
   }
 

@@ -45,7 +45,7 @@ class LexModel[L, L2, W](bundle: LexGrammarBundle[L, L2, W],
     m.expectedCounts(indexed, accum, scale)
   }
 
-  def baseGrammar: RuleTopology[L] = bundle.baseGrammar
+  def topology: RuleTopology[L] = bundle.baseGrammar
   def lexicon = bundle.baseLexicon
 
   val featureIndex = indexed.index

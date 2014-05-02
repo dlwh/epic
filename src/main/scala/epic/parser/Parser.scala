@@ -30,7 +30,7 @@ final case class Parser[L,W](coreGrammar: CoreGrammar[L, W],
                              marginalFactory: RefinedChartMarginal.Factory[L, W],
                              decoder: ChartDecoder[L, W] = ChartDecoder[L, W]()) extends (IndexedSeq[W]=>Tree[L]) {
 
-  def grammar = coreGrammar.topology
+  def topology = coreGrammar.topology
   def lexicon = coreGrammar.lexicon
 
   /**

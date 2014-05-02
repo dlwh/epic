@@ -30,7 +30,7 @@ import epic.util.CacheBroker
  */
 
 trait ParserExtractable[L, W] {
-  def baseGrammar: RuleTopology[L]
+  def topology: RuleTopology[L]
   def lexicon: Lexicon[L, W]
   def extractParser(weights: DenseVector[Double]): Parser[L, W]
 }

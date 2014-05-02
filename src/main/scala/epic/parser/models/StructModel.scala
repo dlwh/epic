@@ -38,7 +38,7 @@ import epic.trees.annotations.KMAnnotator
  * @param annotator
  * @param projections
  * @param baseFactory
- * @param baseGrammar
+ * @param topology
  * @param lexicon
  * @param initialFeatureVal
  * @tparam L
@@ -50,7 +50,7 @@ class StructModel[L, L2, W](indexedFeatures: IndexedFeaturizer[L, L2, W],
                         annotator: TreeAnnotator[L, W, L2],
                         val projections: GrammarRefinements[L, L2],
                         baseFactory: CoreGrammar[L, W],
-                        val baseGrammar: RuleTopology[L],
+                        val topology: RuleTopology[L],
                         val lexicon: Lexicon[L, W],
                         initialFeatureVal: (Feature => Option[Double]) = { _ => None }) extends ParserModel[L, W] with Serializable {
   type Inference = AnnotatedParserInference[L, W]
@@ -62,7 +62,7 @@ class StructModel[L, L2, W](indexedFeatures: IndexedFeaturizer[L, L2, W],
 
   def inferenceFromWeights(weights: DenseVector[Double]) = {
     val lexicon = new FeaturizedLexicon(weights, indexedFeatures)
-    val grammar = FeaturizedGrammar(this.baseGrammar, this.lexicon, projections, weights, indexedFeatures, lexicon)
+    val grammar = FeaturizedGrammar(this.topology, this.lexicon, projections, weights, indexedFeatures, lexicon)
     def reannotate(tree: BinarizedTree[L], words: Seq[W]) = {
       annotator(tree, words).map(projections.labels.localize)
     }

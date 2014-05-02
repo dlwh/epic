@@ -28,7 +28,7 @@ class NeuralModel[L, L2, W](baseModel: SpanModel[L, L2, W],
                             numOutputs: Int,
                             initialFeatureVal: (Feature => Option[Double]) = { _ => None })  extends StandardExpectedCounts.Model[TreeInstance[L, W]] with ParserExtractable[L, W] {
 
-  def baseGrammar: RuleTopology[L] = baseModel.baseGrammar
+  def topology: RuleTopology[L] = baseModel.topology
   def lexicon: Lexicon[L, W] = baseModel.lexicon
 
 

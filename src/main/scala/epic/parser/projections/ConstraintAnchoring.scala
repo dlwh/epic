@@ -56,7 +56,7 @@ class ParserChartConstraintsFactory[L, W](val parser: Parser[L, W],
                                           threshold: Double = math.exp(-9)) extends ChartConstraints.Factory[L, W] with Serializable with SafeLogging {
   require(threshold >= 0 && threshold <= 1, s"Threshold must be between 0 and 1, but whas $threshold")
   import parser._
-  def labelIndex = grammar.labelIndex
+  def labelIndex = topology.labelIndex
 
   def overallStatistics = {
     val xp = pruned.get()
@@ -73,7 +73,7 @@ class ParserChartConstraintsFactory[L, W](val parser: Parser[L, W],
   val notprunedtags = new AtomicInteger(0)
 
 
-  private val synthetics = BitSet.empty ++ (0 until grammar.labelIndex.size).filter(l => isIntermediate(labelIndex.get(l)))
+  private val synthetics = BitSet.empty ++ (0 until topology.labelIndex.size).filter(l => isIntermediate(labelIndex.get(l)))
 
   def constraints(w: IndexedSeq[W]):ChartConstraints[L] = constraints(w, GoldTagPolicy.noGoldTags[L])
   def constraints(words: IndexedSeq[W], gold: GoldTagPolicy[L]):ChartConstraints[L] = {
@@ -92,12 +92,12 @@ class ParserChartConstraintsFactory[L, W](val parser: Parser[L, W],
     val vit = new ViterbiDecoder[L, W].extractBestParse(marg)
 
     val labelThresholds = extractLabelThresholds(length,
-      grammar.labelIndex.size,
-      botLabelScores, grammar.labelIndex,
+      topology.labelIndex.size,
+      botLabelScores, topology.labelIndex,
       gold.isGoldBotTag)
     val topLabelThresholds = extractLabelThresholds(length,
-      grammar.labelIndex.size,
-      unaryScores,grammar.labelIndex,
+      topology.labelIndex.size,
+      unaryScores,topology.labelIndex,
       gold.isGoldTopTag)
     for(i <- 0 until length) {
       assert(labelThresholds(i, i+1) != null && labelThresholds(i,i+1).nonEmpty, "label thresholds" + labelThresholds(i, i+1))
@@ -164,7 +164,7 @@ class ParserChartConstraintsFactory[L, W](val parser: Parser[L, W],
   }
 
   def computePruningStatistics(marg: ParseMarginal[L, W], gold: GoldTagPolicy[L]): (PruningStatistics, PruningStatistics) = {
-    val counts = DenseVector.zeros[Double](grammar.labelIndex.size)
+    val counts = DenseVector.zeros[Double](topology.labelIndex.size)
     val (scores, topScores) = computeScores(marg.length, marg)
     var nConstructed = 0
     val thresholds = ArrayBuffer[Double]()
@@ -174,7 +174,7 @@ class ParserChartConstraintsFactory[L, W](val parser: Parser[L, W],
       {
       val arr = scores(TriangularArray.index(i, j))
       if (arr ne null)
-        for(c <- 0 until grammar.labelIndex.size) {
+        for(c <- 0 until topology.labelIndex.size) {
           thresholds += arr(c)
           nConstructed += 1
           if(gold.isGoldBotTag(i, j, c)) {
@@ -221,9 +221,9 @@ class ParserChartConstraintsFactory[L, W](val parser: Parser[L, W],
         val index = TriangularArray.index(begin, end)
         if (score != 0.0) {
           if (topScores(index) eq null) {
-            topScores(index) = new Array[Double](grammar.labelIndex.size)
+            topScores(index) = new Array[Double](topology.labelIndex.size)
           }
-          topScores(index)(grammar.parent(rule)) = topScores(index)(grammar.parent(rule)) max score
+          topScores(index)(topology.parent(rule)) = topScores(index)(topology.parent(rule)) max score
         }
       }
 
@@ -232,7 +232,7 @@ class ParserChartConstraintsFactory[L, W](val parser: Parser[L, W],
         val index = TriangularArray.index(begin, end)
         if (score != 0.0) {
           if (scores(index) eq null) {
-            scores(index) = new Array[Double](grammar.labelIndex.size)
+            scores(index) = new Array[Double](topology.labelIndex.size)
           }
           scores(index)(tag) = scores(index)(tag) max score
         }

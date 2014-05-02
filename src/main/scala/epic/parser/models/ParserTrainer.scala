@@ -109,19 +109,19 @@ object ParserTrainer extends epic.parser.ParserPipeline with LazyLogging {
     var theTrees = trainTrees.toIndexedSeq.filterNot(sentTooLong(_, params.maxParseLength))
 
     if(useConstraints && enforceReachability)  {
-      val refGrammar = GenerativeParser.annotated(initialParser.grammar, initialParser.lexicon, TreeAnnotator.identity, trainTrees)
+      val refGrammar = GenerativeParser.annotated(initialParser.topology, initialParser.lexicon, TreeAnnotator.identity, trainTrees)
       val proj = new OracleParser(refGrammar)
       theTrees = theTrees.par.map(ti => ti.copy(tree=proj.forTree(ti.tree, ti.words, constraints.constraints(ti.words)))).seq.toIndexedSeq
     }
 
     var baseMeasure = if(useConstraints) {
-      new ConstraintCoreGrammarAdaptor(initialParser.grammar, initialParser.lexicon, constraints)
+      new ConstraintCoreGrammarAdaptor(initialParser.topology, initialParser.lexicon, constraints)
     } else {
-      CoreGrammar.identity(initialParser.grammar, initialParser.lexicon)
+      CoreGrammar.identity(initialParser.topology, initialParser.lexicon)
     }
 
     if(lossAugment)
-      baseMeasure *= new HammingLossAugmentation(initialParser.grammar, initialParser.lexicon, (_:AnnotatedLabel).baseAnnotatedLabel,  (_:AnnotatedLabel).isIntermediate).asCoreGrammar(theTrees)
+      baseMeasure *= new HammingLossAugmentation(initialParser.topology, initialParser.lexicon, (_:AnnotatedLabel).baseAnnotatedLabel,  (_:AnnotatedLabel).isIntermediate).asCoreGrammar(theTrees)
     
     val model = modelFactory.make(theTrees, baseMeasure)
     val obj = new ModelObjective(model, theTrees, params.threads)

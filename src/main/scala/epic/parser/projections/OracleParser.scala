@@ -180,8 +180,8 @@ object OracleParser {
       new CachedChartConstraintsFactory[AnnotatedLabel, String](uncached)
     })
 
-    val refGrammar = GenerativeParser.annotated(initialParser.grammar, initialParser.lexicon, ann, trainTrees)
-    val coreGrammar = new ConstraintCoreGrammarAdaptor(initialParser.grammar, initialParser.lexicon, constraints)
+    val refGrammar = GenerativeParser.annotated(initialParser.topology, initialParser.lexicon, ann, trainTrees)
+    val coreGrammar = new ConstraintCoreGrammarAdaptor(initialParser.topology, initialParser.lexicon, constraints)
 
     val annDevTrees = devTrees.map(ann)
 
