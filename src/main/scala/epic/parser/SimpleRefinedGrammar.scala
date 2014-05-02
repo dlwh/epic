@@ -44,8 +44,8 @@ class SimpleRefinedGrammar[L, L2, W](val topology: RuleTopology[L],
 
   def ruleScore(refinedRule: Int): Double = {
     val ref = refinements.rules.localize(refinedRule)
-    val parent = refinements.rules.project(refinedRule)
-    ruleScoreArray(parent)(ref)
+    val projected = refinements.rules.project(refinedRule)
+    ruleScoreArray(projected)(ref)
   }
 
   def anchor(w: IndexedSeq[W]) = new SimpleRefinedGrammar.Anchoring(this, w)

@@ -9,7 +9,7 @@ import breeze.collection.mutable.TriangularArray
  *
  * @author dlwh
  **/
-final case class SimpleChartMarginal[L, L2, W](anch: ProjectionsRefinedAnchoring[L, L2, W],
+final case class SimpleChartMarginal[L, L2, W](anch: SimpleRefinedGrammar.Anchoring[L, L2, W],
                                                inside: SimpleParseChart[L2], outside: SimpleParseChart[L2],
                                                isMaxMarginal: Boolean = true) extends ParseMarginal[L, W] {
   val anchoring = AugmentedAnchoring.fromRefined(anch)
@@ -81,21 +81,19 @@ final case class SimpleChartMarginal[L, L2, W](anch: ProjectionsRefinedAnchoring
             while(split < end) {
               val bInside = inside.top.labelScore(begin, split, b)
               val cInside = inside.top.labelScore(split, end, c)
-//              val ruleScore = anch.ref
+              val ruleScore = anch.grammar.ruleScore(r)
 
-              val bCoarse = anch.refinements.labels.project(b)
-              val bRef = anch.refinements.labels.localize(b)
-              val cCoarse = anch.refinements.labels.project(c)
-              val cRef = anch.refinements.labels.localize(c)
+              val coarseR = anch.refinements.rules.project(r)
+              val refR = anch.refinements.rules.localize(r)
 
+              val margScore = bInside + cInside + ruleScore + aOutside - logPartition
 
+              if(margScore != Double.NegativeInfinity) {
+                spanVisitor.visitBinaryRule(begin, split, end, coarseR, refR, math.exp(margScore))
+              }
 
               split += 1
             }
-
-
-
-
 
             i += 1
           }
@@ -104,6 +102,31 @@ final case class SimpleChartMarginal[L, L2, W](anch: ProjectionsRefinedAnchoring
 
       }
     }
+
+    if(!spanVisitor.skipUnaryRules)
+      for {
+        span <- 1 to words.length
+        begin <- 0 to (words.length - span)
+        end = begin + span
+        parent <- 0 until anch.topology.labelIndex.size
+      } {
+        val end = begin + span
+        val aOutside = outside.top(begin, end, parent)
+        val labelMarginal = inside.top(begin, end, parent) + aOutside - logPartition
+        if (labelMarginal > spanThreshold) {
+
+          for (r <- anch.refinedTopology.indexedUnaryRulesWithParent(parent)) {
+            val b = grammar.child(r)
+            val bScore = inside.bot.labelScore(begin, end, b)
+            val rScore = anch.grammar.ruleScore(r)
+            val prob = math.exp(bScore + aOutside + rScore - logPartition)
+            val refR = anch.refinements.rules.localize(r)
+            val projR = anch.refinements.rules.project(r)
+            if (prob > 0)
+              spanVisitor.visitUnaryRule(begin, end, projR, refR, prob)
+          }
+        }
+      }
 
   }
 }
