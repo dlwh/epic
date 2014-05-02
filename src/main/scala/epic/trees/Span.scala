@@ -1,4 +1,7 @@
 package epic.trees
+
+import spire.syntax.cfor
+
 /*
  Copyright 2012 David Hall
 
@@ -16,7 +19,7 @@ package epic.trees
 */
 
 
-case class Span(begin: Int, end: Int)  {
+class Span(val begin: Int, val end: Int)  {
   require(begin <= end)
 
   def isEmpty = begin == end
@@ -25,6 +28,11 @@ case class Span(begin: Int, end: Int)  {
   def length = end - begin
 
   def map[U](f: Int=>U) = Range(begin,end).map(f)
+
+  @inline
+  def foreach(f: Int=>Unit) = {
+    cfor.cfor(begin)(_ < end, _ +1) { f }
+  }
 
   def contains(pos: Int) = pos >= begin && pos < end
 
@@ -38,7 +46,14 @@ case class Span(begin: Int, end: Int)  {
     ||  (other.begin < begin && other.end < end && other.end > begin)
   )
 
+  override def hashCode(): Int = {
+    (begin, end).hashCode()
+  }
 
+  override def equals(obj: scala.Any): Boolean = this match {
+    case other: Span => this.begin == other.begin && this.end == other.end
+    case _ => false
+  }
 
   /**
   * Return true if this' range contains the other range.
@@ -48,4 +63,8 @@ case class Span(begin: Int, end: Int)  {
   }
 
   override def toString = s"Span($begin, $end)"
+}
+
+object Span {
+  def apply(begin: Int, end: Int) = new Span(begin, end)
 }
