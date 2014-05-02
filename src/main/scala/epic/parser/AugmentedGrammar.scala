@@ -28,9 +28,9 @@ import epic.constraints.ChartConstraints
  * */
 @SerialVersionUID(1L)
 final case class AugmentedGrammar[L, W](refined: RefinedGrammar[L, W], core: CoreGrammar[L, W]) {
-  def grammar: BaseGrammar[L] = refined.grammar
+  def topology: RuleTopology[L] = refined.topology
   def lexicon: Lexicon[L, W] = refined.lexicon
-  assert(grammar.eq(core.grammar) || grammar == core.grammar, "Grammars of core and refined do not match!")
+  assert(topology.eq(core.topology) || topology == core.topology, "Grammars of core and refined do not match!")
   assert(lexicon.eq(core.lexicon) || lexicon == core.lexicon, "Lexicons of core and refined do not match!")
 
   def anchor(words: IndexedSeq[W]): AugmentedAnchoring[L, W] = {
@@ -45,7 +45,7 @@ object AugmentedGrammar {
    * and an identity [[epic.parser.RefinedGrammar]]
    */
   def fromCore[L, W](core: CoreGrammar[L, W]) = {
-    AugmentedGrammar(RefinedGrammar.identity(core.grammar, core.lexicon), core)
+    AugmentedGrammar(RefinedGrammar.identity(core.topology, core.lexicon), core)
   }
 
   /**
@@ -53,7 +53,7 @@ object AugmentedGrammar {
    * and an identity [[epic.parser.CoreGrammar]]
    */
   def fromRefined[L, W](refined: RefinedGrammar[L, W]) = {
-    AugmentedGrammar(refined, CoreGrammar.identity(refined.grammar, refined.lexicon))
+    AugmentedGrammar(refined, CoreGrammar.identity(refined.topology, refined.lexicon))
   }
 }
 
@@ -65,7 +65,7 @@ object AugmentedGrammar {
 @SerialVersionUID(2L)
 final case class AugmentedAnchoring[L, W](refined: RefinedAnchoring[L, W], core: CoreAnchoring[L, W]) {
 
-  def grammar: BaseGrammar[L] = refined.grammar
+  def grammar: RuleTopology[L] = refined.grammar
   def lexicon: Lexicon[L, W] = refined.lexicon
   def words = refined.words
 
@@ -75,7 +75,7 @@ final case class AugmentedAnchoring[L, W](refined: RefinedAnchoring[L, W], core:
 
   /**
    * Scores the [[epic.trees.BinaryRule]] with its refinement in this context.
-   * Indices are with respect to the [[epic.parser.BaseGrammar]] and refined's refinements
+   * Indices are with respect to the [[epic.parser.RuleTopology]] and refined's refinements
    * @param begin
    * @param split
    * @param end
@@ -91,7 +91,7 @@ final case class AugmentedAnchoring[L, W](refined: RefinedAnchoring[L, W], core:
 
   /**
    * Scores the [[epic.trees.UnaryRule]] with its refinement in this context.
-   * Indices are with respect to the [[epic.parser.BaseGrammar]] and refined's refinements
+   * Indices are with respect to the [[epic.parser.RuleTopology]] and refined's refinements
    * @param begin
    * @param end
    * @param rule the index of the rule
@@ -106,7 +106,7 @@ final case class AugmentedAnchoring[L, W](refined: RefinedAnchoring[L, W], core:
 
   /**
    * Scores the label (of type L) with its refinement in this context.
-   * Indices are with respect to the [[epic.parser.BaseGrammar]] and refined's refinements
+   * Indices are with respect to the [[epic.parser.RuleTopology]] and refined's refinements
    * @param begin
    * @param end
    * @param label the index of the label
@@ -134,7 +134,7 @@ object AugmentedAnchoring {
 
 
   def fromCore[L, W](core: CoreAnchoring[L, W]): AugmentedAnchoring[L, W] = {
-    AugmentedAnchoring(RefinedAnchoring.identity(core.grammar, core.lexicon, core.words), core)
+    AugmentedAnchoring(RefinedAnchoring.identity(core.topology, core.lexicon, core.words), core)
   }
 }
 

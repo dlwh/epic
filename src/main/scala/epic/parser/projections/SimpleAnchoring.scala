@@ -28,7 +28,7 @@ import epic.constraints.ChartConstraints
 case class AnchoredPCFGProjector[L, W](threshold: Double = Double.NegativeInfinity) extends ChartProjector[L, W] {
 
   type MyAnchoring = SimpleAnchoring[L, W]
-  private def normalize(grammar: BaseGrammar[L], ruleScores: OpenAddressHashArray[Double], totals: OpenAddressHashArray[Double]):OpenAddressHashArray[Double] = {
+  private def normalize(grammar: RuleTopology[L], ruleScores: OpenAddressHashArray[Double], totals: OpenAddressHashArray[Double]):OpenAddressHashArray[Double] = {
     if(ruleScores eq null) null
     else {
       val r = new OpenAddressHashArray[Double](ruleScores.length, Double.NegativeInfinity, ruleScores.activeSize)
@@ -103,7 +103,7 @@ case class AnchoredRuleMarginalProjector[L, W](threshold: Double = Double.Negati
 }
 
 @SerialVersionUID(3)
-case class SimpleAnchoring[L, W](grammar: BaseGrammar[L],
+case class SimpleAnchoring[L, W](topology: RuleTopology[L],
                             lexicon: Lexicon[L, W],
                             words: IndexedSeq[W],
                             spanScores: Array[OpenAddressHashArray[Double]], // triangular index -> label -> score

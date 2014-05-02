@@ -98,7 +98,7 @@ case class ProductParserModelFactory(baseParser: ParserParams.XbarGrammar,
       for( (ref,m) <- r.parent._2.zipWithIndex) yield ComponentFeature(m, r.map( pair => pair._1  -> pair._2(m)))
     }
 
-    val annGrammar = BaseGrammar(annTrees.head.tree.label, annBinaries, annUnaries)
+    val annGrammar = RuleTopology(annTrees.head.tree.label, annBinaries, annUnaries)
     val firstLevelRefinements = GrammarRefinements(xbarGrammar, annGrammar, {(_: AnnotatedLabel).baseAnnotatedLabel})
     val secondLevel = GrammarRefinements(annGrammar, {split(_:AnnotatedLabel,substateMap)}, {splitRule(_ :Rule[AnnotatedLabel], {split(_:AnnotatedLabel,substateMap)})}, unsplit)
     val finalRefinements = firstLevelRefinements compose secondLevel

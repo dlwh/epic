@@ -35,7 +35,7 @@ class OracleParser[L, L2, W](val refinedGrammar: SimpleRefinedGrammar[L, L2, W])
 
   private var problems  = 0
   private var total = 0
-  import refinedGrammar.grammar
+  import refinedGrammar.topology
 
   private def refinements = refinedGrammar.refinements
 
@@ -44,7 +44,7 @@ class OracleParser[L, L2, W](val refinedGrammar: SimpleRefinedGrammar[L, L2, W])
               constraints: ChartConstraints[L]) = try {
     val projectedTree: BinarizedTree[L] = tree.map(refinements.labels.project)
     cache.getOrElseUpdate(words, {
-      val treeconstraints = ChartConstraints.fromTree(grammar.labelIndex, projectedTree)
+      val treeconstraints = ChartConstraints.fromTree(topology.labelIndex, projectedTree)
       if(constraints.top.containsAll(treeconstraints.top) && constraints.bot.containsAll(treeconstraints.bot)) {
         synchronized(total += 1)
         tree

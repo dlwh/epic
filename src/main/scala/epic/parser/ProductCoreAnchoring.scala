@@ -26,7 +26,7 @@ import epic.constraints.ChartConstraints
 final case class ProductCoreAnchoring[L, W](s1: CoreAnchoring[L, W],
                                             s2: CoreAnchoring[L, W],
                                             alpha: Double = 1.0) extends CoreAnchoring[L, W] {
-  val grammar = s1.grammar
+  val topology = s1.topology
 
   def lexicon = s1.lexicon
 

@@ -62,7 +62,7 @@ class EPParserModel[L, W](val constrainer: CoreGrammar[L, W],
                           maxEPIter: Int,
                           initFeatureValue: Feature => Option[Double] = {(_:Feature) => None},
                           epInGold: Boolean = false, dropOutFraction: Double = 0.0)(models:EPModel.CompatibleModel[TreeInstance[L, W], CoreAnchoring[L, W]]*) extends EPModel[TreeInstance[L, W], CoreAnchoring[L, W]](maxEPIter, initFeatureValue, epInGold, dropOutFraction)(models:_*) with ParserExtractable[L, W] with Serializable {
-  def baseGrammar = constrainer.grammar
+  def baseGrammar = constrainer.topology
   def lexicon = constrainer.lexicon
 
   def extractParser(weights: DenseVector[Double]): Parser[L, W] = {

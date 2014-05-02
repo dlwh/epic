@@ -30,7 +30,7 @@ import breeze.collection.mutable.TriangularArray
  */
 trait ParseMarginal[L, W] extends VisitableMarginal[AnchoredVisitor[L]] {
   def anchoring: AugmentedAnchoring[L, W]
-  def grammar:BaseGrammar[L] = anchoring.grammar
+  def grammar:RuleTopology[L] = anchoring.grammar
   def lexicon = anchoring.lexicon
   def logPartition: Double
   def words:IndexedSeq[W] = anchoring.words

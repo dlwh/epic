@@ -87,8 +87,8 @@ object AnchoredSpanProjector {
    */
   case class AnchoredData(topType: TriangularArray[DenseVector[Double]],
                           botType: TriangularArray[DenseVector[Double]]) {
-    def decode[L](grammar: BaseGrammar[L]): (TriangularArray[Counter[L, Double]], TriangularArray[Counter[L, Double]]) = {
-      topType.map(grammar.labelEncoder.decode(_)) -> botType.map(grammar.labelEncoder.decode(_))
+    def decode[L](ruleTopology: RuleTopology[L]): (TriangularArray[Counter[L, Double]], TriangularArray[Counter[L, Double]]) = {
+      topType.map(ruleTopology.labelEncoder.decode(_)) -> botType.map(ruleTopology.labelEncoder.decode(_))
     }
   }
 

@@ -14,29 +14,29 @@ import scala.collection.immutable.BitSet
  *
  * @author dlwh
  **/
-case class HammingLossAugmentation[L, W](grammar: BaseGrammar[L],
+case class HammingLossAugmentation[L, W](topology: RuleTopology[L],
                                          lexicon: Lexicon[L, W],
                                          proj: L=>L,
                                          intermediate: L=>Boolean,
                                          labelScale: Double = 1.0) extends LossAugmentation[TreeInstance[L, W], CoreAnchoring[L, W]] {
   def lossAugmentation(datum: TreeInstance[L, W]): CoreAnchoring[L, W] = {
-    val gt = GoldTagPolicy.goldTreeForcing[L](datum.tree.map(proj) map (grammar.labelIndex))
+    val gt = GoldTagPolicy.goldTreeForcing[L](datum.tree.map(proj) map topology.labelIndex)
 
-    new HammingLossAugmentationCoreAnchoring(grammar, lexicon, datum.words, gt, intermediates, labelScale)
+    new HammingLossAugmentationCoreAnchoring(topology, lexicon, datum.words, gt, intermediates, labelScale)
   }
 
   def asCoreGrammar(training: IndexedSeq[TreeInstance[L, W]]):CoreGrammar[L, W] = new CoreGrammar[L, W] with Serializable {
-    def grammar: BaseGrammar[L] = HammingLossAugmentation.this.grammar
+    def topology: RuleTopology[L] = HammingLossAugmentation.this.topology
     def lexicon: Lexicon[L, W] = HammingLossAugmentation.this.lexicon
 
     val trainingMap = training.iterator.map(ti => ti.words -> ti).toMap
 
     def anchor(words: IndexedSeq[W]): CoreAnchoring[L, W] = {
-      trainingMap.get(words).map(lossAugmentation).getOrElse(CoreAnchoring.identity(grammar, lexicon, words))
+      trainingMap.get(words).map(lossAugmentation).getOrElse(CoreAnchoring.identity(topology, lexicon, words))
     }
   }
 
-  import grammar.labelIndex
+  import topology.labelIndex
   private val intermediates = BitSet.empty ++ (0 until labelIndex.size).filter(i => intermediate(labelIndex.get(i)))
 
 }
@@ -45,7 +45,7 @@ object HammingLossAugmentation {
 
 }
 
-case class HammingLossAugmentationCoreAnchoring[L, W](grammar: BaseGrammar[L],
+case class HammingLossAugmentationCoreAnchoring[L, W](topology: RuleTopology[L],
                                  lexicon: Lexicon[L, W],
                                  words: IndexedSeq[W],
                                  gt: GoldTagPolicy[L],
@@ -63,7 +63,7 @@ case class HammingLossAugmentationCoreAnchoring[L, W](grammar: BaseGrammar[L],
      * Scores the indexed [[epic.trees.UnaryRule]] rule when it occurs at (begin,end)
      */
     def scoreUnaryRule(begin: Int, end: Int, rule: Int): Double = {
-      val p = grammar.parent(rule)
+      val p = topology.parent(rule)
       if(intermediates.contains(p)) 0.0
       else I(!gt.isGoldTopTag(begin, end, p))*labelScale
     }

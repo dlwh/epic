@@ -167,11 +167,11 @@ final case class GrammarRefinements[C, F](labels: ProjectionIndexer[C, F], rules
 }
 
 object GrammarRefinements {
-  def identity[C](grammar: BaseGrammar[C]): GrammarRefinements[C, C] = {
-    apply(grammar, grammar, Predef.identity[C] _)
+  def identity[C](topology: RuleTopology[C]): GrammarRefinements[C, C] = {
+    apply(topology, topology, Predef.identity[C] _)
   }
 
-  def apply[C, F](coarse: BaseGrammar[C], fine: BaseGrammar[F], proj: F=>C, skipMissingCoarseRules: Boolean = false): GrammarRefinements[C, F] = {
+  def apply[C, F](coarse: RuleTopology[C], fine: RuleTopology[F], proj: F=>C, skipMissingCoarseRules: Boolean = false): GrammarRefinements[C, F] = {
     def projRule(r: Rule[F]) = r map proj
     val rules = ProjectionIndexer(coarse.index, fine.index, projRule, skipMissingCoarse = skipMissingCoarseRules)
     val labels = ProjectionIndexer(coarse.labelIndex, fine.labelIndex, proj)
@@ -179,7 +179,7 @@ object GrammarRefinements {
     new GrammarRefinements(labels, rules)
   }
 
-  def apply[C, F](coarse: BaseGrammar[C], split: C=>Seq[F], proj: F=>C): GrammarRefinements[C, F] = {
+  def apply[C, F](coarse: RuleTopology[C], split: C=>Seq[F], proj: F=>C): GrammarRefinements[C, F] = {
     def splitRule(r: Rule[C]) = r match {
       case BinaryRule(a, b, c) => for(a_ <- split(a); b_ <- split(b); c_ <- split(c)) yield BinaryRule(a_, b_, c_)
       case UnaryRule(a, b, chain) => for(a_ <- split(a); b_ <- split(b)) yield UnaryRule(a_, b_, chain)
@@ -187,7 +187,7 @@ object GrammarRefinements {
     apply(coarse, split, splitRule _, proj)
   }
 
-  def apply[C, F](coarse: BaseGrammar[C], split: C=>Seq[F], splitRule: Rule[C]=>Seq[Rule[F]], proj: F=>C): GrammarRefinements[C, F] = {
+  def apply[C, F](coarse: RuleTopology[C], split: C=>Seq[F], splitRule: Rule[C]=>Seq[Rule[F]], proj: F=>C): GrammarRefinements[C, F] = {
     val fineIndex = {
       val index = Index[F]()
       for( l <- coarse.labelIndex; l2 <- split(l)) {

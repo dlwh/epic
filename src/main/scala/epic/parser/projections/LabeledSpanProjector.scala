@@ -25,7 +25,7 @@ import epic.constraints.ChartConstraints
  * Creates a grammar using only span marginals and unary rule marginals
  * @author dlwh
  */
-case class LabeledSpanProjector[L, W](grammar: BaseGrammar[L], threshold: Double = Double.NegativeInfinity) extends ChartProjector[L, W] {
+case class LabeledSpanProjector[L, W](topology: RuleTopology[L], threshold: Double = Double.NegativeInfinity) extends ChartProjector[L, W] {
 
   type MyAnchoring = SpanAnchoring[L, W]
   private def normalize(ruleScores: OpenAddressHashArray[Double], totals: OpenAddressHashArray[Double]):OpenAddressHashArray[Double] = {
@@ -33,7 +33,7 @@ case class LabeledSpanProjector[L, W](grammar: BaseGrammar[L], threshold: Double
     else {
       val r = new OpenAddressHashArray[Double](ruleScores.length, Double.NegativeInfinity)
       for( (rule, score) <- ruleScores.activeIterator) {
-        val parent = grammar.parent(rule)
+        val parent = topology.parent(rule)
         if(score > 0.9999999) {
           r(rule) = 10
         } else if(score > 0) {
@@ -77,7 +77,7 @@ case class LabeledSpanProjector[L, W](grammar: BaseGrammar[L], threshold: Double
 
 /**
  * TODO
- * @param grammar
+ * @param topology
  * @param lexicon
  * @param words
  * @param spanScores
@@ -86,7 +86,7 @@ case class LabeledSpanProjector[L, W](grammar: BaseGrammar[L], threshold: Double
  * @tparam W
  */
 @SerialVersionUID(1L)
-case class SpanAnchoring[L, W](grammar: BaseGrammar[L],
+case class SpanAnchoring[L, W](topology: RuleTopology[L],
                                lexicon: Lexicon[L, W],
                                words: IndexedSeq[W],
                                spanScores: Array[OpenAddressHashArray[Double]],

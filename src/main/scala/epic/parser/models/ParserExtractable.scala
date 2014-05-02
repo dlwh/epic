@@ -17,7 +17,7 @@ package epic.parser.models
 */
 import epic.framework.{Feature, Model, ModelFactory}
 import breeze.linalg._
-import epic.parser.{GenerativeParser, CoreGrammar, BaseGrammar, Parser}
+import epic.parser.{GenerativeParser, CoreGrammar, RuleTopology, Parser}
 import epic.trees.{UnaryRule, BinaryRule, TreeInstance}
 import epic.lexicon.Lexicon
 import java.io.File
@@ -30,7 +30,7 @@ import epic.util.CacheBroker
  */
 
 trait ParserExtractable[L, W] {
-  def baseGrammar: BaseGrammar[L]
+  def baseGrammar: RuleTopology[L]
   def lexicon: Lexicon[L, W]
   def extractParser(weights: DenseVector[Double]): Parser[L, W]
 }

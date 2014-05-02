@@ -10,7 +10,7 @@ import epic.trees.{BinaryRule, UnaryRule}
  **/
 trait ProjectionsRefinedAnchoring[L, L2, W] extends RefinedAnchoring[L, W] {
   def refinements: GrammarRefinements[L, L2]
-  def refinedGrammar: BaseGrammar[L2]
+  def refinedTopology: RuleTopology[L2]
 
 
   final def validLabelRefinements(begin: Int, end: Int, label: Int) = {
@@ -35,12 +35,12 @@ trait ProjectionsRefinedAnchoring[L, L2, W] extends RefinedAnchoring[L, W] {
 
   final def leftChildRefinement(rule: Int, ruleRef: Int) = {
     val refinedRuleId = refinements.rules.globalize(rule, ruleRef)
-    refinements.labels.localize(refinedGrammar.leftChild(refinedRuleId))
+    refinements.labels.localize(refinedTopology.leftChild(refinedRuleId))
   }
 
   final def rightChildRefinement(rule: Int, ruleRef: Int) = {
     val refinedRuleId = refinements.rules.globalize(rule, ruleRef)
-    refinements.labels.localize(refinedGrammar.rightChild(refinedRuleId))
+    refinements.labels.localize(refinedTopology.rightChild(refinedRuleId))
   }
 
   final def parentRefinement(rule: Int, ruleRef: Int) = {
@@ -49,7 +49,7 @@ trait ProjectionsRefinedAnchoring[L, L2, W] extends RefinedAnchoring[L, W] {
 
   final def childRefinement(rule: Int, ruleRef: Int) = {
     val refinedRuleId = refinements.rules.globalize(rule, ruleRef)
-    refinements.labels.localize(refinedGrammar.child(refinedRuleId))
+    refinements.labels.localize(refinedTopology.child(refinedRuleId))
   }
 
   // TODO: make this not terminally slow!

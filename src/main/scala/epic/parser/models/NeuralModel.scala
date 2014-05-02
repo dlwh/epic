@@ -28,7 +28,7 @@ class NeuralModel[L, L2, W](baseModel: SpanModel[L, L2, W],
                             numOutputs: Int,
                             initialFeatureVal: (Feature => Option[Double]) = { _ => None })  extends StandardExpectedCounts.Model[TreeInstance[L, W]] with ParserExtractable[L, W] {
 
-  def baseGrammar: BaseGrammar[L] = baseModel.baseGrammar
+  def baseGrammar: RuleTopology[L] = baseModel.baseGrammar
   def lexicon: Lexicon[L, W] = baseModel.lexicon
 
 
@@ -98,7 +98,7 @@ object NeuralModel {
   class Grammar[L, W](base: RefinedGrammar[L, W], baseFeaturizer: RefinedFeaturizer[L, W, Feature],
                       labelFeaturizer: RefinedFeaturizer[L, W, Feature], surfaceFeaturizer: IndexedSplitSpanFeaturizer[W],
                       lastLayerWeights: DenseMatrix[Double], layer: Transform[FeatureVector, DenseVector[Double]]#Layer) extends RefinedGrammar[L, W] {
-    def grammar: BaseGrammar[L] = base.grammar
+    def topology: RuleTopology[L] = base.topology
 
     def lexicon: Lexicon[L, W] = base.lexicon
 
@@ -255,10 +255,10 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
   def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]], constrainer: CoreGrammar[AnnotatedLabel, String]) = {
     val annTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]] = trainTrees.map(annotator(_))
     val (annWords, annBinaries, annUnaries) = this.extractBasicCounts(annTrees)
-    val refGrammar = BaseGrammar(AnnotatedLabel.TOP, annBinaries, annUnaries)
+    val refGrammar = RuleTopology(AnnotatedLabel.TOP, annBinaries, annUnaries)
 
     val trees = trainTrees.map(_.mapLabels(_.baseAnnotatedLabel))
-    val xbarGrammar = constrainer.grammar
+    val xbarGrammar = constrainer.topology
     val xbarLexicon = constrainer.lexicon
     val indexedRefinements = GrammarRefinements(xbarGrammar, refGrammar, (_: AnnotatedLabel).baseAnnotatedLabel)
 

@@ -22,7 +22,7 @@ import epic.trees.{Rule, Production, LexicalProduction}
  * A simple Featurizer that just counts lexical and rule productions that are used.
  * @author dlwh
  */
-class RuleFeaturizer[L, W](grammar: BaseGrammar[L]) extends RefinedFeaturizer[L, W, Rule[L]] {
+class RuleFeaturizer[L, W](grammar: RuleTopology[L]) extends RefinedFeaturizer[L, W, Rule[L]] {
   val index = grammar.index
 
   def anchor(w: IndexedSeq[W]) = new Anchoring {

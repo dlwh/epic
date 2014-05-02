@@ -36,7 +36,7 @@ class InsideOutsideTest extends FunSuite {
     val grammar = DSLGrammar.simpleGrammar
     val sent = "She eats pizza without anchovies" split " "
     val io = RefinedChartMarginal(grammar, sent)
-    val counts = io.expectedCounts(new RuleFeaturizer(grammar.grammar))
+    val counts = io.expectedCounts(new RuleFeaturizer(grammar.topology))
     assert(counts(BinaryRule("Sb","NPu","VPu")) near 1.0)
     assert(counts(BinaryRule("NPb","Nu","PPu")) near 1.0)
     assert(counts(BinaryRule("PPb","Pu","Nu")) near 1.0)
@@ -53,7 +53,7 @@ class InsideOutsideTest extends FunSuite {
     val lexicon = lexiconForComplexExample
     val sent = "He has good control" split " "
     val io = RefinedChartMarginal(grammar, sent)
-    val counts = io.expectedCounts(new RuleFeaturizer(grammar.grammar))
+    val counts = io.expectedCounts(new RuleFeaturizer(grammar.topology))
     assert(counts(BinaryRule("Sb","NPu","VPu")) near  1.0)
     assert(counts(BinaryRule("VPb","VBZu","NPu")) near  0.5)
     assert(counts(BinaryRule("VPb","VBZu","ADJPu"))near 0.5)

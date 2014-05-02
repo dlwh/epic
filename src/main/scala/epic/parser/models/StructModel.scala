@@ -50,7 +50,7 @@ class StructModel[L, L2, W](indexedFeatures: IndexedFeaturizer[L, L2, W],
                         annotator: TreeAnnotator[L, W, L2],
                         val projections: GrammarRefinements[L, L2],
                         baseFactory: CoreGrammar[L, W],
-                        val baseGrammar: BaseGrammar[L],
+                        val baseGrammar: RuleTopology[L],
                         val lexicon: Lexicon[L, W],
                         initialFeatureVal: (Feature => Option[Double]) = { _ => None }) extends ParserModel[L, W] with Serializable {
   type Inference = AnnotatedParserInference[L, W]
@@ -98,7 +98,7 @@ case class StructModelFactory(baseParser: ParserParams.XbarGrammar,
     val (initLexicon, initBinaries, initUnaries) = this.extractBasicCounts(transformed)
 
     val (xbarGrammar, xbarLexicon) = baseParser.xbarGrammar(trainTrees)
-    val refGrammar = BaseGrammar(AnnotatedLabel.TOP, initBinaries, initUnaries)
+    val refGrammar = RuleTopology(AnnotatedLabel.TOP, initBinaries, initUnaries)
     val indexedRefinements = GrammarRefinements(xbarGrammar, refGrammar, (_: AnnotatedLabel).baseAnnotatedLabel)
 
     val cFactory = constrainer

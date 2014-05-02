@@ -22,14 +22,13 @@ import java.io.ObjectStreamException
 
 
 /**
- * A minimalist grammar that encodes just enough information to get reachability.
- * That is, it has enough information to decide what parse trees for a given
- * sentence are admissible given a tagged sentence.
+ * A RuleTopology is basically a grammar with no weights. It provides
+ * lookup methods by rule, by parent, etc.
  *
  * @author dlwh
  */
 @SerialVersionUID(2L)
-final class BaseGrammar[L] private (
+final class RuleTopology[L] private (
                                    /** The "start" symbol. Usually "TOP" in this parser. */
                                      val root: L,
                                     /** Index for all symbols, including synthetic symbols from binarization */
@@ -114,13 +113,13 @@ final class BaseGrammar[L] private (
 
   @throws(classOf[ObjectStreamException])
   private def writeReplace():Object  = {
-    new BaseGrammar.SerializedForm(root, labelIndex, index)
+    new RuleTopology.SerializedForm(root, labelIndex, index)
   }
 }
 
-object BaseGrammar {
+object RuleTopology {
   /** Builds a grammar just from some productions */
-  def apply[L, W](root: L, productions: TraversableOnce[Rule[L]]): BaseGrammar[L] = {
+  def apply[L, W](root: L, productions: TraversableOnce[Rule[L]]): RuleTopology[L] = {
     val index = Index[L]();
     val ruleIndex = Index[Rule[L]]()
     for(r <- productions) {
@@ -141,7 +140,7 @@ object BaseGrammar {
    */
   def apply[L](root: L,
                binaries: Counter2[L, _<:Rule[L], _],
-               unaries: Counter2[L, _ <: Rule[L], _]): BaseGrammar[L] = {
+               unaries: Counter2[L, _ <: Rule[L], _]): RuleTopology[L] = {
     apply(root, binaries.keysIterator.map(_._2) ++ unaries.keysIterator.map(_._2))
   }
 
@@ -155,7 +154,7 @@ object BaseGrammar {
    */
   def apply[L, W](root: L,
                   labelIndex: Index[L],
-                  ruleIndex: Index[Rule[L]]):BaseGrammar[L] = {
+                  ruleIndex: Index[Rule[L]]):RuleTopology[L] = {
     val indexedRules = for ( r <- ruleIndex.toArray) yield r match {
       case BinaryRule(a, b, c) => BinaryRule(labelIndex(a), labelIndex(b), labelIndex(c)):Rule[Int]
       case UnaryRule(a, b, chain) => UnaryRule(labelIndex(a), labelIndex(b), chain):Rule[Int]
@@ -176,7 +175,7 @@ object BaseGrammar {
         unaryRulesByChild(c) += i
     }
 
-    new BaseGrammar(
+    new RuleTopology(
       root,
       labelIndex,
       ruleIndex,

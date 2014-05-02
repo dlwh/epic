@@ -70,7 +70,7 @@ final case class SimpleChartMarginal[L, L2, W](anch: ProjectionsRefinedAnchoring
         val aRef = anch.refinements.labels.localize(parent)
         spanVisitor.visitSpan(begin, end, aCoarse, aRef, math.exp(labelMarginal))
         if(!spanVisitor.skipBinaryRules) {
-          val rules = anch.refinedGrammar.indexedBinaryRulesWithParent(parent)
+          val rules = anch.refinedTopology.indexedBinaryRulesWithParent(parent)
           var i = 0
           while(i < rules.length) {
             val r = rules(i)

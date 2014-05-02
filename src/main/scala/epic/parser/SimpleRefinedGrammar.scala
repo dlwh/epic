@@ -37,10 +37,10 @@ import epic.parser.ProjectionsRefinedAnchoring
  * @author dlwh
  */
 @SerialVersionUID(2)
-class SimpleRefinedGrammar[L, L2, W](val grammar: BaseGrammar[L],
+class SimpleRefinedGrammar[L, L2, W](val topology: RuleTopology[L],
                                      val lexicon: Lexicon[L, W],
                                      val refinements: GrammarRefinements[L, L2],
-                                     val refinedGrammar: BaseGrammar[L2],
+                                     val refinedTopology: RuleTopology[L2],
                                      val ruleScoreArray: Array[Array[Double]],
                                      parentCompatibleRefinements: Array[Array[Array[Int]]],
                                      childCompatibleRefinements: Array[Array[Array[Int]]],
@@ -54,10 +54,10 @@ class SimpleRefinedGrammar[L, L2, W](val grammar: BaseGrammar[L],
   }
 
   def anchor(w: IndexedSeq[W]):ProjectionsRefinedAnchoring[L, L2,  W] = new ProjectionsRefinedAnchoring[L, L2,  W] {
-    val grammar = SimpleRefinedGrammar.this.grammar
+    val grammar = SimpleRefinedGrammar.this.topology
     val lexicon = SimpleRefinedGrammar.this.lexicon
     def refinements = SimpleRefinedGrammar.this.refinements
-    def refinedGrammar: BaseGrammar[L2] = SimpleRefinedGrammar.this.refinedGrammar
+    def refinedTopology: RuleTopology[L2] = SimpleRefinedGrammar.this.refinedTopology
 
     val tagAnchoring = tagScorer.anchor(w)
     override def toString() = "SimpleAnchoring(...)"
@@ -237,8 +237,8 @@ object SimpleRefinedGrammar {
     val coarseRules = Index(rules.map(_.map(project)))
     val coarseSyms = Index(syms.map(project))
 
-    val coarseGrammar = BaseGrammar(AnnotatedLabel.TOP, coarseSyms, coarseRules)
-    val fineGrammar = BaseGrammar(AnnotatedLabel.TOP, syms, rules)
+    val coarseGrammar = RuleTopology(AnnotatedLabel.TOP, coarseSyms, coarseRules)
+    val fineGrammar = RuleTopology(AnnotatedLabel.TOP, syms, rules)
 
     val refinements = GrammarRefinements(coarseGrammar, fineGrammar, project _)
     val lexicon = new SignatureLexicon(coarseGrammar.labelIndex, makeAllowedTags(coarseGrammar.labelIndex, lexCounts), {(w:String) => "UNK"+EnglishWordClassGenerator(w)})
@@ -248,7 +248,6 @@ object SimpleRefinedGrammar {
     RefinedGrammar.unanchored[AnnotatedLabel, AnnotatedLabel, String](coarseGrammar, lexicon,
       refinements,
       ruleScores.toArray,
-      new Array(fineGrammar.labelIndex.size),
       scorer)
   }
 

@@ -28,7 +28,7 @@ import epic.constraints.ChartConstraints
  * @author dlwh
  */
 trait RefinedAnchoring[L, W]  {
-  def grammar: BaseGrammar[L]
+  def grammar: RuleTopology[L]
   def lexicon: Lexicon[L, W]
   def words: IndexedSeq[W]
 
@@ -233,16 +233,16 @@ trait RefinedAnchoring[L, W]  {
 }
 
 object RefinedAnchoring {
-  def identity[L, W](grammar: BaseGrammar[L],
+  def identity[L, W](topology: RuleTopology[L],
                      lexicon: Lexicon[L, W],
                      words: IndexedSeq[W]): RefinedAnchoring[L, W] = {
-    LiftedCoreAnchoring(CoreAnchoring.identity[L, W](grammar, lexicon, words, ChartConstraints.noSparsity[L]))
+    LiftedCoreAnchoring(CoreAnchoring.identity[L, W](topology, lexicon, words, ChartConstraints.noSparsity[L]))
   }
 
   trait StructureDelegatingAnchoring[L, W] extends RefinedAnchoring[L, W] {
     protected def baseAnchoring: RefinedAnchoring[L, W]
 
-    def grammar: BaseGrammar[L] = baseAnchoring.grammar
+    def grammar: RuleTopology[L] = baseAnchoring.grammar
     def lexicon: Lexicon[L, W] = baseAnchoring.lexicon
 
     def words: IndexedSeq[W] = baseAnchoring.words

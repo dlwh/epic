@@ -32,13 +32,13 @@ import epic.constraints.ChartConstraints.Factory
  * @tparam W word type
  */
 trait CoreGrammar[L, W] extends Serializable {
-  def grammar: BaseGrammar[L]
+  def topology: RuleTopology[L]
   def lexicon: Lexicon[L, W]
 
-  def root = grammar.root
-  def index = grammar.index
-  def labelIndex = grammar.labelIndex
-  def labelEncoder = grammar.labelEncoder
+  def root = topology.root
+  def index = topology.index
+  def labelIndex = topology.labelIndex
+  def labelEncoder = topology.labelEncoder
 
   /**
    * Returns a [[epic.parser.CoreAnchoring]] for this particular sentence.
@@ -55,15 +55,15 @@ trait CoreGrammar[L, W] extends Serializable {
 }
 
 object CoreGrammar {
-  def identity[L, W](grammar: BaseGrammar[L], lexicon: Lexicon[L, W]):CoreGrammar[L, W] = new IdentityCoreGrammar(grammar, lexicon)
+  def identity[L, W](topology: RuleTopology[L], lexicon: Lexicon[L, W]):CoreGrammar[L, W] = new IdentityCoreGrammar(topology, lexicon)
 
   @SerialVersionUID(1L)
-  case class IdentityCoreGrammar[L, W](grammar: BaseGrammar[L], lexicon: Lexicon[L, W]) extends CoreGrammar[L, W] {
-    def anchor(words: IndexedSeq[W]) = CoreAnchoring.identity(grammar, lexicon, words, ChartConstraints.noSparsity[L])
+  case class IdentityCoreGrammar[L, W](topology: RuleTopology[L], lexicon: Lexicon[L, W]) extends CoreGrammar[L, W] {
+    def anchor(words: IndexedSeq[W]) = CoreAnchoring.identity(topology, lexicon, words, ChartConstraints.noSparsity[L])
   }
 
   case class ProductGrammar[L, W](g1: CoreGrammar[L, W], g2: CoreGrammar[L, W]) extends CoreGrammar[L, W] {
-    def grammar: BaseGrammar[L] = g1.grammar
+    def topology: RuleTopology[L] = g1.topology
     def lexicon: Lexicon[L, W] = g1.lexicon
 
     def anchor(words: IndexedSeq[W]): CoreAnchoring[L, W] = g1.anchor(words) * g2.anchor(words)

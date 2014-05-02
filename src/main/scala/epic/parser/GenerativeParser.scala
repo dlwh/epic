@@ -34,15 +34,15 @@ import epic.constraints.LongSpanConstraints
  */
 object GenerativeParser {
   /**
-   * Extracts a [[epic.parser.BaseGrammar]] and [[epic.lexicon.Lexicon]]
+   * Extracts a [[epic.parser.RuleTopology]] and [[epic.lexicon.Lexicon]]
    * from a treebank
    * @param data the treebank
    * @return
    */
-  def extractLexiconAndGrammar(data: Traversable[TreeInstance[AnnotatedLabel, String]]): (Lexicon[AnnotatedLabel, String], BaseGrammar[AnnotatedLabel]) = {
+  def extractLexiconAndGrammar(data: Traversable[TreeInstance[AnnotatedLabel, String]]): (Lexicon[AnnotatedLabel, String], RuleTopology[AnnotatedLabel]) = {
     val root = data.head.tree.label
     val (words, binary, unary) = extractCounts(data)
-    val grammar = BaseGrammar(root,
+    val grammar = RuleTopology(root,
       binary.keysIterator.map(_._2) ++ unary.keysIterator.map(_._2)
     )
 
@@ -100,32 +100,32 @@ object GenerativeParser {
     (lexicon, binaryProductions, unaryProductions)
   }
 
-  def annotatedParser(baseGrammar: BaseGrammar[AnnotatedLabel], baseLexicon: Lexicon[AnnotatedLabel, String],
+  def annotatedParser(ruleTopology: RuleTopology[AnnotatedLabel], baseLexicon: Lexicon[AnnotatedLabel, String],
                       annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel],
                       trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]]): Parser[AnnotatedLabel, String] = {
 
-    val refinedGrammar = annotated(baseGrammar, baseLexicon, annotator, trainTrees)
+    val refinedGrammar = annotated(ruleTopology, baseLexicon, annotator, trainTrees)
     Parser(refinedGrammar)
   }
 
   def annotated(annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel], trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]]): SimpleRefinedGrammar[AnnotatedLabel, AnnotatedLabel, String] = {
-    val (baseLexicon, baseGrammar) = extractLexiconAndGrammar(trainTrees.map(Xbarize()))
-    annotated(baseGrammar, baseLexicon, annotator, trainTrees)
+    val (baseLexicon, ruleTopology) = extractLexiconAndGrammar(trainTrees.map(Xbarize()))
+    annotated(ruleTopology, baseLexicon, annotator, trainTrees)
   }
 
-  def annotated(baseGrammar: BaseGrammar[AnnotatedLabel], baseLexicon: Lexicon[AnnotatedLabel, String], annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel], trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]]): SimpleRefinedGrammar[AnnotatedLabel, AnnotatedLabel, String] = {
+  def annotated(ruleTopology: RuleTopology[AnnotatedLabel], baseLexicon: Lexicon[AnnotatedLabel, String], annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel], trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]]): SimpleRefinedGrammar[AnnotatedLabel, AnnotatedLabel, String] = {
     val transformed = trainTrees.par.map {
       ti => annotator(ti)
     }.seq.toIndexedSeq
 
     val (words, binary, unary) = GenerativeParser.extractCounts(transformed)
 
-    val refGrammar = BaseGrammar(AnnotatedLabel.TOP, binary, unary)
-    val indexedRefinements = GrammarRefinements(baseGrammar, refGrammar, {
+    val refGrammar = RuleTopology(AnnotatedLabel.TOP, binary, unary)
+    val indexedRefinements = GrammarRefinements(ruleTopology, refGrammar, {
       (_: AnnotatedLabel).baseAnnotatedLabel
     })
 
-    RefinedGrammar.generative(baseGrammar, baseLexicon, indexedRefinements, binary, unary, words)
+    RefinedGrammar.generative(ruleTopology, baseLexicon, indexedRefinements, binary, unary, words)
   }
 
   def defaultAnnotator(vertical: Int = 1, horizontal: Int = 0): PipelineAnnotator[AnnotatedLabel, String] =  PipelineAnnotator(Seq(FilterAnnotations(), ForgetHeadTag(), Markovize(horizontal = horizontal,vertical = vertical), SplitPunct()))
@@ -157,7 +157,7 @@ object GenerativeTrainer extends ParserPipeline {
 
     val (wordCounts, binaryCounts, initUnaries) = GenerativeParser.extractCounts(transformed)
 
-    val refGrammar = BaseGrammar(AnnotatedLabel.TOP, binaryCounts, initUnaries)
+    val refGrammar = RuleTopology(AnnotatedLabel.TOP, binaryCounts, initUnaries)
     val indexedRefinements = GrammarRefinements(xbar, refGrammar, { (_: AnnotatedLabel).baseAnnotatedLabel })
 
     logger.info("Num coarse rules:" + xbar.index.size)
@@ -181,7 +181,7 @@ object GenerativeTrainer extends ParserPipeline {
 
     val finalGrammar = if(params.pruneUnlikelyLongSpans) {
       val ccs = trainTrees.flatMap(_.asTaggedSequence.pairs.collect{ case (tag, word) if tag.label == "CC" || tag.label == "C" || tag.label == "KON" => word}).toSet
-      val constraints = new ConstraintCoreGrammarAdaptor(refinedGrammar.grammar, refinedGrammar.lexicon, new LongSpanConstraints.Factory[AnnotatedLabel](30, ccs))
+      val constraints = new ConstraintCoreGrammarAdaptor(refinedGrammar.topology, refinedGrammar.lexicon, new LongSpanConstraints.Factory[AnnotatedLabel](30, ccs))
       AugmentedGrammar(refinedGrammar, constraints)
     } else {
       AugmentedGrammar.fromRefined(refinedGrammar)

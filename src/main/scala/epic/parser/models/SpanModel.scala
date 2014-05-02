@@ -35,7 +35,7 @@ import epic.trees.annotations.FilterAnnotations
 import com.typesafe.scalalogging.slf4j.LazyLogging
 import epic.trees.annotations.MarkPreterminals
 import epic.trees.annotations.FixRootLabelVerticalAnnotation
-import epic.parser.BaseGrammar
+import epic.parser.RuleTopology
 import scala.io.Source
 import epic.parser.features.LabelFeature
 
@@ -49,9 +49,9 @@ class SpanModel[L, L2, W](val featurizer: RefinedFeaturizer[L, W, Feature],
                           val featureIndex: Index[Feature],
                           val annotator: (BinarizedTree[L], IndexedSeq[W]) => BinarizedTree[IndexedSeq[L2]],
                           val coreGrammar: CoreGrammar[L, W],
-                          val baseGrammar: BaseGrammar[L],
+                          val baseGrammar: RuleTopology[L],
                           val lexicon: Lexicon[L, W],
-                          val refinedGrammar: BaseGrammar[L2],
+                          val refinedGrammar: RuleTopology[L2],
                           val refinements: GrammarRefinements[L, L2],
                           initialFeatureVal: (Feature => Option[Double]) = { _ => None }) extends ParserModel[L, W] with Serializable {
   type Inference = LatentParserInference[L, L2, W]
@@ -71,9 +71,9 @@ class SpanModel[L, L2, W](val featurizer: RefinedFeaturizer[L, W, Feature],
 }
 
 
-class DotProductGrammar[L, L2, W, Feature](val grammar: BaseGrammar[L],
+class DotProductGrammar[L, L2, W, Feature](val topology: RuleTopology[L],
                                            val lexicon: Lexicon[L, W],
-                                           val refinedGrammar: BaseGrammar[L2],
+                                           val refinedTopology: RuleTopology[L2],
                                            val refinements: GrammarRefinements[L, L2],
                                            val weights: DenseVector[Double],
                                            val featurizer: RefinedFeaturizer[L, W, Feature]) extends RefinedGrammar[L, W] {
@@ -81,9 +81,9 @@ class DotProductGrammar[L, L2, W, Feature](val grammar: BaseGrammar[L],
   def anchor(w: IndexedSeq[W]):RefinedAnchoring[L, W] = new ProjectionsRefinedAnchoring[L, L2, W] {
 
     def refinements = DotProductGrammar.this.refinements
-    def refinedGrammar: BaseGrammar[L2] = DotProductGrammar.this.refinedGrammar
+    def refinedTopology: RuleTopology[L2] = DotProductGrammar.this.refinedTopology
 
-    val grammar = DotProductGrammar.this.grammar
+    val grammar = DotProductGrammar.this.topology
     val lexicon = DotProductGrammar.this.lexicon
 
     def words = w
@@ -125,7 +125,7 @@ case class IndexedSpanFeaturizer[L, L2, W](wordFeatureIndex: CrossProductIndex[F
                                       surfaceFeaturizer: IndexedSplitSpanFeaturizer[W],
                                       ruleAndSpansFeaturizer: RuleAndSpansFeaturizer[W],
                                       refinements: GrammarRefinements[L, L2],
-                                      grammar: BaseGrammar[L]) extends RefinedFeaturizer[L, W, Feature] with Serializable {
+                                      grammar: RuleTopology[L]) extends RefinedFeaturizer[L, W, Feature] with Serializable {
 
   def lock = copy(wordFeatureIndex.lock, spanFeatureIndex.lock)
 
@@ -245,7 +245,7 @@ object IndexedSpanFeaturizer {
                         ruleAndSpansFeaturizer: RuleAndSpansFeaturizer[W],
                         ann: (BinarizedTree[L], IndexedSeq[W]) => BinarizedTree[IndexedSeq[L2]],
                         refinements: GrammarRefinements[L, L2],
-                        grammar: BaseGrammar[L],
+                        grammar: RuleTopology[L],
                         dummyFeatScale: HashFeature.Scale,
                         filterUnseenFeatures: Boolean,
                         trees: Traversable[TreeInstance[L, W]]): IndexedSpanFeaturizer[L, L2, W] = {
@@ -345,9 +345,9 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     annTrees.slice(0, Math.min(3, annTrees.size)).foreach(tree => println(tree.render(false)));
     
     val (annWords, annBinaries, annUnaries) = this.extractBasicCounts(annTrees)
-    val refGrammar = BaseGrammar(AnnotatedLabel.TOP, annBinaries, annUnaries)
+    val refGrammar = RuleTopology(AnnotatedLabel.TOP, annBinaries, annUnaries)
 
-    val xbarGrammar = constrainer.grammar
+    val xbarGrammar = constrainer.topology
     var xbarLexicon = constrainer.lexicon
     if(useGoldPos) {
       val old = xbarLexicon
@@ -509,7 +509,7 @@ case class LatentSpanModelFactory(inner: SpanModelFactory,
 
     val (annWords, annBinaries, annUnaries) = GenerativeParser.extractCounts(annTrees)
 
-    val xbarGrammar = constrainer.grammar
+    val xbarGrammar = constrainer.topology
     var xbarLexicon = constrainer.lexicon
     if(useGoldPos) {
       val old = xbarLexicon
@@ -561,9 +561,9 @@ case class LatentSpanModelFactory(inner: SpanModelFactory,
       case UnaryRule(a, b, chain) => for(aa <- split(a); bb <- split(b)) yield UnaryRule(aa, bb, chain)
     }
 
-    val annGrammar: BaseGrammar[AnnotatedLabel] = BaseGrammar(annTrees.head.tree.label, annBinaries, annUnaries)
-    val firstLevelRefinements = GrammarRefinements(xbarGrammar, annGrammar, {(_: AnnotatedLabel).baseAnnotatedLabel})
-    val secondLevel = GrammarRefinements(annGrammar, splitLabel _, {splitRule(_ :Rule[AnnotatedLabel], splitLabels)}, unsplit _)
+    val annTopology: RuleTopology[AnnotatedLabel] = RuleTopology(annTrees.head.tree.label, annBinaries, annUnaries)
+    val firstLevelRefinements = GrammarRefinements(xbarGrammar, annTopology, {(_: AnnotatedLabel).baseAnnotatedLabel})
+    val secondLevel = GrammarRefinements(annTopology, splitLabel _, {splitRule(_ :Rule[AnnotatedLabel], splitLabels)}, unsplit _)
     val finalRefinements = firstLevelRefinements compose secondLevel
     logger.info("Label refinements:" + finalRefinements.labels)
 
@@ -682,7 +682,7 @@ case class LatentSpanModelFactory(inner: SpanModelFactory,
     val featureCounter = this.readWeights(oldWeights)
 
 
-    val refGrammar = BaseGrammar(finalRefinements.labels.refinementsOf(xbarGrammar.root)(0),
+    val refGrammar = RuleTopology(finalRefinements.labels.refinementsOf(xbarGrammar.root)(0),
       finalRefinements.labels.fineIndex,
       finalRefinements.rules.fineIndex)
 

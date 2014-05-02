@@ -4,7 +4,7 @@ import epic.parser.RefinedFeaturizer
 import epic.framework.Feature
 import breeze.util.Index
 import epic.trees.Rule
-import epic.parser.BaseGrammar
+import epic.parser.RuleTopology
 import epic.trees.TreeInstance
 import epic.trees.AnnotatedLabel
 import scala.collection.mutable.HashMap
@@ -14,7 +14,7 @@ import breeze.linalg._
 import epic.util.Arrays
 
 class HackyLexicalProductionFeaturizer(wordTagCounts: Counter2[String, String, Double],
-                                       xbarGrammar: BaseGrammar[AnnotatedLabel],
+                                       topology: RuleTopology[AnnotatedLabel],
                                        featsDesc: String,
                                        hackyHeadFinder: HackyHeadFinder[String,String] = new RuleBasedHackyHeadFinder,
                                        db: DistanceBinner = DistanceBinner(),
@@ -54,8 +54,8 @@ class HackyLexicalProductionFeaturizer(wordTagCounts: Counter2[String, String, D
         preterminals(i - begin) = tag(words(i));
       }
       
-      val lc = xbarGrammar.labelIndex.get(xbarGrammar.leftChild(rule)).baseLabel;
-      val rc = xbarGrammar.labelIndex.get(xbarGrammar.rightChild(rule)).baseLabel;
+      val lc = topology.labelIndex.get(topology.leftChild(rule)).baseLabel;
+      val rc = topology.labelIndex.get(topology.rightChild(rule)).baseLabel;
       
       val lcHeadIdx = begin + hackyHeadFinder.findHead(lc, preterminals.slice(0, split - begin));
       val rcHeadIdx = split + hackyHeadFinder.findHead(rc, preterminals.slice(split - begin, end - begin));

@@ -29,7 +29,7 @@ import breeze.numerics.logI
  */
 @SerialVersionUID(1)
 trait CoreAnchoring[L, W] extends Factor[CoreAnchoring[L, W]] {
-  def grammar: BaseGrammar[L]
+  def topology: RuleTopology[L]
   def lexicon: Lexicon[L, W]
   def words: IndexedSeq[W]
 
@@ -67,7 +67,7 @@ trait CoreAnchoring[L, W] extends Factor[CoreAnchoring[L, W]] {
     // hacky multimethod dispatch is hacky
     if (other eq null) this // ugh
     else if(other.isInstanceOf[CoreAnchoring.Identity[L, W]] && this.isInstanceOf[CoreAnchoring.Identity[L, W]])
-      CoreAnchoring.identity(grammar, lexicon, words, sparsityPattern & other.sparsityPattern)
+      CoreAnchoring.identity(topology, lexicon, words, sparsityPattern & other.sparsityPattern)
     else if(other.isInstanceOf[CoreAnchoring.Identity[L, W]]) this.addConstraints(other.sparsityPattern)
     else if(this.isInstanceOf[CoreAnchoring.Identity[L, W]]) other.addConstraints(this.sparsityPattern)
     else new ProductCoreAnchoring(this,other)
@@ -83,7 +83,7 @@ trait CoreAnchoring[L, W] extends Factor[CoreAnchoring[L, W]] {
   def /(other: CoreAnchoring[L, W]) = {
     // hacky multimethod dispatch is hacky
     if (other eq null) this // ugh
-    else if(this eq other) new CoreAnchoring.Identity[L, W](grammar, lexicon, words, sparsityPattern)
+    else if(this eq other) new CoreAnchoring.Identity[L, W](topology, lexicon, words, sparsityPattern)
     else if(other.isInstanceOf[CoreAnchoring.Identity[L, W]]) this.addConstraints(other.sparsityPattern)
     else new ProductCoreAnchoring(this, other, -1)
   }
@@ -112,23 +112,23 @@ object CoreAnchoring {
   /**
    * Returns an [[epic.parser.CoreAnchoring.Identity]], which assigns 0
    * to everything that is allowed.
-   * @param grammar
+   * @param topology
    * @param lexicon
    * @param words
    * @tparam L
    * @tparam W
    * @return
    */
-  def identity[L, W](grammar: BaseGrammar[L],
+  def identity[L, W](topology: RuleTopology[L],
                      lexicon: Lexicon[L, W],
                      words: IndexedSeq[W],
                      constraints: ChartConstraints[L] = ChartConstraints.noSparsity[L]):CoreAnchoring[L, W] = {
-    new Identity(grammar, lexicon, words, constraints)
+    new Identity(topology, lexicon, words, constraints)
   }
 
   /**
    * Assigns 0 to everything
-   * @param grammar
+   * @param topology
    * @param lexicon
    * @param words
    * @tparam L
@@ -136,14 +136,14 @@ object CoreAnchoring {
    * @return
    */
   @SerialVersionUID(1L)
-  case class Identity[L, W](grammar: BaseGrammar[L], lexicon: Lexicon[L, W], words: IndexedSeq[W],
+  case class Identity[L, W](topology: RuleTopology[L], lexicon: Lexicon[L, W], words: IndexedSeq[W],
                             override val sparsityPattern: ChartConstraints[L]) extends CoreAnchoring[L, W] {
 
     def addConstraints(cs: ChartConstraints[L]): CoreAnchoring[L, W] = copy(sparsityPattern = sparsityPattern & cs)
 
     def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = 0.0
 
-    def scoreUnaryRule(begin: Int, end: Int, rule: Int) = logI(sparsityPattern.top.isAllowedLabeledSpan(begin, end, grammar.parent(rule)))
+    def scoreUnaryRule(begin: Int, end: Int, rule: Int) = logI(sparsityPattern.top.isAllowedLabeledSpan(begin, end, topology.parent(rule)))
 
     def scoreSpan(begin: Int, end: Int, tag: Int) = logI(sparsityPattern.bot.isAllowedLabeledSpan(begin, end, tag))
   }
@@ -160,7 +160,7 @@ object CoreAnchoring {
 case class LiftedCoreAnchoring[L, W](core: CoreAnchoring[L, W]) extends RefinedAnchoring[L, W] {
   override def annotationTag = 0
 
-  def grammar = core.grammar
+  def grammar = core.topology
 
   def lexicon = core.lexicon
 

@@ -25,7 +25,7 @@ import java.util.concurrent.ConcurrentHashMap
 class MapCacheCoreGrammar[L, W](trueFactory: CoreGrammar[L, W]) extends CoreGrammar[L, W] with Serializable {
   private val cache = new ConcurrentHashMap[IndexedSeq[W], CoreAnchoring[L, W]]
 
-  def grammar = trueFactory.grammar
+  def topology = trueFactory.topology
   def lexicon = trueFactory.lexicon
 
   def anchor(words: IndexedSeq[W]) = {

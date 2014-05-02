@@ -41,14 +41,14 @@ object ParserParams {
 
   @Help(text="Stores/loads a baseline xbar grammar needed to extracting trees.")
   case class XbarGrammar(path: File = new File("xbar.gr")) {
-    def xbarGrammar(trees: IndexedSeq[TreeInstance[AnnotatedLabel, String]]): (BaseGrammar[AnnotatedLabel], Lexicon[AnnotatedLabel, String]) = Option(path) match {
+    def xbarGrammar(trees: IndexedSeq[TreeInstance[AnnotatedLabel, String]]): (RuleTopology[AnnotatedLabel], Lexicon[AnnotatedLabel, String]) = Option(path) match {
       case Some(f) if f.exists =>
-        XbarGrammar.cache.getOrElseUpdate(f, readObject[(parser.BaseGrammar[AnnotatedLabel],Lexicon[AnnotatedLabel, String])](f))
+        XbarGrammar.cache.getOrElseUpdate(f, readObject[(parser.RuleTopology[AnnotatedLabel],Lexicon[AnnotatedLabel, String])](f))
       case _ =>
         val base = Xbarize[String]()
         val (words: Counter2[AnnotatedLabel, String, Double], xbarBinaries, xbarUnaries) = GenerativeParser.extractCounts(trees.map(base))
 
-        val g = BaseGrammar(AnnotatedLabel.TOP, xbarBinaries.keysIterator.map(_._2) ++ xbarUnaries.keysIterator.map(_._2))
+        val g = RuleTopology(AnnotatedLabel.TOP, xbarBinaries.keysIterator.map(_._2) ++ xbarUnaries.keysIterator.map(_._2))
         val lex = new SimpleLexicon(g.labelIndex, words)
         if(path ne null)
           writeObject(path, g -> lex)
@@ -58,7 +58,7 @@ object ParserParams {
   }
 
   object XbarGrammar {
-    private val cache = new mutable.HashMap[File, (parser.BaseGrammar[AnnotatedLabel],Lexicon[AnnotatedLabel, String])]() with mutable.SynchronizedMap[File, (parser.BaseGrammar[AnnotatedLabel],Lexicon[AnnotatedLabel, String])]
+    private val cache = new mutable.HashMap[File, (parser.RuleTopology[AnnotatedLabel],Lexicon[AnnotatedLabel, String])]() with mutable.SynchronizedMap[File, (parser.RuleTopology[AnnotatedLabel],Lexicon[AnnotatedLabel, String])]
   }
 
 }
@@ -147,7 +147,7 @@ trait ParserPipeline extends LazyLogging {
         case cached: CachedChartConstraintsFactory[L, W] => cached.backoff
         case x => x
       }
-      new ConstraintCoreGrammarAdaptor(p.grammar, p.lexicon, constraintsFactory)
+      new ConstraintCoreGrammarAdaptor(p.topology, p.lexicon, constraintsFactory)
     case _ => grammar
   }
 }

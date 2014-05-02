@@ -17,11 +17,11 @@ package epic.parser.models
 */
 import breeze.linalg._
 import epic.parser.projections.GrammarRefinements
-import epic.parser.{RefinedGrammar, BaseGrammar}
+import epic.parser.{RefinedGrammar, RuleTopology}
 import epic.lexicon.{TagScorer, Lexicon}
 
 object FeaturizedGrammar {
-  def apply[L, L2, W](xbar: BaseGrammar[L],
+  def apply[L, L2, W](topology: RuleTopology[L],
                       lexicon: Lexicon[L, W],
                       refinements: GrammarRefinements[L, L2],
                       weights: DenseVector[Double],
@@ -30,8 +30,7 @@ object FeaturizedGrammar {
     val ruleCache = Array.tabulate[Double](refinements.rules.fineIndex.size){r =>
       features.computeWeight(r,weights)
     }
-    val spanCache = new Array[Double](refinements.labels.fineIndex.size)
 
-    RefinedGrammar.unanchored(xbar, lexicon, refinements, ruleCache, spanCache, tagScorer)
+    RefinedGrammar.unanchored(topology, lexicon, refinements, ruleCache, tagScorer)
   }
 }

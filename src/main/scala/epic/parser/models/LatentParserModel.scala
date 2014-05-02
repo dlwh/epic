@@ -34,7 +34,7 @@ class LatentParserModel[L, L3, W](indexedFeatures: IndexedFeaturizer[L, L3, W],
                                   reannotate: (BinarizedTree[L], IndexedSeq[W]) => BinarizedTree[IndexedSeq[L3]],
                                   val projections: GrammarRefinements[L, L3],
                                   baseFactory: CoreGrammar[L, W],
-                                  val baseGrammar: BaseGrammar[L],
+                                  val baseGrammar: RuleTopology[L],
                                   val lexicon: Lexicon[L, W],
                                   initialFeatureVal: (Feature => Option[Double]) = { _ => None }) extends ParserModel[L, W] {
   type L2 = L3
@@ -108,7 +108,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
 
     val (annWords, annBinaries, annUnaries) = this.extractBasicCounts(annTrees)
 
-    val (xbarGrammar, xbarLexicon) = (constrainer.grammar, constrainer.lexicon)
+    val (xbarGrammar, xbarLexicon) = (constrainer.topology, constrainer.lexicon)
 
     val substateMap = if (substates != null && substates.exists) {
       val in = Source.fromFile(substates).getLines()
@@ -123,13 +123,13 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
       LatentModelFactory.statesToNotSplit.iterator.map(s => AnnotatedLabel(s) -> 1).toMap  + (xbarGrammar.root -> 1)
     }
 
-    val annGrammar: BaseGrammar[AnnotatedLabel] = BaseGrammar(annTrees.head.tree.label, annBinaries, annUnaries)
+    val annotatedTopology: RuleTopology[AnnotatedLabel] = RuleTopology(annTrees.head.tree.label, annBinaries, annUnaries)
 
     def split(x: AnnotatedLabel): Seq[(AnnotatedLabel, Int)] = {
       for (i <- 0 until substateMap.getOrElse(x, numStates)) yield (x, i)
     }
 
-    val splitLabels = annGrammar.labelIndex.map(l => l -> split(l)).toMap
+    val splitLabels = annotatedTopology.labelIndex.map(l => l -> split(l)).toMap
 
     def unsplit(x: (AnnotatedLabel, Int)): AnnotatedLabel = x._1
 
@@ -144,8 +144,8 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     val surfaceFeaturizer = new MinimalWordFeaturizer(wordCounts) + new WordPropertyFeaturizer(wordCounts)
     val wordFeaturizer = IndexedWordFeaturizer.fromData(surfaceFeaturizer, annTrees.map{_.words})
 
-    val firstLevelRefinements = GrammarRefinements(xbarGrammar, annGrammar, {(_: AnnotatedLabel).baseAnnotatedLabel})
-    val secondLevel = GrammarRefinements(annGrammar, split _, {splitRule(_ :Rule[AnnotatedLabel], splitLabels)}, unsplit _)
+    val firstLevelRefinements = GrammarRefinements(xbarGrammar, annotatedTopology, {(_: AnnotatedLabel).baseAnnotatedLabel})
+    val secondLevel = GrammarRefinements(annotatedTopology, split _, {splitRule(_ :Rule[AnnotatedLabel], splitLabels)}, unsplit _)
     val finalRefinements = firstLevelRefinements compose secondLevel
     logger.info("Label refinements:" + finalRefinements.labels)
 

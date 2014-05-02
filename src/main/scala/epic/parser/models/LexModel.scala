@@ -45,7 +45,7 @@ class LexModel[L, L2, W](bundle: LexGrammarBundle[L, L2, W],
     m.expectedCounts(indexed, accum, scale)
   }
 
-  def baseGrammar: BaseGrammar[L] = bundle.baseGrammar
+  def baseGrammar: RuleTopology[L] = bundle.baseGrammar
   def lexicon = bundle.baseLexicon
 
   val featureIndex = indexed.index
@@ -79,7 +79,7 @@ class LexModel[L, L2, W](bundle: LexGrammarBundle[L, L2, W],
  * @tparam L Label
  * @tparam W Word
  */
-class IndexedLexFeaturizer[L, L2, W](grammar: BaseGrammar[L],
+class IndexedLexFeaturizer[L, L2, W](grammar: RuleTopology[L],
                                  rawLabelFeatures: Array[Array[Int]],
                                  rawDirFeatures: Array[Array[Int]],
                                  ruleFeaturizer: RefinedFeaturizer[L, W, Feature],
@@ -382,9 +382,9 @@ class IndexedLexFeaturizer[L, L2, W](grammar: BaseGrammar[L],
 
 }
 
-final class LexGrammar[L, L2, W](val grammar: BaseGrammar[L],
+final class LexGrammar[L, L2, W](val topology: RuleTopology[L],
                              val lexicon: Lexicon[L, W],
-                             refinedGrammar: BaseGrammar[L2],
+                             refinedGrammar: RuleTopology[L2],
                              featurizer: IndexedLexFeaturizer[L, L2, W],
                              weights: DenseVector[Double],
                              binaries: Array[Boolean],
@@ -405,7 +405,7 @@ final class LexGrammar[L, L2, W](val grammar: BaseGrammar[L],
   final class Spec(val words: IndexedSeq[W]) extends RefinedAnchoring[L, W] {
     override def annotationTag: Int = 1
 
-    val grammar = LexGrammar.this.grammar
+    val grammar = LexGrammar.this.topology
     val lexicon = LexGrammar.this.lexicon
     private val f = featurizer.anchor(words)
 
@@ -820,9 +820,9 @@ final class LexGrammar[L, L2, W](val grammar: BaseGrammar[L],
 
 }
 
-case class LexGrammarBundle[L, L2, W](baseGrammar: BaseGrammar[L],
+case class LexGrammarBundle[L, L2, W](baseGrammar: RuleTopology[L],
                                   baseLexicon: Lexicon[L, W],
-                                  refinedGrammar: BaseGrammar[L2],
+                                  refinedGrammar: RuleTopology[L2],
                                   headFinder: HeadFinder[L]) { bundle =>
   val bg = baseGrammar
   val leftRules = new Array[Boolean](bg.index.size)
@@ -937,7 +937,7 @@ object IndexedLexFeaturizer extends LazyLogging {
     val sfi = splitBuilder.result()
 
 
-    new IndexedLexFeaturizer(ruleFeaturizer.grammar,
+    new IndexedLexFeaturizer(ruleFeaturizer.topology,
       labelFeatures,
       attachFeatures,
       ruleFeaturizer,
@@ -966,11 +966,11 @@ case class LexModelFactory(@Help(text= "The kind of annotation to do on the refi
   def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]], constrainer: CoreGrammar[AnnotatedLabel, String]) ={
     val trees = trainTrees.map(annotator)
     val (initLexicon, annBinaries, annUnaries) = GenerativeParser.extractCounts(trees)
-    val refGrammar = BaseGrammar(AnnotatedLabel.TOP, annBinaries, annUnaries)
+    val refGrammar = RuleTopology(AnnotatedLabel.TOP, annBinaries, annUnaries)
 
     val cFactory = constrainer
 
-    val (xbarGrammar, xbarLexicon) = constrainer.grammar -> constrainer.lexicon
+    val (xbarGrammar, xbarLexicon) = constrainer.topology -> constrainer.lexicon
     val indexedRefinements = GrammarRefinements(xbarGrammar, refGrammar, (_: AnnotatedLabel).baseAnnotatedLabel)
 
     val (wordFeaturizer, unaryFeaturizer, bilexFeaturizer) = {

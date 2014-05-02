@@ -5,7 +5,7 @@ import epic.framework.LossAugmentation
 import epic.parser.projections.{ConstraintCoreGrammarAdaptor, GoldTagPolicy}
 import epic.lexicon.Lexicon
 import scala.collection.immutable.BitSet
-import epic.parser.{CoreGrammar, CoreAnchoring, BaseGrammar}
+import epic.parser.{CoreGrammar, CoreAnchoring, RuleTopology}
 import epic.constraints.ChartConstraints
 
 /**
@@ -14,7 +14,7 @@ import epic.constraints.ChartConstraints
  * @author dlwh
  **/
 case class SentimentLossAugmentation[W](trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, W]],
-                                        grammar: BaseGrammar[AnnotatedLabel],
+                                        topology: RuleTopology[AnnotatedLabel],
                                         lexicon: Lexicon[AnnotatedLabel, W],
                                         constraintFactory: ChartConstraints.Factory[AnnotatedLabel, W],
                                         loss: (Int, Int)=>Double = SentimentLossAugmentation.defaultLoss,
@@ -23,7 +23,7 @@ case class SentimentLossAugmentation[W](trainTrees: IndexedSeq[TreeInstance[Anno
   val losses = Array.tabulate(5,5)(loss)
 
   def projectedLabel(l: AnnotatedLabel) =   if(l == AnnotatedLabel.TOP) -1 else l.label.toInt
-  val sentimentScores: Array[Int] = grammar.labelEncoder.tabulateArray(projectedLabel)
+  val sentimentScores: Array[Int] = topology.labelEncoder.tabulateArray(projectedLabel)
 
   val trainingMap = trainTrees.iterator.map(ti => ti.words -> ti).toMap
 
@@ -31,7 +31,7 @@ case class SentimentLossAugmentation[W](trainTrees: IndexedSeq[TreeInstance[Anno
     // drop the root
     val goldMap = datum.tree.map(projectedLabel).preorder.filter(_.label != -1).map{t => t.span -> t.label}.toMap
 
-    new SentimentLossAnchoring(grammar, lexicon, datum.words, goldMap, constraintFactory.constraints(datum.words))
+    new SentimentLossAnchoring(topology, lexicon, datum.words, goldMap, constraintFactory.constraints(datum.words))
   }
 
 
@@ -43,10 +43,10 @@ case class SentimentLossAugmentation[W](trainTrees: IndexedSeq[TreeInstance[Anno
   def anchor(words: IndexedSeq[W]): CoreAnchoring[AnnotatedLabel, W] = {
     trainingMap.get(words)
       .map( ti =>lossAugmentation(ti) )
-      .getOrElse ( CoreAnchoring.identity(grammar, lexicon, words, constraintFactory.constraints(words)) )
+      .getOrElse ( CoreAnchoring.identity(topology, lexicon, words, constraintFactory.constraints(words)) )
   }
 
-  case class SentimentLossAnchoring[L, W](grammar: BaseGrammar[L],
+  case class SentimentLossAnchoring[L, W](topology: RuleTopology[L],
                                           lexicon: Lexicon[L, W],
                                           words: IndexedSeq[W],
                                           goldLabels: Map[Span, Int],

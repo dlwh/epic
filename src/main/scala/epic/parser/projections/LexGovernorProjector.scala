@@ -41,12 +41,12 @@ class LexGovernorProjector[L, W](grammar: LexGrammar[L, _, W]) {
       siphonMass(spanHeadCounts(split, end), head, notASpan, score)
       if (grammar.isHeadOnRightForRule(rule)) { // head on the right
         assert(head >= split)
-        val label = grammar.grammar.leftChild(rule)
+        val label = grammar.topology.leftChild(rule)
         maximalLabelType(dep)(label) += score
         governedSpan(dep)(TriangularArray.index(begin,split)) += score
       } else {
         assert(head < split)
-        val label = grammar.grammar.rightChild(rule)
+        val label = grammar.topology.rightChild(rule)
         maximalLabelType(dep)(label) += score
         governedSpan(dep)(TriangularArray.index(split,end)) += score
       }
@@ -68,7 +68,7 @@ class LexGovernorProjector[L, W](grammar: LexGrammar[L, _, W]) {
     }
 
     def visitUnaryRule(begin: Int, end: Int, rule: Int, ref: Int, score: Double) {
-      val parent = grammar.grammar.parent(rule)
+      val parent = grammar.topology.parent(rule)
       siphonMass(spanType(begin,end), parent, notAConstituent, score)
       val head = otherAnch.unaryHeadIndex(ref)
 
@@ -97,12 +97,12 @@ class LexGovernorProjector[L, W](grammar: LexGrammar[L, _, W]) {
 
     private def notASpan = length+1
     def labelBeliefs = {
-      val r = grammar.grammar.labelEncoder.mkDenseVector()
+      val r = grammar.topology.labelEncoder.mkDenseVector()
       r
     }
 
     def optionalLabelBeliefs = {
-      val r = DenseVector.zeros[Double](grammar.grammar.labelIndex.size + 1)
+      val r = DenseVector.zeros[Double](grammar.topology.labelIndex.size + 1)
       r(notAConstituent) = 1.0
       r
     }

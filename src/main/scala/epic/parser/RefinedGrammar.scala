@@ -29,35 +29,35 @@ import epic.lexicon.{SimpleTagScorer, TagScorer, SimpleLexicon, Lexicon}
 trait RefinedGrammar[L, W] extends Serializable {
   def *(refined: RefinedGrammar[L, W]) = RefinedGrammar.product(this, refined)
 
-  def grammar: BaseGrammar[L]
+  def topology: RuleTopology[L]
   def lexicon: Lexicon[L, W]
 
-  def root = grammar.root
-  def index = grammar.index
-  def labelIndex = grammar.labelIndex
-  def labelEncoder = grammar.labelEncoder
+  def root = topology.root
+  def index = topology.index
+  def labelIndex = topology.labelIndex
+  def labelEncoder = topology.labelEncoder
 
   def anchor(words: IndexedSeq[W]):RefinedAnchoring[L, W]
 }
 
 object RefinedGrammar {
   def product[L, W](f1: RefinedGrammar[L, W], f2: RefinedGrammar[L, W]):RefinedGrammar[L, W] = new RefinedGrammar[L, W] {
-    def grammar = f1.grammar
+    def topology = f1.topology
     def lexicon = f1.lexicon
 
     def anchor(words: IndexedSeq[W]) = new ProductRefinedAnchoring(f1.anchor(words), f2.anchor(words))
   }
 
-  def identity[L, W](grammar: BaseGrammar[L], lexicon: Lexicon[L, W]): RefinedGrammar[L, W] = {
-    val g = grammar
+  def identity[L, W](ruleTopology: RuleTopology[L], lexicon: Lexicon[L, W]): RefinedGrammar[L, W] = {
+    val g = ruleTopology
     val l = lexicon
     new RefinedGrammar[L, W] {
-      def grammar = g
+      def topology = g
 
       def lexicon = l
 
       def anchor(words: IndexedSeq[W]) = {
-        RefinedAnchoring.identity(grammar, lexicon, words)
+        RefinedAnchoring.identity(topology, lexicon, words)
       }
     }
   }
@@ -66,29 +66,29 @@ object RefinedGrammar {
                        binaryProductions: Counter2[L, BinaryRule[L], Double],
                        unaryProductions: Counter2[L, UnaryRule[L], Double],
                        wordCounts: Counter2[L, W, Double]):SimpleRefinedGrammar[L, L, W] = {
-    val grammar = BaseGrammar(root, binaryProductions.keysIterator.map(_._2) ++ unaryProductions.keysIterator.map(_._2))
+    val grammar = RuleTopology(root, binaryProductions.keysIterator.map(_._2) ++ unaryProductions.keysIterator.map(_._2))
     val lexicon = new SimpleLexicon[L, W](grammar.labelIndex, wordCounts)
 
     generative(grammar, lexicon,  binaryProductions, unaryProductions, wordCounts)
   }
 
-  def generative[L, W](grammar: BaseGrammar[L], lexicon: Lexicon[L, W],
+  def generative[L, W](topology: RuleTopology[L], lexicon: Lexicon[L, W],
                        binaryProductions: Counter2[L, BinaryRule[L], Double],
                        unaryProductions: Counter2[L, UnaryRule[L], Double],
                        wordCounts: Counter2[L, W, Double]): SimpleRefinedGrammar[L, L, W] = {
-    val ref = GrammarRefinements.identity(grammar)
-    generative(grammar, lexicon, ref, binaryProductions, unaryProductions, wordCounts)
+    val ref = GrammarRefinements.identity(topology)
+    generative(topology, lexicon, ref, binaryProductions, unaryProductions, wordCounts)
   }
 
-  def generative[L, L2, W](grammar: BaseGrammar[L], lexicon: Lexicon[L, W],
+  def generative[L, L2, W](topology: RuleTopology[L], lexicon: Lexicon[L, W],
                            refinements: GrammarRefinements[L, L2],
                            binaryProductions: Counter2[L2, BinaryRule[L2], Double],
                            unaryProductions: Counter2[L2, UnaryRule[L2], Double],
                            wordCounts: Counter2[L2, W, Double]): SimpleRefinedGrammar[L, L2, W] = {
-    generative(grammar, lexicon, refinements, binaryProductions, unaryProductions, new SimpleTagScorer(wordCounts))
+    generative(topology, lexicon, refinements, binaryProductions, unaryProductions, new SimpleTagScorer(wordCounts))
   }
 
-  def generative[L, L2, W](grammar: BaseGrammar[L], lexicon: Lexicon[L, W],
+  def generative[L, L2, W](topology: RuleTopology[L], lexicon: Lexicon[L, W],
                            refinements: GrammarRefinements[L, L2],
                            binaryProductions: Counter2[L2, BinaryRule[L2], Double],
                            unaryProductions: Counter2[L2, UnaryRule[L2], Double],
@@ -101,23 +101,20 @@ object RefinedGrammar {
       case r@UnaryRule(a, _, _) => loggedU(a, r)
     }
 
-    val spanScoreArray = new Array[Double](refinements.labels.fineIndex.size)
-
-    unanchored[L, L2, W](grammar, lexicon, refinements, ruleScoreArray, spanScoreArray, ts)
+    unanchored[L, L2, W](topology, lexicon, refinements, ruleScoreArray, ts)
   }
 
-  def unanchored[L, L2, W](grammar: BaseGrammar[L], lexicon: Lexicon[L, W],
+  def unanchored[L, L2, W](topology: RuleTopology[L], lexicon: Lexicon[L, W],
                         refinements: GrammarRefinements[L, L2],
                         refinedRuleScores: Array[Double],
-                        refinedSpanScores: Array[Double],
                         tagScorer: TagScorer[L2, W]): SimpleRefinedGrammar[L, L2, W] = {
 
-    val refinedGrammar = BaseGrammar(refinements.labels.refinementsOf(grammar.root)(0),
+    val refinedGrammar = RuleTopology(refinements.labels.refinementsOf(topology.root)(0),
       refinements.labels.fineIndex,
       refinements.rules.fineIndex)
 
     // localized rule scores
-    val ruleScoreArray: Array[Array[Double]] = Array.tabulate(grammar.index.size){ (r: Int) =>
+    val ruleScoreArray: Array[Array[Double]] = Array.tabulate(topology.index.size){ (r: Int) =>
       val refs = refinements.rules.refinementsOf(r)
       val arr = new Array[Double](refs.length)
       for (i <- 0 until refs.length) {
@@ -126,18 +123,11 @@ object RefinedGrammar {
       arr
     }
 
-    val spanScoreArray: Array[Array[Double]] = Array.tabulate(grammar.labelIndex.size){ (r: Int) =>
-      val refs = refinements.labels.refinementsOf(r)
-      val arr = new Array[Double](refs.length)
-      for (i <- 0 until refs.length) {
-        arr(i) = refinedSpanScores(refs(i))
-      }
-      arr
-    }
+
 
     // rule -> parentRef -> [ruleRef]
-    val parentCompatibleRefinements: Array[Array[Array[Int]]] = Array.tabulate(grammar.index.size) { r =>
-      val parent = grammar.parent(r)
+    val parentCompatibleRefinements: Array[Array[Array[Int]]] = Array.tabulate(topology.index.size) { r =>
+      val parent = topology.parent(r)
       val parentRefs = Array.fill(refinements.labels.refinementsOf(parent).length){ArrayBuffer[Int]()}
       for(ruleRef <- refinements.rules.refinementsOf(r)) {
         val refParent = refinements.labels.localize(refinedGrammar.parent(ruleRef))
@@ -147,9 +137,9 @@ object RefinedGrammar {
     }
 
     // rule -> parentRef -> [ruleRef]
-    val childCompatibleRefinements: Array[Array[Array[Int]]] = Array.tabulate(grammar.index.size) { r =>
-      if(grammar.index.get(r).isInstanceOf[UnaryRule[L]]) {
-        val child = grammar.child(r)
+    val childCompatibleRefinements: Array[Array[Array[Int]]] = Array.tabulate(topology.index.size) { r =>
+      if(topology.index.get(r).isInstanceOf[UnaryRule[L]]) {
+        val child = topology.child(r)
         val childRefs = Array.fill(refinements.labels.refinementsOf(child).length){ArrayBuffer[Int]()}
         for(ruleRef <- refinements.rules.refinementsOf(r)) {
           val refChild = refinements.labels.localize(refinedGrammar.child(ruleRef))
@@ -161,8 +151,8 @@ object RefinedGrammar {
       }
     }
 
-    new SimpleRefinedGrammar[L, L2, W](grammar, lexicon, refinements,
-      refinedGrammar, ruleScoreArray, spanScoreArray,
+    new SimpleRefinedGrammar[L, L2, W](topology, lexicon, refinements,
+      refinedGrammar, ruleScoreArray,
       parentCompatibleRefinements, childCompatibleRefinements, tagScorer)
   }
 
