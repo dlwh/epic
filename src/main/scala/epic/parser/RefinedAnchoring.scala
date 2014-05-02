@@ -32,6 +32,8 @@ trait RefinedAnchoring[L, W]  {
   def lexicon: Lexicon[L, W]
   def words: IndexedSeq[W]
 
+  def length = words.length
+
 
   def logPartition: Double = marginal.logPartition
 

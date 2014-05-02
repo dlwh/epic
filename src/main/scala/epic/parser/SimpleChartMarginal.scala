@@ -131,6 +131,549 @@ final case class SimpleChartMarginal[L, L2, W](anch: SimpleRefinedGrammar.Anchor
   }
 }
 
+/*
+object SimpleChartMarginal {
+  import RefinedChartMarginal._
+
+  def apply[L, L2, W](grammar: SimpleRefinedGrammar[L, L2, W], words: IndexedSeq[W], maxMarginal: Boolean = false): SimpleChartMarginal[L, L2, W] = {
+    val anchoring = grammar.anchor(words)
+    val sum = if(maxMarginal) MaxSummer else LogSummer
+    val inside = buildInsideChart(anchoring, words, sum)
+    val outside = buildOutsideChart(anchoring, inside, sum)
+    SimpleChartMarginal(anchoring, inside, outside, maxMarginal)
+  }
+
+
+
+  // first parse chart is the inside scores, second parse chart is span scores for spans that were computed.
+  private def buildInsideChart[L, L2, W](anchoring: SimpleRefinedGrammar.Anchoring[L, L2, W],
+                                         words: IndexedSeq[W], sum: Summer): SimpleParseChart[L] = {
+    val refined = anchoring
+
+    val grammar = anchoring.topology
+
+    val inside = new SimpleParseChart(anchoring.refinedTopology.labelIndex, words.length)
+    val tagConstraints = refined.tagConstraints
+
+    // handle lexical
+    for{i <- 0 until words.length} {
+      assert(core.sparsityPattern.isAllowedSpan(i,i+1), "a pos tag isn't allowed? " + core.sparsityPattern)
+      assert(core.sparsityPattern.bot.isAllowedSpan(i,i+1), "a top of a length 1 span isn't allowed?")
+      var foundSomething = false
+      for {
+        a <- tagConstraints.allowedTags(i) if core.sparsityPattern.bot.isAllowedLabeledSpan(i, i+1, a)
+        coreScore = core.scoreSpan(i, i+1, a) if coreScore != Double.NegativeInfinity
+        ref <- refined.validLabelRefinements(i, i+1, a)
+      } {
+        val score:Double = refined.scoreSpan(i, i+1, a, ref) + coreScore
+        if (score != Double.NegativeInfinity) {
+          spanScores.bot.enter(i, i+1, a, ref, score)
+          inside.bot.enter(i, i+1, a, ref, score)
+          foundSomething = true
+        }
+      }
+
+      updateInsideUnaries(inside, anchoring,  i, i+1, sum)
+    }
+
+
+    // cache for coreScores
+    val coreScoreArray = new Array[Double](words.length)
+
+    val top = inside.top
+    val g = grammar
+
+    val scoreArray = Array.ofDim[Double](anchoring.refined.maxLabelRefinements,  40)
+
+    // a -> bc over [begin, split, end)
+    for {
+      span <- 2 to words.length
+      begin:Int <- 0 to (words.length - span)
+    } {
+      val end = begin + span
+      // I get a 20% speedup by inlining code dealing with these arrays. sigh.
+      val narrowRight = top.leftMostEndForBegin(begin)
+      val narrowLeft = top.rightMostBeginForEnd(end)
+      val wideRight = top.rightMostEndForBegin(begin)
+      val wideLeft = top.leftMostBeginForEnd(end)
+
+      val coarseNarrowRight = top.coarseLeftMostEndForBegin(begin)
+      val coarseNarrowLeft = top.coarseRightMostBeginForEnd(end)
+      val coarseWideRight = top.coarseRightMostEndForBegin(begin)
+      val coarseWideLeft = top.coarseLeftMostBeginForEnd(end)
+      val offsets = new Array[Int](anchoring.refined.maxLabelRefinements)
+      val spanScoresEntered = new Array[Boolean](anchoring.refined.maxLabelRefinements)
+
+      for ( a <- 0 until grammar.labelIndex.size if core.sparsityPattern.bot.isAllowedLabeledSpan(begin, end, a)) {
+        val numValidLabelRefs = anchoring.refined.numValidRefinements(a)
+        java.util.Arrays.fill(offsets, 0)
+        java.util.Arrays.fill(spanScoresEntered, false)
+
+        val coreSpan = core.scoreSpan(begin, end, a)
+        if (coreSpan != Double.NegativeInfinity) {
+          val rules = anchoring.topology.indexedBinaryRulesWithParent(a)
+          var ruleIndex = 0
+          // into rules
+          while(ruleIndex < rules.length) {
+            val r = rules(ruleIndex)
+            val b = g.leftChild(r)
+            val c = g.rightChild(r)
+            ruleIndex += 1
+
+            // Check: can we build any refinement of this rule?
+            // basically, we can if TODO
+            val narrowR = coarseNarrowRight(b)
+            val narrowL = coarseNarrowLeft(c)
+            val coarseSplitBegin = math.max(narrowR, coarseWideLeft(c))
+            val coarseSplitEnd = math.min(coarseWideRight(b), narrowL) + 1
+            val canBuildThisRule = narrowR < end && narrowL >= narrowR && coarseSplitBegin <= narrowL && coarseSplitBegin < coarseSplitEnd
+
+            if(canBuildThisRule) {
+              // initialize core scores
+              RefinedChartMarginal.fillCoreScores(coreScoreArray,
+                begin, end,
+                anchoring.core,
+                coarseSplitBegin, coarseSplitEnd,
+                r)
+
+              val validA = refined.validParentRefinementsGivenRule(begin, coarseSplitBegin, coarseSplitEnd, end, r)
+              var ai = 0
+              while(ai < validA.length) {
+                val refA = validA(ai)
+                ai += 1
+                val spanScore = refined.scoreSpan(begin, end, a, refA) + coreSpan
+                if(!spanScore.isInfinite) {
+                  if(!spanScoresEntered(refA)) {
+                    spanScores.bot.enter(begin, end, a, refA, spanScore)
+                    spanScoresEntered(refA) = true
+                  }
+
+                  val refinements = refined.validRuleRefinementsGivenParent(begin, end, r, refA)
+                  var ruleRefIndex = 0
+                  while(ruleRefIndex < refinements.length) {
+                    val refR = refinements(ruleRefIndex)
+                    ruleRefIndex += 1
+                    val refB = refined.leftChildRefinement(r, refR)
+                    val refC = refined.rightChildRefinement(r, refR)
+
+                    val narrowR = narrowRight(b)(refB)
+                    val narrowL = narrowLeft(c)(refC)
+                    var split = math.max(narrowR, wideLeft(c)(refC))
+                    val endSplit = math.min(wideRight(b)(refB), narrowL) + 1
+                    val canBuildThisRule = narrowR < end && narrowL >= narrowR && split <= narrowL && split < endSplit
+                    if(!canBuildThisRule)
+                      split = endSplit
+
+                    while(split < endSplit) {
+                      val bScore = inside.top.labelScore(begin, split, b, refB)
+                      val cScore = inside.top.labelScore(split, end, c, refC)
+                      val withoutRule = bScore + cScore + spanScore + coreScoreArray(split)
+                      if(withoutRule != Double.NegativeInfinity) {
+
+                        val prob = withoutRule + refined.scoreBinaryRule(begin, split, end, r, refR)
+
+                        scoreArray(refA)(offsets(refA)) = prob
+                        offsets(refA) += 1
+                        // buffer full
+                        if(offsets(refA) == scoreArray(refA).length) {
+                          scoreArray(refA)(0) = sum(scoreArray(refA), offsets(refA))
+                          offsets(refA) = 1
+                        }
+                      }
+                      split += 1
+                    }
+                  }
+                }
+
+              } // end a refinement
+
+
+
+            } // end canBuildThisRule
+          } // end rules
+
+          var foundSomething = false
+          var ai = 0
+          while(ai < numValidLabelRefs) {
+            // done updating vector, do an enter:
+            if(offsets(ai) > 0) {
+              val score = sum(scoreArray(ai), offsets(ai))
+              inside.bot.enter(begin, end, a, ai, score)
+              foundSomething = true
+            }
+            ai += 1
+          }
+          //          assert(rootScore(anchoring, inside, sum) != 0.0, (begin, end, a))
+          //          if(!foundSomething && anchoring.core.sparsityPattern != ChartConstraints.noSparsity) {
+          //            logger.warn(s"Failed to replicate a span in ($begin, $end) of ${anchoring.words}. Label is ${anchoring.grammar.labelIndex.get(a)}")
+          //
+          //          }
+
+        }
+      }
+      updateInsideUnaries(inside, anchoring, begin, end, sum)
+    }
+    inside -> spanScores
+  }
+
+  private def buildOutsideChart[L, W](anchoring: AugmentedAnchoring[L, W],
+                                      inside: RefinedParseChart[L], spanScores: RefinedParseChart[L], sum: Summer):RefinedParseChart[L] = {
+    val refined = anchoring.refined
+    val core = anchoring.core
+
+    val grammar = anchoring.topology
+    val rootIndex = grammar.labelIndex(grammar.root)
+
+    // cache for coreScores
+    val coreScoreArray = new Array[Double](inside.length + 1)
+
+    val length = inside.length
+    val outside = RefinedParseChart.logProb.apply(grammar.labelIndex,
+      Array.tabulate(grammar.labelIndex.size)(refined.numValidRefinements),
+      length,
+      core.sparsityPattern)
+    for(refRoot <- refined.validLabelRefinements(0, inside.length, rootIndex)) {
+      outside.top.enter(0, inside.length, rootIndex, refRoot, 0.0)
+    }
+    updateOutsideUnaries(outside, inside, anchoring, 0, inside.length, sum)
+
+    val scoreArray = Array.ofDim[Double](anchoring.refined.maxLabelRefinements,  80)
+    val offsets = new Array[Int](anchoring.refined.maxLabelRefinements)
+
+    for {
+      span <- (length-1) until 0 by (-1)
+      begin <- 0 to (length-span)
+    } {
+      val end = begin + span
+
+      val enteredTop = inside.top.enteredLabelIndexes(begin, end)
+      var a = 0
+      while(a < grammar.labelIndex.size) {
+        // we're going to populate a by looking at rules p -> a rc, p -> lc a
+        if (enteredTop.contains(a)) {
+          java.util.Arrays.fill(offsets, 0)
+          doOutsideLeftCompletionUpdates(inside, outside, spanScores, anchoring, begin, end, a, coreScoreArray, scoreArray, offsets, sum)
+          doOutsideRightCompletionUpdates(inside, outside, spanScores, anchoring, begin, end, a, coreScoreArray, scoreArray, offsets, sum)
+
+          val numValidLabelRefs = anchoring.refined.numValidRefinements(a)
+          var ai = 0
+          while(ai < numValidLabelRefs) {
+            // done updating vector, do an enter:
+            if(offsets(ai) > 0) {
+              outside.top.enter(begin, end, a, ai, sum(scoreArray(ai), offsets(ai)))
+            }
+            ai += 1
+          }
+        }
+
+        a += 1
+      }
+      updateOutsideUnaries(outside, inside, anchoring, begin, end, sum)
+    }
+    outside
+  }
+
+
+  private def doOutsideLeftCompletionUpdates[W, L](inside: RefinedParseChart[L], outside: RefinedParseChart[L],
+                                                   spanScores: RefinedParseChart[L],
+                                                   anchoring: AugmentedAnchoring[L, W],
+                                                   begin: Int, end: Int,
+                                                   label: Int,
+                                                   coreScoreArray: Array[Double],
+                                                   scoreArray: Array[Array[Double]], offsets: Array[Int], sum: Summer) {
+    val refined = anchoring.refined
+    val itop = inside.top
+    val grammar = refined.topology
+    val rules = anchoring.topology.indexedBinaryRulesWithLeftChild(label)
+    val length = inside.length
+
+
+    var br = 0
+    while (br < rules.length) {
+      val r = rules(br)
+      val p = grammar.parent(r)
+      val rc = grammar.rightChild(r)
+      br += 1
+
+      // can I possibly build any refinement of this rule?
+      val parentMinCompletion = inside.bot.coarseLeftMostEndForBegin(begin)(p)
+      val rcMinCompletion = inside.top.coarseLeftMostEndForBegin(end)(rc)
+      val parentMaxCompletion = inside.bot.coarseRightMostEndForBegin(begin)(p)
+      val rcMaxCompletion = inside.top.coarseRightMostEndForBegin(end)(rc)
+      val coarseCompletionBegin = math.max(math.max(parentMinCompletion, rcMinCompletion), end + 1)
+      val coarseCompletionEnd = math.min(parentMaxCompletion, rcMaxCompletion)
+      val canBuildThisRule = coarseCompletionBegin <= coarseCompletionEnd
+      assert(coarseCompletionBegin > end)
+      assert(coarseCompletionEnd <= length, coarseCompletionEnd + " " + length)
+
+
+      if (canBuildThisRule) {
+        // initialize core scores
+        RefinedChartMarginal.fillCoreScoresForLeftCompletion(coreScoreArray,
+          begin, end,
+          anchoring.core,
+          coarseCompletionBegin, coarseCompletionEnd,
+          r)
+
+
+        val enteredRefTop = inside.top.enteredLabelRefinements(begin, end, label)
+        val compatibleRefinements = refined.validLeftChildRefinementsGivenRule(begin, end, coarseCompletionBegin, coarseCompletionEnd, r)
+
+        var refai = 0
+        while (refai < compatibleRefinements.length) {
+          val refA = compatibleRefinements(refai)
+          if (enteredRefTop.contains(refA)) {
+            val ruleRefinements = refined.validRuleRefinementsGivenLeftChild(begin, end, coarseCompletionBegin, coarseCompletionEnd, r, refA)
+            var rfI = 0
+            while (rfI < ruleRefinements.length) {
+              val refR = ruleRefinements(rfI)
+              rfI += 1
+              val refP = refined.parentRefinement(r, refR)
+              val refC = refined.rightChildRefinement(r, refR)
+
+              val parentMinCompletion = inside.bot.leftMostEndForBegin(begin)(p)(refP)
+              val rcMinCompletion = inside.top.leftMostEndForBegin(end)(rc)(refC)
+              val parentMaxCompletion = inside.bot.rightMostEndForBegin(begin)(p)(refP)
+              val rcMaxCompletion = inside.top.rightMostEndForBegin(end)(rc)(refC)
+              val completionBegin = math.max(math.max(parentMinCompletion, rcMinCompletion), end + 1)
+              val completionEnd = math.min(parentMaxCompletion, rcMaxCompletion)
+
+              var completion = completionBegin
+
+              while (completion <= completionEnd) {
+                val pOutside = outside.bot.labelScore(begin, completion, p, refP) + spanScores.bot.labelScore(begin, completion, p, refP)
+                val cInside = itop.labelScore(end, completion, rc, refC)
+                if (cInside != Double.NegativeInfinity && pOutside != Double.NegativeInfinity) {
+                  val ruleScore = refined.scoreBinaryRule(begin, end, completion, r, refR) + coreScoreArray(completion)
+                  val score = cInside + ruleScore + pOutside
+                  scoreArray(refA)(offsets(refA)) = score
+                  offsets(refA) += 1
+                  // buffer full
+                  if (offsets(refA) == scoreArray(refA).length) {
+                    scoreArray(refA)(0) = sum(scoreArray(refA), offsets(refA))
+                    offsets(refA) = 1
+                  }
+                }
+
+                completion += 1
+              }
+            }
+          }
+          refai += 1
+        }
+      }
+    }
+  }
+
+  private def doOutsideRightCompletionUpdates[W, L](inside: RefinedParseChart[L], outside: RefinedParseChart[L],
+                                                    spanScores: RefinedParseChart[L],
+                                                    anchoring: AugmentedAnchoring[L, W],
+                                                    begin: Int, end: Int,
+                                                    label: Int,
+                                                    coreScoreArray: Array[Double],
+                                                    scoreArray: Array[Array[Double]],
+                                                    offsets: Array[Int], sum: Summer) {
+    val refined = anchoring.refined
+    val itop = inside.top
+    val grammar = refined.topology
+    val rules = anchoring.topology.indexedBinaryRulesWithRightChild(label)
+
+    var br = 0
+    while (br < rules.length) {
+      val r = rules(br)
+      val p = grammar.parent(r)
+      val lc = grammar.leftChild(r)
+      br += 1
+
+      // can I possibly build any refinement of this rule?
+      val parentMinCompletion = inside.bot.coarseLeftMostBeginForEnd(end)(p)
+      val rcMinCompletion = inside.top.coarseLeftMostBeginForEnd(begin)(lc)
+      val parentMaxCompletion = inside.bot.coarseRightMostBeginForEnd(end)(p)
+      val rcMaxCompletion = inside.top.coarseRightMostBeginForEnd(begin)(lc)
+      val coarseCompletionBegin = math.max(parentMinCompletion, rcMinCompletion)
+      val coarseCompletionEnd = math.min(begin, math.min(parentMaxCompletion, rcMaxCompletion))
+      val canBuildThisRule = coarseCompletionBegin <= coarseCompletionEnd
+
+      if (canBuildThisRule) {
+        // initialize core scores
+        RefinedChartMarginal.fillCoreScoresForRightCompletion(coreScoreArray,
+          begin, end,
+          anchoring.core,
+          coarseCompletionBegin, coarseCompletionEnd,
+          r)
+
+        val enteredRefTop = inside.top.enteredLabelRefinements(begin, end, label)
+        val compatibleRefinements = refined.validRightChildRefinementsGivenRule(coarseCompletionBegin, coarseCompletionEnd, begin, end, r)
+
+        var refai = 0
+        while (refai < compatibleRefinements.length) {
+          val refA = compatibleRefinements(refai)
+          if (enteredRefTop.contains(refA)) {
+            val ruleRefinements = refined.validRuleRefinementsGivenRightChild(coarseCompletionBegin, coarseCompletionEnd, begin, end, r, refA)
+            var rfI = 0
+            while (rfI < ruleRefinements.length) {
+              val refR = ruleRefinements(rfI)
+              rfI += 1
+              val refP = refined.parentRefinement(r, refR)
+              val refB = refined.leftChildRefinement(r, refR)
+
+              val parentMinCompletion = inside.bot.leftMostBeginForEnd(end)(p)(refP)
+              val rcMinCompletion = inside.top.leftMostBeginForEnd(begin)(lc)(refB)
+              val parentMaxCompletion = inside.bot.rightMostBeginForEnd(end)(p)(refP)
+              val rcMaxCompletion = inside.top.rightMostBeginForEnd(begin)(lc)(refB)
+              val completionBegin = math.max(parentMinCompletion, rcMinCompletion)
+              val completionEnd = math.min(begin,math.min(parentMaxCompletion, rcMaxCompletion))
+
+              var completion = completionBegin
+
+              while (completion <= completionEnd) {
+                val pOutside = outside.bot.labelScore(completion, end, p, refP) + spanScores.bot.labelScore(completion, end, p, refP)
+                val bInside = itop.labelScore(completion, begin, lc, refB)
+                if (bInside != Double.NegativeInfinity && pOutside != Double.NegativeInfinity) {
+                  val ruleScore = refined.scoreBinaryRule(completion, begin, end, r, refR) + coreScoreArray(completion)
+                  val score = bInside + ruleScore + pOutside
+                  scoreArray(refA)(offsets(refA)) = score
+                  offsets(refA) += 1
+                  // buffer full
+                  if (offsets(refA) == scoreArray(refA).length) {
+                    scoreArray(refA)(0) = sum(scoreArray(refA), offsets(refA))
+                    offsets(refA) = 1
+                  }
+                }
+
+                completion += 1
+              }
+            }
+          }
+          refai += 1
+        }
+      }
+    }
+  }
+
+  private def updateInsideUnaries[L, W](chart: RefinedParseChart[L],
+                                        anchoring: AugmentedAnchoring[L, W],
+                                        begin: Int, end: Int, sum: Summer) = {
+    val refined = anchoring.refined
+    val core = anchoring.core
+    val grammar = anchoring.topology
+    for(bi <- chart.bot.enteredLabelIndexes(begin, end); refB <- chart.bot.enteredLabelRefinements(begin, end, bi)) {
+      val b = bi
+      val bScore = chart.bot.labelScore(begin, end, b, refB)
+      if(bScore != Double.NegativeInfinity) {
+        val rules = grammar.indexedUnaryRulesWithChild(b)
+        var j = 0
+        while(j < rules.length) {
+          val r = rules(j)
+          val a = grammar.parent(r)
+          if(core.sparsityPattern.top.isAllowedLabeledSpan(begin, end, a)) {
+            val coreScore = core.scoreUnaryRule(begin, end, r)
+            if(coreScore != Double.NegativeInfinity)
+              for(refR <- refined.validUnaryRuleRefinementsGivenChild(begin, end, r, refB)) {
+                val refA = refined.parentRefinement(r, refR)
+                val ruleScore: Double = refined.scoreUnaryRule(begin, end, r, refR) + coreScore
+                val prob: Double = bScore + ruleScore
+                if(prob != Double.NegativeInfinity) {
+                  chart.top.enter(begin, end, a, refA, sum(chart.top.labelScore(begin, end, a, refA), prob))
+                }
+              }
+          }
+          j += 1
+        }
+      }
+    }
+
+  }
+
+  private def updateOutsideUnaries[L, W](chart: RefinedParseChart[L],
+                                         inside: RefinedParseChart[L],
+                                         anchoring: AugmentedAnchoring[L, W],
+                                         begin: Int, end: Int, sum: Summer) = {
+    val refined = anchoring.refined
+    val core = anchoring.core
+    val grammar = anchoring.topology
+    for(ai <- inside.top.enteredLabelIndexes(begin, end); refA <- inside.top.enteredLabelRefinements(begin, end, ai)) {
+      val a = ai
+      val bScore = chart.top.labelScore(begin, end, a, refA)
+      val rules = grammar.indexedUnaryRulesWithParent(a)
+      var j = 0
+      while(j < rules.length) {
+        val r = rules(j)
+        val coreScore = core.scoreUnaryRule(begin, end, r)
+        if(coreScore != Double.NegativeInfinity) {
+          val b = grammar.child(r)
+          if(inside.bot.isLabelEntered(begin, end, b))
+            for(refR <- refined.validRuleRefinementsGivenParent(begin, end, rules(j), refA)) {
+              val refB = refined.childRefinement(rules(j), refR)
+              val ruleScore: Double = refined.scoreUnaryRule(begin, end, rules(j), refR) + coreScore
+              val prob: Double = bScore + ruleScore
+              if(prob != Double.NegativeInfinity) {
+                chart.bot.enter(begin, end, b, refB, sum(chart.bot.labelScore(begin, end, b, refB), prob))
+              }
+            }
+        }
+        j += 1
+      }
+    }
+
+  }
+
+  private def fillCoreScores[L, W](coreScores: Array[Double],
+                                   begin: Int, end: Int,
+                                   anchoring: CoreAnchoring[L, W],
+                                   splitBegin: Int, splitEnd: Int,
+                                   rule: Int) {
+
+    if(anchoring.isInstanceOf[CoreAnchoring.Identity[_, _]]) {
+      java.util.Arrays.fill(coreScores, 0.0)
+    } else {
+      var split = splitBegin
+      while (split < splitEnd) {
+        coreScores(split) = anchoring.scoreBinaryRule(begin, split, end, rule)
+
+        split += 1
+      }
+    }
+  }
+
+  private def fillCoreScoresForLeftCompletion[L, W](coreScores: Array[Double],
+                                                    begin: Int, end: Int,
+                                                    anchoring: CoreAnchoring[L, W],
+                                                    completionBegin: Int, completionEnd: Int,
+                                                    rule: Int) {
+    if(anchoring.isInstanceOf[CoreAnchoring.Identity[_, _]]) {
+      java.util.Arrays.fill(coreScores, 0.0)
+    } else {
+      var completion = completionBegin
+      while (completion <= completionEnd) {
+        coreScores(completion) = anchoring.scoreBinaryRule(begin, end, completion, rule)
+
+        completion += 1
+      }
+    }
+  }
+
+  private def fillCoreScoresForRightCompletion[L, W](coreScores: Array[Double],
+                                                     begin: Int, end: Int,
+                                                     anchoring: CoreAnchoring[L, W],
+                                                     completionBegin: Int, completionEnd: Int,
+                                                     rule: Int) {
+
+    if(anchoring.isInstanceOf[CoreAnchoring.Identity[_, _]]) {
+      java.util.Arrays.fill(coreScores, 0.0)
+    } else {
+      var completion = completionBegin
+      while (completion <= completionEnd) {
+        coreScores(completion) = anchoring.scoreBinaryRule(completion, begin, end, rule)
+
+        completion += 1
+      }
+    }
+  }
+
+}
+*/
+
 
 @SerialVersionUID(1)
 final class SimpleParseChart[L](val index: Index[L], val length: Int) extends Serializable {
@@ -150,3 +693,4 @@ final class SimpleParseChart[L](val index: Index[L], val length: Int) extends Se
   }
 
 }
+

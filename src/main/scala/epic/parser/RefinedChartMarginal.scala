@@ -319,17 +319,17 @@ object RefinedChartMarginal {
     RefinedChartMarginal(anchoring, inside, outside, logPartition, maxMarginal)
   }
 
-  private trait Summer {
+  private[parser] trait Summer {
     def apply(a: Double, b: Double):Double
     def apply(a: Array[Double], length: Int):Double
   }
 
-  private object LogSummer extends Summer {
+  private[parser] object LogSummer extends Summer {
     def apply(a: Double, b: Double): Double = softmax(a,b)
     def apply(a: Array[Double], length: Int): Double = softmax.array(a, length)
   }
 
-  private object MaxSummer extends Summer {
+  private[parser] object MaxSummer extends Summer {
     def apply(a: Double, b: Double): Double = math.max(a,b)
     def apply(a: Array[Double], length: Int): Double = if(length == 0) Double.NegativeInfinity else max.array(a, length)
   }
