@@ -30,7 +30,7 @@ import breeze.collection.mutable.TriangularArray
  */
 trait ParseMarginal[L, W] extends VisitableMarginal[AnchoredVisitor[L]] {
   def anchoring: AugmentedAnchoring[L, W]
-  def grammar:RuleTopology[L] = anchoring.grammar
+  def topology:RuleTopology[L] = anchoring.topology
   def lexicon = anchoring.lexicon
   def logPartition: Double
   def words:IndexedSeq[W] = anchoring.words
@@ -43,11 +43,11 @@ trait ParseMarginal[L, W] extends VisitableMarginal[AnchoredVisitor[L]] {
   def insideBotScore(begin: Int, end: Int, sym: Int, ref: Int):Double
 
   def labelMarginals: (TriangularArray[Counter[L, Double]], TriangularArray[Counter[L, Double]])  = {
-    new AnchoredSpanProjector().projectSpanPosteriors(this).decode(grammar)
+    new AnchoredSpanProjector().projectSpanPosteriors(this).decode(topology)
   }
 
   def expectedRuleCounts: StandardExpectedCounts[Rule[L]] = {
-    val featurizer = new RuleFeaturizer[L, W](grammar)
+    val featurizer = new RuleFeaturizer[L, W](topology)
     val counts = StandardExpectedCounts.zero(featurizer.index)
     expectedCounts(featurizer, counts, 1.0)
   }

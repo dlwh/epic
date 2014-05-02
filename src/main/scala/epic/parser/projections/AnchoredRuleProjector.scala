@@ -35,8 +35,8 @@ class AnchoredRuleProjector(threshold: Double) extends Serializable {
     val length = charts.length
     // preliminaries: we're not going to fill in everything: some things will be null.
     // all of this is how to deal with it.
-    val numProjectedLabels = charts.grammar.labelIndex.size
-    val numProjectedRules = charts.grammar.index.size
+    val numProjectedLabels = charts.topology.labelIndex.size
+    val numProjectedRules = charts.topology.index.size
     def projVector() = {
       new OpenAddressHashArray(numProjectedLabels, 0.0)
     }
@@ -105,7 +105,7 @@ class AnchoredRuleProjector(threshold: Double) extends Serializable {
         if(totalsUnaries(index) eq null) {
           totalsUnaries(index) = projVector()
         }
-        totalsUnaries(index)(charts.grammar.parent(rule)) += count
+        totalsUnaries(index)(charts.topology.parent(rule)) += count
       }
 
     }

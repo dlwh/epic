@@ -12,7 +12,7 @@ object TopDownKBestAStar {
 
   def apply[L, W](chart: RefinedChartMarginal[L, W], k: Int):IndexedSeq[(BinarizedTree[L], Double)] = {
     import chart._
-    val root = chart.grammar.rootIndex
+    val root = chart.topology.rootIndex
 
     val kbestList = new ArrayBuffer[(BinarizedTree[L], Double)]()
     val queue = new mutable.PriorityQueue[TKAItem[(Int, Int)]]
@@ -29,15 +29,15 @@ object TopDownKBestAStar {
             queue += TopItem(Zipper(NullaryTree(l -> lref, span)), insideScore)
           }
         case CompleteTreeItem(tree, weight) =>
-          kbestList += (tree.map(l => chart.grammar.labelIndex.get(l._1)) -> weight)
+          kbestList += (tree.map(l => chart.topology.labelIndex.get(l._1)) -> weight)
         case TopItem(zipper,  weight) =>
           val (a, refA) = zipper.tree.label
           val begin = zipper.tree.begin
           val end = zipper.tree.end
           val aScore = inside.top.labelScore(begin, end, a, refA)
-          for (r <- grammar.indexedUnaryRulesWithParent(a); refR <- anchoring.refined.validRuleRefinementsGivenParent(begin, end, r, refA)) {
-            val b = grammar.child(r)
-            val chain = grammar.chain(r)
+          for (r <- topology.indexedUnaryRulesWithParent(a); refR <- anchoring.refined.validRuleRefinementsGivenParent(begin, end, r, refA)) {
+            val b = topology.child(r)
+            val chain = topology.chain(r)
             val refB = anchoring.refined.childRefinement(r, refR)
             val bScore = inside.bot.labelScore(begin, end, b, refB)
             if(!bScore.isInfinite) {
@@ -66,9 +66,9 @@ object TopDownKBestAStar {
         val traceOn = (begin == 0 && end == 4)
           val spanScore = anchoring.scoreSpan(begin, end, root, rootRef)
           for {
-            r <- grammar.indexedBinaryRulesWithParent(root)
-            b = grammar.leftChild(r)
-            c = grammar.rightChild(r)
+            r <- topology.indexedBinaryRulesWithParent(root)
+            b = topology.leftChild(r)
+            c = topology.rightChild(r)
             refR <- anchoring.refined.validRuleRefinementsGivenParent(begin, end, r, rootRef)
             refB = anchoring.refined.leftChildRefinement(r, refR)
             refC = anchoring.refined.rightChildRefinement(r, refR)

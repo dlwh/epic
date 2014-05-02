@@ -66,7 +66,7 @@ final case class RefinedChartMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
 
     val itop = inside.top
 
-    val grammar = this.grammar
+    val grammar = this.topology
 
     val lexLoc = anchoring.core.tagConstraints
     val core = anchoring.core
@@ -203,12 +203,12 @@ final case class RefinedChartMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
   def checkForTree(tree: BinarizedTree[(L, Int)]) = {
     for (t <- tree.allChildren) t match {
       case UnaryTree( (label, ref), _, _, span) =>
-        val labelScore = inside.top(span.begin, span.end, anchoring.grammar.labelIndex(label), ref)
+        val labelScore = inside.top(span.begin, span.end, anchoring.topology.labelIndex(label), ref)
         if (labelScore.isInfinite) {
           logger.warn("problem with unary: " + (label, ref) + " " + span)
         }
       case tree =>
-        val labelScore = inside.bot(tree.span.begin, tree.span.end, anchoring.grammar.labelIndex(tree.label._1), tree.label._2)
+        val labelScore = inside.bot(tree.span.begin, tree.span.end, anchoring.topology.labelIndex(tree.label._1), tree.label._2)
         if (labelScore.isInfinite) {
           logger.warn("problem with other: " + t.label + " " + tree.span)
         }
@@ -219,12 +219,12 @@ final case class RefinedChartMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
   def checkForSimpleTree(tree: BinarizedTree[L]) = {
     for (t <- tree.allChildren) t match {
       case UnaryTree( label, _, _, span) =>
-        val labelScore = breeze.linalg.softmax(inside.top.decodedLabelScores(span.begin, span.end, anchoring.grammar.labelIndex(label)))
+        val labelScore = breeze.linalg.softmax(inside.top.decodedLabelScores(span.begin, span.end, anchoring.topology.labelIndex(label)))
         if (labelScore.isInfinite) {
           logger.warn("problem with unary: " + (label) + " " + span)
         }
       case tree =>
-        val labelScore = breeze.linalg.softmax(inside.bot.decodedLabelScores(tree.begin, tree.end, anchoring.grammar.labelIndex(tree.label)))
+        val labelScore = breeze.linalg.softmax(inside.bot.decodedLabelScores(tree.begin, tree.end, anchoring.topology.labelIndex(tree.label)))
         if (labelScore.isInfinite) {
           logger.warn("problem with other: " + t.label + " " + tree.span)
         }
@@ -236,7 +236,7 @@ final case class RefinedChartMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
   def checkForTreeOutside(tree: BinarizedTree[(L, Int)]) {
     for (t <- tree.allChildren) t match {
       case tree@UnaryTree( (label, ref), _, _, span) =>
-        val ai: Int = anchoring.grammar.labelIndex(label)
+        val ai: Int = anchoring.topology.labelIndex(label)
         val labelScore = outside.top(span.begin, span.end, ai, ref)
         if (labelScore.isInfinite) {
           RefinedChartMarginal.synchronized {
@@ -251,7 +251,7 @@ final case class RefinedChartMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
           return
         }
       case tree =>
-        val ai: Int = anchoring.grammar.labelIndex(tree.label._1)
+        val ai: Int = anchoring.topology.labelIndex(tree.label._1)
         val labelScore = outside.bot(tree.span.begin, tree.span.end, ai, tree.label._2)
         if (labelScore.isInfinite) {
           RefinedChartMarginal.synchronized {
@@ -335,7 +335,7 @@ object RefinedChartMarginal {
   }
 
   private def rootScore[L, W](anchoring: AugmentedAnchoring[L, W], inside: RefinedParseChart[L], sum: Summer): Double = {
-    val rootIndex: Int = anchoring.grammar.labelIndex(anchoring.grammar.root)
+    val rootIndex: Int = anchoring.topology.labelIndex(anchoring.topology.root)
     val rootScores = new Array[Double](anchoring.refined.validLabelRefinements(0, inside.length, rootIndex).length)
     var offset = 0
     for(ref <- inside.top.enteredLabelRefinements(0, inside.length, rootIndex)) {
@@ -357,7 +357,7 @@ object RefinedChartMarginal {
     val refined = anchoring.refined
     val core = anchoring.core
 
-    val grammar = anchoring.grammar
+    val grammar = anchoring.topology
 
     val inside = RefinedParseChart.logProb.apply(grammar.labelIndex,
       Array.tabulate(grammar.labelIndex.size)(refined.numValidRefinements),
@@ -425,7 +425,7 @@ object RefinedChartMarginal {
 
         val coreSpan = core.scoreSpan(begin, end, a)
         if (coreSpan != Double.NegativeInfinity) {
-          val rules = anchoring.grammar.indexedBinaryRulesWithParent(a)
+          val rules = anchoring.topology.indexedBinaryRulesWithParent(a)
           var ruleIndex = 0
           // into rules
           while(ruleIndex < rules.length) {
@@ -535,7 +535,7 @@ object RefinedChartMarginal {
     val refined = anchoring.refined
     val core = anchoring.core
 
-    val grammar = anchoring.grammar
+    val grammar = anchoring.topology
     val rootIndex = grammar.labelIndex(grammar.root)
 
     // cache for coreScores
@@ -598,7 +598,7 @@ object RefinedChartMarginal {
     val refined = anchoring.refined
     val itop = inside.top
     val grammar = refined.topology
-    val rules = anchoring.grammar.indexedBinaryRulesWithLeftChild(label)
+    val rules = anchoring.topology.indexedBinaryRulesWithLeftChild(label)
     val length = inside.length
 
 
@@ -690,7 +690,7 @@ object RefinedChartMarginal {
     val refined = anchoring.refined
     val itop = inside.top
     val grammar = refined.topology
-    val rules = anchoring.grammar.indexedBinaryRulesWithRightChild(label)
+    val rules = anchoring.topology.indexedBinaryRulesWithRightChild(label)
 
     var br = 0
     while (br < rules.length) {
@@ -770,7 +770,7 @@ object RefinedChartMarginal {
                                         begin: Int, end: Int, sum: Summer) = {
     val refined = anchoring.refined
     val core = anchoring.core
-    val grammar = anchoring.grammar
+    val grammar = anchoring.topology
     for(bi <- chart.bot.enteredLabelIndexes(begin, end); refB <- chart.bot.enteredLabelRefinements(begin, end, bi)) {
       val b = bi
       val bScore = chart.bot.labelScore(begin, end, b, refB)
@@ -805,7 +805,7 @@ object RefinedChartMarginal {
                                          begin: Int, end: Int, sum: Summer) = {
     val refined = anchoring.refined
     val core = anchoring.core
-    val grammar = anchoring.grammar
+    val grammar = anchoring.topology
     for(ai <- inside.top.enteredLabelIndexes(begin, end); refA <- inside.top.enteredLabelRefinements(begin, end, ai)) {
       val a = ai
       val bScore = chart.top.labelScore(begin, end, a, refA)

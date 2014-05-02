@@ -34,11 +34,11 @@ class AnchoredSpanProjector(threshold: Double = Double.NegativeInfinity) extends
                                   goldTagPolicy: GoldTagPolicy[L] = GoldTagPolicy.noGoldTags[L]):AnchoredSpanProjector.AnchoredData = {
 
     val length = charts.length
-    import charts.grammar
-    val notAConstituent = grammar.labelIndex.size
+    import charts.topology
+    val notAConstituent = topology.labelIndex.size
 
     def labelBeliefs = {
-      DenseVector.zeros[Double](grammar.labelIndex.size)
+      DenseVector.zeros[Double](topology.labelIndex.size)
     }
 
     // The data, and initialization. most things init'd to null
@@ -63,7 +63,7 @@ class AnchoredSpanProjector(threshold: Double = Double.NegativeInfinity) extends
 
       def visitUnaryRule(begin: Int, end: Int, rule: Int, ref: Int, count: Double): Unit = {
         if (count > 0.0)
-          totalsUnaries(begin, end)(charts.grammar.parent(rule)) += count
+          totalsUnaries(begin, end)(charts.topology.parent(rule)) += count
       }
 
     }

@@ -59,8 +59,8 @@ case class ViterbiDecoder[L, W]() extends ChartDecoder[L, W] with Serializable w
   def extractMaxDerivationParse(marginal: ParseMarginal[L, W]): BinarizedTree[(L, Int)] = {
     assert(marginal.isMaxMarginal, "Viterbi only makes sense for max marginal marginals!")
     import marginal._
-    val labelIndex = grammar.labelIndex
-    val rootIndex = grammar.rootIndex
+    val labelIndex = topology.labelIndex
+    val rootIndex = topology.rootIndex
     val refined = anchoring.refined
 
     def buildTreeUnary(begin: Int, end:Int, root: Int, rootRef: Int):BinarizedTree[(L, Int)] = {
@@ -69,11 +69,11 @@ case class ViterbiDecoder[L, W]() extends ChartDecoder[L, W] with Serializable w
       var maxChildRef = -1
       var maxRule = -1
       for {
-        r <- grammar.indexedUnaryRulesWithParent(root)
+        r <- topology.indexedUnaryRulesWithParent(root)
         refR <- refined.validRuleRefinementsGivenParent(begin, end, r, rootRef)
       } {
         val ruleScore = anchoring.scoreUnaryRule(begin, end, r, refR)
-        val b = grammar.child(r)
+        val b = topology.child(r)
         val refB = refined.childRefinement(r, refR)
         val score = ruleScore + insideBotScore(begin, end, b, refB)
         if(score > maxScore) {
@@ -85,11 +85,11 @@ case class ViterbiDecoder[L, W]() extends ChartDecoder[L, W] with Serializable w
       }
 
       if(maxScore == Double.NegativeInfinity) {
-        throw new ParseExtractionException(s"Couldn't find a tree! [$begin,$end) ${grammar.labelIndex.get(root)}", words)
+        throw new ParseExtractionException(s"Couldn't find a tree! [$begin,$end) ${topology.labelIndex.get(root)}", words)
       }
 
       val child = buildTree(begin, end, maxChild, maxChildRef)
-      UnaryTree(labelIndex.get(root) ->rootRef, child, grammar.chain(maxRule), Span(begin, end))
+      UnaryTree(labelIndex.get(root) ->rootRef, child, topology.chain(maxRule), Span(begin, end))
     }
 
     def buildTree(begin: Int, end: Int, root: Int, rootRef: Int):BinarizedTree[(L, Int)] = {
@@ -107,9 +107,9 @@ case class ViterbiDecoder[L, W]() extends ChartDecoder[L, W] with Serializable w
 
       val spanScore = anchoring.scoreSpan(begin, end, root, rootRef)
       for {
-        r <- grammar.indexedBinaryRulesWithParent(root)
-        b = grammar.leftChild(r)
-        c = grammar.rightChild(r)
+        r <- topology.indexedBinaryRulesWithParent(root)
+        b = topology.leftChild(r)
+        c = topology.rightChild(r)
         refR <- refined.validRuleRefinementsGivenParent(begin, end, r, rootRef)
         refB = refined.leftChildRefinement(r, refR)
         refC = refined.rightChildRefinement(r, refR)
@@ -134,7 +134,7 @@ case class ViterbiDecoder[L, W]() extends ChartDecoder[L, W] with Serializable w
       }
 
       if(maxScore == Double.NegativeInfinity) {
-        throw new ParseExtractionException(s"Couldn't find a tree! [$begin,$end) ${grammar.labelIndex.get(root)}\n", marginal.words)
+        throw new ParseExtractionException(s"Couldn't find a tree! [$begin,$end) ${topology.labelIndex.get(root)}\n", marginal.words)
       } else {
         val lchild = buildTreeUnary(begin, maxSplit, maxLeft, maxLeftRef)
         val rchild = buildTreeUnary(maxSplit, end, maxRight, maxRightRef)
@@ -189,7 +189,7 @@ class MaxConstituentDecoder[L, W] extends ChartDecoder[L, W] {
 
 
     val length = marginal.length
-    import marginal.grammar
+    import marginal.topology
 
 
     val spanMarginals = new AnchoredSpanProjector().projectSpanPosteriors(marginal)
@@ -199,7 +199,7 @@ class MaxConstituentDecoder[L, W] extends ChartDecoder[L, W] {
     val maxTopLabel = TriangularArray.fill[Int](length+1)(-1)
     val maxTopScore = TriangularArray.fill[Double](length+1)(0.0)
 
-    val numLabels = grammar.labelIndex.size
+    val numLabels = topology.labelIndex.size
 
 
     for {
@@ -225,11 +225,11 @@ class MaxConstituentDecoder[L, W] extends ChartDecoder[L, W] {
     }
 
     def bestUnaryChain(begin: Int, end: Int, bestBot: Int, bestTop: Int): IndexedSeq[String] = {
-      val candidateUnaries = grammar.indexedUnaryRulesWithChild(bestBot).filter(r => grammar.parent(r) == bestTop)
+      val candidateUnaries = topology.indexedUnaryRulesWithChild(bestBot).filter(r => topology.parent(r) == bestTop)
       val bestChain = if (candidateUnaries.isEmpty) {
         IndexedSeq.empty
       } else if (candidateUnaries.length == 1) {
-        grammar.chain(candidateUnaries(0))
+        topology.chain(candidateUnaries(0))
       } else {
         var bestRule = candidateUnaries(0)
         // TODO: restore this!
@@ -252,7 +252,7 @@ class MaxConstituentDecoder[L, W] extends ChartDecoder[L, W] {
 //          }
 //
 //        }
-        grammar.chain(bestRule)
+        topology.chain(bestRule)
       }
       bestChain
     }
@@ -262,18 +262,18 @@ class MaxConstituentDecoder[L, W] extends ChartDecoder[L, W] {
       val lower = if(begin + 1== end) {
 //        if(maxBotScore(begin, end) == Double.NegativeInfinity)
 //          throw new RuntimeException(s"Couldn't make a good score for ${(begin, end)}. InsideIndices:  ${inside.bot.enteredLabelIndexes(begin, end).toIndexedSeq}\noutside: ${outside.bot.enteredLabelIndexes(begin, end).toIndexedSeq} logPartition: $logPartition")
-        NullaryTree(grammar.labelIndex.get(bestBot), Span(begin, end))
+        NullaryTree(topology.labelIndex.get(bestBot), Span(begin, end))
       } else {
         val split = maxSplit(begin, end)
         val left = extract(begin, split)
         val right = extract(split, end)
-        BinaryTree(grammar.labelIndex.get(bestBot), left, right, Span(begin, end))
+        BinaryTree(topology.labelIndex.get(bestBot), left, right, Span(begin, end))
       }
 
       val bestTop = maxTopLabel(begin, end)
       val bestChain = bestUnaryChain(begin, end, bestBot, bestTop)
 
-      UnaryTree(grammar.labelIndex.get(bestTop), lower, bestChain, Span(begin, end))
+      UnaryTree(topology.labelIndex.get(bestTop), lower, bestChain, Span(begin, end))
     }
 
     extract(0, length)

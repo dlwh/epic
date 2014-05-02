@@ -36,21 +36,21 @@ case class TreeMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
     var score = 0.0
     def rec(t: BinarizedTree[(L,Int) ]):Unit = t match {
       case n@NullaryTree( (a, ref), span ) =>
-        val aI = grammar.labelIndex(a)
+        val aI = topology.labelIndex(a)
         score += anchoring.scoreSpan(span.begin, span.end, aI, ref)
         if(score.isInfinite) throw new Exception(s"Could not score the terminal with tag ${a -> ref} at $span. $words")
       case UnaryTree( (a, refA), child@Tree((b, refB), _, _), chain,  span) =>
-        val r = grammar.index(UnaryRule(a, b, chain))
+        val r = topology.index(UnaryRule(a, b, chain))
         assert(r != -1, "Could not find rule " + UnaryRule(a, b, chain))
         val ruleRef = anchoring.refined.ruleRefinementFromRefinements(r, refA, refB)
         if(ruleRef < 0) throw new Exception(s"Bad refined rule in gold tree!: ${UnaryRule(a, b, chain)} aRef: $refA  bRef: $refB")
 
         score += anchoring.scoreUnaryRule(t.span.begin, t.span.end, r, ruleRef)
-        if(score.isInfinite) throw new Exception(s"Could not score gold tree!\n Partial Tree: ${t.render(words)}\n Full Tree: ${tree.render(words)}\n span ok? ${anchoring.core.sparsityPattern.isAllowedSpan(t.begin, t.end)} okLabels: ${(0 until grammar.labelIndex.size).filter(anchoring.core.sparsityPattern.top.isAllowedLabeledSpan(t.begin, t.end, _)).toSet[Int].map(grammar.labelIndex.get(_))}.toIndexedSeq}")
+        if(score.isInfinite) throw new Exception(s"Could not score gold tree!\n Partial Tree: ${t.render(words)}\n Full Tree: ${tree.render(words)}\n span ok? ${anchoring.core.sparsityPattern.isAllowedSpan(t.begin, t.end)} okLabels: ${(0 until topology.labelIndex.size).filter(anchoring.core.sparsityPattern.top.isAllowedLabeledSpan(t.begin, t.end, _)).toSet[Int].map(topology.labelIndex.get(_))}.toIndexedSeq}")
         rec(child)
       case t@BinaryTree( (a, refA), bt@Tree( (b, refB), _, _), ct@Tree((c, refC), _, _), span) =>
-        val aI = grammar.labelIndex(a)
-        val rule = grammar.index(BinaryRule(a, b, c))
+        val aI = topology.labelIndex(a)
+        val rule = topology.index(BinaryRule(a, b, c))
         val ruleRef = anchoring.refined.ruleRefinementFromRefinements(rule, refA, refB, refC)
         score += anchoring.scoreSpan(t.span.begin, t.span.end, aI, refA)
         score += anchoring.scoreBinaryRule(t.span.begin, bt.span.end, t.span.end, rule, ruleRef)
@@ -67,16 +67,16 @@ case class TreeMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
   def visitPostorder(visitor: AnchoredVisitor[L], threshold: Double = Double.NegativeInfinity) {
     tree.postorder foreach {
       case n@NullaryTree( (a, ref), span ) =>
-        val aI = grammar.labelIndex(a)
+        val aI = topology.labelIndex(a)
         visitor.visitSpan(n.span.begin, n.span.end, aI, ref, 1.0)
       case t@UnaryTree( (a, refA), Tree((b, refB), _, _), chain, span) =>
-        val r = grammar.index(UnaryRule(a, b, chain))
+        val r = topology.index(UnaryRule(a, b, chain))
         val ruleRef = anchoring.refined.ruleRefinementFromRefinements(r, refA, refB)
         if(ruleRef < 0) throw new Exception(s"Bad refined rule in gold tree!: ${UnaryRule(a, b, chain)}  aRef: $refA  bRef: $refB")
         visitor.visitUnaryRule(t.span.begin, t.span.end, r, ruleRef, 1.0)
       case t@BinaryTree( (a, refA), bt@Tree( (b, refB), _, _), Tree((c, refC), _, _), span) =>
-        val aI = grammar.labelIndex(a)
-        val rule = grammar.index(BinaryRule(a, b, c))
+        val aI = topology.labelIndex(a)
+        val rule = topology.index(BinaryRule(a, b, c))
         val ruleRef = anchoring.refined.ruleRefinementFromRefinements(rule, refA, refB, refC)
         visitor.visitSpan(t.span.begin, t.span.end, aI, refA, 1.0)
         visitor.visitBinaryRule(t.span.begin, bt.span.end, t.span.end, rule, ruleRef, 1.0)

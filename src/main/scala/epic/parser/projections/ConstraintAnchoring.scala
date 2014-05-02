@@ -103,7 +103,7 @@ class ParserChartConstraintsFactory[L, W](val parser: Parser[L, W],
       assert(labelThresholds(i, i+1) != null && labelThresholds(i,i+1).nonEmpty, "label thresholds" + labelThresholds(i, i+1))
       assert(topLabelThresholds(i, i+1) != null && topLabelThresholds(0,length).nonEmpty, "top label thresholds" + topLabelThresholds(i, i+1))
     }
-    if(topLabelThresholds(0,length) == null || !topLabelThresholds(0,length).contains(marg.grammar.rootIndex))
+    if(topLabelThresholds(0,length) == null || !topLabelThresholds(0,length).contains(marg.topology.rootIndex))
       throw new NoParseException("No score at the root!", marg.words)
 
 //    val hasMaximalProjection: BitSet = BitSet.empty ++ (0 to length).filter{ i =>

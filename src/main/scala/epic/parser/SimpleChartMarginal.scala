@@ -15,7 +15,7 @@ final case class SimpleChartMarginal[L, L2, W](anch: SimpleRefinedGrammar.Anchor
   val anchoring = AugmentedAnchoring.fromRefined(anch)
 
   override val logPartition: Double = {
-    val scores = anch.refinements.labels.refinementsOf(anchoring.grammar.rootIndex).map(inside.top.labelScore(0, length, _))
+    val scores = anch.refinements.labels.refinementsOf(anchoring.topology.rootIndex).map(inside.top.labelScore(0, length, _))
     if(isMaxMarginal) max(scores)
     else softmax(scores)
   }
@@ -74,8 +74,8 @@ final case class SimpleChartMarginal[L, L2, W](anch: SimpleRefinedGrammar.Anchor
           var i = 0
           while(i < rules.length) {
             val r = rules(i)
-            val b = grammar.leftChild(r)
-            val c = grammar.rightChild(r)
+            val b = topology.leftChild(r)
+            val c = topology.rightChild(r)
 
             var split = begin + 1
             while(split < end) {
@@ -116,7 +116,7 @@ final case class SimpleChartMarginal[L, L2, W](anch: SimpleRefinedGrammar.Anchor
         if (labelMarginal > spanThreshold) {
 
           for (r <- anch.refinedTopology.indexedUnaryRulesWithParent(parent)) {
-            val b = grammar.child(r)
+            val b = topology.child(r)
             val bScore = inside.bot.labelScore(begin, end, b)
             val rScore = anch.grammar.ruleScore(r)
             val prob = math.exp(bScore + aOutside + rScore - logPartition)

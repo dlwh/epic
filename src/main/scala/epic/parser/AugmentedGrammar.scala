@@ -65,7 +65,7 @@ object AugmentedGrammar {
 @SerialVersionUID(2L)
 final case class AugmentedAnchoring[L, W](refined: RefinedAnchoring[L, W], core: CoreAnchoring[L, W]) {
 
-  def grammar: RuleTopology[L] = refined.topology
+  def topology: RuleTopology[L] = refined.topology
   def lexicon: Lexicon[L, W] = refined.lexicon
   def words = refined.words
 

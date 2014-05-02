@@ -70,7 +70,7 @@ case class LabeledSpanProjector[L, W](topology: RuleTopology[L], threshold: Doub
     }
 
     val sparsity = charts.anchoring.core.sparsityPattern
-    new SpanAnchoring(charts.grammar, charts.lexicon, charts.words, normSpans, normUnaries, sparsity)
+    new SpanAnchoring(charts.topology, charts.lexicon, charts.words, normSpans, normUnaries, sparsity)
   }
 
 }

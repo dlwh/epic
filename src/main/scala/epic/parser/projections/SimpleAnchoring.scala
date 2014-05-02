@@ -55,15 +55,15 @@ case class AnchoredPCFGProjector[L, W](threshold: Double = Double.NegativeInfini
   protected def createAnchoring(charts: ParseMarginal[L, W], ruleData: AnchoredData, sentProb: Double) = {
     val AnchoredRuleProjector.AnchoredData(lexicalScores, unaryScores, totalsUnaries, binaryScores, totalsBinaries) = ruleData
     val normUnaries:Array[OpenAddressHashArray[Double]] = for((ruleScores, totals) <- unaryScores zip totalsUnaries) yield {
-      normalize(charts.grammar, ruleScores, totals)
+      normalize(charts.topology, ruleScores, totals)
     }
 
     val normBinaries:Array[Array[OpenAddressHashArray[Double]]] = for ((splits, totals) <- binaryScores zip totalsBinaries) yield {
       if(splits eq null) null
-      else for(ruleScores <- splits) yield normalize(charts.grammar, ruleScores, totals)
+      else for(ruleScores <- splits) yield normalize(charts.topology, ruleScores, totals)
     }
     val sparsity = charts.anchoring.core.sparsityPattern
-    new SimpleAnchoring(charts.grammar, charts.lexicon, charts.words, lexicalScores.map(logify), normUnaries, normBinaries, sparsity)
+    new SimpleAnchoring(charts.topology, charts.lexicon, charts.words, lexicalScores.map(logify), normUnaries, normBinaries, sparsity)
   }
 
 }
@@ -98,7 +98,7 @@ case class AnchoredRuleMarginalProjector[L, W](threshold: Double = Double.Negati
       else splits.map(normalize)
     }
     val sparsity = charts.anchoring.core.sparsityPattern
-    new SimpleAnchoring(charts.grammar, charts.lexicon, charts.words, lexicalScores.map(normalize), normUnaries, normBinaries, sparsity)
+    new SimpleAnchoring(charts.topology, charts.lexicon, charts.words, lexicalScores.map(normalize), normUnaries, normBinaries, sparsity)
   }
 }
 
