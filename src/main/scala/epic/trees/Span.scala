@@ -19,8 +19,9 @@ import spire.syntax.cfor
 */
 
 
-class Span(val begin: Int, val end: Int)  {
-  require(begin <= end)
+class Span(val encoded: Long) extends AnyVal {
+  def begin = (encoded >> 32).toInt
+  def end = encoded.toInt
 
   def isEmpty = begin == end
   def nonEmpty = !isEmpty
@@ -46,14 +47,14 @@ class Span(val begin: Int, val end: Int)  {
     ||  (other.begin < begin && other.end < end && other.end > begin)
   )
 
-  override def hashCode(): Int = {
-    (begin, end).hashCode()
-  }
-
-  override def equals(obj: scala.Any): Boolean = this match {
-    case other: Span => this.begin == other.begin && this.end == other.end
-    case _ => false
-  }
+//  override def hashCode(): Int = {
+//    (begin, end).hashCode()
+//  }
+//
+//  override def equals(obj: scala.Any): Boolean = this match {
+//    case other: Span => this.begin == other.begin && this.end == other.end
+//    case _ => false
+//  }
 
   /**
   * Return true if this' range contains the other range.
@@ -62,9 +63,9 @@ class Span(val begin: Int, val end: Int)  {
     begin <= other.begin && end >= other.end
   }
 
-  override def toString = s"Span($begin, $end)"
+//  override def toString = s"Span($begin, $end)"
 }
 
 object Span {
-  def apply(begin: Int, end: Int) = new Span(begin, end)
+  def apply(begin: Int, end: Int) = new Span( (begin.toLong << 32) | end)
 }
