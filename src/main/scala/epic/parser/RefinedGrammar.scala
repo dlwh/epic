@@ -113,18 +113,8 @@ object RefinedGrammar {
       refinements.labels.fineIndex,
       refinements.rules.fineIndex)
 
-    // localized rule scores
-    val ruleScoreArray: Array[Array[Double]] = Array.tabulate(topology.index.size){ (r: Int) =>
-      val refs = refinements.rules.refinementsOf(r)
-      val arr = new Array[Double](refs.length)
-      for (i <- 0 until refs.length) {
-        arr(i) = refinedRuleScores(refs(i))
-      }
-      arr
-    }
-
     new SimpleRefinedGrammar[L, L2, W](topology, lexicon, refinements,
-      refinedGrammar, ruleScoreArray,
+      refinedGrammar, refinedRuleScores,
       tagScorer)
   }
 

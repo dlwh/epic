@@ -38,14 +38,15 @@ class SimpleRefinedGrammar[L, L2, W](val topology: RuleTopology[L],
                                      val lexicon: Lexicon[L, W],
                                      val refinements: GrammarRefinements[L, L2],
                                      val refinedTopology: RuleTopology[L2],
-                                     val ruleScoreArray: Array[Array[Double]],
+                                     val ruleScoreArray: Array[Double],
                                      val tagScorer: TagScorer[L2, W]) extends RefinedGrammar[L, W] with Serializable {
-  def ruleScore(r: Int, ruleRef: Int):Double = ruleScoreArray(r)(ruleRef)
+  def ruleScore(r: Int, ruleRef: Int):Double = {
+    val global = refinements.rules.globalize(r, ruleRef)
+    ruleScoreArray(global)
+  }
 
   def ruleScore(refinedRule: Int): Double = {
-    val ref = refinements.rules.localize(refinedRule)
-    val projected = refinements.rules.project(refinedRule)
-    ruleScoreArray(projected)(ref)
+    ruleScoreArray(refinedRule)
   }
 
   def anchor(w: IndexedSeq[W]) = new SimpleRefinedGrammar.Anchoring(this, w)
@@ -75,10 +76,10 @@ class SimpleRefinedGrammar[L, L2, W](val topology: RuleTopology[L],
     val md5 = MessageDigest.getInstance("MD5")
     md5.update(index.toString.getBytes("UTF-8"))
     md5.update(labelIndex.toString.getBytes("UTF-8"))
-    md5.update(ruleScoreArray.map(_.mkString("{", ", ", "}")).mkString("{", ",", "}").getBytes("UTF-8"))
+    md5.update(ruleScoreArray.mkString("{", ",", "}").getBytes("UTF-8"))
     val digest = md5.digest()
-    val bigInt = new BigInteger(1,digest);
-    val hashtext = bigInt.toString(16);
+    val bigInt = new BigInteger(1,digest)
+    val hashtext = bigInt.toString(16)
     hashtext
   }
 }
@@ -253,11 +254,11 @@ object SimpleRefinedGrammar {
     }
 
     def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int) = {
-      grammar.ruleScoreArray(rule)(ref)
+      grammar.ruleScore(rule, ref)
     }
 
     def scoreUnaryRule(begin: Int, end: Int, rule: Int, ref: Int) = {
-      grammar.ruleScoreArray(rule)(ref)
+      grammar.ruleScore(rule, ref)
     }
 
   }
