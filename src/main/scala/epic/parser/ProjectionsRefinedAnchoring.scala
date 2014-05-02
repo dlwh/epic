@@ -54,11 +54,11 @@ trait ProjectionsRefinedAnchoring[L, L2, W] extends RefinedAnchoring[L, W] {
 
   // TODO: make this not terminally slow!
   final def ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int) = {
-    val a = grammar.parent(r)
-    val b = grammar.child(r)
+    val a = topology.parent(r)
+    val b = topology.child(r)
     val a2 = refinements.labels.globalize(a, refA)
     val b2 = refinements.labels.globalize(b, refB)
-    val rule = UnaryRule(refinements.labels.fineIndex.get(a2), refinements.labels.fineIndex.get(b2), grammar.chain(r))
+    val rule = UnaryRule(refinements.labels.fineIndex.get(a2), refinements.labels.fineIndex.get(b2), topology.chain(r))
     val refinedRuleIndex = refinements.rules.fineIndex(rule)
     if(refinedRuleIndex < 0) {
       -1
@@ -68,9 +68,9 @@ trait ProjectionsRefinedAnchoring[L, L2, W] extends RefinedAnchoring[L, W] {
   }
 
   final def ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int, refC: Int) = {
-    val a = grammar.parent(r)
-    val b = grammar.leftChild(r)
-    val c = grammar.rightChild(r)
+    val a = topology.parent(r)
+    val b = topology.leftChild(r)
+    val c = topology.rightChild(r)
     val a2 = refinements.labels.globalize(a, refA)
     val b2 = refinements.labels.globalize(b, refB)
     val c2 = refinements.labels.globalize(c, refC)

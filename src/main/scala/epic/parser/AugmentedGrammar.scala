@@ -65,7 +65,7 @@ object AugmentedGrammar {
 @SerialVersionUID(2L)
 final case class AugmentedAnchoring[L, W](refined: RefinedAnchoring[L, W], core: CoreAnchoring[L, W]) {
 
-  def grammar: RuleTopology[L] = refined.grammar
+  def grammar: RuleTopology[L] = refined.topology
   def lexicon: Lexicon[L, W] = refined.lexicon
   def words = refined.words
 
@@ -129,7 +129,7 @@ object AugmentedAnchoring {
   def apply[L, W](refined: RefinedAnchoring[L, W]): AugmentedAnchoring[L, W] = fromRefined(refined)
 
   def apply[L, W](refined: RefinedAnchoring[L, W], sparsity: ChartConstraints[L]): AugmentedAnchoring[L, W] = {
-    new AugmentedAnchoring(refined, CoreAnchoring.identity(refined.grammar, refined.lexicon, refined.words, sparsity))
+    new AugmentedAnchoring(refined, CoreAnchoring.identity(refined.topology, refined.lexicon, refined.words, sparsity))
   }
 
 

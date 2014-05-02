@@ -97,7 +97,7 @@ class OracleParser[L, L2, W](val refinedGrammar: SimpleRefinedGrammar[L, L2, W])
       }
 
       def scoreUnaryRule(begin: Int, end: Int, rule: Int, ref: Int): Double = {
-        val top = grammar.parent(rule)
+        val top = topology.parent(rule)
         val isAllowed = treeconstraints.top.isAllowedLabeledSpan(begin, end, top)
         val isRightRefined = isAllowed && {
           val parentRef = baseAnchoring.parentRefinement(rule, ref)
@@ -106,7 +106,7 @@ class OracleParser[L, L2, W](val refinedGrammar: SimpleRefinedGrammar[L, L2, W])
         }
 
         val isCorrectChain = {
-          isAllowed && grammar.chain(rule) == correctUnaryChains(begin, end)
+          isAllowed && topology.chain(rule) == correctUnaryChains(begin, end)
         }
 
         200 * I(isAllowed) + 10 * I(isRightRefined) + 5 * I(isCorrectChain) + 0.1 * baseAnchoring.scoreUnaryRule(begin, end, rule, ref)

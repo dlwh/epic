@@ -83,7 +83,7 @@ class DotProductGrammar[L, L2, W, Feature](val topology: RuleTopology[L],
     def refinements = DotProductGrammar.this.refinements
     def refinedTopology: RuleTopology[L2] = DotProductGrammar.this.refinedTopology
 
-    val grammar = DotProductGrammar.this.topology
+    val topology = DotProductGrammar.this.topology
     val lexicon = DotProductGrammar.this.lexicon
 
     def words = w

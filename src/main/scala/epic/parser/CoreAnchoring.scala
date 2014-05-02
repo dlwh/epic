@@ -160,7 +160,7 @@ object CoreAnchoring {
 case class LiftedCoreAnchoring[L, W](core: CoreAnchoring[L, W]) extends RefinedAnchoring[L, W] {
   override def annotationTag = 0
 
-  def grammar = core.topology
+  def topology = core.topology
 
   def lexicon = core.lexicon
 
@@ -201,9 +201,9 @@ case class LiftedCoreAnchoring[L, W](core: CoreAnchoring[L, W]) extends RefinedA
 
   final def ruleRefinementFromRefinements(r: Int, refA: Int, refB: Int, refC: Int) = 0
 
-  def validCoarseRulesGivenParentRefinement(a: Int, refA: Int) = grammar.indexedBinaryRulesWithParent(a)
+  def validCoarseRulesGivenParentRefinement(a: Int, refA: Int) = topology.indexedBinaryRulesWithParent(a)
 
-  def validParentRefinementsGivenRule(begin: Int, splitBegin: Int, splitEnd: Int, end: Int, rule: Int): Array[Int] = validLabelRefinements(begin, end, grammar.parent(rule))
+  def validParentRefinementsGivenRule(begin: Int, splitBegin: Int, splitEnd: Int, end: Int, rule: Int): Array[Int] = validLabelRefinements(begin, end, topology.parent(rule))
 
   def validRuleRefinementsGivenLeftChild(begin: Int, split: Int, completionBegin: Int, completionEnd: Int, rule: Int, childRef: Int): Array[Int] = {
     zeroArray

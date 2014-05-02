@@ -597,7 +597,7 @@ object RefinedChartMarginal {
                                                    scoreArray: Array[Array[Double]], offsets: Array[Int], sum: Summer) {
     val refined = anchoring.refined
     val itop = inside.top
-    val grammar = refined.grammar
+    val grammar = refined.topology
     val rules = anchoring.grammar.indexedBinaryRulesWithLeftChild(label)
     val length = inside.length
 
@@ -689,7 +689,7 @@ object RefinedChartMarginal {
                                                     offsets: Array[Int], sum: Summer) {
     val refined = anchoring.refined
     val itop = inside.top
-    val grammar = refined.grammar
+    val grammar = refined.topology
     val rules = anchoring.grammar.indexedBinaryRulesWithRightChild(label)
 
     var br = 0

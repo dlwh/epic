@@ -405,7 +405,7 @@ final class LexGrammar[L, L2, W](val topology: RuleTopology[L],
   final class Spec(val words: IndexedSeq[W]) extends RefinedAnchoring[L, W] {
     override def annotationTag: Int = 1
 
-    val grammar = LexGrammar.this.topology
+    val topology = LexGrammar.this.topology
     val lexicon = LexGrammar.this.lexicon
     private val f = featurizer.anchor(words)
 
@@ -443,7 +443,7 @@ final class LexGrammar[L, L2, W](val topology: RuleTopology[L],
         attachCache(head)(dep) = cache
       }
 
-      val tag = grammar.parent(rule)
+      val tag = topology.parent(rule)
       val ruleRef = this.binaryRuleRef(ref)
       val refinedTag = refinements.labels.globalize(tag, refinements.parentRefinement(rule, ruleRef))
       var attachScore = cache(refinedTag)
@@ -745,12 +745,12 @@ final class LexGrammar[L, L2, W](val topology: RuleTopology[L],
       val labelB = tagRef(refB)
       val hA = unaryHeadIndex(refA)
       val hB = unaryHeadIndex(refB)
-      require(hA == hB, s"Parent head for rule ${grammar.index.get(r)} was '${words(hA)}' and child head was '${words(hB)}', but should be the same!" + words)
-      val a = grammar.parent(r)
-      val b = grammar.child(r)
+      require(hA == hB, s"Parent head for rule ${topology.index.get(r)} was '${words(hA)}' and child head was '${words(hB)}', but should be the same!" + words)
+      val a = topology.parent(r)
+      val b = topology.child(r)
       val a2 = refinements.labels.globalize(a, labelA)
       val b2 = refinements.labels.globalize(b, labelB)
-      val rule = UnaryRule(refinements.labels.fineIndex.get(a2), refinements.labels.fineIndex.get(b2), grammar.chain(r))
+      val rule = UnaryRule(refinements.labels.fineIndex.get(a2), refinements.labels.fineIndex.get(b2), topology.chain(r))
       val refinedRuleIndex = refinements.rules.fineIndex(rule)
       val refR = if(refinedRuleIndex < 0) {
         -1
@@ -778,9 +778,9 @@ final class LexGrammar[L, L2, W](val topology: RuleTopology[L],
       val labelB = tagRef(refB)
       val labelC = tagRef(refC)
 
-      val a = grammar.parent(r)
-      val b = grammar.leftChild(r)
-      val c = grammar.rightChild(r)
+      val a = topology.parent(r)
+      val b = topology.leftChild(r)
+      val c = topology.rightChild(r)
       val a2 = refinements.labels.globalize(a, labelA)
       val b2 = refinements.labels.globalize(b, labelB)
       val c2 = refinements.labels.globalize(c, labelC)

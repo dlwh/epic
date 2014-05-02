@@ -123,37 +123,9 @@ object RefinedGrammar {
       arr
     }
 
-
-
-    // rule -> parentRef -> [ruleRef]
-    val parentCompatibleRefinements: Array[Array[Array[Int]]] = Array.tabulate(topology.index.size) { r =>
-      val parent = topology.parent(r)
-      val parentRefs = Array.fill(refinements.labels.refinementsOf(parent).length){ArrayBuffer[Int]()}
-      for(ruleRef <- refinements.rules.refinementsOf(r)) {
-        val refParent = refinements.labels.localize(refinedGrammar.parent(ruleRef))
-        parentRefs(refParent) += refinements.rules.localize(ruleRef)
-      }
-      parentRefs.map(_.toArray)
-    }
-
-    // rule -> parentRef -> [ruleRef]
-    val childCompatibleRefinements: Array[Array[Array[Int]]] = Array.tabulate(topology.index.size) { r =>
-      if(topology.index.get(r).isInstanceOf[UnaryRule[L]]) {
-        val child = topology.child(r)
-        val childRefs = Array.fill(refinements.labels.refinementsOf(child).length){ArrayBuffer[Int]()}
-        for(ruleRef <- refinements.rules.refinementsOf(r)) {
-          val refChild = refinements.labels.localize(refinedGrammar.child(ruleRef))
-          childRefs(refChild) += refinements.rules.localize(ruleRef)
-        }
-        childRefs.map(_.toArray)
-      } else {
-        null
-      }
-    }
-
     new SimpleRefinedGrammar[L, L2, W](topology, lexicon, refinements,
       refinedGrammar, ruleScoreArray,
-      parentCompatibleRefinements, childCompatibleRefinements, tagScorer)
+      tagScorer)
   }
 
 }

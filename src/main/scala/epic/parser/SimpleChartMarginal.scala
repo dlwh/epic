@@ -60,7 +60,7 @@ final case class SimpleChartMarginal[L, L2, W](anch: ProjectionsRefinedAnchoring
     for {
       span <- 2 to length
       begin <- 0 to (length - span)
-      parent <- 0 until anch.grammar.labelIndex.size
+      parent <- 0 until anch.topology.labelIndex.size
     } {
       val end = begin + span
       val aOutside = outside.bot(begin, end, parent)
@@ -81,7 +81,7 @@ final case class SimpleChartMarginal[L, L2, W](anch: ProjectionsRefinedAnchoring
             while(split < end) {
               val bInside = inside.top.labelScore(begin, split, b)
               val cInside = inside.top.labelScore(split, end, c)
-              val ruleScore = anch
+//              val ruleScore = anch.ref
 
               val bCoarse = anch.refinements.labels.project(b)
               val bRef = anch.refinements.labels.localize(b)
@@ -92,6 +92,8 @@ final case class SimpleChartMarginal[L, L2, W](anch: ProjectionsRefinedAnchoring
 
               split += 1
             }
+
+
 
 
 

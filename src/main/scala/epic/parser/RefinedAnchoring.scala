@@ -28,7 +28,7 @@ import epic.constraints.ChartConstraints
  * @author dlwh
  */
 trait RefinedAnchoring[L, W]  {
-  def grammar: RuleTopology[L]
+  def topology: RuleTopology[L]
   def lexicon: Lexicon[L, W]
   def words: IndexedSeq[W]
 
@@ -176,7 +176,7 @@ trait RefinedAnchoring[L, W]  {
    */
   def validLabelRefinements(begin: Int, end: Int, label: Int):Array[Int]
 
-  def maxLabelRefinements: Int = (0 until grammar.labelIndex.size).map(numValidRefinements _).max
+  def maxLabelRefinements: Int = (0 until topology.labelIndex.size).map(numValidRefinements _).max
 
   def numValidRefinements(label: Int):Int
 
@@ -242,7 +242,7 @@ object RefinedAnchoring {
   trait StructureDelegatingAnchoring[L, W] extends RefinedAnchoring[L, W] {
     protected def baseAnchoring: RefinedAnchoring[L, W]
 
-    def grammar: RuleTopology[L] = baseAnchoring.grammar
+    def topology: RuleTopology[L] = baseAnchoring.topology
     def lexicon: Lexicon[L, W] = baseAnchoring.lexicon
 
     def words: IndexedSeq[W] = baseAnchoring.words

@@ -20,9 +20,7 @@ import collection.mutable.ArrayBuffer
 import java.io.{FileInputStream, PrintWriter, Writer}
 import epic.lexicon._
 import scala.io.Source
-import breeze.util.{MutableIndex, Index}
-import epic.trees.BinaryRule
-import epic.trees.UnaryRule
+import breeze.util.Index
 import breeze.linalg.{DenseMatrix, Counter2}
 import chalk.text.analyze.EnglishWordClassGenerator
 import epic.trees.BinaryRule
@@ -30,7 +28,6 @@ import epic.trees.UnaryRule
 import java.security.MessageDigest
 import java.math.BigInteger
 import scala.collection.immutable
-import epic.parser.ProjectionsRefinedAnchoring
 
 /**
  *
@@ -42,8 +39,6 @@ class SimpleRefinedGrammar[L, L2, W](val topology: RuleTopology[L],
                                      val refinements: GrammarRefinements[L, L2],
                                      val refinedTopology: RuleTopology[L2],
                                      val ruleScoreArray: Array[Array[Double]],
-                                     parentCompatibleRefinements: Array[Array[Array[Int]]],
-                                     childCompatibleRefinements: Array[Array[Array[Int]]],
                                      val tagScorer: TagScorer[L2, W]) extends RefinedGrammar[L, W] with Serializable {
   def ruleScore(r: Int, ruleRef: Int):Double = ruleScoreArray(r)(ruleRef)
 
@@ -53,35 +48,7 @@ class SimpleRefinedGrammar[L, L2, W](val topology: RuleTopology[L],
     ruleScoreArray(parent)(ref)
   }
 
-  def anchor(w: IndexedSeq[W]):ProjectionsRefinedAnchoring[L, L2,  W] = new ProjectionsRefinedAnchoring[L, L2,  W] {
-    val grammar = SimpleRefinedGrammar.this.topology
-    val lexicon = SimpleRefinedGrammar.this.lexicon
-    def refinements = SimpleRefinedGrammar.this.refinements
-    def refinedTopology: RuleTopology[L2] = SimpleRefinedGrammar.this.refinedTopology
-
-    val tagAnchoring = tagScorer.anchor(w)
-    override def toString() = "SimpleAnchoring(...)"
-    def words = w
-
-    def scoreSpan(begin: Int, end: Int, label: Int, ref: Int) = {
-      val baseScore = if(begin + 1 == end) {
-        val fullId = refinements.labels.globalize(label, ref)
-        tagAnchoring.scoreTag(begin, refinements.labels.fineIndex.get(fullId))
-      } else {
-        0.0
-      }
-      baseScore
-    }
-
-    def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int) = {
-      ruleScoreArray(rule)(ref)
-    }
-
-    def scoreUnaryRule(begin: Int, end: Int, rule: Int, ref: Int) = {
-      ruleScoreArray(rule)(ref)
-    }
-
-  }
+  def anchor(w: IndexedSeq[W]) = new SimpleRefinedGrammar.Anchoring(this, w)
 
   /**
    * Writes a text representation of the grammar to the output.
@@ -264,6 +231,35 @@ object SimpleRefinedGrammar {
       map(w) += proj
     }
     map.toMap
+  }
+
+  case class Anchoring[L, L2, W](grammar: SimpleRefinedGrammar[L, L2, W], words: IndexedSeq[W]) extends ProjectionsRefinedAnchoring[L, L2, W] {
+    def topology = grammar.topology
+    def lexicon = grammar.lexicon
+    def refinements = grammar.refinements
+    def refinedTopology: RuleTopology[L2] = grammar.refinedTopology
+
+    private val tagAnchoring = grammar.tagScorer.anchor(words)
+    override def toString() = "SimpleRefinedGrammar.Anchoring(...)"
+
+    def scoreSpan(begin: Int, end: Int, label: Int, ref: Int) = {
+      val baseScore = if(begin + 1 == end) {
+        val fullId = refinements.labels.globalize(label, ref)
+        tagAnchoring.scoreTag(begin, refinements.labels.fineIndex.get(fullId))
+      } else {
+        0.0
+      }
+      baseScore
+    }
+
+    def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int) = {
+      grammar.ruleScoreArray(rule)(ref)
+    }
+
+    def scoreUnaryRule(begin: Int, end: Int, rule: Int, ref: Int) = {
+      grammar.ruleScoreArray(rule)(ref)
+    }
+
   }
 
 
