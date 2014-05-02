@@ -30,6 +30,7 @@ import epic.trees.UnaryRule
 import java.security.MessageDigest
 import java.math.BigInteger
 import scala.collection.immutable
+import epic.parser.ProjectionsRefinedAnchoring
 
 /**
  *
@@ -52,7 +53,7 @@ class SimpleRefinedGrammar[L, L2, W](val grammar: BaseGrammar[L],
     ruleScoreArray(parent)(ref)
   }
 
-  def anchor(w: IndexedSeq[W]) = new ProjectionsRefinedAnchoring[L, L2,  W] {
+  def anchor(w: IndexedSeq[W]):ProjectionsRefinedAnchoring[L, L2,  W] = new ProjectionsRefinedAnchoring[L, L2,  W] {
     val grammar = SimpleRefinedGrammar.this.grammar
     val lexicon = SimpleRefinedGrammar.this.lexicon
     def refinements = SimpleRefinedGrammar.this.refinements
@@ -265,4 +266,6 @@ object SimpleRefinedGrammar {
     }
     map.toMap
   }
+
+
 }
