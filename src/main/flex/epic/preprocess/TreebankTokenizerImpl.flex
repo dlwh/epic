@@ -101,7 +101,7 @@ NUM        = ({ALPHANUM} {P} {HAS_DIGIT}
 // punctuation
 P	         = ("_"|"-"|"/"|"."|",")
 
-PUNCT = ({P}|[?!@#$%\^&*_:;\]\[\"\'])
+PUNCT = ({P}|[?!@#$%\^&*_:;\]\[\"\'»«\202\204\206\207\213\221\222\223\224\225\226\227\233])
 
 // at least one digit
 HAS_DIGIT  = ({LETTER}|[:digit:])* [:digit:] ({LETTER}|[:digit:])*
@@ -110,7 +110,16 @@ ALPHA      = ({LETTER})+
 
 LETTER     = [:letter:]
 
-CONTRACTION_SECOND = ('ll|'d|'ve|'s|'|'re|'LL|'D|'VE|'S|'RE|'m|'M|'n|'N)
+ENGLISH_CLITIC = ('ll|'d|'ve|'s|'|'re|'LL|'D|'VE|'S|'RE|'m|'M|'n|'N)
+
+FRENCH_CLITIC = (-t-elles?|-t-ils?|-t-on|-ce|-elles?|-ils?|-je|-la|-les?|-leur|-lui|-mêmes?|-m\'|-moi|-nous|-on|-toi|-tu|-t\'|-vous|-en|-y|-ci|-là)
+
+FRENCH_INIT_CLITIC = ([dcjlmnstDCJLNMST]\'|[Qq]u\'|[Jj]usqu\'|[Ll]orsqu\')
+
+CLITIC = ({ENGLISH_CLITIC}|{FRENCH_CLITIC})
+
+INIT_CLITIC = ({FRENCH_INIT_CLITIC})
+
 
 WHITESPACE = \r\n | [ \r\n\t\f\xA0]
 
@@ -138,8 +147,9 @@ Got / ta                                                      {return currentTok
 // acronyms that end a sentence
 {LETTER}+\.{LETTER}+ / .$                                       { return currentToken() + ".";}
 // contractions
-{CONTRACTION_SECOND}                                           {return currentToken();}
-{ALPHANUM}+ / {CONTRACTION_SECOND}                             {return currentToken();}
+{INIT_CLITIC}                                           {return currentToken();}
+{CLITIC}                                           {return currentToken();}
+{ALPHANUM}+ / {CLITIC}                             {return currentToken();}
 d' / ye                                                        {return currentToken(); }
 {ALPHANUM}+ / n't                                              {return currentToken(); }
 n't                                                            {return currentToken(); }
