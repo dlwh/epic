@@ -29,7 +29,7 @@ case class SentimentLossAugmentation[W](trainTrees: IndexedSeq[TreeInstance[Anno
     // drop the root
     val goldMap = datum.tree.map(projectedLabel).preorder.filter(_.label != -1).map{t => t.span -> t.label}.toMap
 
-    new SentimentLossAnchoring(topology, lexicon, datum.words, goldMap)
+    new SentimentLossAnchoring(topology, lexicon, datum.words, goldMap, constraintFactory.constraints(datum.words))
   }
 
 
@@ -41,13 +41,14 @@ case class SentimentLossAugmentation[W](trainTrees: IndexedSeq[TreeInstance[Anno
   def anchor(words: IndexedSeq[W]): CoreAnchoring[AnnotatedLabel, W] = {
     trainingMap.get(words)
       .map( ti =>lossAugmentation(ti) )
-      .getOrElse ( CoreAnchoring.identity(topology, lexicon, words) )
+      .getOrElse ( CoreAnchoring.identity(topology, lexicon, words, constraintFactory.constraints(words)) )
   }
 
   case class SentimentLossAnchoring[L, W](topology: RuleTopology[L],
                                           lexicon: Lexicon[L, W],
                                           words: IndexedSeq[W],
-                                          goldLabels: Map[Span, Int])  extends epic.parser.CoreAnchoring[L, W]{
+                                          goldLabels: Map[Span, Int],
+                                          sparsityPattern: ChartConstraints[L])  extends epic.parser.CoreAnchoring[L, W]{
 
     def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int): Double = 0.0
 

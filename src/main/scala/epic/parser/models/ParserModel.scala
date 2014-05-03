@@ -78,7 +78,7 @@ trait ParserInference[L, W] extends ProjectableInference[TreeInstance[L, W], Cor
     charts
   }
 
-  def baseAugment(v: TreeInstance[L, W])  = CoreAnchoring.identity(grammar.topology, grammar.lexicon, v.words)
+  def baseAugment(v: TreeInstance[L, W])  = CoreAnchoring.identity(grammar.topology, grammar.lexicon, v.words, ChartConstraints.noSparsity)
 
 
   def project(v: TreeInstance[L, W], s: Scorer, m: Marginal, oldAugment: CoreAnchoring[L, W]): CoreAnchoring[L, W] = {

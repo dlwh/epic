@@ -256,8 +256,10 @@ object GrammarAnchoring {
                      lexicon: Lexicon[L, W],
                      constraints: ChartConstraints[L],
                      words: IndexedSeq[W]): GrammarAnchoring[L, W] = {
-    LiftedCoreAnchoring(CoreAnchoring.identity[L, W](topology, lexicon, words), constraints)
+    CoreAnchoring.identity[L, W](topology, lexicon, words, constraints)
   }
+
+
 
   trait StructureDelegatingAnchoring[L, W] extends GrammarAnchoring[L, W] {
     protected def baseAnchoring: GrammarAnchoring[L, W]

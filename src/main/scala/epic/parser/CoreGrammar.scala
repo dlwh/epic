@@ -50,6 +50,7 @@ trait CoreGrammar[L, W] extends Serializable { core =>
   def *(other: CoreGrammar[L, W]):CoreGrammar[L, W] = new CoreGrammar.ProductGrammar(this, other)
 
 
+  @deprecated("...","0.2")
   def lift: Grammar[L, W] = new Grammar[L, W] {
     override def topology: RuleTopology[L] = core.topology
 
@@ -65,7 +66,7 @@ object CoreGrammar {
 
   @SerialVersionUID(1L)
   case class IdentityCoreGrammar[L, W](topology: RuleTopology[L], lexicon: Lexicon[L, W]) extends CoreGrammar[L, W] {
-    def anchor(words: IndexedSeq[W]) = CoreAnchoring.identity(topology, lexicon, words)
+    def anchor(words: IndexedSeq[W]) = CoreAnchoring.identity(topology, lexicon, words, ChartConstraints.noSparsity)
   }
 
   case class ProductGrammar[L, W](g1: CoreGrammar[L, W], g2: CoreGrammar[L, W]) extends CoreGrammar[L, W] {

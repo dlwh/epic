@@ -45,7 +45,7 @@ case class EPChartFactory[L, W](grammars: IndexedSeq[Grammar[L, W]], maxIteratio
 
     val ep = new nak.inference.ExpectationPropagation(project _, 1E-5)
     var state: ep.State = null
-    val iterates = ep.inference(CoreAnchoring.identity(topology, lexicon, words), Array.range(0, anchorings.length), Array.fill(anchorings.length)(null))
+    val iterates = ep.inference(CoreAnchoring.identity(topology, lexicon, words, initialCore), Array.range(0, anchorings.length), Array.fill(anchorings.length)(null))
     var converged = false
     while (!converged && iter < maxIterations && iterates.hasNext) {
       val s = iterates.next()

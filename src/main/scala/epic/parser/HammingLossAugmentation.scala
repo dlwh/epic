@@ -32,7 +32,7 @@ case class HammingLossAugmentation[L, W](topology: RuleTopology[L],
     val trainingMap = training.iterator.map(ti => ti.words -> ti).toMap
 
     def anchor(words: IndexedSeq[W]): CoreAnchoring[L, W] = {
-      trainingMap.get(words).map(lossAugmentation).getOrElse(CoreAnchoring.identity(topology, lexicon, words))
+      trainingMap.get(words).map(lossAugmentation).getOrElse(CoreAnchoring.identity(topology, lexicon, words, ChartConstraints.noSparsity))
     }
   }
 
@@ -53,7 +53,10 @@ case class HammingLossAugmentationCoreAnchoring[L, W](topology: RuleTopology[L],
                                  labelScale: Double)  extends epic.parser.CoreAnchoring[L, W]{
 //    def addConstraints(cs: ChartConstraints[L]): parser.CoreAnchoring[L, W] = copy(sparsityPattern = cs & sparsityPattern)
 
-    /**
+
+  override def sparsityPattern: ChartConstraints[L] = ChartConstraints.noSparsity
+
+  /**
      * Scores the indexed [[epic.trees.BinaryRule]] rule when it occurs at (begin,split,end)
      */
     def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int): Double = 0.0
