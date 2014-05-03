@@ -50,9 +50,8 @@ case class HammingLossAugmentationCoreAnchoring[L, W](topology: RuleTopology[L],
                                  words: IndexedSeq[W],
                                  gt: GoldTagPolicy[L],
                                  intermediates: BitSet,
-                                 labelScale: Double,
-                                 override val sparsityPattern: ChartConstraints[L] = ChartConstraints.noSparsity[L])  extends epic.parser.CoreAnchoring[L, W]{
-    def addConstraints(cs: ChartConstraints[L]): parser.CoreAnchoring[L, W] = copy(sparsityPattern = cs & sparsityPattern)
+                                 labelScale: Double)  extends epic.parser.CoreAnchoring[L, W]{
+//    def addConstraints(cs: ChartConstraints[L]): parser.CoreAnchoring[L, W] = copy(sparsityPattern = cs & sparsityPattern)
 
     /**
      * Scores the indexed [[epic.trees.BinaryRule]] rule when it occurs at (begin,split,end)

@@ -28,6 +28,7 @@ import epic.trees.UnaryRule
 import java.security.MessageDigest
 import java.math.BigInteger
 import scala.collection.immutable
+import epic.constraints.ChartConstraints
 
 /**
  *
@@ -49,7 +50,8 @@ class SimpleRefinedGrammar[L, L2, W](val topology: RuleTopology[L],
     ruleScoreArray(refinedRule)
   }
 
-  def anchor(w: IndexedSeq[W]) = new SimpleRefinedGrammar.Anchoring(this, w)
+  def anchor(w: IndexedSeq[W], constr: ChartConstraints[L]) = new SimpleRefinedGrammar.Anchoring(this, w, constr)
+
 
   /**
    * Writes a text representation of the grammar to the output.
@@ -234,7 +236,7 @@ object SimpleRefinedGrammar {
     map.toMap
   }
 
-  case class Anchoring[L, L2, W](grammar: SimpleRefinedGrammar[L, L2, W], words: IndexedSeq[W]) extends ProjectionsRefinedAnchoring[L, L2, W] {
+  case class Anchoring[L, L2, W](grammar: SimpleRefinedGrammar[L, L2, W], words: IndexedSeq[W], override val sparsityPattern: ChartConstraints[L]) extends ProjectionsRefinedAnchoring[L, L2, W] {
     def topology = grammar.topology
     def lexicon = grammar.lexicon
     def refinements = grammar.refinements

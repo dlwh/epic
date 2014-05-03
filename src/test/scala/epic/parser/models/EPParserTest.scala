@@ -29,7 +29,7 @@ class EPParserTest extends FunSuite with ParserTestHarness {
 
   test("two parsers test") {
     val grammar = ParserTestHarness.refinedGrammar
-    val product = Parser(ParserTestHarness.simpleParser.coreGrammar, EPChartFactory(IndexedSeq(grammar, grammar)))
+    val product = Parser(grammar.topology, grammar.lexicon, ParserTestHarness.simpleParser.constraintsFactory, EPChartFactory(IndexedSeq(grammar, grammar)))
 
     val rprod = evalParser(getTestTrees(), product)
     assert(rprod.f1 > 0.6, rprod)

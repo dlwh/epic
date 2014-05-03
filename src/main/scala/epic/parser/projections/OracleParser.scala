@@ -50,7 +50,7 @@ class OracleParser[L, L2, W](val refinedGrammar: SimpleRefinedGrammar[L, L2, W])
         tree
       } else try {
         val w = words
-        val marg = AugmentedAnchoring(makeGoldPromotingAnchoring(w, tree, treeconstraints), constraints).maxMarginal
+        val marg = makeGoldPromotingAnchoring(w, tree, treeconstraints, constraints).maxMarginal
 
         val closest: BinarizedTree[(L, Int)] = new ViterbiDecoder[L,W]().extractMaxDerivationParse(marg)
 
@@ -80,7 +80,8 @@ class OracleParser[L, L2, W](val refinedGrammar: SimpleRefinedGrammar[L, L2, W])
 
   def makeGoldPromotingAnchoring(w: IndexedSeq[W],
                                  tree: BinarizedTree[L2],
-                                 treeconstraints: ChartConstraints[L]): RefinedAnchoring[L, W] = {
+                                 treeconstraints: ChartConstraints[L],
+                                 constraints: ChartConstraints[L]): RefinedAnchoring[L, W] = {
     val correctRefinedSpans = GoldTagPolicy.goldTreeForcing(tree.map(refinements.labels.fineIndex))
     val correctUnaryChains = {
       val arr = TriangularArray.fill(w.length + 1)(IndexedSeq.empty[String])
@@ -91,6 +92,9 @@ class OracleParser[L, L2, W](val refinedGrammar: SimpleRefinedGrammar[L, L2, W])
     }
     new StructureDelegatingAnchoring[L, W] {
       protected val baseAnchoring: RefinedAnchoring[L, W] = refinedGrammar.anchor(w)
+
+
+      override def sparsityPattern: ChartConstraints[L] = constraints
 
       def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int): Double = {
         0.1 * baseAnchoring.scoreBinaryRule(begin, split, end, rule, ref)
@@ -125,15 +129,19 @@ class OracleParser[L, L2, W](val refinedGrammar: SimpleRefinedGrammar[L, L2, W])
   def oracleMarginalFactory(trees: IndexedSeq[TreeInstance[L2, W]]):RefinedChartMarginal.Factory[L, W] = new Factory[L, W] {
     val knownTrees = trees.iterator.map(ti => ti.words -> ti.tree).toMap
 
-    def apply(w: IndexedSeq[W], constraints: CoreAnchoring[L, W]): RefinedChartMarginal[L, W] = {
-      val refAnchoring = knownTrees.get(w).map { t => makeGoldPromotingAnchoring(w, t, constraints.sparsityPattern)}.getOrElse(refinedGrammar.anchor(w))
+    def apply(w: IndexedSeq[W], constraints: ChartConstraints[L]): RefinedChartMarginal[L, W] = {
+      val refAnchoring = knownTrees.get(w).map { t =>
+        val projectedTree: BinarizedTree[L] = t.map(refinements.labels.project)
+        val treeconstraints = ChartConstraints.fromTree(topology.labelIndex, projectedTree)
+        makeGoldPromotingAnchoring(w, t, treeconstraints, constraints)
+      }.getOrElse(refinedGrammar.anchor(w))
 
-      RefinedChartMarginal(AugmentedAnchoring(refAnchoring, constraints), true)
+      RefinedChartMarginal(refAnchoring, true)
     }
   }
 
-  def oracleParser(constraintGrammar: CoreGrammar[L, W], trees: IndexedSeq[TreeInstance[L2, W]]): Parser[L, W] = {
-    new Parser(constraintGrammar, oracleMarginalFactory(trees), ViterbiDecoder())
+  def oracleParser(constraintGrammar: ChartConstraints.Factory[L, W], trees: IndexedSeq[TreeInstance[L2, W]]): Parser[L, W] = {
+    new Parser(refinedGrammar.topology, refinedGrammar.lexicon, constraintGrammar, oracleMarginalFactory(trees), ViterbiDecoder())
   }
 }
 
@@ -171,7 +179,7 @@ object OracleParser {
     val constraints: ChartConstraints.Factory[AnnotatedLabel, String] = new UnifiedFactory({
 
       val maxMarginalized = initialParser.copy(marginalFactory=initialParser.marginalFactory match {
-        case SimpleChartFactory(ref, mm) => SimpleChartFactory(ref, maxMarginal = true)
+        case StandardChartFactory(ref, mm) => StandardChartFactory(ref, maxMarginal = true)
         case x => x
       })
 
@@ -181,16 +189,15 @@ object OracleParser {
     })
 
     val refGrammar = GenerativeParser.annotated(initialParser.topology, initialParser.lexicon, ann, trainTrees)
-    val coreGrammar = new ConstraintCoreGrammarAdaptor(initialParser.topology, initialParser.lexicon, constraints)
 
     val annDevTrees = devTrees.map(ann)
 
     val parser = {
-      new OracleParser(refGrammar).oracleParser(coreGrammar, annDevTrees)
+      new OracleParser(refGrammar).oracleParser(constraints, annDevTrees)
     }
 
     for(ti <- devTrees.par) try {
-      val m = TreeMarginal(AugmentedGrammar(refGrammar, coreGrammar), ti.words, ann.localized(refGrammar.refinements.labels)(ti.tree, ti.words))
+      val m = TreeMarginal(refGrammar, ti.words, ann.localized(refGrammar.refinements.labels)(ti.tree, ti.words))
       println(m.logPartition)
     } catch {
       case e: Exception => e.printStackTrace()

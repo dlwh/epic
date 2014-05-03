@@ -18,6 +18,7 @@ package epic.parser.models
 import epic.framework.Feature
 import epic.trees.{TreeInstance, BinarizedTree}
 import epic.parser._
+import epic.constraints.ChartConstraints
 
 /**
  * Parser inference for parses that have only observed annotations. Handles Structured, Span, and Lexicalized
@@ -25,7 +26,6 @@ import epic.parser._
  * @param featurizer
  * @param annotator
  * @param grammar
- * @param baseMeasure
  * @tparam L
  * @tparam W
  *
@@ -34,7 +34,7 @@ import epic.parser._
 case class AnnotatedParserInference[L, W](featurizer: RefinedFeaturizer[L, W, Feature],
                                           annotator: (BinarizedTree[L], IndexedSeq[W]) => BinarizedTree[(L, Int)],
                                           grammar: RefinedGrammar[L, W],
-                                          baseMeasure: CoreGrammar[L, W]) extends ParserInference[L, W] {
+                                          constrainer: ChartConstraints.Factory[L, W]) extends ParserInference[L, W] {
 
 
   override def forTesting = copy(featurizer.forTesting)
@@ -42,7 +42,7 @@ case class AnnotatedParserInference[L, W](featurizer: RefinedFeaturizer[L, W, Fe
   def goldMarginal(scorer: Scorer, ti: TreeInstance[L, W], aug: CoreAnchoring[L, W]): Marginal = {
     import ti._
     val annotated = annotator(tree, words)
-    TreeMarginal(AugmentedAnchoring.fromRefined(scorer), annotated)
+    TreeMarginal(scorer, annotated)
   }
 
 

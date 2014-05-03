@@ -14,6 +14,8 @@ import epic.trees._
 import epic.trees.annotations.{Xbarize, TreeAnnotator}
 import java.io.File
 import epic.parser.projections.GrammarRefinements
+import epic.constraints.ChartConstraints.Factory
+import epic.constraints.ChartConstraints
 
 /**
  * The neural model is really just a
@@ -30,7 +32,7 @@ class NeuralModel[L, L2, W](baseModel: SpanModel[L, L2, W],
 
   def topology: RuleTopology[L] = baseModel.topology
   def lexicon: Lexicon[L, W] = baseModel.lexicon
-
+  override def constrainer: Factory[L, W] = baseModel.constrainer
 
   type Scorer = RefinedAnchoring[L, W]
   type Marginal = ParseMarginal[L, W]
@@ -39,7 +41,7 @@ class NeuralModel[L, L2, W](baseModel: SpanModel[L, L2, W],
 
   def extractParser(weights: DenseVector[Double]) = {
     val inf = inferenceFromWeights(weights)
-    Parser(inf.baseMeasure, inf.grammar, ChartDecoder[L, W]())
+    Parser(constrainer, inf.grammar, ChartDecoder[L, W]())
   }
 
   val featureIndex = SegmentedIndex( baseModel.featureIndex,
@@ -77,17 +79,17 @@ case class NeuralInference[L, L2, W](baseInference: LatentParserInference[L, L2,
                                  layer: Transform[FeatureVector, DenseVector[Double]]#Layer) extends ParserInference[L, W] {
   override def forTesting = copy(baseInference.forTesting, labelFeaturizer.forTesting)
 
+  override def constrainer: Factory[L, W] = baseInference.constrainer
 
   def goldMarginal(scorer: Scorer, ti: TreeInstance[L, W], aug: CoreAnchoring[L, W]): Marginal = {
     import ti._
 
     val annotated = baseInference.annotator(tree, words).map(_.map(baseInference.projections.labels.localize))
 
-    val product = AugmentedAnchoring.fromRefined(grammar.anchor(words))
+    val product = grammar.anchor(words, constrainer.constraints(ti.words))
     LatentTreeMarginal(product, annotated)
   }
 
-  def baseMeasure: CoreGrammar[L, W] = baseInference.baseMeasure
 
   val grammar = new NeuralModel.Grammar(baseInference.grammar, baseInference.featurizer, labelFeaturizer, surfaceFeaturizer, lastLayerWeights, layer)
 }
@@ -102,8 +104,8 @@ object NeuralModel {
 
     def lexicon: Lexicon[L, W] = base.lexicon
 
-    def anchor(words: IndexedSeq[W]) = {
-      new Anchoring(base.anchor(words),
+    def anchor(words: IndexedSeq[W], constrainer: ChartConstraints[L]) = {
+      new Anchoring(base.anchor(words, constrainer),
       baseFeaturizer.anchor(words),
       labelFeaturizer.anchor(words),
       surfaceFeaturizer.anchor(words),
@@ -119,6 +121,10 @@ object NeuralModel {
                         val surfaceFeaturizer: IndexedSplitSpanFeatureAnchoring[W],
                         val lastLayer: DenseMatrix[Double],
                         val layer: Transform[FeatureVector, DenseVector[Double]]#Layer) extends RefinedAnchoring.StructureDelegatingAnchoring[L, W] {
+
+
+    override def sparsityPattern: ChartConstraints[L] = baseAnchoring.sparsityPattern
+
     override def scoreSpan(begin: Int, end: Int, label: Int, ref: Int): Double = {
       var base = baseAnchoring.scoreSpan(begin, end, label, ref)
       if(lastLayer.size != 0 && base != Double.NegativeInfinity) {
@@ -252,15 +258,15 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
   type MyModel = NeuralModel[AnnotatedLabel, AnnotatedLabel, String]
 
 
-  def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]], constrainer: CoreGrammar[AnnotatedLabel, String]) = {
+  override def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]],
+                    topology: RuleTopology[AnnotatedLabel],
+                    lexicon: Lexicon[AnnotatedLabel, String], constrainer: Factory[AnnotatedLabel, String]): MyModel = {
     val annTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]] = trainTrees.map(annotator(_))
     val (annWords, annBinaries, annUnaries) = this.extractBasicCounts(annTrees)
     val refGrammar = RuleTopology(AnnotatedLabel.TOP, annBinaries, annUnaries)
 
     val trees = trainTrees.map(_.mapLabels(_.baseAnnotatedLabel))
-    val xbarGrammar = constrainer.topology
-    val xbarLexicon = constrainer.lexicon
-    val indexedRefinements = GrammarRefinements(xbarGrammar, refGrammar, (_: AnnotatedLabel).baseAnnotatedLabel)
+    val indexedRefinements = GrammarRefinements(topology, refGrammar, (_: AnnotatedLabel).baseAnnotatedLabel)
 
 
     val wf = {//WordFeaturizer.goodPOSTagFeaturizer(annWords)
@@ -293,20 +299,20 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     val featureCounter = readWeights(oldWeights)
 
     val base = if(useIdentitySurfaceFeatures) {
-      val featurizer = new ProductionFeaturizer[AnnotatedLabel, AnnotatedLabel, String](xbarGrammar, indexedRefinements, labelFeatGen, ruleFeatGen)
+      val featurizer = new ProductionFeaturizer[AnnotatedLabel, AnnotatedLabel, String](topology, indexedRefinements, labelFeatGen, ruleFeatGen)
       val indexed =  IndexedSpanFeaturizer.extract[AnnotatedLabel, AnnotatedLabel, String](indexedWord,
         surface,
         featurizer,
         new ZeroRuleAndSpansFeaturizer,
         annotator.latent,
         indexedRefinements,
-        xbarGrammar,
+        topology,
         HashFeature.Relative(dummyFeats),
         false,
         trees)
-      new SpanModel[AnnotatedLabel, AnnotatedLabel, String](indexed, indexed.index, annotator.latent, constrainer, xbarGrammar, xbarLexicon, refGrammar, indexedRefinements,featureCounter.get)
+      new SpanModel[AnnotatedLabel, AnnotatedLabel, String](indexed, indexed.index, annotator.latent, constrainer, topology, lexicon, refGrammar, indexedRefinements,featureCounter.get)
     } else {
-      val featurizer = new ProductionFeaturizer[AnnotatedLabel, AnnotatedLabel, String](xbarGrammar, indexedRefinements, labelFeatGen, ruleFeatGen)
+      val featurizer = new ProductionFeaturizer[AnnotatedLabel, AnnotatedLabel, String](topology, indexedRefinements, labelFeatGen, ruleFeatGen)
       val surf0 = IndexedSplitSpanFeaturizer.fromData(new ZeroSplitSpanFeaturizer, annTrees)
       val indexed =  IndexedSpanFeaturizer.extract[AnnotatedLabel, AnnotatedLabel, String](indexedWord,
         surf0,
@@ -314,15 +320,15 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
         new ZeroRuleAndSpansFeaturizer,
         annotator.latent,
         indexedRefinements,
-        xbarGrammar,
+        topology,
         HashFeature.Relative(dummyFeats),
         false,
         trees)
-      new SpanModel[AnnotatedLabel, AnnotatedLabel, String](indexed, indexed.index, annotator.latent, constrainer, xbarGrammar, xbarLexicon, refGrammar, indexedRefinements,featureCounter.get)
+      new SpanModel[AnnotatedLabel, AnnotatedLabel, String](indexed, indexed.index, annotator.latent, constrainer, topology, lexicon, refGrammar, indexedRefinements,featureCounter.get)
 
     }
 
-    val labelFeaturizer = new ProductionFeaturizer[AnnotatedLabel, AnnotatedLabel, String](xbarGrammar, indexedRefinements):RefinedFeaturizer[AnnotatedLabel, String, Feature]
+    val labelFeaturizer = new ProductionFeaturizer[AnnotatedLabel, AnnotatedLabel, String](topology, indexedRefinements):RefinedFeaturizer[AnnotatedLabel, String, Feature]
 
 
     val transform = new TanhTransform(new AffineTransform(numOutputs, numHidden, new TanhTransform[FeatureVector](numHidden, surface.featureIndex.size, true)))

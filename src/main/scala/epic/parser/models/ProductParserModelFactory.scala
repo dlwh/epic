@@ -31,14 +31,15 @@ import epic.trees.BinaryRule
 import epic.trees.UnaryRule
 import epic.trees.TreeInstance
 import epic.parser.features.IndicatorFeature
+import epic.lexicon.Lexicon
+import epic.constraints.ChartConstraints.Factory
 
 /**
  *
  * @author dlwh
  */
 
-case class ProductParserModelFactory(baseParser: ParserParams.XbarGrammar,
-                                     annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = Xbarize(),
+case class ProductParserModelFactory(annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = Xbarize(),
                                      substates: File = null,
                                      numStates: Int = 2,
                                      numModels: Int = 2,
@@ -68,12 +69,12 @@ case class ProductParserModelFactory(baseParser: ParserParams.XbarGrammar,
     }
 
 
-  def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]], constrainer: CoreGrammar[AnnotatedLabel, String]) = {
+  override def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]], topology: RuleTopology[AnnotatedLabel], lexicon: Lexicon[AnnotatedLabel, String], constrainer: Factory[AnnotatedLabel, String]): MyModel = {
     val annTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]] = trainTrees.map(annotator(_))
     val (annWords, annBinaries, annUnaries) = this.extractBasicCounts(annTrees)
 
 
-    val (xbarGrammar, xbarLexicon) = baseParser.xbarGrammar(trainTrees)
+    val (xbarGrammar, xbarLexicon) = topology -> lexicon
 
     val cFactory = constrainer
 

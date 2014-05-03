@@ -2,6 +2,7 @@ package epic.parser
 
 import epic.parser.projections.AnchoredPCFGProjector
 import epic.util.SafeLogging
+import epic.constraints.ChartConstraints
 
 /**
  * TODO
@@ -9,12 +10,15 @@ import epic.util.SafeLogging
  * @author dlwh
  **/
 case class EPChartFactory[L, W](grammars: IndexedSeq[RefinedGrammar[L, W]], maxIterations: Int = 5) extends RefinedChartMarginal.Factory[L, W] with SafeLogging {
-  def apply(words: IndexedSeq[W], initialCore: CoreAnchoring[L, W]): RefinedChartMarginal[L, W] = {
-    val anchorings = grammars.map(_ anchor words)
+  def apply(words: IndexedSeq[W], initialCore: ChartConstraints[L]): RefinedChartMarginal[L, W] = {
+    val anchorings = grammars.map(_ anchor(words, initialCore))
 
     if(anchorings.length == 1) {
-      return RefinedChartMarginal(AugmentedAnchoring(anchorings.head, initialCore))
+      return RefinedChartMarginal(anchorings.head)
     }
+
+    val topology = anchorings.head.topology
+    val lexicon = anchorings.head.lexicon
 
     val projector = new AnchoredPCFGProjector[L, W](-15)
     var iter = 0
@@ -41,7 +45,7 @@ case class EPChartFactory[L, W](grammars: IndexedSeq[RefinedGrammar[L, W]], maxI
 
     val ep = new nak.inference.ExpectationPropagation(project _, 1E-5)
     var state: ep.State = null
-    val iterates = ep.inference(initialCore, Array.range(0, anchorings.length), Array.fill(anchorings.length)(null))
+    val iterates = ep.inference(CoreAnchoring.identity(topology, lexicon, words), Array.range(0, anchorings.length), Array.fill(anchorings.length)(null))
     var converged = false
     while (!converged && iter < maxIterations && iterates.hasNext) {
       val s = iterates.next()

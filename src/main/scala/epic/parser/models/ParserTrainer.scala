@@ -22,13 +22,13 @@ import breeze.optimize._
 import epic.trees.{ProcessedTreebank, AnnotatedLabel, TreeInstance}
 import breeze.config.{CommandLineParser, Help}
 import com.typesafe.scalalogging.slf4j.LazyLogging
-import epic.parser.projections.{GrammarRefinements, ConstraintCoreGrammarAdaptor, OracleParser, ParserChartConstraintsFactory}
+import epic.parser.projections.{GrammarRefinements, OracleParser, ParserChartConstraintsFactory}
 import epic.util.CacheBroker
 import epic.parser.ParserParams.XbarGrammar
 import breeze.util._
 import epic.trees.annotations._
 import java.io.File
-import epic.constraints.CachedChartConstraintsFactory
+import epic.constraints.{ChartConstraints, CachedChartConstraintsFactory}
 import breeze.util.Implicits._
 import breeze.optimize.FirstOrderMinimizer.OptParams
 import epic.parser.HammingLossAugmentation
@@ -68,8 +68,6 @@ object ParserTrainer extends epic.parser.ParserPipeline with LazyLogging {
                     enforceReachability: Boolean = true,
                     @Help(text="Whether or not we use constraints. Not using constraints is very slow.")
                     useConstraints: Boolean = true,
-                    @Help(text="Should we do loss augmentation?")
-                    lossAugment: Boolean = false,
                     @Help(text="Should we check the gradient to make sure it's coded correctly?")
                     checkGradient: Boolean = false,
                     @Help(text="check specific indices, in addition to doing a full search.")
@@ -98,7 +96,7 @@ object ParserTrainer extends epic.parser.ParserPipeline with LazyLogging {
     val constraints = {
 
       val maxMarginalized = initialParser.copy(marginalFactory=initialParser.marginalFactory match {
-        case SimpleChartFactory(ref, mm) => SimpleChartFactory(ref, maxMarginal = true)
+        case StandardChartFactory(ref, mm) => StandardChartFactory(ref, maxMarginal = true)
         case x => x
       })
 
@@ -114,16 +112,13 @@ object ParserTrainer extends epic.parser.ParserPipeline with LazyLogging {
       theTrees = theTrees.par.map(ti => ti.copy(tree=proj.forTree(ti.tree, ti.words, constraints.constraints(ti.words)))).seq.toIndexedSeq
     }
 
-    var baseMeasure = if(useConstraints) {
-      new ConstraintCoreGrammarAdaptor(initialParser.topology, initialParser.lexicon, constraints)
+    val baseMeasure = if(useConstraints) {
+      constraints
     } else {
-      CoreGrammar.identity(initialParser.topology, initialParser.lexicon)
+      ChartConstraints.Factory.noSparsity[AnnotatedLabel, String]
     }
 
-    if(lossAugment)
-      baseMeasure *= new HammingLossAugmentation(initialParser.topology, initialParser.lexicon, (_:AnnotatedLabel).baseAnnotatedLabel,  (_:AnnotatedLabel).isIntermediate).asCoreGrammar(theTrees)
-    
-    val model = modelFactory.make(theTrees, baseMeasure)
+    val model = modelFactory.make(theTrees, initialParser.topology, initialParser.lexicon, constraints)
     val obj = new ModelObjective(model, theTrees, params.threads)
     val cachedObj = new CachedBatchDiffFunction(obj)
     val init = obj.initialWeightVector(randomize)

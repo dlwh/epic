@@ -35,17 +35,6 @@ import scala.collection.GenTraversable
 import com.typesafe.scalalogging.slf4j.{LazyLogging, Logger}
 import java.util.concurrent.atomic.AtomicInteger
 
-@SerialVersionUID(1L)
-class ConstraintCoreGrammarAdaptor[L, W](val topology: RuleTopology[L], val lexicon: Lexicon[L, W],
-                                         val constraintsFactory: ChartConstraints.Factory[L, W]) extends CoreGrammar[L, W] with Serializable {
-  /**
-   * Returns a [[epic.parser.CoreAnchoring]] for this particular sentence.
-   * @param words
-   * @return
-   */
-  def anchor(words: IndexedSeq[W]): CoreAnchoring[L, W] = CoreAnchoring.identity[L, W](topology, lexicon, words, constraintsFactory.constraints(words))
-}
-
 /**
  * Creates labeled span scorers for a set of trees from some parser.
  * @author dlwh

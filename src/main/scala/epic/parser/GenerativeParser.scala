@@ -15,18 +15,15 @@ package epic.parser
  limitations under the License.
 */
 
-import epic.parser.projections.{ConstraintCoreGrammarAdaptor, GrammarRefinements}
-import epic.trees._
+import epic.parser.projections.GrammarRefinements
 
 import epic.trees.annotations._
 import breeze.linalg.Counter2
 import breeze.config.Help
 import epic.parser.ParserParams.XbarGrammar
 import epic.lexicon.{SimpleTagScorer, Lexicon, SimpleLexicon}
-import epic.features._
 import java.io.{FileWriter, BufferedWriter, File}
 import epic.trees._
-import epic.constraints.LongSpanConstraints
 
 /**
  * Contains codes to read off parsers and grammars from
@@ -178,17 +175,17 @@ object GenerativeTrainer extends ParserPipeline {
       refinedGrammar.prettyPrint(out)
       out.close()
     }
-
-    val finalGrammar = if(params.pruneUnlikelyLongSpans) {
-      val ccs = trainTrees.flatMap(_.asTaggedSequence.pairs.collect{ case (tag, word) if tag.label == "CC" || tag.label == "C" || tag.label == "KON" => word}).toSet
-      val constraints = new ConstraintCoreGrammarAdaptor(refinedGrammar.topology, refinedGrammar.lexicon, new LongSpanConstraints.Factory[AnnotatedLabel](30, ccs))
-      AugmentedGrammar(refinedGrammar, constraints)
-    } else {
-      AugmentedGrammar.fromRefined(refinedGrammar)
-    }
+//
+//    val finalGrammar = if(params.pruneUnlikelyLongSpans) {
+//      val ccs = trainTrees.flatMap(_.asTaggedSequence.pairs.collect{ case (tag, word) if tag.label == "CC" || tag.label == "C" || tag.label == "KON" => word}).toSet
+//      val constraints = new ConstraintCoreGrammarAdaptor(refinedGrammar.topology, refinedGrammar.lexicon, new LongSpanConstraints.Factory[AnnotatedLabel](30, ccs))
+//      AugmentedGrammar(refinedGrammar, constraints)
+//    } else {
+//      AugmentedGrammar.fromRefined(refinedGrammar)
+//    }
 
     val decoder = if (params.maxRule) new MaxRuleProductDecoder[AnnotatedLabel, String]() else new ViterbiDecoder[AnnotatedLabel, String]
-    val parser = Parser(finalGrammar.core, finalGrammar.refined, decoder)
+    val parser = Parser(refinedGrammar, decoder)
     Iterator.single(("Gen", parser))
   }
 }

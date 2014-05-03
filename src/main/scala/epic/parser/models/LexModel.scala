@@ -33,11 +33,13 @@ import epic.trees._
 import epic.parser.projections.GrammarRefinements
 import epic.features.SplitSpanFeaturizer.ZeroSplitSpanFeaturizer
 import scala.collection.mutable.ArrayBuffer
+import epic.constraints.ChartConstraints
+import epic.constraints.ChartConstraints.Factory
 
 class LexModel[L, L2, W](bundle: LexGrammarBundle[L, L2, W],
                          reannotate: (BinarizedTree[L], IndexedSeq[W])=>BinarizedTree[L2],
                          indexed: IndexedLexFeaturizer[L, L2, W],
-                         baseFactory: CoreGrammar[L, W],
+                         val constrainer: ChartConstraints.Factory[L, W],
                          initFeatureValue: Feature=>Option[Double]) extends ParserModel[L, W] with Serializable with ParserExtractable[L, W] {
 
 
@@ -45,7 +47,7 @@ class LexModel[L, L2, W](bundle: LexGrammarBundle[L, L2, W],
     m.expectedCounts(indexed, accum, scale)
   }
 
-  def topology: RuleTopology[L] = bundle.baseGrammar
+  def topology: RuleTopology[L] = bundle.topology
   def lexicon = bundle.baseLexicon
 
   val featureIndex = indexed.index
@@ -62,7 +64,7 @@ class LexModel[L, L2, W](bundle: LexGrammarBundle[L, L2, W],
       }
 
     }
-    new AnnotatedParserInference(indexed, ann, gram, baseFactory)
+    new AnnotatedParserInference(indexed, ann, gram, constrainer)
   }
 
   type Inference = AnnotatedParserInference[L, W]
@@ -110,6 +112,8 @@ class IndexedLexFeaturizer[L, L2, W](grammar: RuleTopology[L],
 
 
   def anchor(datum: IndexedSeq[W]):Spec = new Spec(datum)
+
+
 
   class Spec(val words: IndexedSeq[W]) extends Anchoring {
     private val fspec = ruleFeaturizer.anchor(words)
@@ -394,7 +398,9 @@ final class LexGrammar[L, L2, W](val topology: RuleTopology[L],
 
   def isHeadOnRightForRule(r: Int) = rightRules(r)
 
-  def anchor(sent: IndexedSeq[W]) = new Spec(sent)
+  override def anchor(words: IndexedSeq[W], constraints: ChartConstraints[L]): RefinedAnchoring[L, W] = {
+    new Spec(words, constraints)
+  }
 
   def refinements = featurizer.refinements
 
@@ -402,7 +408,8 @@ final class LexGrammar[L, L2, W](val topology: RuleTopology[L],
   // binaryRule is (head * words.length + dep)
   // unaryRule is (head)
   // parent/leftchild/rightchild is (head)
-  final class Spec(val words: IndexedSeq[W]) extends RefinedAnchoring[L, W] {
+  final class Spec(val words: IndexedSeq[W], val sparsityPattern: ChartConstraints[L]) extends RefinedAnchoring[L, W] {
+
     override def annotationTag: Int = 1
 
     val topology = LexGrammar.this.topology
@@ -820,11 +827,11 @@ final class LexGrammar[L, L2, W](val topology: RuleTopology[L],
 
 }
 
-case class LexGrammarBundle[L, L2, W](baseGrammar: RuleTopology[L],
+case class LexGrammarBundle[L, L2, W](topology: RuleTopology[L],
                                   baseLexicon: Lexicon[L, W],
                                   refinedGrammar: RuleTopology[L2],
                                   headFinder: HeadFinder[L]) { bundle =>
-  val bg = baseGrammar
+  val bg = topology
   val leftRules = new Array[Boolean](bg.index.size)
   val rightRules = new Array[Boolean](bg.index.size)
   val binaries = new Array[Boolean](bg.index.size)
@@ -840,7 +847,7 @@ case class LexGrammarBundle[L, L2, W](baseGrammar: RuleTopology[L],
   }
 
   def makeGrammar(fi: IndexedLexFeaturizer[L, L2, W], weights: DenseVector[Double]): LexGrammar[L, L2, W] = {
-    new LexGrammar(baseGrammar, baseLexicon, refinedGrammar, fi, weights, binaries, leftRules, rightRules)
+    new LexGrammar(topology, baseLexicon, refinedGrammar, fi, weights, binaries, leftRules, rightRules)
   }
 }
 
@@ -963,15 +970,16 @@ case class LexModelFactory(@Help(text= "The kind of annotation to do on the refi
                            useBilexRuleFeatures: Boolean = true) extends ParserModelFactory[AnnotatedLabel, String] with SafeLogging {
   type MyModel = LexModel[AnnotatedLabel, AnnotatedLabel, String]
 
-  def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]], constrainer: CoreGrammar[AnnotatedLabel, String]) ={
+
+  override def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]],
+                    topology: RuleTopology[AnnotatedLabel],
+                    lexicon: Lexicon[AnnotatedLabel, String], constrainer: Factory[AnnotatedLabel, String]): MyModel = {
+
     val trees = trainTrees.map(annotator)
     val (initLexicon, annBinaries, annUnaries) = GenerativeParser.extractCounts(trees)
     val refGrammar = RuleTopology(AnnotatedLabel.TOP, annBinaries, annUnaries)
 
-    val cFactory = constrainer
-
-    val (xbarGrammar, xbarLexicon) = constrainer.topology -> constrainer.lexicon
-    val indexedRefinements = GrammarRefinements(xbarGrammar, refGrammar, (_: AnnotatedLabel).baseAnnotatedLabel)
+    val indexedRefinements = GrammarRefinements(topology, refGrammar, (_: AnnotatedLabel).baseAnnotatedLabel)
 
     val (wordFeaturizer, unaryFeaturizer, bilexFeaturizer) = {
       val dsl = new WordFeaturizer.DSL(initLexicon) with BilexicalFeaturizer.DSL with SurfaceFeaturizer.DSL
@@ -1062,7 +1070,7 @@ case class LexModelFactory(@Help(text= "The kind of annotation to do on the refi
         Set(r, r.map(_.baseAnnotatedLabel)).toSeq
     }
 
-    val featurizer = new ProductionFeaturizer[AnnotatedLabel, AnnotatedLabel, String](xbarGrammar, indexedRefinements,
+    val featurizer = new ProductionFeaturizer[AnnotatedLabel, AnnotatedLabel, String](topology, indexedRefinements,
       lGen=labelFeaturizer,
       rGen=ruleFeaturizer)
 
@@ -1084,13 +1092,13 @@ case class LexModelFactory(@Help(text= "The kind of annotation to do on the refi
 
      logger.info(s"Num features: Indexed Features: ${indexed.index.size}")
 
-    val bundle = new LexGrammarBundle(xbarGrammar,
-      xbarLexicon,
+    val bundle = new LexGrammarBundle(topology,
+      lexicon,
       refGrammar,
       headFinder)
 
     val featureCounter = readWeights(oldWeights)
 
-    new LexModel(bundle, reannotate, indexed, cFactory, featureCounter.get)
+    new LexModel(bundle, reannotate, indexed, constrainer, featureCounter.get)
   }
 }

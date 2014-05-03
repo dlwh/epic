@@ -29,8 +29,9 @@ import breeze.collection.mutable.TriangularArray
  * @author dlwh
  */
 trait ParseMarginal[L, W] extends VisitableMarginal[AnchoredVisitor[L]] {
-  def anchoring: AugmentedAnchoring[L, W]
+  def anchoring: RefinedAnchoring[L, W]
   def topology:RuleTopology[L] = anchoring.topology
+
   def lexicon = anchoring.lexicon
   def logPartition: Double
   def words:IndexedSeq[W] = anchoring.words
@@ -99,8 +100,8 @@ object ParseMarginal {
 
   }
 
-  def maxDerivationMarginal[L, W](anch: AugmentedAnchoring[L, W]):ParseMarginal[L, W] = {
-    val maxM = RefinedChartMarginal(anch, maxMarginal = true)
+  def maxDerivationMarginal[L, W](anch: RefinedAnchoring[L, W], core: CoreAnchoring[L, W]):ParseMarginal[L, W] = {
+    val maxM = RefinedChartMarginal(anch, core, maxMarginal = true)
     val parse = new ViterbiDecoder().extractMaxDerivationParse(maxM)
     TreeMarginal(anch, parse)
   }

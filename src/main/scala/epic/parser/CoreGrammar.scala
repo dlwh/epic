@@ -31,7 +31,7 @@ import epic.constraints.ChartConstraints.Factory
  * @tparam L label type
  * @tparam W word type
  */
-trait CoreGrammar[L, W] extends Serializable {
+trait CoreGrammar[L, W] extends Serializable { core =>
   def topology: RuleTopology[L]
   def lexicon: Lexicon[L, W]
 
@@ -47,11 +47,17 @@ trait CoreGrammar[L, W] extends Serializable {
    */
   def anchor(words: IndexedSeq[W]):CoreAnchoring[L, W]
 
-  def asConstraintFactory:ChartConstraints.Factory[L, W] = new Factory[L, W] with Serializable {
-    def constraints(w: IndexedSeq[W]): ChartConstraints[L] = anchor(w).sparsityPattern
-  }
-
   def *(other: CoreGrammar[L, W]):CoreGrammar[L, W] = new CoreGrammar.ProductGrammar(this, other)
+
+
+  def lift: RefinedGrammar[L, W] = new RefinedGrammar[L, W] {
+    override def topology: RuleTopology[L] = core.topology
+
+    override def lexicon: Lexicon[L, W] = core.lexicon
+
+    override def anchor(words: IndexedSeq[W], constraints: ChartConstraints[L]): RefinedAnchoring[L, W] = core.anchor(words).lift(constraints)
+
+  }
 }
 
 object CoreGrammar {
@@ -59,7 +65,7 @@ object CoreGrammar {
 
   @SerialVersionUID(1L)
   case class IdentityCoreGrammar[L, W](topology: RuleTopology[L], lexicon: Lexicon[L, W]) extends CoreGrammar[L, W] {
-    def anchor(words: IndexedSeq[W]) = CoreAnchoring.identity(topology, lexicon, words, ChartConstraints.noSparsity[L])
+    def anchor(words: IndexedSeq[W]) = CoreAnchoring.identity(topology, lexicon, words)
   }
 
   case class ProductGrammar[L, W](g1: CoreGrammar[L, W], g2: CoreGrammar[L, W]) extends CoreGrammar[L, W] {

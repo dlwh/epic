@@ -2,9 +2,7 @@ package epic.sentiment
 
 import epic.trees.{Span, AnnotatedLabel, TreeInstance}
 import epic.framework.LossAugmentation
-import epic.parser.projections.{ConstraintCoreGrammarAdaptor, GoldTagPolicy}
 import epic.lexicon.Lexicon
-import scala.collection.immutable.BitSet
 import epic.parser.{CoreGrammar, CoreAnchoring, RuleTopology}
 import epic.constraints.ChartConstraints
 
@@ -31,7 +29,7 @@ case class SentimentLossAugmentation[W](trainTrees: IndexedSeq[TreeInstance[Anno
     // drop the root
     val goldMap = datum.tree.map(projectedLabel).preorder.filter(_.label != -1).map{t => t.span -> t.label}.toMap
 
-    new SentimentLossAnchoring(topology, lexicon, datum.words, goldMap, constraintFactory.constraints(datum.words))
+    new SentimentLossAnchoring(topology, lexicon, datum.words, goldMap)
   }
 
 
@@ -43,15 +41,13 @@ case class SentimentLossAugmentation[W](trainTrees: IndexedSeq[TreeInstance[Anno
   def anchor(words: IndexedSeq[W]): CoreAnchoring[AnnotatedLabel, W] = {
     trainingMap.get(words)
       .map( ti =>lossAugmentation(ti) )
-      .getOrElse ( CoreAnchoring.identity(topology, lexicon, words, constraintFactory.constraints(words)) )
+      .getOrElse ( CoreAnchoring.identity(topology, lexicon, words) )
   }
 
   case class SentimentLossAnchoring[L, W](topology: RuleTopology[L],
                                           lexicon: Lexicon[L, W],
                                           words: IndexedSeq[W],
-                                          goldLabels: Map[Span, Int],
-                                          override val sparsityPattern: ChartConstraints[L] = ChartConstraints.noSparsity[L])  extends epic.parser.CoreAnchoring[L, W]{
-    def addConstraints(cs: ChartConstraints[L]): CoreAnchoring[L, W] = copy(sparsityPattern = cs & sparsityPattern)
+                                          goldLabels: Map[Span, Int])  extends epic.parser.CoreAnchoring[L, W]{
 
     def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int): Double = 0.0
 

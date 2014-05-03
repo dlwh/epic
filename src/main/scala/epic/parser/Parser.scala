@@ -17,6 +17,8 @@ package epic.parser
 
 
 import epic.trees._
+import epic.constraints.ChartConstraints
+import epic.lexicon.Lexicon
 
 
 /**
@@ -26,12 +28,11 @@ import epic.trees._
  * @author dlwh
  */
 @SerialVersionUID(1L)
-final case class Parser[L,W](coreGrammar: CoreGrammar[L, W],
+final case class Parser[L,W](topology: RuleTopology[L],
+                             lexicon: Lexicon[L, W],
+                             constraintsFactory: ChartConstraints.Factory[L, W],
                              marginalFactory: RefinedChartMarginal.Factory[L, W],
                              decoder: ChartDecoder[L, W] = ChartDecoder[L, W]()) extends (IndexedSeq[W]=>Tree[L]) {
-
-  def topology = coreGrammar.topology
-  def lexicon = coreGrammar.lexicon
 
   /**
    * Returns the best parse (calls bestParse) for the sentence
@@ -48,31 +49,26 @@ final case class Parser[L,W](coreGrammar: CoreGrammar[L, W],
     decoder.extractBestParse(marginal(s))
   }
 
-  def marginal(w: IndexedSeq[W]) = marginalFactory.apply(w, coreGrammar.anchor(w))
+  def marginal(w: IndexedSeq[W]) = marginalFactory.apply(w, constraintsFactory.constraints(w))
 }
 
 object Parser {
-  def apply[L, W](grammar: AugmentedGrammar[L, W]): Parser[L, W] = {
-    Parser(grammar.core, grammar.refined)
-
-  }
-
 
   def apply[L, W](ref: RefinedGrammar[L, W]): Parser[L, W]= {
-    Parser(CoreGrammar.identity(ref.topology, ref.lexicon), SimpleChartFactory(ref))
+    Parser(ref.topology, ref.lexicon, ChartConstraints.Factory.noSparsity, StandardChartFactory(ref))
   }
 
   def apply[L, W](refined: RefinedGrammar[L, W], decoder: ChartDecoder[L, W]): Parser[L, W] = {
-    Parser(CoreGrammar.identity(refined.topology, refined.lexicon), SimpleChartFactory(refined, decoder.wantsMaxMarginal), decoder)
+    apply(ChartConstraints.Factory.noSparsity, refined, decoder)
   }
 
 
-  def apply[L, W](core: CoreGrammar[L, W], refinedGrammar: RefinedGrammar[L, W], decoder: ChartDecoder[L, W]): Parser[L, W] = {
-    Parser(core, SimpleChartFactory(refinedGrammar, decoder.wantsMaxMarginal), decoder)
+  def apply[L, W](core: ChartConstraints.Factory[L, W], refinedGrammar: RefinedGrammar[L, W], decoder: ChartDecoder[L, W]): Parser[L, W] = {
+    Parser(refinedGrammar.topology, refinedGrammar.lexicon, core, StandardChartFactory(refinedGrammar, decoder.wantsMaxMarginal), decoder)
   }
 
 
-  def apply[L, W](core: CoreGrammar[L, W], refinedGrammar: RefinedGrammar[L, W]): Parser[L, W] = {
-    Parser(core, refinedGrammar, ChartDecoder[L, W]())
+  def apply[L, W](core: ChartConstraints.Factory[L, W], refinedGrammar: RefinedGrammar[L, W]): Parser[L, W] = {
+    apply(core, refinedGrammar, new MaxConstituentDecoder)
   }
 }

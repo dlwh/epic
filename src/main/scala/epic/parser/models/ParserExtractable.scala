@@ -32,12 +32,13 @@ import epic.util.CacheBroker
 trait ParserExtractable[L, W] {
   def topology: RuleTopology[L]
   def lexicon: Lexicon[L, W]
+  def constrainer: ChartConstraints.Factory[L, W]
   def extractParser(weights: DenseVector[Double]): Parser[L, W]
 }
 
 
 trait ParserExtractableModelFactory[L,W] {
-  def make(train: IndexedSeq[TreeInstance[L, W]], baseMeasure: CoreGrammar[L, W]): MyModel
+  def make(train: IndexedSeq[TreeInstance[L, W]], topology: RuleTopology[L], lexicon: Lexicon[L, W], constraintsFactory: ChartConstraints.Factory[L, W]): MyModel
 
   def readWeights(in: File):Counter[Feature, Double] = if(in != null && in.exists) {
     try {

@@ -76,7 +76,7 @@ object SentimentTreebankPipeline extends LazyLogging {
       params.rootLossScaling)
 
 //    val model = new SpanModelFactory(annotator = GenerativeParser.defaultAnnotator(vertical = params.v), dummyFeats = 0.5).make(trainTrees, constrainer)
-    val model = params.modelFactory.make(trainTrees, constrainer)
+    val model = params.modelFactory.make(trainTrees, gen.topology, gen.lexicon, new GoldBracketingsConstraints)
 
     val obj = new ModelObjective(model, trainTrees)
     val cachedObj = new CachedBatchDiffFunction(obj)
@@ -141,7 +141,7 @@ object SentimentTreebankPipeline extends LazyLogging {
   }
 
   class Inference[L, W](val pm: ParserInference[L, W]) extends epic.framework.Inference[TreeInstance[L, W]] {
-    val labels = pm.baseMeasure.labelIndex.toIndexedSeq.map(_ -> 0)
+    val labels = pm.grammar.topology.labelIndex.toIndexedSeq.map(_ -> 0)
     type Scorer = pm.Scorer
     type Marginal = pm.Marginal
 
@@ -153,8 +153,7 @@ object SentimentTreebankPipeline extends LazyLogging {
 
 
     def marginal(anch: Scorer, v: TreeInstance[L, W]): Inference[L, W]#Marginal = {
-      val aug = AugmentedAnchoring.fromRefined(anch)
-      LatentTreeMarginal[L, W](aug, v.tree.map(l => labels:scala.collection.IndexedSeq[(L, Int)]))
+      LatentTreeMarginal[L, W](anch, v.tree.map(l => labels:scala.collection.IndexedSeq[(L, Int)]))
     }
   }
 

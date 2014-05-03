@@ -29,11 +29,13 @@ import breeze.config.Help
 import epic.features.{WordPropertyFeaturizer, MinimalWordFeaturizer, IndexedWordFeaturizer}
 import epic.lexicon.Lexicon
 import epic.util.{SafeLogging, CacheBroker}
+import epic.constraints.ChartConstraints
+import epic.constraints.ChartConstraints.Factory
 
 class LatentParserModel[L, L3, W](indexedFeatures: IndexedFeaturizer[L, L3, W],
                                   reannotate: (BinarizedTree[L], IndexedSeq[W]) => BinarizedTree[IndexedSeq[L3]],
                                   val projections: GrammarRefinements[L, L3],
-                                  baseFactory: CoreGrammar[L, W],
+                                  val constrainer: ChartConstraints.Factory[L, W],
                                   val topology: RuleTopology[L],
                                   val lexicon: Lexicon[L, W],
                                   initialFeatureVal: (Feature => Option[Double]) = { _ => None }) extends ParserModel[L, W] {
@@ -55,7 +57,7 @@ class LatentParserModel[L, L3, W](indexedFeatures: IndexedFeaturizer[L, L3, W],
     val lexicon = new FeaturizedLexicon(weights, indexedFeatures)
     val grammar = FeaturizedGrammar(this.topology, this.lexicon, projections, weights, indexedFeatures, lexicon)
 
-    new LatentParserInference(indexedFeatures, reannotate, grammar, baseFactory, projections)
+    new LatentParserInference(indexedFeatures, reannotate, grammar, constrainer, projections)
   }
 
 
@@ -64,7 +66,7 @@ class LatentParserModel[L, L3, W](indexedFeatures: IndexedFeaturizer[L, L3, W],
 case class LatentParserInference[L, L2, W](featurizer: RefinedFeaturizer[L, W, Feature],
                                            annotator: (BinarizedTree[L], IndexedSeq[W]) => BinarizedTree[IndexedSeq[L2]],
                                            grammar: RefinedGrammar[L, W],
-                                           baseMeasure: CoreGrammar[L, W],
+                                           constrainer: ChartConstraints.Factory[L, W],
                                            projections: GrammarRefinements[L, L2]) extends ParserInference[L, W] {
 
   override def forTesting = copy(featurizer.forTesting)
@@ -72,8 +74,7 @@ case class LatentParserInference[L, L2, W](featurizer: RefinedFeaturizer[L, W, F
   def goldMarginal(scorer: Scorer, ti: TreeInstance[L, W], aug: CoreAnchoring[L, W]): Marginal = {
     val annotated = annotator(ti.tree, ti.words).map(_.map(projections.labels.localize))
 
-    val product = AugmentedAnchoring(scorer, aug)
-    LatentTreeMarginal(product, annotated)
+    LatentTreeMarginal(scorer * aug, annotated)
   }
 }
 
@@ -101,14 +102,14 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
   type MyModel = LatentParserModel[AnnotatedLabel, (AnnotatedLabel, Int), String]
 
 
-
-  def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]],
-           constrainer: CoreGrammar[AnnotatedLabel, String]):MyModel = {
+  override def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]],
+                    topology: RuleTopology[AnnotatedLabel], lexicon: Lexicon[AnnotatedLabel, String],
+                    constrainer: Factory[AnnotatedLabel, String]): MyModel = {
     val annTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]] = trainTrees.map(annotator(_))
 
     val (annWords, annBinaries, annUnaries) = this.extractBasicCounts(annTrees)
 
-    val (xbarGrammar, xbarLexicon) = (constrainer.topology, constrainer.lexicon)
+    val (xbarGrammar, xbarLexicon) = (topology, lexicon)
 
     val substateMap = if (substates != null && substates.exists) {
       val in = Source.fromFile(substates).getLines()

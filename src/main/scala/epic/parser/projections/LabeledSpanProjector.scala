@@ -69,8 +69,8 @@ case class LabeledSpanProjector[L, W](topology: RuleTopology[L], threshold: Doub
       normalizeSpans(totals)
     }
 
-    val sparsity = charts.anchoring.core.sparsityPattern
-    new SpanAnchoring(charts.topology, charts.lexicon, charts.words, normSpans, normUnaries, sparsity)
+    //val sparsity = charts.anchoring.sparsityPattern
+    new SpanAnchoring(charts.topology, charts.lexicon, charts.words, normSpans, normUnaries)//, sparsity)
   }
 
 }
@@ -90,9 +90,8 @@ case class SpanAnchoring[L, W](topology: RuleTopology[L],
                                lexicon: Lexicon[L, W],
                                words: IndexedSeq[W],
                                spanScores: Array[OpenAddressHashArray[Double]],
-                               unaryScores: Array[OpenAddressHashArray[Double]],
-                               override val sparsityPattern: ChartConstraints[L])  extends CoreAnchoring[L, W] {
-  def addConstraints(cs: ChartConstraints[L]): CoreAnchoring[L, W] = copy(sparsityPattern = sparsityPattern & cs)
+                               unaryScores: Array[OpenAddressHashArray[Double]])  extends CoreAnchoring[L, W] {
+//  def addConstraints(cs: ChartConstraints[L]): CoreAnchoring[L, W] = copy(sparsityPattern = sparsityPattern & cs)
   def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = 0.0
 
   def scoreUnaryRule(begin: Int, end: Int, rule: Int) = {

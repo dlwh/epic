@@ -27,6 +27,7 @@ import epic.constraints.ChartConstraints.Factory
 import epic.util.CacheBroker
 import epic.lexicon.Lexicon
 import breeze.linalg.DenseVector
+import epic.constraints.ChartConstraints
 
 case class EPParams(maxIterations: Int = 5, pruningThreshold: Double = -15, dropOutFraction: Double = 0.0)
 
@@ -44,30 +45,27 @@ case class EPParserModelFactory(ep: EPParams,
   type MyModel = EPParserModel[AnnotatedLabel, String]
 
 
-  def make(train: IndexedSeq[TreeInstance[AnnotatedLabel, String]], constrainer: CoreGrammar[AnnotatedLabel, String]): MyModel = {
+  override def make(train: IndexedSeq[TreeInstance[AnnotatedLabel, String]], topology: RuleTopology[AnnotatedLabel], lexicon: Lexicon[AnnotatedLabel, String], constrainer: Factory[AnnotatedLabel, String]): MyModel = {
     type ModelType = EPModel.CompatibleModel[TreeInstance[AnnotatedLabel, String], CoreAnchoring[AnnotatedLabel, String]]
-    val models = model.filterNot(_ eq null) map {
-      model =>
-        model.make(train, constrainer): ModelType
-    }
+    val models = model.filterNot(_ eq null) map { model => model.make(train, topology, lexicon, constrainer): ModelType }
 
     val featureCounter = readWeights(oldWeights)
 
-    new EPParserModel[AnnotatedLabel, String](constrainer, ep.maxIterations, featureCounter.get, false, ep.dropOutFraction)(models:_*)
+
+    new EPParserModel[AnnotatedLabel, String](topology, lexicon, constrainer, ep.maxIterations, featureCounter.get, false, ep.dropOutFraction)(models:_*)
   }
 }
 
 @SerialVersionUID(1L)
-class EPParserModel[L, W](val constrainer: CoreGrammar[L, W],
+class EPParserModel[L, W](val topology: RuleTopology[L], val lexicon: Lexicon[L, W],
+                          val constrainer: ChartConstraints.Factory[L, W],
                           maxEPIter: Int,
                           initFeatureValue: Feature => Option[Double] = {(_:Feature) => None},
                           epInGold: Boolean = false, dropOutFraction: Double = 0.0)(models:EPModel.CompatibleModel[TreeInstance[L, W], CoreAnchoring[L, W]]*) extends EPModel[TreeInstance[L, W], CoreAnchoring[L, W]](maxEPIter, initFeatureValue, epInGold, dropOutFraction)(models:_*) with ParserExtractable[L, W] with Serializable {
-  def topology = constrainer.topology
-  def lexicon = constrainer.lexicon
 
   def extractParser(weights: DenseVector[Double]): Parser[L, W] = {
     val inf = inferenceFromWeights(weights)
     val refineds = inf.inferences.map(_.asInstanceOf[ParserInference[L, W]].grammar)
-    Parser(constrainer, new EPChartFactory(refineds, maxEPIter))
+    Parser(topology, lexicon, constrainer, new EPChartFactory(refineds, maxEPIter))
   }
 }

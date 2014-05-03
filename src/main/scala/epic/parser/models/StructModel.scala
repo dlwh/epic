@@ -31,6 +31,8 @@ import epic.trees.BinaryRule
 import epic.trees.UnaryRule
 import epic.trees.TreeInstance
 import epic.trees.annotations.KMAnnotator
+import epic.constraints.ChartConstraints
+import epic.constraints.ChartConstraints.Factory
 
 /**
  * Model for structural annotations, a la Klein and Manning 2003.
@@ -49,7 +51,7 @@ import epic.trees.annotations.KMAnnotator
 class StructModel[L, L2, W](indexedFeatures: IndexedFeaturizer[L, L2, W],
                         annotator: TreeAnnotator[L, W, L2],
                         val projections: GrammarRefinements[L, L2],
-                        baseFactory: CoreGrammar[L, W],
+                        val constrainer: ChartConstraints.Factory[L, W],
                         val topology: RuleTopology[L],
                         val lexicon: Lexicon[L, W],
                         initialFeatureVal: (Feature => Option[Double]) = { _ => None }) extends ParserModel[L, W] with Serializable {
@@ -67,7 +69,7 @@ class StructModel[L, L2, W](indexedFeatures: IndexedFeaturizer[L, L2, W],
       annotator(tree, words).map(projections.labels.localize)
     }
 
-    new AnnotatedParserInference(indexedFeatures, reannotate, grammar, baseFactory)
+    new AnnotatedParserInference(indexedFeatures, reannotate, grammar, constrainer)
   }
 
 
@@ -76,8 +78,7 @@ class StructModel[L, L2, W](indexedFeatures: IndexedFeaturizer[L, L2, W],
   }
 }
 
-case class StructModelFactory(baseParser: ParserParams.XbarGrammar,
-                              @Help(text= "The kind of annotation to do on the refined grammar. Defaults to ~KM2003")
+case class StructModelFactory(@Help(text= "The kind of annotation to do on the refined grammar. Defaults to ~KM2003")
                               annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = KMAnnotator(),
                               @Help(text="Old weights to initialize with. Optional")
                               oldWeights: File = null,
@@ -85,7 +86,10 @@ case class StructModelFactory(baseParser: ParserParams.XbarGrammar,
   type MyModel = StructModel[AnnotatedLabel, AnnotatedLabel, String]
 
 
-  def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]], constrainer: CoreGrammar[AnnotatedLabel, String]) = {
+  override def make(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]],
+                    topology: RuleTopology[AnnotatedLabel],
+                    lexicon: Lexicon[AnnotatedLabel, String],
+                    constrainer: Factory[AnnotatedLabel, String]): MyModel = {
     val transformed = trainTrees.par.map(annotator).seq.toIndexedSeq
 
     if(annotatedTreesDumpPath != null) {
@@ -97,11 +101,8 @@ case class StructModelFactory(baseParser: ParserParams.XbarGrammar,
 
     val (initLexicon, initBinaries, initUnaries) = this.extractBasicCounts(transformed)
 
-    val (xbarGrammar, xbarLexicon) = baseParser.xbarGrammar(trainTrees)
     val refGrammar = RuleTopology(AnnotatedLabel.TOP, initBinaries, initUnaries)
-    val indexedRefinements = GrammarRefinements(xbarGrammar, refGrammar, (_: AnnotatedLabel).baseAnnotatedLabel)
-
-    val cFactory = constrainer
+    val indexedRefinements = GrammarRefinements(topology, refGrammar, (_: AnnotatedLabel).baseAnnotatedLabel)
 
     val surfaceFeaturizer = {
       val dsl = new WordFeaturizer.DSL(initLexicon)
@@ -137,18 +138,18 @@ case class StructModelFactory(baseParser: ParserParams.XbarGrammar,
     def ruleFlattener(r: Rule[AnnotatedLabel]) = {
       (IndexedSeq(r, r.map(_.clearFeatures), r.map(_.baseAnnotatedLabel)) ++ selectOneFeature(r)).toSet.toIndexedSeq
     }
-    val feat = new ProductionFeaturizer[AnnotatedLabel, AnnotatedLabel, String](xbarGrammar, indexedRefinements, labelFlattener, ruleFlattener)
+    val feat = new ProductionFeaturizer[AnnotatedLabel, AnnotatedLabel, String](topology, indexedRefinements, labelFlattener, ruleFlattener)
 
     val featureCounter = readWeights(oldWeights)
     val indexedFeaturizer = IndexedFeaturizer(feat, wordFeaturizer, trainTrees, annotator andThen (_.tree.map(IndexedSeq(_))), indexedRefinements)
 
     new StructModel[AnnotatedLabel, AnnotatedLabel, String](indexedFeaturizer,
-    annotator,
-    indexedRefinements,
-    cFactory,
-    xbarGrammar,
-    xbarLexicon,
-    featureCounter.get)
+      annotator,
+      indexedRefinements,
+      constrainer,
+      topology,
+      lexicon,
+      featureCounter.get)
   }
 
 }

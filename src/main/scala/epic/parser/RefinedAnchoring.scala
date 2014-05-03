@@ -28,12 +28,13 @@ import epic.constraints.ChartConstraints
  * @author dlwh
  */
 trait RefinedAnchoring[L, W]  {
+
   def topology: RuleTopology[L]
   def lexicon: Lexicon[L, W]
   def words: IndexedSeq[W]
+  def sparsityPattern: ChartConstraints[L]
 
   def length = words.length
-
 
   def logPartition: Double = marginal.logPartition
 
@@ -70,6 +71,14 @@ trait RefinedAnchoring[L, W]  {
     else new ProductRefinedAnchoring(this,other)
   }
 
+  def *(other: CoreAnchoring[L, W]):RefinedAnchoring[L, W] = {
+    // hacky multimethod dispatch is hacky
+    if (other eq null) this // ugh
+    else if(other.isInstanceOf[CoreAnchoring.Identity[L, W]]) this
+    else if(this.isInstanceOf[CoreAnchoring.Identity[L, W]]) other.lift(this.sparsityPattern)
+    else new ProductRefinedAnchoring(this,other.lift(this.sparsityPattern))
+  }
+
   /**
    * Computes the pointwise division of two grammars, augmenting
    * their refinement space to reflect this. If they share the same annotationTag,
@@ -83,7 +92,8 @@ trait RefinedAnchoring[L, W]  {
     else new ProductRefinedAnchoring(this,other,-1)
   }
 
-  def marginal = AugmentedAnchoring.fromRefined(this).marginal
+  def maxMarginal = RefinedChartMarginal(this, maxMarginal = true)
+  def marginal = RefinedChartMarginal(this, maxMarginal = false)
 
   def isConvergedTo(f: RefinedAnchoring[L, W], diff: Double):Boolean = {
     import scala.util.control.Breaks._
@@ -237,8 +247,9 @@ trait RefinedAnchoring[L, W]  {
 object RefinedAnchoring {
   def identity[L, W](topology: RuleTopology[L],
                      lexicon: Lexicon[L, W],
+                     constraints: ChartConstraints[L],
                      words: IndexedSeq[W]): RefinedAnchoring[L, W] = {
-    LiftedCoreAnchoring(CoreAnchoring.identity[L, W](topology, lexicon, words, ChartConstraints.noSparsity[L]))
+    LiftedCoreAnchoring(CoreAnchoring.identity[L, W](topology, lexicon, words), constraints)
   }
 
   trait StructureDelegatingAnchoring[L, W] extends RefinedAnchoring[L, W] {

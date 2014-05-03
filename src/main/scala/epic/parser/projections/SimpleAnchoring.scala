@@ -62,8 +62,8 @@ case class AnchoredPCFGProjector[L, W](threshold: Double = Double.NegativeInfini
       if(splits eq null) null
       else for(ruleScores <- splits) yield normalize(charts.topology, ruleScores, totals)
     }
-    val sparsity = charts.anchoring.core.sparsityPattern
-    new SimpleAnchoring(charts.topology, charts.lexicon, charts.words, lexicalScores.map(logify), normUnaries, normBinaries, sparsity)
+//    val sparsity = charts.anchoring.sparsityPattern
+    new SimpleAnchoring(charts.topology, charts.lexicon, charts.words, lexicalScores.map(logify), normUnaries, normBinaries)
   }
 
 }
@@ -97,8 +97,8 @@ case class AnchoredRuleMarginalProjector[L, W](threshold: Double = Double.Negati
       if(splits eq null) null
       else splits.map(normalize)
     }
-    val sparsity = charts.anchoring.core.sparsityPattern
-    new SimpleAnchoring(charts.topology, charts.lexicon, charts.words, lexicalScores.map(normalize), normUnaries, normBinaries, sparsity)
+//    val sparsity = charts.anchoring.sparsityPattern
+    new SimpleAnchoring(charts.topology, charts.lexicon, charts.words, lexicalScores.map(normalize), normUnaries, normBinaries)//, sparsity)
   }
 }
 
@@ -110,9 +110,8 @@ case class SimpleAnchoring[L, W](topology: RuleTopology[L],
                             // (begin, end) -> rule -> score
                             unaryScores: Array[OpenAddressHashArray[Double]],
                             // (begin, end) -> (split-begin) -> rule -> score
-                            binaryScores: Array[Array[OpenAddressHashArray[Double]]],
-                            override val sparsityPattern: ChartConstraints[L]) extends CoreAnchoring[L, W] with Serializable {
-  def addConstraints(cs: ChartConstraints[L]): CoreAnchoring[L, W] = copy(sparsityPattern = sparsityPattern & cs)
+                            binaryScores: Array[Array[OpenAddressHashArray[Double]]]) extends CoreAnchoring[L, W] with Serializable {
+//  def addConstraints(cs: ChartConstraints[L]): CoreAnchoring[L, W] = copy(sparsityPattern = sparsityPattern & cs)
 
   def scoreUnaryRule(begin: Int, end: Int, rule: Int) = {
     val forSpan = unaryScores(TriangularArray.index(begin, end))

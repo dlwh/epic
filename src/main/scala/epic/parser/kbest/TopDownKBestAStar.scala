@@ -35,10 +35,10 @@ object TopDownKBestAStar {
           val begin = zipper.tree.begin
           val end = zipper.tree.end
           val aScore = inside.top.labelScore(begin, end, a, refA)
-          for (r <- topology.indexedUnaryRulesWithParent(a); refR <- anchoring.refined.validRuleRefinementsGivenParent(begin, end, r, refA)) {
+          for (r <- topology.indexedUnaryRulesWithParent(a); refR <- anchoring.validRuleRefinementsGivenParent(begin, end, r, refA)) {
             val b = topology.child(r)
             val chain = topology.chain(r)
-            val refB = anchoring.refined.childRefinement(r, refR)
+            val refB = anchoring.childRefinement(r, refR)
             val bScore = inside.bot.labelScore(begin, end, b, refB)
             if(!bScore.isInfinite) {
               val rScore = anchoring.scoreUnaryRule(begin, end, r, refR)
@@ -69,9 +69,9 @@ object TopDownKBestAStar {
             r <- topology.indexedBinaryRulesWithParent(root)
             b = topology.leftChild(r)
             c = topology.rightChild(r)
-            refR <- anchoring.refined.validRuleRefinementsGivenParent(begin, end, r, rootRef)
-            refB = anchoring.refined.leftChildRefinement(r, refR)
-            refC = anchoring.refined.rightChildRefinement(r, refR)
+            refR <- anchoring.validRuleRefinementsGivenParent(begin, end, r, rootRef)
+            refB = anchoring.leftChildRefinement(r, refR)
+            refC = anchoring.rightChildRefinement(r, refR)
             split <- inside.top.feasibleSpan(begin, end, b, refB, c, refC)
           } {
             val ruleScore = anchoring.scoreBinaryRule(begin, split, end, r, refR)

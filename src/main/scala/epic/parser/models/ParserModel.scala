@@ -20,6 +20,7 @@ import epic.framework._
 import breeze.linalg._
 import epic.parser.GenerativeParser
 import epic.trees.{TreeInstance, UnaryRule, BinaryRule}
+import epic.constraints.ChartConstraints
 
 /**
  * Base trait for "normal" Parser-type models
@@ -32,7 +33,7 @@ trait ParserModel[L, W] extends epic.framework.StandardExpectedCounts.Model[Tree
 
   def extractParser(weights: DenseVector[Double]) = {
     val inf = inferenceFromWeights(weights).forTesting
-    Parser(inf.baseMeasure, inf.grammar, ChartDecoder[L, W]())
+    Parser(constrainer, inf.grammar, ChartDecoder[L, W]())
   }
 
 
@@ -46,13 +47,13 @@ trait ParserInference[L, W] extends ProjectableInference[TreeInstance[L, W], Cor
   type Scorer = RefinedAnchoring[L, W]
 
   def grammar: RefinedGrammar[L, W]
-  def baseMeasure: CoreGrammar[L, W]
+  def constrainer: ChartConstraints.Factory[L, W]
 
   def forTesting: ParserInference[L, W] = this
 
 
   def scorer(v: TreeInstance[L, W]): Scorer = {
-     grammar.anchor(v.words)
+     grammar.anchor(v.words, constrainer.constraints(v.words))
   }
 
 
@@ -63,12 +64,12 @@ trait ParserInference[L, W] extends ProjectableInference[TreeInstance[L, W], Cor
    */
   def marginal(scorer: Scorer, v: TreeInstance[L, W], aug: CoreAnchoring[L, W]): Marginal = {
     val charts = try {
-       AugmentedAnchoring(scorer, aug).marginal
+      (scorer * aug).marginal
     } catch {
       case e: Exception =>
       try {
         e.printStackTrace()
-        AugmentedAnchoring.fromRefined(grammar.anchor(v.words)).marginal
+        scorer.marginal
       } catch {
         case e2: Exception =>
           throw e
@@ -77,7 +78,7 @@ trait ParserInference[L, W] extends ProjectableInference[TreeInstance[L, W], Cor
     charts
   }
 
-  def baseAugment(v: TreeInstance[L, W])  = baseMeasure.anchor(v.words)
+  def baseAugment(v: TreeInstance[L, W])  = CoreAnchoring.identity(grammar.topology, grammar.lexicon, v.words)
 
 
   def project(v: TreeInstance[L, W], s: Scorer, m: Marginal, oldAugment: CoreAnchoring[L, W]): CoreAnchoring[L, W] = {

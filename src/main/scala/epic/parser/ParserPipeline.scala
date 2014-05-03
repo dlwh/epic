@@ -14,7 +14,6 @@ package epic.parser
  See the License for the specific language governing permissions and
  limitations under the License.
 */
-import epic.parser.projections.{ConstraintCoreGrammarAdaptor, ParserChartConstraintsFactory}
 import breeze.config._
 import java.io._
 import epic.trees._
@@ -23,7 +22,6 @@ import epic.parser
 import collection.mutable
 import epic.lexicon.{Lexicon, SimpleLexicon}
 import epic.constraints.{CachedChartConstraintsFactory, ChartConstraints}
-import epic.util.CacheBroker
 import com.typesafe.scalalogging.slf4j.LazyLogging
 import breeze.linalg.Counter2
 import epic.trees.annotations.Xbarize
@@ -118,7 +116,7 @@ trait ParserPipeline extends LazyLogging {
         val outDir = new File("parsers/")
         outDir.mkdirs()
         val out = new File(outDir, name +".parser")
-        writeObject(out, parser.copy(decachify(parser.coreGrammar)))
+        writeObject(out, parser.copy(constraintsFactory = decachify(parser.constraintsFactory)))
       } catch {
         case ex: Exception =>
           logger.error(s"Could not serialize $name: " + ex.getMessage, ex)
@@ -141,13 +139,8 @@ trait ParserPipeline extends LazyLogging {
     ParseEval.evaluateAndLog(testTrees, parser, name, AnnotatedLabelChainReplacer, { (_: AnnotatedLabel).label })
   }
 
-  private def decachify[L, W](grammar: CoreGrammar[L, W]) = grammar match {
-    case p: ConstraintCoreGrammarAdaptor[L, W] =>
-      val constraintsFactory = p.constraintsFactory match {
-        case cached: CachedChartConstraintsFactory[L, W] => cached.backoff
-        case x => x
-      }
-      new ConstraintCoreGrammarAdaptor(p.topology, p.lexicon, constraintsFactory)
-    case _ => grammar
+  private def decachify[L, W](grammar: ChartConstraints.Factory[L, W]) = grammar match {
+    case cached: CachedChartConstraintsFactory[L, W] => cached.backoff
+    case x => x
   }
 }

@@ -20,6 +20,7 @@ import epic.trees._
 import breeze.linalg._
 import collection.mutable.ArrayBuffer
 import epic.lexicon.{SimpleTagScorer, TagScorer, SimpleLexicon, Lexicon}
+import epic.constraints.ChartConstraints
 
 /**
  * TODO docs
@@ -37,7 +38,7 @@ trait RefinedGrammar[L, W] extends Serializable {
   def labelIndex = topology.labelIndex
   def labelEncoder = topology.labelEncoder
 
-  def anchor(words: IndexedSeq[W]):RefinedAnchoring[L, W]
+  def anchor(words: IndexedSeq[W], constraints: ChartConstraints[L] = ChartConstraints.noSparsity[L]):RefinedAnchoring[L, W]
 }
 
 object RefinedGrammar {
@@ -45,7 +46,8 @@ object RefinedGrammar {
     def topology = f1.topology
     def lexicon = f1.lexicon
 
-    def anchor(words: IndexedSeq[W]) = new ProductRefinedAnchoring(f1.anchor(words), f2.anchor(words))
+    def anchor(words: IndexedSeq[W],
+               constraints: ChartConstraints[L] = ChartConstraints.noSparsity[L]) = new ProductRefinedAnchoring(f1.anchor(words, constraints), f2.anchor(words, constraints))
   }
 
   def identity[L, W](ruleTopology: RuleTopology[L], lexicon: Lexicon[L, W]): RefinedGrammar[L, W] = {
@@ -56,8 +58,9 @@ object RefinedGrammar {
 
       def lexicon = l
 
-      def anchor(words: IndexedSeq[W]) = {
-        RefinedAnchoring.identity(topology, lexicon, words)
+
+      override def anchor(words: IndexedSeq[W], constraints: ChartConstraints[L]): RefinedAnchoring[L, W] = {
+        RefinedAnchoring.identity(topology, lexicon, constraints, words)
       }
     }
   }

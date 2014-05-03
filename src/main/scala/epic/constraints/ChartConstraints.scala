@@ -45,6 +45,14 @@ object ChartConstraints {
     def |(cf: Factory[L, W]) = new OrFactory(this, cf)
   }
 
+  object Factory {
+    def noSparsity[L, W]:Factory[L, W] = new NoSparsityFactory[L, W]
+  }
+
+  class NoSparsityFactory[L, W] extends Factory[L, W] with Serializable {
+    override def constraints(w: IndexedSeq[W]): ChartConstraints[L] = ChartConstraints.noSparsity[L]
+  }
+
   class GoldConstraintsFactory[L, W](labelIndex: Index[L], insts: Traversable[TreeInstance[L, W]]) extends Factory[L, W] {
     private val gold = insts.map(ti => ti.words -> fromTree(labelIndex, ti.tree)).toMap
     def constraints(w: IndexedSeq[W]): ChartConstraints[L] = {

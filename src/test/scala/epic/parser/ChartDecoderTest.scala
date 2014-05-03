@@ -47,7 +47,6 @@ class ChartDecoderTest extends FunSuite with ParserTestHarness {
     assert(res.f1 > 0.6, res.f1)
   }
 
-
   test("MaxConstituentDecoder") {
     val gen = ParserTestHarness.simpleParser.copy(decoder = new MaxConstituentDecoder)
     val res = evalParser(getTestTrees(), gen)

@@ -6,6 +6,7 @@ import breeze.numerics
 import breeze.collection.mutable.TriangularArray
 import com.typesafe.scalalogging.slf4j.LazyLogging
 import breeze.linalg.{max, DenseVector, softmax, Counter2}
+import epic.constraints.ChartConstraints
 
 /*
  Copyright 2012 David Hall
@@ -35,7 +36,7 @@ import breeze.linalg.{max, DenseVector, softmax, Counter2}
  * @tparam L the label type
  * @tparam W the word type
  */
-final case class RefinedChartMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
+final case class RefinedChartMarginal[L, W](anchoring: RefinedAnchoring[L, W], core: CoreAnchoring[L, W],
                                      inside: RefinedParseChart[L], outside: RefinedParseChart[L],
                                      logPartition: Double,
                                      override val isMaxMarginal: Boolean) extends ParseMarginal[L, W] with SafeLogging {
@@ -68,15 +69,14 @@ final case class RefinedChartMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
 
     val grammar = this.topology
 
-    val lexLoc = anchoring.core.tagConstraints
-    val core = anchoring.core
+    val lexLoc = core.tagConstraints
 
     // handle lexical
     for (i <- 0 until words.length) {
       var visitedSomething  = false
       for {
-        a <- lexLoc.allowedTags(i) if  core.sparsityPattern.bot.isAllowedLabeledSpan(i, i+1, a)
-        ref <- anchoring.refined.validLabelRefinements(i, i+ 1, a)
+        a <- lexLoc.allowedTags(i) if  anchoring.sparsityPattern.bot.isAllowedLabeledSpan(i, i+1, a)
+        ref <- anchoring.validLabelRefinements(i, i+ 1, a)
       } {
         val score:Double = anchoring.scoreSpan(i, i+1, a, ref) + outside.bot(i, i+1, a, ref) - logPartition
         assert(!score.isNaN, anchoring.scoreSpan(i, i+1, a, ref) + " " + outside.bot(i, i+1, a, ref) + " "+ logPartition)
@@ -118,7 +118,7 @@ final case class RefinedChartMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
           spanVisitor.visitSpan(begin, end, a, refA, math.exp(labelMarginal))
           if(!spanVisitor.skipBinaryRules) {
 
-            val rules = anchoring.refined.validCoarseRulesGivenParentRefinement(a, refA)
+            val rules = anchoring.validCoarseRulesGivenParentRefinement(a, refA)
             while(i < rules.length) {
               val r = rules(i)
               val b = grammar.leftChild(r)
@@ -135,17 +135,17 @@ final case class RefinedChartMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
                 // initialize core scores
                 RefinedChartMarginal.fillCoreScores(coreScoreArray,
                   begin, end,
-                  anchoring.core,
+                  core,
                   coarseSplitBegin, coarseSplitEnd,
                   r)
 
-                val refinements = anchoring.refined.validRuleRefinementsGivenParent(begin, end, r, refA)
+                val refinements = anchoring.validRuleRefinementsGivenParent(begin, end, r, refA)
                 var ruleRefIndex = 0
                 while(ruleRefIndex < refinements.length) {
                   val refR = refinements(ruleRefIndex)
                   ruleRefIndex += 1
-                  val refB = anchoring.refined.leftChildRefinement(r, refR)
-                  val refC = anchoring.refined.rightChildRefinement(r, refR)
+                  val refB = anchoring.leftChildRefinement(r, refR)
+                  val refC = anchoring.rightChildRefinement(r, refR)
 
                   val narrowR = narrowRight(b)(refB)
                   val narrowL = narrowLeft(c)(refC)
@@ -161,7 +161,7 @@ final case class RefinedChartMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
                     val coreScore = coreScoreArray(split)
                     val withoutRefined = bInside + cInside + coreScore
                     if (!java.lang.Double.isInfinite(withoutRefined)) {
-                      val ruleScore = anchoring.refined.scoreBinaryRule(begin, split, end, r, refR)
+                      val ruleScore = anchoring.scoreBinaryRule(begin, split, end, r, refR)
                       val score = aScore + withoutRefined + ruleScore - logPartition
                       val expScore = math.exp(score)
                       spanVisitor.visitBinaryRule(begin, split, end, r, refR, expScore)
@@ -187,9 +187,9 @@ final case class RefinedChartMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
         refA <- inside.top.enteredLabelRefinements(begin, end, a)
       } {
         val aScore = outside.top.labelScore(begin, end, a, refA)
-        for (r <- grammar.indexedUnaryRulesWithParent(a); refR <- anchoring.refined.validRuleRefinementsGivenParent(begin, end, r, refA)) {
+        for (r <- grammar.indexedUnaryRulesWithParent(a); refR <- anchoring.validRuleRefinementsGivenParent(begin, end, r, refA)) {
           val b = grammar.child(r)
-          val refB = anchoring.refined.childRefinement(r, refR)
+          val refB = anchoring.childRefinement(r, refR)
           val bScore = inside.bot.labelScore(begin, end, b, refB)
           val rScore = anchoring.scoreUnaryRule(begin, end, r, refR)
           val prob = math.exp(bScore + aScore + rScore - logPartition)
@@ -243,7 +243,7 @@ final case class RefinedChartMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
             logger.warn("problem with top: " + (label, ref) + " " + span)
             logger.warn(s"problem with outside other: ${t.label} ${tree.span} ${outside.top.enteredLabelIndexes(tree.span.begin, tree.span.end)(ai)} $words ${outside.top.decodedLabelScores(tree.span.begin,tree.span.end)}")
             logger.warn(ai + " " + outside.top.enteredLabels(TriangularArray.index(tree.span.begin, tree.span.end)))
-            logger.warn("Constraint: " + anchoring.core.sparsityPattern.top.isAllowedLabeledSpan(tree.begin, tree.end, ai))
+            logger.warn("Constraint: " + anchoring.sparsityPattern.top.isAllowedLabeledSpan(tree.begin, tree.end, ai))
             logger.warn("checking for inside starting from here...")
             checkForTree(t.asInstanceOf[BinarizedTree[(L, Int)]])
             logger.warn("done.")
@@ -257,7 +257,7 @@ final case class RefinedChartMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
           RefinedChartMarginal.synchronized {
             logger.warn(s"problem with outside other: ${t.label} ${tree.span} ${outside.bot.enteredLabelIndexes(tree.span.begin, tree.span.end)(ai)} $words ${outside.bot.decodedLabelScores(tree.span.begin,tree.span.end)}")
             logger.warn(ai + " " + outside.bot.enteredLabels(TriangularArray.index(tree.span.begin, tree.span.end)))
-            logger.warn("Constraint: " + anchoring.core.sparsityPattern.bot.isAllowedLabeledSpan(tree.begin, tree.end, ai))
+            logger.warn("Constraint: " + anchoring.sparsityPattern.bot.isAllowedLabeledSpan(tree.begin, tree.end, ai))
             logger.warn("checking for inside starting from here...")
             checkForTree(t.asInstanceOf[BinarizedTree[(L, Int)]])
           }
@@ -294,29 +294,33 @@ final case class RefinedChartMarginal[L, W](anchoring: AugmentedAnchoring[L, W],
 object RefinedChartMarginal {
 
   trait Factory[L, W] {
-    def apply(w: IndexedSeq[W], constraints: CoreAnchoring[L, W]):ParseMarginal[L, W]
+    def apply(w: IndexedSeq[W], constraints: ChartConstraints[L]):ParseMarginal[L, W]
   }
 
   object Factory {
-    def apply[L, W](grammar: RefinedGrammar[L, W]):SimpleChartFactory[L, W] = new SimpleChartFactory(grammar)
+    def apply[L, W](grammar: RefinedGrammar[L, W]):StandardChartFactory[L, W] = new StandardChartFactory(grammar)
   }
 
-  def apply[L, W](grammar: AugmentedGrammar[L, W], sent: IndexedSeq[W]): RefinedChartMarginal[L, W] = {
+  def apply[L, W](grammar: RefinedGrammar[L, W], sent: IndexedSeq[W]): RefinedChartMarginal[L, W] = {
     apply(grammar.anchor(sent))
   }
 
 
   def apply[L, W](anchoring: RefinedAnchoring[L, W]): RefinedChartMarginal[L, W] = {
-    apply(AugmentedAnchoring.fromRefined(anchoring))
+    apply(anchoring, false)
   }
 
-  def apply[L, W](anchoring: AugmentedAnchoring[L, W], maxMarginal: Boolean = false): RefinedChartMarginal[L, W] = {
+  def apply[L, W](anchoring: RefinedAnchoring[L, W], maxMarginal: Boolean): RefinedChartMarginal[L, W] = {
+    apply(anchoring, CoreAnchoring.identity(anchoring.topology, anchoring.lexicon, anchoring.words), maxMarginal)
+  }
+
+  def apply[L, W](anchoring: RefinedAnchoring[L, W], core: CoreAnchoring[L, W], maxMarginal: Boolean = false): RefinedChartMarginal[L, W] = {
     val sent = anchoring.words
     val sum = if(maxMarginal) MaxSummer else LogSummer
-    val (inside, spanScores) = buildInsideChart(anchoring, sent, sum)
+    val (inside, spanScores) = buildInsideChart(anchoring, core, sent, sum)
     val logPartition = rootScore(anchoring, inside, sum)
-    val outside = buildOutsideChart(anchoring, inside, spanScores, sum)
-    RefinedChartMarginal(anchoring, inside, outside, logPartition, maxMarginal)
+    val outside = buildOutsideChart(anchoring, core: CoreAnchoring[L, W], inside, spanScores, sum)
+    RefinedChartMarginal(anchoring, core, inside, outside, logPartition, maxMarginal)
   }
 
   private[parser] trait Summer {
@@ -334,9 +338,9 @@ object RefinedChartMarginal {
     def apply(a: Array[Double], length: Int): Double = if(length == 0) Double.NegativeInfinity else max.array(a, length)
   }
 
-  private def rootScore[L, W](anchoring: AugmentedAnchoring[L, W], inside: RefinedParseChart[L], sum: Summer): Double = {
+  private def rootScore[L, W](anchoring: RefinedAnchoring[L, W], inside: RefinedParseChart[L], sum: Summer): Double = {
     val rootIndex: Int = anchoring.topology.labelIndex(anchoring.topology.root)
-    val rootScores = new Array[Double](anchoring.refined.validLabelRefinements(0, inside.length, rootIndex).length)
+    val rootScores = new Array[Double](anchoring.validLabelRefinements(0, inside.length, rootIndex).length)
     var offset = 0
     for(ref <- inside.top.enteredLabelRefinements(0, inside.length, rootIndex)) {
       val score = inside.top.labelScore(0, inside.length, rootIndex, ref)
@@ -352,30 +356,29 @@ object RefinedChartMarginal {
   }
 
   // first parse chart is the inside scores, second parse chart is span scores for spans that were computed.
-  private def buildInsideChart[L, W, Chart[X] <: RefinedParseChart[X]](anchoring: AugmentedAnchoring[L, W],
+  private def buildInsideChart[L, W, Chart[X] <: RefinedParseChart[X]](anchoring: RefinedAnchoring[L, W], core: CoreAnchoring[L, W],
                                                                 words: IndexedSeq[W], sum: Summer): (RefinedParseChart[L], RefinedParseChart[L]) = {
-    val refined = anchoring.refined
-    val core = anchoring.core
+    val refined = anchoring
 
     val grammar = anchoring.topology
 
     val inside = RefinedParseChart.logProb.apply(grammar.labelIndex,
       Array.tabulate(grammar.labelIndex.size)(refined.numValidRefinements),
       words.length,
-      core.sparsityPattern)
+      refined.sparsityPattern)
     val spanScores = RefinedParseChart.logProb.apply(grammar.labelIndex,
       Array.tabulate(grammar.labelIndex.size)(refined.numValidRefinements),
       words.length,
-      core.sparsityPattern)
+      refined.sparsityPattern)
     val tagConstraints = core.tagConstraints
 
     // handle lexical
     for{i <- 0 until words.length} {
-      assert(core.sparsityPattern.isAllowedSpan(i,i+1), "a pos tag isn't allowed? " + core.sparsityPattern)
-      assert(core.sparsityPattern.bot.isAllowedSpan(i,i+1), "a top of a length 1 span isn't allowed?")
+      assert(refined.sparsityPattern.isAllowedSpan(i,i+1), "a pos tag isn't allowed? " + refined.sparsityPattern)
+      assert(refined.sparsityPattern.bot.isAllowedSpan(i,i+1), "a top of a length 1 span isn't allowed?")
       var foundSomething = false
       for {
-        a <- tagConstraints.allowedTags(i) if core.sparsityPattern.bot.isAllowedLabeledSpan(i, i+1, a)
+        a <- tagConstraints.allowedTags(i) if refined.sparsityPattern.bot.isAllowedLabeledSpan(i, i+1, a)
         coreScore = core.scoreSpan(i, i+1, a) if coreScore != Double.NegativeInfinity
         ref <- refined.validLabelRefinements(i, i+1, a)
       } {
@@ -387,7 +390,7 @@ object RefinedChartMarginal {
         }
       }
 
-      updateInsideUnaries(inside, anchoring,  i, i+1, sum)
+      updateInsideUnaries(inside, anchoring,  core, i, i+1, sum)
     }
 
 
@@ -397,7 +400,7 @@ object RefinedChartMarginal {
     val top = inside.top
     val g = grammar
 
-    val scoreArray = Array.ofDim[Double](anchoring.refined.maxLabelRefinements,  40)
+    val scoreArray = Array.ofDim[Double](anchoring.maxLabelRefinements,  40)
 
     // a -> bc over [begin, split, end)
     for {
@@ -415,11 +418,11 @@ object RefinedChartMarginal {
       val coarseNarrowLeft = top.coarseRightMostBeginForEnd(end)
       val coarseWideRight = top.coarseRightMostEndForBegin(begin)
       val coarseWideLeft = top.coarseLeftMostBeginForEnd(end)
-      val offsets = new Array[Int](anchoring.refined.maxLabelRefinements)
-      val spanScoresEntered = new Array[Boolean](anchoring.refined.maxLabelRefinements)
+      val offsets = new Array[Int](anchoring.maxLabelRefinements)
+      val spanScoresEntered = new Array[Boolean](anchoring.maxLabelRefinements)
 
-      for ( a <- 0 until grammar.labelIndex.size if core.sparsityPattern.bot.isAllowedLabeledSpan(begin, end, a)) {
-        val numValidLabelRefs = anchoring.refined.numValidRefinements(a)
+      for ( a <- 0 until grammar.labelIndex.size if refined.sparsityPattern.bot.isAllowedLabeledSpan(begin, end, a)) {
+        val numValidLabelRefs = anchoring.numValidRefinements(a)
         java.util.Arrays.fill(offsets, 0)
         java.util.Arrays.fill(spanScoresEntered, false)
 
@@ -446,7 +449,7 @@ object RefinedChartMarginal {
               // initialize core scores
               RefinedChartMarginal.fillCoreScores(coreScoreArray,
                 begin, end,
-                anchoring.core,
+                core,
                 coarseSplitBegin, coarseSplitEnd,
                 r)
 
@@ -518,22 +521,21 @@ object RefinedChartMarginal {
             ai += 1
           }
 //          assert(rootScore(anchoring, inside, sum) != 0.0, (begin, end, a))
-//          if(!foundSomething && anchoring.core.sparsityPattern != ChartConstraints.noSparsity) {
+//          if(!foundSomething && refined.sparsityPattern != ChartConstraints.noSparsity) {
 //            logger.warn(s"Failed to replicate a span in ($begin, $end) of ${anchoring.words}. Label is ${anchoring.grammar.labelIndex.get(a)}")
 //
 //          }
 
         }
       }
-      updateInsideUnaries(inside, anchoring, begin, end, sum)
+      updateInsideUnaries(inside, anchoring, core, begin, end, sum)
     }
     inside -> spanScores
   }
 
-  private def buildOutsideChart[L, W](anchoring: AugmentedAnchoring[L, W],
+  private def buildOutsideChart[L, W](anchoring: RefinedAnchoring[L, W], core: CoreAnchoring[L, W],
                                       inside: RefinedParseChart[L], spanScores: RefinedParseChart[L], sum: Summer):RefinedParseChart[L] = {
-    val refined = anchoring.refined
-    val core = anchoring.core
+    val refined = anchoring
 
     val grammar = anchoring.topology
     val rootIndex = grammar.labelIndex(grammar.root)
@@ -545,14 +547,14 @@ object RefinedChartMarginal {
     val outside = RefinedParseChart.logProb.apply(grammar.labelIndex,
       Array.tabulate(grammar.labelIndex.size)(refined.numValidRefinements),
       length,
-      core.sparsityPattern)
+      refined.sparsityPattern)
     for(refRoot <- refined.validLabelRefinements(0, inside.length, rootIndex)) {
       outside.top.enter(0, inside.length, rootIndex, refRoot, 0.0)
     }
-    updateOutsideUnaries(outside, inside, anchoring, 0, inside.length, sum)
+    updateOutsideUnaries(outside, inside, anchoring, core, 0, inside.length, sum)
 
-    val scoreArray = Array.ofDim[Double](anchoring.refined.maxLabelRefinements,  80)
-    val offsets = new Array[Int](anchoring.refined.maxLabelRefinements)
+    val scoreArray = Array.ofDim[Double](anchoring.maxLabelRefinements,  80)
+    val offsets = new Array[Int](anchoring.maxLabelRefinements)
 
     for {
       span <- (length-1) until 0 by (-1)
@@ -566,10 +568,10 @@ object RefinedChartMarginal {
         // we're going to populate a by looking at rules p -> a rc, p -> lc a
         if (enteredTop.contains(a)) {
           java.util.Arrays.fill(offsets, 0)
-          doOutsideLeftCompletionUpdates(inside, outside, spanScores, anchoring, begin, end, a, coreScoreArray, scoreArray, offsets, sum)
-          doOutsideRightCompletionUpdates(inside, outside, spanScores, anchoring, begin, end, a, coreScoreArray, scoreArray, offsets, sum)
+          doOutsideLeftCompletionUpdates(inside, outside, spanScores, anchoring, core, begin, end, a, coreScoreArray, scoreArray, offsets, sum)
+          doOutsideRightCompletionUpdates(inside, outside, spanScores, anchoring, core, begin, end, a, coreScoreArray, scoreArray, offsets, sum)
 
-          val numValidLabelRefs = anchoring.refined.numValidRefinements(a)
+          val numValidLabelRefs = anchoring.numValidRefinements(a)
           var ai = 0
           while(ai < numValidLabelRefs) {
             // done updating vector, do an enter:
@@ -582,7 +584,7 @@ object RefinedChartMarginal {
 
         a += 1
       }
-      updateOutsideUnaries(outside, inside, anchoring, begin, end, sum)
+      updateOutsideUnaries(outside, inside, anchoring, core, begin, end, sum)
     }
     outside
   }
@@ -590,12 +592,13 @@ object RefinedChartMarginal {
 
   private def doOutsideLeftCompletionUpdates[W, L](inside: RefinedParseChart[L], outside: RefinedParseChart[L],
                                                    spanScores: RefinedParseChart[L],
-                                                   anchoring: AugmentedAnchoring[L, W],
+                                                   anchoring: RefinedAnchoring[L, W],
+                                                   core: CoreAnchoring[L, W],
                                                    begin: Int, end: Int,
                                                    label: Int,
                                                    coreScoreArray: Array[Double],
                                                    scoreArray: Array[Array[Double]], offsets: Array[Int], sum: Summer) {
-    val refined = anchoring.refined
+    val refined = anchoring
     val itop = inside.top
     val grammar = refined.topology
     val rules = anchoring.topology.indexedBinaryRulesWithLeftChild(label)
@@ -625,7 +628,7 @@ object RefinedChartMarginal {
         // initialize core scores
         RefinedChartMarginal.fillCoreScoresForLeftCompletion(coreScoreArray,
           begin, end,
-          anchoring.core,
+          core,
           coarseCompletionBegin, coarseCompletionEnd,
           r)
 
@@ -681,13 +684,14 @@ object RefinedChartMarginal {
 
   private def doOutsideRightCompletionUpdates[W, L](inside: RefinedParseChart[L], outside: RefinedParseChart[L],
                                                     spanScores: RefinedParseChart[L],
-                                                    anchoring: AugmentedAnchoring[L, W],
+                                                    anchoring: RefinedAnchoring[L, W],
+                                                    core: CoreAnchoring[L, W],
                                                     begin: Int, end: Int,
                                                     label: Int,
                                                     coreScoreArray: Array[Double],
                                                     scoreArray: Array[Array[Double]],
                                                     offsets: Array[Int], sum: Summer) {
-    val refined = anchoring.refined
+    val refined = anchoring
     val itop = inside.top
     val grammar = refined.topology
     val rules = anchoring.topology.indexedBinaryRulesWithRightChild(label)
@@ -712,7 +716,7 @@ object RefinedChartMarginal {
         // initialize core scores
         RefinedChartMarginal.fillCoreScoresForRightCompletion(coreScoreArray,
           begin, end,
-          anchoring.core,
+          core,
           coarseCompletionBegin, coarseCompletionEnd,
           r)
 
@@ -766,10 +770,10 @@ object RefinedChartMarginal {
   }
 
   private def updateInsideUnaries[L, W](chart: RefinedParseChart[L],
-                                        anchoring: AugmentedAnchoring[L, W],
+                                        anchoring: RefinedAnchoring[L, W],
+                                        core: CoreAnchoring[L, W],
                                         begin: Int, end: Int, sum: Summer) = {
-    val refined = anchoring.refined
-    val core = anchoring.core
+    val refined = anchoring
     val grammar = anchoring.topology
     for(bi <- chart.bot.enteredLabelIndexes(begin, end); refB <- chart.bot.enteredLabelRefinements(begin, end, bi)) {
       val b = bi
@@ -780,7 +784,7 @@ object RefinedChartMarginal {
         while(j < rules.length) {
           val r = rules(j)
           val a = grammar.parent(r)
-          if(core.sparsityPattern.top.isAllowedLabeledSpan(begin, end, a)) {
+          if(refined.sparsityPattern.top.isAllowedLabeledSpan(begin, end, a)) {
             val coreScore = core.scoreUnaryRule(begin, end, r)
             if(coreScore != Double.NegativeInfinity)
               for(refR <- refined.validUnaryRuleRefinementsGivenChild(begin, end, r, refB)) {
@@ -801,10 +805,10 @@ object RefinedChartMarginal {
 
   private def updateOutsideUnaries[L, W](chart: RefinedParseChart[L],
                                          inside: RefinedParseChart[L],
-                                         anchoring: AugmentedAnchoring[L, W],
+                                         anchoring: RefinedAnchoring[L, W],
+                                         core: CoreAnchoring[L, W],
                                          begin: Int, end: Int, sum: Summer) = {
-    val refined = anchoring.refined
-    val core = anchoring.core
+    val refined = anchoring
     val grammar = anchoring.topology
     for(ai <- inside.top.enteredLabelIndexes(begin, end); refA <- inside.top.enteredLabelRefinements(begin, end, ai)) {
       val a = ai
@@ -889,8 +893,8 @@ object RefinedChartMarginal {
 
 }
 
-case class SimpleChartFactory[L, W](refinedGrammar: RefinedGrammar[L, W], maxMarginal: Boolean = false) extends RefinedChartMarginal.Factory[L, W] {
-  def apply(w: IndexedSeq[W], constraints: CoreAnchoring[L, W]):RefinedChartMarginal[L, W] = {
-    RefinedChartMarginal(AugmentedAnchoring(refinedGrammar.anchor(w), constraints), maxMarginal = maxMarginal)
+case class StandardChartFactory[L, W](refinedGrammar: RefinedGrammar[L, W], maxMarginal: Boolean = false) extends RefinedChartMarginal.Factory[L, W] {
+  def apply(w: IndexedSeq[W], constraints: ChartConstraints[L]):RefinedChartMarginal[L, W] = {
+    RefinedChartMarginal(refinedGrammar.anchor(w, constraints), maxMarginal = maxMarginal)
   }
 }

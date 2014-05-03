@@ -11,9 +11,8 @@ class LatentTreeMarginalTest extends FunSuite {
   test("LatentTreeMarginal is the same as TreeMarginal with no refinements") {
     val trees = ParserTestHarness.getTrainTrees()
     for(t <- trees) {
-      val augmented = AugmentedGrammar.fromRefined(ParserTestHarness.refinedGrammar)
-      val lmarg = LatentTreeMarginal(augmented, t.words, t.tree.map(l => IndexedSeq(l -> 0)))
-      val marg = TreeMarginal(augmented, t.words, t.tree.map(_ -> 0))
+      val lmarg = LatentTreeMarginal(ParserTestHarness.refinedGrammar, t.words, t.tree.map(l => IndexedSeq(l -> 0)))
+      val marg = TreeMarginal(ParserTestHarness.refinedGrammar, t.words, t.tree.map(_ -> 0))
       assert(lmarg.logPartition closeTo marg.logPartition, lmarg.logPartition + " " +marg.logPartition)
       val lcounts = lmarg.expectedRuleCounts
       val counts = lmarg.expectedRuleCounts

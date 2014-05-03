@@ -61,7 +61,7 @@ case class ViterbiDecoder[L, W]() extends ChartDecoder[L, W] with Serializable w
     import marginal._
     val labelIndex = topology.labelIndex
     val rootIndex = topology.rootIndex
-    val refined = anchoring.refined
+    val refined = anchoring
 
     def buildTreeUnary(begin: Int, end:Int, root: Int, rootRef: Int):BinarizedTree[(L, Int)] = {
       var maxScore = Double.NegativeInfinity
@@ -153,7 +153,7 @@ case class ViterbiDecoder[L, W]() extends ChartDecoder[L, W] with Serializable w
 abstract class ProjectingChartDecoder[L, W](proj: ChartProjector[L, W]) extends ChartDecoder[L, W] {
   def extractBestParse(marginal: ParseMarginal[L, W]): BinarizedTree[L] = {
     val anchoring = proj.project(marginal)
-    val newMarg = AugmentedAnchoring.fromCore(anchoring).maxMarginal
+    val newMarg = anchoring.lift(marginal.anchoring.sparsityPattern).maxMarginal
     assert(!newMarg.logPartition.isInfinite, marginal.logPartition + " " + newMarg.logPartition)
     new ViterbiDecoder[L, W].extractBestParse(newMarg)
   }
@@ -238,8 +238,8 @@ class MaxConstituentDecoder[L, W] extends ChartDecoder[L, W] {
 //          val aRefinements = inside.top.enteredLabelRefinements(begin, end, bestTop).toArray
 //          val bRefinements = inside.bot.enteredLabelRefinements(begin, end, bestBot).toArray
 //          var score = 0.0
-//          for (bRef <- bRefinements; ref <- anchoring.refined.validUnaryRuleRefinementsGivenChild(begin, end, r, bRef)) {
-//            val aRef = anchoring.refined.parentRefinement(r, ref)
+//          for (bRef <- bRefinements; ref <- anchoring.validUnaryRuleRefinementsGivenChild(begin, end, r, bRef)) {
+//            val aRef = anchoring.parentRefinement(r, ref)
 //            score+= math.exp(anchoring.scoreUnaryRule(begin, end, r, ref)
 //              + outside.top.labelScore(begin, end, bestTop, aRef)
 //              + inside.bot.labelScore(begin, end, bestBot, bRef)

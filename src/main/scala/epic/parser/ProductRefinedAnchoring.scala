@@ -1,6 +1,7 @@
 package epic.parser
 
 import collection.immutable.BitSet
+import epic.constraints.ChartConstraints
 
 /*
  Copyright 2012 David Hall
@@ -37,6 +38,9 @@ final case class ProductRefinedAnchoring[L,W](s1: RefinedAnchoring[L, W],
   val topology = s1.topology
   def lexicon = s1.lexicon
   def words = s1.words
+
+
+  override val sparsityPattern: ChartConstraints[L] = s1.sparsityPattern & s2.sparsityPattern
 
   override def annotationTag = {
     if(refinementController == null) -1

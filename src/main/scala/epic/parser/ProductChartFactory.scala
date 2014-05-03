@@ -2,6 +2,7 @@ package epic.parser
 
 import epic.util.SafeLogging
 import epic.parser.projections.AnchoredRuleMarginalProjector
+import epic.constraints.ChartConstraints
 
 /**
  * TODO
@@ -9,11 +10,11 @@ import epic.parser.projections.AnchoredRuleMarginalProjector
  * @author dlwh
  **/
 class ProductChartFactory[L, W](grammars: IndexedSeq[RefinedGrammar[L, W]], maxIterations: Int = 5) extends RefinedChartMarginal.Factory[L, W] with SafeLogging {
-  def apply(words: IndexedSeq[W], initialCore: CoreAnchoring[L, W]): RefinedChartMarginal[L, W] = {
-    val anchorings = grammars.map(_ anchor words)
+  def apply(words: IndexedSeq[W], initialCore: ChartConstraints[L]): RefinedChartMarginal[L, W] = {
+    val anchorings = grammars.map(_.anchor(words, initialCore))
 
     if(anchorings.length == 1) {
-      return RefinedChartMarginal(AugmentedAnchoring(anchorings.head, initialCore))
+      return RefinedChartMarginal(anchorings.head)
     }
 
 
