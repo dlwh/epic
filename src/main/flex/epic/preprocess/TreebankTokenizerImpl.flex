@@ -114,21 +114,31 @@ ENGLISH_CLITIC = ('ll|'d|'ve|'s|'|'re|'LL|'D|'VE|'S|'RE|'m|'M|'n|'N)
 
 FRENCH_CLITIC = (-t-elles?|-t-ils?|-t-on|-ce|-elles?|-ils?|-je|-la|-les?|-leur|-lui|-mêmes?|-m\'|-moi|-nous|-on|-toi|-tu|-t\'|-vous|-en|-y|-ci|-là)
 
+
 FRENCH_INIT_CLITIC = ([dcjlmnstDCJLNMST]\'|[Qq]u\'|[Jj]usqu\'|[Ll]orsqu\')
 
 CLITIC = ({ENGLISH_CLITIC}|{FRENCH_CLITIC})
 
 INIT_CLITIC = ({FRENCH_INIT_CLITIC})
 
+POLISH_CONDITIONAL_CLITIC = (by)
+
+POLISH_CONDITIONAL_ENDING = (m|ś|śmy|ście)?
+
+POLISH_PAST_ENDING = ([mś]?|śmy|ście)
 
 WHITESPACE = \r\n | [ \r\n\t\f\xA0]
 
 EMOTICON = ( [:=]-?[()\/] | <\/?3+ )
 
 
-%s OPEN_QUOTE
+%s OPEN_QUOTE POLISH_CONDITIONAL_MODE
 
 %%
+
+
+<POLISH_CONDITIONAL_MODE>{POLISH_CONDITIONAL_CLITIC} / {POLISH_CONDITIONAL_ENDING}                                      { yybegin(YYINITIAL); return currentToken(); }
+<POLISH_CONDITIONAL_MODE>[^b].                                        { throw new RuntimeException("..." + currentToken());}
 
 // special words
 can / not                                                      {return currentToken();}
@@ -150,6 +160,9 @@ Got / ta                                                      {return currentTok
 {INIT_CLITIC}                                           {return currentToken();}
 {CLITIC}                                           {return currentToken();}
 {ALPHANUM}+ / {CLITIC}                             {return currentToken();}
+// polish clitics
+{ALPHANUM}+[lł][aeoiy]? / {POLISH_CONDITIONAL_CLITIC}{POLISH_CONDITIONAL_ENDING}             {yybegin(POLISH_CONDITIONAL_MODE); return currentToken(); }
+{ALPHANUM}+[lł][aeoiy]? / {POLISH_PAST_ENDING}                    {return currentToken(); }
 d' / ye                                                        {return currentToken(); }
 {ALPHANUM}+ / n't                                              {return currentToken(); }
 n't                                                            {return currentToken(); }
@@ -161,6 +174,9 @@ N'T                                                            {return currentTo
 // quotes
 <YYINITIAL>\"                                                  { yybegin(OPEN_QUOTE); return "``"; }
 <OPEN_QUOTE>\"                                                 { yybegin(YYINITIAL); return "''"; }
+
+
+
 
 // normal stuff
 {ALPHANUM}                                                     { return currentToken(); }

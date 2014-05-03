@@ -109,4 +109,12 @@ class TreebankTokenizerTest  extends FunSuite {
     val text = "Go to http://google.com/ now!"
     assert(TreebankTokenizer(text).toList === List("Go", "to", "http://google.com/", "now", "!"))
   }
+
+  test("polish clitics") {
+    val text = Seq("Osobiście radziłabym panu iść do domu", "Opłaciłam telefon", "własnym", "Załamała", "gdy wsiadałam do pociągu .", "temu moglibyśmy")
+    val tok = Seq("Osobiście radziła by m panu iść do domu", "Opłaciła m telefon", "własnym", "Załamała", "gdy wsiadała m do pociągu .", "temu mogli by śmy")
+    for( (txt,tk) <- text zip tok) {
+      assert(TreebankTokenizer(txt).toList === tk.split(" ").toList)
+    }
+  }
 }
