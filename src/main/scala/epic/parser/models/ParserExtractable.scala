@@ -17,7 +17,7 @@ package epic.parser.models
 */
 import epic.framework.{Feature, Model, ModelFactory}
 import breeze.linalg._
-import epic.parser.{GenerativeParser, CoreGrammar, RuleTopology, Parser}
+import epic.parser.{GenerativeParser, RuleTopology, Parser}
 import epic.trees.{UnaryRule, BinaryRule, TreeInstance}
 import epic.lexicon.Lexicon
 import java.io.File

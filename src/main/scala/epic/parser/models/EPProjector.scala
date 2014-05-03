@@ -17,7 +17,7 @@ package models
  limitations under the License.
 */
 
-import epic.parser.{RefinedAnchoring, RefinedParseChart, RefinedChartMarginal}
+import epic.parser.{GrammarAnchoring, RefinedParseChart, RefinedChartMarginal}
 import epic.parser.projections.AnchoredPCFGProjector
 import epic.trees.TreeInstance
 

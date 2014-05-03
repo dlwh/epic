@@ -34,7 +34,7 @@ class NeuralModel[L, L2, W](baseModel: SpanModel[L, L2, W],
   def lexicon: Lexicon[L, W] = baseModel.lexicon
   override def constrainer: Factory[L, W] = baseModel.constrainer
 
-  type Scorer = RefinedAnchoring[L, W]
+  type Scorer = GrammarAnchoring[L, W]
   type Marginal = ParseMarginal[L, W]
   type Inference = NeuralInference[L, L2, W]
 
@@ -115,12 +115,12 @@ object NeuralModel {
 
 
   /** Not thread safe; make a difference anchoring for each thread */
-  class Anchoring[L, W](val baseAnchoring: RefinedAnchoring[L, W],
+  class Anchoring[L, W](val baseAnchoring: GrammarAnchoring[L, W],
                         val baseFeaturizer: RefinedFeaturizer[L, W, Feature]#Anchoring,
                         val labelFeaturizer: RefinedFeaturizer[L, W, Feature]#Anchoring,
                         val surfaceFeaturizer: IndexedSplitSpanFeatureAnchoring[W],
                         val lastLayer: DenseMatrix[Double],
-                        val layer: Transform[FeatureVector, DenseVector[Double]]#Layer) extends RefinedAnchoring.StructureDelegatingAnchoring[L, W] {
+                        val layer: Transform[FeatureVector, DenseVector[Double]]#Layer) extends GrammarAnchoring.StructureDelegatingAnchoring[L, W] {
 
 
     override def sparsityPattern: ChartConstraints[L] = baseAnchoring.sparsityPattern

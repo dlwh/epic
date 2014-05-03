@@ -17,7 +17,7 @@ package epic.parser
 
 /**
  * A class that asks about all anchored spans.
- * It's the "foreach" version of a [[epic.parser.RefinedAnchoring]] that takes in
+ * It's the "foreach" version of a [[epic.parser.GrammarAnchoring]] that takes in
  * expected counts. score is usually an expected count between 0 and 1.
  * @author dlwh
  */

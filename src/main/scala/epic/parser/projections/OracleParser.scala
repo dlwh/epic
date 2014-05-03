@@ -9,7 +9,7 @@ import com.typesafe.scalalogging.slf4j.LazyLogging
 import scala.collection.{GenTraversableLike, GenTraversable, GenTraversableOnce}
 import scala.collection.generic.CanBuildFrom
 import epic.util.{SafeLogging, CacheBroker}
-import epic.parser.RefinedAnchoring.StructureDelegatingAnchoring
+import epic.parser.GrammarAnchoring.StructureDelegatingAnchoring
 import epic.parser.RefinedChartMarginal.Factory
 import breeze.config.{Configuration, CommandLineParser, Help}
 import java.io.File
@@ -81,7 +81,7 @@ class OracleParser[L, L2, W](val refinedGrammar: SimpleGrammar[L, L2, W]) extend
   def makeGoldPromotingAnchoring(w: IndexedSeq[W],
                                  tree: BinarizedTree[L2],
                                  treeconstraints: ChartConstraints[L],
-                                 constraints: ChartConstraints[L]): RefinedAnchoring[L, W] = {
+                                 constraints: ChartConstraints[L]): GrammarAnchoring[L, W] = {
     val correctRefinedSpans = GoldTagPolicy.goldTreeForcing(tree.map(refinements.labels.fineIndex))
     val correctUnaryChains = {
       val arr = TriangularArray.fill(w.length + 1)(IndexedSeq.empty[String])
@@ -91,7 +91,7 @@ class OracleParser[L, L2, W](val refinedGrammar: SimpleGrammar[L, L2, W]) extend
       arr
     }
     new StructureDelegatingAnchoring[L, W] {
-      protected val baseAnchoring: RefinedAnchoring[L, W] = refinedGrammar.anchor(w)
+      protected val baseAnchoring: GrammarAnchoring[L, W] = refinedGrammar.anchor(w)
 
 
       override def sparsityPattern: ChartConstraints[L] = constraints

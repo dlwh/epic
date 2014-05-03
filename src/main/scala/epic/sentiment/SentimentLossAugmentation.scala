@@ -16,7 +16,7 @@ case class SentimentLossAugmentation[W](trainTrees: IndexedSeq[TreeInstance[Anno
                                         lexicon: Lexicon[AnnotatedLabel, W],
                                         constraintFactory: ChartConstraints.Factory[AnnotatedLabel, W],
                                         loss: (Int, Int)=>Double = SentimentLossAugmentation.defaultLoss,
-                                        rootLossScaling:Double = 1.0) extends LossAugmentation[TreeInstance[AnnotatedLabel, W], CoreAnchoring[AnnotatedLabel, W]] with CoreGrammar[AnnotatedLabel, W] {
+                                        rootLossScaling:Double = 1.0) extends LossAugmentation[TreeInstance[AnnotatedLabel, W], CoreAnchoring[AnnotatedLabel, W]] {
 
   val losses = Array.tabulate(5,5)(loss)
 

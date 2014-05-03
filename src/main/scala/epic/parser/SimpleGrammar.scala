@@ -236,7 +236,7 @@ object SimpleGrammar {
     map.toMap
   }
 
-  case class Anchoring[L, L2, W](grammar: SimpleGrammar[L, L2, W], words: IndexedSeq[W], override val sparsityPattern: ChartConstraints[L]) extends ProjectionsRefinedAnchoring[L, L2, W] {
+  case class Anchoring[L, L2, W](grammar: SimpleGrammar[L, L2, W], words: IndexedSeq[W], override val sparsityPattern: ChartConstraints[L]) extends ProjectionsGrammarAnchoring[L, L2, W] {
     def topology = grammar.topology
     def lexicon = grammar.lexicon
     def refinements = grammar.refinements

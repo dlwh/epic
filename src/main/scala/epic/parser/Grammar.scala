@@ -38,7 +38,7 @@ trait Grammar[L, W] extends Serializable {
   def labelIndex = topology.labelIndex
   def labelEncoder = topology.labelEncoder
 
-  def anchor(words: IndexedSeq[W], constraints: ChartConstraints[L] = ChartConstraints.noSparsity[L]):RefinedAnchoring[L, W]
+  def anchor(words: IndexedSeq[W], constraints: ChartConstraints[L] = ChartConstraints.noSparsity[L]):GrammarAnchoring[L, W]
 }
 
 object Grammar {
@@ -47,7 +47,7 @@ object Grammar {
     def lexicon = f1.lexicon
 
     def anchor(words: IndexedSeq[W],
-               constraints: ChartConstraints[L] = ChartConstraints.noSparsity[L]) = new ProductRefinedAnchoring(f1.anchor(words, constraints), f2.anchor(words, constraints))
+               constraints: ChartConstraints[L] = ChartConstraints.noSparsity[L]) = new ProductGrammarAnchoring(f1.anchor(words, constraints), f2.anchor(words, constraints))
   }
 
   def identity[L, W](ruleTopology: RuleTopology[L], lexicon: Lexicon[L, W]): Grammar[L, W] = {
@@ -59,8 +59,8 @@ object Grammar {
       def lexicon = l
 
 
-      override def anchor(words: IndexedSeq[W], constraints: ChartConstraints[L]): RefinedAnchoring[L, W] = {
-        RefinedAnchoring.identity(topology, lexicon, constraints, words)
+      override def anchor(words: IndexedSeq[W], constraints: ChartConstraints[L]): GrammarAnchoring[L, W] = {
+        GrammarAnchoring.identity(topology, lexicon, constraints, words)
       }
     }
   }

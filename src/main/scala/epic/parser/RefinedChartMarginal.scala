@@ -36,7 +36,7 @@ import epic.constraints.ChartConstraints
  * @tparam L the label type
  * @tparam W the word type
  */
-final case class RefinedChartMarginal[L, W](anchoring: RefinedAnchoring[L, W], core: CoreAnchoring[L, W],
+final case class RefinedChartMarginal[L, W](anchoring: GrammarAnchoring[L, W], core: CoreAnchoring[L, W],
                                      inside: RefinedParseChart[L], outside: RefinedParseChart[L],
                                      logPartition: Double,
                                      override val isMaxMarginal: Boolean) extends ParseMarginal[L, W] with SafeLogging {
@@ -306,15 +306,15 @@ object RefinedChartMarginal {
   }
 
 
-  def apply[L, W](anchoring: RefinedAnchoring[L, W]): RefinedChartMarginal[L, W] = {
+  def apply[L, W](anchoring: GrammarAnchoring[L, W]): RefinedChartMarginal[L, W] = {
     apply(anchoring, false)
   }
 
-  def apply[L, W](anchoring: RefinedAnchoring[L, W], maxMarginal: Boolean): RefinedChartMarginal[L, W] = {
+  def apply[L, W](anchoring: GrammarAnchoring[L, W], maxMarginal: Boolean): RefinedChartMarginal[L, W] = {
     apply(anchoring, CoreAnchoring.identity(anchoring.topology, anchoring.lexicon, anchoring.words), maxMarginal)
   }
 
-  def apply[L, W](anchoring: RefinedAnchoring[L, W], core: CoreAnchoring[L, W], maxMarginal: Boolean = false): RefinedChartMarginal[L, W] = {
+  def apply[L, W](anchoring: GrammarAnchoring[L, W], core: CoreAnchoring[L, W], maxMarginal: Boolean = false): RefinedChartMarginal[L, W] = {
     val sent = anchoring.words
     val sum = if(maxMarginal) MaxSummer else LogSummer
     val (inside, spanScores) = buildInsideChart(anchoring, core, sent, sum)
@@ -338,7 +338,7 @@ object RefinedChartMarginal {
     def apply(a: Array[Double], length: Int): Double = if(length == 0) Double.NegativeInfinity else max.array(a, length)
   }
 
-  private def rootScore[L, W](anchoring: RefinedAnchoring[L, W], inside: RefinedParseChart[L], sum: Summer): Double = {
+  private def rootScore[L, W](anchoring: GrammarAnchoring[L, W], inside: RefinedParseChart[L], sum: Summer): Double = {
     val rootIndex: Int = anchoring.topology.labelIndex(anchoring.topology.root)
     val rootScores = new Array[Double](anchoring.validLabelRefinements(0, inside.length, rootIndex).length)
     var offset = 0
@@ -356,7 +356,7 @@ object RefinedChartMarginal {
   }
 
   // first parse chart is the inside scores, second parse chart is span scores for spans that were computed.
-  private def buildInsideChart[L, W, Chart[X] <: RefinedParseChart[X]](anchoring: RefinedAnchoring[L, W], core: CoreAnchoring[L, W],
+  private def buildInsideChart[L, W, Chart[X] <: RefinedParseChart[X]](anchoring: GrammarAnchoring[L, W], core: CoreAnchoring[L, W],
                                                                 words: IndexedSeq[W], sum: Summer): (RefinedParseChart[L], RefinedParseChart[L]) = {
     val refined = anchoring
 
@@ -533,7 +533,7 @@ object RefinedChartMarginal {
     inside -> spanScores
   }
 
-  private def buildOutsideChart[L, W](anchoring: RefinedAnchoring[L, W], core: CoreAnchoring[L, W],
+  private def buildOutsideChart[L, W](anchoring: GrammarAnchoring[L, W], core: CoreAnchoring[L, W],
                                       inside: RefinedParseChart[L], spanScores: RefinedParseChart[L], sum: Summer):RefinedParseChart[L] = {
     val refined = anchoring
 
@@ -592,7 +592,7 @@ object RefinedChartMarginal {
 
   private def doOutsideLeftCompletionUpdates[W, L](inside: RefinedParseChart[L], outside: RefinedParseChart[L],
                                                    spanScores: RefinedParseChart[L],
-                                                   anchoring: RefinedAnchoring[L, W],
+                                                   anchoring: GrammarAnchoring[L, W],
                                                    core: CoreAnchoring[L, W],
                                                    begin: Int, end: Int,
                                                    label: Int,
@@ -684,7 +684,7 @@ object RefinedChartMarginal {
 
   private def doOutsideRightCompletionUpdates[W, L](inside: RefinedParseChart[L], outside: RefinedParseChart[L],
                                                     spanScores: RefinedParseChart[L],
-                                                    anchoring: RefinedAnchoring[L, W],
+                                                    anchoring: GrammarAnchoring[L, W],
                                                     core: CoreAnchoring[L, W],
                                                     begin: Int, end: Int,
                                                     label: Int,
@@ -770,7 +770,7 @@ object RefinedChartMarginal {
   }
 
   private def updateInsideUnaries[L, W](chart: RefinedParseChart[L],
-                                        anchoring: RefinedAnchoring[L, W],
+                                        anchoring: GrammarAnchoring[L, W],
                                         core: CoreAnchoring[L, W],
                                         begin: Int, end: Int, sum: Summer) = {
     val refined = anchoring
@@ -805,7 +805,7 @@ object RefinedChartMarginal {
 
   private def updateOutsideUnaries[L, W](chart: RefinedParseChart[L],
                                          inside: RefinedParseChart[L],
-                                         anchoring: RefinedAnchoring[L, W],
+                                         anchoring: GrammarAnchoring[L, W],
                                          core: CoreAnchoring[L, W],
                                          begin: Int, end: Int, sum: Summer) = {
     val refined = anchoring

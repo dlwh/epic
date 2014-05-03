@@ -29,7 +29,7 @@ import epic.constraints.ChartConstraints
 trait ParserModel[L, W] extends epic.framework.StandardExpectedCounts.Model[TreeInstance[L, W]] with ParserExtractable[L, W] {
   type Inference <: ParserInference[L, W]
   type Marginal = epic.parser.ParseMarginal[L, W]
-  type Scorer = RefinedAnchoring[L, W]
+  type Scorer = GrammarAnchoring[L, W]
 
   def extractParser(weights: DenseVector[Double]) = {
     val inf = inferenceFromWeights(weights).forTesting
@@ -44,7 +44,7 @@ trait ParserModel[L, W] extends epic.framework.StandardExpectedCounts.Model[Tree
 trait ParserInference[L, W] extends ProjectableInference[TreeInstance[L, W], CoreAnchoring[L, W]] {
   type ExpectedCounts = StandardExpectedCounts[Feature]
   type Marginal = epic.parser.ParseMarginal[L, W]
-  type Scorer = RefinedAnchoring[L, W]
+  type Scorer = GrammarAnchoring[L, W]
 
   def grammar: Grammar[L, W]
   def constrainer: ChartConstraints.Factory[L, W]

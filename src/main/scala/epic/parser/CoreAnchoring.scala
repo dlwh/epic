@@ -105,7 +105,7 @@ trait CoreAnchoring[L, W] extends Factor[CoreAnchoring[L, W]] {
   /** The posterior parse forest for this anchoring */
   def maxMarginal = this.lift().maxMarginal
 
-  def lift(sparsityPattern: ChartConstraints[L] = ChartConstraints.noSparsity):RefinedAnchoring[L, W] = LiftedCoreAnchoring(this, sparsityPattern)
+  def lift(sparsityPattern: ChartConstraints[L] = ChartConstraints.noSparsity):GrammarAnchoring[L, W] = LiftedCoreAnchoring(this, sparsityPattern)
 }
 
 object CoreAnchoring {
@@ -147,13 +147,13 @@ object CoreAnchoring {
 }
 
 /**
- * Turns a [[epic.parser.CoreAnchoring]] into a [[epic.parser.RefinedAnchoring]]
+ * Turns a [[epic.parser.CoreAnchoring]] into a [[epic.parser.GrammarAnchoring]]
  * @param core
  * @tparam L
  * @tparam W
  */
 @SerialVersionUID(1)
-case class LiftedCoreAnchoring[L, W](core: CoreAnchoring[L, W], val sparsityPattern: ChartConstraints[L]) extends RefinedAnchoring[L, W] {
+case class LiftedCoreAnchoring[L, W](core: CoreAnchoring[L, W], val sparsityPattern: ChartConstraints[L]) extends GrammarAnchoring[L, W] {
   override def annotationTag = 0
 
   def topology = core.topology

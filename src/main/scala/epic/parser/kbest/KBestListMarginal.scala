@@ -20,7 +20,7 @@ import breeze.linalg._
 import breeze.numerics._
 
 
-case class KBestListMarginal[L, W](anchoring: RefinedAnchoring[L, W],
+case class KBestListMarginal[L, W](anchoring: GrammarAnchoring[L, W],
                                    marginals: IndexedSeq[ParseMarginal[L, W]]) extends ParseMarginal[L, W] {
 
   def isMaxMarginal: Boolean = false

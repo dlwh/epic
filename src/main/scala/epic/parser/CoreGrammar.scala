@@ -55,7 +55,7 @@ trait CoreGrammar[L, W] extends Serializable { core =>
 
     override def lexicon: Lexicon[L, W] = core.lexicon
 
-    override def anchor(words: IndexedSeq[W], constraints: ChartConstraints[L]): RefinedAnchoring[L, W] = core.anchor(words).lift(constraints)
+    override def anchor(words: IndexedSeq[W], constraints: ChartConstraints[L]): GrammarAnchoring[L, W] = core.anchor(words).lift(constraints)
 
   }
 }

@@ -29,7 +29,7 @@ import breeze.linalg.Counter2
  * @author dlwh
  */
 
-case class LatentTreeMarginal[L, W](anchoring: RefinedAnchoring[L, W],
+case class LatentTreeMarginal[L, W](anchoring: GrammarAnchoring[L, W],
                                     tree: BinarizedTree[IndexedSeq[(L, Int)]]) extends ParseMarginal[L, W] {
 
   private val stree = insideScores()
@@ -314,7 +314,7 @@ case class LatentTreeMarginal[L, W](anchoring: RefinedAnchoring[L, W],
 }
 
 object LatentTreeMarginal {
-  def apply[L, L2, W](anchoring: RefinedAnchoring[L, W],
+  def apply[L, L2, W](anchoring: GrammarAnchoring[L, W],
                       projections: ProjectionIndexer[L, L2],
                       tree: BinarizedTree[L]): LatentTreeMarginal[L, W] = {
     new LatentTreeMarginal(anchoring,

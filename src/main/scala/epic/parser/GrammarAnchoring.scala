@@ -19,7 +19,7 @@ import epic.lexicon.Lexicon
 import epic.constraints.ChartConstraints
 
 /**
- * A RefinedAnchoring is a refined grammar that has been tuned to a particular sentence (if applicable).
+ * A GrammarAnchoring is a grammar that has been tuned to a particular sentence (if applicable).
  * It knows how to do two things: assign scores to rules and spans, and determine reachability of various refinements.
  *
  * It might be nice to consider a refined grammar that doesn't need sentence-specific tuning, but
@@ -27,7 +27,7 @@ import epic.constraints.ChartConstraints
  *
  * @author dlwh
  */
-trait RefinedAnchoring[L, W]  {
+trait GrammarAnchoring[L, W]  {
 
   def topology: RuleTopology[L]
   def lexicon: Lexicon[L, W]
@@ -63,20 +63,20 @@ trait RefinedAnchoring[L, W]  {
    * @param other
    * @return
    */
-  def *(other: RefinedAnchoring[L, W]):RefinedAnchoring[L,W] = {
+  def *(other: GrammarAnchoring[L, W]):GrammarAnchoring[L,W] = {
     // hacky multimethod dispatch is hacky
     if (other eq null) this // ugh
     else if(other.isInstanceOf[CoreAnchoring.Identity[L, W]]) this
     else if(this.isInstanceOf[CoreAnchoring.Identity[L, W]]) other
-    else new ProductRefinedAnchoring(this,other)
+    else new ProductGrammarAnchoring(this,other)
   }
 
-  def *(other: CoreAnchoring[L, W]):RefinedAnchoring[L, W] = {
+  def *(other: CoreAnchoring[L, W]):GrammarAnchoring[L, W] = {
     // hacky multimethod dispatch is hacky
     if (other eq null) this // ugh
     else if(other.isInstanceOf[CoreAnchoring.Identity[L, W]]) this
     else if(this.isInstanceOf[CoreAnchoring.Identity[L, W]]) other.lift(this.sparsityPattern)
-    else new ProductRefinedAnchoring(this,other.lift(this.sparsityPattern))
+    else new ProductGrammarAnchoring(this,other.lift(this.sparsityPattern))
   }
 
   /**
@@ -87,15 +87,15 @@ trait RefinedAnchoring[L, W]  {
    * @param other
    * @return
    */
-  def /(other: RefinedAnchoring[L, W]):RefinedAnchoring[L,W] = {
+  def /(other: GrammarAnchoring[L, W]):GrammarAnchoring[L,W] = {
     if(other.eq(null) || other.isInstanceOf[CoreAnchoring.Identity[L, W]]) this
-    else new ProductRefinedAnchoring(this,other,-1)
+    else new ProductGrammarAnchoring(this,other,-1)
   }
 
   def maxMarginal = RefinedChartMarginal(this, maxMarginal = true)
   def marginal = RefinedChartMarginal(this, maxMarginal = false)
 
-  def isConvergedTo(f: RefinedAnchoring[L, W], diff: Double):Boolean = {
+  def isConvergedTo(f: GrammarAnchoring[L, W], diff: Double):Boolean = {
     import scala.util.control.Breaks._
     var ok = false
     breakable {
@@ -244,16 +244,16 @@ trait RefinedAnchoring[L, W]  {
   def validRightChildRefinementsGivenRule(completionBegin: Int, completionEnd: Int, begin: Int, end: Int, rule: Int): Array[Int]
 }
 
-object RefinedAnchoring {
+object GrammarAnchoring {
   def identity[L, W](topology: RuleTopology[L],
                      lexicon: Lexicon[L, W],
                      constraints: ChartConstraints[L],
-                     words: IndexedSeq[W]): RefinedAnchoring[L, W] = {
+                     words: IndexedSeq[W]): GrammarAnchoring[L, W] = {
     LiftedCoreAnchoring(CoreAnchoring.identity[L, W](topology, lexicon, words), constraints)
   }
 
-  trait StructureDelegatingAnchoring[L, W] extends RefinedAnchoring[L, W] {
-    protected def baseAnchoring: RefinedAnchoring[L, W]
+  trait StructureDelegatingAnchoring[L, W] extends GrammarAnchoring[L, W] {
+    protected def baseAnchoring: GrammarAnchoring[L, W]
 
     def topology: RuleTopology[L] = baseAnchoring.topology
     def lexicon: Lexicon[L, W] = baseAnchoring.lexicon

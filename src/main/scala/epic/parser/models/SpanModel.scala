@@ -80,7 +80,7 @@ class DotProductGrammar[L, L2, W, Feature](val topology: RuleTopology[L],
                                            val weights: DenseVector[Double],
                                            val featurizer: RefinedFeaturizer[L, W, Feature]) extends Grammar[L, W] {
 
-  def anchor(w: IndexedSeq[W], cons: ChartConstraints[L]):RefinedAnchoring[L, W] = new ProjectionsRefinedAnchoring[L, L2, W] {
+  def anchor(w: IndexedSeq[W], cons: ChartConstraints[L]):GrammarAnchoring[L, W] = new ProjectionsGrammarAnchoring[L, L2, W] {
 
 
     override def sparsityPattern: ChartConstraints[L] = cons

@@ -8,7 +8,7 @@ import epic.trees.{BinaryRule, UnaryRule}
  *
  * @author dlwh
  **/
-trait ProjectionsRefinedAnchoring[L, L2, W] extends RefinedAnchoring[L, W] {
+trait ProjectionsGrammarAnchoring[L, L2, W] extends GrammarAnchoring[L, W] {
   def refinements: GrammarRefinements[L, L2]
   def refinedTopology: RuleTopology[L2]
 

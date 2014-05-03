@@ -29,7 +29,7 @@ import breeze.linalg.{Counter, Counter2}
  *             the gold refinements at each leaf
  * @author dlwh
  */
-case class TreeMarginal[L, W](anchoring: RefinedAnchoring[L, W],
+case class TreeMarginal[L, W](anchoring: GrammarAnchoring[L, W],
                               tree: BinarizedTree[(L,Int)]) extends ParseMarginal[L, W] {
 
   val logPartition = {

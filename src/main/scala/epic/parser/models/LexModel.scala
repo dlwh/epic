@@ -398,7 +398,7 @@ final class LexGrammar[L, L2, W](val topology: RuleTopology[L],
 
   def isHeadOnRightForRule(r: Int) = rightRules(r)
 
-  override def anchor(words: IndexedSeq[W], constraints: ChartConstraints[L]): RefinedAnchoring[L, W] = {
+  override def anchor(words: IndexedSeq[W], constraints: ChartConstraints[L]): GrammarAnchoring[L, W] = {
     new Spec(words, constraints)
   }
 
@@ -408,7 +408,7 @@ final class LexGrammar[L, L2, W](val topology: RuleTopology[L],
   // binaryRule is (head * words.length + dep)
   // unaryRule is (head)
   // parent/leftchild/rightchild is (head)
-  final class Spec(val words: IndexedSeq[W], val sparsityPattern: ChartConstraints[L]) extends RefinedAnchoring[L, W] {
+  final class Spec(val words: IndexedSeq[W], val sparsityPattern: ChartConstraints[L]) extends GrammarAnchoring[L, W] {
 
     override def annotationTag: Int = 1
 
