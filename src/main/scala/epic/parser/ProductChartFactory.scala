@@ -9,7 +9,7 @@ import epic.constraints.ChartConstraints
  *
  * @author dlwh
  **/
-class ProductChartFactory[L, W](grammars: IndexedSeq[RefinedGrammar[L, W]], maxIterations: Int = 5) extends RefinedChartMarginal.Factory[L, W] with SafeLogging {
+class ProductChartFactory[L, W](grammars: IndexedSeq[Grammar[L, W]], maxIterations: Int = 5) extends RefinedChartMarginal.Factory[L, W] with SafeLogging {
   def apply(words: IndexedSeq[W], initialCore: ChartConstraints[L]): RefinedChartMarginal[L, W] = {
     val anchorings = grammars.map(_.anchor(words, initialCore))
 

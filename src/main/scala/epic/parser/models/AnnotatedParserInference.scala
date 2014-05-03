@@ -33,7 +33,7 @@ import epic.constraints.ChartConstraints
  */
 case class AnnotatedParserInference[L, W](featurizer: RefinedFeaturizer[L, W, Feature],
                                           annotator: (BinarizedTree[L], IndexedSeq[W]) => BinarizedTree[(L, Int)],
-                                          grammar: RefinedGrammar[L, W],
+                                          grammar: Grammar[L, W],
                                           constrainer: ChartConstraints.Factory[L, W]) extends ParserInference[L, W] {
 
 

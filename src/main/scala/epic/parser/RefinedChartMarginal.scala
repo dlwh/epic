@@ -298,10 +298,10 @@ object RefinedChartMarginal {
   }
 
   object Factory {
-    def apply[L, W](grammar: RefinedGrammar[L, W]):StandardChartFactory[L, W] = new StandardChartFactory(grammar)
+    def apply[L, W](grammar: Grammar[L, W]):StandardChartFactory[L, W] = new StandardChartFactory(grammar)
   }
 
-  def apply[L, W](grammar: RefinedGrammar[L, W], sent: IndexedSeq[W]): RefinedChartMarginal[L, W] = {
+  def apply[L, W](grammar: Grammar[L, W], sent: IndexedSeq[W]): RefinedChartMarginal[L, W] = {
     apply(grammar.anchor(sent))
   }
 
@@ -893,7 +893,7 @@ object RefinedChartMarginal {
 
 }
 
-case class StandardChartFactory[L, W](refinedGrammar: RefinedGrammar[L, W], maxMarginal: Boolean = false) extends RefinedChartMarginal.Factory[L, W] {
+case class StandardChartFactory[L, W](refinedGrammar: Grammar[L, W], maxMarginal: Boolean = false) extends RefinedChartMarginal.Factory[L, W] {
   def apply(w: IndexedSeq[W], constraints: ChartConstraints[L]):RefinedChartMarginal[L, W] = {
     RefinedChartMarginal(refinedGrammar.anchor(w, constraints), maxMarginal = maxMarginal)
   }

@@ -322,13 +322,13 @@ object LatentTreeMarginal {
 
   }
 
-  def apply[L, W](grammar: RefinedGrammar[L, W],
+  def apply[L, W](grammar: Grammar[L, W],
                   words: IndexedSeq[W],
                   tree: BinarizedTree[IndexedSeq[(L, Int)]]):LatentTreeMarginal[L, W] = {
     LatentTreeMarginal(grammar.anchor(words), tree)
   }
 
-  def apply[L, L2, W](grammar: RefinedGrammar[L, W],
+  def apply[L, L2, W](grammar: Grammar[L, W],
                       ref: ProjectionIndexer[L, L2],
                       words: IndexedSeq[W],
                       tree: BinarizedTree[L]):LatentTreeMarginal[L, W] = {

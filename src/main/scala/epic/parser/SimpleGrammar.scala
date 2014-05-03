@@ -35,12 +35,12 @@ import epic.constraints.ChartConstraints
  * @author dlwh
  */
 @SerialVersionUID(2)
-class SimpleRefinedGrammar[L, L2, W](val topology: RuleTopology[L],
+class SimpleGrammar[L, L2, W](val topology: RuleTopology[L],
                                      val lexicon: Lexicon[L, W],
                                      val refinements: GrammarRefinements[L, L2],
                                      val refinedTopology: RuleTopology[L2],
                                      val ruleScoreArray: Array[Double],
-                                     val tagScorer: TagScorer[L2, W]) extends RefinedGrammar[L, W] with Serializable {
+                                     val tagScorer: TagScorer[L2, W]) extends Grammar[L, W] with Serializable {
   def ruleScore(r: Int, ruleRef: Int):Double = {
     val global = refinements.rules.globalize(r, ruleRef)
     ruleScoreArray(global)
@@ -50,7 +50,7 @@ class SimpleRefinedGrammar[L, L2, W](val topology: RuleTopology[L],
     ruleScoreArray(refinedRule)
   }
 
-  def anchor(w: IndexedSeq[W], constr: ChartConstraints[L]) = new SimpleRefinedGrammar.Anchoring(this, w, constr)
+  def anchor(w: IndexedSeq[W], constr: ChartConstraints[L]) = new SimpleGrammar.Anchoring(this, w, constr)
 
 
   /**
@@ -86,7 +86,7 @@ class SimpleRefinedGrammar[L, L2, W](val topology: RuleTopology[L],
   }
 }
 
-object SimpleRefinedGrammar {
+object SimpleGrammar {
 
   object CloseUnaries extends Enumeration {
     val None, Sum, Viterbi = Value
@@ -133,7 +133,7 @@ object SimpleRefinedGrammar {
 
   def parseBerkeleyText(prefix: String,
                         threshold: Double = -12,
-                        closeUnaries: CloseUnaries.Value = CloseUnaries.Viterbi): SimpleRefinedGrammar[AnnotatedLabel, AnnotatedLabel, String] = {
+                        closeUnaries: CloseUnaries.Value = CloseUnaries.Viterbi): SimpleGrammar[AnnotatedLabel, AnnotatedLabel, String] = {
     val syms = Index[AnnotatedLabel]()
     val symsIn = Source.fromInputStream(new FileInputStream(prefix+".numstates"))
     for( line <- symsIn.getLines) {
@@ -215,7 +215,7 @@ object SimpleRefinedGrammar {
 
     val scorer = new SignatureTagScorer[AnnotatedLabel, String](lexCounts, { (w:String) => "UNK"+EnglishWordClassGenerator(w)})
 
-    RefinedGrammar.unanchored[AnnotatedLabel, AnnotatedLabel, String](coarseGrammar, lexicon,
+    Grammar.unanchored[AnnotatedLabel, AnnotatedLabel, String](coarseGrammar, lexicon,
       refinements,
       ruleScores.toArray,
       scorer)
@@ -236,7 +236,7 @@ object SimpleRefinedGrammar {
     map.toMap
   }
 
-  case class Anchoring[L, L2, W](grammar: SimpleRefinedGrammar[L, L2, W], words: IndexedSeq[W], override val sparsityPattern: ChartConstraints[L]) extends ProjectionsRefinedAnchoring[L, L2, W] {
+  case class Anchoring[L, L2, W](grammar: SimpleGrammar[L, L2, W], words: IndexedSeq[W], override val sparsityPattern: ChartConstraints[L]) extends ProjectionsRefinedAnchoring[L, L2, W] {
     def topology = grammar.topology
     def lexicon = grammar.lexicon
     def refinements = grammar.refinements

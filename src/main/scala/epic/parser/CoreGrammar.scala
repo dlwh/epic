@@ -50,7 +50,7 @@ trait CoreGrammar[L, W] extends Serializable { core =>
   def *(other: CoreGrammar[L, W]):CoreGrammar[L, W] = new CoreGrammar.ProductGrammar(this, other)
 
 
-  def lift: RefinedGrammar[L, W] = new RefinedGrammar[L, W] {
+  def lift: Grammar[L, W] = new Grammar[L, W] {
     override def topology: RuleTopology[L] = core.topology
 
     override def lexicon: Lexicon[L, W] = core.lexicon

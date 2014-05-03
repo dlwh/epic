@@ -54,21 +54,21 @@ final case class Parser[L,W](topology: RuleTopology[L],
 
 object Parser {
 
-  def apply[L, W](ref: RefinedGrammar[L, W]): Parser[L, W]= {
+  def apply[L, W](ref: Grammar[L, W]): Parser[L, W]= {
     Parser(ref.topology, ref.lexicon, ChartConstraints.Factory.noSparsity, StandardChartFactory(ref))
   }
 
-  def apply[L, W](refined: RefinedGrammar[L, W], decoder: ChartDecoder[L, W]): Parser[L, W] = {
+  def apply[L, W](refined: Grammar[L, W], decoder: ChartDecoder[L, W]): Parser[L, W] = {
     apply(ChartConstraints.Factory.noSparsity, refined, decoder)
   }
 
 
-  def apply[L, W](core: ChartConstraints.Factory[L, W], refinedGrammar: RefinedGrammar[L, W], decoder: ChartDecoder[L, W]): Parser[L, W] = {
+  def apply[L, W](core: ChartConstraints.Factory[L, W], refinedGrammar: Grammar[L, W], decoder: ChartDecoder[L, W]): Parser[L, W] = {
     Parser(refinedGrammar.topology, refinedGrammar.lexicon, core, StandardChartFactory(refinedGrammar, decoder.wantsMaxMarginal), decoder)
   }
 
 
-  def apply[L, W](core: ChartConstraints.Factory[L, W], refinedGrammar: RefinedGrammar[L, W]): Parser[L, W] = {
+  def apply[L, W](core: ChartConstraints.Factory[L, W], refinedGrammar: Grammar[L, W]): Parser[L, W] = {
     apply(core, refinedGrammar, new MaxConstituentDecoder)
   }
 }

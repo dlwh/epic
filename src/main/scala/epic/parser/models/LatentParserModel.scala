@@ -65,7 +65,7 @@ class LatentParserModel[L, L3, W](indexedFeatures: IndexedFeaturizer[L, L3, W],
 
 case class LatentParserInference[L, L2, W](featurizer: RefinedFeaturizer[L, W, Feature],
                                            annotator: (BinarizedTree[L], IndexedSeq[W]) => BinarizedTree[IndexedSeq[L2]],
-                                           grammar: RefinedGrammar[L, W],
+                                           grammar: Grammar[L, W],
                                            constrainer: ChartConstraints.Factory[L, W],
                                            projections: GrammarRefinements[L, L2]) extends ParserInference[L, W] {
 

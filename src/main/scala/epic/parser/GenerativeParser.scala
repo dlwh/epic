@@ -69,9 +69,9 @@ object GenerativeParser {
    * @tparam W
    * @return
    */
-  def extractGrammar[L, W](root: L, data: TraversableOnce[TreeInstance[L, W]]): SimpleRefinedGrammar[L, L, W] = {
+  def extractGrammar[L, W](root: L, data: TraversableOnce[TreeInstance[L, W]]): SimpleGrammar[L, L, W] = {
     val (wordCounts, binaryProductions, unaryProductions) = extractCounts(data)
-    RefinedGrammar.generative(root, binaryProductions, unaryProductions, wordCounts)
+    Grammar.generative(root, binaryProductions, unaryProductions, wordCounts)
   }
 
   def extractCounts[L, W](data: TraversableOnce[TreeInstance[L, W]]) = {
@@ -105,12 +105,12 @@ object GenerativeParser {
     Parser(refinedGrammar)
   }
 
-  def annotated(annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel], trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]]): SimpleRefinedGrammar[AnnotatedLabel, AnnotatedLabel, String] = {
+  def annotated(annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel], trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]]): SimpleGrammar[AnnotatedLabel, AnnotatedLabel, String] = {
     val (baseLexicon, ruleTopology) = extractLexiconAndGrammar(trainTrees.map(Xbarize()))
     annotated(ruleTopology, baseLexicon, annotator, trainTrees)
   }
 
-  def annotated(ruleTopology: RuleTopology[AnnotatedLabel], baseLexicon: Lexicon[AnnotatedLabel, String], annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel], trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]]): SimpleRefinedGrammar[AnnotatedLabel, AnnotatedLabel, String] = {
+  def annotated(ruleTopology: RuleTopology[AnnotatedLabel], baseLexicon: Lexicon[AnnotatedLabel, String], annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel], trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]]): SimpleGrammar[AnnotatedLabel, AnnotatedLabel, String] = {
     val transformed = trainTrees.par.map {
       ti => annotator(ti)
     }.seq.toIndexedSeq
@@ -122,7 +122,7 @@ object GenerativeParser {
       (_: AnnotatedLabel).baseAnnotatedLabel
     })
 
-    RefinedGrammar.generative(ruleTopology, baseLexicon, indexedRefinements, binary, unary, words)
+    Grammar.generative(ruleTopology, baseLexicon, indexedRefinements, binary, unary, words)
   }
 
   def defaultAnnotator(vertical: Int = 1, horizontal: Int = 0): PipelineAnnotator[AnnotatedLabel, String] =  PipelineAnnotator(Seq(FilterAnnotations(), ForgetHeadTag(), Markovize(horizontal = horizontal,vertical = vertical), SplitPunct()))
@@ -168,7 +168,7 @@ object GenerativeTrainer extends ParserPipeline {
       new SimpleTagScorer(wordCounts)
     }
 
-    val refinedGrammar = RefinedGrammar.generative(xbar, xbarLexicon, indexedRefinements, binaryCounts, initUnaries, scorer)
+    val refinedGrammar = Grammar.generative(xbar, xbarLexicon, indexedRefinements, binaryCounts, initUnaries, scorer)
 
     if(params.grammarDumpPath != null) {
       val out = new BufferedWriter(new FileWriter(params.grammarDumpPath))

@@ -21,8 +21,8 @@ import breeze.util.EitherIndex
  * @author dlwh
  */
 
-class ProductRefinedFeaturizer[L, W, Feat1, Feat2](sf1: RefinedGrammar[L, W],
-                                        sf2: RefinedGrammar[L, W],
+class ProductRefinedFeaturizer[L, W, Feat1, Feat2](sf1: Grammar[L, W],
+                                        sf2: Grammar[L, W],
                                         feat1: RefinedFeaturizer[L, W, Feat1],
                                         feat2: RefinedFeaturizer[L, W, Feat2]) extends RefinedFeaturizer[L, W, Either[Feat1, Feat2]] {
   def index: EitherIndex[Feat1, Feat2] = feat1.index | feat2.index

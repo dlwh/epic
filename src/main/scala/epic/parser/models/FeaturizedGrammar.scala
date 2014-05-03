@@ -17,7 +17,7 @@ package epic.parser.models
 */
 import breeze.linalg._
 import epic.parser.projections.GrammarRefinements
-import epic.parser.{RefinedGrammar, RuleTopology}
+import epic.parser.{Grammar, RuleTopology}
 import epic.lexicon.{TagScorer, Lexicon}
 
 object FeaturizedGrammar {
@@ -31,6 +31,6 @@ object FeaturizedGrammar {
       features.computeWeight(r,weights)
     }
 
-    RefinedGrammar.unanchored(topology, lexicon, refinements, ruleCache, tagScorer)
+    Grammar.unanchored(topology, lexicon, refinements, ruleCache, tagScorer)
   }
 }

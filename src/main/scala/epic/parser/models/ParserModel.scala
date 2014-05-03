@@ -46,7 +46,7 @@ trait ParserInference[L, W] extends ProjectableInference[TreeInstance[L, W], Cor
   type Marginal = epic.parser.ParseMarginal[L, W]
   type Scorer = RefinedAnchoring[L, W]
 
-  def grammar: RefinedGrammar[L, W]
+  def grammar: Grammar[L, W]
   def constrainer: ChartConstraints.Factory[L, W]
 
   def forTesting: ParserInference[L, W] = this

@@ -119,7 +119,7 @@ case class TreeMarginal[L, W](anchoring: RefinedAnchoring[L, W],
 }
 
 object TreeMarginal {
-  def apply[L, W](grammar: RefinedGrammar[L, W],
+  def apply[L, W](grammar: Grammar[L, W],
                   words: IndexedSeq[W],
                   tree: BinarizedTree[(L,Int)]):TreeMarginal[L, W] = {
     TreeMarginal(grammar.anchor(words), tree)

@@ -30,7 +30,7 @@ import epic.constraints.ChartConstraints.UnifiedFactory
  * Best is measured as number of correct labeled spans, as usual.
  * @author dlwh
  */
-class OracleParser[L, L2, W](val refinedGrammar: SimpleRefinedGrammar[L, L2, W]) extends SafeLogging {
+class OracleParser[L, L2, W](val refinedGrammar: SimpleGrammar[L, L2, W]) extends SafeLogging {
   private val cache = CacheBroker().make[IndexedSeq[W], BinarizedTree[L2]]("OracleParser")
 
   private var problems  = 0

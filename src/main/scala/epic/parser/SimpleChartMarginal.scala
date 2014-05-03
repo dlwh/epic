@@ -9,7 +9,7 @@ import breeze.collection.mutable.TriangularArray
  *
  * @author dlwh
  **/
-final case class SimpleChartMarginal[L, L2, W](anchoring: SimpleRefinedGrammar.Anchoring[L, L2, W],
+final case class SimpleChartMarginal[L, L2, W](anchoring: SimpleGrammar.Anchoring[L, L2, W],
                                                inside: SimpleParseChart[L2], outside: SimpleParseChart[L2],
                                                isMaxMarginal: Boolean = true) extends ParseMarginal[L, W] {
   override val logPartition: Double = {

@@ -17,7 +17,7 @@ package epic.parser.repl
 */
 import breeze.linalg._
 import epic.trees.{LexicalProduction, Rule, BinaryRule, UnaryRule}
-import epic.parser.{RefinedGrammar, RuleTopology}
+import epic.parser.{Grammar, RuleTopology}
 import epic.lexicon.UnsmoothedLexicon
 
 /**
@@ -26,7 +26,7 @@ import epic.lexicon.UnsmoothedLexicon
  * @author dlwh
  */
 object DSLGrammar {
-  def grammar(rewrites: DSLGrammarPart*): RefinedGrammar[String, String] = {
+  def grammar(rewrites: DSLGrammarPart*): Grammar[String, String] = {
     val binaryProductions = Counter2[String, BinaryRule[String], Double]
     val unaryProductions = Counter2[String, UnaryRule[String], Double]
     val lexicon = Counter2[String, String, Double]
@@ -42,7 +42,7 @@ object DSLGrammar {
 
     val grammar = RuleTopology("S", binaryProductions, unaryProductions)
     val unsmoothed = new UnsmoothedLexicon(grammar.labelIndex, lexicon.keySet.toSet)
-    RefinedGrammar.generative(grammar, unsmoothed, binaryProductions, unaryProductions, lexicon)
+    Grammar.generative(grammar, unsmoothed, binaryProductions, unaryProductions, lexicon)
   }
 
   def simpleGrammar =  grammar(

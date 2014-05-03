@@ -97,9 +97,9 @@ case class NeuralInference[L, L2, W](baseInference: LatentParserInference[L, L2,
 object NeuralModel {
 
 
-  class Grammar[L, W](base: RefinedGrammar[L, W], baseFeaturizer: RefinedFeaturizer[L, W, Feature],
+  class Grammar[L, W](base: epic.parser.Grammar[L, W], baseFeaturizer: RefinedFeaturizer[L, W, Feature],
                       labelFeaturizer: RefinedFeaturizer[L, W, Feature], surfaceFeaturizer: IndexedSplitSpanFeaturizer[W],
-                      lastLayerWeights: DenseMatrix[Double], layer: Transform[FeatureVector, DenseVector[Double]]#Layer) extends RefinedGrammar[L, W] {
+                      lastLayerWeights: DenseMatrix[Double], layer: Transform[FeatureVector, DenseVector[Double]]#Layer) extends epic.parser.Grammar[L, W] {
     def topology: RuleTopology[L] = base.topology
 
     def lexicon: Lexicon[L, W] = base.lexicon

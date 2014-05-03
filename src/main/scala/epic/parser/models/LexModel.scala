@@ -393,7 +393,7 @@ final class LexGrammar[L, L2, W](val topology: RuleTopology[L],
                              weights: DenseVector[Double],
                              binaries: Array[Boolean],
                              leftRules: Array[Boolean],
-                             rightRules: Array[Boolean]) extends RefinedGrammar[L, W] {
+                             rightRules: Array[Boolean]) extends Grammar[L, W] {
   def isHeadOnLeftForRule(r: Int) = leftRules(r)
 
   def isHeadOnRightForRule(r: Int) = rightRules(r)
