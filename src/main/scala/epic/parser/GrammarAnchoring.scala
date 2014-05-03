@@ -16,7 +16,7 @@ package epic.parser
 */
 import nak.inference.Factor
 import epic.lexicon.Lexicon
-import epic.constraints.ChartConstraints
+import epic.constraints.{TagConstraints, ChartConstraints}
 
 /**
  * A GrammarAnchoring is a grammar that has been tuned to a particular sentence (if applicable).
@@ -37,6 +37,11 @@ trait GrammarAnchoring[L, W]  {
   def length = words.length
 
   def logPartition: Double = marginal.logPartition
+
+
+  private lazy val lexLoc = lexicon.anchor(words)
+
+  def tagConstraints: TagConstraints[L] = lexLoc
 
   /**
    * Scores the indexed label rule with refinenemnt ref, when it occurs at (begin, end). Can be used for s, or for a
@@ -78,6 +83,8 @@ trait GrammarAnchoring[L, W]  {
     else if(this.isInstanceOf[CoreAnchoring.Identity[L, W]]) other.lift(this.sparsityPattern)
     else new ProductGrammarAnchoring(this,other.lift(this.sparsityPattern))
   }
+
+
 
   /**
    * Computes the pointwise division of two grammars, augmenting

@@ -100,8 +100,8 @@ object ParseMarginal {
 
   }
 
-  def maxDerivationMarginal[L, W](anch: GrammarAnchoring[L, W], core: CoreAnchoring[L, W]):ParseMarginal[L, W] = {
-    val maxM = RefinedChartMarginal(anch, core, maxMarginal = true)
+  def maxDerivationMarginal[L, W](anch: GrammarAnchoring[L, W]):ParseMarginal[L, W] = {
+    val maxM = RefinedChartMarginal(anch, maxMarginal = true)
     val parse = new ViterbiDecoder().extractMaxDerivationParse(maxM)
     TreeMarginal(anch, parse)
   }
