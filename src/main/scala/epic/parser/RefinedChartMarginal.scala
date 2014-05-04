@@ -1,6 +1,6 @@
 package epic.parser
 
-import epic.trees.{UnaryTree, BinarizedTree}
+import epic.trees.{Span, UnaryTree, BinarizedTree}
 import epic.util.{SafeLogging, Arrays}
 import breeze.numerics
 import breeze.collection.mutable.TriangularArray
@@ -55,7 +55,7 @@ final case class RefinedChartMarginal[L, W](anchoring: GrammarAnchoring[L, W],
 
 
   def feasibleSplitPoints(begin: Int, end: Int, leftChild: Int, leftChildRef: Int, rightChild: Int, rightChildRef: Int):IndexedSeq[Int] = {
-    inside.top.feasibleSpan(begin, end, leftChild, leftChildRef, rightChild, rightChildRef).toIndexedSeq
+    inside.top.feasibleSplitPoints(begin, end, leftChild, leftChildRef, rightChild, rightChildRef).toIndexedSeq
   }
 
   /**
@@ -376,7 +376,6 @@ object RefinedChartMarginal {
     }
 
 
-    val top = inside.top
     val g = grammar
 
     val scoreArray = Array.ofDim[Double](anchoring.maxLabelRefinements,  40)
@@ -405,10 +404,8 @@ object RefinedChartMarginal {
             val c = g.rightChild(r)
             ruleIndex += 1
 
-            // Check: can we build any refinement of this rule?
-            // basically, we can if TODO
 
-            val feasibleCoarseRange = inside.top.feasibleSpanCoarse(begin, end, b, c)
+            val feasibleCoarseRange = inside.top.feasibleSplitPoints(begin, end, b, c)
 
             if(feasibleCoarseRange.nonEmpty) {
               val validA = refined.validParentRefinementsGivenRule(begin, feasibleCoarseRange.begin, feasibleCoarseRange.end, end, r)
@@ -431,7 +428,7 @@ object RefinedChartMarginal {
                     val refB = refined.leftChildRefinement(r, refR)
                     val refC = refined.rightChildRefinement(r, refR)
 
-                    val feasibleSplitRange = inside.top.feasibleSpan(begin, end, b, refB, c, refC)
+                    val feasibleSplitRange = inside.top.feasibleSplitPoints(begin, end, b, refB, c, refC)
 
                     var split = feasibleSplitRange.begin
                     val endSplit = feasibleSplitRange.end
@@ -464,17 +461,7 @@ object RefinedChartMarginal {
             } // end canBuildThisRule
           } // end rules
 
-          var foundSomething = false
-          var ai = 0
-          while(ai < numValidLabelRefs) {
-            // done updating vector, do an enter:
-            if(offsets(ai) > 0) {
-              val score = sum(scoreArray(ai), offsets(ai))
-              inside.bot.enter(begin, end, a, ai, score)
-              foundSomething = true
-            }
-            ai += 1
-          }
+        enterScoresForLabelRefinements(sum, scoreArray, offsets, inside.bot, begin, end, a, numValidLabelRefs)
 //          assert(rootScore(anchoring, inside, sum) != 0.0, (begin, end, a))
 //          if(!foundSomething && refined.sparsityPattern != ChartConstraints.noSparsity) {
 //            logger.warn(s"Failed to replicate a span in ($begin, $end) of ${anchoring.words}. Label is ${anchoring.grammar.labelIndex.get(a)}")
@@ -485,6 +472,21 @@ object RefinedChartMarginal {
       updateInsideUnaries(inside, anchoring, begin, end, sum)
     }
     inside -> spanScores
+  }
+
+
+  private def enterScoresForLabelRefinements[L](sum: Summer, scoreArray: Array[Array[Double]], offsets: Array[Int], bot: RefinedParseChart[L]#ChartScores, begin: Int, end: Int, parent: Int, numValidLabelRefs: Int) {
+    var foundSomething = false
+    var ai = 0
+    while (ai < numValidLabelRefs) {
+      // done updating vector, do an enter:
+      if (offsets(ai) > 0) {
+        val score = sum(scoreArray(ai), offsets(ai))
+        bot.enter(begin, end, parent, ai, score)
+        foundSomething = true
+      }
+      ai += 1
+    }
   }
 
   private def buildOutsideChart[L, W](anchoring: GrammarAnchoring[L, W],
@@ -524,14 +526,7 @@ object RefinedChartMarginal {
           doOutsideRightCompletionUpdates(inside, outside, spanScores, anchoring, begin, end, a, scoreArray, offsets, sum)
 
           val numValidLabelRefs = anchoring.numValidRefinements(a)
-          var ai = 0
-          while(ai < numValidLabelRefs) {
-            // done updating vector, do an enter:
-            if(offsets(ai) > 0) {
-              outside.top.enter(begin, end, a, ai, sum(scoreArray(ai), offsets(ai)))
-            }
-            ai += 1
-          }
+          enterScoresForLabelRefinements(sum, scoreArray, offsets, outside.top, begin, end, a, numValidLabelRefs)
         }
 
         a += 1
@@ -549,10 +544,8 @@ object RefinedChartMarginal {
                                                    label: Int,
                                                    scoreArray: Array[Array[Double]], offsets: Array[Int], sum: Summer) {
     val refined = anchoring
-    val itop = inside.top
     val grammar = refined.topology
     val rules = anchoring.topology.indexedBinaryRulesWithLeftChild(label)
-    val length = inside.length
 
 
     var br = 0
@@ -563,16 +556,11 @@ object RefinedChartMarginal {
       br += 1
 
       // can I possibly build any refinement of this rule?
-      val parentMinCompletion = inside.bot.coarseLeftMostEndForBegin(begin)(p)
-      val rcMinCompletion = inside.top.coarseLeftMostEndForBegin(end)(rc)
-      val parentMaxCompletion = inside.bot.coarseRightMostEndForBegin(begin)(p)
-      val rcMaxCompletion = inside.top.coarseRightMostEndForBegin(end)(rc)
-      val coarseCompletionBegin = math.max(math.max(parentMinCompletion, rcMinCompletion), end + 1)
-      val coarseCompletionEnd = math.min(parentMaxCompletion, rcMaxCompletion)
-      val canBuildThisRule = coarseCompletionBegin <= coarseCompletionEnd
-      assert(coarseCompletionBegin > end)
-      assert(coarseCompletionEnd <= length, coarseCompletionEnd + " " + length)
+      val coarseCompletionSpan = feasibleSpanForCoarseLeftCompletion(begin, end, p, rc, inside)
+      val coarseCompletionBegin = coarseCompletionSpan.begin
+      val coarseCompletionEnd = coarseCompletionSpan.end
 
+      val canBuildThisRule = coarseCompletionBegin <= coarseCompletionEnd
 
       if (canBuildThisRule) {
 
@@ -591,18 +579,13 @@ object RefinedChartMarginal {
               val refP = refined.parentRefinement(r, refR)
               val refC = refined.rightChildRefinement(r, refR)
 
-              val parentMinCompletion = inside.bot.leftMostEndForBegin(begin)(p)(refP)
-              val rcMinCompletion = inside.top.leftMostEndForBegin(end)(rc)(refC)
-              val parentMaxCompletion = inside.bot.rightMostEndForBegin(begin)(p)(refP)
-              val rcMaxCompletion = inside.top.rightMostEndForBegin(end)(rc)(refC)
-              val completionBegin = math.max(math.max(parentMinCompletion, rcMinCompletion), end + 1)
-              val completionEnd = math.min(parentMaxCompletion, rcMaxCompletion)
+              val splitSpan = feasibleSpanForLeftCompletion(begin, end, p, refP, rc, refC, inside)
 
-              var completion = completionBegin
+              var completion = splitSpan.begin
 
-              while (completion <= completionEnd) {
+              while (completion <= splitSpan.end) {
                 val pOutside = outside.bot.labelScore(begin, completion, p, refP) + spanScores.bot.labelScore(begin, completion, p, refP)
-                val cInside = itop.labelScore(end, completion, rc, refC)
+                val cInside = inside.top.labelScore(end, completion, rc, refC)
                 if (cInside != Double.NegativeInfinity && pOutside != Double.NegativeInfinity) {
                   val ruleScore = refined.scoreBinaryRule(begin, end, completion, r, refR)
                   val score = cInside + ruleScore + pOutside
@@ -625,6 +608,29 @@ object RefinedChartMarginal {
     }
   }
 
+
+  private def feasibleSpanForLeftCompletion[L, W](begin: Int, end: Int, p: Int, refP: Int, rc: Int, refC: Int, inside: RefinedParseChart[L]) = {
+    val parentMinCompletion = inside.bot.leftMostEndForBegin(begin)(p)(refP)
+    val rcMinCompletion = inside.top.leftMostEndForBegin(end)(rc)(refC)
+    val parentMaxCompletion = inside.bot.rightMostEndForBegin(begin)(p)(refP)
+    val rcMaxCompletion = inside.top.rightMostEndForBegin(end)(rc)(refC)
+    val completionBegin = math.max(math.max(parentMinCompletion, rcMinCompletion), end + 1)
+    val completionEnd = math.min(parentMaxCompletion, rcMaxCompletion)
+
+    Span(completionBegin, completionEnd)
+  }
+
+  private def feasibleSpanForCoarseLeftCompletion[L, W](begin: Int, end: Int, p: Int, rc: Int, inside: RefinedParseChart[L]) = {
+    val parentMinCompletion = inside.bot.coarseLeftMostEndForBegin(begin)(p)
+    val rcMinCompletion = inside.top.coarseLeftMostEndForBegin(end)(rc)
+    val parentMaxCompletion = inside.bot.coarseRightMostEndForBegin(begin)(p)
+    val rcMaxCompletion = inside.top.coarseRightMostEndForBegin(end)(rc)
+    val completionBegin = math.max(math.max(parentMinCompletion, rcMinCompletion), end + 1)
+    val completionEnd = math.min(parentMaxCompletion, rcMaxCompletion)
+
+    Span(completionBegin, completionEnd)
+  }
+
   private def doOutsideRightCompletionUpdates[W, L](inside: RefinedParseChart[L], outside: RefinedParseChart[L],
                                                     spanScores: RefinedParseChart[L],
                                                     anchoring: GrammarAnchoring[L, W],
@@ -633,7 +639,6 @@ object RefinedChartMarginal {
                                                     scoreArray: Array[Array[Double]],
                                                     offsets: Array[Int], sum: Summer) {
     val refined = anchoring
-    val itop = inside.top
     val grammar = refined.topology
     val rules = anchoring.topology.indexedBinaryRulesWithRightChild(label)
 
@@ -645,12 +650,9 @@ object RefinedChartMarginal {
       br += 1
 
       // can I possibly build any refinement of this rule?
-      val parentMinCompletion = inside.bot.coarseLeftMostBeginForEnd(end)(p)
-      val rcMinCompletion = inside.top.coarseLeftMostBeginForEnd(begin)(lc)
-      val parentMaxCompletion = inside.bot.coarseRightMostBeginForEnd(end)(p)
-      val rcMaxCompletion = inside.top.coarseRightMostBeginForEnd(begin)(lc)
-      val coarseCompletionBegin = math.max(parentMinCompletion, rcMinCompletion)
-      val coarseCompletionEnd = math.min(begin, math.min(parentMaxCompletion, rcMaxCompletion))
+      val coarseCompletionSpan = feasibleSpanForCoarseRightCompletion(begin, end, p, lc, inside)
+      val coarseCompletionBegin = coarseCompletionSpan.begin
+      val coarseCompletionEnd = coarseCompletionSpan.end
       val canBuildThisRule = coarseCompletionBegin <= coarseCompletionEnd
 
       if (canBuildThisRule) {
@@ -669,18 +671,13 @@ object RefinedChartMarginal {
               val refP = refined.parentRefinement(r, refR)
               val refB = refined.leftChildRefinement(r, refR)
 
-              val parentMinCompletion = inside.bot.leftMostBeginForEnd(end)(p)(refP)
-              val rcMinCompletion = inside.top.leftMostBeginForEnd(begin)(lc)(refB)
-              val parentMaxCompletion = inside.bot.rightMostBeginForEnd(end)(p)(refP)
-              val rcMaxCompletion = inside.top.rightMostBeginForEnd(begin)(lc)(refB)
-              val completionBegin = math.max(parentMinCompletion, rcMinCompletion)
-              val completionEnd = math.min(begin,math.min(parentMaxCompletion, rcMaxCompletion))
+              val completionSpan = feasibleSpanForRightCompletion(begin, end, p, refP, lc, refB, inside)
 
-              var completion = completionBegin
+              var completion = completionSpan.begin
 
-              while (completion <= completionEnd) {
+              while (completion <= completionSpan.end) {
                 val pOutside = outside.bot.labelScore(completion, end, p, refP) + spanScores.bot.labelScore(completion, end, p, refP)
-                val bInside = itop.labelScore(completion, begin, lc, refB)
+                val bInside = inside.top.labelScore(completion, begin, lc, refB)
                 if (bInside != Double.NegativeInfinity && pOutside != Double.NegativeInfinity) {
                   val ruleScore = refined.scoreBinaryRule(completion, begin, end, r, refR)
                   val score = bInside + ruleScore + pOutside
@@ -701,6 +698,30 @@ object RefinedChartMarginal {
         }
       }
     }
+  }
+
+
+  private def feasibleSpanForRightCompletion[L, W](begin: Int, end: Int, p: Int, refP: Int, lc: Int, refB: Int, inside: RefinedParseChart[L]) = {
+    val parentMinCompletion = inside.bot.leftMostBeginForEnd(end)(p)(refP)
+    val rcMinCompletion = inside.top.leftMostBeginForEnd(begin)(lc)(refB)
+    val parentMaxCompletion = inside.bot.rightMostBeginForEnd(end)(p)(refP)
+    val rcMaxCompletion = inside.top.rightMostBeginForEnd(begin)(lc)(refB)
+    val completionBegin = math.max(parentMinCompletion, rcMinCompletion)
+    val completionEnd = math.min(begin, math.min(parentMaxCompletion, rcMaxCompletion))
+
+    Span(completionBegin, completionEnd)
+  }
+
+  private def feasibleSpanForCoarseRightCompletion[L, W](begin: Int, end: Int, p: Int, lc: Int, inside: RefinedParseChart[L]) = {
+
+    val parentMinCompletion = inside.bot.coarseLeftMostBeginForEnd(end)(p)
+    val rcMinCompletion = inside.top.coarseLeftMostBeginForEnd(begin)(lc)
+    val parentMaxCompletion = inside.bot.coarseRightMostBeginForEnd(end)(p)
+    val rcMaxCompletion = inside.top.coarseRightMostBeginForEnd(begin)(lc)
+    val completionBegin = math.max(parentMinCompletion, rcMinCompletion)
+    val completionEnd = math.min(begin, math.min(parentMaxCompletion, rcMaxCompletion))
+
+    Span(completionBegin, completionEnd)
   }
 
   private def updateInsideUnaries[L, W](chart: RefinedParseChart[L],

@@ -185,7 +185,7 @@ class RefinedParseChart[L](val index: Index[L],
     val coarseRightMostEndForBegin = makeCoarseExtentArray(-1)
 
 
-    def feasibleSpanCoarse(begin: Int, end: Int, b: Int, c: Int) = {
+    def feasibleSplitPoints(begin: Int, end: Int, b: Int, c: Int) = {
       val narrowR = coarseLeftMostEndForBegin(begin)(b)
       val narrowL = coarseRightMostBeginForEnd(end)(c)
       var split = math.max(narrowR, coarseLeftMostBeginForEnd(end)(c))
@@ -197,7 +197,7 @@ class RefinedParseChart[L](val index: Index[L],
       Span(split, endSplit)
     }
 
-    def feasibleSpan(begin: Int, end: Int, b: Int, refB: Int, c: Int, refC: Int) = {
+    def feasibleSplitPoints(begin: Int, end: Int, b: Int, refB: Int, c: Int, refC: Int) = {
       if(leftMostEndForBegin(begin)(b) == null || rightMostBeginForEnd(end)(c) == null) {
         Span(0,0)
       } else {

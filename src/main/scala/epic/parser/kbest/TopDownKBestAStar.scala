@@ -72,7 +72,7 @@ object TopDownKBestAStar {
             refR <- anchoring.validRuleRefinementsGivenParent(begin, end, r, rootRef)
             refB = anchoring.leftChildRefinement(r, refR)
             refC = anchoring.rightChildRefinement(r, refR)
-            split <- inside.top.feasibleSpan(begin, end, b, refB, c, refC)
+            split <- inside.top.feasibleSplitPoints(begin, end, b, refB, c, refC)
           } {
             val ruleScore = anchoring.scoreBinaryRule(begin, split, end, r, refR)
             val score = (

@@ -20,7 +20,7 @@ import spire.syntax.cfor
 
 
 class Span(val encoded: Long) extends AnyVal {
-  def begin = (encoded >> 32).toInt
+  def begin = (encoded >>> 32).toInt
   def end = encoded.toInt
 
   def isEmpty = begin == end
@@ -69,5 +69,5 @@ class Span(val encoded: Long) extends AnyVal {
 }
 
 object Span {
-  def apply(begin: Int, end: Int) = new Span( (begin.toLong << 32) | end)
+  def apply(begin: Int, end: Int) = new Span((begin.toLong << 32) | (end.toLong&0xFFFFFFFFL))
 }
