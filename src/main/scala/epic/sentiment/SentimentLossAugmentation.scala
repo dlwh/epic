@@ -3,7 +3,7 @@ package epic.sentiment
 import epic.trees.{Span, AnnotatedLabel, TreeInstance}
 import epic.framework.LossAugmentation
 import epic.lexicon.Lexicon
-import epic.parser.{CoreGrammar, UnrefinedGrammarAnchoring, RuleTopology}
+import epic.parser.{UnrefinedGrammarAnchoring, RuleTopology}
 import epic.constraints.ChartConstraints
 
 /**

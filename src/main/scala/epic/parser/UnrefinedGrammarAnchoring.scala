@@ -100,7 +100,7 @@ trait UnrefinedGrammarAnchoring[L, W] extends GrammarAnchoring[L, W] with Factor
   }
 
   /** Is this CoreAnchoring nearly the same as that core anchoring? */
-  def isConvergedTo(f: UnrefinedGrammarAnchoring[L, W], diff: Double) = lift().isConvergedTo(f.lift(),diff)
+  def isConvergedTo(f: UnrefinedGrammarAnchoring[L, W], diff: Double) = isConvergedTo(f:GrammarAnchoring[L, W],diff)
 
   final def validLabelRefinements(begin: Int, end: Int, label: Int) = Array(0)
 

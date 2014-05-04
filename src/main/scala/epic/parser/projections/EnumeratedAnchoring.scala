@@ -27,7 +27,7 @@ import epic.constraints.ChartConstraints
  */
 case class AnchoredPCFGProjector[L, W](threshold: Double = Double.NegativeInfinity) extends ChartProjector[L, W] {
 
-  type MyAnchoring = SimpleAnchoring[L, W]
+  type MyAnchoring = EnumeratedAnchoring[L, W]
   private def normalize(grammar: RuleTopology[L], ruleScores: OpenAddressHashArray[Double], totals: OpenAddressHashArray[Double]):OpenAddressHashArray[Double] = {
     if(ruleScores eq null) null
     else {
@@ -63,7 +63,7 @@ case class AnchoredPCFGProjector[L, W](threshold: Double = Double.NegativeInfini
       else for(ruleScores <- splits) yield normalize(charts.topology, ruleScores, totals)
     }
     val sparsity = charts.anchoring.sparsityPattern
-    new SimpleAnchoring(charts.topology, charts.lexicon, charts.words, lexicalScores.map(logify), normUnaries, normBinaries, sparsity)
+    new EnumeratedAnchoring(charts.topology, charts.lexicon, charts.words, lexicalScores.map(logify), normUnaries, normBinaries, sparsity)
   }
 
 }
@@ -85,7 +85,7 @@ case class AnchoredRuleMarginalProjector[L, W](threshold: Double = Double.Negati
     }
   }
 
-  type MyAnchoring = SimpleAnchoring[L, W]
+  type MyAnchoring = EnumeratedAnchoring[L, W]
 
   protected def createAnchoring(charts: ParseMarginal[L, W],
                                 ruleData: AnchoredData,
@@ -98,20 +98,26 @@ case class AnchoredRuleMarginalProjector[L, W](threshold: Double = Double.Negati
       else splits.map(normalize)
     }
     val sparsity = charts.anchoring.sparsityPattern
-    new SimpleAnchoring(charts.topology, charts.lexicon, charts.words, lexicalScores.map(normalize), normUnaries, normBinaries, sparsity)
+    new EnumeratedAnchoring(charts.topology, charts.lexicon, charts.words, lexicalScores.map(normalize), normUnaries, normBinaries, sparsity)
   }
 }
 
+/**
+ * An [[epic.parser.projections.EnumeratedAnchoring]] is a compressed forest, with potentially distinct
+ * rule and span scores for every possible anchoring.
+ * @tparam L
+ * @tparam W
+ */
 @SerialVersionUID(3)
-case class SimpleAnchoring[L, W](topology: RuleTopology[L],
-                            lexicon: Lexicon[L, W],
-                            words: IndexedSeq[W],
-                            spanScores: Array[OpenAddressHashArray[Double]], // triangular index -> label -> score
-                            // (begin, end) -> rule -> score
-                            unaryScores: Array[OpenAddressHashArray[Double]],
-                            // (begin, end) -> (split-begin) -> rule -> score
-                            binaryScores: Array[Array[OpenAddressHashArray[Double]]],
-                            sparsityPattern: ChartConstraints[L]) extends UnrefinedGrammarAnchoring[L, W] with Serializable {
+case class EnumeratedAnchoring[L, W](topology: RuleTopology[L],
+                                     lexicon: Lexicon[L, W],
+                                     words: IndexedSeq[W],
+                                     spanScores: Array[OpenAddressHashArray[Double]], // triangular index -> label -> score
+                                     // (begin, end) -> rule -> score
+                                     unaryScores: Array[OpenAddressHashArray[Double]],
+                                     // (begin, end) -> (split-begin) -> rule -> score
+                                     binaryScores: Array[Array[OpenAddressHashArray[Double]]],
+                                     sparsityPattern: ChartConstraints[L]) extends UnrefinedGrammarAnchoring[L, W] with Serializable {
 //  def addConstraints(cs: ChartConstraints[L]): CoreAnchoring[L, W] = copy(sparsityPattern = sparsityPattern & cs)
 
   def scoreUnaryRule(begin: Int, end: Int, rule: Int) = {
