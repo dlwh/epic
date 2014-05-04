@@ -153,7 +153,7 @@ case class ViterbiDecoder[L, W]() extends ChartDecoder[L, W] with Serializable w
 abstract class ProjectingChartDecoder[L, W](proj: ChartProjector[L, W]) extends ChartDecoder[L, W] {
   def extractBestParse(marginal: ParseMarginal[L, W]): BinarizedTree[L] = {
     val anchoring = proj.project(marginal)
-    val newMarg = anchoring.lift(marginal.anchoring.sparsityPattern).maxMarginal
+    val newMarg = anchoring.maxMarginal
     assert(!newMarg.logPartition.isInfinite, marginal.logPartition + " " + newMarg.logPartition)
     new ViterbiDecoder[L, W].extractBestParse(newMarg)
   }
