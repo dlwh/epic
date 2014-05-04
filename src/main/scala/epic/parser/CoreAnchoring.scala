@@ -70,6 +70,20 @@ trait CoreAnchoring[L, W] extends GrammarAnchoring[L, W] with Factor[CoreAnchori
     else new ProductCoreAnchoring(this,other)
   }
 
+
+  /**
+   * The annotationTag controls if two grammars are over the same refinements.
+   * If they are, then * and / can be much faster.
+   *
+   * Note that 0 is reserved for unrefined anchorings, and -1 never matches other tags.
+   *
+   * Reserved:
+   * 1 - Lexicalized Parsers with no symbol or rule annotation
+   *
+   * 0's will be optimized
+   */
+  override def annotationTag: Int = 0
+
   /**
    * Computes the point-wise division of this grammar with some other grammar.
    *
