@@ -81,7 +81,7 @@ case class NeuralInference[L, L2, W](baseInference: LatentParserInference[L, L2,
 
   override def constrainer: Factory[L, W] = baseInference.constrainer
 
-  def goldMarginal(scorer: Scorer, ti: TreeInstance[L, W], aug: CoreAnchoring[L, W]): Marginal = {
+  def goldMarginal(scorer: Scorer, ti: TreeInstance[L, W], aug: UnrefinedGrammarAnchoring[L, W]): Marginal = {
     import ti._
 
     val annotated = baseInference.annotator(tree, words).map(_.map(baseInference.projections.labels.localize))

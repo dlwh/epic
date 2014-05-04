@@ -21,14 +21,14 @@ import epic.constraints.{TagConstraints, ChartConstraints}
 import breeze.numerics.logI
 
 /**
- * [[epic.parser.CoreAnchoring]] score rules and labels in a particular context
+ * [[epic.parser.UnrefinedGrammarAnchoring]] score rules and labels in a particular context
  * without needed extra "refined" categories. That is, an anchoring can
  * score x-bar spans in a particular context.
  *
  * @author dlwh
  */
 @SerialVersionUID(1)
-trait CoreAnchoring[L, W] extends GrammarAnchoring[L, W] with Factor[CoreAnchoring[L, W]] {
+trait UnrefinedGrammarAnchoring[L, W] extends GrammarAnchoring[L, W] with Factor[UnrefinedGrammarAnchoring[L, W]] {
   def topology: RuleTopology[L]
   def lexicon: Lexicon[L, W]
   def words: IndexedSeq[W]
@@ -60,14 +60,14 @@ trait CoreAnchoring[L, W] extends GrammarAnchoring[L, W] with Factor[CoreAnchori
    * @param other
    * @return
    */
-  override def *(other: CoreAnchoring[L, W]): CoreAnchoring[L, W] = {
+  override def *(other: UnrefinedGrammarAnchoring[L, W]): UnrefinedGrammarAnchoring[L, W] = {
     // hacky multimethod dispatch is hacky
     if (other eq null) this // ugh
-    else if(other.isInstanceOf[CoreAnchoring.Identity[L, W]] && this.isInstanceOf[CoreAnchoring.Identity[L, W]])
-      CoreAnchoring.identity(topology, lexicon, words, sparsityPattern & other.sparsityPattern)
-    else if(other.isInstanceOf[CoreAnchoring.Identity[L, W]]) this // this.addConstraints(other.sparsityPattern)
-    else if(this.isInstanceOf[CoreAnchoring.Identity[L, W]]) other // other.addConstraints(this.sparsityPattern)
-    else new ProductCoreAnchoring(this,other)
+    else if(other.isInstanceOf[UnrefinedGrammarAnchoring.Identity[L, W]] && this.isInstanceOf[UnrefinedGrammarAnchoring.Identity[L, W]])
+      UnrefinedGrammarAnchoring.identity(topology, lexicon, words, sparsityPattern & other.sparsityPattern)
+    else if(other.isInstanceOf[UnrefinedGrammarAnchoring.Identity[L, W]]) this // this.addConstraints(other.sparsityPattern)
+    else if(this.isInstanceOf[UnrefinedGrammarAnchoring.Identity[L, W]]) other // other.addConstraints(this.sparsityPattern)
+    else new ProductUnrefinedGrammarAnchoring(this,other)
   }
 
 
@@ -91,20 +91,16 @@ trait CoreAnchoring[L, W] extends GrammarAnchoring[L, W] with Factor[CoreAnchori
    * @param other
    * @return
    */
-  def /(other: CoreAnchoring[L, W]) = {
+  def /(other: UnrefinedGrammarAnchoring[L, W]) = {
     // hacky multimethod dispatch is hacky
     if (other eq null) this // ugh
-    else if(this eq other) new CoreAnchoring.Identity[L, W](topology, lexicon, words, ChartConstraints.noSparsity[L])
-    else if(other.isInstanceOf[CoreAnchoring.Identity[L, W]]) this
-    else new ProductCoreAnchoring(this, other, -1)
+    else if(this eq other) new UnrefinedGrammarAnchoring.Identity[L, W](topology, lexicon, words, ChartConstraints.noSparsity[L])
+    else if(other.isInstanceOf[UnrefinedGrammarAnchoring.Identity[L, W]]) this
+    else new ProductUnrefinedGrammarAnchoring(this, other, -1)
   }
 
   /** Is this CoreAnchoring nearly the same as that core anchoring? */
-  def isConvergedTo(f: CoreAnchoring[L, W], diff: Double) = lift().isConvergedTo(f.lift(),diff)
-
-
-  @deprecated("...","0.2")
-  def lift(sparsityPattern: ChartConstraints[L] = ChartConstraints.noSparsity):GrammarAnchoring[L, W] = this
+  def isConvergedTo(f: UnrefinedGrammarAnchoring[L, W], diff: Double) = lift().isConvergedTo(f.lift(),diff)
 
   final def validLabelRefinements(begin: Int, end: Int, label: Int) = Array(0)
 
@@ -172,9 +168,9 @@ trait CoreAnchoring[L, W] extends GrammarAnchoring[L, W] with Factor[CoreAnchori
   }
 }
 
-object CoreAnchoring {
+object UnrefinedGrammarAnchoring {
   /**
-   * Returns an [[epic.parser.CoreAnchoring.Identity]], which assigns 0
+   * Returns an [[epic.parser.UnrefinedGrammarAnchoring.Identity]], which assigns 0
    * to everything that is allowed.
    * @param topology
    * @param lexicon
@@ -186,7 +182,7 @@ object CoreAnchoring {
   def identity[L, W](topology: RuleTopology[L],
                      lexicon: Lexicon[L, W],
                      words: IndexedSeq[W],
-                     constraints: ChartConstraints[L]):CoreAnchoring[L, W] = {
+                     constraints: ChartConstraints[L]):UnrefinedGrammarAnchoring[L, W] = {
     new Identity(topology, lexicon, words, constraints)
   }
 
@@ -200,7 +196,7 @@ object CoreAnchoring {
    * @return
    */
   @SerialVersionUID(1L)
-  case class Identity[L, W](topology: RuleTopology[L], lexicon: Lexicon[L, W], words: IndexedSeq[W], sparsityPattern: ChartConstraints[L]) extends CoreAnchoring[L, W] {
+  case class Identity[L, W](topology: RuleTopology[L], lexicon: Lexicon[L, W], words: IndexedSeq[W], sparsityPattern: ChartConstraints[L]) extends UnrefinedGrammarAnchoring[L, W] {
 
     def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = 0.0
 

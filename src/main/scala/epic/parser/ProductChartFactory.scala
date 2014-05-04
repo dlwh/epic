@@ -20,7 +20,7 @@ class ProductChartFactory[L, W](grammars: IndexedSeq[Grammar[L, W]], maxIteratio
 
     val proj = new AnchoredRuleMarginalProjector[L, W]
     val augments = anchorings.map(_.marginal).map(proj.project(_))
-    val marg = augments.reduceLeft[CoreAnchoring[L, W]](_ * _).marginal
+    val marg = augments.reduceLeft[UnrefinedGrammarAnchoring[L, W]](_ * _).marginal
     marg
   }
 }

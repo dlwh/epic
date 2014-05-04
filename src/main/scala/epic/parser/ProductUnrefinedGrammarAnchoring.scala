@@ -18,14 +18,14 @@ import epic.constraints.ChartConstraints
  limitations under the License.
 */
 /**
- * Creates a product of two [[epic.parser.CoreAnchoring]]s (product is in log space, so actually a sum.)
+ * Creates a product of two [[epic.parser.UnrefinedGrammarAnchoring]]s (product is in log space, so actually a sum.)
  *
  * @author dlwh
  */
 
-final case class ProductCoreAnchoring[L, W](s1: CoreAnchoring[L, W],
-                                            s2: CoreAnchoring[L, W],
-                                            alpha: Double = 1.0) extends CoreAnchoring[L, W] {
+final case class ProductUnrefinedGrammarAnchoring[L, W](s1: UnrefinedGrammarAnchoring[L, W],
+                                            s2: UnrefinedGrammarAnchoring[L, W],
+                                            alpha: Double = 1.0) extends UnrefinedGrammarAnchoring[L, W] {
 
 
   override val sparsityPattern: ChartConstraints[L] = s1.sparsityPattern & s2.sparsityPattern

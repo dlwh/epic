@@ -3,7 +3,7 @@ package epic.sentiment
 import epic.trees.{Span, AnnotatedLabel, TreeInstance}
 import epic.framework.LossAugmentation
 import epic.lexicon.Lexicon
-import epic.parser.{CoreGrammar, CoreAnchoring, RuleTopology}
+import epic.parser.{CoreGrammar, UnrefinedGrammarAnchoring, RuleTopology}
 import epic.constraints.ChartConstraints
 
 /**
@@ -16,7 +16,7 @@ case class SentimentLossAugmentation[W](trainTrees: IndexedSeq[TreeInstance[Anno
                                         lexicon: Lexicon[AnnotatedLabel, W],
                                         constraintFactory: ChartConstraints.Factory[AnnotatedLabel, W],
                                         loss: (Int, Int)=>Double = SentimentLossAugmentation.defaultLoss,
-                                        rootLossScaling:Double = 1.0) extends LossAugmentation[TreeInstance[AnnotatedLabel, W], CoreAnchoring[AnnotatedLabel, W]] {
+                                        rootLossScaling:Double = 1.0) extends LossAugmentation[TreeInstance[AnnotatedLabel, W], UnrefinedGrammarAnchoring[AnnotatedLabel, W]] {
 
   val losses = Array.tabulate(5,5)(loss)
 
@@ -25,7 +25,7 @@ case class SentimentLossAugmentation[W](trainTrees: IndexedSeq[TreeInstance[Anno
 
   val trainingMap = trainTrees.iterator.map(ti => ti.words -> ti).toMap
 
-  def lossAugmentation(datum: TreeInstance[AnnotatedLabel, W]): CoreAnchoring[AnnotatedLabel, W] = {
+  def lossAugmentation(datum: TreeInstance[AnnotatedLabel, W]): UnrefinedGrammarAnchoring[AnnotatedLabel, W] = {
     // drop the root
     val goldMap = datum.tree.map(projectedLabel).preorder.filter(_.label != -1).map{t => t.span -> t.label}.toMap
 
@@ -34,21 +34,21 @@ case class SentimentLossAugmentation[W](trainTrees: IndexedSeq[TreeInstance[Anno
 
 
   /**
-   * Returns a [[epic.parser.CoreAnchoring]] for this particular sentence.
+   * Returns a [[epic.parser.UnrefinedGrammarAnchoring]] for this particular sentence.
    * @param words
    * @return
    */
-  def anchor(words: IndexedSeq[W]): CoreAnchoring[AnnotatedLabel, W] = {
+  def anchor(words: IndexedSeq[W]): UnrefinedGrammarAnchoring[AnnotatedLabel, W] = {
     trainingMap.get(words)
       .map( ti =>lossAugmentation(ti) )
-      .getOrElse ( CoreAnchoring.identity(topology, lexicon, words, constraintFactory.constraints(words)) )
+      .getOrElse ( UnrefinedGrammarAnchoring.identity(topology, lexicon, words, constraintFactory.constraints(words)) )
   }
 
   case class SentimentLossAnchoring[L, W](topology: RuleTopology[L],
                                           lexicon: Lexicon[L, W],
                                           words: IndexedSeq[W],
                                           goldLabels: Map[Span, Int],
-                                          sparsityPattern: ChartConstraints[L])  extends epic.parser.CoreAnchoring[L, W]{
+                                          sparsityPattern: ChartConstraints[L])  extends epic.parser.UnrefinedGrammarAnchoring[L, W]{
 
     def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int): Double = 0.0
 

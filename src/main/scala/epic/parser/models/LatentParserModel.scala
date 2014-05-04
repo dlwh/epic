@@ -71,7 +71,7 @@ case class LatentParserInference[L, L2, W](featurizer: RefinedFeaturizer[L, W, F
 
   override def forTesting = copy(featurizer.forTesting)
 
-  def goldMarginal(scorer: Scorer, ti: TreeInstance[L, W], aug: CoreAnchoring[L, W]): Marginal = {
+  def goldMarginal(scorer: Scorer, ti: TreeInstance[L, W], aug: UnrefinedGrammarAnchoring[L, W]): Marginal = {
     val annotated = annotator(ti.tree, ti.words).map(_.map(projections.labels.localize))
 
     LatentTreeMarginal(scorer * aug, annotated)

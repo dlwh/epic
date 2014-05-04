@@ -71,17 +71,17 @@ trait GrammarAnchoring[L, W]  {
   def *(other: GrammarAnchoring[L, W]):GrammarAnchoring[L,W] = {
     // hacky multimethod dispatch is hacky
     if (other eq null) this // ugh
-    else if(other.isInstanceOf[CoreAnchoring.Identity[L, W]]) this
-    else if(this.isInstanceOf[CoreAnchoring.Identity[L, W]]) other
+    else if(other.isInstanceOf[UnrefinedGrammarAnchoring.Identity[L, W]]) this
+    else if(this.isInstanceOf[UnrefinedGrammarAnchoring.Identity[L, W]]) other
     else new ProductGrammarAnchoring(this,other)
   }
 
-  def *(other: CoreAnchoring[L, W]):GrammarAnchoring[L, W] = {
+  def *(other: UnrefinedGrammarAnchoring[L, W]):GrammarAnchoring[L, W] = {
     // hacky multimethod dispatch is hacky
     if (other eq null) this // ugh
-    else if(other.isInstanceOf[CoreAnchoring.Identity[L, W]]) this
-    else if(this.isInstanceOf[CoreAnchoring.Identity[L, W]]) other.lift(this.sparsityPattern)
-    else new ProductGrammarAnchoring(this,other.lift(this.sparsityPattern))
+    else if(other.isInstanceOf[UnrefinedGrammarAnchoring.Identity[L, W]]) this
+    else if(this.isInstanceOf[UnrefinedGrammarAnchoring.Identity[L, W]]) other
+    else new ProductGrammarAnchoring(this,other)
   }
 
 
@@ -95,7 +95,7 @@ trait GrammarAnchoring[L, W]  {
    * @return
    */
   def /(other: GrammarAnchoring[L, W]):GrammarAnchoring[L,W] = {
-    if(other.eq(null) || other.isInstanceOf[CoreAnchoring.Identity[L, W]]) this
+    if(other.eq(null) || other.isInstanceOf[UnrefinedGrammarAnchoring.Identity[L, W]]) this
     else new ProductGrammarAnchoring(this,other,-1)
   }
 
@@ -256,7 +256,7 @@ object GrammarAnchoring {
                      lexicon: Lexicon[L, W],
                      constraints: ChartConstraints[L],
                      words: IndexedSeq[W]): GrammarAnchoring[L, W] = {
-    CoreAnchoring.identity[L, W](topology, lexicon, words, constraints)
+    UnrefinedGrammarAnchoring.identity[L, W](topology, lexicon, words, constraints)
   }
 
 

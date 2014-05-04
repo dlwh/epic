@@ -22,7 +22,7 @@ package projections
  * @author dlwh
  */
 trait ChartProjector[L, W] {
-  type MyAnchoring <: CoreAnchoring[L, W]
+  type MyAnchoring <: UnrefinedGrammarAnchoring[L, W]
   protected def threshold:Double
   protected def createAnchoring(charts: ParseMarginal[L, W],
                                 ruleData: AnchoredRuleProjector.AnchoredData,

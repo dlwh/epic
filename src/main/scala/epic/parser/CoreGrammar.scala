@@ -24,7 +24,7 @@ import epic.constraints.ChartConstraints.Factory
  * A CoreGrammar is a weighted grammar over x-bar symbols
  * (that is, symbols that are not refined or annotated) that
  * can be "anchored" to a sentence, giving a
- * [[epic.parser.CoreAnchoring]]. This anchoring
+ * [[epic.parser.UnrefinedGrammarAnchoring]]. This anchoring
  * can be used to parse.
  *
  * @author dlwh
@@ -41,11 +41,11 @@ trait CoreGrammar[L, W] extends Serializable { core =>
   def labelEncoder = topology.labelEncoder
 
   /**
-   * Returns a [[epic.parser.CoreAnchoring]] for this particular sentence.
+   * Returns a [[epic.parser.UnrefinedGrammarAnchoring]] for this particular sentence.
    * @param words
    * @return
    */
-  def anchor(words: IndexedSeq[W]):CoreAnchoring[L, W]
+  def anchor(words: IndexedSeq[W]):UnrefinedGrammarAnchoring[L, W]
 
   def *(other: CoreGrammar[L, W]):CoreGrammar[L, W] = new CoreGrammar.ProductGrammar(this, other)
 
@@ -56,7 +56,7 @@ trait CoreGrammar[L, W] extends Serializable { core =>
 
     override def lexicon: Lexicon[L, W] = core.lexicon
 
-    override def anchor(words: IndexedSeq[W], constraints: ChartConstraints[L]): GrammarAnchoring[L, W] = core.anchor(words).lift(constraints)
+    override def anchor(words: IndexedSeq[W], constraints: ChartConstraints[L]): GrammarAnchoring[L, W] = core.anchor(words)
 
   }
 }
@@ -66,13 +66,13 @@ object CoreGrammar {
 
   @SerialVersionUID(1L)
   case class IdentityCoreGrammar[L, W](topology: RuleTopology[L], lexicon: Lexicon[L, W]) extends CoreGrammar[L, W] {
-    def anchor(words: IndexedSeq[W]) = CoreAnchoring.identity(topology, lexicon, words, ChartConstraints.noSparsity)
+    def anchor(words: IndexedSeq[W]) = UnrefinedGrammarAnchoring.identity(topology, lexicon, words, ChartConstraints.noSparsity)
   }
 
   case class ProductGrammar[L, W](g1: CoreGrammar[L, W], g2: CoreGrammar[L, W]) extends CoreGrammar[L, W] {
     def topology: RuleTopology[L] = g1.topology
     def lexicon: Lexicon[L, W] = g1.lexicon
 
-    def anchor(words: IndexedSeq[W]): CoreAnchoring[L, W] = g1.anchor(words) * g2.anchor(words)
+    def anchor(words: IndexedSeq[W]): UnrefinedGrammarAnchoring[L, W] = g1.anchor(words) * g2.anchor(words)
   }
 }

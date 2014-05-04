@@ -31,7 +31,6 @@ import java.io.File
 import epic.constraints.{ChartConstraints, CachedChartConstraintsFactory}
 import breeze.util.Implicits._
 import breeze.optimize.FirstOrderMinimizer.OptParams
-import epic.parser.HammingLossAugmentation
 import epic.parser.ParseEval.Statistics
 import epic.features.LongestFrequentSuffixFeaturizer.LongestFrequentSuffix
 import epic.features.LongestFrequentSuffixFeaturizer

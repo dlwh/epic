@@ -33,7 +33,7 @@ class SpanAnchoringTest extends FunSuite with ParserTestHarness {
     val f = new LabeledSpanProjector[AnnotatedLabel, String](gen.topology, Double.NegativeInfinity)
 
     val grammar = new ProjectingCoreGrammar(gen, f)
-    val chartParser = Parser(grammar.lift)
+    val chartParser = Parser(grammar)
 
     for (TreeInstance(_, t, w) <- getTestTrees()) try {
       chartParser(w)
@@ -48,7 +48,7 @@ class SpanAnchoringTest extends FunSuite with ParserTestHarness {
     val gen = ParserTestHarness.simpleParser
     val f = new LabeledSpanProjector[AnnotatedLabel, String](gen.topology, Double.NegativeInfinity)
     val grammar = new ProjectingCoreGrammar(gen, f)
-    val chartParser = Parser(grammar.lift)
+    val chartParser = Parser(grammar)
 
 
     val res = evalParser(getTestTrees(), chartParser)

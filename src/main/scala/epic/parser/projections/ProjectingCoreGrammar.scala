@@ -1,5 +1,8 @@
 package epic.parser
 package projections
+
+import epic.constraints.ChartConstraints
+
 /*
  Copyright 2012 David Hall
 
@@ -20,14 +23,14 @@ package projections
  * @author dlwh
  */
 case class ProjectingCoreGrammar[L, W](parser: Parser[L, W],
-                                       projector: ChartProjector[L, W]) extends CoreGrammar[L, W] {
+                                       projector: ChartProjector[L, W]) extends Grammar[L, W] {
 
 
   def topology = parser.topology
 
   def lexicon = parser.lexicon
 
-  def anchor(words: IndexedSeq[W]) = {
+  def anchor(words: IndexedSeq[W], constraints: ChartConstraints[L]) = {
     project(words)
   }
 

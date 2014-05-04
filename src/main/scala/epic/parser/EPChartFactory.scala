@@ -24,7 +24,7 @@ case class EPChartFactory[L, W](grammars: IndexedSeq[Grammar[L, W]], maxIteratio
     var iter = 0
     var marginal: RefinedChartMarginal[L, W] = null
 
-    def project(q: CoreAnchoring[L, W], i: Int): (CoreAnchoring[L, W], Double) = {
+    def project(q: UnrefinedGrammarAnchoring[L, W], i: Int): (UnrefinedGrammarAnchoring[L, W], Double) = {
       val inf = anchorings(i)
       marginal = inf.marginal
       var contributionToLikelihood = marginal.logPartition
@@ -45,7 +45,7 @@ case class EPChartFactory[L, W](grammars: IndexedSeq[Grammar[L, W]], maxIteratio
 
     val ep = new nak.inference.ExpectationPropagation(project _, 1E-5)
     var state: ep.State = null
-    val iterates = ep.inference(CoreAnchoring.identity(topology, lexicon, words, initialCore), Array.range(0, anchorings.length), Array.fill(anchorings.length)(null))
+    val iterates = ep.inference(UnrefinedGrammarAnchoring.identity(topology, lexicon, words, initialCore), Array.range(0, anchorings.length), Array.fill(anchorings.length)(null))
     var converged = false
     while (!converged && iter < maxIterations && iterates.hasNext) {
       val s = iterates.next()

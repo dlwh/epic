@@ -33,7 +33,7 @@ case class EPParams(maxIterations: Int = 5, pruningThreshold: Double = -15, drop
 
 object EPParserModelFactory {
   type CompatibleFactory = ParserModelFactory[AnnotatedLabel, String] {
-    type MyModel <: EPModel.CompatibleModel[TreeInstance[AnnotatedLabel, String], CoreAnchoring[AnnotatedLabel, String]]
+    type MyModel <: EPModel.CompatibleModel[TreeInstance[AnnotatedLabel, String], UnrefinedGrammarAnchoring[AnnotatedLabel, String]]
   }
 }
 
@@ -46,7 +46,7 @@ case class EPParserModelFactory(ep: EPParams,
 
 
   override def make(train: IndexedSeq[TreeInstance[AnnotatedLabel, String]], topology: RuleTopology[AnnotatedLabel], lexicon: Lexicon[AnnotatedLabel, String], constrainer: Factory[AnnotatedLabel, String]): MyModel = {
-    type ModelType = EPModel.CompatibleModel[TreeInstance[AnnotatedLabel, String], CoreAnchoring[AnnotatedLabel, String]]
+    type ModelType = EPModel.CompatibleModel[TreeInstance[AnnotatedLabel, String], UnrefinedGrammarAnchoring[AnnotatedLabel, String]]
     val models = model.filterNot(_ eq null) map { model => model.make(train, topology, lexicon, constrainer): ModelType }
 
     val featureCounter = readWeights(oldWeights)
@@ -61,7 +61,7 @@ class EPParserModel[L, W](val topology: RuleTopology[L], val lexicon: Lexicon[L,
                           val constrainer: ChartConstraints.Factory[L, W],
                           maxEPIter: Int,
                           initFeatureValue: Feature => Option[Double] = {(_:Feature) => None},
-                          epInGold: Boolean = false, dropOutFraction: Double = 0.0)(models:EPModel.CompatibleModel[TreeInstance[L, W], CoreAnchoring[L, W]]*) extends EPModel[TreeInstance[L, W], CoreAnchoring[L, W]](maxEPIter, initFeatureValue, epInGold, dropOutFraction)(models:_*) with ParserExtractable[L, W] with Serializable {
+                          epInGold: Boolean = false, dropOutFraction: Double = 0.0)(models:EPModel.CompatibleModel[TreeInstance[L, W], UnrefinedGrammarAnchoring[L, W]]*) extends EPModel[TreeInstance[L, W], UnrefinedGrammarAnchoring[L, W]](maxEPIter, initFeatureValue, epInGold, dropOutFraction)(models:_*) with ParserExtractable[L, W] with Serializable {
 
   def extractParser(weights: DenseVector[Double]): Parser[L, W] = {
     val inf = inferenceFromWeights(weights)

@@ -41,7 +41,7 @@ trait ParserModel[L, W] extends epic.framework.StandardExpectedCounts.Model[Tree
 }
 
 
-trait ParserInference[L, W] extends ProjectableInference[TreeInstance[L, W], CoreAnchoring[L, W]] {
+trait ParserInference[L, W] extends ProjectableInference[TreeInstance[L, W], UnrefinedGrammarAnchoring[L, W]] {
   type ExpectedCounts = StandardExpectedCounts[Feature]
   type Marginal = epic.parser.ParseMarginal[L, W]
   type Scorer = GrammarAnchoring[L, W]
@@ -62,7 +62,7 @@ trait ParserInference[L, W] extends ProjectableInference[TreeInstance[L, W], Cor
    * @param v the example
    * @return gold marginal
    */
-  def marginal(scorer: Scorer, v: TreeInstance[L, W], aug: CoreAnchoring[L, W]): Marginal = {
+  def marginal(scorer: Scorer, v: TreeInstance[L, W], aug: UnrefinedGrammarAnchoring[L, W]): Marginal = {
     val charts = try {
       (scorer * aug).marginal
     } catch {
@@ -78,10 +78,10 @@ trait ParserInference[L, W] extends ProjectableInference[TreeInstance[L, W], Cor
     charts
   }
 
-  def baseAugment(v: TreeInstance[L, W])  = CoreAnchoring.identity(grammar.topology, grammar.lexicon, v.words, ChartConstraints.noSparsity)
+  def baseAugment(v: TreeInstance[L, W])  = UnrefinedGrammarAnchoring.identity(grammar.topology, grammar.lexicon, v.words, ChartConstraints.noSparsity)
 
 
-  def project(v: TreeInstance[L, W], s: Scorer, m: Marginal, oldAugment: CoreAnchoring[L, W]): CoreAnchoring[L, W] = {
+  def project(v: TreeInstance[L, W], s: Scorer, m: Marginal, oldAugment: UnrefinedGrammarAnchoring[L, W]): UnrefinedGrammarAnchoring[L, W] = {
     projector.project(this, v, m)
   }
 

@@ -111,7 +111,7 @@ case class SimpleAnchoring[L, W](topology: RuleTopology[L],
                             unaryScores: Array[OpenAddressHashArray[Double]],
                             // (begin, end) -> (split-begin) -> rule -> score
                             binaryScores: Array[Array[OpenAddressHashArray[Double]]],
-                            sparsityPattern: ChartConstraints[L]) extends CoreAnchoring[L, W] with Serializable {
+                            sparsityPattern: ChartConstraints[L]) extends UnrefinedGrammarAnchoring[L, W] with Serializable {
 //  def addConstraints(cs: ChartConstraints[L]): CoreAnchoring[L, W] = copy(sparsityPattern = sparsityPattern & cs)
 
   def scoreUnaryRule(begin: Int, end: Int, rule: Int) = {
