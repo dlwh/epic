@@ -129,7 +129,7 @@ POLISH_PAST_ENDING = ([mś]?|śmy|ście)
 
 WHITESPACE = \r\n | [ \r\n\t\f\xA0]
 
-EMOTICON = ( [:=]-?[()\/] | <\/?3+ )
+EMOTICON = ( [<>]?[BX;8:=][o\-\']?[DdPp()\/3>oO] | <\/?3+ | ಠ_ಠ)
 
 
 %s OPEN_QUOTE POLISH_CONDITIONAL_MODE
