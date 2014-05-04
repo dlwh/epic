@@ -22,6 +22,7 @@ import collection.mutable.BitSet
 import java.util
 import epic.constraints.{ChartConstraints, LabeledSpanConstraints}
 import breeze.linalg.{Counter, Counter2}
+import epic.trees.Span
 
 @SerialVersionUID(4)
 class RefinedParseChart[L](val index: Index[L],
@@ -183,9 +184,22 @@ class RefinedParseChart[L](val index: Index[L],
     /** right-most place a right constituent with label l--which starts at position i--can end. (end)(sym)*/
     val coarseRightMostEndForBegin = makeCoarseExtentArray(-1)
 
+
+    def feasibleSpanCoarse(begin: Int, end: Int, b: Int, c: Int) = {
+      val narrowR = coarseLeftMostEndForBegin(begin)(b)
+      val narrowL = coarseRightMostBeginForEnd(end)(c)
+      var split = math.max(narrowR, coarseLeftMostBeginForEnd(end)(c))
+      val endSplit = math.min(coarseRightMostEndForBegin(begin)(b), narrowL) + 1
+      val canBuildThisRule = narrowR < end && narrowL >= narrowR && split <= narrowL && split < endSplit
+      if(!canBuildThisRule)
+        split = endSplit
+
+      Span(split, endSplit)
+    }
+
     def feasibleSpan(begin: Int, end: Int, b: Int, refB: Int, c: Int, refC: Int) = {
       if(leftMostEndForBegin(begin)(b) == null || rightMostBeginForEnd(end)(c) == null) {
-        Range(0,0)
+        Span(0,0)
       } else {
         val narrowR = leftMostEndForBegin(begin)(b)(refB)
         val narrowL = rightMostBeginForEnd(end)(c)(refC)
@@ -195,7 +209,7 @@ class RefinedParseChart[L](val index: Index[L],
         if(!canBuildThisRule)
           split = endSplit
 
-        Range(split, endSplit)
+        Span(split, endSplit)
       }
     }
 

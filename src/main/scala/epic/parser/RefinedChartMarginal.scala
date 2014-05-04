@@ -55,7 +55,7 @@ final case class RefinedChartMarginal[L, W](anchoring: GrammarAnchoring[L, W],
 
 
   def feasibleSplitPoints(begin: Int, end: Int, leftChild: Int, leftChildRef: Int, rightChild: Int, rightChildRef: Int):IndexedSeq[Int] = {
-    inside.top.feasibleSpan(begin, end, leftChild, leftChildRef, rightChild, rightChildRef)
+    inside.top.feasibleSpan(begin, end, leftChild, leftChildRef, rightChild, rightChildRef).toIndexedSeq
   }
 
   /**
@@ -387,16 +387,7 @@ object RefinedChartMarginal {
       begin:Int <- 0 to (words.length - span)
     } {
       val end = begin + span
-      // I get a 20% speedup by inlining code dealing with these arrays. sigh.
-      val narrowRight = top.leftMostEndForBegin(begin)
-      val narrowLeft = top.rightMostBeginForEnd(end)
-      val wideRight = top.rightMostEndForBegin(begin)
-      val wideLeft = top.leftMostBeginForEnd(end)
 
-      val coarseNarrowRight = top.coarseLeftMostEndForBegin(begin)
-      val coarseNarrowLeft = top.coarseRightMostBeginForEnd(end)
-      val coarseWideRight = top.coarseRightMostEndForBegin(begin)
-      val coarseWideLeft = top.coarseLeftMostBeginForEnd(end)
       val offsets = new Array[Int](anchoring.maxLabelRefinements)
       val spanScoresEntered = new Array[Boolean](anchoring.maxLabelRefinements)
 
@@ -416,14 +407,11 @@ object RefinedChartMarginal {
 
             // Check: can we build any refinement of this rule?
             // basically, we can if TODO
-            val narrowR = coarseNarrowRight(b)
-            val narrowL = coarseNarrowLeft(c)
-            val coarseSplitBegin = math.max(narrowR, coarseWideLeft(c))
-            val coarseSplitEnd = math.min(coarseWideRight(b), narrowL) + 1
-            val canBuildThisRule = narrowR < end && narrowL >= narrowR && coarseSplitBegin <= narrowL && coarseSplitBegin < coarseSplitEnd
 
-            if(canBuildThisRule) {
-              val validA = refined.validParentRefinementsGivenRule(begin, coarseSplitBegin, coarseSplitEnd, end, r)
+            val feasibleCoarseRange = inside.top.feasibleSpanCoarse(begin, end, b, c)
+
+            if(feasibleCoarseRange.nonEmpty) {
+              val validA = refined.validParentRefinementsGivenRule(begin, feasibleCoarseRange.begin, feasibleCoarseRange.end, end, r)
               var ai = 0
               while(ai < validA.length) {
                 val refA = validA(ai)
@@ -443,13 +431,10 @@ object RefinedChartMarginal {
                     val refB = refined.leftChildRefinement(r, refR)
                     val refC = refined.rightChildRefinement(r, refR)
 
-                    val narrowR = narrowRight(b)(refB)
-                    val narrowL = narrowLeft(c)(refC)
-                    var split = math.max(narrowR, wideLeft(c)(refC))
-                    val endSplit = math.min(wideRight(b)(refB), narrowL) + 1
-                    val canBuildThisRule = narrowR < end && narrowL >= narrowR && split <= narrowL && split < endSplit
-                    if(!canBuildThisRule)
-                      split = endSplit
+                    val feasibleSplitRange = inside.top.feasibleSpan(begin, end, b, refB, c, refC)
+
+                    var split = feasibleSplitRange.begin
+                    val endSplit = feasibleSplitRange.end
 
                     while(split < endSplit) {
                       val bScore = inside.top.labelScore(begin, split, b, refB)

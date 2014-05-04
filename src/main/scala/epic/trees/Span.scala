@@ -63,6 +63,8 @@ class Span(val encoded: Long) extends AnyVal {
     begin <= other.begin && end >= other.end
   }
 
+  def toIndexedSeq = Range(begin, end)
+
 //  override def toString = s"Span($begin, $end)"
 }
 
