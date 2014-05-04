@@ -34,7 +34,7 @@ credentials += Credentials(Path.userHome / ".ivy2" / ".credentials")
 
 scalacOptions ++= Seq("-deprecation", "-language:_", "-optimize")
 
-javaOptions += "-Xmx2g"
+javaOptions += "-Xmx4g"
 
 
 seq(assemblySettings: _*)
