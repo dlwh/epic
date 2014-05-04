@@ -3,25 +3,20 @@ package epic.parser.projections
 import epic.constraints.{CachedChartConstraintsFactory, ChartConstraints}
 import epic.trees._
 import epic.parser._
-import epic.lexicon.{TagScorer, Lexicon}
+import epic.lexicon.TagScorer
 import breeze.numerics.I
-import com.typesafe.scalalogging.slf4j.LazyLogging
-import scala.collection.{GenTraversableLike, GenTraversable, GenTraversableOnce}
-import scala.collection.generic.CanBuildFrom
+import scala.collection.GenTraversableLike
 import epic.util.{SafeLogging, CacheBroker}
 import epic.parser.GrammarAnchoring.StructureDelegatingAnchoring
-import epic.parser.RefinedChartMarginal.Factory
 import breeze.config.{Configuration, CommandLineParser, Help}
 import java.io.File
 import breeze.util._
-import epic.parser.ParseExtractionException
-import epic.parser.ViterbiDecoder
 import epic.parser.ParseExtractionException
 import epic.trees.ProcessedTreebank
 import epic.trees.TreeInstance
 import epic.parser.ViterbiDecoder
 import epic.parser.ParserParams.XbarGrammar
-import epic.trees.annotations.{Xbarize, TreeAnnotator}
+import epic.trees.annotations.TreeAnnotator
 import breeze.collection.mutable.TriangularArray
 import epic.constraints.ChartConstraints.UnifiedFactory
 
@@ -126,7 +121,7 @@ class OracleParser[L, L2, W](val refinedGrammar: SimpleGrammar[L, L2, W]) extend
 
   }
 
-  def oracleMarginalFactory(trees: IndexedSeq[TreeInstance[L2, W]]):RefinedChartMarginal.Factory[L, W] = new Factory[L, W] {
+  def oracleMarginalFactory(trees: IndexedSeq[TreeInstance[L2, W]]):ParseMarginal.Factory[L, W] = new ParseMarginal.Factory[L, W] {
     val knownTrees = trees.iterator.map(ti => ti.words -> ti.tree).toMap
 
     def apply(w: IndexedSeq[W], constraints: ChartConstraints[L]): RefinedChartMarginal[L, W] = {
@@ -161,7 +156,6 @@ object OracleParser {
     val params = CommandLineParser.readIn[Params](args)
     println("Command line arguments for recovery:\n" + Configuration.fromObject(params).toCommandLineString)
     println("Evaluating Parser...")
-    import params._
 
     import params.treebank._
 
@@ -185,7 +179,7 @@ object OracleParser {
 
 
       val uncached = new ParserChartConstraintsFactory[AnnotatedLabel, String](maxMarginalized, {(_:AnnotatedLabel).isIntermediate})
-      new CachedChartConstraintsFactory[AnnotatedLabel, String](uncached)
+      new CachedChartConstraintsFactory[AnnotatedLabel, String](uncached)(params.cache)
     })
 
     val refGrammar = GenerativeParser.annotated(initialParser.topology, initialParser.lexicon, ann, trainTrees)
@@ -211,7 +205,6 @@ object OracleParser {
     {
       println("Evaluating Parser on dev...")
       val stats = ParserTester.evalParser(devTrees, parser, name+ "-dev", params.threads)
-      import stats._
       println("Eval finished. Results:")
       println(stats)
     }

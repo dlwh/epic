@@ -7,6 +7,7 @@ import breeze.linalg.{Counter, Counter2, axpy}
 import breeze.features.FeatureVector
 import epic.parser.projections.AnchoredSpanProjector
 import breeze.collection.mutable.TriangularArray
+import epic.constraints.ChartConstraints
 
 /*
  Copyright 2012 David Hall
@@ -81,6 +82,16 @@ trait ParseMarginal[L, W] extends VisitableMarginal[AnchoredVisitor[L]] {
 }
 
 object ParseMarginal {
+
+
+  trait Factory[L, W] {
+    def apply(w: IndexedSeq[W], constraints: ChartConstraints[L]):ParseMarginal[L, W]
+  }
+
+  object Factory {
+    def apply[L, W](grammar: Grammar[L, W]):StandardChartFactory[L, W] = new StandardChartFactory(grammar)
+  }
+
   private def mkVisitorFromFeaturizer[L, W, Feat](counts: StandardExpectedCounts[Feat],
                                     spec: RefinedFeaturizer[L, W, Feat]#Anchoring,
                                     scale: Double):AnchoredVisitor[L] = {
@@ -106,4 +117,10 @@ object ParseMarginal {
     TreeMarginal(anch, parse)
   }
 
+}
+
+case class StandardChartFactory[L, W](refinedGrammar: Grammar[L, W], maxMarginal: Boolean = false) extends ParseMarginal.Factory[L, W] {
+  def apply(w: IndexedSeq[W], constraints: ChartConstraints[L]):RefinedChartMarginal[L, W] = {
+    RefinedChartMarginal(refinedGrammar.anchor(w, constraints), maxMarginal = maxMarginal)
+  }
 }

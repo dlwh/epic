@@ -31,7 +31,7 @@ import epic.lexicon.Lexicon
 final case class Parser[L,W](topology: RuleTopology[L],
                              lexicon: Lexicon[L, W],
                              constraintsFactory: ChartConstraints.Factory[L, W],
-                             marginalFactory: RefinedChartMarginal.Factory[L, W],
+                             marginalFactory: ParseMarginal.Factory[L, W],
                              decoder: ChartDecoder[L, W] = ChartDecoder[L, W]()) extends (IndexedSeq[W]=>Tree[L]) {
 
   /**
