@@ -12,8 +12,51 @@ The current version is 1.0-SNAPSHOT.
 
 Documentation will live at the GitHub wiki: <https://github.com/dlwh/epic/wiki>
 
+## Using Epic
 
-## Building
+### Pre-trained Models
+
+Epic provides a number of pretrained models. These are available as Maven artifacts, and can be loaded at runtime.
+
+## Pre-trained Parsers
+
+* English: TODO
+  ```scala
+  "org.scalanlp" %% "epic-parser-en-span" % "1.0-SNAPSHOT"
+  ```
+* Basque: TODO
+  ```scala
+  "org.scalanlp" %% "epic-parser-eu-span" % "1.0-SNAPSHOT"
+  ```
+* French: TODO
+  ```scala
+  "org.scalanlp" %% "epic-parser-fr-span" % "1.0-SNAPSHOT"
+  ```
+* German: TODO
+  ```scala
+  "org.scalanlp" %% "epic-parser-de-span" % "1.0-SNAPSHOT"
+  ```
+* Hungarian: TODO
+  ```scala
+  "org.scalanlp" %% "epic-parser-pl-span" % "1.0-SNAPSHOT"
+  ```
+* Korean: TODO
+  ```scala
+  "org.scalanlp" %% "epic-parser-ko-span" % "1.0-SNAPSHOT"
+  ```
+* Polish: TODO
+  ```scala
+  "org.scalanlp" %% "epic-parser-ko-span" % "1.0-SNAPSHOT"
+  ```
+* Swedish: TODO
+  ```scala
+  "org.scalanlp" %% "epic-parser-sv-span" % "1.0-SNAPSHOT"
+  ```
+
+
+
+
+### Building
 
 To build, you need a release of [SBT 0.13.2](http://www.scala-sbt.org/0.13.2/docs/Getting-Started/Setup.html)
 
