@@ -14,61 +14,79 @@ Documentation will live at the GitHub wiki: <https://github.com/dlwh/epic/wiki>
 
 ## Using Epic
 
+### Command-line Usage
+
+#### Parser
+
+#### Part-of-Speech Tagger
+
+#### Named Entity Recognition
+
+### Programmatic Usage
+
+#### Parser
+
+#### Part-of-Speech Tagger
+
+#### Named Entity Recognition
+
 ### Pre-trained Models
 
-Epic provides a number of pretrained models. These are available as Maven artifacts, and can be loaded at runtime.
+Epic provides a number of pretrained models. These are available as Maven artifacts from Maven Central, and can be loaded at runtime. To use a specific model, just depend on it (or alternatively download the jar file). You can then load the parser by calling, for example:
 
-## Pre-trained Parsers
+```scala
+epic.parser.models.en.span.EnglishSpanParser.load()
+```
 
-* English: TODO
-  ```scala
-  "org.scalanlp" %% "epic-parser-en-span" % "1.0-SNAPSHOT"
-  ```
-* Basque: TODO
-  ```scala
-  "org.scalanlp" %% "epic-parser-eu-span" % "1.0-SNAPSHOT"
-  ```
-* French: TODO
-  ```scala
-  "org.scalanlp" %% "epic-parser-fr-span" % "1.0-SNAPSHOT"
-  ```
-* German: TODO
-  ```scala
-  "org.scalanlp" %% "epic-parser-de-span" % "1.0-SNAPSHOT"
-  ```
-* Hungarian: TODO
-  ```scala
-  "org.scalanlp" %% "epic-parser-pl-span" % "1.0-SNAPSHOT"
-  ```
-* Korean: TODO
-  ```scala
-  "org.scalanlp" %% "epic-parser-ko-span" % "1.0-SNAPSHOT"
-  ```
-* Polish: TODO
-  ```scala
-  "org.scalanlp" %% "epic-parser-ko-span" % "1.0-SNAPSHOT"
-  ```
-* Swedish: TODO
-  ```scala
-  "org.scalanlp" %% "epic-parser-sv-span" % "1.0-SNAPSHOT"
-  ```
+This will load the  model and return a `Parser` object. If you want to not hardwire dependencies, either for internationalization or to potentially try different models, use `epic.models.ParserSelector.loadParser(language)`, where
+language is the [two letter code for the language](http://www.loc.gov/standards/iso639-2/php/code_list.php) you want to use.
+
+To following models are available at this time:
+
+* Parser
+  * English: TODO
+    ```
+    "org.scalanlp" %% "epic-parser-en-span" % "1.0-SNAPSHOT"
+    ```
+  * Basque: TODO
+    ```
+    "org.scalanlp" %% "epic-parser-eu-span" % "1.0-SNAPSHOT"
+    ```
+  * French: TODO
+    ```
+    "org.scalanlp" %% "epic-parser-fr-span" % "1.0-SNAPSHOT"
+    ```
+  * German: TODO
+    ```
+    "org.scalanlp" %% "epic-parser-de-span" % "1.0-SNAPSHOT"
+    ```
+  * Hungarian: TODO
+    ```
+    "org.scalanlp" %% "epic-parser-pl-span" % "1.0-SNAPSHOT"
+    ```
+  * Korean: TODO
+    ```
+    "org.scalanlp" %% "epic-parser-ko-span" % "1.0-SNAPSHOT"
+    ```
+  * Polish: TODO
+    ```
+    "org.scalanlp" %% "epic-parser-ko-span" % "1.0-SNAPSHOT"
+    ```
+  * Swedish: TODO
+    ```
+    "org.scalanlp" %% "epic-parser-sv-span" % "1.0-SNAPSHOT"
+    ```
+
+If you use any of these models, please cite:
+
+> David Hall, Greg Durrett, and Dan Klein. 2014. Less Grammar, More Features. In ACL.
 
 
+XXX
 
+## Training Models
 
-### Building
-
-To build, you need a release of [SBT 0.13.2](http://www.scala-sbt.org/0.13.2/docs/Getting-Started/Setup.html)
-
-then run 
-
-<pre>
-$ sbt assembly
-</pre>
-
-which will compile everything, run tests, and build a jar.
-
-## Training Parsers
+### Training Parsers
 
 There are several different discriminative parsers you can train, and the trainer main class has lots of options. To get a sense of them, run the following command:
 <pre>
@@ -108,5 +126,23 @@ If you use the `SpanModel`, please cite:
 > David Hall, Greg Durrett, and Dan Klein. 2014. Less Grammar, More Features. In ACL.
 
 If you use something else, cite one of these, or something.
+
+#### Treebank Types
+
+
+
+## Building Epic
+
+To build, you need a release of [SBT 0.13.2](http://www.scala-sbt.org/0.13.2/docs/Getting-Started/Setup.html)
+
+then run 
+
+<pre>
+$ sbt assembly
+</pre>
+
+which will compile everything, run tests, and build a jar.
+
+
 
 
