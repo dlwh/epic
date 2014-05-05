@@ -1,4 +1,21 @@
-To build, you need a release of [SBT 0.11.2](https://github.com/harrah/xsbt/wiki/Getting-Started-Setup)
+### ReadMe is Work in Progress.
+
+# Epic
+
+(c) 2014- David Hall.
+
+Epic is a structured prediction framework for Scala. It also includes classes for training high-accuracy syntactic parsers, part-of-speech tagging systems, name entity recognizers, and more
+
+The current version is 1.0-SNAPSHOT.
+
+## Documentation
+
+Documentation will live at the GitHub wiki: <https://github.com/dlwh/epic/wiki>
+
+
+## Building
+
+To build, you need a release of [SBT 0.13.2](http://www.scala-sbt.org/0.13.2/docs/Getting-Started/Setup.html)
 
 then run 
 
@@ -7,6 +24,8 @@ $ sbt assembly
 </pre>
 
 which will compile everything, run tests, and build a jar.
+
+## Training Parsers
 
 There are several different discriminative parsers you can train, and the trainer main class has lots of options. To get a sense of them, run the following command:
 <pre>
@@ -29,14 +48,22 @@ There are 4 kinds of base models you can train, and you can tie them together wi
   * epic.parser.models.LatentModelFactory: Latent annotation (like the Berkeley parser)
   * epic.parser.models.LexModelFactory: Lexical annotation (kind of like the Collins parser)
   * epic.parser.models.StructModelFactory: Structural annotation (kind of like the Stanford parser)
-  * epic.parser.models.SpanModelFactory: Span features (Petrov 2008 or Finkel 2008, etc.)
+  * epic.parser.models.SpanModelFactory: Span features (Hall, Durrett, and Klein, 2014)
+ 
 
 These models all have their own options. You can see those by specifying the modelFactory and adding --help: 
 <pre>
 $ java -cp target/epicparser-assembly-0.1.jar epic.parser.models.ParserPipeline --modelFactory "model" --help
 </pre>
 
-None of these models are good by themselves: you need to train them jointly. To do that, use epic.models.EPParserModelFactory:
-<pre>
-$ java -cp target/epicparser-assembly-0.1.jar epic.parser.models.ParserTrainer --modelFactory epic.models.EPParserModelFactory --model.0 "model the first" --model.1 "model the second" // etc.
-</pre>
+If you use the first three in research papers, please cite 
+
+> David Hall and Dan Klein. 2012. Training Factored PCFGs with Expectation Propagation. In EMNLP.
+
+If you use the `SpanModel`, please cite:
+
+> David Hall, Greg Durrett, and Dan Klein. 2014. Less Grammar, More Features. In ACL.
+
+If you use something else, cite one of these, or something.
+
+
