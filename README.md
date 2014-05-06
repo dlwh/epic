@@ -132,7 +132,7 @@ If you use something else, cite one of these, or something.
 There is a `treebank.type` commandline flag that supports a few different formats for treebanks. They are:
 * `penn`: Reads from the `wsj/` subdirectory of the Penn Treebank. This expects a set of directories 00-24, each of which contains a number of `mrg` files. Standard splits are used.
 * `chinese`: Expects a number of chtbNN.mrg files in a single directory.
-* `negra`: Expects a diretory with three files, `negra_[1-3].mrg`
+* `negra`: Expects a directory with three files, `negra_[1-3].mrg`
 * `conllonto`: Expects data formatted like the 2011 CoNLL shared task. Only reads the trees.
 * `spmrl`: Expects a directory layout like that used in the 2012 SPMRL shared task.
 * `simple`: Expects a directory with 3 files: `{train, dev, test}.txt`
