@@ -60,9 +60,7 @@ object GenerativeParser {
   }
 
   /**
-   * Extracts a RefinedGrammar from a raw treebank. The refined grammar could be a core grammar,
-   * maybe I should do that.
-   *
+   * Extracts a [[epic.parser.SimpleGrammar]] from a raw treebank.
    * @param root
    * @param data
    * @tparam L
@@ -175,14 +173,7 @@ object GenerativeTrainer extends ParserPipeline {
       refinedGrammar.prettyPrint(out)
       out.close()
     }
-//
-//    val finalGrammar = if(params.pruneUnlikelyLongSpans) {
-//      val ccs = trainTrees.flatMap(_.asTaggedSequence.pairs.collect{ case (tag, word) if tag.label == "CC" || tag.label == "C" || tag.label == "KON" => word}).toSet
-//      val constraints = new ConstraintCoreGrammarAdaptor(refinedGrammar.topology, refinedGrammar.lexicon, new LongSpanConstraints.Factory[AnnotatedLabel](30, ccs))
-//      AugmentedGrammar(refinedGrammar, constraints)
-//    } else {
-//      AugmentedGrammar.fromRefined(refinedGrammar)
-//    }
+
 
     val decoder = if (params.maxRule) new MaxRuleProductDecoder[AnnotatedLabel, String]() else new ViterbiDecoder[AnnotatedLabel, String]
     val parser = Parser(refinedGrammar, decoder)

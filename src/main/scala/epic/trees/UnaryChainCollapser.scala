@@ -51,24 +51,5 @@ object UnaryChainCollapser {
   }
 }
 
-trait UnaryChainReplacer[L] {
-  def replaceUnaries(t: Tree[L]):Tree[L]
-}
 
-object AnnotatedLabelChainReplacer extends UnaryChainReplacer[AnnotatedLabel] {
-  def replaceUnaries(t: Tree[AnnotatedLabel]):Tree[AnnotatedLabel] = t match {
-    case UnaryTree(a, child, chain, span) if a.label == child.label.label && chain.isEmpty =>
-      replaceUnaries(child)
-    case UnaryTree(a, child, chain, span) =>
-      val deunaried = replaceUnaries(child).asInstanceOf[BinarizedTree[AnnotatedLabel]]
-      val withChain = chain.foldRight(deunaried){ (label, child) =>
-        UnaryTree(AnnotatedLabel(label), child, IndexedSeq.empty, span)
-      }
-      UnaryTree(a,withChain, IndexedSeq.empty, t.span)
-    case t@BinaryTree(a, lchild, rchild, span) =>
-      BinaryTree(a,
-        replaceUnaries(lchild).asInstanceOf[BinarizedTree[AnnotatedLabel]],
-        replaceUnaries(rchild).asInstanceOf[BinarizedTree[AnnotatedLabel]], t.span)
-    case t => t
-  }
-}
+
