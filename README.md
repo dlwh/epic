@@ -127,7 +127,7 @@ If you use the `SpanModel`, please cite:
 
 If you use something else, cite one of these, or something.
 
-#### Treebank Types
+#### Treebank types
 
 There is a `treebank.type` commandline flag that supports a few different formats for treebanks. They are:
 * `penn`: Reads from the `wsj/` subdirectory of the Penn Treebank. This expects a set of directories 00-24, each of which contains a number of `mrg` files. Standard splits are used.
@@ -136,6 +136,10 @@ There is a `treebank.type` commandline flag that supports a few different format
 * `conllonto`: Expects data formatted like the 2011 CoNLL shared task. Only reads the trees.
 * `spmrl`: Expects a directory layout like that used in the 2012 SPMRL shared task.
 * `simple`: Expects a directory with 3 files: `{train, dev, test}.txt`
+
+##### Training a parser programmatically
+
+TODO
 
 
 
