@@ -31,6 +31,7 @@ trait SemiCRF[L, W] extends Serializable {
   def scorer(w: IndexedSeq[W]): SemiCRF.Anchoring[L, W]
   def labelIndex: Index[L]
   def startSymbol: L
+  def outsideSymbol: L
 
   def marginal(w: IndexedSeq[W]) = {
      SemiCRF.Marginal(scorer(w))
@@ -75,6 +76,7 @@ object SemiCRF {
 
   def fromCRF[L, W](crf: CRF[L, W]):SemiCRF[L, W] = new SemiCRF[L, W] {
     def startSymbol: L = crf.startSymbol
+    override def outsideSymbol: L = startSymbol
 
     def scorer(w: IndexedSeq[W]): Anchoring[L, W] = new Anchoring[L, W] {
       val constraints: LabeledSpanConstraints[L] = LabeledSpanConstraints.fromTagConstraints(crf.lexicon.anchor(w))
@@ -450,7 +452,7 @@ object SemiCRF {
   }
 
   @SerialVersionUID(1L)
-  class IdentityConstraintSemiCRF[L, W](val labelIndex: Index[L], val startSymbol: L) extends ConstraintSemiCRF[L, W] with Serializable { outer =>
+  class IdentityConstraintSemiCRF[L, W](val labelIndex: Index[L], val startSymbol: L, val outsideSymbol: L) extends ConstraintSemiCRF[L, W] with Serializable { outer =>
     def scorer(w: IndexedSeq[W]) = new Anchoring[L,W]() {
       def words = w
       def scoreTransition(prev: Int, cur: Int, begin: Int, end: Int) = 0.0
@@ -470,6 +472,7 @@ object SemiCRF {
   class BaseModelConstraintSemiCRF[L, W](val crf: SemiCRF[L, W], val threshold: Double = 1E-5) extends ConstraintSemiCRF[L, W] with Serializable {
     def startSymbol: L = crf.startSymbol
     def labelIndex: Index[L] = crf.labelIndex
+    override def outsideSymbol: L = crf.outsideSymbol
 
     // TODO: make weak
     @transient
@@ -528,6 +531,7 @@ object SemiCRF {
     def anchor(w: IndexedSeq[W]):AnchoredFeaturizer[L, W]
 
     def startSymbol: L
+    def outsideSymbol: L
 
     def labelIndex: Index[L]
     def featureIndex: Index[Feature]
