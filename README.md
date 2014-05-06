@@ -133,9 +133,93 @@ language is the [two letter code for the language](http://www.loc.gov/standards/
 
 To following models are available at this time:
 
+
+* Parser
+  * English: TODO
+    ```
+    "org.scalanlp" %% "epic-parser-en-span" % "1.0-SNAPSHOT"
+    ```
+  * Basque: TODO
+    ```
+    "org.scalanlp" %% "epic-parser-eu-span" % "1.0-SNAPSHOT"
+    ```
+  * French: TODO
+    ```
+    "org.scalanlp" %% "epic-parser-fr-span" % "1.0-SNAPSHOT"
+    ```
+  * German: TODO
+    ```
+    "org.scalanlp" %% "epic-parser-de-span" % "1.0-SNAPSHOT"
+    ```
+  * Hungarian: TODO
+    ```
+    "org.scalanlp" %% "epic-parser-pl-span" % "1.0-SNAPSHOT"
+    ```
+  * Korean: TODO
+    ```
+    "org.scalanlp" %% "epic-parser-ko-span" % "1.0-SNAPSHOT"
+    ```
+  * Polish: TODO
+    ```
+    "org.scalanlp" %% "epic-parser-ko-span" % "1.0-SNAPSHOT"
+    ```
+  * Swedish: TODO
+    ```
+    "org.scalanlp" %% "epic-parser-sv-span" % "1.0-SNAPSHOT"
+    ```
+* POS Taggers
+  * English: TODO
+    ```
+    "org.scalanlp" %% "epic-pos-en" % "1.0-SNAPSHOT"
+    ```
+  * Basque: TODO
+    ```
+    "org.scalanlp" %% "epic-pos-eu" % "1.0-SNAPSHOT"
+    ```
+  * French: TODO
+    ```
+    "org.scalanlp" %% "epic-pos-fr" % "1.0-SNAPSHOT"
+    ```
+  * German: TODO
+    ```
+    "org.scalanlp" %% "epic-pos-de" % "1.0-SNAPSHOT"
+    ```
+  * Hungarian: TODO
+    ```
+    "org.scalanlp" %% "epic-pos-pl" % "1.0-SNAPSHOT"
+    ```
+  * Korean: TODO
+    ```
+    "org.scalanlp" %% "epic-pos-ko" % "1.0-SNAPSHOT"
+    ```
+  * Polish: TODO
+    ```
+    "org.scalanlp" %% "epic-pos-ko" % "1.0-SNAPSHOT"
+    ```
+  * Swedish: TODO
+    ```
+    "org.scalanlp" %% "epic-pos-sv" % "1.0-SNAPSHOT"
+    ```
+* Named Entity Recognizers
+  * English: TODO
+    ```
+    "org.scalanlp" %% "epic-ner-en-conll" % "1.0-SNAPSHOT"
+    ```
+  * Spanish: TODO
+    ```
+    "org.scalanlp" %% "epic-ner-es-conll" % "1.0-SNAPSHOT"
+    ```
+  * German: TODO
+    ```
+    "org.scalanlp" %% "epic-ner-de-conll" % "1.0-SNAPSHOT"
+    ```
+
+
 If you use any of the parser models in research publications, please cite:
 
 > David Hall, Greg Durrett, and Dan Klein. 2014. Less Grammar, More Features. In ACL.
+
+If you use the other things, just link to Epic.
 
 
 ## Training Models
