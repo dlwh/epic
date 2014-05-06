@@ -9,3 +9,6 @@ resolvers += Resolver.url("artifactory", url("http://scalasbt.artifactoryonline.
 addSbtPlugin("com.eed3si9n" % "sbt-assembly" % "0.10.2")
 
 addSbtPlugin("org.scalanlp" % "sbt-jflex" % "0.1-SNAPSHOT")
+
+
+addSbtPlugin("com.github.mpeltonen" % "sbt-idea" % "1.6.0")

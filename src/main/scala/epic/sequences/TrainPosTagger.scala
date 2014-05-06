@@ -12,7 +12,7 @@ import com.typesafe.scalalogging.slf4j.LazyLogging
  *
  * @author dlwh
  */
-object POSTagger extends LazyLogging {
+object TrainPosTagger extends LazyLogging {
   case class Params(opt: OptParams, treebank: ProcessedTreebank, hashFeatureScale: Double = 0.00)
 
   def main(args: Array[String]) {

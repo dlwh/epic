@@ -221,6 +221,20 @@ If you use any of the parser models in research publications, please cite:
 
 If you use the other things, just link to Epic.
 
+## Building Epic
+
+In order to do anything besides use pre-trained models, you will probably need to build Epic.
+
+To build, you need a release of [SBT 0.13.2](http://www.scala-sbt.org/0.13.2/docs/Getting-Started/Setup.html)
+
+then run 
+
+<pre>
+$ sbt assembly
+</pre>
+
+which will compile everything, run tests, and build a fatjar that includes all dependencies.
+
 
 ## Training Models
 
@@ -265,6 +279,12 @@ If you use the `SpanModel`, please cite:
 
 If you use something else, cite one of these, or something.
 
+For training a SpanModel, the following configuration is known to work well in general:
+
+```bash
+TODO
+```
+
 #### Treebank types
 
 There is a `treebank.type` commandline flag that supports a few different formats for treebanks. They are:
@@ -279,20 +299,85 @@ There is a `treebank.type` commandline flag that supports a few different format
 
 TODO
 
+TODO: make buildSimple for SpanModel.
+
+#### Training POS taggers and other sequence models
+
+The main class `epic.sequences.TrainPosTagger` can be used to train a POS Tagger from a treebank. It expects the same treebank options (namely `treebank.path` and `treebank.type`) as the Parser trainer does, as well as the same optimization options.
 
 
-## Building Epic
+The following configuration is known to work well:
 
-To build, you need a release of [SBT 0.13.2](http://www.scala-sbt.org/0.13.2/docs/Getting-Started/Setup.html)
+* English:
+```bash
+TODO
+```
+* Others:
+```bash
+TODO
+```
 
-then run 
+If you want to train other kinds of models, you will probably need to build CRFs programmatically. For inspiration, you should probably look at the source code for TrainPosTagger. It's wonderfully short:
 
-<pre>
-$ sbt assembly
-</pre>
+```scala
+object TrainPosTagger extends LazyLogging {
+  case class Params(opt: OptParams, treebank: ProcessedTreebank, hashFeatureScale: Double = 0.00)
 
-which will compile everything, run tests, and build a jar.
+  def main(args: Array[String]) {
+    val params = CommandLineParser.readIn[Params](args)
+    logger.info("Command line arguments for recovery:\n" + Configuration.fromObject(params).toCommandLineString)
+    import params._
+    val train = treebank.trainTrees.map(_.asTaggedSequence)
+    val test = treebank.devTrees.map(_.asTaggedSequence)
+
+    val crf = CRF.buildSimple(train, AnnotatedLabel("TOP"), opt = opt, hashFeatures = hashFeatureScale)
+
+    val stats = TaggedSequenceEval.eval(crf, test)
+    println("Final Stats: " + stats)
+    println("Confusion Matrix:\n" + stats.confusion)
+
+  }
+
+}
+```
+TODO actually save the tagging models!
+
+Basically, you need to create a collection of TaggedSequences, which is a pair of sequences, one for tags and one for words. Then pass in the training data to `CRF.buildSimple`, along with a start symbol (used for the "beginning of sentence" tag), an optional [Gazetteer](#gazetteer) (not shown), and an [OptParams](#optparams), which is used to control the optimization. There is also an optional hashFeatures argument, which isn't used. (TODO)
+
+TODO: expose featurizer here.
+
+### Training NER systems and other segmentation models
+
+Training an NER system or other SemiCRF is very similar to training a CRF. The main difference is that the inputs are Segmentations, rather than TaggedSequences. The main class `epic.sequences.SemiConllNERPipeline` can be used to train NER models, with data in the [CoNLL 2003 shared task format](http://www.cnts.ua.ac.be/conll2003/ner/). This class completely ignores all fields except the first and last. The commandline takes two paths, `--train` and `--test`, to specify training and test set files, respectively. 
+
+If you need to do something more complicated, you will need to write your own code. As an example, here is the code for `epic.sequences.SemiConllNERPipeline`. This code is somewhat more complicated, as the CoNLL sequences need to be turned into segmentations.
+
+```scala
+def main(args: Array[String]) {
+    val params:Params = CommandLineParser.readIn[Params](args)
+    logger.info("Command line arguments for recovery:\n" + Configuration.fromObject(params).toCommandLineString)
+    val (train,test) = {
+      val standardTrain = CONLLSequenceReader.readTrain(new FileInputStream(params.path), params.path.getName).toIndexedSeq
+      val standardTest = CONLLSequenceReader.readTrain(new FileInputStream(params.test), params.path.getName).toIndexedSeq
+
+      standardTrain.take(params.nsents).map(makeSegmentation) -> standardTest.map(makeSegmentation)
+    }
 
 
+    // you can optionally pass in an a Gazetteer, though I've not gotten much mileage with them.
+    val crf = SemiCRF.buildSimple(train, "--BEGIN--", "O", params.opt)
+
+    val stats = SegmentationEval.eval(crf, test)
+
+    println(stats)
 
 
+  }
+```
+
+TODO write object. TODO: edit SemiConllPipeline to actually match this. TODO: allow passing in of featurizer
+
+
+### OptParams
+
+TODO

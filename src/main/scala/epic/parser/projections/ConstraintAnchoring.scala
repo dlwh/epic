@@ -377,7 +377,7 @@ object PrecacheConstraints extends LazyLogging {
     val params:ProjectionParams = CommandLineParser.readIn[ProjectionParams](args)
     logger.info("Command line arguments for recovery:\n" + Configuration.fromObject(params).toCommandLineString)
     val treebank = params.treebank.copy(maxLength = 1000000)
-    val parser = loadParser[Any](params.parser)
+    val parser =  breeze.util.readObject[Parser[AnnotatedLabel, String]](params.parser)
 
     val out = params.out
     out.getAbsoluteFile.getParentFile.mkdirs()
@@ -387,11 +387,6 @@ object PrecacheConstraints extends LazyLogging {
     forTreebank(factory, treebank, params.name)
     broker.commit()
     broker.close()
-  }
-
-  def loadParser[T](loc: File): Parser[AnnotatedLabel, String] = {
-    val parser = breeze.util.readObject[Parser[AnnotatedLabel, String]](loc)
-    parser
   }
 
 }
