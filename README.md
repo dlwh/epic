@@ -1,12 +1,92 @@
-To build, you need a release of [SBT 0.11.2](https://github.com/harrah/xsbt/wiki/Getting-Started-Setup)
+### ReadMe is Work in Progress.
 
-then run 
+# Epic
 
-<pre>
-$ sbt assembly
-</pre>
+(c) 2014- David Hall.
 
-which will compile everything, run tests, and build a jar.
+Epic is a structured prediction framework for Scala. It also includes classes for training high-accuracy syntactic parsers, part-of-speech tagging systems, name entity recognizers, and more
+
+The current version is 1.0-SNAPSHOT.
+
+## Documentation
+
+Documentation will live at the GitHub wiki: <https://github.com/dlwh/epic/wiki>
+
+## Using Epic
+
+### Command-line Usage
+
+#### Parser
+
+#### Part-of-Speech Tagger
+
+#### Named Entity Recognition
+
+### Programmatic Usage
+
+#### Parser
+
+#### Part-of-Speech Tagger
+
+#### Named Entity Recognition
+
+### Pre-trained Models
+
+Epic provides a number of pretrained models. These are available as Maven artifacts from Maven Central, and can be loaded at runtime. To use a specific model, just depend on it (or alternatively download the jar file). You can then load the parser by calling, for example:
+
+```scala
+epic.parser.models.en.span.EnglishSpanParser.load()
+```
+
+This will load the  model and return a `Parser` object. If you want to not hardwire dependencies, either for internationalization or to potentially try different models, use `epic.models.ParserSelector.loadParser(language)`, where
+language is the [two letter code for the language](http://www.loc.gov/standards/iso639-2/php/code_list.php) you want to use.
+
+To following models are available at this time:
+
+* Parser
+  * English: TODO
+    ```
+    "org.scalanlp" %% "epic-parser-en-span" % "1.0-SNAPSHOT"
+    ```
+  * Basque: TODO
+    ```
+    "org.scalanlp" %% "epic-parser-eu-span" % "1.0-SNAPSHOT"
+    ```
+  * French: TODO
+    ```
+    "org.scalanlp" %% "epic-parser-fr-span" % "1.0-SNAPSHOT"
+    ```
+  * German: TODO
+    ```
+    "org.scalanlp" %% "epic-parser-de-span" % "1.0-SNAPSHOT"
+    ```
+  * Hungarian: TODO
+    ```
+    "org.scalanlp" %% "epic-parser-pl-span" % "1.0-SNAPSHOT"
+    ```
+  * Korean: TODO
+    ```
+    "org.scalanlp" %% "epic-parser-ko-span" % "1.0-SNAPSHOT"
+    ```
+  * Polish: TODO
+    ```
+    "org.scalanlp" %% "epic-parser-ko-span" % "1.0-SNAPSHOT"
+    ```
+  * Swedish: TODO
+    ```
+    "org.scalanlp" %% "epic-parser-sv-span" % "1.0-SNAPSHOT"
+    ```
+
+If you use any of these models, please cite:
+
+> David Hall, Greg Durrett, and Dan Klein. 2014. Less Grammar, More Features. In ACL.
+
+
+XXX
+
+## Training Models
+
+### Training Parsers
 
 There are several different discriminative parsers you can train, and the trainer main class has lots of options. To get a sense of them, run the following command:
 <pre>
@@ -29,14 +109,40 @@ There are 4 kinds of base models you can train, and you can tie them together wi
   * epic.parser.models.LatentModelFactory: Latent annotation (like the Berkeley parser)
   * epic.parser.models.LexModelFactory: Lexical annotation (kind of like the Collins parser)
   * epic.parser.models.StructModelFactory: Structural annotation (kind of like the Stanford parser)
-  * epic.parser.models.SpanModelFactory: Span features (Petrov 2008 or Finkel 2008, etc.)
+  * epic.parser.models.SpanModelFactory: Span features (Hall, Durrett, and Klein, 2014)
+ 
 
 These models all have their own options. You can see those by specifying the modelFactory and adding --help: 
 <pre>
 $ java -cp target/epicparser-assembly-0.1.jar epic.parser.models.ParserPipeline --modelFactory "model" --help
 </pre>
 
-None of these models are good by themselves: you need to train them jointly. To do that, use epic.models.EPParserModelFactory:
+If you use the first three in research papers, please cite 
+
+> David Hall and Dan Klein. 2012. Training Factored PCFGs with Expectation Propagation. In EMNLP.
+
+If you use the `SpanModel`, please cite:
+
+> David Hall, Greg Durrett, and Dan Klein. 2014. Less Grammar, More Features. In ACL.
+
+If you use something else, cite one of these, or something.
+
+#### Treebank Types
+
+
+
+## Building Epic
+
+To build, you need a release of [SBT 0.13.2](http://www.scala-sbt.org/0.13.2/docs/Getting-Started/Setup.html)
+
+then run 
+
 <pre>
-$ java -cp target/epicparser-assembly-0.1.jar epic.parser.models.ParserTrainer --modelFactory epic.models.EPParserModelFactory --model.0 "model the first" --model.1 "model the second" // etc.
+$ sbt assembly
 </pre>
+
+which will compile everything, run tests, and build a jar.
+
+
+
+
