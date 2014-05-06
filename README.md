@@ -107,6 +107,7 @@ You'll get a list of all the available options (so many!) The important ones are
 
 <pre>
 --treebank.path "path/to/treebank"
+--treebank.type                                  # kind of treebank. See [treebank types](#Treebank-types) below.
 --cache.path "constraint.cache"
 --modelFactory  XXX                              # the kind of parser to train. See below.
 --opt.useStochastic true                         # turn on stochastic gradient
@@ -149,7 +150,7 @@ There is a `treebank.type` commandline flag that supports a few different format
 
 ##### Training a parser programmatically
 
-TODO
+Of 
 
 
 
