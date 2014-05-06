@@ -30,11 +30,41 @@ java -Xmx4g -cp /path/to/epic-assembly-1.0-SNAPSHOT.jar epic.parser.ParseText --
 
 Currently, all text is output to standard out. In the future, we will support output in a way that differentiates the files. In addition, we will add support for reading from stdin. By default, the system will use all available cores for execution.
 
-TODO: Models can be downloaded from <https://www.scalanlp.org/epic-models/> or from Maven Central. (See below.)
+TODO: Models can be downloaded from <https://www.scalanlp.org/epic-models/> or from Maven Central. ([See below](#pre-trained-models).)
 
 ### Programmatic Usage
 
+Epic also supports programmatic usage. All of the models assume that text has been segmented and tokenized.
+
+#### Preprocessing text
+
+To preprocess text so that the models can use them, you will need to segment out sentences and tokenize the sentences into individual words. Epic comes with classes to do both.
+
+TODO: bundle the sentence segmenter
+
+To split a text into sentences, use the XXX.
+
+Once you have a sentence, you can tokenize it using a `epic.preprocess.TreebankTokenizer`, which takes a string and returns a sequence of tokens. All told, the pipeline looks like this:
+
+```scala
+val text = getSomeText();
+
+val sentenceSplitter = ??? // TODO
+val tokenizer = new epic.preprocess.TreebankTokenizer()
+
+val sentences: IndexedSeq[IndexedSeq[String]] = sentenceSplitter(text).map(tokenizer).toIndexedSeq
+
+for(sentence <- sentences) {
+  // use the sentence tokens
+}
+
+```
+
+
+
 #### Parser
+
+To use the parser programmaticaly, deserialize parser model, then pass the parser in segmented text.
 
 #### Part-of-Speech Tagger
 
@@ -107,7 +137,6 @@ You'll get a list of all the available options (so many!) The important ones are
 
 <pre>
 --treebank.path "path/to/treebank"
---treebank.type                                  # kind of treebank. See [treebank types](#Treebank-types) below.
 --cache.path "constraint.cache"
 --modelFactory  XXX                              # the kind of parser to train. See below.
 --opt.useStochastic true                         # turn on stochastic gradient
@@ -150,7 +179,7 @@ There is a `treebank.type` commandline flag that supports a few different format
 
 ##### Training a parser programmatically
 
-Of 
+TODO
 
 
 
