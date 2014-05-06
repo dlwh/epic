@@ -1,10 +1,10 @@
-### ReadMe is Work in Progress.
+### README is Work in Progress.
 
 # Epic
 
 (c) 2014- David Hall.
 
-Epic is a structured prediction framework for Scala. It also includes classes for training high-accuracy syntactic parsers, part-of-speech tagging systems, name entity recognizers, and more
+Epic is a structured prediction framework for Scala. It also includes classes for training high-accuracy syntactic parsers, part-of-speech taggers, name entity recognizers, and more.
 
 The current version is 1.0-SNAPSHOT.
 
@@ -16,11 +16,21 @@ Documentation will live at the GitHub wiki: <https://github.com/dlwh/epic/wiki>
 
 ### Command-line Usage
 
-#### Parser
+Epic bundles command line interfaces for using parsers, NER systems, and POS taggers (and more generally, segmentation and tagging systems). There are three classes, one for each kind of system:
 
-#### Part-of-Speech Tagger
+* `epic.parser.ParseText` runs a parser.
+* `epic.sequences.SegmentText` runs an NER system, or any kind of segmentation system.
+* `epic.sequences.TagText` runs a POS tagger, or any kind of tagging system.
 
-#### Named Entity Recognition
+All of these systems expect plain text files as input, along with a path to a model file. The syntax is:
+
+```bash
+java -Xmx4g -cp /path/to/epic-assembly-1.0-SNAPSHOT.jar epic.parser.ParseText --model /path/to/model.ser.gz --nthreads <number of threads> [files]
+```
+
+Currently, all text is output to standard out. In the future, we will support output in a way that differentiates the files. In addition, we will add support for reading from stdin. By default, the system will use all available cores for execution.
+
+TODO: Models can be downloaded from <https://www.scalanlp.org/epic-models/> or from Maven Central. (See below.)
 
 ### Programmatic Usage
 
