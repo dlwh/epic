@@ -81,10 +81,44 @@ println(tree.render(words))
 
 ```
 
+Trees have a number of methods on them. See the class definition or API docs (TODO: publish api docs)
+
 #### Part-of-Speech Tagger
+
+Using a Part-of-Speech tagger is similar to using a parser: load a model, tokenize some text, run the tagger. All taggers are (currently) [linear chain conditional random fields](http://people.cs.umass.edu/~mccallum/papers/crf-tutorial.pdf), or CRFs. (You don't need to understand them to use them. They are just a machine learning method for assigning a sequence of tags to a sequence of words.)
+
+```scala
+val tagger = epic.models.deserialize[CRF[AnnotatedLabel, String]](path)
+
+// or:
+
+val tagger = epic.models.PosTaggerSelector.loadTagger("en") // or another 2 letter code.
+
+val tags = tagger(sentence)
+
+println(tags.render)
+
+```
 
 
 #### Named Entity Recognition
+
+Again, using NER systems is basically the same as using POS taggers. All NER systems are currently [semi-Markov linear chain conditional random fields](http://www.cs.cmu.edu/~wcohen/postscript/semiCRF.pdf), or SemiCRFs. (You don't need to understand them to use them. They are just a machine learning method for segmenting a sequence of words into continguous segments.)
+
+```scala
+val tagger = epic.models.deserialize[SemiCRF[AnnotatedLabel, String]](path)
+
+// or:
+
+val tagger = epic.models.NerSelector.loadSegmenter("en") // or another 2 letter code.
+
+val segments = tagger(sentence)
+
+println(tags.render(tagger.outsideLabel))
+
+```
+
+The outside label of a SemiCRF is the label that is consider not part of a "real" segment. For instance, in NER, it is the label given to words that are not named entities.
 
 ### Pre-trained Models
 
@@ -98,86 +132,6 @@ This will load the  model and return a `Parser` object. If you want to not hardw
 language is the [two letter code for the language](http://www.loc.gov/standards/iso639-2/php/code_list.php) you want to use.
 
 To following models are available at this time:
-
-* Parser
-  * English: TODO
-    ```
-    "org.scalanlp" %% "epic-parser-en-span" % "1.0-SNAPSHOT"
-    ```
-  * Basque: TODO
-    ```
-    "org.scalanlp" %% "epic-parser-eu-span" % "1.0-SNAPSHOT"
-    ```
-  * French: TODO
-    ```
-    "org.scalanlp" %% "epic-parser-fr-span" % "1.0-SNAPSHOT"
-    ```
-  * German: TODO
-    ```
-    "org.scalanlp" %% "epic-parser-de-span" % "1.0-SNAPSHOT"
-    ```
-  * Hungarian: TODO
-    ```
-    "org.scalanlp" %% "epic-parser-pl-span" % "1.0-SNAPSHOT"
-    ```
-  * Korean: TODO
-    ```
-    "org.scalanlp" %% "epic-parser-ko-span" % "1.0-SNAPSHOT"
-    ```
-  * Polish: TODO
-    ```
-    "org.scalanlp" %% "epic-parser-ko-span" % "1.0-SNAPSHOT"
-    ```
-  * Swedish: TODO
-    ```
-    "org.scalanlp" %% "epic-parser-sv-span" % "1.0-SNAPSHOT"
-    ```
-* POS Taggers
-  * English: TODO
-    ```
-    "org.scalanlp" %% "epic-pos-en-span" % "1.0-SNAPSHOT"
-    ```
-  * Basque: TODO
-    ```
-    "org.scalanlp" %% "epic-pos-eu-span" % "1.0-SNAPSHOT"
-    ```
-  * French: TODO
-    ```
-    "org.scalanlp" %% "epic-pos-fr-span" % "1.0-SNAPSHOT"
-    ```
-  * German: TODO
-    ```
-    "org.scalanlp" %% "epic-pos-de-span" % "1.0-SNAPSHOT"
-    ```
-  * Hungarian: TODO
-    ```
-    "org.scalanlp" %% "epic-pos-pl-span" % "1.0-SNAPSHOT"
-    ```
-  * Korean: TODO
-    ```
-    "org.scalanlp" %% "epic-pos-ko-span" % "1.0-SNAPSHOT"
-    ```
-  * Polish: TODO
-    ```
-    "org.scalanlp" %% "epic-pos-ko-span" % "1.0-SNAPSHOT"
-    ```
-  * Swedish: TODO
-    ```
-    "org.scalanlp" %% "epic-pos-sv-span" % "1.0-SNAPSHOT"
-    ```
-* Named Entity Recognizers
-  * English: TODO
-    ```
-    "org.scalanlp" %% "epic-pos-en-span" % "1.0-SNAPSHOT"
-    ```
-  * Spanish: TODO
-    ```
-    "org.scalanlp" %% "epic-pos-en-span" % "1.0-SNAPSHOT"
-    ```
-  * German: TODO
-    ```
-    "org.scalanlp" %% "epic-pos-en-span" % "1.0-SNAPSHOT"
-    ```
 
 If you use any of the parser models in research publications, please cite:
 
