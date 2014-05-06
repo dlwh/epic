@@ -19,7 +19,7 @@ package models
 import epic.framework._
 import breeze.linalg._
 import epic.parser.GenerativeParser
-import epic.trees.{TreeInstance, UnaryRule, BinaryRule}
+import epic.trees.{Debinarizer, TreeInstance, UnaryRule, BinaryRule}
 import epic.constraints.ChartConstraints
 
 /**
@@ -31,7 +31,7 @@ trait ParserModel[L, W] extends epic.framework.StandardExpectedCounts.Model[Tree
   type Marginal = epic.parser.ParseMarginal[L, W]
   type Scorer = GrammarAnchoring[L, W]
 
-  def extractParser(weights: DenseVector[Double]) = {
+  def extractParser(weights: DenseVector[Double])(implicit deb: Debinarizer[L]) = {
     val inf = inferenceFromWeights(weights).forTesting
     Parser(constrainer, inf.grammar, ChartDecoder[L, W]())
   }

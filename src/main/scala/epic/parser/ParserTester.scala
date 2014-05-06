@@ -77,7 +77,7 @@ object ParserTester {
 
   def evalParser(testTrees: IndexedSeq[TreeInstance[AnnotatedLabel,String]],
                  parser: Parser[AnnotatedLabel,String], name: String, nthreads: Int):ParseEval.Statistics = {
-    ParseEval.evaluateAndLog(testTrees, parser, name, AnnotatedLabelChainReplacer, { (_: AnnotatedLabel).label }, nthreads = nthreads)
+    ParseEval.evaluateAndLog(testTrees, parser, name, { (_: AnnotatedLabel).label }, nthreads = nthreads)
   }
 
 }

@@ -54,7 +54,7 @@ object GenerativeParser {
    * @tparam W
    * @return
    */
-  def fromTrees[L, W](data: Traversable[TreeInstance[L, W]]):Parser[L, W] = {
+  def fromTrees[L, W](data: Traversable[TreeInstance[L, W]])(implicit deb: Debinarizer[L]):Parser[L, W] = {
     val grammar = extractGrammar(data.head.tree.label, data)
     Parser(grammar)
   }

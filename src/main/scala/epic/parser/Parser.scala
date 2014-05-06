@@ -27,12 +27,13 @@ import epic.lexicon.Lexicon
  *
  * @author dlwh
  */
-@SerialVersionUID(1L)
+@SerialVersionUID(2L)
 final case class Parser[L,W](topology: RuleTopology[L],
                              lexicon: Lexicon[L, W],
                              constraintsFactory: ChartConstraints.Factory[L, W],
                              marginalFactory: ParseMarginal.Factory[L, W],
-                             decoder: ChartDecoder[L, W] = ChartDecoder[L, W]()) extends (IndexedSeq[W]=>Tree[L]) {
+                             decoder: ChartDecoder[L, W] = ChartDecoder[L, W]())
+                            (implicit val debinarizer: Debinarizer[L]) extends (IndexedSeq[W]=>Tree[L]) {
 
   /**
    * Returns the best parse (calls bestParse) for the sentence
@@ -54,21 +55,21 @@ final case class Parser[L,W](topology: RuleTopology[L],
 
 object Parser {
 
-  def apply[L, W](ref: Grammar[L, W]): Parser[L, W]= {
-    Parser(ref.topology, ref.lexicon, ChartConstraints.Factory.noSparsity, StandardChartFactory(ref))
+  def apply[L, W](grammar: Grammar[L, W])(implicit deb: Debinarizer[L]): Parser[L, W]= {
+    Parser(grammar.topology, grammar.lexicon, ChartConstraints.Factory.noSparsity, StandardChartFactory(grammar), ChartDecoder())
+
   }
 
-  def apply[L, W](refined: Grammar[L, W], decoder: ChartDecoder[L, W]): Parser[L, W] = {
+  def apply[L, W](refined: Grammar[L, W], decoder: ChartDecoder[L, W])(implicit deb: Debinarizer[L]): Parser[L, W] = {
     apply(ChartConstraints.Factory.noSparsity, refined, decoder)
   }
 
 
-  def apply[L, W](core: ChartConstraints.Factory[L, W], refinedGrammar: Grammar[L, W], decoder: ChartDecoder[L, W]): Parser[L, W] = {
-    Parser(refinedGrammar.topology, refinedGrammar.lexicon, core, StandardChartFactory(refinedGrammar, decoder.wantsMaxMarginal), decoder)
+  def apply[L, W](core: ChartConstraints.Factory[L, W], grammar: Grammar[L, W], decoder: ChartDecoder[L, W])(implicit deb: Debinarizer[L]): Parser[L, W] = {
+    Parser(grammar.topology, grammar.lexicon, core, StandardChartFactory(grammar, decoder.wantsMaxMarginal), decoder)
   }
 
-
-  def apply[L, W](core: ChartConstraints.Factory[L, W], refinedGrammar: Grammar[L, W]): Parser[L, W] = {
+  def apply[L, W](core: ChartConstraints.Factory[L, W], refinedGrammar: Grammar[L, W])(implicit deb: Debinarizer[L]): Parser[L, W] = {
     apply(core, refinedGrammar, new MaxConstituentDecoder)
   }
 }

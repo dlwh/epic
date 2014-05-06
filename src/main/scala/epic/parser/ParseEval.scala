@@ -101,9 +101,8 @@ object ParseEval extends LazyLogging {
 
   def parseAll[L](trees: IndexedSeq[TreeInstance[L,String]],
                   parser: Parser[L,String],
-                  chainReplacer: UnaryChainReplacer[L],
                   asString: L=>String,
-                  nthreads: Int = -1): Seq[ParseResult[L]] = {
+                  nthreads: Int = -1)(implicit deb: Debinarizer[L]): Seq[ParseResult[L]] = {
     val partrees = trees.par
     if (nthreads > 0) {
       partrees.tasksupport = new ForkJoinTaskSupport(new ForkJoinPool(nthreads))
@@ -114,12 +113,11 @@ object ParseEval extends LazyLogging {
       try {
         val TreeInstance(_,goldTree,words) = sent
         val startTime = System.currentTimeMillis
-        val tree: Tree[String] = chainReplacer.replaceUnaries(parser.parse(words)).map(asString)
-        val guessTree = Trees.debinarize(Trees.deannotate(tree))
-        val deBgold = Trees.debinarize(Trees.deannotate(goldTree.map(asString)))
+        val debGuess: Tree[String] = deb(parser.parse(words)).map(asString)
+        val debGold: Tree[String] = deb(goldTree).map(asString)
         val endTime = System.currentTimeMillis
         progress.reportProgress()
-        Some(ParseResult(sent, deBgold, guessTree, (endTime-startTime) / 1000.0))
+        Some(ParseResult(sent, debGold, debGuess, (endTime-startTime) / 1000.0))
       } catch {
         case e: Exception =>
           logger.error(s"While parsing ${sent.words}", e)
@@ -133,24 +131,24 @@ object ParseEval extends LazyLogging {
 
   def evaluate[L](trees: IndexedSeq[TreeInstance[L,String]],
                   parser: Parser[L,String],
-                  chainReplacer: UnaryChainReplacer[L],
-                  asString: L=>String, nthreads: Int = -1): Statistics = {
-    val results = parseAll(trees, parser, chainReplacer, asString, nthreads)
+                  asString: L=>String, nthreads: Int = -1)(implicit deb: Debinarizer[L]): Statistics = {
+    val results = parseAll(trees, parser, asString, nthreads)
     results.map(_.stats).reduceLeft(_ + _)
   }
 
   def evaluateAndLog[L](trees: IndexedSeq[TreeInstance[L,String]],
                      parser: Parser[L,String],
                      evalDir: String,
-                     chainReplacer: UnaryChainReplacer[L],
                      asString: L=>String = (_:L).toString,
-                     nthreads: Int = -1) = {
+                     nthreads: Int = -1)(implicit deb: Debinarizer[L]) = {
 
     val parsedir = new File(evalDir)
-    parsedir.exists() || parsedir.mkdirs() || sys.error("Couldn't make directory: " + parsedir)
+    if(!parsedir.exists() && !parsedir.mkdirs()) {
+      throw new RuntimeException("Couldn't make directory: " + parsedir)
+    }
     val goldOut = new PrintStream(new BufferedOutputStream(new FileOutputStream(new File(parsedir,"gold"))))
     val guessOut = new PrintStream(new BufferedOutputStream(new FileOutputStream(new File(parsedir,"guess"))))
-    val results = parseAll(trees, parser, chainReplacer, asString, nthreads=nthreads)
+    val results = parseAll(trees, parser, asString, nthreads=nthreads)
     results foreach { res =>
       import res._
       val buf = new StringBuilder()

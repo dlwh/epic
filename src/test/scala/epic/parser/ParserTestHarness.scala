@@ -40,7 +40,7 @@ trait ParserTestHarness {
 
 
   def evalParser(testTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]], parser: Parser[AnnotatedLabel, String]) = {
-    ParseEval.evaluate(testTrees, parser, AnnotatedLabelChainReplacer, asString = {(_:AnnotatedLabel).baseLabel}, nthreads= -1)
+    ParseEval.evaluate(testTrees, parser, asString = {(_:AnnotatedLabel).baseLabel}, nthreads= -1)
   }
 
   val transform = new StandardTreeProcessor()

@@ -18,7 +18,7 @@ package epic.parser.models
 import epic.framework.{Feature, Model, ModelFactory}
 import breeze.linalg._
 import epic.parser.{GenerativeParser, RuleTopology, Parser}
-import epic.trees.{UnaryRule, BinaryRule, TreeInstance}
+import epic.trees.{Debinarizer, UnaryRule, BinaryRule, TreeInstance}
 import epic.lexicon.Lexicon
 import java.io.File
 import epic.constraints.ChartConstraints
@@ -33,7 +33,7 @@ trait ParserExtractable[L, W] {
   def topology: RuleTopology[L]
   def lexicon: Lexicon[L, W]
   def constrainer: ChartConstraints.Factory[L, W]
-  def extractParser(weights: DenseVector[Double]): Parser[L, W]
+  def extractParser(weights: DenseVector[Double])(implicit deb: Debinarizer[L]): Parser[L, W]
 }
 
 

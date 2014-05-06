@@ -135,7 +135,7 @@ class OracleParser[L, L2, W](val refinedGrammar: SimpleGrammar[L, L2, W]) extend
     }
   }
 
-  def oracleParser(constraintGrammar: ChartConstraints.Factory[L, W], trees: IndexedSeq[TreeInstance[L2, W]]): Parser[L, W] = {
+  def oracleParser(constraintGrammar: ChartConstraints.Factory[L, W], trees: IndexedSeq[TreeInstance[L2, W]])(implicit deb: Debinarizer[L]): Parser[L, W] = {
     new Parser(refinedGrammar.topology, refinedGrammar.lexicon, constraintGrammar, oracleMarginalFactory(trees), ViterbiDecoder())
   }
 }
