@@ -113,7 +113,7 @@ object ParseEval extends LazyLogging {
       try {
         val TreeInstance(_,goldTree,words) = sent
         val startTime = System.currentTimeMillis
-        val debGuess: Tree[String] = deb(parser.parse(words)).map(asString)
+        val debGuess: Tree[String] = deb(parser.bestBinarizedTree(words)).map(asString)
         val debGold: Tree[String] = deb(goldTree).map(asString)
         val endTime = System.currentTimeMillis
         progress.reportProgress()

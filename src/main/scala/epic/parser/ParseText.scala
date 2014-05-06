@@ -7,6 +7,7 @@ import epic.trees.AnnotatedLabel
 import io.{Codec, Source}
 import chalk.text.LanguagePack
 import epic.preprocess.TreebankTokenizer
+import scala.collection.parallel.ForkJoinTaskSupport
 
 /**
  * Simple class that reads in a bunch of files and parses them. Output is dumped to standard out.
@@ -31,22 +32,32 @@ object ParseText {
     }
 
     val parser = readObject[Parser[AnnotatedLabel,String]](params.parser)
-    if(params.threads >= 1) {
-//      collection.parallel.ForkJoinTasks.defaultForkJoinPool.setParallelism(params.threads)
-    }
 
     val sentenceSegmenter = LanguagePack.English.sentenceSegmenter
     val tokenizer = new TreebankTokenizer
 
+    val pool = if(params.threads > 0) {
+      new scala.concurrent.forkjoin.ForkJoinPool(params.threads)
+    } else {
+      collection.parallel.ForkJoinTasks.defaultForkJoinPool
+    }
+
     for(f <- files) {
       val text = Source.fromFile(f)(Codec.UTF8).mkString
-      val parsed = sentenceSegmenter(text).par.map { sent =>
+      val parSentences = sentenceSegmenter(text).par
+      if(params.threads != -1)
+        parSentences.tasksupport = new ForkJoinTaskSupport(pool)
+      val parsed = parSentences.map { sent =>
         val tokens = tokenizer(sent).toIndexedSeq
 
         try {
-          val tree = parser.parse(tokens)
+          if(tokens.length > params.maxLength) {
+            val tree = parser(tokens)
 
-          tree.render(tokens, newline = false)
+            tree.render(tokens, newline = false)
+          } else {
+            "(())"
+          }
         } catch {
           case e: Exception =>
           e.printStackTrace()

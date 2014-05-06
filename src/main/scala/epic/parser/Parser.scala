@@ -36,17 +36,17 @@ final case class Parser[L,W](topology: RuleTopology[L],
                             (implicit val debinarizer: Debinarizer[L]) extends (IndexedSeq[W]=>Tree[L]) {
 
   /**
-   * Returns the best parse (calls bestParse) for the sentence
+   * Returns the best parse (calls bestParse) for the sentence.
    *
    * @param s the sentence
    */
-  def apply(s: IndexedSeq[W]) = parse(s)
+  def apply(s: IndexedSeq[W]): Tree[L] = debinarizer(bestBinarizedTree(s))
 
   /**
-   * Returns the best parse for the sentence.
+   * Returns the best parse for the sentence without debinarizing
    * @param s sentence
    */
-  def parse(s: IndexedSeq[W]):BinarizedTree[L] = {
+  def bestBinarizedTree(s: IndexedSeq[W]):BinarizedTree[L] = {
     decoder.extractBestParse(marginal(s))
   }
 
