@@ -132,13 +132,57 @@ To following models are available at this time:
     ```
     "org.scalanlp" %% "epic-parser-sv-span" % "1.0-SNAPSHOT"
     ```
+* POS Taggers
+  * English: TODO
+    ```
+    "org.scalanlp" %% "epic-pos-en-span" % "1.0-SNAPSHOT"
+    ```
+  * Basque: TODO
+    ```
+    "org.scalanlp" %% "epic-pos-eu-span" % "1.0-SNAPSHOT"
+    ```
+  * French: TODO
+    ```
+    "org.scalanlp" %% "epic-pos-fr-span" % "1.0-SNAPSHOT"
+    ```
+  * German: TODO
+    ```
+    "org.scalanlp" %% "epic-pos-de-span" % "1.0-SNAPSHOT"
+    ```
+  * Hungarian: TODO
+    ```
+    "org.scalanlp" %% "epic-pos-pl-span" % "1.0-SNAPSHOT"
+    ```
+  * Korean: TODO
+    ```
+    "org.scalanlp" %% "epic-pos-ko-span" % "1.0-SNAPSHOT"
+    ```
+  * Polish: TODO
+    ```
+    "org.scalanlp" %% "epic-pos-ko-span" % "1.0-SNAPSHOT"
+    ```
+  * Swedish: TODO
+    ```
+    "org.scalanlp" %% "epic-pos-sv-span" % "1.0-SNAPSHOT"
+    ```
+* Named Entity Recognizers
+  * English: TODO
+    ```
+    "org.scalanlp" %% "epic-pos-en-span" % "1.0-SNAPSHOT"
+    ```
+  * Spanish: TODO
+    ```
+    "org.scalanlp" %% "epic-pos-en-span" % "1.0-SNAPSHOT"
+    ```
+  * German: TODO
+    ```
+    "org.scalanlp" %% "epic-pos-en-span" % "1.0-SNAPSHOT"
+    ```
 
-If you use any of these models, please cite:
+If you use any of the parser models in research publications, please cite:
 
 > David Hall, Greg Durrett, and Dan Klein. 2014. Less Grammar, More Features. In ACL.
 
-
-XXX
 
 ## Training Models
 
