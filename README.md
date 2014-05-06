@@ -64,9 +64,25 @@ for(sentence <- sentences) {
 
 #### Parser
 
-To use the parser programmaticaly, deserialize parser model, then pass the parser in segmented text.
+TODO: epic.models.deserialize
+
+To use the parser programmaticaly, deserialize a parser model--either using `epic.models.deserialize[Parser[AnnotatedLabel, String]](path)` or using the ParserSelector. Then, give the parser segmented and tokenized text:
+
+```scala
+val parser = epic.models.deserialize[Parser[AnnotataedLabel, String]](path)
+
+// or:
+
+val parser = epic.models.ParserSelector.loadParser("en") // or another 2 letter code.
+
+val tree = parser(sentence)
+
+println(tree.render(words))
+
+```
 
 #### Part-of-Speech Tagger
+
 
 #### Named Entity Recognition
 
