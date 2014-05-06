@@ -13,9 +13,9 @@ import scala.collection.parallel.ForkJoinTaskSupport
  * Simple class that reads in a bunch of files and parses them. Output is dumped to standard out.
  * @author dlwh
  */
-object SegmentText {
+object TagText {
 
-  case class Params(model: File, maxLength: Int = 200,
+  case class Params(model: File, maxLength: Int = 500,
                     @Help(text="How many threads to parse with. Default is whatever Scala wants")
                     threads: Int = -1)
 
@@ -31,7 +31,7 @@ object SegmentText {
         sys.exit(1)
     }
 
-    val parser = readObject[SemiCRF[Any,String]](params.model)
+    val parser = readObject[CRF[Any,String]](params.model)
 
     val sentenceSegmenter = LanguagePack.English.sentenceSegmenter
     val tokenizer = new TreebankTokenizer
@@ -54,7 +54,7 @@ object SegmentText {
           if(tokens.length > params.maxLength) {
             val tree = parser.bestSequence(tokens)
 
-            tree.render(parser.outsideSymbol)
+            tree.render
           } else {
             "(())"
           }
