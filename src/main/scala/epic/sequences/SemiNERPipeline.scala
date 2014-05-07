@@ -15,6 +15,7 @@ import breeze.optimize.FirstOrderMinimizer.OptParams
 import breeze.util.Implicits._
 import epic.util.CacheBroker
 import com.typesafe.scalalogging.slf4j.LazyLogging
+import epic.preprocess.TreebankTokenizer
 
 
 /**
@@ -26,7 +27,6 @@ object SemiNERPipeline extends LazyLogging {
   case class Params(path: File,
                     modelOut: File = new File("ner.model.gz"),
                     implicit val cache: CacheBroker,
-                    name: String = "eval/ner",
                     nfiles: Int = 100000,
                     iterPerEval: Int = 20,
                     nthreads: Int = -1,
@@ -109,15 +109,14 @@ object SemiConllNERPipeline extends LazyLogging {
       out += (labels(start).replaceAll(".-","").intern -> Span(start, i))
 
     assert(out.nonEmpty && out.last._2.end == words.length, out + " " + words + " " + labels)
-    Segmentation(out, words, ex.id)
+    Segmentation(out, TreebankTokenizer.tokensToTreebankTokens(words), ex.id)
   }
 
 
 
-  case class Params(path: File,
+  case class Params(train: File,
                     test: File,
                     cache: CacheBroker,
-                    name: String = "eval/ner",
                     nsents: Int = 100000,
                     nthreads: Int = -1,
                     iterPerEval: Int = 20,
@@ -128,8 +127,8 @@ object SemiConllNERPipeline extends LazyLogging {
     val params:Params = CommandLineParser.readIn[Params](args)
     logger.info("Command line arguments for recovery:\n" + Configuration.fromObject(params).toCommandLineString)
     val (train,test) = {
-      val standardTrain = CONLLSequenceReader.readTrain(new FileInputStream(params.path), params.path.getName).toIndexedSeq
-      val standardTest = CONLLSequenceReader.readTrain(new FileInputStream(params.test), params.path.getName).toIndexedSeq
+      val standardTrain = CONLLSequenceReader.readTrain(new FileInputStream(params.train), params.train.getName).toIndexedSeq
+      val standardTest = CONLLSequenceReader.readTrain(new FileInputStream(params.test), params.train.getName).toIndexedSeq
 
       standardTrain.take(params.nsents).map(makeSegmentation) -> standardTest.map(makeSegmentation)
     }

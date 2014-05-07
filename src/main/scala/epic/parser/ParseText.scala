@@ -42,8 +42,10 @@ object ParseText {
       collection.parallel.ForkJoinTasks.defaultForkJoinPool
     }
 
-    for(f <- files) {
-      val text = Source.fromFile(f)(Codec.UTF8).mkString
+    val iter = if(files.length == 0) Iterator(Source.fromInputStream(System.in)) else files.iterator.map(Source.fromFile(_)(Codec.UTF8))
+
+    for(src <- iter) {
+      val text = src.mkString
       val parSentences = sentenceSegmenter(text).par
       if(params.threads != -1)
         parSentences.tasksupport = new ForkJoinTaskSupport(pool)
@@ -51,12 +53,12 @@ object ParseText {
         val tokens = tokenizer(sent).toIndexedSeq
 
         try {
-          if(tokens.length > params.maxLength) {
+          if(tokens.length <= params.maxLength) {
             val tree = parser(tokens)
 
             tree.render(tokens, newline = false)
           } else {
-            "(())"
+            "(()) "
           }
         } catch {
           case e: Exception =>
@@ -65,7 +67,9 @@ object ParseText {
         }
       }
 
-      parsed foreach println
+      src.close()
+
+      parsed.seq foreach println
     }
   }
 

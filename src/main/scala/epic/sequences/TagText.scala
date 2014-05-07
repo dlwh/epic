@@ -42,8 +42,10 @@ object TagText {
       collection.parallel.ForkJoinTasks.defaultForkJoinPool
     }
 
-    for(f <- files) {
-      val text = Source.fromFile(f)(Codec.UTF8).mkString
+    val iter = if(files.length == 0) Iterator(Source.fromInputStream(System.in)) else files.iterator.map(Source.fromFile(_)(Codec.UTF8))
+
+    for(src <- iter) {
+      val text = src.mkString
       val parSentences = sentenceSegmenter(text).par
       if(params.threads != -1)
         parSentences.tasksupport = new ForkJoinTaskSupport(pool)
@@ -51,7 +53,7 @@ object TagText {
         val tokens = tokenizer(sent).toIndexedSeq
 
         try {
-          if(tokens.length > params.maxLength) {
+          if(tokens.length <= params.maxLength) {
             val tree = parser.bestSequence(tokens)
 
             tree.render
@@ -65,7 +67,9 @@ object TagText {
         }
       }
 
-      parsed foreach println
+      src.close()
+
+      parsed.seq foreach println
     }
   }
 

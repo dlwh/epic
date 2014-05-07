@@ -155,6 +155,10 @@ got / ta                                                      {return currentTok
 Got / ta                                                      {return currentToken();}
 
 // acronyms that end a sentence
+
+[01]?[0-9]{WHITESPACE}?:[0-6][0-9]                              { return currentToken(); }
+
+
 {LETTER}+\.{LETTER}+ / .$                                       { return currentToken() + ".";}
 // contractions
 {INIT_CLITIC}                                           {return currentToken();}
