@@ -52,7 +52,7 @@ object SentimentTreebankPipeline extends LazyLogging {
 //      val trees = ((if (params.includeDevInTrain) trainTrees else trainTrees ++ treebank.devTrees) ++ treebank.testTrees).map(ti => ti.words -> ti.tree).toMap
 
       def constraints(w: IndexedSeq[String]): ChartConstraints[AnnotatedLabel] = {
-        val constraints = SpanConstraints.fromTree(trees.getOrElse(w, gen.parse(w)))
+        val constraints = SpanConstraints.fromTree(trees.getOrElse(w, gen.bestBinarizedTree(w)))
         val cons = new LabeledSpanConstraints.PromotedSpanConstraints(constraints)
         ChartConstraints(cons, cons)
       }

@@ -90,7 +90,7 @@ trait ParserPipeline extends LazyLogging {
 
     val validateTrees = devTrees.take(100)
     def validate(parser: Parser[AnnotatedLabel, String]) = {
-      ParseEval.evaluate[AnnotatedLabel](validateTrees, parser, AnnotatedLabelChainReplacer, asString={(l:AnnotatedLabel)=>l.label}, nthreads=params.threads)
+      ParseEval.evaluate[AnnotatedLabel](validateTrees, parser, asString={(l:AnnotatedLabel)=>l.label}, nthreads=params.threads)
     }
     val parsers = trainParser(trainTrees, validate, params)
     parsers
@@ -136,7 +136,7 @@ trait ParserPipeline extends LazyLogging {
   def evalParser(testTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]],
                  parser: Parser[AnnotatedLabel, String],
                  name: String):ParseEval.Statistics = {
-    ParseEval.evaluateAndLog(testTrees, parser, name, AnnotatedLabelChainReplacer, { (_: AnnotatedLabel).label })
+    ParseEval.evaluateAndLog(testTrees, parser, name, { (_: AnnotatedLabel).label })
   }
 
   private def decachify[L, W](grammar: ChartConstraints.Factory[L, W]) = grammar match {

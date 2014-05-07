@@ -21,7 +21,7 @@ import java.io.File
 import epic.framework._
 
 import breeze.util._
-import epic.trees.{TreeInstance, AnnotatedLabel}
+import epic.trees.{Debinarizer, TreeInstance, AnnotatedLabel}
 import breeze.config.Help
 import epic.constraints.ChartConstraints.Factory
 import epic.util.CacheBroker
@@ -63,9 +63,9 @@ class EPParserModel[L, W](val topology: RuleTopology[L], val lexicon: Lexicon[L,
                           initFeatureValue: Feature => Option[Double] = {(_:Feature) => None},
                           epInGold: Boolean = false, dropOutFraction: Double = 0.0)(models:EPModel.CompatibleModel[TreeInstance[L, W], UnrefinedGrammarAnchoring[L, W]]*) extends EPModel[TreeInstance[L, W], UnrefinedGrammarAnchoring[L, W]](maxEPIter, initFeatureValue, epInGold, dropOutFraction)(models:_*) with ParserExtractable[L, W] with Serializable {
 
-  def extractParser(weights: DenseVector[Double]): Parser[L, W] = {
+  def extractParser(weights: DenseVector[Double])(implicit deb: Debinarizer[L]): Parser[L, W] = {
     val inf = inferenceFromWeights(weights)
     val refineds = inf.inferences.map(_.asInstanceOf[ParserInference[L, W]].grammar)
-    Parser(topology, lexicon, constrainer, new EPChartFactory(refineds, maxEPIter))
+    Parser(topology, lexicon, constrainer, new EPChartFactory(refineds, maxEPIter), ChartDecoder[L, W]())
   }
 }

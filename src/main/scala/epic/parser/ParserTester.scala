@@ -17,7 +17,7 @@ package epic.parser
 import breeze.config.{Help, CommandLineParser, Configuration}
 import java.io.File
 import breeze.util._
-import epic.trees.{TreeInstance, ProcessedTreebank, AnnotatedLabel, AnnotatedLabelChainReplacer}
+import epic.trees.{TreeInstance, ProcessedTreebank, AnnotatedLabel}
 
 /**
  * ParserTester just tests a grammar
@@ -46,13 +46,10 @@ object ParserTester {
     val params = CommandLineParser.readIn[Params](args)
     println("Command line arguments for recovery:\n" + Configuration.fromObject(params).toCommandLineString)
     println("Evaluating Parser...")
-    import params._
 
     import params.treebank._
 
     val parser = readObject[Parser[AnnotatedLabel,String]](params.parser)
-
-    import params._
 
     val name = params.name
 
@@ -61,7 +58,6 @@ object ParserTester {
     {
       println("Evaluating Parser on dev...")
       val stats = evalParser(devTrees,parser,name+ "-dev", params.threads)
-      import stats._
       println("Eval finished. Results:")
       println(stats)
     }
@@ -69,7 +65,6 @@ object ParserTester {
     if (params.evalOnTest) {
       println("Evaluating Parser on test...")
       val stats = evalParser(testTrees,parser,name+ "-test", params.threads)
-      import stats._
       println("Eval finished. Results:")
       println(stats)
     }
@@ -77,7 +72,7 @@ object ParserTester {
 
   def evalParser(testTrees: IndexedSeq[TreeInstance[AnnotatedLabel,String]],
                  parser: Parser[AnnotatedLabel,String], name: String, nthreads: Int):ParseEval.Statistics = {
-    ParseEval.evaluateAndLog(testTrees, parser, name, AnnotatedLabelChainReplacer, { (_: AnnotatedLabel).label }, nthreads = nthreads)
+    ParseEval.evaluateAndLog(testTrees, parser, name, { (_: AnnotatedLabel).label }, nthreads = nthreads)
   }
 
 }

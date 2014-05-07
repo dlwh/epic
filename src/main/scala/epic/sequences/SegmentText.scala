@@ -1,4 +1,4 @@
-package epic.parser
+package epic.sequences
 
 import java.io.File
 import breeze.config.{Help, CommandLineParser}
@@ -13,9 +13,9 @@ import scala.collection.parallel.ForkJoinTaskSupport
  * Simple class that reads in a bunch of files and parses them. Output is dumped to standard out.
  * @author dlwh
  */
-object ParseText {
+object SegmentText {
 
-  case class Params(parser: File, maxLength: Int = 60,
+  case class Params(model: File, maxLength: Int = 200,
                     @Help(text="How many threads to parse with. Default is whatever Scala wants")
                     threads: Int = -1)
 
@@ -31,7 +31,7 @@ object ParseText {
         sys.exit(1)
     }
 
-    val parser = readObject[Parser[AnnotatedLabel,String]](params.parser)
+    val parser = readObject[SemiCRF[Any,String]](params.model)
 
     val sentenceSegmenter = LanguagePack.English.sentenceSegmenter
     val tokenizer = new TreebankTokenizer
@@ -52,9 +52,9 @@ object ParseText {
 
         try {
           if(tokens.length > params.maxLength) {
-            val tree = parser(tokens)
+            val tree = parser.bestSequence(tokens)
 
-            tree.render(tokens, newline = false)
+            tree.render(parser.outsideSymbol)
           } else {
             "(())"
           }

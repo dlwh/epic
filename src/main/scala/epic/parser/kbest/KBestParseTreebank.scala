@@ -42,17 +42,13 @@ object KBestParseTreebank {
     val kbest = KBestParser.cached(new AStarKBestParser(parser))(cache)
     params.dir.mkdirs()
 
-    def fullyUnannotate(binarized: BinarizedTree[AnnotatedLabel]) = {
-      Trees.debinarize(Trees.deannotate(AnnotatedLabelChainReplacer.replaceUnaries(binarized).map(_.label)))
-    }
-
     def parse(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]], out: PrintWriter) = {
       val parred = trainTrees.par
       if(params.threads > 0)
         parred.tasksupport = new ForkJoinTaskSupport(new ForkJoinPool(params.threads))
       parred
         .map(ti => ti.words -> kbest.bestKParses(ti.words, params.k))
-        .map{case (words,seq) => seq.map{case (tree, score) => fullyUnannotate(tree).render(words, newline = false) + " " + score}.mkString("\n")}
+        .map{case (words,seq) => seq.map{case (tree, score) => Debinarizer.AnnotatedLabelDebinarizer(tree).render(words, newline = false) + " " + score}.mkString("\n")}
         .seq.foreach{str => out.println(str); out.println()}
     }
 

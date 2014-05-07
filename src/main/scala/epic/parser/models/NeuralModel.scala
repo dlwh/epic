@@ -39,7 +39,7 @@ class NeuralModel[L, L2, W](baseModel: SpanModel[L, L2, W],
   type Inference = NeuralInference[L, L2, W]
 
 
-  def extractParser(weights: DenseVector[Double]) = {
+  def extractParser(weights: DenseVector[Double])(implicit deb: Debinarizer[L]) = {
     val inf = inferenceFromWeights(weights)
     Parser(constrainer, inf.grammar, ChartDecoder[L, W]())
   }

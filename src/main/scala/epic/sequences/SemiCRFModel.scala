@@ -118,6 +118,7 @@ class SemiCRFInference[L, W](weights: DenseVector[Double],
 
   def labelIndex = featurizer.labelIndex
   def startSymbol = featurizer.startSymbol
+  def outsideSymbol = featurizer.outsideSymbol
 
   def scorer(v: Segmentation[L, W]): Scorer = scorer(v.words)
 
@@ -208,6 +209,7 @@ class SemiCRFInference[L, W](weights: DenseVector[Double],
     def labelIndex: Index[L] = featurizer.labelIndex
 
     def startSymbol = featurizer.startSymbol
+
   }
 
   private val negInfArray = Array.fill(labelIndex.size)(Double.NegativeInfinity)
@@ -261,7 +263,7 @@ class SegmentationModelFactory[L](val startSymbol: L,
     for(f <- pruningModel) {
       assert(f.labelIndex == labelIndex, f.labelIndex + " " + labelIndex)
     }
-    val indexed = IndexedStandardFeaturizer.make(wf, sf, startSymbol, labelIndex, allowedSpanClassifier)(train)
+    val indexed = IndexedStandardFeaturizer.make(wf, sf, startSymbol, outsideSymbol, labelIndex, allowedSpanClassifier)(train)
     val model = new SemiCRFModel(indexed, allowedSpanClassifier, weights)
 
     model
@@ -312,6 +314,7 @@ object SegmentationModelFactory {
                                               bioeFeatures: Array[Array[Array[Int]]], // label -> kind -> indexes into surfaceFeaturizer.labelFeatureIndex
                                               transitionFeatures: Array[Array[Array[Int]]], // prev -> cur -> indexes into surfaceFeaturizer.labelFeatureIndex
                                               val startSymbol: L,
+                                              val outsideSymbol: L,
                                               val labelIndex: Index[L],
                                               val constraintFactory: LabeledSpanConstraints.Factory[L, String]) extends SemiCRFModel.BIEOFeaturizer[L,String] with Serializable with SafeLogging {
 
@@ -355,6 +358,7 @@ object SegmentationModelFactory {
     def make[L](wordFeaturizer: IndexedWordFeaturizer[String],
                 spanFeaturizer: IndexedSurfaceFeaturizer[String],
                 startSymbol: L,
+                outsideSymbol: L,
                 labelIndex: Index[L],
                 constraintFactory: LabeledSpanConstraints.Factory[L, String],
                 hashFeatures: HashFeature.Scale = HashFeature.Absolute(0))
@@ -388,7 +392,7 @@ object SegmentationModelFactory {
       val spanFeatures = spanBuilder.result()
       val wordFeatures = wordBuilder.result()
 
-      new IndexedStandardFeaturizer(wordFeaturizer, spanFeaturizer, wordFeatures, spanFeatures, bioeFeatures, transitionFeatures, startSymbol, labelIndex, constraintFactory)
+      new IndexedStandardFeaturizer(wordFeaturizer, spanFeaturizer, wordFeatures, spanFeatures, bioeFeatures, transitionFeatures, startSymbol, outsideSymbol, labelIndex, constraintFactory)
 
     }
 
