@@ -13,7 +13,7 @@ import com.typesafe.scalalogging.slf4j.LazyLogging
  * @author dlwh
  */
 object TrainPosTagger extends LazyLogging {
-  case class Params(opt: OptParams, treebank: ProcessedTreebank, hashFeatureScale: Double = 0.00)
+  case class Params(opt: OptParams, treebank: ProcessedTreebank, modelOut: File = new File("pos-model.ser.gz"))
 
   def main(args: Array[String]) {
     val params = CommandLineParser.readIn[Params](args)
@@ -22,11 +22,8 @@ object TrainPosTagger extends LazyLogging {
     val train = treebank.trainTrees.map(_.asTaggedSequence)
     val test = treebank.devTrees.map(_.asTaggedSequence)
 
-    val crf = CRF.buildSimple(train, AnnotatedLabel("TOP"), opt = opt, hashFeatures = hashFeatureScale)
-    val inf = crf.asInstanceOf[CRFInference[_, _]]
-    val out = new PrintWriter(new BufferedOutputStream(new FileOutputStream("weights.txt")))
-    Encoder.fromIndex(inf.featureIndex).decode(inf.weights).iterator foreach {case (x, v) if v.abs > 1E-6 => out.println(x -> v) case _ => }
-    out.close()
+    val crf = CRF.buildSimple(train, AnnotatedLabel("TOP"), opt = opt)
+    breeze.util.writeObject(modelOut, crf)
     val stats = TaggedSequenceEval.eval(crf, test)
     println("Final Stats: " + stats)
     println("Confusion Matrix:\n" + stats.confusion)

@@ -17,7 +17,8 @@ import breeze.optimize.CachedBatchDiffFunction
 import breeze.linalg.{softmax, DenseVector}
 import epic.constraints.LabeledSpanConstraints
 import epic.constraints.LabeledSpanConstraints.NoConstraints
-import epic.util.CacheBroker
+import epic.util.{NotProvided, Optional, CacheBroker}
+import epic.features.{WordFeaturizer, SurfaceFeaturizer}
 
 /**
  * A Semi-Markov Linear Chain Conditional Random Field, that is, the length
@@ -49,11 +50,14 @@ trait SemiCRF[L, W] extends Serializable {
 
 object SemiCRF {
 
+
   def buildSimple[L](data: IndexedSeq[Segmentation[L, String]],
                      startSymbol: L, outsideSymbol: L,
                      gazetteer: Gazetteer[Any, String] = Gazetteer.empty[Any, String],
+                     wordFeaturizer: Optional[WordFeaturizer[String]] = NotProvided,
+                     spanFeaturizer: Optional[SurfaceFeaturizer[String]] = NotProvided,
                      opt: OptParams = OptParams())(implicit broker: CacheBroker):SemiCRF[L, String] = {
-    val model: SemiCRFModel[L, String] = new SegmentationModelFactory[L](startSymbol, outsideSymbol, gazetteer = gazetteer).makeModel(data)
+    val model: SemiCRFModel[L, String] = new SegmentationModelFactory[L](startSymbol, outsideSymbol, gazetteer = gazetteer, wordFeaturizer = wordFeaturizer, spanFeaturizer = spanFeaturizer).makeModel(data)
 
     val obj = new ModelObjective(model, data)
     val cached = new CachedBatchDiffFunction(obj)
@@ -71,7 +75,7 @@ object SemiCRF {
     val fixedData: IndexedSeq[Segmentation[Boolean, String]] = data.map{s =>
       s.copy(segments=s.segments.map{case (l,span) => (l != outsideSymbol, span)})
     }
-    buildSimple(fixedData, false, false, gazetteer, opt)
+    buildSimple(fixedData, false, false, gazetteer, opt = opt)
   }
 
   def fromCRF[L, W](crf: CRF[L, W]):SemiCRF[L, W] = new SemiCRF[L, W] {

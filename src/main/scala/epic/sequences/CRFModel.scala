@@ -10,7 +10,6 @@ import epic.lexicon.SimpleLexicon
 import java.util
 import epic.util.{ProgressLog, SafeLogging, NotProvided, Optional}
 import epic.constraints.TagConstraints
-import epic.sequences.CRF
 
 /**
  *
@@ -136,6 +135,8 @@ class CRFInference[L, W](val weights: DenseVector[Double],
 
 class TaggedSequenceModelFactory[L](val startSymbol: L,
                                     gazetteer: Optional[Gazetteer[Any, String]] = NotProvided,
+                                    wordFeaturizer: Optional[WordFeaturizer[String]] = NotProvided,
+                                    transitionFeaturizer: Optional[WordFeaturizer[String]] = NotProvided,
                                     weights: Feature=>Double = { (f:Feature) => 0.0},
                                     hashFeatureScale: Double = 0.0) extends SafeLogging {
 
@@ -149,8 +150,9 @@ class TaggedSequenceModelFactory[L](val startSymbol: L,
     val lexicon:TagConstraints.Factory[L, String] = new SimpleLexicon[L, String](labelIndex, counts)
 
 
-    val featurizer = WordFeaturizer.goodPOSTagFeaturizer(counts)
-    val l2featurizer = WordFeaturizer.goodPOSTagTransitionFeaturizer(counts)
+    var featurizer: WordFeaturizer[String] = wordFeaturizer.getOrElse(WordFeaturizer.goodPOSTagFeaturizer(counts))
+    featurizer = gazetteer.foldLeft(featurizer)(_ + _)
+    val l2featurizer: WordFeaturizer[String] = transitionFeaturizer.getOrElse(WordFeaturizer.goodPOSTagTransitionFeaturizer(counts))
 
     val indexedFeaturizer = IndexedWordFeaturizer.fromData(featurizer, train.map{_.words})
     val indexedL2featurizer = IndexedWordFeaturizer.fromData(l2featurizer, train.map{_.words})

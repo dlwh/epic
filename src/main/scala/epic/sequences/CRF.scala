@@ -8,9 +8,10 @@ import java.util
 import collection.mutable.ArrayBuffer
 import breeze.features.FeatureVector
 import epic.constraints.{LabeledSpanConstraints, TagConstraints}
-import epic.util.CacheBroker
+import epic.util.{NotProvided, Optional, CacheBroker}
 import breeze.optimize.FirstOrderMinimizer.OptParams
 import breeze.optimize.CachedBatchDiffFunction
+import epic.features.WordFeaturizer
 
 /**
  * A -Markov Linear Chain Conditional Random Field. Useful for POS tagging, etc.
@@ -59,9 +60,11 @@ object CRF {
   def buildSimple[L](data: IndexedSeq[TaggedSequence[L, String]],
                      startSymbol: L,
                      gazetteer: Gazetteer[Any, String] = Gazetteer.empty[Any, String],
+                     wordFeaturizer: Optional[WordFeaturizer[String]] = NotProvided,
+                     transitionFeaturizer: Optional[WordFeaturizer[String]] = NotProvided,
                      opt: OptParams = OptParams(),
                      hashFeatures: Double = 1.0)(implicit cache: CacheBroker = CacheBroker()):CRF[L, String] = {
-    val model: CRFModel[L, String] = new TaggedSequenceModelFactory[L](startSymbol,  gazetteer = gazetteer, hashFeatureScale = hashFeatures).makeModel(data)
+    val model: CRFModel[L, String] = new TaggedSequenceModelFactory[L](startSymbol,  gazetteer = gazetteer, wordFeaturizer = wordFeaturizer, transitionFeaturizer = transitionFeaturizer, hashFeatureScale = hashFeatures).makeModel(data)
 
 
     val obj = new ModelObjective(model, data)
@@ -79,7 +82,7 @@ object CRF {
     val fixedData: IndexedSeq[TaggedSequence[Boolean, String]] = data.map{s =>
       s.copy(tags=s.tags.map{l => (l != outsideSymbol)})
     }
-    buildSimple(fixedData, false, gazetteer, opt)
+    buildSimple(fixedData, false, gazetteer, opt = opt)
   }
 
 
