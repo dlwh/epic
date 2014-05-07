@@ -121,6 +121,7 @@ object SemiConllNERPipeline extends LazyLogging {
                     nsents: Int = 100000,
                     nthreads: Int = -1,
                     iterPerEval: Int = 20,
+                    modelOut: File = new File("ner-conll.ser.gz"),
                     opt: OptParams)
 
   def main(args: Array[String]) {
@@ -155,6 +156,7 @@ object SemiConllNERPipeline extends LazyLogging {
 
     val weights = params.opt.iterations(cached, obj.initialWeightVector(randomize=false)).tee(state => if((state.iter +1) % params.iterPerEval == 0) eval(state)).take(params.opt.maxIterations).last
     val stats = eval(weights)
+    breeze.util.writeObject(params.modelOut, model.extractCRF(weights.x))
     println(stats)
 
 
