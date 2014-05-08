@@ -8,7 +8,7 @@ import breeze.linalg._
 import breeze.numerics._
 import epic.framework.{ModelObjective, StandardExpectedCounts, Model, Feature}
 import nak.data.Example
-import breeze.util.{Encoder, Index}
+import breeze.util.{Iterators, Encoder, Index}
 import breeze.features.FeatureVector
 import breeze.optimize.{L2Regularization, GradientTester}
 import epic.features.CrossProductFeature
@@ -16,17 +16,21 @@ import epic.features.CrossProductFeature
 @SerialVersionUID(1L)
 class MLSentenceSegmenter(inf: MLSentenceSegmenter.ClassificationInference) extends chalk.text.segment.SentenceSegmenter with Serializable {
 
-  override def apply(text: String): Iterable[String] = {
-    val sentences = ArrayBuffer[String]()
-    var lastOffset = 0
-    for(pos <- MLSentenceSegmenter.potentialSentenceBoundariesIterator(text)) {
-      val feats = MLSentenceSegmenter.featuresForEndPointDetection(text, pos)
-      if(inf.classify(feats) || pos == text.length) {
-        sentences += text.substring(lastOffset, math.min(pos + 1, text.length))
-        lastOffset = pos + 1
+  override def apply(text: String): Iterable[String] = new Iterable[String] {
+    def iterator: Iterator[String] = {
+      val iter = MLSentenceSegmenter.potentialSentenceBoundariesIterator(text)
+      Iterators.fromProducer {
+        var lastOffset = 0
+        if(iter.hasNext) {
+          val pos = iter.next()
+          val res = Some(text.substring(lastOffset, math.min(pos + 1, text.length)))
+          lastOffset = pos + 1
+          res
+        } else {
+          None
+        }
       }
     }
-    sentences
   }
 }
 
@@ -250,6 +254,7 @@ object MLSentenceSegmenter {
     })) yield {
       val slab = MascSlab(f.toURI.toURL)
       val slabWithSentences = MascSlab.s(slab)
+
 
       val guessPoints: IndexedSeq[Int] = potentialSentenceBoundariesIterator(slabWithSentences.content).toIndexedSeq
 
