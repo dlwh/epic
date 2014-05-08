@@ -340,11 +340,11 @@ object TrainPosTagger extends LazyLogging {
 
 }
 ```
-TODO actually save the tagging models!
 
 Basically, you need to create a collection of TaggedSequences, which is a pair of sequences, one for tags and one for words. Then pass in the training data to `CRF.buildSimple`, along with a start symbol (used for the "beginning of sentence" tag), an optional [Gazetteer](#gazetteer) (not shown), and an [OptParams](#optparams), which is used to control the optimization. There is also an optional hashFeatures argument, which isn't used. (TODO)
 
-TODO: expose featurizer here.
+We can also pass in two [`WordFeaturizer`] instances, one for "label" features, and one for "transition" features. Most of the featurizers in Epic have a cross product form `(Label x Surface)`, where `Label` is a feature on the label (e.g. the pos tag) and the `Surface` feature is a feature on the surface string.Here, the label featurizer features are crossed with the tag, and the transition featurizer features are crossed with pairs of sucessive labels. See the wiki page on [[Featurizers]] for more detail.
+
 
 ### Training NER systems and other segmentation models
 
@@ -375,8 +375,9 @@ def main(args: Array[String]) {
   }
 ```
 
-TODO write object. TODO: edit SemiConllPipeline to actually match this. TODO: allow passing in of featurizer
+TODO: edit SemiConllPipeline to actually match this. TODO: allow passing in of featurizer
 
+We can also pass in featurizers, like in the CRF trainer. In this case, we can pass in a [`WordFeaturizer`] and a [`SpanFeaturizer`]. WordFeatures are like before, while SpanFeaturizer give features over the entire input span. For NER, this can be useful for adding features noting that an entity is entirely surrounded by quotation marks, for instance, or for matching against entries in a [[Gazetteer]].
 
 ### OptParams
 
