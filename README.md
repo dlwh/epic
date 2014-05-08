@@ -297,9 +297,14 @@ There is a `treebank.type` commandline flag that supports a few different format
 
 ##### Training a parser programmatically
 
-TODO
+You can also train a span model programmatically, by using the `SpanModelFactory.buildSimple` method. For example:
 
-TODO: make buildSimple for SpanModel.
+```scala
+SpanModelFactory.buildSimple(trees, OptParams(regularization=1.0, useStochastic = true))
+```
+
+The build simple model also supports using custom featurizers.
+
 
 #### Training POS taggers and other sequence models
 
