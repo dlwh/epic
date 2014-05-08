@@ -24,8 +24,8 @@ import annotations.TreeAnnotator
 import collection.mutable.ArrayBuffer
 import java.io.File
 import breeze.util._
-import epic.framework.Feature
-import epic.parser.projections.GrammarRefinements
+import epic.framework.{ModelObjective, Feature}
+import epic.parser.projections.{ParserChartConstraintsFactory, GrammarRefinements}
 import breeze.config.Help
 import epic.lexicon.Lexicon
 import epic.features._
@@ -38,7 +38,7 @@ import epic.trees.annotations.FixRootLabelVerticalAnnotation
 import epic.parser.RuleTopology
 import scala.io.Source
 import epic.parser.features.LabelFeature
-import epic.constraints.ChartConstraints
+import epic.constraints.{CachedChartConstraintsFactory, ChartConstraints}
 import epic.constraints.ChartConstraints.Factory
 import epic.parser.models.LatentParserInference
 import epic.trees.UnaryTree
@@ -48,6 +48,8 @@ import epic.parser.features.LabelFeature
 import epic.trees.BinaryRule
 import epic.trees.UnaryRule
 import epic.trees.BinaryTree
+import breeze.optimize.FirstOrderMinimizer.OptParams
+import epic.parser.ParserParams.XbarGrammar
 
 /**
  * A rather more sophisticated discriminative parser. Uses features on
@@ -609,4 +611,33 @@ object SpanModelFactory {
     }
   }
 
+  def buildSimple(trees: IndexedSeq[TreeInstance[AnnotatedLabel, String]],
+                  annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = GenerativeParser.defaultAnnotator(),
+                  posFeaturizer: Optional[WordFeaturizer[String]] = NotProvided,
+                  spanFeaturizer: Optional[SplitSpanFeaturizer[String]] = NotProvided,
+                  opt: OptParams = OptParams())(implicit cache: CacheBroker) = {
+    val (topo, lexicon) = XbarGrammar().xbarGrammar(trees)
+    val initialParser =  GenerativeParser.annotatedParser(topo, lexicon, annotator, trees)
+
+    val constraints = {
+
+      val maxMarginalized = initialParser.copy(marginalFactory=initialParser.marginalFactory match {
+        case StandardChartFactory(ref, mm) => StandardChartFactory(ref, maxMarginal = true)
+        case x => x
+      })
+
+      val uncached = new ParserChartConstraintsFactory[AnnotatedLabel, String](maxMarginalized, {(_:AnnotatedLabel).isIntermediate})
+      new CachedChartConstraintsFactory[AnnotatedLabel, String](uncached)
+    }
+
+    val mf = new SpanModelFactory(annotator = annotator, posFeaturizer = posFeaturizer, spanFeaturizer = spanFeaturizer).make(trees, topo, lexicon, constraints)
+
+    val mobj = new ModelObjective(mf, trees)
+
+    val weights = breeze.optimize.minimize(mobj, mobj.initialWeightVector(false))
+
+    mf.extractParser(weights)
+  }
+
 }
+
