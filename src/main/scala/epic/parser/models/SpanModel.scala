@@ -30,7 +30,7 @@ import breeze.config.Help
 import epic.lexicon.Lexicon
 import epic.features._
 import epic.features.HashFeature
-import epic.util.{AlwaysSeenSet, ThreadLocalBloomFilter, Arrays, CacheBroker}
+import epic.util._
 import epic.trees.annotations.FilterAnnotations
 import com.typesafe.scalalogging.slf4j.LazyLogging
 import epic.trees.annotations.MarkPreterminals
@@ -40,6 +40,14 @@ import scala.io.Source
 import epic.parser.features.LabelFeature
 import epic.constraints.ChartConstraints
 import epic.constraints.ChartConstraints.Factory
+import epic.parser.models.LatentParserInference
+import epic.trees.UnaryTree
+import epic.trees.TreeInstance
+import epic.trees.NullaryTree
+import epic.parser.features.LabelFeature
+import epic.trees.BinaryRule
+import epic.trees.UnaryRule
+import epic.trees.BinaryTree
 
 /**
  * A rather more sophisticated discriminative parser. Uses features on
@@ -323,12 +331,6 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
                             commonWordThreshold: Int = 100,
                             ngramCountThreshold: Int = 5,
                             useShape: Boolean = true,
-                            useSpanLength: Boolean = true,
-                            useBinaryLengths: Boolean = true,
-                            useFirstLast: Boolean = true,
-                            useSplits: Boolean = true,
-                            useBeforeAfter:Boolean = true,
-                            useGoldPos: Boolean = false,
                             useRichSpanContext:Boolean = false,
                             numSpanContextWords:Int = 1,
                             useNGrams:Boolean = false,
@@ -337,6 +339,8 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
                             useTagSpanShape: Boolean = false,
                             useFullShape: Boolean = false,
                             useSplitShape: Boolean = false,
+                            posFeaturizer: Optional[WordFeaturizer[String]] = NotProvided,
+                            spanFeaturizer: Optional[SplitSpanFeaturizer[String]] = NotProvided,
                             extraParams: ExtraParams = ExtraParams()) extends ParserModelFactory[AnnotatedLabel, String] {
   
   type MyModel = SpanModel[AnnotatedLabel, AnnotatedLabel, String]
@@ -355,107 +359,40 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     val refGrammar = RuleTopology(AnnotatedLabel.TOP, annBinaries, annUnaries)
 
     val xbarGrammar = topology
-    var xbarLexicon = lexicon
-    if(useGoldPos) {
-      val old = xbarLexicon
-      xbarLexicon = new Lexicon[AnnotatedLabel, String] {
-        def labelIndex: Index[AnnotatedLabel] = old.labelIndex
-        val tagSegs = trainTrees.map(_.asTaggedSequence).map(seq => seq.words -> seq.tags.map(_.baseAnnotatedLabel).map(labelIndex(_)).map(Set(_))).toMap
+    val xbarLexicon = lexicon
 
-        def anchor(w: IndexedSeq[String]): Anchoring = new Anchoring {
-          def length: Int = w.length
-
-          val oldAnch = old.anchor(w)
-
-          val preds = tagSegs.getOrElse(w, (0 until w.length).map(oldAnch.allowedTags(_)))
-
-          def allowedTags(pos: Int): Set[Int] = {
-            preds(pos)
-
-          }
-        }
-      }
-
-    }
     val indexedRefinements = GrammarRefinements(xbarGrammar, refGrammar, (_: AnnotatedLabel).baseAnnotatedLabel)
     
-    val mf: MorphFeaturizer = if (useMorph) {
-      MorphFeaturizer(pathsToMorph.split(","))
-    } else {
-      null
-    }
+    lazy val mf: MorphFeaturizer =  MorphFeaturizer(pathsToMorph.split(","))
     val summedWordCounts: Counter[String, Double] = sum(annWords, Axis._0)
-    val ngramF = new NGramSpanFeaturizer(summedWordCounts, NGramSpanFeaturizer.countBigrams(annTrees), annTrees.map(_.words), ngramCountThreshold, maxNGramOrder, useNot = false)
-    val spanShapeBetter = new SpanShapeFeaturizerBetter(numSpanContextWords, useRichSpanContext)
-    val tagSpanShape = new TagSpanShapeFeaturizer(TagSpanShapeGenerator.makeBaseLexicon(trainTrees))
-    val fullShape = new FullWordSpanShapeFeaturizer(summedWordCounts.iterator.filter(_._2 > commonWordThreshold * 10).map(_._1).toSet, numSpanContextWords, useRichSpanContext)
+    lazy val ngramF = new NGramSpanFeaturizer(summedWordCounts, NGramSpanFeaturizer.countBigrams(annTrees), annTrees.map(_.words), ngramCountThreshold, maxNGramOrder, useNot = false)
+    lazy val spanShapeBetter = new SpanShapeFeaturizerBetter(numSpanContextWords, useRichSpanContext)
+    lazy val tagSpanShape = new TagSpanShapeFeaturizer(TagSpanShapeGenerator.makeBaseLexicon(trainTrees))
+    lazy val fullShape = new FullWordSpanShapeFeaturizer(summedWordCounts.iterator.filter(_._2 > commonWordThreshold * 10).map(_._1).toSet, numSpanContextWords, useRichSpanContext)
 
-    val wf = {//WordFeaturizer.goodPOSTagFeaturizer(annWords)
-    val dsl = new WordFeaturizer.DSL(annWords)
-      import dsl._
-      if (useMorph) {
-        unigrams(word, 1) + suffixes() + prefixes() + mf
-      } else {
-        unigrams(word, 1) + suffixes() + prefixes()
-      }
-    }
-    val span:SplitSpanFeaturizer[String] = {
-      val dsl = new WordFeaturizer.DSL(annWords, commonWordThreshold) with SurfaceFeaturizer.DSL with SplitSpanFeaturizer.DSL
-      import dsl._
+    var wf = posFeaturizer.getOrElse( SpanModelFactory.defaultPOSFeaturizer(annWords))
 
-      // class(split + 1)
-      val baseCat = if (useMorph) {
-        (lfsuf + mf)
-      } else {
-        (lfsuf)
-      }
+    if(useMorph)
+      wf += mf
 
-      val leftOfSplit =  ((baseCat)(-1)apply (split))
 
-      var featurizer: SplitSpanFeaturizer[String] = zeroSplit[String]
-      if ( useFirstLast) {
-        featurizer += baseCat(begin)
-        featurizer += baseCat(end-1)
-      }
-      if (useBeforeAfter) {
-        featurizer += baseCat(begin-1)
-        featurizer += baseCat(end)
-      }
 
-      if(useSplits) {
-        featurizer += leftOfSplit
-        featurizer += baseCat(split)
-      }
 
-      if(useSpanLength) {
-        featurizer += length
-      }
+    var span: SplitSpanFeaturizer[String] = spanFeaturizer.getOrElse(SpanModelFactory.goodFeaturizer(annWords, commonWordThreshold, useShape))
 
-      if(useShape) {
-//        featurizer += spanShape
-        featurizer += spanShapeBetter
-      }
+    if(useRichSpanContext)
+      span += spanShapeBetter
 
-      if(useFullShape) {
-        featurizer += fullShape
-      }
+    if(useNGrams)
+      span += ngramF
 
-      if(useSplitShape) {
-        featurizer += splitSpanShape
-      }
+    if(useTagSpanShape)
+      span += tagSpanShape
 
-      if(useBinaryLengths) {
-        featurizer += distance[String](begin, split)
-        featurizer += distance[String](split, end)
-      }
-      if (useNGrams) {
-        featurizer += ngramF
-      }
-      if (useTagSpanShape) {
-        featurizer += tagSpanShape
-      }
-      featurizer
-    }
+    if(useFullShape)
+      span += fullShape
+
+
     val indexedWord = IndexedWordFeaturizer.fromData(wf, annTrees.map{_.words})
     val surface = IndexedSplitSpanFeaturizer.fromData(span, annTrees, bloomFilter = false)
     
@@ -491,6 +428,8 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     new SpanModel[AnnotatedLabel, AnnotatedLabel, String](indexed, indexed.index, annotator.latent, constrainer, xbarGrammar, xbarLexicon, refGrammar, indexedRefinements,featureCounter.get(_))
   }
 
+
+
 }
 
 
@@ -516,28 +455,8 @@ case class LatentSpanModelFactory(inner: SpanModelFactory,
 
     val (annWords, annBinaries, annUnaries) = GenerativeParser.extractCounts(annTrees)
 
-    var xbarLexicon = lexicon
-    if(useGoldPos) {
-      val old = xbarLexicon
-      xbarLexicon = new Lexicon[AnnotatedLabel, String] {
-        def labelIndex: Index[AnnotatedLabel] = old.labelIndex
-        val tagSegs = train.map(_.asTaggedSequence).map(seq => seq.words -> seq.tags.map(_.baseAnnotatedLabel).map(labelIndex(_)).map(Set(_))).toMap
+    val xbarLexicon = lexicon
 
-        def anchor(w: IndexedSeq[String]): Anchoring = new Anchoring {
-          def length: Int = w.length
-
-          val oldAnch = old.anchor(w)
-
-          val preds = tagSegs.getOrElse(w, (0 until w.length).map(oldAnch.allowedTags))
-
-          def allowedTags(pos: Int): Set[Int] = {
-            preds(pos)
-
-          }
-        }
-      }
-
-    }
 
     val substateMap = if (substates != null && substates.exists) {
       val in = Source.fromFile(substates).getLines()
@@ -579,10 +498,10 @@ case class LatentSpanModelFactory(inner: SpanModelFactory,
       null
     }
     val summedWordCounts: Counter[String, Double] = sum(annWords, Axis._0)
-    val ngramF = new NGramSpanFeaturizer(summedWordCounts, NGramSpanFeaturizer.countBigrams(annTrees), annTrees.map(_.words), ngramCountThreshold, maxNGramOrder, useNot = false)
-    val spanShapeBetter = new SpanShapeFeaturizerBetter(numSpanContextWords, useRichSpanContext)
-    val tagSpanShape = new TagSpanShapeFeaturizer(TagSpanShapeGenerator.makeBaseLexicon(train))
-    val fullShape = new FullWordSpanShapeFeaturizer(summedWordCounts.iterator.filter(_._2 > commonWordThreshold * 10).map(_._1).toSet, numSpanContextWords, useRichSpanContext)
+    lazy val ngramF = new NGramSpanFeaturizer(summedWordCounts, NGramSpanFeaturizer.countBigrams(annTrees), annTrees.map(_.words), ngramCountThreshold, maxNGramOrder, useNot = false)
+    lazy val spanShapeBetter = new SpanShapeFeaturizerBetter(numSpanContextWords, useRichSpanContext)
+    lazy val tagSpanShape = new TagSpanShapeFeaturizer(TagSpanShapeGenerator.makeBaseLexicon(train))
+    lazy val fullShape = new FullWordSpanShapeFeaturizer(summedWordCounts.iterator.filter(_._2 > commonWordThreshold * 10).map(_._1).toSet, numSpanContextWords, useRichSpanContext)
 
     val wf = {//WordFeaturizer.goodPOSTagFeaturizer(annWords)
     val dsl = new WordFeaturizer.DSL(annWords)
@@ -593,63 +512,21 @@ case class LatentSpanModelFactory(inner: SpanModelFactory,
         unigrams(word, 1) + suffixes() + prefixes()
       }
     }
-    val span:SplitSpanFeaturizer[String] = {
-      val dsl = new WordFeaturizer.DSL(annWords, commonWordThreshold) with SurfaceFeaturizer.DSL with SplitSpanFeaturizer.DSL
-      import dsl._
 
-      // class(split + 1)
-      val baseCat = if (useMorph) {
-        (lfsuf + mf)
-      } else {
-        (lfsuf)
-      }
+    var span: SplitSpanFeaturizer[String] = SpanModelFactory.goodFeaturizer(annWords, commonWordThreshold)
 
-      val leftOfSplit =  ((baseCat)(-1)apply (split))
+    if(useRichSpanContext)
+      span += spanShapeBetter
 
-      var featurizer: SplitSpanFeaturizer[String] = zeroSplit[String]
-      if ( useFirstLast) {
-        featurizer += baseCat(begin)
-        featurizer += baseCat(end-1)
-      }
-      if (useBeforeAfter) {
-        featurizer += baseCat(begin-1)
-        featurizer += baseCat(end)
-      }
+    if(useNGrams)
+      span += ngramF
 
-      if(useSplits) {
-        featurizer += leftOfSplit
-        featurizer += baseCat(split)
-      }
+    if(useTagSpanShape)
+      span += tagSpanShape
 
-      if(useSpanLength) {
-        featurizer += length
-      }
+    if(useFullShape)
+      span += fullShape
 
-      if(useShape) {
-//        featurizer += spanShape
-        featurizer += spanShapeBetter
-      }
-
-      if(useFullShape) {
-        featurizer += fullShape
-      }
-
-      if(useSplitShape) {
-        featurizer += splitSpanShape
-      }
-
-      if(useBinaryLengths) {
-        featurizer += distance[String](begin, split)
-        featurizer += distance[String](split, end)
-      }
-      if (useNGrams) {
-        featurizer += ngramF
-      }
-      if (useTagSpanShape) {
-        featurizer += tagSpanShape
-      }
-      featurizer
-    }
     val indexedWord = IndexedWordFeaturizer.fromData(wf, annTrees.map{_.words})
     val surface = IndexedSplitSpanFeaturizer.fromData(span, annTrees)
 
@@ -694,6 +571,42 @@ case class LatentSpanModelFactory(inner: SpanModelFactory,
 
     new SpanModel[AnnotatedLabel, (AnnotatedLabel, Int), String](indexed, indexed.index, latentAnnotator,
       constrainer, topology, xbarLexicon, refGrammar, finalRefinements, featureCounter.get(_))
+  }
+
+}
+
+object SpanModelFactory {
+  def goodFeaturizer[L](wordCounts: Counter2[AnnotatedLabel, String, Double],
+                        commonWordThreshold: Int = 100,
+                        useShape: Boolean = true) = {
+    val dsl = new WordFeaturizer.DSL(wordCounts, commonWordThreshold) with SurfaceFeaturizer.DSL with SplitSpanFeaturizer.DSL
+    import dsl._
+
+    // class(split + 1)
+    val baseCat = lfsuf
+
+    val leftOfSplit: SplitSpanFeaturizer[String] =  ((baseCat)(-1)apply (split))
+
+    var featurizer: SplitSpanFeaturizer[String] = zeroSplit[String]
+    featurizer += baseCat(begin)
+    featurizer += baseCat(end-1)
+    featurizer += baseCat(begin-1)
+    featurizer += baseCat(end)
+    featurizer += leftOfSplit
+    featurizer += baseCat(split)
+    featurizer += length
+
+    featurizer += distance[String](begin, split)
+    featurizer += distance[String](split, end)
+    featurizer
+  }
+
+  def defaultPOSFeaturizer(annWords: Counter2[AnnotatedLabel, String, Double]): WordFeaturizer[String] = {
+    {
+      val dsl = new WordFeaturizer.DSL(annWords)
+      import dsl._
+      unigrams(word, 1) + suffixes() + prefixes()
+    }
   }
 
 }
