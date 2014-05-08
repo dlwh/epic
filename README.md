@@ -2,7 +2,7 @@
 
 # Epic
 
-(c) 2014- David Hall.
+(c) 2014 David Hall.
 
 Epic is a structured prediction framework for Scala. It also includes classes for training high-accuracy syntactic parsers, part-of-speech taggers, name entity recognizers, and more.
 
@@ -282,8 +282,15 @@ If you use something else, cite one of these, or something.
 For training a SpanModel, the following configuration is known to work well in general:
 
 ```bash
-TODO
+epic.parser.models.ParserTrainer  --modelFactory epic.parser.models.SpanModelFactory   --cache.path constraints.cache   --opt.useStochastic --opt.regularization 5   --opt.batchSize 500 --alpha 0.1 --maxIterations 1000 --trainer.modelFactory.annotator epic.trees.annotations.PipelineAnnotator  --ann.0 epic.trees.annotations.FilterAnnotations    --ann.1 epic.trees.annotations.ForgetHeadTag   --ann.2 epic.trees.annotations.Markovize --vertical 1 --horizontal 0 --treebank.path /home/dlwh/wsj/
 ```
+
+Training a parser currently needs four files that are cached to the pwd:
+
+* `xbar.gr`: caches the topology of the grammar
+* `constraints.cache`, `constraints.cache.*`: remembers pruning masks computed from the base grammar.
+
+TODO: remove this reliance.
 
 #### Treebank types
 
@@ -386,4 +393,17 @@ We can also pass in featurizers, like in the CRF trainer. In this case, we can p
 
 ### OptParams
 
-TODO
+OptParams is a configuration class that controls the optimizer. There are a bunch of different options:
+```scala
+--opt.batchSize: Int = 512                                                                                                                                                                                                                 
+--opt.regularization: Double = 0.0                                                                                                                                                                                                         
+--opt.alpha: Double = 0.5                                                                                                                                                                                                                  
+--opt.maxIterations: Int = 1000                                                                                                                                                                                                            
+--opt.useL1: Boolean = false                                                                                                                                                                                                               
+--opt.tolerance: Double = 1.0E-5                                                                                                                                                                                                           
+--opt.useStochastic: Boolean = false                                                                                                                                                                                                       
+--opt.randomSeed: Int = 0     
+```
+
+Regularization is generally very important. Using a value of 1.0 usually works pretty well. 5.0 works better on the SpanModel for parsing. `useStochastic` turns on stochastic gradient descent (rather than full batch optimization). It makes training much faster, usually.
+
