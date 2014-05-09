@@ -326,7 +326,7 @@ object MLSentenceSegmenter {
 
 
       val text = slab.content
-      val guessPoints: IndexedSeq[Int] = potentialSentenceBoundariesIterator(new StringCharacterIterator(text)).toIndexedSeq
+      val guessPoints: IndexedSeq[Int] = potentialSentenceBoundariesIterator(new ChunkedCharIterator(text.toIndexedSeq.iterator)).toIndexedSeq
 
       val goldPoints = adjustGoldSentenceBoundaries(new StringCharacterIterator(text), slabWithSentences.iterator[Sentence].map(_.end))
 
