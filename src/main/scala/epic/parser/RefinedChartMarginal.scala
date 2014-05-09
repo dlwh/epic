@@ -239,6 +239,13 @@ final case class RefinedChartMarginal[L, W](anchoring: GrammarAnchoring[L, W],
 
 object RefinedChartMarginal {
 
+  trait Factory[L, W] {
+    def apply(w: IndexedSeq[W], constraints: ChartConstraints[L]):ParseMarginal[L, W]
+  }
+
+  object Factory {
+    def apply[L, W](grammar: Grammar[L, W]):StandardChartFactory[L, W] = new StandardChartFactory(grammar)
+  }
 
   def apply[L, W](grammar: Grammar[L, W], sent: IndexedSeq[W]): RefinedChartMarginal[L, W] = {
     apply(grammar.anchor(sent))
@@ -722,4 +729,8 @@ object RefinedChartMarginal {
 
 }
 
-
+case class StandardChartFactory[L, W](refinedGrammar: Grammar[L, W], maxMarginal: Boolean = false) extends RefinedChartMarginal.Factory[L, W] {
+  def apply(w: IndexedSeq[W], constraints: ChartConstraints[L]):RefinedChartMarginal[L, W] = {
+    RefinedChartMarginal(refinedGrammar.anchor(w, constraints), maxMarginal = maxMarginal)
+  }
+}

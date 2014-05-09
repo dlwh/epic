@@ -36,7 +36,10 @@ scalacOptions ++= Seq("-deprecation", "-language:_", "-optimize")
 
 javaOptions += "-Xmx4g"
 
-
+/*
+javaOptions += "-Xrunhprof:cpu=samples,depth=12"
+fork := true
+*/
 seq(assemblySettings: _*)
 
 publishMavenStyle := true

@@ -35,7 +35,7 @@ class InsideOutsideTest extends FunSuite {
   test("Simple test from iobasics") {
     val grammar = DSLGrammar.simpleGrammar
     val sent = "She eats pizza without anchovies" split " "
-    val io = RefinedChartMarginal(grammar, sent)
+    val io = SimpleChartMarginal(grammar, sent)
     val counts = io.expectedCounts(new RuleFeaturizer(grammar.topology))
     assert(counts(BinaryRule("Sb","NPu","VPu")) near 1.0)
     assert(counts(BinaryRule("NPb","Nu","PPu")) near 1.0)
@@ -68,6 +68,42 @@ class InsideOutsideTest extends FunSuite {
   }
 
 
+
+  test("complex example charts, SimpleChartMarginal") {
+    val grammar = grammarForComplexExample
+    val sent = "He has good control" split " "
+    val io = SimpleChartMarginal.apply(grammar, sent)
+    import io._
+    assert(inside.bot.labelScore(0,1,"PRP") near 0.0)
+    assert(inside.top.labelScore(0,1,"NPu") near math.log(1.0/3.0))
+//    assert(inside.top.enteredLabelScores(0,1).length near 1,"t01")
+//    assert(inside.bot.enteredLabelScores(0,1).length near 1,"b01")
+    assert(inside.bot.labelScore(1,2, "VBZ") near 0.0)
+    assert(inside.top.labelScore(1,2, "VBZu") near 0.0)
+    assert(inside.bot.labelScore(2,3, "JJ") near 0.0)
+    assert(inside.top.labelScore(2,3, "JJu") near 0.0)
+    assert(inside.top.labelScore(3,4, "NPu") near math.log(1.0/3.0))
+    assert(inside.bot.labelScore(3,4, "NN") near 0.0)
+    assert(inside.top.labelScore(3,4, "NNu") near 0.0)
+
+    assert(inside.bot.labelScore(2,4, "NPb") near 0.0,"24npb")
+    assert(inside.bot.labelScore(2,4, "ADJPb") near math.log(1.0/3.0),"24adjpb")
+    assert(inside.top.labelScore(2,4, "ADJPu") near math.log(1.0/3.0),"24adjpu")
+    assert(inside.top.labelScore(2,4, "NPu") near math.log(1.0/3.0),"24npu")
+
+    assert((inside.top.labelScore(1,4, "VPu") near math.log(1.0/3.0)), "1,4 vpu")
+
+    assert((inside.top.labelScore(0,4, "S") - math.log(1.0/9.0)).abs < 1E-4)
+
+    assert((outside.top.labelScore(0,4, "S") near 0.0))
+
+
+    assert((outside.top.labelScore(2,4, "NPu") - math.log(1.0/6.0)).abs < 1E-6, outside.top.labelScore(2,4,"NPu") -> "NP" -> outside.bot.labelScore(2,4,"NPb"))
+    assert((outside.top.labelScore(2,4, "ADJPu") - math.log(1.0/6.0)).abs < 1E-6, outside.bot.labelScore(2,4,"ADJPb") -> "ADJPb")
+
+    assert((outside.bot.labelScore(3,4,"NN") - math.log(1.0/9.0)).abs < 1E-5, outside.bot.labelScore(3,4,"NN") + "NN")
+
+  }
 
   test("complex example charts") {
     val grammar = grammarForComplexExample
