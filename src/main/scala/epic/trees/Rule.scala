@@ -37,6 +37,7 @@ sealed trait Rule[@specialized(Int) +L] extends Production[L, Nothing] {
   def mapChildren[A >: L](f: L => A): Rule[A]
 }
 
+@SerialVersionUID(8613629952079423488L)
 final case class BinaryRule[@specialized(Int) +L](parent: L, left: L, right: L) extends Rule[L] {
   def children = Seq(left, right)
 
