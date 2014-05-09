@@ -263,7 +263,8 @@ object SimpleChartMarginal  {
     outside.top.enter(0, inside.length, refinedTopology.rootIndex, 0.0)
 //    updateOutsideUnaries(outside, anchoring, 0, inside.length, sum)
 
-    val numSyms = refinedTopology.labelIndex.size
+    val tensor = anchoring.grammar.outsideTensor
+    val numSyms = tensor.numLeftChildren
 
     for {
       span <- (length) until 0 by (-1)
@@ -276,32 +277,35 @@ object SimpleChartMarginal  {
       while(a < numSyms) {
         val outsideA = outside.bot.labelScore(begin, end, a)
         if (outsideA != Double.NegativeInfinity) {
-          val rules = refinedTopology.indexedBinaryRulesWithParent(a)
-          var ri = 0
-          while(ri < rules.length) {
-            val r = rules(ri)
-            val b = refinedTopology.leftChild(r)
-            val c = refinedTopology.rightChild(r)
-            val ruleScore = anchoring.grammar.ruleScore(r)
-            ri += 1
+          val pSpan = tensor.leftChildRange(a)
+          val lcEnd = pSpan.end
+          var split = begin + 1
+          while (split < end) {
+            var lcOff = pSpan.begin
+            while(lcOff < lcEnd) {
+              val lc = tensor.rightChildForOffset(lcOff)
+              val bInside = inside.top.labelScore(begin, split, lc)
+              if(bInside != Double.NegativeInfinity) {
+                  val lcSpan = tensor.rightChildRange(lcOff)
+                  var rcOff = lcSpan.begin
+                  val rcEnd = lcSpan.end
 
-            var split = begin + 1
-            while (split < end) {
-
-              val bScore = inside.top.labelScore(begin, split, b)
-              val cScore = inside.top.labelScore(split, end, c)
-
-              outside.top.enter(begin, split, b, sum(outside.top.labelScore(begin, split, b), cScore + outsideA + ruleScore))
-//              println(s"l($begin, $split) ${refinedTopology.index.get(r)} $cScore $outsideA $ruleScore ${outside.top.labelScore(begin, split, b)}")
-              outside.top.enter(split, end, c, sum(outside.top.labelScore(split, end, c), bScore + outsideA + ruleScore))
-//              println(s"r($split, $end) ${refinedTopology.index.get(r)} $bScore $outsideA $ruleScore ${outside.top.labelScore(split, end, c)}")
-
-              split += 1
+                while(rcOff < rcEnd) {
+                  val rc = tensor.parentForOffset(rcOff)
+                  val score = tensor.ruleScoreForOffset(rcOff) + outsideA
+                  val cInside = inside.top.labelScore(split, end, rc)
+                  if (cInside != Double.NegativeInfinity) {
+                    outside.top.enter(begin, split, lc, sum(outside.top.labelScore(begin, split, lc), cInside + score))
+                    outside.top.enter(split, end, rc, sum(outside.top.labelScore(split, end, rc), bInside + score))
+                  }
+                  rcOff += 1
+                }
+              }
+              lcOff += 1
             }
+            split += 1
           }
-
         }
-
         a += 1
       }
     }

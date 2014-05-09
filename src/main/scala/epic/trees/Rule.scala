@@ -37,6 +37,7 @@ sealed trait Rule[@specialized(Int) +L] extends Production[L, Nothing] {
   def mapChildren[A >: L](f: L => A): Rule[A]
 }
 
+@SerialVersionUID(8613629952079423488L)
 final case class BinaryRule[@specialized(Int) +L](parent: L, left: L, right: L) extends Rule[L] {
   def children = Seq(left, right)
 
@@ -67,4 +68,5 @@ case class NullRule[@specialized(Int) +L](parent: L) extends Production[L, Nothi
 
 object BinaryRule {
   def leftChildFirstOrdering[L:Ordering]:Ordering[BinaryRule[L]] = Ordering.Tuple3[L, L, L].on(br => (br.left, br.right, br.parent))
+  def parentFirstOrdering[L:Ordering]:Ordering[BinaryRule[L]] = Ordering.Tuple3[L, L, L].on(br => (br.parent, br.left, br.right))
 }
