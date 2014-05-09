@@ -380,7 +380,11 @@ final class SimpleParseChart[L](val index: Index[L], val length: Int) extends Se
     scores := Double.NegativeInfinity
     @inline def labelScore(begin: Int, end: Int, label: Int) = scores(label, TriangularArray.index(begin, end))
     @inline def apply(begin: Int, end: Int, label: Int) = scores(label, TriangularArray.index(begin, end))
-    @inline def cell(begin: Int, end: Int) = scores(::, TriangularArray.index(begin, end))
+    @inline def cell(begin: Int, end: Int) = {
+      val ind = TriangularArray.index(begin, end)
+      new DenseVector[Double](scores.data, scores.offset + scores.rows * ind, 1, scores.rows)
+      //scores(::, TriangularArray.index(begin, end))
+    }
 
 
     def apply(begin: Int, end: Int, label: L):Double = apply(begin, end, index(label))
