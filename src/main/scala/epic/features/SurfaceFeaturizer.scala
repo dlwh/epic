@@ -3,6 +3,8 @@ package epic.features
 import epic.framework.Feature
 import epic.features.SurfaceFeaturizer.MarkerPos
 import epic.features.WordFeaturizer.Modifier
+import epic.trees.Span
+import breeze.collection.mutable.TriangularArray
 
 /**
  * TODO
@@ -21,6 +23,9 @@ trait SurfaceFeaturizer[W] extends Serializable {
 }
 
 object SurfaceFeaturizer {
+
+  def apply[W](f: (IndexedSeq[W], Span)=>Array[Feature]):SurfaceFeaturizer[W] = new TabulatedSurfaceFeaturizer[W](f)
+
   trait DSL {
 
     /** begin of span */
@@ -97,6 +102,13 @@ object SurfaceFeaturizer {
     def toPos(begin: Int, end: Int) = if(relativeToBegin) begin + offset else end + offset
 
     override def toString =  s"(${if(relativeToBegin) "b" else "e"}${if(offset == 0) "" else if(offset > 0) "+" + offset else offset})"
+  }
+
+  class TabulatedSurfaceFeaturizer[W](f: (IndexedSeq[W], Span)=>Array[Feature]) extends SurfaceFeaturizer[W] {
+    override def anchor(words: IndexedSeq[W]): SurfaceFeatureAnchoring[W] = new SurfaceFeatureAnchoring[W] {
+      val tab = TriangularArray.tabulate(words.length + 1) { (begin, end) => f(words, Span(begin, end)) }
+      override def featuresForSpan(begin: Int, end: Int): Array[Feature] = tab(begin, end)
+    }
   }
 
 }
