@@ -1,7 +1,7 @@
 package epic.parser
 
 import breeze.util.Index
-import breeze.linalg.{softmax, max, DenseMatrix}
+import breeze.linalg.{DenseVector, softmax, max, DenseMatrix}
 import breeze.collection.mutable.TriangularArray
 
 import spire.syntax.cfor._
@@ -174,18 +174,29 @@ object SimpleChartMarginal  {
       begin <- 0 to (length - span)
     } {
       val end = begin + span
+      val pcell = chart.bot.cell(begin, end)
+      val pdata = pcell.data
+      val pdoff = pcell.offset
       var split = begin + 1
       while (split < end) {
+
+        val lcell = chart.top.cell(begin, split)
+        val ldata = lcell.data
+        val ldoff = lcell.offset
+        val rcell = chart.top.cell(split, end)
+        val rdata = rcell.data
+        val rdoff = rcell.offset
+
         var lc = 0
         while(lc < numSyms) {
           val lcSpan = tensor.leftChildRange(lc)
           var rcOff = lcSpan.begin
           val rcEnd = lcSpan.end
-          val bInside = chart.top.labelScore(begin, split, lc)
+          val bInside = ldata(ldoff + lc)
           if(bInside != Double.NegativeInfinity) {
             while(rcOff < rcEnd) {
               val rc = tensor.rightChildForOffset(rcOff)
-              val cInside = chart.top.labelScore(split, end, rc)
+              val cInside = rdata(rdoff + rc)
 
               val rcSpan = tensor.rightChildRange(rcOff)
               val withoutRule = bInside + cInside
@@ -197,7 +208,7 @@ object SimpleChartMarginal  {
                 while(pOff < pEnd) {
                   val p = tensor.parentForOffset(pOff)
                   val score = tensor.ruleScoreForOffset(pOff) + withoutRule
-                  chart.bot.enter(begin, end, p, sum(chart.bot.labelScore(begin, end, p), score))
+                  pdata(p + pdoff) = sum(pdata(p + pdoff), score)
 
                   pOff += 1
                 }
@@ -218,37 +229,6 @@ object SimpleChartMarginal  {
       }
 
 
-      /*
-      for ( parent <- 0 until anchoring.refinedTopology.labelIndex.size ) {
-        val rules = refinedTopology.indexedBinaryRulesWithParent(parent)
-        var i = 0
-        while (i < rules.length) {
-          val r = rules(i)
-          val b = refinedTopology.leftChild(r)
-          val c = refinedTopology.rightChild(r)
-
-          var split = begin + 1
-          while (split < end) {
-            val bInside = chart.top.labelScore(begin, split, b)
-            val cInside = chart.top.labelScore(split, end, c)
-            val ruleScore = anchoring.grammar.ruleScore(r)
-
-
-            val score = bInside + cInside + ruleScore
-
-            if (score != Double.NegativeInfinity) {
-              chart.bot.enter(begin, end, parent, sum(chart.bot.labelScore(begin, end, parent), score))
-//              println(s"($begin, $end) ${refinedTopology.index.get(r)} $bInside $cInside $ruleScore ${chart.bot.labelScore(begin, end, parent)}")
-            }
-
-            split += 1
-          }
-
-          i += 1
-        }
-
-      }
-      */
       updateInsideUnaries(chart, anchoring,  begin, end, sum)
     }
 
@@ -261,7 +241,6 @@ object SimpleChartMarginal  {
     val refinedTopology = anchoring.refinedTopology
     val outside = new SimpleParseChart[L2](refinedTopology.labelIndex, length)
     outside.top.enter(0, inside.length, refinedTopology.rootIndex, 0.0)
-//    updateOutsideUnaries(outside, anchoring, 0, inside.length, sum)
 
     val tensor = anchoring.grammar.outsideTensor
     val numSyms = tensor.numLeftChildren
@@ -273,30 +252,51 @@ object SimpleChartMarginal  {
       val end = begin + span
       updateOutsideUnaries(outside, anchoring, begin, end, sum)
 
+      val pcell = outside.bot.cell(begin, end)
+      val pdata = pcell.data
+      val pdoff = pcell.offset
+
       var a = 0
       while(a < numSyms) {
-        val outsideA = outside.bot.labelScore(begin, end, a)
+        val outsideA = pdata(pdoff + a)
         if (outsideA != Double.NegativeInfinity) {
           val pSpan = tensor.leftChildRange(a)
           val lcEnd = pSpan.end
           var split = begin + 1
           while (split < end) {
+
+            val lcell = inside.top.cell(begin, split)
+            val ldata = lcell.data
+            val ldoff = lcell.offset
+            val rcell = inside.top.cell(split, end)
+            val rdata = rcell.data
+            val rdoff = rcell.offset
+
+            val olcell = outside.top.cell(begin, split)
+            val oldata = olcell.data
+            val oldoff = olcell.offset
+            val orcell = outside.top.cell(split, end)
+            val ordata = orcell.data
+            val ordoff = orcell.offset
+
             var lcOff = pSpan.begin
             while(lcOff < lcEnd) {
               val lc = tensor.rightChildForOffset(lcOff)
-              val bInside = inside.top.labelScore(begin, split, lc)
+              val bInside = ldata(ldoff + lc)
               if(bInside != Double.NegativeInfinity) {
-                  val lcSpan = tensor.rightChildRange(lcOff)
-                  var rcOff = lcSpan.begin
-                  val rcEnd = lcSpan.end
+                val lcSpan = tensor.rightChildRange(lcOff)
+                var rcOff = lcSpan.begin
+                val rcEnd = lcSpan.end
 
                 while(rcOff < rcEnd) {
                   val rc = tensor.parentForOffset(rcOff)
                   val score = tensor.ruleScoreForOffset(rcOff) + outsideA
-                  val cInside = inside.top.labelScore(split, end, rc)
+                  val cInside = rdata(rdoff + rc)
                   if (cInside != Double.NegativeInfinity) {
-                    outside.top.enter(begin, split, lc, sum(outside.top.labelScore(begin, split, lc), cInside + score))
-                    outside.top.enter(split, end, rc, sum(outside.top.labelScore(split, end, rc), bInside + score))
+                    oldata(oldoff + lc) = sum(oldata(oldoff + lc), cInside + score)
+                    ordata(ordoff + rc) = sum(ordata(ordoff + rc), bInside + score)
+//                    outside.top.enter(begin, split, lc, sum(outside.top.labelScore(begin, split, lc), cInside + score))
+//                    outside.top.enter(split, end, rc, sum(outside.top.labelScore(split, end, rc), bInside + score))
                   }
                   rcOff += 1
                 }
@@ -316,44 +316,47 @@ object SimpleChartMarginal  {
   private def updateInsideUnaries[L, L2, W](chart: SimpleParseChart[L2],
                                         anchoring: SimpleGrammar.Anchoring[L, L2, W],
                                         begin: Int, end: Int, sum: Summer) = {
-    for(b <- 0 until anchoring.refinedTopology.labelIndex.size) {
-      val bScore = chart.bot.labelScore(begin, end, b)
-      if(bScore != Double.NegativeInfinity) {
-        val rules = anchoring.refinedTopology.indexedUnaryRulesWithChild(b)
-        var j = 0
-        while(j < rules.length) {
-          val r = rules(j)
-          val a = anchoring.refinedTopology.parent(r)
-          val ruleScore: Double = anchoring.grammar.ruleScore(r)
-          val prob: Double = bScore + ruleScore
-          chart.top.enter(begin, end, a, sum(chart.top.labelScore(begin, end, a), prob))
-//          println(s"($begin, $end) ${anchoring.refinedTopology.index.get(r)} $bScore $ruleScore ${chart.top.labelScore(begin, end, a)}")
-          j += 1
+    val childCell = chart.bot.cell(begin, end)
+    val parentCell = chart.top.cell(begin, end)
+    val tensor = anchoring.grammar.insideTensor
+    doMatrixMultiply(childCell, parentCell, tensor, sum)
+
+  }
+
+
+  private def doMatrixMultiply[W, L2, L](childCell: DenseVector[Double], parentCell: DenseVector[Double], tensor: SparseRuleTensor[L2], sum: RefinedChartMarginal.Summer) {
+    val numSyms = childCell.size
+    val cdata = childCell.data
+    val coffset = childCell.offset
+    val pdata = parentCell.data
+    val poffset = parentCell.offset
+    var b = 0
+    while (b < numSyms) {
+      val bScore = cdata(coffset + b)
+      val aSpan = tensor.unaryChildRange(b)
+      if (bScore != Double.NegativeInfinity) {
+        var aOff = aSpan.begin
+        val aEnd = aSpan.end
+        while (aOff < aEnd) {
+          val a = tensor.unaryParentForOffset(aOff)
+          val ruleScore: Double = tensor.unaryScoreForOffset(aOff)
+          val prob = pdata(a + poffset)
+          pdata(a + poffset) = sum(prob, ruleScore + bScore)
+          aOff += 1
         }
       }
-    }
 
+      b += 1
+    }
   }
 
   private def updateOutsideUnaries[L, L2, W](outside: SimpleParseChart[L2],
                                             anchoring: SimpleGrammar.Anchoring[L, L2, W],
                                             begin: Int, end: Int, sum: Summer) = {
-    for(a <- 0 until anchoring.refinedTopology.labelIndex.size) {
-      val aScore = outside.top.labelScore(begin, end, a)
-      if(aScore != Double.NegativeInfinity) {
-        val rules = anchoring.refinedTopology.indexedUnaryRulesWithParent(a)
-        var j = 0
-        while(j < rules.length) {
-          val r = rules(j)
-          val b = anchoring.refinedTopology.child(r)
-          val ruleScore: Double = anchoring.grammar.ruleScore(r)
-          val prob: Double = aScore + ruleScore
-          outside.bot.enter(begin, end, b, sum(outside.bot.labelScore(begin, end, b), prob))
-//          println(s"($begin, $end) ${anchoring.refinedTopology.index.get(r)} $aScore $ruleScore ${outside.bot.labelScore(begin, end, b)}")
-          j += 1
-        }
-      }
-    }
+    val childCell = outside.bot.cell(begin, end)
+    val parentCell = outside.top.cell(begin, end)
+    val tensor = anchoring.grammar.outsideTensor
+    doMatrixMultiply(parentCell, childCell, tensor, sum)
 
   }
 
@@ -377,6 +380,7 @@ final class SimpleParseChart[L](val index: Index[L], val length: Int) extends Se
     scores := Double.NegativeInfinity
     @inline def labelScore(begin: Int, end: Int, label: Int) = scores(label, TriangularArray.index(begin, end))
     @inline def apply(begin: Int, end: Int, label: Int) = scores(label, TriangularArray.index(begin, end))
+    @inline def cell(begin: Int, end: Int) = scores(::, TriangularArray.index(begin, end))
 
 
     def apply(begin: Int, end: Int, label: L):Double = apply(begin, end, index(label))

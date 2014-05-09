@@ -70,3 +70,8 @@ object BinaryRule {
   def leftChildFirstOrdering[L:Ordering]:Ordering[BinaryRule[L]] = Ordering.Tuple3[L, L, L].on(br => (br.left, br.right, br.parent))
   def parentFirstOrdering[L:Ordering]:Ordering[BinaryRule[L]] = Ordering.Tuple3[L, L, L].on(br => (br.parent, br.left, br.right))
 }
+
+object UnaryRule {
+  def childFirstOrdering[L:Ordering]:Ordering[UnaryRule[L]] = Ordering.Tuple2[L, L].on(br => (br.child, br.parent))
+  def parentFirstOrdering[L:Ordering]:Ordering[UnaryRule[L]] = Ordering.Tuple2[L, L].on(br => (br.parent, br.child))
+}

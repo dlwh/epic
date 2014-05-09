@@ -1,7 +1,8 @@
 package epic.parser
 
-import epic.trees.{BinaryRule, Span}
+import epic.trees.{UnaryRule, BinaryRule, Span}
 import scala.collection.mutable.ArrayBuffer
+import breeze.linalg.CSCMatrix
 
 /**
  *
@@ -12,6 +13,8 @@ import scala.collection.mutable.ArrayBuffer
 final class SparseRuleTensor[L] private(val leftChildOffsets: Array[Int],
                                val rightChildIndicesAndOffsets: Array[Int],
                                val parentIndicesAndScores: Array[Int],
+                               val unaryChildPtrs: Array[Int],
+                               val unaryParentIndicesAndScores: Array[Int],
                                outside: Boolean) extends Serializable {
 
   val numLeftChildren = leftChildOffsets.size - 1
@@ -27,6 +30,17 @@ final class SparseRuleTensor[L] private(val leftChildOffsets: Array[Int],
   def ruleScoreForOffset(off: Int): Double = {
     val first = parentIndicesAndScores(off * 3 + 1)
     val second = parentIndicesAndScores(off * 3 + 2)
+    java.lang.Double.longBitsToDouble((first.toLong << 32) | (second.toLong&0xFFFFFFFFL))
+  }
+
+
+  def unaryChildRange(lc: Int):Span = Span(unaryChildPtrs(lc), unaryChildPtrs(lc+1) )
+
+  def unaryParentForOffset(off: Int) = unaryParentIndicesAndScores(off * 3)
+
+  def unaryScoreForOffset(off: Int): Double = {
+    val first = unaryParentIndicesAndScores(off * 3 + 1)
+    val second = unaryParentIndicesAndScores(off * 3 + 2)
     java.lang.Double.longBitsToDouble((first.toLong << 32) | (second.toLong&0xFFFFFFFFL))
   }
 
@@ -96,7 +110,34 @@ object SparseRuleTensor {
     rightChildIndicesAndOffsets += -1
     rightChildIndicesAndOffsets += lastOffset
 
-    val ret = new SparseRuleTensor[L2](leftChildOffsets.toArray, rightChildIndicesAndOffsets.toArray, parentIndicesAndScores.toArray, false)
+    val unaryChildOffsets            = new ArrayBuffer[Int]
+    val unaryParentIndicesAndScores = new ArrayBuffer[Int]
+
+    val unaryRules = (0 until index.size).filter(index.get(_).isInstanceOf[UnaryRule[_]]).sorted(UnaryRule.childFirstOrdering[Int].on(indexedRules(_:Int).asInstanceOf[UnaryRule[Int]]))
+    lastLc = -1
+    lastOffset = 0
+    for(r <- unaryRules) {
+      val lc = child(r)
+      assert(lastLc <= lc)
+      while(lastLc != lc) {
+        unaryChildOffsets += lastOffset
+        lastLc += 1
+      }
+
+      val p = parent(r)
+      val rs = grammar.ruleScore(r)
+      val span: Span = new Span(java.lang.Double.doubleToLongBits(rs))
+      val encodedFirst = span.begin
+      val encodedSecond = span.end
+      unaryParentIndicesAndScores += (p, encodedFirst, encodedSecond)
+      lastOffset += 1
+    }
+    while(lastLc <= grammar.refinedTopology.labelIndex.size) {
+      lastLc += 1
+      unaryChildOffsets += lastOffset
+    }
+
+    val ret = new SparseRuleTensor[L2](leftChildOffsets.toArray, rightChildIndicesAndOffsets.toArray, parentIndicesAndScores.toArray, unaryChildOffsets.toArray, unaryParentIndicesAndScores.toArray, false)
 
     assert(ret.ruleIterator.map(_._1).toIndexedSeq == orderedRuleIndices.map(indexedRules(_)), s"\n${ret.ruleIterator.map(_._1).toIndexedSeq}\n${orderedRuleIndices.map(indexedRules(_))}")
     assert(ret.ruleIterator.map(_._2).toIndexedSeq == orderedRuleIndices.map(grammar.ruleScore(_)))
@@ -151,7 +192,34 @@ object SparseRuleTensor {
     rightChildIndicesAndOffsets += -1
     rightChildIndicesAndOffsets += lastOffset
 
-    val ret = new SparseRuleTensor[L2](leftChildOffsets.toArray, rightChildIndicesAndOffsets.toArray, parentIndicesAndScores.toArray, true)
+    val unaryChildOffsets            = new ArrayBuffer[Int]
+    val unaryParentIndicesAndScores = new ArrayBuffer[Int]
+
+    val unaryRules = (0 until index.size).filter(index.get(_).isInstanceOf[UnaryRule[_]]).sorted(UnaryRule.parentFirstOrdering[Int].on(indexedRules(_:Int).asInstanceOf[UnaryRule[Int]]))
+    lastLc = -1
+    lastOffset = 0
+    for(r <- unaryRules) {
+      val lc = parent(r)
+      while(lastLc != lc) {
+        unaryChildOffsets += lastOffset
+        lastLc += 1
+      }
+
+      val p = child(r)
+      val rs = grammar.ruleScore(r)
+      val span: Span = new Span(java.lang.Double.doubleToLongBits(rs))
+      val encodedFirst = span.begin
+      val encodedSecond = span.end
+      unaryParentIndicesAndScores += (p, encodedFirst, encodedSecond)
+      lastOffset += 1
+    }
+    while(lastLc <= labelIndex.size) {
+      lastLc += 1
+      unaryChildOffsets += lastOffset
+    }
+
+    val ret = new SparseRuleTensor[L2](leftChildOffsets.toArray, rightChildIndicesAndOffsets.toArray, parentIndicesAndScores.toArray, unaryChildOffsets.toArray, unaryParentIndicesAndScores.toArray, true)
+
 
     assert(ret.ruleIterator.map(_._1).toIndexedSeq == orderedRuleIndices.map(indexedRules(_)), s"\n${ret.ruleIterator.map(_._1).toIndexedSeq}\n${orderedRuleIndices.map(indexedRules(_))}")
     assert(ret.ruleIterator.map(_._2).toIndexedSeq == orderedRuleIndices.map(grammar.ruleScore(_)))
