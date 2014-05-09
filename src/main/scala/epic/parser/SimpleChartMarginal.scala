@@ -166,11 +166,59 @@ object SimpleChartMarginal  {
       updateInsideUnaries(chart, anchoring,  i, i+1, sum)
     }
 
+    val tensor = grammar.insideTensor
+    val numSyms = tensor.numLeftChildren
+
     for {
       span <- 2 to length
       begin <- 0 to (length - span)
     } {
       val end = begin + span
+      var split = begin + 1
+      while (split < end) {
+        var lc = 0
+        while(lc < numSyms) {
+          val lcSpan = tensor.leftChildRange(lc)
+          var rcOff = lcSpan.begin
+          val rcEnd = lcSpan.end
+          val bInside = chart.top.labelScore(begin, split, lc)
+          if(bInside != Double.NegativeInfinity) {
+            while(rcOff < rcEnd) {
+              val rc = tensor.rightChildForOffset(rcOff)
+              val cInside = chart.top.labelScore(split, end, rc)
+
+              val rcSpan = tensor.rightChildRange(rcOff)
+              val withoutRule = bInside + cInside
+
+
+              if(cInside != Double.NegativeInfinity) {
+                var pOff = rcSpan.begin
+                val pEnd = rcSpan.end
+                while(pOff < pEnd) {
+                  val p = tensor.parentForOffset(pOff)
+                  val score = tensor.ruleScoreForOffset(pOff) + withoutRule
+                  chart.bot.enter(begin, end, p, sum(chart.bot.labelScore(begin, end, p), score))
+
+                  pOff += 1
+                }
+
+              }
+
+
+
+              rcOff += 1
+            }
+          }
+
+          lc += 1
+
+        }
+
+        split += 1
+      }
+
+
+      /*
       for ( parent <- 0 until anchoring.refinedTopology.labelIndex.size ) {
         val rules = refinedTopology.indexedBinaryRulesWithParent(parent)
         var i = 0
@@ -200,6 +248,7 @@ object SimpleChartMarginal  {
         }
 
       }
+      */
       updateInsideUnaries(chart, anchoring,  begin, end, sum)
     }
 

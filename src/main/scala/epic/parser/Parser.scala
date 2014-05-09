@@ -64,7 +64,7 @@ object Parser {
     apply(ChartConstraints.Factory.noSparsity, refined, decoder)
   }
 
-  def apply[L, L2, W](refinedGrammar: SimpleGrammar[L, L2, W], decoder: ChartDecoder[L, W]): Parser[L, W] = {
+  def apply[L, L2, W](refinedGrammar: SimpleGrammar[L, L2, W], decoder: ChartDecoder[L, W])(implicit deb: Debinarizer[L]): Parser[L, W] = {
     new Parser(refinedGrammar.topology, refinedGrammar.lexicon, ChartConstraints.Factory.noSparsity[L, W], new SimpleChartMarginal.SimpleChartFactory(refinedGrammar, decoder.wantsMaxMarginal), decoder)
   }
 

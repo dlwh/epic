@@ -35,7 +35,7 @@ final class RuleTopology[L] private (
                                     val labelIndex: Index[L],
                                     /** Index over all acceptable rules */
                                     val index: Index[Rule[L]],
-                                    indexedRules: Array[Rule[Int]],
+                                    val indexedRules: Array[Rule[Int]],
                                     binaryRulesByParent: Array[Array[Int]],
                                     unaryRulesByParent: Array[Array[Int]],
                                     binaryRulesByLeftChild: Array[Array[Int]],

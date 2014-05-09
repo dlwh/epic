@@ -84,6 +84,8 @@ class SimpleGrammar[L, L2, W](val topology: RuleTopology[L],
     val hashtext = bigInt.toString(16)
     hashtext
   }
+
+  val insideTensor = SparseRuleTensor.forSimpleGrammarInside(this)
 }
 
 object SimpleGrammar {
