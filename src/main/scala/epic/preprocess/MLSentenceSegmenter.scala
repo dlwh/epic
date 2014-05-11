@@ -22,17 +22,26 @@ class MLSentenceSegmenter(inf: MLSentenceSegmenter.ClassificationInference) exte
 
   override def apply(text: String): Iterable[String] = new Iterable[String] {
     def iterator: Iterator[String] = {
-      val iter = MLSentenceSegmenter.potentialSentenceBoundariesIterator(new StringCharacterIterator(text))
+      val str: StringCharacterIterator = new StringCharacterIterator(text)
+      val iter = MLSentenceSegmenter.potentialSentenceBoundariesIterator(str)
+      var lastOffset = 0
       Iterators.fromProducer {
-        var lastOffset = 0
-        if(iter.hasNext) {
-          val pos = iter.next()
-          val res = Some(text.substring(lastOffset, math.min(pos + 1, text.length)))
-          lastOffset = pos + 1
-          res
-        } else {
-          None
+        def rec():Option[String] = {
+          if(iter.hasNext) {
+            val pos = iter.next()
+            println(lastOffset, pos, text.length)
+            if(!iter.hasNext || inf.classify(MLSentenceSegmenter.featuresForEndPointDetection(str, pos))) {
+              val res = Some(text.substring(lastOffset, math.min(pos + 1, text.length)))
+              lastOffset = pos + 1
+              res
+            } else {
+              rec()
+            }
+          } else {
+            None
+          }
         }
+        rec()
       }
     }
   }
@@ -309,8 +318,8 @@ object MLSentenceSegmenter {
 
       val goldPoints = adjustGoldSentenceBoundaries(new StringCharacterIterator(text), slabWithSentences.iterator[Sentence].map(_.end))
 
-//      println("<<<<" + f  )
-//      printOutSentenceBoundaries(text, guessPoints.toSet, goldPoints)
+      println("<<<<" + f  )
+      printOutSentenceBoundaries(text, guessPoints.toSet, goldPoints)
 
       for(guess <- guessPoints) yield {
         SentenceDecisionInstance(goldPoints.contains(guess), featuresForEndPointDetection(new StringCharacterIterator(slab.content), guess, s"${f.getName}:$guess"), s"${f.getName}:$guess")
@@ -327,29 +336,39 @@ object MLSentenceSegmenter {
     val model = new ClassificationModel(featureIndex)
 
     val obj = new ModelObjective(model, train)
-    val bestWeights = breeze.optimize.minimize(obj.cached, obj.initialWeightVector(true), L2Regularization(2.0))
+    val bestWeights = breeze.optimize.minimize(obj.cached, obj.initialWeightVector(true), L2Regularization(0.1))
 
     val inf = model.inferenceFromWeights(bestWeights)
 
     val decoded = (Encoder.fromIndex(featureIndex).decode(bestWeights))
 
+    println("Train")
+    evalDev(inf, train, decoded)
+    println("Dev")
+    evalDev(inf, dev, decoded)
+
+    breeze.util.writeObject(new File("en-sent-segmenter.model.ser.gz"), new MLSentenceSegmenter(inf))
+
+  }
+
+  def evalDev(inf: ClassificationInference, dev: Array[SentenceDecisionInstance], decoded: Counter[Feature, Double]) {
     var right = 0
     var wrong = 0
     var tN, fN = 0
     var tP, fP = 0
-    for(inst <- dev) {
-      if(inst.label != inf.classify(inst.features)) {
+    for (inst <- dev) {
+      if (inst.label != inf.classify(inst.features)) {
         println(inst.id, inst.label)
-        val weights = (inst.features.toIndexedSeq.map( f => f -> decoded(f)))
+        val weights = (inst.features.toIndexedSeq.map(f => f -> decoded(f)))
         println(weights.sortBy(_._2), weights.map(_._2).sum)
         wrong += 1
-        if(inst.label) {
+        if (inst.label) {
           fN += 1
         } else {
           fP += 1
         }
       } else {
-        if(inst.label) {
+        if (inst.label) {
           tP += 1
         } else {
           tN += 1
@@ -358,15 +377,9 @@ object MLSentenceSegmenter {
       }
     }
 
-    println(s"prec: ${tP * 1.0/(tP + fP)} rec: ${tP * 1.0 / (tP + fN)}, $tP $tN $fP $fN")
+    println(s"prec: ${tP * 1.0 / (tP + fP)} rec: ${tP * 1.0 / (tP + fN)}, $tP $tN $fP $fN")
 
     println(s"$right $wrong... ${right * 1.0 / (right + wrong)}")
-
-    breeze.util.writeObject(new File("en-sent-segmenter.model.ser.gz"), new MLSentenceSegmenter(inf))
-
-
-
-
   }
 
   def printOutSentenceBoundaries(text: String, guessPoints: Set[Int], goldPoints: Set[Int]): Unit = {
