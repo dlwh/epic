@@ -85,14 +85,7 @@ object MLSentenceSegmenter {
     if(text.next() == CharacterIterator.DONE) {
       Array(BiasFeature, EOFFeature)
     } else {
-      println(s"QQQQ($id): " + (text.substring(math.max(offset - 4, 0), offset) + "[" + text.charAt(offset) + "]" + text.substring(offset+1, math.min(text.getEndIndex, offset + 5))).replaceAll("\n","\\\\n"))
       val buf = new ArrayBuffer[Feature]
-      val javaAgrees = try text.stateless {
-        val instance = BreakIterator.getSentenceInstance()
-        instance.setText(text)
-//        println(instance.following(offset - 1) - offset)
-        JavaGuess(math.min(instance.following(offset - 3) - offset, 6))
-      } catch { case ex: IllegalArgumentException => JavaGuess(0)}
 
       val myFeatures = addCharFeatures(text, offset, 0)
 
@@ -147,20 +140,7 @@ object MLSentenceSegmenter {
         buf += CrossProductFeature(f1, f2)
       }
 
-
-//      buf += SurroundingCharFeature(if (offset == 0) "BOS" else codepointToString(text.codePointBefore(offset)),
-//        if (nextNotSpace < 0) "EOS" else codepointToString(text.codePointAt(nextNotSpace)))
-//
-//      buf += SurroundingCharTypeFeature(if (offset == 0) -1 else Character.getType(text.codePointBefore(offset)),
-//        if (nextNotSpace < 0) -1 else Character.getType(text.codePointAt(nextNotSpace)))
-
-//      for(f <- buf.toIndexedSeq; f2 <- myFeatures)
-//        buf += CrossProductFeature(f, f2)
-
       buf ++= myFeatures
-
-
-//      buf += BiasFeature
 
       buf.toArray
     }
@@ -169,7 +149,6 @@ object MLSentenceSegmenter {
   }
 
 
-  // TODO: this isn't correct for unicode.
   def addCharFeatures(text: CharacterIterator, current: Int, rel: Int): IndexedSeq[Feature] = {
     val buf = new ArrayBuffer[Feature]
     val (cp, cps) = try {
@@ -210,7 +189,7 @@ object MLSentenceSegmenter {
             && offset != 0 //  if it is not the first chracter
             && !isPotentialSentenceBoundary(text, offset - Character.charCount(codepoint), text.codePointBefore(offset)) // the previous char isn't a sentence break
             && ( // one of the following
-              offset == text.getEndIndex //  is EOF
+              text.current() == CharacterIterator.DONE
             || isControl(text.codePointAt(offset + 1)) // two newlines
             || previousLineIsShort(text, offset)
             || nextLineIsShort(text, offset)
