@@ -1,5 +1,4 @@
-package epic
-package preprocess
+package epic.preprocess
 
 import scala.collection.mutable.ArrayBuffer
 import java.io._
@@ -7,30 +6,26 @@ import chalk.corpora.MascSlab
 import chalk.slab.Sentence
 import breeze.linalg._
 import breeze.numerics._
-import framework.{ModelObjective, StandardExpectedCounts, Model, Feature}
+import epic.framework.{ModelObjective, StandardExpectedCounts, Model, Feature}
 import nak.data.Example
 import breeze.util.{Iterators, Encoder, Index}
 import breeze.features.FeatureVector
 import breeze.optimize.{L2Regularization, GradientTester}
-import java.text.{BreakIterator, StringCharacterIterator, CharacterIterator}
-import features._
-import chalk.text.analyze.WordShapeGenerator
-import epic.parser.features.IndicatorFeature
+import epic.features.CrossProductFeature
+import java.text.BreakIterator
 
 @SerialVersionUID(1L)
 class MLSentenceSegmenter(inf: MLSentenceSegmenter.ClassificationInference) extends chalk.text.segment.SentenceSegmenter with Serializable {
 
   override def apply(text: String): Iterable[String] = new Iterable[String] {
     def iterator: Iterator[String] = {
-      val str: StringCharacterIterator = new StringCharacterIterator(text)
-      val iter = MLSentenceSegmenter.potentialSentenceBoundariesIterator(str)
+      val iter = MLSentenceSegmenter.potentialSentenceBoundariesIterator(text)
       var lastOffset = 0
       Iterators.fromProducer {
         def rec():Option[String] = {
           if(iter.hasNext) {
             val pos = iter.next()
-            println(lastOffset, pos, text.length)
-            if(!iter.hasNext || inf.classify(MLSentenceSegmenter.featuresForEndPointDetection(str, pos))) {
+            if(!iter.hasNext || inf.classify(MLSentenceSegmenter.featuresForEndPointDetection(text, pos))) {
               val res = Some(text.substring(lastOffset, math.min(pos + 1, text.length)))
               lastOffset = pos + 1
               res
@@ -53,16 +48,14 @@ object MLSentenceSegmenter {
     breeze.util.readObject[MLSentenceSegmenter](file)
   }
 
-  def nextPotentialSentenceBoundary(text: CharacterIterator):Int = {
-    var start = text.getIndex
-    var codepoint = text.currentCodePoint
-    while (codepoint != CharacterIterator.DONE) {
+  def nextPotentialSentenceBoundary(text: String, offset: Int):Int = {
+    var start = offset + 1
+    while (start < text.length) {
+      val codepoint = text.codePointAt(start)
       if(isPotentialSentenceBoundary(text, start, codepoint)) {
-        text.setIndex(start + 1)
         return start
       }
       start += Character.charCount(codepoint)
-      codepoint = text.codePointAt(start)
     }
     start
   }
@@ -82,74 +75,58 @@ object MLSentenceSegmenter {
   case class SurroundingCharFeature(prev: String, next: String) extends Feature
   case class SurroundingCharTypeFeature(prev: Int, next: Int) extends Feature
   case class LastWord(w: String, offset: Int = 0) extends Feature
-  case class NextWord(w: String, offset: Int = 0) extends Feature
   case class LastWordLength(len: Int, offset: Int = 0) extends Feature
   case object EOFFeature extends Feature
   case object BOFFeature extends Feature
   case object BiasFeature extends Feature
-  case class JavaGuess(v: Int) extends Feature
+  case class JavaDistFeature(x: Int) extends Feature
 
-  def featuresForEndPointDetection(text: CharacterIterator, offset: Int, id: String = ""):Array[Feature] = {
-    text.setIndex(offset)
-    if(text.next() == CharacterIterator.DONE) {
+  def featuresForEndPointDetection(text: String, offset: Int):Array[Feature] = {
+    if (offset == text.length) {
       Array(BiasFeature, EOFFeature)
     } else {
       val buf = new ArrayBuffer[Feature]
-
-      val myFeatures = addCharFeatures(text, offset, 0)
-
-//      for(f <- buf.toIndexedSeq)
-//        buf += CrossProductFeature(f, javaAgrees)
-
-//      buf += javaAgrees
-
+      val break = BreakIterator.getSentenceInstance
+      break.setText(text)
+      val pos = break.following(math.max(offset -  3, 0))
+      buf += JavaDistFeature(math.min(pos - offset, 5))
+      buf += BiasFeature
+      buf ++= addCharFeatures(text, offset, 0)
       buf ++= addCharFeatures(text, offset, -2)
       buf ++= addCharFeatures(text, offset, -1)
       buf ++= addCharFeatures(text, offset, 1)
       buf ++= addCharFeatures(text, offset, 2)
-//      buf += IndicatorFeature(WordShapeGenerator.apply(text.substring(offset - 1, offset + 3)))
-      /*
-      if(offset > 2) text.stateless {
-        text.setIndex(offset - 2)
-        val prevSpace = text.previousIndexWhere(!_.isLetterOrDigit)
-        val word = LastWord(text.substring(prevSpace + 1, offset - 1))
-        buf += word
-
-        for(f <- myFeatures) buf += CrossProductFeature(word, f)
-      }
-      */
-//      buf += LastWordLength(math.log1p(offset - prevSpace).toInt)
-      val nextNotSpace = text.nextIndexWhere(c => !c.isSpaceChar && !c.isControl)
-      if(nextNotSpace >= 0) {
-        text.setIndex(nextNotSpace)
-        val nextnextSpace = text.nextIndexWhere(c => c.isSpaceChar || c.isControl)
-        if(nextnextSpace >= 0)
-          buf += NextWord(text.substring(nextNotSpace, nextnextSpace))
-      }
-      if(nextNotSpace >= 0)
-        buf += LastWord(//Character.getType(text.codePointAt(prevSpace + 1))+
-          "--" + Character.getType(text.codePointAt(nextNotSpace + 1)))
       for(f1 <- addCharFeatures(text, offset, 1); f2 <- addCharFeatures(text, offset, 2)) {
         buf += CrossProductFeature(f1, f2)
       }
 
-      for(f1 <- addCharFeatures(text, offset, 0); f2 <- addCharFeatures(text, offset, 1)) {
+      for(f1 <- addCharFeatures(text, offset, 0).take(1); f2 <- addCharFeatures(text, offset, 1)) {
         buf += CrossProductFeature(f1, f2)
       }
 
-      for(f0 <- addCharFeatures(text, offset, -1); f1 <- addCharFeatures(text, offset, 0); f2 <- addCharFeatures(text, offset, 1)) {
-        buf += CrossProductFeature(f0, CrossProductFeature(f1, f2))
-      }
-
-      for(f0 <- addCharFeatures(text, offset, 0); f1 <- addCharFeatures(text, offset, 1); f2 <- addCharFeatures(text, offset, 2)) {
-        buf += CrossProductFeature(f0, CrossProductFeature(f1, f2))
-      }
-
-      for(f1 <- addCharFeatures(text, offset, -1); f2 <- addCharFeatures(text, offset, 0)) {
+      for(f1 <- addCharFeatures(text, offset, -1); f2 <- addCharFeatures(text, offset, 0).take(1)) {
         buf += CrossProductFeature(f1, f2)
       }
 
-      buf ++= myFeatures
+      for(f1 <- addCharFeatures(text, offset, -1); f2 <- addCharFeatures(text, offset, 1)) {
+        buf += CrossProductFeature(f1, f2)
+      }
+
+      val prevSpace = math.max(text.lastIndexWhere(!_.isLetterOrDigit, offset - 2), 0)
+      buf += LastWord(text.substring(prevSpace + 1, prevSpace + 2))
+      buf += LastWordLength(offset - prevSpace)
+      val nextNotSpace = text.indexWhere(c => !c.isSpaceChar && !c.isControl, offset + 1)
+      if(nextNotSpace >= 0)
+        buf += LastWord(text.substring(prevSpace + 1, prevSpace + 2)+"--" + text.substring(nextNotSpace, nextNotSpace + 1), -3)
+
+
+      buf += SurroundingCharFeature(if (offset == 0) "BOS" else codepointToString(text.codePointBefore(offset)),
+                                    if (nextNotSpace < 0) "EOS" else codepointToString(text.codePointAt(nextNotSpace)))
+
+      buf += SurroundingCharTypeFeature(if (offset == 0) -1 else Character.getType(text.codePointBefore(offset)),
+        if (nextNotSpace < 0) -1 else Character.getType(text.codePointAt(nextNotSpace)))
+
+      buf += CrossProductFeature(buf(1), buf.last)
 
       buf.toArray
     }
@@ -158,25 +135,25 @@ object MLSentenceSegmenter {
   }
 
 
-  def addCharFeatures(text: CharacterIterator, current: Int, rel: Int): IndexedSeq[Feature] = {
+  def addCharFeatures(text: String, base: Int, rel: Int): IndexedSeq[Feature] = {
     val buf = new ArrayBuffer[Feature]
-    val (cp, cps) = try {
-      val ch = text.codePointAt(current + rel)
-      (ch.toInt, codepointToString(ch))
-    } catch {
-      case ex: IllegalArgumentException => 0 -> "###"
+    val next = try {text.offsetByCodePoints(base, rel)} catch { case ex: IndexOutOfBoundsException => if(rel > 0) text.length else 0}
+    val (cp, cps) =
+    if(next < 0 || next >= text.length) {
+      0 -> "###"
+    } else {
+      val cp = text.codePointAt(next)
+      val cps = codepointToString(cp)
+      cp -> cps
     }
-    if(Character.getType(cp) == 24)
-      buf += new CodePointFeature(cps, rel)
-    else buf += new CharTypeFeature(Character.getType(cp), rel)
-    text.setIndex(current)
+    buf += new CodePointFeature(cps, rel)
+    buf += new CharTypeFeature(Character.getType(cp), rel)
     buf.toIndexedSeq
   }
 
   // http://www.unicode.org/Public/UCD/latest/ucd/auxiliary/SentenceBreakProperty.txt
   // http://www.unicode.org/reports/tr29/#Sentence_Boundaries
-  def isPotentialSentenceBoundary(text: CharacterIterator, offset: Int, codepoint: Int):Boolean = text.stateless {
-    text.setIndex(offset)
+  def isPotentialSentenceBoundary(text: String, offset: Int, codepoint: Int):Boolean = {
     Character.getType(codepoint) match {
       case Character.OTHER_PUNCTUATION => codepoint != ',' && isProbablyNotContraction(text, offset, codepoint, '\'')
       case Character.INITIAL_QUOTE_PUNCTUATION => true
@@ -193,17 +170,10 @@ object MLSentenceSegmenter {
           before != ','
         }
       case Character.CONTROL =>
-        (
-          isControl(codepoint) // a control character is a sentence break
-            && offset != 0 //  if it is not the first chracter
-            && !isPotentialSentenceBoundary(text, offset - Character.charCount(codepoint), text.codePointBefore(offset)) // the previous char isn't a sentence break
-            && ( // one of the following
-              text.current() == CharacterIterator.DONE
-            || isControl(text.codePointAt(offset + 1)) // two newlines
-            || previousLineIsShort(text, offset)
-            || nextLineIsShort(text, offset)
-            || Character.isUpperCase(text.codePointAt(offset + 1)) // next line starts with upper case
-            )
+         isControl(codepoint) && (offset == 0 ||
+//          !isPotentialSentenceBoundary(text, offset - Character.charCount(codepoint), text.codePointBefore(offset))
+             text.codePointBefore(offset)!= ','
+           && (offset == text.length - 1 || isControl(text.codePointAt(offset + 1)) || previousLineIsShort(text, offset) || Character.isUpperCase(text.codePointAt(offset + 1)))
           )
       case Character.OTHER_SYMBOL => false
       case _ => false
@@ -217,42 +187,29 @@ object MLSentenceSegmenter {
   }
 
 
-  def previousLineIsShort(s: CharacterIterator, pos: Int): Boolean = s.stateless {
-    s.setIndex(pos - 1)
-    val SHORT_LINE = 40 // in characters
-    (pos - s.previousIndexWhere(_ == '\n') ) < SHORT_LINE
-  }
-
-  def nextLineIsShort(s: CharacterIterator, pos: Int): Boolean = s.stateless {
-    s.setIndex(pos + 1)
-    val SHORT_LINE = 40 // in characters
-    (pos - s.nextIndexWhere(_ == '\n') ) < SHORT_LINE
+  def previousLineIsShort(s: String, pos: Int): Boolean = {
+    val SHORT_LINE = 35 // in characters
+    (pos - s.lastIndexOf('\n', pos - 1) ) < SHORT_LINE
   }
 
 
-  def isProbablyNotContraction(text: CharacterIterator, offset: Int, codepoint: Int, quote: Char): Boolean = text.stateless {
-    (codepoint != quote || codepoint == CharacterIterator.DONE || offset == 0 || !Character.isLetterOrDigit(text.codePointAt(offset + 1)) || !Character.isLetterOrDigit(text.codePointBefore(offset)))
+  def isProbablyNotContraction(text: String, offset: Int, codepoint: Int, quote: Char): Boolean = {
+    (codepoint != quote || offset == text.length || offset == 0 || !Character.isLetterOrDigit(text.codePointAt(offset + 1)) || !Character.isLetterOrDigit(text.codePointBefore(offset)))
   }
 
-  def potentialSentenceBoundariesIterator(text: CharacterIterator):Iterator[Int] = new Iterator[Int] {
+  def potentialSentenceBoundariesIterator(text: String):Iterator[Int] = new Iterator[Int] {
     var offset = 0
 
-    override def hasNext: Boolean = text.current() != CharacterIterator.DONE
+    override def hasNext: Boolean = offset < text.length
 
     override def next(): Int = {
-      offset = nextPotentialSentenceBoundary(text)
-      try {
-        text.setIndex(offset)
-        text.setIndex(offset + 1)
-      } catch {
-        case ex: IllegalArgumentException =>
-      }
+      offset = nextPotentialSentenceBoundary(text, offset)
       offset
     }
 
   }
 
-  def adjustGoldSentenceBoundaries(text: CharacterIterator, endPoints: Iterator[Int]):Set[Int] = {
+  def adjustGoldSentenceBoundaries(text: String, endPoints: Iterator[Int]):Set[Int] = {
     val mapped = for(_p <- endPoints) yield {
       var p = math.max(_p, 0)
       var cp = text.codePointAt(p)
@@ -263,10 +220,9 @@ object MLSentenceSegmenter {
       }
 
       var earliestControlChar = p
-      text.setIndex(p)
-      val nextNonSpacePos = text.nextIndexWhere(!_.isSpaceChar)
+      val nextNonSpacePos = text.indexWhere(!_.isSpaceChar, p)
       if(nextNonSpacePos > p) {
-        val ccp = text.codePointAt(nextNonSpacePos)
+        val ccp = text.charAt(nextNonSpacePos)
         if (ccp == '\n' || ccp == '\t' || ccp == '\r') {
           earliestControlChar = nextNonSpacePos
         }
@@ -286,7 +242,7 @@ object MLSentenceSegmenter {
         cp = text.codePointAt(p)
       }
 
-      if(Character.isSpaceChar(cp)) {
+      if(Character.isSpaceChar(cp) && p < text.length) {
         p = earliestControlChar
         cp = text.codePointAt(p)
       }
@@ -313,20 +269,20 @@ object MLSentenceSegmenter {
       val slabWithSentences = MascSlab.s(slab)
 
 
-      val text = slab.content
-      val guessPoints: IndexedSeq[Int] = potentialSentenceBoundariesIterator(new ChunkedCharIterator(text.toIndexedSeq.iterator)).toIndexedSeq
+      val guessPoints: IndexedSeq[Int] = potentialSentenceBoundariesIterator(slabWithSentences.content).toIndexedSeq
 
-      val goldPoints = adjustGoldSentenceBoundaries(new StringCharacterIterator(text), slabWithSentences.iterator[Sentence].map(_.end))
+      val text = slab.content
+      val goldPoints = adjustGoldSentenceBoundaries(text, slabWithSentences.iterator[Sentence].map(_.end))
 
       println("<<<<" + f  )
       printOutSentenceBoundaries(text, guessPoints.toSet, goldPoints)
 
       for(guess <- guessPoints) yield {
-        SentenceDecisionInstance(goldPoints.contains(guess), featuresForEndPointDetection(new StringCharacterIterator(slab.content), guess, s"${f.getName}:$guess"), s"${f.getName}:$guess")
+        SentenceDecisionInstance(goldPoints.contains(guess), featuresForEndPointDetection(slab.content, guess), s"${f.getName}:$guess")
       }
     }
 
-    val (dev, train) = sentenceBoundaryProblems.flatten.splitAt(2400)
+    val (dev, train) = sentenceBoundaryProblems.flatten.splitAt(1000)
     val featureIndex = Index[Feature]()
     for(inst <- train; f <- inst.features) {
       featureIndex.index(f)
@@ -356,11 +312,12 @@ object MLSentenceSegmenter {
     var wrong = 0
     var tN, fN = 0
     var tP, fP = 0
-    for (inst <- dev) {
-      if (inst.label != inf.classify(inst.features)) {
-        println(inst.id, inst.label)
-        val weights = (inst.features.toIndexedSeq.map(f => f -> decoded(f)))
-        println(weights.sortBy(_._2), weights.map(_._2).sum)
+    for(inst <- dev) {
+      if(inst.label != inf.classify(inst.features)) {
+        val weights = (inst.features.toIndexedSeq.map( f => f -> decoded(f)))
+        val sum: Double = weights.map(_._2).sum
+        println(inst.label, inst.id, sum)
+        println(weights.sortBy(_._2), sum)
         wrong += 1
         if (inst.label) {
           fN += 1
@@ -416,7 +373,7 @@ object MLSentenceSegmenter {
 
 
   @SerialVersionUID(1L)
-  case class ClassificationInference(featureIndex: Index[Feature], weights: DenseVector[Double]) extends framework.Inference[SentenceDecisionInstance] {
+  case class ClassificationInference(featureIndex: Index[Feature], weights: DenseVector[Double]) extends epic.framework.Inference[SentenceDecisionInstance] {
     type Scorer = ClassificationInference
     override def scorer(v: SentenceDecisionInstance): Scorer = this
 
