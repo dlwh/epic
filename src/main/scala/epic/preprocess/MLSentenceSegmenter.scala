@@ -80,18 +80,28 @@ object MLSentenceSegmenter {
   case object BOFFeature extends Feature
   case object BiasFeature extends Feature
   case class JavaDistFeature(x: Int) extends Feature
+  case object LineIsShortFeature extends Feature
 
   def featuresForEndPointDetection(text: String, offset: Int):Array[Feature] = {
     if (offset == text.length) {
       Array(BiasFeature, EOFFeature)
     } else {
       val buf = new ArrayBuffer[Feature]
-      val break = BreakIterator.getSentenceInstance
-      break.setText(text)
-      val pos = break.following(math.max(offset -  3, 0))
-      buf += JavaDistFeature(math.min(pos - offset, 5))
+//      val break = BreakIterator.getSentenceInstance
+//      break.setText(text)
+//      val pos = break.following(math.max(offset -  3, 0))
+//      buf += JavaDistFeature(math.min(pos - offset, 5))
       buf += BiasFeature
-      buf ++= addCharFeatures(text, offset, 0)
+      val myFeatures: IndexedSeq[Feature] = addCharFeatures(text, offset, 0)
+      buf ++= myFeatures
+
+      if(previousLineIsShort(text, offset)) {
+        buf += LineIsShortFeature
+        for(m <- myFeatures) {
+          buf += CrossProductFeature(LineIsShortFeature, m)
+        }
+      }
+
       buf ++= addCharFeatures(text, offset, -2)
       buf ++= addCharFeatures(text, offset, -1)
       buf ++= addCharFeatures(text, offset, 1)
@@ -100,11 +110,11 @@ object MLSentenceSegmenter {
         buf += CrossProductFeature(f1, f2)
       }
 
-      for(f1 <- addCharFeatures(text, offset, 0).take(1); f2 <- addCharFeatures(text, offset, 1)) {
+      for(f1 <- myFeatures; f2 <- addCharFeatures(text, offset, 1)) {
         buf += CrossProductFeature(f1, f2)
       }
 
-      for(f1 <- addCharFeatures(text, offset, -1); f2 <- addCharFeatures(text, offset, 0).take(1)) {
+      for(f1 <- addCharFeatures(text, offset, -1); f2 <- myFeatures.take(1)) {
         buf += CrossProductFeature(f1, f2)
       }
 
@@ -146,8 +156,8 @@ object MLSentenceSegmenter {
       val cps = codepointToString(cp)
       cp -> cps
     }
-    buf += new CodePointFeature(cps, rel)
     buf += new CharTypeFeature(Character.getType(cp), rel)
+    buf += new CodePointFeature(cps, rel)
     buf.toIndexedSeq
   }
 
