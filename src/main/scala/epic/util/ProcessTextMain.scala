@@ -4,7 +4,7 @@ import java.io.{FileInputStream, File}
 import breeze.config.{CommandLineParser, Help}
 import breeze.util._
 import chalk.text.LanguagePack
-import epic.preprocess.{StreamSentenceSegmenter, TreebankTokenizer}
+import epic.preprocess.{NewLineSentenceSegmenter, MLSentenceSegmenter, StreamSentenceSegmenter, TreebankTokenizer}
 import scala.io.{Codec, Source}
 import epic.sequences.CRF
 import java.util.concurrent.{LinkedBlockingDeque, TimeUnit, ThreadPoolExecutor}
@@ -40,7 +40,11 @@ trait ProcessTextMain[Model, AnnotatedType] {
     val model = readObject[Model](params.model)
 
     val sentenceSegmenter = {
-      val base = LanguagePack.English.sentenceSegmenter
+      val base = params.sentences.toLowerCase match {
+        case "java" => LanguagePack.English.sentenceSegmenter
+        case "default" | "trained" => MLSentenceSegmenter.bundled().get
+        case "newline" => new NewLineSentenceSegmenter()
+      }
       new StreamSentenceSegmenter(base)
     }
     val tokenizer = new TreebankTokenizer
@@ -81,6 +85,8 @@ object ProcessTextMain {
   case class Params(model: File,
                     @Help(text="How many threads to parse with. Default is whatever Scala wants")
                     threads: Int = -1,
+                    @Help(text="Kind of sentence segmenter to use. Default is the trained one. Options are: default, newline, java")
+                    sentences: String = "default",
                     maxLength: Int = 1000)
 
   case class SentenceTooLongException(length: Int) extends Exception("Sentence too long: " + length)

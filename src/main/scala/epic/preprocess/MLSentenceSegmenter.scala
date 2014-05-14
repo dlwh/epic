@@ -13,6 +13,7 @@ import breeze.features.FeatureVector
 import breeze.optimize.{L2Regularization, GradientTester}
 import epic.features.CrossProductFeature
 import java.text.BreakIterator
+import java.util.zip.GZIPInputStream
 
 @SerialVersionUID(1L)
 class MLSentenceSegmenter(inf: MLSentenceSegmenter.ClassificationInference) extends chalk.text.segment.SentenceSegmenter with Serializable {
@@ -40,9 +41,24 @@ class MLSentenceSegmenter(inf: MLSentenceSegmenter.ClassificationInference) exte
       }
     }
   }
+
+  override def toString = "MLSentenceSegmenter(...)"
 }
 
 object MLSentenceSegmenter {
+
+  def bundled(language: String = "en"):Option[MLSentenceSegmenter] = {
+    val path = s"$language-sent-segmenter.model.ser.gz"
+    Option(getClass.getResourceAsStream(path)).map { strm =>
+      try {
+      val oin = new ObjectInputStream(new GZIPInputStream(strm))
+      oin.readObject().asInstanceOf[MLSentenceSegmenter]
+      } finally {
+        if(strm != null)
+          strm.close()
+      }
+    }
+  }
 
   def loadModel(file: File) = {
     breeze.util.readObject[MLSentenceSegmenter](file)
