@@ -21,10 +21,7 @@ class StreamSentenceSegmenter(val baseSegmenter: SentenceSegmenter) {
       sentences.view.slice(0, sentences.length - 1)
     }
 
-    if(addendum.nonEmpty)
-      pieces ++ Iterator(addendum)
-    else
-      pieces
+    pieces ++ Iterator(addendum).filter(_.nonEmpty)
   }
 
   private def chunkInput(stream: InputStream):Iterator[String] = {
@@ -42,7 +39,6 @@ class StreamSentenceSegmenter(val baseSegmenter: SentenceSegmenter) {
           None
         } else {
           val s = new String(buffer.take(numRead))
-          println("QQQ " + s)
           Some(s)
         }
       }

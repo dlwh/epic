@@ -1,10 +1,10 @@
 package epic.util
 
-import java.io.File
+import java.io.{FileInputStream, File}
 import breeze.config.{CommandLineParser, Help}
 import breeze.util._
 import chalk.text.LanguagePack
-import epic.preprocess.TreebankTokenizer
+import epic.preprocess.{StreamSentenceSegmenter, TreebankTokenizer}
 import scala.io.{Codec, Source}
 import epic.sequences.CRF
 import java.util.concurrent.{LinkedBlockingDeque, TimeUnit, ThreadPoolExecutor}
@@ -39,7 +39,10 @@ trait ProcessTextMain[Model, AnnotatedType] {
 
     val model = readObject[Model](params.model)
 
-    val sentenceSegmenter = LanguagePack.English.sentenceSegmenter
+    val sentenceSegmenter = {
+      val base = LanguagePack.English.sentenceSegmenter
+      new StreamSentenceSegmenter(base)
+    }
     val tokenizer = new TreebankTokenizer
 
     implicit val context = if(params.threads > 0) {
@@ -48,11 +51,10 @@ trait ProcessTextMain[Model, AnnotatedType] {
       scala.concurrent.ExecutionContext.global
     }
 
-    val iter = if(files.length == 0) Iterator(Source.fromInputStream(System.in)) else files.iterator.map(Source.fromFile(_)(Codec.UTF8))
+    val iter = if(files.length == 0) Iterator(System.in) else files.iterator.map(new FileInputStream(_))
 
     for(src <- iter) {
-      val text = src.mkString
-      val queue = FIFOWorkQueue(sentenceSegmenter(text)){sent =>
+      val queue = FIFOWorkQueue(sentenceSegmenter.sentences(src)){sent =>
         val tokens = tokenizer(sent).toIndexedSeq
         try {
           if(tokens.length > params.maxLength) {
