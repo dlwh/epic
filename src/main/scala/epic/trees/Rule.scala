@@ -64,3 +64,14 @@ final case class LexicalProduction[@specialized(Int) +L, +W](parent: L, word: W)
 case class NullRule[@specialized(Int) +L](parent: L) extends Production[L, Nothing] {
   def map[A](f: (L) => A): NullRule[A] = NullRule(f(parent))
 }
+
+
+object BinaryRule {
+  def leftChildFirstOrdering[L:Ordering]:Ordering[BinaryRule[L]] = Ordering.Tuple3[L, L, L].on(br => (br.left, br.right, br.parent))
+  def parentFirstOrdering[L:Ordering]:Ordering[BinaryRule[L]] = Ordering.Tuple3[L, L, L].on(br => (br.parent, br.left, br.right))
+}
+
+object UnaryRule {
+  def childFirstOrdering[L:Ordering]:Ordering[UnaryRule[L]] = Ordering.Tuple2[L, L].on(br => (br.child, br.parent))
+  def parentFirstOrdering[L:Ordering]:Ordering[UnaryRule[L]] = Ordering.Tuple2[L, L].on(br => (br.parent, br.child))
+}

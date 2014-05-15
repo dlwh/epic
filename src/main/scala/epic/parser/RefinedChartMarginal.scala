@@ -239,7 +239,6 @@ final case class RefinedChartMarginal[L, W](anchoring: GrammarAnchoring[L, W],
 
 object RefinedChartMarginal {
 
-
   def apply[L, W](grammar: Grammar[L, W], sent: IndexedSeq[W]): RefinedChartMarginal[L, W] = {
     apply(grammar.anchor(sent))
   }
