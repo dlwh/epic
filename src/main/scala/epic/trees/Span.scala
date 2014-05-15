@@ -35,6 +35,10 @@ class Span(val encoded: Long) extends AnyVal {
     cfor.cfor(begin)(_ < end, _ +1) { f }
   }
 
+  def iterator = toRange.iterator
+
+  def toRange = Range(begin,end)
+
   def contains(pos: Int) = pos >= begin && pos < end
 
   /**

@@ -84,6 +84,10 @@ class SimpleGrammar[L, L2, W](val topology: RuleTopology[L],
     val hashtext = bigInt.toString(16)
     hashtext
   }
+
+  val insideTensor = SparseRuleTensor.forSimpleGrammarInside(this)
+  /** Swaps left child and parent */
+  val outsideTensor = SparseRuleTensor.forSimpleGrammarOutside(this)
 }
 
 object SimpleGrammar {

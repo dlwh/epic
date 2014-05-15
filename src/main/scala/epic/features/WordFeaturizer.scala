@@ -50,6 +50,8 @@ object WordFeaturizer {
 
   }
 
+  def apply[W](f: W=>Array[Feature]) = new TabulatedWordFeaturizer(f)
+
   case class DSL[L](counts: Counter2[L, String, Double],
                     commonWordThreshold: Int = 100,
                     unknownWordThreshold: Int = 2) {
@@ -99,6 +101,17 @@ object WordFeaturizer {
 
   implicit def rangeModifier[W]: Modifier[W, Range, WordFeaturizer[W]] = new Modifier[W, Range, WordFeaturizer[W]] {
     def apply(f: WordFeaturizer[W], r: Range): WordFeaturizer[W] = r.map(i => f.offset(i):WordFeaturizer[W]).reduceLeft(_ * _)
+  }
+
+  class TabulatedWordFeaturizer[W](f: W=>Array[Feature]) extends WordFeaturizer[W] with Serializable {
+    override def anchor(w: IndexedSeq[W]): WordFeatureAnchoring[W] = new WordFeatureAnchoring[W] {
+
+      override def words: IndexedSeq[W] = w
+
+      val feats = words.map(f)
+
+      override def featuresForWord(pos: Int): Array[Feature] = if(pos < 0 || pos >= words.length) Array() else feats(pos)
+    }
   }
 }
 
@@ -153,6 +166,8 @@ class NextActualWordFeaturizer(f: WordFeaturizer[String], lookRight: Boolean, is
       }
     }
   }
+
+
 }
 
 case class PunctuationFeature(f: Feature) extends Feature

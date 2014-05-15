@@ -184,6 +184,12 @@ class RefinedParseChart[L](val index: Index[L],
     /** right-most place a right constituent with label l--which starts at position i--can end. (end)(sym)*/
     val coarseRightMostEndForBegin = makeCoarseExtentArray(-1)
 
+    def canStartHere(begin: Int, end: Int, leftChild: Int) = {
+      val narrowR = coarseLeftMostEndForBegin(begin)(leftChild)
+      narrowR < end
+    }
+
+
 
     def feasibleSplitPoints(begin: Int, end: Int, b: Int, c: Int) = {
       val narrowR = coarseLeftMostEndForBegin(begin)(b)
