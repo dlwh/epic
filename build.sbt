@@ -36,6 +36,8 @@ scalacOptions ++= Seq("-deprecation", "-language:_", "-optimize")
 
 javaOptions += "-Xmx4g"
 
+fork := true
+
 
 seq(assemblySettings: _*)
 
