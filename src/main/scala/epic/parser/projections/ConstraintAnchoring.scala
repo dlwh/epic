@@ -101,7 +101,7 @@ class ParserChartConstraintsFactory[L, W](val parser: Parser[L, W],
 
     //, hasMaximalProjection)
     val con = ChartConstraints[L](topLabelThresholds, labelThresholds)
-    PrecacheConstraints.checkConstraints(TreeInstance("viterbi", vit, marg.words), con, this)
+//    PrecacheConstraints.checkConstraints(TreeInstance("viterbi", vit, marg.words), con, this)
     con
   }
 
