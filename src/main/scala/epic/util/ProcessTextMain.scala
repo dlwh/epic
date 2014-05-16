@@ -8,6 +8,7 @@ import epic.preprocess.{NewLineSentenceSegmenter, MLSentenceSegmenter, StreamSen
 import scala.io.{Codec, Source}
 import epic.sequences.CRF
 import java.util.concurrent.{LinkedBlockingDeque, TimeUnit, ThreadPoolExecutor}
+import chalk.text.tokenize.WhitespaceTokenizer
 
 /**
  * TODO
@@ -47,7 +48,10 @@ trait ProcessTextMain[Model, AnnotatedType] {
       }
       new StreamSentenceSegmenter(base)
     }
-    val tokenizer = new TreebankTokenizer
+    val tokenizer = params.tokens.toLowerCase match {
+      case "default" | "treebank" => new TreebankTokenizer
+      case "none" | "whitespace" => new WhitespaceTokenizer
+    }
 
     implicit val context = if(params.threads > 0) {
       scala.concurrent.ExecutionContext.fromExecutor(new ThreadPoolExecutor(1, params.threads, 1, TimeUnit.SECONDS, new LinkedBlockingDeque[Runnable]()))
@@ -87,6 +91,8 @@ object ProcessTextMain {
                     threads: Int = -1,
                     @Help(text="Kind of sentence segmenter to use. Default is the trained one. Options are: default, newline, java")
                     sentences: String = "default",
+                    @Help(text="Kind of word tokenizer to use. Default is the treebank. Can also choose whitespace/none for pre-tokenized text.")
+                    tokens: String = "default",
                     maxLength: Int = 1000)
 
   case class SentenceTooLongException(length: Int) extends Exception("Sentence too long: " + length)

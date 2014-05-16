@@ -26,12 +26,17 @@ object SurfaceFeaturizer {
 
   def apply[W](f: (IndexedSeq[W], Span)=>Array[Feature]):SurfaceFeaturizer[W] = new TabulatedSurfaceFeaturizer[W](f)
 
+
+  /** begin of span */
+  object begin extends MarkerPos(0)
+  /** end of span */
+  object end extends MarkerPos(0, false)
+
+
   trait DSL {
 
-    /** begin of span */
-    object begin extends MarkerPos(0)
-    /** end of span */
-    object end extends MarkerPos(0, false)
+    val begin : SurfaceFeaturizer.begin.type = SurfaceFeaturizer.begin
+    val end : SurfaceFeaturizer.end.type = SurfaceFeaturizer.end
 
     def edges[W](first: MarkedWordFeaturizer[W], last: MarkedWordFeaturizer[W]):SurfaceFeaturizer[W] = new SpanEdgesFeaturizer(first, last)
     val spanShape = new SpanShapeFeaturizer()

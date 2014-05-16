@@ -380,7 +380,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
 
 
 
-    var span: SplitSpanFeaturizer[String] = spanFeaturizer.getOrElse(SpanModelFactory.goodFeaturizer(annWords, commonWordThreshold, useShape))
+    var span: SplitSpanFeaturizer[String] = spanFeaturizer.getOrElse(SpanModelFactory.goodFeaturizer(annWords, commonWordThreshold, useShape = useShape))
 
     if(useRichSpanContext)
       span += spanShapeBetter
@@ -600,6 +600,8 @@ object SpanModelFactory {
 
     featurizer += distance[String](begin, split)
     featurizer += distance[String](split, end)
+    if(useShape)
+      featurizer += spanShape
     featurizer
   }
 

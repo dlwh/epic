@@ -37,8 +37,11 @@ trait SplitSpanFeaturizer[W] extends SurfaceFeaturizer[W] {
 
 
 object SplitSpanFeaturizer {
+  object split extends SplitPointMarker
+
   trait DSL extends SurfaceFeaturizer.DSL {
-    object split extends SplitPointMarker
+    val split: SplitSpanFeaturizer.split.type = SplitSpanFeaturizer.split
+
     implicit def splitWFModifier[W]: WordFeaturizer.Modifier[W, split.type, SplitFeaturizer[W]] = new Modifier[W, split.type, SplitFeaturizer[W]] {
       def apply(f: WordFeaturizer[W], t: split.type): SplitFeaturizer[W] = new SplitFeaturizer(f)
     }
