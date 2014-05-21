@@ -19,8 +19,8 @@ object TrainPosTagger extends LazyLogging {
     val params = CommandLineParser.readIn[Params](args)
     logger.info("Command line arguments for recovery:\n" + Configuration.fromObject(params).toCommandLineString)
     import params._
-    val train = treebank.trainTrees.map(_.asTaggedSequence)
-    val test = treebank.devTrees.map(_.asTaggedSequence)
+    val train = treebank.trainTrees.map(_.mapLabels(_.baseAnnotatedLabel)).map(_.asTaggedSequence)
+    val test = treebank.devTrees.map(_.mapLabels(_.baseAnnotatedLabel)).map(_.asTaggedSequence)
 
     val crf = CRF.buildSimple(train, AnnotatedLabel("TOP"), opt = opt)
     breeze.util.writeObject(modelOut, crf)

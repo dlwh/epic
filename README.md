@@ -40,16 +40,14 @@ Epic also supports programmatic usage. All of the models assume that text has be
 
 To preprocess text so that the models can use them, you will need to segment out sentences and tokenize the sentences into individual words. Epic comes with classes to do both.
 
-TODO: bundle the sentence segmenter
-
-To split a text into sentences, use the XXX.
+To split a text into sentences, use the XXX. TODO: provide a way to just tokenize/segment text.
 
 Once you have a sentence, you can tokenize it using a `epic.preprocess.TreebankTokenizer`, which takes a string and returns a sequence of tokens. All told, the pipeline looks like this:
 
 ```scala
 val text = getSomeText();
 
-val sentenceSplitter = ??? // TODO
+val sentenceSplitter = MLSentenceSegmenter.bundled().get
 val tokenizer = new epic.preprocess.TreebankTokenizer()
 
 val sentences: IndexedSeq[IndexedSeq[String]] = sentenceSplitter(text).map(tokenizer).toIndexedSeq
@@ -105,6 +103,8 @@ println(tags.render)
 
 Again, using NER systems is basically the same as using POS taggers. All NER systems are currently [semi-Markov linear chain conditional random fields](http://www.cs.cmu.edu/~wcohen/postscript/semiCRF.pdf), or SemiCRFs. (You don't need to understand them to use them. They are just a machine learning method for segmenting a sequence of words into continguous segments.)
 
+TODO
+
 ```scala
 val tagger = epic.models.deserialize[SemiCRF[AnnotatedLabel, String]](path)
 
@@ -135,35 +135,35 @@ To following models are available at this time:
 
 
 * Parser
-  * English: TODO
+  * English: 
     ```
     "org.scalanlp" %% "epic-parser-en-span" % "1.0-SNAPSHOT"
     ```
-  * Basque: TODO
+  * Basque: 
     ```
     "org.scalanlp" %% "epic-parser-eu-span" % "1.0-SNAPSHOT"
     ```
-  * French: TODO
+  * French: 
     ```
     "org.scalanlp" %% "epic-parser-fr-span" % "1.0-SNAPSHOT"
     ```
-  * German: TODO
+  * German: 
     ```
     "org.scalanlp" %% "epic-parser-de-span" % "1.0-SNAPSHOT"
     ```
-  * Hungarian: TODO
+  * Hungarian: 
     ```
     "org.scalanlp" %% "epic-parser-pl-span" % "1.0-SNAPSHOT"
     ```
-  * Korean: TODO
+  * Korean: 
     ```
     "org.scalanlp" %% "epic-parser-ko-span" % "1.0-SNAPSHOT"
     ```
-  * Polish: TODO
+  * Polish:
     ```
     "org.scalanlp" %% "epic-parser-ko-span" % "1.0-SNAPSHOT"
     ```
-  * Swedish: TODO
+  * Swedish: 
     ```
     "org.scalanlp" %% "epic-parser-sv-span" % "1.0-SNAPSHOT"
     ```
@@ -279,11 +279,51 @@ If you use the `SpanModel`, please cite:
 
 If you use something else, cite one of these, or something.
 
-For training a SpanModel, the following configuration is known to work well in general:
+For training a SpanModel, the following configurations are known to work well in general:
 
+
+* English:
 ```bash
-epic.parser.models.ParserTrainer  --modelFactory epic.parser.models.SpanModelFactory   --cache.path constraints.cache   --opt.useStochastic --opt.regularization 5   --opt.batchSize 500 --alpha 0.1 --maxIterations 1000 --trainer.modelFactory.annotator epic.trees.annotations.PipelineAnnotator  --ann.0 epic.trees.annotations.FilterAnnotations    --ann.1 epic.trees.annotations.ForgetHeadTag   --ann.2 epic.trees.annotations.Markovize --vertical 1 --horizontal 0 --treebank.path /home/dlwh/wsj/
+epic.parser.models.ParserTrainer \
+  --modelFactory epic.parser.models.SpanModelFactory
+  --cache.path constraints.cache
+  --opt.useStochastic
+  --opt.regularization 5
+  --opt.batchSize 500
+  --alpha 0.1
+  --maxIterations 1000
+  --trainer.modelFactory.annotator epic.trees.annotations.PipelineAnnotator
+  --ann.0 epic.trees.annotations.FilterAnnotations
+  --ann.1 epic.trees.annotations.ForgetHeadTag
+  --ann.2 epic.trees.annotations.Markovize
+  --vertical 1
+  --horizontal 0
+  --treebank.path /home/dlwh/wsj/
 ```
+* Other (SPMRL languages):
+```bash
+epic.parser.models.ParserTrainer \
+  --treebankType spmrl \
+  --binarization head \
+  --modelFactory epic.parser.models.SpanModelFactory \
+  --opt.useStochastic --opt.regularization 5.0 \
+  --opt.batchSize 400 --maxIterations 502 \
+  --iterationsPerEval 100 \
+  --alpha 0.1 \
+  --trainer.modelFactory.annotator epic.trees.annotations.PipelineAnnotator \
+  --ann.0 epic.trees.annotations.FilterAnnotations  \
+  --ann.1 epic.trees.annotations.ForgetHeadTag \
+  --ann.2 epic.trees.annotations.Markovize \
+  --ann.2.vertical 1 \
+  --ann.2.horizontal 0 \
+  --ann.3 epic.trees.annotations.SplitPunct \
+  --cache.path $languc-constraints.cache \
+  --treebank.path ${SPMRL}/${languc}_SPMRL/gold/ptb/ \
+  --supervisedHeadFinderPtbPath ${SPMRL}/${languc}_SPMRL/gold/ptb/${train}/${train}.$lang.gold.ptb \
+  --supervisedHeadFinderConllPath ${SPMRL}/${languc}_SPMRL/gold/conll/${train}/${train}.$lang.gold.conll \
+  --threads 8 
+```
+
 
 Training a parser currently needs four files that are cached to the pwd:
 
