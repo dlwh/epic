@@ -26,6 +26,8 @@ trait ProcessTextMain[Model, AnnotatedType] {
 
   def annotate(model: Model, text: IndexedSeq[String]):AnnotatedType
 
+  def classPathLoad(language: String):Model
+
   def main(args: Array[String]) = {
     val (baseConfig, files) = CommandLineParser.parseArguments(args)
     val config = baseConfig
@@ -38,7 +40,12 @@ trait ProcessTextMain[Model, AnnotatedType] {
         sys.exit(1)
     }
 
-    val model = readObject[Model](params.model)
+    val model = try {
+      readObject[Model](params.model)
+    } catch {
+      case ex: Exception =>
+        classPathLoad(params.model.toString)
+    }
 
     val sentenceSegmenter = {
       val base = params.sentences.toLowerCase match {

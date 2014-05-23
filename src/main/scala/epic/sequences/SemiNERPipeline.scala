@@ -2,7 +2,7 @@ package epic.sequences
 
 import java.io._
 import breeze.config.{Configuration, CommandLineParser}
-import epic.ontonotes.{NERType, ConllOntoReader}
+import epic.ontonotes.{NerType, ConllOntoReader}
 import collection.mutable.ArrayBuffer
 import breeze.linalg.DenseVector
 import epic.framework.ModelObjective
@@ -22,7 +22,7 @@ import epic.preprocess.TreebankTokenizer
  *
  * @author dlwh
  */
-object SemiNERPipeline extends LazyLogging {
+object SemiNerPipeline extends LazyLogging {
 
   case class Params(path: File,
                     modelOut: File = new File("ner.model.gz"),
@@ -48,7 +48,7 @@ object SemiNERPipeline extends LazyLogging {
     val gazetteer =  None//Gazetteer.ner("en")
 
     // build feature Index
-    val model = new SegmentationModelFactory(NERType.OutsideSentence, NERType.NotEntity, gazetteer = gazetteer).makeModel(train)
+    val model = new SegmentationModelFactory(NerType.OutsideSentence, NerType.NotEntity, gazetteer = gazetteer).makeModel(train)
     val obj = new ModelObjective(model, train, params.nthreads)
     val cached = new CachedBatchDiffFunction(obj)
     if(params.checkGradient) {
@@ -57,7 +57,7 @@ object SemiNERPipeline extends LazyLogging {
 
     def eval(state: FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State) {
       val crf = model.extractCRF(state.x)
-      println("Eval + " + (state.iter+1) + " " + SegmentationEval.eval(crf, test, NERType.NotEntity))
+      println("Eval + " + (state.iter+1) + " " + SegmentationEval.eval(crf, test, NerType.NotEntity))
     }
 
     val finalState = params.opt.iterations(cached, obj.initialWeightVector(randomize=false)).tee(state => if((state.iter +1) % params.iterPerEval == 0) eval(state)).take(params.opt.maxIterations).last
@@ -71,7 +71,7 @@ object SemiNERPipeline extends LazyLogging {
 
 
 
-object SemiConllNERPipeline extends LazyLogging {
+object SemiConllNerPipeline extends LazyLogging {
 
   def makeSegmentation(ex: Example[IndexedSeq[String],IndexedSeq[IndexedSeq[String]]]): Segmentation[String, String]  = {
     val labels = ex.label

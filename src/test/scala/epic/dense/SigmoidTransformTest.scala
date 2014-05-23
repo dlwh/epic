@@ -8,7 +8,6 @@ import breeze.linalg.{sum, argmax, max, DenseVector}
  *
  *
  * @author dlwh
- */
 class SigmoidTransformTest extends FunSuite {
 
   test("chain rule") {
@@ -51,3 +50,4 @@ class SigmoidTransformTest extends FunSuite {
   }
 
 }
+*/

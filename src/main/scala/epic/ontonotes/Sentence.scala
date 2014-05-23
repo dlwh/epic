@@ -28,21 +28,21 @@ case class Sentence(docId: String, index: Int,
 
   def treeInstance(processor: StandardTreeProcessor) = TreeInstance(docId+"-treeInstance", processor(tree.map(_.treebankString)), words )
 
-  lazy val nerSegmentation: Segmentation[NERType.Value, String]  = {
-    val sorted = ner.toIndexedSeq.sortBy((_: (DSpan, NERType.Value))._1.begin)
-    var out = new ArrayBuffer[(NERType.Value, Span)]()
+  lazy val nerSegmentation: Segmentation[NerType.Value, String]  = {
+    val sorted = ner.toIndexedSeq.sortBy((_: (DSpan, NerType.Value))._1.begin)
+    var out = new ArrayBuffer[(NerType.Value, Span)]()
     var last = 0
     for( (dspan, label) <- sorted ) {
       assert(last <= dspan.begin)
       while(dspan.begin != last) {
-        out += (NERType.NotEntity -> Span(last,last+1))
+        out += (NerType.NotEntity -> Span(last,last+1))
         last += 1
       }
       out += (label -> Span(dspan.begin, dspan.end))
       last = dspan.end
     }
     while(words.length != last) {
-      out += (NERType.NotEntity -> Span(last,last+1))
+      out += (NerType.NotEntity -> Span(last,last+1))
       last += 1
     }
 
@@ -51,7 +51,7 @@ case class Sentence(docId: String, index: Int,
   def coref = annotations.coref
 
   def annotate(tree: Tree[AnnotatedLabel] = tree,
-               ner: Map[DSpan,NERType.Value] = ner,
+               ner: Map[DSpan,NerType.Value] = ner,
                coref: Map[DSpan,Mention] = coref,
                srl: IndexedSeq[Frame] = srl,
                speaker: Option[String] = speaker) = {
@@ -68,7 +68,7 @@ case class Sentence(docId: String, index: Int,
 
 @SerialVersionUID(1L)
 case class OntoAnnotations(tree: Tree[AnnotatedLabel],
-                           ner: Map[DSpan,NERType.Value],
+                           ner: Map[DSpan,NerType.Value],
                            coref: Map[DSpan,Mention],
                            srl: IndexedSeq[Frame],
                            speaker: Option[String])
@@ -155,8 +155,8 @@ object MentionType {
 /**
  * The NER types used in Ontonotes
  */
-object NERType extends Enumeration {
-  def fromString(str: String): NERType.Value = str.toLowerCase match {
+object NerType extends Enumeration {
+  def fromString(str: String): NerType.Value = str.toLowerCase match {
     case "cardinal" => Cardinal
     case "date" => Date
     case "event" => Event

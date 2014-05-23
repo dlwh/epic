@@ -50,15 +50,15 @@ object ConllOntoReader {
         Tree.fromString(b.toString)._1
       }
 
-      val entities = collection.mutable.Map[(Int,Int), NERType.Value]()
+      val entities = collection.mutable.Map[(Int,Int), NerType.Value]()
       var currentChunkStart = -1
-      var currentChunkType = NERType.NotEntity
+      var currentChunkType = NerType.NotEntity
       for(i <- 0 until s.length) {
         val chunk = s(i)(10)
         if(chunk.startsWith("(")) {
           assert(currentChunkStart < 0)
           currentChunkStart = i
-          currentChunkType = NERType.fromString(chunk.replaceAll("[()*]",""))
+          currentChunkType = NerType.fromString(chunk.replaceAll("[()*]",""))
         }
 
         if(chunk.endsWith(")")) {

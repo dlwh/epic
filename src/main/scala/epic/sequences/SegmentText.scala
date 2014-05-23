@@ -2,6 +2,7 @@ package epic.sequences
 
 import io.Codec
 import epic.util.ProcessTextMain
+import epic.models.NerSelector
 
 /**
  * Simple class that reads in a bunch of files and parses them. Output is dumped to standard out.
@@ -18,5 +19,7 @@ object SegmentText extends ProcessTextMain[SemiCRF[Any, String], Segmentation[An
     model.bestSequence(text)
   }
 
-
+  override def classPathLoad(language: String): SemiCRF[Any, String] = {
+    NerSelector.loadNer(language).get
+  }
 }
