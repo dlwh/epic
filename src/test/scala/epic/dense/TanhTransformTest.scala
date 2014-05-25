@@ -8,7 +8,6 @@ import breeze.linalg._
  *
  *
  * @author dlwh
- */
 class TanhTransformTest extends FunSuite {
 
   test("chain rule") {
@@ -51,3 +50,4 @@ class TanhTransformTest extends FunSuite {
   }
 
 }
+ */

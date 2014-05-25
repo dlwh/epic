@@ -41,7 +41,7 @@ trait ProcessTextMain[Model, AnnotatedType] {
     }
 
     val model = try {
-      readObject[Model](params.model)
+      epic.models.deserialize[Model](params.model.toString)
     } catch {
       case ex: Exception =>
         classPathLoad(params.model.toString)

@@ -34,6 +34,7 @@ class StreamSentenceSegmenter(val baseSegmenter: SentenceSegmenter) {
         None
       } else {
         val numRead = reader.read(buffer)
+        println(numRead, new String(buffer.take(numRead)))
         if(numRead == -1) {
           done = true
           None
