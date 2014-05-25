@@ -168,50 +168,38 @@ To following models are available at this time:
     "org.scalanlp" %% "epic-parser-sv-span" % "1.0-SNAPSHOT"
     ```
 * POS Taggers
-  * English: TODO
+  * English: 
     ```
     "org.scalanlp" %% "epic-pos-en" % "1.0-SNAPSHOT"
     ```
-  * Basque: TODO
+  * Basque: 
     ```
     "org.scalanlp" %% "epic-pos-eu" % "1.0-SNAPSHOT"
     ```
-  * French: TODO
+  * French: 
     ```
     "org.scalanlp" %% "epic-pos-fr" % "1.0-SNAPSHOT"
     ```
-  * German: TODO
+  * German: 
     ```
     "org.scalanlp" %% "epic-pos-de" % "1.0-SNAPSHOT"
     ```
-  * Hungarian: TODO
+  * Hungarian: 
     ```
     "org.scalanlp" %% "epic-pos-pl" % "1.0-SNAPSHOT"
     ```
-  * Korean: TODO
+  * Polish: 
     ```
     "org.scalanlp" %% "epic-pos-ko" % "1.0-SNAPSHOT"
     ```
-  * Polish: TODO
-    ```
-    "org.scalanlp" %% "epic-pos-ko" % "1.0-SNAPSHOT"
-    ```
-  * Swedish: TODO
+  * Swedish: 
     ```
     "org.scalanlp" %% "epic-pos-sv" % "1.0-SNAPSHOT"
     ```
 * Named Entity Recognizers
-  * English: TODO
+  * English: 
     ```
     "org.scalanlp" %% "epic-ner-en-conll" % "1.0-SNAPSHOT"
-    ```
-  * Spanish: TODO
-    ```
-    "org.scalanlp" %% "epic-ner-es-conll" % "1.0-SNAPSHOT"
-    ```
-  * German: TODO
-    ```
-    "org.scalanlp" %% "epic-ner-de-conll" % "1.0-SNAPSHOT"
     ```
 
 
@@ -362,11 +350,18 @@ The following configuration is known to work well:
 
 * English:
 ```bash
-TODO
+     epic.sequences.TrainPosTagger \
+     --treebank.path $PATH_TO/wsj \
+     --opt.regularization 2.0 \
+     --useStochastic \
+     --maxIterations 1000
 ```
-* Others:
+* Others (SPMRL):
 ```bash
-TODO
+  epic.sequences.TrainPosTagger --opt.regularization 2.0 --useStochastic --maxIterations 1000 \
+  --treebankType spmrl \
+  --binarization left \
+  --treebank.path ${SPMRL}/${languc}_SPMRL/gold/ptb/
 ```
 
 If you want to train other kinds of models, you will probably need to build CRFs programmatically. For inspiration, you should probably look at the source code for TrainPosTagger. It's wonderfully short:
