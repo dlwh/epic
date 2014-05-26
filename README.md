@@ -62,8 +62,6 @@ for(sentence <- sentences) {
 
 #### Parser
 
-TODO: epic.models.deserialize
-
 To use the parser programmaticaly, deserialize a parser model--either using `epic.models.deserialize[Parser[AnnotatedLabel, String]](path)` or using the ParserSelector. Then, give the parser segmented and tokenized text:
 
 ```scala
@@ -100,8 +98,6 @@ println(tags.render)
 
 
 #### Named Entity Recognition
-
-Again, using NER systems is basically the same as using POS taggers. All NER systems are currently [semi-Markov linear chain conditional random fields](http://www.cs.cmu.edu/~wcohen/postscript/semiCRF.pdf), or SemiCRFs. (You don't need to understand them to use them. They are just a machine learning method for segmenting a sequence of words into continguous segments.)
 
 TODO
 
@@ -421,8 +417,6 @@ def main(args: Array[String]) {
 
   }
 ```
-
-TODO: edit SemiConllPipeline to actually match this. TODO: allow passing in of featurizer
 
 We can also pass in featurizers, like in the CRF trainer. In this case, we can pass in a [`WordFeaturizer`] and a [`SpanFeaturizer`]. WordFeatures are like before, while SpanFeaturizer give features over the entire input span. For NER, this can be useful for adding features noting that an entity is entirely surrounded by quotation marks, for instance, or for matching against entries in a [[Gazetteer]].
 
