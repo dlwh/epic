@@ -30,7 +30,7 @@ java -Xmx4g -cp /path/to/epic-assembly-1.0-SNAPSHOT.jar epic.parser.ParseText --
 
 Currently, all text is output to standard out. In the future, we will support output in a way that differentiates the files. In addition, we will add support for reading from stdin. By default, the system will use all available cores for execution.
 
-Models can be downloaded from <https://www.scalanlp.org/models/> or from Maven Central. ([See below](#pre-trained-models).)
+Models can be downloaded from <http://www.scalanlp.org/models/> or from Maven Central. ([See below](#pre-trained-models).)
 
 ### Programmatic Usage
 
