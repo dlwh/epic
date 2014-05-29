@@ -2,7 +2,7 @@ import AssemblyKeys._ // put this at the top of the file
 
 name := "epic"
 
-version := "0.1"
+version := "0.2-SNAPSHOT"
 
 organization := "org.scalanlp"
 
