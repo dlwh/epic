@@ -40,8 +40,6 @@ Epic also supports programmatic usage. All of the models assume that text has be
 
 To preprocess text so that the models can use them, you will need to segment out sentences and tokenize the sentences into individual words. Epic comes with classes to do both.
 
-To split a text into sentences, use the XXX. TODO: provide a way to just tokenize/segment text.
-
 Once you have a sentence, you can tokenize it using a `epic.preprocess.TreebankTokenizer`, which takes a string and returns a sequence of tokens. All told, the pipeline looks like this:
 
 ```scala
@@ -99,7 +97,9 @@ println(tags.render)
 
 #### Named Entity Recognition
 
-TODO
+Using a named entity recognizer is similar to using a pos tagger: load a model, tokenize some text, run the recognizer. All NER systems are (currently) [linear chain semi-Markov conditional random fields](http://people.cs.umass.edu/~mccallum/papers/crf-tutorial.pdf), or SemiCRFs. (You don't need to understand them to use them. They are just a machine learning method for segmenting text into fields.
+
+```scala
 
 ```scala
 val tagger = epic.models.deserialize[SemiCRF[AnnotatedLabel, String]](path)
@@ -384,7 +384,7 @@ object TrainPosTagger extends LazyLogging {
 }
 ```
 
-Basically, you need to create a collection of TaggedSequences, which is a pair of sequences, one for tags and one for words. Then pass in the training data to `CRF.buildSimple`, along with a start symbol (used for the "beginning of sentence" tag), an optional [Gazetteer](#gazetteer) (not shown), and an [OptParams](#optparams), which is used to control the optimization. There is also an optional hashFeatures argument, which isn't used. (TODO)
+Basically, you need to create a collection of TaggedSequences, which is a pair of sequences, one for tags and one for words. Then pass in the training data to `CRF.buildSimple`, along with a start symbol (used for the "beginning of sentence" tag), an optional [Gazetteer](#gazetteer) (not shown), and an [OptParams](#optparams), which is used to control the optimization. There is also an optional hashFeatures argument, which isn't used. 
 
 We can also pass in two [`WordFeaturizer`] instances, one for "label" features, and one for "transition" features. Most of the featurizers in Epic have a cross product form `(Label x Surface)`, where `Label` is a feature on the label (e.g. the pos tag) and the `Surface` feature is a feature on the surface string.Here, the label featurizer features are crossed with the tag, and the transition featurizer features are crossed with pairs of sucessive labels. See the wiki page on [[Featurizers]] for more detail.
 
