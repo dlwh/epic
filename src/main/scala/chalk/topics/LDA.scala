@@ -44,7 +44,7 @@ class LDA(numTopics: Int, topicSmoothing: Double = 0.5, wordSmoothing: Double = 
       counts += topicSmoothing
       val newCounts =  digamma(counts)
       for(k <- 0 until numTopics) {
-        newCounts(k, ::) -= digamma(sum(counts(k,::)))
+        newCounts(k, ::) -= digamma(sum(counts(k,::).t))
       }
 
       // compute the rest of the likelihood (from the word counts)
