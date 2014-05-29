@@ -149,7 +149,7 @@ To following models are available at this time:
     ```
   * Hungarian: 
     ```
-    "org.scalanlp" %% "epic-parser-pl-span" % "1.0-SNAPSHOT"
+    "org.scalanlp" %% "epic-parser-hu-span" % "1.0-SNAPSHOT"
     ```
   * Korean: 
     ```
@@ -157,7 +157,7 @@ To following models are available at this time:
     ```
   * Polish:
     ```
-    "org.scalanlp" %% "epic-parser-ko-span" % "1.0-SNAPSHOT"
+    "org.scalanlp" %% "epic-parser-pl-span" % "1.0-SNAPSHOT"
     ```
   * Swedish: 
     ```
@@ -182,11 +182,11 @@ To following models are available at this time:
     ```
   * Hungarian: 
     ```
-    "org.scalanlp" %% "epic-pos-pl" % "1.0-SNAPSHOT"
+    "org.scalanlp" %% "epic-pos-hu" % "1.0-SNAPSHOT"
     ```
   * Polish: 
     ```
-    "org.scalanlp" %% "epic-pos-ko" % "1.0-SNAPSHOT"
+    "org.scalanlp" %% "epic-pos-pl" % "1.0-SNAPSHOT"
     ```
   * Swedish: 
     ```
