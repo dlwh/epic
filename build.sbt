@@ -1,6 +1,6 @@
 name := "chalk"
 
-version := "1.3.1"
+version := "1.3.2"
 
 organization := "org.scalanlp"
 
@@ -17,7 +17,7 @@ resolvers ++= Seq(
 )
 
 libraryDependencies ++= Seq(
-  "org.scalanlp" % "nak" % "1.2.1",
+  "org.scalanlp" %% "nak" % "1.2.1",
   "org.scalanlp" %% "breeze" % "0.8.1",
   "org.scalanlp" %% "breeze-config" % "0.8",
   "com.typesafe.akka" %% "akka-actor" % "2.2.3",
