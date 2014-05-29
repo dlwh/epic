@@ -77,7 +77,7 @@ println(tree.render(words))
 
 ```
 
-Trees have a number of methods on them. See the class definition or API docs (TODO: publish api docs)
+Trees have a number of methods on them. See the class definition or [API docs](http://www.scalanlp.org/api/epic).
 
 #### Part-of-Speech Tagger
 
