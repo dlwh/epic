@@ -30,7 +30,7 @@ java -Xmx4g -cp /path/to/epic-assembly-1.0-SNAPSHOT.jar epic.parser.ParseText --
 
 Currently, all text is output to standard out. In the future, we will support output in a way that differentiates the files. In addition, we will add support for reading from stdin. By default, the system will use all available cores for execution.
 
-TODO: Models can be downloaded from <https://www.scalanlp.org/epic-models/> or from Maven Central. ([See below](#pre-trained-models).)
+Models can be downloaded from <https://www.scalanlp.org/models/> or from Maven Central. ([See below](#pre-trained-models).)
 
 ### Programmatic Usage
 
@@ -118,7 +118,7 @@ The outside label of a SemiCRF is the label that is consider not part of a "real
 
 ### Pre-trained Models
 
-Epic provides a number of pretrained models. These are available as Maven artifacts from Maven Central, and can be loaded at runtime. To use a specific model, just depend on it (or alternatively download the jar file). You can then load the parser by calling, for example:
+Epic provides a number of pre-trained models. These are available as Maven artifacts from Maven Central, and can be loaded at runtime. To use a specific model, just depend on it (or alternatively download the jar file). You can then load the parser by calling, for example:
 
 ```scala
 epic.parser.models.en.span.EnglishSpanParser.load()
