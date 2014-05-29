@@ -6,7 +6,7 @@
 
 Epic is a structured prediction framework for Scala. It also includes classes for training high-accuracy syntactic parsers, part-of-speech taggers, name entity recognizers, and more.
 
-The current version is 1.0-SNAPSHOT.
+The current version is 0.2-SNAPSHOT
 
 ## Documentation
 
@@ -25,7 +25,7 @@ Epic bundles command line interfaces for using parsers, NER systems, and POS tag
 All of these systems expect plain text files as input, along with a path to a model file. The syntax is:
 
 ```bash
-java -Xmx4g -cp /path/to/epic-assembly-1.0-SNAPSHOT.jar epic.parser.ParseText --model /path/to/model.ser.gz --nthreads <number of threads> [files]
+java -Xmx4g -cp /path/to/epic-assembly-0.2-SNAPSHOT.jar epic.parser.ParseText --model /path/to/model.ser.gz --nthreads <number of threads> [files]
 ```
 
 Currently, all text is output to standard out. In the future, we will support output in a way that differentiates the files. In addition, we will add support for reading from stdin. By default, the system will use all available cores for execution.
@@ -133,69 +133,69 @@ To following models are available at this time:
 * Parser
   * English: 
     ```
-    "org.scalanlp" %% "epic-parser-en-span" % "1.0-SNAPSHOT"
+    "org.scalanlp" %% "epic-parser-en-span" % "0.1"
     ```
   * Basque: 
     ```
-    "org.scalanlp" %% "epic-parser-eu-span" % "1.0-SNAPSHOT"
+    "org.scalanlp" %% "epic-parser-eu-span" % "0.1"
     ```
   * French: 
     ```
-    "org.scalanlp" %% "epic-parser-fr-span" % "1.0-SNAPSHOT"
+    "org.scalanlp" %% "epic-parser-fr-span" % "0.1"
     ```
   * German: 
     ```
-    "org.scalanlp" %% "epic-parser-de-span" % "1.0-SNAPSHOT"
+    "org.scalanlp" %% "epic-parser-de-span" % "0.1"
     ```
   * Hungarian: 
     ```
-    "org.scalanlp" %% "epic-parser-hu-span" % "1.0-SNAPSHOT"
+    "org.scalanlp" %% "epic-parser-hu-span" % "0.1"
     ```
   * Korean: 
     ```
-    "org.scalanlp" %% "epic-parser-ko-span" % "1.0-SNAPSHOT"
+    "org.scalanlp" %% "epic-parser-ko-span" % "0.1"
     ```
   * Polish:
     ```
-    "org.scalanlp" %% "epic-parser-pl-span" % "1.0-SNAPSHOT"
+    "org.scalanlp" %% "epic-parser-pl-span" % "0.1"
     ```
   * Swedish: 
     ```
-    "org.scalanlp" %% "epic-parser-sv-span" % "1.0-SNAPSHOT"
+    "org.scalanlp" %% "epic-parser-sv-span" % "0.1"
     ```
 * POS Taggers
   * English: 
     ```
-    "org.scalanlp" %% "epic-pos-en" % "1.0-SNAPSHOT"
+    "org.scalanlp" %% "epic-pos-en" % "0.1"
     ```
   * Basque: 
     ```
-    "org.scalanlp" %% "epic-pos-eu" % "1.0-SNAPSHOT"
+    "org.scalanlp" %% "epic-pos-eu" % "0.1"
     ```
   * French: 
     ```
-    "org.scalanlp" %% "epic-pos-fr" % "1.0-SNAPSHOT"
+    "org.scalanlp" %% "epic-pos-fr" % "0.1"
     ```
   * German: 
     ```
-    "org.scalanlp" %% "epic-pos-de" % "1.0-SNAPSHOT"
+    "org.scalanlp" %% "epic-pos-de" % "0.1"
     ```
   * Hungarian: 
     ```
-    "org.scalanlp" %% "epic-pos-hu" % "1.0-SNAPSHOT"
+    "org.scalanlp" %% "epic-pos-hu" % "0.1"
     ```
   * Polish: 
     ```
-    "org.scalanlp" %% "epic-pos-pl" % "1.0-SNAPSHOT"
+    "org.scalanlp" %% "epic-pos-pl" % "0.1"
     ```
   * Swedish: 
     ```
-    "org.scalanlp" %% "epic-pos-sv" % "1.0-SNAPSHOT"
+    "org.scalanlp" %% "epic-pos-sv" % "0.1"
     ```
 * Named Entity Recognizers
   * English: 
     ```
-    "org.scalanlp" %% "epic-ner-en-conll" % "1.0-SNAPSHOT"
+    "org.scalanlp" %% "epic-ner-en-conll" % "0.1"
     ```
 
 
@@ -226,7 +226,7 @@ which will compile everything, run tests, and build a fatjar that includes all d
 
 There are several different discriminative parsers you can train, and the trainer main class has lots of options. To get a sense of them, run the following command:
 <pre>
-$ java -cp target/epic-assembly-0.1-SNAPSHOT.jar epic.parser.models.ParserTrainer --help
+$ java -cp target/epic-assembly-0.1.jar epic.parser.models.ParserTrainer --help
 </pre>
 
 You'll get a list of all the available options (so many!) The important ones are:
