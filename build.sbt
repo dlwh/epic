@@ -2,7 +2,7 @@ import AssemblyKeys._ // put this at the top of the file
 
 name := "epic"
 
-version := "0.1-SNAPSHOT"
+version := "0.1"
 
 organization := "org.scalanlp"
 
@@ -20,8 +20,6 @@ libraryDependencies ++= Seq(
   "org.scalanlp" %% "breeze-config" % "0.8",
   "org.scalanlp" %% "chalk" % "1.3.2",
   "org.scalanlp" %% "nak" % "1.2.1",
-  //"org.scalanlp" %% "breeze-process" % "0.3-SNAPSHOT",
-  //"org.scalanlp" %% "breeze-learn" % "0.3-SNAPSHOT",
   "org.mapdb" % "mapdb" % "0.9.2",
   "org.slf4j" % "slf4j-simple" % "1.7.6",
   "org.scalatest" %% "scalatest" % "2.1.3" % "test",
