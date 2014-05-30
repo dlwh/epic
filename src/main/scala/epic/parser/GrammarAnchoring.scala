@@ -95,6 +95,7 @@ trait GrammarAnchoring[L, W]  {
    * @return
    */
   def /(other: GrammarAnchoring[L, W]):GrammarAnchoring[L,W] = {
+    println(this.getClass, other.getClass)
     if(other.eq(null) || other.isInstanceOf[UnrefinedGrammarAnchoring.Identity[L, W]]) this
     else new ProductGrammarAnchoring(this,other,-1)
   }
