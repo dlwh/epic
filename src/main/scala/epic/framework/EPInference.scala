@@ -19,6 +19,7 @@ package epic.framework
 import collection.mutable.ArrayBuffer
 import epic.util.SafeLogging
 import nak.inference.{ExpectationPropagation, Factor}
+import java.util.concurrent.atomic.AtomicLong
 
 class EPInference[Datum, Augment](val inferences: IndexedSeq[ProjectableInference[Datum, Augment]],
                                   val maxEPIter: Int,
@@ -118,14 +119,22 @@ class EPInference[Datum, Augment](val inferences: IndexedSeq[ProjectableInferenc
     var converged = false
     while (!converged && iter < maxEPIter && iterates.hasNext) {
       val s = iterates.next()
-      if (state != null) {
-        converged = (s.logPartition - state.logPartition).abs / math.max(s.logPartition, state.logPartition) < 1E-5
-      }
+//      if (state != null) {
+//        converged = (s.logPartition - state.logPartition).abs / math.max(s.logPartition, state.logPartition) < 1E-5
+//      }
 
       iter += 1
       state = s
     }
-    logger.debug(f"guess($iter%d:${state.logPartition%.1f})")
+    EPInference.iters.addAndGet(iter)
+    if(EPInference.calls.incrementAndGet % 1000 == 0) {
+      val calls = EPInference.calls.get()
+      val iters = EPInference.iters.get()
+      logger.info(s"EP Stats $iters $calls ${iters * 1.0 / calls} $maxEPIter")
+      EPInference.calls.set(0)
+      EPInference.iters.set(0)
+    }
+    logger.debug(f"guess($iter%d:${state.logPartition}%.1f)")
 
     EPMarginal(state.logPartition, state.q, marginals)
   }
@@ -137,3 +146,8 @@ class EPInference[Datum, Augment](val inferences: IndexedSeq[ProjectableInferenc
 
 case class EPMarginal[Augment, Marginal](logPartition: Double, q: Augment, marginals: IndexedSeq[Marginal]) extends epic.framework.Marginal
 
+
+object EPInference {
+  val iters, calls = new AtomicLong(0)
+
+}

@@ -375,13 +375,17 @@ object RefinedChartMarginal {
                       if(withoutRule != Double.NegativeInfinity) {
 
                         val prob = withoutRule + anchoring.scoreBinaryRule(begin, split, end, r, refR)
+                        assert(!prob.isNaN, s"$withoutRule ${anchoring.scoreBinaryRule(begin, split, end, r, refR)} $bScore $cScore $spanScore")
 
-                        scoreArray(refA)(offsets(refA)) = prob
-                        offsets(refA) += 1
-                        // buffer full
-                        if(offsets(refA) == scoreArray(refA).length) {
-                          scoreArray(refA)(0) = sum(scoreArray(refA), offsets(refA))
-                          offsets(refA) = 1
+                        if(prob != Double.NegativeInfinity) {
+
+                          scoreArray(refA)(offsets(refA)) = prob
+                          offsets(refA) += 1
+                          // buffer full
+                          if(offsets(refA) == scoreArray(refA).length) {
+                            scoreArray(refA)(0) = sum(scoreArray(refA), offsets(refA))
+                            offsets(refA) = 1
+                          }
                         }
                       }
                       split += 1
@@ -417,6 +421,7 @@ object RefinedChartMarginal {
       // done updating vector, do an enter:
       if (offsets(ai) > 0) {
         val score = sum(scoreArray(ai), offsets(ai))
+        assert(!score.isNaN, scoreArray(ai).take(offsets(ai)).toIndexedSeq)
         bot.enter(begin, end, parent, ai, score)
         foundSomething = true
       }
@@ -523,12 +528,14 @@ object RefinedChartMarginal {
                 if (cInside != Double.NegativeInfinity && pOutside != Double.NegativeInfinity) {
                   val ruleScore = refined.scoreBinaryRule(begin, end, completion, r, refR)
                   val score = cInside + ruleScore + pOutside
-                  scoreArray(refA)(offsets(refA)) = score
-                  offsets(refA) += 1
-                  // buffer full
-                  if (offsets(refA) == scoreArray(refA).length) {
-                    scoreArray(refA)(0) = sum(scoreArray(refA), offsets(refA))
-                    offsets(refA) = 1
+                  if(score != Double.NegativeInfinity) {
+                    scoreArray(refA)(offsets(refA)) = score
+                    offsets(refA) += 1
+                    // buffer full
+                    if (offsets(refA) == scoreArray(refA).length) {
+                      scoreArray(refA)(0) = sum(scoreArray(refA), offsets(refA))
+                      offsets(refA) = 1
+                    }
                   }
                 }
 
@@ -614,12 +621,14 @@ object RefinedChartMarginal {
                 if (bInside != Double.NegativeInfinity && pOutside != Double.NegativeInfinity) {
                   val ruleScore = refined.scoreBinaryRule(completion, begin, end, r, refR)
                   val score = bInside + ruleScore + pOutside
-                  scoreArray(refA)(offsets(refA)) = score
-                  offsets(refA) += 1
-                  // buffer full
-                  if (offsets(refA) == scoreArray(refA).length) {
-                    scoreArray(refA)(0) = sum(scoreArray(refA), offsets(refA))
-                    offsets(refA) = 1
+                  if(score != Double.NegativeInfinity) {
+                    scoreArray(refA)(offsets(refA)) = score
+                    offsets(refA) += 1
+                    // buffer full
+                    if (offsets(refA) == scoreArray(refA).length) {
+                      scoreArray(refA)(0) = sum(scoreArray(refA), offsets(refA))
+                      offsets(refA) = 1
+                    }
                   }
                 }
 
@@ -676,6 +685,7 @@ object RefinedChartMarginal {
               val refA = refined.parentRefinement(r, refR)
               val ruleScore: Double = refined.scoreUnaryRule(begin, end, r, refR)
               val prob: Double = bScore + ruleScore
+              assert(!prob.isNaN, s"$ruleScore $bScore")
               if (prob != Double.NegativeInfinity) {
                 chart.top.enter(begin, end, a, refA, sum(chart.top.labelScore(begin, end, a, refA), prob))
               }

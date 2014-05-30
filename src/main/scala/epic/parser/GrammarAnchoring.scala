@@ -104,7 +104,7 @@ trait GrammarAnchoring[L, W]  {
 
   def isConvergedTo(f: GrammarAnchoring[L, W], diff: Double):Boolean = {
     import scala.util.control.Breaks._
-    var ok = false
+    var converged = true
     breakable {
       marginal visit new AnchoredVisitor[L] {
         def visitBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int, score: Double) {
@@ -115,12 +115,12 @@ trait GrammarAnchoring[L, W]  {
 
           if(myScore != theirScore)  {
             if (theirScore.isInfinite || myScore.isInfinite) {
-                ok = true
+                converged = false
                 break()
               }
-            val df = (myScore - theirScore).abs / math.max(math.max(myScore,theirScore).abs,1E-4)
+            val df = (myScore - theirScore).abs / math.max(math.max(myScore.abs,theirScore.abs),1E-4)
             if(df > diff) {
-              ok = true
+              converged = false
               break()
             }
           }
@@ -135,12 +135,12 @@ trait GrammarAnchoring[L, W]  {
 
           if(myScore != theirScore)  {
             if (theirScore.isInfinite || myScore.isInfinite) {
-              ok = true
+              converged = false
               break()
             }
-            val df = (myScore - theirScore).abs / math.max(math.max(myScore,theirScore).abs, 1E-4)
+            val df = (myScore - theirScore).abs / math.max(math.max(myScore.abs,theirScore.abs), 1E-4)
             if(df > diff) {
-              ok = true
+              converged = false
               break()
             }
           }
@@ -154,12 +154,12 @@ trait GrammarAnchoring[L, W]  {
 
           if(myScore != theirScore)  {
             if(theirScore.isInfinite || myScore.isInfinite) {
-              ok = true
+              converged = true
               break()
             }
-            val df = (myScore - theirScore).abs / math.max(math.max(myScore,theirScore).abs, 1E-4)
+            val df = (myScore - theirScore).abs / math.max(math.max(myScore.abs,theirScore.abs), 1E-4)
             if(df > diff) {
-              ok = true
+              converged = false
               break()
             }
           }
@@ -168,7 +168,8 @@ trait GrammarAnchoring[L, W]  {
 
       }
     }
-    !ok
+//    println(converged)
+    converged
   }
 
 
