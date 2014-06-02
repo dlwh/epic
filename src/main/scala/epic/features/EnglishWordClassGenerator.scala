@@ -1,4 +1,6 @@
-package chalk.text.analyze
+package epic.features
+
+import chalk.text.analyze.Analyzer
 
 /**
  * Converts a string into another string with properties of that string

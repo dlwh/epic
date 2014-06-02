@@ -1,4 +1,6 @@
-package chalk.text.analyze
+package epic.features
+
+import chalk.text.analyze.Analyzer
 
 /**
  *

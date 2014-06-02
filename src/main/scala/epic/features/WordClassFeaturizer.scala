@@ -4,7 +4,6 @@ import breeze.linalg.Counter
 import epic.framework.Feature
 import breeze.util.{Encoder, Interner, Index}
 import epic.parser.features.IndicatorFeature
-import chalk.text.analyze.EnglishWordClassGenerator
 import scala.collection.immutable
 
 /**
