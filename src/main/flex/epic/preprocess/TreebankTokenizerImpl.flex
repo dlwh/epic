@@ -139,6 +139,7 @@ EMOTICON = ( [<>]?[BX;8:=][o\-\']?[DdPp()\/3>oO] | <\/?3+ | ಠ_ಠ)
 
 <POLISH_CONDITIONAL_MODE>{POLISH_CONDITIONAL_CLITIC} / {POLISH_CONDITIONAL_ENDING}                                      { yybegin(YYINITIAL); return currentToken(); }
 <POLISH_CONDITIONAL_MODE>[^b].                                        { throw new RuntimeException("..." + currentToken());}
+{URL}                                                         { return currentToken(); }
 
 // special words
 can / not                                                      {return currentToken();}
@@ -187,7 +188,6 @@ N'T                                                            {return currentTo
 {ACRONYM}                                                      { return currentToken(); }
 {COMPANY}                                                      { return currentToken(); }
 {EMAIL}                                                        { return currentToken(); }
-{URL}                                                         { return currentToken(); }
 {HOST}                                                         { return currentToken(); }
 {NUM}                                                          { return currentToken(); }
 {ACRONYM_DEP}                                                  { return currentToken(); }

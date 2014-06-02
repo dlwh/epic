@@ -1,6 +1,7 @@
 package epic.preprocess
 
 import org.scalatest.FunSuite
+import chalk.text.tokenize.PTBTokenizer
 
 class TreebankTokenizerTest  extends FunSuite {
 
@@ -116,5 +117,10 @@ class TreebankTokenizerTest  extends FunSuite {
     for( (txt,tk) <- text zip tok) {
       assert(TreebankTokenizer(txt).toList === tk.split(" ").toList)
     }
+  }
+
+
+  test("emails") {
+    assert(TreebankTokenizer("Email asdf@asdf.com.").toList === List("Email", "asdf@asdf.com", "."))
   }
 }
