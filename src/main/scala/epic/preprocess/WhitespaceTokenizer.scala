@@ -13,7 +13,9 @@
  See the License for the specific language governing permissions and
  limitations under the License.
 */
-package chalk.text.tokenize
+package epic.preprocess
+
+import chalk.text.tokenize.RegexSplitTokenizer
 
 /**
  * Tokenizes by splitting on the regular expression \s+.

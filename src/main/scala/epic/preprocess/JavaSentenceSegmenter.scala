@@ -1,4 +1,4 @@
-package chalk.text.segment
+package epic.preprocess
 
 /*
  Copyright 2009 David Hall, Daniel Ramage
@@ -18,7 +18,6 @@ package chalk.text.segment
 
 import java.text.BreakIterator
 import java.util.Locale
-import epic.preprocess.SentenceSegmenter
 
 /**
  * A Sentence Segmenter backed by Java's BreakIterator.
@@ -37,22 +36,3 @@ class JavaSentenceSegmenter(locale: Locale = Locale.getDefault) extends Sentence
 }
 
 object JavaSentenceSegmenter extends JavaSentenceSegmenter(Locale.getDefault)
-
-
-/**
- * Given a BreakIterator and a string, iterate over the breaks returned by the breakiterator and index into that string
- * for substrings
- */
-private[text] class SegmentingIterator(inner: BreakIterator, str: String) extends Iterator[String] {
-  private var start = inner.first
-  private var end = inner.next
-
-  def hasNext = (end != BreakIterator.DONE)
-
-  def next = {
-    val res = str.substring(start, end)
-    start = end
-    end = inner.next
-    res
-  }
-}

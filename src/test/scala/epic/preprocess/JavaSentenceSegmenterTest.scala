@@ -1,4 +1,4 @@
-package chalk.text.segment
+package epic.preprocess
 
 import org.scalatest._
 import org.scalatest.junit._

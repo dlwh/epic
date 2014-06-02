@@ -3,12 +3,10 @@ package epic.util
 import java.io.{FileInputStream, File}
 import breeze.config.{CommandLineParser, Help}
 import breeze.util._
-import epic.preprocess.{NewLineSentenceSegmenter, MLSentenceSegmenter, StreamSentenceSegmenter, TreebankTokenizer}
+import epic.preprocess._
 import scala.io.{Codec, Source}
 import epic.sequences.CRF
 import java.util.concurrent.{LinkedBlockingDeque, TimeUnit, ThreadPoolExecutor}
-import chalk.text.tokenize.WhitespaceTokenizer
-import chalk.text.segment.JavaSentenceSegmenter
 
 /**
  * TODO
