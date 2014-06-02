@@ -23,6 +23,7 @@ import org.scalacheck._
 import org.junit.runner.RunWith
 
 import scala.io.Source
+import epic.features.PorterStemmer
 
 
 @RunWith(classOf[JUnitRunner])

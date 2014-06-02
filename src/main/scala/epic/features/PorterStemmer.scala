@@ -13,9 +13,10 @@
  See the License for the specific language governing permissions and
  limitations under the License.
 */
-package chalk.text.analyze
+package epic.features
 
 import scala.Some
+import chalk.text.analyze.Stemmer
 
 /**
  * Converts words to their stemmed form using the classic Porter stemming
@@ -25,20 +26,7 @@ import scala.Some
  * @author dramage
  */
 class PorterStemmer() extends Stemmer {
-  def apply(v1: String): String = PorterStemmer(v1)
-}
-
-/**
- * Converts words to their stemmed form using the classic Porter stemming
- * algorithm.
- *
- * @author dlwh
- */
-object PorterStemmer extends Stemmer {
-
-  private val _instance = new PorterStemmer()
-
-  def apply() = _instance
+  import PorterStemmer._
 
   def apply(w: String) = {
     if (w.length < 3) w.toLowerCase
@@ -49,6 +37,19 @@ object PorterStemmer extends Stemmer {
       step5(step4(step3(step2(step1(ret))))).toLowerCase
     }
   }
+}
+
+/**
+ * Converts words to their stemmed form using the classic Porter stemming
+ * algorithm.
+ *
+ * @author dlwh
+ */
+object PorterStemmer extends PorterStemmer {
+
+  def apply() = this
+
+
 
   private def step1(w: String) = step1c(step1b(step1a(w)))
 
