@@ -1,4 +1,4 @@
-package chalk.corpora
+package epic.corpora
 
 import io.Source
 import collection.mutable.ArrayBuffer

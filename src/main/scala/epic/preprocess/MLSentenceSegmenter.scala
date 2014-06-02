@@ -2,7 +2,6 @@ package epic.preprocess
 
 import scala.collection.mutable.ArrayBuffer
 import java.io._
-import chalk.corpora.MascSlab
 import chalk.slab.Sentence
 import breeze.linalg._
 import breeze.numerics._
@@ -14,6 +13,7 @@ import breeze.optimize.{L2Regularization, GradientTester}
 import epic.features.CrossProductFeature
 import java.text.BreakIterator
 import java.util.zip.GZIPInputStream
+import epic.corpora.MascSlab
 
 @SerialVersionUID(1L)
 class MLSentenceSegmenter(inf: MLSentenceSegmenter.ClassificationInference) extends chalk.text.segment.SentenceSegmenter with Serializable {

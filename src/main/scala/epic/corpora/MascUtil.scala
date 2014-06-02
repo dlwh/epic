@@ -1,4 +1,4 @@
-package chalk.corpora
+package epic.corpora
 
 import scala.xml._
 import java.io._
@@ -25,9 +25,6 @@ case class MRegion(id: String, start: Int, end: Int) extends Ordered[MRegion] {
 * @author jasonbaldridge
 */
 object MascTransform {
-
-  import io.Source
-  import MascUtil._
 
   def main(args: Array[String]) {
     val mascDir = args(0)

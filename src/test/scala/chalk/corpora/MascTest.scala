@@ -8,6 +8,7 @@ import chalk.slab.Sentence
 import chalk.slab.Segment
 import chalk.slab.PartOfSpeech
 import chalk.slab.EntityMention
+import epic.corpora
 
 @RunWith(classOf[JUnitRunner])
 class MascTest extends FunSuite {
@@ -15,18 +16,18 @@ class MascTest extends FunSuite {
   test("MASC to Slab") {
     val url = this.getClass.getResource("/masc/data/written/newspaper/nyt/20000424_nyt-NEW.txt")
     val text = io.Source.fromURL(url)(io.Codec.UTF8).mkString
-    val slab = MascSlab(url)
+    val slab = corpora.MascSlab(url)
     assert(slab.content === text)
     assert(slab.iterator[Source].toList === List(Source(0, text.length, url)))
 
-    val sentSlab = MascSlab.s(slab)
+    val sentSlab = corpora.MascSlab.s(slab)
     assert(sentSlab.iterator[Sentence].map(_.in(sentSlab).content).toList === List(
       "IRAQ-POVERTY (Washington)",
       "Rep. Tony Hall, D-Ohio, urges the United Nations to allow a freer flow\n\t\t\t\tof food and medicine into Iraq.",
       "Hall, who recently returned from a trip\n\t\t\t\tto Iraq, said U.N. economic sanctions have hurt millions of civilians\n\t\t\t\tthere.",
       "By AUSTIN ZALKIN."))
 
-    val segSlab = MascSlab.seg(sentSlab)
+    val segSlab = corpora.MascSlab.seg(sentSlab)
     assert(segSlab.iterator[Segment].map(_.in(segSlab).content).toList === List(
       "IRAQ", "-", "POVERTY", "(", "Washington", ")",
       "Rep", ".", "Tony", "Hall", ",", "D", "-", "Ohio", ",", "urges", "the", "United", "Nations",
@@ -36,7 +37,7 @@ class MascTest extends FunSuite {
       "there", ".",
       "By", "AUSTIN", "ZALKIN", "."))
 
-    val posSlab = MascSlab.penn(segSlab)
+    val posSlab = corpora.MascSlab.penn(segSlab)
     assert(posSlab.iterator[PartOfSpeech].map(_.in(posSlab).content).toList === List(
       "IRAQ-POVERTY", "(", "Washington", ")",
       "Rep.", "Tony", "Hall", ",", "D-Ohio", ",", "urges", "the", "United", "Nations",
@@ -54,7 +55,7 @@ class MascTest extends FunSuite {
       "NN", "JJ", "NNS", "VBP", "VBN", "NNS", "IN", "NNS", "RB", ".",
       "IN", "NNP", "NNP", "."))
 
-    val neSlab = MascSlab.ne(posSlab)
+    val neSlab = corpora.MascSlab.ne(posSlab)
     // error in MASC data: "," as "location" instead of "D-Ohio", and "Hall" missed
     assert(neSlab.iterator[EntityMention].map(_.in(neSlab).content).toList === List(
       "IRAQ-POVERTY", "Washington", "Tony Hall", "," /*"D-Ohio"*/, "United Nations", "Iraq",
