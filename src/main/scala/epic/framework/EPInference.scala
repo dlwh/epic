@@ -111,7 +111,7 @@ class EPInference[Datum, Augment](val inferences: IndexedSeq[ProjectableInferenc
       newAugment -> contributionToLikelihood
     }
 
-    val ep = new ExpectationPropagation(project _, 1E-5)
+    val ep = new ExpectationPropagation(project _, 1E-4)
     val inferencesToUse = (0 until inferences.length).filter(inferences(_) ne null)
 
     var state: ep.State = null

@@ -13,9 +13,9 @@ case class EPChartFactory[L, W](grammars: IndexedSeq[Grammar[L, W]], maxIteratio
   def apply(words: IndexedSeq[W], initialCore: ChartConstraints[L]): RefinedChartMarginal[L, W] = {
     val anchorings = grammars.map(_ anchor(words, initialCore))
 
-    if(anchorings.length == 1) {
-      return RefinedChartMarginal(anchorings.head)
-    }
+//    if(anchorings.length == 1) {
+//      return RefinedChartMarginal(anchorings.head)
+//    }
 
     val topology = anchorings.head.topology
     val lexicon = anchorings.head.lexicon

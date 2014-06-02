@@ -18,6 +18,7 @@ package models
 import org.junit.runner.RunWith
 import org.scalatest._
 import org.scalatest.junit._
+import epic.trees.AnnotatedLabel
 
 
 /**
@@ -27,6 +28,31 @@ import org.scalatest.junit._
 @RunWith(classOf[JUnitRunner])
 class EPParserTest extends FunSuite with ParserTestHarness {
 
+  test("one parser partition test") {
+    val grammar = ParserTestHarness.refinedGrammar
+    val product = Parser(grammar.topology, grammar.lexicon, ParserTestHarness.simpleParser.constraintsFactory, EPChartFactory(IndexedSeq(grammar)))
+    val simple = Parser(ParserTestHarness.refinedGrammar, new MaxVariationalDecoder[AnnotatedLabel, String])
+
+    getTestTrees().foreach { t =>
+      val pm = product.marginal(t.words)
+      val sm = simple.marginal(t.words)
+      assert((pm.logPartition - sm.logPartition) <= 1E-4, pm.logPartition + " " + sm.logPartition)
+    }
+
+  }
+
+  /*
+  test("one parsers test") {
+    val grammar = ParserTestHarness.refinedGrammar
+    val product = Parser(grammar.topology, grammar.lexicon, ParserTestHarness.simpleParser.constraintsFactory, EPChartFactory(IndexedSeq(grammar)))
+
+    val simple = ParserTestHarness.simpleParser.copy(decoder = new MaxVariationalDecoder)
+
+    val rprod = evalParser(getTestTrees(), product)
+    println(rprod + " " + evalParser(getTestTrees(), simple))
+    assert(rprod.f1 > 0.6, rprod)
+  }
+
   test("two parsers test") {
     val grammar = ParserTestHarness.refinedGrammar
     val product = Parser(grammar.topology, grammar.lexicon, ParserTestHarness.simpleParser.constraintsFactory, EPChartFactory(IndexedSeq(grammar, grammar)))
@@ -34,6 +60,7 @@ class EPParserTest extends FunSuite with ParserTestHarness {
     val rprod = evalParser(getTestTrees(), product)
     assert(rprod.f1 > 0.6, rprod)
   }
+  */
 
 }
 
