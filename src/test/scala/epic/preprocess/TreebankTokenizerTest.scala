@@ -1,7 +1,6 @@
 package epic.preprocess
 
 import org.scalatest.FunSuite
-import chalk.text.tokenize.PTBTokenizer
 
 class TreebankTokenizerTest  extends FunSuite {
 
