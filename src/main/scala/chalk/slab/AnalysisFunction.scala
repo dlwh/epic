@@ -49,11 +49,11 @@ object AnalysisPipeline {
   private[AnalysisPipeline] def documentAdder(slab: StringSlab[Span]) =
     slab ++ Iterator(Document(0, slab.content.length))
 
+  /*
   def main (args: Array[String]) {
     def sentenceSegmenter[I <: Span] = new SentenceSegmenter[I]{}
     def tokenizer[I <: Sentence] = new Tokenizer[I]{}
     val pipeline = StringIdentityAnalyzer andThen documentAdder andThen sentenceSegmenter andThen tokenizer
-    val slab = pipeline(Slab(AnalysisEngine.text1))
 
     // added only to demonstrate necesssity of [I] parameter on analyzers
     val paragraphs = slab.iterator[Document].toList
@@ -66,6 +66,7 @@ object AnalysisPipeline {
     println("\nTOKENS\n\n" + tokens.map(_.in(slab).content).mkString("\n"))
 
   }
+  */
   
 
 }
