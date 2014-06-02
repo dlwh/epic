@@ -19,6 +19,7 @@ package chalk.text.tokenize
 import java.text._
 import java.util.Locale
 import chalk.text.segment.SegmentingIterator
+import epic.preprocess.Tokenizer
 
 
 /**

@@ -15,6 +15,8 @@
 */
 package chalk.text.tokenize
 
+import epic.preprocess.Tokenizer
+
 /**
  * Finds all occurrences of the given pattern in the document.
  *

@@ -15,6 +15,8 @@
 */
 package chalk.text.tokenize
 
+import epic.preprocess.Tokenizer
+
 /**
  * Splits the input document according to the given pattern.  Does not
  * return the splits.

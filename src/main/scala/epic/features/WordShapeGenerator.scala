@@ -1,12 +1,10 @@
 package epic.features
 
-import chalk.text.analyze.Analyzer
-
 /**
  *
  * @author dlwh
  */
-object WordShapeGenerator extends Analyzer with Serializable {
+object WordShapeGenerator extends (String=>String) with Serializable {
 
   def apply(v1: String) = signatureFor(v1)
 

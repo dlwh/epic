@@ -16,7 +16,7 @@ import java.util.zip.GZIPInputStream
 import epic.corpora.MascSlab
 
 @SerialVersionUID(1L)
-class MLSentenceSegmenter(inf: MLSentenceSegmenter.ClassificationInference) extends chalk.text.segment.SentenceSegmenter with Serializable {
+class MLSentenceSegmenter(inf: MLSentenceSegmenter.ClassificationInference) extends SentenceSegmenter with Serializable {
 
   override def apply(text: String): Iterable[String] = new Iterable[String] {
     def iterator: Iterator[String] = {

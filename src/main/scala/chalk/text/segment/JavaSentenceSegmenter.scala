@@ -18,6 +18,7 @@ package chalk.text.segment
 
 import java.text.BreakIterator
 import java.util.Locale
+import epic.preprocess.SentenceSegmenter
 
 /**
  * A Sentence Segmenter backed by Java's BreakIterator.

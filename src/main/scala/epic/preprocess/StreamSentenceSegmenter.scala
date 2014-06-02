@@ -1,9 +1,9 @@
 package epic.preprocess
 
-import chalk.text.segment.SentenceSegmenter
 import java.io.{Reader, InputStream}
 import breeze.util.Iterators
 import java.nio.channels.Channels
+import epic.preprocess.SentenceSegmenter
 
 /**
  * TODO

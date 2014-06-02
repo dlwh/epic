@@ -1,6 +1,5 @@
 package epic.features
 
-import chalk.text.analyze.Analyzer
 
 /**
  * Converts a string into another string with properties of that string
@@ -8,7 +7,7 @@ import chalk.text.analyze.Analyzer
  * @author dlwh
  */
 @SerialVersionUID(1L)
-object EnglishWordClassGenerator extends Analyzer with Serializable {
+object EnglishWordClassGenerator extends (String=>String) with Serializable {
   def apply(x: String) = signatureFor(x)
 
   def signatureFor(word: String) = {

@@ -1,8 +1,8 @@
 package epic.preprocess
 
-import chalk.text.segment.SentenceSegmenter
 import java.text.BreakIterator
 import java.util.Locale
+import epic.preprocess.SentenceSegmenter
 
 /**
  * TODO move to chalk

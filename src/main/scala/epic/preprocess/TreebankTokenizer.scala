@@ -1,6 +1,5 @@
 package epic.preprocess
 
-import chalk.text.tokenize.Tokenizer
 import breeze.util.Iterators
 import java.io.StringReader
 import scala.collection.mutable.ArrayBuffer
