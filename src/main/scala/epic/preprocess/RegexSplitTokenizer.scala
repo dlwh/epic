@@ -13,9 +13,7 @@
  See the License for the specific language governing permissions and
  limitations under the License.
 */
-package chalk.text.tokenize
-
-import epic.preprocess.Tokenizer
+package epic.preprocess
 
 /**
  * Splits the input document according to the given pattern.  Does not

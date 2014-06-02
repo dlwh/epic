@@ -15,8 +15,6 @@
 */
 package epic.preprocess
 
-import chalk.text.tokenize.RegexSplitTokenizer
-
 /**
  * Tokenizes by splitting on the regular expression \s+.
  *
