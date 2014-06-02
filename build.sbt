@@ -8,20 +8,17 @@ scalaVersion := "2.10.3"
 
 crossScalaVersions  := Seq("2.11.0", "2.10.3")
 
-
-retrieveManaged := true
-
 resolvers ++= Seq(
   "sonatype snapshots" at "https://oss.sonatype.org/content/repositories/snapshots",
   "sonatype releases" at "https://oss.sonatype.org/content/repositories/releases"
 )
 
 libraryDependencies ++= Seq(
-  "org.scalanlp" %% "nak" % "1.2.1",
+  "org.scalanlp" %% "nak" % "1.2.2-SNAPSHOT",
   "org.scalanlp" %% "breeze" % "0.8.1",
   "org.scalanlp" %% "breeze-config" % "0.8",
-  "com.typesafe.akka" %% "akka-actor" % "2.2.3",
-  "com.typesafe.akka" %% "akka-agent" % "2.2.3",
+  //"com.typesafe.akka" %% "akka-actor" % "2.2.3",
+ // "com.typesafe.akka" %% "akka-agent" % "2.2.3",
   "org.scalacheck" %% "scalacheck" % "1.10.0" % "test",
   "org.scalatest" %% "scalatest" % "2.0.M5b" % "test"
 )
