@@ -15,9 +15,6 @@
 */
 package epic.features
 
-import scala.Some
-import chalk.text.analyze.Stemmer
-
 /**
  * Converts words to their stemmed form using the classic Porter stemming
  * algorithm.
@@ -25,7 +22,7 @@ import chalk.text.analyze.Stemmer
  * @author dlwh
  * @author dramage
  */
-class PorterStemmer() extends Stemmer {
+class PorterStemmer() extends (String=>String) {
   import PorterStemmer._
 
   def apply(w: String) = {
