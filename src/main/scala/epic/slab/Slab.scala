@@ -2,6 +2,9 @@ package epic.slab
 
 import scala.reflect.ClassTag
 import java.net.URL
+import spire.math.Searching
+import epic.util.BinarySearch
+import epic.slab.Span.{EndFirstSpanOrdering, SpanOrdering}
 
 trait Slab[ContentType, BaseAnnotationType, +AnnotationTypes <: BaseAnnotationType] {
 
@@ -44,7 +47,29 @@ trait Span {
   val end: Int
 }
 
+
 object Span {
+
+  implicit object SpanOrdering extends Ordering[Span] {
+    override def compare(x: Span, y: Span): Int = {
+      if      (x.begin < y.begin) -1
+      else if (x.begin > y.begin)  1
+      else if (x.end  < y.end)    -1
+      else if (x.end > y.end)      1
+      else                         0
+    }
+  }
+
+  implicit object EndFirstSpanOrdering extends Ordering[Span] {
+    override def compare(x: Span, y: Span): Int = {
+      if (x.end  < y.end)    -1
+      else if (x.end > y.end)      1
+      else if (x.begin < y.begin) -1
+      else if (x.begin > y.begin)  1
+      else                         0
+    }
+  }
+
   implicit class SpanInStringSlab(val span: Span) extends AnyVal {
     def in[AnnotationTypes <: Span](slab: Slab.StringSlab[AnnotationTypes]) =
       new StringSpanAnnotationOps(this.span, slab)
@@ -80,6 +105,10 @@ case class EntityMention(begin: Int, end: Int, entityType: String, id: Option[St
 
 object Slab {
   type StringSlab[+AnnotationTypes <: Span] = Slab[String, Span, AnnotationTypes]
+
+  def apply[BaseAnnotationType <: Span](content: String):StringSlab[BaseAnnotationType] = {
+    new SortedSequenceSlab(content, Map.empty, Map.empty)
+  }
   
   def apply[ContentType, BaseAnnotationType: HasBounds](content: ContentType): Slab[ContentType, BaseAnnotationType, BaseAnnotationType] =
     new HorribleInefficientSlab(content)
@@ -118,6 +147,64 @@ object Slab {
 
     def preceding[A >: AnnotationTypes <: BaseAnnotationType: ClassTag](annotation: BaseAnnotationType): Iterator[A] =
       this.iterator[A].filter(a => hasBounds.precedes(a, annotation)).toSeq.reverseIterator
+
+  }
+
+  /**
+   * This slab should be more efficient, especially for longer documents. It maintains the annotations in sorted order.
+   *
+   * @param content
+   * @param annotations
+   * @tparam ContentType
+   * @tparam BaseAnnotationType
+   * @tparam AnnotationType
+   */
+  private[slab] class SortedSequenceSlab[ContentType,
+  BaseAnnotationType <: Span,
+  AnnotationType <: BaseAnnotationType](val content: ContentType,
+                                        val annotations: Map[Class[_], Vector[BaseAnnotationType]] = Map.empty,
+                                        val reverseAnnotations: Map[Class[_], Vector[BaseAnnotationType]] = Map.empty) extends Slab[ContentType, BaseAnnotationType, AnnotationType] {
+    override def ++[A <: BaseAnnotationType](annotations: Iterator[A]): Slab[ContentType, BaseAnnotationType, AnnotationType with A] = {
+      var newAnnotations = this.annotations
+      val grouped = annotations.toIndexedSeq.groupBy(_.getClass)
+      for( (clss, group) <- grouped) {
+        newAnnotations = newAnnotations + (clss -> (newAnnotations.getOrElse(clss, Vector.empty) ++ group).sorted(SpanOrdering))
+      }
+
+      var reverseAnnotations = this.reverseAnnotations
+      for( (clss, group) <- grouped) {
+        reverseAnnotations = reverseAnnotations + (clss -> (reverseAnnotations.getOrElse(clss, Vector.empty) ++ group).sorted(EndFirstSpanOrdering))
+      }
+      new SortedSequenceSlab(content, newAnnotations, reverseAnnotations)
+    }
+
+    override def following[A >: AnnotationType <: BaseAnnotationType : ClassTag](annotation: BaseAnnotationType): Iterator[A] = {
+      annotations.filterKeys(implicitly[ClassTag[A]].runtimeClass.isAssignableFrom).valuesIterator.flatMap { annotations =>
+        var pos = BinarySearch.interpolationSearch(annotations, (_:Span).begin, annotation.end)
+        if(pos < 0) pos = ~pos
+        annotations.view(pos, annotations.length)
+      }.asInstanceOf[Iterator[A]]
+    }
+
+    override def preceding[A >: AnnotationType <: BaseAnnotationType : ClassTag](annotation: BaseAnnotationType): Iterator[A] = {
+      reverseAnnotations.filterKeys(implicitly[ClassTag[A]].runtimeClass.isAssignableFrom).valuesIterator.flatMap { annotations =>
+        var pos = BinarySearch.interpolationSearch(annotations, (_:Span).end, annotation.begin + 1)
+        if(pos < 0) pos = ~pos
+        annotations.view(0, pos).reverseIterator
+      }.asInstanceOf[Iterator[A]]
+    }
+
+    override def covered[A >: AnnotationType <: BaseAnnotationType : ClassTag](annotation: BaseAnnotationType): Iterator[A] = {
+      annotations.filterKeys(implicitly[ClassTag[A]].runtimeClass.isAssignableFrom).valuesIterator.flatMap { annotations =>
+        var begin = BinarySearch.interpolationSearch(annotations, (_:Span).begin, annotation.begin)
+        if(begin < 0) begin = ~begin
+        annotations.view(begin, annotations.length).takeWhile(_.end <= annotation.end)
+      }.asInstanceOf[Iterator[A]]
+    }
+
+    override def iterator[A >: AnnotationType <: BaseAnnotationType : ClassTag]: Iterator[A] = {
+      annotations.filterKeys(implicitly[ClassTag[A]].runtimeClass.isAssignableFrom).valuesIterator.flatten.asInstanceOf[Iterator[A]]
+    }
 
   }
 }

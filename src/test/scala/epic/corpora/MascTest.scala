@@ -55,7 +55,7 @@ class MascTest extends FunSuite {
       "NN", "JJ", "NNS", "VBP", "VBN", "NNS", "IN", "NNS", "RB", ".",
       "IN", "NNP", "NNP", "."))
 
-    val neSlab = corpora.MascSlab.ne(posSlab)
+    val neSlab = corpora.MascSlab.namedEntities(posSlab)
     // error in MASC data: "," as "location" instead of "D-Ohio", and "Hall" missed
     assert(neSlab.iterator[EntityMention].map(_.in(neSlab).content).toList === List(
       "IRAQ-POVERTY", "Washington", "Tony Hall", "," /*"D-Ohio"*/, "United Nations", "Iraq",

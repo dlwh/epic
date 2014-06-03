@@ -380,7 +380,7 @@ object MascSlab {
    * @param slab The Slab containing the text, the source URL and PartOfSpeech annotations.
    * @return The Slab with added EntityMention annotations as read from the MASC -ne.xml file.
    */
-  def ne[I <: Source with PartOfSpeech](slab: Slab.StringSlab[I]) = {
+  def namedEntities[I <: Source with PartOfSpeech](slab: Slab.StringSlab[I]) = {
     val List(source) = slab.iterator[Source].toList
     val neXml = XML.load(source.url.toString().replaceAll("[.]txt$", "-ne.xml"))
     

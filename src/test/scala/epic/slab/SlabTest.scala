@@ -121,4 +121,14 @@ class SlabTest extends FunSuite {
     assert(actualFaces.map(_.in(slab).content) === List(expectedFaceImage))
     assert(actualFaces(0).in(slab).covered[Face].toList === List(expectedFaceAnnotation))
   }
+
+  test("sorted slab issues with overlapping annotations") {
+    case class Annotation(begin: Int, end: Int) extends Span
+    val slab = Slab("""This is a test.""") ++ Iterator(Annotation(0, 1), Annotation(0, 2), Annotation(1, 3), Annotation(1, 2), Annotation(2, 3))
+    assert(slab.preceding[Annotation](Annotation(0, 1)).isEmpty)
+    assert(slab.preceding[Annotation](Annotation(0, 2)).isEmpty)
+    assert(slab.preceding[Annotation](Annotation(1, 3)).toList == List(Annotation(0, 2), Annotation(0, 1)))
+    assert(slab.covered[Annotation](Annotation(1, 3)).toList == List(Annotation(1, 2), Annotation(1, 3), Annotation(2, 3)))
+    assert(slab.covered[Annotation](Annotation(0, 2)).toList == List(Annotation(0, 1), Annotation(0, 2), Annotation(1, 2)))
+  }
 }
