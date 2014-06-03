@@ -37,7 +37,7 @@ case class AnnotatedParserInference[L, W](featurizer: RefinedFeaturizer[L, W, Fe
                                           constrainer: ChartConstraints.Factory[L, W]) extends ParserInference[L, W] {
 
 
-  override def forTesting = copy(featurizer.forTesting)
+  override def forTesting = copy(featurizer.forTesting, constrainer = ChartConstraints.Factory.noSparsity)
 
   def goldMarginal(scorer: Scorer, ti: TreeInstance[L, W], aug: UnrefinedGrammarAnchoring[L, W]): Marginal = {
     import ti._

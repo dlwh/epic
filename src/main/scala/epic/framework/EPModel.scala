@@ -115,7 +115,7 @@ class EPModel[Datum, Augment](maxEPIter: Int, initFeatureValue: Feature => Optio
     ecounts.loss -> DenseVector.vertcat(vectors: _*)
   }
 
-  def inferenceFromWeights(weights: DenseVector[Double]):EPInference[Datum, Augment] = inferenceFromWeights(weights, dropOutFraction)
+  def inferenceFromWeights(weights: DenseVector[Double]):EPInference[Datum, Augment] = inferenceFromWeights(weights, 0.0)
 
   def inferenceFromWeights(weights: DenseVector[Double], dropOutFraction: Double) = {
     val allWeights = partitionWeights(weights)

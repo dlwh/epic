@@ -49,7 +49,7 @@ trait ParserInference[L, W] extends ProjectableInference[TreeInstance[L, W], Unr
   def grammar: Grammar[L, W]
   def constrainer: ChartConstraints.Factory[L, W]
 
-  def forTesting: ParserInference[L, W] = this
+  override def forTesting: ParserInference[L, W] = this
 
 
   def scorer(v: TreeInstance[L, W]): Scorer = {

@@ -64,8 +64,7 @@ class EPParserModel[L, W](val topology: RuleTopology[L], val lexicon: Lexicon[L,
                           epInGold: Boolean = false, dropOutFraction: Double = 0.0)(models:EPModel.CompatibleModel[TreeInstance[L, W], UnrefinedGrammarAnchoring[L, W]]*) extends EPModel[TreeInstance[L, W], UnrefinedGrammarAnchoring[L, W]](maxEPIter, initFeatureValue, epInGold, dropOutFraction)(models:_*) with ParserExtractable[L, W] with Serializable {
 
   def extractParser(weights: DenseVector[Double])(implicit deb: Debinarizer[L]): Parser[L, W] = {
-    val inf = inferenceFromWeights(weights)
-    val refineds = inf.inferences.map(_.asInstanceOf[ParserInference[L, W]].grammar)
-    Parser(topology, lexicon, constrainer, new EPChartFactory(refineds, maxEPIter), ChartDecoder[L, W]())
+    val inf = inferenceFromWeights(weights).forTesting
+    Parser(topology, lexicon, constrainer, new EPChartFactory(topology, lexicon, inf), ChartDecoder[L, W]())
   }
 }
