@@ -4,13 +4,13 @@ import scala.xml._
 import java.io._
 import io.Codec
 import java.net.URL
-import chalk.slab.Slab
-import chalk.slab.Span
-import chalk.slab.Source
-import chalk.slab.Sentence
-import chalk.slab.Segment
-import chalk.slab.PartOfSpeech
-import chalk.slab.EntityMention
+import epic.slab.Slab
+import epic.slab.Span
+import epic.slab.Source
+import epic.slab.Sentence
+import epic.slab.Segment
+import epic.slab.PartOfSpeech
+import epic.slab.EntityMention
 
 case class MNode(id: String, targets: Seq[String])
 case class MAnnotation(id: String, label: String, ref: String, features: Map[String,String])

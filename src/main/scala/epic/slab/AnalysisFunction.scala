@@ -1,4 +1,4 @@
-package chalk.slab
+package epic.slab
 
 import Slab.StringSlab
 

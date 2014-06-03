@@ -1,7 +1,7 @@
-package chalk.slab
+package epic.slab
 
-import org.scalatest.FunSuite
-import org.scalatest.junit.JUnitRunner
+import org.scalatest._
+import org.scalatest.junit._
 import org.junit.runner.RunWith
 
 @RunWith(classOf[JUnitRunner])

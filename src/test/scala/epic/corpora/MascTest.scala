@@ -1,13 +1,13 @@
-package chalk.corpora
+package epic.corpora
 
-import org.scalatest.FunSuite
-import org.scalatest.junit.JUnitRunner
+import org.scalatest._
+import org.scalatest.junit._
 import org.junit.runner.RunWith
-import chalk.slab.Source
-import chalk.slab.Sentence
-import chalk.slab.Segment
-import chalk.slab.PartOfSpeech
-import chalk.slab.EntityMention
+import epic.slab.Source
+import epic.slab.Sentence
+import epic.slab.Segment
+import epic.slab.PartOfSpeech
+import epic.slab.EntityMention
 import epic.corpora
 
 @RunWith(classOf[JUnitRunner])

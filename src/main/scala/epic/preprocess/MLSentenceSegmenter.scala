@@ -2,7 +2,7 @@ package epic.preprocess
 
 import scala.collection.mutable.ArrayBuffer
 import java.io._
-import chalk.slab.Sentence
+import epic.slab.Sentence
 import breeze.linalg._
 import breeze.numerics._
 import epic.framework.{ModelObjective, StandardExpectedCounts, Model, Feature}

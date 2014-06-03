@@ -14,16 +14,14 @@
  limitations under the License.
 */
 
-package chalk.text.analyze
+package epic.features
 
 import org.scalatest._
 import org.scalatest.junit._
 import org.scalatest.prop._
-import org.scalacheck._
 import org.junit.runner.RunWith
 
 import scala.io.Source
-import epic.features.PorterStemmer
 
 
 @RunWith(classOf[JUnitRunner])
