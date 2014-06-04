@@ -14,7 +14,6 @@ class TreebankTokenizer() extends Tokenizer with Serializable {
   override def apply[In <: Sentence](slab: StringSlab[In]): StringSlab[In with Token] = {
     slab.++[Token](slab.iterator[Sentence].flatMap { s =>
       val content = s.in(slab).content
-      println(content)
       val impl = new TreebankTokenizerImpl(new StringReader(content))
       Iterators.fromProducer{
         try {

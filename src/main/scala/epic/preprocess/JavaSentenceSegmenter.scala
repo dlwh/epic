@@ -18,6 +18,9 @@ package epic.preprocess
 
 import java.text.BreakIterator
 import java.util.Locale
+import epic.slab._
+import epic.slab.Token
+import epic.slab.Sentence
 
 /**
  * A Sentence Segmenter backed by Java's BreakIterator.
@@ -26,13 +29,17 @@ import java.util.Locale
  * @author dlwh
  */
 class JavaSentenceSegmenter(locale: Locale = Locale.getDefault) extends SentenceSegmenter {
-  def apply(s: String): Iterable[String] = {
+
+  override def apply[In <: AnnotatedSpan](slab: StringSlab[In]): StringSlab[In with Sentence] = {
     val breaker = BreakIterator.getSentenceInstance(locale)
-    breaker.setText(s)
-    new Iterable[String] {
-      def iterator = new SegmentingIterator(breaker).map ( span =>s.substring(span.begin, span.end) )
-    }
+    breaker.setText(slab.content)
+    slab.++[Sentence](
+      new SegmentingIterator(breaker).map { span =>
+        Sentence(span.begin, span.end)
+      }
+    )
   }
+
 }
 
 object JavaSentenceSegmenter extends JavaSentenceSegmenter(Locale.getDefault)

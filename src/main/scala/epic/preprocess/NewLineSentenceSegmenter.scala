@@ -4,6 +4,8 @@ import java.text.BreakIterator
 import java.util.Locale
 import epic.preprocess.SentenceSegmenter
 import epic.trees.Span
+import epic.slab._
+import epic.slab.Sentence
 
 /**
  * TODO move to chalk
@@ -11,14 +13,15 @@ import epic.trees.Span
  * @author dlwh
  **/
 class NewLineSentenceSegmenter(locale: Locale = Locale.getDefault) extends SentenceSegmenter {
-  override def apply(v1: String): Iterable[String] = {
-    new Iterable[String] {
-      override def iterator: Iterator[String] = {
-        val it = BreakIterator.getLineInstance(locale)
-        it.setText(v1)
-        new SegmentingIterator(it).map ( span => v1.substring(span.begin, span.end)  )
+
+  override def apply[In <: AnnotatedSpan](slab: StringSlab[In]): StringSlab[In with Sentence] = {
+    val breaker = BreakIterator.getLineInstance(locale)
+    breaker.setText(slab.content)
+    slab.++[Sentence](
+      new SegmentingIterator(breaker).map { span =>
+        Sentence(span.begin, span.end)
       }
-    }
+    )
   }
 }
 

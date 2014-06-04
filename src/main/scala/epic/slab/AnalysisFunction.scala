@@ -1,5 +1,7 @@
 package epic.slab
 
+import epic.preprocess.Tokenizer
+
 /**
  * An analysis function that takes a Slab with declared annotation types in it and outputs
  * a new Slab with additional annotations of a new type.
@@ -31,7 +33,6 @@ object RegexSentenceSegmenter extends SentenceSegmenter {
     slab.++[Sentence]("[^\\s.!?]+[^.!?]+[.!?]".r.findAllMatchIn(slab.content).map(m => Sentence(m.start, m.end)))
 }
 
-trait Tokenizer extends StringAnalysisFunction[Sentence, Token]
 /**
   * A simple regex tokenizer.
   */
@@ -48,7 +49,7 @@ object AnalysisPipeline {
   import AnnotatedSpan._
 
   // added only to demonstrate necesssity of [I] parameter on analyzers
-  private[AnalysisPipeline] case class Document(val begin: Int, val end: Int) extends AnnotatedSpan
+  private[AnalysisPipeline] case class Document(begin: Int, end: Int) extends AnnotatedSpan
   private[AnalysisPipeline] def documentAdder(slab: StringSlab[AnnotatedSpan]) =
     slab ++ Iterator(Document(0, slab.content.length))
 
