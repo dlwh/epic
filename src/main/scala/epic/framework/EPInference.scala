@@ -57,7 +57,7 @@ class EPInference[Datum, Augment](val inferences: IndexedSeq[ProjectableInferenc
   }
 
   def marginal(scorer: Scorer, datum: Datum, augment: Augment): Marginal = {
-    EPInference.doInference(datum, augment, inferences, scorer, (inf:ProjectableInference[Datum, Augment], scorer: ProjectableInference[Datum, Augment]#Scorer, q: Augment) => inf.marginal(scorer.asInstanceOf[inf.Scorer], datum, augment), maxEPIter)
+    EPInference.doInference(datum, augment, inferences, scorer, (inf:ProjectableInference[Datum, Augment], scorer: ProjectableInference[Datum, Augment]#Scorer, q: Augment) => inf.marginal(scorer.asInstanceOf[inf.Scorer], datum, q), maxEPIter)
   }
 
 
