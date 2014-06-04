@@ -1,16 +1,10 @@
 package epic.corpora
 
-import scala.xml._
+import scala.xml.{Source => _, _}
 import java.io._
 import io.Codec
 import java.net.URL
-import epic.slab.Slab
-import epic.slab.AnnotatedSpan
-import epic.slab.Source
-import epic.slab.Sentence
-import epic.slab.Segment
-import epic.slab.PartOfSpeech
-import epic.slab.EntityMention
+import epic.slab._
 
 case class MNode(id: String, targets: Seq[String])
 case class MAnnotation(id: String, label: String, ref: String, features: Map[String,String])
@@ -82,13 +76,13 @@ object MascTransform {
         outputTokens.write(tokenizedSentence.toString.trim + "\n")
       }
     }
-    outputNer.flush
-    outputNer.close
-    outputSentences.flush
-    outputSentences.close
-    outputTokens.flush
-    outputTokens.close
-    System.err.println
+    outputNer.flush()
+    outputNer.close()
+    outputSentences.flush()
+    outputSentences.close()
+    outputTokens.flush()
+    outputTokens.close()
+    System.err.println()
   }
 
 }
@@ -303,7 +297,7 @@ object MascSlab {
    * @param textFileUrl The URL of the MASC .txt (plain text) file.
    * @return A Slab of the text, with the URL saved as a Source annotation.
    */
-  def apply(textFileUrl: URL): Slab.StringSlab[Source] = {
+  def apply(textFileUrl: URL): StringSlab[Source] = {
     val text = io.Source.fromURL(textFileUrl)(Codec.UTF8).mkString
     val slab = Slab[String, AnnotatedSpan](text)
     slab ++ Iterator(Source(0, text.length, textFileUrl))
@@ -317,7 +311,7 @@ object MascSlab {
    * @param slab The Slab containing the text and source URL
    * @return The Slab with added Sentence annotations as read from the MASC -s.xml file.
    */
-  def s[I <: Source](slab: Slab.StringSlab[I]) = {
+  def s[I <: Source](slab: StringSlab[I]) = {
     val List(source) = slab.iterator[Source].toList
     val sentenceXml = XML.load(source.url.toString().replaceAll("[.]txt$", "-s.xml"))
     val sentences = for (region <- MascUtil.getRegions(sentenceXml)) yield {
@@ -334,7 +328,7 @@ object MascSlab {
    * @param slab The Slab containing the text and source URL
    * @return The Slab with added Segment annotations as read from the MASC -seg.xml file.
    */
-  def seg[I <: Source](slab: Slab.StringSlab[I]) = {
+  def seg[I <: Source](slab: StringSlab[I]) = {
     val List(source) = slab.iterator[Source].toList
     val segmentXml = XML.load(source.url.toString().replaceAll("[.]txt$", "-seg.xml"))
     val segments = for (region <- MascUtil.getRegions(segmentXml)) yield {
@@ -351,7 +345,7 @@ object MascSlab {
    * @param slab The Slab containing the text, the source URL and the Segment annotations.
    * @return The Slab with added PartOfSpeech annotations as read from the MASC -penn.xml file.
    */
-  def penn[I <: Source with Segment](slab: Slab.StringSlab[I]) = {
+  def penn[I <: Source with Segment](slab: StringSlab[I]) = {
     val List(source) = slab.iterator[Source].toList
     val pennXml = XML.load(source.url.toString().replaceAll("[.]txt$", "-penn.xml"))
 
@@ -380,7 +374,7 @@ object MascSlab {
    * @param slab The Slab containing the text, the source URL and PartOfSpeech annotations.
    * @return The Slab with added EntityMention annotations as read from the MASC -ne.xml file.
    */
-  def namedEntities[I <: Source with PartOfSpeech](slab: Slab.StringSlab[I]) = {
+  def namedEntities[I <: Source with PartOfSpeech](slab: StringSlab[I]) = {
     val List(source) = slab.iterator[Source].toList
     val neXml = XML.load(source.url.toString().replaceAll("[.]txt$", "-ne.xml"))
     

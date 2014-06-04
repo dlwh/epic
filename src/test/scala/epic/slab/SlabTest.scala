@@ -10,7 +10,6 @@ class SlabTest extends FunSuite {
   // =========
   // Analyzers
   // =========
-  import Slab.StringSlab
 
   val stringBegin = (slab: StringSlab[AnnotatedSpan]) => slab
 

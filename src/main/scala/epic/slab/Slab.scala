@@ -70,13 +70,13 @@ object AnnotatedSpan {
   }
 
   implicit class SpanInStringSlab(val span: AnnotatedSpan) extends AnyVal {
-    def in[AnnotationTypes <: AnnotatedSpan](slab: Slab.StringSlab[AnnotationTypes]) =
+    def in[AnnotationTypes <: AnnotatedSpan](slab: StringSlab[AnnotationTypes]) =
       new StringSpanAnnotationOps(this.span, slab)
   }
 
   class StringSpanAnnotationOps[AnnotationType >: AnnotationTypes <: AnnotatedSpan: ClassTag, AnnotationTypes <: AnnotatedSpan](
     annotation: AnnotationType,
-    slab: Slab.StringSlab[AnnotationTypes])
+    slab: StringSlab[AnnotationTypes])
     extends SlabAnnotationOps[String, AnnotatedSpan, AnnotationType, AnnotationTypes](annotation, slab) {
     def content = this.slab.content.substring(this.annotation.begin, this.annotation.end)
   }
@@ -103,7 +103,6 @@ case class EntityMention(begin: Int, end: Int, entityType: String, id: Option[St
 
 
 object Slab {
-  type StringSlab[+AnnotationTypes <: AnnotatedSpan] = Slab[String, AnnotatedSpan, AnnotationTypes]
 
   def apply[BaseAnnotationType <: AnnotatedSpan](content: String):StringSlab[BaseAnnotationType] = {
     new SortedSequenceSlab(content, Map.empty, Map.empty)

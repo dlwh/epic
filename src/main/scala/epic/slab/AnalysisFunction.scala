@@ -1,20 +1,5 @@
 package epic.slab
 
-import Slab.StringSlab
-
-/**
-  * An analysis function that takes a Slab with declared annotation types in it and outputs
-  * a new Slab with additional annotations of a new type.
-  *
-  * Documentation for the type variables:
-  *   C = Content type
-  *   B = Base annonation type
-  *   I = Input annotation type
-  *   O = Output annotation type
-  */ 
-trait AnalysisFunction[C,B,I<:B,O<:B] extends (Slab[C,B,I] => Slab[C,B,B with I with O])
-
-trait StringAnalysisFunction[I<:AnnotatedSpan,O<:AnnotatedSpan] extends (StringSlab[I] => StringSlab[AnnotatedSpan with I with O])
 
 object StringIdentityAnalyzer extends StringAnalysisFunction[AnnotatedSpan, AnnotatedSpan] {
   def apply(slab: StringSlab[AnnotatedSpan]) = slab
