@@ -104,7 +104,7 @@ object EPInference extends SafeLogging {
 //      println("Leaving " + i)
       newAugment -> contributionToLikelihood
     }
-
+t
     val ep = new ExpectationPropagation(project _, convergenceThreshold)
     val inferencesToUse = (0 until inferences.length).filter(inferences(_) ne null)
 
