@@ -241,6 +241,10 @@ object SimpleGrammar {
   }
 
   case class Anchoring[L, L2, W](grammar: SimpleGrammar[L, L2, W], words: IndexedSeq[W], override val sparsityPattern: ChartConstraints[L]) extends ProjectionsGrammarAnchoring[L, L2, W] {
+
+
+    override def addConstraints(constraints: ChartConstraints[L]): GrammarAnchoring[L, W] = copy(sparsityPattern = sparsityPattern & constraints)
+
     def topology = grammar.topology
     def lexicon = grammar.lexicon
     def refinements = grammar.refinements

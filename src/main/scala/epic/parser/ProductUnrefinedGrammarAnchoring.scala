@@ -28,6 +28,9 @@ final case class ProductUnrefinedGrammarAnchoring[L, W](s1: UnrefinedGrammarAnch
                                             alpha: Double = 1.0) extends UnrefinedGrammarAnchoring[L, W] {
 
 
+  //  def sparsityPattern = ChartConstraints.noSparsity[L]
+  override def addConstraints(cs: ChartConstraints[L]): UnrefinedGrammarAnchoring[L, W] = copy(s1.addConstraints(cs))
+
   override val sparsityPattern: ChartConstraints[L] = s1.sparsityPattern & s2.sparsityPattern
 
   val topology = s1.topology

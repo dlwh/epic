@@ -34,7 +34,7 @@ trait UnrefinedGrammarAnchoring[L, W] extends GrammarAnchoring[L, W] with Factor
   def words: IndexedSeq[W]
 
 //  def sparsityPattern = ChartConstraints.noSparsity[L]
-//  def addConstraints(cs: ChartConstraints[L]):CoreAnchoring[L, W]
+  def addConstraints(cs: ChartConstraints[L]):UnrefinedGrammarAnchoring[L, W]
 
   /**
    * Scores the indexed [[epic.trees.BinaryRule]] rule when it occurs at (begin,split,end)
@@ -63,10 +63,8 @@ trait UnrefinedGrammarAnchoring[L, W] extends GrammarAnchoring[L, W] with Factor
   override def *(other: UnrefinedGrammarAnchoring[L, W]): UnrefinedGrammarAnchoring[L, W] = {
     // hacky multimethod dispatch is hacky
     if (other eq null) this // ugh
-    else if(other.isInstanceOf[UnrefinedGrammarAnchoring.Identity[L, W]] && this.isInstanceOf[UnrefinedGrammarAnchoring.Identity[L, W]])
-      UnrefinedGrammarAnchoring.identity(topology, lexicon, words, sparsityPattern & other.sparsityPattern)
-    else if(other.isInstanceOf[UnrefinedGrammarAnchoring.Identity[L, W]]) this // this.addConstraints(other.sparsityPattern)
-    else if(this.isInstanceOf[UnrefinedGrammarAnchoring.Identity[L, W]]) other // other.addConstraints(this.sparsityPattern)
+    else if(other.isInstanceOf[UnrefinedGrammarAnchoring.Identity[L, W]]) this.addConstraints(other.sparsityPattern)
+    else if(this.isInstanceOf[UnrefinedGrammarAnchoring.Identity[L, W]]) other.addConstraints(this.sparsityPattern)
     else new ProductUnrefinedGrammarAnchoring(this,other)
   }
 
@@ -94,8 +92,8 @@ trait UnrefinedGrammarAnchoring[L, W] extends GrammarAnchoring[L, W] with Factor
   def /(other: UnrefinedGrammarAnchoring[L, W]) = {
     // hacky multimethod dispatch is hacky
     if (other eq null) this // ugh
-    else if(this eq other) new UnrefinedGrammarAnchoring.Identity[L, W](topology, lexicon, words, ChartConstraints.noSparsity[L])
-    else if(other.isInstanceOf[UnrefinedGrammarAnchoring.Identity[L, W]]) this
+    else if(this eq other) new UnrefinedGrammarAnchoring.Identity[L, W](topology, lexicon, words, this.sparsityPattern)
+    else if(other.isInstanceOf[UnrefinedGrammarAnchoring.Identity[L, W]]) this.addConstraints(other.sparsityPattern)
     else new ProductUnrefinedGrammarAnchoring(this, other, -1)
   }
 
@@ -197,6 +195,10 @@ object UnrefinedGrammarAnchoring {
    */
   @SerialVersionUID(1L)
   case class Identity[L, W](topology: RuleTopology[L], lexicon: Lexicon[L, W], words: IndexedSeq[W], sparsityPattern: ChartConstraints[L]) extends UnrefinedGrammarAnchoring[L, W] {
+
+
+    //  def sparsityPattern = ChartConstraints.noSparsity[L]
+    override def addConstraints(cs: ChartConstraints[L]): UnrefinedGrammarAnchoring[L, W] = copy(sparsityPattern = sparsityPattern & cs)
 
     def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = 0.0
 

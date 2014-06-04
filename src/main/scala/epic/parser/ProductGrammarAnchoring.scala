@@ -39,6 +39,7 @@ final case class ProductGrammarAnchoring[L,W](s1: GrammarAnchoring[L, W],
   def lexicon = s1.lexicon
   def words = s1.words
 
+  override def addConstraints(constraints: ChartConstraints[L]): GrammarAnchoring[L, W] = copy(s1.addConstraints(constraints))
 
   override val sparsityPattern: ChartConstraints[L] = s1.sparsityPattern & s2.sparsityPattern
 

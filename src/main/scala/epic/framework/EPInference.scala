@@ -20,6 +20,7 @@ import collection.mutable.ArrayBuffer
 import epic.util.SafeLogging
 import nak.inference.{ExpectationPropagation, Factor}
 import java.util.concurrent.atomic.AtomicLong
+import epic.parser.ParseMarginal
 
 class EPInference[Datum, Augment](val inferences: IndexedSeq[ProjectableInference[Datum, Augment]],
                                   val maxEPIter: Int,
@@ -77,7 +78,7 @@ object EPInference extends SafeLogging {
                           scorer: EPScorer[Scorer],
                           infType: (ProjectableInference[Datum, Augment],Scorer, Augment)=>Marginal,
                           maxEPIter: Int = 5,
-                          convergenceThreshold: Double = 1E-4)
+                          convergenceThreshold: Double = 1E-7)
                          (implicit aIsFactor: Augment <:< Factor[Augment]):EPMarginal[Augment, Marginal] = {
     var iter = 0
     val marginals = ArrayBuffer.fill(inferences.length)(null.asInstanceOf[Marginal])
@@ -104,7 +105,6 @@ object EPInference extends SafeLogging {
 //      println("Leaving " + i)
       newAugment -> contributionToLikelihood
     }
-t
     val ep = new ExpectationPropagation(project _, convergenceThreshold)
     val inferencesToUse = (0 until inferences.length).filter(inferences(_) ne null)
 

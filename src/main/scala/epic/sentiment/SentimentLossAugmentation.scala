@@ -49,6 +49,7 @@ case class SentimentLossAugmentation[W](trainTrees: IndexedSeq[TreeInstance[Anno
                                           words: IndexedSeq[W],
                                           goldLabels: Map[Span, Int],
                                           sparsityPattern: ChartConstraints[L])  extends epic.parser.UnrefinedGrammarAnchoring[L, W]{
+    override def addConstraints(cs: ChartConstraints[L]): UnrefinedGrammarAnchoring[L, W] = copy(sparsityPattern = sparsityPattern & cs)
 
     def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int): Double = 0.0
 

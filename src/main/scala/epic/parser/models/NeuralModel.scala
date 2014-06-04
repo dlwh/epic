@@ -114,14 +114,16 @@ object NeuralModel {
   }
 
 
-  /** Not thread safe; make a difference anchoring for each thread */
-  class Anchoring[L, W](val baseAnchoring: GrammarAnchoring[L, W],
-                        val baseFeaturizer: RefinedFeaturizer[L, W, Feature]#Anchoring,
-                        val labelFeaturizer: RefinedFeaturizer[L, W, Feature]#Anchoring,
-                        val surfaceFeaturizer: IndexedSplitSpanFeatureAnchoring[W],
-                        val lastLayer: DenseMatrix[Double],
-                        val layer: Transform[FeatureVector, DenseVector[Double]]#Layer) extends GrammarAnchoring.StructureDelegatingAnchoring[L, W] {
+  /** Not thread safe; make a different anchoring for each thread */
+  case class Anchoring[L, W](baseAnchoring: GrammarAnchoring[L, W],
+                        baseFeaturizer: RefinedFeaturizer[L, W, Feature]#Anchoring,
+                        labelFeaturizer: RefinedFeaturizer[L, W, Feature]#Anchoring,
+                        surfaceFeaturizer: IndexedSplitSpanFeatureAnchoring[W],
+                        lastLayer: DenseMatrix[Double],
+                        layer: Transform[FeatureVector, DenseVector[Double]]#Layer) extends GrammarAnchoring.StructureDelegatingAnchoring[L, W] {
 
+
+    override def addConstraints(constraints: ChartConstraints[L]): GrammarAnchoring[L, W] = copy(baseAnchoring.addConstraints(constraints))
 
     override def sparsityPattern: ChartConstraints[L] = baseAnchoring.sparsityPattern
 
