@@ -2,9 +2,8 @@ package epic.slab
 
 import scala.reflect.ClassTag
 import java.net.URL
-import spire.math.Searching
 import epic.util.BinarySearch
-import epic.slab.Span.{EndFirstSpanOrdering, SpanOrdering}
+import epic.slab.AnnotatedSpan.{EndFirstSpanOrdering, SpanOrdering}
 
 trait Slab[ContentType, BaseAnnotationType, +AnnotationTypes <: BaseAnnotationType] {
 
@@ -42,16 +41,16 @@ abstract class SlabAnnotationOps[ContentType, BaseAnnotationType, AnnotationType
 // =========================
 // Annotation infrastructure
 // =========================
-trait Span {
-  val begin: Int
-  val end: Int
+trait AnnotatedSpan {
+  def begin: Int
+  def end: Int
 }
 
 
-object Span {
+object AnnotatedSpan {
 
-  implicit object SpanOrdering extends Ordering[Span] {
-    override def compare(x: Span, y: Span): Int = {
+  implicit object SpanOrdering extends Ordering[AnnotatedSpan] {
+    override def compare(x: AnnotatedSpan, y: AnnotatedSpan): Int = {
       if      (x.begin < y.begin) -1
       else if (x.begin > y.begin)  1
       else if (x.end  < y.end)    -1
@@ -60,8 +59,8 @@ object Span {
     }
   }
 
-  implicit object EndFirstSpanOrdering extends Ordering[Span] {
-    override def compare(x: Span, y: Span): Int = {
+  implicit object EndFirstSpanOrdering extends Ordering[AnnotatedSpan] {
+    override def compare(x: AnnotatedSpan, y: AnnotatedSpan): Int = {
       if (x.end  < y.end)    -1
       else if (x.end > y.end)      1
       else if (x.begin < y.begin) -1
@@ -70,24 +69,24 @@ object Span {
     }
   }
 
-  implicit class SpanInStringSlab(val span: Span) extends AnyVal {
-    def in[AnnotationTypes <: Span](slab: Slab.StringSlab[AnnotationTypes]) =
+  implicit class SpanInStringSlab(val span: AnnotatedSpan) extends AnyVal {
+    def in[AnnotationTypes <: AnnotatedSpan](slab: Slab.StringSlab[AnnotationTypes]) =
       new StringSpanAnnotationOps(this.span, slab)
   }
 
-  class StringSpanAnnotationOps[AnnotationType >: AnnotationTypes <: Span: ClassTag, AnnotationTypes <: Span](
+  class StringSpanAnnotationOps[AnnotationType >: AnnotationTypes <: AnnotatedSpan: ClassTag, AnnotationTypes <: AnnotatedSpan](
     annotation: AnnotationType,
     slab: Slab.StringSlab[AnnotationTypes])
-    extends SlabAnnotationOps[String, Span, AnnotationType, AnnotationTypes](annotation, slab) {
+    extends SlabAnnotationOps[String, AnnotatedSpan, AnnotationType, AnnotationTypes](annotation, slab) {
     def content = this.slab.content.substring(this.annotation.begin, this.annotation.end)
   }
   
-  implicit object StringAnnotationHasBounds extends Slab.HasBounds[Span] {
-    def covers(annotation1: Span, annotation2: Span): Boolean =
+  implicit object StringAnnotationHasBounds extends Slab.HasBounds[AnnotatedSpan] {
+    def covers(annotation1: AnnotatedSpan, annotation2: AnnotatedSpan): Boolean =
       annotation1.begin <= annotation2.begin && annotation2.end <= annotation1.end
-    def follows(annotation1: Span, annotation2: Span): Boolean =
+    def follows(annotation1: AnnotatedSpan, annotation2: AnnotatedSpan): Boolean =
       annotation2.end <= annotation1.begin
-    def precedes(annotation1: Span, annotation2: Span): Boolean =
+    def precedes(annotation1: AnnotatedSpan, annotation2: AnnotatedSpan): Boolean =
       annotation1.end <= annotation2.begin
   }
 }
@@ -95,18 +94,18 @@ object Span {
 // ===========
 // Annotations
 // ===========
-case class Source(begin: Int, end: Int, url: URL) extends Span
-case class Sentence(begin: Int, end: Int, id: Option[String] = None) extends Span
-case class Segment(begin: Int, end: Int, id: Option[String] = None) extends Span
-case class Token(begin: Int, end: Int, id: Option[String] = None) extends Span
-case class PartOfSpeech(begin: Int, end: Int, tag: String, id: Option[String] = None) extends Span
-case class EntityMention(begin: Int, end: Int, entityType: String, id: Option[String] = None) extends Span
+case class Source(begin: Int, end: Int, url: URL) extends AnnotatedSpan
+case class Sentence(begin: Int, end: Int, id: Option[String] = None) extends AnnotatedSpan
+case class Segment(begin: Int, end: Int, id: Option[String] = None) extends AnnotatedSpan
+case class Token(begin: Int, end: Int, token: String) extends AnnotatedSpan
+case class PartOfSpeech(begin: Int, end: Int, tag: String, id: Option[String] = None) extends AnnotatedSpan
+case class EntityMention(begin: Int, end: Int, entityType: String, id: Option[String] = None) extends AnnotatedSpan
 
 
 object Slab {
-  type StringSlab[+AnnotationTypes <: Span] = Slab[String, Span, AnnotationTypes]
+  type StringSlab[+AnnotationTypes <: AnnotatedSpan] = Slab[String, AnnotatedSpan, AnnotationTypes]
 
-  def apply[BaseAnnotationType <: Span](content: String):StringSlab[BaseAnnotationType] = {
+  def apply[BaseAnnotationType <: AnnotatedSpan](content: String):StringSlab[BaseAnnotationType] = {
     new SortedSequenceSlab(content, Map.empty, Map.empty)
   }
   
@@ -160,7 +159,7 @@ object Slab {
    * @tparam AnnotationType
    */
   private[slab] class SortedSequenceSlab[ContentType,
-  BaseAnnotationType <: Span,
+  BaseAnnotationType <: AnnotatedSpan,
   AnnotationType <: BaseAnnotationType](val content: ContentType,
                                         val annotations: Map[Class[_], Vector[BaseAnnotationType]] = Map.empty,
                                         val reverseAnnotations: Map[Class[_], Vector[BaseAnnotationType]] = Map.empty) extends Slab[ContentType, BaseAnnotationType, AnnotationType] {
@@ -180,7 +179,7 @@ object Slab {
 
     override def following[A >: AnnotationType <: BaseAnnotationType : ClassTag](annotation: BaseAnnotationType): Iterator[A] = {
       annotations.filterKeys(implicitly[ClassTag[A]].runtimeClass.isAssignableFrom).valuesIterator.flatMap { annotations =>
-        var pos = BinarySearch.interpolationSearch(annotations, (_:Span).begin, annotation.end)
+        var pos = BinarySearch.interpolationSearch(annotations, (_:AnnotatedSpan).begin, annotation.end)
         if(pos < 0) pos = ~pos
         annotations.view(pos, annotations.length)
       }.asInstanceOf[Iterator[A]]
@@ -188,7 +187,7 @@ object Slab {
 
     override def preceding[A >: AnnotationType <: BaseAnnotationType : ClassTag](annotation: BaseAnnotationType): Iterator[A] = {
       reverseAnnotations.filterKeys(implicitly[ClassTag[A]].runtimeClass.isAssignableFrom).valuesIterator.flatMap { annotations =>
-        var pos = BinarySearch.interpolationSearch(annotations, (_:Span).end, annotation.begin + 1)
+        var pos = BinarySearch.interpolationSearch(annotations, (_:AnnotatedSpan).end, annotation.begin + 1)
         if(pos < 0) pos = ~pos
         annotations.view(0, pos).reverseIterator
       }.asInstanceOf[Iterator[A]]
@@ -196,7 +195,7 @@ object Slab {
 
     override def covered[A >: AnnotationType <: BaseAnnotationType : ClassTag](annotation: BaseAnnotationType): Iterator[A] = {
       annotations.filterKeys(implicitly[ClassTag[A]].runtimeClass.isAssignableFrom).valuesIterator.flatMap { annotations =>
-        var begin = BinarySearch.interpolationSearch(annotations, (_:Span).begin, annotation.begin)
+        var begin = BinarySearch.interpolationSearch(annotations, (_:AnnotatedSpan).begin, annotation.begin)
         if(begin < 0) begin = ~begin
         annotations.view(begin, annotations.length).takeWhile(_.end <= annotation.end)
       }.asInstanceOf[Iterator[A]]

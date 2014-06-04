@@ -5,7 +5,7 @@ import java.io._
 import io.Codec
 import java.net.URL
 import epic.slab.Slab
-import epic.slab.Span
+import epic.slab.AnnotatedSpan
 import epic.slab.Source
 import epic.slab.Sentence
 import epic.slab.Segment
@@ -305,7 +305,7 @@ object MascSlab {
    */
   def apply(textFileUrl: URL): Slab.StringSlab[Source] = {
     val text = io.Source.fromURL(textFileUrl)(Codec.UTF8).mkString
-    val slab = Slab[String, Span](text)
+    val slab = Slab[String, AnnotatedSpan](text)
     slab ++ Iterator(Source(0, text.length, textFileUrl))
   }
 

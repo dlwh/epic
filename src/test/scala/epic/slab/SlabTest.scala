@@ -12,15 +12,15 @@ class SlabTest extends FunSuite {
   // =========
   import Slab.StringSlab
 
-  val stringBegin = (slab: StringSlab[Span]) => slab
+  val stringBegin = (slab: StringSlab[AnnotatedSpan]) => slab
 
-  def sentenceSegmenter[AnnotationTypes <: Span](slab: StringSlab[AnnotationTypes]) =
+  def sentenceSegmenter[AnnotationTypes <: AnnotatedSpan](slab: StringSlab[AnnotationTypes]) =
     slab ++ "[^\\s.!?]+[^.!?]+[.!?]".r.findAllMatchIn(slab.content).map(m => Sentence(m.start, m.end))
 
   def tokenizer[AnnotationTypes <: Sentence](slab: StringSlab[AnnotationTypes]) =
     slab ++ slab.iterator[Sentence].flatMap(sentence =>
       "\\p{L}+|\\p{P}+|\\p{N}+".r.findAllMatchIn(sentence.in(slab).content).map(m =>
-        Token(sentence.begin + m.start, sentence.begin + m.end)))
+        Token(sentence.begin + m.start, sentence.begin + m.end, m.group(0))))
 
   // =========
   // Tests
@@ -123,7 +123,7 @@ class SlabTest extends FunSuite {
   }
 
   test("sorted slab issues with overlapping annotations") {
-    case class Annotation(begin: Int, end: Int) extends Span
+    case class Annotation(begin: Int, end: Int) extends AnnotatedSpan
     val slab = Slab("""This is a test.""") ++ Iterator(Annotation(0, 1), Annotation(0, 2), Annotation(1, 3), Annotation(1, 2), Annotation(2, 3))
     assert(slab.preceding[Annotation](Annotation(0, 1)).isEmpty)
     assert(slab.preceding[Annotation](Annotation(0, 2)).isEmpty)
