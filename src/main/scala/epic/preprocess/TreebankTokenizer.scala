@@ -4,23 +4,28 @@ import breeze.util.Iterators
 import java.io.StringReader
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.immutable
+import epic.slab._
+import epic.slab.Sentence
+import epic.slab.Token
 
 @SerialVersionUID(1L)
 class TreebankTokenizer() extends Tokenizer with Serializable {
-  def apply(text: String):Iterable[String] = {
-    new Iterable[String]() {
-      def iterator: Iterator[String] = {
-        val impl = new TreebankTokenizerImpl(new StringReader(text + "\n"))
-        Iterators.fromProducer{
-          try {
-            Option(impl.getNextToken()).map(_.token)
-          } catch {
-            case e: Throwable => throw new RuntimeException("Could not tokenize " + text, e)
-          }
-        }.takeWhile(_ != null)
-      }
-    }
 
+  override def apply[In <: Sentence](slab: StringSlab[In]): StringSlab[In with Token] = {
+    slab.++[Token](slab.iterator[Sentence].flatMap { s =>
+      val content = s.in(slab).content
+      println(content)
+      val impl = new TreebankTokenizerImpl(new StringReader(content))
+      Iterators.fromProducer{
+        try {
+          Option(impl.getNextToken()).map { token =>
+            token.copy(token.begin + s.begin, token.end + s.begin)
+          }
+        } catch {
+          case e: Throwable => throw new RuntimeException("Could not tokenize " + s, e)
+        }
+      }
+    })
   }
 
 

@@ -30,7 +30,7 @@ class JavaSentenceSegmenter(locale: Locale = Locale.getDefault) extends Sentence
     val breaker = BreakIterator.getSentenceInstance(locale)
     breaker.setText(s)
     new Iterable[String] {
-      def iterator = new SegmentingIterator(breaker, s)
+      def iterator = new SegmentingIterator(breaker).map ( span =>s.substring(span.begin, span.end) )
     }
   }
 }

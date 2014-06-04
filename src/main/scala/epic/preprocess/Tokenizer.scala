@@ -15,6 +15,8 @@
 */
 package epic.preprocess
 
+import epic.slab._
+
 
 /**
  * Abstract trait for tokenizers, which act as functions from a String
@@ -24,9 +26,13 @@ package epic.preprocess
  * @author dramage
  */
 @SerialVersionUID(1)
-trait Tokenizer extends (String => Iterable[String]) with Serializable {
-
+trait Tokenizer extends StringAnalysisFunction[Sentence, Token] with Serializable {
   override def toString = getClass.getName
+
+  def apply(a: String):IndexedSeq[String] = {
+    apply(Slab[AnnotatedSpan](a).+(Sentence(0, a.length))).iterator[Token].toIndexedSeq.map(_.token)
+  }
+
 }
 
 /**

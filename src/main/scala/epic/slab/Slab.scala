@@ -9,6 +9,10 @@ trait Slab[ContentType, BaseAnnotationType, +AnnotationTypes <: BaseAnnotationTy
 
   val content: ContentType
 
+  def +[A <: BaseAnnotationType](annotation: A): Slab[ContentType, BaseAnnotationType, AnnotationTypes with A] = {
+    ++[A](Iterator(annotation))
+  }
+
   def ++[A <: BaseAnnotationType](annotations: Iterator[A]): Slab[ContentType, BaseAnnotationType, AnnotationTypes with A]
 
   def iterator[A >: AnnotationTypes <: BaseAnnotationType: ClassTag]: Iterator[A]

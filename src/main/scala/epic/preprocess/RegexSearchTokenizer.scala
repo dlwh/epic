@@ -15,15 +15,31 @@
 */
 package epic.preprocess
 
+import epic.slab._
+import scala.runtime.ScalaRunTime
+
 /**
  * Finds all occurrences of the given pattern in the document.
  *
  * @author dlwh
  * @author dramage
  */
-case class RegexSearchTokenizer(pattern : String)
-extends Tokenizer {
-  override def apply(doc : String) = new Iterable[String] {
-    override def iterator = (pattern.r.findAllIn(doc));
+case class RegexSearchTokenizer(pattern : String) extends Tokenizer {
+  private val compiled = pattern.r
+
+
+  def apply[In <: Sentence](slab:StringSlab[In]):StringSlab[In with Token] = {
+    slab.++[Token](slab.iterator[Sentence].flatMap { s =>
+      compiled.findAllMatchIn(s.in(slab).content).map{ m => new Token(m.start, m.end, m.group(0))}
+    })
   }
+
+
+
+
+
+//  override def apply(doc : String) = new Iterable[String] {
+//    override def iterator = (pattern.r.findAllIn(doc));
+//  }
+  override def toString: String = ScalaRunTime._toString(this)
 }

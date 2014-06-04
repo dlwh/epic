@@ -15,6 +15,10 @@
 */
 package epic.preprocess
 
+import epic.slab._
+import epic.slab.Token
+import epic.slab.Sentence
+
 /**
  * Splits the input document according to the given pattern.  Does not
  * return the splits.
@@ -22,6 +26,17 @@ package epic.preprocess
  * @author dramage
  */
 case class RegexSplitTokenizer(pattern : String) extends Tokenizer {
-  override def apply(doc : String) = doc.split(pattern);
+  val compiled = pattern.r
+  override def apply[In <: Sentence](slab: StringSlab[In]): StringSlab[In with Token] = {
+    slab.++[Token](slab.iterator[Sentence].flatMap { s =>
+      val content = s.in(slab).content
+      var last = 0
+      compiled.findAllMatchIn(content).map{ m =>
+        val ret = Token(last, m.start(0), slab.content.substring(last + s.begin, m.start(0) + s.begin))
+        last += m.end(0)
+        ret
+      }
+    })
+  }
 }
 

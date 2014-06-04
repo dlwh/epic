@@ -1,24 +1,42 @@
 package epic.slab
 
-
-object StringIdentityAnalyzer extends StringAnalysisFunction[AnnotatedSpan, AnnotatedSpan] {
-  def apply(slab: StringSlab[AnnotatedSpan]) = slab
+/**
+ * An analysis function that takes a Slab with declared annotation types in it and outputs
+ * a new Slab with additional annotations of a new type.
+ *
+ * Documentation for the type variables:
+ *   C = Content type
+ *   B = Base annonation type
+ *   I = Input annotation type
+ *   O = Output annotation type
+ */
+trait AnalysisFunction[C,B,I<:B,+O<:B] {
+  def apply[In <: I](slab: Slab[C,B,In]):Slab[C,B,B with In with O]
 }
 
+
+object StringIdentityAnalyzer extends StringAnalysisFunction[AnnotatedSpan, AnnotatedSpan] {
+  def apply[In <: AnnotatedSpan](slab: StringSlab[In]):StringSlab[In] = slab
+}
+
+trait SentenceSegmenter extends StringAnalysisFunction[AnnotatedSpan, Sentence]
+
 /**
-  * A simple regex sentence segmenter.
-  */
-trait SentenceSegmenter[I <: AnnotatedSpan] extends StringAnalysisFunction[I, Sentence] {
-  def apply(slab: StringSlab[I]) =
+ * A simple regex sentence segmenter.
+ */
+object RegexSentenceSegmenter extends SentenceSegmenter {
+
+  def apply[In <: AnnotatedSpan](slab: StringSlab[In]) =
     // the [Sentence] is required because of https://issues.scala-lang.org/browse/SI-7647
     slab.++[Sentence]("[^\\s.!?]+[^.!?]+[.!?]".r.findAllMatchIn(slab.content).map(m => Sentence(m.start, m.end)))
 }
 
+trait Tokenizer extends StringAnalysisFunction[Sentence, Token]
 /**
   * A simple regex tokenizer.
   */
-trait Tokenizer[I <: Sentence] extends StringAnalysisFunction[I, Token] {
-  def apply(slab: StringSlab[I]) =
+object RegexTokenizer extends Tokenizer {
+  def apply[I <: Sentence](slab: StringSlab[I]) =
     // the [Token] is required because of https://issues.scala-lang.org/browse/SI-7647
     slab.++[Token](slab.iterator[Sentence].flatMap(sentence =>
       "\\p{L}+|\\p{P}+|\\p{N}+".r.findAllMatchIn(sentence.in(slab).content).map(m =>

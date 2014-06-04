@@ -3,6 +3,7 @@ package epic.preprocess
 import java.text.BreakIterator
 import java.util.Locale
 import epic.preprocess.SentenceSegmenter
+import epic.trees.Span
 
 /**
  * TODO move to chalk
@@ -15,20 +16,19 @@ class NewLineSentenceSegmenter(locale: Locale = Locale.getDefault) extends Sente
       override def iterator: Iterator[String] = {
         val it = BreakIterator.getLineInstance(locale)
         it.setText(v1)
-        new SegmentingIterator(it, v1)
+        new SegmentingIterator(it).map ( span => v1.substring(span.begin, span.end)  )
       }
     }
   }
 }
 
-class SegmentingIterator(inner: BreakIterator, str: String) extends Iterator[String] {
-  private var start = inner.first
-  private var end = inner.next
+class SegmentingIterator(inner: BreakIterator, private var start: Int = 0, private val last: Int = -1) extends Iterator[Span] {
+  private var end = inner.following(start)
 
-  def hasNext = (end != BreakIterator.DONE)
+  def hasNext = (end != BreakIterator.DONE && (last == -1 || end <= last))
 
   def next = {
-    val res = str.substring(start, end)
+    val res = Span(start, end)
     start = end
     end = inner.next
     res

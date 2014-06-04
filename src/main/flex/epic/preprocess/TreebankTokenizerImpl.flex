@@ -51,6 +51,8 @@ package epic.preprocess;
 
 %{
 
+private int acro_period = -1;
+
 public final int yychar()
 {
     return yychar;
@@ -61,12 +63,20 @@ final epic.slab.Token currentToken() {
 }
 final epic.slab.Token currentToken(String value) {
 //  return new String(zzBuffer, zzStartRead, zzMarkedPos-zzStartRead);
-  return new epic.slab.Token(zzStartRead, zzMarkedPos, value);
+  return new epic.slab.Token(yychar(), yychar() + zzMarkedPos - zzStartRead, value);
 }
 
 
-
 %}
+
+%eofval{
+  if(yychar() == acro_period) {
+      acro_period = -2;
+  return new epic.slab.Token(yychar() - 1, yychar(), ".") ;
+  } else {
+    return null;
+  }
+%eofval}
 
 THAI       = [\u0E00-\u0E59]
 
@@ -223,7 +233,7 @@ TWITTER_HASHTAG = # {ALPHANUM}+
 LONG_END_PUNCT = [?!][?!1]+
 
 
-%s OPEN_QUOTE POLISH_CONDITIONAL_MODE
+%s OPEN_QUOTE POLISH_CONDITIONAL_MODE JUST_AFTER_PERIOD
 
 %%
 
@@ -248,7 +258,8 @@ Got / ta                                                      {return currentTok
 
 // acronyms that end a sentence
 
-{LETTER}+\.{LETTER}+ / .$                                       { return currentToken(currentToken().token() + ".");}
+{LETTER}+\.{LETTER}+ / [.]$                                      { return currentToken(currentToken().token() + ".");}
+{LETTER}+\.{LETTER}+.                                      {acro_period = yychar() + zzMarkedPos; return currentToken(currentToken().token());}
 // contractions
 {INIT_CLITIC}                                           {return currentToken();}
 {CLITIC}                                           {return currentToken();}

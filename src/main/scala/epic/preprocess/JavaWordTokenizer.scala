@@ -18,6 +18,9 @@ package epic.preprocess
 
 import java.text._
 import java.util.Locale
+import epic.slab._
+import epic.slab.Token
+import epic.slab.Sentence
 
 
 /**
@@ -31,12 +34,15 @@ import java.util.Locale
 class JavaWordTokenizer(locale: Locale) extends Tokenizer {
   def this() = this(Locale.getDefault)
 
-  def apply(s: String): Iterable[String] = {
-    val breaker = BreakIterator.getWordInstance(locale)
-    breaker.setText(s)
-    new Iterable[String] {
-     def iterator = new SegmentingIterator(breaker, s).map(_.trim).filter(!_.isEmpty)
-    }
+
+  override def apply[In <: Sentence](slab: StringSlab[In]): StringSlab[In with Token] = {
+    slab.++[Token](slab.iterator[Sentence].flatMap { s =>
+      val breaker = BreakIterator.getWordInstance(locale)
+      breaker.setText(slab.content)
+      new SegmentingIterator(breaker, s.begin, s.end).map { span =>
+        Token(span.begin, span.end, slab.content.substring(span.begin, span.end))
+      }.filterNot(_.token.forall(_.isWhitespace))
+    })
   }
 }
 
