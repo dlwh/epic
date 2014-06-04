@@ -23,9 +23,10 @@ import nak.serialization.DataSerialization._
 import java.io.{StringReader, DataInput, DataOutput}
 import breeze.util.Lens
 import scala.annotation.tailrec
+import epic.slab.AnnotatedSpan
 
 @SerialVersionUID(1L)
-trait Tree[+L] extends Serializable {
+trait Tree[+L] extends AnnotatedSpan with Serializable {
   def label: L
   def children: IndexedSeq[Tree[L]]
   def span: Span
