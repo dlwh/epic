@@ -26,7 +26,7 @@ import scala.annotation.tailrec
 import epic.slab.AnnotatedSpan
 
 @SerialVersionUID(1L)
-trait Tree[+L] extends AnnotatedSpan with Serializable {
+trait Tree[+L] extends Serializable {
   def label: L
   def children: IndexedSeq[Tree[L]]
   def span: Span
