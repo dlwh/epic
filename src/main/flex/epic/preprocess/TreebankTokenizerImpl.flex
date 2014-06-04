@@ -44,7 +44,7 @@ package epic.preprocess;
 */
 %class TreebankTokenizerImpl
 %unicode
-%type String
+%type epic.slab.Token
 %function getNextToken
 %pack
 %char
@@ -56,12 +56,16 @@ public final int yychar()
     return yychar;
 }
 
-final String currentToken() {
-  return new String(zzBuffer, zzStartRead, zzMarkedPos-zzStartRead);
+final epic.slab.Token currentToken() {
+    return currentToken(new String(zzBuffer, zzStartRead, zzMarkedPos-zzStartRead));
+}
+final epic.slab.Token currentToken(String value) {
+//  return new String(zzBuffer, zzStartRead, zzMarkedPos-zzStartRead);
+  return new epic.slab.Token(zzStartRead, zzMarkedPos, value);
 }
 
 
-private boolean insideQuote = false;
+
 %}
 
 THAI       = [\u0E00-\u0E59]
@@ -244,10 +248,7 @@ Got / ta                                                      {return currentTok
 
 // acronyms that end a sentence
 
-[01]?[0-9]{WHITESPACE}?:[0-6][0-9]                              { return currentToken(); }
-
-
-{LETTER}+\.{LETTER}+ / .$                                       { return currentToken() + ".";}
+{LETTER}+\.{LETTER}+ / .$                                       { return currentToken(currentToken().token() + ".");}
 // contractions
 {INIT_CLITIC}                                           {return currentToken();}
 {CLITIC}                                           {return currentToken();}
@@ -263,9 +264,12 @@ N'T                                                            {return currentTo
 'T / is                                                           {return currentToken(); }
 't / is                                                           {return currentToken(); }
 
+// times
+[01]?[0-9]{WHITESPACE}?:[0-6][0-9]                              { return currentToken(); }
+
 // quotes
-<YYINITIAL>\"                                                  { yybegin(OPEN_QUOTE); return "``"; }
-<OPEN_QUOTE>\"                                                 { yybegin(YYINITIAL); return "''"; }
+<YYINITIAL>\"                                                  { yybegin(OPEN_QUOTE); return currentToken("``"); }
+<OPEN_QUOTE>\"                                                 { yybegin(YYINITIAL); return currentToken("''"); }
 
 
 
@@ -281,13 +285,13 @@ N'T                                                            {return currentTo
 {NUM}                                                          { return currentToken(); }
 {ACRONYM_DEP}                                                  { return currentToken(); }
 {WHITESPACE}                                                   {} 
-\(                                                  {return "-LRB-";} 
-\)                                                  {return "-RRB-";} 
-\{                                                  {return "-LCB-";} 
-\}                                                  {return "-RCB-";} 
-\[                                                  {return "-LSB-";} 
-\]                                                  {return "-RSB-";} 
-[.][.]+                                                 {return "...";}
+\(                                                  {return currentToken("-LRB-");}
+\)                                                  {return currentToken("-RRB-");}
+\{                                                  {return currentToken("-LCB-");}
+\}                                                  {return currentToken("-RCB-");}
+\[                                                  {return currentToken("-LSB-");}
+\]                                                  {return currentToken("-RSB-");}
+[.][.]+                                                 {return currentToken("...");}
 {LONG_END_PUNCT}                                        { return currentToken();}
 {PUNCT}                                               { return currentToken();}
 {EMOTICON}                                          { return currentToken();}
