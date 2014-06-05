@@ -408,7 +408,8 @@ final class LexGrammar[L, L2, W](val topology: RuleTopology[L],
   // binaryRule is (head * words.length + dep)
   // unaryRule is (head)
   // parent/leftchild/rightchild is (head)
-  final class Spec(val words: IndexedSeq[W], val sparsityPattern: ChartConstraints[L]) extends GrammarAnchoring[L, W] {
+  final case class Spec(val words: IndexedSeq[W], val sparsityPattern: ChartConstraints[L]) extends GrammarAnchoring[L, W] {
+    override def addConstraints(constraints: ChartConstraints[L]): GrammarAnchoring[L, W] = copy(sparsityPattern = sparsityPattern & constraints)
 
     override def annotationTag: Int = 1
 

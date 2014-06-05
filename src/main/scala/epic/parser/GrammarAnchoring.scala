@@ -59,6 +59,8 @@ trait GrammarAnchoring[L, W]  {
    */
   def scoreUnaryRule(begin: Int, end: Int, rule: Int, ref: Int):Double
 
+  def addConstraints(constraints: ChartConstraints[L]):GrammarAnchoring[L, W]
+
   // factor methods
   /**
    * Computes the pointwise product of two grammars, augmenting
@@ -71,16 +73,16 @@ trait GrammarAnchoring[L, W]  {
   def *(other: GrammarAnchoring[L, W]):GrammarAnchoring[L,W] = {
     // hacky multimethod dispatch is hacky
     if (other eq null) this // ugh
-    else if(other.isInstanceOf[UnrefinedGrammarAnchoring.Identity[L, W]]) this
-    else if(this.isInstanceOf[UnrefinedGrammarAnchoring.Identity[L, W]]) other
+    else if (other.isInstanceOf[UnrefinedGrammarAnchoring.Identity[L, W]]) this.addConstraints(other.sparsityPattern)
+    else if (this.isInstanceOf[UnrefinedGrammarAnchoring.Identity[L, W]]) other.addConstraints(sparsityPattern)
     else new ProductGrammarAnchoring(this,other)
   }
 
   def *(other: UnrefinedGrammarAnchoring[L, W]):GrammarAnchoring[L, W] = {
     // hacky multimethod dispatch is hacky
     if (other eq null) this // ugh
-    else if(other.isInstanceOf[UnrefinedGrammarAnchoring.Identity[L, W]]) this
-    else if(this.isInstanceOf[UnrefinedGrammarAnchoring.Identity[L, W]]) other
+    else if (other.isInstanceOf[UnrefinedGrammarAnchoring.Identity[L, W]]) this.addConstraints(other.sparsityPattern)
+    else if (this.isInstanceOf[UnrefinedGrammarAnchoring.Identity[L, W]]) other.addConstraints(other.sparsityPattern)
     else new ProductGrammarAnchoring(this,other)
   }
 
@@ -95,9 +97,9 @@ trait GrammarAnchoring[L, W]  {
    * @return
    */
   def /(other: GrammarAnchoring[L, W]):GrammarAnchoring[L,W] = {
-    println(this.getClass, other.getClass)
-    if(other.eq(null) || other.isInstanceOf[UnrefinedGrammarAnchoring.Identity[L, W]]) this
-    else new ProductGrammarAnchoring(this,other,-1)
+    if (other.eq(null)) this
+    else if (other.isInstanceOf[UnrefinedGrammarAnchoring.Identity[L, W]]) this.addConstraints(other.sparsityPattern)
+    else new ProductGrammarAnchoring(this, other, -1)
   }
 
   def maxMarginal = RefinedChartMarginal(this, maxMarginal = true)
@@ -114,13 +116,13 @@ trait GrammarAnchoring[L, W]  {
 
 
 
-          if(myScore != theirScore)  {
+          if (myScore != theirScore)  {
             if (theirScore.isInfinite || myScore.isInfinite) {
                 converged = false
                 break()
               }
             val df = (myScore - theirScore).abs / math.max(math.max(myScore.abs,theirScore.abs),1E-4)
-            if(df > diff) {
+            if (df > diff) {
               converged = false
               break()
             }
@@ -134,13 +136,13 @@ trait GrammarAnchoring[L, W]  {
           assert(!myScore.isInfinite)
 
 
-          if(myScore != theirScore)  {
+          if (myScore != theirScore)  {
             if (theirScore.isInfinite || myScore.isInfinite) {
               converged = false
               break()
             }
             val df = (myScore - theirScore).abs / math.max(math.max(myScore.abs,theirScore.abs), 1E-4)
-            if(df > diff) {
+            if (df > diff) {
               converged = false
               break()
             }
@@ -153,13 +155,13 @@ trait GrammarAnchoring[L, W]  {
           val theirScore = f.scoreSpan(begin, end, tag, ref)
 
 
-          if(myScore != theirScore)  {
-            if(theirScore.isInfinite || myScore.isInfinite) {
+          if (myScore != theirScore)  {
+            if (theirScore.isInfinite || myScore.isInfinite) {
               converged = true
               break()
             }
             val df = (myScore - theirScore).abs / math.max(math.max(myScore.abs,theirScore.abs), 1E-4)
-            if(df > diff) {
+            if (df > diff) {
               converged = false
               break()
             }

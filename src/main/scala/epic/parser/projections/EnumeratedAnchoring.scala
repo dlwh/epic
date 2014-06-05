@@ -120,6 +120,9 @@ case class EnumeratedAnchoring[L, W](topology: RuleTopology[L],
                                      sparsityPattern: ChartConstraints[L]) extends UnrefinedGrammarAnchoring[L, W] with Serializable {
 
 
+  override def addConstraints(cs: ChartConstraints[L]): UnrefinedGrammarAnchoring[L, W] = copy(sparsityPattern = sparsityPattern & cs)
+
+
   /**
    * Computes the pointwise division of two grammars, augmenting
    * their refinement space to reflect this. If they share the same annotationTag,

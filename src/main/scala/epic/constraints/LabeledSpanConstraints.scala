@@ -38,7 +38,7 @@ sealed trait LabeledSpanConstraints[-L] extends SpanConstraints {
   def &(other: LabeledSpanConstraints[L @uncheckedVariance ]): LabeledSpanConstraints[L] = {
     if(this eq other) this
     else this match {
-      case NoConstraints => this
+      case NoConstraints => other
       case PromotedSpanConstraints(inner) => other match {
         case NoConstraints => this
         case PromotedSpanConstraints(otherinner) => PromotedSpanConstraints(inner & otherinner)
@@ -84,7 +84,7 @@ sealed trait LabeledSpanConstraints[-L] extends SpanConstraints {
    * @return
    */
   def |(other: LabeledSpanConstraints[L @uncheckedVariance ]): LabeledSpanConstraints[L] = this match {
-    case NoConstraints => other
+    case NoConstraints => this
     case PromotedSpanConstraints(inner) => other match {
       case NoConstraints => this
       case PromotedSpanConstraints(otherinner) => PromotedSpanConstraints(inner | otherinner)

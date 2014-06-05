@@ -49,7 +49,7 @@ trait ParserInference[L, W] extends ProjectableInference[TreeInstance[L, W], Unr
   def grammar: Grammar[L, W]
   def constrainer: ChartConstraints.Factory[L, W]
 
-  def forTesting: ParserInference[L, W] = this
+  override def forTesting: ParserInference[L, W] = this
 
 
   def scorer(v: TreeInstance[L, W]): Scorer = {
@@ -85,7 +85,7 @@ trait ParserInference[L, W] extends ProjectableInference[TreeInstance[L, W], Unr
     projector.project(this, v, m)
   }
 
-  protected def projector: EPProjector[L, W] = new AnchoredRuleApproximator(-14)
+  protected def projector: EPProjector[L, W] = new AnchoredRuleApproximator(-15)
 }
 
 trait ParserModelFactory[L, W] extends ParserExtractableModelFactory[L, W] {

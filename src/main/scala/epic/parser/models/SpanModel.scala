@@ -93,6 +93,10 @@ class DotProductGrammar[L, L2, W, Feature](val topology: RuleTopology[L],
   def anchor(w: IndexedSeq[W], cons: ChartConstraints[L]):GrammarAnchoring[L, W] = new ProjectionsGrammarAnchoring[L, L2, W] {
 
 
+    override def addConstraints(constraints: ChartConstraints[L]): GrammarAnchoring[L, W] = {
+      anchor(w, cons & constraints)
+    }
+
     override def sparsityPattern: ChartConstraints[L] = cons
 
     def refinements = DotProductGrammar.this.refinements

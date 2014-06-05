@@ -87,6 +87,9 @@ class OracleParser[L, L2, W](val refinedGrammar: SimpleGrammar[L, L2, W]) extend
     }
     new StructureDelegatingAnchoring[L, W] {
       protected val baseAnchoring: GrammarAnchoring[L, W] = refinedGrammar.anchor(w)
+      override def addConstraints(cs: ChartConstraints[L]): GrammarAnchoring[L, W] = {
+        makeGoldPromotingAnchoring(w, tree, treeconstraints, constraints & cs)
+      }
 
 
       override def sparsityPattern: ChartConstraints[L] = constraints

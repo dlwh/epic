@@ -57,6 +57,8 @@ trait Inference[Datum] extends Serializable {
   def marginal(scorer: Scorer, v: Datum):Marginal
 
   def marginal(v: Datum): Marginal = marginal(scorer(v), v)
+
+  def forTesting: Inference[Datum] = this
 }
 
 
@@ -95,6 +97,8 @@ trait AugmentableInference[Datum,Augment] extends Inference[Datum] {
 
   def marginal(scorer: Scorer, v: Datum, aug: Augment): Marginal
   def goldMarginal(scorer: Scorer, v: Datum, aug: Augment): Marginal
+
+  override def forTesting = this
 }
 
 /**
@@ -108,4 +112,5 @@ trait AugmentableInference[Datum,Augment] extends Inference[Datum] {
  */
 trait ProjectableInference[Datum,Augment] extends AugmentableInference[Datum,Augment] {
   def project(v: Datum, s: Scorer, m: Marginal, oldAugment: Augment):Augment
+  override def forTesting = this
 }

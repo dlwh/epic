@@ -18,7 +18,7 @@ package epic.framework
 import breeze.util.{Encoder, Index}
 import breeze.linalg._
 import java.io.File
-import epic.util.{WeightsCache, CacheBroker}
+import epic.util.{SafeLogging, WeightsCache, CacheBroker}
 
 
 /**
@@ -29,7 +29,7 @@ import epic.util.{WeightsCache, CacheBroker}
  *
  * @tparam Datum the kind of
  */
-trait Model[Datum] { self =>
+trait Model[Datum] extends SafeLogging { self =>
   type ExpectedCounts >: Null <: epic.framework.ExpectedCounts[ExpectedCounts]
   type Marginal <: epic.framework.Marginal
   type Scorer
@@ -80,6 +80,7 @@ trait Model[Datum] { self =>
    */
   def readCachedFeatureWeights(suffix:String=""):Option[DenseVector[Double]] = {
     val file = new File(weightsCacheName+suffix+".txt.gz")
+    logger.info(s"Reading old weights from $file")
     if(file.exists)  {
       Some(WeightsCache.read(file, featureIndex))
     } else {

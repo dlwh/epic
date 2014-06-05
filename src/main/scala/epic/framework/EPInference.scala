@@ -20,6 +20,7 @@ import collection.mutable.ArrayBuffer
 import epic.util.SafeLogging
 import nak.inference.{ExpectationPropagation, Factor}
 import java.util.concurrent.atomic.AtomicLong
+import epic.parser.ParseMarginal
 
 class EPInference[Datum, Augment](val inferences: IndexedSeq[ProjectableInference[Datum, Augment]],
                                   val maxEPIter: Int,
@@ -35,6 +36,7 @@ class EPInference[Datum, Augment](val inferences: IndexedSeq[ProjectableInferenc
   def scorer(v: Datum): Scorer = EPScorer(inferences.map(_.scorer(v)))
 
 
+  override def forTesting = new EPInference(inferences.map(_.forTesting), maxEPIter, epInGold)
 
 
   // ugh code duplication...
@@ -50,49 +52,42 @@ class EPInference[Datum, Augment](val inferences: IndexedSeq[ProjectableInferenc
       val ((inf, m), iScorer) = (inferences zip marginals zip scorer.scorers).filter(_._1._2 != null).head
       EPMarginal(marginals.filter(_ ne null).map(_.logPartition).sum, inf.project(datum, iScorer.asInstanceOf[inf.Scorer], m.asInstanceOf[inf.Marginal], augment), marginals)
     } else {
-
-      val marginals = ArrayBuffer.fill(inferences.length)(null.asInstanceOf[ProjectableInference[Datum, Augment]#Marginal])
-      var iter = 0
-      def project(q: Augment, i: Int) = {
-        val inf = inferences(i)
-        assert(inf != null)
-        marginals(i) = null.asInstanceOf[ProjectableInference[Datum, Augment]#Marginal]
-        val iScorer = scorer.scorers(i).asInstanceOf[inf.Scorer]
-        val marg = inf.goldMarginal(iScorer, datum, q)
-        val contributionToLikelihood = marg.logPartition
-        assert(!contributionToLikelihood.isInfinite, s"Model $i is misbehaving ($contributionToLikelihood) on iter $iter! Datum: " + datum )
-        assert(!contributionToLikelihood.isNaN, s"Model $i is misbehaving (NaN) on iter $iter!")
-        val newAugment = inf.project(datum, iScorer, marg, q)
-        marginals(i) = marg
-        newAugment -> contributionToLikelihood
-      }
-
-      val ep = new ExpectationPropagation(project, 1E-3)
-
-      val inferencesToUse = (0 until inferences.length).filter(inferences(_) ne null)
-
-      var state: ep.State = null
-      val iterates = ep.inference(augment, inferencesToUse, IndexedSeq.fill[Augment](inferencesToUse.length)(null.asInstanceOf[Augment]))
-      while (iter < maxEPIter && iterates.hasNext) {
-        val s = iterates.next()
-        iter += 1
-        state = s
-      }
-      //    print(f"gold($iter%d:${state.logPartition%.1f})")
-
-      EPMarginal(state.logPartition, state.q, marginals)
+      EPInference.doInference(datum, augment, inferences, scorer, (inf:ProjectableInference[Datum, Augment], scorer: ProjectableInference[Datum, Augment]#Scorer, q: Augment) => inf.goldMarginal(scorer.asInstanceOf[inf.Scorer], datum, q), maxEPIter)
     }
   }
 
   def marginal(scorer: Scorer, datum: Datum, augment: Augment): Marginal = {
+    EPInference.doInference(datum, augment, inferences, scorer, (inf:ProjectableInference[Datum, Augment], scorer: ProjectableInference[Datum, Augment]#Scorer, q: Augment) => inf.marginal(scorer.asInstanceOf[inf.Scorer], datum, q), maxEPIter)
+  }
+
+
+
+}
+
+
+case class EPMarginal[Augment, Marginal](logPartition: Double, q: Augment, marginals: IndexedSeq[Marginal]) extends epic.framework.Marginal
+
+
+object EPInference extends SafeLogging {
+  val iters, calls = new AtomicLong(0)
+
+  def doInference[Datum, Augment,
+                  Marginal <: ProjectableInference[Datum, Augment]#Marginal,
+                  Scorer](datum: Datum,
+                          augment: Augment, inferences: IndexedSeq[ProjectableInference[Datum, Augment]],
+                          scorer: EPScorer[Scorer],
+                          infType: (ProjectableInference[Datum, Augment],Scorer, Augment)=>Marginal,
+                          maxEPIter: Int = 5,
+                          convergenceThreshold: Double = 1E-4)
+                         (implicit aIsFactor: Augment <:< Factor[Augment]):EPMarginal[Augment, Marginal] = {
     var iter = 0
-    val marginals = ArrayBuffer.fill(inferences.length)(null.asInstanceOf[ProjectableInference[Datum, Augment]#Marginal])
+    val marginals = ArrayBuffer.fill(inferences.length)(null.asInstanceOf[Marginal])
 
     def project(q: Augment, i: Int) = {
       val inf = inferences(i)
-      marginals(i) = null.asInstanceOf[ProjectableInference[Datum, Augment]#Marginal]
-      val iScorer = scorer.scorers(i).asInstanceOf[inf.Scorer]
-      var marg = inf.marginal(iScorer, datum, q)
+      marginals(i) = null.asInstanceOf[Marginal]
+      val iScorer = scorer.scorers(i)
+      var marg = infType(inf, iScorer, q)
       var contributionToLikelihood = marg.logPartition
       if (contributionToLikelihood.isInfinite || contributionToLikelihood.isNaN) {
         logger.error(s"Model $i is misbehaving ($contributionToLikelihood) on iter $iter! Datum: $datum" )
@@ -105,24 +100,18 @@ class EPInference[Datum, Augment](val inferences: IndexedSeq[ProjectableInferenc
         }
         */
       }
-      val newAugment = inf.project(datum, iScorer, marg, q)
+      val newAugment = inf.project(datum, iScorer.asInstanceOf[inf.Scorer], marg.asInstanceOf[inf.Marginal], q)
       marginals(i) = marg
 //      println("Leaving " + i)
       newAugment -> contributionToLikelihood
     }
-
-    val ep = new ExpectationPropagation(project _, 1E-5)
+    val ep = new ExpectationPropagation(project _, convergenceThreshold)
     val inferencesToUse = (0 until inferences.length).filter(inferences(_) ne null)
 
     var state: ep.State = null
     val iterates = ep.inference(augment, inferencesToUse, inferencesToUse.map(i => inferences(i).baseAugment(datum)))
-    var converged = false
-    while (!converged && iter < maxEPIter && iterates.hasNext) {
+    while (iter < maxEPIter && iterates.hasNext) {
       val s = iterates.next()
-//      if (state != null) {
-//        converged = (s.logPartition - state.logPartition).abs / math.max(s.logPartition, state.logPartition) < 1E-5
-//      }
-
       iter += 1
       state = s
     }
@@ -137,17 +126,7 @@ class EPInference[Datum, Augment](val inferences: IndexedSeq[ProjectableInferenc
     logger.debug(f"guess($iter%d:${state.logPartition}%.1f)")
 
     EPMarginal(state.logPartition, state.q, marginals)
+
   }
-
-
-
-}
-
-
-case class EPMarginal[Augment, Marginal](logPartition: Double, q: Augment, marginals: IndexedSeq[Marginal]) extends epic.framework.Marginal
-
-
-object EPInference {
-  val iters, calls = new AtomicLong(0)
 
 }
