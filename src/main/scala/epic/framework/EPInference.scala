@@ -52,7 +52,7 @@ class EPInference[Datum, Augment](val inferences: IndexedSeq[ProjectableInferenc
       val ((inf, m), iScorer) = (inferences zip marginals zip scorer.scorers).filter(_._1._2 != null).head
       EPMarginal(marginals.filter(_ ne null).map(_.logPartition).sum, inf.project(datum, iScorer.asInstanceOf[inf.Scorer], m.asInstanceOf[inf.Marginal], augment), marginals)
     } else {
-      EPInference.doInference(datum, augment, inferences, scorer, (inf:ProjectableInference[Datum, Augment], scorer: ProjectableInference[Datum, Augment]#Scorer, q: Augment) => inf.goldMarginal(scorer.asInstanceOf[inf.Scorer], datum, augment), maxEPIter)
+      EPInference.doInference(datum, augment, inferences, scorer, (inf:ProjectableInference[Datum, Augment], scorer: ProjectableInference[Datum, Augment]#Scorer, q: Augment) => inf.goldMarginal(scorer.asInstanceOf[inf.Scorer], datum, q), maxEPIter)
     }
   }
 
@@ -78,7 +78,7 @@ object EPInference extends SafeLogging {
                           scorer: EPScorer[Scorer],
                           infType: (ProjectableInference[Datum, Augment],Scorer, Augment)=>Marginal,
                           maxEPIter: Int = 5,
-                          convergenceThreshold: Double = 1E-7)
+                          convergenceThreshold: Double = 1E-4)
                          (implicit aIsFactor: Augment <:< Factor[Augment]):EPMarginal[Augment, Marginal] = {
     var iter = 0
     val marginals = ArrayBuffer.fill(inferences.length)(null.asInstanceOf[Marginal])
