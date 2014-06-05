@@ -118,7 +118,38 @@ case class EnumeratedAnchoring[L, W](topology: RuleTopology[L],
                                      // (begin, end) -> (split-begin) -> rule -> score
                                      binaryScores: Array[Array[OpenAddressHashArray[Double]]],
                                      sparsityPattern: ChartConstraints[L]) extends UnrefinedGrammarAnchoring[L, W] with Serializable {
-//  def addConstraints(cs: ChartConstraints[L]): CoreAnchoring[L, W] = copy(sparsityPattern = sparsityPattern & cs)
+
+
+  /**
+   * Computes the pointwise division of two grammars, augmenting
+   * their refinement space to reflect this. If they share the same annotationTag,
+   * (assuming it's non-negative) they will share their state space. (That is,
+   * they will have the same annotations.)
+   * @param other
+   * @return
+   */
+  override def /(other: GrammarAnchoring[L, W]): GrammarAnchoring[L, W] = {
+    other match {
+      case that: EnumeratedAnchoring[L, W] => EnumeratedAnchoring.divide(this, that)
+      case _ => super./(other)
+    }
+  }
+
+
+  /**
+   * Computes the point-wise division of this grammar with some other grammar.
+   *
+   * Note that scores are in log space, so we actually subtract scores.
+   * @param other
+   * @return
+   */
+  override def /(other: UnrefinedGrammarAnchoring[L, W]): UnrefinedGrammarAnchoring[L, W] = {
+    other match {
+      case that: EnumeratedAnchoring[L, W] => EnumeratedAnchoring.divide(this, that)
+      case _ => super./(other)
+    }
+
+  }
 
   def scoreUnaryRule(begin: Int, end: Int, rule: Int) = {
     val forSpan = unaryScores(TriangularArray.index(begin, end))
@@ -139,5 +170,74 @@ case class EnumeratedAnchoring[L, W](topology: RuleTopology[L],
     val scores = spanScores(TriangularArray.index(begin, end))
     if(scores ne null) scores(tag)
     else Double.NegativeInfinity
+  }
+}
+
+object EnumeratedAnchoring {
+  def divide[L, W](a: EnumeratedAnchoring[L, W], b: EnumeratedAnchoring[L, W]): EnumeratedAnchoring[L, W] =  {
+    val newSpanScores = Array.tabulate(a.spanScores.length) { i =>
+      val oldA = a.spanScores(i)
+      val oldB = b.spanScores(i)
+      if(null == oldA || null == oldB) {
+        null
+      } else {
+        doDivide(oldA, oldB)
+      }
+    }
+
+    val newUnaryScores = Array.tabulate(a.unaryScores.length) { i =>
+      val oldA = a.unaryScores(i)
+      val oldB = b.unaryScores(i)
+      if(null == oldA || null == oldB) {
+        null
+      } else {
+        doDivide(oldA, oldB)
+      }
+    }
+
+
+    val newBinaryScores = Array.tabulate(a.binaryScores.length) { i =>
+      val aArray = a.binaryScores(i)
+      val bArray = b.binaryScores(i)
+      if(null == aArray || null == bArray) {
+        null
+      } else {
+        Array.tabulate(aArray.length) { split =>
+          val oldA = aArray(split)
+          val oldB = bArray(split)
+          if(null == oldA || null == oldB) {
+            null
+          } else {
+            doDivide(oldA, oldB)
+          }
+        }
+      }
+    }
+
+    a.copy(spanScores = newSpanScores, unaryScores=newUnaryScores, binaryScores = newBinaryScores)
+
+  }
+
+  private def doDivide(a: OpenAddressHashArray[Double], b: OpenAddressHashArray[Double]) = {
+    if(a == null || b == null) {
+      null
+    } else {
+      val oah = new OpenAddressHashArray[Double](a.size, a.default, a.activeSize min b.activeSize)
+
+      var off = 0
+      while(off < a.iterableSize) {
+        if(a.isActive(off)) {
+          val aa = a.valueAt(off)
+          val ii = a.indexAt(off)
+          val bb = b(ii)
+          if(aa != Double.NegativeInfinity && bb != Double.NegativeInfinity) {
+            oah(ii) = aa - bb
+          }
+
+        }
+        off += 1
+      }
+      oah
+    }
   }
 }

@@ -49,9 +49,9 @@ case class EPChartFactory[L, W](grammars: IndexedSeq[Grammar[L, W]], maxIteratio
     var converged = false
     while (!converged && iter < maxIterations && iterates.hasNext) {
       val s = iterates.next()
-      if (state != null) {
-        converged = (s.logPartition - state.logPartition).abs / math.max(s.logPartition, state.logPartition) < 1E-5
-      }
+//      if (state != null) {
+//        converged = (s.logPartition - state.logPartition).abs / math.max(s.logPartition, state.logPartition) < 1E-5
+//      }
 
       iter += 1
       state = s
