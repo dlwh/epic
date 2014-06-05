@@ -11,7 +11,7 @@ trait SentenceSegmenter extends StringAnalysisFunction[AnnotatedSpan, Sentence] 
   override def toString = getClass.getName
 
   def apply(a: String):IndexedSeq[String] = {
-    val slab = Slab[AnnotatedSpan](a)
+    val slab = Slab(a)
     apply(slab).iterator[Sentence].toIndexedSeq.map(s => s.in(slab).content)
   }
 

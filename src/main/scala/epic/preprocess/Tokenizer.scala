@@ -30,7 +30,7 @@ trait Tokenizer extends StringAnalysisFunction[Sentence, Token] with Serializabl
   override def toString = getClass.getName
 
   def apply(a: String):IndexedSeq[String] = {
-    apply(Slab[AnnotatedSpan](a).+(Sentence(0, a.length))).iterator[Token].toIndexedSeq.map(_.token)
+    apply(Slab(a).+(Sentence(0, a.length))).iterator[Token].toIndexedSeq.map(_.token)
   }
 
 }

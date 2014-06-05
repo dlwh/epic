@@ -108,7 +108,7 @@ case class EntityMention(begin: Int, end: Int, entityType: String, id: Option[St
 
 object Slab {
 
-  def apply[BaseAnnotationType <: AnnotatedSpan](content: String):StringSlab[BaseAnnotationType] = {
+  def apply(content: String):StringSlab[AnnotatedSpan] = {
     new SortedSequenceSlab(content, Map.empty, Map.empty)
   }
   

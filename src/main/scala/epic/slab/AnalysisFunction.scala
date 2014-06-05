@@ -1,6 +1,6 @@
 package epic.slab
 
-import epic.preprocess.Tokenizer
+import epic.preprocess.{RegexSentenceSegmenter, Tokenizer}
 
 /**
  * An analysis function that takes a Slab with declared annotation types in it and outputs
@@ -13,7 +13,23 @@ import epic.preprocess.Tokenizer
  *   O = Output annotation type
  */
 trait AnalysisFunction[C,B,I<:B,+O<:B] {
-  def apply[In <: I](slab: Slab[C,B,In]):Slab[C,B,B with In with O]
+  def apply[In <: I](slab: Slab[C,B,In]):Slab[C,B,In with O]
+
+  def andThen[II >: (I with O) <: B, OO <: B](other: AnalysisFunction[C, B, II, OO]):AnalysisFunction[C, B, I, O with OO] = {
+    new ComposedAnalysisFunction[C, B, I, O, II, OO](this, other)
+  }
+
+}
+
+case class ComposedAnalysisFunction[C, B, I <: B, O <: B, II >: (I with O) <: B, +OO <: B](a: AnalysisFunction[C,B,I,O],
+                                                                                   b: AnalysisFunction[C,B,II,OO]) extends AnalysisFunction[C, B, I, O with OO] {
+
+  def apply[In <: I](slab: Slab[C,B,In]):Slab[C,B,B with In with O with OO] = {
+    // type inference can't figure this out...
+    // can you blame it?
+    b[In with O](a[In](slab))
+  }
+
 }
 
 
@@ -21,17 +37,6 @@ object StringIdentityAnalyzer extends StringAnalysisFunction[AnnotatedSpan, Anno
   def apply[In <: AnnotatedSpan](slab: StringSlab[In]):StringSlab[In] = slab
 }
 
-trait SentenceSegmenter extends StringAnalysisFunction[AnnotatedSpan, Sentence]
-
-/**
- * A simple regex sentence segmenter.
- */
-object RegexSentenceSegmenter extends SentenceSegmenter {
-
-  def apply[In <: AnnotatedSpan](slab: StringSlab[In]) =
-    // the [Sentence] is required because of https://issues.scala-lang.org/browse/SI-7647
-    slab.++[Sentence]("[^\\s.!?]+[^.!?]+[.!?]".r.findAllMatchIn(slab.content).map(m => Sentence(m.start, m.end)))
-}
 
 /**
   * A simple regex tokenizer.
@@ -53,24 +58,28 @@ object AnalysisPipeline {
   private[AnalysisPipeline] def documentAdder(slab: StringSlab[AnnotatedSpan]) =
     slab ++ Iterator(Document(0, slab.content.length))
 
-  /*
   def main (args: Array[String]) {
-    def sentenceSegmenter[I <: Span] = new SentenceSegmenter[I]{}
-    def tokenizer[I <: Sentence] = new Tokenizer[I]{}
-    val pipeline = StringIdentityAnalyzer andThen documentAdder andThen sentenceSegmenter andThen tokenizer
+    def sentenceSegmenter = RegexSentenceSegmenter
+    def tokenizer = RegexTokenizer
+    val pipeline = sentenceSegmenter andThen tokenizer
+
+    val inSlab = Slab("test\n.").+(Document(0, 5))
+    val slab = pipeline(inSlab)
+
+    // just to show what the type is
+    val typedSpan: Slab[String, AnnotatedSpan, AnnotatedSpan with Document with Sentence with Token] = slab
 
     // added only to demonstrate necesssity of [I] parameter on analyzers
     val paragraphs = slab.iterator[Document].toList
 
-    // Notice that the last sentence (lacking EOS char) is missing.
+
     val sentences = slab.iterator[Sentence].toList
-    println("\nSENTENCES\n\n" + sentences.map(_.in(slab).content).mkString("\n"))
+    println("\nSENTENCES\n\n" + sentences.map(_.in(slab).content).mkString("\n\n"))
     
     val tokens = slab.iterator[Token].toList
-    println("\nTOKENS\n\n" + tokens.map(_.in(slab).content).mkString("\n"))
+    println("\nTOKENS\n\n" + tokens.map(_.in(slab).content).mkString("\n\n"))
 
   }
-  */
-  
+
 
 }

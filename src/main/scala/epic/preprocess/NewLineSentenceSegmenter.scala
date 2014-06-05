@@ -2,7 +2,6 @@ package epic.preprocess
 
 import java.text.BreakIterator
 import java.util.Locale
-import epic.preprocess.SentenceSegmenter
 import epic.trees.Span
 import epic.slab._
 import epic.slab.Sentence
