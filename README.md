@@ -133,69 +133,69 @@ To following models are available at this time:
 * Parser
   * English: 
     ```
-    "org.scalanlp" %% "epic-parser-en-span" % "0.1"
+    "org.scalanlp" %% "epic-parser-en-span" % "2014.6.3-SNAPSHOT"
     ```
   * Basque: 
     ```
-    "org.scalanlp" %% "epic-parser-eu-span" % "0.1"
+    "org.scalanlp" %% "epic-parser-eu-span" % "2014.6.3-SNAPSHOT"
     ```
   * French: 
     ```
-    "org.scalanlp" %% "epic-parser-fr-span" % "0.1"
+    "org.scalanlp" %% "epic-parser-fr-span" % "2014.6.3-SNAPSHOT"
     ```
   * German: 
     ```
-    "org.scalanlp" %% "epic-parser-de-span" % "0.1"
+    "org.scalanlp" %% "epic-parser-de-span" % "2014.6.3-SNAPSHOT"
     ```
   * Hungarian: 
     ```
-    "org.scalanlp" %% "epic-parser-hu-span" % "0.1"
+    "org.scalanlp" %% "epic-parser-hu-span" % "2014.6.3-SNAPSHOT"
     ```
   * Korean: 
     ```
-    "org.scalanlp" %% "epic-parser-ko-span" % "0.1"
+    "org.scalanlp" %% "epic-parser-ko-span" % "2014.6.3-SNAPSHOT"
     ```
   * Polish:
     ```
-    "org.scalanlp" %% "epic-parser-pl-span" % "0.1"
+    "org.scalanlp" %% "epic-parser-pl-span" % "2014.6.3-SNAPSHOT"
     ```
   * Swedish: 
     ```
-    "org.scalanlp" %% "epic-parser-sv-span" % "0.1"
+    "org.scalanlp" %% "epic-parser-sv-span" % "2014.6.3-SNAPSHOT"
     ```
 * POS Taggers
   * English: 
     ```
-    "org.scalanlp" %% "epic-pos-en" % "0.1"
+    "org.scalanlp" %% "epic-pos-en" % "2014.6.3-SNAPSHOT"
     ```
   * Basque: 
     ```
-    "org.scalanlp" %% "epic-pos-eu" % "0.1"
+    "org.scalanlp" %% "epic-pos-eu" % "2014.6.3-SNAPSHOT"
     ```
   * French: 
     ```
-    "org.scalanlp" %% "epic-pos-fr" % "0.1"
+    "org.scalanlp" %% "epic-pos-fr" % "2014.6.3-SNAPSHOT"
     ```
   * German: 
     ```
-    "org.scalanlp" %% "epic-pos-de" % "0.1"
+    "org.scalanlp" %% "epic-pos-de" % "2014.6.3-SNAPSHOT"
     ```
   * Hungarian: 
     ```
-    "org.scalanlp" %% "epic-pos-hu" % "0.1"
+    "org.scalanlp" %% "epic-pos-hu" % "2014.6.3-SNAPSHOT"
     ```
   * Polish: 
     ```
-    "org.scalanlp" %% "epic-pos-pl" % "0.1"
+    "org.scalanlp" %% "epic-pos-pl" % "2014.6.3-SNAPSHOT"
     ```
   * Swedish: 
     ```
-    "org.scalanlp" %% "epic-pos-sv" % "0.1"
+    "org.scalanlp" %% "epic-pos-sv" % "2014.6.3-SNAPSHOT"
     ```
 * Named Entity Recognizers
   * English: 
     ```
-    "org.scalanlp" %% "epic-ner-en-conll" % "0.1"
+    "org.scalanlp" %% "epic-ner-en-conll" % "2014.6.3-SNAPSHOT"
     ```
 
 
