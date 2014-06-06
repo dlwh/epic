@@ -22,13 +22,13 @@ import epic.lexicon._
 import scala.io.Source
 import breeze.util.Index
 import breeze.linalg.{DenseMatrix, Counter2}
-import chalk.text.analyze.EnglishWordClassGenerator
 import epic.trees.BinaryRule
 import epic.trees.UnaryRule
 import java.security.MessageDigest
 import java.math.BigInteger
 import scala.collection.immutable
 import epic.constraints.ChartConstraints
+import epic.features.EnglishWordClassGenerator
 
 /**
  *

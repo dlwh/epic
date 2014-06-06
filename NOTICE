@@ -1,0 +1,6 @@
+The Chalk Natural Language Processing Library
+Copyright 2013 ScalaNLP
+
+
+The test data in src/test/resources/masc/ is a single file example from the Manually Annotated Sub-Corpus of the Open American National Corpus. MASC is distributed without license or other restrictions from the American National Corpus website (http://www.americannationalcorpus.org/).
+

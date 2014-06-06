@@ -1,8 +1,10 @@
 package epic.preprocess
 
-import chalk.text.segment.SentenceSegmenter
 import java.text.BreakIterator
 import java.util.Locale
+import epic.trees.Span
+import epic.slab._
+import epic.slab.Sentence
 
 /**
  * TODO move to chalk
@@ -10,25 +12,25 @@ import java.util.Locale
  * @author dlwh
  **/
 class NewLineSentenceSegmenter(locale: Locale = Locale.getDefault) extends SentenceSegmenter {
-  override def apply(v1: String): Iterable[String] = {
-    new Iterable[String] {
-      override def iterator: Iterator[String] = {
-        val it = BreakIterator.getLineInstance(locale)
-        it.setText(v1)
-        new SegmentingIterator(it, v1)
+
+  override def apply[In <: AnnotatedSpan](slab: StringSlab[In]): StringSlab[In with Sentence] = {
+    val breaker = BreakIterator.getLineInstance(locale)
+    breaker.setText(slab.content)
+    slab.++[Sentence](
+      new SegmentingIterator(breaker).map { span =>
+        Sentence(span.begin, span.end)
       }
-    }
+    )
   }
 }
 
-class SegmentingIterator(inner: BreakIterator, str: String) extends Iterator[String] {
-  private var start = inner.first
-  private var end = inner.next
+class SegmentingIterator(inner: BreakIterator, private var start: Int = 0, private val last: Int = -1) extends Iterator[Span] {
+  private var end = inner.following(start)
 
-  def hasNext = (end != BreakIterator.DONE)
+  def hasNext = (end != BreakIterator.DONE && (last == -1 || end <= last))
 
   def next = {
-    val res = str.substring(start, end)
+    val res = Span(start, end)
     start = end
     end = inner.next
     res

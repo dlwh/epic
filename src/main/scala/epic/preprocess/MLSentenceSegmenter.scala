@@ -2,32 +2,31 @@ package epic.preprocess
 
 import scala.collection.mutable.ArrayBuffer
 import java.io._
-import chalk.corpora.MascSlab
-import chalk.slab.Sentence
+import epic.slab.{StringSlab, AnnotatedSpan, Sentence}
 import breeze.linalg._
 import breeze.numerics._
-import epic.framework.{ModelObjective, StandardExpectedCounts, Model, Feature}
+import epic.framework.{ModelObjective, StandardExpectedCounts, Feature}
 import nak.data.Example
 import breeze.util.{Iterators, Encoder, Index}
 import breeze.features.FeatureVector
-import breeze.optimize.{L2Regularization, GradientTester}
+import breeze.optimize.L2Regularization
 import epic.features.CrossProductFeature
-import java.text.BreakIterator
 import java.util.zip.GZIPInputStream
+import epic.corpora.MascSlab
 
 @SerialVersionUID(1L)
-class MLSentenceSegmenter(inf: MLSentenceSegmenter.ClassificationInference) extends chalk.text.segment.SentenceSegmenter with Serializable {
-
-  override def apply(text: String): Iterable[String] = new Iterable[String] {
-    def iterator: Iterator[String] = {
-      val iter = MLSentenceSegmenter.potentialSentenceBoundariesIterator(text)
-      var lastOffset = 0
+class MLSentenceSegmenter(inf: MLSentenceSegmenter.ClassificationInference) extends SentenceSegmenter with Serializable {
+  override def apply[In <: AnnotatedSpan](slab: StringSlab[In]): StringSlab[In with Sentence] = {
+    val text = slab.content
+    val iter = MLSentenceSegmenter.potentialSentenceBoundariesIterator(text)
+    var lastOffset = 0
+    slab.++[Sentence](
       Iterators.fromProducer {
-        def rec():Option[String] = {
+        def rec():Option[Sentence] = {
           if(iter.hasNext) {
             val pos = iter.next()
             if(!iter.hasNext || inf.classify(MLSentenceSegmenter.featuresForEndPointDetection(text, pos))) {
-              val res = Some(text.substring(lastOffset, math.min(pos + 1, text.length)))
+              val res = Some(Sentence(lastOffset, math.min(pos + 1, text.length)))
               lastOffset = pos + 1
               res
             } else {
@@ -38,10 +37,10 @@ class MLSentenceSegmenter(inf: MLSentenceSegmenter.ClassificationInference) exte
           }
         }
         rec()
-      }.filterNot(_.forall(_.isWhitespace))
-    }
-  }
+      }.filterNot(s => text.substring()
+    )
 
+  }
   override def toString = "MLSentenceSegmenter(...)"
 }
 

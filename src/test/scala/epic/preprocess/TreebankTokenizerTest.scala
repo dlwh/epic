@@ -117,4 +117,231 @@ class TreebankTokenizerTest  extends FunSuite {
       assert(TreebankTokenizer(txt).toList === tk.split(" ").toList)
     }
   }
+
+
+  test("emails") {
+    assert(TreebankTokenizer("Email asdf@asdf.com.").toList === List("Email", "asdf@asdf.com", "."))
+  }
+
+
+  test("tweets") {
+
+    for( (text, toks) <- tweets zip tweet_tokens) {
+      assert(TreebankTokenizer(text).toList === toks.toList)
+    }
+  }
+
+
+  // test examples from https://github.com/brendano/ark-tweet-nlp/blob/master/examples/example_tweets.txt
+  // Code is Apache License 2.0.0
+
+  val tweets = """I predict I won't win a single game I bet on. Got Cliff Lee today, so if he loses its on me RT @e_one: Texas (cont) http://tl.gd/6meogh
+    RT @DjBlack_Pearl: wat muhfuckaz wearin 4 the lingerie party?????
+    Wednesday 27th october 2010. 》have a nice day :)
+  RT @ddlovato: @joejonas oh, hey THANKS jerk!
+  @thecamion I like monkeys, but I still hate COSTCO parking lots..
+  @DDaimaru I may have to get minecraft after watching videos of it
+    RT @eye_ee_duh_Esq: LMBO! This man filed an EMERGENCY Motion for Continuance on account of the Rangers game tonight! « Wow lmao
+    RT @musicdenver: Lady Gaga - Bad Romance http://dld.bz/n6Xv
+  RT @cheriexamor: When you have a good thing, hold it, squeeze it, never let it go.
+  Texas Rangers are in the World Series!  Go Rangers!!!!!!!!! http://fb.me/D2LsXBJx
+   @aliciakeys Put it in a love song :-))
+   @hellocalyclops =))=))=)) Oh well
+  hello (#hashtag)
+  hello (@person)
+  """.split("\n").map(_.trim)
+
+  val tweet_tokens =
+    """I
+      |predict
+      |I
+      |wo
+      |n't
+      |win
+      |a
+      |single
+      |game
+      |I
+      |bet
+      |on
+      |.
+      |Got
+      |Cliff
+      |Lee
+      |today
+      |,
+      |so
+      |if
+      |he
+      |loses
+      |its
+      |on
+      |me
+      |RT
+      |@e_one
+      |:
+      |Texas
+      |-LRB-
+      |cont
+      |-RRB-
+      |http://tl.gd/6meogh
+      |QQQ
+      |RT
+      |@DjBlack_Pearl
+      |:
+      |wat
+      |muhfuckaz
+      |wearin
+      |4
+      |the
+      |lingerie
+      |party
+      |?????
+      |QQQ
+      |Wednesday
+      |27th
+      |october
+      |2010
+      |.
+      |》
+      |have
+      |a
+      |nice
+      |day
+      |:)
+      |QQQ
+      |RT
+      |@ddlovato
+      |:
+      |@joejonas
+      |oh
+      |,
+      |hey
+      |THANKS
+      |jerk
+      |!
+      |QQQ
+      |@thecamion
+      |I
+      |like
+      |monkeys
+      |,
+      |but
+      |I
+      |still
+      |hate
+      |COSTCO
+      |parking
+      |lots
+      |...
+      |QQQ
+      |@DDaimaru
+      |I
+      |may
+      |have
+      |to
+      |get
+      |minecraft
+      |after
+      |watching
+      |videos
+      |of
+      |it
+      |QQQ
+      |RT
+      |@eye_ee_duh_Esq
+      |:
+      |LMBO
+      |!
+      |This
+      |man
+      |filed
+      |an
+      |EMERGENCY
+      |Motion
+      |for
+      |Continuance
+      |on
+      |account
+      |of
+      |the
+      |Rangers
+      |game
+      |tonight
+      |!
+      |«
+      |Wow
+      |lmao
+      |QQQ
+      |RT
+      |@musicdenver
+      |:
+      |Lady
+      |Gaga
+      |-
+      |Bad
+      |Romance
+      |http://dld.bz/n6Xv
+      |QQQ
+      |RT
+      |@cheriexamor
+      |:
+      |When
+      |you
+      |have
+      |a
+      |good
+      |thing
+      |,
+      |hold
+      |it
+      |,
+      |squeeze
+      |it
+      |,
+      |never
+      |let
+      |it
+      |go
+      |.
+      |QQQ
+      |Texas
+      |Rangers
+      |are
+      |in
+      |the
+      |World
+      |Series
+      |!
+      |Go
+      |Rangers
+      |!!!!!!!!!
+      |http://fb.me/D2LsXBJx
+      |QQQ
+      |@aliciakeys
+      |Put
+      |it
+      |in
+      |a
+      |love
+      |song
+      |:-))
+      |QQQ
+      |@hellocalyclops
+      |=))
+      |=))
+      |=))
+      |Oh
+      |well
+      |QQQ
+      |hello
+      |-LRB-
+      |#hashtag
+      |-RRB-
+      |QQQ
+      |hello
+      |-LRB-
+      |@person
+      |-RRB-
+    """.stripMargin.split("QQQ").map(_.trim.split("\n").map(_.trim))
 }

@@ -67,7 +67,7 @@ object SentimentEvaluator {
 """));
 
   def readStringMatrix(str: String) = str.split("\n").map(_.trim).filter(!_.isEmpty).map(_.split("\\s+").map(_.toInt));
-  def transpose(arr: Array[Array[Int]]) = Array.tabulate(arr(0).size, arr.size)((i, j) => arr(j)(i));
+  def transpose(arr: Array[Array[Int]]) = arr.transpose
   
   def printFromConfusionMatrix(mat: Array[Array[Int]]) {
 //    println("Accuracy: " + accuracy(mat)); // agrees with the Stanford system's way of combining the matrix

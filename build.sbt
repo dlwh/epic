@@ -18,7 +18,6 @@ libraryDependencies ++= Seq(
   "junit" % "junit" % "4.5" % "test",
   "org.scalanlp" %% "breeze" % "0.8.1",
   "org.scalanlp" %% "breeze-config" % "0.8",
-  "org.scalanlp" %% "chalk" % "1.3.2" intransitive(),
   "org.scalanlp" %% "nak" % "1.2.1" intransitive(),
   "org.mapdb" % "mapdb" % "0.9.2",
   "org.slf4j" % "slf4j-simple" % "1.7.6",
@@ -33,8 +32,7 @@ scalacOptions ++= Seq("-deprecation", "-language:_", "-optimize")
 javaOptions += "-Xmx4g"
 
 //javaOptions += "-Xrunhprof:cpu=samples,depth=12"
-fork := true
-
+//fork := true
 seq(assemblySettings: _*)
 
 publishMavenStyle := true
