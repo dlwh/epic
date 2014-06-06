@@ -38,7 +38,7 @@ class MLSentenceSegmenter(inf: MLSentenceSegmenter.ClassificationInference) exte
           }
         }
         rec()
-      }
+      }.filterNot(_.forall(_.isWhitespace))
     }
   }
 
