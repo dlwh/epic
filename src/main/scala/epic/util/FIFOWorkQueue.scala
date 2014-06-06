@@ -46,11 +46,17 @@ class FIFOWorkQueue[-In, Out](f: In=>Out)(implicit context: ExecutionContext) ex
 
 }
 
-object FIFOWorkQueue {
+object FIFOWorkQueue extends SafeLogging {
   def apply[In, Out](iter: TraversableOnce[In])(f: In=>Out)(implicit context: ExecutionContext) = {
     val queue = new FIFOWorkQueue[In, Out](f)
     Future {
-      queue ++= iter
+      try {
+        queue ++= iter
+      } catch {
+        case ex: Exception =>
+        logger.error(ex.getMessage, ex)
+
+      }
       queue.finish()
     }
     queue

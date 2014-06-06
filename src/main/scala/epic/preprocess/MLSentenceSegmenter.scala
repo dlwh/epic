@@ -220,7 +220,7 @@ object MLSentenceSegmenter {
 
 
   def isProbablyNotContraction(text: String, offset: Int, codepoint: Int, quote: Char): Boolean = {
-    (codepoint != quote || offset == text.length || offset == 0 || !Character.isLetterOrDigit(text.codePointAt(offset + 1)) || !Character.isLetterOrDigit(text.codePointBefore(offset)))
+    (codepoint != quote || offset >= text.length - 1 || offset == 0 || !Character.isLetterOrDigit(text.codePointAt(offset + 1)) || !Character.isLetterOrDigit(text.codePointBefore(offset)))
   }
 
   def potentialSentenceBoundariesIterator(text: String):Iterator[Int] = new Iterator[Int] {
