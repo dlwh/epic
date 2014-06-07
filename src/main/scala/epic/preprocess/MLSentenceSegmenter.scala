@@ -37,7 +37,7 @@ class MLSentenceSegmenter(inf: MLSentenceSegmenter.ClassificationInference) exte
           }
         }
         rec()
-      }.filterNot(s => text.substring()
+      }.filterNot(s => text.substring(s.begin, s.end).forall(_.isWhitespace))
     )
 
   }
