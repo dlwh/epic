@@ -81,7 +81,7 @@ class TreebankTokenizerTest  extends FunSuite {
   }
 
   test("'sam i am'") {
-    assert(TreebankTokenizer("'sam i am'").toList === List("'", "sam", "i", "am", "'"))
+    assert(TreebankTokenizer("'sam i am'").toList === List("`", "sam", "i", "am", "'"))
   }
 
 

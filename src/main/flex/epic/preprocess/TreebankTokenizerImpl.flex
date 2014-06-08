@@ -19,7 +19,6 @@ package epic.preprocess;
  * limitations under the License.
  */
 
-
 /**
  Modifications 
  Copyright 2014 David Hall
@@ -59,7 +58,7 @@ public final int yychar()
 }
 
 final epic.slab.Token currentToken() {
-    return currentToken(new String(zzBuffer, zzStartRead, zzMarkedPos-zzStartRead));
+    return currentToken(new String(zzBuffer, zzStartRead, zzMarkedPos-zzStartRead).replaceAll("’", "'"));
 }
 final epic.slab.Token currentToken(String value) {
 //  return new String(zzBuffer, zzStartRead, zzMarkedPos-zzStartRead);
@@ -196,7 +195,7 @@ NUM        = ({ALPHANUM} {P} {HAS_DIGIT}
 // punctuation
 P	         = ("_"|"-"|"/"|"."|",")
 
-Q = [’']
+Q = [’'`]
 
 PUNCT = ({P}|{Q}|[?!@#$%\^&*_:;\]\[\"»«\202\204\206\207\213\221\222\223\224\225\226\227\233])
 
@@ -224,7 +223,7 @@ POLISH_CONDITIONAL_ENDING = (m|ś|śmy|ście)?
 
 POLISH_PAST_ENDING = ([mś]?|śmy|ście)
 
-WHITESPACE = \r\n | [ \r\n\t\f\xA0]
+WHITESPACE = \s
 
 EMOTICON = ( [<>]?[BX;8:=][o\-\']?[DdPp()\/3>oO]+ | <\/?3+ | ಠ_ಠ)
 
@@ -270,19 +269,18 @@ Got / ta                                                      {return currentTok
 // polish clitics
 {ALPHANUM}+[lł][aeoiy]? / {POLISH_CONDITIONAL_CLITIC}{POLISH_CONDITIONAL_ENDING}             {yybegin(POLISH_CONDITIONAL_MODE); return currentToken(); }
 {ALPHANUM}+[lł][aeoiy]? / {POLISH_PAST_ENDING}                    {return currentToken(); }
-d' / ye                                                        {return currentToken(); }
-{ALPHANUM}+ / n't                                              {return currentToken(); }
-n't                                                            {return currentToken(); }
-{ALPHANUM}+ / N'T                                              {return currentToken(); }
-N'T                                                            {return currentToken(); }
-'T / is                                                           {return currentToken(); }
-'t / is                                                           {return currentToken(); }
+d{Q} / ye                                                        {return currentToken(); }
+{ALPHANUM}+ / [Nn]{Q}[Tt]                                              {return currentToken(); }
+[nN]{Q}[Tt]                                                            {return currentToken(); }
+{Q}[Tt] / is                                                           {return currentToken(); }
 
 // times
 [01]?[0-9]{WHITESPACE}?:[0-6][0-9]                              { return currentToken(); }
 
 // quotes
 <YYINITIAL>\"                                                  { yybegin(OPEN_QUOTE); return currentToken("``"); }
+<YYINITIAL>'                                                  { yybegin(OPEN_QUOTE); return currentToken("`"); }
+’                                                  { yybegin(YYINITIAL); return currentToken("'"); }
 <OPEN_QUOTE>\"                                                 { yybegin(YYINITIAL); return currentToken("''"); }
 
 
