@@ -56,7 +56,7 @@ object SemiCRF {
                      gazetteer: Gazetteer[Any, String] = Gazetteer.empty[Any, String],
                      wordFeaturizer: Optional[WordFeaturizer[String]] = NotProvided,
                      spanFeaturizer: Optional[SurfaceFeaturizer[String]] = NotProvided,
-                     opt: OptParams = OptParams())(implicit broker: CacheBroker):SemiCRF[L, String] = {
+                     opt: OptParams = OptParams(regularization = 1.0))(implicit broker: CacheBroker):SemiCRF[L, String] = {
     val model: SemiCRFModel[L, String] = new SegmentationModelFactory[L](startSymbol, outsideSymbol, gazetteer = gazetteer, wordFeaturizer = wordFeaturizer, spanFeaturizer = spanFeaturizer).makeModel(data)
 
     val obj = new ModelObjective(model, data)
