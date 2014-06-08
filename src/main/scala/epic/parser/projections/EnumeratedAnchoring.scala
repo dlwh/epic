@@ -20,6 +20,8 @@ import projections.AnchoredRuleProjector.AnchoredData
 import breeze.collection.mutable.{OpenAddressHashArray, TriangularArray}
 import epic.lexicon.Lexicon
 import epic.constraints.ChartConstraints
+import epic.trees.Span
+import java.util
 
 /**
  * Creates a locally-normalized anchored PCFG from some refined forest.
@@ -161,19 +163,52 @@ case class EnumeratedAnchoring[L, W](topology: RuleTopology[L],
   }
 
   def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int) = {
-    val forSpan = binaryScores(TriangularArray.index(begin, end))
-    if(forSpan eq null) Double.NegativeInfinity
-    else {
+    val ti = TriangularArray.index(begin, end)
+    val forSpan = binaryScores(ti)
+    val cached = checkCache(split, rule, ti)
+    if(!java.lang.Double.isNaN(cached)) {
+      cached
+    } else if(forSpan eq null) {
+      Double.NegativeInfinity
+    } else {
       val forSplit = forSpan(split - begin)
-      if(forSplit eq null) Double.NegativeInfinity
+      val result =  if(forSplit eq null) Double.NegativeInfinity
       else forSplit(rule)
+
+      updateCache(split, rule, ti, result)
+
+      result
     }
   }
+
   def scoreSpan(begin: Int, end: Int, tag: Int): Double = {
     val scores = spanScores(TriangularArray.index(begin, end))
     if(scores ne null) scores(tag)
     else Double.NegativeInfinity
   }
+
+  // (1 entry for each position (a split point), an entry has a rule index, a begin/end pair, and a score
+  private val cache = new Array[Int](length * (1 + 1 + 2))
+  util.Arrays.fill(cache, -1) //
+
+  private def checkCache(splitPoint: Int, rule: Int, ti: Int) = {
+    val crule = cache(splitPoint * 4)
+    val cti = cache(splitPoint * 4 + 1)
+    if(rule == crule && cti == ti) {
+      java.lang.Double.longBitsToDouble(Span(cache(splitPoint * 4 + 2), cache(splitPoint * 4 + 3)).encoded)
+    } else {
+      Double.NaN
+    }
+  }
+
+  private def updateCache(splitPoint: Int, rule: Int, ti: Int, score: Double):Unit = {
+    cache(splitPoint * 4) = rule
+    cache(splitPoint * 4 + 1) = ti
+    val asSpan = new Span(java.lang.Double.doubleToRawLongBits(score))
+    cache(splitPoint * 4 + 2) = asSpan.begin
+    cache(splitPoint * 4 + 3) = asSpan.end
+  }
+
 }
 
 object EnumeratedAnchoring {
