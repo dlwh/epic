@@ -52,7 +52,7 @@ class TreebankTokenizerTest  extends FunSuite {
     }
   }
 
-  test("contractions") {
+  test("contractions and possessives") {
     val sents = Map(//"didn't" -> List("did","n't"),
       "ya'll" -> List("ya","'ll"),
       "we're" -> List("we","'re"),
@@ -60,12 +60,14 @@ class TreebankTokenizerTest  extends FunSuite {
       "YA'LL" -> List("YA","'LL"),
       "WE'RE" -> List("WE","'RE"),
       "WE'VE" -> List("WE","'VE"),
+      "We've" -> List("We","'ve"),
       "cannot" -> List("can","not"),
       "can't" -> List("ca","n't"),
       "CAN'T" -> List("CA","N'T"),
       "I'm" -> List("I","'m"),
       "He's" -> List("He","'s"),
-      "parents'" -> List("parents","'")
+      "parents'" -> List("parents","'"),
+    "America’s"->List("America","'s")
     )
     for( (s,toks) <- sents) {
       assert(TreebankTokenizer(s).toList === toks)
@@ -77,6 +79,11 @@ class TreebankTokenizerTest  extends FunSuite {
     assert(TreebankTokenizer("$99").toList === List("$","99"))
     assert(TreebankTokenizer("$99.33").toList === List("$","99.33"))
   }
+
+  test("'sam i am'") {
+    assert(TreebankTokenizer("'sam i am'").toList === List("'", "sam", "i", "am", "'"))
+  }
+
 
   test("special words") {
     val words = Map("cannot" -> List("can","not"),

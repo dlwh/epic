@@ -196,7 +196,9 @@ NUM        = ({ALPHANUM} {P} {HAS_DIGIT}
 // punctuation
 P	         = ("_"|"-"|"/"|"."|",")
 
-PUNCT = ({P}|[?!@#$%\^&*_:;\]\[\"\'»«\202\204\206\207\213\221\222\223\224\225\226\227\233])
+Q = [’']
+
+PUNCT = ({P}|{Q}|[?!@#$%\^&*_:;\]\[\"»«\202\204\206\207\213\221\222\223\224\225\226\227\233])
 
 // at least one digit
 HAS_DIGIT  = ({LETTER}|[:digit:])* [:digit:] ({LETTER}|[:digit:])*
@@ -205,7 +207,7 @@ ALPHA      = ({LETTER})+
 
 LETTER     = [:letter:]
 
-ENGLISH_CLITIC = ('ll|'d|'ve|'s|'|'re|'LL|'D|'VE|'S|'RE|'m|'M|'n|'N)
+ENGLISH_CLITIC = {Q}(ll|d|ve|s|re|LL|D|VE|S|RE|m|M|n|N)?
 
 FRENCH_CLITIC = (-t-elles?|-t-ils?|-t-on|-ce|-elles?|-ils?|-je|-la|-les?|-leur|-lui|-mêmes?|-m\'|-moi|-nous|-on|-toi|-tu|-t\'|-vous|-en|-y|-ci|-là)
 
@@ -233,7 +235,7 @@ TWITTER_HASHTAG = # {ALPHANUM}+
 LONG_END_PUNCT = [?!][?!1]+
 
 
-%s OPEN_QUOTE POLISH_CONDITIONAL_MODE JUST_AFTER_PERIOD
+%s OPEN_QUOTE POLISH_CONDITIONAL_MODE JUST_AFTER_PERIOD CLITIC_MODE
 
 %%
 
@@ -259,11 +261,12 @@ Got / ta                                                      {return currentTok
 // acronyms that end a sentence
 
 {LETTER}+\.{LETTER}+ / [.]$                                      { return currentToken(currentToken().token() + ".");}
+// we can't ask if we're at EOF, so this is a hack to say append a period if we hit EOF and just generated a period
 {LETTER}+\.{LETTER}+.                                      {acro_period = yychar() + zzMarkedPos; return currentToken(currentToken().token());}
 // contractions
 {INIT_CLITIC}                                           {return currentToken();}
-{CLITIC}                                           {return currentToken();}
-{ALPHANUM}+ / {CLITIC}                             {return currentToken();}
+<CLITIC_MODE>{CLITIC}                                          {yybegin(YYINITIAL); return currentToken(currentToken().token().replaceAll("’", "'"));}
+{ALPHANUM}+ / {CLITIC}                             {yybegin(CLITIC_MODE); return currentToken();}
 // polish clitics
 {ALPHANUM}+[lł][aeoiy]? / {POLISH_CONDITIONAL_CLITIC}{POLISH_CONDITIONAL_ENDING}             {yybegin(POLISH_CONDITIONAL_MODE); return currentToken(); }
 {ALPHANUM}+[lł][aeoiy]? / {POLISH_PAST_ENDING}                    {return currentToken(); }
