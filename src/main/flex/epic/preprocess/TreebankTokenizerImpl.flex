@@ -82,6 +82,7 @@ THAI       = [\u0E00-\u0E59]
 // basic word: a sequence of digits & letters (includes Thai to enable ThaiAnalyzer to function)
 ALPHANUM   = ({LETTER}|{THAI}|[:digit:]|_)+
 
+ALPHA      = ({LETTER})+
 
 // acronyms: U.S.A., I.B.M., etc.
 // use a post-filter to remove dots
@@ -90,14 +91,12 @@ ACRONYM    =  {LETTER} "." ({LETTER} ".")+
 ACRONYM_DEP	= {ALPHANUM} "." ({ALPHANUM} ".")+
 
 // company names like AT&T and Excite@Home.
-COMPANY    =  {ALPHA} ("&"|"@") {ALPHA}
-
-// email addresses
-//EMAIL      =  {ALPHANUM} (("."|"-"|"_") {ALPHANUM})* "@" {ALPHANUM} (("."|"-") {ALPHANUM})+
-
+COMPANY    =  ([aA][tT][&][tT]|Excite[@]Home)
 
 // hostname
 HOST       =  {ALPHANUM} ((".") {ALPHANUM})+
+
+EMDASH = [-]{2,3}
 
 // url
 
@@ -170,13 +169,14 @@ EMAILquotedString = [\"] ([\u0001-\u0008\u000B\u000C\u000E-\u0021\u0023-\u005B\u
 EMAILatomText = [A-Za-z0-9!#$%&'*+-/=?\^_`{|}~]
 EMAILlabel = {EMAILatomText}+ | {EMAILquotedString}
 EMAILlocalPart = {EMAILlabel} ("." {EMAILlabel})*
-EMAILdomainLiteralText = ([\u0001-\u0008\u000B\u000C\u000E-\u005A\u005E-\u007F] | [\\] [\u0000-\u007F])*{ALPHANUM}
+EMAILdomainLiteralText = {ALPHANUM}|{DomainNameLoose}
+//EMAILdomainLiteralText = ([\u0001-\u0008\u000B\u000C\u000E-\u005A\u005E-\u007F]|[\\][\u0000-\u007F])*{ALPHANUM}
 // DFA minimization allows {IPv6Address} and {IPv4Address} to be included
 // in the {EMAILbracketedHost} definition without incurring any size penalties,
 // since {EMAILdomainLiteralText} recognizes all valid IP addresses.
 // The IP address regexes are included in {EMAILbracketedHost} simply as a
 // reminder that they are acceptable bracketed host forms.
-EMAILbracketedHost = "["? ({EMAILdomainLiteralText}* | {IPv4Address} | [iI][pP][vV] "6:" {IPv6Address}) "]"?
+EMAILbracketedHost = "["? ({EMAILdomainLiteralText}+ | {IPv4Address} | [iI][pP][vV] "6:" {IPv6Address}) "]"?
 EMAIL = {EMAILlocalPart} "@" ({EMAILbracketedHost})
 
  //  {ALPHANUM} "://" {HOST} (ALPHANUM|\/)*
@@ -202,14 +202,14 @@ PUNCT = ({P}|{Q}|[?!@#$%\^&*_:;\]\[\"»«\202\204\206\207\213\221\222\223\224\22
 // at least one digit
 HAS_DIGIT  = ({LETTER}|[:digit:])* [:digit:] ({LETTER}|[:digit:])*
 
-ALPHA      = ({LETTER})+
 
 LETTER     = [:letter:]
 
-ENGLISH_CLITIC = {Q}(ll|d|ve|s|re|LL|D|VE|S|RE|m|M|n|N)?
+ENGLISH_CLITIC = ({Q}(ll|d|ve|s|re|LL|D|VE|S|RE|m|M|n|N|[eE][mM])?|[nN]{Q}[Tt])
 
 FRENCH_CLITIC = (-t-elles?|-t-ils?|-t-on|-ce|-elles?|-ils?|-je|-la|-les?|-leur|-lui|-mêmes?|-m\'|-moi|-nous|-on|-toi|-tu|-t\'|-vous|-en|-y|-ci|-là)
 
+IRISH_O = O{Q}
 
 FRENCH_INIT_CLITIC = ([dcjlmnstDCJLNMST]\'|[Qq]u\'|[Jj]usqu\'|[Ll]orsqu\')
 
@@ -221,17 +221,20 @@ POLISH_CONDITIONAL_CLITIC = (by)
 
 POLISH_CONDITIONAL_ENDING = (m|ś|śmy|ście)?
 
-POLISH_PAST_ENDING = ([mś]?|śmy|ście)
+POLISH_PAST_ENDING_1 = (ś|śmy|ście)
+POLISH_PAST_ENDING_2 = ([mś]?|śmy|ście)
 
 WHITESPACE = \s
 
-EMOTICON = ( [<>]?[BX;8:=][o\-\']?[DdPp()\/3>oO]+ | <\/?3+ | ಠ_ಠ)
+EMOTICON = ( [<>]?[BX;8:=][o\-\']?[DdPp()\/3>oO]+|<\/?3+|ಠ_ಠ)
 
-TWITTER_HANDLE = @ {ALPHANUM}+
-TWITTER_HASHTAG = # {ALPHANUM}+
+TWITTER_HANDLE = @{ALPHA}{ALPHANUM}?
+TWITTER_HASHTAG = #{ALPHANUM}
 
 // blocks of question marks and exclamation marks are one token
 LONG_END_PUNCT = [?!][?!1]+
+
+WORD = ({IRISH_O}?{ALPHANUM}+|[Qq]ur{Q}an)
 
 
 %s OPEN_QUOTE POLISH_CONDITIONAL_MODE JUST_AFTER_PERIOD CLITIC_MODE
@@ -259,37 +262,45 @@ Got / ta                                                      {return currentTok
 
 // acronyms that end a sentence
 
-{LETTER}+\.{LETTER}+ / [.]$                                      { return currentToken(currentToken().token() + ".");}
 // we can't ask if we're at EOF, so this is a hack to say append a period if we hit EOF and just generated a period
-{LETTER}+\.{LETTER}+.                                      {acro_period = yychar() + zzMarkedPos; return currentToken(currentToken().token());}
-// contractions
+{LETTER}+\.{LETTER}+.                                      {acro_period = yychar() + zzMarkedPos; return currentToken();}
+(etc|v).                                                      {acro_period = yychar() + zzMarkedPos; return currentToken();}
+
+// contractions and other clitics
 {INIT_CLITIC}                                           {return currentToken();}
 <CLITIC_MODE>{CLITIC}                                          {yybegin(YYINITIAL); return currentToken(currentToken().token().replaceAll("’", "'"));}
-{ALPHANUM}+ / {CLITIC}                             {yybegin(CLITIC_MODE); return currentToken();}
-// polish clitics
-{ALPHANUM}+[lł][aeoiy]? / {POLISH_CONDITIONAL_CLITIC}{POLISH_CONDITIONAL_ENDING}             {yybegin(POLISH_CONDITIONAL_MODE); return currentToken(); }
-{ALPHANUM}+[lł][aeoiy]? / {POLISH_PAST_ENDING}                    {return currentToken(); }
+// make sure the clitic is at the end of the word
+{WORD} / {CLITIC}                                        {yybegin(CLITIC_MODE); return currentToken();}
 d{Q} / ye                                                        {return currentToken(); }
-{ALPHANUM}+ / [Nn]{Q}[Tt]                                              {return currentToken(); }
-[nN]{Q}[Tt]                                                            {return currentToken(); }
 {Q}[Tt] / is                                                           {return currentToken(); }
 
+// polish clitics
+{ALPHANUM}{ALPHANUM}+[lł][aeoiy]? / {POLISH_CONDITIONAL_CLITIC}{POLISH_CONDITIONAL_ENDING}             {yybegin(POLISH_CONDITIONAL_MODE); return currentToken(); }
+{ALPHANUM}{ALPHANUM}+[lł][aeoiy]? / {POLISH_PAST_ENDING_1}                    {return currentToken(); }
+// need to not let lam through....
+{ALPHANUM}{ALPHANUM}+[ł][aeoiy]? / {POLISH_PAST_ENDING_2}                    {return currentToken(); }
+
 // times
-[01]?[0-9]{WHITESPACE}?:[0-6][0-9]                              { return currentToken(); }
+[01]?[0-9]{WHITESPACE}?:[0-6][0-9]                              { return currentToken(currentToken().token().replaceAll("\\s+","")); }
 
 // quotes
 <YYINITIAL>\"                                                  { yybegin(OPEN_QUOTE); return currentToken("``"); }
 <YYINITIAL>'                                                  { yybegin(OPEN_QUOTE); return currentToken("`"); }
 ’                                                  { yybegin(YYINITIAL); return currentToken("'"); }
 <OPEN_QUOTE>\"                                                 { yybegin(YYINITIAL); return currentToken("''"); }
+“                                                 { yybegin(YYINITIAL); return currentToken("``"); }
+”                                                 { yybegin(YYINITIAL); return currentToken("''"); }
 
 
 
 
 // normal stuff
+{EMDASH}                                                 {return currentToken();}
+// dashed words
+{WORD}(- {WORD})+                                           {return currentToken();}
 {TWITTER_HANDLE}                                                     { return currentToken(); }
 {TWITTER_HASHTAG}                                                     { return currentToken(); }
-{ALPHANUM}                                                     { return currentToken(); }
+{WORD}                                        {return currentToken();}
 {ACRONYM}                                                      { return currentToken(); }
 {COMPANY}                                                      { return currentToken(); }
 {EMAIL}                                                        { return currentToken(); }

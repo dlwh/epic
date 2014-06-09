@@ -5,7 +5,7 @@ import org.scalatest.FunSuite
 class TreebankTokenizerTest  extends FunSuite {
 
   private def isOneToken(w: String) =
-    w === TreebankTokenizer(w).head
+    if(w === TreebankTokenizer(w).head) None else Some(w + " " +  TreebankTokenizer(w))
 
   test("simple words") {
     val words = List("Hi","there","pilgrim","happy","Thanksgiving","there")
@@ -14,10 +14,10 @@ class TreebankTokenizerTest  extends FunSuite {
     }
   }
 
-  test("some symbols") {
-    val words = List(".","...","$","-","/")
+  test("some symbols and abbreviations") {
+    val words = List(".","...","$","-","/", "--", "v.", "etc.")
     for(w <- words) {
-      assert(isOneToken(w))
+      assert(isOneToken(w), w)
     }
     val special = Map(
       "(" -> "-LRB-",
@@ -67,7 +67,8 @@ class TreebankTokenizerTest  extends FunSuite {
       "I'm" -> List("I","'m"),
       "He's" -> List("He","'s"),
       "parents'" -> List("parents","'"),
-    "America’s"->List("America","'s")
+    "America’s"->List("America","'s"),
+    "O'Donnell’s"->List("O'Donnell","'s")
     )
     for( (s,toks) <- sents) {
       assert(TreebankTokenizer(s).toList === toks)
@@ -78,6 +79,12 @@ class TreebankTokenizerTest  extends FunSuite {
     assert(TreebankTokenizer("99").toList === List("99"))
     assert(TreebankTokenizer("$99").toList === List("$","99"))
     assert(TreebankTokenizer("$99.33").toList === List("$","99.33"))
+  }
+
+  test("dates + comma") {
+    assert(TreebankTokenizer("13,").toList === List("13", ","))
+    assert(TreebankTokenizer("December 06,").toList === List("December","06",","))
+    assert(TreebankTokenizer("arunrob@gmail.com  October 13, 2010 at 12:39 PM").toList === List("arunrob@gmail.com", "October","13",",", "2010", "at", "12:39", "PM"))
   }
 
   test("'sam i am'") {
@@ -125,6 +132,11 @@ class TreebankTokenizerTest  extends FunSuite {
     }
   }
 
+  test("polish shouldn't mess up english") {
+    val text = Seq("slam", "Islam")
+    text.foreach(w => assert(isOneToken(w)))
+  }
+
 
   test("emails") {
     assert(TreebankTokenizer("Email asdf@asdf.com.").toList === List("Email", "asdf@asdf.com", "."))
@@ -132,7 +144,6 @@ class TreebankTokenizerTest  extends FunSuite {
 
 
   test("tweets") {
-
     for( (text, toks) <- tweets zip tweet_tokens) {
       assert(TreebankTokenizer(text).toList === toks.toList)
     }
