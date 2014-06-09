@@ -212,7 +212,7 @@ ENGLISH_CLITIC = ({Q}(ll|d|ve|s|re|LL|D|VE|S|RE|m|M|n|N|[eE][mM])?|[nN]{Q}[Tt])
 
 FRENCH_CLITIC = (-t-elles?|-t-ils?|-t-on|-ce|-elles?|-ils?|-je|-la|-les?|-leur|-lui|-mêmes?|-m\'|-moi|-nous|-on|-toi|-tu|-t\'|-vous|-en|-y|-ci|-là)
 
-IRISH_O = O{Q}
+IRISH_O = [Oo]{Q}
 
 FRENCH_INIT_CLITIC = ([dcjlmnstDCJLNMST]\'|[Qq]u\'|[Jj]usqu\'|[Ll]orsqu\')
 
@@ -267,7 +267,7 @@ Got / ta                                                      {return currentTok
 
 // we can't ask if we're at EOF, so this is a hack to say append a period if we hit EOF and just generated a period
 {LETTER}+\.{LETTER}+.                                      {acro_period = yychar() + zzMarkedPos; return currentToken();}
-(etc|v).                                                      {acro_period = yychar() + zzMarkedPos; return currentToken();}
+(etc|v|vs).                                                      {acro_period = yychar() + zzMarkedPos; return currentToken();}
 
 // contractions and other clitics
 {INIT_CLITIC}                                           {return currentToken();}

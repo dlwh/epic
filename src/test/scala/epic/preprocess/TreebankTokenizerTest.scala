@@ -15,7 +15,7 @@ class TreebankTokenizerTest  extends FunSuite {
   }
 
   test("some symbols and abbreviations") {
-    val words = List(".","...","$","-","/", "--", "v.", "etc.")
+    val words = List(".","...","$","-","/", "--", "v.", "vs.", "etc.")
     for(w <- words) {
       assert(isOneToken(w), w)
     }
@@ -68,7 +68,8 @@ class TreebankTokenizerTest  extends FunSuite {
       "He's" -> List("He","'s"),
       "parents'" -> List("parents","'"),
     "America’s"->List("America","'s"),
-    "O'Donnell’s"->List("O'Donnell","'s")
+    "O'Donnell’s"->List("O'Donnell","'s"),
+    "o'clock"->List("o'clock")
     )
     for( (s,toks) <- sents) {
       assert(TreebankTokenizer(s).toList === toks)
