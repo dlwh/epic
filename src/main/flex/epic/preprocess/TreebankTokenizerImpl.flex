@@ -96,7 +96,10 @@ COMPANY    =  ([aA][tT][&][tT]|Excite[@]Home)
 // hostname
 HOST       =  {ALPHANUM} ((".") {ALPHANUM})+
 
-EMDASH = [-]{2,3}
+EMDASH = ([-]{2,3}|[\u2014\u2015\u2e3a\u2e3b\ufe58]+)
+
+DASH = ([\-\u2011\u2012\u2013\u2e1a\ufe63\uff0d])
+
 
 // url
 
@@ -284,8 +287,9 @@ d{Q} / ye                                                        {return current
 [01]?[0-9]{WHITESPACE}?:[0-6][0-9]                              { return currentToken(currentToken().token().replaceAll("\\s+","")); }
 
 // quotes
-<YYINITIAL>\"                                                  { yybegin(OPEN_QUOTE); return currentToken("``"); }
-<YYINITIAL>'                                                  { yybegin(OPEN_QUOTE); return currentToken("`"); }
+<YYINITIAL>\"/{WHITESPACE}*{ALPHANUM}              { yybegin(OPEN_QUOTE); return currentToken("``"); }
+<YYINITIAL>'/{WHITESPACE}*{ALPHANUM}               { yybegin(OPEN_QUOTE); return currentToken("`"); }
+‘                                                  { yybegin(OPEN_QUOTE); return currentToken("`"); }
 ’                                                  { yybegin(YYINITIAL); return currentToken("'"); }
 <OPEN_QUOTE>\"                                                 { yybegin(YYINITIAL); return currentToken("''"); }
 “                                                 { yybegin(YYINITIAL); return currentToken("``"); }
@@ -297,7 +301,7 @@ d{Q} / ye                                                        {return current
 // normal stuff
 {EMDASH}                                                 {return currentToken();}
 // dashed words
-{WORD}(- {WORD})+                                           {return currentToken();}
+{WORD}({DASH}{WORD})+                                           {return currentToken();}
 {TWITTER_HANDLE}                                                     { return currentToken(); }
 {TWITTER_HASHTAG}                                                     { return currentToken(); }
 {WORD}                                        {return currentToken();}
@@ -314,7 +318,7 @@ d{Q} / ye                                                        {return current
 \}                                                  {return currentToken("-RCB-");}
 \[                                                  {return currentToken("-LSB-");}
 \]                                                  {return currentToken("-RSB-");}
-[.][.]+                                                 {return currentToken("...");}
+([.][.]+|…+)                                                 {return currentToken("...");}
 {LONG_END_PUNCT}                                        { return currentToken();}
 {PUNCT}                                               { return currentToken();}
 {EMOTICON}                                          { return currentToken();}
