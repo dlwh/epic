@@ -1,7 +1,5 @@
 package epic
 
-import epic.slab.Slab._
-
 /**
  * TODO
  *

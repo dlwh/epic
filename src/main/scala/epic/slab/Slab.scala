@@ -5,6 +5,15 @@ import java.net.URL
 import epic.util.BinarySearch
 import epic.slab.AnnotatedSpan.{EndFirstSpanOrdering, SpanOrdering}
 
+/**
+ * A Slab is the core "document" type in Epic. It represents a document and a set of annotations on that document,
+ * such as sentence boundaries, tokens, named entity spans, etc. The ContentType is the type of the document--typically
+ * a string--and the AnnotationTypes parameter is an encoding of the kinds of annotations that are present. [[epic.slab.AnalysisFunction]]s
+ * can be used to add new annotations to a Slab that have the prerequisite annotations.
+ * @tparam ContentType
+ * @tparam BaseAnnotationType
+ * @tparam AnnotationTypes
+ */
 trait Slab[ContentType, BaseAnnotationType, +AnnotationTypes <: BaseAnnotationType] {
 
   val content: ContentType

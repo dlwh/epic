@@ -19,31 +19,19 @@ import epic.slab._
 
 
 /**
- * Abstract trait for tokenizers, which act as functions from a String
- * to an Iterable[String].  See companion object for instructions on
- * registering new subtypes outside of the current package.
+ * Abstract trait for tokenizers, which annotate sentence-segmented text with tokens. Tokenizers work
+ * with both raw strings and [[epic.slab.StringSlab]]s.
  *
- * @author dramage
+ * @author dlwh
  */
 @SerialVersionUID(1)
-trait Tokenizer extends StringAnalysisFunction[Sentence, Token] with Serializable {
-  override def toString = getClass.getName
+trait Tokenizer extends StringAnalysisFunction[Sentence, Token] with Serializable with (String=>IndexedSeq[String]) {
+  override def toString() = getClass.getName +"()"
 
   def apply(a: String):IndexedSeq[String] = {
-    apply(Slab(a).+(Sentence(0, a.length))).iterator[Token].toIndexedSeq.map(_.token)
+    apply(Slab(a).+(Sentence(0, a.length))).iterator[Token].map(_.token).toIndexedSeq
   }
 
 }
 
-/**
- * Companion object for Tokenizer that supports automatic TextSerialization
- * of Tokenizer and its subtypes.  Tokenizers not in breeze.text.tokenizers
- * need to call <code>Tokenizer.register[CustomTokenizer]("CustomTokenizer")</code>
- * in order for toString and fromString on Tokenizers to recognize the new type.
- *
- * @author dramage
- */
-object Tokenizer  {
 
-
-}

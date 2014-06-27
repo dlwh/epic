@@ -14,7 +14,7 @@ import breeze.optimize.CachedBatchDiffFunction
 import epic.features.WordFeaturizer
 
 /**
- * A -Markov Linear Chain Conditional Random Field. Useful for POS tagging, etc.
+ * A Linear Chain Conditional Random Field. Useful for POS tagging, etc.
  *
  * As usual in Epic, all the heavy lifting is done in the companion object and Marginals.
  *
