@@ -39,9 +39,9 @@ class JavaWordTokenizer(locale: Locale) extends Tokenizer {
     slab.++[Token](slab.iterator[Sentence].flatMap { s =>
       val breaker = BreakIterator.getWordInstance(locale)
       breaker.setText(slab.content)
-      new SegmentingIterator(breaker, s.begin, s.end).map { span =>
-        Token(span.begin, span.end, slab.content.substring(span.begin, span.end))
-      }.filterNot(_.token.forall(_.isWhitespace))
+      new SegmentingIterator(breaker, s._1.begin, s._1.end).map { span =>
+        span -> Token(slab.spanned(span))
+      }.filterNot(_._2.token.forall(_.isWhitespace))
     })
   }
 }

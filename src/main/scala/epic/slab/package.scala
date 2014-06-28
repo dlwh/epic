@@ -1,5 +1,7 @@
 package epic
 
+import epic.trees.Span
+
 /**
  * TODO
  *
@@ -9,7 +11,7 @@ package object slab {
   // some type aliases
 
 
-  type StringAnalysisFunction[I <: AnnotatedSpan, O <: AnnotatedSpan] = AnalysisFunction[String, AnnotatedSpan, I, O]
-  type StringSlab[+AnnotationTypes <: AnnotatedSpan] = Slab[String, AnnotatedSpan, AnnotationTypes]
+  type StringAnalysisFunction[I, O] = AnalysisFunction[String, Span, I, O]
+  type StringSlab[+AnnotationTypes] = Slab[String, Span, AnnotationTypes]
 
 }

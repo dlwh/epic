@@ -363,4 +363,12 @@ class TreebankTokenizerTest  extends FunSuite {
       |@person
       |-RRB-
     """.stripMargin.split("QQQ").map(_.trim.split("\n").map(_.trim))
+
+
+  test("Gettysburg address") {
+    val text = """But, in a larger sense, we can not dedicate -- we can not consecrate -- we can not hallow -- this ground."""
+    val words = TreebankTokenizer(text).toSeq
+    assert(words.length === 25, words)
+    assert(words.startsWith(Seq("But", ",", "in", "a", "larger", "sense", ",", "we", "can", "not", "dedicate", "--")), words)
+  }
 }
