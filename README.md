@@ -226,7 +226,7 @@ which will compile everything, run tests, and build a fatjar that includes all d
 
 There are several different discriminative parsers you can train, and the trainer main class has lots of options. To get a sense of them, run the following command:
 <pre>
-$ java -cp target/epic-assembly-0.1.jar epic.parser.models.ParserTrainer --help
+$ java -cp target/scala-2.10/epic-assembly-0.2-SNAPSHOT.jar epic.parser.models.ParserTrainer --help
 </pre>
 
 You'll get a list of all the available options (so many!) The important ones are:
@@ -250,7 +250,7 @@ There are 4 kinds of base models you can train, and you can tie them together wi
 
 These models all have their own options. You can see those by specifying the modelFactory and adding --help: 
 <pre>
-$ java -cp target/epicparser-assembly-0.1.jar epic.parser.models.ParserPipeline --modelFactory "model" --help
+$ java -cp target/scala-2.10/epic-assembly-0.2-SNAPSHOT.jar epic.parser.models.ParserTrainer --modelFactory "model" --help
 </pre>
 
 If you use the first three in research papers, please cite 
