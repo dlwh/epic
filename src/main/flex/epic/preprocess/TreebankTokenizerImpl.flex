@@ -43,7 +43,7 @@ package epic.preprocess;
 */
 %class TreebankTokenizerImpl
 %unicode
-%type epic.slab.Token
+%type scala.Tuple2<epic.trees.Span, epic.slab.Token>
 %function getNextToken
 %pack
 %char
@@ -57,12 +57,12 @@ public final int yychar()
     return yychar;
 }
 
-final epic.slab.Token currentToken() {
+final  scala.Tuple2<epic.trees.Span, epic.slab.Token> currentToken() {
     return currentToken(new String(zzBuffer, zzStartRead, zzMarkedPos-zzStartRead).replaceAll("’", "'"));
 }
-final epic.slab.Token currentToken(String value) {
+final scala.Tuple2<epic.trees.Span, epic.slab.Token> currentToken(String value) {
 //  return new String(zzBuffer, zzStartRead, zzMarkedPos-zzStartRead);
-  return new epic.slab.Token(yychar(), yychar() + zzMarkedPos - zzStartRead, value);
+  return new scala.Tuple2(new epic.trees.Span(epic.trees.Span.apply(yychar() - 1, yychar())), new epic.slab.Token(value));
 }
 
 
@@ -71,7 +71,7 @@ final epic.slab.Token currentToken(String value) {
 %eofval{
   if(yychar() == acro_period) {
       acro_period = -2;
-  return new epic.slab.Token(yychar() - 1, yychar(), ".") ;
+  return new scala.Tuple2(new epic.trees.Span(epic.trees.Span.apply(yychar() - 1, yychar())), new epic.slab.Token("."));
   } else {
     return null;
   }
@@ -96,7 +96,7 @@ COMPANY    =  ([aA][tT][&][tT]|Excite[@]Home)
 // hostname
 HOST       =  {ALPHANUM} ((".") {ALPHANUM})+
 
-EMDASH = ([-]{2,3}|[\u2014\u2015\u2e3a\u2e3b\ufe58]+)
+EMDASH = (--|---|[\u2014\u2015\u2e3a\u2e3b\ufe58]+)
 
 DASH = ([\-\u2011\u2012\u2013\u2e1a\ufe63\uff0d])
 
@@ -247,6 +247,7 @@ WORD = ({IRISH_O}?{ALPHANUM}+|[Qq]ur{Q}an)
 
 <POLISH_CONDITIONAL_MODE>{POLISH_CONDITIONAL_CLITIC} / {POLISH_CONDITIONAL_ENDING}                                      { yybegin(YYINITIAL); return currentToken(); }
 <POLISH_CONDITIONAL_MODE>[^b].                                        { throw new RuntimeException("..." + currentToken());}
+{EMDASH}                                                 {return currentToken();}
 {URL}                                                         { return currentToken(); }
 
 // special words
@@ -271,7 +272,7 @@ Got / ta                                                      {return currentTok
 
 // contractions and other clitics
 {INIT_CLITIC}                                           {return currentToken();}
-<CLITIC_MODE>{CLITIC}                                          {yybegin(YYINITIAL); return currentToken(currentToken().token().replaceAll("’", "'"));}
+<CLITIC_MODE>{CLITIC}                                          {yybegin(YYINITIAL); return currentToken(currentToken()._2().token().replaceAll("’", "'"));}
 // make sure the clitic is at the end of the word
 {WORD} / {CLITIC}                                        {yybegin(CLITIC_MODE); return currentToken();}
 d{Q} / ye                                                        {return currentToken(); }
@@ -284,7 +285,7 @@ d{Q} / ye                                                        {return current
 {ALPHANUM}{ALPHANUM}+[ł][aeoiy]? / {POLISH_PAST_ENDING_2}                    {return currentToken(); }
 
 // times
-[01]?[0-9]{WHITESPACE}?:[0-6][0-9]                              { return currentToken(currentToken().token().replaceAll("\\s+","")); }
+[01]?[0-9]{WHITESPACE}?:[0-6][0-9]                              { return currentToken(currentToken()._2().token().replaceAll("\\s+","")); }
 
 // quotes
 <YYINITIAL>\"/{WHITESPACE}*{ALPHANUM}              { yybegin(OPEN_QUOTE); return currentToken("``"); }
@@ -299,7 +300,6 @@ d{Q} / ye                                                        {return current
 
 
 // normal stuff
-{EMDASH}                                                 {return currentToken();}
 // dashed words
 {WORD}({DASH}{WORD})+                                           {return currentToken();}
 {TWITTER_HANDLE}                                                     { return currentToken(); }

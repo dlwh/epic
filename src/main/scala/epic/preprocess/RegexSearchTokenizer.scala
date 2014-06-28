@@ -17,6 +17,7 @@ package epic.preprocess
 
 import epic.slab._
 import scala.runtime.ScalaRunTime
+import epic.trees.Span
 
 /**
  * Finds all occurrences of the given pattern in the document.
@@ -30,7 +31,7 @@ case class RegexSearchTokenizer(pattern : String) extends Tokenizer {
 
   def apply[In <: Sentence](slab:StringSlab[In]):StringSlab[In with Token] = {
     slab.++[Token](slab.iterator[Sentence].flatMap { s =>
-      compiled.findAllMatchIn(s.in(slab).content).map{ m => new Token(m.start, m.end, m.group(0))}
+      compiled.findAllMatchIn(slab.spanned(s._1)).map{ m => Span(m.start, m.end) -> new Token(m.group(0))}
     })
   }
 

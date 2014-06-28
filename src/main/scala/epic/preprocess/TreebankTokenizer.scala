@@ -8,18 +8,19 @@ import epic.slab._
 import epic.slab.Sentence
 import epic.slab.Token
 import epic.corpora.MascSlab
+import epic.trees.Span
 
 @SerialVersionUID(1L)
 class TreebankTokenizer() extends Tokenizer with Serializable {
 
   override def apply[In <: Sentence](slab: StringSlab[In]): StringSlab[In with Token] = {
     slab.++[Token](slab.iterator[Sentence].flatMap { s =>
-      val content = s.in(slab).content
+      val content = slab.spanned(s._1)
       val impl = new TreebankTokenizerImpl(new StringReader(content))
       Iterators.fromProducer{
         try {
-          Option(impl.getNextToken()).map { token =>
-            token.copy(token.begin + s.begin, token.end + s.begin)
+          Option(impl.getNextToken()).map { case (region, token) =>
+            Span(region.begin + s._1.begin, region.end + s._1.end) -> token
           }
         } catch {
           case e: Throwable => throw new RuntimeException("Could not tokenize " + s, e)
@@ -58,14 +59,14 @@ object TreebankTokenizer extends TreebankTokenizer {
                                        f <- dir.listFiles(new FilenameFilter {
                                          override def accept(dir: File, name: String): Boolean = name.endsWith(".txt")
                                        })) yield {
-      val slab = MascSlab(f.toURI.toURL)
-      val slabWithSentences = MascSlab.s(slab)
+      val slab: StringSlab[Source] = MascSlab(f.toURI.toURL)
+      val slabWithSentences: Slab[String, Span, Source with Sentence] = MascSlab.s[Source](slab)
       val slabWithTokens = MascSlab.seg(slabWithSentences)
       slabWithTokens.iterator[Sentence].map{sent =>
-        val gold = slabWithTokens.covered[Segment](sent).toIndexedSeq.map(_.in(slab).content)
-        val guess = TreebankTokenizer(sent.in(slab).content)
+        val gold = slabWithTokens.covered[Segment](sent._1).toIndexedSeq.map { case (span, tok) => slab.spanned(span)}
+        val guess = TreebankTokenizer(slab.spanned(sent._1))
 
-        (gold, guess, sent.in(slab).content)
+        (gold, guess, slab.spanned(sent._1))
       }
     }
 

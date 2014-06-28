@@ -13,20 +13,21 @@ import breeze.optimize.L2Regularization
 import epic.features.CrossProductFeature
 import java.util.zip.GZIPInputStream
 import epic.corpora.MascSlab
+import epic.trees.Span
 
 @SerialVersionUID(1L)
 class MLSentenceSegmenter(inf: MLSentenceSegmenter.ClassificationInference) extends SentenceSegmenter with Serializable {
-  override def apply[In <: AnnotatedSpan](slab: StringSlab[In]): StringSlab[In with Sentence] = {
+  override def apply[In](slab: StringSlab[In]): StringSlab[In with Sentence] = {
     val text = slab.content
     val iter = MLSentenceSegmenter.potentialSentenceBoundariesIterator(text)
     var lastOffset = 0
     slab.++[Sentence](
       Iterators.fromProducer {
-        def rec():Option[Sentence] = {
+        def rec():Option[(Span, Sentence)] = {
           if(iter.hasNext) {
             val pos = iter.next()
             if(!iter.hasNext || inf.classify(MLSentenceSegmenter.featuresForEndPointDetection(text, pos))) {
-              val res = Some(Sentence(lastOffset, math.min(pos + 1, text.length)))
+              val res = Some(Span(lastOffset, math.min(pos + 1, text.length)) -> Sentence())
               lastOffset = pos + 1
               res
             } else {
@@ -37,7 +38,7 @@ class MLSentenceSegmenter(inf: MLSentenceSegmenter.ClassificationInference) exte
           }
         }
         rec()
-      }.filterNot(s => text.substring(s.begin, s.end).forall(_.isWhitespace))
+      }.filterNot(s => text.substring(s._1.begin, s._1.end).forall(_.isWhitespace))
     )
 
   }
@@ -297,7 +298,7 @@ object MLSentenceSegmenter {
       val guessPoints: IndexedSeq[Int] = potentialSentenceBoundariesIterator(slabWithSentences.content).toIndexedSeq
 
       val text = slab.content
-      val goldPoints = adjustGoldSentenceBoundaries(text, slabWithSentences.iterator[Sentence].map(_.end))
+      val goldPoints = adjustGoldSentenceBoundaries(text, slabWithSentences.iterator[Sentence].map(_._1.end))
 
       println("<<<<" + f  )
       printOutSentenceBoundaries(text, guessPoints.toSet, goldPoints)

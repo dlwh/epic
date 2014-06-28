@@ -16,6 +16,7 @@
 package epic.preprocess
 
 import epic.slab._
+import epic.trees.Span
 
 
 /**
@@ -29,7 +30,8 @@ trait Tokenizer extends StringAnalysisFunction[Sentence, Token] with Serializabl
   override def toString() = getClass.getName +"()"
 
   def apply(a: String):IndexedSeq[String] = {
-    apply(Slab(a).+(Sentence(0, a.length))).iterator[Token].map(_.token).toIndexedSeq
+    val slab = apply(Slab(a).append(Span(0, a.length), Sentence()))
+    slab.iterator[Token].map(_._2.token).toIndexedSeq
   }
 
 }

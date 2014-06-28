@@ -18,6 +18,7 @@ package epic.preprocess
 import epic.slab._
 import epic.slab.Token
 import epic.slab.Sentence
+import epic.trees.Span
 
 /**
  * Splits the input document according to the given pattern.  Does not
@@ -29,10 +30,11 @@ case class RegexSplitTokenizer(pattern : String) extends Tokenizer {
   val compiled = pattern.r
   override def apply[In <: Sentence](slab: StringSlab[In]): StringSlab[In with Token] = {
     slab.++[Token](slab.iterator[Sentence].flatMap { s =>
-      val content = s.in(slab).content
+      val content = slab.spanned(s._1)
       var last = 0
       compiled.findAllMatchIn(content).map{ m =>
-        val ret = Token(last, m.start(0), slab.content.substring(last + s.begin, m.start(0) + s.begin))
+        val span = Span(last, m.start(0))
+        val ret = span -> Token(slab.content.substring(last + s._1.begin, m.start(0) + s._1.begin))
         last += m.end(0)
         ret
       }
