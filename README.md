@@ -1,18 +1,31 @@
-### README is Work in Progress.
-
 # Epic
 
 (c) 2014 David Hall.
 
 Epic is a structured prediction framework for Scala. It also includes classes for training high-accuracy syntactic parsers, part-of-speech taggers, name entity recognizers, and more.
 
-The current version is 0.2-SNAPSHOT
+Epic is distributed under the [Apache License, Version 2.0](http://www.apache.org/licenses/LICENSE-2.0.html).
+
+The current version is 0.2-SNAPSHOT.
 
 ## Documentation
 
-Documentation will live at the GitHub wiki: <https://github.com/dlwh/epic/wiki>
+Documentation will (eventually) live at the GitHub wiki: <https://github.com/dlwh/epic/wiki>
 
 ## Using Epic
+
+Epic can be used programmatically or from the command line, using
+either pretrained models ([see below](#pre-trained-models)) or with
+models you have trained yourself. Currently,
+
+Epic has support for three kinds of models: parsers, sequence
+labelers, and segmenters. Parsers produce syntactic representations
+of sentences. Sequence labelers are things like part-of-speech
+taggers. These associate each word in a sentence with a label. For
+instance, a part-of-speech tagger can identify nouns, verbs, etc.
+Segmenters break a sentence into a sequence of fields. For instance,
+a named entity recognition system might identify all the people,
+places and things in a sentence.
 
 ### Command-line Usage
 
@@ -28,7 +41,7 @@ All of these systems expect plain text files as input, along with a path to a mo
 java -Xmx4g -cp /path/to/epic-assembly-0.2-SNAPSHOT.jar epic.parser.ParseText --model /path/to/model.ser.gz --nthreads <number of threads> [files]
 ```
 
-Currently, all text is output to standard out. In the future, we will support output in a way that differentiates the files. In addition, we will add support for reading from stdin. By default, the system will use all available cores for execution.
+Currently, all text is output to standard out. In the future, we will support output in a way that differentiates the files. If no files are given, the system will read from standard input. By default, the system will use all available cores for execution.
 
 Models can be downloaded from <http://www.scalanlp.org/models/> or from Maven Central. ([See below](#pre-trained-models).)
 
