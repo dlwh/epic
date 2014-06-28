@@ -86,9 +86,9 @@ val tagger = epic.models.deserialize[CRF[AnnotatedLabel, String]](path)
 
 // or:
 
-val tagger = epic.models.PosTaggerSelector.loadTagger("en") // or another 2 letter code.
+val tagger = epic.models.PosTagSelector.loadTagger("en").get // or another 2 letter code.
 
-val tags = tagger(sentence)
+val tags = tagger.bestSequence(sentence)
 
 println(tags.render)
 
