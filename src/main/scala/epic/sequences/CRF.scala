@@ -38,7 +38,7 @@ trait CRF[L, W] extends Serializable {
     CRF.Marginal.goldMarginal(anchor(w), tags)
   }
 
-  def bestSequence(w: IndexedSeq[W], id: String = "") = {
+  def bestSequence(w: IndexedSeq[W], id: String = ""): TaggedSequence[L, W] = {
     CRF.viterbi(anchor(w), id)
   }
 
