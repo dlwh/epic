@@ -1,18 +1,21 @@
 package epic.sequences
 
 import epic.slab._
+import epic.trees.AnnotatedLabel
 
 /**
- * TODO
+ * A Tagger assigns a sequence of Tags to a
+ *
+ * @tparam Tag the type of tag that is annotated
  *
  * @author dlwh
  **/
-trait Tagger[Tag <: AnnotatedSpan] extends StringAnalysisFunction[Sentence with Token, Tag] with (IndexedSeq[String]=>IndexedSeq[Tag]) {
-  override def apply[In <: Sentence with Token](slab: Slab[String, AnnotatedSpan, In]): Slab[String, AnnotatedSpan, In with Tag] = {
-    val annotatedSentences = for(s <- slab.iterator[Sentence]) yield {
-      val tokens = s.in(slab).covered[Token].map(_.token).toIndexedSeq
-      val tagSeq = apply(tokens)
-      tagSeq
+trait Tagger[Tag] extends StringAnalysisFunction[Sentence with Token, Tag] with (IndexedSeq[String]=>IndexedSeq[Tag]) {
+  override def apply[In <: Sentence with Token](slab: StringSlab[In]): StringSlab[In with Tag] = {
+    val annotatedSentences = for((span, sent) <- slab.iterator[Sentence]) yield {
+      val tokens = slab.covered[Token](span).toIndexedSeq
+      val tagSeq = apply(tokens.map(_._2.token))
+      tokens.map(_._1) zip tagSeq
     }
 
     slab.++[Tag](annotatedSentences.flatten)
@@ -21,11 +24,14 @@ trait Tagger[Tag <: AnnotatedSpan] extends StringAnalysisFunction[Sentence with 
 }
 
 object Tagger {
-  def fromCRF[L, Tag <: AnnotatedSpan](crf: CRF[L, String], lToTag: L=>Tag):Tagger[Tag] = new CRFTagger(crf, lToTag)
 
-  case class CRFTagger[L, Tag <: AnnotatedSpan](crf: CRF[L, String], lToTag: L=>Tag) extends Tagger[Tag] {
+  def posTagger(crf: CRF[AnnotatedLabel, String]) = fromCRF(crf, (a: AnnotatedLabel) => PartOfSpeech(a.label))
+
+  def fromCRF[L, Tag](crf: CRF[L, String], lToTag: L=>Tag):Tagger[Tag] = new CRFTagger(crf, lToTag)
+
+  case class CRFTagger[L, Tag] (crf: CRF[L, String], lToTag: L=>Tag) extends Tagger[Tag] {
     override def apply(v1: IndexedSeq[String]): IndexedSeq[Tag] = {
-      crf.bestSequence(w).tags.map(lToTag)
+      crf.bestSequence(v1).tags.map(lToTag)
     }
   }
 }
