@@ -42,7 +42,7 @@ trait SemiCRF[L, W] extends Serializable {
     SemiCRF.Marginal.goldMarginal(scorer(w), segmentation)
   }
 
-  def bestSequence(w: IndexedSeq[W], id: String = "") = {
+  def bestSequence(w: IndexedSeq[W], id: String = ""): Segmentation[L, W] = {
     SemiCRF.posteriorDecode(marginal(w), id)
   }
 
