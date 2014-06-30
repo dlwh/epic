@@ -15,7 +15,7 @@ import java.io.{ObjectInputStream, IOException}
 import breeze.optimize.FirstOrderMinimizer.OptParams
 import breeze.optimize.CachedBatchDiffFunction
 import breeze.linalg.{softmax, DenseVector}
-import epic.constraints.LabeledSpanConstraints
+import epic.constraints.{TagConstraints, LabeledSpanConstraints}
 import epic.constraints.LabeledSpanConstraints.NoConstraints
 import epic.util.{NotProvided, Optional, CacheBroker}
 import epic.features.{WordFeaturizer, SurfaceFeaturizer}
@@ -83,9 +83,12 @@ object SemiCRF {
     override def outsideSymbol: L = startSymbol
 
     def scorer(w: IndexedSeq[W]): Anchoring[L, W] = new Anchoring[L, W] {
-      val constraints: LabeledSpanConstraints[L] = LabeledSpanConstraints.fromTagConstraints(crf.lexicon.anchor(w))
-
       val anch = crf.anchor(w)
+
+      val constraints: LabeledSpanConstraints[L] = {
+        LabeledSpanConstraints.fromTagConstraints(anch)
+      }
+
       def words: IndexedSeq[W] = w
 
       def scoreTransition(prev: Int, cur: Int, begin: Int, end: Int): Double = {

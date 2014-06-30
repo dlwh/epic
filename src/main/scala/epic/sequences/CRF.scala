@@ -42,8 +42,6 @@ trait CRF[L, W] extends Serializable {
     CRF.viterbi(anchor(w), id)
   }
 
-  def lexicon: TagConstraints.Factory[L, W]
-
 }
 
 object CRF {
@@ -86,13 +84,16 @@ object CRF {
   }
 
 
-  trait Anchoring[L, W] {
+  trait Anchoring[L, W] extends TagConstraints[L] {
     def words : IndexedSeq[W]
     def length: Int = words.length
     def scoreTransition(pos: Int, prev: Int, cur: Int):Double
     def labelIndex: Index[L]
     def startSymbol: L
     def validSymbols(pos: Int): Set[Int]
+
+
+    override def allowedTags(pos: Int): Set[Int] = validSymbols(pos)
 
     def *(other: Anchoring[L, W]):Anchoring[L, W] = {
       (this, other) match {

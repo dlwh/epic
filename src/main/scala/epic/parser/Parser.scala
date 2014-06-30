@@ -19,6 +19,8 @@ package epic.parser
 import epic.trees._
 import epic.constraints.ChartConstraints
 import epic.lexicon.Lexicon
+import epic.slab._
+import epic.slab.Token
 
 
 /**
@@ -51,6 +53,22 @@ final case class Parser[L,W](topology: RuleTopology[L],
   }
 
   def marginal(w: IndexedSeq[W]) = marginalFactory.apply(w, constraintsFactory.constraints(w))
+
+  /*
+
+  def apply[In <: Token with Sentence](slab: StringSlab[In]):StringSlab[In with epic.trees.Tree[L]] = {
+    val annotatedSentences = for((span, sent) <- slab.iterator[Sentence]) yield {
+      val tokens = slab.covered[Token](span).toIndexedSeq
+      val tagSeq = apply(tokens.map(_._2.token))
+      tokens.map(_._1) zip tagSeq
+    }
+
+  }
+  */
+
+
+
+
 }
 
 object Parser {
