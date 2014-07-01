@@ -33,19 +33,25 @@ class TreebankTokenizer() extends Tokenizer with Serializable {
 }
 
 object TreebankTokenizer extends TreebankTokenizer {
+  def treebankTokenToToken(s: String): String = reverseTreebankMappings.getOrElse(s, s)
+
   private val treebankMappings = Map("(" -> "-LRB-", ")" -> "-RRB-", "{" -> "-LCB-", "}" -> "-RCB-", "[" -> "-LSB-", "]" -> "-RSB-")
   private val reverseTreebankMappings = treebankMappings.map(_.swap)
 
   /** Replaces symbols like ( with their penn treebank equivalent */
-  def tokensToTreebankTokens(toks: IndexedSeq[String]): IndexedSeq[String] = {
+  def tokensToTreebankTokens(toks: Seq[String]): IndexedSeq[String] = {
     // have to deal with quotes, so we can't just use map.
     val output =  new ArrayBuffer[String]()
 
-    var yyquote = false
+    var inOpenQuote = false
 
     for(t <- toks) t match {
-      case "\"" if yyquote => yyquote = false; output += "''"
-      case "\"" => yyquote = true; output += "``"
+      case "“" => inOpenQuote = true; output += "``"
+      case "‘" => inOpenQuote = true; output += "`"
+      case "’" => inOpenQuote = true; output += "`"
+      case "”" => inOpenQuote = true; output += "``"
+      case "\"" if inOpenQuote => inOpenQuote = false; output += "''"
+      case "\"" => inOpenQuote = true; output += "``"
       case _ => output += treebankMappings.getOrElse(t, t)
     }
     

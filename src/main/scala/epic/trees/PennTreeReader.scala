@@ -21,6 +21,7 @@ import java.io.PushbackReader
 import java.io.Reader
 import java.io.StringReader
 import scala.collection.mutable.ArrayBuffer
+import epic.preprocess.TreebankTokenizer
 
 /**
  * PennTreeReader due to Adam Pauls.
@@ -31,7 +32,8 @@ import scala.collection.mutable.ArrayBuffer
 class PennTreeReader(val reader : Reader,
                      val lowercase : Boolean = false,
                      val ROOT_LABEL : String = "",
-                     dropLabels:Set[String]=Set("-NONE-")) extends Iterator[(Tree[String],IndexedSeq[String])] {
+                     dropLabels:Set[String]=Set("-NONE-"),
+                     val unescapeTokens: Boolean = true) extends Iterator[(Tree[String],IndexedSeq[String])] {
 
   private val in = new PushbackReader(reader, 4)
 
@@ -92,7 +94,9 @@ class PennTreeReader(val reader : Reader,
     }
 
     in.unread(ch);
-    sb.toString();
+    var res = sb.toString();
+
+    res
   }
 
   private def readChildren(pos : Int) : (IndexedSeq[Tree[String]],IndexedSeq[String]) = {
@@ -149,6 +153,8 @@ class PennTreeReader(val reader : Reader,
 
   private def readLeaf() = {
     var label = readText(true, true);
+    if(unescapeTokens)
+      label = TreebankTokenizer.treebankTokenToToken(label)
     if (lowercase) label = label.toLowerCase;
     label
   }

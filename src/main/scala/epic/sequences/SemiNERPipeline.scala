@@ -109,7 +109,7 @@ object SemiConllNerPipeline extends LazyLogging {
       out += (labels(start).replaceAll(".-","").intern -> Span(start, i))
 
     assert(out.nonEmpty && out.last._2.end == words.length, out + " " + words + " " + labels)
-    Segmentation(out, TreebankTokenizer.tokensToTreebankTokens(words), ex.id)
+    Segmentation(out, words, ex.id)
   }
 
 

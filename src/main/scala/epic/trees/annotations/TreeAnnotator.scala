@@ -4,6 +4,7 @@ package annotations
 import epic.trees.BinarizedTree
 import runtime.ScalaRunTime
 import epic.parser.projections.ProjectionIndexer
+import epic.preprocess.TreebankTokenizer
 
 /**
  *
@@ -196,14 +197,16 @@ case class SplitAuxiliary() extends TreeAnnotator[AnnotatedLabel, String, Annota
 case class Punct(word: String) extends Annotation
 
 /**
- * Marks verb tags based on the auxiliary
+ * Marks tags that immediately dominate punctuation that don't include that punctuation
  */
 case class SplitPunct() extends TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] {
 
-  def apply(tree: BinarizedTree[AnnotatedLabel], words: Seq[String]) = {
+  def apply(tree: BinarizedTree[AnnotatedLabel], w: Seq[String]) = {
+    val words = w
     tree.extend {
       case UnaryTree(label, NullaryTree(lbl2, _), chain, span) if label.baseLabel == lbl2.baseLabel =>
         val w = words(span.begin)
+
         if (w.forall(!_.isLetterOrDigit) && label.baseLabel != w) label.annotate(Punct(w))
         else if(w.matches("-[LR].B-") && label.baseLabel != w) label.annotate(Punct(w))
         else label

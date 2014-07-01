@@ -176,6 +176,8 @@ object LatentModelFactory {
                                |,
                                |-LRB-
                                |-RRB-
+                               |(
+                               |)
                                |@CONJP
                                |@INTJ
                                |@LST

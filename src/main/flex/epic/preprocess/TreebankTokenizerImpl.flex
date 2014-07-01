@@ -314,12 +314,12 @@ d{Q} / ye                                                        {return current
 {NUM}                                                          { return currentToken(); }
 {ACRONYM_DEP}                                                  { return currentToken(); }
 {WHITESPACE}                                                   {} 
-\(                                                  {return currentToken("-LRB-");}
-\)                                                  {return currentToken("-RRB-");}
-\{                                                  {return currentToken("-LCB-");}
-\}                                                  {return currentToken("-RCB-");}
-\[                                                  {return currentToken("-LSB-");}
-\]                                                  {return currentToken("-RSB-");}
+// \(                                                  {return currentToken("-LRB-");}
+// \)                                                  {return currentToken("-RRB-");}
+//\{                                                  {return currentToken("-LCB-");}
+//\}                                                  {return currentToken("-RCB-");}
+//\[                                                  {return currentToken("-LSB-");}
+//\]                                                  {return currentToken("-RSB-");}
 ([.][.]+|…+)                                                 {return currentToken("...");}
 {LONG_END_PUNCT}                                        { return currentToken();}
 {PUNCT}                                               { return currentToken();}

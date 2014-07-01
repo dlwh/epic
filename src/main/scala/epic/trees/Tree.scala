@@ -24,6 +24,7 @@ import java.io.{StringReader, DataInput, DataOutput}
 import breeze.util.Lens
 import scala.annotation.tailrec
 import epic.slab.AnnotatedSpan
+import epic.preprocess.TreebankTokenizer
 
 @SerialVersionUID(1L)
 trait Tree[+L] extends Serializable {
@@ -118,14 +119,14 @@ object Tree {
     import tree._
     sb append "(" append tree.label
     if(isLeaf) {
-      sb append span.map(words).mkString(" "," ","")
+      sb append TreebankTokenizer.tokensToTreebankTokens(span.map(words).map(_.toString)).mkString(" "," ","")
     } else {
       //sb append "\n"
       var _lastWasNonTerminal = false
       for( c <- children ) {
         if(newline && (c.span.length != words.length) && (c.children.nonEmpty || _lastWasNonTerminal)) sb append "\n" append "  " * depth
         else sb.append(' ')
-        recursiveRender(c,depth+1,words, newline, sb)
+        recursiveRender(c,depth+1, words, newline, sb)
         _lastWasNonTerminal = c.children.nonEmpty
       }
     }
@@ -134,6 +135,7 @@ object Tree {
       sb append ' '
     sb
   }
+
 
 
 
