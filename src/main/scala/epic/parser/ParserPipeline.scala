@@ -103,7 +103,7 @@ trait ParserPipeline extends LazyLogging {
     import ParserParams.JointParams
 
     val params = CommandLineParser.readIn[JointParams[Params]](args)
-    logger.info("Command line arguments for recovery:\n" + Configuration.fromObject(params).toCommandLineString)
+//    logger.info("Command line arguments for recovery:\n" + Configuration.fromObject(params).toCommandLineString)
     logger.info("Training Parser...")
 
     val parsers = trainParser(params.treebank, params.trainer)

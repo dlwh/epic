@@ -6,6 +6,11 @@ package epic.util
  * @author dlwh
  */
 sealed trait Optional[+A] {
+  def iterator: Iterator[A] = this match {
+    case Provided(a) => Iterator(a)
+    case NotProvided => Iterator.empty
+  }
+
   def get: A
   def isEmpty: Boolean = this eq NotProvided
   def size : Int = if(isEmpty) 0 else 1

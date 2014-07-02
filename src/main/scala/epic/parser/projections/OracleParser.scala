@@ -3,10 +3,8 @@ package epic.parser.projections
 import epic.constraints.{CachedChartConstraintsFactory, ChartConstraints}
 import epic.trees._
 import epic.parser._
-import epic.lexicon.TagScorer
 import breeze.numerics.I
-import scala.collection.GenTraversableLike
-import epic.util.{SafeLogging, CacheBroker}
+import epic.util.{NotProvided, Optional, SafeLogging, CacheBroker}
 import epic.parser.GrammarAnchoring.StructureDelegatingAnchoring
 import breeze.config.{Configuration, CommandLineParser, Help}
 import java.io.File
@@ -16,53 +14,66 @@ import epic.trees.ProcessedTreebank
 import epic.trees.TreeInstance
 import epic.parser.ViterbiDecoder
 import epic.parser.ParserParams.XbarGrammar
-import epic.trees.annotations.TreeAnnotator
 import breeze.collection.mutable.TriangularArray
 import epic.constraints.ChartConstraints.UnifiedFactory
 
 /**
  * Finds the best tree (relative to the gold tree) s.t. it's reacheable given the current anchoring.
  * Best is measured as number of correct labeled spans, as usual.
+ *
+ * If backupGrammar is provided, it will be used to find such a tree in the case that no tree can be
+ * found with grammar (given the current constraints)
+ *
  * @author dlwh
  */
-class OracleParser[L, L2, W](val refinedGrammar: SimpleGrammar[L, L2, W]) extends SafeLogging {
+class OracleParser[L, L2, W](val grammar: SimpleGrammar[L, L2, W], backupGrammar: Optional[SimpleGrammar[L, L2, W]] = NotProvided) extends SafeLogging {
   private val cache = CacheBroker().make[IndexedSeq[W], BinarizedTree[L2]]("OracleParser")
 
   private var problems  = 0
   private var total = 0
-  import refinedGrammar.topology
-
-  private def refinements = refinedGrammar.refinements
 
   def forTree(tree: BinarizedTree[L2],
               words: IndexedSeq[W],
               constraints: ChartConstraints[L]) = try {
-    val projectedTree: BinarizedTree[L] = tree.map(refinements.labels.project)
+    val projectedTree: BinarizedTree[L] = tree.map(grammar.refinements.labels.project)
     cache.getOrElseUpdate(words, {
-      val treeconstraints = ChartConstraints.fromTree(topology.labelIndex, projectedTree)
+      val treeconstraints = ChartConstraints.fromTree(grammar.topology.labelIndex, projectedTree)
       if(constraints.top.containsAll(treeconstraints.top) && constraints.bot.containsAll(treeconstraints.bot)) {
         synchronized(total += 1)
         tree
       } else try {
-        val w = words
-        val marg = makeGoldPromotingAnchoring(w, tree, treeconstraints, constraints).maxMarginal
-
-        val closest: BinarizedTree[(L, Int)] = new ViterbiDecoder[L,W]().extractMaxDerivationParse(marg)
 
         logger.warn {
-          val stats = new ParseEval(Set.empty[L]).apply(closest.map(_._1), projectedTree)
-          val ratio =  synchronized{problems += 1; total += 1; problems * 1.0 / total}
-          f"Gold tree for $words not reachable. Best has score: $stats. $ratio%.2f are bad so far. "
+          val ratio = synchronized {
+            problems += 1;
+            total += 1;
+            problems * 1.0 / total
+          }
+          f"Gold tree for $words not reachable. $ratio%.2f are bad so far. "
         }
 
-        val globalizedClosest: BinarizedTree[L2] = closest.map({refinements.labels.globalize(_:L, _:Int)}.tupled)
-        logger.trace {
-          s"Reachable: ${globalizedClosest.render(words, newline = true)}\nGold:${tree.render(words, newline = true)}"
-        }
-        globalizedClosest
+        (IndexedSeq(grammar) ++ backupGrammar.iterator).iterator.map { grammar =>
+          try {
+            val w = words
+            val marg = makeGoldPromotingAnchoring(grammar, w, tree, treeconstraints, constraints).maxMarginal
+
+            val closest: BinarizedTree[(L, Int)] = new ViterbiDecoder[L, W]().extractMaxDerivationParse(marg)
+
+            val globalizedClosest: BinarizedTree[L2] = closest.map({
+              grammar.refinements.labels.globalize(_: L, _: Int)
+            }.tupled)
+            logger.trace {
+              s"Reachable: ${globalizedClosest.render(words, newline = true)}\nGold:${tree.render(words, newline = true)}"
+            }
+            Some(globalizedClosest)
+          } catch {
+            case ex: ParseExtractionException => None
+          }
+        }.flatten.next()
+
       } catch {
-        case ex:ParseExtractionException =>
-          logger.error("Couldn't find a parse for " + words +": " + ex.getMessage, ex)
+        case ex:NoSuchElementException =>
+          logger.error("Couldn't find a tree for $words")
           tree
       }
     })
@@ -73,11 +84,13 @@ class OracleParser[L, L2, W](val refinedGrammar: SimpleGrammar[L, L2, W]) extend
   }
 
 
-  def makeGoldPromotingAnchoring(w: IndexedSeq[W],
+  def makeGoldPromotingAnchoring(grammar: SimpleGrammar[L, L2, W],
+                                 w: IndexedSeq[W],
                                  tree: BinarizedTree[L2],
                                  treeconstraints: ChartConstraints[L],
                                  constraints: ChartConstraints[L]): GrammarAnchoring[L, W] = {
-    val correctRefinedSpans = GoldTagPolicy.goldTreeForcing(tree.map(refinements.labels.fineIndex))
+    import grammar.{refinements => _, _}
+    val correctRefinedSpans = GoldTagPolicy.goldTreeForcing(tree.map(grammar.refinements.labels.fineIndex))
     val correctUnaryChains = {
       val arr = TriangularArray.fill(w.length + 1)(IndexedSeq.empty[String])
       for(UnaryTree(a, btree, chain, span) <- tree.allChildren) {
@@ -86,9 +99,9 @@ class OracleParser[L, L2, W](val refinedGrammar: SimpleGrammar[L, L2, W]) extend
       arr
     }
     new StructureDelegatingAnchoring[L, W] {
-      protected val baseAnchoring: GrammarAnchoring[L, W] = refinedGrammar.anchor(w)
+      protected val baseAnchoring: GrammarAnchoring[L, W] = grammar.anchor(w)
       override def addConstraints(cs: ChartConstraints[L]): GrammarAnchoring[L, W] = {
-        makeGoldPromotingAnchoring(w, tree, treeconstraints, constraints & cs)
+        makeGoldPromotingAnchoring(grammar, w, tree, treeconstraints, constraints & cs)
       }
 
 
@@ -103,7 +116,7 @@ class OracleParser[L, L2, W](val refinedGrammar: SimpleGrammar[L, L2, W]) extend
         val isAllowed = treeconstraints.top.isAllowedLabeledSpan(begin, end, top)
         val isRightRefined = isAllowed && {
           val parentRef = baseAnchoring.parentRefinement(rule, ref)
-          val refTop = refinements.labels.globalize(top, parentRef)
+          val refTop = grammar.refinements.labels.globalize(top, parentRef)
           correctRefinedSpans.isGoldTopTag(begin, end, refTop)
         }
 
@@ -115,7 +128,7 @@ class OracleParser[L, L2, W](val refinedGrammar: SimpleGrammar[L, L2, W]) extend
       }
 
       def scoreSpan(begin: Int, end: Int, tag: Int, ref: Int): Double = {
-        val globalized = refinements.labels.globalize(tag, ref)
+        val globalized = grammar.refinements.labels.globalize(tag, ref)
         200 * I(treeconstraints.bot.isAllowedLabeledSpan(begin, end, tag)) +
           10 * I(correctRefinedSpans.isGoldBotTag(begin, end, globalized)) + 0.1 * baseAnchoring.scoreSpan(begin, end, tag, ref)
       }
@@ -129,17 +142,17 @@ class OracleParser[L, L2, W](val refinedGrammar: SimpleGrammar[L, L2, W]) extend
 
     def apply(w: IndexedSeq[W], constraints: ChartConstraints[L]): RefinedChartMarginal[L, W] = {
       val refAnchoring = knownTrees.get(w).map { t =>
-        val projectedTree: BinarizedTree[L] = t.map(refinements.labels.project)
-        val treeconstraints = ChartConstraints.fromTree(topology.labelIndex, projectedTree)
-        makeGoldPromotingAnchoring(w, t, treeconstraints, constraints)
-      }.getOrElse(refinedGrammar.anchor(w))
+        val projectedTree: BinarizedTree[L] = t.map(grammar.refinements.labels.project)
+        val treeconstraints = ChartConstraints.fromTree(grammar.topology.labelIndex, projectedTree)
+        makeGoldPromotingAnchoring(grammar, w, t, treeconstraints, constraints)
+      }.getOrElse(grammar.anchor(w))
 
       RefinedChartMarginal(refAnchoring, true)
     }
   }
 
   def oracleParser(constraintGrammar: ChartConstraints.Factory[L, W], trees: IndexedSeq[TreeInstance[L2, W]])(implicit deb: Debinarizer[L]): Parser[L, W] = {
-    new Parser(refinedGrammar.topology, refinedGrammar.lexicon, constraintGrammar, oracleMarginalFactory(trees), ViterbiDecoder())
+    new Parser(grammar.topology, grammar.lexicon, constraintGrammar, oracleMarginalFactory(trees), ViterbiDecoder())
   }
 }
 

@@ -106,8 +106,9 @@ object ParserTrainer extends epic.parser.ParserPipeline with LazyLogging {
     var theTrees = trainTrees.toIndexedSeq.filterNot(sentTooLong(_, params.maxParseLength))
 
     if(useConstraints && enforceReachability)  {
-      val refGrammar = GenerativeParser.annotated(initialParser.topology, initialParser.lexicon, TreeAnnotator.identity, trainTrees)
-      val proj = new OracleParser(refGrammar)
+      val treebankGrammar = GenerativeParser.annotated(initialParser.topology, initialParser.lexicon, TreeAnnotator.identity, trainTrees)
+      val markovizedGrammar = GenerativeParser.annotated(initialParser.topology, initialParser.lexicon, annotator, trainTrees)
+      val proj = new OracleParser(treebankGrammar, markovizedGrammar)
       theTrees = theTrees.par.map(ti => ti.copy(tree=proj.forTree(ti.tree, ti.words, constraints.constraints(ti.words)))).seq.toIndexedSeq
     }
 
