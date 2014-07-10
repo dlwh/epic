@@ -258,23 +258,23 @@ object ParserChartConstraintsFactory {
 }
 
 
-case class ProjectionParams(treebank: ProcessedTreebank,
-                            @Help(text="Location of the parser")
-                            parser: File,
-                            @Help(text="path to cache database for constraints")
-                            out: File = new File("constraints.cache"),
-                            @Help(text="name of the table for the cache database")
-                            name: String = "parseConstraints",
-                            @Help(text="Longest train sentence to build constraintFactory for.")
-                            maxParseLength: Int = 80,
-                            threshold: Double = -7) {
-}
+
 
 /**
   * Object for creating  [[epic.constraints.CachedChartConstraintsFactory]]
  * from a parser and prepopulating it with the contents of a treebank.
   */
 object PrecacheConstraints extends LazyLogging {
+  case class ProjectionParams(treebank: ProcessedTreebank,
+                              @Help(text="Location of the parser")
+                              parser: File,
+                              @Help(text="path to cache database for constraints")
+                              out: File = new File("constraints.cache"),
+                              @Help(text="name of the table for the cache database")
+                              name: String = "parseConstraints",
+                              @Help(text="Longest train sentence to build constraintFactory for.")
+                              maxParseLength: Int = 80,
+                              threshold: Double = -7)
 
   /**
    * Method for creating  [[epic.constraints.CachedChartConstraintsFactory]]
