@@ -19,10 +19,24 @@ import epic.constraints.ChartConstraints.UnifiedFactory
 
 /**
  * Finds the best tree (relative to the gold tree) s.t. it's reacheable given the current anchoring.
- * Best is measured as number of correct labeled spans, as usual.
+ * Best is measured as number of correct labeled spans, as usual. If the given treebank symbol is correct,
+ * bonus points can be awarded for getting the right refinement.
+ *
+ * On the training set, the "best" reachable tree will not always (~5% of the time) be the correct tree,
+ * because pruning will remove the right answer. We don't want to try to train towards an unreachable tree,
+ * because the training algorithm will do bad things. Instead, we want the best possible tree that
+ * our parser could conceivably produce. That is why this class exists.
  *
  * If backupGrammar is provided, it will be used to find such a tree in the case that no tree can be
- * found with grammar (given the current constraints)
+ * found with grammar (given the current constraints).
+ *
+ * Typically, the first grammar will be a treebank grammar that has no horizontal markovization (i.e.
+ * it is not forgetfully binarized) and it also remembers the functional tags like -TMP.
+ * The backup grammar is usually the grammar
+ * with which the pruning masks were produced; because of the way we prune, that parser will always
+ * be able to find a tree (assuming that it was able to find a tree without pruning.)
+ *
+ * TODO: should be a cascade of grammars
  *
  * @author dlwh
  */
