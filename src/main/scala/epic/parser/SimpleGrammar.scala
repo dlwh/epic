@@ -31,16 +31,20 @@ import epic.constraints.ChartConstraints
 import epic.features.EnglishWordClassGenerator
 
 /**
+ * A [[epic.parser.SimpleGrammar]] is a grammar where the topology of
+ * the grammar (including the refinements) and the scores for the rules
+ * does not vary with the input sentence. That is, this is the class for the standard
+ * kind of PCFG/WCFG that are normally taught.
  *
  * @author dlwh
  */
 @SerialVersionUID(2)
 class SimpleGrammar[L, L2, W](val topology: RuleTopology[L],
-                                     val lexicon: Lexicon[L, W],
-                                     val refinements: GrammarRefinements[L, L2],
-                                     val refinedTopology: RuleTopology[L2],
-                                     val ruleScoreArray: Array[Double],
-                                     val tagScorer: TagScorer[L2, W]) extends Grammar[L, W] with Serializable {
+                              val lexicon: Lexicon[L, W],
+                              val refinements: GrammarRefinements[L, L2],
+                              val refinedTopology: RuleTopology[L2],
+                              val ruleScoreArray: Array[Double],
+                              val tagScorer: TagScorer[L2, W]) extends Grammar[L, W] with Serializable {
   def ruleScore(r: Int, ruleRef: Int):Double = {
     val global = refinements.rules.globalize(r, ruleRef)
     ruleScoreArray(global)

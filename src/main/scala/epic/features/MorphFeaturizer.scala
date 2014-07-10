@@ -10,7 +10,6 @@ import scala.io.Source
 import epic.parser.morph.MorphFeat
 import scala.collection.mutable.HashMap
 import scala.collection.mutable.ArrayBuffer
-import IndicatorFeature
 import java.io.InputStreamReader
 
 class MorphFeaturizer private (morphLookupTable: MorphFeaturizer.MorphLookupTable) extends WordFeaturizer[String] with Serializable {

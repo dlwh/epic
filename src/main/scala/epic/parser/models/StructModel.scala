@@ -19,7 +19,6 @@ package models
 import epic.parser.projections.GrammarRefinements
 import epic.framework.Feature
 import java.io.{PrintStream, FileOutputStream, File}
-import features._
 import breeze.linalg._
 import epic.trees._
 import epic.trees.annotations.TreeAnnotator

@@ -5,6 +5,10 @@ import scala.collection.mutable.ArrayBuffer
 import breeze.linalg.CSCMatrix
 
 /**
+ * This class is mostly an implementation detail. It's used for
+ * [[epic.parser.SimpleGrammar]] instances to accelerate parsing. It's kind of
+ * like a compressed sparse columns matrix ([[breeze.linalg.CSCMatrix]]), but it's a
+ * 3-d tensor  instead of a 2-d matrix.
  *
  *
  * @author dlwh

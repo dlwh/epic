@@ -17,7 +17,6 @@ package models
  limitations under the License.
 */
 
-import features._
 import epic.parser.projections.GrammarRefinements
 import breeze.linalg._
 import java.io.File

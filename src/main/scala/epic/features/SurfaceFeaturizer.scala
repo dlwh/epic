@@ -118,6 +118,7 @@ object SurfaceFeaturizer {
 
 }
 
+case class BigramFeature(offset: Int, prev: Feature, next: Feature) extends Feature
 case class SpanRelativeFeature(f: Feature, mp: MarkerPos) extends Feature
 case class SpanEdgeFeature(mp1: MarkerPos, mp2: MarkerPos, f1: Feature, f2: Feature) extends Feature
 

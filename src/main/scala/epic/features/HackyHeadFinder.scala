@@ -3,6 +3,14 @@ package epic.features
 import scala.collection.mutable.HashMap
 
 
+/**
+ * HackyHeadFinders find "heads" in a span using only preterminal labels.
+ * It doesn't use the syntactic structure of the sentence.
+ *
+ * @author gdurrett
+ * @tparam L
+ * @tparam T
+ */
 trait HackyHeadFinder[L,T] extends Serializable {
   def findHead(label: L, preterminals: Seq[T]): Int;
 }

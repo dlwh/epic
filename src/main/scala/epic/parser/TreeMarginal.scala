@@ -21,7 +21,7 @@ import breeze.linalg.{Counter, Counter2}
 /**
  * This isn't really a marginal, except in a degenerate sense.
  * It gives the likelihood of a known fixed tree under the
- * Anchoring and give expected counts (i.e. count the
+ * Anchoring as well as expected counts (i.e. count the
  * occurrences of each rule.)
  *
  * @param anchoring The grammar anchoring

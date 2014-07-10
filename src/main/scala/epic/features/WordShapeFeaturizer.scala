@@ -3,8 +3,6 @@ package epic.features
 import breeze.linalg.Counter
 import epic.framework.Feature
 import breeze.util.{Encoder, Interner, Index}
-import IndicatorFeature
-import scala.collection.immutable
 
 /**
  *
@@ -28,7 +26,7 @@ class WordShapeFeaturizer(wordCounts: Counter[String, Double],
         }
       }
 
-      private val _minimalFeatures: immutable.IndexedSeq[Array[Feature]] = (0 until words.length) map { i =>
+      private val _minimalFeatures: IndexedSeq[Array[Feature]] = (0 until words.length) map { i =>
         val index = indices(i)
         if(index >= 0) {
           WordShapeFeaturizer.this.minimalFeatures(index)

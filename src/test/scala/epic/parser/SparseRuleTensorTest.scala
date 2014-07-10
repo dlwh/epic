@@ -21,7 +21,6 @@ import org.scalatest._
 import org.scalatest.junit._
 import epic.trees.AnnotatedLabel
 
-
 /**
  *
  * @author dlwh
