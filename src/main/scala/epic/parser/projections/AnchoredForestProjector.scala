@@ -23,14 +23,14 @@ import breeze.collection.mutable.{TriangularArray, OpenAddressHashArray}
  * @author dlwh
  */
 @SerialVersionUID(2L)
-class AnchoredRuleProjector(threshold: Double) extends Serializable {
+class AnchoredForestProjector(threshold: Double) extends Serializable {
 
   /**
    * Projects a [[epic.parser.ParseMarginal]] to marginals on anchored rules.
    *
    */
   def projectRulePosteriors[L, W](charts: ParseMarginal[L, W],
-                                  goldTagPolicy: GoldTagPolicy[L] = GoldTagPolicy.noGoldTags[L]):AnchoredRuleProjector.ForestData = {
+                                  goldTagPolicy: GoldTagPolicy[L] = GoldTagPolicy.noGoldTags[L]):AnchoredForestProjector.ForestData = {
 
     val length = charts.length
     // preliminaries: we're not going to fill in everything: some things will be null.
@@ -112,12 +112,12 @@ class AnchoredRuleProjector(threshold: Double) extends Serializable {
 
     charts.visitPostorder(visitor, threshold)
 
-    new AnchoredRuleProjector.ForestData(lexicalScores, unaryScores, totalsUnaries, binaryScores, totals)
+    new AnchoredForestProjector.ForestData(lexicalScores, unaryScores, totalsUnaries, binaryScores, totals)
   }
 }
 
 
-object AnchoredRuleProjector {
+object AnchoredForestProjector {
 
   /**
    * POJO for anchored rule counts. entries may be null.

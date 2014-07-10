@@ -18,6 +18,14 @@ package epic.parser.projections
 import epic.trees.BinarizedTree
 import breeze.collection.mutable.TriangularArray
 
+/**
+ * GoldTagPolicys are used in places where sometimes (mostly for debugging) we'd like to know
+ * which labeled spans are "gold" (correct) and which are not.
+ *
+ * @author dlwh
+ *
+ * @tparam L
+ */
 trait GoldTagPolicy[L] {
   def isGoldSpan(start: Int, end: Int):Boolean
   def isGoldTopTag(start: Int, end: Int, tag: Int): Boolean

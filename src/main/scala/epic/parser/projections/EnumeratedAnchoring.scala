@@ -16,7 +16,7 @@ package projections
  limitations under the License.
 */
 import java.io._
-import projections.AnchoredRuleProjector.ForestData
+import projections.AnchoredForestProjector.ForestData
 import breeze.collection.mutable.{OpenAddressHashArray, TriangularArray}
 import epic.lexicon.Lexicon
 import epic.constraints.ChartConstraints
@@ -55,7 +55,7 @@ case class AnchoredPCFGProjector[L, W](threshold: Double = Double.NegativeInfini
   }
 
   protected def createAnchoring(charts: ParseMarginal[L, W], ruleData: ForestData, sentProb: Double) = {
-    val AnchoredRuleProjector.ForestData(lexicalScores, unaryScores, totalsUnaries, binaryScores, totalsBinaries) = ruleData
+    val AnchoredForestProjector.ForestData(lexicalScores, unaryScores, totalsUnaries, binaryScores, totalsBinaries) = ruleData
     val normUnaries:Array[OpenAddressHashArray[Double]] = for((ruleScores, totals) <- unaryScores zip totalsUnaries) yield {
       normalize(charts.topology, ruleScores, totals)
     }
@@ -92,7 +92,7 @@ case class AnchoredRuleMarginalProjector[L, W](threshold: Double = Double.Negati
   protected def createAnchoring(charts: ParseMarginal[L, W],
                                 ruleData: ForestData,
                                 sentProb: Double) = {
-    val AnchoredRuleProjector.ForestData(lexicalScores, unaryScores, _, binaryScores, _) = ruleData
+    val AnchoredForestProjector.ForestData(lexicalScores, unaryScores, _, binaryScores, _) = ruleData
     val normUnaries:Array[OpenAddressHashArray[Double]] = unaryScores.map(normalize)
 
     val normBinaries:Array[Array[OpenAddressHashArray[Double]]] = for (splits <- binaryScores) yield {
@@ -106,7 +106,9 @@ case class AnchoredRuleMarginalProjector[L, W](threshold: Double = Double.Negati
 
 /**
  * An [[epic.parser.projections.EnumeratedAnchoring]] is a compressed forest, with potentially distinct
- * rule and span scores for every possible anchoring.
+ * rule and span scores for every possible anchoring into the sentence. Commonly produced by either
+ * an [[epic.parser.projections.AnchoredPCFGProjector]] (for PCFG forests) or an [[epic.parser.projections.AnchoredRuleMarginalProjector]]
+ * (for rule marginal forests).
  * @tparam L
  * @tparam W
  */

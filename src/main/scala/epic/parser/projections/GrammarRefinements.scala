@@ -21,10 +21,17 @@ import epic.trees._
 import scala.collection.mutable.ArrayBuffer
 
 /**
- * 
+ * Handles the mapping between a coarser grammar and a finer grammar. (For example, an xbar
+ * grammar and an xbar grammar with latent variables.) It mostly just aggregates two
+ * [[epic.projections.ProjectionIndexer]]s, one for labels and one for rules. It also provides
+ * convenience methods for, e.g., getting all rule refinements that have a given parent refinment.
+ *
+ * Refined symbols and rules are given a "local" integer index that is specific to a coarse symbol.
+ * For example, NP-4 might have "global index" 37 for all symbols, but will have NP-specific local index 4.
+ * Analogously, NP-4 -> NP-3 PP-2 will have a NP -> NP PP specific local index.
+ *
  * @author dlwh
  */
-
 @SerialVersionUID(2L)
 final case class GrammarRefinements[C, F](labels: ProjectionIndexer[C, F], rules: ProjectionIndexer[Rule[C], Rule[F]]) {
   def compose[F2](other: GrammarRefinements[F, F2]):GrammarRefinements[C, F2] = new GrammarRefinements(labels compose other.labels, rules compose other.rules)

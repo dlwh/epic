@@ -16,7 +16,7 @@ package projections
  See the License for the specific language governing permissions and
  limitations under the License.
 */
-import projections.AnchoredRuleProjector.ForestData
+import projections.AnchoredForestProjector.ForestData
 import breeze.collection.mutable.{TriangularArray, OpenAddressHashArray}
 import epic.lexicon.Lexicon
 import epic.constraints.ChartConstraints
@@ -60,7 +60,7 @@ case class LabeledSpanProjector[L, W](topology: RuleTopology[L], threshold: Doub
   }
 
   protected def createAnchoring(charts: ParseMarginal[L, W], ruleData: ForestData, sentProb: Double) = {
-    val AnchoredRuleProjector.ForestData(lexicalScores, unaryScores, totalsUnaries, binaryScores, totalsBinaries) = ruleData
+    val AnchoredForestProjector.ForestData(lexicalScores, unaryScores, totalsUnaries, binaryScores, totalsBinaries) = ruleData
     val normUnaries:Array[OpenAddressHashArray[Double]] = for((ruleScores, totals) <- unaryScores zip totalsUnaries) yield {
       normalize(ruleScores, totals)
     }
@@ -76,7 +76,7 @@ case class LabeledSpanProjector[L, W](topology: RuleTopology[L], threshold: Doub
 }
 
 /**
- * TODO
+ * A SpanAnchoring just scores spans and unary rules. BinaryRules are all given score 0.0
  * @param topology
  * @param lexicon
  * @param words
