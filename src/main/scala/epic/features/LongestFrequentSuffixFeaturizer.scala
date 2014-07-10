@@ -4,7 +4,7 @@ import breeze.linalg.Counter
 import epic.framework.Feature
 import epic.features.LongestFrequentSuffixFeaturizer.LongestFrequentSuffix
 import breeze.numerics.I
-import epic.parser.features.IndicatorFeature
+import IndicatorFeature
 
 /**
  * TODO

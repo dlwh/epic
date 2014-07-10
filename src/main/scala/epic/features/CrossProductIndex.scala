@@ -7,7 +7,7 @@ import breeze.collection.mutable.OpenAddressHashArray
 import scala.util.hashing.MurmurHash3
 import scala.collection.mutable.ArrayBuffer
 import epic.util.{LockableSeenSet, Arrays}
-import epic.parser.features.LabelFeature
+import LabelFeature
 import com.typesafe.scalalogging.slf4j.{LazyLogging, Logger}
 import epic.util.SafeLogging
 

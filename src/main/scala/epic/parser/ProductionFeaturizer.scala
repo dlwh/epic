@@ -19,7 +19,7 @@ import breeze.util.{Encoder, Index}
 import epic.framework.Feature
 import epic.parser.projections.GrammarRefinements
 import epic.trees.Rule
-import epic.parser.features.IndicatorFeature
+import epic.features.IndicatorFeature
 
 
 /**

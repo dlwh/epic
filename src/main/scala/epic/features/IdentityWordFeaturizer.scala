@@ -3,7 +3,7 @@ package epic.features
 import breeze.linalg.Counter
 import epic.framework.Feature
 import breeze.util.{Encoder, Interner, Index}
-import epic.parser.features.IndicatorFeature
+import IndicatorFeature
 import scala.collection.immutable
 
 /**

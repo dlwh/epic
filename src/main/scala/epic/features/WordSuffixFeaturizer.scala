@@ -18,7 +18,7 @@ package epic.features
 import epic.framework.Feature
 import breeze.linalg._
 import collection.mutable.ArrayBuffer
-import epic.parser.features.IndicatorFeature
+import IndicatorFeature
 import breeze.util.{Encoder, Index}
 
 

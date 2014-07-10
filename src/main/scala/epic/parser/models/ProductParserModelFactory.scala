@@ -24,13 +24,12 @@ import epic.parser.projections.GrammarRefinements
 import epic.framework.Feature
 import epic.parser._
 import epic.trees._
-import epic.features.{WordPropertyFeaturizer, MinimalWordFeaturizer, IndexedWordFeaturizer}
+import epic.features.{IndicatorFeature, WordPropertyFeaturizer, MinimalWordFeaturizer, IndexedWordFeaturizer}
 import epic.util.{SafeLogging, CacheBroker}
 import epic.framework.ComponentFeature
 import epic.trees.BinaryRule
 import epic.trees.UnaryRule
 import epic.trees.TreeInstance
-import epic.parser.features.IndicatorFeature
 import epic.lexicon.Lexicon
 import epic.constraints.ChartConstraints.Factory
 

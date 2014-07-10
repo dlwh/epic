@@ -37,14 +37,12 @@ import epic.trees.annotations.MarkPreterminals
 import epic.trees.annotations.FixRootLabelVerticalAnnotation
 import epic.parser.RuleTopology
 import scala.io.Source
-import epic.parser.features.LabelFeature
 import epic.constraints.{CachedChartConstraintsFactory, ChartConstraints}
 import epic.constraints.ChartConstraints.Factory
 import epic.parser.models.LatentParserInference
 import epic.trees.UnaryTree
 import epic.trees.TreeInstance
 import epic.trees.NullaryTree
-import epic.parser.features.LabelFeature
 import epic.trees.BinaryRule
 import epic.trees.UnaryRule
 import epic.trees.BinaryTree
@@ -537,7 +535,7 @@ case class LatentSpanModelFactory(inner: SpanModelFactory,
     val surface = IndexedSplitSpanFeaturizer.fromData(span, annTrees)
 
 
-    def labelFeaturizer(l: (AnnotatedLabel, Int)) = Set(LabelFeature(l), l._1, l._1.baseAnnotatedLabel).toSeq
+    def labelFeaturizer(l: (AnnotatedLabel, Int)) = Set(l, l._1, l._1.baseAnnotatedLabel).toSeq
     def ruleFeaturizer(r: Rule[(AnnotatedLabel, Int)]) = if(useGrammar) Set(r, r.map(_._1)).toSeq else if(r.isInstanceOf[UnaryRule[(AnnotatedLabel, Int)]]) labelFeaturizer(r.parent) else Seq.empty
 
     val featurizer = new ProductionFeaturizer[AnnotatedLabel, (AnnotatedLabel, Int), String](topology, finalRefinements,
