@@ -25,7 +25,7 @@ trait ChartProjector[L, W] {
   type MyAnchoring <: UnrefinedGrammarAnchoring[L, W]
   protected def threshold:Double
   protected def createAnchoring(charts: ParseMarginal[L, W],
-                                ruleData: AnchoredRuleProjector.AnchoredData,
+                                ruleData: AnchoredRuleProjector.ForestData,
                                 sentProb: Double):MyAnchoring
 
   private def proj = new AnchoredRuleProjector(threshold)

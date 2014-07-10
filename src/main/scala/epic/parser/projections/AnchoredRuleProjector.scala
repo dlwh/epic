@@ -19,7 +19,7 @@ package projections
 import breeze.collection.mutable.{TriangularArray, OpenAddressHashArray}
 
 /**
- * Used for computed the expected number of anchored rules that occur at each span/split.
+ * Used for computing the x-bar parse forest from a [[epic.parser.ParseMarginal]].
  * @author dlwh
  */
 @SerialVersionUID(2L)
@@ -30,7 +30,7 @@ class AnchoredRuleProjector(threshold: Double) extends Serializable {
    *
    */
   def projectRulePosteriors[L, W](charts: ParseMarginal[L, W],
-                                  goldTagPolicy: GoldTagPolicy[L] = GoldTagPolicy.noGoldTags[L]):AnchoredRuleProjector.AnchoredData = {
+                                  goldTagPolicy: GoldTagPolicy[L] = GoldTagPolicy.noGoldTags[L]):AnchoredRuleProjector.ForestData = {
 
     val length = charts.length
     // preliminaries: we're not going to fill in everything: some things will be null.
@@ -112,7 +112,7 @@ class AnchoredRuleProjector(threshold: Double) extends Serializable {
 
     charts.visitPostorder(visitor, threshold)
 
-    new AnchoredRuleProjector.AnchoredData(lexicalScores, unaryScores, totalsUnaries, binaryScores, totals)
+    new AnchoredRuleProjector.ForestData(lexicalScores, unaryScores, totalsUnaries, binaryScores, totals)
   }
 }
 
@@ -122,16 +122,16 @@ object AnchoredRuleProjector {
   /**
    * POJO for anchored rule counts. entries may be null.
    */
-  case class AnchoredData(/** spanScore(trianuglarIndex)(label) = score of tag at position pos */
-                          spanScores: Array[OpenAddressHashArray[Double]],
-                          /** unaryScores(triangularIndex)(rule) => score of unary from parent to child */
-                          unaryScores: Array[OpenAddressHashArray[Double]],
-                          /** (triangularIndex)(parent) => same, but for unaries*/
-                          unaryTotals: Array[OpenAddressHashArray[Double]],
-                          /** binaryScores(triangularIndex)(split)(rule) => score of unary from parent to child */
-                          binaryScores: Array[Array[OpenAddressHashArray[Double]]],
-                          /** (triangularIndex)(parent) => sum of all binary rules at parent. */
-                          binaryTotals: Array[OpenAddressHashArray[Double]])
+  case class ForestData(/** spanScore(trianuglarIndex)(label) = score of tag at position pos */
+                        spanScores: Array[OpenAddressHashArray[Double]],
+                        /** unaryScores(triangularIndex)(rule) => score of unary from parent to child */
+                        unaryScores: Array[OpenAddressHashArray[Double]],
+                        /** (triangularIndex)(parent) => same, but for unaries*/
+                        unaryTotals: Array[OpenAddressHashArray[Double]],
+                        /** binaryScores(triangularIndex)(split)(rule) => score of unary from parent to child */
+                        binaryScores: Array[Array[OpenAddressHashArray[Double]]],
+                        /** (triangularIndex)(parent) => sum of all binary rules at parent. */
+                        binaryTotals: Array[OpenAddressHashArray[Double]])
 
 }
 

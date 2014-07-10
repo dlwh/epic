@@ -16,7 +16,7 @@ package projections
  limitations under the License.
 */
 import java.io._
-import projections.AnchoredRuleProjector.AnchoredData
+import projections.AnchoredRuleProjector.ForestData
 import breeze.collection.mutable.{OpenAddressHashArray, TriangularArray}
 import epic.lexicon.Lexicon
 import epic.constraints.ChartConstraints
@@ -54,8 +54,8 @@ case class AnchoredPCFGProjector[L, W](threshold: Double = Double.NegativeInfini
     }
   }
 
-  protected def createAnchoring(charts: ParseMarginal[L, W], ruleData: AnchoredData, sentProb: Double) = {
-    val AnchoredRuleProjector.AnchoredData(lexicalScores, unaryScores, totalsUnaries, binaryScores, totalsBinaries) = ruleData
+  protected def createAnchoring(charts: ParseMarginal[L, W], ruleData: ForestData, sentProb: Double) = {
+    val AnchoredRuleProjector.ForestData(lexicalScores, unaryScores, totalsUnaries, binaryScores, totalsBinaries) = ruleData
     val normUnaries:Array[OpenAddressHashArray[Double]] = for((ruleScores, totals) <- unaryScores zip totalsUnaries) yield {
       normalize(charts.topology, ruleScores, totals)
     }
@@ -90,9 +90,9 @@ case class AnchoredRuleMarginalProjector[L, W](threshold: Double = Double.Negati
   type MyAnchoring = EnumeratedAnchoring[L, W]
 
   protected def createAnchoring(charts: ParseMarginal[L, W],
-                                ruleData: AnchoredData,
+                                ruleData: ForestData,
                                 sentProb: Double) = {
-    val AnchoredRuleProjector.AnchoredData(lexicalScores, unaryScores, _, binaryScores, _) = ruleData
+    val AnchoredRuleProjector.ForestData(lexicalScores, unaryScores, _, binaryScores, _) = ruleData
     val normUnaries:Array[OpenAddressHashArray[Double]] = unaryScores.map(normalize)
 
     val normBinaries:Array[Array[OpenAddressHashArray[Double]]] = for (splits <- binaryScores) yield {

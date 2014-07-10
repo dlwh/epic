@@ -16,7 +16,7 @@ package projections
  See the License for the specific language governing permissions and
  limitations under the License.
 */
-import projections.AnchoredRuleProjector.AnchoredData
+import projections.AnchoredRuleProjector.ForestData
 import breeze.collection.mutable.{TriangularArray, OpenAddressHashArray}
 import epic.lexicon.Lexicon
 import epic.constraints.ChartConstraints
@@ -59,8 +59,8 @@ case class LabeledSpanProjector[L, W](topology: RuleTopology[L], threshold: Doub
     }
   }
 
-  protected def createAnchoring(charts: ParseMarginal[L, W], ruleData: AnchoredData, sentProb: Double) = {
-    val AnchoredRuleProjector.AnchoredData(lexicalScores, unaryScores, totalsUnaries, binaryScores, totalsBinaries) = ruleData
+  protected def createAnchoring(charts: ParseMarginal[L, W], ruleData: ForestData, sentProb: Double) = {
+    val AnchoredRuleProjector.ForestData(lexicalScores, unaryScores, totalsUnaries, binaryScores, totalsBinaries) = ruleData
     val normUnaries:Array[OpenAddressHashArray[Double]] = for((ruleScores, totals) <- unaryScores zip totalsUnaries) yield {
       normalize(ruleScores, totals)
     }
