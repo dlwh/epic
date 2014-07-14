@@ -1,7 +1,8 @@
 package epic.features
 
 /**
- *
+ * Generates "word-shapes" that track capitalization patterns and character type
+ * patterns. e.g.
  * @author dlwh
  */
 object WordShapeGenerator extends (String=>String) with Serializable {
