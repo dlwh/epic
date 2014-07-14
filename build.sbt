@@ -8,6 +8,8 @@ organization := "org.scalanlp"
 
 scalaVersion := "2.10.4"
 
+crossScalaVersions  := Seq("2.11.1", "2.10.4")
+
 resolvers ++= Seq(
   "ScalaNLP Maven2" at "http://repo.scalanlp.org/repo",
   "Scala Tools Snapshots" at "http://scala-tools.org/repo-snapshots/",
@@ -24,6 +26,14 @@ libraryDependencies ++= Seq(
   "org.scalatest" %% "scalatest" % "2.1.3" % "test",
   "org.scalacheck" %% "scalacheck" % "1.11.3" % "test"
 )
+
+libraryDependencies ++= (CrossVersion.partialVersion(scalaVersion.value) match {
+  // if scala 2.11+ is used, add dependency on scala-xml module
+  case Some((2, scalaMajor)) if scalaMajor >= 11 =>
+    Seq("org.scala-lang.modules" %% "scala-xml" % "1.0.1")
+    case _ =>
+    Seq.empty
+})
 
 
 

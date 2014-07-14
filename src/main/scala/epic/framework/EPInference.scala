@@ -22,7 +22,7 @@ import nak.inference.{ExpectationPropagation, Factor}
 import java.util.concurrent.atomic.AtomicLong
 import epic.parser.ParseMarginal
 
-class EPInference[Datum, Augment](val inferences: IndexedSeq[ProjectableInference[Datum, Augment]],
+class EPInference[Datum, Augment <: AnyRef](val inferences: IndexedSeq[ProjectableInference[Datum, Augment]],
                                   val maxEPIter: Int,
                                   val epInGold: Boolean = false)(implicit aIsFactor: Augment <:< Factor[Augment]) extends ProjectableInference[Datum, Augment] with SafeLogging with Serializable {
   type Marginal = EPMarginal[Augment, ProjectableInference[Datum, Augment]#Marginal]
@@ -71,7 +71,7 @@ case class EPMarginal[Augment, Marginal](logPartition: Double, q: Augment, margi
 object EPInference extends SafeLogging {
   val iters, calls = new AtomicLong(0)
 
-  def doInference[Datum, Augment,
+  def doInference[Datum, Augment <: AnyRef,
                   Marginal <: ProjectableInference[Datum, Augment]#Marginal,
                   Scorer](datum: Datum,
                           augment: Augment, inferences: IndexedSeq[ProjectableInference[Datum, Augment]],

@@ -26,7 +26,7 @@ import breeze.stats.distributions.Rand
  *
  * @author dlwh
  */
-class EPModel[Datum, Augment](maxEPIter: Int, initFeatureValue: Feature => Option[Double] = {(_:Feature) => None}, epInGold: Boolean = false, dropOutFraction: Double = 0.0)(
+class EPModel[Datum, Augment <: AnyRef](maxEPIter: Int, initFeatureValue: Feature => Option[Double] = {(_:Feature) => None}, epInGold: Boolean = false, dropOutFraction: Double = 0.0)(
                               _models: EPModel.CompatibleModel[Datum, Augment]*)(implicit aIsFactor: Augment <:< Factor[Augment]) extends Model[Datum] with SafeLogging {
   def models = _models
   type ExpectedCounts = EPExpectedCounts
