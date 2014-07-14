@@ -6,7 +6,7 @@ version := "0.2-SNAPSHOT"
 
 organization := "org.scalanlp"
 
-scalaVersion := "2.10.3"
+scalaVersion := "2.10.4"
 
 resolvers ++= Seq(
   "ScalaNLP Maven2" at "http://repo.scalanlp.org/repo",
@@ -18,7 +18,7 @@ libraryDependencies ++= Seq(
   "junit" % "junit" % "4.5" % "test",
   "org.scalanlp" %% "breeze" % "0.8.1",
   "org.scalanlp" %% "breeze-config" % "0.8.1-SNAPSHOT",
-  "org.scalanlp" %% "nak" % "1.2.1" intransitive(),
+  "org.scalanlp" %% "nak" % "1.3-SNAPSHOT",
   "org.mapdb" % "mapdb" % "0.9.2",
   "org.slf4j" % "slf4j-simple" % "1.7.6",
   "org.scalatest" %% "scalatest" % "2.1.3" % "test",
@@ -89,3 +89,5 @@ excludedJars in assembly <<= (fullClasspath in assembly) map { cp =>
 }
 
 seq(sbtjflex.SbtJFlexPlugin.jflexSettings: _*)
+
+net.virtualvoid.sbt.graph.Plugin.graphSettings
