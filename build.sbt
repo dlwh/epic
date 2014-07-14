@@ -22,6 +22,7 @@ libraryDependencies ++= Seq(
   "org.scalanlp" %% "breeze-config" % "0.8.1-SNAPSHOT",
   "org.scalanlp" %% "nak" % "1.3-SNAPSHOT",
   "org.mapdb" % "mapdb" % "0.9.2",
+  "org.apache.tika" % "tika-parsers" % "1.5",
   "org.slf4j" % "slf4j-simple" % "1.7.6",
   "org.scalatest" %% "scalatest" % "2.1.3" % "test",
   "org.scalacheck" %% "scalacheck" % "1.11.3" % "test"
