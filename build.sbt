@@ -6,7 +6,7 @@ version := "0.2-SNAPSHOT"
 
 organization := "org.scalanlp"
 
-scalaVersion := "2.10.4"
+scalaVersion := "2.11.1"
 
 crossScalaVersions  := Seq("2.11.1", "2.10.4")
 
