@@ -10,6 +10,7 @@ import epic.util.{LockableSeenSet, Arrays}
 import com.typesafe.scalalogging.slf4j.{LazyLogging, Logger}
 import epic.util.SafeLogging
 
+@SerialVersionUID(1743448091752596096L)
 case class CrossProductFeature[A, B](labelPart: A, surfacePart: B, id: String = "") extends Feature {
   override def toString = s"${if(id.nonEmpty) id else "CrossProduct"}Feature($labelPart, $surfacePart)"
 }

@@ -22,8 +22,11 @@ libraryDependencies ++= Seq(
   "org.scalanlp" %% "breeze-config" % "0.8.1-SNAPSHOT",
   "org.scalanlp" %% "nak" % "1.3-SNAPSHOT",
   "org.mapdb" % "mapdb" % "0.9.2",
-  "org.apache.tika" % "tika-parsers" % "1.5",
+  ("org.apache.tika" % "tika-parsers" % "1.5").exclude ("edu.ucar", "netcdf").exclude("com.googlecode.mp4parser","isoparser"),
+  "de.l3s.boilerpipe" % "boilerpipe" % "1.1.0",
+  "net.sourceforge.nekohtml" % "nekohtml" % "1.9.21",//needed by boilerpipe
   "org.slf4j" % "slf4j-simple" % "1.7.6",
+  "org.apache.commons" % "commons-lang3" % "3.3.2",
   "org.scalatest" %% "scalatest" % "2.1.3" % "test",
   "org.scalacheck" %% "scalacheck" % "1.11.3" % "test"
 )
@@ -86,18 +89,21 @@ publishArtifact in Test := false
 
 pomIncludeRepository := { _ => false }
 
-/*
-excludedJars in assembly <<= (fullClasspath in assembly) map { cp =>
- cp filter {_.data.getName.matches(".native.")}
-}
-*/
 assemblyOption in assembly ~= { _.copy(cacheOutput = false) }
 
+mergeStrategy in assembly <<= (mergeStrategy in assembly) { (old) =>
+{
+  case PathList("org", "w3c", "dom", _) => MergeStrategy.first
+  case x => old(x)
+}
+}
+
 
 
 excludedJars in assembly <<= (fullClasspath in assembly) map { cp =>
- cp filter {x => x.data.getName.matches("sbt.*") || x.data.getName.matches(".*macros.*")}
+ cp filter {x => x.data.getName.matches(".*native.*") || x.data.getName.matches("sbt.*") || x.data.getName.matches(".*macros.*") }
 }
+
 
 seq(sbtjflex.SbtJFlexPlugin.jflexSettings: _*)
 
