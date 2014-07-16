@@ -222,14 +222,14 @@ case class SplitPunct() extends TreeAnnotator[AnnotatedLabel, String, AnnotatedL
  * Marks VPs based on the kind of verb that it has.
  */
 case class SplitVP() extends TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] {
-  val activeVerbs = Set("VBZ", "VBD", "VBP", "MD")
+  val finiteVerbs = Set("VBZ", "VBD", "VBP", "MD")
   def apply(tree: BinarizedTree[AnnotatedLabel], words: Seq[String]) = tree.extend { t =>
     if(t.label.baseLabel != "VP") {
       t.label
     } else {
       val headTag = HeadFinder.collins.lensed[AnnotatedLabel].findHeadTag(t)
       val base = headTag.baseLabel
-      if (activeVerbs(base)) {
+      if (finiteVerbs(base)) {
         t.label.annotate(VPisVBF)
       } else {
         t.label.annotate(VPisX(base))
