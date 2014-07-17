@@ -58,7 +58,7 @@ public final int yychar()
 }
 
 final  scala.Tuple2<epic.trees.Span, epic.slab.Token> currentToken() {
-    return currentToken(new String(zzBuffer, zzStartRead, zzMarkedPos-zzStartRead).replaceAll("’", "'"));
+    return currentToken(new String(zzBuffer, zzStartRead, zzMarkedPos-zzStartRead).replace('’', '\'').replace('¨','\u0308'));
 }
 final scala.Tuple2<epic.trees.Span, epic.slab.Token> currentToken(String value) {
 //  return new String(zzBuffer, zzStartRead, zzMarkedPos-zzStartRead);
@@ -82,7 +82,7 @@ THAI       = [\u0E00-\u0E59]
 // basic word: a sequence of digits & letters (includes Thai to enable ThaiAnalyzer to function)
 ALPHANUM   = ({LETTER}|{THAI}|[:digit:]|_)+
 
-ALPHA      = ({LETTER})+
+ALPHA      = ({LETTER}|¨)+
 
 // acronyms: U.S.A., I.B.M., etc.
 // use a post-filter to remove dots
@@ -206,7 +206,7 @@ PUNCT = ({P}|{Q}|[?!@#$%\^&*_:;\]\[\"»«\202\204\206\207\213\221\222\223\224\22
 HAS_DIGIT  = ({LETTER}|[:digit:])* [:digit:] ({LETTER}|[:digit:])*
 
 
-LETTER     = [:letter:]
+LETTER     = ([:letter:]|¨)
 
 ENGLISH_CLITIC = ({Q}(ll|d|ve|s|re|LL|D|VE|S|RE|m|M|n|N|[eE][mM])?|[nN]{Q}[Tt])
 
