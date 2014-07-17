@@ -11,12 +11,15 @@ import epic.slab.{Slab, StringSlab}
 import epic.trees.Span
 import epic.util.{Optional, NotProvided}
 import org.apache.tika.Tika
+import org.apache.tika.exception.TikaException
 import org.apache.tika.io.TikaInputStream
 import org.apache.tika.metadata.{TikaMetadataKeys, Metadata}
-import org.apache.tika.parser.ParseContext
+import org.apache.tika.parser.{Parser, ParseContext}
+import org.apache.tika.parser.html.BoilerpipeContentHandler
+import org.apache.tika.sax.{ToTextContentHandler, BodyContentHandler, WriteOutContentHandler}
 import org.apache.xerces.parsers.AbstractSAXParser
 import org.cyberneko.html.HTMLConfiguration
-import org.xml.sax.{helpers, Attributes, Locator, InputSource}
+import org.xml.sax._
 import org.xml.sax.helpers.DefaultHandler
 import scala.collection.JavaConverters._
 import scala.collection.mutable.ArrayBuffer
@@ -33,19 +36,70 @@ import scala.xml.Elem
  **/
 object TextExtractor {
 
-  def extractText(url: URL): String = {
+  def extractText(url: URL, extractMainContentOnly: Boolean = true) = loadSlab(url, extractMainContentOnly).content
 
-    new Tika().parseToString(url)
+  def loadSlab(url: URL, extractMainContentOnly: Boolean = true) = {
+    val newLineTags = Set("li","p", "br")
 
+    val textHandler = new ToTextContentHandler() {
+      override def ignorableWhitespace(ch: Array[Char], start: Int, length: Int): Unit = characters(ch, start, length)
+
+      override def startElement(uri: String, localName: String, qName: String, attributes: Attributes): Unit = {
+        super.startElement(uri, localName, qName, attributes)
+
+        if (newLineTags(qName.toLowerCase)) {
+          ignorableWhitespace(Array('\n','\n'), 0, 2)
+        }
+
+      }
+    }
+    val handler = if(extractMainContentOnly) {
+      new BoilerpipeContentHandler(textHandler) {
+        // stupid handler doesn't pass whitespace
+        /*
+        override def ignorableWhitespace(ch: Array[Char], start: Int, length: Int): Unit = {
+          try {
+            characters(ch, start, length)
+          } catch {
+            case ex: ArrayIndexOutOfBoundsException =>
+          }
+        }
+        */
+
+
+
+        setIncludeMarkup(true)
+      }
+    } else {
+      textHandler
+    }
+    val tk = new Tika()
+    val parser = tk.getParser
+
+    val metadata: Metadata = new Metadata
+    val stream: InputStream = TikaInputStream.get(url, metadata)
+
+    try {
+      val context: ParseContext = new ParseContext
+      context.set(classOf[Parser], parser)
+      parser.parse(stream, handler, metadata, context)
+    } finally {
+      stream.close()
+    }
+
+
+    val content = textHandler.toString.trim
+
+    Slab(content).++(Iterator(Span(0, content.length) -> epic.slab.Source(url)))
   }
 
 
-  case class Content(labels: Set[String] = Set.empty)
 
-  /**
+  /* TODO: I'd like to be able to keep the XHTML formatting in the text, but right now that looks like it's going to
+  cause problems with the way slabs work. (Namely, we'll get discontiguous blocks of text, even in the middle of words.
    * Uses boilerpipe to extract the content from an XHTML document
    * @return
-   */
+  case class Content(labels: Set[String] = Set.empty)
   def loadSlab(url: URL):StringSlab[Content] = {
     val originalxhtml = extractXHTML(url)
     val doc = new BoilerpipeSAXInput(new InputSource(new StringReader(originalxhtml.toString))).getTextDocument
@@ -117,6 +171,7 @@ object TextExtractor {
     doc.getTextBlocks.asScala.find(_.getContainedTextElements.get(index)).map(b => Option(b.getLabels).map(_.asScala).iterator.flatten.toSet).getOrElse(Set.empty)
   }
 
+   */
   def extractXHTML(url: URL) = {
     val metadata = new Metadata()
     val stream: InputStream = TikaInputStream.get(url, metadata)
