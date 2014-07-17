@@ -58,7 +58,7 @@ public final int yychar()
 }
 
 final  scala.Tuple2<epic.trees.Span, epic.slab.Token> currentToken() {
-    return currentToken(new String(zzBuffer, zzStartRead, zzMarkedPos-zzStartRead).replace('’', '\'').replace('¨','\u0308'));
+    return currentToken(new String(zzBuffer, zzStartRead, zzMarkedPos-zzStartRead).replace('’', '\'').replace('¨','\u0308').replaceAll("-[\n\r]+",""));
 }
 final scala.Tuple2<epic.trees.Span, epic.slab.Token> currentToken(String value) {
 //  return new String(zzBuffer, zzStartRead, zzMarkedPos-zzStartRead);
@@ -83,6 +83,8 @@ THAI       = [\u0E00-\u0E59]
 ALPHANUM   = ({LETTER}|{THAI}|[:digit:]|_)+
 
 ALPHA      = ({LETTER}|¨)+
+
+NEWLINE = [\n\r]
 
 // acronyms: U.S.A., I.B.M., etc.
 // use a post-filter to remove dots
@@ -301,7 +303,7 @@ d{Q} / ye                                                        {return current
 
 // normal stuff
 // dashed words
-{WORD}({DASH}{WORD})+                                           {return currentToken();}
+{WORD}({DASH}{NEWLINE}*{WORD})+                                           {return currentToken();}
 {TWITTER_HANDLE}                                                     { return currentToken(); }
 {TWITTER_HASHTAG}                                                     { return currentToken(); }
 {WORD}                                        {return currentToken();}
