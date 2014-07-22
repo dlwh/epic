@@ -26,7 +26,7 @@ trait Segmenter[Tag] extends StringAnalysisFunction[Sentence with Token, Tag] wi
 
 object Segmenter {
 
-  def nerSystem(crf: SemiCRF[String, String]) = fromCRF(crf, (a: String) => EntityMention(a))
+  def nerSystem[L](crf: SemiCRF[L, String]) = fromCRF(crf, (a: L) => EntityMention(a.toString))
 
   def fromCRF[L, Tag](crf: SemiCRF[L, String], lToTag: L=>Tag):Segmenter[Tag] = new SemiCRFSegmenter(crf, lToTag)
 

@@ -280,29 +280,30 @@ object SegmentationModelFactory {
     import dsl._
 
     val featurizer = (
-      unigrams(word, 2)
-        + unigrams(brownClusters(9,15), 2)
-        + unigrams(clss, 1)
-//        + unigrams(shape, 2)
-        + bigrams(clss, 1)
-        // + bigrams(tagDict, 2)
-        // + bigrams(shape, 1)
+      unigrams(word + brown + shape, 2)
+//        + bigrams(shape, 1)
 //        + shape(-1) * shape * shape(1)
-        + prefixes()
-        + suffixes()
+//        + prefixes(7)
+//        + suffixes(7)
 //        + unigrams(props, 2)
 //        + bigrams(props, 1)
-      + unigrams(props, 1)
+//      + unigrams(props, 1)
+//      + context(brown, 4)
+//      + nextWordToLeft(word)
+//      + nextWordToRight(word)
       )
-    val spanFeatures = length + spanShape + sent //+ (sent + spanShape) * length
+    val spanFeatures = length  //+ sent //+ (sent + spanShape) * length
     featurizer -> spanFeatures
   }
 
 
-  case class Label1Feature[L](label: L, kind: Symbol) extends Feature
+  case class Label1Feature[L](label: L, kind: Any) extends Feature
   case class TransitionFeature[L](label: L, label2: L) extends Feature
 
-  val kinds = Array('Begin, 'Interior, 'Span)
+
+  object FeatureKinds extends Enumeration {
+    val Begin, Interior, Span, Label = Value
+  }
 
 
 
@@ -323,6 +324,7 @@ object SegmentationModelFactory {
     private val spanOffset = featureIndex.componentOffset(1)
 
     def anchor(w: IndexedSeq[String]): SemiCRFModel.BIEOFeatureAnchoring[L, String] = new SemiCRFModel.BIEOFeatureAnchoring[L, String] {
+      import FeatureKinds._
       val constraints = constraintFactory.constraints(w)
 
       def words: IndexedSeq[String] = w
@@ -334,11 +336,11 @@ object SegmentationModelFactory {
       def featureIndex = IndexedStandardFeaturizer.this.featureIndex
 
       def featuresForBegin(prev: Int, l: Int, w: Int): FeatureVector = {
-        val features = wordFeatureIndex.crossProduct(bioeFeatures(l)(0) ++  transitionFeatures(prev)(l), wloc.featuresForWord(w), wordOffset)
+        val features = wordFeatureIndex.crossProduct(bioeFeatures(l)(Begin.id) ++ transitionFeatures(prev)(l) ++ bioeFeatures(l)(Label.id) , wloc.featuresForWord(w), wordOffset)
         new FeatureVector(features)
       }
       def featuresForInterior(cur: Int, pos: Int): FeatureVector = {
-        val features = wordFeatureIndex.crossProduct(bioeFeatures(cur)(1), wloc.featuresForWord(pos), wordOffset)
+        val features = wordFeatureIndex.crossProduct(bioeFeatures(cur)(Interior.id) ++ bioeFeatures(cur)(Label.id), wloc.featuresForWord(pos), wordOffset)
         new FeatureVector(features)
       }
 
@@ -346,7 +348,7 @@ object SegmentationModelFactory {
         if (!constraints.isAllowedLabeledSpan(begin, end, cur)) {
           null
         } else {
-          val features = spanFeatureIndex.crossProduct(bioeFeatures(cur)(2), loc.featuresForSpan(begin, end), spanOffset)
+          val features = spanFeatureIndex.crossProduct(bioeFeatures(cur)(Span.id), loc.featuresForSpan(begin, end), spanOffset)
           //val features2 = spanFeatureIndex.crossProduct(transitionFeatures(prev)(cur), loc.featuresForSpan(begin, end), spanOffset)
           new FeatureVector(features)
         }
@@ -363,8 +365,9 @@ object SegmentationModelFactory {
                 constraintFactory: LabeledSpanConstraints.Factory[L, String],
                 hashFeatures: HashFeature.Scale = HashFeature.Absolute(0))
                (data: IndexedSeq[Segmentation[L, String]]):IndexedStandardFeaturizer[L] = {
+      import FeatureKinds._
       val labelPartIndex = Index[Feature]()
-      val bioeFeatures = Array.tabulate(labelIndex.size, kinds.length)((i,j) => Array(labelPartIndex.index(Label1Feature(labelIndex.get(i), kinds(j)))))
+      val bioeFeatures = Array.tabulate(labelIndex.size, FeatureKinds.maxId)((i,j) => Array(labelPartIndex.index(Label1Feature(labelIndex.get(i), FeatureKinds(j)))))
       val transitionFeatures = Array.tabulate(labelIndex.size, labelIndex.size)((i,j) => Array(labelPartIndex.index(TransitionFeature(labelIndex.get(i), labelIndex.get(j)))))
 
       val spanBuilder = new CrossProductIndex.Builder(labelPartIndex, spanFeaturizer.featureIndex, hashFeatures, includeLabelOnlyFeatures = true)
@@ -377,11 +380,13 @@ object SegmentationModelFactory {
         for ((l, span) <- d.segments) {
           val li = labelIndex(l)
           // featuresForBegin
-          wordBuilder.add(bioeFeatures(li)(0), wordFeats.featuresForWord(span.begin))
+          wordBuilder.add(bioeFeatures(li)(FeatureKinds.Begin.id), wordFeats.featuresForWord(span.begin))
+          wordBuilder.add(bioeFeatures(li)(FeatureKinds.Label.id), wordFeats.featuresForWord(span.begin))
           wordBuilder.add(transitionFeatures(last)(li), wordFeats.featuresForWord(span.begin))
           // interior
           for(i <- (span.begin+1) until span.end) {
-            wordBuilder.add(bioeFeatures(li)(1), wordFeats.featuresForWord(i))
+            wordBuilder.add(bioeFeatures(li)(FeatureKinds.Interior.id), wordFeats.featuresForWord(i))
+            wordBuilder.add(bioeFeatures(li)(FeatureKinds.Label.id), wordFeats.featuresForWord(i))
           }
           // span
           spanBuilder.add(bioeFeatures(li)(2), feats.featuresForSpan(span.begin, span.end))

@@ -67,7 +67,7 @@ object SurfaceFeaturizer {
   case class SpanEdgesFeaturizer[W](f1: MarkedWordFeaturizer[W], f2: MarkedWordFeaturizer[W]) extends SurfaceFeaturizer[W] {
     def anchor(w: IndexedSeq[W]): SurfaceFeatureAnchoring[W] = {
       val loc1 = f1.wf.anchor(w)
-      val loc2 = f2.wf.anchor(w)
+      val loc2 = if(f1.wf eq f2.wf) loc1 else f2.wf.anchor(w)
       new SurfaceFeatureAnchoring[W] {
         def featuresForSpan(begin: Int, end: Int): Array[Feature] = {
           val ffs1 = loc1.featuresForWord(f1.mp.toPos(begin, end))

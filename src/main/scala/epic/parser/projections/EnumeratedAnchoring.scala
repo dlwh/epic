@@ -75,6 +75,7 @@ case class AnchoredPCFGProjector[L, W](threshold: Double = Double.NegativeInfini
  * Creates anchorings for a set of trees from some parser using p(rule | sentence) marginals.
  * @author dlwh
  */
+@SerialVersionUID(469174684243960202L)
 case class AnchoredRuleMarginalProjector[L, W](threshold: Double = Double.NegativeInfinity) extends ChartProjector[L, W] {
   private def normalize(ruleScores: OpenAddressHashArray[Double]):OpenAddressHashArray[Double] = {
     if(ruleScores eq null) null

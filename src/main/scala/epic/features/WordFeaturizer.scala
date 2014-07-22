@@ -84,6 +84,8 @@ object WordFeaturizer {
       }
     })
 
+    def context(f: WordFeaturizer[String], order: Int = 4) = new ContextFeaturizer[String](f, order)
+
     implicit class RichFeaturizer[String](f: WordFeaturizer[String]) {
       def apply[T, R](i: T)(implicit wfChanger: WordFeaturizer.Modifier[String, T, R]):R = wfChanger(f, i)
       def apply(mp: MarkerPos) = new MarkedWordFeaturizer(f, mp)
@@ -130,7 +132,9 @@ class ZeroFeaturizer[W] extends WordFeaturizer[W] with SurfaceFeaturizer[W] with
 }
 
 
+
 class NextActualWordFeaturizer(f: WordFeaturizer[String], lookRight: Boolean, isPunct: (String=>Boolean) = (_.forall(!_.isLetterOrDigit))) extends WordFeaturizer[String] with Serializable {
+  val dir = if(lookRight) 'Right else 'Left
   def anchor(words: IndexedSeq[String]): WordFeatureAnchoring[String] = {
     val w = words
     new WordFeatureAnchoring[String] {
@@ -146,9 +150,9 @@ class NextActualWordFeaturizer(f: WordFeaturizer[String], lookRight: Boolean, is
         var done = false
         while(!done && pos >= 0 && pos < w.length) {
           if(isPunct(w(pos)))  {
-            feats ++= base.featuresForWord(pos).map(PunctuationFeature)
+            feats ++= base.featuresForWord(pos).map(PunctuationFeature(_, dir))
           } else {
-            feats ++= base.featuresForWord(pos)
+            feats ++= base.featuresForWord(pos).map(ActualWordFeature(_, dir))
             done = true
           }
           pos += delta
@@ -170,4 +174,5 @@ class NextActualWordFeaturizer(f: WordFeaturizer[String], lookRight: Boolean, is
 
 }
 
-case class PunctuationFeature(f: Feature) extends Feature
+case class PunctuationFeature(f: Feature, dir: Symbol) extends Feature
+case class ActualWordFeature(f: Feature, dir: Symbol) extends Feature

@@ -34,15 +34,16 @@ object BrownClusters {
 
 
   trait DSL {
-    val brown = new BrownClusterFeaturizer()
-    def brownClusters(prefixBegin: Int = 7, prefixEnd: Int = 10) = new BrownClusterFeaturizer(prefixBegin, prefixEnd)
+    // Tkachenko and Simanovsky liked these values
+    val brown = new BrownClusterFeaturizer(Array(7, 11, 13))
+    def brownClusters(lengths: Int*) = new BrownClusterFeaturizer(lengths.toArray)
   }
 }
 
 
 case class BrownClusterFeature(f: String) extends Feature
 
-case class BrownClusterFeaturizer(prefixBegin: Int = 7, prefixEnd: Int = 10) extends WordFeaturizer[String] with Serializable {
+case class BrownClusterFeaturizer(lengths: Array[Int]) extends WordFeaturizer[String] with Serializable {
 
   def anchor(w: IndexedSeq[String]): WordFeatureAnchoring[String] = new WordFeatureAnchoring[String] {
     def featuresForWord(pos: Int): Array[Feature] = {
@@ -66,7 +67,7 @@ case class BrownClusterFeaturizer(prefixBegin: Int = 7, prefixEnd: Int = 10) ext
   private val clusterFeatures = {
     BrownClusters.clusterIds
       .iterator
-      .map(k => k -> Array.range(prefixBegin min k.length, prefixEnd min k.length).map(l => BrownClusterFeature(k.substring(0, l)):Feature))
+      .map(k => k -> lengths.map(l => if(l > k.length) BrownClusterFeature(k) else BrownClusterFeature(k.substring(0, l))).toSet[Feature].toArray[Feature])
       .toMap
   }
 }
