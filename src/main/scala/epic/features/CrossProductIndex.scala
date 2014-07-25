@@ -1,14 +1,14 @@
 package epic.features
 
-import breeze.util.Index
-import epic.framework.{VisitableMarginal, Feature}
-import scala.collection.mutable
 import breeze.collection.mutable.OpenAddressHashArray
-import scala.util.hashing.MurmurHash3
+import breeze.linalg.{VectorBuilder, SparseVector, DenseVector, CSCMatrix}
+import breeze.util.Index
+import epic.framework.Feature
+import epic.util.{Arrays, LockableSeenSet, SafeLogging}
+
+import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
-import epic.util.{LockableSeenSet, Arrays}
-import com.typesafe.scalalogging.slf4j.{LazyLogging, Logger}
-import epic.util.SafeLogging
+import scala.util.hashing.MurmurHash3
 
 @SerialVersionUID(1743448091752596096L)
 case class CrossProductFeature[A, B](labelPart: A, surfacePart: B, id: String = "") extends Feature {
@@ -123,6 +123,39 @@ class CrossProductIndex[A, B] private (val firstIndex: Index[A],
 
     builder.result()
   }
+
+  def buildSparseMatrix(weights: DenseVector[Double]):(CSCMatrix[Double], SparseVector[Double]) = {
+    val builder = new CSCMatrix.Builder[Double](firstIndex.size, secondIndex.size)
+    val vbuilder = new VectorBuilder[Double](firstIndex.size)
+
+    if(includePlainLabelFeatures) {
+      for(i <- 0 until firstIndex.size) {
+        val w = weights(i)
+        if(w != 0.0)
+          vbuilder.add(i, w)
+      }
+    }
+
+    if(numHashFeatures == 0) {
+      // if no hash features, we can just iterate over the enumerated part of the index
+      for(((l, s), i) <- (labelPartOfFeature zip surfacePartOfFeature).zipWithIndex) {
+        val w = weights(i + labelOnlySize)
+        if(w != 0.0)
+          builder.add(l, s, w)
+      }
+    } else {
+      // otherwise, check everything
+      for(l <- 0 until firstIndex.size; s <- 0 until secondIndex.size) {
+        val i = mapped(l, s)
+        if(i >= 0 && weights(i) != 0) {
+          builder.add(l, s, weights(i))
+        }
+      }
+    }
+
+
+    (builder.result(), vbuilder.toSparseVector(true, true))
+  }
 }
 
 object CrossProductIndex {
@@ -133,6 +166,8 @@ object CrossProductIndex {
                       id: String = "CrossProductIndex",
                       val includeLabelOnlyFeatures: Boolean = true,
                       seenSet: LockableSeenSet[Long] = LockableSeenSet.always) extends SafeLogging {
+    def add(a: A, b: B):Int = add(firstIndex(a), secondIndex(b))
+
     private val mapping = Array.fill(firstIndex.size)(new OpenAddressHashArray[Int](secondIndex.size max 1, -1, 4))
     private val labelPart, surfacePart = new ArrayBuffer[Int]()
     private val labelOnlySize: Int = if(includeLabelOnlyFeatures) firstIndex.size else 0
