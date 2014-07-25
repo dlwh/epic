@@ -287,7 +287,7 @@ object SegmentationModelFactory {
 //        + suffixes(7)
 //        + unigrams(props, 2)
 //        + bigrams(props, 1)
-//      + unigrams(props, 1)
+      + unigrams(props, 1)
 //      + context(brown, 4)
 //      + nextWordToLeft(word)
 //      + nextWordToRight(word)
