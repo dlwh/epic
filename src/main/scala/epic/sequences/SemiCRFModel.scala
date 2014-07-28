@@ -1,19 +1,20 @@
 package epic
 package sequences
 
-import epic.framework._
-import breeze.util._
-import breeze.linalg._
-import epic.sequences.SemiCRF.{IdentityAnchoring, TransitionVisitor}
-import collection.mutable.ArrayBuffer
 import breeze.collection.mutable.TriangularArray
 import breeze.features.FeatureVector
-import epic.constraints.LabeledSpanConstraints
-import epic.lexicon.SimpleLexicon
-import epic.features._
-import epic.util.{SafeLogging, CacheBroker, NotProvided, Optional}
+import breeze.linalg._
+import breeze.util._
 import com.typesafe.scalalogging.slf4j.LazyLogging
+import epic.constraints.LabeledSpanConstraints
+import epic.features._
+import epic.framework._
+import epic.lexicon.SimpleLexicon
+import epic.sequences.SemiCRF.{IdentityAnchoring, TransitionVisitor}
 import epic.sequences.SemiCRFModel.BIEOFeatureAnchoring
+import epic.util.{NotProvided, Optional, SafeLogging}
+
+import scala.collection.mutable.ArrayBuffer
 
 /**
  *
@@ -238,7 +239,7 @@ class SegmentationModelFactory[L](val startSymbol: L,
                                   gazetteer: Optional[Gazetteer[Any, String]] = NotProvided,
                                   weights: Feature=>Double = { (f:Feature) => 0.0}) extends LazyLogging {
 
-  import SegmentationModelFactory._
+  import epic.sequences.SegmentationModelFactory._
 
   def makeModel(train: IndexedSeq[Segmentation[L, String]]): SemiCRFModel[L, String] = {
     val maxLengthMap = train.flatMap(_.segments.iterator).groupBy(_._1).mapValues(arr => arr.map(_._2.length).max)
@@ -281,14 +282,15 @@ object SegmentationModelFactory {
 
     val featurizer = (
       unigrams(word + brown + shape, 2)
-//        + bigrams(shape, 1)
+        + bigrams(shape, 1)
+//        + bigrams(brownClusters(7), 1)
 //        + shape(-1) * shape * shape(1)
-//        + prefixes(7)
-//        + suffixes(7)
+        + prefixes(7)
+        + suffixes(7)
 //        + unigrams(props, 2)
 //        + bigrams(props, 1)
       + unigrams(props, 1)
-//      + context(brown, 4)
+//      + context(brownClusters(7), 4)
 //      + nextWordToLeft(word)
 //      + nextWordToRight(word)
       )
@@ -324,7 +326,7 @@ object SegmentationModelFactory {
     private val spanOffset = featureIndex.componentOffset(1)
 
     def anchor(w: IndexedSeq[String]): SemiCRFModel.BIEOFeatureAnchoring[L, String] = new SemiCRFModel.BIEOFeatureAnchoring[L, String] {
-      import FeatureKinds._
+      import epic.sequences.SegmentationModelFactory.FeatureKinds._
       val constraints = constraintFactory.constraints(w)
 
       def words: IndexedSeq[String] = w
@@ -365,7 +367,6 @@ object SegmentationModelFactory {
                 constraintFactory: LabeledSpanConstraints.Factory[L, String],
                 hashFeatures: HashFeature.Scale = HashFeature.Absolute(0))
                (data: IndexedSeq[Segmentation[L, String]]):IndexedStandardFeaturizer[L] = {
-      import FeatureKinds._
       val labelPartIndex = Index[Feature]()
       val bioeFeatures = Array.tabulate(labelIndex.size, FeatureKinds.maxId)((i,j) => Array(labelPartIndex.index(Label1Feature(labelIndex.get(i), FeatureKinds(j)))))
       val transitionFeatures = Array.tabulate(labelIndex.size, labelIndex.size)((i,j) => Array(labelPartIndex.index(TransitionFeature(labelIndex.get(i), labelIndex.get(j)))))
