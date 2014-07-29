@@ -1,7 +1,7 @@
 package epic.sequences
 
 import epic.slab._
-import epic.trees.{Span, AnnotatedLabel}
+import epic.trees.Span
 
 /**
  * A [[epic.sequences.Segmenter]] splits up a sentence into labeled segments. For instance, it might
@@ -32,7 +32,7 @@ object Segmenter {
 
   case class SemiCRFSegmenter[L, Tag] (crf: SemiCRF[L, String], lToTag: L=>Tag) extends Segmenter[Tag] {
     override def apply(v1: IndexedSeq[String]) = {
-      crf.bestSequence(v1).segments.collect { case (l, span) if l != crf.outsideSymbol => lToTag(l) -> span}
+      crf.bestSequence(v1).segments.map { case (l, span) => lToTag(l) -> span}
     }
   }
 }

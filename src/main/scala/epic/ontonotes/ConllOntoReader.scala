@@ -15,13 +15,14 @@ package epic.ontonotes
  See the License for the specific language governing permissions and
  limitations under the License.
 */
-import io.Source
-import collection.{IndexedSeq, Iterator}
-import java.lang.String
-import epic.trees.{Span, AnnotatedLabel, Tree}
-import collection.mutable.{Stack, ArrayBuffer}
 import java.io.File
 import java.nio.charset.MalformedInputException
+
+import epic.trees.{AnnotatedLabel, Span, Tree}
+
+import scala.collection.mutable.{ArrayBuffer, Stack}
+import scala.collection.{IndexedSeq, Iterator}
+import scala.io.Source
 
 /**
  * Reads the Conll 2011 shared task format. See http://conll.cemantix.org/2011/data.html
@@ -52,7 +53,7 @@ object ConllOntoReader {
 
       val entities = collection.mutable.Map[(Int,Int), NerType.Value]()
       var currentChunkStart = -1
-      var currentChunkType = NerType.NotEntity
+      var currentChunkType = NerType.OutsideSentence
       for(i <- 0 until s.length) {
         val chunk = s(i)(10)
         if(chunk.startsWith("(")) {

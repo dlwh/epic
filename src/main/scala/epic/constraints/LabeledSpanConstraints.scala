@@ -251,12 +251,12 @@ object LabeledSpanConstraints {
   }
 
   @SerialVersionUID(1L)
-  class LayeredTagConstraintsFactory[L, W](lexicon: TagConstraints.Factory[L, W], maxLengthForLabel: Array[Int]) extends Factory[L, W]  with Serializable {
+  class LayeredTagConstraintsFactory[L, W](lexicon: TagConstraints.Factory[Option[L], W], maxLengthForLabel: Array[Int]) extends Factory[L, W]  with Serializable {
     def constraints(h: IndexedSeq[W]): LabeledSpanConstraints[L] = apply(h)
     def apply(words: IndexedSeq[W]) = layeredFromTagConstraints(lexicon.anchor(words), maxLengthForLabel)
   }
 
-  def layeredFromTagConstraints[L](localization: TagConstraints[L], maxLengthForLabel: Array[Int]): LabeledSpanConstraints[L] = {
+  def layeredFromTagConstraints[L](localization: TagConstraints[Option[L]], maxLengthForLabel: Array[Int]): LabeledSpanConstraints[L] = {
     val arr = new TriangularArray[BitSet](localization.length + 1)
     val maxMaxLength = maxLengthForLabel.max min localization.length
     for(i <- 0 until localization.length) {

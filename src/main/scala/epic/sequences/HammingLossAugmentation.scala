@@ -2,7 +2,7 @@ package epic.sequences
 
 import epic.framework.LossAugmentation
 import epic.constraints.LabeledSpanConstraints
-import breeze.util.Index
+import breeze.util.{OptionIndex, Index}
 
 /**
  * TODO
@@ -15,12 +15,12 @@ class HammingLossAugmentation[L, W](startSymbol: L, labelIndex: Index[L],
   def lossAugmentation(datum: Segmentation[L, W]): SemiCRF.Anchoring[L, W] = {
     val gt = GoldSegmentPolicy.goldSegmentForcing[L](datum.segments.map{ case (k,v) => (labelIndex(k), v)})
 
-    new HammingLossAugmentation.Anchoring(startSymbol, labelIndex, datum.words, gt, precisionScale, recallScale)
+    new HammingLossAugmentation.Anchoring(startSymbol, new OptionIndex(labelIndex), datum.words, gt, precisionScale, recallScale)
 }
 
 object HammingLossAugmentation {
   case class Anchoring[L, W](startSymbol: L,
-                             labelIndex: Index[L],
+                             labelIndex: OptionIndex[L],
                              words: IndexedSeq[W],
                              gt: GoldSegmentPolicy[L],
                              precisionScale: Double,

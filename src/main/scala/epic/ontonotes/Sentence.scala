@@ -30,21 +30,7 @@ case class Sentence(docId: String, index: Int,
 
   lazy val nerSegmentation: Segmentation[NerType.Value, String]  = {
     val sorted = ner.toIndexedSeq.sortBy((_: (DSpan, NerType.Value))._1.begin)
-    var out = new ArrayBuffer[(NerType.Value, Span)]()
-    var last = 0
-    for( (dspan, label) <- sorted ) {
-      assert(last <= dspan.begin)
-      while(dspan.begin != last) {
-        out += (NerType.NotEntity -> Span(last,last+1))
-        last += 1
-      }
-      out += (label -> Span(dspan.begin, dspan.end))
-      last = dspan.end
-    }
-    while(words.length != last) {
-      out += (NerType.NotEntity -> Span(last,last+1))
-      last += 1
-    }
+    val out = sorted.map { case (dspan, label) => label -> dspan.span}
 
     Segmentation(out, words, id)
   }
@@ -175,7 +161,7 @@ object NerType extends Enumeration {
     case "quantity" => Quantity
     case "time" => Time
     case "work_of_art" | "workofart" => WorkOfArt
-    case "notentity" | "none" => NotEntity
+//    case "notentity" | "none" => NotEntity
     case "bos" | "eos" | "outsidesentence" => OutsideSentence
   }
 
@@ -197,7 +183,7 @@ object NerType extends Enumeration {
   val Quantity = Value
   val Time = Value
   val WorkOfArt = Value
-  val NotEntity = Value
+//  val NotEntity = Value
   val OutsideSentence = Value // useful for chains
 
 

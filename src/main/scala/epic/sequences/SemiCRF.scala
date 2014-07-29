@@ -1,6 +1,6 @@
 package epic.sequences
 
-import breeze.util.Index
+import breeze.util.{OptionIndex, Index}
 import epic.trees.Span
 import breeze.numerics
 import epic.sequences.SemiCRF.Marginal
@@ -30,9 +30,8 @@ import epic.features.{WordFeaturizer, SurfaceFeaturizer}
 @SerialVersionUID(1L)
 trait SemiCRF[L, W] extends Serializable {
   def scorer(w: IndexedSeq[W]): SemiCRF.Anchoring[L, W]
-  def labelIndex: Index[L]
+  def labelIndex: OptionIndex[L]
   def startSymbol: L
-  def outsideSymbol: L
 
   def marginal(w: IndexedSeq[W]) = {
      SemiCRF.Marginal(scorer(w))
@@ -52,12 +51,12 @@ object SemiCRF {
 
 
   def buildSimple[L](data: IndexedSeq[Segmentation[L, String]],
-                     startSymbol: L, outsideSymbol: L,
+                     startSymbol: L,
                      gazetteer: Gazetteer[Any, String] = Gazetteer.empty[Any, String],
                      wordFeaturizer: Optional[WordFeaturizer[String]] = NotProvided,
                      spanFeaturizer: Optional[SurfaceFeaturizer[String]] = NotProvided,
                      opt: OptParams = OptParams(regularization = 1.0))(implicit broker: CacheBroker):SemiCRF[L, String] = {
-    val model: SemiCRFModel[L, String] = new SegmentationModelFactory[L](startSymbol, outsideSymbol, gazetteer = gazetteer, wordFeaturizer = wordFeaturizer, spanFeaturizer = spanFeaturizer).makeModel(data)
+    val model: SemiCRFModel[L, String] = new SegmentationModelFactory[L](startSymbol, gazetteer = gazetteer, wordFeaturizer = wordFeaturizer, spanFeaturizer = spanFeaturizer).makeModel(data)
 
     val obj = new ModelObjective(model, data)
     val cached = new CachedBatchDiffFunction(obj)
@@ -69,18 +68,16 @@ object SemiCRF {
   }
 
   def buildIOModel[L](data: IndexedSeq[Segmentation[L, String]],
-                      outsideSymbol: L,
                       gazetteer: Gazetteer[Any, String] = Gazetteer.empty[Any, String],
-                      opt: OptParams = OptParams())(implicit broker: CacheBroker): SemiCRF[Boolean, String] = {
-    val fixedData: IndexedSeq[Segmentation[Boolean, String]] = data.map{s =>
-      s.copy(segments=s.segments.map{case (l,span) => (l != outsideSymbol, span)})
+                      opt: OptParams = OptParams())(implicit broker: CacheBroker): SemiCRF[Unit, String] = {
+    val fixedData: IndexedSeq[Segmentation[Unit, String]] = data.map{s =>
+      s.copy(segments=s.segments.map{case (l,span) => ((), span)})
     }
-    buildSimple(fixedData, false, false, gazetteer, opt = opt)
+    buildSimple(fixedData, (), gazetteer, opt = opt)
   }
 
   def fromCRF[L, W](crf: CRF[L, W]):SemiCRF[L, W] = new SemiCRF[L, W] {
     def startSymbol: L = crf.startSymbol
-    override def outsideSymbol: L = startSymbol
 
     def scorer(w: IndexedSeq[W]): Anchoring[L, W] = new Anchoring[L, W] {
       val anch = crf.anchor(w)
@@ -92,19 +89,19 @@ object SemiCRF {
       def words: IndexedSeq[W] = w
 
       def scoreTransition(prev: Int, cur: Int, begin: Int, end: Int): Double = {
-        if(end - begin != 1) {
+        if(end - begin != 1 || prev == crf.labelIndex.size || cur == crf.labelIndex.size) {
           Double.NegativeInfinity
         } else {
           anch.scoreTransition(begin, prev, cur)
         }
       }
 
-      def labelIndex: Index[L] = crf.labelIndex
+      def labelIndex = new OptionIndex(crf.labelIndex)
 
       def startSymbol: L = crf.startSymbol
     }
 
-    def labelIndex: Index[L] = crf.labelIndex
+    override def labelIndex: OptionIndex[L] = new OptionIndex(crf.labelIndex)
   }
 
 
@@ -120,9 +117,9 @@ object SemiCRF {
     def words : IndexedSeq[W]
     def length: Int = words.length
     def constraints: LabeledSpanConstraints[L]
-    def maxSegmentLength(label: Int): Int = constraints.maxSpanLengthForLabel(label)
+    def maxSegmentLength(label: Int): Int = if(label >= labelIndex.size - 1) 1 else constraints.maxSpanLengthForLabel(label)
     def scoreTransition(prev: Int, cur: Int, begin: Int, end: Int):Double
-    def labelIndex: Index[L]
+    def labelIndex: OptionIndex[L]
     def startSymbol: L
 
     def ignoreTransitionModel: Boolean = false
@@ -284,20 +281,21 @@ object SemiCRF {
 
     }
 
-    def goldMarginal[L, W](scorer: Anchoring[L, W], segmentation: IndexedSeq[(L,Span)]):Marginal[L, W] = {
-      var lastSymbol = scorer.labelIndex(scorer.startSymbol)
+    def goldMarginal[L, W](scorer: Anchoring[L, W], segments: IndexedSeq[(L,Span)]):Marginal[L, W] = {
+      var lastSymbol = scorer.labelIndex(Some(scorer.startSymbol))
       var score = 0.0
       var lastEnd = 0
-      val goldEnds = Array.fill(segmentation.last._2.end)(-1)
-      val goldLabels = Array.fill(segmentation.last._2.end)(-1)
-      val goldPrevLabels = Array.fill(segmentation.last._2.end)(-1)
-      for( (l,span) <- segmentation) {
+      val goldEnds = Array.fill(scorer.length)(-1)
+      val goldLabels = Array.fill(scorer.length)(-1)
+      val goldPrevLabels = Array.fill(scorer.length)(-1)
+      val segmentation: Segmentation[L, W] = new Segmentation(segments, scorer.words)
+      for( (l,span) <- segmentation.segmentsWithOutside) {
         assert(span.begin == lastEnd)
         val symbol = scorer.labelIndex(l)
         assert(symbol != -1, s"$l not in index: ${scorer.labelIndex}")
         assert(scorer.constraints.isAllowedLabeledSpan(span.begin, span.end, symbol))
         score += scorer.scoreTransition(lastSymbol, symbol, span.begin, span.end)
-        assert(!score.isInfinite, " " + segmentation + " " + l + " " + span)
+        assert(!score.isInfinite, " " + segments + " " + l + " " + span)
         goldEnds(span.begin) = span.end
         goldLabels(span.begin) = symbol
         goldPrevLabels(span.begin) = lastSymbol
@@ -313,9 +311,9 @@ object SemiCRF {
 
         /** Visits spans with non-zero score, useful for expected counts */
         def visit(f: TransitionVisitor[L, W]) {
-          var lastSymbol = scorer.labelIndex(scorer.startSymbol)
+          var lastSymbol = scorer.labelIndex(Some(scorer.startSymbol))
           var lastEnd = 0
-          for( (l,span) <- segmentation) {
+          for( (l,span) <- segmentation.segmentsWithOutside) {
             assert(span.begin == lastEnd)
             val symbol = scorer.labelIndex(l)
             f.visitTransition(lastSymbol, symbol, span.begin, span.end, 1.0)
@@ -345,7 +343,7 @@ object SemiCRF {
       val numLabels = anchoring.labelIndex.size
       // total weight (logSum) for ending in pos with label l.
       val forwardScores = Array.fill(length+1, numLabels)(Double.NegativeInfinity)
-      forwardScores(0)(anchoring.labelIndex(anchoring.startSymbol)) = 0.0
+      forwardScores(0)(anchoring.labelIndex(Some(anchoring.startSymbol))) = 0.0
 
       val accumArray = new Array[Double](numLabels * length)
 
@@ -438,7 +436,8 @@ object SemiCRF {
             end -= 1
           }
 
-          backwardScores(begin)(prevLabel) = softmax(new DenseVector(accumArray, 0, 1, acc))
+          if(acc > 0)
+            backwardScores(begin)(prevLabel) = softmax(new DenseVector(accumArray, 0, 1, acc))
           prevLabel += 1
         }
 
@@ -459,7 +458,7 @@ object SemiCRF {
   }
 
   @SerialVersionUID(1L)
-  class IdentityConstraintSemiCRF[L, W](val labelIndex: Index[L], val startSymbol: L, val outsideSymbol: L) extends ConstraintSemiCRF[L, W] with Serializable { outer =>
+  class IdentityConstraintSemiCRF[L, W](val labelIndex: OptionIndex[L], val startSymbol: L) extends ConstraintSemiCRF[L, W] with Serializable { outer =>
     def scorer(w: IndexedSeq[W]) = new Anchoring[L,W]() {
       def words = w
       def scoreTransition(prev: Int, cur: Int, begin: Int, end: Int) = 0.0
@@ -478,8 +477,7 @@ object SemiCRF {
   @SerialVersionUID(1L)
   class BaseModelConstraintSemiCRF[L, W](val crf: SemiCRF[L, W], val threshold: Double = 1E-5) extends ConstraintSemiCRF[L, W] with Serializable {
     def startSymbol: L = crf.startSymbol
-    def labelIndex: Index[L] = crf.labelIndex
-    override def outsideSymbol: L = crf.outsideSymbol
+    def labelIndex = crf.labelIndex
 
     // TODO: make weak
     @transient
@@ -523,7 +521,7 @@ object SemiCRF {
         def constraints: LabeledSpanConstraints[L] = c
 
         def startSymbol: L = crf.startSymbol
-        def labelIndex: Index[L] = crf.labelIndex
+        def labelIndex:OptionIndex[L] = crf.labelIndex
 
         def scoreTransition(prev: Int, cur: Int, begin: Int, end: Int): Double =
           numerics.logI(c.isAllowedLabeledSpan(begin, end, cur))
@@ -538,9 +536,8 @@ object SemiCRF {
     def anchor(w: IndexedSeq[W]):AnchoredFeaturizer[L, W]
 
     def startSymbol: L
-    def outsideSymbol: L
 
-    def labelIndex: Index[L]
+    def labelIndex: OptionIndex[L]
     def featureIndex: Index[Feature]
   }
 
@@ -557,7 +554,7 @@ object SemiCRF {
     val forwardScores = Array.fill(length+1, numLabels)(Double.NegativeInfinity)
     val forwardLabelPointers = Array.fill(length+1, numLabels)(-1)
     val forwardBeginPointers = Array.fill(length+1, numLabels)(-1)
-    forwardScores(0)(anchoring.labelIndex(anchoring.startSymbol)) = 0.0
+    forwardScores(0)(anchoring.labelIndex(Some(anchoring.startSymbol))) = 0.0
 
     var end = 1
     while (end <= length) {
@@ -594,7 +591,9 @@ object SemiCRF {
     def rec(end: Int, label: Int) {
       if(end != 0) {
         val bestStart = forwardBeginPointers(end)(label)
-        segments += (anchoring.labelIndex.get(label) -> Span(bestStart, end))
+        anchoring.labelIndex.get(label).foreach { l =>
+          segments += (l -> Span(bestStart, end))
+        }
         rec(bestStart, forwardLabelPointers(end)(label))
       }
 
@@ -611,7 +610,7 @@ object SemiCRF {
     val forwardScores = Array.fill(length+1, numLabels)(0.0)
     val forwardLabelPointers = Array.fill(length+1, numLabels)(-1)
     val forwardBeginPointers = Array.fill(length+1, numLabels)(-1)
-    forwardScores(0)(m.anchoring.labelIndex(m.anchoring.startSymbol)) = 1.0
+    forwardScores(0)(m.anchoring.labelIndex(Some(m.anchoring.startSymbol))) = 1.0
 
     var end = 1
     while (end <= length) {
@@ -644,7 +643,10 @@ object SemiCRF {
     def rec(end: Int, label: Int) {
       if(end != 0) {
         val bestStart = forwardBeginPointers(end)(label)
-        segments += (m.anchoring.labelIndex.get(label) -> Span(bestStart, end))
+        m.anchoring.labelIndex.get(label).foreach { l =>
+          segments += (l -> Span(bestStart, end))
+        }
+
         rec(bestStart, forwardLabelPointers(end)(label))
       }
 
@@ -670,11 +672,11 @@ object SemiCRF {
       score
     }
 
-    def labelIndex: Index[L] = a.labelIndex
+    def labelIndex = a.labelIndex
     def startSymbol: L = a.startSymbol
   }
 
-  class IdentityAnchoring[L, W](val words: IndexedSeq[W], val labelIndex: Index[L], val startSymbol: L, val constraints: LabeledSpanConstraints[L]) extends Anchoring[L, W] {
+  class IdentityAnchoring[L, W](val words: IndexedSeq[W], val labelIndex: OptionIndex[L], val startSymbol: L, val constraints: LabeledSpanConstraints[L]) extends Anchoring[L, W] {
     def scoreTransition(prev: Int, cur: Int, beg: Int, end: Int): Double = 0.0
 
     def canStartLongSegment(pos: Int): Boolean = true

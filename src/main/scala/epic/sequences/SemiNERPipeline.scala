@@ -48,7 +48,7 @@ object SemiNerPipeline extends LazyLogging {
     val gazetteer =  None//Gazetteer.ner("en")
 
     // build feature Index
-    val model = new SegmentationModelFactory(NerType.OutsideSentence, NerType.NotEntity, gazetteer = gazetteer).makeModel(train)
+    val model = new SegmentationModelFactory(NerType.OutsideSentence, gazetteer = gazetteer).makeModel(train)
     val obj = new ModelObjective(model, train, params.nthreads)
     val cached = new CachedBatchDiffFunction(obj)
     if(params.checkGradient) {
@@ -57,7 +57,7 @@ object SemiNerPipeline extends LazyLogging {
 
     def eval(state: FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State) {
       val crf = model.extractCRF(state.x)
-      println("Eval + " + (state.iter+1) + " " + SegmentationEval.eval(crf, test, NerType.NotEntity))
+      println("Eval + " + (state.iter+1) + " " + SegmentationEval.eval(crf, test))
     }
 
     val finalState = params.opt.iterations(cached, obj.initialWeightVector(randomize=false)).tee(state => if((state.iter +1) % params.iterPerEval == 0) eval(state)).take(params.opt.maxIterations).last
@@ -86,7 +86,7 @@ object SemiConllNerPipeline extends LazyLogging {
         case 'O' =>
           if(start < i)
             out += (labels(start).replaceAll(".-","").intern -> Span(start, i))
-          out += ("O".intern -> Span(i, i+1))
+//          out += ("O".intern -> Span(i, i+1))
           start = i + 1
         case 'B' =>
           if(start < i)
@@ -108,7 +108,7 @@ object SemiConllNerPipeline extends LazyLogging {
     if(start < i)
       out += (labels(start).replaceAll(".-","").intern -> Span(start, i))
 
-    assert(out.nonEmpty && out.last._2.end == words.length, out + " " + words + " " + labels)
+//    assert(out.nonEmpty && out.last._2.end == words.length, out + " " + words + " " + labels)
     Segmentation(out, words, ex.id)
   }
 
@@ -135,7 +135,7 @@ object SemiConllNerPipeline extends LazyLogging {
 
 
     // build feature Index
-    val model: SemiCRFModel[String, String] = new SegmentationModelFactory("##", "O"/*, gazetteer = Gazetteer.ner("en" )*/).makeModel(train)
+    val model: SemiCRFModel[String, String] = new SegmentationModelFactory("##" /*, gazetteer = Gazetteer.ner("en" )*/).makeModel(train)
     val obj = new ModelObjective(model, train, params.nthreads)
     val cached = new CachedBatchDiffFunction(obj)
 
@@ -147,7 +147,7 @@ object SemiConllNerPipeline extends LazyLogging {
       Encoder.fromIndex(model.featureIndex).decode(state.x).iterator.toIndexedSeq.sortBy(-_._2.abs).takeWhile(_._2.abs > 1E-4) foreach {case (x, v) => out.println(v + "\t" + x)}
       val crf: SemiCRF[String, String] = model.extractCRF(state.x)
       println("Eval + " + (state.iter+1))
-      val stats = SegmentationEval.eval(crf, test, "O")
+      val stats = SegmentationEval.eval(crf, test)
       println("Final: " + stats)
       out.close()
       stats
