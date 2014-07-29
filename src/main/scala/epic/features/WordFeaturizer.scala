@@ -64,6 +64,8 @@ object WordFeaturizer {
     val lfsuf = LongestFrequentSuffixFeaturizer(summedCounts, commonWordThreshold)
 
 
+
+
     def suffixes(order: Int = 5) = new WordSuffixFeaturizer(summedCounts, suffixOrder = order, commonWordThreshold = commonWordThreshold)
     def prefixes(order: Int = 5) = new WordPrefixFeaturizer(summedCounts, prefixOrder = order, commonWordThreshold = commonWordThreshold)
 

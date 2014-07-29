@@ -294,7 +294,7 @@ object SegmentationModelFactory {
 //      + nextWordToLeft(word)
 //      + nextWordToRight(word)
       )
-    val spanFeatures = length  //+ sent //+ (sent + spanShape) * length
+    val spanFeatures = length //+ spanShape // //+ length * brownClusters(7)(begin) + length * brownClusters(7)(end)  //+ sent //+ (sent + spanShape) * length
     featurizer -> spanFeatures
   }
 
@@ -350,7 +350,12 @@ object SegmentationModelFactory {
         if (!constraints.isAllowedLabeledSpan(begin, end, cur)) {
           null
         } else {
-          val features = spanFeatureIndex.crossProduct(bioeFeatures(cur)(Span.id), loc.featuresForSpan(begin, end), spanOffset)
+          var features = spanFeatureIndex.crossProduct(bioeFeatures(cur)(Span.id), loc.featuresForSpan(begin, end), spanOffset)
+
+          if(end - begin == 1) {
+            features ++= wordFeatureIndex.crossProduct(bioeFeatures(cur)(Span.id), wloc.featuresForWord(begin), wordOffset)
+          }
+
           //val features2 = spanFeatureIndex.crossProduct(transitionFeatures(prev)(cur), loc.featuresForSpan(begin, end), spanOffset)
           new FeatureVector(features)
         }
@@ -399,7 +404,10 @@ object SegmentationModelFactory {
               wordBuilder.add(bioeFeatures(li)(FeatureKinds.Label.id), wordFeats.featuresForWord(i))
             }
             // span
-            spanBuilder.add(bioeFeatures(li)(2), feats.featuresForSpan(span.begin, span.end))
+            spanBuilder.add(bioeFeatures(li)(FeatureKinds.Span.id), feats.featuresForSpan(span.begin, span.end))
+            if(span.length == 1) {
+              wordBuilder.add(bioeFeatures(li)(FeatureKinds.Span.id), wordFeats.featuresForWord(span.begin))
+            }
             last = li
           case None =>
             wordBuilder.add(outsideFeature, wordFeats.featuresForWord(span.begin))
