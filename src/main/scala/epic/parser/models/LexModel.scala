@@ -17,24 +17,25 @@ package models
  See the License for the specific language governing permissions and
  limitations under the License.
 */
-import epic.framework._
-import breeze.collection.mutable.{TriangularArray, OpenAddressHashArray}
-import breeze.linalg._
-import epic.trees.annotations.{Xbarize, TreeAnnotator}
 import java.io.File
-import epic.parser._
-import breeze.util._
+
+import breeze.collection.mutable.{OpenAddressHashArray, TriangularArray}
 import breeze.config.Help
-import epic.lexicon.Lexicon
-import epic.features._
-import epic.util._
+import breeze.linalg._
+import breeze.util._
 import com.typesafe.scalalogging.slf4j.LazyLogging
-import epic.trees._
-import epic.parser.projections.GrammarRefinements
-import epic.features.SplitSpanFeaturizer.ZeroSplitSpanFeaturizer
-import scala.collection.mutable.ArrayBuffer
 import epic.constraints.ChartConstraints
 import epic.constraints.ChartConstraints.Factory
+import epic.features.SplitSpanFeaturizer.ZeroSplitSpanFeaturizer
+import epic.features._
+import epic.framework._
+import epic.lexicon.Lexicon
+import epic.parser.projections.GrammarRefinements
+import epic.trees._
+import epic.trees.annotations.{TreeAnnotator, Xbarize}
+import epic.util._
+
+import scala.collection.mutable.ArrayBuffer
 
 class LexModel[L, L2, W](bundle: LexGrammarBundle[L, L2, W],
                          reannotate: (BinarizedTree[L], IndexedSeq[W])=>BinarizedTree[L2],
@@ -394,6 +395,12 @@ final class LexGrammar[L, L2, W](val topology: RuleTopology[L],
                              binaries: Array[Boolean],
                              leftRules: Array[Boolean],
                              rightRules: Array[Boolean]) extends Grammar[L, W] {
+
+
+  override def withPermissiveLexicon: Grammar[L, W] = {
+    new LexGrammar(topology, lexicon.morePermissive, refinedGrammar, featurizer, weights, binaries, leftRules, rightRules)
+  }
+
   def isHeadOnLeftForRule(r: Int) = leftRules(r)
 
   def isHeadOnRightForRule(r: Int) = rightRules(r)

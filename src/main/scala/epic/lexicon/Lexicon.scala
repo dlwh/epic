@@ -1,7 +1,6 @@
 package epic.lexicon
 
 import breeze.util.Index
-import epic.trees.LexicalProduction
 import epic.constraints.TagConstraints
 
 /**
@@ -10,6 +9,8 @@ import epic.constraints.TagConstraints
  * @author dlwh
  */
 trait Lexicon[L, W] extends TagConstraints.Factory[L, W] {
+  def morePermissive: Lexicon[L, W]
+
   def labelIndex: Index[L]
   def anchor(w: IndexedSeq[W]):Anchoring
 

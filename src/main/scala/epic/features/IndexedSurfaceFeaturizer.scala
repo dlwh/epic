@@ -3,10 +3,10 @@ package features
 
 import breeze.collection.mutable.TriangularArray
 import breeze.util.Index
-import epic.framework.Feature
-import scala.collection.mutable
 import epic.constraints.SpanConstraints
-import epic.util.CacheBroker
+import epic.framework.Feature
+
+import scala.collection.mutable
 
 /**
  *
@@ -40,7 +40,7 @@ object IndexedSurfaceFeaturizer {
 
 
     val f = new MySurfaceFeaturizer[W](feat, constraintFactory, index)
-    new CachedFeaturizer(f, CacheBroker().make(f.toString))
+    f
   }
 
   @SerialVersionUID(1L)

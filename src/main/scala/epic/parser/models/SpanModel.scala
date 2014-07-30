@@ -17,36 +17,26 @@ package models
  limitations under the License.
 */
 
-import breeze.collection.mutable.{TriangularArray, OpenAddressHashArray}
-import breeze.linalg._
-import epic.trees._
-import annotations.TreeAnnotator
-import collection.mutable.ArrayBuffer
 import java.io.File
-import breeze.util._
-import epic.framework.{ModelObjective, Feature}
-import epic.parser.projections.{ParserChartConstraintsFactory, GrammarRefinements}
+
+import breeze.collection.mutable.{OpenAddressHashArray, TriangularArray}
 import breeze.config.Help
-import epic.lexicon.Lexicon
-import epic.features._
-import epic.features.HashFeature
-import epic.util._
-import epic.trees.annotations.FilterAnnotations
-import com.typesafe.scalalogging.slf4j.LazyLogging
-import epic.trees.annotations.MarkPreterminals
-import epic.trees.annotations.FixRootLabelVerticalAnnotation
-import epic.parser.RuleTopology
-import scala.io.Source
-import epic.constraints.{CachedChartConstraintsFactory, ChartConstraints}
-import epic.constraints.ChartConstraints.Factory
-import epic.trees.UnaryTree
-import epic.trees.TreeInstance
-import epic.trees.NullaryTree
-import epic.trees.BinaryRule
-import epic.trees.UnaryRule
-import epic.trees.BinaryTree
+import breeze.linalg._
 import breeze.optimize.FirstOrderMinimizer.OptParams
+import breeze.util._
+import com.typesafe.scalalogging.slf4j.LazyLogging
+import epic.constraints.ChartConstraints.Factory
+import epic.constraints.{CachedChartConstraintsFactory, ChartConstraints}
+import epic.features._
+import epic.framework.{Feature, ModelObjective}
+import epic.lexicon.Lexicon
 import epic.parser.ParserParams.XbarGrammar
+import epic.parser.projections.{GrammarRefinements, ParserChartConstraintsFactory}
+import epic.trees._
+import epic.trees.annotations.TreeAnnotator
+import epic.util._
+
+import scala.io.Source
 
 /**
  * A rather more sophisticated discriminative parser. Uses features on
@@ -80,12 +70,18 @@ class SpanModel[L, L2, W](val featurizer: RefinedFeaturizer[L, W, Feature],
 }
 
 
+@SerialVersionUID(4749637878577393596L)
 class DotProductGrammar[L, L2, W, Feature](val topology: RuleTopology[L],
                                            val lexicon: Lexicon[L, W],
                                            val refinedTopology: RuleTopology[L2],
                                            val refinements: GrammarRefinements[L, L2],
                                            val weights: DenseVector[Double],
                                            val featurizer: RefinedFeaturizer[L, W, Feature]) extends Grammar[L, W] {
+
+
+  override def withPermissiveLexicon: Grammar[L, W] = {
+    new DotProductGrammar(topology, lexicon.morePermissive, refinedTopology, refinements, weights, featurizer)
+  }
 
   def anchor(w: IndexedSeq[W], cons: ChartConstraints[L]):GrammarAnchoring[L, W] = new ProjectionsGrammarAnchoring[L, L2, W] {
 

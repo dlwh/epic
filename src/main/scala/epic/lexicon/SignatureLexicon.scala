@@ -1,10 +1,6 @@
 package epic.lexicon
 
-import breeze.linalg._
-import java.io.ObjectStreamException
 import breeze.util.Index
-import scala.collection.immutable.BitSet
-import scala.collection.mutable
 import epic.util.SafeLogging
 
 /**
@@ -13,6 +9,10 @@ import epic.util.SafeLogging
 @SerialVersionUID(1L)
 class SignatureLexicon[L, W](val labelIndex: Index[L], allowed: Map[W, Set[Int]], signature: W=>W) extends Lexicon[L, W] with Serializable with SafeLogging {
 
+
+  override def morePermissive: Lexicon[L, W] = {
+    new SignatureLexicon(labelIndex, Map.empty[W, Set[Int]].withDefaultValue(allTags), signature)
+  }
 
   val allTags = allowed.values.reduce(_ ++ _)
   def anchor(w: IndexedSeq[W]):Anchoring = new Anchoring {

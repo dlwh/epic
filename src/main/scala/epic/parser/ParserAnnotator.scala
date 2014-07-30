@@ -13,13 +13,13 @@ class ParserAnnotator[L](parser: Parser[L, String]) extends StringAnalysisFuncti
 
 
   def apply[In <: Token with Sentence](slab: StringSlab[In]):StringSlab[In with epic.trees.Tree[L]] = {
-    val annotatedSentences = for((span, sent) <- slab.iterator[Sentence]) yield {
+    val annotatedSentences = for((span, sent) <- slab.iterator[Sentence].toIndexedSeq.par) yield {
       val tokens = slab.covered[Token](span).toIndexedSeq
       val tree = parser(tokens.map(_._2.token))
       span -> tree
     }
 
-    slab.++[Tree[L]](annotatedSentences)
+    slab.++[Tree[L]](annotatedSentences.seq)
   }
 
 

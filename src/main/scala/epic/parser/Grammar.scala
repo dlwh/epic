@@ -38,6 +38,8 @@ trait Grammar[L, W] extends Serializable {
   def labelIndex = topology.labelIndex
   def labelEncoder = topology.labelEncoder
 
+  def withPermissiveLexicon:Grammar[L, W]
+
   def anchor(words: IndexedSeq[W], constraints: ChartConstraints[L] = ChartConstraints.noSparsity[L]):GrammarAnchoring[L, W]
 }
 
@@ -45,6 +47,9 @@ object Grammar {
   def product[L, W](f1: Grammar[L, W], f2: Grammar[L, W]):Grammar[L, W] = new Grammar[L, W] {
     def topology = f1.topology
     def lexicon = f1.lexicon
+
+
+    override def withPermissiveLexicon: Grammar[L, W] = product(f1.withPermissiveLexicon, f2.withPermissiveLexicon)
 
     def anchor(words: IndexedSeq[W],
                constraints: ChartConstraints[L] = ChartConstraints.noSparsity[L]) = new ProductGrammarAnchoring(f1.anchor(words, constraints), f2.anchor(words, constraints))
@@ -58,6 +63,8 @@ object Grammar {
 
       def lexicon = l
 
+
+      override def withPermissiveLexicon: Grammar[L, W] = identity(ruleTopology, l.morePermissive)
 
       override def anchor(words: IndexedSeq[W], constraints: ChartConstraints[L]): GrammarAnchoring[L, W] = {
         GrammarAnchoring.identity(topology, lexicon, constraints, words)

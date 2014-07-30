@@ -9,6 +9,7 @@ import epic.features.SplitSpanFeaturizer.ZeroSplitSpanFeaturizer
 import epic.features._
 import epic.framework.{StandardExpectedCounts, Feature}
 import epic.lexicon.Lexicon
+import epic.parser
 import epic.parser._
 import epic.trees._
 import epic.trees.annotations.{Xbarize, TreeAnnotator}
@@ -103,6 +104,11 @@ object NeuralModel {
     def topology: RuleTopology[L] = base.topology
 
     def lexicon: Lexicon[L, W] = base.lexicon
+
+
+    override def withPermissiveLexicon: parser.Grammar[L, W] = {
+      new Grammar(base.withPermissiveLexicon, baseFeaturizer, labelFeaturizer, surfaceFeaturizer, lastLayerWeights, layer)
+    }
 
     def anchor(words: IndexedSeq[W], constrainer: ChartConstraints[L]) = {
       new Anchoring(base.anchor(words, constrainer),

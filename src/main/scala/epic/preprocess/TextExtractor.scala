@@ -1,33 +1,19 @@
 package epic
 package preprocess
 
-import java.io.{StringReader, InputStream}
+import java.io.InputStream
 import java.net.URL
 
-import de.l3s.boilerpipe.document.TextDocument
 import de.l3s.boilerpipe.extractors.ArticleExtractor
-import de.l3s.boilerpipe.sax.BoilerpipeSAXInput
-import epic.slab.{Slab, StringSlab}
+import epic.slab.Slab
 import epic.trees.Span
-import epic.util.{Optional, NotProvided}
 import org.apache.tika.Tika
-import org.apache.tika.exception.TikaException
 import org.apache.tika.io.TikaInputStream
-import org.apache.tika.metadata.{TikaMetadataKeys, Metadata}
-import org.apache.tika.parser.{Parser, ParseContext}
+import org.apache.tika.metadata.Metadata
 import org.apache.tika.parser.html.BoilerpipeContentHandler
-import org.apache.tika.sax.{ToTextContentHandler, BodyContentHandler, WriteOutContentHandler}
-import org.apache.xerces.parsers.AbstractSAXParser
-import org.cyberneko.html.HTMLConfiguration
+import org.apache.tika.parser.{ParseContext, Parser}
+import org.apache.tika.sax.ToTextContentHandler
 import org.xml.sax._
-import org.xml.sax.helpers.DefaultHandler
-import scala.collection.JavaConverters._
-import scala.collection.mutable.ArrayBuffer
-
-import org.apache.commons.lang3.StringEscapeUtils;
-
-import scala.io.Source
-import scala.xml.Elem
 
 /**
  * Just a simple thing for me to learn Tika
@@ -39,16 +25,66 @@ object TextExtractor {
   def extractText(url: URL, extractMainContentOnly: Boolean = true) = loadSlab(url, extractMainContentOnly).content
 
   def loadSlab(url: URL, extractMainContentOnly: Boolean = true) = {
-    val newLineTags = Set("li","p", "br")
+    val newLineTags = Set(
+      "address",
+      "blockquote",
+      "div",
+      "dl",
+      "fieldset",
+      "form",
+      "h1",
+      "h2",
+      "h3",
+      "h4",
+      "h5",
+      "h6",
+      "hr",
+      "noscript",
+      "ol",
+      "p",
+      "pre",
+      "table",
+      "ul",
+      "dd",
+      "dt",
+      "li",
+      "tbody",
+      "td",
+      "tfoot",
+      "th",
+      "thead",
+      "tr",
+      // html5
+      "article",
+      "aside",
+      "audio",
+      "canvas",
+      "figcaption",
+      "figure",
+      "header",
+      "hgroup",
+      "output",
+      "section",
+      "video"
+    )
 
     val textHandler = new ToTextContentHandler() {
       override def ignorableWhitespace(ch: Array[Char], start: Int, length: Int): Unit = characters(ch, start, length)
+
 
       override def startElement(uri: String, localName: String, qName: String, attributes: Attributes): Unit = {
         super.startElement(uri, localName, qName, attributes)
 
         if (newLineTags(qName.toLowerCase)) {
-          ignorableWhitespace(Array('\n','\n'), 0, 2)
+          ignorableWhitespace(Array('\n'), 0, 1)
+        }
+
+      }
+
+      override def endElement(uri: String, localName: String, qName: String): Unit = {
+        super.endElement(uri, localName, qName)
+        if (newLineTags(qName.toLowerCase)) {
+          ignorableWhitespace(Array('\n'), 0, 1)
         }
 
       }
@@ -184,14 +220,14 @@ object TextExtractor {
   }
 
   def foo(url: URL)=  {
-    import de.l3s.boilerpipe._
     ArticleExtractor.INSTANCE.getText(url)
   }
 
-  import scala.xml.factory.XMLLoader
-  import scala.xml._
   import org.xml.sax._
   import org.xml.sax.helpers.DefaultHandler
+
+import scala.xml._
+  import scala.xml.factory.XMLLoader
 
   class Loader extends DefaultHandler with XMLLoader[Elem] {
     val newAdapter = adapter

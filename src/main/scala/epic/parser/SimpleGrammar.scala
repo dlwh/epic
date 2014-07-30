@@ -57,6 +57,8 @@ class SimpleGrammar[L, L2, W](val topology: RuleTopology[L],
   def anchor(w: IndexedSeq[W], constr: ChartConstraints[L]) = new SimpleGrammar.Anchoring(this, w, constr)
 
 
+  override def withPermissiveLexicon: Grammar[L, W] = new SimpleGrammar(topology, lexicon.morePermissive, refinements, refinedTopology, ruleScoreArray, tagScorer)
+
   /**
    * Writes a text representation of the grammar to the output.
    * @param out

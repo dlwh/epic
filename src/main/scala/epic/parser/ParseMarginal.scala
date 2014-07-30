@@ -1,13 +1,13 @@
 package epic.parser
 
 
-import epic.framework.{VisitableMarginal, Marginal, StandardExpectedCounts}
-import epic.trees.{Rule, Production}
-import breeze.linalg.{Counter, Counter2, axpy}
-import breeze.features.FeatureVector
-import epic.parser.projections.AnchoredSpanProjector
 import breeze.collection.mutable.TriangularArray
+import breeze.features.FeatureVector
+import breeze.linalg.{Counter, axpy}
 import epic.constraints.ChartConstraints
+import epic.framework.{StandardExpectedCounts, VisitableMarginal}
+import epic.parser.projections.AnchoredSpanProjector
+import epic.trees.Rule
 
 /*
  Copyright 2012 David Hall
@@ -119,8 +119,15 @@ object ParseMarginal {
 
 }
 
+@SerialVersionUID(-875432696804946554L)
 case class StandardChartFactory[L, W](refinedGrammar: Grammar[L, W], maxMarginal: Boolean = false) extends ParseMarginal.Factory[L, W] {
   def apply(w: IndexedSeq[W], constraints: ChartConstraints[L]):RefinedChartMarginal[L, W] = {
-    RefinedChartMarginal(refinedGrammar.anchor(w, constraints), maxMarginal = maxMarginal)
+      val marg = RefinedChartMarginal(refinedGrammar.anchor(w, constraints), maxMarginal = maxMarginal)
+      if(!marg.logPartition.isInfinite) {
+        marg
+      } else {
+        RefinedChartMarginal(refinedGrammar.withPermissiveLexicon.anchor(w, constraints), maxMarginal = maxMarginal)
+      }
+
   }
 }

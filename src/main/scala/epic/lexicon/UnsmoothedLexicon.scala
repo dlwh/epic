@@ -1,7 +1,6 @@
 package epic.lexicon
 
 import breeze.util.Index
-import epic.trees.LexicalProduction
 
 /**
  * A simple lexicon that does no smoothing at all. Only
@@ -14,4 +13,6 @@ class UnsmoothedLexicon[L, W](val labelIndex: Index[L], knownProductions: Set[(L
     def length = w.length
     def allowedTags(pos: Int): Set[Int] = byWord.getOrElse(w(pos), Set.empty)
   }
+
+  override def morePermissive: Lexicon[L, W] = ???
 }

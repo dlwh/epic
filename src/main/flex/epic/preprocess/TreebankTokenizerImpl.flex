@@ -62,7 +62,7 @@ final  scala.Tuple2<epic.trees.Span, epic.slab.Token> currentToken() {
 }
 final scala.Tuple2<epic.trees.Span, epic.slab.Token> currentToken(String value) {
 //  return new String(zzBuffer, zzStartRead, zzMarkedPos-zzStartRead);
-  return new scala.Tuple2(new epic.trees.Span(epic.trees.Span.apply(yychar() - 1, yychar())), new epic.slab.Token(value));
+  return new scala.Tuple2(new epic.trees.Span(epic.trees.Span.apply(yychar(), yychar() + zzMarkedPos - zzStartRead)), new epic.slab.Token(value));
 }
 
 

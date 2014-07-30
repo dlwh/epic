@@ -1,14 +1,13 @@
 package epic.preprocess
 
+import java.io.{File, FilenameFilter, StringReader}
+
 import breeze.util.Iterators
-import java.io.{FilenameFilter, File, StringReader}
-import scala.collection.mutable.ArrayBuffer
-import scala.collection.immutable
-import epic.slab._
-import epic.slab.Sentence
-import epic.slab.Token
 import epic.corpora.MascSlab
+import epic.slab._
 import epic.trees.Span
+
+import scala.collection.mutable.ArrayBuffer
 
 @SerialVersionUID(1L)
 class TreebankTokenizer() extends Tokenizer with Serializable {
@@ -20,7 +19,8 @@ class TreebankTokenizer() extends Tokenizer with Serializable {
       Iterators.fromProducer{
         try {
           Option(impl.getNextToken()).map { case (region, token) =>
-            Span(region.begin + s._1.begin, region.end + s._1.end) -> token
+            val res = Span(region.begin + s._1.begin, region.end + s._1.begin) -> token
+            res
           }
         } catch {
           case e: Throwable => throw new RuntimeException("Could not tokenize " + s, e)

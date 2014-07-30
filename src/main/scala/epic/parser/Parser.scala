@@ -16,11 +16,9 @@ package epic.parser
 */
 
 
-import epic.trees._
 import epic.constraints.ChartConstraints
 import epic.lexicon.Lexicon
-import epic.slab._
-import epic.slab.Token
+import epic.trees._
 
 
 /**
@@ -52,7 +50,17 @@ final case class Parser[L,W](topology: RuleTopology[L],
     decoder.extractBestParse(marginal(s))
   }
 
-  def marginal(w: IndexedSeq[W]) = marginalFactory.apply(w, constraintsFactory.constraints(w))
+  def marginal(w: IndexedSeq[W]): ParseMarginal[L, W] = try {
+    marginalFactory.apply(w, constraintsFactory.constraints(w))
+  } catch {
+    case ex: NoParseException =>
+      try {
+        marginalFactory.apply(w, ChartConstraints.noSparsity)
+      } catch {
+        case ex: NoParseException =>
+          ???
+      }
+  }
 
 
 
