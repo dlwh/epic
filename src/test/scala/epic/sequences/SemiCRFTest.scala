@@ -41,7 +41,6 @@ class SemiCRFTest extends FunSuite {
 //    val cal: Marginal[Symbol, Symbol] = hmm.marginal(IndexedSeq('U))
     val marginals = (0 until cal.length).map(pos => cal.spanMarginal(pos, pos+1)).map(Encoder.fromIndex(hmm.labelIndex).decode(_))
 
-    println(SemiCRF.posteriorDecode(cal).render)
     assert( (marginals(0)(Some('Rainy)) - 0.8673).abs < 1E-4)
     assert( (marginals(1)(Some('Rainy)) - 0.8204).abs < 1E-4)
     assert( (marginals(2)(Some('Rainy)) - 0.3075).abs < 1E-4)
