@@ -3,6 +3,7 @@ package epic.features
 import breeze.linalg.DenseVector
 import breeze.util.Index
 import epic.features.HashFeature.Absolute
+import epic.framework.Feature
 import org.scalatest.FunSuite
 
 /**
@@ -68,6 +69,28 @@ class CrossProductIndexTest extends FunSuite {
     for(i <- 0 until index1.size) {
       assert(intercept(i) === weights(i))
     }
+  }
+
+
+  test("cross product filtering, many buckets") {
+    val index1 = Index(Iterator('A, 'B, 'C, 'D))
+    val index2 = Index(Iterator(1, 2, 3, 4, 5))
+    val cpbuilder = new CrossProductIndex.Builder(index1, index2, includeLabelOnlyFeatures = true, hashFeatures = Absolute(4))
+
+    cpbuilder.add('A, 1)
+    cpbuilder.add('A, 4)
+    cpbuilder.add('B, 2)
+    cpbuilder.add('C, 2)
+    cpbuilder.add('C, 3)
+    cpbuilder.add('D, 4)
+
+    val res = cpbuilder.result()
+    
+    val newCP = res.prune(i => index2.get(res.surfacePart(i)) == 4)
+
+    assert(newCP.toSet === res.iterator.toSet[Feature].filterNot { case CrossProductFeature(_, 4, _) => true; case (_: Feature) => false })
+    assert(newCP.size === 12) // 4 label + 4 hash + 4 non-4 features
+
   }
 
 }

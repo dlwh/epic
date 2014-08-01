@@ -29,6 +29,9 @@ class CrossProductIndex[A, B] private (val firstIndex: Index[A],
                                        val includePlainLabelFeatures: Boolean = true,
                                        val numHashFeatures: Int=0,
                                        seenSet: LockableSeenSet[Long] = LockableSeenSet.always) extends Index[Feature] with Serializable {
+  def surfacePart(i: Int) = surfacePartOfFeature(i - labelOnlySize)
+  def labelPart(i: Int) = labelPartOfFeature(i - labelOnlySize)
+
 
   def lock = {
     val lockedFirst: Index[A] = firstIndex match {
@@ -56,17 +59,19 @@ class CrossProductIndex[A, B] private (val firstIndex: Index[A],
   }
 
   def mapped(labelFeature: Int, surfaceFeature: Int):Int = {
+    var contained = false
     if(labelFeature < 0 || surfaceFeature < 0) {
       -1
     } else {
       val arr = mapping(labelFeature)
       val f = if(arr ne null) {
+        contained = true
         arr(surfaceFeature)
       } else {
         -1
       }
 
-      if(f >= 0 || numHashFeatures == 0) {
+      if(contained || numHashFeatures == 0) {
         f
       } else {
         val hf = MurmurHash3.mixLast(MurmurHash3.mix(10891, labelFeature.##), surfaceFeature.##).abs
@@ -155,6 +160,62 @@ class CrossProductIndex[A, B] private (val firstIndex: Index[A],
 
 
     (builder.result(), vbuilder.toSparseVector(true, true))
+  }
+
+  /**
+   * Gets rid of crossproduct features (i.e. not hash, not label) that are shouldPrune.
+   *
+   * Optionally, we can also build a new surfaceFeature index with only those surface features
+   * that are used in some part of the new cross product.
+   *
+   * (Implementation note: the resulting mapping may contain -1's for elements of the cross product that
+   * have been removed. This is to note that this feature is known and the hash code should not be computed.)
+   *
+   * @return
+   */
+  def prune(shouldPrune: Int=>Boolean, rebuildSurfaceIndex: Boolean = true):CrossProductIndex[A, B] = {
+    val newSecondIndex = Index[B]()
+    def newIndexOf(b: Int) = if(rebuildSurfaceIndex) newSecondIndex.index(secondIndex.get(b)) else b
+    def alreadyInNewIndex(b: Int) = !rebuildSurfaceIndex || newSecondIndex.contains(secondIndex.get(b))
+    val mapping = Array.fill(firstIndex.size)(new OpenAddressHashArray[Int](secondIndex.size max 1, -1, 4))
+    val newLabelPart, newSurfacePart = new ArrayBuffer[Int]()
+    val possibleUnneededBs = new CSCMatrix.Builder[Boolean](firstIndex.size, secondIndex.size)
+
+    def size = newLabelPart.length + labelOnlySize
+
+    for(i <- labelOnlySize until trueSize) {
+
+      val bPart: Int = surfacePart(i)
+      val aPart: Int = labelPart(i)
+      if (!shouldPrune(i)) {
+        val x = size
+        val newA = aPart
+        val newB = newIndexOf(bPart)
+        newLabelPart += newA
+        newSurfacePart += newB
+        mapping(newA)(newB) = x
+      } else if (alreadyInNewIndex(bPart)) {
+        // if the surface part has already been used by some real feature we're keeping,
+        // then we have to mark it as -1 so we don't try to hash it later.
+        val newA = aPart
+        val newB = newIndexOf(bPart)
+        mapping(newA)(newB) = -1
+      } else {
+        possibleUnneededBs.add(aPart, bPart, true)
+      }
+    }
+
+    // todo: add an iterator method to cscmatrix builder
+    for ( ((a, b), _) <- possibleUnneededBs.result.activeIterator if alreadyInNewIndex(b)) {
+      mapping(a)(newIndexOf(b)) = -1
+    }
+
+    new CrossProductIndex(firstIndex,
+      newSecondIndex,
+      mapping,
+      newLabelPart.toArray, newSurfacePart.toArray,
+      id, includePlainLabelFeatures,
+      numHashFeatures, seenSet)
   }
 }
 
