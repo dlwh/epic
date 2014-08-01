@@ -211,7 +211,7 @@ class CrossProductIndex[A, B] private (val firstIndex: Index[A],
     }
 
     new CrossProductIndex(firstIndex,
-      newSecondIndex,
+      if(rebuildSurfaceIndex) newSecondIndex else secondIndex,
       mapping,
       newLabelPart.toArray, newSurfacePart.toArray,
       id, includePlainLabelFeatures,

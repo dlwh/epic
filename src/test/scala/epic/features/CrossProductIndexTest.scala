@@ -86,10 +86,15 @@ class CrossProductIndexTest extends FunSuite {
 
     val res = cpbuilder.result()
     
-    val newCP = res.prune(i => index2.get(res.surfacePart(i)) == 4)
+    val newCP = res.prune(i => index1.get(res.labelPart(i)) == 'A)
 
-    assert(newCP.toSet === res.iterator.toSet[Feature].filterNot { case CrossProductFeature(_, 4, _) => true; case (_: Feature) => false })
+    assert(newCP.toSet === res.iterator.toSet[Feature].filterNot { case CrossProductFeature('A, _, _) => true; case (_: Feature) => false })
     assert(newCP.size === 12) // 4 label + 4 hash + 4 non-4 features
+    assert(newCP(CrossProductFeature('A, 4)) === -1)
+    assert(newCP(CrossProductFeature('A, 1)) === -1)
+    assert(newCP(CrossProductFeature('D, 5)) === -1)
+    assert(newCP.secondIndex(1) === -1)
+    assert(newCP.secondIndex(4) !== -1)
 
   }
 
