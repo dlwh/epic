@@ -41,8 +41,8 @@ class OneBestModelAdaptor[Datum](val model: Model[Datum] { type Inference <: Ann
   def emptyCounts: ExpectedCounts = model.emptyCounts
 
 
-  def accumulateCounts(s: Scorer, d: Datum, m: Marginal, accum: ExpectedCounts, scale: Double) {
-    model.accumulateCounts(s, d, m, accum, scale)
+  def accumulateCounts(inf: Inference, s: Scorer, d: Datum, m: Marginal, accum: ExpectedCounts, scale: Double) {
+    model.accumulateCounts(inf.inference.asInstanceOf[model.Inference], s, d, m, accum, scale)
   }
 
   def featureIndex: Index[Feature] = model.featureIndex

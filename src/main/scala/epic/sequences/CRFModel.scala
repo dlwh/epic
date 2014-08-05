@@ -36,9 +36,9 @@ class CRFModel[L, W](val featureIndex: Index[Feature],
     new CRFInference(weights, featureIndex, lexicon, featurizer)
 
 
-  def accumulateCounts(s: Scorer, d: TaggedSequence[L, W], marg: Marginal, counts: ExpectedCounts, scale: Double): Unit = {
+  def accumulateCounts(inf: Inference, s: Scorer, d: TaggedSequence[L, W], marg: Marginal, counts: ExpectedCounts, scale: Double): Unit = {
     counts.loss += marg.logPartition * scale
-    val localization = s.asInstanceOf[Inference#Anchoring].localization
+    val localization = s.asInstanceOf[inf.Anchoring].localization
     val visitor = new TransitionVisitor[L, W] {
 
       def apply(pos: Int, prev: Int, cur: Int, count: Double) {

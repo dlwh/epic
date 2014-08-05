@@ -121,8 +121,8 @@ object SentimentTreebankPipeline extends LazyLogging {
     def emptyCounts = inner.emptyCounts
 
 
-    def accumulateCounts(s: Scorer, d: TreeInstance[L, W], m: Marginal, accum: ExpectedCounts, scale: Double): Unit = {
-      inner.accumulateCounts(s, d, m, accum, scale)
+    def accumulateCounts(inf: Inference, s: Scorer, d: TreeInstance[L, W], m: Marginal, accum: ExpectedCounts, scale: Double): Unit = {
+      inner.accumulateCounts(inf.pm.asInstanceOf[inner.Inference], s, d, m, accum, scale)
     }
 
     /**

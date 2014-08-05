@@ -42,9 +42,9 @@ class SemiCRFModel[L, W](val featurizer: SemiCRFModel.BIEOFeaturizer[L, W],
     new SemiCRFInference(weights, featureIndex, featurizer, constraintsFactory)
 
 
-  def accumulateCounts(s: Scorer, d: Segmentation[L, W], marg: Marginal, counts: ExpectedCounts, scale: Double): Unit = {
+  def accumulateCounts(inf: Inference, s: Scorer, d: Segmentation[L, W], marg: Marginal, counts: ExpectedCounts, scale: Double): Unit = {
     counts.loss += marg.logPartition * scale
-    val localization = marg.anchoring.asInstanceOf[Inference#Anchoring].localization
+    val localization = marg.anchoring.asInstanceOf[inf.Anchoring].localization
     val visitor = new TransitionVisitor[L, W] {
 
       def visitTransition(prev: Int, cur: Int, begin: Int, end: Int, count: Double) {

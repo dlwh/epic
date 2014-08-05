@@ -44,12 +44,12 @@ class EPModel[Datum, Augment <: AnyRef](maxEPIter: Int, initFeatureValue: Featur
   }
 
 
-  def accumulateCounts(s: Scorer, datum: Datum, marg: Marginal, accum: ExpectedCounts, scale: Double):Unit = {
+  def accumulateCounts(inf: Inference, s: Scorer, datum: Datum, marg: Marginal, accum: ExpectedCounts, scale: Double):Unit = {
     import marg._
     for ( (model, i) <- models.zipWithIndex) {
       val marg = marginals(i)
       if(marg != null)
-        model.accumulateCounts(s.scorers(i).asInstanceOf[model.Scorer], datum, marg.asInstanceOf[model.Marginal], accum.counts(i).asInstanceOf[model.ExpectedCounts], scale)
+        model.accumulateCounts(inf.inferences(i).asInstanceOf[model.Inference], s.scorers(i).asInstanceOf[model.Scorer], datum, marg.asInstanceOf[model.Marginal], accum.counts(i).asInstanceOf[model.ExpectedCounts], scale)
     }
     accum.loss += scale * marg.logPartition
   }

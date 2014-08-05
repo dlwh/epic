@@ -64,7 +64,7 @@ class SpanModel[L, L2, W](val featurizer: RefinedFeaturizer[L, W, Feature],
   }
 
 
-  def accumulateCounts(s: Scorer, d: TreeInstance[L, W], m: Marginal, accum: ExpectedCounts, scale: Double): Unit = {
+  def accumulateCounts(inf: Inference, s: Scorer, d: TreeInstance[L, W], m: Marginal, accum: ExpectedCounts, scale: Double): Unit = {
     m.expectedCounts(featurizer, accum, scale)
   }
 }

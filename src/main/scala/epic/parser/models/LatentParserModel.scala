@@ -17,19 +17,21 @@ package models
  limitations under the License.
 */
 
-import epic.parser.projections.GrammarRefinements
-import breeze.linalg._
 import java.io.File
-import io.Source
-import epic.framework.Feature
-import epic.trees.annotations.{Xbarize, FilterAnnotations, TreeAnnotator}
-import epic.trees._
+
 import breeze.config.Help
-import epic.features.{WordPropertyFeaturizer, MinimalWordFeaturizer, IndexedWordFeaturizer}
-import epic.lexicon.Lexicon
-import epic.util.{SafeLogging, CacheBroker}
+import breeze.linalg._
 import epic.constraints.ChartConstraints
 import epic.constraints.ChartConstraints.Factory
+import epic.features.{IndexedWordFeaturizer, MinimalWordFeaturizer, WordPropertyFeaturizer}
+import epic.framework.Feature
+import epic.lexicon.Lexicon
+import epic.parser.projections.GrammarRefinements
+import epic.trees._
+import epic.trees.annotations.{TreeAnnotator, Xbarize}
+import epic.util.SafeLogging
+
+import scala.io.Source
 
 class LatentParserModel[L, L3, W](indexedFeatures: IndexedFeaturizer[L, L3, W],
                                   reannotate: (BinarizedTree[L], IndexedSeq[W]) => BinarizedTree[IndexedSeq[L3]],
@@ -48,7 +50,7 @@ class LatentParserModel[L, L3, W](indexedFeatures: IndexedFeaturizer[L, L3, W],
   }
 
 
-  def accumulateCounts(s: Scorer, d: TreeInstance[L, W], m: Marginal, accum: ExpectedCounts, scale: Double): Unit = {
+  def accumulateCounts(inf: Inference, s: Scorer, d: TreeInstance[L, W], m: Marginal, accum: ExpectedCounts, scale: Double): Unit = {
     m.expectedCounts(indexedFeatures, accum, scale)
   }
 

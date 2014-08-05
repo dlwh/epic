@@ -61,7 +61,7 @@ class NeuralModel[L, L2, W](baseModel: SpanModel[L, L2, W],
   }
 
 
-  def accumulateCounts(anchoring: Scorer, d: TreeInstance[L, W], m: Marginal, accum: ExpectedCounts, scale: Double): Unit = {
+  def accumulateCounts(inf: Inference, anchoring: Scorer, d: TreeInstance[L, W], m: Marginal, accum: ExpectedCounts, scale: Double): Unit = {
     val Seq(baseDerivatives: DenseVector[Double], outputDerivatives: DenseVector[Double], inputDerivatives: DenseVector[Double]) = featureIndex.shardWeights(accum.counts)
     m.visit(new NeuralModel.ExpectedCountsVisitor(anchoring.asInstanceOf[NeuralModel.Anchoring[L, W]], scale, baseDerivatives,
       inputDerivatives, outputDerivatives.asDenseMatrix.reshape(labelFeaturizer.index.size, numOutputs)))
