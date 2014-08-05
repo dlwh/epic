@@ -40,7 +40,7 @@ trait Model[Datum] extends SafeLogging { self =>
   }
 
   def emptyCounts: ExpectedCounts
-  def accumulateCounts(s: Scorer, d: Datum, m: Marginal, accum: ExpectedCounts, scale: Double):Unit
+  def accumulateCounts(inf: Inference, s: Scorer, d: Datum, m: Marginal, accum: ExpectedCounts, scale: Double):Unit
 
 
   final def expectedCounts(inf: Inference, d: Datum, scale: Double = 1.0):ExpectedCounts = {
@@ -53,8 +53,8 @@ trait Model[Datum] extends SafeLogging { self =>
     val s = inf.scorer(d)
     val m = inf.marginal(s, d)
     val gm = inf.goldMarginal(s, d)
-    accumulateCounts(s, d, m, accum, scale)
-    accumulateCounts(s, d, gm, accum, -scale)
+    accumulateCounts(inf, s, d, m, accum, scale)
+    accumulateCounts(inf, s, d, gm, accum, -scale)
   }
 
 
