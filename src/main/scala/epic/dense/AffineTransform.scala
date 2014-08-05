@@ -1,12 +1,11 @@
 package epic.dense
 
-import epic.framework.Feature
-import breeze.util.Index
-import scala.runtime.ScalaRunTime
 import breeze.linalg._
 import breeze.linalg.operators.OpMulMatrix
-import breeze.numerics._
 import epic.features.SegmentedIndex
+import epic.framework.Feature
+
+import scala.runtime.ScalaRunTime
 
 
 case class AffineTransform[FV, Mid](numOutputs: Int, numInputs: Int, innerTransform: Transform[FV, Mid], includeBias: Boolean = true)
@@ -40,7 +39,7 @@ case class AffineTransform[FV, Mid](numOutputs: Int, numInputs: Int, innerTransf
       out
     }
 
-    def tallyDerivative(deriv: DenseVector[Double], _scale: =>DenseVector[Double], fv: FV) = {
+    def tallyDerivative(deriv: DenseVector[Double], _scale: =>Vector[Double], fv: FV) = {
       val scale = _scale
       val matDeriv = deriv(0 until (numOutputs * numInputs)).asDenseMatrix.reshape(numOutputs, numInputs, view = View.Require)
       val biasDeriv = if(includeBias) {

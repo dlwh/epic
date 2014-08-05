@@ -24,7 +24,7 @@ case class TanhTransform[FV](inner: Transform[FV, DenseVector[Double]]) extends 
       (act :*= 2.0) -= 1.0
     }
 
-    def tallyDerivative(deriv: DenseVector[Double], _scale: =>DenseVector[Double], fv: FV) = {
+    def tallyDerivative(deriv: DenseVector[Double], _scale: =>Vector[Double], fv: FV) = {
       val scale = _scale
       val act = innerLayer.activations(fv) * 2.0
       sigmoid.inPlace(act)
