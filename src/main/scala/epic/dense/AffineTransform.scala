@@ -54,10 +54,14 @@ case class AffineTransform[FV, Mid](numOutputs: Int, numInputs: Int, innerTransf
       // d/d(weights(::, i)) == scale(i) * innerAct
       for (i <- 0 until weights.rows) {
         val a: Double = scale(i)
-        axpy(a, innerAct, matDeriv.t(::, i))
+        if(a != 0.0) {
+          axpy(a, innerAct, matDeriv.t(::, i))
         // so d/dbias(i) = scale(i)
-        biasDeriv(i) += a
+          biasDeriv(i) += a
+        }
       }
+
+//      biasDeriv += scale
 
       // scale is f'(mat * inner(v) + bias)
       // d/dv is mat.t * f'(mat * inner(v) + bias)
