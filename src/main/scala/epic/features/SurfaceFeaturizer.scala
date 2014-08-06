@@ -36,7 +36,7 @@ object SurfaceFeaturizer {
   trait DSL {
 
     def whenLength[W](filt: Int=>Boolean)(f: SurfaceFeaturizer[W])= new LengthFilteredSurfaceFeaturizer(f, filt)
-    def unitLengthSpan[W](f: WordFeaturizer[W]) = new PromotedWordFeaturizer(f)
+    def unitLengthSpan[W](f: WordFeaturizer[W]) = new SingleWordSpanFeaturizer(f)
 
     val begin : SurfaceFeaturizer.begin.type = SurfaceFeaturizer.begin
     val end : SurfaceFeaturizer.end.type = SurfaceFeaturizer.end
@@ -92,7 +92,7 @@ object SurfaceFeaturizer {
   }
 
 
-  case class PromotedWordFeaturizer[W](feat: WordFeaturizer[W]) extends SurfaceFeaturizer[W] with Serializable {
+  case class SingleWordSpanFeaturizer[W](feat: WordFeaturizer[W]) extends SurfaceFeaturizer[W] with Serializable {
     override def anchor(words: IndexedSeq[W]): SurfaceFeatureAnchoring[W] = new SurfaceFeatureAnchoring[W] {
       val anch = feat.anchor(words)
       override def featuresForSpan(begin: Int, end: Int): Array[Feature] = {
