@@ -28,6 +28,7 @@ case class StandardTreeProcessor(headFinder: HeadFinder[AnnotatedLabel] = HeadFi
   import Trees.Transforms._
   private def ens = new EmptyNodeStripper[String]
   private def xox = new XOverXRemover[String]
+  private val dummyLabelStripper  = new StripLabels("EDITED")
   @transient
   private var interner = new Interner[AnnotatedLabel]
   @transient
@@ -45,7 +46,7 @@ case class StandardTreeProcessor(headFinder: HeadFinder[AnnotatedLabel] = HeadFi
 
 
   def apply(tree: Tree[String]):BinarizedTree[AnnotatedLabel] = {
-    var transformed = xox(ens(tree).get)
+    var transformed = xox(dummyLabelStripper(ens(tree).get))
     transformed = if(transformed.children.length != 1) {
       Tree("", IndexedSeq(transformed), transformed.span)
     } else {

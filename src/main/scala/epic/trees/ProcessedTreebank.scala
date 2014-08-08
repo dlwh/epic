@@ -59,6 +59,8 @@ case class ProcessedTreebank(@Help(text="Location of the treebank directory")
       val dev = new File(path, "dev").listFiles().filter(_.getName.endsWith("ptb"))
       val test = new File(path, "test").listFiles().filter(_.getName.endsWith("ptb"))
       new SimpleTreebank(train, dev, test)
+    case "meta" =>
+      SimpleTreebank.fromTrainDevTestDirs(path)
     case _ => throw new RuntimeException("Unknown Treebank type")
   }
 
@@ -89,6 +91,7 @@ case class ProcessedTreebank(@Help(text="Location of the treebank directory")
     if (collapseUnaries) {
       transformed = UnaryChainCollapser.collapseUnaryChains(transformed, keepChains = keepUnaryChainsFromTrain)
     }
+    assert(transformed.children.length == 1, transformed + " " + words)
     TreeInstance(name, transformed, words)
   }
 

@@ -14,9 +14,10 @@ package epic.trees
  See the License for the specific language governing permissions and
  limitations under the License.
 */
-import java.net.URL
 import java.io._
-import io.{Codec, Source}
+import java.net.URL
+
+import scala.io.Codec
 
 /**
  * A SimpleTreebank can be easily specified by paths to the trees in Penn treebank format
@@ -53,6 +54,24 @@ class SimpleTreebank(trainUrls: Map[String,URL],
 }
 
 object SimpleTreebank {
+  def fromTrainDevTestDirs(baseDir: File, extension: String = ".parse"): Treebank[String] = {
+
+    def listRecursively(f: File): Iterator[File] = {
+      f.listFiles().iterator.flatMap {
+        case f if f.isDirectory => listRecursively(f)
+        case f if f.getName.endsWith(extension) =>  Iterator(f)
+        case _ => Iterator.empty
+      }
+    }
+
+    def mapify(iter: Iterator[File]) = iter.map(f => f.getName -> f.toURI.toURL).toMap
+
+    new SimpleTreebank(mapify(listRecursively(new File(baseDir, "train"))),
+      mapify(listRecursively(new File(baseDir, "dev"))),
+      mapify(listRecursively(new File(baseDir, "test"))))
+
+  }
+
   def writeSimpleTreebank(trees: Treebank[String], dir: File) = {
     dir.mkdirs()
     def writeToFile(file: File, trees: Iterator[(Tree[String],IndexedSeq[String])]) = {

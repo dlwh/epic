@@ -1,10 +1,9 @@
 package epic.trees
 package annotations
 
-import epic.trees.BinarizedTree
-import runtime.ScalaRunTime
 import epic.parser.projections.ProjectionIndexer
-import epic.preprocess.TreebankTokenizer
+
+import scala.runtime.ScalaRunTime
 
 /**
  *
@@ -61,7 +60,7 @@ case class PipelineAnnotator[L, W](ann: Seq[TreeAnnotator[L, W, L]]) extends Tre
 
 }
 
-import TreeAnnotations._
+import epic.trees.annotations.TreeAnnotations._
 
 class IdentityAnnotator[L, W] extends TreeAnnotator[L, W, L] with Serializable {
   def apply(tree: BinarizedTree[L], words: Seq[W]) = tree
@@ -117,7 +116,13 @@ case class ParentAnnotate[W](order: Int = 0,  skipPunctTags: Boolean = true) ext
       def join(base: AnnotatedLabel, parent: Seq[AnnotatedLabel]) = {
         base.copy(parents = parent.map(_.label).toIndexedSeq)
       }
-      Trees.annotateParentsBinarized(tree, join, {(_:AnnotatedLabel).isIntermediate}, {(l:Tree[AnnotatedLabel])=> l.label.label.isEmpty || (l.label.label.head != '@' && !l.label.label.head.isLetterOrDigit)}, order)
+      try  {
+        Trees.annotateParentsBinarized(tree, join, {(_:AnnotatedLabel).isIntermediate}, {(l:Tree[AnnotatedLabel])=> l.label.label.isEmpty || (l.label.label.head != '@' && !l.label.label.head.isLetterOrDigit)}, order)
+      } catch {
+        case ex: AssertionError =>
+          throw new RuntimeException(s"While handling $words", ex)
+      }
+
     }
   }
 

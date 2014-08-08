@@ -17,14 +17,13 @@ package epic.trees
 */
 
 
-import scala.collection.mutable.ArrayBuffer
-import nak.serialization.DataSerialization
-import nak.serialization.DataSerialization._
-import java.io.{StringReader, DataInput, DataOutput}
+import java.io.StringReader
+
 import breeze.util.Lens
-import scala.annotation.tailrec
-import epic.slab.AnnotatedSpan
 import epic.preprocess.TreebankTokenizer
+
+import scala.annotation.tailrec
+import scala.collection.mutable.ArrayBuffer
 
 @SerialVersionUID(1L)
 trait Tree[+L] extends Serializable {
@@ -88,7 +87,7 @@ trait Tree[+L] extends Serializable {
 
   def leftHeight:Int = if(isLeaf) 0 else 1 + children(0).leftHeight
 
-  import Tree._
+  import epic.trees.Tree._
   override def toString = toString(false)
 
   def toString(newline: Boolean) = recursiveToString(this,0, newline, new StringBuilder).toString
@@ -355,7 +354,7 @@ object Trees {
       val newLabel = if(dontAnnotate(tree)) {
         label
       } else if(isIntermediate(label)) {
-        assert(history.length > 1, history + " " + tree)
+        assert(history.length > 1, label + " " + history + "\n\n\n" + tree + "\n\n\n" + ot)
         join(label, history drop 1 take depth)
       } else {
         join(label, history take depth)
@@ -424,6 +423,21 @@ object Trees {
       }
     }
 
+    class StripLabels[L](labels: String*)(implicit lens: Lens[L,String]) extends (Tree[L]=>Tree[L]) {
+      private val badLabels = labels.toSet
+      def apply(tree: Tree[L]):Tree[L] = {
+        def rec(t: Tree[L]): IndexedSeq[Tree[L]] = {
+          if (badLabels(lens.get (t.label) ) ) {
+            t.children.flatMap(rec)
+          } else {
+            IndexedSeq(Tree (t.label, t.children.flatMap(rec), t.span))
+          }
+        }
+
+        rec(tree).head
+      }
+    }
+
     object StandardStringTransform extends (Tree[String]=>Tree[String]) {
       private val ens = new EmptyNodeStripper[String]
       private val xox = new XOverXRemover[String]
@@ -463,7 +477,7 @@ object Trees {
 
   }
 
-  import Zipper._
+  import epic.trees.Trees.Zipper._
 
   final case class Zipper[+L](tree: BinarizedTree[L], location: Location[L] = Zipper.Root) {
     @tailrec
