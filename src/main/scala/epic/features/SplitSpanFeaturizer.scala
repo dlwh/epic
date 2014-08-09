@@ -270,19 +270,21 @@ object IndexedSplitSpanFeaturizer {
   def fromData[L, W](f: SplitSpanFeaturizer[W],
                      trees: IndexedSeq[TreeInstance[L, W]],
                      hashFeatures: HashFeature.Scale = HashFeature.Relative(1.0),
-                     bloomFilter: Boolean = false):IndexedSplitSpanFeaturizer[W] =  {
+                     bloomFilter: Boolean = false,
+                     deduplicateFeatures: Boolean = false):IndexedSplitSpanFeaturizer[W] =  {
     def seenSet =  if(bloomFilter) new ThreadLocalBloomFilter[Long](8 * 1024 * 1024 * 50, 3) else AlwaysSeenSet
-    val index = Index[Feature]()
+    val builder = if(deduplicateFeatures) new NonRedundantIndexBuilder[Feature] else new NormalIndexBuilder[Feature]
     for (ti <- trees) {
       val wspec = f.anchor(ti.words)
       ti.tree.allChildren.foreach {
         case t@BinaryTree(a, b, c, span) =>
-          wspec.featuresForSpan(span.begin, span.end).foreach(index.index)
-          wspec.featuresForSplit(span.begin, t.splitPoint, span.end).foreach(index.index)
+          builder.add(wspec.featuresForSpan(span.begin, span.end) ++ wspec.featuresForSplit(span.begin, t.splitPoint, span.end))
         case t =>
-          wspec.featuresForSpan(t.span.begin, t.span.end).foreach(index.index)
+          builder.add(wspec.featuresForSpan(t.span.begin, t.span.end))
       }
     }
+
+    val index = builder.result()
 
     new BasicIndexedSplitSpanFeaturizer(f, if(hashFeatures.numFeatures(index.size) != 0) new HashExtendingIndex(index, HashFeature(_), hashFeatures, seenSet) else index)
   }

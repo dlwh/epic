@@ -26,21 +26,23 @@ trait IndexedSurfaceAnchoring[W] {
 object IndexedSurfaceFeaturizer {
   def fromData[W](feat: SurfaceFeaturizer[W],
                   data: IndexedSeq[IndexedSeq[W]],
-                  constraintFactory: SpanConstraints.Factory[W]) : IndexedSurfaceFeaturizer[W]  = {
-    val index = Index[Feature]()
+                  constraintFactory: SpanConstraints.Factory[W],
+                  deduplicateFeatures: Boolean = false) : IndexedSurfaceFeaturizer[W]  = {
+
+    val index = if(deduplicateFeatures) new NonRedundantIndexBuilder[Feature] else new NormalIndexBuilder[Feature]()
+
     for(words <- data) {
       val cons = constraintFactory.get(words)
       val anch = feat.anchor(words)
       for(i <- 0 until words.length) {
         for(j <- (i+1) to (i + cons.maxSpanLengthStartingAt(i)) if cons(i, j)) {
-          anch.featuresForSpan(i,j) foreach {index.index _}
+          index.add(anch.featuresForSpan(i, j) )
         }
       }
     }
 
 
-    val f = new MySurfaceFeaturizer[W](feat, constraintFactory, index)
-    f
+    new MySurfaceFeaturizer[W](feat, constraintFactory, index.result())
   }
 
   @SerialVersionUID(1L)

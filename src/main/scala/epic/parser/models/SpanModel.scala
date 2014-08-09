@@ -329,6 +329,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
                             @Help(text="For features not seen in gold trees, we bin them into dummyFeats * numGoldFeatures bins using hashing. If negative, use absolute value as number of hash features.")
                             dummyFeats: Double = 0.5,
                             minFeatCount: Int = 1,
+                            pruneRedundantFeatures: Boolean = false,
                             commonWordThreshold: Int = 100,
                             ngramCountThreshold: Int = 5,
                             useShape: Boolean = true,
@@ -393,8 +394,8 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
       span += fullShape
 
 
-    val indexedWord = IndexedWordFeaturizer.fromData(wf, annTrees.map{_.words})
-    val surface = IndexedSplitSpanFeaturizer.fromData(span, annTrees, bloomFilter = false)
+    val indexedWord = IndexedWordFeaturizer.fromData(wf, annTrees.map{_.words}, deduplicateFeatures = pruneRedundantFeatures)
+    val surface = IndexedSplitSpanFeaturizer.fromData(span, annTrees, bloomFilter = false, deduplicateFeatures = pruneRedundantFeatures)
     
     
     def labelFeaturizer(l: AnnotatedLabel) = Set(l, l.baseAnnotatedLabel).toSeq
