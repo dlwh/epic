@@ -260,11 +260,12 @@ object IndexedSpanFeaturizer {
                         grammar: RuleTopology[L],
                         dummyFeatScale: HashFeature.Scale,
                         filterUnseenFeatures: Boolean,
+                        minFeatCount: Int,
                         trees: Traversable[TreeInstance[L, W]]): IndexedSpanFeaturizer[L, L2, W] = {
 
     def seenSet =  if(filterUnseenFeatures) new ThreadLocalBloomFilter[Long](8 * 1024 * 1024 * 50, 3) else AlwaysSeenSet
 
-    val spanBuilder = new CrossProductIndex.Builder(featurizer.index, surfaceFeaturizer.featureIndex, dummyFeatScale, seenSet = seenSet)
+    val spanBuilder = new CrossProductIndex.Builder(featurizer.index, surfaceFeaturizer.featureIndex, dummyFeatScale, seenSet = seenSet, minCount = minFeatCount)
     val wordBuilder = new CrossProductIndex.Builder(featurizer.index, wordFeaturizer.featureIndex, dummyFeatScale, seenSet = seenSet, includeLabelOnlyFeatures = false)
     val ruleAndSpansIndex = Index[Feature]
 
@@ -327,6 +328,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
                             oldWeights: File = null,
                             @Help(text="For features not seen in gold trees, we bin them into dummyFeats * numGoldFeatures bins using hashing. If negative, use absolute value as number of hash features.")
                             dummyFeats: Double = 0.5,
+                            minFeatCount: Int = 1,
                             commonWordThreshold: Int = 100,
                             ngramCountThreshold: Int = 5,
                             useShape: Boolean = true,
@@ -335,12 +337,11 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
                             useNGrams:Boolean = false,
                             maxNGramOrder:Int = 2,
                             useGrammar: Boolean = true,
-                            useTagSpanShape: Boolean = false,
                             useFullShape: Boolean = false,
                             useSplitShape: Boolean = false,
                             posFeaturizer: Optional[WordFeaturizer[String]] = NotProvided,
                             spanFeaturizer: Optional[SplitSpanFeaturizer[String]] = NotProvided,
-                            extraParams: ExtraParams = ExtraParams()) extends ParserModelFactory[AnnotatedLabel, String] {
+                            extraParams: ExtraParams = ExtraParams()) extends ParserModelFactory[AnnotatedLabel, String] with SafeLogging {
   
   type MyModel = SpanModel[AnnotatedLabel, AnnotatedLabel, String]
 
@@ -385,8 +386,8 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     if(useNGrams)
       span += ngramF
 
-    if(useTagSpanShape)
-      span += tagSpanShape
+//    if(useTagSpanShape)
+//      span += tagSpanShape
 
     if(useFullShape)
       span += fullShape
@@ -420,7 +421,10 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
       xbarGrammar,
       if(dummyFeats < 0) HashFeature.Absolute(-dummyFeats.toInt) else HashFeature.Relative(dummyFeats),
       filterUnseenFeatures = false,
+      minFeatCount,
       trainTrees)
+
+    logger.info(s"Num features: Indexed Features: ${indexed.index.size}")
 
     val featureCounter = readWeights(oldWeights)
 
@@ -446,7 +450,7 @@ case class LatentSpanModelFactory(inner: SpanModelFactory,
 
 
   override def make(train: IndexedSeq[TreeInstance[AnnotatedLabel, String]], topology: RuleTopology[AnnotatedLabel], lexicon: Lexicon[AnnotatedLabel, String], constrainer: Factory[AnnotatedLabel, String]): MyModel = {
-    import inner._
+    import inner.{logger => _, _}
     import extraParams._
     val annTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]] = train.map(annotator(_))
     logger.info("Here's what the annotation looks like on the first few trees")
@@ -520,8 +524,6 @@ case class LatentSpanModelFactory(inner: SpanModelFactory,
     if(useNGrams)
       span += ngramF
 
-    if(useTagSpanShape)
-      span += tagSpanShape
 
     if(useFullShape)
       span += fullShape
@@ -559,6 +561,7 @@ case class LatentSpanModelFactory(inner: SpanModelFactory,
       if(dummyFeats < 0) HashFeature.Absolute(-dummyFeats.toInt) else HashFeature.Relative(dummyFeats),
 //      filterUnseenFeatures = true,
       filterUnseenFeatures = false,
+    1,
       train)
 
     val featureCounter = this.readWeights(oldWeights)

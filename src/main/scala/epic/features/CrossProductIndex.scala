@@ -221,14 +221,28 @@ class CrossProductIndex[A, B] private (val firstIndex: Index[A],
 
 object CrossProductIndex {
 
+  /**
+   *
+   * @param firstIndex
+   * @param secondIndex
+   * @param hashFeatures
+   * @param id
+   * @param includeLabelOnlyFeatures
+   * @param minCount minimum count needed to keep a feature
+   * @param seenSet
+   * @tparam A
+   * @tparam B
+   */
   class Builder[A, B](firstIndex: Index[A],
                       secondIndex: Index[B],
                       hashFeatures: HashFeature.Scale = HashFeature.Absolute(0),
                       id: String = "CrossProductIndex",
                       val includeLabelOnlyFeatures: Boolean = true,
+                      minCount: Int = 1,
                       seenSet: LockableSeenSet[Long] = LockableSeenSet.always) extends SafeLogging {
     def add(a: A, b: B):Int = add(firstIndex(a), secondIndex(b))
 
+    private val counts = Array.fill(firstIndex.size)(new OpenAddressHashArray[Int](secondIndex.size max 1, 0, 4))
     private val mapping = Array.fill(firstIndex.size)(new OpenAddressHashArray[Int](secondIndex.size max 1, -1, 4))
     private val labelPart, surfacePart = new ArrayBuffer[Int]()
     private val labelOnlySize: Int = if(includeLabelOnlyFeatures) firstIndex.size else 0
@@ -249,11 +263,17 @@ object CrossProductIndex {
       } else {
         val currentIndex: Int = mapping(first)(second)
         if(currentIndex == -1) {
-          val x = size
-          mapping(first)(second) = x
-          labelPart += first
-          surfacePart += second
-          x
+          val currentCount = counts(first)(second)
+          if(minCount <= 1 || currentCount + 1 >= minCount) {
+            val x = size
+            mapping(first)(second) = x
+            labelPart += first
+            surfacePart += second
+            x
+          } else {
+            counts(first)(second) = currentCount + 1
+            currentIndex
+          }
         } else {
           currentIndex
         }
