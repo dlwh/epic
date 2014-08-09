@@ -12,6 +12,7 @@ import scala.collection.mutable
 package object features {
 
   def buildNonRedundantFeatureIndex[T, F](it: TraversableOnce[T], gen: T=>TraversableOnce[F]):Index[F] = {
+    // TODO: I should figure out how to one pass this
     val index = Index[F]()
     val contexts = new mutable.HashMap[F, mutable.Set[T]] with mutable.MultiMap[F, T]
     for (t <- it) {
