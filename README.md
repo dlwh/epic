@@ -121,7 +121,7 @@ val tagger = epic.models.deserialize[SemiCRF[AnnotatedLabel, String]](path)
 
 // or:
 
-val tagger = epic.models.NerSelector.loadSegmenter("en") // or another 2 letter code.
+val tagger = epic.models.NerSelector.loadNer("en").get// or another 2 letter code.
 
 val segments = tagger(sentence)
 
