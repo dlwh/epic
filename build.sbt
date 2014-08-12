@@ -1,4 +1,7 @@
-import AssemblyKeys._ // put this at the top of the file
+import AssemblyKeys._
+import sbtassembly.AssemblyOption
+
+// put this at the top of the file
 
 name := "epic"
 
@@ -104,11 +107,9 @@ mergeStrategy in assembly <<= (mergeStrategy in assembly) { (old) =>
 
 
 
-excludedJars in assembly <<= (fullClasspath in assembly) map { cp =>
- cp filter {x => x.data.getName.matches(".*native.*") || x.data.getName.matches("sbt.*") || x.data.getName.matches(".*macros.*") }
-}
-
-
+//excludedJars in assembly <<= (fullClasspath in assembly) map { cp =>
+// cp filter {x => x.data.getName.matches(".*native.*") || x.data.getName.matches("sbt.*") || x.data.getName.matches(".*macros.*") }
+//}
 seq(sbtjflex.SbtJFlexPlugin.jflexSettings: _*)
 
 net.virtualvoid.sbt.graph.Plugin.graphSettings
