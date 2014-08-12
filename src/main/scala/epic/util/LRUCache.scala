@@ -68,20 +68,16 @@ final class LRUCache[@specialized(Int, Long) K:ClassTag, V:ClassTag](size: Int, 
   private def lookup(k: K):Int = {
     val hc : Int = k.##
     val hh = MurmurHash3.mixLast(10891, hc).abs % keys.length
-//    val hh2 = MurmurHash3.mixLast(10909, hc).abs % keys.length
-    hh
-    /*
+    val hh2 = MurmurHash3.mixLast(10909, hc).abs % keys.length
     if (occupied(hh) >= 0 && keys(hh) == k) {
       hh
-      //    } else if (occupied(hh2) >= 0 && keys(hh2) == k) {
-      //      hh2
-      //    } else if (occupied(hh) <= occupied(hh2)) {
-      //      hh
-      //    } else {
-      //      hh2
-      //    }
+    } else if (occupied(hh2) >= 0 && keys(hh2) == k) {
+      hh2
+    } else if (occupied(hh) <= occupied(hh2)) {
+      hh
+    } else {
+      hh2
     }
-    */
   }
 
 }
