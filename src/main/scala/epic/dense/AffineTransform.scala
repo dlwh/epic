@@ -96,9 +96,14 @@ object AffineTransform {
       }
     }
 
-    def pairs: Iterator[(Feature, Int)] = iterator zipWithIndex
+    def makeMatrix(dv: DenseVector[Double]):DenseMatrix[Double] = {
+      assert(dv.stride == 1)
+      new DenseMatrix(numOutputs, numInputs, dv.data, dv.offset)
+    }
 
-    def iterator: Iterator[Feature] = Iterator.range(0, size) map (unapply) map (_.get)
+    def pairs: Iterator[(Feature, Int)] = iterator.zipWithIndex
+
+    def iterator: Iterator[Feature] = Iterator.range(0, size) map unapply map (_.get)
 
     override val size: Int = if(includeBias) numOutputs * numInputs + numOutputs else numOutputs * numInputs
 
