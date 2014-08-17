@@ -59,20 +59,20 @@ class CrossProductIndex[A, B] private (val firstIndex: Index[A],
   }
 
   def mapped(labelFeature: Int, surfaceFeature: Int):Int = {
-    var contained = false
     if(labelFeature < 0 || surfaceFeature < 0) {
       -1
     } else {
       val arr = mapping(labelFeature)
       val f = if(arr ne null) {
-        contained = true
-        arr(surfaceFeature)
+         arr(surfaceFeature)
       } else {
         -1
       }
 
-      if(contained || numHashFeatures == 0) {
+      if(numHashFeatures == 0) {
         f
+      } else if (f < -1) { // really not present
+        -1
       } else {
         val hf = MurmurHash3.mixLast(MurmurHash3.mix(10891, labelFeature.##), surfaceFeature.##).abs
         if(!seenSet.addOrSeen(hf)) {
@@ -199,7 +199,7 @@ class CrossProductIndex[A, B] private (val firstIndex: Index[A],
         // then we have to mark it as -1 so we don't try to hash it later.
         val newA = aPart
         val newB = newIndexOf(bPart)
-        mapping(newA)(newB) = -1
+        mapping(newA)(newB) = -2
       } else {
         possibleUnneededBs.add(aPart, bPart, true)
       }
