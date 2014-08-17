@@ -19,9 +19,10 @@ resolvers ++= Seq(
 libraryDependencies ++= Seq(
   "junit" % "junit" % "4.5" % "test",
   "org.scalanlp" %% "breeze" % "0.9",
-  "org.scalanlp" %% "breeze-config" % "0.8.1-SNAPSHOT",
-  "org.scalanlp" %% "nak" % "1.3-SNAPSHOT",
+  "org.scalanlp" %% "breeze-config" % "0.9",
+  "org.scalanlp" %% "nak" % "1.3-SNAPSHOT" intransitive(),
   "org.mapdb" % "mapdb" % "0.9.2",
+  "com.typesafe.scala-logging" %% "scala-logging" % "3.1.0",
   ("org.apache.tika" % "tika-parsers" % "1.5").exclude ("edu.ucar", "netcdf").exclude("com.googlecode.mp4parser","isoparser"),
   "de.l3s.boilerpipe" % "boilerpipe" % "1.1.0",
   "net.sourceforge.nekohtml" % "nekohtml" % "1.9.21",//needed by boilerpipe
