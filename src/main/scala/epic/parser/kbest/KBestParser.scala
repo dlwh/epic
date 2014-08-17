@@ -4,7 +4,7 @@ package kbest
 import epic.trees.BinarizedTree
 import epic.parser.projections.{AnchoredRuleMarginalProjector, ChartProjector}
 import epic.util.CacheBroker
-import com.typesafe.scalalogging.slf4j.LazyLogging
+import com.typesafe.scalalogging.LazyLogging
 
 /**
  * Produces a kbest list of parses, along with scores.

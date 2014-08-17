@@ -1,6 +1,6 @@
 package epic.util
 
-import com.typesafe.scalalogging.slf4j.Logger
+import com.typesafe.scalalogging.Logger
 import java.util.concurrent.atomic.AtomicInteger
 
 /**

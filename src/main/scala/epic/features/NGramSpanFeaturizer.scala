@@ -5,7 +5,7 @@ import breeze.linalg.Counter
 import breeze.util.Index
 import epic.trees.TreeInstance
 import scala.collection.mutable.ArrayBuffer
-import com.typesafe.scalalogging.slf4j.LazyLogging
+import com.typesafe.scalalogging.LazyLogging
 
 /**
  *

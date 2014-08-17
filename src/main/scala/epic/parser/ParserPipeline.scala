@@ -22,7 +22,7 @@ import epic.parser
 import collection.mutable
 import epic.lexicon.{Lexicon, SimpleLexicon}
 import epic.constraints.{CachedChartConstraintsFactory, ChartConstraints}
-import com.typesafe.scalalogging.slf4j.LazyLogging
+import com.typesafe.scalalogging.LazyLogging
 import breeze.linalg.Counter2
 import epic.trees.annotations.Xbarize
 
@@ -103,6 +103,7 @@ trait ParserPipeline extends LazyLogging {
     import ParserParams.JointParams
 
     val params = CommandLineParser.readIn[JointParams[Params]](args)
+
 //    logger.info("Command line arguments for recovery:\n" + Configuration.fromObject(params).toCommandLineString)
     logger.info("Training Parser...")
 

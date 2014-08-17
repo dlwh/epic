@@ -4,7 +4,7 @@ import java.io._
 
 import breeze.config.{CommandLineParser, Configuration}
 import breeze.optimize.FirstOrderMinimizer.OptParams
-import com.typesafe.scalalogging.slf4j.LazyLogging
+import com.typesafe.scalalogging.LazyLogging
 import epic.trees.{AnnotatedLabel, ProcessedTreebank}
 import epic.util.CacheBroker
 

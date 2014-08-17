@@ -3,7 +3,7 @@ package epic.framework
 import breeze.linalg._
 import breeze.stats.distributions.Rand
 import java.util.concurrent.atomic.AtomicInteger
-import com.typesafe.scalalogging.slf4j.LazyLogging
+import com.typesafe.scalalogging.LazyLogging
 
 /**
  * TODO

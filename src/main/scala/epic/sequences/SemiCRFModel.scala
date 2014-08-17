@@ -5,7 +5,7 @@ import breeze.collection.mutable.TriangularArray
 import breeze.features.FeatureVector
 import breeze.linalg._
 import breeze.util._
-import com.typesafe.scalalogging.slf4j.LazyLogging
+import com.typesafe.scalalogging.LazyLogging
 import epic.constraints.LabeledSpanConstraints
 import epic.features._
 import epic.framework._

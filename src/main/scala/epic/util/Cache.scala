@@ -8,7 +8,7 @@ import scala.collection.concurrent.Map
 import java.util
 
 import scala.collection.{mutable, GenTraversableOnce}
-import com.typesafe.scalalogging.slf4j.LazyLogging
+import com.typesafe.scalalogging.LazyLogging
 
 @SerialVersionUID(1L)
 case class CacheBroker(path: File = null, copyFrom: File = null, clearCaches: String = "", autocommit: Boolean = true, disableWriteAheadLog: Boolean = false) extends Serializable {

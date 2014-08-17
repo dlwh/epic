@@ -4,7 +4,7 @@ import epic.trees.{Span, UnaryTree, BinarizedTree}
 import epic.util.{SafeLogging, Arrays}
 import breeze.numerics
 import breeze.collection.mutable.TriangularArray
-import com.typesafe.scalalogging.slf4j.LazyLogging
+import com.typesafe.scalalogging.LazyLogging
 import breeze.linalg.{max, DenseVector, softmax, Counter2}
 import epic.constraints.ChartConstraints
 
