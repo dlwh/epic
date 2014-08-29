@@ -9,7 +9,7 @@ import epic.trees.Span
  *
  * Documentation for the type variables:
  *   C = Content type
- *   B = Base annonation type
+ *   B = Region type
  *   I = Input annotation type
  *   O = Output annotation type
  */
