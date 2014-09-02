@@ -15,15 +15,16 @@ package epic.parser
  limitations under the License.
 */
 
-import epic.parser.projections.GrammarRefinements
+import java.io.{BufferedWriter, File, FileWriter}
 
-import epic.trees.annotations._
-import breeze.linalg.Counter2
 import breeze.config.Help
+import breeze.linalg.Counter2
+import epic.features.WordShapeGenerator
+import epic.lexicon.{Lexicon, SignatureLexicon, SimpleTagScorer}
 import epic.parser.ParserParams.XbarGrammar
-import epic.lexicon.{SimpleTagScorer, Lexicon, SimpleLexicon}
-import java.io.{FileWriter, BufferedWriter, File}
+import epic.parser.projections.GrammarRefinements
 import epic.trees._
+import epic.trees.annotations._
 
 /**
  * Contains codes to read off parsers and grammars from
@@ -43,7 +44,11 @@ object GenerativeParser {
       binary.keysIterator.map(_._2) ++ unary.keysIterator.map(_._2)
     )
 
-    val lexicon = new SimpleLexicon(grammar.labelIndex, words)
+    val sigs = words.activeIterator.collect { case ((label, word), count) if count < 2 => (label, "SHAPE-" + WordShapeGenerator(word))}
+    val multimap = (words.activeKeysIterator ++ sigs).toSet[(AnnotatedLabel, String)].groupBy(_._2).mapValues(_.map(pair => grammar.labelIndex(pair._1))).toMap
+
+    val lexicon = new SignatureLexicon(grammar.labelIndex, multimap, (w: String) => "SHAPE-" + WordShapeGenerator(w))
+    //val lexicon = new SimpleLexicon(grammar.labelIndex, words)
     (lexicon, grammar)
   }
 
