@@ -83,7 +83,7 @@ object AnnotatedSpan {
 
   implicit object EndFirstSpanOrdering extends Ordering[Span] {
     override def compare(x: Span, y: Span): Int = {
-      if (x.end  < y.end)    -1
+      if      (x.end < y.end)    -1
       else if (x.end > y.end)      1
       else if (x.begin < y.begin) -1
       else if (x.begin > y.begin)  1
