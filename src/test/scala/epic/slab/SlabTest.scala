@@ -5,33 +5,34 @@ import org.scalatest.junit._
 import org.junit.runner.RunWith
 import epic.trees.Span
 import epic.preprocess.{JavaWordTokenizer, JavaSentenceSegmenter}
+import epic.slab._
 
 @RunWith(classOf[JUnitRunner])
 class SlabTest extends FunSuite {
 
 
 
-  // =========
-  // Tests
-  // =========
-  test("text Slab") {
-    // should not compile because tokenizer must be after sentence segmenter
-    //val pipeline = begin andThen tokenizer andThen sentenceSegmenter
+// =========
+// Tests
+// =========
+test("text Slab") {
+  // should not compile because tokenizer must be after sentence segmenter
+  //val pipeline = begin andThen tokenizer andThen sentenceSegmenter
 
-    // should cause following code (e.g. slab.iterator[Token]) to not compile
-    //val pipeline = begin andThen sentenceSegmenter
+  // should cause following code (e.g. slab.iterator[Token]) to not compile
+  //val pipeline = begin andThen sentenceSegmenter
 
-    val pipeline = new JavaSentenceSegmenter().andThen(new JavaWordTokenizer())
-    val slab = pipeline(Slab("""
-        The skunk thought the stump
-        stunk. The stump thought the
-        skunk stunk.
-        """))
+  val pipeline = new JavaSentenceSegmenter().andThen(new JavaWordTokenizer())
+  val slab = pipeline(Slab("""
+      The skunk thought the stump
+      stunk. The stump thought the
+      skunk stunk.
+      """))
 
-    val sentences = slab.iterator[Sentence].toList
-    assert(sentences.map(pair => slab.spanned(pair._1).trim) === List(
-      """The skunk thought the stump
-        stunk.""",
+  val sentences = slab.iterator[Sentence].toList
+  assert(sentences.map(pair => slab.spanned(pair._1).trim) === List(
+    """The skunk thought the stump
+      stunk.""",
       """The stump thought the
         skunk stunk."""))
 
@@ -118,5 +119,27 @@ class SlabTest extends FunSuite {
     assert(slab.preceding[Annotation](Span(1, 3)).toList.map(_._1) === List(Span(0, 2), Span(0, 1)))
     assert(slab.covered[Annotation](Span(1, 3)).toList.map(_._1) === List(Span(1, 2), Span(1, 3), Span(2, 3)))
     assert(slab.covered[Annotation](Span(0, 2)).toList.map(_._1) === List(Span(0, 1), Span(0, 2), Span(1, 2)))
+  }
+}
+
+import org.scalatest.FunSpec
+
+class HListUtilsTest extends FunSpec {
+  import shapeless._
+  implicit def hlistOps[L <: HList](l : L) : Utils.HListOps[L] = new Utils.HListOps(l)
+
+  describe("covariant filter") {
+    it("should not filter subtypes") {
+      class Foo(val foo: Int)
+      class Bar(val bar: Int) extends Foo(bar)
+      val l = new Foo(1) :: new Bar(2) :: new Foo(3) :: new Bar(4) :: HNil
+      assert(l.covariantFilter[Foo] == l)
+    }
+    it("should filter supertypes") {
+      class Foo(val foo: Int)
+      class Bar(val bar: Int) extends Foo(bar)
+      val l = new Foo(1) :: new Bar(2) :: new Foo(3) :: new Bar(4) :: HNil
+      assert(l.covariantFilter[Bar] != l)
+    }
   }
 }

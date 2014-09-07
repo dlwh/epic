@@ -4,77 +4,62 @@ import epic.trees.Span
 import shapeless._
 import LUBConstraint._
 import ops.hlist.Prepend
+import shapeless.syntax.typeable._
 
-trait Annotation
+trait Annotation extends Serializable {}
+trait Located
 
-class InefficientShapelessSlab[ContentType, RegionType, AnnotationTypes, L <: HList: <<:[Annotation]#λ](
-  val content: ContentType,
-  val annotations: L = HNil)(implicit hasBounds: HasBounds[RegionType], extract: ExtractRegion[RegionType, ContentType])
-// extends Slab[ContentType, RegionType, AnnotationTypes]
-{
+class InefficientShapelessSlab[Content, Region, Annotations, L <: HList: <<:[Annotation]#λ](
+  val content: Content,
+  val annotations: L = HNil) {
 
   def ++[A <: Annotation, H <: HList: <<:[A]#λ, Out <: HList: <<:[Annotation]#λ]
   (annotations: H)
-  (implicit prepend : Prepend.Aux[L, H, Out]): InefficientShapelessSlab[ContentType, RegionType, AnnotationTypes with A, Out] = {
+  (implicit prepend : Prepend.Aux[L, H, Out]): InefficientShapelessSlab[Content, Region, Annotations with A, Out] = {
     new InefficientShapelessSlab(this.content, this.annotations ::: annotations)
   }
 
-  def +:[A <: Annotation](annotation: A): InefficientShapelessSlab[ContentType, RegionType, AnnotationTypes with A, A :: L] = {
+  def +:[A <: Annotation](annotation: A): InefficientShapelessSlab[Content, Region, Annotations with A, A :: L] = {
     new InefficientShapelessSlab(this.content, annotation +: this.annotations)
   }
 
   def toHList: HList = this.annotations
-
+  def subList[T: Typeable]: List[T] = Utils.sublist[T](this.toHList)
 }
 
+object Utils {
+  def sublist[T: Typeable](l: HList): List[T] = (for(hd :: tail <- l.cast[_ :: HList]) yield hd.cast[T].toList ++ sublist[T](tail)).toList.flatten
 
-// class SortedShapelessSlab[ContentType,
-//                           AnnotationType](val content: ContentType,
-//                                           val annotations: Map[Class[_], Vector[(Span, Any)]] = Map.empty,
-//                                           val reverseAnnotations: Map[Class[_], Vector[(Span, Any)]] = Map.empty)(implicit extract: ExtractRegion[Span, ContentType]) extends Slab[ContentType, Span, AnnotationType] {
+  // https://stackoverflow.com/questions/25713668/do-a-covariant-filter-on-an-hlist
+  trait CoFilter[L <: HList, U] extends DepFn1[L] { type Out <: HList }
 
+  object CoFilter {
+    def apply[L <: HList, U](implicit f: CoFilter[L, U]): Aux[L, U, f.Out] = f
 
-//   override def spanned(region: Span): ContentType = extract(region, content)
+    type Aux[L <: HList, U, Out0 <: HList] = CoFilter[L, U] { type Out = Out0 }
 
-//   override def ++[A](annotations: TraversableOnce[(Span, A)]): Slab[ContentType, Span, AnnotationType with A] = {
-//     var newAnnotations = this.annotations
-//     val grouped = annotations.toIndexedSeq.groupBy(_._2.getClass)
-//     for( (clss, group) <- grouped) {
-//       newAnnotations = newAnnotations + (clss -> (newAnnotations.getOrElse(clss, Vector.empty) ++ group).sortBy(_._1)(SpanOrdering))
-//     }
+    implicit def hlistCoFilterHNil[L <: HList, U]: Aux[HNil, U, HNil] =
+      new CoFilter[HNil, U] {
+        type Out = HNil
+        def apply(l: HNil): Out = HNil
+      }
 
-//     var reverseAnnotations = this.reverseAnnotations
-//     for( (clss, group) <- grouped) {
-//       reverseAnnotations = reverseAnnotations + (clss -> (reverseAnnotations.getOrElse(clss, Vector.empty) ++ group).sortBy(_._1)(EndFirstSpanOrdering))
-//     }
-//     new SortedSequenceSlab(content, newAnnotations, reverseAnnotations)
-//   }
+    implicit def hlistCoFilter1[U, H <: U, T <: HList]
+      (implicit f: CoFilter[T, U]): Aux[H :: T, U, H :: f.Out] =
+        new CoFilter[H :: T, U] {
+          type Out = H :: f.Out
+          def apply(l: H :: T): Out = l.head :: f(l.tail)
+        }
 
-//   override def following[A >: AnnotationType: ClassTag](region: Span): Iterator[(Span, A)] = {
-//     annotations.filterKeys(implicitly[ClassTag[A]].runtimeClass.isAssignableFrom).valuesIterator.flatMap { annotations =>
-//       var pos = BinarySearch.interpolationSearch(annotations, (_:(Span, Any))._1.begin, region.end)
-//       if(pos < 0) pos = ~pos
-//       annotations.view(pos, annotations.length)
-//     }.asInstanceOf[Iterator[(Span, A)]]
-//   }
+    implicit def hlistCoFilter2[U, H, T <: HList]
+      (implicit f: CoFilter[T, U], e: H <:!< U): Aux[H :: T, U, f.Out] =
+        new CoFilter[H :: T, U] {
+          type Out = f.Out
+          def apply(l: H :: T): Out = f(l.tail)
+        }
+  }
 
-//   override def preceding[A >: AnnotationType : ClassTag](region: Span): Iterator[(Span, A)] = {
-//     reverseAnnotations.filterKeys(implicitly[ClassTag[A]].runtimeClass.isAssignableFrom).valuesIterator.flatMap { annotations =>
-//       var pos = BinarySearch.interpolationSearch(annotations, (_:(Span, Any))._1.end, region.begin + 1)
-//       if(pos < 0) pos = ~pos
-//       annotations.view(0, pos).reverseIterator
-//     }.asInstanceOf[Iterator[(Span, A)]]
-//   }
-
-//   override def covered[A >: AnnotationType : ClassTag](region: Span): Iterator[(Span, A)] = {
-//     annotations.filterKeys(implicitly[ClassTag[A]].runtimeClass.isAssignableFrom).valuesIterator.flatMap { annotations =>
-//       var begin = BinarySearch.interpolationSearch(annotations, (_:(Span, Any))._1.begin, region.begin)
-//       if(begin < 0) begin = ~begin
-//       annotations.view(begin, annotations.length).takeWhile(_._1.end <= region.end)
-//     }.asInstanceOf[Iterator[(Span, A)]]
-//   }
-
-//   override def iterator[A >: AnnotationType : ClassTag]: Iterator[(Span, A)] = {
-//     annotations.filterKeys(implicitly[ClassTag[A]].runtimeClass.isAssignableFrom).valuesIterator.flatten.asInstanceOf[Iterator[(Span, A)]]
-//   }
-// }
+  implicit final class HListOps[L <: HList](val l: L)  {
+    def covariantFilter[U](implicit filter: CoFilter[L, U]): filter.Out = filter(l)
+  }
+}
