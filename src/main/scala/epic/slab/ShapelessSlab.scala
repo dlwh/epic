@@ -11,13 +11,7 @@ trait Located
 
 class InefficientShapelessSlab[Content, Region, Annotations, L <: HList: <<:[Annotation]#λ](
   val content: Content,
-  val annotations: L = HNil) {
-
-  def ++[A <: Annotation, H <: HList: <<:[A]#λ, Out <: HList: <<:[Annotation]#λ]
-  (annotations: H)
-  (implicit prepend : Prepend.Aux[L, H, Out]): InefficientShapelessSlab[Content, Region, Annotations with A, Out] = {
-    new InefficientShapelessSlab(this.content, this.annotations ::: annotations)
-  }
+  val annotations: L) {
 
   def +:[A <: Annotation](annotation: A): InefficientShapelessSlab[Content, Region, Annotations with A, A :: L] = {
     new InefficientShapelessSlab(this.content, annotation +: this.annotations)
@@ -25,6 +19,10 @@ class InefficientShapelessSlab[Content, Region, Annotations, L <: HList: <<:[Ann
 
   def toHList: HList = this.annotations
   def subList[T: Typeable]: List[T] = Utils.sublist[T](this.toHList)
+}
+
+object InefficientShapelessSlab {
+  def apply[C, R, A](content: C): InefficientShapelessSlab[C, R, A, HNil] = new InefficientShapelessSlab[C, R, A, HNil](content, HNil)
 }
 
 object Utils {

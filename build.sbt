@@ -24,7 +24,9 @@ libraryDependencies ++= Seq(
   "org.mapdb" % "mapdb" % "0.9.2",
   "org.slf4j" % "slf4j-simple" % "1.7.6",
   "org.scalatest" %% "scalatest" % "2.1.3" % "test",
-  "org.scalacheck" %% "scalacheck" % "1.11.3" % "test"
+  "org.scalacheck" %% "scalacheck" % "1.11.3" % "test",
+  "com.chuusai" %% "shapeless" % "2.0.0",
+  "org.typelevel" %% "scodec-core" % "1.1.0"
 )
 
 libraryDependencies ++= (CrossVersion.partialVersion(scalaVersion.value) match {

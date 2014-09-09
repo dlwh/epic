@@ -143,3 +143,22 @@ class HListUtilsTest extends FunSpec {
     }
   }
 }
+
+class ShapelessSlabTest extends FunSpec {
+  import shapeless.test.illTyped
+  import shapeless._
+  import LUBConstraint._
+
+  describe("basic slab") {
+    val slab = InefficientShapelessSlab("Foobar")
+    val annotation = new Annotation {}
+    it("should accept an annotation") {
+      val slab2 = annotation +: slab
+    }
+    it("should not accept something that isn't an annotation") {
+      illTyped("""
+        slab ++ "foo"
+      """)
+    }
+  }
+}
