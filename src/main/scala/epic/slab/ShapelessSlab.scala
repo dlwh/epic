@@ -22,7 +22,7 @@ class InefficientShapelessSlab[Content, Region, Annotations, L <: HList: <<:[Ann
 }
 
 object InefficientShapelessSlab {
-  def apply[C, R, A](content: C): InefficientShapelessSlab[C, R, A, HNil] = new InefficientShapelessSlab[C, R, A, HNil](content, HNil)
+  def apply[C, R](content: C): InefficientShapelessSlab[C, R, Any, HNil] = new InefficientShapelessSlab[C, R, Any, HNil](content, HNil)
 }
 
 object Utils {

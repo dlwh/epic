@@ -154,10 +154,17 @@ class ShapelessSlabTest extends FunSpec {
     val annotation = new Annotation {}
     it("should accept an annotation") {
       val slab2 = annotation +: slab
-    }
-    it("should not accept something that isn't an annotation") {
       illTyped("""
-        slab ++ "foo"
+        "foo" +: slab
+      """)
+    }
+    it("should add the annotation type") {
+      case class Foo(foo: Int) extends Annotation
+      val foo = Foo(42)
+      def testForFoo[T](slab: InefficientShapelessSlab[_, _, T with Foo, _]) = true
+      testForFoo(foo +: slab)
+      illTyped("""
+        testForFoo(slab)
       """)
     }
   }
