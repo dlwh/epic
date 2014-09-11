@@ -9,11 +9,21 @@ import shapeless.syntax.typeable._
 trait Annotation extends Serializable {}
 trait Located
 
-class InefficientShapelessSlab[Content, Region, Annotations, L <: HList: <<:[Annotation]#λ](
+// Handles annotation over regions
+// any-dimensional required
+trait SpanAnnotation extends Annotation {}
+
+// Handles annotation referencing other annotations
+trait RecursiveAnnotation extends Annotation {}
+
+// Handles annotation on the document-level
+trait DocumentAnnotation extends Annotation {}
+
+class InefficientShapelessSlab[Content, Annotations, L <: HList: <<:[Annotation]#λ](
   val content: Content,
   val annotations: L) {
 
-  def +:[A <: Annotation](annotation: A): InefficientShapelessSlab[Content, Region, Annotations with A, A :: L] = {
+  def prepend[A <: Annotation](annotation: A): InefficientShapelessSlab[Content, Annotations with A, A :: L] = {
     new InefficientShapelessSlab(this.content, annotation +: this.annotations)
   }
 
@@ -22,7 +32,7 @@ class InefficientShapelessSlab[Content, Region, Annotations, L <: HList: <<:[Ann
 }
 
 object InefficientShapelessSlab {
-  def apply[C, R](content: C): InefficientShapelessSlab[C, R, Any, HNil] = new InefficientShapelessSlab[C, R, Any, HNil](content, HNil)
+  def apply[C](content: C): InefficientShapelessSlab[C, Any, HNil] = new InefficientShapelessSlab[C, Any, HNil](content, HNil)
 }
 
 object Utils {
