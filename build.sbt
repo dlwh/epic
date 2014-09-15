@@ -5,7 +5,7 @@ import sbtassembly.AssemblyOption
 
 name := "epic"
 
-version := "0.2-SNAPSHOT"
+version := "0.2"
 
 organization := "org.scalanlp"
 

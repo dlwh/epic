@@ -6,7 +6,7 @@ Epic is a structured prediction framework for Scala. It also includes classes fo
 
 Epic is distributed under the [Apache License, Version 2.0](http://www.apache.org/licenses/LICENSE-2.0.html).
 
-The current version is 0.2-SNAPSHOT.
+The current version is 0.2.
 
 ## Documentation
 
@@ -142,73 +142,83 @@ language is the [two letter code for the language](http://www.loc.gov/standards/
 
 To following models are available at this time:
 
+__AS OF WRITING ONLY THE ENGLISH PARSER IS AVAILABLE!__ Write me if you want these other models.
 
 * Parser
   * English: 
     ```
-    "org.scalanlp" %% "epic-parser-en-span" % "2014.7.29-SNAPSHOT"
+    "org.scalanlp" %% "epic-parser-en-span" % "2014.9.15"
+    ```
+
+
+TODO:
+
+* Parser
+  * English: 
+    ```
+    "org.scalanlp" %% "epic-parser-en-span" % "2014.9.15-SNAPSHOT"
     ```
   * Basque: 
     ```
-    "org.scalanlp" %% "epic-parser-eu-span" % "2014.7.29-SNAPSHOT"
+    "org.scalanlp" %% "epic-parser-eu-span" % "2014.9.15-SNAPSHOT"
     ```
   * French: 
     ```
-    "org.scalanlp" %% "epic-parser-fr-span" % "2014.7.29-SNAPSHOT"
+    "org.scalanlp" %% "epic-parser-fr-span" % "2014.9.15-SNAPSHOT"
     ```
   * German: 
     ```
-    "org.scalanlp" %% "epic-parser-de-span" % "2014.7.29-SNAPSHOT"
+    "org.scalanlp" %% "epic-parser-de-span" % "2014.9.15-SNAPSHOT"
     ```
   * Hungarian: 
     ```
-    "org.scalanlp" %% "epic-parser-hu-span" % "2014.7.29-SNAPSHOT"
+    "org.scalanlp" %% "epic-parser-hu-span" % "2014.9.15-SNAPSHOT"
     ```
   * Korean: 
     ```
-    "org.scalanlp" %% "epic-parser-ko-span" % "2014.7.29-SNAPSHOT"
+    "org.scalanlp" %% "epic-parser-ko-span" % "2014.9.15-SNAPSHOT"
     ```
   * Polish:
     ```
-    "org.scalanlp" %% "epic-parser-pl-span" % "2014.7.29-SNAPSHOT"
+    "org.scalanlp" %% "epic-parser-pl-span" % "2014.9.15-SNAPSHOT"
     ```
   * Swedish: 
     ```
-    "org.scalanlp" %% "epic-parser-sv-span" % "2014.7.29-SNAPSHOT"
+    "org.scalanlp" %% "epic-parser-sv-span" % "2014.9.15-SNAPSHOT"
     ```
 * POS Taggers
   * English: 
     ```
-    "org.scalanlp" %% "epic-pos-en" % "2014.7.29-SNAPSHOT"
+    "org.scalanlp" %% "epic-pos-en" % "2014.9.15-SNAPSHOT"
     ```
   * Basque: 
     ```
-    "org.scalanlp" %% "epic-pos-eu" % "2014.7.29-SNAPSHOT"
+    "org.scalanlp" %% "epic-pos-eu" % "2014.9.15-SNAPSHOT"
     ```
   * French: 
     ```
-    "org.scalanlp" %% "epic-pos-fr" % "2014.7.29-SNAPSHOT"
+    "org.scalanlp" %% "epic-pos-fr" % "2014.9.15-SNAPSHOT"
     ```
   * German: 
     ```
-    "org.scalanlp" %% "epic-pos-de" % "2014.7.29-SNAPSHOT"
+    "org.scalanlp" %% "epic-pos-de" % "2014.9.15-SNAPSHOT"
     ```
   * Hungarian: 
     ```
-    "org.scalanlp" %% "epic-pos-hu" % "2014.7.29-SNAPSHOT"
+    "org.scalanlp" %% "epic-pos-hu" % "2014.9.15-SNAPSHOT"
     ```
   * Polish: 
     ```
-    "org.scalanlp" %% "epic-pos-pl" % "2014.7.29-SNAPSHOT"
+    "org.scalanlp" %% "epic-pos-pl" % "2014.9.15-SNAPSHOT"
     ```
   * Swedish: 
     ```
-    "org.scalanlp" %% "epic-pos-sv" % "2014.7.29-SNAPSHOT"
+    "org.scalanlp" %% "epic-pos-sv" % "2014.9.15-SNAPSHOT"
     ```
 * Named Entity Recognizers
   * English: 
     ```
-    "org.scalanlp" %% "epic-ner-en-conll" % "2014.7.29-SNAPSHOT"
+    "org.scalanlp" %% "epic-ner-en-conll" % "2014.9.15-SNAPSHOT"
     ```
 
 
