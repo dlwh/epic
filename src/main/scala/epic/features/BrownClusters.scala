@@ -10,6 +10,7 @@ import epic.framework.Feature
  * @author dlwh
  */
 object BrownClusters {
+
   // word -> cluster, clusters
   lazy val theClusters: Map[String, String] = {
     val in = new GZIPInputStream(this.getClass.getResourceAsStream("bllip-clusters.gz"))
