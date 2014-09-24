@@ -54,5 +54,10 @@ class ShapelessSlabTest extends FunSpec {
         """ slab1.get[Foo] """
       }
     }
+    it("should also work with empty annotation lists") {
+      case class Foo(foo: Int) extends Annotation
+      val slab1 = slab.add(List[Int]().map(Foo(_)).toVector)
+      slab1.get[Foo] == Vector[Foo]()
+    }
   }
 }
