@@ -1,73 +1,37 @@
 package epic.slab
-import epic.slab.Slab._
-import epic.trees.Span
 import shapeless._
 import LUBConstraint._
-import ops.hlist.Prepend
 import shapeless.syntax.typeable._
+import Utils._
+import ops.hlist._
 
-trait Annotation extends Serializable {}
-trait Located
+class Slab[Content, L <: HList](val content: Content, val annotations: L) {
 
-// Handles annotation over regions
-// any-dimensional required
-trait SpanAnnotation extends Annotation {}
+  def get[T](index: Int)(implicit sel: Selector[L, Vector[T]]): T = sel(annotations)(index)
+  def get[T](implicit sel: Selector[L, Vector[T]]): Vector[T] = sel(annotations)
 
-// Handles annotation referencing other annotations
-trait RecursiveAnnotation extends Annotation {}
-
-// Handles annotation on the document-level
-trait DocumentAnnotation extends Annotation {}
-
-class InefficientShapelessSlab[Content, Annotations, L <: HList: <<:[Annotation]#λ](
-  val content: Content,
-  val annotations: L) {
-
-  def prepend[A <: Annotation](annotation: A): InefficientShapelessSlab[Content, Annotations with A, A :: L] = {
-    new InefficientShapelessSlab(this.content, annotation +: this.annotations)
+  def add[A, Tmp <: HList, Result <: HList](newAnnotations: Vector[A])(implicit adder: Adder.Aux[L, A, Vector[A], Result]): Slab[Content, Result] = {
+    new Slab(content, adder(annotations, newAnnotations))
+  }
+  def add[A, Tmp <: HList, Result <: HList](newAnnotation: A)(implicit adder: Adder.Aux[L, A, Vector[A], Result]): Slab[Content, Result] = {
+    new Slab(content, adder(annotations, Vector(newAnnotation)))
   }
 
-  def toHList: HList = this.annotations
-  def subList[T: Typeable]: List[T] = Utils.sublist[T](this.toHList)
+  def toHList: L = this.annotations
 }
 
-object InefficientShapelessSlab {
-  def apply[C](content: C): InefficientShapelessSlab[C, Any, HNil] = new InefficientShapelessSlab[C, Any, HNil](content, HNil)
+object Slab {
+  def apply[C](content: C): Slab[C, HNil] = new Slab[C, HNil](content, HNil)
 }
 
-object Utils {
-  def sublist[T: Typeable](l: HList): List[T] = (for(hd :: tail <- l.cast[_ :: HList]) yield hd.cast[T].toList ++ sublist[T](tail)).toList.flatten
-
-  // https://stackoverflow.com/questions/25713668/do-a-covariant-filter-on-an-hlist
-  trait CoFilter[L <: HList, U] extends DepFn1[L] { type Out <: HList }
-
-  object CoFilter {
-    def apply[L <: HList, U](implicit f: CoFilter[L, U]): Aux[L, U, f.Out] = f
-
-    type Aux[L <: HList, U, Out0 <: HList] = CoFilter[L, U] { type Out = Out0 }
-
-    implicit def hlistCoFilterHNil[L <: HList, U]: Aux[HNil, U, HNil] =
-      new CoFilter[HNil, U] {
-        type Out = HNil
-        def apply(l: HNil): Out = HNil
-      }
-
-    implicit def hlistCoFilter1[U, H <: U, T <: HList]
-      (implicit f: CoFilter[T, U]): Aux[H :: T, U, H :: f.Out] =
-        new CoFilter[H :: T, U] {
-          type Out = H :: f.Out
-          def apply(l: H :: T): Out = l.head :: f(l.tail)
-        }
-
-    implicit def hlistCoFilter2[U, H, T <: HList]
-      (implicit f: CoFilter[T, U], e: H <:!< U): Aux[H :: T, U, f.Out] =
-        new CoFilter[H :: T, U] {
-          type Out = f.Out
-          def apply(l: H :: T): Out = f(l.tail)
-        }
-  }
-
-  implicit final class HListOps[L <: HList](val l: L)  {
-    def covariantFilter[U](implicit filter: CoFilter[L, U]): filter.Out = filter(l)
+object Test {
+  def main(args: Array[String]) = {
+    val s = Slab("foo")
+    val s1 = s.add(Vector(1,2,3))
+    print(s1.toHList)
+    val s2 = s1.add(Vector(4,5,6))
+    print(s2.toHList)
+    val s3 = s2.add(Vector("foo", "bar"))
+    print(s3.toHList)
   }
 }
