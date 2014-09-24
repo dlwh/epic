@@ -45,5 +45,14 @@ class ShapelessSlabTest extends FunSpec {
       assert(slab3.get[Foo](0) === Foo(13))
       assert(slab3.get[Foo](1) === Foo(42))
     }
+    it("should raise a type error if trying to retrieve that's not available") {
+      case class Foo(foo: Int) extends Annotation
+      val slab1 = slab.add(annotation)
+      // could not find implicit value for parameter sel:
+      // shapeless.ops.hlist.Selector[shapeless.::[Vector[Annotation],shapeless.HNil],Vector[Foo]]
+      illTyped {
+        """ slab1.get[Foo] """
+      }
+    }
   }
 }
