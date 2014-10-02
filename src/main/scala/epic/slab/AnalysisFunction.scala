@@ -1,4 +1,7 @@
 package epic.slab
+import shapeless._
+import ops.hlist._
+import Utils._
 
 /**
  * An analysis function that takes a Slab with declared annotation types in it and outputs
@@ -9,40 +12,19 @@ package epic.slab
  *   I = Required annotation types
  *   O = Produced annotation types
  */
-// trait AnalysisFunction[C,I,+O] {
-//   def apply[In <: I](slab: Slab[C,_]):Slab[C,_]
+trait AnalysisFunction[C] {
+  def apply[In <: HList, Out <: HList](slab: StringSlab[In])(implicit sel: Selector[In, Vector[Sentence]], adder: Adder.Aux[In, Token, Vector[Token], Out]): Slab[C, Out]
 
-//   def andThen[II >: (I with O), OO](other: AnalysisFunction[C,  II, OO]):AnalysisFunction[C, I, O with OO] = {
-//     new ComposedAnalysisFunction[C, I, O, II, OO](this, other)
+  // def andThen(other: AnalysisFunction[C]):AnalysisFunction[C] = {
+  //   new ComposedAnalysisFunction[C](this, other)
+  // }
+
+}
+
+// case class ComposedAnalysisFunction[C](a: AnalysisFunction[C], b: AnalysisFunction[C]) extends AnalysisFunction[C] {
+//   def apply[In <: HList, Out <: HList](slab: Slab[C,In]):Slab[C,Out] = {
+//     b(a(slab))
 //   }
-
-// }
-
-// case class ComposedAnalysisFunction[C,  I, O, II >: (I with O), +OO](a: AnalysisFunction[C,I,O],
-//                                                                        b: AnalysisFunction[C,II,OO]) extends AnalysisFunction[C, I, O with OO] {
-
-//   def apply[In <: I](slab: Slab[C,In]):Slab[C,In with O with OO] = {
-//     // type inference can't figure this out...
-//     // can you blame it?
-//   }
-
-// }
-
-
-// object StringIdentityAnalyzer extends StringAnalysisFunction[Any, Any] {
-//   def apply[In](slab: StringSlab[In]):StringSlab[In] = slab
-// }
-
-/**
-  * A simple regex tokenizer.
-  */
-// object RegexTokenizer extends Tokenizer {
-//   def apply[I <: Sentence](slab: StringSlab[I]) =
-//     // the [Token] is required because of https://issues.scala-lang.org/browse/SI-7647
-//     slab.++[Token](slab.iterator[Sentence].flatMap{ case (region, sentence) =>
-//       "\\p{L}+|\\p{P}+|\\p{N}+".r.findAllMatchIn(slab.content.substring(region.begin, region.end)).map(m =>
-//         Span(region.begin + m.start, region.begin + m.end) -> Token(m.group(0)))
-//     })
 // }
 
 

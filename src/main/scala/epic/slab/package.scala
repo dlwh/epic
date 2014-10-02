@@ -1,4 +1,5 @@
 package epic
+import shapeless._
 
 /**
  * TODO
@@ -8,7 +9,7 @@ package epic
 package object slab {
   // some type aliases
 
-  // type StringAnalysisFunction[I, O] = AnalysisFunction[String, I, O]
-  // type StringSlab[+AnnotationTypes] = Slab[String, AnnotationTypes]
+  type StringAnalysisFunction = AnalysisFunction[String]
+  type StringSlab[L <: HList] = Slab[String, L]
 
 }
