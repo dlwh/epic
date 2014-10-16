@@ -28,5 +28,12 @@ class HListUtilsTest extends FunSpec {
       val l = 1 :: "foo" :: HNil
       assert(l.selectMany[String :: HNil].at(0) == "foo")
     }
+    it("should get multiple elements") {
+      val l = 1 :: "foo" :: 2.3 :: HNil
+      assert(l.selectMany[String :: Int ::  HNil] == "foo" :: 1 :: HNil)
+      assert(l.selectMany[Int :: String :: HNil] == 1 :: "foo" :: HNil)
+      assert(l.selectMany[Double :: String :: HNil] == 2.3 :: "foo" :: HNil)
+      assert(l.selectMany[String :: Double :: HNil] == "foo" :: 2.3 :: HNil)
+    }
   }
 }

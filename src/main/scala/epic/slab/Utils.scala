@@ -2,6 +2,7 @@ package epic.slab
 import shapeless._
 import shapeless.syntax.typeable._
 import ops.hlist._
+import scala.annotation.implicitNotFound
 
 object Utils {
   def iterator[T: Typeable](l: HList): Iterator[T] = (for(hd :: tail <- l.cast[_ :: HList]) yield hd.cast[T].toList ++ iterator[T](tail)).toIterator.flatten
@@ -35,10 +36,6 @@ object Utils {
         }
   }
 
-  implicit final class HListOps[L <: HList](val l: L)  {
-    def covariantFilter[U](implicit filter: CoFilter[L, U]): filter.Out = filter(l)
-  }
-
   sealed trait Adder[L <: HList, A, V <: Vector[A]] extends DepFn2[L, Vector[A]]
 
   object Adder {
@@ -66,4 +63,36 @@ object Utils {
         def apply(l: HNil, vector: Vector[A]): Out = vector :: HNil
       }
   }
+
+  @implicitNotFound("Implicit not found: epic.slab.Utils.SelectMany[${L}, ${SL}]. You requested to select elements of the types ${SL}, but not all were found in HList ${L}.")
+  trait SelectMany[L <: HList, SL <: HList] extends DepFn1[L]
+
+  object SelectMany {
+    def apply[L <: HList, SL <: HList](implicit selectM: SelectMany[L, SL]): Aux[L, SL, selectM.Out] = selectM
+
+    type Aux[L <: HList, SL <: HList, Out0] = SelectMany[L, SL] { type Out = Out0 }
+
+    implicit def eol[L <: HList]: Aux[L, HNil, HNil] =
+      new SelectMany[L, HNil] {
+        type Out = HNil
+        def apply(l : L): Out = HNil
+      }
+
+    implicit def hlistSelectMany[L <: HList, E, Result <: HList]
+      (implicit selector: Selector.Aux[L, E], selectMany: Aux[L, Result, Result]): Aux[L, E :: Result, E :: Result] =
+        new SelectMany[L, E :: Result] {
+          type Out = E :: Result
+          def apply(l : L): Out = {
+            val e = selector(l)
+            val sl = selectMany(l)
+            e :: sl
+          }
+        }
+  }
+
+  implicit final class HListOps[L <: HList](val l: L)  {
+    def covariantFilter[U](implicit filter: CoFilter[L, U]): filter.Out = filter(l)
+    def selectMany[SL <: HList](implicit sm: SelectMany[L, SL]): sm.Out = sm(l)
+  }
+
 }

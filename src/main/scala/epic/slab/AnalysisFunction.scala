@@ -13,7 +13,7 @@ import Utils._
  *   O = Produced annotation types
  */
 trait AnalysisFunction[C] {
-  def apply[In <: HList, I, O, Out <: HList](slab: Slab[C, In])(implicit sel: Selector[In, Vector[I]], adder: Adder.Aux[In, O, Vector[O], Out]): Slab[C, Out]
+  def apply[In <: HList, Out <: HList](slab: StringSlab[In])(implicit sel: Selector[In, Vector[Sentence]], adder: Adder.Aux[In, Token, Vector[Token], Out]): Slab[C, Out]
 
   // def andThen(other: AnalysisFunction[C]):AnalysisFunction[C] = {
   //   new ComposedAnalysisFunction[C](this, other)
