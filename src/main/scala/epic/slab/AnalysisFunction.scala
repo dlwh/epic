@@ -21,6 +21,10 @@ trait AnalysisFunction11[C, I, O] {
 
 }
 
+trait AnalysisFunctionN1[C, I <: HList, O] {
+  def apply[In <: HList, Out <: HList](slab: Slab[C, In])(implicit sel: SelectMany.Aux[In, I, I], adder: Adder.Aux[In, O, Vector[O], Out]): Slab[C, Out]
+}
+
 // case class ComposedAnalysisFunction[C](a: AnalysisFunction[C], b: AnalysisFunction[C]) extends AnalysisFunction[C] {
 //   def apply[In <: HList, Out <: HList](slab: Slab[C,In]):Slab[C,Out] = {
 //     b(a(slab))
