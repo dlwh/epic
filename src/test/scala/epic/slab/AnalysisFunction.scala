@@ -9,8 +9,8 @@ import org.scalatest.FunSpec
 /**
   * A simple regex tokenizer.
   */
-object RegexTokenizer extends AnalysisFunction[String] {
-  def apply[In <: HList, Out <: HList](slab: StringSlab[In])(implicit sel: Selector[In, Vector[Sentence]], adder: Adder.Aux[In, Token, Vector[Token], Out]): Slab[String, Out] =
+object RegexTokenizer extends AnalysisFunction11[String, Sentence, Token] {
+  def apply[In <: HList, Out <: HList](slab: Slab[String, In])(implicit sel: Selector[In, Vector[Sentence]], adder: Adder.Aux[In, Token, Vector[Token], Out]): Slab[String, Out] =
     slab.add(slab.get[Sentence](sel).flatMap { sentence =>
       "\\p{L}+|\\p{P}+|\\p{N}+".r.findAllMatchIn(
         slab.content.substring(sentence.begin, sentence.end)
