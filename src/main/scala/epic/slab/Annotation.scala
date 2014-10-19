@@ -1,6 +1,7 @@
 package epic.slab
 
 import java.net.URL
+import epic.trees.Span
 
 trait Annotation extends Serializable {}
 trait Located
@@ -10,8 +11,6 @@ trait Located
 // No real implementation yet because I have no idea what would be a
 // good generalization.
 trait RegionAnnotation extends Annotation {}
-
-case class Span(begin: Int, end: Int)
 
 trait SpanAnnotation extends RegionAnnotation {
   def span: Span
@@ -30,4 +29,4 @@ case class Sentence(span: Span, id: Option[String] = None) extends SpanAnnotatio
 case class Segment(span: Span, id: Option[String] = None) extends SpanAnnotation
 case class Token(span: Span) extends SpanAnnotation
 case class Tagged[Tag](span: Span, tag: Tag, id: Option[String] = None) extends SpanAnnotation
-case class EntityMention(span: Span, entityType: String, id: Option[String] = None) extends SpanAnnotation
+case class EntityMention(entityType: String, id: Option[String] = None)

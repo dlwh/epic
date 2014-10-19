@@ -1,6 +1,9 @@
 package epic.sequences
 
 import epic.slab._
+import Utils._
+import shapeless._
+import ops.hlist._
 import epic.trees.{Span, AnnotatedLabel}
 
 /**
@@ -11,17 +14,24 @@ import epic.trees.{Span, AnnotatedLabel}
  *
  * @author dlwh
  **/
-trait Segmenter[Tag] extends StringAnalysisFunction[Sentence with Token, Tag] with (IndexedSeq[String]=>IndexedSeq[(Tag, Span)]) {
-  override def apply[In <: Sentence with Token](slab: StringSlab[In]): StringSlab[In with Tag] = {
-    val annotatedSentences = for((span, sent) <- slab.iterator[Sentence]) yield {
-      val tokens = slab.covered[Token](span).toIndexedSeq
-      val tagSeq = apply(tokens.map(_._2.token))
-      for( (lbl, span) <- tagSeq) yield Span(tokens(span.begin)._1.begin, tokens(span.end - 1)._1.end) -> lbl
+package object sequences {
+  type input = Vector[Sentence] :: Vector[Token] :: HNil
+}
+import sequences._
+
+trait Segmenter[Tag] extends AnalysisFunctionN1[String, input, Tag] {
+  def apply[In <: HList, Out <: HList](slab: StringSlab[In])(implicit sel: SelectMany.Aux[In, input, input], adder: Adder.Aux[In, Tagged[Tag], Vector[Tagged[Tag]], Out]): Slab[String, Out] = {
+    val data = slab.getMany(sel)
+    val index = SpanIndex(slab.content, data.select[Vector[Token]])
+    val annotatedSentences = for(sent <- data.select[Vector[Sentence]]) yield {
+      val tokens = index(sent.span)
+      val strings = tokens.map(t => slab.at(t.span))
+      apply(strings)
     }
 
-    slab.++[Tag](annotatedSentences.flatten)
+    slab.add(annotatedSentences.flatten)(adder)
   }
-
+  def apply(v1: Vector[String]): Vector[Tagged[Tag]]
 }
 
 object Segmenter {
@@ -31,8 +41,8 @@ object Segmenter {
   def fromCRF[L, Tag](crf: SemiCRF[L, String], lToTag: L=>Tag):Segmenter[Tag] = new SemiCRFSegmenter(crf, lToTag)
 
   case class SemiCRFSegmenter[L, Tag] (crf: SemiCRF[L, String], lToTag: L=>Tag) extends Segmenter[Tag] {
-    override def apply(v1: IndexedSeq[String]) = {
-      crf.bestSequence(v1).segments.collect { case (l, span) if l != crf.outsideSymbol => lToTag(l) -> span}
+    override def apply(v1: Vector[String]) = {
+      crf.bestSequence(v1).segments.collect { case (l, span) if l != crf.outsideSymbol => Tagged(span, lToTag(l))}.toVector
     }
   }
 }

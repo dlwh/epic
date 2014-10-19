@@ -8,6 +8,7 @@ import shapeless._
 import shapeless.syntax.typeable._
 import Utils._
 import ops.hlist._
+import epic.trees.Span
 
 class Slab[Content, L <: HList](val content: Content, val annotations: L) {
 
