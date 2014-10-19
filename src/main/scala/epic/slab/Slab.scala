@@ -21,11 +21,21 @@ class Slab[Content, L <: HList](val content: Content, val annotations: L) {
   def add[A, Tmp <: HList, Result <: HList](newAnnotation: A)(implicit adder: Adder.Aux[L, A, Vector[A], Result]): Slab[Content, Result] = {
     new Slab(content, adder(annotations, Vector(newAnnotation)))
   }
-
-  def toHList: L = this.annotations
 }
 
 object Slab {
   def apply[C](content: C): Slab[C, HNil] = new Slab[C, HNil](content, HNil)
   def apply[C, L <: HList](content: C, annotations: L): Slab[C, L] = new Slab[C, L](content, annotations)
+}
+
+class StringSlab[L <: HList](val content: String, val annotations: L) extends Slab[String, L](content, annotations) {
+  def at(span: Span): String = content.substring(span.begin, span.end)
+}
+
+object StringSlab {
+  def apply[L <: HList](s: Slab[String, L]): StringSlab[L] = new StringSlab(s.content, s.annotations)
+}
+
+object Implicits {
+  implicit def stringSlab[L <: HList](s: Slab[String, L]) = StringSlab[L](s)
 }

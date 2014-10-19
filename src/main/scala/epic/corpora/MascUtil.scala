@@ -5,7 +5,10 @@ import java.io._
 import io.Codec
 import java.net.URL
 import epic.slab._
+import Utils._
 import epic.trees.Span
+import shapeless._
+import ops.hlist._
 
 
 import MascTransform._
@@ -305,10 +308,10 @@ object MascSlab {
    * @param textFileUrl The URL of the MASC .txt (plain text) file.
    * @return A Slab of the text, with the URL saved as a Source annotation.
    */
-  def apply(textFileUrl: URL): StringSlab[Source] = {
+  def apply(textFileUrl: URL): Slab[String, Vector[Source] :: HNil] = {
     val text = io.Source.fromURL(textFileUrl)(Codec.UTF8).mkString
     val slab = Slab(text)
-    slab.append(Span(0, text.length), new Source(textFileUrl))
+    slab.add(Source(textFileUrl))
   }
 
   /**
@@ -319,13 +322,13 @@ object MascSlab {
    * @param slab The Slab containing the text and source URL
    * @return The Slab with added Sentence annotations as read from the MASC -s.xml file.
    */
-  def s[I <: Source](slab: StringSlab[I]): Slab[String, Span, I with Sentence] = {
-    val List((_, source)) = slab.iterator[Source].toList
+  def s[In <: HList, Out <: HList](slab: StringSlab[In])(implicit sel: Selector[In, Vector[Source]], adder: Adder.Aux[In, Sentence, Vector[Sentence], Out]): Slab[String, Out] = {
+    val source = slab.get[Source](0)(sel)
     val sentenceXml = XML.load(source.url.toString().replaceAll("[.]txt$", "-s.xml"))
     val sentences = for (region <- MascUtil.getRegions(sentenceXml)) yield {
       region.span ->  Sentence(Some(region.id))
     }
-    slab.++[Sentence](sentences)
+    slab.add(sentences)(adder)
   }
   
   /**

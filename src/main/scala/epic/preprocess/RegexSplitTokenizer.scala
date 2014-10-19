@@ -28,8 +28,8 @@ import epic.trees.Span
  */
 case class RegexSplitTokenizer(pattern : String) extends Tokenizer {
   val compiled = pattern.r
-  override def apply[In <: Sentence](slab: StringSlab[In]): StringSlab[In with Token] = {
-    slab.++[Token](slab.iterator[Sentence].flatMap { s =>
+  override def apply(slab: StringSlab[In]): StringSlab[Out] = {
+    slab.add(slab.get[Sentence].flatMap { s =>
       val content = slab.spanned(s._1)
       var last = 0
       compiled.findAllMatchIn(content).map{ m =>

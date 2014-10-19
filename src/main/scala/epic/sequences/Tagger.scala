@@ -1,6 +1,11 @@
 package epic.sequences
 
 import epic.slab._
+import epic.slab.Implicits
+import epic.slab.Utils._
+import shapeless._
+import ops.hlist._
+import epic.slab.Indexes._
 import epic.trees.AnnotatedLabel
 
 /**
@@ -10,22 +15,25 @@ import epic.trees.AnnotatedLabel
  *
  * @author dlwh
  **/
-trait Tagger[Tag] extends StringAnalysisFunction with (Vector[String]=>Vector[Tag]) {
-  def apply[In <: HList, Out <: HList](slab: StringSlab[In])(implicit sel: Selector[In, Vector[Sentence]], adder: Adder.Aux[In, Token, Vector[Tag], Out]): Slab[C, Out] = {
-    val annotatedSentences = for((span, sent) <- slab.iterator[Sentence]) yield {
-      val tokens = slab.covered[Token](span).toIndexedSeq
-      val tagSeq = apply(tokens.map(_._2.token))
-      tokens.map(_._1) zip tagSeq
+trait Tagger[Tag] extends AnalysisFunction11[String, Sentence, Token] {
+  def apply(v1: Vector[String]): Vector[Tag]
+
+  def apply[In <: HList, Out <: HList](slab: StringSlab[In])(implicit sel: Selector[In, Vector[Token]], adder: Adder.Aux[In, Tagged[Tag], Vector[Tagged[Tag]], Out]): Slab[String, Out] = {
+    val annotatedSentences = for(token <- slab.get[Token]) yield {
+      val tokens = slab.covered[Token](token.span)
+      val strings = tokens.map(t => slab.at(t.span))
+      val tagSeq = apply(strings)
+      tokens.zip(tagSeq).map({case (token, tag) => Tagged[Tag](token.span, tag)})
     }
 
-    slab.++[Tag](annotatedSentences.flatten)
+    slab.add(annotatedSentences.flatten)(adder)
   }
 
 }
 
 object Tagger {
 
-  def posTagger(crf: CRF[AnnotatedLabel, String]) = fromCRF(crf, (a: AnnotatedLabel) => PartOfSpeech(a.label))
+  def posTagger(crf: CRF[AnnotatedLabel, String]) = fromCRF(crf, (a: AnnotatedLabel) => a.label)
 
   def fromCRF[L, Tag](crf: CRF[L, String], lToTag: L=>Tag):Tagger[Tag] = new CRFTagger(crf, lToTag)
 
