@@ -35,14 +35,14 @@ class JavaWordTokenizer(locale: Locale) extends Tokenizer {
   def this() = this(Locale.getDefault)
 
 
-  override def apply[In <: Sentence](slab: StringSlab[In]): StringSlab[In with Token] = {
-    slab.++[Token](slab.iterator[Sentence].flatMap { s =>
+  def apply(content: String, sentences: Vector[Sentence]): Vector[Token] = {
+    sentences.flatMap { s =>
       val breaker = BreakIterator.getWordInstance(locale)
-      breaker.setText(slab.content)
-      new SegmentingIterator(breaker, s._1.begin, s._1.end).map { span =>
+      breaker.setText(content)
+      new SegmentingIterator(breaker, s.begin, s.end).map { span =>
         span -> Token(slab.spanned(span))
       }.filterNot(_._2.token.forall(_.isWhitespace))
-    })
+    }
   }
 }
 

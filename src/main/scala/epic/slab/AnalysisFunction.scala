@@ -14,11 +14,11 @@ import Utils._
  */
 trait AnalysisFunction11[C, I, O] {
   def apply[In <: HList, Out <: HList](slab: Slab[C, In])(implicit sel: Selector[In, Vector[I]], adder: Adder.Aux[In, O, Vector[O], Out]): Slab[C, Out]
+}
 
-  // def andThen(other: AnalysisFunction[C]):AnalysisFunction[C] = {
-  //   new ComposedAnalysisFunction[C](this, other)
-  // }
-
+trait SimpleAnalysisFunction[C, I, O] extends AnalysisFunction11[C, I, O] {
+  def apply(content: C, in: Vector[I]): Vector[O]
+  def apply[In <: HList, Out <: HList](slab: Slab[C, In])(implicit sel: Selector[In, Vector[I]], adder: Adder.Aux[In, O, Vector[O], Out]): Slab[C, Out] = slab.add(apply(slab.content, slab.get(sel)))
 }
 
 trait AnalysisFunctionN1[C, I <: HList, O] {

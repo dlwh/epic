@@ -16,24 +16,33 @@
 package epic.preprocess
 
 import epic.slab._
+import Utils._
+import shapeless._
+import ops.hlist._
 import epic.trees.Span
-
+import Indexes._
+import Implicits._
 
 /**
- * Abstract trait for tokenizers, which annotate sentence-segmented text with tokens. Tokenizers work
- * with both raw strings and [[epic.slab.StringSlab]]s.
+ * Abstract trait for tokenizers, which annotate sentence-segmented
+ * text with tokens. The trait offsets the returned tokens according
+ * to the Sentence.
  *
  * @author dlwh
+ * @author reactormonk
  */
 @SerialVersionUID(1)
-trait Tokenizer extends StringAnalysisFunction[Sentence, Token] with Serializable with (String=>IndexedSeq[String]) {
+trait Tokenizer extends SimpleAnalysisFunction[String, Sentence, Token] with (String => Vector[Token]) {
   override def toString() = getClass.getName +"()"
 
-  def apply(a: String):IndexedSeq[String] = {
-    val slab = apply(Slab(a).append(Span(0, a.length), Sentence()))
-    slab.iterator[Token].map(_._2.token).toIndexedSeq
-  }
+  def apply(sentence: String): Vector[Token]
 
+  def apply(content: String, sentences: Vector[Sentence]): Vector[Token]  = {
+    sentences.map({ sentence => 
+      apply(content.substring(sentence.span.begin, sentence.span.end))
+        .map(t => Token(t.span.offset(sentence.span.begin)))
+    }).flatten
+  }
 }
 
 

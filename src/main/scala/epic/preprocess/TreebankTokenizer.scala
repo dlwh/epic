@@ -12,24 +12,18 @@ import epic.trees.Span
 
 @SerialVersionUID(1L)
 class TreebankTokenizer() extends Tokenizer with Serializable {
-
-  override def apply[In <: Sentence](slab: StringSlab[In]): StringSlab[In with Token] = {
-    slab.++[Token](slab.iterator[Sentence].flatMap { s =>
-      val content = slab.spanned(s._1)
-      val impl = new TreebankTokenizerImpl(new StringReader(content))
-      Iterators.fromProducer{
-        try {
-          Option(impl.getNextToken()).map { case (region, token) =>
-            Span(region.begin + s._1.begin, region.end + s._1.end) -> token
-          }
-        } catch {
-          case e: Throwable => throw new RuntimeException("Could not tokenize " + s, e)
+  def apply(sentence: String): Vector[Token] = {
+    val impl = new TreebankTokenizerImpl(new StringReader(sentence))
+    Iterators.fromProducer{
+      try {
+        Option(impl.getNextToken()).map { case (region, token) =>
+          Span(region.begin + s._1.begin, region.end + s._1.end)
         }
+      } catch {
+        case e: Throwable => throw new RuntimeException("Could not tokenize " + sentence, e)
       }
-    })
+    }
   }
-
-
 }
 
 object TreebankTokenizer extends TreebankTokenizer {
