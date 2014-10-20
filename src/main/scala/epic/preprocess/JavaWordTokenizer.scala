@@ -40,8 +40,8 @@ class JavaWordTokenizer(locale: Locale) extends Tokenizer {
       val breaker = BreakIterator.getWordInstance(locale)
       breaker.setText(content)
       new SegmentingIterator(breaker, s.begin, s.end).map { span =>
-        span -> Token(slab.spanned(span))
-      }.filterNot(_._2.token.forall(_.isWhitespace))
+        Token(span._1, span._2) -> content.substring(span._1, span._2)
+      }.filterNot(_._2.token.forall(_.isWhitespace)).map(_._1)
     }
   }
 }
