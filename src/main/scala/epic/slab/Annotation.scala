@@ -29,4 +29,5 @@ case class Sentence(span: Span, id: Option[String] = None) extends SpanAnnotatio
 case class Segment(span: Span, id: Option[String] = None) extends SpanAnnotation
 case class Token(span: Span) extends SpanAnnotation
 case class Tagged[Tag](span: Span, tag: Tag, id: Option[String] = None) extends SpanAnnotation
-case class EntityMention(entityType: String, id: Option[String] = None)
+case class EntityMention(span: Span, entityType: String, id: Option[String] = None) extends SpanAnnotation
+case class PartOfSpeech(span: Span, tag: String, id: Option[String] = None) extends SpanAnnotation
