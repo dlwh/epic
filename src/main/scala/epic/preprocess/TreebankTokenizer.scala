@@ -17,7 +17,7 @@ class TreebankTokenizer() extends Tokenizer with Serializable {
     Iterators.fromProducer{
       try {
         Option(impl.getNextToken()).map { case (region, token) =>
-          Span(region.begin + s._1.begin, region.end + s._1.end)
+          Span(region.begin + token.begin, region.end + token.end)
         }
       } catch {
         case e: Throwable => throw new RuntimeException("Could not tokenize " + sentence, e)

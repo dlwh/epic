@@ -12,25 +12,40 @@ import Utils._
  *   I = Required annotation type
  *   O = Produced annotation type
  */
+
+// This analysis function requires one input and adds one output type
 trait AnalysisFunction11[C, I, O] {
   def apply[In <: HList, Out <: HList](slab: Slab[C, In])(implicit sel: Selector[In, Vector[I]], adder: Adder.Aux[In, O, Vector[O], Out]): Slab[C, Out]
 }
 
+// This analysis function takes N input types and adds one output type
+trait AnalysisFunctionN1[C, I <: HList, O] {
+  def apply[In <: HList, Out <: HList](slab: Slab[C, In])(implicit sel: SelectMany.Aux[In, I, I], adder: Adder.Aux[In, O, Vector[O], Out]): Slab[C, Out]
+}
+
+// This analysis function requires no input types except for the
+// content itself.
+trait AnalysisFunction01[C, O] {
+  def apply[In <: HList, Out <: HList](slab: Slab[C, In])(implicit adder: Adder.Aux[In, O, Vector[O], Out]): Slab[C, Out]
+}
+
+// A simpler version of the 1 to 1 analysis function which allows for
+// an easy definition of new analysis function without directly
+// interfacing with the shapeless data structure.
 trait SimpleAnalysisFunction[C, I, O] extends AnalysisFunction11[C, I, O] {
   def apply(content: C, in: Vector[I]): Vector[O]
   def apply[In <: HList, Out <: HList](slab: Slab[C, In])(implicit sel: Selector[In, Vector[I]], adder: Adder.Aux[In, O, Vector[O], Out]): Slab[C, Out] = slab.add(apply(slab.content, slab.get(sel)))
 }
 
-trait AnalysisFunctionN1[C, I <: HList, O] {
-  def apply[In <: HList, Out <: HList](slab: Slab[C, In])(implicit sel: SelectMany.Aux[In, I, I], adder: Adder.Aux[In, O, Vector[O], Out]): Slab[C, Out]
+// No input types required, so functions extending this trait can be
+// used to construct a new slab directly from content.
+trait SourceAnalysisFunction[C, O] extends AnalysisFunction01[C, O] with (C => Vector[O]) {
+  def apply(content: C): Vector[O]
+  def apply[In <: HList, Out <: HList](slab: Slab[C, In])(implicit adder: Adder.Aux[In, O, Vector[O], Out]): Slab[C, Out] = slab.add(apply(slab.content))(adder)
+  def createSlabFrom(content: C): Slab[C, Vector[O] :: HNil] = {
+    Slab(content, apply(content) :: HNil)
+  }
 }
-
-// case class ComposedAnalysisFunction[C](a: AnalysisFunction[C], b: AnalysisFunction[C]) extends AnalysisFunction[C] {
-//   def apply[In <: HList, Out <: HList](slab: Slab[C,In]):Slab[C,Out] = {
-//     b(a(slab))
-//   }
-// }
-
 
 // object AnalysisPipeline {
 //   import AnnotatedSpan._

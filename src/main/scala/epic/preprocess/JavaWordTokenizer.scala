@@ -34,14 +34,13 @@ import epic.slab.Sentence
 class JavaWordTokenizer(locale: Locale) extends Tokenizer {
   def this() = this(Locale.getDefault)
 
-
   def apply(content: String, sentences: Vector[Sentence]): Vector[Token] = {
     sentences.flatMap { s =>
       val breaker = BreakIterator.getWordInstance(locale)
       breaker.setText(content)
       new SegmentingIterator(breaker, s.begin, s.end).map { span =>
-        Token(span._1, span._2) -> content.substring(span._1, span._2)
-      }.filterNot(_._2.token.forall(_.isWhitespace)).map(_._1)
+        Token(span) -> content.substring(span.begin, span.end)
+      }.filterNot(_._2.forall(_.isWhitespace)).map(_._1)
     }
   }
 }

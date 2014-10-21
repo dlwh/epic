@@ -2,7 +2,7 @@ package epic.preprocess
 
 import scala.collection.mutable.ArrayBuffer
 import java.io._
-import epic.slab.{StringSlab, AnnotatedSpan, Sentence}
+import epic.slab._
 import breeze.linalg._
 import breeze.numerics._
 import epic.framework.{ModelObjective, StandardExpectedCounts, Feature}
@@ -17,29 +17,26 @@ import epic.trees.Span
 
 @SerialVersionUID(1L)
 class MLSentenceSegmenter(inf: MLSentenceSegmenter.ClassificationInference) extends SentenceSegmenter with Serializable {
-  override def apply[In](slab: StringSlab[In]): StringSlab[In with Sentence] = {
-    val text = slab.content
+  def apply(text: String): scala.collection.immutable.Vector[Sentence] = {
     val iter = MLSentenceSegmenter.potentialSentenceBoundariesIterator(text)
     var lastOffset = 0
-    slab.++[Sentence](
-      Iterators.fromProducer {
-        def rec():Option[(Span, Sentence)] = {
-          if(iter.hasNext) {
-            val pos = iter.next()
-            if(!iter.hasNext || inf.classify(MLSentenceSegmenter.featuresForEndPointDetection(text, pos))) {
-              val res = Some(Span(lastOffset, math.min(pos + 1, text.length)) -> Sentence())
-              lastOffset = pos + 1
-              res
-            } else {
-              rec()
-            }
+    Iterators.fromProducer {
+      def rec():Option[Sentence] = {
+        if(iter.hasNext) {
+          val pos = iter.next()
+          if(!iter.hasNext || inf.classify(MLSentenceSegmenter.featuresForEndPointDetection(text, pos))) {
+            val res = Some(Sentence(Span(lastOffset, math.min(pos + 1, text.length))))
+            lastOffset = pos + 1
+            res
           } else {
-            None
+            rec()
           }
+        } else {
+          None
         }
-        rec()
-      }.filterNot(s => text.substring(s._1.begin, s._1.end).forall(_.isWhitespace))
-    )
+      }
+      rec()
+    }.filterNot(s => text.substring(s.begin, s.end).forall(_.isWhitespace)).toVector
 
   }
   override def toString = "MLSentenceSegmenter(...)"

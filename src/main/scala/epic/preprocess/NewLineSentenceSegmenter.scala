@@ -12,15 +12,12 @@ import epic.slab.Sentence
  * @author dlwh
  **/
 class NewLineSentenceSegmenter(locale: Locale = Locale.getDefault) extends SentenceSegmenter {
-
-  override def apply[In](slab: StringSlab[In]): StringSlab[In with Sentence] = {
+  def apply(content: String): Vector[Sentence] = {
     val breaker = BreakIterator.getLineInstance(locale)
-    breaker.setText(slab.content)
-    slab.++[Sentence](
-      new SegmentingIterator(breaker).map { span =>
-        span -> Sentence()
-      }
-    )
+    breaker.setText(content)
+    new SegmentingIterator(breaker).map({ span =>
+      Sentence(span)
+    }).toVector
   }
 }
 
