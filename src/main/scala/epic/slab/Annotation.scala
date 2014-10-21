@@ -27,7 +27,12 @@ trait DocumentAnnotation extends Annotation {}
 case class Source(url: URL) extends DocumentAnnotation
 case class Sentence(span: Span, id: Option[String] = None) extends SpanAnnotation
 case class Segment(span: Span, id: Option[String] = None) extends SpanAnnotation
-case class Token(span: Span) extends SpanAnnotation
-case class Tagged[Tag](span: Span, tag: Tag, id: Option[String] = None) extends SpanAnnotation
-case class EntityMention(span: Span, entityType: String, id: Option[String] = None) extends SpanAnnotation
-case class PartOfSpeech(span: Span, tag: String, id: Option[String] = None) extends SpanAnnotation
+case class Token(span: Span) extends SpanAnnotation {
+  def offset(by: Int) = this.copy(span.offset(by))
+}
+
+case class Tagged[Tag](val span: Span, val tag: Tag) extends SpanAnnotation {
+  def offset(by: Int) = this.copy(span.offset(by))
+}
+case class EntityMention(entityType: String, id: Option[String] = None)
+case class PartOfSpeech(tag: String, id: Option[String] = None)

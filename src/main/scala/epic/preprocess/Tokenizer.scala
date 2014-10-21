@@ -40,7 +40,7 @@ trait Tokenizer extends SimpleAnalysisFunction[String, Sentence, Token] with (St
   def apply(content: String, sentences: Vector[Sentence]): Vector[Token]  = {
     sentences.map({ sentence => 
       apply(content.substring(sentence.span.begin, sentence.span.end))
-        .map(t => Token(t.span.offset(sentence.span.begin)))
+        .map(t => t.offset(sentence.span.begin))
     }).flatten
   }
 }

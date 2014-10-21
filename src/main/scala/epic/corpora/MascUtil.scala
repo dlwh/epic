@@ -358,7 +358,7 @@ object MascSlab {
    */
   def penn[In <: HList, Out <: HList](slab: StringSlab[In])(
     implicit sel: SelectMany.Aux[In, Vector[Source] :: Vector[Segment] :: HNil, Vector[Source] :: Vector[Segment] :: HNil],
-      adder: Adder.Aux[In, PartOfSpeech, Vector[PartOfSpeech], Out]): Slab[String, Out] = {
+      adder: Adder.Aux[In, Tagged[PartOfSpeech], Vector[Tagged[PartOfSpeech]], Out]): Slab[String, Out] = {
     val data = slab.getMany(sel)
     val source = data.select[Vector[Source]].apply(0)
     val pennXml = XML.load(source.url.toString().replaceAll("[.]txt$", "-penn.xml"))
@@ -372,7 +372,7 @@ object MascSlab {
     val partOfSpeechTags = for (annotation <- MascUtil.getAnnotations(pennXml)) yield {
       val region = idToPosRegion(annotation.ref)
       val tag = MascUtil.getPos(annotation)
-      PartOfSpeech(region.span, tag, Some(region.id))
+      Tagged(region.span, PartOfSpeech(tag, Some(region.id)))
     }
     // TODO: should probably create Stem annotations too, available as the MASC "base" feature
     slab.add(partOfSpeechTags.toVector)(adder)
@@ -387,13 +387,13 @@ object MascSlab {
    * @return The Slab with added EntityMention annotations as read from the MASC -ne.xml file.
    */
   def namedEntities[In <: HList, Out <: HList](slab: StringSlab[In])
-    (implicit sel: SelectMany.Aux[In, Vector[Source] :: Vector[PartOfSpeech] :: HNil, Vector[Source] :: Vector[PartOfSpeech] :: HNil],
-      adder: Adder.Aux[In, EntityMention, Vector[EntityMention], Out]): Slab[String, Out] = {
+    (implicit sel: SelectMany.Aux[In, Vector[Source] :: Vector[Tagged[PartOfSpeech]] :: HNil, Vector[Source] :: Vector[Tagged[PartOfSpeech]] :: HNil],
+      adder: Adder.Aux[In, Tagged[EntityMention], Vector[Tagged[EntityMention]], Out]): Slab[String, Out] = {
     val data = slab.getMany(sel)
     val source = data.select[Vector[Source]].apply(0)
     val neXml = XML.load(source.url.toString().replaceAll("[.]txt$", "-ne.xml"))
     
-    val idToPos = (for (pos <- data.select[Vector[PartOfSpeech]]; id <- pos.id.iterator) yield id -> (pos.span, pos)).toMap
+    val idToPos = (for (tag <- data.select[Vector[Tagged[PartOfSpeech]]]; id <- tag.tag.id.iterator) yield id -> (tag.span, tag)).toMap
     val neIdPosIdTuples = MascUtil.getEdges(neXml).map(e => (e.from -> e.to))
     val neIdToPosIds = neIdPosIdTuples.groupBy(_._1).mapValues(_.map(_._2))
     
@@ -401,7 +401,7 @@ object MascSlab {
       val posTags = neIdToPosIds(annotation.ref).map(idToPos).sortBy{ case (span, p) => span.begin -> -span.end}
       val begin = posTags.head._1.begin
       val end = posTags.last._1.end
-      EntityMention(Span(begin, end), annotation.label, Some(annotation.ref))
+      Tagged(Span(begin, end), EntityMention(annotation.label, Some(annotation.ref)))
     }
     
     slab.add(entityMentions.toVector)(adder)
