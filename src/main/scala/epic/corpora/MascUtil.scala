@@ -323,7 +323,7 @@ object MascSlab {
    * @return The Slab with added Sentence annotations as read from the MASC -s.xml file.
    */
   def s[In <: HList, Out <: HList](slab: StringSlab[In])(implicit sel: Selector[In, Vector[Source]], adder: Adder.Aux[In, Sentence, Vector[Sentence], Out]): Slab[String, Out] = {
-    val source = slab.get[Source](0)(sel)
+    val source = slab.select[Source](0)(sel)
     val sentenceXml = XML.load(source.url.toString().replaceAll("[.]txt$", "-s.xml"))
     val sentences = for (region <- MascUtil.getRegions(sentenceXml)) yield {
        Sentence(region.span, Some(region.id))
@@ -340,7 +340,7 @@ object MascSlab {
    * @return The Slab with added Segment annotations as read from the MASC -seg.xml file.
    */
   def seg[In <: HList, Out <: HList](slab: StringSlab[In])(implicit sel: Selector[In, Vector[Source]], adder: Adder.Aux[In, Segment, Vector[Segment], Out]): Slab[String, Out] = {
-    val source = slab.get[Source](0)(sel)
+    val source = slab.select[Source](0)(sel)
     val segmentXml = XML.load(source.url.toString().replaceAll("[.]txt$", "-seg.xml"))
     val segments = for (region <- MascUtil.getRegions(segmentXml)) yield {
        Segment(region.span, Some(region.id))
@@ -359,7 +359,7 @@ object MascSlab {
   def penn[In <: HList, Out <: HList](slab: StringSlab[In])(
     implicit sel: SelectMany.Aux[In, Vector[Source] :: Vector[Segment] :: HNil, Vector[Source] :: Vector[Segment] :: HNil],
       adder: Adder.Aux[In, Tagged[PartOfSpeech], Vector[Tagged[PartOfSpeech]], Out]): Slab[String, Out] = {
-    val data = slab.getMany(sel)
+    val data = slab.selectMany(sel)
     val source = data.select[Vector[Source]].apply(0)
     val pennXml = XML.load(source.url.toString().replaceAll("[.]txt$", "-penn.xml"))
 
@@ -389,7 +389,7 @@ object MascSlab {
   def namedEntities[In <: HList, Out <: HList](slab: StringSlab[In])
     (implicit sel: SelectMany.Aux[In, Vector[Source] :: Vector[Tagged[PartOfSpeech]] :: HNil, Vector[Source] :: Vector[Tagged[PartOfSpeech]] :: HNil],
       adder: Adder.Aux[In, Tagged[EntityMention], Vector[Tagged[EntityMention]], Out]): Slab[String, Out] = {
-    val data = slab.getMany(sel)
+    val data = slab.selectMany(sel)
     val source = data.select[Vector[Source]].apply(0)
     val neXml = XML.load(source.url.toString().replaceAll("[.]txt$", "-ne.xml"))
     

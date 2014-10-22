@@ -32,7 +32,7 @@ import Implicits._
  * @author reactormonk
  */
 @SerialVersionUID(1)
-trait Tokenizer extends SimpleAnalysisFunction[String, Sentence, Token] with (String => Vector[Token]) {
+trait Tokenizer extends (String => Vector[Token]) {
   override def toString() = getClass.getName +"()"
 
   def apply(sentence: String): Vector[Token]

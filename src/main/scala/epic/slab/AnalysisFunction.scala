@@ -14,8 +14,10 @@ import Utils._
  */
 
 // This analysis function requires one input and adds one output type
-trait AnalysisFunction11[C, I, O] {
-  def apply[In <: HList, Out <: HList](slab: Slab[C, In])(implicit sel: Selector[In, Vector[I]], adder: Adder.Aux[In, O, Vector[O], Out]): Slab[C, Out]
+case class AnalysisFunction11[C, I, O](fun: ((C, Vector[I]) => Vector[O])) {
+  def apply[In <: HList, Out <: HList](slab: Slab[C, In])(implicit sel: Selector[In, Vector[I]], adder: Adder.Aux[In, O, Vector[O], Out]): Slab[C, Out] = {
+    slab.add(fun(slab.content, slab.select(sel)))
+  }
 }
 
 // This analysis function takes N input types and adds one output type
@@ -25,16 +27,10 @@ trait AnalysisFunctionN1[C, I <: HList, O] {
 
 // This analysis function requires no input types except for the
 // content itself.
-trait AnalysisFunction01[C, O] {
-  def apply[In <: HList, Out <: HList](slab: Slab[C, In])(implicit adder: Adder.Aux[In, O, Vector[O], Out]): Slab[C, Out]
-}
-
-// A simpler version of the 1 to 1 analysis function which allows for
-// an easy definition of new analysis function without directly
-// interfacing with the shapeless data structure.
-trait SimpleAnalysisFunction[C, I, O] extends AnalysisFunction11[C, I, O] {
-  def apply(content: C, in: Vector[I]): Vector[O]
-  def apply[In <: HList, Out <: HList](slab: Slab[C, In])(implicit sel: Selector[In, Vector[I]], adder: Adder.Aux[In, O, Vector[O], Out]): Slab[C, Out] = slab.add(apply(slab.content, slab.get(sel)))
+case class AnalysisFunction01[C, O](fun: (C => Vector[O])) {
+  def apply[In <: HList, Out <: HList](slab: Slab[C, In])(implicit adder: Adder.Aux[In, O, Vector[O], Out]): Slab[C, Out] = {
+    slab.add(fun(slab.content))
+  }
 }
 
 // No input types required, so functions extending this trait can be

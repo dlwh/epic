@@ -12,9 +12,9 @@ import epic.trees.Span
 
 class Slab[Content, L <: HList](val content: Content, val annotations: L) {
 
-  def get[T](implicit sel: Selector[L, Vector[T]]): Vector[T] = sel(annotations)
-  def get[T](index: Int)(implicit sel: Selector[L, Vector[T]]): T = sel(annotations)(index)
-  def getMany[T <: HList](implicit sel: SelectMany.Aux[L, T, T]): T = sel(annotations)
+  def select[T](implicit sel: Selector[L, Vector[T]]): Vector[T] = sel(annotations)
+  def select[T](index: Int)(implicit sel: Selector[L, Vector[T]]): T = sel(annotations)(index)
+  def selectMany[T <: HList](implicit sel: SelectMany.Aux[L, T, T]): T = sel(annotations)
 
   def add[A, Tmp <: HList, Result <: HList](newAnnotations: Vector[A])(implicit adder: Adder.Aux[L, A, Vector[A], Result]): Slab[Content, Result] = {
     new Slab(content, adder(annotations, newAnnotations))

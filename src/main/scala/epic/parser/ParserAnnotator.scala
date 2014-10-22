@@ -1,7 +1,8 @@
 package epic.parser
 
-import epic.slab.{StringSlab, Sentence, Token, StringAnalysisFunction}
+import epic.slab._
 import epic.trees.Tree
+import epic.sequences.Annotator
 
 /**
  * A ParserAnnotator is a slab-ified [[epic.parser.Parser]]. The analogy is that a [[epic.sequences.Tagger]] is
@@ -9,18 +10,12 @@ import epic.trees.Tree
  *
  * @author dlwh
  **/
-class ParserAnnotator[L](parser: Parser[L, String]) extends StringAnalysisFunction[Token with Sentence, Tree[L]] {
 
+class ParserAnnotator[L](val parser: Parser[L, String]) extends Annotator[Tree[L]](ParserAnnotator.annotate(parser))
 
-  def apply[In <: Token with Sentence](slab: StringSlab[In]):StringSlab[In with epic.trees.Tree[L]] = {
-    val annotatedSentences = for((span, sent) <- slab.iterator[Sentence]) yield {
-      val tokens = slab.covered[Token](span).toIndexedSeq
-      val tree = parser(tokens.map(_._2.token))
-      span -> tree
-    }
-
-    slab.++[Tree[L]](annotatedSentences)
+object ParserAnnotator {
+  def annotate[L](parser: Parser[L, String])(content: String, tokens: Vector[Token]) = {
+    Vector(parser(tokens.map(t => content.substring(t.span.begin, t.span.end))))
   }
-
-
+  def apply[L](parser: Parser[L, String]): ParserAnnotator[L] = new ParserAnnotator[L](parser)
 }
