@@ -7,8 +7,12 @@ import epic.slab.Sentence
  *
  * @author dlwh
  */
-trait SentenceSegmenter extends SourceAnalysisFunction[String, Sentence] with (String => Vector[Sentence]) {
+class SentenceSegmenter extends (String => Vector[Sentence]) {
   override def toString = getClass.getName
 
-  def apply(content: String): Vector[Sentence]
+  def apply(sentence: String): Vector[Token]
+  def strings(document: String): Vector[String] = {
+    val sentences = apply(document)
+    sentences.map(s => document.substring(s.begin, s.end))
+  }
 }

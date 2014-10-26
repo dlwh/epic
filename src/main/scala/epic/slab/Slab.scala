@@ -30,7 +30,8 @@ object Slab {
 }
 
 class StringSlab[L <: HList](val content: String, val annotations: L) extends Slab[String, L](content, annotations) {
-  def at(span: Span): String = content.substring(span.begin, span.end)
+  def substring(span: Span): String = content.substring(span.begin, span.end)
+  def substring(begin: Int, end: Int): String = content.substring(begin, end)
 }
 
 object StringSlab {
@@ -39,4 +40,5 @@ object StringSlab {
 
 object Implicits {
   implicit def stringSlab[L <: HList](s: Slab[String, L]) = StringSlab[L](s)
+  implicit def stringSlab[L <: HList](s: StringSlab[L]) = Slab[String, L](s.content, s.annotations)
 }

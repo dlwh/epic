@@ -15,7 +15,7 @@ class StreamSentenceSegmenter(val baseSegmenter: SentenceSegmenter) {
     // addendum maintains the characters that we haven't read.
     var addendum = ""
     val pieces = chunkInput(stream).flatMap { (s: String) =>
-      val sentences = baseSegmenter(addendum + s).toIndexedSeq
+      val sentences = baseSegmenter.strings(addendum + s).toIndexedSeq
       addendum = sentences.last
       sentences.view.slice(0, sentences.length - 1)
     }

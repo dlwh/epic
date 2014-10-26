@@ -24,7 +24,7 @@ trait Segmenter[Tag] extends AnalysisFunctionN1[String, input, Tag] {
     val data = slab.selectMany(sel)
     val index = SpanIndex(slab.content, data.select[Vector[Token]])
     val annotatedSentences = for(sent <- data.select[Vector[Sentence]]) yield {
-      val strings = index(sent.span).map(t => slab.at(t.span))
+      val strings = index(sent.span).map(t => slab.substring(t.span))
       apply(strings).map(_.offset(sent.begin))
     }
 

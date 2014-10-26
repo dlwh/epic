@@ -14,10 +14,12 @@ import epic.features.CrossProductFeature
 import java.util.zip.GZIPInputStream
 import epic.corpora.MascSlab
 import epic.trees.Span
+import scala.collection.immutable.Vector
+import epic.slab.Implicits._
 
 @SerialVersionUID(1L)
 class MLSentenceSegmenter(inf: MLSentenceSegmenter.ClassificationInference) extends SentenceSegmenter with Serializable {
-  def apply(text: String): scala.collection.immutable.Vector[Sentence] = {
+  def apply(text: String): Vector[Sentence] = {
     val iter = MLSentenceSegmenter.potentialSentenceBoundariesIterator(text)
     var lastOffset = 0
     Iterators.fromProducer {
@@ -291,11 +293,10 @@ object MLSentenceSegmenter {
       val slab = MascSlab(f.toURI.toURL)
       val slabWithSentences = MascSlab.s(slab)
 
-
       val guessPoints: IndexedSeq[Int] = potentialSentenceBoundariesIterator(slabWithSentences.content).toIndexedSeq
 
       val text = slab.content
-      val goldPoints = adjustGoldSentenceBoundaries(text, slabWithSentences.iterator[Sentence].map(_._1.end))
+      val goldPoints = adjustGoldSentenceBoundaries(text, slabWithSentences.select[Sentence].map(_.span.end).toIterator)
 
       println("<<<<" + f  )
       printOutSentenceBoundaries(text, guessPoints.toSet, goldPoints)

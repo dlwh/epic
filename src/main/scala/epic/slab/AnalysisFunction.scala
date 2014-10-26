@@ -35,11 +35,10 @@ case class AnalysisFunction01[C, O](fun: (C => Vector[O])) {
 
 // No input types required, so functions extending this trait can be
 // used to construct a new slab directly from content.
-trait SourceAnalysisFunction[C, O] extends AnalysisFunction01[C, O] with (C => Vector[O]) {
-  def apply(content: C): Vector[O]
-  def apply[In <: HList, Out <: HList](slab: Slab[C, In])(implicit adder: Adder.Aux[In, O, Vector[O], Out]): Slab[C, Out] = slab.add(apply(slab.content))(adder)
+class SourceAnalysisFunction[C, O](fun: (C => Vector[O])) extends AnalysisFunction01[C, O](fun) {
+  def apply[In <: HList, Out <: HList](slab: Slab[C, In])(implicit adder: Adder.Aux[In, O, Vector[O], Out]): Slab[C, Out] = slab.add(fun(slab.content))(adder)
   def createSlabFrom(content: C): Slab[C, Vector[O] :: HNil] = {
-    Slab(content, apply(content) :: HNil)
+    Slab(content, fun(content) :: HNil)
   }
 }
 

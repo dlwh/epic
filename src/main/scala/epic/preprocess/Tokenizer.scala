@@ -43,6 +43,9 @@ trait Tokenizer extends (String => Vector[Token]) {
         .map(t => t.offset(sentence.span.begin))
     }).flatten
   }
+
+  def strings(sentence: String): Vector[String] = {
+    val tokens = apply(sentence)
+    tokens.map(t => sentence.substring(t.begin, t.end))
+  }
 }
-
-
