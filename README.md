@@ -142,14 +142,18 @@ language is the [two letter code for the language](http://www.loc.gov/standards/
 
 To following models are available at this time:
 
-__AS OF WRITING ONLY THE ENGLISH PARSER IS AVAILABLE!__ Write me if you want these other models.
+__AS OF WRITING ONLY THE ENGLISH PARSER AND NER SYSTEM ARE AVAILABLE!__ Write me if you want these other models.
 
 * Parser
   * English: 
     ```
     "org.scalanlp" %% "epic-parser-en-span" % "2014.9.15"
     ```
-
+* Named Entity Recognizers
+  * English: 
+    ```
+    "org.scalanlp" %% "epic-ner-en-conll" % "2014.10.26"
+    ```
 
 TODO:
 
