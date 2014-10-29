@@ -5,7 +5,7 @@ import sbtassembly.AssemblyOption
 
 name := "epic"
 
-version := "0.2"
+version := "0.3-SNAPSHOT"
 
 organization := "org.scalanlp"
 
@@ -21,7 +21,7 @@ resolvers ++= Seq(
 
 libraryDependencies ++= Seq(
   "junit" % "junit" % "4.5" % "test",
-  "org.scalanlp" %% "breeze" % "0.9",
+  "org.scalanlp" %% "breeze" % "0.10",
   "org.scalanlp" %% "breeze-config" % "0.9.1",
   "org.scalanlp" %% "nak" % "1.3",
   "org.mapdb" % "mapdb" % "0.9.2",
