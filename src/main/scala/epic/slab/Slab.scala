@@ -29,7 +29,7 @@ object Slab {
   def apply[C, L <: HList](content: C, annotations: L): Slab[C, L] = new Slab[C, L](content, annotations)
 }
 
-class StringSlab[L <: HList](val content: String, val annotations: L) extends Slab[String, L](content, annotations) {
+class StringSlab[L <: HList](override val content: String, override val annotations: L) extends Slab[String, L](content, annotations) {
   def substring(span: Span): String = content.substring(span.begin, span.end)
   def substring(begin: Int, end: Int): String = content.substring(begin, end)
 }

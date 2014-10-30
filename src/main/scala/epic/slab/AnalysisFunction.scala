@@ -20,7 +20,10 @@ case class AnalysisFunction11[C, I, O](fun: ((C, Vector[I]) => Vector[O])) {
   }
 }
 
-// This analysis function takes N input types and adds one output type
+// This analysis function takes N input types and adds one output
+// type. Does not use the composite pattern because then the passing
+// of the implicits to extract the elements from the HList gets
+// complicated.
 trait AnalysisFunctionN1[C, I <: HList, O] {
   def apply[In <: HList, Out <: HList](slab: Slab[C, In])(implicit sel: SelectMany.Aux[In, I, I], adder: Adder.Aux[In, O, Vector[O], Out]): Slab[C, Out]
 }
@@ -36,7 +39,7 @@ case class AnalysisFunction01[C, O](fun: (C => Vector[O])) {
 // No input types required, so functions extending this trait can be
 // used to construct a new slab directly from content.
 class SourceAnalysisFunction[C, O](fun: (C => Vector[O])) extends AnalysisFunction01[C, O](fun) {
-  def apply[In <: HList, Out <: HList](slab: Slab[C, In])(implicit adder: Adder.Aux[In, O, Vector[O], Out]): Slab[C, Out] = slab.add(fun(slab.content))(adder)
+  override def apply[In <: HList, Out <: HList](slab: Slab[C, In])(implicit adder: Adder.Aux[In, O, Vector[O], Out]): Slab[C, Out] = slab.add(fun(slab.content))(adder)
   def createSlabFrom(content: C): Slab[C, Vector[O] :: HNil] = {
     Slab(content, fun(content) :: HNil)
   }
