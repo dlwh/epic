@@ -14,9 +14,16 @@ import Utils._
  */
 
 // This analysis function requires one input and adds one output type
-case class AnalysisFunction11[C, I, O](fun: ((C, Vector[I]) => Vector[O])) {
+trait AnalysisFunction11[C, I, O] {
   def apply[In <: HList, Out <: HList](slab: Slab[C, In])(implicit sel: Selector[In, Vector[I]], adder: Adder.Aux[In, O, Vector[O], Out]): Slab[C, Out] = {
     slab.add(fun(slab.content, slab.select(sel)))
+  }
+  def apply(content: C, input: Vector[I]): Vector[O]
+}
+
+object AnalysisFunction11 {
+  def apply[C, I, O](fun: ((C, Vector[I]) => Vector[O])): AnalysisFunction01[C, O] = new AnalysisFunction01[C, O] {
+    val apply = fun
   }
 }
 
@@ -29,19 +36,23 @@ trait AnalysisFunctionN1[C, I <: HList, O] {
 }
 
 // This analysis function requires no input types except for the
-// content itself.
-case class AnalysisFunction01[C, O](fun: (C => Vector[O])) {
+// content itself.  No input types required, so functions extending
+// this trait can be used to construct a new slab directly from
+// content.
+trait AnalysisFunction01[C, O] {
   def apply[In <: HList, Out <: HList](slab: Slab[C, In])(implicit adder: Adder.Aux[In, O, Vector[O], Out]): Slab[C, Out] = {
-    slab.add(fun(slab.content))
+    slab.add(fun(slab.content))(adder)
+  }
+  def apply(content: C): Vector[O]
+
+  def createSlabFrom(content: C): Slab[C, Vector[O] :: HNil] = {
+    Slab(content, fun(content) :: HNil)
   }
 }
 
-// No input types required, so functions extending this trait can be
-// used to construct a new slab directly from content.
-class SourceAnalysisFunction[C, O](fun: (C => Vector[O])) extends AnalysisFunction01[C, O](fun) {
-  override def apply[In <: HList, Out <: HList](slab: Slab[C, In])(implicit adder: Adder.Aux[In, O, Vector[O], Out]): Slab[C, Out] = slab.add(fun(slab.content))(adder)
-  def createSlabFrom(content: C): Slab[C, Vector[O] :: HNil] = {
-    Slab(content, fun(content) :: HNil)
+object AnalysisFunction01 {
+  def apply[C, O](fun: (C => Vector[O])): AnalysisFunction01[C, O] = new AnalysisFunction01[C, O] {
+    val apply = fun
   }
 }
 
