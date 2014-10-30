@@ -19,8 +19,7 @@ package epic.preprocess
 import java.text._
 import java.util.Locale
 import epic.slab._
-import epic.slab.Token
-import epic.slab.Sentence
+import epic.trees.Span
 
 
 /**
@@ -34,7 +33,7 @@ import epic.slab.Sentence
 class JavaWordTokenizer(locale: Locale) extends Tokenizer {
   def this() = this(Locale.getDefault)
 
-  def apply(content: String, sentences: Vector[Sentence]): Vector[Token] = {
+  override def apply(content: String, sentences: Vector[Sentence]): Vector[Token] = {
     sentences.flatMap { s =>
       val breaker = BreakIterator.getWordInstance(locale)
       breaker.setText(content)
@@ -43,6 +42,8 @@ class JavaWordTokenizer(locale: Locale) extends Tokenizer {
       }.filterNot(_._2.forall(_.isWhitespace)).map(_._1)
     }
   }
+
+  def apply(sentence: String): Vector[Token] = apply(sentence, Vector(Sentence(Span(0, sentence.length-1))))
 }
 
 object JavaWordTokenizer extends JavaWordTokenizer

@@ -32,13 +32,21 @@ import Implicits._
  * @author reactormonk
  */
 @SerialVersionUID(1)
-class Tokenizer(val fun: (String => Vector[Token])) extends AnalysisFunction11[String, Sentence, Token] {
+trait Tokenizer extends AnalysisFunction11[String, Sentence, Token] {
   override def toString() = getClass.getName +"()"
 
-  override def apply[In <: HList, Out <: HList](slab: Slab[String, In])(implicit sel: Select.Aux[In, Vector[Sentence], Vector[Sentence]], adder: Adder.Aux[In, Token, Vector[Token], Out]): Slab[String, Out] = {
-    slab.add(slab.select(sel).map({ sentence => 
-      fun(content.substring(sentence.span.begin, sentence.span.end))
+  override def apply(content: String, sentences: Vector[epic.slab.Sentence]): Vector[epic.slab.Token] = {
+    sentences.map({ sentence => 
+      apply(content.substring(sentence.span.begin, sentence.span.end))
         .map(t => t.offset(sentence.span.begin))
-    }).flatten)(adder)
+    }).flatten
+  }
+
+  def apply(sentence: String): Vector[Token]
+}
+
+object Tokenizer {
+  def apply(tokenizer: (String => Vector[Token])): Tokenizer = new Tokenizer {
+    def apply(sentence: String): Vector[Token] = tokenizer(sentence)
   }
 }

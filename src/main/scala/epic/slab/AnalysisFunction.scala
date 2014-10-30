@@ -16,21 +16,21 @@ import Utils._
 // This analysis function requires one input and adds one output type
 trait AnalysisFunction11[C, I, O] {
   def apply[In <: HList, Out <: HList](slab: Slab[C, In])(implicit sel: Selector[In, Vector[I]], adder: Adder.Aux[In, O, Vector[O], Out]): Slab[C, Out] = {
-    slab.add(fun(slab.content, slab.select(sel)))
+    slab.add(apply(slab.content, slab.select(sel)))
   }
   def apply(content: C, input: Vector[I]): Vector[O]
 }
 
 object AnalysisFunction11 {
-  def apply[C, I, O](fun: ((C, Vector[I]) => Vector[O])): AnalysisFunction01[C, O] = new AnalysisFunction01[C, O] {
-    val apply = fun
+  def apply[C, I, O](fun: ((C, Vector[I]) => Vector[O])): AnalysisFunction11[C, I, O] = new AnalysisFunction11[C, I, O] {
+    def apply(content: C, input: Vector[I]): Vector[O] = fun(content, input)
   }
 }
 
 // This analysis function takes N input types and adds one output
 // type. Does not use the composite pattern because then the passing
 // of the implicits to extract the elements from the HList gets
-// complicated.
+// complicated. For an example, take a look at epic.sequences.Segmenter
 trait AnalysisFunctionN1[C, I <: HList, O] {
   def apply[In <: HList, Out <: HList](slab: Slab[C, In])(implicit sel: SelectMany.Aux[In, I, I], adder: Adder.Aux[In, O, Vector[O], Out]): Slab[C, Out]
 }
@@ -41,18 +41,18 @@ trait AnalysisFunctionN1[C, I <: HList, O] {
 // content.
 trait AnalysisFunction01[C, O] {
   def apply[In <: HList, Out <: HList](slab: Slab[C, In])(implicit adder: Adder.Aux[In, O, Vector[O], Out]): Slab[C, Out] = {
-    slab.add(fun(slab.content))(adder)
+    slab.add(apply(slab.content))(adder)
   }
   def apply(content: C): Vector[O]
 
   def createSlabFrom(content: C): Slab[C, Vector[O] :: HNil] = {
-    Slab(content, fun(content) :: HNil)
+    Slab(content, apply(content) :: HNil)
   }
 }
 
 object AnalysisFunction01 {
   def apply[C, O](fun: (C => Vector[O])): AnalysisFunction01[C, O] = new AnalysisFunction01[C, O] {
-    val apply = fun
+    def apply(content: C): Vector[O] = fun(content)
   }
 }
 

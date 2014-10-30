@@ -68,7 +68,7 @@ trait ProcessTextMain[Model, AnnotatedType] {
 
     for(src <- iter) {
       val queue = FIFOWorkQueue(sentenceSegmenter.sentences(src)){sent =>
-        val tokens = tokenizer.strings(sent).toIndexedSeq
+        val tokens = tokenizer(sent).map(token => sent.substring(token.begin, token.end))
         try {
           if(tokens.length > params.maxLength) {
             throw new SentenceTooLongException(tokens.length)
