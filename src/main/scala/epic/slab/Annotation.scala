@@ -16,6 +16,13 @@ trait SpanAnnotation extends RegionAnnotation {
   def span: Span
   def begin: Int = span.begin
   def end: Int = span.end
+  def substring(content: String): String = {
+    // This code should be in a typeclass. But I'm not sure if it will
+    // work and it's not really possible to extend typeclasses in
+    // Scala (that I know of). Exists for elements that carry their
+    // own content around for e.g. normalization.
+    content.substring(begin, end)
+  }
 }
 
 // Handles annotation referencing other annotations
@@ -36,3 +43,11 @@ case class Tagged[Tag](val span: Span, val tag: Tag) extends SpanAnnotation {
 }
 case class EntityMention(entityType: String, id: Option[String] = None)
 case class PartOfSpeech(tag: String, id: Option[String] = None)
+
+class ContentToken(override val span: Span, val content: String) extends Token(span) {
+  override def substring(c: String): String = content
+}
+
+object ContentToken {
+  def apply(span: Span, content: String): ContentToken = new ContentToken(span, content)
+}

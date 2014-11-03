@@ -16,9 +16,7 @@ class TreebankTokenizer() extends Tokenizer with Serializable {
     val impl = new TreebankTokenizerImpl(new StringReader(sentence))
     Iterators.fromProducer{
       try {
-        Option(impl.getNextToken()).map { case (region, token) =>
-          Token(Span(region.begin + token.begin, region.end + token.end))
-        }
+        Option(impl.getNextToken())
       } catch {
         case e: Throwable => throw new RuntimeException("Could not tokenize " + sentence, e)
       }
@@ -76,4 +74,3 @@ object TreebankTokenizer extends TreebankTokenizer {
     }
   }
 }
-

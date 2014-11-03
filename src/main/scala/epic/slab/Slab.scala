@@ -11,7 +11,6 @@ import ops.hlist._
 import epic.trees.Span
 
 class Slab[Content, L <: HList](val content: Content, val annotations: L) {
-
   def select[T](implicit sel: Selector[L, Vector[T]]): Vector[T] = sel(annotations)
   def select[T](index: Int)(implicit sel: Selector[L, Vector[T]]): T = sel(annotations)(index)
   def selectMany[T <: HList](implicit sel: SelectMany.Aux[L, T, T]): T = sel(annotations)
@@ -30,7 +29,8 @@ object Slab {
 }
 
 class StringSlab[L <: HList](override val content: String, override val annotations: L) extends Slab[String, L](content, annotations) {
-  def substring(span: Span): String = content.substring(span.begin, span.end)
+  def substring(span: SpanAnnotation): String = span.substring(content)
+  def substring(span: Span): String = substring(span.begin, span.end)
   def substring(begin: Int, end: Int): String = content.substring(begin, end)
 }
 
