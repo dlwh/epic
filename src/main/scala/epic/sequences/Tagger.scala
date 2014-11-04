@@ -24,9 +24,9 @@ import aliases._
 class Annotator[T](val fun: ((String, Vector[Token]) => Vector[T])) extends AnalysisFunctionN1[String, TaggerInput, T] {
   override def apply[In <: HList, Out <: HList](slab: Slab[String, In])(implicit sel: SelectMany.Aux[In, TaggerInput, TaggerInput], adder: Adder.Aux[In, T, Vector[T], Out]): Slab[String, Out] = {
     val data = slab.selectMany(sel)
-    val index = SpanIndex(slab.content, data.select[Vector[Token]])
+    val index = SpanIndex(data.select[Vector[Token]])
     val annotatedSentences = for(sentence <- data.select[Vector[Sentence]]) yield {
-      fun(slab.content, index(sentence.span))
+      fun(slab.content, index(sentence.span).toVector)
     }
     slab.add(annotatedSentences.flatten)(adder)
   }

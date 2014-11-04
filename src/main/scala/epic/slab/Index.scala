@@ -2,23 +2,34 @@ package epic.slab
 import shapeless._
 import ops.hlist._
 import epic.trees.Span
+import scala.collection.immutable.SortedMap
 
-// TODO: Get one which supports multiple types via HLists
-class SpanIndex[T](content: String, data: Vector[T]) {
-  def apply(span: Span): Vector[T] = ???
+// TODO: Get one which supports multiple types via HLists and CoProducts
+class SpanIndex[T <: SpanAnnotation](data: Vector[T]) {
+  // Indexes by `begin`.
+  lazy val indexed = data.foldLeft(SortedMap[Int, Seq[T]]())({case (map, e) =>
+    map + ((e.begin, (map.get(e.begin).map(_ :+ e).getOrElse((Seq[T](e))))))
+  })
+
+  def apply(span: Span): Iterable[T] = {
+    indexed.iteratorFrom(span.begin).filter(_._1 <= span.end).flatMap({ case (_, seq) =>
+      seq.filter(_.end <= span.end)
+    }).toIterable
+  }
 }
 
 object SpanIndex {
-  def apply[T](content: String, data: Vector[T]) = new SpanIndex[T](content, data)
+  def apply[T <: SpanAnnotation](data: Vector[T]) = new SpanIndex(data)
 }
+
 
 object Indexes {
   implicit final class SpanIndexSlabOps[In <: HList](slab: Slab[String, In]) {
-    def covered[T](span: Span)(implicit sel: Selector[In, Vector[T]]): Vector[T] = {
+    def covered[T <: SpanAnnotation](span: Span)(implicit sel: Selector[In, Vector[T]]): Iterable[T] = {
       spanIndex(sel).apply(span)
     }
-    def spanIndex[T](implicit sel: Selector[In, Vector[T]]) = SpanIndex(slab.content, slab.select[T](sel))
-    def covered[T](span: Span, index: SpanIndex[T]): Vector[T] = {
+    def spanIndex[T <: SpanAnnotation](implicit sel: Selector[In, Vector[T]]) = SpanIndex(slab.select[T](sel))
+    def covered[T <: SpanAnnotation](span: Span, index: SpanIndex[T]): Iterable[T] = {
       index(span)
     }
   }

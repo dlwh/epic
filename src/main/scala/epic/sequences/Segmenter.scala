@@ -25,9 +25,9 @@ import sequences._
 trait Segmenter[Tag] extends AnalysisFunctionN1[String, input, Tagged[Tag]] {
   override def apply[In <: HList, Out <: HList](slab: Slab[String, In])(implicit sel: SelectMany.Aux[In, input, input], adder: Adder.Aux[In, Tagged[Tag], Vector[Tagged[Tag]], Out]): Slab[String, Out] = {
     val data = slab.selectMany(sel)
-    val index = SpanIndex(slab.content, data.select[Vector[Token]])
+    val index = SpanIndex(data.select[Vector[Token]])
     val annotatedSentences = for(sent <- data.select[Vector[Sentence]]) yield {
-      val strings = index(sent.span).map(t => slab.substring(t))
+      val strings = index(sent.span).map(t => slab.substring(t)).toVector
       apply(strings).map(_.offset(sent.begin))
     }
 
