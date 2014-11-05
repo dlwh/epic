@@ -24,7 +24,8 @@ class SparkIntegration extends FunSpec with SparkSuite {
       assert(rdd.collect()(0).select[Vector[Sentence]] == sentences)
     }
     it("should work with adder") {
-      // Don't reference stuff in inner functions from outer scope.
+      // Don't reference stuff from outer scope in functions which are
+      // sent over the wire.
       val t = tokens
       val rdd = SparkSuite.sc.parallelize(List(slab)).map(_.add(t))
       assert(rdd.collect()(0).select[Token] == tokens)
