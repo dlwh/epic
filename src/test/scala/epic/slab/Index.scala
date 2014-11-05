@@ -14,10 +14,10 @@ class SpanIndexTest extends FunSpec {
   }
   describe("the spanning") {
     it("should include the edges") {
-      assert(index(Span(0, 1)) == Vector(0, 3).map(data))
-      assert(index(Span(2, 3)) == Vector(1).map(data))
-      assert(index(Span(1, 3)) == Vector(3, 1).map(data))
-      assert(index(Span(1, 1)) == Vector(3).map(data))
+      assert(index(Span(0, 1)) == List(0, 3).map(data))
+      assert(index(Span(2, 3)) == List(1).map(data))
+      assert(index(Span(1, 3)) == List(3, 1).map(data))
+      assert(index(Span(1, 1)) == List(3).map(data))
     }
   }
 }

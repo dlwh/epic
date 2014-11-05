@@ -12,7 +12,7 @@ class SpanIndex[T <: SpanAnnotation](data: Vector[T]) {
   })
 
   def apply(span: Span): Iterable[T] = {
-    indexed.range(span.begin, span.end).toIterable.flatMap({ case (_, seq) =>
+    indexed.range(span.begin, span.end + 1).toIterable.flatMap({ case (_, seq) =>
       seq.filter(_.end <= span.end)
     })
   }
