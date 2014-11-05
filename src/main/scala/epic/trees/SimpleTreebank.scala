@@ -16,7 +16,7 @@ package epic.trees
 */
 import java.net.URL
 import java.io._
-import io.{Codec, Source}
+import scala.io.{Codec, Source}
 
 /**
  * A SimpleTreebank can be easily specified by paths to the trees in Penn treebank format

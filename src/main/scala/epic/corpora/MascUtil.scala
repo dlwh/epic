@@ -2,7 +2,7 @@ package epic.corpora
 
 import scala.xml.{Source => _, _}
 import java.io._
-import io.Codec
+import scala.io.Codec
 import java.net.URL
 import epic.slab._
 import Utils._
@@ -123,7 +123,7 @@ class MascFile (
 object MascFile {
 
   import MascUtil._
-  import io.Source
+  import scala.io.Source
 
   lazy val outsideNe = MAnnotation("outside", "outside", "none", Map[String,String]())
 
@@ -309,7 +309,7 @@ object MascSlab {
    * @return A Slab of the text, with the URL saved as a Source annotation.
    */
   def apply(textFileUrl: URL): Slab[String, Vector[Source] :: HNil] = {
-    val text = io.Source.fromURL(textFileUrl)(Codec.UTF8).mkString
+    val text = scala.io.Source.fromURL(textFileUrl)(Codec.UTF8).mkString
     val slab = Slab(text)
     slab.add(Source(textFileUrl))
   }

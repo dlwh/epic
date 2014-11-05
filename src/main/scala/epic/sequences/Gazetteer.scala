@@ -1,6 +1,6 @@
 package epic.sequences
 
-import io.{Codec, Source}
+import scala.io.{Codec, Source}
 import epic.features.{WordFeatureAnchoring, WordFeaturizer, SurfaceFeatureAnchoring, SurfaceFeaturizer}
 import epic.framework.Feature
 import epic.trees.Span

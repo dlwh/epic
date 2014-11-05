@@ -6,7 +6,7 @@ version := "0.2-SNAPSHOT"
 
 organization := "org.scalanlp"
 
-scalaVersion := "2.11.1"
+scalaVersion := "2.10.4"
 
 crossScalaVersions  := Seq("2.11.1", "2.10.4")
 
@@ -24,15 +24,16 @@ libraryDependencies ++= Seq(
   "org.slf4j" % "slf4j-simple" % "1.7.6",
   "org.scalatest" %% "scalatest" % "2.1.3" % "test",
   "org.scalacheck" %% "scalacheck" % "1.11.3" % "test",
-  "com.chuusai" %% "shapeless" % "2.0.0",
-  "org.typelevel" %% "scodec-core" % "1.1.0"
+  "com.chuusai" % "shapeless_2.10.4" % "2.0.0",
+  "org.typelevel" %% "scodec-core" % "1.1.0",
+  "org.apache.spark" %% "spark-core" % "1.1.0" % "provided"
 )
 
 libraryDependencies ++= (CrossVersion.partialVersion(scalaVersion.value) match {
   // if scala 2.11+ is used, add dependency on scala-xml module
   case Some((2, scalaMajor)) if scalaMajor >= 11 =>
     Seq("org.scala-lang.modules" %% "scala-xml" % "1.0.1")
-    case _ =>
+  case _ =>
     Seq.empty
 })
 

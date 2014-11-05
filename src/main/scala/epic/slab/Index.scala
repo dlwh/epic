@@ -2,7 +2,7 @@ package epic.slab
 import shapeless._
 import ops.hlist._
 import epic.trees.Span
-import scala.collection.immutable.SortedMap
+import scala.collection.SortedMap
 
 // TODO: Get one which supports multiple types via HLists and CoProducts
 class SpanIndex[T <: SpanAnnotation](data: Vector[T]) {
@@ -12,9 +12,9 @@ class SpanIndex[T <: SpanAnnotation](data: Vector[T]) {
   })
 
   def apply(span: Span): Iterable[T] = {
-    indexed.iteratorFrom(span.begin).filter(_._1 <= span.end).flatMap({ case (_, seq) =>
+    indexed.range(span.begin, span.end).toIterable.flatMap({ case (_, seq) =>
       seq.filter(_.end <= span.end)
-    }).toIterable
+    })
   }
 }
 

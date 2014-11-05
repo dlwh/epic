@@ -20,7 +20,7 @@ package models
 import epic.parser.projections.GrammarRefinements
 import breeze.linalg._
 import java.io.File
-import io.Source
+import scala.io.Source
 import epic.framework.Feature
 import epic.trees.annotations.{Xbarize, FilterAnnotations, TreeAnnotator}
 import epic.trees._

@@ -18,7 +18,7 @@ package epic.parser.models
 
 import java.io.File
 import epic.trees.annotations.{Xbarize, TreeAnnotator, FilterAnnotations}
-import io.Source
+import scala.io.Source
 import breeze.linalg._
 import epic.parser.projections.GrammarRefinements
 import epic.framework.Feature

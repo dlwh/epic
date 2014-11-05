@@ -15,7 +15,7 @@ package epic.ontonotes
  See the License for the specific language governing permissions and
  limitations under the License.
 */
-import io.Source
+import scala.io.Source
 import collection.{IndexedSeq, Iterator}
 import java.lang.String
 import epic.trees.{Span, AnnotatedLabel, Tree}
