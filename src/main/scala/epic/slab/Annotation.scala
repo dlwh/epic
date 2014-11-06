@@ -46,6 +46,7 @@ case class PartOfSpeech(tag: String, id: Option[String] = None)
 
 class ContentToken(override val span: Span, val content: String) extends Token(span) {
   override def substring(c: String): String = content
+  override def offset(by: Int) = this.copy(span.offset(by))
 }
 
 object ContentToken {

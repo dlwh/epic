@@ -46,7 +46,7 @@ trait AnalysisFunction01[C, O] {
   }
   def apply(content: C): Vector[O]
 
-  def createSlabFrom(content: C): Slab[C, Vector[O] :: HNil] = {
+  def slabFrom(content: C): Slab[C, Vector[O] :: HNil] = {
     Slab(content, apply(content) :: HNil)
   }
 }

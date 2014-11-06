@@ -2,7 +2,7 @@ package epic.preprocess
 
 import org.scalatest._
 import org.scalatest.junit._
-
+import epic.slab._
 
 import org.junit.runner.RunWith
 
@@ -13,8 +13,8 @@ class JavaSentenceSegmenterTest extends FunSuite {
              """
 
   test("Gettysburg address") {
-    val sentences = JavaSentenceSegmenter(text).toSeq
-    assert(sentences.length === 5, sentences)
-    assert(sentences(0).trim === "But, in a larger sense, we can not dedicate -- we can not consecrate -- we can not hallow -- this ground.")
+    val slab = JavaSentenceSegmenter.slabFrom(text)
+    assert(slab.select[Sentence].length === 5)
+    assert(slab.substring(slab.select[Sentence](0)).trim === "But, in a larger sense, we can not dedicate -- we can not consecrate -- we can not hallow -- this ground.")
   }
 }

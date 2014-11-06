@@ -10,7 +10,7 @@ import epic.trees.Span
 
 @SerialVersionUID(1L)
 class TreebankTokenizer() extends Tokenizer with Serializable {
-  def apply(sentence: String): Vector[Token] = {
+  def apply(sentence: String): Vector[ContentToken] = {
     val impl = new TreebankTokenizerImpl(new StringReader(sentence))
     Iterators.fromProducer{
       try {

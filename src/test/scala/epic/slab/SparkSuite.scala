@@ -2,10 +2,7 @@ package epic.slab
 
 // Source stolen from tresata/spark-columnar
 
-import scala.reflect.ClassTag
-
 import org.apache.spark.{ SparkConf, SparkContext }
-import org.apache.spark.rdd.RDD
 
 object SparkSuite {
   lazy val sc = {

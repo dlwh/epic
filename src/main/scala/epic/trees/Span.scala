@@ -71,7 +71,7 @@ class Span(val encoded: Long) extends AnyVal {
 
   def offset(by: Int) = Span(begin + by, end + by)
 
-//  override def toString = s"Span($begin, $end)"
+  override def toString = s"Span($begin, $end)"
 }
 
 object Span {

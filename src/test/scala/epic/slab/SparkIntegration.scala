@@ -10,6 +10,7 @@ class SparkIntegration extends FunSpec with SparkSuite {
   val sentences = Vector(Sentence(Span(0,0)))
   val tokens = Vector(Token(Span(0,0)))
   val slab = Slab("", sentences :: HNil)
+
   describe("Slab") {
     it("should transport around in spark") {
       val rdd = SparkSuite.sc.parallelize(List(slab))

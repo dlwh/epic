@@ -36,7 +36,7 @@ trait Tokenizer extends AnalysisFunction11[String, Sentence, Token] {
   override def apply(content: String, sentences: Vector[epic.slab.Sentence]): Vector[epic.slab.Token] = {
     sentences.map({ sentence => 
       apply(content.substring(sentence.span.begin, sentence.span.end))
-        .map(t => t.offset(sentence.span.begin))
+        .map(_.offset(sentence.span.begin))
     }).flatten
   }
 
