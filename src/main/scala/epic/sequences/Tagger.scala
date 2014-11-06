@@ -1,7 +1,6 @@
 package epic.sequences
 
 import epic.slab._
-import epic.slab.Implicits
 import epic.slab.Utils._
 import shapeless._
 import ops.hlist._

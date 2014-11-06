@@ -5,7 +5,6 @@ import Utils._
 import shapeless._
 import ops.hlist._
 import epic.trees.{Span, AnnotatedLabel}
-import epic.slab.Implicits._
 
 package object sequences {
   type input = Vector[Sentence] :: Vector[Token] :: HNil

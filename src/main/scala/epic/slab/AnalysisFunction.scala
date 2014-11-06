@@ -13,7 +13,7 @@ import Utils._
  *   O = Produced annotation type
  */
 
-// This analysis function requires one input and adds one output type
+// This analysis function requires one input and adds one output type.
 trait AnalysisFunction11[C, I, O] {
   def apply[In <: HList, Out <: HList](slab: Slab[C, In])(implicit sel: Selector[In, Vector[I]], adder: Adder.Aux[In, O, Vector[O], Out]): Slab[C, Out] = {
     slab.add(apply(slab.content, slab.select(sel)))
@@ -21,6 +21,7 @@ trait AnalysisFunction11[C, I, O] {
   def apply(content: C, input: Vector[I]): Vector[O]
 }
 
+// Convert a function of the correct signature to an AnalysisFunction11.
 object AnalysisFunction11 {
   def apply[C, I, O](fun: ((C, Vector[I]) => Vector[O])): AnalysisFunction11[C, I, O] = new AnalysisFunction11[C, I, O] {
     def apply(content: C, input: Vector[I]): Vector[O] = fun(content, input)
@@ -50,6 +51,7 @@ trait AnalysisFunction01[C, O] {
   }
 }
 
+// Convert a function of the correct signature to an AnalysisFunction01.
 object AnalysisFunction01 {
   def apply[C, O](fun: (C => Vector[O])): AnalysisFunction01[C, O] = new AnalysisFunction01[C, O] {
     def apply(content: C): Vector[O] = fun(content)

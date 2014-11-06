@@ -21,7 +21,6 @@ import shapeless._
 import ops.hlist._
 import epic.trees.Span
 import Indexes._
-import Implicits._
 
 /**
  * Abstract trait for tokenizers, which annotate sentence-segmented

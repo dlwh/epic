@@ -7,7 +7,6 @@ import scala.collection.immutable
 import epic.slab._
 import epic.corpora.MascSlab
 import epic.trees.Span
-import epic.slab.Implicits._
 import epic.slab.Indexes._
 
 @SerialVersionUID(1L)

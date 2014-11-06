@@ -15,7 +15,6 @@ import java.util.zip.GZIPInputStream
 import epic.corpora.MascSlab
 import epic.trees.Span
 import scala.collection.immutable.Vector
-import epic.slab.Implicits._
 
 @SerialVersionUID(1L)
 class MLSentenceSegmenter(inf: MLSentenceSegmenter.ClassificationInference) extends SentenceSegmenter with Serializable {
