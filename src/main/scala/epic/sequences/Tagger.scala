@@ -4,7 +4,6 @@ import epic.slab._
 import epic.slab.Utils._
 import shapeless._
 import ops.hlist._
-import epic.slab.Indexes._
 import epic.trees.AnnotatedLabel
 
 /**

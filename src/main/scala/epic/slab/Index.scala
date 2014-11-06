@@ -21,16 +21,3 @@ class SpanIndex[T <: SpanAnnotation](data: Vector[T]) {
 object SpanIndex {
   def apply[T <: SpanAnnotation](data: Vector[T]) = new SpanIndex(data)
 }
-
-
-object Indexes {
-  implicit final class SpanIndexSlabOps[In <: HList](slab: Slab[String, In]) {
-    def covered[T <: SpanAnnotation](span: Span)(implicit sel: Selector[In, Vector[T]]): Iterable[T] = {
-      spanIndex(sel).apply(span)
-    }
-    def spanIndex[T <: SpanAnnotation](implicit sel: Selector[In, Vector[T]]) = SpanIndex(slab.select[T](sel))
-    def covered[T <: SpanAnnotation](span: Span, index: SpanIndex[T]): Iterable[T] = {
-      index(span)
-    }
-  }
-}
