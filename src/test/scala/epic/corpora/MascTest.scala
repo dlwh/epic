@@ -35,7 +35,7 @@ class MascTest extends FunSuite {
       "By", "AUSTIN", "ZALKIN", "."))
 
     val posSlab = corpora.MascSlab.penn(segSlab)
-    assert(posSlab.select[Tagged[PartOfSpeech]].map(posSlab.substring).toList === List(
+    assert(posSlab.spanIndex[Tagged[PartOfSpeech]].all.map(posSlab.substring).toList === List(
       "IRAQ-POVERTY", "(", "Washington", ")",
       "Rep.", "Tony", "Hall", ",", "D-Ohio", ",", "urges", "the", "United", "Nations",
       "to", "allow", "a", "freer", "flow", "of", "food", "and", "medicine", "into", "Iraq", ".",
@@ -44,7 +44,7 @@ class MascTest extends FunSuite {
       "there", ".",
       "By", "AUSTIN", "ZALKIN", "."))
 
-    assert(posSlab.select[Tagged[PartOfSpeech]].map(_.tag).toList === List(
+    assert(posSlab.spanIndex[Tagged[PartOfSpeech]].all.map(_.tag.tag).toList === List(
       "NNP", "(", "NNP", ")",
       "NN", "NNP", "NNP", ",", "NNP", ",", "VBZ", "DT", "NNP", "NNPS",
       "TO", "VB", "DT", "JJR", "NN", "IN", "NN", "CC", "NN", "IN", "NNP", ".",

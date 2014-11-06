@@ -16,6 +16,10 @@ class SpanIndex[T <: SpanAnnotation](data: Vector[T]) {
       seq.filter(_.end <= span.end)
     })
   }
+
+  def all(): Iterable[T] = {
+    indexed.values.flatten
+  }
 }
 
 object SpanIndex {
