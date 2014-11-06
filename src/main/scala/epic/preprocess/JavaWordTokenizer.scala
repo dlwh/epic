@@ -33,17 +33,17 @@ import epic.trees.Span
 class JavaWordTokenizer(locale: Locale) extends Tokenizer {
   def this() = this(Locale.getDefault)
 
-  override def apply(content: String, sentences: Vector[Sentence]): Vector[Token] = {
+  override def apply(content: String, sentences: Vector[Sentence]): Vector[ContentToken] = {
     sentences.flatMap { s =>
       val breaker = BreakIterator.getWordInstance(locale)
       breaker.setText(content)
       new SegmentingIterator(breaker, s.begin, s.end).map { span =>
-        Token(span) -> content.substring(span.begin, span.end)
-      }.filterNot(_._2.forall(_.isWhitespace)).map(_._1)
+        ContentToken(span, content.substring(span.begin, span.end))
+      }.filterNot(_.content.forall(_.isWhitespace))
     }
   }
 
-  def apply(sentence: String): Vector[Token] = apply(sentence, Vector(Sentence(Span(0, sentence.length-1))))
+  def apply(sentence: String): Vector[ContentToken] = apply(sentence, Vector(Sentence(Span(0, sentence.length))))
 }
 
 object JavaWordTokenizer extends JavaWordTokenizer
