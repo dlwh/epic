@@ -17,7 +17,7 @@ object PSentence {
 
 class SentenceDetector(val model: SentenceModel) extends AnalysisFunction01[String, PSentence] {
   def apply(text: String): Vector[PSentence] = {
-    // The detector s not threadsafe, so let's do this instead.
+    // The detector is not threadsafe
     val detector = new SentenceDetectorME(model) 
     detector.sentPosDetect(text)
       .zip(detector.getSentenceProbabilities())

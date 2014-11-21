@@ -9,10 +9,10 @@ import opennlp.tools.util._
 import SpanToSpan._
 import scala.collection.JavaConversions._
 
-class ParseTag(val parseType: String, val probability: Double, val parent: Option[Tagged[ParseTag]]) extends ProbabilityAnnotation
+class ParseTag(val span: epic.trees.Span, val parseType: String, val probability: Double, val children: List[ParseTag]) extends ProbabilityAnnotation with SpanAnnotation
 
 object ParseTag {
-  def apply(tag: String, probability: Double, parent: Option[Tagged[ParseTag]]): ParseTag = new ParseTag(tag, probability, parent)
+  def apply(span: Span, tag: String, probability: Double, children: List[ParseTag]): ParseTag = new ParseTag(span, tag, probability, children)
 }
 
 import aliases._
@@ -20,36 +20,34 @@ import aliases._
 class Parser(
   val model: ParserModel,
   val parser: ParserModel => opennlp.tools.parser.Parser
-) extends AnalysisFunctionN1[String, TaggerInput, Tagged[ParseTag]] {
+) extends AnalysisFunctionN1[String, TaggerInput, ParseTag] {
   override def apply[In <: HList, Out <: HList](slab: Slab[String, In])(
     implicit sel: SelectMany.Aux[In, TaggerInput, TaggerInput],
-    adder: Adder.Aux[In, Tagged[ParseTag], Vector[Tagged[ParseTag]], Out]
+    adder: Adder.Aux[In, ParseTag, Vector[ParseTag], Out]
   ): Slab[String, Out] = {
     val data = slab.selectMany(sel)
     val index = SpanIndex(data.select[Vector[PToken]])
     // Required because the API is not threadsafe.
     val pmodel = parser(model)
-    val annotatedSentences: Vector[List[Tagged[ParseTag]]] = data.select[Vector[PSentence]].flatMap({ sentence =>
+    val annotatedSentences: Vector[List[ParseTag]] = data.select[Vector[PSentence]].flatMap({ sentence =>
       val s = slab.substring(sentence.span)
       val tokens = index(sentence.span)
       val unparsed = new Parse(s, Span(0, sentence.end - sentence.begin), "INC", 1, null)
       tokens.map(t => unparsed.insert(new Parse(s, t.span.offset(-sentence.begin), "TK", 0.0, 0)))
       val parsed = if(unparsed.getChildCount > 0) { Some(pmodel.parse(unparsed)) } else { None }
-      parsed.map(p => transform(p).map(_.offset(sentence.begin)))
+      parsed.map(p => collectChildren(transform(List(p), sentence.begin)))
     })
     slab.add(annotatedSentences.flatten)(adder)
   }
 
-  def transform(parse: Parse): List[Tagged[ParseTag]] = {
-    val parent = Tagged(parse.getSpan(), ParseTag(parse.getType, parse.getProb, None))
-    transformRecurse(parse, parent)
+  def transform(parses: List[Parse], offset: Int): List[ParseTag] = {
+    parses.map({child =>
+      ParseTag(child.getSpan().offset(offset), child.getType, child.getProb, transform(child.getChildren.toList, offset))
+    })
   }
 
-  def transformRecurse(parse: Parse, parent: Tagged[ParseTag]): List[Tagged[ParseTag]] = {
-    parse.getChildren.map({child =>
-      val childTag = Tagged(child.getSpan(), ParseTag(child.getType, child.getProb, Some(parent)))
-      List(parent) ++ transformRecurse(child, childTag)
-    }).toList.flatten
+  def collectChildren(parses: List[ParseTag]): List[ParseTag] = {
+    parses ++ parses.flatMap(_.children)
   }
 }
 
