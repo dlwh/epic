@@ -30,16 +30,16 @@ object SparkPipeline {
   val parser = Parser(new ParserModel(resource("en-parser-chunking.bin")))
 
   lazy val sc = {
-    val conf = new SparkConf(false)
-      .setMaster("local")
+    val conf = new SparkConf()
       .setAppName("OpenNLP Pipeline")
       .set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
     new SparkContext(conf)
   }
 
-  def pipeline(path: String) = {
+  def pipeline(path: String, partitions: Int) = {
     sc.wholeTextFiles(path)
       .map(_._2)
+      .repartition(partitions)
       .map(sentence.slabFrom(_))
       .map(tokenizer(_))
       .map(person(_))
@@ -55,7 +55,6 @@ object SparkPipeline {
   }
 
   def main(args: Array[String]) {
-    val txt = "/home/tass/dev/scala/epic-opennlp/txt"
-    println(pipeline(txt).collect())
+    println(pipeline(args(0), Integer.parseInt(args(1))).collect())
   }
 }
