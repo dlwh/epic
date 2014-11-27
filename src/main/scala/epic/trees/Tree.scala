@@ -120,13 +120,12 @@ object Tree {
     if(isLeaf) {
       sb append TreebankTokenizer.tokensToTreebankTokens(span.map(words).map(_.toString)).mkString(" "," ","")
     } else {
+      val anyNonTerminals = children.exists(!_.isLeaf)
       //sb append "\n"
-      var _lastWasNonTerminal = false
       for( c <- children ) {
-        if(newline && (c.span.length != words.length) && (c.children.nonEmpty || _lastWasNonTerminal)) sb append "\n" append "  " * depth
+        if(newline && (c.span.length != words.length) && anyNonTerminals) sb append "\n" append "  " * depth
         else sb.append(' ')
         recursiveRender(c,depth+1, words, newline, sb)
-        _lastWasNonTerminal = c.children.nonEmpty
       }
     }
     sb append ')'

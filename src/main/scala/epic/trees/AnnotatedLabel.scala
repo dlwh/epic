@@ -19,6 +19,7 @@ import epic.framework.Feature
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable.ArrayBuffer
+import scala.util.Try
 
 /**
  * Something we can throw in an AnnotatedLabel
@@ -40,7 +41,8 @@ case class AnnotatedLabel(label: String,
                           headTag: Option[String] = None,
                           parents: IndexedSeq[String] = IndexedSeq.empty,
                           siblings: IndexedSeq[Either[String, String]] = IndexedSeq.empty,
-                          features: Set[Annotation] = Set.empty) extends Feature with CachedHashCode {
+                          features: Set[Annotation] = Set.empty,
+                          index: Int = -1) extends Feature with CachedHashCode {
   def hasAnnotation(f: Annotation): Boolean = features.contains(f)
 
 
@@ -76,6 +78,9 @@ case class AnnotatedLabel(label: String,
     if(features.nonEmpty)
       components ++= features.iterator.map(_.toString)
 
+    if(index != -1)
+      components += s"_$index"
+
     if(components.nonEmpty) components.mkString(label+"[", ", ", "]")
     else label
   }
@@ -83,7 +88,7 @@ case class AnnotatedLabel(label: String,
 
 object AnnotatedLabel {
 
-  def parseTreebank(label: String, stripCoref: Boolean = true):AnnotatedLabel = try {
+  def parseTreebank(label: String):AnnotatedLabel = try {
 
     var fields = if (label == "PRT|ADVP") {
       Array("PRT")
@@ -104,10 +109,12 @@ object AnnotatedLabel {
 
     fields = fields.drop(1)
 
-    if (stripCoref)
-      fields = fields.filterNot(l => l.charAt(0).isDigit)
+    // TODO: what to do with =
+    val (coref, realFields) = fields.partition(l => l.charAt(0).isDigit)
 
-    val lbl = interner(AnnotatedLabel(tag).annotate(fields.map(FunctionalTag).map(functionalTagInterner):_*))
+    val index = Try { coref.last.toInt }.toOption.getOrElse(-1)
+
+    val lbl = interner(AnnotatedLabel(tag, index = index).annotate(realFields.map(FunctionalTag).map(functionalTagInterner):_*))
 
     lbl
   } catch {
