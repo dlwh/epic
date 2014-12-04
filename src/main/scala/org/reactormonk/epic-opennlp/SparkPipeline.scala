@@ -11,6 +11,7 @@ import opennlp.tools.postag.POSModel
 import opennlp.tools.parser.ParserModel
 import org.apache.spark.SparkContext
 import org.apache.spark.SparkConf
+import org.apache.spark.rdd.RDD
 
 object SparkPipeline {
   def resource(name: String): URL = {
@@ -36,10 +37,8 @@ object SparkPipeline {
     new SparkContext(conf)
   }
 
-  def pipeline(path: String, partitions: Int) = {
-    sc.wholeTextFiles(path)
-      .map(_._2)
-      .repartition(partitions)
+  def pipeline(files: RDD[String]) = {
+    files
       .map(sentence.slabFrom(_))
       .map(tokenizer(_))
       .map(person(_))
@@ -54,7 +53,23 @@ object SparkPipeline {
       .map(parser(_))
   }
 
+  def readFiles(path: String): Array[String] = {
+    new java.io.File(path).listFiles.map(f => scala.io.Source.fromFile(f).mkString)
+  }
+}
+
+object WithRepartition {
+  import SparkPipeline._
   def main(args: Array[String]) {
-    println(pipeline(args(0), Integer.parseInt(args(1))).collect())
+    val files = sc.parallelize(readFiles(args(0)), Integer.parseInt(args(1)))
+    pipeline(files).foreach(print)
+  }
+}
+
+object WithoutRepartition {
+  import SparkPipeline._
+  def main(args: Array[String]) {
+    val files = sc.parallelize(readFiles(args(0)))
+    pipeline(files).foreach(print)
   }
 }
