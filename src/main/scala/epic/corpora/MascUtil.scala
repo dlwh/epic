@@ -326,7 +326,7 @@ object MascSlab {
     val source = slab.select[Source](0)(sel)
     val sentenceXml = XML.load(source.url.toString().replaceAll("[.]txt$", "-s.xml"))
     val sentences = for (region <- MascUtil.getRegions(sentenceXml)) yield {
-       Sentence(region.span, Some(region.id))
+       Sentence(region.span)
     }
     slab.add(sentences.toVector)(adder)
   }

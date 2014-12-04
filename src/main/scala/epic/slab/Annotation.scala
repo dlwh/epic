@@ -32,8 +32,7 @@ trait RecursiveAnnotation extends Annotation {}
 trait DocumentAnnotation extends Annotation {}
 
 case class Source(url: URL) extends DocumentAnnotation
-case class Sentence(span: Span, id: Option[String] = None) extends SpanAnnotation
-case class Segment(span: Span, id: Option[String] = None) extends SpanAnnotation
+case class Sentence(span: Span) extends SpanAnnotation
 case class Token(span: Span) extends SpanAnnotation {
   def offset(by: Int) = this.copy(span.offset(by))
 }
@@ -52,3 +51,5 @@ class ContentToken(override val span: Span, val content: String) extends Token(s
 object ContentToken {
   def apply(span: Span, content: String): ContentToken = new ContentToken(span, content)
 }
+
+case class Segment(span: Span, id: Option[String]) extends SpanAnnotation
