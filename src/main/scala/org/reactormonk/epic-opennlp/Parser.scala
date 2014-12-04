@@ -9,10 +9,10 @@ import opennlp.tools.util._
 import SpanToSpan._
 import scala.collection.JavaConversions._
 
-class ParseTag(val span: epic.trees.Span, val parseType: String, val probability: Double, val children: List[ParseTag]) extends ProbabilityAnnotation with SpanAnnotation
+class ParseTag(val span: epic.trees.Span, val parseType: String, val probability: Double) extends ProbabilityAnnotation with SpanAnnotation
 
 object ParseTag {
-  def apply(span: Span, tag: String, probability: Double, children: List[ParseTag]): ParseTag = new ParseTag(span, tag, probability, children)
+  def apply(span: Span, tag: String, probability: Double): ParseTag = new ParseTag(span, tag, probability)
 }
 
 import aliases._
@@ -35,19 +35,15 @@ class Parser(
       val unparsed = new Parse(s, Span(0, sentence.end - sentence.begin), "INC", 1, null)
       tokens.map(t => unparsed.insert(new Parse(s, t.span.offset(-sentence.begin), "TK", 0.0, 0)))
       val parsed = if(unparsed.getChildCount > 0) { Some(pmodel.parse(unparsed)) } else { None }
-      parsed.map(p => collectChildren(transform(List(p), sentence.begin)))
+      parsed.map(p => transform(List(p), sentence.begin))
     })
     slab.add(annotatedSentences.flatten)(adder)
   }
 
   def transform(parses: List[Parse], offset: Int): List[ParseTag] = {
-    parses.map({child =>
-      ParseTag(child.getSpan().offset(offset), child.getType, child.getProb, transform(child.getChildren.toList, offset))
+    parses.flatMap({child =>
+      List(ParseTag(child.getSpan().offset(offset), child.getType, child.getProb)) ++ transform(child.getChildren.toList, offset)
     })
-  }
-
-  def collectChildren(parses: List[ParseTag]): List[ParseTag] = {
-    parses ++ parses.flatMap(_.children)
   }
 }
 
