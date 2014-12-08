@@ -10,21 +10,23 @@ import scala.util.Try
  *
  * @author dlwh
  **/
-class ExplicitTraceRemover(emptyPosTags: Set[String] = Set("-NONE-"), tracesToKeep: Set[String] = Set("*T*")) {
+class ExplicitTraceRemover(emptyPosTags: Set[String] = Set("-NONE-")) {
+
   def apply(tree: Tree[AnnotatedLabel], words: IndexedSeq[String]):(Tree[AnnotatedLabel], IndexedSeq[String]) = {
     val newWords = ArrayBuffer[String]()
     // list is pairs of (empty constituent, its id)
-    def recursive(tree: Tree[AnnotatedLabel]):(Tree[AnnotatedLabel], Seq[(String, Int)]) = {
+    def recursive(tree: Tree[AnnotatedLabel], cCommandIndices: Set[Int]):(Tree[AnnotatedLabel], Seq[(String, Int)]) = {
       tree match {
         case Tree(label, IndexedSeq(Tree(child, IndexedSeq(), _)), span) if emptyPosTags(child.label) =>
           val trace = words(span.begin)
-          val ignoreTrace = !tracesToKeep.exists(trace.startsWith)
+          val ignoreTrace = false
           // traces either show up as (NP-1 *NONE*) or as (NP *T*-1) need to catch both
           val id = parseId(trace).getOrElse(-1)//.getOrElse(label.index)
           val list = id match {
             case _ if ignoreTrace => List.empty
             case -1 => List.empty
-            case _ => List(label.label -> id)
+            case i if cCommandIndices(i) => List(label.label -> id)
+            case _ => List.empty
           }
           Tree(label, IndexedSeq.empty, Span(newWords.length, newWords.length)) -> list
         case Tree(label, IndexedSeq(), span) =>
@@ -34,8 +36,8 @@ class ExplicitTraceRemover(emptyPosTags: Set[String] = Set("-NONE-"), tracesToKe
           Tree(label, IndexedSeq.empty, Span(newBegin, newWords.length)) -> List.empty
 
         case Tree(label, children, span) =>
-          val (newChildren, gapsList) = tree.children.map(recursive).unzip
-          val resolvedIndices = newChildren.map(_.label.index).toSet
+          val resolvedIndices = children.map(_.label.index).toSet
+          val (newChildren, gapsList) = tree.children.filterNot(_.label.label == "-NONE-").map(recursive(_, resolvedIndices ++ cCommandIndices)).unzip
           val gaps = gapsList.flatten
           val unresolvedGaps =  gaps.filterNot(pair => resolvedIndices(pair._2))
 
@@ -44,12 +46,12 @@ class ExplicitTraceRemover(emptyPosTags: Set[String] = Set("-NONE-"), tracesToKe
 
           if(unresolvedGaps.nonEmpty) println("QQQ",unresolvedGaps, newLabel)
 
-          Tree(newLabel, newChildren, Span(children.head.span.begin, children.last.span.end))  -> unresolvedGaps
+          Tree(newLabel, newChildren, Span(newChildren.head.span.begin, newChildren.last.span.end))  -> unresolvedGaps
       }
 
     }
 
-    val (newTree, gaps) = recursive(tree)
+    val (newTree, gaps) = recursive(tree, Set.empty)
     assert(gaps.isEmpty, newTree.render(newWords) + " " + gaps)
     newTree -> newWords
   }
