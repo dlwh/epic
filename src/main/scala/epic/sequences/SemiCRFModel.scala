@@ -23,8 +23,7 @@ import scala.collection.mutable.ArrayBuffer
 @SerialVersionUID(1L)
 class SemiCRFModel[L, W](val featurizer: SemiCRFModel.BIEOFeaturizer[L, W],
                          val constraintsFactory: LabeledSpanConstraints.Factory[L, W],
-                         initialWeights: Feature=>Double = {(_: Feature) => 0.0},
-                         cacheFeatures: Boolean = false) extends StandardExpectedCounts.Model[Segmentation[L, W]] with Serializable {
+                         initialWeights: Feature=>Double = {(_: Feature) => 0.0}) extends StandardExpectedCounts.Model[Segmentation[L, W]] with Serializable {
 
   def featureIndex = featurizer.featureIndex
 
@@ -182,31 +181,31 @@ class SemiCRFInference[L, W](weights: DenseVector[Double],
 
     private def cachedSpanScore(prev: Int, cur: Int, beg: Int, end: Int):Double = {
       val tind: Int = TriangularArray.index(beg, end)
-      var cc = spanCache(tind)
+      var spanCell = spanCache(tind)
       if(spanCache(tind) == null) {
-        cc = new Array[Array[Double]](labelIndex.size)
-        spanCache(tind) = cc
+        spanCell = new Array[Array[Double]](labelIndex.size)
+        spanCache(tind) = spanCell
       }
 
-      var xx = cc(cur)
-      if(xx == null) {
+      var curLabelCell = spanCell(cur)
+      if(curLabelCell == null) {
 
         val span = localization.featuresForSpan(prev, cur, beg, end)
         if (span eq null) {
-          cc(cur) = negInfArray
+          spanCell(cur) = negInfArray
           Double.NegativeInfinity
         } else {
-          xx = java.util.Arrays.copyOf(nanArray, nanArray.length)
-          xx(prev) = weights dot span
-          cc(cur) = xx
-          xx(prev)
+          curLabelCell = java.util.Arrays.copyOf(nanArray, nanArray.length)
+          curLabelCell(prev) = weights dot span
+          spanCell(cur) = curLabelCell
+          curLabelCell(prev)
         }
       } else {
-        if (java.lang.Double.isNaN(xx(prev))) {
+        if (java.lang.Double.isNaN(curLabelCell(prev))) {
           val span = localization.featuresForSpan(prev, cur, beg, end)
-          xx(prev) = weights dot span
+          curLabelCell(prev) = weights dot span
         }
-        xx(prev)
+        curLabelCell(prev)
       }
     }
 
@@ -311,25 +310,25 @@ object SegmentationModelFactory {
 
 
   @SerialVersionUID(2L)
-  class IndexedStandardFeaturizer[L] private (wordFeaturizer: IndexedWordFeaturizer[String],
-                                              surfaceFeaturizer: IndexedSurfaceFeaturizer[String],
-                                              wordFeatureIndex: CrossProductIndex[Feature, Feature],
-                                              spanFeatureIndex: CrossProductIndex[Feature, Feature],
-                                              bioeFeatures: Array[Array[Array[Int]]], // label -> kind -> indexes into surfaceFeaturizer.labelFeatureIndex
-                                              transitionFeatures: Array[Array[Array[Int]]], // prev -> cur -> indexes into surfaceFeaturizer.labelFeatureIndex
-                                              val startSymbol: L,
-                                              val labelIndex: OptionIndex[L],
-                                              val constraintFactory: LabeledSpanConstraints.Factory[L, String]) extends SemiCRFModel.BIEOFeaturizer[L,String] with Serializable with SafeLogging {
+  class IndexedStandardFeaturizer[L, W] private (wordFeaturizer: IndexedWordFeaturizer[W],
+                                                 surfaceFeaturizer: IndexedSurfaceFeaturizer[W],
+                                                 wordFeatureIndex: CrossProductIndex[Feature, Feature],
+                                                 spanFeatureIndex: CrossProductIndex[Feature, Feature],
+                                                 bioeFeatures: Array[Array[Array[Int]]], // label -> kind -> indexes into surfaceFeaturizer.labelFeatureIndex
+                                                 transitionFeatures: Array[Array[Array[Int]]], // prev -> cur -> indexes into surfaceFeaturizer.labelFeatureIndex
+                                                 val startSymbol: L,
+                                                 val labelIndex: OptionIndex[L],
+                                                 val constraintFactory: LabeledSpanConstraints.Factory[L, W]) extends SemiCRFModel.BIEOFeaturizer[L,W] with Serializable with SafeLogging {
 
     val featureIndex = SegmentedIndex(wordFeatureIndex, spanFeatureIndex)
     private val wordOffset = featureIndex.componentOffset(0)
     private val spanOffset = featureIndex.componentOffset(1)
 
-    def anchor(w: IndexedSeq[String]): SemiCRFModel.BIEOFeatureAnchoring[L, String] = new SemiCRFModel.BIEOFeatureAnchoring[L, String] {
+    def anchor(w: IndexedSeq[W]): SemiCRFModel.BIEOFeatureAnchoring[L, W] = new SemiCRFModel.BIEOFeatureAnchoring[L, W] {
       import epic.sequences.SegmentationModelFactory.FeatureKinds._
       val constraints = constraintFactory.constraints(w)
 
-      def words: IndexedSeq[String] = w
+      def words: IndexedSeq[W] = w
 
       val loc = surfaceFeaturizer.anchor(w)
       val wloc = wordFeaturizer.anchor(w)
@@ -364,13 +363,13 @@ object SegmentationModelFactory {
   }
 
   object IndexedStandardFeaturizer {
-    def make[L](wordFeaturizer: IndexedWordFeaturizer[String],
-                spanFeaturizer: IndexedSurfaceFeaturizer[String],
+    def make[L, W](wordFeaturizer: IndexedWordFeaturizer[W],
+                spanFeaturizer: IndexedSurfaceFeaturizer[W],
                 startSymbol: L,
                 labelIndex: OptionIndex[L],
-                constraintFactory: LabeledSpanConstraints.Factory[L, String],
+                constraintFactory: LabeledSpanConstraints.Factory[L, W],
                 hashFeatures: HashFeature.Scale = HashFeature.Absolute(0))
-               (data: IndexedSeq[Segmentation[L, String]]):IndexedStandardFeaturizer[L] = {
+               (data: IndexedSeq[Segmentation[L, W]]):IndexedStandardFeaturizer[L, W] = {
       val labelPartIndex = Index[Feature]()
       val outsideFeature = labelPartIndex.index(OutsideFeature)
       val bioeFeatures = Array.tabulate(labelIndex.size, FeatureKinds.maxId)((i,j) => if(i == labelIndex.size - 1) Array.empty[Int] else Array(labelPartIndex.index(Label1Feature(labelIndex.get(i).get, FeatureKinds(j)))))

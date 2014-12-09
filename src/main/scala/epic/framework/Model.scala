@@ -15,10 +15,11 @@ package epic.framework
  See the License for the specific language governing permissions and
  limitations under the License.
 */
-import breeze.util.{Encoder, Index}
-import breeze.linalg._
 import java.io.File
-import epic.util.{SafeLogging, WeightsCache, CacheBroker}
+
+import breeze.linalg._
+import breeze.util.Index
+import epic.util.{SafeLogging, WeightsCache}
 
 
 /**
