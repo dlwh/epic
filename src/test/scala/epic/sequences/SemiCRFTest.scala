@@ -48,12 +48,12 @@ class SemiCRFTest extends FunSuite {
       ('Start,'N,0.0)
     )
 
-    val hmm = SemiCRF.fromCRF(HMM[Symbol,Symbol]('Start,transitions,emissions, smoothEmissions=false))
+    val hmm = SemiCRF.fromCRF(HMM[Symbol,Symbol]('Start, transitions, emissions, smoothEmissions=false))
     val cal: Marginal[Symbol, Symbol] = hmm.marginal(IndexedSeq('U,'U,'N,'U,'U))
 //    val cal: Marginal[Symbol, Symbol] = hmm.marginal(IndexedSeq('U))
     val marginals = (0 until cal.length).map(pos => cal.spanMarginal(pos, pos+1)).map(Encoder.fromIndex(hmm.labelIndex).decode(_))
 
-    assert( (marginals(0)(Some('Rainy)) - 0.8673).abs < 1E-4)
+    assert( (marginals(0)(Some('Rainy)) - 0.8673).abs < 1E-4, marginals(0))
     assert( (marginals(1)(Some('Rainy)) - 0.8204).abs < 1E-4)
     assert( (marginals(2)(Some('Rainy)) - 0.3075).abs < 1E-4)
     assert( (marginals(3)(Some('Rainy)) - 0.8204).abs < 1E-4)
@@ -116,8 +116,6 @@ class SemiCRFTest extends FunSuite {
 
       }
 
-      override def startSymbol = 'START
-
       override def labelIndex: OptionIndex[Symbol] = index
 
       override def featureIndex: Index[Feature] = cpIndex
@@ -126,7 +124,6 @@ class SemiCRFTest extends FunSuite {
 
   private def makeConstraintFactory[G](syms: Map[IndexedSeq[G], Set[Symbol]]) = {
     val symIndex = Index[Symbol]()
-    symIndex.index('START)
 
     val allowedSyms = syms.map { case (g, ps) =>
       g -> (new BitSet() ++= ps.map(symIndex.index) )
