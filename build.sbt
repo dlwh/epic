@@ -30,6 +30,7 @@ libraryDependencies ++= Seq(
   "net.sourceforge.nekohtml" % "nekohtml" % "1.9.21",//needed by boilerpipe
   "org.slf4j" % "slf4j-simple" % "1.7.6",
   "org.apache.commons" % "commons-lang3" % "3.3.2",
+  "de.jflex" % "jflex" % "1.6.0" % "compile",
   "org.scalatest" %% "scalatest" % "2.1.3" % "test",
   "org.scalacheck" %% "scalacheck" % "1.11.3" % "test"
 )
