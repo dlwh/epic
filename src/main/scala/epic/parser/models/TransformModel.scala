@@ -36,7 +36,9 @@ class TransformModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSeq[W]) => B
 
 
   override def accumulateCounts(inf: Inference, s: Scorer, d: TreeInstance[L, W], m: Marginal, accum: ExpectedCounts, scale: Double): Unit = {
+//    println("Extracting ecounts")
     inf.grammar.extractEcounts(m, accum.counts, scale)
+//    println("Ecounts extracted")
     accum.loss += scale * m.logPartition
   }
 
@@ -94,7 +96,10 @@ object TransformModel {
       val sspec = surfaceFeaturizer.anchor(w)
       val lspec = labelFeaturizer.anchor(w)
 
-      // cache: we remember the (begin/end) pair we saw with each
+      // For each split point, remember the (begin, end) pair that that split point was observed with. There'll
+      // only be one in the gold, but more in the prediction. Accumulate rule counts (output layer) until
+      // we need this split point for a different set of indices or we come to the end. Then, backpropagate
+      // the rule marginals through the network to get the derivative.
       val UNUSED = (-1, -1)
       val states = Array.fill(w.length + 2)(UNUSED) // 1 for each split,  length for unaries, length +1 for spans
       val ruleCountsPerState = Array.fill(w.length + 2)(SparseVector.zeros[Double](labelFeaturizer.index.size))
@@ -188,6 +193,10 @@ object TransformModel {
         })
         val rfeats = lspec.featuresForUnaryRule(begin, end, rule, ref)
 
+//        println("One example UFEATS: " + rfeats.size)
+//        for (rfeat <- rfeats) {
+//          println("UFEAT: " + labelFeaturizer.index.unapply(rfeats(0)))
+//        }
         new FeatureVector(rfeats) dot fs
       }
 
@@ -198,6 +207,10 @@ object TransformModel {
         })
         val rfeats = lspec.featuresForSpan(begin, end, tag, ref)
 
+//        println("One example SFEATS: " + rfeats.size)
+//        for (rfeat <- rfeats) {
+//          println("SFEAT: " + labelFeaturizer.index.unapply(rfeats(0)))
+//        }
         new FeatureVector(rfeats) dot fs
       }
 

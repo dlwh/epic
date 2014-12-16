@@ -63,6 +63,10 @@ object ParserTrainer extends epic.parser.ParserPipeline with LazyLogging {
                     threads: Int = -1,
                     @Help(text="Should we randomize weights? Some models will force randomization.")
                     randomize: Boolean = false,
+                    @Help(text="Scale of random weight initialization")
+                    initWeightsScale: Double = 1E-3,
+                    @Help(text="True if we should determinimize training (remove randomness associated with random minibatches)")
+                    determinizeTraining: Boolean = false,
                     @Help(text="Should we enforce reachability? Can be useful if we're pruning the gold tree.")
                     enforceReachability: Boolean = true,
                     @Help(text="Whether or not we use constraints. Not using constraints is very slow.")
@@ -121,11 +125,13 @@ object ParserTrainer extends epic.parser.ParserPipeline with LazyLogging {
     val model = modelFactory.make(theTrees, initialParser.topology, initialParser.lexicon, constraints)
     val obj = new ModelObjective(model, theTrees, params.threads)
     val cachedObj = new CachedBatchDiffFunction(obj)
-    val init = obj.initialWeightVector(randomize)
+    val init = obj.initialWeightVector(randomize, initWeightsScale)
     if(checkGradient) {
       val cachedObj2 = new CachedBatchDiffFunction(new ModelObjective(model, theTrees.take(opt.batchSize), params.threads))
-        val indices = (0 until 10).map(i => if(i < 0) model.featureIndex.size + i else i)
+      val indices = (0 until 10).map(i => if(i < 0) model.featureIndex.size + i else i)
+      println("testIndices")
       GradientTester.testIndices(cachedObj2, obj.initialWeightVector(randomize = true), indices, toString={(i: Int) => model.featureIndex.get(i).toString}, skipZeros = true)
+      println("test")
       GradientTester.test(cachedObj2, obj.initialWeightVector(randomize = true), toString={(i: Int) => model.featureIndex.get(i).toString}, skipZeros = false)
     }
 
@@ -143,7 +149,12 @@ object ParserTrainer extends epic.parser.ParserPipeline with LazyLogging {
 
 
     val name = Option(params.name).orElse(Option(model.getClass.getSimpleName).filter(_.nonEmpty)).getOrElse("DiscrimParser")
-    for ((state, iter) <- params.opt.iterations(cachedObj, init).take(maxIterations).zipWithIndex.tee(evalAndCache _)
+    val itr = if (determinizeTraining) {
+      params.opt.iterations(cachedObj.withScanningBatches(params.opt.batchSize), init).asInstanceOf[Iterator[FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State]]
+    } else {
+      params.opt.iterations(cachedObj, init)
+    }
+    for ((state, iter) <- itr.take(maxIterations).zipWithIndex.tee(evalAndCache _)
          if iter != 0 && iter % iterationsPerEval == 0 || evaluateNow) yield try {
       val parser = model.extractParser(state.x)
       (s"$name-$iter", parser)
@@ -151,7 +162,7 @@ object ParserTrainer extends epic.parser.ParserPipeline with LazyLogging {
       case e: Exception => e.printStackTrace(); throw e
     }
   }
-
+  
   def sentTooLong(p: TreeInstance[AnnotatedLabel, String], maxLength: Int): Boolean = {
     p.words.count(x => x == "'s" || x(0).isLetterOrDigit) > maxLength
   }

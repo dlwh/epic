@@ -28,14 +28,21 @@ class ModelObjective[Datum](val model: Model[Datum],
 
   // Selects a set of data to use
   protected def select(batch: IndexedSeq[Int]):GenTraversable[Datum] = batchSelector(batch)
-
+  
   def initialWeightVector(randomize: Boolean): DenseVector[Double] = {
+    initialWeightVector(randomize, 1E-3)
+  }
+
+  def initialWeightVector(randomize: Boolean, scale: Double): DenseVector[Double] = {
    val v = model.readCachedFeatureWeights() match {
      case Some(vector) => vector
      case None => Encoder.fromIndex(featureIndex).tabulateDenseVector(f => model.initialValueForFeature(f))
    }
     if(randomize) {
-      v += (DenseVector.rand(numFeatures) * 2E-3 - 1E-3)
+//      v += (DenseVector.rand(numFeatures) * 2.0 * scale - scale)
+      // Control the seed of the RNG for the weights
+      val rng = new scala.util.Random(0)
+      v += DenseVector(Array.tabulate(numFeatures)(i => rng.nextDouble * 2.0 * scale - scale))
     }
     v
   }
