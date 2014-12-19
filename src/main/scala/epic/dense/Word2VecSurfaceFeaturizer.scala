@@ -59,10 +59,11 @@ class Word2VecSurfaceFeaturizerIndexed[W](val wordIndex: Index[W],
     
   def assemble(vectors: Seq[Array[Double]]) = vectors.reduce(_ ++ _)
   
-  def convertToVector(indexedWords: Array[Int]) = assemble(indexedWords.map(word2vec(_)))
+  def convertToVector(indexedWords: Array[Int]) = assemble(indexedWords.map(wordIdx => if (wordIdx == -1) zeroVector else word2vec(wordIdx)))
     
   def anchor(words: IndexedSeq[W]): WordVectorAnchoringIndexed[W] = {
     val convertedWords = words.map(converter(_))
+    val indexedWords = convertedWords.map(wordIndex(_))
     new WordVectorAnchoringIndexed[W] {
       
       def featuresForSpan(start: Int, end: Int) = {
@@ -72,11 +73,15 @@ class Word2VecSurfaceFeaturizerIndexed[W](val wordIndex: Index[W],
         
       def featuresForSplit(start: Int, split: Int, end: Int) = {
 //        val vect = new DenseVector[Double](assemble(Seq(fetchVector(start - 1), fetchVector(start), fetchVector(split - 1), fetchVector(split), fetchVector(end - 1), fetchVector(end))))
-        Array(fetchWord(start - 1), fetchWord(start), -1, fetchWord(split - 1), fetchWord(split), fetchWord(end - 1), fetchWord(end))
+        Array(fetchWord(start - 1), fetchWord(start), fetchWord(split - 1), fetchWord(split), fetchWord(end - 1), fetchWord(end))
       }
         
+//      private def fetchWord(idx: Int): Int = {
+//        if (idx < 0 || idx >= words.size || !word2vec.contains(convertedWords(idx))) -1 else wordIndex(convertedWords(idx))
+//      }
+      
       private def fetchWord(idx: Int): Int = {
-        if (idx < 0 || idx >= words.size || !word2vec.contains(convertedWords(idx))) -1 else wordIndex(convertedWords(idx))
+        if (idx < 0 || idx >= words.size) -1 else indexedWords(idx)
       }
     } 
   }

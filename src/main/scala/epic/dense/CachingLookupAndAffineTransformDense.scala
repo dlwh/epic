@@ -34,15 +34,30 @@ case class CachingLookupAndAffineTransformDense[FV](numOutputs: Int,
     val weightst = weights.t
 
     val cache = new HashMap[(Int,Int),DenseVector[Double]]
+//    val caches = Array.tabulate(6)(i => new HashMap[Int,DenseVector[Double]])
 
     def activations(fv: Array[Int]) = {
       val finalVector = DenseVector.zeros[Double](numOutputs)
       for (i <- 0 until fv.size) {
         val wordPosn = fv(i) -> i
-        if (!cache.contains(wordPosn)) {
-          cache.put(wordPosn, weights(i to i+numOutputs, ::) * DenseVector(word2vecFeaturizer.word2vec(wordPosn._1)))
+        if (fv(i) != -1) {
+//          caches(i).synchronized {
+//            if (!caches(i).contains(fv(i))) {
+//              val startIdx = i * word2vecFeaturizer.wordRepSize
+//              caches(i).put(fv(i), weights(::, startIdx until startIdx + word2vecFeaturizer.wordRepSize) * DenseVector(word2vecFeaturizer.word2vec(wordPosn._1)))
+//            }
+//            finalVector += caches(i)(fv(i))
+//          }
+          cache.synchronized {
+            if (!cache.contains(wordPosn)) {
+              val startIdx = i * word2vecFeaturizer.wordRepSize
+              cache.put(wordPosn, weights(::, startIdx until startIdx + word2vecFeaturizer.wordRepSize) * DenseVector(word2vecFeaturizer.word2vec(wordPosn._1)))
+            }
+            finalVector += cache(wordPosn)
+          }
+//          val startIdx = i * word2vecFeaturizer.wordRepSize
+//          finalVector += weights(::, startIdx until startIdx + word2vecFeaturizer.wordRepSize) * DenseVector(word2vecFeaturizer.word2vec(wordPosn._1))
         }
-        finalVector += cache(wordPosn)
       }
       finalVector + bias
     }

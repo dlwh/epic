@@ -22,6 +22,7 @@ import scala.collection.mutable.HashMap
 import epic.dense.Transform
 import epic.dense.AffineTransformDense
 import epic.dense.Word2VecSurfaceFeaturizer
+import epic.dense.Word2VecSurfaceFeaturizerIndexed
 
 /**
  * TODO
@@ -35,8 +36,8 @@ class PositionalTransformModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSe
                                refinedTopology: RuleTopology[L2],
                                refinements: GrammarRefinements[L, L2],
                                labelFeaturizer: RefinedFeaturizer[L, W, Feature],
-                               surfaceFeaturizer: Word2VecSurfaceFeaturizer[W],
-                               val transform: AffineTransformDense[DenseVector[Double]]) extends ParserModel[L, W] {
+                               surfaceFeaturizer: Word2VecSurfaceFeaturizerIndexed[W],
+                               val transform: AffineTransformDense[Array[Int]]) extends ParserModel[L, W] {
   override type Inference = PositionalTransformModel.Inference[L, L2, W]
 
 
@@ -55,7 +56,6 @@ class PositionalTransformModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSe
 
   override def inferenceFromWeights(weights: DenseVector[Double]): Inference = {
     val (layer, innerLayer) = transform.extractLayerAndPenultimateLayer(weights)
-
     val grammar = new PositionalTransformModel.PositionalTransformGrammar[L, L2, W](topology, lexicon, refinedTopology, refinements, labelFeaturizer, surfaceFeaturizer, layer, innerLayer)
     new Inference(annotator, constrainer, grammar, refinements)
   }
@@ -86,9 +86,9 @@ object PositionalTransformModel {
                                    val refinedTopology: RuleTopology[L2],
                                    val refinements: GrammarRefinements[L, L2],
                                    labelFeaturizer: RefinedFeaturizer[L, W, Feature],
-                                   surfaceFeaturizer: Word2VecSurfaceFeaturizer[W],
-                                   layer: AffineTransformDense[DenseVector[Double]]#Layer,
-                                   penultimateLayer: epic.dense.Transform.Layer[DenseVector[Double],DenseVector[Double]]) extends Grammar[L, W] with Serializable {
+                                   surfaceFeaturizer: Word2VecSurfaceFeaturizerIndexed[W],
+                                   layer: AffineTransformDense[Array[Int]]#Layer,
+                                   penultimateLayer: epic.dense.Transform.Layer[Array[Int],DenseVector[Double]]) extends Grammar[L, W] with Serializable {
 
     override def withPermissiveLexicon: Grammar[L, W] = {
       new PositionalTransformGrammar(topology, lexicon.morePermissive, refinedTopology, refinements, labelFeaturizer, surfaceFeaturizer, layer, penultimateLayer)
