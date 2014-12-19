@@ -7,19 +7,19 @@ import epic.framework.Feature
 
 import scala.runtime.ScalaRunTime
 
+/**
+ * Used at the input layer to cache lookups and 
+ */
+case class CachingLookupAndAffineTransformDense[FV](numOutputs: Int,
+                                                    numInputs: Int,
+                                                    innerTransform: Transform[FV, DenseVector[Double]],
+                                                    
+                                                    includeBias: Boolean = true) extends Transform[FV, DenseVector[Double]] {
 
-case class AffineTransform[FV, Mid](numOutputs: Int, numInputs: Int, innerTransform: Transform[FV, Mid], includeBias: Boolean = true)
-                              (implicit mult: OpMulMatrix.Impl2[DenseMatrix[Double], Mid, DenseVector[Double]],
-                               canaxpy: scaleAdd.InPlaceImpl3[DenseVector[Double], Double, Mid]) extends Transform[FV, DenseVector[Double]] {
 
-
-  val index = SegmentedIndex(new AffineTransform.Index(numOutputs, numInputs, includeBias), innerTransform.index)
-
-  def extractLayer(weights: DenseVector[Double]) = {
-    extractLayerAndPenultimateLayer(weights)._1
-  }
+  val index = SegmentedIndex(new AffineTransformDense.Index(numOutputs, numInputs, includeBias), innerTransform.index)
   
-  def extractLayerAndPenultimateLayer(weights: DenseVector[Double]) = {
+  def extractLayer(weights: DenseVector[Double]) = {
     val mat = weights(0 until (numOutputs * numInputs)).asDenseMatrix.reshape(numOutputs, numInputs, view = View.Require)
     val bias = if(includeBias) {
       weights(numOutputs * numInputs until index.componentOffset(1))
@@ -27,15 +27,14 @@ case class AffineTransform[FV, Mid](numOutputs: Int, numInputs: Int, innerTransf
       DenseVector.zeros[Double](numOutputs)
     }
     val inner = innerTransform.extractLayer(weights(index.componentOffset(1) to -1))
-    new Layer(mat, bias, inner) -> inner
+    new Layer(mat, bias, inner)
   }
 
   case class Layer(weights: DenseMatrix[Double], bias: DenseVector[Double], innerLayer: innerTransform.Layer) extends Transform.Layer[FV,DenseVector[Double]] {
-    override val index = AffineTransform.this.index
+    
+    override val index = CachingLookupAndAffineTransformDense.this.index
 
     val weightst = weights.t
-//    val weightst = weights.t.copy
-
 
     def activations(fv: FV) = {
       val out = weights * innerLayer.activations(fv) += bias
@@ -71,16 +70,11 @@ case class AffineTransform[FV, Mid](numOutputs: Int, numInputs: Int, innerTransf
 
       innerLayer.tallyDerivative(deriv(index.componentOffset(1) to -1), weightst * scale, fv)
     }
-
   }
-
 }
 
-object AffineTransform {
-  def typed[FV](numOutputs: Int, numInputs: Int, includeBias: Boolean)(implicit mult: OpMulMatrix.Impl2[DenseMatrix[Double], FV, DenseVector[Double]],
-                                                                    canAxpy: scaleAdd.InPlaceImpl3[DenseVector[Double], Double, FV]) = new AffineTransform(numOutputs, numInputs, new IdentityTransform[FV], includeBias)
-  def apply(numOutputs: Int, numInputs: Int, includeBias: Boolean):AffineTransform[DenseVector[Double], DenseVector[Double]] = apply(numOutputs, numInputs, new IdentityTransform[DenseVector[Double]], includeBias)
-  def apply(numOutputs: Int, numInputs: Int):AffineTransform[DenseVector[Double], DenseVector[Double]]  = apply(numOutputs, numInputs, true)
+object CachingLookupAndAffineTransformDense {
+  
   case class Index(numOutputs: Int, numInputs: Int, includeBias: Boolean = true) extends breeze.util.Index[Feature] {
     def apply(t: Feature): Int = t match {
       case NeuralFeature(output, input) if output < numOutputs && input < numInputs && output > 0 && input > 0 =>

@@ -15,11 +15,14 @@ trait Transform[In, +Out] {
 
   def extractLayer(dv: DenseVector[Double]):Layer
 
-  type Layer <: _Layer
+  type Layer <: Transform.Layer[In,Out]
+}
 
-  trait _Layer {
+object Transform {
+  
+  trait Layer[In, +Out] {
 
-    def index = Transform.this.index
+    def index: Index[Feature];
 
     def activations(fv: In):Out
 

@@ -19,6 +19,9 @@ import epic.util.{LRUCache, NotProvided, Optional}
 import epic.dense.TanhTransform
 import edu.berkeley.nlp.nn.Word2Vec
 import scala.collection.mutable.HashMap
+import epic.dense.Transform
+import epic.dense.AffineTransformDense
+import epic.dense.Word2VecSurfaceFeaturizer
 
 /**
  * TODO
@@ -32,9 +35,9 @@ class PositionalTransformModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSe
                                refinedTopology: RuleTopology[L2],
                                refinements: GrammarRefinements[L, L2],
                                labelFeaturizer: RefinedFeaturizer[L, W, Feature],
-                               surfaceFeaturizer: PositionalTransformModel.Word2VecSurfaceFeaturizer[W],
-                               val transform: Transform[DenseVector[Double], Vector[Double]]) extends ParserModel[L, W] {
-  override type Inference = PositionalTransformModel.Inference[L, L2, W, transform.type]
+                               surfaceFeaturizer: Word2VecSurfaceFeaturizer[W],
+                               val transform: AffineTransformDense[DenseVector[Double]]) extends ParserModel[L, W] {
+  override type Inference = PositionalTransformModel.Inference[L, L2, W]
 
 
   override def accumulateCounts(inf: Inference, s: Scorer, d: TreeInstance[L, W], m: Marginal, accum: ExpectedCounts, scale: Double): Unit = {
@@ -51,10 +54,9 @@ class PositionalTransformModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSe
   override def featureIndex: Index[Feature] = transform.index
 
   override def inferenceFromWeights(weights: DenseVector[Double]): Inference = {
-    val layer = transform.extractLayer(weights)
+    val (layer, innerLayer) = transform.extractLayerAndPenultimateLayer(weights)
 
-    val grammar = new PositionalTransformModel.PositionalTransformGrammar[L, L2, W, transform.type](topology, lexicon, refinedTopology, refinements, labelFeaturizer, surfaceFeaturizer, layer)
-//    val grammar = new PositionalTransformModel.PositionalTransformGrammar[L, L2, W, transform.type](topology, lexicon, refinedTopology, refinements, labelFeaturizer, layer)
+    val grammar = new PositionalTransformModel.PositionalTransformGrammar[L, L2, W](topology, lexicon, refinedTopology, refinements, labelFeaturizer, surfaceFeaturizer, layer, innerLayer)
     new Inference(annotator, constrainer, grammar, refinements)
   }
 
@@ -64,52 +66,10 @@ class PositionalTransformModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSe
 // TODO: Instantiate Word2VecExtractor or something that allows us to featurize splits
 
 object PositionalTransformModel {
-  
-  trait WordVectorAnchoring {
-    def featuresForSpan(start: Int, end: Int): DenseVector[Double];
-    def featuresForSplit(start: Int, split: Int, end: Int): DenseVector[Double];
-  }
-  
-  class Word2VecSurfaceFeaturizer[W](val word2vec: HashMap[W,Array[Double]],
-                                     val converter: W => W) {
-    
-    def wordRepSize = word2vec.head._2.size
-    def vectorSize: Int = 6 * wordRepSize
-    
-    val zeroVector = Array.tabulate(wordRepSize)(i => 0.0)
-//    val zeroVector = new DenseVector[Double](Array.tabulate(vectorSize)(i => 0.0))
-    
-    def assemble(vectors: Seq[Array[Double]]) = vectors.reduce(_ ++ _)
-    
-    def anchor(words: IndexedSeq[W]): WordVectorAnchoring = {
-      
-      val convertedWords = words.map(converter(_))
-      
-      new WordVectorAnchoring {
-        
-        private def fetchVector(idx: Int): Array[Double] = {
-          if (idx < 0 || idx >= words.size || !word2vec.contains(convertedWords(idx))) zeroVector else word2vec(convertedWords(idx))
-        }
-        
-        def featuresForSpan(start: Int, end: Int) = {
-          val vect = new DenseVector[Double](assemble(Seq(fetchVector(start - 1), fetchVector(start), zeroVector, zeroVector, fetchVector(end - 1), fetchVector(end))))
-//          println(vect.size + " " + vectorSize)
-          vect
-        }
-        
-        def featuresForSplit(start: Int, split: Int, end: Int) = {
-          val vect = new DenseVector[Double](assemble(Seq(fetchVector(start - 1), fetchVector(start), fetchVector(split - 1), fetchVector(split), fetchVector(end - 1), fetchVector(end))))
-//          println(vect.size + " " + vectorSize)
-          vect
-        }
-      }
-      
-    }
-  }
 
-  case class Inference[L, L2, W, T <: Transform[DenseVector[Double], Vector[Double]]](annotator: (BinarizedTree[L], IndexedSeq[W]) => BinarizedTree[IndexedSeq[L2]],
+  case class Inference[L, L2, W](annotator: (BinarizedTree[L], IndexedSeq[W]) => BinarizedTree[IndexedSeq[L2]],
                                                                                 constrainer: ChartConstraints.Factory[L, W],
-                                                                                grammar: PositionalTransformGrammar[L, L2, W, T],
+                                                                                grammar: PositionalTransformGrammar[L, L2, W],
                                                                                 refinements: GrammarRefinements[L, L2]) extends ParserInference[L, W]  {
     override def goldMarginal(scorer: Scorer, ti: TreeInstance[L, W], aug: UnrefinedGrammarAnchoring[L, W]): Marginal = {
 
@@ -123,17 +83,17 @@ object PositionalTransformModel {
   }
 
   @SerialVersionUID(4749637878577393596L)
-  class PositionalTransformGrammar[L, L2, W, T <: Transform[DenseVector[Double], Vector[Double]]](val topology: RuleTopology[L],
+  class PositionalTransformGrammar[L, L2, W](val topology: RuleTopology[L],
                                    val lexicon: Lexicon[L, W],
                                    val refinedTopology: RuleTopology[L2],
                                    val refinements: GrammarRefinements[L, L2],
                                    labelFeaturizer: RefinedFeaturizer[L, W, Feature],
                                    surfaceFeaturizer: Word2VecSurfaceFeaturizer[W],
-                                   layer: T#Layer) extends Grammar[L, W] with Serializable {
-
+                                   layer: AffineTransformDense[DenseVector[Double]]#Layer,
+                                   penultimateLayer: epic.dense.Transform.Layer[DenseVector[Double],DenseVector[Double]]) extends Grammar[L, W] with Serializable {
 
     override def withPermissiveLexicon: Grammar[L, W] = {
-      new PositionalTransformGrammar(topology, lexicon.morePermissive, refinedTopology, refinements, labelFeaturizer, surfaceFeaturizer, layer)
+      new PositionalTransformGrammar(topology, lexicon.morePermissive, refinedTopology, refinements, labelFeaturizer, surfaceFeaturizer, layer, penultimateLayer)
     }
 
 
@@ -147,66 +107,94 @@ object PositionalTransformModel {
       // only be one in the gold, but more in the prediction. Accumulate rule counts (output layer) until
       // we need this split point for a different set of indices or we come to the end. Then, backpropagate
       // the rule marginals through the network to get the derivative.
-      val UNUSED = (-1, -1)
-      val states = Array.fill(w.length + 2)(UNUSED) // 1 for each split,  length for unaries, length +1 for spans
-      val ruleCountsPerState = Array.fill(w.length + 2)(SparseVector.zeros[Double](labelFeaturizer.index.size))
-
-      def checkFlush(begin: Int, split: Int, end: Int) {
-        val state: (Int, Int) = (begin, end)
-        val oldState: (Int, Int) = states(split)
-        if(oldState != state) {
-          if(oldState != UNUSED) {
-            val ffeats = if(split >= length) sspec.featuresForSpan(oldState._1, oldState._2) else sspec.featuresForSplit(oldState._1, split, oldState._2)
-            layer.tallyDerivative(deriv, ruleCountsPerState(split) *= scale, ffeats)
-            ruleCountsPerState(split) := 0.0
-          }
-          states(split) = state
-        }
+//      val UNUSED = (-1, -1)
+//      val states = Array.fill(w.length + 2)(UNUSED) // 1 for each split,  length for unaries, length +1 for spans
+//      val ruleCountsPerState = Array.fill(w.length + 2)(SparseVector.zeros[Double](labelFeaturizer.index.size))
+//
+//      def checkFlush(begin: Int, split: Int, end: Int) {
+//        val state: (Int, Int) = (begin, end)
+//        val oldState: (Int, Int) = states(split)
+//        if(oldState != state) {
+//          if(oldState != UNUSED) {
+//            val ffeats = if(split >= length) sspec.featuresForSpan(oldState._1, oldState._2) else sspec.featuresForSplit(oldState._1, split, oldState._2)
+//            layer.tallyDerivative(deriv, ruleCountsPerState(split) *= scale, ffeats)
+//            ruleCountsPerState(split) := 0.0
+//          }
+//          states(split) = state
+//        }
+//      }
+//      
+//      m visit new AnchoredVisitor[L] {
+//        
+//        override def visitUnaryRule(begin: Int, end: Int, rule: Int, ref: Int, score: Double): Unit = {
+//          checkFlush(begin, length, end)
+//          axpy(score, new FeatureVector(lspec.featuresForUnaryRule(begin, end, rule, ref)), ruleCountsPerState(length))
+//        }
+//
+//        override def visitSpan(begin: Int, end: Int, tag: Int, ref: Int, score: Double): Unit = {
+//          checkFlush(begin, length + 1, end)
+//          axpy(score, new FeatureVector(lspec.featuresForSpan(begin, end, tag, ref)), ruleCountsPerState(length + 1))
+//
+//        }
+//
+//        override def visitBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int, score: Double): Unit = {
+//          checkFlush(begin, split, end)
+//          axpy(score, new FeatureVector(lspec.featuresForBinaryRule(begin, split, end, rule, ref)), ruleCountsPerState(split))
+//        }
+//      }
+//
+//      for(i <- 0 until states.length) {
+//        checkFlush(-1, i, -1) // force a flush
+//      }
+      
+      
+      val maxTetraLen = ((w.size + 2) * (w.size + 3) * (w.size + 4))/6 + ((w.size + 1) * (w.size + 2))/2 + w.size + 2
+      
+      def tetra(begin: Int, split: Int, end: Int) = {
+        (end * (end + 1) * (end + 2))/6 + ((split + 1) * split / 2 + begin)
       }
-
-//      var numVisits = 0
-//      var sentenceLen = 0;
+      
+      val ruleCountsPerState = Array.fill(maxTetraLen)(SparseVector.zeros[Double](labelFeaturizer.index.size))
+      val statesUsed = Array.fill(maxTetraLen)(false)
+      val untetra = Array.fill(maxTetraLen)((-1, -1, -1))
       
       m visit new AnchoredVisitor[L] {
         
         override def visitUnaryRule(begin: Int, end: Int, rule: Int, ref: Int, score: Double): Unit = {
-          checkFlush(begin, length, end)
-          axpy(score, new FeatureVector(lspec.featuresForUnaryRule(begin, end, rule, ref)), ruleCountsPerState(length))
-//          numVisits += 1
-//          sentenceLen = Math.max(sentenceLen, end)
-//          val ffeats = sspec.featuresForSpan(begin, end)
-//          layer.tallyDerivative(deriv, SparseVector(labelFeaturizer.index.size)(lspec.featuresForUnaryRule(begin, end, rule, ref).map(_ -> (scale * score)):_*), new FeatureVector(ffeats))
+          val tetraIdx = tetra(begin, end, length + 1)
+          statesUsed(tetraIdx) = true;
+          untetra(tetraIdx) = (begin, end, length + 1)
+          axpy(score, new FeatureVector(lspec.featuresForUnaryRule(begin, end, rule, ref)), ruleCountsPerState(tetraIdx))
         }
 
         override def visitSpan(begin: Int, end: Int, tag: Int, ref: Int, score: Double): Unit = {
-          checkFlush(begin, length + 1, end)
-          axpy(score, new FeatureVector(lspec.featuresForSpan(begin, end, tag, ref)), ruleCountsPerState(length + 1))
-//          numVisits += 1
-//          sentenceLen = Math.max(sentenceLen, end)
-//          val ffeats = sspec.featuresForSpan(begin, end)
-//          layer.tallyDerivative(deriv, SparseVector(labelFeaturizer.index.size)(lspec.featuresForSpan(begin, end, tag, ref).map(_ -> (scale * score)):_*), new FeatureVector(ffeats))
-
+          val tetraIdx = tetra(begin, end, length + 2)
+          statesUsed(tetraIdx) = true;
+          untetra(tetraIdx) = (begin, end, length + 2)
+          axpy(score, new FeatureVector(lspec.featuresForSpan(begin, end, tag, ref)), ruleCountsPerState(tetraIdx))
         }
 
         override def visitBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int, score: Double): Unit = {
-//          val ffeats = sspec.featuresForSplit(begin, split, end)
-//          layer.tallyDerivative(deriv, SparseVector(labelFeaturizer.index.size)(lspec.featuresForBinaryRule(begin, split, end, rule, ref).map(_ -> (scale * score)):_*), new FeatureVector(ffeats))
-          checkFlush(begin, split, end)
-          axpy(score, new FeatureVector(lspec.featuresForBinaryRule(begin, split, end, rule, ref)), ruleCountsPerState(split))
-//          numVisits += 1
-//          sentenceLen = Math.max(sentenceLen, end)
+          val tetraIdx = tetra(begin, split, end)
+          statesUsed(tetraIdx) = true;
+          untetra(tetraIdx) = (begin, split, end)
+          axpy(score, new FeatureVector(lspec.featuresForBinaryRule(begin, split, end, rule, ref)), ruleCountsPerState(tetraIdx))
         }
       }
-      
-//      println("Sentence len: " + sentenceLen + ", numVisits: " + numVisits)
 
-      for(i <- 0 until states.length) {
-        checkFlush(-1, i, -1) // force a flush
+      for (i <- 0 until ruleCountsPerState.length) {
+        if (statesUsed(i)) {
+          val (begin, split, end) = untetra(i)
+          val ffeats = if (end > length) sspec.featuresForSpan(begin, split) else sspec.featuresForSplit(begin, split, end)
+          layer.tallyDerivative(deriv, ruleCountsPerState(i) *= scale, ffeats)
+        }
       }
     }
 
     def anchor(w: IndexedSeq[W], cons: ChartConstraints[L]):GrammarAnchoring[L, W] = new ProjectionsGrammarAnchoring[L, L2, W] {
 
+//      var numScored = 0
+      
       override def addConstraints(constraints: ChartConstraints[L]): GrammarAnchoring[L, W] = {
         anchor(w, cons & constraints)
       }
@@ -221,53 +209,113 @@ object PositionalTransformModel {
 
       def words = w
 
-      val cache = new LRUCache[Long, Vector[Double]](2 * length)
+//      val cache = new LRUCache[Long, Vector[Double]](2 * length)
+//      val sspec = surfaceFeaturizer.anchor(w)
+//      val lspec = labelFeaturizer.anchor(w)
+//
+//      private def tetra(begin: Int, split: Int, end: Int) = {
+//        (end.toLong * (end + 1) * (end + 2))/6 + ((split + 1) * split / 2 + begin)
+//      }
+//
+//      def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int) = {
+//        val fs = cache.getOrElseUpdate(tetra(begin, split, end), {
+//          val sfeats = sspec.featuresForSplit(begin, split, end)
+//          layer.activations(sfeats)
+//        })
+//        val rfeats = lspec.featuresForBinaryRule(begin, split, end, rule, ref)
+//        new FeatureVector(rfeats) dot fs
+//      }
+//
+//      def scoreUnaryRule(begin: Int, end: Int, rule: Int, ref: Int) = {
+//        val fs = cache.getOrElseUpdate(tetra(begin, end, length + 1), {
+//          val sfeats = sspec.featuresForSpan(begin, end)
+//          layer.activations(sfeats)
+//        })
+//        val rfeats = lspec.featuresForUnaryRule(begin, end, rule, ref)
+//        new FeatureVector(rfeats) dot fs
+//      }
+//
+//      def scoreSpan(begin: Int, end: Int, tag: Int, ref: Int) = {
+//        val fs = cache.getOrElseUpdate(tetra(begin, end, length + 1), {
+//        val sfeats = sspec.featuresForSpan(begin, end)
+//          layer.activations(sfeats)
+//        })
+//        val rfeats = lspec.featuresForSpan(begin, end, tag, ref)
+//        new FeatureVector(rfeats) dot fs
+//      }
+      
+//      val cache = new LRUCache[Long, DenseVector[Double]](2 * length)
+      val maxTetraLen = ((w.size + 2) * (w.size + 3) * (w.size + 4))/6 + ((w.size + 1) * (w.size + 2))/2 + w.size + 2
+      val cache = new Array[DenseVector[Double]](maxTetraLen)
+      val finalCache = new Array[SparseVector[Double]](maxTetraLen)
+      
+      def getOrElseUpdate(tetraIdx: Int, fun: => DenseVector[Double]) = {
+        if (cache(tetraIdx) == null) cache(tetraIdx) = fun
+        cache(tetraIdx)
+      }
+      
+      def getOrElseUpdateFinal(tetraIdx: Int, rfeatIdx: Int, maxVectSize: Int, fun: => Double) = {
+        if (finalCache(tetraIdx) == null) finalCache(tetraIdx) = SparseVector.zeros(maxVectSize)
+        if (!finalCache(tetraIdx).contains(rfeatIdx)) finalCache(tetraIdx)(rfeatIdx) = fun
+        finalCache(tetraIdx)(rfeatIdx)
+      }
+      
       val sspec = surfaceFeaturizer.anchor(w)
       val lspec = labelFeaturizer.anchor(w)
 
       private def tetra(begin: Int, split: Int, end: Int) = {
-        (end.toLong * (end + 1) * (end + 2))/6 + ((split + 1) * split / 2 + begin)
-//        (begin, split, end)
+        (end * (end + 1) * (end + 2))/6 + ((split + 1) * split / 2 + begin)
       }
 
       def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int) = {
-        val fs = cache.getOrElseUpdate(tetra(begin, split, end), {
+        val tetraIdx = tetra(begin, split, end)
+        val fs = getOrElseUpdate(tetraIdx, {
           val sfeats = sspec.featuresForSplit(begin, split, end)
-          layer.activations(sfeats)
+          penultimateLayer.activations(sfeats)
         })
-//        if(fs !=  layer.activations(new FeatureVector( sspec.featuresForSplit(begin, split, end)))) {
-//          println("!!!!")
-//        }
         val rfeats = lspec.featuresForBinaryRule(begin, split, end, rule, ref)
-        new FeatureVector(rfeats) dot fs
+//        layer.activationsFromPenultimateDot(fs, rfeats)
+        var total = 0.0;
+        for (rfeat <- rfeats) {
+          total += getOrElseUpdateFinal(tetraIdx, rfeat, labelFeaturizer.index.size, {
+            layer.activationsFromPenultimateDot(fs, Array(rfeat))
+          })
+        }
+        total
       }
 
       def scoreUnaryRule(begin: Int, end: Int, rule: Int, ref: Int) = {
-        val fs = cache.getOrElseUpdate(tetra(begin, end, length + 1), {
+        val tetraIdx = tetra(begin, end, length + 1)
+        val fs = getOrElseUpdate(tetraIdx, {
           val sfeats = sspec.featuresForSpan(begin, end)
-          layer.activations(sfeats)
+          penultimateLayer.activations(sfeats)
         })
         val rfeats = lspec.featuresForUnaryRule(begin, end, rule, ref)
-
-//        println("One example UFEATS: " + rfeats.size)
-//        for (rfeat <- rfeats) {
-//          println("UFEAT: " + labelFeaturizer.index.unapply(rfeats(0)))
-//        }
-        new FeatureVector(rfeats) dot fs
+//        layer.activationsFromPenultimateDot(fs, rfeats)
+        var total = 0.0;
+        for (rfeat <- rfeats) {
+          total += getOrElseUpdateFinal(tetraIdx, rfeat, labelFeaturizer.index.size, {
+            layer.activationsFromPenultimateDot(fs, Array(rfeat))
+          })
+        }
+        total
       }
 
       def scoreSpan(begin: Int, end: Int, tag: Int, ref: Int) = {
-        val fs = cache.getOrElseUpdate(tetra(begin, end, length + 1), {
+        val tetraIdx = tetra(begin, end, length + 2)
+        val fs = getOrElseUpdate(tetraIdx, {
         val sfeats = sspec.featuresForSpan(begin, end)
-          layer.activations(sfeats)
+          penultimateLayer.activations(sfeats)
         })
         val rfeats = lspec.featuresForSpan(begin, end, tag, ref)
-
-//        println("One example SFEATS: " + rfeats.size)
-//        for (rfeat <- rfeats) {
-//          println("SFEAT: " + labelFeaturizer.index.unapply(rfeats(0)))
-//        }
-        new FeatureVector(rfeats) dot fs
+//        layer.activationsFromPenultimateDot(fs, rfeats)
+        var total = 0.0;
+        for (rfeat <- rfeats) {
+          total += getOrElseUpdateFinal(tetraIdx, rfeat, labelFeaturizer.index.size, {
+            layer.activationsFromPenultimateDot(fs, Array(rfeat))
+          })
+        }
+        total
       }
 
     }

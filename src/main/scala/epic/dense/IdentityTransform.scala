@@ -14,7 +14,11 @@ class IdentityTransform[T] extends Transform[T, T] {
     new Layer()
   }
 
-  class Layer extends _Layer {
+  class Layer extends Transform.Layer[T,T] {
+    
+    val myIndex = Index[Feature]
+    
+    def index = myIndex;
 
     def activations(fv: T) = fv
 

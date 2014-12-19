@@ -17,8 +17,10 @@ import epic.trees._
 import epic.trees.annotations.TreeAnnotator
 import epic.util.{LRUCache, NotProvided, Optional}
 import epic.dense.TanhTransform
+import epic.dense.AffineTransformDense
 import edu.berkeley.nlp.nn.Word2Vec
 import scala.collection.mutable.HashMap
+import epic.dense.Word2VecSurfaceFeaturizer
 
 /**
  * TODO
@@ -81,7 +83,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     // Convert Array[Float] values to DenseVector[Double] values
     val word2vecDenseVect = word2vec.map(keyValue => (keyValue._1 -> keyValue._2.map(_.toDouble)))
 //    val word2vecDenseVect = word2vec.map(keyValue => (keyValue._1 -> new DenseVector[Double](keyValue._2.map(_.toDouble))))
-    val surfaceFeaturizer = new PositionalTransformModel.Word2VecSurfaceFeaturizer(word2vecDenseVect, (str: String) => Word2Vec.convertWord(str))
+    val surfaceFeaturizer = new Word2VecSurfaceFeaturizer(word2vecDenseVect, (str: String) => Word2Vec.convertWord(str))
     
 
 //    val baselineAffineTransform = new AffineTransform(featurizer.index.size, indexedSurface.featureIndex.size, new IdentityTransform[FeatureVector]())
@@ -89,9 +91,9 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     
     val transform = if (useNonlinearity) {
       // Affine transform of word embeddings, tanh, affine transform to output layer
-      new AffineTransform(featurizer.index.size, numHidden, new TanhTransform(new AffineTransform(numHidden, surfaceFeaturizer.vectorSize, new IdentityTransform[DenseVector[Double]]())))
+      new AffineTransformDense(featurizer.index.size, numHidden, new TanhTransform(new AffineTransformDense(numHidden, surfaceFeaturizer.vectorSize, new IdentityTransform[DenseVector[Double]]())))
     } else {
-      new AffineTransform(featurizer.index.size, surfaceFeaturizer.vectorSize, new IdentityTransform[DenseVector[Double]]())
+      new AffineTransformDense(featurizer.index.size, surfaceFeaturizer.vectorSize, new IdentityTransform[DenseVector[Double]]())
     }
     println(surfaceFeaturizer.vectorSize + " x " + numHidden + " x " + featurizer.index.size + " neural net")
     

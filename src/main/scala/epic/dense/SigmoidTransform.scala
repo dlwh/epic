@@ -5,6 +5,7 @@ import breeze.linalg._
 import breeze.linalg.operators.OpMulMatrix
 import breeze.numerics._
 import breeze.linalg.support.{CanMapValues}
+import breeze.util.Index
 
 /**
  *
@@ -25,8 +26,12 @@ case class SigmoidTransform[FV](inner: Transform[FV, DenseVector[Double]]) exten
 
   def extractLayer(dv: DenseVector[Double]) = new Layer(inner.extractLayer(dv))
 
-  case class Layer(innerLayer: inner.Layer) extends _Layer {
+  case class Layer(innerLayer: inner.Layer) extends Transform.Layer[FV,DenseVector[Double]] {
 
+    val myIndex = Index[Feature]
+    
+    def index = myIndex;
+    
     def activations(fv: FV): DenseVector[Double] = sigmoid(innerLayer.activations(fv))
 
     def tallyDerivative(deriv: DenseVector[Double], _scale: =>Vector[Double], fv: FV) = {

@@ -3,6 +3,8 @@ package epic.dense
 import breeze.linalg._
 import breeze.linalg.operators.OpMulMatrix
 import breeze.numerics._
+import epic.framework.Feature
+import breeze.util.Index
 
 
 case class TanhTransform[FV](inner: Transform[FV, DenseVector[Double]]) extends Transform[FV, DenseVector[Double]] {
@@ -16,7 +18,11 @@ case class TanhTransform[FV](inner: Transform[FV, DenseVector[Double]]) extends 
 
   def extractLayer(dv: DenseVector[Double]) = new Layer(inner.extractLayer(dv))
 
-  case class Layer(innerLayer: inner.Layer) extends _Layer {
+  case class Layer(innerLayer: inner.Layer) extends Transform.Layer[FV,DenseVector[Double]] {
+    
+    val myIndex = Index[Feature]
+    
+    def index = myIndex;
 
     def activations(fv: FV): DenseVector[Double] = {
       val act = innerLayer.activations(fv) * 2.0

@@ -7,13 +7,16 @@ import epic.framework.Feature
 
 import scala.runtime.ScalaRunTime
 
+/**
+ * Used at the output layer when we're only going to need some of the possible ouputs;
+ * it exposes the penultimate layer and then the Layer allows you to pass the results
+ * from that back in (caching it elsewhere) and only compute certain cells in the
+ * output layer (activationsFromPenultimateDot). 
+ */
+case class AffineTransformDense[FV](numOutputs: Int, numInputs: Int, innerTransform: Transform[FV, DenseVector[Double]], includeBias: Boolean = true) extends Transform[FV, DenseVector[Double]] {
 
-case class AffineTransform[FV, Mid](numOutputs: Int, numInputs: Int, innerTransform: Transform[FV, Mid], includeBias: Boolean = true)
-                              (implicit mult: OpMulMatrix.Impl2[DenseMatrix[Double], Mid, DenseVector[Double]],
-                               canaxpy: scaleAdd.InPlaceImpl3[DenseVector[Double], Double, Mid]) extends Transform[FV, DenseVector[Double]] {
 
-
-  val index = SegmentedIndex(new AffineTransform.Index(numOutputs, numInputs, includeBias), innerTransform.index)
+  val index = SegmentedIndex(new AffineTransformDense.Index(numOutputs, numInputs, includeBias), innerTransform.index)
 
   def extractLayer(weights: DenseVector[Double]) = {
     extractLayerAndPenultimateLayer(weights)._1
@@ -31,7 +34,7 @@ case class AffineTransform[FV, Mid](numOutputs: Int, numInputs: Int, innerTransf
   }
 
   case class Layer(weights: DenseMatrix[Double], bias: DenseVector[Double], innerLayer: innerTransform.Layer) extends Transform.Layer[FV,DenseVector[Double]] {
-    override val index = AffineTransform.this.index
+    override val index = AffineTransformDense.this.index
 
     val weightst = weights.t
 //    val weightst = weights.t.copy
@@ -40,6 +43,14 @@ case class AffineTransform[FV, Mid](numOutputs: Int, numInputs: Int, innerTransf
     def activations(fv: FV) = {
       val out = weights * innerLayer.activations(fv) += bias
       out
+    }
+    
+    def activationsFromPenultimateDot(innerLayerActivations: DenseVector[Double], sparseFeatures: Array[Int]) = {
+      var value = 0.0;
+      for (sparseFeature <- sparseFeatures) {
+        value += (weights(sparseFeature, ::) * innerLayerActivations + bias(sparseFeature))
+      }
+      value
     }
 
     def tallyDerivative(deriv: DenseVector[Double], _scale: =>Vector[Double], fv: FV) = {
@@ -76,11 +87,11 @@ case class AffineTransform[FV, Mid](numOutputs: Int, numInputs: Int, innerTransf
 
 }
 
-object AffineTransform {
-  def typed[FV](numOutputs: Int, numInputs: Int, includeBias: Boolean)(implicit mult: OpMulMatrix.Impl2[DenseMatrix[Double], FV, DenseVector[Double]],
-                                                                    canAxpy: scaleAdd.InPlaceImpl3[DenseVector[Double], Double, FV]) = new AffineTransform(numOutputs, numInputs, new IdentityTransform[FV], includeBias)
-  def apply(numOutputs: Int, numInputs: Int, includeBias: Boolean):AffineTransform[DenseVector[Double], DenseVector[Double]] = apply(numOutputs, numInputs, new IdentityTransform[DenseVector[Double]], includeBias)
-  def apply(numOutputs: Int, numInputs: Int):AffineTransform[DenseVector[Double], DenseVector[Double]]  = apply(numOutputs, numInputs, true)
+object AffineTransformDense {
+//  def typed[FV](numOutputs: Int, numInputs: Int, includeBias: Boolean)(implicit mult: OpMulMatrix.Impl2[DenseMatrix[Double], FV, DenseVector[Double]],
+//                                                                    canAxpy: scaleAdd.InPlaceImpl3[DenseVector[Double], Double, FV]) = new AffineTransformDense(numOutputs, numInputs, new IdentityTransform[FV], includeBias)
+  def apply(numOutputs: Int, numInputs: Int, includeBias: Boolean):AffineTransformDense[DenseVector[Double]] = apply(numOutputs, numInputs, new IdentityTransform[DenseVector[Double]], includeBias)
+  def apply(numOutputs: Int, numInputs: Int):AffineTransformDense[DenseVector[Double]]  = apply(numOutputs, numInputs, true)
   case class Index(numOutputs: Int, numInputs: Int, includeBias: Boolean = true) extends breeze.util.Index[Feature] {
     def apply(t: Feature): Int = t match {
       case NeuralFeature(output, input) if output < numOutputs && input < numInputs && output > 0 && input > 0 =>
