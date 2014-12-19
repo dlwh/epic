@@ -21,6 +21,8 @@ import epic.dense.AffineTransformDense
 import edu.berkeley.nlp.nn.Word2Vec
 import scala.collection.mutable.HashMap
 import epic.dense.Word2VecSurfaceFeaturizer
+import epic.dense.Word2VecSurfaceFeaturizerIndexed
+import epic.dense.CachingLookupAndAffineTransformDense
 
 /**
  * TODO
@@ -81,13 +83,9 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
       
     val word2vec = Word2Vec.loadVectorsForVocabulary(word2vecPath, summedWordCounts.keySet.toSet[String].map(str => Word2Vec.convertWord(str)), true)
     // Convert Array[Float] values to DenseVector[Double] values
-    val word2vecDenseVect = word2vec.map(keyValue => (keyValue._1 -> keyValue._2.map(_.toDouble)))
-//    val word2vecDenseVect = word2vec.map(keyValue => (keyValue._1 -> new DenseVector[Double](keyValue._2.map(_.toDouble))))
-    val surfaceFeaturizer = new Word2VecSurfaceFeaturizer(word2vecDenseVect, (str: String) => Word2Vec.convertWord(str))
-    
-
-//    val baselineAffineTransform = new AffineTransform(featurizer.index.size, indexedSurface.featureIndex.size, new IdentityTransform[FeatureVector]())
-//    val lowRankAffineTransform = new AffineTransform(featurizer.index.size, rank, new AffineTransform(rank, indexedSurface.featureIndex.size, new IdentityTransform[FeatureVector]()))
+    val word2vecDoubleVect = word2vec.map(keyValue => (keyValue._1 -> keyValue._2.map(_.toDouble)))
+//    val word2vecDoubleVect = word2vec.map(keyValue => (keyValue._1 -> new DenseVector[Double](keyValue._2.map(_.toDouble))))
+    val surfaceFeaturizer = new Word2VecSurfaceFeaturizer(word2vecDoubleVect, (str: String) => Word2Vec.convertWord(str))
     
     val transform = if (useNonlinearity) {
       // Affine transform of word embeddings, tanh, affine transform to output layer
@@ -95,6 +93,10 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     } else {
       new AffineTransformDense(featurizer.index.size, surfaceFeaturizer.vectorSize, new IdentityTransform[DenseVector[Double]]())
     }
+    
+//    val indexedSurfaceFeaturizer = Word2VecSurfaceFeaturizerIndexed(word2vecDoubleVect, (str: String) => Word2Vec.convertWord(str))
+//    val transform = new AffineTransformDense(featurizer.index.size, numHidden, new TanhTransform(new CachingLookupAndAffineTransformDense(numHidden, surfaceFeaturizer.vectorSize, indexedSurfaceFeaturizer)))
+    
     println(surfaceFeaturizer.vectorSize + " x " + numHidden + " x " + featurizer.index.size + " neural net")
     
     new PositionalTransformModel(annotator.latent,

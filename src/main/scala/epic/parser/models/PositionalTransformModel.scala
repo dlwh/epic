@@ -63,8 +63,6 @@ class PositionalTransformModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSe
   override def initialValueForFeature(f: Feature): Double = 0.0
 }
 
-// TODO: Instantiate Word2VecExtractor or something that allows us to featurize splits
-
 object PositionalTransformModel {
 
   case class Inference[L, L2, W](annotator: (BinarizedTree[L], IndexedSeq[W]) => BinarizedTree[IndexedSeq[L2]],

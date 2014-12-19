@@ -1,58 +1,65 @@
 package epic.dense
 
+import scala.runtime.ScalaRunTime
 import breeze.linalg._
-import breeze.linalg.operators.OpMulMatrix
 import epic.features.SegmentedIndex
 import epic.framework.Feature
-
-import scala.runtime.ScalaRunTime
+import scala.collection.mutable.HashMap
 
 /**
  * Used at the input layer to cache lookups and 
  */
 case class CachingLookupAndAffineTransformDense[FV](numOutputs: Int,
                                                     numInputs: Int,
-                                                    innerTransform: Transform[FV, DenseVector[Double]],
-                                                    
-                                                    includeBias: Boolean = true) extends Transform[FV, DenseVector[Double]] {
+                                                    word2vecFeaturizer: Word2VecSurfaceFeaturizerIndexed[String],
+                                                    includeBias: Boolean = true) extends Transform[Array[Int], DenseVector[Double]] {
 
 
-  val index = SegmentedIndex(new AffineTransformDense.Index(numOutputs, numInputs, includeBias), innerTransform.index)
+  val index = new CachingLookupAndAffineTransformDense.Index(numOutputs, numInputs, includeBias)
   
   def extractLayer(weights: DenseVector[Double]) = {
     val mat = weights(0 until (numOutputs * numInputs)).asDenseMatrix.reshape(numOutputs, numInputs, view = View.Require)
     val bias = if(includeBias) {
-      weights(numOutputs * numInputs until index.componentOffset(1))
+      weights(numOutputs * numInputs until index.size)
     } else {
       DenseVector.zeros[Double](numOutputs)
     }
-    val inner = innerTransform.extractLayer(weights(index.componentOffset(1) to -1))
-    new Layer(mat, bias, inner)
+    new Layer(mat, bias)
   }
 
-  case class Layer(weights: DenseMatrix[Double], bias: DenseVector[Double], innerLayer: innerTransform.Layer) extends Transform.Layer[FV,DenseVector[Double]] {
+  case class Layer(weights: DenseMatrix[Double], bias: DenseVector[Double]) extends Transform.Layer[Array[Int],DenseVector[Double]] {
     
     override val index = CachingLookupAndAffineTransformDense.this.index
-
+    
     val weightst = weights.t
 
-    def activations(fv: FV) = {
-      val out = weights * innerLayer.activations(fv) += bias
-      out
+    val cache = new HashMap[(Int,Int),DenseVector[Double]]
+
+    def activations(fv: Array[Int]) = {
+      val finalVector = DenseVector.zeros[Double](numOutputs)
+      for (i <- 0 until fv.size) {
+        val wordPosn = fv(i) -> i
+        if (!cache.contains(wordPosn)) {
+          cache.put(wordPosn, weights(i to i+numOutputs, ::) * DenseVector(word2vecFeaturizer.word2vec(wordPosn._1)))
+        }
+        finalVector += cache(wordPosn)
+      }
+      finalVector + bias
     }
 
-    def tallyDerivative(deriv: DenseVector[Double], _scale: =>Vector[Double], fv: FV) = {
+    def tallyDerivative(deriv: DenseVector[Double], _scale: =>Vector[Double], fv: Array[Int]) = {
       val scale = _scale
       val matDeriv = deriv(0 until (numOutputs * numInputs)).asDenseMatrix.reshape(numOutputs, numInputs, view = View.Require)
       val biasDeriv = if(includeBias) {
-        deriv(numOutputs * numInputs until index.componentOffset(1))
+        deriv(numOutputs * numInputs until index.size)
       } else {
         DenseVector.zeros[Double](numOutputs)
       }
 
       // whole function is f(mat * inner(fv) + bias)
       // scale(i) pushes in  (f'(mat * inner(v) + bias))(i)
-      val innerAct = innerLayer.activations(fv)
+      val innerAct = DenseVector(word2vecFeaturizer.convertToVector(fv));
+      
       // d/d(weights(::, i)) == scale(i) * innerAct
       for (i <- 0 until weights.rows) {
         val a: Double = scale(i)
@@ -67,8 +74,6 @@ case class CachingLookupAndAffineTransformDense[FV](numOutputs: Int,
 
       // scale is f'(mat * inner(v) + bias)
       // d/dv is mat.t * f'(mat * inner(v) + bias)
-
-      innerLayer.tallyDerivative(deriv(index.componentOffset(1) to -1), weightst * scale, fv)
     }
   }
 }
