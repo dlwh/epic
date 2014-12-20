@@ -82,7 +82,7 @@ val parser = epic.models.deserialize[Parser[AnnotataedLabel, String]](path)
 
 // or:
 
-val parser = epic.models.ParserSelector.loadParser("en") // or another 2 letter code.
+val parser = epic.models.ParserSelector.loadParser("en").get // or another 2 letter code.
 
 val tree = parser(sentence)
 
@@ -115,15 +115,15 @@ println(tags.render)
 Using a named entity recognizer is similar to using a pos tagger: load a model, tokenize some text, run the recognizer. All NER systems are (currently) [linear chain semi-Markov conditional random fields](http://people.cs.umass.edu/~mccallum/papers/crf-tutorial.pdf), or SemiCRFs. (You don't need to understand them to use them. They are just a machine learning method for segmenting text into fields.
 
 ```scala
-val tagger = epic.models.deserialize[SemiCRF[AnnotatedLabel, String]](path)
+val ner = epic.models.deserialize[SemiCRF[AnnotatedLabel, String]](path)
 
 // or:
 
-val tagger = epic.models.NerSelector.loadNer("en").get// or another 2 letter code.
+val ner = epic.models.NerSelector.loadNer("en").get// or another 2 letter code.
 
-val segments = tagger(sentence)
+val segments = ner.bestSequence(sentence)
 
-println(tags.render(tagger.outsideLabel))
+println(segments.render)
 
 ```
 
