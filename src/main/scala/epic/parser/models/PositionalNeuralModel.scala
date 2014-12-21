@@ -41,6 +41,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
                             commonWordThreshold: Int = 100,
                             ngramCountThreshold: Int = 5,
                             useGrammar: Boolean = false,
+                            useSparseFeatures: Boolean = false,
                             numHidden: Int = 100,
                             posFeaturizer: Optional[WordFeaturizer[String]] = NotProvided,
                             spanFeaturizer: Optional[SplitSpanFeaturizer[String]] = NotProvided,
@@ -68,10 +69,6 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     val indexedRefinements = GrammarRefinements(xbarGrammar, refGrammar, (_: AnnotatedLabel).baseAnnotatedLabel)
 
     val summedWordCounts: Counter[String, Double] = sum(annWords, Axis._0)
-//    var wf = posFeaturizer.getOrElse( SpanModelFactory.defaultPOSFeaturizer(annWords))
-//    var span: SplitSpanFeaturizer[String] = spanFeaturizer.getOrElse(SpanModelFactory.goodFeaturizer(annWords, commonWordThreshold, useShape = false))
-//    span += new SingleWordSpanFeaturizer[String](wf)
-//    val indexedSurface = IndexedSplitSpanFeaturizer.fromData(span, annTrees, bloomFilter = false)
 
     def labelFeaturizer(l: AnnotatedLabel) = Set(l, l.baseAnnotatedLabel).toSeq
     def ruleFeaturizer(r: Rule[AnnotatedLabel]) = if(useGrammar) Set(r, r.map(_.baseAnnotatedLabel)).toSeq else if(r.isInstanceOf[UnaryRule[AnnotatedLabel]]) Set(r.parent, r.parent.baseAnnotatedLabel).toSeq else Seq.empty
@@ -99,6 +96,28 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     
     println(surfaceFeaturizer.vectorSize + " x " + numHidden + " x " + featurizer.index.size + " neural net")
     
+    val maybeSparseFeaturizer = if (useSparseFeatures) {
+      var wf = posFeaturizer.getOrElse( SpanModelFactory.defaultPOSFeaturizer(annWords))
+      var span: SplitSpanFeaturizer[String] = spanFeaturizer.getOrElse(SpanModelFactory.goodFeaturizer(annWords, commonWordThreshold, useShape = false))
+      span += new SingleWordSpanFeaturizer[String](wf)
+      val indexedWord = IndexedWordFeaturizer.fromData(wf, annTrees.map{_.words}, deduplicateFeatures = false)
+      val indexedSurface = IndexedSplitSpanFeaturizer.fromData(span, annTrees, bloomFilter = false)
+      val indexed = IndexedSpanFeaturizer.extract[AnnotatedLabel, AnnotatedLabel, String](indexedWord,
+        indexedSurface,
+        featurizer,
+        new ZeroRuleAndSpansFeaturizer(),
+        annotator.latent,
+        indexedRefinements,
+        xbarGrammar,
+        if(dummyFeats < 0) HashFeature.Absolute(-dummyFeats.toInt) else HashFeature.Relative(dummyFeats),
+        filterUnseenFeatures = false,
+        minFeatCount = 1,
+        trainTrees)
+      Option(indexed)
+    } else {
+      None
+    }
+    
     new PositionalTransformModel(annotator.latent,
       constrainer,
       topology, lexicon,
@@ -106,7 +125,8 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
       indexedRefinements,
       featurizer,
       surfaceFeaturizer,
-      transform
+      transform,
+      maybeSparseFeaturizer
       )
   }
 

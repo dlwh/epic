@@ -125,10 +125,16 @@ object ParserTrainer extends epic.parser.ParserPipeline with LazyLogging {
     val model = modelFactory.make(theTrees, initialParser.topology, initialParser.lexicon, constraints)
     val obj = new ModelObjective(model, theTrees, params.threads)
     val cachedObj = new CachedBatchDiffFunction(obj)
-    val init = obj.initialWeightVector(randomize, initWeightsScale)
+    val init = if (model.isInstanceOf[PositionalTransformModel[AnnotatedLabel, AnnotatedLabel, String]]) {
+      println("Initializing weights custom for model " + model.getClass)
+      model.asInstanceOf[PositionalTransformModel[AnnotatedLabel, AnnotatedLabel, String]].initialWeightVector(randomize, initWeightsScale)
+    } else {
+      obj.initialWeightVector(randomize, initWeightsScale)
+    }
     if(checkGradient) {
       val cachedObj2 = new CachedBatchDiffFunction(new ModelObjective(model, theTrees.take(opt.batchSize), params.threads))
       val indices = (0 until 10).map(i => if(i < 0) model.featureIndex.size + i else i)
+//      val indices = (0 until 10).map(i => 283316 + i)
       println("testIndices")
       GradientTester.testIndices(cachedObj2, obj.initialWeightVector(randomize = true), indices, toString={(i: Int) => model.featureIndex.get(i).toString}, skipZeros = true)
       println("test")
