@@ -18,7 +18,7 @@ libraryDependencies ++= Seq(
   "org.scalatest" %% "scalatest" % "2.1.3" % "test",
   "org.scalacheck" %% "scalacheck" % "1.11.3" % "test",
   // "com.chuusai" % "shapeless_2.10.4" % "2.0.0",
-  "com.chuusai" %% "shapeless" % "2.0.0",
+  "com.chuusai" %% "shapeless" % "2.0.0" cross CrossVersion.full,
   "org.scalaz" %% "scalaz-core" % "7.1.0"
 )
 
