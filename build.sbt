@@ -14,11 +14,19 @@ resolvers ++= Seq(
   "Sonatype Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots/"
 )
 
+val shapeless = Def setting (
+    CrossVersion partialVersion scalaVersion.value match {
+    case Some((2, scalaMajor)) if scalaMajor >= 11 => 
+      "com.chuusai" %% "shapeless" % "2.0.0"
+    case Some((2, 10)) => 
+      "com.chuusai" %  "shapeless" % "2.0.0" cross CrossVersion.full
+  }
+)
+
 libraryDependencies ++= Seq(
   "org.scalatest" %% "scalatest" % "2.1.3" % "test",
   "org.scalacheck" %% "scalacheck" % "1.11.3" % "test",
-  // "com.chuusai" % "shapeless_2.10.4" % "2.0.0",
-  "com.chuusai" %% "shapeless" % "2.0.0" cross CrossVersion.full,
+  shapeless.value,
   "org.scalaz" %% "scalaz-core" % "7.1.0"
 )
 
