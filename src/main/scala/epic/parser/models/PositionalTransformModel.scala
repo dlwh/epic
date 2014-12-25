@@ -62,7 +62,7 @@ class PositionalTransformModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSe
     transform.index
   }
   
-  def initialWeightVector(randomize: Boolean, initWeightsScale: Double): DenseVector[Double] = {
+  def initialWeightVector(randomize: Boolean, randomizeGaussian: Boolean, initWeightsScale: Double): DenseVector[Double] = {
     val transformIndex = if (maybeSparseSurfaceFeaturizer.isDefined) {
       index.asInstanceOf[SegmentedIndex[Feature,Index[Feature]]].indices(0)
     } else {
@@ -73,7 +73,13 @@ class PositionalTransformModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSe
     val endOfInnerLayers = startOfInnerLayers + subIndices(1).size;
     println("Setting higher initial values for weights from " + startOfInnerLayers + " to " + endOfInnerLayers)
     val rng = new Random(0)
-    new DenseVector[Double](Array.tabulate(index.size)(i => if (i >= startOfInnerLayers && i < endOfInnerLayers) rng.nextDouble * initWeightsScale else 0.0))
+    new DenseVector[Double](Array.tabulate(index.size)(i => {
+      if (i >= startOfInnerLayers && i < endOfInnerLayers) {
+        initWeightsScale * (if (randomizeGaussian) rng.nextGaussian else rng.nextDouble) 
+      } else {
+        0.0
+      }
+    }));
   }
   
 //  override def featureIndex: Index[Feature] = transform.index

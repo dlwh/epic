@@ -17,6 +17,8 @@ import epic.trees._
 import epic.trees.annotations.TreeAnnotator
 import epic.util.{LRUCache, NotProvided, Optional}
 import epic.dense.TanhTransform
+import epic.dense.ReluTransform
+import epic.dense.CubeTransform
 import epic.dense.AffineTransformDense
 import edu.berkeley.nlp.nn.Word2Vec
 import scala.collection.mutable.HashMap
@@ -41,8 +43,12 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
                             commonWordThreshold: Int = 100,
                             ngramCountThreshold: Int = 5,
                             useGrammar: Boolean = false,
+                            useChildFeats: Boolean = false,
                             useSparseFeatures: Boolean = false,
+                            useRelu: Boolean = false,
+                            useCube: Boolean = false,
                             numHidden: Int = 100,
+                            numHiddenLayers: Int = 1,
                             posFeaturizer: Optional[WordFeaturizer[String]] = NotProvided,
                             spanFeaturizer: Optional[SplitSpanFeaturizer[String]] = NotProvided,
                             word2vecPath: String = "../cnnkim/data/GoogleNews-vectors-negative300.bin",
@@ -71,7 +77,20 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     val summedWordCounts: Counter[String, Double] = sum(annWords, Axis._0)
 
     def labelFeaturizer(l: AnnotatedLabel) = Set(l, l.baseAnnotatedLabel).toSeq
-    def ruleFeaturizer(r: Rule[AnnotatedLabel]) = if(useGrammar) Set(r, r.map(_.baseAnnotatedLabel)).toSeq else if(r.isInstanceOf[UnaryRule[AnnotatedLabel]]) Set(r.parent, r.parent.baseAnnotatedLabel).toSeq else Seq.empty
+    def ruleFeaturizer(r: Rule[AnnotatedLabel]) = if(useGrammar) {
+      if (useChildFeats && r.isInstanceOf[BinaryRule[AnnotatedLabel]]) {
+        Set(r,
+            r.map(_.baseAnnotatedLabel),
+            new LeftChildFeature(r.asInstanceOf[BinaryRule[AnnotatedLabel]].left),
+            new RightChildFeature(r.asInstanceOf[BinaryRule[AnnotatedLabel]].right)).toSeq
+      } else {
+        Set(r, r.map(_.baseAnnotatedLabel)).toSeq
+      }
+    } else if(r.isInstanceOf[UnaryRule[AnnotatedLabel]]) {
+      Set(r.parent, r.parent.baseAnnotatedLabel).toSeq
+    } else {
+      Seq.empty
+    }
 //    def ruleFeaturizer(r: Rule[AnnotatedLabel]) = if(r.isInstanceOf[UnaryRule[AnnotatedLabel]]) Set(r.parent, r.parent.baseAnnotatedLabel).toSeq else Seq.empty
 
     val featurizer = new ProductionFeaturizer[AnnotatedLabel, AnnotatedLabel, String](xbarGrammar, indexedRefinements,
@@ -92,9 +111,16 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
 //    }
     
     val surfaceFeaturizer = Word2VecSurfaceFeaturizerIndexed(word2vecDoubleVect, (str: String) => Word2Vec.convertWord(str))
-    val transform = new AffineTransformDense(featurizer.index.size, numHidden, new TanhTransform(new CachingLookupAndAffineTransformDense(numHidden, surfaceFeaturizer.vectorSize, surfaceFeaturizer)))
     
-    println(surfaceFeaturizer.vectorSize + " x " + numHidden + " x " + featurizer.index.size + " neural net")
+    val baseTransformLayer = new CachingLookupAndAffineTransformDense(numHidden, surfaceFeaturizer.vectorSize, surfaceFeaturizer)
+    var currLayer: Transform[Array[Int],DenseVector[Double]] = if (useRelu) new ReluTransform(baseTransformLayer) else new TanhTransform(baseTransformLayer)
+    for (i <- 1 until numHiddenLayers) {
+      val tmpLayer = new AffineTransformDense(numHidden, numHidden, currLayer)
+      currLayer = if (useRelu) new ReluTransform(tmpLayer) else if (useCube) new CubeTransform(tmpLayer) else new TanhTransform(tmpLayer)
+    }
+    var transform = new AffineTransformDense(featurizer.index.size, numHidden, currLayer)
+    
+    println(surfaceFeaturizer.vectorSize + " x (" + numHidden + ")^" + numHiddenLayers + " x " + featurizer.index.size + " neural net")
     
     val maybeSparseFeaturizer = if (useSparseFeatures) {
       var wf = posFeaturizer.getOrElse( SpanModelFactory.defaultPOSFeaturizer(annWords))
@@ -130,6 +156,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
       )
   }
 
-
-
 }
+
+case class LeftChildFeature(f: Feature) extends Feature;
+case class RightChildFeature(f: Feature) extends Feature;

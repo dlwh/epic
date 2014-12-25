@@ -338,6 +338,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
                             useNGrams:Boolean = false,
                             maxNGramOrder:Int = 2,
                             useGrammar: Boolean = true,
+                            useChildFeats: Boolean = false,
                             useFullShape: Boolean = false,
                             useSplitShape: Boolean = false,
                             posFeaturizer: Optional[WordFeaturizer[String]] = NotProvided,
@@ -399,7 +400,23 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     
     
     def labelFeaturizer(l: AnnotatedLabel) = Set(l, l.baseAnnotatedLabel).toSeq
-    def ruleFeaturizer(r: Rule[AnnotatedLabel]) = if(useGrammar) Set(r, r.map(_.baseAnnotatedLabel)).toSeq else if(r.isInstanceOf[UnaryRule[AnnotatedLabel]]) Set(r.parent, r.parent.baseAnnotatedLabel).toSeq else Seq.empty
+    
+//    def ruleFeaturizer(r: Rule[AnnotatedLabel]) = if(useGrammar) Set(r, r.map(_.baseAnnotatedLabel)).toSeq else if(r.isInstanceOf[UnaryRule[AnnotatedLabel]]) Set(r.parent, r.parent.baseAnnotatedLabel).toSeq else Seq.empty
+    def ruleFeaturizer(r: Rule[AnnotatedLabel]) = if(useGrammar) {
+      if (useChildFeats && r.isInstanceOf[BinaryRule[AnnotatedLabel]]) {
+        Set(r,
+            r.map(_.baseAnnotatedLabel),
+            new LeftChildFeature(r.asInstanceOf[BinaryRule[AnnotatedLabel]].left),
+            new RightChildFeature(r.asInstanceOf[BinaryRule[AnnotatedLabel]].right)).toSeq
+      } else {
+        Set(r, r.map(_.baseAnnotatedLabel)).toSeq
+      }
+    } else if(r.isInstanceOf[UnaryRule[AnnotatedLabel]]) {
+      Set(r.parent, r.parent.baseAnnotatedLabel).toSeq
+    } else {
+      Seq.empty
+    }
+    
     
     val featurizer = new ProductionFeaturizer[AnnotatedLabel, AnnotatedLabel, String](xbarGrammar, indexedRefinements,
       lGen=labelFeaturizer,
