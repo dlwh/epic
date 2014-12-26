@@ -42,17 +42,17 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
                             dummyFeats: Double = 0.5,
                             commonWordThreshold: Int = 100,
                             ngramCountThreshold: Int = 5,
-                            useGrammar: Boolean = false,
+                            useGrammar: Boolean = true,
                             useChildFeats: Boolean = false,
                             useSparseFeatures: Boolean = false,
-                            useRelu: Boolean = false,
+                            nonLinType: String = "tanh",
                             useCube: Boolean = false,
                             numHidden: Int = 100,
                             numHiddenLayers: Int = 1,
                             posFeaturizer: Optional[WordFeaturizer[String]] = NotProvided,
                             spanFeaturizer: Optional[SplitSpanFeaturizer[String]] = NotProvided,
-                            word2vecPath: String = "../cnnkim/data/GoogleNews-vectors-negative300.bin",
-                            useNonlinearity: Boolean = true) extends ParserModelFactory[AnnotatedLabel, String] {
+                            useNewVectorLoading: Boolean = false,
+                            word2vecPath: String = "../cnnkim/data/GoogleNews-vectors-negative300.bin") extends ParserModelFactory[AnnotatedLabel, String] {
 
   type MyModel = PositionalTransformModel[AnnotatedLabel, AnnotatedLabel, String]
 
@@ -91,13 +91,16 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     } else {
       Seq.empty
     }
-//    def ruleFeaturizer(r: Rule[AnnotatedLabel]) = if(r.isInstanceOf[UnaryRule[AnnotatedLabel]]) Set(r.parent, r.parent.baseAnnotatedLabel).toSeq else Seq.empty
 
     val featurizer = new ProductionFeaturizer[AnnotatedLabel, AnnotatedLabel, String](xbarGrammar, indexedRefinements,
       lGen=labelFeaturizer,
       rGen=ruleFeaturizer)
       
-    val word2vec = Word2Vec.loadVectorsForVocabulary(word2vecPath, summedWordCounts.keySet.toSet[String].map(str => Word2Vec.convertWord(str)), true)
+    val word2vec = if (useNewVectorLoading) {
+      Word2Vec.smartLoadVectorsForVocabulary(word2vecPath.split(":"), summedWordCounts.keySet.toSet[String].map(str => Word2Vec.convertWord(str)), true)
+    } else {
+      Word2Vec.loadVectorsForVocabulary(word2vecPath, summedWordCounts.keySet.toSet[String].map(str => Word2Vec.convertWord(str)), true)
+    }
     // Convert Array[Float] values to DenseVector[Double] values
     val word2vecDoubleVect = word2vec.map(keyValue => (keyValue._1 -> keyValue._2.map(_.toDouble)))
 //    val word2vecDoubleVect = word2vec.map(keyValue => (keyValue._1 -> new DenseVector[Double](keyValue._2.map(_.toDouble))))
@@ -111,14 +114,15 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
 //    }
     
     val surfaceFeaturizer = Word2VecSurfaceFeaturizerIndexed(word2vecDoubleVect, (str: String) => Word2Vec.convertWord(str))
+    val transform = PositionalNeuralModelFactory.buildNet(surfaceFeaturizer, numHidden, numHiddenLayers, featurizer.index.size, nonLinType)
     
-    val baseTransformLayer = new CachingLookupAndAffineTransformDense(numHidden, surfaceFeaturizer.vectorSize, surfaceFeaturizer)
-    var currLayer: Transform[Array[Int],DenseVector[Double]] = if (useRelu) new ReluTransform(baseTransformLayer) else new TanhTransform(baseTransformLayer)
-    for (i <- 1 until numHiddenLayers) {
-      val tmpLayer = new AffineTransformDense(numHidden, numHidden, currLayer)
-      currLayer = if (useRelu) new ReluTransform(tmpLayer) else if (useCube) new CubeTransform(tmpLayer) else new TanhTransform(tmpLayer)
-    }
-    var transform = new AffineTransformDense(featurizer.index.size, numHidden, currLayer)
+//    val baseTransformLayer = new CachingLookupAndAffineTransformDense(numHidden, surfaceFeaturizer.vectorSize, surfaceFeaturizer)
+//    var currLayer: Transform[Array[Int],DenseVector[Double]] = if (useRelu) new ReluTransform(baseTransformLayer) else new TanhTransform(baseTransformLayer)
+//    for (i <- 1 until numHiddenLayers) {
+//      val tmpLayer = new AffineTransformDense(numHidden, numHidden, currLayer)
+//      currLayer = if (nonLinType == "relu") new ReluTransform(tmpLayer) else if (nonLinType == "cube") new CubeTransform(tmpLayer) else new TanhTransform(tmpLayer)
+//    }
+//    var transform = new AffineTransformDense(featurizer.index.size, numHidden, currLayer)
     
     println(surfaceFeaturizer.vectorSize + " x (" + numHidden + ")^" + numHiddenLayers + " x " + featurizer.index.size + " neural net")
     
@@ -155,7 +159,32 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
       maybeSparseFeaturizer
       )
   }
+}
 
+object PositionalNeuralModelFactory {
+  
+  def buildNet(surfaceFeaturizer: Word2VecSurfaceFeaturizerIndexed[String], numHidden: Int, numHiddenLayers: Int, outputSize: Int, nonLinType: String) = {
+    val baseTransformLayer = new CachingLookupAndAffineTransformDense(numHidden, surfaceFeaturizer.vectorSize, surfaceFeaturizer)
+    var currLayer: Transform[Array[Int],DenseVector[Double]] = addNonlinearLayer(baseTransformLayer, nonLinType)
+    for (i <- 1 until numHiddenLayers) {
+      val tmpLayer = new AffineTransformDense(numHidden, numHidden, currLayer)
+      currLayer = addNonlinearLayer(tmpLayer, nonLinType)
+    }
+    var transform = new AffineTransformDense(outputSize, numHidden, currLayer)
+    transform
+  }
+  
+  def addNonlinearLayer(currNet: Transform[Array[Int],DenseVector[Double]], nonLinType: String) = {
+    if (nonLinType == "relu") {
+      new ReluTransform(currNet)
+    } else if (nonLinType == "cube") {
+      new CubeTransform(currNet)
+    } else if (nonLinType == "tanh") {
+      new TanhTransform(currNet)
+    } else {
+      throw new RuntimeException("Unknown nonlinearity type: " + nonLinType)
+    }
+  }
 }
 
 case class LeftChildFeature(f: Feature) extends Feature;
