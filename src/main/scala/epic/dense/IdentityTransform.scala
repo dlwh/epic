@@ -3,7 +3,7 @@ package epic.dense
 import breeze.linalg._
 import breeze.util.Index
 import epic.framework.Feature
-
+import scala.util.Random
 
 class IdentityTransform[T] extends Transform[T, T] {
 
@@ -13,6 +13,8 @@ class IdentityTransform[T] extends Transform[T, T] {
   def extractLayer(weights: DenseVector[Double]) = {
     new Layer()
   }
+  
+  def initialWeightVector(initWeightsScale: Double, rng: Random) = DenseVector(Array[Double]())
 
   class Layer extends Transform.Layer[T,T] {
     

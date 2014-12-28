@@ -5,6 +5,7 @@ import breeze.linalg._
 import epic.features.SegmentedIndex
 import epic.framework.Feature
 import scala.collection.mutable.HashMap
+import scala.util.Random
 
 /**
  * Used at the input layer to cache lookups and 
@@ -12,7 +13,8 @@ import scala.collection.mutable.HashMap
 case class CachingLookupAndAffineTransformDense[FV](numOutputs: Int,
                                                     numInputs: Int,
                                                     word2vecFeaturizer: Word2VecSurfaceFeaturizerIndexed[String],
-                                                    includeBias: Boolean = true) extends Transform[Array[Int], DenseVector[Double]] {
+                                                    includeBias: Boolean = true,
+                                                    backpropIntoEmbeddings: Boolean = false) extends Transform[Array[Int], DenseVector[Double]] {
 
 
   val index = new CachingLookupAndAffineTransformDense.Index(numOutputs, numInputs, includeBias)
@@ -25,6 +27,10 @@ case class CachingLookupAndAffineTransformDense[FV](numOutputs: Int,
       DenseVector.zeros[Double](numOutputs)
     }
     new Layer(mat, bias)
+  }
+  
+  def initialWeightVector(initWeightsScale: Double, rng: Random) = {
+    DenseVector(Array.tabulate(index.size)(i => rng.nextGaussian * initWeightsScale))
   }
 
   case class Layer(weights: DenseMatrix[Double], bias: DenseVector[Double]) extends Transform.Layer[Array[Int],DenseVector[Double]] {

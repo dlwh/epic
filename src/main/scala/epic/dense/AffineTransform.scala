@@ -6,7 +6,7 @@ import epic.features.SegmentedIndex
 import epic.framework.Feature
 
 import scala.runtime.ScalaRunTime
-
+import scala.util.Random
 
 case class AffineTransform[FV, Mid](numOutputs: Int, numInputs: Int, innerTransform: Transform[FV, Mid], includeBias: Boolean = true)
                               (implicit mult: OpMulMatrix.Impl2[DenseMatrix[Double], Mid, DenseVector[Double]],
@@ -28,6 +28,11 @@ case class AffineTransform[FV, Mid](numOutputs: Int, numInputs: Int, innerTransf
     }
     val inner = innerTransform.extractLayer(weights(index.componentOffset(1) to -1))
     new Layer(mat, bias, inner) -> inner
+  }
+  
+  def initialWeightVector(initWeightsScale: Double, rng: Random) = {
+    DenseVector.vertcat(DenseVector(Array.tabulate(index.indices(0).size)(i => rng.nextGaussian * initWeightsScale)),
+                                    innerTransform.initialWeightVector(initWeightsScale, rng))
   }
 
   case class Layer(weights: DenseMatrix[Double], bias: DenseVector[Double], innerLayer: innerTransform.Layer) extends Transform.Layer[FV,DenseVector[Double]] {

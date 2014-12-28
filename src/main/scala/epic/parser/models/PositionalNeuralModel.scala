@@ -51,7 +51,6 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
                             numHiddenLayers: Int = 1,
                             posFeaturizer: Optional[WordFeaturizer[String]] = NotProvided,
                             spanFeaturizer: Optional[SplitSpanFeaturizer[String]] = NotProvided,
-                            useNewVectorLoading: Boolean = false,
                             word2vecPath: String = "../cnnkim/data/GoogleNews-vectors-negative300.bin") extends ParserModelFactory[AnnotatedLabel, String] {
 
   type MyModel = PositionalTransformModel[AnnotatedLabel, AnnotatedLabel, String]
@@ -96,11 +95,12 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
       lGen=labelFeaturizer,
       rGen=ruleFeaturizer)
       
-    val word2vec = if (useNewVectorLoading) {
-      Word2Vec.smartLoadVectorsForVocabulary(word2vecPath.split(":"), summedWordCounts.keySet.toSet[String].map(str => Word2Vec.convertWord(str)), true)
-    } else {
-      Word2Vec.loadVectorsForVocabulary(word2vecPath, summedWordCounts.keySet.toSet[String].map(str => Word2Vec.convertWord(str)), true)
-    }
+    val word2vec = Word2Vec.smartLoadVectorsForVocabulary(word2vecPath.split(":"), summedWordCounts.keySet.toSet[String].map(str => Word2Vec.convertWord(str)), true)
+//    val word2vec = if (useNewVectorLoading) {
+//      Word2Vec.smartLoadVectorsForVocabulary(word2vecPath.split(":"), summedWordCounts.keySet.toSet[String].map(str => Word2Vec.convertWord(str)), true)
+//    } else {
+//      Word2Vec.loadVectorsForVocabulary(word2vecPath, summedWordCounts.keySet.toSet[String].map(str => Word2Vec.convertWord(str)), true)
+//    }
     // Convert Array[Float] values to DenseVector[Double] values
     val word2vecDoubleVect = word2vec.map(keyValue => (keyValue._1 -> keyValue._2.map(_.toDouble)))
 //    val word2vecDoubleVect = word2vec.map(keyValue => (keyValue._1 -> new DenseVector[Double](keyValue._2.map(_.toDouble))))

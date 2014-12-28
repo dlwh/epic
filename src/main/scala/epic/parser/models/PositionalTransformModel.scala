@@ -62,24 +62,32 @@ class PositionalTransformModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSe
     transform.index
   }
   
-  def initialWeightVector(randomize: Boolean, randomizeGaussian: Boolean, initWeightsScale: Double): DenseVector[Double] = {
-    val transformIndex = if (maybeSparseSurfaceFeaturizer.isDefined) {
-      index.asInstanceOf[SegmentedIndex[Feature,Index[Feature]]].indices(0)
+  def initialWeightVector(randomize: Boolean, initWeightsScale: Double): DenseVector[Double] = {
+//    val transformIndex = if (maybeSparseSurfaceFeaturizer.isDefined) {
+//      index.asInstanceOf[SegmentedIndex[Feature,Index[Feature]]].indices(0)
+//    } else {
+//      index
+//    }
+//    val subIndices = transformIndex.asInstanceOf[SegmentedIndex[Feature,Index[Feature]]].indices
+//    val startOfInnerLayers = subIndices(0).size;
+//    val endOfInnerLayers = startOfInnerLayers + subIndices(1).size;
+//    println("Setting higher initial values for weights from " + startOfInnerLayers + " to " + endOfInnerLayers)
+//    val rng = new Random(0)
+//    val oldInitVector = new DenseVector[Double](Array.tabulate(index.size)(i => {
+//      if (i >= startOfInnerLayers && i < endOfInnerLayers) {
+////        initWeightsScale * (if (randomizeGaussian) rng.nextGaussian else rng.nextDouble)
+//        initWeightsScale * rng.nextGaussian
+//      } else {
+//        0.0
+//      }
+//    }));
+    val initTransformWeights = transform.initialWeightVector(initWeightsScale, new Random(0));
+    val newInitVector: DenseVector[Double] = if (maybeSparseSurfaceFeaturizer.isDefined) {
+      DenseVector.vertcat(initTransformWeights, DenseVector.zeros(maybeSparseSurfaceFeaturizer.get.index.size))
     } else {
-      index
+      initTransformWeights
     }
-    val subIndices = transformIndex.asInstanceOf[SegmentedIndex[Feature,Index[Feature]]].indices
-    val startOfInnerLayers = subIndices(0).size;
-    val endOfInnerLayers = startOfInnerLayers + subIndices(1).size;
-    println("Setting higher initial values for weights from " + startOfInnerLayers + " to " + endOfInnerLayers)
-    val rng = new Random(0)
-    new DenseVector[Double](Array.tabulate(index.size)(i => {
-      if (i >= startOfInnerLayers && i < endOfInnerLayers) {
-        initWeightsScale * (if (randomizeGaussian) rng.nextGaussian else rng.nextDouble) 
-      } else {
-        0.0
-      }
-    }));
+    newInitVector
   }
   
 //  override def featureIndex: Index[Feature] = transform.index

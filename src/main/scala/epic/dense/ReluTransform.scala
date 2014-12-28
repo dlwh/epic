@@ -5,13 +5,15 @@ import breeze.linalg.operators.OpMulMatrix
 import breeze.numerics._
 import epic.framework.Feature
 import breeze.util.Index
-
+import scala.util.Random
 
 case class ReluTransform[FV](inner: Transform[FV, DenseVector[Double]]) extends Transform[FV, DenseVector[Double]] {
 
   val index: inner.index.type = inner.index
 
   def extractLayer(dv: DenseVector[Double]) = new Layer(inner.extractLayer(dv))
+  
+  def initialWeightVector(initWeightsScale: Double, rng: Random) = inner.initialWeightVector(initWeightsScale, rng)
 
   case class Layer(innerLayer: inner.Layer) extends Transform.Layer[FV,DenseVector[Double]] {
     

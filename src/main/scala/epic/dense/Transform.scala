@@ -3,6 +3,7 @@ package epic.dense
 import breeze.linalg._
 import breeze.util.Index
 import epic.framework.Feature
+import scala.util.Random
 
 /**
  *
@@ -14,6 +15,8 @@ trait Transform[In, +Out] {
 
 
   def extractLayer(dv: DenseVector[Double]):Layer
+  
+  def initialWeightVector(initWeightsScale: Double, rng: Random): DenseVector[Double]
 
   type Layer <: Transform.Layer[In,Out]
 }

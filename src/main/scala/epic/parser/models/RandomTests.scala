@@ -5,9 +5,6 @@ import epic.dense.TanhTransform
 import epic.dense.IdentityTransform
 import epic.dense.AffineTransform
 import breeze.linalg.DenseVector
-import epic.dense.IdentityTransformFloat
-import epic.dense.TanhTransformFloat
-import epic.dense.AffineTransformFloat
 
 object RandomTests {
 
@@ -55,20 +52,20 @@ object RandomTests {
   
   
   
-  def testNNSpeedFloat() {
-    val neuralAffineTransform = new AffineTransformFloat(87, 100, new TanhTransformFloat(new AffineTransformFloat(100, 1807, new IdentityTransformFloat[DenseVector[Float]]())))
-    val numParams = neuralAffineTransform.index.size
-    val weights = new DenseVector[Float](Array.tabulate(numParams)(i => 0.01F))
-    val inputVector = new DenseVector[Float](Array.tabulate(1807)(i => 1.0F))
-    
-    println(numParams + " feats")
-    val time = System.nanoTime()
-//    val layer = neuralAffineTransform.extractLayer(weights)
-    for (i <- 0 until 5000) {
-      weights(0) += 0.01F
-      val layer = neuralAffineTransform.extractLayer(weights)
-      layer.activations(inputVector)
-    }
-    println((System.nanoTime() - time) / 1000000 + " millis")
-  }
+//  def testNNSpeedFloat() {
+//    val neuralAffineTransform = new AffineTransformFloat(87, 100, new TanhTransformFloat(new AffineTransformFloat(100, 1807, new IdentityTransformFloat[DenseVector[Float]]())))
+//    val numParams = neuralAffineTransform.index.size
+//    val weights = new DenseVector[Float](Array.tabulate(numParams)(i => 0.01F))
+//    val inputVector = new DenseVector[Float](Array.tabulate(1807)(i => 1.0F))
+//    
+//    println(numParams + " feats")
+//    val time = System.nanoTime()
+////    val layer = neuralAffineTransform.extractLayer(weights)
+//    for (i <- 0 until 5000) {
+//      weights(0) += 0.01F
+//      val layer = neuralAffineTransform.extractLayer(weights)
+//      layer.activations(inputVector)
+//    }
+//    println((System.nanoTime() - time) / 1000000 + " millis")
+//  }
 }
