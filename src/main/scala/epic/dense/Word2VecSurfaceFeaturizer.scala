@@ -3,6 +3,7 @@ package epic.dense
 import breeze.linalg.DenseVector
 import scala.collection.mutable.HashMap
 import breeze.util.Index
+import breeze.linalg.DenseMatrix
 
 
 trait WordVectorAnchoring[String] {
@@ -54,6 +55,8 @@ class Word2VecSurfaceFeaturizerIndexed[W](val wordIndex: Index[W],
     
   def wordRepSize = word2vec.head.size
   def vectorSize: Int = 6 * wordRepSize
+  
+  def vocSize = wordIndex.size
     
   val zeroVector = Array.tabulate(wordRepSize)(i => 0.0)
     
@@ -89,6 +92,13 @@ class Word2VecSurfaceFeaturizerIndexed[W](val wordIndex: Index[W],
 
 object Word2VecSurfaceFeaturizerIndexed {
   
+  def makeVectFromParams(wordIndices: Array[Int], params: DenseMatrix[Double]): DenseVector[Double] = {
+    var currVect = DenseVector[Double](Array[Double]())
+    for (wordIndex <- wordIndices) {
+      currVect = DenseVector.vertcat(currVect, params(wordIndex, ::).t)
+    }
+    currVect
+  }
   
   def apply[W](word2vec: HashMap[W,Array[Double]], converter: W => W) = {
     val index = Index[W]

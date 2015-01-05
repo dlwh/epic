@@ -13,7 +13,7 @@ case class ReluTransform[FV](inner: Transform[FV, DenseVector[Double]]) extends 
 
   def extractLayer(dv: DenseVector[Double]) = new Layer(inner.extractLayer(dv))
   
-  def initialWeightVector(initWeightsScale: Double, rng: Random) = inner.initialWeightVector(initWeightsScale, rng)
+  def initialWeightVector(initWeightsScale: Double, rng: Random, outputLayer: Boolean) = inner.initialWeightVector(initWeightsScale, rng, false)
 
   case class Layer(innerLayer: inner.Layer) extends Transform.Layer[FV,DenseVector[Double]] {
     

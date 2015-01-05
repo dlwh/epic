@@ -30,9 +30,9 @@ case class AffineTransform[FV, Mid](numOutputs: Int, numInputs: Int, innerTransf
     new Layer(mat, bias, inner) -> inner
   }
   
-  def initialWeightVector(initWeightsScale: Double, rng: Random) = {
-    DenseVector.vertcat(DenseVector(Array.tabulate(index.indices(0).size)(i => rng.nextGaussian * initWeightsScale)),
-                                    innerTransform.initialWeightVector(initWeightsScale, rng))
+  def initialWeightVector(initWeightsScale: Double, rng: Random, outputLayer: Boolean) = {
+    DenseVector.vertcat(DenseVector(Array.tabulate(index.indices(0).size)(i => if (outputLayer) 0.0 else rng.nextGaussian * initWeightsScale)),
+                                    innerTransform.initialWeightVector(initWeightsScale, rng, false))
   }
 
   case class Layer(weights: DenseMatrix[Double], bias: DenseVector[Double], innerLayer: innerTransform.Layer) extends Transform.Layer[FV,DenseVector[Double]] {

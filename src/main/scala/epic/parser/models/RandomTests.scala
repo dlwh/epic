@@ -4,18 +4,28 @@ import scala.collection.mutable.HashMap
 import epic.dense.TanhTransform
 import epic.dense.IdentityTransform
 import epic.dense.AffineTransform
-import breeze.linalg.DenseVector
+import breeze.linalg._
 
 object RandomTests {
 
   def main(args: Array[String]) {
-    for (end <- 2 until 10) {
-      for (split <- 1 until end) {
-        for (begin <- 0 until split) {
-          println(tetra(begin, split, end))
-        }
-      }
-    }
+//    for (end <- 2 until 10) {
+//      for (split <- 1 until end) {
+//        for (begin <- 0 until split) {
+//          println(tetra(begin, split, end))
+//        }
+//      }
+//    }
+    
+    val mat = DenseMatrix.zeros[Double](5, 5)
+    val vect = DenseVector.vertcat(mat(1, ::).t, mat(3, ::).t)
+//    axpy(1.0, DenseVector.ones[Double](5), mat(1, ::).t)
+    axpy(1.0, DenseVector.ones[Double](10), vect)
+    println(mat)
+    println(vect)
+//    mat(1, ::) += DenseVector.ones[Double](5)
+    
+    
     
 //    val weightsTest = new DenseVector[Double](Array.tabulate(100000)(i => 0.01))
 //    import breeze.linalg._

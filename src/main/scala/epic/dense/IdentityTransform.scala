@@ -14,7 +14,7 @@ class IdentityTransform[T] extends Transform[T, T] {
     new Layer()
   }
   
-  def initialWeightVector(initWeightsScale: Double, rng: Random) = DenseVector(Array[Double]())
+  def initialWeightVector(initWeightsScale: Double, rng: Random, outputLayer: Boolean) = DenseVector(Array[Double]())
 
   class Layer extends Transform.Layer[T,T] {
     

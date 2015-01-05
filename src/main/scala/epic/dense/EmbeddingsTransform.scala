@@ -8,34 +8,38 @@ import scala.collection.mutable.HashMap
 import scala.util.Random
 
 /**
- * Used at the input layer to cache lookups and 
+ * Used at the input layer to cache lookups and
+ * backprop into embeddings 
  */
-case class CachingLookupAndAffineTransformDense[FV](numOutputs: Int,
-                                                    numInputs: Int,
-                                                    word2vecFeaturizer: Word2VecSurfaceFeaturizerIndexed[String],
-                                                    includeBias: Boolean = true,
-                                                    backpropIntoEmbeddings: Boolean = false) extends Transform[Array[Int], DenseVector[Double]] {
+case class EmbeddingsTransform[FV](numOutputs: Int,
+                                   numInputs: Int,
+                                   word2vecFeaturizer: Word2VecSurfaceFeaturizerIndexed[String],
+                                   includeBias: Boolean = true) extends Transform[Array[Int], DenseVector[Double]] {
 
 
-  val index = new CachingLookupAndAffineTransformDense.Index(numOutputs, numInputs, includeBias)
+  val index = SegmentedIndex(new EmbeddingsTransform.Index(numOutputs, numInputs, includeBias),
+                             new EmbeddingsTransform.Index(word2vecFeaturizer.vocSize, word2vecFeaturizer.wordRepSize, false))
+  println("Allocated " + index.indices.map(_.size) + " parameters for each index in the embedding layer (backpropagating into embeddings)")
   
   def extractLayer(weights: DenseVector[Double]) = {
     val mat = weights(0 until (numOutputs * numInputs)).asDenseMatrix.reshape(numOutputs, numInputs, view = View.Require)
     val bias = if(includeBias) {
-      weights(numOutputs * numInputs until index.size)
+      weights(numOutputs * numInputs until index.indices(0).size)
     } else {
       DenseVector.zeros[Double](numOutputs)
     }
-    new Layer(mat, bias)
+    val wordWeights = weights(index.indices(0).size until weights.size).asDenseMatrix.reshape(word2vecFeaturizer.vocSize, word2vecFeaturizer.wordRepSize, view = View.Require)
+    new Layer(mat, bias, wordWeights)
   }
   
   def initialWeightVector(initWeightsScale: Double, rng: Random, outputLayer: Boolean) = {
-    DenseVector(Array.tabulate(index.size)(i => if (!outputLayer) rng.nextGaussian * initWeightsScale else 0.0))
+    // Only randomly initialize the weights in the matrix, not the word deltas
+    DenseVector(Array.tabulate(index.size)(i => if (!outputLayer && i < index.indices(0).size) rng.nextGaussian * initWeightsScale else 0.0))
   }
 
-  case class Layer(weights: DenseMatrix[Double], bias: DenseVector[Double]) extends Transform.Layer[Array[Int],DenseVector[Double]] {
+  case class Layer(weights: DenseMatrix[Double], bias: DenseVector[Double], wordWeights: DenseMatrix[Double]) extends Transform.Layer[Array[Int],DenseVector[Double]] {
     
-    override val index = CachingLookupAndAffineTransformDense.this.index
+    override val index = EmbeddingsTransform.this.index
     
     val weightst = weights.t
 
@@ -61,7 +65,8 @@ case class CachingLookupAndAffineTransformDense[FV](numOutputs: Int,
           cache.synchronized {
             if (!cache.contains(wordPosn)) {
               val startIdx = i * word2vecFeaturizer.wordRepSize
-              cache.put(wordPosn, weights(::, startIdx until startIdx + word2vecFeaturizer.wordRepSize) * DenseVector(word2vecFeaturizer.word2vec(wordPosn._1)))
+              val wordVec = DenseVector(word2vecFeaturizer.word2vec(wordPosn._1)) + wordWeights(wordPosn._1, ::).t
+              cache.put(wordPosn, weights(::, startIdx until startIdx + word2vecFeaturizer.wordRepSize) * wordVec)
             }
             finalVector += cache(wordPosn)
           }
@@ -83,18 +88,23 @@ case class CachingLookupAndAffineTransformDense[FV](numOutputs: Int,
 
       // whole function is f(mat * inner(fv) + bias)
       // scale(i) pushes in  (f'(mat * inner(v) + bias))(i)
-      val innerAct = DenseVector(word2vecFeaturizer.convertToVector(fv));
+      val innerAct = DenseVector(word2vecFeaturizer.convertToVector(fv)) + Word2VecSurfaceFeaturizerIndexed.makeVectFromParams(fv, wordWeights);
       
+      val wordsDeriv = deriv(index.indices(0).size until deriv.size).asDenseMatrix.reshape(word2vecFeaturizer.vocSize, word2vecFeaturizer.wordRepSize, view = View.Require)
       // d/d(weights(::, i)) == scale(i) * innerAct
       for (i <- 0 until weights.rows) {
         val a: Double = scale(i)
         if(a != 0.0) {
           axpy(a, innerAct, matDeriv.t(::, i))
+          for (wordPosnIdx <- 0 until fv.size) {
+            val relevantWeights = weights(i, wordPosnIdx * word2vecFeaturizer.wordRepSize until (wordPosnIdx + 1) * word2vecFeaturizer.wordRepSize).t
+            axpy(a, relevantWeights, wordsDeriv(fv(wordPosnIdx), ::).t)
+          }
         // so d/dbias(i) = scale(i)
           biasDeriv(i) += a
         }
       }
-
+      
 //      biasDeriv += scale
 
       // scale is f'(mat * inner(v) + bias)
@@ -103,7 +113,7 @@ case class CachingLookupAndAffineTransformDense[FV](numOutputs: Int,
   }
 }
 
-object CachingLookupAndAffineTransformDense {
+object EmbeddingsTransform {
   
   case class Index(numOutputs: Int, numInputs: Int, includeBias: Boolean = true, backPropIntoEmbeddings: Boolean = false) extends breeze.util.Index[Feature] {
     def apply(t: Feature): Int = t match {

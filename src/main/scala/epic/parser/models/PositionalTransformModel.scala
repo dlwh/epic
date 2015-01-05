@@ -81,7 +81,7 @@ class PositionalTransformModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSe
 //        0.0
 //      }
 //    }));
-    val initTransformWeights = transform.initialWeightVector(initWeightsScale, new Random(0));
+    val initTransformWeights = transform.initialWeightVector(initWeightsScale, new Random(0), true);
     val newInitVector: DenseVector[Double] = if (maybeSparseSurfaceFeaturizer.isDefined) {
       DenseVector.vertcat(initTransformWeights, DenseVector.zeros(maybeSparseSurfaceFeaturizer.get.index.size))
     } else {

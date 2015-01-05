@@ -16,7 +16,7 @@ trait Transform[In, +Out] {
 
   def extractLayer(dv: DenseVector[Double]):Layer
   
-  def initialWeightVector(initWeightsScale: Double, rng: Random): DenseVector[Double]
+  def initialWeightVector(initWeightsScale: Double, rng: Random, outputLayer: Boolean): DenseVector[Double]
 
   type Layer <: Transform.Layer[In,Out]
 }
