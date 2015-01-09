@@ -1,7 +1,8 @@
 package epic.slab
 
 /**
- * A Slab is the core "document" type in Slabs.
+ * A Slab is the core "document" type. It holds the document itself as
+ * well as the annotations.
  */
 
 import shapeless._
