@@ -3,6 +3,7 @@ package epic.preprocess
 import org.scalatest._
 import org.scalatest.junit._
 import epic.slab._
+import scalaz.std.list._
 
 import org.junit.runner.RunWith
 
