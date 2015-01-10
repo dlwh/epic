@@ -3,6 +3,8 @@ package epic.preprocess
 import scala.collection.mutable.ArrayBuffer
 import java.io._
 import epic.slab._
+import epic.slab.annotators.SentenceSegmenter
+import scalaz.std.list._
 import breeze.linalg._
 import breeze.numerics._
 import epic.framework.{ModelObjective, StandardExpectedCounts, Feature}
@@ -14,6 +16,7 @@ import epic.features.CrossProductFeature
 import java.util.zip.GZIPInputStream
 import epic.corpora.MascSlab
 import epic.trees.Span
+import epic.trees.SpanConvert._
 import scala.collection.immutable.Vector
 
 @SerialVersionUID(1L)

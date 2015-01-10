@@ -17,7 +17,7 @@ class ShapelessSlabTest extends FunSpec {
       val slab2 = slab.add(annotation)
       assert(slab2.select[Annotation](0) === annotation)
     }
-    it("should add further annotations to the same vector, with disturbing the order") {
+    it("should add further annotations to the same vector, without disturbing the order") {
       case class Foo(foo: Int) extends Annotation
       val slab2 = slab.add(Foo(13))
       assert(slab2.select[Foo](0) === Foo(13))

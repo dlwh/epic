@@ -6,9 +6,9 @@ version := "0.2-SNAPSHOT"
 
 organization := "org.scalanlp"
 
-scalaVersion := "2.10.4"
+scalaVersion := "2.11.4"
 
-crossScalaVersions  := Seq("2.11.1", "2.10.4")
+crossScalaVersions  := Seq("2.11.4", "2.10.4")
 
 resolvers ++= Seq(
   "ScalaNLP Maven2" at "http://repo.scalanlp.org/repo",
@@ -20,13 +20,12 @@ libraryDependencies ++= Seq(
   "junit" % "junit" % "4.5" % "test",
   "org.scalanlp" %% "breeze" % "0.9",
   "org.scalanlp" %% "nak" % "1.3-SNAPSHOT",
+  "org.scalanlp" %% "epic-slab" % "0.1-SNAPSHOT",
   "org.mapdb" % "mapdb" % "0.9.2",
   "org.slf4j" % "slf4j-simple" % "1.7.6",
   "org.scalatest" %% "scalatest" % "2.1.3" % "test",
   "org.scalacheck" %% "scalacheck" % "1.11.3" % "test",
-  "com.chuusai" % "shapeless_2.10.4" % "2.0.0",
-  "org.typelevel" %% "scodec-core" % "1.1.0",
-  "org.apache.spark" %% "spark-core" % "1.1.0" % "provided"
+  "org.typelevel" %% "scodec-core" % "1.1.0"
 )
 
 libraryDependencies ++= (CrossVersion.partialVersion(scalaVersion.value) match {

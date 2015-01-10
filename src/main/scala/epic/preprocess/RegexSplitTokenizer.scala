@@ -16,9 +16,9 @@
 package epic.preprocess
 
 import epic.slab._
-import epic.slab.Token
-import epic.slab.Sentence
 import epic.trees.Span
+import epic.trees.SpanConvert._
+import epic.slab.annotators.Tokenizer
 
 /**
   * Splits the input document according to the given pattern.  Does not

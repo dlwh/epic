@@ -2,7 +2,7 @@ package epic.parser
 
 import epic.slab._
 import epic.trees.Tree
-import epic.sequences.Annotator
+import epic.slab.annotators.Annotator
 
 /**
  * A ParserAnnotator is a slab-ified [[epic.parser.Parser]]. The analogy is that a [[epic.sequences.Tagger]] is

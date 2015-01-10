@@ -5,8 +5,11 @@ import java.io.{FilenameFilter, File, StringReader}
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.immutable
 import epic.slab._
+import epic.slab.annotators.Tokenizer
 import epic.corpora.MascSlab
 import epic.trees.Span
+import epic.trees.SpanConvert._
+import scalaz.std.list._
 
 @SerialVersionUID(1L)
 class TreebankTokenizer() extends Tokenizer with Serializable {
@@ -46,9 +49,9 @@ object TreebankTokenizer extends TreebankTokenizer {
   def main(args: Array[String]) = {
     val mascDir = new java.io.File(args(0))
     val comps = for(dir <- new File(new File(mascDir,"data"), "written").listFiles();
-                                       f <- dir.listFiles(new FilenameFilter {
-                                         override def accept(dir: File, name: String): Boolean = name.endsWith(".txt")
-                                       })) yield {
+                    f <- dir.listFiles(new FilenameFilter {
+                      override def accept(dir: File, name: String): Boolean = name.endsWith(".txt")
+                    })) yield {
       val slab = MascSlab(f.toURI.toURL)
       val slabWithSentences = MascSlab.s(slab)
       val slabWithTokens = MascSlab.seg(slabWithSentences)

@@ -77,3 +77,8 @@ class Span(val encoded: Long) extends AnyVal {
 object Span {
   def apply(begin: Int, end: Int) = new Span((begin.toLong << 32) | (end.toLong&0xFFFFFFFFL))
 }
+
+object SpanConvert {
+  implicit def slabtoepic(span: epic.slab.Span): epic.trees.Span = new epic.trees.Span(span.encoded)
+  implicit def epictoslab(span: epic.trees.Span): epic.slab.Span = new epic.slab.Span(span.encoded)
+}

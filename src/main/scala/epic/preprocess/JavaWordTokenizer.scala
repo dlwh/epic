@@ -18,8 +18,10 @@ package epic.preprocess
 
 import java.text._
 import java.util.Locale
-import epic.slab._
 import epic.trees.Span
+import epic.slab._
+import epic.trees.SpanConvert._
+import epic.slab.annotators.Tokenizer
 
 
 /**
@@ -33,7 +35,10 @@ import epic.trees.Span
 class JavaWordTokenizer(locale: Locale) extends Tokenizer {
   def this() = this(Locale.getDefault)
 
-  override def apply(content: String, sentences: Vector[Sentence]): Vector[ContentToken] = {
+  override def apply(content: String, sentences: List[Sentence]): Vector[ContentToken] =
+    apply(content, sentences.toVector)
+
+  def apply(content: String, sentences: Vector[Sentence]): Vector[ContentToken] = {
     sentences.flatMap { s =>
       val breaker = BreakIterator.getWordInstance(locale)
       breaker.setText(content)

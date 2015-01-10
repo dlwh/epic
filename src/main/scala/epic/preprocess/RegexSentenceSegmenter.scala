@@ -2,6 +2,8 @@ package epic.preprocess
 
 import epic.slab._
 import epic.trees.Span
+import epic.trees.SpanConvert._
+import epic.slab.annotators.SentenceSegmenter
 
 /**
  * A simple regex sentence segmenter.

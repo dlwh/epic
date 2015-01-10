@@ -19,8 +19,8 @@ package epic.preprocess
 import java.text.BreakIterator
 import java.util.Locale
 import epic.slab._
-import epic.slab.Token
-import epic.slab.Sentence
+import epic.slab.annotators.SentenceSegmenter
+import epic.trees.SpanConvert._
 
 /**
  * A Sentence Segmenter backed by Java's BreakIterator.
