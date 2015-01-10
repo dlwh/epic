@@ -1,4 +1,4 @@
-package epic.slab
+package epic.slab.typeclasses
 
 import shapeless._
 import ops.hlist._

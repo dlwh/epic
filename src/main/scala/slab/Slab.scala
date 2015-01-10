@@ -1,13 +1,14 @@
 package epic.slab
 
+import shapeless._
+import shapeless.syntax.typeable._
+import ops.hlist._
+import epic.slab.typeclasses._
+
 /**
  * A Slab is the core "document" type. It holds the document itself as
  * well as the annotations.
  */
-
-import shapeless._
-import shapeless.syntax.typeable._
-import ops.hlist._
 
 class Slab[Content, L <: HList](val content: Content, val annotations: L) {
   // Select a single element from an hlist. For more than one element

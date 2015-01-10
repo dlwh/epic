@@ -1,4 +1,5 @@
 package epic.slab
+import epic.slab.typeclasses._
 import shapeless._
 import ops.hlist._
 
@@ -15,15 +16,15 @@ import ops.hlist._
 // This analysis function requires one input and adds one output type.
 trait AnalysisFunction11[C, I, O] {
   def apply[In <: HList, Out <: HList](slab: Slab[C, In])(implicit sel: SubSelector[In, List[I]], adder: Adder.Aux[In, List[O], Out]): Slab[C, Out] = {
-    slab.add(apply(slab.content, slab.select(sel)))
+    slab.add(apply(slab.content, slab.select(sel)).toList)
   }
-  def apply(content: C, input: List[I]): List[O]
+  def apply(content: C, input: List[I]): Iterable[O]
 }
 
 // Convert a function of the correct signature to an AnalysisFunction11.
 object AnalysisFunction11 {
-  def apply[C, I, O](fun: ((C, List[I]) => List[O])): AnalysisFunction11[C, I, O] = new AnalysisFunction11[C, I, O] {
-    def apply(content: C, input: List[I]): List[O] = fun(content, input)
+  def apply[C, I, O](fun: ((C, List[I]) => Iterable[O])): AnalysisFunction11[C, I, O] = new AnalysisFunction11[C, I, O] {
+    def apply(content: C, input: List[I]): Iterable[O] = fun(content, input)
   }
 }
 
@@ -41,18 +42,18 @@ trait AnalysisFunctionN1[C, I <: HList, O] {
 // content.
 trait AnalysisFunction01[C, O] {
   def apply[In <: HList, Out <: HList](slab: Slab[C, In])(implicit adder: Adder.Aux[In, List[O], Out]): Slab[C, Out] = {
-    slab.add(apply(slab.content))(adder)
+    slab.add(apply(slab.content).toList)(adder)
   }
-  def apply(content: C): List[O]
+  def apply(content: C): Iterable[O]
 
   def slabFrom(content: C): Slab[C, List[O] :: HNil] = {
-    Slab(content, apply(content) :: HNil)
+    Slab(content, apply(content).toList :: HNil)
   }
 }
 
 // Convert a function of the correct signature to an AnalysisFunction01.
 object AnalysisFunction01 {
-  def apply[C, O](fun: (C => List[O])): AnalysisFunction01[C, O] = new AnalysisFunction01[C, O] {
-    def apply(content: C): List[O] = fun(content)
+  def apply[C, O](fun: (C => Iterable[O])): AnalysisFunction01[C, O] = new AnalysisFunction01[C, O] {
+    def apply(content: C): Iterable[O] = fun(content)
   }
 }
