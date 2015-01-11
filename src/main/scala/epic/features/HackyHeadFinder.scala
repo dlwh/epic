@@ -45,7 +45,7 @@ object RuleBasedHackyHeadFinder {
   headRules.put("ADVP", (preterminals) => searchFindFirst(preterminals, R2L, Set("RB", "RBR", "RBS", "FW")));
   headRules.put("NP", (preterminals) => searchFindLastBefore(preterminals, L2R,
                      Set("NN", "NNP", "NNPS", "NNS", "NX", "POS", "JJR", "$", "PRN"),
-                     Set(",", "WDT", "TO", "IN", "-LRB-", ":", "CC"
+                     Set(",", "WDT", "TO", "IN", "-LRB-", ":", "CC", "("
                          ))); // block appositives, complementizers, prepositions, parentheticals, conjunctions
   headRules.put("QP", (preterminals) => searchFindFirst(preterminals, L2R, Set("$", "IN", "CD")));
   headRules.put("PP", (preterminals) => searchFindFirst(preterminals, L2R, Set("IN", "TO", "VBG", "VBN", "RP", "FW")));

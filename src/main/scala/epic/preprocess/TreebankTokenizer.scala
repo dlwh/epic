@@ -1,15 +1,17 @@
 package epic.preprocess
 
+import java.io.{File, FilenameFilter, StringReader}
+
 import breeze.util.Iterators
-import java.io.{FilenameFilter, File, StringReader}
-import scala.collection.mutable.ArrayBuffer
-import scala.collection.immutable
+import epic.corpora.MascSlab
 import epic.slab._
 import epic.slab.annotators.Tokenizer
 import epic.corpora.MascSlab
 import epic.trees.Span
 import epic.trees.SpanConvert._
 import scalaz.std.list._
+
+import scala.collection.mutable.ArrayBuffer
 
 @SerialVersionUID(1L)
 class TreebankTokenizer() extends Tokenizer with Serializable {
@@ -26,6 +28,8 @@ class TreebankTokenizer() extends Tokenizer with Serializable {
 }
 
 object TreebankTokenizer extends TreebankTokenizer {
+  def treebankTokenToToken(s: String): String = reverseTreebankMappings.getOrElse(s, s)
+
   private val treebankMappings = Map("(" -> "-LRB-", ")" -> "-RRB-", "{" -> "-LCB-", "}" -> "-RCB-", "[" -> "-LSB-", "]" -> "-RSB-")
   private val reverseTreebankMappings = treebankMappings.map(_.swap)
 
@@ -34,11 +38,15 @@ object TreebankTokenizer extends TreebankTokenizer {
     // have to deal with quotes, so we can't just use map.
     val output =  new ArrayBuffer[String]()
 
-    var yyquote = false
+    var inOpenQuote = false
 
     for(t <- toks) t match {
-      case "\"" if yyquote => yyquote = false; output += "''"
-      case "\"" => yyquote = true; output += "``"
+      case "“" => inOpenQuote = true; output += "``"
+      case "‘" => inOpenQuote = true; output += "`"
+      case "’" => inOpenQuote = true; output += "`"
+      case "”" => inOpenQuote = true; output += "``"
+      case "\"" if inOpenQuote => inOpenQuote = false; output += "''"
+      case "\"" => inOpenQuote = true; output += "``"
       case _ => output += treebankMappings.getOrElse(t, t)
     }
     
@@ -75,3 +83,4 @@ object TreebankTokenizer extends TreebankTokenizer {
     }
   }
 }
+

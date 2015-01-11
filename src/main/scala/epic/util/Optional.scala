@@ -52,6 +52,7 @@ case class Provided[+A](get: A) extends Optional[A] {
 /**
  * Equivalent to None
  */
+@SerialVersionUID(-649101350749082174L)
 case object NotProvided extends Optional[Nothing] {
   def get = throw new NoSuchElementException("NotProvided.get")
 }

@@ -1,4 +1,5 @@
 import java.util.BitSet
+
 import scala.collection.generic.CanBuildFrom
 import scala.collection.mutable
 
@@ -81,7 +82,12 @@ package object epic {
 
     def +=(i: Int) = {
       bs.set(i)
-      this
+      bs
+    }
+
+    def ++=(xs: TraversableOnce[Int]) = {
+      xs.foreach(+=)
+      bs
     }
   }
 
@@ -89,7 +95,7 @@ package object epic {
     var currentBit = bs.nextSetBit(0)
     def hasNext: Boolean = currentBit != -1
 
-    def next = {
+    def next() = {
       assert(currentBit != -1)
       val cur = currentBit
       currentBit = bs.nextSetBit(cur+1)
@@ -97,7 +103,7 @@ package object epic {
     }
   }
 
-  implicit def _bitsetcbf[U] = new CanBuildFrom[java.util.BitSet, U, Set[U]] {
+  implicit def _bitsetcbf[U]: CanBuildFrom[BitSet, U, Set[U]]  = new CanBuildFrom[java.util.BitSet, U, Set[U]] {
     def apply(from: BitSet): mutable.Builder[U, Set[U]] = Set.newBuilder[U]
     def apply(): mutable.Builder[U, Set[U]] = Set.newBuilder[U]
   }

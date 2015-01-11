@@ -11,13 +11,14 @@ import breeze.linalg.Counter2
  * @author dlwh
  */
 object TaggedSequenceEval {
-  def eval[L ,W](crf: CRF[L, W], examples: IndexedSeq[TaggedSequence[L, W]]):Stats[L] = {
+  def eval[L ,W](crf: CRF[L, W], examples: IndexedSeq[TaggedSequence[L, W]], printBadExamples: Boolean = false):Stats[L] = {
     examples.par.aggregate(new Stats[L]()) ({ (stats, gold )=>
       val guess = crf.bestSequence(gold.words, gold.id +"-guess")
       val myStats = evaluateExample(guess, gold)
 
       val sent = for( ((p,g),w) <- guess.label zip gold.label zip guess.words) yield if (g == p) s"$w/$g" else s"$w/[G:$g,P:$p]"
-      println(sent.mkString(" ") + "\n" + myStats)
+      if(myStats.exact != 1)
+        println(sent.mkString(" ") + "\n" + myStats)
       stats + myStats
     }, {_ + _})
 

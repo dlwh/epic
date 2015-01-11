@@ -35,6 +35,9 @@ object SurfaceFeaturizer {
 
   trait DSL {
 
+    def whenLength[W](filt: Int=>Boolean)(f: SurfaceFeaturizer[W])= new LengthFilteredSurfaceFeaturizer(f, filt)
+    def unitLengthSpan[W](f: WordFeaturizer[W]) = new SingleWordSpanFeaturizer(f)
+
     val begin : SurfaceFeaturizer.begin.type = SurfaceFeaturizer.begin
     val end : SurfaceFeaturizer.end.type = SurfaceFeaturizer.end
 
@@ -67,7 +70,7 @@ object SurfaceFeaturizer {
   case class SpanEdgesFeaturizer[W](f1: MarkedWordFeaturizer[W], f2: MarkedWordFeaturizer[W]) extends SurfaceFeaturizer[W] {
     def anchor(w: IndexedSeq[W]): SurfaceFeatureAnchoring[W] = {
       val loc1 = f1.wf.anchor(w)
-      val loc2 = f2.wf.anchor(w)
+      val loc2 = if(f1.wf eq f2.wf) loc1 else f2.wf.anchor(w)
       new SurfaceFeatureAnchoring[W] {
         def featuresForSpan(begin: Int, end: Int): Array[Feature] = {
           val ffs1 = loc1.featuresForWord(f1.mp.toPos(begin, end))
@@ -76,6 +79,25 @@ object SurfaceFeaturizer {
         }
       }
 
+    }
+  }
+
+  case class LengthFilteredSurfaceFeaturizer[W](feat: SurfaceFeaturizer[W], f: Int=>Boolean) extends SurfaceFeaturizer[W] with Serializable {
+    override def anchor(words: IndexedSeq[W]): SurfaceFeatureAnchoring[W] = new SurfaceFeatureAnchoring[W] {
+      val anch = feat.anchor(words)
+      override def featuresForSpan(begin: Int, end: Int): Array[Feature] = {
+        if (f(end - begin)) anch.featuresForSpan(begin, end) else Array.empty
+      }
+    }
+  }
+
+
+  case class SingleWordSpanFeaturizer[W](feat: WordFeaturizer[W]) extends SurfaceFeaturizer[W] with Serializable {
+    override def anchor(words: IndexedSeq[W]): SurfaceFeatureAnchoring[W] = new SurfaceFeatureAnchoring[W] {
+      val anch = feat.anchor(words)
+      override def featuresForSpan(begin: Int, end: Int): Array[Feature] = {
+        if (end == begin + 1) anch.featuresForWord(begin) else Array.empty
+      }
     }
   }
 

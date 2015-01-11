@@ -2,22 +2,28 @@ package epic.preprocess
 
 import scala.collection.mutable.ArrayBuffer
 import java.io._
+import java.util.zip.GZIPInputStream
+
+import breeze.features.FeatureVector
+
 import epic.slab._
 import epic.slab.annotators.SentenceSegmenter
 import scalaz.std.list._
 import breeze.linalg._
 import breeze.numerics._
-import epic.framework.{ModelObjective, StandardExpectedCounts, Feature}
-import nak.data.Example
+
 import breeze.util.{Iterators, Encoder, Index}
+import epic.corpora.MascSlab
 import breeze.features.FeatureVector
 import breeze.optimize.L2Regularization
+
 import epic.features.CrossProductFeature
-import java.util.zip.GZIPInputStream
-import epic.corpora.MascSlab
+import epic.framework.{Feature, ModelObjective, StandardExpectedCounts}
 import epic.trees.Span
 import epic.trees.SpanConvert._
-import scala.collection.immutable.Vector
+import nak.data.Example
+
+import scala.collection.mutable.ArrayBuffer
 
 @SerialVersionUID(1L)
 class MLSentenceSegmenter(inf: MLSentenceSegmenter.ClassificationInference) extends SentenceSegmenter with Serializable {
@@ -295,6 +301,7 @@ object MLSentenceSegmenter {
       val slab = MascSlab(f.toURI.toURL)
       val slabWithSentences = MascSlab.s(slab)
 
+
       val guessPoints: IndexedSeq[Int] = potentialSentenceBoundariesIterator(slabWithSentences.content).toIndexedSeq
 
       val text = slab.content
@@ -390,7 +397,7 @@ object MLSentenceSegmenter {
 
     override def inferenceFromWeights(weights: DenseVector[Double]): Inference = new ClassificationInference(featureIndex, weights)
 
-    override def accumulateCounts(s: Scorer, d: SentenceDecisionInstance, m: Marginal, accum: ExpectedCounts, scale: Double): Unit = {
+    override def accumulateCounts(inf: Inference, s: Scorer, d: SentenceDecisionInstance, m: Marginal, accum: ExpectedCounts, scale: Double): Unit = {
       val fs = new FeatureVector(d.features.map(featureIndex).filterNot(_ == -1))
       axpy(m.prob * scale, fs, accum.counts)
       accum.loss += scale * m.logPartition

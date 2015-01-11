@@ -15,12 +15,11 @@ package epic.features
  See the License for the specific language governing permissions and
  limitations under the License.
 */
-import epic.framework.Feature
 import breeze.linalg._
-import collection.mutable.ArrayBuffer
-import java.text.NumberFormat
-import java.util.Locale
 import breeze.util.{Encoder, Index}
+import epic.framework.Feature
+
+import scala.collection.mutable.ArrayBuffer
 
 final case class IndicatorWSFeature(name: Symbol) extends Feature
 final case class SuffixFeature(str: String) extends Feature
@@ -35,7 +34,7 @@ final case class RightWordFeature(str: Any) extends Feature
 
 class WordPropertyFeaturizer(wordCounts: Counter[String, Double],
                              commonWordThreshold: Int = 20) extends WordFeaturizer[String] with Serializable {
-  import WordPropertyFeaturizer._
+  import epic.features.WordPropertyFeaturizer._
 
   private val wordIndex = Index(wordCounts.keysIterator)
   private val knownWordFeatures = Encoder.fromIndex(wordIndex).tabulateArray(s => featuresFor(s).toArray)
@@ -116,7 +115,10 @@ class WordPropertyFeaturizer(wordCounts: Counter[String, Double],
 
       if(!hasLower && hasLetter) features += hasNoLower
       if(hasDash) features += hasDashFeature
-      if(hasDigit)  features += hasDigitFeature
+      if(hasDigit) {
+        features += hasDigitFeature
+        features += DigitNormalizedFeature(w.replaceAll("\\d", "0"))
+      }
       if(!hasLetter)  features += hasNoLetterFeature
       if(hasNotLetter)  features += hasNotLetterFeature
 
@@ -163,6 +165,8 @@ class WordPropertyFeaturizer(wordCounts: Counter[String, Double],
     features
   }
 
+
+
   def apply(w: String) = featuresFor(w)
 
 
@@ -194,3 +198,5 @@ object WordPropertyFeaturizer {
   val isAnInitialFeature = IndicatorWSFeature('IsAnInitial)
   val endsWithPeriodFeature = IndicatorWSFeature('EndsWithPeriod)
 }
+
+case class DigitNormalizedFeature(w: String) extends Feature

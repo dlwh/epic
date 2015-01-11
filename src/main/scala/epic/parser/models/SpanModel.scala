@@ -17,36 +17,26 @@ package models
  limitations under the License.
 */
 
-import breeze.collection.mutable.{TriangularArray, OpenAddressHashArray}
-import breeze.linalg._
-import epic.trees._
-import annotations.TreeAnnotator
-import collection.mutable.ArrayBuffer
 import java.io.File
-import breeze.util._
-import epic.framework.{ModelObjective, Feature}
-import epic.parser.projections.{ParserChartConstraintsFactory, GrammarRefinements}
+
+import breeze.collection.mutable.{OpenAddressHashArray, TriangularArray}
 import breeze.config.Help
-import epic.lexicon.Lexicon
-import epic.features._
-import epic.features.HashFeature
-import epic.util._
-import epic.trees.annotations.FilterAnnotations
-import com.typesafe.scalalogging.slf4j.LazyLogging
-import epic.trees.annotations.MarkPreterminals
-import epic.trees.annotations.FixRootLabelVerticalAnnotation
-import epic.parser.RuleTopology
-import scala.io.Source
-import epic.constraints.{CachedChartConstraintsFactory, ChartConstraints}
-import epic.constraints.ChartConstraints.Factory
-import epic.trees.UnaryTree
-import epic.trees.TreeInstance
-import epic.trees.NullaryTree
-import epic.trees.BinaryRule
-import epic.trees.UnaryRule
-import epic.trees.BinaryTree
+import breeze.linalg._
 import breeze.optimize.FirstOrderMinimizer.OptParams
+import breeze.util._
+import com.typesafe.scalalogging.slf4j.LazyLogging
+import epic.constraints.ChartConstraints.Factory
+import epic.constraints.{CachedChartConstraintsFactory, ChartConstraints}
+import epic.features._
+import epic.framework.{Feature, ModelObjective}
+import epic.lexicon.Lexicon
 import epic.parser.ParserParams.XbarGrammar
+import epic.parser.projections.{GrammarRefinements, ParserChartConstraintsFactory}
+import epic.trees._
+import epic.trees.annotations.TreeAnnotator
+import epic.util._
+
+import scala.io.Source
 
 /**
  * A rather more sophisticated discriminative parser. Uses features on
@@ -74,18 +64,24 @@ class SpanModel[L, L2, W](val featurizer: RefinedFeaturizer[L, W, Feature],
   }
 
 
-  def accumulateCounts(s: Scorer, d: TreeInstance[L, W], m: Marginal, accum: ExpectedCounts, scale: Double): Unit = {
+  def accumulateCounts(inf: Inference, s: Scorer, d: TreeInstance[L, W], m: Marginal, accum: ExpectedCounts, scale: Double): Unit = {
     m.expectedCounts(featurizer, accum, scale)
   }
 }
 
 
+@SerialVersionUID(4749637878577393596L)
 class DotProductGrammar[L, L2, W, Feature](val topology: RuleTopology[L],
                                            val lexicon: Lexicon[L, W],
                                            val refinedTopology: RuleTopology[L2],
                                            val refinements: GrammarRefinements[L, L2],
                                            val weights: DenseVector[Double],
                                            val featurizer: RefinedFeaturizer[L, W, Feature]) extends Grammar[L, W] {
+
+
+  override def withPermissiveLexicon: Grammar[L, W] = {
+    new DotProductGrammar(topology, lexicon.morePermissive, refinedTopology, refinements, weights, featurizer)
+  }
 
   def anchor(w: IndexedSeq[W], cons: ChartConstraints[L]):GrammarAnchoring[L, W] = new ProjectionsGrammarAnchoring[L, L2, W] {
 
@@ -264,11 +260,12 @@ object IndexedSpanFeaturizer {
                         grammar: RuleTopology[L],
                         dummyFeatScale: HashFeature.Scale,
                         filterUnseenFeatures: Boolean,
+                        minFeatCount: Int,
                         trees: Traversable[TreeInstance[L, W]]): IndexedSpanFeaturizer[L, L2, W] = {
 
     def seenSet =  if(filterUnseenFeatures) new ThreadLocalBloomFilter[Long](8 * 1024 * 1024 * 50, 3) else AlwaysSeenSet
 
-    val spanBuilder = new CrossProductIndex.Builder(featurizer.index, surfaceFeaturizer.featureIndex, dummyFeatScale, seenSet = seenSet)
+    val spanBuilder = new CrossProductIndex.Builder(featurizer.index, surfaceFeaturizer.featureIndex, dummyFeatScale, seenSet = seenSet, minCount = minFeatCount)
     val wordBuilder = new CrossProductIndex.Builder(featurizer.index, wordFeaturizer.featureIndex, dummyFeatScale, seenSet = seenSet, includeLabelOnlyFeatures = false)
     val ruleAndSpansIndex = Index[Feature]
 
@@ -331,6 +328,8 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
                             oldWeights: File = null,
                             @Help(text="For features not seen in gold trees, we bin them into dummyFeats * numGoldFeatures bins using hashing. If negative, use absolute value as number of hash features.")
                             dummyFeats: Double = 0.5,
+                            minFeatCount: Int = 1,
+                            pruneRedundantFeatures: Boolean = false,
                             commonWordThreshold: Int = 100,
                             ngramCountThreshold: Int = 5,
                             useShape: Boolean = true,
@@ -339,12 +338,11 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
                             useNGrams:Boolean = false,
                             maxNGramOrder:Int = 2,
                             useGrammar: Boolean = true,
-                            useTagSpanShape: Boolean = false,
                             useFullShape: Boolean = false,
                             useSplitShape: Boolean = false,
                             posFeaturizer: Optional[WordFeaturizer[String]] = NotProvided,
                             spanFeaturizer: Optional[SplitSpanFeaturizer[String]] = NotProvided,
-                            extraParams: ExtraParams = ExtraParams()) extends ParserModelFactory[AnnotatedLabel, String] {
+                            extraParams: ExtraParams = ExtraParams()) extends ParserModelFactory[AnnotatedLabel, String] with SafeLogging {
   
   type MyModel = SpanModel[AnnotatedLabel, AnnotatedLabel, String]
 
@@ -389,15 +387,15 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     if(useNGrams)
       span += ngramF
 
-    if(useTagSpanShape)
-      span += tagSpanShape
+//    if(useTagSpanShape)
+//      span += tagSpanShape
 
     if(useFullShape)
       span += fullShape
 
 
-    val indexedWord = IndexedWordFeaturizer.fromData(wf, annTrees.map{_.words})
-    val surface = IndexedSplitSpanFeaturizer.fromData(span, annTrees, bloomFilter = false)
+    val indexedWord = IndexedWordFeaturizer.fromData(wf, annTrees.map{_.words}, deduplicateFeatures = pruneRedundantFeatures)
+    val surface = IndexedSplitSpanFeaturizer.fromData(span, annTrees, bloomFilter = false, deduplicateFeatures = pruneRedundantFeatures)
     
     
     def labelFeaturizer(l: AnnotatedLabel) = Set(l, l.baseAnnotatedLabel).toSeq
@@ -424,7 +422,12 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
       xbarGrammar,
       if(dummyFeats < 0) HashFeature.Absolute(-dummyFeats.toInt) else HashFeature.Relative(dummyFeats),
       filterUnseenFeatures = false,
+      minFeatCount,
       trainTrees)
+
+    println("LAST FEAT:::::" + indexed.spanFeatureIndex.last)
+
+    logger.info(s"Num features: Indexed Features: ${indexed.index.size}")
 
     val featureCounter = readWeights(oldWeights)
 
@@ -450,7 +453,7 @@ case class LatentSpanModelFactory(inner: SpanModelFactory,
 
 
   override def make(train: IndexedSeq[TreeInstance[AnnotatedLabel, String]], topology: RuleTopology[AnnotatedLabel], lexicon: Lexicon[AnnotatedLabel, String], constrainer: Factory[AnnotatedLabel, String]): MyModel = {
-    import inner._
+    import inner.{logger => _, _}
     import extraParams._
     val annTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]] = train.map(annotator(_))
     logger.info("Here's what the annotation looks like on the first few trees")
@@ -524,8 +527,6 @@ case class LatentSpanModelFactory(inner: SpanModelFactory,
     if(useNGrams)
       span += ngramF
 
-    if(useTagSpanShape)
-      span += tagSpanShape
 
     if(useFullShape)
       span += fullShape
@@ -563,7 +564,9 @@ case class LatentSpanModelFactory(inner: SpanModelFactory,
       if(dummyFeats < 0) HashFeature.Absolute(-dummyFeats.toInt) else HashFeature.Relative(dummyFeats),
 //      filterUnseenFeatures = true,
       filterUnseenFeatures = false,
+    1,
       train)
+
 
     val featureCounter = this.readWeights(oldWeights)
 

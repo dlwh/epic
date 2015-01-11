@@ -16,10 +16,10 @@ class NextActualWordFeaturizerTest extends FunSuite {
 
     val identAnch = ident.anchor("This is a test , of the system .".split(" "))
     val anch = next.anchor("This is a test , of the system .".split(" "))
-    assert(anch.featuresForWord(0).toIndexedSeq === identAnch.featuresForWord(0).toIndexedSeq)
-    assert(anch.featuresForWord(1).toIndexedSeq === identAnch.featuresForWord(1).toIndexedSeq)
-    assert(anch.featuresForWord(4).toIndexedSeq != identAnch.featuresForWord(4).toIndexedSeq)
-    assert(anch.featuresForWord(4).toIndexedSeq containsSlice identAnch.featuresForWord(5).toIndexedSeq)
+    assert(anch.featuresForWord(0).toIndexedSeq.collect { case ActualWordFeature(f, _) => f; case PunctuationFeature(f, _) => f} === identAnch.featuresForWord(0).toIndexedSeq)
+    assert(anch.featuresForWord(1).toIndexedSeq.collect { case ActualWordFeature(f, _) => f; case PunctuationFeature(f, _) => f}  === identAnch.featuresForWord(1).toIndexedSeq)
+    assert(anch.featuresForWord(4).toIndexedSeq.collect { case ActualWordFeature(f, _) => f; case PunctuationFeature(f, _) => f}  != identAnch.featuresForWord(4).toIndexedSeq)
+    assert(anch.featuresForWord(4).toIndexedSeq.collect { case ActualWordFeature(f, _) => f; case PunctuationFeature(f, _) => f}  containsSlice identAnch.featuresForWord(5).toIndexedSeq)
 
   }
 

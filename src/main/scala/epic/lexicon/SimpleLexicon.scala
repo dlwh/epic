@@ -1,9 +1,10 @@
 package epic.lexicon
 
-import breeze.linalg._
 import java.io.ObjectStreamException
+
+import breeze.linalg._
 import breeze.util.Index
-import epic.trees.LexicalProduction
+
 import scala.collection.immutable.BitSet
 import scala.collection.mutable
 
@@ -31,6 +32,8 @@ class SimpleLexicon[L, W](val labelIndex: Index[L],
     else set
   }
 
+
+
   for( (w,v) <- wordCounts.iterator if v < closedWordThreshold) {
     byWord.get(w) match {
       case None => byWord(w) = openTags
@@ -52,6 +55,8 @@ class SimpleLexicon[L, W](val labelIndex: Index[L],
   private def writeReplace():Object = {
     new SimpleLexicon.SerializedForm(labelIndex, wordTagCounts, openTagThreshold, closedWordThreshold)
   }
+
+  override def morePermissive: Lexicon[L, W] = new SimpleLexicon(labelIndex, wordTagCounts, openTagThreshold, 1000000)
 }
 
 object SimpleLexicon {

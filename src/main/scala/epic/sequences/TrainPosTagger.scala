@@ -1,12 +1,11 @@
 package epic.sequences
 
-import breeze.optimize.FirstOrderMinimizer.OptParams
 import java.io._
-import epic.trees.{AnnotatedLabel, ProcessedTreebank}
-import breeze.config.{Configuration, CommandLineParser}
-import breeze.util.Encoder
-import epic.util.CacheBroker
+
+import breeze.config.{CommandLineParser, Configuration}
+import breeze.optimize.FirstOrderMinimizer.OptParams
 import com.typesafe.scalalogging.slf4j.LazyLogging
+import epic.trees.{AnnotatedLabel, ProcessedTreebank}
 
 /**
  *
@@ -38,7 +37,7 @@ object TrainPosTagger extends LazyLogging {
  * @author dlwh
  */
 object SemiPOSTagger extends LazyLogging {
-  case class Params(opt: OptParams, treebank: ProcessedTreebank, cache: CacheBroker)
+  case class Params(opt: OptParams, treebank: ProcessedTreebank)
 
   def main(args: Array[String]) {
     val params = CommandLineParser.readIn[Params](args)
@@ -47,12 +46,12 @@ object SemiPOSTagger extends LazyLogging {
     val train = treebank.trainTrees.map(_.asTaggedSequence.asSegmentation)
     val test = treebank.devTrees.map(_.asTaggedSequence.asSegmentation)
 
-    val crf = SemiCRF.buildSimple(train, AnnotatedLabel("TOP"), AnnotatedLabel("TOP"), opt = opt)(cache)
+    val crf = SemiCRF.buildSimple(train, opt = opt)
     val inf = crf.asInstanceOf[SemiCRFInference[_, _]]
 //    val out = new PrintWriter(new BufferedOutputStream(new FileOutputStream("weights.txt")))
 //    Encoder.fromIndex(inf.featureIndex).decode(inf.weights).iterator foreach {case (x, v) if v.abs > 1E-6 => out.println(x -> v) case _ => }
 //    out.close()
-    val stats = SegmentationEval.eval(crf, test, AnnotatedLabel("TOP"))
+    val stats = SegmentationEval.eval(crf, test)
     println("Final Stats: " + stats)
   }
 

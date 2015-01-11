@@ -76,6 +76,8 @@ class Span(val encoded: Long) extends AnyVal {
 
 object Span {
   def apply(begin: Int, end: Int) = new Span((begin.toLong << 32) | (end.toLong&0xFFFFFFFFL))
+
+  def unapply(span: Span) = Some((span.begin, span.end))
 }
 
 object SpanConvert {

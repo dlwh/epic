@@ -1,9 +1,9 @@
 package epic.trees
 package annotations
 
-import epic.trees.BinarizedTree
-import runtime.ScalaRunTime
 import epic.parser.projections.ProjectionIndexer
+
+import scala.runtime.ScalaRunTime
 
 /**
  *
@@ -60,7 +60,7 @@ case class PipelineAnnotator[L, W](ann: Seq[TreeAnnotator[L, W, L]]) extends Tre
 
 }
 
-import TreeAnnotations._
+import epic.trees.annotations.TreeAnnotations._
 
 class IdentityAnnotator[L, W] extends TreeAnnotator[L, W, L] with Serializable {
   def apply(tree: BinarizedTree[L], words: Seq[W]) = tree
@@ -116,7 +116,13 @@ case class ParentAnnotate[W](order: Int = 0,  skipPunctTags: Boolean = true) ext
       def join(base: AnnotatedLabel, parent: Seq[AnnotatedLabel]) = {
         base.copy(parents = parent.map(_.label).toIndexedSeq)
       }
-      Trees.annotateParentsBinarized(tree, join, {(_:AnnotatedLabel).isIntermediate}, {(l:Tree[AnnotatedLabel])=> l.label.label.isEmpty || (l.label.label.head != '@' && !l.label.label.head.isLetterOrDigit)}, order)
+      try  {
+        Trees.annotateParentsBinarized(tree, join, {(_:AnnotatedLabel).isIntermediate}, {(l:Tree[AnnotatedLabel])=> l.label.label.isEmpty || (l.label.label.head != '@' && !l.label.label.head.isLetterOrDigit)}, order)
+      } catch {
+        case ex: AssertionError =>
+          throw new RuntimeException(s"While handling $words", ex)
+      }
+
     }
   }
 
@@ -196,14 +202,16 @@ case class SplitAuxiliary() extends TreeAnnotator[AnnotatedLabel, String, Annota
 case class Punct(word: String) extends Annotation
 
 /**
- * Marks verb tags based on the auxiliary
+ * Marks tags that immediately dominate punctuation that don't include that punctuation
  */
 case class SplitPunct() extends TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] {
 
-  def apply(tree: BinarizedTree[AnnotatedLabel], words: Seq[String]) = {
+  def apply(tree: BinarizedTree[AnnotatedLabel], w: Seq[String]) = {
+    val words = w
     tree.extend {
       case UnaryTree(label, NullaryTree(lbl2, _), chain, span) if label.baseLabel == lbl2.baseLabel =>
         val w = words(span.begin)
+
         if (w.forall(!_.isLetterOrDigit) && label.baseLabel != w) label.annotate(Punct(w))
         else if(w.matches("-[LR].B-") && label.baseLabel != w) label.annotate(Punct(w))
         else label
@@ -222,14 +230,14 @@ case class SplitPunct() extends TreeAnnotator[AnnotatedLabel, String, AnnotatedL
  * Marks VPs based on the kind of verb that it has.
  */
 case class SplitVP() extends TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] {
-  val activeVerbs = Set("VBZ", "VBD", "VBP", "MD")
+  val finiteVerbs = Set("VBZ", "VBD", "VBP", "MD")
   def apply(tree: BinarizedTree[AnnotatedLabel], words: Seq[String]) = tree.extend { t =>
     if(t.label.baseLabel != "VP") {
       t.label
     } else {
       val headTag = HeadFinder.collins.lensed[AnnotatedLabel].findHeadTag(t)
       val base = headTag.baseLabel
-      if (activeVerbs(base)) {
+      if (finiteVerbs(base)) {
         t.label.annotate(VPisVBF)
       } else {
         t.label.annotate(VPisX(base))

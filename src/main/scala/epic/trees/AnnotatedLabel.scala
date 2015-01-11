@@ -15,10 +15,10 @@ package epic.trees
  limitations under the License.
 */
 import breeze.util.{CachedHashCode, Interner, Lens}
-import collection.JavaConverters._
-import collection.mutable.ArrayBuffer
-import epic.trees.annotations.TreeAnnotations.RightRecNP
 import epic.framework.Feature
+
+import scala.collection.JavaConverters._
+import scala.collection.mutable.ArrayBuffer
 
 /**
  * Something we can throw in an AnnotatedLabel
@@ -44,7 +44,7 @@ case class AnnotatedLabel(label: String,
   def hasAnnotation(f: Annotation): Boolean = features.contains(f)
 
 
-  def annotate(sym: Annotation) = copy(features = features + sym)
+  def annotate(sym: Annotation*) = copy(features = features ++ sym)
 
   def isIntermediate = label.nonEmpty && label.charAt(0) == '@'
 
@@ -83,10 +83,44 @@ case class AnnotatedLabel(label: String,
 
 object AnnotatedLabel {
 
-  def apply(label: String):AnnotatedLabel = lblCache.getOrElseUpdate(label, interner.intern(new AnnotatedLabel(label)))
+  def parseTreebank(label: String, stripCoref: Boolean = true):AnnotatedLabel = try {
+
+    var fields = if (label == "PRT|ADVP") {
+      Array("PRT")
+    } else if (label.startsWith("-") || label.isEmpty || label == "#") {
+      Array(label)
+    } else if (label.contains("#")) {
+      val splits = label.split("#").filter(_.nonEmpty)
+      val nonmorphSplits = splits.head.split("[-=]")
+      val morphSplits = splits.tail.flatMap(_.split("[|]")).filter("_" != _)
+      nonmorphSplits ++ morphSplits
+    } else {
+      label.split("[-=#]")
+    }
+
+    if(label.isEmpty) return AnnotatedLabel.TOP
+
+    val tag = fields.head
+
+    fields = fields.drop(1)
+
+    if (stripCoref)
+      fields = fields.filterNot(l => l.charAt(0).isDigit)
+
+    val lbl = interner(AnnotatedLabel(tag).annotate(fields.map(FunctionalTag).map(functionalTagInterner):_*))
+
+    lbl
+  } catch {
+    case ex: Exception => throw new RuntimeException("while dealing with the label " + label, ex)
+  }
+
+  def apply(label: String):AnnotatedLabel = {
+    lblCache.getOrElseUpdate(label, interner.intern(new AnnotatedLabel(label)))
+  }
 
   private val lblCache = new java.util.concurrent.ConcurrentHashMap[String, AnnotatedLabel]().asScala
   private val interner: Interner[AnnotatedLabel] = new Interner[AnnotatedLabel]()
+  private val functionalTagInterner = new Interner[FunctionalTag]
 
   val TOP = AnnotatedLabel("TOP")
 

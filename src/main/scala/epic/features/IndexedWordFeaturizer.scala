@@ -1,8 +1,8 @@
 package epic.features
 
-import epic.util.{CacheBroker, Has2}
 import breeze.util.Index
 import epic.framework.Feature
+
 import scala.collection.mutable
 
 trait IndexedWordFeaturizer[W] {
@@ -18,17 +18,18 @@ trait IndexedWordFeaturizer[W] {
 object IndexedWordFeaturizer {
   def fromData[W](feat: WordFeaturizer[W],
                   data: IndexedSeq[IndexedSeq[W]],
-                  wordHashFeatures: Int = 0): IndexedWordFeaturizer[W]  = {
-    val wordIndex = Index[Feature]()
+                  wordHashFeatures: Int = 0,
+                  deduplicateFeatures: Boolean = true): IndexedWordFeaturizer[W]  = {
+    val wordIndex = if(deduplicateFeatures) new NonRedundantIndexBuilder[Feature] else new NormalIndexBuilder[Feature]()
     for(words <- data) {
       val anch = feat.anchor(words)
       for(i <- 0 until words.length) {
-        anch.featuresForWord(i) foreach {wordIndex.index _}
+        wordIndex.add(anch.featuresForWord(i) )
       }
     }
 
 
-    new MyWordFeaturizer[W](feat, wordIndex)
+    new MyWordFeaturizer[W](feat, wordIndex.result())
   }
 
   @SerialVersionUID(1L)

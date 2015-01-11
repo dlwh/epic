@@ -26,12 +26,12 @@ class TreebankTokenizerTest  extends FunSuite {
       assert(isOneToken(w), w)
     }
     val special = Map(
-      "(" -> "-LRB-",
-      ")" -> "-RRB-",
-      "[" -> "-LSB-",
-      "]" -> "-RSB-",
-      "{" -> "-LCB-",
-      "}" -> "-RCB-"
+      "(" -> "(",
+      ")" -> ")",
+      "[" -> "[",
+      "]" -> "]",
+      "{" -> "{",
+      "}" -> "}"
     )
 
     for( (s,t) <- special) {
@@ -43,7 +43,7 @@ class TreebankTokenizerTest  extends FunSuite {
     val sents = Map( "Every good boy does fine." -> List("Every","good","boy","does","fine","."),
       "Hi there, pilgrim; happy Thanksgiving there, pilgrim?" -> List("Hi","there",",","pilgrim",";","happy","Thanksgiving","there",",","pilgrim","?"),
       "Hi there, pilgrim; happy Thanksgiving there, pilgrim!" -> List("Hi","there",",","pilgrim",";","happy","Thanksgiving","there",",","pilgrim","!"),
-      "Hi there, (pilgrim); happy Thanksgiving there, pilgrim!" -> List("Hi","there",",","-LRB-", "pilgrim", "-RRB-", ";","happy","Thanksgiving","there",",","pilgrim","!")
+      "Hi there, (pilgrim); happy Thanksgiving there, pilgrim!" -> List("Hi","there",",","(", "pilgrim", ")", ";","happy","Thanksgiving","there",",","pilgrim","!")
     )
     for( (s,toks) <- sents) {
       assert(TreebankTokenizer(s).toList.map(_.content) === toks)
@@ -206,9 +206,9 @@ class TreebankTokenizerTest  extends FunSuite {
       |@e_one
       |:
       |Texas
-      |-LRB-
+      |(
       |cont
-      |-RRB-
+      |)
       |http://tl.gd/6meogh
       |QQQ
       |RT
@@ -360,14 +360,14 @@ class TreebankTokenizerTest  extends FunSuite {
       |well
       |QQQ
       |hello
-      |-LRB-
+      |(
       |#hashtag
-      |-RRB-
+      |)
       |QQQ
       |hello
-      |-LRB-
+      |(
       |@person
-      |-RRB-
+      |)
     """.stripMargin.split("QQQ").map(_.trim.split("\n").map(_.trim))
 
 

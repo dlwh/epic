@@ -18,7 +18,7 @@ class IdentityTransform[T] extends Transform[T, T] {
 
     def activations(fv: T) = fv
 
-    def tallyDerivative(deriv: DenseVector[Double], scale: =>DenseVector[Double], t: T) = {}
+    def tallyDerivative(deriv: DenseVector[Double], scale: =>Vector[Double], t: T) = {}
   }
 
 }

@@ -12,10 +12,31 @@ case class Segmentation[+L, +W](segments: IndexedSeq[(L, Span)],
                               words: IndexedSeq[W],
                               id: String = "") extends Example[IndexedSeq[(L, Span)], IndexedSeq[W]] {
 
+  def segmentsWithOutside: Iterator[(Option[L], Span)] = {
+    val segs = for {
+      qq@IndexedSeq((pL, pSpan), (l, span)) <- (segments.headOption.map(pair => pair._1 -> Span(0, 0)).toIndexedSeq ++ segments).sliding(2)
+      padding = Iterator.range(pSpan.end, span.begin).map(i => None -> Span(i, i + 1))
+      pair <- padding ++ Iterator((Some(l), span))
+    } yield {
+      pair
+    }
 
 
-  def render[LL>:L](badLabel: LL) = {
-    segments.map(l => if (l._1 == badLabel) l._2.map(words).mkString(" ") else l._2.map(words).mkString(s"[${l._1.toString}:", " ","]")).mkString(" ")
+    val lastSpanEnd = segments.lastOption match {
+      case Some((_, Span(_, end))) => end
+      case _ => 0
+    }
+
+    segs ++ (lastSpanEnd until length).map(i => None -> Span(i, i + 1))
+  }
+
+
+
+  def render: String = {
+    segmentsWithOutside.map {
+      case (None, span) => words.slice(span.begin, span.end).mkString(" ")
+      case (Some(l), span) => words.slice(span.begin, span.end).mkString(s"[$l: ", " ", "]")
+    }.mkString(" ")
   }
 
 
@@ -47,19 +68,19 @@ case class Segmentation[+L, +W](segments: IndexedSeq[(L, Span)],
     TaggedSequence(outLabels, words, id +"-bio")
   }
 
-  def asFlatTaggedSequence[LL>:L](outsideLabel: LL): TaggedSequence[LL, W] = {
-    val outLabels = new ArrayBuffer[LL]()
+  def asFlatTaggedSequence[LL>:L]: TaggedSequence[Option[LL], W] = {
+    val outLabels = new ArrayBuffer[Option[LL]]()
     for((l,span) <- segments if !span.isEmpty) {
       while(outLabels.length < span.begin) {
-        outLabels += outsideLabel
+        outLabels += None
       }
 
       for(i <- (span.begin) until (span.end) ) {
-        outLabels += l
+        outLabels += Some(l)
       }
     }
     while(outLabels.length < words.length) {
-      outLabels += outsideLabel
+      outLabels += None
     }
     assert(outLabels.length == words.length)
     TaggedSequence(outLabels, words, id +"-flattened")

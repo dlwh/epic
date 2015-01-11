@@ -18,6 +18,7 @@ package epic.trees
 
 
 import java.io._
+
 import epic.ontonotes.ConllOntoReader
 
 /**
@@ -101,8 +102,10 @@ object Treebank {
     }
   }
 
+  def fromMetatreebankDirectory(dir: File):Treebank[String] = {
+    SimpleTreebank.fromTrainDevTestDirs(dir)
+  }
 
-  import scala.io.Source
   /**
   * Reads a treebank from the "mrg/wsj" section
   * of the parsed Treebank.

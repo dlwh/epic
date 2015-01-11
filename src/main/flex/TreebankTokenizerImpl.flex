@@ -58,7 +58,7 @@ public final int yychar()
 }
 
 final epic.slab.ContentToken currentToken() {
-    return currentToken(new String(zzBuffer, zzStartRead, zzMarkedPos-zzStartRead).replaceAll("’", "'"));
+    return currentToken(new String(zzBuffer, zzStartRead, zzMarkedPos-zzStartRead).replace('’', '\'').replace('¨','\u0308').replaceAll("-[\n\r]+",""));
 }
 final epic.slab.ContentToken currentToken(String value) {
 //  return new String(zzBuffer, zzStartRead, zzMarkedPos-zzStartRead);
@@ -82,7 +82,9 @@ THAI       = [\u0E00-\u0E59]
 // basic word: a sequence of digits & letters (includes Thai to enable ThaiAnalyzer to function)
 ALPHANUM   = ({LETTER}|{THAI}|[:digit:]|_)+
 
-ALPHA      = ({LETTER})+
+ALPHA      = ({LETTER}|¨)+
+
+NEWLINE = [\n\r]
 
 // acronyms: U.S.A., I.B.M., etc.
 // use a post-filter to remove dots
@@ -206,7 +208,7 @@ PUNCT = ({P}|{Q}|[?!@#$%\^&*_:;\]\[\"»«\202\204\206\207\213\221\222\223\224\22
 HAS_DIGIT  = ({LETTER}|[:digit:])* [:digit:] ({LETTER}|[:digit:])*
 
 
-LETTER     = [:letter:]
+LETTER     = ([:letter:]|¨)
 
 ENGLISH_CLITIC = ({Q}(ll|d|ve|s|re|LL|D|VE|S|RE|m|M|n|N|[eE][mM])?|[nN]{Q}[Tt])
 
@@ -301,7 +303,7 @@ d{Q} / ye                                                        {return current
 
 // normal stuff
 // dashed words
-{WORD}({DASH}{WORD})+                                           {return currentToken();}
+{WORD}({DASH}{NEWLINE}*{WORD})+                                           {return currentToken();}
 {TWITTER_HANDLE}                                                     { return currentToken(); }
 {TWITTER_HASHTAG}                                                     { return currentToken(); }
 {WORD}                                        {return currentToken();}
@@ -312,12 +314,12 @@ d{Q} / ye                                                        {return current
 {NUM}                                                          { return currentToken(); }
 {ACRONYM_DEP}                                                  { return currentToken(); }
 {WHITESPACE}                                                   {} 
-\(                                                  {return currentToken("-LRB-");}
-\)                                                  {return currentToken("-RRB-");}
-\{                                                  {return currentToken("-LCB-");}
-\}                                                  {return currentToken("-RCB-");}
-\[                                                  {return currentToken("-LSB-");}
-\]                                                  {return currentToken("-RSB-");}
+// \(                                                  {return currentToken("-LRB-");}
+// \)                                                  {return currentToken("-RRB-");}
+//\{                                                  {return currentToken("-LCB-");}
+//\}                                                  {return currentToken("-RCB-");}
+//\[                                                  {return currentToken("-LSB-");}
+//\]                                                  {return currentToken("-RSB-");}
 ([.][.]+|…+)                                                 {return currentToken("...");}
 {LONG_END_PUNCT}                                        { return currentToken();}
 {PUNCT}                                               { return currentToken();}

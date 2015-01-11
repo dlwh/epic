@@ -1,16 +1,15 @@
 package epic.dense
 
 import breeze.linalg._
-import operators._
-import epic.framework.Feature
 import breeze.util.Index
+import epic.framework.Feature
 
 /**
  *
  *
  * @author dlwh
  */
-trait Transform[In, Out] {
+trait Transform[In, +Out] {
   val index: Index[Feature]
 
 
@@ -24,7 +23,7 @@ trait Transform[In, Out] {
 
     def activations(fv: In):Out
 
-    def tallyDerivative(deriv: DenseVector[Double], scale: =>DenseVector[Double], fv: In)
+    def tallyDerivative(deriv: DenseVector[Double], scale: =>Vector[Double], fv: In)
 
   }
 

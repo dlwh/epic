@@ -53,6 +53,24 @@ class SimpleTreebank(trainUrls: Map[String,URL],
 }
 
 object SimpleTreebank {
+  def fromTrainDevTestDirs(baseDir: File, extension: String = ".parse"): Treebank[String] = {
+
+    def listRecursively(f: File): Iterator[File] = {
+      f.listFiles().iterator.flatMap {
+        case f if f.isDirectory => listRecursively(f)
+        case f if f.getName.endsWith(extension) =>  Iterator(f)
+        case _ => Iterator.empty
+      }
+    }
+
+    def mapify(iter: Iterator[File]) = iter.map(f => f.getName -> f.toURI.toURL).toMap
+
+    new SimpleTreebank(mapify(listRecursively(new File(baseDir, "train"))),
+      mapify(listRecursively(new File(baseDir, "dev"))),
+      mapify(listRecursively(new File(baseDir, "test"))))
+
+  }
+
   def writeSimpleTreebank(trees: Treebank[String], dir: File) = {
     dir.mkdirs()
     def writeToFile(file: File, trees: Iterator[(Tree[String],IndexedSeq[String])]) = {

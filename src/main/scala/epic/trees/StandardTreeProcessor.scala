@@ -28,36 +28,24 @@ case class StandardTreeProcessor(headFinder: HeadFinder[AnnotatedLabel] = HeadFi
   import Trees.Transforms._
   private def ens = new EmptyNodeStripper[String]
   private def xox = new XOverXRemover[String]
-  @transient
-  private var interner = new Interner[AnnotatedLabel]
-  @transient
-  private var functionalTagInterner = new Interner[FunctionalTag]
-
+  private val dummyLabelStripper  = new StripLabels("EDITED")
 
   // Don't delete.
   @throws(classOf[IOException])
   @throws(classOf[ClassNotFoundException])
   private def readObject(oin: ObjectInputStream) {
     oin.defaultReadObject()
-    interner = new Interner
-    functionalTagInterner = new Interner
   }
 
 
   def apply(tree: Tree[String]):BinarizedTree[AnnotatedLabel] = {
-    var transformed = xox(ens(tree).get)
+    var transformed = xox(dummyLabelStripper(ens(tree).get))
     transformed = if(transformed.children.length != 1) {
       Tree("", IndexedSeq(transformed), transformed.span)
     } else {
       transformed
     }
-    val ann = transformed.map { label =>
-      val fields = StandardTreeProcessor.splitLabel(label)
-      val anno = fields.drop(1).filterNot(s => s.nonEmpty && s.charAt(0).isDigit)
-      interner.intern(AnnotatedLabel(fields.head.intern,
-        features= anno.iterator.map(tag => functionalTagInterner.intern(FunctionalTag(tag))).toSet
-      ))
-    }
+    val ann = transformed.map { AnnotatedLabel.parseTreebank(_) }
 
 
     def makeIntermediate(l: AnnotatedLabel, tag: AnnotatedLabel) = {
@@ -77,19 +65,5 @@ case class StandardTreeProcessor(headFinder: HeadFinder[AnnotatedLabel] = HeadFi
 
 object StandardTreeProcessor {
 
-  def splitLabel(label: String): Array[String] = try {
-    if (label == "PRT|ADVP") return Array("PRT")
-    else if (label.startsWith("-") || label.isEmpty || label == "#")
-      Array(label)
-    else if (label.contains("#")) {
-      val splits = label.split("#").filter(_.nonEmpty)
-      val nonmorphSplits = splits.head.split("[-=]")
-      val morphSplits = splits.tail.flatMap(_.split("[|]")).filter("_" != _)
-      nonmorphSplits ++ morphSplits
-    } else {
-      label.split("[-=#]")
-    }
-  } catch {
-    case ex: Exception => throw new RuntimeException("while dealing with the label " + label, ex)
-  }
+
 }

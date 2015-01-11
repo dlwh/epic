@@ -6,11 +6,13 @@ Epic is a structured prediction framework for Scala. It also includes classes fo
 
 Epic is distributed under the [Apache License, Version 2.0](http://www.apache.org/licenses/LICENSE-2.0.html).
 
-The current version is 0.2-SNAPSHOT.
+The current version is 0.2.
 
 ## Documentation
 
 Documentation will (eventually) live at the GitHub wiki: <https://github.com/dlwh/epic/wiki>
+
+See some example usages at <https://github.com/dlwh/epic-demo>.
 
 ## Using Epic
 
@@ -80,7 +82,7 @@ val parser = epic.models.deserialize[Parser[AnnotataedLabel, String]](path)
 
 // or:
 
-val parser = epic.models.ParserSelector.loadParser("en") // or another 2 letter code.
+val parser = epic.models.ParserSelector.loadParser("en").get // or another 2 letter code.
 
 val tree = parser(sentence)
 
@@ -113,17 +115,15 @@ println(tags.render)
 Using a named entity recognizer is similar to using a pos tagger: load a model, tokenize some text, run the recognizer. All NER systems are (currently) [linear chain semi-Markov conditional random fields](http://people.cs.umass.edu/~mccallum/papers/crf-tutorial.pdf), or SemiCRFs. (You don't need to understand them to use them. They are just a machine learning method for segmenting text into fields.
 
 ```scala
-
-```scala
-val tagger = epic.models.deserialize[SemiCRF[AnnotatedLabel, String]](path)
+val ner = epic.models.deserialize[SemiCRF[AnnotatedLabel, String]](path)
 
 // or:
 
-val tagger = epic.models.NerSelector.loadSegmenter("en") // or another 2 letter code.
+val ner = epic.models.NerSelector.loadNer("en").get// or another 2 letter code.
 
-val segments = tagger(sentence)
+val segments = ner.bestSequence(sentence)
 
-println(tags.render(tagger.outsideLabel))
+println(segments.render)
 
 ```
 
@@ -142,73 +142,87 @@ language is the [two letter code for the language](http://www.loc.gov/standards/
 
 To following models are available at this time:
 
+__AS OF WRITING ONLY THE ENGLISH PARSER AND NER SYSTEM ARE AVAILABLE!__ Write me if you want these other models.
 
 * Parser
   * English: 
     ```
-    "org.scalanlp" %% "epic-parser-en-span" % "2014.6.3-SNAPSHOT"
-    ```
-  * Basque: 
-    ```
-    "org.scalanlp" %% "epic-parser-eu-span" % "2014.6.3-SNAPSHOT"
-    ```
-  * French: 
-    ```
-    "org.scalanlp" %% "epic-parser-fr-span" % "2014.6.3-SNAPSHOT"
-    ```
-  * German: 
-    ```
-    "org.scalanlp" %% "epic-parser-de-span" % "2014.6.3-SNAPSHOT"
-    ```
-  * Hungarian: 
-    ```
-    "org.scalanlp" %% "epic-parser-hu-span" % "2014.6.3-SNAPSHOT"
-    ```
-  * Korean: 
-    ```
-    "org.scalanlp" %% "epic-parser-ko-span" % "2014.6.3-SNAPSHOT"
-    ```
-  * Polish:
-    ```
-    "org.scalanlp" %% "epic-parser-pl-span" % "2014.6.3-SNAPSHOT"
-    ```
-  * Swedish: 
-    ```
-    "org.scalanlp" %% "epic-parser-sv-span" % "2014.6.3-SNAPSHOT"
-    ```
-* POS Taggers
-  * English: 
-    ```
-    "org.scalanlp" %% "epic-pos-en" % "2014.6.3-SNAPSHOT"
-    ```
-  * Basque: 
-    ```
-    "org.scalanlp" %% "epic-pos-eu" % "2014.6.3-SNAPSHOT"
-    ```
-  * French: 
-    ```
-    "org.scalanlp" %% "epic-pos-fr" % "2014.6.3-SNAPSHOT"
-    ```
-  * German: 
-    ```
-    "org.scalanlp" %% "epic-pos-de" % "2014.6.3-SNAPSHOT"
-    ```
-  * Hungarian: 
-    ```
-    "org.scalanlp" %% "epic-pos-hu" % "2014.6.3-SNAPSHOT"
-    ```
-  * Polish: 
-    ```
-    "org.scalanlp" %% "epic-pos-pl" % "2014.6.3-SNAPSHOT"
-    ```
-  * Swedish: 
-    ```
-    "org.scalanlp" %% "epic-pos-sv" % "2014.6.3-SNAPSHOT"
+    "org.scalanlp" %% "epic-parser-en-span" % "2014.9.15"
     ```
 * Named Entity Recognizers
   * English: 
     ```
-    "org.scalanlp" %% "epic-ner-en-conll" % "2014.6.3-SNAPSHOT"
+    "org.scalanlp" %% "epic-ner-en-conll" % "2014.10.26"
+    ```
+
+TODO:
+
+* Parser
+  * English: 
+    ```
+    "org.scalanlp" %% "epic-parser-en-span" % "2014.9.15-SNAPSHOT"
+    ```
+  * Basque: 
+    ```
+    "org.scalanlp" %% "epic-parser-eu-span" % "2014.9.15-SNAPSHOT"
+    ```
+  * French: 
+    ```
+    "org.scalanlp" %% "epic-parser-fr-span" % "2014.9.15-SNAPSHOT"
+    ```
+  * German: 
+    ```
+    "org.scalanlp" %% "epic-parser-de-span" % "2014.9.15-SNAPSHOT"
+    ```
+  * Hungarian: 
+    ```
+    "org.scalanlp" %% "epic-parser-hu-span" % "2014.9.15-SNAPSHOT"
+    ```
+  * Korean: 
+    ```
+    "org.scalanlp" %% "epic-parser-ko-span" % "2014.9.15-SNAPSHOT"
+    ```
+  * Polish:
+    ```
+    "org.scalanlp" %% "epic-parser-pl-span" % "2014.9.15-SNAPSHOT"
+    ```
+  * Swedish: 
+    ```
+    "org.scalanlp" %% "epic-parser-sv-span" % "2014.9.15-SNAPSHOT"
+    ```
+* POS Taggers
+  * English: 
+    ```
+    "org.scalanlp" %% "epic-pos-en" % "2014.9.15-SNAPSHOT"
+    ```
+  * Basque: 
+    ```
+    "org.scalanlp" %% "epic-pos-eu" % "2014.9.15-SNAPSHOT"
+    ```
+  * French: 
+    ```
+    "org.scalanlp" %% "epic-pos-fr" % "2014.9.15-SNAPSHOT"
+    ```
+  * German: 
+    ```
+    "org.scalanlp" %% "epic-pos-de" % "2014.9.15-SNAPSHOT"
+    ```
+  * Hungarian: 
+    ```
+    "org.scalanlp" %% "epic-pos-hu" % "2014.9.15-SNAPSHOT"
+    ```
+  * Polish: 
+    ```
+    "org.scalanlp" %% "epic-pos-pl" % "2014.9.15-SNAPSHOT"
+    ```
+  * Swedish: 
+    ```
+    "org.scalanlp" %% "epic-pos-sv" % "2014.9.15-SNAPSHOT"
+    ```
+* Named Entity Recognizers
+  * English: 
+    ```
+    "org.scalanlp" %% "epic-ner-en-conll" % "2014.9.15-SNAPSHOT"
     ```
 
 
