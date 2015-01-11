@@ -32,7 +32,7 @@ class PositionalTransformModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSe
                                refinements: GrammarRefinements[L, L2],
                                labelFeaturizer: RefinedFeaturizer[L, W, Feature],
                                surfaceFeaturizer: Word2VecSurfaceFeaturizerIndexed[W],
-                               val transform: AffineTransformDense[Array[Int]],
+                               val transforms: AffineTransformDense[Array[Int]],
                                val maybeSparseSurfaceFeaturizer: Option[IndexedSpanFeaturizer[L, L2, W]]) extends ParserModel[L, W] {
   override type Inference = PositionalTransformModel.Inference[L, L2, W]
 

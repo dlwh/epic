@@ -28,7 +28,7 @@ case class EmbeddingsTransform[FV](numOutputs: Int,
     } else {
       DenseVector.zeros[Double](numOutputs)
     }
-    val wordWeights = weights(index.indices(0).size until weights.size).asDenseMatrix.reshape(word2vecFeaturizer.vocSize, word2vecFeaturizer.wordRepSize, view = View.Require)
+    val wordWeights = weights(index.indices(0).size until index.indices(0).size + index.indices(1).size).asDenseMatrix.reshape(word2vecFeaturizer.vocSize, word2vecFeaturizer.wordRepSize, view = View.Require)
     new Layer(mat, bias, wordWeights)
   }
   
@@ -90,7 +90,7 @@ case class EmbeddingsTransform[FV](numOutputs: Int,
       // scale(i) pushes in  (f'(mat * inner(v) + bias))(i)
       val innerAct = DenseVector(word2vecFeaturizer.convertToVector(fv)) + Word2VecSurfaceFeaturizerIndexed.makeVectFromParams(fv, wordWeights);
       
-      val wordsDeriv = deriv(index.indices(0).size until deriv.size).asDenseMatrix.reshape(word2vecFeaturizer.vocSize, word2vecFeaturizer.wordRepSize, view = View.Require)
+      val wordsDeriv = deriv(index.indices(0).size until index.indices(0).size + index.indices(1).size).asDenseMatrix.reshape(word2vecFeaturizer.vocSize, word2vecFeaturizer.wordRepSize, view = View.Require)
       // d/d(weights(::, i)) == scale(i) * innerAct
       for (i <- 0 until weights.rows) {
         val a: Double = scale(i)

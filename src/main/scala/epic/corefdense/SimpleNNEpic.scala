@@ -15,7 +15,6 @@ import scala.util.Random
 import edu.berkeley.nlp.futile.util.Logger
 import epic.dense.IdentityTransform
 import epic.dense.AffineTransform
-import edu.berkeley.nlp.futile.classify.ClassifyUtils
 
 class SimpleNNEpic[T](val inputSize: Int,
                       val hiddenSize: Int,
@@ -31,7 +30,7 @@ class SimpleNNEpic[T](val inputSize: Int,
   def accumulateGradientAndComputeObjective(ex: NNExample[T], weights: Array[Double], gradient: Array[Double]): Double = {
     val layer = transform.extractLayer(DenseVector(weights))
     val logProbs = layer.activations(DenseVector(ex.input)).data
-    ClassifyUtils.softmaxi(logProbs)
+    CorefNNEpic.softmaxi(logProbs)
     val trueLabelIdx = labelIndexer.getIndex(ex.getLabel)
     val tallyInputs = Array.tabulate(labelIndexer.size)(i => (if (i == trueLabelIdx) 1.0 else 0.0) - Math.exp(logProbs(i)))
     layer.tallyDerivative(DenseVector(gradient), DenseVector(tallyInputs), DenseVector(ex.input))
@@ -41,7 +40,7 @@ class SimpleNNEpic[T](val inputSize: Int,
   def predict(input: Array[Double], weights: DenseVector[Double]): T = {
     val layer = transform.extractLayer(weights)
     val logProbs = layer.activations(DenseVector(input)).data
-    labelIndexer.getObject(ClassifyUtils.argMaxIdx(logProbs))
+    labelIndexer.getObject(CorefNNEpic.argMaxIdx(logProbs))
   }
   
   def computeObjective(ex: NNExample[T], weights: Array[Double]): Double = accumulateGradientAndComputeObjective(ex, weights, Array.tabulate(weights.size)(i => 0.0))

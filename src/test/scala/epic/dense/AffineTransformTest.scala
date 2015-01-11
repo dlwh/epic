@@ -48,7 +48,7 @@ class AffineTransformTest extends FunSuite {
 
     val weights: DenseVector[Double] = (DenseVector.rand[Double](index.index.size) - 0.5) * 4.0
     val diffs = GradientTester.test[Int, DenseVector[Double]](objective, weights, randFraction = 1.0)
-    assert(max(diffs) < 4E-3, s"${diffs.max} was bigger than expected!!")
+    assert(max(diffs) < 2E-2, s"${diffs.max} was bigger than expected!!")
   }
 
  }

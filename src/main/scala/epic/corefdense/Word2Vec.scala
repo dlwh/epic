@@ -8,6 +8,7 @@ import java.util.regex.Pattern
 import edu.berkeley.nlp.futile.fig.basic.IOUtils
 import java.io.File
 import scala.util.Random
+import breeze.linalg.Counter
 
 object Word2Vec {
   
@@ -132,13 +133,20 @@ object Word2Vec {
       if (inputVectorBias) {
         vector(j) = 1.0F
       }
-      if (words.contains(word)) {
+      if (words.isEmpty || words.contains(word)) {
         word2Vec.put(word, vector);
       }
     }
     println("Loaded " + word2Vec.size + " word2vec representations out of " + words.size + " attempted words");
     word2Vec;
   }
+  
+//  def printTopMissedWords(word2VecPath: String, words: Counter[String,Double]) {
+//    val w2v = readWord2Vec(word2VecPath, words.keySet.toSet[String], false)
+//    for (word <- words.keysIterator) {
+//      println(word + ": " + words(word))
+//    }
+//  }
   
   val hyphenPattern = Pattern.compile("(\\w+-)+(\\w+)");
   
@@ -182,32 +190,80 @@ object Word2Vec {
   def readBansalEmbeddings(embeddingsPath: String, words: Set[String], inputVectorBias: Boolean) = {
     val inFile = IOUtils.lineIterator(embeddingsPath)
     val word2Vec = new HashMap[String,Array[Float]];
+    var firstLine = true
     while (inFile.hasNext()) {
       val line = inFile.next;
-      val word = line.substring(0, line.indexOf("\t"));
-      if (words.contains(word)) {
-        val entries = line.substring(line.indexOf("\t")).split(" ")
-        val arr = Array.tabulate(if (inputVectorBias) entries.size + 1 else entries.size)(i => {
-          if (inputVectorBias && i == entries.size) {
-            1.0F
-          } else {
-            entries(i).toFloat
-          }
-        })
-        word2Vec.put(word, arr)
+      if (firstLine) {
+        if (line.split("\\s+").size == 2) {
+          println("Skipping first line: " + line)
+          // Just an indicator of how many words there are and the vector dim, so
+          // skip over it by leaving firstLine set to true
+        } else {
+          println("Not skipping first line: " + line)
+          firstLine = false;
+        }
       }
+      if (!firstLine) {
+        // If the line contains a tab, then that's the delimiter between the word and
+        // the vectors
+        if (line.contains("\t")) {
+          val word = line.substring(0, line.indexOf("\t"));
+          if (words.isEmpty || words.contains(word)) {
+            val entries = line.substring(line.indexOf("\t") + 1).split(" ")
+            val arr = Array.tabulate(if (inputVectorBias) entries.size + 1 else entries.size)(i => {
+              if (inputVectorBias && i == entries.size) {
+                1.0F
+              } else {
+                entries(i).toFloat
+              }
+            })
+            word2Vec.put(word, arr)
+          }
+        } else {
+          // Otherwise, a space is the first delimiter
+          val word = line.substring(0, line.indexOf(" "));
+          if (words.isEmpty || words.contains(word)) {
+            val entries = line.substring(line.indexOf(" ") + 1).split(" ");
+            val arr = Array.tabulate(if (inputVectorBias) entries.size + 1 else entries.size)(i => {
+              if (inputVectorBias && i == entries.size) {
+                1.0F
+              } else {
+                entries(i).toFloat
+              }
+            })
+            word2Vec.put(word, arr)
+          }
+        }
+      }
+      firstLine = false;
     }
     println("Loaded " + word2Vec.size + " Bansal representations out of " + words.size + " attempted words");
     word2Vec;
   }
   
   def main(args: Array[String]) {
-    smartLoadVectorsForVocabulary(Seq("data/syntacticEmbeddings/skipdep_embeddings.txt",
-                                      "../cnnkim/data/GoogleNews-vectors-negative300.bin"), Set("the", ",", "crazyoovword"), true)
-    
+//    smartLoadVectorsForVocabulary(Seq("data/syntacticEmbeddings/skipdep_embeddings.txt",
+//                                      "../cnnkim/data/GoogleNews-vectors-negative300.bin"), Set("the", ",", "crazyoovword"), true)
+//    readBansalEmbeddings("data/kushw2v/swedishwordvector.txt", Set("Den", ","), false)
 //    smartLoadVectorsForVocabulary(Seq("data/syntacticEmbeddings/skipdep_embeddings.txt"), Set("the", ","), true)
     
 //    readBansalEmbeddings("data/syntacticEmbeddings/skipdep_embeddings.txt", Set("the", ","), false)
+    
+//    val counts = Counter[String,Double]
+//    counts("thing") = 5
+//    counts("stuff") = 3
+//    counts("a") = 1
+//    counts("b") = 10
+//    for (word <- counts.keySet.toSeq.sortBy(word => -counts(word))) {
+//      println(word + ": " + counts(word))
+//    }
+//    System.exit(0)
+//    
+//    val w2v = readWord2Vec("data/w2v/sv2.bin", Set(), true)
+//    for (word <- w2v.keySet) {
+//      println(word + ": " + w2v(word).toSeq)
+//    }
+    
     
 //    println(convertWord("a15"))
 //    println(convertWord("1526"))

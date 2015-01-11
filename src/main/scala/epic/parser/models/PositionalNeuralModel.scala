@@ -24,6 +24,7 @@ import epic.corefdense.Word2Vec
 import scala.collection.mutable.HashMap
 import epic.dense.Word2VecSurfaceFeaturizer
 import epic.dense.Word2VecSurfaceFeaturizerIndexed
+import epic.dense.CachingLookupTransform
 import epic.dense.CachingLookupAndAffineTransformDense
 import epic.dense.EmbeddingsTransform
 
@@ -86,24 +87,25 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
       
 
     val prodFeaturizer = new ProductionFeaturizer[AnnotatedLabel, AnnotatedLabel, String](xbarGrammar, indexedRefinements, lGen=labelFeaturizer, rGen=ruleFeaturizer)
+    
+//    val presentWords = Word2Vec.readBansalEmbeddings(word2vecPath, summedWordCounts.keySet.toSet[String], false)
+//    var displayCount = 0
+//    var displayCount2 = 0
+//    for (word <- summedWordCounts.keySet.toSeq.sortBy(word => -summedWordCounts(word))) {
+//      if (!presentWords.contains(word) && displayCount < 100) {
+//        println(word + ": " + summedWordCounts(word))
+//        displayCount += 1
+//      } else if (presentWords.contains(word) && displayCount2 < 100) {
+//        println("PRESENT: " + summedWordCounts(word))
+//        displayCount2 += 1
+//      }
+//    }
+//    System.exit(0)
       
     val word2vec = Word2Vec.smartLoadVectorsForVocabulary(word2vecPath.split(":"), summedWordCounts.keySet.toSet[String].map(str => Word2Vec.convertWord(str)), true)
-//    val word2vec = if (useNewVectorLoading) {
-//      Word2Vec.smartLoadVectorsForVocabulary(word2vecPath.split(":"), summedWordCounts.keySet.toSet[String].map(str => Word2Vec.convertWord(str)), true)
-//    } else {
-//      Word2Vec.loadVectorsForVocabulary(word2vecPath, summedWordCounts.keySet.toSet[String].map(str => Word2Vec.convertWord(str)), true)
-//    }
     // Convert Array[Float] values to DenseVector[Double] values
     val word2vecDoubleVect = word2vec.map(keyValue => (keyValue._1 -> keyValue._2.map(_.toDouble)))
 //    val word2vecDoubleVect = word2vec.map(keyValue => (keyValue._1 -> new DenseVector[Double](keyValue._2.map(_.toDouble))))
-    
-//    val surfaceFeaturizer = new Word2VecSurfaceFeaturizer(word2vecDoubleVect, (str: String) => Word2Vec.convertWord(str))
-//    val transform = if (useNonlinearity) {
-//      // Affine transform of word embeddings, tanh, affine transform to output layer
-//      new AffineTransformDense(featurizer.index.size, numHidden, new TanhTransform(new AffineTransformDense(numHidden, surfaceFeaturizer.vectorSize, new IdentityTransform[DenseVector[Double]]())))
-//    } else {
-//      new AffineTransformDense(featurizer.index.size, surfaceFeaturizer.vectorSize, new IdentityTransform[DenseVector[Double]]())
-//    }
     
     val surfaceFeaturizer = Word2VecSurfaceFeaturizerIndexed(word2vecDoubleVect, (str: String) => Word2Vec.convertWord(str))
     val transform = PositionalNeuralModelFactory.buildNet(surfaceFeaturizer, numHidden, numHiddenLayers, prodFeaturizer.index.size, nonLinType, backpropIntoEmbeddings)
@@ -166,19 +168,23 @@ object PositionalNeuralModelFactory {
                numHiddenLayers: Int,
                outputSize: Int,
                nonLinType: String,
-               backpropIntoEmbeddings: Boolean) = {
-    val baseTransformLayer = if (backpropIntoEmbeddings) {
-      new EmbeddingsTransform(numHidden, surfaceFeaturizer.vectorSize, surfaceFeaturizer)
+               backpropIntoEmbeddings: Boolean): AffineTransformDense[Array[Int]] = {
+    if (numHiddenLayers == 0) {
+      new AffineTransformDense(outputSize, surfaceFeaturizer.vectorSize, new CachingLookupTransform(surfaceFeaturizer))
     } else {
-      new CachingLookupAndAffineTransformDense(numHidden, surfaceFeaturizer.vectorSize, surfaceFeaturizer)
+      val baseTransformLayer = if (backpropIntoEmbeddings) {
+        new EmbeddingsTransform(numHidden, surfaceFeaturizer.vectorSize, surfaceFeaturizer)
+      } else {
+        new CachingLookupAndAffineTransformDense(numHidden, surfaceFeaturizer.vectorSize, surfaceFeaturizer)
+      }
+      var currLayer: Transform[Array[Int],DenseVector[Double]] = addNonlinearLayer(baseTransformLayer, nonLinType)
+      for (i <- 1 until numHiddenLayers) {
+        val tmpLayer = new AffineTransformDense(numHidden, numHidden, currLayer)
+        currLayer = addNonlinearLayer(tmpLayer, nonLinType)
+      }
+      var transform = new AffineTransformDense(outputSize, numHidden, currLayer)
+      transform
     }
-    var currLayer: Transform[Array[Int],DenseVector[Double]] = addNonlinearLayer(baseTransformLayer, nonLinType)
-    for (i <- 1 until numHiddenLayers) {
-      val tmpLayer = new AffineTransformDense(numHidden, numHidden, currLayer)
-      currLayer = addNonlinearLayer(tmpLayer, nonLinType)
-    }
-    var transform = new AffineTransformDense(outputSize, numHidden, currLayer)
-    transform
   }
   
   def addNonlinearLayer(currNet: Transform[Array[Int],DenseVector[Double]], nonLinType: String) = {

@@ -1,22 +1,12 @@
 package epic.corefdense
 
-import edu.berkeley.nlp.futile.fig.basic.Indexer
-import epic.dense.Word2VecSurfaceFeaturizerIndexed
-import epic.dense.CachingLookupAndAffineTransformDense
-import epic.dense.EmbeddingsTransform
-import epic.dense.AffineTransformDense
-import epic.dense.Transform
-import breeze.linalg._
-import epic.dense.TanhTransform
-import epic.dense.ReluTransform
-import epic.dense.CubeTransform
-import epic.parser.models.PositionalNeuralModelFactory
 import scala.util.Random
+import breeze.linalg._
 import edu.berkeley.nlp.futile.util.Logger
-import epic.dense.IdentityTransform
 import epic.dense.AffineTransform
-import edu.berkeley.nlp.futile.classify.ClassifyUtils
-import java.util.Arrays
+import epic.dense.IdentityTransform
+import epic.dense.TanhTransform
+import edu.berkeley.nlp.futile.math.SloppyMath
 
 case class CorefEx(val antecedents: Array[Array[Double]],
                    val anaphor: Array[Double],
@@ -64,7 +54,7 @@ class CorefNNEpic(val inputSize: Int,
 //    }
 //    System.exit(0)
     val antecedentScores = antecedentVecs.map(vec => vec.dot(anaphorVec))
-    ClassifyUtils.softmaxi(antecedentScores)
+    CorefNNEpic.softmaxi(antecedentScores)
     val antecedentProbs = antecedentScores.map(Math.exp(_))
     
     val deriv = DenseVector(weights)
@@ -89,7 +79,7 @@ class CorefNNEpic(val inputSize: Int,
     } else {
       antecedents.map(inputVec => anaphorVec.dot(DenseVector(inputVec)))
     }
-    ClassifyUtils.argMaxIdx(antecedentDots)
+    CorefNNEpic.argMaxIdx(antecedentDots)
   }
   
   def computeObjective(ex: CorefEx, weights: Array[Double]): Double = accumulateGradientAndComputeObjective(ex, weights, Array.tabulate(weights.size)(i => 0.0))
@@ -126,7 +116,7 @@ class CorefNNEpicDistinctEmbeddings(val inputSize: Int,
     val antecedentVecs = ex.antecedents.map(inputVec => antLayer.activations(DenseVector(inputVec)))
     
     val antecedentScores = antecedentVecs.map(vec => vec.dot(anaphorVec))
-    ClassifyUtils.softmaxi(antecedentScores)
+    CorefNNEpic.softmaxi(antecedentScores)
     val antecedentProbs = antecedentScores.map(Math.exp(_))
     
     val deriv = DenseVector(weights)(0 until transform.index.size)
@@ -147,7 +137,7 @@ class CorefNNEpicDistinctEmbeddings(val inputSize: Int,
     // Take dot products
     val anaphorVec = layer.activations(DenseVector(anaphor))
     val antecedentDots = antecedents.map(inputVec => anaphorVec.dot(antLayer.activations(DenseVector(inputVec))))
-    ClassifyUtils.argMaxIdx(antecedentDots)
+    CorefNNEpic.argMaxIdx(antecedentDots)
   }
   
   def computeObjective(ex: CorefEx, weights: Array[Double]): Double = accumulateGradientAndComputeObjective(ex, weights, Array.tabulate(weights.size)(i => 0.0))
@@ -157,6 +147,37 @@ class CorefNNEpicDistinctEmbeddings(val inputSize: Int,
 
 
 object CorefNNEpic {
+  
+  def softmaxi(values: Array[Double]) {
+    val total = SloppyMath.logAdd(values)
+    for (i <- 0 until values.size) {
+      values(i) = values(i) - total
+    }
+  }
+  
+  def argMaxIdx(values: Array[Double]) = {
+    var max = Double.NegativeInfinity;
+    var selected = -1
+    for (i <- 0 until values.size) {
+      if (selected == -1 || values(i) > max) {
+        max = values(i)
+        selected = i
+      }
+    }
+    selected
+  }
+  
+  def argMaxIdxFloat(values: Array[Float]) = {
+    var max = Float.NegativeInfinity;
+    var selected = -1
+    for (i <- 0 until values.size) {
+      if (selected == -1 || values(i) > max) {
+        max = values(i)
+        selected = i
+      }
+    }
+    selected
+  }
   
   def displayMat(mat: DenseMatrix[Double]) {
     for (i <- 0 until mat.rows) {
