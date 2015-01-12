@@ -23,7 +23,7 @@ import nak.serialization.DataSerialization._
 import java.io.{StringReader, DataInput, DataOutput}
 import breeze.util.Lens
 import scala.annotation.tailrec
-import epic.slab.AnnotatedSpan
+import epic.preprocess.TreebankTokenizer
 
 @SerialVersionUID(1L)
 trait Tree[+L] extends Serializable {

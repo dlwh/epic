@@ -18,7 +18,7 @@ package object preprocess {
   }
 
   def preprocess(text: String): IndexedSeq[IndexedSeq[String]] = {
-    _seg(text).map(tokenize)
+    _seg.strings(text).map(tokenize).toVector
   }
 
   def preprocess(file: File): IndexedSeq[IndexedSeq[String]] = {

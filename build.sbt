@@ -1,3 +1,5 @@
+import AssemblyKeys._
+import sbtassembly.AssemblyOption
 
 name := "epic"
 
@@ -79,7 +81,6 @@ pomExtra := (
   </developers>)
 
 
-  
 publishTo <<= version { (v: String) =>
   val nexus = "https://oss.sonatype.org/"
   if (v.trim.endsWith("SNAPSHOT")) 

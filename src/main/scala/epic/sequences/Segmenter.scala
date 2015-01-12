@@ -12,8 +12,8 @@ object Segmenter {
   def fromCRF[L, Tag](crf: SemiCRF[L, String], lToTag: L=>Tag): SlabSegmenter[Tag] = new SemiCRFSegmenter(crf, lToTag)
 
   case class SemiCRFSegmenter[L, Tag] (crf: SemiCRF[L, String], lToTag: L=>Tag) extends SlabSegmenter[Tag] {
-    override def apply(l1: List[String]) = apply(l1.toVector)
-    def apply(v1: Vector[String]): Vector[Tagged[Tag]] = crf.bestSequence(v1).segments.collect { case (l, span) if l != crf.outsideSymbol => Tagged(span, lToTag(l))}.toVector
+    override def apply(sentence: List[String]): Vector[Tagged[Tag]] = apply(sentence.toVector)
+    def apply(v1: Vector[String]): Vector[Tagged[Tag]] = crf.bestSequence(v1).segments.collect { case (l, span) => Tagged(span, lToTag(l))}.toVector
   }
 
   def apply[Tag](seg: Vector[String] => Vector[Tagged[Tag]]) = new SlabSegmenter[Tag] {
