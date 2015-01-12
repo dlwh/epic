@@ -32,7 +32,7 @@ class PositionalTransformModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSe
                                refinements: GrammarRefinements[L, L2],
                                labelFeaturizer: RefinedFeaturizer[L, W, Feature],
                                surfaceFeaturizer: Word2VecSurfaceFeaturizerIndexed[W],
-                               val transforms: AffineTransformDense[Array[Int]],
+                               val transforms: IndexedSeq[AffineTransformDense[Array[Int]]],
                                val maybeSparseSurfaceFeaturizer: Option[IndexedSpanFeaturizer[L, L2, W]]) extends ParserModel[L, W] {
   override type Inference = PositionalTransformModel.Inference[L, L2, W]
 
@@ -45,7 +45,9 @@ class PositionalTransformModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSe
       val f = maybeSparseSurfaceFeaturizer.get
       val innerAccum = StandardExpectedCounts.zero(f.index)
       m.expectedCounts(maybeSparseSurfaceFeaturizer.get, innerAccum, scale)
-      accum.counts += DenseVector.vertcat(DenseVector.zeros[Double](transform.index.size), innerAccum.counts)
+      //      val totalTransformSize = transform.index.size
+      val totalTransformSize = transforms.map(_.index.size).reduce(_ + _)
+      accum.counts += DenseVector.vertcat(DenseVector.zeros[Double](totalTransformSize), innerAccum.counts)
     }
 //    println("Ecounts extracted")
     accum.loss += scale * m.logPartition
@@ -56,10 +58,15 @@ class PositionalTransformModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSe
    * @return
    */
   
+//  val index = if (maybeSparseSurfaceFeaturizer.isDefined) {
+//    SegmentedIndex(transform.index, maybeSparseSurfaceFeaturizer.get.index)
+//  } else {
+//    transform.index
+//  }
   val index = if (maybeSparseSurfaceFeaturizer.isDefined) {
-    SegmentedIndex(transform.index, maybeSparseSurfaceFeaturizer.get.index)
+    SegmentedIndex((transforms.map(_.index) ++ IndexedSeq(maybeSparseSurfaceFeaturizer.get.index)):_*)
   } else {
-    transform.index
+    SegmentedIndex(transforms.map(_.index):_*)
   }
   
   def initialWeightVector(randomize: Boolean, initWeightsScale: Double): DenseVector[Double] = {
@@ -81,7 +88,9 @@ class PositionalTransformModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSe
 //        0.0
 //      }
 //    }));
-    val initTransformWeights = transform.initialWeightVector(initWeightsScale, new Random(0), true);
+    val rng = new Random(0)
+//    val initTransformWeights = transform.initialWeightVector(initWeightsScale, rng, true);
+    val initTransformWeights = DenseVector.vertcat(transforms.map(_.initialWeightVector(initWeightsScale, rng, true)):_*);
     val newInitVector: DenseVector[Double] = if (maybeSparseSurfaceFeaturizer.isDefined) {
       DenseVector.vertcat(initTransformWeights, DenseVector.zeros(maybeSparseSurfaceFeaturizer.get.index.size))
     } else {
@@ -94,15 +103,23 @@ class PositionalTransformModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSe
   override def featureIndex: Index[Feature] = index
 
   override def inferenceFromWeights(weights: DenseVector[Double]): Inference = {
-    val (layer, innerLayer) = transform.extractLayerAndPenultimateLayer(weights)
-    val grammar = new PositionalTransformModel.PositionalTransformGrammar[L, L2, W](topology, lexicon, refinedTopology, refinements, labelFeaturizer, surfaceFeaturizer, layer, innerLayer, maybeSparseSurfaceFeaturizer, weights)
+//    val (layer, innerLayer) = transforms(0).extractLayerAndPenultimateLayer(weights)
+//    val grammar = new PositionalTransformModel.PositionalTransformGrammar[L, L2, W](topology, lexicon, refinedTopology, refinements, labelFeaturizer, surfaceFeaturizer, layer, innerLayer, maybeSparseSurfaceFeaturizer, weights)
+    val layersAndInnerLayers = for (i <- 0 until transforms.size) yield {
+//      println(i + ": " + index.componentOffset(i))
+      transforms(i).extractLayerAndPenultimateLayer(weights(index.componentOffset(i) until (if (i < transforms.size - 1) index.componentOffset(i+1) else index.size)))
+    }
+    val layers: IndexedSeq[AffineTransformDense[Array[Int]]#Layer] = layersAndInnerLayers.map(_._1)
+    val innerLayers: IndexedSeq[epic.dense.Transform.Layer[Array[Int],DenseVector[Double]]] = layersAndInnerLayers.map(_._2)
+//    val grammar = new PositionalTransformModel.PositionalTransformGrammar[L, L2, W](topology, lexicon, refinedTopology, refinements, labelFeaturizer, surfaceFeaturizer, layers.head, innerLayers.head, maybeSparseSurfaceFeaturizer, weights)
+    val grammar = new PositionalTransformModel.PositionalTransformGrammar[L, L2, W](topology, lexicon, refinedTopology, refinements, labelFeaturizer, surfaceFeaturizer, layers, innerLayers, maybeSparseSurfaceFeaturizer, weights)
     new Inference(annotator, constrainer, grammar, refinements)
   }
 
   override def initialValueForFeature(f: Feature): Double = 0.0
 }
 
-object PositionalTransformModel {
+object PositionalTransformModel { 
 
   case class Inference[L, L2, W](annotator: (BinarizedTree[L], IndexedSeq[W]) => BinarizedTree[IndexedSeq[L2]],
                                                                                 constrainer: ChartConstraints.Factory[L, W],
@@ -126,13 +143,13 @@ object PositionalTransformModel {
                                    val refinements: GrammarRefinements[L, L2],
                                    labelFeaturizer: RefinedFeaturizer[L, W, Feature],
                                    surfaceFeaturizer: Word2VecSurfaceFeaturizerIndexed[W],
-                                   layer: AffineTransformDense[Array[Int]]#Layer,
-                                   penultimateLayer: epic.dense.Transform.Layer[Array[Int],DenseVector[Double]],
+                                   layers: IndexedSeq[AffineTransformDense[Array[Int]]#Layer],
+                                   penultimateLayers: IndexedSeq[epic.dense.Transform.Layer[Array[Int],DenseVector[Double]]],
                                    val maybeSparseSurfaceFeaturizer: Option[IndexedSpanFeaturizer[L, L2, W]],
                                    weights: DenseVector[Double]) extends Grammar[L, W] with Serializable {
 
     override def withPermissiveLexicon: Grammar[L, W] = {
-      new PositionalTransformGrammar(topology, lexicon.morePermissive, refinedTopology, refinements, labelFeaturizer, surfaceFeaturizer, layer, penultimateLayer, maybeSparseSurfaceFeaturizer, weights)
+      new PositionalTransformGrammar(topology, lexicon.morePermissive, refinedTopology, refinements, labelFeaturizer, surfaceFeaturizer, layers, penultimateLayers, maybeSparseSurfaceFeaturizer, weights)
     }
 
 
@@ -226,7 +243,11 @@ object PositionalTransformModel {
         if (statesUsed(i)) {
           val (begin, split, end) = untetra(i)
           val ffeats = if (end > length) sspec.featuresForSpan(begin, split) else sspec.featuresForSplit(begin, split, end)
-          layer.tallyDerivative(deriv, ruleCountsPerState(i) *= scale, ffeats)
+          var layerSizeTally = 0
+          for (j <- 0 until layers.size) {
+            layers(j).tallyDerivative(deriv(layerSizeTally until layerSizeTally + layers(j).index.size), { ruleCountsPerState(i) * scale }, ffeats)
+            layerSizeTally += layers(j).index.size;
+          }
         }
       }
     }
@@ -286,84 +307,88 @@ object PositionalTransformModel {
       
 //      val cache = new LRUCache[Long, DenseVector[Double]](2 * length)
       val maxTetraLen = ((w.size + 2) * (w.size + 3) * (w.size + 4))/6 + ((w.size + 1) * (w.size + 2))/2 + w.size + 2
-      val cache = new Array[DenseVector[Double]](maxTetraLen)
-      val finalCache = new Array[SparseVector[Double]](maxTetraLen)
       
-      def getOrElseUpdate(tetraIdx: Int, fun: => DenseVector[Double]) = {
-        if (cache(tetraIdx) == null) cache(tetraIdx) = fun
-        cache(tetraIdx)
+      val cache = Array.tabulate(layers.size)(i => new Array[DenseVector[Double]](maxTetraLen))
+      val finalCache = Array.tabulate(layers.size)(i => new Array[SparseVector[Double]](maxTetraLen))
+
+      def getOrElseUpdate(layerIdx: Int, tetraIdx: Int, fun: => DenseVector[Double]) = {
+        if (cache(layerIdx)(tetraIdx) == null) cache(layerIdx)(tetraIdx) = fun
+        cache(layerIdx)(tetraIdx)
+      }
+
+      def getOrElseUpdateFinal(layerIdx: Int, tetraIdx: Int, rfeatIdx: Int, maxVectSize: Int, fun: => Double) = {
+        if (finalCache(layerIdx)(tetraIdx) == null) finalCache(layerIdx)(tetraIdx) = SparseVector.zeros(maxVectSize)
+        if (!finalCache(layerIdx)(tetraIdx).contains(rfeatIdx)) finalCache(layerIdx)(tetraIdx)(rfeatIdx) = fun
+        finalCache(layerIdx)(tetraIdx)(rfeatIdx)
       }
       
-      def getOrElseUpdateFinal(tetraIdx: Int, rfeatIdx: Int, maxVectSize: Int, fun: => Double) = {
-        if (finalCache(tetraIdx) == null) finalCache(tetraIdx) = SparseVector.zeros(maxVectSize)
-        if (!finalCache(tetraIdx).contains(rfeatIdx)) finalCache(tetraIdx)(rfeatIdx) = fun
-        finalCache(tetraIdx)(rfeatIdx)
-      }
+//      val cache = new Array[DenseVector[Double]](maxTetraLen)
+//      val finalCache = new Array[SparseVector[Double]](maxTetraLen)
+//      
+//      def getOrElseUpdate(tetraIdx: Int, fun: => DenseVector[Double]) = {
+//        if (cache(tetraIdx) == null) cache(tetraIdx) = fun
+//        cache(tetraIdx)
+//      }
+//      
+//      def getOrElseUpdateFinal(tetraIdx: Int, rfeatIdx: Int, maxVectSize: Int, fun: => Double) = {
+//        if (finalCache(tetraIdx) == null) finalCache(tetraIdx) = SparseVector.zeros(maxVectSize)
+//        if (!finalCache(tetraIdx).contains(rfeatIdx)) finalCache(tetraIdx)(rfeatIdx) = fun
+//        finalCache(tetraIdx)(rfeatIdx)
+//      }
       
       val sspec = surfaceFeaturizer.anchor(w)
       val lspec = labelFeaturizer.anchor(w)
       val fspec = if (maybeSparseSurfaceFeaturizer.isDefined) maybeSparseSurfaceFeaturizer.get.anchor(w) else null
+      val sparseFeatsStart = if (maybeSparseSurfaceFeaturizer.isDefined) layers.map(_.index.size).reduce(_ + _) else -1
 
       private def tetra(begin: Int, split: Int, end: Int) = {
         (end * (end + 1) * (end + 2))/6 + ((split + 1) * split / 2 + begin)
       }
-
+      
       def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int) = {
-        val tetraIdx = tetra(begin, split, end)
-        val fs = getOrElseUpdate(tetraIdx, {
-          val sfeats = sspec.featuresForSplit(begin, split, end)
-          penultimateLayer.activations(sfeats)
-        })
-        val rfeats = lspec.featuresForBinaryRule(begin, split, end, rule, ref)
-//        layer.activationsFromPenultimateDot(fs, rfeats)
         var total = 0.0;
-        for (rfeat <- rfeats) {
-          total += getOrElseUpdateFinal(tetraIdx, rfeat, labelFeaturizer.index.size, {
-            layer.activationsFromPenultimateDot(fs, Array(rfeat))
-          })
+        val rfeats = lspec.featuresForBinaryRule(begin, split, end, rule, ref)
+        for (layerIdx <- 0 until layers.size) {
+          val tetraIdx = tetra(begin, split, end)
+          val fs = getOrElseUpdate(layerIdx, tetraIdx, { penultimateLayers(layerIdx).activations(sspec.featuresForSplit(begin, split, end)) })
+          for (rfeat <- rfeats) {
+            total += getOrElseUpdateFinal(layerIdx, tetraIdx, rfeat, labelFeaturizer.index.size, { layers(layerIdx).activationsFromPenultimateDot(fs, Array(rfeat)) })
+          }
         }
         if (maybeSparseSurfaceFeaturizer.isDefined) {
-          total += dot(fspec.featuresForBinaryRule(begin, split, end, rule, ref), layer.index.size)
+          total += dot(fspec.featuresForBinaryRule(begin, split, end, rule, ref), sparseFeatsStart)
         }
         total
       }
-
+      
       def scoreUnaryRule(begin: Int, end: Int, rule: Int, ref: Int) = {
-        val tetraIdx = tetra(begin, end, length + 1)
-        val fs = getOrElseUpdate(tetraIdx, {
-          val sfeats = sspec.featuresForSpan(begin, end)
-          penultimateLayer.activations(sfeats)
-        })
-        val rfeats = lspec.featuresForUnaryRule(begin, end, rule, ref)
-//        layer.activationsFromPenultimateDot(fs, rfeats)
         var total = 0.0;
-        for (rfeat <- rfeats) {
-          total += getOrElseUpdateFinal(tetraIdx, rfeat, labelFeaturizer.index.size, {
-            layer.activationsFromPenultimateDot(fs, Array(rfeat))
-          })
+        val tetraIdx = tetra(begin, end, length + 1)
+        val rfeats = lspec.featuresForUnaryRule(begin, end, rule, ref)
+        for (layerIdx <- 0 until layers.size) {
+          val fs = getOrElseUpdate(layerIdx, tetraIdx, { penultimateLayers(layerIdx).activations(sspec.featuresForSpan(begin, end)) })
+          for (rfeat <- rfeats) {
+            total += getOrElseUpdateFinal(layerIdx, tetraIdx, rfeat, labelFeaturizer.index.size, { layers(layerIdx).activationsFromPenultimateDot(fs, Array(rfeat)) })
+          }
         }
         if (maybeSparseSurfaceFeaturizer.isDefined) {
-          total += dot(fspec.featuresForUnaryRule(begin, end, rule, ref), layer.index.size)
+          total += dot(fspec.featuresForUnaryRule(begin, end, rule, ref), sparseFeatsStart)
         }
         total
       }
 
       def scoreSpan(begin: Int, end: Int, tag: Int, ref: Int) = {
-        val tetraIdx = tetra(begin, end, length + 2)
-        val fs = getOrElseUpdate(tetraIdx, {
-        val sfeats = sspec.featuresForSpan(begin, end)
-          penultimateLayer.activations(sfeats)
-        })
-        val rfeats = lspec.featuresForSpan(begin, end, tag, ref)
-//        layer.activationsFromPenultimateDot(fs, rfeats)
         var total = 0.0;
-        for (rfeat <- rfeats) {
-          total += getOrElseUpdateFinal(tetraIdx, rfeat, labelFeaturizer.index.size, {
-            layer.activationsFromPenultimateDot(fs, Array(rfeat))
-          })
+        val tetraIdx = tetra(begin, end, length + 2)
+        val rfeats = lspec.featuresForSpan(begin, end, tag, ref)
+        for (layerIdx <- 0 until layers.size) {
+          val fs = getOrElseUpdate(layerIdx, tetraIdx, { penultimateLayers(layerIdx).activations(sspec.featuresForSpan(begin, end)) })
+          for (rfeat <- rfeats) {
+            total += getOrElseUpdateFinal(layerIdx, tetraIdx, rfeat, labelFeaturizer.index.size, { layers(layerIdx).activationsFromPenultimateDot(fs, Array(rfeat)) })
+          }
         }
         if (maybeSparseSurfaceFeaturizer.isDefined) {
-          total += dot(fspec.featuresForSpan(begin, end, tag, ref), layer.index.size)
+          total += dot(fspec.featuresForSpan(begin, end, tag, ref), sparseFeatsStart)
         }
         total
       }
@@ -378,13 +403,8 @@ object PositionalTransformModel {
         }
         score
       }
-
     }
   }
-
-
-
-
 }
 
 

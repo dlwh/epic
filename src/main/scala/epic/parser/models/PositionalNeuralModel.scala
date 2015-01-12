@@ -51,6 +51,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
                             backpropIntoEmbeddings: Boolean = false,
                             numHidden: Int = 100,
                             numHiddenLayers: Int = 1,
+                            augmentWithLinear: Boolean = false,
                             posFeaturizer: Optional[WordFeaturizer[String]] = NotProvided,
                             spanFeaturizer: Optional[SplitSpanFeaturizer[String]] = NotProvided,
                             word2vecPath: String = "../cnnkim/data/GoogleNews-vectors-negative300.bin") extends ParserModelFactory[AnnotatedLabel, String] {
@@ -148,6 +149,15 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
       None
     }
     
+    val transforms = if (augmentWithLinear) {
+      println("Adding a linear transform: " + surfaceFeaturizer.vectorSize + " x " + prodFeaturizer.index.size) 
+      IndexedSeq(transform, PositionalNeuralModelFactory.buildNet(surfaceFeaturizer, 0, 0, prodFeaturizer.index.size, "", backpropIntoEmbeddings))
+    } else {
+      IndexedSeq(transform)
+    }
+    
+    println(transforms.size + " transforms, " + transforms.map(_.index.size).toSeq + " parameters for each")
+    
     new PositionalTransformModel(annotator.latent,
       constrainer,
       topology, lexicon,
@@ -155,7 +165,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
       indexedRefinements,
       prodFeaturizer,
       surfaceFeaturizer,
-      transform,
+      transforms,
       maybeSparseFeaturizer
       )
   }
