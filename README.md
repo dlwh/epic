@@ -6,7 +6,7 @@ document. It is based on HLists from
 
 Slabs is distributed under the [Apache License, Version 2.0](http://www.apache.org/licenses/LICENSE-2.0.html).
 
-The current version is 0.1-SNAPSHOT.
+The current version is 0.1.
 
 ## Documentation
 
