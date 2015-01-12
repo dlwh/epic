@@ -4,6 +4,7 @@ import shapeless._
 import ops.hlist._
 import scalaz._
 
+@implicitNotFound("Implicit not found: epic.slab.typeclasses.SubSelector[${L}, ${V}]. You requested an element of upper type ${V}, but there is none in the HList ${L}.")
 trait SubSelector[L <: HList, V] {
   def apply(l: L): V
 }
@@ -34,6 +35,7 @@ object SubSelector {
 
 }
 
+@implicitNotFound("Implicit not found: epic.slab.typeclasses.SubSelectMany[${L}, ${SL}]. You requested the elements ${SL}, but not all were found in the HList ${L}.")
 trait SubSelectMany[L <: HList, SL <: HList] extends DepFn1[L]
 
 object SubSelectMany {
@@ -59,6 +61,7 @@ object SubSelectMany {
       }
 }
 
+@implicitNotFound("Implicit not found: epic.slab.typeclasses.Adder[${L}, ${V}]. Check that you imported scalaz.std.list._")
 sealed trait Adder[L <: HList, V] extends DepFn2[L, V]
 
 object Adder {
