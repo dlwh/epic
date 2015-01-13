@@ -22,6 +22,7 @@ import edu.berkeley.nlp.futile.fig.basic.Indexer
 import edu.berkeley.nlp.entity.coref.PairwiseIndexingFeaturizerJoint
 import epic.dense.TanhTransform
 import epic.dense.IdentityTransform
+import epic.dense.Word2VecIndexed
 import edu.berkeley.nlp.futile.LightRunner
 import epic.dense.AffineTransform
 import breeze.linalg.DenseVector
@@ -94,16 +95,16 @@ object CorefDriver {
     val featureIndexer = new Indexer[String]();
     val word2vecRaw = Word2Vec.smartLoadVectorsForVocabulary(word2vecPath.split(":"), trainVoc.map(str => Word2Vec.convertWord(str)), true)
     val word2vecRawDoubleVect = word2vecRaw.map(keyValue => (keyValue._1 -> keyValue._2.map(_.toDouble)))
-    val word2vec = Word2VecSurfaceFeaturizerIndexed(word2vecRawDoubleVect, (str: String) => Word2Vec.convertWord(str))
+    val word2vecIndexed = Word2VecIndexed(word2vecRawDoubleVect, (str: String) => Word2Vec.convertWord(str))
     
 //    val corefNeuralModel 
-    val vecSize = word2vec.vectorSize * CorefNeuralModel.extractRelevantMentionWords(trainDocGraphs.head.getMention(0)).size
+    val vecSize = word2vecIndexed.vectorSize * CorefNeuralModel.extractRelevantMentionWords(trainDocGraphs.head.getMention(0)).size
     
     featureIndexer.getIndex(PairwiseIndexingFeaturizerJoint.UnkFeatName);
     val sparseFeaturizer = new SimplePairwiseIndexingFeaturizerJoint(featureIndexer, featsToUse.split(",").toSet)
     val transform = new AffineTransform(vecSize, hiddenSize, new TanhTransform(new AffineTransform(hiddenSize, vecSize, new IdentityTransform[DenseVector[Double]]())))
     val lossFcnObj = PairwiseLossFunctions(lossFcn)
-    val corefNeuralModel = new CorefNeuralModel(sparseFeaturizer, transform, word2vec, lossFcnObj)
+    val corefNeuralModel = new CorefNeuralModel(sparseFeaturizer, transform, word2vecIndexed, lossFcnObj)
     new CorefFeaturizerTrainer().featurizeBasic(trainDocGraphs, sparseFeaturizer)
     
     

@@ -12,7 +12,7 @@ import scala.util.Random
  */
 case class CachingLookupAndAffineTransformDense[FV](numOutputs: Int,
                                                     numInputs: Int,
-                                                    word2vecFeaturizer: Word2VecSurfaceFeaturizerIndexed[String],
+                                                    word2vecIndexed: Word2VecIndexed[String],
                                                     includeBias: Boolean = true,
                                                     backpropIntoEmbeddings: Boolean = false) extends Transform[Array[Int], DenseVector[Double]] {
 
@@ -60,8 +60,8 @@ case class CachingLookupAndAffineTransformDense[FV](numOutputs: Int,
 //          }
           cache.synchronized {
             if (!cache.contains(wordPosn)) {
-              val startIdx = i * word2vecFeaturizer.wordRepSize
-              cache.put(wordPosn, weights(::, startIdx until startIdx + word2vecFeaturizer.wordRepSize) * DenseVector(word2vecFeaturizer.word2vec(wordPosn._1)))
+              val startIdx = i * word2vecIndexed.wordRepSize
+              cache.put(wordPosn, weights(::, startIdx until startIdx + word2vecIndexed.wordRepSize) * DenseVector(word2vecIndexed.word2vec(wordPosn._1)))
             }
             finalVector += cache(wordPosn)
           }
@@ -83,7 +83,7 @@ case class CachingLookupAndAffineTransformDense[FV](numOutputs: Int,
 
       // whole function is f(mat * inner(fv) + bias)
       // scale(i) pushes in  (f'(mat * inner(v) + bias))(i)
-      val innerAct = DenseVector(word2vecFeaturizer.convertToVector(fv));
+      val innerAct = DenseVector(word2vecIndexed.convertToVector(fv));
       
       // d/d(weights(::, i)) == scale(i) * innerAct
       for (i <- 0 until weights.rows) {

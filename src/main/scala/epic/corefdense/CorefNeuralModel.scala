@@ -5,7 +5,7 @@ import breeze.linalg.DenseVector
 import edu.berkeley.nlp.entity.coref.PairwiseIndexingFeaturizer
 import scala.util.Random
 import epic.dense.Transform
-import epic.dense.Word2VecSurfaceFeaturizerIndexed
+import epic.dense.Word2VecIndexed
 import edu.berkeley.nlp.entity.coref.Mention
 import edu.berkeley.nlp.entity.coref.OrderedClustering
 import epic.dense.AffineTransform
@@ -14,7 +14,7 @@ import edu.berkeley.nlp.entity.coref.CorefDoc
 
 class CorefNeuralModel(val sparseFeaturizer: PairwiseIndexingFeaturizer,
                        val transform: AffineTransform[DenseVector[Double],DenseVector[Double]],
-                       val word2vec: Word2VecSurfaceFeaturizerIndexed[String],
+                       val word2vec: Word2VecIndexed[String],
                        val lossFcn: (CorefDoc, Int, Int) => Float) extends LikelihoodAndGradientComputer[DocumentGraph] {
   
 //  val transform = new 

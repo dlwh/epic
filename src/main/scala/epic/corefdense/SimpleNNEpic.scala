@@ -1,7 +1,7 @@
 package epic.corefdense
 
 import edu.berkeley.nlp.futile.fig.basic.Indexer
-import epic.dense.Word2VecSurfaceFeaturizerIndexed
+import epic.dense.Word2VecIndexed
 import epic.dense.CachingLookupAndAffineTransformDense
 import epic.dense.EmbeddingsTransform
 import epic.dense.AffineTransformDense
@@ -48,16 +48,16 @@ class SimpleNNEpic[T](val inputSize: Int,
 
 object SimpleNNEpic {
   
-  def buildNet(surfaceFeaturizer: Word2VecSurfaceFeaturizerIndexed[String],
+  def buildNet(word2vecIndexed: Word2VecIndexed[String],
                numHidden: Int,
                numHiddenLayers: Int,
                outputSize: Int,
                nonLinType: String,
                backpropIntoEmbeddings: Boolean) = {
     val baseTransformLayer = if (backpropIntoEmbeddings) {
-      new EmbeddingsTransform(numHidden, surfaceFeaturizer.vectorSize, surfaceFeaturizer)
+      new EmbeddingsTransform(numHidden, word2vecIndexed.vectorSize, word2vecIndexed)
     } else {
-      new CachingLookupAndAffineTransformDense(numHidden, surfaceFeaturizer.vectorSize, surfaceFeaturizer)
+      new CachingLookupAndAffineTransformDense(numHidden, word2vecIndexed.vectorSize, word2vecIndexed)
     }
     var currLayer: Transform[Array[Int],DenseVector[Double]] = PositionalNeuralModelFactory.addNonlinearLayer(baseTransformLayer, nonLinType)
     for (i <- 1 until numHiddenLayers) {

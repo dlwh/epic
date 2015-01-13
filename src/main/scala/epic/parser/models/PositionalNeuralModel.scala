@@ -22,8 +22,10 @@ import epic.dense.CubeTransform
 import epic.dense.AffineTransformDense
 import epic.corefdense.Word2Vec
 import scala.collection.mutable.HashMap
-import epic.dense.Word2VecSurfaceFeaturizer
 import epic.dense.Word2VecSurfaceFeaturizerIndexed
+import epic.dense.Word2VecDepFeaturizerIndexed
+import epic.dense.Word2VecIndexed
+import epic.dense.FrequencyTagger
 import epic.dense.CachingLookupTransform
 import epic.dense.CachingLookupAndAffineTransformDense
 import epic.dense.EmbeddingsTransform
@@ -52,6 +54,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
                             numHidden: Int = 100,
                             numHiddenLayers: Int = 1,
                             augmentWithLinear: Boolean = false,
+                            useDeps: Boolean = false,
                             posFeaturizer: Optional[WordFeaturizer[String]] = NotProvided,
                             spanFeaturizer: Optional[SplitSpanFeaturizer[String]] = NotProvided,
                             word2vecPath: String = "../cnnkim/data/GoogleNews-vectors-negative300.bin") extends ParserModelFactory[AnnotatedLabel, String] {
@@ -107,9 +110,12 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     // Convert Array[Float] values to DenseVector[Double] values
     val word2vecDoubleVect = word2vec.map(keyValue => (keyValue._1 -> keyValue._2.map(_.toDouble)))
 //    val word2vecDoubleVect = word2vec.map(keyValue => (keyValue._1 -> new DenseVector[Double](keyValue._2.map(_.toDouble))))
+    val word2vecIndexed = Word2VecIndexed(word2vecDoubleVect, (str: String) => Word2Vec.convertWord(str))
     
-    val surfaceFeaturizer = Word2VecSurfaceFeaturizerIndexed(word2vecDoubleVect, (str: String) => Word2Vec.convertWord(str))
-    val transform = PositionalNeuralModelFactory.buildNet(surfaceFeaturizer, numHidden, numHiddenLayers, prodFeaturizer.index.size, nonLinType, backpropIntoEmbeddings)
+    val surfaceFeaturizer = new Word2VecSurfaceFeaturizerIndexed(word2vecIndexed)
+    val tagCountsLexicon = TagSpanShapeGenerator.makeStandardLexicon(annTrees)
+    val depFeaturizer = new Word2VecDepFeaturizerIndexed(word2vecIndexed, new FrequencyTagger(tagCountsLexicon), topology)
+    
     
 //    val baseTransformLayer = new CachingLookupAndAffineTransformDense(numHidden, surfaceFeaturizer.vectorSize, surfaceFeaturizer)
 //    var currLayer: Transform[Array[Int],DenseVector[Double]] = if (useRelu) new ReluTransform(baseTransformLayer) else new TanhTransform(baseTransformLayer)
@@ -119,7 +125,31 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
 //    }
 //    var transform = new AffineTransformDense(featurizer.index.size, numHidden, currLayer)
     
-    println(surfaceFeaturizer.vectorSize + " x (" + numHidden + ")^" + numHiddenLayers + " x " + prodFeaturizer.index.size + " neural net")
+    println(word2vecIndexed.vectorSize + " x (" + numHidden + ")^" + numHiddenLayers + " x " + prodFeaturizer.index.size + " neural net")
+    val transform = PositionalNeuralModelFactory.buildNet(word2vecIndexed, numHidden, numHiddenLayers, prodFeaturizer.index.size, nonLinType, backpropIntoEmbeddings)
+    val transforms = if (augmentWithLinear) {
+      println("Adding a linear transform: " + word2vecIndexed.vectorSize + " x " + prodFeaturizer.index.size) 
+      IndexedSeq(transform, PositionalNeuralModelFactory.buildNet(word2vecIndexed, 0, 0, prodFeaturizer.index.size, "", backpropIntoEmbeddings))
+    } else {
+      IndexedSeq(transform)
+    }
+    val depTransforms = if (useDeps) {
+      println("Deps: " + word2vecIndexed.vectorSize + " x (" + numHidden + ")^" + numHiddenLayers + " x " + prodFeaturizer.index.size + " neural net")
+      val depTransform = PositionalNeuralModelFactory.buildNet(word2vecIndexed, numHidden, numHiddenLayers, 1, nonLinType, backpropIntoEmbeddings)
+      if (augmentWithLinear) {
+        println("Adding a linear transform to deps: " + word2vecIndexed.vectorSize + " x 1") 
+        IndexedSeq(depTransform, PositionalNeuralModelFactory.buildNet(word2vecIndexed, 0, 0, 1, "", backpropIntoEmbeddings))
+      } else {
+        IndexedSeq(depTransform)
+      }
+    } else {
+      IndexedSeq()
+    }
+    
+    println(transforms.size + " transforms, " + transforms.map(_.index.size).toSeq + " parameters for each")
+    println(depTransforms.size + " dep transforms, " + depTransforms.map(_.index.size).toSeq + " parameters for each")
+    
+    
     
     val maybeSparseFeaturizer = if (useSparseFeatures) {
       var wf = posFeaturizer.getOrElse( SpanModelFactory.defaultPOSFeaturizer(annWords))
@@ -149,15 +179,6 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
       None
     }
     
-    val transforms = if (augmentWithLinear) {
-      println("Adding a linear transform: " + surfaceFeaturizer.vectorSize + " x " + prodFeaturizer.index.size) 
-      IndexedSeq(transform, PositionalNeuralModelFactory.buildNet(surfaceFeaturizer, 0, 0, prodFeaturizer.index.size, "", backpropIntoEmbeddings))
-    } else {
-      IndexedSeq(transform)
-    }
-    
-    println(transforms.size + " transforms, " + transforms.map(_.index.size).toSeq + " parameters for each")
-    
     new PositionalTransformModel(annotator.latent,
       constrainer,
       topology, lexicon,
@@ -165,27 +186,28 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
       indexedRefinements,
       prodFeaturizer,
       surfaceFeaturizer,
+      depFeaturizer,
       transforms,
-      maybeSparseFeaturizer
-      )
+      maybeSparseFeaturizer,
+      depTransforms)
   }
 }
 
 object PositionalNeuralModelFactory {
   
-  def buildNet(surfaceFeaturizer: Word2VecSurfaceFeaturizerIndexed[String],
+  def buildNet(word2vecIndexed: Word2VecIndexed[String],
                numHidden: Int,
                numHiddenLayers: Int,
                outputSize: Int,
                nonLinType: String,
                backpropIntoEmbeddings: Boolean): AffineTransformDense[Array[Int]] = {
     if (numHiddenLayers == 0) {
-      new AffineTransformDense(outputSize, surfaceFeaturizer.vectorSize, new CachingLookupTransform(surfaceFeaturizer))
+      new AffineTransformDense(outputSize, word2vecIndexed.vectorSize, new CachingLookupTransform(word2vecIndexed))
     } else {
       val baseTransformLayer = if (backpropIntoEmbeddings) {
-        new EmbeddingsTransform(numHidden, surfaceFeaturizer.vectorSize, surfaceFeaturizer)
+        new EmbeddingsTransform(numHidden, word2vecIndexed.vectorSize, word2vecIndexed)
       } else {
-        new CachingLookupAndAffineTransformDense(numHidden, surfaceFeaturizer.vectorSize, surfaceFeaturizer)
+        new CachingLookupAndAffineTransformDense(numHidden, word2vecIndexed.vectorSize, word2vecIndexed)
       }
       var currLayer: Transform[Array[Int],DenseVector[Double]] = addNonlinearLayer(baseTransformLayer, nonLinType)
       for (i <- 1 until numHiddenLayers) {

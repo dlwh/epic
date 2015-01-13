@@ -11,7 +11,7 @@ import breeze.util.Index
 /**
  * Used at the input layer to cache lookups and 
  */
-case class CachingLookupTransform(word2vecFeaturizer: Word2VecSurfaceFeaturizerIndexed[String]) extends Transform[Array[Int], DenseVector[Double]] {
+case class CachingLookupTransform(word2vecIndexed: Word2VecIndexed[String]) extends Transform[Array[Int], DenseVector[Double]] {
 
 
   val index = Index[epic.framework.Feature]()
@@ -31,7 +31,7 @@ case class CachingLookupTransform(word2vecFeaturizer: Word2VecSurfaceFeaturizerI
     def activations(fv: Array[Int]) = {
       var finalVector = DenseVector.zeros[Double](0)
       for (i <- 0 until fv.size) {
-        val vec: DenseVector[Double] = if (fv(i) != -1) DenseVector(word2vecFeaturizer.word2vec(fv(i))) else DenseVector(word2vecFeaturizer.zeroVector)
+        val vec: DenseVector[Double] = if (fv(i) != -1) DenseVector(word2vecIndexed.word2vec(fv(i))) else DenseVector(word2vecIndexed.zeroVector)
         finalVector = DenseVector.vertcat(finalVector, vec)
       }
       finalVector

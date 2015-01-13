@@ -13,12 +13,12 @@ import scala.util.Random
  */
 case class EmbeddingsTransform[FV](numOutputs: Int,
                                    numInputs: Int,
-                                   word2vecFeaturizer: Word2VecSurfaceFeaturizerIndexed[String],
+                                   word2vecIndexed: Word2VecIndexed[String],
                                    includeBias: Boolean = true) extends Transform[Array[Int], DenseVector[Double]] {
 
 
   val index = SegmentedIndex(new EmbeddingsTransform.Index(numOutputs, numInputs, includeBias),
-                             new EmbeddingsTransform.Index(word2vecFeaturizer.vocSize, word2vecFeaturizer.wordRepSize, false))
+                             new EmbeddingsTransform.Index(word2vecIndexed.vocSize, word2vecIndexed.wordRepSize, false))
   println("Allocated " + index.indices.map(_.size) + " parameters for each index in the embedding layer (backpropagating into embeddings)")
   
   def extractLayer(weights: DenseVector[Double]) = {
@@ -28,7 +28,7 @@ case class EmbeddingsTransform[FV](numOutputs: Int,
     } else {
       DenseVector.zeros[Double](numOutputs)
     }
-    val wordWeights = weights(index.indices(0).size until index.indices(0).size + index.indices(1).size).asDenseMatrix.reshape(word2vecFeaturizer.vocSize, word2vecFeaturizer.wordRepSize, view = View.Require)
+    val wordWeights = weights(index.indices(0).size until index.indices(0).size + index.indices(1).size).asDenseMatrix.reshape(word2vecIndexed.vocSize, word2vecIndexed.wordRepSize, view = View.Require)
     new Layer(mat, bias, wordWeights)
   }
   
@@ -64,9 +64,9 @@ case class EmbeddingsTransform[FV](numOutputs: Int,
 //          }
           cache.synchronized {
             if (!cache.contains(wordPosn)) {
-              val startIdx = i * word2vecFeaturizer.wordRepSize
-              val wordVec = DenseVector(word2vecFeaturizer.word2vec(wordPosn._1)) + wordWeights(wordPosn._1, ::).t
-              cache.put(wordPosn, weights(::, startIdx until startIdx + word2vecFeaturizer.wordRepSize) * wordVec)
+              val startIdx = i * word2vecIndexed.wordRepSize
+              val wordVec = DenseVector(word2vecIndexed.word2vec(wordPosn._1)) + wordWeights(wordPosn._1, ::).t
+              cache.put(wordPosn, weights(::, startIdx until startIdx + word2vecIndexed.wordRepSize) * wordVec)
             }
             finalVector += cache(wordPosn)
           }
@@ -88,16 +88,16 @@ case class EmbeddingsTransform[FV](numOutputs: Int,
 
       // whole function is f(mat * inner(fv) + bias)
       // scale(i) pushes in  (f'(mat * inner(v) + bias))(i)
-      val innerAct = DenseVector(word2vecFeaturizer.convertToVector(fv)) + Word2VecSurfaceFeaturizerIndexed.makeVectFromParams(fv, wordWeights);
+      val innerAct = DenseVector(word2vecIndexed.convertToVector(fv)) + Word2VecSurfaceFeaturizerIndexed.makeVectFromParams(fv, wordWeights);
       
-      val wordsDeriv = deriv(index.indices(0).size until index.indices(0).size + index.indices(1).size).asDenseMatrix.reshape(word2vecFeaturizer.vocSize, word2vecFeaturizer.wordRepSize, view = View.Require)
+      val wordsDeriv = deriv(index.indices(0).size until index.indices(0).size + index.indices(1).size).asDenseMatrix.reshape(word2vecIndexed.vocSize, word2vecIndexed.wordRepSize, view = View.Require)
       // d/d(weights(::, i)) == scale(i) * innerAct
       for (i <- 0 until weights.rows) {
         val a: Double = scale(i)
         if(a != 0.0) {
           axpy(a, innerAct, matDeriv.t(::, i))
           for (wordPosnIdx <- 0 until fv.size) {
-            val relevantWeights = weights(i, wordPosnIdx * word2vecFeaturizer.wordRepSize until (wordPosnIdx + 1) * word2vecFeaturizer.wordRepSize).t
+            val relevantWeights = weights(i, wordPosnIdx * word2vecIndexed.wordRepSize until (wordPosnIdx + 1) * word2vecIndexed.wordRepSize).t
             axpy(a, relevantWeights, wordsDeriv(fv(wordPosnIdx), ::).t)
           }
         // so d/dbias(i) = scale(i)
