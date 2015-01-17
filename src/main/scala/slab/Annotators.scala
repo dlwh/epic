@@ -4,9 +4,10 @@ import epic.slab.typeclasses._
 import shapeless._
 import scalaz.std.list._
 
-// Classes which implement common annotators. The initialize part is
-// for implementing annotators which have a limited degree of
-// referential transparency.
+/** Classes which implement common annotators. The initialize part is
+  *  for implementing annotators which have a limited degree of
+  *  referential transparency.
+  */
 
 // Splits the input document into sentences.
 
@@ -18,10 +19,11 @@ trait SentenceSegmenter[S <: Sentence] extends (String => Iterable[Sentence]) wi
   }
 }
 
-// Abstract trait for tokenizers, which annotate sentence-segmented
-// text with tokens. Tokens are usually words, but e.g. 42 is also a
-// token. The trait offsets the returned tokens according to the
-// Sentence. Sentences are not guaranteed to be in order.
+/** Abstract trait for tokenizers, which annotate sentence-segmented
+  *  text with tokens. Tokens are usually words, but e.g. 42 is also a
+  *  token. The trait offsets the returned tokens according to the
+  *  Sentence. Sentences are not guaranteed to be in order.
+  */
 
 abstract class Tokenizer[T <: Token: Offsetter] extends AnalysisFunction11[String, Sentence, T] {
   override def apply(content: String, sentences: List[Sentence]): Iterable[T] = {
@@ -46,8 +48,10 @@ object aliases {
 }
 import aliases._
 
-// Basic annotator. The function is passed the List of Tokens, one
-// Sentence per time. The sentences are not guaranteed to be in order.
+/** Basic annotator. The function is passed the List of Tokens, one
+  * Sentence per time. The sentences are not guaranteed to be in order.
+  */
+
 class Annotator[T](val fun: ((String, Vector[Token]) => Iterable[T])) extends AnalysisFunctionN1[String, input, T] {
   override def apply[In <: HList, Out <: HList]
     (slab: Slab[String, In])
@@ -67,9 +71,11 @@ object Annotator {
   def apply[T](fun: ((String, Vector[Token]) => Iterable[T])) = new Annotator(fun)
 }
 
-// A Tagger assigns a sequence of Tags to a Sentence.
-// Create a new tagger by creating a new class passing a tagger as
-// function.
+/** A Tagger assigns a sequence of Tags to a Sentence.
+  * Create a new tagger by creating a new class passing a tagger as
+  * function.
+  */
+
 class Tagger[Tag](val tagger: (Vector[String] => Iterable[Tag])) extends Annotator[Tagged[Tag]](Tagger.tag(tagger))
 
 object Tagger {
@@ -82,12 +88,13 @@ object Tagger {
   def apply[Tag](fun: Vector[String] => Iterable[Tag]): Tagger[Tag] = new Tagger[Tag](fun)
 }
 
-// A Segmenter splits up a sentence into labeled segments. For
-// instance, it might find all the people, places and things (Named
-// Entity Recognition) in a document. To create a new Segmenter,
-// either inherit from it and define `apply` or create pass the
-// segmenting function to the constructor. The sentences are not
-// guaranteed to be in order.
+/** A Segmenter splits up a sentence into labeled segments. For
+  * instance, it might find all the people, places and things (Named
+  * Entity Recognition) in a document. To create a new Segmenter,
+  * either inherit from it and define `apply` or create pass the
+  * segmenting function to the constructor. The sentences are not
+  * guaranteed to be in order.
+  */
 
 trait Segmenter[Tag] extends AnalysisFunctionN1[String, input, Tagged[Tag]] {
   override def apply[In <: HList, Out <: HList](slab: Slab[String, In])(implicit sel: SubSelectMany.Aux[In, input, input], adder: Adder.Aux[In, List[Tagged[Tag]], Out]): Slab[String, Out] = {
