@@ -71,9 +71,11 @@ object Annotator {
   def apply[T](fun: ((String, Vector[Token]) => Iterable[T])) = new Annotator(fun)
 }
 
-/** A Tagger assigns a sequence of Tags to a Sentence.
-  * Create a new tagger by creating a new class passing a tagger as
-  * function.
+/** A Tagger assigns a sequence of Tags to a Sentence. Create a new
+  * Tagger by creating a new class passing a tagger as function. The
+  * Tagger expects the output from the library to be the same length
+  * as the Token Vector passed as input and then copies the position
+  * information from the Tokens.
   */
 
 class Tagger[Tag](val tagger: (Vector[String] => Iterable[Tag])) extends Annotator[Tagged[Tag]](Tagger.tag(tagger))
