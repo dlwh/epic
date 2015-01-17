@@ -5,7 +5,7 @@ import epic.trees.Tree
 import epic.slab.annotators.Annotator
 
 /**
- * A ParserAnnotator is a slab-ified [[epic.parser.Parser]]. The analogy is that a [[epic.sequences.Tagger]] is
+ * A ParserAnnotator is a slab-ified [[epic.parser.Parser]]. The analogy is that a [[epic.slab.annotator.Tagger]] is
  * to [[epic.sequences.CRF]] as this class is to [[epic.parser.Parser]].
  *
  * @author dlwh

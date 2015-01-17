@@ -12,7 +12,7 @@ import epic.slab.annotators.SentenceSegmenter
  *
  * @author dlwh
  **/
-class NewLineSentenceSegmenter(locale: Locale = Locale.getDefault) extends SentenceSegmenter {
+class NewLineSentenceSegmenter(locale: Locale = Locale.getDefault) extends SentenceSegmenter[Sentence] {
   def apply(content: String): Vector[Sentence] = {
     val breaker = BreakIterator.getLineInstance(locale)
     breaker.setText(content)

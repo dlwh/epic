@@ -28,7 +28,7 @@ import epic.trees.SpanConvert._
  *
  * @author dlwh
  */
-class JavaSentenceSegmenter(locale: Locale = Locale.getDefault) extends SentenceSegmenter {
+class JavaSentenceSegmenter(locale: Locale = Locale.getDefault) extends SentenceSegmenter[Sentence] {
   def apply(content: String): Vector[Sentence] = {
     val breaker = BreakIterator.getSentenceInstance(locale)
     breaker.setText(content)

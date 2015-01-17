@@ -4,13 +4,14 @@ import java.io.{Reader, InputStream}
 import breeze.util.Iterators
 import java.nio.channels.Channels
 import epic.slab.annotators.SentenceSegmenter
+import epic.slab.Sentence
 
 /**
  * TODO
  *
  * @author dlwh
  **/
-class StreamSentenceSegmenter(val baseSegmenter: SentenceSegmenter) {
+class StreamSentenceSegmenter(val baseSegmenter: SentenceSegmenter[Sentence]) {
 
   def sentences(stream: InputStream):Iterator[String] = {
     // addendum maintains the characters that we haven't read.

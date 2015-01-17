@@ -22,7 +22,7 @@ libraryDependencies ++= Seq(
   "org.scalanlp" %% "breeze" % "0.10",
   "org.scalanlp" %% "breeze-config" % "0.9.1",
   "org.scalanlp" %% "nak" % "1.3",
-  "org.scalanlp" %% "epic-slab" % "0.1-SNAPSHOT",
+  "org.scalanlp" %% "epic-slab" % "0.2-SNAPSHOT",
   "org.mapdb" % "mapdb" % "0.9.2",
   ("org.apache.tika" % "tika-parsers" % "1.5").exclude ("edu.ucar", "netcdf").exclude("com.googlecode.mp4parser","isoparser"),
   "de.l3s.boilerpipe" % "boilerpipe" % "1.1.0",
