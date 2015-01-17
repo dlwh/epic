@@ -42,6 +42,11 @@ class Token(val span: Span) extends SpanAnnotation {
     case _ => false
   }
   override def hashCode = span.hashCode
+
+  // The implicits help avoid Tokenized[Token], which looks ugly imo.
+  // Also, the Token class won't be subclassed too often, so a bit of
+  // copy/pasting in the name of a nicer looking API for beginners is
+  // a worthy trade-off.
 }
 
 object Token {
@@ -54,6 +59,13 @@ object Token {
 
 case class Tagged[Tag](val span: Span, val tag: Tag) extends SpanAnnotation {
   def offset(by: Int) = this.copy(span.offset(by))
+
+  // I considered to use the same offsetter pattern with the Tagged
+  // class. I decided against it because usually tags are aligned with
+  // the Tokens and the offset isn't passed to the annotating library,
+  // so it can be constructed in the annotator. Also, there are a lot
+  // more different tags than tokens, which would lead to more
+  // boilerplate, which would lead back to the path of UIMA.
 }
 case class EntityMention(entityType: String, id: Option[String] = None)
 case class PartOfSpeech(tag: String, id: Option[String] = None)
