@@ -10,8 +10,8 @@ import scalaz.std.list._
 
 // Splits the input document into sentences.
 
-trait SentenceSegmenter extends (String => Iterable[Sentence]) with AnalysisFunction01[String, Sentence] {
-  def apply(sentence: String): Iterable[Sentence]
+trait SentenceSegmenter[S <: Sentence] extends (String => Iterable[Sentence]) with AnalysisFunction01[String, S] {
+  def apply(sentence: String): Iterable[S]
   def strings(document: String): Iterable[String] = {
     val sentences = apply(document)
     sentences.map(s => document.substring(s.begin, s.end))
@@ -23,25 +23,22 @@ trait SentenceSegmenter extends (String => Iterable[Sentence]) with AnalysisFunc
 // token. The trait offsets the returned tokens according to the
 // Sentence. Sentences are not guaranteed to be in order.
 
-trait Tokenizer extends AnalysisFunction11[String, Sentence, Token] {
-  override def apply(content: String, sentences: List[Sentence]): Iterable[Token] = {
+abstract class Tokenizer[T <: Token: Offsetter] extends AnalysisFunction11[String, Sentence, T] {
+  override def apply(content: String, sentences: List[Sentence]): Iterable[T] = {
     sentences.map({ sentence => 
       apply(content.substring(sentence.span.begin, sentence.span.end))
-        .map(_.offset(sentence.span.begin))
+        .map(token => implicitly[Offsetter[T]].apply(token, sentence.span.begin))
     }).flatten
   }
 
-  def apply(sentence: String): Iterable[Token]
+  def apply(sentence: String): Iterable[T]
 }
 
 object Tokenizer {
-  def apply(tokenizer: (String => Iterable[Token])): Tokenizer = new Tokenizer {
-    def apply(sentence: String): Iterable[Token] = tokenizer(sentence)
+  def apply[T <: Token: Offsetter](tokenizer: (String => Iterable[T])): Tokenizer[T] = new Tokenizer[T] {
+    def apply(sentence: String): Iterable[T] = tokenizer(sentence)
   }
 }
-
-
-// A Tagger assigns a sequence of Tags to a Sentence.
 
 object aliases {
   // Type alias to reduce the clutter in the Annotator signature.
@@ -70,6 +67,7 @@ object Annotator {
   def apply[T](fun: ((String, Vector[Token]) => Iterable[T])) = new Annotator(fun)
 }
 
+// A Tagger assigns a sequence of Tags to a Sentence.
 // Create a new tagger by creating a new class passing a tagger as
 // function.
 class Tagger[Tag](val tagger: (Vector[String] => Iterable[Tag])) extends Annotator[Tagged[Tag]](Tagger.tag(tagger))

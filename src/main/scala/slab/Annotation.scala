@@ -24,6 +24,10 @@ trait SpanAnnotation extends RegionAnnotation {
   }
 }
 
+trait Offsetter[T <: SpanAnnotation] {
+  def apply(obj: T, by: Int): T
+}
+
 // Handles annotation referencing other annotations
 trait RecursiveAnnotation extends Annotation {}
 
@@ -32,8 +36,20 @@ trait DocumentAnnotation extends Annotation {}
 
 case class Source(url: URL) extends DocumentAnnotation
 case class Sentence(span: Span) extends SpanAnnotation
-case class Token(span: Span) extends SpanAnnotation {
-  def offset(by: Int) = this.copy(span.offset(by))
+class Token(val span: Span) extends SpanAnnotation {
+  override def equals(o: Any) = o match {
+    case that: Token => that.span == span
+    case _ => false
+  }
+  override def hashCode = span.hashCode
+}
+
+object Token {
+  implicit val tokenOffsetter = new Offsetter[Token] {
+    def apply(obj: Token, by: Int): Token = Token(obj.span.offset(by))
+  }
+
+  def apply(span: Span): Token = new Token(span)
 }
 
 case class Tagged[Tag](val span: Span, val tag: Tag) extends SpanAnnotation {
@@ -44,10 +60,17 @@ case class PartOfSpeech(tag: String, id: Option[String] = None)
 
 class ContentToken(override val span: Span, val content: String) extends Token(span) {
   override def substring(c: String): String = content
-  override def offset(by: Int) = this.copy(span.offset(by))
+  override def equals(o: Any) = o match {
+    case that: ContentToken => that.span == span && that.content == content
+    case _ => false
+  }
+  override def hashCode = span.hashCode ^ content.hashCode
 }
 
 object ContentToken {
+  implicit val contentTokenOffsetter = new Offsetter[ContentToken] {
+    def apply(obj: ContentToken, by: Int): ContentToken = ContentToken(obj.span.offset(by), obj.content)
+  }
   def apply(span: Span, content: String): ContentToken = new ContentToken(span, content)
 }
 

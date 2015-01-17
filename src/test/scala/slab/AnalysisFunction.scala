@@ -3,6 +3,7 @@ import org.scalatest._
 import shapeless._
 import ops.hlist._
 import scalaz.std.list._
+import epic.slab.typeclasses._
 
 import org.scalatest.FunSpec
 

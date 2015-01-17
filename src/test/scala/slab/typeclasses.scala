@@ -1,4 +1,5 @@
 import epic.slab._
+import epic.slab.typeclasses._
 import org.scalatest._
 import shapeless._
 import scalaz._
