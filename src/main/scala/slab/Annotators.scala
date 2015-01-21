@@ -12,12 +12,13 @@ import scalaz.std.list._
 /** Splits the input document into sentences.
   */
 
-trait SentenceSegmenter[S <: Sentence] extends (String => Iterable[Sentence]) with AnalysisFunction01[String, S] {
+trait NoInitializer extends legacyannotators.Initialized[Boolean] {
+  override val initialize = () => true
+}
+
+trait SentenceSegmenter[S <: Sentence] extends legacyannotators.SentenceSegmenter[S, Boolean] with NoInitializer {
+  override def apply(initialized: Boolean, sentence: String) = apply(sentence)
   def apply(sentence: String): Iterable[S]
-  def strings(document: String): Iterable[String] = {
-    val sentences = apply(document)
-    sentences.map(s => document.substring(s.begin, s.end))
-  }
 }
 
 /** Abstract trait for tokenizers, which annotate sentence-segmented
@@ -26,15 +27,9 @@ trait SentenceSegmenter[S <: Sentence] extends (String => Iterable[Sentence]) wi
   *  Sentence. Sentences are not guaranteed to be in order.
   */
 
-abstract class Tokenizer[T <: Token: Offsetter] extends AnalysisFunction11[String, Sentence, T] {
-  override def apply(content: String, sentences: List[Sentence]): Iterable[T] = {
-    sentences.map({ sentence => 
-      apply(content.substring(sentence.span.begin, sentence.span.end))
-        .map(token => implicitly[Offsetter[T]].apply(token, sentence.span.begin))
-    }).flatten
-  }
-
+abstract class Tokenizer[T <: Token: Offsetter] extends legacyannotators.Tokenizer[T, Boolean] with NoInitializer {
   def apply(sentence: String): Iterable[T]
+  override def apply(initialized: Boolean, sentence: String): Iterable[T] = apply(sentence)
 }
 
 object Tokenizer {
@@ -53,20 +48,7 @@ import aliases._
   * Sentence per time. The sentences are not guaranteed to be in order.
   */
 
-class Annotator[T](val fun: ((String, Vector[Token]) => Iterable[T])) extends AnalysisFunctionN1[String, input, T] {
-  override def apply[In <: HList, Out <: HList]
-    (slab: Slab[String, In])
-    (implicit sel: SubSelectMany.Aux[In, input, input],
-      adder: Adder.Aux[In, List[T], Out]
-    ): Slab[String, Out] = {
-    val data = slab.selectMany(sel)
-    val index = SpanIndex(data.select[List[Token]])
-    val annotatedSentences = for(sentence <- data.select[List[Sentence]]) yield {
-      fun(slab.content, index(sentence.span).toVector)
-    }
-    slab.add(annotatedSentences.flatten)(adder)
-  }
-}
+class Annotator[T](fun: ((String, Vector[Token]) => Iterable[T])) extends legacyannotators.Annotator[T, Boolean](() => true, ({case (f, sentence, tokens) => fun(sentence, tokens)}))
 
 object Annotator {
   def apply[T](fun: ((String, Vector[Token]) => Iterable[T])) = new Annotator(fun)
@@ -82,12 +64,8 @@ object Annotator {
 class Tagger[Tag](val tagger: (Vector[String] => Iterable[Tag])) extends Annotator[Tagged[Tag]](Tagger.tag(tagger))
 
 object Tagger {
-  // Merges tag information back into the List[Tagged[Tag]] format.
-  def tag[Tag](fun: Vector[String] => Iterable[Tag])(content: String, tokens: Vector[Token]): List[Tagged[Tag]] = {
-    val strings = tokens.map(t => content.substring(t.span.begin, t.span.end))
-    val tagSeq = fun(strings)
-    tokens.zip(tagSeq).map({case (token, tag) => Tagged[Tag](token.span, tag)}).toList
-  }
+  def tag[Tag](fun: Vector[String] => Iterable[Tag])(content: String, tokens: Vector[Token]): List[Tagged[Tag]] =
+    legacyannotators.Tagger.tag[Tag, Boolean](({case (f, tokens) => fun(tokens)}))(true, content, tokens)
   def apply[Tag](fun: Vector[String] => Iterable[Tag]): Tagger[Tag] = new Tagger[Tag](fun)
 }
 
@@ -99,18 +77,8 @@ object Tagger {
   * guaranteed to be in order.
   */
 
-trait Segmenter[Tag] extends AnalysisFunctionN1[String, input, Tagged[Tag]] {
-  override def apply[In <: HList, Out <: HList](slab: Slab[String, In])(implicit sel: SubSelectMany.Aux[In, input, input], adder: Adder.Aux[In, List[Tagged[Tag]], Out]): Slab[String, Out] = {
-    val data = slab.selectMany(sel)
-    val index = SpanIndex(data.select[List[Token]])
-    val annotatedSentences = for(sent <- data.select[List[Sentence]]) yield {
-      val strings = index(sent.span).map(t => slab.substring(t)).toList
-      apply(strings).map(_.offset(sent.begin)).toList
-    }
-
-    slab.add(annotatedSentences.flatten)(adder)
-  }
-
+trait Segmenter[Tag] extends legacyannotators.Segmenter[Tag, Boolean] with NoInitializer {
+  override def apply(initialized: Boolean, sentence: List[String]): Iterable[Tagged[Tag]] = apply(sentence)
   def apply(sentence: List[String]): Iterable[Tagged[Tag]]
 }
 
