@@ -9,9 +9,9 @@ version := "0.3-SNAPSHOT"
 
 organization := "org.scalanlp"
 
-scalaVersion := "2.11.1"
+scalaVersion := "2.11.4"
 
-crossScalaVersions  := Seq("2.11.1", "2.10.4")
+crossScalaVersions  := Seq("2.11.4", "2.10.4")
 
 resolvers ++= Seq(
   "ScalaNLP Maven2" at "http://repo.scalanlp.org/repo",
@@ -21,7 +21,7 @@ resolvers ++= Seq(
 
 libraryDependencies ++= Seq(
   "junit" % "junit" % "4.5" % "test",
-  "org.scalanlp" %% "breeze" % "0.10",
+  "org.scalanlp" %% "breeze" % "0.11-M0",
   "org.scalanlp" %% "breeze-config" % "0.9.1",
   "org.scalanlp" %% "nak" % "1.3",
   "org.mapdb" % "mapdb" % "0.9.2",
