@@ -16,9 +16,12 @@ trait NoInitializer extends legacyannotators.Initialized[Boolean] {
   override val initialize = () => true
 }
 
-trait SentenceSegmenter[S <: Sentence] extends legacyannotators.SentenceSegmenter[S, Boolean] with NoInitializer {
-  override def apply(initialized: Boolean, sentence: String) = apply(sentence)
+trait SentenceSegmenter[S <: Sentence] extends (String => Iterable[Sentence]) with AnalysisFunction01[String, S] {
   def apply(sentence: String): Iterable[S]
+  def strings(document: String): Iterable[String] = {
+    val sentences = apply(document)
+    sentences.map(s => document.substring(s.begin, s.end))
+  }
 }
 
 /** Abstract trait for tokenizers, which annotate sentence-segmented
