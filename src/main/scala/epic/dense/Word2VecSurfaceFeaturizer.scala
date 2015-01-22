@@ -33,6 +33,14 @@ class Word2VecIndexed[W](val wordIndex: Index[W],
     assemble(indexedWords.map(wordIdx => if (wordIdx == -1) zeroVector else word2vec(wordIdx)))
   }
   
+  def augment(numSparseFeats: Int, featurizer: W => Array[Int]): Word2VecIndexed[W] = {
+    val newWord2Vec = Array.tabulate(word2vec.size)(i => {
+      val word = wordIndex.get(i)
+      val feats = featurizer(word)
+      word2vec(i) ++ Array.tabulate(numSparseFeats)(j => if (feats.contains(j)) 1.0 else 0.0)
+    })
+    new Word2VecIndexed(wordIndex, newWord2Vec, converter)
+  }
 }
 
 object Word2VecIndexed {
@@ -165,7 +173,12 @@ class FrequencyTagger[W](wordTagCounts: Counter2[String, W, Double]) extends Tag
       wordToTagMap.put(word, bestTag);
     }
   }
+  val tagTypesIdx = Index[String]
+  wordToTagMap.values.toSet[String].foreach(tagType => tagTypesIdx.index(tagType))
+  tagTypesIdx.index(HackyLexicalProductionFeaturizer.UnkTag)
   
   def tag(word: W) = if (wordToTagMap.contains(word)) wordToTagMap(word) else HackyLexicalProductionFeaturizer.UnkTag;
+  
+  def convertToFeaturizer: W => Array[Int] = (word: W) => Array(tagTypesIdx.index(tag(word)))
 }
 

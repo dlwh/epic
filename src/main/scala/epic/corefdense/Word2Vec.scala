@@ -12,21 +12,21 @@ import breeze.linalg.Counter
 
 object Word2Vec {
   
-  /**
-   * Loads vectors for a vocabulary unless a certain file exists, in which case things are just loaded from there.
-   * Does not check that the vocabularies are the same.
-   */
-  def loadVectorsForVocabularyUseCache(word2vecPath: String, voc: Set[String], inputVectorBias: Boolean, word2vecCache: String) = {
-    if (!new File(word2vecCache).exists) {
-      val map = loadVectorsForVocabulary(word2vecPath, voc, inputVectorBias);
-      println("Writing word2vec cache to " + word2vecCache)
-      IOUtils.writeObjFile(word2vecCache, map);
-      map;
-    } else {
-      println("Reading word2vec cache from " + word2vecCache)
-      IOUtils.readObjFile(word2vecCache).asInstanceOf[HashMap[String,Array[Float]]]
-    }
-  }
+//  /**
+//   * Loads vectors for a vocabulary unless a certain file exists, in which case things are just loaded from there.
+//   * Does not check that the vocabularies are the same.
+//   */
+//  def loadVectorsForVocabularyUseCache(word2vecPath: String, voc: Set[String], inputVectorBias: Boolean, word2vecCache: String) = {
+//    if (!new File(word2vecCache).exists) {
+//      val map = loadVectorsForVocabulary(word2vecPath, voc, inputVectorBias);
+//      println("Writing word2vec cache to " + word2vecCache)
+//      IOUtils.writeObjFile(word2vecCache, map);
+//      map;
+//    } else {
+//      println("Reading word2vec cache from " + word2vecCache)
+//      IOUtils.readObjFile(word2vecCache).asInstanceOf[HashMap[String,Array[Float]]]
+//    }
+//  }
   
   /**
    * Loads vectors from one or more sources in word2vecPaths; these might be in
@@ -36,7 +36,7 @@ object Word2Vec {
    * For each word, vectors are appended from each source. If at least one source
    * is present, others are zeroes. Otherwise, it gets a random vector.
    */
-  def smartLoadVectorsForVocabulary(word2vecPaths: Seq[String], voc: Set[String], inputVectorBias: Boolean) = {
+  def smartLoadVectorsForVocabulary(word2vecPaths: Seq[String], voc: Set[String], maxVectorLen: Int = Int.MaxValue, inputVectorBias: Boolean) = {
     val vectorsEachSource = for (word2vecPath <- word2vecPaths) yield {
       if (word2vecPath.endsWith("bin")) {
         readWord2Vec(word2vecPath, voc, false)
@@ -47,7 +47,7 @@ object Word2Vec {
       }
     }
     val dimsEachSource = vectorsEachSource.map(_.values.head.size)
-    val finalVectorDim = dimsEachSource.reduce(_ + _) + (if (inputVectorBias) 1 else 0)
+    val finalVectorDim = Math.min(maxVectorLen, dimsEachSource.reduce(_ + _) + (if (inputVectorBias) 1 else 0))
     val finalVectors = new HashMap[String,Array[Float]]
     val rng = new Random(0)
     var numRand = 0
@@ -58,7 +58,7 @@ object Word2Vec {
 //        (0 until vectorsEachSource.size).foreach(i => Logger.logss(vectorsEachSource(i).getOrElse(word, { Array[Float]() }).toSeq))
         var finalVector = (0 until vectorsEachSource.size).map(i => vectorsEachSource(i).getOrElse(word, { Array.tabulate(dimsEachSource(i))(j => 0.0F) })).reduce(_ ++ _)
         if (inputVectorBias) {
-          finalVector = finalVector ++ Array(1.0F)
+          finalVector = finalVector ++ Array(1.0F) 
         }
 //        Logger.logss(finalVector.toSeq)
         finalVector
@@ -67,11 +67,24 @@ object Word2Vec {
         numRand += 1
         Array.tabulate(finalVectorDim)(i => if (i == finalVectorDim - 1 && inputVectorBias) 1.0F else ((rng.nextDouble - 0.5) * 0.5).toFloat)
       }
-      require(vector.size == finalVectorDim, "Mismatched sizes, expected dimension " + finalVectorDim + " but got " + vector.size)
-      finalVectors.put(word, vector)
+      val vectorTrimmed = if (vector.size > finalVectorDim) vector.slice(0, finalVectorDim) else vector
+      require(vectorTrimmed.size == finalVectorDim, "Mismatched sizes, expected dimension " + finalVectorDim + " but got " + vector.size + " clipped to " + vectorTrimmed.size)
+      finalVectors.put(word, vectorTrimmed)
     }
     println("Read embeddings for " + voc.size + " words from " + word2vecPaths.size + " sources, " +
             "total embedding size = " + finalVectorDim + ", " + numRand + " present in no source")
+    finalVectors
+  }
+  
+  def makeRandomVectorsForVocabulary(voc: Set[String], dim: Int, inputVectorBias: Boolean) = {
+    val finalVectors = new HashMap[String,Array[Float]]
+    val finalVectorDim = dim + (if (inputVectorBias) 1 else 0)
+    val rng = new Random(0)
+    var numRand = 0
+    for (word <- voc) {
+      val vec = Array.tabulate(finalVectorDim)(i => if (i == finalVectorDim - 1 && inputVectorBias) 1.0F else ((rng.nextDouble - 0.5) * 0.5).toFloat)
+      finalVectors.put(word, vec)
+    }
     finalVectors
   }
   

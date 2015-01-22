@@ -13,14 +13,10 @@ import edu.berkeley.nlp.futile.math.SloppyMath
 import edu.berkeley.nlp.entity.coref.CorefDoc
 import edu.berkeley.nlp.futile.util.Logger
 
-trait CorefPredictor extends LikelihoodAndGradientComputer[DocumentGraph] {
-  def predictAllFormClusterings(inputs: Seq[DocumentGraph], weights: Array[Double]): (Array[Array[Int]], Array[OrderedClustering]);
-}
-
-class CorefNeuralModel(val sparseFeaturizer: PairwiseIndexingFeaturizer,
-                       val transform: AffineTransform[DenseVector[Double],DenseVector[Double]],
-                       val word2vec: Word2VecIndexed[String],
-                       val lossFcn: (CorefDoc, Int, Int) => Float) extends CorefPredictor {
+class CorefNeuralModel2(val sparseFeaturizer: PairwiseIndexingFeaturizer,
+                        val transform: AffineTransform[DenseVector[Double],DenseVector[Double]],
+                        val word2vec: Word2VecIndexed[String],
+                        val lossFcn: (CorefDoc, Int, Int) => Float) extends CorefPredictor {
   
 //  val transform = new 
   val sparseIndexer = sparseFeaturizer.getIndexer()
@@ -28,41 +24,42 @@ class CorefNeuralModel(val sparseFeaturizer: PairwiseIndexingFeaturizer,
   val rng = new Random(0)
   
   val MaxSize = 2000
-  val cachedVectors = new Array[DenseVector[Double]](MaxSize)
-  val cachedActivations = new Array[DenseVector[Double]](MaxSize)
+  // TODO: Pick MaxSize to be low enough
+//  val cachedVectors = new Array[DenseVector[Double]](MaxSize)
+//  val cachedActivations = new Array[DenseVector[Double]](MaxSize)
   
   def getInitialWeights(initialWeightsScale: Double) = transform.initialWeightVector(initialWeightsScale, rng, true).data ++ Array.tabulate(sparseIndexer.size)(i => 0.0)
   
   def vectorSize = 5 * word2vec.wordRepSize
   
-  private def formVector(ment: Mention) = {
-    word2vec.convertToVector(CorefNeuralModel.extractRelevantMentionWords(ment).map(word2vec.wordIndex(_)))
+  private def formVector(ment: Mention, antecedent: Mention) = {
+    word2vec.convertToVector(CorefNeuralModel2.extractRelevantMentionWords(ment, antecedent).map(word2vec.wordIndex(_)))
   }
   
-  private def cacheActivations(ex: DocumentGraph, layer: AffineTransform[DenseVector[Double],DenseVector[Double]]#Layer) {
-    for (i <- 0 until ex.getMentions().size) {
-      cachedVectors(i) = DenseVector(formVector(ex.getMention(i)))
-//      Logger.logss(cachedVectors(i).size)
-      cachedActivations(i) = layer.activations(cachedVectors(i))
-    }
-  }
+//  private def cacheActivations(ex: DocumentGraph, layer: AffineTransform[DenseVector[Double],DenseVector[Double]]#Layer) {
+//    for (i <- 0 until ex.getMentions().size) {
+//      cachedVectors(i) = DenseVector(formVector(ex.getMention(i)))
+////      Logger.logss(cachedVectors(i).size)
+//      cachedActivations(i) = layer.activations(cachedVectors(i))
+//    }
+//  }
   
   def computeCacheLogProbs(input: DocumentGraph,
                            weights: Array[Double],
                            layer: AffineTransform[DenseVector[Double],DenseVector[Double]]#Layer,
                            lossAugment: Boolean) {
-    cacheActivations(input, layer)
     val featsChart = input.featurizeIndexNonPrunedUseCache(sparseFeaturizer)
     for (mentIdx <- 0 until input.size) {
       val scores = input.cachedScoreMatrix(mentIdx)
       for (antIdx <- 0 to mentIdx) {
         val sparseScore = CorefNeuralModel.dotProductOffset(featsChart(mentIdx)(antIdx), weights, transform.index.size)
         val denseScore = if (antIdx == mentIdx) {
-          // Score the new cluster
+          // Right now do nothing, could have a separate NN for this task
           0.0F
         } else {
           // Score the antecedent choice
-          cachedActivations(mentIdx).dot(cachedVectors(antIdx))
+          layer.activations(DenseVector(formVector(input.getMention(mentIdx), input.getMention(antIdx))))(0)
+//          cachedActivations(mentIdx).dot(cachedVectors(antIdx))
         }
 //        if (!lossAugment) {
 //          Logger.logss(denseScore + " " + sparseScore)
@@ -104,24 +101,13 @@ class CorefNeuralModel(val sparseFeaturizer: PairwiseIndexingFeaturizer,
           CorefNeuralModel.addToGradient(featsChart(mentIdx)(antIdx), delta, gradient, transform.index.size);
           // Update the partials vector for dense features
           if (antIdx != mentIdx) {
-            partialsVec += cachedVectors(antIdx) * delta
+            layer.tallyDerivative(DenseVector(gradient), DenseVector(Array(delta)), DenseVector(formVector(input.getMention(mentIdx), input.getMention(antIdx))))
           }
         }
         antIdx += 1
       }
-      // Update dense features
-      layer.tallyDerivative(DenseVector(gradient), partialsVec, cachedVectors(mentIdx))
     }
     ll
-//    val layer = transform.extractLayer(DenseVector(weights))
-//    val logProbs = layer.activations(DenseVector(ex.input)).data
-//    ClassifyUtils.softmaxi(logProbs)
-//    val trueLabelIdx = labelIndexer.getIndex(ex.getLabel)
-//    // Sparse features gradient
-//    
-//    val tallyInputs = Array.tabulate(labelIndexer.size)(i => (if (i == trueLabelIdx) 1.0 else 0.0) - Math.exp(logProbs(i)))
-//    layer.tallyDerivative(DenseVector(gradient), DenseVector(tallyInputs), DenseVector(ex.input))
-//    logProbs(labelIndexer.indexOf(ex.getLabel))
   }
   
   def predict(input: DocumentGraph, weights: Array[Double]) = {
@@ -143,31 +129,18 @@ class CorefNeuralModel(val sparseFeaturizer: PairwiseIndexingFeaturizer,
   def computeObjective(ex: DocumentGraph, weights: Array[Double]): Double = accumulateGradientAndComputeObjective(ex, weights, Array.tabulate(weights.size)(i => 0.0))
 }
 
-object CorefNeuralModel {
+object CorefNeuralModel2 {
   
-  def extractRelevantMentionWords(ment: Mention) = {
-    Array(ment.contextWordOrPlaceholder(-1),
+  def extractRelevantMentionWords(ment: Mention, antecedent: Mention) = {
+    Array(antecedent.contextWordOrPlaceholder(-1),
+          antecedent.contextWordOrPlaceholder(0),
+          antecedent.contextWordOrPlaceholder(ment.headIdx- ment.startIdx),
+          antecedent.contextWordOrPlaceholder(ment.endIdx - 1 - ment.startIdx),
+          antecedent.contextWordOrPlaceholder(ment.endIdx - ment.startIdx),
+          ment.contextWordOrPlaceholder(-1),
           ment.contextWordOrPlaceholder(0),
           ment.contextWordOrPlaceholder(ment.headIdx- ment.startIdx),
           ment.contextWordOrPlaceholder(ment.endIdx - 1 - ment.startIdx),
           ment.contextWordOrPlaceholder(ment.endIdx - ment.startIdx))
-  }
-  
-  def addToGradient(feats: Array[Int], scale: Double, gradient: Array[Double], offset: Int) {
-    var i = 0;
-    while (i < feats.size) {
-      gradient(feats(i) + offset) += scale;
-      i += 1;
-    }
-  }
-  
-  def dotProductOffset(feats: Array[Int], weights: Array[Double], offset: Int) = {
-    var score = 0.0
-    var i = 0;
-    while (i < feats.size) {
-      score += weights(feats(i) + offset)
-      i += 1
-    }
-    score
   }
 }

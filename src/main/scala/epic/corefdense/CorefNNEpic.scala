@@ -29,7 +29,7 @@ class CorefNNEpic(val inputSize: Int,
     new AffineTransform(outputSize, inputSize, new IdentityTransform[DenseVector[Double]]())
   }
   
-  def getInitialWeights = transform.initialWeightVector(1.0, rng, false).data
+  def getInitialWeights(initWeightsScale: Double) = transform.initialWeightVector(initWeightsScale, rng, false).data
 //  def getInitialWeights = transform.initialWeightVector(1.0, rng, true).data
   
   def accumulateGradientAndComputeObjective(ex: CorefEx, weights: Array[Double], gradient: Array[Double]): Double = {
@@ -105,7 +105,7 @@ class CorefNNEpicDistinctEmbeddings(val inputSize: Int,
     new AffineTransform(outputSize, inputSize, new IdentityTransform[DenseVector[Double]]())
   }
   
-  def getInitialWeights = DenseVector.vertcat(transform.initialWeightVector(1.0, rng, false), antTransform.initialWeightVector(1.0, rng, false)).data
+  def getInitialWeights(initWeightsScale: Double) = DenseVector.vertcat(transform.initialWeightVector(initWeightsScale, rng, false), antTransform.initialWeightVector(initWeightsScale, rng, false)).data
 //  def getInitialWeights = transform.initialWeightVector(1.0, rng, true).data
   
   def accumulateGradientAndComputeObjective(ex: CorefEx, weights: Array[Double], gradient: Array[Double]): Double = {
@@ -225,7 +225,7 @@ object CorefNNEpic {
 //    Logger.logss(trainExs(0))
 //    GeneralTrainer.checkGradient(trainSamples.slice(0, 1), nn, nn.numFeats, verbose = true)
 //    System.exit(0);
-    val initialWeights = corefNN.getInitialWeights;
+    val initialWeights = corefNN.getInitialWeights(1.0);
 //    val numItrs = 100
     val numItrs = 50
     val eta = 1.0F

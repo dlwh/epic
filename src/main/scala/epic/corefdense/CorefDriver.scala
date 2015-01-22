@@ -17,6 +17,7 @@ import edu.berkeley.nlp.entity.coref.CorefDocAssembler
 import edu.berkeley.nlp.entity.coref.LexicalCountsBundle
 import edu.berkeley.nlp.entity.WordNetInterfacer
 import edu.berkeley.nlp.entity.coref.CorefFeaturizerTrainer
+import edu.berkeley.nlp.entity.coref.OrderedClustering
 import edu.berkeley.nlp.futile.util.Logger
 import edu.berkeley.nlp.futile.fig.basic.Indexer
 import edu.berkeley.nlp.entity.coref.PairwiseIndexingFeaturizerJoint
@@ -28,28 +29,49 @@ import epic.dense.AffineTransform
 import breeze.linalg.DenseVector
 import epic.dense.Word2VecSurfaceFeaturizerIndexed
 import edu.berkeley.nlp.entity.coref.PairwiseLossFunctions
+import edu.berkeley.nlp.entity.coref.ConjScheme
+import edu.berkeley.nlp.entity.coref.ConjFeatures
+import edu.berkeley.nlp.entity.coref.FeatureSetSpecification
+import epic.features.SegmentedIndex
+import epic.framework.Feature
+import scala.collection.mutable.HashSet
 
 object CorefDriver {
+  
+  // ARGUMENTS ///////
   
   val numberGenderDataPath = "data/gender.data"
   val docSuffix = "auto_conll"
   val wordNetPath = ""
-  val pruningStrategy = "" // TODO: FIGURE OUT PRUNING
-    
+  val pruningStrategy = "distance:10000:5000" // TODO: FIGURE OUT PRUNING
+  
   val hiddenSize = 100
+  
+  val numItrs = 5
+  val eta = 1.0F
+  val reg = 0.001F
+  val initWeightsScale = 0.01
+  val batchSize = 1
     
   val featsToUse = ""
-  
   
   val lossFcn = "customLoss-0.1-3-1";
   val conllEvalScriptPath = "scorer/v7/scorer.pl"
   val word2vecPath = ""
+  
+  val nonLinear = true;
   
   
   val trainPath = "";
   val trainSize = -1;
   val testPath = "";
   val testSize = -1;
+  
+  val checkEmpiricalGradient = false
+  
+  val oldStyleCorefNN = true;
+  
+  ////////////////////
 
   def loadCorefDocs(path: String, size: Int, suffix: String, maybeNumberGenderComputer: Option[NumberGenderComputer]): Seq[CorefDoc] = {
     val docs = ConllDocReader.loadRawConllDocsWithSuffix(path, size, suffix);
@@ -90,32 +112,58 @@ object CorefDriver {
     preprocessDocsCacheResources(trainDocGraphs);
     CorefPruner.buildPruner(pruningStrategy).pruneAll(trainDocGraphs);
     
+    // N.B. does not need to be updated to CorefNeuralModel2 because we're just getting the vocab
     val trainVoc = trainDocGraphs.map(docGraph => docGraph.getMentions.map(ment => CorefNeuralModel.extractRelevantMentionWords(ment).toSet).reduce(_ ++ _)).reduce(_ ++ _)
     
     val featureIndexer = new Indexer[String]();
-    val word2vecRaw = Word2Vec.smartLoadVectorsForVocabulary(word2vecPath.split(":"), trainVoc.map(str => Word2Vec.convertWord(str)), true)
+    val word2vecRaw = Word2Vec.smartLoadVectorsForVocabulary(word2vecPath.split(":"), trainVoc.map(str => Word2Vec.convertWord(str)), Int.MaxValue, true)
     val word2vecRawDoubleVect = word2vecRaw.map(keyValue => (keyValue._1 -> keyValue._2.map(_.toDouble)))
     val word2vecIndexed = Word2VecIndexed(word2vecRawDoubleVect, (str: String) => Word2Vec.convertWord(str))
     
 //    val corefNeuralModel 
-    val vecSize = word2vecIndexed.vectorSize * CorefNeuralModel.extractRelevantMentionWords(trainDocGraphs.head.getMention(0)).size
     
     featureIndexer.getIndex(PairwiseIndexingFeaturizerJoint.UnkFeatName);
-    val sparseFeaturizer = new SimplePairwiseIndexingFeaturizerJoint(featureIndexer, featsToUse.split(",").toSet)
-    val transform = new AffineTransform(vecSize, hiddenSize, new TanhTransform(new AffineTransform(hiddenSize, vecSize, new IdentityTransform[DenseVector[Double]]())))
+//    val featurizer = new SimplePairwiseIndexingFeaturizerJoint(featureIndexer, featsToUse.split(",").toSet)
+    val featureSetSpec = FeatureSetSpecification("FINAL", ConjScheme.COARSE_BOTH, ConjFeatures.TYPE_OR_CANONICAL_PRON, "", "");
+    val featurizer = new PairwiseIndexingFeaturizerJoint(featureIndexer, featureSetSpec, lexicalCounts, None, None)
     val lossFcnObj = PairwiseLossFunctions(lossFcn)
-    val corefNeuralModel = new CorefNeuralModel(sparseFeaturizer, transform, word2vecIndexed, lossFcnObj)
-    new CorefFeaturizerTrainer().featurizeBasic(trainDocGraphs, sparseFeaturizer)
+    
+//    val (transform, corefNeuralModel): (AffineTransform[DenseVector[Double],DenseVector[Double]],CorefPredictor]) = if (oldStyleCorefNN) {
+    val (transform: AffineTransform[DenseVector[Double],DenseVector[Double]], corefNeuralModel: CorefPredictor) = if (oldStyleCorefNN) {
+      val vecSize = word2vecIndexed.wordRepSize * CorefNeuralModel.extractRelevantMentionWords(trainDocGraphs.head.getMention(0)).size
+      Logger.logss("Net size: " + vecSize + " x " + hiddenSize + " x " + vecSize)
+      val transform = if (nonLinear) {
+        new AffineTransform(vecSize, hiddenSize, new TanhTransform(new AffineTransform(hiddenSize, vecSize, new IdentityTransform[DenseVector[Double]]())))
+      } else {
+        new AffineTransform(vecSize, vecSize, new IdentityTransform[DenseVector[Double]]())
+      }
+      Logger.logss("Transform index size: " + transform.index.size)
+      (transform, new CorefNeuralModel(featurizer, transform, word2vecIndexed, lossFcnObj))
+    } else {
+      val vecSize = word2vecIndexed.wordRepSize * CorefNeuralModel2.extractRelevantMentionWords(trainDocGraphs.head.getMention(0), trainDocGraphs.head.getMention(0)).size
+      Logger.logss("Net size: " + vecSize + " x " + hiddenSize + " x " + vecSize)
+      val transform = if (nonLinear) {
+        new AffineTransform(1, hiddenSize, new TanhTransform(new AffineTransform(hiddenSize, vecSize, new IdentityTransform[DenseVector[Double]]())))
+      } else {
+        new AffineTransform(1, vecSize, new IdentityTransform[DenseVector[Double]]())
+      }
+      Logger.logss("Transform index size: " + transform.index.size)
+      (transform, new CorefNeuralModel2(featurizer, transform, word2vecIndexed, lossFcnObj))
+    }
+    new CorefFeaturizerTrainer().featurizeBasic(trainDocGraphs, featurizer)
     
     
-    val initialWeights = corefNeuralModel.getInitialWeights;
+    val initialWeights = corefNeuralModel.getInitialWeights(initWeightsScale);
 //    val numItrs = 100
-    val numItrs = 50
-    val eta = 1.0F
-    val reg = 0.0000001F
-//    val eta = 1.0F
-//    val reg = 1.0F
-//    val weights = new GeneralTrainer().train(trainExs, corefNN, eta, reg, 10, numItrs, initialWeights, verbose = false);
+    
+    if (checkEmpiricalGradient) {
+      val indices = HashSet[Int]();
+      indices ++= 0 until 5
+//      indices ++= ((vecSize + 1) * hiddenSize) until ((vecSize + 1) * hiddenSize + 5)
+      indices ++= transform.index.size until transform.index.size + 5
+      GeneralTrainer.checkGradientFromPoint(trainDocGraphs, corefNeuralModel, initialWeights, Array.tabulate(initialWeights.size)(i => 0.0), indices.toSet, verbose = true)
+    }
+    val weights = new GeneralTrainer().train(trainDocGraphs, corefNeuralModel, eta, reg, batchSize, numItrs, initialWeights, verbose = true);
     
     
     
@@ -139,12 +187,20 @@ object CorefDriver {
     
     val devDocGraphs = prepareTestDocuments(testPath, testSize);
 //    new CorefFeaturizerTrainer().featurizeBasic(devDocGraphs, scorer.featurizer);  // dev docs already know they are dev docs so they don't add features
-//    Logger.startTrack("Decoding dev");
 //    val basicInferencer = new DocumentInferencerBasic();
 //    val (allPredBackptrs, allPredClusterings) = basicInferencer.viterbiDecodeAllFormClusterings(devDocGraphs, scorer);
-    val (allPredBackptrs, allPredClusterings) = (null, null)
+    Logger.startTrack("Decoding dev");
+    val (allPredBackptrs, allPredClusterings) = corefNeuralModel.predictAllFormClusterings(devDocGraphs, weights)
     Logger.logss(CorefEvaluator.evaluateAndRender(devDocGraphs, allPredBackptrs, allPredClusterings, conllEvalScriptPath, "DEV: ", ""));
     Logger.endTrack();
     LightRunner.finalizeOutput()
   }
+  
+//  def getInterestingIndexSet(transform: AffineTransform[DenseVector[Double],DenseVector[Double]]) {
+//    if (transform.index.isInstanceOf[SegmentedIndex[Feature,_]]) {
+//      transform.index.asInstanceOf[SegmentedIndex[Feature]].
+//    }
+//    transform.get
+//  }
 }
+

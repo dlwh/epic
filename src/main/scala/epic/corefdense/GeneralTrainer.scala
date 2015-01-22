@@ -9,6 +9,9 @@ import scala.util.Random
  * N.B. REPURPOSED TO USE DOUBLES
  */
 trait LikelihoodAndGradientComputer[T] {
+  
+  def getInitialWeights(initialWeightsScale: Double): Array[Double]
+  
   /**
    * Accumulates the gradient on this example into gradient and returns the log likelihood
    * of this example

@@ -19,13 +19,16 @@ import epic.dense.AffineTransform
 class SimpleNNEpic[T](val inputSize: Int,
                       val hiddenSize: Int,
                       val outputSize: Int,
+                      val nonLinType: String,
                       val labelIndexer: Indexer[T]) extends LikelihoodAndGradientComputer[NNExample[T]] {
   
   val rng = new Random(0)
-  val transform = new AffineTransform(outputSize, hiddenSize, new TanhTransform(new AffineTransform(hiddenSize, inputSize, new IdentityTransform[DenseVector[Double]]())))
-//  val layers = 
   
-  def getInitialWeights = transform.initialWeightVector(1.0, rng, true).data
+  val innerTransform = new AffineTransform(hiddenSize, inputSize, new IdentityTransform[DenseVector[Double]]())
+  val nonLinTransform = if (nonLinType == "tanh") new TanhTransform(innerTransform) else if (nonLinType == "relu") new ReluTransform(innerTransform) else new CubeTransform(innerTransform)
+  val transform = new AffineTransform(outputSize, hiddenSize, nonLinTransform)
+  
+  def getInitialWeights(initWeightsScale: Double) = transform.initialWeightVector(initWeightsScale, rng, true).data
   
   def accumulateGradientAndComputeObjective(ex: NNExample[T], weights: Array[Double], gradient: Array[Double]): Double = {
     val layer = transform.extractLayer(DenseVector(weights))
@@ -84,6 +87,7 @@ object SimpleNNEpic {
   }
   
   def main(args: Array[String]) {
+    val nonLinType = "";
     val trainSamples = generateGaussianData(1000);
     Logger.logss(trainSamples.map(_.getLabel).reduce(_ + _) + " total 1s")
     val testSamples = generateGaussianData(100);
@@ -95,7 +99,7 @@ object SimpleNNEpic {
     Logger.logss(trainSamples(0))
 //    GeneralTrainer.checkGradient(trainSamples.slice(0, 1), nn, nn.numFeats, verbose = true)
 //    System.exit(0);
-    val initialWeights = nn.getInitialWeights;
+    val initialWeights = nn.getInitialWeights(1.0);
 //    val initialWeights = Array.fill(nn.numFeats)(0.0F);
     val weights = new GeneralTrainer().train(trainSamples, nn, 1.0, 0.0000001, 10, 100, initialWeights, verbose = false);
 //    val weightsOA = new OffsetArray(weights, 0)

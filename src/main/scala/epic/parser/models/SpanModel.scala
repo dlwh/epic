@@ -601,13 +601,21 @@ case class LatentSpanModelFactory(inner: SpanModelFactory,
 object SpanModelFactory {
   def goodFeaturizer[L](wordCounts: Counter2[AnnotatedLabel, String, Double],
                         commonWordThreshold: Int = 100,
-                        useShape: Boolean = true) = {
+                        useShape: Boolean = true,
+                        useLfsuf: Boolean = true,
+                        useBrown: Boolean = false) = {
     val dsl = new WordFeaturizer.DSL(wordCounts, commonWordThreshold) with SurfaceFeaturizer.DSL with SplitSpanFeaturizer.DSL
     import dsl._
 
     // class(split + 1)
-    val baseCat = lfsuf
-
+    var baseCat: WordFeaturizer[String] = new ZeroFeaturizer[String];
+    if (useLfsuf) {
+      baseCat += lfsuf
+    }
+    if (useBrown) {
+      baseCat += new BrownClusterFeaturizer(Array(4, 10))
+    }
+    
     val leftOfSplit: SplitSpanFeaturizer[String] =  ((baseCat)(-1)apply (split))
 
     var featurizer: SplitSpanFeaturizer[String] = zeroSplit[String]

@@ -17,6 +17,9 @@ object RandomTests {
 //      }
 //    }
     
+    println(entropy(Array(0.25, 0.25, 0.25, 0.25)))
+    System.exit(0)
+    
     val mat = DenseMatrix.zeros[Double](5, 5)
     val vect = DenseVector.vertcat(mat(1, ::).t, mat(3, ::).t)
 //    axpy(1.0, DenseVector.ones[Double](5), mat(1, ::).t)
@@ -37,6 +40,10 @@ object RandomTests {
 //    testNNSpeedDouble();
 //    testNNSpeedFloat();
 //  1806 x 100 x 87
+  }
+  
+  def entropy(dist: Array[Double]) = {
+    dist.map(value => -value * Math.log(value)/Math.log(2)).reduce(_ + _)
   }
   
   
