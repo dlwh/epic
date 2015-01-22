@@ -94,7 +94,7 @@ object SimpleNNEpic {
     val vacuousIndexer = new Indexer[Int];
     vacuousIndexer.add(0)
     vacuousIndexer.add(1)
-    val nn = new SimpleNNEpic(3, 20, 2, vacuousIndexer)
+    val nn = new SimpleNNEpic(3, 20, 2, nonLinType, vacuousIndexer)
 //    val nnBlas = new SimpleNNBest(3, 20, 2)
     Logger.logss(trainSamples(0))
 //    GeneralTrainer.checkGradient(trainSamples.slice(0, 1), nn, nn.numFeats, verbose = true)
