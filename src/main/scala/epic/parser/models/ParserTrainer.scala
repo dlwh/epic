@@ -21,7 +21,7 @@ import breeze.linalg._
 import breeze.optimize._
 import epic.trees.{ProcessedTreebank, AnnotatedLabel, TreeInstance}
 import breeze.config.{CommandLineParser, Help}
-import com.typesafe.scalalogging.LazyLogging
+import com.typesafe.scalalogging.slf4j.LazyLogging
 import epic.parser.projections.{GrammarRefinements, OracleParser, ParserChartConstraintsFactory}
 import epic.util.CacheBroker
 import epic.parser.ParserParams.XbarGrammar

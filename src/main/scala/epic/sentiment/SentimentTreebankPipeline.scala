@@ -9,7 +9,7 @@ import breeze.linalg._
 import epic.framework._
 import epic.constraints.{LabeledSpanConstraints, SpanConstraints, ChartConstraints}
 import breeze.optimize.CachedBatchDiffFunction
-import com.typesafe.scalalogging.LazyLogging
+import com.typesafe.scalalogging.slf4j.LazyLogging
 import epic.parser.models.SpanModelFactory
 import epic.trees.ProcessedTreebank
 import epic.trees.TreeInstance

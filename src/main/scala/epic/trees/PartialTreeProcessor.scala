@@ -13,13 +13,9 @@ case class PartialTreeProcessor() {
       transformed
     }
     val ann = transformed.map { label =>
-      val fields = StandardTreeProcessor.splitLabel(label)
-      fields(0);
-//      val anno = fields.drop(1).filterNot(s => s.nonEmpty && s.charAt(0).isDigit)
-//      interner.intern(AnnotatedLabel(fields.head.intern,
-//        features= anno.iterator.map(tag => functionalTagInterner.intern(FunctionalTag(tag))).toSet
-//      ))
+      val fields = AnnotatedLabel.parseTreebank(label)
+      fields.label
     }
-    ann;
+    ann
   }
 }

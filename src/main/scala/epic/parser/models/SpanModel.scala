@@ -24,7 +24,7 @@ import breeze.config.Help
 import breeze.linalg._
 import breeze.optimize.FirstOrderMinimizer.OptParams
 import breeze.util._
-import com.typesafe.scalalogging.LazyLogging
+import com.typesafe.scalalogging.slf4j.LazyLogging
 import epic.constraints.ChartConstraints.Factory
 import epic.constraints.{CachedChartConstraintsFactory, ChartConstraints}
 import epic.features._

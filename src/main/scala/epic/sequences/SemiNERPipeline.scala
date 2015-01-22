@@ -12,8 +12,7 @@ import breeze.util.Encoder
 import epic.trees.Span
 import breeze.optimize.FirstOrderMinimizer.OptParams
 import breeze.util.Implicits._
-import epic.util.CacheBroker
-import com.typesafe.scalalogging.LazyLogging
+import com.typesafe.scalalogging.slf4j.LazyLogging
 import epic.preprocess.TreebankTokenizer
 import epic.corpora.CONLLSequenceReader
 
@@ -26,7 +25,6 @@ object SemiNerPipeline extends LazyLogging {
 
   case class Params(path: File,
                     modelOut: File = new File("ner.model.gz"),
-                    implicit val cache: CacheBroker,
                     nfiles: Int = 100000,
                     iterPerEval: Int = 20,
                     nthreads: Int = -1,
@@ -48,7 +46,7 @@ object SemiNerPipeline extends LazyLogging {
     val gazetteer =  None//Gazetteer.ner("en")
 
     // build feature Index
-    val model = new SegmentationModelFactory(NerType.OutsideSentence, gazetteer = gazetteer).makeModel(train)
+    val model = new SegmentationModelFactory(gazetteer = gazetteer).makeModel(train)
     val obj = new ModelObjective(model, train, params.nthreads)
     val cached = new CachedBatchDiffFunction(obj)
     if(params.checkGradient) {
@@ -116,12 +114,12 @@ object SemiConllNerPipeline extends LazyLogging {
 
   case class Params(train: File,
                     test: File,
-                    cache: CacheBroker,
                     nsents: Int = 100000,
                     nthreads: Int = -1,
                     iterPerEval: Int = 20,
                     modelOut: File = new File("ner-conll.ser.gz"),
-                    opt: OptParams)
+                    opt: OptParams,
+                    checkGradient: Boolean = false)
 
   def main(args: Array[String]) {
     val params:Params = CommandLineParser.readIn[Params](args)
@@ -135,11 +133,13 @@ object SemiConllNerPipeline extends LazyLogging {
 
 
     // build feature Index
-    val model: SemiCRFModel[String, String] = new SegmentationModelFactory("##" /*, gazetteer = Gazetteer.ner("en" )*/).makeModel(train)
+    val model: SemiCRFModel[String, String] = new SegmentationModelFactory(/*, gazetteer = Gazetteer.ner("en" )*/).makeModel(train)
     val obj = new ModelObjective(model, train, params.nthreads)
     val cached = new CachedBatchDiffFunction(obj)
 
-    //    GradientTester.test(cached, obj.initialWeightVector(true), toString={(i: Int) => model.featureIndex.get(i).toString})
+    if(params.checkGradient) {
+      GradientTester.test(cached, obj.initialWeightVector(true), toString={(i: Int) => model.featureIndex.get(i).toString})
+    }
 
     //
     def eval(state: FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State) = {

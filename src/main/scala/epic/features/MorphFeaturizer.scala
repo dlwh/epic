@@ -2,7 +2,7 @@ package epic.features
 
 import breeze.linalg.Counter
 import epic.framework.Feature
-import com.typesafe.scalalogging.LazyLogging
+import com.typesafe.scalalogging.slf4j.LazyLogging
 import breeze.io.FileStreams
 import java.io.File
 import java.io.BufferedReader

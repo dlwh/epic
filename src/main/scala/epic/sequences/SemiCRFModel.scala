@@ -5,7 +5,7 @@ import breeze.collection.mutable.TriangularArray
 import breeze.features.FeatureVector
 import breeze.linalg._
 import breeze.util._
-import com.typesafe.scalalogging.LazyLogging
+import com.typesafe.scalalogging.slf4j.LazyLogging
 import epic.constraints.LabeledSpanConstraints
 import epic.features._
 import epic.framework._
@@ -23,8 +23,7 @@ import scala.collection.mutable.ArrayBuffer
 @SerialVersionUID(1L)
 class SemiCRFModel[L, W](val featurizer: SemiCRFModel.BIEOFeaturizer[L, W],
                          val constraintsFactory: LabeledSpanConstraints.Factory[L, W],
-                         initialWeights: Feature=>Double = {(_: Feature) => 0.0},
-                         cacheFeatures: Boolean = false) extends StandardExpectedCounts.Model[Segmentation[L, W]] with Serializable {
+                         initialWeights: Feature=>Double = {(_: Feature) => 0.0}) extends StandardExpectedCounts.Model[Segmentation[L, W]] with Serializable {
 
   def featureIndex = featurizer.featureIndex
 
@@ -117,7 +116,6 @@ class SemiCRFInference[L, W](weights: DenseVector[Double],
   }
 
   val labelIndex = featurizer.labelIndex
-  def startSymbol = featurizer.startSymbol
 
   def scorer(v: Segmentation[L, W]): Scorer = scorer(v.words)
 
@@ -138,7 +136,7 @@ class SemiCRFInference[L, W](weights: DenseVector[Double],
 
 
   def baseAugment(v: Segmentation[L, W]): SemiCRF.Anchoring[L, W] = {
-    new IdentityAnchoring(v.words, labelIndex, featurizer.startSymbol, constraintsFactory.constraints(v.words))
+    new IdentityAnchoring(v.words, labelIndex, constraintsFactory.constraints(v.words))
   }
 
   case class Anchoring(localization: BIEOFeatureAnchoring[L, W],
@@ -182,36 +180,34 @@ class SemiCRFInference[L, W](weights: DenseVector[Double],
 
     private def cachedSpanScore(prev: Int, cur: Int, beg: Int, end: Int):Double = {
       val tind: Int = TriangularArray.index(beg, end)
-      var cc = spanCache(tind)
+      var spanCell = spanCache(tind)
       if(spanCache(tind) == null) {
-        cc = new Array[Array[Double]](labelIndex.size)
-        spanCache(tind) = cc
+        spanCell = new Array[Array[Double]](labelIndex.size)
+        spanCache(tind) = spanCell
       }
 
-      var xx = cc(cur)
-      if(xx == null) {
+      var curLabelCell = spanCell(cur)
+      if(curLabelCell == null) {
 
         val span = localization.featuresForSpan(prev, cur, beg, end)
         if (span eq null) {
-          cc(cur) = negInfArray
+          spanCell(cur) = negInfArray
           Double.NegativeInfinity
         } else {
-          xx = java.util.Arrays.copyOf(nanArray, nanArray.length)
-          xx(prev) = weights dot span
-          cc(cur) = xx
-          xx(prev)
+          curLabelCell = java.util.Arrays.copyOf(nanArray, nanArray.length)
+          curLabelCell(prev) = weights dot span
+          spanCell(cur) = curLabelCell
+          curLabelCell(prev)
         }
       } else {
-        if (java.lang.Double.isNaN(xx(prev))) {
+        if (java.lang.Double.isNaN(curLabelCell(prev))) {
           val span = localization.featuresForSpan(prev, cur, beg, end)
-          xx(prev) = weights dot span
+          curLabelCell(prev) = weights dot span
         }
-        xx(prev)
+        curLabelCell(prev)
       }
     }
 
-
-    def startSymbol = featurizer.startSymbol
 
   }
 
@@ -226,14 +222,12 @@ class SemiCRFInference[L, W](weights: DenseVector[Double],
 /**
  * Factory class for making a [[epic.sequences.SemiCRFModel]] based
  * on some data and an optional gazetteer.
- * @param startSymbol
  * @param pruningModel
  * @param gazetteer
  * @param weights
  * @tparam L
  */
-class SegmentationModelFactory[L](val startSymbol: L,
-                                  wordFeaturizer: Optional[WordFeaturizer[String]] = NotProvided,
+class SegmentationModelFactory[L](wordFeaturizer: Optional[WordFeaturizer[String]] = NotProvided,
                                   spanFeaturizer: Optional[SurfaceFeaturizer[String]] = NotProvided,
                                   pruningModel: Optional[SemiCRF.ConstraintSemiCRF[L, String]] = NotProvided,
                                   gazetteer: Optional[Gazetteer[Any, String]] = NotProvided,
@@ -243,7 +237,7 @@ class SegmentationModelFactory[L](val startSymbol: L,
 
   def makeModel(train: IndexedSeq[Segmentation[L, String]]): SemiCRFModel[L, String] = {
     val maxLengthMap = train.flatMap(_.segments.iterator).groupBy(_._1).mapValues(arr => arr.map(_._2.length).max)
-    val labelIndex: Index[L] = Index[L](Iterator(startSymbol) ++ train.iterator.flatMap(_.label.map(_._1)))
+    val labelIndex: Index[L] = Index[L](train.iterator.flatMap(_.label.map(_._1)))
     val maxLengthArray = Encoder.fromIndex(labelIndex).tabulateArray(maxLengthMap.getOrElse(_, 0))
     logger.info("Maximum lengths for segments: " + maxLengthMap)
 
@@ -264,7 +258,7 @@ class SegmentationModelFactory[L](val startSymbol: L,
     for(f <- pruningModel) {
       assert(f.labelIndex == new OptionIndex(labelIndex), f.labelIndex + " " + labelIndex)
     }
-    val indexed = IndexedStandardFeaturizer.make(wf, sf, startSymbol, new OptionIndex(labelIndex), allowedSpanClassifier)(train)
+    val indexed = IndexedStandardFeaturizer.make(wf, sf, new OptionIndex(labelIndex), allowedSpanClassifier)(train)
     val model = new SemiCRFModel(indexed, allowedSpanClassifier, weights)
 
     model
@@ -311,25 +305,24 @@ object SegmentationModelFactory {
 
 
   @SerialVersionUID(2L)
-  class IndexedStandardFeaturizer[L] private (wordFeaturizer: IndexedWordFeaturizer[String],
-                                              surfaceFeaturizer: IndexedSurfaceFeaturizer[String],
-                                              wordFeatureIndex: CrossProductIndex[Feature, Feature],
-                                              spanFeatureIndex: CrossProductIndex[Feature, Feature],
-                                              bioeFeatures: Array[Array[Array[Int]]], // label -> kind -> indexes into surfaceFeaturizer.labelFeatureIndex
-                                              transitionFeatures: Array[Array[Array[Int]]], // prev -> cur -> indexes into surfaceFeaturizer.labelFeatureIndex
-                                              val startSymbol: L,
-                                              val labelIndex: OptionIndex[L],
-                                              val constraintFactory: LabeledSpanConstraints.Factory[L, String]) extends SemiCRFModel.BIEOFeaturizer[L,String] with Serializable with SafeLogging {
+  class IndexedStandardFeaturizer[L, W] private (wordFeaturizer: IndexedWordFeaturizer[W],
+                                                 surfaceFeaturizer: IndexedSurfaceFeaturizer[W],
+                                                 wordFeatureIndex: CrossProductIndex[Feature, Feature],
+                                                 spanFeatureIndex: CrossProductIndex[Feature, Feature],
+                                                 bioeFeatures: Array[Array[Array[Int]]], // label -> kind -> indexes into surfaceFeaturizer.labelFeatureIndex
+                                                 transitionFeatures: Array[Array[Array[Int]]], // prev -> cur -> indexes into surfaceFeaturizer.labelFeatureIndex
+                                                 val labelIndex: OptionIndex[L],
+                                                 val constraintFactory: LabeledSpanConstraints.Factory[L, W]) extends SemiCRFModel.BIEOFeaturizer[L,W] with Serializable with SafeLogging {
 
     val featureIndex = SegmentedIndex(wordFeatureIndex, spanFeatureIndex)
     private val wordOffset = featureIndex.componentOffset(0)
     private val spanOffset = featureIndex.componentOffset(1)
 
-    def anchor(w: IndexedSeq[String]): SemiCRFModel.BIEOFeatureAnchoring[L, String] = new SemiCRFModel.BIEOFeatureAnchoring[L, String] {
+    def anchor(w: IndexedSeq[W]): SemiCRFModel.BIEOFeatureAnchoring[L, W] = new SemiCRFModel.BIEOFeatureAnchoring[L, W] {
       import epic.sequences.SegmentationModelFactory.FeatureKinds._
       val constraints = constraintFactory.constraints(w)
 
-      def words: IndexedSeq[String] = w
+      def words: IndexedSeq[W] = w
 
       val loc = surfaceFeaturizer.anchor(w)
       val wloc = wordFeaturizer.anchor(w)
@@ -364,13 +357,12 @@ object SegmentationModelFactory {
   }
 
   object IndexedStandardFeaturizer {
-    def make[L](wordFeaturizer: IndexedWordFeaturizer[String],
-                spanFeaturizer: IndexedSurfaceFeaturizer[String],
-                startSymbol: L,
+    def make[L, W](wordFeaturizer: IndexedWordFeaturizer[W],
+                spanFeaturizer: IndexedSurfaceFeaturizer[W],
                 labelIndex: OptionIndex[L],
-                constraintFactory: LabeledSpanConstraints.Factory[L, String],
+                constraintFactory: LabeledSpanConstraints.Factory[L, W],
                 hashFeatures: HashFeature.Scale = HashFeature.Absolute(0))
-               (data: IndexedSeq[Segmentation[L, String]]):IndexedStandardFeaturizer[L] = {
+               (data: IndexedSeq[Segmentation[L, W]]):IndexedStandardFeaturizer[L, W] = {
       val labelPartIndex = Index[Feature]()
       val outsideFeature = labelPartIndex.index(OutsideFeature)
       val bioeFeatures = Array.tabulate(labelIndex.size, FeatureKinds.maxId)((i,j) => if(i == labelIndex.size - 1) Array.empty[Int] else Array(labelPartIndex.index(Label1Feature(labelIndex.get(i).get, FeatureKinds(j)))))
@@ -390,7 +382,7 @@ object SegmentationModelFactory {
       for (d <- data){
         val feats = spanFeaturizer.anchor(d.words)
         val wordFeats = wordFeaturizer.anchor(d.words)
-        var last = labelIndex(Some(startSymbol))
+        var last = labelIndex(None)
         for ((optL, span) <- d.segmentsWithOutside) optL match {
           case Some(l) =>
             val li = labelIndex(optL)
@@ -418,7 +410,7 @@ object SegmentationModelFactory {
       val spanFeatures = spanBuilder.result()
       val wordFeatures = wordBuilder.result()
 
-      new IndexedStandardFeaturizer(wordFeaturizer, spanFeaturizer, wordFeatures, spanFeatures, bioeFeatures, transitionFeatures, startSymbol, labelIndex, constraintFactory)
+      new IndexedStandardFeaturizer(wordFeaturizer, spanFeaturizer, wordFeatures, spanFeatures, bioeFeatures, transitionFeatures, labelIndex, constraintFactory)
 
     }
 

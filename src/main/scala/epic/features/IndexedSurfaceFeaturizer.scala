@@ -35,7 +35,7 @@ object IndexedSurfaceFeaturizer {
       val cons = constraintFactory.get(words)
       val anch = feat.anchor(words)
       for(i <- 0 until words.length) {
-        for(j <- (i+1) to (i + cons.maxSpanLengthStartingAt(i)) if cons(i, j)) {
+        for(j <- (i+1) to math.min(words.length, (i + cons.maxSpanLengthStartingAt(i))) if cons(i, j)) {
           index.add(anch.featuresForSpan(i, j) )
         }
       }

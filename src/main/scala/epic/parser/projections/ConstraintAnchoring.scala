@@ -32,7 +32,7 @@ import epic.lexicon.Lexicon
 import epic.constraints.{CachedChartConstraintsFactory, ChartConstraints}
 import epic.util.{SafeLogging, CacheBroker}
 import scala.collection.GenTraversable
-import com.typesafe.scalalogging.{LazyLogging, Logger}
+import com.typesafe.scalalogging.slf4j.{LazyLogging, Logger}
 import java.util.concurrent.atomic.AtomicInteger
 
 /**

@@ -25,7 +25,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import epic.framework.EvaluationResult
 import collection.parallel.ForkJoinTaskSupport
 import concurrent.forkjoin.ForkJoinPool
-import com.typesafe.scalalogging.LazyLogging
+import com.typesafe.scalalogging.slf4j.LazyLogging
 import java.text.DecimalFormat
 import epic.util.ProgressLog
 

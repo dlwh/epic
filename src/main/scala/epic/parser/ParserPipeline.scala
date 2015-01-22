@@ -22,7 +22,7 @@ import epic.parser
 import collection.mutable
 import epic.lexicon.{Lexicon, SimpleLexicon}
 import epic.constraints.{CachedChartConstraintsFactory, ChartConstraints}
-import com.typesafe.scalalogging.LazyLogging
+import com.typesafe.scalalogging.slf4j.LazyLogging
 import breeze.linalg.Counter2
 import epic.trees.annotations.Xbarize
 
