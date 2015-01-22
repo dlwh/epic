@@ -5,7 +5,7 @@ import sbtassembly.AssemblyOption
 
 name := "epic"
 
-version := "0.2-SNAPSHOT"
+version := "0.2"
 
 organization := "org.scalanlp"
 
@@ -22,8 +22,8 @@ resolvers ++= Seq(
 libraryDependencies ++= Seq(
   "junit" % "junit" % "4.5" % "test",
   "org.scalanlp" %% "breeze" % "0.9",
-  "org.scalanlp" %% "breeze-config" % "0.9",
-  "org.scalanlp" %% "nak" % "1.3-SNAPSHOT" intransitive(),
+  "org.scalanlp" %% "breeze-config" % "0.9.1",
+  "org.scalanlp" %% "nak" % "1.3" intransitive(),
   "org.mapdb" % "mapdb" % "0.9.2",
   "com.typesafe.scala-logging" %% "scala-logging" % "3.1.0",
   ("org.apache.tika" % "tika-parsers" % "1.5").exclude ("edu.ucar", "netcdf").exclude("com.googlecode.mp4parser","isoparser"),

@@ -69,7 +69,7 @@ class CrossProductIndex[A, B] private (val firstIndex: Index[A],
         -1
       }
 
-      if(numHashFeatures == 0) {
+      if(f != -1 || numHashFeatures == 0) {
         f
       } else if (f < -1) { // really not present
         -1

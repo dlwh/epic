@@ -425,6 +425,8 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
       minFeatCount,
       trainTrees)
 
+    println("LAST FEAT:::::" + indexed.spanFeatureIndex.last)
+
     logger.info(s"Num features: Indexed Features: ${indexed.index.size}")
 
     val featureCounter = readWeights(oldWeights)
@@ -564,6 +566,7 @@ case class LatentSpanModelFactory(inner: SpanModelFactory,
       filterUnseenFeatures = false,
     1,
       train)
+
 
     val featureCounter = this.readWeights(oldWeights)
 
