@@ -48,15 +48,7 @@ lazy val commonSettings = Seq(
       Some("releases"  at nexus + "service/local/staging/deploy/maven2")
   },
   publishArtifact in Test := false,
-  pomIncludeRepository := { _ => false },
-  mergeStrategy in assembly <<= (mergeStrategy in assembly) { (old) =>
-    {
-      case PathList("org", "w3c", "dom", _) => MergeStrategy.first
-      case PathList("javax", "xml", "stream", _ *) => MergeStrategy.first
-      case PathList("org", "cyberneko", "html", _ *) => MergeStrategy.first
-      case x => old(x)
-    }
-  }
+  pomIncludeRepository := { _ => false }
 )
 
 lazy val root = (project in file("."))
@@ -68,7 +60,7 @@ lazy val root = (project in file("."))
     "org.scalanlp" %% "breeze" % "0.10",
     "org.scalanlp" %% "breeze-config" % "0.9.1",
     "org.scalanlp" %% "nak" % "1.3",
-    "org.scalanlp" %% "epic-slab" % "0.2-SNAPSHOT",
+    "org.scalanlp" %% "epic-slab" % "0.3-SNAPSHOT",
     "org.mapdb" % "mapdb" % "0.9.2",
     ("org.apache.tika" % "tika-parsers" % "1.5").exclude ("edu.ucar", "netcdf").exclude("com.googlecode.mp4parser","isoparser"),
     "de.l3s.boilerpipe" % "boilerpipe" % "1.1.0",
@@ -87,11 +79,42 @@ lazy val root = (project in file("."))
     case _ =>
       Seq.empty
   }))
+  .dependsOn(slab)
+  .settings(test in Test <<= test in Test dependsOn (test in Test in slab))
 
 seq(assemblySettings: _*)
 
 assemblyOption in assembly ~= { _.copy(cacheOutput = false) }
 
+mergeStrategy in assembly <<= (mergeStrategy in assembly) { (old) =>
+  {
+    case PathList("org", "w3c", "dom", _) => MergeStrategy.first
+    case PathList("javax", "xml", "stream", _ *) => MergeStrategy.first
+    case PathList("org", "cyberneko", "html", _ *) => MergeStrategy.first
+    case x => old(x)
+  }
+}
+
 seq(sbtjflex.SbtJFlexPlugin.jflexSettings: _*)
 
 net.virtualvoid.sbt.graph.Plugin.graphSettings
+
+val shapeless = Def setting (
+    CrossVersion partialVersion scalaVersion.value match {
+    case Some((2, scalaMajor)) if scalaMajor >= 11 => 
+      "com.chuusai" %% "shapeless" % "2.0.0"
+    case Some((2, 10)) => 
+      "com.chuusai" %  "shapeless" % "2.0.0" cross CrossVersion.full
+  }
+)
+
+lazy val slab = (project in file("slab"))
+  .settings(commonSettings: _*)
+  .settings(name := "epic-slab")
+  .settings(version := "0.3-SNAPSHOT")
+  .settings(libraryDependencies ++= Seq(
+    "org.scalatest" %% "scalatest" % "2.1.3" % "test",
+    "org.scalacheck" %% "scalacheck" % "1.11.3" % "test",
+    shapeless.value,
+    "org.scalaz" %% "scalaz-core" % "7.1.0"
+  ))
