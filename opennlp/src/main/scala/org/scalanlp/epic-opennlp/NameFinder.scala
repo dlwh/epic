@@ -1,11 +1,8 @@
 package org.scalanlp.epic.opennlp
 
 import epic.slab._
-import epic.slab.Utils._
 import shapeless._
-import epic.trees.Span
 import opennlp.tools.namefind._
-import opennlp.tools.util._
 import SpanToSpan._
 
 object aliases {
@@ -17,22 +14,12 @@ class Tagger[T <: ProbabilityAnnotation](
   val model: TokenNameFinderModel,
   val tag: Double => T,
   val tagger: TokenNameFinderModel => NameFinderME
-) extends AnalysisFunctionN1[String, TaggerInput, Tagged[T]] {
-  override def apply[In <: HList, Out <: HList](slab: Slab[String, In])(
-    implicit sel: SelectMany.Aux[In, TaggerInput, TaggerInput],
-    adder: Adder.Aux[In, Tagged[T], Vector[Tagged[T]], Out]
-  ): Slab[String, Out] = {
-    val data = slab.selectMany(sel)
-    val index = SpanIndex(data.select[Vector[PToken]])
-    // Required because the API is not threadsafe.
-    val tmodel = tagger(model)
-    val annotatedSentences = for(sentence <- data.select[Vector[PSentence]]) yield {
-      val tokens = index(sentence.span).map(s => slab.substring(s.span))
-      val spans = tmodel.find(tokens.toArray).map(_.offset(sentence.begin))
-      val tags = tmodel.probs().map(tag)
-      spans.zip(tags).map({case (span, tag) => Tagged[T](span, tag)})
-    }
-    slab.add(annotatedSentences.flatten)(adder)
+) extends legacyannotators.Segmenter[T, NameFinderME] {
+  override def initializer = () => tagger(model)
+  override def apply(model: NameFinderME, tokens: Iterable[String]) = {
+    val spans = model.find(tokens.toArray)
+    val tags = model.probs().map(tag)
+    spans.zip(tags).map({case (span, tag) => Tagged[T](span, tag)})
   }
 }
 

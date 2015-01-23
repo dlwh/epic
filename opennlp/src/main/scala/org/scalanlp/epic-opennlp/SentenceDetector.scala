@@ -5,7 +5,6 @@ import opennlp.tools.util._
 import epic.slab.Span
 import opennlp.tools.sentdetect._
 import SpanToSpan._
-import epic.slab.legacyannotators._
 
 trait ProbabilityAnnotation {
   def probability: Double
@@ -16,10 +15,9 @@ object PSentence {
   def apply(s: Span, p: Double): PSentence = new PSentence(s, p)
 }
 
-class SentenceDetector(val model: SentenceModel) extends SentenceSegmenter {
-  def apply(text: String): Vector[PSentence] = {
-    // The detector is not threadsafe
-    val detector = new SentenceDetectorME(model) 
+class SentenceSegmenter(val model: SentenceModel) extends legacyannotators.SentenceSegmenter[PSentence, SentenceDetectorME] {
+  override def initialize = () => new SentenceDetectorME(model)
+  override def apply(detector: SentenceDetectorME, text: String): Vector[PSentence] = {
     detector.sentPosDetect(text)
       .zip(detector.getSentenceProbabilities())
       .map({case (span, prob) => PSentence(span, prob)})
@@ -28,10 +26,10 @@ class SentenceDetector(val model: SentenceModel) extends SentenceSegmenter {
 }
 
 object SentenceDetector {
-  def apply(model: SentenceModel): SentenceDetector = new SentenceDetector(model)
+  def apply(model: SentenceModel): SentenceSegmenter = new SentenceSegmenter(model)
 }
 
 object SpanToSpan {
-  implicit def toEpic(span: opennlp.tools.util.Span): epic.trees.Span = Span(span.getStart, span.getEnd)
-  implicit def toOpennlp(span: epic.trees.Span): opennlp.tools.util.Span = new opennlp.tools.util.Span(span.begin, span.end)
+  implicit def toEpic(span: opennlp.tools.util.Span): epic.slab.Span = Span(span.getStart, span.getEnd)
+  implicit def toOpennlp(span: epic.slab.Span): opennlp.tools.util.Span = new opennlp.tools.util.Span(span.begin, span.end)
 }
