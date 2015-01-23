@@ -1,7 +1,8 @@
 package org.scalanlp.epic.opennlp
 
 import epic.slab._
-import epic.slab.Utils._
+import scalaz.std.list._
+
 import java.net.URL
 import opennlp.tools.sentdetect.SentenceModel
 import opennlp.tools.tokenize.TokenizerModel

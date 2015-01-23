@@ -5,11 +5,6 @@ import shapeless._
 import opennlp.tools.namefind._
 import SpanToSpan._
 
-object aliases {
-  type TaggerInput = Vector[PSentence] :: Vector[PToken] :: HNil
-}
-import aliases._
-
 class Tagger[T <: ProbabilityAnnotation](
   val model: TokenNameFinderModel,
   val tag: Double => T,

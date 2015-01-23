@@ -1,15 +1,13 @@
 package org.scalanlp.epic.opennlp
 
 import epic.slab._
-import epic.slab.Utils._
+import epic.slab.typeclasses._
 import shapeless._
-import epic.trees.Span
 import opennlp.tools.parser._
-import opennlp.tools.util._
 import SpanToSpan._
 import scala.collection.JavaConversions._
 
-class ParseTag(val span: epic.trees.Span, val parseType: String, val probability: Double) extends ProbabilityAnnotation with SpanAnnotation
+class ParseTag(val span: Span, val parseType: String, val probability: Double) extends ProbabilityAnnotation with SpanAnnotation
 
 object ParseTag {
   def apply(span: Span, tag: String, probability: Double): ParseTag = new ParseTag(span, tag, probability)
@@ -22,14 +20,14 @@ class Parser(
   val parser: ParserModel => opennlp.tools.parser.Parser
 ) extends AnalysisFunctionN1[String, TaggerInput, ParseTag] {
   override def apply[In <: HList, Out <: HList](slab: Slab[String, In])(
-    implicit sel: SelectMany.Aux[In, TaggerInput, TaggerInput],
-    adder: Adder.Aux[In, ParseTag, Vector[ParseTag], Out]
+    implicit sel: SubSelectMany.Aux[In, TaggerInput, TaggerInput],
+    adder: Adder.Aux[In, List[ParseTag], Out]
   ): Slab[String, Out] = {
     val data = slab.selectMany(sel)
-    val index = SpanIndex(data.select[Vector[PToken]])
+    val index = SpanIndex(data.select[List[Token]])
     // Required because the API is not threadsafe.
     val pmodel = parser(model)
-    val annotatedSentences: Vector[List[ParseTag]] = data.select[Vector[PSentence]].flatMap({ sentence =>
+    val annotatedSentences: List[List[ParseTag]] = data.select[List[Sentence]].flatMap({ sentence =>
       val s = slab.substring(sentence.span)
       val tokens = index(sentence.span)
       val unparsed = new Parse(s, Span(0, sentence.end - sentence.begin), "INC", 1, null)
