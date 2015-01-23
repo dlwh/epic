@@ -1,9 +1,7 @@
 package org.reactormonk.epic.opennlp
 
 import epic.slab._
-import epic.slab.Utils._
 import shapeless._
-import epic.trees.Span
 import opennlp.tools.chunker._
 import opennlp.tools.util._
 import SpanToSpan._

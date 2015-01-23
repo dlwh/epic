@@ -2,9 +2,10 @@ package org.reactormonk.epic.opennlp
 
 import epic.slab._
 import opennlp.tools.util._
-import epic.trees.Span
+import epic.slab.Span
 import opennlp.tools.sentdetect._
 import SpanToSpan._
+import epic.slab.legacyannotators._
 
 trait ProbabilityAnnotation {
   def probability: Double
@@ -15,7 +16,7 @@ object PSentence {
   def apply(s: Span, p: Double): PSentence = new PSentence(s, p)
 }
 
-class SentenceDetector(val model: SentenceModel) extends AnalysisFunction01[String, PSentence] {
+class SentenceDetector(val model: SentenceModel) extends SentenceSegmenter {
   def apply(text: String): Vector[PSentence] = {
     // The detector is not threadsafe
     val detector = new SentenceDetectorME(model) 
