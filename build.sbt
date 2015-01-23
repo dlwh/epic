@@ -118,3 +118,18 @@ lazy val slab = (project in file("slab"))
     shapeless.value,
     "org.scalaz" %% "scalaz-core" % "7.1.0"
   ))
+
+lazy val opennlp = (project in file("opennlp"))
+  .settings(commonSettings: _*)
+  .settings(name := "epic-opennlp")
+  .settings(version := "0.1-SNAPSHOT")
+  .settings(libraryDependencies ++= Seq(
+    "org.scalanlp" %% "epic-slab" % "0.3-SNAPSHOT",
+    "org.apache.spark" %% "spark-core" % "1.2.0" % "provided",
+    "org.apache.opennlp" % "opennlp" % "1.5.3",
+    "org.scalatest" %% "scalatest" % "2.1.3" % "test",
+    "org.apache.opennlp" % "opennlp-tools" % "1.5.3"
+  ))
+  .settings(mainClass in assembly := Some("org.scalanlp.epic.opennlp.SparkPipeline"))
+  .dependsOn(slab)
+
