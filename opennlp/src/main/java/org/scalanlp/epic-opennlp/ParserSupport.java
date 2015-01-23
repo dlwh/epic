@@ -1,4 +1,4 @@
-// package org.reactormonk.epic.opennlp
+// package org.scalanlp.epic.opennlp
 
 // import java.util.HashMap;
 // import java.util.Iterator;

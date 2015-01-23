@@ -1,4 +1,4 @@
-package org.reactormonk.epic.opennlp
+package org.scalanlp.epic.opennlp
 
 import epic.slab._
 import epic.slab.Utils._
@@ -9,10 +9,13 @@ import opennlp.tools.namefind.TokenNameFinderModel
 import opennlp.tools.chunker.ChunkerModel
 import opennlp.tools.postag.POSModel
 import opennlp.tools.parser.ParserModel
+import org.apache.spark.SparkContext
+import org.apache.spark.SparkConf
+import org.apache.spark.rdd.RDD
 
-object Pipeline {
+object SparkPipeline {
   def resource(name: String): URL = {
-    getClass.getResource("/org/reactormonk/epic-opennlp/opennlp-models/" + name)
+    getClass.getResource("/org/scalanlp/epic-opennlp/opennlp-models/" + name)
   }
   val sentence = SentenceDetector(new SentenceModel(resource("en-sent.bin")))
   val tokenizer = Tokenizer(new TokenizerModel(resource("en-token.bin")))
@@ -27,8 +30,15 @@ object Pipeline {
   val chunker = Chunker(new ChunkerModel(resource("en-chunker.bin")))
   val parser = Parser(new ParserModel(resource("en-parser-chunking.bin")))
 
-  def pipeline(documents: Iterable[String]) = {
-    documents
+  lazy val sc = {
+    val conf = new SparkConf()
+      .setAppName("OpenNLP Pipeline")
+      .set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
+    new SparkContext(conf)
+  }
+
+  def pipeline(files: RDD[String]) = {
+    files
       .map(sentence.slabFrom(_))
       .map(tokenizer(_))
       .map(person(_))
@@ -43,9 +53,23 @@ object Pipeline {
       .map(parser(_))
   }
 
+  def readFiles(path: String): Array[String] = {
+    new java.io.File(path).listFiles.map(f => scala.io.Source.fromFile(f).mkString)
+  }
+}
+
+object WithRepartition {
+  import SparkPipeline._
   def main(args: Array[String]) {
-    val txt = "/home/tass/dev/scala/epic-opennlp/txt"
-    val documents = new java.io.File(txt).listFiles.map(scala.io.Source.fromFile(_).mkString)
-    println(pipeline(documents))
+    val files = sc.parallelize(readFiles(args(0)), Integer.parseInt(args(1)))
+    pipeline(files).foreach(print)
+  }
+}
+
+object WithoutRepartition {
+  import SparkPipeline._
+  def main(args: Array[String]) {
+    val files = sc.parallelize(readFiles(args(0)))
+    pipeline(files).foreach(print)
   }
 }

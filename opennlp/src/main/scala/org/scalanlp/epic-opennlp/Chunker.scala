@@ -1,4 +1,4 @@
-package org.reactormonk.epic.opennlp
+package org.scalanlp.epic.opennlp
 
 import epic.slab._
 import shapeless._
