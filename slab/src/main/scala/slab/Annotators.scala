@@ -9,12 +9,12 @@ import scalaz.std.list._
   *  referential transparency.
   */
 
-/** Splits the input document into sentences.
-  */
-
 trait NoInitializer extends legacyannotators.Initialized[Boolean] {
   override val initialize = () => true
 }
+
+/** Splits the input document into sentences.
+  */
 
 trait SentenceSegmenter[S <: Sentence] extends (String => Iterable[Sentence]) with AnalysisFunction01[String, S] {
   def apply(sentence: String): Iterable[S]
