@@ -31,7 +31,7 @@ class CorefNeuralModel(val sparseFeaturizer: PairwiseIndexingFeaturizer,
   val cachedVectors = new Array[DenseVector[Double]](MaxSize)
   val cachedActivations = new Array[DenseVector[Double]](MaxSize)
   
-  def getInitialWeights(initialWeightsScale: Double) = transform.initialWeightVector(initialWeightsScale, rng, true).data ++ Array.tabulate(sparseIndexer.size)(i => 0.0)
+  def getInitialWeights(initialWeightsScale: Double) = transform.initialWeightVector(initialWeightsScale, rng, true, "").data ++ Array.tabulate(sparseIndexer.size)(i => 0.0)
   
   def vectorSize = 5 * word2vec.wordRepSize
   

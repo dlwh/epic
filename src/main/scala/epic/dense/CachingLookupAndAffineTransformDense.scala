@@ -29,8 +29,16 @@ case class CachingLookupAndAffineTransformDense[FV](numOutputs: Int,
     new Layer(mat, bias)
   }
   
-  def initialWeightVector(initWeightsScale: Double, rng: Random, outputLayer: Boolean) = {
-    DenseVector(Array.tabulate(index.size)(i => if (!outputLayer) rng.nextGaussian * initWeightsScale else 0.0))
+  def initialWeightVector(initWeightsScale: Double, rng: Random, outputLayer: Boolean, spec: String) = {
+    val myWeights = if (outputLayer) {
+      DenseVector(Array.tabulate(index.size)(i => 0.0))
+    } else if (spec == "magic") {
+      AffineTransform.getMagicAffineWeights(index.size, numInputs, numOutputs, initWeightsScale, rng)
+    } else {
+      AffineTransform.getGaussianAffineWeights(index.size, initWeightsScale, rng)
+    }
+    myWeights
+//    DenseVector(Array.tabulate(index.size)(i => if (!outputLayer) rng.nextGaussian * initWeightsScale else 0.0))
   }
 
   case class Layer(weights: DenseMatrix[Double], bias: DenseVector[Double]) extends Transform.Layer[Array[Int],DenseVector[Double]] {

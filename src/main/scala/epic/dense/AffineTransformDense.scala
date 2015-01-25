@@ -38,9 +38,9 @@ case class AffineTransformDense[FV](numOutputs: Int, numInputs: Int, innerTransf
    * N.B. Initialized to zero because this should *only* be used at the output layer, where
    * zero initialization is appropriate
    */
-  def initialWeightVector(initWeightsScale: Double, rng: Random, outputLayer: Boolean) = {
+  def initialWeightVector(initWeightsScale: Double, rng: Random, outputLayer: Boolean, spec: String) = {
     require(outputLayer)
-    DenseVector.vertcat(DenseVector.zeros(index.indices(0).size), innerTransform.initialWeightVector(initWeightsScale, rng, false))
+    DenseVector.vertcat(DenseVector.zeros(index.indices(0).size), innerTransform.initialWeightVector(initWeightsScale, rng, false, spec))
   }
 
   case class Layer(weights: DenseMatrix[Double], bias: DenseVector[Double], innerLayer: innerTransform.Layer) extends Transform.Layer[FV,DenseVector[Double]] {

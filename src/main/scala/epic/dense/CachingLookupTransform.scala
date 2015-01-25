@@ -20,7 +20,7 @@ case class CachingLookupTransform(word2vecIndexed: Word2VecIndexed[String]) exte
     new Layer()
   }
   
-  def initialWeightVector(initWeightsScale: Double, rng: Random, outputLayer: Boolean) = {
+  def initialWeightVector(initWeightsScale: Double, rng: Random, outputLayer: Boolean, spec: String) = {
     DenseVector()
   }
 

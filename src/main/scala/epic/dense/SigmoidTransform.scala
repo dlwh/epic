@@ -27,7 +27,7 @@ case class SigmoidTransform[FV](inner: Transform[FV, DenseVector[Double]]) exten
 
   def extractLayer(dv: DenseVector[Double]) = new Layer(inner.extractLayer(dv))
   
-  def initialWeightVector(initWeightsScale: Double, rng: Random, outputLayer: Boolean) = inner.initialWeightVector(initWeightsScale, rng, false)
+  def initialWeightVector(initWeightsScale: Double, rng: Random, outputLayer: Boolean, spec: String) = inner.initialWeightVector(initWeightsScale, rng, false, spec)
 
   case class Layer(innerLayer: inner.Layer) extends Transform.Layer[FV,DenseVector[Double]] {
 

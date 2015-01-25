@@ -32,9 +32,17 @@ case class EmbeddingsTransform[FV](numOutputs: Int,
     new Layer(mat, bias, wordWeights)
   }
   
-  def initialWeightVector(initWeightsScale: Double, rng: Random, outputLayer: Boolean) = {
+  def initialWeightVector(initWeightsScale: Double, rng: Random, outputLayer: Boolean, spec: String) = {
+    val myWeights = if (outputLayer) {
+      DenseVector(Array.tabulate(index.indices(0).size)(i => 0.0))
+    } else if (spec == "magic") {
+      AffineTransform.getMagicAffineWeights(index.indices(0).size, numInputs, numOutputs, initWeightsScale, rng)
+    } else {
+      AffineTransform.getGaussianAffineWeights(index.indices(0).size, initWeightsScale, rng)
+    }
     // Only randomly initialize the weights in the matrix, not the word deltas
-    DenseVector(Array.tabulate(index.size)(i => if (!outputLayer && i < index.indices(0).size) rng.nextGaussian * initWeightsScale else 0.0))
+    DenseVector.vertcat(myWeights, DenseVector(Array.tabulate(index.size - index.indices(0).size)(i => 0.0)))
+//    DenseVector(Array.tabulate(index.size)(i => if (!outputLayer && i < index.indices(0).size) rng.nextGaussian * initWeightsScale else 0.0))
   }
 
   case class Layer(weights: DenseMatrix[Double], bias: DenseVector[Double], wordWeights: DenseMatrix[Double]) extends Transform.Layer[Array[Int],DenseVector[Double]] {

@@ -16,19 +16,46 @@ import edu.berkeley.nlp.futile.util.Logger
 import epic.dense.IdentityTransform
 import epic.dense.AffineTransform
 
-class SimpleNNEpic[T](val inputSize: Int,
-                      val hiddenSize: Int,
-                      val outputSize: Int,
-                      val nonLinType: String,
+//class SimpleNNEpic[T](val inputSize: Int,
+//                      val hiddenSize: Int,
+//                      val outputSize: Int,
+//                      val nonLinType: String,
+//                      val labelIndexer: Indexer[T]) extends LikelihoodAndGradientComputer[NNExample[T]] {
+//  
+//  val rng = new Random(0)
+//  
+//  val innerTransform = new AffineTransform(hiddenSize, inputSize, new IdentityTransform[DenseVector[Double]]())
+//  val nonLinTransform = if (nonLinType == "tanh") new TanhTransform(innerTransform) else if (nonLinType == "relu") new ReluTransform(innerTransform) else new CubeTransform(innerTransform)
+//  val transform = new AffineTransform(outputSize, hiddenSize, nonLinTransform)
+//  
+//  def getInitialWeights(initWeightsScale: Double) = transform.initialWeightVector(initWeightsScale, rng, true).data
+//  
+//  def accumulateGradientAndComputeObjective(ex: NNExample[T], weights: Array[Double], gradient: Array[Double]): Double = {
+//    val layer = transform.extractLayer(DenseVector(weights))
+//    val logProbs = layer.activations(DenseVector(ex.input)).data
+//    CorefNNEpic.softmaxi(logProbs)
+//    val trueLabelIdx = labelIndexer.getIndex(ex.getLabel)
+//    val tallyInputs = Array.tabulate(labelIndexer.size)(i => (if (i == trueLabelIdx) 1.0 else 0.0) - Math.exp(logProbs(i)))
+//    layer.tallyDerivative(DenseVector(gradient), DenseVector(tallyInputs), DenseVector(ex.input))
+//    logProbs(labelIndexer.indexOf(ex.getLabel))
+//  }
+//  
+//  def predict(input: Array[Double], weights: DenseVector[Double]): T = {
+//    val layer = transform.extractLayer(weights)
+//    val logProbs = layer.activations(DenseVector(input)).data
+//    labelIndexer.getObject(CorefNNEpic.argMaxIdx(logProbs))
+//  }
+//  
+//  def computeObjective(ex: NNExample[T], weights: Array[Double]): Double = accumulateGradientAndComputeObjective(ex, weights, Array.tabulate(weights.size)(i => 0.0))
+//}
+
+class SimpleNNEpic[T](val transform: Transform[DenseVector[Double],DenseVector[Double]],
                       val labelIndexer: Indexer[T]) extends LikelihoodAndGradientComputer[NNExample[T]] {
   
   val rng = new Random(0)
   
-  val innerTransform = new AffineTransform(hiddenSize, inputSize, new IdentityTransform[DenseVector[Double]]())
-  val nonLinTransform = if (nonLinType == "tanh") new TanhTransform(innerTransform) else if (nonLinType == "relu") new ReluTransform(innerTransform) else new CubeTransform(innerTransform)
-  val transform = new AffineTransform(outputSize, hiddenSize, nonLinTransform)
-  
-  def getInitialWeights(initWeightsScale: Double) = transform.initialWeightVector(initWeightsScale, rng, true).data
+//  def getInitialWeights(initWeightsScale: Double) = transform.initialWeightVector(initWeightsScale, rng, true, "").data
+  def getInitialWeights(initWeightsScale: Double) = transform.initialWeightVector(initWeightsScale, rng, true, "magic").data
   
   def accumulateGradientAndComputeObjective(ex: NNExample[T], weights: Array[Double], gradient: Array[Double]): Double = {
     val layer = transform.extractLayer(DenseVector(weights))
@@ -50,6 +77,39 @@ class SimpleNNEpic[T](val inputSize: Int,
 }
 
 object SimpleNNEpic {
+  
+  
+  def makeTransform(inputSize: Int, hiddenSize: Int, outputSize: Int, nonLinType: String) = {
+    val innerTransform = new AffineTransform(hiddenSize, inputSize, new IdentityTransform[DenseVector[Double]]())
+    val nonLinTransform = if (nonLinType == "tanh") new TanhTransform(innerTransform) else if (nonLinType == "relu") new ReluTransform(innerTransform) else new CubeTransform(innerTransform)
+    new AffineTransform(outputSize, hiddenSize, nonLinTransform)
+  }
+  
+  def makeLinearTransform(inputSize: Int, outputSize: Int) = {
+    new AffineTransform(outputSize, inputSize, new IdentityTransform[DenseVector[Double]])
+  }
+  
+  def makeDeepTransform(inputSize: Int, hiddenSize: Int, numHiddenLayers: Int, outputSize: Int, nonLinType: String) = {
+    val baseTransformLayer = new AffineTransform(hiddenSize, inputSize, new IdentityTransform[DenseVector[Double]])
+    var currLayer: Transform[DenseVector[Double],DenseVector[Double]] = addNonlinearLayer(baseTransformLayer, nonLinType)
+    for (i <- 1 until numHiddenLayers) {
+      val tmpLayer = new AffineTransform(hiddenSize, hiddenSize, currLayer)
+      currLayer = addNonlinearLayer(tmpLayer, nonLinType)
+    }
+    new AffineTransform(outputSize, hiddenSize, currLayer)
+  }
+  
+  def addNonlinearLayer(currNet: Transform[DenseVector[Double],DenseVector[Double]], nonLinType: String) = {
+    if (nonLinType == "relu") {
+      new ReluTransform(currNet)
+    } else if (nonLinType == "cube") {
+      new CubeTransform(currNet)
+    } else if (nonLinType == "tanh") {
+      new TanhTransform(currNet)
+    } else {
+      throw new RuntimeException("Unknown nonlinearity type: " + nonLinType)
+    }
+  }
   
   def buildNet(word2vecIndexed: Word2VecIndexed[String],
                numHidden: Int,
@@ -94,7 +154,7 @@ object SimpleNNEpic {
     val vacuousIndexer = new Indexer[Int];
     vacuousIndexer.add(0)
     vacuousIndexer.add(1)
-    val nn = new SimpleNNEpic(3, 20, 2, nonLinType, vacuousIndexer)
+    val nn = new SimpleNNEpic(makeTransform(3, 20, 2, nonLinType), vacuousIndexer)
 //    val nnBlas = new SimpleNNBest(3, 20, 2)
     Logger.logss(trainSamples(0))
 //    GeneralTrainer.checkGradient(trainSamples.slice(0, 1), nn, nn.numFeats, verbose = true)

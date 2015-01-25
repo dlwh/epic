@@ -29,7 +29,7 @@ class CorefNNEpic(val inputSize: Int,
     new AffineTransform(outputSize, inputSize, new IdentityTransform[DenseVector[Double]]())
   }
   
-  def getInitialWeights(initWeightsScale: Double) = transform.initialWeightVector(initWeightsScale, rng, false).data
+  def getInitialWeights(initWeightsScale: Double) = transform.initialWeightVector(initWeightsScale, rng, false, "").data
 //  def getInitialWeights = transform.initialWeightVector(1.0, rng, true).data
   
   def accumulateGradientAndComputeObjective(ex: CorefEx, weights: Array[Double], gradient: Array[Double]): Double = {
@@ -105,7 +105,7 @@ class CorefNNEpicDistinctEmbeddings(val inputSize: Int,
     new AffineTransform(outputSize, inputSize, new IdentityTransform[DenseVector[Double]]())
   }
   
-  def getInitialWeights(initWeightsScale: Double) = DenseVector.vertcat(transform.initialWeightVector(initWeightsScale, rng, false), antTransform.initialWeightVector(initWeightsScale, rng, false)).data
+  def getInitialWeights(initWeightsScale: Double) = DenseVector.vertcat(transform.initialWeightVector(initWeightsScale, rng, false, ""), antTransform.initialWeightVector(initWeightsScale, rng, false, "")).data
 //  def getInitialWeights = transform.initialWeightVector(1.0, rng, true).data
   
   def accumulateGradientAndComputeObjective(ex: CorefEx, weights: Array[Double], gradient: Array[Double]): Double = {
