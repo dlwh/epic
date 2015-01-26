@@ -42,6 +42,10 @@ case class AffineTransformDense[FV](numOutputs: Int, numInputs: Int, innerTransf
     require(outputLayer)
     DenseVector.vertcat(DenseVector.zeros(index.indices(0).size), innerTransform.initialWeightVector(initWeightsScale, rng, false, spec))
   }
+  
+  def clipHiddenWeightVectors(weights: DenseVector[Double], norm: Double, outputLayer: Boolean) {
+    innerTransform.clipHiddenWeightVectors(weights(index.componentOffset(1) to -1), norm, false)
+  }
 
   case class Layer(weights: DenseMatrix[Double], bias: DenseVector[Double], innerLayer: innerTransform.Layer) extends Transform.Layer[FV,DenseVector[Double]] {
     override val index = AffineTransformDense.this.index

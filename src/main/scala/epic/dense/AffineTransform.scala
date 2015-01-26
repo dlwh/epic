@@ -42,6 +42,13 @@ case class AffineTransform[FV, Mid](numOutputs: Int, numInputs: Int, innerTransf
     }
     DenseVector.vertcat(myWeights, innerTransform.initialWeightVector(initWeightsScale, rng, false, spec))
   }
+  
+  def clipHiddenWeightVectors(weights: DenseVector[Double], norm: Double, outputLayer: Boolean) {
+    if (!outputLayer) {
+      AffineTransform.clipHiddenWeightVectors(numOutputs, numInputs, weights, norm)
+    }
+    innerTransform.clipHiddenWeightVectors(weights(index.componentOffset(1) to -1), norm, false)
+  }
 
   case class Layer(weights: DenseMatrix[Double], bias: DenseVector[Double], innerLayer: innerTransform.Layer) extends Transform.Layer[FV,DenseVector[Double]] {
     override val index = AffineTransform.this.index
@@ -110,6 +117,28 @@ object AffineTransform {
     val range = Math.sqrt(6.0/(inSize + outSize))
     DenseVector(Array.tabulate(numWeights)(i => rng.nextDouble * 2 * range - range))
   }
+  
+  def clipHiddenWeightVectors(numOutputs: Int, numInputs: Int, weights: DenseVector[Double], norm: Double) {
+    val mat = weights(0 until (numOutputs * numInputs)).asDenseMatrix.reshape(numOutputs, numInputs, view = View.Require)
+    for (i <- 0 until mat.rows) {
+      var thisRowNorm = 0.0
+      var j = 0
+      while (j < mat.cols) {
+        thisRowNorm += mat(i, j) * mat(i, j)
+        j += 1
+      }
+//      println("thisRowNorm: " + Math.sqrt(thisRowNorm))
+      val multFactor = norm/Math.sqrt(thisRowNorm)
+      if (multFactor < 1) {
+//        println("Clipping from " + Math.sqrt(thisRowNorm) + " to " + norm)
+        j = 0
+        while (j < mat.cols) {
+          mat(i, j) *= multFactor
+          j += 1
+        }
+      }
+    }
+  } 
   
   case class Index(numOutputs: Int, numInputs: Int, includeBias: Boolean = true) extends breeze.util.Index[Feature] {
     def apply(t: Feature): Int = t match {

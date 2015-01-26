@@ -15,6 +15,8 @@ case class ReluTransform[FV](inner: Transform[FV, DenseVector[Double]]) extends 
   
   def initialWeightVector(initWeightsScale: Double, rng: Random, outputLayer: Boolean, spec: String) = inner.initialWeightVector(initWeightsScale, rng, false, spec)
 
+  def clipHiddenWeightVectors(weights: DenseVector[Double], norm: Double, outputLayer: Boolean) = inner.clipHiddenWeightVectors(weights, norm, false)
+  
   case class Layer(innerLayer: inner.Layer) extends Transform.Layer[FV,DenseVector[Double]] {
     
     val myIndex = Index[Feature]

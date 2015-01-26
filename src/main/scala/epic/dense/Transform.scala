@@ -18,6 +18,8 @@ trait Transform[In, +Out] {
   
   def initialWeightVector(initWeightsScale: Double, rng: Random, outputLayer: Boolean, spec: String): DenseVector[Double]
 
+  def clipHiddenWeightVectors(weights: DenseVector[Double], norm: Double, outputLayer: Boolean)
+  
   type Layer <: Transform.Layer[In,Out]
 }
 

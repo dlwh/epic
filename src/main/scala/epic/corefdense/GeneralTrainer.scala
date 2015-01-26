@@ -32,27 +32,27 @@ class GeneralTrainer[T] {
   var inferenceNanos = 0L;
   var adagradNanos = 0L;
   
-  def train(trainExs: Seq[T],
-            computer: LikelihoodAndGradientComputer[T],
-            eta: Double,
-            reg: Double,
-            batchSize: Int,
-            numItrs: Int,
-            numFeats: Int,
-            verbose: Boolean): Array[Double] = {
-    trainAdagrad(trainExs, computer, eta, reg, batchSize, numItrs, Array.fill(numFeats)(0.0), verbose);
-  }
-  
-  def train(trainExs: Seq[T],
-            computer: LikelihoodAndGradientComputer[T],
-            eta: Double,
-            reg: Double,
-            batchSize: Int,
-            numItrs: Int,
-            initialWeights: Array[Double],
-            verbose: Boolean): Array[Double] = {
-    trainAdagrad(trainExs, computer, eta, reg, batchSize, numItrs, initialWeights, verbose);
-  }
+//  def train(trainExs: Seq[T],
+//            computer: LikelihoodAndGradientComputer[T],
+//            eta: Double,
+//            reg: Double,
+//            batchSize: Int,
+//            numItrs: Int,
+//            numFeats: Int,
+//            verbose: Boolean): Array[Double] = {
+//    trainAdagrad(trainExs, computer, eta, reg, batchSize, numItrs, Array.fill(numFeats)(0.0), verbose);
+//  }
+//  
+//  def train(trainExs: Seq[T],
+//            computer: LikelihoodAndGradientComputer[T],
+//            eta: Double,
+//            reg: Double,
+//            batchSize: Int,
+//            numItrs: Int,
+//            initialWeights: Array[Double],
+//            verbose: Boolean): Array[Double] = {
+//    trainAdagrad(trainExs, computer, eta, reg, batchSize, numItrs, initialWeights, verbose);
+//  }
 
   def trainAdagrad(trainExs: Seq[T],
                    computer: LikelihoodAndGradientComputer[T],
@@ -61,6 +61,7 @@ class GeneralTrainer[T] {
                    batchSize: Int,
                    numItrs: Int,
                    initialWeights: Array[Double],
+                   weightPostprocessor: Array[Double] => Unit = (weights: Array[Double]) => {},
                    verbose: Boolean = true): Array[Double] = {
 //    val weights = Array.fill(pairwiseIndexingFeaturizer.featureIndexer.size)(0.0);
     val weights = initialWeights;
@@ -87,6 +88,7 @@ class GeneralTrainer[T] {
                                                   diagGt,
                                                   eta,
                                                   lambda);
+        weightPostprocessor(weights)
         currIdx += batchSize;
         currBatchIdx += 1;
       }
@@ -96,17 +98,21 @@ class GeneralTrainer[T] {
       Logger.logss("APPROXIMATE OBJECTIVE: " + cumulativeObjective + " (avg = " + cumulativeObjective/trainExs.size + ")")
       if (verbose) {
         Logger.endTrack();
-        Logger.logss("NONZERO WEIGHTS: " + weights.foldRight(0)((weight, count) => if (Math.abs(weight) > 1e-15) count + 1 else count));
-        Logger.logss("WEIGHT VECTOR NORM: " + weights.foldRight(0.0)((weight, norm) => norm + weight * weight));
-        Logger.logss("MILLIS FOR ITER " + i + ": " + (System.nanoTime() - startTime) / 1000000.0 +
-                     " (" + inferenceNanos / 1000000.0 + " for inference and " + adagradNanos / 1000000.0 + " for Adagrad)");
-        Logger.logss("MEMORY AFTER ITER " + i + ": " + SysInfoUtils.getUsedMemoryStr());
+        displayWeightsAndTime(i, weights, startTime, inferenceNanos, adagradNanos)
       }
     }
     if (verbose) {
       Logger.logss("FINAL TRAIN OBJECTIVE: " + computeObjectiveL1R(trainExs, computer, weights, lambda));
     }
     weights
+  }
+  
+  def displayWeightsAndTime(iter: Int, weights: Array[Double], startTime: Long, inferenceNanos: Long, adagradNanos: Long) {
+    Logger.logss("NONZERO WEIGHTS: " + weights.foldRight(0)((weight, count) => if (Math.abs(weight) > 1e-15) count + 1 else count));
+    Logger.logss("WEIGHT VECTOR NORM: " + weights.foldRight(0.0)((weight, norm) => norm + weight * weight));
+    Logger.logss("MILLIS FOR ITER " + iter + ": " + (System.nanoTime() - startTime) / 1000000.0 +
+              " (" + inferenceNanos / 1000000.0 + " for inference and " + adagradNanos / 1000000.0 + " for Adagrad)");
+    Logger.logss("MEMORY AFTER ITER " + iter + ": " + SysInfoUtils.getUsedMemoryStr());
   }
   
   def computeObjectiveL1R(trainExs: Seq[T],
@@ -141,7 +147,7 @@ class GeneralTrainer[T] {
     inferenceNanos += (System.nanoTime() - nanoTime);
     nanoTime = System.nanoTime();
     // Precompute this so dividing by batch size is a multiply and not a divide
-    val batchSizeMultiplier = 1.0F/exs.size;
+    val batchSizeMultiplier = 1.0/exs.size;
     var i = 0;
     while (i < reusableGradientArray.size) {
       val xti = weights(i);
@@ -153,7 +159,7 @@ class GeneralTrainer[T] {
       val gti = -reusableGradientArray(i) * batchSizeMultiplier;
       // Update diagGt
       diagGt(i) += gti * gti;
-      val Htii = 1F + Math.sqrt(diagGt(i)).toDouble;
+      val Htii = 1 + Math.sqrt(diagGt(i)).toDouble;
       // Avoid divisions at all costs...
       val etaOverHtii = eta / Htii;
       val newXti = xti - etaOverHtii * gti;
@@ -165,40 +171,86 @@ class GeneralTrainer[T] {
   }
   
   
-  def takeAdadeltaStepL2R(exs: Seq[T],
-                          computer: LikelihoodAndGradientComputer[T],
-                          weights: Array[Double],
-                          reusableGradientArray: Array[Double],
-                          diagGt: Array[Double],
-                          eta: Double,
-                          lambda: Double): Double = {
+  
+  
+  def trainAdadelta(trainExs: Seq[T],
+                    computer: LikelihoodAndGradientComputer[T],
+                    rho: Double,
+                    batchSize: Int,
+                    numItrs: Int,
+                    initialWeights: Array[Double],
+                    weightPostprocessor: Array[Double] => Unit = (weights: Array[Double]) => {},
+                    verbose: Boolean = true): Array[Double] = {
+//    val weights = Array.fill(pairwiseIndexingFeaturizer.featureIndexer.size)(0.0);
+    val weights = initialWeights;
+    val reusableGradientArray = Array.fill(initialWeights.size)(0.0);
+    val gradsSquared = Array.fill(initialWeights.size)(0.0);
+    val updatesSquared = Array.fill(initialWeights.size)(0.0);
+    for (i <- 0 until numItrs) {
+      Logger.logss("ITERATION " + i);
+      val startTime = System.nanoTime();
+      inferenceNanos = 0;
+      adagradNanos = 0;
+      if (verbose) Logger.startTrack("Computing gradient");
+      var cumulativeObjective = 0.0
+      var currIdx = 0;
+      var currBatchIdx = 0;
+      val printFreq = (trainExs.size / batchSize) / 10 // Print progress 10 times per pass through the data
+      while (currIdx < trainExs.size) {
+        if (verbose && currBatchIdx % printFreq == 0) {
+          Logger.logs("Computing gradient on " + currIdx + " (batch " + currBatchIdx + " / " + (trainExs.size / batchSize) + ")");
+        }
+        cumulativeObjective += takeAdadeltaStep(trainExs.slice(currIdx, Math.min(trainExs.size, currIdx + batchSize)),
+                                                computer,
+                                                weights,
+                                                reusableGradientArray,
+                                                gradsSquared,
+                                                updatesSquared,
+                                                rho);
+        weightPostprocessor(weights)
+        currIdx += batchSize;
+        currBatchIdx += 1;
+      }
+      Logger.logss("APPROXIMATE OBJECTIVE: " + cumulativeObjective + " (avg = " + cumulativeObjective/trainExs.size + ")")
+      if (verbose) {
+        Logger.endTrack();
+        displayWeightsAndTime(i, weights, startTime, inferenceNanos, adagradNanos)
+      }
+    }
+    if (verbose) {
+      Logger.logss("FINAL TRAIN OBJECTIVE: " + computeObjectiveL1R(trainExs, computer, weights, 0.0));
+    }
+    weights
+  }
+  
+  
+  def takeAdadeltaStep(exs: Seq[T],
+                       computer: LikelihoodAndGradientComputer[T],
+                       weights: Array[Double],
+                       reusableGradientArray: Array[Double],
+                       gradsSquared: Array[Double],
+                       updatesSquared: Array[Double],
+                       rho: Double): Double = {
     Arrays.fill(reusableGradientArray, 0.0);
     var nanoTime = System.nanoTime();
     var objective = 0.0
     for (ex <- exs) {
+      // Don't need to rescale objective here since it's not used in the update
       objective += computer.accumulateGradientAndComputeObjective(ex, weights, reusableGradientArray);
     }
     inferenceNanos += (System.nanoTime() - nanoTime);
     nanoTime = System.nanoTime();
-    // Precompute this so dividing by batch size is a multiply and not a divide
-    val batchSizeMultiplier = 1.0F/exs.size;
-    var i = 0;
+    val epsilon = 1e-6
+    val inverseBatchSize = 1.0/exs.size
+    var i = 0
     while (i < reusableGradientArray.size) {
-      val xti = weights(i);
-      // N.B. We negate the gradient here because the Adagrad formulas are all for minimizing
-      // and we're trying to maximize, so think of it as minimizing the negative of the objective
-      // which has the opposite gradient
-      // Equation (25) in http://www.cs.berkeley.edu/~jduchi/projects/DuchiHaSi10.pdf
-      // eta is the step size, lambda is the regularization
-      val gti = -reusableGradientArray(i) * batchSizeMultiplier;
-      // Update diagGt
-      diagGt(i) += gti * gti;
-      val Htii = 1F + Math.sqrt(diagGt(i)).toDouble;
-      // Avoid divisions at all costs...
-      val etaOverHtii = eta / Htii;
-      val newXti = xti - etaOverHtii * gti;
-      weights(i) = Math.signum(newXti) * Math.max(0, Math.abs(newXti) - lambda * etaOverHtii);
-      i += 1;
+      // Rescale the gradient by the batch size
+      reusableGradientArray(i) *= inverseBatchSize
+      gradsSquared(i) = rho * gradsSquared(i) + (1 - rho) * reusableGradientArray(i) * reusableGradientArray(i)
+      val step = Math.sqrt(updatesSquared(i) + epsilon)/Math.sqrt(gradsSquared(i) + epsilon) * reusableGradientArray(i)
+      updatesSquared(i) = rho * updatesSquared(i) + (1 - rho) * step * step
+      weights(i) += step
+      i += 1
     }
     adagradNanos += (System.nanoTime() - nanoTime);
     objective
@@ -268,64 +320,6 @@ class GeneralTrainer[T] {
     }
     new LBFGSMinimizer(numItrs).minimize(diffFunc, initialWeights, epsilon, true);
   }
-  
-  
-//  public void trainWeightsLbfgsL2R(final List<? extends Example> exs,
-//                                   final double reg,
-//                                   final double epsilon,
-//                                   final int numItrs,
-//                                   final double[] weights) {
-//    CachingDifferentiableFunction diffFunc = new CachingDifferentiableFunction() {
-//      
-//      private final double[] reusableGradientArr = new double[weights.length];
-//      
-//      public int dimension() {
-//        return weights.length;
-//      }
-//      
-//      public Pair<Double, double[]> calculate(double[] currWeights) {
-//        long nanoTime = System.nanoTime();
-//        double objective = 0.0;
-////        double[] gradient = new double[currWeights.length];
-//        double[] gradient = reusableGradientArr;
-//        Arrays.fill(gradient, 0.0);
-//        for (Example ex : exs) {
-//          objective += ex.computeLogLikelihood(currWeights);
-//          ex.addUnregularizedStochasticGradient(currWeights, gradient);
-//        }
-//        if (shouldRunEmpiricalGradientCheck) {
-//          checkGradient(exs, currWeights, gradient);
-//        }
-//        for (int i = 0; i < gradient.length; i++) {
-//          objective -= reg * currWeights[i] * currWeights[i];
-//          gradient[i] -= 2 * reg * currWeights[i];
-//        }
-//
-//        double negObjective = -objective;
-//        double[] negGradient = new double[currWeights.length];
-//        for (int i = 0; i < gradient.length; i++) {
-//          negGradient[i] = -gradient[i];
-//        }
-//        // Print some diagnostics
-//        double norm = 0, nonzeroWeights = 0;
-//        for (int j = 0; j < currWeights.length; j++) {
-//          if (currWeights[j] != 0) {
-//            nonzeroWeights++;
-//          }
-//          norm += currWeights[j] * currWeights[j];
-//        }
-//        Logger.logss("NONZERO WEIGHTS: " + nonzeroWeights);
-//        Logger.logss("NORM OF WEIGHTS: " + norm);
-//        Logger.logss("TRAIN OBJECTIVE: " + objective);
-//        Logger.logss("TRAIN MILLIS: "+  (System.nanoTime() - nanoTime)/1000000);
-//        return new Pair<Double, double[]>(negObjective, negGradient);
-//      }
-//    };
-//    double[] finalWeights = new LBFGSMinimizer(numItrs).minimize(diffFunc, weights, epsilon, true);
-//    for (int i = 0; i < finalWeights.length; i++) {
-//      weights[i] = finalWeights[i];
-//    }
-//  }  
 }
 
 object GeneralTrainer {

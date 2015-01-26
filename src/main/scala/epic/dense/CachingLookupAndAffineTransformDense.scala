@@ -40,6 +40,12 @@ case class CachingLookupAndAffineTransformDense[FV](numOutputs: Int,
     myWeights
 //    DenseVector(Array.tabulate(index.size)(i => if (!outputLayer) rng.nextGaussian * initWeightsScale else 0.0))
   }
+  
+  def clipHiddenWeightVectors(weights: DenseVector[Double], norm: Double, outputLayer: Boolean) {
+    if (!outputLayer) {
+      AffineTransform.clipHiddenWeightVectors(numOutputs, numInputs, weights, norm)
+    }
+  }
 
   case class Layer(weights: DenseMatrix[Double], bias: DenseVector[Double]) extends Transform.Layer[Array[Int],DenseVector[Double]] {
     

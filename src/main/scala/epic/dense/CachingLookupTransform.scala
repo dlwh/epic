@@ -23,6 +23,9 @@ case class CachingLookupTransform(word2vecIndexed: Word2VecIndexed[String]) exte
   def initialWeightVector(initWeightsScale: Double, rng: Random, outputLayer: Boolean, spec: String) = {
     DenseVector()
   }
+  
+  def clipHiddenWeightVectors(weights: DenseVector[Double], norm: Double, outputLayer: Boolean) {
+  }
 
   case class Layer() extends Transform.Layer[Array[Int],DenseVector[Double]] {
     

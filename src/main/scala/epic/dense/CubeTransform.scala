@@ -14,6 +14,8 @@ case class CubeTransform[FV](inner: Transform[FV, DenseVector[Double]]) extends 
   def extractLayer(dv: DenseVector[Double]) = new Layer(inner.extractLayer(dv))
   
   def initialWeightVector(initWeightsScale: Double, rng: Random, outputLayer: Boolean, spec: String) = inner.initialWeightVector(initWeightsScale, rng, false, spec)
+  
+  def clipHiddenWeightVectors(weights: DenseVector[Double], norm: Double, outputLayer: Boolean) = inner.clipHiddenWeightVectors(weights, norm, false)
 
   case class Layer(innerLayer: inner.Layer) extends Transform.Layer[FV,DenseVector[Double]] {
     

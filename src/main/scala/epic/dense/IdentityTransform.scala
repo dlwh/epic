@@ -15,6 +15,9 @@ class IdentityTransform[T] extends Transform[T, T] {
   }
   
   def initialWeightVector(initWeightsScale: Double, rng: Random, outputLayer: Boolean, spec: String) = DenseVector(Array[Double]())
+  
+  def clipHiddenWeightVectors(weights: DenseVector[Double], norm: Double, outputLayer: Boolean) {
+  }
 
   class Layer extends Transform.Layer[T,T] {
     

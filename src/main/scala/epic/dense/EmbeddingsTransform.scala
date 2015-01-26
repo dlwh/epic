@@ -44,6 +44,12 @@ case class EmbeddingsTransform[FV](numOutputs: Int,
     DenseVector.vertcat(myWeights, DenseVector(Array.tabulate(index.size - index.indices(0).size)(i => 0.0)))
 //    DenseVector(Array.tabulate(index.size)(i => if (!outputLayer && i < index.indices(0).size) rng.nextGaussian * initWeightsScale else 0.0))
   }
+  
+  def clipHiddenWeightVectors(weights: DenseVector[Double], norm: Double, outputLayer: Boolean) {
+    if (!outputLayer) {
+      AffineTransform.clipHiddenWeightVectors(numOutputs, numInputs, weights, norm)
+    }
+  }
 
   case class Layer(weights: DenseMatrix[Double], bias: DenseVector[Double], wordWeights: DenseMatrix[Double]) extends Transform.Layer[Array[Int],DenseVector[Double]] {
     

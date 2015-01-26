@@ -232,7 +232,7 @@ object CorefNNEpic {
     val reg = 0.0000001F
 //    val eta = 1.0F
 //    val reg = 1.0F
-    val weights = new GeneralTrainer().train(trainExs, corefNN, eta, reg, 10, numItrs, initialWeights, verbose = false);
+    val weights = new GeneralTrainer().trainAdagrad(trainExs, corefNN, eta, reg, 10, numItrs, initialWeights, verbose = false);
     
     
     if (hiddenLayer) {

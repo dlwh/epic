@@ -33,8 +33,8 @@ object MNISTTester {
 //  640 / 1000
 //    val transform = SimpleNNEpic.makeDeepTransform(trainSamples.head.input.size, 200, 2, vacuousIndexer.size, "tanh")
     
-//    val transform = SimpleNNEpic.makeDeepTransform(trainSamples.head.input.size, hiddenSize, 2, vacuousIndexer.size, "tanh")
-    val transform = SimpleNNEpic.makeDeepTransform(trainSamples.head.input.size, hiddenSize, 1, vacuousIndexer.size, "tanh")
+    val transform = SimpleNNEpic.makeDeepTransform(trainSamples.head.input.size, hiddenSize, 2, vacuousIndexer.size, "tanh")
+//    val transform = SimpleNNEpic.makeDeepTransform(trainSamples.head.input.size, hiddenSize, 1, vacuousIndexer.size, "tanh")
 //    val transform = SimpleNNEpic.makeDeepTransform(trainSamples.head.input.size, hiddenSize, 1, vacuousIndexer.size, "relu")
 //  APPROXIMATE OBJECTIVE: -1.9972034553071694
 //  1000 / 1000
@@ -54,7 +54,9 @@ object MNISTTester {
     // 824 correct
 //    val transform = SimpleNNEpic.makeDeepTransform(trainSamples.head.input.size, 500, 1, vacuousIndexer.size, "tanh")
     val nn: SimpleNNEpic[Byte] = new SimpleNNEpic(transform, vacuousIndexer)
-    val initialWeights = nn.getInitialWeights(1.0);
+//    val initialWeights = nn.getInitialWeights(1.0);
+    val initialWeights = nn.getInitialWeights(0.1);
+//    val initialWeights = nn.getInitialWeights(0.01);
     Logger.logss(initialWeights.slice(initialWeights.size - 1000, initialWeights.size).toSeq)
     Logger.logss(trainSamples(0))
     
@@ -74,30 +76,20 @@ object MNISTTester {
       System.exit(0); 
     }
     
+//    val weightProjector = (weights: Array[Double]) => {}
+    val weightProjector = (weights: Array[Double]) => {
+      transform.clipHiddenWeightVectors(new DenseVector(weights), 9, true)
+    }
+    
+//    val eta = 1.0
     val eta = 0.1
 //    val eta = 0.01
-//    val eta = 0.1
-    val batchSize = 1000
+    val batchSize = 100
 //    val batchSize = 1000
     val iters = 100;
-    val weights = new GeneralTrainer().train(trainSamples, nn, eta, 0.0000001, batchSize, iters, initialWeights, verbose = false);
+//    val weights = new GeneralTrainer().trainAdadelta(trainSamples, nn, 0.95, batchSize, iters, initialWeights, weightPostprocessor = weightProjector, verbose = false);
+    val weights = new GeneralTrainer().trainAdagrad(trainSamples, nn, eta, 0.0000001, batchSize, iters, initialWeights, weightPostprocessor = weightProjector, verbose = false);
 //    val weights = new GeneralTrainer().trainLBFGS(trainSamples, nn, 0.0000001, 0.001, iters, initialWeights, verbose = false);
-//    val weightsOA = new OffsetArray(weights, 0)
-//    var nanoTime = System.nanoTime();
-//    for (i <- 0 until 10000) {
-//      nn.forward(trainSamples(0).input, weightsOA)
-//    }
-//    Logger.logss((System.nanoTime() - nanoTime) / 1000 + " micros")
-//    nanoTime = System.nanoTime()
-//    val firstLayerWeightsMat = new FloatMatrix(nnBlas.hiddenSize, nnBlas.inputSize, weights.slice(0, nnBlas.firstLayerMatSize):_*)
-//    val secondLayerWeightsMat = new FloatMatrix(nnBlas.outputSize, nnBlas.hiddenSize, weights.slice(nnBlas.firstLayerMatSize, nnBlas.firstLayerMatSize + nnBlas.secondLayerMatSize):_*)
-//    for (i <- 0 until 10000) {
-//      nnBlas.forward(trainSamples(0).input, weights)
-//    }
-//    Logger.logss((System.nanoTime() - nanoTime) / 1000 + " micros")
-//    Logger.logss(nn.outputProbs.toSeq)
-//    Logger.logss(nnBlas.outputProbs.toSeq)
-    
     getAccuracy(nn, trainSamples, weights)
     getAccuracy(nn, testSamples, weights)
     

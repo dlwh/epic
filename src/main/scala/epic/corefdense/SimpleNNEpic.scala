@@ -54,8 +54,8 @@ class SimpleNNEpic[T](val transform: Transform[DenseVector[Double],DenseVector[D
   
   val rng = new Random(0)
   
-//  def getInitialWeights(initWeightsScale: Double) = transform.initialWeightVector(initWeightsScale, rng, true, "").data
-  def getInitialWeights(initWeightsScale: Double) = transform.initialWeightVector(initWeightsScale, rng, true, "magic").data
+  def getInitialWeights(initWeightsScale: Double) = transform.initialWeightVector(initWeightsScale, rng, true, "").data
+//  def getInitialWeights(initWeightsScale: Double) = transform.initialWeightVector(initWeightsScale, rng, true, "magic").data
   
   def accumulateGradientAndComputeObjective(ex: NNExample[T], weights: Array[Double], gradient: Array[Double]): Double = {
     val layer = transform.extractLayer(DenseVector(weights))
@@ -161,7 +161,7 @@ object SimpleNNEpic {
 //    System.exit(0);
     val initialWeights = nn.getInitialWeights(1.0);
 //    val initialWeights = Array.fill(nn.numFeats)(0.0F);
-    val weights = new GeneralTrainer().train(trainSamples, nn, 1.0, 0.0000001, 10, 100, initialWeights, verbose = false);
+    val weights = new GeneralTrainer().trainAdagrad(trainSamples, nn, 1.0, 0.0000001, 10, 100, initialWeights, verbose = false);
 //    val weightsOA = new OffsetArray(weights, 0)
 //    var nanoTime = System.nanoTime();
 //    for (i <- 0 until 10000) {

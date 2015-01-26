@@ -163,7 +163,7 @@ object CorefDriver {
       indices ++= transform.index.size until transform.index.size + 5
       GeneralTrainer.checkGradientFromPoint(trainDocGraphs, corefNeuralModel, initialWeights, Array.tabulate(initialWeights.size)(i => 0.0), indices.toSet, verbose = true)
     }
-    val weights = new GeneralTrainer().train(trainDocGraphs, corefNeuralModel, eta, reg, batchSize, numItrs, initialWeights, verbose = true);
+    val weights = new GeneralTrainer().trainAdagrad(trainDocGraphs, corefNeuralModel, eta, reg, batchSize, numItrs, initialWeights, verbose = true);
     
     
     
