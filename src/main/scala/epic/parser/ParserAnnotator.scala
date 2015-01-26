@@ -11,11 +11,11 @@ import epic.slab.annotators.Annotator
  * @author dlwh
  **/
 
-class ParserAnnotator[L](val parser: Parser[L, String]) extends Annotator[Tree[L]](ParserAnnotator.annotate(parser))
+class ParserAnnotator[S <: Sentence, T <: Token, L](val parser: Parser[L, String]) extends Annotator[S, T, Tree[L]](ParserAnnotator.annotate(parser))
 
 object ParserAnnotator {
   def annotate[L](parser: Parser[L, String])(content: String, tokens: Vector[Token]) = {
     Vector(parser(tokens.map(t => content.substring(t.span.begin, t.span.end))))
   }
-  def apply[L](parser: Parser[L, String]): ParserAnnotator[L] = new ParserAnnotator[L](parser)
+  def apply[L](parser: Parser[L, String]): ParserAnnotator[Sentence, Token, L] = new ParserAnnotator[Sentence, Token, L](parser)
 }

@@ -32,11 +32,8 @@ import epic.slab.annotators.Tokenizer
  * @author dlwh
  */
 
-class JavaWordTokenizer(locale: Locale) extends Tokenizer {
+class JavaWordTokenizer[S <: Sentence](locale: Locale) extends Tokenizer[S, Token] {
   def this() = this(Locale.getDefault)
-
-  override def apply(content: String, sentences: List[Sentence]): Vector[ContentToken] =
-    apply(content, sentences.toVector)
 
   def apply(content: String, sentences: Vector[Sentence]): Vector[ContentToken] = {
     sentences.flatMap { s =>
@@ -48,7 +45,8 @@ class JavaWordTokenizer(locale: Locale) extends Tokenizer {
     }
   }
 
-  def apply(sentence: String): Vector[ContentToken] = apply(sentence, Vector(Sentence(Span(0, sentence.length))))
+  def apply(sentence: String): Vector[ContentToken] =
+    apply(sentence, Vector(Sentence(Span(0, sentence.length))))
 }
 
 object JavaWordTokenizer extends JavaWordTokenizer

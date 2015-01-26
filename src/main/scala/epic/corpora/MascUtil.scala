@@ -323,7 +323,7 @@ object MascSlab {
    * @param slab The Slab containing the text and source URL
    * @return The Slab with added Sentence annotations as read from the MASC -s.xml file.
    */
-  def s[In <: HList, Out <: HList](slab: Slab[String, In])(implicit sel: SubSelector[In, List[Source]], adder: Adder.Aux[In, List[Sentence], Out]): Slab[String, Out] = {
+  def s[In <: HList, Out <: HList](slab: Slab[String, In])(implicit sel: Selector[In, List[Source]], adder: Adder.Aux[In, List[Sentence], Out]): Slab[String, Out] = {
     val source = slab.select[Source](0)(sel)
     val sentenceXml = XML.load(source.url.toString().replaceAll("[.]txt$", "-s.xml"))
     val sentences = for (region <- MascUtil.getRegions(sentenceXml)) yield {
@@ -340,7 +340,7 @@ object MascSlab {
    * @param slab The Slab containing the text and source URL
    * @return The Slab with added Segment annotations as read from the MASC -seg.xml file.
    */
-  def seg[In <: HList, Out <: HList](slab: Slab[String, In])(implicit sel: SubSelector[In, List[Source]], adder: Adder.Aux[In, List[Segment], Out]): Slab[String, Out] = {
+  def seg[In <: HList, Out <: HList](slab: Slab[String, In])(implicit sel: Selector[In, List[Source]], adder: Adder.Aux[In, List[Segment], Out]): Slab[String, Out] = {
     val source = slab.select[Source](0)(sel)
     val segmentXml = XML.load(source.url.toString().replaceAll("[.]txt$", "-seg.xml"))
     val segments = for (region <- MascUtil.getRegions(segmentXml)) yield {
@@ -358,7 +358,7 @@ object MascSlab {
    * @return The Slab with added PartOfSpeech annotations as read from the MASC -penn.xml file.
    */
   def penn[In <: HList, Out <: HList](slab: Slab[String, In])(
-    implicit sel: SubSelectMany.Aux[In, List[Source] :: List[Segment] :: HNil, List[Source] :: List[Segment] :: HNil],
+    implicit sel: SelectMany.Aux[In, List[Source] :: List[Segment] :: HNil, List[Source] :: List[Segment] :: HNil],
       adder: Adder.Aux[In, List[Tagged[PartOfSpeech]], Out]): Slab[String, Out] = {
     val data = slab.selectMany(sel)
     val source = data.select[List[Source]].apply(0)
@@ -388,7 +388,7 @@ object MascSlab {
    * @return The Slab with added EntityMention annotations as read from the MASC -ne.xml file.
    */
   def namedEntities[In <: HList, Out <: HList](slab: Slab[String, In])
-    (implicit sel: SubSelectMany.Aux[In, List[Source] :: List[Tagged[PartOfSpeech]] :: HNil, List[Source] :: List[Tagged[PartOfSpeech]] :: HNil],
+    (implicit sel: SelectMany.Aux[In, List[Source] :: List[Tagged[PartOfSpeech]] :: HNil, List[Source] :: List[Tagged[PartOfSpeech]] :: HNil],
       adder: Adder.Aux[In, List[Tagged[EntityMention]], Out]): Slab[String, Out] = {
     val data = slab.selectMany(sel)
     val source = data.select[List[Source]].apply(0)

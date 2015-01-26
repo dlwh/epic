@@ -11,11 +11,11 @@ object Tagger {
     val tagSeq = fun(strings)
     tokens.zip(tagSeq).map({case (token, tag) => Tagged[Tag](token.span, tag)})
   }
-  def apply[Tag](fun: Vector[String] => Vector[Tag]): SlabTagger[Tag] = new SlabTagger[Tag](fun)
+  def apply[Tag](fun: Vector[String] => Vector[Tag]): SlabTagger[Sentence, Token, Tag] = new SlabTagger[Sentence, Token, Tag](fun)
 
   def posTagger(crf: CRF[AnnotatedLabel, String]) = fromCRF(crf, (a: AnnotatedLabel) => a.label)
 
-  def fromCRF[L, Tag](crf: CRF[L, String], lToTag: L=>Tag): SlabTagger[Tag] = new CRFTagger(crf, lToTag)
+  def fromCRF[L, Tag](crf: CRF[L, String], lToTag: L=>Tag): SlabTagger[Sentence, Token, Tag] = new CRFTagger[Sentence, Token, L, Tag](crf, lToTag)
 
-  case class CRFTagger[L, Tag](crf: CRF[L, String], lToTag: L=>Tag) extends  SlabTagger[Tag](v1 => crf.bestSequence(v1).tags.map(lToTag).toVector)
+  case class CRFTagger[S <: Sentence, T <: Token, L, Tag](crf: CRF[L, String], lToTag: L=>Tag) extends SlabTagger[S, T, Tag](v1 => crf.bestSequence(v1).tags.map(lToTag).toVector)
 }
