@@ -5,54 +5,23 @@ import ops.hlist._
 import scalaz._
 import scala.annotation.implicitNotFound
 
-@implicitNotFound("Implicit not found: epic.slab.typeclasses.SubSelector[${L}, ${V}]. You requested an element of upper type ${V}, but there is none in the HList ${L}. Check that you imported scalaz.std.list._")
-trait SubSelector[L <: HList, V] {
-  def apply(l: L): V
-}
+@implicitNotFound("Implicit not found: epic.slab.Utils.SelectMany[${L}, ${SL}]. You requested to select elements of the types ${SL}, but not all were found in HList ${L}.")
+trait SelectMany[L <: HList, SL <: HList] extends DepFn1[L]
 
-object SubSelector {
-  def apply[L <: HList, V](implicit subsel: SubSelector[L, V]): SubSelector[L, V] = subsel
+object SelectMany {
+  def apply[L <: HList, SL <: HList](implicit selectM: SelectMany[L, SL]): Aux[L, SL, selectM.Out] = selectM
 
-  implicit def eol[L <: HList, V: Monoid]: SubSelector[L, V] =
-    new SubSelector[L, V] {
-      def apply(l : L): V = Monoid[V].zero
-    }
-
-  implicit def found[H <: V, T <: HList, E, V: Monoid]
-    (implicit subsel: SubSelector[T, V]): SubSelector[H :: T, V] =
-    new SubSelector[H :: T, V] {
-      def apply(l : H :: T): V = {
-        Monoid[V].append(l.head,subsel(l.tail))
-      }
-    }
-
-  implicit def notFound[H, T <: HList, E, V]
-    (implicit subsel: SubSelector[T, V]): SubSelector[H :: T, V] =
-    new SubSelector[H :: T, V] {
-      def apply(l : H :: T): V = {
-        subsel(l.tail)
-      }
-    }
-
-}
-
-@implicitNotFound("Implicit not found: epic.slab.typeclasses.SubSelectMany[${L}, ${SL}]. You requested the elements ${SL}, but not all were found in the HList ${L}. Check that you imported scalaz.std.list._")
-trait SubSelectMany[L <: HList, SL <: HList] extends DepFn1[L]
-
-object SubSelectMany {
-  def apply[L <: HList, SL <: HList](implicit selectM: SubSelectMany[L, SL]): Aux[L, SL, selectM.Out] = selectM
-
-  type Aux[L <: HList, SL <: HList, Out0] = SubSelectMany[L, SL] { type Out = Out0 }
+  type Aux[L <: HList, SL <: HList, Out0] = SelectMany[L, SL] { type Out = Out0 }
 
   implicit def eol[L <: HList]: Aux[L, HNil, HNil] =
-    new SubSelectMany[L, HNil] {
+    new SelectMany[L, HNil] {
       type Out = HNil
       def apply(l : L): Out = HNil
     }
 
-  implicit def recurse[L <: HList, E: Monoid, Result <: HList]
-    (implicit selector: SubSelector[L, E], selectMany: Aux[L, Result, Result]): Aux[L, E :: Result, E :: Result] =
-      new SubSelectMany[L, E :: Result] {
+  implicit def hlistSelectMany[L <: HList, E, Result <: HList]
+    (implicit selector: Selector.Aux[L, E], selectMany: Aux[L, Result, Result]): Aux[L, E :: Result, E :: Result] =
+      new SelectMany[L, E :: Result] {
         type Out = E :: Result
         def apply(l : L): Out = {
           val e = selector(l)
@@ -97,8 +66,7 @@ object Adder {
 
 object HOps {
   implicit class Ops[L <: HList](l: L) {
-    def subselect[V](implicit subsel: SubSelector[L, V]): V = subsel(l)
-    def selectMany[SL <: HList](implicit sm: SubSelectMany[L, SL]): sm.Out = sm(l)
+    def selectMany[SL <: HList](implicit sm: SelectMany[L, SL]): sm.Out = sm(l)
     def add[V](v: V)(implicit adder: Adder[L, V]): adder.Out = adder(l, v)
   }
 }

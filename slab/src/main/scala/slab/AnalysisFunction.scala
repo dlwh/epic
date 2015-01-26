@@ -15,7 +15,7 @@ import ops.hlist._
 
 // This analysis function requires one input and adds one output type.
 trait AnalysisFunction11[C, I, O] {
-  def apply[In <: HList, Out <: HList](slab: Slab[C, In])(implicit sel: SubSelector[In, List[I]], adder: Adder.Aux[In, List[O], Out]): Slab[C, Out] = {
+  def apply[In <: HList, Out <: HList](slab: Slab[C, In])(implicit sel: Selector[In, List[I]], adder: Adder.Aux[In, List[O], Out]): Slab[C, Out] = {
     slab.add(apply(slab.content, slab.select(sel)).toList)
   }
   def apply(content: C, input: List[I]): Iterable[O]
@@ -33,7 +33,7 @@ object AnalysisFunction11 {
 // of the implicits to extract the elements from the HList gets
 // complicated. For an example, take a look at epic.sequences.Segmenter
 trait AnalysisFunctionN1[C, I <: HList, O] {
-  def apply[In <: HList, Out <: HList](slab: Slab[C, In])(implicit sel: SubSelectMany.Aux[In, I, I], adder: Adder.Aux[In, List[O], Out]): Slab[C, Out]
+  def apply[In <: HList, Out <: HList](slab: Slab[C, In])(implicit sel: SelectMany.Aux[In, I, I], adder: Adder.Aux[In, List[O], Out]): Slab[C, Out]
 }
 
 // This analysis function requires no input types except for the
