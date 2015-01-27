@@ -13,21 +13,19 @@ object ParseTag {
   def apply(span: Span, tag: String, probability: Double): ParseTag = new ParseTag(span, tag, probability)
 }
 
-import aliases._
-
-class Parser(
+class Parser[S <: Sentence, T <: Token](
   val model: ParserModel,
   val parser: ParserModel => opennlp.tools.parser.Parser
-) extends AnalysisFunctionN1[String, TaggerInput, ParseTag] {
+) extends AnalysisFunctionN1[String, List[S] :: List[T] :: HNil, ParseTag] {
   override def apply[In <: HList, Out <: HList](slab: Slab[String, In])(
-    implicit sel: SubSelectMany.Aux[In, TaggerInput, TaggerInput],
+    implicit sel: SelectMany.Aux[In, List[S] :: List[T] :: HNil, List[S] :: List[T] :: HNil],
     adder: Adder.Aux[In, List[ParseTag], Out]
   ): Slab[String, Out] = {
     val data = slab.selectMany(sel)
-    val index = SpanIndex(data.select[List[Token]])
+    val index = SpanIndex(data.select[List[T]])
     // Required because the API is not threadsafe.
     val pmodel = parser(model)
-    val annotatedSentences: List[List[ParseTag]] = data.select[List[Sentence]].flatMap({ sentence =>
+    val annotatedSentences: List[List[ParseTag]] = data.select[List[S]].flatMap({ sentence =>
       val s = slab.substring(sentence.span)
       val tokens = index(sentence.span)
       val unparsed = new Parse(s, Span(0, sentence.end - sentence.begin), "INC", 1, null)
@@ -47,9 +45,9 @@ class Parser(
 
 object Parser {
   def parser(): ParserModel => opennlp.tools.parser.Parser = { model => ParserFactory.create(model)}
-  def apply(model: ParserModel): Parser = apply(model, Parser.parser())
+  def apply(model: ParserModel): Parser[PSentence, PToken] = apply(model, Parser.parser())
   def apply(
     model: ParserModel,
     tagger: ParserModel => opennlp.tools.parser.Parser
-  ): Parser = new Parser(model, tagger)
+  ): Parser[PSentence, PToken] = new Parser[PSentence, PToken](model, tagger)
 }

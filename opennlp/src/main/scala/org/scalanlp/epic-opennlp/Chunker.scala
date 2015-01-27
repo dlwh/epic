@@ -12,25 +12,20 @@ object Chunk {
   def apply(tag: String, probabilitiy: Double): Chunk = new Chunk(tag, probabilitiy)
 }
 
-object caliases {
-  type ChunkerInput = List[Tagged[PosTag]] :: List[PSentence] :: List[PToken] :: HNil
-}
-import caliases._
-
-class Chunker(
+class Chunker[S <: Sentence, T <: Token, P <: Tagged[PosTag]] (
   val model: ChunkerModel,
   val chunker: ChunkerModel => ChunkerME
-) extends AnalysisFunctionN1[String, ChunkerInput, Tagged[PosTag]] {
+) extends AnalysisFunctionN1[String, List[S] :: List[T] :: List[P] :: HNil, Tagged[PosTag]] {
   override def apply[In <: HList, Out <: HList](slab: Slab[String, In])(
-    implicit sel: SubSelectMany.Aux[In, ChunkerInput, ChunkerInput],
+    implicit sel: SelectMany.Aux[In, List[S] :: List[T] :: List[P] :: HNil, List[S] :: List[T] :: List[P] :: HNil],
     adder: Adder.Aux[In, List[Tagged[PosTag]], Out]
   ): Slab[String, Out] = {
     val data = slab.selectMany(sel)
-    val tokenIndex = SpanIndex(data.select[List[PToken]])
-    val posIndex = SpanIndex(data.select[List[Tagged[PosTag]]])
+    val tokenIndex = SpanIndex(data.select[List[T]])
+    val posIndex = SpanIndex(data.select[List[P]])
     // Required because the API is not threadsafe.
     val cmodel = chunker(model)
-    val annotatedSentences = for(sentence <- data.select[List[PSentence]]) yield {
+    val annotatedSentences = for(sentence <- data.select[List[S]]) yield {
       val tokens = tokenIndex(sentence.span)
       val pos = posIndex(sentence.span)
       val tags = cmodel.chunk(tokens.map(s => slab.substring(s.span)).toArray, pos.map(_.tag.tag).toArray)
@@ -45,9 +40,9 @@ object Chunker {
     new ChunkerME(model)
   }
 
-  def apply(model: ChunkerModel): Chunker = apply(model, Chunker.chunker())
+  def apply(model: ChunkerModel): Chunker[PSentence, PToken, Tagged[PosTag]] = apply(model, Chunker.chunker())
   def apply(
     model: ChunkerModel,
     tagger: ChunkerModel => ChunkerME
-  ): Chunker = new Chunker(model, tagger)
+  ): Chunker[PSentence, PToken, Tagged[PosTag]] = new Chunker[PSentence, PToken, Tagged[PosTag]](model, tagger)
 }

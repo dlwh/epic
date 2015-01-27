@@ -16,7 +16,7 @@ object PSentence {
 }
 
 class SentenceSegmenter(val model: SentenceModel) extends legacyannotators.SentenceSegmenter[PSentence, SentenceDetectorME] {
-  override def initialize = () => new SentenceDetectorME(model)
+  override val initialize = () => new SentenceDetectorME(model)
   override def apply(detector: SentenceDetectorME, text: String): Iterable[PSentence] = {
     detector.sentPosDetect(text)
       .zip(detector.getSentenceProbabilities())

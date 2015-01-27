@@ -13,8 +13,8 @@ object PToken {
   }
 }
 
-class Tokenizer(val model: TokenizerModel) extends legacyannotators.Tokenizer[PToken, TokenizerME] {
-  override val initializer = () => new TokenizerME(model)
+class Tokenizer[S <: Sentence](val model: TokenizerModel) extends legacyannotators.Tokenizer[S, PToken, TokenizerME] {
+  override val initialize = () => new TokenizerME(model)
   override def apply(tokenizer: TokenizerME, sentence: String) = {
     tokenizer.tokenizePos(sentence)
       .zip(tokenizer.getTokenProbabilities())
@@ -25,5 +25,5 @@ class Tokenizer(val model: TokenizerModel) extends legacyannotators.Tokenizer[PT
 }
 
 object Tokenizer {
-  def apply(model: TokenizerModel): Tokenizer = new Tokenizer(model)
+  def apply(model: TokenizerModel): Tokenizer[PSentence] = new Tokenizer[PSentence](model)
 }
