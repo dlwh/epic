@@ -34,6 +34,7 @@ import breeze.optimize.FirstOrderMinimizer.OptParams
 import epic.parser.ParseEval.Statistics
 import epic.features.LongestFrequentSuffixFeaturizer.LongestFrequentSuffix
 import epic.features.LongestFrequentSuffixFeaturizer
+import epic.corefdense.AdadeltaGradientDescentDVD
 
 
 /**
@@ -67,6 +68,8 @@ object ParserTrainer extends epic.parser.ParserPipeline with LazyLogging {
                     initWeightsScale: Double = 1E-2,
                     @Help(text="True if we should determinimize training (remove randomness associated with random minibatches)")
                     determinizeTraining: Boolean = false,
+                    @Help(text="Use Adadelta for optimiziation instead of Adagrad")
+                    useAdadelta: Boolean = false,
                     @Help(text="Should we enforce reachability? Can be useful if we're pruning the gold tree.")
                     enforceReachability: Boolean = true,
                     @Help(text="Whether or not we use constraints. Not using constraints is very slow.")
@@ -155,10 +158,21 @@ object ParserTrainer extends epic.parser.ParserPipeline with LazyLogging {
 
 
     val name = Option(params.name).orElse(Option(model.getClass.getSimpleName).filter(_.nonEmpty)).getOrElse("DiscrimParser")
-    val itr = if (determinizeTraining) {
-      params.opt.iterations(cachedObj.withScanningBatches(params.opt.batchSize), init).asInstanceOf[Iterator[FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State]]
+    val itr: Iterator[FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State] = if (determinizeTraining) {
+      val scanningBatchesObj = cachedObj.withScanningBatches(params.opt.batchSize)
+      if (useAdadelta) {
+        new AdadeltaGradientDescentDVD(params.opt.maxIterations).iterations(scanningBatchesObj, init).
+            asInstanceOf[Iterator[FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State]]
+      } else {
+        params.opt.iterations(scanningBatchesObj, init).asInstanceOf[Iterator[FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State]]
+      }
     } else {
-      params.opt.iterations(cachedObj, init)
+      if (useAdadelta) {
+        new AdadeltaGradientDescentDVD(params.opt.maxIterations).iterations(cachedObj.withRandomBatches(params.opt.batchSize), init).
+            asInstanceOf[Iterator[FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State]]
+      } else {
+        params.opt.iterations(cachedObj, init)
+      }
     }
     for ((state, iter) <- itr.take(maxIterations).zipWithIndex.tee(evalAndCache _)
          if iter != 0 && iter % iterationsPerEval == 0 || evaluateNow) yield try {
