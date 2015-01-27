@@ -403,7 +403,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     
     val featurizer = new ProductionFeaturizer[AnnotatedLabel, AnnotatedLabel, String](xbarGrammar, indexedRefinements,
       lGen=labelFeaturizer,
-      rGen=ruleFeaturizer)
+      rGen=ruleFeaturizer, filterRedundantFeatures = pruneRedundantFeatures)
     
     // This is a catch-all for other features that must be instantiated over the entire rule
     // and which are not synthesized on-the-fly from cross-products.

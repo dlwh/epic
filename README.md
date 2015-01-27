@@ -6,7 +6,7 @@ Epic is a structured prediction framework for Scala. It also includes classes fo
 
 Epic is distributed under the [Apache License, Version 2.0](http://www.apache.org/licenses/LICENSE-2.0.html).
 
-The current version is 0.2.
+The current version is 0.3.
 
 ## Documentation
 
@@ -40,7 +40,7 @@ Epic bundles command line interfaces for using parsers, NER systems, and POS tag
 All of these systems expect plain text files as input, along with a path to a model file. The syntax is:
 
 ```bash
-java -Xmx4g -cp /path/to/epic-assembly-0.2-SNAPSHOT.jar epic.parser.ParseText --model /path/to/model.ser.gz --nthreads <number of threads> [files]
+java -Xmx4g -cp /path/to/epic-assembly-0.3-SNAPSHOT.jar epic.parser.ParseText --model /path/to/model.ser.gz --nthreads <number of threads> [files]
 ```
 
 Currently, all text is output to standard out. In the future, we will support output in a way that differentiates the files. If no files are given, the system will read from standard input. By default, the system will use all available cores for execution.

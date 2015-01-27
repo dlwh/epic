@@ -54,14 +54,15 @@ lazy val commonSettings = Seq(
 lazy val root = (project in file("."))
   .settings(commonSettings: _*)
   .settings(name := "epic")
-  .settings(version := "0.3-SNAPSHOT")
+  .settings(version := "0.4-SNAPSHOT")
   .settings(libraryDependencies ++= Seq(
     "junit" % "junit" % "4.5" % "test",
-    "org.scalanlp" %% "breeze" % "0.10",
+    "org.scalanlp" %% "breeze" % "0.11-M0",
     "org.scalanlp" %% "breeze-config" % "0.9.1",
-    "org.scalanlp" %% "nak" % "1.3",
-    "org.scalanlp" %% "epic-slab" % "0.3-SNAPSHOT",
+    "org.scalanlp" %% "nak" % "1.3" intransitive(),
+    "org.scalanlp" %% "epic-slab" % "0.4-SNAPSHOT",
     "org.mapdb" % "mapdb" % "0.9.2",
+    "com.typesafe.scala-logging" %% "scala-logging-slf4j" % "2.1.2",
     ("org.apache.tika" % "tika-parsers" % "1.5").exclude ("edu.ucar", "netcdf").exclude("com.googlecode.mp4parser","isoparser"),
     "de.l3s.boilerpipe" % "boilerpipe" % "1.1.0",
     "net.sourceforge.nekohtml" % "nekohtml" % "1.9.21",//needed by boilerpipe
@@ -69,8 +70,7 @@ lazy val root = (project in file("."))
     "org.apache.commons" % "commons-lang3" % "3.3.2",
     "de.jflex" % "jflex" % "1.6.0" % "compile",
     "org.scalatest" %% "scalatest" % "2.1.3" % "test",
-    "org.scalacheck" %% "scalacheck" % "1.11.3" % "test",
-    "org.typelevel" %% "scodec-core" % "1.1.0"
+    "org.scalacheck" %% "scalacheck" % "1.11.3" % "test"
   ))
   .settings(libraryDependencies ++= (CrossVersion.partialVersion(scalaVersion.value) match {
     // if scala 2.11+ is used, add dependency on scala-xml module
