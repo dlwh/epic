@@ -142,18 +142,31 @@ language is the [two letter code for the language](http://www.loc.gov/standards/
 
 To following models are available at this time:
 
-__AS OF WRITING ONLY THE ENGLISH PARSER AND NER SYSTEM ARE AVAILABLE!__ Write me if you want these other models.
+__AS OF WRITING ONLY MODELS FOR ENGLISH ARE AVAILABLE!__ Write me if you want these other models.
 
 * Parser
   * English: 
     ```
-    "org.scalanlp" %% "epic-parser-en-span" % "2014.9.15"
+    "org.scalanlp" %% "epic-parser-en-span" % "2014.1.25"
+    ```
+* POS Taggers
+  * English: 
+    ```
+    "org.scalanlp" %% "epic-pos-en" % "2014.1.25"
     ```
 * Named Entity Recognizers
   * English: 
     ```
-    "org.scalanlp" %% "epic-ner-en-conll" % "2014.10.26"
+    "org.scalanlp" %% "epic-ner-en-conll" % "2014.1.25"
     ```
+
+There is also a meta-dependency that includes the above three models:
+
+```
+"org.scalanlp" %% "english"  % "2014.1.25"
+```
+
+I meant to name that "epic-english" but messed up. So it's that for now. Expect it to change.
 
 TODO:
 
@@ -191,10 +204,6 @@ TODO:
     "org.scalanlp" %% "epic-parser-sv-span" % "2014.9.15-SNAPSHOT"
     ```
 * POS Taggers
-  * English: 
-    ```
-    "org.scalanlp" %% "epic-pos-en" % "2014.9.15-SNAPSHOT"
-    ```
   * Basque: 
     ```
     "org.scalanlp" %% "epic-pos-eu" % "2014.9.15-SNAPSHOT"
