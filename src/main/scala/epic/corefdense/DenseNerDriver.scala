@@ -2,7 +2,6 @@ package epic.corefdense
 
 import breeze.linalg.DenseVector
 import edu.berkeley.nlp.entity.ner.NEEvaluator
-import edu.berkeley.nlp.entity.ner.NerDriver
 import edu.berkeley.nlp.entity.ner.NerSystemLabeled
 import edu.berkeley.nlp.entity.ner.NerFeaturizer
 import edu.berkeley.nlp.entity.sem.BrownClusterInterface
@@ -19,7 +18,7 @@ object DenseNerDriver {
   val hiddenSize = 100
   
   val useAdadelta = false
-  val numItrs = 5
+  val numItrs = 30
   val eta = 1.0F
   val reg = 1e-8
   val initWeightsScale = 0.01
@@ -39,15 +38,13 @@ object DenseNerDriver {
   
   val checkEmpiricalGradient = false
   
-  val oldStyleCorefNN = false;
-  
   def main(args: Array[String]) {
     LightRunner.initializeOutput(DenseNerDriver.getClass())
     LightRunner.populateScala(DenseNerDriver.getClass(), args)
     
     // Load preliminaries
     val labelIndexer = NerSystemLabeled.StdLabelIndexer;
-    val maybeBrownClusters = if (brownPath != "") Some(BrownClusterInterface.loadBrownClusters(NerDriver.brownClustersPath, 0)) else None;
+    val maybeBrownClusters = if (brownPath != "") Some(BrownClusterInterface.loadBrownClusters(brownPath, 0)) else None;
     val maybeWikipediaDB = None;
     val featureIndexer = new Indexer[String]();
     
@@ -55,7 +52,7 @@ object DenseNerDriver {
     val trainDocs = NerSystemLabeled.loadDocs(trainPath, trainSize, true)
     Logger.logss("Extracting training examples");
     val trainExamples = NerSystemLabeled.extractNerChunksFromConll(trainDocs);
-    val nerFeaturizer = NerFeaturizer(featureSetSpec.split(":").toSet, featureIndexer, labelIndexer, trainExamples.map(_.words), maybeWikipediaDB, maybeBrownClusters, NerDriver.unigramThreshold, NerDriver.bigramThreshold, NerDriver.prefSuffThreshold);
+    val nerFeaturizer = NerFeaturizer(featureSetSpec.split(":").toSet, featureIndexer, labelIndexer, trainExamples.map(_.words), maybeWikipediaDB, maybeBrownClusters, 1, 10, 2);
     // Featurize transitions and then examples
     val featurizedTransitionMatrix = Array.tabulate(labelIndexer.size, labelIndexer.size)((prev, curr) => {
       nerFeaturizer.featurizeTransition(labelIndexer.getObject(prev), labelIndexer.getObject(curr), true);

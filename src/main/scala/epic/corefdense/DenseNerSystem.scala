@@ -27,7 +27,7 @@ class DenseNerSystem(val labelIndexer: Indexer[String],
   val reducedLabelSetSize = NerSystemLabeled.LabelSetReduced.size;
   
   // Caches and structures that are used during inference
-  val MaxSize = 200
+  val MaxSize = 500
   
   val cachedEmissionScores = Array.tabulate(MaxSize, labelIndexer.size)((i, j) => 0.0)
   val cachedTransitionScores = Array.tabulate(labelIndexer.size, labelIndexer.size)((i, j) => 0.0)
