@@ -56,7 +56,7 @@ class CorefNeuralModel(val sparseFeaturizer: PairwiseIndexingFeaturizer,
     for (mentIdx <- 0 until input.size) {
       val scores = input.cachedScoreMatrix(mentIdx)
       for (antIdx <- 0 to mentIdx) {
-        val sparseScore = CorefNeuralModel.dotProductOffset(featsChart(mentIdx)(antIdx), weights, transform.index.size)
+        val sparseScore = DeepUtils.dotProductOffset(featsChart(mentIdx)(antIdx), weights, transform.index.size)
         val denseScore = if (antIdx == mentIdx) {
           // Score the new cluster
           0.0F
@@ -101,7 +101,7 @@ class CorefNeuralModel(val sparseFeaturizer: PairwiseIndexingFeaturizer,
           // Update sparse features
           val isGold = goldAnts.contains(antIdx)
           val delta = (if (isGold) Math.exp(scores(antIdx) - goldNormalizer) else 0) - Math.exp(scores(antIdx) - allNormalizer) 
-          CorefNeuralModel.addToGradient(featsChart(mentIdx)(antIdx), delta, gradient, transform.index.size);
+          DeepUtils.addToGradient(featsChart(mentIdx)(antIdx), delta, gradient, transform.index.size);
           // Update the partials vector for dense features
           if (antIdx != mentIdx) {
             partialsVec += cachedVectors(antIdx) * delta
@@ -151,23 +151,5 @@ object CorefNeuralModel {
           ment.contextWordOrPlaceholder(ment.headIdx- ment.startIdx),
           ment.contextWordOrPlaceholder(ment.endIdx - 1 - ment.startIdx),
           ment.contextWordOrPlaceholder(ment.endIdx - ment.startIdx))
-  }
-  
-  def addToGradient(feats: Array[Int], scale: Double, gradient: Array[Double], offset: Int) {
-    var i = 0;
-    while (i < feats.size) {
-      gradient(feats(i) + offset) += scale;
-      i += 1;
-    }
-  }
-  
-  def dotProductOffset(feats: Array[Int], weights: Array[Double], offset: Int) = {
-    var score = 0.0
-    var i = 0;
-    while (i < feats.size) {
-      score += weights(feats(i) + offset)
-      i += 1
-    }
-    score
   }
 }

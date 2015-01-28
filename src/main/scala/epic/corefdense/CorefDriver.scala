@@ -69,7 +69,7 @@ object CorefDriver {
   
   val checkEmpiricalGradient = false
   
-  val oldStyleCorefNN = true;
+  val oldStyleCorefNN = false;
   
   ////////////////////
 

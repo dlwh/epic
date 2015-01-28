@@ -78,7 +78,7 @@ class GeneralTrainer[T] {
       var currBatchIdx = 0;
       val printFreq = (trainExs.size / batchSize) / 10 // Print progress 10 times per pass through the data
       while (currIdx < trainExs.size) {
-        if (verbose && currBatchIdx % printFreq == 0) {
+        if (verbose && (printFreq == 0 || currBatchIdx % printFreq == 0)) {
           Logger.logs("Computing gradient on " + currIdx + " (batch " + currBatchIdx + " / " + (trainExs.size / batchSize) + ")");
         }
         cumulativeObjective += takeAdagradStepL1R(trainExs.slice(currIdx, Math.min(trainExs.size, currIdx + batchSize)),

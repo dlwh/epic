@@ -28,31 +28,11 @@ object MNISTTester {
     val hiddenSize = 200
 //    val hiddenSize = 500
     
-//  APPROXIMATE OBJECTIVE: -8.950063626269229
-//  1000 / 1000
-//  640 / 1000
-//    val transform = SimpleNNEpic.makeDeepTransform(trainSamples.head.input.size, 200, 2, vacuousIndexer.size, "tanh")
-    
-    val transform = SimpleNNEpic.makeDeepTransform(trainSamples.head.input.size, hiddenSize, 2, vacuousIndexer.size, "tanh")
+//    val transform = SimpleNNEpic.makeDeepTransform(trainSamples.head.input.size, hiddenSize, 2, vacuousIndexer.size, "tanh")
+    val transform = SimpleNNEpic.makeDeepTransform(trainSamples.head.input.size, hiddenSize, 2, vacuousIndexer.size, "relu")
+//    val transform = SimpleNNEpic.makeDeepTransform(trainSamples.head.input.size, hiddenSize, 2, vacuousIndexer.size, "cube")
 //    val transform = SimpleNNEpic.makeDeepTransform(trainSamples.head.input.size, hiddenSize, 1, vacuousIndexer.size, "tanh")
 //    val transform = SimpleNNEpic.makeDeepTransform(trainSamples.head.input.size, hiddenSize, 1, vacuousIndexer.size, "relu")
-//  APPROXIMATE OBJECTIVE: -1.9972034553071694
-//  1000 / 1000
-//  824 / 1000
-//    val transform = SimpleNNEpic.makeDeepTransform(trainSamples.head.input.size, 500, 1, vacuousIndexer.size, "tanh")
-//  APPROXIMATE OBJECTIVE: -0.5572691610234091
-//  1000 / 1000
-//  825 / 1000
-//    val transform = SimpleNNEpic.makeDeepTransform(trainSamples.head.input.size, 784, 1, vacuousIndexer.size, "tanh")
-//  APPROXIMATE OBJECTIVE: -4.8510921594965107E-4
-//  1000 / 1000
-//  821 / 1000
-//  APPROXIMATE OBJECTIVE: -1305932.345400486
-//  54610 / 60000
-//  883 / 1000 (Yann LeCun reports 12% on the full dataset)
-//    val transform = SimpleNNEpic.makeLinearTransform(trainSamples.head.input.size, vacuousIndexer.size)
-    // 824 correct
-//    val transform = SimpleNNEpic.makeDeepTransform(trainSamples.head.input.size, 500, 1, vacuousIndexer.size, "tanh")
     val nn: SimpleNNEpic[Byte] = new SimpleNNEpic(transform, vacuousIndexer)
 //    val initialWeights = nn.getInitialWeights(1.0);
     val initialWeights = nn.getInitialWeights(0.1);
@@ -87,8 +67,8 @@ object MNISTTester {
     val batchSize = 100
 //    val batchSize = 1000
     val iters = 100;
-//    val weights = new GeneralTrainer().trainAdadelta(trainSamples, nn, 0.95, batchSize, iters, initialWeights, weightPostprocessor = weightProjector, verbose = false);
-    val weights = new GeneralTrainer().trainAdagrad(trainSamples, nn, eta, 0.0000001, batchSize, iters, initialWeights, weightPostprocessor = weightProjector, verbose = false);
+    val weights = new GeneralTrainer().trainAdadelta(trainSamples, nn, 0.95, batchSize, iters, initialWeights, weightPostprocessor = weightProjector, verbose = false);
+//    val weights = new GeneralTrainer().trainAdagrad(trainSamples, nn, eta, 0.0000001, batchSize, iters, initialWeights, weightPostprocessor = weightProjector, verbose = false);
 //    val weights = new GeneralTrainer().trainLBFGS(trainSamples, nn, 0.0000001, 0.001, iters, initialWeights, verbose = false);
     getAccuracy(nn, trainSamples, weights)
     getAccuracy(nn, testSamples, weights)

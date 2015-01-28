@@ -52,7 +52,7 @@ class CorefNeuralModel2(val sparseFeaturizer: PairwiseIndexingFeaturizer,
     for (mentIdx <- 0 until input.size) {
       val scores = input.cachedScoreMatrix(mentIdx)
       for (antIdx <- 0 to mentIdx) {
-        val sparseScore = CorefNeuralModel.dotProductOffset(featsChart(mentIdx)(antIdx), weights, transform.index.size)
+        val sparseScore = DeepUtils.dotProductOffset(featsChart(mentIdx)(antIdx), weights, transform.index.size)
         val denseScore = if (antIdx == mentIdx) {
           // Right now do nothing, could have a separate NN for this task
           0.0F
@@ -98,7 +98,7 @@ class CorefNeuralModel2(val sparseFeaturizer: PairwiseIndexingFeaturizer,
           // Update sparse features
           val isGold = goldAnts.contains(antIdx)
           val delta = (if (isGold) Math.exp(scores(antIdx) - goldNormalizer) else 0) - Math.exp(scores(antIdx) - allNormalizer) 
-          CorefNeuralModel.addToGradient(featsChart(mentIdx)(antIdx), delta, gradient, transform.index.size);
+          DeepUtils.addToGradient(featsChart(mentIdx)(antIdx), delta, gradient, transform.index.size);
           // Update the partials vector for dense features
           if (antIdx != mentIdx) {
             layer.tallyDerivative(DenseVector(gradient), DenseVector(Array(delta)), DenseVector(formVector(input.getMention(mentIdx), input.getMention(antIdx))))
