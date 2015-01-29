@@ -65,7 +65,7 @@ object DenseNerDriver {
         Logger.logss("Featurizing train example " + i);
       }
       val ex = trainExamples(i);
-      new NerExampleWithFeatures(ex, nerFeaturizer.featurize(ex, true));
+      new NerExampleWithFeatures(ex, nerFeaturizer.featurize(ex, true), Array.tabulate(ex.words.size, labelIndexer.size)((j, k) => true));
     };
     Logger.endTrack();
     Logger.logss(featureIndexer.size + " features");
@@ -103,7 +103,7 @@ object DenseNerDriver {
     // Extract test examples and run the model
     val testDocs = NerSystemLabeled.loadDocs(testPath, testSize, true)
     val testExamples = NerSystemLabeled.extractNerChunksFromConll(testDocs);
-    val testSequenceExs = testExamples.map(ex => new NerExampleWithFeatures(ex, nerFeaturizer.featurize(ex, false)));
+    val testSequenceExs = testExamples.map(ex => new NerExampleWithFeatures(ex, nerFeaturizer.featurize(ex, false), Array.tabulate(ex.words.size, labelIndexer.size)((j, k) => true)));
     val testGoldChunks = testSequenceExs.map(ex => NerSystemLabeled.convertToLabeledChunks(ex.ex.goldLabels));
     Logger.startTrack("Decoding dev");
     val testPredChunks = testSequenceExs.map(ex => NerSystemLabeled.convertToLabeledChunks(denseNerSystem.decode(ex, weights)))

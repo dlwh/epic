@@ -12,7 +12,9 @@ import epic.dense.AffineTransform
 import epic.dense.Word2VecIndexed
 import edu.berkeley.nlp.futile.util.Logger
 
-case class NerExampleWithFeatures(val ex: NerExample, val featsPerState: Array[Array[Array[Int]]]) {
+case class NerExampleWithFeatures(val ex: NerExample,
+                                  val featsPerState: Array[Array[Array[Int]]],
+                                  val allowedStates: Array[Array[Boolean]]) {
   def size = ex.words.size
 }
 
