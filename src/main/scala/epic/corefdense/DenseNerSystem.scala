@@ -16,23 +16,37 @@ case class NerExampleWithFeatures(val ex: NerExample, val featsPerState: Array[A
   def size = ex.words.size
 }
 
+case class HmmMarginals(emissionScores: Array[Array[Double]],
+                        transitionScores: Array[Array[Double]],
+                        forwardLogProbs: Array[Array[Double]],
+                        backwardLogProbs: Array[Array[Double]]) {
+  def computeLogNormalizer = SloppyMath.logAdd(forwardLogProbs(forwardLogProbs.size - 1))
+  
+  def computeLogLikelihood(goldLabels: Seq[Int]) = {
+    var score = 0.0
+    for (i <- 0 until goldLabels.size) {
+      if (i < goldLabels.size - 1) {
+        score += transitionScores(goldLabels(i))(goldLabels(i+1))
+      }
+      score += emissionScores(i)(goldLabels(i))
+    }
+    val logNormalizer = computeLogNormalizer
+    require(!score.isNaN())
+    require(!logNormalizer.isNaN())
+    score - logNormalizer
+  }
+}
+
+
 @SerialVersionUID(1L)
 class DenseNerSystem(val labelIndexer: Indexer[String],
                      val word2vec: Word2VecIndexed[String],
                      val transform: AffineTransform[DenseVector[Double],DenseVector[Double]],
                      val featurizedTransitionMatrix: Array[Array[Array[Int]]],
                      val featurizer: NerFeaturizer) extends LikelihoodAndGradientComputer[NerExampleWithFeatures] {
-  
   val numStates = labelIndexer.size
   val reducedLabelSetSize = NerSystemLabeled.LabelSetReduced.size;
   
-  // Caches and structures that are used during inference
-  val MaxSize = 500
-  
-  val cachedEmissionScores = Array.tabulate(MaxSize, labelIndexer.size)((i, j) => 0.0)
-  val cachedTransitionScores = Array.tabulate(labelIndexer.size, labelIndexer.size)((i, j) => 0.0)
-  val cachedForwardLogProbs = Array.tabulate(MaxSize, labelIndexer.size)((i, j) => 0.0)
-  val cachedBackwardLogProbs = Array.tabulate(MaxSize, labelIndexer.size)((i, j) => 0.0)
   val permittedTransitions = Array.tabulate(labelIndexer.size, labelIndexer.size)((i, j) => {
     NerFeaturizer.isLegalTransition(labelIndexer.getObject(i), labelIndexer.getObject(j))
   })
@@ -43,7 +57,6 @@ class DenseNerSystem(val labelIndexer: Indexer[String],
       null
     }
   })
-  val tempLogProbVector = Array.tabulate(labelIndexer.size)(i => 0.0)
   
   val rng = new Random(0)
   
@@ -51,13 +64,12 @@ class DenseNerSystem(val labelIndexer: Indexer[String],
     word2vec.convertToVector(DenseNerSystem.extractRelevantWords(words, idx).map(word2vec.wordIndex(_)))
   }
   
-  private def cacheEmissionScores(ex: NerExampleWithFeatures, weights: Array[Double]) {
+  private def cacheEmissionScores(ex: NerExampleWithFeatures, weights: Array[Double]) = {
+    val cachedEmissionScores = Array.tabulate(ex.size, labelIndexer.size)((i, j) => 0.0)
     val layer = transform.extractLayer(DenseVector(weights)(0 until transform.index.size))
     for (i <- 0 until ex.size) {
       // Dense scores
-      // XXX
       val denseScores = layer.activations(DenseVector(formVector(ex.ex.words, i)))
-//      val denseScores = Array.tabulate(labelIndexer.size)(i => 0.0)
       // Sparse scores
       var j = 0
       while (j < numStates) {
@@ -71,10 +83,11 @@ class DenseNerSystem(val labelIndexer: Indexer[String],
         j += 1
       }
     }
-//    Logger.logss("Cached emission scores")
+    cachedEmissionScores
   }
   
-  private def cacheTransitionScores(weights: Array[Double]) {
+  private def cacheTransitionScores(weights: Array[Double]) = {
+    val cachedTransitionScores = Array.tabulate(labelIndexer.size, labelIndexer.size)((i, j) => 0.0)
     for (i <- 0 until numStates) {
       for (j <- 0 until numStates) {
         if (transitionFeatures(i)(j) == null) {
@@ -85,12 +98,16 @@ class DenseNerSystem(val labelIndexer: Indexer[String],
         require(!cachedTransitionScores(i)(j).isNaN)
       }
     }
+    cachedTransitionScores
   }
   
-  private def computeForwardBackwardProbs(ex: NerExampleWithFeatures, weights: Array[Double], sum: Boolean) {
+  private def computeForwardBackwardProbs(ex: NerExampleWithFeatures, weights: Array[Double], sum: Boolean) = {
     val numTokens = ex.size
-    cacheEmissionScores(ex, weights)
-    cacheTransitionScores(weights)
+    val cachedEmissionScores = cacheEmissionScores(ex, weights)
+    val cachedTransitionScores = cacheTransitionScores(weights)
+    val cachedForwardLogProbs = Array.tabulate(ex.size, labelIndexer.size)((i, j) => 0.0)
+    val cachedBackwardLogProbs = Array.tabulate(ex.size, labelIndexer.size)((i, j) => 0.0)
+    val tempLogProbVector = Array.tabulate(labelIndexer.size)(i => 0.0)
     for (i <- 0 until numTokens) {
       var j = 0
       while (j < numStates) {
@@ -125,23 +142,7 @@ class DenseNerSystem(val labelIndexer: Indexer[String],
         j += 1
       }
     }
-  }
-  
-  private def computeLogNormalizer(ex: NerExampleWithFeatures) = SloppyMath.logAdd(cachedForwardLogProbs(ex.size - 1))
-  
-  private def computeLogLikelihood(ex: NerExampleWithFeatures) = {
-    var score = 0.0
-    val goldLabels = ex.ex.goldLabels.map(label => labelIndexer.getIndex(label))
-    for (i <- 0 until ex.size) {
-      if (i < ex.size - 1) {
-        score += cachedTransitionScores(goldLabels(i))(goldLabels(i+1))
-      }
-      score += cachedEmissionScores(i)(goldLabels(i))
-    }
-    val logNormalizer = computeLogNormalizer(ex)
-    require(!score.isNaN())
-    require(!logNormalizer.isNaN())
-    score - logNormalizer
+    new HmmMarginals(cachedEmissionScores, cachedTransitionScores, cachedForwardLogProbs, cachedBackwardLogProbs)
   }
   
   def getInitialWeights(initialWeightsScale: Double): Array[Double] = {
@@ -154,36 +155,36 @@ class DenseNerSystem(val labelIndexer: Indexer[String],
    * of this example
    */
   def accumulateGradientAndComputeObjective(ex: NerExampleWithFeatures, weights: Array[Double], gradient: Array[Double]): Double = {
-    computeForwardBackwardProbs(ex, weights, true)
-    accumulateDenseFeatureGradient(ex, weights, gradient)
-    accumulateSparseFeatureGradient(ex, gradient)
+    val hmmMarginals = computeForwardBackwardProbs(ex, weights, true)
+    accumulateDenseFeatureGradient(ex, weights, gradient, hmmMarginals)
+    accumulateSparseFeatureGradient(ex, gradient, hmmMarginals)
     // Return the log likelihood
-    computeLogLikelihood(ex)
+    hmmMarginals.computeLogLikelihood(ex.ex.goldLabels.map(labelIndexer.getIndex(_)))
   }
   
-  private def accumulateDenseFeatureGradient(ex: NerExampleWithFeatures, weights: Array[Double], gradient: Array[Double]) {
+  private def accumulateDenseFeatureGradient(ex: NerExampleWithFeatures, weights: Array[Double], gradient: Array[Double], hmmMarginals: HmmMarginals) {
     val numTokens = ex.size
     val goldLabels = ex.ex.goldLabels.map(label => labelIndexer.getIndex(label))
     val layer = transform.extractLayer(DenseVector(weights)(0 until transform.index.size))
-    val logNormalizer = computeLogNormalizer(ex)
+    val logNormalizer = hmmMarginals.computeLogNormalizer
     for (i <- 0 until numTokens) {
       val scale = DenseVector(Array.tabulate(numStates)(j => {
-        (if (j == goldLabels(i)) 1 else 0) - Math.exp(cachedForwardLogProbs(i)(j) + cachedBackwardLogProbs(i)(j) - logNormalizer)
+        (if (j == goldLabels(i)) 1 else 0) - Math.exp(hmmMarginals.forwardLogProbs(i)(j) + hmmMarginals.backwardLogProbs(i)(j) - logNormalizer)
       }))
       layer.tallyDerivative(DenseVector(gradient), scale, DenseVector(formVector(ex.ex.words, i)))
     }
   }
   
-  private def accumulateSparseFeatureGradient(ex: NerExampleWithFeatures, gradient: Array[Double]) {
+  private def accumulateSparseFeatureGradient(ex: NerExampleWithFeatures, gradient: Array[Double], hmmMarginals: HmmMarginals) {
     val numTokens = ex.size
     val goldLabels = ex.ex.goldLabels.map(labelIndexer.getIndex(_))
-    val logNormalizer = computeLogNormalizer(ex)
+    val logNormalizer = hmmMarginals.computeLogNormalizer
     // Update emission features
     for (i <- 0 until numTokens) {
       for (j <- 0 until numStates) {
         val thisFeatureVector = ex.featsPerState(i)(j);
         if (thisFeatureVector != null) {
-          val logProb = cachedForwardLogProbs(i)(j) + cachedBackwardLogProbs(i)(j) - logNormalizer;
+          val logProb = hmmMarginals.forwardLogProbs(i)(j) + hmmMarginals.backwardLogProbs(i)(j) - logNormalizer;
           val prob = Math.exp(logProb);
           require(!prob.isNaN)
           DeepUtils.addToGradient(thisFeatureVector, (if (j == goldLabels(i)) 1 else 0) - prob, gradient, transform.index.size)
@@ -201,12 +202,12 @@ class DenseNerSystem(val labelIndexer: Indexer[String],
     // Update transition features
     for (i <- 0 until numTokens - 1) {
       for (j <- 0 until numStates) {
-        val beforeScore = cachedForwardLogProbs(i)(j);
+        val beforeScore = hmmMarginals.forwardLogProbs(i)(j);
         for (k <- 0 until numStates) {
           val thisFeatureVector = transitionFeatures(j)(k);
           if (thisFeatureVector != null) {
-            val afterScore = cachedBackwardLogProbs(i+1)(k);
-            val logProb = beforeScore + cachedTransitionScores(j)(k) + cachedEmissionScores(i+1)(k) + afterScore - logNormalizer;
+            val afterScore = hmmMarginals.backwardLogProbs(i+1)(k);
+            val logProb = beforeScore + hmmMarginals.transitionScores(j)(k) + hmmMarginals.emissionScores(i+1)(k) + afterScore - logNormalizer;
             val prob = Math.exp(logProb);
             require(!prob.isNaN)
             DeepUtils.addToGradient(thisFeatureVector, (if (j == goldLabels(i) && k == goldLabels(i+1)) 1 else 0) - prob, gradient, transform.index.size)
@@ -228,15 +229,15 @@ class DenseNerSystem(val labelIndexer: Indexer[String],
   def computeObjective(ex: NerExampleWithFeatures, weights: Array[Double]): Double = accumulateGradientAndComputeObjective(ex, weights, Array.tabulate(weights.size)(i => 0.0))
   
   def decode(ex: NerExampleWithFeatures, weights: Array[Double]): Array[String] = {
-    computeForwardBackwardProbs(ex, weights, false)
+    val hmmMarginals = computeForwardBackwardProbs(ex, weights, false)
     val numTokens = ex.size
     var bestState = -1;
     var bestScore = Double.NegativeInfinity;
     val prediction = Array.tabulate(numTokens)(i => 0);
     for (j <- 0 until numStates) {
-      if (cachedForwardLogProbs(numTokens-1)(j) > bestScore) {
+      if (hmmMarginals.forwardLogProbs(numTokens-1)(j) > bestScore) {
         bestState = j;
-        bestScore = cachedForwardLogProbs(numTokens-1)(j);
+        bestScore = hmmMarginals.forwardLogProbs(numTokens-1)(j);
       }
     }
     prediction(numTokens-1) = bestState;
@@ -244,8 +245,8 @@ class DenseNerSystem(val labelIndexer: Indexer[String],
       bestScore = Double.NegativeInfinity;
       var j = 0;
       while (j < numStates) {
-        val score = cachedForwardLogProbs(i)(j) + cachedTransitionScores(j)(prediction(i+1)) +
-            cachedEmissionScores(i+1)(prediction(i+1)) + cachedBackwardLogProbs(i+1)(prediction(i+1));
+        val score = hmmMarginals.forwardLogProbs(i)(j) + hmmMarginals.transitionScores(j)(prediction(i+1)) +
+            hmmMarginals.emissionScores(i+1)(prediction(i+1)) + hmmMarginals.backwardLogProbs(i+1)(prediction(i+1));
         if (score > bestScore) {
           bestScore = score;
           prediction(i) = j;

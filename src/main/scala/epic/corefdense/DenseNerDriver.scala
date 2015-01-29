@@ -24,6 +24,8 @@ object DenseNerDriver {
   val initWeightsScale = 0.01
   val batchSize = 100
   
+  val parallel = true
+  
   val featureSetSpec = ""
   
   val word2vecPath = ""
@@ -93,9 +95,9 @@ object DenseNerDriver {
 //      GeneralTrainer.checkGradientFromPoint(trainDocGraphs, corefNeuralModel, initialWeights, Array.tabulate(initialWeights.size)(i => 0.0), indices.toSet, verbose = true)
 //    }
     val weights = if (useAdadelta) {
-      new GeneralTrainer().trainAdadelta(trainSequenceExs, denseNerSystem, 0.95, batchSize, numItrs, initialWeights, verbose = true);
+      new GeneralTrainer(parallel).trainAdadelta(trainSequenceExs, denseNerSystem, 0.95, batchSize, numItrs, initialWeights, verbose = true);
     } else {
-      new GeneralTrainer().trainAdagrad(trainSequenceExs, denseNerSystem, eta, reg, batchSize, numItrs, initialWeights, verbose = true);
+      new GeneralTrainer(parallel).trainAdagrad(trainSequenceExs, denseNerSystem, eta, reg, batchSize, numItrs, initialWeights, verbose = true);
     }
     
     // Extract test examples and run the model

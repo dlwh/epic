@@ -27,7 +27,7 @@ trait LikelihoodAndGradientComputer[T] {
   def computeObjective(ex: T, weights: Array[Double]): Double;
 }
 
-class GeneralTrainer[T] {
+class GeneralTrainer[T](val parallel: Boolean = false) {
   
   var inferenceNanos = 0L;
   var adagradNanos = 0L;
@@ -119,7 +119,8 @@ class GeneralTrainer[T] {
                           computer: LikelihoodAndGradientComputer[T],
                           weights: Array[Double],
                           lambda: Double): Double = {
-    var objective = trainExs.map(computer.computeObjective(_, weights)).reduce(_ + _);
+//    var objective = trainExs.map(computer.computeObjective(_, weights)).reduce(_ + _);
+    var objective = (if (parallel) trainExs.par else trainExs).aggregate(0.0)((currLL, ex) => currLL + computer.computeObjective(ex, weights), _ + _)
     objective + computeRegularizationTermL1R(weights, lambda)
   }
   
@@ -130,6 +131,61 @@ class GeneralTrainer[T] {
     }
     regTerm;
   }
+  
+  def getMinibatchObjectiveAndGradient(exs: Seq[T], computer: LikelihoodAndGradientComputer[T], weights: Array[Double], gradientArray: Array[Double]) = {
+    if (parallel) {
+      parallelGetMinibatchObjectiveAndGradient(exs, computer, weights, gradientArray)
+    } else {
+      serialGetMinibatchObjectiveAndGradient(exs, computer, weights, gradientArray)
+    }
+  }
+  
+  def serialGetMinibatchObjectiveAndGradient(exs: Seq[T], computer: LikelihoodAndGradientComputer[T], weights: Array[Double], gradientArray: Array[Double]) = {
+    var nanoTime = System.nanoTime();
+    var objective = 0.0
+    for (ex <- exs) {
+      // Don't need to rescale objective here since it's not used in the update
+      objective += computer.accumulateGradientAndComputeObjective(ex, weights, gradientArray);
+    }
+    inferenceNanos += (System.nanoTime() - nanoTime);
+    objective
+  }
+  
+//  case class SuffStats(val ll: Double, val gradient: Array[Double]) {
+//    def +(other: SuffStats) = new SuffStats(ll + other.ll, Array.tabulate(gradient.size)(i => gradient(i) + other.gradient(i)))
+//  }
+  
+  case class SuffStats(var ll: Double, val gradient: Array[Double]) {
+    
+    def incrementLL(increment: Double) { ll += increment }
+    
+    def +=(other: SuffStats) = {
+      ll += other.ll
+      var i = 0
+      while (i < gradient.size) {
+        gradient(i) += other.gradient(i)
+        i += 1
+      }
+      this
+    }
+  }
+  
+  def parallelGetMinibatchObjectiveAndGradient(exs: Seq[T], computer: LikelihoodAndGradientComputer[T], weights: Array[Double], gradientArray: Array[Double]) = {
+    var nanoTime = System.nanoTime();
+    var objective = 0.0
+    val emptySS = new SuffStats(0.0, Array.tabulate(gradientArray.size)(i => 0.0))
+//    val finalSS = exs.aggregate(null: SuffStats)((currSS, ex) => {
+    val finalSS = exs.par.aggregate(null: SuffStats)((currSS, ex) => {
+      val ss = if (currSS ne null) currSS else new SuffStats(0.0, Array.tabulate(gradientArray.size)(i => 0.0))
+//      val ss = if (currSS ne null) currSS else new SuffStats(0.0, Array.tabulate(gradientArray.size)(i => 0.0))
+      val ll = computer.accumulateGradientAndComputeObjective(ex, weights, ss.gradient);
+      ss.incrementLL(ll)
+      ss
+    }, { (a, b) => if (a eq null) b else if (b eq null) a else b += a })
+    System.arraycopy(finalSS.gradient, 0, gradientArray, 0, gradientArray.size)
+    inferenceNanos += (System.nanoTime() - nanoTime);
+    finalSS.ll
+  }
 
   def takeAdagradStepL1R(exs: Seq[T],
                          computer: LikelihoodAndGradientComputer[T],
@@ -139,13 +195,16 @@ class GeneralTrainer[T] {
                          eta: Double,
                          lambda: Double): Double = {
     Arrays.fill(reusableGradientArray, 0.0);
-    var nanoTime = System.nanoTime();
-    var objective = 0.0
-    for (ex <- exs) {
-      objective += computer.accumulateGradientAndComputeObjective(ex, weights, reusableGradientArray);
-    }
-    inferenceNanos += (System.nanoTime() - nanoTime);
-    nanoTime = System.nanoTime();
+    val objective = getMinibatchObjectiveAndGradient(exs, computer, weights, reusableGradientArray)
+    val nanoTime = System.nanoTime();
+//    var nanoTime = System.nanoTime();
+//    var objective = 0.0
+//    for (ex <- exs) {
+//      objective += computer.accumulateGradientAndComputeObjective(ex, weights, reusableGradientArray);
+//    }
+//    inferenceNanos += (System.nanoTime() - nanoTime);
+//    nanoTime = System.nanoTime();
+    
     // Precompute this so dividing by batch size is a multiply and not a divide
     val batchSizeMultiplier = 1.0/exs.size;
     var i = 0;
@@ -197,7 +256,7 @@ class GeneralTrainer[T] {
       var currBatchIdx = 0;
       val printFreq = (trainExs.size / batchSize) / 10 // Print progress 10 times per pass through the data
       while (currIdx < trainExs.size) {
-        if (verbose && currBatchIdx % printFreq == 0) {
+        if (verbose && (printFreq == 0 || currBatchIdx % printFreq == 0)) {
           Logger.logs("Computing gradient on " + currIdx + " (batch " + currBatchIdx + " / " + (trainExs.size / batchSize) + ")");
         }
         cumulativeObjective += takeAdadeltaStep(trainExs.slice(currIdx, Math.min(trainExs.size, currIdx + batchSize)),
@@ -232,14 +291,16 @@ class GeneralTrainer[T] {
                        updatesSquared: Array[Double],
                        rho: Double): Double = {
     Arrays.fill(reusableGradientArray, 0.0);
-    var nanoTime = System.nanoTime();
-    var objective = 0.0
-    for (ex <- exs) {
-      // Don't need to rescale objective here since it's not used in the update
-      objective += computer.accumulateGradientAndComputeObjective(ex, weights, reusableGradientArray);
-    }
-    inferenceNanos += (System.nanoTime() - nanoTime);
-    nanoTime = System.nanoTime();
+    val objective = getMinibatchObjectiveAndGradient(exs, computer, weights, reusableGradientArray)
+    val nanoTime = System.nanoTime();
+//    var nanoTime = System.nanoTime();
+//    var objective = 0.0
+//    for (ex <- exs) {
+//      // Don't need to rescale objective here since it's not used in the update
+//      objective += computer.accumulateGradientAndComputeObjective(ex, weights, reusableGradientArray);
+//    }
+//    inferenceNanos += (System.nanoTime() - nanoTime);
+//    nanoTime = System.nanoTime();
     val epsilon = 1e-6
     val inverseBatchSize = 1.0/exs.size
     var i = 0
