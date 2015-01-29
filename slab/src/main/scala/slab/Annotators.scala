@@ -30,7 +30,7 @@ trait SentenceSegmenter[S <: Sentence] extends (String => Iterable[Sentence]) wi
   *  Sentence. Sentences are not guaranteed to be in order.
   */
 
-abstract class Tokenizer[S <: Sentence, T <: Token: Offsetter] extends legacyannotators.Tokenizer[S, T, Boolean] with NoInitializer {
+abstract class Tokenizer[S <: Sentence, T <: Token: Offsetter] extends legacyannotators.Tokenizer[S, T, Boolean] with NoInitializer with (String => Iterable[T]) {
   def apply(sentence: String): Iterable[T]
   override def apply(initialized: Boolean, sentence: String): Iterable[T] = apply(sentence)
 }

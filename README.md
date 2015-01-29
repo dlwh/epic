@@ -53,17 +53,27 @@ Epic also supports programmatic usage. All of the models assume that text has be
 
 #### Preprocessing text
 
-To preprocess text so that the models can use them, you will need to segment out sentences and tokenize the sentences into individual words. Epic comes with classes to do both.
+To preprocess text so that the models can use them, you will need to
+segment out sentences and tokenize the sentences into individual
+words. Epic comes with classes to do both.
 
-Once you have a sentence, you can tokenize it using a `epic.preprocess.TreebankTokenizer`, which takes a string and returns a sequence of tokens. All told, the pipeline looks like this:
+Once you have a sentence, you can tokenize it using a
+`epic.preprocess.TreebankTokenizer`. The information is stored in a
+slab. To retrieve the tokens, use the method of the same name. All
+told, the pipeline looks like this:
 
 ```scala
-val text = getSomeText();
+import epic.slab._
+import scalaz.std.list._
+import epic.util.slabutils._
+
+val documents = getSomeDocuments();
 
 val sentenceSplitter = MLSentenceSegmenter.bundled().get
 val tokenizer = new epic.preprocess.TreebankTokenizer()
 
-val sentences: IndexedSeq[IndexedSeq[String]] = sentenceSplitter(text).map(tokenizer).toIndexedSeq
+val slabs = text.map(sentenceSplitter.slabFrom(_)).map(tokenizer(_))
+val tokens = slabs.map(_.tokens)
 
 for(sentence <- sentences) {
   // use the sentence tokens
@@ -75,10 +85,13 @@ for(sentence <- sentences) {
 
 #### Parser
 
-To use the parser programmaticaly, deserialize a parser model--either using `epic.models.deserialize[Parser[AnnotatedLabel, String]](path)` or using the ParserSelector. Then, give the parser segmented and tokenized text:
+To use the parser programmaticaly, deserialize a parser model--either
+using `epic.models.deserialize[Parser[AnnotatedLabel, String]](path)`
+or using the ParserSelector. Then, give the parser segmented and
+tokenized text:
 
 ```scala
-val parser = epic.models.deserialize[Parser[AnnotataedLabel, String]](path)
+val parser = epic.models.deserialize[Parser[AnnotatedLabel, String]](path)
 
 // or:
 

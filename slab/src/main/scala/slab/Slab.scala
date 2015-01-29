@@ -20,6 +20,10 @@ class Slab[Content, L <: HList](val content: Content, val annotations: L) {
   // @select because it only requires a single evidence.
   def selectMany[T <: HList](implicit sel: SelectMany.Aux[L, T, T]): T = sel(annotations)
 
+  // Select a single element from an hlist, and its subtypes. Slow to
+  // compile.
+  def subselect[T](implicit sel: SubSelector[L, List[T]]): List[T] = sel(annotations)
+
   // Returns a new slab with the new annotations added. Preferably
   // only call once per AnalysisFunction, because the performance is
   // questionable.

@@ -111,7 +111,7 @@ val shapeless = Def setting (
 lazy val slab = (project in file("slab"))
   .settings(commonSettings: _*)
   .settings(name := "epic-slab")
-  .settings(version := "0.3-SNAPSHOT")
+  .settings(version := "0.4-SNAPSHOT")
   .settings(libraryDependencies ++= Seq(
     "org.scalatest" %% "scalatest" % "2.1.3" % "test",
     "org.scalacheck" %% "scalacheck" % "1.11.3" % "test",

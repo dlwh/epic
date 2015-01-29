@@ -8,10 +8,25 @@ import std.vector._
 import std.list._
 
 class Sentence(val loc: Int)
+case class PSentence(override val loc: Int) extends Sentence(loc)
+case class ISentence(override val loc: Int) extends Sentence(loc)
 case class Token(val loc: Int)
 
 class SSSpec extends FunSpec {
   import HOps.Ops
+  val token = List(Token(0))
+  val isent = List(ISentence(0))
+  val psent = List(PSentence(0))
+  val annotations = isent :: psent :: token :: HNil
+
+  describe("SubSelect") {
+    it("should select both") {
+      assert(Set(annotations.subselect[List[Sentence]]).flatten == Set(isent, psent).flatten)
+    }
+    it("should select only one subclass") {
+      assert(annotations.subselect[List[PSentence]] == psent)
+    }
+  }
 
   describe("selectMany") {
     it("should get a single element") {

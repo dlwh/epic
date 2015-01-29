@@ -14,7 +14,7 @@ import scalaz.std.list._
 import scala.collection.mutable.ArrayBuffer
 
 @SerialVersionUID(1L)
-class TreebankTokenizer() extends Tokenizer with Serializable {
+class TreebankTokenizer[S <: Sentence]() extends Tokenizer[S, ContentToken] with Serializable {
   def apply(sentence: String): Vector[ContentToken] = {
     val impl = new TreebankTokenizerImpl(new StringReader(sentence))
     Iterators.fromProducer{
@@ -27,7 +27,7 @@ class TreebankTokenizer() extends Tokenizer with Serializable {
   }
 }
 
-object TreebankTokenizer extends TreebankTokenizer {
+object TreebankTokenizer extends TreebankTokenizer[Sentence] {
   def treebankTokenToToken(s: String): String = reverseTreebankMappings.getOrElse(s, s)
 
   private val treebankMappings = Map("(" -> "-LRB-", ")" -> "-RRB-", "{" -> "-LCB-", "}" -> "-RCB-", "[" -> "-LSB-", "]" -> "-RSB-")

@@ -31,6 +31,37 @@ object SelectMany {
       }
 }
 
+@implicitNotFound("Implicit not found: epic.slab.Utils.SubSelector[${L}, ${V}]. You requested to select all elements of type lower or equal to ${V}, but none were found in HList ${L}. Check that you imported scalaz.std.list._")
+trait SubSelector[L <: HList, V] {
+  def apply(l: L): V
+}
+
+object SubSelector {
+  def apply[L <: HList, V](implicit subsel: SubSelector[L, V]): SubSelector[L, V] = subsel
+
+  implicit def eol[L <: HList, V: Monoid]: SubSelector[L, V] =
+    new SubSelector[L, V] {
+      def apply(l : L): V = Monoid[V].zero
+    }
+
+  implicit def found[H <: V, T <: HList, E, V: Monoid]
+    (implicit subsel: SubSelector[T, V]): SubSelector[H :: T, V] =
+    new SubSelector[H :: T, V] {
+      def apply(l : H :: T): V = {
+        Monoid[V].append(l.head,subsel(l.tail))
+      }
+    }
+
+  implicit def notFound[H, T <: HList, E, V]
+    (implicit subsel: SubSelector[T, V]): SubSelector[H :: T, V] =
+    new SubSelector[H :: T, V] {
+      def apply(l : H :: T): V = {
+        subsel(l.tail)
+      }
+    }
+
+}
+
 @implicitNotFound("Implicit not found: epic.slab.typeclasses.Adder[${L}, ${V}]. Check that you imported scalaz.std.list._")
 sealed trait Adder[L <: HList, V] extends DepFn2[L, V]
 
@@ -66,6 +97,7 @@ object Adder {
 
 object HOps {
   implicit class Ops[L <: HList](l: L) {
+    def subselect[V](implicit subsel: SubSelector[L, V]): V = subsel(l)
     def selectMany[SL <: HList](implicit sm: SelectMany[L, SL]): sm.Out = sm(l)
     def add[V](v: V)(implicit adder: Adder[L, V]): adder.Out = adder(l, v)
   }

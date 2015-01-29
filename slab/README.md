@@ -8,13 +8,10 @@ Slabs is distributed under the [Apache License, Version 2.0](http://www.apache.o
 
 The current version is 0.1.
 
-## Documentation
+## Building a Pipeline with Annotators
 
-There isn't any direct documentation available. If you want to write
-annotators which use slabs, take a look at the example annotators and
-the opennlp wrappers. The annotations themselves are not stored in any
-ordered fashion. If you require ordering, please take a look at the
-indexes.
+
+
 
 ## Hacking
 
