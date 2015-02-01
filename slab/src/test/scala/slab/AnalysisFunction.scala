@@ -10,8 +10,8 @@ import org.scalatest.FunSpec
 /**
   * A simple regex tokenizer.
   */
-object RegexTokenizer11 extends AnalysisFunction11[String, Sentence, Token] {
-  def apply(content: String, sentences: List[Sentence]): List[Token] = {
+object RegexTokenizer11 extends AnalysisFunction11[String, Sentence, Token]({
+  case (content: String, sentences: List[Sentence]) =>
     sentences.flatMap { sentence =>
       "\\p{L}+|\\p{P}+|\\p{N}+".r.findAllMatchIn(
         content.substring(sentence.begin, sentence.end)
@@ -20,7 +20,7 @@ object RegexTokenizer11 extends AnalysisFunction11[String, Sentence, Token] {
       ).toList
     }
   }
-}
+)
 
 // Same again, except using a different interface. The API sucks,
 // needs to be improved.

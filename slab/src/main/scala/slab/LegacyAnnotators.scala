@@ -5,10 +5,6 @@ import shapeless._
 import scalaz.std.list._
 
 
-trait Initialized[T] {
-  val initialize: (() => T)
-}
-
 /** Classes which implement common annotators. The initialize part is
   *  for implementing annotators which have a limited degree of
   *  referential transparency.
@@ -17,12 +13,20 @@ trait Initialized[T] {
 /** Splits the input document into sentences.
   */
 
-trait SentenceSegmenter[S <: Sentence, I] extends (String => Iterable[Sentence]) with AnalysisFunction01[String, S] with Initialized[I] {
-  override def apply(sentence: String) = apply(initialize(), sentence)
-  def apply(initialized: I, sentence: String): Iterable[S]
-  def strings(document: String): Iterable[String] = {
-    val sentences = apply(document)
+class SentenceSegmenter[S <: Sentence, I](val initialize: () => I, val seg: (I, String) => Iterable[S])
+    extends AnalysisFunction01[String, S](SentenceSegmenter.apply(initialize)(seg))
+    with (String => Iterable[String]) {
+  def apply(document: String): Iterable[String] = {
+    val init = initialize()
+    val sentences = seg(init, document)
     sentences.map(s => document.substring(s.begin, s.end))
+  }
+}
+
+object SentenceSegmenter {
+  def apply[S <: Sentence, I](initialize: () => I)(fun: (I, String) => Iterable[S])(content: String): Iterable[S] = {
+    val init = initialize()
+    fun(init, content)
   }
 }
 
@@ -32,30 +36,28 @@ trait SentenceSegmenter[S <: Sentence, I] extends (String => Iterable[Sentence])
   *  Sentence. Sentences are not guaranteed to be in order.
   */
 
-abstract class Tokenizer[S <: Sentence, T <: Token: Offsetter, I] extends AnalysisFunction11[String, S, T] with Initialized[I] {
-  override def apply(content: String, sentences: List[S]): Iterable[T] = {
-    val initialized = initialize()
-    sentences.map({ sentence => 
-      apply(initialized, content.substring(sentence.span.begin, sentence.span.end))
-        .map(token => implicitly[Offsetter[T]].apply(token, sentence.span.begin))
-    }).flatten
-  }
-
-  def apply(initialized: I, sentence: String): Iterable[T]
+class Tokenizer[S <: Sentence, T <: Token: Offsetter, I](val initialize: () => I, val seg: (I, String) => Iterable[T])
+    extends AnalysisFunction11[String, S, T](Tokenizer.apply[S, T, I](initialize)(seg)(implicitly[Offsetter[T]])) {
 }
 
 object Tokenizer {
-  def apply[S <: Sentence, T <: Token: Offsetter, I](initializer: (() => I), tokenizer: ((I, String) => Iterable[T])): Tokenizer[S, T, I] = new Tokenizer[S, T, I] {
-    val initialize = initializer
-    def apply(initialized: I, sentence: String): Iterable[T] = tokenizer(initialized, sentence)
+  def apply[S <: Sentence, T <: Token, I](initialize: () => I)(fun: (I, String) => Iterable[T])(offsetter: Offsetter[T])(content: String, sentences: List[S]): Iterable[T] = {
+    val initialized = initialize()
+    sentences.map({ sentence => 
+      fun(initialized, content.substring(sentence.span.begin, sentence.span.end))
+        .map(token => offsetter(token, sentence.span.begin))
+    }).flatten
   }
+
+  def apply[S <: Sentence, T <: Token: Offsetter, I](initializer: (() => I), tokenizer: ((I, String) => Iterable[T])): Tokenizer[S, T, I] = new Tokenizer[S, T, I](initializer, tokenizer)
 }
 
 /** Basic annotator. The function is passed the List of Tokens, one
   * Sentence per time. The sentences are not guaranteed to be in order.
   */
 
-class Annotator[S <: Sentence, T <: Token, Annotated, I](override val initialize: (() => I), val fun: ((I, String, Vector[T]) => Iterable[Annotated])) extends AnalysisFunctionN1[String, List[S] :: List[T] :: HNil, Annotated] with Initialized[I] {
+class Annotator[S <: Sentence, T <: Token, Annotated, I](val initialize: (() => I), val annot: ((I, String, Vector[T]) => Iterable[Annotated]))
+    extends AnalysisFunctionN1[String, List[S] :: List[T] :: HNil, Annotated] {
   override def apply[In <: HList, Out <: HList]
     (slab: Slab[String, In])
     (implicit sel: SelectMany.Aux[In, List[S] :: List[T] :: HNil, List[S] :: List[T] :: HNil],
@@ -65,7 +67,7 @@ class Annotator[S <: Sentence, T <: Token, Annotated, I](override val initialize
     val data = slab.selectMany(sel)
     val index = SpanIndex(data.select[List[T]])
     val annotatedSentences = for(sentence <- data.select[List[S]]) yield {
-      fun(initialized, slab.content, index(sentence.span).toVector)
+      annot(initialized, slab.content, index(sentence.span).toVector)
     }
     slab.add(annotatedSentences.flatten)(adder)
   }
@@ -104,7 +106,8 @@ object Tagger {
   * guaranteed to be in order.
   */
 
-trait Segmenter[S <: Sentence, T <: Token, Tag, I] extends AnalysisFunctionN1[String, List[S] :: List[T] :: HNil, Tagged[Tag]] with Initialized[I] {
+class Segmenter[S <: Sentence, T <: Token, Tag, I](val initialize: () => I, val fun: (I, Vector[String]) => Iterable[Tagged[Tag]])
+    extends AnalysisFunctionN1[String, List[S] :: List[T] :: HNil, Tagged[Tag]] {
   override def apply[In <: HList, Out <: HList](slab: Slab[String, In])(implicit sel:
       SelectMany.Aux[In, List[S] :: List[T] :: HNil, List[S] :: List[T] :: HNil], adder: Adder.Aux[In, List[Tagged[Tag]], Out]): Slab[String, Out] = {
     val initialized = initialize()
@@ -112,18 +115,13 @@ trait Segmenter[S <: Sentence, T <: Token, Tag, I] extends AnalysisFunctionN1[St
     val index = SpanIndex(data.select[List[T]])
     val annotatedSentences = for(sent <- data.select[List[S]]) yield {
       val strings = index(sent.span).map(t => slab.substring(t)).toVector
-      apply(initialized, strings).map(_.offset(sent.begin)).toList
+      fun(initialized, strings).map(_.offset(sent.begin)).toList
     }
 
     slab.add(annotatedSentences.flatten)(adder)
   }
-
-  def apply(initialized: I, sentence: Vector[String]): Iterable[Tagged[Tag]]
 }
 
 object Segmenter {
-  def apply[S <: Sentence, T <: Token, Tag, I](initializer: (() => I), seg: (I, Vector[String]) => Iterable[Tagged[Tag]]) = new Segmenter[S, T, Tag, I] {
-    override val initialize = initializer
-    override def apply(initialized: I, sentence: Vector[String]): Iterable[Tagged[Tag]] = seg(initialized, sentence)
-  }
+  def apply[S <: Sentence, T <: Token, Tag, I](initialize: (() => I), seg: (I, Vector[String]) => Iterable[Tagged[Tag]]) = new Segmenter[S, T, Tag, I](initialize, seg)
 }
