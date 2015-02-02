@@ -19,7 +19,4 @@ class ReadmeExamplesTest extends FunSpec {
     val tokens = slabs.map(_.tokens)
     assert(tokens == output)
   }
-  it("should run the tokenizer example") {
-    val parser = epic.models.ParserSelector.loadParser("en").get
-  }
 }
