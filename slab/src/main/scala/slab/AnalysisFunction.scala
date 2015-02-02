@@ -14,15 +14,18 @@ import ops.hlist._
  */
 
 // This analysis function requires one input and adds one output type.
-class AnalysisFunction11[C, I, O](val fun: (C, List[I]) => Iterable[O]) {
+trait AnalysisFunction11[C, I, O] {
   def apply[In <: HList, Out <: HList](slab: Slab[C, In])(implicit sel: Selector[In, List[I]], adder: Adder.Aux[In, List[O], Out]): Slab[C, Out] = {
-    slab.add(fun(slab.content, slab.select(sel)).toList)
+    slab.add(apply(slab.content, slab.select(sel)).toList)
   }
+  def apply(content: C, input: List[I]): Iterable[O]
 }
 
 // Convert a function of the correct signature to an AnalysisFunction11.
 object AnalysisFunction11 {
-  def apply[C, I, O](fun: ((C, List[I]) => Iterable[O])): AnalysisFunction11[C, I, O] = new AnalysisFunction11[C, I, O](fun) 
+  def apply[C, I, O](fun: ((C, List[I]) => Iterable[O])): AnalysisFunction11[C, I, O] = new AnalysisFunction11[C, I, O] {
+    def apply(content: C, input: List[I]): Iterable[O] = fun(content, input)
+  }
 }
 
 // This analysis function takes N input types and adds one output
@@ -37,16 +40,20 @@ trait AnalysisFunctionN1[C, I <: HList, O] {
 // content itself.  No input types required, so functions extending
 // this trait can be used to construct a new slab directly from
 // content.
-class AnalysisFunction01[C, O](val fun: C => Iterable[O]) {
+trait AnalysisFunction01[C, O] {
   def apply[In <: HList, Out <: HList](slab: Slab[C, In])(implicit adder: Adder.Aux[In, List[O], Out]): Slab[C, Out] = {
-    slab.add(fun(slab.content).toList)(adder)
+    slab.add(apply(slab.content).toList)(adder)
   }
+  def apply(content: C): Iterable[O]
+
   def slabFrom(content: C): Slab[C, List[O] :: HNil] = {
-    Slab(content, fun(content).toList :: HNil)
+    Slab(content, apply(content).toList :: HNil)
   }
 }
 
 // Convert a function of the correct signature to an AnalysisFunction01.
 object AnalysisFunction01 {
-  def apply[C, O](fun: (C => Iterable[O])): AnalysisFunction01[C, O] = new AnalysisFunction01[C, O](fun)
+  def apply[C, O](fun: (C => Iterable[O])): AnalysisFunction01[C, O] = new AnalysisFunction01[C, O] {
+    def apply(content: C): Iterable[O] = fun(content)
+  }
 }

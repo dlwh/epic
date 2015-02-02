@@ -9,15 +9,20 @@ import scalaz.std.list._
   *  referential transparency.
   */
 
-object NoInitializer {
-  val i = () => true
+trait NoInitializer extends legacyannotators.Initialized[Boolean] {
+  override val initialize = () => true
 }
 
 /** Splits the input document into sentences.
   */
 
-class SentenceSegmenter[S <: Sentence](val segmenter: String => Iterable[S])
-    extends legacyannotators.SentenceSegmenter[S, Boolean](NoInitializer.i, {case (i: Boolean, c: String) => segmenter(c)})
+trait SentenceSegmenter[S <: Sentence] extends (String => Iterable[Sentence]) with AnalysisFunction01[String, S] {
+  def apply(sentence: String): Iterable[S]
+  def strings(document: String): Iterable[String] = {
+    val sentences = apply(document)
+    sentences.map(s => document.substring(s.begin, s.end))
+  }
+}
 
 /** Abstract trait for tokenizers, which annotate sentence-segmented
   *  text with tokens. Tokens are usually words, but e.g. 42 is also a
@@ -25,11 +30,15 @@ class SentenceSegmenter[S <: Sentence](val segmenter: String => Iterable[S])
   *  Sentence. Sentences are not guaranteed to be in order.
   */
 
-class Tokenizer[S <: Sentence, T <: Token: Offsetter](val tokenizer: String => Iterable[T])
-    extends legacyannotators.Tokenizer[S, T, Boolean](NoInitializer.i, {case (i: Boolean, sentence: String) => tokenizer(sentence)})
+abstract class Tokenizer[S <: Sentence, T <: Token: Offsetter] extends legacyannotators.Tokenizer[S, T, Boolean] with NoInitializer with (String => Iterable[T]) {
+  def apply(sentence: String): Iterable[T]
+  override def apply(initialized: Boolean, sentence: String): Iterable[T] = apply(sentence)
+}
 
 object Tokenizer {
-  def apply[S <: Sentence, T <: Token: Offsetter](tokenizer: (String => Iterable[T])): Tokenizer[S, T] = new Tokenizer[S, T](tokenizer)
+  def apply[S <: Sentence, T <: Token: Offsetter](tokenizer: (String => Iterable[T])): Tokenizer[S, T] = new Tokenizer[S, T] {
+    def apply(sentence: String): Iterable[T] = tokenizer(sentence)
+  }
 }
 
 object aliases {
@@ -71,9 +80,13 @@ object Tagger {
   * guaranteed to be in order.
   */
 
-class Segmenter[S <: Sentence, T <: Token, Tag](val segmenter: Vector[String] => Iterable[Tagged[Tag]])
-    extends legacyannotators.Segmenter[S, T, Tag, Boolean](NoInitializer.i, {case (i: Boolean, tokens: Vector[String]) => segmenter(tokens)})
+trait Segmenter[S <: Sentence, T <: Token, Tag] extends legacyannotators.Segmenter[S, T, Tag, Boolean] with NoInitializer {
+  override def apply(initialized: Boolean, sentence: Vector[String]): Iterable[Tagged[Tag]] = apply(sentence)
+  def apply(sentence: Vector[String]): Iterable[Tagged[Tag]]
+}
 
 object Segmenter {
-  def apply[S <: Sentence, T <: Token, Tag](seg: Vector[String] => Iterable[Tagged[Tag]]) = new Segmenter[S, T, Tag](seg)
+  def apply[S <: Sentence, T <: Token, Tag](seg: Vector[String] => Iterable[Tagged[Tag]]) = new Segmenter[S, T, Tag] {
+    def apply(sentence: Vector[String]) = seg(sentence)
+  }
 }
