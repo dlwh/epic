@@ -62,7 +62,7 @@ final epic.slab.ContentToken currentToken() {
 }
 final epic.slab.ContentToken currentToken(String value) {
 //  return new String(zzBuffer, zzStartRead, zzMarkedPos-zzStartRead);
-  return new epic.slab.ContentToken(epic.trees.Span.apply(yychar(), yychar() + value.length()), value);
+  return new epic.slab.ContentToken(epic.slab.Span.apply(yychar(), yychar() + value.length()), value);
 }
 
 
@@ -71,7 +71,7 @@ final epic.slab.ContentToken currentToken(String value) {
 %eofval{
   if(yychar() == acro_period) {
       acro_period = -2;
-  return new epic.slab.ContentToken(epic.trees.Span.apply(yychar(), yychar() + 1), ".");
+  return new epic.slab.ContentToken(epic.slab.Span.apply(yychar(), yychar() + 1), ".");
   } else {
     return null;
   }

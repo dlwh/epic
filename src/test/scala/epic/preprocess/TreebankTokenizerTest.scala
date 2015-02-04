@@ -3,7 +3,6 @@ package epic.preprocess
 import org.scalatest.FunSuite
 import epic.slab._
 import epic.trees.Span
-import epic.trees.SpanConvert._
 import scalaz.std.list._
 
 class TreebankTokenizerTest  extends FunSuite {

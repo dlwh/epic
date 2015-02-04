@@ -18,7 +18,6 @@ package epic.preprocess
 import epic.slab._
 import scala.runtime.ScalaRunTime
 import epic.trees.Span
-import epic.trees.SpanConvert._
 import epic.slab.annotators.Tokenizer
 
 /**

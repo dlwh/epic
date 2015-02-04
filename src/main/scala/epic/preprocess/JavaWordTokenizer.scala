@@ -20,7 +20,6 @@ import java.text._
 import java.util.Locale
 import epic.trees.Span
 import epic.slab._
-import epic.trees.SpanConvert._
 import epic.slab.annotators.Tokenizer
 
 

@@ -7,7 +7,6 @@ import java.net.URL
 import epic.slab._
 import epic.slab.typeclasses._
 import epic.trees.Span
-import epic.trees.SpanConvert._
 import shapeless._
 import ops.hlist._
 import scalaz.std.list._

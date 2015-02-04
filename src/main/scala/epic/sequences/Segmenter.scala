@@ -3,7 +3,6 @@ package epic.sequences
 import epic.slab._
 import epic.slab.annotators.{Segmenter => SlabSegmenter}
 import epic.trees.{Span, AnnotatedLabel}
-import epic.trees.SpanConvert._
 
 object Segmenter {
   def nerSystem(crf: SemiCRF[String, String]) = fromCRF(crf, (a: String) => EntityMention(a))

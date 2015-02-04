@@ -20,7 +20,6 @@ import breeze.optimize.L2Regularization
 import epic.features.CrossProductFeature
 import epic.framework.{Feature, ModelObjective, StandardExpectedCounts}
 import epic.trees.Span
-import epic.trees.SpanConvert._
 import nak.data.Example
 
 import scala.collection.mutable.ArrayBuffer

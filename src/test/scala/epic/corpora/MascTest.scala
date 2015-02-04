@@ -6,7 +6,6 @@ import org.junit.runner.RunWith
 import epic.slab._
 import epic.corpora
 import epic.trees.Span
-import epic.trees.SpanConvert._
 import scalaz.std.list._
 
 @RunWith(classOf[JUnitRunner])

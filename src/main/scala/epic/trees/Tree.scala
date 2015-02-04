@@ -24,15 +24,13 @@ import java.io.{StringReader, DataInput, DataOutput}
 import breeze.util.Lens
 import scala.annotation.tailrec
 import epic.preprocess.TreebankTokenizer
+import epic.slab.SpanAnnotation
 
 @SerialVersionUID(1L)
-trait Tree[+L] extends Serializable {
+trait Tree[+L] extends Serializable with SpanAnnotation {
   def label: L
   def children: IndexedSeq[Tree[L]]
   def span: Span
-
-  def begin = span.begin
-  def end = span.end
 
   def isLeaf = children.size == 0
   /**

@@ -8,7 +8,6 @@ import epic.slab._
 import epic.slab.annotators.Tokenizer
 import epic.corpora.MascSlab
 import epic.trees.Span
-import epic.trees.SpanConvert._
 import scalaz.std.list._
 
 import scala.collection.mutable.ArrayBuffer

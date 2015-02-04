@@ -3,7 +3,6 @@ package epic.preprocess
 import java.text.BreakIterator
 import java.util.Locale
 import epic.trees.Span
-import epic.trees.SpanConvert._
 import epic.slab._
 import epic.slab.annotators.SentenceSegmenter
 
