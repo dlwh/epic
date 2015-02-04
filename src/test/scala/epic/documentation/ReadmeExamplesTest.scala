@@ -13,9 +13,9 @@ class ReadmeExamplesTest extends FunSpec {
   val text = List("This is an example sentence. And this one is another.")
   val output = List(List(List("This", "is", "an", "example", "sentence", "."), List("And", "this", "one", "is", "another", ".")))
   it("should run the tokenizer example") {
-    val sentenceSplitter = epic.preprocess.MLSentenceSegmenter.bundled().get
+    val sentenceSegmenter = epic.preprocess.MLSentenceSegmenter.bundled().get
     val tokenizer = epic.preprocess.TreebankTokenizer
-    val slabs = text.map(sentenceSplitter.slabFrom(_)).map(tokenizer(_))
+    val slabs = text.map(Slab(_)).map(sentenceSegmenter(_)).map(tokenizer(_))
     val tokens = slabs.map(_.tokens)
     assert(tokens == output)
   }

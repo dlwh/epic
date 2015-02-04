@@ -57,10 +57,12 @@ To preprocess text so that the models can use them, you will need to
 segment out sentences and tokenize the sentences into individual
 words. Epic comes with classes to do both.
 
-Once you have a sentence, you can tokenize it using a
-`epic.preprocess.TreebankTokenizer`. The information is stored in a
-slab. To retrieve the tokens, use the method of the same name. All
-told, the pipeline looks like this:
+First, you encapsulate the documents into a Slab, which stores all
+annotation data. Then you can run a SentenceSegmenter on the Slab to
+create the Sentence annotations. Once you have a sentences, you can
+tokenize it using a `epic.preprocess.TreebankTokenizer`. To retrieve
+the tokens, use the method of the same name. All told, the pipeline
+looks like this:
 
 ```scala
 import epic.slab._
@@ -69,19 +71,17 @@ import epic.util.slabutils._
 
 val documents = getSomeDocuments();
 
-val sentenceSplitter = MLSentenceSegmenter.bundled().get
+val sentenceSegmenter = MLSentenceSegmenter.bundled().get
 val tokenizer = new epic.preprocess.TreebankTokenizer()
 
-val slabs = text.map(sentenceSplitter.slabFrom(_)).map(tokenizer(_))
+val slabs = text.map(Slab(_)).map(sentenceSegmenter(_)).map(tokenizer(_))
 val tokens = slabs.map(_.tokens)
 
-for(sentence <- sentences) {
+for(sentence <- tokens) {
   // use the sentence tokens
 }
 
 ```
-
-
 
 #### Parser
 
