@@ -133,21 +133,22 @@ class GeneralTrainer[T](val parallel: Boolean = false) {
   }
   
   def getMinibatchObjectiveAndGradient(exs: Seq[T], computer: LikelihoodAndGradientComputer[T], weights: Array[Double], gradientArray: Array[Double]) = {
-    if (parallel) {
+    var nanoTime = System.nanoTime();
+    val objective = if (parallel) {
       parallelGetMinibatchObjectiveAndGradient(exs, computer, weights, gradientArray)
     } else {
       serialGetMinibatchObjectiveAndGradient(exs, computer, weights, gradientArray)
     }
+    inferenceNanos += (System.nanoTime() - nanoTime);
+    objective
   }
   
-  def serialGetMinibatchObjectiveAndGradient(exs: Seq[T], computer: LikelihoodAndGradientComputer[T], weights: Array[Double], gradientArray: Array[Double]) = {
-    var nanoTime = System.nanoTime();
+  private def serialGetMinibatchObjectiveAndGradient(exs: Seq[T], computer: LikelihoodAndGradientComputer[T], weights: Array[Double], gradientArray: Array[Double]) = {
     var objective = 0.0
     for (ex <- exs) {
       // Don't need to rescale objective here since it's not used in the update
       objective += computer.accumulateGradientAndComputeObjective(ex, weights, gradientArray);
     }
-    inferenceNanos += (System.nanoTime() - nanoTime);
     objective
   }
   
@@ -171,7 +172,6 @@ class GeneralTrainer[T](val parallel: Boolean = false) {
   }
   
   def parallelGetMinibatchObjectiveAndGradient(exs: Seq[T], computer: LikelihoodAndGradientComputer[T], weights: Array[Double], gradientArray: Array[Double]) = {
-    var nanoTime = System.nanoTime();
     var objective = 0.0
     val emptySS = new SuffStats(0.0, Array.tabulate(gradientArray.size)(i => 0.0))
 //    val finalSS = exs.aggregate(null: SuffStats)((currSS, ex) => {
@@ -183,7 +183,6 @@ class GeneralTrainer[T](val parallel: Boolean = false) {
       ss
     }, { (a, b) => if (a eq null) b else if (b eq null) a else b += a })
     System.arraycopy(finalSS.gradient, 0, gradientArray, 0, gradientArray.size)
-    inferenceNanos += (System.nanoTime() - nanoTime);
     finalSS.ll
   }
 

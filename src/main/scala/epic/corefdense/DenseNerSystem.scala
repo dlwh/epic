@@ -11,11 +11,21 @@ import edu.berkeley.nlp.math.SloppyMath
 import epic.dense.AffineTransform
 import epic.dense.Word2VecIndexed
 import edu.berkeley.nlp.futile.util.Logger
+import edu.berkeley.nlp.entity.ConllDoc
+import edu.berkeley.nlp.entity.ner.NerPruner
+import breeze.util.Index
+
+case class NerExamplePruned(val ex: NerExample,
+                            val allowedStates: Array[Array[Boolean]]) {
+  def size = ex.words.size
+}
 
 case class NerExampleWithFeatures(val ex: NerExample,
                                   val featsPerState: Array[Array[Array[Int]]],
                                   val allowedStates: Array[Array[Boolean]]) {
   def size = ex.words.size
+  
+  def isStateAllowed(posn: Int, state: Int) = allowedStates(posn)(state)
 }
 
 case class HmmMarginals(emissionScores: Array[Array[Double]],
@@ -45,7 +55,8 @@ class DenseNerSystem(val labelIndexer: Indexer[String],
                      val word2vec: Word2VecIndexed[String],
                      val transform: AffineTransform[DenseVector[Double],DenseVector[Double]],
                      val featurizedTransitionMatrix: Array[Array[Array[Int]]],
-                     val featurizer: NerFeaturizer) extends LikelihoodAndGradientComputer[NerExampleWithFeatures] {
+                     val featurizer: NerFeaturizer,
+                     val useSparseFeatures: Boolean) extends LikelihoodAndGradientComputer[NerExampleWithFeatures] {
   val numStates = labelIndexer.size
   val reducedLabelSetSize = NerSystemLabeled.LabelSetReduced.size;
   
@@ -75,13 +86,13 @@ class DenseNerSystem(val labelIndexer: Indexer[String],
       // Sparse scores
       var j = 0
       while (j < numStates) {
-        if (ex.featsPerState(i)(j) == null) {
+        if (ex.featsPerState(i)(j) == null && ex.isStateAllowed(i, j)) {
           cachedEmissionScores(i)(j) = Double.NegativeInfinity
         } else {
           require(!denseScores(j).isNaN, denseScores.data.toSeq)
-          cachedEmissionScores(i)(j) = denseScores(j) + DeepUtils.dotProductOffset(ex.featsPerState(i)(j), weights, transform.index.size)
+          val sparseScore = if (useSparseFeatures) DeepUtils.dotProductOffset(ex.featsPerState(i)(j), weights, transform.index.size) else 0.0
+          cachedEmissionScores(i)(j) = denseScores(j) + sparseScore
         }
-        require(!cachedEmissionScores(i)(j).isNaN, denseScores(j) + " " + DeepUtils.dotProductOffset(ex.featsPerState(i)(j), weights, transform.index.size))
         j += 1
       }
     }
@@ -95,7 +106,8 @@ class DenseNerSystem(val labelIndexer: Indexer[String],
         if (transitionFeatures(i)(j) == null) {
           cachedTransitionScores(i)(j) = Double.NegativeInfinity;
         } else {
-          cachedTransitionScores(i)(j) = DeepUtils.dotProductOffset(transitionFeatures(i)(j), weights, transform.index.size)
+          val sparseScore = if (useSparseFeatures) DeepUtils.dotProductOffset(transitionFeatures(i)(j), weights, transform.index.size) else 0.0
+          cachedTransitionScores(i)(j) = sparseScore
         }
         require(!cachedTransitionScores(i)(j).isNaN)
       }
@@ -113,7 +125,9 @@ class DenseNerSystem(val labelIndexer: Indexer[String],
     for (i <- 0 until numTokens) {
       var j = 0
       while (j < numStates) {
-        if (i == 0) {
+        if (!ex.isStateAllowed(i, j)) {
+          cachedForwardLogProbs(i)(j) = Double.NegativeInfinity
+        } else if (i == 0) {
           cachedForwardLogProbs(i)(j) = cachedEmissionScores(i)(j)
         } else {
           var k = 0
@@ -130,7 +144,9 @@ class DenseNerSystem(val labelIndexer: Indexer[String],
     for (i <- (numTokens-1) to 0 by -1) {
       var j = 0
       while (j < numStates) {
-        if (i == numTokens - 1) {
+        if (!ex.isStateAllowed(i, j)) {
+          cachedBackwardLogProbs(i)(j) = Double.NegativeInfinity
+        } else if (i == numTokens - 1) {
           cachedBackwardLogProbs(i)(j) = 0;
         } else {
           var k = 0;
@@ -148,8 +164,12 @@ class DenseNerSystem(val labelIndexer: Indexer[String],
   }
   
   def getInitialWeights(initialWeightsScale: Double): Array[Double] = {
-    DenseVector.vertcat(transform.initialWeightVector(initialWeightsScale, rng, true, ""),
-                        DenseVector.zeros[Double](featurizer.featureIndexer.size)).data
+    val transformWeights = transform.initialWeightVector(initialWeightsScale, rng, true, "")
+    if (useSparseFeatures) {
+      DenseVector.vertcat(transformWeights, DenseVector.zeros[Double](featurizer.featureIndexer.size)).data
+    } else {
+      transformWeights.data
+    }
   }
   
   /**
@@ -159,7 +179,9 @@ class DenseNerSystem(val labelIndexer: Indexer[String],
   def accumulateGradientAndComputeObjective(ex: NerExampleWithFeatures, weights: Array[Double], gradient: Array[Double]): Double = {
     val hmmMarginals = computeForwardBackwardProbs(ex, weights, true)
     accumulateDenseFeatureGradient(ex, weights, gradient, hmmMarginals)
-    accumulateSparseFeatureGradient(ex, gradient, hmmMarginals)
+    if (useSparseFeatures) {
+      accumulateSparseFeatureGradient(ex, gradient, hmmMarginals)
+    }
     // Return the log likelihood
     hmmMarginals.computeLogLikelihood(ex.ex.goldLabels.map(labelIndexer.getIndex(_)))
   }
@@ -184,44 +206,33 @@ class DenseNerSystem(val labelIndexer: Indexer[String],
     // Update emission features
     for (i <- 0 until numTokens) {
       for (j <- 0 until numStates) {
-        val thisFeatureVector = ex.featsPerState(i)(j);
-        if (thisFeatureVector != null) {
-          val logProb = hmmMarginals.forwardLogProbs(i)(j) + hmmMarginals.backwardLogProbs(i)(j) - logNormalizer;
-          val prob = Math.exp(logProb);
-          require(!prob.isNaN)
-          DeepUtils.addToGradient(thisFeatureVector, (if (j == goldLabels(i)) 1 else 0) - prob, gradient, transform.index.size)
-//          var weightIdx = 0
-//          while (weightIdx < thisFeatureVector.size) {
-//            if (j == goldLabels(i)) {
-//              gradient(thisFeatureVector(weightIdx + transform.index.size)) += 1;
-//            }
-////            gradient[thisFeatureVector[weightIdx)) -= prob;
-//            weightIdx += 1
-//          }
+        if (ex.isStateAllowed(i, j)) {
+          val thisFeatureVector = ex.featsPerState(i)(j);
+          if (thisFeatureVector != null) {
+            val logProb = hmmMarginals.forwardLogProbs(i)(j) + hmmMarginals.backwardLogProbs(i)(j) - logNormalizer;
+            val prob = Math.exp(logProb);
+            require(!prob.isNaN)
+            DeepUtils.addToGradient(thisFeatureVector, (if (j == goldLabels(i)) 1 else 0) - prob, gradient, transform.index.size)
+          }
         }
       }
     }
     // Update transition features
     for (i <- 0 until numTokens - 1) {
       for (j <- 0 until numStates) {
-        val beforeScore = hmmMarginals.forwardLogProbs(i)(j);
-        for (k <- 0 until numStates) {
-          val thisFeatureVector = transitionFeatures(j)(k);
-          if (thisFeatureVector != null) {
-            val afterScore = hmmMarginals.backwardLogProbs(i+1)(k);
-            val logProb = beforeScore + hmmMarginals.transitionScores(j)(k) + hmmMarginals.emissionScores(i+1)(k) + afterScore - logNormalizer;
-            val prob = Math.exp(logProb);
-            require(!prob.isNaN)
-            DeepUtils.addToGradient(thisFeatureVector, (if (j == goldLabels(i) && k == goldLabels(i+1)) 1 else 0) - prob, gradient, transform.index.size)
-//            while (weightIdx < thisFeatureVector.size) {
-//              var weightIdx = 0
-//              // TODO: Write gradient appropriately
-////              if (j == goldLabels[i] && k == goldLabels[i+1]) {
-////                gradient[thisFeatureVector[weightIdx]] += 1;
-////              }
-////              gradient[thisFeatureVector[weightIdx]] -= prob;
-//              weightIdx += 1
-//            }
+        if (ex.isStateAllowed(i, j)) {
+          val beforeScore = hmmMarginals.forwardLogProbs(i)(j);
+          for (k <- 0 until numStates) {
+            if (ex.isStateAllowed(i+1, k)) {
+              val thisFeatureVector = transitionFeatures(j)(k);
+              if (thisFeatureVector != null) {
+                val afterScore = hmmMarginals.backwardLogProbs(i+1)(k);
+                val logProb = beforeScore + hmmMarginals.transitionScores(j)(k) + hmmMarginals.emissionScores(i+1)(k) + afterScore - logNormalizer;
+                val prob = Math.exp(logProb);
+                require(!prob.isNaN)
+                DeepUtils.addToGradient(thisFeatureVector, (if (j == goldLabels(i) && k == goldLabels(i+1)) 1 else 0) - prob, gradient, transform.index.size)
+              }
+            }
           }
         }
       }
@@ -229,6 +240,10 @@ class DenseNerSystem(val labelIndexer: Indexer[String],
   }
   
   def computeObjective(ex: NerExampleWithFeatures, weights: Array[Double]): Double = accumulateGradientAndComputeObjective(ex, weights, Array.tabulate(weights.size)(i => 0.0))
+  
+  def decode(ex: NerExample, weights: Array[Double]): Array[String] = {
+    decode(new NerExampleWithFeatures(ex, featurizer.featurize(ex, false), Array.tabulate(ex.words.size, labelIndexer.size)((j, k) => true)), weights)
+  }
   
   def decode(ex: NerExampleWithFeatures, weights: Array[Double]): Array[String] = {
     val hmmMarginals = computeForwardBackwardProbs(ex, weights, false)
@@ -260,6 +275,18 @@ class DenseNerSystem(val labelIndexer: Indexer[String],
   }
 }
 
+case class DenseNerExampleLoader(val pruner: Option[NerPruner],
+                                 val labelIndexer: Indexer[String]) {
+  
+  def extractNerExsFromConll(docs: Seq[ConllDoc]) = {
+    if (pruner.isDefined) {
+      DenseNerSystem.extractNerChunksFromConllAndPrune(docs, labelIndexer, pruner.get)
+    } else {
+      NerSystemLabeled.extractNerChunksFromConll(docs).map(ex => new NerExamplePruned(ex, Array.tabulate(ex.words.size, labelIndexer.size)((j, k) => true)));
+    }
+  }
+}
+
 object DenseNerSystem {
   
   private def accessWord(words: Seq[String], idx: Int) = {
@@ -268,5 +295,19 @@ object DenseNerSystem {
   
   def extractRelevantWords(words: Seq[String], posn: Int) = {
     Array(accessWord(words, posn - 2), accessWord(words, posn - 1), accessWord(words, posn), accessWord(words, posn + 1), accessWord(words, posn + 2))
+  }
+  
+  def extractNerChunksFromConllAndPrune(conllDocs: Seq[ConllDoc],
+                                        labelIndexer: Indexer[String],
+                                        nerPruner: NerPruner): Seq[NerExamplePruned] = {
+    conllDocs.flatMap(conllDoc => {
+      for (sentIdx <- 0 until conllDoc.numSents) yield {
+        val sentLen = conllDoc.words(sentIdx).size
+        val labels = NerSystemLabeled.convertToBIO(conllDoc.nerChunks(sentIdx), sentLen)
+        val pruningMask = nerPruner.pruneSentence(conllDoc, sentIdx)
+        val pruningBoolean = Array.tabulate(sentLen, labelIndexer.size)((i, j) => pruningMask(i).contains(labelIndexer.getObject(j)))
+        new NerExamplePruned(new NerExample(conllDoc.words(sentIdx), conllDoc.pos(sentIdx), labels), pruningBoolean)
+      }
+    })
   }
 }

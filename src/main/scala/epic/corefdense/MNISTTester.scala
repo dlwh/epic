@@ -5,38 +5,52 @@ import edu.berkeley.nlp.futile.fig.basic.Indexer
 import edu.berkeley.nlp.futile.util.Logger
 import breeze.linalg.DenseVector
 import scala.util.Random
+import epic.dense.IdentityTransform
+import epic.dense.LowRankQuadraticTransform
 
 object MNISTTester {
   
-  def readMNIST(labelsFile: String, dataFile: String, maxToRead: Int = -1): Array[NNExample[Byte]] = {
+  def readMNIST(labelsFile: String, dataFile: String, maxToRead: Int = -1, normalize: Boolean = false): Array[NNExample[Byte]] = {
     val mnistReader = new MNISTReader()
     val exs = mnistReader.readMNIST(labelsFile, dataFile, maxToRead)
-    exs.asScala.map(pair => new NNExampleImpl(pair.getFirst.map(value => value.toDouble), pair.getSecond.byteValue)).toArray 
+    exs.asScala.map(pair => new NNExampleImpl(pair.getFirst.map(value => if (normalize) value.toDouble/255.0 else value.toDouble), pair.getSecond.byteValue)).toArray 
   }
   
   def main(args: Array[String]) {
      
     val trainSize = 1000
     val testSize = 1000
-    val trainSamples: Array[NNExample[Byte]] = readMNIST("data/mnist/train-labels-idx1-ubyte", "data/mnist/train-images-idx3-ubyte", trainSize)
-    val testSamples = readMNIST("data/mnist/t10k-labels-idx1-ubyte", "data/mnist/t10k-images-idx3-ubyte", testSize)
+//    val trainSamples= readMNIST("data/mnist/train-labels-idx1-ubyte", "data/mnist/train-images-idx3-ubyte", trainSize)
+//    val testSamples = readMNIST("data/mnist/t10k-labels-idx1-ubyte", "data/mnist/t10k-images-idx3-ubyte", testSize)
+    val trainSamples= readMNIST("data/mnist/train-labels-idx1-ubyte", "data/mnist/train-images-idx3-ubyte", trainSize, true)
+    val testSamples = readMNIST("data/mnist/t10k-labels-idx1-ubyte", "data/mnist/t10k-images-idx3-ubyte", testSize, true)
     
     val vacuousIndexer = new Indexer[Byte];
     (0 to 9).map(idx => vacuousIndexer.add(idx.toByte))
+    
+    val inputSize = trainSamples.head.input.size
+    val outputSize = vacuousIndexer.size
+    Logger.logss(inputSize + " inputs, " + outputSize + " outputs")
     
 //    val hiddenSize = 100
     val hiddenSize = 200
 //    val hiddenSize = 500
     
-//    val transform = SimpleNNEpic.makeDeepTransform(trainSamples.head.input.size, hiddenSize, 2, vacuousIndexer.size, "tanh")
-    val transform = SimpleNNEpic.makeDeepTransform(trainSamples.head.input.size, hiddenSize, 2, vacuousIndexer.size, "relu")
-//    val transform = SimpleNNEpic.makeDeepTransform(trainSamples.head.input.size, hiddenSize, 2, vacuousIndexer.size, "cube")
-//    val transform = SimpleNNEpic.makeDeepTransform(trainSamples.head.input.size, hiddenSize, 1, vacuousIndexer.size, "tanh")
-//    val transform = SimpleNNEpic.makeDeepTransform(trainSamples.head.input.size, hiddenSize, 1, vacuousIndexer.size, "relu")
+//    val transform = SimpleNNEpic.makeDeepTransform(inputSize, hiddenSize, 2, outputSize, "tanh")
+//    val transform = SimpleNNEpic.makeDeepTransform(inputSize, hiddenSize, 2, outputSize, "relu")
+//    val transform = SimpleNNEpic.makeDeepTransform(inputSize, hiddenSize, 2, outputSize, "cube")
+    val transform = SimpleNNEpic.makeDeepTransform(inputSize, hiddenSize, 1, outputSize, "tanh")
+//    val transform = SimpleNNEpic.makeDeepTransform(inputSize, hiddenSize, 1, outputSize, "relu")
+//    val transform = SimpleNNEpic.makeDeepTransform(inputSize, hiddenSize, 1, outputSize, "cube")
+    
+    // N.B. MAKE SURE TO NORMALIZE TO [0, 1] RATHER THAN [0, 255] FOR THIS!
+//    val transform = new LowRankQuadraticTransform(outputSize, 10, inputSize, inputSize, new IdentityTransform[DenseVector[Double]]())
+    
     val nn: SimpleNNEpic[Byte] = new SimpleNNEpic(transform, vacuousIndexer)
 //    val initialWeights = nn.getInitialWeights(1.0);
-    val initialWeights = nn.getInitialWeights(0.1);
-//    val initialWeights = nn.getInitialWeights(0.01);
+//    val initialWeights = nn.getInitialWeights(0.1);
+    val initialWeights = nn.getInitialWeights(0.01);
+//    val initialWeights = nn.getInitialWeights(1e-8);
     Logger.logss(initialWeights.slice(initialWeights.size - 1000, initialWeights.size).toSeq)
     Logger.logss(trainSamples(0))
     
@@ -66,7 +80,10 @@ object MNISTTester {
 //    val eta = 0.01
     val batchSize = 100
 //    val batchSize = 1000
-    val iters = 100;
+    
+//    val iters = 100;
+    val iters = 50;
+    
     val weights = new GeneralTrainer().trainAdadelta(trainSamples, nn, 0.95, batchSize, iters, initialWeights, weightPostprocessor = weightProjector, verbose = false);
 //    val weights = new GeneralTrainer().trainAdagrad(trainSamples, nn, eta, 0.0000001, batchSize, iters, initialWeights, weightPostprocessor = weightProjector, verbose = false);
 //    val weights = new GeneralTrainer().trainLBFGS(trainSamples, nn, 0.0000001, 0.001, iters, initialWeights, verbose = false);

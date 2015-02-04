@@ -73,24 +73,6 @@ class PositionalTransformModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSe
   }
   
   def initialWeightVector(randomize: Boolean, initWeightsScale: Double): DenseVector[Double] = {
-//    val transformIndex = if (maybeSparseSurfaceFeaturizer.isDefined) {
-//      index.asInstanceOf[SegmentedIndex[Feature,Index[Feature]]].indices(0)
-//    } else {
-//      index
-//    }
-//    val subIndices = transformIndex.asInstanceOf[SegmentedIndex[Feature,Index[Feature]]].indices
-//    val startOfInnerLayers = subIndices(0).size;
-//    val endOfInnerLayers = startOfInnerLayers + subIndices(1).size;
-//    println("Setting higher initial values for weights from " + startOfInnerLayers + " to " + endOfInnerLayers)
-//    val rng = new Random(0)
-//    val oldInitVector = new DenseVector[Double](Array.tabulate(index.size)(i => {
-//      if (i >= startOfInnerLayers && i < endOfInnerLayers) {
-////        initWeightsScale * (if (randomizeGaussian) rng.nextGaussian else rng.nextDouble)
-//        initWeightsScale * rng.nextGaussian
-//      } else {
-//        0.0
-//      }
-//    }));
     val rng = new Random(0)
 //    val initTransformWeights = transform.initialWeightVector(initWeightsScale, rng, true);
     val initTransformWeights = DenseVector.vertcat(transforms.map(_.initialWeightVector(initWeightsScale, rng, true, "")):_*);
@@ -131,9 +113,9 @@ class PositionalTransformModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSe
 object PositionalTransformModel {
 
   case class Inference[L, L2, W](annotator: (BinarizedTree[L], IndexedSeq[W]) => BinarizedTree[IndexedSeq[L2]],
-                                                                                constrainer: ChartConstraints.Factory[L, W],
-                                                                                grammar: PositionalTransformGrammar[L, L2, W],
-                                                                                refinements: GrammarRefinements[L, L2]) extends ParserInference[L, W]  {
+                                 constrainer: ChartConstraints.Factory[L, W],
+                                 grammar: PositionalTransformGrammar[L, L2, W],
+                                 refinements: GrammarRefinements[L, L2]) extends ParserInference[L, W]  {
     override def goldMarginal(scorer: Scorer, ti: TreeInstance[L, W], aug: UnrefinedGrammarAnchoring[L, W]): Marginal = {
 
       import ti._

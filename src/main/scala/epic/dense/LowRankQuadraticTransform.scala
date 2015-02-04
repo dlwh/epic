@@ -4,6 +4,7 @@ import breeze.linalg._
 import breeze.linalg.operators.OpMulMatrix
 import epic.features.SegmentedIndex
 import epic.framework.Feature
+import breeze.util.Index
 
 import scala.runtime.ScalaRunTime
 import scala.util.Random
@@ -28,7 +29,7 @@ case class LowRankQuadraticTransform[FV](numOutputs: Int, numRanks: Int, numLeft
     innerTransform.clipHiddenWeightVectors(weights(index.componentOffset(1) to -1), norm, outputLayer);
   }
 
-  case class Layer(sublayers: Seq[LowRankQuadraticTransformNeuron#Layer], innerLayer: innerTransform.Layer) extends Transform.Layer[FV,DenseVector[Double]] {
+  case class Layer(sublayers: Seq[LRQTNLayer], innerLayer: innerTransform.Layer) extends Transform.Layer[FV,DenseVector[Double]] {
     
     override val index = LowRankQuadraticTransform.this.index
     val neuronIndex = LowRankQuadraticTransform.this.neuronIndex
@@ -49,14 +50,19 @@ case class LowRankQuadraticTransform[FV](numOutputs: Int, numRanks: Int, numLeft
  
 }
 
-case class LowRankQuadraticTransformNeuron(numRanks: Int, numLeftInputs: Int, numRightInputs: Int) extends Transform[DenseVector[Double], DenseVector[Double]] {
+/**
+ * Separate because I was having some issues...
+ */
+case class LowRankQuadraticTransformNeuron(numRanks: Int, numLeftInputs: Int, numRightInputs: Int) {
 
-  val index = SegmentedIndex(new AffineTransform.Index(numRanks, numLeftInputs), new AffineTransform.Index(numRanks, numRightInputs))
+  val index = SegmentedIndex(new AffineTransform.Index(numRanks, numLeftInputs, false), new AffineTransform.Index(numRanks, numRightInputs, false))
 
   def extractLayer(weights: DenseVector[Double]) = {
-    val lhsMat = weights(0 until numRanks * numLeftInputs).asDenseMatrix.reshape(numRanks, numLeftInputs, view = View.Require)
-    val rhsMat = weights(0 until numRanks * numRightInputs).asDenseMatrix.reshape(numRanks, numRightInputs, view = View.Require)
-    new Layer(lhsMat, rhsMat)
+    val lhsSize = numRanks * numLeftInputs
+    val rhsSize = numRanks * numRightInputs
+    val lhsMat = weights(0 until lhsSize).asDenseMatrix.reshape(numRanks, numLeftInputs, view = View.Require)
+    val rhsMat = weights(lhsSize until (lhsSize + rhsSize)).asDenseMatrix.reshape(numRanks, numRightInputs, view = View.Require)
+    new LRQTNLayer(lhsMat, rhsMat, index, numRanks, numLeftInputs, numRightInputs)
   }
   
   def initialWeightVector(initWeightsScale: Double, rng: Random, outputLayer: Boolean, spec: String) = {
@@ -71,42 +77,85 @@ case class LowRankQuadraticTransformNeuron(numRanks: Int, numLeftInputs: Int, nu
   
   def clipHiddenWeightVectors(weights: DenseVector[Double], norm: Double, outputLayer: Boolean) {
   }
+  
+//  case class Layer(lhsWeights: DenseMatrix[Double], rhsWeights: DenseMatrix[Double]) extends Transform.Layer[Den
+//    override val index = LowRankQuadraticTransformNeuron.this.index
+//
+//    val lhsWeightst = lhsWeights.t
+//    val rhsWeightst = rhsWeights.t
+//
+//    def activations(fv: DenseVector[Double]) = {
+//      val lhsProj = lhsWeights * fv
+//      val rhsProj = rhsWeights * fv
+//      DenseVector(Array(lhsProj.dot(rhsProj)))
+//    }
+//
+//    def tallyDerivative(deriv: DenseVector[Double], _scale: =>Vector[Double], fv: DenseVector[Double]) = {
+////      println("SCALE: " + _scale)
+//      val scale = _scale(0)
+//      val lhsSize = numRanks * numLeftInputs
+//      val rhsSize = numRanks * numRightInputs
+//      val lhsDeriv = deriv(0 until lhsSize).asDenseMatrix.reshape(numRanks, numLeftInputs, view = View.Require)
+//      val rhsDeriv = deriv(lhsSize until rhsSize).asDenseMatrix.reshape(numRanks, numRightInputs, view = View.Require)
+//      
+//      val innerActs = fv
+//      val lhsProj = lhsWeights * innerActs
+//      val rhsProj = rhsWeights * innerActs
+//      
+//      for (r <- 0 until lhsWeights.rows) {
+//        for (i <- 0 until lhsWeights.cols) {
+//          lhsDeriv(r)(i) += innerActs(i) * rhsProj(r)
+//        }
+//        for (i <- 0 until rhsWeights.cols) {
+//          rhsDeriv(r)(i) += innerActs(i) * lhsProj(r)
+//        }
+//      }
+//      require(deriv.size == lhsSize + rhsSize, "Backpropagating through LowRankQuadraticTransform is not currently supported")
+//    }
+//  }
 
-  case class Layer(lhsWeights: DenseMatrix[Double], rhsWeights: DenseMatrix[Double]) extends Transform.Layer[DenseVector[Double],DenseVector[Double]] {
-    override val index = LowRankQuadraticTransformNeuron.this.index
+}
 
-    val lhsWeightst = lhsWeights.t
-    val rhsWeightst = rhsWeights.t
 
-    def activations(fv: DenseVector[Double]) = {
-      val lhsProj = lhsWeights * fv
-      val rhsProj = rhsWeights * fv
-      DenseVector(Array(lhsProj.dot(rhsProj)))
-    }
+case class LRQTNLayer(lhsWeights: DenseMatrix[Double], rhsWeights: DenseMatrix[Double], index: Index[Feature], numRanks: Int, numLeftInputs: Int, numRightInputs: Int) {
+  val lhsWeightst = lhsWeights.t
+  val rhsWeightst = rhsWeights.t
 
-    def tallyDerivative(deriv: DenseVector[Double], _scale: =>Vector[Double], fv: DenseVector[Double]) = {
+  def activations(fv: DenseVector[Double]) = {
+    val lhsProj = lhsWeights * fv
+    val rhsProj = rhsWeights * fv
+    val dotProd = lhsProj.dot(rhsProj)
+//    println(dotProd + "            " + lhsProj.data.toSeq + "         " + rhsProj.data.toSeq)
+    DenseVector(Array(dotProd))
+  }
+
+  def tallyDerivative(deriv: DenseVector[Double], _scale: =>Vector[Double], fv: DenseVector[Double]) = {
 //      println("SCALE: " + _scale)
-      require(_scale.size == 0)
-      val scale = _scale(0)
+    val scale = _scale(0)
+    if (Math.abs(scale) > 1e-6) {
       val lhsSize = numRanks * numLeftInputs
       val rhsSize = numRanks * numRightInputs
+//      println(deriv.size + " " + lhsSize + " " + numRanks + " " + numLeftInputs + " " + rhsSize)
       val lhsDeriv = deriv(0 until lhsSize).asDenseMatrix.reshape(numRanks, numLeftInputs, view = View.Require)
-      val rhsDeriv = deriv(lhsSize until rhsSize).asDenseMatrix.reshape(numRanks, numRightInputs, view = View.Require)
-      
+      val rhsDeriv = deriv(lhsSize until lhsSize + rhsSize).asDenseMatrix.reshape(numRanks, numRightInputs, view = View.Require)
+
       val innerActs = fv
       val lhsProj = lhsWeights * innerActs
       val rhsProj = rhsWeights * innerActs
-      
+
       for (r <- 0 until lhsWeights.rows) {
+//        lhsDeriv += rhsProj * innerActs.t * scale
+//      lhsDeriv(r) += innerActs * scale * rhsProj(r)
         for (i <- 0 until lhsWeights.cols) {
-          lhsDeriv(r)(i) += innerActs(i) * rhsProj(r)
+          lhsDeriv(r, i) += scale * innerActs(i) * rhsProj(r)
         }
         for (i <- 0 until rhsWeights.cols) {
-          rhsDeriv(r)(i) += innerActs(i) * lhsProj(r)
+          rhsDeriv(r, i) += scale * innerActs(i) * lhsProj(r)
         }
       }
       require(deriv.size == lhsSize + rhsSize, "Backpropagating through LowRankQuadraticTransform is not currently supported")
     }
   }
-
 }
+
+//}

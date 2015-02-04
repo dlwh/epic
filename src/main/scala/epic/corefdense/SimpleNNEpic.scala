@@ -60,6 +60,7 @@ class SimpleNNEpic[T](val transform: Transform[DenseVector[Double],DenseVector[D
   def accumulateGradientAndComputeObjective(ex: NNExample[T], weights: Array[Double], gradient: Array[Double]): Double = {
     val layer = transform.extractLayer(DenseVector(weights))
     val logProbs = layer.activations(DenseVector(ex.input)).data
+//    println(logProbs.toSeq)
     CorefNNEpic.softmaxi(logProbs)
     val trueLabelIdx = labelIndexer.getIndex(ex.getLabel)
     val tallyInputs = Array.tabulate(labelIndexer.size)(i => (if (i == trueLabelIdx) 1.0 else 0.0) - Math.exp(logProbs(i)))

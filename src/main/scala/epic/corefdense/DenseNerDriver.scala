@@ -12,6 +12,8 @@ import epic.dense.AffineTransform
 import epic.dense.IdentityTransform
 import epic.dense.TanhTransform
 import epic.dense.Word2VecIndexed
+import edu.berkeley.nlp.entity.ner.NerPruner
+import edu.berkeley.nlp.entity.ner.NerPrunerFromModel
 
 object DenseNerDriver {
 
@@ -26,6 +28,7 @@ object DenseNerDriver {
   
   val parallel = true
   
+  val useSparseFeatures = false;
   val featureSetSpec = ""
   
   val word2vecPath = ""
@@ -40,6 +43,10 @@ object DenseNerDriver {
   
   val checkEmpiricalGradient = false
   
+  val pruningModelPath = "models/ner.ser.gz"
+//  val pruningModelPath = ""
+  val pruningThreshold = -5;
+  
   def main(args: Array[String]) {
     LightRunner.initializeOutput(DenseNerDriver.getClass())
     LightRunner.populateScala(DenseNerDriver.getClass(), args)
@@ -52,9 +59,19 @@ object DenseNerDriver {
     
     // Instantiate and featurize training data
     val trainDocs = NerSystemLabeled.loadDocs(trainPath, trainSize, true)
-    Logger.logss("Extracting training examples");
-    val trainExamples = NerSystemLabeled.extractNerChunksFromConll(trainDocs);
-    val nerFeaturizer = NerFeaturizer(featureSetSpec.split(":").toSet, featureIndexer, labelIndexer, trainExamples.map(_.words), maybeWikipediaDB, maybeBrownClusters, 1, 10, 2);
+    Logger.logss("Loading pruner from " + pruningModelPath + " (not loading if path is empty)");
+    val exampleLoader = new DenseNerExampleLoader(if (pruningModelPath == "") None else Option(new NerPrunerFromModel(GUtil.load(pruningModelPath).asInstanceOf[NerSystemLabeled], -5)), labelIndexer)
+    Logger.startTrack("Extracting training examples");
+    val trainExamples = exampleLoader.extractNerExsFromConll(trainDocs)
+    Logger.endTrack();
+//    val trainExamples = if (false) {
+//      // TODO: Load pruner and prune
+//      val pruner = new NerPrunerFromModel(GUtil.load(pruningModelPath).asInstanceOf[NerSystemLabeled], -5)
+//      DenseNerSystem.extractNerChunksFromConllAndPrune(trainDocs, labelIndexer, pruner)
+//    } else {
+//      NerSystemLabeled.extractNerChunksFromConll(trainDocs).map(ex => new NerExamplePruned(ex, Array.tabulate(ex.words.size, labelIndexer.size)((j, k) => true)));
+//    }
+    val nerFeaturizer = NerFeaturizer(featureSetSpec.split(":").toSet, featureIndexer, labelIndexer, trainExamples.map(_.ex.words), maybeWikipediaDB, maybeBrownClusters, 1, 10, 2);
     // Featurize transitions and then examples
     val featurizedTransitionMatrix = Array.tabulate(labelIndexer.size, labelIndexer.size)((prev, curr) => {
       nerFeaturizer.featurizeTransition(labelIndexer.getObject(prev), labelIndexer.getObject(curr), true);
@@ -65,7 +82,7 @@ object DenseNerDriver {
         Logger.logss("Featurizing train example " + i);
       }
       val ex = trainExamples(i);
-      new NerExampleWithFeatures(ex, nerFeaturizer.featurize(ex, true), Array.tabulate(ex.words.size, labelIndexer.size)((j, k) => true));
+      new NerExampleWithFeatures(ex.ex, nerFeaturizer.featurize(ex.ex, true), ex.allowedStates);
     };
     Logger.endTrack();
     Logger.logss(featureIndexer.size + " features");
@@ -83,7 +100,7 @@ object DenseNerDriver {
     } else {
       new AffineTransform(labelIndexer.size, vecSize, new IdentityTransform[DenseVector[Double]]())
     }
-    val denseNerSystem = new DenseNerSystem(labelIndexer, word2vecIndexed, transform, featurizedTransitionMatrix, nerFeaturizer)
+    val denseNerSystem = new DenseNerSystem(labelIndexer, word2vecIndexed, transform, featurizedTransitionMatrix, nerFeaturizer, useSparseFeatures)
     
     // Train
     val initialWeights = denseNerSystem.getInitialWeights(initWeightsScale);
@@ -102,8 +119,9 @@ object DenseNerDriver {
     
     // Extract test examples and run the model
     val testDocs = NerSystemLabeled.loadDocs(testPath, testSize, true)
-    val testExamples = NerSystemLabeled.extractNerChunksFromConll(testDocs);
-    val testSequenceExs = testExamples.map(ex => new NerExampleWithFeatures(ex, nerFeaturizer.featurize(ex, false), Array.tabulate(ex.words.size, labelIndexer.size)((j, k) => true)));
+//    val testExamples = NerSystemLabeled.extractNerChunksFromConll(testDocs);
+    val testExamples = exampleLoader.extractNerExsFromConll(testDocs);
+    val testSequenceExs = testExamples.map(ex => new NerExampleWithFeatures(ex.ex, nerFeaturizer.featurize(ex.ex, false), ex.allowedStates));
     val testGoldChunks = testSequenceExs.map(ex => NerSystemLabeled.convertToLabeledChunks(ex.ex.goldLabels));
     Logger.startTrack("Decoding dev");
     val testPredChunks = testSequenceExs.map(ex => NerSystemLabeled.convertToLabeledChunks(denseNerSystem.decode(ex, weights)))
