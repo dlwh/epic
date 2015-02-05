@@ -29,6 +29,7 @@ import epic.dense.FrequencyTagger
 import epic.dense.CachingLookupTransform
 import epic.dense.CachingLookupAndAffineTransformDense
 import epic.dense.EmbeddingsTransform
+import epic.dense.NonlinearTransform
 
 /**
  * TODO
@@ -232,27 +233,29 @@ object PositionalNeuralModelFactory {
       } else {
         new CachingLookupAndAffineTransformDense(numHidden, word2vecIndexed.vectorSize, word2vecIndexed)
       }
-      var currLayer: Transform[Array[Int],DenseVector[Double]] = addNonlinearLayer(baseTransformLayer, nonLinType)
+      var currLayer: Transform[Array[Int],DenseVector[Double]] = new NonlinearTransform(nonLinType, baseTransformLayer)
       for (i <- 1 until numHiddenLayers) {
         val tmpLayer = new AffineTransform(numHidden, numHidden, currLayer)
-        currLayer = addNonlinearLayer(tmpLayer, nonLinType)
+        currLayer = new NonlinearTransform(nonLinType, tmpLayer)
       }
       var transform = new AffineTransformDense(outputSize, numHidden, currLayer)
       transform
     }
   }
-  
-  def addNonlinearLayer(currNet: Transform[Array[Int],DenseVector[Double]], nonLinType: String) = {
-    if (nonLinType == "relu") {
-      new ReluTransform(currNet)
-    } else if (nonLinType == "cube") {
-      new CubeTransform(currNet)
-    } else if (nonLinType == "tanh") {
-      new TanhTransform(currNet)
-    } else {
-      throw new RuntimeException("Unknown nonlinearity type: " + nonLinType)
-    }
-  }
+//  
+//  def addNonlinearLayer(currNet: Transform[Array[Int],DenseVector[Double]], nonLinType: String) = {
+//    if (nonLinType == "relu") {
+//      new NonlinearTransform(nonLinType, currNet)
+////      new ReluTransform(currNet)
+//    } else if (nonLinType == "cube") {
+////      new CubeTransform(currNet)
+//    } else if (nonLinType == "tanh") {
+//      new NonlinearTransform(nonLinType, currNet)
+////      new TanhTransform(currNet)
+//    } else {
+//      throw new RuntimeException("Unknown nonlinearity type: " + nonLinType)
+//    }
+//  }
 }
 
 case class LeftChildFeature(f: Feature) extends Feature;

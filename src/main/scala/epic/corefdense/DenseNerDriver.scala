@@ -9,8 +9,9 @@ import edu.berkeley.nlp.futile.LightRunner
 import edu.berkeley.nlp.futile.fig.basic.Indexer
 import edu.berkeley.nlp.futile.util.Logger
 import epic.dense.AffineTransform
+import epic.dense.AffineTransformDense
 import epic.dense.IdentityTransform
-import epic.dense.TanhTransform
+import epic.dense.NonlinearTransform
 import epic.dense.Word2VecIndexed
 import edu.berkeley.nlp.entity.ner.NerPruner
 import edu.berkeley.nlp.entity.ner.NerPrunerFromModel
@@ -35,6 +36,7 @@ object DenseNerDriver {
   val brownPath = ""
   
   val nonLinear = true;
+  val nonLinType = "relu"
   
   val trainPath = "";
   val trainSize = -1;
@@ -96,9 +98,9 @@ object DenseNerDriver {
     
     // Build the net and system
     val transform = if (nonLinear) {
-      new AffineTransform(labelIndexer.size, hiddenSize, new TanhTransform(new AffineTransform(hiddenSize, vecSize, new IdentityTransform[DenseVector[Double]]())))
+      new AffineTransformDense(labelIndexer.size, hiddenSize, new NonlinearTransform(nonLinType, new AffineTransform(hiddenSize, vecSize, new IdentityTransform[DenseVector[Double]]())))
     } else {
-      new AffineTransform(labelIndexer.size, vecSize, new IdentityTransform[DenseVector[Double]]())
+      new AffineTransformDense(labelIndexer.size, vecSize, new IdentityTransform[DenseVector[Double]]())
     }
     val denseNerSystem = new DenseNerSystem(labelIndexer, word2vecIndexed, transform, featurizedTransitionMatrix, nerFeaturizer, useSparseFeatures)
     

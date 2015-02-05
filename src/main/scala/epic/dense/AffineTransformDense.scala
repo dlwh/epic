@@ -59,6 +59,10 @@ case class AffineTransformDense[FV](numOutputs: Int, numInputs: Int, innerTransf
       out
     }
     
+    def activationsFromPenultimateDot(innerLayerActivations: DenseVector[Double], sparseIdx: Int) = {
+      weights(sparseIdx, ::) * innerLayerActivations + bias(sparseIdx)
+    }
+    
     def activationsFromPenultimateDot(innerLayerActivations: DenseVector[Double], sparseFeatures: Array[Int]) = {
       var value = 0.0;
       for (sparseFeature <- sparseFeatures) {

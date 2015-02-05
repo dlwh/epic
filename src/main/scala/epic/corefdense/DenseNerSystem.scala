@@ -14,6 +14,7 @@ import edu.berkeley.nlp.futile.util.Logger
 import edu.berkeley.nlp.entity.ConllDoc
 import edu.berkeley.nlp.entity.ner.NerPruner
 import breeze.util.Index
+import epic.dense.AffineTransformDense
 
 case class NerExamplePruned(val ex: NerExample,
                             val allowedStates: Array[Array[Boolean]]) {
@@ -23,9 +24,16 @@ case class NerExamplePruned(val ex: NerExample,
 case class NerExampleWithFeatures(val ex: NerExample,
                                   val featsPerState: Array[Array[Array[Int]]],
                                   val allowedStates: Array[Array[Boolean]]) {
+//  val cachedStatesAllowed = allowedStates.map(allAllowed => (0 until allAllowed.size).filter(i => allAllowed(i)).toSet)
+  val cachedNumStatesAllowed = allowedStates.map(_.map(allowed => if (allowed) 1 else 0).reduce(_ + _))
+  
   def size = ex.words.size
   
+//  def getAllowedStates(posn: Int) = cachedStatesAllowed(posn)
+  
   def isStateAllowed(posn: Int, state: Int) = allowedStates(posn)(state)
+  
+  def numStatesAllowed(posn: Int) = cachedNumStatesAllowed(posn)
 }
 
 case class HmmMarginals(emissionScores: Array[Array[Double]],
@@ -53,7 +61,7 @@ case class HmmMarginals(emissionScores: Array[Array[Double]],
 @SerialVersionUID(1L)
 class DenseNerSystem(val labelIndexer: Indexer[String],
                      val word2vec: Word2VecIndexed[String],
-                     val transform: AffineTransform[DenseVector[Double],DenseVector[Double]],
+                     val transform: AffineTransformDense[DenseVector[Double]],
                      val featurizedTransitionMatrix: Array[Array[Array[Int]]],
                      val featurizer: NerFeaturizer,
                      val useSparseFeatures: Boolean) extends LikelihoodAndGradientComputer[NerExampleWithFeatures] {
@@ -79,21 +87,34 @@ class DenseNerSystem(val labelIndexer: Indexer[String],
   
   private def cacheEmissionScores(ex: NerExampleWithFeatures, weights: Array[Double]) = {
     val cachedEmissionScores = Array.tabulate(ex.size, labelIndexer.size)((i, j) => 0.0)
-    val layer = transform.extractLayer(DenseVector(weights)(0 until transform.index.size))
+    val (layer, penultimateLayer) = transform.extractLayerAndPenultimateLayer(DenseVector(weights)(0 until transform.index.size))
+    // Only compute non-trivial emission scores for unpruned states and for states where there is
+    // more than one possible label; if only one label, 
     for (i <- 0 until ex.size) {
-      // Dense scores
-      val denseScores = layer.activations(DenseVector(formVector(ex.ex.words, i)))
-      // Sparse scores
-      var j = 0
-      while (j < numStates) {
-        if (ex.featsPerState(i)(j) == null && ex.isStateAllowed(i, j)) {
-          cachedEmissionScores(i)(j) = Double.NegativeInfinity
-        } else {
-          require(!denseScores(j).isNaN, denseScores.data.toSeq)
-          val sparseScore = if (useSparseFeatures) DeepUtils.dotProductOffset(ex.featsPerState(i)(j), weights, transform.index.size) else 0.0
-          cachedEmissionScores(i)(j) = denseScores(j) + sparseScore
+      if (ex.numStatesAllowed(i) > 1) {
+        // Dense scores
+//        val penultimateActs = penultimateLayer.activations(DenseVector(formVector(ex.ex.words, i)))
+        val denseScores = layer.activations(DenseVector(formVector(ex.ex.words, i)))
+        // Sparse scores
+        var j = 0
+        while (j < numStates) {
+          if (ex.featsPerState(i)(j) == null && ex.isStateAllowed(i, j)) {
+            cachedEmissionScores(i)(j) = Double.NegativeInfinity
+          } else {
+            val denseScore = denseScores(j)
+//            val denseScore = layer.activationsFromPenultimateDot(penultimateActs, j)
+            require(!denseScore.isNaN, denseScore)
+            val sparseScore = if (useSparseFeatures) DeepUtils.dotProductOffset(ex.featsPerState(i)(j), weights, transform.index.size) else 0.0
+            cachedEmissionScores(i)(j) = denseScore + sparseScore
+          }
+          j += 1
         }
-        j += 1
+      } else {
+        var j = 0
+        while (j < numStates) {
+          cachedEmissionScores(i)(j) = if (ex.isStateAllowed(i, j)) 0 else Double.NegativeInfinity
+          j += 1
+        }
       }
     }
     cachedEmissionScores
@@ -192,10 +213,12 @@ class DenseNerSystem(val labelIndexer: Indexer[String],
     val layer = transform.extractLayer(DenseVector(weights)(0 until transform.index.size))
     val logNormalizer = hmmMarginals.computeLogNormalizer
     for (i <- 0 until numTokens) {
-      val scale = DenseVector(Array.tabulate(numStates)(j => {
-        (if (j == goldLabels(i)) 1 else 0) - Math.exp(hmmMarginals.forwardLogProbs(i)(j) + hmmMarginals.backwardLogProbs(i)(j) - logNormalizer)
-      }))
-      layer.tallyDerivative(DenseVector(gradient), scale, DenseVector(formVector(ex.ex.words, i)))
+      if (ex.numStatesAllowed(i) > 1) {
+        val scale = DenseVector(Array.tabulate(numStates)(j => {
+          (if (j == goldLabels(i)) 1 else 0) - Math.exp(hmmMarginals.forwardLogProbs(i)(j) + hmmMarginals.backwardLogProbs(i)(j) - logNormalizer)
+        }))
+        layer.tallyDerivative(DenseVector(gradient), scale, DenseVector(formVector(ex.ex.words, i)))
+      }
     }
   }
   
@@ -205,32 +228,36 @@ class DenseNerSystem(val labelIndexer: Indexer[String],
     val logNormalizer = hmmMarginals.computeLogNormalizer
     // Update emission features
     for (i <- 0 until numTokens) {
-      for (j <- 0 until numStates) {
-        if (ex.isStateAllowed(i, j)) {
-          val thisFeatureVector = ex.featsPerState(i)(j);
-          if (thisFeatureVector != null) {
-            val logProb = hmmMarginals.forwardLogProbs(i)(j) + hmmMarginals.backwardLogProbs(i)(j) - logNormalizer;
-            val prob = Math.exp(logProb);
-            require(!prob.isNaN)
-            DeepUtils.addToGradient(thisFeatureVector, (if (j == goldLabels(i)) 1 else 0) - prob, gradient, transform.index.size)
+      if (ex.numStatesAllowed(i) > 1) {
+        for (j <- 0 until numStates) {
+          if (ex.isStateAllowed(i, j)) {
+            val thisFeatureVector = ex.featsPerState(i)(j);
+            if (thisFeatureVector != null) {
+              val logProb = hmmMarginals.forwardLogProbs(i)(j) + hmmMarginals.backwardLogProbs(i)(j) - logNormalizer;
+              val prob = Math.exp(logProb);
+              require(!prob.isNaN)
+              DeepUtils.addToGradient(thisFeatureVector, (if (j == goldLabels(i)) 1 else 0) - prob, gradient, transform.index.size)
+            }
           }
         }
       }
     }
     // Update transition features
     for (i <- 0 until numTokens - 1) {
-      for (j <- 0 until numStates) {
-        if (ex.isStateAllowed(i, j)) {
-          val beforeScore = hmmMarginals.forwardLogProbs(i)(j);
-          for (k <- 0 until numStates) {
-            if (ex.isStateAllowed(i+1, k)) {
-              val thisFeatureVector = transitionFeatures(j)(k);
-              if (thisFeatureVector != null) {
-                val afterScore = hmmMarginals.backwardLogProbs(i+1)(k);
-                val logProb = beforeScore + hmmMarginals.transitionScores(j)(k) + hmmMarginals.emissionScores(i+1)(k) + afterScore - logNormalizer;
-                val prob = Math.exp(logProb);
-                require(!prob.isNaN)
-                DeepUtils.addToGradient(thisFeatureVector, (if (j == goldLabels(i) && k == goldLabels(i+1)) 1 else 0) - prob, gradient, transform.index.size)
+      if (ex.numStatesAllowed(i) > 1 || ex.numStatesAllowed(i+1) > 1) {
+        for (j <- 0 until numStates) {
+          if (ex.isStateAllowed(i, j)) {
+            val beforeScore = hmmMarginals.forwardLogProbs(i)(j);
+            for (k <- 0 until numStates) {
+              if (ex.isStateAllowed(i+1, k)) {
+                val thisFeatureVector = transitionFeatures(j)(k);
+                if (thisFeatureVector != null) {
+                  val afterScore = hmmMarginals.backwardLogProbs(i+1)(k);
+                  val logProb = beforeScore + hmmMarginals.transitionScores(j)(k) + hmmMarginals.emissionScores(i+1)(k) + afterScore - logNormalizer;
+                  val prob = Math.exp(logProb);
+                  require(!prob.isNaN)
+                  DeepUtils.addToGradient(thisFeatureVector, (if (j == goldLabels(i) && k == goldLabels(i+1)) 1 else 0) - prob, gradient, transform.index.size)
+                }
               }
             }
           }

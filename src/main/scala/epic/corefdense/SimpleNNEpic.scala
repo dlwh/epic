@@ -7,14 +7,12 @@ import epic.dense.EmbeddingsTransform
 import epic.dense.AffineTransformDense
 import epic.dense.Transform
 import breeze.linalg._
-import epic.dense.TanhTransform
-import epic.dense.ReluTransform
-import epic.dense.CubeTransform
 import epic.parser.models.PositionalNeuralModelFactory
 import scala.util.Random
 import edu.berkeley.nlp.futile.util.Logger
 import epic.dense.IdentityTransform
 import epic.dense.AffineTransform
+import epic.dense.NonlinearTransform
 
 //class SimpleNNEpic[T](val inputSize: Int,
 //                      val hiddenSize: Int,
@@ -82,7 +80,8 @@ object SimpleNNEpic {
   
   def makeTransform(inputSize: Int, hiddenSize: Int, outputSize: Int, nonLinType: String) = {
     val innerTransform = new AffineTransform(hiddenSize, inputSize, new IdentityTransform[DenseVector[Double]]())
-    val nonLinTransform = if (nonLinType == "tanh") new TanhTransform(innerTransform) else if (nonLinType == "relu") new ReluTransform(innerTransform) else new CubeTransform(innerTransform)
+    val nonLinTransform = new NonlinearTransform(nonLinType, innerTransform)
+//    val nonLinTransform = if (nonLinType == "tanh") new TanhTransform(innerTransform) else if (nonLinType == "relu") new ReluTransform(innerTransform) else new CubeTransform(innerTransform)
     new AffineTransform(outputSize, hiddenSize, nonLinTransform)
   }
   
@@ -92,25 +91,25 @@ object SimpleNNEpic {
   
   def makeDeepTransform(inputSize: Int, hiddenSize: Int, numHiddenLayers: Int, outputSize: Int, nonLinType: String) = {
     val baseTransformLayer = new AffineTransform(hiddenSize, inputSize, new IdentityTransform[DenseVector[Double]])
-    var currLayer: Transform[DenseVector[Double],DenseVector[Double]] = addNonlinearLayer(baseTransformLayer, nonLinType)
+    var currLayer: Transform[DenseVector[Double],DenseVector[Double]] = new NonlinearTransform(nonLinType, baseTransformLayer)
     for (i <- 1 until numHiddenLayers) {
       val tmpLayer = new AffineTransform(hiddenSize, hiddenSize, currLayer)
-      currLayer = addNonlinearLayer(tmpLayer, nonLinType)
+      currLayer = new NonlinearTransform(nonLinType, tmpLayer)
     }
     new AffineTransform(outputSize, hiddenSize, currLayer)
   }
   
-  def addNonlinearLayer(currNet: Transform[DenseVector[Double],DenseVector[Double]], nonLinType: String) = {
-    if (nonLinType == "relu") {
-      new ReluTransform(currNet)
-    } else if (nonLinType == "cube") {
-      new CubeTransform(currNet)
-    } else if (nonLinType == "tanh") {
-      new TanhTransform(currNet)
-    } else {
-      throw new RuntimeException("Unknown nonlinearity type: " + nonLinType)
-    }
-  }
+//  def addNonlinearLayer(currNet: Transform[DenseVector[Double],DenseVector[Double]], nonLinType: String) = {
+//    if (nonLinType == "relu") {
+//      new ReluTransform(currNet)
+//    } else if (nonLinType == "cube") {
+//      new CubeTransform(currNet)
+//    } else if (nonLinType == "tanh") {
+//      new TanhTransform(currNet)
+//    } else {
+//      throw new RuntimeException("Unknown nonlinearity type: " + nonLinType)
+//    }
+//  }
   
   def buildNet(word2vecIndexed: Word2VecIndexed[String],
                numHidden: Int,
@@ -123,10 +122,10 @@ object SimpleNNEpic {
     } else {
       new CachingLookupAndAffineTransformDense(numHidden, word2vecIndexed.vectorSize, word2vecIndexed)
     }
-    var currLayer: Transform[Array[Int],DenseVector[Double]] = PositionalNeuralModelFactory.addNonlinearLayer(baseTransformLayer, nonLinType)
+    var currLayer: Transform[Array[Int],DenseVector[Double]] = new NonlinearTransform(nonLinType, baseTransformLayer)
     for (i <- 1 until numHiddenLayers) {
       val tmpLayer = new AffineTransformDense(numHidden, numHidden, currLayer)
-      currLayer = PositionalNeuralModelFactory.addNonlinearLayer(tmpLayer, nonLinType)
+      currLayer = new NonlinearTransform(nonLinType, tmpLayer)
     }
     var transform = new AffineTransformDense(outputSize, numHidden, currLayer)
     transform
