@@ -29,7 +29,7 @@ case class NonlinearTransform[FV](nonLinType: String, inner: Transform[FV, Dense
       val act = innerLayer.activations(fv)
       var i = 0;
       while (i < act.size) {
-        act(i) = nonlinearFcn.fcn(act(i))
+        act(i) = nonlinearFcn.fcn(i, act(i))
         i += 1
       }
       act
@@ -40,7 +40,7 @@ case class NonlinearTransform[FV](nonLinType: String, inner: Transform[FV, Dense
       val act = innerLayer.activations(fv)
       var i = 0;
       while (i < act.size) {
-        act(i) = nonlinearFcn.deriv(act(i))
+        act(i) = nonlinearFcn.deriv(i, act(i))
         i += 1
       }
       act :*= scale
@@ -66,26 +66,38 @@ object NonlinearTransform {
   }
   
   trait NonlinearFcn {
-    def fcn(x: Double): Double;
-    def deriv(x: Double): Double;
+    // idx is the position of the unit; this basically only applies to dropout
+    // where we want to zero out particular units
+    def fcn(idx: Int, x: Double): Double;
+    def deriv(idx: Int, x: Double): Double;
+  }
+  
+  case class Mask(val mask: Array[Boolean]) extends NonlinearFcn {
+    def fcn(idx: Int, x: Double) = if (mask(idx)) x else 0
+    def deriv(idx: Int, x: Double) = if (mask(idx)) 1 else 0
+  }
+  
+  case class Scale(val factor: Double) extends NonlinearFcn {
+    def fcn(idx: Int, x: Double) = factor * x
+    def deriv(idx: Int, x: Double) = factor
   }
   
   case class Tanh() extends NonlinearFcn {
-    def fcn(x: Double) = 2 * sigmoid(2 * x) - 1.0
-    def deriv(x: Double) = {
+    def fcn(idx: Int, x: Double) = 2 * sigmoid(2 * x) - 1.0
+    def deriv(idx: Int, x: Double) = {
       val sig = sigmoid(2 * x)
       -4 * sig * (sig - 1.0)
     }
   }
   
   case class Relu() extends NonlinearFcn {
-    def fcn(x: Double) = Math.max(x, 0)
-    def deriv(x: Double) = if (x > 0) 1.0 else 0.0
+    def fcn(idx: Int, x: Double) = Math.max(x, 0)
+    def deriv(idx: Int, x: Double) = if (x > 0) 1.0 else 0.0
   }
   
   case class Cube() extends NonlinearFcn {
-    def fcn(x: Double) = x * x * x
-    def deriv(x: Double) = 2 * x * x
+    def fcn(idx: Int, x: Double) = x * x * x
+    def deriv(idx: Int, x: Double) = 2 * x * x
   }
   
 }

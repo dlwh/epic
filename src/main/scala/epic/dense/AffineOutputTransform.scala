@@ -14,15 +14,10 @@ import scala.util.Random
  * from that back in (caching it elsewhere) and only compute certain cells in the
  * output layer (activationsFromPenultimateDot). 
  */
-case class AffineTransformDense[FV](numOutputs: Int, numInputs: Int, innerTransform: Transform[FV, DenseVector[Double]], includeBias: Boolean = true) extends Transform[FV, DenseVector[Double]] {
+case class AffineOutputTransform[FV](numOutputs: Int, numInputs: Int, innerTransform: Transform[FV, DenseVector[Double]], includeBias: Boolean = true) extends OutputTransform[FV, DenseVector[Double]] {
 
 
-//  val index = SegmentedIndex(new AffineTransformDense.Index(numOutputs, numInputs, includeBias), innerTransform.index)
   val index = SegmentedIndex(new AffineTransform.Index(numOutputs, numInputs, includeBias), innerTransform.index)
-
-  def extractLayer(weights: DenseVector[Double]) = {
-    extractLayerAndPenultimateLayer(weights)._1
-  }
   
   def extractLayerAndPenultimateLayer(weights: DenseVector[Double]) = {
     val mat = weights(0 until (numOutputs * numInputs)).asDenseMatrix.reshape(numOutputs, numInputs, view = View.Require)
@@ -32,7 +27,7 @@ case class AffineTransformDense[FV](numOutputs: Int, numInputs: Int, innerTransf
       DenseVector.zeros[Double](numOutputs)
     }
     val inner = innerTransform.extractLayer(weights(index.componentOffset(1) to -1))
-    new Layer(mat, bias, inner) -> inner
+    new OutputLayer(mat, bias, inner) -> inner
   }
   
   /**
@@ -48,8 +43,8 @@ case class AffineTransformDense[FV](numOutputs: Int, numInputs: Int, innerTransf
     innerTransform.clipHiddenWeightVectors(weights(index.componentOffset(1) to -1), norm, false)
   }
 
-  case class Layer(weights: DenseMatrix[Double], bias: DenseVector[Double], innerLayer: innerTransform.Layer) extends Transform.Layer[FV,DenseVector[Double]] {
-    override val index = AffineTransformDense.this.index
+  case class OutputLayer(weights: DenseMatrix[Double], bias: DenseVector[Double], innerLayer: innerTransform.Layer) extends OutputTransform.OutputLayer[FV,DenseVector[Double]] {
+    override val index = AffineOutputTransform.this.index
 
     val weightst = weights.t
 //    val weightst = weights.t.copy
@@ -62,14 +57,6 @@ case class AffineTransformDense[FV](numOutputs: Int, numInputs: Int, innerTransf
     
     def activationsFromPenultimateDot(innerLayerActivations: DenseVector[Double], sparseIdx: Int) = {
       weights(sparseIdx, ::) * innerLayerActivations + bias(sparseIdx)
-    }
-    
-    def activationsFromPenultimateDot(innerLayerActivations: DenseVector[Double], sparseFeatures: Array[Int]) = {
-      var value = 0.0;
-      for (sparseFeature <- sparseFeatures) {
-        value += (weights(sparseFeature, ::) * innerLayerActivations + bias(sparseFeature))
-      }
-      value
     }
 
     def tallyDerivative(deriv: DenseVector[Double], _scale: =>Vector[Double], fv: FV) = {

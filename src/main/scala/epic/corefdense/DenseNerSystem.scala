@@ -15,6 +15,7 @@ import edu.berkeley.nlp.entity.ConllDoc
 import edu.berkeley.nlp.entity.ner.NerPruner
 import breeze.util.Index
 import epic.dense.AffineTransformDense
+import epic.dense.OutputTransform
 
 case class NerExamplePruned(val ex: NerExample,
                             val allowedStates: Array[Array[Boolean]]) {
@@ -61,7 +62,7 @@ case class HmmMarginals(emissionScores: Array[Array[Double]],
 @SerialVersionUID(1L)
 class DenseNerSystem(val labelIndexer: Indexer[String],
                      val word2vec: Word2VecIndexed[String],
-                     val transform: AffineTransformDense[DenseVector[Double]],
+                     val transform: OutputTransform[DenseVector[Double],DenseVector[Double]],
                      val featurizedTransitionMatrix: Array[Array[Array[Int]]],
                      val featurizer: NerFeaturizer,
                      val useSparseFeatures: Boolean) extends LikelihoodAndGradientComputer[NerExampleWithFeatures] {
@@ -305,9 +306,9 @@ class DenseNerSystem(val labelIndexer: Indexer[String],
 case class DenseNerExampleLoader(val pruner: Option[NerPruner],
                                  val labelIndexer: Indexer[String]) {
   
-  def extractNerExsFromConll(docs: Seq[ConllDoc]) = {
+  def extractNerExsFromConll(docs: Seq[ConllDoc], filterPrunedExs: Boolean) = {
     if (pruner.isDefined) {
-      DenseNerSystem.extractNerChunksFromConllAndPrune(docs, labelIndexer, pruner.get)
+      DenseNerSystem.extractNerChunksFromConllAndPrune(docs, labelIndexer, pruner.get, filterPrunedExs)
     } else {
       NerSystemLabeled.extractNerChunksFromConll(docs).map(ex => new NerExamplePruned(ex, Array.tabulate(ex.words.size, labelIndexer.size)((j, k) => true)));
     }
@@ -326,15 +327,38 @@ object DenseNerSystem {
   
   def extractNerChunksFromConllAndPrune(conllDocs: Seq[ConllDoc],
                                         labelIndexer: Indexer[String],
-                                        nerPruner: NerPruner): Seq[NerExamplePruned] = {
-    conllDocs.flatMap(conllDoc => {
-      for (sentIdx <- 0 until conllDoc.numSents) yield {
+                                        nerPruner: NerPruner,
+                                        filterPrunedExs: Boolean): Seq[NerExamplePruned] = {
+    val finalExs = conllDocs.flatMap(conllDoc => {
+      (0 until conllDoc.numSents).flatMap(sentIdx => {
         val sentLen = conllDoc.words(sentIdx).size
-        val labels = NerSystemLabeled.convertToBIO(conllDoc.nerChunks(sentIdx), sentLen)
         val pruningMask = nerPruner.pruneSentence(conllDoc, sentIdx)
         val pruningBoolean = Array.tabulate(sentLen, labelIndexer.size)((i, j) => pruningMask(i).contains(labelIndexer.getObject(j)))
-        new NerExamplePruned(new NerExample(conllDoc.words(sentIdx), conllDoc.pos(sentIdx), labels), pruningBoolean)
-      }
+        val goldLabels = NerSystemLabeled.convertToBIO(conllDoc.nerChunks(sentIdx), sentLen)
+        val somethingImpossible = (0 until sentLen).map(i => !pruningMask(i).contains(goldLabels(i))).reduce(_ || _);
+        if (filterPrunedExs && somethingImpossible) {
+          Seq() 
+        } else {
+          Seq(new NerExamplePruned(new NerExample(conllDoc.words(sentIdx), conllDoc.pos(sentIdx), goldLabels), pruningBoolean))
+        }
+      })
     })
+    Logger.logss(conllDocs.map(_.numSents).reduce(_ + _) + " sentences yielded " + finalExs.size + " final examples")
+    finalExs
   }
+  
+  
+//  val somethingImpossible = (0 until sentLen).map(i => !allOptions(i).contains(goldNESequence(i))).reduce(_ || _);
+//      val impossibleGoldNERChunks = goldNERChunks(sentIdx).filter(chunk => {
+//        (chunk.start until chunk.end).map(wordIdx => !allOptions(wordIdx).contains(NerSystemLabeled.getGoldNETag(Array(chunk), wordIdx))).foldLeft(false)(_ || _);
+//      });
+//      Array.tabulate(sentLen)(wordIdx => {
+//        val isPossible = allOptions(wordIdx).contains(goldNESequence(wordIdx)) &&
+//                impossibleGoldNERChunks.filter(chunk => chunk.start <= wordIdx && wordIdx < chunk.end).size == 0;
+//        if (isPossible) {
+//          new Domain(Array(goldNESequence(wordIdx)));
+//        } else {
+//          new Domain(allOptions(wordIdx));
+//        }
+//      });
 }

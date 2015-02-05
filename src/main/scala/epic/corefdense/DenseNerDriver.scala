@@ -9,7 +9,9 @@ import edu.berkeley.nlp.futile.LightRunner
 import edu.berkeley.nlp.futile.fig.basic.Indexer
 import edu.berkeley.nlp.futile.util.Logger
 import epic.dense.AffineTransform
-import epic.dense.AffineTransformDense
+import epic.dense.AffineOutputTransform
+import epic.dense.AffineOutputEmbeddingTransform
+import epic.dense.LowRankQuadraticTransform
 import epic.dense.IdentityTransform
 import epic.dense.NonlinearTransform
 import epic.dense.Word2VecIndexed
@@ -37,6 +39,10 @@ object DenseNerDriver {
   
   val nonLinear = true;
   val nonLinType = "relu"
+  val lrqt = false;
+  val lrqtRanks = 20
+  val outputEmbedding = false;
+  val outputEmbeddingDim = 20;
   
   val trainPath = "";
   val trainSize = -1;
@@ -47,7 +53,7 @@ object DenseNerDriver {
   
   val pruningModelPath = "models/ner.ser.gz"
 //  val pruningModelPath = ""
-  val pruningThreshold = -5;
+  val negPruningThreshold = 5;
   
   def main(args: Array[String]) {
     LightRunner.initializeOutput(DenseNerDriver.getClass())
@@ -62,17 +68,10 @@ object DenseNerDriver {
     // Instantiate and featurize training data
     val trainDocs = NerSystemLabeled.loadDocs(trainPath, trainSize, true)
     Logger.logss("Loading pruner from " + pruningModelPath + " (not loading if path is empty)");
-    val exampleLoader = new DenseNerExampleLoader(if (pruningModelPath == "") None else Option(new NerPrunerFromModel(GUtil.load(pruningModelPath).asInstanceOf[NerSystemLabeled], -5)), labelIndexer)
+    val exampleLoader = new DenseNerExampleLoader(if (pruningModelPath == "") None else Option(new NerPrunerFromModel(GUtil.load(pruningModelPath).asInstanceOf[NerSystemLabeled], -negPruningThreshold)), labelIndexer)
     Logger.startTrack("Extracting training examples");
-    val trainExamples = exampleLoader.extractNerExsFromConll(trainDocs)
+    val trainExamples = exampleLoader.extractNerExsFromConll(trainDocs, filterPrunedExs = true)
     Logger.endTrack();
-//    val trainExamples = if (false) {
-//      // TODO: Load pruner and prune
-//      val pruner = new NerPrunerFromModel(GUtil.load(pruningModelPath).asInstanceOf[NerSystemLabeled], -5)
-//      DenseNerSystem.extractNerChunksFromConllAndPrune(trainDocs, labelIndexer, pruner)
-//    } else {
-//      NerSystemLabeled.extractNerChunksFromConll(trainDocs).map(ex => new NerExamplePruned(ex, Array.tabulate(ex.words.size, labelIndexer.size)((j, k) => true)));
-//    }
     val nerFeaturizer = NerFeaturizer(featureSetSpec.split(":").toSet, featureIndexer, labelIndexer, trainExamples.map(_.ex.words), maybeWikipediaDB, maybeBrownClusters, 1, 10, 2);
     // Featurize transitions and then examples
     val featurizedTransitionMatrix = Array.tabulate(labelIndexer.size, labelIndexer.size)((prev, curr) => {
@@ -97,10 +96,18 @@ object DenseNerDriver {
     val vecSize = word2vecIndexed.wordRepSize * DenseNerSystem.extractRelevantWords(trainSequenceExs.head.ex.words, 0).size
     
     // Build the net and system
-    val transform = if (nonLinear) {
-      new AffineTransformDense(labelIndexer.size, hiddenSize, new NonlinearTransform(nonLinType, new AffineTransform(hiddenSize, vecSize, new IdentityTransform[DenseVector[Double]]())))
+    val innerTransform = new NonlinearTransform(nonLinType, new AffineTransform(hiddenSize, vecSize, new IdentityTransform[DenseVector[Double]]()))
+    val transform = if (lrqt) {
+      new LowRankQuadraticTransform(labelIndexer.size, lrqtRanks, vecSize, vecSize, new IdentityTransform[DenseVector[Double]]())
+    } else if (outputEmbedding) {
+      new AffineOutputEmbeddingTransform(labelIndexer.size, vecSize, outputEmbeddingDim, new IdentityTransform[DenseVector[Double]]())
+//      new AffineOutputEmbeddingTransform(labelIndexer.size, hiddenSize, outputEmbeddingDim, innerTransform)
+    } else if (nonLinear) {
+//      new AffineTransformDense(labelIndexer.size, hiddenSize, new NonlinearTransform(nonLinType, new AffineTransform(hiddenSize, vecSize, new IdentityTransform[DenseVector[Double]]())))
+      new AffineOutputTransform(labelIndexer.size, hiddenSize, new NonlinearTransform(nonLinType, new AffineTransform(hiddenSize, vecSize, new IdentityTransform[DenseVector[Double]]())))
     } else {
-      new AffineTransformDense(labelIndexer.size, vecSize, new IdentityTransform[DenseVector[Double]]())
+//      new AffineTransformDense(labelIndexer.size, vecSize, new IdentityTransform[DenseVector[Double]]())
+      new AffineOutputTransform(labelIndexer.size, vecSize, new IdentityTransform[DenseVector[Double]]())
     }
     val denseNerSystem = new DenseNerSystem(labelIndexer, word2vecIndexed, transform, featurizedTransitionMatrix, nerFeaturizer, useSparseFeatures)
     
@@ -121,8 +128,7 @@ object DenseNerDriver {
     
     // Extract test examples and run the model
     val testDocs = NerSystemLabeled.loadDocs(testPath, testSize, true)
-//    val testExamples = NerSystemLabeled.extractNerChunksFromConll(testDocs);
-    val testExamples = exampleLoader.extractNerExsFromConll(testDocs);
+    val testExamples = exampleLoader.extractNerExsFromConll(testDocs, filterPrunedExs = false);
     val testSequenceExs = testExamples.map(ex => new NerExampleWithFeatures(ex.ex, nerFeaturizer.featurize(ex.ex, false), ex.allowedStates));
     val testGoldChunks = testSequenceExs.map(ex => NerSystemLabeled.convertToLabeledChunks(ex.ex.goldLabels));
     Logger.startTrack("Decoding dev");

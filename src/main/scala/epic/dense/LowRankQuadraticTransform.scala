@@ -9,16 +9,22 @@ import breeze.util.Index
 import scala.runtime.ScalaRunTime
 import scala.util.Random
 
-case class LowRankQuadraticTransform[FV](numOutputs: Int, numRanks: Int, numLeftInputs: Int, numRightInputs: Int, innerTransform: Transform[FV, DenseVector[Double]]) extends Transform[FV, DenseVector[Double]] {
+case class LowRankQuadraticTransform[FV](numOutputs: Int, numRanks: Int, numLeftInputs: Int, numRightInputs: Int, innerTransform: Transform[FV, DenseVector[Double]]) extends OutputTransform[FV, DenseVector[Double]] {
 
   val neurons = (0 until numOutputs).map(i => new LowRankQuadraticTransformNeuron(numRanks, numLeftInputs, numRightInputs))
   val neuronIndex = SegmentedIndex(neurons.map(_.index):_*)
   val index = SegmentedIndex(neuronIndex, innerTransform.index)
 
-  def extractLayer(weights: DenseVector[Double]) = {
+  def extractLayerAndPenultimateLayer(weights: DenseVector[Double]) = {
     val subTransforms = (0 until neurons.size).map(i => neurons(i).extractLayer(weights(neuronIndex.componentOffset(i) until neuronIndex.componentOffset(i) + neuronIndex.indices(i).size)))
-    new Layer(subTransforms, innerTransform.extractLayer(weights(index.componentOffset(1) to -1)))
+    val innerLayer = innerTransform.extractLayer(weights(index.componentOffset(1) to -1));
+    new OutputLayer(subTransforms, innerLayer) -> innerLayer
   }
+  
+//  def extractLayer(weights: DenseVector[Double]) = {
+//    val subTransforms = (0 until neurons.size).map(i => neurons(i).extractLayer(weights(neuronIndex.componentOffset(i) until neuronIndex.componentOffset(i) + neuronIndex.indices(i).size)))
+//    new Layer(subTransforms, innerTransform.extractLayer(weights(index.componentOffset(1) to -1)))
+//  }
   
   def initialWeightVector(initWeightsScale: Double, rng: Random, outputLayer: Boolean, spec: String) = {
     val subVects = DenseVector.vertcat(neurons.map(_.initialWeightVector(initWeightsScale, rng, outputLayer, spec)):_*) 
@@ -29,7 +35,7 @@ case class LowRankQuadraticTransform[FV](numOutputs: Int, numRanks: Int, numLeft
     innerTransform.clipHiddenWeightVectors(weights(index.componentOffset(1) to -1), norm, outputLayer);
   }
 
-  case class Layer(sublayers: Seq[LRQTNLayer], innerLayer: innerTransform.Layer) extends Transform.Layer[FV,DenseVector[Double]] {
+  case class OutputLayer(sublayers: Seq[LRQTNLayer], innerLayer: innerTransform.Layer) extends OutputTransform.OutputLayer[FV,DenseVector[Double]] {
     
     override val index = LowRankQuadraticTransform.this.index
     val neuronIndex = LowRankQuadraticTransform.this.neuronIndex
@@ -37,6 +43,10 @@ case class LowRankQuadraticTransform[FV](numOutputs: Int, numRanks: Int, numLeft
     def activations(fv: FV) = {
       val innerActivations = innerLayer.activations(fv)
       DenseVector(Array.tabulate(sublayers.size)(i => sublayers(i).activations(innerActivations)(0)))
+    }
+    
+    def activationsFromPenultimateDot(innerLayerActivations: DenseVector[Double], sparseIdx: Int): Double = {
+      sublayers(sparseIdx).activations(innerLayerActivations)(0)
     }
 
     def tallyDerivative(deriv: DenseVector[Double], _scale: =>Vector[Double], fv: FV) = {
@@ -77,43 +87,6 @@ case class LowRankQuadraticTransformNeuron(numRanks: Int, numLeftInputs: Int, nu
   
   def clipHiddenWeightVectors(weights: DenseVector[Double], norm: Double, outputLayer: Boolean) {
   }
-  
-//  case class Layer(lhsWeights: DenseMatrix[Double], rhsWeights: DenseMatrix[Double]) extends Transform.Layer[Den
-//    override val index = LowRankQuadraticTransformNeuron.this.index
-//
-//    val lhsWeightst = lhsWeights.t
-//    val rhsWeightst = rhsWeights.t
-//
-//    def activations(fv: DenseVector[Double]) = {
-//      val lhsProj = lhsWeights * fv
-//      val rhsProj = rhsWeights * fv
-//      DenseVector(Array(lhsProj.dot(rhsProj)))
-//    }
-//
-//    def tallyDerivative(deriv: DenseVector[Double], _scale: =>Vector[Double], fv: DenseVector[Double]) = {
-////      println("SCALE: " + _scale)
-//      val scale = _scale(0)
-//      val lhsSize = numRanks * numLeftInputs
-//      val rhsSize = numRanks * numRightInputs
-//      val lhsDeriv = deriv(0 until lhsSize).asDenseMatrix.reshape(numRanks, numLeftInputs, view = View.Require)
-//      val rhsDeriv = deriv(lhsSize until rhsSize).asDenseMatrix.reshape(numRanks, numRightInputs, view = View.Require)
-//      
-//      val innerActs = fv
-//      val lhsProj = lhsWeights * innerActs
-//      val rhsProj = rhsWeights * innerActs
-//      
-//      for (r <- 0 until lhsWeights.rows) {
-//        for (i <- 0 until lhsWeights.cols) {
-//          lhsDeriv(r)(i) += innerActs(i) * rhsProj(r)
-//        }
-//        for (i <- 0 until rhsWeights.cols) {
-//          rhsDeriv(r)(i) += innerActs(i) * lhsProj(r)
-//        }
-//      }
-//      require(deriv.size == lhsSize + rhsSize, "Backpropagating through LowRankQuadraticTransform is not currently supported")
-//    }
-//  }
-
 }
 
 

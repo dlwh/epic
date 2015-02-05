@@ -17,8 +17,8 @@ case class EmbeddingsTransform[FV](numOutputs: Int,
                                    includeBias: Boolean = true) extends Transform[Array[Int], DenseVector[Double]] {
 
 
-  val index = SegmentedIndex(new EmbeddingsTransform.Index(numOutputs, numInputs, includeBias),
-                             new EmbeddingsTransform.Index(word2vecIndexed.vocSize, word2vecIndexed.wordRepSize, false))
+  val index = SegmentedIndex(new AffineTransform.Index(numOutputs, numInputs, includeBias),
+                             new AffineTransform.Index(word2vecIndexed.vocSize, word2vecIndexed.wordRepSize, false))
   println("Allocated " + index.indices.map(_.size) + " parameters for each index in the embedding layer (backpropagating into embeddings)")
   
   def extractLayer(weights: DenseVector[Double]) = {
@@ -127,37 +127,37 @@ case class EmbeddingsTransform[FV](numOutputs: Int,
   }
 }
 
-object EmbeddingsTransform {
-  
-  case class Index(numOutputs: Int, numInputs: Int, includeBias: Boolean = true, backPropIntoEmbeddings: Boolean = false) extends breeze.util.Index[Feature] {
-    def apply(t: Feature): Int = t match {
-      case NeuralFeature(output, input) if output < numOutputs && input < numInputs && output > 0 && input > 0 =>
-        output * numInputs + input
-      case NeuralBias(output) if output <= numOutputs => output + numOutputs * numInputs
-      case _ => -1
-    }
-
-    def unapply(i: Int): Option[Feature] = {
-      if (i < 0 || i >= size) {
-        None
-      } else if (includeBias && i >= numInputs * numOutputs) {
-        Some(NeuralBias(i - numInputs * numOutputs))
-      } else  {
-        Some(NeuralFeature(i/numInputs, i % numInputs))
-      }
-    }
-
-    def makeMatrix(dv: DenseVector[Double]):DenseMatrix[Double] = {
-      assert(dv.stride == 1)
-      new DenseMatrix(numOutputs, numInputs, dv.data, dv.offset)
-    }
-
-    def pairs: Iterator[(Feature, Int)] = iterator.zipWithIndex
-
-    def iterator: Iterator[Feature] = Iterator.range(0, size) map unapply map (_.get)
-
-    override val size: Int = if(includeBias) numOutputs * numInputs + numOutputs else numOutputs * numInputs
-
-    override def toString() = ScalaRunTime._toString(this)
-  }
-}
+//object EmbeddingsTransform {
+//  
+//  case class Index(numOutputs: Int, numInputs: Int, includeBias: Boolean = true, backPropIntoEmbeddings: Boolean = false) extends breeze.util.Index[Feature] {
+//    def apply(t: Feature): Int = t match {
+//      case NeuralFeature(output, input) if output < numOutputs && input < numInputs && output > 0 && input > 0 =>
+//        output * numInputs + input
+//      case NeuralBias(output) if output <= numOutputs => output + numOutputs * numInputs
+//      case _ => -1
+//    }
+//
+//    def unapply(i: Int): Option[Feature] = {
+//      if (i < 0 || i >= size) {
+//        None
+//      } else if (includeBias && i >= numInputs * numOutputs) {
+//        Some(NeuralBias(i - numInputs * numOutputs))
+//      } else  {
+//        Some(NeuralFeature(i/numInputs, i % numInputs))
+//      }
+//    }
+//
+//    def makeMatrix(dv: DenseVector[Double]):DenseMatrix[Double] = {
+//      assert(dv.stride == 1)
+//      new DenseMatrix(numOutputs, numInputs, dv.data, dv.offset)
+//    }
+//
+//    def pairs: Iterator[(Feature, Int)] = iterator.zipWithIndex
+//
+//    def iterator: Iterator[Feature] = Iterator.range(0, size) map unapply map (_.get)
+//
+//    override val size: Int = if(includeBias) numOutputs * numInputs + numOutputs else numOutputs * numInputs
+//
+//    override def toString() = ScalaRunTime._toString(this)
+//  }
+//}

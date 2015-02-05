@@ -17,7 +17,7 @@ case class CachingLookupAndAffineTransformDense[FV](numOutputs: Int,
                                                     backpropIntoEmbeddings: Boolean = false) extends Transform[Array[Int], DenseVector[Double]] {
 
 
-  val index = new CachingLookupAndAffineTransformDense.Index(numOutputs, numInputs, includeBias)
+  val index = new AffineTransform.Index(numOutputs, numInputs, includeBias)
   
   def extractLayer(weights: DenseVector[Double]) = {
     val mat = weights(0 until (numOutputs * numInputs)).asDenseMatrix.reshape(numOutputs, numInputs, view = View.Require)
@@ -114,40 +114,5 @@ case class CachingLookupAndAffineTransformDense[FV](numOutputs: Int,
       // scale is f'(mat * inner(v) + bias)
       // d/dv is mat.t * f'(mat * inner(v) + bias)
     }
-  }
-}
-
-object CachingLookupAndAffineTransformDense {
-  
-  case class Index(numOutputs: Int, numInputs: Int, includeBias: Boolean = true, backPropIntoEmbeddings: Boolean = false) extends breeze.util.Index[Feature] {
-    def apply(t: Feature): Int = t match {
-      case NeuralFeature(output, input) if output < numOutputs && input < numInputs && output > 0 && input > 0 =>
-        output * numInputs + input
-      case NeuralBias(output) if output <= numOutputs => output + numOutputs * numInputs
-      case _ => -1
-    }
-
-    def unapply(i: Int): Option[Feature] = {
-      if (i < 0 || i >= size) {
-        None
-      } else if (includeBias && i >= numInputs * numOutputs) {
-        Some(NeuralBias(i - numInputs * numOutputs))
-      } else  {
-        Some(NeuralFeature(i/numInputs, i % numInputs))
-      }
-    }
-
-    def makeMatrix(dv: DenseVector[Double]):DenseMatrix[Double] = {
-      assert(dv.stride == 1)
-      new DenseMatrix(numOutputs, numInputs, dv.data, dv.offset)
-    }
-
-    def pairs: Iterator[(Feature, Int)] = iterator.zipWithIndex
-
-    def iterator: Iterator[Feature] = Iterator.range(0, size) map unapply map (_.get)
-
-    override val size: Int = if(includeBias) numOutputs * numInputs + numOutputs else numOutputs * numInputs
-
-    override def toString() = ScalaRunTime._toString(this)
   }
 }
