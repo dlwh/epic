@@ -86,9 +86,9 @@ class DenseNerSystem(val labelIndexer: Indexer[String],
     word2vec.convertToVector(DenseNerSystem.extractRelevantWords(words, idx).map(word2vec.wordIndex(_)))
   }
   
-  private def cacheEmissionScores(ex: NerExampleWithFeatures, weights: Array[Double], forTrain: Boolean) = {
+  private def cacheEmissionScores(ex: NerExampleWithFeatures, weights: Array[Double], layer: OutputTransform[DenseVector[Double],DenseVector[Double]]#OutputLayer) = {
     val cachedEmissionScores = Array.tabulate(ex.size, labelIndexer.size)((i, j) => 0.0)
-    val layer = transform.extractLayer(DenseVector(weights)(0 until transform.index.size), forTrain)
+//    val layer = transform.extractLayer(DenseVector(weights)(0 until transform.index.size), forTrain)
     // Only compute non-trivial emission scores for unpruned states and for states where there is
     // more than one possible label; if only one label, 
     for (i <- 0 until ex.size) {
@@ -137,9 +137,9 @@ class DenseNerSystem(val labelIndexer: Indexer[String],
     cachedTransitionScores
   }
   
-  private def computeForwardBackwardProbs(ex: NerExampleWithFeatures, weights: Array[Double], sum: Boolean, forTrain: Boolean) = {
+  private def computeForwardBackwardProbs(ex: NerExampleWithFeatures, weights: Array[Double], sum: Boolean, layer: OutputTransform[DenseVector[Double],DenseVector[Double]]#OutputLayer) = {
     val numTokens = ex.size
-    val cachedEmissionScores = cacheEmissionScores(ex, weights, forTrain)
+    val cachedEmissionScores = cacheEmissionScores(ex, weights, layer)
     val cachedTransitionScores = cacheTransitionScores(weights)
     val cachedForwardLogProbs = Array.tabulate(ex.size, labelIndexer.size)((i, j) => 0.0)
     val cachedBackwardLogProbs = Array.tabulate(ex.size, labelIndexer.size)((i, j) => 0.0)
@@ -199,8 +199,9 @@ class DenseNerSystem(val labelIndexer: Indexer[String],
    * of this example
    */
   def accumulateGradientAndComputeObjective(ex: NerExampleWithFeatures, weights: Array[Double], gradient: Array[Double]): Double = {
-    val hmmMarginals = computeForwardBackwardProbs(ex, weights, sum = true, forTrain = true)
-    accumulateDenseFeatureGradient(ex, weights, gradient, hmmMarginals)
+    val layer = transform.extractLayer(DenseVector(weights)(0 until transform.index.size), forTrain = true)
+    val hmmMarginals = computeForwardBackwardProbs(ex, weights, sum = true, layer)
+    accumulateDenseFeatureGradient(ex, weights, gradient, hmmMarginals, layer)
     if (useSparseFeatures) {
       accumulateSparseFeatureGradient(ex, gradient, hmmMarginals)
     }
@@ -208,10 +209,10 @@ class DenseNerSystem(val labelIndexer: Indexer[String],
     hmmMarginals.computeLogLikelihood(ex.ex.goldLabels.map(labelIndexer.getIndex(_)))
   }
   
-  private def accumulateDenseFeatureGradient(ex: NerExampleWithFeatures, weights: Array[Double], gradient: Array[Double], hmmMarginals: HmmMarginals) {
+  private def accumulateDenseFeatureGradient(ex: NerExampleWithFeatures, weights: Array[Double], gradient: Array[Double], hmmMarginals: HmmMarginals, layer: OutputTransform[DenseVector[Double],DenseVector[Double]]#OutputLayer) {
     val numTokens = ex.size
     val goldLabels = ex.ex.goldLabels.map(label => labelIndexer.getIndex(label))
-    val layer = transform.extractLayer(DenseVector(weights)(0 until transform.index.size), true)
+//    val layer = transform.extractLayer(DenseVector(weights)(0 until transform.index.size), true)
     val logNormalizer = hmmMarginals.computeLogNormalizer
     for (i <- 0 until numTokens) {
       if (ex.numStatesAllowed(i) > 1) {
@@ -274,7 +275,9 @@ class DenseNerSystem(val labelIndexer: Indexer[String],
   }
   
   def decode(ex: NerExampleWithFeatures, weights: Array[Double]): Array[String] = {
-    val hmmMarginals = computeForwardBackwardProbs(ex, weights, sum = false, forTrain = false)
+    val layer = transform.extractLayer(DenseVector(weights)(0 until transform.index.size), forTrain = false)
+//    val layer = transform.extractLayer(DenseVector(weights)(0 until transform.index.size), forTrain = true)
+    val hmmMarginals = computeForwardBackwardProbs(ex, weights, sum = false, layer)
     val numTokens = ex.size
     var bestState = -1;
     var bestScore = Double.NegativeInfinity;

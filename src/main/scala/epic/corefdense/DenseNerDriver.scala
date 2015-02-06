@@ -14,13 +14,12 @@ import epic.dense.AffineOutputEmbeddingTransform
 import epic.dense.LowRankQuadraticTransform
 import epic.dense.IdentityTransform
 import epic.dense.NonlinearTransform
+import epic.dense.Transform
 import epic.dense.Word2VecIndexed
 import edu.berkeley.nlp.entity.ner.NerPruner
 import edu.berkeley.nlp.entity.ner.NerPrunerFromModel
 
 object DenseNerDriver {
-
-  val hiddenSize = 100
   
   val useAdadelta = false
   val numItrs = 30
@@ -38,6 +37,8 @@ object DenseNerDriver {
   val brownPath = ""
   
   val nonLinear = true;
+  val hiddenSize = 100
+  val numHiddenLayers = 1
   val nonLinType = "relu"
   val lrqt = false;
   val lrqtRanks = 20
@@ -98,19 +99,23 @@ object DenseNerDriver {
     val vecSize = word2vecIndexed.wordRepSize * DenseNerSystem.extractRelevantWords(trainSequenceExs.head.ex.words, 0).size
     
     // Build the net and system
-    val innerTransformPreDropout = new NonlinearTransform(nonLinType, hiddenSize, new AffineTransform(hiddenSize, vecSize, new IdentityTransform[DenseVector[Double]]()))
-    val innerTransform = if (useDropout) {
-      new NonlinearTransform("dropout", hiddenSize, innerTransformPreDropout)
-    } else {
-      innerTransformPreDropout
-    }
     val transform = if (lrqt) {
       new LowRankQuadraticTransform(labelIndexer.size, lrqtRanks, vecSize, vecSize, new IdentityTransform[DenseVector[Double]]())
     } else if (outputEmbedding) {
       new AffineOutputEmbeddingTransform(labelIndexer.size, vecSize, outputEmbeddingDim, new IdentityTransform[DenseVector[Double]]())
-//      new AffineOutputEmbeddingTransform(labelIndexer.size, hiddenSize, outputEmbeddingDim, innerTransform)
     } else if (nonLinear) {
-      new AffineOutputTransform(labelIndexer.size, hiddenSize, innerTransform)
+      var innerTransform: Transform[DenseVector[Double],DenseVector[Double]] = new IdentityTransform[DenseVector[Double]]();
+      var nextLayerInputSize = vecSize
+      for (i <- 0 until numHiddenLayers) {
+        innerTransform = new NonlinearTransform(nonLinType, hiddenSize, new AffineTransform(hiddenSize, nextLayerInputSize, innerTransform))
+        nextLayerInputSize = hiddenSize
+        innerTransform = if (useDropout) {
+          new NonlinearTransform("dropout", hiddenSize, innerTransform)
+        } else {
+          innerTransform
+        }
+      }
+      new AffineOutputTransform(labelIndexer.size, nextLayerInputSize, innerTransform)
     } else {
       new AffineOutputTransform(labelIndexer.size, vecSize, new IdentityTransform[DenseVector[Double]]())
     }
