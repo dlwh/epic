@@ -21,11 +21,11 @@ case class AffineOutputEmbeddingTransform[FV](numOutputs: Int, numInputs: Int, o
                              new AffineTransform.Index(numOutputs, outputDim, true),
                              innerTransform.index)
   
-  def extractLayerAndPenultimateLayer(weights: DenseVector[Double]) = {
+  def extractLayerAndPenultimateLayer(weights: DenseVector[Double], forTrain: Boolean) = {
     val mat = weights(0 until (outputDim * numInputs)).asDenseMatrix.reshape(outputDim, numInputs, view = View.Require)
     val embeddings = weights(index.componentOffset(1) until index.componentOffset(1) + (numOutputs * outputDim)).asDenseMatrix.reshape(numOutputs, outputDim, view = View.Require)
     val bias = weights(index.componentOffset(1) + numOutputs * outputDim until index.componentOffset(2))
-    val inner = innerTransform.extractLayer(weights(index.componentOffset(1) to -1))
+    val inner = innerTransform.extractLayer(weights(index.componentOffset(1) to -1), forTrain)
     new OutputLayer(mat, embeddings, bias, inner) -> inner
   }
   

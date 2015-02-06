@@ -16,7 +16,7 @@ case class CachingLookupTransform(word2vecIndexed: Word2VecIndexed[String]) exte
 
   val index = Index[epic.framework.Feature]()
   
-  def extractLayer(weights: DenseVector[Double]) = {
+  def extractLayer(weights: DenseVector[Double], forTrain: Boolean) = {
     new Layer()
   }
   

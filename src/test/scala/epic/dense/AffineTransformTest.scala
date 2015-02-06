@@ -16,7 +16,7 @@ class AffineTransformTest extends FunSuite {
      val dv = DenseVector.rand(10)
      val objective = new DiffFunction[DenseVector[Double]] {
        def calculate(x: DenseVector[Double]): (Double, DenseVector[Double]) = {
-         val layer = index.extractLayer(x)
+         val layer = index.extractLayer(x, true)
          val acts = layer.activations(dv)
          val obj = acts.sum
          val deriv = DenseVector.zeros[Double](x.length)
@@ -36,7 +36,7 @@ class AffineTransformTest extends FunSuite {
     val target = DenseVector.rand(11) * 100.0
     val objective = new DiffFunction[DenseVector[Double]] {
       def calculate(x: DenseVector[Double]): (Double, DenseVector[Double]) = {
-        val layer = index.extractLayer(x)
+        val layer = index.extractLayer(x, true)
         val acts = layer.activations(dv)
         val obj = math.pow(norm(target - acts, 2), 2) / 2
         val initDeriv = acts - target

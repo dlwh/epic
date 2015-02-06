@@ -19,7 +19,7 @@ case class CachingLookupAndAffineTransformDense[FV](numOutputs: Int,
 
   val index = new AffineTransform.Index(numOutputs, numInputs, includeBias)
   
-  def extractLayer(weights: DenseVector[Double]) = {
+  def extractLayer(weights: DenseVector[Double], forTrain: Boolean) = {
     val mat = weights(0 until (numOutputs * numInputs)).asDenseMatrix.reshape(numOutputs, numInputs, view = View.Require)
     val bias = if(includeBias) {
       weights(numOutputs * numInputs until index.size)

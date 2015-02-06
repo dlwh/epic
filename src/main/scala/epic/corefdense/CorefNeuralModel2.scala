@@ -71,7 +71,7 @@ class CorefNeuralModel2(val sparseFeaturizer: PairwiseIndexingFeaturizer,
   
   def accumulateGradientAndComputeObjective(input: DocumentGraph, weights: Array[Double], gradient: Array[Double]): Double = {
     require(input.size < MaxSize)
-    val layer = transform.extractLayer(DenseVector(weights))
+    val layer = transform.extractLayer(DenseVector(weights), true)
     computeCacheLogProbs(input, weights, layer, true)
     val featsChart = input.featurizeIndexNonPrunedUseCache(sparseFeaturizer)
     var ll = 0.0
@@ -112,7 +112,7 @@ class CorefNeuralModel2(val sparseFeaturizer: PairwiseIndexingFeaturizer,
   
   def predict(input: DocumentGraph, weights: Array[Double]) = {
     require(input.size < MaxSize)
-    val layer = transform.extractLayer(DenseVector(weights))
+    val layer = transform.extractLayer(DenseVector(weights), false)
     computeCacheLogProbs(input, weights, layer, false)
     (0 until input.size).toArray.map(mentIdx => {
       val scores = input.cachedScoreMatrix(mentIdx)

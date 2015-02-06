@@ -49,7 +49,7 @@ class TransformModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSeq[W]) => B
   override def featureIndex: Index[Feature] = transform.index
 
   override def inferenceFromWeights(weights: DenseVector[Double]): Inference = {
-    val layer = transform.extractLayer(weights)
+    val layer = transform.extractLayer(weights, true)
 
     val grammar = new TransformModel.TransformGrammar[L, L2, W, transform.type](topology, lexicon, refinedTopology, refinements, labelFeaturizer, surfaceFeaturizer, layer)
     new Inference(annotator, constrainer, grammar, refinements)

@@ -56,7 +56,7 @@ class SimpleNNEpic[T](val transform: Transform[DenseVector[Double],DenseVector[D
 //  def getInitialWeights(initWeightsScale: Double) = transform.initialWeightVector(initWeightsScale, rng, true, "magic").data
   
   def accumulateGradientAndComputeObjective(ex: NNExample[T], weights: Array[Double], gradient: Array[Double]): Double = {
-    val layer = transform.extractLayer(DenseVector(weights))
+    val layer = transform.extractLayer(DenseVector(weights), true)
     val logProbs = layer.activations(DenseVector(ex.input)).data
 //    println(logProbs.toSeq)
     CorefNNEpic.softmaxi(logProbs)
@@ -67,7 +67,7 @@ class SimpleNNEpic[T](val transform: Transform[DenseVector[Double],DenseVector[D
   }
   
   def predict(input: Array[Double], weights: DenseVector[Double]): T = {
-    val layer = transform.extractLayer(weights)
+    val layer = transform.extractLayer(weights, true)
     val logProbs = layer.activations(DenseVector(input)).data
     labelIndexer.getObject(CorefNNEpic.argMaxIdx(logProbs))
   }
@@ -80,7 +80,7 @@ object SimpleNNEpic {
   
   def makeTransform(inputSize: Int, hiddenSize: Int, outputSize: Int, nonLinType: String) = {
     val innerTransform = new AffineTransform(hiddenSize, inputSize, new IdentityTransform[DenseVector[Double]]())
-    val nonLinTransform = new NonlinearTransform(nonLinType, innerTransform)
+    val nonLinTransform = new NonlinearTransform(nonLinType, hiddenSize, innerTransform)
 //    val nonLinTransform = if (nonLinType == "tanh") new TanhTransform(innerTransform) else if (nonLinType == "relu") new ReluTransform(innerTransform) else new CubeTransform(innerTransform)
     new AffineTransform(outputSize, hiddenSize, nonLinTransform)
   }
@@ -91,10 +91,10 @@ object SimpleNNEpic {
   
   def makeDeepTransform(inputSize: Int, hiddenSize: Int, numHiddenLayers: Int, outputSize: Int, nonLinType: String) = {
     val baseTransformLayer = new AffineTransform(hiddenSize, inputSize, new IdentityTransform[DenseVector[Double]])
-    var currLayer: Transform[DenseVector[Double],DenseVector[Double]] = new NonlinearTransform(nonLinType, baseTransformLayer)
+    var currLayer: Transform[DenseVector[Double],DenseVector[Double]] = new NonlinearTransform(nonLinType, hiddenSize, baseTransformLayer)
     for (i <- 1 until numHiddenLayers) {
       val tmpLayer = new AffineTransform(hiddenSize, hiddenSize, currLayer)
-      currLayer = new NonlinearTransform(nonLinType, tmpLayer)
+      currLayer = new NonlinearTransform(nonLinType, hiddenSize, tmpLayer)
     }
     new AffineTransform(outputSize, hiddenSize, currLayer)
   }
@@ -122,10 +122,10 @@ object SimpleNNEpic {
     } else {
       new CachingLookupAndAffineTransformDense(numHidden, word2vecIndexed.vectorSize, word2vecIndexed)
     }
-    var currLayer: Transform[Array[Int],DenseVector[Double]] = new NonlinearTransform(nonLinType, baseTransformLayer)
+    var currLayer: Transform[Array[Int],DenseVector[Double]] = new NonlinearTransform(nonLinType, numHidden, baseTransformLayer)
     for (i <- 1 until numHiddenLayers) {
       val tmpLayer = new AffineTransformDense(numHidden, numHidden, currLayer)
-      currLayer = new NonlinearTransform(nonLinType, tmpLayer)
+      currLayer = new NonlinearTransform(nonLinType, numHidden, tmpLayer)
     }
     var transform = new AffineTransformDense(outputSize, numHidden, currLayer)
     transform

@@ -15,18 +15,18 @@ case class AffineTransform[FV, Mid](numOutputs: Int, numInputs: Int, innerTransf
 
   val index = SegmentedIndex(new AffineTransform.Index(numOutputs, numInputs, includeBias), innerTransform.index)
 
-  def extractLayer(weights: DenseVector[Double]) = {
-    extractLayerAndPenultimateLayer(weights)._1
+  def extractLayer(weights: DenseVector[Double], forTrain: Boolean) = {
+    extractLayerAndPenultimateLayer(weights, forTrain)._1
   }
   
-  def extractLayerAndPenultimateLayer(weights: DenseVector[Double]) = {
+  def extractLayerAndPenultimateLayer(weights: DenseVector[Double], forTrain: Boolean) = {
     val mat = weights(0 until (numOutputs * numInputs)).asDenseMatrix.reshape(numOutputs, numInputs, view = View.Require)
     val bias = if(includeBias) {
       weights(numOutputs * numInputs until index.componentOffset(1))
     } else {
       DenseVector.zeros[Double](numOutputs)
     }
-    val inner = innerTransform.extractLayer(weights(index.componentOffset(1) to -1))
+    val inner = innerTransform.extractLayer(weights(index.componentOffset(1) to -1), forTrain)
     new Layer(mat, bias, inner) -> inner
   }
   

@@ -14,7 +14,7 @@ trait Transform[In, +Out] {
   val index: Index[Feature]
 
 
-  def extractLayer(dv: DenseVector[Double]):Layer
+  def extractLayer(dv: DenseVector[Double], forTrain: Boolean):Layer
   
   def initialWeightVector(initWeightsScale: Double, rng: Random, outputLayer: Boolean, spec: String): DenseVector[Double]
 

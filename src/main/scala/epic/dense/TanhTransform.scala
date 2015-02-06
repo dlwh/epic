@@ -15,8 +15,7 @@ case class TanhTransform[FV](inner: Transform[FV, DenseVector[Double]]) extends 
 
   val index: inner.index.type = inner.index
 
-
-  def extractLayer(dv: DenseVector[Double]) = new Layer(inner.extractLayer(dv))
+  def extractLayer(dv: DenseVector[Double], forTrain: Boolean) = new Layer(inner.extractLayer(dv, forTrain))
   
   def initialWeightVector(initWeightsScale: Double, rng: Random, outputLayer: Boolean, spec: String) = inner.initialWeightVector(initWeightsScale, rng, false, spec)
   

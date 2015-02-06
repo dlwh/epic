@@ -19,14 +19,14 @@ case class AffineOutputTransform[FV](numOutputs: Int, numInputs: Int, innerTrans
 
   val index = SegmentedIndex(new AffineTransform.Index(numOutputs, numInputs, includeBias), innerTransform.index)
   
-  def extractLayerAndPenultimateLayer(weights: DenseVector[Double]) = {
+  def extractLayerAndPenultimateLayer(weights: DenseVector[Double], forTrain: Boolean) = {
     val mat = weights(0 until (numOutputs * numInputs)).asDenseMatrix.reshape(numOutputs, numInputs, view = View.Require)
     val bias = if(includeBias) {
       weights(numOutputs * numInputs until index.componentOffset(1))
     } else {
       DenseVector.zeros[Double](numOutputs)
     }
-    val inner = innerTransform.extractLayer(weights(index.componentOffset(1) to -1))
+    val inner = innerTransform.extractLayer(weights(index.componentOffset(1) to -1), forTrain)
     new OutputLayer(mat, bias, inner) -> inner
   }
   

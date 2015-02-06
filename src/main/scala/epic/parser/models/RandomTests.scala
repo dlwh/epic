@@ -61,7 +61,7 @@ object RandomTests {
     val time = System.nanoTime()
     for (i <- 0 until 5000) {
       weights(0) += 0.01
-      val layer = neuralAffineTransform.extractLayer(weights)
+      val layer = neuralAffineTransform.extractLayer(weights, true)
       layer.activations(inputVector)
     }
     println((System.nanoTime() - time) / 1000000 + " millis")

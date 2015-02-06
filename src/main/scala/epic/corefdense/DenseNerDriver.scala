@@ -44,6 +44,8 @@ object DenseNerDriver {
   val outputEmbedding = false;
   val outputEmbeddingDim = 20;
   
+  val useDropout = false
+  
   val trainPath = "";
   val trainSize = -1;
   val testPath = "";
@@ -96,17 +98,20 @@ object DenseNerDriver {
     val vecSize = word2vecIndexed.wordRepSize * DenseNerSystem.extractRelevantWords(trainSequenceExs.head.ex.words, 0).size
     
     // Build the net and system
-    val innerTransform = new NonlinearTransform(nonLinType, new AffineTransform(hiddenSize, vecSize, new IdentityTransform[DenseVector[Double]]()))
+    val innerTransformPreDropout = new NonlinearTransform(nonLinType, hiddenSize, new AffineTransform(hiddenSize, vecSize, new IdentityTransform[DenseVector[Double]]()))
+    val innerTransform = if (useDropout) {
+      new NonlinearTransform("dropout", hiddenSize, innerTransformPreDropout)
+    } else {
+      innerTransformPreDropout
+    }
     val transform = if (lrqt) {
       new LowRankQuadraticTransform(labelIndexer.size, lrqtRanks, vecSize, vecSize, new IdentityTransform[DenseVector[Double]]())
     } else if (outputEmbedding) {
       new AffineOutputEmbeddingTransform(labelIndexer.size, vecSize, outputEmbeddingDim, new IdentityTransform[DenseVector[Double]]())
 //      new AffineOutputEmbeddingTransform(labelIndexer.size, hiddenSize, outputEmbeddingDim, innerTransform)
     } else if (nonLinear) {
-//      new AffineTransformDense(labelIndexer.size, hiddenSize, new NonlinearTransform(nonLinType, new AffineTransform(hiddenSize, vecSize, new IdentityTransform[DenseVector[Double]]())))
-      new AffineOutputTransform(labelIndexer.size, hiddenSize, new NonlinearTransform(nonLinType, new AffineTransform(hiddenSize, vecSize, new IdentityTransform[DenseVector[Double]]())))
+      new AffineOutputTransform(labelIndexer.size, hiddenSize, innerTransform)
     } else {
-//      new AffineTransformDense(labelIndexer.size, vecSize, new IdentityTransform[DenseVector[Double]]())
       new AffineOutputTransform(labelIndexer.size, vecSize, new IdentityTransform[DenseVector[Double]]())
     }
     val denseNerSystem = new DenseNerSystem(labelIndexer, word2vecIndexed, transform, featurizedTransitionMatrix, nerFeaturizer, useSparseFeatures)

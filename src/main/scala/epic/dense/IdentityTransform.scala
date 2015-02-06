@@ -10,7 +10,7 @@ class IdentityTransform[T] extends Transform[T, T] {
   val index = Index[Feature]()
 
 
-  def extractLayer(weights: DenseVector[Double]) = {
+  def extractLayer(weights: DenseVector[Double], forTrain: Boolean) = {
     new Layer()
   }
   

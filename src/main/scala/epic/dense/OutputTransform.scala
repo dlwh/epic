@@ -13,10 +13,10 @@ import scala.util.Random
 trait OutputTransform[In, +Out] {
   val index: Index[Feature]
 
-  def extractLayer(dv: DenseVector[Double]):OutputLayer = extractLayerAndPenultimateLayer(dv)._1
+  def extractLayer(dv: DenseVector[Double], forTrain: Boolean):OutputLayer = extractLayerAndPenultimateLayer(dv, forTrain)._1
   
 //  def extractLayerAndPenultimateLayer(dv: DenseVector[Double]): (OutputLayer, Transform[In,Out]#Layer);
-  def extractLayerAndPenultimateLayer(dv: DenseVector[Double]): (OutputLayer, Transform.Layer[In,Out]);
+  def extractLayerAndPenultimateLayer(dv: DenseVector[Double], forTrain: Boolean): (OutputLayer, Transform.Layer[In,Out]);
   
   def initialWeightVector(initWeightsScale: Double, rng: Random, outputLayer: Boolean, spec: String): DenseVector[Double]
 

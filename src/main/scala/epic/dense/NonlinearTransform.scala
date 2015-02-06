@@ -7,19 +7,31 @@ import breeze.util.Index
 import scala.util.Random
 import breeze.numerics.sigmoid
 
-case class NonlinearTransform[FV](nonLinType: String, inner: Transform[FV, DenseVector[Double]]) extends Transform[FV, DenseVector[Double]] {
+case class NonlinearTransform[FV](nonLinType: String, size: Int, inner: Transform[FV, DenseVector[Double]]) extends Transform[FV, DenseVector[Double]] {
   
-  val nonlinearFcn = NonlinearTransform.getNonlinearFcn(nonLinType);
-
   val index: inner.index.type = inner.index
 
-  def extractLayer(dv: DenseVector[Double]) = new Layer(inner.extractLayer(dv))
+  def extractLayer(dv: DenseVector[Double], forTrain: Boolean) = { 
+    if (nonLinType == "dropout") {
+      val keepFrac = 0.5  // 1 - dropout fraction
+      val fcn = if (forTrain) {
+        // Only have "true" when we want to keep things around
+        new NonlinearTransform.Mask(Array.tabulate(size)(i => NonlinearTransform.globalRng.nextDouble < keepFrac)) 
+      } else {
+        new NonlinearTransform.Scale(keepFrac)
+      }
+      new Layer(fcn, inner.extractLayer(dv, forTrain))
+    } else {
+      val nonlinearFcn = NonlinearTransform.getNonlinearFcn(nonLinType);
+      new Layer(nonlinearFcn, inner.extractLayer(dv, forTrain))
+    }
+  }
   
   def initialWeightVector(initWeightsScale: Double, rng: Random, outputLayer: Boolean, spec: String) = inner.initialWeightVector(initWeightsScale, rng, false, spec)
 
   def clipHiddenWeightVectors(weights: DenseVector[Double], norm: Double, outputLayer: Boolean) = inner.clipHiddenWeightVectors(weights, norm, false)
   
-  case class Layer(innerLayer: inner.Layer) extends Transform.Layer[FV,DenseVector[Double]] {
+  case class Layer(nonlinearFcn: NonlinearTransform.NonlinearFcn, innerLayer: inner.Layer) extends Transform.Layer[FV,DenseVector[Double]] {
     
     val myIndex = Index[Feature]
     
@@ -52,6 +64,8 @@ case class NonlinearTransform[FV](nonLinType: String, inner: Transform[FV, Dense
 }
 
 object NonlinearTransform {
+  
+  val globalRng = new scala.util.Random(0)
   
   def getNonlinearFcn(nonLinType: String) = {
     if (nonLinType == "tanh") {

@@ -231,10 +231,10 @@ object PositionalNeuralModelFactory {
       } else {
         new CachingLookupAndAffineTransformDense(numHidden, word2vecIndexed.vectorSize, word2vecIndexed)
       }
-      var currLayer: Transform[Array[Int],DenseVector[Double]] = new NonlinearTransform(nonLinType, baseTransformLayer)
+      var currLayer: Transform[Array[Int],DenseVector[Double]] = new NonlinearTransform(nonLinType, numHidden, baseTransformLayer)
       for (i <- 1 until numHiddenLayers) {
         val tmpLayer = new AffineTransform(numHidden, numHidden, currLayer)
-        currLayer = new NonlinearTransform(nonLinType, tmpLayer)
+        currLayer = new NonlinearTransform(nonLinType, numHidden, tmpLayer)
       }
       var transform = new AffineTransformDense(outputSize, numHidden, currLayer)
       transform

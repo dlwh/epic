@@ -21,7 +21,7 @@ case class EmbeddingsTransform[FV](numOutputs: Int,
                              new AffineTransform.Index(word2vecIndexed.vocSize, word2vecIndexed.wordRepSize, false))
   println("Allocated " + index.indices.map(_.size) + " parameters for each index in the embedding layer (backpropagating into embeddings)")
   
-  def extractLayer(weights: DenseVector[Double]) = {
+  def extractLayer(weights: DenseVector[Double], forTrain: Boolean) = {
     val mat = weights(0 until (numOutputs * numInputs)).asDenseMatrix.reshape(numOutputs, numInputs, view = View.Require)
     val bias = if(includeBias) {
       weights(numOutputs * numInputs until index.indices(0).size)

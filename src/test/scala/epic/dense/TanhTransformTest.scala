@@ -16,7 +16,7 @@ class TanhTransformTest extends FunSuite {
     val dv = DenseVector.rand(10)
     val objective = new DiffFunction[DenseVector[Double]] {
       def calculate(x: DenseVector[Double]): (Double, DenseVector[Double]) = {
-        val layer = index.extractLayer(x)
+        val layer = index.extractLayer(x, true)
         val acts = layer.activations(dv)
         val obj = acts.sum
         val deriv = DenseVector.zeros[Double](x.length)
@@ -36,7 +36,7 @@ class TanhTransformTest extends FunSuite {
     val dv = DenseVector.rand(10)
     val objective = new DiffFunction[DenseVector[Double]] {
       def calculate(x: DenseVector[Double]): (Double, DenseVector[Double]) = {
-        val layer = index.extractLayer(x)
+        val layer = index.extractLayer(x, true)
         val acts = layer.activations(dv)
         val obj = acts.sum
         val deriv = DenseVector.zeros[Double](x.length)

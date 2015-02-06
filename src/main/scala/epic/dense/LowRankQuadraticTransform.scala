@@ -15,9 +15,9 @@ case class LowRankQuadraticTransform[FV](numOutputs: Int, numRanks: Int, numLeft
   val neuronIndex = SegmentedIndex(neurons.map(_.index):_*)
   val index = SegmentedIndex(neuronIndex, innerTransform.index)
 
-  def extractLayerAndPenultimateLayer(weights: DenseVector[Double]) = {
+  def extractLayerAndPenultimateLayer(weights: DenseVector[Double], forTrain: Boolean) = {
     val subTransforms = (0 until neurons.size).map(i => neurons(i).extractLayer(weights(neuronIndex.componentOffset(i) until neuronIndex.componentOffset(i) + neuronIndex.indices(i).size)))
-    val innerLayer = innerTransform.extractLayer(weights(index.componentOffset(1) to -1));
+    val innerLayer = innerTransform.extractLayer(weights(index.componentOffset(1) to -1), forTrain);
     new OutputLayer(subTransforms, innerLayer) -> innerLayer
   }
   

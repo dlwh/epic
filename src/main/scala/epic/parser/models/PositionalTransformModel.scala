@@ -91,16 +91,17 @@ class PositionalTransformModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSe
   override def inferenceFromWeights(weights: DenseVector[Double]): Inference = {
 //    val (layer, innerLayer) = transforms(0).extractLayerAndPenultimateLayer(weights)
 //    val grammar = new PositionalTransformModel.PositionalTransformGrammar[L, L2, W](topology, lexicon, refinedTopology, refinements, labelFeaturizer, surfaceFeaturizer, layer, innerLayer, maybeSparseSurfaceFeaturizer, weights)
+    // TODO: Change how layers are extracted here to handle train/test divergence
     val layersAndInnerLayers = for (i <- 0 until transforms.size) yield {
 //      println(i + ": " + index.componentOffset(i))
-      transforms(i).extractLayerAndPenultimateLayer(weights(index.componentOffset(i) until index.componentOffset(i) + index.indices(i).size))
+      transforms(i).extractLayerAndPenultimateLayer(weights(index.componentOffset(i) until index.componentOffset(i) + index.indices(i).size), true)
     }
     val layers: IndexedSeq[AffineTransformDense[Array[Int]]#Layer] = layersAndInnerLayers.map(_._1)
     val innerLayers: IndexedSeq[epic.dense.Transform.Layer[Array[Int],DenseVector[Double]]] = layersAndInnerLayers.map(_._2)
     val depLayers: IndexedSeq[AffineTransformDense[Array[Int]]#Layer] = for (i <- 0 until depTransforms.size) yield {
       val idxIdx = transforms.size + i
 //      println("dep " + i + ": " + index.componentOffset(idxIdx))
-      depTransforms(i).extractLayer(weights(index.componentOffset(idxIdx) until index.componentOffset(idxIdx) + index.indices(idxIdx).size)) 
+      depTransforms(i).extractLayer(weights(index.componentOffset(idxIdx) until index.componentOffset(idxIdx) + index.indices(idxIdx).size), true) 
     }
     val grammar = new PositionalTransformModel.PositionalTransformGrammar[L, L2, W](topology, lexicon, refinedTopology, refinements, labelFeaturizer,
                                                                                    surfaceFeaturizer, depFeaturizer, layers, innerLayers, depLayers, maybeSparseSurfaceFeaturizer, weights)
