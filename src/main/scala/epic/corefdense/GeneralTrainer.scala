@@ -172,7 +172,6 @@ class GeneralTrainer[T](val parallel: Boolean = false) {
   }
   
   def parallelGetMinibatchObjectiveAndGradient(exs: Seq[T], computer: LikelihoodAndGradientComputer[T], weights: Array[Double], gradientArray: Array[Double]) = {
-    var objective = 0.0
     val emptySS = new SuffStats(0.0, Array.tabulate(gradientArray.size)(i => 0.0))
 //    val finalSS = exs.aggregate(null: SuffStats)((currSS, ex) => {
     val finalSS = exs.par.aggregate(null: SuffStats)((currSS, ex) => {

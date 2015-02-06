@@ -76,19 +76,18 @@ case class AffineOutputEmbeddingTransform[FV](numOutputs: Int, numInputs: Int, o
           // Bias update
           biasDeriv(k) += scale(k)
           // Dumb way
-          for (i <- 0 until numInputs) {
-            for (j <- 0 until outputDim) {
-              weightsDeriv(j, i) += scale(k) * innerAct(i) * embeddings(k, j)
-              embeddingsDeriv(k, j) += scale(k) * weights(j, i) * innerAct(i)
-              innerScale(i) += scale(k) * weights(j, i) * embeddings(k, j)
-            }
-          }
-          // Smart way
-          // Weights update
-          // Row * column gives outer product
-//          weightsDeriv += innerAct.t * embeddings(k, ::).t * scale(k)
-//          embeddingsDeriv(k, ::).t += weights * innerAct * scale(k) // Embeddings update
-//          innerScale += weightst * embeddingsDeriv(k, ::).t * scale(k) // Inner scale update
+//          for (i <- 0 until numInputs) {
+//            for (j <- 0 until outputDim) {
+//              weightsDeriv(j, i) += scale(k) * innerAct(i) * embeddings(k, j)
+//              embeddingsDeriv(k, j) += scale(k) * weights(j, i) * innerAct(i)
+//              innerScale(i) += scale(k) * weights(j, i) * embeddings(k, j)
+//            }
+//          }
+          // Smart way; matches the dumb way exactly
+          // Column * row gives outer product
+          weightsDeriv += embeddings(k, ::).t * innerAct.t * scale(k) // Weights update
+          embeddingsDeriv(k, ::).t += weights * innerAct * scale(k) // Embeddings update
+          innerScale += weightst * embeddingsDeriv(k, ::).t * scale(k) // Inner scale update
         }
       }
       innerLayer.tallyDerivative(deriv(index.componentOffset(1) to -1), innerScale, fv)

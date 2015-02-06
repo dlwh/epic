@@ -116,16 +116,18 @@ case class LRQTNLayer(lhsWeights: DenseMatrix[Double], rhsWeights: DenseMatrix[D
       val lhsProj = lhsWeights * innerActs
       val rhsProj = rhsWeights * innerActs
 
-      for (r <- 0 until lhsWeights.rows) {
-//        lhsDeriv += rhsProj * innerActs.t * scale
-//      lhsDeriv(r) += innerActs * scale * rhsProj(r)
-        for (i <- 0 until lhsWeights.cols) {
-          lhsDeriv(r, i) += scale * innerActs(i) * rhsProj(r)
-        }
-        for (i <- 0 until rhsWeights.cols) {
-          rhsDeriv(r, i) += scale * innerActs(i) * lhsProj(r)
-        }
-      }
+      // Smart way
+      lhsDeriv += rhsProj * innerActs.t * scale
+      rhsDeriv += lhsProj * innerActs.t * scale
+      // Dumb way
+//      for (r <- 0 until lhsWeights.rows) {
+//        for (i <- 0 until lhsWeights.cols) {
+//          lhsDeriv(r, i) += scale * innerActs(i) * rhsProj(r)
+//        }
+//        for (i <- 0 until rhsWeights.cols) {
+//          rhsDeriv(r, i) += scale * innerActs(i) * lhsProj(r)
+//        }
+//      }
       require(deriv.size == lhsSize + rhsSize, "Backpropagating through LowRankQuadraticTransform is not currently supported")
     }
   }
