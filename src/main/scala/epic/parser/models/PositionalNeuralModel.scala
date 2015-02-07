@@ -17,7 +17,7 @@ import epic.trees._
 import epic.trees.annotations.TreeAnnotator
 import epic.util.{LRUCache, NotProvided, Optional}
 import epic.dense.TanhTransform
-import epic.dense.AffineTransformDense
+import epic.dense.AffineOutputTransform
 import epic.corefdense.Word2Vec
 import scala.collection.mutable.HashMap
 import epic.dense.Word2VecSurfaceFeaturizerIndexed
@@ -37,6 +37,7 @@ import epic.dense.NonlinearTransform
 
 case class ExtraPNMParams(useSparseLfsuf: Boolean = true,
                           useSparseBrown: Boolean = false,
+                          useDropout: Boolean = false,
                           vectorRescaling: Double = 1.0)
 
 case class PositionalNeuralModelFactory(@Help(text=
@@ -146,22 +147,23 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
 //    var transform = new AffineTransformDense(featurizer.index.size, numHidden, currLayer)
     
     println(word2vecIndexed.vectorSize + " x (" + numHidden + ")^" + numHiddenLayers + " x " + prodFeaturizer.index.size + " neural net")
-    val transform = PositionalNeuralModelFactory.buildNet(word2vecIndexed, numHidden, numHiddenLayers, prodFeaturizer.index.size, nonLinType, backpropIntoEmbeddings)
+    val transform = PositionalNeuralModelFactory.buildNet(word2vecIndexed, numHidden, numHiddenLayers, prodFeaturizer.index.size, nonLinType, useDropout, backpropIntoEmbeddings)
     val transforms = if (augmentWithLinear) {
       println("Adding a linear transform: " + word2vecIndexed.vectorSize + " x " + prodFeaturizer.index.size) 
-      IndexedSeq(transform, PositionalNeuralModelFactory.buildNet(word2vecIndexed, 0, 0, prodFeaturizer.index.size, "", backpropIntoEmbeddings))
+      IndexedSeq(transform, PositionalNeuralModelFactory.buildNet(word2vecIndexed, 0, 0, prodFeaturizer.index.size, "", useDropout, backpropIntoEmbeddings))
     } else {
       IndexedSeq(transform)
     }
-    val depTransforms = if (useDeps) {
-      println("Deps: " + word2vecIndexed.vectorSize + " x (" + numHidden + ")^" + numHiddenLayers + " x " + prodFeaturizer.index.size + " neural net")
-      val depTransform = PositionalNeuralModelFactory.buildNet(word2vecIndexed, numHidden, numHiddenLayers, 1, nonLinType, backpropIntoEmbeddings)
-      if (augmentWithLinear) {
-        println("Adding a linear transform to deps: " + word2vecIndexed.vectorSize + " x 1") 
-        IndexedSeq(depTransform, PositionalNeuralModelFactory.buildNet(word2vecIndexed, 0, 0, 1, "", backpropIntoEmbeddings))
-      } else {
-        IndexedSeq(depTransform)
-      }
+    val depTransforms: IndexedSeq[AffineOutputTransform[Array[Int]]] = if (useDeps) {
+      throw new RuntimeException("Dependency NNs removed temporarily")
+//      println("Deps: " + word2vecIndexed.vectorSize + " x (" + numHidden + ")^" + numHiddenLayers + " x " + prodFeaturizer.index.size + " neural net")
+//      val depTransform = PositionalNeuralModelFactory.buildNet(word2vecIndexed, numHidden, numHiddenLayers, 1, nonLinType, backpropIntoEmbeddings)
+//      if (augmentWithLinear) {
+//        println("Adding a linear transform to deps: " + word2vecIndexed.vectorSize + " x 1") 
+//        IndexedSeq(depTransform, PositionalNeuralModelFactory.buildNet(word2vecIndexed, 0, 0, 1, "", backpropIntoEmbeddings))
+//      } else {
+//        IndexedSeq(depTransform)
+//      }
     } else {
       IndexedSeq()
     }
@@ -222,9 +224,10 @@ object PositionalNeuralModelFactory {
                numHiddenLayers: Int,
                outputSize: Int,
                nonLinType: String,
-               backpropIntoEmbeddings: Boolean): AffineTransformDense[Array[Int]] = {
+               useDropout: Boolean,
+               backpropIntoEmbeddings: Boolean): AffineOutputTransform[Array[Int]] = {
     if (numHiddenLayers == 0) {
-      new AffineTransformDense(outputSize, word2vecIndexed.vectorSize, new CachingLookupTransform(word2vecIndexed))
+      new AffineOutputTransform(outputSize, word2vecIndexed.vectorSize, new CachingLookupTransform(word2vecIndexed))
     } else {
       val baseTransformLayer = if (backpropIntoEmbeddings) {
         new EmbeddingsTransform(numHidden, word2vecIndexed.vectorSize, word2vecIndexed)
@@ -236,7 +239,8 @@ object PositionalNeuralModelFactory {
         val tmpLayer = new AffineTransform(numHidden, numHidden, currLayer)
         currLayer = new NonlinearTransform(nonLinType, numHidden, tmpLayer)
       }
-      var transform = new AffineTransformDense(outputSize, numHidden, currLayer)
+//      var transform = new AffineTransformDense(outputSize, numHidden, currLayer)
+      var transform = new AffineOutputTransform(outputSize, numHidden, currLayer)
       transform
     }
   }

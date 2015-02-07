@@ -8,7 +8,7 @@ import epic.constraints.ChartConstraints
 import epic.dense.AffineTransformDense
 import epic.dense.IdentityTransform
 import epic.dense.Transform
-import epic.dense.Transform
+import epic.dense.OutputTransform
 import epic.dense.Word2VecSurfaceFeaturizerIndexed
 import epic.dense.Word2VecDepFeaturizerIndexed
 import epic.features._
@@ -34,9 +34,9 @@ class PositionalTransformModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSe
                                labelFeaturizer: RefinedFeaturizer[L, W, Feature],
                                surfaceFeaturizer: Word2VecSurfaceFeaturizerIndexed[W],
                                depFeaturizer: Word2VecDepFeaturizerIndexed[W],
-                               val transforms: IndexedSeq[AffineTransformDense[Array[Int]]],
+                               val transforms: IndexedSeq[OutputTransform[Array[Int],DenseVector[Double]]],
                                val maybeSparseSurfaceFeaturizer: Option[IndexedSpanFeaturizer[L, L2, W]],
-                               val depTransforms: Seq[AffineTransformDense[Array[Int]]]) extends ParserModel[L, W] {
+                               val depTransforms: Seq[OutputTransform[Array[Int],DenseVector[Double]]]) extends ParserModel[L, W] {
   override type Inference = PositionalTransformModel.Inference[L, L2, W]
 
 
@@ -89,16 +89,12 @@ class PositionalTransformModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSe
   override def featureIndex: Index[Feature] = index
 
   override def inferenceFromWeights(weights: DenseVector[Double]): Inference = {
-//    val (layer, innerLayer) = transforms(0).extractLayerAndPenultimateLayer(weights)
-//    val grammar = new PositionalTransformModel.PositionalTransformGrammar[L, L2, W](topology, lexicon, refinedTopology, refinements, labelFeaturizer, surfaceFeaturizer, layer, innerLayer, maybeSparseSurfaceFeaturizer, weights)
-    // TODO: Change how layers are extracted here to handle train/test divergence
     val layersAndInnerLayers = for (i <- 0 until transforms.size) yield {
-//      println(i + ": " + index.componentOffset(i))
       transforms(i).extractLayerAndPenultimateLayer(weights(index.componentOffset(i) until index.componentOffset(i) + index.indices(i).size), true)
     }
-    val layers: IndexedSeq[AffineTransformDense[Array[Int]]#Layer] = layersAndInnerLayers.map(_._1)
+    val layers: IndexedSeq[OutputTransform[Array[Int],DenseVector[Double]]#OutputLayer] = layersAndInnerLayers.map(_._1)
     val innerLayers: IndexedSeq[epic.dense.Transform.Layer[Array[Int],DenseVector[Double]]] = layersAndInnerLayers.map(_._2)
-    val depLayers: IndexedSeq[AffineTransformDense[Array[Int]]#Layer] = for (i <- 0 until depTransforms.size) yield {
+    val depLayers: IndexedSeq[OutputTransform[Array[Int],DenseVector[Double]]#OutputLayer] = for (i <- 0 until depTransforms.size) yield {
       val idxIdx = transforms.size + i
 //      println("dep " + i + ": " + index.componentOffset(idxIdx))
       depTransforms(i).extractLayer(weights(index.componentOffset(idxIdx) until index.componentOffset(idxIdx) + index.indices(idxIdx).size), true) 
@@ -126,21 +122,23 @@ object PositionalTransformModel {
       val product = grammar.anchor(words, constrainer.constraints(ti.words))
       LatentTreeMarginal(product, annotated)
     }
+    
+    override def forTesting = this
   }
 
   @SerialVersionUID(4749637878577393596L)
   class PositionalTransformGrammar[L, L2, W](val topology: RuleTopology[L],
-                                   val lexicon: Lexicon[L, W],
-                                   val refinedTopology: RuleTopology[L2],
-                                   val refinements: GrammarRefinements[L, L2],
-                                   labelFeaturizer: RefinedFeaturizer[L, W, Feature],
-                                   surfaceFeaturizer: Word2VecSurfaceFeaturizerIndexed[W],
-                                   depFeaturizer: Word2VecDepFeaturizerIndexed[W],
-                                   layers: IndexedSeq[AffineTransformDense[Array[Int]]#Layer],
-                                   penultimateLayers: IndexedSeq[epic.dense.Transform.Layer[Array[Int],DenseVector[Double]]],
-                                   depLayers: IndexedSeq[AffineTransformDense[Array[Int]]#Layer],
-                                   val maybeSparseSurfaceFeaturizer: Option[IndexedSpanFeaturizer[L, L2, W]],
-                                   weights: DenseVector[Double]) extends Grammar[L, W] with Serializable {
+                                             val lexicon: Lexicon[L, W],
+                                             val refinedTopology: RuleTopology[L2],
+                                             val refinements: GrammarRefinements[L, L2],
+                                             labelFeaturizer: RefinedFeaturizer[L, W, Feature],
+                                             surfaceFeaturizer: Word2VecSurfaceFeaturizerIndexed[W],
+                                             depFeaturizer: Word2VecDepFeaturizerIndexed[W],
+                                             layers: IndexedSeq[OutputTransform[Array[Int],DenseVector[Double]]#OutputLayer],
+                                             penultimateLayers: IndexedSeq[epic.dense.Transform.Layer[Array[Int],DenseVector[Double]]],
+                                             depLayers: IndexedSeq[OutputTransform[Array[Int],DenseVector[Double]]#OutputLayer],
+                                             val maybeSparseSurfaceFeaturizer: Option[IndexedSpanFeaturizer[L, L2, W]],
+                                             weights: DenseVector[Double]) extends Grammar[L, W] with Serializable {
 
     override def withPermissiveLexicon: Grammar[L, W] = {
       new PositionalTransformGrammar(topology, lexicon.morePermissive, refinedTopology, refinements, labelFeaturizer, surfaceFeaturizer, depFeaturizer, layers, penultimateLayers, depLayers, maybeSparseSurfaceFeaturizer, weights)
