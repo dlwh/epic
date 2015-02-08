@@ -5,7 +5,6 @@ import breeze.features.FeatureVector
 import breeze.linalg._
 import breeze.util.Index
 import epic.constraints.ChartConstraints
-import epic.dense.AffineTransformDense
 import epic.dense.IdentityTransform
 import epic.dense.Transform
 import epic.dense.OutputTransform
@@ -19,6 +18,7 @@ import epic.trees._
 import spire.math.fpf.MaybeDouble
 import epic.framework.StandardExpectedCounts
 import scala.util.Random
+import scala.collection.mutable.HashMap
 
 /**
  * TODO
@@ -39,6 +39,13 @@ class PositionalTransformModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSe
                                val depTransforms: Seq[OutputTransform[Array[Int],DenseVector[Double]]]) extends ParserModel[L, W] {
   override type Inference = PositionalTransformModel.Inference[L, L2, W]
 
+//  override def accumulateCounts(inf: Inference, d: TreeInstance[L, W], accum: ExpectedCounts, scale: Double):Unit = {
+//    val s = inf.scorer(d)
+//    val m = inf.marginal(s, d)
+//    val gm = inf.goldMarginal(s, d)
+//    accumulateCounts(inf, s, d, m, accum, scale)
+//    accumulateCounts(inf, s, d, gm, accum, -scale)
+//  }
 
   override def accumulateCounts(inf: Inference, s: Scorer, d: TreeInstance[L, W], m: Marginal, accum: ExpectedCounts, scale: Double): Unit = {
 //    println("Extracting ecounts")
@@ -125,6 +132,7 @@ object PositionalTransformModel {
       LatentTreeMarginal(product, annotated)
     }
     
+    // This needs to be different for dropout, so that we can get the right layers
 //    override def forTesting = this
     override def forTesting = grammar.origPTModel.inferenceFromWeights(grammar.weights, false)
   }
@@ -155,53 +163,9 @@ object PositionalTransformModel {
       val sspec = surfaceFeaturizer.anchor(w)
       val depSpec = depFeaturizer.anchor(w)
       val lspec = labelFeaturizer.anchor(w)
-
-      // For each split point, remember the (begin, end) pair that that split point was observed with. There'll
-      // only be one in the gold, but more in the prediction. Accumulate rule counts (output layer) until
-      // we need this split point for a different set of indices or we come to the end. Then, backpropagate
-      // the rule marginals through the network to get the derivative.
-//      val UNUSED = (-1, -1)
-//      val states = Array.fill(w.length + 2)(UNUSED) // 1 for each split,  length for unaries, length +1 for spans
-//      val ruleCountsPerState = Array.fill(w.length + 2)(SparseVector.zeros[Double](labelFeaturizer.index.size))
-//
-//      def checkFlush(begin: Int, split: Int, end: Int) {
-//        val state: (Int, Int) = (begin, end)
-//        val oldState: (Int, Int) = states(split)
-//        if(oldState != state) {
-//          if(oldState != UNUSED) {
-//            val ffeats = if(split >= length) sspec.featuresForSpan(oldState._1, oldState._2) else sspec.featuresForSplit(oldState._1, split, oldState._2)
-//            layer.tallyDerivative(deriv, ruleCountsPerState(split) *= scale, ffeats)
-//            ruleCountsPerState(split) := 0.0
-//          }
-//          states(split) = state
-//        }
-//      }
-//      
-//      m visit new AnchoredVisitor[L] {
-//        
-//        override def visitUnaryRule(begin: Int, end: Int, rule: Int, ref: Int, score: Double): Unit = {
-//          checkFlush(begin, length, end)
-//          axpy(score, new FeatureVector(lspec.featuresForUnaryRule(begin, end, rule, ref)), ruleCountsPerState(length))
-//        }
-//
-//        override def visitSpan(begin: Int, end: Int, tag: Int, ref: Int, score: Double): Unit = {
-//          checkFlush(begin, length + 1, end)
-//          axpy(score, new FeatureVector(lspec.featuresForSpan(begin, end, tag, ref)), ruleCountsPerState(length + 1))
-//
-//        }
-//
-//        override def visitBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int, score: Double): Unit = {
-//          checkFlush(begin, split, end)
-//          axpy(score, new FeatureVector(lspec.featuresForBinaryRule(begin, split, end, rule, ref)), ruleCountsPerState(split))
-//        }
-//      }
-//
-//      for(i <- 0 until states.length) {
-//        checkFlush(-1, i, -1) // force a flush
-//      }
-      
       
       val maxTetraLen = ((w.size + 2) * (w.size + 3) * (w.size + 4))/6 + ((w.size + 1) * (w.size + 2))/2 + w.size + 2
+//      val maxTetraLen = ((w.size + 2) * (w.size + 3) * (w.size + 4))/6 + ((w.size + 1) * (w.size + 2))/2 + w.size + 2
       
       def tetra(begin: Int, split: Int, end: Int) = {
         (end * (end + 1) * (end + 2))/6 + ((split + 1) * split / 2 + begin)
@@ -211,6 +175,8 @@ object PositionalTransformModel {
       val countsPerHeadDepPair = Array.tabulate(w.size, w.size)((i, j) => 0.0)
       val statesUsed = Array.fill(maxTetraLen)(false)
       val untetra = Array.fill(maxTetraLen)((-1, -1, -1))
+      
+//      val untetra = new HashMap[Int,(Int,Int,Int)]
       
       m visit new AnchoredVisitor[L] {
         
@@ -238,6 +204,10 @@ object PositionalTransformModel {
           countsPerHeadDepPair(headIdx)(childIdx) += score
         }
       }
+      
+//      println("MTL: " + maxTetraLen + ", " + w.size)
+//      println(tetra(w.length - 1, w.length, w.length + 2))
+//      println(statesUsed.map(a => if (a) 1 else 0).reduce(_ + _) + " used")
 
       for (i <- 0 until ruleCountsPerState.length) {
         if (statesUsed(i)) {
@@ -341,7 +311,7 @@ object PositionalTransformModel {
           val tetraIdx = tetra(begin, split, end)
           val fs = getOrElseUpdate(layerIdx, tetraIdx, { penultimateLayers(layerIdx).activations(sspec.featuresForSplit(begin, split, end)) })
           for (rfeat <- rfeats) {
-            total += getOrElseUpdateFinal(layerIdx, tetraIdx, rfeat, labelFeaturizer.index.size, { layers(layerIdx).activationsFromPenultimateDot(fs, Array(rfeat)) })
+            total += getOrElseUpdateFinal(layerIdx, tetraIdx, rfeat, labelFeaturizer.index.size, { layers(layerIdx).activationsFromPenultimateDot(fs, rfeat) })
           }
         }
         if (depLayers.size > 0) {
@@ -362,7 +332,7 @@ object PositionalTransformModel {
         for (layerIdx <- 0 until layers.size) {
           val fs = getOrElseUpdate(layerIdx, tetraIdx, { penultimateLayers(layerIdx).activations(sspec.featuresForSpan(begin, end)) })
           for (rfeat <- rfeats) {
-            total += getOrElseUpdateFinal(layerIdx, tetraIdx, rfeat, labelFeaturizer.index.size, { layers(layerIdx).activationsFromPenultimateDot(fs, Array(rfeat)) })
+            total += getOrElseUpdateFinal(layerIdx, tetraIdx, rfeat, labelFeaturizer.index.size, { layers(layerIdx).activationsFromPenultimateDot(fs, rfeat) })
           }
         }
         if (maybeSparseSurfaceFeaturizer.isDefined) {
@@ -378,7 +348,7 @@ object PositionalTransformModel {
         for (layerIdx <- 0 until layers.size) {
           val fs = getOrElseUpdate(layerIdx, tetraIdx, { penultimateLayers(layerIdx).activations(sspec.featuresForSpan(begin, end)) })
           for (rfeat <- rfeats) {
-            total += getOrElseUpdateFinal(layerIdx, tetraIdx, rfeat, labelFeaturizer.index.size, { layers(layerIdx).activationsFromPenultimateDot(fs, Array(rfeat)) })
+            total += getOrElseUpdateFinal(layerIdx, tetraIdx, rfeat, labelFeaturizer.index.size, { layers(layerIdx).activationsFromPenultimateDot(fs, rfeat) })
           }
         }
         if (maybeSparseSurfaceFeaturizer.isDefined) {

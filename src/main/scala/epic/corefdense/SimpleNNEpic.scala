@@ -4,7 +4,7 @@ import edu.berkeley.nlp.futile.fig.basic.Indexer
 import epic.dense.Word2VecIndexed
 import epic.dense.CachingLookupAndAffineTransformDense
 import epic.dense.EmbeddingsTransform
-import epic.dense.AffineTransformDense
+import epic.dense.AffineOutputTransform
 import epic.dense.Transform
 import breeze.linalg._
 import epic.parser.models.PositionalNeuralModelFactory
@@ -124,10 +124,10 @@ object SimpleNNEpic {
     }
     var currLayer: Transform[Array[Int],DenseVector[Double]] = new NonlinearTransform(nonLinType, numHidden, baseTransformLayer)
     for (i <- 1 until numHiddenLayers) {
-      val tmpLayer = new AffineTransformDense(numHidden, numHidden, currLayer)
+      val tmpLayer = new AffineTransform(numHidden, numHidden, currLayer)
       currLayer = new NonlinearTransform(nonLinType, numHidden, tmpLayer)
     }
-    var transform = new AffineTransformDense(outputSize, numHidden, currLayer)
+    var transform = new AffineOutputTransform(outputSize, numHidden, currLayer)
     transform
   }
   

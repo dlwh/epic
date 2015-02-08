@@ -61,29 +61,29 @@ case class EmbeddingsTransform[FV](numOutputs: Int,
     // these being multiplied by the parameter vector. Note that although the same
     // word vector is used for each word identity, the parameter vector depends
     // on the position.
-    val cache = new HashMap[(Int,Int),DenseVector[Double]]
-//    val caches = Array.tabulate(6)(i => new HashMap[Int,DenseVector[Double]])
+//    val cache = new HashMap[(Int,Int),DenseVector[Double]]
+    val caches = Array.tabulate(6)(i => new HashMap[Int,DenseVector[Double]])
 
     def activations(fv: Array[Int]) = {
       val finalVector = DenseVector.zeros[Double](numOutputs)
       for (i <- 0 until fv.size) {
-        val wordPosn = fv(i) -> i
+//        val wordPosn = fv(i) -> i
         if (fv(i) != -1) {
-//          caches(i).synchronized {
-//            if (!caches(i).contains(fv(i))) {
-//              val startIdx = i * word2vecFeaturizer.wordRepSize
-//              caches(i).put(fv(i), weights(::, startIdx until startIdx + word2vecFeaturizer.wordRepSize) * DenseVector(word2vecFeaturizer.word2vec(wordPosn._1)))
-//            }
-//            finalVector += caches(i)(fv(i))
-//          }
-          cache.synchronized {
-            if (!cache.contains(wordPosn)) {
+          caches(i).synchronized {
+            if (!caches(i).contains(fv(i))) {
               val startIdx = i * word2vecIndexed.wordRepSize
-              val wordVec = DenseVector(word2vecIndexed.word2vec(wordPosn._1)) + wordWeights(wordPosn._1, ::).t
-              cache.put(wordPosn, weights(::, startIdx until startIdx + word2vecIndexed.wordRepSize) * wordVec)
+              caches(i).put(fv(i), weights(::, startIdx until startIdx + word2vecIndexed.wordRepSize) * DenseVector(word2vecIndexed.word2vec(fv(i))))
             }
-            finalVector += cache(wordPosn)
+            finalVector += caches(i)(fv(i))
           }
+//          cache.synchronized {
+//            if (!cache.contains(wordPosn)) {
+//              val startIdx = i * word2vecIndexed.wordRepSize
+//              val wordVec = DenseVector(word2vecIndexed.word2vec(wordPosn._1)) + wordWeights(wordPosn._1, ::).t
+//              cache.put(wordPosn, weights(::, startIdx until startIdx + word2vecIndexed.wordRepSize) * wordVec)
+//            }
+//            finalVector += cache(wordPosn)
+//          }
 //          val startIdx = i * word2vecFeaturizer.wordRepSize
 //          finalVector += weights(::, startIdx until startIdx + word2vecFeaturizer.wordRepSize) * DenseVector(word2vecFeaturizer.word2vec(wordPosn._1))
         }
