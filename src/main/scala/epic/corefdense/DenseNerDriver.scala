@@ -18,6 +18,7 @@ import epic.dense.Transform
 import epic.dense.Word2VecIndexed
 import edu.berkeley.nlp.entity.ner.NerPruner
 import edu.berkeley.nlp.entity.ner.NerPrunerFromModel
+import scala.util.Random
 
 object DenseNerDriver {
   
@@ -26,6 +27,7 @@ object DenseNerDriver {
   val eta = 1.0F
   val reg = 1e-8
   val initWeightsScale = 0.01
+  val initializerSpec = ""
   val batchSize = 100
   
   val parallel = true
@@ -44,8 +46,10 @@ object DenseNerDriver {
   val lrqtRanks = 20
   val outputEmbedding = false;
   val outputEmbeddingDim = 20;
+  val clipEmbeddingNorms = false;
   
   val useDropout = false
+  val stagedTraining = false
   
   val trainPath = "";
   val trainSize = -1;
@@ -73,7 +77,8 @@ object DenseNerDriver {
     Logger.logss("Loading pruner from " + pruningModelPath + " (not loading if path is empty)");
     val exampleLoader = new DenseNerExampleLoader(if (pruningModelPath == "") None else Option(new NerPrunerFromModel(GUtil.load(pruningModelPath).asInstanceOf[NerSystemLabeled], -negPruningThreshold)), labelIndexer)
     Logger.startTrack("Extracting training examples");
-    val trainExamples = exampleLoader.extractNerExsFromConll(trainDocs, filterPrunedExs = true)
+//    val trainExamples = exampleLoader.extractNerExsFromConll(trainDocs, filterPrunedExs = true)
+    val trainExamples = new Random(0).shuffle(exampleLoader.extractNerExsFromConll(trainDocs, filterPrunedExs = true))
     Logger.endTrack();
     val nerFeaturizer = NerFeaturizer(featureSetSpec.split(":").toSet, featureIndexer, labelIndexer, trainExamples.map(_.ex.words), maybeWikipediaDB, maybeBrownClusters, 1, 10, 2);
     // Featurize transitions and then examples
@@ -104,25 +109,26 @@ object DenseNerDriver {
     } else if (outputEmbedding) {
       new AffineOutputEmbeddingTransform(labelIndexer.size, vecSize, outputEmbeddingDim, new IdentityTransform[DenseVector[Double]]())
     } else if (nonLinear) {
-      var innerTransform: Transform[DenseVector[Double],DenseVector[Double]] = new IdentityTransform[DenseVector[Double]]();
-      var nextLayerInputSize = vecSize
-      for (i <- 0 until numHiddenLayers) {
-        innerTransform = new NonlinearTransform(nonLinType, hiddenSize, new AffineTransform(hiddenSize, nextLayerInputSize, innerTransform))
-        nextLayerInputSize = hiddenSize
-        innerTransform = if (useDropout) {
-          new NonlinearTransform("dropout", hiddenSize, innerTransform)
-        } else {
-          innerTransform
-        }
-      }
-      new AffineOutputTransform(labelIndexer.size, nextLayerInputSize, innerTransform)
+      buildBasicNN(labelIndexer.size, vecSize, numHiddenLayers)
+//      var innerTransform: Transform[DenseVector[Double],DenseVector[Double]] = new IdentityTransform[DenseVector[Double]]();
+//      var nextLayerInputSize = vecSize
+//      for (i <- 0 until numHiddenLayers) {
+//        innerTransform = new NonlinearTransform(nonLinType, hiddenSize, new AffineTransform(hiddenSize, nextLayerInputSize, innerTransform))
+//        nextLayerInputSize = hiddenSize
+//        innerTransform = if (useDropout) {
+//          new NonlinearTransform("dropout", hiddenSize, innerTransform)
+//        } else {
+//          innerTransform
+//        }
+//      }
+//      new AffineOutputTransform(labelIndexer.size, nextLayerInputSize, innerTransform)
     } else {
       new AffineOutputTransform(labelIndexer.size, vecSize, new IdentityTransform[DenseVector[Double]]())
     }
-    val denseNerSystem = new DenseNerSystem(labelIndexer, word2vecIndexed, transform, featurizedTransitionMatrix, nerFeaturizer, useSparseFeatures)
+    val denseNerSystem = new DenseNerSystem(labelIndexer, word2vecIndexed, transform, featurizedTransitionMatrix, nerFeaturizer, useSparseFeatures, clipEmbeddingNorms)
     
     // Train
-    val initialWeights = denseNerSystem.getInitialWeights(initWeightsScale);
+    val initialWeights = denseNerSystem.getInitialWeights(initWeightsScale, initializerSpec);
 //    if (checkEmpiricalGradient) {
 //      val indices = HashSet[Int]();
 //      indices ++= 0 until 5
@@ -130,10 +136,23 @@ object DenseNerDriver {
 //      indices ++= transform.index.size until transform.index.size + 5
 //      GeneralTrainer.checkGradientFromPoint(trainDocGraphs, corefNeuralModel, initialWeights, Array.tabulate(initialWeights.size)(i => 0.0), indices.toSet, verbose = true)
 //    }
-    val weights = if (useAdadelta) {
+    var weights = if (useAdadelta) {
       new GeneralTrainer(parallel).trainAdadelta(trainSequenceExs, denseNerSystem, 0.95, batchSize, numItrs, initialWeights, verbose = true);
     } else {
       new GeneralTrainer(parallel).trainAdagrad(trainSequenceExs, denseNerSystem, eta, reg, batchSize, numItrs, initialWeights, verbose = true);
+    }
+    
+    // If staged training, do another stage
+    val (finalSystem, finalWeights) = if (stagedTraining) {
+      Logger.logss("Running staged training; doing another round")
+      val newTransform = buildBasicNN(labelIndexer.size, vecSize, numHiddenLayers + 1)
+      val newDenseNerSystem = new DenseNerSystem(labelIndexer, word2vecIndexed, newTransform, featurizedTransitionMatrix, nerFeaturizer, useSparseFeatures, clipEmbeddingNorms)
+      val newInitialWeights = graftGetInitialWeights(transform.asInstanceOf[AffineOutputTransform[DenseVector[Double]]], newTransform, DenseVector(weights), initWeightsScale, new Random(0), initializerSpec)
+      // Train for twice as long on the new system
+      val newWeights = new GeneralTrainer(parallel).trainAdadelta(trainSequenceExs, newDenseNerSystem, 0.95, batchSize, 2 * numItrs, newInitialWeights.data, verbose = true);
+      (newDenseNerSystem, newWeights)
+    } else {
+      (denseNerSystem, weights)
     }
     
     // Extract test examples and run the model
@@ -142,10 +161,44 @@ object DenseNerDriver {
     val testSequenceExs = testExamples.map(ex => new NerExampleWithFeatures(ex.ex, nerFeaturizer.featurize(ex.ex, false), ex.allowedStates));
     val testGoldChunks = testSequenceExs.map(ex => NerSystemLabeled.convertToLabeledChunks(ex.ex.goldLabels));
     Logger.startTrack("Decoding dev");
-    val testPredChunks = testSequenceExs.map(ex => NerSystemLabeled.convertToLabeledChunks(denseNerSystem.decode(ex, weights)))
+    val testPredChunks = testSequenceExs.map(ex => NerSystemLabeled.convertToLabeledChunks(finalSystem.decode(ex, finalWeights)))
     Logger.endTrack();
     NEEvaluator.evaluateChunksBySent(testGoldChunks, testPredChunks);
     
     LightRunner.finalizeOutput()
+  }
+  
+  def buildBasicNN(outputSize: Int, inputSize: Int, numHiddenLayersThisNet: Int) = {
+    var innerTransform: Transform[DenseVector[Double],DenseVector[Double]] = new IdentityTransform[DenseVector[Double]]();
+    var nextLayerInputSize = inputSize
+    for (i <- 0 until numHiddenLayersThisNet) {
+      innerTransform = new NonlinearTransform(nonLinType, hiddenSize, new AffineTransform(hiddenSize, nextLayerInputSize, innerTransform))
+      nextLayerInputSize = hiddenSize
+      innerTransform = if (useDropout) {
+        new NonlinearTransform("dropout", hiddenSize, innerTransform)
+      } else {
+        innerTransform
+      }
+    }
+    new AffineOutputTransform(outputSize, nextLayerInputSize, innerTransform)
+  }
+  
+  
+  def graftGetInitialWeights[FV](baseTransform: AffineOutputTransform[FV],
+                                 newTransform: AffineOutputTransform[FV],
+                                 weights: DenseVector[Double],
+                                 initWeightsScale: Double,
+                                 rng: Random,
+                                 initializerSpec: String) = {
+    val newTransformInitialWeights = newTransform.initialWeightVector(initWeightsScale, rng, true, initializerSpec)
+    // Discard the output layer from the first transform
+    val oldStart = baseTransform.index.componentOffset(1)
+    val oldEnd = weights.size
+    val numWeightsToKeep = baseTransform.index.size - oldStart
+    val newStart = newTransformInitialWeights.size - numWeightsToKeep
+    val newEnd = newTransformInitialWeights.size
+    newTransformInitialWeights(newStart until newEnd) := weights(oldStart until oldEnd)
+    Logger.logss("Rewriting weights from " + newStart + " until " + newEnd + " with old weights from " + oldStart + " until " + oldEnd)
+    newTransformInitialWeights
   }
 }

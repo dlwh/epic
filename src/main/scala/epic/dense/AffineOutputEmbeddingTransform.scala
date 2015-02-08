@@ -29,10 +29,54 @@ case class AffineOutputEmbeddingTransform[FV](numOutputs: Int, numInputs: Int, o
     new OutputLayer(mat, embeddings, bias, inner) -> inner
   }
   
+  def clipEmbeddingNorms(weights: DenseVector[Double]) {
+    val embeddings = weights(index.componentOffset(1) until index.componentOffset(1) + (numOutputs * outputDim)).asDenseMatrix.reshape(numOutputs, outputDim, view = View.Require)
+    for (i <- 0 until embeddings.rows) {
+      var norm = 0.0
+      for (j <- 0 until embeddings.cols) {
+        norm += embeddings(i, j) * embeddings(i, j)
+      }
+      norm = Math.sqrt(norm)
+      for (j <- 0 until embeddings.cols) {
+        embeddings(i, j) /= norm
+      }
+    }
+  }
+  
+  def displayEmbeddingNorms(weights: DenseVector[Double]) {
+    val embeddings = weights(index.componentOffset(1) until index.componentOffset(1) + (numOutputs * outputDim)).asDenseMatrix.reshape(numOutputs, outputDim, view = View.Require)
+    var avgNorm = 0.0
+    var maxNorm = 0.0
+    for (i <- 0 until embeddings.rows) {
+      var norm = 0.0
+      for (j <- 0 until embeddings.cols) {
+        norm += embeddings(i, j) * embeddings(i, j)
+      }
+      norm = Math.sqrt(norm)
+      avgNorm += norm
+      maxNorm = Math.max(maxNorm, norm)
+    }
+    println("Average norm: " + avgNorm/embeddings.rows + ", max norm: " + maxNorm)
+  }
+  
   def initialWeightVector(initWeightsScale: Double, rng: Random, outputLayer: Boolean, spec: String) = {
     require(outputLayer)
     val embeddingsInitialization = if (spec == "magic") {
       AffineTransform.getMagicAffineWeights(index.indices(1).size, numOutputs, outputDim, initWeightsScale, rng)
+    } else if (spec == "identity") {
+      require(outputDim <= numOutputs, outputDim + " " + numOutputs)
+      val mat = DenseMatrix.zeros[Double](numOutputs, outputDim)
+      for (i <- 0 until outputDim) {
+        mat(i, i) = 1.0
+      }
+      for (i <- outputDim until numOutputs) {
+        mat(i, rng.nextInt(outputDim)) = 1.0
+      }
+      val biasInitializer = DenseVector.zeros[Double](numOutputs)
+      val initWeights = DenseVector.vertcat(DenseVector(mat.data), biasInitializer)
+//      val tmpIW = AffineTransform.getMagicAffineWeights(index.indices(1).size, numOutputs, outputDim, initWeightsScale, rng)
+//      println(initWeights.size + " " + tmpIW.size)
+      initWeights
     } else {
       AffineTransform.getGaussianAffineWeights(index.indices(1).size, initWeightsScale, rng)
     }

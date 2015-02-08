@@ -72,11 +72,11 @@ class PositionalTransformModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSe
     SegmentedIndex((transforms.map(_.index) ++ depTransforms.map(_.index)):_*)
   }
   
-  def initialWeightVector(randomize: Boolean, initWeightsScale: Double): DenseVector[Double] = {
+  def initialWeightVector(randomize: Boolean, initWeightsScale: Double, initializerSpec: String): DenseVector[Double] = {
     val rng = new Random(0)
 //    val initTransformWeights = transform.initialWeightVector(initWeightsScale, rng, true);
-    val initTransformWeights = DenseVector.vertcat(transforms.map(_.initialWeightVector(initWeightsScale, rng, true, "")):_*);
-    val initDepWeights = DenseVector.vertcat(depTransforms.map(_.initialWeightVector(initWeightsScale, rng, true, "")):_*);
+    val initTransformWeights = DenseVector.vertcat(transforms.map(_.initialWeightVector(initWeightsScale, rng, true, initializerSpec)):_*);
+    val initDepWeights = DenseVector.vertcat(depTransforms.map(_.initialWeightVector(initWeightsScale, rng, true, initializerSpec)):_*);
     val newInitVector: DenseVector[Double] = if (maybeSparseSurfaceFeaturizer.isDefined) {
       DenseVector.vertcat(initTransformWeights, initDepWeights, DenseVector.zeros(maybeSparseSurfaceFeaturizer.get.index.size))
     } else {
@@ -88,19 +88,21 @@ class PositionalTransformModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSe
 //  override def featureIndex: Index[Feature] = transform.index
   override def featureIndex: Index[Feature] = index
 
-  override def inferenceFromWeights(weights: DenseVector[Double]): Inference = {
+  override def inferenceFromWeights(weights: DenseVector[Double]): Inference = inferenceFromWeights(weights, true)
+  
+  def inferenceFromWeights(weights: DenseVector[Double], forTrain: Boolean): Inference = {
     val layersAndInnerLayers = for (i <- 0 until transforms.size) yield {
-      transforms(i).extractLayerAndPenultimateLayer(weights(index.componentOffset(i) until index.componentOffset(i) + index.indices(i).size), true)
+      transforms(i).extractLayerAndPenultimateLayer(weights(index.componentOffset(i) until index.componentOffset(i) + index.indices(i).size), forTrain)
     }
     val layers: IndexedSeq[OutputTransform[Array[Int],DenseVector[Double]]#OutputLayer] = layersAndInnerLayers.map(_._1)
     val innerLayers: IndexedSeq[epic.dense.Transform.Layer[Array[Int],DenseVector[Double]]] = layersAndInnerLayers.map(_._2)
     val depLayers: IndexedSeq[OutputTransform[Array[Int],DenseVector[Double]]#OutputLayer] = for (i <- 0 until depTransforms.size) yield {
       val idxIdx = transforms.size + i
 //      println("dep " + i + ": " + index.componentOffset(idxIdx))
-      depTransforms(i).extractLayer(weights(index.componentOffset(idxIdx) until index.componentOffset(idxIdx) + index.indices(idxIdx).size), true) 
+      depTransforms(i).extractLayer(weights(index.componentOffset(idxIdx) until index.componentOffset(idxIdx) + index.indices(idxIdx).size), forTrain)
     }
     val grammar = new PositionalTransformModel.PositionalTransformGrammar[L, L2, W](topology, lexicon, refinedTopology, refinements, labelFeaturizer,
-                                                                                   surfaceFeaturizer, depFeaturizer, layers, innerLayers, depLayers, maybeSparseSurfaceFeaturizer, weights)
+                                                                                   surfaceFeaturizer, depFeaturizer, layers, innerLayers, depLayers, maybeSparseSurfaceFeaturizer, weights, this)
     new Inference(annotator, constrainer, grammar, refinements)
   }
 
@@ -123,7 +125,8 @@ object PositionalTransformModel {
       LatentTreeMarginal(product, annotated)
     }
     
-    override def forTesting = this
+//    override def forTesting = this
+    override def forTesting = grammar.origPTModel.inferenceFromWeights(grammar.weights, false)
   }
 
   @SerialVersionUID(4749637878577393596L)
@@ -138,10 +141,11 @@ object PositionalTransformModel {
                                              penultimateLayers: IndexedSeq[epic.dense.Transform.Layer[Array[Int],DenseVector[Double]]],
                                              depLayers: IndexedSeq[OutputTransform[Array[Int],DenseVector[Double]]#OutputLayer],
                                              val maybeSparseSurfaceFeaturizer: Option[IndexedSpanFeaturizer[L, L2, W]],
-                                             weights: DenseVector[Double]) extends Grammar[L, W] with Serializable {
+                                             val weights: DenseVector[Double],
+                                             val origPTModel: PositionalTransformModel[L,L2,W]) extends Grammar[L, W] with Serializable {
 
     override def withPermissiveLexicon: Grammar[L, W] = {
-      new PositionalTransformGrammar(topology, lexicon.morePermissive, refinedTopology, refinements, labelFeaturizer, surfaceFeaturizer, depFeaturizer, layers, penultimateLayers, depLayers, maybeSparseSurfaceFeaturizer, weights)
+      new PositionalTransformGrammar(topology, lexicon.morePermissive, refinedTopology, refinements, labelFeaturizer, surfaceFeaturizer, depFeaturizer, layers, penultimateLayers, depLayers, maybeSparseSurfaceFeaturizer, weights, origPTModel)
     }
 
 

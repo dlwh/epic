@@ -9,6 +9,7 @@ import edu.berkeley.nlp.entity.ner.NerSystemLabeled
 import edu.berkeley.nlp.futile.fig.basic.Indexer
 import edu.berkeley.nlp.math.SloppyMath
 import epic.dense.AffineTransform
+import epic.dense.AffineOutputEmbeddingTransform
 import epic.dense.Word2VecIndexed
 import edu.berkeley.nlp.futile.util.Logger
 import edu.berkeley.nlp.entity.ConllDoc
@@ -65,7 +66,8 @@ class DenseNerSystem(val labelIndexer: Indexer[String],
                      val transform: OutputTransform[DenseVector[Double],DenseVector[Double]],
                      val featurizedTransitionMatrix: Array[Array[Array[Int]]],
                      val featurizer: NerFeaturizer,
-                     val useSparseFeatures: Boolean) extends LikelihoodAndGradientComputer[NerExampleWithFeatures] {
+                     val useSparseFeatures: Boolean,
+                     val clipEmbeddingNorms: Boolean = false) extends LikelihoodAndGradientComputer[NerExampleWithFeatures] {
   val numStates = labelIndexer.size
   val reducedLabelSetSize = NerSystemLabeled.LabelSetReduced.size;
   
@@ -185,8 +187,10 @@ class DenseNerSystem(val labelIndexer: Indexer[String],
     new HmmMarginals(cachedEmissionScores, cachedTransitionScores, cachedForwardLogProbs, cachedBackwardLogProbs)
   }
   
-  def getInitialWeights(initialWeightsScale: Double): Array[Double] = {
-    val transformWeights = transform.initialWeightVector(initialWeightsScale, rng, true, "")
+  def getInitialWeights(initialWeightsScale: Double): Array[Double] = getInitialWeights(initialWeightsScale, "")
+  
+  def getInitialWeights(initialWeightsScale: Double, initializerSpec: String): Array[Double] = {
+    val transformWeights = transform.initialWeightVector(initialWeightsScale, rng, true, initializerSpec)
     if (useSparseFeatures) {
       DenseVector.vertcat(transformWeights, DenseVector.zeros[Double](featurizer.featureIndexer.size)).data
     } else {
@@ -304,6 +308,18 @@ class DenseNerSystem(val labelIndexer: Indexer[String],
     }
     return prediction.map(labelIndexer.getObject(_));
   }
+  
+  override def weightsUpdateCallback(weights: Array[Double]) = {
+    if (clipEmbeddingNorms && transform.isInstanceOf[AffineOutputEmbeddingTransform[DenseVector[Double]]]) {
+      transform.asInstanceOf[AffineOutputEmbeddingTransform[DenseVector[Double]]].clipEmbeddingNorms(DenseVector(weights))
+    }
+  }
+  
+  override def iterationEndCallback(weights: Array[Double]) = {
+    if (transform.isInstanceOf[AffineOutputEmbeddingTransform[DenseVector[Double]]]) {
+      transform.asInstanceOf[AffineOutputEmbeddingTransform[DenseVector[Double]]].displayEmbeddingNorms(DenseVector(weights))
+    }
+  } 
 }
 
 case class DenseNerExampleLoader(val pruner: Option[NerPruner],

@@ -234,30 +234,23 @@ object PositionalNeuralModelFactory {
       } else {
         new CachingLookupAndAffineTransformDense(numHidden, word2vecIndexed.vectorSize, word2vecIndexed)
       }
-      var currLayer: Transform[Array[Int],DenseVector[Double]] = new NonlinearTransform(nonLinType, numHidden, baseTransformLayer)
+      var currLayer = addNonlinearity(nonLinType, numHidden, useDropout, baseTransformLayer)
       for (i <- 1 until numHiddenLayers) {
-        val tmpLayer = new AffineTransform(numHidden, numHidden, currLayer)
-        currLayer = new NonlinearTransform(nonLinType, numHidden, tmpLayer)
+        currLayer = addNonlinearity(nonLinType, numHidden, useDropout, new AffineTransform(numHidden, numHidden, currLayer))
       }
-//      var transform = new AffineTransformDense(outputSize, numHidden, currLayer)
       var transform = new AffineOutputTransform(outputSize, numHidden, currLayer)
       transform
     }
   }
-//  
-//  def addNonlinearLayer(currNet: Transform[Array[Int],DenseVector[Double]], nonLinType: String) = {
-//    if (nonLinType == "relu") {
-//      new NonlinearTransform(nonLinType, currNet)
-////      new ReluTransform(currNet)
-//    } else if (nonLinType == "cube") {
-////      new CubeTransform(currNet)
-//    } else if (nonLinType == "tanh") {
-//      new NonlinearTransform(nonLinType, currNet)
-////      new TanhTransform(currNet)
-//    } else {
-//      throw new RuntimeException("Unknown nonlinearity type: " + nonLinType)
-//    }
-//  }
+  
+  def addNonlinearity(nonLinType: String, numHidden: Int, useDropout: Boolean, currLayer: Transform[Array[Int],DenseVector[Double]]) = {
+    val tmpLayer = new NonlinearTransform(nonLinType, numHidden, currLayer)
+    if (useDropout) {
+      new NonlinearTransform("dropout", numHidden, tmpLayer)
+    } else {
+      tmpLayer
+    }
+  }
 }
 
 case class LeftChildFeature(f: Feature) extends Feature;

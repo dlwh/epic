@@ -84,7 +84,8 @@ object MNISTTester {
 //    val iters = 100;
     val iters = 50;
     
-    val weights = new GeneralTrainer().trainAdadelta(trainSamples, nn, 0.95, batchSize, iters, initialWeights, weightPostprocessor = weightProjector, verbose = false);
+    val weights = new GeneralTrainer().trainAdadelta(trainSamples, nn, 0.95, batchSize, iters, initialWeights, verbose = false);
+//    val weights = new GeneralTrainer().trainAdadelta(trainSamples, nn, 0.95, batchSize, iters, initialWeights, weightPostprocessor = weightProjector, verbose = false);
 //    val weights = new GeneralTrainer().trainAdagrad(trainSamples, nn, eta, 0.0000001, batchSize, iters, initialWeights, weightPostprocessor = weightProjector, verbose = false);
 //    val weights = new GeneralTrainer().trainLBFGS(trainSamples, nn, 0.0000001, 0.001, iters, initialWeights, verbose = false);
     getAccuracy(nn, trainSamples, weights)

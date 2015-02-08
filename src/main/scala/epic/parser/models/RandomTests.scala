@@ -17,16 +17,22 @@ object RandomTests {
 //      }
 //    }
     
-    println(entropy(Array(0.25, 0.25, 0.25, 0.25)))
+//    println(entropy(Array(0.25, 0.25, 0.25, 0.25)))
+    
+    val mat = DenseMatrix.zeros[Double](3, 5)
+    mat(0, 0) = 1.0
+    mat(1, 1) = 1.0
+    println(mat.data.toSeq)
+    println(DenseVector(mat.data).asDenseMatrix.reshape(3, 5).toString)
     System.exit(0)
     
-    val mat = DenseMatrix.zeros[Double](5, 5)
-    val vect = DenseVector.vertcat(mat(1, ::).t, mat(3, ::).t)
-//    axpy(1.0, DenseVector.ones[Double](5), mat(1, ::).t)
-    axpy(1.0, DenseVector.ones[Double](10), vect)
-    println(mat)
-    println(vect)
-//    mat(1, ::) += DenseVector.ones[Double](5)
+//    val mat = DenseMatrix.zeros[Double](5, 5)
+//    val vect = DenseVector.vertcat(mat(1, ::).t, mat(3, ::).t)
+////    axpy(1.0, DenseVector.ones[Double](5), mat(1, ::).t)
+//    axpy(1.0, DenseVector.ones[Double](10), vect)
+//    println(mat)
+//    println(vect)
+////    mat(1, ::) += DenseVector.ones[Double](5)
     
     
     

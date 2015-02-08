@@ -66,6 +66,8 @@ object ParserTrainer extends epic.parser.ParserPipeline with LazyLogging {
                     randomize: Boolean = false,
                     @Help(text="Scale of random weight initialization")
                     initWeightsScale: Double = 1E-2,
+                    @Help(text="Scale of random weight initialization")
+                    initializerSpec: String = "",
                     @Help(text="True if we should determinimize training (remove randomness associated with random minibatches)")
                     determinizeTraining: Boolean = false,
                     @Help(text="Use Adadelta for optimiziation instead of Adagrad")
@@ -130,7 +132,7 @@ object ParserTrainer extends epic.parser.ParserPipeline with LazyLogging {
     val cachedObj = new CachedBatchDiffFunction(obj)
     val init = if (model.isInstanceOf[PositionalTransformModel[AnnotatedLabel, AnnotatedLabel, String]]) {
       println("Initializing weights custom for model " + model.getClass)
-      model.asInstanceOf[PositionalTransformModel[AnnotatedLabel, AnnotatedLabel, String]].initialWeightVector(randomize, initWeightsScale)
+      model.asInstanceOf[PositionalTransformModel[AnnotatedLabel, AnnotatedLabel, String]].initialWeightVector(randomize, initWeightsScale, initializerSpec)
     } else {
       obj.initialWeightVector(randomize, initWeightsScale)
     }

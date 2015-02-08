@@ -25,6 +25,16 @@ trait LikelihoodAndGradientComputer[T] {
    * more efficiently
    */
   def computeObjective(ex: T, weights: Array[Double]): Double;
+  
+  /**
+   * Allows for modification of the weights to do things like clipping or printing
+   */
+  def weightsUpdateCallback(weights: Array[Double]) = {}
+  
+  /**
+   * Allows for modification of the weights to do things like clipping or printing
+   */
+  def iterationEndCallback(weights: Array[Double]) = {}
 }
 
 class GeneralTrainer[T](val parallel: Boolean = false) {
@@ -61,7 +71,6 @@ class GeneralTrainer[T](val parallel: Boolean = false) {
                    batchSize: Int,
                    numItrs: Int,
                    initialWeights: Array[Double],
-                   weightPostprocessor: Array[Double] => Unit = (weights: Array[Double]) => {},
                    verbose: Boolean = true): Array[Double] = {
 //    val weights = Array.fill(pairwiseIndexingFeaturizer.featureIndexer.size)(0.0);
     val weights = initialWeights;
@@ -88,7 +97,7 @@ class GeneralTrainer[T](val parallel: Boolean = false) {
                                                   diagGt,
                                                   eta,
                                                   lambda);
-        weightPostprocessor(weights)
+        computer.weightsUpdateCallback(weights)
         currIdx += batchSize;
         currBatchIdx += 1;
       }
@@ -100,6 +109,7 @@ class GeneralTrainer[T](val parallel: Boolean = false) {
         Logger.endTrack();
         displayWeightsAndTime(i, weights, startTime, inferenceNanos, adagradNanos)
       }
+      computer.iterationEndCallback(weights)
     }
     if (verbose) {
       Logger.logss("FINAL TRAIN OBJECTIVE: " + computeObjectiveL1R(trainExs, computer, weights, lambda));
@@ -236,7 +246,6 @@ class GeneralTrainer[T](val parallel: Boolean = false) {
                     batchSize: Int,
                     numItrs: Int,
                     initialWeights: Array[Double],
-                    weightPostprocessor: Array[Double] => Unit = (weights: Array[Double]) => {},
                     verbose: Boolean = true): Array[Double] = {
 //    val weights = Array.fill(pairwiseIndexingFeaturizer.featureIndexer.size)(0.0);
     val weights = initialWeights;
@@ -264,7 +273,7 @@ class GeneralTrainer[T](val parallel: Boolean = false) {
                                                 gradsSquared,
                                                 updatesSquared,
                                                 rho);
-        weightPostprocessor(weights)
+        computer.weightsUpdateCallback(weights)
         currIdx += batchSize;
         currBatchIdx += 1;
       }
@@ -273,6 +282,7 @@ class GeneralTrainer[T](val parallel: Boolean = false) {
         Logger.endTrack();
         displayWeightsAndTime(i, weights, startTime, inferenceNanos, adagradNanos)
       }
+      computer.iterationEndCallback(weights)
     }
     if (verbose) {
       Logger.logss("FINAL TRAIN OBJECTIVE: " + computeObjectiveL1R(trainExs, computer, weights, 0.0));
