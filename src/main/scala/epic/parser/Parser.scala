@@ -62,10 +62,6 @@ final case class Parser[L,W](topology: RuleTopology[L],
       }
   }
 
-
-
-
-
 }
 
 object Parser {
