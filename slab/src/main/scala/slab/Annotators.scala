@@ -90,3 +90,14 @@ object Segmenter {
     def apply(sentence: Vector[String]) = seg(sentence)
   }
 }
+
+trait Parser[S <: Sentence, T <: Token, Label] extends legacyannotators.Parser[S, T, Label, Boolean] with NoInitializer {
+  override def apply(initialized: Boolean, sentence: Vector[String]): scalaz.Tree[Tagged[Label]] = apply(sentence)
+  def apply(sentence: Vector[String]): scalaz.Tree[Tagged[Label]]
+}
+
+object Parser {
+  def apply[S <: Sentence, T <: Token, Label](parser: Vector[String] => scalaz.Tree[Tagged[Label]]) = new Parser[S, T, Label] {
+    override def apply(sentence: Vector[String]) = parser(sentence)
+  }
+}

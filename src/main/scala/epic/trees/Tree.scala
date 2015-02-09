@@ -24,13 +24,15 @@ import java.io.{StringReader, DataInput, DataOutput}
 import breeze.util.Lens
 import scala.annotation.tailrec
 import epic.preprocess.TreebankTokenizer
-import epic.slab.SpanAnnotation
+import epic.slab.{Tagged, Token}
 
 @SerialVersionUID(1L)
-trait Tree[+L] extends Serializable with SpanAnnotation {
+trait Tree[+L] extends Serializable {
   def label: L
   def children: IndexedSeq[Tree[L]]
   def span: Span
+  def begin = span.begin
+  def end = span.end
 
   def isLeaf = children.size == 0
   /**
@@ -91,7 +93,6 @@ trait Tree[+L] extends Serializable with SpanAnnotation {
   def toString(newline: Boolean) = recursiveToString(this,0, newline, new StringBuilder).toString
 
   def render[W](words: Seq[W], newline: Boolean = true) = recursiveRender(this,1,words, newline, new StringBuilder).toString
-
 }
 
 object Tree {
@@ -134,6 +135,14 @@ object Tree {
   }
 
 
+  def slabSpan[L](tree: Tree[L], tokens: List[Token]): Span =
+    Span(tokens(tree.span.begin).begin, tokens(tree.span.end).end)
+
+  def slabTree[L](tree: Tree[L], tokens: List[Token]): scalaz.Tree[Tagged[L]] =
+    scalaz.Tree.unfoldTree((tree, tokens))({
+      case (tree, tokens) => (
+        Tagged(slabSpan(tree, tokens), tree.label),
+        () => tree.children.toStream.zip(Stream.continually(tokens)))})
 
 }
 
@@ -577,6 +586,5 @@ object Trees {
     case class RightChild[+L](parentLabel: L, parent: Location[L], leftSibling: BinarizedTree[L]) extends NotRoot[L]
     case class UnaryChild[+L](parentLabel: L, chain: IndexedSeq[String], parent: Location[L]) extends NotRoot[L]
   }
-
 
 }
