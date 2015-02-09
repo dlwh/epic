@@ -131,10 +131,10 @@ case class AffineOutputEmbeddingTransform[FV](numOutputs: Int, numInputs: Int, o
           // Column * row gives outer product
           weightsDeriv += embeddings(k, ::).t * innerAct.t * scale(k) // Weights update
           embeddingsDeriv(k, ::).t += weights * innerAct * scale(k) // Embeddings update
-          innerScale += weightst * embeddingsDeriv(k, ::).t * scale(k) // Inner scale update
+          innerScale += weightst * embeddings(k, ::).t * scale(k) // Inner scale update
         }
       }
-      innerLayer.tallyDerivative(deriv(index.componentOffset(1) to -1), innerScale, fv)
+      innerLayer.tallyDerivative(deriv(index.componentOffset(2) to -1), innerScale, fv)
     }
   }
 

@@ -181,18 +181,6 @@ object ParserTrainer extends epic.parser.ParserPipeline with LazyLogging {
       val parser = model.extractParser(state.x)
       if (iter + iterationsPerEval >= maxIterations) {
         computeLL(trainTrees, model, state.x)
-//        println("Computing final log likelihood on the whole training set...")
-//        val inf = model.inferenceFromWeights(state.x)
-//        val ll = trainTrees.par.aggregate(0.0)((currLL, trainTree) => { 
-//          try {
-//            val s = inf.scorer(trainTree)
-//            currLL + inf.goldMarginal(s, trainTree).logPartition - inf.marginal(s, trainTree).logPartition
-//          } catch {
-//            case e: Exception => println("Couldn't parse")
-//            currLL
-//          }
-//        }, _ + _)
-//        println("Log likelihood on " + trainTrees.size + " examples: " + ll)
       }
       (s"$name-$iter", parser)
     } catch {

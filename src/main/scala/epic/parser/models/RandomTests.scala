@@ -19,7 +19,7 @@ object RandomTests {
     
 //    println(entropy(Array(0.25, 0.25, 0.25, 0.25)))
     
-    
+//    def untetra(i: Int) = 
     
 //    val mat = DenseMatrix.zeros[Double](3, 5)
 //    mat(0, 0) = 1.0

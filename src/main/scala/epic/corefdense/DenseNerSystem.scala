@@ -15,7 +15,6 @@ import edu.berkeley.nlp.futile.util.Logger
 import edu.berkeley.nlp.entity.ConllDoc
 import edu.berkeley.nlp.entity.ner.NerPruner
 import breeze.util.Index
-import epic.dense.AffineTransformDense
 import epic.dense.OutputTransform
 
 case class NerExamplePruned(val ex: NerExample,
@@ -101,7 +100,7 @@ class DenseNerSystem(val labelIndexer: Indexer[String],
         // Sparse scores
         var j = 0
         while (j < numStates) {
-          if (ex.featsPerState(i)(j) == null && ex.isStateAllowed(i, j)) {
+          if (ex.featsPerState(i)(j) == null || !ex.isStateAllowed(i, j)) {
             cachedEmissionScores(i)(j) = Double.NegativeInfinity
           } else {
             val denseScore = denseScores(j)

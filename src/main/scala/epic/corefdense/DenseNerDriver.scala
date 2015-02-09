@@ -19,6 +19,7 @@ import epic.dense.Word2VecIndexed
 import edu.berkeley.nlp.entity.ner.NerPruner
 import edu.berkeley.nlp.entity.ner.NerPrunerFromModel
 import scala.util.Random
+import scala.collection.mutable.HashSet
 
 object DenseNerDriver {
   
@@ -129,13 +130,16 @@ object DenseNerDriver {
     
     // Train
     val initialWeights = denseNerSystem.getInitialWeights(initWeightsScale, initializerSpec);
-//    if (checkEmpiricalGradient) {
-//      val indices = HashSet[Int]();
+    if (checkEmpiricalGradient) {
+      val indices = HashSet[Int]();
+      for (i <- 0 until initialWeights.size by initialWeights.size/20) {
+        indices += i
+      }
 //      indices ++= 0 until 5
-////      indices ++= ((vecSize + 1) * hiddenSize) until ((vecSize + 1) * hiddenSize + 5)
+//      indices ++= ((vecSize + 1) * hiddenSize) until ((vecSize + 1) * hiddenSize + 5)
 //      indices ++= transform.index.size until transform.index.size + 5
-//      GeneralTrainer.checkGradientFromPoint(trainDocGraphs, corefNeuralModel, initialWeights, Array.tabulate(initialWeights.size)(i => 0.0), indices.toSet, verbose = true)
-//    }
+      GeneralTrainer.checkGradientFromPoint(trainSequenceExs, denseNerSystem, initialWeights, Array.tabulate(initialWeights.size)(i => 0.0), indices.toSet, verbose = true)
+    }
     var weights = if (useAdadelta) {
       new GeneralTrainer(parallel).trainAdadelta(trainSequenceExs, denseNerSystem, 0.95, batchSize, numItrs, initialWeights, verbose = true);
     } else {

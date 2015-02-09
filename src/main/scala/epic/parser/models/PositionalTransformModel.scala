@@ -164,44 +164,54 @@ object PositionalTransformModel {
       val depSpec = depFeaturizer.anchor(w)
       val lspec = labelFeaturizer.anchor(w)
       
-      val maxTetraLen = ((w.size + 2) * (w.size + 3) * (w.size + 4))/6 + ((w.size + 1) * (w.size + 2))/2 + w.size + 2
 //      val maxTetraLen = ((w.size + 2) * (w.size + 3) * (w.size + 4))/6 + ((w.size + 1) * (w.size + 2))/2 + w.size + 2
       
       def tetra(begin: Int, split: Int, end: Int) = {
         (end * (end + 1) * (end + 2))/6 + ((split + 1) * split / 2 + begin)
       }
       
-      val ruleCountsPerState = Array.fill(maxTetraLen)(SparseVector.zeros[Double](labelFeaturizer.index.size))
-      val countsPerHeadDepPair = Array.tabulate(w.size, w.size)((i, j) => 0.0)
-      val statesUsed = Array.fill(maxTetraLen)(false)
-      val untetra = Array.fill(maxTetraLen)((-1, -1, -1))
+      // This representation appears to make things a bit faster?
+      val ruleCountsPerState = new HashMap[Int,SparseVector[Double]]
+//      val ruleCountsPerState = Array.fill(maxTetraLen)(SparseVector.zeros[Double](labelFeaturizer.index.size))
+//      val countsPerHeadDepPair = Array.tabulate(w.size, w.size)((i, j) => 0.0)
+//      val statesUsed = Array.fill(maxTetraLen)(false)
+//      val untetra = Array.fill(maxTetraLen)((-1, -1, -1))
       
-//      val untetra = new HashMap[Int,(Int,Int,Int)]
+      
+      
+      val untetra = new HashMap[Int,(Int,Int,Int)]
       
       m visit new AnchoredVisitor[L] {
         
         override def visitUnaryRule(begin: Int, end: Int, rule: Int, ref: Int, score: Double): Unit = {
           val tetraIdx = tetra(begin, end, length + 1)
-          statesUsed(tetraIdx) = true;
+//          statesUsed(tetraIdx) = true;
           untetra(tetraIdx) = (begin, end, length + 1)
+          if (!ruleCountsPerState.contains(tetraIdx)) ruleCountsPerState.put(tetraIdx, SparseVector.zeros[Double](labelFeaturizer.index.size))
+          
           axpy(score, new FeatureVector(lspec.featuresForUnaryRule(begin, end, rule, ref)), ruleCountsPerState(tetraIdx))
         }
 
         override def visitSpan(begin: Int, end: Int, tag: Int, ref: Int, score: Double): Unit = {
           val tetraIdx = tetra(begin, end, length + 2)
-          statesUsed(tetraIdx) = true;
+//          statesUsed(tetraIdx) = true;
           untetra(tetraIdx) = (begin, end, length + 2)
+          if (!ruleCountsPerState.contains(tetraIdx)) ruleCountsPerState.put(tetraIdx, SparseVector.zeros[Double](labelFeaturizer.index.size))
+          
           axpy(score, new FeatureVector(lspec.featuresForSpan(begin, end, tag, ref)), ruleCountsPerState(tetraIdx))
           
         }
 
         override def visitBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int, score: Double): Unit = {
           val tetraIdx = tetra(begin, split, end)
-          statesUsed(tetraIdx) = true;
+//          statesUsed(tetraIdx) = true;
           untetra(tetraIdx) = (begin, split, end)
+          if (!ruleCountsPerState.contains(tetraIdx)) ruleCountsPerState.put(tetraIdx, SparseVector.zeros[Double](labelFeaturizer.index.size))
+          
           axpy(score, new FeatureVector(lspec.featuresForBinaryRule(begin, split, end, rule, ref)), ruleCountsPerState(tetraIdx))
-          val (headIdx, childIdx) = depSpec.getHeadDepPair(begin, split, end, rule)
-          countsPerHeadDepPair(headIdx)(childIdx) += score
+          
+//          val (headIdx, childIdx) = depSpec.getHeadDepPair(begin, split, end, rule)
+//          countsPerHeadDepPair(headIdx)(childIdx) += score
         }
       }
       
@@ -209,30 +219,40 @@ object PositionalTransformModel {
 //      println(tetra(w.length - 1, w.length, w.length + 2))
 //      println(statesUsed.map(a => if (a) 1 else 0).reduce(_ + _) + " used")
 
-      for (i <- 0 until ruleCountsPerState.length) {
-        if (statesUsed(i)) {
-          val (begin, split, end) = untetra(i)
-          val ffeats = if (end > length) sspec.featuresForSpan(begin, split) else sspec.featuresForSplit(begin, split, end)
-          var layerSizeTally = 0
-          for (j <- 0 until layers.size) {
-            layers(j).tallyDerivative(deriv(layerSizeTally until layerSizeTally + layers(j).index.size), { ruleCountsPerState(i) * scale }, ffeats)
-            layerSizeTally += layers(j).index.size;
-          }
+      
+      for (key <- ruleCountsPerState.keySet) {
+        val (begin, split, end) = untetra(key)
+        val ffeats = if (end > length) sspec.featuresForSpan(begin, split) else sspec.featuresForSplit(begin, split, end)
+        var layerSizeTally = 0
+        for (j <- 0 until layers.size) {
+          layers(j).tallyDerivative(deriv(layerSizeTally until layerSizeTally + layers(j).index.size), { ruleCountsPerState(key) * scale }, ffeats)
+          layerSizeTally += layers(j).index.size;
         }
       }
-      for (headIdx <- 0 until w.size) {
-        for (childIdx <- 0 until w.size) {
-          var layerSizeTally = layers.map(_.index.size).foldLeft(0)(_ + _)
-          for (j <- 0 until depLayers.size) {
-            val score = countsPerHeadDepPair(headIdx)(childIdx)
-//            println(layerSizeTally + " " + score)
-            if (score != 0 && Math.abs(score) > 1e-8) {
-              depLayers(j).tallyDerivative(deriv(layerSizeTally until layerSizeTally + depLayers(j).index.size), DenseVector(Array(score * scale)), depSpec.featuresForHeadPair(headIdx, childIdx))
-            }
-            layerSizeTally += depLayers(j).index.size
-          }
-        }
-      }
+      
+//      for (i <- 0 until ruleCountsPerState.length) {
+//        if (statesUsed(i)) {
+//          val (begin, split, end) = untetra(i)
+//          val ffeats = if (end > length) sspec.featuresForSpan(begin, split) else sspec.featuresForSplit(begin, split, end)
+//          var layerSizeTally = 0
+//          for (j <- 0 until layers.size) {
+//            layers(j).tallyDerivative(deriv(layerSizeTally until layerSizeTally + layers(j).index.size), { ruleCountsPerState(i) * scale }, ffeats)
+//            layerSizeTally += layers(j).index.size;
+//          }
+//        }
+//      }
+//      for (headIdx <- 0 until w.size) {
+//        for (childIdx <- 0 until w.size) {
+//          var layerSizeTally = layers.map(_.index.size).foldLeft(0)(_ + _)
+//          for (j <- 0 until depLayers.size) {
+//            val score = countsPerHeadDepPair(headIdx)(childIdx)
+//            if (score != 0 && Math.abs(score) > 1e-8) {
+//              depLayers(j).tallyDerivative(deriv(layerSizeTally until layerSizeTally + depLayers(j).index.size), DenseVector(Array(score * scale)), depSpec.featuresForHeadPair(headIdx, childIdx))
+//            }
+//            layerSizeTally += depLayers(j).index.size
+//          }
+//        }
+//      }
     }
 
     def anchor(w: IndexedSeq[W], cons: ChartConstraints[L]):GrammarAnchoring[L, W] = new ProjectionsGrammarAnchoring[L, L2, W] {
@@ -256,10 +276,12 @@ object PositionalTransformModel {
       val l = w.size
       val maxTetraLen = ((l + 2) * (l + 3) * (l + 4))/6 + ((l + 1) * (l + 2))/2 + l + 2
       
+      // Doesn't make things faster to use HashMaps here
       val cache = Array.tabulate(layers.size)(i => new Array[DenseVector[Double]](maxTetraLen))
       val finalCache = Array.tabulate(layers.size)(i => new Array[SparseVector[Double]](maxTetraLen))
-      val headDepCache = Array.tabulate(w.size, w.size)((i, j) => 0.0)
-      val headDepStale = Array.tabulate(w.size, w.size)((i, j) => true)
+      
+//      val headDepCache = Array.tabulate(w.size, w.size)((i, j) => 0.0)
+//      val headDepStale = Array.tabulate(w.size, w.size)((i, j) => true)
 
       def getOrElseUpdate(layerIdx: Int, tetraIdx: Int, fun: => DenseVector[Double]) = {
         if (cache(layerIdx)(tetraIdx) == null) cache(layerIdx)(tetraIdx) = fun
@@ -272,26 +294,12 @@ object PositionalTransformModel {
         finalCache(layerIdx)(tetraIdx)(rfeatIdx)
       }
       
-      def getOrElseUpdateHeadDep(headIdx: Int, depIdx: Int, fun: => Double) = {
-        if (headDepStale(headIdx)(depIdx)) {
-          headDepCache(headIdx)(depIdx) = fun
-          headDepStale(headIdx)(depIdx) = false
-        }
-        headDepCache(headIdx)(depIdx)
-      }
-      
-//      val cache = new Array[DenseVector[Double]](maxTetraLen)
-//      val finalCache = new Array[SparseVector[Double]](maxTetraLen)
-//      
-//      def getOrElseUpdate(tetraIdx: Int, fun: => DenseVector[Double]) = {
-//        if (cache(tetraIdx) == null) cache(tetraIdx) = fun
-//        cache(tetraIdx)
-//      }
-//      
-//      def getOrElseUpdateFinal(tetraIdx: Int, rfeatIdx: Int, maxVectSize: Int, fun: => Double) = {
-//        if (finalCache(tetraIdx) == null) finalCache(tetraIdx) = SparseVector.zeros(maxVectSize)
-//        if (!finalCache(tetraIdx).contains(rfeatIdx)) finalCache(tetraIdx)(rfeatIdx) = fun
-//        finalCache(tetraIdx)(rfeatIdx)
+//      def getOrElseUpdateHeadDep(headIdx: Int, depIdx: Int, fun: => Double) = {
+//        if (headDepStale(headIdx)(depIdx)) {
+//          headDepCache(headIdx)(depIdx) = fun
+//          headDepStale(headIdx)(depIdx) = false
+//        }
+//        headDepCache(headIdx)(depIdx)
 //      }
       
       val sspec = surfaceFeaturizer.anchor(w)
@@ -314,11 +322,11 @@ object PositionalTransformModel {
             total += getOrElseUpdateFinal(layerIdx, tetraIdx, rfeat, labelFeaturizer.index.size, { layers(layerIdx).activationsFromPenultimateDot(fs, rfeat) })
           }
         }
-        if (depLayers.size > 0) {
-          val (headIdx, childIdx) = depSpec.getHeadDepPair(begin, split, end, rule)
-          val pairFeats = depSpec.featuresForHeadPair(headIdx, childIdx)
-          total += getOrElseUpdateHeadDep(headIdx, childIdx, { depLayers.map(layer => layer.activations(pairFeats)).reduce(_ + _).data(0) })
-        }
+//        if (depLayers.size > 0) {
+//          val (headIdx, childIdx) = depSpec.getHeadDepPair(begin, split, end, rule)
+//          val pairFeats = depSpec.featuresForHeadPair(headIdx, childIdx)
+//          total += getOrElseUpdateHeadDep(headIdx, childIdx, { depLayers.map(layer => layer.activations(pairFeats)).reduce(_ + _).data(0) })
+//        }
         if (maybeSparseSurfaceFeaturizer.isDefined) {
           total += dot(fspec.featuresForBinaryRule(begin, split, end, rule, ref), sparseFeatsStart)
         }
