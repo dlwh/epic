@@ -16,8 +16,11 @@ import epic.parser.projections.GrammarRefinements
 import epic.trees._
 import epic.trees.annotations.TreeAnnotator
 import epic.util.{LRUCache, NotProvided, Optional}
+import epic.dense.Transform
 import epic.dense.TanhTransform
 import epic.dense.AffineOutputTransform
+import epic.dense.AffineOutputEmbeddingTransform
+import epic.dense.OutputEmbeddingTransform
 import epic.corefdense.Word2Vec
 import scala.collection.mutable.HashMap
 import epic.dense.Word2VecSurfaceFeaturizerIndexed
@@ -38,7 +41,9 @@ import epic.dense.NonlinearTransform
 case class ExtraPNMParams(useSparseLfsuf: Boolean = true,
                           useSparseBrown: Boolean = false,
                           useDropout: Boolean = false,
-                          vectorRescaling: Double = 1.0)
+                          vectorRescaling: Double = 1.0,
+                          outputEmbedding: Boolean = false,
+                          outputEmbeddingDim: Int = 20)
 
 case class PositionalNeuralModelFactory(@Help(text=
                               """The kind of annotation to do on the refined grammar. Default uses just parent annotation.
@@ -147,7 +152,11 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
 //    var transform = new AffineTransformDense(featurizer.index.size, numHidden, currLayer)
     
     println(word2vecIndexed.vectorSize + " x (" + numHidden + ")^" + numHiddenLayers + " x " + prodFeaturizer.index.size + " neural net")
-    val transform = PositionalNeuralModelFactory.buildNet(word2vecIndexed, numHidden, numHiddenLayers, prodFeaturizer.index.size, nonLinType, useDropout, backpropIntoEmbeddings)
+    val transform = if (outputEmbedding) {
+      PositionalNeuralModelFactory.buildNetOutputEmbedding(word2vecIndexed, numHidden, numHiddenLayers, prodFeaturizer.index.size, nonLinType, useDropout, backpropIntoEmbeddings, outputEmbeddingDim)
+    } else {
+      PositionalNeuralModelFactory.buildNet(word2vecIndexed, numHidden, numHiddenLayers, prodFeaturizer.index.size, nonLinType, useDropout, backpropIntoEmbeddings)
+    }
     val transforms = if (augmentWithLinear) {
       println("Adding a linear transform: " + word2vecIndexed.vectorSize + " x " + prodFeaturizer.index.size) 
       IndexedSeq(transform, PositionalNeuralModelFactory.buildNet(word2vecIndexed, 0, 0, prodFeaturizer.index.size, "", useDropout, backpropIntoEmbeddings))
@@ -219,15 +228,14 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
 
 object PositionalNeuralModelFactory {
   
-  def buildNet(word2vecIndexed: Word2VecIndexed[String],
-               numHidden: Int,
-               numHiddenLayers: Int,
-               outputSize: Int,
-               nonLinType: String,
-               useDropout: Boolean,
-               backpropIntoEmbeddings: Boolean): AffineOutputTransform[Array[Int]] = {
+  def buildNetInnerTransforms(word2vecIndexed: Word2VecIndexed[String],
+                              numHidden: Int,
+                              numHiddenLayers: Int,
+                              nonLinType: String,
+                              useDropout: Boolean,
+                              backpropIntoEmbeddings: Boolean): Transform[Array[Int],DenseVector[Double]] = {
     if (numHiddenLayers == 0) {
-      new AffineOutputTransform(outputSize, word2vecIndexed.vectorSize, new CachingLookupTransform(word2vecIndexed))
+      new CachingLookupTransform(word2vecIndexed)
     } else {
       val baseTransformLayer = if (backpropIntoEmbeddings) {
         new EmbeddingsTransform(numHidden, word2vecIndexed.vectorSize, word2vecIndexed)
@@ -238,9 +246,52 @@ object PositionalNeuralModelFactory {
       for (i <- 1 until numHiddenLayers) {
         currLayer = addNonlinearity(nonLinType, numHidden, useDropout, new AffineTransform(numHidden, numHidden, currLayer))
       }
-      var transform = new AffineOutputTransform(outputSize, numHidden, currLayer)
-      transform
+      currLayer
     }
+  }
+  
+  def buildNet(word2vecIndexed: Word2VecIndexed[String],
+               numHidden: Int,
+               numHiddenLayers: Int,
+               outputSize: Int,
+               nonLinType: String,
+               useDropout: Boolean,
+               backpropIntoEmbeddings: Boolean): AffineOutputTransform[Array[Int]] = {
+    val innerTransform = buildNetInnerTransforms(word2vecIndexed, numHidden, numHiddenLayers, nonLinType, useDropout, backpropIntoEmbeddings)
+    new AffineOutputTransform(outputSize, if (numHiddenLayers >= 1) numHidden else word2vecIndexed.vectorSize, innerTransform)
+//    if (numHiddenLayers == 0) {
+//      new AffineOutputTransform(outputSize, word2vecIndexed.vectorSize, new CachingLookupTransform(word2vecIndexed))
+//    } else {
+//      val baseTransformLayer = if (backpropIntoEmbeddings) {
+//        new EmbeddingsTransform(numHidden, word2vecIndexed.vectorSize, word2vecIndexed)
+//      } else {
+//        new CachingLookupAndAffineTransformDense(numHidden, word2vecIndexed.vectorSize, word2vecIndexed)
+//      }
+//      var currLayer = addNonlinearity(nonLinType, numHidden, useDropout, baseTransformLayer)
+//      for (i <- 1 until numHiddenLayers) {
+//        currLayer = addNonlinearity(nonLinType, numHidden, useDropout, new AffineTransform(numHidden, numHidden, currLayer))
+//      }
+//      var transform = new AffineOutputTransform(outputSize, numHidden, currLayer)
+//      transform
+//    }
+  }
+  
+  
+  def buildNetOutputEmbedding(word2vecIndexed: Word2VecIndexed[String],
+                              numHidden: Int,
+                              numHiddenLayers: Int,
+                              outputSize: Int,
+                              nonLinType: String,
+                              useDropout: Boolean,
+                              backpropIntoEmbeddings: Boolean,
+//                              outputEmbeddingDim: Int): AffineOutputEmbeddingTransform[Array[Int]] = {
+                              outputEmbeddingDim: Int): OutputEmbeddingTransform[Array[Int]] = {
+    val innerTransform = buildNetInnerTransforms(word2vecIndexed, numHidden, numHiddenLayers, nonLinType, useDropout, backpropIntoEmbeddings)
+    
+    val innerTransformLastLayer = new AffineTransform(outputEmbeddingDim, if (numHiddenLayers >= 1) numHidden else word2vecIndexed.vectorSize, innerTransform, includeBias = false)
+    new OutputEmbeddingTransform(outputSize, outputEmbeddingDim, innerTransformLastLayer)
+    
+//    new AffineOutputEmbeddingTransform(outputSize, if (numHiddenLayers >= 1) numHidden else word2vecIndexed.vectorSize, outputEmbeddingDim, innerTransform)
   }
   
   def addNonlinearity(nonLinType: String, numHidden: Int, useDropout: Boolean, currLayer: Transform[Array[Int],DenseVector[Double]]) = {

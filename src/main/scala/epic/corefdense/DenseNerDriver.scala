@@ -11,6 +11,7 @@ import edu.berkeley.nlp.futile.util.Logger
 import epic.dense.AffineTransform
 import epic.dense.AffineOutputTransform
 import epic.dense.AffineOutputEmbeddingTransform
+import epic.dense.OutputEmbeddingTransform
 import epic.dense.LowRankQuadraticTransform
 import epic.dense.IdentityTransform
 import epic.dense.NonlinearTransform
@@ -108,21 +109,11 @@ object DenseNerDriver {
     val transform = if (lrqt) {
       new LowRankQuadraticTransform(labelIndexer.size, lrqtRanks, vecSize, vecSize, new IdentityTransform[DenseVector[Double]]())
     } else if (outputEmbedding) {
-      new AffineOutputEmbeddingTransform(labelIndexer.size, vecSize, outputEmbeddingDim, new IdentityTransform[DenseVector[Double]]())
+//      new AffineOutputEmbeddingTransform(labelIndexer.size, if (numHiddenLayers == 0) vecSize else hiddenSize, outputEmbeddingDim, buildBasicNNLayers(vecSize, numHiddenLayers))
+      // Not 100% equivalent but quite close, and the latter is way faster
+      new OutputEmbeddingTransform(labelIndexer.size, outputEmbeddingDim, new AffineTransform(outputEmbeddingDim, if (numHiddenLayers == 0) vecSize else hiddenSize, buildBasicNNLayers(vecSize, numHiddenLayers), includeBias = false))
     } else if (nonLinear) {
-      buildBasicNN(labelIndexer.size, vecSize, numHiddenLayers)
-//      var innerTransform: Transform[DenseVector[Double],DenseVector[Double]] = new IdentityTransform[DenseVector[Double]]();
-//      var nextLayerInputSize = vecSize
-//      for (i <- 0 until numHiddenLayers) {
-//        innerTransform = new NonlinearTransform(nonLinType, hiddenSize, new AffineTransform(hiddenSize, nextLayerInputSize, innerTransform))
-//        nextLayerInputSize = hiddenSize
-//        innerTransform = if (useDropout) {
-//          new NonlinearTransform("dropout", hiddenSize, innerTransform)
-//        } else {
-//          innerTransform
-//        }
-//      }
-//      new AffineOutputTransform(labelIndexer.size, nextLayerInputSize, innerTransform)
+      new AffineOutputTransform(labelIndexer.size, if (numHiddenLayers == 0) vecSize else hiddenSize, buildBasicNNLayers(vecSize, numHiddenLayers))
     } else {
       new AffineOutputTransform(labelIndexer.size, vecSize, new IdentityTransform[DenseVector[Double]]())
     }
@@ -149,7 +140,7 @@ object DenseNerDriver {
     // If staged training, do another stage
     val (finalSystem, finalWeights) = if (stagedTraining) {
       Logger.logss("Running staged training; doing another round")
-      val newTransform = buildBasicNN(labelIndexer.size, vecSize, numHiddenLayers + 1)
+      val newTransform = new AffineOutputTransform(labelIndexer.size, hiddenSize, buildBasicNNLayers(vecSize, numHiddenLayers + 1))
       val newDenseNerSystem = new DenseNerSystem(labelIndexer, word2vecIndexed, newTransform, featurizedTransitionMatrix, nerFeaturizer, useSparseFeatures, clipEmbeddingNorms)
       val newInitialWeights = graftGetInitialWeights(transform.asInstanceOf[AffineOutputTransform[DenseVector[Double]]], newTransform, DenseVector(weights), initWeightsScale, new Random(0), initializerSpec)
       // Train for twice as long on the new system
@@ -172,7 +163,7 @@ object DenseNerDriver {
     LightRunner.finalizeOutput()
   }
   
-  def buildBasicNN(outputSize: Int, inputSize: Int, numHiddenLayersThisNet: Int) = {
+  def buildBasicNNLayers(inputSize: Int, numHiddenLayersThisNet: Int) = {
     var innerTransform: Transform[DenseVector[Double],DenseVector[Double]] = new IdentityTransform[DenseVector[Double]]();
     var nextLayerInputSize = inputSize
     for (i <- 0 until numHiddenLayersThisNet) {
@@ -184,7 +175,7 @@ object DenseNerDriver {
         innerTransform
       }
     }
-    new AffineOutputTransform(outputSize, nextLayerInputSize, innerTransform)
+    innerTransform
   }
   
   
