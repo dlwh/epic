@@ -18,7 +18,7 @@ class Word2VecIndexed[W](val wordIndex: Index[W],
                          val converter: W => W) {
   
   def wordRepSize = word2vec.head.size
-  def vectorSize: Int = 6 * wordRepSize
+//  def vectorSize: Int = 6 * wordRepSize
   def vocSize = wordIndex.size
     
   val zeroVector = Array.tabulate(wordRepSize)(i => 0.0)
@@ -61,7 +61,12 @@ trait WordVectorAnchoringIndexed[String] {
   def featuresForSplit(start: Int, split: Int, end: Int): Array[Int];
 }
 
-class Word2VecSurfaceFeaturizerIndexed[W](val word2vecIndexed: Word2VecIndexed[W]) {
+class Word2VecSurfaceFeaturizerIndexed[W](val word2vecIndexed: Word2VecIndexed[W],
+                                          val featureSpec: String) {
+  
+  def inputSize = {
+    anchor(IndexedSeq[W]()).featuresForSplit(0, 0, 0).size * word2vecIndexed.wordRepSize
+  }
   
   def anchor(words: IndexedSeq[W]): WordVectorAnchoringIndexed[W] = {
     val convertedWords = words.map(word2vecIndexed.converter(_))
@@ -69,18 +74,34 @@ class Word2VecSurfaceFeaturizerIndexed[W](val word2vecIndexed: Word2VecIndexed[W
     new WordVectorAnchoringIndexed[W] {
       
       def featuresForSpan(start: Int, end: Int) = {
-//        val vect = new DenseVector[Double](assemble(Seq(fetchVector(start - 1), fetchVector(start), zeroVector, zeroVector, fetchVector(end - 1), fetchVector(end))))
-        Array(fetchWord(start - 1), fetchWord(start), -1, -1, fetchWord(end - 1), fetchWord(end))
+//        Array(fetchWord(start - 1), fetchWord(start), -1, -1, fetchWord(end - 1), fetchWord(end))
+        if (featureSpec == "") {
+          Array(fetchWord(start - 1), fetchWord(start), -1, -1, fetchWord(end - 1), fetchWord(end))
+        } else if (featureSpec == "morecontext") {
+          Array(fetchWord(start - 2), fetchWord(start - 1), fetchWord(start), -1, -1, fetchWord(end - 1), fetchWord(end), fetchWord(end + 1))
+        } else if (featureSpec == "morefirstlast") {
+          Array(fetchWord(start - 1), fetchWord(start), fetchWord(start + 1), -1, -1, fetchWord(end - 2), fetchWord(end - 1), fetchWord(end))
+        } else if (featureSpec == "moresplit") {
+          Array(fetchWord(start - 1), fetchWord(start), -1, -1, -1, -1, fetchWord(end - 1), fetchWord(end))
+        } else {
+          throw new RuntimeException("Unknown featureSpec: " + featureSpec)
+        }
       }
         
       def featuresForSplit(start: Int, split: Int, end: Int) = {
-//        val vect = new DenseVector[Double](assemble(Seq(fetchVector(start - 1), fetchVector(start), fetchVector(split - 1), fetchVector(split), fetchVector(end - 1), fetchVector(end))))
-        Array(fetchWord(start - 1), fetchWord(start), fetchWord(split - 1), fetchWord(split), fetchWord(end - 1), fetchWord(end))
+//        Array(fetchWord(start - 1), fetchWord(start), fetchWord(split - 1), fetchWord(split), fetchWord(end - 1), fetchWord(end))
+        if (featureSpec == "") {
+          Array(fetchWord(start - 1), fetchWord(start), fetchWord(split - 1), fetchWord(split), fetchWord(end - 1), fetchWord(end))
+        } else if (featureSpec == "morecontext") {
+          Array(fetchWord(start - 2), fetchWord(start - 1), fetchWord(start), fetchWord(split - 1), fetchWord(split), fetchWord(end - 1), fetchWord(end), fetchWord(end + 1))
+        } else if (featureSpec == "morefirstlast") {
+          Array(fetchWord(start - 1), fetchWord(start), fetchWord(start + 1), fetchWord(split - 1), fetchWord(split), fetchWord(end - 2), fetchWord(end - 1), fetchWord(end))
+        } else if (featureSpec == "moresplit") {
+          Array(fetchWord(start - 1), fetchWord(start), fetchWord(split - 2), fetchWord(split - 1), fetchWord(split), fetchWord(split + 1), fetchWord(end - 1), fetchWord(end))
+        } else {
+          throw new RuntimeException("Unknown featureSpec: " + featureSpec)
+        }
       }
-        
-//      private def fetchWord(idx: Int): Int = {
-//        if (idx < 0 || idx >= words.size || !word2vec.contains(convertedWords(idx))) -1 else wordIndex(convertedWords(idx))
-//      }
       
       private def fetchWord(idx: Int): Int = {
         if (idx < 0 || idx >= words.size) -1 else indexedWords(idx)

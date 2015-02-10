@@ -43,7 +43,8 @@ case class ExtraPNMParams(useSparseLfsuf: Boolean = true,
                           useDropout: Boolean = false,
                           vectorRescaling: Double = 1.0,
                           outputEmbedding: Boolean = false,
-                          outputEmbeddingDim: Int = 20)
+                          outputEmbeddingDim: Int = 20,
+                          surfaceFeatureSpec: String = "")
 
 case class PositionalNeuralModelFactory(@Help(text=
                               """The kind of annotation to do on the refined grammar. Default uses just parent annotation.
@@ -139,7 +140,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
       Word2VecIndexed(word2vecDoubleVect, (str: String) => Word2Vec.convertWord(str))
     }
     
-    val surfaceFeaturizer = new Word2VecSurfaceFeaturizerIndexed(word2vecIndexed)
+    val surfaceFeaturizer = new Word2VecSurfaceFeaturizerIndexed(word2vecIndexed, surfaceFeatureSpec)
     val depFeaturizer = new Word2VecDepFeaturizerIndexed(word2vecIndexed, freqTagger, topology)
     
     
@@ -151,15 +152,17 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
 //    }
 //    var transform = new AffineTransformDense(featurizer.index.size, numHidden, currLayer)
     
-    println(word2vecIndexed.vectorSize + " x (" + numHidden + ")^" + numHiddenLayers + " x " + prodFeaturizer.index.size + " neural net")
+    val inputSize = surfaceFeaturizer.inputSize
+    
+    println(inputSize + " x (" + numHidden + ")^" + numHiddenLayers + " x " + prodFeaturizer.index.size + " neural net")
     val transform = if (outputEmbedding) {
-      PositionalNeuralModelFactory.buildNetOutputEmbedding(word2vecIndexed, numHidden, numHiddenLayers, prodFeaturizer.index.size, nonLinType, useDropout, backpropIntoEmbeddings, outputEmbeddingDim)
+      PositionalNeuralModelFactory.buildNetOutputEmbedding(word2vecIndexed, inputSize, numHidden, numHiddenLayers, prodFeaturizer.index.size, nonLinType, useDropout, backpropIntoEmbeddings, outputEmbeddingDim)
     } else {
-      PositionalNeuralModelFactory.buildNet(word2vecIndexed, numHidden, numHiddenLayers, prodFeaturizer.index.size, nonLinType, useDropout, backpropIntoEmbeddings)
+      PositionalNeuralModelFactory.buildNet(word2vecIndexed, inputSize, numHidden, numHiddenLayers, prodFeaturizer.index.size, nonLinType, useDropout, backpropIntoEmbeddings)
     }
     val transforms = if (augmentWithLinear) {
-      println("Adding a linear transform: " + word2vecIndexed.vectorSize + " x " + prodFeaturizer.index.size) 
-      IndexedSeq(transform, PositionalNeuralModelFactory.buildNet(word2vecIndexed, 0, 0, prodFeaturizer.index.size, "", useDropout, backpropIntoEmbeddings))
+      println("Adding a linear transform: " + inputSize + " x " + prodFeaturizer.index.size) 
+      IndexedSeq(transform, PositionalNeuralModelFactory.buildNet(word2vecIndexed, inputSize, 0, 0, prodFeaturizer.index.size, "", useDropout, backpropIntoEmbeddings))
     } else {
       IndexedSeq(transform)
     }
@@ -229,6 +232,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
 object PositionalNeuralModelFactory {
   
   def buildNetInnerTransforms(word2vecIndexed: Word2VecIndexed[String],
+                              inputSize: Int,
                               numHidden: Int,
                               numHiddenLayers: Int,
                               nonLinType: String,
@@ -238,9 +242,9 @@ object PositionalNeuralModelFactory {
       new CachingLookupTransform(word2vecIndexed)
     } else {
       val baseTransformLayer = if (backpropIntoEmbeddings) {
-        new EmbeddingsTransform(numHidden, word2vecIndexed.vectorSize, word2vecIndexed)
+        new EmbeddingsTransform(numHidden, inputSize, word2vecIndexed)
       } else {
-        new CachingLookupAndAffineTransformDense(numHidden, word2vecIndexed.vectorSize, word2vecIndexed)
+        new CachingLookupAndAffineTransformDense(numHidden, inputSize, word2vecIndexed)
       }
       var currLayer = addNonlinearity(nonLinType, numHidden, useDropout, baseTransformLayer)
       for (i <- 1 until numHiddenLayers) {
@@ -251,14 +255,15 @@ object PositionalNeuralModelFactory {
   }
   
   def buildNet(word2vecIndexed: Word2VecIndexed[String],
+               inputSize: Int,
                numHidden: Int,
                numHiddenLayers: Int,
                outputSize: Int,
                nonLinType: String,
                useDropout: Boolean,
                backpropIntoEmbeddings: Boolean): AffineOutputTransform[Array[Int]] = {
-    val innerTransform = buildNetInnerTransforms(word2vecIndexed, numHidden, numHiddenLayers, nonLinType, useDropout, backpropIntoEmbeddings)
-    new AffineOutputTransform(outputSize, if (numHiddenLayers >= 1) numHidden else word2vecIndexed.vectorSize, innerTransform)
+    val innerTransform = buildNetInnerTransforms(word2vecIndexed, inputSize, numHidden, numHiddenLayers, nonLinType, useDropout, backpropIntoEmbeddings)
+    new AffineOutputTransform(outputSize, if (numHiddenLayers >= 1) numHidden else inputSize, innerTransform)
 //    if (numHiddenLayers == 0) {
 //      new AffineOutputTransform(outputSize, word2vecIndexed.vectorSize, new CachingLookupTransform(word2vecIndexed))
 //    } else {
@@ -278,6 +283,7 @@ object PositionalNeuralModelFactory {
   
   
   def buildNetOutputEmbedding(word2vecIndexed: Word2VecIndexed[String],
+                              inputSize: Int,
                               numHidden: Int,
                               numHiddenLayers: Int,
                               outputSize: Int,
@@ -286,9 +292,9 @@ object PositionalNeuralModelFactory {
                               backpropIntoEmbeddings: Boolean,
 //                              outputEmbeddingDim: Int): AffineOutputEmbeddingTransform[Array[Int]] = {
                               outputEmbeddingDim: Int): OutputEmbeddingTransform[Array[Int]] = {
-    val innerTransform = buildNetInnerTransforms(word2vecIndexed, numHidden, numHiddenLayers, nonLinType, useDropout, backpropIntoEmbeddings)
+    val innerTransform = buildNetInnerTransforms(word2vecIndexed, inputSize, numHidden, numHiddenLayers, nonLinType, useDropout, backpropIntoEmbeddings)
     
-    val innerTransformLastLayer = new AffineTransform(outputEmbeddingDim, if (numHiddenLayers >= 1) numHidden else word2vecIndexed.vectorSize, innerTransform, includeBias = false)
+    val innerTransformLastLayer = new AffineTransform(outputEmbeddingDim, if (numHiddenLayers >= 1) numHidden else inputSize, innerTransform)
     new OutputEmbeddingTransform(outputSize, outputEmbeddingDim, innerTransformLastLayer)
     
 //    new AffineOutputEmbeddingTransform(outputSize, if (numHiddenLayers >= 1) numHidden else word2vecIndexed.vectorSize, outputEmbeddingDim, innerTransform)

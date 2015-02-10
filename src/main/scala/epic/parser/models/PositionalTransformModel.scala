@@ -176,9 +176,6 @@ object PositionalTransformModel {
 //      val countsPerHeadDepPair = Array.tabulate(w.size, w.size)((i, j) => 0.0)
 //      val statesUsed = Array.fill(maxTetraLen)(false)
 //      val untetra = Array.fill(maxTetraLen)((-1, -1, -1))
-      
-      
-      
       val untetra = new HashMap[Int,(Int,Int,Int)]
       
       m visit new AnchoredVisitor[L] {

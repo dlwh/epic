@@ -111,7 +111,7 @@ object DenseNerDriver {
     } else if (outputEmbedding) {
 //      new AffineOutputEmbeddingTransform(labelIndexer.size, if (numHiddenLayers == 0) vecSize else hiddenSize, outputEmbeddingDim, buildBasicNNLayers(vecSize, numHiddenLayers))
       // Not 100% equivalent but quite close, and the latter is way faster
-      new OutputEmbeddingTransform(labelIndexer.size, outputEmbeddingDim, new AffineTransform(outputEmbeddingDim, if (numHiddenLayers == 0) vecSize else hiddenSize, buildBasicNNLayers(vecSize, numHiddenLayers), includeBias = false))
+      new OutputEmbeddingTransform(labelIndexer.size, outputEmbeddingDim, new AffineTransform(outputEmbeddingDim, if (numHiddenLayers == 0) vecSize else hiddenSize, buildBasicNNLayers(vecSize, numHiddenLayers)))
     } else if (nonLinear) {
       new AffineOutputTransform(labelIndexer.size, if (numHiddenLayers == 0) vecSize else hiddenSize, buildBasicNNLayers(vecSize, numHiddenLayers))
     } else {

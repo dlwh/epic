@@ -58,7 +58,7 @@ case class CachingLookupAndAffineTransformDense[FV](numOutputs: Int,
     // word vector is used for each word identity, the parameter vector depends
     // on the position.
 //    val cache = new HashMap[(Int,Int),DenseVector[Double]]
-    val caches = Array.tabulate(6)(i => new HashMap[Int,DenseVector[Double]])
+    val caches = Array.tabulate(numInputs/word2vecIndexed.wordRepSize)(i => new HashMap[Int,DenseVector[Double]])
 
     def activations(fv: Array[Int]) = {
       val finalVector = DenseVector.zeros[Double](numOutputs)
