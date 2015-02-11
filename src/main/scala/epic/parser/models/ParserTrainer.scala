@@ -70,6 +70,8 @@ object ParserTrainer extends epic.parser.ParserPipeline with LazyLogging {
                     initializerSpec: String = "",
                     @Help(text="True if we should determinimize training (remove randomness associated with random minibatches)")
                     determinizeTraining: Boolean = false,
+                    @Help(text="True if we should train two models and ram them together")
+                    ensemble: Boolean = false,
                     @Help(text="Use Adadelta for optimiziation instead of Adagrad")
                     useAdadelta: Boolean = false,
                     @Help(text="Should we enforce reachability? Can be useful if we're pruning the gold tree.")
@@ -176,15 +178,29 @@ object ParserTrainer extends epic.parser.ParserPipeline with LazyLogging {
         params.opt.iterations(cachedObj, init)
       }
     }
-    for ((state, iter) <- itr.take(maxIterations).zipWithIndex.tee(evalAndCache _)
-         if iter != 0 && iter % iterationsPerEval == 0 || evaluateNow) yield try {
-      val parser = model.extractParser(state.x)
-      if (iter + iterationsPerEval >= maxIterations) {
-        computeLL(trainTrees, model, state.x)
+    if (ensemble) {
+      val weights1 = itr.take(maxIterations).last.x
+      // Hard-wired to use Adadelta
+      val initParams2 = model.asInstanceOf[PositionalTransformModel[AnnotatedLabel, AnnotatedLabel, String]].initialWeightVector(randomize, initWeightsScale, initializerSpec, trulyRandom = true)
+      val itr2 = new AdadeltaGradientDescentDVD(params.opt.maxIterations).iterations(cachedObj.withRandomBatches(params.opt.batchSize), initParams2).
+            asInstanceOf[Iterator[FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State]]
+      println("Optimizing second parser")
+      val weights2 = itr2.take(maxIterations).last.x
+      println("Optimized both parsers")
+      val clonedModel = model.asInstanceOf[PositionalTransformModel[AnnotatedLabel, AnnotatedLabel, String]].cloneModelForEnsembling
+      Seq(("ComboParser-Final", clonedModel.extractParser(DenseVector.vertcat(weights1, weights2)))).iterator
+    } else {
+      // Normal execution
+      for ((state, iter) <- itr.take(maxIterations).zipWithIndex.tee(evalAndCache _)
+           if iter != 0 && iter % iterationsPerEval == 0 || evaluateNow) yield try {
+        val parser = model.extractParser(state.x)
+        if (iter + iterationsPerEval >= maxIterations) {
+          computeLL(trainTrees, model, state.x)
+        }
+        (s"$name-$iter", parser)
+      } catch {
+        case e: Exception => e.printStackTrace(); throw e
       }
-      (s"$name-$iter", parser)
-    } catch {
-      case e: Exception => e.printStackTrace(); throw e
     }
   }
   

@@ -37,6 +37,15 @@ class PositionalTransformModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSe
                                val transforms: IndexedSeq[OutputTransform[Array[Int],DenseVector[Double]]],
                                val maybeSparseSurfaceFeaturizer: Option[IndexedSpanFeaturizer[L, L2, W]],
                                val depTransforms: Seq[OutputTransform[Array[Int],DenseVector[Double]]]) extends ParserModel[L, W] {
+  
+  def cloneModelForEnsembling = {
+    val newTransforms = transforms ++ transforms;
+    // Can't have anything else in there for the parameter vector ramming to work
+    require(depTransforms.isEmpty && !maybeSparseSurfaceFeaturizer.isDefined)
+    new PositionalTransformModel(annotator, constrainer, topology, lexicon, refinedTopology, refinements, labelFeaturizer, surfaceFeaturizer, depFeaturizer,
+                                 newTransforms, maybeSparseSurfaceFeaturizer, depTransforms)
+  }
+  
   override type Inference = PositionalTransformModel.Inference[L, L2, W]
 
 //  override def accumulateCounts(inf: Inference, d: TreeInstance[L, W], accum: ExpectedCounts, scale: Double):Unit = {
@@ -79,8 +88,8 @@ class PositionalTransformModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSe
     SegmentedIndex((transforms.map(_.index) ++ depTransforms.map(_.index)):_*)
   }
   
-  def initialWeightVector(randomize: Boolean, initWeightsScale: Double, initializerSpec: String): DenseVector[Double] = {
-    val rng = new Random(0)
+  def initialWeightVector(randomize: Boolean, initWeightsScale: Double, initializerSpec: String, trulyRandom: Boolean = false): DenseVector[Double] = {
+    val rng = if (trulyRandom) new Random() else new Random(0)
 //    val initTransformWeights = transform.initialWeightVector(initWeightsScale, rng, true);
     val initTransformWeights = DenseVector.vertcat(transforms.map(_.initialWeightVector(initWeightsScale, rng, true, initializerSpec)):_*);
     val initDepWeights = DenseVector.vertcat(depTransforms.map(_.initialWeightVector(initWeightsScale, rng, true, initializerSpec)):_*);
