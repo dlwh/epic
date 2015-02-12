@@ -83,6 +83,8 @@ class Word2VecSurfaceFeaturizerIndexed[W](val word2vecIndexed: Word2VecIndexed[W
           Array(fetchWord(start - 1), fetchWord(start), fetchWord(start + 1), -1, -1, fetchWord(end - 2), fetchWord(end - 1), fetchWord(end))
         } else if (featureSpec == "moresplit") {
           Array(fetchWord(start - 1), fetchWord(start), -1, -1, -1, -1, fetchWord(end - 1), fetchWord(end))
+        } else if (featureSpec == "mcmfl") {
+          Array(fetchWord(start - 2), fetchWord(start - 1), fetchWord(start), fetchWord(start + 1), -1, -1, fetchWord(end - 2), fetchWord(end - 1), fetchWord(end), fetchWord(end + 1))
         } else {
           throw new RuntimeException("Unknown featureSpec: " + featureSpec)
         }
@@ -98,6 +100,8 @@ class Word2VecSurfaceFeaturizerIndexed[W](val word2vecIndexed: Word2VecIndexed[W
           Array(fetchWord(start - 1), fetchWord(start), fetchWord(start + 1), fetchWord(split - 1), fetchWord(split), fetchWord(end - 2), fetchWord(end - 1), fetchWord(end))
         } else if (featureSpec == "moresplit") {
           Array(fetchWord(start - 1), fetchWord(start), fetchWord(split - 2), fetchWord(split - 1), fetchWord(split), fetchWord(split + 1), fetchWord(end - 1), fetchWord(end))
+        } else if (featureSpec == "mcmfl") {
+          Array(fetchWord(start - 2), fetchWord(start - 1), fetchWord(start), fetchWord(start + 1), fetchWord(split - 1), fetchWord(split), fetchWord(end - 2), fetchWord(end - 1), fetchWord(end), fetchWord(end + 1))
         } else {
           throw new RuntimeException("Unknown featureSpec: " + featureSpec)
         }
