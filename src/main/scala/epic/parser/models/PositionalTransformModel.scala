@@ -379,7 +379,7 @@ object PositionalTransformModel {
       val depSpec = depFeaturizer.anchor(w)
       val lspec = labelFeaturizer.anchor(w)
       val fspec = if (maybeSparseSurfaceFeaturizer.isDefined) maybeSparseSurfaceFeaturizer.get.anchor(w) else null
-      val sparseFeatsStart = if (maybeSparseSurfaceFeaturizer.isDefined) (layers.map(_.index.size).foldLeft(0)(_ + _) + depLayers.map(_.index.size).foldLeft(0)(_ + _)) else -1
+      val sparseFeatsStart = if (maybeSparseSurfaceFeaturizer.isDefined) (layers.map(_.index.size).foldLeft(0)(_ + _) + depLayers.map(_.index.size).foldLeft(0)(_ + _) + decoupledLayers.map(_.index.size).foldLeft(0)(_ + _)) else -1
 
       private def tetra(begin: Int, split: Int, end: Int) = {
         (end * (end + 1) * (end + 2))/6 + ((split + 1) * split / 2 + begin)
