@@ -18,6 +18,7 @@ import epic.trees.annotations.TreeAnnotator
 import epic.util.{LRUCache, NotProvided, Optional}
 import epic.dense.Transform
 import epic.dense.TanhTransform
+import epic.dense.OutputTransform
 import epic.dense.AffineOutputTransform
 import epic.dense.AffineOutputEmbeddingTransform
 import epic.dense.OutputEmbeddingTransform
@@ -44,7 +45,8 @@ case class ExtraPNMParams(useSparseLfsuf: Boolean = true,
                           vectorRescaling: Double = 1.0,
                           outputEmbedding: Boolean = false,
                           outputEmbeddingDim: Int = 20,
-                          surfaceFeatureSpec: String = "")
+                          surfaceFeatureSpec: String = "",
+                          decoupleTransforms: Boolean = false)
 
 case class PositionalNeuralModelFactory(@Help(text=
                               """The kind of annotation to do on the refined grammar. Default uses just parent annotation.
@@ -152,19 +154,23 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
 //    }
 //    var transform = new AffineTransformDense(featurizer.index.size, numHidden, currLayer)
     
-    val inputSize = surfaceFeaturizer.inputSize
     
-    println(inputSize + " x (" + numHidden + ")^" + numHiddenLayers + " x " + prodFeaturizer.index.size + " neural net")
-    val transform = if (outputEmbedding) {
-      PositionalNeuralModelFactory.buildNetOutputEmbedding(word2vecIndexed, inputSize, numHidden, numHiddenLayers, prodFeaturizer.index.size, nonLinType, useDropout, backpropIntoEmbeddings, outputEmbeddingDim)
+    val transforms = if (decoupleTransforms) {
+      IndexedSeq[AffineOutputTransform[Array[Int]]]()
     } else {
-      PositionalNeuralModelFactory.buildNet(word2vecIndexed, inputSize, numHidden, numHiddenLayers, prodFeaturizer.index.size, nonLinType, useDropout, backpropIntoEmbeddings)
-    }
-    val transforms = if (augmentWithLinear) {
-      println("Adding a linear transform: " + inputSize + " x " + prodFeaturizer.index.size) 
-      IndexedSeq(transform, PositionalNeuralModelFactory.buildNet(word2vecIndexed, inputSize, 0, 0, prodFeaturizer.index.size, "", useDropout, backpropIntoEmbeddings))
-    } else {
-      IndexedSeq(transform)
+      val inputSize = surfaceFeaturizer.splitInputSize
+      val transform = if (outputEmbedding) {
+        PositionalNeuralModelFactory.buildNetOutputEmbedding(word2vecIndexed, inputSize, numHidden, numHiddenLayers, prodFeaturizer.index.size, nonLinType, useDropout, backpropIntoEmbeddings, outputEmbeddingDim)
+      } else {
+        println(inputSize + " x (" + numHidden + ")^" + numHiddenLayers + " x " + prodFeaturizer.index.size + " neural net")
+        PositionalNeuralModelFactory.buildNet(word2vecIndexed, inputSize, numHidden, numHiddenLayers, prodFeaturizer.index.size, nonLinType, useDropout, backpropIntoEmbeddings)
+      }
+      if (augmentWithLinear) {
+        println("Adding a linear transform: " + inputSize + " x " + prodFeaturizer.index.size) 
+        IndexedSeq(transform, PositionalNeuralModelFactory.buildNet(word2vecIndexed, inputSize, 0, 0, prodFeaturizer.index.size, "", useDropout, backpropIntoEmbeddings))
+      } else {
+        IndexedSeq(transform)
+      }
     }
     val depTransforms: IndexedSeq[AffineOutputTransform[Array[Int]]] = if (useDeps) {
       throw new RuntimeException("Dependency NNs removed temporarily")
@@ -179,9 +185,17 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     } else {
       IndexedSeq()
     }
+    val decoupledTransforms = if (decoupleTransforms) {
+      // Span and unary use the reduced input (no split point features), whereas surface uses the split point features
+      val inputSizes = Seq(surfaceFeaturizer.reducedInputSize, surfaceFeaturizer.reducedInputSize, surfaceFeaturizer.splitInputSize)
+      inputSizes.map(inputSize => PositionalNeuralModelFactory.buildNet(word2vecIndexed, inputSize, numHidden, numHiddenLayers, prodFeaturizer.index.size, nonLinType, useDropout, backpropIntoEmbeddings))
+    } else {
+      IndexedSeq[AffineOutputTransform[Array[Int]]]()
+    }
     
     println(transforms.size + " transforms, " + transforms.map(_.index.size).toSeq + " parameters for each")
     println(depTransforms.size + " dep transforms, " + depTransforms.map(_.index.size).toSeq + " parameters for each")
+    println(decoupledTransforms.size + " decoupled transforms, " + decoupledTransforms.map(_.index.size).toSeq + " parameters for each")
     
     
     
@@ -225,7 +239,8 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
       depFeaturizer,
       transforms,
       maybeSparseFeaturizer,
-      depTransforms)
+      depTransforms,
+      decoupledTransforms)
   }
 }
 

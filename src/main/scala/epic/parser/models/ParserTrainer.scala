@@ -181,14 +181,16 @@ object ParserTrainer extends epic.parser.ParserPipeline with LazyLogging {
     if (ensemble) {
       val weights1 = itr.take(maxIterations).last.x
       // Hard-wired to use Adadelta
-      val initParams2 = model.asInstanceOf[PositionalTransformModel[AnnotatedLabel, AnnotatedLabel, String]].initialWeightVector(randomize, initWeightsScale, initializerSpec, trulyRandom = true)
+      val castModel = model.asInstanceOf[PositionalTransformModel[AnnotatedLabel, AnnotatedLabel, String]]
+      val initParams2 = castModel.initialWeightVector(randomize, initWeightsScale, initializerSpec, trulyRandom = true)
       val itr2 = new AdadeltaGradientDescentDVD(params.opt.maxIterations).iterations(cachedObj.withRandomBatches(params.opt.batchSize), initParams2).
             asInstanceOf[Iterator[FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State]]
       println("Optimizing second parser")
       val weights2 = itr2.take(maxIterations).last.x
       println("Optimized both parsers")
-      val clonedModel = model.asInstanceOf[PositionalTransformModel[AnnotatedLabel, AnnotatedLabel, String]].cloneModelForEnsembling
-      Seq(("ComboParser-Final", clonedModel.extractParser(DenseVector.vertcat(weights1, weights2)))).iterator
+      val clonedModel = castModel.cloneModelForEnsembling
+      val mergedWeights = castModel.mergeWeightsForEnsembling(weights1, weights2)
+      Seq(("ComboParser-Final", clonedModel.extractParser(mergedWeights))).iterator
     } else {
       // Normal execution
       for ((state, iter) <- itr.take(maxIterations).zipWithIndex.tee(evalAndCache _)

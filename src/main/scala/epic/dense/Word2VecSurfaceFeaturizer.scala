@@ -57,6 +57,7 @@ object Word2VecIndexed {
 }
 
 trait WordVectorAnchoringIndexed[String] {
+  def reducedFeaturesForSpan(start: Int, end: Int): Array[Int];
   def featuresForSpan(start: Int, end: Int): Array[Int];
   def featuresForSplit(start: Int, split: Int, end: Int): Array[Int];
 }
@@ -64,7 +65,11 @@ trait WordVectorAnchoringIndexed[String] {
 class Word2VecSurfaceFeaturizerIndexed[W](val word2vecIndexed: Word2VecIndexed[W],
                                           val featureSpec: String) {
   
-  def inputSize = {
+  def reducedInputSize = {
+    anchor(IndexedSeq[W]()).reducedFeaturesForSpan(0, 0).size * word2vecIndexed.wordRepSize
+  }
+  
+  def splitInputSize = {
     anchor(IndexedSeq[W]()).featuresForSplit(0, 0, 0).size * word2vecIndexed.wordRepSize
   }
   
@@ -72,6 +77,21 @@ class Word2VecSurfaceFeaturizerIndexed[W](val word2vecIndexed: Word2VecIndexed[W
     val convertedWords = words.map(word2vecIndexed.converter(_))
     val indexedWords = convertedWords.map(word2vecIndexed.wordIndex(_))
     new WordVectorAnchoringIndexed[W] {
+      
+      def reducedFeaturesForSpan(start: Int, end: Int) = {
+//        Array(fetchWord(start - 1), fetchWord(start), -1, -1, fetchWord(end - 1), fetchWord(end))
+        if (featureSpec == "" || featureSpec == "moresplit") {
+          Array(fetchWord(start - 1), fetchWord(start), fetchWord(end - 1), fetchWord(end))
+        } else if (featureSpec == "morecontext") {
+          Array(fetchWord(start - 2), fetchWord(start - 1), fetchWord(start), fetchWord(end - 1), fetchWord(end), fetchWord(end + 1))
+        } else if (featureSpec == "morefirstlast") {
+          Array(fetchWord(start - 1), fetchWord(start), fetchWord(start + 1), fetchWord(end - 2), fetchWord(end - 1), fetchWord(end))
+        } else if (featureSpec == "mcmfl") {
+          Array(fetchWord(start - 2), fetchWord(start - 1), fetchWord(start), fetchWord(start + 1), fetchWord(end - 2), fetchWord(end - 1), fetchWord(end), fetchWord(end + 1))
+        } else {
+          throw new RuntimeException("Unknown featureSpec: " + featureSpec)
+        }
+      }
       
       def featuresForSpan(start: Int, end: Int) = {
 //        Array(fetchWord(start - 1), fetchWord(start), -1, -1, fetchWord(end - 1), fetchWord(end))

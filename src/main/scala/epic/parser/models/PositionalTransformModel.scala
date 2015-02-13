@@ -36,14 +36,30 @@ class PositionalTransformModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSe
                                depFeaturizer: Word2VecDepFeaturizerIndexed[W],
                                val transforms: IndexedSeq[OutputTransform[Array[Int],DenseVector[Double]]],
                                val maybeSparseSurfaceFeaturizer: Option[IndexedSpanFeaturizer[L, L2, W]],
-                               val depTransforms: Seq[OutputTransform[Array[Int],DenseVector[Double]]]) extends ParserModel[L, W] {
+                               val depTransforms: Seq[OutputTransform[Array[Int],DenseVector[Double]]],
+                               val decoupledTransforms: Seq[OutputTransform[Array[Int],DenseVector[Double]]]) extends ParserModel[L, W] {
+  
+  def mergeWeightsForEnsembling(x1: DenseVector[Double], x2: DenseVector[Double]) = {
+    require(decoupledTransforms.size == 0)
+    require(x1.size == x2.size)
+    // Stack up the dense parts, average the sparse parts
+    if (maybeSparseSurfaceFeaturizer.isDefined) {
+      val sparseFeatsStart = index.componentOffset(index.indices.size - 1)
+      val summedSparseFeatures = x1(sparseFeatsStart to -1) + x2(sparseFeatsStart to -1)
+      DenseVector.vertcat(x1(0 until sparseFeatsStart), x2(0 until sparseFeatsStart), summedSparseFeatures)
+    } else {
+      DenseVector.vertcat(x1, x2)
+    }
+  }
   
   def cloneModelForEnsembling = {
+    require(decoupledTransforms.size == 0)
+    // Note that duping the transforms is okay because they still produce distinct
+    // layers, so caching behavior is unaffected
     val newTransforms = transforms ++ transforms;
-    // Can't have anything else in there for the parameter vector ramming to work
-    require(depTransforms.isEmpty && !maybeSparseSurfaceFeaturizer.isDefined)
+    val newDepTransforms = depTransforms ++ depTransforms;
     new PositionalTransformModel(annotator, constrainer, topology, lexicon, refinedTopology, refinements, labelFeaturizer, surfaceFeaturizer, depFeaturizer,
-                                 newTransforms, maybeSparseSurfaceFeaturizer, depTransforms)
+                                 newTransforms, maybeSparseSurfaceFeaturizer, newDepTransforms, decoupledTransforms)
   }
   
   override type Inference = PositionalTransformModel.Inference[L, L2, W]
@@ -65,7 +81,7 @@ class PositionalTransformModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSe
       val innerAccum = StandardExpectedCounts.zero(f.index)
       m.expectedCounts(maybeSparseSurfaceFeaturizer.get, innerAccum, scale)
       //      val totalTransformSize = transform.index.size
-      val totalTransformSize = transforms.map(_.index.size).reduce(_ + _)
+      val totalTransformSize = transforms.map(_.index.size).foldLeft(0)(_ + _) + depTransforms.map(_.index.size).foldLeft(0)(_ + _)  + decoupledTransforms.map(_.index.size).foldLeft(0)(_ + _)
       accum.counts += DenseVector.vertcat(DenseVector.zeros[Double](totalTransformSize), innerAccum.counts)
     }
 //    println("Ecounts extracted")
@@ -83,9 +99,9 @@ class PositionalTransformModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSe
 //    transform.index
 //  }
   val index = if (maybeSparseSurfaceFeaturizer.isDefined) {
-    SegmentedIndex((transforms.map(_.index) ++ depTransforms.map(_.index) ++ IndexedSeq(maybeSparseSurfaceFeaturizer.get.index)):_*)
+    SegmentedIndex((transforms.map(_.index) ++ depTransforms.map(_.index) ++ decoupledTransforms.map(_.index) ++ IndexedSeq(maybeSparseSurfaceFeaturizer.get.index)):_*)
   } else {
-    SegmentedIndex((transforms.map(_.index) ++ depTransforms.map(_.index)):_*)
+    SegmentedIndex((transforms.map(_.index) ++ depTransforms.map(_.index) ++ decoupledTransforms.map(_.index)):_*)
   }
   
   def initialWeightVector(randomize: Boolean, initWeightsScale: Double, initializerSpec: String, trulyRandom: Boolean = false): DenseVector[Double] = {
@@ -93,10 +109,11 @@ class PositionalTransformModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSe
 //    val initTransformWeights = transform.initialWeightVector(initWeightsScale, rng, true);
     val initTransformWeights = DenseVector.vertcat(transforms.map(_.initialWeightVector(initWeightsScale, rng, true, initializerSpec)):_*);
     val initDepWeights = DenseVector.vertcat(depTransforms.map(_.initialWeightVector(initWeightsScale, rng, true, initializerSpec)):_*);
+    val initDecoupledWeights = DenseVector.vertcat(decoupledTransforms.map(_.initialWeightVector(initWeightsScale, rng, true, initializerSpec)):_*);
     val newInitVector: DenseVector[Double] = if (maybeSparseSurfaceFeaturizer.isDefined) {
-      DenseVector.vertcat(initTransformWeights, initDepWeights, DenseVector.zeros(maybeSparseSurfaceFeaturizer.get.index.size))
+      DenseVector.vertcat(initTransformWeights, initDepWeights, initDecoupledWeights, DenseVector.zeros(maybeSparseSurfaceFeaturizer.get.index.size))
     } else {
-      DenseVector.vertcat(initTransformWeights, initDepWeights)
+      DenseVector.vertcat(initTransformWeights, initDepWeights, initDecoupledWeights)
     }
     newInitVector
   }
@@ -117,8 +134,15 @@ class PositionalTransformModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSe
 //      println("dep " + i + ": " + index.componentOffset(idxIdx))
       depTransforms(i).extractLayer(weights(index.componentOffset(idxIdx) until index.componentOffset(idxIdx) + index.indices(idxIdx).size), forTrain)
     }
+    val decoupledLayersAndInner = for (i <- 0 until decoupledTransforms.size) yield {
+      val idxIdx = transforms.size + depTransforms.size + i
+//      println("dep " + i + ": " + index.componentOffset(idxIdx))
+      decoupledTransforms(i).extractLayerAndPenultimateLayer(weights(index.componentOffset(idxIdx) until index.componentOffset(idxIdx) + index.indices(idxIdx).size), forTrain)
+    }
+    val decoupledLayers = decoupledLayersAndInner.map(_._1)
+    val decoupledInnerLayers = decoupledLayersAndInner.map(_._2)
     val grammar = new PositionalTransformModel.PositionalTransformGrammar[L, L2, W](topology, lexicon, refinedTopology, refinements, labelFeaturizer,
-                                                                                   surfaceFeaturizer, depFeaturizer, layers, innerLayers, depLayers, maybeSparseSurfaceFeaturizer, weights, this)
+                                                                                   surfaceFeaturizer, depFeaturizer, layers, innerLayers, depLayers, maybeSparseSurfaceFeaturizer, decoupledLayers, decoupledInnerLayers, weights, this)
     new Inference(annotator, constrainer, grammar, refinements)
   }
 
@@ -158,14 +182,27 @@ object PositionalTransformModel {
                                              penultimateLayers: IndexedSeq[epic.dense.Transform.Layer[Array[Int],DenseVector[Double]]],
                                              depLayers: IndexedSeq[OutputTransform[Array[Int],DenseVector[Double]]#OutputLayer],
                                              val maybeSparseSurfaceFeaturizer: Option[IndexedSpanFeaturizer[L, L2, W]],
+                                             decoupledLayers: IndexedSeq[OutputTransform[Array[Int],DenseVector[Double]]#OutputLayer],
+                                             penultimateDecoupledLayers: IndexedSeq[epic.dense.Transform.Layer[Array[Int],DenseVector[Double]]],
                                              val weights: DenseVector[Double],
                                              val origPTModel: PositionalTransformModel[L,L2,W]) extends Grammar[L, W] with Serializable {
 
+    val SpanLayerIdx = 0
+    val UnaryLayerIdx = 1
+    val BinaryLayerIdx = 2
+    val dcSpanFeatOffset = layers.map(_.index.size).foldLeft(0)(_ + _) + depLayers.map(_.index.size).foldLeft(0)(_ + _)
+    val dcUnaryFeatOffset = dcSpanFeatOffset + (if (decoupledLayers.size > 0) decoupledLayers(0).index.size else 0)
+    val dcBinaryFeatOffset = dcUnaryFeatOffset + (if (decoupledLayers.size > 0) decoupledLayers(1).index.size else 0)
+    
     override def withPermissiveLexicon: Grammar[L, W] = {
-      new PositionalTransformGrammar(topology, lexicon.morePermissive, refinedTopology, refinements, labelFeaturizer, surfaceFeaturizer, depFeaturizer, layers, penultimateLayers, depLayers, maybeSparseSurfaceFeaturizer, weights, origPTModel)
+      new PositionalTransformGrammar(topology, lexicon.morePermissive, refinedTopology, refinements, labelFeaturizer, surfaceFeaturizer,
+                                     depFeaturizer, layers, penultimateLayers, depLayers, maybeSparseSurfaceFeaturizer, decoupledLayers, penultimateDecoupledLayers, weights, origPTModel)
     }
 
 
+    /**
+     * N.B. does not extracted expected counts for sparse features; this is done outside this loop
+     */
     def extractEcounts(m: ParseMarginal[L, W], deriv: DenseVector[Double], scale: Double): Unit = {
       val w = m.words
       val length = w.length
@@ -181,6 +218,9 @@ object PositionalTransformModel {
       
       // This representation appears to make things a bit faster?
       val ruleCountsPerState = new HashMap[Int,SparseVector[Double]]
+      val unaryRuleCountsPerState = new HashMap[Int,SparseVector[Double]]
+      val binaryRuleCountsPerState = new HashMap[Int,SparseVector[Double]]
+      val spanCountsPerState = new HashMap[Int,SparseVector[Double]]
 //      val ruleCountsPerState = Array.fill(maxTetraLen)(SparseVector.zeros[Double](labelFeaturizer.index.size))
 //      val countsPerHeadDepPair = Array.tabulate(w.size, w.size)((i, j) => 0.0)
 //      val statesUsed = Array.fill(maxTetraLen)(false)
@@ -193,29 +233,39 @@ object PositionalTransformModel {
           val tetraIdx = tetra(begin, end, length + 1)
 //          statesUsed(tetraIdx) = true;
           untetra(tetraIdx) = (begin, end, length + 1)
+          val fv = new FeatureVector(lspec.featuresForUnaryRule(begin, end, rule, ref))
           if (!ruleCountsPerState.contains(tetraIdx)) ruleCountsPerState.put(tetraIdx, SparseVector.zeros[Double](labelFeaturizer.index.size))
-          
-          axpy(score, new FeatureVector(lspec.featuresForUnaryRule(begin, end, rule, ref)), ruleCountsPerState(tetraIdx))
+          axpy(score, fv, ruleCountsPerState(tetraIdx))
+          if (!decoupledLayers.isEmpty) {
+            if (!unaryRuleCountsPerState.contains(tetraIdx)) unaryRuleCountsPerState.put(tetraIdx, SparseVector.zeros[Double](labelFeaturizer.index.size))
+            axpy(score, fv, unaryRuleCountsPerState(tetraIdx))
+          }
         }
 
         override def visitSpan(begin: Int, end: Int, tag: Int, ref: Int, score: Double): Unit = {
           val tetraIdx = tetra(begin, end, length + 2)
 //          statesUsed(tetraIdx) = true;
           untetra(tetraIdx) = (begin, end, length + 2)
+          val fv = new FeatureVector(lspec.featuresForSpan(begin, end, tag, ref))
           if (!ruleCountsPerState.contains(tetraIdx)) ruleCountsPerState.put(tetraIdx, SparseVector.zeros[Double](labelFeaturizer.index.size))
-          
-          axpy(score, new FeatureVector(lspec.featuresForSpan(begin, end, tag, ref)), ruleCountsPerState(tetraIdx))
-          
+          axpy(score, fv, ruleCountsPerState(tetraIdx))
+          if (!decoupledLayers.isEmpty) {
+            if (!spanCountsPerState.contains(tetraIdx)) spanCountsPerState.put(tetraIdx, SparseVector.zeros[Double](labelFeaturizer.index.size))
+            axpy(score, fv, spanCountsPerState(tetraIdx))
+          }
         }
 
         override def visitBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int, score: Double): Unit = {
           val tetraIdx = tetra(begin, split, end)
 //          statesUsed(tetraIdx) = true;
           untetra(tetraIdx) = (begin, split, end)
+          val fv = new FeatureVector(lspec.featuresForBinaryRule(begin, split, end, rule, ref))
           if (!ruleCountsPerState.contains(tetraIdx)) ruleCountsPerState.put(tetraIdx, SparseVector.zeros[Double](labelFeaturizer.index.size))
-          
-          axpy(score, new FeatureVector(lspec.featuresForBinaryRule(begin, split, end, rule, ref)), ruleCountsPerState(tetraIdx))
-          
+          axpy(score, fv, ruleCountsPerState(tetraIdx))
+          if (!decoupledLayers.isEmpty) {
+            if (!binaryRuleCountsPerState.contains(tetraIdx)) binaryRuleCountsPerState.put(tetraIdx, SparseVector.zeros[Double](labelFeaturizer.index.size))
+            axpy(score, fv, binaryRuleCountsPerState(tetraIdx))
+          }
 //          val (headIdx, childIdx) = depSpec.getHeadDepPair(begin, split, end, rule)
 //          countsPerHeadDepPair(headIdx)(childIdx) += score
         }
@@ -233,6 +283,23 @@ object PositionalTransformModel {
         for (j <- 0 until layers.size) {
           layers(j).tallyDerivative(deriv(layerSizeTally until layerSizeTally + layers(j).index.size), { ruleCountsPerState(key) * scale }, ffeats)
           layerSizeTally += layers(j).index.size;
+        }
+      }
+      if (!decoupledLayers.isEmpty) {
+        for (key <- spanCountsPerState.keySet) {
+          val (begin, end, _) = untetra(key)
+          val ffeats = sspec.reducedFeaturesForSpan(begin, end)
+          decoupledLayers(SpanLayerIdx).tallyDerivative(deriv(dcSpanFeatOffset until dcSpanFeatOffset + decoupledLayers(SpanLayerIdx).index.size), { spanCountsPerState(key) * scale }, ffeats)
+        }
+        for (key <- unaryRuleCountsPerState.keySet) {
+          val (begin, end, _) = untetra(key)
+          val ffeats = sspec.reducedFeaturesForSpan(begin, end)
+          decoupledLayers(UnaryLayerIdx).tallyDerivative(deriv(dcUnaryFeatOffset until dcUnaryFeatOffset + decoupledLayers(UnaryLayerIdx).index.size), { unaryRuleCountsPerState(key) * scale }, ffeats)
+        }
+        for (key <- binaryRuleCountsPerState.keySet) {
+          val (begin, split, end) = untetra(key)
+          val ffeats = sspec.featuresForSplit(begin, split, end)
+          decoupledLayers(BinaryLayerIdx).tallyDerivative(deriv(dcBinaryFeatOffset until dcBinaryFeatOffset + decoupledLayers(BinaryLayerIdx).index.size), { binaryRuleCountsPerState(key) * scale }, ffeats)
         }
       }
       
@@ -283,8 +350,8 @@ object PositionalTransformModel {
       val maxTetraLen = ((l + 2) * (l + 3) * (l + 4))/6 + ((l + 1) * (l + 2))/2 + l + 2
       
       // Doesn't make things faster to use HashMaps here
-      val cache = Array.tabulate(layers.size)(i => new Array[DenseVector[Double]](maxTetraLen))
-      val finalCache = Array.tabulate(layers.size)(i => new Array[SparseVector[Double]](maxTetraLen))
+      val cache = Array.tabulate(layers.size + decoupledLayers.size)(i => new Array[DenseVector[Double]](maxTetraLen))
+      val finalCache = Array.tabulate(layers.size + decoupledLayers.size)(i => new Array[SparseVector[Double]](maxTetraLen))
       
 //      val headDepCache = Array.tabulate(w.size, w.size)((i, j) => 0.0)
 //      val headDepStale = Array.tabulate(w.size, w.size)((i, j) => true)
@@ -320,12 +387,19 @@ object PositionalTransformModel {
       
       def scoreBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int) = {
         var total = 0.0;
+        val tetraIdx = tetra(begin, split, end)
         val rfeats = lspec.featuresForBinaryRule(begin, split, end, rule, ref)
         for (layerIdx <- 0 until layers.size) {
-          val tetraIdx = tetra(begin, split, end)
           val fs = getOrElseUpdate(layerIdx, tetraIdx, { penultimateLayers(layerIdx).activations(sspec.featuresForSplit(begin, split, end)) })
           for (rfeat <- rfeats) {
             total += getOrElseUpdateFinal(layerIdx, tetraIdx, rfeat, labelFeaturizer.index.size, { layers(layerIdx).activationsFromPenultimateDot(fs, rfeat) })
+          }
+        }
+        if (!decoupledLayers.isEmpty) {
+          val layerIdx = layers.size + BinaryLayerIdx
+          val fs = getOrElseUpdate(layerIdx, tetraIdx, { penultimateDecoupledLayers(BinaryLayerIdx).activations(sspec.featuresForSplit(begin, split, end)) })
+          for (rfeat <- rfeats) {
+            total += getOrElseUpdateFinal(layerIdx, tetraIdx, rfeat, labelFeaturizer.index.size, { decoupledLayers(BinaryLayerIdx).activationsFromPenultimateDot(fs, rfeat) })
           }
         }
 //        if (depLayers.size > 0) {
@@ -349,6 +423,13 @@ object PositionalTransformModel {
             total += getOrElseUpdateFinal(layerIdx, tetraIdx, rfeat, labelFeaturizer.index.size, { layers(layerIdx).activationsFromPenultimateDot(fs, rfeat) })
           }
         }
+        if (!decoupledLayers.isEmpty) {
+          val layerIdx = layers.size + UnaryLayerIdx
+          val fs = getOrElseUpdate(layerIdx, tetraIdx, { penultimateDecoupledLayers(UnaryLayerIdx).activations(sspec.reducedFeaturesForSpan(begin, end)) })
+          for (rfeat <- rfeats) {
+            total += getOrElseUpdateFinal(layerIdx, tetraIdx, rfeat, labelFeaturizer.index.size, { decoupledLayers(UnaryLayerIdx).activationsFromPenultimateDot(fs, rfeat) })
+          }
+        }
         if (maybeSparseSurfaceFeaturizer.isDefined) {
           total += dot(fspec.featuresForUnaryRule(begin, end, rule, ref), sparseFeatsStart)
         }
@@ -363,6 +444,13 @@ object PositionalTransformModel {
           val fs = getOrElseUpdate(layerIdx, tetraIdx, { penultimateLayers(layerIdx).activations(sspec.featuresForSpan(begin, end)) })
           for (rfeat <- rfeats) {
             total += getOrElseUpdateFinal(layerIdx, tetraIdx, rfeat, labelFeaturizer.index.size, { layers(layerIdx).activationsFromPenultimateDot(fs, rfeat) })
+          }
+        }
+        if (!decoupledLayers.isEmpty) {
+          val layerIdx = layers.size + SpanLayerIdx
+          val fs = getOrElseUpdate(layerIdx, tetraIdx, { penultimateDecoupledLayers(SpanLayerIdx).activations(sspec.reducedFeaturesForSpan(begin, end)) })
+          for (rfeat <- rfeats) {
+            total += getOrElseUpdateFinal(layerIdx, tetraIdx, rfeat, labelFeaturizer.index.size, { decoupledLayers(SpanLayerIdx).activationsFromPenultimateDot(fs, rfeat) })
           }
         }
         if (maybeSparseSurfaceFeaturizer.isDefined) {
