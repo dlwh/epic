@@ -10,7 +10,7 @@ import scala.util.Random
  *
  * @author dlwh
  */
-trait OutputTransform[In, +Out] {
+trait OutputTransform[In, +Out] extends Serializable {
   val index: Index[Feature]
 
   def extractLayer(dv: DenseVector[Double], forTrain: Boolean):OutputLayer = extractLayerAndPenultimateLayer(dv, forTrain)._1

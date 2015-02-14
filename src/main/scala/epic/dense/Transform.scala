@@ -10,7 +10,7 @@ import scala.util.Random
  *
  * @author dlwh
  */
-trait Transform[In, +Out] {
+trait Transform[In, +Out] extends Serializable  {
   val index: Index[Feature]
 
 

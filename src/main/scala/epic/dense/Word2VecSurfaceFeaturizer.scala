@@ -15,7 +15,7 @@ import epic.trees.AnnotatedLabel
 
 class Word2VecIndexed[W](val wordIndex: Index[W],
                          val word2vec: Array[Array[Double]],
-                         val converter: W => W) {
+                         val converter: W => W) extends Serializable {
   
   def wordRepSize = word2vec.head.size
 //  def vectorSize: Int = 6 * wordRepSize
@@ -63,7 +63,7 @@ trait WordVectorAnchoringIndexed[String] {
 }
 
 class Word2VecSurfaceFeaturizerIndexed[W](val word2vecIndexed: Word2VecIndexed[W],
-                                          val featureSpec: String) {
+                                          val featureSpec: String) extends Serializable {
   
   def reducedInputSize = {
     anchor(IndexedSeq[W]()).reducedFeaturesForSpan(0, 0).size * word2vecIndexed.wordRepSize
@@ -153,7 +153,7 @@ trait WordVectorDepAnchoringIndexed[String] {
 
 class Word2VecDepFeaturizerIndexed[W](val word2VecIndexed: Word2VecIndexed[W],
                                       val tagger: Tagger[W],
-                                      val topology: RuleTopology[AnnotatedLabel]) {
+                                      val topology: RuleTopology[AnnotatedLabel]) extends Serializable  {
   
   val hackyHeadFinder: HackyHeadFinder[String,String] = new RuleBasedHackyHeadFinder
     
@@ -199,7 +199,7 @@ trait Tagger[W] {
   def tag(word: W): String
 }
 
-class FrequencyTagger[W](wordTagCounts: Counter2[String, W, Double]) extends Tagger[W] {
+class FrequencyTagger[W](wordTagCounts: Counter2[String, W, Double]) extends Tagger[W] with Serializable {
   
   private val wordCounts = Counter[W,Double];
   private val wordToTagMap = new HashMap[W,String];

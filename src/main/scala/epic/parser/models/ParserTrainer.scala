@@ -183,7 +183,7 @@ object ParserTrainer extends epic.parser.ParserPipeline with LazyLogging {
       if (useAdadelta) {
         new AdadeltaGradientDescentDVD(params.opt.maxIterations).iterations(cachedObj.withRandomBatches(params.opt.batchSize), init).
             asInstanceOf[Iterator[FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State]]
-      } else if (useAdadelta) {
+      } else if (useSGD) {
         new StochasticGradientDescentMomentumDVD(params.opt.maxIterations, params.opt.alpha, momentum).iterations(cachedObj.withRandomBatches(params.opt.batchSize), init).
             asInstanceOf[Iterator[FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State]]
       } else {

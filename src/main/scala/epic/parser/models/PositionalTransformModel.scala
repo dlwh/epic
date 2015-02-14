@@ -37,7 +37,7 @@ class PositionalTransformModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSe
                                val transforms: IndexedSeq[OutputTransform[Array[Int],DenseVector[Double]]],
                                val maybeSparseSurfaceFeaturizer: Option[IndexedSpanFeaturizer[L, L2, W]],
                                val depTransforms: Seq[OutputTransform[Array[Int],DenseVector[Double]]],
-                               val decoupledTransforms: Seq[OutputTransform[Array[Int],DenseVector[Double]]]) extends ParserModel[L, W] {
+                               val decoupledTransforms: Seq[OutputTransform[Array[Int],DenseVector[Double]]]) extends ParserModel[L, W] with Serializable {
   
   def mergeWeightsForEnsembling(x1: DenseVector[Double], x2: DenseVector[Double]) = {
     require(decoupledTransforms.size == 0)

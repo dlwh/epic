@@ -17,8 +17,6 @@ class StochasticGradientDescentMomentumDVD(maxIter: Int,
                                            minImprovementWindow: Int = 50)
     extends StochasticGradientDescent[DenseVector[Double]](sgdStepSize, maxIter, tolerance, improvementTolerance, minImprovementWindow) {
 
-  val delta = 1E-4
-  val epsilon = 1e-6
   import vspace._
   
   case class History(pastStep: DenseVector[Double])
