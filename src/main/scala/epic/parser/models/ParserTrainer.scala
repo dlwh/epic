@@ -35,6 +35,7 @@ import epic.parser.ParseEval.Statistics
 import epic.features.LongestFrequentSuffixFeaturizer.LongestFrequentSuffix
 import epic.features.LongestFrequentSuffixFeaturizer
 import epic.corefdense.AdadeltaGradientDescentDVD
+import epic.corefdense.StochasticGradientDescentMomentumDVD
 
 
 /**
@@ -45,6 +46,9 @@ import epic.corefdense.AdadeltaGradientDescentDVD
  *
  */
 object ParserTrainer extends epic.parser.ParserPipeline with LazyLogging {
+  
+  case class ExtraPTParams(useSGD: Boolean = false,
+                           momentum: Double = 0.95)
 
   case class Params(@Help(text="What parser to build. LatentModelFactory,StructModelFactory,LexModelFactory,SpanModelFactory")
                     modelFactory: ParserExtractableModelFactory[AnnotatedLabel, String],
@@ -84,13 +88,15 @@ object ParserTrainer extends epic.parser.ParserPipeline with LazyLogging {
                     checkGradientsAt: String = null,
                     @Help(text="check specific indices, in addition to doing a full search.")
                     maxParseLength: Int = 70,
-                    annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = GenerativeParser.defaultAnnotator())
+                    annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = GenerativeParser.defaultAnnotator(),
+                    extraPTParams: ExtraPTParams = ExtraPTParams())
   protected val paramManifest = manifest[Params]
 
   def trainParser( trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]],
                   validate: (Parser[AnnotatedLabel, String]) => Statistics, params: Params) = {
     import params._
-
+    import extraPTParams._
+    
 //    if(threads >= 1)
 //      collection.parallel.ForkJoinTasks.defaultForkJoinPool.setParallelism(params.threads)
 
@@ -165,7 +171,10 @@ object ParserTrainer extends epic.parser.ParserPipeline with LazyLogging {
     val itr: Iterator[FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State] = if (determinizeTraining) {
       val scanningBatchesObj = cachedObj.withScanningBatches(params.opt.batchSize)
       if (useAdadelta) {
-        new AdadeltaGradientDescentDVD(params.opt.maxIterations).iterations(scanningBatchesObj, init).
+        new AdadeltaGradientDescentDVD(params.opt.maxIterations, rho = momentum).iterations(scanningBatchesObj, init).
+            asInstanceOf[Iterator[FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State]]
+      } else if (useSGD) {
+        new StochasticGradientDescentMomentumDVD(params.opt.maxIterations, params.opt.alpha, momentum).iterations(scanningBatchesObj, init).
             asInstanceOf[Iterator[FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State]]
       } else {
         params.opt.iterations(scanningBatchesObj, init).asInstanceOf[Iterator[FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State]]
@@ -173,6 +182,9 @@ object ParserTrainer extends epic.parser.ParserPipeline with LazyLogging {
     } else {
       if (useAdadelta) {
         new AdadeltaGradientDescentDVD(params.opt.maxIterations).iterations(cachedObj.withRandomBatches(params.opt.batchSize), init).
+            asInstanceOf[Iterator[FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State]]
+      } else if (useAdadelta) {
+        new StochasticGradientDescentMomentumDVD(params.opt.maxIterations, params.opt.alpha, momentum).iterations(cachedObj.withRandomBatches(params.opt.batchSize), init).
             asInstanceOf[Iterator[FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State]]
       } else {
         params.opt.iterations(cachedObj, init)

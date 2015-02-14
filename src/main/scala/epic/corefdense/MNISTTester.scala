@@ -39,8 +39,8 @@ object MNISTTester {
 //    val transform = SimpleNNEpic.makeDeepTransform(inputSize, hiddenSize, 2, outputSize, "tanh")
 //    val transform = SimpleNNEpic.makeDeepTransform(inputSize, hiddenSize, 2, outputSize, "relu")
 //    val transform = SimpleNNEpic.makeDeepTransform(inputSize, hiddenSize, 2, outputSize, "cube")
-    val transform = SimpleNNEpic.makeDeepTransform(inputSize, hiddenSize, 1, outputSize, "tanh")
-//    val transform = SimpleNNEpic.makeDeepTransform(inputSize, hiddenSize, 1, outputSize, "relu")
+//    val transform = SimpleNNEpic.makeDeepTransform(inputSize, hiddenSize, 1, outputSize, "tanh")
+    val transform = SimpleNNEpic.makeDeepTransform(inputSize, hiddenSize, 1, outputSize, "relu")
 //    val transform = SimpleNNEpic.makeDeepTransform(inputSize, hiddenSize, 1, outputSize, "cube")
     
     // N.B. MAKE SURE TO NORMALIZE TO [0, 1] RATHER THAN [0, 255] FOR THIS!
@@ -82,9 +82,13 @@ object MNISTTester {
 //    val batchSize = 1000
     
 //    val iters = 100;
-    val iters = 50;
+//    val iters = 50;
+    val iters = 25;
     
-    val weights = new GeneralTrainer().trainAdadelta(trainSamples, nn, 0.95, batchSize, iters, initialWeights, verbose = false);
+//    val weights = new GeneralTrainer().trainSGDMomentum(trainSamples, nn, 0.001, 0.9, 1e-3, batchSize, iters, initialWeights, verbose = false);
+    val weights = new GeneralTrainer().trainSGDMomentum(trainSamples, nn, 0.01, 0, 1e-3, batchSize, iters, initialWeights, verbose = false);
+    
+//    val weights = new GeneralTrainer().trainAdadelta(trainSamples, nn, 0.95, batchSize, iters, initialWeights, verbose = false);
 //    val weights = new GeneralTrainer().trainAdadelta(trainSamples, nn, 0.95, batchSize, iters, initialWeights, weightPostprocessor = weightProjector, verbose = false);
 //    val weights = new GeneralTrainer().trainAdagrad(trainSamples, nn, eta, 0.0000001, batchSize, iters, initialWeights, weightPostprocessor = weightProjector, verbose = false);
 //    val weights = new GeneralTrainer().trainLBFGS(trainSamples, nn, 0.0000001, 0.001, iters, initialWeights, verbose = false);
