@@ -32,6 +32,8 @@ import epic.dense.CachingLookupTransform
 import epic.dense.CachingLookupAndAffineTransformDense
 import epic.dense.EmbeddingsTransform
 import epic.dense.NonlinearTransform
+import scala.io.Source
+import scala.collection.mutable.HashSet
 
 /**
  * TODO
@@ -46,7 +48,8 @@ case class ExtraPNMParams(useSparseLfsuf: Boolean = true,
                           outputEmbedding: Boolean = false,
                           outputEmbeddingDim: Int = 20,
                           surfaceFeatureSpec: String = "",
-                          decoupleTransforms: Boolean = false)
+                          decoupleTransforms: Boolean = false,
+                          treebankVocFile: String = "")
 
 case class PositionalNeuralModelFactory(@Help(text=
                               """The kind of annotation to do on the refined grammar. Default uses just parent annotation.
@@ -95,9 +98,6 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
 
     val indexedRefinements = GrammarRefinements(xbarGrammar, refGrammar, (_: AnnotatedLabel).baseAnnotatedLabel)
 
-    val summedWordCounts: Counter[String, Double] = sum(annWords, Axis._0)
-    val voc = summedWordCounts.keySet.toSet[String].map(str => Word2Vec.convertWord(str))
-
     def labelFeaturizer(l: AnnotatedLabel) = Set(l, l.baseAnnotatedLabel).toSeq
     def ruleFeaturizer(r: Rule[AnnotatedLabel]) = if (usingV1) {
       require(useGrammar)
@@ -122,17 +122,29 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
 //      }
 //    }
 //    System.exit(0)
+
     
+    ///////////////////////
+    // READ IN WORD VECTORS
     val tagCountsLexicon = TagSpanShapeGenerator.makeStandardLexicon(annTrees)
     val freqTagger = new FrequencyTagger(tagCountsLexicon)
-      
+
+    val voc = new HashSet[String]()
+    // Add words in the training set
+    val summedWordCounts: Counter[String, Double] = sum(annWords, Axis._0)
+    voc ++= summedWordCounts.keySet.toSet[String].map(str => Word2Vec.convertWord(str))
+    // Read in a file of words in the treebank; this allows us to load words that are
+    // in the dev or test sets but not in train
+    voc ++= (if (treebankVocFile != "") Source.fromFile(treebankVocFile).getLines().map(str => Word2Vec.convertWord(str)).toSet else Set[String]())
     val word2vec = if (embeddingType == "trivial") {
-      Word2Vec.makeRandomVectorsForVocabulary(voc, 0, true)
+      Word2Vec.makeRandomVectorsForVocabulary(voc.toSet, 0, true)
     } else if (embeddingType == "random") {
-      Word2Vec.makeRandomVectorsForVocabulary(voc, 50, true)
+      Word2Vec.makeRandomVectorsForVocabulary(voc.toSet, 50, true)
     } else {
-      Word2Vec.smartLoadVectorsForVocabulary(word2vecPath.split(":"), voc, if (embeddingType == "trivial") 1 else Int.MaxValue, true)
+      Word2Vec.smartLoadVectorsForVocabulary(word2vecPath.split(":"), voc.toSet, if (embeddingType == "trivial") 1 else Int.MaxValue, true)
     }
+    val missedWords = summedWordCounts.keySet.map(word => (Word2Vec.convertWord(word), summedWordCounts(word))).filter(wordAndCount => !word2vec.contains(wordAndCount._1)).toSeq.sortBy(- _._2)
+    println("Top missed words: " + missedWords.slice(0, Math.min(20, missedWords.size)))
     // Convert Array[Float] values to Array[Double] values and rescale them
     val word2vecDoubleVect = word2vec.map(keyValue => (keyValue._1 -> keyValue._2.map(_.toDouble * vectorRescaling)))
 //    val word2vecDoubleVect = word2vec.map(keyValue => (keyValue._1 -> new DenseVector[Double](keyValue._2.map(_.toDouble))))
@@ -141,6 +153,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     } else {
       Word2VecIndexed(word2vecDoubleVect, (str: String) => Word2Vec.convertWord(str))
     }
+    //////////////////////
     
     val surfaceFeaturizer = new Word2VecSurfaceFeaturizerIndexed(word2vecIndexed, surfaceFeatureSpec)
     val depFeaturizer = new Word2VecDepFeaturizerIndexed(word2vecIndexed, freqTagger, topology)
