@@ -1,24 +1,25 @@
 package epic.parser
 package models
 
+import scala.collection.mutable.HashMap
+import scala.util.Random
+import scala.collection.GenTraversable
 import breeze.features.FeatureVector
 import breeze.linalg._
 import breeze.util.Index
 import epic.constraints.ChartConstraints
 import epic.dense.IdentityTransform
-import epic.dense.Transform
 import epic.dense.OutputTransform
-import epic.dense.Word2VecSurfaceFeaturizerIndexed
+import epic.dense.Transform
 import epic.dense.Word2VecDepFeaturizerIndexed
+import epic.dense.Word2VecSurfaceFeaturizerIndexed
 import epic.features._
 import epic.framework.Feature
+import epic.framework.StandardExpectedCounts
 import epic.lexicon.Lexicon
 import epic.parser.projections.GrammarRefinements
 import epic.trees._
-import spire.math.fpf.MaybeDouble
-import epic.framework.StandardExpectedCounts
-import scala.util.Random
-import scala.collection.mutable.HashMap
+import scala.collection.mutable.ArrayBuffer
 
 /**
  * TODO
@@ -37,7 +38,8 @@ class PositionalTransformModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSe
                                val transforms: IndexedSeq[OutputTransform[Array[Int],DenseVector[Double]]],
                                val maybeSparseSurfaceFeaturizer: Option[IndexedSpanFeaturizer[L, L2, W]],
                                val depTransforms: Seq[OutputTransform[Array[Int],DenseVector[Double]]],
-                               val decoupledTransforms: Seq[OutputTransform[Array[Int],DenseVector[Double]]]) extends ParserModel[L, W] with Serializable {
+                               val decoupledTransforms: Seq[OutputTransform[Array[Int],DenseVector[Double]]],
+                               val batchNormalization: Boolean = false) extends ParserModel[L, W] with Serializable {
   
   def mergeWeightsForEnsembling(x1: DenseVector[Double], x2: DenseVector[Double]) = {
     require(decoupledTransforms.size == 0)
@@ -143,7 +145,16 @@ class PositionalTransformModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSe
     val decoupledInnerLayers = decoupledLayersAndInner.map(_._2)
     val grammar = new PositionalTransformModel.PositionalTransformGrammar[L, L2, W](topology, lexicon, refinedTopology, refinements, labelFeaturizer,
                                                                                    surfaceFeaturizer, depFeaturizer, layers, innerLayers, depLayers, maybeSparseSurfaceFeaturizer, decoupledLayers, decoupledInnerLayers, weights, this)
-    new Inference(annotator, constrainer, grammar, refinements)
+    new Inference(annotator, constrainer, grammar, refinements, batchNormalization)
+  }
+  
+  /**
+   * When doing batch normalization, we need to normalize the test network
+   */
+  def extractParser(weights: DenseVector[Double], trainExs: Seq[TreeInstance[L,W]])(implicit deb: Debinarizer[L]) = {
+    val inf = inferenceFromWeights(weights).forTesting
+    inf.relativizeToData(trainExs.slice(0, Math.min(trainExs.size, 200)).asInstanceOf[Seq[TreeInstance[AnnotatedLabel,String]]]);
+    Parser(constrainer, inf.grammar, ChartDecoder[L, W]())
   }
 
   override def initialValueForFeature(f: Feature): Double = 0.0
@@ -154,7 +165,8 @@ object PositionalTransformModel {
   case class Inference[L, L2, W](annotator: (BinarizedTree[L], IndexedSeq[W]) => BinarizedTree[IndexedSeq[L2]],
                                  constrainer: ChartConstraints.Factory[L, W],
                                  grammar: PositionalTransformGrammar[L, L2, W],
-                                 refinements: GrammarRefinements[L, L2]) extends ParserInference[L, W]  {
+                                 refinements: GrammarRefinements[L, L2],
+                                 batchNormalization: Boolean) extends ParserInference[L, W]  {
     override def goldMarginal(scorer: Scorer, ti: TreeInstance[L, W], aug: UnrefinedGrammarAnchoring[L, W]): Marginal = {
 
       import ti._
@@ -168,6 +180,32 @@ object PositionalTransformModel {
     // This needs to be different for dropout, so that we can get the right layers
 //    override def forTesting = this
     override def forTesting = grammar.origPTModel.inferenceFromWeights(grammar.weights, false)
+    
+    def relativizeToData(data: GenTraversable[TreeInstance[AnnotatedLabel,String]]) {
+      if (batchNormalization) {
+        require(grammar.layers.size == 1, "Right now batch normalization is only implemented for a single net")
+        val fvs = data.flatMap(ex => {
+          val words = ex.words.asInstanceOf[IndexedSeq[W]]
+          val constraints = constrainer.constraints(words)
+          val surffeat = grammar.surfaceFeaturizer.anchor(words)
+          val surfaceFeatsSeen = new ArrayBuffer[Array[Int]] 
+          for (begin <- 0 until words.size) {
+            for (end <- begin + 1 to words.size) {
+              if (constraints.isAllowedSpan(begin, end)) {
+                for (split <- begin + 1 until end) {
+                  if (constraints.isAllowedSpan(begin, split) && constraints.isAllowedSpan(split, end)) {
+                    surfaceFeatsSeen += surffeat.featuresForSplit(begin, split, end)
+                  }
+                }
+              }
+            }
+          }
+          surfaceFeatsSeen
+        })
+//        println(data.size + " examples in mini-batch yield " + fvs.size + " feature vectors to feedforward")
+        grammar.layers(0).applyBatchNormalization(fvs)
+      }
+    }
   }
 
   @SerialVersionUID(4749637878577393596L)
@@ -176,9 +214,9 @@ object PositionalTransformModel {
                                              val refinedTopology: RuleTopology[L2],
                                              val refinements: GrammarRefinements[L, L2],
                                              labelFeaturizer: RefinedFeaturizer[L, W, Feature],
-                                             surfaceFeaturizer: Word2VecSurfaceFeaturizerIndexed[W],
+                                             val surfaceFeaturizer: Word2VecSurfaceFeaturizerIndexed[W],
                                              depFeaturizer: Word2VecDepFeaturizerIndexed[W],
-                                             layers: IndexedSeq[OutputTransform[Array[Int],DenseVector[Double]]#OutputLayer],
+                                             val layers: IndexedSeq[OutputTransform[Array[Int],DenseVector[Double]]#OutputLayer],
                                              penultimateLayers: IndexedSeq[epic.dense.Transform.Layer[Array[Int],DenseVector[Double]]],
                                              depLayers: IndexedSeq[OutputTransform[Array[Int],DenseVector[Double]]#OutputLayer],
                                              val maybeSparseSurfaceFeaturizer: Option[IndexedSpanFeaturizer[L, L2, W]],

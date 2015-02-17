@@ -94,6 +94,8 @@ case class OutputEmbeddingTransform[FV](numOutputs: Int, outputDim: Int, innerTr
       }
       innerLayer.tallyDerivative(deriv(index.componentOffset(1) to -1), innerScale, fv)
     }
+    
+    def applyBatchNormalization(inputs: scala.collection.GenTraversable[FV]) = innerLayer.applyBatchNormalization(inputs)
   }
 
 }

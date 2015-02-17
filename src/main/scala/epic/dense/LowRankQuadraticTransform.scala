@@ -55,6 +55,8 @@ case class LowRankQuadraticTransform[FV](numOutputs: Int, numRanks: Int, numLeft
         sublayers(i).tallyDerivative(deriv(neuronIndex.componentOffset(i) until neuronIndex.componentOffset(i) + neuronIndex.indices(i).size), _scale(i), innerActivations)
       }
     }
+    
+    def applyBatchNormalization(inputs: scala.collection.GenTraversable[FV]) = innerLayer.applyBatchNormalization(inputs)
   }
 
  

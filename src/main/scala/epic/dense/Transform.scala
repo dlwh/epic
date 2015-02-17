@@ -33,6 +33,7 @@ object Transform {
 
     def tallyDerivative(deriv: DenseVector[Double], scale: =>Vector[Double], fv: In)
 
+    def applyBatchNormalization(inputs: scala.collection.GenTraversable[In])
   }
 
 }

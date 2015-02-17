@@ -28,6 +28,8 @@ class IdentityTransform[T] extends Transform[T, T] {
     def activations(fv: T) = fv
 
     def tallyDerivative(deriv: DenseVector[Double], scale: =>Vector[Double], t: T) = {}
+    
+    def applyBatchNormalization(inputs: scala.collection.GenTraversable[T]) = {}
   }
 
 }

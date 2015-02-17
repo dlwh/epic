@@ -114,5 +114,7 @@ case class CachingLookupAndAffineTransformDense[FV](numOutputs: Int,
       // scale is f'(mat * inner(v) + bias)
       // d/dv is mat.t * f'(mat * inner(v) + bias)
     }
+    
+    def applyBatchNormalization(inputs: scala.collection.GenTraversable[Array[Int]]) = {}
   }
 }

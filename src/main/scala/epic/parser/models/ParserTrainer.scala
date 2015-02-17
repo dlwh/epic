@@ -207,7 +207,17 @@ object ParserTrainer extends epic.parser.ParserPipeline with LazyLogging {
       // Normal execution
       for ((state, iter) <- itr.take(maxIterations).zipWithIndex.tee(evalAndCache _)
            if iter != 0 && iter % iterationsPerEval == 0 || evaluateNow) yield try {
-        val parser = model.extractParser(state.x)
+        val parser = if (model.isInstanceOf[PositionalTransformModel[AnnotatedLabel, AnnotatedLabel, String]]) {
+          val castModel = model.asInstanceOf[PositionalTransformModel[AnnotatedLabel, AnnotatedLabel, String]]
+          if (castModel.batchNormalization) {
+//            castModel.extractParser(state.x, theTrees)
+            model.extractParser(state.x)
+          } else {
+            model.extractParser(state.x)
+          }
+        } else {
+          model.extractParser(state.x)
+        }
         if (iter + iterationsPerEval >= maxIterations) {
           computeLL(trainTrees, model, state.x)
         }
@@ -236,7 +246,18 @@ object ParserTrainer extends epic.parser.ParserPipeline with LazyLogging {
   
   def computeLL(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]], model: Model[TreeInstance[AnnotatedLabel, String]], weights: DenseVector[Double]) {
     println("Computing final log likelihood on the whole training set...")
-    val inf = model.inferenceFromWeights(weights)
+    val inf = if (model.isInstanceOf[PositionalTransformModel[AnnotatedLabel, AnnotatedLabel, String]]) {
+      val castModel = model.asInstanceOf[PositionalTransformModel[AnnotatedLabel, AnnotatedLabel, String]]
+      if (castModel.batchNormalization) {
+        val inf = castModel.inferenceFromWeights(weights).forTesting
+        inf.relativizeToData(trainTrees.slice(0, Math.min(trainTrees.size, 200)))
+        inf
+      } else {
+        model.inferenceFromWeights(weights).forTesting
+      }
+    } else {
+      model.inferenceFromWeights(weights).forTesting
+    }
     val ll = trainTrees.par.aggregate(0.0)((currLL, trainTree) => { 
       try {
         val s = inf.scorer(trainTree)

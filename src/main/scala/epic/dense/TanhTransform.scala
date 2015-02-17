@@ -50,6 +50,8 @@ case class TanhTransform[FV](inner: Transform[FV, DenseVector[Double]]) extends 
       innerLayer.tallyDerivative(deriv, act, fv)
 
     }
+    
+    def applyBatchNormalization(inputs: scala.collection.GenTraversable[FV]) = innerLayer.applyBatchNormalization(inputs)
 
   }
 

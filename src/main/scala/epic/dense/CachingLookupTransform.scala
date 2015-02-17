@@ -40,7 +40,8 @@ case class CachingLookupTransform(word2vecIndexed: Word2VecIndexed[String]) exte
       finalVector
     }
 
-    def tallyDerivative(deriv: DenseVector[Double], _scale: =>Vector[Double], fv: Array[Int]) = {
-    }
+    def tallyDerivative(deriv: DenseVector[Double], _scale: =>Vector[Double], fv: Array[Int]) = {}
+    
+    def applyBatchNormalization(inputs: scala.collection.GenTraversable[Array[Int]]) = {}
   }
 }

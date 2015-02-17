@@ -92,6 +92,8 @@ case class AffineTransform[FV, Mid](numOutputs: Int, numInputs: Int, innerTransf
 //      println("Intermediate scale: " + weightst * scale)
       innerLayer.tallyDerivative(deriv(index.componentOffset(1) to -1), weightst * scale, fv)
     }
+    
+    def applyBatchNormalization(inputs: scala.collection.GenTraversable[FV]) = innerLayer.applyBatchNormalization(inputs)
 
   }
 

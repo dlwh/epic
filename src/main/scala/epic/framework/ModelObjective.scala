@@ -9,6 +9,9 @@ import collection.parallel.ForkJoinTaskSupport
 import concurrent.forkjoin.ForkJoinPool
 import com.typesafe.scalalogging.slf4j.LazyLogging
 import epic.util.{SafeLogging, CacheBroker}
+import epic.parser.models.PositionalTransformModel
+import epic.trees.AnnotatedLabel
+import epic.trees.TreeInstance
 
 /**
  * The objective function for training a [[epic.framework.Model]]. Selects
@@ -62,7 +65,13 @@ class ModelObjective[Datum](val model: Model[Datum],
     val inference = inferenceFromWeights(x)
     val timeIn = System.currentTimeMillis()
     val success = new AtomicInteger(0)
-    val finalCounts = select(batch).aggregate(null:model.ExpectedCounts)({ ( _countsSoFar,datum) =>
+    val minibatch = select(batch)
+    // Compute minibatch activation statistics
+    if (inference.isInstanceOf[PositionalTransformModel.Inference[AnnotatedLabel,AnnotatedLabel,String]]) {
+      val castMinibatch = minibatch.toSeq.asInstanceOf[GenTraversable[TreeInstance[AnnotatedLabel,String]]]
+      inference.asInstanceOf[PositionalTransformModel.Inference[AnnotatedLabel,AnnotatedLabel,String]].relativizeToData(castMinibatch)
+    }
+    val finalCounts = minibatch.aggregate(null:model.ExpectedCounts)({ ( _countsSoFar,datum) =>
       try {
         val countsSoFar:model.ExpectedCounts = if (_countsSoFar ne null) _countsSoFar else emptyCounts
         model.accumulateCounts(inference, datum, countsSoFar, 1.0)

@@ -7,6 +7,10 @@ import breeze.util.Index
 import scala.util.Random
 import breeze.numerics.sigmoid
 
+/**
+ * A bit of a misnomer since this has been generalized to support linear functions as
+ * well...
+ */
 case class NonlinearTransform[FV](nonLinType: String, size: Int, inner: Transform[FV, DenseVector[Double]]) extends Transform[FV, DenseVector[Double]] {
   
   val index: inner.index.type = inner.index
@@ -58,6 +62,8 @@ case class NonlinearTransform[FV](nonLinType: String, size: Int, inner: Transfor
       act :*= scale
       innerLayer.tallyDerivative(deriv, act, fv)
     }
+    
+    def applyBatchNormalization(inputs: scala.collection.GenTraversable[FV]) = innerLayer.applyBatchNormalization(inputs)
 
   }
 
@@ -89,6 +95,11 @@ object NonlinearTransform {
   case class Mask(val mask: Array[Boolean]) extends NonlinearFcn {
     def fcn(idx: Int, x: Double) = if (mask(idx)) x else 0
     def deriv(idx: Int, x: Double) = if (mask(idx)) 1 else 0
+  }
+  
+  case class ShiftAndScaleEach(val shifts: Array[Double], val factors: Array[Double]) extends NonlinearFcn {
+    def fcn(idx: Int, x: Double) = factors(idx) * (x - shifts(idx))
+    def deriv(idx: Int, x: Double) = factors(idx)
   }
   
   case class Scale(val factor: Double) extends NonlinearFcn {
