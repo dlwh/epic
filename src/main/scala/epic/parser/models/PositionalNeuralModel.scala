@@ -345,7 +345,7 @@ object PositionalNeuralModelFactory {
                               batchNormalization: Boolean,
 //                              outputEmbeddingDim: Int): AffineOutputEmbeddingTransform[Array[Int]] = {
                               outputEmbeddingDim: Int,
-                              coarsenerForInitialization: Option[Int => Int]): OutputEmbeddingTransform[Array[Int]] = {
+                              coarsenerForInitialization: Option[Int => Int]): OutputTransform[Array[Int],DenseVector[Double]] = {
     val innerTransform = buildNetInnerTransforms(word2vecIndexed, inputSize, numHidden, numHiddenLayers, nonLinType, useDropout, backpropIntoEmbeddings, batchNormalization)
     
     val innerTransformLastLayer = new AffineTransform(outputEmbeddingDim, if (numHiddenLayers >= 1) numHidden else inputSize, innerTransform)

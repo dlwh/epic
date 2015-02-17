@@ -36,11 +36,11 @@ case class OutputEmbeddingTransform[FV](numOutputs: Int, outputDim: Int, innerTr
     val embeddingsInitialization = if (coarsenerForInitialization.isDefined) {
       OutputEmbeddingTransform.getCoarsenedInitialEmbeddingWeights(numOutputs, outputDim, coarsenerForInitialization.get)
     } else if (spec == "magic") {
-      AffineTransform.getMagicAffineWeights(index.indices(1).size, numOutputs, outputDim, initWeightsScale, rng)
+      AffineTransform.getMagicAffineWeights(index.indices(0).size, numOutputs, outputDim, initWeightsScale, rng)
     } else if (spec == "identity") {
       AffineOutputEmbeddingTransform.getIdentityEmbeddingWeights(numOutputs, outputDim, rng)
     } else {
-      AffineTransform.getGaussianAffineWeights(index.indices(1).size, initWeightsScale, rng)
+      AffineTransform.getGaussianAffineWeights(index.indices(0).size, initWeightsScale, rng)
     }
     // N.B. "true" because the next layer effectively becomes the output layer from the purposes of
     // initialization

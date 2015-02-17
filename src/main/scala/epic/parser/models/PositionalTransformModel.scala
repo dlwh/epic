@@ -117,6 +117,7 @@ class PositionalTransformModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSe
     } else {
       DenseVector.vertcat(initTransformWeights, initDepWeights, initDecoupledWeights)
     }
+    require(newInitVector.size == index.size, newInitVector.size + " " + index.size)
     newInitVector
   }
   
