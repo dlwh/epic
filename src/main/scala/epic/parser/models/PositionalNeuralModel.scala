@@ -48,10 +48,12 @@ case class ExtraPNMParams(useSparseLfsuf: Boolean = true,
                           vectorRescaling: Double = 1.0,
                           outputEmbedding: Boolean = false,
                           outputEmbeddingDim: Int = 20,
+                          coarsenByRoot: Boolean = false, // should we coarsen for initialization by root symbol?
                           surfaceFeatureSpec: String = "",
                           decoupleTransforms: Boolean = false,
                           treebankVocFile: String = "",
-                          batchNormalization: Boolean = false)
+                          batchNormalization: Boolean = false,
+                          useRootLabel: Boolean = false)
 
 case class PositionalNeuralModelFactory(@Help(text=
                               """The kind of annotation to do on the refined grammar. Default uses just parent annotation.
@@ -105,7 +107,18 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
       require(useGrammar)
       Set(r.map(_.baseAnnotatedLabel)).toSeq
     } else {
-      if(useGrammar) Set(r, r.map(_.baseAnnotatedLabel)).toSeq else if(r.isInstanceOf[UnaryRule[AnnotatedLabel]]) Set(r.parent, r.parent.baseAnnotatedLabel).toSeq else Seq.empty
+      if(useGrammar) {
+        if (useRootLabel) {
+          // N.B. for v0, baseAnnotatedLabel is the same as the rule itself
+          Set(r, r.map(_.baseAnnotatedLabel), r.parent).toSeq
+        } else {
+          Set(r, r.map(_.baseAnnotatedLabel)).toSeq
+        }
+      } else if (r.isInstanceOf[UnaryRule[AnnotatedLabel]]) {
+        Set(r.parent, r.parent.baseAnnotatedLabel).toSeq 
+      } else {
+        Seq.empty
+      }
     }
       
 
@@ -175,8 +188,14 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     } else {
       val inputSize = surfaceFeaturizer.splitInputSize
       val transform = if (outputEmbedding) {
-        PositionalNeuralModelFactory.buildNetOutputEmbedding(word2vecIndexed, inputSize, numHidden, numHiddenLayers, prodFeaturizer.index.size, nonLinType, useDropout, backpropIntoEmbeddings, batchNormalization, outputEmbeddingDim)
+        val coarsenerForInitialization = if (coarsenByRoot) {
+          Option(PositionalNeuralModelFactory.getRuleToParentMapping(prodFeaturizer.index)) 
+        } else {
+          None
+        }
+        PositionalNeuralModelFactory.buildNetOutputEmbedding(word2vecIndexed, inputSize, numHidden, numHiddenLayers, prodFeaturizer.index.size, nonLinType, useDropout, backpropIntoEmbeddings, batchNormalization, outputEmbeddingDim, coarsenerForInitialization)
       } else {
+        // THIS IS THE STANDARD CODE PATH
         println(inputSize + " x (" + numHidden + ")^" + numHiddenLayers + " x " + prodFeaturizer.index.size + " neural net")
         PositionalNeuralModelFactory.buildNet(word2vecIndexed, inputSize, numHidden, numHiddenLayers, prodFeaturizer.index.size, nonLinType, useDropout, backpropIntoEmbeddings, batchNormalization)
       }
@@ -325,11 +344,12 @@ object PositionalNeuralModelFactory {
                               backpropIntoEmbeddings: Boolean,
                               batchNormalization: Boolean,
 //                              outputEmbeddingDim: Int): AffineOutputEmbeddingTransform[Array[Int]] = {
-                              outputEmbeddingDim: Int): OutputEmbeddingTransform[Array[Int]] = {
+                              outputEmbeddingDim: Int,
+                              coarsenerForInitialization: Option[Int => Int]): OutputEmbeddingTransform[Array[Int]] = {
     val innerTransform = buildNetInnerTransforms(word2vecIndexed, inputSize, numHidden, numHiddenLayers, nonLinType, useDropout, backpropIntoEmbeddings, batchNormalization)
     
     val innerTransformLastLayer = new AffineTransform(outputEmbeddingDim, if (numHiddenLayers >= 1) numHidden else inputSize, innerTransform)
-    new OutputEmbeddingTransform(outputSize, outputEmbeddingDim, innerTransformLastLayer)
+    new OutputEmbeddingTransform(outputSize, outputEmbeddingDim, innerTransformLastLayer, coarsenerForInitialization)
     
 //    new AffineOutputEmbeddingTransform(outputSize, if (numHiddenLayers >= 1) numHidden else word2vecIndexed.vectorSize, outputEmbeddingDim, innerTransform)
   }
@@ -345,6 +365,23 @@ object PositionalNeuralModelFactory {
       tmpLayer = new NonlinearTransform("dropout", numHidden, tmpLayer)
     }
     tmpLayer
+  }
+  
+  def getRuleToParentMapping(index: Index[Feature]): Int => Int = {
+    (i: Int) => {
+      if (index.get(i).isInstanceOf[Rule[AnnotatedLabel]]) {
+        val parentIdx = index(index.get(i).asInstanceOf[Rule[AnnotatedLabel]].parent)
+        if (parentIdx == -1) {
+//          println("-1!")
+          0
+        } else {
+//          println("Mapping " + index.get(i) + " to " + index.get(parentIdx))
+          parentIdx
+        }
+      } else {
+        i
+      }
+    }
   }
 }
 

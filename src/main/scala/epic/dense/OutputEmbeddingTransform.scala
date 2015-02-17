@@ -8,7 +8,7 @@ import epic.framework.Feature
 import scala.runtime.ScalaRunTime
 import scala.util.Random
 
-case class OutputEmbeddingTransform[FV](numOutputs: Int, outputDim: Int, innerTransform: Transform[FV, DenseVector[Double]]) extends OutputTransform[FV, DenseVector[Double]] {
+case class OutputEmbeddingTransform[FV](numOutputs: Int, outputDim: Int, innerTransform: Transform[FV, DenseVector[Double]], coarsenerForInitialization: Option[Int => Int] = None) extends OutputTransform[FV, DenseVector[Double]] {
 
 
   val index = SegmentedIndex(new AffineTransform.Index(numOutputs, outputDim, true),
@@ -33,7 +33,9 @@ case class OutputEmbeddingTransform[FV](numOutputs: Int, outputDim: Int, innerTr
   
   def initialWeightVector(initWeightsScale: Double, rng: Random, outputLayer: Boolean, spec: String) = {
     require(outputLayer)
-    val embeddingsInitialization = if (spec == "magic") {
+    val embeddingsInitialization = if (coarsenerForInitialization.isDefined) {
+      OutputEmbeddingTransform.getCoarsenedInitialEmbeddingWeights(numOutputs, outputDim, coarsenerForInitialization.get)
+    } else if (spec == "magic") {
       AffineTransform.getMagicAffineWeights(index.indices(1).size, numOutputs, outputDim, initWeightsScale, rng)
     } else if (spec == "identity") {
       AffineOutputEmbeddingTransform.getIdentityEmbeddingWeights(numOutputs, outputDim, rng)
@@ -98,4 +100,18 @@ case class OutputEmbeddingTransform[FV](numOutputs: Int, outputDim: Int, innerTr
     def applyBatchNormalization(inputs: scala.collection.GenTraversable[FV]) = innerLayer.applyBatchNormalization(inputs)
   }
 
+}
+
+object OutputEmbeddingTransform {
+  
+  def getCoarsenedInitialEmbeddingWeights(numOutputs: Int, outputDim: Int, coarsenerForInitialization: Int => Int) = {
+    val mat = DenseMatrix.zeros[Double](numOutputs, outputDim)
+    for (i <- 0 until numOutputs) {
+      val j = ((coarsenerForInitialization(i) % outputDim) + outputDim) % outputDim
+      mat(i, j) = 1.0
+    }
+    val biasInitializer = DenseVector.zeros[Double](numOutputs)
+    val initWeights = DenseVector.vertcat(DenseVector(mat.data), biasInitializer)
+    initWeights
+  }
 }
