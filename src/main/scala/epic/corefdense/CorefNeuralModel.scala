@@ -36,7 +36,7 @@ class CorefNeuralModel(val sparseFeaturizer: PairwiseIndexingFeaturizer,
   def vectorSize = 5 * word2vec.wordRepSize
   
   private def formVector(ment: Mention) = {
-    word2vec.convertToVector(CorefNeuralModel.extractRelevantMentionWords(ment).map(word2vec.wordIndex(_)))
+    word2vec.convertToVector(CorefNeuralModel.extractRelevantMentionWords(ment).map(word2vec.indexWord(_)))
   }
   
   private def cacheActivations(ex: DocumentGraph, layer: AffineTransform[DenseVector[Double],DenseVector[Double]]#Layer) {

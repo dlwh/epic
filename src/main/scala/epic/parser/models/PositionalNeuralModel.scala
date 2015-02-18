@@ -53,7 +53,8 @@ case class ExtraPNMParams(useSparseLfsuf: Boolean = true,
                           decoupleTransforms: Boolean = false,
                           treebankVocFile: String = "",
                           batchNormalization: Boolean = false,
-                          useRootLabel: Boolean = false)
+                          useRootLabel: Boolean = false,
+                          lowercasedVectors: Boolean = false)
 
 case class PositionalNeuralModelFactory(@Help(text=
                               """The kind of annotation to do on the refined grammar. Default uses just parent annotation.
@@ -110,7 +111,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
       if(useGrammar) {
         if (useRootLabel) {
           // N.B. for v0, baseAnnotatedLabel is the same as the rule itself
-          Set(r, r.map(_.baseAnnotatedLabel), r.parent).toSeq
+          Set(r, r.map(_.baseAnnotatedLabel), ParentFeature(r.parent)).toSeq
         } else {
           Set(r, r.map(_.baseAnnotatedLabel)).toSeq
         }
@@ -147,10 +148,10 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     val voc = new HashSet[String]()
     // Add words in the training set
     val summedWordCounts: Counter[String, Double] = sum(annWords, Axis._0)
-    voc ++= summedWordCounts.keySet.toSet[String].map(str => Word2Vec.convertWord(str))
+    voc ++= summedWordCounts.keySet.toSet[String].map(str => Word2Vec.convertWord(str, lowercasedVectors))
     // Read in a file of words in the treebank; this allows us to load words that are
     // in the dev or test sets but not in train
-    voc ++= (if (treebankVocFile != "") Source.fromFile(treebankVocFile).getLines().map(str => Word2Vec.convertWord(str)).toSet else Set[String]())
+    voc ++= (if (treebankVocFile != "") Source.fromFile(treebankVocFile).getLines().map(str => Word2Vec.convertWord(str, lowercasedVectors)).toSet else Set[String]())
     val word2vec = if (embeddingType == "trivial") {
       Word2Vec.makeRandomVectorsForVocabulary(voc.toSet, 0, true)
     } else if (embeddingType == "random") {
@@ -158,15 +159,13 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     } else {
       Word2Vec.smartLoadVectorsForVocabulary(word2vecPath.split(":"), voc.toSet, if (embeddingType == "trivial") 1 else Int.MaxValue, true)
     }
-    val missedWords = summedWordCounts.keySet.map(word => (Word2Vec.convertWord(word), summedWordCounts(word))).filter(wordAndCount => !word2vec.contains(wordAndCount._1)).toSeq.sortBy(- _._2)
-    println("Top missed words: " + missedWords.slice(0, Math.min(20, missedWords.size)))
     // Convert Array[Float] values to Array[Double] values and rescale them
     val word2vecDoubleVect = word2vec.map(keyValue => (keyValue._1 -> keyValue._2.map(_.toDouble * vectorRescaling)))
 //    val word2vecDoubleVect = word2vec.map(keyValue => (keyValue._1 -> new DenseVector[Double](keyValue._2.map(_.toDouble))))
     val word2vecIndexed: Word2VecIndexed[String] = if (embeddingType == "normalpos") {
-      Word2VecIndexed(word2vecDoubleVect, (str: String) => Word2Vec.convertWord(str)).augment(freqTagger.tagTypesIdx.size, freqTagger.convertToFeaturizer)
+      Word2VecIndexed(word2vecDoubleVect, (str: String) => Word2Vec.convertWord(str, lowercasedVectors)).augment(freqTagger.tagTypesIdx.size, freqTagger.convertToFeaturizer)
     } else {
-      Word2VecIndexed(word2vecDoubleVect, (str: String) => Word2Vec.convertWord(str))
+      Word2VecIndexed(word2vecDoubleVect, (str: String) => Word2Vec.convertWord(str, lowercasedVectors))
     }
     //////////////////////
     
@@ -385,5 +384,6 @@ object PositionalNeuralModelFactory {
   }
 }
 
+case class ParentFeature(f: Feature) extends Feature;
 case class LeftChildFeature(f: Feature) extends Feature;
 case class RightChildFeature(f: Feature) extends Feature;

@@ -13,9 +13,13 @@ import epic.features.HackyHeadFinder
 import epic.parser.RuleTopology
 import epic.trees.AnnotatedLabel
 
-class Word2VecIndexed[W](val wordIndex: Index[W],
-                         val word2vec: Array[Array[Double]],
-                         val converter: W => W) extends Serializable {
+/**
+ * converter is used to map words into the word2vec vocabulary, which might include things
+ * like lowercasing, replacing numbers, changing -LRB-, etc. See Word2Vec.convertWord
+ */
+class Word2VecIndexed[W](private val wordIndex: Index[W],
+                         private val word2vec: Array[Array[Double]],
+                         private val converter: W => W) extends Serializable {
   
   def wordRepSize = word2vec.head.size
 //  def vectorSize: Int = 6 * wordRepSize
@@ -23,11 +27,17 @@ class Word2VecIndexed[W](val wordIndex: Index[W],
     
   val zeroVector = Array.tabulate(wordRepSize)(i => 0.0)
   
-  def fetch(wordIdx: Int): DenseVector[Double] = {
-    if (wordIdx != -1 && wordIdx < word2vec.size) DenseVector(word2vec(wordIdx)) else DenseVector(zeroVector)
-  }
+//  def fetch(wordIdx: Int): DenseVector[Double] = {
+//    if (wordIdx != -1 && wordIdx < word2vec.size) DenseVector(word2vec(wordIdx)) else DenseVector(zeroVector)
+//  }
+  
+  def containsWord(rawStr: W) = wordIndex.contains(converter(rawStr))
+  
+  def indexWord(rawStr: W) = wordIndex(converter(rawStr))
+  
+  def convertIndexToVector(idx: Int) = word2vec(idx)
    
-  def assemble(vectors: Seq[Array[Double]]) = vectors.reduce(_ ++ _)
+  private def assemble(vectors: Seq[Array[Double]]) = vectors.reduce(_ ++ _)
   
   def convertToVector(indexedWords: Array[Int]): Array[Double] = {
     assemble(indexedWords.map(wordIdx => if (wordIdx == -1) zeroVector else word2vec(wordIdx)))
@@ -74,8 +84,9 @@ class Word2VecSurfaceFeaturizerIndexed[W](val word2vecIndexed: Word2VecIndexed[W
   }
   
   def anchor(words: IndexedSeq[W]): WordVectorAnchoringIndexed[W] = {
-    val convertedWords = words.map(word2vecIndexed.converter(_))
-    val indexedWords = convertedWords.map(word2vecIndexed.wordIndex(_))
+//    val convertedWords = words.map(word2vecIndexed.converter(_))
+//    val indexedWords = convertedWords.map(word2vecIndexed.wordIndex(_))
+    val indexedWords = words.map(word2vecIndexed.indexWord(_))
     new WordVectorAnchoringIndexed[W] {
       
       def reducedFeaturesForSpan(start: Int, end: Int) = {
@@ -164,8 +175,9 @@ class Word2VecDepFeaturizerIndexed[W](val word2VecIndexed: Word2VecIndexed[W],
   val hackyHeadFinder: HackyHeadFinder[String,String] = new RuleBasedHackyHeadFinder
     
   def anchor(words: IndexedSeq[W]): WordVectorDepAnchoringIndexed[W] = {
-    val convertedWords = words.map(word2VecIndexed.converter(_))
-    val indexedWords = convertedWords.map(word2VecIndexed.wordIndex(_))
+//    val convertedWords = words.map(word2VecIndexed.converter(_))
+//    val indexedWords = convertedWords.map(word2VecIndexed.wordIndex(_))
+    val indexedWords = words.map(word2VecIndexed.indexWord(_))
     new WordVectorDepAnchoringIndexed[W] {
       
       val preterminals = new Array[String](words.size);

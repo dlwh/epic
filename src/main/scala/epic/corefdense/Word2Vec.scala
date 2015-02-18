@@ -163,7 +163,7 @@ object Word2Vec {
   
   val hyphenPattern = Pattern.compile("(\\w+-)+(\\w+)");
   
-  def convertWord(str: String) = {
+  def convertWord(str: String, lowercase: Boolean = false) = {
     var strRep = str;
     strRep = strRep.replace("-LRB-", "(")
     strRep = strRep.replace("-RRB-", ")")
@@ -179,6 +179,9 @@ object Word2Vec {
       m.group(2)
     } else {
       strRep
+    }
+    if (lowercase) {
+      strRep = strRep.toLowerCase()
     }
     strRep
     

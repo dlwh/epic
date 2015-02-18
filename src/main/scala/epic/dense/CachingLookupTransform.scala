@@ -34,7 +34,7 @@ case class CachingLookupTransform(word2vecIndexed: Word2VecIndexed[String]) exte
     def activations(fv: Array[Int]) = {
       var finalVector = DenseVector.zeros[Double](0)
       for (i <- 0 until fv.size) {
-        val vec: DenseVector[Double] = if (fv(i) != -1) DenseVector(word2vecIndexed.word2vec(fv(i))) else DenseVector(word2vecIndexed.zeroVector)
+        val vec: DenseVector[Double] = if (fv(i) != -1) DenseVector(word2vecIndexed.convertIndexToVector(fv(i))) else DenseVector(word2vecIndexed.zeroVector)
         finalVector = DenseVector.vertcat(finalVector, vec)
       }
       finalVector

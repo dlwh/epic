@@ -84,7 +84,7 @@ class DenseNerSystem(val labelIndexer: Indexer[String],
   val rng = new Random(0)
   
   private def formVector(words: Seq[String], idx: Int) = {
-    word2vec.convertToVector(DenseNerSystem.extractRelevantWords(words, idx).map(word2vec.wordIndex(_)))
+    word2vec.convertToVector(DenseNerSystem.extractRelevantWords(words, idx).map(word2vec.indexWord(_)))
   }
   
   private def cacheEmissionScores(ex: NerExampleWithFeatures, weights: Array[Double], layer: OutputTransform[DenseVector[Double],DenseVector[Double]]#OutputLayer) = {

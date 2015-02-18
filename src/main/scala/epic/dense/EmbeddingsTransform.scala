@@ -72,7 +72,7 @@ case class EmbeddingsTransform[FV](numOutputs: Int,
           caches(i).synchronized {
             if (!caches(i).contains(fv(i))) {
               val startIdx = i * word2vecIndexed.wordRepSize
-              caches(i).put(fv(i), weights(::, startIdx until startIdx + word2vecIndexed.wordRepSize) * DenseVector(word2vecIndexed.word2vec(fv(i))))
+              caches(i).put(fv(i), weights(::, startIdx until startIdx + word2vecIndexed.wordRepSize) * DenseVector(word2vecIndexed.convertIndexToVector(fv(i))))
             }
             finalVector += caches(i)(fv(i))
           }
