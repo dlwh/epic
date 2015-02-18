@@ -49,6 +49,10 @@ case class AffineTransform[FV, Mid](numOutputs: Int, numInputs: Int, innerTransf
     }
     innerTransform.clipHiddenWeightVectors(weights(index.componentOffset(1) to -1), norm, false)
   }
+  
+  def getInterestingWeightIndicesForGradientCheck(offset: Int): Seq[Int] = {
+    (offset until offset + Math.min(10, index.indices(0).size)) ++ innerTransform.getInterestingWeightIndicesForGradientCheck(offset + index.indices(0).size)
+  }
 
   case class Layer(weights: DenseMatrix[Double], bias: DenseVector[Double], innerLayer: innerTransform.Layer) extends Transform.Layer[FV,DenseVector[Double]] {
     override val index = AffineTransform.this.index
@@ -140,7 +144,7 @@ object AffineTransform {
         }
       }
     }
-  } 
+  }
   
   case class Index(numOutputs: Int, numInputs: Int, includeBias: Boolean = true) extends breeze.util.Index[Feature] {
     def apply(t: Feature): Int = t match {

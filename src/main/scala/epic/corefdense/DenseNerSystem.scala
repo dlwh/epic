@@ -9,7 +9,6 @@ import edu.berkeley.nlp.entity.ner.NerSystemLabeled
 import edu.berkeley.nlp.futile.fig.basic.Indexer
 import edu.berkeley.nlp.math.SloppyMath
 import epic.dense.AffineTransform
-import epic.dense.AffineOutputEmbeddingTransform
 import epic.dense.Word2VecIndexed
 import edu.berkeley.nlp.futile.util.Logger
 import edu.berkeley.nlp.entity.ConllDoc
@@ -309,15 +308,15 @@ class DenseNerSystem(val labelIndexer: Indexer[String],
   }
   
   override def weightsUpdateCallback(weights: Array[Double]) = {
-    if (clipEmbeddingNorms && transform.isInstanceOf[AffineOutputEmbeddingTransform[DenseVector[Double]]]) {
-      transform.asInstanceOf[AffineOutputEmbeddingTransform[DenseVector[Double]]].clipEmbeddingNorms(DenseVector(weights))
-    }
+//    if (clipEmbeddingNorms && transform.isInstanceOf[AffineOutputEmbeddingTransform[DenseVector[Double]]]) {
+//      transform.asInstanceOf[AffineOutputEmbeddingTransform[DenseVector[Double]]].clipEmbeddingNorms(DenseVector(weights))
+//    }
   }
   
   override def iterationEndCallback(weights: Array[Double]) = {
-    if (transform.isInstanceOf[AffineOutputEmbeddingTransform[DenseVector[Double]]]) {
-      transform.asInstanceOf[AffineOutputEmbeddingTransform[DenseVector[Double]]].displayEmbeddingNorms(DenseVector(weights))
-    }
+//    if (transform.isInstanceOf[AffineOutputEmbeddingTransform[DenseVector[Double]]]) {
+//      transform.asInstanceOf[AffineOutputEmbeddingTransform[DenseVector[Double]]].displayEmbeddingNorms(DenseVector(weights))
+//    }
   } 
 }
 

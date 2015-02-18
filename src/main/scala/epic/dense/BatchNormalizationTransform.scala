@@ -35,6 +35,14 @@ case class BatchNormalizationTransform[FV](size: Int, useBias: Boolean, inner: T
 
   def clipHiddenWeightVectors(weights: DenseVector[Double], norm: Double, outputLayer: Boolean) = inner.clipHiddenWeightVectors(weights, norm, false)
   
+  def getInterestingWeightIndicesForGradientCheck(offset: Int): Seq[Int] = {
+    if (useBias) {
+      (offset until offset + Math.min(10, size)) ++ inner.getInterestingWeightIndicesForGradientCheck(offset + size)
+    } else {
+      inner.getInterestingWeightIndicesForGradientCheck(offset)
+    }
+  }
+  
   case class Layer(bias: DenseVector[Double], size: Int, innerLayer: inner.Layer) extends Transform.Layer[FV,DenseVector[Double]] {
     
     var fcn = new NonlinearTransform.ShiftAndScaleEach(Array.tabulate(size)(i => 0.0), Array.tabulate(size)(i => 1.0))

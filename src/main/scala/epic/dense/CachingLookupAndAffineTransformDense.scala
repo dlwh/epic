@@ -13,8 +13,7 @@ import scala.util.Random
 case class CachingLookupAndAffineTransformDense[FV](numOutputs: Int,
                                                     numInputs: Int,
                                                     word2vecIndexed: Word2VecIndexed[String],
-                                                    includeBias: Boolean = true,
-                                                    backpropIntoEmbeddings: Boolean = false) extends Transform[Array[Int], DenseVector[Double]] {
+                                                    includeBias: Boolean = true) extends Transform[Array[Int], DenseVector[Double]] {
 
 
   val index = new AffineTransform.Index(numOutputs, numInputs, includeBias)
@@ -45,6 +44,10 @@ case class CachingLookupAndAffineTransformDense[FV](numOutputs: Int,
     if (!outputLayer) {
       AffineTransform.clipHiddenWeightVectors(numOutputs, numInputs, weights, norm)
     }
+  }
+  
+  def getInterestingWeightIndicesForGradientCheck(offset: Int): Seq[Int] = {
+    (offset until offset + Math.min(10, index.size))
   }
 
   case class Layer(weights: DenseMatrix[Double], bias: DenseVector[Double]) extends Transform.Layer[Array[Int],DenseVector[Double]] {

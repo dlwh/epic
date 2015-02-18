@@ -20,7 +20,6 @@ import epic.dense.Transform
 import epic.dense.TanhTransform
 import epic.dense.OutputTransform
 import epic.dense.AffineOutputTransform
-import epic.dense.AffineOutputEmbeddingTransform
 import epic.dense.OutputEmbeddingTransform
 import epic.corefdense.Word2Vec
 import scala.collection.mutable.HashMap

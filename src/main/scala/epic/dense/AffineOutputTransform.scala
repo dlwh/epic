@@ -42,6 +42,10 @@ case class AffineOutputTransform[FV](numOutputs: Int, numInputs: Int, innerTrans
   def clipHiddenWeightVectors(weights: DenseVector[Double], norm: Double, outputLayer: Boolean) {
     innerTransform.clipHiddenWeightVectors(weights(index.componentOffset(1) to -1), norm, false)
   }
+  
+  def getInterestingWeightIndicesForGradientCheck(offset: Int): Seq[Int] = {
+    (offset until offset + Math.min(10, index.indices(0).size)) ++ innerTransform.getInterestingWeightIndicesForGradientCheck(offset + index.indices(0).size)
+  }
 
   case class OutputLayer(weights: DenseMatrix[Double], bias: DenseVector[Double], innerLayer: innerTransform.Layer) extends OutputTransform.OutputLayer[FV,DenseVector[Double]] {
     override val index = AffineOutputTransform.this.index

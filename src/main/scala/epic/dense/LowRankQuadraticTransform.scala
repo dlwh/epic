@@ -34,6 +34,10 @@ case class LowRankQuadraticTransform[FV](numOutputs: Int, numRanks: Int, numLeft
   def clipHiddenWeightVectors(weights: DenseVector[Double], norm: Double, outputLayer: Boolean) {
     innerTransform.clipHiddenWeightVectors(weights(index.componentOffset(1) to -1), norm, outputLayer);
   }
+  
+  def getInterestingWeightIndicesForGradientCheck(offset: Int): Seq[Int] = {
+    (offset until offset + Math.min(10, index.indices(0).size)) ++ innerTransform.getInterestingWeightIndicesForGradientCheck(offset + index.indices(0).size)
+  }
 
   case class OutputLayer(sublayers: Seq[LRQTNLayer], innerLayer: innerTransform.Layer) extends OutputTransform.OutputLayer[FV,DenseVector[Double]] {
     

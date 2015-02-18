@@ -20,6 +20,8 @@ trait Transform[In, +Out] extends Serializable  {
 
   def clipHiddenWeightVectors(weights: DenseVector[Double], norm: Double, outputLayer: Boolean)
   
+  def getInterestingWeightIndicesForGradientCheck(offset: Int): Seq[Int];
+  
   type Layer <: Transform.Layer[In,Out]
 }
 

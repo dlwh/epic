@@ -23,12 +23,12 @@ case class OutputEmbeddingTransform[FV](numOutputs: Int, outputDim: Int, innerTr
   
   def clipEmbeddingNorms(weights: DenseVector[Double]) {
     val embeddings = weights(index.componentOffset(1) until index.componentOffset(1) + (numOutputs * outputDim)).asDenseMatrix.reshape(numOutputs, outputDim, view = View.Require)
-    AffineOutputEmbeddingTransform.clipEmbeddingNorms(embeddings);
+    OutputEmbeddingTransform.clipEmbeddingNorms(embeddings);
   }
   
   def displayEmbeddingNorms(weights: DenseVector[Double]) {
     val embeddings = weights(index.componentOffset(1) until index.componentOffset(1) + (numOutputs * outputDim)).asDenseMatrix.reshape(numOutputs, outputDim, view = View.Require)
-    AffineOutputEmbeddingTransform.displayEmbeddingNorms(embeddings);
+    OutputEmbeddingTransform.displayEmbeddingNorms(embeddings);
   }
   
   def initialWeightVector(initWeightsScale: Double, rng: Random, outputLayer: Boolean, spec: String) = {
@@ -38,7 +38,7 @@ case class OutputEmbeddingTransform[FV](numOutputs: Int, outputDim: Int, innerTr
     } else if (spec == "magic") {
       AffineTransform.getMagicAffineWeights(index.indices(0).size, numOutputs, outputDim, initWeightsScale, rng)
     } else if (spec == "identity") {
-      AffineOutputEmbeddingTransform.getIdentityEmbeddingWeights(numOutputs, outputDim, rng)
+      OutputEmbeddingTransform.getIdentityEmbeddingWeights(numOutputs, outputDim, rng)
     } else {
       AffineTransform.getGaussianAffineWeights(index.indices(0).size, initWeightsScale, rng)
     }
@@ -50,6 +50,10 @@ case class OutputEmbeddingTransform[FV](numOutputs: Int, outputDim: Int, innerTr
   
   def clipHiddenWeightVectors(weights: DenseVector[Double], norm: Double, outputLayer: Boolean) {
     innerTransform.clipHiddenWeightVectors(weights(index.componentOffset(1) to -1), norm, false)
+  }
+  
+  def getInterestingWeightIndicesForGradientCheck(offset: Int): Seq[Int] = {
+    (offset until offset + Math.min(10, index.indices(0).size)) ++ innerTransform.getInterestingWeightIndicesForGradientCheck(offset + index.indices(0).size)
   }
 
   case class OutputLayer(embeddings: DenseMatrix[Double], bias: DenseVector[Double], innerLayer: innerTransform.Layer) extends OutputTransform.OutputLayer[FV,DenseVector[Double]] {
@@ -103,6 +107,48 @@ case class OutputEmbeddingTransform[FV](numOutputs: Int, outputDim: Int, innerTr
 }
 
 object OutputEmbeddingTransform {
+  
+  def getIdentityEmbeddingWeights(numOutputs: Int, outputDim: Int, rng: Random) = {
+    require(outputDim <= numOutputs, outputDim + " " + numOutputs)
+    val mat = DenseMatrix.zeros[Double](numOutputs, outputDim)
+    for (i <- 0 until outputDim) {
+      mat(i, i) = 1.0
+    }
+    for (i <- outputDim until numOutputs) {
+      mat(i, rng.nextInt(outputDim)) = 1.0
+    }
+    val biasInitializer = DenseVector.zeros[Double](numOutputs)
+    val initWeights = DenseVector.vertcat(DenseVector(mat.data), biasInitializer)
+    initWeights
+  }
+  
+  def clipEmbeddingNorms(embeddings: DenseMatrix[Double]) {
+    for (i <- 0 until embeddings.rows) {
+      var norm = 0.0
+      for (j <- 0 until embeddings.cols) {
+        norm += embeddings(i, j) * embeddings(i, j)
+      }
+      norm = Math.sqrt(norm)
+      for (j <- 0 until embeddings.cols) {
+        embeddings(i, j) /= norm
+      }
+    }
+  }
+  
+  def displayEmbeddingNorms(embeddings: DenseMatrix[Double]) {
+    var avgNorm = 0.0
+    var maxNorm = 0.0
+    for (i <- 0 until embeddings.rows) {
+      var norm = 0.0
+      for (j <- 0 until embeddings.cols) {
+        norm += embeddings(i, j) * embeddings(i, j)
+      }
+      norm = Math.sqrt(norm)
+      avgNorm += norm
+      maxNorm = Math.max(maxNorm, norm)
+    }
+    println("Average norm: " + avgNorm/embeddings.rows + ", max norm: " + maxNorm)
+  }
   
   def getCoarsenedInitialEmbeddingWeights(numOutputs: Int, outputDim: Int, coarsenerForInitialization: Int => Int) = {
     val mat = DenseMatrix.zeros[Double](numOutputs, outputDim)

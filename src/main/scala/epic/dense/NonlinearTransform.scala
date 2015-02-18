@@ -35,6 +35,8 @@ case class NonlinearTransform[FV](nonLinType: String, size: Int, inner: Transfor
 
   def clipHiddenWeightVectors(weights: DenseVector[Double], norm: Double, outputLayer: Boolean) = inner.clipHiddenWeightVectors(weights, norm, false)
   
+  def getInterestingWeightIndicesForGradientCheck(offset: Int): Seq[Int] = inner.getInterestingWeightIndicesForGradientCheck(offset)
+  
   case class Layer(nonlinearFcn: NonlinearTransform.NonlinearFcn, innerLayer: inner.Layer) extends Transform.Layer[FV,DenseVector[Double]] {
     
     val myIndex = Index[Feature]

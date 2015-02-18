@@ -13,19 +13,15 @@ import breeze.util.Index
  */
 case class CachingLookupTransform(word2vecIndexed: Word2VecIndexed[String]) extends Transform[Array[Int], DenseVector[Double]] {
 
-
   val index = Index[epic.framework.Feature]()
   
-  def extractLayer(weights: DenseVector[Double], forTrain: Boolean) = {
-    new Layer()
-  }
+  def extractLayer(weights: DenseVector[Double], forTrain: Boolean) = new Layer()
   
-  def initialWeightVector(initWeightsScale: Double, rng: Random, outputLayer: Boolean, spec: String) = {
-    DenseVector()
-  }
+  def initialWeightVector(initWeightsScale: Double, rng: Random, outputLayer: Boolean, spec: String) = DenseVector()
   
-  def clipHiddenWeightVectors(weights: DenseVector[Double], norm: Double, outputLayer: Boolean) {
-  }
+  def clipHiddenWeightVectors(weights: DenseVector[Double], norm: Double, outputLayer: Boolean) {}
+  
+  def getInterestingWeightIndicesForGradientCheck(offset: Int): Seq[Int] = Seq[Int]()
 
   case class Layer() extends Transform.Layer[Array[Int],DenseVector[Double]] {
     

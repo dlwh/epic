@@ -10,7 +10,6 @@ import edu.berkeley.nlp.futile.fig.basic.Indexer
 import edu.berkeley.nlp.futile.util.Logger
 import epic.dense.AffineTransform
 import epic.dense.AffineOutputTransform
-import epic.dense.AffineOutputEmbeddingTransform
 import epic.dense.OutputEmbeddingTransform
 import epic.dense.LowRankQuadraticTransform
 import epic.dense.IdentityTransform

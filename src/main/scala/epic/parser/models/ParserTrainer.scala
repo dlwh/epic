@@ -146,12 +146,22 @@ object ParserTrainer extends epic.parser.ParserPipeline with LazyLogging {
     }
     if(checkGradient) {
       val cachedObj2 = new CachedBatchDiffFunction(new ModelObjective(model, theTrees.take(opt.batchSize), params.threads))
-      val indices = (0 until 10).map(i => if(i < 0) model.featureIndex.size + i else i)
+      val defaultIndices = (0 until 10).map(i => if(i < 0) model.featureIndex.size + i else i)
+      val indices = if (model.isInstanceOf[PositionalTransformModel[AnnotatedLabel, AnnotatedLabel, String]]) {
+        val castModel = model.asInstanceOf[PositionalTransformModel[AnnotatedLabel, AnnotatedLabel, String]]
+        if (castModel.transforms.size > 0) {
+          castModel.transforms(0).getInterestingWeightIndicesForGradientCheck(0)
+        } else {
+          defaultIndices
+        }
+      } else {
+        defaultIndices
+      }
 //      val indices = (0 until 10).map(i => 283316 + i)
-      println("testIndices")
-      GradientTester.testIndices(cachedObj2, obj.initialWeightVector(randomize = true), indices, toString={(i: Int) => model.featureIndex.get(i).toString}, skipZeros = true)
+      println("testIndices: " + indices)
+      GradientTester.testIndices(cachedObj2, init, indices, toString={(i: Int) => model.featureIndex.get(i).toString}, skipZeros = true)
       println("test")
-      GradientTester.test(cachedObj2, obj.initialWeightVector(randomize = true), toString={(i: Int) => model.featureIndex.get(i).toString}, skipZeros = false)
+      GradientTester.test(cachedObj2, init, toString={(i: Int) => model.featureIndex.get(i).toString}, skipZeros = false)
     }
 
     type OptState = FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State
