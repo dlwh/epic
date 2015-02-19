@@ -20,6 +20,8 @@ import spire.syntax.cfor
 
 
 class Span(val encoded: Long) extends AnyVal {
+  def toPair: (Int, Int) = (begin, end)
+
   def begin = (encoded >>> 32).toInt
   def end = encoded.toInt
 
