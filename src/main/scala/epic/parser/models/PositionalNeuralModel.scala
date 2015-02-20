@@ -43,7 +43,7 @@ import epic.dense.BatchNormalizationTransform
 
 case class ExtraPNMParams(useSparseLfsuf: Boolean = true,
                           useSparseBrown: Boolean = false,
-                          useDropout: Boolean = false,
+                          dropoutRate: Double = 0.0,
                           vectorRescaling: Double = 1.0,
                           outputEmbedding: Boolean = false,
                           outputEmbeddingDim: Int = 20,
@@ -192,15 +192,15 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
         } else {
           None
         }
-        PositionalNeuralModelFactory.buildNetOutputEmbedding(word2vecIndexed, inputSize, numHidden, numHiddenLayers, prodFeaturizer.index.size, nonLinType, useDropout, backpropIntoEmbeddings, batchNormalization, outputEmbeddingDim, coarsenerForInitialization)
+        PositionalNeuralModelFactory.buildNetOutputEmbedding(word2vecIndexed, inputSize, numHidden, numHiddenLayers, prodFeaturizer.index.size, nonLinType, dropoutRate, backpropIntoEmbeddings, batchNormalization, outputEmbeddingDim, coarsenerForInitialization)
       } else {
         // THIS IS THE STANDARD CODE PATH
         println(inputSize + " x (" + numHidden + ")^" + numHiddenLayers + " x " + prodFeaturizer.index.size + " neural net")
-        PositionalNeuralModelFactory.buildNet(word2vecIndexed, inputSize, numHidden, numHiddenLayers, prodFeaturizer.index.size, nonLinType, useDropout, backpropIntoEmbeddings, batchNormalization)
+        PositionalNeuralModelFactory.buildNet(word2vecIndexed, inputSize, numHidden, numHiddenLayers, prodFeaturizer.index.size, nonLinType, dropoutRate, backpropIntoEmbeddings, batchNormalization)
       }
       if (augmentWithLinear) {
         println("Adding a linear transform: " + inputSize + " x " + prodFeaturizer.index.size) 
-        IndexedSeq(transform, PositionalNeuralModelFactory.buildNet(word2vecIndexed, inputSize, 0, 0, prodFeaturizer.index.size, "", useDropout, backpropIntoEmbeddings, batchNormalization))
+        IndexedSeq(transform, PositionalNeuralModelFactory.buildNet(word2vecIndexed, inputSize, 0, 0, prodFeaturizer.index.size, "", dropoutRate, backpropIntoEmbeddings, batchNormalization))
       } else {
         IndexedSeq(transform)
       }
@@ -221,7 +221,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     val decoupledTransforms = if (decoupleTransforms) {
       // Span and unary use the reduced input (no split point features), whereas surface uses the split point features
       val inputSizes = Seq(surfaceFeaturizer.reducedInputSize, surfaceFeaturizer.reducedInputSize, surfaceFeaturizer.splitInputSize)
-      inputSizes.map(inputSize => PositionalNeuralModelFactory.buildNet(word2vecIndexed, inputSize, numHidden, numHiddenLayers, prodFeaturizer.index.size, nonLinType, useDropout, backpropIntoEmbeddings, batchNormalization))
+      inputSizes.map(inputSize => PositionalNeuralModelFactory.buildNet(word2vecIndexed, inputSize, numHidden, numHiddenLayers, prodFeaturizer.index.size, nonLinType, dropoutRate, backpropIntoEmbeddings, batchNormalization))
     } else {
       IndexedSeq[AffineOutputTransform[Array[Int]]]()
     }
@@ -285,7 +285,7 @@ object PositionalNeuralModelFactory {
                               numHidden: Int,
                               numHiddenLayers: Int,
                               nonLinType: String,
-                              useDropout: Boolean,
+                              dropoutRate: Double,
                               backpropIntoEmbeddings: Boolean,
                               batchNormalization: Boolean): Transform[Array[Int],DenseVector[Double]] = {
     if (numHiddenLayers == 0) {
@@ -296,9 +296,9 @@ object PositionalNeuralModelFactory {
       } else {
         new CachingLookupAndAffineTransformDense(numHidden, inputSize, word2vecIndexed)
       }
-      var currLayer = addNonlinearity(nonLinType, numHidden, useDropout, batchNormalization, baseTransformLayer)
+      var currLayer = addNonlinearity(nonLinType, numHidden, dropoutRate, batchNormalization, baseTransformLayer)
       for (i <- 1 until numHiddenLayers) {
-        currLayer = addNonlinearity(nonLinType, numHidden, useDropout, batchNormalization, new AffineTransform(numHidden, numHidden, currLayer))
+        currLayer = addNonlinearity(nonLinType, numHidden, dropoutRate, batchNormalization, new AffineTransform(numHidden, numHidden, currLayer))
       }
       currLayer
     }
@@ -310,10 +310,10 @@ object PositionalNeuralModelFactory {
                numHiddenLayers: Int,
                outputSize: Int,
                nonLinType: String,
-               useDropout: Boolean,
+               dropoutRate: Double,
                backpropIntoEmbeddings: Boolean,
                batchNormalization: Boolean): AffineOutputTransform[Array[Int]] = {
-    val innerTransform = buildNetInnerTransforms(word2vecIndexed, inputSize, numHidden, numHiddenLayers, nonLinType, useDropout, backpropIntoEmbeddings, batchNormalization)
+    val innerTransform = buildNetInnerTransforms(word2vecIndexed, inputSize, numHidden, numHiddenLayers, nonLinType, dropoutRate, backpropIntoEmbeddings, batchNormalization)
     new AffineOutputTransform(outputSize, if (numHiddenLayers >= 1) numHidden else inputSize, innerTransform)
 //    if (numHiddenLayers == 0) {
 //      new AffineOutputTransform(outputSize, word2vecIndexed.vectorSize, new CachingLookupTransform(word2vecIndexed))
@@ -339,13 +339,13 @@ object PositionalNeuralModelFactory {
                               numHiddenLayers: Int,
                               outputSize: Int,
                               nonLinType: String,
-                              useDropout: Boolean,
+                              dropoutRate: Double,
                               backpropIntoEmbeddings: Boolean,
                               batchNormalization: Boolean,
 //                              outputEmbeddingDim: Int): AffineOutputEmbeddingTransform[Array[Int]] = {
                               outputEmbeddingDim: Int,
                               coarsenerForInitialization: Option[Int => Int]): OutputTransform[Array[Int],DenseVector[Double]] = {
-    val innerTransform = buildNetInnerTransforms(word2vecIndexed, inputSize, numHidden, numHiddenLayers, nonLinType, useDropout, backpropIntoEmbeddings, batchNormalization)
+    val innerTransform = buildNetInnerTransforms(word2vecIndexed, inputSize, numHidden, numHiddenLayers, nonLinType, dropoutRate, backpropIntoEmbeddings, batchNormalization)
     
     val innerTransformLastLayer = new AffineTransform(outputEmbeddingDim, if (numHiddenLayers >= 1) numHidden else inputSize, innerTransform)
     new OutputEmbeddingTransform(outputSize, outputEmbeddingDim, innerTransformLastLayer, coarsenerForInitialization)
@@ -353,7 +353,8 @@ object PositionalNeuralModelFactory {
 //    new AffineOutputEmbeddingTransform(outputSize, if (numHiddenLayers >= 1) numHidden else word2vecIndexed.vectorSize, outputEmbeddingDim, innerTransform)
   }
   
-  def addNonlinearity(nonLinType: String, numHidden: Int, useDropout: Boolean, batchNormalization: Boolean, currLayer: Transform[Array[Int],DenseVector[Double]]) = {
+  def addNonlinearity(nonLinType: String, numHidden: Int, dropoutRate: Double, batchNormalization: Boolean, currLayer: Transform[Array[Int],DenseVector[Double]]) = {
+    val useDropout = dropoutRate > 1e-8
     require(!useDropout || !batchNormalization, "Shouldn't use dropout and batch normalization together, they may interact weirdly")
     var tmpLayer = currLayer
     if (batchNormalization) {
@@ -361,7 +362,7 @@ object PositionalNeuralModelFactory {
     }
     tmpLayer = new NonlinearTransform(nonLinType, numHidden, tmpLayer)
     if (useDropout) {
-      tmpLayer = new NonlinearTransform("dropout", numHidden, tmpLayer)
+      tmpLayer = new NonlinearTransform("dropout", numHidden, tmpLayer, dropoutRate)
     }
     tmpLayer
   }

@@ -11,13 +11,13 @@ import breeze.numerics.sigmoid
  * A bit of a misnomer since this has been generalized to support linear functions as
  * well...
  */
-case class NonlinearTransform[FV](nonLinType: String, size: Int, inner: Transform[FV, DenseVector[Double]]) extends Transform[FV, DenseVector[Double]] {
+case class NonlinearTransform[FV](nonLinType: String, size: Int, inner: Transform[FV, DenseVector[Double]], dropoutRate: Double = 0.5) extends Transform[FV, DenseVector[Double]] {
   
   val index: inner.index.type = inner.index
 
   def extractLayer(dv: DenseVector[Double], forTrain: Boolean) = { 
     if (nonLinType == "dropout") {
-      val keepFrac = 0.5  // 1 - dropout fraction
+      val keepFrac = 1.0 - dropoutRate
       val fcn = if (forTrain) {
         // Only have "true" when we want to keep things around
         new NonlinearTransform.Mask(Array.tabulate(size)(i => NonlinearTransform.globalRng.nextDouble < keepFrac)) 
@@ -80,6 +80,8 @@ object NonlinearTransform {
       Tanh()
     } else if (nonLinType == "relu") {
       Relu()
+    } else if (nonLinType == "requ") {
+      Requ()
     } else if (nonLinType == "cube") {
       Cube()
     } else {
@@ -122,9 +124,14 @@ object NonlinearTransform {
     def deriv(idx: Int, x: Double) = if (x > 0) 1.0 else 0.0
   }
   
+  case class Requ() extends NonlinearFcn {
+    def fcn(idx: Int, x: Double) = if (x > 0) x * x else 0.0
+    def deriv(idx: Int, x: Double) = if (x > 0) 2 * x else 0.0
+  }
+  
   case class Cube() extends NonlinearFcn {
     def fcn(idx: Int, x: Double) = x * x * x
-    def deriv(idx: Int, x: Double) = 2 * x * x
+    def deriv(idx: Int, x: Double) = 3 * x * x
   }
   
 }
