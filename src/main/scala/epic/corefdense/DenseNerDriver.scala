@@ -99,7 +99,7 @@ object DenseNerDriver {
     
     // Figure out the vocabulary and load word2vec
     val trainVoc = trainSequenceExs.flatMap(ex => (0 until ex.size).flatMap(i => DenseNerSystem.extractRelevantWords(ex.ex.words, i)).toSet).toSet
-    val word2vecRaw = Word2Vec.smartLoadVectorsForVocabulary(word2vecPath.split(":"), trainVoc.map(str => Word2Vec.convertWord(str)), Int.MaxValue, true)
+    val word2vecRaw = Word2Vec.smartLoadVectorsForVocabulary(word2vecPath.split(":"), trainVoc.map(str => Word2Vec.convertWord(str)), maxVectorLen = Int.MaxValue, inputVectorBias = true)
     val word2vecRawDoubleVect = word2vecRaw.map(keyValue => (keyValue._1 -> keyValue._2.map(_.toDouble)))
     val word2vecIndexed = Word2VecIndexed(word2vecRawDoubleVect, (str: String) => Word2Vec.convertWord(str))
     val vecSize = word2vecIndexed.wordRepSize * DenseNerSystem.extractRelevantWords(trainSequenceExs.head.ex.words, 0).size

@@ -1,14 +1,15 @@
 package epic.corefdense
 
-import java.io.FileInputStream
 import java.io.BufferedInputStream
-import scala.collection.mutable.HashMap
 import java.io.DataInputStream
+import java.io.FileInputStream
 import java.util.regex.Pattern
-import edu.berkeley.nlp.futile.fig.basic.IOUtils
-import java.io.File
+
+import scala.collection.mutable.HashMap
 import scala.util.Random
+
 import breeze.linalg.Counter
+import edu.berkeley.nlp.futile.fig.basic.IOUtils
 
 object Word2Vec {
   
@@ -36,7 +37,7 @@ object Word2Vec {
    * For each word, vectors are appended from each source. If at least one source
    * is present, others are zeroes. Otherwise, it gets a random vector.
    */
-  def smartLoadVectorsForVocabulary(word2vecPaths: Seq[String], voc: Set[String], maxVectorLen: Int = Int.MaxValue, inputVectorBias: Boolean) = {
+  def smartLoadVectorsForVocabulary(word2vecPaths: Seq[String], voc: Set[String], vocCounts: Counter[String,Double] = Counter[String,Double], maxVectorLen: Int = Int.MaxValue, inputVectorBias: Boolean, randomizeUnks: Boolean = true) = {
     val vectorsEachSource = for (word2vecPath <- word2vecPaths) yield {
       if (word2vecPath.endsWith("bin")) {
         readWord2Vec(word2vecPath, voc, false)
@@ -50,6 +51,7 @@ object Word2Vec {
     val finalVectorDim = Math.min(maxVectorLen, dimsEachSource.reduce(_ + _) + (if (inputVectorBias) 1 else 0))
     val finalVectors = new HashMap[String,Array[Float]]
     val rng = new Random(0)
+    val mostCommonMisses = Counter[String,Double]
     var numRand = 0
     for (word <- voc) {
       val containedInSome = vectorsEachSource.map(_.keySet.contains(word)).reduce(_ || _)
@@ -63,9 +65,14 @@ object Word2Vec {
 //        Logger.logss(finalVector.toSeq)
         finalVector
       } else {
-//        Logger.logss("No vectors at all for " + word)
+//        println("No vectors at all for " + word)
+        mostCommonMisses(word) = vocCounts(word)
         numRand += 1
-        Array.tabulate(finalVectorDim)(i => if (i == finalVectorDim - 1 && inputVectorBias) 1.0F else ((rng.nextDouble - 0.5) * 0.5).toFloat)
+        if (randomizeUnks) {
+          Array.tabulate(finalVectorDim)(i => if (i == finalVectorDim - 1 && inputVectorBias) 1.0F else ((rng.nextDouble - 0.5) * 0.5).toFloat)
+        } else {
+          Array.tabulate(finalVectorDim)(i => if (i == finalVectorDim - 1 && inputVectorBias) 1.0F else 0.0F)
+        }
       }
       val vectorTrimmed = if (vector.size > finalVectorDim) vector.slice(0, finalVectorDim) else vector
       require(vectorTrimmed.size == finalVectorDim, "Mismatched sizes, expected dimension " + finalVectorDim + " but got " + vector.size + " clipped to " + vectorTrimmed.size)
@@ -73,6 +80,7 @@ object Word2Vec {
     }
     println("Read embeddings for " + voc.size + " words from " + word2vecPaths.size + " sources, " +
             "total embedding size = " + finalVectorDim + ", " + numRand + " present in no source")
+    println("Fifty most common misses: " + mostCommonMisses.argtopk(50).map(word => word + ": " + mostCommonMisses(word)))
     finalVectors
   }
   

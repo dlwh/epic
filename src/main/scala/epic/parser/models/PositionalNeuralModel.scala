@@ -53,7 +53,8 @@ case class ExtraPNMParams(useSparseLfsuf: Boolean = true,
                           treebankVocFile: String = "",
                           batchNormalization: Boolean = false,
                           useRootLabel: Boolean = false,
-                          lowercasedVectors: Boolean = false)
+                          lowercasedVectors: Boolean = false,
+                          randomizeUnks: Boolean = false)
 
 case class PositionalNeuralModelFactory(@Help(text=
                               """The kind of annotation to do on the refined grammar. Default uses just parent annotation.
@@ -156,7 +157,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     } else if (embeddingType == "random") {
       Word2Vec.makeRandomVectorsForVocabulary(voc.toSet, 50, true)
     } else {
-      Word2Vec.smartLoadVectorsForVocabulary(word2vecPath.split(":"), voc.toSet, if (embeddingType == "trivial") 1 else Int.MaxValue, true)
+      Word2Vec.smartLoadVectorsForVocabulary(word2vecPath.split(":"), voc.toSet, summedWordCounts, if (embeddingType == "trivial") 1 else Int.MaxValue, true, randomizeUnks)
     }
     // Convert Array[Float] values to Array[Double] values and rescale them
     val word2vecDoubleVect = word2vec.map(keyValue => (keyValue._1 -> keyValue._2.map(_.toDouble * vectorRescaling)))
