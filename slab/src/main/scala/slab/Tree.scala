@@ -50,7 +50,7 @@ class Tree[+L](val label: L, val span: Span, val children: IndexedSeq[Tree[L]]) 
   }
 
   import epic.slab.Tree._
-  // override def toString = toString(false)
+  override def toString = toString(false)
 
   def toString(newline: Boolean) = recursiveToString(this, 0, newline, new StringBuilder).toString
 
