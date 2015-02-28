@@ -99,7 +99,7 @@ trait Tree[+L] extends Serializable {
 object Tree {
   def apply[L](label: L, children: IndexedSeq[Tree[L]], span: Span): NaryTree[L] = NaryTree(label,children, span)
   def unapply[L](t: Tree[L]): Option[(L,IndexedSeq[Tree[L]], Span)] = Some((t.label,t.children, t.span))
-  def fromString(input: String):(Tree[String],Seq[String]) = new PennTreeReader(new StringReader(input)).next
+  def fromString(input: String):(Tree[String],IndexedSeq[String]) = new PennTreeReader(new StringReader(input)).next
 
   private def recursiveToString[L](tree: Tree[L], depth: Int, newline: Boolean, sb: StringBuilder):StringBuilder = {
     import tree._

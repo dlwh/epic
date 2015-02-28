@@ -6,11 +6,11 @@ import scala.collection.mutable.ArrayBuffer
 import scala.util.Try
 
 /**
- * Removes traces from the word sequence, and makes the tree
+ * Removes traces from the word sequence, and makes the tree have empty spans
  *
  * @author dlwh
  **/
-class ExplicitTraceRemover(emptyPosTags: Set[String] = Set("-NONE-")) {
+class TraceToSlashCategoryConverter(emptyPosTags: Set[String] = Set("-NONE-")) extends ( (Tree[AnnotatedLabel], IndexedSeq[String]) =>(Tree[AnnotatedLabel], IndexedSeq[String]) ) {
 
   def apply(tree: Tree[AnnotatedLabel], words: IndexedSeq[String]):(Tree[AnnotatedLabel], IndexedSeq[String]) = {
     val newWords = ArrayBuffer[String]()
@@ -38,13 +38,16 @@ class ExplicitTraceRemover(emptyPosTags: Set[String] = Set("-NONE-")) {
         case Tree(label, children, span) =>
           val resolvedIndices = children.map(_.label.index).toSet
           val (newChildren, gapsList) = tree.children.filterNot(_.label.label == "-NONE-").map(recursive(_, resolvedIndices ++ cCommandIndices)).unzip
-          val gaps = gapsList.flatten
+          val gaps: IndexedSeq[(String, Int)] = gapsList.flatten.distinct
           val unresolvedGaps =  gaps.filterNot(pair => resolvedIndices(pair._2))
 
 
           val newLabel = label.copy(siblings = label.siblings ++ unresolvedGaps.map(pair => Left(pair._1)))
 
-          if(unresolvedGaps.nonEmpty) println("QQQ",unresolvedGaps, newLabel)
+
+//          if(unresolvedGaps.nonEmpty) {
+//            println(unresolvedGaps, newLabel)
+//          }
 
           Tree(newLabel, newChildren, Span(newChildren.head.span.begin, newChildren.last.span.end))  -> unresolvedGaps
       }
@@ -68,7 +71,7 @@ class ExplicitTraceRemover(emptyPosTags: Set[String] = Set("-NONE-")) {
 }
 
 
-object ExplicitTraceRemover {
+object TraceToSlashCategoryConverter {
   def main(args: Array[String]):Unit = {
 
     def listRecursively(f: File): Iterator[File] = {
@@ -81,7 +84,7 @@ object ExplicitTraceRemover {
 
     val treeFiles = listRecursively(new File(args(0)))
 
-    val rem = new ExplicitTraceRemover()
+    val rem = new TraceToSlashCategoryConverter()
 
     for(f <- treeFiles; (tree, words) <- new PennTreeReader(f)) try {
         println(tree.render(words))

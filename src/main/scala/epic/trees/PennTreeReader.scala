@@ -26,12 +26,25 @@ import scala.collection.mutable.ArrayBuffer
 /**
  * PennTreeReader due to Adam Pauls.
  *
+ * This reader returns empty categories as leaves of the tree below the -NONE-. These leaves
+ * span 0 words.
+ *
+ * For example,
+ *     (TOP (S-IMP (NP-SBJ (-NONE- *PRO*))
+                (VP (VB Look)
+                    (PP-DIR (IN at)
+                            (NP (DT that))))
+                (. /.)))
+
+ * will return (TOP[0:4] (S-IMP[0:4] (NP-SBJ[0:0] (-NONE-[0:0] (*PRO*[0:0]))) (VP[0:4]...)
+ *
  * @author adpauls
  * @author dlwh
  */
-class PennTreeReader(val reader : Reader,
-                     val ROOT_LABEL : String = "",
-                     val unescapeTokens: Boolean = true) extends Iterator[(Tree[String],IndexedSeq[String])] {
+class PennTreeReader(reader: Reader,
+                     isEmptyCategory: String=>Boolean = _ == "-NONE-",
+                     rootLabel : String = "TOP",
+                     unescapeTokens: Boolean = true) extends Iterator[(Tree[String],IndexedSeq[String])] {
 
   def this(f: File) = this(new BufferedReader(new FileReader(f)))
 
@@ -68,7 +81,7 @@ class PennTreeReader(val reader : Reader,
     readLeftParen()
     val label = {
       val labelx = readLabel()
-      if (isRoot && labelx.length == 0) ROOT_LABEL else labelx
+      if (isRoot && labelx.length == 0) rootLabel else labelx
     }
 
     val (children,words) = readChildren(pos)
@@ -93,9 +106,7 @@ class PennTreeReader(val reader : Reader,
     }
 
     in.unread(ch)
-    var res = sb.toString()
-
-    res
+    sb.toString()
   }
 
   private def readChildren(pos : Int) : (IndexedSeq[Tree[String]],IndexedSeq[String]) = {
@@ -152,6 +163,9 @@ class PennTreeReader(val reader : Reader,
     var label = readText(true, true)
     if(unescapeTokens)
       label = TreebankTokenizer.treebankTokenToToken(label)
+    if(label.startsWith("/") && label.length == 2 && label(1) != '/') {
+      label = label.drop(1) // ontonotes escapes periods as /.
+    }
     label
   }
 

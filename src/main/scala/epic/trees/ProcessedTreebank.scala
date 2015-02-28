@@ -87,12 +87,13 @@ case class ProcessedTreebank(@Help(text="Location of the treebank directory")
 
 
   def makeTreeInstance(name: String, tree: Tree[String], words: IndexedSeq[String], collapseUnaries: Boolean): TreeInstance[AnnotatedLabel, String] = {
-    var transformed = process(tree)
+    val (_t, _w) = process(tree.map(AnnotatedLabel.parseTreebank), words)
+    var transformed = _t
     if (collapseUnaries) {
       transformed = UnaryChainCollapser.collapseUnaryChains(transformed, keepChains = keepUnaryChainsFromTrain)
     }
     assert(transformed.children.length == 1, transformed + " " + words)
-    TreeInstance(name, transformed, words)
+    TreeInstance(name, transformed, _w)
   }
 
   def headRules = {
