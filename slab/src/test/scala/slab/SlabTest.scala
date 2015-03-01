@@ -2,12 +2,9 @@ import epic.slab._
 import org.scalatest._
 import scalaz.std.list._
 
-import org.scalatest.FunSpec
-
 class ShapelessSlabTest extends FunSpec {
   import shapeless.test.illTyped
   import shapeless._
-  import LUBConstraint._
 
   describe("basic slab") {
     val slab = Slab("Foobar")
@@ -36,7 +33,7 @@ class ShapelessSlabTest extends FunSpec {
     it("should also work with empty annotation lists") {
       case class Foo(foo: Int) extends Annotation
       val slab1 = slab.add(List[Int]().map(Foo(_)).toList)
-      slab1.select[Foo] == List[Foo]()
+      assert(slab1.select[Foo] == List[Foo]())
     }
   }
 }
