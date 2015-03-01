@@ -10,33 +10,30 @@ import scala.util.Try
  *
  * @author dlwh
  **/
-class TraceToSlashCategoryConverter(emptyPosTags: Set[String] = Set("-NONE-")) extends ( (Tree[AnnotatedLabel], IndexedSeq[String]) =>(Tree[AnnotatedLabel], IndexedSeq[String]) ) {
+class TraceToSlashCategoryConverter extends (Tree[AnnotatedLabel] =>Tree[AnnotatedLabel]) {
 
-  def apply(tree: Tree[AnnotatedLabel], words: IndexedSeq[String]):(Tree[AnnotatedLabel], IndexedSeq[String]) = {
-    val newWords = ArrayBuffer[String]()
+  def apply(tree: Tree[AnnotatedLabel]):Tree[AnnotatedLabel] = {
     // list is pairs of (empty constituent, its id)
     def recursive(tree: Tree[AnnotatedLabel], cCommandIndices: Set[Int]):(Tree[AnnotatedLabel], Seq[(String, Int)]) = {
       tree match {
-        case Tree(label, IndexedSeq(Tree(child, IndexedSeq(), _)), span) if emptyPosTags(child.label) =>
-          val trace = words(span.begin)
-          val ignoreTrace = false
+        case Tree(label, IndexedSeq(Tree(child, IndexedSeq(Tree(trace, _, _)), _)), span) if span.isEmpty =>
           // traces either show up as (NP-1 *NONE*) or as (NP *T*-1) need to catch both
-          val id = parseId(trace).getOrElse(-1)//.getOrElse(label.index)
+          var id = trace.index
+          if (id == -1) {
+            id = label.index
+          }
           val list = id match {
-            case _ if ignoreTrace => List.empty
             case -1 => List.empty
-            case i if cCommandIndices(i) => List(label.label -> id)
+            case i if cCommandIndices(i) => List(label.label -> i)
             case _ => List.empty
           }
-          Tree(label, IndexedSeq.empty, Span(newWords.length, newWords.length)) -> list
+//          println(tree.toString(true), list)
+          Tree(label, IndexedSeq.empty, span) -> list
         case Tree(label, IndexedSeq(), span) =>
-          val newBegin = newWords.length
-          newWords ++= span.map(words)
-
-          Tree(label, IndexedSeq.empty, Span(newBegin, newWords.length)) -> List.empty
-
+          assert(span.nonEmpty)
+          Tree(label, IndexedSeq.empty, span) -> List.empty
         case Tree(label, children, span) =>
-          val resolvedIndices = children.map(_.label.index).toSet
+          val resolvedIndices = children.filterNot(_.span.isEmpty).map(_.label.index).toSet
           val (newChildren, gapsList) = tree.children.filterNot(_.label.label == "-NONE-").map(recursive(_, resolvedIndices ++ cCommandIndices)).unzip
           val gaps: IndexedSeq[(String, Int)] = gapsList.flatten.distinct
           val unresolvedGaps =  gaps.filterNot(pair => resolvedIndices(pair._2))
@@ -49,24 +46,14 @@ class TraceToSlashCategoryConverter(emptyPosTags: Set[String] = Set("-NONE-")) e
 //            println(unresolvedGaps, newLabel)
 //          }
 
-          Tree(newLabel, newChildren, Span(newChildren.head.span.begin, newChildren.last.span.end))  -> unresolvedGaps
+          Tree(newLabel, newChildren, span)  -> unresolvedGaps
       }
 
     }
 
     val (newTree, gaps) = recursive(tree, Set.empty)
-    assert(gaps.isEmpty, newTree.render(newWords) + " " + gaps)
-    newTree -> newWords
-  }
-
-  def parseId(trace: String):Option[Int] = {
-    if(trace == "0") {
-      None
-    } else {
-      Try {
-        trace.split("-").last.toInt
-      }.toOption
-    }
+    assert(gaps.isEmpty, gaps + "\n" + newTree.toString(true))
+    newTree
   }
 }
 
@@ -89,8 +76,8 @@ object TraceToSlashCategoryConverter {
     for(f <- treeFiles; (tree, words) <- new PennTreeReader(f)) try {
         println(tree.render(words))
         println("----")
-        val (nt, nw) = rem.apply(tree.map(AnnotatedLabel.parseTreebank), words)
-        println(nt.render(nw))
+        val nt = rem.apply(tree.map(AnnotatedLabel.parseTreebank))
+        println(nt.render(words))
         println("==============")
     } catch {
       case e: AssertionError => e.printStackTrace()

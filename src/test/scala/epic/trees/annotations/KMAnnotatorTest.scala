@@ -32,7 +32,7 @@ class KMAnnotatorTest extends FunSuite {
   val pipeline = KMAnnotator()
   test("KLMA fig 7") {
     val (tree, words) = Tree.fromString("(TOP (S (NP (DT This)) (VP (VBZ is) (NP (NN panic) (NN buying))) (. .)))")
-    val processed = processor(tree)
+    val processed = processor(tree.map(AnnotatedLabel.parseTreebank))
     val pipelined: BinarizedTree[AnnotatedLabel] = pipeline(processed, words)
     import TreeAnnotations._
     assert(pipelined.children.head.label.features === Set(Dom("V")))
@@ -53,7 +53,7 @@ class KMAnnotatorTest extends FunSuite {
 
   test("KLMA NPs") {
     val (tree, words) = Tree.fromString("(TOP (S (NP (DT This)) (VP (VBZ is) (NP (NN panic) (NP (NN buying)))) (. .)))")
-    val processed = processor(tree)
+    val processed = processor(tree.map(AnnotatedLabel.parseTreebank))
     val pipelined = pipeline(processed, words)
     import TreeAnnotations._
     assert(pipelined.allChildren.exists(t => t.label.label == "NP" && t.span == Span(2,4) && t.label.hasAnnotation(RightRecNP) && !t.label.hasAnnotation(BaseNP)), pipelined render words)

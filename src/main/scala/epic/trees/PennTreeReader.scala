@@ -84,10 +84,16 @@ class PennTreeReader(reader: Reader,
       if (isRoot && labelx.length == 0) rootLabel else labelx
     }
 
-    val (children,words) = readChildren(pos)
-    val spanEnd = pos + words.length
-    readRightParen()
-    Tree[String](label, children, Span(pos, spanEnd)) -> words
+    if (isEmptyCategory(label)) {
+      val emptyChild = readLeaf()
+      readRightParen()
+      Tree(label, IndexedSeq(Tree(emptyChild, IndexedSeq.empty, Span(pos, pos))), Span(pos, pos)) -> IndexedSeq.empty
+    } else {
+      val (children,words) = readChildren(pos)
+      val spanEnd = pos + words.length
+      readRightParen()
+      Tree[String](label, children, Span(pos, spanEnd)) -> words
+    }
   }
 
   private def readLabel() = {

@@ -23,7 +23,7 @@ import java.io.{ObjectInputStream, IOException}
  *
  * @author dlwh
  */
-case class StandardTreeProcessor(headFinder: HeadFinder[AnnotatedLabel] = HeadFinder.collins, removeTraces: Boolean = true) extends ((Tree[AnnotatedLabel], IndexedSeq[String])=>(BinarizedTree[AnnotatedLabel], IndexedSeq[String])) {
+case class StandardTreeProcessor(headFinder: HeadFinder[AnnotatedLabel] = HeadFinder.collins, removeTraces: Boolean = true) extends (Tree[AnnotatedLabel]=>BinarizedTree[AnnotatedLabel]) {
   import Trees.Transforms._
   private def xox = new XOverXRemover[AnnotatedLabel]
 
@@ -31,7 +31,7 @@ case class StandardTreeProcessor(headFinder: HeadFinder[AnnotatedLabel] = HeadFi
     if (removeTraces) {
       new TraceRemover[AnnotatedLabel, String](_.label == "-NONE-")
     } else {
-      new TraceToSlashCategoryConverter(Set("-NONE-"))
+      new TraceToSlashCategoryConverter
     }
   }
 
@@ -43,9 +43,9 @@ case class StandardTreeProcessor(headFinder: HeadFinder[AnnotatedLabel] = HeadFi
   }
 
 
-  def apply(tree: Tree[AnnotatedLabel], words: IndexedSeq[String]):(BinarizedTree[AnnotatedLabel], IndexedSeq[String]) = {
-//    val ann = tree.map { AnnotatedLabel.parseTreebank(_) }
-    val (detraced, newWords) = traceProcessor(tree, words)
+  def apply(ann: Tree[AnnotatedLabel]):BinarizedTree[AnnotatedLabel] = {
+//    val ann = tree.map { AnnotatedLabel.parseTreebank }
+    val detraced = traceProcessor(ann)
     var transformed = xox(detraced)
     transformed = if(transformed.children.length != 1) {
       Tree(AnnotatedLabel.TOP, IndexedSeq(transformed), transformed.span)
@@ -63,7 +63,7 @@ case class StandardTreeProcessor(headFinder: HeadFinder[AnnotatedLabel] = HeadFi
     }
 
     val binarized = Trees.binarize(transformed, makeIntermediate, extend, headFinder).relabelRoot(_ => AnnotatedLabel.TOP)
-    binarized -> newWords
+    binarized
   }
 }
 

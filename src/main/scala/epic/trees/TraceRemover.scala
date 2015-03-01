@@ -5,27 +5,24 @@ package epic.trees
  *
  * @author dlwh
  **/
-class TraceRemover[T, W](emptyCategory: T=>Boolean) extends ( (Tree[T], IndexedSeq[W]) =>(Tree[T], IndexedSeq[W]) ) {
-  def apply(tree: Tree[T], words: IndexedSeq[W]):(Tree[T], IndexedSeq[W]) = {
-    def rec(tree: Tree[T]):(Option[Tree[T]], IndexedSeq[W]) = {
+class TraceRemover[T, W](emptyCategory: T=>Boolean) extends (Tree[T] =>Tree[T]) {
+  def apply(tree: Tree[T]):Tree[T] = {
+    def rec(tree: Tree[T]):Option[Tree[T]] = {
       if (emptyCategory(tree.label) || tree.span.begin == tree.span.end) {
-        None -> IndexedSeq.empty
+        None
       } else if (tree.children.length == 0) {
-        Some(tree) -> words.slice(tree.begin, tree.end)
+        Some(tree)
       } else {
-        val (newChildren, _newWords) = tree.children.map(rec).collect{ case (Some(t), w) => t -> w}.unzip
-        val newWords = _newWords.flatten
+        val newChildren = tree.children.map(rec).collect{ case Some(t) => t }
         if (newChildren.length == 0 && !tree.isLeaf) {
-          assert(newWords.length == 0)
-          None -> IndexedSeq.empty
+          None
         } else {
-          Some(Tree(tree.label,newChildren, tree.span)) -> newWords
+          Some(Tree(tree.label,newChildren, tree.span))
         }
       }
     }
 
-    val (t, w) = rec(tree)
-    t.get -> w
+    rec(tree).get
   }
 
 }

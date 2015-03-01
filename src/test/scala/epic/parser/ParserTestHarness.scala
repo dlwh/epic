@@ -33,7 +33,7 @@ trait ParserTestHarness {
 
   def massageTrees(trees: Iterator[(Tree[String], IndexedSeq[String])], maxLength:Int=15): IndexedSeq[TreeInstance[AnnotatedLabel, String]] = {
     val trainTrees = ArrayBuffer() ++= (for( (tree, words) <- trees.filter(_._2.length <= maxLength))
-    yield TreeInstance("", Xbarize() apply (transform(tree), words), words))
+    yield TreeInstance("", Xbarize() apply (transform(tree.map(AnnotatedLabel.parseTreebank)), words), words))
 
     trainTrees
   }

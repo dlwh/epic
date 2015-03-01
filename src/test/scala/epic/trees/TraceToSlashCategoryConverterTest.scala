@@ -1,5 +1,6 @@
 package epic.trees
 
+import org.mapdb.CC
 import org.scalatest.FunSuite
 
 /**
@@ -41,9 +42,9 @@ class TraceToSlashCategoryConverterTest extends FunSuite {
 
     val (tree, words) = Tree.fromString(str)
     val annTree = tree.map(AnnotatedLabel.parseTreebank(_))
-    val (remTree, remWords) = new TraceToSlashCategoryConverter().apply(annTree, words)
+    val remTree = new TraceToSlashCategoryConverter().apply(annTree)
 
-    assert(remWords == "What we want to do is have the evidence speak for itself .".split(" ").toIndexedSeq)
+    assert(words == "What we want to do is have the evidence speak for itself .".split(" ").toIndexedSeq)
     assert(remTree.map(_.clearFeatures).preorder.map(_.label).toSeq startsWith  Seq(
       AnnotatedLabel("TOP"), AnnotatedLabel("S"),
       AnnotatedLabel("SBAR"),
@@ -60,7 +61,40 @@ class TraceToSlashCategoryConverterTest extends FunSuite {
                 AnnotatedLabel("VB"),
                 AnnotatedLabel("NP"),
       AnnotatedLabel("VP")
-    ))
+    ), remTree.render(words))
+  }
+
+  test("Simple test, trace on word") {
+    val (tree, words) = Tree.fromString("""(TOP (S (CC And)
+      (NP-SBJ-1 (PRP we))
+      (VP (VBP 're)
+    (VP (VBG going)
+      (S (NP-SBJ (-NONE- *-1))
+    (VP (TO to)
+      (VP (VB get)
+        (VP (VBN started)
+          (ADVP-LOC (RB here))))))))
+    (. .)))""")
+    val annTree = tree.map(AnnotatedLabel.parseTreebank(_))
+    val remTree = new TraceToSlashCategoryConverter().apply(annTree)
+    assert(remTree.children.head.children(2).label.siblings.nonEmpty, remTree.render(words))
+  }
+
+
+  test("Simple test, trace on cat") {
+    val (tree, words) = Tree.fromString("""(TOP (S (CC And)
+      (NP-SBJ-1 (PRP we))
+      (VP (VBP 're)
+    (VP (VBG going)
+      (S (NP-SBJ-1 (-NONE- *))
+    (VP (TO to)
+      (VP (VB get)
+        (VP (VBN started)
+          (ADVP-LOC (RB here))))))))
+    (. .)))""")
+    val annTree = tree.map(AnnotatedLabel.parseTreebank(_))
+    val remTree = new TraceToSlashCategoryConverter().apply(annTree)
+    assert(remTree.children.head.children(2).label.siblings.nonEmpty, remTree.render(words))
   }
 
 }

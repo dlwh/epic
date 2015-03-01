@@ -40,12 +40,10 @@ class TraceRemoverTest extends FunSuite {
         |     (. /.) ))""".stripMargin
 
     val (tree, words) = Tree.fromString(str)
-    val
-    annTree = tree.map(AnnotatedLabel.parseTreebank(_))
-    val (
-      remTree, remWords) = new TraceRemover[AnnotatedLabel, String](_.label == "-NONE-").apply(annTree, words)
+    val annTree = tree.map(AnnotatedLabel.parseTreebank(_))
+    val (remTree) = new TraceRemover[AnnotatedLabel, String](_.label == "-NONE-").apply(annTree)
 
-    assert(remWords == "What we want to do is have the evidence speak for itself .".split(" ").toIndexedSeq)
+    assert(words == "What we want to do is have the evidence speak for itself .".split(" ").toIndexedSeq)
     assert(remTree.map(_.clearFeatures).preorder.map(_.label).toSeq startsWith Seq(
       AnnotatedLabel("TOP"), AnnotatedLabel("S"),
       AnnotatedLabel("SBAR"),

@@ -27,8 +27,7 @@ case class Sentence(docId: String, index: Int,
   def srl = annotations.srl
 
   def treeInstance(processor: StandardTreeProcessor) = {
-    val (t, w) = processor(tree, words)
-    TreeInstance(docId+"-treeInstance", t, w)
+    TreeInstance(docId+"-treeInstance", processor(tree), words)
   }
 
   lazy val nerSegmentation: Segmentation[NerType.Value, String]  = {
