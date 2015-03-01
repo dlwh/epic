@@ -32,8 +32,5 @@ class TreeTest extends FunSpec {
     it("should iterate with leaves") {
       small.leaves == Iterable(small, Vector(Tree("b", Span(0,2))))
     }
-    it("should cut them if asked") {
-      small.leaves == Iterable(Tree("a", Span(0,3)), Vector(Tree("b", Span(0,2))))
-    }
   }
 }

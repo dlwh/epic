@@ -19,22 +19,6 @@ class Tree[+L](val label: L, val span: Span, val children: IndexedSeq[Tree[L]]) 
     children.map(_.leaves).foldLeft[Stream[Tree[L]]](Stream.empty){_ append _}
   }
 
-  /**
-   * Useful for stripping the words out of a tree
-   * Returns (tree without leaves, leaves)
-   */
-  def cutLeaves: (Tree[L],IndexedSeq[L]) = {
-    def recCutLeaves(tree: Tree[L]): (Option[Tree[L]],IndexedSeq[L]) = {
-      if(tree.isLeaf) (None,IndexedSeq(tree.label))
-      else {
-        val fromChildren = tree.children.map(recCutLeaves _)
-        Some(Tree(tree.label, span, fromChildren.flatMap(_._1))) -> fromChildren.flatMap(_._2)
-      }
-    }
-    val (treeOpt,leaves) = recCutLeaves(this)
-    treeOpt.get -> leaves
-  }
-
   def map[B](f: L=>B):Tree[B] = Tree(f(label), span, children map {_ map f})
   def extend[B](f: Tree[L]=>B):Tree[B] = Tree(f(this), span, children map {_ extend f})
   def offset(by: Int):Tree[L] = Tree(label, span.offset(by), children map {_ offset by})
