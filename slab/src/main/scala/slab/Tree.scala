@@ -14,7 +14,7 @@ class Tree[+L](val label: L, val span: Span, val children: IndexedSeq[Tree[L]]) 
   }
 
   def leaves:Iterable[Tree[L]] = if(isLeaf) {
-    IndexedSeq(this).view
+    Iterable(this).view
   } else  {
     children.map(_.leaves).foldLeft[Stream[Tree[L]]](Stream.empty){_ append _}
   }
