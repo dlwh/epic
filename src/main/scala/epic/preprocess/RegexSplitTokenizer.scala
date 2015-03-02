@@ -15,9 +15,13 @@
  */
 package epic.preprocess
 
+import java.util.regex.Pattern
+
 import epic.slab._
+import epic.slab.Token
 import epic.trees.Span
 import epic.slab.annotators.Tokenizer
+import scala.collection.mutable.ArrayBuffer
 
 /**
   * Splits the input document according to the given pattern.  Does not
@@ -26,14 +30,24 @@ import epic.slab.annotators.Tokenizer
   * @author dramage
   */
 case class RegexSplitTokenizer(pattern : String) extends Tokenizer {
-  val compiled = pattern.r
-  def apply(sentence: String): Vector[Token] = {
-    var last = 0
-    compiled.findAllMatchIn(sentence).map{ m =>
-      val span = Token(Span(last, m.start(0)))
-      last += m.end(0)
-      span
-    }.toVector
+
+  private val regex = Pattern.compile(pattern)
+
+  override def apply(sentence: String): Vector[Token] = {
+    val m = regex.matcher(sentence)
+
+    val spans = new ArrayBuffer[Token]()
+
+    var start = 0
+    while (m.find()) {
+      val end = m.start()
+      if (end - start >= 1)
+        spans += Token(Span(start, end))
+      start = m.end()
+    }
+    if(start != sentence.length)
+      spans += Token(Span(start, sentence.length))
+    spans.toVector
   }
 }
 

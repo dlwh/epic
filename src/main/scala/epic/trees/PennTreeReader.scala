@@ -2,7 +2,7 @@ package epic.trees
 /*
  Copyright 2012 David Hall
 
- Licensed under the Apache License, Version 2.0 (the "License");
+ Licensed under the Apache License, Version 2.0 (the "License")
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
 
@@ -16,42 +16,58 @@ package epic.trees
 */
 
 
-import scala.collection.JavaConversions._
-import java.io.PushbackReader
-import java.io.Reader
-import java.io.StringReader
-import scala.collection.mutable.ArrayBuffer
+import java.io._
+
 import epic.preprocess.TreebankTokenizer
+
+import scala.collection.JavaConversions._
+import scala.collection.mutable.ArrayBuffer
 
 /**
  * PennTreeReader due to Adam Pauls.
  *
+ * This reader returns empty categories as leaves of the tree below the -NONE-. These leaves
+ * span 0 words.
+ *
+ * For example,
+ *     (TOP (S-IMP (NP-SBJ (-NONE- *PRO*))
+                (VP (VB Look)
+                    (PP-DIR (IN at)
+                            (NP (DT that))))
+                (. /.)))
+
+ * will return (TOP[0:4] (S-IMP[0:4] (NP-SBJ[0:0] (-NONE-[0:0] (*PRO*[0:0]))) (VP[0:4]...)
+ *
  * @author adpauls
  * @author dlwh
  */
-class PennTreeReader(val reader : Reader,
-                     val lowercase : Boolean = false,
-                     val ROOT_LABEL : String = "",
-                     dropLabels:Set[String]=Set("-NONE-"),
-                     val unescapeTokens: Boolean = true) extends Iterator[(Tree[String],IndexedSeq[String])] {
+class PennTreeReader(reader: Reader,
+                     isEmptyCategory: String=>Boolean = _ == "-NONE-",
+                     rootLabel : String = "TOP",
+                     unescapeTokens: Boolean = true) extends Iterator[(Tree[String],IndexedSeq[String])] {
+
+  def this(f: File) = this(new BufferedReader(new FileReader(f)))
 
   private val in = new PushbackReader(reader, 4)
 
   private var nextTree = readRootTree()
 
-  def hasNext = (nextTree != null);
+  def hasNext = (nextTree != null)
 
   def next() = {
-    if (!hasNext) throw new NoSuchElementException();
-    val tree = nextTree;
+    if (!hasNext) throw new NoSuchElementException()
+    val tree = nextTree
 
-    nextTree = readRootTree();
+    nextTree = readRootTree()
+    if(nextTree == null) {
+      in.close()
+    }
 
-    tree;
+    tree
   }
 
   private def readRootTree() : (Tree[String], IndexedSeq[String]) = {
-    readWhiteSpace();
+    readWhiteSpace()
     if (!isLeftParen(peek())) null
     else {
       val tree = readTree(true, 0)
@@ -62,157 +78,135 @@ class PennTreeReader(val reader : Reader,
 
 
   private def readTree(isRoot : Boolean, pos : Int) : (Tree[String],IndexedSeq[String]) = {
-    readLeftParen();
+    readLeftParen()
     val label = {
-      val labelx = readLabel();
-      if (isRoot && labelx.length == 0) ROOT_LABEL else labelx
+      val labelx = readLabel()
+      if (isRoot && labelx.length == 0) rootLabel else labelx
     }
 
-    val (children,words) = readChildren(pos);
-    val spanEnd = pos + words.length
-    readRightParen();
-    if (!lowercase || children.size > 0) {
-      Tree[String](label, children, Span(pos, spanEnd)) -> words
+    if (isEmptyCategory(label)) {
+      val emptyChild = readLeaf()
+      readRightParen()
+      Tree(label, IndexedSeq(Tree(emptyChild, IndexedSeq.empty, Span(pos, pos))), Span(pos, pos)) -> IndexedSeq.empty
     } else {
-      Tree[String](label.toLowerCase, children, Span(pos, spanEnd)) -> words
+      val (children,words) = readChildren(pos)
+      val spanEnd = pos + words.length
+      readRightParen()
+      Tree[String](label, children, Span(pos, spanEnd)) -> words
     }
   }
 
   private def readLabel() = {
-    readWhiteSpace();
-    readText(false, false);
+    readWhiteSpace()
+    readText(false, false)
   }
 
   private def readText(atLeastOnex : Boolean, skipLeftParen : Boolean) = {
     var atLeastOne = atLeastOnex
-    val sb = new StringBuilder();
-    var ch = in.read();
+    val sb = new StringBuilder()
+    var ch = in.read()
     while (atLeastOne || (!isWhiteSpace(ch) && (skipLeftParen || !isLeftParen(ch)) && !isRightParen(ch) && ch != -1)) {
-      sb.append(ch.toChar);
-      ch = in.read();
-      atLeastOne = false;
+      sb.append(ch.toChar)
+      ch = in.read()
+      atLeastOne = false
     }
 
-    in.unread(ch);
-    var res = sb.toString();
-
-    res
+    in.unread(ch)
+    sb.toString()
   }
 
   private def readChildren(pos : Int) : (IndexedSeq[Tree[String]],IndexedSeq[String]) = {
-    val words = ArrayBuffer[String]();
+    val words = ArrayBuffer[String]()
     var currPos = pos
-    readWhiteSpace();
-    val children = new ArrayBuffer[Tree[String]]();
+    readWhiteSpace()
+    val children = new ArrayBuffer[Tree[String]]()
     while (!isRightParen(peek())) {
-      readWhiteSpace();
+      readWhiteSpace()
       if (isLeftParen(peek())) {
         if (isTextParen()) {
           words += readLeaf()
           currPos += 1
         } else {
           val (tree,w) = readTree(isRoot = false, pos = currPos)
-          if(!dropLabels(tree.label)) {
-            currPos = tree.end
-            words ++= w
-            children.add(tree);
-          }
+          currPos = tree.end
+          words ++= w
+          children.add(tree)
         }
       } else if (peek() == 65535) {
-        throw new RuntimeException("Unmatched parentheses in tree input.");
+        throw new RuntimeException("Unmatched parentheses in tree input.")
       } else {
         words += readLeaf()
         currPos += 1
       }
-      readWhiteSpace();
+      readWhiteSpace()
     }
     children -> words
   }
 
   private def isTextParen() = {
 
-    var numRead = 0;
+    var numRead = 0
     var ch = in.read()
     while (isLeftParen(ch)) {
-      numRead += 1;
+      numRead += 1
       ch = in.read()
     }
-    val yes = numRead > 0 && (isRightParen(ch));
-    in.unread(ch);
+    val yes = numRead > 0 && (isRightParen(ch))
+    in.unread(ch)
     for (i <- 0 until numRead) {
-      in.unread('(');
+      in.unread('(')
     }
-    yes;
+    yes
   }
 
   private def peek() = {
-    val ch = in.read();
-    in.unread(ch);
-    ch;
+    val ch = in.read()
+    in.unread(ch)
+    ch
   }
 
   private def readLeaf() = {
-    var label = readText(true, true);
+    var label = readText(true, true)
     if(unescapeTokens)
       label = TreebankTokenizer.treebankTokenToToken(label)
-    if (lowercase) label = label.toLowerCase;
+    if(label.startsWith("/") && label.length == 2 && label(1) != '/') {
+      label = label.drop(1) // ontonotes escapes periods as /.
+    }
     label
   }
 
   private def readLeftParen() = {
-    readWhiteSpace();
-    val ch = in.read();
-    if (!isLeftParen(ch)) throw new RuntimeException("Format error reading tree. Expected '(' but got " + ch);
+    readWhiteSpace()
+    val ch = in.read()
+    if (!isLeftParen(ch)) throw new RuntimeException("Format error reading tree. Expected '(' but got " + ch)
   }
 
   private def readRightParen() = {
-    readWhiteSpace();
-    val ch = in.read();
-    if (!isRightParen(ch)) throw new RuntimeException("Format error reading tree.");
+    readWhiteSpace()
+    val ch = in.read()
+    if (!isRightParen(ch)) throw new RuntimeException("Format error reading tree.")
   }
 
   private def readWhiteSpace() = {
-    var ch = in.read();
+    var ch = in.read()
     while (isWhiteSpace(ch)) {
-      ch = in.read();
+      ch = in.read()
     }
-    in.unread(ch);
+    in.unread(ch)
   }
 
   private def isWhiteSpace(ch : Int) = {
-    (ch == ' ' || ch == '\t' || ch == '\f' || ch == '\r' || ch == '\n');
+    (ch == ' ' || ch == '\t' || ch == '\f' || ch == '\r' || ch == '\n')
   }
 
   private def isLeftParen(ch : Int) = {
-    ch == '(';
+    ch == '('
   }
 
   private def isRightParen(ch : Int) = {
-    ch == ')';
+    ch == ')'
   }
 
-}
-
-object PennTreeReader {
-  /**
-   * Reads a tree on a single line and returns null if there was a
-   * problem.
-   *
-   * @param lowercase
-   */
-  def parseEasy(treeString : String, lowercase : Boolean = false) = {
-    try {
-      parseHard(treeString, lowercase);
-    } catch {
-      case e : RuntimeException => null;
-    }
-  }
-
-  def parseHard(treeString : String, lowercase : Boolean = false) = {
-    val sr = new StringReader(treeString);
-    val reader = new PennTreeReader(sr, lowercase = lowercase);
-    reader.next();
-  }
 }
 
 

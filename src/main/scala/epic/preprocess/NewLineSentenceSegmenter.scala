@@ -2,22 +2,31 @@ package epic.preprocess
 
 import java.text.BreakIterator
 import java.util.Locale
+import java.util.regex.Pattern
 import epic.trees.Span
 import epic.slab._
 import epic.slab.annotators.SentenceSegmenter
 
-/**
- * TODO move to chalk
- *
- * @author dlwh
- **/
+import scala.collection.mutable.ArrayBuffer
+
 class NewLineSentenceSegmenter(locale: Locale = Locale.getDefault) extends SentenceSegmenter[Sentence] {
+
+  private val regex = Pattern.compile("\n+")
+
   def apply(content: String): Vector[Sentence] = {
-    val breaker = BreakIterator.getLineInstance(locale)
-    breaker.setText(content)
-    new SegmentingIterator(breaker).map({ span =>
-      Sentence(span)
-    }).toVector
+    val m = regex.matcher(content)
+
+    val spans = new ArrayBuffer[Sentence]()
+
+    var start = 0
+    while(m.find()) {
+      val end = m.end()
+      if(end - start > 1)
+        spans += Sentence(Span(start, end))
+      start = end
+    }
+    spans += Sentence(Span(start, content.length))
+    spans.toVector
   }
 }
 
