@@ -128,20 +128,20 @@ object Segmenter {
   }
 }
 
-trait Parser[S <: Sentence, T <: Token, Label, I] extends AnalysisFunctionN1[String, List[S] :: List[T] :: HNil, scalaz.Tree[Tagged[Label]]] with Initialized[I] {
+trait TokenParser[S <: Sentence, T <: Token, Label, I] extends AnalysisFunctionN1[String, List[S] :: List[T] :: HNil, Tree[Label]] with Initialized[I] {
   override def apply[In <: HList, Out <: HList](slab: Slab[String, In])
     (implicit sel: SelectMany.Aux[In, List[S] :: List[T] :: HNil, List[S] :: List[T] :: HNil],
-      adder: Adder.Aux[In, List[scalaz.Tree[Tagged[Label]]], Out]): Slab[String, Out] = {
+      adder: Adder.Aux[In, List[Tree[Label]], Out]): Slab[String, Out] = {
     // Duplicated from segmenter - refactor?
     val initialized = initialize()
     val data = slab.selectMany(sel)
     val index = SpanIndex(data.select[List[T]])
     val annotatedSentences = for(sent <- data.select[List[S]]) yield {
       val strings = index(sent.span).map(t => slab.substring(t)).toVector
-      apply(initialized, strings).map(_.offset(sent.begin))
+      apply(initialized, strings).offset(sent.begin)
     }
 
     slab.add(annotatedSentences)(adder)
   }
-  def apply(initialized: I, sentence: Vector[String]): scalaz.Tree[Tagged[Label]]
+  def apply(initialized: I, sentence: Vector[String]): Tree[Label]
 }

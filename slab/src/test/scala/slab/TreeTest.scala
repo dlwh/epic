@@ -12,6 +12,11 @@ class TreeTest extends FunSpec {
       assert(small.map(Map("a" -> 1, "b" -> 2)) == Tree(1, Span(0,3), Vector(Tree(2, Span(0,2)))))
     }
   }
+  describe("offset") {
+    it("should offset the simple tree") {
+      assert(small.offset(3) == Tree("a", Span(3,6), Vector(Tree("b", Span(3,5)))))
+    }
+  }
 
   describe("isTree") {
     it("should pass a small tree") {

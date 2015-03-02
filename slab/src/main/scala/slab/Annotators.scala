@@ -91,13 +91,13 @@ object Segmenter {
   }
 }
 
-trait Parser[S <: Sentence, T <: Token, Label] extends legacyannotators.Parser[S, T, Label, Boolean] with NoInitializer {
-  override def apply(initialized: Boolean, sentence: Vector[String]): scalaz.Tree[Tagged[Label]] = apply(sentence)
-  def apply(sentence: Vector[String]): scalaz.Tree[Tagged[Label]]
+trait TokenParser[S <: Sentence, T <: Token, Label] extends legacyannotators.TokenParser[S, T, Label, Boolean] with NoInitializer {
+  override def apply(initialized: Boolean, sentence: Vector[String]): Tree[Label] = apply(sentence)
+  def apply(sentence: Vector[String]): Tree[Label]
 }
 
-object Parser {
-  def apply[S <: Sentence, T <: Token, Label](parser: Vector[String] => scalaz.Tree[Tagged[Label]]) = new Parser[S, T, Label] {
+object TokenParser {
+  def apply[S <: Sentence, T <: Token, Label](parser: Vector[String] => Tree[Label]) = new TokenParser[S, T, Label] {
     override def apply(sentence: Vector[String]) = parser(sentence)
   }
 }
