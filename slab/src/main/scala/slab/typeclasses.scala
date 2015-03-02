@@ -5,6 +5,7 @@ import ops.hlist._
 import scalaz._
 import scala.annotation.implicitNotFound
 
+// Replace with RemoveAll at some point, or depend on it.
 @implicitNotFound("Implicit not found: epic.slab.Utils.SelectMany[${L}, ${SL}]. You requested to select elements of the types ${SL}, but not all were found in HList ${L}.")
 trait SelectMany[L <: HList, SL <: HList] extends DepFn1[L]
 
