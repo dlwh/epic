@@ -3,10 +3,9 @@ package epic.preprocess
 import java.io.{File, FilenameFilter, StringReader}
 
 import breeze.util.Iterators
-import epic.corpora.MascSlab
+import epic.corpora.{MascSlab, Segment}
 import epic.slab._
 import epic.slab.annotators.Tokenizer
-import epic.corpora.MascSlab
 import epic.trees.Span
 import scalaz.std.list._
 

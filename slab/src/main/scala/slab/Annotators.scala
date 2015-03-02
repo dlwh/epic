@@ -92,12 +92,23 @@ object Segmenter {
 }
 
 trait TokenParser[S <: Sentence, T <: Token, Label] extends legacyannotators.TokenParser[S, T, Label, Boolean] with NoInitializer {
-  override def apply(initialized: Boolean, sentence: Vector[String]): Tree[Label] = apply(sentence)
-  def apply(sentence: Vector[String]): Tree[Label]
+  override def apply(initialized: Boolean, body: String, tokens: Vector[T]): Tree[Label] = apply(body, tokens)
+  def apply(body: String, tokens: Vector[T]): Tree[Label]
 }
 
 object TokenParser {
-  def apply[S <: Sentence, T <: Token, Label](parser: Vector[String] => Tree[Label]) = new TokenParser[S, T, Label] {
-    override def apply(sentence: Vector[String]) = parser(sentence)
+  def apply[S <: Sentence, T <: Token, Label](parser: (String, Vector[T]) => Tree[Label]) = new TokenParser[S, T, Label] {
+    override def apply(body: String, tokens: Vector[T]) = parser(body, tokens)
+  }
+}
+
+trait StringTokenParser[S <: Sentence, T <: Token, Label] extends legacyannotators.StringTokenParser[S, T, Label, Boolean] with NoInitializer {
+  def apply(tokens: Vector[String]): Tree[Label]
+  override def apply(initialized: Boolean, tokens: Vector[String]): Tree[Label] = apply(tokens)
+}
+
+object StringTokenParser {
+  def apply[S <: Sentence, T <: Token, Label](parser: (Vector[String]) => Tree[Label]) = new StringTokenParser[S, T, Label] {
+    override def apply(tokens: Vector[String]) = parser(tokens)
   }
 }

@@ -24,12 +24,16 @@ import java.io.{StringReader, DataInput, DataOutput}
 import breeze.util.Lens
 import scala.annotation.tailrec
 import epic.preprocess.TreebankTokenizer
-import epic.slab.{Tagged, Token}
+import epic.slab.{Tagged, Token, Tree => SlabTree}
 
 @SerialVersionUID(1L)
 trait Tree[+L] extends Serializable {
   def label: L
   def children: IndexedSeq[Tree[L]]
+  /**
+  *  Spans in Tree are [begin, end), so inclusive at the beginning and
+  * exclusive at the end
+  */
   def span: Span
   def begin = span.begin
   def end = span.end
@@ -49,7 +53,7 @@ trait Tree[+L] extends Serializable {
   }
 
   def leaves:Iterable[Tree[L]] = if(isLeaf) {
-    IndexedSeq(this).view
+    Iterable(this).view
   } else  {
     children.map(_.leaves).foldLeft[Stream[Tree[L]]](Stream.empty){_ append _}
   }
@@ -135,15 +139,15 @@ object Tree {
   }
 
 
-  def slabSpan[L](tree: Tree[L], tokens: List[Token]): Span =
-    Span(tokens(tree.span.begin).begin, tokens(tree.span.end).end)
+  def slabSpan[L](tree: Tree[L], tokens: IndexedSeq[Token]): Span =
+    Span(tokens(tree.begin).begin, tokens(tree.end-1).end)
 
-  def slabTree[L](tree: Tree[L], tokens: List[Token]): scalaz.Tree[Tagged[L]] =
-    scalaz.Tree.unfoldTree((tree, tokens))({
+  def slabTree[L](tree: Tree[L], tokens: IndexedSeq[Token]): SlabTree[L] =
+    SlabTree.unfoldTree[Tuple2[Tree[L], IndexedSeq[Token]], L]((tree, tokens))({
       case (tree, tokens) => (
-        Tagged(slabSpan(tree, tokens), tree.label),
-        () => tree.children.toStream.zip(Stream.continually(tokens)))})
-
+        {case children: IndexedSeq[SlabTree[L]] => SlabTree(tree.label, slabSpan(tree, tokens), children)},
+        tree.children.zip(Stream.continually(tokens)))
+    })
 }
 
 case class NaryTree[L](label: L, children: IndexedSeq[Tree[L]], span: Span) extends Tree[L] {

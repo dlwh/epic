@@ -13,6 +13,7 @@ import scalaz.std.list._
 
 import MascTransform._
 
+case class Segment(span: Span, id: Option[String]) extends SpanAnnotation
 
 /**
 * Convert native MASC xml into CONLL format for named entity recognition.

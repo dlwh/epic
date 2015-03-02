@@ -137,11 +137,17 @@ trait TokenParser[S <: Sentence, T <: Token, Label, I] extends AnalysisFunctionN
     val data = slab.selectMany(sel)
     val index = SpanIndex(data.select[List[T]])
     val annotatedSentences = for(sent <- data.select[List[S]]) yield {
-      val strings = index(sent.span).map(t => slab.substring(t)).toVector
-      apply(initialized, strings).offset(sent.begin)
+      val tokens = index(sent.span).toVector
+      apply(initialized, slab.content, tokens)
     }
 
     slab.add(annotatedSentences)(adder)
   }
-  def apply(initialized: I, sentence: Vector[String]): Tree[Label]
+  def apply(initialized: I, body: String, tokens: Vector[T]): Tree[Label]
+}
+
+trait StringTokenParser[S <: Sentence, T <: Token, Label, I] extends TokenParser[S, T, Label, I] {
+  def apply(initialized: I, tokens: Vector[String]): Tree[Label]
+  override def apply(initialized: I, body: String, tokens: Vector[T]): Tree[Label] =
+    apply(initialized, tokens.map(_.substring(body))).offset(tokens.headOption.map(_.begin).getOrElse(0))
 }

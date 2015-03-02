@@ -54,6 +54,7 @@ object Token {
   }
 
   def apply(span: Span): Token = new Token(span)
+  def apply(begin: Int, end: Int): Token = new Token(Span(begin, end))
 }
 
 // I considered to use the same offsetter pattern with the Tagged
@@ -83,5 +84,3 @@ object ContentToken {
   }
   def apply(span: Span, content: String): ContentToken = new ContentToken(span, content)
 }
-
-case class Segment(span: Span, id: Option[String]) extends SpanAnnotation

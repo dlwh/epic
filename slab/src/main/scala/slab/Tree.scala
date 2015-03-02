@@ -50,6 +50,10 @@ object Tree {
   def apply[L](label: L, span: Span): Tree[L] = Tree(label, span, Vector())
   def unapply[L](t: Tree[L]): Option[(L,IndexedSeq[Tree[L]], Span)] = Some((t.label,t.children, t.span))
 
+  def unfoldTree[A, L](v: A)(f: A => (IndexedSeq[Tree[L]] => Tree[L], IndexedSeq[A])): Tree[L] = f(v) match {
+    case (tree, a) => tree(a.map(unfoldTree(_)(f)))
+  }
+
   private def recursiveToString[L](tree: Tree[L], depth: Int, newline: Boolean, sb: StringBuilder):StringBuilder = {
     import tree._
     sb append "( " append tree.label append " [" append span.begin append "," append span.end append "] "
