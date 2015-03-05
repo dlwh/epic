@@ -124,9 +124,16 @@ val tagger = epic.models.deserialize[CRF[AnnotatedLabel, String]](path)
 
 val tagger = epic.models.PosTagSelector.loadTagger("en").get // or another 2 letter code.
 
-val tags = tagger.bestSequence(sentence)
+val posSlabs = slabs.map(tagger(_))
 
-println(tags.render)
+for(slab <- posSlabs) {
+  for(sentences <- slab.select[Tagged[AnnotatedLabel]]) {
+    for(sentence <- sentences) {
+      val strings = sentence.map(_.substring(slab.content))
+      // use PoS tags
+    }
+  }
+}
 
 ```
 
