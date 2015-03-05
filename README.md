@@ -77,8 +77,10 @@ val tokenizer = new epic.preprocess.TreebankTokenizer()
 val slabs = text.map(Slab(_)).map(sentenceSegmenter(_)).map(tokenizer(_))
 val tokens = slabs.map(_.tokens)
 
-for(sentence <- tokens) {
-  // use the sentence tokens
+for(document <- tokens) {
+  for(sentence <- document) {
+    // use the sentence tokens
+  }
 }
 
 ```
@@ -97,9 +99,15 @@ val parser = epic.models.deserialize[Parser[AnnotatedLabel, String]](path)
 
 val parser = epic.models.ParserSelector.loadParser("en").get // or another 2 letter code.
 
-val tree = parser(sentence)
+val treeSlabs = slabs.map(parser(_))
 
-println(tree.render(words))
+for(slab <- treeSlabs) {
+  for(sentences <- slab.select[Tree[AnnotatedLabel]]) {
+    for(tree <- sentences) {
+      println(tree)
+    }
+  }
+}
 
 ```
 
