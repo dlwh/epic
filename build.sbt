@@ -62,6 +62,8 @@ lazy val root = (project in file("."))
     "org.scalanlp" %% "nak" % "1.3" intransitive(),
     "org.scalanlp" %% "epic-slab" % "0.4-SNAPSHOT",
     "org.scalanlp" %% "epic-parser-en-span" % "2015.2.19" % "test",
+    "org.scalanlp" %% "epic-pos-en" % "2015.2.19" % "test",
+    "org.scalanlp" %% "epic-ner-en-conll" % "2015.2.19" % "test",
     "org.mapdb" % "mapdb" % "0.9.2",
     "com.typesafe.scala-logging" %% "scala-logging-slf4j" % "2.1.2",
     ("org.apache.tika" % "tika-parsers" % "1.5").exclude ("edu.ucar", "netcdf").exclude("com.googlecode.mp4parser","isoparser"),

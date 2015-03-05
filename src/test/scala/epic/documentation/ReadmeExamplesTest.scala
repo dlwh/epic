@@ -30,4 +30,15 @@ class ReadmeExamplesTest extends FunSpec {
     val slab = slabs.head
     assert(slab.select[Tree[AnnotatedLabel]].map(_.leaves.map(_.substring(slab.content))) == output.head)
   }
+  it("should run the PoS tagger example") {
+    val sentenceSegmenter = epic.preprocess.MLSentenceSegmenter.bundled().get
+    val tokenizer = epic.preprocess.TreebankTokenizer
+    val tagger = epic.models.PosTagSelector.loadTagger("en").get
+    val slabs = documents.map(Slab(_))
+      .map(sentenceSegmenter(_))
+      .map(tokenizer(_))
+      .map(tagger(_))
+    val slab = slabs.head
+    assert(slab.perSentence[Tagged[AnnotatedLabel]].map(_.map(_.substring(slab.content))) == output.head)
+  }
 }

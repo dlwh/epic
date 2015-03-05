@@ -12,6 +12,8 @@ import epic.util.{NotProvided, Optional, CacheBroker}
 import breeze.optimize.FirstOrderMinimizer.OptParams
 import breeze.optimize.CachedBatchDiffFunction
 import epic.features.WordFeaturizer
+import epic.slab.annotators.{Tagger => SlabTagger}
+import epic.slab.{Token, Sentence}
 
 /**
  * A Linear Chain Conditional Random Field. Useful for POS tagging, etc.
@@ -45,6 +47,8 @@ trait CRF[L, W] extends Serializable {
 }
 
 object CRF {
+  // converts a CRF into a slabified version.
+  implicit def crf2slab[L](crf: CRF[L, String]) = SlabTagger[Sentence, Token, L](crf.bestSequence(_).tags)
 
   /**
    * Builds a CRF from a corpus of TaggedSequences using reasonable defaults.
