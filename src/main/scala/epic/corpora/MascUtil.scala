@@ -323,7 +323,7 @@ object MascSlab {
    * @param slab The Slab containing the text and source URL
    * @return The Slab with added Sentence annotations as read from the MASC -s.xml file.
    */
-  def s[In <: HList, Out <: HList](slab: Slab[String, In])(implicit sel: Selector[In, List[Source]], adder: Adder.Aux[In, List[Sentence], Out]): Slab[String, Out] = {
+  def s[In <: HList, Out <: HList](slab: Slab[String, In])(implicit sel: SubSelector[In, List[Source]], adder: Adder.Aux[In, List[Sentence], Out]): Slab[String, Out] = {
     val source = slab.select[Source](0)(sel)
     val sentenceXml = XML.load(source.url.toString().replaceAll("[.]txt$", "-s.xml"))
     val sentences = for (region <- MascUtil.getRegions(sentenceXml)) yield {
@@ -340,7 +340,7 @@ object MascSlab {
    * @param slab The Slab containing the text and source URL
    * @return The Slab with added Segment annotations as read from the MASC -seg.xml file.
    */
-  def seg[In <: HList, Out <: HList](slab: Slab[String, In])(implicit sel: Selector[In, List[Source]], adder: Adder.Aux[In, List[Segment], Out]): Slab[String, Out] = {
+  def seg[In <: HList, Out <: HList](slab: Slab[String, In])(implicit sel: SubSelector[In, List[Source]], adder: Adder.Aux[In, List[Segment], Out]): Slab[String, Out] = {
     val source = slab.select[Source](0)(sel)
     val segmentXml = XML.load(source.url.toString().replaceAll("[.]txt$", "-seg.xml"))
     val segments = for (region <- MascUtil.getRegions(segmentXml)) yield {

@@ -61,6 +61,7 @@ lazy val root = (project in file("."))
     "org.scalanlp" %% "breeze-config" % "0.9.1",
     "org.scalanlp" %% "nak" % "1.3" intransitive(),
     "org.scalanlp" %% "epic-slab" % "0.4-SNAPSHOT",
+    "org.scalanlp" %% "epic-parser-en-span" % "2015.2.19" % "test",
     "org.mapdb" % "mapdb" % "0.9.2",
     "com.typesafe.scala-logging" %% "scala-logging-slf4j" % "2.1.2",
     ("org.apache.tika" % "tika-parsers" % "1.5").exclude ("edu.ucar", "netcdf").exclude("com.googlecode.mp4parser","isoparser"),
@@ -69,7 +70,7 @@ lazy val root = (project in file("."))
     "org.slf4j" % "slf4j-simple" % "1.7.6",
     "org.apache.commons" % "commons-lang3" % "3.3.2",
     "de.jflex" % "jflex" % "1.6.0" % "compile",
-    "org.scalatest" %% "scalatest" % "2.1.3" % "test",
+    "org.scalatest" %% "scalatest" % "2.2.4" % "test",
     "org.scalacheck" %% "scalacheck" % "1.11.3" % "test"
   ))
   .settings(libraryDependencies ++= (CrossVersion.partialVersion(scalaVersion.value) match {
@@ -132,4 +133,3 @@ lazy val opennlp = (project in file("opennlp"))
   ))
   .settings(mainClass in assembly := Some("org.scalanlp.epic.opennlp.SparkPipeline"))
   .dependsOn(slab)
-

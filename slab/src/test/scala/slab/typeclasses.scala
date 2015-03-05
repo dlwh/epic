@@ -20,10 +20,10 @@ class SSSpec extends FunSpec {
   val annotations = isent :: psent :: token :: HNil
 
   describe("SubSelect") {
-    it("should select both") {
-      assert(Set(annotations.subselect[List[Sentence]]).flatten == Set(isent, psent).flatten)
+    it("should select the first one") {
+      assert(annotations.subselect[List[Sentence]] == isent)
     }
-    it("should select only one subclass") {
+    it("should select only the specified subclass") {
       assert(annotations.subselect[List[PSentence]] == psent)
     }
   }

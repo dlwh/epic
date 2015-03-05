@@ -21,7 +21,7 @@ object SelectMany {
     }
 
   implicit def hlistSelectMany[L <: HList, E, Result <: HList]
-    (implicit selector: Selector.Aux[L, E], selectMany: Aux[L, Result, Result]): Aux[L, E :: Result, E :: Result] =
+    (implicit selector: SubSelector[L, E], selectMany: Aux[L, Result, Result]): Aux[L, E :: Result, E :: Result] =
       new SelectMany[L, E :: Result] {
         type Out = E :: Result
         def apply(l : L): Out = {
@@ -32,7 +32,7 @@ object SelectMany {
       }
 }
 
-@implicitNotFound("Implicit not found: epic.slab.Utils.SubSelector[${L}, ${V}]. You requested to select all elements of type lower or equal to ${V}, but none were found in HList ${L}. Check that you imported scalaz.std.list._")
+@implicitNotFound("Implicit not found: epic.slab.Utils.SubSelector[${L}, ${V}]. You requested to select an element of type lower or equal to ${V}, but none were found in HList ${L}.")
 trait SubSelector[L <: HList, V] {
   def apply(l: L): V
 }
@@ -49,7 +49,7 @@ object SubSelector {
     (implicit subsel: SubSelector[T, V]): SubSelector[H :: T, V] =
     new SubSelector[H :: T, V] {
       def apply(l : H :: T): V = {
-        Monoid[V].append(l.head,subsel(l.tail))
+        l.head
       }
     }
 

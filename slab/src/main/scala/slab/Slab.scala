@@ -13,16 +13,12 @@ import epic.slab.typeclasses._
 class Slab[Content, L <: HList](val content: Content, val annotations: L) {
   // Select a single element from an hlist. For more than one element
   // in a single AnalysisFunction, see @selectMany
-  def select[T](implicit sel: Selector[L, List[T]]): List[T] = sel(annotations)
+  def select[T](implicit sel: SubSelector[L, List[T]]): List[T] = sel(annotations)
   // Convenience overload for slab.select[T](index)
-  def select[T](index: Int)(implicit sel: Selector[L, List[T]]): T = sel(annotations)(index)
+  def select[T](index: Int)(implicit sel: SubSelector[L, List[T]]): T = sel(annotations)(index)
   // Select multiple elements, creating a new HList. Preferable over
   // @select because it only requires a single evidence.
   def selectMany[T <: HList](implicit sel: SelectMany.Aux[L, T, T]): T = sel(annotations)
-
-  // Select a single element from an hlist, and its subtypes. Slow to
-  // compile.
-  def subselect[T](implicit sel: SubSelector[L, List[T]]): List[T] = sel(annotations)
 
   // Returns a new slab with the new annotations added. Preferably
   // only call once per AnalysisFunction, because the performance is
@@ -46,10 +42,10 @@ object Slab {
   }
 
   implicit final class SpanIndexSlabOps[In <: HList](slab: Slab[String, In]) {
-    def covered[T <: SpanAnnotation](span: Span)(implicit sel: Selector[In, List[T]]): Iterable[T] = {
+    def covered[T <: SpanAnnotation](span: Span)(implicit sel: SubSelector[In, List[T]]): Iterable[T] = {
       spanIndex(sel).apply(span)
     }
-    def spanIndex[T <: SpanAnnotation](implicit sel: Selector[In, List[T]]) = SpanIndex(slab.select[T](sel))
+    def spanIndex[T <: SpanAnnotation](implicit sel: SubSelector[In, List[T]]) = SpanIndex(slab.select[T](sel))
     def covered[T <: SpanAnnotation](span: Span, index: SpanIndex[T]): Iterable[T] = {
       index(span)
     }
