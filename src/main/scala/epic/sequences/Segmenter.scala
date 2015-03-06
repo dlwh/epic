@@ -17,7 +17,7 @@ trait Segmenter[Tag] extends StringAnalysisFunction[Sentence with Token, Tag] wi
   implicit protected def tagTag: ClassTag[Tag]
   override def apply[In <: Sentence with Token](slab: StringSlab[In]): StringSlab[In with Tag] = {
     val annotatedSentences = for((span, sent) <- slab.iterator[Sentence]) yield {
-      val tokens = slab.covered[Token](span).toIndexedSeq
+      val tokens = slab.covered[Token](span)
       val tagSeq = apply(tokens.map(_._2.token))
       for( (lbl, espan) <- tagSeq) yield {
         Span(tokens(espan.begin)._1.begin, tokens(espan.end - 1)._1.end) -> lbl

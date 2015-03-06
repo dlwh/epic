@@ -6,8 +6,6 @@ import epic.util.BinarySearch
 import epic.slab.AnnotatedSpan.{EndFirstSpanOrdering, SpanOrdering}
 import epic.trees.Span
 
-import scala.util.Try
-
 /**
  * A Slab is the core "document" type in Epic. It represents a document and a set of annotations on that document,
  * such as sentence boundaries, tokens, named entity spans, etc. The ContentType is the type of the document--typically
@@ -60,13 +58,15 @@ trait Slab[ContentType, RegionType, +AnnotationTypes] {
 
   def iterator[A >: AnnotationTypes: ClassTag]: Iterator[(RegionType, A)]
 
+  def indexedSeq[A >: AnnotationTypes : ClassTag]: IndexedSeq[(RegionType, A)]
+
   /**
    * Returns annotations wholly contained in the region
    * @param region
    * @tparam A
    * @return
    */
-  def covered[A >: AnnotationTypes: ClassTag](region: RegionType): Iterator[(RegionType, A)]
+  def covered[A >: AnnotationTypes: ClassTag](region: RegionType): IndexedSeq[(RegionType, A)]
 
   /**
    * Returns annotations that are entirely before the region
@@ -83,29 +83,6 @@ trait Slab[ContentType, RegionType, +AnnotationTypes] {
   }
   
   
-}
-
-/*
-abstract class SlabAnnotationOps[ContentType, RegionType, AnnotationTypes](
-  val region: RegionType,
-  val slab: Slab[ContentType, RegionType, AnnotationTypes]) {
-
-  def content: ContentType
-
-  def covered[A >: AnnotationTypes : ClassTag] = this.slab.covered[A](this.annotation)
-
-  def preceding[A >: AnnotationTypes: ClassTag] = this.slab.preceding[A](this.annotation)
-
-  def following[A >: AnnotationTypes: ClassTag] = this.slab.following[A](this.annotation)
-}
-*/
-
-// =========================
-// Annotation infrastructure
-// =========================
-trait AnnotatedSpan {
-  def begin: Int
-  def end: Int
 }
 
 
@@ -215,15 +192,21 @@ object Slab {
       annotations.view(0, pos).reverseIterator
     }
 
-    override def covered[A >: AnnotationType : ClassTag](region: Span): Iterator[(Span, A)] = {
+    override def covered[A >: AnnotationType : ClassTag](region: Span): IndexedSeq[(Span, A)] = {
       val annotations = selectAnnotations[A]
       var begin = BinarySearch.interpolationSearch(annotations, (_:(Span, Any))._1.begin, region.begin)
       if(begin < 0) begin = ~begin
-      annotations.view(begin, annotations.length).takeWhile(_._1.end <= region.end).iterator
+      var end = annotations.indexWhere(_._1.end > region.end, begin)
+      if(end < 0) end = annotations.length
+      annotations.slice(begin, end)
     }
 
     override def iterator[A >: AnnotationType : ClassTag]: Iterator[(Span, A)] = {
       selectAnnotations[A].iterator
+    }
+
+    override def indexedSeq[A >: AnnotationType : ClassTag]: IndexedSeq[(Span, A)] = {
+      selectAnnotations[A]
     }
 
     private def selectAnnotations[A >: AnnotationType : ClassTag]: IndexedSeq[(Span, A)] = {
