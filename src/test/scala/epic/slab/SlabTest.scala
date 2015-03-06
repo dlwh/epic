@@ -112,11 +112,29 @@ class SlabTest extends FunSuite {
 
   test("sorted slab issues with overlapping annotations") {
     case class Annotation()
-    val slab = Slab("""This is a test.""") ++ Iterator(Span(0, 1) -> Annotation(), Span(0, 2) -> Annotation(), Span(1, 3) -> Annotation(), Span(1, 2) -> Annotation(), Span(2, 3) -> Annotation())
+    val slab = Slab("""This is a test.""").addLayer(Span(0, 1) -> Annotation(), Span(0, 2) -> Annotation(), Span(1, 3) -> Annotation(), Span(1, 2) -> Annotation(), Span(2, 3) -> Annotation())
     assert(slab.preceding[Annotation](Span(0, 1)).isEmpty)
     assert(slab.preceding[Annotation](Span(0, 2)).isEmpty)
     assert(slab.preceding[Annotation](Span(1, 3)).toList.map(_._1) === List(Span(0, 2), Span(0, 1)))
     assert(slab.covered[Annotation](Span(1, 3)).toList.map(_._1) === List(Span(1, 2), Span(1, 3), Span(2, 3)))
     assert(slab.covered[Annotation](Span(0, 2)).toList.map(_._1) === List(Span(0, 1), Span(0, 2), Span(1, 2)))
+  }
+
+  test("subclasses work") {
+    sealed trait A
+    case class B() extends A
+    case class C() extends A
+    val slab = Slab("""This is a test.""").addLayer[A](Span(0, 1) -> B(), Span(1, 8) -> C())
+    assert(slab.iterator[A].toIndexedSeq == IndexedSeq(Span(0, 1) -> B(), Span(1, 8) -> C()))
+    val slab2 = Slab("""This is a test.""").addLayer[A](Span(0, 1) -> C(), Span(1, 8) -> B())
+    assert(slab2.iterator[A].toIndexedSeq == IndexedSeq(Span(0, 1) -> C(), Span(1, 8) -> B()))
+  }
+
+  test("removal works") {
+    sealed trait A
+    case class B() extends A
+    case class C() extends A
+    val slab = Slab("""This is a test.""").addLayer[A](Span(0, 1) -> B(), Span(1, 8) -> C())
+    assert(!slab.removeLayer[A].hasLayer[A])
   }
 }

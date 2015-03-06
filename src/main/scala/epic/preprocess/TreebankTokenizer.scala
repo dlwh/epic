@@ -13,7 +13,7 @@ import scala.collection.mutable.ArrayBuffer
 class TreebankTokenizer() extends Tokenizer with Serializable {
 
   override def apply[In <: Sentence](slab: StringSlab[In]): StringSlab[In with Token] = {
-    slab.++[Token](slab.iterator[Sentence].flatMap { s =>
+    slab.addLayer[Token](slab.iterator[Sentence].flatMap { s =>
       val content = slab.spanned(s._1)
       val impl = new TreebankTokenizerImpl(new StringReader(content))
       Iterators.fromProducer{

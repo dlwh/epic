@@ -25,7 +25,7 @@ class MLSentenceSegmenter(inf: MLSentenceSegmenter.ClassificationInference) exte
     val text = slab.content
     val iter = MLSentenceSegmenter.potentialSentenceBoundariesIterator(text)
     var lastOffset = 0
-    slab.++[Sentence](
+    slab.addLayer[Sentence](
       Iterators.fromProducer {
         def rec():Option[(Span, Sentence)] = {
           if(iter.hasNext) {

@@ -28,7 +28,7 @@ class NewLineSentenceSegmenter(locale: Locale = Locale.getDefault) extends Sente
     spans += Span(start, slab.content.length) -> Sentence()
 
 
-    slab.++[Sentence](spans)
+    slab.addLayer[Sentence](spans)
   }
 }
 

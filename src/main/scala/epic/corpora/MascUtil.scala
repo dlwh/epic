@@ -325,7 +325,7 @@ object MascSlab {
     val sentences = for (region <- MascUtil.getRegions(sentenceXml)) yield {
       region.span ->  Sentence(Some(region.id))
     }
-    slab.++[Sentence](sentences)
+    slab.addLayer[Sentence](sentences)
   }
   
   /**
@@ -342,7 +342,7 @@ object MascSlab {
     val segments = for (region <- MascUtil.getRegions(segmentXml)) yield {
       region.span -> Segment(Some(region.id))
     }
-    slab.++[Segment](segments)
+    slab.addLayer[Segment](segments)
   }
 
   /**
@@ -362,7 +362,7 @@ object MascSlab {
       val segments = node.targets.map(idToSegment).sortBy{ s => (s.begin, -s.end)}
       node.id -> MRegion(node.id, segments.head.begin, segments.last.end)
     }.toMap
-    
+
     val partOfSpeechTags = for (annotation <- MascUtil.getAnnotations(pennXml)) yield {
       val region = idToPosRegion(annotation.ref)
       val tag = MascUtil.getPos(annotation)
@@ -370,8 +370,7 @@ object MascSlab {
     }
     // TODO: should probably create Stem annotations too, available as the MASC "base" feature
     
-    // FIXME: should not be necesssary to sort, but Slab needs better implementation
-    slab ++ partOfSpeechTags
+    slab.addLayer[PartOfSpeech](partOfSpeechTags)
   }
   
   /**
@@ -397,6 +396,6 @@ object MascSlab {
       Span(begin, end) -> EntityMention(annotation.label, Some(annotation.ref))
     }
     
-    slab ++ entityMentions.iterator
+    slab.addLayer[EntityMention](entityMentions)
   }
 }

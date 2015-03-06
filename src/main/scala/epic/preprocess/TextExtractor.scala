@@ -126,7 +126,7 @@ object TextExtractor {
 
     val content = textHandler.toString.trim
 
-    Slab(content).++(Iterator(Span(0, content.length) -> epic.slab.Source(url)))
+    Slab(content).addLayer(Span(0, content.length) -> epic.slab.Source(url))
   }
 
 

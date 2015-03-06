@@ -36,7 +36,7 @@ class JavaWordTokenizer(locale: Locale) extends Tokenizer {
 
 
   override def apply[In <: Sentence](slab: StringSlab[In]): StringSlab[In with Token] = {
-    slab.++[Token](slab.iterator[Sentence].flatMap { s =>
+    slab.addLayer[Token](slab.iterator[Sentence].flatMap { s =>
       val breaker = BreakIterator.getWordInstance(locale)
       breaker.setText(slab.content)
       new SegmentingIterator(breaker, s._1.begin, s._1.end).map { span =>

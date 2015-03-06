@@ -47,7 +47,7 @@ case class RegexSplitTokenizer(pattern : String) extends Tokenizer {
     }
     if(start != slab.content.length)
       spans += Span(start, slab.content.length) -> Token(slab.content.substring(start, slab.content.length))
-    slab.++[Token](spans)
+    slab.addLayer[Token](spans)
   }
 
 }

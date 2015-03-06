@@ -19,7 +19,7 @@ class ParserAnnotator[L](parser: Parser[L, String]) extends StringAnalysisFuncti
       span -> tree
     }
 
-    slab.++[Tree[L]](annotatedSentences.seq)
+    slab.addLayer[Tree[L]](annotatedSentences.seq)
   }
 
 

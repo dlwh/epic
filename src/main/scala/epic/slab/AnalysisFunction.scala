@@ -44,7 +44,7 @@ object StringIdentityAnalyzer extends StringAnalysisFunction[Any, Any] {
 object RegexTokenizer extends Tokenizer {
   def apply[I <: Sentence](slab: StringSlab[I]) =
     // the [Token] is required because of https://issues.scala-lang.org/browse/SI-7647
-    slab.++[Token](slab.iterator[Sentence].flatMap{ case (region, sentence) =>
+    slab.addLayer[Token](slab.iterator[Sentence].flatMap{ case (region, sentence) =>
       "\\p{L}+|\\p{P}+|\\p{N}+".r.findAllMatchIn(slab.content.substring(region.begin, region.end)).map(m =>
         Span(region.begin + m.start, region.begin + m.end) -> Token(m.group(0)))
     })
@@ -57,7 +57,7 @@ object AnalysisPipeline {
   // added only to demonstrate necesssity of [I] parameter on analyzers
   private[AnalysisPipeline] case class Document()
   private[AnalysisPipeline] def documentAdder(slab: StringSlab[Any]) =
-    slab ++ Iterator(Span(0, slab.content.length) -> Document())
+    slab.addLayer(Iterator(Span(0, slab.content.length) -> Document()))
 
   def main (args: Array[String]) {
     def sentenceSegmenter:StringAnalysisFunction[Any, Sentence] = RegexSentenceSegmenter
