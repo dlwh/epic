@@ -82,6 +82,13 @@ class TreebankTokenizerTest  extends FunSuite {
     assert(TreebankTokenizer("$99.33").toList === List("$","99.33"))
   }
 
+  test("negatives") {
+    assert(TreebankTokenizer("-99").toList === List("-99"))
+    assert(TreebankTokenizer("-99.01").toList === List("-99.01"))
+
+
+  }
+
   test("dates + comma") {
     assert(TreebankTokenizer("13,").toList === List("13", ","))
     assert(TreebankTokenizer("December 06,").toList === List("December","06",","))
