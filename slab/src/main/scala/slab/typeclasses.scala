@@ -40,25 +40,15 @@ trait SubSelector[L <: HList, V] {
 object SubSelector {
   def apply[L <: HList, V](implicit subsel: SubSelector[L, V]): SubSelector[L, V] = subsel
 
-  implicit def eol[L <: HList, V: Monoid]: SubSelector[L, V] =
-    new SubSelector[L, V] {
-      def apply(l : L): V = Monoid[V].zero
+  implicit def found[H <: V, T <: HList, V]: SubSelector[H :: T, V] =
+    new SubSelector[H :: T, V] {
+      def apply(l : H :: T): V = l.head
     }
 
-  implicit def found[H <: V, T <: HList, E, V: Monoid]
+  implicit def notFound[H, T <: HList, V]
     (implicit subsel: SubSelector[T, V]): SubSelector[H :: T, V] =
     new SubSelector[H :: T, V] {
-      def apply(l : H :: T): V = {
-        l.head
-      }
-    }
-
-  implicit def notFound[H, T <: HList, E, V]
-    (implicit subsel: SubSelector[T, V]): SubSelector[H :: T, V] =
-    new SubSelector[H :: T, V] {
-      def apply(l : H :: T): V = {
-        subsel(l.tail)
-      }
+      def apply(l : H :: T): V = subsel(l.tail)
     }
 
 }
