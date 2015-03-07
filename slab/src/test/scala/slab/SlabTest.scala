@@ -1,6 +1,6 @@
 import epic.slab._
 import org.scalatest._
-import scalaz.std.list._
+import scalaz.std.vector._
 
 class ShapelessSlabTest extends FunSpec {
   import shapeless.test.illTyped
@@ -25,15 +25,15 @@ class ShapelessSlabTest extends FunSpec {
       case class Foo(foo: Int) extends Annotation
       val slab1 = slab.add(annotation)
       // could not find implicit value for parameter sel:
-      // shapeless.ops.hlist.Selector[shapeless.::[List[Annotation],shapeless.HNil],List[Foo]]
+      // shapeless.ops.hlist.Selector[shapeless.::[Vector[Annotation],shapeless.HNil],Vector[Foo]]
       illTyped {
-        """ slab1.get[Foo] """
+        """ slab1.select[Foo] """
       }
     }
     it("should also work with empty annotation lists") {
       case class Foo(foo: Int) extends Annotation
-      val slab1 = slab.add(List[Int]().map(Foo(_)).toList)
-      assert(slab1.select[Foo] == List[Foo]())
+      val slab1 = slab.add(Vector[Int]().map(Foo(_)).toVector)
+      assert(slab1.select[Foo] == Vector[Foo]())
     }
   }
 }

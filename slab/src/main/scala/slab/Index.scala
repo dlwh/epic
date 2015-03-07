@@ -4,7 +4,7 @@ import ops.hlist._
 import scala.collection.SortedMap
 
 // TODO: Get one which supports multiple types via HLists and CoProducts
-class SpanIndex[T <: SpanAnnotation](data: List[T]) {
+class SpanIndex[T <: SpanAnnotation](data: Vector[T]) {
   // Indexes by `begin`.
   lazy val indexed = data.foldLeft(SortedMap[Int, Seq[T]]())({case (map, e) =>
     map + ((e.begin, (map.get(e.begin).map(_ :+ e).getOrElse((Seq[T](e))))))
@@ -22,5 +22,5 @@ class SpanIndex[T <: SpanAnnotation](data: List[T]) {
 }
 
 object SpanIndex {
-  def apply[T <: SpanAnnotation](data: List[T]) = new SpanIndex(data)
+  def apply[T <: SpanAnnotation](data: Vector[T]) = new SpanIndex(data)
 }

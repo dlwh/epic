@@ -15,16 +15,16 @@ import ops.hlist._
 
 // This analysis function requires one input and adds one output type.
 trait AnalysisFunction11[C, I, O] {
-  def apply[In <: HList, Out <: HList](slab: Slab[C, In])(implicit sel: SubSelector[In, List[I]], adder: Adder.Aux[In, List[O], Out]): Slab[C, Out] = {
-    slab.add(apply(slab.content, slab.select(sel)).toList)
+  def apply[In <: HList, Out <: HList](slab: Slab[C, In])(implicit sel: SubSelector[In, Vector[I]], adder: Adder.Aux[In, Vector[O], Out]): Slab[C, Out] = {
+    slab.add(apply(slab.content, slab.select(sel)).toVector)
   }
-  def apply(content: C, input: List[I]): Iterable[O]
+  def apply(content: C, input: Vector[I]): Iterable[O]
 }
 
 // Convert a function of the correct signature to an AnalysisFunction11.
 object AnalysisFunction11 {
-  def apply[C, I, O](fun: ((C, List[I]) => Iterable[O])): AnalysisFunction11[C, I, O] = new AnalysisFunction11[C, I, O] {
-    def apply(content: C, input: List[I]): Iterable[O] = fun(content, input)
+  def apply[C, I, O](fun: ((C, Vector[I]) => Iterable[O])): AnalysisFunction11[C, I, O] = new AnalysisFunction11[C, I, O] {
+    def apply(content: C, input: Vector[I]): Iterable[O] = fun(content, input)
   }
 }
 
@@ -33,7 +33,7 @@ object AnalysisFunction11 {
 // of the implicits to extract the elements from the HList gets
 // complicated. For an example, take a look at epic.sequences.Segmenter
 trait AnalysisFunctionN1[C, I <: HList, O] {
-  def apply[In <: HList, Out <: HList](slab: Slab[C, In])(implicit sel: SelectMany.Aux[In, I, I], adder: Adder.Aux[In, List[O], Out]): Slab[C, Out]
+  def apply[In <: HList, Out <: HList](slab: Slab[C, In])(implicit sel: SelectMany.Aux[In, I, I], adder: Adder.Aux[In, Vector[O], Out]): Slab[C, Out]
 }
 
 // This analysis function requires no input types except for the
@@ -41,13 +41,13 @@ trait AnalysisFunctionN1[C, I <: HList, O] {
 // this trait can be used to construct a new slab directly from
 // content.
 trait AnalysisFunction01[C, O] {
-  def apply[In <: HList, Out <: HList](slab: Slab[C, In])(implicit adder: Adder.Aux[In, List[O], Out]): Slab[C, Out] = {
-    slab.add(apply(slab.content).toList)(adder)
+  def apply[In <: HList, Out <: HList](slab: Slab[C, In])(implicit adder: Adder.Aux[In, Vector[O], Out]): Slab[C, Out] = {
+    slab.add(apply(slab.content).toVector)(adder)
   }
   def apply(content: C): Iterable[O]
 
-  def slabFrom(content: C): Slab[C, List[O] :: HNil] = {
-    Slab(content, apply(content).toList :: HNil)
+  def slabFrom(content: C): Slab[C, Vector[O] :: HNil] = {
+    Slab(content, apply(content).toVector :: HNil)
   }
 }
 

@@ -53,7 +53,7 @@ object SubSelector {
 
 }
 
-@implicitNotFound("Implicit not found: epic.slab.typeclasses.Adder[${L}, ${V}]. Check that you imported scalaz.std.list._")
+@implicitNotFound("Implicit not found: epic.slab.typeclasses.Adder[${L}, ${V}]. Check that you imported scalaz.std.vector._")
 sealed trait Adder[L <: HList, V] extends DepFn2[L, V]
 
 object Adder {
