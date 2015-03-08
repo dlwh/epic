@@ -1,8 +1,10 @@
 package epic.slab
 
 import java.net.URL
+import scalaz.std.vector._
 
 trait Annotation extends Serializable {}
+
 trait Located
 
 //** Handles annotation over regions, any-dimensional
@@ -21,6 +23,12 @@ trait SpanAnnotation extends RegionAnnotation {
     // Scala (that I know of). Exists for elements that carry their
     // own content around for e.g. normalization.
     content.substring(begin, end)
+  }
+}
+
+object SpanAnnotation {
+  implicit def ordering[A <: SpanAnnotation] = new Ordering[A] {
+    override def compare(a: A, b: A) = a.span.encoded.compare(b.span.encoded)
   }
 }
 

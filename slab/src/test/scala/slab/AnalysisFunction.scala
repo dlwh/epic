@@ -4,6 +4,7 @@ import shapeless._
 import ops.hlist._
 import scalaz.std.vector._
 import epic.slab.typeclasses._
+import epic.slab._
 
 import org.scalatest.FunSpec
 
@@ -25,7 +26,7 @@ object RegexTokenizer11 extends AnalysisFunction11[String, Sentence, Token] {
 // Same again, except using a different interface. The API sucks,
 // needs to be improved.
 object RegexTokenizerN1 extends AnalysisFunctionN1[String, Vector[Sentence] :: HNil, Token] {
-  def apply[In <: HList, Out <: HList](slab: Slab[String, In])(implicit sel: SelectMany.Aux[In, Vector[Sentence] :: HNil, Vector[Sentence] :: HNil], adder: Adder.Aux[In, Vector[Token], Out]): Slab[String, Out] =
+  def apply[In <: HList, Out <: HList](slab: Slab[String, In])(implicit sel: SelectMany.Aux[In, Vector[Sentence] :: HNil, Vector[Sentence] :: HNil], adder: Adder.Aux[In, Token, Out]): Slab[String, Out] =
     slab.add(slab.selectMany[Vector[Sentence] :: HNil](sel).at(0).flatMap { sentence =>
       "\\p{L}+|\\p{P}+|\\p{N}+".r.findAllMatchIn(
         slab.content.substring(sentence.begin, sentence.end)
@@ -34,7 +35,6 @@ object RegexTokenizerN1 extends AnalysisFunctionN1[String, Vector[Sentence] :: H
       ).toVector
     })(adder)
 }
-
 
 class SimpleTokenizerTest extends FunSpec {
   describe("a 1 to 1 tokenizer") {

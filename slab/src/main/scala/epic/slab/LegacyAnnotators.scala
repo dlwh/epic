@@ -4,7 +4,6 @@ import epic.slab.typeclasses._
 import shapeless._
 import scalaz.std.vector._
 
-
 trait Initialized[T] {
   val initialize: (() => T)
 }
@@ -59,7 +58,7 @@ class Annotator[S <: Sentence, T <: Token, Annotated, I](override val initialize
   override def apply[In <: HList, Out <: HList]
     (slab: Slab[String, In])
     (implicit sel: SelectMany.Aux[In, Vector[S] :: Vector[T] :: HNil, Vector[S] :: Vector[T] :: HNil],
-      adder: Adder.Aux[In, Vector[Annotated], Out]
+      adder: Adder.Aux[In, Annotated, Out]
     ): Slab[String, Out] = {
     val initialized = initialize()
     val data = slab.selectMany(sel)
@@ -106,7 +105,7 @@ object Tagger {
 
 trait Segmenter[S <: Sentence, T <: Token, Tag, I] extends AnalysisFunctionN1[String, Vector[S] :: Vector[T] :: HNil, Tagged[Tag]] with Initialized[I] {
   override def apply[In <: HList, Out <: HList](slab: Slab[String, In])(implicit sel:
-      SelectMany.Aux[In, Vector[S] :: Vector[T] :: HNil, Vector[S] :: Vector[T] :: HNil], adder: Adder.Aux[In, Vector[Tagged[Tag]], Out]): Slab[String, Out] = {
+      SelectMany.Aux[In, Vector[S] :: Vector[T] :: HNil, Vector[S] :: Vector[T] :: HNil], adder: Adder.Aux[In, Tagged[Tag], Out]): Slab[String, Out] = {
     val initialized = initialize()
     val data = slab.selectMany(sel)
     val index = SpanIndex(data.select[Vector[T]])
@@ -131,7 +130,7 @@ object Segmenter {
 trait TokenParser[S <: Sentence, T <: Token, Label, I] extends AnalysisFunctionN1[String, Vector[S] :: Vector[T] :: HNil, Tree[Label]] with Initialized[I] {
   override def apply[In <: HList, Out <: HList](slab: Slab[String, In])
     (implicit sel: SelectMany.Aux[In, Vector[S] :: Vector[T] :: HNil, Vector[S] :: Vector[T] :: HNil],
-      adder: Adder.Aux[In, Vector[Tree[Label]], Out]): Slab[String, Out] = {
+      adder: Adder.Aux[In, Tree[Label], Out]): Slab[String, Out] = {
     // Duplicated from segmenter - refactor?
     val initialized = initialize()
     val data = slab.selectMany(sel)

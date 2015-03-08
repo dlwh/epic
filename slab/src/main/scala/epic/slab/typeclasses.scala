@@ -2,7 +2,6 @@ package epic.slab.typeclasses
 
 import shapeless._
 import ops.hlist._
-import scalaz._
 import scala.annotation.implicitNotFound
 
 // Replace with RemoveAll at some point, or depend on it.
@@ -53,36 +52,46 @@ object SubSelector {
 
 }
 
-@implicitNotFound("Implicit not found: epic.slab.typeclasses.Adder[${L}, ${V}]. Check that you imported scalaz.std.vector._")
-sealed trait Adder[L <: HList, V] extends DepFn2[L, V]
-
-object Adder {
-  def apply[L <: HList, V](implicit adder: Adder[L, V]): Aux[L, V, adder.Out] = adder
-
-  type Aux[L <: HList, V, Out0] = Adder[L, V] { type Out = Out0 }
-
-  implicit def found[T <: HList, V: Monoid]: Aux[V :: T, V, V :: T] =
-    new Adder[V :: T, V] {
-      type Out = V :: T
-      def apply(l: V :: T, collection: V): Out = {
-        val v: V = l.head
-        Monoid[V].append(v, collection) :: l.tail
+trait LowPriorityAdderImplicits {
+  implicit def foundNoOrdering[T <: HList, U]: Adder.Aux[Vector[U] :: T, U, Vector[U] :: T] =
+    new Adder[Vector[U] :: T, U] {
+      type Out = Vector[U] :: T
+      def apply(l: Vector[U] :: T, collection: Vector[U]): Out = {
+        (l.head ++ collection) :: l.tail
       }
     }
 
-  implicit def notFound[H, T <: HList, V, OutT <: HList](implicit ut: Aux[T, V, OutT]): Aux[H :: T, V, H :: OutT] =
-    new Adder[H :: T, V] {
+  implicit def notFound[H, T <: HList, U, OutT <: HList](implicit ut: Adder.Aux[T, U, OutT]): Adder.Aux[H :: T, U, H :: OutT] =
+    new Adder[H :: T, U] {
       type Out = H :: OutT
-      def apply(l: H :: T, collection: V): Out = {
+      def apply(l: H :: T, collection: Vector[U]): Out = {
         val outT = ut(l.tail, collection)
         l.head :: outT
       }
     }
 
-  implicit def empty[V]: Aux[HNil, V, V :: HNil] =
-    new Adder[HNil, V] {
-      type Out = V :: HNil
-      def apply(l: HNil, collection: V): Out = collection :: HNil
+}
+
+@implicitNotFound("Implicit not found: epic.slab.typeclasses.Adder[${L}, ${U}].")
+sealed trait Adder[L <: HList, U] extends DepFn2[L, Vector[U]]
+
+object Adder extends LowPriorityAdderImplicits {
+  def apply[L <: HList, U: Ordering](implicit adder: Adder[L, U]): Aux[L, U, adder.Out] = adder
+
+  type Aux[L <: HList, U, Out0] = Adder[L, U] { type Out = Out0 }
+
+  implicit def foundWithOrdering[T <: HList, U: Ordering]: Adder.Aux[Vector[U] :: T, U, Vector[U] :: T] =
+    new Adder[Vector[U] :: T, U] {
+      type Out = Vector[U] :: T
+      def apply(l: Vector[U] :: T, collection: Vector[U]): Out = {
+        (l.head ++ collection).sorted :: l.tail
+      }
+    }
+
+  implicit def empty[U]: Aux[HNil, U, Vector[U] :: HNil] =
+    new Adder[HNil, U] {
+      type Out = Vector[U] :: HNil
+      def apply(l: HNil, collection: Vector[U]): Out = collection :: HNil
     }
 }
 
@@ -90,6 +99,6 @@ object HOps {
   implicit class Ops[L <: HList](l: L) {
     def subselect[V](implicit subsel: SubSelector[L, V]): V = subsel(l)
     def selectMany[SL <: HList](implicit sm: SelectMany[L, SL]): sm.Out = sm(l)
-    def add[V](v: V)(implicit adder: Adder[L, V]): adder.Out = adder(l, v)
+    def add[U](v: Vector[U])(implicit adder: Adder[L, U]): adder.Out = adder(l, v)
   }
 }

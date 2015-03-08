@@ -46,8 +46,33 @@ class SSSpec extends FunSpec {
     it("should add a new element") {
       assert(l.add(Vector(1)) == Vector("foo") :: Vector(1) :: HNil)
     }
-    it("should add it to the existing element if one exists") {
-      assert(l.add(Vector("bar")) == Vector("foo", "bar") :: HNil)
+    it("should add it to the existing element if one exists, and sort them") {
+      assert(l.add(Vector("bar")) == Vector("bar", "foo") :: HNil)
+    }
+  }
+}
+
+package epic.slab.test {
+  import epic.slab.{Sentence, Span}
+  import shapeless._
+
+  object TestVals {
+    val list = Vector(Sentence(Span(0, 1)), Sentence(Span(2, 3))) :: HNil
+    val added = Vector(Sentence(Span(1, 2)))
+    val result = Vector(Sentence(Span(0, 1)), Sentence(Span(1, 2)), Sentence(Span(2, 3))) :: HNil
+  }
+}
+
+package epic.slab.test2 {
+  import org.scalatest.FunSpec
+  import epic.slab.typeclasses.HOps._
+  import epic.slab.test.TestVals._
+
+  class ImplicitOrderingInAdderTest extends FunSpec {
+    describe("implicit ordering in adder") {
+      it("should work without importing") {
+        assert(list.add(added) == result)
+      }
     }
   }
 }

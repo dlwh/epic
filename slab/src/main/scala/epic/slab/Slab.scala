@@ -23,10 +23,10 @@ class Slab[Content, L <: HList](val content: Content, val annotations: L) {
   // Returns a new slab with the new annotations added. Preferably
   // only call once per AnalysisFunction, because the performance is
   // questionable.
-  def add[A, Tmp <: HList, Result <: HList](newAnnotations: Vector[A])(implicit adder: Adder.Aux[L, Vector[A], Result]): Slab[Content, Result] = {
+  def add[A, Tmp <: HList, Result <: HList](newAnnotations: Vector[A])(implicit adder: Adder.Aux[L, A, Result]): Slab[Content, Result] = {
     new Slab(content, adder(annotations, newAnnotations))
   }
-  def add[A, Tmp <: HList, Result <: HList](newAnnotation: A)(implicit adder: Adder.Aux[L, Vector[A], Result]): Slab[Content, Result] = {
+  def add[A, Tmp <: HList, Result <: HList](newAnnotation: A)(implicit adder: Adder.Aux[L, A, Result]): Slab[Content, Result] = {
     new Slab(content, adder(annotations, Vector(newAnnotation)))
   }
 }
