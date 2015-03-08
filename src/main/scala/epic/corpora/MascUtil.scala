@@ -309,7 +309,7 @@ object MascSlab {
    * @param textFileUrl The URL of the MASC .txt (plain text) file.
    * @return A Slab of the text, with the URL saved as a Source annotation.
    */
-  def apply(textFileUrl: URL): Slab[String, List[Source] :: HNil] = {
+  def apply(textFileUrl: URL): Slab[String, Vector[Source] :: HNil] = {
     val text = scala.io.Source.fromURL(textFileUrl)(Codec.UTF8).mkString
     val slab = Slab(text)
     slab.add(Source(textFileUrl))
@@ -323,13 +323,13 @@ object MascSlab {
    * @param slab The Slab containing the text and source URL
    * @return The Slab with added Sentence annotations as read from the MASC -s.xml file.
    */
-  def s[In <: HList, Out <: HList](slab: Slab[String, In])(implicit sel: SubSelector[In, List[Source]], adder: Adder.Aux[In, List[Sentence], Out]): Slab[String, Out] = {
+  def s[In <: HList, Out <: HList](slab: Slab[String, In])(implicit sel: SubSelector[In, Vector[Source]], adder: Adder.Aux[In, Sentence, Out]): Slab[String, Out] = {
     val source = slab.select[Source](0)(sel)
     val sentenceXml = XML.load(source.url.toString().replaceAll("[.]txt$", "-s.xml"))
     val sentences = for (region <- MascUtil.getRegions(sentenceXml)) yield {
        Sentence(region.span)
     }
-    slab.add(sentences.toList)(adder)
+    slab.add(sentences.toVector)(adder)
   }
   
   /**
@@ -340,13 +340,13 @@ object MascSlab {
    * @param slab The Slab containing the text and source URL
    * @return The Slab with added Segment annotations as read from the MASC -seg.xml file.
    */
-  def seg[In <: HList, Out <: HList](slab: Slab[String, In])(implicit sel: SubSelector[In, List[Source]], adder: Adder.Aux[In, List[Segment], Out]): Slab[String, Out] = {
+  def seg[In <: HList, Out <: HList](slab: Slab[String, In])(implicit sel: SubSelector[In, Vector[Source]], adder: Adder.Aux[In, Segment, Out]): Slab[String, Out] = {
     val source = slab.select[Source](0)(sel)
     val segmentXml = XML.load(source.url.toString().replaceAll("[.]txt$", "-seg.xml"))
     val segments = for (region <- MascUtil.getRegions(segmentXml)) yield {
        Segment(region.span, Some(region.id))
     }
-    slab.add(segments.toList)(adder)
+    slab.add(segments.toVector)(adder)
   }
 
   /**
@@ -358,13 +358,13 @@ object MascSlab {
    * @return The Slab with added PartOfSpeech annotations as read from the MASC -penn.xml file.
    */
   def penn[In <: HList, Out <: HList](slab: Slab[String, In])(
-    implicit sel: SelectMany.Aux[In, List[Source] :: List[Segment] :: HNil, List[Source] :: List[Segment] :: HNil],
-      adder: Adder.Aux[In, List[Tagged[PartOfSpeech]], Out]): Slab[String, Out] = {
+    implicit sel: SelectMany.Aux[In, Vector[Source] :: Vector[Segment] :: HNil, Vector[Source] :: Vector[Segment] :: HNil],
+      adder: Adder.Aux[In, Tagged[PartOfSpeech], Out]): Slab[String, Out] = {
     val data = slab.selectMany(sel)
-    val source = data.select[List[Source]].apply(0)
+    val source = data.select[Vector[Source]].apply(0)
     val pennXml = XML.load(source.url.toString().replaceAll("[.]txt$", "-penn.xml"))
 
-    val idToSegment = (for (segment <- data.select[List[Segment]]; id <- segment.id.iterator) yield id -> segment.span).toMap
+    val idToSegment = (for (segment <- data.select[Vector[Segment]]; id <- segment.id.iterator) yield id -> segment.span).toMap
     val idToPosRegion = MascUtil.getNodes(pennXml).map{ node =>
       val segments = node.targets.map(idToSegment).sortBy{ s => (s.begin, -s.end)}
       node.id -> MRegion(node.id, segments.head.begin, segments.last.end)
@@ -376,7 +376,7 @@ object MascSlab {
       Tagged(region.span, PartOfSpeech(tag, Some(region.id)))
     }
     // TODO: should probably create Stem annotations too, available as the MASC "base" feature
-    slab.add(partOfSpeechTags.toList)(adder)
+    slab.add(partOfSpeechTags.toVector)(adder)
   }
   
   /**
@@ -388,13 +388,13 @@ object MascSlab {
    * @return The Slab with added EntityMention annotations as read from the MASC -ne.xml file.
    */
   def namedEntities[In <: HList, Out <: HList](slab: Slab[String, In])
-    (implicit sel: SelectMany.Aux[In, List[Source] :: List[Tagged[PartOfSpeech]] :: HNil, List[Source] :: List[Tagged[PartOfSpeech]] :: HNil],
-      adder: Adder.Aux[In, List[Tagged[EntityMention]], Out]): Slab[String, Out] = {
+    (implicit sel: SelectMany.Aux[In, Vector[Source] :: Vector[Tagged[PartOfSpeech]] :: HNil, Vector[Source] :: Vector[Tagged[PartOfSpeech]] :: HNil],
+      adder: Adder.Aux[In, Tagged[EntityMention], Out]): Slab[String, Out] = {
     val data = slab.selectMany(sel)
-    val source = data.select[List[Source]].apply(0)
+    val source = data.select[Vector[Source]].apply(0)
     val neXml = XML.load(source.url.toString().replaceAll("[.]txt$", "-ne.xml"))
     
-    val idToPos = (for (tag <- data.select[List[Tagged[PartOfSpeech]]]; id <- tag.tag.id.iterator) yield id -> (tag.span, tag)).toMap
+    val idToPos = (for (tag <- data.select[Vector[Tagged[PartOfSpeech]]]; id <- tag.tag.id.iterator) yield id -> (tag.span, tag)).toMap
     val neIdPosIdTuples = MascUtil.getEdges(neXml).map(e => (e.from -> e.to))
     val neIdToPosIds = neIdPosIdTuples.groupBy(_._1).mapValues(_.map(_._2))
     
@@ -405,6 +405,6 @@ object MascSlab {
       Tagged(Span(begin, end), EntityMention(annotation.label, Some(annotation.ref)))
     }
     
-    slab.add(entityMentions.toList)(adder)
+    slab.add(entityMentions.toVector)(adder)
   }
 }
