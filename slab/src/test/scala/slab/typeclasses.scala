@@ -12,12 +12,13 @@ case class PSentence(override val loc: Int) extends Sentence(loc)
 case class ISentence(override val loc: Int) extends Sentence(loc)
 case class Token(val loc: Int)
 
-class SSSpec extends FunSpec {
+class TypeclassesSpec extends FunSpec {
   import HOps.Ops
   val token = Vector(Token(0))
   val isent = Vector(ISentence(0))
   val psent = Vector(PSentence(0))
   val annotations = isent :: psent :: token :: HNil
+  val hnil: HNil = HList()
 
   describe("SubSelect") {
     it("should select the first one") {
@@ -42,12 +43,41 @@ class SSSpec extends FunSpec {
     }
   }
   describe("adder") {
+    it("should add a new element to an empty list") {
+      assert(hnil.add(Vector(1)) == Vector(1) :: HNil)
+    }
     val l = Vector("foo") :: HNil
-    it("should add a new element") {
+    it("should add a new element to an existing list") {
       assert(l.add(Vector(1)) == Vector("foo") :: Vector(1) :: HNil)
     }
     it("should add it to the existing element if one exists, and sort them") {
       assert(l.add(Vector("bar")) == Vector("bar", "foo") :: HNil)
+    }
+  }
+  describe("addmany") {
+    it("should be identity if L is empty") {
+      val l = Vector(1) :: HNil
+      val added = hnil.addMany(l)
+      assert(added.select[Vector[Int]] == Vector(1))
+    }
+    it("should be identity if SL is empty") {
+      val sl = Vector(1) :: HNil
+      val added = sl.addMany(hnil)
+      assert(added.select[Vector[Int]] == Vector(1))
+    }
+    it("should add unrelated") {
+      val l = Vector(1, 2, 3) :: HNil
+      val sl = Vector("a", "b", "c") :: HNil
+      val added = l.addMany(sl)
+      assert(added.select[Vector[Int]] == Vector(1, 2, 3))
+      assert(added.select[Vector[String]] == Vector("a", "b", "c"))
+    }
+    it("should add and sort") {
+      val l = Vector(1, 2, 5, 6) :: Vector("a", "b", "d") :: HNil
+      val sl = Vector("c") :: Vector(3, 4) ::  HNil
+      val added = l.addMany(sl)
+      assert(added.select[Vector[Int]] == Vector(1, 2, 3, 4, 5, 6))
+      assert(added.select[Vector[String]] == Vector("a", "b", "c", "d"))
     }
   }
 }

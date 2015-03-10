@@ -52,6 +52,12 @@ object SubSelector {
 
 }
 
+@implicitNotFound("Implicit not found: epic.slab.typeclasses.Adder[${L}, ${U}].")
+sealed trait Adder[L <: HList, U] {
+  type Out <: HList
+  def apply(l: L, v: Vector[U]): Out
+}
+
 trait LowPriorityAdderImplicits {
   implicit def foundNoOrdering[T <: HList, U]: Adder.Aux[Vector[U] :: T, U, Vector[U] :: T] =
     new Adder[Vector[U] :: T, U] {
@@ -71,9 +77,6 @@ trait LowPriorityAdderImplicits {
     }
 
 }
-
-@implicitNotFound("Implicit not found: epic.slab.typeclasses.Adder[${L}, ${U}].")
-sealed trait Adder[L <: HList, U] extends DepFn2[L, Vector[U]]
 
 object Adder extends LowPriorityAdderImplicits {
   def apply[L <: HList, U: Ordering](implicit adder: Adder[L, U]): Aux[L, U, adder.Out] = adder
@@ -95,10 +98,42 @@ object Adder extends LowPriorityAdderImplicits {
     }
 }
 
+sealed trait AddMany[L <: HList, SL <: HList] {
+  type Out <: HList
+  def apply(l: L, sl: SL): Out
+}
+
+object AddMany {
+  // L: list to iterate over, SL: list to add into
+  def apply[L <: HList, SL <: HList](implicit addmany: AddMany[L, SL]): Aux[L, SL, addmany.Out] = addmany
+
+  type Aux[L <: HList, SL <: HList, Out0 <: HList] = AddMany[L, SL] { type Out = Out0 }
+
+  // The order of the parameters of addmany and adder is important,
+  // because scalac infers from left to right, and Input is inferred
+  // from the recursion. Thanks to @mandubian for suggesting that.
+  implicit def addMany[SL <: HList, H, Input <: HList, Tail <: HList, Output <: HList]
+    (implicit addmany: Aux[Tail, SL, Input], adder: Adder.Aux[Input, H, Output]): Aux[Vector[H] :: Tail, SL, Output] =
+      new AddMany[Vector[H] :: Tail, SL] {
+        type Out = Output
+        def apply(l: Vector[H] :: Tail, sl: SL): Output = adder(addmany(l.tail, sl), l.head)
+      }
+
+  implicit def eolL[SL <: HList]: Aux[HNil, SL, SL] = new AddMany[HNil, SL] {
+    type Out = SL
+    def apply(l: HNil, sl: SL): SL = sl
+  }
+  implicit def eolSL[L <: HList]: Aux[L, HNil, L] = new AddMany[L, HNil] {
+    type Out = L
+    def apply(l: L, sl: HNil): L = l
+  }
+}
+
 object HOps {
   implicit class Ops[L <: HList](l: L) {
     def subselect[V](implicit subsel: SubSelector[L, V]): V = subsel(l)
     def selectMany[SL <: HList](implicit sm: SelectMany[L, SL]): sm.Out = sm(l)
     def add[U](v: Vector[U])(implicit adder: Adder[L, U]): adder.Out = adder(l, v)
+    def addMany[SL <: HList](sl: SL)(implicit addmany: AddMany[L, SL]): addmany.Out = addmany(l, sl)
   }
 }
