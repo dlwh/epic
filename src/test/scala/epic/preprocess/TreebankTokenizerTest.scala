@@ -88,8 +88,8 @@ class TreebankTokenizerTest  extends FunSuite {
   }
 
   test("negatives") {
-    assert(TreebankTokenizer("-99").toList === List("-99"))
-    assert(TreebankTokenizer("-99.01").toList === List("-99.01"))
+    assert(TreebankTokenizer("-99").toList.map(_.content) === List("-99"))
+    assert(TreebankTokenizer("-99.01").toList.map(_.content) === List("-99.01"))
 
 
   }
