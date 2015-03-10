@@ -2,7 +2,7 @@ import AssemblyKeys._
 import sbtassembly.AssemblyOption
 
 lazy val commonSettings = Seq(
-  scalaVersion := "2.11.4",
+  scalaVersion := "2.11.6",
   organization := "org.scalanlp",
   crossScalaVersions  := Seq("2.11.4", "2.10.4"),
   resolvers ++= Seq(
