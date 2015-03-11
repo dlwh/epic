@@ -93,11 +93,12 @@ or using the ParserSelector. Then, give the parser segmented and
 tokenized text:
 
 ```scala
-val parser = epic.models.deserialize[Parser[AnnotatedLabel, String]](path)
+import epic.parser.Parser.SlabParser
+val parser = SlabParser(epic.models.deserialize[Parser[AnnotatedLabel, String]](path))
 
 // or:
 
-val parser = epic.models.ParserSelector.loadParser("en").get // or another 2 letter code.
+val parser = SlabParser(epic.models.ParserSelector.loadParser("en").get) // or another 2 letter code.
 
 val treeSlabs = slabs.map(parser(_))
 
@@ -110,6 +111,9 @@ for(slab <- treeSlabs) {
 }
 
 ```
+
+The SlabParser is required until I figure out how to help scalac to
+find it.
 
 Trees have a number of methods on them. See the class definition or [API docs](http://www.scalanlp.org/api/epic).
 

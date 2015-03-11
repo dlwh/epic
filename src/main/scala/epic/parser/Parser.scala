@@ -19,7 +19,7 @@ package epic.parser
 import epic.constraints.ChartConstraints
 import epic.lexicon.Lexicon
 import epic.trees._
-import epic.slab.annotators.{TokenParser => SlabParser}
+import epic.slab.annotators.TokenParser
 import epic.slab.{Sentence, Token, Tree => SlabTree}
 
 
@@ -68,7 +68,7 @@ final case class Parser[L,W](topology: RuleTopology[L],
 
 object Parser {
   // converts a Parser into a slabified version.
-  implicit class SlabAnnotator[L](val parser: Parser[L, String]) extends SlabParser[Sentence, Token, L] {
+  implicit class SlabParser[L](val parser: Parser[L, String]) extends TokenParser[Sentence, Token, L] {
     override def apply(body: String, tokens: Vector[Token]): SlabTree[L] = Tree.slabTree(parser(tokens.map(_.substring(body))), tokens)
   }
 

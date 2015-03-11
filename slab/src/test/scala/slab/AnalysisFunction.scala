@@ -12,7 +12,7 @@ import org.scalatest.FunSpec
   * A simple regex tokenizer.
   */
 object RegexTokenizer11 extends AnalysisFunction11[String, Sentence, Token] {
-  def apply(content: String, sentences: Vector[Sentence]): Vector[Token] = {
+  override def apply(content: String, sentences: Vector[Sentence]): Vector[Token] = {
     sentences.flatMap { sentence =>
       "\\p{L}+|\\p{P}+|\\p{N}+".r.findAllMatchIn(
         content.substring(sentence.begin, sentence.end)
@@ -23,17 +23,18 @@ object RegexTokenizer11 extends AnalysisFunction11[String, Sentence, Token] {
   }
 }
 
-// Same again, except using a different interface. The API sucks,
-// needs to be improved.
+// Same again, except using a different interface.
 object RegexTokenizerN1 extends AnalysisFunctionN1[String, Vector[Sentence] :: HNil, Token] {
-  def apply[In <: HList, Out <: HList](slab: Slab[String, In])(implicit sel: SelectMany.Aux[In, Vector[Sentence] :: HNil, Vector[Sentence] :: HNil], adder: Adder.Aux[In, Token, Out]): Slab[String, Out] =
-    slab.add(slab.selectMany[Vector[Sentence] :: HNil](sel).at(0).flatMap { sentence =>
+  override def apply(content: String, in: Vector[Sentence] :: HNil): Vector[Token] :: HNil = {
+    val res = in.select[Vector[Sentence]].flatMap { sentence =>
       "\\p{L}+|\\p{P}+|\\p{N}+".r.findAllMatchIn(
-        slab.content.substring(sentence.begin, sentence.end)
+        content.substring(sentence.begin, sentence.end)
       ).map(
         m => Token(Span(sentence.begin + m.start, sentence.begin + m.end))
-      ).toVector
-    })(adder)
+      )
+    }
+    res.toVector :: HNil
+  }
 }
 
 class SimpleTokenizerTest extends FunSpec {

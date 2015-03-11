@@ -21,7 +21,7 @@ trait SentenceSegmenter[S <: Sentence, I] extends (String => Iterable[Sentence])
   def apply(initialized: I, sentence: String): Iterable[S]
   def strings(document: String): Iterable[String] = {
     val sentences = apply(document)
-    sentences.map(s => document.substring(s.begin, s.end))
+    sentences.map(_.substring(document))
   }
 }
 
@@ -35,7 +35,7 @@ abstract class Tokenizer[S <: Sentence, T <: Token: Offsetter, I] extends Analys
   override def apply(content: String, sentences: Vector[S]): Iterable[T] = {
     val initialized = initialize()
     sentences.map({ sentence => 
-      apply(initialized, content.substring(sentence.span.begin, sentence.span.end))
+      apply(initialized, sentence.substring(content))
         .map(token => implicitly[Offsetter[T]].apply(token, sentence.span.begin))
     }).flatten
   }
@@ -55,18 +55,13 @@ object Tokenizer {
   */
 
 class Annotator[S <: Sentence, T <: Token, Annotated, I](override val initialize: (() => I), val fun: ((I, String, Vector[T]) => Iterable[Annotated])) extends AnalysisFunctionN1[String, Vector[S] :: Vector[T] :: HNil, Annotated] with Initialized[I] {
-  override def apply[In <: HList, Out <: HList]
-    (slab: Slab[String, In])
-    (implicit sel: SelectMany.Aux[In, Vector[S] :: Vector[T] :: HNil, Vector[S] :: Vector[T] :: HNil],
-      adder: Adder.Aux[In, Annotated, Out]
-    ): Slab[String, Out] = {
+  override def apply(content: String, in: Vector[S] :: Vector[T] :: HNil) = {
     val initialized = initialize()
-    val data = slab.selectMany(sel)
-    val index = SpanIndex(data.select[Vector[T]])
-    val annotatedSentences = for(sentence <- data.select[Vector[S]]) yield {
-      fun(initialized, slab.content, index(sentence.span).toVector)
+    val index = SpanIndex(in.select[Vector[T]])
+    val annotatedSentences = for(sentence <- in.select[Vector[S]]) yield {
+      fun(initialized, content, index(sentence.span).toVector)
     }
-    slab.add(annotatedSentences.flatten)(adder)
+    annotatedSentences.flatten :: HNil
   }
 }
 
@@ -87,7 +82,7 @@ class Tagger[S <: Sentence, T <: Token, Tag, I](override val initialize: (() => 
 object Tagger {
   // Merges tag information back into the Vector[Tagged[Tag]] format.
   def tag[T <: Token, Tag, I](fun: (I, Vector[String]) => Iterable[Tag])(initialized: I, content: String, tokens: Vector[T]): Vector[Tagged[Tag]] = {
-    val strings = tokens.map(t => content.substring(t.span.begin, t.span.end))
+    val strings = tokens.map(_.substring(content))
     val tagSeq = fun(initialized, strings)
     tokens.zip(tagSeq).map({case (token, tag) => Tagged[Tag](token.span, tag)}).toVector
   }
@@ -104,17 +99,15 @@ object Tagger {
   */
 
 trait Segmenter[S <: Sentence, T <: Token, Tag, I] extends AnalysisFunctionN1[String, Vector[S] :: Vector[T] :: HNil, Tagged[Tag]] with Initialized[I] {
-  override def apply[In <: HList, Out <: HList](slab: Slab[String, In])(implicit sel:
-      SelectMany.Aux[In, Vector[S] :: Vector[T] :: HNil, Vector[S] :: Vector[T] :: HNil], adder: Adder.Aux[In, Tagged[Tag], Out]): Slab[String, Out] = {
+  override def apply(content: String, in: Vector[S] :: Vector[T] :: HNil): Vector[Tagged[Tag]] :: HNil = {
     val initialized = initialize()
-    val data = slab.selectMany(sel)
-    val index = SpanIndex(data.select[Vector[T]])
-    val annotatedSentences = for(sent <- data.select[Vector[S]]) yield {
-      val strings = index(sent.span).map(t => slab.substring(t)).toVector
+    val index = SpanIndex(in.select[Vector[T]])
+    val annotatedSentences = for(sent <- in.select[Vector[S]]) yield {
+      val strings = index(sent.span).map(_.substring(content)).toVector
       apply(initialized, strings).map(_.offset(sent.begin)).toVector
     }
 
-    slab.add(annotatedSentences.flatten)(adder)
+    annotatedSentences.flatten :: HNil
   }
 
   def apply(initialized: I, sentence: Vector[String]): Iterable[Tagged[Tag]]
@@ -128,19 +121,15 @@ object Segmenter {
 }
 
 trait TokenParser[S <: Sentence, T <: Token, Label, I] extends AnalysisFunctionN1[String, Vector[S] :: Vector[T] :: HNil, Tree[Label]] with Initialized[I] {
-  override def apply[In <: HList, Out <: HList](slab: Slab[String, In])
-    (implicit sel: SelectMany.Aux[In, Vector[S] :: Vector[T] :: HNil, Vector[S] :: Vector[T] :: HNil],
-      adder: Adder.Aux[In, Tree[Label], Out]): Slab[String, Out] = {
+  override def apply(content: String, in: Vector[S] :: Vector[T] :: HNil): Vector[Tree[Label]] :: HNil = {
     // Duplicated from segmenter - refactor?
     val initialized = initialize()
-    val data = slab.selectMany(sel)
-    val index = SpanIndex(data.select[Vector[T]])
-    val annotatedSentences = for(sent <- data.select[Vector[S]]) yield {
+    val index = SpanIndex(in.select[Vector[T]])
+    var annotatedSentences = for(sent <- in.select[Vector[S]]) yield {
       val tokens = index(sent.span).toVector
-      apply(initialized, slab.content, tokens)
+      apply(initialized, content, tokens)
     }
-
-    slab.add(annotatedSentences)(adder)
+    annotatedSentences :: HNil
   }
   def apply(initialized: I, body: String, tokens: Vector[T]): Tree[Label]
 }

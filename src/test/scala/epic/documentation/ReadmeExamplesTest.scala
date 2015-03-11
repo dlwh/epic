@@ -5,6 +5,7 @@ import epic.slab._
 import scalaz.std.list._
 import epic.util.slabutils._
 import epic.trees.AnnotatedLabel
+import epic.parser.Parser.SlabParser
 
 // This file contains all the examples from the readme, making sure
 // they work.
@@ -22,7 +23,7 @@ class ReadmeExamplesTest extends FunSpec {
   it("should run the parser example") {
     val sentenceSegmenter = epic.preprocess.MLSentenceSegmenter.bundled().get
     val tokenizer = epic.preprocess.TreebankTokenizer
-    val parser = epic.models.ParserSelector.loadParser("en").get
+    val parser = SlabParser(epic.models.ParserSelector.loadParser("en").get)
     val slabs = documents.map(Slab(_))
       .map(sentenceSegmenter(_))
       .map(tokenizer(_))

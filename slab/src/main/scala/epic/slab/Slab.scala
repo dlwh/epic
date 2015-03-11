@@ -29,6 +29,9 @@ class Slab[Content, L <: HList](val content: Content, val annotations: L) {
   def add[A, Tmp <: HList, Result <: HList](newAnnotation: A)(implicit adder: Adder.Aux[L, A, Result]): Slab[Content, Result] = {
     new Slab(content, adder(annotations, Vector(newAnnotation)))
   }
+  def add[A <: HList, Tmp <: HList, Result <: HList](newAnnotations: A)(implicit addmany: AddMany.Aux[L, A, Result]): Slab[Content, Result] = {
+    new Slab(content, addmany(annotations, newAnnotations))
+  }
 }
 
 object Slab {
