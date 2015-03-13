@@ -84,6 +84,8 @@ object NonlinearTransform {
       Requ()
     } else if (nonLinType == "cube") {
       Cube()
+    } else if (nonLinType == "const") {
+      Constant()
     } else {
       throw new RuntimeException("Unrecognized nonlin type: " + nonLinType)
     }
@@ -94,6 +96,11 @@ object NonlinearTransform {
     // where we want to zero out particular units
     def fcn(idx: Int, x: Double): Double;
     def deriv(idx: Int, x: Double): Double;
+  }
+  
+  case class Constant() extends NonlinearFcn {
+    def fcn(idx: Int, x: Double) = 1
+    def deriv(idx: Int, x: Double) = 0
   }
   
   case class Mask(val mask: Array[Boolean]) extends NonlinearFcn {
