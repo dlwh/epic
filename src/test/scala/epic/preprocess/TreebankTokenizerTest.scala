@@ -46,7 +46,9 @@ class TreebankTokenizerTest  extends FunSuite {
 
   test("quotes") {
     val sents = Map("\"Hi there\"" -> List("``","Hi","there","''"),
-      "\"Hi there.\"" -> List("``","Hi","there",".","''"))
+      "\"Hi there.\"" -> List("``","Hi","there",".","''"),
+      "Hi there.\"" -> List("Hi","there",".","''")
+    )
     for( (s,toks) <- sents) {
       assert(TreebankTokenizer(s).toList === toks)
     }

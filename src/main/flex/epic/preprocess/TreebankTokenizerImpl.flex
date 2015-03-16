@@ -306,6 +306,8 @@ d{Q} / ye                                                        {return current
 <OPEN_QUOTE>\"                                                 { yybegin(YYINITIAL); return currentToken("''"); }
 “                                                 { yybegin(YYINITIAL); return currentToken("``"); }
 ”                                                 { yybegin(YYINITIAL); return currentToken("''"); }
+\"/.*{ALPHANUM}+                                  { yybegin(OPEN_QUOTE); return currentToken("``"); }
+\"                                                { yybegin(YYINITIAL); return currentToken("''"); }
 
 
 
