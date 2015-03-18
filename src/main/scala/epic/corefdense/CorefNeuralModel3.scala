@@ -16,6 +16,7 @@ import epic.dense.AffineOutputTransform
 
 class CorefNeuralModel3(val sparseFeaturizer: PairwiseIndexingFeaturizer,
                         val transform: AffineOutputTransform[Array[Int]],
+                        val maybeDiscourseNewTransform: Option[AffineOutputTransform[Array[Int]]],
                         val word2vec: Word2VecIndexed[String],
                         val lossFcn: (CorefDoc, Int, Int) => Float,
                         val surfaceFeats: String = "") extends CorefPredictor {
@@ -31,9 +32,11 @@ class CorefNeuralModel3(val sparseFeaturizer: PairwiseIndexingFeaturizer,
 //  val cachedVectors = new Array[DenseVector[Double]](MaxSize)
 //  val cachedActivations = new Array[DenseVector[Double]](MaxSize)
   
-  def getInitialWeights(initialWeightsScale: Double) = transform.initialWeightVector(initialWeightsScale, rng, true, "").data ++ Array.tabulate(sparseIndexer.size)(i => 0.0)
-  
-  def vectorSize = 5 * word2vec.wordRepSize
+  def getInitialWeights(initialWeightsScale: Double) = {
+    transform.initialWeightVector(initialWeightsScale, rng, true, "").data ++
+    (if (maybeDiscourseNewTransform.isDefined) maybeDiscourseNewTransform.get.initialWeightVector(initialWeightsScale, rng, true, "").data else Array[Double]()) ++
+    Array.tabulate(sparseIndexer.size)(i => 0.0)
+  }
   
   private def getWordIndicators(ment: Mention) = {
     CorefNeuralModel.extractRelevantMentionWords(ment, surfaceFeats).map(str => word2vec.indexWord(str))
@@ -41,6 +44,10 @@ class CorefNeuralModel3(val sparseFeaturizer: PairwiseIndexingFeaturizer,
   
   private def formVector(docGraph: DocumentGraph, mentIdx: Int, antIdx: Int) = {
     cachedWordVectors(mentIdx) ++ cachedWordVectors(antIdx)
+  }
+  
+  private def formDiscourseNewVector(docGraph: DocumentGraph, mentIdx: Int) = {
+    cachedWordVectors(mentIdx)
   }
   
 //  private def cacheActivations(ex: DocumentGraph, layer: AffineTransform[DenseVector[Double],DenseVector[Double]]#Layer) {
@@ -51,28 +58,32 @@ class CorefNeuralModel3(val sparseFeaturizer: PairwiseIndexingFeaturizer,
 //    }
 //  }
   
+  private def sparseFeatsOffset = transform.index.size + (if (maybeDiscourseNewTransform.isDefined) maybeDiscourseNewTransform.get.index.size else 0)
+  
+  private def extractLayers(weights: Array[Double]) = {
+    val layer = transform.extractLayer(DenseVector(weights)(0 until transform.index.size), true)
+    val maybeDiscourseNewLayer = maybeDiscourseNewTransform.map(_.extractLayer(DenseVector(weights)(transform.index.size until transform.index.size + maybeDiscourseNewTransform.get.index.size), true))
+    (layer, maybeDiscourseNewLayer)
+  }
+  
   def computeCacheLogProbs(input: DocumentGraph,
                            weights: Array[Double],
                            layer: AffineOutputTransform[Array[Int]]#OutputLayer,
+                           maybeDiscourseNewLayer: Option[AffineOutputTransform[Array[Int]]#OutputLayer],
                            lossAugment: Boolean) {
     val featsChart = input.featurizeIndexNonPrunedUseCache(sparseFeaturizer)
+    val featsOffset = 
     for (mentIdx <- 0 until input.size) {
       cachedWordVectors(mentIdx) = getWordIndicators(input.getMention(mentIdx))
       val scores = input.cachedScoreMatrix(mentIdx)
       for (antIdx <- 0 to mentIdx) {
         if (!input.isPruned(mentIdx, antIdx)) {
-          val sparseScore = DeepUtils.dotProductOffset(featsChart(mentIdx)(antIdx), weights, transform.index.size)
+          val sparseScore = DeepUtils.dotProductOffset(featsChart(mentIdx)(antIdx), weights, sparseFeatsOffset)
           val denseScore = if (antIdx == mentIdx) {
-            // Right now do nothing, could have a separate NN for this task
-            0.0F
+            if (maybeDiscourseNewLayer.isDefined) maybeDiscourseNewLayer.get.activations(formDiscourseNewVector(input, mentIdx))(0) else 0.0F
           } else {
-            // Score the antecedent choice
             layer.activations(formVector(input, mentIdx, antIdx))(0)
-//            cachedActivations(mentIdx).dot(cachedVectors(antIdx))
           }
-//          if (!lossAugment) {
-//            Logger.logss(denseScore + " " + sparseScore)
-//          }
           scores(antIdx) = (denseScore + sparseScore + (if (lossAugment) lossFcn(input.corefDoc, mentIdx, antIdx) else 0.0)).toFloat
         } else {
           scores(antIdx) = Float.NegativeInfinity
@@ -83,8 +94,10 @@ class CorefNeuralModel3(val sparseFeaturizer: PairwiseIndexingFeaturizer,
   
   def accumulateGradientAndComputeObjective(input: DocumentGraph, weights: Array[Double], gradient: Array[Double]): Double = {
     require(input.size < MaxSize)
-    val layer = transform.extractLayer(DenseVector(weights), true)
-    computeCacheLogProbs(input, weights, layer, true)
+    val (layer, maybeDiscourseNewLayer) = extractLayers(weights)
+//    val layer = transform.extractLayer(DenseVector(weights)(0 until transform.index.size), true)
+//    val maybeDiscourseNewLayer = maybeDiscourseNewTransform.map(_.extractLayer(DenseVector(weights)(transform.index.size until transform.index.size + maybeDiscourseNewTransform.get.index.size), true))
+    computeCacheLogProbs(input, weights, layer, maybeDiscourseNewLayer, true)
     val featsChart = input.featurizeIndexNonPrunedUseCache(sparseFeaturizer)
     var ll = 0.0
     for (mentIdx <- 0 until input.size) {
@@ -104,16 +117,17 @@ class CorefNeuralModel3(val sparseFeaturizer: PairwiseIndexingFeaturizer,
       }
       ll += goldNormalizer - allNormalizer;
       antIdx =  0
-      val partialsVec = DenseVector.zeros[Double](vectorSize)
       while (antIdx <= mentIdx) {
         if (!input.isPruned(mentIdx, antIdx)) {
           // Update sparse features
           val isGold = goldAnts.contains(antIdx)
           val delta = (if (isGold) Math.exp(scores(antIdx) - goldNormalizer) else 0) - Math.exp(scores(antIdx) - allNormalizer) 
-          DeepUtils.addToGradient(featsChart(mentIdx)(antIdx), delta, gradient, transform.index.size);
+          DeepUtils.addToGradient(featsChart(mentIdx)(antIdx), delta, gradient, sparseFeatsOffset);
           // Update the partials vector for dense features
           if (antIdx != mentIdx) {
-            layer.tallyDerivative(DenseVector(gradient), DenseVector(Array(delta)), formVector(input, mentIdx, antIdx))
+            layer.tallyDerivative(DenseVector(gradient)(0 until transform.index.size), DenseVector(Array(delta)), formVector(input, mentIdx, antIdx))
+          } else {
+            if (maybeDiscourseNewLayer.isDefined) maybeDiscourseNewLayer.get.tallyDerivative(DenseVector(gradient)(transform.index.size until transform.index.size + maybeDiscourseNewTransform.get.index.size), DenseVector(Array(delta)), formDiscourseNewVector(input, mentIdx))
           }
         }
         antIdx += 1
@@ -124,8 +138,10 @@ class CorefNeuralModel3(val sparseFeaturizer: PairwiseIndexingFeaturizer,
   
   def predict(input: DocumentGraph, weights: Array[Double]) = {
     require(input.size < MaxSize)
-    val layer = transform.extractLayer(DenseVector(weights), false)
-    computeCacheLogProbs(input, weights, layer, false)
+//    val layer = transform.extractLayer(DenseVector(weights), false)
+//    val maybeDiscourseNewLayer = maybeDiscourseNewTransform.map(_.extractLayer(DenseVector(weights), true))
+    val (layer, maybeDiscourseNewLayer) = extractLayers(weights)
+    computeCacheLogProbs(input, weights, layer, maybeDiscourseNewLayer, false)
     (0 until input.size).toArray.map(mentIdx => {
       val scores = input.cachedScoreMatrix(mentIdx)
       CorefNNEpic.argMaxIdxFloat(scores)
@@ -139,20 +155,4 @@ class CorefNeuralModel3(val sparseFeaturizer: PairwiseIndexingFeaturizer,
   }
   
   def computeObjective(ex: DocumentGraph, weights: Array[Double]): Double = accumulateGradientAndComputeObjective(ex, weights, Array.tabulate(weights.size)(i => 0.0))
-}
-
-object CorefNeuralModel3 {
-  
-  def extractRelevantMentionWords(ment: Mention, antecedent: Mention) = {
-    Array(antecedent.contextWordOrPlaceholder(-1),
-          antecedent.contextWordOrPlaceholder(0),
-          antecedent.contextWordOrPlaceholder(ment.headIdx- ment.startIdx),
-          antecedent.contextWordOrPlaceholder(ment.endIdx - 1 - ment.startIdx),
-          antecedent.contextWordOrPlaceholder(ment.endIdx - ment.startIdx),
-          ment.contextWordOrPlaceholder(-1),
-          ment.contextWordOrPlaceholder(0),
-          ment.contextWordOrPlaceholder(ment.headIdx- ment.startIdx),
-          ment.contextWordOrPlaceholder(ment.endIdx - 1 - ment.startIdx),
-          ment.contextWordOrPlaceholder(ment.endIdx - ment.startIdx))
-  }
 }

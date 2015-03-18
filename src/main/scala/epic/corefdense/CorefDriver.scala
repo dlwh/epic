@@ -66,13 +66,13 @@ object CorefDriver {
   val conllEvalScriptPath = "scorer/v7/scorer.pl"
   val word2vecPath = ""
   
+  val useDiscourseNewTransform: Boolean = false;
   val backpropIntoEmbeddings: Boolean = false;
   val hiddenSize = 100
   val nonLinear = true;
   val nonLinType = "relu"
   val dropoutRate = 0.0
   val surfaceFeats = ""
-  
   
   val trainPath = "";
   val trainSize = -1;
@@ -154,6 +154,7 @@ object CorefDriver {
       
       // TODO: Make CorefNeuralModel3
     val vecSize = word2vecIndexed.wordRepSize * CorefNeuralModel.extractRelevantMentionWords(trainDocGraphs.head.getMention(0)).size * 2
+    val discourseNewVecSize = word2vecIndexed.wordRepSize * CorefNeuralModel.extractRelevantMentionWords(trainDocGraphs.head.getMention(0)).size
 //      Logger.logss("Net size: " + vecSize + " x " + hiddenSize + " x " + vecSize)
 //      val transform = if (nonLinear) {
 //        new AffineTransform(1, hiddenSize, new TanhTransform(new AffineTransform(hiddenSize, vecSize, new IdentityTransform[DenseVector[Double]]())))
@@ -162,11 +163,13 @@ object CorefDriver {
 //      }
 //      Logger.logss("Transform index size: " + transform.index.size)
     val transform = PositionalNeuralModelFactory.buildNet(word2vecIndexed, vecSize, hiddenSize, 1, 1, nonLinType, dropoutRate, backpropIntoEmbeddings, batchNormalization = false)
-    val corefNeuralModel = new CorefNeuralModel3(featurizer, transform, word2vecIndexed, lossFcnObj)
+    val dnTransform = if (useDiscourseNewTransform) Some(PositionalNeuralModelFactory.buildNet(word2vecIndexed, discourseNewVecSize, hiddenSize, 1, 1, nonLinType, dropoutRate, backpropIntoEmbeddings, batchNormalization = false)) else None
+    val corefNeuralModel = new CorefNeuralModel3(featurizer, transform, dnTransform, word2vecIndexed, lossFcnObj)
     new CorefFeaturizerTrainer().featurizeBasic(trainDocGraphs, featurizer)
     
     
     val initialWeights = corefNeuralModel.getInitialWeights(initWeightsScale);
+    Logger.logss(initialWeights.size + " weights in the model")
 //    val numItrs = 100
     
     if (checkEmpiricalGradient) {
