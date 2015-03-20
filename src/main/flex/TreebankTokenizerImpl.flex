@@ -43,7 +43,7 @@ package epic.preprocess;
 */
 %class TreebankTokenizerImpl
 %unicode
-%type scala.Tuple2<epic.trees.Span, epic.slab.Token>
+%type epic.slab.ContentToken
 %function getNextToken
 %pack
 %char
@@ -57,12 +57,12 @@ public final int yychar()
     return yychar;
 }
 
-final  scala.Tuple2<epic.trees.Span, epic.slab.Token> currentToken() {
+final epic.slab.ContentToken currentToken() {
     return currentToken(new String(zzBuffer, zzStartRead, zzMarkedPos-zzStartRead).replace('’', '\'').replace('¨','\u0308').replaceAll("-[\n\r]+",""));
 }
-final scala.Tuple2<epic.trees.Span, epic.slab.Token> currentToken(String value) {
+final epic.slab.ContentToken currentToken(String value) {
 //  return new String(zzBuffer, zzStartRead, zzMarkedPos-zzStartRead);
-  return new scala.Tuple2(new epic.trees.Span(epic.trees.Span.apply(yychar(), yychar() + zzMarkedPos - zzStartRead)), new epic.slab.Token(value));
+  return new epic.slab.ContentToken(epic.slab.Span.apply(yychar(), yychar() + value.length()), value);
 }
 
 
@@ -71,7 +71,7 @@ final scala.Tuple2<epic.trees.Span, epic.slab.Token> currentToken(String value) 
 %eofval{
   if(yychar() == acro_period) {
       acro_period = -2;
-  return new scala.Tuple2(new epic.trees.Span(epic.trees.Span.apply(yychar() - 1, yychar())), new epic.slab.Token("."));
+  return new epic.slab.ContentToken(epic.slab.Span.apply(yychar(), yychar() + 1), ".");
   } else {
     return null;
   }
@@ -283,7 +283,7 @@ Got / ta                                                      {return currentTok
 
 // contractions and other clitics
 {INIT_CLITIC}                                           {return currentToken();}
-<CLITIC_MODE>{CLITIC}                                          {yybegin(YYINITIAL); return currentToken(currentToken()._2().token().replaceAll("’", "'"));}
+<CLITIC_MODE>{CLITIC}                                          {yybegin(YYINITIAL); return currentToken(currentToken().content().replaceAll("’", "'"));}
 // make sure the clitic is at the end of the word
 {WORD} / {CLITIC}                                        {yybegin(CLITIC_MODE); return currentToken();}
 d{Q} / ye                                                        {return currentToken(); }
@@ -296,7 +296,7 @@ d{Q} / ye                                                        {return current
 {ALPHANUM}{ALPHANUM}+[ł][aeoiy]? / {POLISH_PAST_ENDING_2}                    {return currentToken(); }
 
 // times
-[01]?[0-9]{WHITESPACE}?:[0-6][0-9]                              { return currentToken(currentToken()._2().token().replaceAll("\\s+","")); }
+[01]?[0-9]{WHITESPACE}?:[0-6][0-9]                              { return currentToken(currentToken().content().replaceAll("\\s+","")); }
 
 // quotes
 <YYINITIAL>\"/{WHITESPACE}*{ALPHANUM}              { yybegin(OPEN_QUOTE); return currentToken("``"); }

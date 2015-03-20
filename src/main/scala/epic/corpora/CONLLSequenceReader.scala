@@ -1,6 +1,6 @@
 package epic.corpora
 
-import io.Source
+import scala.io.Source
 import collection.mutable.ArrayBuffer
 import nak.data.{Observation, Example}
 import java.io.{File, FileInputStream, InputStream}

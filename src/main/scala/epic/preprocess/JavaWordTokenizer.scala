@@ -18,9 +18,9 @@ package epic.preprocess
 
 import java.text._
 import java.util.Locale
+import epic.trees.Span
 import epic.slab._
-import epic.slab.Token
-import epic.slab.Sentence
+import epic.slab.annotators.Tokenizer
 
 
 /**
@@ -31,19 +31,21 @@ import epic.slab.Sentence
  * @author dlwh
  */
 
-class JavaWordTokenizer(locale: Locale) extends Tokenizer {
+class JavaWordTokenizer[S <: Sentence](locale: Locale) extends Tokenizer[S, Token] {
   def this() = this(Locale.getDefault)
 
-
-  override def apply[In <: Sentence](slab: StringSlab[In]): StringSlab[In with Token] = {
-    slab.addLayer[Token](slab.iterator[Sentence].flatMap { s =>
+  def apply(content: String, sentences: Vector[Sentence]): Vector[ContentToken] = {
+    sentences.flatMap { s =>
       val breaker = BreakIterator.getWordInstance(locale)
-      breaker.setText(slab.content)
-      new SegmentingIterator(breaker, s._1.begin, s._1.end).map { span =>
-        span -> Token(slab.spanned(span))
-      }.filterNot(_._2.token.forall(_.isWhitespace))
-    })
+      breaker.setText(content)
+      new SegmentingIterator(breaker, s.begin, s.end).map { span =>
+        ContentToken(span, content.substring(span.begin, span.end))
+      }.filterNot(_.content.forall(_.isWhitespace))
+    }
   }
+
+  def apply(sentence: String): Vector[ContentToken] =
+    apply(sentence, Vector(Sentence(Span(0, sentence.length))))
 }
 
 object JavaWordTokenizer extends JavaWordTokenizer

@@ -9,7 +9,7 @@ import java.net.URL
  * @author dlwh
  **/
 package object preprocess {
-  def tokenize(sentence: String): IndexedSeq[String] = TreebankTokenizer(sentence)
+  def tokenize(sentence: String): IndexedSeq[String] = TreebankTokenizer(sentence).map(t => sentence.substring(t.begin, t.end))
 
   def loadContent(url: URL):String = TextExtractor.extractText(url)
   
@@ -18,7 +18,7 @@ package object preprocess {
   }
 
   def preprocess(text: String): IndexedSeq[IndexedSeq[String]] = {
-    _seg(text).map(tokenize)
+    _seg.strings(text).map(tokenize).toVector
   }
 
   def preprocess(file: File): IndexedSeq[IndexedSeq[String]] = {

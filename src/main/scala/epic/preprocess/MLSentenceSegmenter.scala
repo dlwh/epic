@@ -4,15 +4,21 @@ import java.io._
 import java.util.zip.GZIPInputStream
 
 import breeze.features.FeatureVector
+
+import epic.slab._
+import epic.slab.annotators.SentenceSegmenter
+import scalaz.std.list._
 import breeze.linalg._
 import breeze.numerics._
+
+import breeze.features.FeatureVector
 import breeze.optimize.L2Regularization
 import breeze.stats.distributions.{RandBasis, Rand}
 import breeze.util.{Encoder, Index, Iterators}
 import epic.corpora.MascSlab
 import epic.features.CrossProductFeature
 import epic.framework.{Feature, ModelObjective, StandardExpectedCounts}
-import epic.slab.{Sentence, StringSlab}
+import epic.slab._
 import epic.trees.Span
 import nak.data.Example
 
@@ -20,30 +26,27 @@ import scala.collection.mutable.ArrayBuffer
 import scala.io.Source
 
 @SerialVersionUID(1L)
-class MLSentenceSegmenter(inf: MLSentenceSegmenter.ClassificationInference) extends SentenceSegmenter with Serializable {
-  override def apply[In](slab: StringSlab[In]): StringSlab[In with Sentence] = {
-    val text = slab.content
+class MLSentenceSegmenter(inf: MLSentenceSegmenter.ClassificationInference) extends SentenceSegmenter[Sentence] with Serializable {
+  def apply(text: String): IndexedSeq[Sentence] = {
     val iter = MLSentenceSegmenter.potentialSentenceBoundariesIterator(text)
     var lastOffset = 0
-    slab.addLayer[Sentence](
-      Iterators.fromProducer {
-        def rec():Option[(Span, Sentence)] = {
-          if(iter.hasNext) {
-            val pos = iter.next()
-            if(!iter.hasNext || inf.classify(MLSentenceSegmenter.featuresForEndPointDetection(text, pos))) {
-              val res = Some(Span(lastOffset, math.min(pos + 1, text.length)) -> Sentence())
-              lastOffset = pos + 1
-              res
-            } else {
-              rec()
-            }
+    Iterators.fromProducer {
+      def rec():Option[Sentence] = {
+        if(iter.hasNext) {
+          val pos = iter.next()
+          if(!iter.hasNext || inf.classify(MLSentenceSegmenter.featuresForEndPointDetection(text, pos))) {
+            val res = Some(Sentence(Span(lastOffset, math.min(pos + 1, text.length))))
+            lastOffset = pos + 1
+            res
           } else {
-            None
+            rec()
           }
+        } else {
+          None
         }
-        rec()
-      }.filterNot(s => text.substring(s._1.begin, s._1.end).forall(_.isWhitespace))
-    )
+      }
+      rec()
+    }.filterNot(s => text.substring(s.begin, s.end).forall(_.isWhitespace)).toVector
 
   }
   override def toString = "MLSentenceSegmenter(...)"
@@ -384,7 +387,7 @@ object MLSentenceSegmenter {
       val guessPoints: IndexedSeq[Int] = potentialSentenceBoundariesIterator(slabWithSentences.content).toIndexedSeq
 
       val text = slab.content
-      val goldPoints = adjustGoldSentenceBoundaries(text, slabWithSentences.iterator[Sentence].map(_._1))
+      val goldPoints = adjustGoldSentenceBoundaries(text, slabWithSentences.select[Sentence].map(_.span).toIterator)
 
 //      println("<<<<" + f  )
 //      printOutSentenceBoundaries(text, guessPoints.toSet, goldPoints)

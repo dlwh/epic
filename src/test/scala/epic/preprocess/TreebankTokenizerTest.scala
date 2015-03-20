@@ -1,16 +1,21 @@
 package epic.preprocess
 
 import org.scalatest.FunSuite
+import epic.slab._
+import epic.trees.Span
+import scalaz.std.list._
 
 class TreebankTokenizerTest  extends FunSuite {
 
   private def isOneToken(w: String) =
-    if(w === TreebankTokenizer(w).head) None else Some(w + " " +  TreebankTokenizer(w))
+    if(w === TreebankTokenizer(w).head.content) None else Some(w + " " +  TreebankTokenizer(w))
 
   test("simple words") {
     val words = List("Hi","there","pilgrim","happy","Thanksgiving","there")
     for(w <- words) {
-      assert(isOneToken(w))
+      val parsed = TreebankTokenizer(w).head
+      assert(w == parsed.content)
+      assert(Token(Span(0, w.length)) == parsed)
     }
   }
 
@@ -29,7 +34,7 @@ class TreebankTokenizerTest  extends FunSuite {
     )
 
     for( (s,t) <- special) {
-      assert(TreebankTokenizer(s).toList === List(t))
+      assert(TreebankTokenizer(s).toList.map(_.content) === List(t))
     }
   }
 
@@ -40,7 +45,7 @@ class TreebankTokenizerTest  extends FunSuite {
       "Hi there, (pilgrim); happy Thanksgiving there, pilgrim!" -> List("Hi","there",",","(", "pilgrim", ")", ";","happy","Thanksgiving","there",",","pilgrim","!")
     )
     for( (s,toks) <- sents) {
-      assert(TreebankTokenizer(s).toList === toks)
+      assert(TreebankTokenizer(s).toList.map(_.content) === toks)
     }
   }
 
@@ -48,7 +53,7 @@ class TreebankTokenizerTest  extends FunSuite {
     val sents = Map("\"Hi there\"" -> List("``","Hi","there","''"),
       "\"Hi there.\"" -> List("``","Hi","there",".","''"))
     for( (s,toks) <- sents) {
-      assert(TreebankTokenizer(s).toList === toks)
+      assert(TreebankTokenizer(s).toList.map(_.content) === toks)
     }
   }
 
@@ -72,31 +77,31 @@ class TreebankTokenizerTest  extends FunSuite {
     "o'clock"->List("o'clock")
     )
     for( (s,toks) <- sents) {
-      assert(TreebankTokenizer(s).toList === toks)
+      assert(TreebankTokenizer(s).toList.map(_.content) === toks)
     }
   }
 
   test("moneys") {
-    assert(TreebankTokenizer("99").toList === List("99"))
-    assert(TreebankTokenizer("$99").toList === List("$","99"))
-    assert(TreebankTokenizer("$99.33").toList === List("$","99.33"))
+    assert(TreebankTokenizer("99").toList.map(_.content) === List("99"))
+    assert(TreebankTokenizer("$99").toList.map(_.content) === List("$","99"))
+    assert(TreebankTokenizer("$99.33").toList.map(_.content) === List("$","99.33"))
   }
 
   test("negatives") {
-    assert(TreebankTokenizer("-99").toList === List("-99"))
-    assert(TreebankTokenizer("-99.01").toList === List("-99.01"))
+    assert(TreebankTokenizer("-99").toList.map(_.content) === List("-99"))
+    assert(TreebankTokenizer("-99.01").toList.map(_.content) === List("-99.01"))
 
 
   }
 
   test("dates + comma") {
-    assert(TreebankTokenizer("13,").toList === List("13", ","))
-    assert(TreebankTokenizer("December 06,").toList === List("December","06",","))
-    assert(TreebankTokenizer("arunrob@gmail.com  October 13, 2010 at 12:39 PM").toList === List("arunrob@gmail.com", "October","13",",", "2010", "at", "12:39", "PM"))
+    assert(TreebankTokenizer("13,").toList.map(_.content) === List("13", ","))
+    assert(TreebankTokenizer("December 06,").toList.map(_.content) === List("December","06",","))
+    assert(TreebankTokenizer("arunrob@gmail.com  October 13, 2010 at 12:39 PM").toList.map(_.content) === List("arunrob@gmail.com", "October","13",",", "2010", "at", "12:39", "PM"))
   }
 
   test("'sam i am'") {
-    assert(TreebankTokenizer("'sam i am'").toList === List("`", "sam", "i", "am", "'"))
+    assert(TreebankTokenizer("'sam i am'").toList.map(_.content) === List("`", "sam", "i", "am", "'"))
   }
 
 
@@ -115,7 +120,7 @@ class TreebankTokenizerTest  extends FunSuite {
       //        "Whatcha"->List("Wha","t","cha")
     )
     for( (s,toks) <- words) {
-      assert(TreebankTokenizer(s).toList === toks)
+      assert(TreebankTokenizer(s).toList.map(_.content) === toks)
     }
 
   }
@@ -123,20 +128,20 @@ class TreebankTokenizerTest  extends FunSuite {
   test("acronyms") {
     val candidates = Seq("U.S.","u.s.","p.s.")
     for(s <- candidates) {
-      assert(TreebankTokenizer(s).toList === List(s,"."))
+      assert(TreebankTokenizer(s).toList.map(_.content) === List(s,"."))
     }
   }
 
   test("URLs") {
     val text = "Go to http://google.com/ now!"
-    assert(TreebankTokenizer(text).toList === List("Go", "to", "http://google.com/", "now", "!"))
+    assert(TreebankTokenizer(text).toList.map(_.content) === List("Go", "to", "http://google.com/", "now", "!"))
   }
 
   test("polish clitics") {
     val text = Seq("Osobiście radziłabym panu iść do domu", "Opłaciłam telefon", "własnym", "Załamała", "gdy wsiadałam do pociągu .", "temu moglibyśmy")
     val tok = Seq("Osobiście radziła by m panu iść do domu", "Opłaciła m telefon", "własnym", "Załamała", "gdy wsiadała m do pociągu .", "temu mogli by śmy")
     for( (txt,tk) <- text zip tok) {
-      assert(TreebankTokenizer(txt).toList === tk.split(" ").toList)
+      assert(TreebankTokenizer(txt).toList.map(_.content) === tk.split(" ").toList)
     }
   }
 
@@ -147,13 +152,13 @@ class TreebankTokenizerTest  extends FunSuite {
 
 
   test("emails") {
-    assert(TreebankTokenizer("Email asdf@asdf.com.").toList === List("Email", "asdf@asdf.com", "."))
+    assert(TreebankTokenizer("Email asdf@asdf.com.").toList.map(_.content) === List("Email", "asdf@asdf.com", "."))
   }
 
 
   test("tweets") {
     for( (text, toks) <- tweets zip tweet_tokens) {
-      assert(TreebankTokenizer(text).toList === toks.toList)
+      assert(TreebankTokenizer(text).toList.map(_.content) === toks.toList)
     }
   }
 
@@ -374,7 +379,7 @@ class TreebankTokenizerTest  extends FunSuite {
 
   test("Gettysburg address") {
     val text = """But, in a larger sense, we can not dedicate -- we can not consecrate -- we can not hallow -- this ground."""
-    val words = TreebankTokenizer(text).toSeq
+    val words = TreebankTokenizer(text).toSeq.map(_.content)
     assert(words.length === 25, words)
     assert(words.startsWith(Seq("But", ",", "in", "a", "larger", "sense", ",", "we", "can", "not", "dedicate", "--")), words)
   }

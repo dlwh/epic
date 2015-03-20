@@ -39,7 +39,7 @@ class TagDictionaryFeaturizer[L](counts: Counter2[L, String, Double], commonWord
     if(w(0).isUpper) {
       val lowerCount = sum(counts(::, w.toLowerCase))
       if(lowerCount != 0.0) {
-        arr += HasKnownLowerCaseVariant(counts(::, w.toLowerCase).argmax)
+        arr += HasKnownLowerCaseVariant(argmax(counts(::, w.toLowerCase)))
       }
     }
 
@@ -48,7 +48,7 @@ class TagDictionaryFeaturizer[L](counts: Counter2[L, String, Double], commonWord
       val afterDash = w.substring(dashIndex)
       val undashedCount = sum(counts(::, afterDash))
       if(undashedCount != 0.0) {
-        arr += HasKnownAfterDashSuffix(counts(::, afterDash).argmax)
+        arr += HasKnownAfterDashSuffix(argmax(counts(::, afterDash)))
       }
     }
     arr.result()

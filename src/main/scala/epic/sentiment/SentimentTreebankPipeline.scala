@@ -296,7 +296,7 @@ object SentimentTreebankPipeline extends LazyLogging {
           AnnotatedLabel("2")
         }
       } else {
-        summed.argmax
+        argmax(summed)
       }
     }
   }

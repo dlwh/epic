@@ -3,19 +3,21 @@ package epic.preprocess
 import java.io.{Reader, InputStream}
 import breeze.util.Iterators
 import java.nio.channels.Channels
+import epic.slab.annotators.SentenceSegmenter
+import epic.slab.Sentence
 
 /**
  * TODO
  *
  * @author dlwh
  **/
-class StreamSentenceSegmenter(val baseSegmenter: SentenceSegmenter) {
+class StreamSentenceSegmenter(val baseSegmenter: SentenceSegmenter[Sentence]) {
 
   def sentences(stream: InputStream):Iterator[String] = {
     // addendum maintains the characters that we haven't read.
     var addendum = ""
     val pieces = chunkInput(stream).flatMap { (s: String) =>
-      val sentences = baseSegmenter(addendum + s).toIndexedSeq
+      val sentences = baseSegmenter.strings(addendum + s).toIndexedSeq
       addendum = sentences.last
       sentences.view.slice(0, sentences.length - 1)
     }

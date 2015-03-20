@@ -15,6 +15,8 @@ import org.apache.tika.parser.{ParseContext, Parser}
 import org.apache.tika.sax.ToTextContentHandler
 import org.xml.sax._
 
+import shapeless._
+
 /**
  * Just a simple thing for me to learn Tika
  *
@@ -126,7 +128,7 @@ object TextExtractor {
 
     val content = textHandler.toString.trim
 
-    Slab(content).addLayer(Span(0, content.length) -> epic.slab.Source(url))
+    Slab(content, Vector(epic.slab.Source(url)) :: HNil)
   }
 
 

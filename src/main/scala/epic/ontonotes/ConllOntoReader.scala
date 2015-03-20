@@ -15,6 +15,7 @@ package epic.ontonotes
  See the License for the specific language governing permissions and
  limitations under the License.
 */
+import java.lang.String
 import java.io.File
 import java.nio.charset.MalformedInputException
 

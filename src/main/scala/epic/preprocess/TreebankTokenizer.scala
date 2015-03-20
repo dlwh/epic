@@ -3,43 +3,36 @@ package epic.preprocess
 import java.io.{File, FilenameFilter, StringReader}
 
 import breeze.util.Iterators
-import epic.corpora.MascSlab
+import epic.corpora.{MascSlab, Segment}
 import epic.slab._
+import epic.slab.annotators.Tokenizer
 import epic.trees.Span
+import scalaz.std.list._
 
 import scala.collection.mutable.ArrayBuffer
 
 @SerialVersionUID(1L)
-class TreebankTokenizer() extends Tokenizer with Serializable {
-
-  override def apply[In <: Sentence](slab: StringSlab[In]): StringSlab[In with Token] = {
-    slab.addLayer[Token](slab.iterator[Sentence].flatMap { s =>
-      val content = slab.spanned(s._1)
-      val impl = new TreebankTokenizerImpl(new StringReader(content))
-      Iterators.fromProducer{
-        try {
-          Option(impl.getNextToken()).map { case (region, token) =>
-            val res = Span(region.begin + s._1.begin, region.end + s._1.begin) -> token
-            res
-          }
-        } catch {
-          case e: Throwable => throw new RuntimeException("Could not tokenize " + s, e)
-        }
+class TreebankTokenizer[S <: Sentence]() extends Tokenizer[S, ContentToken] with Serializable {
+  def apply(sentence: String): Vector[ContentToken] = {
+    val impl = new TreebankTokenizerImpl(new StringReader(sentence))
+    Iterators.fromProducer{
+      try {
+        Option(impl.getNextToken())
+      } catch {
+        case e: Throwable => throw new RuntimeException("Could not tokenize " + sentence, e)
       }
-    })
+    }.toVector
   }
-
-
 }
 
-object TreebankTokenizer extends TreebankTokenizer {
+object TreebankTokenizer extends TreebankTokenizer[Sentence] {
   def treebankTokenToToken(s: String): String = reverseTreebankMappings.getOrElse(s, s)
 
   private val treebankMappings = Map("(" -> "-LRB-", ")" -> "-RRB-", "{" -> "-LCB-", "}" -> "-RCB-", "[" -> "-LSB-", "]" -> "-RSB-")
   private val reverseTreebankMappings = treebankMappings.map(_.swap)
 
   /** Replaces symbols like ( with their penn treebank equivalent */
-  def tokensToTreebankTokens(toks: Seq[String]): IndexedSeq[String] = {
+  def tokensToTreebankTokens(toks: IndexedSeq[String]): IndexedSeq[String] = {
     // have to deal with quotes, so we can't just use map.
     val output =  new ArrayBuffer[String]()
 
@@ -62,17 +55,17 @@ object TreebankTokenizer extends TreebankTokenizer {
   def main(args: Array[String]) = {
     val mascDir = new java.io.File(args(0))
     val comps = for(dir <- new File(new File(mascDir,"data"), "written").listFiles();
-                                       f <- dir.listFiles(new FilenameFilter {
-                                         override def accept(dir: File, name: String): Boolean = name.endsWith(".txt")
-                                       })) yield {
-      val slab: StringSlab[Source] = MascSlab(f.toURI.toURL)
-      val slabWithSentences: Slab[String, Span, Source with Sentence] = MascSlab.s[Source](slab)
+                    f <- dir.listFiles(new FilenameFilter {
+                      override def accept(dir: File, name: String): Boolean = name.endsWith(".txt")
+                    })) yield {
+      val slab = MascSlab(f.toURI.toURL)
+      val slabWithSentences = MascSlab.s(slab)
       val slabWithTokens = MascSlab.seg(slabWithSentences)
-      slabWithTokens.iterator[Sentence].map{sent =>
-        val gold = slabWithTokens.covered[Segment](sent._1).map { case (span, tok) => slab.spanned(span)}
-        val guess = TreebankTokenizer(slab.spanned(sent._1))
+      slabWithTokens.select[Sentence].map{sent =>
+        val gold = slabWithTokens.covered[Segment](sent.span).toIndexedSeq.map { token => slab.substring(token.span)}
+        val guess = TreebankTokenizer(slab.substring(sent.span))
 
-        (gold, guess, slab.spanned(sent._1))
+        (gold, guess, slab.substring(sent.span))
       }
     }
 

@@ -14,10 +14,9 @@ package epic.trees
  See the License for the specific language governing permissions and
  limitations under the License.
 */
-import java.io._
 import java.net.URL
-
-import scala.io.Codec
+import java.io._
+import scala.io.{Codec, Source}
 
 /**
  * A SimpleTreebank can be easily specified by paths to the trees in Penn treebank format

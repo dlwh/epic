@@ -5,30 +5,28 @@ import java.util.Locale
 import java.util.regex.Pattern
 import epic.trees.Span
 import epic.slab._
-import epic.slab.Sentence
+import epic.slab.annotators.SentenceSegmenter
 
 import scala.collection.mutable.ArrayBuffer
 
-class NewLineSentenceSegmenter(locale: Locale = Locale.getDefault) extends SentenceSegmenter {
+class NewLineSentenceSegmenter(locale: Locale = Locale.getDefault) extends SentenceSegmenter[Sentence] {
 
   private val regex = Pattern.compile("\n+")
 
-  override def apply[In](slab: StringSlab[In]): StringSlab[In with Sentence] = {
-    val m = regex.matcher(slab.content)
+  def apply(content: String): Vector[Sentence] = {
+    val m = regex.matcher(content)
 
-    val spans = new ArrayBuffer[(Span, Sentence)]()
+    val spans = new ArrayBuffer[Sentence]()
 
     var start = 0
     while(m.find()) {
       val end = m.end()
       if(end - start > 1)
-        spans += (Span(start, end) -> Sentence())
+        spans += Sentence(Span(start, end))
       start = end
     }
-    spans += Span(start, slab.content.length) -> Sentence()
-
-
-    slab.addLayer[Sentence](spans)
+    spans += Sentence(Span(start, content.length))
+    spans.toVector
   }
 }
 

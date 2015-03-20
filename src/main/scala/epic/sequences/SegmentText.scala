@@ -1,5 +1,6 @@
 package epic.sequences
 
+import scala.io.Codec
 import epic.models.NerSelector
 import epic.util.ProcessTextMain
 

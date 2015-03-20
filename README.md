@@ -53,42 +53,67 @@ Epic also supports programmatic usage. All of the models assume that text has be
 
 #### Preprocessing text
 
-To preprocess text so that the models can use them, you will need to segment out sentences and tokenize the sentences into individual words. Epic comes with classes to do both.
+To preprocess text so that the models can use them, you will need to
+segment out sentences and tokenize the sentences into individual
+words. Epic comes with classes to do both.
 
-Once you have a sentence, you can tokenize it using a `epic.preprocess.TreebankTokenizer`, which takes a string and returns a sequence of tokens. All told, the pipeline looks like this:
+First, you encapsulate the documents into a Slab, which stores all
+annotation data. Then you can run a SentenceSegmenter on the Slab to
+create the Sentence annotations. Once you have a sentences, you can
+tokenize it using a `epic.preprocess.TreebankTokenizer`. To retrieve
+the tokens, use the method of the same name. All told, the pipeline
+looks like this:
 
 ```scala
-val text = getSomeText();
+import epic.slab._
+import scalaz.std.list._
+import epic.util.slabutils._
 
-val sentenceSplitter = MLSentenceSegmenter.bundled().get
+val documents = getSomeDocuments();
+
+val sentenceSegmenter = MLSentenceSegmenter.bundled().get
 val tokenizer = new epic.preprocess.TreebankTokenizer()
 
-val sentences: IndexedSeq[IndexedSeq[String]] = sentenceSplitter(text).map(tokenizer).toIndexedSeq
+val slabs = text.map(Slab(_)).map(sentenceSegmenter(_)).map(tokenizer(_))
+val tokens = slabs.map(_.tokens)
 
-for(sentence <- sentences) {
-  // use the sentence tokens
+for(document <- tokens) {
+  for(sentence <- document) {
+    // use the sentence tokens
+  }
 }
 
 ```
 
-
-
 #### Parser
 
-To use the parser programmaticaly, deserialize a parser model--either using `epic.models.deserialize[Parser[AnnotatedLabel, String]](path)` or using the ParserSelector. Then, give the parser segmented and tokenized text:
+To use the parser programmaticaly, deserialize a parser model--either
+using `epic.models.deserialize[Parser[AnnotatedLabel, String]](path)`
+or using the ParserSelector. Then, give the parser segmented and
+tokenized text:
 
 ```scala
-val parser = epic.models.deserialize[Parser[AnnotataedLabel, String]](path)
+import epic.parser.Parser.SlabParser
+val parser = SlabParser(epic.models.deserialize[Parser[AnnotatedLabel, String]](path))
 
 // or:
 
-val parser = epic.models.ParserSelector.loadParser("en").get // or another 2 letter code.
+val parser = SlabParser(epic.models.ParserSelector.loadParser("en").get) // or another 2 letter code.
 
-val tree = parser(sentence)
+val treeSlabs = slabs.map(parser(_))
 
-println(tree.render(words))
+for(slab <- treeSlabs) {
+  for(sentences <- slab.select[Tree[AnnotatedLabel]]) {
+    for(tree <- sentences) {
+      println(tree)
+    }
+  }
+}
 
 ```
+
+The SlabParser is required until I figure out how to help scalac to
+find it.
 
 Trees have a number of methods on them. See the class definition or [API docs](http://www.scalanlp.org/api/epic).
 
@@ -103,9 +128,16 @@ val tagger = epic.models.deserialize[CRF[AnnotatedLabel, String]](path)
 
 val tagger = epic.models.PosTagSelector.loadTagger("en").get // or another 2 letter code.
 
-val tags = tagger.bestSequence(sentence)
+val posSlabs = slabs.map(tagger(_))
 
-println(tags.render)
+for(slab <- posSlabs) {
+  for(sentences <- slab.select[Tagged[AnnotatedLabel]]) {
+    for(sentence <- sentences) {
+      val strings = sentence.map(_.substring(slab.content))
+      // use PoS tags
+    }
+  }
+}
 
 ```
 

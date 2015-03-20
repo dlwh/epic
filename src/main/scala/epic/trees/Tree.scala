@@ -17,20 +17,24 @@ package epic.trees
 */
 
 
-import java.io.StringReader
-
-import breeze.util.Lens
-import epic.preprocess.TreebankTokenizer
-
-import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
+import nak.serialization.DataSerialization
+import nak.serialization.DataSerialization._
+import java.io.{StringReader, DataInput, DataOutput}
+import breeze.util.Lens
+import scala.annotation.tailrec
+import epic.preprocess.TreebankTokenizer
+import epic.slab.{Tagged, Token, Tree => SlabTree}
 
 @SerialVersionUID(1L)
 trait Tree[+L] extends Serializable {
   def label: L
   def children: IndexedSeq[Tree[L]]
+  /**
+  *  Spans in Tree are [begin, end), so inclusive at the beginning and
+  * exclusive at the end
+  */
   def span: Span
-
   def begin = span.begin
   def end = span.end
 
@@ -49,7 +53,7 @@ trait Tree[+L] extends Serializable {
   }
 
   def leaves:Iterable[Tree[L]] = if(isLeaf) {
-    IndexedSeq(this).view
+    Iterable(this).view
   } else  {
     children.map(_.leaves).foldLeft[Stream[Tree[L]]](Stream.empty){_ append _}
   }
@@ -93,7 +97,6 @@ trait Tree[+L] extends Serializable {
   def toString(newline: Boolean) = recursiveToString(this,0, newline, new StringBuilder).toString
 
   def render[W](words: Seq[W], newline: Boolean = true) = recursiveRender(this,1,words, newline, new StringBuilder).toString
-
 }
 
 object Tree {
@@ -135,8 +138,15 @@ object Tree {
   }
 
 
+  def slabSpan[L](tree: Tree[L], tokens: IndexedSeq[Token]): Span =
+    Span(tokens(tree.begin).begin, tokens(tree.end-1).end)
 
-
+  def slabTree[L](tree: Tree[L], tokens: IndexedSeq[Token]): SlabTree[L] =
+    SlabTree.unfoldTree[Tuple2[Tree[L], IndexedSeq[Token]], L]((tree, tokens))({
+      case (tree, tokens) => (
+        {case children: IndexedSeq[SlabTree[L]] => SlabTree(tree.label, slabSpan(tree, tokens), children)},
+        tree.children.zip(Stream.continually(tokens)))
+    })
 }
 
 case class NaryTree[L](label: L, children: IndexedSeq[Tree[L]], span: Span) extends Tree[L] {
@@ -579,6 +589,5 @@ object Trees {
     case class RightChild[+L](parentLabel: L, parent: Location[L], leftSibling: BinarizedTree[L]) extends NotRoot[L]
     case class UnaryChild[+L](parentLabel: L, chain: IndexedSeq[String], parent: Location[L]) extends NotRoot[L]
   }
-
 
 }

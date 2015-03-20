@@ -19,6 +19,8 @@ package epic.parser
 import epic.constraints.ChartConstraints
 import epic.lexicon.Lexicon
 import epic.trees._
+import epic.slab.annotators.TokenParser
+import epic.slab.{Sentence, Token, Tree => SlabTree}
 
 
 /**
@@ -33,7 +35,7 @@ final case class Parser[L,W](topology: RuleTopology[L],
                              constraintsFactory: ChartConstraints.Factory[L, W],
                              marginalFactory: ParseMarginal.Factory[L, W],
                              decoder: ChartDecoder[L, W] = ChartDecoder[L, W]())
-                            (implicit val debinarizer: Debinarizer[L]) extends (IndexedSeq[W]=>Tree[L]) {
+                            (implicit val debinarizer: Debinarizer[L]) {
 
   /**
    * Returns the best parse (calls bestParse) for the sentence.
@@ -62,13 +64,13 @@ final case class Parser[L,W](topology: RuleTopology[L],
       }
   }
 
-
-
-
-
 }
 
 object Parser {
+  // converts a Parser into a slabified version.
+  implicit class SlabParser[L](val parser: Parser[L, String]) extends TokenParser[Sentence, Token, L] {
+    override def apply(body: String, tokens: Vector[Token]): SlabTree[L] = Tree.slabTree(parser(tokens.map(_.substring(body))), tokens)
+  }
 
   def apply[L, W](grammar: Grammar[L, W])(implicit deb: Debinarizer[L]): Parser[L, W]= {
     Parser(grammar.topology, grammar.lexicon, ChartConstraints.Factory.noSparsity, StandardChartFactory(grammar), ChartDecoder())
