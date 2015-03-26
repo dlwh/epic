@@ -53,6 +53,7 @@ class Span(val encoded: Long) extends AnyVal {
     ||  (other.begin < begin && other.end < end && other.end > begin)
   )
 
+
 //  override def hashCode(): Int = {
 //    (begin, end).hashCode()
 //  }
@@ -71,7 +72,7 @@ class Span(val encoded: Long) extends AnyVal {
 
   def toIndexedSeq = Range(begin, end)
 
-//  override def toString = s"Span($begin, $end)"
+  override def toString = s"Span($begin, $end)"
 }
 
 object Span {
