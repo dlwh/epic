@@ -19,7 +19,7 @@ import spire.syntax.cfor
 */
 
 
-class Span(val encoded: Long) extends AnyVal {
+class Span(val encoded: Long) extends AnyVal with Serializable {
   def toPair: (Int, Int) = (begin, end)
 
   def begin = (encoded >>> 32).toInt
