@@ -69,7 +69,7 @@ object SimpleLexicon {
       Class.forName("breeze.linalg.Counter$Impl")
       new SimpleLexicon(labelIndex, wordTagCounts, openTagThreshold, closedWordThreshold)
     } catch {
-      case ex =>
+      case ex: Throwable =>
       ex.printStackTrace()
       throw ex
     }
