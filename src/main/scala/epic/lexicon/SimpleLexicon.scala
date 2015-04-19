@@ -33,12 +33,8 @@ class SimpleLexicon[L, W](
     else set
   }
 
-  for((w,v) <- wordCounts.iterator if v < closedWordThreshold) {
-    byWord.get(w) match {
-      case None => byWord(w) = openTags
-      case Some(set) => byWord(w) = set ++ openTags
-    }
-  }
+  for((w,v) <- wordCounts.iterator if v < closedWordThreshold)
+    byWord(w) = byWord.get(w).fold(openTags)( _ ++ openTags)
 
   def allowedTags(w: W): Set[Int] = byWord.getOrElse(w, openTags)
 
