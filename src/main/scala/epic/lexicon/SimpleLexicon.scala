@@ -28,7 +28,7 @@ class SimpleLexicon[L, W](
   private val byWord: Map[W, Set[Int]] = Map.empty[W, Set[Int]] ++ wordTagCounts.keySet.groupBy(_._2).mapValues(_.map(pair => labelIndex(pair._1)).toSet)
 
   private val openTags: Set[Int] = {
-    val set = labelCounts.keysIterator.filter(l => wordTagCounts(l, ::).size > openTagThreshold).toSet.map((l:L) => labelIndex(l))
+    val set = labelCounts.keysIterator.collect { case l if wordTagCounts(l, ::).size > openTagThreshold => labelIndex(l) }.toSet
     if (set.isEmpty) BitSet.empty ++ (0 until labelIndex.size)
     else set
   }
