@@ -25,7 +25,8 @@ class SimpleLexicon[L, W](
 ) extends Lexicon[L, W] with Serializable {
   private val wordCounts: Counter[W, Double] = sum(wordTagCounts, Axis._0)
   private val labelCounts: Counter[L, Double] = sum(wordTagCounts, Axis._1)
-  private val byWord: Map[W, Set[Int]] = Map.empty[W, Set[Int]] ++ wordTagCounts.keySet.groupBy(_._2).mapValues(_.map(pair => labelIndex(pair._1)).toSet)
+  private val byWord: Map[W, Set[Int]] = Map.empty[W, Set[Int]] ++
+    wordTagCounts.keySet.groupBy(_._2).mapValues(_.map(pair => labelIndex(pair._1)).toSet)
 
   private val openTags: Set[Int] = Option(
     labelCounts.keysIterator.collect { case l if wordTagCounts(l, ::).size > openTagThreshold => labelIndex(l) }.toSet
