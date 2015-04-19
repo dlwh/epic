@@ -27,11 +27,11 @@ class SimpleLexicon[L, W](
   private val labelCounts: Counter[L, Double] = sum(wordTagCounts, Axis._1)
   private val byWord: Map[W, Set[Int]] = Map.empty[W, Set[Int]] ++ wordTagCounts.keySet.groupBy(_._2).mapValues(_.map(pair => labelIndex(pair._1)).toSet)
 
-  private val openTags: Set[Int] = {
-    val set = labelCounts.keysIterator.collect { case l if wordTagCounts(l, ::).size > openTagThreshold => labelIndex(l) }.toSet
-    if (set.isEmpty) BitSet.empty ++ (0 until labelIndex.size)
-    else set
-  }
+  private val openTags: Set[Int] = Option(
+    labelCounts.keysIterator.collect { case l if wordTagCounts(l, ::).size > openTagThreshold => labelIndex(l) }.toSet
+  ).filter(_.nonEmpty).getOrElse(
+    BitSet.empty ++ (0 until labelIndex.size)
+  )
 
   for((w,v) <- wordCounts.iterator if v < closedWordThreshold)
     byWord(w) = byWord.get(w).fold(openTags)( _ ++ openTags)
