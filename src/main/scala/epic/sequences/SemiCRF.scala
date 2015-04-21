@@ -17,7 +17,7 @@ import breeze.optimize.CachedBatchDiffFunction
 import breeze.linalg.{softmax, DenseVector}
 import epic.constraints.{TagConstraints, LabeledSpanConstraints}
 import epic.constraints.LabeledSpanConstraints.NoConstraints
-import epic.util.{NotProvided, Optional}
+import epic.util.Optional
 import epic.features.{WordFeaturizer, SurfaceFeaturizer}
 
 /**
@@ -51,8 +51,8 @@ object SemiCRF {
 
   def buildSimple[L](data: IndexedSeq[Segmentation[L, String]],
                      gazetteer: Gazetteer[Any, String] = Gazetteer.empty[Any, String],
-                     wordFeaturizer: Optional[WordFeaturizer[String]] = NotProvided,
-                     spanFeaturizer: Optional[SurfaceFeaturizer[String]] = NotProvided,
+                     wordFeaturizer: Optional[WordFeaturizer[String]] = None,
+                     spanFeaturizer: Optional[SurfaceFeaturizer[String]] = None,
                      opt: OptParams = OptParams(regularization = 1.0)):SemiCRF[L, String] = {
     val model: SemiCRFModel[L, String] = new SegmentationModelFactory[L](gazetteer = gazetteer, wordFeaturizer = wordFeaturizer, spanFeaturizer = spanFeaturizer).makeModel(data)
 

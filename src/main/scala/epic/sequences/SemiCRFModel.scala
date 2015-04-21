@@ -12,7 +12,7 @@ import epic.framework._
 import epic.lexicon.SimpleLexicon
 import epic.sequences.SemiCRF.{IdentityAnchoring, TransitionVisitor}
 import epic.sequences.SemiCRFModel.BIEOFeatureAnchoring
-import epic.util.{NotProvided, Optional, SafeLogging}
+import epic.util.{Optional, SafeLogging}
 
 import scala.collection.mutable.ArrayBuffer
 
@@ -227,10 +227,10 @@ class SemiCRFInference[L, W](weights: DenseVector[Double],
  * @param weights
  * @tparam L
  */
-class SegmentationModelFactory[L](wordFeaturizer: Optional[WordFeaturizer[String]] = NotProvided,
-                                  spanFeaturizer: Optional[SurfaceFeaturizer[String]] = NotProvided,
-                                  pruningModel: Optional[SemiCRF.ConstraintSemiCRF[L, String]] = NotProvided,
-                                  gazetteer: Optional[Gazetteer[Any, String]] = NotProvided,
+class SegmentationModelFactory[L](wordFeaturizer: Optional[WordFeaturizer[String]] = None,
+                                  spanFeaturizer: Optional[SurfaceFeaturizer[String]] = None,
+                                  pruningModel: Optional[SemiCRF.ConstraintSemiCRF[L, String]] = None,
+                                  gazetteer: Optional[Gazetteer[Any, String]] = None,
                                   weights: Feature=>Double = { (f:Feature) => 0.0}) extends LazyLogging {
 
   import epic.sequences.SegmentationModelFactory._

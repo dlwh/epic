@@ -1,71 +1,20 @@
 package epic.util
 
 /**
- * Optional is just like [[scala.Option]], except that we offer implicit
- * conversion from the Optional to Provided. Mostly for use in optional argument lists
- * @author dlwh
+ * Optional is a wrapper of [[scala.Option]] with an implicit conversion from Any to Optional.
+ * Mostly for use in optional argument lists.
+ * @author dlwh, jovilius
  */
-sealed trait Optional[+A] {
-  def iterator: Iterator[A] = this match {
-    case Provided(a) => Iterator(a)
-    case NotProvided => Iterator.empty
-  }
-
-  def get: A
-  def isEmpty: Boolean = this eq NotProvided
-  def size : Int = if(isEmpty) 0 else 1
-
-  def map[B](f: A=>B): Optional[B] = this match {
-    case Provided(x) => Provided(f(x))
-    case NotProvided => NotProvided
-  }
-
-  def flatMap[B](f: A=>Optional[B]) = this match {
-    case Provided(x) => f(x)
-    case NotProvided => NotProvided
-  }
-
-
-  def foreach[B](f: A=>B) {
-    this match {
-      case Provided(x) => f(x)
-      case _ =>
-    }
-  }
-
-  def foldLeft[B](b:B)(f: (B,A) => B) = if(isEmpty) b else f(b, get)
-
-  def fold[B](ifSome: A => B , ifNone: => B) = if(isEmpty) ifNone else ifSome(get)
-
-  def getOrElse[B>:A](ifNone: => B) = if(isEmpty) ifNone else get
+case class Optional[+A](value: Option[A]) {
+  def foldLeft[B](b: B)(f: (B, A) => B) = value.fold(b)(x => f(b, x))
 }
 
-/**
- * Equivalent to Some, but with an implicit conversion
- * from A to Provided(aA
- * @param get
- * @tparam A
- */
-case class Provided[+A](get: A) extends Optional[A] {
-}
+object Optional {
 
-/**
- * Equivalent to None
- */
-@SerialVersionUID(-649101350749082174L)
-case object NotProvided extends Optional[Nothing] {
-  def get = throw new NoSuchElementException("NotProvided.get")
-}
+  implicit def anyToOptional[A](x: A): Optional[A] = if (x == null) Optional(None) else Optional(Some(x))
 
+  implicit def optionToOptional[A](x: Option[A]): Optional[A] = Optional(x)
 
-object Optional extends LowPriorityOptionalImplicit {
-  implicit def liftOption[A](o: Option[A]) = o match {
-    case Some(a) => Provided(a)
-    case None => NotProvided
-  }
-
-}
-
-sealed trait LowPriorityOptionalImplicit {
-  implicit def liftAnything[A](a: A) = if(a == null) NotProvided else Provided(a)
+  implicit def optionalToOption[A](x: Optional[A]): Option[A] = x.value
+  
 }

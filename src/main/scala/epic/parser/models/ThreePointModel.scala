@@ -19,7 +19,7 @@ import epic.parser.projections.GrammarRefinements
 import epic.preprocess.MLSentenceSegmenter.BiasFeature
 import epic.trees.annotations.TreeAnnotator
 import epic.trees._
-import epic.util.{NotProvided, Optional, LRUCache}
+import epic.util.{Optional, LRUCache}
 
 /**
  * TODO
@@ -305,8 +305,8 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
                                  maxNGramOrder:Int = 2,
                                  useGrammar: Boolean = true,
                                  rank: Int = 1,
-                                 posFeaturizer: Optional[WordFeaturizer[String]] = NotProvided,
-                                 spanFeaturizer: Optional[SplitSpanFeaturizer[String]] = NotProvided,
+                                 posFeaturizer: Optional[WordFeaturizer[String]] = None,
+                                 spanFeaturizer: Optional[SplitSpanFeaturizer[String]] = None,
                                  extraParams: ExtraParams = ExtraParams()) extends ParserModelFactory[AnnotatedLabel, String] {
 
   type MyModel = ThreePointModel[AnnotatedLabel, AnnotatedLabel, String]
