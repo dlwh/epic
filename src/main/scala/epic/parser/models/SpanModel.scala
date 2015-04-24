@@ -340,8 +340,8 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
                             useGrammar: Boolean = true,
                             useFullShape: Boolean = false,
                             useSplitShape: Boolean = false,
-                            posFeaturizer: Optional[WordFeaturizer[String]] = NotProvided,
-                            spanFeaturizer: Optional[SplitSpanFeaturizer[String]] = NotProvided,
+                            posFeaturizer: Optional[WordFeaturizer[String]] = None,
+                            spanFeaturizer: Optional[SplitSpanFeaturizer[String]] = None,
                             extraParams: ExtraParams = ExtraParams()) extends ParserModelFactory[AnnotatedLabel, String] with SafeLogging {
   
   type MyModel = SpanModel[AnnotatedLabel, AnnotatedLabel, String]
@@ -619,8 +619,8 @@ object SpanModelFactory {
 
   def buildSimple(trees: IndexedSeq[TreeInstance[AnnotatedLabel, String]],
                   annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = GenerativeParser.defaultAnnotator(),
-                  posFeaturizer: Optional[WordFeaturizer[String]] = NotProvided,
-                  spanFeaturizer: Optional[SplitSpanFeaturizer[String]] = NotProvided,
+                  posFeaturizer: Optional[WordFeaturizer[String]] = None,
+                  spanFeaturizer: Optional[SplitSpanFeaturizer[String]] = None,
                   opt: OptParams = OptParams())(implicit cache: CacheBroker) = {
     val (topo, lexicon) = XbarGrammar().xbarGrammar(trees)
     val initialParser =  GenerativeParser.annotatedParser(topo, lexicon, annotator, trees)

@@ -18,7 +18,7 @@ import java.io.File
 import epic.parser.projections.GrammarRefinements
 import epic.constraints.ChartConstraints.Factory
 import epic.constraints.ChartConstraints
-import epic.util.{NotProvided, Optional}
+import epic.util.Optional
 
 case class NeuralModelFactory(@Help(text=
                               """The kind of annotation to do on the refined grammar. Default uses no annotations.
@@ -30,8 +30,8 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
                             oldWeights: File = null,
                             numOutputs: Int = 100,
                             numHidden: Int = 100,
-                            posFeaturizer: Optional[WordFeaturizer[String]] = NotProvided,
-                            spanFeaturizer: Optional[SplitSpanFeaturizer[String]] = NotProvided,
+                            posFeaturizer: Optional[WordFeaturizer[String]] = None,
+                            spanFeaturizer: Optional[SplitSpanFeaturizer[String]] = None,
                             useIdentitySurfaceFeatures: Boolean = false) extends ParserExtractableModelFactory[AnnotatedLabel, String] {
   type MyModel = TransformModel[AnnotatedLabel, AnnotatedLabel, String]
 
