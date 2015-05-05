@@ -16,6 +16,7 @@ import epic.dense.IdentityTransform
 import epic.dense.NonlinearTransform
 import epic.dense.Transform
 import epic.dense.Word2VecIndexed
+import epic.dense.Word2Vec
 import edu.berkeley.nlp.entity.ner.NerPruner
 import edu.berkeley.nlp.entity.ner.NerPrunerFromModel
 import scala.util.Random

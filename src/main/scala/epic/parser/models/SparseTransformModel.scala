@@ -17,7 +17,7 @@ import epic.trees._
 import epic.trees.annotations.TreeAnnotator
 import epic.util.{LRUCache, NotProvided, Optional}
 import epic.dense.TanhTransform
-import epic.corefdense.Word2Vec
+import epic.dense.Word2Vec
 import scala.collection.mutable.HashMap
 
 /**

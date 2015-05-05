@@ -1,13 +1,11 @@
-package epic.corefdense
+package epic.dense
 
 import java.io.BufferedInputStream
 import java.io.DataInputStream
 import java.io.FileInputStream
 import java.util.regex.Pattern
-
 import scala.collection.mutable.HashMap
 import scala.util.Random
-
 import breeze.linalg.Counter
 import edu.berkeley.nlp.futile.fig.basic.IOUtils
 

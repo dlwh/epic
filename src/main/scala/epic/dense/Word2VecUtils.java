@@ -1,4 +1,4 @@
-package epic.corefdense;
+package epic.dense;
 
 import java.io.DataInputStream;
 import java.io.IOException;

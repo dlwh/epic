@@ -36,6 +36,7 @@ import edu.berkeley.nlp.entity.coref.FeatureSetSpecification
 import epic.features.SegmentedIndex
 import epic.framework.Feature
 import scala.collection.mutable.HashSet
+import epic.dense.Word2Vec
 
 object CorefDriver {
   

@@ -1,6 +1,7 @@
 package epic.corefdense
 
 import edu.berkeley.nlp.futile.fig.basic.IOUtils
+import epic.dense.Word2Vec
 
 /**
  * Applies Word2Vec.convertWord to each word of a corpus
