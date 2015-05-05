@@ -39,3 +39,6 @@ object Transform {
   }
 
 }
+
+case class NeuralFeature(output: Int, input: Int) extends Feature
+case class NeuralBias(input: Int) extends Feature

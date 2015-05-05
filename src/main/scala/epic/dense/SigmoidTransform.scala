@@ -13,8 +13,7 @@ import scala.util.Random
  *
  * @author dlwh
  */
-case class NeuralFeature(output: Int, input: Int) extends Feature
-case class NeuralBias(input: Int) extends Feature
+
 
 //case class SigmoidTransform[FV](inner: Transform[FV, DenseVector[Double]]) extends Transform[FV, DenseVector[Double]] {
 //  def this(numOutputs: Int, numInputs: Int,
