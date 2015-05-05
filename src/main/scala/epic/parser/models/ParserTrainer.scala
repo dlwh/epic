@@ -188,17 +188,17 @@ object ParserTrainer extends epic.parser.ParserPipeline with LazyLogging {
         println("OPTIMIZATION: Adadelta")
         new AdadeltaGradientDescentDVD(params.opt.maxIterations, momentum).iterations(scanningBatchesObj, init).
             asInstanceOf[Iterator[FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State]]
-      } else if (useSGD) {
-        println("OPTIMIZATION: SGDMOM")
-        new StochasticGradientDescentMomentumDVD(params.opt.maxIterations, params.opt.alpha, momentum).iterations(scanningBatchesObj, init).
-            asInstanceOf[Iterator[FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State]]
-      } else if (useAdagradCombo) {
-        println("OPTIMIZATION: AdagradCombo")
-        val castModel = model.asInstanceOf[PositionalTransformModel[AnnotatedLabel, AnnotatedLabel, String]]
-        require(castModel.maybeSparseSurfaceFeaturizer.isDefined, "Can't do combo optimization without combination")
-        val idxToSwitchAt = castModel.index.componentOffset(castModel.index.indices.size - 1)
-        new CombinationAdaptiveGradientDescentDVD(params.opt.regularization, 0.01, params.opt.regularization, 0.1, idxToSwitchAt, params.opt.maxIterations, params.opt.tolerance).iterations(scanningBatchesObj, init).
-            asInstanceOf[Iterator[FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State]]
+//      } else if (useSGD) {
+//        println("OPTIMIZATION: SGDMOM")
+//        new StochasticGradientDescentMomentumDVD(params.opt.maxIterations, params.opt.alpha, momentum).iterations(scanningBatchesObj, init).
+//            asInstanceOf[Iterator[FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State]]
+//      } else if (useAdagradCombo) {
+//        println("OPTIMIZATION: AdagradCombo")
+//        val castModel = model.asInstanceOf[PositionalTransformModel[AnnotatedLabel, AnnotatedLabel, String]]
+//        require(castModel.maybeSparseSurfaceFeaturizer.isDefined, "Can't do combo optimization without combination")
+//        val idxToSwitchAt = castModel.index.componentOffset(castModel.index.indices.size - 1)
+//        new CombinationAdaptiveGradientDescentDVD(params.opt.regularization, 0.01, params.opt.regularization, 0.1, idxToSwitchAt, params.opt.maxIterations, params.opt.tolerance).iterations(scanningBatchesObj, init).
+//            asInstanceOf[Iterator[FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State]]
       } else {
         println("OPTIMIZATION: Adagrad")
         params.opt.iterations(scanningBatchesObj, init).asInstanceOf[Iterator[FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State]]
@@ -208,17 +208,17 @@ object ParserTrainer extends epic.parser.ParserPipeline with LazyLogging {
         println("OPTIMIZATION: Adadelta")
         new AdadeltaGradientDescentDVD(params.opt.maxIterations, momentum).iterations(cachedObj.withRandomBatches(params.opt.batchSize), init).
             asInstanceOf[Iterator[FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State]]
-      } else if (useSGD) {
-        println("OPTIMIZATION: SGDMOM")
-        new StochasticGradientDescentMomentumDVD(params.opt.maxIterations, params.opt.alpha, momentum).iterations(cachedObj.withRandomBatches(params.opt.batchSize), init).
-            asInstanceOf[Iterator[FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State]]
-      } else if (useAdagradCombo) {
-        println("OPTIMIZATION: AdagradCombo")
-        val castModel = model.asInstanceOf[PositionalTransformModel[AnnotatedLabel, AnnotatedLabel, String]]
-        require(castModel.maybeSparseSurfaceFeaturizer.isDefined, "Can't do combo optimization without combination")
-        val idxToSwitchAt = castModel.index.componentOffset(castModel.index.indices.size - 1)
-        new CombinationAdaptiveGradientDescentDVD(params.opt.alpha, 0.01, params.opt.alpha, 0.1, idxToSwitchAt, params.opt.maxIterations, params.opt.tolerance).iterations(cachedObj.withRandomBatches(params.opt.batchSize), init).
-            asInstanceOf[Iterator[FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State]]
+//      } else if (useSGD) {
+//        println("OPTIMIZATION: SGDMOM")
+//        new StochasticGradientDescentMomentumDVD(params.opt.maxIterations, params.opt.alpha, momentum).iterations(cachedObj.withRandomBatches(params.opt.batchSize), init).
+//            asInstanceOf[Iterator[FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State]]
+//      } else if (useAdagradCombo) {
+//        println("OPTIMIZATION: AdagradCombo")
+//        val castModel = model.asInstanceOf[PositionalTransformModel[AnnotatedLabel, AnnotatedLabel, String]]
+//        require(castModel.maybeSparseSurfaceFeaturizer.isDefined, "Can't do combo optimization without combination")
+//        val idxToSwitchAt = castModel.index.componentOffset(castModel.index.indices.size - 1)
+//        new CombinationAdaptiveGradientDescentDVD(params.opt.alpha, 0.01, params.opt.alpha, 0.1, idxToSwitchAt, params.opt.maxIterations, params.opt.tolerance).iterations(cachedObj.withRandomBatches(params.opt.batchSize), init).
+//            asInstanceOf[Iterator[FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State]]
       } else {
         println("OPTIMIZATION: Adagrad")
         params.opt.iterations(cachedObj, init)
