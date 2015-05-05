@@ -1,9 +1,7 @@
-package epic.corefdense
+package epic.dense
 
 import breeze.linalg._
-import breeze.linalg.support.{CanMapValues, CanZipMapValues, CanTraverseValues}
 import breeze.numerics._
-import breeze.stats.distributions.{Rand, RandBasis}
 import breeze.optimize.StochasticDiffFunction
 import breeze.optimize.StochasticGradientDescent
 

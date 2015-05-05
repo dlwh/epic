@@ -34,9 +34,7 @@ import breeze.optimize.FirstOrderMinimizer.OptParams
 import epic.parser.ParseEval.Statistics
 import epic.features.LongestFrequentSuffixFeaturizer.LongestFrequentSuffix
 import epic.features.LongestFrequentSuffixFeaturizer
-import epic.corefdense.AdadeltaGradientDescentDVD
-import epic.corefdense.StochasticGradientDescentMomentumDVD
-import epic.corefdense.CombinationAdaptiveGradientDescentDVD
+import epic.dense.AdadeltaGradientDescentDVD
 
 
 /**
