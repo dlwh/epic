@@ -50,7 +50,8 @@ object ParserTrainer extends epic.parser.ParserPipeline with LazyLogging {
   
   case class ExtraPTParams(useSGD: Boolean = false,
                            momentum: Double = 0.95,
-                           useAdagradCombo: Boolean = false)
+                           useAdagradCombo: Boolean = false,
+                           computeTrainLL: Boolean = true)
 
   case class Params(@Help(text="What parser to build. LatentModelFactory,StructModelFactory,LexModelFactory,SpanModelFactory")
                     modelFactory: ParserExtractableModelFactory[AnnotatedLabel, String],
@@ -137,6 +138,7 @@ object ParserTrainer extends epic.parser.ParserPipeline with LazyLogging {
       ChartConstraints.Factory.noSparsity[AnnotatedLabel, String]
     }
 
+    println("Building model")
     val model = modelFactory.make(theTrees, initialParser.topology, initialParser.lexicon, constraints)
     val obj = new ModelObjective(model, theTrees, params.threads)
     val cachedObj = new CachedBatchDiffFunction(obj)
@@ -250,7 +252,7 @@ object ParserTrainer extends epic.parser.ParserPipeline with LazyLogging {
         } else {
           model.extractParser(state.x)
         }
-        if (iter + iterationsPerEval >= maxIterations) {
+        if (iter + iterationsPerEval >= maxIterations && computeTrainLL) {
           computeLL(trainTrees, model, state.x)
         }
         (s"$name-$iter", parser)

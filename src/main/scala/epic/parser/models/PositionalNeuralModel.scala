@@ -43,6 +43,7 @@ import epic.dense.BatchNormalizationTransform
 
 case class ExtraPNMParams(useSparseLfsuf: Boolean = true,
                           useSparseBrown: Boolean = false,
+                          useMostSparseIndicators: Boolean = false,
                           dropoutRate: Double = 0.0,
                           vectorRescaling: Double = 1.0,
                           outputEmbedding: Boolean = false,
@@ -233,10 +234,8 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     
     
     val maybeSparseFeaturizer = if (useSparseFeatures) {
-//      var wf = posFeaturizer.getOrElse( SpanModelFactory.defaultPOSFeaturizer(annWords))
-//      var span: SplitSpanFeaturizer[String] = spanFeaturizer.getOrElse(SpanModelFactory.goodFeaturizer(annWords, commonWordThreshold, useShape = false, useBrown = useSparseBrown))
       var wf = SpanModelFactory.defaultPOSFeaturizer(annWords)
-      var span = SpanModelFactory.goodFeaturizer(annWords, commonWordThreshold, useShape = false, useLfsuf = useSparseLfsuf, useBrown = useSparseBrown)
+      var span = SpanModelFactory.goodFeaturizer(annWords, commonWordThreshold, useShape = false, useLfsuf = useSparseLfsuf, useBrown = useSparseBrown, useMostSparseIndicators = useMostSparseIndicators)
       span += new SingleWordSpanFeaturizer[String](wf)
       val indexedWord = IndexedWordFeaturizer.fromData(wf, annTrees.map{_.words}, deduplicateFeatures = false)
       val indexedSurface = IndexedSplitSpanFeaturizer.fromData(span, annTrees, bloomFilter = false)

@@ -603,7 +603,8 @@ object SpanModelFactory {
                         commonWordThreshold: Int = 100,
                         useShape: Boolean = true,
                         useLfsuf: Boolean = true,
-                        useBrown: Boolean = false) = {
+                        useBrown: Boolean = false,
+                        useMostSparseIndicators: Boolean = false) = {
     val dsl = new WordFeaturizer.DSL(wordCounts, commonWordThreshold) with SurfaceFeaturizer.DSL with SplitSpanFeaturizer.DSL
     import dsl._
 
@@ -617,7 +618,7 @@ object SpanModelFactory {
     }
     
     val leftOfSplit: SplitSpanFeaturizer[String] =  ((baseCat)(-1)apply (split))
-
+    
     var featurizer: SplitSpanFeaturizer[String] = zeroSplit[String]
     featurizer += baseCat(begin)
     featurizer += baseCat(end-1)
@@ -626,6 +627,14 @@ object SpanModelFactory {
     featurizer += leftOfSplit
     featurizer += baseCat(split)
     featurizer += length
+    if (useMostSparseIndicators) {
+      featurizer += baseCat(begin-2)
+      featurizer += baseCat(end-2)
+      featurizer += baseCat(begin+1)
+      featurizer += baseCat(end+1)
+      featurizer +=  ((baseCat)(-2)apply (split))
+      featurizer +=  ((baseCat)(1)apply (split))
+    }
 
     featurizer += distance[String](begin, split)
     featurizer += distance[String](split, end)
