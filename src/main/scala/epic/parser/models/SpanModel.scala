@@ -643,11 +643,16 @@ object SpanModelFactory {
     featurizer
   }
 
-  def defaultPOSFeaturizer(annWords: Counter2[AnnotatedLabel, String, Double]): WordFeaturizer[String] = {
+  def defaultPOSFeaturizer(annWords: Counter2[AnnotatedLabel, String, Double], useBrown: Boolean = false): WordFeaturizer[String] = {
     {
       val dsl = new WordFeaturizer.DSL(annWords)
       import dsl._
-      unigrams(word, 1) + suffixes() + prefixes()
+      if (useBrown) {
+        val brown = new BrownClusterFeaturizer(Array(4, 10))
+        unigrams(brown, 1) + unigrams(word, 1) + suffixes() + prefixes()
+      } else {
+        unigrams(word, 1) + suffixes() + prefixes()
+      }
     }
   }
 

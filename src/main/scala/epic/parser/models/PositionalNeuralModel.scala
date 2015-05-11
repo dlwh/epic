@@ -36,15 +36,15 @@ import scala.collection.mutable.HashSet
 import epic.dense.BatchNormalizationTransform
 
 /**
- * TODO
+ * Entry point for instantiating a neural CRF parser. Parameters specify neural
+ * net parameters, word vectors, and sparse features to use.
  *
- * @author dlwh
+ * @author gdurrett
  **/
 
 case class ExtraPNMParams(useSparseLfsuf: Boolean = true,
                           useSparseBrown: Boolean = false,
                           useMostSparseIndicators: Boolean = false,
-                          dropoutRate: Double = 0.0,
                           vectorRescaling: Double = 1.0,
                           outputEmbedding: Boolean = false,
                           outputEmbeddingDim: Int = 20,
@@ -67,18 +67,15 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
                             @Help(text="For features not seen in gold trees, we bin them into dummyFeats * numGoldFeatures bins using hashing. If negative, use absolute value as number of hash features.")
                             dummyFeats: Double = 0.5,
                             commonWordThreshold: Int = 100,
-                            ngramCountThreshold: Int = 5,
-                            useGrammar: Boolean = true,
-                            usingV1: Boolean = false,
                             useSparseFeatures: Boolean = false,
                             @Help(text="Options: tanh, relu, cube")
                             nonLinType: String = "tanh",
                             @Help(text="Options: normal, random, trivial, normalpos")
                             embeddingType: String = "normal",
                             backpropIntoEmbeddings: Boolean = false,
+                            dropoutRate: Double = 0.0,
                             numHidden: Int = 100,
                             numHiddenLayers: Int = 1,
-                            augmentWithLinear: Boolean = false,
                             useDeps: Boolean = false,
                             word2vecPath: String = "../cnnkim/data/GoogleNews-vectors-negative300.bin",
                             extraPNMParams: ExtraPNMParams = ExtraPNMParams()) extends ParserModelFactory[AnnotatedLabel, String] {
@@ -105,24 +102,11 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     val indexedRefinements = GrammarRefinements(xbarGrammar, refGrammar, (_: AnnotatedLabel).baseAnnotatedLabel)
 
     def labelFeaturizer(l: AnnotatedLabel) = Set(l, l.baseAnnotatedLabel).toSeq
-    def ruleFeaturizer(r: Rule[AnnotatedLabel]) = if (usingV1) {
-      require(useGrammar)
-      Set(r.map(_.baseAnnotatedLabel)).toSeq
+    def ruleFeaturizer(r: Rule[AnnotatedLabel]) = if (useRootLabel) {
+      Set(r, r.map(_.baseAnnotatedLabel), ParentFeature(r.parent)).toSeq
     } else {
-      if(useGrammar) {
-        if (useRootLabel) {
-          // N.B. for v0, baseAnnotatedLabel is the same as the rule itself
-          Set(r, r.map(_.baseAnnotatedLabel), ParentFeature(r.parent)).toSeq
-        } else {
-          Set(r, r.map(_.baseAnnotatedLabel)).toSeq
-        }
-      } else if (r.isInstanceOf[UnaryRule[AnnotatedLabel]]) {
-        Set(r.parent, r.parent.baseAnnotatedLabel).toSeq 
-      } else {
-        Seq.empty
-      }
+      Set(r, r.map(_.baseAnnotatedLabel)).toSeq
     }
-      
 
     val prodFeaturizer = new ProductionFeaturizer[AnnotatedLabel, AnnotatedLabel, String](xbarGrammar, indexedRefinements, lGen=labelFeaturizer, rGen=ruleFeaturizer)
     
@@ -199,23 +183,13 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
         println(inputSize + " x (" + numHidden + ")^" + numHiddenLayers + " x " + prodFeaturizer.index.size + " neural net")
         PositionalNeuralModelFactory.buildNet(word2vecIndexed, inputSize, numHidden, numHiddenLayers, prodFeaturizer.index.size, nonLinType, dropoutRate, backpropIntoEmbeddings, batchNormalization)
       }
-      if (augmentWithLinear) {
-        println("Adding a linear transform: " + inputSize + " x " + prodFeaturizer.index.size) 
-        IndexedSeq(transform, PositionalNeuralModelFactory.buildNet(word2vecIndexed, inputSize, 0, 0, prodFeaturizer.index.size, "", dropoutRate, backpropIntoEmbeddings, batchNormalization))
-      } else {
-        IndexedSeq(transform)
-      }
+      IndexedSeq(transform)
     }
     val depTransforms: IndexedSeq[AffineOutputTransform[Array[Int]]] = if (useDeps) {
       throw new RuntimeException("Dependency NNs removed temporarily")
 //      println("Deps: " + word2vecIndexed.vectorSize + " x (" + numHidden + ")^" + numHiddenLayers + " x " + prodFeaturizer.index.size + " neural net")
 //      val depTransform = PositionalNeuralModelFactory.buildNet(word2vecIndexed, numHidden, numHiddenLayers, 1, nonLinType, backpropIntoEmbeddings)
-//      if (augmentWithLinear) {
-//        println("Adding a linear transform to deps: " + word2vecIndexed.vectorSize + " x 1") 
-//        IndexedSeq(depTransform, PositionalNeuralModelFactory.buildNet(word2vecIndexed, 0, 0, 1, "", backpropIntoEmbeddings))
-//      } else {
-//        IndexedSeq(depTransform)
-//      }
+//      IndexedSeq(depTransform)
     } else {
       IndexedSeq()
     }
@@ -234,14 +208,15 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     
     
     val maybeSparseFeaturizer = if (useSparseFeatures) {
-      var wf = SpanModelFactory.defaultPOSFeaturizer(annWords)
+      var wf = SpanModelFactory.defaultPOSFeaturizer(annWords, useBrown = useSparseBrown)
       var span = SpanModelFactory.goodFeaturizer(annWords, commonWordThreshold, useShape = false, useLfsuf = useSparseLfsuf, useBrown = useSparseBrown, useMostSparseIndicators = useMostSparseIndicators)
       span += new SingleWordSpanFeaturizer[String](wf)
       val indexedWord = IndexedWordFeaturizer.fromData(wf, annTrees.map{_.words}, deduplicateFeatures = false)
       val indexedSurface = IndexedSplitSpanFeaturizer.fromData(span, annTrees, bloomFilter = false)
       
       def sparseLabelFeaturizer(l: AnnotatedLabel) = Set(l, l.baseAnnotatedLabel).toSeq
-      def sparseRuleFeaturizer(r: Rule[AnnotatedLabel]) = if(useGrammar) Set(r, r.map(_.baseAnnotatedLabel)).toSeq else if(r.isInstanceOf[UnaryRule[AnnotatedLabel]]) Set(r.parent, r.parent.baseAnnotatedLabel).toSeq else Seq.empty
+//      def sparseRuleFeaturizer(r: Rule[AnnotatedLabel]) = if(useGrammar) Set(r, r.map(_.baseAnnotatedLabel)).toSeq else if(r.isInstanceOf[UnaryRule[AnnotatedLabel]]) Set(r.parent, r.parent.baseAnnotatedLabel).toSeq else Seq.empty
+      def sparseRuleFeaturizer(r: Rule[AnnotatedLabel]) = Set(r, r.map(_.baseAnnotatedLabel)).toSeq
       val sparseProdFeaturizer = new ProductionFeaturizer[AnnotatedLabel, AnnotatedLabel, String](xbarGrammar, indexedRefinements, lGen=sparseLabelFeaturizer, rGen=sparseRuleFeaturizer)
       
       

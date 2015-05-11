@@ -51,7 +51,7 @@ case class SpanModelBaselineFactory(annotator: TreeAnnotator[AnnotatedLabel, Str
 //    val prodFeaturizer = new ProductionFeaturizer[AnnotatedLabel, AnnotatedLabel, String](xbarGrammar, indexedRefinements, lGen=labelFeaturizer, rGen=ruleFeaturizer)
     
     
-    var wf = SpanModelFactory.defaultPOSFeaturizer(annWords)
+    var wf = SpanModelFactory.defaultPOSFeaturizer(annWords, useBrown = useSparseBrown)
     var span = SpanModelFactory.goodFeaturizer(annWords, commonWordThreshold, useShape = false, useLfsuf = useSparseLfsuf, useBrown = useSparseBrown, useMostSparseIndicators = useMostSparseIndicators)
     span += new SingleWordSpanFeaturizer[String](wf)
     val indexedWord = IndexedWordFeaturizer.fromData(wf, annTrees.map{_.words}, deduplicateFeatures = false)

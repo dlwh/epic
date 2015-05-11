@@ -22,10 +22,11 @@ import epic.trees._
 import scala.collection.mutable.ArrayBuffer
 
 /**
- * TODO
+ * Main neural CRF parser class.
  *
- * @author dlwh
+ * @author gdurrett
  **/
+@SerialVersionUID(1L)
 class PositionalTransformModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSeq[W]) => BinarizedTree[IndexedSeq[L2]],
                                val constrainer: ChartConstraints.Factory[L, W],
                                val topology: RuleTopology[L],
@@ -341,18 +342,6 @@ object PositionalTransformModel {
           decoupledLayers(BinaryLayerIdx).tallyDerivative(deriv(dcBinaryFeatOffset until dcBinaryFeatOffset + decoupledLayers(BinaryLayerIdx).index.size), { binaryRuleCountsPerState(key) * scale }, ffeats)
         }
       }
-      
-//      for (i <- 0 until ruleCountsPerState.length) {
-//        if (statesUsed(i)) {
-//          val (begin, split, end) = untetra(i)
-//          val ffeats = if (end > length) sspec.featuresForSpan(begin, split) else sspec.featuresForSplit(begin, split, end)
-//          var layerSizeTally = 0
-//          for (j <- 0 until layers.size) {
-//            layers(j).tallyDerivative(deriv(layerSizeTally until layerSizeTally + layers(j).index.size), { ruleCountsPerState(i) * scale }, ffeats)
-//            layerSizeTally += layers(j).index.size;
-//          }
-//        }
-//      }
 //      for (headIdx <- 0 until w.size) {
 //        for (childIdx <- 0 until w.size) {
 //          var layerSizeTally = layers.map(_.index.size).foldLeft(0)(_ + _)
