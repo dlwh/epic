@@ -63,7 +63,7 @@ trait Tree[+L] extends Serializable {
       if(tree.isLeaf) (None,IndexedSeq(tree.label))
       else {
         val fromChildren = tree.children.map(recCutLeaves _)
-        Some(Tree(tree.label,fromChildren.flatMap(_._1), span)) -> fromChildren.flatMap(_._2)
+        Some(Tree(tree.label,fromChildren.flatMap(_._1), tree.span)) -> fromChildren.flatMap(_._2)
       }
     }
     val (treeOpt,leaves) = recCutLeaves(this)
