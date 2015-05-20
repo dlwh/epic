@@ -59,6 +59,14 @@ case class AffineOutputTransform[FV](numOutputs: Int, numInputs: Int, innerTrans
       out
     }
     
+    def activationsDot(fv: FV, sparseIdx: Int) = {
+      activationsFromPenultimateDot(innerLayer.activations(fv), sparseIdx)
+    }
+    
+    def activationsDot(fv: FV, sparseIndices: Array[Int]) = {
+      activationsFromPenultimateDot(innerLayer.activations(fv), sparseIndices)
+    }
+    
     def activationsFromPenultimateDot(innerLayerActivations: DenseVector[Double], sparseIdx: Int) = {
       weights(sparseIdx, ::) * innerLayerActivations + bias(sparseIdx)
     }

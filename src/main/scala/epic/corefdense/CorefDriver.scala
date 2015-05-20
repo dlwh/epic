@@ -74,6 +74,8 @@ object CorefDriver {
   val nonLinType = "relu"
   val dropoutRate = 0.0
   val surfaceFeats = ""
+  val useOutputLayerFeatures = false
+  val outputLayerFeatures = ""
   
   val trainPath = "";
   val trainSize = -1;
@@ -152,10 +154,21 @@ object CorefDriver {
 //      }
 //      Logger.logss("Transform index size: " + transform.index.size)
 //      (transform, new CorefNeuralModel2(featurizer, transform, word2vecIndexed, lossFcnObj))
-      
-      // TODO: Make CorefNeuralModel3
-    val vecSize = word2vecIndexed.wordRepSize * CorefNeuralModel.extractRelevantMentionWords(trainDocGraphs.head.getMention(0)).size * 2
-    val discourseNewVecSize = word2vecIndexed.wordRepSize * CorefNeuralModel.extractRelevantMentionWords(trainDocGraphs.head.getMention(0)).size
+    
+    val outputIndexer = new Indexer[String]
+    val outputFeaturizer = new OutputFeaturizer(outputIndexer, outputLayerFeatures)
+    OutputFeaturizer.featurizeAll(outputFeaturizer, trainDocGraphs)
+    Logger.logss("Output features: " + outputIndexer.size)
+    
+    val dnOutputIndexer = new Indexer[String]
+    val dnOutputFeaturizer = new OutputFeaturizer(dnOutputIndexer, outputLayerFeatures)
+    OutputFeaturizer.featurizeAllDiscourseNew(dnOutputFeaturizer, trainDocGraphs)
+    Logger.logss("Discourse new output features: " + dnOutputIndexer.size)
+    
+    
+    val numKeyWords = CorefNeuralModel.extractRelevantMentionWords(trainDocGraphs.head.getMention(0), surfaceFeats).size
+    val vecSize = word2vecIndexed.wordRepSize * numKeyWords * 2
+    val discourseNewVecSize = word2vecIndexed.wordRepSize * numKeyWords
 //      Logger.logss("Net size: " + vecSize + " x " + hiddenSize + " x " + vecSize)
 //      val transform = if (nonLinear) {
 //        new AffineTransform(1, hiddenSize, new TanhTransform(new AffineTransform(hiddenSize, vecSize, new IdentityTransform[DenseVector[Double]]())))
@@ -163,9 +176,23 @@ object CorefDriver {
 //        new AffineTransform(1, vecSize, new IdentityTransform[DenseVector[Double]]())
 //      }
 //      Logger.logss("Transform index size: " + transform.index.size)
-    val transform = PositionalNeuralModelFactory.buildNet(word2vecIndexed, vecSize, hiddenSize, 1, 1, nonLinType, dropoutRate, backpropIntoEmbeddings, batchNormalization = false)
-    val dnTransform = if (useDiscourseNewTransform) Some(PositionalNeuralModelFactory.buildNet(word2vecIndexed, discourseNewVecSize, hiddenSize, 1, 1, nonLinType, dropoutRate, backpropIntoEmbeddings, batchNormalization = false)) else None
-    val corefNeuralModel = new CorefNeuralModel3(featurizer, transform, dnTransform, word2vecIndexed, lossFcnObj)
+    val transform = if (useOutputLayerFeatures) {
+      PositionalNeuralModelFactory.buildNet(word2vecIndexed, vecSize, hiddenSize, if (nonLinear) 1 else 0, outputIndexer.size, nonLinType, dropoutRate, backpropIntoEmbeddings, batchNormalization = false)
+    } else {
+      PositionalNeuralModelFactory.buildNet(word2vecIndexed, vecSize, hiddenSize, if (nonLinear) 1 else 0, 1, nonLinType, dropoutRate, backpropIntoEmbeddings, batchNormalization = false)
+    }
+    val maybeOutputFeaturizer = if (useOutputLayerFeatures) Some(outputFeaturizer) else None
+    val dnTransform = if (useDiscourseNewTransform) {
+      if (useOutputLayerFeatures) {
+        Some(PositionalNeuralModelFactory.buildNet(word2vecIndexed, discourseNewVecSize, hiddenSize, if (nonLinear) 1 else 0, dnOutputIndexer.size, nonLinType, dropoutRate, backpropIntoEmbeddings, batchNormalization = false))
+      } else {
+        Some(PositionalNeuralModelFactory.buildNet(word2vecIndexed, discourseNewVecSize, hiddenSize, if (nonLinear) 1 else 0, 1, nonLinType, dropoutRate, backpropIntoEmbeddings, batchNormalization = false))
+      }
+    } else {
+      None
+    }
+    val maybeDnOutputFeaturizer = if (useOutputLayerFeatures && useDiscourseNewTransform) Some(dnOutputFeaturizer) else None
+    val corefNeuralModel = new CorefNeuralModel3(featurizer, transform, dnTransform, word2vecIndexed, lossFcnObj, surfaceFeats, maybeOutputFeaturizer, maybeDnOutputFeaturizer)
     new CorefFeaturizerTrainer().featurizeBasic(trainDocGraphs, featurizer)
     
     

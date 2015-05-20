@@ -2,6 +2,7 @@ package epic.corefdense
 
 import edu.berkeley.nlp.entity.coref.DocumentGraph
 import breeze.linalg.DenseVector
+import breeze.linalg.SparseVector
 import edu.berkeley.nlp.entity.coref.PairwiseIndexingFeaturizer
 import scala.util.Random
 import epic.dense.Transform
@@ -13,15 +14,18 @@ import edu.berkeley.nlp.futile.math.SloppyMath
 import edu.berkeley.nlp.entity.coref.CorefDoc
 import edu.berkeley.nlp.futile.util.Logger
 import epic.dense.AffineOutputTransform
+import edu.berkeley.nlp.futile.fig.basic.Indexer
+import scala.collection.mutable.ArrayBuffer
 
 class CorefNeuralModel3(val sparseFeaturizer: PairwiseIndexingFeaturizer,
                         val transform: AffineOutputTransform[Array[Int]],
                         val maybeDiscourseNewTransform: Option[AffineOutputTransform[Array[Int]]],
                         val word2vec: Word2VecIndexed[String],
                         val lossFcn: (CorefDoc, Int, Int) => Float,
-                        val surfaceFeats: String = "") extends CorefPredictor {
+                        val surfaceFeats: String = "",
+                        val maybeOutputFeaturizer: Option[OutputFeaturizer] = None,
+                        val maybeDiscourseNewOutputFeaturizer: Option[OutputFeaturizer] = None) extends CorefPredictor {
   
-//  val transform = new 
   val sparseIndexer = sparseFeaturizer.getIndexer()
   
   val rng = new Random(0)
@@ -72,7 +76,6 @@ class CorefNeuralModel3(val sparseFeaturizer: PairwiseIndexingFeaturizer,
                            maybeDiscourseNewLayer: Option[AffineOutputTransform[Array[Int]]#OutputLayer],
                            lossAugment: Boolean) {
     val featsChart = input.featurizeIndexNonPrunedUseCache(sparseFeaturizer)
-    val featsOffset = 
     for (mentIdx <- 0 until input.size) {
       cachedWordVectors(mentIdx) = getWordIndicators(input.getMention(mentIdx))
       val scores = input.cachedScoreMatrix(mentIdx)
@@ -80,9 +83,22 @@ class CorefNeuralModel3(val sparseFeaturizer: PairwiseIndexingFeaturizer,
         if (!input.isPruned(mentIdx, antIdx)) {
           val sparseScore = DeepUtils.dotProductOffset(featsChart(mentIdx)(antIdx), weights, sparseFeatsOffset)
           val denseScore = if (antIdx == mentIdx) {
-            if (maybeDiscourseNewLayer.isDefined) maybeDiscourseNewLayer.get.activations(formDiscourseNewVector(input, mentIdx))(0) else 0.0F
+            if (maybeDiscourseNewLayer.isDefined) {
+              val dnVec = formDiscourseNewVector(input, mentIdx)
+              if (maybeDiscourseNewOutputFeaturizer.isDefined) {
+                maybeDiscourseNewLayer.get.activationsDot(dnVec, maybeDiscourseNewOutputFeaturizer.get.extractDiscourseNewFeats(input, mentIdx, false))
+              } else {
+                maybeDiscourseNewLayer.get.activations(dnVec)(0)
+              }
+            } else {
+              0.0F
+            }
           } else {
-            layer.activations(formVector(input, mentIdx, antIdx))(0)
+            if (maybeOutputFeaturizer.isDefined) {
+              layer.activationsDot(formVector(input, mentIdx, antIdx), maybeOutputFeaturizer.get.extractFeats(input, mentIdx, antIdx, false))
+            } else {
+              layer.activations(formVector(input, mentIdx, antIdx))(0)
+            }
           }
           scores(antIdx) = (denseScore + sparseScore + (if (lossAugment) lossFcn(input.corefDoc, mentIdx, antIdx) else 0.0)).toFloat
         } else {
@@ -125,9 +141,27 @@ class CorefNeuralModel3(val sparseFeaturizer: PairwiseIndexingFeaturizer,
           DeepUtils.addToGradient(featsChart(mentIdx)(antIdx), delta, gradient, sparseFeatsOffset);
           // Update the partials vector for dense features
           if (antIdx != mentIdx) {
-            layer.tallyDerivative(DenseVector(gradient)(0 until transform.index.size), DenseVector(Array(delta)), formVector(input, mentIdx, antIdx))
+            if (maybeOutputFeaturizer.isDefined) {
+              val of = maybeOutputFeaturizer.get.extractFeats(input, mentIdx, antIdx, false)
+              val deltas = new SparseVector(of.sorted, Array.tabulate(of.size)(i => delta), maybeOutputFeaturizer.get.featIdx.size)
+              layer.tallyDerivative(DenseVector(gradient)(0 until transform.index.size), deltas, formVector(input, mentIdx, antIdx))
+//              val deltas = Array.tabulate(maybeOutputFeaturizer.get.featIdx.size)(i => if (of.contains(i)) delta else 0.0)
+//              Logger.logss(of.toSeq)
+//              layer.tallyDerivative(DenseVector(gradient)(0 until transform.index.size), DenseVector(deltas), formVector(input, mentIdx, antIdx))
+            } else {
+              layer.tallyDerivative(DenseVector(gradient)(0 until transform.index.size), DenseVector(Array(delta)), formVector(input, mentIdx, antIdx))
+            }
           } else {
-            if (maybeDiscourseNewLayer.isDefined) maybeDiscourseNewLayer.get.tallyDerivative(DenseVector(gradient)(transform.index.size until transform.index.size + maybeDiscourseNewTransform.get.index.size), DenseVector(Array(delta)), formDiscourseNewVector(input, mentIdx))
+            if (maybeDiscourseNewLayer.isDefined) {
+              val dnVec = formDiscourseNewVector(input, mentIdx)
+              if (maybeDiscourseNewOutputFeaturizer.isDefined) {
+                val of = maybeDiscourseNewOutputFeaturizer.get.extractDiscourseNewFeats(input, mentIdx, false)
+                val deltas = new SparseVector(of.sorted, Array.tabulate(of.size)(i => delta), maybeDiscourseNewOutputFeaturizer.get.featIdx.size)
+                maybeDiscourseNewLayer.get.tallyDerivative(DenseVector(gradient)(transform.index.size until transform.index.size + maybeDiscourseNewTransform.get.index.size), deltas, dnVec)
+              } else {
+                maybeDiscourseNewLayer.get.tallyDerivative(DenseVector(gradient)(transform.index.size until transform.index.size + maybeDiscourseNewTransform.get.index.size), DenseVector(Array(delta)), dnVec)
+              }
+            }
           }
         }
         antIdx += 1
@@ -155,4 +189,80 @@ class CorefNeuralModel3(val sparseFeaturizer: PairwiseIndexingFeaturizer,
   }
   
   def computeObjective(ex: DocumentGraph, weights: Array[Double]): Double = accumulateGradientAndComputeObjective(ex, weights, Array.tabulate(weights.size)(i => 0.0))
+}
+
+case class OutputFeaturizer(val featIdx: Indexer[String],
+                            val featSpecStr: String) {
+  val featSpec = featSpecStr.split(",").toSet
+  
+  private def maybeAddFeat(indexedFeats: ArrayBuffer[Int], feat: String, addToIndexer: Boolean) {
+    if (addToIndexer) {
+      indexedFeats += featIdx.getIndex(feat)
+    } else {
+      val idx = featIdx.indexOf(feat)
+      if (idx != -1) indexedFeats += idx;
+    }
+  }
+  
+  def extractFeats(docGraph: DocumentGraph, mentIdx: Int, antIdx: Int, addToIndexer: Boolean): Array[Int] = {
+    val feats = new ArrayBuffer[Int]
+    val curr = docGraph.getMention(mentIdx)
+    val ant = docGraph.getMention(antIdx)
+    val currType = curr.mentionType
+    val antType = ant.mentionType
+    val headMatch = curr.headStringLc == ant.headStringLc
+    maybeAddFeat(feats, "Bias", addToIndexer)
+    if (featSpec.contains("more")) {
+      maybeAddFeat(feats, currType + "-" + antType, addToIndexer)
+      maybeAddFeat(feats, "HM=" + headMatch, addToIndexer)
+    }
+    if (featSpec.contains("most")) {
+      maybeAddFeat(feats, currType + "-" + antType + "-HM=" + headMatch, addToIndexer)
+    }
+    if (featSpec.contains("prons")) {
+      val currTypePron = if (currType.isClosedClass) curr.headStringLc else currType.toString
+      val antTypePron = if (antType.isClosedClass) ant.headStringLc else antType.toString
+      maybeAddFeat(feats, currTypePron + "-" + antTypePron + "-HM=" + headMatch, addToIndexer)
+    }
+    feats.toArray
+  }
+  
+  /**
+   * Extract feats from a single mention for use in the discourse new features
+   */
+  def extractDiscourseNewFeats(docGraph: DocumentGraph, mentIdx: Int, addToIndexer: Boolean): Array[Int] = {
+    val feats = new ArrayBuffer[Int]
+    val curr = docGraph.getMention(mentIdx)
+    val currType = curr.mentionType
+    maybeAddFeat(feats, "Bias", addToIndexer)
+    if (featSpec.contains("more") || featSpec.contains("most")) {
+      maybeAddFeat(feats, currType.toString(), addToIndexer)
+    }
+    if (featSpec.contains("prons")) {
+      val currTypePron = if (currType.isClosedClass) curr.headStringLc else currType.toString
+      maybeAddFeat(feats, currTypePron, addToIndexer)
+    }
+    feats.toArray
+  }
+}
+
+object OutputFeaturizer {
+  
+  def featurizeAll(outputFeaturizer: OutputFeaturizer, docGraphs: Seq[DocumentGraph]) {
+    for (docGraph <- docGraphs) {
+      for (i <- 0 until docGraph.size) {
+        for (j <- 0 until i) {
+          outputFeaturizer.extractFeats(docGraph, i, j, true)
+        }
+      }
+    }
+  }
+  
+  def featurizeAllDiscourseNew(outputFeaturizer: OutputFeaturizer, docGraphs: Seq[DocumentGraph]) {
+    for (docGraph <- docGraphs) {
+      for (i <- 0 until docGraph.size) {
+        outputFeaturizer.extractDiscourseNewFeats(docGraph, i, true)
+      }
+    }
+  }
 }

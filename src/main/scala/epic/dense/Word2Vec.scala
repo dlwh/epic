@@ -7,7 +7,7 @@ import java.util.regex.Pattern
 import scala.collection.mutable.HashMap
 import scala.util.Random
 import breeze.linalg.Counter
-import edu.berkeley.nlp.futile.fig.basic.IOUtils
+import java.io.File
 
 object Word2Vec {
   
@@ -210,10 +210,11 @@ object Word2Vec {
   }
   
   def readBansalEmbeddings(embeddingsPath: String, words: Set[String], inputVectorBias: Boolean) = {
-    val inFile = IOUtils.lineIterator(embeddingsPath)
+//    val inFile = IOUtils.lineIterator(embeddingsPath)
+    val inFile = scala.io.Source.fromFile(new File(embeddingsPath)).getLines()
     val word2Vec = new HashMap[String,Array[Float]];
     var firstLine = true
-    while (inFile.hasNext()) {
+    while (inFile.hasNext) {
       val line = inFile.next;
       if (firstLine) {
         if (line.split("\\s+").size == 2) {

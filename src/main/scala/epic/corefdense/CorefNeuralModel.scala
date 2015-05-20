@@ -23,7 +23,17 @@ object CorefNeuralModel {
   
   // Note that the placeholders here <s> 
   def extractRelevantMentionWords(ment: Mention, surfaceFeats: String = "") = {
-    if (surfaceFeats == "most") {
+    if (surfaceFeats == "head") {
+      Array(ment.contextWordOrPlaceholder(ment.headIdx - ment.startIdx))
+    } else if (surfaceFeats == "headcontext") {
+      Array(ment.contextWordOrPlaceholder(-1),
+            ment.contextWordOrPlaceholder(ment.headIdx - ment.startIdx),
+            ment.contextWordOrPlaceholder(ment.endIdx - ment.startIdx))
+    } else if (surfaceFeats == "headfirstlast") {
+      Array(ment.contextWordOrPlaceholder(0),
+            ment.contextWordOrPlaceholder(ment.headIdx - ment.startIdx),
+            ment.contextWordOrPlaceholder(ment.endIdx - 1 - ment.startIdx))
+    } else if (surfaceFeats == "most") {
       Array(ment.contextWordOrPlaceholder(-2),
             ment.contextWordOrPlaceholder(-1),
             ment.contextWordOrPlaceholder(0),
