@@ -37,6 +37,12 @@ import epic.features.SegmentedIndex
 import epic.framework.Feature
 import scala.collection.mutable.HashSet
 import epic.dense.Word2Vec
+import epic.dense.CachingLookupTransform
+import epic.dense.CachingLookupAndAffineTransformDense
+import epic.dense.AffineOutputTransform
+import epic.dense.EmbeddingsTransform
+import epic.dense.Transform
+import epic.dense.CachingLookupAffineWithSparse
 
 object CorefDriver {
   
@@ -85,6 +91,8 @@ object CorefDriver {
   val checkEmpiricalGradient = false
   
   val oldStyleCorefNN = false;
+  
+  val useSparseNetFeats = false
   
   ////////////////////
 
@@ -177,22 +185,26 @@ object CorefDriver {
 //      }
 //      Logger.logss("Transform index size: " + transform.index.size)
     val transform = if (useOutputLayerFeatures) {
-      PositionalNeuralModelFactory.buildNet(word2vecIndexed, vecSize, hiddenSize, if (nonLinear) 1 else 0, outputIndexer.size, nonLinType, dropoutRate, backpropIntoEmbeddings, batchNormalization = false)
+      if (useSparseNetFeats) {
+        buildNetWithSparse(word2vecIndexed, numKeyWords * 2, SimplePairwiseIndexingFeaturizerJoint.getPredefinedFeatureDomains, hiddenSize, if (nonLinear) 1 else 0, outputIndexer.size, nonLinType, dropoutRate)
+      } else {
+        buildNet(word2vecIndexed, vecSize, hiddenSize, if (nonLinear) 1 else 0, outputIndexer.size, nonLinType, dropoutRate, backpropIntoEmbeddings, batchNormalization = false)
+      }
     } else {
-      PositionalNeuralModelFactory.buildNet(word2vecIndexed, vecSize, hiddenSize, if (nonLinear) 1 else 0, 1, nonLinType, dropoutRate, backpropIntoEmbeddings, batchNormalization = false)
+      buildNet(word2vecIndexed, vecSize, hiddenSize, if (nonLinear) 1 else 0, 1, nonLinType, dropoutRate, backpropIntoEmbeddings, batchNormalization = false)
     }
     val maybeOutputFeaturizer = if (useOutputLayerFeatures) Some(outputFeaturizer) else None
     val dnTransform = if (useDiscourseNewTransform) {
       if (useOutputLayerFeatures) {
-        Some(PositionalNeuralModelFactory.buildNet(word2vecIndexed, discourseNewVecSize, hiddenSize, if (nonLinear) 1 else 0, dnOutputIndexer.size, nonLinType, dropoutRate, backpropIntoEmbeddings, batchNormalization = false))
+        Some(buildNet(word2vecIndexed, discourseNewVecSize, hiddenSize, if (nonLinear) 1 else 0, dnOutputIndexer.size, nonLinType, dropoutRate, backpropIntoEmbeddings, batchNormalization = false))
       } else {
-        Some(PositionalNeuralModelFactory.buildNet(word2vecIndexed, discourseNewVecSize, hiddenSize, if (nonLinear) 1 else 0, 1, nonLinType, dropoutRate, backpropIntoEmbeddings, batchNormalization = false))
+        Some(buildNet(word2vecIndexed, discourseNewVecSize, hiddenSize, if (nonLinear) 1 else 0, 1, nonLinType, dropoutRate, backpropIntoEmbeddings, batchNormalization = false))
       }
     } else {
       None
     }
     val maybeDnOutputFeaturizer = if (useOutputLayerFeatures && useDiscourseNewTransform) Some(dnOutputFeaturizer) else None
-    val corefNeuralModel = new CorefNeuralModel3(featurizer, transform, dnTransform, word2vecIndexed, lossFcnObj, surfaceFeats, maybeOutputFeaturizer, maybeDnOutputFeaturizer)
+    val corefNeuralModel = new CorefNeuralModel3(featurizer, transform, dnTransform, word2vecIndexed, lossFcnObj, surfaceFeats, maybeOutputFeaturizer, maybeDnOutputFeaturizer, useSparseNetFeats)
     new CorefFeaturizerTrainer().featurizeBasic(trainDocGraphs, featurizer)
     
     
@@ -241,6 +253,77 @@ object CorefDriver {
     Logger.logss(CorefEvaluator.evaluateAndRender(devDocGraphs, allPredBackptrs, allPredClusterings, conllEvalScriptPath, "DEV: ", ""));
     Logger.endTrack();
     LightRunner.finalizeOutput()
+  }
+  
+  
+  def buildNetInnerTransforms(word2vecIndexed: Word2VecIndexed[String],
+                              inputSize: Int,
+                              numHidden: Int,
+                              numHiddenLayers: Int,
+                              nonLinType: String,
+                              dropoutRate: Double,
+                              backpropIntoEmbeddings: Boolean,
+                              batchNormalization: Boolean): Transform[Array[Int],DenseVector[Double]] = {
+    if (numHiddenLayers == 0) {
+      new CachingLookupTransform(word2vecIndexed)
+    } else {
+      val baseTransformLayer = if (backpropIntoEmbeddings) {
+        new EmbeddingsTransform(numHidden, inputSize, word2vecIndexed)
+      } else {
+        new CachingLookupAndAffineTransformDense(numHidden, inputSize, word2vecIndexed)
+      }
+      var currLayer = PositionalNeuralModelFactory.addNonlinearity(nonLinType, numHidden, dropoutRate, batchNormalization, baseTransformLayer)
+      for (i <- 1 until numHiddenLayers) {
+        currLayer = PositionalNeuralModelFactory.addNonlinearity(nonLinType, numHidden, dropoutRate, batchNormalization, new AffineTransform(numHidden, numHidden, currLayer))
+      }
+      currLayer
+    }
+  }
+  
+  def buildNet(word2vecIndexed: Word2VecIndexed[String],
+               inputSize: Int,
+               numHidden: Int,
+               numHiddenLayers: Int,
+               outputSize: Int,
+               nonLinType: String,
+               dropoutRate: Double,
+               backpropIntoEmbeddings: Boolean,
+               batchNormalization: Boolean): AffineOutputTransform[Array[Int]] = {
+    val innerTransform = buildNetInnerTransforms(word2vecIndexed, inputSize, numHidden, numHiddenLayers, nonLinType, dropoutRate, backpropIntoEmbeddings, batchNormalization)
+    new AffineOutputTransform(outputSize, if (numHiddenLayers >= 1) numHidden else inputSize, innerTransform)
+  }
+  
+  
+  
+  def buildNetInnerTransformsWithSparse(word2vecIndexed: Word2VecIndexed[String],
+                              inputWords: Int,
+                              inputSparseFeatDomains: Array[Int],
+                              numHidden: Int,
+                              numHiddenLayers: Int,
+                              nonLinType: String,
+                              dropoutRate: Double): Transform[Array[Int],DenseVector[Double]] = {
+    if (numHiddenLayers == 0) {
+      new CachingLookupTransform(word2vecIndexed)
+    } else {
+      val baseTransformLayer = new CachingLookupAffineWithSparse(numHidden, inputWords, word2vecIndexed, inputSparseFeatDomains)
+      var currLayer = PositionalNeuralModelFactory.addNonlinearity(nonLinType, numHidden, dropoutRate, false, baseTransformLayer)
+      for (i <- 1 until numHiddenLayers) {
+        currLayer = PositionalNeuralModelFactory.addNonlinearity(nonLinType, numHidden, dropoutRate, false, new AffineTransform(numHidden, numHidden, currLayer))
+      }
+      currLayer
+    }
+  }
+  
+  def buildNetWithSparse(word2vecIndexed: Word2VecIndexed[String],
+                         inputWords: Int,
+                         inputSparseFeatDomains: Array[Int],
+                         numHidden: Int,
+                         numHiddenLayers: Int,
+                         outputSize: Int,
+                         nonLinType: String,
+                         dropoutRate: Double): AffineOutputTransform[Array[Int]] = {
+    val innerTransform = buildNetInnerTransformsWithSparse(word2vecIndexed, inputWords, inputSparseFeatDomains, numHidden, numHiddenLayers, nonLinType, dropoutRate)
+    new AffineOutputTransform(outputSize, if (numHiddenLayers >= 1) numHidden else inputWords * word2vecIndexed.wordRepSize, innerTransform)
   }
   
 //  def getInterestingIndexSet(transform: AffineTransform[DenseVector[Double],DenseVector[Double]]) {

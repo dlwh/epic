@@ -24,7 +24,8 @@ class CorefNeuralModel3(val sparseFeaturizer: PairwiseIndexingFeaturizer,
                         val lossFcn: (CorefDoc, Int, Int) => Float,
                         val surfaceFeats: String = "",
                         val maybeOutputFeaturizer: Option[OutputFeaturizer] = None,
-                        val maybeDiscourseNewOutputFeaturizer: Option[OutputFeaturizer] = None) extends CorefPredictor {
+                        val maybeDiscourseNewOutputFeaturizer: Option[OutputFeaturizer] = None,
+                        val useSparseNetFeats: Boolean = false) extends CorefPredictor {
   
   val sparseIndexer = sparseFeaturizer.getIndexer()
   
@@ -47,7 +48,11 @@ class CorefNeuralModel3(val sparseFeaturizer: PairwiseIndexingFeaturizer,
   }
   
   private def formVector(docGraph: DocumentGraph, mentIdx: Int, antIdx: Int) = {
-    cachedWordVectors(mentIdx) ++ cachedWordVectors(antIdx)
+    if (useSparseNetFeats) {
+      cachedWordVectors(mentIdx) ++ cachedWordVectors(antIdx) ++ SimplePairwiseIndexingFeaturizerJoint.featurizePredefined(docGraph, mentIdx, antIdx)
+    } else {
+      cachedWordVectors(mentIdx) ++ cachedWordVectors(antIdx)
+    }
   }
   
   private def formDiscourseNewVector(docGraph: DocumentGraph, mentIdx: Int) = {
