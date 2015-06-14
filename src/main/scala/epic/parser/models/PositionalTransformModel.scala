@@ -107,7 +107,7 @@ class PositionalTransformModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSe
     SegmentedIndex((transforms.map(_.index) ++ depTransforms.map(_.index) ++ decoupledTransforms.map(_.index)):_*)
   }
   
-  def initialWeightVector(randomize: Boolean, initWeightsScale: Double, initializerSpec: String, trulyRandom: Boolean = false): DenseVector[Double] = {
+  def initialWeightVector(initWeightsScale: Double, initializerSpec: String, trulyRandom: Boolean = false): DenseVector[Double] = {
     val rng = if (trulyRandom) new Random() else new Random(0)
 //    val initTransformWeights = transform.initialWeightVector(initWeightsScale, rng, true);
     val initTransformWeights = DenseVector.vertcat(transforms.map(_.initialWeightVector(initWeightsScale, rng, true, initializerSpec)):_*);

@@ -142,7 +142,7 @@ object ParserTrainer extends epic.parser.ParserPipeline with LazyLogging {
     val cachedObj = new CachedBatchDiffFunction(obj)
     val init = if (model.isInstanceOf[PositionalTransformModel[AnnotatedLabel, AnnotatedLabel, String]]) {
       println("Initializing weights custom for model " + model.getClass)
-      model.asInstanceOf[PositionalTransformModel[AnnotatedLabel, AnnotatedLabel, String]].initialWeightVector(randomize, initWeightsScale, initializerSpec)
+      model.asInstanceOf[PositionalTransformModel[AnnotatedLabel, AnnotatedLabel, String]].initialWeightVector(initWeightsScale, initializerSpec)
     } else {
       obj.initialWeightVector(randomize, initWeightsScale)
     }
@@ -226,7 +226,7 @@ object ParserTrainer extends epic.parser.ParserPipeline with LazyLogging {
       val weights1 = itr.take(maxIterations).last.x
       // Hard-wired to use Adadelta
       val castModel = model.asInstanceOf[PositionalTransformModel[AnnotatedLabel, AnnotatedLabel, String]]
-      val initParams2 = castModel.initialWeightVector(randomize, initWeightsScale, initializerSpec, trulyRandom = true)
+      val initParams2 = castModel.initialWeightVector(initWeightsScale, initializerSpec, trulyRandom = true)
       val itr2 = new AdadeltaGradientDescentDVD(params.opt.maxIterations).iterations(cachedObj.withRandomBatches(params.opt.batchSize), initParams2).
             asInstanceOf[Iterator[FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State]]
       println("Optimizing second parser")

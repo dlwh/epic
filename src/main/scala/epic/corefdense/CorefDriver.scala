@@ -76,12 +76,14 @@ object CorefDriver {
   val useDiscourseNewTransform: Boolean = false;
   val backpropIntoEmbeddings: Boolean = false;
   val hiddenSize = 100
-  val nonLinear = true;
+  val numHiddenLayers = 1
   val nonLinType = "relu"
   val dropoutRate = 0.0
   val surfaceFeats = ""
   val useOutputLayerFeatures = false
   val outputLayerFeatures = ""
+  
+  val sparseFeatStr = "FINAL"
   
   val trainPath = "";
   val trainSize = -1;
@@ -147,7 +149,7 @@ object CorefDriver {
     
     featureIndexer.getIndex(PairwiseIndexingFeaturizerJoint.UnkFeatName);
 //    val featurizer = new SimplePairwiseIndexingFeaturizerJoint(featureIndexer, featsToUse.split(",").toSet)
-    val featureSetSpec = FeatureSetSpecification("FINAL", ConjScheme.COARSE_BOTH, ConjFeatures.TYPE_OR_CANONICAL_PRON, "", "");
+    val featureSetSpec = FeatureSetSpecification(sparseFeatStr, ConjScheme.COARSE_BOTH, ConjFeatures.TYPE_OR_CANONICAL_PRON, "", "");
     val featurizer = new PairwiseIndexingFeaturizerJoint(featureIndexer, featureSetSpec, lexicalCounts, None, None)
     val lossFcnObj = PairwiseLossFunctions(lossFcn)
     
@@ -173,6 +175,13 @@ object CorefDriver {
     OutputFeaturizer.featurizeAllDiscourseNew(dnOutputFeaturizer, trainDocGraphs)
     Logger.logss("Discourse new output features: " + dnOutputIndexer.size)
     
+    val maybeSparseNetFeaturizer: Option[SimplePairwiseIndexingFeaturizerJoint] = if (useSparseNetFeats) {
+      val feat = new SimplePairwiseIndexingFeaturizerJoint(SimplePairwiseIndexingFeaturizerJoint.makeTypeIndexer(trainDocGraphs))
+      Logger.logss("Predefined feature domain sizes: " + feat.getPredefinedFeatureDomains.toSeq)
+      Some(feat)
+    } else {
+      None
+    }
     
     val numKeyWords = CorefNeuralModel.extractRelevantMentionWords(trainDocGraphs.head.getMention(0), surfaceFeats).size
     val vecSize = word2vecIndexed.wordRepSize * numKeyWords * 2
@@ -184,27 +193,24 @@ object CorefDriver {
 //        new AffineTransform(1, vecSize, new IdentityTransform[DenseVector[Double]]())
 //      }
 //      Logger.logss("Transform index size: " + transform.index.size)
-    val transform = if (useOutputLayerFeatures) {
-      if (useSparseNetFeats) {
-        buildNetWithSparse(word2vecIndexed, numKeyWords * 2, SimplePairwiseIndexingFeaturizerJoint.getPredefinedFeatureDomains, hiddenSize, if (nonLinear) 1 else 0, outputIndexer.size, nonLinType, dropoutRate)
-      } else {
-        buildNet(word2vecIndexed, vecSize, hiddenSize, if (nonLinear) 1 else 0, outputIndexer.size, nonLinType, dropoutRate, backpropIntoEmbeddings, batchNormalization = false)
-      }
+    val netOutputSize = if (useOutputLayerFeatures) outputIndexer.size else 1
+    val transform = if (useSparseNetFeats) {
+      buildNetWithSparse(word2vecIndexed, numKeyWords * 2, maybeSparseNetFeaturizer.get.getPredefinedFeatureDomains, hiddenSize, numHiddenLayers, netOutputSize, nonLinType, dropoutRate)
     } else {
-      buildNet(word2vecIndexed, vecSize, hiddenSize, if (nonLinear) 1 else 0, 1, nonLinType, dropoutRate, backpropIntoEmbeddings, batchNormalization = false)
+      buildNet(word2vecIndexed, vecSize, hiddenSize, numHiddenLayers, netOutputSize, nonLinType, dropoutRate, backpropIntoEmbeddings, batchNormalization = false)
     }
     val maybeOutputFeaturizer = if (useOutputLayerFeatures) Some(outputFeaturizer) else None
     val dnTransform = if (useDiscourseNewTransform) {
       if (useOutputLayerFeatures) {
-        Some(buildNet(word2vecIndexed, discourseNewVecSize, hiddenSize, if (nonLinear) 1 else 0, dnOutputIndexer.size, nonLinType, dropoutRate, backpropIntoEmbeddings, batchNormalization = false))
+        Some(buildNet(word2vecIndexed, discourseNewVecSize, hiddenSize, numHiddenLayers, dnOutputIndexer.size, nonLinType, dropoutRate, backpropIntoEmbeddings, batchNormalization = false))
       } else {
-        Some(buildNet(word2vecIndexed, discourseNewVecSize, hiddenSize, if (nonLinear) 1 else 0, 1, nonLinType, dropoutRate, backpropIntoEmbeddings, batchNormalization = false))
+        Some(buildNet(word2vecIndexed, discourseNewVecSize, hiddenSize, numHiddenLayers, 1, nonLinType, dropoutRate, backpropIntoEmbeddings, batchNormalization = false))
       }
     } else {
       None
     }
     val maybeDnOutputFeaturizer = if (useOutputLayerFeatures && useDiscourseNewTransform) Some(dnOutputFeaturizer) else None
-    val corefNeuralModel = new CorefNeuralModel3(featurizer, transform, dnTransform, word2vecIndexed, lossFcnObj, surfaceFeats, maybeOutputFeaturizer, maybeDnOutputFeaturizer, useSparseNetFeats)
+    val corefNeuralModel = new CorefNeuralModel3(featurizer, transform, dnTransform, word2vecIndexed, lossFcnObj, surfaceFeats, maybeOutputFeaturizer, maybeDnOutputFeaturizer, maybeSparseNetFeaturizer)
     new CorefFeaturizerTrainer().featurizeBasic(trainDocGraphs, featurizer)
     
     

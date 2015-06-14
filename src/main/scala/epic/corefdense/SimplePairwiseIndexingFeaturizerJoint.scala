@@ -5,52 +5,9 @@ import edu.berkeley.nlp.entity.sem.QueryCountsBundle
 import edu.berkeley.nlp.entity.coref.PairwiseIndexingFeaturizer
 import edu.berkeley.nlp.futile.fig.basic.Indexer
 import scala.collection.mutable.ArrayBuffer
+import edu.berkeley.nlp.entity.coref.Mention
 
-class SimplePairwiseIndexingFeaturizerJoint(val indexer: Indexer[String],
-                                            val featsToUse: Set[String]) extends PairwiseIndexingFeaturizer {
-  
-  def getIndexer(): Indexer[String] = indexer
-  
-  def getQueryCountsBundle: Option[QueryCountsBundle] = None
-
-  private def maybeAddFeat(indexedFeats: ArrayBuffer[Int], feat: String, addToIndexer: Boolean) {
-    if (addToIndexer) {
-      indexedFeats += indexer.getIndex(feat)
-    } else {
-      val idx = indexer.indexOf(feat)
-      if (idx != -1) indexedFeats += idx;
-    }
-  }
-  
-  def featurizeIndex(docGraph: DocumentGraph, currMentIdx: Int, antecedentIdx: Int, addToFeaturizer: Boolean): Array[Int] = {
-    val feats = new ArrayBuffer[Int]
-    def add(feat: String) = maybeAddFeat(feats, feat, addToFeaturizer)
-    
-    val currMent = docGraph.getMention(currMentIdx)
-    val antecedentMent = docGraph.getMention(antecedentIdx)
-    
-    //val snStr = ;
-    val sn = "SN=" + antecedentIdx == currMentIdx
-    add("SN=" + sn)
-    add("SNMentLen=" + currMent.words.size + sn)
-    add("Dist=" + Math.min(currMentIdx - antecedentIdx, 10));
-    add("SentDist=" + Math.min(currMent.sentIdx - antecedentMent.sentIdx, 10));
-    add("iWi=" + currMent.iWi(antecedentMent));
-    val exactStrMatch = (currMent.spanToString.toLowerCase.equals(antecedentMent.spanToString.toLowerCase));
-    add("ExactStrMatch=" + exactStrMatch);
-    add("ThisContained=" + (antecedentMent.spanToString.contains(currMent.spanToString)));
-    add("AntContained=" + (currMent.spanToString.contains(antecedentMent.spanToString)));
-    val headMatch = currMent.headStringLc.equals(antecedentMent.headStringLc);
-    add("HeadMatch=" + headMatch);
-    add("ThisHeadContained=" + (antecedentMent.spanToString.contains(currMent.headString)));
-    add("AntHeadContained=" + (currMent.spanToString.contains(antecedentMent.headString)));
-    
-    // TODO: featurize + index
-    feats.toArray
-  }
-}
-
-object SimplePairwiseIndexingFeaturizerJoint {
+class SimplePairwiseIndexingFeaturizerJoint(val typeIndexer: Indexer[String]) {
   
   val predefinedFeatureDomains = Array(6, // ment len
                                        6, // prev ment len
@@ -62,7 +19,9 @@ object SimplePairwiseIndexingFeaturizerJoint {
                                        2, // exact reverse contained
                                        2, // head match
                                        2, // head contained
-                                       2) // head reverse contained
+                                       2, // head reverse contained
+                                       typeIndexer.size, // curr mention type
+                                       typeIndexer.size) // ant mention type
   
   def getPredefinedFeatureDomains: Array[Int] = predefinedFeatureDomains
   
@@ -90,6 +49,65 @@ object SimplePairwiseIndexingFeaturizerJoint {
     addFeat(if (currMent.headStringLc.equals(antMent.headStringLc)) 1 else 0); // head match
     addFeat(if (antMent.spanToString.contains(currMent.headString)) 1 else 0); // head contained
     addFeat(if (currMent.spanToString.contains(antMent.headString)) 1 else 0); // head reverse contained
+    val currType = SimplePairwiseIndexingFeaturizerJoint.mentType(currMent)
+    // Use the first type by convention for unks (should be extremely rare)
+    addFeat(if (typeIndexer.contains(currType)) typeIndexer.indexOf(currType) else 0) // curr mention type
+    val antType = SimplePairwiseIndexingFeaturizerJoint.mentType(antMent)
+    addFeat(if (typeIndexer.contains(antType)) typeIndexer.indexOf(antType) else 0) // ant mention type
     feats
+  }
+
+//  private def maybeAddFeat(indexedFeats: ArrayBuffer[Int], feat: String, addToIndexer: Boolean) {
+//    if (addToIndexer) {
+//      indexedFeats += indexer.getIndex(feat)
+//    } else {
+//      val idx = indexer.indexOf(feat)
+//      if (idx != -1) indexedFeats += idx;
+//    }
+//  }
+//  
+//  def featurizeIndex(docGraph: DocumentGraph, currMentIdx: Int, antecedentIdx: Int, addToFeaturizer: Boolean): Array[Int] = {
+//    val feats = new ArrayBuffer[Int]
+//    def add(feat: String) = maybeAddFeat(feats, feat, addToFeaturizer)
+//    
+//    val currMent = docGraph.getMention(currMentIdx)
+//    val antecedentMent = docGraph.getMention(antecedentIdx)
+//    
+//    //val snStr = ;
+//    val sn = "SN=" + antecedentIdx == currMentIdx
+//    add("SN=" + sn)
+//    add("SNMentLen=" + currMent.words.size + sn)
+//    add("Dist=" + Math.min(currMentIdx - antecedentIdx, 10));
+//    add("SentDist=" + Math.min(currMent.sentIdx - antecedentMent.sentIdx, 10));
+//    add("iWi=" + currMent.iWi(antecedentMent));
+//    val exactStrMatch = (currMent.spanToString.toLowerCase.equals(antecedentMent.spanToString.toLowerCase));
+//    add("ExactStrMatch=" + exactStrMatch);
+//    add("ThisContained=" + (antecedentMent.spanToString.contains(currMent.spanToString)));
+//    add("AntContained=" + (currMent.spanToString.contains(antecedentMent.spanToString)));
+//    val headMatch = currMent.headStringLc.equals(antecedentMent.headStringLc);
+//    add("HeadMatch=" + headMatch);
+//    add("ThisHeadContained=" + (antecedentMent.spanToString.contains(currMent.headString)));
+//    add("AntHeadContained=" + (currMent.spanToString.contains(antecedentMent.headString))));
+//    
+//    
+//    
+//    // TODO: featurize + index
+//    feats.toArray
+//  }
+}
+
+object SimplePairwiseIndexingFeaturizerJoint {
+  
+  def mentType(ment: Mention) = if (ment.mentionType.isClosedClass) ment.headStringLc else ment.mentionType.toString
+  
+  def makeTypeIndexer(docGraphs: Seq[DocumentGraph]) = {
+    val indexer = new Indexer[String]
+    for (docGraph <- docGraphs) {
+      for (ment <- docGraph.getMentions) {
+        val currTypePron = mentType(ment)
+        indexer.getIndex(currTypePron)
+      }
+    }
+    indexer
   }
 }

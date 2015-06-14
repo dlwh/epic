@@ -67,14 +67,14 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
                             @Help(text="For features not seen in gold trees, we bin them into dummyFeats * numGoldFeatures bins using hashing. If negative, use absolute value as number of hash features.")
                             dummyFeats: Double = 0.5,
                             commonWordThreshold: Int = 100,
-                            useSparseFeatures: Boolean = false,
+                            useSparseFeatures: Boolean = true,
                             @Help(text="Options: tanh, relu, cube")
                             nonLinType: String = "tanh",
                             @Help(text="Options: normal, random, trivial, normalpos")
                             embeddingType: String = "normal",
                             backpropIntoEmbeddings: Boolean = false,
                             dropoutRate: Double = 0.0,
-                            numHidden: Int = 100,
+                            numHidden: Int = 200,
                             numHiddenLayers: Int = 1,
                             useDeps: Boolean = false,
                             word2vecPath: String = "../cnnkim/data/GoogleNews-vectors-negative300.bin",

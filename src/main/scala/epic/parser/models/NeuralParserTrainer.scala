@@ -55,8 +55,6 @@ object NeuralParserTrainer extends epic.parser.ParserPipeline with LazyLogging {
                     iterPerValidate: Int = 30,
                     @Help(text="How many threads to use, default is to use whatever Scala thinks is best.")
                     threads: Int = -1,
-                    @Help(text="Should we randomize weights? Some models will force randomization.")
-                    randomize: Boolean = false,
                     @Help(text="Scale of random weight initialization")
                     initWeightsScale: Double = 1E-2,
                     @Help(text="Scale of random weight initialization")
@@ -66,7 +64,7 @@ object NeuralParserTrainer extends epic.parser.ParserPipeline with LazyLogging {
                     @Help(text="True if we should train two models and ram them together")
                     ensemble: Boolean = false,
                     @Help(text="Use Adadelta for optimiziation instead of Adagrad")
-                    useAdadelta: Boolean = false,
+                    useAdadelta: Boolean = true,
                     @Help(text="Should we enforce reachability? Can be useful if we're pruning the gold tree.")
                     enforceReachability: Boolean = true,
                     @Help(text="Whether or not we use constraints. Not using constraints is very slow.")
@@ -129,7 +127,7 @@ object NeuralParserTrainer extends epic.parser.ParserPipeline with LazyLogging {
     val obj = new ModelObjective(model, theTrees, params.threads)
     val cachedObj = new CachedBatchDiffFunction(obj)
     println("Initializing weights custom for model " + model.getClass)
-    val init = model.initialWeightVector(randomize, initWeightsScale, initializerSpec)
+    val init = model.initialWeightVector(initWeightsScale, initializerSpec)
     if(checkGradient) {
       val cachedObj2 = new CachedBatchDiffFunction(new ModelObjective(model, theTrees.take(opt.batchSize), params.threads))
       val defaultIndices = (0 until 10).map(i => if(i < 0) model.featureIndex.size + i else i)
@@ -203,7 +201,7 @@ object NeuralParserTrainer extends epic.parser.ParserPipeline with LazyLogging {
     if (ensemble) {
       val weights1 = itr.take(maxIterations).last.x
       // Hard-wired to use Adadelta
-      val initParams2 = model.initialWeightVector(randomize, initWeightsScale, initializerSpec, trulyRandom = true)
+      val initParams2 = model.initialWeightVector(initWeightsScale, initializerSpec, trulyRandom = true)
       val itr2 = new AdadeltaGradientDescentDVD(params.opt.maxIterations).iterations(cachedObj.withRandomBatches(params.opt.batchSize), initParams2).
             asInstanceOf[Iterator[FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State]]
       println("Optimizing second parser")
