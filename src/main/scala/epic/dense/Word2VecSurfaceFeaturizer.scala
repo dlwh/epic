@@ -91,7 +91,7 @@ class Word2VecSurfaceFeaturizerIndexed[W](val word2vecIndexed: Word2VecIndexed[W
       
       def reducedFeaturesForSpan(start: Int, end: Int) = {
 //        Array(fetchWord(start - 1), fetchWord(start), -1, -1, fetchWord(end - 1), fetchWord(end))
-        if (featureSpec == "" || featureSpec == "moresplit") {
+        if (featureSpec == "" || featureSpec == "moresplit" || featureSpec == "basic") {
           Array(fetchWord(start - 1), fetchWord(start), fetchWord(end - 1), fetchWord(end))
         } else if (featureSpec == "morecontext") {
           Array(fetchWord(start - 2), fetchWord(start - 1), fetchWord(start), fetchWord(end - 1), fetchWord(end), fetchWord(end + 1))
@@ -108,7 +108,7 @@ class Word2VecSurfaceFeaturizerIndexed[W](val word2vecIndexed: Word2VecIndexed[W
       
       def featuresForSpan(start: Int, end: Int) = {
 //        Array(fetchWord(start - 1), fetchWord(start), -1, -1, fetchWord(end - 1), fetchWord(end))
-        if (featureSpec == "") {
+        if (featureSpec == "" || featureSpec == "basic") {
           Array(fetchWord(start - 1), fetchWord(start), -1, -1, fetchWord(end - 1), fetchWord(end))
         } else if (featureSpec == "morecontext") {
           Array(fetchWord(start - 2), fetchWord(start - 1), fetchWord(start), -1, -1, fetchWord(end - 1), fetchWord(end), fetchWord(end + 1))
@@ -127,7 +127,7 @@ class Word2VecSurfaceFeaturizerIndexed[W](val word2vecIndexed: Word2VecIndexed[W
         
       def featuresForSplit(start: Int, split: Int, end: Int) = {
 //        Array(fetchWord(start - 1), fetchWord(start), fetchWord(split - 1), fetchWord(split), fetchWord(end - 1), fetchWord(end))
-        if (featureSpec == "") {
+        if (featureSpec == "" || featureSpec == "basic") {
           Array(fetchWord(start - 1), fetchWord(start), fetchWord(split - 1), fetchWord(split), fetchWord(end - 1), fetchWord(end))
         } else if (featureSpec == "morecontext") {
           Array(fetchWord(start - 2), fetchWord(start - 1), fetchWord(start), fetchWord(split - 1), fetchWord(split), fetchWord(end - 1), fetchWord(end), fetchWord(end + 1))

@@ -42,44 +42,66 @@ import epic.dense.BatchNormalizationTransform
  * @author gdurrett
  **/
 
-case class ExtraPNMParams(useSparseLfsuf: Boolean = true,
-                          useSparseBrown: Boolean = false,
-                          useMostSparseIndicators: Boolean = false,
-                          vectorRescaling: Double = 1.0,
-                          outputEmbedding: Boolean = false,
-                          outputEmbeddingDim: Int = 20,
-                          coarsenByRoot: Boolean = false, // should we coarsen for initialization by root symbol?
-                          surfaceFeatureSpec: String = "",
-                          decoupleTransforms: Boolean = false,
-                          treebankVocFile: String = "",
-                          batchNormalization: Boolean = false,
-                          useRootLabel: Boolean = false,
-                          lowercasedVectors: Boolean = false,
-                          randomizeUnks: Boolean = false)
 
+/**
+ * Less-used parameters
+ */
+case class ExtraPNMParams(@Help(text="Used for ablations with random word embeddings; don't change this. Options: normal, random, trivial, normalpos")
+                          embeddingType: String = "normal",
+                          @Help(text="Use longest frequent suffix (standard representation) for sparse feats")
+                          useSparseLfsuf: Boolean = true,
+                          @Help(text="Use sparse Brown cluster features")
+                          useSparseBrown: Boolean = false,
+                          @Help(text="Use expanded set of sparse surface features (doesn't help)")
+                          useMostSparseIndicators: Boolean = false,
+                          @Help(text="Scaling factor for all input vectors")
+                          vectorRescaling: Double = 1.0,
+                          @Help(text="Use the output embedding model (Figure 4b in the neural CRF paper)")
+                          outputEmbedding: Boolean = false,
+                          @Help(text="Dimension of the output embedding model")
+                          outputEmbeddingDim: Int = 20,
+                          @Help(text="When initializing the output embedding model, initialize based on root symbols")
+                          coarsenByRoot: Boolean = false,
+                          @Help(text="Use separate neural net parameters for span/unary/binary settings. Doesn't help.")
+                          decoupleTransforms: Boolean = false,
+                          @Help(text="Apply batch normalization; doesn't work.")
+                          batchNormalization: Boolean = false,
+                          @Help(text="Extract additional output features based on root label.")
+                          useRootLabel: Boolean = false,
+                          @Help(text="Set unknown word vectors to be random rather than 0")
+                          randomizeUnks: Boolean = false)
+                          
 case class PositionalNeuralModelFactory(@Help(text=
                               """The kind of annotation to do on the refined grammar. Default uses just parent annotation.
 You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Manning 2003.
                               """)
                             annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = GenerativeParser.defaultAnnotator(),
-                            @Help(text="Old weights to initialize with. Optional")
-                            oldWeights: File = null,
                             @Help(text="For features not seen in gold trees, we bin them into dummyFeats * numGoldFeatures bins using hashing. If negative, use absolute value as number of hash features.")
                             dummyFeats: Double = 0.5,
+                            @Help(text="Sparse features only fire on suffixes seen at lease this many times. Lower than 100 doesn't seem to do better.")
                             commonWordThreshold: Int = 100,
+                            @Help(text="Combine the neural net features with sparse features. The NN does well on its own but sparse helps by >1 F1.")
                             useSparseFeatures: Boolean = true,
-                            @Help(text="Options: tanh, relu, cube")
-                            nonLinType: String = "tanh",
-                            @Help(text="Options: normal, random, trivial, normalpos")
-                            embeddingType: String = "normal",
+                            @Help(text="Nonlinearity to use. Options: tanh, relu, cube")
+                            nonLinType: String = "relu",
+                            @Help(text="Backpropagate into word embeddings (tune them during training). Doesn't help.")
                             backpropIntoEmbeddings: Boolean = false,
+                            @Help(text="Dropout rate; 0.0 won't instantiate any dropout units, higher rates will but it doesn't seem to help.")
                             dropoutRate: Double = 0.0,
+                            @Help(text="Width of hidden layer to use.")
                             numHidden: Int = 200,
+                            @Help(text="Number of hidden layers to use. More than 1 slows down dramatically and doesn't help.")
                             numHiddenLayers: Int = 1,
-                            useDeps: Boolean = false,
-                            word2vecPath: String = "../cnnkim/data/GoogleNews-vectors-negative300.bin",
+                            @Help(text="How much surface context should we use as input to the neural network? Default is +/-2 words around begin/end/split. See Word2VecSurfaceFeaturizer for options")
+                            neuralSurfaceWordsToUse: String = "most",
+                            @Help(text="Path to word vectors. Can either be .bin like Mikolov et al.'s or .txt like Bansal et al.'s")
+                            word2vecPath: String = "",
+                            @Help(text="Load additional word vectors into the model rather than just those in the training set. Doesn't help.")
+                            vocFile: String = "",
+                            @Help(text="Set to true if your word vectors are all lowercase. Otherwise true case is used.")
+                            lowercasedVectors: Boolean = false,
                             extraPNMParams: ExtraPNMParams = ExtraPNMParams()) extends ParserModelFactory[AnnotatedLabel, String] {
-
+  
   type MyModel = PositionalTransformModel[AnnotatedLabel, AnnotatedLabel, String]
 
 
@@ -136,7 +158,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     voc ++= summedWordCounts.keySet.toSet[String].map(str => Word2Vec.convertWord(str, lowercasedVectors))
     // Read in a file of words in the treebank; this allows us to load words that are
     // in the dev or test sets but not in train
-    voc ++= (if (treebankVocFile != "") Source.fromFile(treebankVocFile).getLines().map(str => Word2Vec.convertWord(str, lowercasedVectors)).toSet else Set[String]())
+    voc ++= (if (vocFile != "") Source.fromFile(vocFile).getLines().map(str => Word2Vec.convertWord(str, lowercasedVectors)).toSet else Set[String]())
     val word2vec = if (embeddingType == "trivial") {
       Word2Vec.makeRandomVectorsForVocabulary(voc.toSet, 0, true)
     } else if (embeddingType == "random") {
@@ -154,7 +176,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     }
     //////////////////////
     
-    val surfaceFeaturizer = new Word2VecSurfaceFeaturizerIndexed(word2vecIndexed, surfaceFeatureSpec)
+    val surfaceFeaturizer = new Word2VecSurfaceFeaturizerIndexed(word2vecIndexed, neuralSurfaceWordsToUse)
     val depFeaturizer = new Word2VecDepFeaturizerIndexed(word2vecIndexed, freqTagger, topology)
     
     
@@ -185,14 +207,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
       }
       IndexedSeq(transform)
     }
-    val depTransforms: IndexedSeq[AffineOutputTransform[Array[Int]]] = if (useDeps) {
-      throw new RuntimeException("Dependency NNs removed temporarily")
-//      println("Deps: " + word2vecIndexed.vectorSize + " x (" + numHidden + ")^" + numHiddenLayers + " x " + prodFeaturizer.index.size + " neural net")
-//      val depTransform = PositionalNeuralModelFactory.buildNet(word2vecIndexed, numHidden, numHiddenLayers, 1, nonLinType, backpropIntoEmbeddings)
-//      IndexedSeq(depTransform)
-    } else {
-      IndexedSeq()
-    }
+    val depTransforms: IndexedSeq[AffineOutputTransform[Array[Int]]] = IndexedSeq()
     val decoupledTransforms = if (decoupleTransforms) {
       // Span and unary use the reduced input (no split point features), whereas surface uses the split point features
       val inputSizes = Seq(surfaceFeaturizer.reducedInputSize, surfaceFeaturizer.reducedInputSize, surfaceFeaturizer.splitInputSize)
@@ -289,21 +304,6 @@ object PositionalNeuralModelFactory {
                batchNormalization: Boolean): AffineOutputTransform[Array[Int]] = {
     val innerTransform = buildNetInnerTransforms(word2vecIndexed, inputSize, numHidden, numHiddenLayers, nonLinType, dropoutRate, backpropIntoEmbeddings, batchNormalization)
     new AffineOutputTransform(outputSize, if (numHiddenLayers >= 1) numHidden else inputSize, innerTransform)
-//    if (numHiddenLayers == 0) {
-//      new AffineOutputTransform(outputSize, word2vecIndexed.vectorSize, new CachingLookupTransform(word2vecIndexed))
-//    } else {
-//      val baseTransformLayer = if (backpropIntoEmbeddings) {
-//        new EmbeddingsTransform(numHidden, word2vecIndexed.vectorSize, word2vecIndexed)
-//      } else {
-//        new CachingLookupAndAffineTransformDense(numHidden, word2vecIndexed.vectorSize, word2vecIndexed)
-//      }
-//      var currLayer = addNonlinearity(nonLinType, numHidden, useDropout, baseTransformLayer)
-//      for (i <- 1 until numHiddenLayers) {
-//        currLayer = addNonlinearity(nonLinType, numHidden, useDropout, new AffineTransform(numHidden, numHidden, currLayer))
-//      }
-//      var transform = new AffineOutputTransform(outputSize, numHidden, currLayer)
-//      transform
-//    }
   }
   
   

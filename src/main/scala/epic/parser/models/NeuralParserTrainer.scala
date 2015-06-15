@@ -34,12 +34,10 @@ import epic.util.CacheBroker
  */
 object NeuralParserTrainer extends epic.parser.ParserPipeline with LazyLogging {
   
-  case class ExtraPTParams(useSGD: Boolean = false,
-                           momentum: Double = 0.95,
-                           useAdagradCombo: Boolean = false,
+  case class ExtraPTParams(momentum: Double = 0.95,
                            computeTrainLL: Boolean = true)
 
-  case class Params(@Help(text="What parser to build. LatentModelFactory,StructModelFactory,LexModelFactory,SpanModelFactory")
+  case class Params(@Help(text="Details about the parser to build")
                     modelFactory: PositionalNeuralModelFactory,
                     @Help(text="Name for the parser for saving and logging. will be inferrred if not provided.")
                     name: String = null,
@@ -57,7 +55,7 @@ object NeuralParserTrainer extends epic.parser.ParserPipeline with LazyLogging {
                     threads: Int = -1,
                     @Help(text="Scale of random weight initialization")
                     initWeightsScale: Double = 1E-2,
-                    @Help(text="Scale of random weight initialization")
+                    @Help(text="String to specify fancier initialization types based on fan-in/fan-out")
                     initializerSpec: String = "",
                     @Help(text="True if we should determinimize training (remove randomness associated with random minibatches)")
                     determinizeTraining: Boolean = false,
@@ -162,17 +160,6 @@ object NeuralParserTrainer extends epic.parser.ParserPipeline with LazyLogging {
         println("OPTIMIZATION: Adadelta")
         new AdadeltaGradientDescentDVD(params.opt.maxIterations, momentum).iterations(scanningBatchesObj, init).
             asInstanceOf[Iterator[FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State]]
-//      } else if (useSGD) {
-//        println("OPTIMIZATION: SGDMOM")
-//        new StochasticGradientDescentMomentumDVD(params.opt.maxIterations, params.opt.alpha, momentum).iterations(scanningBatchesObj, init).
-//            asInstanceOf[Iterator[FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State]]
-//      } else if (useAdagradCombo) {
-//        println("OPTIMIZATION: AdagradCombo")
-//        val castModel = model.asInstanceOf[PositionalTransformModel[AnnotatedLabel, AnnotatedLabel, String]]
-//        require(castModel.maybeSparseSurfaceFeaturizer.isDefined, "Can't do combo optimization without combination")
-//        val idxToSwitchAt = castModel.index.componentOffset(castModel.index.indices.size - 1)
-//        new CombinationAdaptiveGradientDescentDVD(params.opt.regularization, 0.01, params.opt.regularization, 0.1, idxToSwitchAt, params.opt.maxIterations, params.opt.tolerance).iterations(scanningBatchesObj, init).
-//            asInstanceOf[Iterator[FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State]]
       } else {
         println("OPTIMIZATION: Adagrad")
         params.opt.iterations(scanningBatchesObj, init).asInstanceOf[Iterator[FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State]]
@@ -182,17 +169,6 @@ object NeuralParserTrainer extends epic.parser.ParserPipeline with LazyLogging {
         println("OPTIMIZATION: Adadelta")
         new AdadeltaGradientDescentDVD(params.opt.maxIterations, momentum).iterations(cachedObj.withRandomBatches(params.opt.batchSize), init).
             asInstanceOf[Iterator[FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State]]
-//      } else if (useSGD) {
-//        println("OPTIMIZATION: SGDMOM")
-//        new StochasticGradientDescentMomentumDVD(params.opt.maxIterations, params.opt.alpha, momentum).iterations(cachedObj.withRandomBatches(params.opt.batchSize), init).
-//            asInstanceOf[Iterator[FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State]]
-//      } else if (useAdagradCombo) {
-//        println("OPTIMIZATION: AdagradCombo")
-//        val castModel = model.asInstanceOf[PositionalTransformModel[AnnotatedLabel, AnnotatedLabel, String]]
-//        require(castModel.maybeSparseSurfaceFeaturizer.isDefined, "Can't do combo optimization without combination")
-//        val idxToSwitchAt = castModel.index.componentOffset(castModel.index.indices.size - 1)
-//        new CombinationAdaptiveGradientDescentDVD(params.opt.alpha, 0.01, params.opt.alpha, 0.1, idxToSwitchAt, params.opt.maxIterations, params.opt.tolerance).iterations(cachedObj.withRandomBatches(params.opt.batchSize), init).
-//            asInstanceOf[Iterator[FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State]]
       } else {
         println("OPTIMIZATION: Adagrad")
         params.opt.iterations(cachedObj, init)
