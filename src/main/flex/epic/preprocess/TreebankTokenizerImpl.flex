@@ -279,7 +279,8 @@ Got / ta                                                      {return currentTok
 
 // we can't ask if we're at EOF, so this is a hack to say append a period if we hit EOF and just generated a period
 {LETTER}+\.{LETTER}+.                                      {acro_period = yychar() + zzMarkedPos; return currentToken();}
-(etc|v|vs)\.                                                      {acro_period = yychar() + zzMarkedPos; return currentToken();}
+{LETTER}+\./{WHITESPACE}                                   {return currentToken();}
+([Dd][Rr]|[Mm][Rr]?[Ss]?|[Ee][Tt][Cc]|[Vv][Ss]?)\.         {acro_period = yychar() + zzMarkedPos; return currentToken();}
 
 // contractions and other clitics
 {INIT_CLITIC}                                           {return currentToken();}
