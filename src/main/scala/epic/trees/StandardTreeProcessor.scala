@@ -27,7 +27,7 @@ case class StandardTreeProcessor(headFinder: HeadFinder[AnnotatedLabel] = HeadFi
   import Trees.Transforms._
   private def xox = new XOverXRemover[AnnotatedLabel]
 
-  private val traceProcessor = {
+  private val traceProcessor: (Tree[AnnotatedLabel]) => Tree[AnnotatedLabel] = {
     if (removeTraces) {
       new TraceRemover[AnnotatedLabel, String](_.label == "-NONE-")
     } else {
@@ -43,9 +43,12 @@ case class StandardTreeProcessor(headFinder: HeadFinder[AnnotatedLabel] = HeadFi
   }
 
 
-  def apply(ann: Tree[AnnotatedLabel]):BinarizedTree[AnnotatedLabel] = {
+  def apply(rawTree: Tree[AnnotatedLabel]):BinarizedTree[AnnotatedLabel] = {
 //    val ann = tree.map { AnnotatedLabel.parseTreebank }
-    val detraced = traceProcessor(ann)
+    var detraced = traceProcessor(rawTree)
+    if (removeTraces) {
+      detraced = detraced.map(_.copy(index = -1))
+    }
     var transformed = xox(detraced)
     transformed = if(transformed.children.length != 1) {
       Tree(AnnotatedLabel.TOP, IndexedSeq(transformed), transformed.span)
