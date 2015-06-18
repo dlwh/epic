@@ -1,6 +1,5 @@
 package epic.trees
 
-import breeze.util.Interner
 import java.io.{ObjectInputStream, IOException}
 
 
@@ -24,11 +23,17 @@ import java.io.{ObjectInputStream, IOException}
  *
  * @author dlwh
  */
-case class StandardTreeProcessor(headFinder: HeadFinder[AnnotatedLabel] = HeadFinder.collins) extends (Tree[String]=>BinarizedTree[AnnotatedLabel]) {
+case class StandardTreeProcessor(headFinder: HeadFinder[AnnotatedLabel] = HeadFinder.collins, removeTraces: Boolean = true) extends (Tree[AnnotatedLabel]=>BinarizedTree[AnnotatedLabel]) {
   import Trees.Transforms._
-  private def ens = new EmptyNodeStripper[String]
-  private def xox = new XOverXRemover[String]
-  private val dummyLabelStripper  = new StripLabels("EDITED")
+  private def xox = new XOverXRemover[AnnotatedLabel]
+
+  private val traceProcessor: (Tree[AnnotatedLabel]) => Tree[AnnotatedLabel] = {
+    if (removeTraces) {
+      new TraceRemover[AnnotatedLabel, String](_.label == "-NONE-")
+    } else {
+      new TraceToSlashCategoryConverter
+    }
+  }
 
   // Don't delete.
   @throws(classOf[IOException])
@@ -38,15 +43,18 @@ case class StandardTreeProcessor(headFinder: HeadFinder[AnnotatedLabel] = HeadFi
   }
 
 
-  def apply(tree: Tree[String]):BinarizedTree[AnnotatedLabel] = {
-    var transformed = xox(dummyLabelStripper(ens(tree).get))
+  def apply(rawTree: Tree[AnnotatedLabel]):BinarizedTree[AnnotatedLabel] = {
+//    val ann = tree.map { AnnotatedLabel.parseTreebank }
+    var detraced = traceProcessor(rawTree)
+    if (removeTraces) {
+      detraced = detraced.map(_.copy(index = -1))
+    }
+    var transformed = xox(detraced)
     transformed = if(transformed.children.length != 1) {
-      Tree("", IndexedSeq(transformed), transformed.span)
+      Tree(AnnotatedLabel.TOP, IndexedSeq(transformed), transformed.span)
     } else {
       transformed
     }
-    val ann = transformed.map { AnnotatedLabel.parseTreebank(_) }
-
 
     def makeIntermediate(l: AnnotatedLabel, tag: AnnotatedLabel) = {
        l.copy("@"+l.label, headTag = Some(tag.baseLabel))
@@ -57,9 +65,8 @@ case class StandardTreeProcessor(headFinder: HeadFinder[AnnotatedLabel] = HeadFi
       case Right(s) => a.copy(siblings = a.siblings :+ Right(s.baseLabel))
     }
 
-
-
-    Trees.binarize(ann, makeIntermediate, extend, headFinder).relabelRoot(_ => AnnotatedLabel.TOP)
+    val binarized = Trees.binarize(transformed, makeIntermediate, extend, headFinder).relabelRoot(_ => AnnotatedLabel.TOP)
+    binarized
   }
 }
 

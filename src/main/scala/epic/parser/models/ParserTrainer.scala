@@ -35,7 +35,7 @@ import epic.parser.ParseEval.Statistics
 import epic.features.LongestFrequentSuffixFeaturizer.LongestFrequentSuffix
 import epic.features.LongestFrequentSuffixFeaturizer
 import epic.dense.AdadeltaGradientDescentDVD
-
+import epic.util.Optional
 
 /**
  * The main entry point for training discriminative parsers.

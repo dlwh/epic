@@ -57,8 +57,8 @@ package object models {
               try {
                 readFromJar("", f)
               } catch {
-                case ex: IOException =>
-                  throw new RuntimeException(s"Could not find model $model in path $path")
+                case ex: Exception =>
+                  throw new RuntimeException(s"Could not find model $model in path $path", ex)
               }
 
           }

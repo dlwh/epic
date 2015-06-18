@@ -46,7 +46,9 @@ class TreebankTokenizerTest  extends FunSuite {
 
   test("quotes") {
     val sents = Map("\"Hi there\"" -> List("``","Hi","there","''"),
-      "\"Hi there.\"" -> List("``","Hi","there",".","''"))
+      "\"Hi there.\"" -> List("``","Hi","there",".","''"),
+      "Hi there.\"" -> List("Hi","there",".","''")
+    )
     for( (s,toks) <- sents) {
       assert(TreebankTokenizer(s).toList === toks)
     }
@@ -80,6 +82,13 @@ class TreebankTokenizerTest  extends FunSuite {
     assert(TreebankTokenizer("99").toList === List("99"))
     assert(TreebankTokenizer("$99").toList === List("$","99"))
     assert(TreebankTokenizer("$99.33").toList === List("$","99.33"))
+  }
+
+  test("negatives") {
+    assert(TreebankTokenizer("-99").toList === List("-99"))
+    assert(TreebankTokenizer("-99.01").toList === List("-99.01"))
+
+
   }
 
   test("dates + comma") {

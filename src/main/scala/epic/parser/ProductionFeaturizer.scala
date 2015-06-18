@@ -30,19 +30,29 @@ import epic.features.IndicatorFeature
 class ProductionFeaturizer[L, L2, W](val topology: RuleTopology[L], refinements: GrammarRefinements[L, L2],
                                      lGen: L2=>Seq[Feature] = {(x:L2)=>if(x.isInstanceOf[Feature]) Seq(x.asInstanceOf[Feature]) else Seq(IndicatorFeature(x))},
                                      rGen: Rule[L2] => Seq[Feature] = {(x: Rule[L2]) => Seq(x)},
-                                     filterRedundantFeatures: Boolean = true) extends RefinedFeaturizer[L, W, Feature] with Serializable {
+                                     filterRedundantFeatures: Boolean = false) extends RefinedFeaturizer[L, W, Feature] with Serializable {
 
   private val (index_ :Index[Feature], ruleFeatures: Array[Array[Int]], labelFeatures: Array[Array[Int]]) = {
-    val index = epic.features.buildNonRedundantFeatureIndex[Either[Rule[L2], L2], Feature](refinements.rules.fineIndex.iterator.map(Left(_)) ++ refinements.labels.fineIndex.iterator.map(Right(_)), {
-      case Left(r) => rGen(r)
-      case Right(l) => lGen(l)
-    })
+    if(filterRedundantFeatures) {
+      val index = epic.features.buildNonRedundantFeatureIndex[Either[Rule[L2], L2], Feature](refinements.rules.fineIndex.iterator.map(Left(_)) ++ refinements.labels.fineIndex.iterator.map(Right(_)), {
+        case Left(r) => rGen(r)
+        case Right(l) => lGen(l)
+      })
 
-    // TODO: I should figure out how to one pass this
-    val rules = Encoder.fromIndex(refinements.rules.fineIndex).tabulateArray(r => rGen(r).map(index).toArray.filter(_ != -1))
-    val labels = Encoder.fromIndex(refinements.labels.fineIndex).tabulateArray(l => lGen(l).map(index).toArray.filter(_ != -1))
-    (index: Index[Feature], rules, labels)
+      // TODO: I should figure out how to one pass this
+      val rules = Encoder.fromIndex(refinements.rules.fineIndex).tabulateArray(r => rGen(r).map(index).toArray.filter(_ != -1))
+      val labels = Encoder.fromIndex(refinements.labels.fineIndex).tabulateArray(l => lGen(l).map(index).toArray.filter(_ != -1))
+      (index: Index[Feature], rules, labels)
+    } else {
+      val index = Index[Feature]()
+      val rules = Encoder.fromIndex(refinements.rules.fineIndex).tabulateArray(r => rGen(r).map(index.index).toArray)
+      val labels = Encoder.fromIndex(refinements.labels.fineIndex).tabulateArray(l => lGen(l).map(index.index).toArray)
+      (index: Index[Feature], rules, labels)
+    }
   }
+
+  assert(ruleFeatures.forall(_.nonEmpty))
+  assert(labelFeatures.forall(_.nonEmpty))
 
   def index = index_
 

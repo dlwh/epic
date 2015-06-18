@@ -15,10 +15,13 @@
 */
 package epic.preprocess
 
+import java.util.regex.Pattern
+
 import epic.slab._
 import epic.slab.Token
-import epic.slab.Sentence
 import epic.trees.Span
+
+import scala.collection.mutable.ArrayBuffer
 
 /**
  * Splits the input document according to the given pattern.  Does not
@@ -27,18 +30,25 @@ import epic.trees.Span
  * @author dramage
  */
 case class RegexSplitTokenizer(pattern : String) extends Tokenizer {
-  val compiled = pattern.r
-  override def apply[In <: Sentence](slab: StringSlab[In]): StringSlab[In with Token] = {
-    slab.++[Token](slab.iterator[Sentence].flatMap { s =>
-      val content = slab.spanned(s._1)
-      var last = 0
-      compiled.findAllMatchIn(content).map{ m =>
-        val span = Span(last, m.start(0))
-        val ret = span -> Token(slab.content.substring(last + s._1.begin, m.start(0) + s._1.begin))
-        last += m.end(0)
-        ret
-      }
-    })
+
+  private val regex = Pattern.compile(pattern)
+
+  override def apply[In](slab: StringSlab[In]): StringSlab[In with Token] = {
+    val m = regex.matcher(slab.content)
+
+    val spans = new ArrayBuffer[(Span, Token)]()
+
+    var start = 0
+    while (m.find()) {
+      val end = m.start()
+      if (end - start >= 1)
+        spans += (Span(start, end) -> Token(slab.content.substring(start, end)))
+      start = m.end()
+    }
+    if(start != slab.content.length)
+      spans += Span(start, slab.content.length) -> Token(slab.content.substring(start, slab.content.length))
+    slab.addLayer[Token](spans)
   }
+
 }
 

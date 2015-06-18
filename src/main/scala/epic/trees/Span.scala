@@ -19,7 +19,9 @@ import spire.syntax.cfor
 */
 
 
-class Span(val encoded: Long) extends AnyVal {
+class Span(val encoded: Long) extends AnyVal with Serializable {
+  def toPair: (Int, Int) = (begin, end)
+
   def begin = (encoded >>> 32).toInt
   def end = encoded.toInt
 
@@ -51,6 +53,7 @@ class Span(val encoded: Long) extends AnyVal {
     ||  (other.begin < begin && other.end < end && other.end > begin)
   )
 
+
 //  override def hashCode(): Int = {
 //    (begin, end).hashCode()
 //  }
@@ -69,7 +72,7 @@ class Span(val encoded: Long) extends AnyVal {
 
   def toIndexedSeq = Range(begin, end)
 
-//  override def toString = s"Span($begin, $end)"
+  override def toString = s"Span($begin, $end)"
 }
 
 object Span {

@@ -341,8 +341,8 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
                             useChildFeats: Boolean = false,
                             useFullShape: Boolean = false,
                             useSplitShape: Boolean = false,
-                            posFeaturizer: Optional[WordFeaturizer[String]] = NotProvided,
-                            spanFeaturizer: Optional[SplitSpanFeaturizer[String]] = NotProvided,
+                            posFeaturizer: Optional[WordFeaturizer[String]] = None,
+                            spanFeaturizer: Optional[SplitSpanFeaturizer[String]] = None,
                             extraParams: ExtraParams = ExtraParams()) extends ParserModelFactory[AnnotatedLabel, String] with SafeLogging {
   
   type MyModel = SpanModel[AnnotatedLabel, AnnotatedLabel, String]
@@ -420,7 +420,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     
     val featurizer = new ProductionFeaturizer[AnnotatedLabel, AnnotatedLabel, String](xbarGrammar, indexedRefinements,
       lGen=labelFeaturizer,
-      rGen=ruleFeaturizer)
+      rGen=ruleFeaturizer, filterRedundantFeatures = pruneRedundantFeatures)
     
     // This is a catch-all for other features that must be instantiated over the entire rule
     // and which are not synthesized on-the-fly from cross-products.
@@ -658,8 +658,8 @@ object SpanModelFactory {
 
   def buildSimple(trees: IndexedSeq[TreeInstance[AnnotatedLabel, String]],
                   annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = GenerativeParser.defaultAnnotator(),
-                  posFeaturizer: Optional[WordFeaturizer[String]] = NotProvided,
-                  spanFeaturizer: Optional[SplitSpanFeaturizer[String]] = NotProvided,
+                  posFeaturizer: Optional[WordFeaturizer[String]] = None,
+                  spanFeaturizer: Optional[SplitSpanFeaturizer[String]] = None,
                   opt: OptParams = OptParams())(implicit cache: CacheBroker) = {
     val (topo, lexicon) = XbarGrammar().xbarGrammar(trees)
     val initialParser =  GenerativeParser.annotatedParser(topo, lexicon, annotator, trees)
@@ -675,6 +675,7 @@ object SpanModelFactory {
       new CachedChartConstraintsFactory[AnnotatedLabel, String](uncached)
     }
 
+    
     val mf = new SpanModelFactory(annotator = annotator, posFeaturizer = posFeaturizer, spanFeaturizer = spanFeaturizer).make(trees, topo, lexicon, constraints)
 
     val mobj = new ModelObjective(mf, trees)

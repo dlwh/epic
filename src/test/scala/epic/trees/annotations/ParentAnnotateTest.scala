@@ -13,7 +13,7 @@ class ParentAnnotateTest extends FunSuite {
 
   test("basic test") {
     val (tree, words) = Tree.fromString("( (S (NP (DT A) (NN record) (NN date)) (VP (VBZ has) (RB n't) (VP (VBN been) (VP (VBN set)))) (. .)))")
-    val binarized = StandardTreeProcessor().apply(tree).map(_.baseAnnotatedLabel)
+    val binarized = StandardTreeProcessor().apply(tree.map(AnnotatedLabel.parseTreebank)).map(_.baseAnnotatedLabel)
     val tree2 = ParentAnnotate(2).apply(binarized, words)
 
     assert(tree2.preorder.filter(_.label.label == "S").next().label.parents === IndexedSeq("TOP"))

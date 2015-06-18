@@ -15,7 +15,7 @@ import epic.lexicon.Lexicon
 import epic.parser.projections.GrammarRefinements
 import epic.trees._
 import epic.trees.annotations.TreeAnnotator
-import epic.util.{LRUCache, NotProvided, Optional}
+import epic.util.{LRUCache, Optional}
 import epic.dense.Transform
 import epic.dense.TanhTransform
 import epic.dense.OutputTransform

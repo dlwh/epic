@@ -197,6 +197,15 @@ NUM        = ({ALPHANUM} {P} {HAS_DIGIT}
            | {ALPHANUM} {P} {HAS_DIGIT} ({P} {ALPHANUM} {P} {HAS_DIGIT})+
            | {HAS_DIGIT} {P} {ALPHANUM} ({P} {HAS_DIGIT} {P} {ALPHANUM})+)
 
+
+/* floating point literals */
+DoubleLiteral = ({FLit1}|{FLit2}|{FLit3}) {Exponent}?
+
+FLit1    = [0-9]+ \. [0-9]*
+FLit2    = \. [0-9]+
+FLit3    = [0-9]+
+Exponent = [eE] [+-]? [0-9]+
+
 // punctuation
 P	         = ("_"|"-"|"/"|"."|",")
 
@@ -270,7 +279,7 @@ Got / ta                                                      {return currentTok
 
 // we can't ask if we're at EOF, so this is a hack to say append a period if we hit EOF and just generated a period
 {LETTER}+\.{LETTER}+.                                      {acro_period = yychar() + zzMarkedPos; return currentToken();}
-(etc|v|vs).                                                      {acro_period = yychar() + zzMarkedPos; return currentToken();}
+(etc|v|vs)\.                                                      {acro_period = yychar() + zzMarkedPos; return currentToken();}
 
 // contractions and other clitics
 {INIT_CLITIC}                                           {return currentToken();}
@@ -297,6 +306,8 @@ d{Q} / ye                                                        {return current
 <OPEN_QUOTE>\"                                                 { yybegin(YYINITIAL); return currentToken("''"); }
 “                                                 { yybegin(YYINITIAL); return currentToken("``"); }
 ”                                                 { yybegin(YYINITIAL); return currentToken("''"); }
+\"/.*{ALPHANUM}+                                  { yybegin(OPEN_QUOTE); return currentToken("``"); }
+\"                                                { yybegin(YYINITIAL); return currentToken("''"); }
 
 
 
@@ -324,6 +335,7 @@ d{Q} / ye                                                        {return current
 {LONG_END_PUNCT}                                        { return currentToken();}
 {PUNCT}                                               { return currentToken();}
 {EMOTICON}                                          { return currentToken();}
+{DASH}{DoubleLiteral}                               { return currentToken();}
 .                                                   { return currentToken();}
 
 

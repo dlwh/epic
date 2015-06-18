@@ -63,7 +63,7 @@ trait Tree[+L] extends Serializable {
       if(tree.isLeaf) (None,IndexedSeq(tree.label))
       else {
         val fromChildren = tree.children.map(recCutLeaves _)
-        Some(Tree(tree.label,fromChildren.flatMap(_._1), span)) -> fromChildren.flatMap(_._2)
+        Some(Tree(tree.label,fromChildren.flatMap(_._1), tree.span)) -> fromChildren.flatMap(_._2)
       }
     }
     val (treeOpt,leaves) = recCutLeaves(this)
@@ -99,7 +99,7 @@ trait Tree[+L] extends Serializable {
 object Tree {
   def apply[L](label: L, children: IndexedSeq[Tree[L]], span: Span): NaryTree[L] = NaryTree(label,children, span)
   def unapply[L](t: Tree[L]): Option[(L,IndexedSeq[Tree[L]], Span)] = Some((t.label,t.children, t.span))
-  def fromString(input: String):(Tree[String],Seq[String]) = new PennTreeReader(new StringReader(input)).next
+  def fromString(input: String):(Tree[String],IndexedSeq[String]) = new PennTreeReader(new StringReader(input)).next
 
   private def recursiveToString[L](tree: Tree[L], depth: Int, newline: Boolean, sb: StringBuilder):StringBuilder = {
     import tree._
@@ -120,13 +120,12 @@ object Tree {
     if(isLeaf) {
       sb append TreebankTokenizer.tokensToTreebankTokens(span.map(words).map(_.toString)).mkString(" "," ","")
     } else {
+      val anyNonTerminals = children.exists(!_.isLeaf)
       //sb append "\n"
-      var _lastWasNonTerminal = false
       for( c <- children ) {
-        if(newline && (c.span.length != words.length) && (c.children.nonEmpty || _lastWasNonTerminal)) sb append "\n" append "  " * depth
+        if(newline && (c.span.length != words.length) && anyNonTerminals) sb append "\n" append "  " * depth
         else sb.append(' ')
         recursiveRender(c,depth+1, words, newline, sb)
-        _lastWasNonTerminal = c.children.nonEmpty
       }
     }
     sb append ')'

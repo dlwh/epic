@@ -5,13 +5,13 @@ import sbtassembly.AssemblyOption
 
 name := "epic"
 
-version := "0.3-SNAPSHOT"
+version := "0.4-SNAPSHOT"
 
 organization := "org.scalanlp"
 
-scalaVersion := "2.11.1"
+scalaVersion := "2.11.4"
 
-crossScalaVersions  := Seq("2.11.1", "2.10.4")
+crossScalaVersions  := Seq("2.11.4", "2.10.4")
 
 resolvers ++= Seq(
   "ScalaNLP Maven2" at "http://repo.scalanlp.org/repo",
@@ -21,15 +21,17 @@ resolvers ++= Seq(
 
 libraryDependencies ++= Seq(
   "junit" % "junit" % "4.5" % "test",
-  "org.scalanlp" %% "breeze" % "0.10",
+  "org.scalanlp" %% "breeze" % "0.12-SNAPSHOT",
   "org.scalanlp" %% "breeze-config" % "0.9.1",
-  "org.scalanlp" %% "nak" % "1.3",
+  "org.scalanlp" %% "nak" % "1.3" intransitive(),
   "org.mapdb" % "mapdb" % "0.9.2",
+  "com.typesafe.scala-logging" %% "scala-logging-slf4j" % "2.1.2",
   ("org.apache.tika" % "tika-parsers" % "1.5").exclude ("edu.ucar", "netcdf").exclude("com.googlecode.mp4parser","isoparser"),
   "de.l3s.boilerpipe" % "boilerpipe" % "1.1.0",
   "net.sourceforge.nekohtml" % "nekohtml" % "1.9.21",//needed by boilerpipe
   "org.slf4j" % "slf4j-simple" % "1.7.6",
   "org.apache.commons" % "commons-lang3" % "3.3.2",
+  "de.jflex" % "jflex" % "1.6.0" % "compile",
   "org.scalatest" %% "scalatest" % "2.1.3" % "test",
   "org.scalacheck" %% "scalacheck" % "1.11.3" % "test"
 )

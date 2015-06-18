@@ -26,7 +26,9 @@ case class Sentence(docId: String, index: Int,
   def speaker = annotations.speaker
   def srl = annotations.srl
 
-  def treeInstance(processor: StandardTreeProcessor) = TreeInstance(docId+"-treeInstance", processor(tree.map(_.treebankString)), words )
+  def treeInstance(processor: StandardTreeProcessor) = {
+    TreeInstance(docId+"-treeInstance", processor(tree), words)
+  }
 
   lazy val nerSegmentation: Segmentation[NerType.Value, String]  = {
     val sorted = ner.toIndexedSeq.sortBy((_: (DSpan, NerType.Value))._1.begin)
@@ -162,7 +164,6 @@ object NerType extends Enumeration {
     case "time" => Time
     case "work_of_art" | "workofart" => WorkOfArt
 //    case "notentity" | "none" => NotEntity
-    case "bos" | "eos" | "outsidesentence" => OutsideSentence
   }
 
   val Cardinal = Value

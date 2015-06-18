@@ -33,7 +33,7 @@ class JavaSentenceSegmenter(locale: Locale = Locale.getDefault) extends Sentence
   override def apply[In](slab: StringSlab[In]): StringSlab[In with Sentence] = {
     val breaker = BreakIterator.getSentenceInstance(locale)
     breaker.setText(slab.content)
-    slab.++[Sentence](
+    slab.addLayer[Sentence](
       new SegmentingIterator(breaker).map { span =>
         span -> Sentence()
       }

@@ -8,7 +8,7 @@ import breeze.features.FeatureVector
 import epic.features._
 import epic.lexicon.SimpleLexicon
 import java.util
-import epic.util.{ProgressLog, SafeLogging, NotProvided, Optional}
+import epic.util.{ProgressLog, SafeLogging, Optional}
 import epic.constraints.TagConstraints
 
 /**
@@ -134,9 +134,9 @@ class CRFInference[L, W](val weights: DenseVector[Double],
 }
 
 class TaggedSequenceModelFactory[L](val startSymbol: L,
-                                    gazetteer: Optional[Gazetteer[Any, String]] = NotProvided,
-                                    wordFeaturizer: Optional[WordFeaturizer[String]] = NotProvided,
-                                    transitionFeaturizer: Optional[WordFeaturizer[String]] = NotProvided,
+                                    gazetteer: Optional[Gazetteer[Any, String]] = None,
+                                    wordFeaturizer: Optional[WordFeaturizer[String]] = None,
+                                    transitionFeaturizer: Optional[WordFeaturizer[String]] = None,
                                     weights: Feature=>Double = { (f:Feature) => 0.0},
                                     hashFeatureScale: Double = 0.0) extends SafeLogging {
 

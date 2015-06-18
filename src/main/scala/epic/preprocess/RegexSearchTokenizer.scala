@@ -30,7 +30,7 @@ case class RegexSearchTokenizer(pattern : String) extends Tokenizer {
 
 
   def apply[In <: Sentence](slab:StringSlab[In]):StringSlab[In with Token] = {
-    slab.++[Token](slab.iterator[Sentence].flatMap { s =>
+    slab.addLayer[Token](slab.iterator[Sentence].flatMap { s =>
       compiled.findAllMatchIn(slab.spanned(s._1)).map{ m => Span(m.start, m.end) -> new Token(m.group(0))}
     })
   }

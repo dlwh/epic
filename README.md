@@ -6,7 +6,7 @@ Epic is a structured prediction framework for Scala. It also includes classes fo
 
 Epic is distributed under the [Apache License, Version 2.0](http://www.apache.org/licenses/LICENSE-2.0.html).
 
-The current version is 0.2.
+The current version is 0.3.
 
 ## Documentation
 
@@ -40,7 +40,7 @@ Epic bundles command line interfaces for using parsers, NER systems, and POS tag
 All of these systems expect plain text files as input, along with a path to a model file. The syntax is:
 
 ```bash
-java -Xmx4g -cp /path/to/epic-assembly-0.2-SNAPSHOT.jar epic.parser.ParseText --model /path/to/model.ser.gz --nthreads <number of threads> [files]
+java -Xmx4g -cp /path/to/epic-assembly-0.3-SNAPSHOT.jar epic.parser.ParseText --model /path/to/model.ser.gz --nthreads <number of threads> [files]
 ```
 
 Currently, all text is output to standard out. In the future, we will support output in a way that differentiates the files. If no files are given, the system will read from standard input. By default, the system will use all available cores for execution.
@@ -82,7 +82,7 @@ val parser = epic.models.deserialize[Parser[AnnotataedLabel, String]](path)
 
 // or:
 
-val parser = epic.models.ParserSelector.loadParser("en") // or another 2 letter code.
+val parser = epic.models.ParserSelector.loadParser("en").get // or another 2 letter code.
 
 val tree = parser(sentence)
 
@@ -115,15 +115,15 @@ println(tags.render)
 Using a named entity recognizer is similar to using a pos tagger: load a model, tokenize some text, run the recognizer. All NER systems are (currently) [linear chain semi-Markov conditional random fields](http://people.cs.umass.edu/~mccallum/papers/crf-tutorial.pdf), or SemiCRFs. (You don't need to understand them to use them. They are just a machine learning method for segmenting text into fields.
 
 ```scala
-val tagger = epic.models.deserialize[SemiCRF[AnnotatedLabel, String]](path)
+val ner = epic.models.deserialize[SemiCRF[AnnotatedLabel, String]](path)
 
 // or:
 
-val tagger = epic.models.NerSelector.loadNer("en").get// or another 2 letter code.
+val ner = epic.models.NerSelector.loadNer("en").get// or another 2 letter code.
 
-val segments = tagger(sentence)
+val segments = ner.bestSequence(sentence)
 
-println(tags.render(tagger.outsideLabel))
+println(segments.render)
 
 ```
 
@@ -142,18 +142,31 @@ language is the [two letter code for the language](http://www.loc.gov/standards/
 
 To following models are available at this time:
 
-__AS OF WRITING ONLY THE ENGLISH PARSER AND NER SYSTEM ARE AVAILABLE!__ Write me if you want these other models.
+__AS OF WRITING ONLY MODELS FOR ENGLISH ARE AVAILABLE!__ Write me if you want these other models.
 
 * Parser
   * English: 
     ```
-    "org.scalanlp" %% "epic-parser-en-span" % "2014.9.15"
+    "org.scalanlp" %% "epic-parser-en-span" % "2015.1.25"
+    ```
+* POS Taggers
+  * English: 
+    ```
+    "org.scalanlp" %% "epic-pos-en" % "2015.1.25"
     ```
 * Named Entity Recognizers
   * English: 
     ```
-    "org.scalanlp" %% "epic-ner-en-conll" % "2014.10.26"
+    "org.scalanlp" %% "epic-ner-en-conll" % "2015.1.25"
     ```
+
+There is also a meta-dependency that includes the above three models:
+
+```
+"org.scalanlp" %% "english"  % "2015.1.25"
+```
+
+I meant to name that "epic-english" but messed up. So it's that for now. Expect it to change.
 
 TODO:
 
@@ -191,10 +204,6 @@ TODO:
     "org.scalanlp" %% "epic-parser-sv-span" % "2014.9.15-SNAPSHOT"
     ```
 * POS Taggers
-  * English: 
-    ```
-    "org.scalanlp" %% "epic-pos-en" % "2014.9.15-SNAPSHOT"
-    ```
   * Basque: 
     ```
     "org.scalanlp" %% "epic-pos-eu" % "2014.9.15-SNAPSHOT"

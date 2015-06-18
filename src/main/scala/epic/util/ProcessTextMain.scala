@@ -42,6 +42,8 @@ trait ProcessTextMain[Model, AnnotatedType] {
       epic.models.deserialize[Model](params.model.toString)
     } catch {
       case ex: Exception =>
+        // BT 20150514 - skanky hack to get message to screen, would be nicer if could say "enable debug messages for full trace"
+        System.err.println(s"Couldn't deserialize model due to exception, ${ex.getCause.getMessage}. Trying classPathLoad...")
         classPathLoad(params.model.toString)
     }
 

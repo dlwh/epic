@@ -21,20 +21,59 @@ trait Slab[ContentType, RegionType, +AnnotationTypes] {
 
   def spanned(region: RegionType):ContentType
 
-  def append[A](region: RegionType, annotation: A): Slab[ContentType, RegionType, AnnotationTypes with A] = {
+  def append[A:ClassTag](region: RegionType, annotation: A): Slab[ContentType, RegionType, AnnotationTypes with A] = {
     this.+[A](region -> annotation)
   }
 
-  def +[A](pair: (RegionType, A)): Slab[ContentType, RegionType, AnnotationTypes with A] = {
-    ++[A](Iterator(pair))
+  def +[A:ClassTag](pair: (RegionType, A)): Slab[ContentType, RegionType, AnnotationTypes with A] = {
+    addLayer[A](pair)
   }
 
-  def ++[A](annotations: TraversableOnce[(RegionType, A)]): Slab[ContentType, RegionType, AnnotationTypes with A]
+  @deprecated("use addLayer", "0.3.1")
+  def ++[A:ClassTag](annotations: TraversableOnce[(RegionType, A)]): Slab[ContentType, RegionType, AnnotationTypes with A] = {
+    addLayer[A](annotations)
+  }
+
+  def addLayer[A:ClassTag](annotations: TraversableOnce[(RegionType, A)]): Slab[ContentType, RegionType, AnnotationTypes with A]
+
+  def addLayer[A:ClassTag](annotations: (RegionType, A)*): Slab[ContentType, RegionType, AnnotationTypes with A] = {
+    addLayer[A](annotations)
+  }
+
+  /** Can't remove the type, but you can upcast */
+  def removeLayer[A >: AnnotationTypes:ClassTag]: Slab[ContentType, RegionType, AnnotationTypes]
+
+  /** useful for downcasting */
+  def checkedCast[A: ClassTag]:Option[Slab[ContentType, RegionType, AnnotationTypes with A]] = {
+    if(!hasLayer[A]) {
+      None
+    } else {
+      Some(this.asInstanceOf[Slab[ContentType, RegionType, AnnotationTypes with A]])
+    }
+  }
+
+  /** Queries whether we have annotations of this type, even if the slab
+    *  doesn't have this type. Sometimes you just have to cast... */
+  def hasLayer[A :ClassTag]:Boolean
 
   def iterator[A >: AnnotationTypes: ClassTag]: Iterator[(RegionType, A)]
 
-  def covered[A >: AnnotationTypes: ClassTag](region: RegionType): Iterator[(RegionType, A)]
+  def indexedSeq[A >: AnnotationTypes : ClassTag]: IndexedSeq[(RegionType, A)]
 
+  /**
+   * Returns annotations wholly contained in the region
+   * @param region
+   * @tparam A
+   * @return
+   */
+  def covered[A >: AnnotationTypes: ClassTag](region: RegionType): IndexedSeq[(RegionType, A)]
+
+  /**
+   * Returns annotations that are entirely before the region
+   * @param region
+   * @tparam A
+   * @return
+   */
   def preceding[A >: AnnotationTypes: ClassTag](region: RegionType): Iterator[(RegionType, A)]
 
   def following[A >: AnnotationTypes: ClassTag](region: RegionType): Iterator[(RegionType, A)]
@@ -43,29 +82,7 @@ trait Slab[ContentType, RegionType, +AnnotationTypes] {
     iterator[A].mkString("\n")
   }
   
-}
-
-/*
-abstract class SlabAnnotationOps[ContentType, RegionType, AnnotationTypes](
-  val region: RegionType,
-  val slab: Slab[ContentType, RegionType, AnnotationTypes]) {
-
-  def content: ContentType
-
-  def covered[A >: AnnotationTypes : ClassTag] = this.slab.covered[A](this.annotation)
-
-  def preceding[A >: AnnotationTypes: ClassTag] = this.slab.preceding[A](this.annotation)
-
-  def following[A >: AnnotationTypes: ClassTag] = this.slab.following[A](this.annotation)
-}
-*/
-
-// =========================
-// Annotation infrastructure
-// =========================
-trait AnnotatedSpan {
-  def begin: Int
-  def end: Int
+  
 }
 
 
@@ -91,28 +108,6 @@ object AnnotatedSpan {
     }
   }
 
-  /*
-  implicit class SpanInStringSlab(val span: AnnotatedSpan) extends AnyVal {
-    def in[AnnotationTypes <: AnnotatedSpan](slab: StringSlab[AnnotationTypes]) =
-      new StringSpanAnnotationOps(this.span, slab)
-  }
-
-  class StringSpanAnnotationOps[AnnotationType >: AnnotationTypes <: AnnotatedSpan: ClassTag, AnnotationTypes <: AnnotatedSpan](
-    annotation: AnnotationType,
-    slab: StringSlab[AnnotationTypes])
-    extends SlabAnnotationOps[String, AnnotatedSpan, AnnotationType, AnnotationTypes](annotation, slab) {
-    def content = this.slab.content.substring(this.annotation.begin, this.annotation.end)
-  }
-  */
-  
-  implicit object StringAnnotationHasBounds extends Slab.HasBounds[AnnotatedSpan] {
-    def covers(annotation1: AnnotatedSpan, annotation2: AnnotatedSpan): Boolean =
-      annotation1.begin <= annotation2.begin && annotation2.end <= annotation1.end
-    def follows(annotation1: AnnotatedSpan, annotation2: AnnotatedSpan): Boolean =
-      annotation2.end <= annotation1.begin
-    def precedes(annotation1: AnnotatedSpan, annotation2: AnnotatedSpan): Boolean =
-      annotation1.end <= annotation2.begin
-  }
 }
 
 // ===========
@@ -140,51 +135,6 @@ object Slab {
     new SortedSequenceSlab(content, Map.empty, Map.empty)
   }
   
-  def apply[ContentType, RegionType](content: ContentType)
-                                    (implicit hasBounds: HasBounds[RegionType],
-                                     extract: ExtractRegion[RegionType, ContentType]): Slab[ContentType, RegionType, Any] =
-    new HorribleInefficientSlab[ContentType, RegionType, Any](content)
-
-  /**
-   * This trait has the minimum necessary for the implementation below.
-   *
-   * An efficient implementation will probably need some other set of operations.
-   */
-  trait HasBounds[AnnotationType] {
-    def covers(annotation1: AnnotationType, annotation2: AnnotationType): Boolean
-    def precedes(annotation1: AnnotationType, annotation2: AnnotationType): Boolean
-    def follows(annotation1: AnnotationType, annotation2: AnnotationType): Boolean
-  }
-
-  private[slab] class HorribleInefficientSlab[ContentType, RegionType, AnnotationTypes](
-    val content: ContentType,
-    val _annotations: Seq[(RegionType, Any)] = Seq.empty)(
-      implicit hasBounds: HasBounds[RegionType], extract: ExtractRegion[RegionType, ContentType])
-    extends Slab[ContentType, RegionType, AnnotationTypes] {
-
-
-    override def spanned(region: RegionType): ContentType = extract(region, content)
-
-    def ++[AnnotationType](annotations: TraversableOnce[(RegionType, AnnotationType)]): Slab[ContentType, RegionType, AnnotationTypes with AnnotationType] =
-      // FIXME: this should keep the annotations sorted by offset
-      new HorribleInefficientSlab(this.content, this._annotations ++ annotations)
-
-    def iterator[A >: AnnotationTypes: ClassTag]: Iterator[(RegionType, A)] =
-      this._annotations.iterator.collect {
-        case pair@(region, annotation: A) => pair.asInstanceOf[(RegionType, A)]
-      }
-
-    def covered[A >: AnnotationTypes: ClassTag](region: RegionType): Iterator[(RegionType, A)] =
-      this.iterator[A].filter(a => hasBounds.covers(region, a._1))
-
-    def following[A >: AnnotationTypes: ClassTag](region: RegionType): Iterator[(RegionType, A)] =
-      this.iterator[A].filter(a => hasBounds.follows(a._1, region))
-
-    def preceding[A >: AnnotationTypes: ClassTag](region: RegionType): Iterator[(RegionType, A)] =
-      this.iterator[A].filter(a => hasBounds.precedes(a._1, region)).toSeq.reverseIterator
-
-  }
-
   /**
    * This slab should be more efficient, especially for longer documents. It maintains the annotations in sorted order.
    *
@@ -201,49 +151,78 @@ object Slab {
 
     override def spanned(region: Span): ContentType = extract(region, content)
 
-    override def ++[A](annotations: TraversableOnce[(Span, A)]): Slab[ContentType, Span, AnnotationType with A] = {
+    override def addLayer[A:ClassTag](annotations: TraversableOnce[(Span, A)]): Slab[ContentType, Span, AnnotationType with A] = {
+      val ann = annotations.toSeq
       var newAnnotations = this.annotations
-      val grouped = annotations.toIndexedSeq.groupBy(_._2.getClass)
-      for( (clss, group) <- grouped) {
-        newAnnotations = newAnnotations + (clss -> (newAnnotations.getOrElse(clss, Vector.empty) ++ group).sortBy(_._1)(SpanOrdering))
+      val clss = implicitly[ClassTag[A]].runtimeClass
+      newAnnotations = newAnnotations + (clss -> (newAnnotations.getOrElse(clss, Vector.empty) ++ ann).sortBy(_._1)(SpanOrdering))
+
+      val reverseAnnotations = {
+        this.reverseAnnotations + (clss -> (this.reverseAnnotations.getOrElse(clss, Vector.empty) ++ ann).sortBy(_._1)(EndFirstSpanOrdering))
       }
 
-      var reverseAnnotations = this.reverseAnnotations
-      for( (clss, group) <- grouped) {
-        reverseAnnotations = reverseAnnotations + (clss -> (reverseAnnotations.getOrElse(clss, Vector.empty) ++ group).sortBy(_._1)(EndFirstSpanOrdering))
-      }
       new SortedSequenceSlab(content, newAnnotations, reverseAnnotations)
     }
 
+
+    override def removeLayer[A >: AnnotationType: ClassTag]: Slab[ContentType, Span, AnnotationType] = {
+      new SortedSequenceSlab(content,
+        annotations - implicitly[ClassTag[A]].runtimeClass,
+        reverseAnnotations - implicitly[ClassTag[A]].runtimeClass)
+    }
+
+
+    /** Queries whether we have annotations of this type, even if the slab
+      * doesn't have this type. Sometimes you just have to cast... */
+    override def hasLayer[A: ClassTag]: Boolean = {
+      annotations.contains(implicitly[ClassTag[A]].runtimeClass)
+    }
+
     override def following[A >: AnnotationType: ClassTag](region: Span): Iterator[(Span, A)] = {
-      annotations.filterKeys(implicitly[ClassTag[A]].runtimeClass.isAssignableFrom).valuesIterator.flatMap { annotations =>
-        var pos = BinarySearch.interpolationSearch(annotations, (_:(Span, Any))._1.begin, region.end)
-        if(pos < 0) pos = ~pos
-        annotations.view(pos, annotations.length)
-      }.asInstanceOf[Iterator[(Span, A)]]
+      val annotations = selectAnnotations[A]
+      var pos = BinarySearch.interpolationSearch(annotations, (_:(Span, Any))._1.begin, region.end)
+      if(pos < 0) pos = ~pos
+      annotations.view(pos, annotations.length).iterator
     }
 
     override def preceding[A >: AnnotationType : ClassTag](region: Span): Iterator[(Span, A)] = {
-      reverseAnnotations.filterKeys(implicitly[ClassTag[A]].runtimeClass.isAssignableFrom).valuesIterator.flatMap { annotations =>
-        var pos = BinarySearch.interpolationSearch(annotations, (_:(Span, Any))._1.end, region.begin + 1)
-        if(pos < 0) pos = ~pos
-        annotations.view(0, pos).reverseIterator
-      }.asInstanceOf[Iterator[(Span, A)]]
+      val annotations = selectReverse[A]
+      var pos = BinarySearch.interpolationSearch(annotations, (_:(Span, Any))._1.end, region.begin + 1)
+      if(pos < 0) pos = ~pos
+      annotations.view(0, pos).reverseIterator
     }
 
-    override def covered[A >: AnnotationType : ClassTag](region: Span): Iterator[(Span, A)] = {
-      annotations.filterKeys(implicitly[ClassTag[A]].runtimeClass.isAssignableFrom).valuesIterator.flatMap { annotations =>
-        var begin = BinarySearch.interpolationSearch(annotations, (_:(Span, Any))._1.begin, region.begin)
-        if(begin < 0) begin = ~begin
-        annotations.view(begin, annotations.length).takeWhile(_._1.end <= region.end)
-      }.asInstanceOf[Iterator[(Span, A)]]
+    override def covered[A >: AnnotationType : ClassTag](region: Span): IndexedSeq[(Span, A)] = {
+      val annotations = selectAnnotations[A]
+      var begin = BinarySearch.interpolationSearch(annotations, (_:(Span, Any))._1.begin, region.begin)
+      if(begin < 0) begin = ~begin
+      var end = annotations.indexWhere(_._1.end > region.end, begin)
+      if(end < 0) end = annotations.length
+      annotations.slice(begin, end)
     }
 
     override def iterator[A >: AnnotationType : ClassTag]: Iterator[(Span, A)] = {
-      annotations.filterKeys(implicitly[ClassTag[A]].runtimeClass.isAssignableFrom).valuesIterator.flatten.asInstanceOf[Iterator[(Span, A)]]
+      selectAnnotations[A].iterator
+    }
+
+    override def indexedSeq[A >: AnnotationType : ClassTag]: IndexedSeq[(Span, A)] = {
+      selectAnnotations[A]
+    }
+
+    private def selectAnnotations[A >: AnnotationType : ClassTag]: IndexedSeq[(Span, A)] = {
+      annotations.getOrElse(implicitly[ClassTag[A]].runtimeClass, IndexedSeq.empty).asInstanceOf[IndexedSeq[(Span, A)]]
+    }
+
+    private def selectReverse[A >: AnnotationType : ClassTag]:  IndexedSeq[(Span, A)] = {
+      reverseAnnotations.getOrElse(implicitly[ClassTag[A]].runtimeClass, IndexedSeq.empty).asInstanceOf[IndexedSeq[(Span, A)]]
+    }
+
+    override def stringRep[A >: AnnotationType: ClassTag] = {
+      iterator[A].map { case (Span(begin, end), x) => s"Span($begin, $end) $x"}.mkString("\n")
     }
 
   }
+
 
 
 

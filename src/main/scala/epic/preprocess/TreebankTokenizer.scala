@@ -13,7 +13,7 @@ import scala.collection.mutable.ArrayBuffer
 class TreebankTokenizer() extends Tokenizer with Serializable {
 
   override def apply[In <: Sentence](slab: StringSlab[In]): StringSlab[In with Token] = {
-    slab.++[Token](slab.iterator[Sentence].flatMap { s =>
+    slab.addLayer[Token](slab.iterator[Sentence].flatMap { s =>
       val content = slab.spanned(s._1)
       val impl = new TreebankTokenizerImpl(new StringReader(content))
       Iterators.fromProducer{
@@ -48,8 +48,8 @@ object TreebankTokenizer extends TreebankTokenizer {
     for(t <- toks) t match {
       case "“" => inOpenQuote = true; output += "``"
       case "‘" => inOpenQuote = true; output += "`"
-      case "’" => inOpenQuote = true; output += "`"
-      case "”" => inOpenQuote = true; output += "``"
+      case "’" => inOpenQuote = false; output += "`"
+      case "”" => inOpenQuote = false; output += "``"
       case "\"" if inOpenQuote => inOpenQuote = false; output += "''"
       case "\"" => inOpenQuote = true; output += "``"
       case _ => output += treebankMappings.getOrElse(t, t)
@@ -69,7 +69,7 @@ object TreebankTokenizer extends TreebankTokenizer {
       val slabWithSentences: Slab[String, Span, Source with Sentence] = MascSlab.s[Source](slab)
       val slabWithTokens = MascSlab.seg(slabWithSentences)
       slabWithTokens.iterator[Sentence].map{sent =>
-        val gold = slabWithTokens.covered[Segment](sent._1).toIndexedSeq.map { case (span, tok) => slab.spanned(span)}
+        val gold = slabWithTokens.covered[Segment](sent._1).map { case (span, tok) => slab.spanned(span)}
         val guess = TreebankTokenizer(slab.spanned(sent._1))
 
         (gold, guess, slab.spanned(sent._1))

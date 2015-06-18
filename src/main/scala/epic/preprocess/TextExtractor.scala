@@ -90,7 +90,7 @@ object TextExtractor {
       }
     }
     val handler = if(extractMainContentOnly) {
-      new BoilerpipeContentHandler(textHandler) {
+      new BoilerpipeContentHandler(textHandler, ArticleExtractor.getInstance()) {
         // stupid handler doesn't pass whitespace
         /*
         override def ignorableWhitespace(ch: Array[Char], start: Int, length: Int): Unit = {
@@ -126,7 +126,7 @@ object TextExtractor {
 
     val content = textHandler.toString.trim
 
-    Slab(content).++(Iterator(Span(0, content.length) -> epic.slab.Source(url)))
+    Slab(content).addLayer(Span(0, content.length) -> epic.slab.Source(url))
   }
 
 

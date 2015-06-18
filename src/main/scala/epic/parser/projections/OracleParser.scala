@@ -4,7 +4,7 @@ import epic.constraints.{CachedChartConstraintsFactory, ChartConstraints}
 import epic.trees._
 import epic.parser._
 import breeze.numerics.I
-import epic.util.{NotProvided, Optional, SafeLogging, CacheBroker}
+import epic.util.{Optional, SafeLogging, CacheBroker}
 import epic.parser.GrammarAnchoring.StructureDelegatingAnchoring
 import breeze.config.{Configuration, CommandLineParser, Help}
 import java.io.File
@@ -40,7 +40,7 @@ import epic.constraints.ChartConstraints.UnifiedFactory
  *
  * @author dlwh
  */
-class OracleParser[L, L2, W](val grammar: SimpleGrammar[L, L2, W], backupGrammar: Optional[SimpleGrammar[L, L2, W]] = NotProvided) extends SafeLogging {
+class OracleParser[L, L2, W](val grammar: SimpleGrammar[L, L2, W], backupGrammar: Optional[SimpleGrammar[L, L2, W]] = None) extends SafeLogging {
   private val cache = CacheBroker().make[IndexedSeq[W], BinarizedTree[L2]]("OracleParser")
 
   private var problems  = 0
@@ -66,7 +66,7 @@ class OracleParser[L, L2, W](val grammar: SimpleGrammar[L, L2, W], backupGrammar
           f"Gold tree for $words not reachable. $ratio%.2f are bad so far. "
         }
 
-        (IndexedSeq(grammar) ++ backupGrammar.iterator).iterator.map { grammar =>
+        (IndexedSeq(grammar) ++ backupGrammar.iterator).iterator.flatMap { grammar =>
           try {
             val w = words
             val marg = makeGoldPromotingAnchoring(grammar, w, tree, treeconstraints, constraints).maxMarginal
@@ -83,7 +83,7 @@ class OracleParser[L, L2, W](val grammar: SimpleGrammar[L, L2, W], backupGrammar
           } catch {
             case ex: ParseExtractionException => None
           }
-        }.flatten.next()
+        }.next()
 
       } catch {
         case ex:NoSuchElementException =>

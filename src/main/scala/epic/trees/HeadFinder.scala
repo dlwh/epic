@@ -237,7 +237,7 @@ object HeadRules {
       "ROOT" -> Seq(shr(Left, false, "S", "SINV")),
       "TOP" -> Seq(shr(Left, false, "S", "SINV")),
       "ADJP" -> Seq(shr(Left, false,
-        "NNS", "QP", "NN", "$", "ADVP", "JJ", "VBN", "VBG", "ADJP", "JJR",
+        "NNS", "QP", "NN", "$", "JJ", "ADVP", "VBN", "VBG", "ADJP", "JJR",
         "NP", "JJS", "DT", "FW", "RBR", "RBS", "SBAR", "RB")),
       "ADVP" -> Seq(shr(Right, false,
         "RB", "RBR", "RBS", "FW", "ADVP", "TO", "CD",
