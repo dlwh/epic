@@ -34,8 +34,8 @@ import breeze.optimize.FirstOrderMinimizer.OptParams
 import epic.parser.ParseEval.Statistics
 import epic.features.LongestFrequentSuffixFeaturizer.LongestFrequentSuffix
 import epic.features.LongestFrequentSuffixFeaturizer
-import epic.dense.AdadeltaGradientDescentDVD
 import epic.util.Optional
+import epic.dense.AdadeltaGradientDescentDVD
 
 /**
  * The main entry point for training discriminative parsers.
@@ -45,11 +45,6 @@ import epic.util.Optional
  *
  */
 object ParserTrainer extends epic.parser.ParserPipeline with LazyLogging {
-  
-  case class ExtraPTParams(useSGD: Boolean = false,
-                           momentum: Double = 0.95,
-                           useAdagradCombo: Boolean = false,
-                           computeTrainLL: Boolean = true)
 
   case class Params(@Help(text="What parser to build. LatentModelFactory,StructModelFactory,LexModelFactory,SpanModelFactory")
                     modelFactory: ParserExtractableModelFactory[AnnotatedLabel, String],
@@ -59,6 +54,10 @@ object ParserTrainer extends epic.parser.ParserPipeline with LazyLogging {
                     @Help(text="path for a baseline parser for computing constraints. will be built automatically if not provided.")
                     parser: File = null,
                     opt: OptParams,
+                    @Help(text="Use Adadelta instead of Adagrad (hardcoded in here...)")
+                    useAdadelta: Boolean = false,
+                    @Help(text="Make training batches deterministic; useful for debugging / regression testing")
+                    determinizeTraining: Boolean = false,
                     @Help(text="How often to run on the dev set.")
                     iterationsPerEval: Int = 100,
                     @Help(text="How many iterations to run.")
@@ -69,16 +68,6 @@ object ParserTrainer extends epic.parser.ParserPipeline with LazyLogging {
                     threads: Int = -1,
                     @Help(text="Should we randomize weights? Some models will force randomization.")
                     randomize: Boolean = false,
-                    @Help(text="Scale of random weight initialization")
-                    initWeightsScale: Double = 1E-2,
-                    @Help(text="Scale of random weight initialization")
-                    initializerSpec: String = "",
-                    @Help(text="True if we should determinimize training (remove randomness associated with random minibatches)")
-                    determinizeTraining: Boolean = false,
-                    @Help(text="True if we should train two models and ram them together")
-                    ensemble: Boolean = false,
-                    @Help(text="Use Adadelta for optimiziation instead of Adagrad")
-                    useAdadelta: Boolean = false,
                     @Help(text="Should we enforce reachability? Can be useful if we're pruning the gold tree.")
                     enforceReachability: Boolean = true,
                     @Help(text="Whether or not we use constraints. Not using constraints is very slow.")
@@ -87,17 +76,17 @@ object ParserTrainer extends epic.parser.ParserPipeline with LazyLogging {
                     checkGradient: Boolean = false,
                     @Help(text="check specific indices, in addition to doing a full search.")
                     checkGradientsAt: String = null,
-                    @Help(text="check specific indices, in addition to doing a full search.")
+                    @Help(text="Max parse length")
                     maxParseLength: Int = 70,
-                    annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = GenerativeParser.defaultAnnotator(),
-                    extraPTParams: ExtraPTParams = ExtraPTParams())
+                    @Help(text="Compute log likelihood on the training set")
+                    computeTrainLL: Boolean = true,
+                    annotator: TreeAnnotator[AnnotatedLabel, String, AnnotatedLabel] = GenerativeParser.defaultAnnotator())
   protected val paramManifest = manifest[Params]
 
   def trainParser( trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]],
                   validate: (Parser[AnnotatedLabel, String]) => Statistics, params: Params) = {
     import params._
-    import extraPTParams._
-    
+
 //    if(threads >= 1)
 //      collection.parallel.ForkJoinTasks.defaultForkJoinPool.setParallelism(params.threads)
 
@@ -136,34 +125,17 @@ object ParserTrainer extends epic.parser.ParserPipeline with LazyLogging {
       ChartConstraints.Factory.noSparsity[AnnotatedLabel, String]
     }
 
-    println("Building model")
     val model = modelFactory.make(theTrees, initialParser.topology, initialParser.lexicon, constraints)
     val obj = new ModelObjective(model, theTrees, params.threads)
     val cachedObj = new CachedBatchDiffFunction(obj)
-    val init = if (model.isInstanceOf[PositionalTransformModel[AnnotatedLabel, AnnotatedLabel, String]]) {
-      println("Initializing weights custom for model " + model.getClass)
-      model.asInstanceOf[PositionalTransformModel[AnnotatedLabel, AnnotatedLabel, String]].initialWeightVector(initWeightsScale, initializerSpec)
-    } else {
-      obj.initialWeightVector(randomize, initWeightsScale)
-    }
+    val init = obj.initialWeightVector(randomize)
     if(checkGradient) {
       val cachedObj2 = new CachedBatchDiffFunction(new ModelObjective(model, theTrees.take(opt.batchSize), params.threads))
-      val defaultIndices = (0 until 10).map(i => if(i < 0) model.featureIndex.size + i else i)
-      val indices = if (model.isInstanceOf[PositionalTransformModel[AnnotatedLabel, AnnotatedLabel, String]]) {
-        val castModel = model.asInstanceOf[PositionalTransformModel[AnnotatedLabel, AnnotatedLabel, String]]
-        if (castModel.transforms.size > 0) {
-          castModel.transforms(0).getInterestingWeightIndicesForGradientCheck(0)
-        } else {
-          defaultIndices
-        }
-      } else {
-        defaultIndices
-      }
-//      val indices = (0 until 10).map(i => 283316 + i)
+      val indices = (0 until 10).map(i => if(i < 0) model.featureIndex.size + i else i)
       println("testIndices: " + indices)
-      GradientTester.testIndices(cachedObj2, init, indices, toString={(i: Int) => model.featureIndex.get(i).toString}, skipZeros = true)
+      GradientTester.testIndices(cachedObj2, obj.initialWeightVector(randomize = true), indices, toString={(i: Int) => model.featureIndex.get(i).toString}, skipZeros = true)
       println("test")
-      GradientTester.test(cachedObj2, init, toString={(i: Int) => model.featureIndex.get(i).toString}, skipZeros = false)
+      GradientTester.test(cachedObj2, obj.initialWeightVector(randomize = true), toString={(i: Int) => model.featureIndex.get(i).toString}, skipZeros = false)
     }
 
     type OptState = FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State
@@ -184,19 +156,8 @@ object ParserTrainer extends epic.parser.ParserPipeline with LazyLogging {
       val scanningBatchesObj = cachedObj.withScanningBatches(params.opt.batchSize)
       if (useAdadelta) {
         println("OPTIMIZATION: Adadelta")
-        new AdadeltaGradientDescentDVD(params.opt.maxIterations, momentum).iterations(scanningBatchesObj, init).
+        new AdadeltaGradientDescentDVD(params.opt.maxIterations).iterations(scanningBatchesObj, init).
             asInstanceOf[Iterator[FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State]]
-//      } else if (useSGD) {
-//        println("OPTIMIZATION: SGDMOM")
-//        new StochasticGradientDescentMomentumDVD(params.opt.maxIterations, params.opt.alpha, momentum).iterations(scanningBatchesObj, init).
-//            asInstanceOf[Iterator[FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State]]
-//      } else if (useAdagradCombo) {
-//        println("OPTIMIZATION: AdagradCombo")
-//        val castModel = model.asInstanceOf[PositionalTransformModel[AnnotatedLabel, AnnotatedLabel, String]]
-//        require(castModel.maybeSparseSurfaceFeaturizer.isDefined, "Can't do combo optimization without combination")
-//        val idxToSwitchAt = castModel.index.componentOffset(castModel.index.indices.size - 1)
-//        new CombinationAdaptiveGradientDescentDVD(params.opt.regularization, 0.01, params.opt.regularization, 0.1, idxToSwitchAt, params.opt.maxIterations, params.opt.tolerance).iterations(scanningBatchesObj, init).
-//            asInstanceOf[Iterator[FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State]]
       } else {
         println("OPTIMIZATION: Adagrad")
         params.opt.iterations(scanningBatchesObj, init).asInstanceOf[Iterator[FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State]]
@@ -204,57 +165,25 @@ object ParserTrainer extends epic.parser.ParserPipeline with LazyLogging {
     } else {
       if (useAdadelta) {
         println("OPTIMIZATION: Adadelta")
-        new AdadeltaGradientDescentDVD(params.opt.maxIterations, momentum).iterations(cachedObj.withRandomBatches(params.opt.batchSize), init).
+        new AdadeltaGradientDescentDVD(params.opt.maxIterations).iterations(cachedObj.withRandomBatches(params.opt.batchSize), init).
             asInstanceOf[Iterator[FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State]]
-//      } else if (useSGD) {
-//        println("OPTIMIZATION: SGDMOM")
-//        new StochasticGradientDescentMomentumDVD(params.opt.maxIterations, params.opt.alpha, momentum).iterations(cachedObj.withRandomBatches(params.opt.batchSize), init).
-//            asInstanceOf[Iterator[FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State]]
-//      } else if (useAdagradCombo) {
-//        println("OPTIMIZATION: AdagradCombo")
-//        val castModel = model.asInstanceOf[PositionalTransformModel[AnnotatedLabel, AnnotatedLabel, String]]
-//        require(castModel.maybeSparseSurfaceFeaturizer.isDefined, "Can't do combo optimization without combination")
-//        val idxToSwitchAt = castModel.index.componentOffset(castModel.index.indices.size - 1)
-//        new CombinationAdaptiveGradientDescentDVD(params.opt.alpha, 0.01, params.opt.alpha, 0.1, idxToSwitchAt, params.opt.maxIterations, params.opt.tolerance).iterations(cachedObj.withRandomBatches(params.opt.batchSize), init).
-//            asInstanceOf[Iterator[FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State]]
       } else {
         println("OPTIMIZATION: Adagrad")
         params.opt.iterations(cachedObj, init)
       }
     }
-    if (ensemble) {
-      val weights1 = itr.take(maxIterations).last.x
-      // Hard-wired to use Adadelta
-      val castModel = model.asInstanceOf[PositionalTransformModel[AnnotatedLabel, AnnotatedLabel, String]]
-      val initParams2 = castModel.initialWeightVector(initWeightsScale, initializerSpec, trulyRandom = true)
-      val itr2 = new AdadeltaGradientDescentDVD(params.opt.maxIterations).iterations(cachedObj.withRandomBatches(params.opt.batchSize), initParams2).
-            asInstanceOf[Iterator[FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State]]
-      println("Optimizing second parser")
-      val weights2 = itr2.take(maxIterations).last.x
-      println("Optimized both parsers")
-      val clonedModel = castModel.cloneModelForEnsembling
-      val mergedWeights = castModel.mergeWeightsForEnsembling(weights1, weights2)
-      Seq(("ComboParser-Final", clonedModel.extractParser(mergedWeights))).iterator
-    } else {
-      // Normal execution
-      for ((state, iter) <- itr.take(maxIterations).zipWithIndex.tee(evalAndCache _)
-           if iter != 0 && iter % iterationsPerEval == 0 || evaluateNow) yield try {
-        val parser = if (model.isInstanceOf[PositionalTransformModel[AnnotatedLabel, AnnotatedLabel, String]]) {
-          val castModel = model.asInstanceOf[PositionalTransformModel[AnnotatedLabel, AnnotatedLabel, String]]
-          model.extractParser(state.x)
-        } else {
-          model.extractParser(state.x)
-        }
-        if (iter + iterationsPerEval >= maxIterations && computeTrainLL) {
-          computeLL(trainTrees, model, state.x)
-        }
-        (s"$name-$iter", parser)
-      } catch {
-        case e: Exception => e.printStackTrace(); throw e
+    for ((state, iter) <- itr.take(maxIterations).zipWithIndex.tee(evalAndCache _)
+         if iter != 0 && iter % iterationsPerEval == 0 || evaluateNow) yield try {
+      val parser = model.extractParser(state.x)
+      if (iter + iterationsPerEval >= maxIterations && computeTrainLL) {
+        computeLL(trainTrees, model, state.x)
       }
+      (s"$name-$iter", parser)
+    } catch {
+      case e: Exception => e.printStackTrace(); throw e
     }
   }
-  
+
   def sentTooLong(p: TreeInstance[AnnotatedLabel, String], maxLength: Int): Boolean = {
     p.words.count(x => x == "'s" || x(0).isLetterOrDigit) > maxLength
   }
