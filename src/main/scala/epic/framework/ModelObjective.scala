@@ -42,7 +42,6 @@ class ModelObjective[Datum](val model: Model[Datum],
      case None => Encoder.fromIndex(featureIndex).tabulateDenseVector(f => model.initialValueForFeature(f))
    }
     if(randomize) {
-//      v += (DenseVector.rand(numFeatures) * 2.0 * scale - scale)
       // Control the seed of the RNG for the weights
       val rng = new scala.util.Random(0)
       v += DenseVector(Array.tabulate(numFeatures)(i => rng.nextDouble * 2.0 * scale - scale))
@@ -66,11 +65,6 @@ class ModelObjective[Datum](val model: Model[Datum],
     val timeIn = System.currentTimeMillis()
     val success = new AtomicInteger(0)
     val minibatch = select(batch)
-    // Compute minibatch activation statistics
-    if (inference.isInstanceOf[PositionalTransformModel.Inference[AnnotatedLabel,AnnotatedLabel,String]]) {
-      val castMinibatch = minibatch.toSeq.asInstanceOf[GenTraversable[TreeInstance[AnnotatedLabel,String]]]
-      inference.asInstanceOf[PositionalTransformModel.Inference[AnnotatedLabel,AnnotatedLabel,String]].relativizeToData(castMinibatch)
-    }
     val finalCounts = minibatch.aggregate(null:model.ExpectedCounts)({ ( _countsSoFar,datum) =>
       try {
         val countsSoFar:model.ExpectedCounts = if (_countsSoFar ne null) _countsSoFar else emptyCounts

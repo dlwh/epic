@@ -39,8 +39,7 @@ class PositionalTransformModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSe
                                val transforms: IndexedSeq[OutputTransform[Array[Int],DenseVector[Double]]],
                                val maybeSparseSurfaceFeaturizer: Option[IndexedSpanFeaturizer[L, L2, W]],
                                val depTransforms: Seq[OutputTransform[Array[Int],DenseVector[Double]]],
-                               val decoupledTransforms: Seq[OutputTransform[Array[Int],DenseVector[Double]]],
-                               val batchNormalization: Boolean = false) extends ParserModel[L, W] with Serializable {
+                               val decoupledTransforms: Seq[OutputTransform[Array[Int],DenseVector[Double]]]) extends ParserModel[L, W] with Serializable {
   
   def mergeWeightsForEnsembling(x1: DenseVector[Double], x2: DenseVector[Double]) = {
     require(decoupledTransforms.size == 0)
@@ -147,7 +146,7 @@ class PositionalTransformModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSe
     val decoupledInnerLayers = decoupledLayersAndInner.map(_._2)
     val grammar = new PositionalTransformModel.PositionalTransformGrammar[L, L2, W](topology, lexicon, refinedTopology, refinements, labelFeaturizer,
                                                                                    surfaceFeaturizer, depFeaturizer, layers, innerLayers, depLayers, maybeSparseSurfaceFeaturizer, decoupledLayers, decoupledInnerLayers, weights, this)
-    new Inference(annotator, constrainer, grammar, refinements, batchNormalization)
+    new Inference(annotator, constrainer, grammar, refinements)
   }
   
   /**
@@ -167,8 +166,7 @@ object PositionalTransformModel {
   case class Inference[L, L2, W](annotator: (BinarizedTree[L], IndexedSeq[W]) => BinarizedTree[IndexedSeq[L2]],
                                  constrainer: ChartConstraints.Factory[L, W],
                                  grammar: PositionalTransformGrammar[L, L2, W],
-                                 refinements: GrammarRefinements[L, L2],
-                                 batchNormalization: Boolean) extends ParserInference[L, W]  {
+                                 refinements: GrammarRefinements[L, L2]) extends ParserInference[L, W]  {
     override def goldMarginal(scorer: Scorer, ti: TreeInstance[L, W], aug: UnrefinedGrammarAnchoring[L, W]): Marginal = {
 
       import ti._
@@ -184,29 +182,30 @@ object PositionalTransformModel {
     override def forTesting = grammar.origPTModel.inferenceFromWeights(grammar.weights, false)
     
     def relativizeToData(data: GenTraversable[TreeInstance[AnnotatedLabel,String]]) {
-      if (batchNormalization) {
-        require(grammar.layers.size == 1, "Right now batch normalization is only implemented for a single net")
-        val fvs = data.flatMap(ex => {
-          val words = ex.words.asInstanceOf[IndexedSeq[W]]
-          val constraints = constrainer.constraints(words)
-          val surffeat = grammar.surfaceFeaturizer.anchor(words)
-          val surfaceFeatsSeen = new ArrayBuffer[Array[Int]] 
-          for (begin <- 0 until words.size) {
-            for (end <- begin + 1 to words.size) {
-              if (constraints.isAllowedSpan(begin, end)) {
-                for (split <- begin + 1 until end) {
-                  if (constraints.isAllowedSpan(begin, split) && constraints.isAllowedSpan(split, end)) {
-                    surfaceFeatsSeen += surffeat.featuresForSplit(begin, split, end)
-                  }
-                }
-              }
-            }
-          }
-          surfaceFeatsSeen
-        })
-//        println(data.size + " examples in mini-batch yield " + fvs.size + " feature vectors to feedforward")
-        grammar.layers(0).applyBatchNormalization(fvs)
-      }
+      // Deprecated, was around for batch normalization which I never got working
+//      if (batchNormalization) {
+//        require(grammar.layers.size == 1, "Right now batch normalization is only implemented for a single net")
+//        val fvs = data.flatMap(ex => {
+//          val words = ex.words.asInstanceOf[IndexedSeq[W]]
+//          val constraints = constrainer.constraints(words)
+//          val surffeat = grammar.surfaceFeaturizer.anchor(words)
+//          val surfaceFeatsSeen = new ArrayBuffer[Array[Int]] 
+//          for (begin <- 0 until words.size) {
+//            for (end <- begin + 1 to words.size) {
+//              if (constraints.isAllowedSpan(begin, end)) {
+//                for (split <- begin + 1 until end) {
+//                  if (constraints.isAllowedSpan(begin, split) && constraints.isAllowedSpan(split, end)) {
+//                    surfaceFeatsSeen += surffeat.featuresForSplit(begin, split, end)
+//                  }
+//                }
+//              }
+//            }
+//          }
+//          surfaceFeatsSeen
+//        })
+////        println(data.size + " examples in mini-batch yield " + fvs.size + " feature vectors to feedforward")
+//        grammar.layers(0).applyBatchNormalization(fvs)
+//      }
     }
   }
 
