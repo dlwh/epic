@@ -37,7 +37,11 @@ class TreebankTokenizerTest  extends FunSuite {
     val sents = Map( "Every good boy does fine." -> List("Every","good","boy","does","fine","."),
       "Hi there, pilgrim; happy Thanksgiving there, pilgrim?" -> List("Hi","there",",","pilgrim",";","happy","Thanksgiving","there",",","pilgrim","?"),
       "Hi there, pilgrim; happy Thanksgiving there, pilgrim!" -> List("Hi","there",",","pilgrim",";","happy","Thanksgiving","there",",","pilgrim","!"),
-      "Hi there, (pilgrim); happy Thanksgiving there, pilgrim!" -> List("Hi","there",",","(", "pilgrim", ")", ";","happy","Thanksgiving","there",",","pilgrim","!")
+      "Hi there, (pilgrim); happy Thanksgiving there, pilgrim!" -> List("Hi","there",",","(", "pilgrim", ")", ";","happy","Thanksgiving","there",",","pilgrim","!"),
+       "A victims' board tried to force Gravano, Maas and his company, T.J.M. Productions Inc., HarperCollins, and Maas's agent all to give the book's proceeds to the murder victims' families."
+         -> List("A", "victims", "'", "board", "tried", "to", "force", "Gravano", ",", "Maas", "and", "his", "company", ",", "T.J.M.", "Productions", "Inc.", ",", "HarperCollins", ",", "and", "Maas", "'s", "agent", "all", "to", "give", "the", "book", "'s", "proceeds", "to", "the", "murder", "victims", "'", "families", "."),
+      "scheme in which Fierer and his associates, Conviction Consultants Inc., arranged for federal"
+        -> List("scheme", "in", "which", "Fierer", "and", "his", "associates", ",", "Conviction", "Consultants", "Inc.", ",", "arranged", "for", "federal")
     )
     for( (s,toks) <- sents) {
       assert(TreebankTokenizer(s).toList === toks)
@@ -123,7 +127,7 @@ class TreebankTokenizerTest  extends FunSuite {
   }
 
   test("acronyms") {
-    val candidates = Seq("U.S.","u.s.","p.s.")
+    val candidates = Seq("U.S.","u.s.","p.s.","Inc.","vs.","mt.","ltd.","co.", "T.J.M.")
     for(s <- candidates) {
       assert(TreebankTokenizer(s).toList === List(s,"."))
     }
@@ -157,6 +161,10 @@ class TreebankTokenizerTest  extends FunSuite {
     for( (text, toks) <- tweets zip tweet_tokens) {
       assert(TreebankTokenizer(text).toList === toks.toList)
     }
+  }
+
+  test("sentences") {
+
   }
 
 

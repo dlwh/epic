@@ -7,7 +7,7 @@ import scala.collection.mutable.HashMap
  * HackyHeadFinders find "heads" in a span using only preterminal labels.
  * It doesn't use the syntactic structure of the sentence.
  *
- * @author gdurrett
+ * @author gdurret
  * @tparam L
  * @tparam T
  */
