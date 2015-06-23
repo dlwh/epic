@@ -9,7 +9,6 @@ import collection.parallel.ForkJoinTaskSupport
 import concurrent.forkjoin.ForkJoinPool
 import com.typesafe.scalalogging.slf4j.LazyLogging
 import epic.util.{SafeLogging, CacheBroker}
-import epic.parser.models.PositionalTransformModel
 import epic.trees.AnnotatedLabel
 import epic.trees.TreeInstance
 
