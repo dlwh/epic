@@ -305,19 +305,19 @@ For training a SpanModel, the following configurations are known to work well in
 * English:
 ```bash
 epic.parser.models.ParserTrainer \
-  --modelFactory epic.parser.models.SpanModelFactory
-  --cache.path constraints.cache
-  --opt.useStochastic
-  --opt.regularization 5
-  --opt.batchSize 500
-  --alpha 0.1
-  --maxIterations 1000
-  --trainer.modelFactory.annotator epic.trees.annotations.PipelineAnnotator
-  --ann.0 epic.trees.annotations.FilterAnnotations
-  --ann.1 epic.trees.annotations.ForgetHeadTag
-  --ann.2 epic.trees.annotations.Markovize
-  --vertical 1
-  --horizontal 0
+  --modelFactory epic.parser.models.SpanModelFactory \
+  --cache.path constraints.cache \
+  --opt.useStochastic \
+  --opt.regularization 5 \
+  --opt.batchSize 500 \
+  --alpha 0.1 \
+  --maxIterations 1000 \
+  --trainer.modelFactory.annotator epic.trees.annotations.PipelineAnnotator \
+  --ann.0 epic.trees.annotations.FilterAnnotations \
+  --ann.1 epic.trees.annotations.ForgetHeadTag \
+  --ann.2 epic.trees.annotations.Markovize \
+  --vertical 1 \
+  --horizontal 0 \
   --treebank.path /home/dlwh/wsj/
 ```
 * Other (SPMRL languages):

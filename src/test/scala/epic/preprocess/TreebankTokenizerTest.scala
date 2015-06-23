@@ -15,7 +15,7 @@ class TreebankTokenizerTest  extends FunSuite {
   }
 
   test("some symbols and abbreviations") {
-    val words = List(".","...","$","-","/", "--", "v.", "vs.", "etc.")
+    val words = List(".","...","$","-","/", "--", "v.", "vs.", "etc.", "Mr.", "Mrs.", "Ms.", "mr.")
     for(w <- words) {
       assert(isOneToken(w), w)
     }
@@ -37,7 +37,11 @@ class TreebankTokenizerTest  extends FunSuite {
     val sents = Map( "Every good boy does fine." -> List("Every","good","boy","does","fine","."),
       "Hi there, pilgrim; happy Thanksgiving there, pilgrim?" -> List("Hi","there",",","pilgrim",";","happy","Thanksgiving","there",",","pilgrim","?"),
       "Hi there, pilgrim; happy Thanksgiving there, pilgrim!" -> List("Hi","there",",","pilgrim",";","happy","Thanksgiving","there",",","pilgrim","!"),
-      "Hi there, (pilgrim); happy Thanksgiving there, pilgrim!" -> List("Hi","there",",","(", "pilgrim", ")", ";","happy","Thanksgiving","there",",","pilgrim","!")
+      "Hi there, (pilgrim); happy Thanksgiving there, pilgrim!" -> List("Hi","there",",","(", "pilgrim", ")", ";","happy","Thanksgiving","there",",","pilgrim","!"),
+       "A victims' board tried to force Gravano, Maas and his company, T.J.M. Productions Inc., HarperCollins, and Maas's agent all to give the book's proceeds to the murder victims' families."
+         -> List("A", "victims", "'", "board", "tried", "to", "force", "Gravano", ",", "Maas", "and", "his", "company", ",", "T.J.M.", "Productions", "Inc.", ",", "HarperCollins", ",", "and", "Maas", "'s", "agent", "all", "to", "give", "the", "book", "'s", "proceeds", "to", "the", "murder", "victims", "'", "families", "."),
+      "scheme in which Fierer and his associates, Conviction Consultants Inc., arranged for federal"
+        -> List("scheme", "in", "which", "Fierer", "and", "his", "associates", ",", "Conviction", "Consultants", "Inc.", ",", "arranged", "for", "federal")
     )
     for( (s,toks) <- sents) {
       assert(TreebankTokenizer(s).toList === toks)
@@ -123,7 +127,7 @@ class TreebankTokenizerTest  extends FunSuite {
   }
 
   test("acronyms") {
-    val candidates = Seq("U.S.","u.s.","p.s.")
+    val candidates = Seq("U.S.","u.s.","p.s.","Inc.","vs.","mt.","ltd.","co.", "T.J.M.")
     for(s <- candidates) {
       assert(TreebankTokenizer(s).toList === List(s,"."))
     }
@@ -159,11 +163,16 @@ class TreebankTokenizerTest  extends FunSuite {
     }
   }
 
+  test("sentences") {
+
+  }
+
 
   // test examples from https://github.com/brendano/ark-tweet-nlp/blob/master/examples/example_tweets.txt
   // Code is Apache License 2.0.0
 
-  val tweets = """I predict I won't win a single game I bet on. Got Cliff Lee today, so if he loses its on me RT @e_one: Texas (cont) http://tl.gd/6meogh
+  val tweets = """I predict I won't win a single game I bet on.
+               Got Cliff Lee today, so if he loses its on me RT @e_one: Texas (cont) http://tl.gd/6meogh
     RT @DjBlack_Pearl: wat muhfuckaz wearin 4 the lingerie party?????
     Wednesday 27th october 2010. 》have a nice day :)
   RT @ddlovato: @joejonas oh, hey THANKS jerk!
@@ -193,6 +202,7 @@ class TreebankTokenizerTest  extends FunSuite {
       |bet
       |on
       |.
+      |QQQ
       |Got
       |Cliff
       |Lee

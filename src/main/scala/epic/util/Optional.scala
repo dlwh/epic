@@ -12,7 +12,7 @@ sealed trait Optional[+A] {
     case NotProvided => None
     case Provided(v) => Some(v)
   }
- }
+}
 case class Provided[A](value: A) extends Optional[A]
 case object NotProvided extends Optional[Nothing]
 
