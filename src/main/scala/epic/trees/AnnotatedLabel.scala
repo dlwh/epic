@@ -101,7 +101,7 @@ object AnnotatedLabel {
       Array("PRT")
     } else if (label.startsWith("-") || label.isEmpty || label == "#") {
       Array(label)
-    } else if (label.contains("##")) { // SPMRL uses two ## as the delimiter for 
+    } else if (label.contains("##")) { // SPMRL uses two ## as the delimiter for this info
       val splits = label.split("##").filter(_.nonEmpty)
       val nonmorphSplits = splits.head.split("[-=]")
       val morphSplits = splits.tail.flatMap(_.split("[|]")).filter("_" != _)
