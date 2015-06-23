@@ -100,7 +100,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
                             lowercasedVectors: Boolean = false,
                             extraPNMParams: ExtraPNMParams = ExtraPNMParams()) extends ParserModelFactory[AnnotatedLabel, String] {
   
-  type MyModel = PositionalTransformModel[AnnotatedLabel, AnnotatedLabel, String]
+  type MyModel = PositionalNeuralModel[AnnotatedLabel, AnnotatedLabel, String]
 
 
 
@@ -249,7 +249,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
       None
     }
     
-    new PositionalTransformModel(annotator.latent,
+    new PositionalNeuralModel(annotator.latent,
       constrainer,
       topology, lexicon,
       refGrammar,

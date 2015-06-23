@@ -27,19 +27,19 @@ import scala.collection.mutable.ArrayBuffer
  * @author gdurrett
  **/
 @SerialVersionUID(1L)
-class PositionalTransformModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSeq[W]) => BinarizedTree[IndexedSeq[L2]],
-                               val constrainer: ChartConstraints.Factory[L, W],
-                               val topology: RuleTopology[L],
-                               val lexicon: Lexicon[L, W],
-                               refinedTopology: RuleTopology[L2],
-                               refinements: GrammarRefinements[L, L2],
-                               labelFeaturizer: RefinedFeaturizer[L, W, Feature],
-                               surfaceFeaturizer: Word2VecSurfaceFeaturizerIndexed[W],
-                               depFeaturizer: Word2VecDepFeaturizerIndexed[W],
-                               val transforms: IndexedSeq[OutputTransform[Array[Int],DenseVector[Double]]],
-                               val maybeSparseSurfaceFeaturizer: Option[IndexedSpanFeaturizer[L, L2, W]],
-                               val depTransforms: Seq[OutputTransform[Array[Int],DenseVector[Double]]],
-                               val decoupledTransforms: Seq[OutputTransform[Array[Int],DenseVector[Double]]]) extends ParserModel[L, W] with Serializable {
+class PositionalNeuralModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSeq[W]) => BinarizedTree[IndexedSeq[L2]],
+                                      val constrainer: ChartConstraints.Factory[L, W],
+                                      val topology: RuleTopology[L],
+                                      val lexicon: Lexicon[L, W],
+                                      refinedTopology: RuleTopology[L2],
+                                      refinements: GrammarRefinements[L, L2],
+                                      labelFeaturizer: RefinedFeaturizer[L, W, Feature],
+                                      surfaceFeaturizer: Word2VecSurfaceFeaturizerIndexed[W],
+                                      depFeaturizer: Word2VecDepFeaturizerIndexed[W],
+                                      val transforms: IndexedSeq[OutputTransform[Array[Int],DenseVector[Double]]],
+                                      val maybeSparseSurfaceFeaturizer: Option[IndexedSpanFeaturizer[L, L2, W]],
+                                      val depTransforms: Seq[OutputTransform[Array[Int],DenseVector[Double]]],
+                                      val decoupledTransforms: Seq[OutputTransform[Array[Int],DenseVector[Double]]]) extends ParserModel[L, W] with Serializable {
   
   def mergeWeightsForEnsembling(x1: DenseVector[Double], x2: DenseVector[Double]) = {
     require(decoupledTransforms.size == 0)
@@ -60,11 +60,11 @@ class PositionalTransformModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSe
     // layers, so caching behavior is unaffected
     val newTransforms = transforms ++ transforms;
     val newDepTransforms = depTransforms ++ depTransforms;
-    new PositionalTransformModel(annotator, constrainer, topology, lexicon, refinedTopology, refinements, labelFeaturizer, surfaceFeaturizer, depFeaturizer,
+    new PositionalNeuralModel(annotator, constrainer, topology, lexicon, refinedTopology, refinements, labelFeaturizer, surfaceFeaturizer, depFeaturizer,
                                  newTransforms, maybeSparseSurfaceFeaturizer, newDepTransforms, decoupledTransforms)
   }
   
-  override type Inference = PositionalTransformModel.Inference[L, L2, W]
+  override type Inference = PositionalNeuralModel.Inference[L, L2, W]
 
 //  override def accumulateCounts(inf: Inference, d: TreeInstance[L, W], accum: ExpectedCounts, scale: Double):Unit = {
 //    val s = inf.scorer(d)
@@ -144,7 +144,7 @@ class PositionalTransformModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSe
     }
     val decoupledLayers = decoupledLayersAndInner.map(_._1)
     val decoupledInnerLayers = decoupledLayersAndInner.map(_._2)
-    val grammar = new PositionalTransformModel.PositionalTransformGrammar[L, L2, W](topology, lexicon, refinedTopology, refinements, labelFeaturizer,
+    val grammar = new PositionalNeuralModel.PositionalNeuralGrammar[L, L2, W](topology, lexicon, refinedTopology, refinements, labelFeaturizer,
                                                                                    surfaceFeaturizer, depFeaturizer, layers, innerLayers, depLayers, maybeSparseSurfaceFeaturizer, decoupledLayers, decoupledInnerLayers, weights, this)
     new Inference(annotator, constrainer, grammar, refinements)
   }
@@ -161,11 +161,11 @@ class PositionalTransformModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSe
   override def initialValueForFeature(f: Feature): Double = 0.0
 }
 
-object PositionalTransformModel {
+object PositionalNeuralModel {
 
   case class Inference[L, L2, W](annotator: (BinarizedTree[L], IndexedSeq[W]) => BinarizedTree[IndexedSeq[L2]],
                                  constrainer: ChartConstraints.Factory[L, W],
-                                 grammar: PositionalTransformGrammar[L, L2, W],
+                                 grammar: PositionalNeuralGrammar[L, L2, W],
                                  refinements: GrammarRefinements[L, L2]) extends ParserInference[L, W]  {
     override def goldMarginal(scorer: Scorer, ti: TreeInstance[L, W], aug: UnrefinedGrammarAnchoring[L, W]): Marginal = {
 
@@ -210,7 +210,7 @@ object PositionalTransformModel {
   }
 
   @SerialVersionUID(4749637878577393596L)
-  class PositionalTransformGrammar[L, L2, W](val topology: RuleTopology[L],
+  class PositionalNeuralGrammar[L, L2, W](val topology: RuleTopology[L],
                                              val lexicon: Lexicon[L, W],
                                              val refinedTopology: RuleTopology[L2],
                                              val refinements: GrammarRefinements[L, L2],
@@ -224,7 +224,7 @@ object PositionalTransformModel {
                                              decoupledLayers: IndexedSeq[OutputTransform[Array[Int],DenseVector[Double]]#OutputLayer],
                                              penultimateDecoupledLayers: IndexedSeq[epic.dense.Transform.Layer[Array[Int],DenseVector[Double]]],
                                              val weights: DenseVector[Double],
-                                             val origPTModel: PositionalTransformModel[L,L2,W]) extends Grammar[L, W] with Serializable {
+                                             val origPTModel: PositionalNeuralModel[L,L2,W]) extends Grammar[L, W] with Serializable {
 
     val SpanLayerIdx = 0
     val UnaryLayerIdx = 1
@@ -234,7 +234,7 @@ object PositionalTransformModel {
     val dcBinaryFeatOffset = dcUnaryFeatOffset + (if (decoupledLayers.size > 0) decoupledLayers(1).index.size else 0)
     
     override def withPermissiveLexicon: Grammar[L, W] = {
-      new PositionalTransformGrammar(topology, lexicon.morePermissive, refinedTopology, refinements, labelFeaturizer, surfaceFeaturizer,
+      new PositionalNeuralGrammar(topology, lexicon.morePermissive, refinedTopology, refinements, labelFeaturizer, surfaceFeaturizer,
                                      depFeaturizer, layers, penultimateLayers, depLayers, maybeSparseSurfaceFeaturizer, decoupledLayers, penultimateDecoupledLayers, weights, origPTModel)
     }
 
@@ -365,11 +365,11 @@ object PositionalTransformModel {
 
       override def sparsityPattern: ChartConstraints[L] = cons
 
-      def refinements = PositionalTransformGrammar.this.refinements
-      def refinedTopology: RuleTopology[L2] = PositionalTransformGrammar.this.refinedTopology
+      def refinements = PositionalNeuralGrammar.this.refinements
+      def refinedTopology: RuleTopology[L2] = PositionalNeuralGrammar.this.refinedTopology
 
-      val topology = PositionalTransformGrammar.this.topology
-      val lexicon = PositionalTransformGrammar.this.lexicon
+      val topology = PositionalNeuralGrammar.this.topology
+      val lexicon = PositionalNeuralGrammar.this.lexicon
 
       def words = w
 
