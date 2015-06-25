@@ -183,7 +183,7 @@ object MLSentenceSegmenter {
       }
 
 
-      val prevSpace = math.max(text.lastIndexWhere(!_.isLetterOrDigit, offset - 2), 0)
+      val prevSpace = math.max(text.lastIndexWhere(!_.isLetterOrDigit, offset - 2), -1) // -1 is ok, assume BOS is space
       buf += ContextWord(text.substring(prevSpace + 1, offset))
       buf += LastWordLength(offset - prevSpace)
       val nextNotSpace = text.indexWhere(c => !c.isSpaceChar && !c.isControl, offset + 1)
