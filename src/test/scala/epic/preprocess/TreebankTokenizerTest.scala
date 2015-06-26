@@ -126,6 +126,11 @@ class TreebankTokenizerTest  extends FunSuite {
 
   }
 
+  test("bizarre yychar bug") {
+    assert(TreebankTokenizer("Everyone was looking at the I.S. cops on the ground, not me.").endsWith(Seq("me", ".")))
+    assert(TreebankTokenizer("in the I.S.") == Seq("in", "the", "I.S.", "."))
+  }
+
   test("acronyms") {
     val candidates = Seq("U.S.","u.s.","p.s.","Inc.","vs.","mt.","ltd.","co.", "T.J.M.")
     for(s <- candidates) {

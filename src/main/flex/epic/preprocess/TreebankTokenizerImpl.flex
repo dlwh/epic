@@ -71,7 +71,7 @@ final scala.Tuple2<epic.trees.Span, epic.slab.Token> currentToken(String value) 
 %eofval{
   if(yychar() == acro_period) {
       acro_period = -2;
-  return new scala.Tuple2(new epic.trees.Span(epic.trees.Span.apply(yychar() - 1, yychar())), new epic.slab.Token("."));
+      return new scala.Tuple2(new epic.trees.Span(epic.trees.Span.apply(yychar() - 1, yychar())), new epic.slab.Token("."));
   } else {
     return null;
   }
@@ -295,25 +295,19 @@ ABBR = ({ABBR_TITLE}|{ABBR_GEN})
 {URL}                                                         { return currentToken(); }
 
 // special words
-can / not                                                      {return currentToken();}
-Can / not                                                      {return currentToken();}
-lem / me                                                      {return currentToken();}
-Lem / me                                                      {return currentToken();}
-gon / na                                                      {return currentToken();}
-Gon / na                                                      {return currentToken();}
-gim / me                                                      {return currentToken();}
-Gim / me                                                      {return currentToken();}
-wan / na                                                      {return currentToken();}
-Wan / na                                                      {return currentToken();}
-got / ta                                                      {return currentToken();}
-Got / ta                                                      {return currentToken();}
+{c}an / not                                                      {return currentToken();}
+{l}em / me                                                      {return currentToken();}
+{g}on / na                                                      {return currentToken();}
+{g}im / me                                                      {return currentToken();}
+{w}an / na                                                      {return currentToken();}
+{g}ot / ta                                                      {return currentToken();}
 
 // acronyms that end a sentence
 
 // we can't ask if we're at EOF, so this is a hack to say append a period if we hit EOF and just generated a period
-{LETTER}+\.({LETTER}+\.)+       {acro_period = yychar() + zzMarkedPos; return currentToken();}
+{LETTER}+\.({LETTER}+\.)+       {acro_period = yychar() + yylength(); return currentToken();}
 {LETTER}+\./{WHITESPACE}        {return currentToken();}
-{ABBR}\.                        {acro_period = yychar() + zzMarkedPos; return currentToken();}
+{ABBR}\.                        {acro_period = yychar() + yylength();  return currentToken();}
 
 // contractions and other clitics
 {INIT_CLITIC}                                           {return currentToken();}
