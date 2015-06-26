@@ -129,6 +129,10 @@ class TreebankTokenizerTest  extends FunSuite {
   test("bizarre yychar bug") {
     assert(TreebankTokenizer("Everyone was looking at the I.S. cops on the ground, not me.").endsWith(Seq("me", ".")))
     assert(TreebankTokenizer("in the I.S.") == Seq("in", "the", "I.S.", "."))
+
+    val tokens = TreebankTokenizer("There were two snowmobiles and three ATVs and what might possibly have been the remains of" +
+      " an old U.S. Army jeep that Bill Mauldin had driven back from Italy after he won his Pulitzer in World War II.")
+    assert(tokens endsWith Seq("II", "."))
   }
 
   test("acronyms") {
