@@ -351,11 +351,6 @@ object PositionalNeuralModel {
             total += getOrElseUpdateFinal(layerIdx, tetraIdx, rfeat, labelFeaturizer.index.size, { decoupledLayers(BinaryLayerIdx).activationsFromPenultimateDot(fs, rfeat) })
           }
         }
-//        if (depLayers.size > 0) {
-//          val (headIdx, childIdx) = depSpec.getHeadDepPair(begin, split, end, rule)
-//          val pairFeats = depSpec.featuresForHeadPair(headIdx, childIdx)
-//          total += getOrElseUpdateHeadDep(headIdx, childIdx, { depLayers.map(layer => layer.activations(pairFeats)).reduce(_ + _).data(0) })
-//        }
         if (maybeSparseSurfaceFeaturizer.isDefined) {
           total += dot(fspec.featuresForBinaryRule(begin, split, end, rule, ref), sparseFeatsStart)
         }
