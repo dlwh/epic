@@ -22,11 +22,16 @@ trait SentenceSegmenter extends StringAnalysisFunction[Any, Sentence] with (Stri
 
 object SegmentSentences {
   def main(args: Array[String]):Unit = {
-    val in = if(args.length == 0) System.in else new FileInputStream(args(0))
-
-    val text = scala.io.Source.fromInputStream(in).mkString
-
-    MLSentenceSegmenter.bundled().get.apply(text).map(_.replaceAll("\n"," ")) foreach println
-
+    val ins = if(args.length == 0) IndexedSeq(System.in) else args.toStream.map(new FileInputStream(_))
+    val streaming = new StreamSentenceSegmenter(MLSentenceSegmenter.bundled().get)
+    for(in <- ins) {
+      try {
+        for(s <- streaming.sentences(in)) {
+          println(s.replaceAll("\n"," ").trim)
+        }
+      } finally {
+        in.close()
+      }
+    }
   }
 }
