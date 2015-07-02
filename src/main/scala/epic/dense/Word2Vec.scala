@@ -10,23 +10,6 @@ import breeze.linalg.Counter
 import java.io.File
 
 object Word2Vec {
-  
-//  /**
-//   * Loads vectors for a vocabulary unless a certain file exists, in which case things are just loaded from there.
-//   * Does not check that the vocabularies are the same.
-//   */
-//  def loadVectorsForVocabularyUseCache(word2vecPath: String, voc: Set[String], inputVectorBias: Boolean, word2vecCache: String) = {
-//    if (!new File(word2vecCache).exists) {
-//      val map = loadVectorsForVocabulary(word2vecPath, voc, inputVectorBias);
-//      println("Writing word2vec cache to " + word2vecCache)
-//      IOUtils.writeObjFile(word2vecCache, map);
-//      map;
-//    } else {
-//      println("Reading word2vec cache from " + word2vecCache)
-//      IOUtils.readObjFile(word2vecCache).asInstanceOf[HashMap[String,Array[Float]]]
-//    }
-//  }
-  
   /**
    * Loads vectors from one or more sources in word2vecPaths; these might be in
    * word2vec format (should end in .bin) or C+W/Bansal format (should end
@@ -54,16 +37,12 @@ object Word2Vec {
     for (word <- voc) {
       val containedInSome = vectorsEachSource.map(_.keySet.contains(word)).reduce(_ || _)
       val vector = if (containedInSome) {
-//        Logger.logss("Vectors for " + word)
-//        (0 until vectorsEachSource.size).foreach(i => Logger.logss(vectorsEachSource(i).getOrElse(word, { Array[Float]() }).toSeq))
         var finalVector = (0 until vectorsEachSource.size).map(i => vectorsEachSource(i).getOrElse(word, { Array.tabulate(dimsEachSource(i))(j => 0.0F) })).reduce(_ ++ _)
         if (inputVectorBias) {
           finalVector = finalVector ++ Array(1.0F) 
         }
-//        Logger.logss(finalVector.toSeq)
         finalVector
       } else {
-//        println("No vectors at all for " + word)
         mostCommonMisses(word) = vocCounts(word)
         numRand += 1
         if (randomizeUnks) {
@@ -160,13 +139,6 @@ object Word2Vec {
     word2Vec;
   }
   
-//  def printTopMissedWords(word2VecPath: String, words: Counter[String,Double]) {
-//    val w2v = readWord2Vec(word2VecPath, words.keySet.toSet[String], false)
-//    for (word <- words.keysIterator) {
-//      println(word + ": " + words(word))
-//    }
-//  }
-  
   val hyphenPattern = Pattern.compile("(\\w+-)+(\\w+)");
   
   def convertWord(str: String, lowercase: Boolean = false) = {
@@ -190,27 +162,9 @@ object Word2Vec {
       strRep = strRep.toLowerCase()
     }
     strRep
-    
-//    string = re.sub(r"-LRB-", "(", string)
-//    string = re.sub(r"-RRB-", ")", string)
-//    string = re.sub(r"-LSB-", "[", string)
-//    string = re.sub(r"-RSB-", "]", string)
-//    string = re.sub(r"-LCB-", "{", string)
-//    string = re.sub(r"-RCB-", "}", string)
-//    # Replace hyphenated words with the final part
-//    string = re.sub(r"(\w+-)+(\w+)", "\g<2>", string)
-//    # Replace all numbers with 15 to fight sparsity. For some reason
-//    # this doesn't replace periods (even not sentence-final ones) though
-//    # it looks like it might...
-//    string = re.sub(r"\s-?[0-9,.]{2,15}\s", " fifteen ", string)
-//    string = re.sub(r"\s{2,}", " ", string)
-//    return string.strip()   
-    
-    
   }
   
   def readBansalEmbeddings(embeddingsPath: String, words: Set[String], inputVectorBias: Boolean) = {
-//    val inFile = IOUtils.lineIterator(embeddingsPath)
     val inFile = scala.io.Source.fromFile(new File(embeddingsPath)).getLines()
     val word2Vec = new HashMap[String,Array[Float]];
     var firstLine = true
@@ -262,38 +216,5 @@ object Word2Vec {
     }
     println("Loaded " + word2Vec.size + " Bansal representations out of " + words.size + " attempted words");
     word2Vec;
-  }
-  
-  def main(args: Array[String]) {
-//    smartLoadVectorsForVocabulary(Seq("data/syntacticEmbeddings/skipdep_embeddings.txt",
-//                                      "../cnnkim/data/GoogleNews-vectors-negative300.bin"), Set("the", ",", "crazyoovword"), true)
-//    readBansalEmbeddings("data/kushw2v/swedishwordvector.txt", Set("Den", ","), false)
-//    smartLoadVectorsForVocabulary(Seq("data/syntacticEmbeddings/skipdep_embeddings.txt"), Set("the", ","), true)
-    
-//    readBansalEmbeddings("data/syntacticEmbeddings/skipdep_embeddings.txt", Set("the", ","), false)
-    
-//    val counts = Counter[String,Double]
-//    counts("thing") = 5
-//    counts("stuff") = 3
-//    counts("a") = 1
-//    counts("b") = 10
-//    for (word <- counts.keySet.toSeq.sortBy(word => -counts(word))) {
-//      println(word + ": " + counts(word))
-//    }
-//    System.exit(0)
-//    
-//    val w2v = readWord2Vec("data/w2v/sv2.bin", Set(), true)
-//    for (word <- w2v.keySet) {
-//      println(word + ": " + w2v(word).toSeq)
-//    }
-    
-    
-//    println(convertWord("a15"))
-//    println(convertWord("1526"))
-//    val str = "triple-hyphenated-word"
-//    val m = hyphenPattern.matcher(str);
-//    if (m.find()) {
-//      println(m.group(2))
-//    }
   }
 }

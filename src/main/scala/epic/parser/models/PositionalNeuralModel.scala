@@ -66,14 +66,6 @@ class PositionalNeuralModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSeq[W
   
   override type Inference = PositionalNeuralModel.Inference[L, L2, W]
 
-//  override def accumulateCounts(inf: Inference, d: TreeInstance[L, W], accum: ExpectedCounts, scale: Double):Unit = {
-//    val s = inf.scorer(d)
-//    val m = inf.marginal(s, d)
-//    val gm = inf.goldMarginal(s, d)
-//    accumulateCounts(inf, s, d, m, accum, scale)
-//    accumulateCounts(inf, s, d, gm, accum, -scale)
-//  }
-
   override def accumulateCounts(inf: Inference, s: Scorer, d: TreeInstance[L, W], m: Marginal, accum: ExpectedCounts, scale: Double): Unit = {
 //    println("Extracting ecounts")
     inf.grammar.extractEcounts(m, accum.counts, scale)
@@ -94,12 +86,6 @@ class PositionalNeuralModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSeq[W
    * Models have features, and this defines the mapping from indices in the weight vector to features.
    * @return
    */
-  
-//  val index = if (maybeSparseSurfaceFeaturizer.isDefined) {
-//    SegmentedIndex(transform.index, maybeSparseSurfaceFeaturizer.get.index)
-//  } else {
-//    transform.index
-//  }
   val index = if (maybeSparseSurfaceFeaturizer.isDefined) {
     SegmentedIndex((transforms.map(_.index) ++ depTransforms.map(_.index) ++ decoupledTransforms.map(_.index) ++ IndexedSeq(maybeSparseSurfaceFeaturizer.get.index)):_*)
   } else {
@@ -108,7 +94,6 @@ class PositionalNeuralModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSeq[W
   
   def initialWeightVector(initWeightsScale: Double, initializerSpec: String, trulyRandom: Boolean = false): DenseVector[Double] = {
     val rng = if (trulyRandom) new Random() else new Random(0)
-//    val initTransformWeights = transform.initialWeightVector(initWeightsScale, rng, true);
     val initTransformWeights = DenseVector.vertcat(transforms.map(_.initialWeightVector(initWeightsScale, rng, true, initializerSpec)):_*);
     val initDepWeights = DenseVector.vertcat(depTransforms.map(_.initialWeightVector(initWeightsScale, rng, true, initializerSpec)):_*);
     val initDecoupledWeights = DenseVector.vertcat(decoupledTransforms.map(_.initialWeightVector(initWeightsScale, rng, true, initializerSpec)):_*);
@@ -121,7 +106,6 @@ class PositionalNeuralModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSeq[W
     newInitVector
   }
   
-//  override def featureIndex: Index[Feature] = transform.index
   override def featureIndex: Index[Feature] = index
 
   override def inferenceFromWeights(weights: DenseVector[Double]): Inference = inferenceFromWeights(weights, true)
@@ -134,12 +118,10 @@ class PositionalNeuralModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSeq[W
     val innerLayers: IndexedSeq[epic.dense.Transform.Layer[Array[Int],DenseVector[Double]]] = layersAndInnerLayers.map(_._2)
     val depLayers: IndexedSeq[OutputTransform[Array[Int],DenseVector[Double]]#OutputLayer] = for (i <- 0 until depTransforms.size) yield {
       val idxIdx = transforms.size + i
-//      println("dep " + i + ": " + index.componentOffset(idxIdx))
       depTransforms(i).extractLayer(weights(index.componentOffset(idxIdx) until index.componentOffset(idxIdx) + index.indices(idxIdx).size), forTrain)
     }
     val decoupledLayersAndInner = for (i <- 0 until decoupledTransforms.size) yield {
       val idxIdx = transforms.size + depTransforms.size + i
-//      println("dep " + i + ": " + index.componentOffset(idxIdx))
       decoupledTransforms(i).extractLayerAndPenultimateLayer(weights(index.componentOffset(idxIdx) until index.componentOffset(idxIdx) + index.indices(idxIdx).size), forTrain)
     }
     val decoupledLayers = decoupledLayersAndInner.map(_._1)
@@ -178,34 +160,9 @@ object PositionalNeuralModel {
     }
     
     // This needs to be different for dropout, so that we can get the right layers
-//    override def forTesting = this
     override def forTesting = grammar.origPTModel.inferenceFromWeights(grammar.weights, false)
     
     def relativizeToData(data: GenTraversable[TreeInstance[AnnotatedLabel,String]]) {
-      // Deprecated, was around for batch normalization which I never got working
-//      if (batchNormalization) {
-//        require(grammar.layers.size == 1, "Right now batch normalization is only implemented for a single net")
-//        val fvs = data.flatMap(ex => {
-//          val words = ex.words.asInstanceOf[IndexedSeq[W]]
-//          val constraints = constrainer.constraints(words)
-//          val surffeat = grammar.surfaceFeaturizer.anchor(words)
-//          val surfaceFeatsSeen = new ArrayBuffer[Array[Int]] 
-//          for (begin <- 0 until words.size) {
-//            for (end <- begin + 1 to words.size) {
-//              if (constraints.isAllowedSpan(begin, end)) {
-//                for (split <- begin + 1 until end) {
-//                  if (constraints.isAllowedSpan(begin, split) && constraints.isAllowedSpan(split, end)) {
-//                    surfaceFeatsSeen += surffeat.featuresForSplit(begin, split, end)
-//                  }
-//                }
-//              }
-//            }
-//          }
-//          surfaceFeatsSeen
-//        })
-////        println(data.size + " examples in mini-batch yield " + fvs.size + " feature vectors to feedforward")
-//        grammar.layers(0).applyBatchNormalization(fvs)
-//      }
     }
   }
 
@@ -270,7 +227,6 @@ object PositionalNeuralModel {
         
         override def visitUnaryRule(begin: Int, end: Int, rule: Int, ref: Int, score: Double): Unit = {
           val tetraIdx = tetra(begin, end, length + 1)
-//          statesUsed(tetraIdx) = true;
           untetra(tetraIdx) = (begin, end, length + 1)
           val fv = new FeatureVector(lspec.featuresForUnaryRule(begin, end, rule, ref))
           if (!ruleCountsPerState.contains(tetraIdx)) ruleCountsPerState.put(tetraIdx, SparseVector.zeros[Double](labelFeaturizer.index.size))
@@ -283,7 +239,6 @@ object PositionalNeuralModel {
 
         override def visitSpan(begin: Int, end: Int, tag: Int, ref: Int, score: Double): Unit = {
           val tetraIdx = tetra(begin, end, length + 2)
-//          statesUsed(tetraIdx) = true;
           untetra(tetraIdx) = (begin, end, length + 2)
           val fv = new FeatureVector(lspec.featuresForSpan(begin, end, tag, ref))
           if (!ruleCountsPerState.contains(tetraIdx)) ruleCountsPerState.put(tetraIdx, SparseVector.zeros[Double](labelFeaturizer.index.size))
@@ -296,7 +251,6 @@ object PositionalNeuralModel {
 
         override def visitBinaryRule(begin: Int, split: Int, end: Int, rule: Int, ref: Int, score: Double): Unit = {
           val tetraIdx = tetra(begin, split, end)
-//          statesUsed(tetraIdx) = true;
           untetra(tetraIdx) = (begin, split, end)
           val fv = new FeatureVector(lspec.featuresForBinaryRule(begin, split, end, rule, ref))
           if (!ruleCountsPerState.contains(tetraIdx)) ruleCountsPerState.put(tetraIdx, SparseVector.zeros[Double](labelFeaturizer.index.size))
@@ -305,16 +259,9 @@ object PositionalNeuralModel {
             if (!binaryRuleCountsPerState.contains(tetraIdx)) binaryRuleCountsPerState.put(tetraIdx, SparseVector.zeros[Double](labelFeaturizer.index.size))
             axpy(score, fv, binaryRuleCountsPerState(tetraIdx))
           }
-//          val (headIdx, childIdx) = depSpec.getHeadDepPair(begin, split, end, rule)
-//          countsPerHeadDepPair(headIdx)(childIdx) += score
         }
       }
-      
-//      println("MTL: " + maxTetraLen + ", " + w.size)
-//      println(tetra(w.length - 1, w.length, w.length + 2))
-//      println(statesUsed.map(a => if (a) 1 else 0).reduce(_ + _) + " used")
 
-      
       for (key <- ruleCountsPerState.keySet) {
         val (begin, split, end) = untetra(key)
         val ffeats = if (end > length) sspec.featuresForSpan(begin, split) else sspec.featuresForSplit(begin, split, end)
@@ -341,23 +288,9 @@ object PositionalNeuralModel {
           decoupledLayers(BinaryLayerIdx).tallyDerivative(deriv(dcBinaryFeatOffset until dcBinaryFeatOffset + decoupledLayers(BinaryLayerIdx).index.size), { binaryRuleCountsPerState(key) * scale }, ffeats)
         }
       }
-//      for (headIdx <- 0 until w.size) {
-//        for (childIdx <- 0 until w.size) {
-//          var layerSizeTally = layers.map(_.index.size).foldLeft(0)(_ + _)
-//          for (j <- 0 until depLayers.size) {
-//            val score = countsPerHeadDepPair(headIdx)(childIdx)
-//            if (score != 0 && Math.abs(score) > 1e-8) {
-//              depLayers(j).tallyDerivative(deriv(layerSizeTally until layerSizeTally + depLayers(j).index.size), DenseVector(Array(score * scale)), depSpec.featuresForHeadPair(headIdx, childIdx))
-//            }
-//            layerSizeTally += depLayers(j).index.size
-//          }
-//        }
-//      }
     }
 
     def anchor(w: IndexedSeq[W], cons: ChartConstraints[L]):GrammarAnchoring[L, W] = new ProjectionsGrammarAnchoring[L, L2, W] {
-
-//      var numScored = 0
       
       override def addConstraints(constraints: ChartConstraints[L]): GrammarAnchoring[L, W] = {
         anchor(w, cons & constraints)
@@ -380,9 +313,6 @@ object PositionalNeuralModel {
       val cache = Array.tabulate(layers.size + decoupledLayers.size)(i => new Array[DenseVector[Double]](maxTetraLen))
       val finalCache = Array.tabulate(layers.size + decoupledLayers.size)(i => new Array[SparseVector[Double]](maxTetraLen))
       
-//      val headDepCache = Array.tabulate(w.size, w.size)((i, j) => 0.0)
-//      val headDepStale = Array.tabulate(w.size, w.size)((i, j) => true)
-
       def getOrElseUpdate(layerIdx: Int, tetraIdx: Int, fun: => DenseVector[Double]) = {
         if (cache(layerIdx)(tetraIdx) == null) cache(layerIdx)(tetraIdx) = fun
         cache(layerIdx)(tetraIdx)
@@ -393,14 +323,6 @@ object PositionalNeuralModel {
         if (!finalCache(layerIdx)(tetraIdx).contains(rfeatIdx)) finalCache(layerIdx)(tetraIdx)(rfeatIdx) = fun
         finalCache(layerIdx)(tetraIdx)(rfeatIdx)
       }
-      
-//      def getOrElseUpdateHeadDep(headIdx: Int, depIdx: Int, fun: => Double) = {
-//        if (headDepStale(headIdx)(depIdx)) {
-//          headDepCache(headIdx)(depIdx) = fun
-//          headDepStale(headIdx)(depIdx) = false
-//        }
-//        headDepCache(headIdx)(depIdx)
-//      }
       
       val sspec = surfaceFeaturizer.anchor(w)
       val depSpec = depFeaturizer.anchor(w)

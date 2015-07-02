@@ -41,7 +41,7 @@ case class EmbeddingsTransform[FV](numOutputs: Int,
       AffineTransform.getGaussianAffineWeights(index.indices(0).size, initWeightsScale, rng)
     }
     // Only randomly initialize the weights in the matrix, not the word deltas
-    DenseVector.vertcat(myWeights, DenseVector(Array.tabulate(index.size - index.indices(0).size)(i => 0.0)))
+    DenseVector.vertcat(myWeights, DenseVector.zeros[Double](index.size - index.indices(0).size))
 //    DenseVector(Array.tabulate(index.size)(i => if (!outputLayer && i < index.indices(0).size) rng.nextGaussian * initWeightsScale else 0.0))
   }
   
@@ -65,7 +65,6 @@ case class EmbeddingsTransform[FV](numOutputs: Int,
     // these being multiplied by the parameter vector. Note that although the same
     // word vector is used for each word identity, the parameter vector depends
     // on the position.
-//    val cache = new HashMap[(Int,Int),DenseVector[Double]]
     val caches = Array.tabulate(numInputs/word2vecIndexed.wordRepSize)(i => new HashMap[Int,DenseVector[Double]])
 
     def activations(fv: Array[Int]) = {
@@ -81,16 +80,6 @@ case class EmbeddingsTransform[FV](numOutputs: Int,
             }
             finalVector += caches(i)(fv(i))
           }
-//          cache.synchronized {
-//            if (!cache.contains(wordPosn)) {
-//              val startIdx = i * word2vecIndexed.wordRepSize
-//              val wordVec = DenseVector(word2vecIndexed.word2vec(wordPosn._1)) + wordWeights(wordPosn._1, ::).t
-//              cache.put(wordPosn, weights(::, startIdx until startIdx + word2vecIndexed.wordRepSize) * wordVec)
-//            }
-//            finalVector += cache(wordPosn)
-//          }
-//          val startIdx = i * word2vecFeaturizer.wordRepSize
-//          finalVector += weights(::, startIdx until startIdx + word2vecFeaturizer.wordRepSize) * DenseVector(word2vecFeaturizer.word2vec(wordPosn._1))
         }
       }
       finalVector + bias
@@ -111,8 +100,6 @@ case class EmbeddingsTransform[FV](numOutputs: Int,
       
       val wordsDeriv = deriv(index.indices(0).size until index.indices(0).size + index.indices(1).size).asDenseMatrix.reshape(word2vecIndexed.vocSize, word2vecIndexed.wordRepSize, view = View.Require)
       val wordsDerivs = Array.tabulate(fv.size)(wordPosnIdx => wordsDeriv(fv(wordPosnIdx), ::).t)
-      
-//      val wordsDerivs = Array.tabulate(fv.size)(wordPosnIdx => deriv(index.indices(0).size + fv(wordPosnIdx) * word2vecIndexed.wordRepSize until index.indices(0).size + (fv(wordPosnIdx) + 1) * word2vecIndexed.wordRepSize))
       // d/d(weights(::, i)) == scale(i) * innerAct
       for (i <- 0 until weights.rows) {
         val a: Double = scale(i)
@@ -121,7 +108,6 @@ case class EmbeddingsTransform[FV](numOutputs: Int,
           var wordPosnIdx = 0;
           while (wordPosnIdx < fv.size) {
             val relevantWeights = weights(i, wordPosnIdx * word2vecIndexed.wordRepSize until (wordPosnIdx + 1) * word2vecIndexed.wordRepSize).t
-//            axpy(a, relevantWeights, wordsDeriv(fv(wordPosnIdx), ::).t)
             axpy(a, relevantWeights, wordsDerivs(wordPosnIdx))
             wordPosnIdx += 1
           }
@@ -129,8 +115,6 @@ case class EmbeddingsTransform[FV](numOutputs: Int,
           biasDeriv(i) += a
         }
       }
-      
-//      biasDeriv += scale
 
       // scale is f'(mat * inner(v) + bias)
       // d/dv is mat.t * f'(mat * inner(v) + bias)
@@ -140,38 +124,3 @@ case class EmbeddingsTransform[FV](numOutputs: Int,
     def applyBatchNormalization(inputs: scala.collection.GenTraversable[Array[Int]]) = {}
   }
 }
-
-//object EmbeddingsTransform {
-//  
-//  case class Index(numOutputs: Int, numInputs: Int, includeBias: Boolean = true, backPropIntoEmbeddings: Boolean = false) extends breeze.util.Index[Feature] {
-//    def apply(t: Feature): Int = t match {
-//      case NeuralFeature(output, input) if output < numOutputs && input < numInputs && output > 0 && input > 0 =>
-//        output * numInputs + input
-//      case NeuralBias(output) if output <= numOutputs => output + numOutputs * numInputs
-//      case _ => -1
-//    }
-//
-//    def unapply(i: Int): Option[Feature] = {
-//      if (i < 0 || i >= size) {
-//        None
-//      } else if (includeBias && i >= numInputs * numOutputs) {
-//        Some(NeuralBias(i - numInputs * numOutputs))
-//      } else  {
-//        Some(NeuralFeature(i/numInputs, i % numInputs))
-//      }
-//    }
-//
-//    def makeMatrix(dv: DenseVector[Double]):DenseMatrix[Double] = {
-//      assert(dv.stride == 1)
-//      new DenseMatrix(numOutputs, numInputs, dv.data, dv.offset)
-//    }
-//
-//    def pairs: Iterator[(Feature, Int)] = iterator.zipWithIndex
-//
-//    def iterator: Iterator[Feature] = Iterator.range(0, size) map unapply map (_.get)
-//
-//    override val size: Int = if(includeBias) numOutputs * numInputs + numOutputs else numOutputs * numInputs
-//
-//    override def toString() = ScalaRunTime._toString(this)
-//  }
-//}

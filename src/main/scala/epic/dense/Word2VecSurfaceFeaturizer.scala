@@ -22,14 +22,9 @@ class Word2VecIndexed[W](private val wordIndex: Index[W],
                          private val converter: W => W) extends Serializable {
   
   def wordRepSize = word2vec.head.size
-//  def vectorSize: Int = 6 * wordRepSize
   def vocSize = wordIndex.size
     
   val zeroVector = Array.tabulate(wordRepSize)(i => 0.0)
-  
-//  def fetch(wordIdx: Int): DenseVector[Double] = {
-//    if (wordIdx != -1 && wordIdx < word2vec.size) DenseVector(word2vec(wordIdx)) else DenseVector(zeroVector)
-//  }
   
   def containsWord(rawStr: W) = wordIndex.contains(converter(rawStr))
   
@@ -84,13 +79,10 @@ class Word2VecSurfaceFeaturizerIndexed[W](val word2vecIndexed: Word2VecIndexed[W
   }
   
   def anchor(words: IndexedSeq[W]): WordVectorAnchoringIndexed[W] = {
-//    val convertedWords = words.map(word2vecIndexed.converter(_))
-//    val indexedWords = convertedWords.map(word2vecIndexed.wordIndex(_))
     val indexedWords = words.map(word2vecIndexed.indexWord(_))
     new WordVectorAnchoringIndexed[W] {
       
       def reducedFeaturesForSpan(start: Int, end: Int) = {
-//        Array(fetchWord(start - 1), fetchWord(start), -1, -1, fetchWord(end - 1), fetchWord(end))
         if (featureSpec == "" || featureSpec == "moresplit" || featureSpec == "basic") {
           Array(fetchWord(start - 1), fetchWord(start), fetchWord(end - 1), fetchWord(end))
         } else if (featureSpec == "morecontext") {
@@ -107,7 +99,6 @@ class Word2VecSurfaceFeaturizerIndexed[W](val word2vecIndexed: Word2VecIndexed[W
       }
       
       def featuresForSpan(start: Int, end: Int) = {
-//        Array(fetchWord(start - 1), fetchWord(start), -1, -1, fetchWord(end - 1), fetchWord(end))
         if (featureSpec == "" || featureSpec == "basic") {
           Array(fetchWord(start - 1), fetchWord(start), -1, -1, fetchWord(end - 1), fetchWord(end))
         } else if (featureSpec == "morecontext") {
@@ -126,7 +117,6 @@ class Word2VecSurfaceFeaturizerIndexed[W](val word2vecIndexed: Word2VecIndexed[W
       }
         
       def featuresForSplit(start: Int, split: Int, end: Int) = {
-//        Array(fetchWord(start - 1), fetchWord(start), fetchWord(split - 1), fetchWord(split), fetchWord(end - 1), fetchWord(end))
         if (featureSpec == "" || featureSpec == "basic") {
           Array(fetchWord(start - 1), fetchWord(start), fetchWord(split - 1), fetchWord(split), fetchWord(end - 1), fetchWord(end))
         } else if (featureSpec == "morecontext") {
@@ -175,8 +165,6 @@ class Word2VecDepFeaturizerIndexed[W](val word2VecIndexed: Word2VecIndexed[W],
   val hackyHeadFinder: HackyHeadFinder[String,String] = new RuleBasedHackyHeadFinder
     
   def anchor(words: IndexedSeq[W]): WordVectorDepAnchoringIndexed[W] = {
-//    val convertedWords = words.map(word2VecIndexed.converter(_))
-//    val indexedWords = convertedWords.map(word2VecIndexed.wordIndex(_))
     val indexedWords = words.map(word2VecIndexed.indexWord(_))
     new WordVectorDepAnchoringIndexed[W] {
       
@@ -193,8 +181,6 @@ class Word2VecDepFeaturizerIndexed[W](val word2VecIndexed: Word2VecIndexed[W],
         val lcHeadIdx = begin + hackyHeadFinder.findHead(lc, preterminals.slice(begin, split));
         val rcHeadIdx = split + hackyHeadFinder.findHead(rc, preterminals.slice(split, end));
         val overallHeadIdx = begin + hackyHeadFinder.findHead(parent, preterminals.slice(begin, end))
-//        println("Span: " + words.slice(begin, split) + " with begin = " + begin + ", head = " + lcHeadIdx)
-//        println("Span: " + words.slice(split, end) + " with begin = " + split + ", head = " + rcHeadIdx)
         if (overallHeadIdx == rcHeadIdx) {
           (rcHeadIdx, lcHeadIdx)
         } else {

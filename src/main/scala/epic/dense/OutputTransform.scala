@@ -5,17 +5,11 @@ import breeze.util.Index
 import epic.framework.Feature
 import scala.util.Random
 
-/**
- *
- *
- * @author dlwh
- */
 trait OutputTransform[In, +Out] extends Serializable {
   val index: Index[Feature]
 
   def extractLayer(dv: DenseVector[Double], forTrain: Boolean):OutputLayer = extractLayerAndPenultimateLayer(dv, forTrain)._1
   
-//  def extractLayerAndPenultimateLayer(dv: DenseVector[Double]): (OutputLayer, Transform[In,Out]#Layer);
   def extractLayerAndPenultimateLayer(dv: DenseVector[Double], forTrain: Boolean): (OutputLayer, Transform.Layer[In,Out]);
   
   def initialWeightVector(initWeightsScale: Double, rng: Random, outputLayer: Boolean, spec: String): DenseVector[Double]

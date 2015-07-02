@@ -8,7 +8,10 @@ import scala.collection.mutable.HashMap
 import scala.util.Random
 
 /**
- * Used at the input layer to cache lookups and 
+ * Used at the input layer to cache lookups and the result of applying
+ * the affine transform at the first layer of the network. This saves
+ * computation across repeated invocations of the neural network in
+ * the sentence.
  */
 case class CachingLookupAndAffineTransformDense[FV](numOutputs: Int,
                                                     numInputs: Int,
@@ -30,14 +33,13 @@ case class CachingLookupAndAffineTransformDense[FV](numOutputs: Int,
   
   def initialWeightVector(initWeightsScale: Double, rng: Random, outputLayer: Boolean, spec: String) = {
     val myWeights = if (outputLayer) {
-      DenseVector(Array.tabulate(index.size)(i => 0.0))
+      DenseVector.zeros[Double](index.size)
     } else if (spec == "magic") {
       AffineTransform.getMagicAffineWeights(index.size, numInputs, numOutputs, initWeightsScale, rng)
     } else {
       AffineTransform.getGaussianAffineWeights(index.size, initWeightsScale, rng)
     }
     myWeights
-//    DenseVector(Array.tabulate(index.size)(i => if (!outputLayer) rng.nextGaussian * initWeightsScale else 0.0))
   }
   
   def clipHiddenWeightVectors(weights: DenseVector[Double], norm: Double, outputLayer: Boolean) {
@@ -60,7 +62,6 @@ case class CachingLookupAndAffineTransformDense[FV](numOutputs: Int,
     // these being multiplied by the parameter vector. Note that although the same
     // word vector is used for each word identity, the parameter vector depends
     // on the position.
-//    val cache = new HashMap[(Int,Int),DenseVector[Double]]
     val caches = Array.tabulate(numInputs/word2vecIndexed.wordRepSize)(i => new HashMap[Int,DenseVector[Double]])
 
     def activations(fv: Array[Int]) = {
@@ -75,15 +76,6 @@ case class CachingLookupAndAffineTransformDense[FV](numOutputs: Int,
             }
             finalVector += caches(i)(fv(i))
           }
-//          cache.synchronized {
-//            if (!cache.contains(wordPosn)) {
-//              val startIdx = i * word2vecIndexed.wordRepSize
-//              cache.put(wordPosn, weights(::, startIdx until startIdx + word2vecIndexed.wordRepSize) * DenseVector(word2vecIndexed.word2vec(wordPosn._1)))
-//            }
-//            finalVector += cache(wordPosn)
-//          }
-//          val startIdx = i * word2vecFeaturizer.wordRepSize
-//          finalVector += weights(::, startIdx until startIdx + word2vecFeaturizer.wordRepSize) * DenseVector(word2vecFeaturizer.word2vec(wordPosn._1))
         }
       }
       finalVector + bias
@@ -111,8 +103,6 @@ case class CachingLookupAndAffineTransformDense[FV](numOutputs: Int,
           biasDeriv(i) += a
         }
       }
-
-//      biasDeriv += scale
 
       // scale is f'(mat * inner(v) + bias)
       // d/dv is mat.t * f'(mat * inner(v) + bias)

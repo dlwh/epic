@@ -129,20 +129,6 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     }
 
     val prodFeaturizer = new ProductionFeaturizer[AnnotatedLabel, AnnotatedLabel, String](xbarGrammar, indexedRefinements, lGen=labelFeaturizer, rGen=ruleFeaturizer)
-    
-//    val presentWords = Word2Vec.readBansalEmbeddings(word2vecPath, summedWordCounts.keySet.toSet[String], false)
-//    var displayCount = 0
-//    var displayCount2 = 0
-//    for (word <- summedWordCounts.keySet.toSeq.sortBy(word => -summedWordCounts(word))) {
-//      if (!presentWords.contains(word) && displayCount < 100) {
-//        println(word + ": " + summedWordCounts(word))
-//        displayCount += 1
-//      } else if (presentWords.contains(word) && displayCount2 < 100) {
-//        println("PRESENT: " + summedWordCounts(word))
-//        displayCount2 += 1
-//      }
-//    }
-//    System.exit(0)
 
     
     ///////////////////////
@@ -177,16 +163,6 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     val surfaceFeaturizer = new Word2VecSurfaceFeaturizerIndexed(word2vecIndexed, neuralSurfaceWordsToUse)
     val depFeaturizer = new Word2VecDepFeaturizerIndexed(word2vecIndexed, freqTagger, topology)
     
-    
-//    val baseTransformLayer = new CachingLookupAndAffineTransformDense(numHidden, surfaceFeaturizer.vectorSize, surfaceFeaturizer)
-//    var currLayer: Transform[Array[Int],DenseVector[Double]] = if (useRelu) new ReluTransform(baseTransformLayer) else new TanhTransform(baseTransformLayer)
-//    for (i <- 1 until numHiddenLayers) {
-//      val tmpLayer = new AffineTransformDense(numHidden, numHidden, currLayer)
-//      currLayer = if (nonLinType == "relu") new ReluTransform(tmpLayer) else if (nonLinType == "cube") new CubeTransform(tmpLayer) else new TanhTransform(tmpLayer)
-//    }
-//    var transform = new AffineTransformDense(featurizer.index.size, numHidden, currLayer)
-    
-    
     val transforms = if (decoupleTransforms) {
       IndexedSeq[AffineOutputTransform[Array[Int]]]()
     } else {
@@ -218,8 +194,6 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     println(depTransforms.size + " dep transforms, " + depTransforms.map(_.index.size).toSeq + " parameters for each")
     println(decoupledTransforms.size + " decoupled transforms, " + decoupledTransforms.map(_.index.size).toSeq + " parameters for each")
     
-    
-    
     val maybeSparseFeaturizer = if (useSparseFeatures) {
       var wf = SpanModelFactory.defaultPOSFeaturizer(annWords, useBrown = useSparseBrown)
       var span = SpanModelFactory.goodFeaturizer(annWords, commonWordThreshold, useShape = false, useLfsuf = useSparseLfsuf, useBrown = useSparseBrown, useMostSparseIndicators = useMostSparseIndicators)
@@ -228,10 +202,8 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
       val indexedSurface = IndexedSplitSpanFeaturizer.fromData(span, annTrees, bloomFilter = false)
       
       def sparseLabelFeaturizer(l: AnnotatedLabel) = Set(l, l.baseAnnotatedLabel).toSeq
-//      def sparseRuleFeaturizer(r: Rule[AnnotatedLabel]) = if(useGrammar) Set(r, r.map(_.baseAnnotatedLabel)).toSeq else if(r.isInstanceOf[UnaryRule[AnnotatedLabel]]) Set(r.parent, r.parent.baseAnnotatedLabel).toSeq else Seq.empty
       def sparseRuleFeaturizer(r: Rule[AnnotatedLabel]) = Set(r, r.map(_.baseAnnotatedLabel)).toSeq
       val sparseProdFeaturizer = new ProductionFeaturizer[AnnotatedLabel, AnnotatedLabel, String](xbarGrammar, indexedRefinements, lGen=sparseLabelFeaturizer, rGen=sparseRuleFeaturizer)
-      
       
       val indexed = IndexedSpanFeaturizer.extract[AnnotatedLabel, AnnotatedLabel, String](indexedWord,
         indexedSurface,
@@ -310,23 +282,17 @@ object PositionalNeuralModelFactory {
                               nonLinType: String,
                               dropoutRate: Double,
                               backpropIntoEmbeddings: Boolean,
-//                              outputEmbeddingDim: Int): AffineOutputEmbeddingTransform[Array[Int]] = {
                               outputEmbeddingDim: Int,
                               coarsenerForInitialization: Option[Int => Int]): OutputTransform[Array[Int],DenseVector[Double]] = {
     val innerTransform = buildNetInnerTransforms(word2vecIndexed, inputSize, numHidden, numHiddenLayers, nonLinType, dropoutRate, backpropIntoEmbeddings)
     
     val innerTransformLastLayer = new AffineTransform(outputEmbeddingDim, if (numHiddenLayers >= 1) numHidden else inputSize, innerTransform)
     new OutputEmbeddingTransform(outputSize, outputEmbeddingDim, innerTransformLastLayer, coarsenerForInitialization)
-    
-//    new AffineOutputEmbeddingTransform(outputSize, if (numHiddenLayers >= 1) numHidden else word2vecIndexed.vectorSize, outputEmbeddingDim, innerTransform)
   }
   
   def addNonlinearity(nonLinType: String, numHidden: Int, dropoutRate: Double, currLayer: Transform[Array[Int],DenseVector[Double]]) = {
     val useDropout = dropoutRate > 1e-8
     var tmpLayer = currLayer
-//    if (batchNormalization) {
-//      tmpLayer = new BatchNormalizationTransform(numHidden, useBias = true, tmpLayer)
-//    }
     tmpLayer = new NonlinearTransform(nonLinType, numHidden, tmpLayer)
     if (useDropout) {
       tmpLayer = new NonlinearTransform("dropout", numHidden, tmpLayer, dropoutRate)
@@ -339,10 +305,8 @@ object PositionalNeuralModelFactory {
       if (index.get(i).isInstanceOf[Rule[AnnotatedLabel]]) {
         val parentIdx = index(index.get(i).asInstanceOf[Rule[AnnotatedLabel]].parent)
         if (parentIdx == -1) {
-//          println("-1!")
           0
         } else {
-//          println("Mapping " + index.get(i) + " to " + index.get(parentIdx))
           parentIdx
         }
       } else {

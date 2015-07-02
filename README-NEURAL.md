@@ -49,7 +49,8 @@ settings are likely to work well too.
 
 To run the parser on new text (tokenized, one-sentence-per-line), use the following command:
 
-    java -Xmx4g -cp path/to/assembly.jar epic.parser.ParseText --model neuralcrf.parser --nthreads 8 [files]
+    java -Xmx4g -cp path/to/assembly.jar epic.parser.ParseText --model neuralcrf.parser \
+      --tokenizer whitespace --sentences newline --nthreads 8 [files]
 
 To reproduce the results in the neural CRF paper, run the following command
 (note that you need to fill in paths for -cp, --treebank.path, and --word2vecPath):
@@ -91,16 +92,15 @@ Options to configure the neural network and training are largely defined in
 To run on the development set, simply remove ```evalOnTest``` and
 ```includeDevInTrain``` from the arguments.
 
-Note that you should use the official version of ```evalb``` on the output
-files (gold and guess) rather than relying on the native scorer in the Epic
-parser. For SPMRL, you should use the version distributed with the shared
-task.
+You should use the official version of ```evalb``` on the output files (gold
+and guess) rather than relying on the native scorer in the Epic parser. For
+SPMRL, you should use the version distributed with the shared task.
 
-Also note that the X-bar grammar and coarse pruning masks (constraints) are
-cached between runs in the same directory, which speeds up training and testing
-time considerably as generating the masks is time-consuming.
+Note that the X-bar grammar and coarse pruning masks (constraints) are cached
+between runs in the same directory, which speeds up training and testing time
+considerably as generating the masks is time-consuming.
 
-
-
-
+Finally, note that multiple parsers cannot be trained simultaneously in
+the same directory, since certain files (such as pruning masks from the
+coarse model) will collide.
 

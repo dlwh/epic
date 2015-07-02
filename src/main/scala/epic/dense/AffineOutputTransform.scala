@@ -93,8 +93,6 @@ case class AffineOutputTransform[FV](numOutputs: Int, numInputs: Int, innerTrans
         }
       }
 
-//      biasDeriv += scale
-
       // scale is f'(mat * inner(v) + bias)
       // d/dv is mat.t * f'(mat * inner(v) + bias)
 

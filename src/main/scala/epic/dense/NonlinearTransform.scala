@@ -20,7 +20,7 @@ case class NonlinearTransform[FV](nonLinType: String, size: Int, inner: Transfor
       val keepFrac = 1.0 - dropoutRate
       val fcn = if (forTrain) {
         // Only have "true" when we want to keep things around
-        new NonlinearTransform.Mask(Array.tabulate(size)(i => NonlinearTransform.globalRng.nextDouble < keepFrac)) 
+        new NonlinearTransform.Mask(Array.fill(size)(NonlinearTransform.globalRng.nextDouble < keepFrac)) 
       } else {
         new NonlinearTransform.Scale(keepFrac)
       }

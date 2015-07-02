@@ -8,6 +8,13 @@ import epic.framework.Feature
 import scala.runtime.ScalaRunTime
 import scala.util.Random
 
+/**
+ * Output embedding technique described in section 6 of
+ * http://www.eecs.berkeley.edu/~gdurrett/papers/durrett-klein-acl2015.pdf
+ * Basically learns a dictionary for the output as well as an affine transformation
+ * in order to produce the vector that gets combined with the input in the final
+ * bilinear product.
+ */
 case class OutputEmbeddingTransform[FV](numOutputs: Int, outputDim: Int, innerTransform: Transform[FV, DenseVector[Double]], coarsenerForInitialization: Option[Int => Int] = None) extends OutputTransform[FV, DenseVector[Double]] {
 
 
@@ -74,28 +81,13 @@ case class OutputEmbeddingTransform[FV](numOutputs: Int, outputDim: Int, innerTr
       val biasDeriv = deriv(numOutputs * outputDim until index.componentOffset(1))
       val innerAct = innerLayer.activations(fv)
       val innerScale = DenseVector(Array.tabulate(outputDim)(i => 0.0))
-      // TODO: Compute derivatives here
       for (k <- 0 until scale.size) {
         // Assuming there's something nontrivial to pass back
         if (scale(k) != 0.0) {
           // Bias update
           biasDeriv(k) += scale(k)
-          // Dumb way
-//          for (i <- 0 until numInputs) {
-//            for (j <- 0 until outputDim) {
-//              weightsDeriv(j, i) += scale(k) * innerAct(i) * embeddings(k, j)
-//              embeddingsDeriv(k, j) += scale(k) * weights(j, i) * innerAct(i)
-//              innerScale(i) += scale(k) * weights(j, i) * embeddings(k, j)
-//            }
-//          }
-          // Smart way; matches the dumb way exactly
-          // Column * row gives outer product
-          // TODO: Derive update here
           embeddingsDeriv(k, ::).t += innerAct * scale(k) // Embeddings update
           innerScale += embeddings(k, ::).t * scale(k)
-//          weightsDeriv += embeddings(k, ::).t * innerAct.t * scale(k) // Weights update
-//          embeddingsDeriv(k, ::).t += weights * innerAct * scale(k) // Embeddings update
-//          innerScale += weightst * embeddings(k, ::).t * scale(k) // Inner scale update
         }
       }
       innerLayer.tallyDerivative(deriv(index.componentOffset(1) to -1), innerScale, fv)

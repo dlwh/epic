@@ -127,22 +127,9 @@ object AffineTransform {
   def clipHiddenWeightVectors(numOutputs: Int, numInputs: Int, weights: DenseVector[Double], norm: Double) {
     val mat = weights(0 until (numOutputs * numInputs)).asDenseMatrix.reshape(numOutputs, numInputs, view = View.Require)
     for (i <- 0 until mat.rows) {
-      var thisRowNorm = 0.0
-      var j = 0
-      while (j < mat.cols) {
-        thisRowNorm += mat(i, j) * mat(i, j)
-        j += 1
-      }
-//      println("thisRowNorm: " + Math.sqrt(thisRowNorm))
+      val thisRowNorm = breeze.linalg.norm(mat(i, ::), 2)
       val multFactor = norm/Math.sqrt(thisRowNorm)
-      if (multFactor < 1) {
-//        println("Clipping from " + Math.sqrt(thisRowNorm) + " to " + norm)
-        j = 0
-        while (j < mat.cols) {
-          mat(i, j) *= multFactor
-          j += 1
-        }
-      }
+      mat(i, ::) *= multFactor
     }
   }
   

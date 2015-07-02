@@ -105,7 +105,7 @@ case class LRQTNLayer(lhsWeights: DenseMatrix[Double], rhsWeights: DenseMatrix[D
     val rhsProj = rhsWeights * fv
     val dotProd = lhsProj.dot(rhsProj)
 //    println(dotProd + "            " + lhsProj.data.toSeq + "         " + rhsProj.data.toSeq)
-    DenseVector(Array(dotProd))
+    DenseVector(dotProd)
   }
 
   def tallyDerivative(deriv: DenseVector[Double], _scale: =>Vector[Double], fv: DenseVector[Double]) = {

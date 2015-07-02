@@ -8,6 +8,13 @@ import scala.util.Random
 import breeze.numerics.sigmoid
 import epic.features.SegmentedIndex
 
+/**
+ * Implements batch normalization from
+ * http://arxiv.org/pdf/1502.03167v3.pdf
+ * Basically, each unit is shifted and rescaled per minibatch so that its activations 
+ * have mean 0 and variance 1. This has been demonstrated to help training deep networks,
+ * but doesn't seem to help here.
+ */
 case class BatchNormalizationTransform[FV](size: Int, useBias: Boolean, inner: Transform[FV, DenseVector[Double]]) extends Transform[FV, DenseVector[Double]] {
   
   val index = if (useBias) {

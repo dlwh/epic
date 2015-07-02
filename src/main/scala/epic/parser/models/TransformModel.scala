@@ -36,9 +36,7 @@ class TransformModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSeq[W]) => B
 
 
   override def accumulateCounts(inf: Inference, s: Scorer, d: TreeInstance[L, W], m: Marginal, accum: ExpectedCounts, scale: Double): Unit = {
-//    println("Extracting ecounts")
     inf.grammar.extractEcounts(m, accum.counts, scale)
-//    println("Ecounts extracted")
     accum.loss += scale * m.logPartition
   }
 
@@ -192,11 +190,6 @@ object TransformModel {
           layer.activations(new FeatureVector(sfeats))
         })
         val rfeats = lspec.featuresForUnaryRule(begin, end, rule, ref)
-
-//        println("One example UFEATS: " + rfeats.size)
-//        for (rfeat <- rfeats) {
-//          println("UFEAT: " + labelFeaturizer.index.unapply(rfeats(0)))
-//        }
         new FeatureVector(rfeats) dot fs
       }
 
@@ -206,11 +199,6 @@ object TransformModel {
           layer.activations(new FeatureVector(sfeats))
         })
         val rfeats = lspec.featuresForSpan(begin, end, tag, ref)
-
-//        println("One example SFEATS: " + rfeats.size)
-//        for (rfeat <- rfeats) {
-//          println("SFEAT: " + labelFeaturizer.index.unapply(rfeats(0)))
-//        }
         new FeatureVector(rfeats) dot fs
       }
 

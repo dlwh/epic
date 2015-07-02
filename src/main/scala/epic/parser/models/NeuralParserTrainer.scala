@@ -219,13 +219,6 @@ object NeuralParserTrainer extends epic.parser.ParserPipeline with LazyLogging {
   
   def computeLL(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]], model: PositionalNeuralModel[AnnotatedLabel,AnnotatedLabel,String], weights: DenseVector[Double]) {
     println("Computing final log likelihood on the whole training set...")
-//    val inf = if (model.batchNormalization) {
-//      val inf = model.inferenceFromWeights(weights).forTesting
-//      inf.relativizeToData(trainTrees.slice(0, Math.min(trainTrees.size, 200)))
-//      inf
-//    } else {
-//      model.inferenceFromWeights(weights).forTesting
-//    }
     val inf = model.inferenceFromWeights(weights).forTesting
     val ll = trainTrees.par.aggregate(0.0)((currLL, trainTree) => { 
       try {
