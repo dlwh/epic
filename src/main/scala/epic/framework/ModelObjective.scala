@@ -9,6 +9,8 @@ import collection.parallel.ForkJoinTaskSupport
 import concurrent.forkjoin.ForkJoinPool
 import com.typesafe.scalalogging.slf4j.LazyLogging
 import epic.util.{SafeLogging, CacheBroker}
+import epic.trees.AnnotatedLabel
+import epic.trees.TreeInstance
 
 /**
  * The objective function for training a [[epic.framework.Model]]. Selects
@@ -28,14 +30,20 @@ class ModelObjective[Datum](val model: Model[Datum],
 
   // Selects a set of data to use
   protected def select(batch: IndexedSeq[Int]):GenTraversable[Datum] = batchSelector(batch)
-
+  
   def initialWeightVector(randomize: Boolean): DenseVector[Double] = {
+    initialWeightVector(randomize, 1E-3)
+  }
+
+  def initialWeightVector(randomize: Boolean, scale: Double): DenseVector[Double] = {
    val v = model.readCachedFeatureWeights() match {
      case Some(vector) => vector
      case None => Encoder.fromIndex(featureIndex).tabulateDenseVector(f => model.initialValueForFeature(f))
    }
     if(randomize) {
-      v += (DenseVector.rand(numFeatures) * 2E-3 - 1E-3)
+      // Control the seed of the RNG for the weights
+      val rng = new scala.util.Random(0)
+      v += DenseVector(Array.tabulate(numFeatures)(i => rng.nextDouble * 2.0 * scale - scale))
     }
     v
   }
@@ -55,7 +63,8 @@ class ModelObjective[Datum](val model: Model[Datum],
     val inference = inferenceFromWeights(x)
     val timeIn = System.currentTimeMillis()
     val success = new AtomicInteger(0)
-    val finalCounts = select(batch).aggregate(null:model.ExpectedCounts)({ ( _countsSoFar,datum) =>
+    val minibatch = select(batch)
+    val finalCounts = minibatch.aggregate(null:model.ExpectedCounts)({ ( _countsSoFar,datum) =>
       try {
         val countsSoFar:model.ExpectedCounts = if (_countsSoFar ne null) _countsSoFar else emptyCounts
         model.accumulateCounts(inference, datum, countsSoFar, 1.0)

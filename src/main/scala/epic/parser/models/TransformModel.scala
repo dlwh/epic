@@ -47,7 +47,7 @@ class TransformModel[L, L2, W](annotator: (BinarizedTree[L], IndexedSeq[W]) => B
   override def featureIndex: Index[Feature] = transform.index
 
   override def inferenceFromWeights(weights: DenseVector[Double]): Inference = {
-    val layer = transform.extractLayer(weights)
+    val layer = transform.extractLayer(weights, true)
 
     val grammar = new TransformModel.TransformGrammar[L, L2, W, transform.type](topology, lexicon, refinedTopology, refinements, labelFeaturizer, surfaceFeaturizer, layer)
     new Inference(annotator, constrainer, grammar, refinements)
@@ -94,7 +94,10 @@ object TransformModel {
       val sspec = surfaceFeaturizer.anchor(w)
       val lspec = labelFeaturizer.anchor(w)
 
-      // cache: we remember the (begin/end) pair we saw with each
+      // For each split point, remember the (begin, end) pair that that split point was observed with. There'll
+      // only be one in the gold, but more in the prediction. Accumulate rule counts (output layer) until
+      // we need this split point for a different set of indices or we come to the end. Then, backpropagate
+      // the rule marginals through the network to get the derivative.
       val UNUSED = (-1, -1)
       val states = Array.fill(w.length + 2)(UNUSED) // 1 for each split,  length for unaries, length +1 for spans
       val ruleCountsPerState = Array.fill(w.length + 2)(SparseVector.zeros[Double](labelFeaturizer.index.size))
@@ -187,7 +190,6 @@ object TransformModel {
           layer.activations(new FeatureVector(sfeats))
         })
         val rfeats = lspec.featuresForUnaryRule(begin, end, rule, ref)
-
         new FeatureVector(rfeats) dot fs
       }
 
@@ -197,7 +199,6 @@ object TransformModel {
           layer.activations(new FeatureVector(sfeats))
         })
         val rfeats = lspec.featuresForSpan(begin, end, tag, ref)
-
         new FeatureVector(rfeats) dot fs
       }
 

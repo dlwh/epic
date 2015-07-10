@@ -16,7 +16,7 @@ tmp/
 .idea*
 .scratch/
 java.hprof.txt
-
 *.bbl
 *.blg
 *.aux
+/bin/
