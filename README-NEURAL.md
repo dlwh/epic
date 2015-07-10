@@ -52,7 +52,15 @@ To run the parser on new text (tokenized, one-sentence-per-line), use the follow
     java -Xmx4g -cp path/to/assembly.jar epic.parser.ParseText --model neuralcrf.parser \
       --tokenizer whitespace --sentences newline --nthreads 8 [files]
 
-To reproduce the results in the neural CRF paper, run the following command
+You can download the ```neuralcrf.parser``` model from:
+
+http://nlp.cs.berkeley.edu/projects/neuralcrf.shtml
+
+Due to modifications to the code for the system release and randomness in the
+training process, this model performs slightly worse than reported in the paper
+(90.9 on WSJ Section 23).
+
+To train a new parser as described in the neural CRF paper, run the following command
 (note that you need to fill in paths for -cp, --treebank.path, and --word2vecPath):
 
     java -Xmx47g -cp path/to/assembly.jar epic.parser.models.NeuralParserTrainer \
@@ -72,7 +80,7 @@ To reproduce the results in the neural CRF paper, run the following command
       --word2vecPath path/to/skipdep_embeddings.txt \
       --threads 8
 
-To run SPMRL treebanks, modify the arguments to the command above as follows:
+To run on SPMRL treebanks, modify the arguments to the command above as follows:
 
 1) Add the following arguments (replace ${LANG}$ as appropriate):
 
