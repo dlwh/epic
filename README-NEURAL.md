@@ -92,8 +92,7 @@ To run on SPMRL treebanks, modify the arguments to the command above as follows:
 
 2) Modify --treebank.path to point to the X_SPMRL/gold/ptb directory.
 
-Options to configure the neural network and training are largely defined in
-```epic.parser.models.PositionalNeuralModel```
+Options to configure the neural network and training are largely defined in ```epic.parser.models.PositionalNeuralModelFactory```
 
 ###Miscellaneous Notes
 
