@@ -14,6 +14,7 @@ sealed trait Optional[+A] {
   }
 }
 case class Provided[A](value: A) extends Optional[A]
+@SerialVersionUID(-649101350749082174L)
 case object NotProvided extends Optional[Nothing]
 
 object Optional {
