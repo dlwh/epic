@@ -21,6 +21,8 @@ import org.xml.sax._
  * @author dlwh
  **/
 object TextExtractor {
+  if (!hasTika)
+    throw new RuntimeException("Apache Tika is an optional dependency and is not on the classpath")
 
   def extractText(url: URL, extractMainContentOnly: Boolean = true) = loadSlab(url, extractMainContentOnly).content
 
@@ -263,5 +265,14 @@ import scala.xml._
 
   }
 
+  def hasTika = {
+    try {
+      Class.forName(classOf[Tika].getName)
+      true
+    }
+    catch {
+      case _: Any => false
+    }
+  }
 
 }
