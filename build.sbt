@@ -102,6 +102,7 @@ mergeStrategy in assembly <<= (mergeStrategy in assembly) { (old) =>
 {
   case PathList("org", "w3c", "dom", _) => MergeStrategy.first
   case PathList("javax", "xml", "stream", _ *) => MergeStrategy.first
+  case PathList("scala", "xml", _ *) => MergeStrategy.first
   case PathList("org", "cyberneko", "html", _ *) => MergeStrategy.first
   case x => old(x)
 }

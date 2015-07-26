@@ -6,7 +6,7 @@ import epic.features.SegmentedIndex
 import epic.framework.Feature
 
 import scala.runtime.ScalaRunTime
-
+import scala.util.Random
 
 case class AffineTransform[FV, Mid](numOutputs: Int, numInputs: Int, innerTransform: Transform[FV, Mid], includeBias: Boolean = true)
                               (implicit mult: OpMulMatrix.Impl2[DenseMatrix[Double], Mid, DenseVector[Double]],
@@ -15,23 +15,50 @@ case class AffineTransform[FV, Mid](numOutputs: Int, numInputs: Int, innerTransf
 
   val index = SegmentedIndex(new AffineTransform.Index(numOutputs, numInputs, includeBias), innerTransform.index)
 
-
-
-  def extractLayer(weights: DenseVector[Double]) = {
+  def extractLayer(weights: DenseVector[Double], forTrain: Boolean) = {
+    extractLayerAndPenultimateLayer(weights, forTrain)._1
+  }
+  
+  def extractLayerAndPenultimateLayer(weights: DenseVector[Double], forTrain: Boolean) = {
     val mat = weights(0 until (numOutputs * numInputs)).asDenseMatrix.reshape(numOutputs, numInputs, view = View.Require)
     val bias = if(includeBias) {
       weights(numOutputs * numInputs until index.componentOffset(1))
     } else {
       DenseVector.zeros[Double](numOutputs)
     }
-    val inner = innerTransform.extractLayer(weights(index.componentOffset(1) to -1))
-    new Layer(mat, bias, inner)
+    val inner = innerTransform.extractLayer(weights(index.componentOffset(1) to -1), forTrain)
+    new Layer(mat, bias, inner) -> inner
+  }
+  
+  def initialWeightVector(initWeightsScale: Double, rng: Random, outputLayer: Boolean, spec: String) = {
+//    if (spec == "") {
+//    DenseVector(Array.tabulate(index.indices(0).size)(i => if (outputLayer) 0.0 else rng.nextGaussian * initWeightsScale)),
+    val myWeights = if (outputLayer) {
+      DenseVector(Array.tabulate(index.indices(0).size)(i => 0.0))
+    } else if (spec == "magic") {
+      AffineTransform.getMagicAffineWeights(index.indices(0).size, numInputs, numOutputs, initWeightsScale, rng)
+    } else {
+      AffineTransform.getGaussianAffineWeights(index.indices(0).size, initWeightsScale, rng)
+    }
+    DenseVector.vertcat(myWeights, innerTransform.initialWeightVector(initWeightsScale, rng, false, spec))
+  }
+  
+  def clipHiddenWeightVectors(weights: DenseVector[Double], norm: Double, outputLayer: Boolean) {
+    if (!outputLayer) {
+      AffineTransform.clipHiddenWeightVectors(numOutputs, numInputs, weights, norm)
+    }
+    innerTransform.clipHiddenWeightVectors(weights(index.componentOffset(1) to -1), norm, false)
+  }
+  
+  def getInterestingWeightIndicesForGradientCheck(offset: Int): Seq[Int] = {
+    (offset until offset + Math.min(10, index.indices(0).size)) ++ innerTransform.getInterestingWeightIndicesForGradientCheck(offset + index.indices(0).size)
   }
 
-  case class Layer(weights: DenseMatrix[Double], bias: DenseVector[Double], innerLayer: innerTransform.Layer) extends _Layer {
+  case class Layer(weights: DenseMatrix[Double], bias: DenseVector[Double], innerLayer: innerTransform.Layer) extends Transform.Layer[FV,DenseVector[Double]] {
     override val index = AffineTransform.this.index
 
-    val weightst = weights.t.copy
+    val weightst = weights.t
+//    val weightst = weights.t.copy
 
 
     def activations(fv: FV) = {
@@ -40,6 +67,7 @@ case class AffineTransform[FV, Mid](numOutputs: Int, numInputs: Int, innerTransf
     }
 
     def tallyDerivative(deriv: DenseVector[Double], _scale: =>Vector[Double], fv: FV) = {
+//      println("SCALE: " + _scale) 
       val scale = _scale
       val matDeriv = deriv(0 until (numOutputs * numInputs)).asDenseMatrix.reshape(numOutputs, numInputs, view = View.Require)
       val biasDeriv = if(includeBias) {
@@ -65,9 +93,11 @@ case class AffineTransform[FV, Mid](numOutputs: Int, numInputs: Int, innerTransf
 
       // scale is f'(mat * inner(v) + bias)
       // d/dv is mat.t * f'(mat * inner(v) + bias)
-
+//      println("Intermediate scale: " + weightst * scale)
       innerLayer.tallyDerivative(deriv(index.componentOffset(1) to -1), weightst * scale, fv)
     }
+    
+    def applyBatchNormalization(inputs: scala.collection.GenTraversable[FV]) = innerLayer.applyBatchNormalization(inputs)
 
   }
 
@@ -78,6 +108,31 @@ object AffineTransform {
                                                                     canAxpy: scaleAdd.InPlaceImpl3[DenseVector[Double], Double, FV]) = new AffineTransform(numOutputs, numInputs, new IdentityTransform[FV], includeBias)
   def apply(numOutputs: Int, numInputs: Int, includeBias: Boolean):AffineTransform[DenseVector[Double], DenseVector[Double]] = apply(numOutputs, numInputs, new IdentityTransform[DenseVector[Double]], includeBias)
   def apply(numOutputs: Int, numInputs: Int):AffineTransform[DenseVector[Double], DenseVector[Double]]  = apply(numOutputs, numInputs, true)
+  
+  
+  def getUniformAffineWeights(numWeights: Int, initWeightsScale: Double, rng: Random) = {
+    DenseVector(Array.tabulate(numWeights)(i => rng.nextGaussian * initWeightsScale))
+  }
+  
+  def getGaussianAffineWeights(numWeights: Int, initWeightsScale: Double, rng: Random) = {
+    DenseVector(Array.tabulate(numWeights)(i => rng.nextGaussian * initWeightsScale))
+  }
+  
+  // N.B. numWeights != inSize * outSize if there's a bias
+  def getMagicAffineWeights(numWeights: Int, inSize: Int, outSize: Int, initWeightsScale: Double, rng: Random) = {
+    val range = Math.sqrt(6.0/(inSize + outSize))
+    DenseVector(Array.tabulate(numWeights)(i => rng.nextDouble * 2 * range - range))
+  }
+  
+  def clipHiddenWeightVectors(numOutputs: Int, numInputs: Int, weights: DenseVector[Double], norm: Double) {
+    val mat = weights(0 until (numOutputs * numInputs)).asDenseMatrix.reshape(numOutputs, numInputs, view = View.Require)
+    for (i <- 0 until mat.rows) {
+      val thisRowNorm = breeze.linalg.norm(mat(i, ::), 2)
+      val multFactor = norm/Math.sqrt(thisRowNorm)
+      mat(i, ::) *= multFactor
+    }
+  }
+  
   case class Index(numOutputs: Int, numInputs: Int, includeBias: Boolean = true) extends breeze.util.Index[Feature] {
     def apply(t: Feature): Int = t match {
       case NeuralFeature(output, input) if output < numOutputs && input < numInputs && output > 0 && input > 0 =>
