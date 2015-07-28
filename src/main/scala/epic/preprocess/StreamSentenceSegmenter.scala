@@ -9,15 +9,25 @@ import java.nio.channels.Channels
  *
  * @author dlwh
  **/
-class StreamSentenceSegmenter(val baseSegmenter: SentenceSegmenter) {
+class StreamSentenceSegmenter(val baseSegmenter: SentenceSegmenter, segmentOnNewLines: Boolean = false) {
 
   def sentences(stream: InputStream):Iterator[String] = {
     // addendum maintains the characters that we haven't read.
     var addendum = ""
     val pieces = chunkInput(stream).flatMap { (s: String) =>
-      val sentences = baseSegmenter(addendum + s).toIndexedSeq
-      addendum = sentences.last
-      sentences.view.slice(0, sentences.length - 1)
+      if (segmentOnNewLines) {
+        val sentences = (addendum + s).split("\n").flatMap(baseSegmenter(_)).toIndexedSeq
+        if (!s.endsWith("\n")) {
+          addendum = sentences.last
+          sentences.dropRight(1)
+        } else {
+          sentences
+        }
+      } else {
+        val sentences = baseSegmenter(addendum + s).flatMap(baseSegmenter(_)).toIndexedSeq
+        addendum = sentences.last
+        sentences.dropRight(1)
+      }
     }
 
     pieces ++ Iterator(addendum).filter(_.nonEmpty)

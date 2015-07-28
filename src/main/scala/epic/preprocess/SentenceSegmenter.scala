@@ -2,6 +2,7 @@ package epic.preprocess
 
 import java.io.FileInputStream
 
+import breeze.config.CommandLineParser
 import epic.slab._
 import epic.slab.Sentence
 
@@ -21,9 +22,14 @@ trait SentenceSegmenter extends StringAnalysisFunction[Any, Sentence] with (Stri
 
 
 object SegmentSentences {
-  def main(args: Array[String]):Unit = {
-    val ins = if(args.length == 0) IndexedSeq(System.in) else args.toStream.map(new FileInputStream(_))
-    val streaming = new StreamSentenceSegmenter(MLSentenceSegmenter.bundled().get)
+  case class Params(splitOnNewline: Boolean = false)
+  def main(_args: Array[String]):Unit = {
+    val (config, args) = CommandLineParser.parseArguments(_args)
+    val params = config.readIn[Params]()
+    import params._
+
+    val ins = if(args.isEmpty) IndexedSeq(System.in) else args.toStream.map(new FileInputStream(_))
+    val streaming = new StreamSentenceSegmenter(MLSentenceSegmenter.bundled().get, segmentOnNewLines = params.splitOnNewline)
     for(in <- ins) {
       try {
         for(s <- streaming.sentences(in)) {
