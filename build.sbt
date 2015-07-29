@@ -27,7 +27,7 @@ lazy val commonSettings = Seq(
   organization := "org.scalanlp",
   version := "0.4-SNAPSHOT",
   scalaVersion := Version.scala,
-  crossScalaVersions := Seq("2.11.4", "2.10.4"),
+  crossScalaVersions := Seq("2.11.3", "2.10.4"),
   libraryDependencies ++= Seq(
     Library.breeze,
     Library.breezeConfig,
@@ -67,13 +67,28 @@ lazy val commonSettings = Seq(
     "Sonatype Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots/"
   ),
   libraryDependencies ++= (CrossVersion.partialVersion(scalaVersion.value) match {
-    // if scala 2.11+ is used, add dependency on scala-xml module
-    case Some((2, scalaMajor)) if scalaMajor >= 11 =>
+      // if scala 2.11+ is used, add dependency on scala-xml module
+      case Some((2, scalaMajor)) if scalaMajor >= 11 =>
       Seq("org.scala-lang.modules" %% "scala-xml" % "1.0.1")
-    case _ =>
+      case _ =>
       Seq.empty
-  })
-) ++ assemblySettings ++ osgiSettings ++ sbtjflex.SbtJFlexPlugin.jflexSettings ++ net.virtualvoid.sbt.graph.Plugin.graphSettings
+      })
+
+  ) ++ assemblySettings ++ osgiSettings ++ sbtjflex.SbtJFlexPlugin.jflexSettings ++ net.virtualvoid.sbt.graph.Plugin.graphSettings ++
+  IndexedSeq (
+      mergeStrategy in assembly <<= (mergeStrategy in assembly) { (old) =>
+        {
+          case PathList("org", "w3c", "dom", _) => MergeStrategy.first
+          case PathList("javax", "xml", "stream", _ *) => MergeStrategy.first
+          case PathList("scala", "xml", _ *) => MergeStrategy.first
+          case PathList("org", "cyberneko", "html", _ *) => MergeStrategy.first
+          case x => old(x)
+         }
+      }
+)
+
+
+
 
 lazy val core = project
   .in(file("."))
