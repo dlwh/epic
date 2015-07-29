@@ -1,7 +1,7 @@
 package epic.sequences
 
+import epic.framework.Example
 import epic.trees.Span
-import nak.data.Example
 
 /**
  * A tagged sequence has a sequence of tags and a sequence of words that are in

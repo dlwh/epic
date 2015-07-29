@@ -1,6 +1,7 @@
 package epic.util
 
-import nak.data.{Example, Observation}
+import epic.framework.{Example, Observation}
+
 
 /**
  *

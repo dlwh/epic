@@ -5,9 +5,8 @@ import breeze.config.{Configuration, CommandLineParser}
 import epic.ontonotes.{NerType, ConllOntoReader}
 import collection.mutable.ArrayBuffer
 import breeze.linalg.DenseVector
-import epic.framework.ModelObjective
+import epic.framework.{Example, ModelObjective}
 import breeze.optimize._
-import nak.data.Example
 import breeze.util.Encoder
 import epic.trees.Span
 import breeze.optimize.FirstOrderMinimizer.OptParams
@@ -15,6 +14,7 @@ import breeze.util.Implicits._
 import com.typesafe.scalalogging.slf4j.LazyLogging
 import epic.preprocess.TreebankTokenizer
 import epic.corpora.CONLLSequenceReader
+import epic.framework.Example
 
 
 /**

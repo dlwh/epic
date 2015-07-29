@@ -1,7 +1,7 @@
 package epic.ontonotes
 
+import epic.framework.Example
 import epic.trees._
-import nak.data.Example
 import epic.sequences.Segmentation
 import collection.mutable.ArrayBuffer
 import collection.mutable

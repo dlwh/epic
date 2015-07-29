@@ -1,8 +1,9 @@
 package epic.corpora
 
+import epic.framework.{Observation, Example}
+
 import io.Source
 import collection.mutable.ArrayBuffer
-import nak.data.{Observation, Example}
 import java.io.{File, FileInputStream, InputStream}
 
 /**

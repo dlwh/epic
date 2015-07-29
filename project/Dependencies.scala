@@ -3,9 +3,8 @@ import sbt._
 object Version {
   val scala               = "2.11.6"
   val scalaTest           = "2.2.5"
-  val breeze              = "0.11-M0"
+  val breeze              = "0.12-SNAPSHOT"
   val breezeConfig        = "0.9.1"
-  val nak                 = "1.3"
   val mapdb               = "0.9.2"
   val scalaLogging        = "2.1.2"
   val tikaParsers         = "1.5"
@@ -23,7 +22,6 @@ object Version {
 object Library {
   val breeze              = "org.scalanlp"               %% "breeze"                               % Version.breeze
   val breezeConfig        = "org.scalanlp"               %% "breeze-config"                        % Version.breezeConfig
-  val nak                 = "org.scalanlp"               %% "nak"                                  % Version.nak intransitive()
   val mapdb               = "org.mapdb"                  %  "mapdb"                                % Version.mapdb
   val scalaLoggingSlf4j   = "com.typesafe.scala-logging" %% "scala-logging-slf4j"                  % Version.scalaLogging
   val tikaParsers         = ("org.apache.tika"           %  "tika-parsers"                         % Version.tikaParsers)

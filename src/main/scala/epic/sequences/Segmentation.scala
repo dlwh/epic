@@ -1,8 +1,8 @@
 package epic.sequences
 
+import epic.framework.Example
 import epic.trees.{Tree, Span}
 import scala.collection.mutable.ArrayBuffer
-import nak.data.Example
 
 /**
  *

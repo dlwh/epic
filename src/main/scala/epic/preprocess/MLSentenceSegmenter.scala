@@ -11,10 +11,9 @@ import breeze.stats.distributions.{RandBasis, Rand}
 import breeze.util.{Encoder, Index, Iterators}
 import epic.corpora.MascSlab
 import epic.features.CrossProductFeature
-import epic.framework.{Feature, ModelObjective, StandardExpectedCounts}
+import epic.framework.{Example, Feature, ModelObjective, StandardExpectedCounts}
 import epic.slab.{Sentence, StringSlab}
 import epic.trees.Span
-import nak.data.Example
 
 import scala.collection.mutable.ArrayBuffer
 import scala.io.Source

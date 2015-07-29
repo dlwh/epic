@@ -16,8 +16,8 @@ package epic.framework
  limitations under the License.
 */
 import breeze.linalg._
+import epic.inference.Factor
 import collection.mutable.ArrayBuffer
-import nak.inference.Factor
 import breeze.util._
 import epic.util.{SafeLogging, CacheBroker}
 import breeze.stats.distributions.Rand

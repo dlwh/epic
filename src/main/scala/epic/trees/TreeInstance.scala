@@ -15,8 +15,8 @@ package epic.trees
  limitations under the License.
 */
 
+import epic.framework.Example
 import epic.sequences.TaggedSequence
-import nak.data.Example
 
 case class TreeInstance[L, +W](id: String,
                                tree: BinarizedTree[L],

@@ -1,6 +1,6 @@
 package epic.ontonotes
 
-import nak.data.Example
+import epic.framework.Example
 import epic.trees.{AnnotatedLabel, Tree}
 
 

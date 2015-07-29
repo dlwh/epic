@@ -16,9 +16,10 @@ package epic.framework
  limitations under the License.
 */
 
+import epic.inference.{ExpectationPropagation, Factor}
+
 import collection.mutable.ArrayBuffer
 import epic.util.SafeLogging
-import nak.inference.{ExpectationPropagation, Factor}
 import java.util.concurrent.atomic.AtomicLong
 import epic.parser.ParseMarginal
 

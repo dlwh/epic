@@ -15,7 +15,7 @@ package epic.parser
  limitations under the License.
 */
 
-import nak.inference.Factor
+import epic.inference.Factor
 import epic.lexicon.Lexicon
 import epic.constraints.{TagConstraints, ChartConstraints}
 import breeze.numerics.logI

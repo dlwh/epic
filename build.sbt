@@ -31,7 +31,6 @@ lazy val commonSettings = Seq(
   libraryDependencies ++= Seq(
     Library.breeze,
     Library.breezeConfig,
-    Library.nak,
     Library.mapdb,
     Library.scalaLoggingSlf4j,
     Library.tikaParsers % "compile,optional",
