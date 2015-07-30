@@ -165,6 +165,7 @@ abstract class ProjectingChartDecoder[L, W](proj: ChartProjector[L, W]) extends 
  *
  * @author dlwh
  */
+@SerialVersionUID(3904281411822753993L)
 case class MaxRuleProductDecoder[L, W]() extends ProjectingChartDecoder[L, W](new AnchoredRuleMarginalProjector())
 
 /**
