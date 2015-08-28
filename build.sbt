@@ -27,7 +27,7 @@ lazy val commonSettings = Seq(
   organization := "org.scalanlp",
   version := "0.4-SNAPSHOT",
   scalaVersion := Version.scala,
-  crossScalaVersions := Seq("2.11.6", "2.10.4"),
+  crossScalaVersions := Seq("2.11.7", "2.10.4"),
   libraryDependencies ++= Seq(
     Library.breeze,
     Library.breezeConfig,
