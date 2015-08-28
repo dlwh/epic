@@ -74,7 +74,7 @@ lazy val commonSettings = Seq(
       Seq.empty
       })
 
-  ) ++ assemblySettings ++ osgiSettings ++ sbtjflex.SbtJFlexPlugin.jflexSettings ++ net.virtualvoid.sbt.graph.Plugin.graphSettings ++
+  ) ++ assemblySettings ++ sbtjflex.SbtJFlexPlugin.jflexSettings ++ net.virtualvoid.sbt.graph.Plugin.graphSettings ++
   IndexedSeq (
       mergeStrategy in assembly <<= (mergeStrategy in assembly) { (old) =>
         {
@@ -94,8 +94,9 @@ lazy val core = project
   .in(file("."))
   .settings(commonSettings: _*)
   .settings(
-    name := "epic",
-    OsgiKeys.privatePackage := Seq(),
-    OsgiKeys.importPackage := Seq("org.apache.tika.*; resolution:=optional", "*"),
-    OsgiKeys.exportPackage := Seq("epic.*")
+    name := "epic"
+    //,
+    //OsgiKeys.privatePackage := Seq(),
+    //OsgiKeys.importPackage := Seq("org.apache.tika.*; resolution:=optional", "*"),
+    //OsgiKeys.exportPackage := Seq("epic.*")
   )
