@@ -48,8 +48,8 @@ object TreebankTokenizer extends TreebankTokenizer {
     for(t <- toks) t match {
       case "“" => inOpenQuote = true; output += "``"
       case "‘" => inOpenQuote = true; output += "`"
-      case "’" => inOpenQuote = false; output += "`"
-      case "”" => inOpenQuote = false; output += "``"
+      case "’" => inOpenQuote = false; output += "'"
+      case "”" => inOpenQuote = false; output += "''"
       case "\"" if inOpenQuote => inOpenQuote = false; output += "''"
       case "\"" => inOpenQuote = true; output += "``"
       case _ => output += treebankMappings.getOrElse(t, t)
