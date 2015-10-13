@@ -11,7 +11,7 @@ class AdadeltaGradientDescentDVD(maxIter: Int,
                               tolerance: Double = 1E-5,
                               improvementTolerance: Double = 1E-4,
                               minImprovementWindow: Int = 50)
-    extends StochasticGradientDescent[DenseVector[Double]](1.0, maxIter, tolerance, improvementTolerance, minImprovementWindow) {
+    extends StochasticGradientDescent[DenseVector[Double]](1.0, maxIter, tolerance, minImprovementWindow) {
 
   val delta = 1E-4
   val epsilon = 1e-6
