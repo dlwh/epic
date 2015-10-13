@@ -356,7 +356,9 @@ object CRF {
         backPointer(i)(next) = currentArgMax
       }
     }
+
     val tags = ArrayBuffer[L]()
+
     def rec(end: Int, label: Int) {
       tags += scorer.labelIndex.get(label)
       if(end > 0) {
@@ -366,6 +368,7 @@ object CRF {
 
     }
     rec(length-1, (0 until numLabels).maxBy(forwardScores(length)(_)))
+    assert(tags.length == scorer.words.length, tags.reverse + " " + scorer.words)
 
     TaggedSequence(tags.reverse, scorer.words, id)
   }
