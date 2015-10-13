@@ -1,4 +1,3 @@
-import AssemblyKeys._
 import sbt.Keys._
 import Version._
 import com.typesafe.sbt.osgi.SbtOsgi._
@@ -19,7 +18,7 @@ lazy val extra = <url>http://scalanlp.org/</url>
     <developer>
       <id>dlwh</id>
       <name>David Hall</name>
-      <url>http://cs.berkeley.edu/~dlwh/</url>
+      <url>http://www.dlwh.org/</url>
     </developer>
   </developers>;
 
@@ -74,7 +73,7 @@ lazy val commonSettings = Seq(
       Seq.empty
       })
 
-  ) ++ assemblySettings ++ sbtjflex.SbtJFlexPlugin.jflexSettings ++ net.virtualvoid.sbt.graph.Plugin.graphSettings ++
+  ) ++ sbtjflex.SbtJFlexPlugin.jflexSettings ++ net.virtualvoid.sbt.graph.Plugin.graphSettings ++
   IndexedSeq (
       mergeStrategy in assembly <<= (mergeStrategy in assembly) { (old) =>
         {
@@ -90,7 +89,7 @@ lazy val commonSettings = Seq(
 
 
 
-lazy val core = project
+lazy val epicCore = project
   .in(file("."))
   .settings(commonSettings: _*)
   .settings(
