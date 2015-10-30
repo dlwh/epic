@@ -1,14 +1,16 @@
 package epic.sentiment
 
 import java.io.File
+import breeze.config.Help
 import breeze.config.CommandLineParser
 import epic.trees._
-import epic.parser.models.{ParserInference, ParserModel}
+import epic.parser.models._
 import epic.parser._
 import breeze.linalg._
 import epic.framework._
 import epic.constraints.{LabeledSpanConstraints, SpanConstraints, ChartConstraints}
-import breeze.optimize.CachedBatchDiffFunction
+import breeze.optimize._
+import breeze.optimize.FirstOrderMinimizer.OptParams
 import com.typesafe.scalalogging.slf4j.LazyLogging
 import epic.parser.models.SpanModelFactory
 import epic.trees.ProcessedTreebank
@@ -18,6 +20,7 @@ import epic.trees.Span
 import scala.collection.mutable.HashMap
 import breeze.util._
 import epic.parser.models.ParserExtractableModelFactory
+import epic.dense.AdadeltaGradientDescentDVD
 
 /**
  *
@@ -25,14 +28,23 @@ import epic.parser.models.ParserExtractableModelFactory
  * @author dlwh
  */
 object SentimentTreebankPipeline extends LazyLogging {
-  case class Options(path: File,
+  case class Options(@Help(text="Treebank path")
+                     path: File,
+                     @Help(text="Name for the model")
+                     name: String = "SentiParser",
                      opt: OptParams,
                      lossType: String = "",
-                     iterPerEval: Int = 100,
+                     iterationsPerEval: Int = 50,
+                     @Help(text="How many iterations to run.")
+                     maxIterations: Int = 202,
                      evalOnTest: Boolean = false,
+                     @Help(text="Evaluate on test as well; this is so we can pick the best held-out score and evaluate that on test")
+                     alsoEvalOnTest: Boolean = false,
                      includeDevInTrain: Boolean = false,
-                     modelFactory: ParserExtractableModelFactory[AnnotatedLabel, String] = new SpanModelFactory,
-                     rootLossScaling: Double = 1.0)
+                     @Help(text="Details about the parser to build")
+                     modelFactory: SpanModelFactory = new SpanModelFactory,
+                     rootLossScaling: Double = 1.0,
+                     computeTrainLL: Boolean = false)
 
 
   def main(args: Array[String]):Unit = {
@@ -82,25 +94,26 @@ object SentimentTreebankPipeline extends LazyLogging {
     val cachedObj = new CachedBatchDiffFunction(obj)
     val init = obj.initialWeightVector(true)
 
-    val name = "SentiParser"
-
-    for ((state, iter) <- params.opt.iterations(cachedObj, init).take(1000).zipWithIndex
-         if iter % params.iterPerEval == 0) try {
+    val itr = params.opt.iterations(cachedObj, init)
+    
+    val name = params.name
+    for ((state, iter) <- itr.take(params.maxIterations).zipWithIndex
+         if iter % params.iterationsPerEval == 0) try {
       val parser = model.extractParser(state.x).copy(decoder=new MaxConstituentDecoder[AnnotatedLabel, String])
 //      if(params.evalOnTest)
 //        println("Eval: " + evaluate(s"$name-$iter", parser, treebank.testTrees))
 //      else
 //        println("Eval: " + evaluate(s"$name-$iter", parser, treebank.devTrees))
-      if(params.evalOnTest) {
+      if (params.computeTrainLL) {
+        computeLL(trainTrees, model, state.x)
+      }
+      if (params.evalOnTest) {
         println("NORMAL DECODE: Eval: " + evaluate(s"$name-$iter", parser, treebank.testTrees, DecodeType.Normal));
       } else {
-        println("Span confusions");
-        println(renderArr(evaluateSpanConfusions(s"$name-$iter", parser, treebank.devTrees, DecodeType.Normal)));
-        println("Root confusions");
-        println(renderArr(evaluateRootConfusions(s"$name-$iter", parser, treebank.devTrees, DecodeType.Normal)));
         println("NORMAL DECODE: Eval: " + evaluate(s"$name-$iter", parser, treebank.devTrees, DecodeType.Normal));
-        println("TERNARY DECODE: Eval: " + evaluate(s"$name-$iter", parser, treebank.devTrees, DecodeType.Ternary));
-//        println("BINARY DECODE: Eval: " + evaluateBetter(s"$name-$iter", parser, treebank.devTrees, DecodeType.Binary));
+        if (params.alsoEvalOnTest) {
+          println("TEST SET: Eval: " + evaluate(s"$name-$iter", parser, treebank.testTrees, DecodeType.Normal));
+        }
       }
     } catch {
       case e: Exception => e.printStackTrace(); throw e
@@ -162,37 +175,26 @@ object SentimentTreebankPipeline extends LazyLogging {
                          spansRightTernary: Int, // denom is same as numSpans
                          spansRightBinary: Int,
                          numBinarySpans: Int,
-                         numBinarySpansSocher: Int,
                          rootsRight: Int,
                          numRoots: Int,
                          rootsRightTernary: Int, // denom is same as numSpans
                          rootsRightBinary: Int,
-                         numBinaryRoots: Int,
-                         numBinaryRootsSocher: Int) {
+                         numBinaryRoots: Int) {
     def +(stats: Stats) = Stats(spansRight + stats.spansRight,
                                             numSpans + stats.numSpans,
                                             spansRightTernary + stats.spansRightTernary,
                                             spansRightBinary + stats.spansRightBinary,
                                             numBinarySpans + stats.numBinarySpans,
-                                            numBinarySpansSocher + stats.numBinarySpansSocher,
                                             rootsRight + stats.rootsRight,
                                             numRoots + stats.numRoots,
                                             rootsRightTernary + stats.rootsRightTernary,
                                             rootsRightBinary + stats.rootsRightBinary,
-                                            numBinaryRoots + stats.numBinaryRoots,
-                                            numBinaryRootsSocher + stats.numBinaryRootsSocher);
+                                            numBinaryRoots + stats.numBinaryRoots);
 
     
     override def toString = {
-      val render: (Int, Int) => String = SentimentEvaluator.renderNumerDenom;
-      "Spans: " + render(spansRight, numSpans) + "\n" +
-                    "  Ternary: " + render(spansRightTernary, numSpans) + "\n" +
-//                    "  Binary: " + render(spansRightBinary, numBinarySpans) + "\n" +
-//                    "  Binary (Socher): " + render(spansRightBinary, numBinarySpansSocher) + "\n" +
-                    "Roots: " + render(rootsRight, numRoots) + "\n" +
-                    "  Ternary: " + render(rootsRightTernary, numRoots) + "\n";
-//                    "  Binary: " + render(rootsRightBinary, numBinaryRoots) + "\n" +
-//                    "  Binary (Socher): " + render(rootsRightBinary, numBinaryRootsSocher);
+      "Spans: " + SentimentEvaluator.renderNumerDenom(spansRight, numSpans) + " (Ternary: " + SentimentEvaluator.renderNumerDenom(spansRightTernary, numSpans) +
+      "), Roots: " + SentimentEvaluator.renderNumerDenom(rootsRight, numRoots) + " (Ternary: " + SentimentEvaluator.renderNumerDenom(rootsRightTernary, numRoots) + ")";
     }
       
                                             
@@ -250,7 +252,6 @@ object SentimentTreebankPipeline extends LazyLogging {
       var spansRightTernary = 0;
       var spansRightBinary = 0;
       var numBinarySpans = 0;
-      var numBinarySpansSocher = 0;
       for ((gLabel, gSpan) <- gold) {
         val pLabel = guessMap(gSpan);
         spansRight += (if (SentimentEvaluator.isCorrectNormal(gLabel, pLabel)) 1 else 0);
@@ -258,23 +259,26 @@ object SentimentTreebankPipeline extends LazyLogging {
         spansRightTernary += (if (SentimentEvaluator.isCorrectTernary(gLabel, pLabel)) 1 else 0);
         spansRightBinary += (if (SentimentEvaluator.isUsedBinaryCoarse(gLabel, pLabel) && SentimentEvaluator.isCorrectBinary(gLabel, pLabel)) 1 else 0);
         numBinarySpans += (if (SentimentEvaluator.isUsedBinaryCoarse(gLabel, pLabel)) 1 else 0);
-        numBinarySpansSocher += (if (SentimentEvaluator.isUsedSocherCoarse(gLabel, pLabel)) 1 else 0);
       }
       val rootsRight = (if (SentimentEvaluator.isCorrectNormal(goldRoot, guessRoot)) 1 else 0);
       val numRoots = 1;
       val rootsRightTernary = if (SentimentEvaluator.isCorrectTernary(goldRoot, guessRoot)) 1 else 0;
       val rootsRightBinary = (if (SentimentEvaluator.isUsedBinaryCoarse(goldRoot, guessRoot) && SentimentEvaluator.isCorrectBinary(goldRoot, guessRoot)) 1 else 0);
       val numBinaryRoots = (if (SentimentEvaluator.isUsedBinaryCoarse(goldRoot, guessRoot)) 1 else 0);
-      val numBinaryRootsSocher = (if (SentimentEvaluator.isUsedSocherCoarse(goldRoot, guessRoot)) 1 else 0);
-      Stats(spansRight, numSpans, spansRightTernary, spansRightBinary, numBinarySpans, numBinarySpansSocher,
-                  rootsRight, numRoots, rootsRightTernary, rootsRightBinary, numBinaryRoots, numBinaryRootsSocher)
+      Stats(spansRight, numSpans, spansRightTernary, spansRightBinary, numBinarySpans,
+                  rootsRight, numRoots, rootsRightTernary, rootsRightBinary, numBinaryRoots)
     }.reduce(_+_);
   }
 
   def decode(tree: BinarizedTree[Unit], marginal: ParseMarginal[AnnotatedLabel, String], decodeType: DecodeType) = {
     val (topMarg, botMarg) = marginal.labelMarginals
     tree.extend { t =>
-      val summed = topMarg(t.begin, t.end)
+      val summed = if (t.begin == 0 && t.end == tree.end) {
+        botMarg(t.begin, t.end)
+      } else {
+        // Elsewhere, use the top chart
+        topMarg(t.begin, t.end)
+      }
       if(decodeType == Binary) {
         val neg = (summed(AnnotatedLabel("0")) + summed(AnnotatedLabel("1")) )
         val pos = (summed(AnnotatedLabel("3")) + summed(AnnotatedLabel("4")) )
@@ -299,6 +303,22 @@ object SentimentTreebankPipeline extends LazyLogging {
         summed.argmax
       }
     }
+  }
+  
+  
+  def computeLL(trainTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]], model: SpanModel[AnnotatedLabel,AnnotatedLabel,String], weights: DenseVector[Double]) {
+    println("Computing final log likelihood on the whole training set...")
+    val inf = model.inferenceFromWeights(weights)
+    val ll = trainTrees.par.aggregate(0.0)((currLL, trainTree) => { 
+      try {
+        val s = inf.scorer(trainTree)
+        currLL + inf.goldMarginal(s, trainTree).logPartition - inf.marginal(s, trainTree).logPartition
+      } catch {
+        case e: Exception => println("Couldn't parse")
+        currLL
+      }
+    }, _ + _)
+    println("Log likelihood on " + trainTrees.size + " examples: " + ll)
   }
 
 }

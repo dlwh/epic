@@ -69,6 +69,15 @@ case class ExtraPNMParams(@Help(text="Used for ablations with random word embedd
                           @Help(text="Set unknown word vectors to be random rather than 0")
                           randomizeUnks: Boolean = false)
                           
+case class ExtraPNMSparseParams(@Help(text="Use n-gram features in the sparse featurizer (good for sentiment)")
+                                useNGrams: Boolean = false,
+                                @Help(text="Max order of n-grams to use in these features")
+                                maxNGramOrder:Int = 2,
+                                @Help(text="Count threshold for firing n-gram features")
+                                ngramCountThreshold: Int = 1,
+                                @Help(text="Additional span shape features based on tags")
+                                useTagSpanShape: Boolean = false)
+                          
 case class PositionalNeuralModelFactory(@Help(text=
                               """The kind of annotation to do on the refined grammar. Default uses just parent annotation.
 You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Manning 2003.
@@ -98,7 +107,8 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
                             vocFile: String = "",
                             @Help(text="Set to true if your word vectors are all lowercase. Otherwise true case is used.")
                             lowercasedVectors: Boolean = false,
-                            extraPNMParams: ExtraPNMParams = ExtraPNMParams()) extends ParserModelFactory[AnnotatedLabel, String] {
+                            extraPNMParams: ExtraPNMParams = ExtraPNMParams(),
+                            extraPNMSparseParams: ExtraPNMSparseParams = ExtraPNMSparseParams()) extends ParserModelFactory[AnnotatedLabel, String] {
   
   type MyModel = PositionalNeuralModel[AnnotatedLabel, AnnotatedLabel, String]
 
@@ -109,6 +119,7 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
                     lexicon: Lexicon[AnnotatedLabel, String],
                     constrainer: ChartConstraints.Factory[AnnotatedLabel, String]): MyModel = {
     import extraPNMParams._
+    import extraPNMSparseParams._
     val annTrees: IndexedSeq[TreeInstance[AnnotatedLabel, String]] = trainTrees.map(annotator(_))
     println("Here's what the annotation looks like on the first few trees")
     annTrees.slice(0, Math.min(3, annTrees.size)).foreach(tree => println(tree.render(false)))
@@ -198,6 +209,12 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
       var wf = SpanModelFactory.defaultPOSFeaturizer(annWords, useBrown = useSparseBrown)
       var span = SpanModelFactory.goodFeaturizer(annWords, commonWordThreshold, useShape = false, useLfsuf = useSparseLfsuf, useBrown = useSparseBrown, useMostSparseIndicators = useMostSparseIndicators)
       span += new SingleWordSpanFeaturizer[String](wf)
+      if (useNGrams) {
+        span += new NGramSpanFeaturizer(summedWordCounts, NGramSpanFeaturizer.countBigrams(annTrees), annTrees.map(_.words), ngramCountThreshold, maxNGramOrder, useNot = false)
+      }
+      if (useTagSpanShape) {
+        span += new TagSpanShapeFeaturizer(TagSpanShapeGenerator.makeBaseLexicon(trainTrees))
+      }
       val indexedWord = IndexedWordFeaturizer.fromData(wf, annTrees.map{_.words}, deduplicateFeatures = false)
       val indexedSurface = IndexedSplitSpanFeaturizer.fromData(span, annTrees, bloomFilter = false)
       
