@@ -367,11 +367,23 @@ object MLSentenceSegmenter {
                                       id: String,
                                       context: String) extends Example[Boolean, Array[Feature]]
 
+  implicit class addIndicesWhere(private val __str: String) extends AnyVal {
+    def indicesWhere(f: Char=>Boolean) = (0 until __str.length).filter(i => f(__str.charAt(i)))
+
+  }
+
+  def instancesAtPeriods(str: String) = str -> str.indicesWhere(_ == '.')
+
+  val extraExamples = IndexedSeq (
+    instancesAtPeriods("Hello to you.Let's go outside."),
+    instancesAtPeriods("Among the items up for sale: the Singer sewing machine the embattled domestic diva used to sew her own wedding dress back in 1961. He also hocked the double boiler.")
+  )
+
   def main(args: Array[String]):Unit = {
     val mascDir = new File(args(0))
 
 
-    val sentenceBoundaryProblems = for(dir <- new File(new File(mascDir,"data"), "written").listFiles()
+    var sentenceBoundaryProblems = for(dir <- new File(new File(mascDir,"data"), "written").listFiles()
         if !dir.toString.contains("twitter") && dir.isDirectory;
         f <- dir.listFiles(new FilenameFilter {
       override def accept(dir: File, name: String): Boolean = name.endsWith(".txt")
@@ -404,6 +416,29 @@ object MLSentenceSegmenter {
     }
 
 
+    val extraInstances = {
+      for ( (text, goldPoints) <- extraExamples) yield {
+        val guessPoints: IndexedSeq[Int] = potentialSentenceBoundariesIterator(text).toIndexedSeq
+        for (guess <- guessPoints) yield {
+          val contextBegin = math.max(0, guess - 50)
+          val contextEnd = math.min(text.length, guess + 50)
+          val context =   if(guess != text.length) {
+            text.substring(contextBegin, guess) + "[[" + text.charAt(guess) + "]]" +  text.substring(guess + 1, contextEnd)
+          } else {
+            text.substring(contextBegin, guess) + "[[]]"
+          }
+
+          SentenceDecisionInstance(goldPoints.contains(guess),
+            featuresForEndPointDetection(text, guess),
+            s"$text:$guess", context)
+
+        }
+
+      }
+    }
+
+    sentenceBoundaryProblems ++= extraInstances
+
     val allProbs = sentenceBoundaryProblems.flatten
     val perm = RandBasis.mt0.permutation(allProbs.length).draw()
     val (dev, train) = perm.map(allProbs).splitAt(1000)
@@ -426,6 +461,8 @@ object MLSentenceSegmenter {
     evalDev(inf, train, decoded)
     println("Dev")
     evalDev(inf, dev, decoded)
+    println("Special")
+    evalDev(inf, extraInstances.flatten, decoded)
 
 
     val segmenter: MLSentenceSegmenter = new MLSentenceSegmenter(inf)
@@ -442,9 +479,10 @@ object MLSentenceSegmenter {
       if(inst.label != inf.classify(inst.features)) {
         val weights = (inst.features.toIndexedSeq.map( f => f -> decoded(f)))
         val sum: Double = weights.map(_._2).sum
+        println("===========")
         println(inst.label, inst.id, sum)
         println(inst.context)
-        println(weights.sortBy(_._2), sum)
+        println(weights.sortBy(-_._2.abs).scanLeft(null: Any, 0.0, 0.0){ (acc, z) => (z._1, z._2, z._2 + acc._2)}.drop(1), sum)
         wrong += 1
         if (inst.label) {
           fN += 1
@@ -463,7 +501,7 @@ object MLSentenceSegmenter {
 
     println(s"prec: ${tP * 1.0 / (tP + fP)} rec: ${tP * 1.0 / (tP + fN)}, $tP $tN $fP $fN")
 
-    println(s"$right $wrong... ${right * 1.0 / (right + wrong)}")
+    println(s"Accuracy: $right $wrong... ${right * 1.0 / (right + wrong)}")
   }
 
   def printOutSentenceBoundaries(text: String, guessPoints: Set[Int], goldPoints: Set[Int]): Unit = {
