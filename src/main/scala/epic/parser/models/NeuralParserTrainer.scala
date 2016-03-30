@@ -158,7 +158,7 @@ object NeuralParserTrainer extends epic.parser.ParserPipeline with LazyLogging {
       val scanningBatchesObj = cachedObj.withScanningBatches(params.opt.batchSize)
       if (useAdadelta) {
         println("OPTIMIZATION: Adadelta")
-        new AdadeltaGradientDescentDVD(params.opt.maxIterations, momentum).iterations(scanningBatchesObj, init).
+        new AdadeltaGradientDescentDVD(params.opt.maxIterations, momentum, tolerance = 0, minImprovementWindow = 1).iterations(scanningBatchesObj, init).
             asInstanceOf[Iterator[FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State]]
       } else {
         println("OPTIMIZATION: Adagrad")
@@ -167,7 +167,7 @@ object NeuralParserTrainer extends epic.parser.ParserPipeline with LazyLogging {
     } else {
       if (useAdadelta) {
         println("OPTIMIZATION: Adadelta")
-        new AdadeltaGradientDescentDVD(params.opt.maxIterations, momentum).iterations(cachedObj.withRandomBatches(params.opt.batchSize), init).
+        new AdadeltaGradientDescentDVD(params.opt.maxIterations, momentum, tolerance = 0, minImprovementWindow = 1).iterations(cachedObj.withRandomBatches(params.opt.batchSize), init).
             asInstanceOf[Iterator[FirstOrderMinimizer[DenseVector[Double], BatchDiffFunction[DenseVector[Double]]]#State]]
       } else {
         println("OPTIMIZATION: Adagrad")
