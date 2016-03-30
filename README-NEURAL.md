@@ -56,10 +56,6 @@ You can download the ```neuralcrf.parser``` model from:
 
 http://nlp.cs.berkeley.edu/projects/neuralcrf.shtml
 
-Due to modifications to the code for the system release and randomness in the
-training process, this model performs slightly worse than reported in the paper
-(90.9 on WSJ Section 23).
-
 To train a new parser as described in the neural CRF paper, run the following command
 (note that you need to fill in paths for -cp, --treebank.path, and --word2vecPath):
 
