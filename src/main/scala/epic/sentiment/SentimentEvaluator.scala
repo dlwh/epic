@@ -77,7 +77,6 @@ object SentimentEvaluator {
     println("Accuracy: " + accuracy(mat, isCorrectNormal, isUsedAlways)); // agrees with the Stanford system's way of combining the matrix
     println("Ternary: " + accuracy(mat, isCorrectTernary, isUsedAlways));
     println("Binary: " + accuracy(mat, isCorrectBinary, isUsedBinaryCoarse));
-    println("Socher binary: " + accuracy(mat, isCorrectBinary, isUsedSocherCoarse)); // agrees with the Stanford system's way of combining the matrix
   }
   
   def accuracy(mat: Array[Array[Int]]) = {
@@ -102,7 +101,6 @@ object SentimentEvaluator {
   
   def isUsedAlways(gold: Int, guess: Int) = true;
   def isUsedBinaryCoarse(gold: Int, guess: Int) = gold != 2;
-  def isUsedSocherCoarse(gold: Int, guess: Int) = gold != 2 && guess != 2;
   
 //  def ternaryCoarseEval(mat: Array[Array[Int]]) = {
 //    val numer = mat(0)(0) + mat(0)(1) + mat(1)(0) + mat(1)(1) + mat(2)(2) + mat(3)(3) + mat(3)(4) + mat(4)(3) + mat(4)(4); 

@@ -315,9 +315,10 @@ object IndexedSpanFeaturizer {
 
   
 case class ExtraParams(useHackyLexicalFeatures:Boolean = false,
-                      hackyLexicalFeatureDesc:String = "",
-                      useMorph:Boolean = false,
-                      pathsToMorph:String = "")
+                       hackyLexicalFeatureDesc:String = "",
+                       useMorph:Boolean = false,
+                       useTagSpanShape:Boolean = false,
+                       pathsToMorph:String = "")
   
 case class SpanModelFactory(@Help(text=
                               """The kind of annotation to do on the refined grammar. Default uses just parent annotation.
@@ -388,8 +389,8 @@ You can also epic.trees.annotations.KMAnnotator to get more or less Klein and Ma
     if(useNGrams)
       span += ngramF
 
-//    if(useTagSpanShape)
-//      span += tagSpanShape
+    if(useTagSpanShape)
+      span += tagSpanShape
 
     if(useFullShape)
       span += fullShape

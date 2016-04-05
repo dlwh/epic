@@ -9,7 +9,6 @@ import breeze.optimize.StochasticGradientDescent
 class AdadeltaGradientDescentDVD(maxIter: Int,
                               rho: Double = 0.95,
                               tolerance: Double = 1E-5,
-                              improvementTolerance: Double = 1E-4,
                               minImprovementWindow: Int = 50)
     extends StochasticGradientDescent[DenseVector[Double]](1.0, maxIter, tolerance, minImprovementWindow) {
 
