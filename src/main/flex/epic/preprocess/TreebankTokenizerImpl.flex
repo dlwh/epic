@@ -130,6 +130,8 @@ EMDASH = (--|---|[\u2014\u2015\u2e3a\u2e3b\ufe58]+)
 
 DASH = ([\-\u2011\u2012\u2013\u2e1a\ufe63\uff0d])
 
+SLASH = [⁄∕／/]
+
 
 // url
 
@@ -235,7 +237,7 @@ FLit3    = [0-9]+
 Exponent = [eE] [+-]? [0-9]+
 
 // punctuation
-P	         = ("_"|"-"|"/"|"."|",")
+P	         = ("_"|"-"|"."|",")
 
 Q = [’'`]
 
@@ -289,6 +291,11 @@ ABBR = ({ABBR_TITLE}|{ABBR_GEN})
 %%
 
 
+// dates and fractions
+[:digit:]+ / {SLASH}                              { return currentToken(); }
+{SLASH} / [:digit:]                              { return  currentToken(); }
+
+
 <POLISH_CONDITIONAL_MODE>{POLISH_CONDITIONAL_CLITIC} / {POLISH_CONDITIONAL_ENDING}                                      { yybegin(YYINITIAL); return currentToken(); }
 <POLISH_CONDITIONAL_MODE>[^b].                                        { throw new RuntimeException("..." + currentToken());}
 {EMDASH}                                                 {return currentToken();}
@@ -325,6 +332,7 @@ d{Q} / ye                                                        {return current
 
 // times
 [01]?[0-9]{WHITESPACE}?:[0-6][0-9]                              { return currentToken(currentToken()._2().token().replaceAll("\\s+","")); }
+
 
 // quotes
 <YYINITIAL>\"/{WHITESPACE}*{ALPHANUM}              { yybegin(OPEN_QUOTE); return currentToken("``"); }
