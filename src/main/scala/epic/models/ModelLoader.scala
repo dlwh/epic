@@ -18,7 +18,7 @@ trait ModelLoader[+T] { outer =>
 abstract class ClassPathModelLoader[+T](modelPath: String = "model.ser.gz") extends ModelLoader[T] {
   def load() = {
     val input = this.getClass.getResourceAsStream(modelPath)
-    val gzipin = breeze.util.nonstupidObjectInputStream(new BufferedInputStream(new GZIPInputStream(input)))
+    val gzipin = breeze.util.nonstupidObjectInputStream(new BufferedInputStream(new GZIPInputStream(input)), ignoreSerialVersionUID = true)
     try {
       gzipin.readObject().asInstanceOf[T]
     } finally {

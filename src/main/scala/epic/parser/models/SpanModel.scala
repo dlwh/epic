@@ -313,7 +313,8 @@ object IndexedSpanFeaturizer {
   }
 }
 
-  
+
+@SerialVersionUID(-155022487059445275L)
 case class ExtraParams(useHackyLexicalFeatures:Boolean = false,
                        hackyLexicalFeatureDesc:String = "",
                        useMorph:Boolean = false,
